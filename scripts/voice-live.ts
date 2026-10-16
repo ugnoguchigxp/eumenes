@@ -74,8 +74,13 @@ try {
 	let turn = await client.voiceTurn(utteranceId);
 	while (
 		Date.now() < deadline &&
-		["recognizing", "responding", "synthesizing"].includes(turn.status)
+		["recognizing", "input_ready", "responding", "synthesizing"].includes(
+			turn.status,
+		)
 	) {
+		// The transcript waits for the client to send it, as the Web does when the speaker is idle.
+		if (turn.status === "input_ready")
+			await client.voiceCommit(utteranceId, turn.revision);
 		await Bun.sleep(250);
 		turn = await client.voiceTurn(utteranceId);
 	}

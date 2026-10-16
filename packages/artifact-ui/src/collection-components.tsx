@@ -3,11 +3,12 @@ import {
 	ConfirmModal,
 	Input,
 	Modal,
-	ServerDataTable,
 	Textarea,
 	type ServerDataTableProps,
 } from "@eumenes/design-system";
-import { useEffect, useId, useRef, useState } from "react";
+import { Fragment, useEffect, useId, useRef, useState } from "react";
+import { CollectionTable } from "./collection-table";
+import { CollectionIndicator } from "./collection-indicator";
 import type { ArtifactRequest } from "./contracts";
 import type {
 	CollectionFormField,
@@ -17,6 +18,7 @@ import type {
 } from "./collection-contracts";
 import { useAction } from "./components";
 import { useArtifactRuntime } from "./runtime";
+import { useInputStatus } from "./input-status";
 
 type Row = CollectionRow;
 type Pending = {
@@ -92,6 +94,80 @@ function tableColumns(
 				]
 			: []),
 	];
+}
+
+function CollectionDetail({
+	data,
+	row,
+}: {
+	data: CollectionResource;
+	row: Row;
+}) {
+	return (
+		<dl>
+			{data.columns.map((column) => (
+				<Fragment key={column.key}>
+					<dt>{column.label}</dt>
+					<dd>
+						{column.media ? (
+							<MediaValue row={row} column={column.key} />
+						) : (
+							row.cells[column.key]
+						)}
+					</dd>
+				</Fragment>
+			))}
+		</dl>
+	);
+}
+
+function CollectionPlainTable({
+	data,
+	label,
+	busy,
+	onAct,
+}: {
+	data: CollectionResource;
+	label: string;
+	busy: boolean;
+	onAct: (row: Row, action: CollectionRowAction) => void;
+}) {
+	return (
+		<table aria-label={label}>
+			<thead>
+				<tr>
+					{data.columns.map((column) => (
+						<th key={column.key} scope="col">
+							{column.label}
+						</th>
+					))}
+					{data.rows.some((row) => row.actions.length) && (
+						<th scope="col">操作</th>
+					)}
+				</tr>
+			</thead>
+			<tbody>
+				{data.rows.map((row) => (
+					<tr key={row.id}>
+						{data.columns.map((column) => (
+							<td key={column.key}>
+								{column.media ? (
+									<MediaValue row={row} column={column.key} />
+								) : (
+									row.cells[column.key]
+								)}
+							</td>
+						))}
+						{row.actions.length > 0 && (
+							<td>
+								<RowActions row={row} disabled={busy} onAct={onAct} />
+							</td>
+						)}
+					</tr>
+				))}
+			</tbody>
+		</table>
+	);
 }
 
 function RowActions({
@@ -191,6 +267,7 @@ function CollectionForm({
 	fields,
 	initial: start,
 	busy,
+	draft = false,
 	notice,
 	onSubmit,
 }: {
@@ -201,10 +278,12 @@ function CollectionForm({
 	fields: CollectionFormField[];
 	initial?: Record<string, string | boolean>;
 	busy: boolean;
+	draft?: boolean;
 	onSubmit: (values: Record<string, string | boolean>) => Promise<boolean>;
 }) {
 	const runtime = useArtifactRuntime();
 	const prefix = useId();
+	const reportEditing = useInputStatus(source, prefix);
 	const uploadGeneration = useRef(0);
 	const [uploading, setUploading] = useState(false);
 	const [uploadError, setUploadError] = useState("");
@@ -226,6 +305,14 @@ function CollectionForm({
 			]),
 		) as Record<string, string | boolean>;
 	const [values, setValues] = useState(initial);
+	const edited = JSON.stringify(values) !== JSON.stringify(initial());
+	useEffect(() => {
+		reportEditing(
+			draft && edited
+				? `「${label}」に入力中の内容があります。先に「${label}」を押して下書きに追加してください。`
+				: null,
+		);
+	}, [draft, edited, label, reportEditing]);
 	const set = (id: string, value: string | boolean) =>
 		setValues((old) => ({ ...old, [id]: value }));
 	const input = (field: CollectionFormField) => {
@@ -338,6 +425,12 @@ function CollectionForm({
 				});
 			}}
 		>
+			{draft && (
+				<p>
+					① 入力して「{label}
+					」を押し、下書きに追加します。②「設定の変更をすべて保存」で保存します。
+				</p>
+			)}
 			{fields
 				.filter(
 					(field) =>
@@ -369,11 +462,25 @@ export function CollectionWorkspaceView({
 }) {
 	const action = useAction(request);
 	const data = action.resource;
+	const collectionRequest =
+		request.view === "collection-workspace" ? request : undefined;
 	const [pending, setPending] = useState<Pending | null>(null);
 	const [editing, setEditing] = useState<Editing | null>(null);
 	const [selectedId, setSelectedId] = useState<string | null>(null);
 	const [search, setSearch] = useState("");
 	if (data?.kind !== "collection") return null;
+	if (
+		request.view === "collection-workspace" &&
+		request.presentation === "indicator" &&
+		request.indicator
+	)
+		return (
+			<CollectionIndicator
+				data={data}
+				label={request.title ?? data.title ?? "状態"}
+				indicator={request.indicator}
+			/>
+		);
 	const catalog =
 		request.view === "collection-workspace" &&
 		request.presentation === "catalog" &&
@@ -382,6 +489,9 @@ export function CollectionWorkspaceView({
 		request.view === "collection-workspace" &&
 		request.presentation === "summary" &&
 		!data.paging;
+	const table =
+		request.view === "collection-workspace" && request.presentation === "table";
+	const tableKeys = collectionRequest?.tableColumns;
 	const foundRows = data.rows.filter((row) =>
 		Object.values(row.cells).some((value) =>
 			value.toLocaleLowerCase().includes(search.toLocaleLowerCase()),
@@ -409,7 +519,16 @@ export function CollectionWorkspaceView({
 				...(chosen.guard ? { guard: chosen.guard } : {}),
 			});
 	};
-	const columns = tableColumns(data, busy, act);
+	const columns = tableColumns(
+		{
+			...data,
+			columns: data.columns.filter(
+				(c) => !tableKeys || tableKeys.includes(c.key),
+			),
+		},
+		busy,
+		act,
+	);
 	return (
 		<section
 			className="aui-stack aui-collection-workspace"
@@ -513,16 +632,23 @@ export function CollectionWorkspaceView({
 						)}
 					</div>
 				</div>
-			) : data.paging ? (
-				<ServerDataTable
+			) : table || data.paging ? (
+				<CollectionTable
+					data={data}
 					label={data.title ?? request.title ?? "一覧"}
-					rows={data.rows}
 					columns={columns}
-					query={data.paging}
-					total={data.total}
 					busy={busy}
 					error={data.error}
-					emptyMessage={data.emptyMessage}
+					emptyMessage={
+						data.emptyMessage ??
+						(data.paging ? undefined : "項目はありません。")
+					}
+					detailMode={collectionRequest?.detailMode}
+					detail={
+						collectionRequest?.detailMode
+							? (row) => <CollectionDetail data={data} row={row} />
+							: undefined
+					}
 					onQuery={(query) =>
 						void action.send("collection-page", {
 							pageIndex: String(query.pageIndex),
@@ -534,50 +660,27 @@ export function CollectionWorkspaceView({
 					}
 				/>
 			) : (
-				<table aria-label={data.title ?? request.title ?? "一覧"}>
-					<thead>
-						<tr>
-							{data.columns.map((column) => (
-								<th key={column.key} scope="col">
-									{column.label}
-								</th>
-							))}
-							{data.rows.some((row) => row.actions.length) && (
-								<th scope="col">操作</th>
-							)}
-						</tr>
-					</thead>
-					<tbody>
-						{data.rows.map((row) => (
-							<tr key={row.id}>
-								{data.columns.map((column) => (
-									<td key={column.key}>
-										{column.media ? (
-											<MediaValue row={row} column={column.key} />
-										) : (
-											row.cells[column.key]
-										)}
-									</td>
-								))}
-								{row.actions.length > 0 && (
-									<td>
-										<RowActions row={row} disabled={busy} onAct={act} />
-									</td>
-								)}
-							</tr>
-						))}
-					</tbody>
-				</table>
+				<CollectionPlainTable
+					data={data}
+					label={data.title ?? request.title ?? "一覧"}
+					busy={busy}
+					onAct={act}
+				/>
 			)}
-			{!data.paging && !catalog && !summary && data.rows.length === 0 && (
-				<p>{data.emptyMessage ?? "項目はありません。"}</p>
-			)}
-			{data.error && !data.paging && <p role="alert">{data.error}</p>}
+			{!data.paging &&
+				!catalog &&
+				!summary &&
+				!table &&
+				data.rows.length === 0 && (
+					<p>{data.emptyMessage ?? "項目はありません。"}</p>
+				)}
+			{data.error && !data.paging && !table && <p role="alert">{data.error}</p>}
 			{data.create && !catalog && (
 				<CollectionForm
 					source={action.source}
 					label={data.create.label}
 					fields={data.create.fields}
+					draft={data.create.draft}
 					busy={busy}
 					onSubmit={async (values) => {
 						const ok = await action.send("collection-create", {

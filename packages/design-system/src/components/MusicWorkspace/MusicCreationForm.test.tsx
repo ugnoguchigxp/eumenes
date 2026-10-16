@@ -17,12 +17,8 @@ it("selects multiple genres including orchestra, filters the catalogue and remov
 	const generate = vi.fn();
 	render(<MusicCreationForm onGenerate={generate} />);
 	expect(screen.getAllByRole("checkbox").length).toBeGreaterThan(60);
-	fireEvent.click(
-		screen.getByRole("checkbox", { name: "オーケストラ" }),
-	);
-	fireEvent.click(
-		screen.getByRole("checkbox", { name: "Ambient" }),
-	);
+	fireEvent.click(screen.getByRole("checkbox", { name: "オーケストラ" }));
+	fireEvent.click(screen.getByRole("checkbox", { name: "Ambient" }));
 	expect(prompt().value).toContain("オーケストラ、Ambient");
 	fireEvent.change(screen.getByRole("textbox", { name: "ジャンルを探す" }), {
 		target: { value: "orch-not-found" },
@@ -39,16 +35,12 @@ it("selects multiple genres including orchestra, filters the catalogue and remov
 it("preserves a hand-written prompt, requires a decision on changed choices and allows restoring overwritten text", () => {
 	render(<MusicCreationForm onGenerate={vi.fn()} />);
 	fireEvent.change(prompt(), { target: { value: "手書きの曲の希望を残す" } });
-	fireEvent.click(
-		screen.getByRole("checkbox", { name: "ロック" }),
-	);
+	fireEvent.click(screen.getByRole("checkbox", { name: "ロック" }));
 	expect(prompt().value).toBe("手書きの曲の希望を残す");
 	expect(screen.getByRole("button", { name: "楽曲を生成" })).toBeDisabled();
 	fireEvent.click(screen.getByRole("button", { name: "編集内容を使う" }));
 	expect(prompt().value).toBe("手書きの曲の希望を残す");
-	fireEvent.click(
-		screen.getByRole("checkbox", { name: "ポップ" }),
-	);
+	fireEvent.click(screen.getByRole("checkbox", { name: "ポップ" }));
 	fireEvent.click(screen.getByRole("button", { name: "選択内容を反映" }));
 	expect(prompt().value).toContain("ロック、ポップ");
 	fireEvent.click(screen.getByRole("button", { name: "編集内容に戻す" }));
@@ -57,10 +49,9 @@ it("preserves a hand-written prompt, requires a decision on changed choices and 
 it("reflects vocal characteristics and exact lyric line breaks, and removes them when vocals are turned off", () => {
 	render(<MusicCreationForm onGenerate={vi.fn()} />);
 	fireEvent.click(screen.getByRole("checkbox", { name: "歌声を入れる" }));
-	fireEvent.change(
-		screen.getByRole("combobox", { name: "ボーカル" }),
-		{ target: { value: "女性ボーカル" } },
-	);
+	fireEvent.change(screen.getByRole("combobox", { name: "ボーカル" }), {
+		target: { value: "女性ボーカル" },
+	});
 	fireEvent.change(screen.getByRole("combobox", { name: "声の高さ" }), {
 		target: { value: "高め" },
 	});
@@ -103,7 +94,9 @@ it("uses registered choices and defaults when a screen supplies them", () => {
 	};
 	render(<MusicCreationForm options={options} onGenerate={vi.fn()} />);
 	expect(prompt().value).toContain("テンポ：ゆっくり");
-	expect(screen.getByRole("checkbox", { name: "和風アンビエント" })).toBeVisible();
+	expect(
+		screen.getByRole("checkbox", { name: "和風アンビエント" }),
+	).toBeVisible();
 	expect(screen.queryByRole("checkbox", { name: "オーケストラ" })).toBeNull();
 	fireEvent.click(screen.getByRole("checkbox", { name: "和風アンビエント" }));
 	expect(prompt().value).toContain("ジャンル：和風アンビエント");

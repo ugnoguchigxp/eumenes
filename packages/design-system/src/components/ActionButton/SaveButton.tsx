@@ -6,7 +6,7 @@ import { ActionButton, type ActionButtonProps } from "./ActionButton";
  * 保存ボタン
  */
 export const SaveButton: React.FC<ActionButtonProps> = ({
-	label = "Save",
+	label = "保存",
 	icon = Save,
 	variant = "default",
 	...props

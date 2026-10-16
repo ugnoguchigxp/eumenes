@@ -47,7 +47,7 @@ export function createStartTask(ctx: RuntimeContext, ops: TaskOps) {
 				originalRequest?: string;
 				urls?: string[];
 				command?: unknown;
-				researcher?: "codex_luna";
+				researcher?: "codex";
 				/** The package of the toolchain the conversation chose. */
 				packageRevisionId?: string;
 			};
@@ -64,7 +64,7 @@ export function createStartTask(ctx: RuntimeContext, ops: TaskOps) {
 			if (
 				request.researcher &&
 				(request.kind !== "web" ||
-					request.researcher !== "codex_luna" ||
+					request.researcher !== "codex" ||
 					!inference.codexResearchAvailable?.())
 			)
 				throw new Error("codex_research_unavailable");
@@ -103,7 +103,7 @@ export function createStartTask(ctx: RuntimeContext, ops: TaskOps) {
 					db,
 					request.kind === "history"
 						? "history.research"
-						: request.researcher === "codex_luna"
+						: request.researcher === "codex"
 							? "web.search"
 							: "web.quick",
 				);

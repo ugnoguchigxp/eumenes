@@ -22,10 +22,10 @@ import {
 	existsSync,
 	mkdirSync,
 	readFileSync,
-	writeFileSync,
 } from "node:fs";
 import { dirname, join } from "node:path";
 import type { Database } from "bun:sqlite";
+import { createFileExclusive } from "../../../infrastructure/atomic-file";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import {
 	defaultSubtitles,
@@ -71,7 +71,6 @@ export function defaults(env: Record<string, string | undefined>): Settings {
 			agentName: "",
 			userName: "",
 			persona: "butler",
-			asrLanguages: ["ja", "en"],
 			theme: "system",
 			background: "light-fairy",
 			subtitles: defaultSubtitles,
@@ -124,7 +123,8 @@ export async function createSettings(
 			mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
 			chmodSync(dirname(path), 0o700);
 			key = randomBytes(32);
-			writeFileSync(path, key, { mode: 0o600, flag: "wx" });
+			// A concurrent creator won the race: use the key it wrote.
+			if (!createFileExclusive(path, key)) key = readFileSync(path);
 		}
 		if (key.length !== 32) throw new Error("secret_key_invalid");
 		if (recognitionCiphertext)

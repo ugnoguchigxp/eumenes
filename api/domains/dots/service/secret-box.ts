@@ -16,8 +16,12 @@ export function createSecretBox(keyDir: string) {
 			return Buffer.concat([iv, c.getAuthTag(), body]).toString("base64");
 		},
 		unseal(value: string, owner: string) {
-			const b = Buffer.from(value, "base64"),
-				d = createDecipheriv("aes-256-gcm", key, b.subarray(0, 12));
+			const b = Buffer.from(value, "base64");
+			// A short value would otherwise be accepted with a truncated tag.
+			if (b.length < 28) throw new Error("invalid_sealed_value");
+			const d = createDecipheriv("aes-256-gcm", key, b.subarray(0, 12), {
+				authTagLength: 16,
+			});
 			d.setAAD(Buffer.from(owner));
 			d.setAuthTag(b.subarray(12, 28));
 			return Buffer.concat([d.update(b.subarray(28)), d.final()]).toString(

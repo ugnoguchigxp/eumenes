@@ -3,6 +3,8 @@ import { z } from "zod";
 /*
  * Typed inputs of the Kanban operations (spec/kanban-claude-code-plan-2026-10-14.md §3.8,
  * §3.13). Flat objects, shared by the adapter, the UI input adapters and the conversation tools.
+ * This file is the single source of truth for these inputs: `api/domains/kanban/contracts`
+ * derives its `Kanban*Input` types from these schemas (`z.infer`) and never redeclares them.
  */
 const title = z
 	.string()

@@ -7,7 +7,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@eumenes/design-system";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import {
 	billingPathLabels,
 	type ConversationModelOption,
@@ -63,18 +63,12 @@ export function ConversationModelSelect({
 	running: boolean;
 	actualModel?: ActualModel | undefined;
 }) {
-	const [switched, setSwitched] = useState(false);
-	const previous = useRef(model.selected);
-	useEffect(() => {
-		if (previous.current !== model.selected) {
-			if (previous.current) setSwitched(true);
-			previous.current = model.selected;
-		}
-	}, [model.selected]);
-	// The hint ends once the next utterance starts.
-	useEffect(() => {
-		if (running) setSwitched(false);
-	}, [running]);
+	// The route the current run started with. Adjusted during render (not in an effect)
+	// so the hint appears on a switch and ends once the next utterance starts.
+	const [settled, setSettled] = useState(model.selected);
+	if (model.selected && (!settled || running) && settled !== model.selected)
+		setSettled(model.selected);
+	const switched = Boolean(settled) && settled !== model.selected;
 	if (!model.ready)
 		return (
 			<span className="model-label">
@@ -125,9 +119,9 @@ export function ConversationModelSelect({
 				</SelectContent>
 			</Select>
 			{(running || switched) && (
-				<span className="model-hint" role="status">
+				<output className="model-hint">
 					{running ? "回答中は切り替えできません" : "次の発言から適用されます"}
-				</span>
+				</output>
 			)}
 		</>
 	);

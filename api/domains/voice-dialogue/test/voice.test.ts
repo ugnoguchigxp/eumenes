@@ -1,5 +1,5 @@
 import type { LarmPort } from "../../larm";
-import { withLanguageControl } from "./control-fixture";
+import { withVoiceAuthority } from "./voice-fixture";
 import { expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -18,12 +18,27 @@ import {
 } from "../../dialogue";
 import { createQueue, migration as queueMigration } from "../../queue";
 import { createVoiceDialogue, migration, sequenceMigration } from "..";
+import {
+	inputMigration,
+	inputSimplificationMigration,
+	inputTextDedupMigration,
+} from "../repository/input";
 import { SpeechSentences } from "../service/sentences";
 import { Hono } from "hono";
 import { registerVoiceDialogue } from "..";
 import type { InferencePort } from "../../inference";
 
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+/** Sends a transcribed input, as the Web does when the speaker is idle. */
+async function commitWhenReady(
+	voice: ReturnType<typeof createVoiceDialogue>,
+	id: string,
+) {
+	for (let i = 0; i < 200 && voice.get(id)?.status === "recognizing"; i++)
+		await pause(10);
+	const turn = voice.get(id);
+	if (turn?.status === "input_ready") await voice.commit(id, turn.revision);
+}
 const wav = (() => {
 	const b = new Uint8Array(44);
 	b.set(new TextEncoder().encode("RIFF"), 0);
@@ -36,7 +51,7 @@ test("voice capture to ASR, dialogue, TTS; duplicate utterance is ignored", asyn
 	let asr = 0,
 		llm = 0,
 		tts = 0;
-	const larm = withLanguageControl({
+	const larm = withVoiceAuthority({
 		status: () => ({ state: "ready", capabilities: ["llm", "asr", "tts"] }),
 		connect: async () => {},
 		answer: async () => {
@@ -63,6 +78,9 @@ test("voice capture to ASR, dialogue, TTS; duplicate utterance is ignored", asyn
 			queueMigration,
 			queueLinkMigration,
 			sequenceMigration,
+			inputMigration,
+			inputSimplificationMigration,
+			inputTextDedupMigration,
 		]);
 		const conversation = createConversationService(store);
 		const queue = createQueue(store);
@@ -99,6 +117,7 @@ test("voice capture to ASR, dialogue, TTS; duplicate utterance is ignored", asyn
 		await expect(
 			voice.accept(sessionId, 1, 2, utteranceId, wav),
 		).rejects.toThrow("voice_utterance_conflict");
+		await commitWhenReady(voice, utteranceId);
 		for (let i = 0; i < 100 && voice.get(utteranceId)?.status !== "ready"; i++)
 			await pause(20);
 		expect(voice.get(utteranceId)?.status).toBe("ready");
@@ -130,7 +149,7 @@ test("voice capture to ASR, dialogue, TTS; duplicate utterance is ignored", asyn
 
 test("restart cancels the run of a stale voice turn so no old answer is spoken", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-voice-recover-"));
-	const larm = withLanguageControl({
+	const larm = withVoiceAuthority({
 		status: () => ({ state: "ready", capabilities: ["llm", "asr", "tts"] }),
 		connect: async () => {},
 		answer: () => new Promise(() => {}),
@@ -148,6 +167,9 @@ test("restart cancels the run of a stale voice turn so no old answer is spoken",
 			queueMigration,
 			queueLinkMigration,
 			sequenceMigration,
+			inputMigration,
+			inputSimplificationMigration,
+			inputTextDedupMigration,
 		]);
 		const conversation = createConversationService(store);
 		const queue = createQueue(store);
@@ -162,6 +184,7 @@ test("restart cancels the run of a stale voice turn so no old answer is spoken",
 		const utteranceId = crypto.randomUUID();
 		voice.start(sessionId, 1);
 		await voice.accept(sessionId, 1, 1, utteranceId, wav);
+		await commitWhenReady(voice, utteranceId);
 		for (let i = 0; i < 100 && !voice.get(utteranceId)?.runId; i++)
 			await pause(10);
 		const runId = voice.get(utteranceId)?.runId as string;
@@ -194,6 +217,9 @@ async function evictionHarness(options: { prepared?: AbortSignal[] } = {}) {
 	const store = openStore(join(dir, "db.sqlite3"), [
 		migration,
 		sequenceMigration,
+		inputMigration,
+		inputSimplificationMigration,
+		inputTextDedupMigration,
 	]);
 	const dialogue = {
 		submitVoice: async (
@@ -215,7 +241,7 @@ async function evictionHarness(options: { prepared?: AbortSignal[] } = {}) {
 		answerText: () => "回答",
 		cancel: async () => null,
 	} as unknown as ReturnType<typeof createDialogueService>;
-	const larm = withLanguageControl({
+	const larm = withVoiceAuthority({
 		status: () => ({ state: "ready", capabilities: ["llm", "asr", "tts"] }),
 		connect: async () => {},
 		answer: async () => "回答",
@@ -239,6 +265,7 @@ async function evictionHarness(options: { prepared?: AbortSignal[] } = {}) {
 		const id = crypto.randomUUID();
 		ids.push(id);
 		await voice.accept(sessionId, 1, sequence, id, wav);
+		await commitWhenReady(voice, id);
 		for (let i = 0; i < 200 && voice.get(id)?.status !== status; i++)
 			await pause(10);
 		expect(voice.get(id)?.status).toBe(status);
@@ -346,9 +373,12 @@ test("stopping a session fences acceptance waiting in the writer queue", async (
 	const store = openStore(join(dir, "db.sqlite3"), [
 		migration,
 		sequenceMigration,
+		inputMigration,
+		inputSimplificationMigration,
+		inputTextDedupMigration,
 	]);
 	let asr = 0;
-	const larm = withLanguageControl({
+	const larm = withVoiceAuthority({
 		status: () => ({ state: "ready", capabilities: ["asr"] }),
 		connect: async () => {},
 		answer: async () => "answer",
@@ -489,6 +519,9 @@ test("a clause that keeps failing is skipped and the rest is still spoken", asyn
 		const store = openStore(join(dir, "db.sqlite3"), [
 			migration,
 			sequenceMigration,
+			inputMigration,
+			inputSimplificationMigration,
+			inputTextDedupMigration,
 		]);
 		const dialogue = {
 			submitVoice: async (
@@ -511,7 +544,7 @@ test("a clause that keeps failing is skipped and the rest is still spoken", asyn
 			cancel: async () => null,
 		} as unknown as ReturnType<typeof createDialogueService>;
 		const calls: string[] = [];
-		const larm = withLanguageControl({
+		const larm = withVoiceAuthority({
 			status: () => ({ state: "ready", capabilities: ["llm", "asr", "tts"] }),
 			connect: async () => {},
 			answer: async () => "回答",
@@ -528,6 +561,7 @@ test("a clause that keeps failing is skipped and the rest is still spoken", asyn
 			utteranceId = crypto.randomUUID();
 		voice.start(sessionId, 1);
 		await voice.accept(sessionId, 1, 1, utteranceId, wav);
+		await commitWhenReady(voice, utteranceId);
 		for (let i = 0; i < 100 && voice.get(utteranceId)?.status !== "ready"; i++)
 			await pause(20);
 		expect(voice.get(utteranceId)?.status).toBe("ready");
@@ -554,14 +588,17 @@ test("clauses without any phoneme are never sent to TTS", () => {
 test("a failed turn stores only a machine-readable error code", async () => {
 	for (const [thrown, expected] of [
 		["connect ECONNREFUSED 192.168.0.2:9810", "voice_failed"],
-		["asr_language_not_allowed", "asr_language_not_allowed"],
+		["audio_size_invalid", "audio_size_invalid"],
 	] as const) {
 		const dir = mkdtempSync(join(tmpdir(), "eumenes-voice-error-"));
 		const store = openStore(join(dir, "db.sqlite3"), [
 			migration,
 			sequenceMigration,
+			inputMigration,
+			inputSimplificationMigration,
+			inputTextDedupMigration,
 		]);
-		const larm = withLanguageControl({
+		const larm = withVoiceAuthority({
 			status: () => ({ state: "ready", capabilities: ["asr"] }),
 			connect: async () => {},
 			transcribe: async () => {
@@ -591,12 +628,9 @@ test("a failed turn stores only a machine-readable error code", async () => {
 	}
 });
 
-async function raceFixture(
-	prefix: string,
-	executeControl?: InferencePort["executeControl"],
-) {
+async function raceFixture(prefix: string) {
 	const dir = mkdtempSync(join(tmpdir(), prefix));
-	const base = withLanguageControl({
+	const base = withVoiceAuthority({
 		status: () => ({ state: "ready", capabilities: ["llm", "asr", "tts"] }),
 		connect: async () => {},
 		answer: async () => "回答",
@@ -604,7 +638,7 @@ async function raceFixture(
 		speak: async () => wav,
 		close: async () => {},
 	});
-	const larm = executeControl ? { ...base, executeControl } : base;
+	const larm = base;
 	const store = openStore(join(dir, "db.sqlite3"), [
 		conversationMigration,
 		conversationAvatarMotionMigration,
@@ -614,6 +648,9 @@ async function raceFixture(
 		queueMigration,
 		queueLinkMigration,
 		sequenceMigration,
+		inputMigration,
+		inputSimplificationMigration,
+		inputTextDedupMigration,
 	]);
 	const conversation = createConversationService(store);
 	const queue = createQueue(store);
@@ -635,35 +672,6 @@ async function raceFixture(
 	};
 }
 
-test("cancelling while the language check resolves leaves no running dialogue run", async () => {
-	let release!: () => void;
-	const gate = new Promise<void>((resolve) => (release = resolve));
-	let inner: InferencePort["executeControl"];
-	const f = await raceFixture("eumenes-voice-race-a-", async (...args) => {
-		await gate;
-		return inner!(...args);
-	});
-	inner = f.base.executeControl;
-	const voice = createVoiceDialogue(f.store, f.dialogue, f.larm);
-	try {
-		const sessionId = crypto.randomUUID(),
-			id = crypto.randomUUID();
-		voice.start(sessionId, 1);
-		await voice.accept(sessionId, 1, 1, id, wav);
-		release();
-		await voice.cancel(id);
-		await voice.stop(sessionId, 1);
-		await f.queue.close(100);
-		expect(voice.get(id)?.status).toBe("cancelled");
-		for (const run of f.dialogue.list("main"))
-			expect(run.status).toBe("cancelled");
-	} finally {
-		await voice.close();
-		rmSync(f.dir, { recursive: true, force: true });
-		await f.store.close().catch(() => {});
-	}
-});
-
 test("linking a run to a cancelled turn rolls the run back", async () => {
 	const f = await raceFixture("eumenes-voice-race-b-");
 	let voice!: ReturnType<typeof createVoiceDialogue>;
@@ -680,6 +688,7 @@ test("linking a run to a cancelled turn rolls the run back", async () => {
 		const sessionId = crypto.randomUUID();
 		voice.start(sessionId, 1);
 		await voice.accept(sessionId, 1, 1, id, wav);
+		await commitWhenReady(voice, id);
 		for (let i = 0; i < 100 && !cancelling; i++) await pause(10);
 		await cancelling;
 		await pause(50);
@@ -688,38 +697,6 @@ test("linking a run to a cancelled turn rolls the run back", async () => {
 		expect(f.conversation.get("main").messages.length).toBe(0);
 	} finally {
 		await voice.close();
-		await f.close();
-	}
-});
-
-test("a failing cleanup write neither rejects unhandled nor breaks close", async () => {
-	const f = await raceFixture("eumenes-voice-cleanup-", async () => {
-		throw new Error("asr_language_not_allowed");
-	});
-	const unhandled: unknown[] = [];
-	const onUnhandled = (reason: unknown) => unhandled.push(reason);
-	process.on("unhandledRejection", onUnhandled);
-	const larm = {
-		...f.larm,
-		cancelRequestsInTransaction: () => {
-			throw new Error("database_writer_queue_full");
-		},
-	};
-	const voice = createVoiceDialogue(f.store, f.dialogue, larm);
-	try {
-		const sessionId = crypto.randomUUID(),
-			id = crypto.randomUUID();
-		voice.start(sessionId, 1);
-		await voice.accept(sessionId, 1, 1, id, wav);
-		for (let i = 0; i < 100 && voice.get(id)?.status !== "failed"; i++)
-			await pause(10);
-		await pause(50);
-		expect(voice.get(id)?.status).toBe("failed");
-		expect((await voice.accept(sessionId, 1, 1, id, wav)).utteranceId).toBe(id);
-		expect(unhandled).toEqual([]);
-		await voice.close().catch(() => {});
-	} finally {
-		process.off("unhandledRejection", onUnhandled);
 		await f.close();
 	}
 });

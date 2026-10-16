@@ -48,9 +48,9 @@ export const InfiniteListMenu: React.FC<InfiniteListMenuProps> = ({
 	hasMore = false,
 	isLoading = false,
 	loadMoreOffset = 120,
-	emptyText = "No items available.",
-	loadingText = "Loading more...",
-	endText = "All items loaded.",
+	emptyText = "項目がありません。",
+	loadingText = "さらに読み込み中...",
+	endText = "すべて読み込みました。",
 	headerMeta,
 	hideHeader = false,
 	resizable = false,
@@ -95,7 +95,6 @@ export const InfiniteListMenu: React.FC<InfiniteListMenuProps> = ({
 		if (!isLoading) loadMoreRequestedRef.current = false;
 	}, [isLoading]);
 
-	// biome-ignore lint/correctness/useExhaustiveDependencies: reset loadMoreRequestedRef when itemsLength changes
 	React.useEffect(() => {
 		loadMoreRequestedRef.current = false;
 	}, [itemsLength]);

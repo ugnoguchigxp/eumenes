@@ -644,4 +644,23 @@ describe("DropdownMenu", () => {
 
 		expect(cancelRafSpy).toHaveBeenCalled();
 	});
+
+	it("focuses the first item on open and moves with arrow keys", async () => {
+		render(
+			<DropdownMenu
+				trigger={<button type="button">Open Menu</button>}
+				items={items}
+			/>,
+		);
+		await user.click(screen.getByText("Open Menu"));
+		const [first, second] = await screen.findAllByRole("menuitem");
+		await waitFor(() => expect(first).toHaveFocus());
+		await user.keyboard("{ArrowDown}");
+		expect(second).toHaveFocus();
+		await user.keyboard("{Escape}");
+		await waitFor(() =>
+			expect(screen.queryByRole("menu")).not.toBeInTheDocument(),
+		);
+		expect(screen.getByText("Open Menu")).toHaveFocus();
+	});
 });

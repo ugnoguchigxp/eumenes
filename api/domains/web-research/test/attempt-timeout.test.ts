@@ -209,3 +209,34 @@ test("W01 cancellation stays web_cancelled and invalid timeouts are rejected; de
 	expect(s.service.get(run.runId)?.status).toBe("cancelled");
 	expect(s.service.get(run.runId)?.errorCode).toBe("cancel_requested");
 });
+
+test("Queue honors a receipt cooldown before acquisition starts and retains the hard task deadline", async () => {
+	let calls = 0;
+	const s = setup(async () => {
+		calls++;
+		return { result: response(), freshUntilMs: null };
+	});
+	const availableAtMs = s.clock.t + 1500;
+	const run = await s.store.write((db) =>
+		s.service.submitInTransaction(db, read(), {
+			availableAtMs,
+			deadlineAtMs: s.clock.t + 10000,
+			lane: "background",
+			attemptTimeoutMs: 5000,
+		}),
+	);
+	await s.queue.tick();
+	expect(calls).toBe(0);
+	expect(s.timers).toHaveLength(0);
+	s.clock.t = availableAtMs - 1;
+	await s.queue.tick();
+	expect(calls).toBe(0);
+	s.clock.t++;
+	await until(
+		() => s.service.get(run.runId)?.status === "completed",
+		s.queue.tick,
+	);
+	expect(calls).toBe(1);
+	expect(s.timers[0]?.ms).toBe(5000);
+	expect(s.queue.get(run.jobId)?.deadlineAtMs).toBe(1000000 + 10000);
+});

@@ -1,0 +1,95 @@
+bun test v1.4.3 (c6da4a4d3)
+
+api/application/settings-adapter.test.ts:
+(pass) describe offers the settings document, one write operation, its queries and the Web conditions [1.18ms]
+(pass) every field of the settings bundle names an existing, writable settings path and a declared condition [1.41ms]
+(pass) describePath accepts leaves and stable-id array elements and rejects objects, managed values and unknown names [0.20ms]
+(pass) a draft's changes become one saved revision with typed values, and the receipt carries no values [534.51ms]
+(pass) an array element is chosen by its stable id and no other element changes [504.08ms]
+(pass) targets are required for element fields, refused for plain fields and must exist [452.75ms]
+(pass) unset follows the field's registered meaning and is refused elsewhere [430.47ms]
+(pass) rejections are safe codes and save nothing [374.83ms]
+(pass) conversations cannot change settings [357.69ms]
+(pass) a stale draft is reported as revision_conflict, even when its target has since gone [431.78ms]
+(pass) the same request id is a replay and saves once [419.52ms]
+(pass) keys go through to the settings domain and never into the result or an error [439.49ms]
+(pass) sources give the saved document, the TTS models as targets and the ASR languages [417.55ms]
+(pass) fields registered by published artifacts are found through capabilities [1081.44ms]
+(pass) the registered settings bundle applies a draft through the action ledger and rejects a stale one [1219.24ms]
+(pass) describePath reports kind, bounds, enum values and optional/nullable from the settings schema [0.25ms]
+(pass) a target must be one the field's query lists: another purpose's model is refused [445.94ms]
+(pass) every structure and action of the bundle is registered with a matching schema [0.26ms]
+(pass) a connection is added with its first model, its key and the route it fills [372.14ms]
+(pass) a new connection takes exactly one credential source, except CLI-login agent kinds [364.81ms]
+(pass) deleting a connection removes its models, frees the routes that used them and drops its key [280.62ms]
+(pass) connection targets name the auth method and never claim a Claude login [217.23ms]
+(pass) deleting a model or connection also frees the dedicated World and sub-agent models that used it [241.77ms]
+(pass) models are added and deleted, and a change may name an added model as its target [227.18ms]
+(pass) changing a model's purpose resets the purpose's values and frees its route [244.62ms]
+(pass) turning cloud sending off leaves a cloud-only purpose LARM only [214.61ms]
+(pass) a changed LARM origin needs its confirmation as a structure [227.29ms]
+(pass) connection fields use the connection query's targets, and the API key never travels in changes [256.42ms]
+(pass) sources list connections without credentials, models per purpose and the routes [222.14ms]
+(pass) the AI and external-work artifacts apply through the action ledger with structure and keys [348.02ms]
+(pass) a key alone is an apply, and a key inside a structure's input is refused [291.28ms]
+(pass) the AI screen's collections name registered actions with rows built by fixed paths [0.51ms]
+(pass) the connection form registers a connection alone or with its first model in one apply [319.34ms]
+(pass) the probe row is offered for enabled targets and a clean draft, and the key field can be unset [0.38ms]
+
+api/application/settings-registration.test.ts:
+(pass) registration rejects bad input without writes and saves the corrected connection through HTTP [37.99ms]
+
+api/domains/settings/test/registration.test.ts:
+(pass) registration rejects malformed accounts and missing credentials before a draft can be accepted [0.36ms]
+(pass) the shared registration contract retains credential-source, URL and optional-model rules for other connections [0.25ms]
+
+api/domains/settings/test/settings.test.ts:
+(pass) background selection persists without changing inference permissions; old documents remain valid [12.07ms]
+(pass) a fresh install has no profile; the env import and saved choices survive reopening [11.55ms]
+(pass) same-host can start unconfigured while configured URLs still require loopback [1.69ms]
+(pass) backend live evaluation reads the saved LARM connection without changing settings [12.71ms]
+(pass) new voice settings wait for a conversational pause and retain a saved custom interval [10.24ms]
+(pass) old settings retain normal playback; speech adjustments validate and persist [11.64ms]
+(pass) coding supervision instruction approval defaults to on, including for saved documents without it [10.40ms]
+(pass) world.enabled defaults to false (also for saved documents without it), persists through apply and is what startup reads [9.43ms]
+(pass) the settings API saves world.enabled and returns it [10.99ms]
+(pass) readStoredWorldEnabled is false while no settings document exists [7.14ms]
+(pass) bootstraps once; atomic revision and idempotency; encrypted secret never in document [10.11ms]
+(pass) revocation epochs cannot be reset by client; origin changes cannot reuse credential [9.15ms]
+(pass) missing or wrong master key preserves data, disables ciphertext and does not regenerate [15.00ms]
+(pass) deleting then recreating the same connection ID cannot revive old permissions [11.52ms]
+(pass) malformed LARM URLs are validation errors and same-host requires loopback [9.17ms]
+(pass) key replacement, key deletion and connection deletion discard obsolete ciphertext [12.22ms]
+(pass) envRef must be allowlisted when saved and when resolved [8.22ms]
+(pass) cloud connections require https outside private networks [0.16ms]
+(pass) a saved http cloud URL still loads, but applying it is rejected [9.47ms]
+(pass) credential ciphertext is bound to its row [11.28ms]
+(pass) v1 ciphertext is upgraded to v2 on startup and survives restart [10.98ms]
+(pass) keyDir option and EUMENES_KEY_DIR relocate the master key [10.03ms]
+(pass) a changed LARM origin needs an explicit confirmation; same origin or first setup does not [11.70ms]
+(pass) an Azure key is bound to one single-label host and one host per key [10.64ms]
+(pass) settings_requests keeps only the newest 64 requests [21.25ms]
+(pass) old settings keep English speech routing disabled and English settings persist independently [12.33ms]
+(pass) a stored sentence-language switch migrates to englishSpeechEnabled and drops the classifier selector [11.13ms]
+(pass) a stored ASR language allow-list is dropped when settings are read [10.78ms]
+(pass) world.curationResourceId must name a registered LLM resource [9.39ms]
+(pass) auth is required exactly for Claude Agent SDK connections and a subscription takes no env ref [10.50ms]
+(pass) stored settings are migrated once: Managed Agents removed, auth filled, nothing else changed [14.67ms]
+(pass) a connection in use never changes its billing path in place; other changes of path are allowed [13.54ms]
+(pass) subagent.resourceId must name a registered LLM resource and defaults to LARM [10.09ms]
+
+api/domains/settings/test/object-recognition.test.ts:
+(pass) dedicated gateway settings are encrypted, revision-bound, redacted and protected from missing/replaced master keys [13.51ms]
+(pass) LARM credential source is an explicit backend reference: no copied secret, no fallback, dedicated settings survive [10.28ms]
+(pass) existing settings migrate to dedicated mode; a new shared connection saves only the reference [18.12ms]
+
+api/domains/settings/test/workers-ai.test.ts:
+(pass) Workers AI keeps a shared encrypted token and account; changing the account revokes captured inference [12.61ms]
+
+api/domains/settings/test/spatial.test.ts:
+(pass) legacy documents remain valid; presentation bounds and enums reject invalid settings [1.58ms]
+
+ 75 pass
+ 0 fail
+ 643 expect() calls
+Ran 75 tests across 7 files. [12.47s]

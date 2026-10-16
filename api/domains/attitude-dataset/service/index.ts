@@ -5,7 +5,6 @@ import type { SqliteStore } from "../../../infrastructure/sqlite";
 import {
 	chooseSpeechDelivery,
 	decisionDetails,
-	RURI_MODEL,
 	emotionSchema,
 	type Judge,
 	type DeliveryContext,
@@ -251,12 +250,7 @@ export function createAttitudeDataset(store: SqliteStore, path: string) {
 			let model = args.model;
 			if (collectionOnly && model === null && args.prepareJudge)
 				model = await args.prepareJudge(signal);
-			if (
-				collectionOnly &&
-				model === RURI_MODEL &&
-				wrapped &&
-				args.text.trim()
-			) {
+			if (collectionOnly && model !== null && wrapped && args.text.trim()) {
 				// Separate promise: normal TTS never waits for this all-six-candidate judgment.
 				await chooseSpeechDelivery(
 					wrapped,
@@ -280,7 +274,7 @@ export function createAttitudeDataset(store: SqliteStore, path: string) {
 			const success =
 				!sensitive &&
 				details?.valid &&
-				details.model === RURI_MODEL &&
+				details.scored &&
 				details.logits &&
 				details.scores;
 			let sample: Sample | null = null;

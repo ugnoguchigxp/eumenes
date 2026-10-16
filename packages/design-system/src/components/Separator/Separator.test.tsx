@@ -28,7 +28,6 @@ vi.mock("@radix-ui/react-separator", () => ({
 			},
 			ref,
 		) => (
-			// biome-ignore lint/a11y/useAriaPropsSupportedByRole: Valid when role is separator
 			<div
 				data-testid="separator-root"
 				className={className}

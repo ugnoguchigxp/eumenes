@@ -10,7 +10,7 @@ vi.mock("react-i18next", () => ({
 	}),
 }));
 
-describe("Calculator", () => {
+describe("電卓", () => {
 	const user = userEvent.setup();
 
 	it("renders correctly (inline mode)", () => {
@@ -107,7 +107,7 @@ describe("Calculator", () => {
 		await user.click(screen.getByRole("button", { name: "=" }));
 
 		expect(
-			screen.getByText("Error", { selector: ".text-right" }),
+			screen.getByText("エラー", { selector: ".text-right" }),
 		).toBeInTheDocument();
 	});
 
@@ -125,7 +125,7 @@ describe("Calculator", () => {
 	it("opens modal when onResult is not provided", async () => {
 		render(<Calculator />);
 
-		const trigger = screen.getByRole("button", { name: "Calculator" });
+		const trigger = screen.getByRole("button", { name: "電卓" });
 		await user.click(trigger);
 
 		expect(screen.getByRole("dialog")).toBeInTheDocument();
@@ -155,7 +155,7 @@ describe("Calculator", () => {
 		await user.click(screen.getByRole("button", { name: "0" }));
 		await user.click(screen.getByRole("button", { name: "=" }));
 		expect(
-			screen.getByText("Error", { selector: ".text-right" }),
+			screen.getByText("エラー", { selector: ".text-right" }),
 		).toBeInTheDocument();
 
 		// New input
@@ -173,7 +173,7 @@ describe("Calculator", () => {
 		await user.click(screen.getByRole("button", { name: "+" }));
 		await user.click(screen.getByRole("button", { name: "=" }));
 		expect(
-			screen.getByText("Error", { selector: ".text-right" }),
+			screen.getByText("エラー", { selector: ".text-right" }),
 		).toBeInTheDocument();
 
 		// Clear
@@ -184,7 +184,7 @@ describe("Calculator", () => {
 		await user.click(screen.getByRole("button", { name: "+" }));
 		await user.click(screen.getByRole("button", { name: "=" }));
 		expect(
-			screen.getByText("Error", { selector: ".text-right" }),
+			screen.getByText("エラー", { selector: ".text-right" }),
 		).toBeInTheDocument();
 
 		// Clear
@@ -196,7 +196,7 @@ describe("Calculator", () => {
 		await user.click(screen.getByRole("button", { name: "-" }));
 		await user.click(screen.getByRole("button", { name: "=" }));
 		expect(
-			screen.getByText("Error", { selector: ".text-right" }),
+			screen.getByText("エラー", { selector: ".text-right" }),
 		).toBeInTheDocument();
 	});
 });

@@ -15,8 +15,8 @@ vi.mock("@radix-ui/react-dialog", () => ({
 		open?: boolean;
 		onOpenChange?: (open: boolean) => void;
 	}) => (
-		// biome-ignore lint/a11y/noStaticElementInteractions: Mock element needs click
 		<div
+			role="presentation"
 			data-testid="dialog-root"
 			data-open={open}
 			onClick={() => onOpenChange?.(false)}
@@ -232,7 +232,6 @@ describe("Drawer Component", () => {
 			// Test all positions to cover cva variants
 			["top", "bottom", "left", "right"].forEach((pos) => {
 				const { unmount } = render(
-					// biome-ignore lint/suspicious/noExplicitAny: Testing strict types
 					<Drawer isOpen={true} onClose={mockOnClose} position={pos as any}>
 						<div>Content</div>
 					</Drawer>,

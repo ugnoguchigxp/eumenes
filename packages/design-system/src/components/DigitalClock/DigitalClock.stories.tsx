@@ -15,7 +15,9 @@ export const FullDay: Story = { args: { seconds: 86400, size: "hero" } };
 export const Finished: Story = {
 	args: { seconds: 0, tone: "finished", size: "hero", label: "終了" },
 };
-export const Muted: Story = { args: { seconds: 120, tone: "muted", size: "lg" } };
+export const Muted: Story = {
+	args: { seconds: 120, tone: "muted", size: "lg" },
+};
 export const Narrow: Story = {
 	args: { seconds: 86400, size: "hero" },
 	decorators: [

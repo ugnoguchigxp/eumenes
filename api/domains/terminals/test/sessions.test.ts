@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { Hono } from "hono";
 import { registerTerminals } from "../controller";
 import { createTerminals } from "../service";
-import { childEnv } from "../spawn";
+import { childEnv } from "../service/spawn";
 import { fakePty } from "./terminals.fixture";
 
 async function readEvents(response: Response, count: number) {
@@ -78,6 +78,34 @@ test("starts sessions up to the limit, forwards input and resize, and reports ex
 	expect(pty.spawned[1]!.killed).toBe(true);
 	expect(pty.spawned[2]!.killed).toBe(true);
 	expect(terminals.list().sessions).toEqual([]);
+});
+
+test("a PTY that cannot be released still ends the session, without an unhandled rejection", async () => {
+	const rejections: unknown[] = [];
+	const onRejection = (reason: unknown) => rejections.push(reason);
+	process.on("unhandledRejection", onRejection);
+	try {
+		const pty = fakePty({ failClose: true });
+		const terminals = createTerminals({
+			command: ["claude"],
+			spawn: pty.spawn,
+		});
+		const session = terminals.start({ cols: 80, rows: 24 });
+		pty.spawned[0]!.exit(0);
+		await Bun.sleep(10);
+		expect(terminals.list().sessions[0]).toMatchObject({
+			id: session.id,
+			status: "exited",
+			exitCode: 0,
+		});
+		expect(rejections).toEqual([]);
+		// The slot is free again: the failed close did not leave the session running.
+		expect(terminals.restart(session.id, { cols: 80, rows: 24 })).toMatchObject(
+			{ status: "running", run: 2 },
+		);
+	} finally {
+		process.off("unhandledRejection", onRejection);
+	}
 });
 
 test("is unavailable without the command", () => {

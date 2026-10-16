@@ -9,7 +9,7 @@ describe("Spinner Component", () => {
 
 			const spinner = screen.getByRole("status");
 			expect(spinner).toBeInTheDocument();
-			expect(spinner).toHaveAttribute("aria-label", "Loading");
+			expect(spinner).toHaveAttribute("aria-label", "読み込み中");
 		});
 
 		it("renders with default size (md) and variant (primary)", () => {
@@ -223,7 +223,7 @@ describe("Spinner Component", () => {
 
 			const spinner = screen.getByRole("status");
 			// expect(spinner).toHaveAttribute("role", "status");
-			expect(spinner).toHaveAttribute("aria-label", "Loading");
+			expect(spinner).toHaveAttribute("aria-label", "読み込み中");
 		});
 	});
 
@@ -275,7 +275,6 @@ describe("Spinner Component", () => {
 			];
 
 			sizeTests.forEach(({ size, border }) => {
-				// biome-ignore lint/suspicious/noExplicitAny: Bypassing strict union check
 				const { unmount } = render(<Spinner size={size as any} />);
 
 				const spinner = screen.getByRole("status");
@@ -309,7 +308,7 @@ describe("Spinner Component", () => {
 			render(<Spinner />);
 
 			const spinner = screen.getByRole("status");
-			expect(spinner).toHaveAttribute("aria-label", "Loading");
+			expect(spinner).toHaveAttribute("aria-label", "読み込み中");
 		});
 
 		it("includes screen reader only text", () => {

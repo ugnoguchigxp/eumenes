@@ -204,6 +204,7 @@ const live = (container: HTMLElement) =>
 
 test("history on first render is not announced; new answers are, even with identical text", () => {
 	const long = "あ".repeat(100);
+	const announced = `回答が完了しました。${long}`;
 	const { container, rerender } = render(
 		<MessageList conversation={convo(["a1", "assistant", "古い回答"])} />,
 	);
@@ -216,7 +217,7 @@ test("history on first render is not announced; new answers are, even with ident
 			)}
 		/>,
 	);
-	expect(live(container)).toBe(long.slice(0, 80));
+	expect(live(container)).toBe(announced);
 	const first = container.querySelector("output[aria-live]");
 	rerender(
 		<MessageList
@@ -227,8 +228,26 @@ test("history on first render is not announced; new answers are, even with ident
 			)}
 		/>,
 	);
-	expect(live(container)).toBe(long.slice(0, 80));
+	expect(live(container)).toBe(announced);
 	expect(container.querySelector("output[aria-live]")).not.toBe(first);
+});
+
+test("a very long answer is announced up to a limit with a pointer to the text", () => {
+	const veryLong = "い".repeat(800);
+	const { container, rerender } = render(
+		<MessageList conversation={convo(["a1", "assistant", "古い回答"])} />,
+	);
+	rerender(
+		<MessageList
+			conversation={convo(
+				["a1", "assistant", "古い回答"],
+				["a2", "assistant", veryLong],
+			)}
+		/>,
+	);
+	expect(live(container)).toBe(
+		`回答が完了しました。${"い".repeat(500)}…続きは会話欄で確認できます。`,
+	);
 });
 
 test("the newest 20 bubbles render first and older bubbles appear 20 at a time", () => {

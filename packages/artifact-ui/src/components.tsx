@@ -48,7 +48,8 @@ export function useAction(request: ArtifactRequest) {
 		last.receipt.status === "pending" ||
 		last.receipt.status === "indeterminate";
 	const result: Receipt =
-		unsettled && (last.revision !== here.revision || last.epoch !== here.epoch)
+		(unsettled || last.receipt.status === "accepted") &&
+		(last.revision !== here.revision || last.epoch !== here.epoch)
 			? { status: "accepted", message: "" }
 			: last.receipt;
 	async function send(

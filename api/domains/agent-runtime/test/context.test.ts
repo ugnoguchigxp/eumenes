@@ -39,7 +39,7 @@ const source = (body: string): Source => ({
 	fetchedAt: "2026-10-10T00:00:00Z",
 	truncated: false,
 });
-test("quick Web work is bounded independently of question wording while Luna keeps exploration", () => {
+test("quick Web work is bounded independently of question wording while Codex research keeps exploration", () => {
 	const quick = {
 		...prepared,
 		package: { ...prepared.package, id: "web.quick" },

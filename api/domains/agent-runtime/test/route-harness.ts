@@ -68,7 +68,7 @@ const learnedPair = (): Definition[] => [
 ];
 export async function harness(
 	now = Date.now,
-	luna = false,
+	codex = false,
 	/** A registered domain adapter for bound operations; also seeds the package that uses one. */
 	actions?: ActionAdapter,
 	/** Opt in to the versioned Web bundle; archived-route tests keep their old contracts. */
@@ -116,6 +116,7 @@ export async function harness(
 		args: unknown;
 		grantedUrl?: string;
 		attemptTimeoutMs?: number;
+		availableAtMs?: number;
 	}> = [];
 	const results = new Map<string, AdapterOperation>();
 	const adapter: ToolAdapter = {
@@ -159,6 +160,7 @@ export async function harness(
 				args: r.arguments,
 				grantedUrl: r.grantedUrl,
 				attemptTimeoutMs: r.attemptTimeoutMs,
+				availableAtMs: r.availableAtMs,
 			});
 			// A real queue job so the runtime can parent follow-up steps to it.
 			const { job } = queue.enqueueInTransaction(db, {
@@ -167,6 +169,7 @@ export async function harness(
 				dedupeKey: `web-${started.length}`,
 				payload: { taskId: "web", stepId: `web-${started.length}` },
 				lane: "background",
+				availableAtMs: r.availableAtMs,
 				maxAttempts: 1,
 			});
 			return { operationId: `op${started.length}`, jobId: job.id };
@@ -183,7 +186,7 @@ export async function harness(
 	/** The saved sub-agent resource the fixture settings hold. */
 	const subagent = { resourceId: null as string | null };
 	const inference = {
-		codexResearchAvailable: () => luna,
+		codexResearchAvailable: () => codex,
 		snapshotInTransaction: () => ({ subagent }),
 		captureControlInTransaction: (
 			_db: unknown,
@@ -225,7 +228,7 @@ export async function harness(
 	const start = (
 		runId: string,
 		question = "天気予報 鎌倉",
-		researcher?: "codex_luna",
+		researcher?: "codex",
 		kind: "web" | "history" = "web",
 	) =>
 		store.write((db) =>
@@ -266,7 +269,11 @@ export async function harness(
 				result: {
 					receipt: {} as never,
 					...(outputText === undefined
-						? { invalid: false, action }
+						? {
+								invalid: false,
+								action:
+									typeof action === "function" ? action(prep.input) : action,
+							}
 						: parseControlOutput(outputText)),
 				},
 			} as never),

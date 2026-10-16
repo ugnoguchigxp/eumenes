@@ -24,7 +24,6 @@ vi.mock("@radix-ui/react-switch", async () => {
 					ref={ref}
 					data-testid="switch-root"
 					className={className}
-					// biome-ignore lint/suspicious/noExplicitAny: Spreading generic props
 					{...(props as unknown as any)}
 				>
 					{children}

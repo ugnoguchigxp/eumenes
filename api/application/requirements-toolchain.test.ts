@@ -16,7 +16,7 @@ for (const c of cases)
 	if (c.suite === "requirements")
 		test(`data-only report host fixture: ${c.id}`, async () => {
 			const canned = responses[c.id];
-			const search = c.engine === "codex_luna";
+			const search = c.engine === "codex";
 			let calls = 0;
 			const model: LarmPort = {
 				status: () => ({ state: "ready", capabilities: ["llm"] }),
@@ -31,7 +31,7 @@ for (const c of cases)
 							{
 								id: crypto.randomUUID(),
 								name:
-									c.engine === "codex_luna"
+									c.engine === "codex"
 										? "web_research"
 										: "conversation_history",
 								// The conversation hands over the request only.
@@ -120,16 +120,15 @@ for (const c of cases)
 				c,
 				profiles,
 				model,
-				c.engine === "codex_luna"
+				c.engine === "codex"
 					? {
-							model: "fixture-luna",
 							execute: (messages, signal) => model.answer(messages, signal),
 						}
 					: undefined,
 				!search,
 			);
 			if (search) {
-				expect(result.engine).toBe("codex_luna");
+				expect(result.engine).toBe("codex");
 				expect(result.report).toMatchObject({
 					version: 2,
 					outcome: canned.outcome,

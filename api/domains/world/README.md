@@ -298,7 +298,7 @@ change route. A correction, retraction or forget of a claim is a steward operati
 
 - Deterministic evidence uses a fixture inference port and a TTS spy. No real Local Provider was run; curation runs on the conversation route and its live acceptance is the steward's.
 - Curation is covered with a fixture model (a function of what it is shown) on the real store, the real
-  World package and the real conversation adapter (`test/curation.test.ts`). Extraction quality on a real model is
+  World package and the real conversation adapter (`test/curation-*.test.ts`). Extraction quality on a real model is
   not measured here; the steward's live acceptance does that.
 - No product entry point forgets a message yet. Nothing calls `conversation.retract` or Memory's host-source forget in production; the acceptance test composes both. The consumers handle either when it happens.
 - Only the default Scope (`local:owner` / `profile:owner`) is consumed.
@@ -309,7 +309,7 @@ change route. A correction, retraction or forget of a claim is a steward operati
 ## Tests
 
 - `api/domains/world/test/*`: World domain, lifecycle, names hint (real store, production migrations);
-  `change-feed.test.ts` (P4-01: A28, A29, A42), `curation.test.ts` (prepare, settle, held, forget operations)
+  `change-feed.test.ts` (P4-01: A28, A29, A42), `curation-*.test.ts` (claims, entities, windows, settle, pending, forget operations; shared rig in `curation-fixture.ts`)
   and `steward-migration.test.ts`.
 - `api/application/world.test.ts`: mode flag, cursor secret, enabling, idle quietness, cursor reset.
 - `api/application/world-acceptance-p3.test.ts`: P3-09 on the real assembly (A34 host side, A35 to A41). It lives in `application` because the world domain may not depend on dialogue, voice or queue.

@@ -9,7 +9,7 @@ import {
 	readWorkspaceGuard,
 	type KanbanExecutor,
 } from "..";
-import { LEGACY_EXECUTOR } from "../shared-contracts";
+import { LEGACY_EXECUTOR } from "../contracts/shared";
 import { openKanban } from "./kanban.fixture";
 
 const executors: KanbanExecutor[] = [

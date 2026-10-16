@@ -262,7 +262,7 @@ describe("Modal Components", () => {
 
 			// Find the close button by its screen reader text
 			const closeButton = document.querySelector("button span.sr-only");
-			expect(closeButton?.textContent).toBe("Close");
+			expect(closeButton?.textContent).toBe("ダイアログを閉じる");
 		});
 
 		it("has proper accessibility attributes", () => {
@@ -277,7 +277,7 @@ describe("Modal Components", () => {
 
 			// Check that close button exists with screen reader text
 			const closeButton = document.querySelector("button span.sr-only");
-			expect(closeButton?.textContent).toBe("Close");
+			expect(closeButton?.textContent).toBe("ダイアログを閉じる");
 		});
 	});
 
@@ -335,7 +335,7 @@ describe("Modal Components", () => {
 
 			// Find the close button by its text content (screen reader only)
 			const closeButton = document.querySelector("button span.sr-only");
-			expect(closeButton?.textContent).toBe("Close");
+			expect(closeButton?.textContent).toBe("ダイアログを閉じる");
 		});
 
 		it("renders overlay for accessibility", () => {
@@ -496,9 +496,9 @@ describe("Modal Components", () => {
 				</Modal>,
 			);
 
-			const dragHandle = screen.getByLabelText("Drag modal");
+			const dragHandle = screen.getByLabelText("ダイアログを移動");
 			expect(dragHandle).toBeInTheDocument();
-			expect(dragHandle).toHaveAttribute("aria-label", "Drag modal");
+			expect(dragHandle).toHaveAttribute("aria-label", "ダイアログを移動");
 		});
 
 		it("does not have drag handle when not draggable", () => {
@@ -508,7 +508,9 @@ describe("Modal Components", () => {
 				</Modal>,
 			);
 
-			expect(screen.queryByLabelText("Drag modal")).not.toBeInTheDocument();
+			expect(
+				screen.queryByLabelText("ダイアログを移動"),
+			).not.toBeInTheDocument();
 		});
 
 		it("updates position on drag", async () => {
@@ -518,7 +520,7 @@ describe("Modal Components", () => {
 				</Modal>,
 			);
 
-			const dragHandle = screen.getByLabelText("Drag modal");
+			const dragHandle = screen.getByLabelText("ダイアログを移動");
 			const content = screen.getByText("Content").closest('[role="dialog"]');
 
 			// Start dragging

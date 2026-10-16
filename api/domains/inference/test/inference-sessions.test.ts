@@ -1,0 +1,183 @@
+import { afterEach, expect, test } from "bun:test";
+import { cleanup, messages, setup } from "./inference.fixture";
+afterEach(async () => {
+	for (const close of cleanup.splice(0)) await close();
+});
+test("a call without a role is auxiliary: the output mode no longer decides the session", async () => {
+	const roles: unknown[] = [];
+	const h = await setup({
+		local: async (_messages, _signal, options) => {
+			roles.push(options?.sessionRole);
+			return "{}";
+		},
+	});
+	await h.inference.answer(messages, new AbortController().signal);
+	const id = await h.store.write((db) =>
+		h.inference.captureMaintenanceControlInTransaction(db, {
+			subject: "independent-helper",
+			deadline: Date.now() + 30000,
+			maxOutputTokens: 512,
+		}),
+	);
+	await h.inference.executeControl(id, messages, new AbortController().signal);
+	expect(roles).toEqual(["auxiliary", "auxiliary"]);
+});
+test("the caller sets the session role per call; it is validated and recorded with the task on each attempt", async () => {
+	const seen: unknown[] = [];
+	const h = await setup({
+		local: async (_messages, _signal, options) => {
+			seen.push([options?.sessionRole, options?.taskId]);
+			return "{}";
+		},
+	});
+	const signal = new AbortController().signal;
+	const answerRequest = () =>
+		h.store.write((db) =>
+			h.inference.captureInTransaction(
+				db,
+				crypto.randomUUID(),
+				"llm",
+				Date.now() + 30000,
+			),
+		);
+	const controlRequest = () =>
+		h.store.write((db) =>
+			h.inference.captureBackgroundControlInTransaction(db, {
+				taskId: "task",
+				decisionId: crypto.randomUUID(),
+				authorityEpoch: 1,
+				executionGeneration: 1,
+				deadline: Date.now() + 20000,
+				taskDeadline: Date.now() + 30000,
+				maxOutputTokens: 512,
+			}),
+		);
+	// One answer request: a one-shot call, then the main answer, with the same request id.
+	const shared = await answerRequest();
+	const stream = (
+		id: string,
+		session?: Parameters<typeof h.inference.executeStream>[6],
+	) =>
+		h.inference.executeStream(
+			id,
+			messages,
+			signal,
+			() => {},
+			undefined,
+			undefined,
+			session,
+		);
+	await stream(shared, { sessionRole: "auxiliary" });
+	await stream(shared, { sessionRole: "main" });
+	await stream(await answerRequest());
+	// Control mode: a sub-agent call is allowed and carries its task.
+	await h.inference.executeControl(
+		await controlRequest(),
+		messages,
+		signal,
+		undefined,
+		{ sessionRole: "subagent", taskId: "agent:task-1" },
+	);
+	expect(seen).toEqual([
+		["auxiliary", undefined],
+		["main", undefined],
+		["auxiliary", undefined],
+		["subagent", "agent:task-1"],
+	]);
+	// Rejected before any attempt starts: main on a control request, a sub-agent without a task, a task on another role.
+	const before = h.inference.usage().length;
+	await expect(
+		h.inference.executeControl(
+			await controlRequest(),
+			messages,
+			signal,
+			undefined,
+			{
+				sessionRole: "main",
+			},
+		),
+	).rejects.toThrow("invalid_session_role");
+	await expect(
+		h.inference.executeControl(
+			await controlRequest(),
+			messages,
+			signal,
+			undefined,
+			{
+				sessionRole: "subagent",
+			},
+		),
+	).rejects.toThrow("invalid_session_role");
+	await expect(
+		h.inference.executeControl(
+			await controlRequest(),
+			messages,
+			signal,
+			undefined,
+			{
+				sessionRole: "auxiliary",
+				taskId: "task",
+			},
+		),
+	).rejects.toThrow("invalid_session_role");
+	await expect(
+		stream(await answerRequest(), {
+			sessionRole: "subagent",
+			taskId: "bad id",
+		}),
+	).rejects.toThrow("invalid_session_role");
+	expect(h.inference.usage()).toHaveLength(before);
+	const attempts = h.store.read((db) =>
+		db
+			.query(
+				"SELECT source,session_role,task_id,billing_path FROM inference_attempts ORDER BY started,rowid",
+			)
+			.all(),
+	);
+	expect(attempts).toEqual([
+		{
+			source: "larm",
+			session_role: "auxiliary",
+			task_id: null,
+			billing_path: "larm",
+		},
+		{
+			source: "larm",
+			session_role: "main",
+			task_id: null,
+			billing_path: "larm",
+		},
+		{
+			source: "larm",
+			session_role: "auxiliary",
+			task_id: null,
+			billing_path: "larm",
+		},
+		{
+			source: "larm",
+			session_role: "subagent",
+			task_id: "agent:task-1",
+			billing_path: "larm",
+		},
+	]);
+});
+test("a cloud fallback attempt records the role and the connection's billing path", async () => {
+	const h = await setup();
+	await h.inference.answer(messages, new AbortController().signal);
+	const row = h.store.read((db) =>
+		db
+			.query(
+				"SELECT session_role,billing_path FROM inference_attempts WHERE source='cloud'",
+			)
+			.get(),
+	);
+	expect(row).toEqual({
+		session_role: "auxiliary",
+		billing_path: "openai-compatible",
+	}); // The usage listing carries the path, for the chat screen's last-used display.
+	expect(
+		(h.inference.usage() as { source: string; billingPath: string }[])
+			.filter((u) => u.source === "cloud")
+			.map((u) => u.billingPath),
+	).toEqual(["openai-compatible"]);
+});

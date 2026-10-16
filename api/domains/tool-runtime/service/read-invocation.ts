@@ -29,6 +29,7 @@ export function createReadInvocation({
 	capabilities,
 	adapter,
 	canReplayPartial,
+	retryAvailableAt,
 }: {
 	refs: Map<string, ReadReference>;
 	localOperations: Map<string, AdapterOperation>;
@@ -36,6 +37,10 @@ export function createReadInvocation({
 	capabilities: Capabilities;
 	adapter: ToolAdapter;
 	canReplayPartial: (db: Database, invocation: Invocation) => boolean;
+	retryAvailableAt: (
+		db: Database,
+		invocation: Invocation,
+	) => number | undefined;
 }) {
 	function invokeInTransaction(
 		db: Database,
@@ -89,7 +94,11 @@ export function createReadInvocation({
 		}
 		if (
 			toolRuntimeOf(ref.tool.revisionId)?.urlScope === "request_or_observed" &&
-			!allowedUrls.includes((parsed.data as { url: string }).url)
+			!allowedUrls.some(
+				(url) =>
+					new URL(url).href ===
+					new URL((parsed.data as { url: string }).url).href,
+			)
 		)
 			throw new Error("tool_url_out_of_scope");
 		if (old) {
@@ -159,6 +168,12 @@ export function createReadInvocation({
 			localKind === "history" ||
 			localKind === "world" ||
 			localKind === "recipe";
+		const previous = db
+			.query(
+				`SELECT * FROM tool_invocations WHERE owner_task_id=? AND tool_revision_id=? AND args_digest=?${hasSupersededColumn(db) ? " AND superseded=0" : ""} ORDER BY finished_at DESC LIMIT 1`,
+			)
+			.get(owner.taskId, ref.tool.revisionId, digest) as Invocation | null;
+		const availableAtMs = previous ? retryAvailableAt(db, previous) : undefined;
 		const localId = crypto.randomUUID();
 		const operation = isLocal
 			? { operationId: `local:${localId}`, jobId: parentJobId }
@@ -170,6 +185,7 @@ export function createReadInvocation({
 					deadline,
 					parentJobId,
 					question,
+					availableAtMs,
 				});
 		if (isLocal) {
 			if (!adapter.localInTransaction)

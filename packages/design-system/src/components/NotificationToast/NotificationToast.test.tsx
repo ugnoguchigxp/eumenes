@@ -198,7 +198,7 @@ describe("NotificationToast Component", () => {
 				/>,
 			);
 
-			const closeButton = screen.getByLabelText("Close");
+			const closeButton = screen.getByLabelText("閉じる");
 			expect(closeButton).toBeInTheDocument();
 			expect(screen.getByTestId("icon-x")).toBeInTheDocument();
 		});
@@ -214,7 +214,7 @@ describe("NotificationToast Component", () => {
 				/>,
 			);
 
-			expect(screen.queryByLabelText("Close")).not.toBeInTheDocument();
+			expect(screen.queryByLabelText("閉じる")).not.toBeInTheDocument();
 		});
 
 		it("calls onClose when close button is clicked", () => {
@@ -227,7 +227,7 @@ describe("NotificationToast Component", () => {
 				/>,
 			);
 
-			const closeButton = screen.getByLabelText("Close");
+			const closeButton = screen.getByLabelText("閉じる");
 			fireEvent.click(closeButton);
 			expect(mockOnClose).toHaveBeenCalledTimes(1);
 		});
@@ -240,8 +240,7 @@ describe("NotificationToast Component", () => {
 			const parentClick = vi.fn();
 
 			render(
-				// biome-ignore lint/a11y/noStaticElementInteractions: Mock wrapper needs click
-				<div onClick={parentClick} onKeyUp={() => {}}>
+				<div role="presentation" onClick={parentClick} onKeyUp={() => {}}>
 					<NotificationToast
 						type="info"
 						title="Title"
@@ -251,7 +250,7 @@ describe("NotificationToast Component", () => {
 				</div>,
 			);
 
-			const closeButton = screen.getByLabelText("Close");
+			const closeButton = screen.getByLabelText("閉じる");
 			fireEvent.click(closeButton);
 
 			expect(mockOnClose).toHaveBeenCalled();

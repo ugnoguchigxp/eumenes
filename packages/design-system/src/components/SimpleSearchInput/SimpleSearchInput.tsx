@@ -2,8 +2,7 @@ import { Search } from "lucide-react";
 import React from "react";
 import { cn } from "@/utils/cn";
 
-export interface SimpleSearchInputProps
-	extends React.InputHTMLAttributes<HTMLInputElement> {
+export interface SimpleSearchInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
 	onSearch?: (query: string) => void;
 }
 
@@ -20,7 +19,7 @@ export const SimpleSearchInput = React.memo(
 							"flex h-11 w-full rounded-md border border-input bg-background pl-10 pr-3 py-2 text-base ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
 							className,
 						)}
-						placeholder="Search..."
+						placeholder="検索"
 						onChange={(e) => onSearch?.(e.target.value)}
 						{...props}
 					/>

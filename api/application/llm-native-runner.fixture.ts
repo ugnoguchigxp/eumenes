@@ -12,7 +12,6 @@ export async function evaluateRequirements(
 	profiles: Map<string, RequirementProfileData>,
 	model: LarmPort,
 	codexResearch?: {
-		model: string;
 		execute: (
 			messages: import("../domains/inference/contracts").Messages,
 			signal: AbortSignal,

@@ -15,7 +15,7 @@ export function createVoiceIntake({
 	sessions: Map<string, number>;
 	touchSession: (id: string) => void;
 	clock: () => string;
-	dispatch: (turn: VoiceTurn, wav: Uint8Array, deferred: boolean) => void;
+	dispatch: (turn: VoiceTurn, wav: Uint8Array) => void;
 }) {
 	return async function accept(
 		sessionId: string,
@@ -23,7 +23,6 @@ export function createVoiceIntake({
 		sequence: number,
 		utteranceId: string,
 		wav: Uint8Array,
-		deferred = false,
 	): Promise<VoiceTurn> {
 		touchSession(sessionId);
 		if (sessions.get(sessionId) !== generation)
@@ -75,7 +74,7 @@ export function createVoiceIntake({
 				);
 			return { turn, fresh: true };
 		});
-		if (fresh) dispatch(turn, wav, deferred);
+		if (fresh) dispatch(turn, wav);
 		return turn;
 	};
 }

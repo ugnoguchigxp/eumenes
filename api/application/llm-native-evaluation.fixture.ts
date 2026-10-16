@@ -14,7 +14,6 @@ import {
 	checkStatus,
 	draftReportBase,
 } from "../domains/agent-runtime/contracts/requirements";
-import { asrLanguages } from "../domains/settings/contracts";
 import { canonicalRequirementJson } from "../domains/capabilities";
 import { emotionSchema } from "../domains/delivery";
 import type { Report } from "../domains/agent-runtime";
@@ -23,7 +22,7 @@ const requirementsCase = z
 	.object({
 		id: z.string().min(1),
 		suite: z.literal("requirements"),
-		engine: z.enum(["default", "codex_luna"]),
+		engine: z.enum(["default", "codex"]),
 		request: z.string().min(1).max(8000),
 		profiles: z
 			.array(z.object({ id: z.string(), file: z.string() }).strict())
@@ -76,31 +75,11 @@ const deliveryCase = z
 		expected: z.object({ emotion: emotionSchema }).strict(),
 	})
 	.strict();
-const voiceCase = z
-	.object({
-		id: z.string(),
-		suite: z.literal("voice-language"),
-		text: z.string().min(1).max(8000),
-		allowedLanguages: z.array(z.string()).min(1),
-		expected: z
-			.object({
-				status: z.enum(["allowed", "not_allowed", "unverified"]),
-				languages: z.array(z.string()).optional(),
-			})
-			.strict(),
-	})
-	.strict();
 export const evaluationCases = z
 	.object({
 		version: z.literal(1),
 		cases: z
-			.array(
-				z.discriminatedUnion("suite", [
-					requirementsCase,
-					deliveryCase,
-					voiceCase,
-				]),
-			)
+			.array(z.discriminatedUnion("suite", [requirementsCase, deliveryCase]))
 			.min(1),
 	})
 	.strict();
@@ -139,13 +118,6 @@ export function loadEvaluationCases(path: string) {
 					throw new Error("invalid_evaluation_reference");
 		}
 	for (const c of data.cases) {
-		if (
-			c.suite === "voice-language" &&
-			c.allowedLanguages.some(
-				(language) => !asrLanguages.some(([code]) => code === language),
-			)
-		)
-			throw new Error("invalid_evaluation_language");
 		if (c.suite !== "requirements") continue;
 		if (
 			new Set(c.profiles.map((p) => p.id)).size !== c.profiles.length ||

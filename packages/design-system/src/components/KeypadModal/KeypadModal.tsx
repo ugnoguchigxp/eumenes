@@ -184,6 +184,7 @@ export const KeypadModal: React.FC<UnifiedKeypadModalProps> = React.memo(
 
 		useEffect(() => {
 			if (open) {
+				// oxlint-disable-next-line react/set-state-in-effect -- local state follows a prop or open state, reset when it changes
 				setValue(sanitizedInitialValue);
 				setError("");
 			}

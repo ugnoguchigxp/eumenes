@@ -192,8 +192,7 @@ const h = await harness({
 	model,
 	codexResearch: codex
 		? {
-				model: codex.model,
-				execute: async (messages, signal, control) => {
+				execute: async (messages, signal, control, model) => {
 					const system = messages
 						.filter((m) => m.role === "system")
 						.map((m) => m.content)
@@ -207,7 +206,7 @@ const h = await harness({
 						}),
 					);
 					observeContext(messages, "codex");
-					const raw = await codex.execute(messages, signal, control);
+					const raw = await codex.execute(messages, signal, control, model);
 					observeDecision(raw, "codex");
 					let action;
 					try {

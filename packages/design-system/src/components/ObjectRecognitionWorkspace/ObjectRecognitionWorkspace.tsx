@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Menu, Trash2, X } from "lucide-react";
 import { Button } from "../Button";
+import { menuKeyDown } from "../../utils/menuKeyboard";
 import { DetectionPreview } from "./DetectionPreview";
 import type { ObjectRecognitionWorkspaceProps, RecognitionItem } from "./types";
 import { useCameraCapture } from "./useCameraCapture";
@@ -46,14 +47,18 @@ function progressText(progress: unknown) {
 		: "";
 }
 
-export function ObjectRecognitionWorkspace(props: ObjectRecognitionWorkspaceProps) {
+export function ObjectRecognitionWorkspace(
+	props: ObjectRecognitionWorkspaceProps,
+) {
 	const [localError, setLocalError] = useState("");
 	const [submitting, setSubmitting] = useState(false);
 	const [historyOpen, setHistoryOpen] = useState(false);
 	const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 	const historyTrigger = useRef<HTMLButtonElement>(null);
 	const firstHistoryItem = useRef<HTMLButtonElement>(null);
-	const item = props.items.find((candidate) => candidate.id === props.selectedId);
+	const item = props.items.find(
+		(candidate) => candidate.id === props.selectedId,
+	);
 	useEffect(() => {
 		if (historyOpen) firstHistoryItem.current?.focus();
 	}, [historyOpen]);
@@ -76,7 +81,7 @@ export function ObjectRecognitionWorkspace(props: ObjectRecognitionWorkspaceProp
 			setSubmitting(false);
 		}
 	};
-	const camera = useCameraCapture(uploading);
+	const { preview, ...camera } = useCameraCapture(uploading);
 	const selectedProgress = item ? progressText(item.progress) : "";
 	const analyzing =
 		item?.state === "queued" ||
@@ -97,7 +102,10 @@ export function ObjectRecognitionWorkspace(props: ObjectRecognitionWorkspaceProp
 						: "処理中";
 
 	return (
-		<section className="recognition-workspace" aria-label="映っている物を調べる">
+		<section
+			className="recognition-workspace"
+			aria-label="映っている物を調べる"
+		>
 			<header className="recognition-heading">
 				<div className="recognition-heading-main">
 					<Button
@@ -107,8 +115,14 @@ export function ObjectRecognitionWorkspace(props: ObjectRecognitionWorkspaceProp
 						aria-haspopup="menu"
 						aria-expanded={historyOpen}
 						disabled={camera.recording}
-						title={camera.recording ? "録画を終了してから資料を選んでください。" : undefined}
-						onClick={() => historyOpen ? closeHistory() : setHistoryOpen(true)}
+						title={
+							camera.recording
+								? "録画を終了してから資料を選んでください。"
+								: undefined
+						}
+						onClick={() =>
+							historyOpen ? closeHistory() : setHistoryOpen(true)
+						}
 					>
 						<Menu size={16} />
 						資料一覧
@@ -124,16 +138,33 @@ export function ObjectRecognitionWorkspace(props: ObjectRecognitionWorkspaceProp
 			</header>
 			{historyOpen && (
 				<>
-					<button className="recognition-history-backdrop" aria-label="資料一覧を閉じる" onClick={closeHistory} />
-					<div className="recognition-history-menu" role="menu" aria-label="資料一覧" onKeyDown={(event) => {
-						if (event.key === "Escape") {
-							event.stopPropagation();
-							closeHistory();
-						}
-					}}>
+					<button
+						className="recognition-history-backdrop"
+						aria-label="資料一覧を閉じる"
+						onClick={closeHistory}
+					/>
+					<div
+						className="recognition-history-menu"
+						role="menu"
+						tabIndex={-1}
+						aria-label="資料一覧"
+						onKeyDown={(event) => {
+							if (event.key === "Escape") {
+								event.stopPropagation();
+								closeHistory();
+							} else menuKeyDown(event);
+						}}
+					>
 						<header>
 							<strong>保存した資料</strong>
-							<Button variant="ghost" size="icon" aria-label="資料一覧を閉じる" onClick={closeHistory}><X size={16} /></Button>
+							<Button
+								variant="ghost"
+								size="icon"
+								aria-label="資料一覧を閉じる"
+								onClick={closeHistory}
+							>
+								<X size={16} />
+							</Button>
 						</header>
 						{props.items.length === 0 && <p>保存した資料はありません。</p>}
 						<div className="recognition-history-items">
@@ -150,7 +181,9 @@ export function ObjectRecognitionWorkspace(props: ObjectRecognitionWorkspaceProp
 											closeHistory();
 										}}
 									>
-										<span className="recognition-history-name">{saved.name}</span>
+										<span className="recognition-history-name">
+											{saved.name}
+										</span>
 										<small>{stateLabel(saved)}</small>
 									</button>
 									<Button
@@ -158,19 +191,46 @@ export function ObjectRecognitionWorkspace(props: ObjectRecognitionWorkspaceProp
 										size="icon"
 										aria-label={`${saved.name}を削除`}
 										className="recognition-history-delete"
-										disabled={!canRemove(saved) || !props.onRemove || props.busy}
-										title={!canRemove(saved) ? "解析中の資料は、先に取消してください。" : undefined}
+										disabled={
+											!canRemove(saved) || !props.onRemove || props.busy
+										}
+										title={
+											!canRemove(saved)
+												? "解析中の資料は、先に取消してください。"
+												: undefined
+										}
 										onClick={() => setPendingDeleteId(saved.id)}
-									><Trash2 size={14} /></Button>
+									>
+										<Trash2 size={14} />
+									</Button>
 									{pendingDeleteId === saved.id && canRemove(saved) && (
-										<div className="recognition-delete-confirm" role="group" aria-label={`${saved.name}の削除確認`}>
-											<p>「{saved.name}」と解析結果を削除します。元に戻せません。</p>
+										<div
+											className="recognition-delete-confirm"
+											role="group"
+											aria-label={`${saved.name}の削除確認`}
+										>
+											<p>
+												「{saved.name}」と解析結果を削除します。元に戻せません。
+											</p>
 											<div>
-												<Button variant="destructive" size="sm" disabled={props.busy} onClick={() => {
-													props.onRemove?.(saved.id);
-													closeHistory();
-												}}>削除する</Button>
-												<Button variant="secondary" size="sm" onClick={() => setPendingDeleteId(null)}>やめる</Button>
+												<Button
+													variant="destructive"
+													size="sm"
+													disabled={props.busy}
+													onClick={() => {
+														props.onRemove?.(saved.id);
+														closeHistory();
+													}}
+												>
+													削除する
+												</Button>
+												<Button
+													variant="secondary"
+													size="sm"
+													onClick={() => setPendingDeleteId(null)}
+												>
+													やめる
+												</Button>
 											</div>
 										</div>
 									)}
@@ -190,7 +250,9 @@ export function ObjectRecognitionWorkspace(props: ObjectRecognitionWorkspaceProp
 				<select
 					aria-label="物体認識の認証方式"
 					value={props.credentialSource ?? "dedicated"}
-					disabled={props.busy || !props.hasEndpoint || !props.onCredentialSourceChange}
+					disabled={
+						props.busy || !props.hasEndpoint || !props.onCredentialSourceChange
+					}
 					onChange={(event) => {
 						const source = event.target.value;
 						if (source === "dedicated" || source === "larm")
@@ -220,7 +282,7 @@ export function ObjectRecognitionWorkspace(props: ObjectRecognitionWorkspaceProp
 				cameraActive={camera.opened}
 				cameraPreview={
 					<video
-						ref={camera.preview}
+						ref={preview}
 						autoPlay
 						muted
 						playsInline
@@ -250,17 +312,23 @@ export function ObjectRecognitionWorkspace(props: ObjectRecognitionWorkspaceProp
 						<Button
 							className={processing ? "recognition-submit-loading" : undefined}
 							aria-busy={processing}
-							disabled={disabled || !camera.opened || camera.recording || processing}
+							disabled={
+								disabled || !camera.opened || camera.recording || processing
+							}
 							onClick={() => void camera.photo()}
 						>
-							{processing && <span className="recognition-spinner" aria-hidden="true" />}
+							{processing && (
+								<span className="recognition-spinner" aria-hidden="true" />
+							)}
 							<span aria-live="polite">
 								{processing ? processingLabel : "撮影して調べる"}
 							</span>
 						</Button>
 						<Button
 							variant="secondary"
-							className={camera.recording ? "recognition-record-button" : undefined}
+							className={
+								camera.recording ? "recognition-record-button" : undefined
+							}
 							disabled={disabled || !camera.opened}
 							onClick={() =>
 								camera.recording ? camera.finishRecording() : camera.record()
@@ -306,17 +374,24 @@ export function ObjectRecognitionWorkspace(props: ObjectRecognitionWorkspaceProp
 							</div>
 							{selectedProgress && <span>{selectedProgress}</span>}
 							{["queued", "starting", "running"].includes(item.state) && (
-								<Button variant="secondary" onClick={() => props.onCancel?.(item.id)}>
+								<Button
+									variant="secondary"
+									onClick={() => props.onCancel?.(item.id)}
+								>
 									取消
 								</Button>
 							)}
 							{item.state === "failed" && (
 								<span>
-									{errors[item.errorCode ?? ""] ?? "サービスに接続できませんでした。"}
+									{errors[item.errorCode ?? ""] ??
+										"サービスに接続できませんでした。"}
 								</span>
 							)}
 							{item.canRecheck && (
-								<Button variant="secondary" onClick={() => props.onRecheck?.(item.id)}>
+								<Button
+									variant="secondary"
+									onClick={() => props.onRecheck?.(item.id)}
+								>
 									保存した受付から再確認
 								</Button>
 							)}

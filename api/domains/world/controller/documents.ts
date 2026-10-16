@@ -9,6 +9,23 @@ export function registerWorldDocuments(
 	documents: WorldDocuments,
 	scope: () => WorldDocumentScope,
 ) {
+	app.get("/api/world/documents/page", (c) => {
+		const { desc, ...query } = c.req.query();
+		if (desc !== undefined && desc !== "true" && desc !== "false")
+			return c.json({ error: "invalid_input" }, 400);
+		try {
+			return c.json(
+				documents.page(scope(), {
+					...query,
+					...(desc === undefined ? {} : { desc: desc === "true" }),
+				}),
+			);
+		} catch (error) {
+			if (error instanceof Error && error.name === "ZodError")
+				return c.json({ error: "invalid_input" }, 400);
+			throw error;
+		}
+	});
 	app.get("/api/world/documents", (c) => {
 		try {
 			const { offset, ...query } = c.req.query();

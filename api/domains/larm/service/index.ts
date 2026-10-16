@@ -1,48 +1,15 @@
-import { providerRequest } from "./provider-request";
 import { measureStage } from "../../../infrastructure/performance";
-import { createSpeechSynthesizer } from "./speech";
-import { answerRequest } from "./answer-request";
-import {
-	isNetworkError,
-	toErrorCode,
-} from "../../../infrastructure/error-code";
-import { getLogger } from "../../../infrastructure/logger";
-const log = getLogger("larm");
-import type {
-	Capability,
-	LarmPort,
-	LarmStatus,
-	LarmCallOptions,
-} from "../contracts";
-import {
-	type Fetcher,
-	type Lease,
-	type Provider,
-	type ProviderName,
-} from "./profiles";
-import { assertRuriQuestions, decodeSpeechCredit } from "./context";
-import {
-	awaitReady,
-	renewProviders,
-	claimProviders,
-	createConnection,
-	fetchCatalog,
-} from "./connect";
-import {
-	localEndpoint,
-	readJson,
-	record,
-	string,
-	untilAborted,
-	wait,
-} from "./guards";
-import { LarmInferenceError, providerError } from "./inference-error";
+import type { Capability, LarmPort, LarmCallOptions } from "../contracts";
 import { ttsVoicesSchema } from "../contracts";
 import type { TtsVoices } from "../contracts";
-
-/** True when the caller's own signal cancelled the request (not a timeout or a LARM fault). */
-const callerAborted = (error: unknown, signal?: AbortSignal) =>
-	signal?.aborted === true && (error as Error)?.name === "AbortError";
+import { createSpeechSynthesizer } from "./speech";
+import { answerRequest } from "./answer-request";
+import { assertAttitudeQuestions } from "./context";
+import { createControl } from "./control";
+import { createInfer } from "./infer";
+import { createLeaseManager } from "./lease-manager";
+import { type Fetcher, type Provider } from "./profiles";
+import { localEndpoint, readJson, record, untilAborted } from "./guards";
 
 export function createLarm(config: {
 	/** LARM control origin. There is no default: without it the port stays unconfigured. */
@@ -111,584 +78,26 @@ export function createLarm(config: {
 	const auxiliarySessions = new Set<LarmPort>();
 	let mainAnswer = Promise.resolve();
 	const voiceCatalogs = new WeakMap<Provider, TtsVoices>();
-	let lease: Lease | undefined;
-	/** Leases confirmed without an English voice; later English clauses skip the recheck. */
-	const withoutEnglish = new WeakSet<Lease>();
-	let connecting: Promise<Lease> | undefined;
-	let lastError: string | undefined;
-	let closed = false;
 	let judging = false;
-	const listeners = new Set<() => void>();
-	function status(): LarmStatus {
-		return {
-			state:
-				!token || !base || !profile
-					? "unconfigured"
-					: connecting
-						? "connecting"
-						: lastError
-							? "failed"
-							: lease
-								? "ready"
-								: "idle",
-			...(lease?.providers.get("llm")?.vision &&
-			lease.providers.get("llm")?.chatInput
-				? { chatInput: lease.providers.get("llm")!.chatInput }
-				: {}),
-			capabilities: lease
-				? [...lease.providers.keys()].filter(
-						(name): name is Capability =>
-							name === "llm" || name === "asr" || name === "tts",
-					)
-				: [],
-			...(!base
-				? { error: "larm_base_url_unconfigured" }
-				: !profile
-					? { error: "larm_profile_missing" }
-					: lastError
-						? { error: lastError }
-						: {}),
-		};
-	}
-	let previousStatus = JSON.stringify(status());
-	function notify() {
-		const next = JSON.stringify(status());
-		if (previousStatus === next) return;
-		previousStatus = next;
-		for (const listener of listeners) {
-			try {
-				listener();
-			} catch {
-				/* Independent subscribers. */
-			}
-		}
-	}
-	async function control(
-		path: string,
-		init: RequestInit,
-		accepted: number[],
-	): Promise<Response> {
-		if (!base) throw new Error("larm_base_url_unconfigured");
-		if (!token) throw new Error("larm_unconfigured");
-		const url = new URL(path, base);
-		if (url.origin !== base.origin)
-			throw new Error("larm_control_origin_mismatch");
-		const response = await request(url, {
-			...init,
-			headers: { Authorization: `Bearer ${token}`, ...init.headers },
-			redirect: "error",
-			signal:
-				init.method === "DELETE"
-					? AbortSignal.timeout(15_000)
-					: AbortSignal.any([
-							lifetime.signal,
-							// Only read-only status checks are short; POSTs (create, claim,
-							// renew) may legitimately wait for LARM and must not be cut early.
-							AbortSignal.timeout(
-								(!init.method || init.method === "GET") && init.signal
-									? 3_000
-									: 15_000,
-							),
-							...(init.signal ? [init.signal] : []),
-						]),
-		});
-		if (!accepted.includes(response.status)) {
-			log.warn("larm.control_rejected", {
-				route: path
-					.split("?")[0]!
-					.replace(/(agent-connections\/)[^/]+/, "$1:id"),
-				method: init.method ?? "GET",
-				status: response.status,
-			});
-			throw new Error(`larm_control_${response.status}`);
-		}
-		return response;
-	}
-	async function release(current: Lease, force = false) {
-		current.closing = true;
-		if (current.renewTimer) clearTimeout(current.renewTimer);
-		clearTimeout(current.idleTimer);
-		if (current.useCount > 0 && !force) return;
-		if (lease === current) lease = undefined;
-		notify();
-		try {
-			await control(
-				`/v1/agent-connections/${encodeURIComponent(current.id)}`,
-				{ method: "DELETE" },
-				[204, 200, 404, 410],
-			);
-		} catch {
-			if (!lease) {
-				lastError = "larm_release_unconfirmed";
-				notify();
-			}
-		}
-	}
-	function discard(current: Lease, error?: string) {
-		current.closing = true;
-		clearTimeout(current.renewTimer);
-		clearTimeout(current.idleTimer);
-		if (lease === current) {
-			lease = undefined;
-			lastError = error;
-			notify();
-		}
-	}
-	function scheduleIdle(current: Lease) {
-		clearTimeout(current.idleTimer);
-		current.idleTimer = setTimeout(
-			() => {
-				if (lease === current && !current.useCount) discard(current);
-			},
-			Math.max(0, current.idleAt - Date.now()),
-		);
-		current.idleTimer.unref?.();
-	}
-	function scheduleRenew(current: Lease) {
-		if (current.renewTimer) clearTimeout(current.renewTimer);
-		const delay = Math.max(0, current.expiresAt - Date.now() - 180_000);
-		current.renewTimer = setTimeout(() => {
-			if (lease === current && !closed && !current.closing)
-				void connect(["llm"]).catch(() => {});
-		}, delay);
-		current.renewTimer.unref?.();
-	}
-	async function refresh(
-		current: Lease,
-		required: Capability[],
-		signal?: AbortSignal,
-	): Promise<boolean> {
-		const scopedControl = (
-			path: string,
-			init: RequestInit,
-			accepted: number[],
-		) => control(path, { ...init, signal }, accepted);
-		const state = record(
-			await readJson(
-				await scopedControl(
-					`/v1/agent-connections/${current.id}`,
-					{ method: "GET" },
-					[200],
-				),
-			),
-		);
-		if (state.id !== current.id) throw new Error("larm_invalid_connection");
-		if (["failed", "expired", "released"].includes(String(state.status)))
-			throw new Error(`larm_connection_${state.status}`);
-		if (
-			state.profile !== profile ||
-			state.agentProfile !== current.agentProfile
-		)
-			throw new Error("larm_invalid_connection");
-		if (state.status !== "ready") return false;
-		if (!required.every((name) => current.providers.has(name))) return false;
-		const expiresAt = Date.parse(string(state.expiresAt));
-		if (!Number.isFinite(expiresAt) || expiresAt <= Date.now())
-			throw new Error("larm_expired");
-		current.expiresAt = Math.min(current.expiresAt, expiresAt);
-		if (current.expiresAt > Date.now() + 180_000) return true;
-		for (let attempt = 0; current.useCount > 0 && attempt < 120; attempt++)
-			await wait(1000, lifetime.signal);
-		if (current.useCount > 0) throw new Error("larm_renew_busy");
-		try {
-			const { providers: next, expiresAt: nextExpiry } = await renewProviders(
-				scopedControl,
-				current,
-				hostsFor(),
-			);
-			if (current.closing || lease !== current)
-				throw new Error("larm_connection_released");
-			current.providers = next;
-			current.expiresAt = nextExpiry;
-			scheduleRenew(current);
-			return true;
-		} catch (error) {
-			// The caller's cancellation says nothing about the shared lease.
-			if (callerAborted(error, signal)) throw error;
-			await release(current);
-			throw error;
-		}
-	}
-	async function connect(
-		required: Capability[],
-		signal?: AbortSignal,
-		force = false,
-	): Promise<Lease> {
-		signal?.throwIfAborted();
-		const scopedControl = (
-			path: string,
-			init: RequestInit,
-			accepted: number[],
-		) => control(path, { ...init, signal }, accepted);
-		const pause = (ms: number) =>
-			wait(
-				ms,
-				signal ? AbortSignal.any([signal, lifetime.signal]) : lifetime.signal,
-			);
-		if (closed) throw new Error("larm_closed");
-		if (!base) throw new Error("larm_base_url_unconfigured");
-		if (!token) throw new Error("larm_unconfigured");
-		if (!profile) throw new Error("larm_profile_missing");
-		if (lease && !lease.useCount && lease.idleAt <= Date.now()) discard(lease);
-		if (
-			!force &&
-			lease &&
-			!lease.closing &&
-			lease.expiresAt > Date.now() + 180_000 &&
-			required.every((name) => lease!.providers.has(name))
-		)
-			return lease;
-		if (connecting) {
-			// A renewal in flight must not stop new work on a lease that is still valid.
-			if (
-				!force &&
-				lease &&
-				!lease.closing &&
-				lease.expiresAt - Date.now() > 30_000 &&
-				required.every((name) => lease!.providers.has(name))
-			)
-				return lease;
-			try {
-				await untilAborted(connecting, signal ?? lifetime.signal);
-			} catch (error) {
-				(signal ?? lifetime.signal).throwIfAborted();
-				// The attempt belongs to another caller; its own cancellation or
-				// deadline (AbortError / TimeoutError) must not fail this caller.
-				if (
-					!(
-						error instanceof DOMException &&
-						(error.name === "AbortError" || error.name === "TimeoutError")
-					)
-				)
-					throw error;
-			}
-			return connect(required, signal, force);
-		}
-		const connectStarted = performance.now();
-		// One key per connect(): every attempt to create this connection reuses it.
-		const idempotencyKey = crypto.randomUUID();
-		log.info("larm.connection_started", { count: required.length });
-		connecting = (async () => {
-			if (lease && !lease.closing) {
-				const current = lease;
-				try {
-					if (
-						(await refresh(current, required, signal)) &&
-						lease === current &&
-						!current.closing
-					) {
-						lastError = undefined;
-						return current;
-					}
-				} catch (error) {
-					if (
-						!(error instanceof Error) ||
-						![
-							"larm_expired",
-							"larm_connection_failed",
-							"larm_connection_expired",
-							"larm_connection_released",
-							"larm_control_404",
-						].includes(error.message)
-					)
-						throw error;
-				}
-				for (let attempt = 0; current.useCount > 0 && attempt < 120; attempt++)
-					await pause(1000);
-				if (current.useCount > 0) throw new Error("larm_connection_busy");
-				await release(current);
-			}
-			const { catalogRevision, catalogProfile, catalogProviders } =
-				await fetchCatalog(scopedControl, profile, required);
-			const fullProfile = required.some((name) => name !== "llm");
-			const creation = {
-				profile,
-				client,
-				audience,
-				fullProfile,
-				catalogRevision,
-				idempotencyKey,
-			};
-			let creationResult: Awaited<ReturnType<typeof createConnection>>;
-			try {
-				creationResult = await createConnection(scopedControl, creation);
-			} catch (error) {
-				// A timed-out POST may still have created the connection; the same
-				// Idempotency-Key makes one retry return it instead of a duplicate.
-				if (
-					!(error instanceof DOMException && error.name === "TimeoutError") ||
-					signal?.aborted ||
-					lifetime.signal.aborted
-				)
-					throw error;
-				creationResult = await createConnection(scopedControl, creation);
-			}
-			const { id, created } = creationResult;
-			try {
-				const ready = await awaitReady(scopedControl, pause, {
-					id,
-					created,
-					required,
-					profile,
-					agentProfile: catalogProfile.id,
-				});
-				const { expiresAt, providers } = await claimProviders(scopedControl, {
-					id,
-					created: ready,
-					required,
-					catalogProviders,
-					fullProfile,
-					hosts: hostsFor(),
-				});
-				const current: Lease = {
-					id,
-					expiresAt,
-					providers,
-					agentProfile: string(catalogProfile.id),
-					useCount: 0,
-					closing: false,
-					idleAt: Date.now() + idleTimeoutMs,
-				};
-				lease = current;
-				scheduleRenew(current);
-				scheduleIdle(current);
-				lastError = undefined;
-				return current;
-			} catch (error) {
-				try {
-					await control(
-						`/v1/agent-connections/${id}`,
-						{ method: "DELETE" },
-						[204, 200],
-					);
-				} catch {
-					/* original error is primary */
-				}
-				throw error;
-			}
-		})();
-		notify();
-		try {
-			const connected = await connecting;
-			log.info("larm.connection_ready", {
-				count: connected.providers.size,
-				durationMs: Math.round(performance.now() - connectStarted),
-			});
-			return connected;
-		} catch (error) {
-			if (callerAborted(error, signal))
-				// The caller gave up; LARM did not fail, so the status stays as it was.
-				log.info("larm.connection_failed", {
-					reason: "caller_aborted",
-					durationMs: Math.round(performance.now() - connectStarted),
-				});
-			else {
-				log.warn(
-					"larm.connection_failed",
-					{ durationMs: Math.round(performance.now() - connectStarted) },
-					error,
-				);
-				lastError = isNetworkError(error)
-					? "larm_connection_failed"
-					: toErrorCode(error, "larm_failed");
-			}
-			throw error;
-		} finally {
-			connecting = undefined;
-			notify();
-		}
-	}
-	async function isReleased(
-		current: Lease,
-		signal: AbortSignal,
-	): Promise<boolean> {
-		if (current.closing) return true;
-		const response = await control(
-			`/v1/agent-connections/${encodeURIComponent(current.id)}`,
-			{ method: "GET", signal },
-			[200, 404, 410],
-		);
-		if (response.status !== 200) {
-			await response.body?.cancel();
-			return true;
-		}
-		const state = record(await readJson(response));
-		return (
-			state.id === current.id &&
-			["released", "expired"].includes(String(state.status))
-		);
-	}
-	async function withProvider<T>(
-		name: ProviderName,
-		signal: AbortSignal,
-		use: (p: Provider, connectionId: string) => Promise<T>,
-	): Promise<T> {
-		const required: Capability[] =
-			name === "llm" ? ["llm"] : ["llm", "asr", "tts"];
-		for (let attempt = 0; ; attempt++) {
-			signal.throwIfAborted();
-			let current = await measureStage(
-				"larm",
-				"provider_ready",
-				() => untilAborted(connect(required, signal), signal),
-				{ kind: name },
-			);
-			let provider = current.providers.get(name);
-			if (name === "tts-english" && !provider && !withoutEnglish.has(current)) {
-				// A pre-deployment voice lease may lack the newly published role.
-				// Check its current control state before treating the role as absent.
-				current = await untilAborted(connect(required, signal, true), signal);
-				provider = current.providers.get(name);
-				if (!provider) withoutEnglish.add(current);
-			}
-			if (name === "tts-english" && !provider)
-				throw new Error("speech_tts_target_unavailable");
-			if (name === "system-one" && !provider)
-				throw new Error("larm_system_one_unavailable");
-			if (
-				!provider ||
-				current.expiresAt <= Date.now() + 10_000 ||
-				current.closing
-			)
-				throw new Error("larm_credential_expired");
-			current.useCount++;
-			clearTimeout(current.idleTimer);
-			try {
-				signal.throwIfAborted();
-				return await use(provider, current.id);
-			} catch (error) {
-				let unusable =
-					error instanceof LarmInferenceError &&
-					error.status === 409 &&
-					error.code === "connection_idle_released";
-				// Some gateway versions return unauthorized after an idle profile switch.
-				// Confirm the old connection is terminal; a ready connection's 401 stays an error.
-				if (
-					!signal.aborted &&
-					error instanceof LarmInferenceError &&
-					error.status === 401 &&
-					error.code === "unauthorized"
-				) {
-					try {
-						unusable = await isReleased(current, signal);
-					} catch {
-						signal.throwIfAborted();
-					}
-				}
-				if (unusable) {
-					discard(current, "larm_connection_released");
-					// The gateway rejected before inference began. Only this explicit
-					// lifecycle rejection may replay once; streamed output is never replayed.
-					if (!attempt && !signal.aborted) continue;
-				}
-				throw error;
-			} finally {
-				current.useCount--;
-				if (current.closing && current.useCount === 0) await release(current);
-				else if (!current.closing && !current.useCount) {
-					current.idleAt = Date.now() + idleTimeoutMs;
-					scheduleIdle(current);
-				}
-			}
-		}
-	}
-	async function infer(
-		provider: Provider,
-		operation: string,
-		init: RequestInit,
-		signal: AbortSignal,
-		connectionId: string,
-		options?: LarmCallOptions,
-	): Promise<Response> {
-		const endpoint = new URL(
-			provider.baseUrl.endsWith("/")
-				? provider.baseUrl
-				: `${provider.baseUrl}/`,
-		);
-		const url = provider.endpoint
-			? new URL(provider.endpoint)
-			: new URL(operation, endpoint);
-		if (url.origin !== endpoint.origin)
-			throw new Error("larm_endpoint_mismatch");
-		const started = Date.now();
-		let response: Response;
-		try {
-			response = await providerRequest(
-				request,
-				url,
-				provider,
-				init,
-				signal,
-				operation,
-			);
-		} catch (error) {
-			if (signal.aborted)
-				log.info("larm.inference_cancelled", {
-					kind: operation,
-					reason: "cancelled",
-					durationMs: Date.now() - started,
-				});
-			else
-				log.warn(
-					"larm.inference_unreachable",
-					{
-						kind: operation,
-						reason: "network_unavailable",
-						durationMs: Date.now() - started,
-					},
-					error,
-				);
-			await options?.onExchange?.({
-				connectionId,
-				model: provider.model,
-				operation,
-				started,
-			});
-			throw error;
-		}
-		if (!response.ok) {
-			const details = await providerError(response, signal, [
-				provider.token,
-				token ?? "",
-			]);
-			log.warn("larm.inference_rejected", {
-				kind: operation,
-				status: response.status,
-				reason: `larm_inference_${response.status}`,
-				durationMs: Date.now() - started,
-			});
-			await options?.onExchange?.({
-				connectionId,
-				model: provider.model,
-				operation,
-				started,
-				httpStatus: response.status,
-				...details,
-			});
-			throw new LarmInferenceError(response.status, details.errorCode);
-		}
-		try {
-			const speechCredit =
-				operation === "audio/speech"
-					? decodeSpeechCredit(response.headers.get("X-VOICEVOX-Credit"))
-					: undefined;
-			await options?.onExchange?.({
-				connectionId,
-				model: provider.model,
-				operation,
-				started,
-				httpStatus: response.status,
-				speechVoice: options?.speechVoice,
-				...(speechCredit
-					? { speechCredit, speechVoice: options?.speechVoice }
-					: {}),
-			});
-		} catch (error) {
-			await response.body?.cancel();
-			throw error;
-		}
-		return response;
-	}
+	const control = createControl({
+		base,
+		token,
+		request,
+		lifetime: lifetime.signal,
+	});
+	const infer = createInfer({ request, token });
+	const leases = createLeaseManager({
+		base,
+		token,
+		profile,
+		audience,
+		client,
+		idleTimeoutMs,
+		hostsFor,
+		control,
+		lifetime,
+	});
+	const { connect, withProvider, status } = leases;
 	async function inferAnswer(
 		messages: Parameters<LarmPort["answer"]>[0],
 		signal: AbortSignal,
@@ -699,7 +108,7 @@ export function createLarm(config: {
 			answerRequest(p, messages, signal, onDelta, options, {
 				profile,
 				request,
-				sameClaim: () => lease?.providers.get("llm") === p,
+				sameClaim: () => leases.current()?.providers.get("llm") === p,
 				send: (init) =>
 					infer(p, "chat/completions", init, signal, connectionId, options),
 			}),
@@ -780,7 +189,8 @@ export function createLarm(config: {
 	}
 
 	return {
-		decisionModel: () => lease?.providers.get("system-one")?.model ?? null,
+		decisionModel: () =>
+			leases.current()?.providers.get("system-one")?.model ?? null,
 		async judge(state, questions, signal) {
 			if (judging) throw new Error("larm_decision_busy");
 			judging = true;
@@ -790,12 +200,10 @@ export function createLarm(config: {
 					"system-one",
 					scoped,
 					async (p, connectionId) => {
-						const ruri = p.model === "ruri-v3-30m-speaking-attitude";
-						if (ruri) assertRuriQuestions(questions);
-						const { current_chunk, ...legacyState } = state;
-						const sentState = ruri
-							? { current_chunk: current_chunk ?? state.response ?? "" }
-							: legacyState;
+						assertAttitudeQuestions(questions);
+						const sentState = {
+							current_chunk: state.current_chunk ?? state.response ?? "",
+						};
 						const response = await infer(
 							p,
 							"systemone",
@@ -872,6 +280,7 @@ export function createLarm(config: {
 			}
 		},
 		inspect() {
+			const lease = leases.current();
 			return {
 				profile,
 				decisionModel: lease?.providers.get("system-one")?.model ?? null,
@@ -898,12 +307,7 @@ export function createLarm(config: {
 			await connect(["llm"], signal);
 		},
 		status,
-		onChange(listener) {
-			listeners.add(listener);
-			return () => {
-				listeners.delete(listener);
-			};
-		},
+		onChange: leases.onChange,
 		answer: (messages, signal, options) =>
 			answer(messages, signal, undefined, options),
 		answerStream: answer,
@@ -939,30 +343,17 @@ export function createLarm(config: {
 		speak: createSpeechSynthesizer({
 			withProvider,
 			infer,
-			japaneseVoice: () => lease?.providers.get("tts"),
+			japaneseVoice: () => leases.current()?.providers.get("tts"),
 			readVoices,
 			voiceCatalogs,
 			config,
 			voice,
 		}),
-		async close() {
-			closed = true;
-			lifetime.abort(new Error("larm_closed"));
-			await Promise.all([...auxiliarySessions].map((helper) => helper.close()));
-			if (connecting) await connecting.catch(() => {});
-			if (lease) {
-				const current = lease;
-				// Let in-flight work finish (up to 5 s) so the DELETE is not skipped.
-				const idle = new AbortController().signal;
-				for (
-					let waited = 0;
-					current.useCount > 0 && waited < 5_000;
-					waited += 100
-				)
-					await wait(100, idle);
-				await release(current, true);
-			}
-			listeners.clear();
-		},
+		close: () =>
+			leases.close(() =>
+				Promise.all(
+					[...auxiliarySessions].map((helper) => helper.close()),
+				).then(() => {}),
+			),
 	};
 }

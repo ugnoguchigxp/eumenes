@@ -104,6 +104,7 @@ export function TaskForm({
 		if (ready && !disabled) onSubmit(next);
 	};
 	return (
+		// oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- handles keys or drag events that bubble up from its interactive children
 		<form
 			className="kanban-form"
 			aria-label={label}
@@ -202,6 +203,7 @@ export function NoteForm({ disabled, onSubmit, onCancel }: NoteFormProps) {
 		NOTE_QUOTED_MAX - quotedLength(trimmed),
 	);
 	return (
+		// oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- handles keys or drag events that bubble up from its interactive children
 		<form
 			className="kanban-form"
 			aria-label="追加で直す"

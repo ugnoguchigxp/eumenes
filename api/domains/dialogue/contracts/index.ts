@@ -77,23 +77,6 @@ export const promptTargetSchema = z.object({
 });
 export type PromptTarget = z.infer<typeof promptTargetSchema>;
 
-/** Optional post-answer hook owned by dialogue. It never receives message text. */
-export type PostAnswerObservation = {
-	runId: string;
-	ticketId: string;
-	reportEpoch: number;
-};
-export type PostAnswerObserverResult =
-	| { status: "recorded" }
-	| { status: "skipped"; code: string };
-export interface PostAnswerObserverPort {
-	/** Called inside a SAVEPOINT after the answer is adopted; must be synchronous. */
-	recordInTransaction(
-		db: Database,
-		input: PostAnswerObservation,
-	): PostAnswerObserverResult;
-}
-
 /**
  * The steward as dialogue sees it (wired by the application). Called in the transaction in which a run ends,
  * after the run's exchange was recorded in memory's ledger.

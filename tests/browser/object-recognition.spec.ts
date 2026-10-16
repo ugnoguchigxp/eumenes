@@ -316,6 +316,10 @@ test("camera recording finishes through the artifact controls", async ({
 	).toBeEnabled();
 	await workspace.getByRole("button", { name: "カメラを開く" }).click();
 	await expect(workspace.getByLabel("カメラプレビュー")).toBeVisible();
+	const preview = workspace.getByLabel("カメラプレビュー");
+	const previewTime = () =>
+		preview.evaluate((v: HTMLVideoElement) => v.currentTime);
+	const recordingFrom = await previewTime();
 	await workspace.getByRole("button", { name: "録画を開始" }).click();
 	await expect(workspace.locator(".recognition-record-dot")).toBeVisible();
 	await expect(
@@ -325,8 +329,11 @@ test("camera recording finishes through the artifact controls", async ({
 		name: "録画を終了して調べる",
 	});
 	await expect(finish).toBeVisible();
-	await page.waitForTimeout(1000);
-	await expect(finish).toBeVisible({ timeout: 5000 });
+	// Record at least a second of the live preview before finishing.
+	await expect
+		.poll(previewTime, { timeout: 10_000 })
+		.toBeGreaterThan(recordingFrom + 1);
+	await expect(finish).toBeVisible();
 	await finish.click({ timeout: 5000 });
 	await workspace
 		.getByRole("button", { name: "資料一覧", exact: true })

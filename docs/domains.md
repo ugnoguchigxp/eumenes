@@ -2,53 +2,53 @@
 
 ## Domain 一覧(自動生成)
 
-次の表は `scripts/domains.ts` から `bun scripts/domain-docs.ts` が生成します。手で編集しないでください。`bun scripts/domain-docs.ts --check` が差分を検出します(`verify --all` に組み込みます)。依存の方向は `scripts/boundaries.ts` が検査し、下位 domain は上位 domain を参照しません。
+次の表は `scripts/domains.ts` から `bun scripts/domain-docs.ts` が生成します。手で編集しないでください。`bun scripts/domain-docs.ts --check` が差分を検出します(`verify --all` に組み込みます)。依存の方向は `scripts/boundaries.ts` が検査します。各 domain は `scripts/domains.ts` で明示した Tier(0 が最下位)を持ち、宣言した依存(api・web・試験のみ)は必ず自分より低い Tier の domain だけを指します。許可リストに加えてこの Tier 検査を通らなければならないため、下位 domain は上位 domain を参照できません。依存を足して Tier が合わなくなった場合は、設計を見直したうえで `scripts/domains.ts` の Tier を更新します。
 
 <!-- domains:start -->
-| Domain | Backend 入口 | Web 入口 | Components | 依存 (api) | 依存 (web) | 依存 (試験のみ) |
-| --- | --- | --- | --- | --- | --- | --- |
-| `google-accounts` | `api/domains/google-accounts/index.ts` | `web/src/domains/google-accounts/` | `packages/design-system/src/components/GoogleAccounts/index.tsx` | なし | なし | なし |
-| `excalidraw` | `api/domains/excalidraw/index.ts` | `web/src/domains/excalidraw/` | なし | `capabilities`、`inference`、`larm`、`queue` | なし | なし |
-| `ocr` | `api/domains/ocr/index.ts` | `web/src/domains/ocr/index.ts` | `packages/design-system/src/components/OcrWorkspace/index.ts` | `capabilities`、`inference`、`queue` | なし | なし |
-| `object-recognition` | `api/domains/object-recognition/index.ts` | `web/src/domains/object-recognition/index.ts` | なし | `capabilities`、`queue` | なし | なし |
-| `kanban` | `api/domains/kanban/index.ts` | `web/src/domains/kanban/index.ts` | なし | `capabilities` | なし | なし |
-| `codex-tasks` | `api/domains/codex-tasks/index.ts` | `web/src/domains/codex-tasks/` | なし | `coding` | なし | なし |
-| `terminals` | `api/domains/terminals/index.ts` | `web/src/domains/terminals/index.ts` | なし | なし | なし | なし |
-| `background` | なし | `web/src/domains/background/index.ts` | なし | なし | なし | なし |
-| `image` | `api/domains/image/index.ts` | `web/src/domains/image/index.ts` | なし | `capabilities`、`inference`、`larm`、`queue` | なし | なし |
-| `ui-compositions` | `api/domains/ui-compositions/index.ts` | `web/src/domains/ui-compositions/` | なし | `capabilities`、`inference`、`larm`、`queue` | なし | なし |
-| `music` | `api/domains/music/index.ts` | `web/src/domains/music/index.ts` | `web/src/components/domains/music/` | `capabilities`、`inference`、`larm`、`queue` | なし | なし |
-| `dots` | `api/domains/dots/index.ts` | なし | なし | `queue` | なし | なし |
-| `task-reports` | `api/domains/task-reports/index.ts` | なし | なし | `tasks` | なし | なし |
-| `coding-supervision` | `api/domains/coding-supervision/index.ts` | なし | なし | `coding`、`inference`、`queue`、`task-reports`、`tasks` | なし | なし |
-| `coding` | `api/domains/coding/index.ts` | なし | なし | なし | なし | なし |
-| `artifact` | なし | `web/src/domains/artifact/index.ts` | `web/src/components/domains/artifact/` | なし | `conversation` | なし |
-| `tasks` | `api/domains/tasks/index.ts` | なし | なし | なし | なし | なし |
-| `capabilities` | `api/domains/capabilities/index.ts` | なし | なし | なし | なし | なし |
-| `tool-runtime` | `api/domains/tool-runtime/index.ts` | なし | なし | `capabilities`、`queue` | なし | なし |
-| `agent-runtime` | `api/domains/agent-runtime/index.ts` | `web/src/domains/agent-runtime/index.ts` | なし | `capabilities`、`inference`、`queue`、`tool-runtime` | なし | なし |
-| `toolchain-history` | `api/domains/toolchain-history/index.ts` | なし | なし | `capabilities` | なし | なし |
-| `web-research` | `api/domains/web-research/index.ts` | なし | なし | `queue` | なし | なし |
-| `attitude-dataset` | `api/domains/attitude-dataset/index.ts` | なし | なし | `delivery` | なし | なし |
-| `service-tests` | `api/domains/service-tests/index.ts` | `web/src/domains/service-tests/` | なし | `inference`、`larm`、`settings` | なし | なし |
-| `delivery` | `api/domains/delivery/index.ts` | なし | なし | なし | なし | なし |
-| `avatar` | なし | `web/src/domains/avatar/index.ts` | なし | なし | `delivery` | なし |
-| `settings` | `api/domains/settings/index.ts` | `web/src/domains/settings/index.tsx` | なし | なし | なし | なし |
-| `inference` | `api/domains/inference/index.ts` | なし | なし | `attitude-dataset`、`delivery`、`larm`、`settings` | なし | なし |
-| `tts-dictionary` | `api/domains/tts-dictionary/index.ts` | なし | なし | なし | なし | なし |
-| `conversation` | `api/domains/conversation/index.ts` | `web/src/domains/conversation/index.ts` | `web/src/components/domains/conversation/index.ts` | `delivery` | `avatar`、`delivery` | なし |
-| `continuity` | `api/domains/continuity/index.ts` | なし | なし | なし | なし | なし |
-| `goals` | `api/domains/goals/index.ts` | なし | なし | なし | なし | なし |
-| `world` | `api/domains/world/index.ts` | なし | なし | `conversation`、`goals` | なし | `memory` |
-| `memory` | `api/domains/memory/index.ts` | なし | なし | `continuity`、`conversation` | なし | なし |
-| `steward` | `api/domains/steward/index.ts` | なし | なし | `continuity`、`conversation`、`goals`、`memory`、`world` | なし | `queue` |
-| `larm` | `api/domains/larm/index.ts` | なし | なし | なし | なし | なし |
-| `audio` | なし | `web/src/domains/audio/index.ts` | なし | なし | なし | なし |
-| `queue` | `api/domains/queue/index.ts` | なし | なし | なし | なし | なし |
-| `scheduler` | `api/domains/scheduler/index.ts` | なし | なし | `queue` | なし | なし |
-| `timers` | `api/domains/timers/index.ts` | `web/src/domains/timers/` | `web/src/components/domains/timers/` | `queue`、`scheduler` | なし | なし |
-| `dialogue` | `api/domains/dialogue/index.ts` | `web/src/domains/dialogue/index.ts` | なし | `agent-runtime`、`capabilities`、`conversation`、`delivery`、`inference`、`memory`、`queue`、`scheduler`、`toolchain-history` | `conversation` | `world` |
-| `voice-dialogue` | `api/domains/voice-dialogue/index.ts` | `web/src/domains/voice-dialogue/index.ts` | なし | `delivery`、`dialogue`、`inference`、`settings` | `audio`、`avatar`、`dialogue`、`settings` | なし |
+| Domain | Tier | Backend 入口 | Web 入口 | Components | 依存 (api) | 依存 (web) | 依存 (試験のみ) |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `google-accounts` | 0 | `api/domains/google-accounts/index.ts` | `web/src/domains/google-accounts/` | `packages/design-system/src/components/GoogleAccounts/index.tsx` | なし | なし | なし |
+| `excalidraw` | 3 | `api/domains/excalidraw/index.ts` | `web/src/domains/excalidraw/` | なし | `capabilities`、`inference`、`larm`、`queue` | なし | なし |
+| `ocr` | 3 | `api/domains/ocr/index.ts` | `web/src/domains/ocr/index.ts` | `packages/design-system/src/components/OcrWorkspace/index.ts` | `capabilities`、`inference`、`queue` | なし | なし |
+| `object-recognition` | 1 | `api/domains/object-recognition/index.ts` | `web/src/domains/object-recognition/index.ts` | なし | `capabilities`、`queue` | なし | なし |
+| `kanban` | 1 | `api/domains/kanban/index.ts` | `web/src/domains/kanban/index.ts` | なし | `capabilities` | なし | なし |
+| `codex-tasks` | 1 | `api/domains/codex-tasks/index.ts` | `web/src/domains/codex-tasks/` | なし | `coding` | なし | なし |
+| `terminals` | 0 | `api/domains/terminals/index.ts` | `web/src/domains/terminals/index.ts` | なし | なし | なし | なし |
+| `background` | 0 | なし | `web/src/domains/background/index.ts` | なし | なし | なし | なし |
+| `image` | 3 | `api/domains/image/index.ts` | `web/src/domains/image/index.ts` | なし | `capabilities`、`inference`、`larm`、`queue` | なし | なし |
+| `ui-compositions` | 3 | `api/domains/ui-compositions/index.ts` | `web/src/domains/ui-compositions/` | なし | `capabilities`、`inference`、`larm`、`queue` | なし | なし |
+| `music` | 3 | `api/domains/music/index.ts` | `web/src/domains/music/index.ts` | `web/src/components/domains/music/` | `capabilities`、`inference`、`larm`、`queue` | なし | なし |
+| `dots` | 1 | `api/domains/dots/index.ts` | なし | なし | `queue` | なし | なし |
+| `task-reports` | 1 | `api/domains/task-reports/index.ts` | なし | なし | `tasks` | なし | なし |
+| `coding-supervision` | 3 | `api/domains/coding-supervision/index.ts` | なし | なし | `coding`、`inference`、`queue`、`task-reports`、`tasks` | なし | なし |
+| `coding` | 0 | `api/domains/coding/index.ts` | なし | なし | なし | なし | なし |
+| `artifact` | 3 | なし | `web/src/domains/artifact/index.ts` | `web/src/components/domains/artifact/` | なし | `conversation` | なし |
+| `tasks` | 0 | `api/domains/tasks/index.ts` | なし | なし | なし | なし | なし |
+| `capabilities` | 0 | `api/domains/capabilities/index.ts` | なし | なし | なし | なし | なし |
+| `tool-runtime` | 1 | `api/domains/tool-runtime/index.ts` | なし | なし | `capabilities`、`queue` | なし | なし |
+| `agent-runtime` | 3 | `api/domains/agent-runtime/index.ts` | `web/src/domains/agent-runtime/index.ts` | なし | `capabilities`、`inference`、`queue`、`tool-runtime` | なし | なし |
+| `toolchain-history` | 1 | `api/domains/toolchain-history/index.ts` | なし | なし | `capabilities` | なし | なし |
+| `web-research` | 1 | `api/domains/web-research/index.ts` | なし | なし | `queue` | なし | なし |
+| `attitude-dataset` | 1 | `api/domains/attitude-dataset/index.ts` | なし | なし | `delivery` | なし | なし |
+| `service-tests` | 3 | `api/domains/service-tests/index.ts` | `web/src/domains/service-tests/` | なし | `inference`、`larm`、`settings` | なし | なし |
+| `delivery` | 0 | `api/domains/delivery/index.ts` | なし | なし | なし | なし | なし |
+| `avatar` | 1 | なし | `web/src/domains/avatar/index.ts` | なし | なし | `delivery` | なし |
+| `settings` | 0 | `api/domains/settings/index.ts` | `web/src/domains/settings/index.tsx` | なし | なし | なし | なし |
+| `inference` | 2 | `api/domains/inference/index.ts` | なし | なし | `attitude-dataset`、`delivery`、`larm`、`settings` | なし | なし |
+| `tts-dictionary` | 0 | `api/domains/tts-dictionary/index.ts` | なし | なし | なし | なし | なし |
+| `conversation` | 2 | `api/domains/conversation/index.ts` | `web/src/domains/conversation/index.ts` | `web/src/components/domains/conversation/index.ts` | `delivery` | `avatar`、`delivery` | なし |
+| `continuity` | 0 | `api/domains/continuity/index.ts` | なし | なし | なし | なし | なし |
+| `goals` | 0 | `api/domains/goals/index.ts` | なし | なし | なし | なし | なし |
+| `world` | 4 | `api/domains/world/index.ts` | なし | なし | `conversation`、`goals` | なし | `memory` |
+| `memory` | 3 | `api/domains/memory/index.ts` | なし | なし | `continuity`、`conversation` | なし | なし |
+| `steward` | 5 | `api/domains/steward/index.ts` | なし | なし | `continuity`、`conversation`、`goals`、`memory`、`world` | なし | `queue` |
+| `larm` | 0 | `api/domains/larm/index.ts` | なし | なし | なし | なし | なし |
+| `audio` | 0 | なし | `web/src/domains/audio/index.ts` | なし | なし | なし | なし |
+| `queue` | 0 | `api/domains/queue/index.ts` | なし | なし | なし | なし | なし |
+| `scheduler` | 1 | `api/domains/scheduler/index.ts` | なし | なし | `queue` | なし | なし |
+| `timers` | 2 | `api/domains/timers/index.ts` | `web/src/domains/timers/` | `web/src/components/domains/timers/` | `queue`、`scheduler` | なし | なし |
+| `dialogue` | 5 | `api/domains/dialogue/index.ts` | `web/src/domains/dialogue/index.ts` | なし | `agent-runtime`、`capabilities`、`conversation`、`delivery`、`inference`、`memory`、`queue`、`scheduler`、`toolchain-history` | `conversation` | `world` |
+| `voice-dialogue` | 6 | `api/domains/voice-dialogue/index.ts` | `web/src/domains/voice-dialogue/index.ts` | なし | `delivery`、`dialogue`、`inference`、`settings` | `audio`、`avatar`、`dialogue`、`settings` | なし |
 <!-- domains:end -->
 
 ## 試験と関連文書
@@ -85,6 +85,10 @@
 | voice-dialogue | `api/domains/voice-dialogue/index.ts` | `web/src/domains/voice-dialogue/index.ts` | `api/domains/voice-dialogue/test/`、`web/src/domains/voice-dialogue/test/` |
 
 backend の HTTP 組立ては `api/application/`、SQLite の排他・接続・migration 実行は `api/infrastructure/sqlite/`、Web と CLI の共通 HTTP 搬送は `client/` が所有します。domain 間 import の方向は `scripts/domains.ts` と `scripts/boundaries.ts` が検査します。`export … from`、動的 `import()`、型 `import("…")` も同じ規則で検査し、`web/src` と `client` から `api` へは `api/domains/<domain>/contracts` だけ、`cli` からは `client`・contracts・`api/infrastructure/auth-config` だけを許します。`bun run test:domain -- <name>` は所有試験のみ、`bun run verify -- --domain <name>` は format、lint、型依存閉包、境界、試験を確認します。
+
+### domain 内の標準構成
+
+backend の domain は `contracts/`(公開型・schema)、`controller/`(HTTP 登録)、`service/`(業務判断)、`repository/`(SQL と migration)、`test/`(所有する試験)に分け、外部へは `index.ts` と `contracts` だけを公開します。各ディレクトリの入口は `index.ts`、1 ファイルが 800 行に近づいたら主題ごとにファイルを分けます。例外は、配布物が置く `google-accounts/distribution-client.json`(`service/desktop-client.ts` が読む)と、Vite 設定が直接読む `google-accounts/proxy-errors.ts` です。
 
 ### migration の追加規則
 

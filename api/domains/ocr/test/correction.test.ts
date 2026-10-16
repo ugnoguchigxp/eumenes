@@ -626,3 +626,18 @@ test("table cells keep their grid spans and cannot overlap", () => {
 		"ocr_correction_invalid_table",
 	);
 });
+test("frame extraction cannot be redirected to local files by a crafted container", async () => {
+	const { imageForInput } = await import("../service/correction-shared");
+	const playlist = new TextEncoder().encode(
+		"#EXTM3U\n#EXT-X-TARGETDURATION:1\n#EXTINF:1,\nfile:///etc/hosts\n#EXT-X-ENDLIST\n",
+	);
+	await expect(
+		imageForInput(
+			playlist,
+			0,
+			new AbortController().signal,
+			["image/png"],
+			1_000_000,
+		),
+	).rejects.toThrow();
+});

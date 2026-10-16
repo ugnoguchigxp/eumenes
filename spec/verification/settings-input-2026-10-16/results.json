@@ -1,0 +1,66 @@
+{
+  "scope": "Four settings input regressions; no production settings written and no server lifecycle operations performed",
+  "fixture": {
+    "web": {
+      "passed": 52,
+      "failed": 0,
+      "log": "web-regression.log"
+    },
+    "settings_and_application": {
+      "passed": 75,
+      "failed": 0,
+      "log": "backend-regression.log"
+    },
+    "artifact": {
+      "passed": 46,
+      "failed": 0,
+      "log": "artifact-verify.log",
+      "gateResult": "invalidated_by_concurrent_source_change"
+    },
+    "selected_typecheck": {
+      "passed": true,
+      "files": 414
+    },
+    "size_budget": {
+      "passed": true,
+      "files": 78
+    },
+    "changed_host_and_contract_lint": "pass"
+  },
+  "live_ui": {
+    "server": "existing user server",
+    "account_validation_preserves_input": true,
+    "token_required_preserves_input": true,
+    "numeric_intermediate_preserved_and_save_blocked": true,
+    "writes_to_saved_settings": 0,
+    "connection_lost_before_final_restore": true,
+    "cleanup": "agent-created test tab closed; unsaved input discarded",
+    "screenshot": "registration-validation.jpg"
+  },
+  "not_run": [
+    "Cloudflare provider requests",
+    "production settings save",
+    "server restart"
+  ],
+  "limitations": [
+    "settings verify stops at existing settings/service/index.ts formatting",
+    "artifact verify ran all checks but source changed elsewhere during the run",
+    "whole-workspace typecheck later blocked by a syntax error in unrelated world-adapter.ts; selected dependency closure passes",
+    "direct DesignSystem lint reports an existing group-role warning outside the edited lines"
+  ],
+  "source_sha256": {
+    "api/application/settings-structures.ts": "388c7ddd7b9a8678ae1433642ce1bbe94432256a818f2e52d14dc625c5b9f4e1",
+    "api/domains/settings/contracts/registration.ts": "8a9b0ba4ecbc934115d7de2f245de2fc2c83e963960a9501f2aed277f85003eb",
+    "packages/artifact-ui/src/settings-inputs.ts": "077aaa15386a2b34076922a38a6355b82d334ae2f57de81969333253338f6e9d",
+    "packages/artifact-ui/src/collection-components.tsx": "2f0f0ce5ad228d5fcda7f4fb853f6534025785ecc39b8c567f98964c8979fabb",
+    "packages/artifact-ui/src/settings-components.tsx": "aa8a031aa5c86ce2c0e0b6724173b56fbcb97ccb16189960ee31882ba0479f7d",
+    "packages/artifact-ui/src/runtime.tsx": "d83726f60d91c29b441bbda4f29dbc3cf97743ad50cdf7ce887455d5210fff10",
+    "packages/design-system/src/components/SettingsPanels/index.tsx": "066324f971e939f9ca99559bdd9c2181536f61cc72513a3ec4ba662d93635ab8",
+    "web/src/domains/settings-data/adapter.tsx": "9f2eb5c5f071691bbad180375b9d28ff367d85ea2a54495a13d2080b1f3ed967",
+    "web/src/domains/toolchain-artifacts/input-bridge.ts": "ffd521c316f5d1c44778063207f21b4170490da63ec366af3614c89fecb35b6b",
+    "web/src/domains/toolchain-artifacts/ToolchainArtifactHost.tsx": "6aa7e2f6f07b2dd4697c255288d428eb9bdfcb8c8d56093bf256ab18ea332c4e",
+    "web/src/domains/toolchain-artifacts/collection-actions.ts": "3a758529e17c3d3d68a40f8a90742f498df880e0509b29c8cf6bb96d598d4773",
+    "web/src/domains/toolchain-artifacts/draft-actions.ts": "3720f4caf6990e4ed73942f79cdea2af6d23a6410c69eadaec92cc0cabfa365f",
+    "web/src/domains/toolchain-artifacts/drafts.ts": "a90badceb6346f4e262f7932d3d0373cedd7531478024421130af9ac2ef78908"
+  }
+}

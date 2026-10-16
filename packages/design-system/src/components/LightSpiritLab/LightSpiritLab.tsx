@@ -24,7 +24,7 @@ export type LightSpiritLabStatus = {
 	fps?: number;
 };
 export type LightSpiritLabProps = {
-motions: LightSpiritLabMotion[];
+	motions: LightSpiritLabMotion[];
 	selected: string | null;
 	/** `""` picks a variant automatically on each play. */
 	variant: string;
@@ -123,9 +123,9 @@ export function LightSpiritLab({
 		<div
 			className={cn("light-spirit-lab", className)}
 			data-lab-state={status.state}
->
+		>
 			<div className="light-spirit-lab-summary">
-<output className="light-spirit-lab-status" aria-live="polite">
+				<output className="light-spirit-lab-status" aria-live="polite">
 					{status.state === "loading" && "読み込んでいます"}
 					{status.state === "unavailable" && "動かせる精霊がありません"}
 					{status.state === "failed" && "表示に失敗しました"}

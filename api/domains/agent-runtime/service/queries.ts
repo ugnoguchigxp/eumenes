@@ -49,7 +49,7 @@ export function createQueries(ctx: RuntimeContext, answer: Answer) {
 		},
 		conversationContextInTransaction(db: Database) {
 			return {
-				lunaEnabled: inference.codexResearchAvailable?.() ?? false,
+				codexEnabled: inference.codexResearchAvailable?.() ?? false,
 				requirementCatalog: capabilities.requirementCatalogInTransaction(db),
 			};
 		},

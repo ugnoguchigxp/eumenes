@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { harness, workerPacket } from "./toolchain.fixture";
 
 for (const topic of ["公開イベントのニュース", "製品の更新情報"])
-	test(`Luna returns linked search snippets without requirement extraction or a grading call: ${topic}`, async () => {
+	test(`Codex research returns linked search snippets without requirement extraction or a grading call: ${topic}`, async () => {
 		const h = await harness({
 			fullResearch: true,
 			control: (messages) => {

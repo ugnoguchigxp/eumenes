@@ -16,9 +16,6 @@ export { isAdoptedAnswerInTransaction } from "./service/adopted-answer";
 export type {
 	ContextGoalEntry,
 	GoalsLayerPort,
-	PostAnswerObservation,
-	PostAnswerObserverPort,
-	PostAnswerObserverResult,
 	StewardPort,
 	StewardRunEnd,
 	WorldContextNamesInput,

@@ -21,7 +21,10 @@ test("importing server.ts has no side effects", async () => {
 		process.listenerCount("SIGTERM"),
 	];
 	const mod = await import("./server");
-	expect(typeof mod.buildServices).toBe("function");
+	expect(typeof mod.startupFailureReason).toBe("function");
+	expect(typeof (await import("./server-services")).buildServices).toBe(
+		"function",
+	);
 	expect([
 		process.listenerCount("SIGINT"),
 		process.listenerCount("SIGTERM"),
@@ -55,7 +58,8 @@ test("a separate process that imports server.ts neither starts nor touches the d
 
 test("the shutdown order is fixed, and a freshly built set of services closes cleanly through it", async () => {
 	const dir = tempDir();
-	const { buildServices, createLifecycles } = await import("./server");
+	const { buildServices } = await import("./server-services");
+	const { createLifecycles } = await import("./server-lifecycles");
 	const { createLifecycleRunner } = await import("./lifecycle");
 	const services = await buildServices(
 		loadConfig({

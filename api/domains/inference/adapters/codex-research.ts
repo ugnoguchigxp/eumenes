@@ -9,7 +9,10 @@ import { codexRuntime, lockedCodex } from "./codex-sdk";
 const mission =
 	"Select the next Eumenes host action for originalRequest and task.question. TOOLS in the base instructions lists available host operations, independently of Codex native tools and sandbox/network access. Eumenes executes your chosen operation and supplies its result next time. Return one JSON action at the root: invoke with a TOOLS id and its inputSchema when information is needed and budget.canInvoke=true; finish when answered or acquisition cannot continue. operations records past attempts, not available tools. Do not call Codex native tools, inspect files or delegate.";
 
-/** SDK owns the turn and structured events; Eumenes executes all operations. */
+/**
+ * SDK owns the turn and structured events; Eumenes executes all operations. The model is the
+ * one of the saved Codex connection (passed per call); without one Codex uses its own default.
+ */
 export function createCodexResearch(
 	environment: Readonly<Record<string, string | undefined>>,
 	executable = "codex",
@@ -17,14 +20,14 @@ export function createCodexResearch(
 	const runtime = codexRuntime(environment, executable);
 	if (!runtime) return undefined;
 	return {
-		model: "gpt-6-luna",
 		async execute(
 			messages: Messages,
 			signal: AbortSignal,
 			control?: ControlContract,
+			model?: string,
 		) {
 			try {
-				return await this.executeOnce(messages, signal, control);
+				return await this.executeOnce(messages, signal, control, model);
 			} catch (error) {
 				// An empty turn carries no decision; one fresh turn is still within the step.
 				if (
@@ -32,13 +35,14 @@ export function createCodexResearch(
 					error.message !== "codex_research_empty_output"
 				)
 					throw error;
-				return await this.executeOnce(messages, signal, control);
+				return await this.executeOnce(messages, signal, control, model);
 			}
 		},
 		async executeOnce(
 			messages: Messages,
 			signal: AbortSignal,
 			control?: ControlContract,
+			model?: string,
 		) {
 			signal.throwIfAborted();
 			if (!control) throw new Error("codex_research_schema_missing");
@@ -57,7 +61,7 @@ export function createCodexResearch(
 					mission,
 				);
 				const thread = sdk.startThread({
-					model: "gpt-6-luna",
+					...(model ? { model } : {}),
 					workingDirectory: cwd,
 					sandboxMode: "read-only",
 					skipGitRepoCheck: true,

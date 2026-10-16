@@ -28,9 +28,7 @@ export const voiceTurnSchema = z.object({
 	sequence: z.number().int().positive(),
 	status: z.enum([
 		"recognizing",
-		"awaiting_input",
 		"input_ready",
-		"draft",
 		"merged",
 		"responding",
 		"synthesizing",

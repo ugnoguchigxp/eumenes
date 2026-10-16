@@ -1,4 +1,4 @@
-import type { Services } from "./server";
+import type { Services } from "./server-services";
 import { registerDots } from "./dots-http";
 
 export function appServices(s: Services) {

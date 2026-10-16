@@ -47,7 +47,9 @@ export const ImageViewer: React.FC<IImageViewerProps> = React.memo(
 							"max-h-[80dvh] max-w-full w-auto h-auto",
 							"transition-opacity duration-200",
 						)}
-						style={{ maxWidth: `min(${maxWidthPx}px, calc(100vw - 4rem), 100%)` }}
+						style={{
+							maxWidth: `min(${maxWidthPx}px, calc(100vw - 4rem), 100%)`,
+						}}
 					/>
 				</div>
 			</Modal>
@@ -130,12 +132,7 @@ export const ImageWithPreview: React.FC<IImageWithPreviewProps> = ({
 				)}
 			</button>
 
-			<ImageViewer
-				src={src}
-				alt={alt}
-				open={open}
-				onOpenChange={setOpen}
-			/>
+			<ImageViewer src={src} alt={alt} open={open} onOpenChange={setOpen} />
 		</>
 	);
 };

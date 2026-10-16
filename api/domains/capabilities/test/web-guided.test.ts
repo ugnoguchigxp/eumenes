@@ -49,7 +49,7 @@ test("new Web revisions upgrade and reseed without changing archived definitions
 			store.read((db) =>
 				db
 					.query(
-						"SELECT id,definition_hash FROM capability_revisions WHERE id IN ('package:web.recipe@1','package:web.search@1','package:web.quick@2','profile:web.research@1','skill:web.search@1','tool:web.read@1','skill:web.guided@1','package:web.recipe@2','package:web.search@2','package:web.quick@3','toolchain:web.search@2','toolchain:web.research.luna@2') ORDER BY id",
+						"SELECT id,definition_hash FROM capability_revisions WHERE id IN ('package:web.recipe@1','package:web.search@1','package:web.quick@2','profile:web.research@1','skill:web.search@1','tool:web.read@1','skill:web.guided@1','package:web.recipe@2','package:web.search@2','package:web.quick@3') ORDER BY id",
 					)
 					.all(),
 			);
@@ -60,19 +60,19 @@ test("new Web revisions upgrade and reseed without changing archived definitions
 			store.read((db) =>
 				db
 					.query(
-						"SELECT key,active_revision_id FROM capability_items WHERE key IN ('toolchain:web.search','toolchain:web.research.luna','package:web.quick') ORDER BY key",
+						"SELECT key,active_revision_id FROM capability_items WHERE key IN ('toolchain:web.search','toolchain:web.research.codex','package:web.quick') ORDER BY key",
 					)
 					.all(),
 			);
 		expect(active()).toEqual([
-			{ key: "package:web.quick", active_revision_id: "package:web.quick@4" },
+			{ key: "package:web.quick", active_revision_id: "package:web.quick@5" },
 			{
-				key: "toolchain:web.research.luna",
-				active_revision_id: "toolchain:web.research.luna@3",
+				key: "toolchain:web.research.codex",
+				active_revision_id: "toolchain:web.research.codex@2",
 			},
 			{
 				key: "toolchain:web.search",
-				active_revision_id: "toolchain:web.search@3",
+				active_revision_id: "toolchain:web.search@5",
 			},
 		]);
 		const registered = active();

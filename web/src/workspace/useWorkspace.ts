@@ -1,7 +1,7 @@
 import { chatSend } from "./chat-send";
 import { useChatAttachments } from "./useChatAttachments";
 import { useDrawingArtifacts } from "../domains/excalidraw/useDrawingArtifacts";
-import { useOpenDrawing } from "./WorkspaceArtifacts";
+import { useOpenDrawing, useOpenPlaylist } from "./open-artifacts";
 import { useRecognitionArtifacts } from "../domains/object-recognition";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -24,12 +24,7 @@ import { useToolchainArtifacts } from "../domains/toolchain-artifacts";
 import { useTimerTone, type AudioStore } from "../domains/audio";
 import { useArtifactWorkspace } from "../domains/artifact";
 import { useConversation } from "../domains/conversation";
-import {
-	useCancel,
-	useRuns,
-	useSubmit,
-	useRunProgress,
-} from "../domains/dialogue";
+import { useCancel, useRuns, useSubmit } from "../domains/dialogue";
 import {
 	useAutomaticSpeech,
 	useReplay,
@@ -39,7 +34,6 @@ import { useSettings, useVoiceMute } from "../domains/settings";
 import { useKanbanNotices } from "../domains/kanban/useKanbanNotices";
 import { useClaudeCodeArtifacts } from "../domains/terminals";
 import { changeRoots, invalidateAllButLive, queryRoots } from "../queryKeys";
-import { useOpenPlaylist } from "./WorkspaceArtifacts";
 
 export function useWorkspace({
 	client,
@@ -195,27 +189,6 @@ export function useWorkspace({
 		client.subscribeChangesState,
 		client.changesState,
 	);
-	useEffect(() => {
-		let pending: ReturnType<typeof setTimeout> | undefined;
-		const resume = () => {
-			if (document.visibilityState !== "visible") return;
-			clearTimeout(pending);
-			pending = setTimeout(() => {
-				// Queries refetch through refetchOnWindowFocus; only a stream that is not
-				// live needs a nudge. A live stream already delivers changes, and
-				// reconnecting would force a full reset.
-				if (client.changesState() === "connected") return;
-				client.reconnectChanges();
-			}, 100);
-		};
-		window.addEventListener("focus", resume);
-		document.addEventListener("visibilitychange", resume);
-		return () => {
-			clearTimeout(pending);
-			window.removeEventListener("focus", resume);
-			document.removeEventListener("visibilitychange", resume);
-		};
-	}, [client]);
 	useEffect(
 		() =>
 			client.subscribeChanges((kind) => {
@@ -250,12 +223,11 @@ export function useWorkspace({
 		?.slice()
 		.reverse()
 		.find((run) => run.status === "queued" || run.status === "running");
-	const messageCount = conversation.data?.messages.length ?? 0;
-	const streamingText = useRunProgress(client, activeRun?.id);
-	useEffect(() => {
+	// Streamed tokens are subscribed by the message list alone, so they never re-render the workspace.
+	const followLatestIfPinned = useCallback(() => {
 		if (followLatest.current && historyRef.current)
 			historyRef.current.scrollTop = historyRef.current.scrollHeight;
-	}, [messageCount, activeRun?.id, streamingText]);
+	}, []);
 	function scrollLatest() {
 		const history = historyRef.current;
 		if (!history) return;
@@ -317,7 +289,7 @@ export function useWorkspace({
 		connectionState,
 		latestRun,
 		activeRun,
-		streamingText,
+		followLatestIfPinned,
 		scrollLatest,
 		onHistoryScroll,
 		editInput,

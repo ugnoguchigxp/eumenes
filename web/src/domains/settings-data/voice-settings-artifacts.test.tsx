@@ -113,22 +113,17 @@ test("input and cloud edits join the shared change review and save to the regist
 		target: { value: "nova" },
 	});
 	fireEvent.click(screen.getByRole("button", { name: "聞き取り" }));
-	fireEvent.click(screen.getByLabelText("英語"));
 	fireEvent.click(screen.getByText("詳細設定"));
 	fireEvent.change(screen.getByLabelText("発話を確定する無音時間（ミリ秒）"), {
 		target: { value: "1800" },
 	});
 	fireEvent.click(screen.getByRole("button", { name: "変更一覧を開く" }));
-	await screen.findByText("音声と入力 / 利用する言語");
-	expect(
-		screen.getByText("音声と入力 / クラウド音声 / multilingual の音声ID"),
-	).toBeTruthy();
+	await screen.findByText("音声と入力 / クラウド音声 / multilingual の音声ID");
 	fireEvent.click(
 		screen.getByRole("button", { name: "設定の変更をすべて適用" }),
 	);
 	await screen.findByText("変更を適用しました");
 	const saved = backend.saved();
-	expect(saved.general.asrLanguages).toEqual(["ja"]);
 	expect(saved.voice.silenceMs).toBe(1800);
 	expect(saved.resources[0]!.voice).toBe("nova");
 	expect(saved.routes.tts.mode).toBe("larm-preferred");
@@ -140,13 +135,12 @@ test("input and cloud edits join the shared change review and save to the regist
 				target: backend.cloud.id,
 				value: "nova",
 			},
-			{ fieldId: "input.languages", value: '["ja"]' },
 			{ fieldId: "input.silence-ms", value: "1800" },
 		]),
 	});
 });
 
-test("invalid numbers and language sets are refused and never reach the draft", async () => {
+test("invalid numbers are refused and never reach the draft", async () => {
 	const { backend } = openVoice();
 	await ready();
 	fireEvent.click(screen.getByRole("button", { name: "聞き取り" }));
@@ -155,12 +149,6 @@ test("invalid numbers and language sets are refused and never reach the draft", 
 	for (const bad of ["300.5", "100", "99999", "abc"])
 		fireEvent.change(silence, { target: { value: bad } });
 	expect(saveButton()).toHaveProperty("disabled", true);
-	// Unchecking every language is refused: at least one must stay selected.
-	fireEvent.click(screen.getByLabelText("日本語"));
-	fireEvent.click(screen.getByLabelText("英語"));
-	expect((screen.getByLabelText("英語") as HTMLInputElement).checked).toBe(
-		true,
-	);
 	expect(backend.sent).toHaveLength(0);
 });
 
@@ -226,7 +214,6 @@ test("every registered voice/input setting reaches the shared draft, applies, an
 	fireEvent.click(screen.getByLabelText(/文章に合わせて抑揚/));
 	set(/自動調整の強さ/, "1.5");
 	fireEvent.click(screen.getByRole("button", { name: "聞き取り" }));
-	fireEvent.click(screen.getByLabelText("フランス語"));
 	set("声を検出するしきい値", ".012");
 	set("発話を確定する無音時間（ミリ秒）", "2100");
 	for (const label of [
@@ -243,9 +230,8 @@ test("every registered voice/input setting reaches the shared draft, applies, an
 	set(/の音声ID/, "nova");
 	set(/の話す速さ/, "1.2");
 	fireEvent.click(screen.getByRole("button", { name: "変更一覧を開く" }));
-	await screen.findByText("音声と入力 / 利用する言語");
 	fireEvent.click(
-		screen.getByRole("button", { name: "設定の変更をすべて適用" }),
+		await screen.findByRole("button", { name: "設定の変更をすべて適用" }),
 	);
 	await screen.findByText("変更を適用しました");
 	const saved = backend.saved();
@@ -261,9 +247,6 @@ test("every registered voice/input setting reaches the shared draft, applies, an
 		inputDevice: "mic-test",
 		outputDevice: "speaker-test",
 	});
-	expect(saved.general.asrLanguages).toEqual(
-		expect.arrayContaining(["ja", "fr"]),
-	);
 	expect(saved.larm).toMatchObject({
 		voice: "female",
 		style: "bright",
@@ -329,8 +312,6 @@ test("the change review names values as the screen that owns the field does: lan
 	});
 	openVoice();
 	await ready();
-	fireEvent.click(screen.getByRole("button", { name: "聞き取り" }));
-	fireEvent.click(screen.getByLabelText("英語"));
 	fireEvent.click(screen.getByRole("button", { name: "機器" }));
 	fireEvent.click(screen.getByRole("button", { name: "音声機器を確認" }));
 	await screen.findByRole("option", { name: "ヘッドセットのマイク" });
@@ -338,10 +319,7 @@ test("the change review names values as the screen that owns the field does: lan
 		target: { value: "mic-test" },
 	});
 	fireEvent.click(screen.getByRole("button", { name: "変更一覧を開く" }));
-	await screen.findByText("音声と入力 / 利用する言語");
 	// The review screen has no options of its own: it reads them where the fields were registered.
-	expect(screen.getByText("日本語、英語")).toBeTruthy();
-	expect(screen.getByText("日本語")).toBeTruthy();
-	expect(screen.getByText("ヘッドセットのマイク")).toBeTruthy();
+	await screen.findByText("ヘッドセットのマイク");
 	expect(screen.queryByText("mic-test")).toBeNull();
 });

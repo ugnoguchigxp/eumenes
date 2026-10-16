@@ -42,6 +42,8 @@ export function commitIdleInput(
 				});
 		})
 		.catch((e) => {
+			// A segment that arrived meanwhile continues this input; it is sent with that one.
+			if (e instanceof Error && e.message === "voice_input_stale") return;
 			if (isCurrent(machine.get(), session.token)) setError(describeError(e));
 		});
 }

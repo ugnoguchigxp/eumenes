@@ -89,7 +89,7 @@ describe("EditableSelect Component", () => {
 				<EditableSelect value="" onChange={mockOnChange} options={options} />,
 			);
 
-			const toggleButton = screen.getByLabelText("Toggle options");
+			const toggleButton = screen.getByLabelText("選択肢を開閉");
 			fireEvent.click(toggleButton);
 
 			options.forEach((option) => {
@@ -116,7 +116,7 @@ describe("EditableSelect Component", () => {
 			);
 
 			// Open dropdown
-			const toggleButton = screen.getByLabelText("Toggle options");
+			const toggleButton = screen.getByLabelText("選択肢を開閉");
 			fireEvent.click(toggleButton);
 
 			// select option
@@ -135,7 +135,7 @@ describe("EditableSelect Component", () => {
 			);
 
 			// Open dropdown
-			const toggleButton = screen.getByLabelText("Toggle options");
+			const toggleButton = screen.getByLabelText("選択肢を開閉");
 			fireEvent.click(toggleButton);
 			expect(screen.getByText("Option 1")).toBeInTheDocument();
 

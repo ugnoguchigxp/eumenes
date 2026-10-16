@@ -5,7 +5,7 @@ import { configureLogging } from "../../../infrastructure/logger";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import { registerTerminals } from "../controller";
 import { errorStatus } from "../contracts";
-import { headerFileOf } from "../hooks";
+import { headerFileOf } from "../service/hooks";
 import { createTerminals } from "../service";
 import {
 	fakePty,

@@ -74,11 +74,12 @@ test("an API key stays in memory: a count in the review, keys in the apply, noth
 	fireEvent.change(screen.getByLabelText("APIキーの更新"), {
 		target: { value: KEY },
 	});
-	// The field never echoes the key: it shows one mark per character.
+	// The native password input holds the exact draft value; snapshots and storage do not.
 	expect(screen.getByLabelText("APIキーの更新")).toHaveProperty(
-		"value",
-		"•".repeat(KEY.length),
+		"type",
+		"password",
 	);
+	expect(screen.getByLabelText("APIキーの更新")).toHaveProperty("value", KEY);
 	await review();
 	await screen.findByText("更新・削除予定 1件");
 	expect(document.body.textContent).not.toContain(KEY);
@@ -101,10 +102,10 @@ test("typing a key one character at a time builds the secret; deleting from the 
 	for (const ch of "sk-ab") {
 		fireEvent.change(box(), { target: { value: shown + ch } });
 		shown = box().value;
-		expect(shown).toBe("•".repeat(shown.length));
+		expect(box()).toHaveProperty("type", "password");
 	}
-	expect(box().value).toBe("•••••");
-	fireEvent.change(box(), { target: { value: "••••" } });
+	expect(box().value).toBe("sk-ab");
+	fireEvent.change(box(), { target: { value: "sk-a" } });
 	await review();
 	await screen.findByText("更新・削除予定 1件");
 	applyAll();
@@ -184,6 +185,7 @@ test("registering a connection stages it with the key in memory; the apply carri
 	});
 	fireEvent.change(inputs[2]!, { target: { value: KEY } });
 	fireEvent.submit(form);
+	await waitFor(() => expect(saveButton()).toHaveProperty("disabled", false));
 	await review();
 	await screen.findByText("クラウドAPIを登録（追加する接続）");
 	await screen.findByText("更新・削除予定 1件");
@@ -245,6 +247,7 @@ test("discarding the draft takes staged operations and their keys back", async (
 	});
 	fireEvent.change(inputs[2]!, { target: { value: KEY } });
 	fireEvent.submit(form);
+	await waitFor(() => expect(saveButton()).toHaveProperty("disabled", false));
 	await review();
 	await screen.findByText("クラウドAPIを登録（やめる接続）");
 	fireEvent.click(

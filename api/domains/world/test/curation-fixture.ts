@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import { expect } from "bun:test";
 import {
 	createConversationSourceAdapter,
 	createWorldCuration,
@@ -11,8 +12,15 @@ import {
 	type PreparedCuration,
 	type WorldCuration,
 } from "..";
-import { PURPOSE, SCOPE, TEST_CURSOR_SECRET } from "./fixture";
-import type { Life } from "./lifecycle-fixture";
+import {
+	ACCESS,
+	NOW,
+	PURPOSE,
+	SCOPE,
+	TEST_CURSOR_SECRET,
+	entityOp,
+} from "./fixture";
+import { openLife, type Life } from "./lifecycle-fixture";
 
 /** What the host says about messages: shared by the feed (intake) and by curation. */
 export function testPorts() {
@@ -194,3 +202,56 @@ export const assertionRows = (life: Life) =>
 			)
 			.all(),
 	) as { id: string; revision: number; lifecycle: string; origin: string }[];
+
+// --- shared by the curation test files -------------------------------------
+
+export const TEXT = "音声サービスは9月から利用できる。";
+
+export async function started(ports = testPorts()) {
+	const life = await openLife({ intake: ports.intake });
+	expect((await life.lifecycle.recoverWorld()).status).toBe("open");
+	const rig = curationFor(life, ports);
+	return { life, rig, ports };
+}
+
+export async function received(life: Life) {
+	return life.lifecycle.consumeSourceChanges(SCOPE);
+}
+
+/** The heads World holds now: claim id -> lifecycle, origin and payload. */
+export async function heads(life: Life) {
+	const read = await life.world.read({
+		access: ACCESS,
+		scope: SCOPE,
+		asOf: NOW,
+	});
+	if (read.status !== "ready") throw new Error(JSON.stringify(read));
+	return new Map(
+		read.snapshot.assertions.map((a) => [
+			a.id,
+			{ lifecycle: a.lifecycle, origin: a.origin, revision: a.revision, a },
+		]),
+	);
+}
+
+export const one = <T>(items: readonly T[]): T => {
+	expect(items).toHaveLength(1);
+	return items[0]!;
+};
+
+export function ready(
+	run: Awaited<ReturnType<typeof curate>>,
+): PreparedCuration {
+	if (run.prepare.status !== "ready")
+		throw new Error(`prepare: ${run.prepare.status} ${run.prepare.reason}`);
+	return run.prepare.prepared;
+}
+export function settled(run: Awaited<ReturnType<typeof curate>>) {
+	if (run.settle?.status !== "settled")
+		throw new Error(`settle: ${JSON.stringify(run.settle)}`);
+	return run.settle;
+}
+
+export const withService = async (life: Life) => {
+	expect((await life.world.apply(entityOp())).status).toBe("applied");
+};

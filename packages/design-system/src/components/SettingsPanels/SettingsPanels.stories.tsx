@@ -48,7 +48,10 @@ export const Conversation: Story = {
 export const Pending: Story = { args: { ...Conversation.args, dirty: true } };
 export const Saving: Story = { args: { ...Pending.args, busy: true } };
 export const SaveFailed: Story = {
-	args: { ...Pending.args, message: "適用できませんでした。接続を確認してもう一度保存してください。" },
+	args: {
+		...Pending.args,
+		message: "適用できませんでした。接続を確認してもう一度保存してください。",
+	},
 };
 
 export const VoiceInput: Story = {

@@ -389,6 +389,39 @@
 	font-size: clamp(1.35rem, 2vw, 1.8rem);
 	font-weight: 700;
 }
+.aui-composition-heading {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+	padding: 0.8rem 1.25rem;
+	border-bottom: 1px solid var(--border);
+}
+.aui-composition-heading > .aui-composition-title {
+	margin: 0;
+	font-size: 1.1rem;
+	font-weight: 700;
+}
+.aui-composition-heading > .aui-composition-header-child {
+	padding: 0;
+	border: 0;
+}
+.aui-collection-indicator {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 1.5rem;
+	height: 1.5rem;
+}
+.aui-collection-indicator > span {
+	width: 0.65rem;
+	height: 0.65rem;
+	border-radius: 50%;
+	background: var(--destructive);
+}
+.aui-collection-indicator[data-online="true"] > span {
+	background: var(--success);
+}
 .aui-composition-header-child {
 	padding: 1rem 1.25rem;
 	border-bottom: 1px solid var(--border);
@@ -559,6 +592,7 @@
 }
 .aui-collection-catalog-list {
 	display: grid;
+	grid-template-columns: minmax(0, 1fr);
 	align-content: start;
 	gap: 0.3rem;
 	margin-top: 0.7rem;
@@ -567,6 +601,7 @@
 	display: grid;
 	gap: 0.3rem;
 	width: 100%;
+	min-width: 0;
 	border: 1px solid transparent;
 	border-radius: 0.4rem;
 	padding: 0.7rem;
@@ -582,6 +617,9 @@
 .aui-collection-catalog-list > button:hover {
 	background: var(--accent);
 }
+.aui-collection-catalog-list strong {
+	overflow-wrap: anywhere;
+}
 .aui-collection-catalog-list small {
 	color: var(--muted-foreground);
 	overflow-wrap: anywhere;
@@ -596,6 +634,7 @@
 .aui-collection-catalog-detail h4 {
 	margin: 0;
 	font-size: 1.2rem;
+	overflow-wrap: anywhere;
 }
 .aui-collection-catalog-detail dl {
 	display: grid;

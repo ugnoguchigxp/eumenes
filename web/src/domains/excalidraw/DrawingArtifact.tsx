@@ -9,11 +9,6 @@ import { draftDrawingHash, drawingLocation } from "./location";
 import { queryRoots } from "../../queryKeys";
 const emptyReferences: Awaited<ReturnType<EumenesClient["drawingReferences"]>> =
 	[];
-export const drawingDefinition = JSON.stringify({
-	view: "drawing-workspace",
-	source: "drawings",
-	title: "図を描く・編集する",
-});
 export function DrawingArtifact({
 	client,
 	definition,

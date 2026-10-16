@@ -80,14 +80,7 @@ export function registerVoiceDialogue(
 				await service.preview(sessionId, generation, utteranceId, wav),
 			);
 		return c.json(
-			await service.accept(
-				sessionId,
-				generation,
-				sequence,
-				utteranceId,
-				wav,
-				c.req.header("x-voice-deferred") === "1",
-			),
+			await service.accept(sessionId, generation, sequence, utteranceId, wav),
 			202,
 		);
 	};

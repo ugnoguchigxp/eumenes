@@ -12,7 +12,7 @@ import {
 	type Definition,
 } from "..";
 import { builtins } from "../builtin/web-research";
-test("quick Web capability grants only lookup and read and preserves Luna tools", () => {
+test("quick Web capability grants only lookup and read and preserves deep research tools", () => {
 	const quick = builtins.find(
 		(d) => d.kind === "package" && d.id === "web.quick",
 	);

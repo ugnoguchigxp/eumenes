@@ -3,16 +3,19 @@ import { join, relative, resolve, sep } from "node:path";
 import ts from "typescript";
 
 /**
- * Ratchet for file and function size. Entries over the threshold are recorded
- * in size-budget.json; the check fails only when one grows or a new one appears.
+ * Ratchet for file and function size, plus a separate test file ratchet
+ * (TEST_FILE_LIMIT). Entries over the threshold are recorded in
+ * size-budget.json; the check fails only when one grows or a new one appears.
  *   bun scripts/size-budget.ts [paths...]   check (optionally limited to paths)
  *   bun scripts/size-budget.ts --write      record the current values
  */
 export const FILE_LIMIT = 800;
 export const FUNCTION_LIMIT = 300;
+export const TEST_FILE_LIMIT = 1000;
 export type Budget = {
 	files: Record<string, number>;
 	functions: Record<string, number>;
+	testFiles: Record<string, number>;
 };
 
 const root = resolve(import.meta.dir, "..");
@@ -42,6 +45,16 @@ export function sourceFiles(): string[] {
 		.flatMap((dir) => walk(join(root, dir)))
 		.map((file) => relative(root, file).split(sep).join("/"))
 		.filter((file) => /\.tsx?$/.test(file) && !isTest(file))
+		.sort();
+}
+
+/** Test, spec and fixture .ts/.tsx under every tracked source root. */
+export function testSourceFiles(): string[] {
+	const dirs = ["api", "web", "client", "cli", "scripts", "tests", "packages"];
+	return dirs
+		.flatMap((dir) => walk(join(root, dir)))
+		.map((file) => relative(root, file).split(sep).join("/"))
+		.filter((file) => /\.tsx?$/.test(file) && isTest(file))
 		.sort();
 }
 
@@ -119,9 +132,31 @@ export function measure(
 	return { lines, functions };
 }
 
+/** Test files currently over TEST_FILE_LIMIT lines. */
+export function measureTests(
+	paths: string[] = testSourceFiles(),
+): Record<string, number> {
+	const over: Record<string, number> = {};
+	for (const path of paths) {
+		const text = readFileSync(join(root, path), "utf8");
+		const lines = text.endsWith("\n")
+			? text.split("\n").length - 1
+			: text.split("\n").length;
+		if (lines > TEST_FILE_LIMIT) over[path] = lines;
+	}
+	return over;
+}
+
 /** Everything currently over its threshold. */
-export function measureAll(paths: string[] = sourceFiles()): Budget {
-	const budget: Budget = { files: {}, functions: {} };
+export function measureAll(
+	paths: string[] = sourceFiles(),
+	testPaths: string[] = testSourceFiles(),
+): Budget {
+	const budget: Budget = {
+		files: {},
+		functions: {},
+		testFiles: measureTests(testPaths),
+	};
 	for (const path of paths) {
 		const { lines, functions } = measure(
 			path,
@@ -137,13 +172,23 @@ export function measureAll(paths: string[] = sourceFiles()): Budget {
 /** Violations: over-threshold entries that are new or larger than recorded. */
 export function compare(current: Budget, recorded: Budget): string[] {
 	const errors: string[] = [];
-	for (const kind of ["files", "functions"] as const) {
-		const limit = kind === "files" ? FILE_LIMIT : FUNCTION_LIMIT;
+	const labels = {
+		files: "file",
+		functions: "function",
+		testFiles: "test file",
+	};
+	const limits = {
+		files: FILE_LIMIT,
+		functions: FUNCTION_LIMIT,
+		testFiles: TEST_FILE_LIMIT,
+	};
+	for (const kind of ["files", "functions", "testFiles"] as const) {
+		const limit = limits[kind];
 		for (const [name, size] of Object.entries(current[kind])) {
 			const before = recorded[kind][name];
 			if (before === undefined)
 				errors.push(
-					`size-budget: new ${kind === "files" ? "file" : "function"} over ${limit} lines: ${name} (${size})`,
+					`size-budget: new ${labels[kind]} over ${limit} lines: ${name} (${size})`,
 				);
 			else if (size > before)
 				errors.push(
@@ -159,9 +204,13 @@ function readBudget(): Budget {
 		const parsed = JSON.parse(
 			readFileSync(budgetPath, "utf8"),
 		) as Partial<Budget>;
-		return { files: parsed.files ?? {}, functions: parsed.functions ?? {} };
+		return {
+			files: parsed.files ?? {},
+			functions: parsed.functions ?? {},
+			testFiles: parsed.testFiles ?? {},
+		};
 	} catch {
-		return { files: {}, functions: {} };
+		return { files: {}, functions: {}, testFiles: {} };
 	}
 }
 const sorted = (record: Record<string, number>) =>
@@ -176,13 +225,17 @@ if (import.meta.main) {
 		writeFileSync(
 			budgetPath,
 			`${JSON.stringify(
-				{ files: sorted(budget.files), functions: sorted(budget.functions) },
+				{
+					files: sorted(budget.files),
+					functions: sorted(budget.functions),
+					testFiles: sorted(budget.testFiles),
+				},
 				null,
 				"\t",
 			)}\n`,
 		);
 		console.log(
-			`size-budget: wrote ${Object.keys(budget.files).length} files, ${Object.keys(budget.functions).length} functions`,
+			`size-budget: wrote ${Object.keys(budget.files).length} files, ${Object.keys(budget.functions).length} functions, ${Object.keys(budget.testFiles).length} test files`,
 		);
 	} else {
 		const scope = args.map((arg) => arg.replace(/\/+$/, ""));
@@ -191,7 +244,12 @@ if (import.meta.main) {
 				scope.length === 0 ||
 				scope.some((dir) => file === dir || file.startsWith(`${dir}/`)),
 		);
-		const errors = compare(measureAll(paths), readBudget());
+		const testPaths = testSourceFiles().filter(
+			(file) =>
+				scope.length === 0 ||
+				scope.some((dir) => file === dir || file.startsWith(`${dir}/`)),
+		);
+		const errors = compare(measureAll(paths, testPaths), readBudget());
 		if (errors.length) {
 			console.error(errors.join("\n"));
 			process.exit(1);

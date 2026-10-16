@@ -3,7 +3,6 @@ import "@testing-library/jest-dom";
 console.log("Test setup running...");
 
 // Defines pointer capture methods for Radix UI
-// biome-ignore lint/suspicious/noExplicitAny: Patching global prototypes requires any
 function patchElementPrototype(elementProto: any) {
 	if (!elementProto) return;
 

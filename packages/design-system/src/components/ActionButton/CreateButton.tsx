@@ -11,7 +11,7 @@ export interface CreateButtonProps extends ActionButtonProps {
  * 新規作成 / 追加ボタン
  */
 export const CreateButton: React.FC<CreateButtonProps> = ({
-	label = "Create New",
+	label = "新規作成",
 	position = "inline",
 	icon = Plus,
 	variant = "default",

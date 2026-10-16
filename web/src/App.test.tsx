@@ -1,11 +1,10 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { cleanup, fireEvent, render } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { settingsFixture } from "./domains/settings/sections/fixture";
 
 const api = vi.hoisted(() => ({
 	current: null as unknown,
 	state: "connected" as string,
-	reconnect: null as unknown as ReturnType<typeof vi.fn>,
 }));
 vi.mock("../../client", async (importOriginal) => ({
 	...(await importOriginal<typeof import("../../client")>()),
@@ -29,7 +28,7 @@ function mockClient() {
 		subscribeChanges: () => () => {},
 		subscribeChangesState: () => () => {},
 		changesState: () => api.state,
-		reconnectChanges: api.reconnect,
+		reconnectChanges: () => {},
 		settingsDiagnostics: async () => ({}),
 		inferenceProbes: async () => [],
 		larmDetails: async () => null,
@@ -47,7 +46,6 @@ function mockClient() {
 }
 
 beforeEach(() => {
-	api.reconnect = vi.fn();
 	api.current = mockClient();
 	window.location.hash = "";
 	vi.stubGlobal(
@@ -65,22 +63,15 @@ afterEach(() => {
 	vi.unstubAllGlobals();
 });
 
-test("window focus never reconnects a live change stream", async () => {
-	vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-	api.state = "connected";
+test("the workspace renders without the editor loading fallback", async () => {
 	render(<App />);
-	fireEvent.focus(window);
-	await vi.advanceTimersByTimeAsync(200);
-	expect(api.reconnect).not.toHaveBeenCalled();
+	expect(await screen.findByRole("main")).toBeTruthy();
+	expect(screen.queryByText("編集画面を読み込み中です。")).toBeNull();
 });
 
-test("window focus reconnects a failed change stream once after 100 ms", async () => {
-	vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-	api.state = "failed";
+test("only a drawing location waits behind the editor loading fallback", () => {
+	window.location.hash = "#drawing/new/22222222-2222-4222-8222-222222222222";
 	render(<App />);
-	fireEvent.focus(window);
-	await vi.advanceTimersByTimeAsync(99);
-	expect(api.reconnect).not.toHaveBeenCalled();
-	await vi.advanceTimersByTimeAsync(1);
-	expect(api.reconnect).toHaveBeenCalledTimes(1);
+	expect(screen.getByText("編集画面を読み込み中です。")).toBeTruthy();
+	expect(screen.queryByRole("main")).toBeNull();
 });

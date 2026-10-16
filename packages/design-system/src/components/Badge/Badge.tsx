@@ -36,14 +36,22 @@ const BadgeVariants = cva(
 );
 
 export interface BadgeProps
-	extends React.HTMLAttributes<HTMLDivElement>,
+	extends
+		React.HTMLAttributes<HTMLDivElement>,
 		VariantProps<typeof BadgeVariants> {
 	label?: React.ReactNode;
 	pill?: boolean;
 }
 
 const Badge = React.memo(
-	({ className, variant, label, pill, children, ...props }: BadgeProps) => {
+	({
+		className,
+		variant,
+		label,
+		pill: _pill,
+		children,
+		...props
+	}: BadgeProps) => {
 		return (
 			<div className={cn(BadgeVariants({ variant }), className)} {...props}>
 				{label ?? children}

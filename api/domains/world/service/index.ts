@@ -120,22 +120,19 @@ export type {
 	SourceForgetRequest,
 	WorldCuration,
 } from "./curation";
-export {
-	RUNTIME_REFUSALS,
-	createRuntimeObservation,
-	missingConditions,
-	runtimeOutcomeId,
-} from "./runtime-adapter";
+export { createRuntimeObservation } from "./runtime-adapter";
+export type { RuntimeObservation } from "./runtime-adapter";
+export { missingConditions, runtimeOutcomeId } from "./runtime-outcome";
+export { RUNTIME_REFUSALS } from "./runtime-types";
 export type {
 	AssessedObservations,
 	LedgerVersion,
 	ObserveResult,
 	PredictionRef,
 	ReconcileReport,
-	RuntimeObservation,
 	RuntimeObservationOptions,
 	RuntimeRefusal,
-} from "./runtime-adapter";
+} from "./runtime-types";
 export {
 	WORLD_QUERY_DEFAULT_PURPOSE,
 	createWorldQuery,

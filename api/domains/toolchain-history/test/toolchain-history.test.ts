@@ -141,7 +141,7 @@ test("procedures: found by signature, suspended after three failures, disabled o
 	expect(
 		store.read((db) =>
 			history.findRecipesInTransaction(db, {
-				toolchainId: "web.research.luna",
+				toolchainId: "web.research.codex",
 				text: "鎌倉市の天気予報",
 			}),
 		),

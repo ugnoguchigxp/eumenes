@@ -4,8 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openStore, type SqliteStore } from "../../../infrastructure/sqlite";
 import { executionStates } from "../../../../packages/coding-runner/src/contracts";
-import { LIVE_STATES } from "../repository";
-import { migrations as hostMigrations } from "../../../application/migrations";
+import { LIVE_STATES, migrations } from "../repository";
 
 let store: SqliteStore | undefined;
 let dir = "";
@@ -18,7 +17,7 @@ afterEach(() => {
 function plan(sql: string): string {
 	if (!store) {
 		dir = mkdtempSync(join(tmpdir(), "coding-indexes-"));
-		store = openStore(join(dir, "test.sqlite"), hostMigrations);
+		store = openStore(join(dir, "test.sqlite"), migrations);
 	}
 	return store.read((db) =>
 		(db.query(`EXPLAIN QUERY PLAN ${sql}`).all() as { detail: string }[])
@@ -57,18 +56,4 @@ test("countEvents uses coding_evidence_kind", () => {
 			"SELECT COUNT(*) AS n FROM coding_evidence WHERE execution_id='e' AND json_extract(data_json,'$.kind')='k'",
 		),
 	).toContain("USING COVERING INDEX coding_evidence_kind");
-});
-
-test("supervision trim and purge use their task indexes", () => {
-	expect(
-		plan(
-			"DELETE FROM coding_observations WHERE task_id='t' AND id NOT IN (SELECT id FROM coding_observations WHERE task_id='t' ORDER BY created_ms DESC,rowid DESC LIMIT 128)",
-		),
-	).toContain("coding_observations_task_created");
-	expect(plan("DELETE FROM coding_decisions WHERE task_id='t'")).toContain(
-		"coding_decisions_task",
-	);
-	expect(plan("DELETE FROM coding_steps WHERE task_id='t'")).toContain(
-		"coding_steps_task",
-	);
 });

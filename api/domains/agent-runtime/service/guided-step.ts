@@ -4,7 +4,6 @@ import type { Task } from "../contracts";
 import { get, update } from "../repository";
 import { guidedActionFor, type GuidedAction } from "./guided-contract";
 import { saveGuidedReport } from "./guided-report";
-import { createWebReadPlan } from "./web-read-plan";
 import type { RuntimeContext } from "./runtime-context";
 import type { TaskOps } from "./task-ops";
 import type { Tx, Claim, StepInput } from "./step-actions";
@@ -21,37 +20,17 @@ export function applyGuidedAction(
 	raw: unknown,
 	invoke: (action: Extract<GuidedAction, { action: "invoke" }>) => void,
 ) {
-	const webReads = createWebReadPlan(ctx, ops);
 	const action = guidedActionFor(p).parse(raw);
-	if (action.action === "wait") webReads.wait(db, get(db, t.id)!);
-	else if (action.action === "invoke") {
-		const grant = input.grants.find(
-			(g) => g.id === action.tool && !g.replayOnly,
-		);
-		const binding = (ctx.state.bindings.get(t.id) ?? []).find(
-			(b) => b.executionRef === grant?.executionRef,
-		);
+	if (action.action === "wait") {
 		if (
-			binding &&
-			toolRuntimeOf(binding.tool.revisionId)?.operation === "read"
-		) {
-			const args = binding.tool.schemaKey === "read" ? action.arguments : null;
-			if (
-				!args ||
-				typeof args.url !== "string" ||
-				Object.keys(args).length !== 1
-			)
-				throw new Error("invalid_tool_input");
-			webReads.select(db, get(db, t.id)!, {
-				executionRef: binding.executionRef,
-				stepId: input.stepId,
-				jobId: claim.jobId,
-				urls: [args.url, ...(action.readAhead ?? []).map((r) => r.url)],
-			});
-		} else {
-			if (action.readAhead?.length) throw new Error("invalid_tool_input");
-			invoke(action);
-		}
+			!ctx.deps.tools
+				.invocationsInTransaction(db, t.id)
+				.some((i) => i.state === "pending" && !i.superseded)
+		)
+			throw new Error("research_no_progress");
+		ops.waitForTools(db, t, claim.jobId);
+	} else if (action.action === "invoke") {
+		invoke(action);
 	} else {
 		if (
 			!ctx.deps.tools

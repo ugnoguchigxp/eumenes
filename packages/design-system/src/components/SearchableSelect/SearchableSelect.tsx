@@ -35,7 +35,7 @@ export const SearchableSelect = React.forwardRef<
 			name,
 			disabled = false,
 			required = false,
-			noResultsText = "No results",
+			noResultsText = "該当なし",
 		},
 		ref,
 	) => {
@@ -57,6 +57,7 @@ export const SearchableSelect = React.forwardRef<
 			if (value !== lastValueRef.current) {
 				lastValueRef.current = value;
 				justCommittedValueRef.current = null;
+				// oxlint-disable-next-line react/set-state-in-effect -- local state follows a prop or open state, reset when it changes
 				if (!isOpen) setQuery(selectedOptionLabel);
 			}
 		}, [isOpen, selectedOptionLabel, value]);
@@ -80,6 +81,7 @@ export const SearchableSelect = React.forwardRef<
 
 		React.useEffect(() => {
 			if (!isOpen) return;
+			// oxlint-disable-next-line react/set-state-in-effect -- local state follows a prop or open state, reset when it changes
 			setActiveIndex(filteredOptions.length ? 0 : -1);
 		}, [isOpen, filteredOptions.length]);
 

@@ -36,9 +36,7 @@ for (const pause of [false, true])
 				_seq: number,
 				id: string,
 				_wav: Uint8Array,
-				deferred: boolean,
 			) => {
-				expect(deferred).toBe(true);
 				ids.push(id);
 				status.set(id, "recognizing");
 			},

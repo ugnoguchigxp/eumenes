@@ -84,10 +84,11 @@ export function useDrawingFrame(url: string | undefined, refresh: () => void) {
 			}
 		};
 		window.addEventListener("message", receive);
+		const pending = waiting.current;
 		return () => {
 			window.removeEventListener("message", receive);
-			for (const finish of waiting.current.values()) finish(false);
-			waiting.current.clear();
+			for (const finish of pending.values()) finish(false);
+			pending.clear();
 		};
 	}, []);
 	useEffect(() => {

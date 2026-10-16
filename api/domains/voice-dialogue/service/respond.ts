@@ -4,11 +4,14 @@ import type { DialogueService } from "../../dialogue";
 import type { InferencePort } from "../../inference";
 import type { SpeechPreparation } from "../../delivery";
 import type { VoiceTurn } from "../contracts";
-import type { VoiceAdvance } from "./process";
 import type { Speech } from "./speech-state";
 import { spokenText } from "./spoken-text";
 import { getLogger } from "../../../infrastructure/logger";
 const log = getLogger("voice-dialogue");
+export type VoiceAdvance = (
+	id: string,
+	status: VoiceTurn["status"],
+) => Promise<boolean>;
 export function createVoiceResponder({
 	store,
 	dialogue,
@@ -34,13 +37,11 @@ export function createVoiceResponder({
 	return async (
 		turn: VoiceTurn,
 		text: string,
-		asrId: string,
-		languageId: string,
+		transcriptionRequestIds: string[],
 		controller: AbortController,
-		transcriptionRequestIds: string[] = [],
 	) => {
 		controller.signal.throwIfAborted();
-		if (!larm.validRequest?.(asrId) || !larm.validRequest?.(languageId))
+		if (!transcriptionRequestIds.every((id) => larm.validRequest?.(id)))
 			throw new Error("permission_revoked");
 		let run: Awaited<ReturnType<DialogueService["submitVoice"]>>;
 		try {
@@ -52,7 +53,7 @@ export function createVoiceResponder({
 					text,
 				},
 				turn.utteranceId,
-				{ validationRequestIds: [languageId], transcriptionRequestIds },
+				transcriptionRequestIds,
 				(db, accepted) =>
 					linkRunInTransaction(db, turn.utteranceId, accepted.id),
 			);

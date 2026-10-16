@@ -88,8 +88,8 @@ test("a toolchain is offered only where its whole package is registered", async 
 });
 
 test("an incomplete set or a reused function name is refused at registration", async () => {
-	const { store, capabilities } = await setup(["web"]);
-	const web = toolchainBuiltins.find((d) => d.id === "web.search")!;
+	const { store, capabilities } = await setup(["web", "history"]);
+	const web = toolchainBuiltins.find((d) => d.id === "history.research")!;
 	const broken: Definition[] = [
 		{
 			...web,
@@ -126,16 +126,21 @@ test("an incomplete set or a reused function name is refused at registration", a
 
 test("without vectors every available toolchain is offered; with vectors the top ones by similarity", async () => {
 	const { store, capabilities } = await setup();
-	const available = (id: string) => id !== "web.research.luna";
+	const available = (id: string) => id !== "web.research.codex";
 	const all = store.read((db) =>
 		capabilities.toolchainCandidatesInTransaction(db, {
 			text: "鎌倉の天気を教えて",
 			available,
 		}),
 	);
-	expect(all.map((c) => c.id)).not.toContain("web.research.luna");
+	expect(all.map((c) => c.id)).not.toContain("web.research.codex");
 	expect(all.map((c) => c.id).sort()).toEqual(
-		[...toolchainBuiltins.map((d) => d.id), "timers.manage"]
+		[
+			...toolchainBuiltins.map((d) => d.id),
+			"timers.manage",
+			"web.search",
+			"web.research.codex",
+		]
 			.filter(
 				(id) =>
 					available(id) &&

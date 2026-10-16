@@ -1,4 +1,4 @@
-import { withLanguageControl } from "../domains/voice-dialogue/test/control-fixture";
+import { withVoiceAuthority } from "../domains/voice-dialogue/test/voice-fixture";
 /**
  * P3-09 first product connection, accepted on the REAL assembly: a temp-file
  * store with the production migrations, the real Writer and queue, the real
@@ -127,7 +127,7 @@ async function boot(options: BootOptions) {
 	const seen: { role: string; content: string }[][] = [];
 	const spoken: string[] = [];
 	let sends = 0;
-	const larm: InferencePort = withLanguageControl({
+	const larm: InferencePort = withVoiceAuthority({
 		status: () =>
 			options.modelStopped
 				? { state: "failed", capabilities: [], error: "model_stopped" }

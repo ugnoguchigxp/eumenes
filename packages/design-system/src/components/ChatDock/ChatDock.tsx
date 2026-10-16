@@ -25,7 +25,7 @@ export const ChatDock: React.FC<ChatDockProps> = React.memo(
 		onOpen,
 		onClose,
 		title = "chatbot",
-		buttonLabel = "Chatbot",
+		buttonLabel = "チャット",
 		children,
 		className,
 		panelClassName,

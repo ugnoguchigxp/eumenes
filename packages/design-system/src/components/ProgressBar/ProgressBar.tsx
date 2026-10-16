@@ -3,8 +3,9 @@ import * as React from "react";
 import { PercentFormat } from "@/components/NumberFormat";
 import { cn } from "@/utils/cn";
 
-export interface ProgressBarProps
-	extends React.ComponentPropsWithoutRef<typeof ProgressPrimitive.Root> {
+export interface ProgressBarProps extends React.ComponentPropsWithoutRef<
+	typeof ProgressPrimitive.Root
+> {
 	value: number;
 	label?: React.ReactNode;
 	subLabel?: React.ReactNode;

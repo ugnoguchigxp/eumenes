@@ -1,5 +1,10 @@
 import { expect, test } from "bun:test";
-import { allSourceFiles, checkSource, unusedDependencies } from "./boundaries";
+import {
+	allSourceFiles,
+	checkSource,
+	checkTiers,
+	unusedDependencies,
+} from "./boundaries";
 import { closure, dependsOf } from "./domains";
 
 const check = (name: string, spec: string) =>
@@ -98,4 +103,23 @@ test("web and client reach world only through contracts/view", () => {
 			"../../../../api/domains/conversation/contracts",
 		),
 	).toEqual([]);
+});
+
+test("declared dependencies point to a strictly lower tier", () => {
+	expect(checkTiers()).toEqual([]);
+	const depends = (api: string[]) => ({ api, web: [], test: [] });
+	expect(
+		checkTiers({
+			low: { tier: 0, depends: depends(["high"]) },
+			high: { tier: 1, depends: depends([]) },
+		}),
+	).toEqual([
+		"tier violation low (tier 0) -> high (tier 1) (api): dependencies must point to a lower tier",
+	]);
+	expect(
+		checkTiers({
+			a: { tier: 1, depends: depends(["b"]) },
+			b: { tier: 1, depends: depends([]) },
+		}),
+	).toHaveLength(1);
 });

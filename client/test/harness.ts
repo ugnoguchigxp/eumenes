@@ -11,7 +11,7 @@ export type Seen = {
 export type Contract = {
 	name: string;
 	call: (client: EumenesClient) => Promise<unknown>;
-	method: "GET" | "POST";
+	method: "GET" | "POST" | "PUT";
 	path: string;
 	body?: unknown;
 	/** Minimal JSON the backend contract allows. */

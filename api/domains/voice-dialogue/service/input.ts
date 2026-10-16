@@ -1,5 +1,6 @@
+import { measureStage } from "../../../infrastructure/performance";
+import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
-import type { DialogueService } from "../../dialogue";
 import type { InferencePort } from "../../inference";
 import type { VoiceTurn } from "../contracts";
 import { get, lastSequence, update } from "../repository";
@@ -9,29 +10,29 @@ import {
 	saveInput,
 	type PreparedInput,
 } from "../repository/input";
-import { recognizeInput } from "./recognize";
 import type { createVoiceResponder } from "./respond";
 import { toErrorCode } from "../../../infrastructure/error-code";
 import { getLogger, withLogContext } from "../../../infrastructure/logger";
 const log = getLogger("voice-dialogue");
-const CONFIDENCE = 0.8;
+/** The dialogue input limit: a merged input must still be accepted when sent. */
+const MAX_TEXT = 8000;
 
-/** Serializes recognition per session, while answering stays on the existing dialogue queue. */
+/**
+ * Serializes recognition per session, while answering stays on the existing dialogue queue.
+ * A transcript is ready as heard; a segment arriving before the previous one was committed
+ * (the speaker resumed after a pause) continues that input.
+ */
 export function createInputCollector({
 	store,
-	dialogue,
 	larm,
 	sessions,
-	languageRequests,
 	controllers,
 	respond,
 	clock,
 }: {
 	store: SqliteStore;
-	dialogue: DialogueService;
 	larm: InferencePort;
 	sessions: Map<string, number>;
-	languageRequests: Map<string, string>;
 	controllers: Map<string, AbortController>;
 	respond: ReturnType<typeof createVoiceResponder>;
 	clock: () => string;
@@ -42,192 +43,128 @@ export function createInputCollector({
 		if (sessions.get(turn.sessionId) !== turn.generation)
 			throw new Error("voice_input_stale");
 	};
+	async function transcribe(
+		turn: VoiceTurn,
+		wav: Uint8Array,
+		signal: AbortSignal,
+	) {
+		const asrId = store.read((db) =>
+			larm.requestFor?.(db, turn.utteranceId, "asr"),
+		);
+		if (!asrId || !larm.executeRequest) throw new Error("permission_revoked");
+		return measureStage(
+			"voice-dialogue",
+			"asr",
+			() => larm.executeRequest!(asrId, wav, signal),
+			{ utteranceId: turn.utteranceId },
+		);
+	}
+	/**
+	 * Makes this turn the session's pending input: the previous uncommitted input (if any)
+	 * followed by what was heard. Without either, the turn ends as empty.
+	 */
+	function stage(
+		db: Database,
+		turn: VoiceTurn,
+		current: VoiceTurn,
+		heard: { text: string; requestId: string } | null,
+	) {
+		const previousId = previousInputId(
+			db,
+			turn.sessionId,
+			turn.generation,
+			turn.sequence,
+		);
+		const previous = previousId ? get(db, previousId) : null;
+		const previousPrepared = previousId ? readInput(db, previousId) : null;
+		const addition = heard?.text.trim() ?? "";
+		if (!addition && !previous) {
+			update(db, turn.utteranceId, current.revision, "completed", clock(), {
+				text: "",
+			});
+			larm.skipInTransaction?.(db, turn.utteranceId, "llm");
+			larm.skipInTransaction?.(db, turn.utteranceId, "tts");
+			return "completed" as const;
+		}
+		// Noise after a pause carries the pending input forward instead of stranding it
+		// behind a later sequence. (A failed segment cannot: its own ASR was never accepted.)
+		const prepared: PreparedInput = {
+			utteranceId: turn.utteranceId,
+			sources: [...(previousPrepared?.sources ?? []), turn.utteranceId],
+			asrRequests: [
+				...(previousPrepared?.asrRequests ?? []),
+				...(heard ? [heard.requestId] : []),
+			],
+		};
+		const text = [previous?.text, addition].filter(Boolean).join("\n");
+		if (prepared.sources.length > 32 || text.length > MAX_TEXT)
+			throw new Error("voice_input_capacity");
+		if (previous) {
+			if (
+				!update(db, previous.utteranceId, previous.revision, "merged", clock())
+			)
+				throw new Error("voice_input_stale");
+			larm.skipInTransaction?.(db, previous.utteranceId, "llm");
+			larm.skipInTransaction?.(db, previous.utteranceId, "tts");
+		}
+		saveInput(db, prepared);
+		if (
+			!update(db, turn.utteranceId, current.revision, "input_ready", clock(), {
+				text,
+			})
+		)
+			throw new Error("voice_input_stale");
+		return previous ? ("merged" as const) : ("input_ready" as const);
+	}
 	async function collect(
 		turn: VoiceTurn,
 		wav: Uint8Array,
 		controller: AbortController,
 	) {
-		let prepared: PreparedInput | undefined;
-		let previous: VoiceTurn | null = null;
-		let previousPrepared: PreparedInput | null = null;
 		try {
 			valid(turn, controller.signal);
-			const previousId = store.read((db) =>
-				previousInputId(db, turn.sessionId, turn.generation, turn.sequence),
-			);
-			previous = previousId ? store.read((db) => get(db, previousId)) : null;
-			previousPrepared = previousId
-				? store.read((db) => readInput(db, previousId))
-				: null;
-			const last = dialogue
-				.list("main")
-				.reverse()
-				.find((r) => r.status === "completed");
-			const context = last ? dialogue.answerContext(last.id) : null;
-			const conversation = context
-				? [...context.turns, { role: "assistant", text: context.answer }]
-						.slice(-4)
-						.map((t) => ({ role: t.role, text: t.text.slice(0, 2000) }))
-				: [];
-			const result = await recognizeInput({
-				store,
-				larm,
-				turn,
-				wav,
-				controller,
-				languageRequests,
-				context: () => ({ previousText: previous?.text ?? "", conversation }),
-				onTranscript: async (text, receipt) => {
-					prepared = {
-						utteranceId: turn.utteranceId,
-						rawText: text,
-						sources: [turn.utteranceId],
-						asrRequests: [receipt.requestId],
-						languageRequest: null,
-						readiness: "uncertain",
-					};
-					await store.write((db) => {
-						valid(turn, controller.signal);
-						const current = get(db, turn.utteranceId);
-						if (
-							current?.status !== "recognizing" ||
-							!larm.acceptInTransaction?.(db, receipt)
-						)
-							throw new Error("permission_revoked");
-						saveInput(db, prepared!);
-						if (
-							!update(
-								db,
-								turn.utteranceId,
-								current.revision,
-								"recognizing",
-								clock(),
-								{ text },
-							)
-						)
-							throw new Error("voice_input_stale");
-					});
-				},
-			});
+			const receipt = await transcribe(turn, wav, controller.signal);
 			valid(turn, controller.signal);
-			if (!prepared) throw new Error("asr_language_unverified");
-			if (!result.text.trim()) {
-				await store.write((db) => {
-					const current = get(db, turn.utteranceId);
-					valid(turn, controller.signal);
-					if (current)
-						update(
-							db,
-							turn.utteranceId,
-							current.revision,
-							"completed",
-							clock(),
-						);
-					larm.skipInTransaction?.(db, turn.utteranceId, "llm");
-					larm.skipInTransaction?.(db, turn.utteranceId, "tts");
-				});
-				return;
-			}
-			const a = result.assessment!;
-			const related =
-				a.relation === "continuation" && a.relationConfidence >= CONFIDENCE;
-			const uncertain =
-				a.relation === "uncertain" || a.relationConfidence < CONFIDENCE;
-			const text =
-				related && previous?.text
-					? previous.text + "\n" + result.text
-					: result.text;
-			if (related && previousPrepared) {
-				prepared.sources = [...previousPrepared.sources, turn.utteranceId];
-				prepared.asrRequests = [
-					...previousPrepared.asrRequests,
-					...prepared.asrRequests,
-				];
-			}
-			if (prepared.sources.length > 32 || text.length > 8192)
-				throw new Error("voice_input_capacity");
-			prepared.languageRequest = result.languageId!;
-			prepared.readiness =
-				!uncertain && a.readinessConfidence >= CONFIDENCE
-					? a.readiness
-					: "uncertain";
-			const status =
-				prepared.readiness === "ready"
-					? "input_ready"
-					: prepared.readiness === "waiting"
-						? "awaiting_input"
-						: "draft";
-			await store.write((db) => {
+			const status = await store.write((db) => {
 				valid(turn, controller.signal);
 				const current = get(db, turn.utteranceId);
 				if (
 					current?.status !== "recognizing" ||
-					!larm.acceptInTransaction?.(db, result.languageReceipt!)
+					!larm.acceptInTransaction?.(db, receipt)
 				)
 					throw new Error("permission_revoked");
-				if (previous && !uncertain) {
-					const prior = get(db, previous.utteranceId);
-					if (
-						!prior ||
-						prior.revision !== previous.revision ||
-						!["awaiting_input", "input_ready", "draft"].includes(prior.status)
-					)
-						throw new Error("voice_input_stale");
-					if (
-						!update(
-							db,
-							prior.utteranceId,
-							prior.revision,
-							related ? "merged" : "draft",
-							clock(),
-						)
-					)
-						throw new Error("voice_input_stale");
-					if (related) {
-						larm.skipInTransaction?.(db, previous.utteranceId, "llm");
-						larm.skipInTransaction?.(db, previous.utteranceId, "tts");
-					}
-				}
-				saveInput(db, prepared!);
-				if (
-					!update(db, turn.utteranceId, current.revision, status, clock(), {
-						text,
-					})
-				)
-					throw new Error("voice_input_stale");
+				return stage(db, turn, current, {
+					text: receipt.value as string,
+					requestId: receipt.requestId,
+				});
 			});
-			log.info("voice.input_prepared", {
-				utteranceId: turn.utteranceId,
-				sessionId: turn.sessionId,
-				generation: turn.generation,
-				status,
-				count: prepared.sources.length,
-			});
+			if (status === "completed")
+				log.info("voice.input_ignored", { reason: "empty_transcript" });
+			else
+				log.info("voice.input_prepared", {
+					utteranceId: turn.utteranceId,
+					sessionId: turn.sessionId,
+					generation: turn.generation,
+					status,
+				});
 		} catch (error) {
 			if (!controller.signal.aborted) {
+				const reason = toErrorCode(error, "voice_failed");
 				log.warn("voice.input_preparation_failed", {
 					utteranceId: turn.utteranceId,
-					reason: toErrorCode(error, "asr_language_unverified"),
+					reason,
 				});
 				await store
 					.write((db) => {
 						const current = get(db, turn.utteranceId);
-						if (current && current.status === "recognizing")
-							update(db, turn.utteranceId, current.revision, "draft", clock(), {
-								error: toErrorCode(error, "asr_language_unverified"),
-							});
+						if (current?.status !== "recognizing") return;
+						update(db, turn.utteranceId, current.revision, "failed", clock(), {
+							error: reason,
+						});
 					})
 					.catch(() => {});
 			}
 		} finally {
-			const languageId = languageRequests.get(turn.utteranceId);
-			languageRequests.delete(turn.utteranceId);
-			if (languageId) {
-				await store
-					.write((db) => larm.cancelRequestsInTransaction?.(db, [languageId]))
-					.catch(() => {});
-				larm.flushCancelledRequests?.([languageId]);
-			}
 			if (controllers.get(turn.utteranceId) === controller)
 				controllers.delete(turn.utteranceId);
 			controller.abort();
@@ -259,16 +196,9 @@ export function createInputCollector({
 					turn.revision !== revision
 				)
 					throw new Error("voice_input_stale");
-				if (
-					turn.status !== "input_ready" ||
-					prepared.readiness !== "ready" ||
-					!prepared.languageRequest
-				)
+				if (turn.status !== "input_ready")
 					throw new Error("voice_input_not_ready");
-				for (const requestId of [
-					...prepared.asrRequests,
-					prepared.languageRequest,
-				])
+				for (const requestId of prepared.asrRequests)
 					if (!larm.validInTransaction?.(db, requestId))
 						throw new Error("permission_revoked");
 				if (!update(db, id, revision, "responding", clock()))
@@ -283,15 +213,7 @@ export function createInputCollector({
 						sessionId: turn.sessionId,
 						generation: turn.generation,
 					},
-					() =>
-						respond(
-							turn,
-							turn.text!,
-							prepared.asrRequests.at(-1)!,
-							prepared.languageRequest!,
-							controller,
-							prepared.asrRequests,
-						),
+					() => respond(turn, turn.text!, prepared.asrRequests, controller),
 				)
 					.catch(async (error) => {
 						if (controller.signal.aborted) return;

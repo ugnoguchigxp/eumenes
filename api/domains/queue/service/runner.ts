@@ -2,11 +2,8 @@ import { getLogger, withLogContext } from "../../../infrastructure/logger";
 const log = getLogger("queue");
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import {
-	type CandidateCursor,
 	candidates,
-	candidatesAfter,
 	claimJob,
-	cursorOf,
 	endAttempt,
 	expiredQueued,
 	finishJob,
@@ -21,126 +18,20 @@ import {
 } from "../repository";
 import type {
 	HandlerDefinition,
-	JobClaim,
 	JobRecord,
-	QueueOptions,
 	SettleOutcome,
 	SettleResult,
 	Tx,
 } from "../types";
 import { type Registry, sync } from "./registry";
-
-const SCAN_PAGE = 256;
-const SCAN_MAX = 4096;
-
-export interface Resolved {
-	now: () => number;
-	id: () => string;
-	sleep: (ms: number, signal?: AbortSignal) => Promise<void>;
-	random: () => number;
-	resources: Record<string, number>;
-	resourceAliases: Record<string, string>;
-	leaseMs: number;
-	heartbeatMs: number;
-	pollMs: number;
-	backoff: { baseMs: number; maxMs: number };
-	tickClaims: number;
-	/** How long after the runner starts a job of an unregistered kind waits instead of failing. */
-	handlerGraceMs: number;
-	startedAtMs: number;
-}
-
-export type RunnerOptions = QueueOptions & { handlerGraceMs?: number };
-
-/** A job of an unregistered kind waits (the feature may only be disabled for now) until the grace since start ends. */
-function handlerGraceReason(o: Resolved, now: number): string | null {
-	return now - o.startedAtMs < o.handlerGraceMs ? "handler_unavailable" : null;
-}
-
-export function resolveOptions(o: RunnerOptions = {}): Resolved {
-	return {
-		now: o.now ?? Date.now,
-		startedAtMs: (o.now ?? Date.now)(),
-		id: o.id ?? (() => crypto.randomUUID()),
-		sleep:
-			o.sleep ??
-			((ms, signal) =>
-				new Promise((resolve) => {
-					if (signal?.aborted) {
-						resolve();
-						return;
-					}
-					const finish = () => {
-						clearTimeout(timer);
-						signal?.removeEventListener("abort", finish);
-						resolve();
-					};
-					const timer = setTimeout(finish, ms);
-					signal?.addEventListener("abort", finish, { once: true });
-				})),
-		random: o.random ?? Math.random,
-		resources: o.resources ?? { "inference.llm": 1 },
-		resourceAliases: o.resourceAliases ?? {},
-		leaseMs: o.leaseMs ?? 30_000,
-		heartbeatMs: o.heartbeatMs ?? 10_000,
-		pollMs: o.pollMs ?? 1_000,
-		backoff: o.backoff ?? { baseMs: 1_000, maxMs: 30_000 },
-		tickClaims: o.tickClaims ?? 16,
-		handlerGraceMs: o.handlerGraceMs ?? 600_000,
-	};
-}
-
-interface Active {
-	claim: JobClaim;
-	input: unknown;
-	handler: HandlerDefinition<unknown, unknown, unknown>;
-	controller: AbortController;
-	heartbeat: AbortController;
-	resourceKey: string | null;
-	concurrencyKey: string | null;
-	promise: Promise<void>;
-	lost: boolean;
-	revoked: boolean;
-	deadlineHit: boolean;
-}
-
-/** Only machine-readable codes are persisted; free text may carry Provider output. */
-export function toErrorCode(e: unknown): string {
-	if (!(e instanceof Error) || !e.message) return "execution_failed";
-	return /^[a-z][a-z0-9_:]{0,100}$/.test(e.message)
-		? e.message
-		: "handler_failed";
-}
-
-/** Pages through ready jobs so a wall of blocked ones cannot hide runnable ones behind it. */
-function* scanCandidates(db: Tx, now: number): Generator<JobRecord> {
-	let after: CandidateCursor | null = null;
-	let scanned = 0;
-	while (scanned < SCAN_MAX) {
-		const page = candidatesAfter(db, now, SCAN_PAGE, after);
-		for (const job of page) yield job;
-		scanned += page.length;
-		const last = page[page.length - 1];
-		if (page.length < SCAN_PAGE || !last) return;
-		after = cursorOf(last);
-	}
-}
-
-function claimOf(job: JobRecord): JobClaim {
-	return {
-		jobId: job.id,
-		scope: job.scope,
-		kind: job.kind,
-		payloadVersion: job.payloadVersion,
-		payload: JSON.parse(job.payloadJson),
-		subjectRef: job.subjectRef,
-		owner: job.owner ?? "",
-		attempt: job.attempt,
-		generation: job.generation,
-		maxAttempts: job.maxAttempts,
-		deadlineAtMs: job.deadlineAtMs,
-	};
-}
+import { handlerGraceReason, type Resolved } from "./runner-options";
+import {
+	type Active,
+	claimOf,
+	scanCandidates,
+	toErrorCode,
+} from "./runner-shared";
+import { createSettler } from "./settle";
 
 export function createRunner(
 	store: SqliteStore,
@@ -280,16 +171,27 @@ export function createRunner(
 		}
 	}
 	const pendingHooks: Array<() => void> = [];
-	async function writeAndFlush<T>(fn: (db: Tx) => T): Promise<T> {
+	/**
+	 * Writer transaction followed by the after-commit hooks it collected. Everything but claiming
+	 * runs on the reserved lane: lease renewal, settlement, sweep and recovery must still go
+	 * through when general writes have filled the writer queue.
+	 */
+	async function writeAndFlush<T>(
+		fn: (db: Tx) => T,
+		reserved = true,
+	): Promise<T> {
 		let hooks: Array<() => void> = [];
-		const result = await store.write((db) => {
-			const start = pendingHooks.length;
-			try {
-				return fn(db);
-			} finally {
-				hooks = pendingHooks.splice(start);
-			}
-		});
+		const result = await store.write(
+			(db) => {
+				const start = pendingHooks.length;
+				try {
+					return fn(db);
+				} finally {
+					hooks = pendingHooks.splice(start);
+				}
+			},
+			{ reserved },
+		);
 		runHooks(hooks);
 		return result;
 	}
@@ -442,14 +344,25 @@ export function createRunner(
 		return { type: "none" };
 	}
 
+	const settle = createSettler({
+		opts,
+		writeCritical: writeAndFlush,
+		finishRunning,
+		applyOutcome,
+		backoffMs,
+		isClosing: () => closing,
+		pendingHooks,
+	});
+
 	async function heartbeat(a: Active) {
 		while (!a.heartbeat.signal.aborted) {
 			await opts.sleep(opts.heartbeatMs, a.heartbeat.signal);
 			if (a.heartbeat.signal.aborted) return;
 			try {
 				const now = opts.now();
-				const ok = await store.write((db) =>
-					renewLease(db, a.claim, now + opts.leaseMs, now),
+				const ok = await store.write(
+					(db) => renewLease(db, a.claim, now + opts.leaseMs, now),
+					{ reserved: true },
 				);
 				if (!ok) {
 					a.lost = true;
@@ -528,73 +441,6 @@ export function createRunner(
 		}
 	}
 
-	async function settle(
-		a: Active,
-		result: { ok: true; value: unknown } | { ok: false; error: unknown },
-	) {
-		const attemptSettle = (
-			pick: (job: JobRecord, now: number) => SettleOutcome<unknown>,
-		) =>
-			writeAndFlush((db) => {
-				const now = opts.now();
-				const job = getJob(db, a.claim.jobId);
-				if (
-					!job ||
-					job.owner !== a.claim.owner ||
-					job.attempt !== a.claim.attempt ||
-					job.generation !== a.claim.generation ||
-					a.revoked
-				)
-					return;
-				if (job.state === "cancel_requested") {
-					finishRunning(db, job, "cancelled", job.errorCode, now);
-					return;
-				}
-				if (job.state !== "running") return;
-				applyOutcome(
-					db,
-					job,
-					a.handler,
-					a.input,
-					pick(job, now),
-					now,
-					pendingHooks,
-				);
-			});
-		const pick = (job: JobRecord, now: number): SettleOutcome<unknown> => {
-			const late = job.deadlineAtMs !== null && now >= job.deadlineAtMs;
-			if (result.ok)
-				return late || a.deadlineHit
-					? { type: "expired" }
-					: { type: "success", result: result.value };
-			if (closing) return { type: "interrupted", errorCode: "shutdown" };
-			if (a.deadlineHit || late) return { type: "expired" };
-			const errorCode = toErrorCode(result.error);
-			const retryable =
-				a.handler.classify?.(result.error) === "retry" &&
-				job.attempt < job.maxAttempts;
-			if (!retryable) return { type: "failed", errorCode };
-			const availableAtMs = now + backoffMs(job.attempt);
-			if (job.deadlineAtMs !== null && availableAtMs >= job.deadlineAtMs)
-				return { type: "failed", errorCode };
-			return { type: "retry", errorCode, availableAtMs };
-		};
-		try {
-			await attemptSettle(pick);
-		} catch (error) {
-			log.error(
-				"queue.business_settlement_failed",
-				{ reason: "settle_failed" },
-				error,
-			);
-			// Business settlement threw and rolled back; record a plain failure through the handler.
-			await attemptSettle(() => ({
-				type: "failed",
-				errorCode: "settle_failed",
-			}));
-		}
-	}
-
 	async function sweep(now: number) {
 		const needed = store.read(
 			(db) =>
@@ -654,7 +500,10 @@ export function createRunner(
 		await sweep(now);
 		for (let i = 0; i < opts.tickClaims && !closing; i++) {
 			if (!store.read((db) => candidates(db, opts.now(), 1).length > 0)) break;
-			const result = await writeAndFlush((db) => claimOne(db, opts.now()));
+			const result = await writeAndFlush(
+				(db) => claimOne(db, opts.now()),
+				false,
+			);
 			if (result.type === "none") break;
 			if (result.type === "claimed") {
 				const a = result.active as Active;
@@ -763,5 +612,3 @@ export function createRunner(
 	};
 }
 export type Runner = ReturnType<typeof createRunner>;
-
-export type { HandlerDefinition };

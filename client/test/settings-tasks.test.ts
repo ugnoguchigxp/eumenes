@@ -41,7 +41,6 @@ const settings = {
 		agentName: "",
 		userName: "",
 		persona: "butler",
-		asrLanguages: ["ja"],
 		theme: "system",
 		subtitles: { enabled: false, style: "netflix", size: "large" },
 	},

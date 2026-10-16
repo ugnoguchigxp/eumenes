@@ -1,6 +1,10 @@
 import { createApp } from "../../../application/app";
 import { registerVoiceDialogue } from "..";
-import { inputMigration } from "../repository/input";
+import {
+	inputMigration,
+	inputSimplificationMigration,
+	inputTextDedupMigration,
+} from "../repository/input";
 import { afterEach, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -46,7 +50,6 @@ function wav() {
 async function setup(
 	fetcher?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>,
 	local: Partial<LarmPort> = {},
-	languageAnswer?: LarmPort["answer"],
 ) {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-settings-voice-"));
 	const dbPath = join(dir, "test.db");
@@ -61,6 +64,8 @@ async function setup(
 		queueLinkMigration,
 		sequenceMigration,
 		inputMigration,
+		inputSimplificationMigration,
+		inputTextDedupMigration,
 		settingsMigration,
 		inferenceMigration,
 		settingsEpochsMigration,
@@ -122,17 +127,9 @@ async function setup(
 			close: async () => {},
 			...local,
 			answer: async (messages, signal, options) =>
-				messages[0]?.content.includes("転記された発話の主要な言語")
-					? languageAnswer
-						? languageAnswer(messages, signal, options)
-						: JSON.stringify({
-								status: "identified",
-								languages: ["ja"],
-								confidence: 0.99,
-							})
-					: local.answer
-						? local.answer(messages, signal, options)
-						: Promise.reject(new Error("larm_unconfigured")),
+				local.answer
+					? local.answer(messages, signal, options)
+					: Promise.reject(new Error("larm_unconfigured")),
 		}),
 	});
 	const conversation = createConversationService(store);
@@ -170,12 +167,23 @@ async function until(condition: () => boolean) {
 	}
 	throw new Error("condition_not_reached");
 }
+/** Uploads one segment and sends it once transcribed, as the Web does when the speaker is idle. */
+async function say(
+	h: Awaited<ReturnType<typeof setup>>,
+	session: string,
+	id: string,
+) {
+	await h.voice.accept(session, 1, 1, id, wav());
+	await until(() => h.voice.get(id)?.status !== "recognizing");
+	const turn = h.voice.get(id)!;
+	if (turn.status === "input_ready") await h.voice.commit(id, turn.revision);
+}
 test("one voice turn uses fallback in all three stages, adopts one answer, and does not repeat duplicate upload", async () => {
 	const h = await setup();
 	const session = crypto.randomUUID(),
 		id = crypto.randomUUID();
 	h.voice.start(session, 1);
-	await h.voice.accept(session, 1, 1, id, wav());
+	await say(h, session, id);
 	await h.voice.accept(session, 1, 1, id, wav());
 	await until(() => h.voice.get(id)?.status === "ready");
 	expect(h.calls).toHaveLength(3);
@@ -208,7 +216,7 @@ test("autoSpeak false is captured at voice acceptance and ends successfully with
 	const session = crypto.randomUUID(),
 		id = crypto.randomUUID();
 	h.voice.start(session, 1);
-	await h.voice.accept(session, 1, 1, id, wav());
+	await say(h, session, id);
 	const changed = h.settings.get();
 	changed.voice.autoSpeak = true;
 	await h.settings.apply({
@@ -293,7 +301,7 @@ test("revoking a cloud answer aborts downstream TTS and never publishes late aud
 	const session = crypto.randomUUID(),
 		id = crypto.randomUUID();
 	h.voice.start(session, 1);
-	await h.voice.accept(session, 1, 1, id, wav());
+	await say(h, session, id);
 	await until(() => synthesizing);
 	const next = h.settings.get();
 	next.routes.llm.cloudAllowed = false;
@@ -347,7 +355,7 @@ test("streaming text is visible but speech waits for completion; cancellation pr
 	const session = crypto.randomUUID(),
 		id = crypto.randomUUID();
 	h.voice.start(session, 1);
-	await h.voice.accept(session, 1, 1, id, wav());
+	await say(h, session, id);
 	await until(
 		() =>
 			!!h.voice.get(id)?.runId &&
@@ -395,7 +403,7 @@ test("render ahead is bounded at three clauses and playback releases the next cl
 	const session = crypto.randomUUID(),
 		id = crypto.randomUUID();
 	h.voice.start(session, 1);
-	await h.voice.accept(session, 1, 1, id, wav());
+	await say(h, session, id);
 	await until(() => h.voice.get(id)?.audioChunks?.length === 3);
 	await Bun.sleep(15);
 	expect(spoken).toEqual(["一。", "二。", "三。"]);
@@ -433,7 +441,7 @@ test("final recognition preempts a slow prefix and never submits a late hypothes
 	h.voice.start(session, 1);
 	const prefix = h.voice.preview(session, 1, id, wav());
 	await until(() => started);
-	await h.voice.accept(session, 1, 1, id, wav());
+	await say(h, session, id);
 	expect((await prefix).text).toBe("");
 	release();
 	await until(() => h.voice.get(id)?.status === "ready");
@@ -462,7 +470,7 @@ test("accepted audio chunks publish Laya delivery and cancellation removes the p
 	const session = crypto.randomUUID(),
 		id = crypto.randomUUID();
 	h.voice.start(session, 1);
-	await h.voice.accept(session, 1, 1, id, wav());
+	await say(h, session, id);
 	await until(() => h.voice.get(id)?.status === "ready");
 	expect(h.voice.get(id)?.audioChunks).toEqual([
 		expect.objectContaining({
@@ -617,7 +625,7 @@ test("automatic three-clause speech shares the adopted full-answer decision", as
 	});
 	const id = crypto.randomUUID();
 	h.voice.start("shared-emotion", 1);
-	await h.voice.accept("shared-emotion", 1, 1, id, wav());
+	await say(h, "shared-emotion", id);
 	await until(() => h.voice.get(id)?.status === "ready");
 	const turn = h.voice.get(id)!;
 	const saved = h.dialogue.answerDelivery(turn.runId!);
@@ -666,69 +674,60 @@ test("cancelling during final Laya classification rejects late emotion and assis
 	).toEqual(["user"]);
 });
 
-test("V05 cancelling during language control rejects the late receipt before dialogue or speech", async () => {
+const ready = (): ReturnType<LarmPort["status"]> => ({
+	state: "ready",
+	capabilities: ["llm", "asr", "tts"],
+});
+const controlRequests = (h: Awaited<ReturnType<typeof setup>>) =>
+	h.store.read((db) =>
+		db
+			.query(
+				"SELECT COUNT(*) AS n FROM inference_requests WHERE mode='control'",
+			)
+			.get(),
+	);
+
+test("cancelling during ASR rejects the late transcript before dialogue or speech", async () => {
 	let finish!: (value: string) => void;
-	let called = false;
-	const h = await setup(undefined, {}, async () => {
-		called = true;
-		return new Promise<string>((resolve) => {
-			finish = resolve;
-		});
+	const h = await setup(undefined, {
+		status: ready,
+		transcribe: () =>
+			new Promise<string>((resolve) => {
+				finish = resolve;
+			}),
 	});
 	const session = crypto.randomUUID(),
 		id = crypto.randomUUID();
 	h.voice.start(session, 1);
 	await h.voice.accept(session, 1, 1, id, wav());
-	await until(() => called);
+	await until(() => !!finish);
 	await h.voice.cancel(id);
-	finish(
-		JSON.stringify({
-			status: "identified",
-			languages: ["ja"],
-			confidence: 0.99,
-		}),
-	);
+	finish("遅れて届いた文字起こし");
 	await Bun.sleep(30);
 	expect(h.voice.get(id)?.status).toBe("cancelled");
+	expect(h.voice.get(id)?.text).toBeNull();
 	expect(h.dialogue.list("main")).toHaveLength(0);
-	expect(h.conversation.get("main").messages).toHaveLength(0);
-	expect(h.calls).toHaveLength(1);
 	expect(h.voice.takeAudio(id)).toBeNull();
-	expect(
-		h.store.read((db) =>
-			db
-				.query(
-					"SELECT COUNT(*) AS n FROM inference_requests WHERE mode='control' AND status='accepted'",
-				)
-				.get(),
-		),
-	).toEqual({ n: 0 });
 });
-for (const [result, error] of [
-	[
-		{ status: "identified", languages: ["fr"], confidence: 0.99 },
-		"asr_language_not_allowed",
-	],
-	[
-		{ status: "undetermined", languages: [], confidence: 0.2 },
-		"asr_language_unverified",
-	],
-] as const)
-	test(`V02/V04 ${error} prevents dialogue and TTS through real inference receipts`, async () => {
-		const h = await setup(undefined, {}, async () => JSON.stringify(result));
-		const session = crypto.randomUUID(),
-			id = crypto.randomUUID();
-		h.voice.start(session, 1);
-		await h.voice.accept(session, 1, 1, id, wav());
-		await until(() => h.voice.get(id)?.status === "failed");
-		expect(h.voice.get(id)?.error).toBe(error);
-		expect(h.dialogue.list("main")).toHaveLength(0);
-		expect(h.calls).toHaveLength(1);
-		expect(h.voice.takeAudio(id)).toBeNull();
+
+test("a transcript is ready as heard, with no language or endpoint control", async () => {
+	const h = await setup(undefined, {
+		status: ready,
+		transcribe: async () => "Hello, 今日の予定は？",
 	});
-test("V06 empty final ASR performs zero language control and creates no dialogue", async () => {
-	const h = await setup(undefined, { transcribe: async () => "" }, async () => {
-		throw new Error("unexpected_language_control");
+	const session = crypto.randomUUID(),
+		id = crypto.randomUUID();
+	h.voice.start(session, 1);
+	await h.voice.accept(session, 1, 1, id, wav());
+	await until(() => h.voice.get(id)?.status === "input_ready");
+	expect(h.voice.get(id)?.text).toBe("Hello, 今日の予定は？");
+	expect(controlRequests(h)).toEqual({ n: 0 });
+});
+
+test("empty final ASR creates no dialogue", async () => {
+	const h = await setup(undefined, {
+		status: ready,
+		transcribe: async () => "",
 	});
 	const session = crypto.randomUUID(),
 		id = crypto.randomUUID();
@@ -741,68 +740,14 @@ test("V06 empty final ASR performs zero language control and creates no dialogue
 		"completed",
 	);
 	expect(h.dialogue.list("main")).toHaveLength(0);
-	expect(
-		h.store.read((db) =>
-			db
-				.query(
-					"SELECT COUNT(*) AS n FROM inference_requests WHERE mode='control'",
-				)
-				.get(),
-		),
-	).toEqual({ n: 0 });
-});
-
-const assessment = (relation: string, readiness: string) =>
-	JSON.stringify({
-		status: "identified",
-		languages: ["ja"],
-		confidence: 0.99,
-		relation,
-		readiness,
-		relationConfidence: 0.99,
-		readinessConfidence: 0.99,
-	});
-
-test("cancelled source cannot be resurrected by a late continuation decision", async () => {
-	let count = 0,
-		release!: (value: string) => void;
-	const h = await setup(
-		undefined,
-		{
-			status: () => ({ state: "ready", capabilities: ["llm", "asr", "tts"] }),
-			transcribe: async () => (++count === 1 ? "ニュースの" : "続きです"),
-		},
-		async () =>
-			count === 1
-				? assessment("independent", "waiting")
-				: new Promise<string>((r) => {
-						release = r;
-					}),
-	);
-	const session = crypto.randomUUID(),
-		first = crypto.randomUUID(),
-		second = crypto.randomUUID();
-	h.voice.start(session, 1);
-	await h.voice.accept(session, 1, 1, first, wav(), true);
-	await until(() => h.voice.get(first)!.status === "awaiting_input");
-	await h.voice.accept(session, 1, 2, second, wav(), true);
-	await until(() => !!release);
-	await h.voice.cancel(first);
-	release(assessment("continuation", "ready"));
-	await until(() => h.voice.get(second)!.status === "draft");
-	expect(h.voice.get(first)!.status).toBe("cancelled");
-	expect(h.voice.get(second)!.text).toBe("続きです");
-	expect(h.dialogue.list("main")).toHaveLength(0);
 });
 
 test("ASR permission revocation after staging rejects commit", async () => {
-	const h = await setup(undefined, {}, async () =>
-		assessment("independent", "ready"),
-	);
+	const h = await setup();
 	const session = crypto.randomUUID(),
 		id = crypto.randomUUID();
 	h.voice.start(session, 1);
-	await h.voice.accept(session, 1, 1, id, wav(), true);
+	await h.voice.accept(session, 1, 1, id, wav());
 	await until(() => h.voice.get(id)!.status === "input_ready");
 	const value = h.settings.get();
 	value.routes.asr.cloudAllowed = false;
@@ -818,92 +763,60 @@ test("ASR permission revocation after staging rejects commit", async () => {
 	expect(h.dialogue.list("main")).toHaveLength(0);
 });
 
-test("an answered input forms a boundary before an abandoned draft", async () => {
+test("an answered input forms a boundary: the next segment starts a new input", async () => {
 	let count = 0;
-	const previousTexts: string[] = [];
-	const h = await setup(
-		undefined,
-		{
-			status: () => ({ state: "ready", capabilities: ["llm", "asr", "tts"] }),
-			transcribe: async () =>
-				["今日のニュースの", "人口を教えて", "ありがとう"][count++]!,
-			answer: async () => "人口の回答",
-			speak: async () => wav(),
-		},
-		async (messages) => {
-			previousTexts.push(JSON.parse(messages[1]!.content).previousText);
-			return assessment("independent", count === 1 ? "waiting" : "ready");
-		},
-	);
+	const h = await setup(undefined, {
+		status: ready,
+		transcribe: async () => ["人口を教えて", "ありがとう"][count++]!,
+		answer: async () => "人口の回答",
+		speak: async () => wav(),
+	});
 	const session = crypto.randomUUID(),
-		ids = Array.from({ length: 3 }, () => crypto.randomUUID());
+		ids = [crypto.randomUUID(), crypto.randomUUID()];
 	h.voice.start(session, 1);
-	for (let i = 0; i < 2; i++) {
-		await h.voice.accept(session, 1, i + 1, ids[i]!, wav(), true);
-		await until(() =>
-			["awaiting_input", "input_ready"].includes(h.voice.get(ids[i]!)!.status),
-		);
-	}
-	await h.voice.commit(ids[1]!, h.voice.get(ids[1]!)!.revision);
-	await until(() => h.voice.get(ids[1]!)!.status === "ready");
-	await h.voice.accept(session, 1, 3, ids[2]!, wav(), true);
-	await until(() => h.voice.get(ids[2]!)!.status === "input_ready");
-	expect(previousTexts).toEqual(["", "今日のニュースの", ""]);
+	await h.voice.accept(session, 1, 1, ids[0]!, wav());
+	await until(() => h.voice.get(ids[0]!)!.status === "input_ready");
+	await h.voice.commit(ids[0]!, h.voice.get(ids[0]!)!.revision);
+	await until(() => h.voice.get(ids[0]!)!.status === "ready");
+	await h.voice.accept(session, 1, 2, ids[1]!, wav());
+	await until(() => h.voice.get(ids[1]!)!.status === "input_ready");
+	expect(h.voice.get(ids[1]!)!.text).toBe("ありがとう");
 });
 
-test("three paused clauses use one language/endpoint control per fragment and create one answer after commit", async () => {
+test("segments sent before commit merge into one input and create one answer", async () => {
 	const fragments = [
 		"じゃあ今日は。",
 		"イラン側の。",
 		"最新のニュースを教えてください。",
 	];
-	const seen: Array<{ text: string; previousText: string }> = [];
 	let recognized = 0,
 		answers = 0;
-	const h = await setup(
-		undefined,
-		{
-			status: () => ({ state: "ready", capabilities: ["llm", "asr", "tts"] }),
-			transcribe: async () => fragments[recognized++]!,
-			answer: async () => {
-				answers++;
-				return "まとめた依頼への回答です。";
-			},
-			speak: async () => wav(),
+	const h = await setup(undefined, {
+		status: ready,
+		transcribe: async () => fragments[recognized++]!,
+		answer: async () => {
+			answers++;
+			return "まとめた依頼への回答です。";
 		},
-		async (messages) => {
-			seen.push(JSON.parse(messages[1]!.content));
-			return assessment(
-				seen.length === 1 ? "independent" : "continuation",
-				seen.length === 3 ? "ready" : "waiting",
-			);
-		},
-	);
+		speak: async () => wav(),
+	});
 	const session = crypto.randomUUID(),
 		ids = fragments.map(() => crypto.randomUUID());
 	h.voice.start(session, 1);
 	for (let i = 0; i < ids.length; i++) {
-		await h.voice.accept(session, 1, i + 1, ids[i]!, wav(), true);
-		await until(() =>
-			["awaiting_input", "input_ready"].includes(h.voice.get(ids[i]!)!.status),
-		);
+		await h.voice.accept(session, 1, i + 1, ids[i]!, wav());
+		await until(() => h.voice.get(ids[i]!)!.status === "input_ready");
 		expect(h.dialogue.list("main")).toHaveLength(0);
 	}
 	const final = h.voice.get(ids[2]!)!;
 	expect(final.text).toBe(fragments.join("\n"));
 	expect(h.voice.get(ids[0]!)!.status).toBe("merged");
 	expect(h.voice.get(ids[1]!)!.status).toBe("merged");
-	expect(seen.map((v) => v.previousText)).toEqual([
-		"",
-		fragments[0]!,
-		fragments.slice(0, 2).join("\n"),
-	]);
 	await h.voice.commit(ids[2]!, final.revision);
 	await h.voice.commit(ids[2]!, final.revision);
 	await until(() => h.voice.get(ids[2]!)!.status === "ready");
-	expect(recognized).toBe(3);
-	expect(seen).toHaveLength(3);
 	expect(answers).toBe(1);
+	expect(controlRequests(h)).toEqual({ n: 0 });
 	expect(h.dialogue.list("main")).toHaveLength(1);
 	expect(h.conversation.get("main").messages.map((m) => m.text)).toEqual([
 		fragments.join("\n"),
@@ -911,34 +824,73 @@ test("three paused clauses use one language/endpoint control per fragment and cr
 	]);
 });
 
-test("a later accepted fragment blocks an older ready input, including while its ASR is delayed", async () => {
-	let release!: () => void,
-		count = 0;
-	const h = await setup(
-		undefined,
-		{
-			status: () => ({ state: "ready", capabilities: ["llm", "asr", "tts"] }),
-			transcribe: async () =>
-				++count === 1
-					? "天気を教えて"
-					: (await new Promise<void>((r) => {
-							release = r;
-						}),
-						"明日の分も"),
-			answer: async () => "天気の回答",
-			speak: async () => wav(),
-		},
-		async () =>
-			assessment(count === 1 ? "independent" : "continuation", "ready"),
-	);
+test("an empty segment after a pause carries the pending input forward", async () => {
+	let count = 0;
+	const h = await setup(undefined, {
+		status: ready,
+		transcribe: async () => ["天気を教えて", ""][count++]!,
+		answer: async () => "天気の回答",
+		speak: async () => wav(),
+	});
 	const session = crypto.randomUUID(),
 		first = crypto.randomUUID(),
 		second = crypto.randomUUID();
 	h.voice.start(session, 1);
-	await h.voice.accept(session, 1, 1, first, wav(), true);
+	await h.voice.accept(session, 1, 1, first, wav());
+	await until(() => h.voice.get(first)!.status === "input_ready");
+	await h.voice.accept(session, 1, 2, second, wav());
+	await until(() => h.voice.get(second)!.status === "input_ready");
+	expect(h.voice.get(first)!.status).toBe("merged");
+	expect(h.voice.get(second)!.text).toBe("天気を教えて");
+	await h.voice.commit(second, h.voice.get(second)!.revision);
+	await until(() => h.voice.get(second)!.status === "ready");
+	expect(h.conversation.get("main").messages[0]!.text).toBe("天気を教えて");
+});
+
+test("a failed segment after a pause fails alone and never answers the pending input", async () => {
+	let count = 0;
+	const h = await setup(undefined, {
+		status: ready,
+		transcribe: async () => {
+			if (count++ === 0) return "天気を教えて";
+			throw new Error("larm_timeout");
+		},
+	});
+	const session = crypto.randomUUID(),
+		first = crypto.randomUUID(),
+		second = crypto.randomUUID();
+	h.voice.start(session, 1);
+	await h.voice.accept(session, 1, 1, first, wav());
+	await until(() => h.voice.get(first)!.status === "input_ready");
+	await h.voice.accept(session, 1, 2, second, wav());
+	await until(() => h.voice.get(second)!.status === "failed");
+	expect(h.voice.get(first)!.status).toBe("input_ready");
+	expect(h.dialogue.list("main")).toHaveLength(0);
+});
+
+test("a later accepted fragment blocks an older ready input, including while its ASR is delayed", async () => {
+	let release!: () => void,
+		count = 0;
+	const h = await setup(undefined, {
+		status: ready,
+		transcribe: async () =>
+			++count === 1
+				? "天気を教えて"
+				: (await new Promise<void>((r) => {
+						release = r;
+					}),
+					"明日の分も"),
+		answer: async () => "天気の回答",
+		speak: async () => wav(),
+	});
+	const session = crypto.randomUUID(),
+		first = crypto.randomUUID(),
+		second = crypto.randomUUID();
+	h.voice.start(session, 1);
+	await h.voice.accept(session, 1, 1, first, wav());
 	await until(() => h.voice.get(first)!.status === "input_ready");
 	const revision = h.voice.get(first)!.revision;
-	await h.voice.accept(session, 1, 2, second, wav(), true);
+	await h.voice.accept(session, 1, 2, second, wav());
 	await until(() => !!release);
 	await expect(h.voice.commit(first, revision)).rejects.toThrow(
 		"voice_input_stale",
@@ -949,79 +901,33 @@ test("a later accepted fragment blocks an older ready input, including while its
 	expect(h.voice.get(second)!.text).toBe("天気を教えて\n明日の分も");
 });
 
-for (const result of [
-	assessment("uncertain", "ready"),
-	"{}",
-	assessment("independent", "waiting"),
-	...[
-		{ relationConfidence: 0.79 },
-		{ readinessConfidence: 0.79 },
-		{ confidence: 0.79 },
-		{ languages: ["fr"] },
-	].map((patch) =>
-		JSON.stringify({
-			status: "identified",
-			languages: ["ja"],
-			confidence: 1,
-			relation: "independent",
-			readiness: "ready",
-			relationConfidence: 1,
-			readinessConfidence: 1,
-			...patch,
-		}),
-	),
-])
-	test(`uncertain, malformed and incomplete input never starts an answer: ${result}`, async () => {
-		const h = await setup(
-			undefined,
-			{
-				status: () => ({ state: "ready", capabilities: ["llm", "asr", "tts"] }),
-				transcribe: async () => "じゃあ今日は。",
-			},
-			async () => result,
-		);
-		const session = crypto.randomUUID(),
-			id = crypto.randomUUID();
-		h.voice.start(session, 1);
-		await h.voice.accept(session, 1, 1, id, wav(), true);
-		await until(() =>
-			["draft", "awaiting_input"].includes(h.voice.get(id)!.status),
-		);
-		expect(h.voice.get(id)!.text).toBe("じゃあ今日は。");
-		await expect(h.voice.commit(id, h.voice.get(id)!.revision)).rejects.toThrow(
-			"voice_input_not_ready",
-		);
-		expect(h.dialogue.list("main")).toHaveLength(0);
+test("a cancelled input is not merged into the next segment", async () => {
+	let release!: () => void,
+		count = 0;
+	const h = await setup(undefined, {
+		status: ready,
+		transcribe: async () =>
+			++count === 1
+				? "ニュースの"
+				: (await new Promise<void>((r) => {
+						release = r;
+					}),
+					"続きです"),
 	});
-
-test("independent input keeps an unfinished prior utterance as a draft and answers only the new request", async () => {
-	let asr = 0;
-	const h = await setup(
-		undefined,
-		{
-			status: () => ({ state: "ready", capabilities: ["llm", "asr", "tts"] }),
-			transcribe: async () =>
-				++asr === 1 ? "今日のニュースの" : "東京の人口を教えて",
-			answer: async () => "人口の回答",
-			speak: async () => wav(),
-		},
-		async () => assessment("independent", asr === 1 ? "waiting" : "ready"),
-	);
 	const session = crypto.randomUUID(),
 		first = crypto.randomUUID(),
 		second = crypto.randomUUID();
 	h.voice.start(session, 1);
-	await h.voice.accept(session, 1, 1, first, wav(), true);
-	await until(() => h.voice.get(first)!.status === "awaiting_input");
-	await h.voice.accept(session, 1, 2, second, wav(), true);
+	await h.voice.accept(session, 1, 1, first, wav());
+	await until(() => h.voice.get(first)!.status === "input_ready");
+	await h.voice.accept(session, 1, 2, second, wav());
+	await until(() => !!release);
+	await h.voice.cancel(first);
+	release();
 	await until(() => h.voice.get(second)!.status === "input_ready");
-	expect(h.voice.get(first)!.status).toBe("draft");
-	expect(h.voice.get(second)!.text).toBe("東京の人口を教えて");
-	await h.voice.commit(second, h.voice.get(second)!.revision);
-	await until(() => h.voice.get(second)!.status === "ready");
-	expect(h.conversation.get("main").messages[0]!.text).toBe(
-		"東京の人口を教えて",
-	);
+	expect(h.voice.get(first)!.status).toBe("cancelled");
+	expect(h.voice.get(second)!.text).toBe("続きです");
+	expect(h.dialogue.list("main")).toHaveLength(0);
 });
 
 test("an adopted mixed answer is routed per language part and synthesis stays bounded until playback acknowledgements", async () => {
@@ -1050,7 +956,7 @@ test("an adopted mixed answer is routed per language part and synthesis stays bo
 	const session = crypto.randomUUID(),
 		id = crypto.randomUUID();
 	h.voice.start(session, 1);
-	await h.voice.accept(session, 1, 1, id, wav());
+	await say(h, session, id);
 	await until(() => h.voice.get(id)?.audioChunks.length === 3);
 	expect(spoken).toEqual([
 		["最初です。", "ja"],
@@ -1103,7 +1009,7 @@ test("without an English voice every clause is still spoken by the Japanese voic
 	const session = crypto.randomUUID(),
 		id = crypto.randomUUID();
 	h.voice.start(session, 1);
-	await h.voice.accept(session, 1, 1, id, wav());
+	await say(h, session, id);
 	await until(() => h.voice.get(id)?.audioChunks.length === 3);
 	expect(spoken).toEqual([
 		["First.", "ja"],

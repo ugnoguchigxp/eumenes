@@ -105,6 +105,29 @@ describe("history client details", () => {
 	});
 });
 
+const selection = {
+	id: "s1",
+	runId: "r1",
+	conversationId: "c1",
+	utteranceId: null,
+	requestId: null,
+	retrieval: "none",
+	candidates: [],
+	historyRefs: [],
+	decision: "answer",
+	toolchainId: null,
+	toolchainRevisionId: null,
+	functionName: null,
+	request: null,
+	repaired: false,
+	taskId: null,
+	outcome: null,
+	outcomeCode: null,
+	recipe: null,
+	durationMs: null,
+	createdAt: 1,
+	settledAt: null,
+};
 describe("toolchain-history client", () => {
 	it("lists selections with only the given filters", async () => {
 		const seen = stubFetch(() =>
@@ -118,12 +141,24 @@ describe("toolchain-history client", () => {
 		expect(seen[1]?.path).toBe("/api/toolchain-history/selections");
 	});
 	it("encodes ids into the path and posts recipe state as JSON", async () => {
-		const seen = stubFetch(() => Response.json({ ok: true }));
+		const seen = stubFetch(() => Response.json(selection));
 		await newClient().toolchainSelection("a/b");
 		expect(seen[0]?.path).toBe("/api/toolchain-history/selections/a%2Fb");
+		stubFetch(() => Response.json({ ok: true }));
+		const state = stubFetch(() => Response.json({ ok: true }));
 		await newClient().setToolchainRecipeState("x/y", "disabled");
-		expect(seen[1]?.path).toBe("/api/toolchain-history/recipes/x%2Fy/state");
-		expect(seen[1]?.headers["content-type"]).toBe("application/json");
+		expect(state[0]?.path).toBe("/api/toolchain-history/recipes/x%2Fy/state");
+		expect(state[0]?.headers["content-type"]).toBe("application/json");
+	});
+	it("rejects a selection or recipe page that breaks the contract", async () => {
+		stubFetch(() => Response.json({ items: [{ id: "s1" }], nextCursor: null }));
+		await expect(newClient().toolchainSelections()).rejects.toMatchObject({
+			name: "ZodError",
+		});
+		stubFetch(() => Response.json({ ok: false }));
+		await expect(
+			newClient().setToolchainRecipeState("r1", "active"),
+		).rejects.toMatchObject({ name: "ZodError" });
 	});
 	it("combines the caller's signal with a timeout", async () => {
 		const signals = stubSignals(() => Response.json({ items: [] }));

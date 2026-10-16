@@ -7,7 +7,7 @@ import { expect, test } from "bun:test";
 import { WorldHostStateError, createConversationSourceAdapter } from "..";
 import { createConversationService } from "../../conversation";
 import { openStore } from "../../../infrastructure/sqlite";
-import { migrations } from "../../../application/migrations";
+import { migrations } from "./migrations";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";

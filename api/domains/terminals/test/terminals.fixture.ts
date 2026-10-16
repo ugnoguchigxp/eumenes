@@ -6,8 +6,8 @@ import { openStore, type SqliteStore } from "../../../infrastructure/sqlite";
 import type { EnqueueRequest } from "../contracts";
 import { migrations } from "../repository";
 import { createTerminals } from "../service";
-import { type HookPayload, headerFileOf } from "../hooks";
-import type { SpawnPty, TerminalsOptions } from "../types";
+import { type HookPayload, headerFileOf } from "../service/hooks";
+import type { SpawnPty, TerminalsOptions } from "../service/types";
 
 /** What the fake PTY did, with the facts a test needs read at spawn time. */
 export type Spawned = {
@@ -39,6 +39,8 @@ export function fakePty(
 		/** Runs when a PTY is spawned; may throw to fail the launch. */
 		onSpawn?(spawned: Spawned): void;
 		failWrites?: boolean;
+		/** `close()` throws, like a PTY that cannot be released. */
+		failClose?: boolean;
 	} = {},
 ) {
 	const spawned: Spawned[] = [];
@@ -97,6 +99,7 @@ export function fakePty(
 				if (!behavior.ignore?.includes(signal)) exit(null);
 			},
 			close: () => {
+				if (behavior.failClose) throw new Error("close_failed");
 				entry.closed = true;
 			},
 			exited,

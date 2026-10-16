@@ -17,8 +17,10 @@ import { KeypadModal } from "@/components/KeypadModal";
 
 export type TextInputType = "text" | "numeric" | "time" | "phone";
 
-export interface TextInputProps
-	extends Omit<InputProps, "type" | "onChange" | "value"> {
+export interface TextInputProps extends Omit<
+	InputProps,
+	"type" | "onChange" | "value"
+> {
 	type?: TextInputType;
 	value?: string;
 	onChange?: (value: string) => void;

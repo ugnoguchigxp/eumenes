@@ -1,9 +1,7 @@
 import { z } from "zod";
+import { prepareConnectionRegistration } from "../domains/settings/contracts/registration";
 import {
-	agentAuths,
-	connectionKinds,
 	purposeSchema,
-	type Connection,
 	type Purpose,
 	type Settings,
 } from "../domains/settings/contracts";
@@ -42,41 +40,6 @@ const resource = {
 	language: z.string().min(1).max(80).optional(),
 	assign: z.boolean().optional(),
 };
-const addConnection = z
-	.strictObject({
-		connectionId: id,
-		kind: z.enum(connectionKinds).optional(),
-		name: z.string().min(1).max(80),
-		baseUrl: z.string().min(1).max(2048).optional(),
-		accountId: z
-			.string()
-			.regex(/^[a-fA-F0-9]{32}$/)
-			.optional(),
-		envRef: z.string().min(1).max(128).optional(),
-		/** Claude Agent SDK only: the other kinds ignore it. */
-		auth: z.enum(agentAuths).optional(),
-		enabled: z.boolean().optional(),
-		// The optional first model of the connection.
-		resourceId: id.optional(),
-		purpose: resource.purpose.optional(),
-		model: resource.model.optional(),
-		contextWindow: resource.contextWindow,
-		voice: resource.voice,
-		language: resource.language,
-		assign: resource.assign,
-	})
-	.refine(
-		(c) =>
-			c.purpose
-				? !!c.resourceId && !!c.model
-				: // A generated model id without a purpose is no model (a form left it empty).
-					!c.model &&
-					c.contextWindow === undefined &&
-					c.voice === undefined &&
-					c.language === undefined &&
-					!c.assign,
-		{ message: "resource" },
-	);
 const deleteConnection = z.strictObject({ connectionId: id });
 const addResource = z.strictObject({
 	resourceId: id,
@@ -108,24 +71,6 @@ function releaseFallbacks(doc: Settings, resourceIds: ReadonlySet<string>) {
 	if (subagent && resourceIds.has(subagent)) doc.subagent.resourceId = null;
 }
 
-/**
- * The credential rule of a new connection: one source, except for the Codex SDK (CLI login).
- * A Claude subscription connection needs its setup token as a stored key and never an env ref.
- */
-function checkCredentialSource(
-	connection: Connection,
-	keys: readonly ApplyKey[],
-) {
-	const key = keys.find(
-		(k) => k.connectionId === connection.id && k.value !== undefined,
-	);
-	if (key && connection.envRef) throw new Error("invalid_credential_source");
-	if (connection.auth === "subscription" && connection.envRef)
-		throw new Error("invalid_credential_source");
-	if (!key && !connection.envRef && connection.kind !== "codex-sdk")
-		throw new Error("credential_required");
-}
-
 export type StructuralResult = {
 	settings: Settings;
 	keys: ApplyKey[];
@@ -148,30 +93,14 @@ export function applyStructures(
 		switch (structure) {
 			case structureRefs.addConnection:
 			case structureRefs.addWorkersConnection: {
-				const c = addConnection.safeParse(input);
-				if (!c.success) throw new Error("invalid_input");
-				const v = c.data;
+				const registration = prepareConnectionRegistration(
+					input,
+					keys.some((k) => k.connectionId === input.connectionId && !!k.value),
+				);
+				if (!registration.ok) throw new Error(registration.code);
+				const { input: v, connection } = registration;
 				if (doc.connections.some((x) => x.id === v.connectionId))
 					throw new Error("connection_exists");
-				const typed = !!v.kind && v.kind !== "openai-compatible";
-				const workers = v.kind === "cloudflare-workers-ai";
-				if (!workers && !v.baseUrl) throw new Error("invalid_input");
-				const claude = v.kind === "claude-agent-sdk";
-				if (claude && !v.auth) throw new Error("auth_required");
-				const connection: Connection = {
-					id: v.connectionId,
-					...(typed ? { kind: v.kind } : {}),
-					...(claude ? { auth: v.auth } : {}),
-					name: v.name,
-					baseUrl: workers
-						? "https://api.cloudflare.com/client/v4"
-						: v.baseUrl!,
-					...(v.accountId ? { accountId: v.accountId } : {}),
-					enabled: v.enabled ?? true,
-					epoch: 0,
-					envRef: v.envRef ?? null,
-				};
-				checkCredentialSource(connection, keys);
 				doc.connections.push(connection);
 				if (v.purpose)
 					addModel(doc, {

@@ -5,13 +5,6 @@ import { evaluateRequirements } from "../api/application/llm-native-runner.fixtu
 import { createLiveLarm } from "./live-larm";
 import { createCodexResearch } from "../api/domains/inference";
 import { chooseSpeechDelivery } from "../api/domains/delivery";
-import {
-	transcriptLanguageMessages,
-	parseTranscriptLanguage,
-	transcriptLanguageStatus,
-} from "../api/domains/voice-dialogue/service/transcript-language";
-import { harness } from "../api/application/toolchain.fixture";
-import { asrLanguages } from "../api/domains/settings/contracts";
 const args = process.argv.slice(2);
 const option = (name: string, fallback: string) => {
 	const at = args.indexOf(name);
@@ -24,7 +17,7 @@ const suite = option("--suite", "all"),
 	out = resolve(option("--out", "spec/verification/llm-native-2026-10-10")),
 	repeats = Number(option("--repeats", "2"));
 if (
-	!["requirements", "delivery", "voice-language", "all"].includes(suite) ||
+	!["requirements", "delivery", "all"].includes(suite) ||
 	!Number.isInteger(repeats) ||
 	repeats !== 2
 )
@@ -55,10 +48,8 @@ casesLoop: for (const c of selected) {
 			let result: Record<string, unknown>;
 			if (c.suite === "requirements") {
 				const codex =
-					c.engine === "codex_luna"
-						? createCodexResearch(process.env)
-						: undefined;
-				if (c.engine === "codex_luna" && !codex) {
+					c.engine === "codex" ? createCodexResearch(process.env) : undefined;
+				if (c.engine === "codex" && !codex) {
 					results.push({
 						caseId: c.id,
 						repeat,
@@ -76,7 +67,7 @@ casesLoop: for (const c of selected) {
 						: "failed",
 					lane: "live_model_fixed_artificial_sources",
 				};
-			} else if (c.suite === "delivery") {
+			} else {
 				let calls = 0;
 				const judged = await chooseSpeechDelivery(
 					port.judge
@@ -103,61 +94,6 @@ casesLoop: for (const c of selected) {
 					safeCode: judged.reason ?? null,
 					semanticChecks: "unchecked",
 				};
-			} else {
-				for (const language of c.allowedLanguages)
-					if (!asrLanguages.some(([code]) => code === language))
-						throw new Error("invalid_evaluation_language");
-				const h = await harness({ model: port });
-				try {
-					const subject = crypto.randomUUID();
-					const id = await h.store.write((db) => {
-						h.inference.captureInTransaction(
-							db,
-							subject,
-							"llm",
-							Date.now() + 8000,
-						);
-						return h.inference.captureControlInTransaction(db, {
-							subject: subject + ":language",
-							policySubject: subject,
-							deadline: Date.now() + 8000,
-							maxOutputTokens: 256,
-						});
-					});
-					const receipt = await h.inference.executeControl(
-						id,
-						transcriptLanguageMessages(c.text),
-						AbortSignal.timeout(8000),
-					);
-					const parsed = parseTranscriptLanguage(receipt.value);
-					const status = transcriptLanguageStatus(
-						parsed,
-						c.allowedLanguages as any,
-					);
-					const accepted = await h.store.write((db) =>
-						h.inference.acceptInTransaction(db, receipt),
-					);
-					const matched =
-						accepted &&
-						status === c.expected.status &&
-						(!c.expected.languages ||
-							JSON.stringify([...parsed.languages].sort()) ===
-								JSON.stringify([...c.expected.languages].sort()));
-					result = {
-						status: matched ? "needs_semantic_review" : "failed",
-						structureMatched: matched,
-						languageStatus: status,
-						languages: parsed.languages,
-						calls: 1,
-						model: h.inference
-							.usage()
-							.map((u) => ({ source: u.source, model: u.model })),
-						semanticChecks: "unchecked",
-						lane: "live_language_model_text_only",
-					};
-				} finally {
-					await h.close();
-				}
 			}
 			results.push({
 				caseId: c.id,

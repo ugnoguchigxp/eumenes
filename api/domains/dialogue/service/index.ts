@@ -14,7 +14,6 @@ import type { InferencePort } from "../../inference";
 import type { QueueService } from "../../queue";
 import type { MemoryService } from "../../memory";
 import type {
-	PostAnswerObserverPort,
 	Run,
 	StewardPort,
 	GoalsLayerPort,
@@ -48,7 +47,6 @@ export function createDialogueService({
 	memory,
 	steward,
 	agents,
-	postAnswer,
 	delegation,
 	objectRecognition,
 	excalidraw,
@@ -67,7 +65,6 @@ export function createDialogueService({
 	memory?: MemoryService;
 	steward?: StewardPort;
 	agents?: AgentRuntime;
-	postAnswer?: PostAnswerObserverPort;
 	music?: import("../contracts/music").MusicPort;
 	excalidraw?: import("../contracts/image").ImagePort;
 	image?: import("../contracts/image").ImagePort;
@@ -87,7 +84,6 @@ export function createDialogueService({
 		memory,
 		steward,
 		agents,
-		postAnswer,
 		delegation,
 		objectRecognition,
 		excalidraw,

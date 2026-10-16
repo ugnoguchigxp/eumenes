@@ -1,3 +1,4 @@
+import type { z } from "zod";
 export class ApiError extends Error {
 	constructor(
 		public status: number,
@@ -66,3 +67,12 @@ export const json = (body: unknown): RequestInit => ({
 	headers: { "Content-Type": "application/json" },
 	body: JSON.stringify(body),
 });
+/** Calls the API and parses the JSON answer with its contract, so a drifted answer fails here. */
+export async function callJson<S extends z.ZodType>(
+	t: Transport,
+	schema: S,
+	path: string,
+	init?: RequestInit,
+): Promise<z.output<S>> {
+	return schema.parse(await (await t.call(path, init)).json());
+}

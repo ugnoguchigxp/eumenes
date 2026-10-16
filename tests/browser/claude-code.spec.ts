@@ -50,7 +50,7 @@ test("a conversation request opens Claude Code, and the finished task is reporte
 	const pane = page.locator(".terminal-pane");
 	await expect(pane).toHaveCount(1);
 	await expect.poll(() => streams.length).toBeGreaterThan(0);
-	await page.waitForTimeout(500);
+	await expect(pane.locator(".xterm-screen")).toBeVisible();
 	await page.screenshot({ path: `${evidence}/conversation-started.png` });
 
 	// When the task finishes, the agent reports it by name and suggests the next step. The

@@ -61,6 +61,7 @@ export function createToolchainHostLinks(services: {
 	let interactions: InteractionViews | undefined;
 	const worldPorts: WorldAdapterPorts | undefined = world && {
 		claims: world.claims,
+		documents: world.documents,
 		context: world.claimsContext,
 	};
 	const worldResearch =

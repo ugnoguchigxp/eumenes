@@ -1,16 +1,14 @@
 import { randomBytes } from "node:crypto";
 import {
 	chmodSync,
-	constants,
-	copyFileSync,
 	existsSync,
 	mkdirSync,
 	readFileSync,
 	statSync,
-	writeFileSync,
 } from "node:fs";
 import { dirname, join } from "node:path";
 import type { ScopeRef } from "eumenes-world-model";
+import { createFileExclusive } from "../infrastructure/atomic-file";
 import { getLogger } from "../infrastructure/logger";
 import type { SqliteStore } from "../infrastructure/sqlite";
 import {
@@ -126,20 +124,14 @@ export function resolveWorldCursorSecret(options: {
 	if (!existsSync(path)) {
 		mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
 		chmodSync(dirname(path), 0o700);
-		try {
-			// Moving the key directory must not void stored cursors: copy the old key.
-			if (path !== legacy && existsSync(legacy)) {
-				copyFileSync(legacy, path, constants.COPYFILE_EXCL);
-				chmodSync(path, 0o600);
-			} else
-				writeFileSync(path, randomBytes(32).toString("hex"), {
-					mode: 0o600,
-					flag: "wx",
-				});
-		} catch (error) {
-			// A concurrent creator won the race: read what it wrote.
-			if ((error as { code?: string }).code !== "EEXIST") throw error;
-		}
+		// Moving the key directory must not void stored cursors: copy the old key.
+		// A concurrent creator that wins the race is read below instead.
+		createFileExclusive(
+			path,
+			path !== legacy && existsSync(legacy)
+				? readFileSync(legacy)
+				: randomBytes(32).toString("hex"),
+		);
 	}
 	if ((statSync(path).mode & 0o077) !== 0) chmodSync(path, 0o600);
 	const secret = readFileSync(path, "utf8").trim();

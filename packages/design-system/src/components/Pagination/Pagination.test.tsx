@@ -56,8 +56,8 @@ describe("Pagination Component", () => {
 		);
 
 		expect(screen.getByText("2 / 5")).toBeInTheDocument();
-		expect(screen.getByLabelText("Previous page")).toBeInTheDocument();
-		expect(screen.getByLabelText("Next page")).toBeInTheDocument();
+		expect(screen.getByLabelText("前のページ")).toBeInTheDocument();
+		expect(screen.getByLabelText("次のページ")).toBeInTheDocument();
 	});
 
 	it("renders nothing if totalPages <= 1", () => {
@@ -83,7 +83,7 @@ describe("Pagination Component", () => {
 			/>,
 		);
 
-		const prevBtn = screen.getByLabelText("Previous page");
+		const prevBtn = screen.getByLabelText("前のページ");
 		expect(prevBtn).toBeDisabled();
 
 		fireEvent.click(prevBtn);
@@ -100,7 +100,7 @@ describe("Pagination Component", () => {
 			/>,
 		);
 
-		const nextBtn = screen.getByLabelText("Next page");
+		const nextBtn = screen.getByLabelText("次のページ");
 		expect(nextBtn).toBeDisabled();
 
 		fireEvent.click(nextBtn);
@@ -117,7 +117,7 @@ describe("Pagination Component", () => {
 			/>,
 		);
 
-		const nextBtn = screen.getByLabelText("Next page");
+		const nextBtn = screen.getByLabelText("次のページ");
 		fireEvent.click(nextBtn);
 		expect(mockOnNext).toHaveBeenCalled();
 	});
@@ -132,7 +132,7 @@ describe("Pagination Component", () => {
 			/>,
 		);
 
-		const prevBtn = screen.getByLabelText("Previous page");
+		const prevBtn = screen.getByLabelText("前のページ");
 		fireEvent.click(prevBtn);
 		expect(mockOnPrev).toHaveBeenCalled();
 	});

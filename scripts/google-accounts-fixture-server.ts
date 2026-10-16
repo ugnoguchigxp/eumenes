@@ -5,11 +5,9 @@ import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { createApp } from "../api/application/app";
 import { appModules } from "../api/application/app-modules";
-import {
-	buildServices,
-	appServices,
-	createLifecycles,
-} from "../api/application/server";
+import { appServices } from "../api/application/server-app-services";
+import { createLifecycles } from "../api/application/server-lifecycles";
+import { buildServices } from "../api/application/server-services";
 import { createLifecycleRunner } from "../api/application/lifecycle";
 import { loadConfig } from "../api/infrastructure/config";
 import { configureLogging } from "../api/infrastructure/logger";

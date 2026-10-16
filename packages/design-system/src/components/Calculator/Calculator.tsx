@@ -13,7 +13,7 @@ export interface CalculatorProps {
 export const Calculator = ({
 	onResult,
 	className,
-	buttonLabel = "Calculator",
+	buttonLabel = "電卓",
 }: CalculatorProps) => {
 	const [isOpen, setIsOpen] = useState(false);
 	const [display, setDisplay] = useState("0");
@@ -116,12 +116,12 @@ export const Calculator = ({
 					onResult(result);
 				}
 			} catch {
-				setDisplay("Error");
+				setDisplay("エラー");
 			}
 		} else if (value === "C") {
 			setDisplay("0");
 		} else {
-			if (display === "Error") {
+			if (display === "エラー") {
 				setDisplay(value);
 				return;
 			}

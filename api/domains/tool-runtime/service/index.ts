@@ -82,6 +82,18 @@ export function createToolRuntime(
 		now,
 		capabilities,
 		adapter,
+		retryAvailableAt(db, inv) {
+			if (!inv.result_ref || inv.finished_at == null) return undefined;
+			const entry = resolve(db, inv.result_ref, inv.owner_task_id);
+			const cooldown = Math.max(
+				0,
+				...entry.failures
+					.filter((f) => f.retryable)
+					.map((f) => f.cooldownMs ?? 0),
+			);
+			const at = inv.finished_at + cooldown;
+			return at > now() ? at : undefined;
+		},
 		canReplayPartial(db, inv) {
 			try {
 				return (
@@ -110,12 +122,30 @@ export function createToolRuntime(
 			throw new Error("result_expired");
 		return entry;
 	}
-	function observations(db: Database, taskId: string) {
-		const invocations = db
+	function currentInvocations(db: Database, taskId: string) {
+		return db
 			.query(
 				`SELECT * FROM tool_invocations WHERE owner_task_id=?${hasSupersededColumn(db) ? " AND superseded=0" : ""} ORDER BY created_at,id`,
 			)
 			.all(taskId) as Invocation[];
+	}
+	/**
+	 * Sources of the results still held in memory. Unlike `observations`, an expired or lost
+	 * result (900s lifetime, cleared on restart) contributes nothing instead of throwing, for
+	 * callers that only carry source information forward.
+	 */
+	function liveSources(db: Database, taskId: string): Source[] {
+		return currentInvocations(db, taskId).flatMap((inv) => {
+			if (!inv.result_ref) return [];
+			try {
+				return resolve(db, inv.result_ref, taskId).sources;
+			} catch {
+				return [];
+			}
+		});
+	}
+	function observations(db: Database, taskId: string) {
+		const invocations = currentInvocations(db, taskId);
 		return invocations.map((inv) =>
 			inv.result_ref
 				? { state: inv.state, ...resolve(db, inv.result_ref, taskId) }
@@ -357,6 +387,7 @@ export function createToolRuntime(
 		bind,
 		invokeInTransaction,
 		observationsInTransaction: observations,
+		liveSourcesInTransaction: liveSources,
 		settleInTransaction,
 		cancelInTransaction,
 		release,

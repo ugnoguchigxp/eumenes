@@ -3,10 +3,10 @@ import {
 	chooseSpeechDelivery,
 	decisionDetails,
 	emotionSchema,
-	RURI_MODEL,
 	acceptedEmotion,
 	type Emotion,
 } from "..";
+const ATTITUDE_MODEL = "attitude-test-model";
 function response(
 	top: Emotion = "warmth",
 	choice: Emotion = top,
@@ -14,7 +14,7 @@ function response(
 ) {
 	const score = choice === top ? confidence : 0.9;
 	return {
-		model: RURI_MODEL,
+		model: ATTITUDE_MODEL,
 		answers: {
 			emotion: {
 				type: "choice",
@@ -138,12 +138,12 @@ test("malformed Ruri metadata retains its identity and cannot be accepted as Lay
 		};
 		expect(decisionDetails(malformed)).toMatchObject({
 			valid: false,
-			model: RURI_MODEL,
+			model: ATTITUDE_MODEL,
 		});
 		expect(await select(malformed)).toMatchObject({
 			source: "fallback",
 			reason: "invalid",
-			model: RURI_MODEL,
+			model: ATTITUDE_MODEL,
 		});
 	}
 });

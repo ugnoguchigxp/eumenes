@@ -77,12 +77,13 @@ export const codexTasksWebAdapter: WebArtifactAdapter = {
 			},
 		});
 		return {
-			phase: query.data
-				? { kind: "ready" }
-				: query.isError
-					? { kind: "error", message: "Codexの設定を取得できません" }
+			// A failed refresh is shown as an error, not as the last settings read.
+			phase: query.isError
+				? { kind: "error", message: "Codexの設定を取得できません" }
+				: query.data
+					? { kind: "ready" }
 					: { kind: "loading" },
-			snapshot: query.data ? { [source]: query.data } : {},
+			snapshot: query.data && !query.isError ? { [source]: query.data } : {},
 			targetOf: () => undefined,
 			local: async () => ({
 				status: "rejected",

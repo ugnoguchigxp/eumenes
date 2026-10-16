@@ -67,7 +67,12 @@ export type CollectionResource = {
 	total: number;
 	/** Present when the source pages, sorts and searches by params. */
 	paging?: TableQuery;
-	create?: { actionId: string; label: string; fields: CollectionFormField[] };
+	create?: {
+		actionId: string;
+		label: string;
+		fields: CollectionFormField[];
+		draft?: boolean;
+	};
 	busy?: boolean;
 	message?: string;
 	error?: string;

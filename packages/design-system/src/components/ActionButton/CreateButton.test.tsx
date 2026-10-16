@@ -58,7 +58,7 @@ describe("CreateButton Component", () => {
 			const button = screen.getByRole("button");
 			expect(button).toBeInTheDocument();
 			expect(button).toHaveAttribute("data-variant", "default");
-			expect(button).toHaveTextContent("Create New");
+			expect(button).toHaveTextContent("新規作成");
 		});
 
 		it("renders with custom label", () => {
@@ -218,7 +218,7 @@ describe("CreateButton Component", () => {
 			render(<CreateButton />);
 
 			const button = screen.getByRole("button");
-			expect(button).toHaveTextContent("Create New");
+			expect(button).toHaveTextContent("新規作成");
 		});
 
 		it("overrides default label with custom label", () => {
@@ -226,7 +226,7 @@ describe("CreateButton Component", () => {
 
 			const button = screen.getByRole("button");
 			expect(button).toHaveTextContent("Custom Create");
-			expect(button).not.toHaveTextContent("Create New");
+			expect(button).not.toHaveTextContent("新規作成");
 		});
 	});
 

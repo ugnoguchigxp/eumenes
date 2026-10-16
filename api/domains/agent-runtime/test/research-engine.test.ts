@@ -41,14 +41,14 @@ test("worker contract failure after syntax correction retries once and then stop
 	}
 });
 
-test("Luna uses the common Web worker and retains the selected engine across steps", async () => {
+test("Codex uses the common Web worker and retains the selected engine across steps", async () => {
 	const h = await harness(Date.now, true);
 	try {
-		await h.start("luna", "複数資料を比較して詳しく説明", "codex_luna");
-		const child = h.agents.list("luna").find((t) => t.kind === "worker")!;
+		await h.start("codex", "複数資料を比較して詳しく説明", "codex");
+		const child = h.agents.list("codex").find((t) => t.kind === "worker")!;
 		expect(child.packageRevisionId).toBe("package:web.search@1");
 		expect(JSON.parse(h.task(child.id).input_json!)).toMatchObject({
-			researcher: "codex_luna",
+			researcher: "codex",
 		});
 		await h.runModelStep(child.id, {
 			action: "invoke",
@@ -78,7 +78,7 @@ test("Luna uses the common Web worker and retains the selected engine across ste
 				limitations: [],
 			},
 		});
-		expect(h.engines).toEqual(["codex_luna", "codex_luna"]);
+		expect(h.engines).toEqual(["codex", "codex"]);
 		expect(h.agents.report(child.id)?.version).toBe(2);
 		expect(h.task(child.id).state).toBe("completed");
 		await h.start("current", "語句を確認して");
@@ -98,10 +98,10 @@ test("Luna uses the common Web worker and retains the selected engine across ste
 	}
 });
 
-test("Luna cannot be used for history or when its provider is absent", async () => {
+test("Codex cannot be used for history or when its provider is absent", async () => {
 	const h = await harness();
 	try {
-		await expect(h.start("unavailable", "調査", "codex_luna")).rejects.toThrow(
+		await expect(h.start("unavailable", "調査", "codex")).rejects.toThrow(
 			"codex_research_unavailable",
 		);
 	} finally {
@@ -116,7 +116,7 @@ test("Luna cannot be used for history or when its provider is absent", async () 
 					input: {
 						kind: "history",
 						question: "以前の発言",
-						researcher: "codex_luna",
+						researcher: "codex",
 					},
 					deadline: Date.now() + 10000,
 				}),
@@ -130,7 +130,7 @@ test("Luna cannot be used for history or when its provider is absent", async () 
 test("search-only reports still reject invented evidence and return the failure to the parent", async () => {
 	const h = await harness(Date.now, true);
 	try {
-		await h.start("invalid-search-source", "公開情報を検索", "codex_luna");
+		await h.start("invalid-search-source", "公開情報を検索", "codex");
 		const child = h.agents
 			.list("invalid-search-source")
 			.find((t) => t.kind === "worker")!;
@@ -161,7 +161,7 @@ test("search-only reports still reject invented evidence and return the failure 
 test("search failures return without creating requirement contracts or drafts", async () => {
 	const h = await harness(Date.now, true);
 	try {
-		await h.start("failed-search", "検索して", "codex_luna");
+		await h.start("failed-search", "検索して", "codex");
 		const child = h.agents
 			.list("failed-search")
 			.find((t) => t.kind === "worker")!;
@@ -203,7 +203,7 @@ test("search failures return without creating requirement contracts or drafts", 
 test("a worker cannot give up before invoking an available tool: one repair, then failure", async () => {
 	const h = await harness(Date.now, true);
 	try {
-		await h.start("give-up", "最新のニュースを調べて", "codex_luna");
+		await h.start("give-up", "最新のニュースを調べて", "codex");
 		const child = h.agents.list("give-up").find((t) => t.kind === "worker")!;
 		const giveUp = {
 			action: "finish",

@@ -23,7 +23,7 @@ const card = (
 const web = card("web.search", "web_search", [
 	{
 		when: "ニュースの整理",
-		toolchainId: "web.research.luna",
+		toolchainId: "web.research.codex",
 		functionName: "web_research",
 	},
 ]);
@@ -95,7 +95,7 @@ test("a description names another function only when that function is offered", 
 	const alone = JSON.stringify(toolchainTools([web]));
 	expect(alone).not.toContain("web_research");
 	const both = JSON.stringify(
-		toolchainTools([web, card("web.research.luna", "web_research")]),
+		toolchainTools([web, card("web.research.codex", "web_research")]),
 	);
 	expect(both).toContain("ニュースの整理にはweb_researchを使う");
 });

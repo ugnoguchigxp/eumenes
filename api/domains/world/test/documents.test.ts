@@ -133,3 +133,64 @@ test("search metadata fits the research operation budget and advances without dr
 		expect(ids.size).toBe(15);
 	});
 });
+
+test("owner browsing pages all 1000 documents, searches beyond the first page, isolates scopes and clamps a removed final page", async () => {
+	await withHarness(async (h) => {
+		const docs = createWorldDocuments(h.store);
+		for (let i = 0; i < 1000; i++) {
+			const id = `doc-${String(i).padStart(4, "0")}`;
+			const text = i === 999 ? "needle-last" + "文".repeat(3000) : content;
+			await docs.import(SCOPE, {
+				...document,
+				id,
+				title: id,
+				content: text,
+				digest: `sha256:${sha256Hex(text)}`,
+			});
+		}
+		const ids = new Set<string>();
+		for (let pageIndex = 0; pageIndex < 20; pageIndex++) {
+			const result = docs.page(SCOPE, { pageIndex, pageSize: 50, sort: "id" });
+			expect(result.total).toBe(1000);
+			expect(result.pageIndex).toBe(pageIndex);
+			expect(result.items).toHaveLength(50);
+			for (const row of result.items) ids.add(row.id);
+		}
+		expect(ids.size).toBe(1000);
+		const found = docs.page(SCOPE, { q: "needle-last" });
+		expect(found.total).toBe(1);
+		expect(found.items[0]?.id).toBe("doc-0999");
+		expect([...found.items[0]!.excerpt]).toHaveLength(2048);
+		expect(found.items[0]!.contentLength).toBe(3011);
+		expect(docs.page({ ...SCOPE, principal: "other" }).total).toBe(0);
+		expect(docs.page({ ...SCOPE, scopeKey: "other" }).total).toBe(0);
+		expect(docs.page(SCOPE, { sort: "title", desc: true }).items[0]?.id).toBe(
+			"doc-0999",
+		);
+		const app = new Hono();
+		registerWorldDocuments(app, docs, () => SCOPE);
+		const response = await app.request(
+			"/api/world/documents/page?pageIndex=99&pageSize=10&sort=id",
+		);
+		expect(response.status).toBe(200);
+		expect(await response.json()).toMatchObject({
+			total: 1000,
+			pageIndex: 99,
+			items: Array.from({ length: 10 }, (_, i) => ({ id: `doc-099${i}` })),
+		});
+		for (const query of [
+			"pageSize=1000",
+			"pageIndex=-1",
+			"sort=content",
+			"principal=other",
+			"desc=invalid",
+		])
+			expect(
+				(await app.request(`/api/world/documents/page?${query}`)).status,
+			).toBe(400);
+		await docs.withdraw(SCOPE, "doc-0999");
+		expect(docs.page(SCOPE, { q: "needle-last", pageIndex: 99 })).toMatchObject(
+			{ total: 0, pageIndex: 0, items: [] },
+		);
+	});
+});

@@ -221,15 +221,21 @@ test("five tasks run one after another, one process at a time, each in its own c
 	await expect(status(page, "連続5")).toHaveText(/^キュー待ち（[1-4]番目）$/);
 	await page.screenshot({ path: `${evidence}/e2e-five-queued.png` });
 	let working = 0;
-	for (let i = 0; i < 80 && (await label(page, "連続5").count()) === 0; i++) {
-		working = Math.max(
-			working,
-			await board(page)
-				.locator(".kanban-status", { hasText: "作業中" })
-				.count(),
-		);
-		await page.waitForTimeout(250);
-	}
+	// Sample the number of running tasks until the last one has finished.
+	await expect
+		.poll(
+			async () => {
+				working = Math.max(
+					working,
+					await board(page)
+						.locator(".kanban-status", { hasText: "作業中" })
+						.count(),
+				);
+				return (await label(page, "連続5").count()) > 0;
+			},
+			{ timeout: 30_000, intervals: [250] },
+		)
+		.toBe(true);
 	// Never two at once.
 	expect(working).toBeLessThanOrEqual(1);
 	for (const title of titles)

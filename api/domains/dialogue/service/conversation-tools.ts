@@ -109,7 +109,6 @@ export const conversationToolNames = new Set([
 	"open_music_library",
 	"delegate_task",
 	"research",
-	"research_web_luna",
 ]);
 /** Rejection with a safe classification only: no arguments, text or unknown names. */
 export function operationRejection(

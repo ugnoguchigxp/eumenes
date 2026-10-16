@@ -76,13 +76,11 @@ export function useVoiceDialogue(
 	useEffect(() => {
 		const value = turn.data;
 		if (!value) return;
-		if (value.status === "failed" || (value.status === "draft" && value.error))
+		if (value.status === "failed")
 			// Keep the failure visible when restoring a previous accepted turn.
 			// oxlint-disable-next-line react/set-state-in-effect
 			setError(
-				value.status === "draft"
-					? describeError(value.error)
-					: (value.error ?? "音声処理に失敗しました"),
+				value.error ? describeError(value.error) : "音声処理に失敗しました",
 			);
 		const pending = replacement.current;
 		if (pending?.id === value.utteranceId) {
@@ -265,19 +263,9 @@ export function useVoiceDialogue(
 		if (
 			!value ||
 			value.utteranceId !== recognitionId ||
-			!["input_ready", "awaiting_input", "draft"].includes(value.status)
+			value.status !== "input_ready"
 		)
 			return;
-		if (value.status !== "input_ready") {
-			// A bounded notice leaves the transcript editable after pausing the microphone.
-			const timer = setTimeout(() => {
-				if (!value.error && !candidate.current && turnId === value.utteranceId)
-					setError(
-						"発話の続き待ちです。マイクを停止すると、文字起こしを編集して送信できます。",
-					);
-			}, 6000);
-			return () => clearTimeout(timer);
-		}
 		commitIdleInput(
 			value,
 			client,
@@ -397,7 +385,6 @@ export function useVoiceDialogue(
 									sequence,
 									id,
 									wav,
-									true,
 								);
 							} catch (error) {
 								if (!(error instanceof TypeError) || !live()) throw error;
@@ -409,7 +396,6 @@ export function useVoiceDialogue(
 									sequence,
 									id,
 									wav,
-									true,
 								);
 							}
 							if (!live()) return;

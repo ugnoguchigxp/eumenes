@@ -4,10 +4,12 @@ import type { SqliteStore } from "../../../infrastructure/sqlite";
 import {
 	worldDocumentInput,
 	worldDocumentsInput,
+	worldDocumentPageInput,
 	type WorldDocumentScope,
 } from "../contracts/documents";
 import {
 	insertDocument,
+	pageDocuments,
 	readDocument,
 	searchDocuments,
 	withdrawDocument,
@@ -16,6 +18,13 @@ import {
 /** Host-owned reference material. Import is not extraction, adoption, or verification of external truth. */
 export function createWorldDocuments(store: SqliteStore) {
 	const api = {
+		pageInTransaction(
+			db: Database,
+			scope: WorldDocumentScope,
+			raw: unknown = {},
+		) {
+			return pageDocuments(db, scope, worldDocumentPageInput.parse(raw));
+		},
 		async import(scope: WorldDocumentScope, raw: unknown) {
 			const doc = worldDocumentInput.parse(raw);
 			if (
@@ -100,6 +109,8 @@ export function createWorldDocuments(store: SqliteStore) {
 	};
 	return {
 		...api,
+		page: (scope: WorldDocumentScope, raw: unknown = {}) =>
+			store.readSnapshot((db) => api.pageInTransaction(db, scope, raw)),
 		lookup: (scope: WorldDocumentScope, raw: unknown) =>
 			store.readSnapshot((db) => api.lookupInTransaction(db, scope, raw)),
 	};

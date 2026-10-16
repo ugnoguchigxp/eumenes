@@ -19,11 +19,11 @@ interface AsyncDataWrapperProps {
 	 * Default: true
 	 */
 	useSkeletonLoading?: boolean;
-	/** Text shown during loading state. Default: "Loading..." */
+	/** Text shown during loading state. Default: "読み込み中..." */
 	loadingText?: string;
-	/** Text shown when data is empty. Default: "No data available" */
+	/** Text shown when data is empty. Default: "データがありません" */
 	noDataText?: string;
-	/** Text for refresh button. Default: "Refresh data" */
+	/** Text for refresh button. Default: "データを更新" */
 	refreshText?: string;
 }
 
@@ -37,9 +37,9 @@ export const AsyncDataWrapper = ({
 	isEmpty,
 	emptyMessage,
 	useSkeletonLoading = true,
-	loadingText = "Loading...",
-	noDataText = "No data available",
-	refreshText = "Refresh data",
+	loadingText = "読み込み中...",
+	noDataText = "データがありません",
+	refreshText = "データを更新",
 }: AsyncDataWrapperProps) => {
 	if (isError) {
 		return (

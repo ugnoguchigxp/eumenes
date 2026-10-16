@@ -3,6 +3,7 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 import ts from "typescript";
 import {
 	closure,
+	type Depends,
 	type Domain,
 	dependsOf,
 	domains,
@@ -259,8 +260,26 @@ export function unusedDependencies(files: string[]): string[] {
 	return errors;
 }
 
-export function checkBoundaries(files: string[]): string[] {
+/** Every declared dependency (api, web or test) must point to a strictly lower tier. */
+export function checkTiers(
+	graph: Record<string, { tier: number; depends: Depends }> = domains,
+): string[] {
 	const errors: string[] = [];
+	for (const [name, info] of Object.entries(graph))
+		for (const layer of ["api", "web", "test"] as const)
+			for (const dep of info.depends[layer]) {
+				const target = graph[dep];
+				if (!target) errors.push(`unknown dependency ${name} -> ${dep}`);
+				else if (target.tier >= info.tier)
+					errors.push(
+						`tier violation ${name} (tier ${info.tier}) -> ${dep} (tier ${target.tier}) (${layer}): dependencies must point to a lower tier`,
+					);
+			}
+	return errors;
+}
+
+export function checkBoundaries(files: string[]): string[] {
+	const errors = checkTiers();
 	for (const name of files) {
 		const path = resolve(root, name);
 		if (!checked(path) || !existsSync(path)) continue;

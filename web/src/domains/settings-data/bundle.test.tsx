@@ -74,7 +74,7 @@ test("the shipped bundle drives conversation edit, review and apply from the hub
 	});
 });
 
-test("the shipped bundle's voice fields, languages source and review labels work together", async () => {
+test("the shipped bundle's voice fields and review labels work together", async () => {
 	const backend = open();
 	fireEvent.click(await screen.findByRole("button", { name: "音声と入力" }));
 	fireEvent.change(
@@ -83,21 +83,16 @@ test("the shipped bundle's voice fields, languages source and review labels work
 			target: { value: "0.4" },
 		},
 	);
-	fireEvent.click(screen.getByRole("button", { name: "聞き取り" }));
-	fireEvent.click(await screen.findByLabelText("英語"));
 	fireEvent.click(screen.getByRole("button", { name: "変更一覧を開く" }));
-	await screen.findByText(`音声と入力 / ${fieldLabel("input.languages")}`);
-	expect(screen.getByText("日本語、英語")).toBeTruthy();
+	await screen.findByText(`音声と入力 / ${fieldLabel("speech.volume")}`);
 	fireEvent.click(
 		screen.getByRole("button", { name: "設定の変更をすべて適用" }),
 	);
 	await screen.findAllByText("変更を適用しました");
 	await waitFor(() => expect(backend.saved().voice.outputVolume).toBe(0.4));
-	expect(backend.saved().general.asrLanguages).toEqual(["ja"]);
 	expect(backend.sent[0]!.input).toMatchObject({
 		changes: expect.arrayContaining([
 			{ fieldId: "speech.volume", value: "0.4" },
-			{ fieldId: "input.languages", value: '["ja"]' },
 		]),
 	});
 });

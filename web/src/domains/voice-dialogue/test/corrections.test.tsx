@@ -104,49 +104,46 @@ function setup() {
 	};
 }
 
-for (const continuation of [true, false])
-	test(`preview keeps pending input, then only the server-adopted text is committed once: continuation=${continuation}`, async () => {
-		const h = setup();
-		try {
-			await act(async () => h.hook.result.current.start());
-			h.speech();
-			h.segment();
-			await waitFor(() => expect(h.ids).toHaveLength(1));
-			await h.update(0, {
-				text: "明日の予定を",
-				status: "awaiting_input",
-				revision: 2,
-			});
-			await waitFor(() =>
-				expect(h.hook.result.current.transcription?.text).toBe("明日の予定を"),
-			);
-			h.speech();
-			await h.preview("いえ、来週の予定を教えて");
-			const expected = "明日の予定を\nいえ、来週の予定を教えて";
-			await waitFor(() =>
-				expect(h.hook.result.current.transcription?.text).toBe(expected),
-			);
-			h.segment();
-			await waitFor(() => expect(h.ids).toHaveLength(2));
-			expect(h.hook.result.current.transcription?.text).toBe(expected);
-			await h.update(1, { text: "いえ、来週の予定を教えて", revision: 1 });
-			expect(h.hook.result.current.transcription?.text).toBe(expected);
-			expect(h.voiceCommit).not.toHaveBeenCalled();
-			const adopted = continuation ? expected : "いえ、来週の予定を教えて";
-			await h.update(1, { text: adopted, status: "input_ready", revision: 2 });
-			await waitFor(() =>
-				expect(h.voiceCommit).toHaveBeenCalledExactlyOnceWith(h.ids[1], 2),
-			);
-			expect(h.hook.result.current.transcription?.text).toBe(adopted);
-			h.speech();
-			await h.preview("次の依頼です");
-			expect(h.hook.result.current.transcription?.text).toBe("次の依頼です");
-		} finally {
-			h.done();
-		}
-	});
+test("preview keeps pending input, then only the server-adopted text is committed once", async () => {
+	const h = setup();
+	try {
+		await act(async () => h.hook.result.current.start());
+		h.speech();
+		h.segment();
+		await waitFor(() => expect(h.ids).toHaveLength(1));
+		// The speaker resumes before the first transcript arrives, so it is not sent yet.
+		h.speech();
+		await h.update(0, {
+			text: "明日の予定を",
+			status: "input_ready",
+			revision: 2,
+		});
+		await waitFor(() =>
+			expect(h.hook.result.current.transcription?.text).toBe("明日の予定を"),
+		);
+		await h.preview("いえ、来週の予定を教えて");
+		const expected = "明日の予定を\nいえ、来週の予定を教えて";
+		await waitFor(() =>
+			expect(h.hook.result.current.transcription?.text).toBe(expected),
+		);
+		h.segment();
+		await waitFor(() => expect(h.ids).toHaveLength(2));
+		expect(h.hook.result.current.transcription?.text).toBe(expected);
+		expect(h.voiceCommit).not.toHaveBeenCalled();
+		await h.update(1, { text: expected, status: "input_ready", revision: 2 });
+		await waitFor(() =>
+			expect(h.voiceCommit).toHaveBeenCalledExactlyOnceWith(h.ids[1], 2),
+		);
+		expect(h.hook.result.current.transcription?.text).toBe(expected);
+		h.speech();
+		await h.preview("次の依頼です");
+		expect(h.hook.result.current.transcription?.text).toBe("次の依頼です");
+	} finally {
+		h.done();
+	}
+});
 
-test("a rejected language remains editable and reports the rejection instead of a continuation notice", async () => {
+test("a failed transcription reports its error and is never committed", async () => {
 	const h = setup();
 	try {
 		await act(async () => h.hook.result.current.start());
@@ -154,18 +151,14 @@ test("a rejected language remains editable and reports the rejection instead of 
 		h.segment();
 		await waitFor(() => expect(h.ids).toHaveLength(1));
 		await h.update(0, {
-			text: "Recognized text",
-			status: "draft",
-			error: "asr_language_not_allowed",
+			status: "failed",
+			error: "voice_input_capacity",
 			revision: 2,
 		});
 		await waitFor(() =>
-			expect(h.hook.result.current.error).toContain("許可されていない言語"),
+			expect(h.hook.result.current.error).toContain("文字起こしが長く"),
 		);
-		expect(h.hook.result.current.transcription?.text).toBe("Recognized text");
 		expect(h.voiceCommit).not.toHaveBeenCalled();
-		act(() => h.hook.result.current.pause());
-		expect(h.hook.result.current.transcription?.text).toBe("Recognized text");
 	} finally {
 		h.done();
 	}

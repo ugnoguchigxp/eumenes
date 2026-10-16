@@ -35,7 +35,6 @@ export const AdaptiveText: React.FC<AdaptiveTextProps> = ({
 	const [scale, setScale] = useState(1);
 	const [isTruncated, setIsTruncated] = useState(false);
 
-	// biome-ignore lint/correctness/useExhaustiveDependencies: text and width changes require re-measurement
 	useLayoutEffect(() => {
 		const container = containerRef.current;
 		const textElement = textRef.current;

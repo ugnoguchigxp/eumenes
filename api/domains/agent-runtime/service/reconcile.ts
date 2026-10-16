@@ -10,8 +10,6 @@ import {
 	type RuntimeContext,
 } from "./runtime-context";
 import type { TaskOps } from "./task-ops";
-import { guidedWeb } from "./guided-contract";
-import { createWebReadPlan } from "./web-read-plan";
 import { armRuntimeTimer } from "./reconcile-timer";
 
 export function createReconcile(
@@ -19,7 +17,6 @@ export function createReconcile(
 	ops: TaskOps,
 	flush: () => void,
 ) {
-	const webReads = createWebReadPlan(ctx, ops);
 	const { store, capabilities, tools, queue, now, log } = ctx.deps;
 	const {
 		prepared,
@@ -131,16 +128,6 @@ export function createReconcile(
 							const applied = await store.write((db) => {
 								if (!tools.settleInTransaction(db, inv, operation)) return;
 								const settled = tools.getInTransaction(db, inv.id)!;
-								const t = get(db, inv.owner_task_id);
-								if (t?.state !== "waiting_tool" || t.invocation_id !== inv.id)
-									return settled;
-								// Failure is an observation too. The worker may choose a different in-scope source within its budget.
-								if (
-									settled.state === "cancelled" ||
-									settled.state === "interrupted"
-								)
-									fail(db, t, settled.error_code ?? "tool_failed");
-								else next(db, t, inv.job_id);
 								return settled;
 							});
 							if (applied) {
@@ -184,18 +171,29 @@ export function createReconcile(
 						}
 					}
 				}
-				for (const [id, p] of prepared)
-					if (guidedWeb(p)) {
-						const due = store.read((db) => {
-							const t = get(db, id);
-							return active(t) && webReads.due(db, t);
-						});
-						if (!due) continue;
-						await store.write((db) => {
-							const t = get(db, id);
-							if (active(t)) webReads.advance(db, t);
-						});
-					}
+				for (const id of prepared.keys()) {
+					const task = store.read((db) => get(db, id));
+					if (task?.state !== "waiting_tool") continue;
+					await store.write((db) => {
+						const t = get(db, id);
+						if (t?.state !== "waiting_tool") return;
+						const calls = tools
+							.invocationsInTransaction(db, id)
+							.filter((i) => !i.superseded);
+						if (calls.some((i) => i.state === "pending")) return;
+						const cancelled = calls.find((i) =>
+							["cancelled", "interrupted"].includes(i.state),
+						);
+						if (cancelled)
+							fail(
+								db,
+								t,
+								tools.getInTransaction(db, cancelled.id)?.error_code ??
+									"tool_failed",
+							);
+						else next(db, t, t.job_id ?? undefined);
+					});
+				}
 				const expired = store.read(
 					(db) =>
 						db

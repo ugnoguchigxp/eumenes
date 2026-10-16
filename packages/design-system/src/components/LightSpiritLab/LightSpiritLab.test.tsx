@@ -2,7 +2,9 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { LightSpiritLab, type LightSpiritLabProps } from "./LightSpiritLab";
 
-const props = (overrides: Partial<LightSpiritLabProps> = {}): LightSpiritLabProps => ({
+const props = (
+	overrides: Partial<LightSpiritLabProps> = {},
+): LightSpiritLabProps => ({
 	motions: [
 		{
 			id: "joyful",
@@ -49,8 +51,12 @@ describe("LightSpiritLab", () => {
 	it("groups motions, offers variants of the selected motion and reports choices", () => {
 		const p = props();
 		render(<LightSpiritLab {...p} />);
-		expect(screen.getByRole("group", { name: "感情と仕草" })).toBeInTheDocument();
-		expect(screen.getByRole("group", { name: "待機中の仕草" })).toBeInTheDocument();
+		expect(
+			screen.getByRole("group", { name: "感情と仕草" }),
+		).toBeInTheDocument();
+		expect(
+			screen.getByRole("group", { name: "待機中の仕草" }),
+		).toBeInTheDocument();
 		fireEvent.click(screen.getByRole("button", { name: "くるっと回る" }));
 		expect(p.onSelect).toHaveBeenCalledWith("twirl");
 		fireEvent.change(screen.getByLabelText("変化版"), {
@@ -77,12 +83,17 @@ describe("LightSpiritLab", () => {
 		render(
 			<LightSpiritLab
 				{...props({
-					status: { state: "unavailable", message: "背景を光の妖精にしてください" },
+					status: {
+						state: "unavailable",
+						message: "背景を光の妖精にしてください",
+					},
 				})}
 			/>,
 		);
 		expect(screen.getByText("動かせる精霊がありません")).toBeInTheDocument();
-		expect(screen.getByText("背景を光の妖精にしてください")).toBeInTheDocument();
+		expect(
+			screen.getByText("背景を光の妖精にしてください"),
+		).toBeInTheDocument();
 		expect(screen.getByRole("button", { name: "再生" })).toBeDisabled();
 	});
 

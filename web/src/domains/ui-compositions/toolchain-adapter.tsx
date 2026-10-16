@@ -58,15 +58,17 @@ export const uiCompositionsWebAdapter: WebArtifactAdapter = {
 					targetRef,
 					signal,
 				),
+			// An undefined `enabled` means enabled: wait for the list to prove the item is ready.
 			enabled:
 				!!targetRef &&
-				(
+				((
 					list.data?.data as
 						| { items?: Array<{ id: string; state: string }> }
 						| undefined
 				)?.items?.some(
 					(item) => item.id === targetRef && item.state === "ready",
-				),
+				) ??
+					false),
 			retry: false,
 		});
 		const raw = list.data?.data as

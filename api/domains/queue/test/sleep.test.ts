@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { getEventListeners } from "node:events";
-import { resolveOptions } from "../service/runner";
+import { resolveOptions } from "../service/runner-options";
 
 test("heartbeat waits release abort listeners after each elapsed interval", async () => {
 	const signal = new AbortController().signal;

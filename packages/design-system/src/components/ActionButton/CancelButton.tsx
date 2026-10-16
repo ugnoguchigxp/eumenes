@@ -6,7 +6,7 @@ import { ActionButton, type ActionButtonProps } from "./ActionButton";
  * キャンセルボタン
  */
 export const CancelButton: React.FC<ActionButtonProps> = ({
-	label = "Cancel",
+	label = "キャンセル",
 	icon = X,
 	variant = "secondary",
 	...props

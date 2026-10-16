@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { emotionSchema } from "../contracts";
-export const RURI_MODEL = "ruri-v3-30m-speaking-attitude";
 const six = (value: z.ZodNumber) =>
 	z.object(
 		Object.fromEntries(
@@ -57,6 +56,17 @@ const metadata = z.object({
 		})
 		.optional(),
 });
+/** A classifier that returns the six-class score vectors declares them in its answer. */
+function declaresScores(response: unknown) {
+	const emotion = (
+		response as { answers?: { emotion?: Record<string, unknown> } } | null
+	)?.answers?.emotion;
+	return (
+		typeof emotion === "object" &&
+		emotion !== null &&
+		("logits" in emotion || "probabilities" in emotion)
+	);
+}
 /** An explicit allowlist. Never retain the raw provider response. Unknown metadata stays null. */
 export function decisionDetails(response: unknown) {
 	const identity = identitySchema.safeParse(response);
@@ -69,12 +79,9 @@ export function decisionDetails(response: unknown) {
 	const top = logits
 		? [...emotionSchema.options].sort((x, y) => logits[y] - logits[x])[0]!
 		: null;
-	const ruri =
-		(identity.success
-			? (identity.data.model ?? identity.data.claimed_model)
-			: null) === RURI_MODEL;
+	const scored = declaresScores(response);
 	const coherent =
-		!ruri ||
+		!scored ||
 		!!(
 			scores &&
 			logits &&
@@ -94,7 +101,8 @@ export function decisionDetails(response: unknown) {
 	].filter((value): value is number => value !== undefined);
 	return {
 		valid: !!r && coherent,
-		// Malformed scores must not erase a known Ruri identity and fall back to a Laya attribution.
+		// Malformed scores must not erase the scored-classifier identity and fall back to a plain choice attribution.
+		scored,
 		model: identity.success ? (identity.data.model ?? null) : null,
 		claimed_model: identity.success
 			? (identity.data.claimed_model ?? null)

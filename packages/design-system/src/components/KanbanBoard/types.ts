@@ -28,7 +28,18 @@ export type KanbanBoardCard = {
 	executorId?: string;
 	executorLabel?: string;
 	canSelectExecutor?: boolean;
-	git?:{sourceRunId:string;head:string;snapshotDigest:string;branch:string;targets:Array<{id:string;label:string}>;files:string[];commitSha?:string;remoteSha?:string;commitVerified:boolean;pushVerified:boolean};
+	git?: {
+		sourceRunId: string;
+		head: string;
+		snapshotDigest: string;
+		branch: string;
+		targets: Array<{ id: string; label: string }>;
+		files: string[];
+		commitSha?: string;
+		remoteSha?: string;
+		commitVerified: boolean;
+		pushVerified: boolean;
+	};
 	prompt: string;
 	column: KanbanBoardColumn;
 	/** Shown on cards in `finished`. */
@@ -118,7 +129,13 @@ export type KanbanBoardProps = {
 		action: Exclude<KanbanCardAction, "edit">,
 		cardId: string,
 		revision: number,
-		extra?: { note?: string;sourceRunId?:string;remoteId?:string;head?:string;snapshotDigest?:string },
+		extra?: {
+			note?: string;
+			sourceRunId?: string;
+			remoteId?: string;
+			head?: string;
+			snapshotDigest?: string;
+		},
 	) => void;
 	onResumeQueue: (executorId?: string) => void;
 	className?: string;

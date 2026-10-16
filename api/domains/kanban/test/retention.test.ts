@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import type { Database } from "bun:sqlite";
-import { boardInTransaction } from "../board";
+import { boardInTransaction } from "../service/board";
 import { openKanban } from "./kanban.fixture";
 
 const DAY = 24 * 60 * 60 * 1000;

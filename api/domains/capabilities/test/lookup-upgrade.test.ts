@@ -51,7 +51,7 @@ test("deployed search schemas survive upgrade; current packages use the new tool
 			const prepared = current.prepareActiveByIdInTransaction(
 				db,
 				{ rootRunId: "run", taskId: "task", cancelEpoch: 0 },
-				"package:web.search@2",
+				current.activePackageRevisionInTransaction(db, "web.search"),
 				{ question: "公開情報を確認する" },
 			);
 			expect(

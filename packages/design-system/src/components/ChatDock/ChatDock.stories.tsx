@@ -46,7 +46,7 @@ export const Default: Story = {
 				onOpen={() => setOpen(true)}
 				onClose={() => setOpen(false)}
 				title="chatbot"
-				buttonLabel="Chatbot"
+				buttonLabel="チャット"
 				panelClassName="h-[520px] max-h-[70vh] w-[360px] max-w-[92vw]"
 				bodyClassName="flex h-full flex-col"
 			>
@@ -72,7 +72,7 @@ export const OpenByDefault: Story = {
 				onOpen={() => setOpen(true)}
 				onClose={() => setOpen(false)}
 				title="chatbot"
-				buttonLabel="Chatbot"
+				buttonLabel="チャット"
 				panelClassName="h-[520px] max-h-[70vh] w-[360px] max-w-[92vw]"
 				bodyClassName="flex h-full flex-col"
 			>

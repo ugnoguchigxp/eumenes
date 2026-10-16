@@ -432,7 +432,7 @@ test("each kind of reference problem is refused", async () => {
 			[
 				"function taken by another toolchain",
 				(b) => {
-					b.definitions[0].functionName = "web_search";
+					b.definitions[0].functionName = "conversation_history";
 				},
 				"duplicate_function",
 			],
@@ -461,7 +461,10 @@ test("each kind of reference problem is refused", async () => {
 				"dependency_cycle",
 			],
 		];
-		await createCapabilities(store, new Set(["web", "timer"])).seed();
+		await createCapabilities(
+			store,
+			new Set(["web", "history", "timer"]),
+		).seed();
 		const before = await counts(store);
 		for (const [name, mutate, code] of cases) {
 			const bundle = bundleRaw();

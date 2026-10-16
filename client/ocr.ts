@@ -1,27 +1,29 @@
 import { z } from "zod";
 import { correctionRecord, ocrRecord } from "../api/domains/ocr/contracts";
-import { json, type Transport } from "./transport";
+import { runSchema } from "../api/domains/dialogue/contracts";
+import { callJson, json, type Transport } from "./transport";
+
+const ocrConnectionSchema = z.object({
+	revision: z.number(),
+	serviceId: z.literal("ocr-host"),
+	baseUrl: z.string().nullable(),
+	credentialConfigured: z.boolean(),
+});
 export function ocrClient(t: Transport) {
 	const root = "/api/ocr";
 	const record = async (path: string, init?: RequestInit) =>
 		ocrRecord.parse(await (await t.call(path, init)).json());
 	return {
-		ocrConnection: async (signal?: AbortSignal) =>
-			z
-				.object({
-					revision: z.number(),
-					serviceId: z.literal("ocr-host"),
-					baseUrl: z.string().nullable(),
-					credentialConfigured: z.boolean(),
-				})
-				.parse(await (await t.call("/api/settings/ocr", { signal })).json()),
+		ocrConnection: (signal?: AbortSignal) =>
+			callJson(t, ocrConnectionSchema, "/api/settings/ocr", { signal }),
 		configureOcrConnection: async (input: {
 			expectedRevision: number;
 			baseUrl: string;
 		}) =>
-			(
-				await t.call("/api/settings/ocr", { ...json(input), method: "PUT" })
-			).json(),
+			callJson(t, ocrConnectionSchema, "/api/settings/ocr", {
+				...json(input),
+				method: "PUT",
+			}),
 		ocrRecords: async (conversationId: string, signal?: AbortSignal) =>
 			ocrRecord
 				.array()
@@ -64,12 +66,12 @@ export function ocrClient(t: Transport) {
 			frameIndex?: number,
 			lineIndexes?: number[],
 		) =>
-			(
-				await t.call(
-					`${root}/${encodeURIComponent(id)}/conversation`,
-					json({ requestId, frameIndex, lineIndexes }),
-				)
-			).json(),
+			callJson(
+				t,
+				runSchema,
+				`${root}/${encodeURIComponent(id)}/conversation`,
+				json({ requestId, frameIndex, lineIndexes }),
+			),
 		ocrCorrectionCreate: async (
 			id: string,
 			input: {
@@ -161,11 +163,11 @@ export function ocrClient(t: Transport) {
 			requestId: string,
 			conversationId: string,
 		) =>
-			(
-				await t.call(
-					`${root}/${encodeURIComponent(id)}/corrections/${encodeURIComponent(candidateId)}/conversation`,
-					json({ requestId, conversationId }),
-				)
-			).json(),
+			callJson(
+				t,
+				runSchema,
+				`${root}/${encodeURIComponent(id)}/corrections/${encodeURIComponent(candidateId)}/conversation`,
+				json({ requestId, conversationId }),
+			),
 	};
 }

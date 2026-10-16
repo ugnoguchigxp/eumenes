@@ -3,6 +3,7 @@ import { createCipheriv, randomBytes } from "node:crypto";
 import {
 	existsSync,
 	mkdtempSync,
+	readdirSync,
 	rmSync,
 	readFileSync,
 	statSync,
@@ -329,6 +330,8 @@ test("bootstraps once; atomic revision and idempotency; encrypted secret never i
 	expect(JSON.stringify(rows)).not.toContain("fixture-cloud-secret");
 	expect(readFileSync(join(h.dir, "keys/settings.key")).length).toBe(32);
 	expect(statSync(join(h.dir, "keys/settings.key")).mode & 0o777).toBe(0o600);
+	// Created atomically: no temp file is left beside the key.
+	expect(readdirSync(join(h.dir, "keys"))).toEqual(["settings.key"]);
 	await expect(
 		h.settings.apply({
 			...input,
@@ -860,6 +863,26 @@ test("a stored sentence-language switch migrates to englishSpeechEnabled and dro
 	expect(migrated).not.toHaveProperty("sentenceLanguageProvider");
 	const reopened = await createSettings(h.store, { dbPath: h.dbPath, env: {} });
 	expect(reopened.get().larm).toEqual(migrated);
+});
+
+test("a stored ASR language allow-list is dropped when settings are read", async () => {
+	const h = await setup();
+	const raw = JSON.parse(
+		(
+			h.store.read((db) =>
+				db.query("SELECT document FROM settings_document WHERE id=1").get(),
+			) as { document: string }
+		).document,
+	);
+	raw.general.asrLanguages = ["ja", "en"];
+	await h.store.write((db) => {
+		db.query("UPDATE settings_document SET document=? WHERE id=1").run(
+			JSON.stringify(raw),
+		);
+	});
+	const reopened = await createSettings(h.store, { dbPath: h.dbPath, env: {} });
+	expect(reopened.get().general).not.toHaveProperty("asrLanguages");
+	expect(reopened.get().general.persona).toBe(raw.general.persona);
 });
 
 test("world.curationResourceId must name a registered LLM resource", async () => {

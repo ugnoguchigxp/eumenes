@@ -1,7 +1,6 @@
 import type { Database } from "bun:sqlite";
 import type { RequestRow } from "../repository";
 import { get } from "../repository";
-import { additionalValidationParents } from "./control-policy";
 export function createVoiceBinding(
 	valid: (db: Database, id: string) => boolean,
 	allowed: (db: Database, row: RequestRow) => boolean,
@@ -11,10 +10,7 @@ export function createVoiceBinding(
 		voiceSubject: string,
 		runSubject: string,
 		deadline?: number,
-		validation?: {
-			validationRequestIds: string[];
-			transcriptionRequestIds?: string[];
-		},
+		transcriptions: string[] = [],
 	) {
 		const transcription = db
 			.query(
@@ -32,13 +28,6 @@ export function createVoiceBinding(
 			throw new Error("invalid_voice_inference");
 		const policy = get(db, row.id);
 		if (!policy || !allowed(db, policy)) throw new Error("permission_revoked");
-		const extra = additionalValidationParents(
-			db,
-			row.id,
-			validation?.validationRequestIds ?? [],
-			valid,
-		);
-		const transcriptions = validation?.transcriptionRequestIds ?? [];
 		if (
 			transcriptions.length > 32 ||
 			new Set(transcriptions).size !== transcriptions.length
@@ -54,30 +43,20 @@ export function createVoiceBinding(
 			)
 				throw new Error("permission_revoked");
 		}
-		if (transcription || extra.length || transcriptions.length) {
+		const parents = [
+			...new Set([
+				...(transcription ? [transcription.id] : []),
+				...transcriptions,
+			]),
+		];
+		if (parents.length) {
 			db.query("UPDATE inference_requests SET parents=? WHERE id=?").run(
-				JSON.stringify([
-					...new Set([
-						...(transcription ? [transcription.id] : []),
-						...transcriptions,
-					]),
-					...extra,
-				]),
+				JSON.stringify(parents),
 				row.id,
 			);
 			db.query(
 				"UPDATE inference_requests SET parents=? WHERE subject=? AND purpose='tts'",
-			).run(
-				JSON.stringify([
-					...new Set([
-						...(transcription ? [transcription.id] : []),
-						...transcriptions,
-					]),
-					row.id,
-					...extra,
-				]),
-				voiceSubject,
-			);
+			).run(JSON.stringify([...parents, row.id]), voiceSubject);
 		}
 		db.query(
 			"UPDATE inference_requests SET subject=?,deadline=MIN(deadline,?) WHERE id=?",

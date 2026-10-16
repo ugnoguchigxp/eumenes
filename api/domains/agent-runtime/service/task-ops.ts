@@ -162,6 +162,14 @@ export function createTaskOps(ctx: RuntimeContext) {
 			fail(db, get(db, t.id)!, safeCode(e));
 		}
 	}
+	function waitForTools(db: Database, t: Task, parentJobId?: string) {
+		const calls = tools
+			.invocationsInTransaction(db, t.id)
+			.filter((i) => !i.superseded);
+		if (calls.some((i) => i.state === "pending"))
+			update(db, get(db, t.id)!, "waiting_tool", t.phase);
+		else next(db, get(db, t.id)!, parentJobId, "research_no_progress");
+	}
 	function cancelTreeInTransaction(
 		db: Database,
 		rootRunId: string,
@@ -214,6 +222,7 @@ export function createTaskOps(ctx: RuntimeContext) {
 		fail,
 		endSteps,
 		next,
+		waitForTools,
 		cancelTreeInTransaction,
 	};
 }

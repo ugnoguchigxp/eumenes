@@ -141,7 +141,6 @@ test("describe offers the settings document, one write operation, its queries an
 		effect: "write",
 	});
 	expect([...d.queries].sort()).toEqual([
-		"query:settings.asr-languages@1",
 		"query:settings.asr-resources@1",
 		"query:settings.connections@1",
 		"query:settings.document@1",
@@ -183,7 +182,6 @@ test("describePath accepts leaves and stable-id array elements and rejects objec
 		"$.general.theme",
 		"$.general.subtitles.size",
 		"$.general.background",
-		"$.general.asrLanguages",
 		"$.larm.voice",
 		"$.voice.silenceMs",
 		"$.routes.llm.mode",
@@ -232,7 +230,6 @@ test("a draft's changes become one saved revision with typed values, and the rec
 			{ fieldId: "appearance.theme", value: "dark" },
 			{ fieldId: "appearance.subtitle-enabled", value: "true" },
 			{ fieldId: "speech.volume", value: "0.5" },
-			{ fieldId: "input.languages", value: '["ja","ko"]' },
 			{ fieldId: "input.silence", value: "1200" },
 		],
 	});
@@ -247,7 +244,6 @@ test("a draft's changes become one saved revision with typed values, and the rec
 		enabled: true,
 	});
 	expect(saved.voice.outputVolume).toBe(0.5);
-	expect(saved.general.asrLanguages).toEqual(["ja", "ko"]);
 	expect(saved.voice.silenceMs).toBe(1200);
 	// Nothing else moved.
 	expect({ ...saved, general: before.general, voice: before.voice }).toEqual({
@@ -387,12 +383,6 @@ test("rejections are safe codes and save nothing", async () => {
 		"invalid_value",
 	);
 	expect(await code([{ fieldId: "speech.enabled", value: "yes" }])).toBe(
-		"invalid_value",
-	);
-	expect(await code([{ fieldId: "input.languages", value: "[]" }])).toBe(
-		"invalid_settings",
-	);
-	expect(await code([{ fieldId: "input.languages", value: "ja" }])).toBe(
 		"invalid_value",
 	);
 	expect(
@@ -551,11 +541,6 @@ test("sources give the saved document, the TTS models as targets and the ASR lan
 		[resources[0]!, "クラウド音声 / tts-0", true],
 		[resources[1]!, "クラウド音声 / tts-1", false],
 	]);
-	const languages = read("query:settings.asr-languages@1")!.data as {
-		options: Array<{ value: string; label: string }>;
-	};
-	expect(languages.options).toHaveLength(30);
-	expect(languages.options[0]).toEqual({ value: "ja", label: "日本語" });
 	expect(read("query:settings.unknown@1")).toBeNull();
 });
 
@@ -679,8 +664,6 @@ test("describePath reports kind, bounds, enum values and optional/nullable from 
 		maxLength: 40,
 	});
 	expect(info("$.voice.autoSpeak").kind).toBe("boolean");
-	expect(info("$.general.asrLanguages")).toMatchObject({ kind: "array" });
-	expect(info("$.general.asrLanguages").values).toContain("ja");
 	expect(info("$.resources[id=$target].voice")).toMatchObject({
 		kind: "string",
 		maxLength: 200,

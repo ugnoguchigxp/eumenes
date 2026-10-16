@@ -10,7 +10,7 @@ import {
 describe("Tooltip Components", () => {
 	// Helper component for testing
 	const TestTooltip = ({
-		children,
+		children: _children,
 		content,
 		...props
 	}: {

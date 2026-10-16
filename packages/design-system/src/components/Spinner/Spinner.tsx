@@ -26,7 +26,7 @@ export const Spinner = React.memo<ISpinnerProps>(
 		return (
 			<output
 				aria-live="polite"
-				aria-label="Loading"
+				aria-label="読み込み中"
 				className={cn("inline-block", className)}
 				{...props}
 			>

@@ -2,8 +2,11 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { loadDesktopClient, desktopRedirectUri } from "../desktop-client";
-import { googleProviderFromEnv } from "../provider";
+import {
+	loadDesktopClient,
+	desktopRedirectUri,
+} from "../service/desktop-client";
+import { googleProviderFromEnv } from "../service/provider";
 const directories: string[] = [];
 afterEach(() => {
 	for (const dir of directories.splice(0))

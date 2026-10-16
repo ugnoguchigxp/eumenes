@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import {
 	appendFileSync,
+	existsSync,
 	mkdtempSync,
 	readFileSync,
 	rmSync,
@@ -85,6 +86,7 @@ test("file output rotates with bounded retention and private permissions", () =>
 	const writer = createLogWriter(sink);
 	for (let count = 0; count < 8; count++)
 		writer.info({ event: "fixture.record", count });
+	sink.flush();
 	const counts = [2, 1, 0].flatMap((n) =>
 		readFileSync(n ? `${file}.${n}` : file, "utf8")
 			.trim()
@@ -213,6 +215,7 @@ test("following logs survives rotation without duplicates and retries an incompl
 			count,
 		});
 	sink.write(row(1) + "\n");
+	sink.flush();
 	const child = Bun.spawn(
 		[process.execPath, "scripts/logs.ts", "--file", file, "--follow", "--json"],
 		{ cwd: resolve(import.meta.dir, "../.."), stdout: "pipe", stderr: "pipe" },
@@ -237,6 +240,7 @@ test("following logs survives rotation without duplicates and retries an incompl
 		await until(1);
 		sink.write(row(2) + "\n");
 		sink.write(row(3) + "\n");
+		sink.flush();
 		await until(3);
 		const partial = row(4);
 		appendFileSync(file, partial.slice(0, 20));
@@ -275,14 +279,18 @@ test("file output resumes after a transient failure with one notice per outage",
 	try {
 		const sink = rotatingLogFile(file, 1024, 2, { now: () => clock });
 		sink.write('{"n":1}\n');
+		sink.flush();
 		clock = 500;
 		sink.write('{"n":2}\n');
+		sink.flush();
 		expect(events).toEqual(["logging.file_unavailable"]);
 		rmSync(join(dir, "logs"));
 		sink.write('{"n":3}\n');
+		sink.flush();
 		expect(() => readFileSync(file, "utf8")).toThrow();
 		clock = 1_000;
 		sink.write('{"n":4}\n');
+		sink.flush();
 		expect(readFileSync(file, "utf8")).toBe('{"n":4}\n');
 		expect(events).toEqual([
 			"logging.file_unavailable",
@@ -291,9 +299,54 @@ test("file output resumes after a transient failure with one notice per outage",
 		rmSync(join(dir, "logs"), { recursive: true, force: true });
 		writeFileSync(join(dir, "logs"), "blocker");
 		sink.write('{"n":5}\n');
+		sink.flush();
 		expect(events.at(-1)).toBe("logging.file_unavailable");
 		expect(events).toHaveLength(3);
 	} finally {
 		process.stderr.write = original;
 	}
+});
+
+test("records are buffered and written in a batch on flush, interval, error level and exit", async () => {
+	const file = join(temp(), "logs/api.jsonl");
+	const sink = rotatingLogFile(file, 1024 * 1024, 2);
+	const info = (n: number) => `{"level":"info","n":${n}}\n`;
+	sink.write(info(1));
+	sink.write(info(2));
+	expect(readFileSync(file, "utf8")).toBe("");
+	sink.flush();
+	expect(readFileSync(file, "utf8")).toBe(info(1) + info(2));
+	sink.write(info(3));
+	await Bun.sleep(250);
+	expect(readFileSync(file, "utf8")).toBe(info(1) + info(2) + info(3));
+	sink.write(info(4));
+	sink.write('{"level":"error","n":5}\n');
+	expect(readFileSync(file, "utf8")).toContain('"n":5');
+	expect(readFileSync(file, "utf8")).toContain('"n":4');
+	sink.close();
+});
+
+test("buffered records survive process exit and a rotation keeps their order", async () => {
+	const dir = temp();
+	const file = join(dir, "api.jsonl");
+	const script = join(dir, "child.ts");
+	writeFileSync(
+		script,
+		`import { rotatingLogFile } from ${JSON.stringify(resolve(import.meta.dir, "logger.ts"))};
+const sink = rotatingLogFile(${JSON.stringify(file)}, 120, 3);
+for (let n = 1; n <= 6; n++) sink.write(JSON.stringify({ level: "info", n }) + "\\n");
+process.exit(0);`,
+	);
+	const result = Bun.spawnSync([process.execPath, script]);
+	expect(result.exitCode).toBe(0);
+	const numbers = [3, 2, 1, 0].flatMap((n) => {
+		const path = n ? `${file}.${n}` : file;
+		return existsSync(path)
+			? readFileSync(path, "utf8")
+					.trim()
+					.split("\n")
+					.map((line) => JSON.parse(line).n)
+			: [];
+	});
+	expect(numbers).toEqual([1, 2, 3, 4, 5, 6]);
 });

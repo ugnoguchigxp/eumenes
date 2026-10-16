@@ -4,32 +4,38 @@ import {
 	voiceTurnSchema,
 } from "../api/domains/voice-dialogue/contracts";
 import { avatarMotionSchema } from "../api/domains/delivery/contracts";
+import { z } from "zod";
 import type { Transport } from "./transport";
-import { json } from "./transport";
+import { callJson, json } from "./transport";
+
+const voiceSessionSchema = z.object({
+	sessionId: z.string(),
+	generation: z.number().int(),
+});
+const voiceStoppedSchema = z.object({ stopped: z.literal(true) });
 export function voiceDialogueClient(transport: Transport) {
 	return {
 		identity: transport.identity,
-		voiceStart: async (sessionId: string, generation: number) =>
-			await (
-				await transport.call(
-					"/api/voice/sessions",
-					json({ sessionId, generation }),
-				)
-			).json(),
-		voiceStop: async (sessionId: string, generation: number) =>
-			await (
-				await transport.call(
-					"/api/voice/sessions/stop",
-					json({ sessionId, generation }),
-				)
-			).json(),
+		voiceStart: (sessionId: string, generation: number) =>
+			callJson(
+				transport,
+				voiceSessionSchema,
+				"/api/voice/sessions",
+				json({ sessionId, generation }),
+			),
+		voiceStop: (sessionId: string, generation: number) =>
+			callJson(
+				transport,
+				voiceStoppedSchema,
+				"/api/voice/sessions/stop",
+				json({ sessionId, generation }),
+			),
 		voiceSend: async (
 			sessionId: string,
 			generation: number,
 			sequence: number,
 			utteranceId: string,
 			wav: Uint8Array,
-			deferred = false,
 		) => {
 			return voiceTurnSchema.parse(
 				await (
@@ -41,7 +47,6 @@ export function voiceDialogueClient(transport: Transport) {
 							"X-Generation": String(generation),
 							"X-Sequence": String(sequence),
 							"X-Utterance-Id": utteranceId,
-							...(deferred ? { "X-Voice-Deferred": "1" } : {}),
 						},
 						body: new Uint8Array(wav),
 					})

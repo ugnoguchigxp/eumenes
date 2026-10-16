@@ -1,9 +1,9 @@
+import { lazy, Suspense } from "react";
 import type { EumenesClient } from "../../../client";
 import type { AudioStore } from "../domains/audio";
 import { ArtifactLauncher } from "../components/domains/artifact/ArtifactLauncher";
 import { ResizableWorkspace } from "../components/domains/artifact/ResizableWorkspace";
 import { TimerNotifications } from "../components/domains/timers/TimerNotifications";
-import { WorkspaceArtifacts } from "./WorkspaceArtifacts";
 import { ConversationPanel } from "./ConversationPanel";
 import { useWorkspace } from "./useWorkspace";
 import {
@@ -11,6 +11,8 @@ import {
 	entryLabel,
 	menuEntries,
 } from "../domains/toolchain-artifacts";
+
+const WorkspaceArtifacts = lazy(() => import("./WorkspaceArtifacts"));
 
 export function Workspace({
 	client,
@@ -73,7 +75,15 @@ export function Workspace({
 				}
 				artifact={
 					artifacts.tabs.length > 0 ? (
-						<WorkspaceArtifacts client={client} artifacts={artifacts} />
+						<Suspense
+							fallback={
+								<output className="artifact-loading">
+									アーティファクトを読み込み中です。
+								</output>
+							}
+						>
+							<WorkspaceArtifacts client={client} artifacts={artifacts} />
+						</Suspense>
 					) : null
 				}
 			>

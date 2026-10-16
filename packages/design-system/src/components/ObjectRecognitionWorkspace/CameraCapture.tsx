@@ -9,7 +9,7 @@ export function CameraCapture({
 	onCapture: (file: File) => Promise<void>;
 	disabled?: boolean;
 }) {
-	const camera = useCameraCapture(onCapture);
+	const { preview, ...camera } = useCameraCapture(onCapture);
 	return (
 		<div className="recognition-camera">
 			<Button
@@ -20,7 +20,7 @@ export function CameraCapture({
 				カメラを開く
 			</Button>
 			<video
-				ref={camera.preview}
+				ref={preview}
 				autoPlay
 				muted
 				playsInline

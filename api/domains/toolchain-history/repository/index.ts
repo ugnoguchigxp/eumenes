@@ -80,4 +80,11 @@ export const migrations: readonly Migration[] = [
 		sql: migration,
 		after: ["capabilities/0003-toolchain-vectors"],
 	},
+	{
+		// The Web research toolchain, formerly named after its model, has the model-neutral id `web.research.codex`.
+		id: "toolchain-history/0002-rename-web-research",
+		after: ["toolchain-history/0001-init"],
+		sql: `UPDATE toolchain_selections SET toolchain_id='web.research.codex' WHERE toolchain_id LIKE 'web.research.%' AND toolchain_id<>'web.research.codex';
+UPDATE toolchain_recipes SET toolchain_id='web.research.codex' WHERE toolchain_id LIKE 'web.research.%' AND toolchain_id<>'web.research.codex';`,
+	},
 ];

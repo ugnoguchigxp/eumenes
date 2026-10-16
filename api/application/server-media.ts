@@ -1,0 +1,93 @@
+import type { Database } from "bun:sqlite";
+import type { Capabilities } from "../domains/capabilities";
+import type { DialogueService } from "../domains/dialogue";
+import {
+	createExcalidraw,
+	registerDrawingOperations,
+} from "../domains/excalidraw";
+import { createImage } from "../domains/image";
+import { createLarmPlayground, createLocalServices } from "../domains/larm";
+import { createMusic } from "../domains/music";
+import { createObjectRecognition } from "../domains/object-recognition";
+import type { Config } from "../infrastructure/config";
+import type { Core } from "./server-core";
+
+/**
+ * Music, image, drawing and object recognition. Their jobs report into the
+ * dialogue that is built after them, hence the lazy `dialogue`.
+ */
+export function buildMedia(
+	config: Config,
+	deps: {
+		core: Pick<Core, "store" | "queue" | "inference" | "settings">;
+		capabilities: Capabilities;
+		dialogue: () => DialogueService;
+	},
+) {
+	const { store, queue, inference, settings } = deps.core;
+	const mediaGateway = () => {
+		const s = settings.get();
+		return createLarmPlayground({
+			baseUrl: s.larm.baseUrl ?? undefined,
+			token: config.larmToken,
+			profile: s.larm.profile,
+			audience: s.larm.audience,
+			providerHosts: config.larmProviderHosts,
+		});
+	};
+	const mediaDependencies = {
+		store,
+		queue,
+		inference,
+		capabilities: deps.capabilities,
+		gateway: mediaGateway,
+		onJob: (db: Database, runId: string, jobId: string) =>
+			deps.dialogue().linkOperationJobInTransaction(db, runId, jobId),
+		onFinished: (db: Database, runId: string) =>
+			deps.dialogue().finishOperationInTransaction(db, runId),
+	};
+	const music = createMusic(mediaDependencies);
+	const image = createImage(mediaDependencies);
+	const excalidraw = createExcalidraw({
+		store,
+		webOrigin: config.origin,
+		connection: () => {
+			const saved = settings.excalidrawCredentials(),
+				larmUrl = settings.get().larm.baseUrl;
+			if (!saved || !larmUrl)
+				throw new Error("excalidraw_connection_unconfigured");
+			if (
+				saved.consumerToken === config.larmToken ||
+				saved.appToken === config.larmToken
+			)
+				throw new Error("excalidraw_credential_roles_invalid");
+			return {
+				version: `${larmUrl}:${saved.revision}`,
+				gatewayUrl: saved.gatewayUrl,
+				gatewayOrigin: saved.gatewayOrigin,
+				leaseEndpoint: saved.leaseEndpoint,
+				appToken: saved.appToken,
+				client: createLocalServices({
+					baseUrl: larmUrl,
+					token: saved.consumerToken,
+				}),
+			};
+		},
+	});
+	const drawingOperations = registerDrawingOperations({
+		...mediaDependencies,
+		service: excalidraw,
+	});
+	const objectRecognition = createObjectRecognition({
+		store,
+		queue,
+		connection: () => settings.objectRecognitionCredentials(),
+	});
+	return {
+		music,
+		image,
+		excalidraw,
+		drawingOperations,
+		objectRecognition,
+	};
+}

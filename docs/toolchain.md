@@ -2,7 +2,7 @@
 
 ## LLM生成JSONの構文補正
 
-LLMが返すJSONは `api/infrastructure/llm-json.ts` の共通処理を一度通してから、各domainの既存スキーマと採用条件で検証する。対象は会話function引数、workerの操作・要件検証、Codexの最終制御応答、音楽生成・再生計画、coding-supervisionの判断、音声言語判定、Worldの抽出。通常の会話本文、HTTP/SSEの通信envelope、DB保存値、設定や利用者のJSON入力は対象外。これらの破損をLLMの出力不正として補正しない。
+LLMが返すJSONは `api/infrastructure/llm-json.ts` の共通処理を一度通してから、各domainの既存スキーマと採用条件で検証する。対象は会話function引数、workerの操作・要件検証、Codexの最終制御応答、音楽生成・再生計画、coding-supervisionの判断、Worldの抽出。通常の会話本文、HTTP/SSEの通信envelope、DB保存値、設定や利用者のJSON入力は対象外。これらの破損をLLMの出力不正として補正しない。
 
 正常なJSONは値を変更せずに通す。構文不正だけ `jsonrepair@3.15.0` で一回補正し、元のキー・値・コロン・括弧の列が保たれることを検査する。補正を採用できる範囲は引用符とカンマ。完全な外側のJSONコードブロックと先頭のthinkブロック一件は解包するが、説明文からJSONを探さない。欠けた値・括弧・文字列の補完、型変換、項目削除、重複キー、複数JSON、深さ64超過は拒否する。入力と補正後の双方へ容量上限を適用する。語句・業務シナリオ別の対応表を置かず、意味の判断はLLMへ委ねる。
 
@@ -30,8 +30,8 @@ streamでは、function名や制御区切りになり得る末尾だけを保留
 
 | 会話の関数 | ツールチェーン | package | 実行 | 検索 | 読取り | 保存本文 | モデル呼出し | 報告 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `web_search` | `web.search` | `package:web.recipe@1` | 調査担当(LARM)、手順キャッシュ付き | 1 | 2 | なし | 5 | search報告 |
-| `web_research` | `web.research.luna` | `package:web.search@1` | Codex Luna | 1 | 3 | 4 | 12 | search報告 |
+| `web_search` | `web.search` | `package:web.recipe@4` | 調査担当、手順キャッシュ付き | 2 | 4 | 4 | 5 | 本文根拠と完成回答 |
+| `web_research` | `web.research.codex` | `package:web.search@4` | 保存済みの調査担当 | 2 | 6 | 4 | 12 | 本文根拠と完成回答 |
 | `conversation_history` | `history.research` | `package:history.research@2` | 調査担当 | — | — | 履歴 | 7 | V3報告 |
 | `timer` | `timers.manage` | `package:timers.manage@1` | 操作担当→タイマー操作 | — | — | — | 1+回答 | 操作結果 |
 | `music` / `music_library` | `music.create` / `music.library` | `package:music.create@2` / `package:music.playback@1` | 音楽domainの計画担当 | — | — | — | 計画+回答 | 音楽結果 |
@@ -41,11 +41,11 @@ streamでは、function名や制御区切りになり得る末尾だけを保留
 
 選択の記録: 会話の判断ごとに、提示した候補(順位・FTS順位・類似度・過去の選択由来)、判断(ツールチェーン・回答・契約違反)、選んだ関数と渡した依頼、サブエージェントのtask、結果(outcome)、手順キャッシュの利用を `toolchain-history` に30日保存します。`/api/toolchain-history/selections`、`bun run cli -- toolchain-history list|show`、設定「ツールチェーンの記録」で確認できます。ログには相関IDと固定分類だけを出し、依頼文は出しません。
 
-`web_search` の手順キャッシュ: サブエージェントは最初に`recipe.find`で保存済みの取得手順を探し、同じ要求かをLLMが判断します。一致すればそのURLを取得し直して回答し、なければ検索1回・読取り1回で調べます。answeredで、読み取ったページを根拠に引用した場合だけ、報告の`recipe`(signature・URL・読む箇所)をホストが保存します。値は保存しません。同じ手順の取得が3回続けて失敗すると停止します。
+`web_search` の手順キャッシュ: 担当は保存済みの取得手順を候補として探し、現在の依頼に合うかを判断します。一致すればそのURLを取得し直し、なければ予算内で検索・読取りを選びます。answeredで、読み取ったページを根拠に引用した場合だけ、報告の`recipe`（signature・URL・読む箇所）をホストが保存します。値は保存しません。
 
 操作担当(`timer`・`delegate_project`): ツールチェーンのprofile・SKILL・ツール詳細とsnapshot(タイマー一覧・委任catalog)を読み込み、ツールを一つ選んで平坦な引数で返すか、確認質問を一つ返します。ホストは型付きの操作に変換して既存の実行経路で実行します。確認質問は会話担当が自分の言葉で尋ねます。
 
-search報告の経路(`web.recipe@1`・`web.search@1`)は既存の検索報告処理を使い、quickは簡単な検索の指示、Lunaは検索用の指示を使います。検索抜粋で回答可能ならそこで報告し、本文は必要なときだけ読みます。要件抽出・確認profile・要件別の採点・finish後の意味検証はありません。既存の報告version 2と出典参照検査を再利用し、成功時はfinishから直接会話回答へ進みます。構造や参照が不正な場合の修正(一回まで)、権限・取消・期限の検査は維持します。ニュースは指定件数、指定がなければ重要度順の3〜5トピックを短く要約し、内容の裏取り・逐語照合・採点はしません。情報が少なければ得られた分を返し、抜粋だけの結果はpartialを保持します。各モデル呼出しは独立しているため、有効な根拠の正確な抜粋と実行済みの操作条件を毎回提示します。
+現行のWeb担当は `skill:web.guided@3` を使います。検索抜粋は取得先選択の参考とし、本文に基づく主張・未確認点・完成回答を同じfinishで返します。要件抽出・追加の意味採点は行いません。`readAhead` は同じ呼出しで確認するURLの追加指定で、主URLを含め残りの読取・外部呼出し上限内に収めます。全操作を共通のツール実行記録とQueueへ登録し、選んだ組の全件が完了・失敗してからモデルを一度再開します。到着ごとのモデル呼出し、2件ずつの追加取得、10秒タイマー、独自の取得状態は使いません。必要十分な小さな組をモデルが選ぶため、単独URLの取得もできます。取消・期限・参照の採用検査は共通機構に残します。再試行のcooldownは前の確定receiptからQueueの受付可能時刻へ渡します。
 
 実装目標(SystemContextの層構成、会話方針と公開ツールの一致、結果返却の必須規則など)と現行との差分は [Web検索 実装目標](../spec/web-search-target-2026-10-11.md) にあります。今回の会話契約と根拠容量の修正範囲は[実装計画](../spec/web-search-repair-implementation-plan-2026-10-11.md)のA〜Dです。後続の構造改善とは区別します。
 
@@ -94,7 +94,7 @@ profileは最大12要件・16 KiB、同時選択は4profile、合成後は12要�
 
 タイマーは権限・操作receiptを再検査したうえで、label、状態、残時間、期限を含む全itemsを回答モデルへ渡します。ページングされた一覧は `complete:false`、失敗は固定codeを含む構造化結果です。回答直前に状態をrefreshし、ユーザー本文を位置・内容検索で書き換えません。操作の再実行やホストでの定型文章化は行いません。
 
-非空の本入力のASR後、既定controlモデルが主要言語を一回判定します。8秒・256 tokenが上限で、判定結果の全言語が許可リストにありconfidenceが0.8以上の場合だけ進みます。判定不能・不正・不在は `asr_language_unverified`、許可外は `asr_language_not_allowed`。previewと空ASRは言語判定を呼びません。ASRと言語判定のreceiptを同一transactionで受理し、回答・操作・TTSの検証parentにも言語判定を結びます。Web用Luna権限は流用しません。
+音声入力はASRの文字起こしをそのまま入力とし、言語判定や発話の続き判定をLLMで行いません。無音で区切られた区間を送ると `input_ready` になり、Webは話し終えた状態で送信します。送信前に次の区間が届いた場合は直前の入力に連結し、元のASR receiptはすべて回答・TTSの検証parentに結びます。
 
 感情判定は引用・否定・定義文を保持して全6候補を提示し、非空回答で一回判定します。候補・判断基準・声色presetは `delivery/data/speech-delivery.v1.json` に置きます。語句・句読点から抑揚を推定せず、判定失敗時は保存済みの声設定を使います。
 
@@ -121,3 +121,5 @@ SDKのホスト操作選択ルールは短いdeveloper指示へ置き、版付�
 Lunaはactionを直接返します。操作は `{"action":"invoke","tool":"提示済みのid","arguments":{}}`、終了は `{"action":"finish","report":{"outcome":"not_found","summary":"調査結果","claims":[],"limitations":[]}}`。argumentsは選んだTOOLSのinputSchemaに合わせ、任意項目は省略します。報告の事実には提示済みの根拠参照を付け、answered/partialではclaimsを1件以上、それ以外では空にします。SystemContextで役割・各項目・終了条件を説明します。
 
 SDKにはnative outputSchemaを渡しません。decisionの包み、ツールごとの出力schema展開、strict用のnullable変換・復元を撤去しました。正常に完了したSDKの最終応答を共通のJSON補正と既存のworker契約・ツール権限・根拠検証へ渡します。不正出力は既存の一回限りのモデル修正対象になり、違反箇所を安全なpath/codeで記録します。契約そのものや取得・取消・期限の制約は緩めません。
+
+Web本文の根拠は、履歴等と同じ最大300文字の連続範囲を使います。短い行を一件ずつ数えず、見出し・表ヘッダ等の対応は範囲間のcontext参照で補います。正確な抜粋を保持し、根拠64件・資料32 KiB・全体64 KiBの上限を変えません。日本語パス・国際化ドメインを含む指定URLはURL parserの正規形で許可対象と照合し、別パスや未提示の取得先へ権限を広げません。

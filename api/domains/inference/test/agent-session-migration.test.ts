@@ -17,7 +17,11 @@ test("deployed session migration stays immutable; references upgrade without cle
 	const path = join(dir, "test.db");
 	let store = openStore(
 		path,
-		migrations.filter((m) => m.id !== "inference/0010-attempt-refs"),
+		migrations.filter(
+			(m) =>
+				m.id !== "inference/0010-attempt-refs" &&
+				m.id !== "inference/0011-control-engine-codex",
+		),
 	);
 	try {
 		await store.write((db) => {

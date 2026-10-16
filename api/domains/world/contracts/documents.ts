@@ -18,3 +18,16 @@ export const worldDocumentsInput = z.strictObject({
 	offset: z.number().int().min(0).max(262144).optional(),
 });
 export type WorldDocumentScope = { principal: string; scopeKey: string };
+
+/** Owner browsing is separate from the bounded model-facing document lookup. */
+export const worldDocumentPageInput = z.strictObject({
+	pageIndex: z.coerce.number().int().min(0).max(100000).default(0),
+	pageSize: z.coerce
+		.number()
+		.pipe(z.union([z.literal(10), z.literal(25), z.literal(50)]))
+		.default(10),
+	q: z.string().trim().max(200).default(""),
+	sort: z.enum(["id", "title", "collection", "revision"]).default("title"),
+	desc: z.boolean().default(false),
+});
+export type WorldDocumentPageInput = z.infer<typeof worldDocumentPageInput>;

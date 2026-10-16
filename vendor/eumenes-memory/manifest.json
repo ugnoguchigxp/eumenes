@@ -1,8 +1,8 @@
 {
 	"package": "eumenes-memory",
 	"version": "0.0.1",
-	"artifact": "eumenes-memory-0.0.1.tgz",
-	"sha256": "9e8856374e4cce834ee9cf1c13e0df2c4bfef1fa9979ec328a7151b7bf851942",
+	"artifact": "eumenes-memory-0.0.1-1f2c941571da.tgz",
+	"sha256": "1f2c941571da3028bc7d0e01e0e36222e688d1a7dea0c881308bc98474510796",
 	"contractVersions": {
 		"records": 1,
 		"state": 1,

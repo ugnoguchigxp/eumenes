@@ -12,6 +12,7 @@ import {
 	X,
 } from "lucide-react";
 import { Button } from "../Button";
+import { menuKeyDown } from "../../utils/menuKeyboard";
 import { Input } from "../Input";
 import { useDrawingFrame } from "./useDrawingFrame";
 import "./drawing.css";
@@ -38,7 +39,7 @@ export type DrawingWorkspaceProps = {
 };
 /** Auth and storage stay in the existing editor; this host owns only layout and frame controls. */
 export function DrawingWorkspace(p: DrawingWorkspaceProps) {
-	const frame = useDrawingFrame(p.url, p.onRefresh);
+	const { root, iframe, ...frame } = useDrawingFrame(p.url, p.onRefresh);
 	const [menu, setMenu] = useState(false),
 		[fullscreen, setFullscreen] = useState(false);
 	const trigger = useRef<HTMLButtonElement>(null),
@@ -68,10 +69,10 @@ export function DrawingWorkspace(p: DrawingWorkspaceProps) {
 	}, [menu]);
 	useEffect(() => {
 		const change = () =>
-			setFullscreen(document.fullscreenElement === frame.root.current);
+			setFullscreen(document.fullscreenElement === root.current);
 		document.addEventListener("fullscreenchange", change);
 		return () => document.removeEventListener("fullscreenchange", change);
-	}, [frame.root]);
+	}, [root]);
 	async function choose(id?: string) {
 		if (id && id === f?.referenceId) {
 			browse(false);
@@ -85,14 +86,14 @@ export function DrawingWorkspace(p: DrawingWorkspaceProps) {
 	async function expand() {
 		try {
 			if (document.fullscreenElement) await document.exitFullscreen();
-			else await frame.root.current?.requestFullscreen();
+			else await root.current?.requestFullscreen();
 		} catch {
 			/* The ordinary artifact remains usable when fullscreen is unavailable. */
 		}
 	}
 	return (
 		<section
-			ref={frame.root}
+			ref={root}
 			aria-label={p.title ?? "図を描く・編集する"}
 			className="ds-drawing-workspace"
 		>
@@ -124,11 +125,7 @@ export function DrawingWorkspace(p: DrawingWorkspaceProps) {
 				) : (
 					<span className="dw-title">図を描く・編集する</span>
 				)}
-				<output
-					className="dw-status"
-					role="status"
-					title={f?.status ?? p.status}
-				>
+				<output className="dw-status" title={f?.status ?? p.status}>
 					{f?.status ?? p.status}
 				</output>
 				{f && (
@@ -160,12 +157,13 @@ export function DrawingWorkspace(p: DrawingWorkspaceProps) {
 					<div
 						className="dw-menu"
 						role="menu"
+						tabIndex={-1}
 						aria-label="図一覧"
 						onKeyDown={(e) => {
 							if (e.key === "Escape") {
 								e.stopPropagation();
 								browse(false);
-							}
+							} else menuKeyDown(e);
 						}}
 					>
 						<header>
@@ -268,7 +266,7 @@ export function DrawingWorkspace(p: DrawingWorkspaceProps) {
 			<div className="dw-canvas">
 				{frame.displayed ? (
 					<iframe
-						ref={frame.iframe}
+						ref={iframe}
 						key={frame.displayed}
 						src={frame.displayed}
 						title="Excalidraw編集画面"
@@ -368,9 +366,7 @@ export function DrawingEditorFrame(p: DrawingEditorFrameProps) {
 				<Button variant="ghost" size="sm" onClick={p.onClose}>
 					閉じる
 				</Button>
-				<output role="status" className="dw-status">
-					{p.status}
-				</output>
+				<output className="dw-status">{p.status}</output>
 			</header>
 			{p.error && (
 				<p role="alert" className="dw-error">

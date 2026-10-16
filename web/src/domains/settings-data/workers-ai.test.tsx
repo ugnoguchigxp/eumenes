@@ -87,6 +87,11 @@ test("the shipped form registers Account ID and a confidential token without req
 		target: { value: "fixture-private-token" },
 	});
 	fireEvent.submit(form);
+	await waitFor(() =>
+		expect(
+			screen.getByRole("button", { name: "設定の変更をすべて保存" }),
+		).toHaveProperty("disabled", false),
+	);
 	expect(document.body.textContent).not.toContain("fixture-private-token");
 	expect(JSON.stringify({ ...sessionStorage })).not.toContain(
 		"fixture-private-token",

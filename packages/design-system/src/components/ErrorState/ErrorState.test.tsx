@@ -52,29 +52,29 @@ describe("ErrorState Component", () => {
 			render(<ErrorState error={new Error("Test error")} />);
 
 			expect(screen.getByTestId("alert-circle")).toBeInTheDocument();
-			expect(screen.getByText("Error")).toBeInTheDocument();
+			expect(screen.getByText("エラー")).toBeInTheDocument();
 			expect(screen.getByText("Test error")).toBeInTheDocument();
 		});
 
 		it("renders with unknown error", () => {
 			render(<ErrorState error="Unknown error" />);
 
-			expect(screen.getByText("Error")).toBeInTheDocument();
-			expect(screen.getByText("Something went wrong.")).toBeInTheDocument();
+			expect(screen.getByText("エラー")).toBeInTheDocument();
+			expect(screen.getByText("問題が発生しました。")).toBeInTheDocument();
 		});
 
 		it("renders with null error", () => {
 			render(<ErrorState error={null} />);
 
-			expect(screen.getByText("Error")).toBeInTheDocument();
-			expect(screen.getByText("Something went wrong.")).toBeInTheDocument();
+			expect(screen.getByText("エラー")).toBeInTheDocument();
+			expect(screen.getByText("問題が発生しました。")).toBeInTheDocument();
 		});
 
 		it("renders with undefined error", () => {
 			render(<ErrorState error={undefined} />);
 
-			expect(screen.getByText("Error")).toBeInTheDocument();
-			expect(screen.getByText("Something went wrong.")).toBeInTheDocument();
+			expect(screen.getByText("エラー")).toBeInTheDocument();
+			expect(screen.getByText("問題が発生しました。")).toBeInTheDocument();
 		});
 
 		it("renders without retry button when onRetry is not provided", () => {
@@ -106,7 +106,7 @@ describe("ErrorState Component", () => {
 		it("displays string error message", () => {
 			render(<ErrorState error="String error message" />);
 
-			expect(screen.getByText("Something went wrong.")).toBeInTheDocument();
+			expect(screen.getByText("問題が発生しました。")).toBeInTheDocument();
 		});
 
 		it("displays object error with message property", () => {
@@ -120,13 +120,13 @@ describe("ErrorState Component", () => {
 			const error = { someProperty: "value" };
 			render(<ErrorState error={error} />);
 
-			expect(screen.getByText("Something went wrong.")).toBeInTheDocument();
+			expect(screen.getByText("問題が発生しました。")).toBeInTheDocument();
 		});
 
 		it("handles empty string error", () => {
 			render(<ErrorState error="" />);
 
-			expect(screen.getByText("Something went wrong.")).toBeInTheDocument();
+			expect(screen.getByText("問題が発生しました。")).toBeInTheDocument();
 		});
 	});
 
@@ -134,7 +134,7 @@ describe("ErrorState Component", () => {
 		it("renders with proper structure", () => {
 			render(<ErrorState error={new Error("Test")} />);
 
-			const container = screen.getByText("Error").parentElement?.parentElement;
+			const container = screen.getByText("エラー").parentElement?.parentElement;
 			expect(container).toBeTruthy();
 			expect(container).toBeInTheDocument();
 		});
@@ -144,7 +144,7 @@ describe("ErrorState Component", () => {
 				<ErrorState error={new Error("Test")} className="custom-error-class" />,
 			);
 
-			const container = screen.getByText("Error").parentElement?.parentElement;
+			const container = screen.getByText("エラー").parentElement?.parentElement;
 			expect(container).toBeTruthy();
 			expect(container).toBeInTheDocument();
 		});
@@ -164,7 +164,7 @@ describe("ErrorState Component", () => {
 		it("applies title styles", () => {
 			render(<ErrorState error={new Error("Test")} />);
 
-			const title = screen.getByText("Error");
+			const title = screen.getByText("エラー");
 			expect(title).toHaveClass(
 				"text-lg",
 				"font-semibold",
@@ -240,11 +240,11 @@ describe("ErrorState Component", () => {
 		it("maintains proper DOM hierarchy", () => {
 			render(<ErrorState error={new Error("Test")} onRetry={mockOnRetry} />);
 
-			const container = screen.getByText("Error").parentElement?.parentElement;
+			const container = screen.getByText("エラー").parentElement?.parentElement;
 			expect(container).toBeInTheDocument();
 
 			const iconContainer = screen.getByTestId("alert-circle").parentElement;
-			const title = screen.getByText("Error");
+			const title = screen.getByText("エラー");
 			const message = screen.getByText("Test");
 			const retryButton = screen.getByRole("button");
 
@@ -260,7 +260,7 @@ describe("ErrorState Component", () => {
 			);
 
 			expect(screen.getByTestId("alert-circle")).toBeInTheDocument();
-			expect(screen.getByText("Error")).toBeInTheDocument();
+			expect(screen.getByText("エラー")).toBeInTheDocument();
 			expect(screen.getByText("Test error")).toBeInTheDocument();
 			expect(screen.getByTestId("refresh-ccw")).toBeInTheDocument();
 			expect(screen.getByRole("button")).toBeInTheDocument();
@@ -271,43 +271,43 @@ describe("ErrorState Component", () => {
 		it("handles empty error object", () => {
 			render(<ErrorState error={{}} />);
 
-			expect(screen.getByText("Error")).toBeInTheDocument();
-			expect(screen.getByText("Something went wrong.")).toBeInTheDocument();
+			expect(screen.getByText("エラー")).toBeInTheDocument();
+			expect(screen.getByText("問題が発生しました。")).toBeInTheDocument();
 		});
 
 		it("handles error with null message", () => {
 			const error = { message: null };
 			render(<ErrorState error={error} />);
 
-			expect(screen.getByText("Something went wrong.")).toBeInTheDocument();
+			expect(screen.getByText("問題が発生しました。")).toBeInTheDocument();
 		});
 
 		it("handles error with undefined message", () => {
 			const error = { message: undefined };
 			render(<ErrorState error={error} />);
 
-			expect(screen.getByText("Something went wrong.")).toBeInTheDocument();
+			expect(screen.getByText("問題が発生しました。")).toBeInTheDocument();
 		});
 
 		it("handles number error", () => {
 			render(<ErrorState error={404} />);
 
-			expect(screen.getByText("Error")).toBeInTheDocument();
-			expect(screen.getByText("Something went wrong.")).toBeInTheDocument();
+			expect(screen.getByText("エラー")).toBeInTheDocument();
+			expect(screen.getByText("問題が発生しました。")).toBeInTheDocument();
 		});
 
 		it("handles boolean error", () => {
 			render(<ErrorState error={true} />);
 
-			expect(screen.getByText("Error")).toBeInTheDocument();
-			expect(screen.getByText("Something went wrong.")).toBeInTheDocument();
+			expect(screen.getByText("エラー")).toBeInTheDocument();
+			expect(screen.getByText("問題が発生しました。")).toBeInTheDocument();
 		});
 
 		it("handles function error", () => {
 			render(<ErrorState error={() => {}} />);
 
-			expect(screen.getByText("Error")).toBeInTheDocument();
-			expect(screen.getByText("Something went wrong.")).toBeInTheDocument();
+			expect(screen.getByText("エラー")).toBeInTheDocument();
+			expect(screen.getByText("問題が発生しました。")).toBeInTheDocument();
 		});
 	});
 
@@ -317,7 +317,7 @@ describe("ErrorState Component", () => {
 
 			const title = screen.getByRole("heading", { level: 3 });
 			expect(title).toBeInTheDocument();
-			expect(title).toHaveTextContent("Error");
+			expect(title).toHaveTextContent("エラー");
 		});
 
 		it("has button with proper role when retry is provided", () => {
@@ -378,7 +378,7 @@ describe("ErrorState Component", () => {
 			render(<ErrorState error={error} />);
 
 			expect(screen.getByText("Standard error")).toBeInTheDocument();
-			expect(screen.getByText("Error")).toBeInTheDocument();
+			expect(screen.getByText("エラー")).toBeInTheDocument();
 		});
 
 		it("handles custom error class", () => {
@@ -406,9 +406,9 @@ describe("ErrorState Component", () => {
 			render(<ErrorState error={error} />);
 
 			// When message is undefined, it falls back to default message
-			const messageElement = screen.getByText("Error").nextElementSibling;
+			const messageElement = screen.getByText("エラー").nextElementSibling;
 			expect(messageElement).toBeInTheDocument();
-			expect(messageElement).toHaveTextContent("Something went wrong.");
+			expect(messageElement).toHaveTextContent("問題が発生しました。");
 		});
 	});
 

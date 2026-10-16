@@ -111,10 +111,13 @@ export function createIntake(deps: DialogueDeps) {
 			updatedAt: now,
 		};
 		if (input.voiceSubject && larm.bindInTransaction)
-			larm.bindInTransaction(db, input.voiceSubject, runId, deadlineAtMs, {
-				validationRequestIds: input.validationRequestIds ?? [],
-				transcriptionRequestIds: input.transcriptionRequestIds,
-			});
+			larm.bindInTransaction(
+				db,
+				input.voiceSubject,
+				runId,
+				deadlineAtMs,
+				input.transcriptionRequestIds,
+			);
 		else larm.captureInTransaction?.(db, runId, "llm", deadlineAtMs);
 		insert(db, run);
 		// A scheduled prompt is stored as a user message but is the system's: it is never learned from.
@@ -150,21 +153,16 @@ export function createIntake(deps: DialogueDeps) {
 		async submitVoice(
 			input: Submit,
 			voiceSubject: string,
-			validation: {
-				validationRequestIds: string[];
-				transcriptionRequestIds?: string[];
-			},
+			transcriptionRequestIds: string[],
 			/** Runs in the same writer transaction as acceptance; throw to roll the run back. */
 			link: (db: Tx, run: Run) => void,
 		): Promise<Run> {
-			if (!larm.bindInTransaction || !validation?.validationRequestIds.length)
-				throw new Error("invalid_voice_inference");
+			if (!larm.bindInTransaction) throw new Error("invalid_voice_inference");
 			const accepted = await store.write((db) => {
 				const result = acceptInTransaction(db, {
 					...input,
 					voiceSubject,
-					validationRequestIds: validation.validationRequestIds,
-					transcriptionRequestIds: validation.transcriptionRequestIds,
+					transcriptionRequestIds,
 					sourceKind: "voice",
 				});
 				link(db, result.run);

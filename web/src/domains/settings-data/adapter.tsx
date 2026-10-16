@@ -1,6 +1,7 @@
 import type { ArtifactEvent, Receipt } from "@eumenes/artifact-ui";
 import { useQueryClient } from "@tanstack/react-query";
 import type { ActionBindingV1 } from "../../../../api/domains/capabilities/contracts";
+import { prepareConnectionRegistration } from "../../../../api/domains/settings/contracts/registration";
 import { invalidateAllButLive, queryRoots } from "../../queryKeys";
 import { useSettings } from "../settings";
 import { dirtyEntries } from "../toolchain-artifacts/documents";
@@ -189,6 +190,27 @@ function useSettingsArtifact(context: AdapterHostContext): AdapterState {
 			void cache.invalidateQueries({ queryKey: [queryRoots.settings] }),
 		documents: { [SETTINGS_DOCUMENT]: access },
 		describeRejection: (code) => (code ? settingsMessages[code] : undefined),
+		validateStructure(structure, input, secrets) {
+			if (
+				![
+					"structure:settings.add-connection@1",
+					"structure:settings.add-connection@2",
+				].includes(structure)
+			)
+				return { status: "accepted", message: "" };
+			const checked = prepareConnectionRegistration(
+				input,
+				secrets.some((s) => typeof s.value === "string" && s.value.length > 0),
+			);
+			if (checked.ok) return { status: "accepted", message: "" };
+			const label = artifact.collections
+				?.flatMap((c) => c.create?.fields ?? [])
+				.find((f) => f.fieldId === checked.field)?.label;
+			return {
+				status: "rejected",
+				message: `${label ? `${label}: ` : ""}${checked.message}`,
+			};
+		},
 		editLocal(key, wire) {
 			const catalogResult = modelCatalog.edit(key, wire);
 			if (catalogResult) return catalogResult;

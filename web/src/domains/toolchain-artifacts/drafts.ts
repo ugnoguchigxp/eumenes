@@ -63,6 +63,8 @@ export type StructuralEntry = {
 
 /** What a screen may read: confidential values are reduced to their identity. */
 export type DraftView = {
+	/** Uncommitted editor state: labels/messages only, never input values or secrets. */
+	editors?: ReadonlyArray<{ id: string; message: string }>;
 	/** Increases with every change, so a stale event is recognizable. */
 	version: number;
 	entries: ReadonlyArray<DraftEntry>;
@@ -90,6 +92,7 @@ export type DraftStore = ReturnType<typeof createDraftStore>;
 
 export function createDraftStore() {
 	const entries = new Map<string, DraftEntry>();
+	const editors = new Map<string, string>();
 	let structural: StructuralEntry[] = [];
 	let version = 0;
 	let busy = false;
@@ -99,6 +102,7 @@ export function createDraftStore() {
 	function build(): DraftView {
 		const all = [...entries.values()];
 		return {
+			editors: [...editors].map(([id, message]) => ({ id, message })),
 			version,
 			entries: all.filter((e) => !e.confidential),
 			structural: [...structural],
@@ -120,6 +124,13 @@ export function createDraftStore() {
 		for (const listener of listeners) listener();
 	}
 	return {
+		setEditing(id: string, message: string | null) {
+			if (message === null ? !editors.has(id) : editors.get(id) === message)
+				return;
+			if (message === null) editors.delete(id);
+			else editors.set(id, message);
+			publish();
+		},
 		getView: () => view,
 		subscribe(listener: () => void) {
 			listeners.add(listener);
@@ -175,6 +186,7 @@ export function createDraftStore() {
 		},
 		discard() {
 			if (busy) return false;
+			editors.clear();
 			entries.clear();
 			structural = [];
 			message = "";
@@ -191,7 +203,7 @@ export function createDraftStore() {
 		 * after the apply settles. Null when there is nothing to send or an apply is running.
 		 */
 		freeze(include: (entry: DraftEntry) => boolean): FrozenDraft | null {
-			if (busy) return null;
+			if (busy || editors.size > 0) return null;
 			const frozen = [...entries.values()].filter(include);
 			if (frozen.length === 0 && structural.length === 0) return null;
 			busy = true;

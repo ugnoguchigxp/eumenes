@@ -217,55 +217,6 @@
 			}
 		},
 		{
-			"id": "voice-ja-api",
-			"suite": "voice-language",
-			"text": "APIを確認してください",
-			"allowedLanguages": ["ja"],
-			"expected": {
-				"status": "allowed",
-				"languages": ["ja"]
-			}
-		},
-		{
-			"id": "voice-fr",
-			"suite": "voice-language",
-			"text": "Bonjour, comment allez-vous?",
-			"allowedLanguages": ["en"],
-			"expected": {
-				"status": "not_allowed",
-				"languages": ["fr"]
-			}
-		},
-		{
-			"id": "voice-mixed",
-			"suite": "voice-language",
-			"text": "設定を確認して、then explain the next step in English.",
-			"allowedLanguages": ["ja", "en"],
-			"expected": {
-				"status": "allowed",
-				"languages": ["ja", "en"]
-			}
-		},
-		{
-			"id": "voice-mixed-denied",
-			"suite": "voice-language",
-			"text": "設定を確認して、then explain the next step in English.",
-			"allowedLanguages": ["ja"],
-			"expected": {
-				"status": "not_allowed",
-				"languages": ["ja", "en"]
-			}
-		},
-		{
-			"id": "voice-short",
-			"suite": "voice-language",
-			"text": "OK",
-			"allowedLanguages": ["ja"],
-			"expected": {
-				"status": "unverified"
-			}
-		},
-		{
 			"id": "product-target",
 			"suite": "requirements",
 			"engine": "default",
@@ -348,10 +299,10 @@
 			}
 		},
 		{
-			"id": "event-complete-luna",
+			"id": "event-complete-codex",
 			"suite": "requirements",
-			"engine": "codex_luna",
-			"request": "催しの申込締切と料金を確認してください。 https://example.org/fixtures/event-complete 調査はCodex Lunaへ依頼してください。",
+			"engine": "codex",
+			"request": "催しの申込締切と料金を確認してください。 https://example.org/fixtures/event-complete 調査はCodexへ依頼してください。",
 			"profiles": [
 				{
 					"id": "event",
@@ -392,10 +343,10 @@
 			}
 		},
 		{
-			"id": "event-missing-luna",
+			"id": "event-missing-codex",
 			"suite": "requirements",
-			"engine": "codex_luna",
-			"request": "催しの申込締切と料金を確認してください。 https://example.org/fixtures/event-missing 調査はCodex Lunaへ依頼してください。",
+			"engine": "codex",
+			"request": "催しの申込締切と料金を確認してください。 https://example.org/fixtures/event-missing 調査はCodexへ依頼してください。",
 			"profiles": [
 				{
 					"id": "event",
@@ -436,10 +387,10 @@
 			}
 		},
 		{
-			"id": "facility-complete-luna",
+			"id": "facility-complete-codex",
 			"suite": "requirements",
-			"engine": "codex_luna",
-			"request": "日曜日の利用時間と12歳未満の利用条件を確認してください。 https://example.org/fixtures/facility-complete 調査はCodex Lunaへ依頼してください。",
+			"engine": "codex",
+			"request": "日曜日の利用時間と12歳未満の利用条件を確認してください。 https://example.org/fixtures/facility-complete 調査はCodexへ依頼してください。",
 			"profiles": [
 				{
 					"id": "facility",
@@ -477,10 +428,10 @@
 			}
 		},
 		{
-			"id": "facility-conflict-luna",
+			"id": "facility-conflict-codex",
 			"suite": "requirements",
-			"engine": "codex_luna",
-			"request": "日曜日の利用時間と12歳未満の利用条件を確認してください。 https://example.org/fixtures/facility-conflict 調査はCodex Lunaへ依頼してください。",
+			"engine": "codex",
+			"request": "日曜日の利用時間と12歳未満の利用条件を確認してください。 https://example.org/fixtures/facility-conflict 調査はCodexへ依頼してください。",
 			"profiles": [
 				{
 					"id": "facility",
@@ -518,10 +469,10 @@
 			}
 		},
 		{
-			"id": "product-target-luna",
+			"id": "product-target-codex",
 			"suite": "requirements",
-			"engine": "codex_luna",
-			"request": "NX-42のR2対応可否と必要firmwareを確認してください。 https://example.org/fixtures/product-target 調査はCodex Lunaへ依頼してください。",
+			"engine": "codex",
+			"request": "NX-42のR2対応可否と必要firmwareを確認してください。 https://example.org/fixtures/product-target 調査はCodexへ依頼してください。",
 			"profiles": [
 				{
 					"id": "product",
@@ -559,10 +510,10 @@
 			}
 		},
 		{
-			"id": "product-old-luna",
+			"id": "product-old-codex",
 			"suite": "requirements",
-			"engine": "codex_luna",
-			"request": "NX-24のR2対応可否と必要firmwareを確認してください。 https://example.org/fixtures/product-old 調査はCodex Lunaへ依頼してください。",
+			"engine": "codex",
+			"request": "NX-24のR2対応可否と必要firmwareを確認してください。 https://example.org/fixtures/product-old 調査はCodexへ依頼してください。",
 			"profiles": [
 				{
 					"id": "product",
@@ -642,10 +593,10 @@
 			}
 		},
 		{
-			"id": "lodging-complete-luna",
+			"id": "lodging-complete-codex",
 			"suite": "requirements",
-			"engine": "codex_luna",
-			"request": "公式サイトで予約した2026年11月8日宿泊について無料取消期限と期限後の取消料率を確認してください。 https://example.org/fixtures/lodging-complete-luna 調査はCodex Lunaへ依頼してください。",
+			"engine": "codex",
+			"request": "公式サイトで予約した2026年11月8日宿泊について無料取消期限と期限後の取消料率を確認してください。 https://example.org/fixtures/lodging-complete-codex 調査はCodexへ依頼してください。",
 			"profiles": [
 				{
 					"id": "lodging",
@@ -654,7 +605,7 @@
 			],
 			"sources": [
 				{
-					"url": "https://example.org/fixtures/lodging-complete-luna",
+					"url": "https://example.org/fixtures/lodging-complete-codex",
 					"title": "人工固定資料・宿泊規程",
 					"body": "公式サイトで予約した2026年11月8日宿泊の予約は、11月4日18:00 JSTまで無料で取消可能。旅行代理店経由の予約は代理店の約款に従う。期限後は一泊あたり料金の40%が取消料となる。当日の無連絡は100%。",
 					"fetchedAt": "2026-10-10T00:00:00Z"
@@ -726,10 +677,10 @@
 			}
 		},
 		{
-			"id": "lodging-missing-luna",
+			"id": "lodging-missing-codex",
 			"suite": "requirements",
-			"engine": "codex_luna",
-			"request": "公式サイトで予約した2026年11月8日宿泊について無料取消期限と期限後の取消料率を確認してください。 https://example.org/fixtures/lodging-missing-luna 調査はCodex Lunaへ依頼してください。",
+			"engine": "codex",
+			"request": "公式サイトで予約した2026年11月8日宿泊について無料取消期限と期限後の取消料率を確認してください。 https://example.org/fixtures/lodging-missing-codex 調査はCodexへ依頼してください。",
 			"profiles": [
 				{
 					"id": "lodging",
@@ -738,7 +689,7 @@
 			],
 			"sources": [
 				{
-					"url": "https://example.org/fixtures/lodging-missing-luna",
+					"url": "https://example.org/fixtures/lodging-missing-codex",
 					"title": "人工固定資料・宿泊規程",
 					"body": "公式サイトで予約した2026年11月8日宿泊の予約は、11月4日18:00 JSTまで無料で取消可能。旅行代理店経由の予約は代理店の約款に従う。無料取消期限後の取消料率は記載されていない。当日の無連絡は100%。",
 					"fetchedAt": "2026-10-10T00:00:00Z"
@@ -812,10 +763,10 @@
 			}
 		},
 		{
-			"id": "rental-complete-luna",
+			"id": "rental-complete-codex",
 			"suite": "requirements",
-			"engine": "codex_luna",
-			"request": "個人として機材を借りるときの最低年齢と保証金を確認してください。 https://example.org/fixtures/rental-complete-luna 調査はCodex Lunaへ依頼してください。",
+			"engine": "codex",
+			"request": "個人として機材を借りるときの最低年齢と保証金を確認してください。 https://example.org/fixtures/rental-complete-codex 調査はCodexへ依頼してください。",
 			"profiles": [
 				{
 					"id": "rental",
@@ -824,7 +775,7 @@
 			],
 			"sources": [
 				{
-					"url": "https://example.org/fixtures/rental-complete-luna",
+					"url": "https://example.org/fixtures/rental-complete-codex",
 					"title": "人工固定資料・機材貸出規程",
 					"body": "個人で機材を借りる契約者は21歳以上。18〜20歳の利用者は法人契約による機材の使用に限る。法人契約の保証金は不要。個人契約の保証金は8,000 JPYで、返却点検後に返金する。",
 					"fetchedAt": "2026-10-10T00:00:00Z"
@@ -897,10 +848,10 @@
 			}
 		},
 		{
-			"id": "rental-missing-luna",
+			"id": "rental-missing-codex",
 			"suite": "requirements",
-			"engine": "codex_luna",
-			"request": "個人として機材を借りるときの最低年齢と保証金を確認してください。 https://example.org/fixtures/rental-missing-luna 調査はCodex Lunaへ依頼してください。",
+			"engine": "codex",
+			"request": "個人として機材を借りるときの最低年齢と保証金を確認してください。 https://example.org/fixtures/rental-missing-codex 調査はCodexへ依頼してください。",
 			"profiles": [
 				{
 					"id": "rental",
@@ -909,7 +860,7 @@
 			],
 			"sources": [
 				{
-					"url": "https://example.org/fixtures/rental-missing-luna",
+					"url": "https://example.org/fixtures/rental-missing-codex",
 					"title": "人工固定資料・機材貸出規程",
 					"body": "個人で機材を借りる契約者は21歳以上。18〜20歳の利用者は法人契約による機材の使用に限る。法人契約の保証金は不要。個人契約の保証金額はこの資料に記載されていない。",
 					"fetchedAt": "2026-10-10T00:00:00Z"

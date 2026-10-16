@@ -228,6 +228,9 @@ export function collectionResource({
 	message?: string;
 	title?: string;
 }): CollectionResource {
+	const pageIndex = getPath(data, "pageIndex");
+	const sourceNote = getPath(data, "unavailableText");
+	const sourceUnavailable = getPath(data, "unavailable");
 	const labelOf = (actionId: string) =>
 		bindings.find((b) => b.actionId === actionId)?.label ?? actionId;
 	const rows: CollectionRow[] = rowsOf(collection, data).flatMap((raw) => {
@@ -290,7 +293,16 @@ export function collectionResource({
 		kind: "collection",
 		revision,
 		...(title || collection.title ? { title: title ?? collection.title } : {}),
-		...(collection.description ? { description: collection.description } : {}),
+		...(collection.description || typeof sourceNote === "string"
+			? {
+					description: [
+						collection.description,
+						typeof sourceNote === "string" ? sourceNote : undefined,
+					]
+						.filter(Boolean)
+						.join(" "),
+				}
+			: {}),
 		columns: collection.columns.map((c) => ({
 			key: c.key,
 			label: c.label,
@@ -298,11 +310,28 @@ export function collectionResource({
 		})),
 		rows,
 		total: totalOf(collection, data, rows.length),
-		...(collection.paging ? { paging: query } : {}),
+		...(collection.paging
+			? {
+					paging: {
+						...query,
+						...(typeof pageIndex === "number" &&
+						Number.isInteger(pageIndex) &&
+						pageIndex >= 0
+							? { pageIndex }
+							: {}),
+					},
+				}
+			: {}),
 		...(collection.create
 			? {
 					create: {
 						actionId: collection.create.actionId,
+						draft: bindings.some(
+							(b) =>
+								b.actionId === collection.create!.actionId &&
+								b.effect === "draft" &&
+								b.draftAction === "structure",
+						),
 						label: labelOf(collection.create.actionId),
 						fields: withOptions(collection.create.fields, formOptions).map(
 							formFieldView,
@@ -311,7 +340,11 @@ export function collectionResource({
 				}
 			: {}),
 		busy,
-		...(error ? { error } : {}),
+		...(error
+			? { error }
+			: typeof sourceUnavailable === "string" && typeof sourceNote === "string"
+				? { error: sourceNote }
+				: {}),
 		...(message ? { message } : {}),
 	};
 }

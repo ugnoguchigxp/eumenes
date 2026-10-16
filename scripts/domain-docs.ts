@@ -11,6 +11,7 @@ export const START = "<!-- domains:start -->";
 export const END = "<!-- domains:end -->";
 
 type Info = {
+	tier: number;
 	backend: string | null;
 	web: string | null;
 	components: string | null;
@@ -43,6 +44,7 @@ export function renderDomainTable(
 	const rows = Object.entries(graph).map(([name, info]) =>
 		[
 			`\`${name}\``,
+			String(info.tier),
 			entryOf(info.backend, exists),
 			entryOf(info.web, exists),
 			entryOf(info.components, exists),
@@ -52,8 +54,8 @@ export function renderDomainTable(
 		].join(" | "),
 	);
 	return [
-		"| Domain | Backend 入口 | Web 入口 | Components | 依存 (api) | 依存 (web) | 依存 (試験のみ) |",
-		"| --- | --- | --- | --- | --- | --- | --- |",
+		"| Domain | Tier | Backend 入口 | Web 入口 | Components | 依存 (api) | 依存 (web) | 依存 (試験のみ) |",
+		"| --- | --- | --- | --- | --- | --- | --- | --- |",
 		...rows.map((row) => `| ${row} |`),
 	].join("\n");
 }

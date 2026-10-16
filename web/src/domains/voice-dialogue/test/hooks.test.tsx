@@ -109,7 +109,7 @@ for (const recognized of [false, true, "failed"])
 				);
 				expect(voiceCancel).not.toHaveBeenCalled();
 				if (recognized === "failed")
-					expect(hook.result.current.error).toBe("larm_timeout");
+					expect(hook.result.current.error).toContain("larm_timeout");
 				states.set(ids[0]!, { status: "ready", text: "受け付けた依頼" });
 				await act(async () => {
 					await query.invalidateQueries();

@@ -1,13 +1,13 @@
 /** Supplement omitted model metadata with bounded, explicit URLs in the current request. */
 export function requestUrls(question: string, supplied?: string[]) {
 	const urls = [...(supplied ?? [])];
-	for (const raw of question.match(/https?:\/\/[^\s<>"'\u0080-\uFFFF]+/gu) ??
+	for (const raw of question.match(/https?:\/\/[^\s<>"'`）］」』】]+/gu) ??
 		[]) {
-		const url = raw.replace(/[)\],;]+$/u, "");
+		const url = raw.replace(/[)\],;。、）］」』】]+$/u, "");
 		try {
 			const parsed = new URL(url);
 			if (!["http:", "https:"].includes(parsed.protocol)) continue;
-			if (!urls.includes(url)) urls.push(url);
+			if (!urls.includes(parsed.href)) urls.push(parsed.href);
 		} catch {
 			/* Leave malformed references outside the tool scope. */
 		}

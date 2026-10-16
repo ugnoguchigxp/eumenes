@@ -9,9 +9,9 @@ interface IConfirmModalProps {
 	description?: string;
 	onConfirm: () => void;
 	onCancel?: () => void;
-	/** Text for confirm button. Default: "Confirm" */
+	/** Text for confirm button. Default: "確認" */
 	confirmText?: string;
-	/** Text for cancel button. Default: "Cancel" */
+	/** Text for cancel button. Default: "キャンセル" */
 	cancelText?: string;
 	variant?: "default" | "destructive";
 	loading?: boolean;
@@ -25,8 +25,8 @@ export const ConfirmModal: React.FC<IConfirmModalProps> = ({
 	description,
 	onConfirm,
 	onCancel,
-	confirmText = "Confirm",
-	cancelText = "Cancel",
+	confirmText = "確認",
+	cancelText = "キャンセル",
 	variant = "default",
 	loading = false,
 	showCancel = true,

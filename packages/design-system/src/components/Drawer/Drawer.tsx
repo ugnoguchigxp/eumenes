@@ -58,7 +58,7 @@ export const Drawer: React.FC<DrawerProps> = React.memo(
 		width,
 		trigger,
 		overlayClassName,
-		closeLabel = "Close",
+		closeLabel = "閉じる",
 	}) => {
 		return (
 			<DialogPrimitive.Root

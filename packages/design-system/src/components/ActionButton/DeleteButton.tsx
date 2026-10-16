@@ -6,7 +6,7 @@ import { ActionButton, type ActionButtonProps } from "./ActionButton";
  * 削除ボタン
  */
 export const DeleteButton: React.FC<ActionButtonProps> = ({
-	label = "Delete",
+	label = "削除",
 	icon = Trash2,
 	variant = "destructive",
 	...props

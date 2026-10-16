@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { createHash } from "node:crypto";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -17,7 +18,92 @@ import {
 import { createQueue, migration as queueMigration } from "../../queue";
 import { migration as voiceMigration, sequenceMigration } from "..";
 import { migration as schedulerMigration } from "../../scheduler";
-import { inputMigration, readInput, saveInput } from "../repository/input";
+import {
+	inputMigration,
+	inputSimplificationMigration,
+	inputTextDedupMigration,
+	readInput,
+	saveInput,
+} from "../repository/input";
+import { get, migrations as voiceMigrations } from "../repository";
+
+test("the deployed input simplification upgrades without rewriting its checksum or voice history", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "eumenes-voice-deployed-"));
+	const file = join(dir, "db.sqlite3");
+	// Frozen SQL already deployed as 0004, before transcript deduplication.
+	const deployedSql = `
+ALTER TABLE voice_input_preparations DROP COLUMN language_request;
+ALTER TABLE voice_input_preparations DROP COLUMN readiness;
+UPDATE voice_turns SET status='interrupted',error=COALESCE(error,'input_superseded'),revision=revision+1 WHERE status IN ('awaiting_input','draft');
+`;
+	const checksum =
+		"5260a7de2680af52e2cfe690807261f5ea939eac900a632714d1905b97d9907e";
+	expect(createHash("sha256").update(deployedSql).digest("hex")).toBe(checksum);
+	const base = [conversationMigration, dialogueMigration];
+	let store: ReturnType<typeof openStore> | undefined;
+	try {
+		store = openStore(file, [
+			...base,
+			...voiceMigrations.slice(0, 3),
+			{
+				...voiceMigrations[3]!,
+				sql: deployedSql,
+			},
+		]);
+		await store.write((db) => {
+			db.exec(
+				"INSERT INTO voice_turns (utterance_id,session_id,generation,status,revision,created_at,updated_at,sequence,text) VALUES ('kept','session',1,'input_ready',3,'before','before',1,'kept transcript')",
+			);
+			db.exec(
+				"INSERT INTO voice_input_preparations (utterance_id,raw_text,sources,asr_requests) VALUES ('kept','duplicate transcript','[\"kept\"]','[\"asr\"]')",
+			);
+		});
+		await store.close();
+		store = undefined;
+		for (let attempt = 0; attempt < 2; attempt++) {
+			store = openStore(file, [...base, ...voiceMigrations]);
+			expect(
+				store.read((db) =>
+					db
+						.query(
+							"SELECT checksum FROM schema_migrations_v2 WHERE id='voice-dialogue/0004-input-simplification'",
+						)
+						.get(),
+				),
+			).toEqual({ checksum });
+			expect(store.read((db) => get(db, "kept"))).toMatchObject({
+				status: "input_ready",
+				revision: 3,
+				text: "kept transcript",
+			});
+			expect(store.read((db) => readInput(db, "kept"))).toEqual({
+				utteranceId: "kept",
+				sources: ["kept"],
+				asrRequests: ["asr"],
+			});
+			expect(
+				store.read((db) =>
+					db
+						.query("PRAGMA table_info(voice_input_preparations)")
+						.all()
+						.map((row) => (row as { name: string }).name),
+				),
+			).toEqual(["utterance_id", "sources", "asr_requests"]);
+			await store.write((db) =>
+				saveInput(db, {
+					utteranceId: "kept",
+					sources: ["kept"],
+					asrRequests: ["asr"],
+				}),
+			);
+			await store.close();
+			store = undefined;
+		}
+	} finally {
+		await store?.close();
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
 
 test("a database with only the original three migrations (plus later ones) upgrades in place and keeps history", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-mig-"));
@@ -108,16 +194,28 @@ test("a database with only the original three migrations (plus later ones) upgra
 			db.query(
 				"INSERT INTO voice_turns (utterance_id,session_id,generation,status,revision,created_at,updated_at,sequence) VALUES ('input','session',1,'awaiting_input',0,?,?,1)",
 			).run(now, now);
-			saveInput(db, {
-				utteranceId: "input",
-				rawText: "unfinished",
-				sources: ["input"],
-				asrRequests: ["asr"],
-				languageRequest: "language",
-				readiness: "waiting",
-			});
+			// A staged input from the language/endpoint judgment era.
+			db.query(
+				"INSERT INTO voice_input_preparations VALUES ('input','unfinished','[\"input\"]','[\"asr\"]','language','waiting')",
+			).run();
 		});
 		await upgraded.close();
+		const simplified = openStore(file, [
+			...original,
+			queueMigration,
+			schedulerMigration,
+			queueLinkMigration,
+			sequenceMigration,
+			conversationAvatarMotionMigration,
+			conversationAnswerDeliveryMigration,
+			inputMigration,
+			inputSimplificationMigration,
+			inputTextDedupMigration,
+		]);
+		expect(simplified.read((db) => get(db, "input"))?.status).toBe(
+			"interrupted",
+		);
+		await simplified.close();
 		// second start is a no-op
 		const again = openStore(file, [
 			...original,
@@ -128,13 +226,17 @@ test("a database with only the original three migrations (plus later ones) upgra
 			conversationAvatarMotionMigration,
 			conversationAnswerDeliveryMigration,
 			inputMigration,
+			inputSimplificationMigration,
+			inputTextDedupMigration,
 		]);
 		expect(
 			again.read((db) => db.query("SELECT id FROM schema_migrations_v2").all()),
-		).toHaveLength(10);
-		expect(again.read((db) => readInput(db, "input"))?.rawText).toBe(
-			"unfinished",
-		);
+		).toHaveLength(12);
+		expect(again.read((db) => readInput(db, "input"))).toEqual({
+			utteranceId: "input",
+			sources: ["input"],
+			asrRequests: ["asr"],
+		});
 		await again.close();
 	} finally {
 		rmSync(dir, { recursive: true, force: true });

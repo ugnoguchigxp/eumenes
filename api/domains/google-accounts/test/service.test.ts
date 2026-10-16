@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { openStore } from "../../../infrastructure/sqlite";
 import { createGoogleAccounts } from "../service";
 import { migrations, read, save } from "../repository";
-import { seal, unseal } from "../secrets";
+import { seal, unseal } from "../service/secrets";
 import {
 	GoogleAccountError,
 	type Authorization,

@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { atomicWrite, optionalJson, readPrivate } from "./storage";
 import { sdkGitPhaseSchema } from "./sdk-git-contracts";
+import { SENSITIVE_FILE_GLOBS } from "./sdk-sensitive-files";
 import {
 	sdkOutputSchema,
 	sdkReportSchema,
@@ -76,7 +77,9 @@ function client(config: SdkConfig, directory: string, gitPhaseFile?: string) {
 			".agents": "read",
 			".codex": "read",
 			".aws": "read",
-			"**/*.env": "deny",
+			...Object.fromEntries(
+				SENSITIVE_FILE_GLOBS.map((glob) => [glob, "deny" as const]),
+			),
 		},
 		[env.CODEX_HOME ?? join(env.HOME!, ".codex")]: "deny",
 		[config.root]: "deny",

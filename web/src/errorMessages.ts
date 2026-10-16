@@ -28,16 +28,12 @@ const messages: Record<string, string> = {
 	stale_voice_generation: "音声セッションが切り替わりました。",
 	stale_voice_preview: "試聴の内容が古くなりました。もう一度お試しください。",
 	voice_input_stale: "発話の続きが届いたため、文字起こしをまとめ直しています。",
-	voice_input_not_ready:
-		"発話の続き待ちです。マイクを停止して文字起こしを確認できます。",
+	voice_input_not_ready: "文字起こしがまだ確定していません。",
 	voice_input_capacity:
 		"文字起こしが長くなりました。マイクを停止して、内容を確認して送信してください。",
 	audio_too_large: "音声が長すぎます。短く区切って話してください。",
 	audio_empty: "音声が聞き取れませんでした。",
 	audio_invalid_wav: "音声データを読み取れませんでした。",
-	asr_language_unverified:
-		"音声の言語を確認できませんでした。もう一度話すか、文字で入力してください。",
-	asr_language_not_allowed: "設定で許可されていない言語です。",
 	larm_tts_voice_presentation_unavailable:
 		"選んだ日本語の声の種類を確認できません。声の一覧を再取得してください。",
 	larm_tts_voice_presentation_mismatch:
@@ -89,9 +85,7 @@ const messages: Record<string, string> = {
 };
 
 const turnStatuses: Record<string, string> = {
-	awaiting_input: "発話の続き待ち",
 	input_ready: "発話を確認中",
-	draft: "文字起こしを確認してください",
 	merged: "続きの発話へ結合済み",
 	recognizing: "聞き取り中",
 	responding: "回答を生成中",

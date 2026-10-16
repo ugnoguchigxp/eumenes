@@ -1,6 +1,6 @@
 /**
  * World name hint through the REAL dialogue handler, queue runner and Writer on a temp-file store with the
- * production migrations: the conversation gets one L4 line naming the known targets this turn's wording
+ * migrations of the domains it touches: the conversation gets one L4 line naming the known targets this turn's wording
  * mentions (names only; World's content is read by the research sub-agent, never here), and the goals layer
  * keeps its own adoption rules.
  *
@@ -11,37 +11,63 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { migrations as memoryPackageMigrations } from "eumenes-memory/sqlite";
 import { planAssertionTransition } from "eumenes-world-model";
-import { migrations } from "../../../application/migrations";
+import { migrations as worldPackageMigrations } from "eumenes-world-model/sqlite";
 import { openStore, type SqliteStore } from "../../../infrastructure/sqlite";
 import {
 	CONVERSATION_DEFAULT_PRINCIPAL,
 	CONVERSATION_DEFAULT_SCOPE,
 	createConversationService,
+	migrations as conversationMigrations,
 } from "../../conversation";
-import { createContinuityService } from "../../continuity";
+import {
+	createContinuityService,
+	migrations as continuityMigrations,
+} from "../../continuity";
 import {
 	createGoalsService,
 	existingGoalIdsInTransaction,
+	migrations as goalsMigrations,
 	type Goal,
 } from "../../goals";
 import type { InferencePort, Receipt } from "../../inference";
-import { createMemoryService } from "../../memory";
+import {
+	createMemoryService,
+	migrations as memoryMigrations,
+} from "../../memory";
 import { saveItem } from "./memory-seed";
-import { createQueue } from "../../queue";
+import { createQueue, migrations as queueMigrations } from "../../queue";
+import { migrations as schedulerMigrations } from "../../scheduler";
 import {
 	createConversationSourceAdapter,
 	createWorldContextNames,
 	createWorldHostGate,
 	createWorldLifecycle,
 	createWorldService,
+	migrations as worldMigrations,
 	type WorldService,
 } from "../../world";
 import {
 	createDialogueService,
+	migrations as dialogueMigrations,
 	type WorldContextNamesInput,
 	type WorldContextPort,
 } from "..";
+
+/** The schema a dialogue turn with a real World, Memory, Goals and queue runs on, before dialogue's own. */
+const migrations = [
+	...conversationMigrations,
+	...continuityMigrations,
+	...memoryMigrations,
+	...memoryPackageMigrations,
+	...queueMigrations,
+	...schedulerMigrations,
+	...goalsMigrations,
+	...worldPackageMigrations,
+	...worldMigrations,
+	...dialogueMigrations,
+];
 
 const SCOPE = {
 	principal: CONVERSATION_DEFAULT_PRINCIPAL,

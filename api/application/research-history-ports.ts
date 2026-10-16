@@ -14,6 +14,34 @@ export type BlockedMessages = Pick<
 	MemoryService,
 	"blockedMessageIdsInTransaction"
 >;
+type HistoryMessage = ReturnType<
+	ConversationService["historyReadInTransaction"]
+>["messages"][number];
+/** A stored conversation message as the evidence source a research report may cite. */
+function conversationSource(m: HistoryMessage, scopeRef: string): Source {
+	return {
+		kind: "conversation_source",
+		sourceId: m.messageId,
+		messageRef: m.messageRef,
+		messageId: m.messageId,
+		conversationId: m.conversationId,
+		speaker: m.speaker,
+		createdAt: m.createdAt,
+		revision: m.revision,
+		digest: m.digest,
+		viewId: m.viewId,
+		viewDigest: m.viewDigest,
+		scopeRef,
+		start: m.start,
+		end: m.end,
+		nextCursor: m.nextCursor,
+		title: "保存済み発言",
+		basis: "conversation",
+		fetchedAt: m.createdAt,
+		body: m.text,
+		truncated: m.truncated,
+	};
+}
 export function createReadPorts(
 	web: WebResearchService,
 	conversation: ConversationService | undefined,
@@ -145,28 +173,9 @@ export function createReadPorts(
 					found.map((m) => m.messageId),
 				) ?? new Set<string>();
 			const messages = found.filter((m) => !hidden.has(m.messageId));
-			const readings: Source[] = messages.map((m) => ({
-				kind: "conversation_source",
-				sourceId: m.messageId,
-				messageRef: m.messageRef,
-				messageId: m.messageId,
-				conversationId: m.conversationId,
-				speaker: m.speaker,
-				createdAt: m.createdAt,
-				revision: m.revision,
-				digest: m.digest,
-				viewId: m.viewId,
-				viewDigest: m.viewDigest,
-				scopeRef: result.scope.scopeRef,
-				start: m.start,
-				end: m.end,
-				nextCursor: m.nextCursor,
-				title: "保存済み発言",
-				basis: "conversation",
-				fetchedAt: m.createdAt,
-				body: m.text,
-				truncated: m.truncated,
-			}));
+			const readings = messages.map((m) =>
+				conversationSource(m, result.scope.scopeRef),
+			);
 			return {
 				state: "succeeded",
 				result: {

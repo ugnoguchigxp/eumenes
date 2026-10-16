@@ -18,7 +18,15 @@ import {
 	settingsSchema,
 	type ApplySettings,
 } from "../api/domains/settings/contracts";
+import { z } from "zod";
 import { json, type Transport } from "./transport";
+
+const usagePageSchema = z.object({
+	items: z.array(usageSchema),
+	total: z.number(),
+	pageIndex: z.number(),
+	pageSize: z.number(),
+});
 export type {
 	ConnectionModels,
 	LarmDetails,
@@ -83,15 +91,11 @@ export function settingsClient(t: Transport) {
 			const params = new URLSearchParams(
 				Object.entries(query).map(([key, value]) => [key, String(value)]),
 			);
-			const page = (await (
-				await t.call("/api/inference/usage/page?" + params, { signal })
-			).json()) as {
-				items: unknown[];
-				total: number;
-				pageIndex: number;
-				pageSize: number;
-			};
-			return { ...page, items: usageSchema.array().parse(page.items) };
+			return usagePageSchema.parse(
+				await (
+					await t.call("/api/inference/usage/page?" + params, { signal })
+				).json(),
+			);
 		},
 		larmDetails: async () =>
 			larmDetailsSchema.parse(

@@ -130,7 +130,9 @@ test("compact records show AI and toolchain details in dialogs", () => {
 	let dialog = screen.getByRole("dialog", { name: "AIの利用の詳細" });
 	expect(within(dialog).getByText("ai-request")).toBeTruthy();
 	expect(screen.queryByText("選択した行の詳細")).toBeNull();
-	fireEvent.click(within(dialog).getByRole("button", { name: "Close" }));
+	fireEvent.click(
+		within(dialog).getByRole("button", { name: "ダイアログを閉じる" }),
+	);
 	fireEvent.mouseDown(screen.getByRole("tab", { name: "ツールチェーン" }), {
 		button: 0,
 		ctrlKey: false,

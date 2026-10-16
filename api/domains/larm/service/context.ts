@@ -39,7 +39,7 @@ export function decodeSpeechCredit(header: string | null): string | undefined {
 	}
 }
 
-const ruriLabels = [
+const attitudeLabels = [
 	"none",
 	"warmth",
 	"joy",
@@ -47,8 +47,8 @@ const ruriLabels = [
 	"curiosity",
 	"surprise",
 ];
-/** Ruri classifies a fixed label set; any other question shape is a caller bug. */
-export function assertRuriQuestions(
+/** The system-one classifier answers a fixed label set; any other question shape is a caller bug. */
+export function assertAttitudeQuestions(
 	questions: Record<string, { type: string; criteria: Record<string, string> }>,
 ) {
 	const entries = Object.values(questions);
@@ -58,8 +58,10 @@ export function assertRuriQuestions(
 			(q) =>
 				q.type !== "choice" ||
 				!Object.hasOwn(q.criteria, "none") ||
-				Object.keys(q.criteria).some((label) => !ruriLabels.includes(label)),
+				Object.keys(q.criteria).some(
+					(label) => !attitudeLabels.includes(label),
+				),
 		)
 	)
-		throw new Error("larm_invalid_ruri_question");
+		throw new Error("larm_invalid_attitude_question");
 }

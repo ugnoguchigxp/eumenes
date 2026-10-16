@@ -11,7 +11,7 @@ test("live startup failure still produces a safe evaluation report and stops aft
 				process.execPath,
 				"scripts/llm-native-live.ts",
 				"--suite",
-				"voice-language",
+				"delivery",
 				"--out",
 				out,
 			],

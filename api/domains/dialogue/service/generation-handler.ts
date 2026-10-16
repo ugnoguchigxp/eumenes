@@ -1,6 +1,5 @@
 import { createAnswerStream } from "./generation-stream";
 import { generationTiming } from "./generation-timing";
-import { observeAnswer } from "./post-answer";
 import {
 	resolveAttachmentContext,
 	validAttachmentContext,
@@ -81,8 +80,7 @@ export function createGenerationHandler(
 	deps: DialogueDeps,
 	{ partials, publish }: Pick<Progress, "partials" | "publish">,
 ) {
-	const { store, conversation, larm, clock, id, memory, agents, postAnswer } =
-		deps;
+	const { store, conversation, larm, clock, id, memory, agents } = deps;
 
 	const handler: HandlerDefinition<
 		GeneratePayload,
@@ -364,7 +362,6 @@ export function createGenerationHandler(
 						outcome.result.receipt.delivery,
 					);
 				const done = endRun(deps, tx, run, "completed", null, messageId);
-				if (done) observeAnswer(postAnswer, tx, run.id, input.agent);
 				if (done) traceOutcome(deps, tx, run.id, agentOutcome(input.agent));
 				return done ? "applied" : "stale";
 			}

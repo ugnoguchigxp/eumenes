@@ -109,7 +109,7 @@ Toolchainのlive検証も、一時DBを削除する前に運用ログを `verifi
 
 ## Codex SDKによる調査の失敗
 
-LunaのSDK呼出しでは `inference.attempt_failed` に `phase=sdk_start/sdk_turn/sdk_output` と安全な分類を残します。`codex_research_process_exit` はCLIランタイムの異常終了、`codex_research_http_401` などは外部応答のHTTP状態、`codex_research_invalid_json_schema` などは許可したProviderコード、`codex_research_invalid_event` はSDKイベントの不正です。最終応答のJSON・契約違反は共通workerの `agent.control_rejected` に記録し、構文違反・schema違反・不正な根拠を区別します。未分類は `codex_research_failed` とし、原因を推測しません。
+Codex調査のSDK呼出しでは `inference.attempt_failed` に `phase=sdk_start/sdk_turn/sdk_output` と安全な分類を残します。`codex_research_process_exit` はCLIランタイムの異常終了、`codex_research_http_401` などは外部応答のHTTP状態、`codex_research_invalid_json_schema` などは許可したProviderコード、`codex_research_invalid_event` はSDKイベントの不正です。最終応答のJSON・契約違反は共通workerの `agent.control_rejected` に記録し、構文違反・schema違反・不正な根拠を区別します。未分類は `codex_research_failed` とし、原因を推測しません。
 
 利用可能な場合だけ `exitCode`、許可した `processSignal`、HTTPの `status`、許可したProviderコードの `validationCode` を追加します。SDKイベントと例外の生メッセージはメモリー内で分類し、通常ログ・会話・DBへ保存しません。`inferenceId/attemptId/jobId/subjectId` からagentの `runId/taskId` を辿ります。`queue.settled.reason` とtask APIのerrorCodeにも分類を保持し、会話のcompletedを調査成功とは扱いません。
 

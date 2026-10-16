@@ -12,6 +12,7 @@ import type {
 	SettingsChangesResource,
 } from "./settings-contracts";
 import { useArtifactRuntime } from "./runtime";
+import { useSettingsInputs } from "./settings-inputs";
 
 function useSettingsAction(request: ArtifactRequest | string) {
 	const runtime = useArtifactRuntime();
@@ -21,7 +22,7 @@ function useSettingsAction(request: ArtifactRequest | string) {
 		action: ArtifactEvent["action"],
 		values: ArtifactEvent["values"] = {},
 	) {
-		void runtime
+		return runtime
 			.dispatch({
 				id: crypto.randomUUID(),
 				source,
@@ -29,10 +30,18 @@ function useSettingsAction(request: ArtifactRequest | string) {
 				action,
 				values,
 			})
-			.then((receipt) =>
-				setMessage(receipt.status === "accepted" ? "" : receipt.message),
-			)
-			.catch(() => setMessage("操作に失敗しました。もう一度お試しください"));
+			.then((receipt) => {
+				setMessage(receipt.status === "accepted" ? "" : receipt.message);
+				return receipt;
+			})
+			.catch(() => {
+				const receipt = {
+					status: "rejected" as const,
+					message: "操作に失敗しました。もう一度お試しください",
+				};
+				setMessage(receipt.message);
+				return receipt;
+			});
 	}
 	return { resource: runtime.snapshot[source], send, message };
 }
@@ -47,6 +56,9 @@ export function SettingsSectionView({
 }) {
 	const action = useSettingsAction(request);
 	const resource = action.resource as SettingsSectionResource;
+	const inputs = useSettingsInputs(request.source!, resource, (id, value) =>
+		action.send("settings-edit", { fieldId: id, value }),
+	);
 	return (
 		<>
 			<SettingsSection
@@ -55,7 +67,7 @@ export function SettingsSectionView({
 					request.view === "settings-section" ? request.presentation : undefined
 				}
 				description={resource.description}
-				fields={resource.fields}
+				fields={inputs.fields}
 				groups={resource.groups}
 				actions={resource.actions}
 				onAction={(id) => action.send("settings-action", { id })}
@@ -65,9 +77,7 @@ export function SettingsSectionView({
 				message={resource.message}
 				supplement={supplement}
 				hideFooter={hideFooter}
-				onChange={(id, value) =>
-					action.send("settings-edit", { fieldId: id, value })
-				}
+				onChange={inputs.change}
 				onReview={() => action.send("settings-review")}
 				onApply={() => action.send("settings-apply")}
 			/>

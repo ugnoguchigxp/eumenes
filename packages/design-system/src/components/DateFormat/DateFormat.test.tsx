@@ -39,7 +39,6 @@ describe("DateFormat", () => {
 		vi.mocked(useTranslation).mockReturnValue({
 			i18n: { language: "en-US" },
 			t: (k: string) => k,
-			// biome-ignore lint/suspicious/noExplicitAny: Mocking complex i18next return type
 		} as any);
 	});
 
@@ -242,8 +241,6 @@ describe("DateFormat", () => {
 	describe("Error Handling", () => {
 		it("falls back to base locale on formatting error", () => {
 			const originalIntl = Intl.DateTimeFormat;
-			// biome-ignore lint/suspicious/noExplicitAny: Mocking internal implementation
-			// biome-ignore lint/complexity/useArrowFunction: Constructor mock requires function type
 			const mockImpl: any = function (loc: any, opts: any) {
 				if (typeof loc === "string" && loc.includes("-u-ca-")) {
 					throw new Error("Calendar not supported");
@@ -264,7 +261,6 @@ describe("DateFormat", () => {
 			vi.mocked(useTranslation).mockReturnValue({
 				i18n: { language: "ja-JP" },
 				t: (k: string) => k,
-				// biome-ignore lint/suspicious/noExplicitAny: Mocking complex i18next return type
 			} as any);
 
 			const d = new Date(2025, 9, 23, 14, 30);

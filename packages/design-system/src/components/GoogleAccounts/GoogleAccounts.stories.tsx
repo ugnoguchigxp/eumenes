@@ -1,10 +1,30 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { GoogleAccounts } from ".";
-const meta: Meta<typeof GoogleAccounts> = {title:"Components/GoogleAccounts",component:GoogleAccounts,tags:["autodocs"],args:{configured:true,status:"disconnected",pending:false,onBack:()=>{},onConnect:()=>{},onCancel:()=>{},onDisconnect:()=>{}}};
+const meta: Meta<typeof GoogleAccounts> = {
+	title: "Components/GoogleAccounts",
+	component: GoogleAccounts,
+	tags: ["autodocs"],
+	args: {
+		configured: true,
+		status: "disconnected",
+		pending: false,
+		onBack: () => {},
+		onConnect: () => {},
+		onCancel: () => {},
+		onDisconnect: () => {},
+	},
+};
 export default meta;
 type Story = StoryObj<typeof GoogleAccounts>;
 export const Disconnected: Story = {};
-export const Connected: Story = {args:{status:"connected",profile:{name:"山田 花子",email:"hanako@example.com"}}};
-export const Reconnect: Story = {args:{...Connected.args,status:"reconnect"}};
-export const Pending: Story = {args:{pending:true}};
-export const Unconfigured: Story = {args:{configured:false}};
+export const Connected: Story = {
+	args: {
+		status: "connected",
+		profile: { name: "山田 花子", email: "hanako@example.com" },
+	},
+};
+export const Reconnect: Story = {
+	args: { ...Connected.args, status: "reconnect" },
+};
+export const Pending: Story = { args: { pending: true } };
+export const Unconfigured: Story = { args: { configured: false } };

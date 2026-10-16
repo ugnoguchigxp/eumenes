@@ -208,6 +208,8 @@ it("shows a small heading only for a pane that has an owner", () => {
 	);
 	expect(screen.getAllByText("README の手順修正")).toHaveLength(1);
 	expect(
-		screen.getByRole("region", { name: "セッション 1" }).querySelector(".terminal-pane-heading"),
+		screen
+			.getByRole("region", { name: "セッション 1" })
+			.querySelector(".terminal-pane-heading"),
 	).toBeNull();
 });

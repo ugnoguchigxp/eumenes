@@ -1,0 +1,105 @@
+{
+  "scope": "World Table list and detail modal; user-authorized responsive Modal positioning fix",
+  "artifactRevisionId": "artifact:settings.world@5",
+  "connection": "settings.world -> collection-workspace -> CollectionTable -> DesignSystem ServerDataTable and Modal; existing world adapter sources",
+  "implementation": {
+    "summaryColumns": [
+      "subject",
+      "claim",
+      "toneLabel",
+      "originLabel",
+      "freshnessLabel"
+    ],
+    "detail": "All registered columns including conditions, supports, refutations, source versions and history",
+    "query": "Local search, sorting and pagination over already loaded rows; API-paged sources continue to delegate to the host",
+    "meaningJudgment": "No phrase-specific branches, fixed responses or model judgment replacements added"
+  },
+  "checks": {
+    "artifactAndWorldUI": {
+      "passed": 49,
+      "command": "bunx vitest run web/src/domains/toolchain-artifacts/world-table.test.tsx web/src/domains/artifact/test"
+    },
+    "apiIntegration": {
+      "passed": 9,
+      "command": "bun test ./api/application/world-adapter.test.ts ./api/application/world-bundle-upgrade.test.ts",
+      "includes": [
+        "fresh registration",
+        "previous revision unchanged",
+        "idempotent registration",
+        "read-only action ledger"
+      ]
+    },
+    "designSystem": {
+      "passed": 40,
+      "command": "bun run --cwd packages/design-system test -- src/components/Modal/Modal.test.tsx src/components/ServerDataTable/ServerDataTable.test.tsx src/components/RecordsWorkspace/RecordsWorkspace.test.tsx"
+    },
+    "browser": {
+      "type": "Isolated static fixture built from current source, Chromium, no server or product API calls",
+      "passed": [
+        "desktop table",
+        "detail evidence",
+        "Escape closes modal",
+        "focus returns to detail button",
+        "pagination",
+        "search",
+        "forget details",
+        "mobile page has no horizontal overflow",
+        "mobile dialog fits viewport"
+      ],
+      "desktopViewport": [
+        1280,
+        900
+      ],
+      "mobileViewport": [
+        390,
+        844
+      ],
+      "mobileDialog": {
+        "x": 0,
+        "y": 84.40625,
+        "width": 390,
+        "height": 759.59375
+      },
+      "pageErrors": []
+    },
+    "bundleDryRun": "passed",
+    "designSystemBuild": "passed",
+    "webBuild": "passed (existing chunk size warnings)",
+    "targetedLint": "passed",
+    "targetedFormat": "passed",
+    "targetedSizeBudget": "passed",
+    "domainVerify": {
+      "status": "blocked by unrelated format errors",
+      "command": "bun run verify -- --domain artifact --domain capabilities --domain world",
+      "files": [
+        "api/domains/capabilities/repository/index.ts",
+        "api/domains/capabilities/test/bundles.test.ts"
+      ],
+      "report": "verification-reports/runs/2026-10-16T13-21-10-735Z-e4ca73e3-57f8-43d8-8c38-b46a2ef4f804/report.json"
+    },
+    "workspaceTypecheck": {
+      "status": "blocked by unrelated errors",
+      "errorCount": 9,
+      "files": [
+        "api/domains/voice-dialogue/test/migration.test.ts",
+        "api/domains/voice-dialogue/test/settings-integration.test.ts"
+      ],
+      "changedWorldFilesHadErrors": false
+    },
+    "additionalHostRegression": {
+      "passed": 59,
+      "failed": 1,
+      "failure": "collections.test.tsx structural create expected submit once, got zero; parallel input-status changes were present; left unchanged as outside scope"
+    }
+  },
+  "limitations": [
+    "Product server was not stopped, started or restarted",
+    "Live product registration and product-backed browser E2E not performed",
+    "No live LLM or device acceptance needed for the presentation change"
+  ],
+  "scopeReview": "Unrelated existing and concurrent changes in shared files were retained, including input-status and accessibility wording changes.",
+  "contextTools": {
+    "context_compile": 1,
+    "compile_eval": 1
+  }
+}

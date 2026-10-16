@@ -1,3 +1,5 @@
+import { createProbes } from "./probes";
+import { createRequestValidity } from "./request-validity";
 import { createUsageReader } from "./usage";
 import { createVoiceAccess } from "./voice-access";
 import { createVoiceBinding } from "./voice-binding";
@@ -10,12 +12,7 @@ import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import { createLarm, type LarmPort } from "../../larm";
 import type { SpeechPreparation } from "../../delivery/contracts";
-import type {
-	SettingsService,
-	Settings,
-	Purpose,
-	Connection,
-} from "../../settings";
+import type { SettingsService, Settings, Purpose } from "../../settings";
 import type {
 	AgentAttemptRevocation,
 	CallSession,
@@ -26,17 +23,14 @@ import type {
 	SpeechOverride,
 	BackgroundControl,
 } from "../contracts";
-import { get, bindControlEngine, type RequestRow } from "../repository";
-import {
-	executeRequest as runRequest,
-	type CollectionAdoption,
-	type Env,
-	type InferenceOptions,
-	type Running,
-} from "./execute";
-import { probeWav } from "./wav";
-import { finishProbe, openProbe } from "./probe";
-import { safeError } from "./errors";
+import { get, bindControlEngine } from "../repository";
+import { executeRequest as runRequest } from "./execute";
+import type {
+	CollectionAdoption,
+	Env,
+	InferenceOptions,
+	Running,
+} from "./execute-types";
 import { validateReceipt as checkReceipt } from "./receipt-authority";
 import { createAgentSweeper } from "./agent-sweep";
 import { releaseTaskSessions } from "./agent-session";
@@ -139,26 +133,10 @@ export function createInference(
 		}
 		return p;
 	}
-	function resolve(row: RequestRow) {
-		const id = row.snapshot.routes[row.purpose].fallbackId;
-		const resource = row.snapshot.resources.find((r) => r.id === id);
-		const connection = row.snapshot.connections.find(
-			(c) => c.id === resource?.connectionId,
-		);
-		return resource && connection ? { resource, connection } : null;
-	}
-	function allowed(db: Database, row: RequestRow, connection?: Connection) {
-		return (
-			get(db, row.id)?.status === "pending" &&
-			(!row.subject.startsWith("background:") ||
-				settings.inTransaction(db).revision === row.snapshot.revision) &&
-			row.deadline > Date.now() &&
-			settings.valid(db, row.snapshot, row.purpose, connection) &&
-			row.parents.every((id) =>
-				row.purpose === "tts" ? usable(db, id) : valid(db, id),
-			)
-		);
-	}
+	const { resolve, allowed, valid, usable } = createRequestValidity({
+		settings,
+		active,
+	});
 	const unsubscribe = settings.onChange(() => {
 		prune();
 		for (const a of active.values())
@@ -284,61 +262,14 @@ export function createInference(
 		return (await standaloneReceipt(purpose, input, signal, onDelta, override))
 			.value;
 	}
-	function valid(db: Database, id: string) {
-		const row = get(db, id);
-		if (
-			!row ||
-			row.status !== "accepted" ||
-			(row.subject.startsWith("background:") &&
-				settings.inTransaction(db).revision !== row.snapshot.revision) ||
-			!row.parents.every((parent) =>
-				row.purpose === "tts" ? usable(db, parent) : valid(db, parent),
-			)
-		)
-			return false;
-		const selected = resolve(row);
-		const cloud = db
-			.query(
-				"SELECT id FROM inference_attempts WHERE request_id=? AND source='cloud' AND accepted=1",
-			)
-			.get(id);
-		return settings.valid(
-			db,
-			row.snapshot,
-			row.purpose,
-			cloud ? selected?.connection : undefined,
-		);
-	}
-
-	// TTS is provisional while its parent answer is still arriving. It cannot
-	// outlive cancellation/revocation or authorize a non-TTS dependent request.
-	function usable(db: Database, id: string): boolean {
-		const row = get(db, id);
-		if (!row) return false;
-		if (row.status === "accepted") return valid(db, id);
-		if (
-			row.status !== "pending" ||
-			row.purpose !== "llm" ||
-			row.deadline <= Date.now() ||
-			!row.parents.every((parent) => valid(db, parent))
-		)
-			return false;
-		const running = active.get(id);
-		const completed = db
-			.query(
-				"SELECT source,connection_id FROM inference_attempts WHERE request_id=? AND status='succeeded' ORDER BY started DESC LIMIT 1",
-			)
-			.get(id) as { source: string; connection_id: string | null } | null;
-		if ((!running || running.controller.signal.aborted) && !completed)
-			return false;
-		const connection =
-			running?.connection ??
-			(completed?.source === "cloud"
-				? row.snapshot.connections.find((c) => c.id === completed.connection_id)
-				: undefined);
-		return settings.valid(db, row.snapshot, row.purpose, connection);
-	}
-
+	const probes = createProbes({
+		store,
+		settings,
+		port,
+		capture,
+		executeRequest,
+		accept,
+	});
 	const service = {
 		countControlTokens(messages: Messages) {
 			const count = options.countControlTokens?.(messages) ?? null;
@@ -362,14 +293,11 @@ export function createInference(
 				policySubject: string;
 				deadline: number;
 				maxOutputTokens: number;
-				engine?: "codex_luna";
+				engine?: "codex";
 				route?: "larm-only" | { resourceId: string };
 			},
 		) {
-			if (
-				input.engine &&
-				(input.engine !== "codex_luna" || !options.codexResearch)
-			)
+			if (input.engine && (input.engine !== "codex" || !options.codexResearch))
 				throw new Error("codex_research_unavailable");
 			const policy = db
 				.query(
@@ -616,86 +544,7 @@ export function createInference(
 		transcribe: (wav: Uint8Array, signal: AbortSignal) =>
 			standalone("asr", wav, signal) as Promise<string>,
 		...createUsageReader(store),
-		getProbe: (id: string) =>
-			store.read((db) =>
-				db.query("SELECT * FROM inference_probes WHERE id=?").get(id),
-			),
-		probes: () =>
-			store.read((db) =>
-				db
-					.query(
-						"SELECT * FROM inference_probes ORDER BY created DESC LIMIT 20",
-					)
-					.all(),
-			),
-		async testResource(
-			resourceId: string,
-			input: Messages | string | Uint8Array,
-			signal: AbortSignal,
-		) {
-			const snapshot = settings.get();
-			const resource = snapshot.resources.find((r) => r.id === resourceId);
-			if (!resource) throw new Error("invalid_probe_target");
-			const fixed = structuredClone(snapshot);
-			fixed.routes[resource.purpose].mode = "cloud-only";
-			fixed.routes[resource.purpose].fallbackId = resourceId;
-			const id = await store.write((db) =>
-				capture(
-					db,
-					`probe:${crypto.randomUUID()}`,
-					resource.purpose,
-					Date.now() + 120_000,
-					fixed,
-				),
-			);
-			const receipt = await executeRequest(id, input, signal);
-			signal.throwIfAborted();
-			if (!(await store.write((db) => accept(db, receipt))))
-				throw new Error("permission_revoked");
-			return receipt.value;
-		},
-		async startProbe(target: string) {
-			const current = settings.get();
-			const id = crypto.randomUUID();
-			await store.write((db) => openProbe(db, id, target, current.revision));
-			launchProbe(id, target, current);
-			return { id };
-		},
-		/**
-		 * Register a probe inside the caller's writer transaction. The caller runs `launch` after
-		 * the commit; it does nothing when the registration was rolled back.
-		 */
-		startProbeInTransaction(db: Database, target: string) {
-			const current = settings.inTransaction(db);
-			if (target !== "larm" && !current.resources.some((r) => r.id === target))
-				throw new Error("invalid_probe_target");
-			const id = crypto.randomUUID();
-			openProbe(db, id, target, current.revision);
-			return {
-				id,
-				launch() {
-					if (service.getProbe(id)) launchProbe(id, target, current);
-				},
-			};
-		},
-		cancelProbe(id: string) {
-			probeControllers.get(id)?.abort();
-		},
-		/**
-		 * Mark a running probe as being cancelled inside the caller's writer transaction. The
-		 * caller aborts it (`cancelProbe`) after the commit, only if the mark is still there.
-		 */
-		cancelProbeInTransaction(db: Database, id: string) {
-			const changed = db
-				.query(
-					"UPDATE inference_probes SET status='cancelling' WHERE id=? AND status='running'",
-				)
-				.run(id).changes;
-			if (changed) return;
-			if (!db.query("SELECT 1 FROM inference_probes WHERE id=?").get(id))
-				throw new Error("probe_not_found");
-			throw new Error("probe_not_running");
-		},
+		...probes,
 		async recover() {
 			await store.write((db) => {
 				db.query(
@@ -723,73 +572,13 @@ export function createInference(
 			listeners.clear();
 			const pending = [...active.values()];
 			for (const a of pending) a.controller.abort();
-			for (const c of probeControllers.values()) c.abort();
+			probes.abortAll();
 			await Promise.all(pending.map((a) => a.done));
-			await Promise.allSettled(probeTasks);
+			await probes.settled();
 			await Promise.all([...ports.values()].map((p) => p.close()));
 			await Promise.allSettled(closingPorts);
 		},
 	} satisfies InferencePort & Record<string, unknown>;
-	const probeControllers = new Map<string, AbortController>();
-	const probeTasks = new Set<Promise<void>>();
-	/** Runs the probe of a registered `inference_probes` row in the background. */
-	function launchProbe(id: string, target: string, current: Settings) {
-		const controller = new AbortController();
-		probeControllers.set(id, controller);
-		const task = (async () => {
-			try {
-				if (target === "larm") {
-					await port(current).probe?.(
-						AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)]),
-					);
-				} else {
-					const resource = current.resources.find((r) => r.id === target);
-					if (!resource) throw new Error("invalid_probe_target");
-
-					const snap = structuredClone(current);
-					snap.routes[resource.purpose].mode = "cloud-only";
-					snap.routes[resource.purpose].fallbackId = resource.id;
-					const requestId = await store.write((db) =>
-						capture(
-							db,
-							`probe:${id}`,
-							resource.purpose,
-							Date.now() + 15_000,
-							snap,
-						),
-					);
-					const receipt = await executeRequest(
-						requestId,
-						resource.purpose === "llm"
-							? [{ role: "user", content: "Reply OK." }]
-							: resource.purpose === "tts"
-								? "接続のテストです。"
-								: probeWav(),
-						controller.signal,
-					);
-					if (!(await store.write((db) => accept(db, receipt))))
-						throw new Error("permission_revoked");
-				}
-				controller.signal.throwIfAborted();
-				await finishProbe(
-					store,
-					id,
-					settings.get().revision === current.revision ? "succeeded" : "stale",
-				);
-			} catch (error) {
-				await finishProbe(
-					store,
-					id,
-					controller.signal.aborted ? "cancelled" : "failed",
-					safeError(error, controller.signal),
-				);
-			} finally {
-				probeControllers.delete(id);
-			}
-		})();
-		probeTasks.add(task);
-		void task.finally(() => probeTasks.delete(task)).catch(() => {});
-	}
 	return service;
 }
 export type InferenceService = ReturnType<typeof createInference>;

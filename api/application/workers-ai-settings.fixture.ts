@@ -19,9 +19,11 @@ import {
 	migrations as actionMigrations,
 	registerToolchainActions,
 } from "../domains/tool-runtime";
-import { registerInference } from "../domains/inference/controller";
-import type { InferenceService } from "../domains/inference/service";
-import { createConnectionModels } from "../domains/inference/service/connection-models";
+import {
+	createConnectionModels,
+	registerInference,
+	type InferenceService,
+} from "../domains/inference";
 import {
 	createSettingsAdapter,
 	describeSettingsAdapter,

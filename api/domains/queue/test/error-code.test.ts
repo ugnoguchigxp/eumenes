@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { toErrorCode } from "../service/runner";
+import { toErrorCode } from "../service/runner-shared";
 
 test("snake_case error codes are stored as-is", () => {
 	expect(toErrorCode(new Error("larm_inference_401"))).toBe(

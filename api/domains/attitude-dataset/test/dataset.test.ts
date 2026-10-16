@@ -4,7 +4,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openStore } from "../../../infrastructure/sqlite";
 import { createAttitudeDataset, migration, type Sample } from "..";
-import { RURI_MODEL, emotionSchema, type Emotion } from "../../delivery";
+import { emotionSchema, type Emotion } from "../../delivery";
+
+const ATTITUDE_MODEL = "attitude-test-model";
 import { groupSplit } from "../service/split";
 const closers: Array<() => Promise<void>> = [];
 afterEach(async () => {
@@ -23,7 +25,7 @@ function setup() {
 }
 function result(label: Emotion = "none") {
 	return {
-		model: RURI_MODEL,
+		model: ATTITUDE_MODEL,
 		answers: {
 			emotion: {
 				type: "choice",
@@ -60,7 +62,7 @@ const identity = (turn = "turn", conversation = "conversation") => ({
 	chunkOrder: null,
 });
 const args = (turn = "turn", text = "こんにちは。") => ({
-	model: RURI_MODEL,
+	model: ATTITUDE_MODEL,
 	text,
 	identity: identity(turn),
 	context: {
@@ -210,7 +212,7 @@ test("non-ruri, malformed, timeout, probes and missing identity never count as s
 	});
 	await service.decide({
 		...args("bad"),
-		judge: async () => ({ model: RURI_MODEL }),
+		judge: async () => ({ model: ATTITUDE_MODEL }),
 	});
 	await service.decide({ ...args("probe"), identity: undefined });
 	await service.decide({
@@ -381,7 +383,7 @@ test("available judge is called once even when cached model identity is absent",
 		model: null,
 		prepareJudge: async () => {
 			prepares++;
-			return RURI_MODEL;
+			return ATTITUDE_MODEL;
 		},
 		judge: async () => {
 			calls++;
@@ -469,7 +471,7 @@ test("six malformed Ruri scores do not count toward the 300 successful judgments
 	expect(selected).toMatchObject({
 		source: "fallback",
 		reason: "invalid",
-		model: RURI_MODEL,
+		model: ATTITUDE_MODEL,
 	});
 	expect(service.status()).toMatchObject({ successful: 0, failed: 1 });
 });

@@ -91,10 +91,10 @@ describe("TreeMenu", () => {
 		// Use uncontrolled for this test
 		render(<TreeMenu items={mockItems} />);
 
-		await user.click(screen.getByLabelText("Expand all"));
+		await user.click(screen.getByLabelText("すべて展開"));
 		expect(screen.getByText("Child 1-1")).toBeInTheDocument();
 
-		await user.click(screen.getByLabelText("Collapse all"));
+		await user.click(screen.getByLabelText("すべて折りたたむ"));
 		// Wait for collapse (React state update)
 		// queryByText might still be there if animation? Code doesn't use animation library, just conditional rendering:
 		// {hasChildren && isExpanded ... ? renderItems : null}

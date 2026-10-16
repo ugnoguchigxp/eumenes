@@ -139,12 +139,14 @@ test("the spatial settings bundle keeps its latest screen and shares the new sav
 			h.caps.importBundleInTransaction(db, bundle, h.host()),
 		);
 		expect(imported.issues).toEqual([]);
-		expect(
-			h.ledger
-				.artifacts()
-				.find((a) => a.artifactRevisionId === "artifact:settings.display@9")
-				?.artifactRevisionId,
-		).toBe("artifact:settings.display@9");
+		const display = h.store.read((db) =>
+			h.caps
+				.artifactsInTransaction(db)
+				.filter((a) => a.artifactId === "settings.display"),
+		);
+		expect(display.map((a) => a.artifactRevisionId)).toEqual([
+			"artifact:settings.display@9",
+		]);
 		const doc = h.store.read((db) =>
 			h.caps.documentInTransaction(db, "artifact:settings.display@9"),
 		);

@@ -7,6 +7,7 @@ import { afterEach, expect, test } from "bun:test";
 import {
 	existsSync,
 	mkdtempSync,
+	readdirSync,
 	readFileSync,
 	rmSync,
 	statSync,
@@ -208,6 +209,8 @@ test("cursor secret: host-owned file (dir 0700, file 0600), created once, stable
 	expect(first).toMatch(/^[0-9a-f]{64}$/);
 	expect(statSync(file).mode & 0o777).toBe(0o600);
 	expect(statSync(join(dir, "data", "keys")).mode & 0o777).toBe(0o700);
+	// Created atomically: no temp file is left beside the key.
+	expect(readdirSync(join(dir, "data", "keys"))).toEqual(["world-cursor.key"]);
 	// Stable across calls (and processes): the stored value, not a new random one.
 	expect(resolveWorldCursorSecret({ dbPath, env: {} })).toBe(first);
 	// A loosened file mode is tightened again.

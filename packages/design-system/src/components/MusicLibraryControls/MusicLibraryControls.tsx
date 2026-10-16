@@ -33,6 +33,7 @@ export function MusicLibraryControls({
 	compact,
 }: MusicLibraryControlsProps) {
 	const [draft, setDraft] = useState(filter);
+	// oxlint-disable-next-line react/set-state-in-effect -- local state follows a prop or open state, reset when it changes
 	useEffect(() => setDraft(filter), [filter]);
 	return (
 		<section

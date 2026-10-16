@@ -23,8 +23,8 @@ export const ErrorState = ({
 	retryText = "再読み込み",
 }: ErrorStateProps) => {
 	const getErrorMessage = (err: unknown) => ({
-		title: "Error",
-		message: (err as Error | undefined)?.message ?? "Something went wrong.",
+		title: "エラー",
+		message: (err as Error | undefined)?.message ?? "問題が発生しました。",
 	});
 
 	const { title: defaultTitle, message: defaultMessage } =

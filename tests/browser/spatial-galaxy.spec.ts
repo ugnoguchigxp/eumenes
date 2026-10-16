@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createFixture } from "./fixture";
 import { closeArtifact, openSettings, saveSettings } from "./artifact-launcher";
+import { settledScreenshot } from "./canvas";
 
 const fixture = createFixture();
 let webPort: number, dir: string;
@@ -88,9 +89,7 @@ test("12 models, saved zero-speed pause, demo health, resize, context loss and r
 		page.getByRole("combobox", { name: "会話モデル", exact: true }),
 	).toHaveCount(0);
 	const canvas = host.locator("canvas");
-	await page.waitForTimeout(1100);
-	const still = await canvas.screenshot();
-	await page.waitForTimeout(250);
+	const still = await settledScreenshot(canvas);
 	expect(await canvas.screenshot()).toEqual(still);
 	await page.screenshot({
 		path: test.info().outputPath("spatial-galaxy-wide.png"),
@@ -111,10 +110,13 @@ test("12 models, saved zero-speed pause, demo health, resize, context loss and r
 	await page.getByLabel("動きを停止", { exact: true }).uncheck();
 	await save(page);
 	await expect(host).toHaveAttribute("data-background-state", "ready");
-	await page.waitForTimeout(1100);
 	const moving = await canvas.screenshot();
-	await page.waitForTimeout(400);
-	expect(await canvas.screenshot()).not.toEqual(moving);
+	await expect
+		.poll(async () => (await canvas.screenshot()).equals(moving), {
+			timeout: 10_000,
+			intervals: [100, 250, 500],
+		})
+		.toBe(false);
 	await page.evaluate(() => {
 		const canvas = document.querySelector<HTMLCanvasElement>(
 			".chat-panel .spatial-background canvas",

@@ -36,41 +36,70 @@ function wav(samples: Float32Array, rate: number): Uint8Array {
 		);
 	return bytes;
 }
-export function encodeRecording(
-	frames: readonly Float32Array[],
-	sampleCount: number,
-	rate: number,
-): Uint8Array {
-	const joined = new Float32Array(sampleCount);
-	let offset = 0;
-	for (const frame of frames) {
-		joined.set(frame, offset);
-		offset += frame.length;
-	}
-	if (rate <= 16000) return wav(joined, rate);
-	const ratio = rate / 16000;
-	const downsampled = new Float32Array(Math.floor(joined.length / ratio));
-	for (let i = 0; i < downsampled.length; i++) {
-		const begin = Math.floor(i * ratio),
-			end = Math.floor((i + 1) * ratio);
-		let sum = 0;
-		for (let n = begin; n < end; n++) sum += joined[n] ?? 0;
-		downsampled[i] = sum / Math.max(1, end - begin);
-	}
-	return wav(downsampled, 16000);
+const TARGET_RATE = 16_000;
+/**
+ * Blackman-windowed sinc low-pass at 7.2 kHz, evaluated at output sample `index`. Plain
+ * averaging leaves energy above the 8 kHz Nyquist that folds back over consonants.
+ */
+function lowPass(rate: number) {
+	const ratio = rate / TARGET_RATE;
+	const cutoff = (0.45 * TARGET_RATE) / rate;
+	const half = Math.ceil(16 * ratio);
+	// Output positions repeat a few fractional phases (one at 48 kHz, 160 at 44.1 kHz).
+	const kernels = new Map<number, Float64Array>();
+	const kernel = (phase: number) => {
+		const key = Math.round(phase * 1e9);
+		let weights = kernels.get(key);
+		if (weights) return weights;
+		weights = new Float64Array(2 * half + 1);
+		let total = 0;
+		for (let j = 0; j < weights.length; j++) {
+			const d = j - half - phase;
+			const x = 2 * Math.PI * cutoff * d;
+			const k =
+				Math.abs(d) >= half
+					? 0
+					: (d === 0 ? 1 : Math.sin(x) / x) *
+						(0.42 +
+							0.5 * Math.cos((Math.PI * d) / half) +
+							0.08 * Math.cos((2 * Math.PI * d) / half));
+			weights[j] = k;
+			total += k;
+		}
+		for (let j = 0; j < weights.length; j++) weights[j]! /= total;
+		kernels.set(key, weights);
+		return weights;
+	};
+	return {
+		half,
+		at(read: (n: number) => number, index: number) {
+			const center = index * ratio;
+			const first = Math.floor(center) - half;
+			const weights = kernel(center - Math.floor(center));
+			let sum = 0;
+			for (let j = 0; j < weights.length; j++)
+				sum += weights[j]! * read(first + j);
+			return sum;
+		},
+	};
 }
 /**
- * Appends frames while downsampling to 16 kHz so partial results only pay for the
- * header and PCM conversion. Window boundaries match encodeRecording exactly.
+ * Appends frames while resampling to 16 kHz, so partial results only filter the last
+ * few milliseconds whose window is still open. Output is identical however frames are split.
  */
 export function createIncrementalEncoder(rate: number) {
-	const ratio = rate / 16000;
-	const passthrough = rate <= 16000;
+	const ratio = rate / TARGET_RATE;
+	const passthrough = rate <= TARGET_RATE;
+	const filter = lowPass(rate);
 	let out = new Float32Array(16_384);
 	let outLength = 0;
-	// Input samples not yet consumed by a complete window, starting at absolute `tailStart`.
-	let tail = new Float32Array(0);
-	let tailStart = 0;
+	// Input still needed by an output window; `base` is the absolute index of input[0].
+	let input = new Float32Array(16_384);
+	let inputLength = 0;
+	let base = 0;
+	let total = 0;
+	const read = (n: number) =>
+		n < base || n >= total ? 0 : (input[n - base] ?? 0);
 	const append = (value: number) => {
 		if (outLength === out.length) {
 			const grown = new Float32Array(out.length * 2);
@@ -85,26 +114,31 @@ export function createIncrementalEncoder(rate: number) {
 				for (const sample of frame) append(sample);
 				return;
 			}
-			const joined = new Float32Array(tail.length + frame.length);
-			joined.set(tail);
-			joined.set(frame, tail.length);
-			const total = tailStart + joined.length;
-			let index = outLength;
-			let begin = Math.floor(index * ratio);
-			let end = Math.floor((index + 1) * ratio);
-			while (index < Math.floor(total / ratio)) {
-				let sum = 0;
-				for (let n = begin; n < end; n++) sum += joined[n - tailStart] ?? 0;
-				append(sum / Math.max(1, end - begin));
-				index++;
-				begin = end;
-				end = Math.floor((index + 1) * ratio);
+			const keep = Math.max(base, Math.ceil(outLength * ratio - filter.half));
+			input.copyWithin(0, keep - base, inputLength);
+			inputLength -= keep - base;
+			base = keep;
+			if (inputLength + frame.length > input.length) {
+				const grown = new Float32Array(
+					Math.max(input.length * 2, inputLength + frame.length),
+				);
+				grown.set(input.subarray(0, inputLength));
+				input = grown;
 			}
-			tail = joined.slice(begin - tailStart);
-			tailStart = begin;
+			input.set(frame, inputLength);
+			inputLength += frame.length;
+			total += frame.length;
+			while (Math.floor(outLength * ratio + filter.half) < total)
+				append(filter.at(read, outLength));
 		},
 		wav(): Uint8Array {
-			return wav(out.subarray(0, outLength), passthrough ? rate : 16000);
+			if (passthrough) return wav(out.subarray(0, outLength), rate);
+			// The last windows run past the recording; the missing input is silence.
+			const samples = new Float32Array(Math.floor(total / ratio));
+			samples.set(out.subarray(0, Math.min(outLength, samples.length)));
+			for (let i = outLength; i < samples.length; i++)
+				samples[i] = filter.at(read, i);
+			return wav(samples, TARGET_RATE);
 		},
 	};
 }

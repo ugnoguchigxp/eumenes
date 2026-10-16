@@ -310,16 +310,57 @@ contracts("coding client", [
 	},
 ]);
 
-// These endpoints hand the backend JSON through without a zod parse.
-const passthrough = { ok: true };
+const attitudeStatus = {
+	enabled: true,
+	target: 300,
+	successful: 2,
+	unreviewed: 1,
+	reviewed: 1,
+	held: 0,
+	skipped: 0,
+	skip_reasons: {},
+	pending: 0,
+	failed: 0,
+	storage_errors: 0,
+	score_notice: "provisional",
+};
+const attitudeReport = {
+	...attitudeStatus,
+	contrasting_context_groups: [{ sample_ids: ["s1"], reviewed: 1 }],
+	short_texts: 0,
+	dominant_class_fraction: null,
+	classes: { joy: 1 },
+	rejections: {},
+	coverage: { short: 0 },
+	missing_classes: [],
+	missing_coverage: [],
+	differences: [],
+	granularity: { answer: 1, chunk: 1 },
+	splits: { train: 0, calibration: 0, eval: 0 },
+	warnings: [],
+};
+const attitudeSample = {
+	sample_id: "s1",
+	conversation_id: "c1",
+	revision: 0,
+	primary_label: null,
+	acceptable_labels: [],
+	expression_transition: null,
+	review_status: "unreviewed",
+	correction_reason: null,
+	template_group_id: "g1",
+	template_group_confirmed: false,
+	coverage_tags: [],
+	current_chunk: "こんにちは",
+	split: null,
+};
 contracts("attitude-dataset client", [
 	{
 		name: "attitudeStatus",
 		call: (c) => c.attitudeStatus(),
 		method: "GET",
 		path: "/api/attitude-dataset/status",
-		response: passthrough,
-		parsed: false,
+		response: attitudeStatus,
 	},
 	{
 		name: "attitudeStart",
@@ -327,8 +368,7 @@ contracts("attitude-dataset client", [
 		method: "POST",
 		path: "/api/attitude-dataset/start",
 		body: {},
-		response: passthrough,
-		parsed: false,
+		response: attitudeStatus,
 	},
 	{
 		name: "attitudeStop",
@@ -336,24 +376,29 @@ contracts("attitude-dataset client", [
 		method: "POST",
 		path: "/api/attitude-dataset/stop",
 		body: {},
-		response: passthrough,
-		parsed: false,
+		response: attitudeStatus,
 	},
 	{
 		name: "attitudeSamples",
 		call: (c) => c.attitudeSamples(),
 		method: "GET",
 		path: "/api/attitude-dataset/samples",
-		response: passthrough,
-		parsed: false,
+		response: [
+			{
+				sample_id: "s1",
+				review_status: "unreviewed",
+				revision: 0,
+				granularity: "chunk",
+				chunk_order: 1,
+			},
+		],
 	},
 	{
 		name: "attitudeSample",
 		call: (c) => c.attitudeSample("s/1", true),
 		method: "GET",
 		path: "/api/attitude-dataset/samples/s%2F1?predictions=show",
-		response: passthrough,
-		parsed: false,
+		response: attitudeSample,
 	},
 	{
 		name: "attitudeReview",
@@ -361,16 +406,14 @@ contracts("attitude-dataset client", [
 		method: "POST",
 		path: "/api/attitude-dataset/samples/s1/review",
 		body: { label: "ok" },
-		response: passthrough,
-		parsed: false,
+		response: { sample_id: "s1", revision: 1, review_status: "reviewed" },
 	},
 	{
 		name: "attitudeReport",
 		call: (c) => c.attitudeReport(),
 		method: "GET",
 		path: "/api/attitude-dataset/report",
-		response: passthrough,
-		parsed: false,
+		response: attitudeReport,
 	},
 	{
 		name: "attitudeSplit",
@@ -378,20 +421,38 @@ contracts("attitude-dataset client", [
 		method: "POST",
 		path: "/api/attitude-dataset/split",
 		body: {},
-		response: passthrough,
-		parsed: false,
+		response: {
+			counts: { train: 1, calibration: 0, eval: 0 },
+			groups: 1,
+			warning: null,
+		},
 	},
 	{
 		name: "attitudeExport",
 		call: (c) => c.attitudeExport(),
 		method: "GET",
 		path: "/api/attitude-dataset/export",
-		response: passthrough,
-		parsed: false,
+		response: {
+			jsonl: "",
+			partitions: { train: "", calibration: "", eval: "" },
+			report: attitudeReport,
+			schema: { title: "sample" },
+		},
 	},
 ]);
 
-const researchRun = { id: "rr1", status: "queued" };
+const researchRun = {
+	id: "rr1",
+	requestId: "q1",
+	jobId: "j1",
+	operation: "lookup",
+	status: "queued",
+	createdAt: t0,
+	finishedAt: null,
+	errorCode: null,
+	result: null,
+	resultExpired: false,
+};
 contracts("web-research client", [
 	{
 		name: "submitResearch",
@@ -400,7 +461,6 @@ contracts("web-research client", [
 		path: "/api/web-research/runs",
 		body: { requestId: "q1", query: "bun" },
 		response: researchRun,
-		parsed: false,
 	},
 	{
 		name: "researchRun",
@@ -408,7 +468,6 @@ contracts("web-research client", [
 		method: "GET",
 		path: "/api/web-research/runs/rr%2F1",
 		response: researchRun,
-		parsed: false,
 	},
 	{
 		name: "cancelResearch",
@@ -417,15 +476,19 @@ contracts("web-research client", [
 		path: "/api/web-research/runs/rr1/cancel",
 		body: {},
 		response: researchRun,
-		parsed: false,
 	},
 	{
 		name: "researchCacheStatus",
 		call: (c) => c.researchCacheStatus(),
 		method: "GET",
 		path: "/api/web-research/cache/status",
-		response: { entries: 0 },
-		parsed: false,
+		response: {
+			enabled: true,
+			entries: 0,
+			bytes: 0,
+			generation: 1,
+			lastSweepAt: null,
+		},
 	},
 	{
 		name: "clearResearchCache",
@@ -434,7 +497,6 @@ contracts("web-research client", [
 		path: "/api/web-research/cache/clear",
 		body: {},
 		response: { cleared: true },
-		parsed: false,
 	},
 ]);
 

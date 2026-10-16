@@ -18,6 +18,7 @@ function Demo() {
 	const [playback, setPlayback] = useState<MusicPlaybackState | null>(null);
 	useEffect(() => {
 		const url = URL.createObjectURL(demoAudio());
+		// oxlint-disable-next-line react/set-state-in-effect -- local state follows a prop or open state, reset when it changes
 		setSrc(url);
 		return () => URL.revokeObjectURL(url);
 	}, []);
@@ -25,7 +26,10 @@ function Demo() {
 		<div style={{ display: "grid", gap: 16, maxWidth: 720 }}>
 			<label>
 				表示
-				<select value={mode} onChange={(event) => setMode(event.target.value as typeof mode)}>
+				<select
+					value={mode}
+					onChange={(event) => setMode(event.target.value as typeof mode)}
+				>
 					<option value="spectrum">スペクトラム</option>
 					<option value="waveform">波形</option>
 				</select>

@@ -4,7 +4,7 @@ import type { Provider } from "../service/profiles";
 import { createSpeechSynthesizer } from "../service/speech";
 
 const japanese = ttsVoicesSchema.parse({
-	model: "voicevox-core",
+	model: "model-tts-rich",
 	default_voice: "voice-a",
 	voices: [
 		{ id: "voice-a", voice_presentation: "feminine" },

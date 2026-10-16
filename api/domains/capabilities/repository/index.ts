@@ -83,6 +83,16 @@ export const migrations: readonly Migration[] = [
 		sql: artifactPointersMigration,
 		after: ["capabilities/0004-bindings"],
 	},
+	{
+		// The Web research toolchain moved to a model-neutral id (`web.research.codex`). Its earlier item,
+		// named after the model, keeps its revisions as history but no longer holds a function name,
+		// a search entry or an embedding.
+		id: "capabilities/0006-retire-model-named-web-research",
+		sql: `DELETE FROM capability_toolchain_vectors WHERE revision_id IN (SELECT r.id FROM capability_revisions r JOIN capability_items i ON i.key=r.item_key WHERE i.kind='toolchain' AND i.id LIKE 'web.research.%' AND i.id<>'web.research.codex');
+DELETE FROM capability_search WHERE key IN (SELECT key FROM capability_items WHERE kind='toolchain' AND id LIKE 'web.research.%' AND id<>'web.research.codex');
+DELETE FROM capability_items WHERE kind='toolchain' AND id LIKE 'web.research.%' AND id<>'web.research.codex';`,
+		after: ["capabilities/0005-artifact-pointers"],
+	},
 ];
 
 export type DocumentKind = "binding" | "http-binding" | "artifact" | "schema";

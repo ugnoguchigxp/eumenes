@@ -93,7 +93,7 @@ export const EditableSelect = React.forwardRef<
 							"text-muted-foreground hover:bg-accent focus:outline-none",
 						)}
 						tabIndex={-1}
-						aria-label="Toggle options"
+						aria-label="選択肢を開閉"
 					>
 						<ChevronDown
 							className={cn(size === "lg" ? "h-5 w-5" : "h-4 w-4")}

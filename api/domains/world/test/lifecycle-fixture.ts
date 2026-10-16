@@ -9,7 +9,7 @@ import {
 	planForget,
 } from "eumenes-memory/sqlite";
 import type { ForgetJournalEntry } from "eumenes-memory/sqlite";
-import { migrations } from "../../../application/migrations";
+import { migrations } from "./migrations";
 import { openStore, type SqliteStore } from "../../../infrastructure/sqlite";
 import { createConversationService } from "../../conversation";
 import {
@@ -111,7 +111,7 @@ function build(
 	};
 }
 
-/** A temp-file store with the real production migrations, World ON, gate CLOSED until recoverWorld(). */
+/** A temp-file store with the World host schema, World ON, gate CLOSED until recoverWorld(). */
 export async function openLife(
 	over: Partial<LifecycleOptions> = {},
 ): Promise<Life> {

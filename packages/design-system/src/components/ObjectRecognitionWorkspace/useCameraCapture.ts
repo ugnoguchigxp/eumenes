@@ -61,7 +61,9 @@ export function useCameraCapture(onCapture: (file: File) => Promise<void>) {
 		} catch {
 			stop();
 			setOpened(false);
-			setError("カメラを開けませんでした。ブラウザのカメラ許可を確認してください。");
+			setError(
+				"カメラを開けませんでした。ブラウザのカメラ許可を確認してください。",
+			);
 		}
 	}
 
@@ -119,9 +121,13 @@ export function useCameraCapture(onCapture: (file: File) => Promise<void>) {
 				setOpened(false);
 				setRecording(false);
 				void onCapture(
-					new File([blob], mime.startsWith("video/mp4") ? "camera.mp4" : "camera.webm", {
-						type: blob.type,
-					}),
+					new File(
+						[blob],
+						mime.startsWith("video/mp4") ? "camera.mp4" : "camera.webm",
+						{
+							type: blob.type,
+						},
+					),
 				).catch(() => setError("動画を保存できませんでした。"));
 			};
 			recorder.current = next;

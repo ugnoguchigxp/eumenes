@@ -28,7 +28,11 @@ export function NotificationCard({
 	return (
 		<article className={`notification-card ${className}`} {...props}>
 			<div className="notification-card-heading">
-				{icon && <span className="notification-card-icon" aria-hidden="true">{icon}</span>}
+				{icon && (
+					<span className="notification-card-icon" aria-hidden="true">
+						{icon}
+					</span>
+				)}
 				<span className="notification-card-app">{appName}</span>
 				{timestamp && <time dateTime={dateTime}>{timestamp}</time>}
 			</div>

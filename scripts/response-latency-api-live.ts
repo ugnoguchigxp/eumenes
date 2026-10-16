@@ -115,19 +115,11 @@ if (import.meta.main) {
 			await client.voiceStart(sessionId, 1);
 			const started = performance.now();
 			try {
-				let turn = await client.voiceSend(
-					sessionId,
-					1,
-					1,
-					utteranceId,
-					wav,
-					true,
-				);
+				let turn = await client.voiceSend(sessionId, 1, 1, utteranceId, wav);
 				let committed = false;
 				let inputReadyMs: number | undefined;
 				const deadline = Date.now() + 90_000;
 				while (!turn.audioChunks?.length && Date.now() < deadline) {
-					if (turn.status === "draft" && turn.error) break;
 					if (
 						[
 							"failed",

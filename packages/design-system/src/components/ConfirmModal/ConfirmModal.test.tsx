@@ -172,8 +172,8 @@ describe("ConfirmModal Component", () => {
 			const buttons = screen.getAllByRole("button");
 			expect(buttons).toHaveLength(3); // 2 footer buttons + 1 modal close
 
-			const cancelButton = screen.getByText("Cancel");
-			const confirmButton = screen.getByText("Confirm");
+			const cancelButton = screen.getByText("キャンセル");
+			const confirmButton = screen.getByText("確認");
 
 			expect(cancelButton).toBeInTheDocument();
 			expect(confirmButton).toBeInTheDocument();
@@ -192,8 +192,8 @@ describe("ConfirmModal Component", () => {
 				/>,
 			);
 
-			expect(screen.queryByText("Cancel")).not.toBeInTheDocument();
-			expect(screen.getByText("Confirm")).toBeInTheDocument();
+			expect(screen.queryByText("キャンセル")).not.toBeInTheDocument();
+			expect(screen.getByText("確認")).toBeInTheDocument();
 		});
 
 		it("uses custom button text when provided", () => {
@@ -223,7 +223,7 @@ describe("ConfirmModal Component", () => {
 				/>,
 			);
 
-			const confirmButton = screen.getByText("Confirm");
+			const confirmButton = screen.getByText("確認");
 			expect(confirmButton).toHaveAttribute("data-variant", "destructive");
 		});
 
@@ -255,7 +255,7 @@ describe("ConfirmModal Component", () => {
 				/>,
 			);
 
-			const cancelButton = screen.getByText("Cancel");
+			const cancelButton = screen.getByText("キャンセル");
 			expect(cancelButton).toBeDisabled();
 		});
 	});
@@ -271,7 +271,7 @@ describe("ConfirmModal Component", () => {
 				/>,
 			);
 
-			const confirmButton = screen.getByText("Confirm");
+			const confirmButton = screen.getByText("確認");
 			fireEvent.click(confirmButton);
 
 			expect(mockOnConfirm).toHaveBeenCalledTimes(1);
@@ -288,7 +288,7 @@ describe("ConfirmModal Component", () => {
 				/>,
 			);
 
-			const cancelButton = screen.getByText("Cancel");
+			const cancelButton = screen.getByText("キャンセル");
 			fireEvent.click(cancelButton);
 
 			expect(mockOnCancel).toHaveBeenCalledTimes(1);
@@ -305,7 +305,7 @@ describe("ConfirmModal Component", () => {
 				/>,
 			);
 
-			const cancelButton = screen.getByText("Cancel");
+			const cancelButton = screen.getByText("キャンセル");
 			fireEvent.click(cancelButton);
 
 			expect(mockOnOpenChange).toHaveBeenCalledWith(false);
@@ -358,7 +358,7 @@ describe("ConfirmModal Component", () => {
 				/>,
 			);
 
-			const confirmButton = screen.getByText("Confirm");
+			const confirmButton = screen.getByText("確認");
 			expect(confirmButton).toHaveAttribute("data-variant", "default");
 		});
 
@@ -373,7 +373,7 @@ describe("ConfirmModal Component", () => {
 				/>,
 			);
 
-			const confirmButton = screen.getByText("Confirm");
+			const confirmButton = screen.getByText("確認");
 			expect(confirmButton).toHaveAttribute("data-variant", "destructive");
 		});
 
@@ -404,7 +404,7 @@ describe("ConfirmModal Component", () => {
 				/>,
 			);
 
-			const confirmButton = screen.getByText("Confirm");
+			const confirmButton = screen.getByText("確認");
 			expect(confirmButton).toHaveAttribute("data-loading", "false");
 			expect(confirmButton).not.toBeDisabled();
 		});
@@ -451,7 +451,7 @@ describe("ConfirmModal Component", () => {
 				/>,
 			);
 
-			const cancelButton = screen.getByText("Cancel");
+			const cancelButton = screen.getByText("キャンセル");
 			fireEvent.click(cancelButton);
 
 			expect(mockOnOpenChange).toHaveBeenCalledWith(false);
@@ -492,8 +492,8 @@ describe("ConfirmModal Component", () => {
 				/>,
 			);
 
-			expect(screen.getByText("Cancel")).toBeInTheDocument();
-			expect(screen.getByText("Confirm")).toBeInTheDocument();
+			expect(screen.getByText("キャンセル")).toBeInTheDocument();
+			expect(screen.getByText("確認")).toBeInTheDocument();
 		});
 
 		it("does not use default text when custom text is provided", () => {
@@ -544,8 +544,8 @@ describe("ConfirmModal Component", () => {
 
 			const footer = screen.getByTestId("modal-footer");
 			expect(footer).toBeInTheDocument();
-			expect(footer).toContainElement(screen.getByText("Cancel"));
-			expect(footer).toContainElement(screen.getByText("Confirm"));
+			expect(footer).toContainElement(screen.getByText("キャンセル"));
+			expect(footer).toContainElement(screen.getByText("確認"));
 		});
 	});
 });

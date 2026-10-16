@@ -141,5 +141,50 @@
     "createToolchain remains over the 300-line function size limit."
   ],
   "postFreezeSourceEdits": false,
-  "worldReadableWebExperiment": "Not implemented or measured; current Web packages do not expose World tools."
+  "worldReadableWebExperiment": "Not implemented or measured; current Web packages do not expose World tools.",
+  "followUp": {
+    "status": "implemented_not_reverified",
+    "commit": "4d7204ca6415a107141b2edb2d057e4d5c13195e",
+    "note": "The measurements in this file are from the frozen baseCommit and are unchanged. Commit 4d7204c removed the duplicated mission state instead of making the initial mission required.",
+    "published": {
+      "skill": "skill:web.guided@2",
+      "packages": [
+        "package:web.recipe@3",
+        "package:web.search@3",
+        "package:web.quick@4"
+      ],
+      "toolchains": [
+        "toolchain:web.search@3",
+        "toolchain:web.research.luna@3"
+      ],
+      "archivedContract": "skill:web.guided@1 output keeps an optional mission readable (guided-contract.ts archivedAction); revisions are immutable and toolchain rollback can activate them again."
+    },
+    "unresolvedStatus": [
+      {
+        "item": "Initial mission is optional in the presented action schema but required by applyGuidedAction",
+        "status": "addressed_by_removal",
+        "verified": "fixed tests only"
+      },
+      {
+        "item": "Rejection reports invalid_report without a missing mission field path",
+        "status": "not_rechecked"
+      },
+      {
+        "item": "createToolchain remains over the 300-line function size limit",
+        "status": "resolved",
+        "detail": "300 lines per web-guide-refactor-2026-10-16"
+      }
+    ],
+    "realModelReverification": {
+      "status": "not_run",
+      "cases": [
+        "stock",
+        "weather-after-stock",
+        "definition",
+        "live-stock",
+        "live-weather-after-stock"
+      ],
+      "note": "No end-to-end real-model run exists for the implemented state. web-guide-refactor-2026-10-16 holds an interrupted, ungraded partial run."
+    }
+  }
 }

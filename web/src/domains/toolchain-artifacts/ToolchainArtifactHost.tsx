@@ -17,6 +17,7 @@ import type { EumenesClient } from "../../../../client";
 import { queryRoots } from "../../queryKeys";
 import { useActionWiring } from "./action-wiring";
 import { useCollectionActions } from "./collection-actions";
+import { useInputBridge, withEditingState } from "./input-bridge";
 import { useCollections } from "./use-collections";
 import type { ActionOutcome } from "./dispatcher";
 import { useDraftActions } from "./draft-actions";
@@ -26,6 +27,7 @@ import {
 	useDraftViews,
 } from "./document-hooks";
 import { dirtyEntries } from "./documents";
+import { draftStoreFor } from "./drafts";
 import { toolchainArtifactsQuery } from "./launcher";
 import { receiptOf } from "./messages";
 import { navigationDestination } from "./navigation";
@@ -213,8 +215,18 @@ function AdapterScreen({
 		},
 	};
 	const withLists = useMemo<Snapshot>(
-		() => ({ ...own.snapshot, ...collections.resources }),
-		[own.snapshot, collections.resources],
+		() =>
+			withEditingState(
+				{ ...own.snapshot, ...collections.resources },
+				artifact,
+				drafts,
+			),
+		[own.snapshot, collections.resources, artifact, drafts],
+	);
+	const { setEditing, readSecret } = useInputBridge(
+		client.identity,
+		artifactId,
+		artifact,
 	);
 	const snapshot = useMemo<Snapshot>(
 		() =>
@@ -296,6 +308,17 @@ function AdapterScreen({
 			if (binding.effect === "local") return s.local(binding, event);
 			if (binding.effect === "draft") return draftAction(binding, event);
 			if (binding.effect === "navigate") {
+				if (event.action === "settings-review") {
+					const editors = documents.flatMap(
+						(doc) =>
+							draftStoreFor(client.identity, doc).getView().editors ?? [],
+					);
+					if (editors.length)
+						return {
+							status: "rejected",
+							message: editors.map((e) => e.message).join("\n"),
+						};
+				}
 				const destination = navigationDestination(binding, event.values);
 				const opened = destination ? await onNavigate?.(destination) : false;
 				return opened
@@ -325,6 +348,8 @@ function AdapterScreen({
 		},
 		[
 			artifact,
+			documents,
+			client.identity,
 			answer,
 			describe,
 			draftAction,
@@ -353,6 +378,8 @@ function AdapterScreen({
 	const runtime = useMemo<ArtifactRuntime>(
 		() => ({
 			snapshot,
+			setEditing,
+			readSecret,
 			dispatch,
 			refresh: state.refresh,
 			settledEpoch,
@@ -363,6 +390,8 @@ function AdapterScreen({
 		}),
 		[
 			snapshot,
+			setEditing,
+			readSecret,
 			dispatch,
 			settledEpoch,
 			client,

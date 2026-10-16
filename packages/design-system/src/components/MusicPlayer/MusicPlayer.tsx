@@ -1,5 +1,5 @@
 import { Music2, Volume2 } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useEffect, useState } from "react";
 import { cn } from "../../utils/cn";
 import { formatClockSeconds } from "../DigitalClock/format";
 import { PlaybackControls } from "./PlaybackControls";
@@ -21,9 +21,9 @@ export type MusicPlayerProps = {
 };
 
 export function MusicPlayer(props: MusicPlayerProps) {
-	const resume = useRef(false);
+	const [resume, setResume] = useState(false);
 	if (!props.track) {
-		if (!props.loading) resume.current = false;
+		if (!props.loading && resume) setResume(false);
 		return (
 			<section
 				className={cn(
@@ -48,9 +48,9 @@ export function MusicPlayer(props: MusicPlayerProps) {
 			key={`${props.track.id}:${props.track.src}`}
 			{...props}
 			track={props.track}
-			autoPlay={resume.current}
+			autoPlay={resume}
 			onPlayingChange={(playing) => {
-				resume.current = playing;
+				setResume(playing);
 			}}
 		/>
 	);
@@ -71,7 +71,10 @@ function Player({
 	autoPlay: boolean;
 	onPlayingChange: (playing: boolean) => void;
 }) {
-	const playback = usePlayback(autoPlay, !!onPlaybackChange);
+	const { ref: audioRef, ...playback } = usePlayback(
+		autoPlay,
+		!!onPlaybackChange,
+	);
 	useEffect(() => {
 		onPlaybackChange?.({
 			id: track.id,
@@ -112,7 +115,7 @@ function Player({
 			{/* Audio-only generated music; no video caption track. */}
 			{/* oxlint-disable-next-line jsx-a11y/media-has-caption */}
 			<audio
-				ref={playback.ref}
+				ref={audioRef}
 				src={track.src}
 				preload="metadata"
 				{...playback.events}

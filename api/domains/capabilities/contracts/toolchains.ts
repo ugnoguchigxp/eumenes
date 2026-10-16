@@ -49,7 +49,7 @@ export type ToolchainRuntimeMeta = {
 	/** Runtime availability the host checks before offering the toolchain. */
 	requires?:
 		| "object-recognition"
-		| "luna"
+		| "codex"
 		| "timers"
 		| "music"
 		| "dots"
@@ -57,7 +57,7 @@ export type ToolchainRuntimeMeta = {
 		| "excalidraw"
 		| "world";
 	/** Fixed engine for research toolchains; omitted means the current model. */
-	researcher?: "codex_luna";
+	researcher?: "codex";
 	/** The research route the agent runtime keeps for its existing contracts. */
 	route?: "web" | "history" | "world";
 	/**

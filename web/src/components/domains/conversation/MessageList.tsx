@@ -20,6 +20,14 @@ import {
 import { emotionEmoji } from "./emotionEmoji";
 import { renderSafeMarkdown } from "./markdownRenderer";
 const PAGE_SIZE = 20;
+const ANNOUNCE_LIMIT = 500;
+
+/** A settled answer is announced in full; a very long one is cut with a pointer back to the text. */
+function completionAnnouncement(text: string) {
+	return text.length <= ANNOUNCE_LIMIT
+		? `回答が完了しました。${text}`
+		: `回答が完了しました。${text.slice(0, ANNOUNCE_LIMIT)}…続きは会話欄で確認できます。`;
+}
 
 export const MessageList = memo(function MessageList({
 	conversation,
@@ -64,7 +72,7 @@ export const MessageList = memo(function MessageList({
 		announced.current = lastAssistantId;
 		setAnnouncement({
 			id: lastAssistantId,
-			text: lastAssistantText.slice(0, 80),
+			text: completionAnnouncement(lastAssistantText),
 		});
 	}, [conversation, lastAssistantId, lastAssistantText, streaming]);
 	const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);

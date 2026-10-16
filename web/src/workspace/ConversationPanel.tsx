@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { EumenesClient } from "../../../client";
 import type { AudioStore } from "../domains/audio";
 import { Button } from "../design-system";
-import { MessageList } from "../components/domains/conversation/MessageList";
+import { LiveMessageList } from "./LiveMessageList";
 import { ConversationBackground } from "../components/ConversationBackground";
 import { Subtitle } from "../components/domains/subtitle/Subtitle";
 import { ResearchTaskCard } from "../domains/agent-runtime";
@@ -40,7 +40,7 @@ export function ConversationPanel({
 		historyRef,
 		onHistoryScroll,
 		runs,
-		streamingText,
+		followLatestIfPinned,
 		cancel,
 		showLatest,
 		scrollLatest,
@@ -49,6 +49,14 @@ export function ConversationPanel({
 	const panel = useRef<HTMLElement>(null);
 	const depth = useRef(0);
 	const [dragging, setDragging] = useState(false);
+	// The listeners below attach once; they read the latest callbacks through this ref.
+	const latest = useRef({
+		add: state.attachments.add,
+		edit: state.editInput,
+	});
+	useEffect(() => {
+		latest.current = { add: state.attachments.add, edit: state.editInput };
+	});
 	useEffect(() => {
 		function paste(event: ClipboardEvent) {
 			const target = document.activeElement;
@@ -60,12 +68,12 @@ export function ConversationPanel({
 			const files = Array.from(event.clipboardData?.files ?? []);
 			if (!files.length) return;
 			event.preventDefault();
-			state.attachments.add(files);
+			latest.current.add(files);
 			const text = event.clipboardData?.getData("text/plain");
 			if (text && target instanceof HTMLTextAreaElement) {
 				const start = target.selectionStart;
 				const end = target.selectionEnd;
-				state.editInput(
+				latest.current.edit(
 					target.value.slice(0, start) + text + target.value.slice(end),
 				);
 				requestAnimationFrame(() =>
@@ -95,7 +103,7 @@ export function ConversationPanel({
 				e.preventDefault();
 				depth.current = 0;
 				setDragging(false);
-				state.attachments.add(Array.from(e.dataTransfer.files));
+				latest.current.add(Array.from(e.dataTransfer.files));
 			}
 		};
 		document.addEventListener("paste", paste);
@@ -110,7 +118,7 @@ export function ConversationPanel({
 			element?.removeEventListener("dragover", over);
 			element?.removeEventListener("drop", drop);
 		};
-	}, [state]);
+	}, []);
 	const subtitleText =
 		replay.subtitle ?? (phase === "playing" ? voice.subtitle : null);
 	const subtitles = settings.data?.general.subtitles;
@@ -207,8 +215,10 @@ export function ConversationPanel({
 				ref={historyRef}
 				onScroll={(event) => onHistoryScroll(event.currentTarget)}
 			>
-				<MessageList
+				<LiveMessageList
 					client={client}
+					activeRunId={activeRun?.id}
+					followLatestIfPinned={followLatestIfPinned}
 					conversation={conversation.data}
 					renderInsideMessage={(message) =>
 						message.role === "assistant" ? (
@@ -236,7 +246,6 @@ export function ConversationPanel({
 							/>
 						) : null;
 					}}
-					streaming={streamingText}
 					agentName={settings.data?.general.agentName}
 					replayingId={replay.playingId}
 					onReplay={(message) =>

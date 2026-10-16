@@ -21,7 +21,12 @@ export function DigitalClock({
 	const text = formatClockSeconds(seconds, format);
 	return (
 		<div
-			className={["digital-clock", `digital-clock-${size}`, `digital-clock-${tone}`, className]
+			className={[
+				"digital-clock",
+				`digital-clock-${size}`,
+				`digital-clock-${tone}`,
+				className,
+			]
 				.filter(Boolean)
 				.join(" ")}
 			role="timer"

@@ -108,7 +108,7 @@ export const NavigationStepper: React.FC<NavigationStepperProps> = React.memo(
 			const isAccordion = variant === "accordion";
 
 			return (
-				<nav aria-label="Progress" className={cn("w-full", className)}>
+				<nav aria-label="進行状況" className={cn("w-full", className)}>
 					<div
 						className={cn(
 							"grid gap-3",
@@ -216,7 +216,7 @@ export const NavigationStepper: React.FC<NavigationStepperProps> = React.memo(
 		const activeTitle = activeStepObj?.title;
 
 		return (
-			<nav aria-label="Progress" className={cn("w-full", className)}>
+			<nav aria-label="進行状況" className={cn("w-full", className)}>
 				<div className="flex flex-col gap-3">
 					{compactOnMobile && (
 						<div

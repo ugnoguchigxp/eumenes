@@ -12,8 +12,9 @@ export interface OptionButtonGroupBaseProps<T extends string> {
 	className?: string;
 }
 
-export interface SingleOptionButtonGroupProps<T extends string>
-	extends OptionButtonGroupBaseProps<T> {
+export interface SingleOptionButtonGroupProps<
+	T extends string,
+> extends OptionButtonGroupBaseProps<T> {
 	multiple?: false;
 	value: T | null;
 	onChange: (value: T | null) => void;
@@ -21,8 +22,9 @@ export interface SingleOptionButtonGroupProps<T extends string>
 	nullLabel?: string;
 }
 
-export interface MultiOptionButtonGroupProps<T extends string>
-	extends OptionButtonGroupBaseProps<T> {
+export interface MultiOptionButtonGroupProps<
+	T extends string,
+> extends OptionButtonGroupBaseProps<T> {
 	multiple: true;
 	value: T[];
 	onChange: (value: T[]) => void;

@@ -1,19 +1,15 @@
 import type { Database } from "bun:sqlite";
-import { sha256Hex } from "../../../infrastructure/digest";
 import type { SourceRef } from "eumenes-memory";
 import {
 	assessOutcome,
-	type AssessResult,
 	type Outcome,
 	type Prediction,
 	type ScopeRef,
 } from "eumenes-world-model";
-import type { SqliteStore } from "../../../infrastructure/sqlite";
 import {
 	WORLD_PROVIDER_REF,
 	WORLD_RUNTIME_PURPOSE,
 	type RuntimeLedgerPort,
-	type RuntimeMeasurement,
 	type SourceKey,
 } from "../contracts";
 import { upsertDependent } from "../repository/lifecycle";
@@ -25,7 +21,6 @@ import {
 	listRuntimeObservationsOfSource,
 	maxOutcomeRevision,
 	setRuntimeObservationState,
-	type RuntimeObservationRow,
 } from "../repository/runtime";
 import {
 	deleteDependents,
@@ -33,11 +28,6 @@ import {
 	markReleasePending,
 } from "../repository/usage";
 import { isMemoryStateItem, sourceKeyOf } from "./inputs";
-import type {
-	ForgetRefusal,
-	ForgetReport,
-	ForgetRequest,
-} from "./lifecycle-adapter";
 import { defaultMemoryPort, type MemoryPort } from "./lifecycle-memory";
 import {
 	MemoryRegistrationRejected,
@@ -45,7 +35,23 @@ import {
 	planDependents,
 	registerWorldDependents,
 } from "./memory-adapter";
-import type { WorldService } from "./world-service";
+import {
+	missingConditions,
+	outcomeOf,
+	runtimeOutcomeId,
+	short,
+	sourceKeyOfRow,
+} from "./runtime-outcome";
+import type {
+	AssessedObservations,
+	LedgerVersion,
+	ObserveResult,
+	PredictionRef,
+	ReconcileReport,
+	RuntimeObservationOptions,
+	RuntimeRefusal,
+} from "./runtime-types";
+const MAX_SWEEP = 500;
 
 /**
  * Runtime result observation (P4-04). A VERIFIED result of the execution
@@ -73,152 +79,6 @@ import type { WorldService } from "./world-service";
  * deterministic operationKey). A later ledger revision becomes the next Outcome
  * revision of the same outcome id, which `assessOutcome` reads as a correction.
  */
-
-export type RuntimeObservationOptions = {
-	store: SqliteStore;
-	world: WorldService;
-	ledger: RuntimeLedgerPort;
-	/** Forget procedure for withdrawn Outcomes; without it `reconcile` can only report. */
-	lifecycle?: {
-		acceptForget(request: ForgetRequest): Promise<ForgetReport | ForgetRefusal>;
-	};
-	purpose?: string;
-	clock?: () => number;
-	/** Replace single Memory calls (tests); production uses the public API only. */
-	memory?: Partial<MemoryPort>;
-	/** Test seam for the Memory dependent registration (the default is the real public API). */
-	register?: typeof registerWorldDependents;
-};
-
-export const RUNTIME_REFUSALS = [
-	"LEDGER_UNAVAILABLE",
-	"NOT_VERIFIED",
-	"SCOPE_MISMATCH",
-] as const;
-export type RuntimeRefusal = (typeof RUNTIME_REFUSALS)[number];
-
-export type PredictionRef = { predictionId: string; revision: number };
-
-export type LedgerVersion = {
-	sourceKey: string;
-	revision: string;
-	digest: string;
-};
-
-export type ObserveResult =
-	| {
-			status: "observed";
-			outcome: { id: string; revision: number };
-			ledger: LedgerVersion;
-	  }
-	| {
-			/** The same ledger version was already seen for this Prediction: nothing changed. */
-			status: "duplicate";
-			state: RuntimeObservationRow["state"];
-			outcome: { id: string; revision: number } | null;
-			ledger: LedgerVersion;
-	  }
-	| {
-			status: "incomparable";
-			reasons: string[];
-			ledger: LedgerVersion;
-	  }
-	| { status: "refused"; reasonCode: RuntimeRefusal }
-	| {
-			/** World / Memory refused or could not take it; nothing was written. */
-			status: "rejected" | "blocked";
-			reasonCode: string;
-			stage: "world" | "memory";
-	  };
-
-export type AssessedObservations = {
-	/** The package's verdict. With no usable observation it is `incomparable` with zero counts. */
-	assessed: AssessResult;
-	/** Which verified ledger version each judged Outcome stands on. */
-	trace: {
-		outcome: { id: string; revision: number };
-		ledger: LedgerVersion;
-	}[];
-	/** Verified results that could not be compared at all (conditions missing / not matching). */
-	incomparable: { ledger: LedgerVersion; reasons: string[] }[];
-	/** Recorded observations whose ledger version is no longer current & verified: NOT judged. */
-	stale: number;
-};
-
-export type ReconcileReport = {
-	checked: number;
-	unchanged: number;
-	/** A later verified ledger revision was observed as the next Outcome revision. */
-	corrected: number;
-	/** The ledger forgot / retracted / un-verified the result: the Outcome went to the forget procedure. */
-	withdrawn: number;
-	/** Withdrawals that could not be started (no lifecycle, refused, Memory unavailable): retried by the next call. */
-	pending: number;
-};
-
-const short = (text: string) => sha256Hex(text).slice(0, 24);
-const MAX_SWEEP = 500;
-
-const present = (value: unknown): value is string =>
-	typeof value === "string" && value.length > 0;
-
-/** The comparison conditions the ledger did not record, as stable reason codes. */
-export function missingConditions(m: RuntimeMeasurement): string[] {
-	const missing: string[] = [];
-	for (const field of [
-		"comparisonId",
-		"subjectId",
-		"metric",
-		"unit",
-		"statistic",
-		"configuration",
-		"inputProfile",
-		"baselineRef",
-	] as const)
-		if (!present(m[field])) missing.push(`CONDITION_MISSING_${field}`);
-	const window = m.window;
-	if (
-		!window ||
-		!Number.isSafeInteger(window.startMs) ||
-		!Number.isSafeInteger(window.endMs) ||
-		window.startMs >= window.endMs
-	)
-		missing.push("CONDITION_MISSING_window");
-	if (typeof m.value !== "number" || !Number.isFinite(m.value))
-		missing.push("CONDITION_MISSING_value");
-	return missing.sort();
-}
-
-/** Outcome id: one per (ledger source, Prediction); ledger corrections raise its revision. */
-export const runtimeOutcomeId = (
-	scope: ScopeRef,
-	sourceKey: string,
-	prediction: PredictionRef,
-): string =>
-	`ro-${short(JSON.stringify([scope.principal, scope.scopeKey, sourceKey, prediction.predictionId]))}`;
-
-const outcomeOf = (
-	m: RuntimeMeasurement,
-	ids: { outcomeId: string; revision: number; predictionRevision: number },
-): Outcome =>
-	({
-		kind: "outcome",
-		outcomeId: ids.outcomeId,
-		revision: ids.revision,
-		comparisonId: m.comparisonId,
-		predictionRevision: ids.predictionRevision,
-		conditions: {
-			subjectId: m.subjectId,
-			metric: m.metric,
-			unit: m.unit,
-			statistic: m.statistic,
-			configuration: m.configuration,
-			inputProfile: m.inputProfile,
-		},
-		baselineRef: m.baselineRef,
-		window: { startMs: m.window!.startMs, endMs: m.window!.endMs },
-		value: m.value,
-	}) as Outcome;
 
 export function createRuntimeObservation(options: RuntimeObservationOptions) {
 	const { store, world, ledger } = options;
@@ -705,26 +565,3 @@ export function createRuntimeObservation(options: RuntimeObservationOptions) {
 	};
 }
 export type RuntimeObservation = ReturnType<typeof createRuntimeObservation>;
-
-/** Parses a World source identity key back into the ledger's SourceKey. */
-function sourceKeyOfRow(key: string): SourceKey | null {
-	try {
-		const parsed = JSON.parse(key) as unknown;
-		if (
-			Array.isArray(parsed) &&
-			parsed.length === 4 &&
-			typeof parsed[0] === "string" &&
-			typeof parsed[1] === "string" &&
-			typeof parsed[2] === "string"
-		)
-			return {
-				namespace: parsed[0],
-				kind: parsed[1],
-				id: parsed[2],
-				representation: typeof parsed[3] === "string" ? parsed[3] : "",
-			};
-	} catch {
-		// fallthrough
-	}
-	return null;
-}

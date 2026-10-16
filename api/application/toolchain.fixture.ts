@@ -94,11 +94,11 @@ export async function harness(
 		) => ReturnType<typeof import("./kanban-sdk-host").createKanbanSdkHost>;
 		settingsEnv?: Record<string, string | undefined>;
 		codexResearch?: {
-			model: string;
 			execute: (
 				messages: import("../domains/inference/contracts").Messages,
 				signal: AbortSignal,
 				control?: import("../domains/inference/contracts").ControlContract,
+				model?: string,
 			) => Promise<string>;
 		};
 		gate?: Promise<void>;
@@ -421,7 +421,6 @@ export async function harness(
 			: options.fullResearch
 				? {
 						codexResearch: {
-							model: "fixture-control",
 							execute: (messages, signal) => model.answer(messages, signal),
 						},
 					}

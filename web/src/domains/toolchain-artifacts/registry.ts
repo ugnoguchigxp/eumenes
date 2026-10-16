@@ -108,6 +108,12 @@ export type AdapterState = {
 	 * adjusted). Returns the receipt when the adapter handled it, null otherwise.
 	 */
 	editLocal?(fieldKey: string, wire: string): Receipt | null;
+	/** Domain contract validation before a structural form relinquishes its input. */
+	validateStructure?(
+		structure: string,
+		input: Record<string, unknown>,
+		secrets: ReadonlyArray<{ fieldId: string; value: unknown }>,
+	): Receipt;
 	/** Domain wording for a rejected input; undefined falls back to the host's wording. */
 	describeRejection?(
 		code: string | undefined,

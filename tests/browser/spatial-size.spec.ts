@@ -5,6 +5,7 @@ import { join } from "node:path";
 import sharp from "sharp";
 import { createFixture } from "./fixture";
 import { settingsFixture } from "../../web/src/domains/settings/sections/fixture";
+import { settledScreenshot } from "./canvas";
 const fixture = createFixture();
 let webPort: number, dir: string;
 test.beforeAll(async () => {
@@ -74,8 +75,7 @@ test("Spatial fills wide and portrait viewports without extra overlay controls",
 			"data-background-state",
 			"paused",
 		);
-		await page.waitForTimeout(1000);
-		const picture = await canvas.screenshot({
+		const picture = await settledScreenshot(canvas, {
 			path: test.info().outputPath(`${phase}-${viewport.width}.png`),
 		});
 		const { data, info } = await sharp(picture)
@@ -118,16 +118,14 @@ test("Spatial fills wide and portrait viewports without extra overlay controls",
 	}
 	scatter = 200;
 	await page.reload();
-	await page.waitForTimeout(1000);
-	await page.locator(".spatial-background canvas").screenshot({
+	await settledScreenshot(page.locator(".spatial-background canvas"), {
 		path: test.info().outputPath(`${phase}-max-scatter-portrait.png`),
 	});
 	demo = false;
 	scatter = 100;
 	await page.setViewportSize({ width: 2048, height: 862 });
 	await page.reload();
-	await page.waitForTimeout(1000);
-	await page.locator(".spatial-background canvas").screenshot({
+	await settledScreenshot(page.locator(".spatial-background canvas"), {
 		path: test.info().outputPath(`${phase}-unconfirmed-wide.png`),
 	});
 	writeFileSync(

@@ -88,8 +88,12 @@ export async function imageForInput(
 			[
 				"ffmpeg",
 				"-hide_banner",
+				"-nostdin",
 				"-loglevel",
 				"info",
+				// Container formats can reference files or URLs; only the piped bytes may be read.
+				"-protocol_whitelist",
+				"pipe",
 				"-i",
 				"pipe:0",
 				"-vf",

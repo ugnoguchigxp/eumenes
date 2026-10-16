@@ -163,7 +163,7 @@ describe("AsyncDataWrapper Component", () => {
 			expect(screen.getAllByTestId("skeleton")).toHaveLength(5);
 			expect(screen.getByTestId("spinner")).toBeInTheDocument();
 			expect(screen.getByTestId("spinner")).toHaveAttribute("data-size", "lg");
-			expect(screen.getByText("Loading...")).toBeInTheDocument();
+			expect(screen.getByText("読み込み中...")).toBeInTheDocument();
 		});
 
 		it("applies correct classes for skeleton loading", () => {
@@ -240,7 +240,7 @@ describe("AsyncDataWrapper Component", () => {
 
 			expect(screen.getByTestId("spinner")).toBeInTheDocument();
 			expect(screen.getByTestId("spinner")).toHaveAttribute("data-size", "lg");
-			expect(screen.getByText("Loading...")).toBeInTheDocument();
+			expect(screen.getByText("読み込み中...")).toBeInTheDocument();
 			expect(screen.queryByTestId("skeleton")).not.toBeInTheDocument();
 		});
 
@@ -327,7 +327,7 @@ describe("AsyncDataWrapper Component", () => {
 				"data-variant",
 				"secondary",
 			);
-			expect(screen.getByText("Loading...")).toBeInTheDocument();
+			expect(screen.getByText("読み込み中...")).toBeInTheDocument();
 		});
 
 		it("does not show fetching indicator when also loading", () => {
@@ -521,9 +521,9 @@ describe("AsyncDataWrapper Component", () => {
 				</AsyncDataWrapper>,
 			);
 
-			expect(screen.getByText("No data available")).toBeInTheDocument();
+			expect(screen.getByText("データがありません")).toBeInTheDocument();
 			expect(
-				screen.getByRole("button", { name: "Refresh data" }),
+				screen.getByRole("button", { name: "データを更新" }),
 			).toBeInTheDocument();
 			expect(screen.queryByTestId("children")).not.toBeInTheDocument();
 		});
@@ -557,7 +557,7 @@ describe("AsyncDataWrapper Component", () => {
 			);
 
 			const refreshButton = screen.getByRole("button", {
-				name: "Refresh data",
+				name: "データを更新",
 			});
 			refreshButton.click();
 

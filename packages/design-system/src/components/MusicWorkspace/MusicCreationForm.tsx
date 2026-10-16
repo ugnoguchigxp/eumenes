@@ -118,7 +118,7 @@ function VocalChoices({
 					</div>
 					<Choices
 						label="声質"
-					options={options.voiceQualities}
+						options={options.voiceQualities}
 						selected={selection.voiceQualities}
 						onChange={(voiceQualities) =>
 							update({ ...selection, voiceQualities })
@@ -162,7 +162,9 @@ export function MusicCreationForm({
 	onGenerate,
 }: MusicCreationFormProps) {
 	const id = useId();
-	const [selection, setSelection] = useState(() => emptyMusicSelection(options));
+	const [selection, setSelection] = useState(() =>
+		emptyMusicSelection(options),
+	);
 	const [prompt, setPrompt] = useState(
 		() => initialPrompt ?? musicSelectionText(emptyMusicSelection(options)),
 	);
@@ -266,6 +268,7 @@ export function MusicCreationForm({
 					className="music-creation-genres"
 					role="region"
 					aria-label="ジャンル一覧"
+					// oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- scrollable or keyboard-reachable region needs to take focus
 					tabIndex={0}
 				>
 					{groups.map((group) => (

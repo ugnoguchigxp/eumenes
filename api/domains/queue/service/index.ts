@@ -22,7 +22,8 @@ import type {
 	Tx,
 } from "../types";
 import { createRegistry } from "./registry";
-import { createRunner, resolveOptions, type RunnerOptions } from "./runner";
+import { createRunner } from "./runner";
+import { resolveOptions, type RunnerOptions } from "./runner-options";
 
 export const QUEUE_RETENTION = {
 	settledMs: 14 * 86_400_000,

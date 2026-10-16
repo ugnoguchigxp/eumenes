@@ -36,6 +36,7 @@ async function setup(options: Parameters<typeof worldHarness>[0] = {}) {
 	open.push(h);
 	const ports: WorldAdapterPorts = {
 		claims: h.world.claims,
+		documents: h.world.documents,
 		context: h.world.claimsContext,
 	};
 	const adapter = createWorldAdapter(() => ports);
@@ -88,9 +89,12 @@ const claimOf = (h: Harness, id: string) =>
 test("describe offers the World queries and no operation; the shipped bundle registers with no issue and has no action", async () => {
 	const d = describeWorldAdapter();
 	expect([...d.queries].sort()).toEqual([
+		"query:world.claims-page@1",
 		"query:world.claims@1",
+		"query:world.documents-page@1",
 		"query:world.forgets@1",
 		"query:world.status@1",
+		"query:world.status@2",
 	]);
 	expect([...d.operations.keys()]).toEqual([]);
 	const h = await setup();
@@ -115,7 +119,9 @@ test("describe offers the World queries and no operation; the shipped bundle reg
 	expect(artifact.actionBindings).toEqual([]);
 	for (const collection of artifact.collections)
 		expect(collection.rowActions).toBeUndefined();
-	expect(worldBundle.schemas).toEqual([]);
+	expect(
+		worldBundle.schemas.map((schema: { id: string }) => schema.id),
+	).toEqual(["world-claims-page", "world-documents-page"]);
 	// The adapter refuses the removed operations whoever asks.
 	for (const name of ["world.correct", "world.retract", "world.forget"])
 		expect(
@@ -125,7 +131,12 @@ test("describe offers the World queries and no operation; the shipped bundle reg
 		).toBe("capability_unavailable");
 	expect(
 		artifact.sourceBindings.map((b: { query: string }) => b.query).sort(),
-	).toEqual([...d.queries].sort());
+	).toEqual([
+		"query:world.claims-page@1",
+		"query:world.documents-page@1",
+		"query:world.forgets@1",
+		"query:world.status@2",
+	]);
 });
 
 test("World OFF has no ports: the adapter is unavailable and shows nothing", async () => {
@@ -232,11 +243,15 @@ test("the World bundle runs through the action ledger as a view: sources read, n
 		registry,
 		scope: "test-scope",
 	});
-	const revisionId = "artifact:settings.world@4";
+	const revisionId = "artifact:settings.world@6";
 	expect(ledger.artifacts().map((a) => a.artifactRevisionId)).toContain(
 		revisionId,
 	);
 	const rows = ledger.source(revisionId, "world-claims");
+	expect(
+		ledger.source(revisionId, "world-documents", undefined, { pageIndex: 99 })
+			.data,
+	).toMatchObject({ total: 0, pageIndex: 0, items: [] });
 	expect(
 		(rows.data as { items: Array<{ id: string }> }).items
 			.map((i) => i.id)
@@ -266,6 +281,45 @@ test("the World bundle runs through the action ledger as a view: sources read, n
 		expect(sent).not.toBe("accepted");
 	}
 	expect(claimOf(h, "claim-report")).toBeDefined();
+});
+
+test("World table revision upgrades the catalog without changing the prior view and imports idempotently", async () => {
+	const h = await setup();
+	const registry = createAdapterRegistry([h.adapter]);
+	const host = bundleHostOf(registry);
+	const caps = createCapabilities(h.store, new Set(), {
+		bundleHost: () => host,
+	});
+	const previous = structuredClone(worldBundle);
+	previous.artifacts[0].revision = 4;
+	for (const child of previous.artifacts[0].variants[0].definition.children) {
+		if (child.source === "world-claims") child.presentation = "catalog";
+		if (child.source === "world-forgets") delete child.presentation;
+		delete child.tableColumns;
+		delete child.detailMode;
+	}
+	const load = (bundle: unknown) =>
+		h.store.write((db) => caps.importBundleInTransaction(db, bundle, host));
+	expect((await load(previous)).issues).toEqual([]);
+	const ledger = createActionRequests({
+		store: h.store,
+		capabilities: caps,
+		registry,
+		scope: "test-scope",
+	});
+	const archived = () =>
+		h.store.read((db) =>
+			caps.documentInTransaction(db, "artifact:settings.world@4"),
+		);
+	const before = archived();
+	expect(before).not.toBeNull();
+	for (let i = 0; i < 2; i++) {
+		expect((await load(worldBundle)).issues).toEqual([]);
+		expect(archived()).toEqual(before);
+		expect(
+			ledger.artifacts().map((entry) => entry.artifactRevisionId),
+		).toContain("artifact:settings.world@6");
+	}
 });
 
 test("an unavailable or partial list says why in the status row instead of passing for empty", async () => {
@@ -331,5 +385,66 @@ test("the forgets list marks the forgets still moving, and the bundle re-reads i
 		forgetId,
 		display: "complete",
 		inProgress: false,
+	});
+});
+
+test("paged claims fetch grounds for the selected page beyond row 50; compact status avoids reading lists", async () => {
+	const h = await setup();
+	const ctx = h.world.claimsContext();
+	const original = h.world.claims.list(ctx);
+	if (original.status !== "ok") throw new Error("fixture_list_failed");
+	const first = original.value.items[0]!;
+	let detailReads = 0;
+	let listReads = 0;
+	const adapter = createWorldAdapter(() => ({
+		...h.ports,
+		claims: {
+			...h.ports.claims,
+			list: () => {
+				listReads++;
+				return {
+					...original,
+					value: {
+						...original.value,
+						items: Array.from({ length: 1000 }, (_, i) => ({
+							...first,
+							id: `claim-${String(i).padStart(4, "0")}`,
+							target: { subjectId: `対象${String(i).padStart(4, "0")}` },
+						})),
+					},
+				};
+			},
+			detail: () => {
+				detailReads++;
+				return h.ports.claims.detail(ctx, { claimId: first.id });
+			},
+		},
+	}));
+	const page = (query: string, params?: unknown) =>
+		h.store.readSnapshot((db) =>
+			adapter.sourceInTransaction(db, query, undefined, params),
+		)!.data as {
+			total: number;
+			pageIndex: number;
+			items: Array<{ id: string; supports: string; connection?: string }>;
+		};
+	expect(page("query:world.status@2").items[0]?.connection).toBe("online");
+	expect(listReads).toBe(0);
+	const result = page("query:world.claims-page@1", {
+		pageIndex: 99,
+		pageSize: 10,
+		sort: "subject",
+	});
+	expect(result).toMatchObject({ total: 1000, pageIndex: 99 });
+	expect(result.items[0]?.id).toBe("claim-0990");
+	expect(result.items[0]?.supports).not.toBe("—");
+	expect(detailReads).toBe(10);
+	expect(page("query:world.claims-page@1", { q: "対象0999" })).toMatchObject({
+		total: 1,
+		pageIndex: 0,
+		items: [{ id: "claim-0999" }],
+	});
+	expect(page("query:world.claims-page@1", { pageIndex: 9999 })).toMatchObject({
+		pageIndex: 99,
 	});
 });

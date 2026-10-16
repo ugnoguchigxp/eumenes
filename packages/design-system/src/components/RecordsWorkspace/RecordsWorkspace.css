@@ -66,15 +66,42 @@
 .ds-records-workspace td[data-column="updatedAt"] {
 	white-space: nowrap;
 }
-.ds-records-workspace { overflow: hidden; box-shadow: 0 18px 45px rgb(0 0 0 / .08); }
-.ds-records-header { border-bottom: 1px solid var(--border); padding: 1.25rem 1.5rem; }
-.ds-records-title { font-size: clamp(1.35rem, 2vw, 1.8rem); }
-.ds-records-content { padding: 0 1.5rem 1.5rem; }
-.ds-records-content > .ds-tabs-root > .ds-tabs-list { width: 100%; border-bottom: 1px solid var(--border); }
-.ds-records-workspace .ds-tabs-content { margin-top: 1.2rem; }
+.ds-records-workspace {
+	overflow: hidden;
+	box-shadow: 0 18px 45px rgb(0 0 0 / 0.08);
+}
+.ds-records-header {
+	border-bottom: 1px solid var(--border);
+	padding: 1.25rem 1.5rem;
+}
+.ds-records-title {
+	font-size: clamp(1.35rem, 2vw, 1.8rem);
+}
+.ds-records-content {
+	padding: 0 1.5rem 1.5rem;
+}
+.ds-records-content > .ds-tabs-root > .ds-tabs-list {
+	width: 100%;
+	border-bottom: 1px solid var(--border);
+}
+.ds-records-workspace .ds-tabs-content {
+	margin-top: 1.2rem;
+}
 .ds-records-table,
-.ds-records-workspace .ds-server-table { border: 1px solid var(--border); border-radius: .5rem; overflow: auto; }
+.ds-records-workspace .ds-server-table {
+	border: 1px solid var(--border);
+	border-radius: 0.5rem;
+	overflow: auto;
+}
 .ds-records-workspace table th,
-.ds-records-workspace table td { padding: .7rem .8rem; }
-.ds-records-workspace table th { background: color-mix(in srgb, var(--muted) 55%, var(--card)); font-weight: 600; }
-.ds-records-workspace .ds-records-fold { margin-top: 1.3rem; padding-top: 1rem; }
+.ds-records-workspace table td {
+	padding: 0.7rem 0.8rem;
+}
+.ds-records-workspace table th {
+	background: color-mix(in srgb, var(--muted) 55%, var(--card));
+	font-weight: 600;
+}
+.ds-records-workspace .ds-records-fold {
+	margin-top: 1.3rem;
+	padding-top: 1rem;
+}

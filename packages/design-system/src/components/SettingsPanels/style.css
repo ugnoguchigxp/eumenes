@@ -1,7 +1,11 @@
 .ds-settings-panel {
 	min-width: 0;
 	overflow: hidden;
-	background: color-mix(in srgb, var(--color-card) 94%, var(--color-background));
+	background: color-mix(
+		in srgb,
+		var(--color-card) 94%,
+		var(--color-background)
+	);
 	box-shadow: 0 18px 45px rgb(0 0 0 / 0.08);
 }
 .ds-settings-panel > :first-child {
@@ -85,8 +89,11 @@
 	font-weight: 600;
 	line-height: 1.45;
 }
-.ds-settings-field > label .ds-settings-value { display: none; }
-.ds-settings-field > :is(input, select, .ds-settings-range, .ds-settings-choice-group) {
+.ds-settings-field > label .ds-settings-value {
+	display: none;
+}
+.ds-settings-field
+	> :is(input, select, .ds-settings-range, .ds-settings-choice-group) {
 	min-width: 0;
 }
 .ds-settings-field > .ds-settings-hint {
@@ -100,7 +107,11 @@
 	border: 1px solid var(--color-border);
 	border-radius: 0.45rem;
 	padding: 0.55rem 0.8rem;
-	background: color-mix(in srgb, var(--color-background) 75%, var(--color-card));
+	background: color-mix(
+		in srgb,
+		var(--color-background) 75%,
+		var(--color-card)
+	);
 	color: var(--color-foreground);
 }
 .ds-settings-field input:focus-visible,
@@ -114,8 +125,16 @@
 	align-items: center;
 	gap: 0.8rem;
 }
-.ds-settings-range input { flex: 1; min-width: 0; accent-color: var(--color-primary); }
-.ds-settings-range output { min-width: 2.8rem; font-variant-numeric: tabular-nums; text-align: right; }
+.ds-settings-range input {
+	flex: 1;
+	min-width: 0;
+	accent-color: var(--color-primary);
+}
+.ds-settings-range output {
+	min-width: 2.8rem;
+	font-variant-numeric: tabular-nums;
+	text-align: right;
+}
 .ds-settings-field > input[type="checkbox"] {
 	appearance: none;
 	justify-self: start;
@@ -140,38 +159,134 @@
 	box-shadow: 0 1px 3px rgb(0 0 0 / 0.25);
 	transition: transform 150ms ease;
 }
-.ds-settings-field > input[type="checkbox"]:checked { background: var(--color-primary); border-color: var(--color-primary); }
-.ds-settings-field > input[type="checkbox"]:checked::after { transform: translateX(1.12rem); }
-.ds-settings-field fieldset { grid-column: 1 / -1; border: 0; padding: 0; }
-.ds-settings-options { display: flex; flex-wrap: wrap; gap: 0.75rem 1.2rem; margin-top: 0.7rem; }
-.ds-settings-options label { display: inline-flex; align-items: center; gap: 0.4rem; }
-.ds-settings-options input { accent-color: var(--color-primary); }
-.ds-settings-choice-group { display: flex; flex-wrap: wrap; gap: 0.6rem; }
+.ds-settings-field > input[type="checkbox"]:checked {
+	background: var(--color-primary);
+	border-color: var(--color-primary);
+}
+.ds-settings-field > input[type="checkbox"]:checked::after {
+	transform: translateX(1.12rem);
+}
+.ds-settings-field fieldset {
+	grid-column: 1 / -1;
+	border: 0;
+	padding: 0;
+}
+.ds-settings-options {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.75rem 1.2rem;
+	margin-top: 0.7rem;
+}
+.ds-settings-options label {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+}
+.ds-settings-options input {
+	accent-color: var(--color-primary);
+}
+.ds-settings-choice-group {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.6rem;
+}
 .ds-settings-choice {
 	border: 1px solid var(--color-border);
 	border-radius: 0.45rem;
-	background: color-mix(in srgb, var(--color-background) 75%, var(--color-card));
+	background: color-mix(
+		in srgb,
+		var(--color-background) 75%,
+		var(--color-card)
+	);
 	color: var(--color-foreground);
 	cursor: pointer;
 }
-.ds-settings-choice[aria-pressed="true"] { border-color: var(--color-primary); box-shadow: inset 0 0 0 1px var(--color-primary); }
-.ds-settings-choice-group-segmented { width: 100%; flex-wrap: nowrap; gap: 0; }
-.ds-settings-choice-group-segmented .ds-settings-choice { flex: 1 1 0; min-width: 0; padding: 0.65rem 0.35rem; border-radius: 0; overflow-wrap: anywhere; }
-.ds-settings-choice-group-segmented .ds-settings-choice:first-child { flex-grow: 1.7; }
-.ds-settings-choice-group-segmented .ds-settings-choice:first-child { border-radius: 0.45rem 0 0 0.45rem; }
-.ds-settings-choice-group-segmented .ds-settings-choice:last-child { border-radius: 0 0.45rem 0.45rem 0; }
-.ds-settings-choice-group-segmented .ds-settings-choice + .ds-settings-choice { border-left: 0; }
-.ds-settings-choice-group-segmented .ds-settings-choice[aria-pressed="true"] { background: var(--color-primary); color: var(--color-primary-foreground); }
-.ds-settings-choice-group-cards .ds-settings-choice { flex: 1 1 7.5rem; min-width: min(7.5rem, 100%); padding: 0.3rem; text-align: center; }
-.ds-settings-choice-group-cards .ds-settings-choice > span:last-child { display: block; padding: 0.45rem; }
-.ds-settings-choice-preview { display: block; height: 4.9rem; border-radius: 0.3rem; background: radial-gradient(circle at 30% 45%, #d9e9ff 0 5%, transparent 24%), radial-gradient(circle at 72% 65%, #a5c6f3 0 8%, transparent 30%), linear-gradient(130deg, #d7e7f7, #607fa9); }
-.ds-settings-choice-preview[data-index="1"] { background: repeating-radial-gradient(ellipse at 80% 0%, transparent 0 7px, rgb(170 201 238 / .3) 8px 9px, transparent 10px 16px), linear-gradient(145deg, #172337, #48627d 50%, #101a29); }
-.ds-settings-choice-preview[data-index="2"] { background: linear-gradient(130deg, #9b8db7, #24375b); }
-.ds-settings-choice-preview[data-index="3"] { background: linear-gradient(130deg, #5c8495, #1c2f40); }
-.ds-settings-details { grid-column: 1 / -1; margin-top: 0.4rem; border-top: 1px solid var(--color-border); padding-top: 1rem; }
-.ds-settings-details summary { cursor: pointer; font-weight: 600; }
-.ds-settings-details > .ds-settings-fields { padding-bottom: 0; }
-.ds-settings-actions { display: flex; gap: 0.6rem; flex-wrap: wrap; grid-column: 2; }
+.ds-settings-choice[aria-pressed="true"] {
+	border-color: var(--color-primary);
+	box-shadow: inset 0 0 0 1px var(--color-primary);
+}
+.ds-settings-choice-group-segmented {
+	width: 100%;
+	flex-wrap: nowrap;
+	gap: 0;
+}
+.ds-settings-choice-group-segmented .ds-settings-choice {
+	flex: 1 1 0;
+	min-width: 0;
+	padding: 0.65rem 0.35rem;
+	border-radius: 0;
+	overflow-wrap: anywhere;
+}
+.ds-settings-choice-group-segmented .ds-settings-choice:first-child {
+	flex-grow: 1.7;
+}
+.ds-settings-choice-group-segmented .ds-settings-choice:first-child {
+	border-radius: 0.45rem 0 0 0.45rem;
+}
+.ds-settings-choice-group-segmented .ds-settings-choice:last-child {
+	border-radius: 0 0.45rem 0.45rem 0;
+}
+.ds-settings-choice-group-segmented .ds-settings-choice + .ds-settings-choice {
+	border-left: 0;
+}
+.ds-settings-choice-group-segmented .ds-settings-choice[aria-pressed="true"] {
+	background: var(--color-primary);
+	color: var(--color-primary-foreground);
+}
+.ds-settings-choice-group-cards .ds-settings-choice {
+	flex: 1 1 7.5rem;
+	min-width: min(7.5rem, 100%);
+	padding: 0.3rem;
+	text-align: center;
+}
+.ds-settings-choice-group-cards .ds-settings-choice > span:last-child {
+	display: block;
+	padding: 0.45rem;
+}
+.ds-settings-choice-preview {
+	display: block;
+	height: 4.9rem;
+	border-radius: 0.3rem;
+	background:
+		radial-gradient(circle at 30% 45%, #d9e9ff 0 5%, transparent 24%),
+		radial-gradient(circle at 72% 65%, #a5c6f3 0 8%, transparent 30%),
+		linear-gradient(130deg, #d7e7f7, #607fa9);
+}
+.ds-settings-choice-preview[data-index="1"] {
+	background:
+		repeating-radial-gradient(
+			ellipse at 80% 0%,
+			transparent 0 7px,
+			rgb(170 201 238 / 0.3) 8px 9px,
+			transparent 10px 16px
+		),
+		linear-gradient(145deg, #172337, #48627d 50%, #101a29);
+}
+.ds-settings-choice-preview[data-index="2"] {
+	background: linear-gradient(130deg, #9b8db7, #24375b);
+}
+.ds-settings-choice-preview[data-index="3"] {
+	background: linear-gradient(130deg, #5c8495, #1c2f40);
+}
+.ds-settings-details {
+	grid-column: 1 / -1;
+	margin-top: 0.4rem;
+	border-top: 1px solid var(--color-border);
+	padding-top: 1rem;
+}
+.ds-settings-details summary {
+	cursor: pointer;
+	font-weight: 600;
+}
+.ds-settings-details > .ds-settings-fields {
+	padding-bottom: 0;
+}
+.ds-settings-actions {
+	display: flex;
+	gap: 0.6rem;
+	flex-wrap: wrap;
+	grid-column: 2;
+}
 .ds-settings-footer {
 	display: flex;
 	gap: 0.8rem;
@@ -183,40 +298,163 @@
 	padding: 1rem 1.7rem;
 	background: color-mix(in srgb, var(--color-card) 94%, var(--color-muted));
 }
-.ds-settings-footer output { flex: 1 1 10rem; color: var(--color-muted-foreground); font-size: 0.86rem; }
-.ds-settings-footer button { min-height: 2.5rem; }
-.ds-settings-search { display: flex; align-items: center; gap: 0.55rem; padding: 0 0.75rem; border: 1px solid var(--color-border); border-radius: 0.5rem; }
-.ds-settings-search svg { flex: 0 0 auto; color: var(--color-muted-foreground); }
-.ds-settings-search input { border: 0; background: transparent; box-shadow: none; min-height: 2.8rem; }
-.ds-settings-groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin: 1rem 0 1.2rem; }
-.ds-settings-groups section { border: 1px solid var(--color-border); border-radius: 0.55rem; padding: 1rem; }
-.ds-settings-groups h3 { margin: 0 0 0.65rem; color: var(--color-muted-foreground); font-size: 0.93rem; font-weight: 600; }
-.ds-settings-groups .ds-settings-link { display: flex; width: 100%; min-height: 2.75rem; justify-content: flex-start; gap: 0.85rem; padding: 0.5rem 0.35rem; text-align: left; font-weight: 500; }
-.ds-settings-groups .ds-settings-link > span { display: flex; width: 100%; align-items: center; gap: 0.85rem; }
-.ds-settings-groups .ds-settings-link > span > svg:first-child { flex: 0 0 auto; color: var(--color-foreground); }
-.ds-settings-groups .ds-settings-link > span > span:last-child { margin-left: auto; color: var(--color-muted-foreground); font-size: 0.8rem; }
-.ds-settings-groups .ds-settings-link:hover { background: var(--color-muted); }
-.ds-settings-changes { display: grid; gap: 0.65rem; padding: 1rem 0 1.5rem; }
-.ds-settings-changes > div { display: grid; grid-template-columns: minmax(9rem, 34%) minmax(0, 1fr); gap: 0.8rem; align-items: center; border: 1px solid var(--color-border); border-radius: 0.45rem; padding: 1rem; }
-.ds-settings-changes dt { font-weight: 600; }
-.ds-settings-changes dd { display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap; overflow-wrap: anywhere; }
-.ds-settings-changes dd > span:first-child { color: var(--color-muted-foreground); }
-.ds-settings-changes dd strong { font-weight: 600; }
-@container (max-width: 620px) {
-	.ds-settings-field { grid-template-columns: minmax(0, 1fr); gap: 0.5rem; }
-	.ds-settings-field > .ds-settings-hint { grid-column: 1; }
-	.ds-settings-actions { grid-column: 1; }
-	.ds-settings-groups { grid-template-columns: 1fr; }
-	.ds-settings-changes > div { grid-template-columns: 1fr; }
-	.ds-settings-panel > :first-child { padding: 1rem 1.1rem; }
-	.ds-settings-panel > :last-child { padding: 1rem 1.1rem 0; }
-	.ds-settings-sections { margin: -1rem -1.1rem 0; padding: 0 1.1rem; }
-	.ds-settings-footer { margin: 0 -1.1rem; padding: 1rem 1.1rem; }
+.ds-settings-footer output {
+	flex: 1 1 10rem;
+	color: var(--color-muted-foreground);
+	font-size: 0.86rem;
 }
-.ds-settings-supplement { grid-column: 1 / -1; }
-.ds-settings-supplement > .rounded-lg { border: 0; background: transparent; }
-.ds-settings-supplement > .rounded-lg > :first-child { padding: 0 0 .55rem; }
-.ds-settings-supplement > .rounded-lg > :first-child > :first-child { font-size: 1rem; }
-.ds-settings-supplement > .rounded-lg > :last-child { padding: 0; }
-.ds-settings-supplement .subtitle-preview-stage { min-height: 7rem; border: 1px solid var(--color-border); border-radius: .45rem; }
-.ds-settings-change-count { margin: .35rem 0 .2rem; font-size: 1.55rem; line-height: 1.3; font-weight: 700; }
+.ds-settings-footer button {
+	min-height: 2.5rem;
+}
+.ds-settings-search {
+	display: flex;
+	align-items: center;
+	gap: 0.55rem;
+	padding: 0 0.75rem;
+	border: 1px solid var(--color-border);
+	border-radius: 0.5rem;
+}
+.ds-settings-search svg {
+	flex: 0 0 auto;
+	color: var(--color-muted-foreground);
+}
+.ds-settings-search input {
+	border: 0;
+	background: transparent;
+	box-shadow: none;
+	min-height: 2.8rem;
+}
+.ds-settings-groups {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 1rem;
+	margin: 1rem 0 1.2rem;
+}
+.ds-settings-groups section {
+	border: 1px solid var(--color-border);
+	border-radius: 0.55rem;
+	padding: 1rem;
+}
+.ds-settings-groups h3 {
+	margin: 0 0 0.65rem;
+	color: var(--color-muted-foreground);
+	font-size: 0.93rem;
+	font-weight: 600;
+}
+.ds-settings-groups .ds-settings-link {
+	display: flex;
+	width: 100%;
+	min-height: 2.75rem;
+	justify-content: flex-start;
+	gap: 0.85rem;
+	padding: 0.5rem 0.35rem;
+	text-align: left;
+	font-weight: 500;
+}
+.ds-settings-groups .ds-settings-link > span {
+	display: flex;
+	width: 100%;
+	align-items: center;
+	gap: 0.85rem;
+}
+.ds-settings-groups .ds-settings-link > span > svg:first-child {
+	flex: 0 0 auto;
+	color: var(--color-foreground);
+}
+.ds-settings-groups .ds-settings-link > span > span:last-child {
+	margin-left: auto;
+	color: var(--color-muted-foreground);
+	font-size: 0.8rem;
+}
+.ds-settings-groups .ds-settings-link:hover {
+	background: var(--color-muted);
+}
+.ds-settings-changes {
+	display: grid;
+	gap: 0.65rem;
+	padding: 1rem 0 1.5rem;
+}
+.ds-settings-changes > div {
+	display: grid;
+	grid-template-columns: minmax(9rem, 34%) minmax(0, 1fr);
+	gap: 0.8rem;
+	align-items: center;
+	border: 1px solid var(--color-border);
+	border-radius: 0.45rem;
+	padding: 1rem;
+}
+.ds-settings-changes dt {
+	font-weight: 600;
+}
+.ds-settings-changes dd {
+	display: flex;
+	align-items: center;
+	gap: 0.65rem;
+	flex-wrap: wrap;
+	overflow-wrap: anywhere;
+}
+.ds-settings-changes dd > span:first-child {
+	color: var(--color-muted-foreground);
+}
+.ds-settings-changes dd strong {
+	font-weight: 600;
+}
+@container (max-width: 620px) {
+	.ds-settings-field {
+		grid-template-columns: minmax(0, 1fr);
+		gap: 0.5rem;
+	}
+	.ds-settings-field > .ds-settings-hint {
+		grid-column: 1;
+	}
+	.ds-settings-actions {
+		grid-column: 1;
+	}
+	.ds-settings-groups {
+		grid-template-columns: 1fr;
+	}
+	.ds-settings-changes > div {
+		grid-template-columns: 1fr;
+	}
+	.ds-settings-panel > :first-child {
+		padding: 1rem 1.1rem;
+	}
+	.ds-settings-panel > :last-child {
+		padding: 1rem 1.1rem 0;
+	}
+	.ds-settings-sections {
+		margin: -1rem -1.1rem 0;
+		padding: 0 1.1rem;
+	}
+	.ds-settings-footer {
+		margin: 0 -1.1rem;
+		padding: 1rem 1.1rem;
+	}
+}
+.ds-settings-supplement {
+	grid-column: 1 / -1;
+}
+.ds-settings-supplement > .rounded-lg {
+	border: 0;
+	background: transparent;
+}
+.ds-settings-supplement > .rounded-lg > :first-child {
+	padding: 0 0 0.55rem;
+}
+.ds-settings-supplement > .rounded-lg > :first-child > :first-child {
+	font-size: 1rem;
+}
+.ds-settings-supplement > .rounded-lg > :last-child {
+	padding: 0;
+}
+.ds-settings-supplement .subtitle-preview-stage {
+	min-height: 7rem;
+	border: 1px solid var(--color-border);
+	border-radius: 0.45rem;
+}
+.ds-settings-change-count {
+	margin: 0.35rem 0 0.2rem;
+	font-size: 1.55rem;
+	line-height: 1.3;
+	font-weight: 700;
+}

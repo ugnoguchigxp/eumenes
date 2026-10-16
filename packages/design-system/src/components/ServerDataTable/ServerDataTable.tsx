@@ -49,6 +49,7 @@ export function ServerDataTable<T extends { id: string }>({
 	const [open, setOpen] = useState<string | null>(null);
 	const detailTrigger = useRef<HTMLButtonElement | null>(null);
 	const sorting: SortingState = [{ id: query.sort, desc: query.desc }];
+	// oxlint-disable-next-line react/incompatible-library -- TanStack Table returns unmemoizable functions; nothing here depends on their identity
 	const table = useReactTable({
 		data: rows,
 		columns,
@@ -129,6 +130,7 @@ export function ServerDataTable<T extends { id: string }>({
 				className="ds-server-table-scroll"
 				role="region"
 				aria-label={`${label}の表`}
+				// oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- scrollable or keyboard-reachable region needs to take focus
 				tabIndex={0}
 				aria-busy={busy}
 			>

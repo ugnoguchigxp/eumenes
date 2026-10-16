@@ -65,7 +65,9 @@ export function TerminalPane({
 	const hostRef = useRef<HTMLDivElement>(null);
 	const terminalRef = useRef<Terminal | null>(null);
 	const callbacks = useRef({ onInput, onResize, status });
-	callbacks.current = { onInput, onResize, status };
+	useEffect(() => {
+		callbacks.current = { onInput, onResize, status };
+	});
 
 	useEffect(() => {
 		const host = hostRef.current;

@@ -12,7 +12,7 @@ export const searchAgentCases = [
 		answerPattern: /宮城/,
 	},
 	{
-		id: "luna",
+		id: "codex",
 		question: "AIの最新ニュースを教えて",
 		expectedPackage: "package:web.search@1",
 		query: "AI 最新ニュース",
@@ -105,7 +105,7 @@ export function assessSearchAgent(
 		// This is a test-case keyword signal, not semantic grading of news content.
 		queryTargetsRequest:
 			c.queryPattern.test(queries[0]?.query ?? "") &&
-			(c.id !== "luna" || /ニュース|news/i.test(queries[0]?.query ?? "")) &&
+			(c.id !== "codex" || /ニュース|news/i.test(queries[0]?.query ?? "")) &&
 			(!quotePattern ||
 				/株価|stock|share|quote/i.test(queries[0]?.query ?? "")),
 		stockQuote:
@@ -119,12 +119,12 @@ export function assessSearchAgent(
 					/(?:\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}月\d{1,2}日)/.test(text),
 			),
 		requestedResult:
-			c.id !== "luna"
+			c.id !== "codex"
 				? c.answerPattern.test(result.answer ?? "")
 				: (result.report?.claims.length ?? 0) >= 3 &&
 					(result.report?.claims.length ?? 0) <= 5,
 		bulletList:
-			c.id !== "luna" ||
+			c.id !== "codex" ||
 			(() => {
 				const n = (
 					result.answer?.match(/^\s*(?:[-*・●]|\d+[.)、])\s*\S/gm) ?? []

@@ -189,7 +189,10 @@ export function verificationPlan(
 			});
 	}
 	// DS was already built before every consumer; do not rebuild shared dist here.
-	if (all) command("web build", ["x", "--no-install", "vite", "build"]);
+	if (all) {
+		command("web build", ["x", "--no-install", "vite", "build"]);
+		command("bundle-budget", ["scripts/bundle-budget.ts"]);
+	}
 	return plan;
 }
 

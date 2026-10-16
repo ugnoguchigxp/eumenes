@@ -1,4 +1,4 @@
-import { decisionDetails, RURI_MODEL } from "./result";
+import { decisionDetails } from "./result";
 import { z } from "zod";
 import { speechDeliverySettings } from "./settings";
 import {
@@ -127,13 +127,10 @@ export async function chooseSpeechDelivery(
 			return fallback("invalid");
 		const choice = parsed.data.answers.emotion;
 
-		if (
-			(details.model ?? details.claimed_model) === RURI_MODEL &&
-			(!details.logits || !details.scores)
-		)
+		if (details.scored && (!details.logits || !details.scores))
 			return fallback("invalid");
 		if (
-			(details.model ?? details.claimed_model) === RURI_MODEL &&
+			details.scored &&
 			details.top_label &&
 			!(details.top_label in questions.emotion!.criteria)
 		)
@@ -142,11 +139,7 @@ export async function chooseSpeechDelivery(
 				model: details.model,
 				calibrationStatus: details.calibration_status,
 			};
-		if (
-			(details.model ?? details.claimed_model) === RURI_MODEL &&
-			!details.valid
-		)
-			return fallback("invalid");
+		if (details.scored && !details.valid) return fallback("invalid");
 		const confidence = choice.answer_confidence;
 		if (confidence < 0.6) return fallback("low-confidence");
 		return {
@@ -155,13 +148,12 @@ export async function chooseSpeechDelivery(
 			emotion: choice.choice,
 			emotionConfidence: confidence,
 			...emotionPerformance[choice.choice],
-			source:
-				(details.model ?? details.claimed_model) === RURI_MODEL
-					? "ruri"
-					: (details.model ?? details.claimed_model) &&
-						  !(details.model ?? details.claimed_model)!.startsWith("laya")
-						? "system-one"
-						: "laya",
+			source: details.scored
+				? "ruri"
+				: (details.model ?? details.claimed_model) &&
+					  !(details.model ?? details.claimed_model)!.startsWith("laya")
+					? "system-one"
+					: "laya",
 			model: details.model,
 			calibrationStatus: details.calibration_status,
 			confidence,

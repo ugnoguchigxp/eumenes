@@ -363,8 +363,7 @@ contracts("voice-dialogue client", [
 		method: "POST",
 		path: "/api/voice/sessions",
 		body: { sessionId: uuid2, generation: 1 },
-		response: { ok: true },
-		parsed: false,
+		response: { sessionId: uuid2, generation: 1 },
 	},
 	{
 		name: "voiceStop",
@@ -372,8 +371,7 @@ contracts("voice-dialogue client", [
 		method: "POST",
 		path: "/api/voice/sessions/stop",
 		body: { sessionId: uuid2, generation: 1 },
-		response: { ok: true },
-		parsed: false,
+		response: { stopped: true },
 	},
 	{
 		name: "voiceSend",

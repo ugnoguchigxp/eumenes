@@ -58,8 +58,10 @@ function actionLabel(action: KanbanCardAction, card: KanbanBoardCard) {
 			return card.column === "todo" ? "実行" : "やり直す";
 		case "followup":
 			return "追加で直す";
-		case "commit": return "commit";
-		case "push": return "push";
+		case "commit":
+			return "commit";
+		case "push":
+			return "push";
 		case "commitPush":
 			return "commit & push";
 		case "review":
@@ -129,7 +131,9 @@ export function KanbanCard({
 	const [panel, setPanel] = useState<Panel>(null);
 	const [expanded, setExpanded] = useState(false);
 	// The card as the person saw it when the dialog opened (what they confirm is this revision).
-	const [gitAction,setGitAction]=useState<"commitPush"|"commit"|"push">("commitPush");
+	const [gitAction, setGitAction] = useState<"commitPush" | "commit" | "push">(
+		"commitPush",
+	);
 	const [confirming, setConfirming] = useState<KanbanBoardCard | null>(null);
 	const article = useRef<HTMLElement>(null);
 	const opener = useRef<Element | null>(null);
@@ -188,7 +192,10 @@ export function KanbanCard({
 	const run = (action: KanbanCardAction) => {
 		if (action === "edit" || action === "followup" || action === "remove")
 			return open(action);
-		if (action === "commitPush" || action==="commit" || action==="push") {setGitAction(action);return setConfirming(card);}
+		if (action === "commitPush" || action === "commit" || action === "push") {
+			setGitAction(action);
+			return setConfirming(card);
+		}
 		onAction(action as Act, card.id, card.revision);
 	};
 	const disabled = (action: KanbanCardAction) =>
@@ -201,10 +208,11 @@ export function KanbanCard({
 			data-dragging={dragging || undefined}
 			data-card-id={card.id}
 		>
+			{/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- handles keys or drag events that bubble up from its interactive children */}
 			<article
 				ref={article}
 				className="kanban-card"
-				// biome-ignore lint/a11y/noNoninteractiveTabindex: a card is focusable so Alt+arrows can reorder it
+				// oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- scrollable or keyboard-reachable region needs to take focus
 				tabIndex={0}
 				aria-labelledby={titleId}
 				aria-keyshortcuts={movable ? "Alt+ArrowUp Alt+ArrowDown" : undefined}
@@ -262,7 +270,7 @@ export function KanbanCard({
 				)}
 				{card.statusText && <p className="kanban-status">{card.statusText}</p>}
 				{card.reasonText && <p className="kanban-reason">{card.reasonText}</p>}
-				<KanbanMarks card={card}/>
+				<KanbanMarks card={card} />
 
 				{card.followedByOtherRun && (
 					<p className="kanban-warning">
@@ -291,8 +299,7 @@ export function KanbanCard({
 				</Button>
 				{expanded && (
 					<div id={detailId} className="kanban-detail">
-						<KanbanDetails card={card}/>
-
+						<KanbanDetails card={card} />
 					</div>
 				)}
 				{/* Kept mounted while a panel is open so cancelling can focus its button again. */}
@@ -400,7 +407,9 @@ export function KanbanCard({
 					onShow={setConfirming}
 					onConfirm={(extra) => {
 						setConfirming(null);
-						if(extra)onAction(gitAction,confirming.id,confirming.revision,extra);else onAction(gitAction, confirming.id, confirming.revision);
+						if (extra)
+							onAction(gitAction, confirming.id, confirming.revision, extra);
+						else onAction(gitAction, confirming.id, confirming.revision);
 					}}
 				/>
 			)}
@@ -408,43 +417,57 @@ export function KanbanCard({
 	);
 }
 
-function KanbanDetails({card}:{card:KanbanBoardCard}) {return <>
-						<section aria-label="依頼内容">
-							<h5>依頼内容</h5>
-							<p className="kanban-prompt">{card.prompt}</p>
-						</section>
-						<section aria-label="最後の報告">
-							<h5>最後の報告</h5>
-							{card.lastReport ? (
-								// biome-ignore lint/a11y/noNoninteractiveTabindex: scrollable region of a long report
-								<div className="kanban-report" tabIndex={0}>
-									{card.lastReport}
-								</div>
-							) : (
-								<p className="kanban-muted">報告はまだありません。</p>
-							)}
-						</section>
-						<section aria-label="変更したファイル">
-							<h5>変更したファイル</h5>
-							{card.files.length > 0 ? (
-								<ul className="kanban-files">
-									{card.files.map((file) => (
-										<li key={file}>{file}</li>
-									))}
-								</ul>
-							) : (
-								<p className="kanban-muted">記録された変更はありません。</p>
-							)}
-						</section>
-</>;}
-
-function KanbanMarks({card}:{card:KanbanBoardCard}) {return <>
-				{(card.reviewed || card.commitPushReported || card.git?.commitVerified) && (
-					<ul className="kanban-marks">
-						{card.reviewed && <li>確認済み</li>}
-						{card.commitPushReported && <li>commit & push の報告あり</li>}
-						{card.git?.commitVerified && <li>commit確認済み: {card.git.commitSha}</li>}
-						{card.git?.pushVerified && <li>push確認済み: {card.git.remoteSha}</li>}
-					</ul>
+function KanbanDetails({ card }: { card: KanbanBoardCard }) {
+	return (
+		<>
+			<section aria-label="依頼内容">
+				<h5>依頼内容</h5>
+				<p className="kanban-prompt">{card.prompt}</p>
+			</section>
+			<section aria-label="最後の報告">
+				<h5>最後の報告</h5>
+				{card.lastReport ? (
+					// oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- scrollable or keyboard-reachable region needs to take focus
+					<div className="kanban-report" tabIndex={0}>
+						{card.lastReport}
+					</div>
+				) : (
+					<p className="kanban-muted">報告はまだありません。</p>
 				)}
-</>;}
+			</section>
+			<section aria-label="変更したファイル">
+				<h5>変更したファイル</h5>
+				{card.files.length > 0 ? (
+					<ul className="kanban-files">
+						{card.files.map((file) => (
+							<li key={file}>{file}</li>
+						))}
+					</ul>
+				) : (
+					<p className="kanban-muted">記録された変更はありません。</p>
+				)}
+			</section>
+		</>
+	);
+}
+
+function KanbanMarks({ card }: { card: KanbanBoardCard }) {
+	return (
+		<>
+			{(card.reviewed ||
+				card.commitPushReported ||
+				card.git?.commitVerified) && (
+				<ul className="kanban-marks">
+					{card.reviewed && <li>確認済み</li>}
+					{card.commitPushReported && <li>commit & push の報告あり</li>}
+					{card.git?.commitVerified && (
+						<li>commit確認済み: {card.git.commitSha}</li>
+					)}
+					{card.git?.pushVerified && (
+						<li>push確認済み: {card.git.remoteSha}</li>
+					)}
+				</ul>
+			)}
+		</>
+	);
+}

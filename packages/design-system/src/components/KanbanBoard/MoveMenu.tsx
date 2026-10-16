@@ -64,6 +64,7 @@ export function MoveMenu({
 		onCancel();
 	};
 	return (
+		// oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- handles keys or drag events that bubble up from its interactive children
 		<form
 			ref={form}
 			className="kanban-form kanban-move"

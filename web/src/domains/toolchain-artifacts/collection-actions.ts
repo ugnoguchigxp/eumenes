@@ -162,7 +162,15 @@ export function useCollectionActions({
 				};
 			}
 			if (binding.effect === "draft" && binding.draftAction === "structure") {
+				const validation = getLatest().state.validateStructure?.(
+					binding.structure!,
+					input,
+					secrets,
+				);
+				if (validation && validation.status !== "accepted") return validation;
 				const store = draftStoreFor(client.identity, binding.draftDocument!);
+				if (store.getView().busy)
+					return refuse("保存中です。完了してから登録してください。");
 				const target = createdId(binding, input);
 				store.stage({
 					id: crypto.randomUUID(),
@@ -181,7 +189,11 @@ export function useCollectionActions({
 						change: { value: secret.value as string },
 						confidential: true,
 					});
-				return { status: "accepted", message: "" };
+				return {
+					status: "accepted",
+					message:
+						"下書きに追加しました。「設定の変更をすべて保存」で保存してください。",
+				};
 			}
 			const dispatcher = dispatcherRef.current;
 			if (binding.effect !== "write" || !dispatcher)

@@ -89,6 +89,7 @@ export function ActivityTimeline({
 			<div
 				ref={container}
 				className="activity-timeline-scroll"
+				// oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- scrollable or keyboard-reachable region needs to take focus
 				tabIndex={0}
 				aria-label="動きの記録"
 				onScroll={(event) => {

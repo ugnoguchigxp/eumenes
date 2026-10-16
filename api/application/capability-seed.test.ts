@@ -12,7 +12,8 @@ import { createSettings } from "../domains/settings";
 import { openStore } from "../infrastructure/sqlite";
 import { createLifecycleRunner } from "./lifecycle";
 import { migrations } from "./migrations";
-import { buildServices, createLifecycles } from "./server";
+import { createLifecycles } from "./server-lifecycles";
+import { buildServices } from "./server-services";
 import { offlineBundleHost } from "./toolchain-adapters";
 
 const backends = new Set([

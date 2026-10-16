@@ -12,7 +12,7 @@ import { assessSearchAgent, searchAgentCases } from "./search-agents.fixture";
 for (const c of searchAgentCases)
 	for (const mode of ["success", "timeout", "repair"] as const)
 		test(`search API E2E fixture: ${c.id}, ${mode}`, async () => {
-			const luna = c.expectedPackage === "package:web.search@1";
+			const deep = c.expectedPackage === "package:web.search@1";
 			const fail = mode === "timeout";
 			let repaired = false;
 			const facts = [...c.facts];
@@ -30,7 +30,7 @@ for (const c of searchAgentCases)
 						options.onToolCalls!([
 							{
 								id: "selected",
-								name: luna ? "web_research" : "web_search",
+								name: deep ? "web_research" : "web_search",
 								arguments: JSON.stringify({ request: c.question }),
 							},
 						]);
@@ -49,15 +49,15 @@ for (const c of searchAgentCases)
 								repaired = true;
 								return JSON.stringify({
 									action: "invoke",
-									tool: luna ? "web.lookup@1" : "web.lookup",
-									...(luna ? {} : { requirements: [] }),
+									tool: deep ? "web.lookup@1" : "web.lookup",
+									...(deep ? {} : { requirements: [] }),
 									arguments: { query: c.query },
 								});
 							}
 							if (mode === "repair")
 								expect(data.lastResult.issues).toContainEqual({
-									validationPath: luna ? "tool" : "requirements",
-									validationCode: luna ? "unknown_tool" : "unrecognized_keys",
+									validationPath: deep ? "tool" : "requirements",
+									validationCode: deep ? "unknown_tool" : "unrecognized_keys",
 								});
 							const action = JSON.parse(
 								fixtureResearchOutput(
@@ -76,7 +76,7 @@ for (const c of searchAgentCases)
 						}
 						if (fail) {
 							// web_search keeps its one saved-procedure lookup after a failed search.
-							expect(data.budget.canInvoke).toBe(!luna);
+							expect(data.budget.canInvoke).toBe(!deep);
 							expect(data.operations[0]).toMatchObject({
 								tool: "web.lookup",
 								state: "failed",
@@ -132,7 +132,7 @@ for (const c of searchAgentCases)
 							const source = data.report.sources.find(
 								(s: { sourceId: string }) => s.sourceId === claim.sourceIds[0],
 							);
-							return `${luna ? "- " : ""}${claim.text} [出典](${source.url})`;
+							return `${deep ? "- " : ""}${claim.text} [出典](${source.url})`;
 						})
 						.join("\n");
 				},
@@ -140,7 +140,6 @@ for (const c of searchAgentCases)
 			const h = await harness({
 				model,
 				codexResearch: {
-					model: "fixture",
 					execute: (messages, signal) => model.answer(messages, signal),
 				},
 				acquire: async (request) => {
@@ -236,9 +235,11 @@ for (const c of searchAgentCases)
 			}
 		});
 
-for (const luna of [false, true])
-	test(`five long snippets allow ${luna ? "three Luna reads" : "one quick read"} before the API answer`, async () => {
-		const c = searchAgentCases.find((c) => c.id === (luna ? "luna" : "stock"))!;
+for (const deep of [false, true])
+	test(`five long snippets allow ${deep ? "three deep reads" : "one quick read"} before the API answer`, async () => {
+		const c = searchAgentCases.find(
+			(c) => c.id === (deep ? "codex" : "stock"),
+		)!;
 		const operations: string[] = [];
 		let verifierCalls = 0;
 		let firstEvidence: { reference: string; quote: string } | undefined;
@@ -254,7 +255,7 @@ for (const luna of [false, true])
 					options.onToolCalls!([
 						{
 							id: "route",
-							name: luna ? "web_research" : "web_search",
+							name: deep ? "web_research" : "web_search",
 							arguments: JSON.stringify({ request: c.question }),
 						},
 					]);
@@ -290,7 +291,7 @@ for (const luna of [false, true])
 						data.observations.flatMap((o: any) => o.excerpts),
 					).toContainEqual(firstEvidence);
 					expect(firstEvidence!.quote.length).toBeGreaterThan(24);
-					if (pageCount < (luna ? 3 : 1)) {
+					if (pageCount < (deep ? 3 : 1)) {
 						expect(data.budget.canInvoke).toBe(true);
 						expect(messages[0]!.content).toContain('"id":"web.read"');
 						return JSON.stringify({
@@ -321,7 +322,7 @@ for (const luna of [false, true])
 				return result.report.claims
 					.map(
 						(claim: any) =>
-							`${luna ? "- " : ""}${claim.text} [出典](${result.report.sources.find((s: any) => s.sourceId === claim.sourceIds[0]).url})`,
+							`${deep ? "- " : ""}${claim.text} [出典](${result.report.sources.find((s: any) => s.sourceId === claim.sourceIds[0]).url})`,
 					)
 					.join("\n");
 			},
@@ -329,7 +330,6 @@ for (const luna of [false, true])
 		const h = await harness({
 			model,
 			codexResearch: {
-				model: "fixture",
 				execute: (m, s) => model.answer(m, s),
 			},
 			acquire: async (r) => {
@@ -396,7 +396,7 @@ for (const luna of [false, true])
 			expect(worker.status).toBe("completed");
 			expect(operations).toEqual([
 				"lookup",
-				...Array(luna ? 3 : 1).fill("read"),
+				...Array(deep ? 3 : 1).fill("read"),
 			]);
 			expect(verifierCalls).toBe(0);
 			expect(maximumMaterialBytes).toBeLessThanOrEqual(32768);

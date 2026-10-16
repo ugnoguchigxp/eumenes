@@ -75,9 +75,11 @@ export function Canvas2D({
 }: Canvas2DProps) {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const viewportRef = useRef(viewport);
-	viewportRef.current = viewport;
 	const drawRef = useRef(draw);
-	drawRef.current = draw;
+	useEffect(() => {
+		viewportRef.current = viewport;
+		drawRef.current = draw;
+	});
 	const refreshRef = useRef<() => void>(() => {});
 	const elapsedRef = useRef(0);
 	const lastRef = useRef<number | null>(null);

@@ -170,7 +170,7 @@ test("dictionary: create, edit, delete, and every conflict is shown", async ({
 		{ written: "今日", spoken: "べつ" },
 	]);
 	// The form stays open for another try; the list behind it has been read again.
-	await dialog.getByRole("button", { name: "Close" }).click();
+	await dialog.getByRole("button", { name: "ダイアログを閉じる" }).click();
 	await expect(dialog).toHaveCount(0);
 	await expect(page.getByRole("cell", { name: "べつ" })).toBeVisible();
 
@@ -258,22 +258,25 @@ test("world: status remains visible while the empty lists switch", async ({
 	await openHub(page);
 	await openFromHub(page, "World");
 	const screen = panel(page);
-	for (const title of ["Worldの状態", "主張の一覧"])
-		await expect(
-			screen.getByText(title, { exact: true }).first(),
-		).toBeVisible();
 	await expect(
-		screen.getByRole("definition").filter({ hasText: "オン" }),
+		screen.getByRole("status", { name: "World: オンライン" }),
 	).toBeVisible();
 	await expect(
-		screen.getByLabel("主張の一覧の一覧").getByText("項目はありません。"),
+		screen.getByRole("table", { name: "資料", exact: true }),
+	).toBeVisible();
+	await screen.getByRole("tab", { name: "主張の一覧", exact: true }).click();
+	await expect(
+		screen.getByRole("table", { name: "主張の一覧", exact: true }),
+	).toBeVisible();
+	await expect(
+		screen.getByText("項目はありません。", { exact: true }),
 	).toBeVisible();
 	await screen.getByRole("tab", { name: "忘却の状況" }).click();
 	await expect(
 		screen.getByRole("tab", { name: "忘却の状況", selected: true }),
 	).toBeVisible();
 	await expect(
-		screen.getByRole("definition").filter({ hasText: "オン" }),
+		screen.getByRole("status", { name: "World: オンライン" }),
 	).toBeVisible();
 	await expect(screen.getByRole("alert")).toHaveCount(0);
 });

@@ -14,6 +14,7 @@ import {
 import { basename, dirname, join, resolve } from "node:path";
 import { flock, LOCK_EX_NB, LOCK_UN } from "../flock";
 import { getLogger } from "../logger";
+import { backupBeforeMigration } from "./pre-migration-backup";
 
 const log = getLogger("sqlite");
 
@@ -144,6 +145,11 @@ export class WriterBusyError extends Error {
 	}
 }
 
+/** Queued writer operations accepted before general writes are refused. */
+const WRITER_PENDING_LIMIT = 64;
+/** Extra slots only `reserved` writes may take once the general limit is reached. */
+const WRITER_RESERVED_SLOTS = 32;
+
 type SyncResult<T> = T extends PromiseLike<unknown> ? never : T;
 
 export interface SqliteStore {
@@ -154,7 +160,15 @@ export interface SqliteStore {
 	 * attempted inside fails on the readonly connection.
 	 */
 	readSnapshot<T>(operation: (db: Database) => SyncResult<T>): T;
-	write<T>(operation: (db: Database) => T): Promise<T>;
+	/**
+	 * Serialized writer transaction. `reserved` writes (queue lease renewal, settlement,
+	 * recovery) may use the slots above the general limit, so a saturated writer cannot make a
+	 * finished job lose its result.
+	 */
+	write<T>(
+		operation: (db: Database) => T,
+		options?: { reserved?: boolean },
+	): Promise<T>;
 	/** Serialized writer operation outside a transaction (checkpoint / incremental vacuum only). */
 	maintenance?<T>(operation: (db: Database) => T): Promise<T>;
 	onCommit(listener: () => void): () => void;
@@ -241,10 +255,14 @@ export function openStore(
 			if (!byId.has(id)) throw new MigrationUnknownAppliedError(id);
 		for (const { id, sql } of ordered) {
 			const stored = applied.get(id);
-			if (stored !== undefined) {
-				if (stored !== sha256(sql)) throw new MigrationChecksumError(id);
-				continue;
-			}
+			if (stored !== undefined && stored !== sha256(sql))
+				throw new MigrationChecksumError(id);
+		}
+		// An existing database gets a consistency check and a snapshot before its schema changes.
+		if (applied.size > 0 && ordered.some((m) => !applied.has(m.id)))
+			backupBeforeMigration(migrationWriter, canonical);
+		for (const { id, sql } of ordered) {
+			if (applied.has(id)) continue;
 			migrationWriter.transaction(() => {
 				migrationWriter.exec(sql);
 				migrationWriter
@@ -273,9 +291,13 @@ export function openStore(
 	const changes = w.query<{ count: number }, []>(
 		"SELECT total_changes() AS count",
 	);
-	function serialized<T>(operation: () => T): Promise<T> {
+	function serialized<T>(operation: () => T, reserved = false): Promise<T> {
 		if (closing) return Promise.reject(new Error("database_closing"));
-		if (pending >= 64) return Promise.reject(new WriterBusyError());
+		if (
+			pending >=
+			WRITER_PENDING_LIMIT + (reserved ? WRITER_RESERVED_SLOTS : 0)
+		)
+			return Promise.reject(new WriterBusyError());
 		pending++;
 		const task = tail.then(operation);
 		tail = task
@@ -301,7 +323,7 @@ export function openStore(
 				return value;
 			})();
 		},
-		write: (operation) => {
+		write: (operation, options) => {
 			return serialized(() => {
 				const before = changes.get()?.count;
 				const result = w.transaction(() => {
@@ -322,7 +344,7 @@ export function openStore(
 						}
 					}
 				return result;
-			});
+			}, options?.reserved);
 		},
 		maintenance: (operation) =>
 			serialized(() => {

@@ -146,6 +146,8 @@ export interface ToolAdapter {
 			deadline: number;
 			parentJobId: string;
 			question?: string;
+			/** Queue admission time for a retry, derived from the previous receipt. */
+			availableAtMs?: number;
 			/** Host-set per-attempt timeout for cached-route fetches (ms, from execute start). */
 			attemptTimeoutMs?: number;
 			/** Present for cached-route grants: the one URL the grant allows; adapters must verify the derived URL equals it. */
@@ -168,6 +170,7 @@ export type Invocation = {
 	operation_id: string;
 	job_id: string;
 	state: string;
+	finished_at?: number | null;
 	result_ref: string | null;
 	result_digest: string | null;
 	error_code: string | null;

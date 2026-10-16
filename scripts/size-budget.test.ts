@@ -36,22 +36,43 @@ test("ratchet fails on growth and new offenders, not on shrinkage", () => {
 	const recorded: Budget = {
 		files: { "a.ts": 900 },
 		functions: { "a.ts#f": 400 },
+		testFiles: { "a.test.ts": 1200 },
 	};
 	expect(compare(recorded, recorded)).toEqual([]);
 	expect(
-		compare({ files: { "a.ts": 850 }, functions: { "a.ts#f": 300 } }, recorded),
+		compare(
+			{
+				files: { "a.ts": 850 },
+				functions: { "a.ts#f": 300 },
+				testFiles: { "a.test.ts": 1000 },
+			},
+			recorded,
+		),
 	).toEqual([]);
 	expect(
-		compare({ files: { "a.ts": 901 }, functions: { "a.ts#f": 401 } }, recorded),
+		compare(
+			{
+				files: { "a.ts": 901 },
+				functions: { "a.ts#f": 401 },
+				testFiles: { "a.test.ts": 1201 },
+			},
+			recorded,
+		),
 	).toEqual([
 		"size-budget: a.ts grew 900 -> 901 (limit 800)",
 		"size-budget: a.ts#f grew 400 -> 401 (limit 300)",
+		"size-budget: a.test.ts grew 1200 -> 1201 (limit 1000)",
 	]);
 	const fresh = compare(
-		{ files: { "b.ts": 801 }, functions: { "b.ts#g": FUNCTION_LIMIT + 1 } },
+		{
+			files: { "b.ts": 801 },
+			functions: { "b.ts#g": FUNCTION_LIMIT + 1 },
+			testFiles: { "b.test.ts": 1001 },
+		},
 		recorded,
 	);
-	expect(fresh).toHaveLength(2);
+	expect(fresh).toHaveLength(3);
 	expect(fresh[0]).toContain("new file over 800 lines: b.ts");
 	expect(fresh[1]).toContain("new function over 300 lines: b.ts#g");
+	expect(fresh[2]).toContain("new test file over 1000 lines: b.test.ts");
 });

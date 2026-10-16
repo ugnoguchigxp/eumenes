@@ -30,7 +30,7 @@ async function fixture(body: string) {
 	};
 }
 
-test("Codex adapter fixes Luna, sends only supplied context, disables native tools and omits product secrets", async () => {
+test("Codex adapter runs the supplied model, sends only supplied context, disables native tools and omits product secrets", async () => {
 	const f = await fixture(
 		`console.log(JSON.stringify({ type: "item.completed", item: { type: "agent_message", text: 'progress must not be adopted' } })); console.log(JSON.stringify({ type: "item.completed", item: { type: "agent_message", text: '{"action":"finish"}' } })); console.log(JSON.stringify({ type: "turn.completed", usage: {} }));`,
 	);
@@ -44,13 +44,17 @@ test("Codex adapter fixes Luna, sends only supplied context, disables native too
 			},
 			f.command,
 		)!;
-		expect(adapter.model).toBe("gpt-6-luna");
 		expect(
-			await adapter.execute(messages, AbortSignal.timeout(3000), control),
+			await adapter.execute(
+				messages,
+				AbortSignal.timeout(3000),
+				control,
+				"test-model",
+			),
 		).toBe('{"action":"finish"}');
 		const record = JSON.parse(await readFile(f.record, "utf8"));
 		expect(record.argv).not.toContain("--output-schema");
-		expect(record.argv).toContain("gpt-6-luna");
+		expect(record.argv[record.argv.indexOf("--model") + 1]).toBe("test-model");
 		for (const flag of [
 			"--ephemeral",
 			"--experimental-json",
@@ -98,6 +102,24 @@ test("Codex adapter fixes Luna, sends only supplied context, disables native too
 		expect(record.env.EUMENES_API_TOKEN).toBeUndefined();
 		expect(record.cwd).not.toBe(process.cwd());
 		await expect(stat(record.cwd)).rejects.toThrow();
+	} finally {
+		await f.close();
+	}
+});
+
+test("without a saved model Codex keeps its own default", async () => {
+	const f = await fixture(
+		`console.log(JSON.stringify({ type: "item.completed", item: { type: "agent_message", text: '{"action":"finish"}' } })); console.log(JSON.stringify({ type: "turn.completed", usage: {} }));`,
+	);
+	try {
+		await createCodexResearch({ HOME: f.dir, PATH: "" }, f.command)!.execute(
+			messages,
+			AbortSignal.timeout(3000),
+			control,
+		);
+		expect(JSON.parse(await readFile(f.record, "utf8")).argv).not.toContain(
+			"--model",
+		);
 	} finally {
 		await f.close();
 	}

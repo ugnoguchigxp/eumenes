@@ -7,18 +7,8 @@ import type { ActionDispatcher } from "./dispatcher";
 import { dirtyEntries, equalsSaved, parseWire, toWire } from "./documents";
 import { draftStoreFor, entryKey, splitEntryKey } from "./drafts";
 import { pendingMessage, receiptOf, unsettledMessage } from "./messages";
-import { DELETE_SUFFIX, SECRET_MASK } from "./drafts";
+import { DELETE_SUFFIX } from "./drafts";
 import type { GetLatest } from "./screen-state";
-
-/** What the user did to a masked secret field: appended, deleted from the end, or replaced. */
-export function nextSecret(current: string, shown: string): string {
-	const mask = SECRET_MASK.repeat(current.length);
-	if (shown.startsWith(mask)) return current + shown.slice(mask.length);
-	const dots = shown.length - shown.replaceAll(SECRET_MASK, "").length;
-	if (dots === shown.length) return current.slice(0, dots);
-	const lead = /^•*/.exec(shown)![0].length;
-	return current.slice(0, lead) + shown.slice(lead).replaceAll(SECRET_MASK, "");
-}
 
 type Describe = (
 	code: string | undefined,
@@ -106,13 +96,10 @@ export function useDraftActions({
 			const rule = access.rule(field, target);
 			if (!rule || rule.disabled)
 				return { status: "rejected", message: "この設定項目は操作できません" };
-			// A secret field shows only a mask of its length, so the text of an edit is read as
-			// a change to the secret held in memory. Emptying it keeps the stored secret.
+			// A password input sends its actual new value through the in-memory channel.
+			// Emptying it keeps the stored credential; snapshots still carry masks only.
 			if (field.confidential && typeof event.values.value === "string") {
-				const next = nextSecret(
-					store.peekSecret(field.fieldId, target),
-					event.values.value,
-				);
+				const next = event.values.value;
 				if (next === "") {
 					store.remove(field.fieldId, target);
 					return accepted;
@@ -177,6 +164,13 @@ export function useDraftActions({
 					message: "変更を適用できる状態ではありません",
 				};
 			if (store.getView().busy) return refused("適用中です");
+			if (store.getView().editors?.length)
+				return refused(
+					store
+						.getView()
+						.editors!.map((e) => e.message)
+						.join("\n"),
+				);
 			const dirty = new Set(
 				dirtyEntries(store.getView(), all[doc] ?? [], access).map(({ entry }) =>
 					entryKey(entry.fieldId, entry.target),

@@ -8,6 +8,10 @@ import type {
 
 export type ArtifactRuntime = {
 	snapshot: Snapshot;
+	/** Editor metadata only; a pending form or invalid field blocks the shared save. */
+	setEditing?: (source: string, id: string, message: string | null) => void;
+	/** Reads only a draft secret in memory, directly into a password input, never a snapshot. */
+	readSecret?: (source: string, fieldId: string) => string | undefined;
 	/** Transient File bridge for host-owned uploads; never serialized into saved JSON. */
 	uploadFile?: (
 		source: string,

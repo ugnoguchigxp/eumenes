@@ -1,43 +1,261 @@
-.ds-google-accounts { max-width: 620px; width: 100%; margin: 0 auto; padding: 28px; color: var(--color-foreground); }
-.ds-google-accounts button { cursor: pointer; font: inherit; border-radius: 9px; transition: background .15s; }
-.ds-google-accounts button:disabled { cursor: not-allowed; opacity: .5; }
-.ds-google-accounts button:focus-visible,.ds-google-accounts a:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 4px; }
-.ds-google-back { display: inline-flex; align-items: center; gap: 8px; background: transparent; color: var(--color-muted-foreground); border: 0; padding: 8px 0; }
-.ds-google-accounts header { margin: 18px 0 32px; }
-.ds-google-accounts h2 { font-size: 28px; font-weight: 650; letter-spacing: -.02em; margin: 0 0 8px; }
-.ds-google-accounts h3 { font-size: 18px; font-weight: 600; margin: 0 0 14px; }
-.ds-google-accounts h4 { font-size: 15px; font-weight: 600; margin: 0 0 16px; }
-.ds-google-accounts p { line-height: 1.7; }
-.ds-google-accounts header p,.ds-google-empty p { color: var(--color-muted-foreground); margin: 0; }
-.ds-google-empty { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 8px 0 30px; gap: 18px; }
-.ds-google-empty h3 { margin: 0; font-size: 21px; }
-.ds-google-connect { display: flex; justify-content: center; align-items: center; gap: 12px; width: 100%; background: #fff; color: #202124; border: 1px solid #dadce0; min-height: 50px; padding: 12px 16px; margin-top: 6px; font-weight: 600 !important; }
-.ds-google-connect:hover:not(:disabled) { background: #f0f4ff; }
-.ds-google-hint { display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--color-muted-foreground); font-size: 13px; margin: 16px 0; }
-.ds-google-information { border-top: 1px solid var(--color-border); padding: 24px 0 0; }
-.ds-google-information p,.ds-google-permissions p { display: flex; align-items: center; gap: 16px; margin: 12px 0; color: var(--color-muted-foreground); }
-.ds-google-card { border: 1px solid var(--color-border); border-radius: 12px; padding: 22px; background: var(--color-card); }
-.ds-google-identity { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; }
-.ds-google-avatar { width: 54px; height: 54px; border-radius: 50%; background: #5d80bf; color: white; display: grid; place-items: center; font-size: 24px; overflow: hidden; flex-shrink: 0; }
-.ds-google-avatar img { width: 100%; height: 100%; object-fit: cover; }
-.ds-google-person { display: flex; flex: 1; min-width: 100px; flex-direction: column; gap: 5px; overflow-wrap: anywhere; }
-.ds-google-person strong { font-size: 17px; }
-.ds-google-person span { font-size: 13px; color: var(--color-muted-foreground); }
-.ds-google-badge { display: inline-flex; align-items: center; gap: 5px; border: 1px solid; padding: 5px 8px; border-radius: 30px; font-size: 11px; white-space: nowrap; }
-.ds-google-badge.is-connected { color: #43a86b; background: #43a86b12; }
-.ds-google-badge.is-warning { color: #c98b18; background: #c98b1812; }
-.ds-google-permissions { border-top: 1px solid var(--color-border); padding-top: 23px; margin-top: 24px; }
-.ds-google-permissions svg { color: var(--color-primary); }
-.ds-google-card-footer { display: flex; justify-content: flex-end; margin-top: 14px; }
-.ds-google-danger { border: 0; background: transparent; color: #df7667; padding: 8px 10px; }
-.ds-google-reconnect { margin-top: 24px; padding: 18px; border: 1px solid #c98b18; background: #c98b180d; border-radius: 10px; }
-.ds-google-reconnect strong { display: flex; align-items: center; gap: 8px; color: #c98b18; }
-.ds-google-reconnect p { font-size: 13px; color: var(--color-muted-foreground); }
-.ds-google-primary { background: var(--color-primary); color: var(--color-primary-foreground); border: 0; padding: 13px; width: 100%; }
-.ds-google-notice,.ds-google-confirm { padding: 16px; border: 1px solid var(--color-border); border-radius: 10px; margin: 16px 0; font-size: 14px; line-height: 1.7; }
-.ds-google-notice a { display: flex; align-items: center; gap: 6px; color: var(--color-primary); }
-.ds-google-confirm > div { display: flex; justify-content: flex-end; gap: 14px; }
-.ds-google-confirm button { padding: 8px 12px; border: 1px solid var(--color-border); background: transparent; }
-.ds-google-message { display: block; color: var(--color-muted-foreground); font-size: 14px; margin-top: 14px; }
-.ds-google-saved { text-align: center; color: var(--color-muted-foreground); font-size: 12px; margin: 32px 0 0; }
-@media (max-width: 480px) { .ds-google-accounts { padding: 18px; } .ds-google-card { padding: 16px; } .ds-google-badge { margin-left: 68px; } }
+.ds-google-accounts {
+	max-width: 620px;
+	width: 100%;
+	margin: 0 auto;
+	padding: 28px;
+	color: var(--color-foreground);
+}
+.ds-google-accounts button {
+	cursor: pointer;
+	font: inherit;
+	border-radius: 9px;
+	transition: background 0.15s;
+}
+.ds-google-accounts button:disabled {
+	cursor: not-allowed;
+	opacity: 0.5;
+}
+.ds-google-accounts button:focus-visible,
+.ds-google-accounts a:focus-visible {
+	outline: 2px solid var(--color-primary);
+	outline-offset: 4px;
+}
+.ds-google-back {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	background: transparent;
+	color: var(--color-muted-foreground);
+	border: 0;
+	padding: 8px 0;
+}
+.ds-google-accounts header {
+	margin: 18px 0 32px;
+}
+.ds-google-accounts h2 {
+	font-size: 28px;
+	font-weight: 650;
+	letter-spacing: -0.02em;
+	margin: 0 0 8px;
+}
+.ds-google-accounts h3 {
+	font-size: 18px;
+	font-weight: 600;
+	margin: 0 0 14px;
+}
+.ds-google-accounts h4 {
+	font-size: 15px;
+	font-weight: 600;
+	margin: 0 0 16px;
+}
+.ds-google-accounts p {
+	line-height: 1.7;
+}
+.ds-google-accounts header p,
+.ds-google-empty p {
+	color: var(--color-muted-foreground);
+	margin: 0;
+}
+.ds-google-empty {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	text-align: center;
+	padding: 8px 0 30px;
+	gap: 18px;
+}
+.ds-google-empty h3 {
+	margin: 0;
+	font-size: 21px;
+}
+.ds-google-connect {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	gap: 12px;
+	width: 100%;
+	background: #fff;
+	color: #202124;
+	border: 1px solid #dadce0;
+	min-height: 50px;
+	padding: 12px 16px;
+	margin-top: 6px;
+	font-weight: 600 !important;
+}
+.ds-google-connect:hover:not(:disabled) {
+	background: #f0f4ff;
+}
+.ds-google-hint {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	color: var(--color-muted-foreground);
+	font-size: 13px;
+	margin: 16px 0;
+}
+.ds-google-information {
+	border-top: 1px solid var(--color-border);
+	padding: 24px 0 0;
+}
+.ds-google-information p,
+.ds-google-permissions p {
+	display: flex;
+	align-items: center;
+	gap: 16px;
+	margin: 12px 0;
+	color: var(--color-muted-foreground);
+}
+.ds-google-card {
+	border: 1px solid var(--color-border);
+	border-radius: 12px;
+	padding: 22px;
+	background: var(--color-card);
+}
+.ds-google-identity {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 14px;
+}
+.ds-google-avatar {
+	width: 54px;
+	height: 54px;
+	border-radius: 50%;
+	background: #5d80bf;
+	color: white;
+	display: grid;
+	place-items: center;
+	font-size: 24px;
+	overflow: hidden;
+	flex-shrink: 0;
+}
+.ds-google-avatar img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+.ds-google-person {
+	display: flex;
+	flex: 1;
+	min-width: 100px;
+	flex-direction: column;
+	gap: 5px;
+	overflow-wrap: anywhere;
+}
+.ds-google-person strong {
+	font-size: 17px;
+}
+.ds-google-person span {
+	font-size: 13px;
+	color: var(--color-muted-foreground);
+}
+.ds-google-badge {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	border: 1px solid;
+	padding: 5px 8px;
+	border-radius: 30px;
+	font-size: 11px;
+	white-space: nowrap;
+}
+.ds-google-badge.is-connected {
+	color: #43a86b;
+	background: #43a86b12;
+}
+.ds-google-badge.is-warning {
+	color: #c98b18;
+	background: #c98b1812;
+}
+.ds-google-permissions {
+	border-top: 1px solid var(--color-border);
+	padding-top: 23px;
+	margin-top: 24px;
+}
+.ds-google-permissions svg {
+	color: var(--color-primary);
+}
+.ds-google-card-footer {
+	display: flex;
+	justify-content: flex-end;
+	margin-top: 14px;
+}
+.ds-google-danger {
+	border: 0;
+	background: transparent;
+	color: #df7667;
+	padding: 8px 10px;
+}
+.ds-google-reconnect {
+	margin-top: 24px;
+	padding: 18px;
+	border: 1px solid #c98b18;
+	background: #c98b180d;
+	border-radius: 10px;
+}
+.ds-google-reconnect strong {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	color: #c98b18;
+}
+.ds-google-reconnect p {
+	font-size: 13px;
+	color: var(--color-muted-foreground);
+}
+.ds-google-primary {
+	background: var(--color-primary);
+	color: var(--color-primary-foreground);
+	border: 0;
+	padding: 13px;
+	width: 100%;
+}
+.ds-google-notice,
+.ds-google-confirm {
+	padding: 16px;
+	border: 1px solid var(--color-border);
+	border-radius: 10px;
+	margin: 16px 0;
+	font-size: 14px;
+	line-height: 1.7;
+}
+.ds-google-notice a {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	color: var(--color-primary);
+}
+.ds-google-confirm > div {
+	display: flex;
+	justify-content: flex-end;
+	gap: 14px;
+}
+.ds-google-confirm button {
+	padding: 8px 12px;
+	border: 1px solid var(--color-border);
+	background: transparent;
+}
+.ds-google-message {
+	display: block;
+	color: var(--color-muted-foreground);
+	font-size: 14px;
+	margin-top: 14px;
+}
+.ds-google-saved {
+	text-align: center;
+	color: var(--color-muted-foreground);
+	font-size: 12px;
+	margin: 32px 0 0;
+}
+@media (max-width: 480px) {
+	.ds-google-accounts {
+		padding: 18px;
+	}
+	.ds-google-card {
+		padding: 16px;
+	}
+	.ds-google-badge {
+		margin-left: 68px;
+	}
+}

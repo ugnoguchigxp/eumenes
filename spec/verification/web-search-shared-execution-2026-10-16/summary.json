@@ -1,0 +1,81 @@
+{
+  "date": "2026-10-16",
+  "baseCommit": "4d7204ca6415a107141b2edb2d057e4d5c13195e",
+  "scope": "Four web_search review findings; other working changes preserved. No server lifecycle, live service, DB or credential operations.",
+  "implementation": {
+    "commonExecution": "readAhead uses the existing invocation/receipt path and Queue. Resume the model once after all selected invocations settle. Removed web-read-plan.ts and web-read-state.ts and their counters/hedge timer.",
+    "cooldown": "Previous committed invocation finished_at + retryable cooldown schedules Queue availableAt; hard task deadline is retained.",
+    "evidence": "Reuse bounded continuous spans for multiline pages. Heading/header context remains metadata. Existing 64-reference, 32KiB material and 64KiB overall limits remain.",
+    "urlScope": "Unicode-aware lexical URL extraction and canonical URL identity checks, without granting another path.",
+    "upgradeTest": "Resolve active package revision; retain assertions for archived lookup schema digest and new lookup dependency."
+  },
+  "revisions": [
+    "skill:web.guided@3",
+    "package:web.recipe@4",
+    "package:web.search@4",
+    "package:web.quick@5",
+    "toolchain:web.search@5",
+    "toolchain:web.research.codex@2"
+  ],
+  "verification": {
+    "partial": "24 pass / 0 fail (9 files); includes cooldown not-before and hard-deadline test.",
+    "bundle": "issues=[]; fresh registration and repeated seeding tested.",
+    "isolatedSnapshot": "Source-only copy, fixed installed dependencies, no product data or configuration. Own file bytes match verified copy.",
+    "domainBun": "471 pass / 0 fail (71 files)",
+    "domainWeb": "17 pass / 0 fail (3 files)",
+    "static": "Selected lint, TypeScript 907 files, DesignSystem typecheck and build passed. Dependency closure: 824 workspace files.",
+    "gate": {
+      "command": "bun run verify -- --domain agent-runtime --domain capabilities --domain tool-runtime --domain web-research --domain dialogue",
+      "result": "blocked at unrelated formatting files; not a passing verify",
+      "files": [
+        "api/domains/capabilities/repository/index.ts",
+        "api/domains/capabilities/test/bundles.test.ts",
+        "api/domains/dialogue/test/guided-answer.test.ts"
+      ],
+      "remainingSteps": "Run separately using the unchanged verification plan; all passed. No unrelated formatting changed."
+    },
+    "applicationComparison": {
+      "command": "bun test api/application/guided-web.test.ts api/application/toolchain-recipe-e2e.test.ts api/application/search-agents-check.test.ts api/application/search-agents-e2e.test.ts api/application/search-results.test.ts api/application/research-history.test.ts",
+      "baseline": "22 pass / 32 fail",
+      "candidate": "22 pass / 32 fail",
+      "sameFailureCases": true,
+      "candidateOnlyFailures": [],
+      "interpretation": "Existing broader fixture expectations conflict with guided direct-answer behavior; not modified as unrelated work. Current API stock/weather, source invalidation, and no-parent-regeneration cases passed."
+    },
+    "negativeControl": "The same new regression tests on the pre-fix execution code fail 6 cases; candidate domain run passes them. This verifies detection, not live model accuracy.",
+    "live": "Not run; fixture regressions use injected models and acquisitions. No server start/restart was authorized or performed."
+  },
+  "ownedPaths": [
+    "api/application/guided-web.test.ts",
+    "api/application/toolchain.ts",
+    "api/domains/agent-runtime/service/context.ts",
+    "api/domains/agent-runtime/service/evidence-excerpts.ts",
+    "api/domains/agent-runtime/service/guided-step.ts",
+    "api/domains/agent-runtime/service/reconcile-timer.ts",
+    "api/domains/agent-runtime/service/reconcile.ts",
+    "api/domains/agent-runtime/service/request-urls.ts",
+    "api/domains/agent-runtime/service/step-actions.ts",
+    "api/domains/agent-runtime/service/step-handler.ts",
+    "api/domains/agent-runtime/service/task-ops.ts",
+    "api/domains/agent-runtime/service/web-read-plan.ts",
+    "api/domains/agent-runtime/service/web-read-state.ts",
+    "api/domains/agent-runtime/test/guided-limits.test.ts",
+    "api/domains/agent-runtime/test/guided-web.test.ts",
+    "api/domains/agent-runtime/test/request-urls.test.ts",
+    "api/domains/agent-runtime/test/route-harness.ts",
+    "api/domains/agent-runtime/test/structured-web.test.ts",
+    "api/domains/capabilities/bundles/web-guided.bundle.json",
+    "api/domains/capabilities/bundles/web-shared-execution.bundle.json",
+    "api/domains/capabilities/test/lookup-upgrade.test.ts",
+    "api/domains/capabilities/test/web-guided.test.ts",
+    "api/domains/tool-runtime/contracts/index.ts",
+    "api/domains/tool-runtime/service/index.ts",
+    "api/domains/tool-runtime/service/read-invocation.ts",
+    "api/domains/web-research/service/index.ts",
+    "api/domains/web-research/test/attempt-timeout.test.ts",
+    "docs/toolchain.md",
+    "docs/web-research.md",
+    "api/domains/capabilities/test/web-research-rename.test.ts"
+  ],
+  "remaining": "No implementation work remains for the four findings. Repository-wide verify remains blocked by unrelated formatting and the existing application fixture failures."
+}

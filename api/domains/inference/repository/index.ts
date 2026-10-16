@@ -17,7 +17,7 @@ export const backgroundControlMigration = `CREATE TABLE inference_background_con
  request_id TEXT PRIMARY KEY REFERENCES inference_requests(id), binding TEXT NOT NULL
 );`;
 export interface RequestRow {
-	controlEngine: "larm" | "codex_luna";
+	controlEngine: "larm" | "codex";
 	controlPolicyRequestId: string | null;
 	id: string;
 	subject: string;
@@ -41,7 +41,7 @@ export function get(db: Database, id: string): RequestRow | null {
 				parents: string;
 				output_limit?: number | null;
 				context_policy?: "legacy" | "exact";
-				control_engine?: "larm" | "codex_luna";
+				control_engine?: "larm" | "codex";
 				control_policy_request_id?: string | null;
 				structured_output?: number;
 		  })
@@ -62,11 +62,7 @@ export function get(db: Database, id: string): RequestRow | null {
 }
 
 /** Pin the host-selected provider when the control is first captured. */
-export function bindControlEngine(
-	db: Database,
-	id: string,
-	engine?: "codex_luna",
-) {
+export function bindControlEngine(db: Database, id: string, engine?: "codex") {
 	const row = get(db, id)!;
 	if (
 		(row.mode === "control" || !engine) &&
@@ -133,5 +129,14 @@ CREATE UNIQUE INDEX inference_agent_sessions_task ON inference_agent_sessions(ta
 		after: ["inference/0009-agent-sessions"],
 		sql: `ALTER TABLE inference_attempts ADD COLUMN refs TEXT;
 CREATE INDEX inference_attempts_revocable ON inference_attempts(status, request_id) WHERE refs IS NOT NULL AND accepted=0;`,
+	},
+	{
+		// The CHECK on the old column cannot admit the model-neutral engine name: replace the column.
+		id: "inference/0011-control-engine-codex",
+		after: ["inference/0010-attempt-refs"],
+		sql: `ALTER TABLE inference_requests ADD COLUMN control_engine_next TEXT NOT NULL DEFAULT 'larm' CHECK(control_engine_next IN ('larm','codex'));
+UPDATE inference_requests SET control_engine_next=CASE WHEN control_engine='larm' THEN 'larm' ELSE 'codex' END;
+ALTER TABLE inference_requests DROP COLUMN control_engine;
+ALTER TABLE inference_requests RENAME COLUMN control_engine_next TO control_engine;`,
 	},
 ];

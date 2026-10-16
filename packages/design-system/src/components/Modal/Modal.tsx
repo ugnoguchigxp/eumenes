@@ -3,8 +3,9 @@ import { X } from "lucide-react";
 import * as React from "react";
 import { cn } from "@/utils/cn";
 
-interface IModalProps
-	extends React.ComponentPropsWithoutRef<typeof DialogPrimitive.Root> {
+interface IModalProps extends React.ComponentPropsWithoutRef<
+	typeof DialogPrimitive.Root
+> {
 	trigger?: React.ReactNode;
 	title?: string;
 	description?: string;
@@ -60,6 +61,7 @@ const Modal = React.memo(
 			// Modal閉じた時に位置をリセット
 			React.useEffect(() => {
 				if (!show) {
+					// oxlint-disable-next-line react/set-state-in-effect -- local state follows a prop or open state, reset when it changes
 					setPosition({ x: 0, y: 0 });
 					setIsDragging(false);
 				}
@@ -129,7 +131,7 @@ const Modal = React.memo(
 							{draggable && (
 								<button
 									type="button"
-									aria-label="Drag modal"
+									aria-label="ダイアログを移動"
 									className="absolute inset-0 cursor-move"
 									onMouseDown={handleMouseDown}
 								/>
@@ -146,7 +148,7 @@ const Modal = React.memo(
 									</DialogPrimitive.Title>
 									<DialogPrimitive.Close className="rounded-full p-1 opacity-70 ring-offset-background transition-all hover:opacity-100 hover:bg-accent focus:outline-none disabled:pointer-events-none cursor-pointer">
 										<X className="h-5 w-5 text-foreground" />
-										<span className="sr-only">Close</span>
+										<span className="sr-only">ダイアログを閉じる</span>
 									</DialogPrimitive.Close>
 								</div>
 								{description ? (
@@ -221,6 +223,8 @@ const Modal = React.memo(
 								!draggable &&
 									"bottom-0 left-0 right-0 w-full h-[90vh] rounded-t-xl border-t border-border",
 								!draggable &&
+									"translate-x-0 translate-y-0 sm:-translate-x-1/2 sm:-translate-y-1/2",
+								!draggable &&
 									"data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom",
 								draggable &&
 									"left-[50%] top-[50%] h-auto max-h-[90vh] w-[90vw] max-w-lg rounded-md border border-border",
@@ -240,9 +244,7 @@ const Modal = React.memo(
 											transform: `translate(calc(-50% + ${position.x}px), calc(-50% + ${position.y}px))`,
 											cursor: isDragging ? "grabbing" : undefined,
 										}
-									: {
-											transform: "translate(-50%, -50%)",
-										}
+									: undefined
 							}
 						>
 							{modalContent}

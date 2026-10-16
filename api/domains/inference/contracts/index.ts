@@ -123,7 +123,7 @@ export interface InferencePort {
 			policySubject: string;
 			deadline: number;
 			maxOutputTokens: number;
-			engine?: "codex_luna";
+			engine?: "codex";
 			/** `larm-only` (default) or the saved cloud LLM resource task sub-agents run on (see `BackgroundControl.route`). */
 			route?: "larm-only" | { resourceId: string };
 		},
@@ -201,10 +201,8 @@ export interface InferencePort {
 		voiceSubject: string,
 		runSubject: string,
 		deadline?: number,
-		validation?: {
-			validationRequestIds: string[];
-			transcriptionRequestIds?: string[];
-		},
+		/** Earlier ASR results merged into this input; each becomes a parent of the answer. */
+		transcriptionRequestIds?: string[],
 	): void;
 	cancelSubject?(subject: string): Promise<void>;
 	snapshotInTransaction?(db: Database): Settings;

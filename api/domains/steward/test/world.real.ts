@@ -2,7 +2,7 @@ import type { Database } from "bun:sqlite";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { migrations } from "../../../application/migrations";
+import { migrations as worldPackageMigrations } from "eumenes-world-model/sqlite";
 import { openStore } from "../../../infrastructure/sqlite";
 import {
 	CONVERSATION_DEFAULT_PRINCIPAL,
@@ -15,9 +15,17 @@ import {
 	createWorldHostGate,
 	createWorldLifecycle,
 	createWorldService,
+	migrations as worldMigrations,
 	type IntakePorts,
 	type WorldApplyRequest,
 } from "../../world";
+import { migrations as stewardHostMigrations } from "./steward.fixture";
+
+const migrations = [
+	...stewardHostMigrations,
+	...worldPackageMigrations,
+	...worldMigrations,
+];
 
 export const PURPOSE = "world.test";
 export const SCOPE = {
@@ -32,7 +40,7 @@ export const ACCESS = {
 };
 
 /**
- * The real World (package, store, lifecycle, curation) on the production migrations, for the tests that hold the
+ * The real World (package, store, lifecycle, curation) on the steward host schema plus World's, for the tests that hold the
  * steward to World's own behavior. The steward and memory are built over its store and conversation.
  */
 export async function openRealWorld(intake: Partial<IntakePorts>) {

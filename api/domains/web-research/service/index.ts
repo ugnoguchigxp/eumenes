@@ -456,6 +456,7 @@ export function createWebResearch({
 			deadlineAtMs: number;
 			parentJobId?: string;
 			lane: "interactive" | "background";
+			availableAtMs?: number;
 			/** 1..15000 ms, counted from execute start (never from Queue admission). */
 			attemptTimeoutMs?: number;
 		},
@@ -488,9 +489,10 @@ export function createWebResearch({
 				payload: { runId },
 				subjectRef: runId,
 				lane: hostOptions?.lane ?? "background",
+				availableAtMs: hostOptions?.availableAtMs,
 				parentJobId: hostOptions?.parentJobId,
 				deadlineAtMs: Math.min(
-					now() + 30000,
+					Math.max(now(), hostOptions?.availableAtMs ?? 0) + 30000,
 					hostOptions?.deadlineAtMs ?? Infinity,
 				),
 				maxAttempts: 1,

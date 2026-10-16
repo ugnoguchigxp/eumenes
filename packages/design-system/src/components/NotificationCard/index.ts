@@ -1,1 +1,4 @@
-export { NotificationCard, type NotificationCardProps } from "./NotificationCard";
+export {
+	NotificationCard,
+	type NotificationCardProps,
+} from "./NotificationCard";

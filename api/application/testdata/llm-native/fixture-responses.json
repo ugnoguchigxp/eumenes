@@ -167,7 +167,7 @@
 			}
 		]
 	},
-	"event-complete-luna": {
+	"event-complete-codex": {
 		"outcome": "answered",
 		"summary": "受付開始は2026年10月12日09:00 JST。申込締切は2026年10月15日18:00 JST。参加費は一人1,500 JPY。",
 		"claims": [
@@ -197,7 +197,7 @@
 			}
 		]
 	},
-	"event-missing-luna": {
+	"event-missing-codex": {
 		"outcome": "partial",
 		"summary": "受付開始は2026年10月12日09:00 JST。申込締切は記載がない。参加費は一人1,500 JPY。",
 		"claims": [
@@ -227,7 +227,7 @@
 			}
 		]
 	},
-	"facility-complete-luna": {
+	"facility-complete-codex": {
 		"outcome": "answered",
 		"summary": "日曜日は10:00〜17:00。12歳未満は成人同伴が必要。一般料金500 JPY、会員料金300 JPY。",
 		"claims": [
@@ -254,7 +254,7 @@
 			}
 		]
 	},
-	"facility-conflict-luna": {
+	"facility-conflict-codex": {
 		"outcome": "partial",
 		"summary": "本館規程: 日曜日10:00〜17:00。12歳未満は成人同伴が必要。予約案内: 日曜日10:00〜17:00。12歳未満は同伴の有無によらず入館不可。どちらが有効かは記載なし。",
 		"claims": [
@@ -281,7 +281,7 @@
 			}
 		]
 	},
-	"product-target-luna": {
+	"product-target-codex": {
 		"outcome": "answered",
 		"summary": "NX-42はR2対応。firmwareは3.2以上。",
 		"claims": [
@@ -308,7 +308,7 @@
 			}
 		]
 	},
-	"product-old-luna": {
+	"product-old-codex": {
 		"outcome": "answered",
 		"summary": "NX-24はR2非対応。必要firmwareの条件は適用外。",
 		"claims": [
@@ -362,7 +362,7 @@
 			}
 		]
 	},
-	"lodging-complete-luna": {
+	"lodging-complete-codex": {
 		"outcome": "answered",
 		"summary": "公式サイト予約の2026年11月8日宿泊は2026-11-04 18:00 JSTまで無料取消可能。期限後の取消料率は40%。",
 		"claims": [
@@ -416,7 +416,7 @@
 			}
 		]
 	},
-	"lodging-missing-luna": {
+	"lodging-missing-codex": {
 		"outcome": "partial",
 		"summary": "公式サイト予約の2026年11月8日宿泊は2026-11-04 18:00 JSTまで無料取消可能。期限後の取消料率は不明。",
 		"claims": [
@@ -473,7 +473,7 @@
 			}
 		]
 	},
-	"rental-complete-luna": {
+	"rental-complete-codex": {
 		"outcome": "answered",
 		"summary": "個人契約の最低年齢は21歳。保証金は8,000 JPY。",
 		"claims": [
@@ -530,7 +530,7 @@
 			}
 		]
 	},
-	"rental-missing-luna": {
+	"rental-missing-codex": {
 		"outcome": "partial",
 		"summary": "個人契約の最低年齢は21歳。保証金額は未記載のため不明。",
 		"claims": [

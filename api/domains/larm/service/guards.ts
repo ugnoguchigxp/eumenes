@@ -113,3 +113,7 @@ export function providerEndpoint(
 		throw new Error("larm_provider_host_mismatch");
 	return url;
 }
+
+/** True when the caller's own signal cancelled the request (not a timeout or a LARM fault). */
+export const callerAborted = (error: unknown, signal?: AbortSignal) =>
+	signal?.aborted === true && (error as Error)?.name === "AbortError";

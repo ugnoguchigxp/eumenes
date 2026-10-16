@@ -2,7 +2,6 @@ import { createVoiceIntake } from "./intake";
 import { createVoiceResponder } from "./respond";
 import { createInputCollector } from "./input";
 import type { Database } from "bun:sqlite";
-import { createVoiceProcessor } from "./process";
 import type { Speech } from "./speech-state";
 import type { SpeechPreparation } from "../../delivery";
 import { getLogger } from "../../../infrastructure/logger";
@@ -25,7 +24,6 @@ export function createVoiceDialogue(
 ) {
 	const sessions = new Map<string, number>();
 	const controllers = new Map<string, AbortController>();
-	const languageRequests = new Map<string, string>();
 
 	const audio = new Map<string, Speech>();
 	const previews = new Map<
@@ -296,23 +294,10 @@ export function createVoiceDialogue(
 	async function advance(
 		id: string,
 		status: VoiceTurn["status"],
-		patch: { text?: string; runId?: string; error?: string } = {},
-		receipt?: Receipt,
-		language?: { receipt: Receipt; turn: VoiceTurn; signal: AbortSignal },
+		patch: { error?: string } = {},
 	) {
 		const result = await store.write((db) => {
 			const current = get(db, id);
-			if (language) {
-				language.signal.throwIfAborted();
-				if (
-					!current ||
-					current.status !== "recognizing" ||
-					current.revision !== language.turn.revision ||
-					current.generation !== language.turn.generation ||
-					sessions.get(current.sessionId) !== current.generation
-				)
-					throw new Error("permission_revoked");
-			}
 			if (
 				status !== "failed" &&
 				status !== "cancelled" &&
@@ -322,42 +307,14 @@ export function createVoiceDialogue(
 					larm.requestFor?.(db, id, "asr"),
 					current?.runId ? larm.requestFor?.(db, current.runId, "llm") : null,
 				];
-				if (
-					parents.some(
-						(ref) =>
-							ref &&
-							ref !== receipt?.requestId &&
-							!larm.validInTransaction?.(db, ref),
-					)
-				)
+				if (parents.some((ref) => ref && !larm.validInTransaction?.(db, ref)))
 					throw new Error("permission_revoked");
 			}
-			if (
-				receipt &&
-				(!current ||
-					[
-						"cancelled",
-						"interrupted",
-						"failed",
-						"played",
-						"completed",
-						"merged",
-					].includes(current.status) ||
-					!larm.acceptInTransaction?.(db, receipt))
-			)
-				throw new Error("permission_revoked");
-			if (language && !larm.acceptInTransaction?.(db, language.receipt))
-				throw new Error("permission_revoked");
 			return current
 				? update(db, id, current.revision, status, clock(), patch)
 				: false;
 		});
-		if (result)
-			log.debug("voice.transition", {
-				utteranceId: id,
-				runId: patch.runId,
-				status,
-			});
+		if (result) log.debug("voice.transition", { utteranceId: id, status });
 		else log.debug("voice.transition_skipped", { utteranceId: id, status });
 		return result;
 	}
@@ -373,23 +330,10 @@ export function createVoiceDialogue(
 		if (!update(db, id, current.revision, "responding", clock(), { runId }))
 			throw new Error("voice_turn_inactive");
 	}
-	const process = createVoiceProcessor({
-		store,
-		dialogue,
-		larm,
-		advance,
-		createSpeech,
-		controllers,
-		audio,
-		languageRequests,
-		linkRunInTransaction,
-	});
 	const input = createInputCollector({
 		store,
-		dialogue,
 		larm,
 		sessions,
-		languageRequests,
 		controllers,
 		respond: createVoiceResponder({
 			store,
@@ -499,19 +443,11 @@ export function createVoiceDialogue(
 			sessions,
 			touchSession,
 			clock,
-			dispatch: (turn, wav, deferred) => {
+			dispatch: (turn, wav) => {
 				previews.get(turn.utteranceId)?.controller.abort();
 				const controller = new AbortController();
 				controllers.set(turn.utteranceId, controller);
-				if (deferred) input.accept(turn, wav, controller);
-				else
-					void process(turn, wav, controller).catch((error) =>
-						log.error(
-							"voice.processing_crashed",
-							{ reason: toErrorCode(error, "voice_failed") },
-							error,
-						),
-					);
+				input.accept(turn, wav, controller);
 			},
 		}),
 
@@ -619,13 +555,6 @@ export function createVoiceDialogue(
 			controllers.get(id)?.abort();
 			previews.get(id)?.controller.abort();
 			audio.get(id)?.wake();
-			const languageId = languageRequests.get(id);
-			if (languageId) {
-				await store.write((db) =>
-					larm.cancelRequestsInTransaction?.(db, [languageId]),
-				);
-				larm.flushCancelledRequests?.([languageId]);
-			}
 			await larm.cancelSubject?.(id);
 			audio.delete(id);
 			if (latest?.runId) await dialogue.cancel(latest.runId);
@@ -650,10 +579,6 @@ export function createVoiceDialogue(
 		async close() {
 			for (const c of controllers.values()) c.abort();
 			controllers.clear();
-			const ids = [...languageRequests.values()];
-			await store.write((db) => larm.cancelRequestsInTransaction?.(db, ids));
-			larm.flushCancelledRequests?.(ids);
-			languageRequests.clear();
 			for (const p of previews.values()) p.controller.abort();
 			previews.clear();
 			for (const c of warming.values()) c.abort();

@@ -170,10 +170,17 @@ test("gateway refuses foreign refs and unselected URLs; idempotent invocation an
 						?.body,
 			),
 		).toBe("fact");
+		expect(
+			store.read((db) => tools.liveSourcesInTransaction(db, owner.taskId)),
+		).toHaveLength(1);
 		time = Date.now() + 1_000_000;
 		expect(() =>
 			store.read((db) => tools.observationsInTransaction(db, owner.taskId)),
 		).toThrow("result_expired");
+		// Carrying sources forward must not fail once the held result has expired.
+		expect(
+			store.read((db) => tools.liveSourcesInTransaction(db, owner.taskId)),
+		).toEqual([]);
 	} finally {
 		tools.close();
 		await queue.close(100);

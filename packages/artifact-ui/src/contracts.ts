@@ -260,7 +260,21 @@ export const viewRegistry = {
 				view: z.literal("collection-workspace"),
 				source,
 				title,
-				presentation: z.enum(["table", "catalog", "summary"]).optional(),
+				presentation: z
+					.enum(["table", "catalog", "summary", "indicator"])
+					.optional(),
+				indicator: z
+					.strictObject({
+						key: z.string().min(1).max(64),
+						activeValue: z.string().max(80),
+					})
+					.optional(),
+				tableColumns: z
+					.array(z.string().regex(/^[A-Za-z][A-Za-z0-9_-]{0,63}$/))
+					.min(1)
+					.max(32)
+					.optional(),
+				detailMode: z.enum(["inline", "modal"]).optional(),
 				selectionField: z
 					.string()
 					.regex(/^[A-Za-z][A-Za-z0-9_-]{0,63}$/)
@@ -486,6 +500,7 @@ export const layoutSchema = z
 		title,
 		draftSource: source.optional(),
 		headerChildren: z.array(z.number().int().min(0).max(11)).max(12).optional(),
+		headerLayout: z.enum(["stack", "inline"]).optional(),
 		tabs: z
 			.array(
 				z.strictObject({

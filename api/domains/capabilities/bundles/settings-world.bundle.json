@@ -8,7 +8,7 @@
 		{
 			"kind": "artifact",
 			"id": "settings.world",
-			"revision": 4,
+			"revision": 6,
 			"title": "World",
 			"variants": [
 				{
@@ -20,6 +20,10 @@
 						"title": "World",
 						"headerChildren": [0],
 						"tabs": [
+							{
+								"label": "資料",
+								"children": [3]
+							},
 							{
 								"label": "主張の一覧",
 								"children": [1]
@@ -33,21 +37,50 @@
 							{
 								"view": "collection-workspace",
 								"source": "world-status",
-								"title": "Worldの状態",
-								"presentation": "summary"
+								"title": "World",
+								"presentation": "indicator",
+								"indicator": {
+									"key": "connection",
+									"activeValue": "online"
+								}
 							},
 							{
 								"view": "collection-workspace",
 								"source": "world-claims",
 								"title": "主張の一覧",
-								"presentation": "catalog"
+								"presentation": "table",
+								"tableColumns": [
+									"subject",
+									"claim",
+									"toneLabel",
+									"originLabel",
+									"freshnessLabel"
+								],
+								"detailMode": "modal"
 							},
 							{
 								"view": "collection-workspace",
 								"source": "world-forgets",
-								"title": "忘却の状況"
+								"title": "忘却の状況",
+								"presentation": "table",
+								"tableColumns": [
+									"displayLabel",
+									"rootCount",
+									"createdAt",
+									"updatedAt"
+								],
+								"detailMode": "modal"
+							},
+							{
+								"view": "collection-workspace",
+								"source": "world-documents",
+								"title": "資料",
+								"presentation": "table",
+								"tableColumns": ["title", "collection", "revision"],
+								"detailMode": "modal"
 							}
-						]
+						],
+						"headerLayout": "inline"
 					}
 				}
 			],
@@ -56,20 +89,28 @@
 				{
 					"source": "world-status",
 					"adapterRef": "adapter:world@1",
-					"query": "query:world.status@1",
+					"query": "query:world.status@2",
 					"target": "none"
 				},
 				{
 					"source": "world-claims",
 					"adapterRef": "adapter:world@1",
-					"query": "query:world.claims@1",
-					"target": "none"
+					"query": "query:world.claims-page@1",
+					"target": "none",
+					"paramsSchemaRef": "schema:world-claims-page@1"
 				},
 				{
 					"source": "world-forgets",
 					"adapterRef": "adapter:world@1",
 					"query": "query:world.forgets@1",
 					"target": "none"
+				},
+				{
+					"source": "world-documents",
+					"adapterRef": "adapter:world@1",
+					"query": "query:world.documents-page@1",
+					"target": "none",
+					"paramsSchemaRef": "schema:world-documents-page@1"
 				}
 			],
 			"actionBindings": [],
@@ -81,23 +122,8 @@
 					"rowsPath": "items",
 					"columns": [
 						{
-							"key": "state",
-							"label": "状態",
-							"format": "badge"
-						},
-						{
-							"key": "gateOpen",
-							"label": "Scopeの受付",
-							"format": "boolean"
-						},
-						{
-							"key": "claimsNote",
-							"label": "主張の一覧の状況",
-							"format": "text"
-						},
-						{
-							"key": "forgetsNote",
-							"label": "忘却の状況の読み取り",
+							"key": "connection",
+							"label": "接続",
 							"format": "text"
 						}
 					]
@@ -163,7 +189,8 @@
 							"label": "版",
 							"format": "number"
 						}
-					]
+					],
+					"paging": true
 				},
 				{
 					"source": "world-forgets",
@@ -201,6 +228,56 @@
 						"key": "inProgress",
 						"in": [true]
 					}
+				},
+				{
+					"source": "world-documents",
+					"title": "資料",
+					"description": "取り込んだ原資料です。主張として抽出・採用された件数とは異なります。",
+					"rowKey": "id",
+					"rowsPath": "items",
+					"paging": true,
+					"columns": [
+						{
+							"key": "title",
+							"label": "資料名",
+							"format": "text"
+						},
+						{
+							"key": "collection",
+							"label": "コレクション",
+							"format": "text"
+						},
+						{
+							"key": "revision",
+							"label": "版",
+							"format": "text"
+						},
+						{
+							"key": "excerpt",
+							"label": "本文（先頭2048文字）",
+							"format": "text"
+						},
+						{
+							"key": "contentLength",
+							"label": "本文の文字数",
+							"format": "number"
+						},
+						{
+							"key": "id",
+							"label": "資料ID",
+							"format": "text"
+						},
+						{
+							"key": "digest",
+							"label": "本文ハッシュ",
+							"format": "text"
+						},
+						{
+							"key": "manifestDigest",
+							"label": "シードの版",
+							"format": "text"
+						}
+					]
 				}
 			],
 			"launcher": {
@@ -212,5 +289,74 @@
 			}
 		}
 	],
-	"schemas": []
+	"schemas": [
+		{
+			"kind": "schema",
+			"id": "world-claims-page",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"pageIndex": {
+						"type": "integer",
+						"minimum": 0,
+						"maximum": 100000
+					},
+					"pageSize": {
+						"type": "integer",
+						"enum": [10, 25, 50]
+					},
+					"sort": {
+						"type": "string",
+						"enum": [
+							"subject",
+							"claim",
+							"toneLabel",
+							"originLabel",
+							"freshnessLabel"
+						]
+					},
+					"desc": {
+						"type": "boolean"
+					},
+					"q": {
+						"type": "string",
+						"maxLength": 200
+					}
+				}
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "world-documents-page",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"pageIndex": {
+						"type": "integer",
+						"minimum": 0,
+						"maximum": 100000
+					},
+					"pageSize": {
+						"type": "integer",
+						"enum": [10, 25, 50]
+					},
+					"sort": {
+						"type": "string",
+						"enum": ["id", "title", "collection", "revision"]
+					},
+					"desc": {
+						"type": "boolean"
+					},
+					"q": {
+						"type": "string",
+						"maxLength": 200
+					}
+				}
+			}
+		}
+	]
 }

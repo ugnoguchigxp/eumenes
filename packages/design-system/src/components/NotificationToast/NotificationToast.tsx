@@ -11,8 +11,7 @@ import { cn } from "@/utils/cn";
 
 export type NotificationToastType = "info" | "success" | "warning" | "error";
 
-export interface NotificationToastProps
-	extends React.HTMLAttributes<HTMLDivElement> {
+export interface NotificationToastProps extends React.HTMLAttributes<HTMLDivElement> {
 	type: NotificationToastType;
 	title: string;
 	message: string;
@@ -128,7 +127,7 @@ export const NotificationToast = React.memo<NotificationToastProps>(
 							onClose?.();
 						}}
 						className="absolute top-[5px] right-[5px] flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors p-1"
-						aria-label={t("close", "Close")}
+						aria-label={t("close", "閉じる")}
 					>
 						<X className="h-3 w-3" />
 					</button>

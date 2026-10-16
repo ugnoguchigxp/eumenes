@@ -28,6 +28,7 @@ export function useIsMobile(): boolean {
 		}
 
 		// Ensure state is synced on mount
+		// oxlint-disable-next-line react/set-state-in-effect -- local state follows a prop or open state, reset when it changes
 		setIsMobile(mql.matches);
 
 		return () => {

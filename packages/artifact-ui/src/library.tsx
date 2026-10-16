@@ -125,26 +125,35 @@ function CompositionView({
 				/>
 			</section>
 		);
+	const heading = (
+		<>
+			{request.title && (
+				<h2 className="aui-composition-title">{request.title}</h2>
+			)}
+			{request.headerChildren?.map((index) => {
+				const child = request.children[index]!;
+				return (
+					<div
+						className="aui-composition-header-child"
+						key={`${index}:${child.source ?? child.view}`}
+					>
+						<RegisteredView request={child} />
+					</div>
+				);
+			})}
+		</>
+	);
 	if (request.direction === "tabs")
 		return (
 			<section
 				aria-label={request.title ?? "組合せ表示"}
 				className="aui-composition aui-composition-tabs"
 			>
-				{request.title && (
-					<h2 className="aui-composition-title">{request.title}</h2>
+				{request.headerLayout === "inline" ? (
+					<div className="aui-composition-heading">{heading}</div>
+				) : (
+					heading
 				)}
-				{request.headerChildren?.map((index) => {
-					const child = request.children[index]!;
-					return (
-						<div
-							className="aui-composition-header-child"
-							key={`${index}:${child.source ?? child.view}`}
-						>
-							<RegisteredView request={child} />
-						</div>
-					);
-				})}
 				<Tabs value={selected} onValueChange={setSelected}>
 					<TabsList aria-label={`${request.title ?? "画面"}の区分`}>
 						{tabs.map((tab, index) => (

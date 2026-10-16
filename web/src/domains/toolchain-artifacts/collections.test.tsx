@@ -432,6 +432,11 @@ test("a structural create is staged in the draft with a host-made id, its secret
 	expect(screen.getByText("更新・削除予定 1件")).toBeTruthy();
 	expect(document.body.textContent).not.toContain(SECRET);
 	expect(submit).not.toHaveBeenCalled();
+	await waitFor(() =>
+		expect(
+			screen.getAllByRole("button", { name: "設定の変更をすべて適用" })[0],
+		).toHaveProperty("disabled", false),
+	);
 	fireEvent.click(
 		screen.getAllByRole("button", { name: "設定の変更をすべて適用" })[0]!,
 	);

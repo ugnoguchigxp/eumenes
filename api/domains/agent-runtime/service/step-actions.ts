@@ -13,7 +13,13 @@ import { requirementVerification } from "../contracts/requirements";
 import { get, byRoot, update } from "../repository";
 import { safeCode } from "./control-output";
 import type { EvidenceCatalog } from "./evidence-catalog";
-import { isHistory, isSearch, modelLimit } from "./exploration";
+import {
+	isHistory,
+	isSearch,
+	isPageRead,
+	explorationBudget,
+	modelLimit,
+} from "./exploration";
 import { logRejection } from "./rejection-log";
 import {
 	researchAction,
@@ -96,7 +102,6 @@ function invokeStepTool(
 ) {
 	const { tools } = ctx.deps;
 	const { catalogs, bindings } = ctx.state;
-	const { next } = ops;
 	// Authority at prepare is immutable for this step. Cancellation,
 	// registry revision and the hard deadline are still checked at invoke.
 	const grant = input.grants.find((g) => g.id === action.tool);
@@ -121,30 +126,51 @@ function invokeStepTool(
 		...(taskInput.urls ?? []),
 		...obs.flatMap((o) => o.sources.flatMap((s) => (s.url ? [s.url] : []))),
 	];
-	const inv = tools.invokeInTransaction(
-		db,
-		owner(t),
-		tool.executionRef,
-		catalogs.get(t.id)!.arguments(action.arguments),
-		input.stepId,
-		t.deadline,
-		claim.jobId,
-		urls,
-		taskInput.question,
-		!grant?.replayOnly,
-	);
+	const calls = [
+		action.arguments,
+		...("readAhead" in action ? (action.readAhead ?? []) : []),
+	];
+	if (calls.length > 1 && !isPageRead(toolRuntimeOf(tool.tool.revisionId)))
+		throw new Error("invalid_tool_input");
+	let lastId = "";
+	for (const [index, args] of calls.entries()) {
+		const budget = explorationBudget(
+			t,
+			p,
+			tools.invocationsInTransaction(db, t.id),
+			ctx.deps.now(),
+		);
+		if (
+			calls.length > 1 &&
+			(!budget.canOperate ||
+				budget.reads >= budget.maxReads ||
+				budget.externalCalls >= budget.maxExternalCalls)
+		)
+			throw new Error("invalid_tool_input");
+		const inv = tools.invokeInTransaction(
+			db,
+			owner(t),
+			tool.executionRef,
+			catalogs.get(t.id)!.arguments(args),
+			calls.length === 1 ? input.stepId : `${input.stepId}:${index}`,
+			t.deadline,
+			claim.jobId,
+			urls,
+			taskInput.question,
+			!grant?.replayOnly,
+		);
+		lastId = inv.id;
+	}
 	db.query(
 		"UPDATE agent_tasks SET tool_calls=?,invocation_id=? WHERE id=?",
-	).run(tools.invocationsInTransaction(db, t.id).length, inv.id, t.id);
-	if (inv.state !== "pending") {
-		next(db, get(db, t.id)!, claim.jobId, "research_no_progress");
-	} else
-		update(
-			db,
-			get(db, t.id)!,
-			"waiting_tool",
-			isSearch(toolRuntimeOf(tool.tool.revisionId)) ? "search" : "read",
-		);
+	).run(tools.invocationsInTransaction(db, t.id).length, lastId, t.id);
+	update(
+		db,
+		get(db, t.id)!,
+		"running",
+		isSearch(toolRuntimeOf(tool.tool.revisionId)) ? "search" : "read",
+	);
+	ops.waitForTools(db, get(db, t.id)!, claim.jobId);
 }
 export function createStepActions(ctx: RuntimeContext, ops: TaskOps) {
 	const { store, capabilities, tools, inference, now } = ctx.deps;

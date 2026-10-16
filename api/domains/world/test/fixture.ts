@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { SourceRef } from "eumenes-memory";
 import { planAssertionTransition } from "eumenes-world-model";
-import { migrations } from "../../../application/migrations";
+import { migrations } from "./migrations";
 import { openStore, type SqliteStore } from "../../../infrastructure/sqlite";
 import {
 	CONVERSATION_DEFAULT_PRINCIPAL,
@@ -53,7 +53,7 @@ export type Harness = {
 	cleanup(): Promise<void>;
 };
 
-/** A temp-file store with the REAL production migrations (host, Memory, World). */
+/** A temp-file store with the World host schema (Conversation, Memory, World migrations). */
 export async function openHarness(
 	over: Partial<WorldServiceOptions> = {},
 	options: { enabled?: boolean; initialSync?: boolean } = {},

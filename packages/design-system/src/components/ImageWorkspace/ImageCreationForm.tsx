@@ -185,7 +185,9 @@ export function ImageCreationForm({
 	onGenerate,
 }: ImageCreationFormProps) {
 	const id = useId();
-	const [selection, setSelection] = useState(() => emptyImageSelection(creationOptions));
+	const [selection, setSelection] = useState(() =>
+		emptyImageSelection(creationOptions),
+	);
 	const [parameters, setParameters] = useState(() => ({
 		width: initialValues.width,
 		height: initialValues.height,

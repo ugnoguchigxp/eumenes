@@ -4,6 +4,9 @@
 	"categories": {
 		"correctness": "error"
 	},
+	"rules": {
+		"unicorn/prefer-array-flat-map": "error"
+	},
 	"ignorePatterns": [
 		"node_modules/**",
 		"dist/**",
@@ -13,7 +16,15 @@
 		"verification-reports/**",
 		"test-results/**",
 		"playwright-report/**",
-		".serena/**",
-		"packages/design-system/**"
+		".serena/**"
+	],
+	"overrides": [
+		{
+			// The design system builds ARIA widgets (listbox, combobox, group, status)
+			// on layout elements whose CSS depends on the tag; native elements would
+			// change their rendering.
+			"files": ["packages/design-system/**"],
+			"rules": { "jsx-a11y/prefer-tag-over-role": "off" }
+		}
 	]
 }

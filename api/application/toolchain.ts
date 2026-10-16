@@ -275,8 +275,7 @@ export async function createToolchain(
 			);
 			if (raw.operation === "read")
 				raw.source = tools
-					.observationsInTransaction(db, r.owner.taskId)
-					.flatMap((o) => o.sources)
+					.liveSourcesInTransaction(db, r.owner.taskId)
 					.filter((s) => s.basis === "snippet" && s.url === raw.url && s.source)
 					.at(-1)?.source;
 			const op = web.submitInTransaction(db, raw, {
@@ -284,6 +283,7 @@ export async function createToolchain(
 				parentJobId: r.parentJobId,
 				lane: "background",
 				attemptTimeoutMs: r.attemptTimeoutMs,
+				availableAtMs: r.availableAtMs,
 			});
 			return { operationId: op.runId, jobId: op.jobId };
 		},

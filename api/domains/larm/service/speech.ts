@@ -55,7 +55,6 @@ export function createSpeechSynthesizer({
 						? options.speechOverride.voice || undefined
 						: voice;
 				let selectedVoice = requestedVoice ?? p.voice;
-				const voicevox = !english && p.model === "voicevox-core";
 				if (english) {
 					// Reading the paired Japanese catalog must not reacquire the lease
 					// this call already holds: a renewal would wait on this very use.
@@ -72,8 +71,10 @@ export function createSpeechSynthesizer({
 					);
 					signal.throwIfAborted();
 				}
+				// The Japanese voice's catalog declares which synthesis parameters the
+				// service accepts (styles and per-voice ranges); English speech sends none.
 				let catalog: TtsVoices | undefined;
-				if (voicevox || !selectedVoice) {
+				if (!english || !selectedVoice) {
 					try {
 						catalog = voiceCatalogs.get(p) ?? (await readVoices(p, signal));
 					} catch (error) {
@@ -93,39 +94,40 @@ export function createSpeechSynthesizer({
 						if (!selectedVoice) throw error;
 					}
 				}
-				const catalogUnavailable = (voicevox || !selectedVoice) && !catalog;
-				if (!requestedVoice && voicevox && !english)
+				if (!requestedVoice && !english)
 					selectedVoice = catalog?.default_voice ?? selectedVoice;
 				if (!selectedVoice) selectedVoice = p.voice = catalog?.default_voice;
 				if (!selectedVoice) throw new Error("larm_tts_voice_unconfigured");
 				const speaker = catalog?.voices.find((v) => v.id === selectedVoice);
-				if (voicevox && !catalogUnavailable && !speaker) {
+				if (!english && catalog && !speaker) {
 					log.warn("larm.tts_voice_missing", {
 						kind: selectedVoice,
-						count: catalog?.voices.length,
-						reason: `catalog: ${(catalog?.voices ?? [])
+						count: catalog.voices.length,
+						reason: `catalog: ${catalog.voices
 							.slice(0, 12)
 							.map((v) => v.id)
 							.join(",")}`.slice(0, 250),
 					});
 					throw new Error("larm_tts_voice_missing");
 				}
+				// Only a voice the catalog describes takes the per-voice parameters.
+				const described = !english && speaker;
 				if (
-					voicevox &&
-					!catalogUnavailable &&
+					described &&
 					synthesis.style &&
-					!speaker?.styles.some((s) => s.id === synthesis.style)
+					speaker.styles.length > 0 &&
+					!speaker.styles.some((s) => s.id === synthesis.style)
 				)
 					throw new Error("larm_tts_voice_style_invalid");
 				let intonationScale = synthesis.intonationScale;
 				const selectedSpeed =
-					voicevox && options?.speed !== undefined
+					described && options?.speed !== undefined
 						? options.speed
 						: english
 							? 1
 							: synthesis.speed;
 				const selectedPitch =
-					voicevox && options?.pitchScale !== undefined
+					described && options?.pitchScale !== undefined
 						? options.pitchScale
 						: synthesis.pitchScale;
 				const boundedParameter = (
@@ -142,12 +144,12 @@ export function createSpeechSynthesizer({
 				const speechSpeed = boundedParameter(
 					selectedSpeed,
 					"speed",
-					voicevox && options?.speed !== undefined,
+					!!described && options?.speed !== undefined,
 				);
 				const speechPitch = boundedParameter(
 					selectedPitch,
 					"pitch_scale",
-					voicevox && options?.pitchScale !== undefined,
+					!!described && options?.pitchScale !== undefined,
 				);
 				if (options?.intonationScale !== undefined) {
 					const range = speaker?.capabilities.intonation_scale;
@@ -161,8 +163,8 @@ export function createSpeechSynthesizer({
 					["pitch_scale", speechPitch],
 					["intonation_scale", intonationScale],
 				] as const) {
-					if (voicevox && value !== undefined) {
-						const range = speaker?.capabilities[key];
+					if (described && value !== undefined) {
+						const range = speaker.capabilities[key];
 						if (
 							!Number.isFinite(value) ||
 							(range && (value < range.minimum || value > range.maximum))
@@ -170,6 +172,8 @@ export function createSpeechSynthesizer({
 							throw new Error("larm_tts_parameter_invalid");
 					}
 				}
+				const accepts = (key: "pitch_scale" | "intonation_scale"): boolean =>
+					!!described && !!speaker.capabilities[key];
 				const response = await infer(
 					p,
 					"audio/speech",
@@ -181,13 +185,13 @@ export function createSpeechSynthesizer({
 							input: text,
 							voice: selectedVoice,
 							...(speechSpeed !== undefined ? { speed: speechSpeed } : {}),
-							...(voicevox && synthesis.style
+							...(described && speaker.styles.length > 0 && synthesis.style
 								? { style: synthesis.style }
 								: {}),
-							...(voicevox && speechPitch !== undefined
+							...(accepts("pitch_scale") && speechPitch !== undefined
 								? { pitch_scale: speechPitch }
 								: {}),
-							...(voicevox && intonationScale !== undefined
+							...(accepts("intonation_scale") && intonationScale !== undefined
 								? { intonation_scale: intonationScale }
 								: {}),
 							response_format: "wav",

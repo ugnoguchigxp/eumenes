@@ -1,8 +1,4 @@
 export {
-	ToolchainArtifactHost,
-	findActionBinding,
-} from "./ToolchainArtifactHost";
-export {
 	createWebAdapterRegistry,
 	type AdapterHostContext,
 	type AdapterState,

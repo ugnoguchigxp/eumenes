@@ -7,9 +7,8 @@ const releaseStreams = new Set<() => void>();
 const ttsInputs: string[] = [];
 const ttsParameters: Array<Record<string, unknown>> = [];
 const asrInputs: Array<{ rate: number; bytes: number }> = [];
-let voiceInputs: Array<{ text: string; relation: string; readiness: string }> =
-	[];
-const assessments: Array<{ relation: string; readiness: string }> = [];
+/** Scripted final-ASR results; `delayMs` holds the transcript, as a slow recognizer would. */
+let voiceInputs: Array<{ text: string; delayMs?: number }> = [];
 // Neutral fixture ids: the product takes profile and model names from saved settings and the catalog.
 const profile = "test-profile";
 const agentProfile = profile;
@@ -57,7 +56,7 @@ const model = (name: string, selected = profile) =>
 	name === "llm"
 		? binding(selected).model
 		: name === "tts"
-			? "voicevox-core"
+			? "model-tts-rich"
 			: `model-${name}`;
 const voiceCatalog = {
 	default_voice: "fixture-voice",
@@ -123,7 +122,6 @@ const server = Bun.serve({
 		if (path === "/health") return Response.json({ status: "ok" });
 		if (path === "/fixture/voice-inputs") {
 			voiceInputs = (await request.json()) as typeof voiceInputs;
-			assessments.length = 0;
 			return Response.json({ ok: true });
 		}
 		const healthMatch = path.match(
@@ -333,7 +331,7 @@ const server = Bun.serve({
 				bytes: bytes.byteLength,
 			});
 			const scripted = voiceInputs.shift();
-			if (scripted) assessments.push(scripted);
+			if (scripted?.delayMs) await Bun.sleep(scripted.delayMs);
 			return Response.json({ text: scripted?.text ?? "こんにちは" });
 		}
 		if (path === "/llm/v1/chat/completions") {
@@ -341,32 +339,6 @@ const server = Bun.serve({
 				stream?: boolean;
 				messages?: Array<{ role: string; content: string }>;
 			};
-			// Synthetic language-control response; fixture data, not production classification.
-			if (body.messages?.[0]?.content.includes("転記された発話の主要な言語")) {
-				const staged = body.messages[0].content.includes("音声の無音区間");
-				const assessment = staged ? assessments.shift() : undefined;
-				return Response.json({
-					choices: [
-						{
-							message: {
-								content: JSON.stringify({
-									status: "identified",
-									languages: ["ja"],
-									confidence: 0.99,
-									...(staged
-										? {
-												relation: assessment?.relation ?? "independent",
-												readiness: assessment?.readiness ?? "ready",
-												relationConfidence: 0.99,
-												readinessConfidence: 0.99,
-											}
-										: {}),
-								}),
-							},
-						},
-					],
-				});
-			}
 			const text = "承知しました。先ほどの話を覚えています。";
 			if (!body.stream)
 				return Response.json({ choices: [{ message: { content: text } }] });

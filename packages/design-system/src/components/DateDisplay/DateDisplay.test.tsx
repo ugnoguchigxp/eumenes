@@ -16,7 +16,6 @@ describe("DateDisplay", () => {
 		vi.mocked(useTranslation).mockReturnValue({
 			i18n: { language: currentLang },
 			t: (k: string) => k,
-			// biome-ignore lint/suspicious/noExplicitAny: Mocking complex i18next return type
 		} as any);
 	});
 

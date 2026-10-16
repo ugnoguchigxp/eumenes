@@ -24,7 +24,7 @@ export function delegateConversation(
 		route: "web" | "history" | "world" | "action";
 		request: string;
 		packageRevisionId?: string;
-		researcher?: "codex_luna";
+		researcher?: "codex";
 		command?: unknown;
 	},
 	context: {
@@ -77,8 +77,8 @@ export function prepareRouting(
 	const ready = (requires: string | undefined) =>
 		requires === undefined || requires === "world"
 			? !!agents
-			: requires === "luna"
-				? !!context?.lunaEnabled
+			: requires === "codex"
+				? !!context?.codexEnabled
 				: requires === "excalidraw"
 					? !!deps.excalidraw
 					: requires === "object-recognition"

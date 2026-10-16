@@ -1,4 +1,9 @@
-import type { WorldClaims, WorldClaimsContext } from "../domains/world";
+import type {
+	WorldClaims,
+	WorldClaimsContext,
+	WorldDocuments,
+} from "../domains/world";
+import { z } from "zod";
 import type {
 	ClaimContent,
 	ClaimDetail,
@@ -11,10 +16,23 @@ export const WORLD_ADAPTER_REF = "adapter:world@1";
 const STATUS = "query:world.status@1";
 const CLAIMS = "query:world.claims@1";
 const FORGETS = "query:world.forgets@1";
+const STATUS_COMPACT = "query:world.status@2";
+const CLAIMS_PAGE = "query:world.claims-page@1";
+const DOCUMENTS_PAGE = "query:world.documents-page@1";
+const claimPageQuery = z.strictObject({
+	pageIndex: z.number().int().min(0).max(100000).default(0),
+	pageSize: z.union([z.literal(10), z.literal(25), z.literal(50)]).default(10),
+	q: z.string().trim().max(200).default(""),
+	sort: z
+		.enum(["subject", "claim", "toneLabel", "originLabel", "freshnessLabel"])
+		.default("subject"),
+	desc: z.boolean().default(false),
+});
 
 /** What the World adapter reads; each is a public read operation of the World domain. */
 export type WorldAdapterPorts = {
 	claims: Pick<WorldClaims, "status" | "list" | "detail" | "forgets">;
+	documents?: Pick<WorldDocuments, "pageInTransaction">;
 	/** Who the screen shows: bound by the host, never by a request. */
 	context: () => WorldClaimsContext;
 };
@@ -176,7 +194,14 @@ export const describeWorldAdapter = () => ({
 		string,
 		{ inputSchemaRef: string; effect: "read" | "write" }
 	>(),
-	queries: new Set([STATUS, CLAIMS, FORGETS]),
+	queries: new Set([
+		STATUS,
+		CLAIMS,
+		FORGETS,
+		STATUS_COMPACT,
+		CLAIMS_PAGE,
+		DOCUMENTS_PAGE,
+	]),
 	inputAdapters: new Map(),
 	projections: new Set<string>(),
 	availability: "availability:world@1",
@@ -204,11 +229,104 @@ export function createWorldAdapter(
 			throw new Error("capability_unavailable");
 		},
 		readInTransaction: () => null,
-		sourceInTransaction(_tx, query) {
+		sourceInTransaction(tx, query, _target, params) {
 			const ports = lookup();
 			if (!ports) return null;
 			const ctx = ports.context();
 			switch (query) {
+				case STATUS_COMPACT: {
+					const status = ports.claims.status(ctx);
+					const online = status.enabled && status.usable && status.gateOpen;
+					return {
+						revision: 0,
+						data: {
+							items: [
+								{ id: "world", connection: online ? "online" : "offline" },
+							],
+						},
+					};
+				}
+				case DOCUMENTS_PAGE: {
+					if (!ports.documents || ctx.scopeKeys.length !== 1) return null;
+					return {
+						revision: 0,
+						data: ports.documents.pageInTransaction(
+							tx,
+							{
+								principal: ctx.principal,
+								scopeKey: ctx.scopeKeys[0]!,
+							},
+							params ?? {},
+						),
+					};
+				}
+				case CLAIMS_PAGE: {
+					const parsed = claimPageQuery.safeParse(params ?? {});
+					if (!parsed.success) throw new Error("invalid_input");
+					const list = ports.claims.list(ctx);
+					if (list.status !== "ok")
+						return {
+							revision: 0,
+							data: {
+								items: [],
+								total: 0,
+								unavailable: list.code,
+								unavailableText: unavailableText("主張の一覧", list.code),
+							},
+						};
+					const { q, sort, desc, pageSize } = parsed.data;
+					const needle = q.toLocaleLowerCase();
+					const rows = list.value.items
+						.map(claimRow)
+						.filter(
+							(row) =>
+								!needle ||
+								[
+									row.subject,
+									row.claim,
+									row.toneLabel,
+									row.originLabel,
+									row.freshnessLabel,
+								].some((value) => value.toLocaleLowerCase().includes(needle)),
+						);
+					rows.sort(
+						(a, b) =>
+							a[sort].localeCompare(b[sort], undefined, { numeric: true }) *
+								(desc ? -1 : 1) || a.id.localeCompare(b.id),
+					);
+					const pageIndex = Math.min(
+						parsed.data.pageIndex,
+						Math.max(0, Math.ceil(rows.length / pageSize) - 1),
+					);
+					const items = rows
+						.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize)
+						.map((row) => {
+							const detail = ports.claims.detail(ctx, { claimId: row.id });
+							return {
+								...row,
+								...(detail.status === "ok"
+									? detailColumns(detail.value)
+									: NO_DETAIL),
+							};
+						});
+					return {
+						revision: 0,
+						data: {
+							total: rows.length,
+							pageIndex,
+							pageSize,
+							items,
+							complete: list.value.complete,
+							stopped: list.value.stopped,
+							...(list.value.complete
+								? {}
+								: {
+										unavailableText:
+											"読み取りの上限に達したため、一部の主張を表示しています。",
+									}),
+						},
+					};
+				}
 				case STATUS: {
 					const status = ports.claims.status(ctx);
 					const list = ports.claims.list(ctx);

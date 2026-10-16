@@ -19,7 +19,6 @@ import { STEP_KIND, active, type RuntimeContext } from "./runtime-context";
 import type { TaskOps } from "./task-ops";
 import { createToolSelection } from "./tool-selection";
 import { guidedWeb, guidedActionFor } from "./guided-contract";
-import { webReadState, saveWebReadState } from "./web-read-state";
 
 import {
 	createStepActions,
@@ -91,11 +90,6 @@ export function createStepHandler(ctx: RuntimeContext, ops: TaskOps) {
 				const latest = obs.findIndex((o) => o.invocationId === t.invocation_id);
 				if (latest >= 0) obs.push(...obs.splice(latest, 1));
 				const guided = guidedWeb(p);
-				if (guided) {
-					const state = webReadState(t);
-					state.presented = state.arrivals;
-					saveWebReadState(db, t.id, state);
-				}
 				const catalog = (
 					catalogs.get(t.id) ?? new EvidenceCatalog(guided)
 				).copy();

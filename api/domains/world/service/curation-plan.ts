@@ -178,13 +178,10 @@ export function planOutput(
 		const wanted = groundingForm(text);
 		return [
 			text,
-			...host.entitySnapshot
-				.filter((e) =>
-					[e.displayName, ...e.aliases].some(
-						(n) => groundingForm(n) === wanted,
-					),
-				)
-				.flatMap((e) => [e.displayName, ...e.aliases]),
+			...host.entitySnapshot.flatMap((e) => {
+				const names = [e.displayName, ...e.aliases];
+				return names.some((n) => groundingForm(n) === wanted) ? names : [];
+			}),
 		];
 	};
 	const contentOf = (event: CurationHostEvent) =>

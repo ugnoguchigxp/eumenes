@@ -1,30 +1,16 @@
 import { expect, test } from "bun:test";
 import { harness } from "./route-harness";
-import { webReadState } from "../service/web-read-state";
 
-const urls = [
-	"https://a.example/one",
-	"https://b.example/two",
-	"https://c.example/three",
-	"https://d.example/four",
-];
-async function searched(h: Awaited<ReturnType<typeof harness>>, id: string) {
-	await h.start(id);
-	const child = h.agents.list(id).find((t) => t.kind === "worker")!;
-	expect(child.packageRevisionId).toBe("package:web.quick@4");
-	const first = await h.runRawModelStep(child.id, {
+const urls = [1, 2, 3, 4].map((n) => `https://site${n}.example/page`);
+async function searched(h: Awaited<ReturnType<typeof harness>>, run: string) {
+	await h.start(run);
+	const id = h.agents.list(run).find((t) => t.kind === "worker")!.id;
+	const step = await h.runRawModelStep(id, {
 		action: "invoke",
 		tool: "web.lookup",
 		arguments: { query: "依頼から選んだ検索語" },
 	});
-	if (first.prep.status === "ready") {
-		expect(first.prep.input.control).toBeDefined();
-		expect(
-			JSON.stringify(first.prep.input.control?.outputSchema),
-		).not.toContain('"mission"');
-	}
-	expect(h.started).toHaveLength(1);
-	expect(webReadState(h.task(child.id))).not.toHaveProperty("mission");
+	expect(step.prep.status).toBe("ready");
 	h.results.set("op1", {
 		state: "succeeded",
 		result: {
@@ -32,24 +18,24 @@ async function searched(h: Awaited<ReturnType<typeof harness>>, id: string) {
 			hits: urls.map((url) => ({
 				url,
 				title: "候補",
-				snippet: "候補の数値は根拠にできない",
+				snippet: "本文で確認する",
 			})),
 			documents: [],
 			failures: [],
 		},
 	});
 	await h.agents.reconcile();
-	return child.id;
+	return id;
 }
 const finish = (reference: string) => ({
 	action: "finish",
 	report: {
 		completion: "complete",
-		answer: "本文で確認した値です。",
-		summary: "本文で確認した値です。",
+		answer: "確認した値は123.45です。",
+		summary: "確認した値は123.45です。",
 		claims: [
 			{
-				text: "本文で確認した値です。",
+				text: "確認した値は123.45です。",
 				status: "verified",
 				evidence: [reference],
 			},
@@ -58,138 +44,124 @@ const finish = (reference: string) => ({
 	},
 });
 
-test("paired reads hedge after ten seconds, buffer arrivals during evaluation, and cancel remaining work on finish", async () => {
-	let clock = Date.now();
-	const h = await harness(() => clock, false, undefined, true);
+test("staggered batch arrivals use shared receipts and reserve the final answer without wait calls", async () => {
+	const h = await harness(Date.now, false, undefined, true);
 	try {
-		const id = await searched(h, "paired");
-		const selected = await h.runRawModelStep(id, {
+		const id = await searched(h, "batch");
+		await h.runRawModelStep(id, {
 			action: "invoke",
 			tool: "web.read",
 			arguments: { url: urls[0] },
 			readAhead: urls.slice(1).map((url) => ({ url })),
 		});
-		expect(selected.prep.status).toBe("ready");
-		if (selected.prep.status === "ready") {
-			const material = JSON.parse(
-				selected.prep.input.messages[1]!.content.split("=").slice(1).join("="),
+		expect(h.started).toHaveLength(5);
+		expect(h.task(id).acquisition_plan_json).toBeNull();
+		for (let n = 2; n <= 4; n++) {
+			h.results.set(
+				`op${n}`,
+				h.doc("必要な値はまだ確認できません。", urls[n - 2]),
 			);
-			expect(material.candidates).toHaveLength(4);
-			expect(material.evidence).toEqual([]);
-			expect(
-				Buffer.byteLength(JSON.stringify(selected.prep.input.messages)),
-			).toBeLessThanOrEqual(65536);
-		}
-		expect(h.started).toHaveLength(3); // search + first pair
-		clock += 9999;
-		await h.agents.reconcile();
-		expect(h.started).toHaveLength(3);
-		clock++;
-		await h.agents.reconcile();
-		expect(h.started).toHaveLength(5);
-		expect(h.tools.pending()).toHaveLength(4); // first pair was not cancelled
-		h.results.set("op2", h.doc("先に届いた本文。", urls[0]));
-		await h.agents.reconcile();
-		expect(h.task(id).state).toBe("queued");
-		await h.runRawModelStep(id, { action: "wait" }, async () => {
-			h.results.set("op3", h.doc("評価中に届いた本文。", urls[1]));
 			await h.agents.reconcile();
-			expect(h.task(id).state).toBe("running");
-		});
+			expect(h.task(id).state).toBe("waiting_tool");
+			expect(h.task(id).model_calls).toBe(2);
+			const early = await h.runRawModelStep(id, { action: "wait" });
+			expect(early.prep.status).toBe("stale");
+		}
+		h.results.set("op5", h.doc("確認した値は123.45です。", urls[3]));
+		await h.agents.reconcile();
 		expect(h.task(id).state).toBe("queued");
-		expect(webReadState(h.task(id)).arrivals).toBe(2);
-		await h.runRawModelStep(id, finish("e1"));
-		expect(h.task(id).state).toBe("completed");
-		expect(h.tools.pending()).toHaveLength(0);
-		const root = h.agents.list("paired").find((t) => t.kind === "coordinator")!;
-		const ticket = h.store.read((db) =>
-			h.agents.prepareAnswerInTransaction(db, "paired"),
-		);
-		expect(ticket.taskId).toBe(root.id);
-		expect(JSON.parse(ticket.projection!)).toMatchObject({
-			delivery: "guided-web",
-			completion: "complete",
-		});
-	} finally {
-		await h.close();
-	}
-});
-
-test("empty active count does not schedule another pair after a successful body", async () => {
-	const h = await harness(Date.now, false, undefined, true);
-	try {
-		const id = await searched(h, "success-group");
-		await h.runRawModelStep(id, {
-			action: "invoke",
-			tool: "web.read",
-			arguments: { url: urls[0] },
-			readAhead: urls.slice(1).map((url) => ({ url })),
-		});
-		h.results.set("op2", h.doc("必要な本文。", urls[0]));
-		h.results.set("op3", h.doc("もう一つの本文。", urls[1]));
-		await h.agents.reconcile();
-		expect(h.started).toHaveLength(3);
-		await h.runRawModelStep(id, finish("e1"));
-		expect(h.task(id).state).toBe("completed");
-	} finally {
-		await h.close();
-	}
-});
-
-test("failed pair starts the next pair immediately and legitimate unknown may complete the response", async () => {
-	const h = await harness(Date.now, false, undefined, true);
-	try {
-		const id = await searched(h, "failed-group");
-		await h.runRawModelStep(id, {
-			action: "invoke",
-			tool: "web.read",
-			arguments: { url: urls[0] },
-			readAhead: urls.slice(1).map((url) => ({ url })),
-		});
-		for (const n of [2, 3])
-			h.results.set(`op${n}`, { state: "failed", errorCode: "web_timeout" });
-		await h.agents.reconcile();
-		expect(h.started).toHaveLength(5);
-		for (const n of [4, 5])
-			h.results.set(`op${n}`, { state: "failed", errorCode: "web_timeout" });
-		await h.agents.reconcile();
-		await h.runRawModelStep(id, {
-			action: "finish",
-			report: {
-				completion: "complete",
-				answer: "該当する事実は確認できませんでした。",
-				summary: "確認できません。",
-				claims: [{ text: "現在値は不明。", status: "unknown", evidence: [] }],
-				limitations: ["取得できた範囲に回答の根拠がありません。"],
+		const result = await h.runRawModelStep(
+			id,
+			(input: { messages: Array<{ content: string }> }) => {
+				const material = JSON.parse(
+					input.messages[1]!.content.split("=").slice(1).join("="),
+				);
+				const excerpt = material.observations
+					.flatMap(
+						(o: { excerpts: Array<{ reference: string; quote: string }> }) =>
+							o.excerpts,
+					)
+					.find((e: { quote: string }) => e.quote.includes("123.45"));
+				return finish(excerpt.reference);
 			},
-		});
+		);
+		expect(result.prep.status).toBe("ready");
 		expect(h.task(id).state).toBe("completed");
-		expect(h.agents.report(id)?.claims).toEqual([]);
+		expect(h.task(id).model_calls).toBe(3);
+		expect(h.agents.report(id)?.claims[0]?.evidence[0]?.quote).toContain(
+			"123.45",
+		);
+		const ticket = h.store.read((db) =>
+			h.agents.prepareAnswerInTransaction(db, "batch"),
+		);
+		expect(JSON.parse(ticket.projection!).answer).toContain("123.45");
 	} finally {
 		await h.close();
 	}
 });
 
-test("an evaluation cannot cite a body that arrived after its corpus was frozen", async () => {
+test("failed reads remain observations and a batch resumes once after its final receipt", async () => {
 	const h = await harness(Date.now, false, undefined, true);
 	try {
-		const id = await searched(h, "late-reference");
+		const id = await searched(h, "failures");
 		await h.runRawModelStep(id, {
 			action: "invoke",
 			tool: "web.read",
 			arguments: { url: urls[0] },
 			readAhead: [{ url: urls[1] }],
 		});
-		h.results.set("op2", h.doc("既に提示した本文。", urls[0]));
+		h.results.set("op2", { state: "failed", errorCode: "web_timeout" });
 		await h.agents.reconcile();
-		await h.runRawModelStep(id, finish("e2"), async () => {
-			h.results.set("op3", h.doc("まだ提示していない本文。", urls[1]));
-			await h.agents.reconcile();
+		expect(h.task(id).state).toBe("waiting_tool");
+		h.results.set("op3", h.doc("確認した値は123.45です。", urls[1]));
+		await h.agents.reconcile();
+		await h.runRawModelStep(id, finish("e1"));
+		expect(h.task(id).state).toBe("completed");
+		expect(h.agents.report(id)?.coverage).toBe("partial");
+	} finally {
+		await h.close();
+	}
+});
+
+test("batch cancellation rejects late successful results and cancels every pending call", async () => {
+	const h = await harness(Date.now, false, undefined, true);
+	try {
+		const id = await searched(h, "cancel-batch");
+		await h.runRawModelStep(id, {
+			action: "invoke",
+			tool: "web.read",
+			arguments: { url: urls[0] },
+			readAhead: urls.slice(1).map((url) => ({ url })),
 		});
-		expect(h.task(id).state).toBe("queued");
+		await h.store.write((db) =>
+			h.agents.cancelTreeInTransaction(db, "cancel-batch"),
+		);
+		for (let n = 2; n <= 5; n++)
+			h.results.set(`op${n}`, h.doc("遅れて到着した値123.45", urls[n - 2]));
+		await h.agents.reconcile();
+		expect(h.tools.pending()).toHaveLength(0);
+		expect(h.task(id).state).toBe("cancelled");
+		expect(() => h.agents.report(id)).toThrow("report_not_ready");
+	} finally {
+		await h.close();
+	}
+});
+
+test("unpresented evidence still requires repair and cannot become an accepted report", async () => {
+	const h = await harness(Date.now, false, undefined, true);
+	try {
+		const id = await searched(h, "unknown-ref");
+		await h.runRawModelStep(id, {
+			action: "invoke",
+			tool: "web.read",
+			arguments: { url: urls[0] },
+		});
+		h.results.set("op2", h.doc("確認した値は123.45です。", urls[0]));
+		await h.agents.reconcile();
+		await h.runRawModelStep(id, finish("e99"));
 		expect(h.task(id).error_code).toBe("invalid_evidence");
 		expect(() => h.agents.report(id)).toThrow("report_not_ready");
-		await h.runRawModelStep(id, finish("e2"));
+		await h.runRawModelStep(id, finish("e1"));
 		expect(h.task(id).state).toBe("completed");
 	} finally {
 		await h.close();

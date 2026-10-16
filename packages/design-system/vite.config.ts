@@ -1,6 +1,7 @@
 /// <reference types="vitest/config" />
 /// <reference types="vitest" />
 
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { storybookTest } from "@storybook/addon-vitest/vitest-plugin";
@@ -9,6 +10,18 @@ import react from "@vitejs/plugin-react";
 import { playwright } from "@vitest/browser-playwright";
 import { defineConfig } from "vite";
 import dts from "vite-plugin-dts";
+
+const manifest = JSON.parse(
+	readFileSync(new URL("./package.json", import.meta.url), "utf8"),
+) as {
+	dependencies: Record<string, string>;
+	peerDependencies: Record<string, string>;
+};
+const externalPackages = [
+	...Object.keys(manifest.dependencies),
+	...Object.keys(manifest.peerDependencies),
+	"react/jsx-runtime",
+];
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -43,17 +56,19 @@ export default defineConfig({
 		lib: {
 			entry: path.resolve(__dirname, "src/index.ts"),
 			formats: ["es", "cjs"],
-			fileName: (format) => `index.${format === "es" ? "mjs" : "js"}`,
+			fileName: (format) => `[name].${format === "es" ? "mjs" : "js"}`,
 		},
 		rollupOptions: {
-			external: [
-				"react",
-				"react-dom",
-				"react/jsx-runtime",
-				"react-i18next",
-				"i18next",
-			],
+			// Dependencies stay external so the consuming app bundles (and can lazy-load) them.
+			external: (id) =>
+				externalPackages.some(
+					(name) => id === name || id.startsWith(`${name}/`),
+				),
 			output: {
+				// One module per source file, so an app that imports a few components
+				// does not also bundle terminal, table or other heavy widgets.
+				preserveModules: true,
+				preserveModulesRoot: "src",
 				globals: {
 					react: "React",
 					"react-dom": "ReactDOM",

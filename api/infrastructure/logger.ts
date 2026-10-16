@@ -184,16 +184,47 @@ const keys = new Set<keyof LogFields>([
 const scope = new AsyncLocalStorage<LogFields>();
 const bootId = crypto.randomUUID();
 
-/** Bounded, synchronous writes preserve the final record on process exit. */
+/** A batch is written once this many characters are buffered. */
+const FLUSH_BYTES = 64 * 1024;
+/** Longest a buffered record waits before it is written. */
+const FLUSH_INTERVAL_MS = 100;
+/** Error and fatal records bypass the buffer so a crash right after them still leaves a trace. */
+const URGENT_LEVEL = /"level":"(?:error|fatal)"/;
+
+export interface RotatingLogFile extends DestinationStream {
+	/** Writes everything buffered, synchronously. */
+	flush(): void;
+	/** Flushes and detaches the sink from the process-exit flush. */
+	close(): void;
+}
+
+const openSinks = new Set<RotatingLogFile>();
+let exitHookInstalled = false;
+function installExitHook() {
+	if (exitHookInstalled) return;
+	exitHookInstalled = true;
+	// A synchronous flush on exit keeps the final records of a crash or shutdown.
+	process.on("exit", () => {
+		for (const sink of openSinks) sink.flush();
+	});
+}
+
+/**
+ * Size-rotated JSONL file. Records are buffered and written in batches (interval, size,
+ * rotation, error-level record, `flush()` and process exit) instead of one syscall per record.
+ */
 export function rotatingLogFile(
 	path: string,
 	maxBytes = 10 * 1024 * 1024,
 	backups = 4,
 	options?: { now?: () => number },
-): DestinationStream {
+): RotatingLogFile {
 	let retryAt = 0; // 0 = healthy
 	let backoffMs = 1_000;
 	let size = 0;
+	let buffer: string[] = [];
+	let buffered = 0;
+	let timer: ReturnType<typeof setTimeout> | undefined;
 	const now = options?.now ?? Date.now;
 	function notice(level: string, event: string) {
 		process.stderr.write(
@@ -225,33 +256,73 @@ export function rotatingLogFile(
 		chmodSync(path, 0o600);
 		size = statSync(path).size;
 	}
+	function rotate() {
+		rmSync(`${path}.${backups}`, { force: true });
+		for (let n = backups - 1; n >= 1; n--)
+			if (existsSync(`${path}.${n}`))
+				renameSync(`${path}.${n}`, `${path}.${n + 1}`);
+		renameSync(path, `${path}.1`);
+		size = 0;
+	}
 	try {
 		prepare();
 	} catch {
 		fail();
 	}
-	return {
-		write(line) {
-			if (retryAt !== 0 && now() < retryAt) return;
-			try {
-				if (retryAt !== 0) prepare();
+	function flush() {
+		if (timer !== undefined) clearTimeout(timer);
+		timer = undefined;
+		const lines = buffer;
+		buffer = [];
+		buffered = 0;
+		if (lines.length === 0) return;
+		// An outage drops what arrives during its backoff; stderr still carries every record.
+		if (retryAt !== 0 && now() < retryAt) return;
+		try {
+			if (retryAt !== 0) prepare();
+			let batch = "";
+			let batchBytes = 0;
+			const append = () => {
+				if (!batch) return;
+				appendFileSync(path, batch, { mode: 0o600 });
+				size += batchBytes;
+				batch = "";
+				batchBytes = 0;
+			};
+			for (const line of lines) {
 				const bytes = Buffer.byteLength(line);
-				if (size && size + bytes > maxBytes) {
-					rmSync(`${path}.${backups}`, { force: true });
-					for (let n = backups - 1; n >= 1; n--)
-						if (existsSync(`${path}.${n}`))
-							renameSync(`${path}.${n}`, `${path}.${n + 1}`);
-					renameSync(path, `${path}.1`);
-					size = 0;
+				if (size + batchBytes && size + batchBytes + bytes > maxBytes) {
+					append();
+					rotate();
 				}
-				appendFileSync(path, line, { mode: 0o600 });
-				size += bytes;
-				recovered();
-			} catch {
-				fail();
+				batch += line;
+				batchBytes += bytes;
+			}
+			append();
+			recovered();
+		} catch {
+			fail();
+		}
+	}
+	const sink: RotatingLogFile = {
+		write(line) {
+			buffer.push(line);
+			buffered += line.length;
+			if (buffered >= FLUSH_BYTES || URGENT_LEVEL.test(line)) flush();
+			else if (timer === undefined) {
+				timer = setTimeout(flush, FLUSH_INTERVAL_MS);
+				timer.unref();
 			}
 		},
+		flush,
+		close() {
+			flush();
+			openSinks.delete(sink);
+		},
 	};
+	openSinks.add(sink);
+	installExitHook();
+	return sink;
 }
 
 export function createLogWriter(
@@ -273,6 +344,8 @@ let writer = createLogWriter(
 	process.env.NODE_ENV === "test" ? "silent" : "info",
 );
 
+let fileSink: RotatingLogFile | undefined;
+
 export function configureLogging(options: {
 	file?: string;
 	level?: string;
@@ -282,7 +355,9 @@ export function configureLogging(options: {
 	const level = levels.includes(options.level ?? "")
 		? (options.level as LevelWithSilent)
 		: "info";
+	fileSink?.close();
 	const file = options.file ? rotatingLogFile(options.file) : undefined;
+	fileSink = file;
 	writer = createLogWriter(
 		{
 			write(line) {

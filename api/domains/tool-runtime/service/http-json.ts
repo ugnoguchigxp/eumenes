@@ -1,6 +1,12 @@
+import {
+	resolveSafeOutboundUrl,
+	type AddressResolver,
+	type ResolvedAddress,
+} from "llm-fetch";
 import type { z } from "zod";
 import { getLogger } from "../../../infrastructure/logger";
 import type { HttpJsonBindingV1 } from "../../capabilities";
+import { pinnedHttpsFetch } from "./pinned-https";
 
 const log = getLogger("tool-runtime.http-json");
 
@@ -44,22 +50,49 @@ export type HttpJsonRequest = {
 	idempotencyKey?: string;
 };
 
-const privateHost =
-	/^(localhost|.*\.localhost|.*\.local|.*\.internal|0\.0\.0\.0|\[?::1?\]?|\[?(fc|fd|fe80)[0-9a-f:]*\]?|127\..*|10\..*|192\.168\..*|169\.254\..*|172\.(1[6-9]|2[0-9]|3[01])\..*|100\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\..*)$/i;
-
 /**
  * Executor of declared `http-json` bindings (spec §5.3). It applies, for every call: registered
  * connection only, https (a loopback http exception exists for fixtures and must be configured),
- * host allowlist, private-address refusal, manual redirects (all refused), timeout, a streamed
+ * host allowlist, private-address refusal (every address the host resolves to is validated and
+ * the connection is pinned to the validated one), manual redirects (all refused), timeout, a streamed
  * response size limit, output schema validation and no unconditional retry.
  */
 export function createHttpJsonExecutor(config: {
 	connections: ReadonlyMap<string, HttpJsonConnection>;
 	/** Permit `http://127.0.0.1` for isolated fixtures. Off in production. */
 	allowLoopbackHttp?: boolean;
+	/** Test/fixture seam for the transport. A replaced `fetch` cannot pin the validated address. */
 	fetch?: typeof fetch;
+	/** DNS seam for tests; defaults to the system resolver. */
+	resolver?: AddressResolver;
 }) {
-	const doFetch = config.fetch ?? fetch;
+	const isLoopbackFixture = (url: URL) =>
+		config.allowLoopbackHttp === true &&
+		url.protocol === "http:" &&
+		url.hostname === "127.0.0.1";
+
+	/** Rejects loopback, private, link-local, mapped and otherwise non-public addresses. */
+	async function publicAddress(
+		url: URL,
+		timeoutMs: number,
+	): Promise<ResolvedAddress | undefined> {
+		const deadline = AbortSignal.timeout(timeoutMs);
+		try {
+			const { addresses } = await Promise.race([
+				resolveSafeOutboundUrl(url.href, config.resolver),
+				new Promise<never>((_, reject) =>
+					deadline.addEventListener(
+						"abort",
+						() => reject(new Error("resolve_timeout")),
+						{ once: true },
+					),
+				),
+			]);
+			return addresses[0];
+		} catch {
+			return undefined;
+		}
+	}
 
 	function resolveUrl(
 		binding: HttpJsonBindingV1,
@@ -78,7 +111,6 @@ export function createHttpJsonExecutor(config: {
 		if (base.username || base.password) return "invalid_binding";
 		if (!connection.allowHosts.includes(base.hostname))
 			return "host_not_allowed";
-		if (privateHost.test(base.hostname) && !loopback) return "private_address";
 
 		const value = (
 			field: HttpJsonBindingV1["pathFields"][string],
@@ -166,6 +198,7 @@ export function createHttpJsonExecutor(config: {
 		connection: HttpJsonConnection,
 		payload: string | undefined,
 		idempotency: { header: string; key: string } | undefined,
+		pinned: ResolvedAddress | undefined,
 	): Promise<
 		| { ok: true; value: unknown }
 		| { ok: false; code: HttpJsonFailureCode; retryable: boolean }
@@ -178,13 +211,25 @@ export function createHttpJsonExecutor(config: {
 		if (idempotency) headers[idempotency.header] = idempotency.key;
 		const deadline = AbortSignal.timeout(binding.timeoutMs);
 		try {
-			const response = await doFetch(url, {
-				method: binding.method,
-				headers,
-				body: payload,
-				redirect: "manual",
-				signal: deadline,
-			});
+			const response =
+				pinned && !config.fetch
+					? await pinnedHttpsFetch(
+							url,
+							{
+								method: binding.method,
+								headers,
+								body: payload,
+								signal: deadline,
+							},
+							pinned,
+						)
+					: await (config.fetch ?? fetch)(url, {
+							method: binding.method,
+							headers,
+							body: payload,
+							redirect: "manual",
+							signal: deadline,
+						});
 			if (response.status >= 300 && response.status < 400) {
 				await response.body?.cancel().catch(() => {});
 				return { ok: false, code: "redirect_rejected", retryable: false };
@@ -242,6 +287,11 @@ export function createHttpJsonExecutor(config: {
 			const input = checked.data as Record<string, unknown>;
 			const url = resolveUrl(binding, connection, input);
 			if (typeof url === "string") return refuse(url);
+			// Validate what the host resolves to (not just its spelling) and connect to that address.
+			const pinned = isLoopbackFixture(url)
+				? undefined
+				: await publicAddress(url, binding.timeoutMs);
+			if (!pinned && !isLoopbackFixture(url)) return refuse("private_address");
 			const payload = body(binding, input);
 			// Only a POST with a registered idempotency header may be sent more than once.
 			const retry = binding.retry;
@@ -264,6 +314,7 @@ export function createHttpJsonExecutor(config: {
 					connection,
 					payload,
 					idempotency,
+					pinned,
 				);
 				if (result.ok) {
 					const output = request.outputSchema.safeParse(result.value);

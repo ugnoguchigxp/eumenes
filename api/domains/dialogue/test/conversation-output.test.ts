@@ -6,7 +6,7 @@ const leaked =
 	'create_music{question:<|"|>夜にふさわしい、しっとりとした落ち着いた雰囲気の楽曲。2分間。<|"|>}';
 for (const text of [
 	leaked,
-	'<call:research_web_luna{question:<|"|>最新ニュース<|"|>}>',
+	'<call:research_web_codex{question:<|"|>最新ニュース<|"|>}>',
 	'timer \n ({"operation":"start"})',
 	'open_music_library{"question":"保存曲"}',
 	'<call:unoffered{question:"secret"}>',

@@ -1,37 +1,44 @@
 import { z } from "zod";
 import { recognitionRecord } from "../api/domains/object-recognition/contracts";
-import { json, type Transport } from "./transport";
+import { runSchema } from "../api/domains/dialogue/contracts";
+import { callJson, json, type Transport } from "./transport";
+
+const recognitionConnectionSchema = z.object({
+	revision: z.number(),
+	serviceId: z.literal("object-recognition-host"),
+	baseUrl: z.string().nullable(),
+	credentialConfigured: z.boolean(),
+	credentialSource: z.enum(["dedicated", "larm"]).default("dedicated"),
+	sharedCredentialAvailable: z.boolean().default(false),
+});
 export function objectRecognitionClient(t: Transport) {
 	const root = "/api/object-recognition";
 	const record = async (path: string, init?: RequestInit) =>
 		recognitionRecord.parse(await (await t.call(path, init)).json());
 	return {
-		recognitionConnection: async (signal?: AbortSignal) =>
-			z
-				.object({
-					revision: z.number(),
-					serviceId: z.literal("object-recognition-host"),
-					baseUrl: z.string().nullable(),
-					credentialConfigured: z.boolean(),
-					credentialSource: z.enum(["dedicated", "larm"]).default("dedicated"),
-					sharedCredentialAvailable: z.boolean().default(false),
-				})
-				.parse(
-					await (
-						await t.call("/api/settings/object-recognition", { signal })
-					).json(),
-				),
+		recognitionConnection: (signal?: AbortSignal) =>
+			callJson(
+				t,
+				recognitionConnectionSchema,
+				"/api/settings/object-recognition",
+				{
+					signal,
+				},
+			),
 		configureRecognitionConnection: async (input: {
 			expectedRevision: number;
 			credentialSource: "dedicated" | "larm";
 			baseUrl?: string;
-		}) => {
-			const response = await t.call("/api/settings/object-recognition", {
-				...json(input),
-				method: "PUT",
-			});
-			return response.json();
-		},
+		}) =>
+			callJson(
+				t,
+				recognitionConnectionSchema,
+				"/api/settings/object-recognition",
+				{
+					...json(input),
+					method: "PUT",
+				},
+			),
 		recognitionRecords: async (conversationId: string, signal?: AbortSignal) =>
 			recognitionRecord
 				.array()
@@ -85,11 +92,11 @@ export function objectRecognitionClient(t: Transport) {
 			requestId: string,
 			frameIndex?: number,
 		) =>
-			(
-				await t.call(
-					`${root}/${encodeURIComponent(id)}/conversation`,
-					json({ requestId, frameIndex }),
-				)
-			).json(),
+			callJson(
+				t,
+				runSchema,
+				`${root}/${encodeURIComponent(id)}/conversation`,
+				json({ requestId, frameIndex }),
+			),
 	};
 }

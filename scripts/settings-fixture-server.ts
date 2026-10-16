@@ -4,11 +4,9 @@ import { join } from "node:path";
 import { createApp } from "../api/application/app";
 import { appModules } from "../api/application/app-modules";
 import { createLifecycleRunner } from "../api/application/lifecycle";
-import {
-	appServices,
-	buildServices,
-	createLifecycles,
-} from "../api/application/server";
+import { appServices } from "../api/application/server-app-services";
+import { createLifecycles } from "../api/application/server-lifecycles";
+import { buildServices } from "../api/application/server-services";
 import { migrations } from "../api/application/migrations";
 import { createSettings } from "../api/domains/settings";
 import { loadConfig } from "../api/infrastructure/config";

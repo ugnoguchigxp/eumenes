@@ -1,6 +1,10 @@
 import { expect, test } from "bun:test";
 import { KANBAN_PROMPT_MAX, WORK_ONLY_INSTRUCTION } from "..";
-import { FOLLOWUP_QUOTED_NOTE_MAX, followupBody, taskBody } from "../text";
+import {
+	FOLLOWUP_QUOTED_NOTE_MAX,
+	followupBody,
+	taskBody,
+} from "../service/text";
 import { openKanban } from "./kanban.fixture";
 
 let req = 0;

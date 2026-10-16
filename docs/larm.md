@@ -53,7 +53,7 @@ LLMのみの要求は `providers: ["llm"]`、音声の要求は `providers` を�
 
 利用者が示したこのPCでの実測目安（2026-10-10）は、512角約16秒、768角約31秒、1024角約58秒、1200×777約53秒、1280角約102秒です。負荷や起動状態で変わります。試用の待機上限は既存の15分を維持します。
 
-非空ASRの本入力には、会話開始前の言語判定controlが一回加わります。既定モデルを使い、8秒・256 token以内、confidence 0.8以上、主要言語すべてが利用者の許可リスト内であることが条件です。英字略語やLatin文字の有無では分類しません。判定不在・不正・判定不能では会話を開始しません。ASRと判定receiptの受理、取消、回答/TTSへの検証parentはbackendが管理します。詳細と検証laneは [toolchain](toolchain.md#タイマーと音声) を参照してください。
+ASRの文字起こしはそのまま会話入力になり、言語判定や発話の続き判定のcontrolは呼びません。ASR receiptの受理、取消、回答/TTSへの検証parentはbackendが管理します。詳細は [toolchain](toolchain.md#タイマーと音声) を参照してください。
 
 画像生成ツールチェーンと、プロンプト編集・全画面の画像一覧を接続しました。保存画像の一覧と取得はControlの `/v1/image-artifacts` を使用し、生成やProvider claimは不要です。2026-10-13の配備OpenAPIで `DELETE /v1/image-artifacts/{id}`、Bearer認証、HTTP200と`{id,deleted:true}`を確認しました。一覧から保存画像を物理削除し、Eumenesでは応答IDが対象と一致することを検査します。生成履歴は維持し、削除を自動再送しません。詳細は[画像生成](images.md)を参照してください。
 

@@ -6,44 +6,45 @@ export function evidenceExcerpts(
 	structured = false,
 ): Array<{ excerptId: string; quote: string; context?: string[] }> {
 	if (structured) {
-		const out: Array<{ excerptId: string; quote: string; context?: string[] }> =
-			[];
+		const spans = evidenceExcerpts(body);
 		const headings: Array<{ depth: number; id: string }> = [];
 		let table: string | undefined, fence: string | undefined;
+		let offset = 0;
 		const lines = body.match(/[^\n]*\n|[^\n]+$/g) ?? [];
-		for (let i = 0; i < lines.length; i++) {
-			const line = lines[i]!;
-			if (!line.trim()) {
-				table = undefined;
-				continue;
+		let lineIndex = 0,
+			lineStart = 0;
+		return spans.map((span) => {
+			const start = body.indexOf(span.quote, offset);
+			const end = start + span.quote.length;
+			offset = end;
+			const context = new Set([...headings.map((h) => h.id), table, fence]);
+			// Process each original line once, even when a long line crosses spans.
+			while (lineIndex < lines.length && lineStart < end) {
+				const line = lines[lineIndex]!;
+				const id = span.excerptId;
+				if (!fence) {
+					const heading = /^\s{0,3}(#{1,6})\s/.exec(line);
+					if (heading) {
+						while (
+							headings.length &&
+							headings.at(-1)!.depth >= heading[1]!.length
+						)
+							headings.pop();
+						headings.push({ depth: heading[1]!.length, id });
+					}
+					if (!line.includes("|")) table = undefined;
+					else if (/^\s*\|?\s*:?-{3,}/.test(lines[lineIndex + 1] ?? ""))
+						table = id;
+				}
+				if (/^\s*(`{3,}|~{3,})/.test(line)) fence = fence ? undefined : id;
+				lineStart += line.length;
+				lineIndex++;
 			}
-			const isFence = /^\s*(`{3,}|~{3,})/.test(line);
-			const isHeading = !fence && /^\s{0,3}#{1,6}\s/.test(line);
-			const depth = isHeading ? line.trimStart().match(/^#+/)![0].length : 0;
-			if (isHeading)
-				while (headings.length && headings.at(-1)!.depth >= depth)
-					headings.pop();
-			const isTable = !fence && line.includes("|");
-			if (!isTable) table = undefined;
-			const header = isTable && /^\s*\|?\s*:?-{3,}/.test(lines[i + 1] ?? "");
-			for (const span of evidenceExcerpts(line)) {
-				const excerptId = `e${out.length}`;
-				const context = [
-					...new Set(
-						[headings.at(-1)?.id, table, fence].filter((v): v is string => !!v),
-					),
-				];
-				out.push({
-					excerptId,
-					quote: span.quote,
-					...(context.length ? { context } : {}),
-				});
-				if (isHeading) headings.push({ depth, id: excerptId });
-				if (header) table = excerptId;
-				if (isFence) fence = fence ? undefined : excerptId;
-			}
-		}
-		return out;
+			const refs = [...context].filter(
+				(id): id is string => !!id && id !== span.excerptId,
+			);
+			return { ...span, ...(refs.length ? { context: refs } : {}) };
+		});
 	}
 	const excerpts: Array<{ excerptId: string; quote: string }> = [];
 	let start = 0;

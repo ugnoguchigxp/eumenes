@@ -11,7 +11,7 @@ vi.mock("@radix-ui/react-collapsible", () => ({
 	Root: ({
 		children,
 		open,
-		onOpenChange,
+		onOpenChange: _onOpenChange,
 		...props
 	}: {
 		children?:
@@ -319,11 +319,7 @@ describe("Collapsible Components", () => {
 
 			expect(screen.getByText("Always Visible")).toBeInTheDocument();
 
-			rerender(
-				<Collapsible>
-					{false && <CollapsibleContent>Hidden Content</CollapsibleContent>}
-				</Collapsible>,
-			);
+			rerender(<Collapsible>{null}</Collapsible>);
 
 			expect(screen.queryByText("Hidden Content")).not.toBeInTheDocument();
 		});

@@ -1,50 +1,14 @@
-import {
-	DrawingArtifact,
-	drawingDefinition,
-} from "../domains/excalidraw/DrawingArtifact";
-import { useCallback } from "react";
+import { DrawingArtifact } from "../domains/excalidraw/DrawingArtifact";
 import type { EumenesClient } from "../../../client";
-import { playlistArtifactDefinition } from "../domains/music/artifact-definition";
 import { useArtifactWorkspace } from "../domains/artifact";
 import { ErrorBoundary } from "../components/ErrorBoundary";
 import { ArtifactPanel } from "../components/domains/artifact/ArtifactPanel";
 import { MusicArtifact } from "../components/domains/music/MusicArtifact";
-import {
-	ToolchainArtifactHost,
-	useToolchainArtifacts,
-} from "../domains/toolchain-artifacts";
+import { ToolchainArtifactHost } from "../domains/toolchain-artifacts/ToolchainArtifactHost";
+import { useToolchainArtifacts } from "../domains/toolchain-artifacts";
 import { toolchainWebAdapters } from "./toolchain-adapters";
 
-export function useOpenDrawing(
-	open: ReturnType<typeof useArtifactWorkspace>["open"],
-) {
-	return useCallback(
-		() =>
-			open({
-				id: "drawing-workspace",
-				kind: "openui",
-				title: "図を描く・編集する",
-				definition: drawingDefinition,
-				keepMounted: true,
-			}),
-		[open],
-	);
-}
-export function useOpenPlaylist(
-	open: ReturnType<typeof useArtifactWorkspace>["open"],
-) {
-	return useCallback(
-		() =>
-			open({
-				id: "music-playlist",
-				kind: "openui",
-				definition: playlistArtifactDefinition(),
-				title: "音楽プレイリスト",
-			}),
-		[open],
-	);
-}
-export function WorkspaceArtifacts({
+export default function WorkspaceArtifacts({
 	client,
 	artifacts,
 }: {

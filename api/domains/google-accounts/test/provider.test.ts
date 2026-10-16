@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { createSign, generateKeyPairSync } from "node:crypto";
 import { OAuth2Client } from "google-auth-library";
-import { createGoogleProvider } from "../provider";
+import { createGoogleProvider } from "../service/provider";
 const keys = generateKeyPairSync("rsa", { modulusLength: 2048 });
 const other = generateKeyPairSync("rsa", { modulusLength: 2048 });
 function setup(

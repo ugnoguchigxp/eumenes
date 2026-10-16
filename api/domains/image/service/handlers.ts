@@ -251,7 +251,10 @@ export function registerImageHandlers(
 				phase: "completed",
 				artifactId: output.artifact!.id,
 				mime: output.mime!,
-				actualModel: output.actualModel ?? output.artifact?.actualModel ?? null,
+				actualModel:
+					output.actualModel ??
+					output.artifact?.actualModel ??
+					record(r).actualModel,
 			});
 			deps.onFinished(db, r.run_id);
 			return "applied";

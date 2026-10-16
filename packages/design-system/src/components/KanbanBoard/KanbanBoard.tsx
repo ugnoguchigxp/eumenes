@@ -58,7 +58,6 @@ export function KanbanBoard(props: KanbanBoardProps) {
 	const root = useRef<HTMLElement>(null);
 
 	// A card that moved is a different DOM node (or was re-inserted) and drops keyboard focus.
-	// biome-ignore lint/correctness/useExhaustiveDependencies: runs when the host redraws cards
 	useLayoutEffect(() => {
 		const id = pendingFocus.current;
 		if (!id) return;

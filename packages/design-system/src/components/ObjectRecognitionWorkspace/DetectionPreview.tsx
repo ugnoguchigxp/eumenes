@@ -30,9 +30,11 @@ export function DetectionPreview({
 	const [atFrame, setAtFrame] = useState(true);
 	const result = item?.state === "completed" ? item.result : null;
 	const width = result?.kind === "image" ? result.width : result?.video.width;
-	const height = result?.kind === "image" ? result.height : result?.video.height;
+	const height =
+		result?.kind === "image" ? result.height : result?.video.height;
 	const frame = result?.kind === "video" ? result.frames[index] : undefined;
-	const objects = result?.kind === "image" ? result.objects : frame?.objects ?? [];
+	const objects =
+		result?.kind === "image" ? result.objects : (frame?.objects ?? []);
 	const hasMedia = !!item && !!url;
 	const emptyMessage = item
 		? "保存した画像・動画を読み込んでいます。"
@@ -54,14 +56,14 @@ export function DetectionPreview({
 				{cameraPreview && (
 					<div className="recognition-view-tabs" aria-label="表示する映像">
 						<button
-						type="button"
+							type="button"
 							aria-pressed={cameraActive}
 							onClick={onShowCamera}
 						>
 							カメラ
 						</button>
 						<button
-						type="button"
+							type="button"
 							aria-pressed={!cameraActive}
 							onClick={onShowResults}
 						>
@@ -79,11 +81,16 @@ export function DetectionPreview({
 					{!cameraActive && hasMedia && (
 						<div
 							className="recognition-media"
-							style={width && height ? { aspectRatio: `${width}/${height}` } : undefined}
+							style={
+								width && height
+									? { aspectRatio: `${width}/${height}` }
+									: undefined
+							}
 						>
 							{item.mime.startsWith("image/") ? (
 								<img src={url} alt={item?.name ?? "解析した画像"} />
 							) : (
+								// oxlint-disable-next-line jsx-a11y/media-has-caption -- user-supplied recording or camera preview has no caption track
 								<video
 									ref={video}
 									src={url}
@@ -94,7 +101,7 @@ export function DetectionPreview({
 									aria-label="保存した動画"
 									onLoadedMetadata={() => seek(index)}
 									onTimeUpdate={() => {
-									if (result?.kind !== "video") return;
+										if (result?.kind !== "video") return;
 										const time = video.current?.currentTime ?? 0;
 										const found = result.frames.findIndex(
 											(f) => Math.abs(f.timestampSeconds - time) < 0.12,
@@ -137,13 +144,13 @@ export function DetectionPreview({
 									))}
 								</svg>
 							)}
-							<span className="recognition-media-tag">{result ? "撮影済みの資料・解析結果" : "保存した資料"}</span>
+							<span className="recognition-media-tag">
+								{result ? "撮影済みの資料・解析結果" : "保存した資料"}
+							</span>
 						</div>
 					)}
 					{!cameraActive && !hasMedia && (
-						<div className="recognition-empty">
-							{emptyMessage}
-						</div>
+						<div className="recognition-empty">{emptyMessage}</div>
 					)}
 				</div>
 				{!cameraActive && result?.kind === "video" && (
@@ -155,7 +162,8 @@ export function DetectionPreview({
 								aria-pressed={frameIndex === index}
 								onClick={() => seek(frameIndex)}
 							>
-								{observed.timestampSeconds.toFixed(1)}秒 · {observed.objects.length}件
+								{observed.timestampSeconds.toFixed(1)}秒 ·{" "}
+								{observed.objects.length}件
 							</Button>
 						))}
 					</div>
@@ -194,7 +202,9 @@ export function DetectionPreview({
 						</ul>
 					)}
 					<Button
-						onClick={() => onIncorporate?.(result?.kind === "video" ? index : undefined)}
+						onClick={() =>
+							onIncorporate?.(result?.kind === "video" ? index : undefined)
+						}
 						disabled={!onIncorporate || !result}
 					>
 						{cameraActive

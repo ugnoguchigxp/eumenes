@@ -251,7 +251,7 @@ export const TreeMenu: React.FC<TreeMenuProps> = ({
 					{showCloseButton && onCloseMenu && (
 						<button
 							type="button"
-							aria-label="Close menu"
+							aria-label="メニューを閉じる"
 							className={cn(
 								"min-w-[32px] focus:outline-none",
 								headerTextColor,
@@ -279,7 +279,7 @@ export const TreeMenu: React.FC<TreeMenuProps> = ({
 								headerTextColor,
 								headerHoverColor,
 							)}
-							aria-label="Expand all"
+							aria-label="すべて展開"
 						>
 							<Plus size={"0.8rem"} />
 						</button>
@@ -291,7 +291,7 @@ export const TreeMenu: React.FC<TreeMenuProps> = ({
 								headerTextColor,
 								headerHoverColor,
 							)}
-							aria-label="Collapse all"
+							aria-label="すべて折りたたむ"
 						>
 							<Minus size={"0.8rem"} />
 						</button>

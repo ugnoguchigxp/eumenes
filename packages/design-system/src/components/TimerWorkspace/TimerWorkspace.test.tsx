@@ -18,9 +18,10 @@ test("mode buttons expose their selection and fixed timer controls survive every
 	expect(dial).toHaveTextContent("00:10:00");
 	const fields = screen.getByRole("group", { name: "設定時間" });
 	const presets = screen.getByRole("group", { name: "よく使う時間" });
-	expect(
-		screen.getByRole("button", { name: /^タイマー$/ }),
-	).toHaveAttribute("aria-pressed", "true");
+	expect(screen.getByRole("button", { name: /^タイマー$/ })).toHaveAttribute(
+		"aria-pressed",
+		"true",
+	);
 	expect(screen.queryByRole("tablist")).toBeNull();
 	for (const state of ["active", "paused", "elapsed"] as const) {
 		view.rerender(
@@ -121,9 +122,7 @@ test("stopwatch controls delegate start, stop and reset to the host", () => {
 	expect(screen.getByRole("button", { name: "再開する" })).toBeVisible();
 	fireEvent.click(screen.getByRole("button", { name: "リセット" }));
 	expect(reset).toHaveBeenCalledOnce();
-	fireEvent.click(
-		screen.getByRole("button", { name: /^タイマー$/ }),
-	);
+	fireEvent.click(screen.getByRole("button", { name: /^タイマー$/ }));
 	expect(mode).toHaveBeenCalledWith("timer");
 });
 test("a pending operation blocks another submit and preset edits", () => {

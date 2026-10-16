@@ -37,7 +37,7 @@ describe("Skeleton Component", () => {
 
 			const spinner = screen.getByRole("status");
 			expect(spinner).toBeInTheDocument();
-			expect(spinner).toHaveAttribute("aria-label", "Loading");
+			expect(spinner).toHaveAttribute("aria-label", "読み込み中");
 		});
 
 		it("applies flex classes when showing spinner", () => {
@@ -304,7 +304,7 @@ describe("Skeleton Component", () => {
 
 			const spinner = screen.getByRole("status");
 			expect(spinner).toBeInTheDocument();
-			expect(spinner).toHaveAttribute("aria-label", "Loading");
+			expect(spinner).toHaveAttribute("aria-label", "読み込み中");
 		});
 
 		it("does not have accessibility attributes when spinner is hidden", () => {

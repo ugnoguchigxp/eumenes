@@ -7,7 +7,6 @@ import { hashRequirementData } from "../../capabilities";
 import { controlInstructions } from "../../inference";
 import { EvidenceCatalog, MATERIAL_BYTES } from "./evidence-catalog";
 import { modelLimit, operationLimits } from "./exploration";
-import { webReadState } from "./web-read-state";
 import { createWorkerControl } from "./worker-control";
 const OPERATION_BYTES = 4096;
 const VARIABLE_RESERVE_BYTES = 8192;
@@ -113,15 +112,6 @@ export function workerContext(
 	const visible = [...observations];
 	const data: { [key: string]: unknown } = {
 		...fixed,
-		...(guided
-			? {
-					collection: {
-						corpusRevision: webReadState(task).arrivals,
-						pending: webReadState(task).reads.filter((r) => !r.settled).length,
-						queued: webReadState(task).queue.length,
-					},
-				}
-			: {}),
 		now: new Date(now).toISOString(),
 		timeZone: "Asia/Tokyo",
 		budget: {

@@ -38,13 +38,13 @@ export type {
 	KanbanExecutor,
 	ExecutorRegistry,
 	CommonRunState,
-} from "./shared-contracts";
-export { DEFAULT_EXECUTOR_ID } from "./shared-contracts";
-export type { SharedBoardView } from "./shared-board";
+} from "./contracts/shared";
+export { DEFAULT_EXECUTOR_ID } from "./contracts/shared";
+export type { SharedBoardView } from "./service/shared-board";
 export {
 	readWorkspaceGuard,
 	reserveWorkspaceInTransaction,
 	beginWorkspaceReleaseInTransaction,
 	finishWorkspaceReleaseInTransaction,
 	markWorkspaceUnknownInTransaction,
-} from "./workspace-guard";
+} from "./repository/workspace-guard";

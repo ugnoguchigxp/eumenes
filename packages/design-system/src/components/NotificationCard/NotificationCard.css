@@ -4,7 +4,8 @@
 	border-radius: 20px;
 	color: var(--foreground);
 	background: color-mix(in srgb, var(--card) 94%, transparent);
-	box-shadow: 0 8px 28px color-mix(in srgb, #000 13%, transparent),
+	box-shadow:
+		0 8px 28px color-mix(in srgb, #000 13%, transparent),
 		inset 0 1px 0 color-mix(in srgb, #fff 12%, transparent);
 	backdrop-filter: blur(24px) saturate(150%);
 }

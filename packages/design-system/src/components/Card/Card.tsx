@@ -8,8 +8,7 @@ const cardVariants = cva("rounded-lg border", {
 			default: "bg-card text-card-foreground border-border",
 			destructive:
 				"border-destructive/50 bg-destructive/10 text-foreground border-2",
-			warning:
-				"border-warning/50 bg-warning/10 text-foreground border-2",
+			warning: "border-warning/50 bg-warning/10 text-foreground border-2",
 		},
 	},
 	defaultVariants: {

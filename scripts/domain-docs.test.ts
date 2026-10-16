@@ -12,12 +12,14 @@ import {
 
 const graph = {
 	alpha: {
+		tier: 0,
 		backend: "api/domains/alpha",
 		web: null,
 		components: null,
 		depends: { api: [], web: [], test: [] },
 	},
 	beta: {
+		tier: 1,
 		backend: "api/domains/beta",
 		web: "web/src/domains/beta",
 		components: "web/src/components/domains/beta",
@@ -43,9 +45,10 @@ test("renderDomainTable lists every domain with its dependencies", () => {
 	const lines = renderDomainTable(graph, exists).split("\n");
 	expect(lines).toHaveLength(2 + 2);
 	expect(lines[2]).toBe(
-		"| `alpha` | `api/domains/alpha/index.ts` | なし | なし | なし | なし | なし |",
+		"| `alpha` | 0 | `api/domains/alpha/index.ts` | なし | なし | なし | なし | なし |",
 	);
 	expect(lines[3]).toContain("`alpha` | `alpha` | `gamma` |");
+	expect(lines[3]).toContain("`beta` | 1 |");
 });
 
 test("replaceBlock rewrites only the marked block and requires both markers", () => {

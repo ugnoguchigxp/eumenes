@@ -72,11 +72,11 @@ const toolchains: Readonly<
 	Record<string, import("./toolchains").ToolchainRuntimeMeta>
 > = {
 	"web.search": { execution: "research", route: "web" },
-	"web.research.luna": {
+	"web.research.codex": {
 		execution: "research",
 		route: "web",
-		requires: "luna",
-		researcher: "codex_luna",
+		requires: "codex",
+		researcher: "codex",
 	},
 	"history.research": { execution: "research", route: "history" },
 	"world.query": { execution: "research", route: "world", requires: "world" },

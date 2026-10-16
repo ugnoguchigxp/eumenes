@@ -32,13 +32,14 @@ describe("Button", () => {
 			["option-active", "bg-primary/10"],
 		] as const;
 
-		it.each(
-			variants,
-		)("renders %s variant with correct class", (variant, expectedClass) => {
-			render(<Button variant={variant}>Button</Button>);
-			const button = screen.getByRole("button");
-			expect(button).toHaveClass(expectedClass);
-		});
+		it.each(variants)(
+			"renders %s variant with correct class",
+			(variant, expectedClass) => {
+				render(<Button variant={variant}>Button</Button>);
+				const button = screen.getByRole("button");
+				expect(button).toHaveClass(expectedClass);
+			},
+		);
 
 		it("renders success variant via success prop", () => {
 			render(<Button success>Success</Button>);
@@ -64,13 +65,14 @@ describe("Button", () => {
 			["circle", "h-8 w-8 rounded-full"],
 		] as const;
 
-		it.each(
-			sizes,
-		)("renders %s size with correct class", (size, expectedClass) => {
-			render(<Button size={size}>Button</Button>);
-			const button = screen.getByRole("button");
-			expect(button).toHaveClass(expectedClass);
-		});
+		it.each(sizes)(
+			"renders %s size with correct class",
+			(size, expectedClass) => {
+				render(<Button size={size}>Button</Button>);
+				const button = screen.getByRole("button");
+				expect(button).toHaveClass(expectedClass);
+			},
+		);
 	});
 
 	describe("States", () => {

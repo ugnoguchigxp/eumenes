@@ -5,6 +5,13 @@
 import * as React from "react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { menuKeyDown } from "../../utils/menuKeyboard";
+
+type TriggerElementProps = {
+	onClick?: (event: React.MouseEvent) => void;
+	onKeyDown?: (event: React.KeyboardEvent) => void;
+	type?: string;
+};
 
 export interface IDropdownMenuItem {
 	label: string;
@@ -237,10 +244,21 @@ export const DropdownMenu: React.FC<IDropdownMenuProps> = React.memo(
 			};
 		}, [computeMenuPosition, isOpen, prepareHiddenMenuStyle]);
 
+		// Once the menu is placed and visible, focus its first item so arrow keys work at once.
+		const menuVisible = menuStyle.visibility === "visible";
+		useEffect(() => {
+			if (!isOpen || !menuVisible) return;
+			menuRef.current
+				?.querySelector<HTMLElement>('[role="menuitem"]:not(:disabled)')
+				?.focus({ preventScroll: true });
+		}, [isOpen, menuVisible]);
+
 		useEffect(() => {
 			if (!isOpen) return;
 			const onKeyDown = (e: KeyboardEvent) => {
-				if (e.key === "Escape") setIsOpen(false);
+				if (e.key !== "Escape") return;
+				setIsOpen(false);
+				triggerRef.current?.focus();
 			};
 			window.addEventListener("keydown", onKeyDown);
 			return () => window.removeEventListener("keydown", onKeyDown);
@@ -249,6 +267,7 @@ export const DropdownMenu: React.FC<IDropdownMenuProps> = React.memo(
 		const handleItemClick = (item: IDropdownMenuItem) => {
 			item.onClick();
 			setIsOpen(false);
+			triggerRef.current?.focus();
 		};
 
 		const toggleMenu = () => {
@@ -281,23 +300,21 @@ export const DropdownMenu: React.FC<IDropdownMenuProps> = React.memo(
 			},
 		} as const;
 
-		const triggerElement = React.isValidElement(trigger) ? (
+		const triggerElement = React.isValidElement<TriggerElementProps>(
+			trigger,
+		) ? (
 			React.cloneElement(trigger, {
 				...triggerProps,
 				onClick: (event: React.MouseEvent) => {
-					/* biome-ignore lint/suspicious/noExplicitAny: Safely accessing props of cloned element */
-					(trigger as any).props?.onClick?.(event);
+					trigger.props.onClick?.(event);
 					handleTriggerClick(event);
 				},
 				onKeyDown: (event: React.KeyboardEvent) => {
-					/* biome-ignore lint/suspicious/noExplicitAny: Safely accessing props of cloned element */
-					(trigger as any).props?.onKeyDown?.(event);
+					trigger.props.onKeyDown?.(event);
 					handleTriggerKeyDown(event);
 				},
-				...((trigger as React.ReactElement).type === "button"
-					? { type: "button" }
-					: {}),
-			} as React.HTMLAttributes<HTMLElement>)
+				...(trigger.type === "button" ? { type: "button" } : {}),
+			})
 		) : (
 			<button type="button" {...triggerProps}>
 				{trigger}
@@ -315,6 +332,8 @@ export const DropdownMenu: React.FC<IDropdownMenuProps> = React.memo(
 						<div
 							ref={menuRef}
 							role="menu"
+							tabIndex={-1}
+							onKeyDown={menuKeyDown}
 							style={menuStyle}
 							className="rounded-md border border-border bg-background shadow-lg"
 						>

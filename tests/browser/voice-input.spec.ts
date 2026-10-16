@@ -19,7 +19,7 @@ test.afterAll(async () => {
 	rmSync(dir, { recursive: true, force: true });
 });
 
-test("three paused ASR fragments create one conversation request and one answer", async ({
+test("fragments spoken again before their transcript is sent create one conversation request and one answer", async ({
 	page,
 }) => {
 	const fragments = [
@@ -33,12 +33,9 @@ test("three paused ASR fragments create one conversation request and one answer"
 			Authorization: "Bearer fixture-control",
 			"Content-Type": "application/json",
 		},
+		// The speaker resumes while each earlier fragment is still being transcribed.
 		body: JSON.stringify(
-			fragments.map((text, i) => ({
-				text,
-				relation: i ? "continuation" : "independent",
-				readiness: i === 2 ? "ready" : "waiting",
-			})),
+			fragments.map((text, i) => ({ text, delayMs: i < 2 ? 2000 : 0 })),
 		),
 	});
 	await page.addInitScript(() => {
@@ -91,22 +88,14 @@ test("three paused ASR fragments create one conversation request and one answer"
 	for (let i = 0; i < 3; i++) {
 		preview = fragments[i]!;
 		await page.evaluate(() => Reflect.get(window, "triggerSpeech")());
-		// While the next segment is still being recorded, earlier input stays visible.
 		await expect(page.getByRole("textbox", { name: "メッセージ" })).toHaveValue(
-			fragments.slice(0, i + 1).join("\n"),
+			new RegExp(fragments[i]!),
 		);
 		expect(ids).toHaveLength(i); // This is a preview, not the final ASR result.
 		await page.evaluate(() => Reflect.get(window, "finishSpeech")());
 		await expect.poll(() => ids.length).toBe(i + 1);
-		if (i < 2) {
-			await expect
-				.poll(async () => (await getTurn(ids[i]!)).status)
-				.toBe("awaiting_input");
-			expect(commits).toHaveLength(0);
-			await expect(
-				page.getByRole("textbox", { name: "メッセージ" }),
-			).toHaveValue(fragments.slice(0, i + 1).join("\n"));
-		}
+		// Nothing is sent while the speaker is still talking.
+		expect(commits).toHaveLength(0);
 	}
 	await expect.poll(() => commits.length).toBe(1);
 	await expect(page.locator(".messages .message-user")).toHaveCount(1);

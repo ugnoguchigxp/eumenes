@@ -6,7 +6,7 @@ import { ActionButton, type ActionButtonProps } from "./ActionButton";
  * 編集ボタン
  */
 export const EditButton: React.FC<ActionButtonProps> = ({
-	label = "Edit",
+	label = "編集",
 	icon = Pencil,
 	variant = "secondary",
 	...props

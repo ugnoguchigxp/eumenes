@@ -187,6 +187,7 @@ describe("Input", () => {
 		});
 
 		it("passes through autoFocus attribute", () => {
+			// oxlint-disable-next-line jsx-a11y/no-autofocus -- the test checks that autoFocus is passed through
 			render(<Input autoFocus />);
 			const input = screen.getByRole("textbox");
 			// autoFocus is a boolean attribute that may not appear in DOM

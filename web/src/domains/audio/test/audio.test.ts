@@ -827,11 +827,7 @@ test("output preparation resumes an existing context that is waiting for a gestu
 	expect(close).toHaveBeenCalledOnce();
 });
 
-import {
-	createIncrementalEncoder,
-	encodeRecording,
-	partialInterval,
-} from "../controller";
+import { createIncrementalEncoder, partialInterval } from "../controller";
 
 function toneFrames(lengths: number[]): Float32Array[] {
 	let n = 0;
@@ -842,20 +838,52 @@ function toneFrames(lengths: number[]): Float32Array[] {
 	);
 }
 
+function encodeAll(frames: Float32Array[], rate: number) {
+	const encoder = createIncrementalEncoder(rate);
+	const joined = new Float32Array(frames.reduce((n, f) => n + f.length, 0));
+	let offset = 0;
+	for (const frame of frames) {
+		joined.set(frame, offset);
+		offset += frame.length;
+	}
+	encoder.push(joined);
+	return encoder.wav();
+}
+
 for (const rate of [48000, 44100, 16000]) {
-	test(`incremental encoder matches encodeRecording at ${rate} Hz`, () => {
+	test(`incremental encoder output does not depend on frame boundaries at ${rate} Hz`, () => {
 		const frames = toneFrames([2048, 2048, 2048, 2048, 1317, 91, 2048, 3]);
-		const total = frames.reduce((sum, f) => sum + f.length, 0);
 		const encoder = createIncrementalEncoder(rate);
-		for (const frame of frames) {
+		frames.forEach((frame, i) => {
 			encoder.push(frame);
-			const so_far = frames.slice(0, frames.indexOf(frame) + 1);
-			const count = so_far.reduce((sum, f) => sum + f.length, 0);
-			expect(encoder.wav()).toEqual(encodeRecording(so_far, count, rate));
-		}
-		expect(encoder.wav()).toEqual(encodeRecording(frames, total, rate));
+			expect(encoder.wav()).toEqual(encodeAll(frames.slice(0, i + 1), rate));
+		});
 	});
 }
+
+function toneRms(hz: number, rate: number) {
+	const samples = new Float32Array(rate).map((_, n) =>
+		Math.sin((2 * Math.PI * hz * n) / rate),
+	);
+	const wav = encodeAll([samples], rate);
+	const view = new DataView(wav.buffer, wav.byteOffset);
+	let sum = 0,
+		count = 0;
+	// Skip the edges, where the filter window runs past the recording.
+	for (let offset = 44 + 2000; offset < wav.length - 2000; offset += 2) {
+		const value = view.getInt16(offset, true) / 32767;
+		sum += value * value;
+		count++;
+	}
+	return Math.sqrt(sum / count);
+}
+
+test("resampling to 16 kHz keeps speech and removes what would alias", () => {
+	for (const rate of [48000, 44100]) {
+		expect(toneRms(1000, rate)).toBeGreaterThan(0.69);
+		expect(toneRms(11000, rate)).toBeLessThan(0.01);
+	}
+});
 
 test("partial interval grows with utterance length and is capped", () => {
 	expect(partialInterval(0)).toBe(0.6);

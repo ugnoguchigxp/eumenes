@@ -16,9 +16,10 @@ const prompt = () =>
 it("explicit choices build the editable prompt and pass arbitrary integer dimensions unchanged", () => {
 	const generate = vi.fn();
 	render(<ImageCreationForm initialValues={defaults} onGenerate={generate} />);
-	expect(
-		screen.getByRole("button", { name: "画像を生成" }),
-	).toHaveProperty("disabled", true);
+	expect(screen.getByRole("button", { name: "画像を生成" })).toHaveProperty(
+		"disabled",
+		true,
+	);
 	fireEvent.change(screen.getByLabelText("テーマ・描きたいもの"), {
 		target: { value: "駅で踊るタコ" },
 	});
@@ -30,9 +31,7 @@ it("explicit choices build the editable prompt and pass arbitrary integer dimens
 	expect(prompt().value).toBe(
 		"テーマ：駅で踊るタコ\n画風：水彩\n雰囲気：温かい\n構図：広めの画角",
 	);
-	fireEvent.click(
-		screen.getByRole("button", { name: "画像を生成" }),
-	);
+	fireEvent.click(screen.getByRole("button", { name: "画像を生成" }));
 	expect(generate).toHaveBeenCalledWith({
 		...defaults,
 		prompt: prompt().value,
@@ -43,9 +42,10 @@ it("manual prose survives choice changes until the user reflects or keeps edits;
 	fireEvent.change(prompt(), { target: { value: "手書きの希望を残す" } });
 	fireEvent.click(screen.getByLabelText("水彩", { selector: "input" }));
 	expect(prompt().value).toBe("手書きの希望を残す");
-	expect(
-		screen.getByRole("button", { name: "画像を生成" }),
-	).toHaveProperty("disabled", true);
+	expect(screen.getByRole("button", { name: "画像を生成" })).toHaveProperty(
+		"disabled",
+		true,
+	);
 	fireEvent.click(screen.getByRole("button", { name: "編集内容を使う" }));
 	expect(prompt().value).toBe("手書きの希望を残す");
 	fireEvent.click(screen.getByRole("button", { name: "選択内容を反映" }));
@@ -85,9 +85,7 @@ it("resource updates retain manual draft and all editable API settings", () => {
 		/>,
 	);
 	expect(prompt().value).toBe("変更した文章");
-	fireEvent.click(
-		screen.getByRole("button", { name: "画像を生成" }),
-	);
+	fireEvent.click(screen.getByRole("button", { name: "画像を生成" }));
 	expect(generate).toHaveBeenCalledWith({
 		...defaults,
 		width: 777,

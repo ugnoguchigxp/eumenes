@@ -4,7 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { loadConfig } from "../infrastructure/config";
 import { createLifecycleRunner } from "./lifecycle";
-import { buildServices, createLifecycles } from "./server";
+import { createLifecycles } from "./server-lifecycles";
+import { buildServices } from "./server-services";
 
 const dirs: string[] = [];
 afterEach(() => {

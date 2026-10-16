@@ -331,3 +331,83 @@ test("a GET binding with body fields and a mismatched path template are invalid 
 		await run(executor(), getBinding({ pathFields: {} }), { itemId: "a" }),
 	).toMatchObject({ ok: false, code: "invalid_binding" });
 });
+
+const publicResolver = async () => [
+	{ address: "93.184.216.34", family: 4 as const },
+];
+const refusedHosts = (
+	resolver: () => Promise<{ address: string; family: 4 | 6 }[]>,
+) => {
+	let called = 0;
+	const exec = createHttpJsonExecutor({
+		connections: new Map([
+			[
+				"connection:fixture",
+				connection({
+					baseUrl: "https://api.example.com",
+					allowHosts: ["api.example.com"],
+				}),
+			],
+		]),
+		resolver,
+		fetch: (async () => {
+			called++;
+			return Response.json({ id: "x" });
+		}) as unknown as typeof fetch,
+	});
+	return { exec, called: () => called };
+};
+
+test("a hostname that resolves to a private, loopback, link-local or mapped address is refused before any request", async () => {
+	for (const address of [
+		"10.0.0.8",
+		"127.0.0.1",
+		"169.254.169.254",
+		"::1",
+		"::ffff:127.0.0.1",
+		"::ffff:7f00:1",
+		"fd00::1",
+	]) {
+		const { exec, called } = refusedHosts(async () => [
+			{ address, family: address.includes(":") ? 6 : 4 },
+		]);
+		expect(await run(exec, getBinding(), { itemId: "a" })).toMatchObject({
+			ok: false,
+			code: "private_address",
+		});
+		expect(called()).toBe(0);
+	}
+	// One private address among public ones is enough to refuse.
+	const mixed = refusedHosts(async () => [
+		{ address: "93.184.216.34", family: 4 },
+		{ address: "10.0.0.8", family: 4 },
+	]);
+	expect(await run(mixed.exec, getBinding(), { itemId: "a" })).toMatchObject({
+		code: "private_address",
+	});
+	expect(mixed.called()).toBe(0);
+});
+
+test("IPv4-mapped IPv6 literals in the base URL are refused", async () => {
+	for (const baseUrl of [
+		"https://[::ffff:127.0.0.1]",
+		"https://[::ffff:a00:1]",
+	]) {
+		const host = new URL(baseUrl).hostname;
+		expect(
+			await run(
+				executor(connection({ baseUrl, allowHosts: [host] })),
+				getBinding(),
+				{ itemId: "a" },
+			),
+		).toMatchObject({ ok: false, code: "private_address" });
+	}
+});
+
+test("a hostname that resolves to a public address is requested", async () => {
+	const { exec, called } = refusedHosts(publicResolver);
+	expect(await run(exec, getBinding(), { itemId: "a" })).toMatchObject({
+		ok: true,
+	});
+	expect(called()).toBe(1);
+});

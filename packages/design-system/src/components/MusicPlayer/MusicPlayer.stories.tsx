@@ -16,6 +16,7 @@ export function PlayerAndPlaylistDemo() {
 	const [index, setIndex] = useState(0);
 	useEffect(() => {
 		const url = URL.createObjectURL(demoAudio());
+		// oxlint-disable-next-line react/set-state-in-effect -- local state follows a prop or open state, reset when it changes
 		setSrc(url);
 		return () => URL.revokeObjectURL(url);
 	}, []);

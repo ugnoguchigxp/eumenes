@@ -9,9 +9,7 @@ function pendingText(snapshot: Snapshot | null): string {
 	if (!snapshot || snapshot.turn.runId) return "";
 	const { turn, prefix } = snapshot;
 	if (turn.status === "recognizing") return join(prefix, turn.text);
-	return ["awaiting_input", "input_ready", "draft"].includes(turn.status)
-		? (turn.text ?? "")
-		: "";
+	return turn.status === "input_ready" ? (turn.text ?? "") : "";
 }
 
 function observe(previous: Snapshot | null, turn: VoiceTurn | undefined) {

@@ -236,7 +236,8 @@ test("a confidential value stays in memory: not on screen, not in storage, only 
 	expect(document.body.textContent).not.toContain(SECRET);
 	expect(JSON.stringify({ ...sessionStorage })).not.toContain(SECRET);
 	expect(sessionStorage.length).toBe(0);
-	expect(screen.getByLabelText("APIキー")).toHaveProperty("value", "");
+	expect(screen.getByLabelText("APIキー")).toHaveProperty("type", "password");
+	expect(screen.getByLabelText("APIキー")).toHaveProperty("value", SECRET);
 });
 
 test("an apply with secrets sends them once, keeps nothing in the outbox and forgets them on success", async () => {

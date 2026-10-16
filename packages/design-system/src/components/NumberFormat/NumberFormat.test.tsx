@@ -141,7 +141,6 @@ describe("NumberFormat Components", () => {
 
 			const spy = vi
 				.spyOn(Intl, "NumberFormat")
-				/* biome-ignore lint/suspicious/noExplicitAny: Mocking complex object */
 				.mockImplementation(MockBrokenNumberFormat as any);
 
 			render(<NumberFormat value={1000} locale="en-US" fallback="Error" />);

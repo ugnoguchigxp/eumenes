@@ -11,7 +11,6 @@ import {
 } from "../../agent-runtime";
 import type {
 	GoalsLayerPort,
-	PostAnswerObserverPort,
 	Run,
 	StewardPort,
 	WorldContextPort,
@@ -98,7 +97,6 @@ export interface Accept {
 	occurrenceId?: string;
 	deadlineMs?: number;
 	voiceSubject?: string;
-	validationRequestIds?: string[];
 	transcriptionRequestIds?: string[];
 	/**
 	 * The run resumes an interaction's command sub-agent: its job is the command job, not a
@@ -125,7 +123,6 @@ export type DialogueDeps = {
 	objectRecognition?: import("../contracts/object-recognition").ObjectRecognitionPort;
 	delegation?: import("../contracts/delegation").DelegationPort;
 	toolchains?: import("../contracts/toolchains").ToolchainRoutingPort;
-	postAnswer?: PostAnswerObserverPort;
 	worldContext?: WorldContextPort;
 	/** The adopted goals, shown as a layer right after L1. Without it no goals layer exists. */
 	goals?: GoalsLayerPort;
