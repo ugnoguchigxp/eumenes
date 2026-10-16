@@ -6,7 +6,7 @@
 
 対象は `ugnoguchigxp/eumenes`、調査基準は main `3f79a1c538933ef30d463b28e828ab2f4b05f378`。本文の `path:line` はこの時点のソースを指す。変更範囲は設計文書と索引のみとし、製品コード・設定・依存・DB・試験コードは変更していない。サービス操作、試験、実LLM・実API呼出しも行っていない。
 
-本書はタイマーの移行範囲の設計を定める。現状の判断は現行コードを優先し、既存計画の未実装項目を実装済みとは扱わない。関連する[ツールチェーン登録](../docs/toolchain-extension.md)、[段階別検証](../docs/toolchain-extension-verification.md)、[検証規則](../docs/verification.md)、[設定登録設計](settings-openui-definition-storage-2026-10-12.md)とは、版を固定した参照・有限のbinding・所有domainの公開操作という考え方を揃える。設定設計の先行実装は本書の前提にしない。
+本書はタイマーの移行範囲の設計を定める。現状の判断は現行コードを優先し、既存計画の未実装項目を実装済みとは扱わない。関連する[ツールチェーン登録](../../docs/toolchain-extension.md)、[段階別検証](../../docs/toolchain-extension-verification.md)、[検証規則](../../docs/verification.md)、[設定登録設計](settings-openui-definition-storage-2026-10-12.md)とは、版を固定した参照・有限のbinding・所有domainの公開操作という考え方を揃える。設定設計の先行実装は本書の前提にしない。
 
 ## 1. 目的と今回の到達点
 

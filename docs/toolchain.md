@@ -24,7 +24,7 @@ streamでは、function名や制御区切りになり得る末尾だけを保留
 
 通常の会話入力から、登録済みのツールチェーン(定形セット)を選べます。`EUMENES_TOOLCHAIN_ENABLED` は既定 `1`、`0` なら従来の会話生成へ戻ります。内部JSONを読み上げや態度収集へ渡しません。子の待機中は推論枠を解放します。
 
-ツールチェーンは「サブエージェント・SystemContext・SKILL・ツールの使い方・ツール詳細・Artifact」の一組です([設計](../spec/toolchain-set-routing-design-2026-10-12.md)、[登録手順](toolchain-extension.md#1-全体像))。会話担当の判断は「直接回答する・確認質問を返す・提示された関数を一つ呼ぶ」だけで、関数の引数は全ツールチェーン共通の `{ request }` です。経路・ツール・引数はツールチェーン内のサブエージェントが決めます。
+ツールチェーンは「サブエージェント・SystemContext・SKILL・ツールの使い方・ツール詳細・Artifact」の一組です([設計](../spec/.archived/toolchain-set-routing-design-2026-10-12.md)、[登録手順](toolchain-extension.md#1-全体像))。会話担当の判断は「直接回答する・確認質問を返す・提示された関数を一つ呼ぶ」だけで、関数の引数は全ツールチェーン共通の `{ request }` です。経路・ツール・引数はツールチェーン内のサブエージェントが決めます。
 
 調査担当には今回の依頼を渡し、検索キーワードは担当が選びます。過去の会話から出典URLを集めて渡しません。URLの直接読取りは今回の依頼に明示されたURL、今回の検索結果、今回の依頼に合う保存済み手順の候補に限ります。
 
@@ -53,7 +53,7 @@ streamでは、function名や制御区切りになり得る末尾だけを保留
 
 公開中のWeb経路（`package:web.recipe@3`・`package:web.search@3`、schema `guidedResearch`、SKILL `skill:web.guided@2`）は、検索結果の抜粋を主張の根拠にしません。必要な事実は本文の提示箇所で確認します。`web.read` は `{url}` だけを受け、次候補を `readAhead` で最大5件指定できます。ホストは最初の2件を開始し、新しい本文が無いまま10秒経つと次の2件を追加します。保存済み本文の `web.find` / `web.read_saved` と手順の `recipe.find` はページ読取とは別のlocal予算（4）です。`finish.report` は `completion`、利用者へ届く `answer`、`summary`、事実ごとの `claims`（`verified` / `unknown` / `conflicting` と本文根拠 `eN`）、`limitations` を持ちます。十分性の判断と回答は同じfinishで返し、別の採点呼出しは追加しません。不明や矛盾を説明した回答は `complete` にできます。構造や参照が不正な場合の修正（一回まで）、権限・取消・期限の検査は維持します。各モデル呼出しは独立しているため、有効な根拠の抜粋と実行済みの操作条件を毎回提示します。
 
-実装目標(SystemContextの層構成、会話方針と公開ツールの一致、結果返却の必須規則など)と現行との差分は [Web検索 実装目標](../spec/web-search-target-2026-10-11.md) にあります。今回の会話契約と根拠容量の修正範囲は[実装計画](../spec/web-search-repair-implementation-plan-2026-10-11.md)のA〜Dです。後続の構造改善とは区別します。
+実装目標(SystemContextの層構成、会話方針と公開ツールの一致、結果返却の必須規則など)と現行との差分は [Web検索 実装目標](../spec/.archived/web-search-target-2026-10-11.md) にあります。今回の会話契約と根拠容量の修正範囲は[実装計画](../spec/.archived/web-search-repair-implementation-plan-2026-10-11.md)のA〜Dです。後続の構造改善とは区別します。
 
 Lunaはbackendの `@openai/codex-sdk@0.160.0` から `startThread` / `runStreamed` で `gpt-6-luna` を実行します。SDK内部のCLIランタイムに、既存の保存済みログインを利用します。backendの実行ユーザーでCodex CLIをインストール・ログインし、PATHから起動できるようにしてください。実行ファイルは `EUMENES_RESEARCH_CODEX_EXECUTABLE` で指定できます（既定 `codex`）。CLIが見つからないときやWeb調査が無効なときはLunaのツールを公開しません。認証・モデル利用権・接続の失敗は調査失敗として扱い、別モデルへ自動変更しません。
 

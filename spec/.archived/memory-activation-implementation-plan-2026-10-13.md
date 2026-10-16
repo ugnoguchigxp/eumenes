@@ -6,7 +6,7 @@
 
 2026-10-13 / 状態: **計画**（未実装・未検証）/ 改訂3。実装担当は Sonnet。本書の「決定事項」と各タスクの指定に従い、本書にない設計変更をしない。本書の記述と実際のコードが食い違う（関数名・型・表名が違う、前提の振る舞いが違う）場合は、推測で合わせず、実装を止めて食い違いを報告する。
 
-関連: [接続計画](../memory-system-incremental-adoption-concept.md)、[本体の発展案](../../../eumenes_memory/spec/eumenes-memory-evolution-proposal.md)、[LARM](../../docs/larm.md)、[ログ](../../docs/logging.md)。
+関連: [接続計画](memory-system-incremental-adoption-concept.md)、[本体の発展案](../../../eumenes_memory/spec/eumenes-memory-evolution-proposal.md)、[LARM](../../docs/larm.md)、[ログ](../../docs/logging.md)。
 
 ---
 

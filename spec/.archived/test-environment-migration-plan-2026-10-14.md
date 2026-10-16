@@ -12,7 +12,7 @@ Eumenesの既存の `verify` を拡張し、正しい入力に対して必要な
 
 **変更からの自動選択は条件付きの後続段階とする。** 現在のdomain所有パスだけでは実際の変更の多くを扱えない。application・共通Web・DesignSystemの対応を含めた小さな分析で効果を見積もってから、表示専用の計画生成へ進む。
 
-Replay、不変条件の試験、JiTTestは[テスト品質改善の後続案](test-quality-improvement-options-2026-10-15.md)へ分離した。本計画の完了に、それらの導入を要求しない。
+Replay、不変条件の試験、JiTTestは[テスト品質改善の後続案](../test-quality-improvement-options-2026-10-15.md)へ分離した。本計画の完了に、それらの導入を要求しない。
 
 ## 1 目的と成功の定義
 
@@ -31,20 +31,20 @@ Replay、不変条件の試験、JiTTestは[テスト品質改善の後続案](t
 | 確認事項 | 根拠 | 対応 |
 | --- | --- | --- |
 | JS/TSの試験ファイルは527本。MJSを含めると528本 | 同じHEADのGit treeを再集計。追加の1本は `scripts/dots-oauth/provider.test.mjs` | ファイル数は参考値。Storybookのような生成試験を含むrunner/project単位で棚卸しする |
-| `--affected` は未実装。`--domain` は1つを読み、`selected[0]` の試験だけを実行する | [verify](../scripts/verify.ts) | 自動選択に先立ち、複数domainを1回で扱えるようにする |
-| 依存閉包の表示は、利用側試験の自動実行を意味しない | [verify](../scripts/verify.ts)、[test-domain](../scripts/test-domain.ts) | 試験の選択根拠と実際の実行集合を一致させる |
-| DesignSystemの試験はdomain所有パスから収集されても実行先に振り分けられない | [test-domain](../scripts/test-domain.ts)、[domains](../scripts/domains.ts) | DesignSystemの既存runnerへ渡す |
-| `tests/acceptance/nl` の4ファイルはブラウザなし、driverはChromiumを起動する | [runner試験](../tests/acceptance/nl/runner.test.ts)、[run処理](../scripts/nl-acceptance/run.ts)、[driver試験](../tests/acceptance/nl/driver.test.ts)、[driver](../scripts/nl-acceptance/driver.ts) | `verify:all` にはブラウザなし4本だけ登録し、driverはファイルを明示した別実行とする |
-| DesignSystemにはunitとstorybookの2 projectがあり、通常のtestはunitのみ | [Vite設定](../packages/design-system/vite.config.ts)、[Storybook入力](../packages/design-system/.storybook/main.ts)、[package](../packages/design-system/package.json) | storiesから生成する試験も棚卸しする。storybookはブラウザ区分として初回の全件CIから除外する |
-| DesignSystemのbuild用型検査はtest・spec・stories等を除外するが、通常の型検査はsrc全体を含む | [通常tsconfig](../packages/design-system/tsconfig.json)、[build用tsconfig](../packages/design-system/tsconfig.build.json) | buildを通常の型検査の代わりにせず、検査範囲を維持する |
-| format・lint・root型検査は既に試験より前。DesignSystem型検査は後ろにある | [verify](../scripts/verify.ts) | 順序改善はDesignSystem型検査の前倒しに限定して記述する |
-| DesignSystemのexportsは `dist` を指し、rootのVitestにsrcへのaliasはない | [package](../packages/design-system/package.json)、[Vitest設定](../vitest.config.ts) | 利用側の型検査・試験より前に、その入力のDesignSystemをビルドする |
-| `postinstall` にsource hash付きのビルド補助があるが、domain検証は呼ばない | [build補助](../scripts/build-design-system.ts)、[root package](../package.json) | 既存buildを再利用する。現在のstampはlockfile・runtime・出力内容まで保証していない |
+| `--affected` は未実装。`--domain` は1つを読み、`selected[0]` の試験だけを実行する | [verify](../../scripts/verify.ts) | 自動選択に先立ち、複数domainを1回で扱えるようにする |
+| 依存閉包の表示は、利用側試験の自動実行を意味しない | [verify](../../scripts/verify.ts)、[test-domain](../../scripts/test-domain.ts) | 試験の選択根拠と実際の実行集合を一致させる |
+| DesignSystemの試験はdomain所有パスから収集されても実行先に振り分けられない | [test-domain](../../scripts/test-domain.ts)、[domains](../../scripts/domains.ts) | DesignSystemの既存runnerへ渡す |
+| `tests/acceptance/nl` の4ファイルはブラウザなし、driverはChromiumを起動する | [runner試験](../../tests/acceptance/nl/runner.test.ts)、[run処理](../../scripts/nl-acceptance/run.ts)、[driver試験](../../tests/acceptance/nl/driver.test.ts)、[driver](../../scripts/nl-acceptance/driver.ts) | `verify:all` にはブラウザなし4本だけ登録し、driverはファイルを明示した別実行とする |
+| DesignSystemにはunitとstorybookの2 projectがあり、通常のtestはunitのみ | [Vite設定](../../packages/design-system/vite.config.ts)、[Storybook入力](../../packages/design-system/.storybook/main.ts)、[package](../../packages/design-system/package.json) | storiesから生成する試験も棚卸しする。storybookはブラウザ区分として初回の全件CIから除外する |
+| DesignSystemのbuild用型検査はtest・spec・stories等を除外するが、通常の型検査はsrc全体を含む | [通常tsconfig](../../packages/design-system/tsconfig.json)、[build用tsconfig](../../packages/design-system/tsconfig.build.json) | buildを通常の型検査の代わりにせず、検査範囲を維持する |
+| format・lint・root型検査は既に試験より前。DesignSystem型検査は後ろにある | [verify](../../scripts/verify.ts) | 順序改善はDesignSystem型検査の前倒しに限定して記述する |
+| DesignSystemのexportsは `dist` を指し、rootのVitestにsrcへのaliasはない | [package](../../packages/design-system/package.json)、[Vitest設定](../../vitest.config.ts) | 利用側の型検査・試験より前に、その入力のDesignSystemをビルドする |
+| `postinstall` にsource hash付きのビルド補助があるが、domain検証は呼ばない | [build補助](../../scripts/build-design-system.ts)、[root package](../../package.json) | 既存buildを再利用する。現在のstampはlockfile・runtime・出力内容まで保証していない |
 | workspaceのDesignSystemとartifact-uiは相対symlinkで接続される | `node_modules/@eumenes` の参照先 | snapshotで元のnode_modules全体をsymlink共有しない |
-| 検証digestは実行権限・symlink先を含まず、DesignSystemのdistを除外する | [入力hash](../scripts/verification-inputs.ts) | 入力manifestに種別・必要なmode・リンク先を含め、成果物は生成元との対応を記録する |
-| CIの結果アップロードは失敗時だけ | [CI定義](../.github/workflows/verify.yml) | 成功・中断も含め実行ごとに保存する |
-| 音声domainは約10.1秒。全体のbackend等の試験は302.37秒、その後のDesignSystem型検査で失敗した | [domain記録](verification/voice-input-latency-2026-10-14/verify-voice-dialogue-final.log)、[全体記録](verification/voice-input-latency-2026-10-14/verify-all-final.log) | 現在の基準値を測り直す。古い記録の失敗を現行不具合と断定しない |
-| 検証中の入力変更による無効化がある | [実行記録](verification/object-recognition-shared-credential-2026-10-13/verify-object-recognition-invalidated.json) | 入力変更検出を維持したまま固定実行を検討する |
+| 検証digestは実行権限・symlink先を含まず、DesignSystemのdistを除外する | [入力hash](../../scripts/verification-inputs.ts) | 入力manifestに種別・必要なmode・リンク先を含め、成果物は生成元との対応を記録する |
+| CIの結果アップロードは失敗時だけ | [CI定義](../../.github/workflows/verify.yml) | 成功・中断も含め実行ごとに保存する |
+| 音声domainは約10.1秒。全体のbackend等の試験は302.37秒、その後のDesignSystem型検査で失敗した | [domain記録](../verification/voice-input-latency-2026-10-14/verify-voice-dialogue-final.log)、[全体記録](../verification/voice-input-latency-2026-10-14/verify-all-final.log) | 現在の基準値を測り直す。古い記録の失敗を現行不具合と断定しない |
+| 検証中の入力変更による無効化がある | [実行記録](../verification/object-recognition-shared-credential-2026-10-13/verify-object-recognition-invalidated.json) | 入力変更検出を維持したまま固定実行を検討する |
 
 試験ファイル数の集計条件は、Git treeのパス末尾に対する正規表現 `\.(test|spec)\.[jt]sx?$` で527本、`\.(test|spec)\.[cm]?[jt]sx?$` で528本。時点の差ではなくMJSを含めるかの差であり、Storybookの生成試験数はどちらにも含まれない。
 
@@ -263,16 +263,16 @@ Opusへの再評価では、次の依頼文を使用できる。
 
 ## 10 関連文書
 
-- [検証手順](../docs/verification.md)
-- [domain一覧](../docs/domains.md)
-- [自然言語UI受入](../docs/nl-acceptance.md)
-- [既存の配布物整合試験](../api/application/vendor.test.ts)
-- [Replay 不変条件 JiTTestの後続案](test-quality-improvement-options-2026-10-15.md)
+- [検証手順](../../docs/verification.md)
+- [domain一覧](../../docs/domains.md)
+- [自然言語UI受入](../../docs/nl-acceptance.md)
+- [既存の配布物整合試験](../../api/application/vendor.test.ts)
+- [Replay 不変条件 JiTTestの後続案](../test-quality-improvement-options-2026-10-15.md)
 
 
 ## 11 初回実装の記録（2026-10-15）
 
-A・Bを実装し、Mの棚卸し・履歴集計・工程時間記録と比較用集計を追加した。利用手順は [検証手順](../docs/verification.md) に反映した。Cのaffected自動選択とDのsnapshotは導入していない。
+A・Bを実装し、Mの棚卸し・履歴集計・工程時間記録と比較用集計を追加した。利用手順は [検証手順](../../docs/verification.md) に反映した。Cのaffected自動選択とDのsnapshotは導入していない。
 
 - A：ブラウザなしacceptance 4本を全件へ追加。DS unitをdomain試験へ接続し、複数domainの和集合を実行する。Storybook projectの75 sourceとブラウザ24ファイルは別実行として記録する。`.mjs` を含めた棚卸しは実装時530ファイル（元の528＋今回の回帰試験2）で、通常経路は506ファイル。OAuthの `.test.mjs` はBunでも発見されることをfixtureで確認し、既存範囲を維持した。
 - B：DS通常型検査→build→利用側型検査→試験の順序、出力前後hash、実行別レポート、割り込み・未実行・無効化の区別、CIの常時artifact保存を実装した。DSのソースは専用の型設定で検査し、rootの選択設定に混在させない。
@@ -280,15 +280,15 @@ A・Bを実装し、Mの棚卸し・履歴集計・工程時間記録と比較�
 
 変更前の全件検証は `api/application/google-accounts.test.ts` にあるcapabilities内部bundleへの参照境界違反で停止した。またroot型検査では、今回未変更の `tests/browser/object-recognition.spec.ts:265` にTS2769がある。これらを今回の範囲で修正したり、検査対象から外したりしない。全件が合格するまでCI分割の実測比較と改善率判定は保留し、Cは見送る。CI上のinstall/postinstall時間は今後の実行で収集する。CI job分割はまだ採用していない。
 
-初回の局所・結合検証は、移行処理等の13試験、ブラウザなしacceptanceの61試験、OCR＋Google Accountsの選択検証で合格した。全件の合格、ブラウザ・live・実機器の合格を意味しない。実行証跡と最終確認は [初回実装の検証記録](verification/test-environment-migration-2026-10-15/README.md) に分けて残す。
+初回の局所・結合検証は、移行処理等の13試験、ブラウザなしacceptanceの61試験、OCR＋Google Accountsの選択検証で合格した。全件の合格、ブラウザ・live・実機器の合格を意味しない。実行証跡と最終確認は [初回実装の検証記録](../verification/test-environment-migration-2026-10-15/README.md) に分けて残す。
 
 
 ## 12 受入までの継続（2026-10-15）
 
 利用者の継続指示により、初回に担当外として残した既存の全件失敗も修正対象に含めた。bundle内部の検査は所有domainへ移動し、画像fixtureのBlob取得を型推論できる形にした。整形・lintの既存不備、サイズ制限に抵触する4関数は、検査基準を下げずに修正した。サイズ対応は既存処理の切り出しに限定し、意味判断の変更は行わない。サーバー停止順序の試験には、既存のGoogle Accountsの終了処理を追加した。
 
-前節の失敗記録は初回時点の履歴として保持する。継続後の全件結果、実行時間、残る運用上の制約は [継続の検証記録](verification/test-environment-migration-2026-10-15/continuation.md) を正本とする。自動選択・snapshot・CI分割は引き続き導入しない。
+前節の失敗記録は初回時点の履歴として保持する。継続後の全件結果、実行時間、残る運用上の制約は [継続の検証記録](../verification/test-environment-migration-2026-10-15/continuation.md) を正本とする。自動選択・snapshot・CI分割は引き続き導入しない。
 
 継続中に会話の機能選択と回答生成を分けた変更との試験前提の差も見つかった。利用者の明示承認により、機能を呼ばず文章だけが返った場合は既存のLLM再確認を1回行い、選ばれた操作を既存の契約検査・実行機構へ戻す。再確認にも直近の利用者発話を使い、過去のassistantの完了主張を操作根拠にしない。通常回答の場合は選択→再確認→回答の3呼出しになり、速度改善とは扱わない。画像の順序・確認質問・履歴の分離・一度だけの楽曲生成を保ったまま試験を整合させる。
 
-初回の全件検証は `scripts/codex-tasks-p0/orphan.test.ts` の完全停止要件で失敗した。その後、利用者がmacOSでのSDK完了待ち・管理対象終了を採用したため、[SDK計画の改訂7](codex-sdk-task-artifact-plan-2026-10-14.md)に従って受入契約を更新する。同じ孤児再現を除外せず「全停止を偽って証明しない」試験として維持し、正常終了待ちと強制停止を実SDK＋CLI fixtureで追加検証する。全daemon子孫の停止は未対応であり、修正成功とは扱わない。変更後の全件結果は[終了処理の検証記録](verification/test-environment-migration-2026-10-15/sdk-lifecycle.md)に保存し、過去の失敗レポートは保持する。
+初回の全件検証は `scripts/codex-tasks-p0/orphan.test.ts` の完全停止要件で失敗した。その後、利用者がmacOSでのSDK完了待ち・管理対象終了を採用したため、[SDK計画の改訂7](../codex-sdk-task-artifact-plan-2026-10-14.md)に従って受入契約を更新する。同じ孤児再現を除外せず「全停止を偽って証明しない」試験として維持し、正常終了待ちと強制停止を実SDK＋CLI fixtureで追加検証する。全daemon子孫の停止は未対応であり、修正成功とは扱わない。変更後の全件結果は[終了処理の検証記録](../verification/test-environment-migration-2026-10-15/sdk-lifecycle.md)に保存し、過去の失敗レポートは保持する。

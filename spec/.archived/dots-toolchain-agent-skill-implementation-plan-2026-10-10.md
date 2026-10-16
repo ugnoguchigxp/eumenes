@@ -2,7 +2,7 @@
 
 作成日: 2026-10-10。更新日: 2026-10-11。状態: **製品側の実装・隔離試験を実施。認証付き公開接続と実 dots の製品受入は未実施**。
 
-実装後の設定・契約・検証範囲は [運用手順](../docs/dots.md) を正本とする。以下の調査表と既存コードの記述は、2026-10-10 の設計時点の記録。実装では既存の tasks、capabilities、Queue、報告 outbox を再利用し、会話の意味判断は LLM に委ねた。
+実装後の設定・契約・検証範囲は [運用手順](../../docs/dots.md) を正本とする。以下の調査表と既存コードの記述は、2026-10-10 の設計時点の記録。実装では既存の tasks、capabilities、Queue、報告 outbox を再利用し、会話の意味判断は LLM に委ねた。
 
 利用者の方針は、実装を含む Codex 上の仕事を dots に任せ、該当プロジェクトの Session を開始し、ブロッカー・完了・次の作業がなくなったことを Eumenes に返すこと。定期的なリマインドから次の仕事にもつなげる。本書では Session を Codex のタスク／チャットとして扱い、内部識別子は `threadId` 等の実際に返された値を保存する。
 
@@ -20,7 +20,7 @@ Eumenes の「サブエージェント設定」は、独立した LLM をもう�
 
 | 項目 | 現在の根拠と状態 |
 | --- | --- |
-| script → Events → 実 dots → MCP 経由の回答保存 | 実動作確認済み。[単体 MVP 受入記録](verification/dots-mvp/acceptance-2026-10-10.md)。本文をイベントに入れず、参照を取得して回答する経路 |
+| script → Events → 実 dots → MCP 経由の回答保存 | 実動作確認済み。[単体 MVP 受入記録](../verification/dots-mvp/acceptance-2026-10-10.md)。本文をイベントに入れず、参照を取得して回答する経路 |
 | dots による新規ローカル／クラウド Codex タスク、並列委任 | 公式仕様で確認。本接続での実プロジェクト開始は未受入 |
 | dots によるブロッカー・完了・次の仕事なしの報告 | 統括担当として要求する振る舞い。本接続への自動返却、再開、停止は未受入 |
 | Codex／dots の定期実行から次の仕事を促す | 利用者の運用方針。dots の定期タスクは公式仕様で確認。Eumenes への構造化返却は追加実装・受入が必要 |
@@ -320,8 +320,8 @@ P0 のネイティブ機能確認と P1 の隔離 fixture 実装は別々に進�
 ## 14. 参照
 
 - [単体 MVP 実装計画と実施差分](dots-script-mvp-implementation-plan-2026-10-10.md)
-- [単体 MVP の実 dots 受入記録](verification/dots-mvp/acceptance-2026-10-10.md)
-- [既存ツールチェーン](../docs/toolchain.md)／[domain の責務](../docs/domains.md)
+- [単体 MVP の実 dots 受入記録](../verification/dots-mvp/acceptance-2026-10-10.md)
+- [既存ツールチェーン](../../docs/toolchain.md)／[domain の責務](../../docs/domains.md)
 - [MCP Events](https://developers.openai.com/plugins/build/mcp-events)
 - [MCP server／認証／Skills](https://developers.openai.com/plugins/build/mcp-server)
 - [dots のタスク・委任・定期実行](https://learn.chatgpt.com/docs/dots/tasks-and-memory)

@@ -433,7 +433,7 @@ fixture 成功後、以下を実 dots で行う。すべての回答を JSON sch
 
 ## 18. 実装と実 dots 受入（2026-10-10）
 
-ユーザーの実装指示により `scripts/dots-mvp` に独立サーバー・CLI・専用 SQLite・配送 worker・MCP tools/Events・検証を実装した。非機密な依頼で、実 dots「セバスチャン」が本文を取得し、回答全文を保存し、CLI が stdout で受信した。最初の成功条件5項目を同じ requestId で照合できた。詳細は [受入記録](verification/dots-mvp/acceptance-2026-10-10.md)、手順は [README](../scripts/dots-mvp/README.md) を参照。
+ユーザーの実装指示により `scripts/dots-mvp` に独立サーバー・CLI・専用 SQLite・配送 worker・MCP tools/Events・検証を実装した。非機密な依頼で、実 dots「セバスチャン」が本文を取得し、回答全文を保存し、CLI が stdout で受信した。最初の成功条件5項目を同じ requestId で照合できた。詳細は [受入記録](../verification/dots-mvp/acceptance-2026-10-10.md)、手順は [README](../../scripts/dots-mvp/README.md) を参照。
 
 | 工程 | 実施結果 |
 | --- | --- |

@@ -331,7 +331,7 @@ cacheのSQLはEumenes所有の取得metadataと本体所有のRecords等に分�
 
 - [Eumenesのdomain入口](../docs/domains.md)
 - [運用ログ](../docs/logging.md)
-- [EumenesとMemorySystemの接続計画](memory-system-incremental-adoption-concept.md)
+- [EumenesとMemorySystemの接続計画](.archived/memory-system-incremental-adoption-concept.md)
 - [MemorySystemの実装計画](../../eumenes_memory/spec/implementation-plan.md)
 - [MemorySystemの公開SQLite API](../../eumenes_memory/src/sqlite.ts)
 - [ContextStillのCodex調査契約](/Users/y.noguchi/Code/contextStill/spec/docs/codex-research-contract-2026-10-04.html)

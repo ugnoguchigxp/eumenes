@@ -8,40 +8,16 @@ archive の基準: その文書が担当した実装がコードにあり、本�
 
 | 文書 | 状態 |
 | --- | --- |
-| [claude-agent-sdk-session-plan-2026-10-15.md](claude-agent-sdk-session-plan-2026-10-15.md) | 計画書の状態欄は未実装。設定文書と `api/domains/inference/adapters/claude-session.ts` には認証方式の明示、実行時のモデル一覧、セッション台帳がある。計画の全項目と受入の照合は未了 |
 | [codex-sdk-task-artifact-plan-2026-10-14.md](codex-sdk-task-artifact-plan-2026-10-14.md) | 共通KanbanとCodex SDK。P1〜P3のホスト接続とP4の隔離commit/pushは記録済み。Git復旧・共通画面の最終受入とP5は継続 |
 | [kanban-claude-code-plan-2026-10-14.md](kanban-claude-code-plan-2026-10-14.md) | Claude Code実行。P1〜P3は実装・固定試験済み。実 `claude` の通しと自然言語受入（P4）は未実施 |
 | [kanban-implementation-assignments-2026-10-14.md](kanban-implementation-assignments-2026-10-14.md) | 上記の分担と固定契約。P4の実機・自然言語受入は計画側に残る |
-| [world-steward-implementation-plan-2026-10-14.md](world-steward-implementation-plan-2026-10-14.md) | 冒頭は未実装、本文は実装済み・fixture検証中。live受入の完了記述は無い |
-| [world-research-subagent-2026-10-15.md](world-research-subagent-2026-10-15.md) | World照会を調査担当へ移す設計。現行の `world_query` 経路と対応する記述がある。文書内に完了記録は無い |
-| [memory-system-incremental-adoption-concept.md](memory-system-incremental-adoption-concept.md) | E1/E2の最小接続のみ。一覧UI・実モデルは未実装 |
-| [regex-speech-language-routing-plan-2026-10-16.md](regex-speech-language-routing-plan-2026-10-16.md) | 日英混在の区間判定。実装済み・fixture検証済み。liveと実機器受入は未実施 |
-| [settings-data-driven-design-2026-10-14.md](settings-data-driven-design-2026-10-14.md) | P1実装済み・固定試験通過。P2〜P4は未着手 |
-| [settings-openui-definition-storage-2026-10-12.md](settings-openui-definition-storage-2026-10-12.md) | 設定項目の保存先設計。設計案 |
-| [settings-openui-redesign-2026-10-12.md](settings-openui-redesign-2026-10-12.md) | 設定入口の全体設計。音声と入力は移行済み。全フォームの移行完了とは読んでいない |
-| [timer-data-driven-ui-acceptance-design-2026-10-13.md](timer-data-driven-ui-acceptance-design-2026-10-13.md) | タイマーのデータドリブン移行と自然言語受入の設計。状態欄は設計案 |
-| [timer-data-driven-implementation-contracts-2026-10-13.md](timer-data-driven-implementation-contracts-2026-10-13.md) | 固定契約は実装済み・`verify:all` の固定試験は通過。自然言語pilotは12 run中 success 0 |
-| [toolchain-set-routing-design-2026-10-12.md](toolchain-set-routing-design-2026-10-12.md) | 定形セットの設計。本文はP0〜P4実装済み・試験未実行。現行のguided Webと照合し直すまで残置 |
-| [web-search-target-2026-10-11.md](web-search-target-2026-10-11.md) | Web検索の目標仕様。差分が残る間は正本として残す |
-| [web-search-repair-implementation-plan-2026-10-11.md](web-search-repair-implementation-plan-2026-10-11.md) | 状態欄は未実装。検証記録ではA〜Dのコードは入り、単発liveは失敗。完成とは扱わない |
 | [web-research-cache-implementation-plan-2026-10-09.md](web-research-cache-implementation-plan-2026-10-09.md) | 初期実装とレビューは第15章以降。調査メモなど未実装範囲が残る |
-| [conversation-and-research-simplification-plan-2026-10-10.md](conversation-and-research-simplification-plan-2026-10-10.md) | Web調査の汎用化とLuna接続は実装。liveと実機器を含むP5は未完了 |
-| [research-and-history-tools-implementation-plan-2026-10-10.md](research-and-history-tools-implementation-plan-2026-10-10.md) | P0〜P5は固定試験と全体検証を通過。P6の実モデル再受入と実機器は未完了 |
-| [dots-toolchain-agent-skill-implementation-plan-2026-10-10.md](dots-toolchain-agent-skill-implementation-plan-2026-10-10.md) | 製品側の実装と隔離試験は実施。認証付き公開接続と実dotsの製品受入は未実施 |
-| [dots-script-mvp-implementation-plan-2026-10-10.md](dots-script-mvp-implementation-plan-2026-10-10.md) | 独立MVPは実dotsで成功。OAuthと製品統合は未実装 |
 | [delegated-coding-implementation-2026-10-09/](delegated-coding-implementation-2026-10-09/README.md) | 委任コーディングの実装計画(01〜06)。実CLI隔離と全体受入は未完了 |
-| [llm-native-implementation-plan-2026-10-10.md](llm-native-implementation-plan-2026-10-10.md) | S1〜S7は実装。通し試験は記録済み。live未合格・実機器未実施 |
-| [llm-native-remaining-domains-implementation-plan-2026-10-10.md](llm-native-remaining-domains-implementation-plan-2026-10-10.md) | GoalsとWorldの対象修正はfixture実施。live・実機器は未達。計画自身が全項目完了までarchiveしないと書いている |
 | [improvement-plan-2026-10-10.md](improvement-plan-2026-10-10.md) | 改善手順の初版。延期項目は第2版へ移管。第2版の未完了が残るため同時archiveしない |
 | [improvement-plan-2026-10-10-r2.md](improvement-plan-2026-10-10-r2.md) | 第2版。多数のWPは実施記録あり。CI関連・FE-4・VO-16・FE-9・DT-11・DT-13が残るためarchiveしない |
-| [test-environment-migration-plan-2026-10-14.md](test-environment-migration-plan-2026-10-14.md) | 状態欄は未着手。本文ではA・B・Mを実装。affected自動選択とsnapshotは未導入 |
 | [test-quality-improvement-options-2026-10-15.md](test-quality-improvement-options-2026-10-15.md) | Replay・JiTTest等の評価候補。未着手 |
-| [openui-artifact-foundation-plan-2026-10-09.md](openui-artifact-foundation-plan-2026-10-09.md) | P0/P1は実装・fixture E2E済み。P2以降は計画 |
 | [external-apps-artifacts-implementation-plan-2026-10-09.md](external-apps-artifacts-implementation-plan-2026-10-09.md) | 外部アプリ成果物。レビュー用草案、実装前 |
-| [provider-playground-design-2026-10-09.md](provider-playground-design-2026-10-09.md) | サービス試用の設計。実装は [検証記録](verification/service-tests/README.md)。設計項目との照合は未了 |
-| [provider-playground-image-prompt-2026-10-09.txt](provider-playground-image-prompt-2026-10-09.txt) | 設計画像の生成プロンプト |
 | [avatar-expression-context-design-2026-10-09.md](avatar-expression-context-design-2026-10-09.md) | アバター表情とTTS感情の設計。製品実装は未着手 |
-| [laya-voicevox-avatar-plan.md](laya-voicevox-avatar-plan.md) | 接続した範囲の話し方・アバター同期は実装済み。拡張案は未実装 |
 | [decision-model-benchmark-design.md](decision-model-benchmark-design.md) | 初版は実装済み（[scripts/decision-bench/README.md](../scripts/decision-bench/README.md)）。実時間の保持、GPU/NPU利用率などは未実装 |
 
 ## archive 済み(spec/.archived/)
@@ -57,7 +33,7 @@ archive の基準: その文書が担当した実装がコードにあり、本�
 | [continuity-bookmarks-preimplementation-plan.md](.archived/continuity-bookmarks-preimplementation-plan.md) | continuity ブックマークの実装前計画 |
 | [excalidraw-artifact-2026-10-14.md](.archived/excalidraw-artifact-2026-10-14.md) | Excalidraw の iframe 編集。実装・`verify --domain excalidraw --domain artifact` 通過・正式接続の live 記録（[artifact-2026-10-14.json](verification/excalidraw-live/artifact-2026-10-14.json)）あり |
 | [larm-multimodal-contract-inquiry-prompt-2026-10-13.md](.archived/larm-multimodal-contract-inquiry-prompt-2026-10-13.md) | LARM 画像入力契約の問い合わせ Prompt。回答を受けた契約（MIME・入力予算）を `larm/contracts/chat-input.ts` に実装済み |
-| [ruri-sentence-language-tts-implementation-plan-2026-10-12.md](.archived/ruri-sentence-language-tts-implementation-plan-2026-10-12.md) | 廃案（2026-10-16）。Ruriの文章全体ja/en二分類は [正規表現判定](regex-speech-language-routing-plan-2026-10-16.md) に置換。接続記録は検証記録に残す |
+| [ruri-sentence-language-tts-implementation-plan-2026-10-12.md](.archived/ruri-sentence-language-tts-implementation-plan-2026-10-12.md) | 廃案（2026-10-16）。Ruriの文章全体ja/en二分類は [正規表現判定](.archived/regex-speech-language-routing-plan-2026-10-16.md) に置換。接続記録は検証記録に残す |
 | [openui-artifact-free-creation-implementation-plan-2026-10-14.md](.archived/openui-artifact-free-creation-implementation-plan-2026-10-14.md) | UI自由制作。保存・制作・登録・画面・デモは実装済み。部分、公開API結合、ブラウザ、実モデルを記録。親runへの自動追記は対象外 |
 | [music-playback-work-record-2026-10-11.md](.archived/music-playback-work-record-2026-10-11.md) | 保存曲の検索・再生。実装・固定試験・live・`verify:all` を記録し、残作業なし。実スピーカーの聴取は対象外 |
 | [music-toolchain-work-record-2026-10-11.md](.archived/music-toolchain-work-record-2026-10-11.md) | 楽曲生成 toolchain。作業単位10で Opus・実生成・全体回帰まで記録。再生分離は playback 記録 |
@@ -87,6 +63,30 @@ archive の基準: その文書が担当した実装がコードにあり、本�
 | [world-reference-integration-2026-10-16.md](.archived/world-reference-integration-2026-10-16.md) | 収集資料台帳。隔離検証と本体 Seed 984件の投入を記録。通常起動を止めていた Web ツール版競合は別作業 |
 | [research-route-learning-implementation-plan-2026-10-09.md](.archived/research-route-learning-implementation-plan-2026-10-09.md) | 廃止（2026-10-12）。`research-routes` を削除し toolchain-history へ置換 |
 | [research-route-learning-implementation-tasks-2026-10-09.md](.archived/research-route-learning-implementation-tasks-2026-10-09.md) | 上記のチェックリスト。経路削除につき廃止 |
+| [web-search-target-2026-10-11.md](.archived/web-search-target-2026-10-11.md) | 旧目標（quick@2 / search@1）。公開中は guided の recipe@3 / search@3 |
+| [web-search-repair-implementation-plan-2026-10-11.md](.archived/web-search-repair-implementation-plan-2026-10-11.md) | 旧契約の A〜D。コードは入り、単発 live は失敗。経路は guided へ置換 |
+| [toolchain-set-routing-design-2026-10-12.md](.archived/toolchain-set-routing-design-2026-10-12.md) | 定形セット P0〜P4 は実装済み。その後 guided へ進んだ |
+| [conversation-and-research-simplification-plan-2026-10-10.md](.archived/conversation-and-research-simplification-plan-2026-10-10.md) | 調査の親子関係と Luna 接続は実装済み。live を含む P5 は未完了 |
+| [research-and-history-tools-implementation-plan-2026-10-10.md](.archived/research-and-history-tools-implementation-plan-2026-10-10.md) | P0〜P5 と全体検証は通過。実モデル再受入は記録上未完了 |
+| [world-steward-implementation-plan-2026-10-14.md](.archived/world-steward-implementation-plan-2026-10-14.md) | World と steward の接続。fixture 通過。live は一部 |
+| [world-research-subagent-2026-10-15.md](.archived/world-research-subagent-2026-10-15.md) | World 照会を調査担当へ移した設計。fixture 通過。live は修正後に2問合格 |
+| [regex-speech-language-routing-plan-2026-10-16.md](.archived/regex-speech-language-routing-plan-2026-10-16.md) | 日英区間の読み上げ。実装と fixture 検証済み。live と実機器は未実施 |
+| [settings-openui-redesign-2026-10-12.md](.archived/settings-openui-redesign-2026-10-12.md) | 設定入口の全体設計。旧 `SettingsPage` は削除済み |
+| [settings-openui-definition-storage-2026-10-12.md](.archived/settings-openui-definition-storage-2026-10-12.md) | 設定項目の保存先設計。データドリブン設定が後続の実装 |
+| [settings-data-driven-design-2026-10-14.md](.archived/settings-data-driven-design-2026-10-14.md) | P1〜P4 の実装記録あり。実 LARM の接続確認は未実施 |
+| [timer-data-driven-ui-acceptance-design-2026-10-13.md](.archived/timer-data-driven-ui-acceptance-design-2026-10-13.md) | タイマーのデータドリブン設計。実装は契約書側 |
+| [timer-data-driven-implementation-contracts-2026-10-13.md](.archived/timer-data-driven-implementation-contracts-2026-10-13.md) | 固定契約は実装済み。自然言語 pilot は 12 run 中 success 0（旧 UI も 0/3） |
+| [openui-artifact-foundation-plan-2026-10-09.md](.archived/openui-artifact-foundation-plan-2026-10-09.md) | P0/P1 ショーケース。P2 以降は後続アーティファクトで製品に入った |
+| [provider-playground-design-2026-10-09.md](.archived/provider-playground-design-2026-10-09.md) | サービス試用の設計。実装と `verify:all` は検証記録 |
+| [provider-playground-image-prompt-2026-10-09.txt](.archived/provider-playground-image-prompt-2026-10-09.txt) | 設計画像の生成プロンプト |
+| [claude-agent-sdk-session-plan-2026-10-15.md](.archived/claude-agent-sdk-session-plan-2026-10-15.md) | セッション継続と課金経路。コードに接続済み。live のキャッシュ受入は文書に無い |
+| [llm-native-implementation-plan-2026-10-10.md](.archived/llm-native-implementation-plan-2026-10-10.md) | S1〜S7 は実装。通し試験は記録済み。live は未合格 |
+| [llm-native-remaining-domains-implementation-plan-2026-10-10.md](.archived/llm-native-remaining-domains-implementation-plan-2026-10-10.md) | Goals と World の対象修正。fixture と `verify:all` は通過。live は未実施 |
+| [dots-script-mvp-implementation-plan-2026-10-10.md](.archived/dots-script-mvp-implementation-plan-2026-10-10.md) | 単体スクリプトは実 dots で成功。OAuth と製品統合は別計画 |
+| [dots-toolchain-agent-skill-implementation-plan-2026-10-10.md](.archived/dots-toolchain-agent-skill-implementation-plan-2026-10-10.md) | 製品側の実装と隔離試験は実施。実 dots の製品受入は未実施 |
+| [laya-voicevox-avatar-plan.md](.archived/laya-voicevox-avatar-plan.md) | 接続した範囲の話し方とアバター同期は実装済み。拡張案は未実装 |
+| [memory-system-incremental-adoption-concept.md](.archived/memory-system-incremental-adoption-concept.md) | 初期の接続構想。記憶担当と Seed 接続が後続 |
+| [test-environment-migration-plan-2026-10-14.md](.archived/test-environment-migration-plan-2026-10-14.md) | 初回範囲 A・B・M は検証記録どおり。snapshot と affected は後続 |
 
 ## 検証記録・レビュー・資料
 

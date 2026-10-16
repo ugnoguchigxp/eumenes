@@ -39,4 +39,4 @@ Three.js のライセンスを `THREE-LICENSE.txt` に同梱する。
 
 開発用の依存キャッシュは `node_modules/.vite/development`、ブラウザfixtureはfixtureごとの一時ディレクトリに分ける。異なる環境のViteサーバーが同じキャッシュを置換すると、実行中の開発画面が古い依存URLを参照し、動的importが504で失敗してアバターが消える。Three.jsは起動時の依存最適化に含める。描画hostの `data-avatar-state` で読み込み・描画失敗・非表示・非対応を切り分ける。初期化失敗のconsole警告にはエラーの種類だけを渡す。
 
-2026-10-09以降は、回答全体からLayaが選んだ5種の感情をmotionへ対応させる。親しみ→agreeing、喜び→joyful、寄り添う→listening、興味→curious、驚き→surprised。発話の頷き・手振りは別のcueとして重ねる。待機の呼吸・瞬き・待機中の仕草は判断の有無にかかわらず継続する。会話の名前横にはmotionではなく同じ感情の絵文字を表示する。通常・低確度・fallback、および旧motionだけの回答には感情アイコンを付けない。判定と保存・取消の現行仕様は [Laya計画](../../../../../../spec/laya-voicevox-avatar-plan.md) の現行仕様節を参照。
+2026-10-09以降は、回答全体からLayaが選んだ5種の感情をmotionへ対応させる。親しみ→agreeing、喜び→joyful、寄り添う→listening、興味→curious、驚き→surprised。発話の頷き・手振りは別のcueとして重ねる。待機の呼吸・瞬き・待機中の仕草は判断の有無にかかわらず継続する。会話の名前横にはmotionではなく同じ感情の絵文字を表示する。通常・低確度・fallback、および旧motionだけの回答には感情アイコンを付けない。判定と保存・取消の現行仕様は [Laya計画](../../../../../../spec/.archived/laya-voicevox-avatar-plan.md) の現行仕様節を参照。

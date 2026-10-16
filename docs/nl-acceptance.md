@@ -1,6 +1,6 @@
 # 自然言語UI受入
 
-更新日: 2026年10月14日。設計は[タイマー設計書 §10](../spec/timer-data-driven-ui-acceptance-design-2026-10-13.md)。固定のPlaywright回帰（`tests/browser/*.spec.ts`）は残し、この受入はその上に足す層である。
+更新日: 2026年10月14日。設計は[タイマー設計書 §10](../spec/.archived/timer-data-driven-ui-acceptance-design-2026-10-13.md)。固定のPlaywright回帰（`tests/browser/*.spec.ts`）は残し、この受入はその上に足す層である。
 
 ## 構成
 

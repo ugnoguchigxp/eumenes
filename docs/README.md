@@ -32,8 +32,8 @@
 | [toolchain-extension.md](toolchain-extension.md) | 追加の種類ごとの変更箇所・最小登録例・revision更新・登録漏れの確認手順 |
 | [toolchain-extension-verification.md](toolchain-extension-verification.md) | ツールチェーン追加の段階別検証・停止条件と2026年10月11日の基準記録 |
 | [web-research.md](web-research.md) | llm-fetch による Web 取得、保存と期限、検索地域 |
-| [Web検索 実装目標](../spec/web-search-target-2026-10-11.md) | Web検索経路の目標仕様と現行との差分(計画) |
-| [ツールチェーン設計](../spec/toolchain-set-routing-design-2026-10-12.md) | 定形セット・候補検索・選択の記録・手順キャッシュの設計 |
+| [Web検索 実装目標](../spec/.archived/web-search-target-2026-10-11.md) | Web検索経路の目標仕様と現行との差分(計画) |
+| [ツールチェーン設計](../spec/.archived/toolchain-set-routing-design-2026-10-12.md) | 定形セット・候補検索・選択の記録・手順キャッシュの設計 |
 
 ## 委任タスクとコーディング
 

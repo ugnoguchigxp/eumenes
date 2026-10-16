@@ -1,8 +1,10 @@
 # OpenUI アーティファクト基盤の導入計画
 
+> 2026-10-16 archive。P0/P1 のショーケースは検証済み。P2 以降の保存・画像・設定・World は後続の各アーティファクトとして製品に入っている。
+
 作成日: 2026-10-09 JST。状態: P0/P1 実装・fixture E2E 検証済み（2026-10-09）。P2 以降は計画。初回の到達点はコンポーネントショーケース。
 
-実装と受入結果は [Showcase 検証記録](verification/openui-artifact/README.md)、利用と拡張方法は [実装ガイド](../docs/openui-artifact-showcase.md) を参照。
+実装と受入結果は [Showcase 検証記録](../verification/openui-artifact/README.md)、利用と拡張方法は [実装ガイド](../../docs/openui-artifact-showcase.md) を参照。
 
 OpenUI をアーティファクト内の対話 UI の共通描画基盤として導入する。LLM は短い JSON で用途と対象を選び、ホストが表示、入力、非同期状態、操作の契約を補って OpenUI に渡す。画像生成、質問回答、メモリー整理、一部設定編集を同じ仕組みで扱い、機能ごとに別の画面生成方式を増やさない。
 
@@ -35,7 +37,7 @@ OpenUI をアーティファクト内の対話 UI の共通描画基盤として
 | `world` | service、SourceAdapter、利用検査、Memory 依存登録、fixture | server/API 接続と忘却・復旧の運用接続。利用可能判定を先行 |
 | `settings` | 全設定と expectedRevision/requestId による適用、独立した Web draft | 部分編集の公開操作と既存 draft との競合処理 |
 
-関連計画: [タイマー](.archived/timer-artifact-implementation-plan-2026-10-09.md)、[外部アプリ成果物](external-apps-artifacts-implementation-plan-2026-10-09.md)、[設定](.archived/settings-screen-implementation-plan.md)、[委任タスク](../docs/delegated-tasks.md)。Artifact の型・migration・会話参照はこれらと一本化する。timer や外部文書の正本を本基盤へ移さない。
+関連計画: [タイマー](timer-artifact-implementation-plan-2026-10-09.md)、[外部アプリ成果物](../external-apps-artifacts-implementation-plan-2026-10-09.md)、[設定](settings-screen-implementation-plan.md)、[委任タスク](../../docs/delegated-tasks.md)。Artifact の型・migration・会話参照はこれらと一本化する。timer や外部文書の正本を本基盤へ移さない。
 
 ## 3 LLM が生成する小さな JSON
 

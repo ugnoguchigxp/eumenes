@@ -8,4 +8,4 @@ HTMLとJSONは同じガードを通し、JSONの項目を天気・株価向け�
 
 検索の応答は最大10秒待ちます。検索サービス内の通信と代替経路への切替もこの上限に含みます。
 
-会話からの調査経路(担当・予算・報告)は [toolchain.md](toolchain.md)、Web検索の実装目標と未達は [Web検索 実装目標](../spec/web-search-target-2026-10-11.md)、手順キャッシュと選択の記録は [toolchain.md](toolchain.md) を参照してください。
+会話からの調査経路(担当・予算・報告)は [toolchain.md](toolchain.md)、Web検索の実装目標と未達は [Web検索 実装目標](../spec/.archived/web-search-target-2026-10-11.md)、手順キャッシュと選択の記録は [toolchain.md](toolchain.md) を参照してください。

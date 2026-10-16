@@ -1,6 +1,6 @@
 # 設定画面と設定アーティファクトの全体設計
 
-状態は設計案。2026年10月12日の現行ソースとAstraの設計レビューに基づく。設定入口・会話・変更一覧に続き、2026年10月13日に音声と入力を移行済み（[検証記録](verification/settings-voice-input-2026-10-13/README.md)）。各フォームを一つずつ移し、既存設定画面は全対象の移行と受入が終わる最後に削除する。
+状態は設計案。2026年10月12日の現行ソースとAstraの設計レビューに基づく。設定入口・会話・変更一覧に続き、2026年10月13日に音声と入力を移行済み（[検証記録](../verification/settings-voice-input-2026-10-13/README.md)）。各フォームを一つずつ移し、既存設定画面は全対象の移行と受入が終わる最後に削除する。
 
 設定画面は、項目を探して開く薄い入口にする。会話、表示、音声、AI接続、外部作業を含む設定の編集と、記憶、辞書、試用、記録の管理は、目的ごとのOpenUIアーティファクトへ移す。会話画面を残したまま、必要な編集だけを横に開ける構成にする。
 
@@ -14,13 +14,13 @@ APIの違いはバックエンドの接続処理が吸収する。OpenUIは接�
 
 | 現行の根拠 | 設計上の課題と再利用する部分 |
 | --- | --- |
-| [SettingsPageのカテゴリと下書き](../web/src/domains/settings/SettingsPage.tsx) | 13カテゴリに一括適用、即時保存、管理操作、閲覧が混在。保存方法と画面の責任を明確にする。 |
-| [設定の適用処理](../api/domains/settings/service/index.ts) | requestId、expectedRevision、単一writer、秘密の暗号化、接続epochを再利用する。OpenUI専用の保存機構は追加しない。 |
-| [OpenUI契約](../packages/artifact-ui/src/contracts.ts) | SmallFormは8項目と8選択肢まで。数値範囲や刻み、選択肢IDと表示名の分離がない。操作値はstringとbooleanで、本番の設定操作には不足する。 |
-| [OpenUIの描画と操作](../packages/artifact-ui/src/index.tsx) | 登録view、許可source、検証済みJSON、ホストdispatchの仕組みを再利用する。既存settings viewはテーマ、読み上げ、音量の試用型であり、本番保存には未接続。 |
-| [音声設定](../web/src/domains/settings/sections/voice.tsx) | VOICEVOX固有の表示分岐とクラウド一律の声IDと速度欄がUIにある。接続先とモデルの対応能力を渡す契約へ移す。 |
-| [音声カタログ](../api/domains/larm/contracts/voices.ts) | 最大1000声と100スタイルを扱う。SmallFormの選択肢上限を増やすだけではなく、検索して選ぶ部品を使う。 |
-| [クラウド要求](../api/domains/inference/service/cloud.ts) | 現状のTTSはOpenAI互換のaudio/speechとWAV応答に対応。別APIへの対応には接続処理が必要で、表示の追加だけでは実現しない。 |
+| [SettingsPageのカテゴリと下書き](../../web/src/domains/settings/SettingsPage.tsx) | 13カテゴリに一括適用、即時保存、管理操作、閲覧が混在。保存方法と画面の責任を明確にする。 |
+| [設定の適用処理](../../api/domains/settings/service/index.ts) | requestId、expectedRevision、単一writer、秘密の暗号化、接続epochを再利用する。OpenUI専用の保存機構は追加しない。 |
+| [OpenUI契約](../../packages/artifact-ui/src/contracts.ts) | SmallFormは8項目と8選択肢まで。数値範囲や刻み、選択肢IDと表示名の分離がない。操作値はstringとbooleanで、本番の設定操作には不足する。 |
+| [OpenUIの描画と操作](../../packages/artifact-ui/src/index.tsx) | 登録view、許可source、検証済みJSON、ホストdispatchの仕組みを再利用する。既存settings viewはテーマ、読み上げ、音量の試用型であり、本番保存には未接続。 |
+| [音声設定](../../web/src/domains/settings/sections/voice.tsx) | VOICEVOX固有の表示分岐とクラウド一律の声IDと速度欄がUIにある。接続先とモデルの対応能力を渡す契約へ移す。 |
+| [音声カタログ](../../api/domains/larm/contracts/voices.ts) | 最大1000声と100スタイルを扱う。SmallFormの選択肢上限を増やすだけではなく、検索して選ぶ部品を使う。 |
+| [クラウド要求](../../api/domains/inference/service/cloud.ts) | 現状のTTSはOpenAI互換のaudio/speechとWAV応答に対応。別APIへの対応には接続処理が必要で、表示の追加だけでは実現しない。 |
 
 ## 採用する構成
 
@@ -97,7 +97,7 @@ AIの名前、あなたの名前、口調を編集する。口調は現行の執
 
 ### 読み方辞書
 
-提案した新しい辞書画像は却下済み。現行の[TtsDictionaryPanel](../web/src/domains/tts-dictionary/index.tsx)と実画面を再現の正本とする。文字・読み方・削除からなる表を横に3列配置し、各列の行数は画面高さから決める。空の行に直接追加し、検索、上部の保存ボタンと保存状況、件数、下部のページ送りを維持する。行からフォーカスが離れた際の保存、IME変換中を除くEnter、削除、競合時の「最新を使う」等の操作も維持する。独立した追加フォームや行ごとの保存ボタンを新設しない。
+提案した新しい辞書画像は却下済み。現行の[TtsDictionaryPanel](../../web/src/domains/tts-dictionary/index.tsx)と実画面を再現の正本とする。文字・読み方・削除からなる表を横に3列配置し、各列の行数は画面高さから決める。空の行に直接追加し、検索、上部の保存ボタンと保存状況、件数、下部のページ送りを維持する。行からフォーカスが離れた際の保存、IME変換中を除くEnter、削除、競合時の「最新を使う」等の操作も維持する。独立した追加フォームや行ごとの保存ボタンを新設しない。
 
 共通設定の適用対象には含めない。既存の保存契約を維持し、未保存入力の寿命だけ共通ホストへ接続する。生成画像を現行画面の代替見本として使わない。
 
@@ -280,8 +280,8 @@ LLMは利用者の意図を解釈し、対応能力の範囲内で変更案を�
 ## 関連する手順
 
 - [設定項目の登録と保存先の詳細設計](settings-openui-definition-storage-2026-10-12.md)
-- [画面見本と実装時の再現条件](design/settings-openui-2026-10-12/README.md)
-- [DesignSystemとOpenUIとArtifactの登録手順](../docs/toolchain-extension.md#10-e-designsystemopenuiartifactを追加する)
-- [UIの検証手順](../docs/toolchain-extension-verification.md#uiを追加変更した場合)
-- [現行設定と接続仕様](../docs/settings.md)
-- [Ruri文章言語判定の実装計画](.archived/ruri-sentence-language-tts-implementation-plan-2026-10-12.md)
+- [画面見本と実装時の再現条件](../design/settings-openui-2026-10-12/README.md)
+- [DesignSystemとOpenUIとArtifactの登録手順](../../docs/toolchain-extension.md#10-e-designsystemopenuiartifactを追加する)
+- [UIの検証手順](../../docs/toolchain-extension-verification.md#uiを追加変更した場合)
+- [現行設定と接続仕様](../../docs/settings.md)
+- [Ruri文章言語判定の実装計画](ruri-sentence-language-tts-implementation-plan-2026-10-12.md)

@@ -1,6 +1,6 @@
 # Ruri 文章言語判定と TTS 振分けの実装計画
 
-> 2026-10-16 廃案。Ruriによる判定をやめ、[正規表現判定の計画](../regex-speech-language-routing-plan-2026-10-16.md) に置き換える。
+> 2026-10-16 廃案。Ruriによる判定をやめ、[正規表現判定の計画](regex-speech-language-routing-plan-2026-10-16.md) に置き換える。
 
 作成日: 2026-10-12。状態: **Eumenesの接続準備と固定試験、日英TTSの公開接続確認を実施済み。二分類Providerの公開配備とEumenes公開API経路の接続を確認済み。全体gateと実機器受入は実施記録を参照**。
 

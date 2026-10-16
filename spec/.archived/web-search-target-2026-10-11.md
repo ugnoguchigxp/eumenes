@@ -1,8 +1,10 @@
 # Web検索 実装目標(2026-10-11)
 
+> 2026-10-16 archive。公開中の経路は guided の `web.recipe@3` / `web.search@3`。本書の `web.quick@2` / `web.search@1` は置換済み。
+
 状態: 計画。本書はWeb検索経路の**目標仕様の正本**です。`docs/` は実装済みの挙動だけを書き、目標と未達は本書に置きます。第9章の差分がすべて解消し、第10章の受入を通したら `docs/toolchain.md` へ反映して archive します。
 
-対象: 会話担当の検索ツール選択、調査worker(`package:web.quick@2`・`package:web.search@1`)、Codex Luna adapter、結果の会話への返却。取得・保存そのもの([web-research.md](../docs/web-research.md))と履歴調査の要件検証は変更しません。
+対象: 会話担当の検索ツール選択、調査worker(`package:web.quick@2`・`package:web.search@1`)、Codex Luna adapter、結果の会話への返却。取得・保存そのもの([web-research.md](../../docs/web-research.md))と履歴調査の要件検証は変更しません。
 
 ## 1. 原則
 
@@ -62,7 +64,7 @@ L2は経路固有の内容(検索語の選び方、読取りの判断、ニュ�
 - 先頭に「通常の会話・翻訳・提示された文章への回答はそのまま自然文で返す」を置き、検索が必要な場合だけツールを一回呼びます。
 - 検索が必要な場合、最初の応答は関数呼出し一件だけとし、本文に呼出しを表す文字列や「取得できません」を書きません。
 - 要件profileの選択は `history` にだけ適用します。`web` とLunaのツールschemaに `requirementProfiles` を出しません。
-- 方針は現在の依頼の直前のsystemに置きます。実LARMでこの位置の振り分け(ニュースはLuna、天気・株価・Wikiは通常検索)を確認済みです([news-routing記録](verification/news-routing-2026-10-11/README.md))。タイマーsnapshotなどの操作対象データは方針と別のメッセージにします。
+- 方針は現在の依頼の直前のsystemに置きます。実LARMでこの位置の振り分け(ニュースはLuna、天気・株価・Wikiは通常検索)を確認済みです([news-routing記録](../verification/news-routing-2026-10-11/README.md))。タイマーsnapshotなどの操作対象データは方針と別のメッセージにします。
 
 ### 3.4 結果の返却
 

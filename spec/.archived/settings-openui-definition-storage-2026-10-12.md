@@ -10,7 +10,7 @@
 
 ## 保存先と実行の分離
 
-大半の設定は、[settings repository](../api/domains/settings/repository/index.ts)にある`settings_document`の`id=1`の行、`document`列にJSONとして保存される。名前やテーマに専用の列があるわけではない。接続とモデルもこのJSONの配列で、別のconnectionsテーブルへ保存しているわけではない。
+大半の設定は、[settings repository](../../api/domains/settings/repository/index.ts)にある`settings_document`の`id=1`の行、`document`列にJSONとして保存される。名前やテーマに専用の列があるわけではない。接続とモデルもこのJSONの配列で、別のconnectionsテーブルへ保存しているわけではない。
 
 登録定義の保存先情報は、実装者が変更範囲を確認するための監査情報である。実際の書込みは公開操作を通す。画面JSON、LLM、利用者の入力に任意のテーブル、列、SQL、JSONパスを指定する権限を与えない。
 
@@ -320,15 +320,15 @@ JSON項目追加はtable追加を必須としない。ただしstrict schemaの�
 
 ## 根拠
 
-- [共通設定の保存先](../api/domains/settings/repository/index.ts)と[保存の検証](../api/domains/settings/service/index.ts)
-- [現行設定schema](../api/domains/settings/contracts/index.ts)
-- [辞書の保存処理](../api/domains/tts-dictionary/service/index.ts)
-- [メモリーのホスト設定](../api/domains/memory/repository/index.ts)
-- [schedulerの保存先](../api/domains/scheduler/repository/index.ts)
-- [dotsの保存先](../api/domains/dots/repository/index.ts)と[設定操作](../api/domains/dots/service/configuration.ts)
-- [担当とSkillの登録](../api/domains/capabilities/service/dots-packages.ts)
-- [委任作業の保存先](../api/domains/tasks/repository/index.ts)
-- [Worldの公開操作](../api/domains/world/service/world-claims.ts)と[忘却の継続状態](../api/domains/world/repository/lifecycle.ts)
-- [サービス試用の一時データ](../api/domains/service-tests/service/index.ts)
-- [利用記録の保存先](../api/domains/inference/repository/index.ts)
-- [選択記録と取得手順](../api/domains/toolchain-history/repository/index.ts)
+- [共通設定の保存先](../../api/domains/settings/repository/index.ts)と[保存の検証](../../api/domains/settings/service/index.ts)
+- [現行設定schema](../../api/domains/settings/contracts/index.ts)
+- [辞書の保存処理](../../api/domains/tts-dictionary/service/index.ts)
+- [メモリーのホスト設定](../../api/domains/memory/repository/index.ts)
+- [schedulerの保存先](../../api/domains/scheduler/repository/index.ts)
+- [dotsの保存先](../../api/domains/dots/repository/index.ts)と[設定操作](../../api/domains/dots/service/configuration.ts)
+- [担当とSkillの登録](../../api/domains/capabilities/service/dots-packages.ts)
+- [委任作業の保存先](../../api/domains/tasks/repository/index.ts)
+- [Worldの公開操作](../../api/domains/world/service/world-claims.ts)と[忘却の継続状態](../../api/domains/world/repository/lifecycle.ts)
+- [サービス試用の一時データ](../../api/domains/service-tests/service/index.ts)
+- [利用記録の保存先](../../api/domains/inference/repository/index.ts)
+- [選択記録と取得手順](../../api/domains/toolchain-history/repository/index.ts)

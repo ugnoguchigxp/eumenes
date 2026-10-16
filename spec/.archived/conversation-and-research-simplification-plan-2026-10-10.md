@@ -8,7 +8,7 @@
 
 今回の目的は、既存の分岐へ補正を追加することではなく、判断と状態の重複を取り除くことにある。Web取得、保存本文の読取り、会話履歴検索など、既にある機能とデータは再利用する。通常会話や音声の使い勝手を犠牲にして呼出し回数だけを減らした状態は完了としない。
 
-本計画はユーザー承認後に実装した。[調査と履歴ツールの旧計画](research-and-history-tools-implementation-plan-2026-10-10.md)のエージェント制御部分を本計画で置き換え、保存・検索・権限・採用検証の要件は引き継ぐ。DeepSeekなど特定のharnessが設計の由来かどうかは、本計画の前提にしない。実装後の残存レビューは[再レビュー記録](verification/conversation-and-research-simplification/review.md)、今回のfixture・live・未受入項目は[検証記録](verification/conversation-and-research-simplification/verification.md)に記載する。
+本計画はユーザー承認後に実装した。[調査と履歴ツールの旧計画](research-and-history-tools-implementation-plan-2026-10-10.md)のエージェント制御部分を本計画で置き換え、保存・検索・権限・採用検証の要件は引き継ぐ。DeepSeekなど特定のharnessが設計の由来かどうかは、本計画の前提にしない。実装後の残存レビューは[再レビュー記録](../verification/conversation-and-research-simplification/review.md)、今回のfixture・live・未受入項目は[検証記録](../verification/conversation-and-research-simplification/verification.md)に記載する。
 
 ## 1 構造の到達点
 

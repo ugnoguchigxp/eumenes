@@ -169,7 +169,7 @@ State（過去の版を含む）・usage・Window・傾向、World の派生、�
 
 ## World と目標（steward が兼任する）
 
-計画: [World Model と steward の接続計画](../spec/world-steward-implementation-plan-2026-10-14.md)。
+計画: [World Model と steward の接続計画](../spec/.archived/world-steward-implementation-plan-2026-10-14.md)。
 
 | 棚 | 入れるもの | 書き手の step |
 |---|---|---|
@@ -181,7 +181,7 @@ State（過去の版を含む）・usage・Window・傾向、World の派生、�
 - **World の記録に使う AI** は設定 `world.curationResourceId`（設定画面「会話」の「ワールドモデルの記録に使うAI」）。次の記録から反映される。応答は他の手順と同じく `parseLlmJson` で構文だけ補正してから schema で検査する。
 - **World への反映**: 会話の outbox から World が受け付けた event（ユーザー発言と、採用されたアシスタントの回答）を、steward の実行単位 `world_events` が1往復分（最大2件）ずつ処理する。往復の完了は World を待たない。受付の後に World が steward を kick する。3回保留された event は `STEWARD_GAVE_UP` で終わる。
 - **振り分け**: curate-memory が往復ごとに「World・目標の処理が要るか」を判定し、発言の revision と digest に結び付けて記録する。要らない往復は推論しない。版が違う・判定がないときは処理する。
-- **回答での使い方**: ① 採用済みの目標を L1 の直後に置く（優先度順、1件120文字、全体 2KB、溢れは「ほか N 件」）。② 本人の発言（今回の入力、直前の往復）に出た既知の対象を名前・別名の一致（決定的、NFKC・小文字、曖昧な名前は除く）で最大5件引き、**名前だけ**を L4 の1行（`Worldに記録がある対象: freee、経費精算システム（内容は world_query で調べる）`）にする。主張の中身・ID は渡さない。対象が無い、または World が使えないときは何も入れない。③ World の中身は、会話の AI が直接読まない。`world_query`（toolchain `world.query`）の調査として、会話とは別の LARM セッション（auxiliary）で動く research sub-agent が `world.find`／`world.query` で読み、根拠つきの報告（Report）を返す。会話の AI はその報告（projection）だけを引用して答える。World の記録は本人と会話から作った記録で、外部で確認した事実ではない。`model_hypothesis` の主張は仮説として伝え、カバー範囲が partial のときは「影響がない」「依存がない」と言い切らない。仕様: [World の照会を sub-agent の調査にする](../spec/world-research-subagent-2026-10-15.md)。
+- **回答での使い方**: ① 採用済みの目標を L1 の直後に置く（優先度順、1件120文字、全体 2KB、溢れは「ほか N 件」）。② 本人の発言（今回の入力、直前の往復）に出た既知の対象を名前・別名の一致（決定的、NFKC・小文字、曖昧な名前は除く）で最大5件引き、**名前だけ**を L4 の1行（`Worldに記録がある対象: freee、経費精算システム（内容は world_query で調べる）`）にする。主張の中身・ID は渡さない。対象が無い、または World が使えないときは何も入れない。③ World の中身は、会話の AI が直接読まない。`world_query`（toolchain `world.query`）の調査として、会話とは別の LARM セッション（auxiliary）で動く research sub-agent が `world.find`／`world.query` で読み、根拠つきの報告（Report）を返す。会話の AI はその報告（projection）だけを引用して答える。World の記録は本人と会話から作った記録で、外部で確認した事実ではない。`model_hypothesis` の主張は仮説として伝え、カバー範囲が partial のときは「影響がない」「依存がない」と言い切らない。仕様: [World の照会を sub-agent の調査にする](../spec/.archived/world-research-subagent-2026-10-15.md)。
 - **忘却**: World の主張・対象、目標を忘れるときは、その根拠の発言も記憶の除外台帳に入れる（同じ発言を根拠にした他の記憶・目標は消さない）。忘れる目標の ID は block journal の `derived.goalIds` に書き、起動時の照合でやり直す。除外台帳に入れた発言は World の source の忘却としても受け付ける。
 - **手動の変更はない**: World の主張の訂正・取り消し・忘却は会話で頼む（依頼キュー）。設定画面の World は閲覧だけ。
 - **World 側の巻き込み（意図した非対称）**: 記憶では、忘れた発言を根拠にした他の記憶は残す。World では、同じ窓（1往復分）から作られた主張が窓の全発言を根拠に持つため（パッケージの仕様）、その中の1発言が除外台帳に入る（記憶・主張・目標のどれを忘れても、根拠の発言は World の source の忘却に回る）と、同じ窓の他の主張も消える。窓を1往復に絞って範囲を小さくしている。

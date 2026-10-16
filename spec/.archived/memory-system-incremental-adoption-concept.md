@@ -1,5 +1,7 @@
 # 独立 MemorySystem と Eumenes の接続計画
 
+> 2026-10-16 archive。記憶担当と Memory パッケージの Seed 接続が後続の正本。本書の自動抽出は未接続のまま。
+
 ## 自動抽出の接続前条件（2026-10-10追記）
 
 現行の明示登録・View v2接続を維持し、自動抽出は未接続のままとする。配布版0.3.6のadmissionには括弧内を引用と推定してmodelのmodalityを覆す処理があるため、接続前に依存側で撤去し、新版配布物とconsumer試験で確認する。原文role・所有・scope・UTF-8根拠・改訂・temporal・user overrideの検証は残す。

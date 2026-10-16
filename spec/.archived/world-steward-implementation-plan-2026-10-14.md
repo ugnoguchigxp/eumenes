@@ -1,8 +1,8 @@
 # World Model を記憶担当（steward）につなぐ実装計画
 
 2026-10-14 / 状態: **計画**（未実装・未検証）/ 改訂4＋実装時の変更（§18）。実装済み・fixture 検証中。
-前提: [記憶担当の実装計画](.archived/memory-steward-implementation-plan-2026-10-14.md)（実装済み。以下「steward 計画」）、[World の host 側の説明](../api/domains/world/README.md)、World Model パッケージの設計書（`../eumenes_world_model/spec/world-model-design.md`）。
-実装形態: steward 計画と同じく TypeScript で直接実装する。会話エージェントが呼ぶツール（`world_query`）と設定画面の閲覧だけは、toolchain・bundle の手順（[登録と拡張の手順](../docs/toolchain-extension.md)）に載せる。
+前提: [記憶担当の実装計画](memory-steward-implementation-plan-2026-10-14.md)（実装済み。以下「steward 計画」）、[World の host 側の説明](../../api/domains/world/README.md)、World Model パッケージの設計書（`../eumenes_world_model/spec/world-model-design.md`）。
+実装形態: steward 計画と同じく TypeScript で直接実装する。会話エージェントが呼ぶツール（`world_query`）と設定画面の閲覧だけは、toolchain・bundle の手順（[登録と拡張の手順](../../docs/toolchain-extension.md)）に載せる。
 
 ---
 

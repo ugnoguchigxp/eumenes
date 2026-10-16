@@ -88,7 +88,7 @@
   ```
 
 - **調整が必要な進行中の計画**
-  - [llm-native-implementation-plan-2026-10-10.md](llm-native-implementation-plan-2026-10-10.md) と [conversation-and-research-simplification-plan-2026-10-10.md](conversation-and-research-simplification-plan-2026-10-10.md) は、agent-runtime と dialogue を大きく変える。
+  - [llm-native-implementation-plan-2026-10-10.md](.archived/llm-native-implementation-plan-2026-10-10.md) と [conversation-and-research-simplification-plan-2026-10-10.md](.archived/conversation-and-research-simplification-plan-2026-10-10.md) は、agent-runtime と dialogue を大きく変える。
   - AG-7、AG-10〜AG-13 に着手する前に、`git log --oneline -20 -- api/domains/agent-runtime api/domains/dialogue` と `git status` で、これらの計画が作業中でないかを確認する。
   - 作業中なら、その WP は延期して報告する。
 

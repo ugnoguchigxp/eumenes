@@ -137,7 +137,7 @@ fixture / ローカル検証：artifact domain gate（整形・lint・型・34�
 
 P2 以降の永続化、LLM / tasks / capabilities の本番操作、LARM の実画像生成、Memory / WorldModel の本番 API 接続は未実装。今回の fixture 成功をそれらの完了とは扱わない。
 
-[実装ガイド](../../../docs/openui-artifact-showcase.md) / [導入計画](../../openui-artifact-foundation-plan-2026-10-09.md)
+[実装ガイド](../../../docs/openui-artifact-showcase.md) / [導入計画](../../.archived/openui-artifact-foundation-plan-2026-10-09.md)
 
 ## 2026-10-10 表示内容・操作結果・タブ・分割画面の見直し
 

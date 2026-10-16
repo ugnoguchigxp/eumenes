@@ -1,6 +1,6 @@
 # 設定のデータドリブン化 設計（2026-10-14）
 
-状態: P1 実装済み・固定試験通過（2026-10-14）。P2〜P4 は未着手。根拠は現行コードの調査（2026-10-14）と、[設定全体設計](settings-openui-redesign-2026-10-12.md)・[保存先の詳細設計](settings-openui-definition-storage-2026-10-12.md)。登録の仕組みは[タイマーで実証したデータドリブン形式](timer-data-driven-implementation-contracts-2026-10-13.md)と[手順書](../docs/toolchain-extension.md)を拡張する。
+状態: P1 実装済み・固定試験通過（2026-10-14）。P2〜P4 は未着手。根拠は現行コードの調査（2026-10-14）と、[設定全体設計](settings-openui-redesign-2026-10-12.md)・[保存先の詳細設計](settings-openui-definition-storage-2026-10-12.md)。登録の仕組みは[タイマーで実証したデータドリブン形式](timer-data-driven-implementation-contracts-2026-10-13.md)と[手順書](../../docs/toolchain-extension.md)を拡張する。
 
 ## 1. 目的と進め方
 

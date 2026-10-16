@@ -1,6 +1,6 @@
 # 残存domainのLLM-Native修正計画
 
-2026-10-10。Sol実装用。**G01・W01実装済み、検証記録は末尾。live・実機器は未実施**。[根拠と再現](reviews/llm-native-remaining-domains-2026-10-10/README.md)を伴う。製品全体を再設計する計画ではない。
+2026-10-10。Sol実装用。**G01・W01実装済み、検証記録は末尾。live・実機器は未実施**。[根拠と再現](../reviews/llm-native-remaining-domains-2026-10-10/README.md)を伴う。製品全体を再設計する計画ではない。
 
 ## 1. 実装対象と判断
 
@@ -185,6 +185,6 @@ W01はnullableなhost列を`world/0008-extraction-hold`で追加した。heldを
 
 Memoryは接続前条件の文書化のみ。依存ソース・tgz・lockfile・Memory製品コードに本作業の変更はない。
 
-検証の結果・移行制約・未達gateは[実施記録](verification/llm-native-remaining-domains-2026-10-10/README.md)を正本とする。実モデルのWorld抽出品質、production entity snapshot接続、音声実機器は未達。archiveしない。
+検証の結果・移行制約・未達gateは[実施記録](../verification/llm-native-remaining-domains-2026-10-10/README.md)を正本とする。実モデルのWorld抽出品質、production entity snapshot接続、音声実機器は未達。archiveしない。
 
 対象と利用側のdomain検証、application/runner試験を実施し、現在版で`verify:all`が全13工程成功した。backend 1231 pass / 1 skip、Web 253・client 329・design-system 1086 pass、browser 42 pass / 1 skip。初回失敗・並行source変更による失効・検証ロック拒否は実施記録へ残し、最終成功とは区別した。
