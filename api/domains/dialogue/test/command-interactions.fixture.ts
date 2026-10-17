@@ -30,8 +30,8 @@ import type { RequestAnalysis } from "../service/initial-decision";
 import { waitFor } from "../../../infrastructure/wait-for";
 import {
 	analysisReceipt,
-	delegatingArgs,
 	isAnalysisRound,
+	offeredToolchains,
 	UNAVAILABLE,
 } from "./analysis.fixture";
 export const REVISION = "toolchain:fake.manage@1";
@@ -84,14 +84,6 @@ export const operationCall = (args: Record<string, unknown>) => [
 		}),
 	},
 ];
-/** The explanation that no offered function fits. */
-export const unavailableCall = (reply: string) => [
-	{
-		id: "unavailable",
-		name: UNAVAILABLE,
-		arguments: JSON.stringify({ reply }),
-	},
-];
 export const lastUser = (history: Call["history"]) =>
 	[...history].reverse().find((m) => m.role === "user")?.content ?? "";
 export const until = (check: () => boolean, ms = 4000) =>
@@ -115,8 +107,8 @@ export function setup(
 		backend?: string;
 		bound?: boolean;
 		available?: boolean;
-		/** The request analysis of the i-th run, over a delegating one; without it a run delegates. */
-		analyses?: Array<Partial<RequestAnalysis>>;
+		/** The first round of the i-th run: the function it calls and its analysis; without it a run hands over to the offered toolchain. */
+		analyses?: Array<Partial<RequestAnalysis> & { call?: string }>;
 		/** The binding's allowed question schemas (default: QUESTIONS). */
 		questions?: BoundCommandSet["questions"];
 	} = {},
@@ -223,11 +215,13 @@ export function setup(
 			tools: Call["tools"] | undefined,
 			session?: unknown,
 		) => {
-			if (isAnalysisRound(tools))
+			if (isAnalysisRound(tools)) {
+				const { call: named, ...over } = analyses.shift() ?? {};
 				return analysisReceipt(requestId, {
-					...delegatingArgs(),
-					...analyses.shift(),
+					name: named ?? offeredToolchains(tools)[0] ?? UNAVAILABLE,
+					args: over,
 				});
+			}
 			const call = { history, tools: tools ?? [], session };
 			const index = conversationCalls.push(call) - 1;
 			// By default the conversation hands the utterance to the offered function.
@@ -241,7 +235,15 @@ export function setup(
 					requestId,
 					attemptId: String(index),
 					value: "",
-					toolCalls: result.toolCalls,
+					// The notice belongs to the first round; the second round's function takes the request only.
+					toolCalls: (result.toolCalls as Array<{ arguments: string }>).map(
+						(c) => {
+							const { announcement: _notice, ...rest } = JSON.parse(
+								c.arguments,
+							);
+							return { ...c, arguments: JSON.stringify(rest) };
+						},
+					),
 				} as unknown as Receipt;
 			delta("了解しました");
 			return {

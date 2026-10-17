@@ -7,7 +7,6 @@ import {
 	PACKAGE,
 	ADAPTER,
 	operationCall,
-	unavailableCall,
 	lastUser,
 	until,
 	open,
@@ -283,8 +282,6 @@ test("a reply in natural language answers an open question through its questionR
 				return {
 					toolCalls: operationCall({ request: text, questionRef: ref }),
 				};
-			if (text === "もう一度")
-				return { toolCalls: unavailableCall("対応できません。") };
 			return undefined;
 		},
 	});
@@ -296,7 +293,7 @@ test("a reply in natural language answers an open question through its questionR
 		Object.keys(
 			(h.conversationCalls[0]!.tools[0]!.function.parameters as any).properties,
 		),
-	).toEqual(["request", "announcement"]);
+	).toEqual(["request"]);
 	const interaction = h.interaction()!;
 	ref = interaction.question!.questionId;
 	h.state.commands.push({
@@ -328,8 +325,9 @@ test("a reply in natural language answers an open question through its questionR
 	expect(h.started.at(-1)!.rootRunId).toBe(second.id);
 	expect(h.rows("SELECT id FROM dialogue_runs")).toHaveLength(2);
 	// Answered once: the question is no longer offered.
-	const third = await h.run("もう一度");
-	await until(() => h.status(third.id) === "completed");
+	const before = h.conversationCalls.length;
+	await h.run("もう一度");
+	await until(() => h.conversationCalls.length > before);
 	expect(
 		h.conversationCalls
 			.at(-1)!

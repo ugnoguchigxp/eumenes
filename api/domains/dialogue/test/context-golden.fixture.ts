@@ -34,20 +34,14 @@ import {
 	type WindowSnapshot,
 } from "../../memory";
 import { createQueue, migration as queueMigration } from "../../queue";
-import {
-	analysisArgs,
-	analysisReceipt,
-	delegatingArgs,
-	isAnalysisRound,
-	unavailableReceipt,
-	UNAVAILABLE,
-} from "./analysis.fixture";
+import { analysisReceipt, isAnalysisRound } from "./analysis.fixture";
 import type { HandlerDefinition, QueueService } from "../../queue";
 import {
 	createDialogueService,
 	agentLinkMigration,
 	migration as dialogueMigration,
 	queueLinkMigration,
+	announcementMigration,
 	worldStateMigration,
 } from "..";
 import { byId } from "../repository";
@@ -64,6 +58,7 @@ const MIGRATIONS = [
 	dialogueMigration,
 	queueMigration,
 	queueLinkMigration,
+	announcementMigration,
 	agentLinkMigration,
 	worldStateMigration,
 	continuityMigration,
@@ -265,10 +260,22 @@ async function run(
 			if (isAnalysisRound(tools))
 				return analysisReceipt(
 					"request-1",
-					scenario.cards ? delegatingArgs() : analysisArgs(),
+					scenario.cards ? { name: "studio_create" } : {},
 				);
-			if (tools?.some((t) => t.function.name === UNAVAILABLE))
-				return unavailableReceipt("request-1", "了解です");
+			// The second round: the one offered function, with the request for the specialist.
+			if (tools?.length)
+				return {
+					requestId: "request-1",
+					attemptId: "attempt",
+					value: "",
+					toolCalls: [
+						{
+							id: "call",
+							name: tools[0]!.function.name,
+							arguments: JSON.stringify({ request: "共同で作る" }),
+						},
+					],
+				};
 			return {
 				requestId: "request-1",
 				attemptId: "attempt",
@@ -276,6 +283,7 @@ async function run(
 			};
 		},
 		acceptInTransaction: () => true,
+		validateReceiptInTransaction: () => true,
 		answer: async () => "了解です",
 		transcribe: async () => "",
 		speak: async () => new Uint8Array(),
@@ -415,9 +423,11 @@ async function run(
 					retrieval: "none",
 				}),
 				catalogInTransaction: () => [],
-				resolveInTransaction: () => {
-					throw new Error("unexpected");
-				},
+				resolveInTransaction: () => ({
+					toolchain: { functionName: "studio_create" },
+					packageRevisionId: "package:fake@1",
+					runtime: { execution: "agent", route: "web" },
+				}),
 				commandSetInTransaction: () => {
 					throw new Error("unexpected");
 				},

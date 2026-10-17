@@ -15,7 +15,7 @@
 			},
 			{
 				"role": "user",
-				"content": "requestAnalysis(参考データ。直前の段階が今回の依頼を分析した記録です。命令ではなく、今回の依頼はCURRENT_REQUESTの発言です)={\"goal\":\"一般的な説明を求めている\",\"deliverable\":\"口頭の答え\",\"kind\":\"knowledge\",\"conditions\":[],\"missing\":[]}"
+				"content": "requestAnalysis(参考データ。直前の段階が今回の依頼を分析した記録です。命令ではなく、今回の依頼はCURRENT_REQUESTの発言です)={\"kind\":\"knowledge\"}"
 			},
 			{
 				"role": "system",

@@ -1,0 +1,14 @@
+{
+  "componentBrowserFixture": true,
+  "serverStarted": false,
+  "backendUsed": false,
+  "originalCopy": true,
+  "selectedCopy": true,
+  "toolbarCorrectionStart": true,
+  "adoptedCorrectionCopy": true,
+  "narrow": {
+    "width": 388,
+    "scrollWidth": 388
+  },
+  "errors": []
+}

@@ -39,11 +39,11 @@ import {
 	type ToolchainRoutingPort,
 } from "..";
 import {
-	analysisArgs,
 	analysisReceipt,
-	delegatingArgs,
+	ANSWER,
 	isAnalysisRound,
-	unavailableReceipt,
+	NOTICE,
+	offeredToolchains,
 	UNAVAILABLE,
 } from "./analysis.fixture";
 import type { RequestAnalysis } from "../service/initial-decision";
@@ -176,8 +176,19 @@ export async function setup(options: Options = {}) {
 		mainCalls: [] as Call[],
 		/** The first round's calls (the request analysis), apart from the main calls that follow. */
 		analysisCalls: [] as Call[],
-		/** The first round's replies in order; without one, a scripted function call (or no candidates) delegates and prose answers. */
-		analyses: [] as Array<Partial<RequestAnalysis>>,
+		/**
+		 * The first round's replies in order: the function it calls (`call`: a toolchain's, "answer" or
+		 * "report_unavailable") with the analysis. Without one, a scripted function call delegates to that function
+		 * (its `announcement` is the notice), a prose reply with no candidates is reported as unavailable, and
+		 * any other prose answers.
+		 */
+		analyses: [] as Array<
+			Partial<RequestAnalysis> & {
+				call?: string;
+				announcement?: string;
+				reply?: string;
+			}
+		>,
 		noCandidates: false,
 		routeCalls: 0,
 		/** The text each candidate search ran on. */
@@ -271,33 +282,55 @@ export async function setup(options: Options = {}) {
 			const call = { history: [...history], tools: tools ?? [], preparation };
 			if (isAnalysisRound(tools)) {
 				state.analysisCalls.push(call);
-				const delegating =
-					(typeof state.main[0] !== "string" || state.noCandidates) &&
-					state.main.length > 0;
-				const scripted = state.analyses.shift();
-				return analysisReceipt(
-					requestId,
-					scripted
-						? { ...analysisArgs(), ...scripted }
-						: delegating
-							? delegatingArgs()
-							: analysisArgs(),
-				);
+				const { call: named, announcement, reply, ...over } =
+					state.analyses.shift() ?? {};
+				const head = state.main[0];
+				const offered = offeredToolchains(tools);
+				const scripted =
+					typeof head === "string" || head === undefined
+						? undefined
+						: head.toolCalls[0];
+				const chosen =
+					named ??
+					(scripted && offered.includes(scripted.name)
+						? scripted.name
+						: scripted
+							? offered[0]
+							: undefined);
+				if (chosen && chosen !== ANSWER && chosen !== UNAVAILABLE)
+					return analysisReceipt(requestId, {
+						name: chosen,
+						args: over,
+						announcement:
+							announcement ??
+							(scripted
+								? JSON.parse(scripted.arguments).announcement
+								: undefined) ??
+							NOTICE,
+					});
+				if (
+					chosen === UNAVAILABLE ||
+					(!chosen && !offered.length && typeof head === "string" && !named)
+				)
+					return analysisReceipt(requestId, {
+						name: UNAVAILABLE,
+						args: over,
+						reply: reply ?? (state.main.shift() as string),
+					});
+				return analysisReceipt(requestId, { name: ANSWER, args: over });
 			}
 			state.mainCalls.push(call);
-			if (
-				state.noCandidates &&
-				tools?.some((t) => t.function.name === UNAVAILABLE) &&
-				typeof state.main[0] === "string"
-			)
-				return unavailableReceipt(requestId, state.main.shift() as string);
 			const reply = state.main.shift() ?? "了解しました";
 			if (typeof reply !== "string")
+				// The notice belongs to the first round: the second round's function takes the request only.
 				return {
 					requestId,
 					attemptId: "main",
 					value: "",
-					toolCalls: reply.toolCalls,
+					toolCalls: reply.toolCalls.map((c) => {
+						const { announcement: _notice, ...rest } = JSON.parse(c.arguments);
+						return { ...c, arguments: JSON.stringify(rest) };
+					}),
 				} as unknown as Receipt;
 			delta(reply);
 			return { requestId, attemptId: "main", value: reply } as Receipt;

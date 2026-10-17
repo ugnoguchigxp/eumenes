@@ -22,7 +22,7 @@ OCR domain は原本と結果を所有者・会話・受付 ID ごとに SQLite 
 
 `ocr.bundle.json` が profile・Skill・open/read/cancel の tool・package・toolchain・binding・Artifact・入力 schema を版付きで定義する。`adapter:ocr@1` は OCR domain の公開操作に接続する。会話の command 担当は登録された SystemContext と認可済み snapshot から操作を選ぶ。画面は JSON の `layout` に登録 view `ocr-media` と `ocr-panel` を組み合わせる。Web adapter が認証済み API と `uploadFile` bridge を使い、原本の Blob URL は表示時だけ作る。履歴のサムネイルは、見えている項目の保存原本をブラウザで縮小して一時的に表示する。ファイル選択は読み上げ名を持つアイコンボタン。履歴選択・時刻・行選択は local actionで、時刻・行の操作には選択中の資料IDを含める。取消・再確認・削除・会話追加は OCR の認証済み API を呼ぶ local action である。
 
-2026年10月17日に[画像生成した画面案](../spec/design/ocr-2026-10-17-redesign/README.md)を反映した。原本を少し広く取り、結果は「全文」「行ごと」で切り替える。選択行と原本の対応領域は同じ青で示し、選択行の操作は帯へ、原文全体の会話追加は別ボタンへまとめる。採用した補正案は全文タブで開き、原文も比較できる。表示領域が760px未満では縦に並ぶ。[実装・検証記録](../spec/verification/ocr-redesign-2026-10-17/README.md)に実装画面と検証の範囲を残す。
+2026年10月17日に[画像生成した画面案](../spec/design/ocr-2026-10-17-redesign/README.md)を反映した。原本を少し広く取り、結果は「全文」「行ごと」で切り替える。結果見出しの直下には「読み取り結果を補正」「全文をコピー」を並べ、行選択用の操作には「選択行をコピー」と表示する。選択行と原本の対応領域は同じ青で示し、選択行の操作は帯へ、原文全体の会話追加は別ボタンへまとめる。採用した補正案は全文タブで開き、原文も比較できる。表示領域が760px未満では縦に並ぶ。[実装・検証記録](../spec/verification/ocr-redesign-2026-10-17/README.md)に実装画面と検証の範囲を残す。
 
 ## LLM補正案
 

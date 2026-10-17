@@ -3,10 +3,12 @@ import type { ToolchainCard } from "../../capabilities";
 import {
 	appendConversationPolicy,
 	operation,
-	reportUnavailableTool,
 	toolchainTools,
-	unavailable,
 } from "../service/conversation-tools";
+import {
+	analysisTools,
+	validateAnalysis,
+} from "../service/initial-decision";
 
 const card = (
 	id: string,
@@ -37,10 +39,8 @@ test("every offered toolchain function takes one flat request object", () => {
 		const schema = tool.function.parameters as Record<string, unknown>;
 		expect(schema.type).toBe("object");
 		expect("oneOf" in schema || "anyOf" in schema).toBe(false);
-		expect(Object.keys(schema.properties as object)).toEqual([
-			"request",
-			"announcement",
-		]);
+		// The notice belongs to the first round; the second writes the request for the specialist only.
+		expect(Object.keys(schema.properties as object)).toEqual(["request"]);
 	}
 });
 
@@ -52,10 +52,7 @@ test("a call resolves to the offered toolchain and keeps the request as given", 
 				{
 					id: "c",
 					name: "web_search",
-					arguments: JSON.stringify({
-						announcement: "確認します。",
-						request: "鎌倉の天気",
-					}),
+					arguments: JSON.stringify({ request: "鎌倉の天気" }),
 				},
 			],
 			tools,
@@ -67,7 +64,6 @@ test("a call resolves to the offered toolchain and keeps the request as given", 
 		revisionId: "toolchain:web.search@1",
 		functionName: "web_search",
 		request: "鎌倉の天気",
-		announcement: "確認します。",
 	});
 });
 
@@ -122,27 +118,88 @@ test("the policy is placed before the current request and carries past selection
 	expect(messages.at(-3)!.content).toContain("pastSelections");
 	// The fixed layer names no individual toolchain.
 	expect(messages.at(-2)!.content).not.toContain("web_search");
-	// It tells the model how to say that nothing fits.
-	expect(messages.at(-2)!.content).toContain("report_unavailable");
+	// The second round has no way out: the function is called.
+	expect(messages.at(-2)!.content).not.toContain("report_unavailable");
 });
 
-test("report_unavailable takes one strict reply and nothing else", () => {
-	const parameters = reportUnavailableTool.function.parameters as {
-		properties: Record<string, unknown>;
-		required: string[];
-		additionalProperties: boolean;
-	};
-	expect(Object.keys(parameters.properties)).toEqual(["reply"]);
-	expect(parameters.required).toEqual(["reply"]);
-	expect(parameters.additionalProperties).toBe(false);
-	const call = (args: string, name = "report_unavailable") => ({
-		id: "c",
-		name,
-		arguments: args,
+const call = (name: string, args: unknown) => ({
+	id: name,
+	name,
+	arguments: typeof args === "string" ? args : JSON.stringify(args),
+});
+const analysis = {
+	kind: "live_info",
+	freshness: "live",
+	impact: "none",
+	approved: false,
+};
+
+test("the first round offers each candidate with the analysis and the notice, beside answer and report_unavailable", () => {
+	const tools = analysisTools([web, history]);
+	expect(tools.map((t) => t.function.name)).toEqual([
+		"web_search",
+		"conversation_history",
+		"answer",
+		"report_unavailable",
+	]);
+	const keys = (name: string) =>
+		Object.keys(
+			(
+				tools.find((t) => t.function.name === name)!.function.parameters as {
+					properties: object;
+				}
+			).properties,
+		);
+	// None of them writes the request for the specialist or an answer.
+	expect(keys("web_search")).toEqual([
+		"kind",
+		"freshness",
+		"impact",
+		"approved",
+		"announcement",
+	]);
+	expect(keys("answer")).toEqual(["kind", "freshness", "impact", "approved"]);
+	expect(keys("report_unavailable")).toEqual([
+		"kind",
+		"freshness",
+		"impact",
+		"approved",
+		"reply",
+	]);
+	// With no candidate only the two functions without a toolchain remain.
+	expect(analysisTools([]).map((t) => t.function.name)).toEqual([
+		"answer",
+		"report_unavailable",
+	]);
+});
+
+test("a first-round call is told by the function: a toolchain's, answer or report_unavailable", () => {
+	const cards = [web, history];
+	expect(
+		validateAnalysis(
+			[call("web_search", { ...analysis, announcement: "お調べします。" })],
+			cards,
+		),
+	).toMatchObject({
+		next: "toolchain",
+		card: web,
+		announcement: "お調べします。",
 	});
-	expect(unavailable([call('{"reply":"対応できる担当がありません。"}')])).toBe(
-		"対応できる担当がありません。",
-	);
+	expect(
+		validateAnalysis(
+			[
+				call("answer", {
+					...analysis,
+					kind: "knowledge",
+					freshness: "not_live",
+				}),
+			],
+			cards,
+		),
+	).toMatchObject({ next: "answer", kind: "knowledge" });
+	const parameters = analysisTools([]).find(
+		(t) => t.function.name === "report_unavailable",
+	)!.function.parameters as { properties: Record<string, unknown> };
 	// The contract is the spoken reply: the schema and the description say 160 characters and two sentences.
 	expect(
 		(parameters.properties.reply as { maxLength: number; description: string })
@@ -151,21 +208,66 @@ test("report_unavailable takes one strict reply and nothing else", () => {
 	expect(
 		(parameters.properties.reply as { description: string }).description,
 	).toContain("音声整形後の合計160字以内・2文以内");
-	expect(reportUnavailableTool.function.description).toContain("音声");
-	expect(reportUnavailableTool.function.description).toContain("160字以内");
-	expect(unavailable([call(JSON.stringify({ reply: "あ".repeat(160) }))])).toBe(
-		"あ".repeat(160),
-	);
-	expect(() =>
-		unavailable([call(JSON.stringify({ reply: "あ".repeat(161) }))]),
-	).toThrow("invalid_conversation_operation");
-	// Another function, or several calls, are not an explanation.
-	expect(unavailable([call("{}", "web_search")])).toBeUndefined();
 	expect(
-		unavailable([call('{"reply":"a"}'), call('{"reply":"b"}')]),
-	).toBeUndefined();
-	for (const args of ["{}", '{"reply":""}', '{"reply":"a","extra":1}', "[1]"])
-		expect(() => unavailable([call(args)])).toThrow(
+		validateAnalysis(
+			[
+				call("report_unavailable", {
+					...analysis,
+					reply: "対応できる担当がありません。",
+				}),
+			],
+			cards,
+		),
+	).toMatchObject({
+		next: "report_unavailable",
+		reply: "対応できる担当がありません。",
+	});
+});
+
+test("live or delegated kinds cannot be answered from hand, and any other malformed first-round call is rejected", () => {
+	const cards = [web];
+	for (const over of [
+		{ kind: "live_info" },
+		{ kind: "past_conversation" },
+		{ kind: "action" },
+		{ kind: "creation" },
+		{ freshness: "live" },
+	])
+		expect(() =>
+			validateAnalysis(
+				[
+					call("answer", {
+						...analysis,
+						kind: "knowledge",
+						freshness: "not_live",
+						...over,
+					}),
+				],
+				cards,
+			),
+		).toThrow("invalid_conversation_operation");
+	const bad: Array<unknown[]> = [
+		[],
+		[call("web_search", { ...analysis, announcement: "a" }), call("answer", analysis)],
+		[call("conversation_history", { ...analysis, announcement: "a" })],
+		[call("web_search", analysis)],
+		[call("web_search", { ...analysis, announcement: "a", request: "x" })],
+		[call("answer", { ...analysis, announcement: "a" })],
+		[call("answer", "{")],
+		[call("report_unavailable", { ...analysis, reply: "" })],
+		[call("report_unavailable", { ...analysis, reply: "あ".repeat(161) })],
+		[call("report_unavailable", analysis)],
+		[call("web_search", { ...analysis, announcement: "あ".repeat(81) })],
+	];
+	for (const calls of bad)
+		expect(() => validateAnalysis(calls as never, cards)).toThrow(
 			"invalid_conversation_operation",
 		);
+	// A function that reports why it cannot may do so about a live request.
+	expect(
+		validateAnalysis(
+			[call("report_unavailable", { ...analysis, reply: "できません。" })],
+			cards,
+		).next,
+	).toBe("report_unavailable");
 });

@@ -43,3 +43,19 @@ verifyの最初の実行後にタブの幅だけを調整したため、最終�
 再起動後の[画面](running/desktop.png)、[狭幅](running/narrow.png)、[空状態](running/empty.png)、[結果JSON](running/browser.json)。実際の開発assetを使用し、結果JSONの `productionBuildRenderedViaBrowserRoutes` は `false`。幅1130pxで2列、狭幅602pxで1列かつ横のはみ出しなし。
 
 再起動前後の確認途中では、行選択の待機がタイムアウトした実行もあった。再起動完了を利用者から受けた後、新しいブラウザで最初から実施し、主要操作を通して成功した。製品コードの変更や期待値の緩和は行っていない。いずれのUI試験も固定データを使うため、実gatewayの解析・取消・認証を再実施した結果ではない。実接続については[Mac gateway確認](../ocr-mac-gateway-2026-10-17/README.md)を参照する。
+
+## 補正・コピー入口の追加調整
+
+利用者から両操作が見当たらないとの依頼を受け、結果見出しの直下へ「読み取り結果を補正」「全文をコピー」を並べた。全文コピーを通常サイズへ広げ、行選択用には「選択行をコピー」と表示した。下部の補正案詳細と既存の開始・採用・原文復帰は維持する。補正開始は既存callbackへ接続し、読込中・待機中・実行中・取消中には重複開始を無効にする。コピー対象と実行契約は変更せず、意味判断の専用分岐は追加していない。
+
+[操作帯追加後の部品表示](toolbar/desktop.png)、[狭幅の操作帯](toolbar/narrow-toolbar.png)、[ブラウザ結果](toolbar/result.json)。この追補の画像は、実製品部品とDesignSystemの配布CSSを使う単独ブラウザfixtureである。
+
+- 部分試験: OcrPanel 7件成功。上部の開始操作・全文コピー、補正実行中の開始無効化、採用案と原文のコピー対象等を確認。
+- 関連試験: `bun run test:domain -- --domain ocr --domain artifact` 成功。backend 258件・Web 87件・DesignSystem 7件、計352件。
+- ビルド: `bun run build:web` 成功。DesignSystemの型検査も成功。既存の大きいchunkの警告あり。対象ファイルのlint・format・差分検査も成功。
+- 一括検証: `bun run verify -- --domain ocr --domain artifact` は `S11TNEXT_BUILD_STALE` によりsystem-context段階で停止。今回の変更外にある生成済みcatalogの不整合を検出した。全体成功とは扱わず、担当外を修正していない。
+- サイズ検査: 全体検査は担当外の `api/application/toolchain/toolchain.ts#createToolchain` が309行で上限300行を超えるため失敗。今回のOCR部品への指摘はなし。
+- ブラウザ: 追加後の原文全文コピー・選択行コピー・上部からの補正開始・採用後の全文コピー、幅388pxでのボタン表示とはみ出しなしを確認。page errorなし。初回の単独fixtureにはArtifactの基底layout classが欠けていたため、製品と同じclassを付けたfixtureで再確認した。製品コード・期待値は変更していない。
+- 稼働画面: 今回の追補検証時点では既存のWeb（5173）とbackend（8787）が両方接続拒否（HTTP 000）だったため、追加後の稼働画面確認は未実施。利用者の指定に従ってサーバーは起動・再起動していない。生成済み配布ビルドは更新済み。
+
+前節の「再起動後の稼働中Web成功」は追補前のデザイン反映の記録であり、今回の操作帯追加後の稼働確認とは区別する。

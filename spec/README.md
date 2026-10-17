@@ -34,6 +34,7 @@ archive の基準: その文書が担当した実装がコードにあり、本�
 | --- | --- |
 | [01-tasks-and-queue.md](.archived/01-tasks-and-queue.md) | 委任タスクの永続台帳。実装とfixture、レビュー再試験を本文に記録。会話配送・モーダル・実CLIは後続計画 |
 | [ocr-larm-connectivity-request-2026-10-17.md](.archived/ocr-larm-connectivity-request-2026-10-17.md) | OCRの正式入口の依頼。Macからの設定保存と画像・動画・取消の受入は [検証記録](verification/ocr-mac-gateway-2026-10-17/README.md) |
+| [run-error-report-design-2026-10-17.md](run-error-report-design-2026-10-17.md) | 実装中（E1〜E3決定）。失敗したrunの診断を固定形式・約3,000文字で組み立て、画面のダイアログ・CLIからLLMへ貼れるようにする |
 | [request-url-boundary-design-2026-10-17.md](.archived/request-url-boundary-design-2026-10-17.md) | 依頼文のURLは「、」「。」で区切る（U2）。`request-urls.test.ts` で確認。助詞直結（U1）は対応しない |
 | [toolchain-specialist-dialogue-implementation-plan-2026-10-17.md](.archived/toolchain-specialist-dialogue-implementation-plan-2026-10-17.md) | 専門担当への共通切替とUI自由制作の対話編集。実装と固定試験を§15に記録。ブラウザE2E・実モデル・実機器は未実施 |
 | [toolchain-specialist-dialogue-p0-contract-2026-10-17.md](.archived/toolchain-specialist-dialogue-p0-contract-2026-10-17.md) | 上記の型契約。コードで固定済み。実モデルの容量測定は未実施 |

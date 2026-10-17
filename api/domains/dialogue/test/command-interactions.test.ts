@@ -13,7 +13,7 @@ afterEach(async () => {
 test("an earlier mistaken answer does not enter the next toolchain choice", async () => {
 	const h = setup({
 		// The first request is answered from hand; the second goes to the toolchains.
-		analyses: [{ kind: "knowledge", next: "answer" }],
+		analyses: [{ call: "answer", kind: "knowledge" }],
 	});
 	const first = await h.run("操作を実行して");
 	await until(() => h.status(first.id) === "completed");
@@ -31,10 +31,8 @@ test("an earlier mistaken answer does not enter the next toolchain choice", asyn
 	await h.run("先ほどの操作を実行して");
 	await until(() => h.started.length === 1);
 	const selection = h.conversationCalls[1]!;
-	expect(selection.tools.map((t) => t.function.name)).toEqual([
-		"fake_op",
-		"report_unavailable",
-	]);
+	// The second round offers the function the first round chose, and nothing else.
+	expect(selection.tools.map((t) => t.function.name)).toEqual(["fake_op"]);
 	const reference = selection.history.find((m) =>
 		m.content.startsWith("referenceContext"),
 	)!;
@@ -50,8 +48,8 @@ test("an earlier mistaken answer does not enter the next toolchain choice", asyn
 test("an answer from hand retains the full exchange as the main session", async () => {
 	const h = setup({
 		analyses: [
-			{ kind: "knowledge", next: "answer" },
-			{ kind: "knowledge", next: "answer" },
+			{ call: "answer", kind: "knowledge" },
+			{ call: "answer", kind: "knowledge" },
 		],
 	});
 	const first = await h.run("前の話を覚えておいて");
