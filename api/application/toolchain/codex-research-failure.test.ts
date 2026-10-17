@@ -12,7 +12,7 @@ test("SDK process failure reaches correlated logs and current answer context wit
 	const command = join(dir, "codex");
 	await writeFile(
 		command,
-		`#!${process.execPath}\nimport { readFileSync } from "node:fs";\nimport assert from "node:assert/strict";\nconst argv = process.argv.slice(2);\nconst instructionArg = argv.find(v => v.startsWith("model_instructions_file="));\nconst text = readFileSync(JSON.parse(instructionArg.slice("model_instructions_file=".length)), "utf8");\nassert.ok(!argv.includes("--output-schema"));\nassert.equal(text.split("\\nOUTPUT_FORMAT=").length, 2);\nconst forms = JSON.parse(text.split("\\nOUTPUT_FORMAT=")[1]);\nassert.equal(forms[0].action, "invoke");\nassert.deepEqual(Object.keys(forms[0]), ["action", "tool", "arguments"]);\nassert.equal(forms[1].action, "finish");\nassert.deepEqual(Object.keys(forms[1]), ["action", "report"]);\nconsole.error("HTTP 401 invalid_api_key PRIVATE_PROVIDER_CREDENTIAL"); process.exit(7);\n`,
+		`#!${process.execPath}\nimport { readFileSync } from "node:fs";\nimport assert from "node:assert/strict";\nconst argv = process.argv.slice(2);\nconst instructionArg = argv.find(v => v.startsWith("model_instructions_file="));\nconst text = readFileSync(JSON.parse(instructionArg.slice("model_instructions_file=".length)), "utf8");\nassert.ok(!argv.includes("--output-schema"));\nassert.equal(text.split("\\nOUTPUT_SCHEMA=").length, 2);\nconst schema = JSON.parse(text.split("\\nOUTPUT_SCHEMA=")[1]);\nassert.deepEqual(schema.oneOf.map(f => f.properties.action.const), ["invoke", "wait", "finish"]);\nconsole.error("HTTP 401 invalid_api_key PRIVATE_PROVIDER_CREDENTIAL"); process.exit(7);\n`,
 		{ mode: 0o700 },
 	);
 	const lines: string[] = [];
@@ -43,12 +43,21 @@ test("SDK process failure reaches correlated logs and current answer context wit
 				.filter((m) => m.role === "user")
 				.at(-1)!.content;
 			if (question === "以前の記録") return "制御JSONが不正でした。";
+			if (options?.tools?.[0]?.function.name === "find_toolchain") {
+				options.onToolCalls!([
+					{ id: "discovery", name: "find_toolchain", arguments: "{}" },
+				]);
+				return "";
+			}
 			if (options?.tools?.length) {
 				options.onToolCalls!([
 					{
 						id: "research",
 						name: "web_research",
-						arguments: JSON.stringify({ request: question }),
+						arguments: JSON.stringify({
+							request: question,
+							announcement: "調べます。",
+						}),
 					},
 				]);
 				return "";
@@ -59,14 +68,13 @@ test("SDK process failure reaches correlated logs and current answer context wit
 					m.content.includes("CURRENT_RESEARCH_FAILURE="),
 			)!;
 			expect(
-				JSON.parse(notice.content.split("CURRENT_RESEARCH_FAILURE=")[1]!),
-			).toMatchObject({ code: "codex_research_http_401" });
-			expect(
-				messages.some(
-					(m) => m.role === "assistant" && m.content.includes("制御JSON"),
+				JSON.parse(
+					notice.content.split("CURRENT_RESEARCH_FAILURE=")[1]!.split("\n")[0]!,
 				),
-			).toBe(true);
-			const result = JSON.parse(messages.at(-2)!.content);
+			).toMatchObject({ code: "codex_research_http_401" });
+			// A failed research turn answers from the current request only; earlier history is dropped.
+			expect(messages.some((m) => m.content.includes("制御JSON"))).toBe(false);
+			const result = JSON.parse(messages.at(-3)!.content);
 			expect(result.report.researchProgress).toMatchObject({
 				searchAttempts: 0,
 				readAttempts: 0,

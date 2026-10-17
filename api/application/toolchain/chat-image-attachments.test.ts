@@ -82,24 +82,10 @@ test("Eumenes upload, atomic acceptance, image-only streaming, ordered history r
 		const generation = f.requests
 			.filter((r) => r.operation === "generate")
 			.map((r) => JSON.parse(r.body));
-		// Each turn selects, reviews a prose-only selection, then answers.
-		expect(generation).toHaveLength(6);
-		expect(generation.map((r) => !!r.tools?.length)).toEqual([
-			true,
-			false,
-			false,
-			true,
-			false,
-			false,
-		]);
-		expect(generation.map((r) => r.stream)).toEqual([
-			true,
-			false,
-			true,
-			true,
-			false,
-			true,
-		]);
+		// Each turn is a single streamed tool-enabled generation.
+		expect(generation).toHaveLength(2);
+		expect(generation.map((r) => !!r.tools?.length)).toEqual([true, true]);
+		expect(generation.map((r) => r.stream)).toEqual([true, true]);
 		for (const sent of generation) {
 			const images = sent.messages.flatMap((m: { content: unknown }) =>
 				Array.isArray(m.content)

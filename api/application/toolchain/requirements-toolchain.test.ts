@@ -3,7 +3,10 @@ import { readFileSync } from "node:fs";
 import { workerPacket } from "./toolchain.fixture";
 import { loadEvaluationCases } from "./llm-native-evaluation.fixture";
 import { evaluateRequirements } from "./llm-native-runner.fixture";
-import { fixtureVerification } from "../../domains/agent-runtime/test/research-fixture";
+import {
+	fixtureResearchOutput,
+	fixtureVerification,
+} from "../../domains/agent-runtime/test/research-fixture";
 import type { LarmPort } from "../../domains/larm";
 const directory = new URL("./testdata/llm-native/", import.meta.url);
 const { cases, profiles } = loadEvaluationCases(
@@ -26,6 +29,16 @@ for (const c of cases)
 				speak: async () => new Uint8Array(),
 				answer: async (messages, _signal, options) => {
 					calls++;
+					if (options?.tools?.[0]?.function.name === "find_toolchain") {
+						options.onToolCalls!([
+							{
+								id: crypto.randomUUID(),
+								name: "find_toolchain",
+								arguments: "{}",
+							},
+						]);
+						return "";
+					}
 					if (options?.tools?.length) {
 						options.onToolCalls!([
 							{
@@ -35,7 +48,10 @@ for (const c of cases)
 										? "web_research"
 										: "conversation_history",
 								// The conversation hands over the request only.
-								arguments: JSON.stringify({ request: c.request }),
+								arguments: JSON.stringify({
+									announcement: "お調べします。",
+									request: c.request,
+								}),
 							},
 						]);
 						return "";
@@ -45,22 +61,25 @@ for (const c of cases)
 						if (data.draftReport)
 							return JSON.stringify(fixtureVerification(data.draftReport));
 						if (search)
-							return JSON.stringify(
-								data.observations.length
-									? {
-											action: "finish",
-											report: {
-												outcome: canned.outcome,
-												summary: canned.summary,
-												claims: canned.claims,
-												limitations: canned.limitations,
+							return fixtureResearchOutput(
+								data,
+								JSON.stringify(
+									data.observations.length
+										? {
+												action: "finish",
+												report: {
+													outcome: canned.outcome,
+													summary: canned.summary,
+													claims: canned.claims,
+													limitations: canned.limitations,
+												},
+											}
+										: {
+												action: "invoke",
+												tool: "web.read",
+												arguments: { url: c.sources[0]!.url },
 											},
-										}
-									: {
-											action: "invoke",
-											tool: "web.read",
-											arguments: { url: c.sources[0]!.url },
-										},
+								),
 							);
 						if (!data.requirementContract)
 							return JSON.stringify({
@@ -141,7 +160,7 @@ for (const c of cases)
 				expect(result.counts.verify).toEqual({ n: 0 });
 			} else expect(result.structureMatched).toBe(true);
 			expect(result.counts.worker).toBe(search ? 2 : 3);
-			expect(calls).toBe(search ? 4 : 5);
+			expect(calls).toBe(search ? 5 : 6);
 			expect(result.semanticChecks.every((v) => v.status === "unchecked")).toBe(
 				true,
 			);

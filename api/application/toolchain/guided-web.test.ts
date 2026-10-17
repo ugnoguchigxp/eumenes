@@ -6,7 +6,7 @@ for (const [fullResearch, invalidateLatest] of [
 	[true, false],
 	[false, true],
 ] as const)
-	test(`source-linked answers survive stock → weather without parent regeneration (${fullResearch ? "broad" : "quick"}${invalidateLatest ? ", superseded search" : ""})`, async () => {
+	test(`source-linked answers survive stock → weather through conversation rephrasing (${fullResearch ? "broad" : "quick"}${invalidateLatest ? ", superseded search" : ""})`, async () => {
 		let parents = 0;
 		const queries: string[] = [];
 		const requests: unknown[] = [];
@@ -33,9 +33,12 @@ for (const [fullResearch, invalidateLatest] of [
 		};
 		const h = await harness({
 			fullResearch,
-			parent: async () => {
+			parent: async (messages) => {
 				parents++;
-				return "会話モデルで書き換えてはいけない";
+				const report = messages.find((m) =>
+					m.content.includes('"delivery":"guided-web"'),
+				)!;
+				return JSON.parse(report.content).report.answer;
 			},
 			control: async (messages) => {
 				const data = workerPacket(messages);
@@ -164,7 +167,7 @@ for (const [fullResearch, invalidateLatest] of [
 				);
 				expect(child.modelCalls).toBe(invalidateLatest ? 4 : 3);
 			}
-			expect(parents).toBe(0);
+			expect(parents).toBe(2);
 			expect(queries).toHaveLength(invalidateLatest ? 4 : 2);
 			const weatherQuery = queries[invalidateLatest ? 2 : 1];
 			expect(weatherQuery).toContain("鎌倉");

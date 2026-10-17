@@ -6,22 +6,14 @@ export const searchAgentCases = [
 		id: "quick",
 		question: "仙台市が何県にあるか、Webで調べて教えて",
 		expectedPackage: "package:web.recipe@1",
-		query: "仙台市 都道府県",
 		queryPattern: /仙台|sendai/i,
-		facts: ["仙台市は宮城県にあります。"],
 		answerPattern: /宮城/,
 	},
 	{
 		id: "codex",
 		question: "AIの最新ニュースを教えて",
 		expectedPackage: "package:web.search@1",
-		query: "AI 最新ニュース",
 		queryPattern: /(?:\bAI\b|人工知能|\bLLM\b|transformer)/i,
-		facts: [
-			"AIモデルAが公開されました。",
-			"LLM推論の高速化が発表されました。",
-			"音声AI製品が更新されました。",
-		],
 		answerPattern: /AI|LLM/,
 	},
 	{
@@ -29,16 +21,13 @@ export const searchAgentCases = [
 		question:
 			"LFM2.5-24B-A2B というモデルが出たそうです。どんなモデルか調査して詳細を教えて",
 		expectedPackage: "package:web.search@1",
-		query: "LFM2.5-24B-A2B model specifications",
 		queryPattern: /LFM2\.5-24B-A2B/i,
-		facts: ["公開資料はLFM2.5-24B-A2Bのモデル構成を説明しています。"],
 		answerPattern: /LFM2\.5-24B-A2B/,
 	},
 	{
 		id: "stock",
 		question: "マイクロソフトの最新の株価を教えて",
 		expectedPackage: "package:web.recipe@1",
-		query: "Microsoft MSFT stock price",
 		queryPattern: /マイクロソフト|microsoft|\bMSFT\b/i,
 		// Deliberately synthetic price/date; never a live quote.
 		facts: ["テスト用MSFT株価は2026年10月9日終値で500米ドルです。"],
@@ -50,10 +39,8 @@ export const searchAgentCases = [
 		id: "softbank-stock",
 		question: "ソフトバンク（9434）の株価を教えて",
 		expectedPackage: "package:web.recipe@1",
-		query: "ソフトバンク 9434 株価",
 		queryPattern: /ソフトバンク|9434/i,
-		// Regression fixture for a report with a price that the final answer omitted.
-		facts: ["テスト用ソフトバンク株価は2026年10月14日終値で241.8円です。"],
+		// Regression: the final answer must keep the price in the report.
 		answerPattern: /241\.8\s*円/,
 		quotePattern: /\d[\d,]*(?:\.\d+)?\s*円/,
 	},
@@ -61,9 +48,7 @@ export const searchAgentCases = [
 		id: "weather",
 		question: "今日の東京の天気を教えて",
 		expectedPackage: "package:web.recipe@1",
-		query: "東京 今日 天気",
 		queryPattern: /東京|tokyo/i,
-		facts: ["テスト用の東京の予報は2026年10月11日、晴れ、最高気温25度です。"],
 		answerPattern: /天気|予報|晴|雨|曇/,
 	},
 ] as const;

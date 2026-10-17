@@ -27,10 +27,15 @@ test("鎌倉の天気: the second request reads the saved page again without sea
 				return JSON.stringify({
 					action: "finish",
 					report: {
-						outcome: "answered",
+						completion: "complete",
+						answer: "晴れの予報です。",
 						summary: "晴れの予報です。",
 						claims: [
-							{ text: "晴れの予報", evidence: [page.excerpts[0].reference] },
+							{
+								text: "晴れの予報",
+								status: "verified",
+								evidence: [page.excerpts[0].reference],
+							},
 						],
 						limitations: [],
 						recipe: {
@@ -43,13 +48,12 @@ test("鎌倉の天気: the second request reads the saved page again without sea
 			if (!data.operations.length && offered("recipe.find"))
 				return invoke("recipe.find", { query: "鎌倉市の天気予報" });
 			// The sub-agent judges a saved procedure as the same request and reads it again.
-			const saved = data.observations.find(
-				(o: any) =>
-					o.basis === "snippet" && String(o.title).startsWith("天気予報:"),
+			const saved = data.candidates.find((o: any) =>
+				String(o.title).startsWith("天気予報:"),
 			);
 			if (saved && offered("web.read"))
 				return invoke("web.read", { url: saved.url });
-			const hit = data.observations.find((o: any) => o.basis === "snippet");
+			const hit = data.candidates[0];
 			if (hit && offered("web.read"))
 				return invoke("web.read", { url: hit.url });
 			return invoke("web.lookup", { query: "鎌倉 天気" });

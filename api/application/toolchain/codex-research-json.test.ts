@@ -6,7 +6,7 @@ import { createCodexResearch } from "../../domains/inference";
 import { harness } from "./toolchain.fixture";
 
 const finish =
-	"{action:'finish',report:{outcome:'not_found',summary:'検索範囲では必要な根拠なし',claims:[],limitations:[],},}";
+	"{action:'finish',report:{completion:'incomplete',answer:'検索範囲では必要な根拠なし',summary:'検索範囲では必要な根拠なし',claims:[],limitations:[],},}";
 for (const scenario of [
 	{
 		name: "corrected syntax reaches search and finish without a model repair",
@@ -42,9 +42,10 @@ for (const scenario of [
 	{
 		name: "corrected syntax cannot invent evidence references",
 		outputs: [
-			"{action:'finish',report:{outcome:'answered',summary:'未取得の事実',claims:[{text:'未取得の事実',evidence:['e999']}],limitations:[],},}",
+			"{action:'invoke',tool:'web.lookup',arguments:{query:'公開情報'},}",
+			"{action:'finish',report:{completion:'complete',answer:'未取得の事実',summary:'未取得の事実',claims:[{text:'未取得の事実',status:'verified',evidence:['e999']}],limitations:[],},}",
 		],
-		searches: 0,
+		searches: 1,
 		state: "failed",
 		repairs: 1,
 		error: "invalid_evidence",
@@ -100,11 +101,13 @@ console.log(JSON.stringify({type:"turn.completed",usage:{}}));
 			expect(state).toMatchObject({
 				state: scenario.state,
 				json_repairs: scenario.repairs,
-				model_calls: 2,
+				model_calls: scenario.error === "invalid_evidence" ? 3 : 2,
 				error_code: scenario.error,
 			});
 			expect(h.acquisitions).toBe(scenario.searches);
-			expect(JSON.parse(await readFile(counter, "utf8"))).toBe(2);
+			expect(JSON.parse(await readFile(counter, "utf8"))).toBe(
+				scenario.error === "invalid_evidence" ? 3 : 2,
+			);
 			if (scenario.state === "completed")
 				expect(h.toolchain.agents.report(child.id)?.version).toBe(2);
 			else

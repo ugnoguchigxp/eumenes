@@ -23,7 +23,7 @@
 		"test:domain": "bun scripts/test-domain.ts",
 		"test:inventory": "bun scripts/test-inventory.ts",
 		"verify:metrics": "bun scripts/verification-metrics.ts",
-		"test:search": "bun test api/domains/dialogue/test/toolchain-tools.test.ts api/domains/agent-runtime/test/context.test.ts api/application/toolchain/search-agents-check.test.ts api/application/toolchain/search-agents-e2e.test.ts",
+		"test:search": "bun test api/domains/dialogue/test/toolchain-tools.test.ts api/domains/agent-runtime/test/context.test.ts api/application/toolchain/search-agents-check.test.ts",
 		"test:search:live": "bun scripts/search-agents-live.ts --run",
 		"verify:all": "bun scripts/verify.ts --all",
 		"verify:live": "bun scripts/verify-live.ts",

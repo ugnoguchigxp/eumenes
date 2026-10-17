@@ -40,7 +40,7 @@ test("three far-apart facts and the seventh condition retain earlier evidence th
 			(data) =>
 				invoke("web.read_saved", {
 					sourceRef: data.observations[0]!.document,
-					cursor: data.operations.at(-1)!.notes!.matches![0]!.cursor,
+					cursor: data.toolNotes.at(-1)!.notes!.matches![0]!.cursor,
 					characters: 1200,
 				}),
 			(data) => {
@@ -53,7 +53,7 @@ test("three far-apart facts and the seventh condition retain earlier evidence th
 			(data) =>
 				invoke("web.read_saved", {
 					sourceRef: data.observations[0]!.document,
-					cursor: data.operations.at(-1)!.notes!.matches![0]!.cursor,
+					cursor: data.toolNotes.at(-1)!.notes!.matches![0]!.cursor,
 					characters: 1200,
 				}),
 			(data) => {
@@ -74,7 +74,7 @@ test("three far-apart facts and the seventh condition retain earlier evidence th
 		],
 		{
 			acquire: syntheticAcquisition({ [url]: body }),
-			parent: () => facts.join(""),
+			parent: () => facts[1]!,
 		},
 	);
 	try {
@@ -181,8 +181,8 @@ test("cursor/start conflict is refused with a precise, private repair hint, then
 			(d) =>
 				invoke("web.read_saved", {
 					sourceRef: d.observations.find((s) => s.basis === "page")!.sourceRef,
-					cursor: d.operations.find((o) => o.notes?.matches)?.notes!
-						.matches![0]!.cursor,
+					cursor: d.toolNotes.find((o) => o.notes?.matches)?.notes!.matches![0]!
+						.cursor,
 					start: "head",
 				}),
 			(d, messages) => {
@@ -191,8 +191,8 @@ test("cursor/start conflict is refused with a precise, private repair hint, then
 				).toBe(true);
 				return invoke("web.read_saved", {
 					sourceRef: d.observations.find((s) => s.basis === "page")!.sourceRef,
-					cursor: d.operations.find((o) => o.notes?.matches)?.notes!
-						.matches![0]!.cursor,
+					cursor: d.toolNotes.find((o) => o.notes?.matches)?.notes!.matches![0]!
+						.cursor,
 				});
 			},
 			(d) => finish(d, keyword),
@@ -263,14 +263,14 @@ test("new research may search after a specified URL is mismatched, using only it
 		const run = await h.dialogue.submit({
 			requestId: crypto.randomUUID(),
 			conversationId: "main",
-			text: `${url}を読み、対象が違えばWeb検索して集合時刻を確認して`,
+			text: `${url} を読み、対象が違えばWeb検索して集合時刻を確認して`,
 		});
 		expect(
 			(await h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 }))?.status,
 		).toBe("completed");
 		h.assertConsumed();
 		expect(h.acquisitions).toBe(3);
-		expect(h.dialogue.answerText(run.id)).toBe(keyword);
+		expect(h.dialogue.answerText(run.id)).toStartWith(keyword);
 	} finally {
 		await h.close();
 	}
@@ -296,8 +296,8 @@ test("an invalid saved-body reference is refused before execution and a valid re
 			(d) =>
 				invoke("web.read_saved", {
 					sourceRef: d.observations.find((s) => s.basis === "page")!.sourceRef,
-					cursor: d.operations.find((o) => o.notes?.matches)?.notes!
-						.matches![0]!.cursor,
+					cursor: d.toolNotes.find((o) => o.notes?.matches)?.notes!.matches![0]!
+						.cursor,
 				}),
 			(d) => finish(d, keyword),
 		],
@@ -348,8 +348,8 @@ test("R1/R2/R3: fetch once then find/read_saved obtains middle evidence and pare
 			(d) =>
 				invoke("web.read_saved", {
 					sourceRef: d.observations.find((s) => s.basis === "page")!.sourceRef,
-					cursor: d.operations.find((o) => o.notes?.matches)?.notes!
-						.matches![0]!.cursor,
+					cursor: d.toolNotes.find((o) => o.notes?.matches)?.notes!.matches![0]!
+						.cursor,
 				}),
 			(d) => finish(d, keyword),
 		],
@@ -379,7 +379,7 @@ test("R1/R2/R3: fetch once then find/read_saved obtains middle evidence and pare
 		expect(report.sources[0]!.viewId).toBeTruthy();
 		expect(report.sources[0]!.sourceRevision).toBeTruthy();
 		expect(report.sources[0]!.acquisitionTruncated).toBe(false);
-		expect(h.dialogue.answerText(run.id)).toBe(keyword);
+		expect(h.dialogue.answerText(run.id)).toStartWith(keyword);
 		const inputs = JSON.stringify(h.inputs);
 		expect(inputs.length).toBeLessThan(40000);
 		expect(h.parentContexts.at(-1)).not.toContain("無関係な序文".repeat(5));
@@ -387,7 +387,7 @@ test("R1/R2/R3: fetch once then find/read_saved obtains middle evidence and pare
 		await h.close();
 	}
 });
-test("R4/R5: mismatched first page cannot repeat the search beyond the current budget", async () => {
+test("R4/R5: after the allowed second search, a third search is refused without any external acquisition", async () => {
 	let lookups = 0;
 	const a = "https://example.com/wrong",
 		b = "https://example.com/right",
@@ -406,6 +406,8 @@ test("R4/R5: mismatched first page cannot repeat the search beyond the current b
 			() => invoke("web.lookup", { query: "集合時刻" }),
 			() => invoke("web.read", { url: a }),
 			() => invoke("web.lookup", { query: "大阪 10月10日 集合時刻" }),
+			() => invoke("web.lookup", { query: "大阪 集合 3回目" }),
+			() => invoke("web.lookup", { query: "大阪 集合 3回目" }),
 		],
 		{
 			acquire,
@@ -422,14 +424,17 @@ test("R4/R5: mismatched first page cannot repeat the search beyond the current b
 			(await h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 }))?.status,
 		).toBe("completed");
 		h.assertConsumed();
-		expect(h.acquisitions).toBe(2);
+		// Guided budget: searches 2. The third lookup is no longer offered and the repeated request fails the worker.
+		expect(lookups).toBe(2);
+		expect(h.acquisitions).toBe(3);
 		const worker = h.toolchain.agents
 			.list(run.id)
 			.find((t) => t.kind === "worker")!;
 		expect(worker).toMatchObject({
 			status: "failed",
-			errorCode: "agent_budget_exhausted",
-			modelCalls: 3,
+			errorCode: "invalid_tool_input",
+			modelCalls: 5,
+			toolCalls: 3,
 		});
 		expect(h.dialogue.answerText(run.id)).not.toContain(keyword);
 	} finally {

@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { harness, forbidden } from "./toolchain.fixture";
+import { harness, forbidden, workerPacket } from "./toolchain.fixture";
 import { checkLiveCitations } from "./toolchain-live-check";
 import { settle, waitFor } from "../../infrastructure/wait-for";
 test("adoption removes a fabricated model citation and cannot reuse sources after failed research", async () => {
@@ -25,7 +25,9 @@ test("adoption removes a fabricated model citation and cannot reuse sources afte
 			const answer = h.dialogue.answerText(run.id)!;
 			if (badQuote) expect(answer).toBe("確認できませんでした。");
 			else {
-				expect(answer).toContain("[example.com](https://example.com/weather)");
+				expect(answer).toContain(
+					"[example.com](<https://example.com/weather>)",
+				);
 				expect(answer).not.toContain("https://example.com/obsolete");
 			}
 		}
@@ -95,7 +97,8 @@ test("the current report follows earlier failed answers and stays adjacent to th
 		);
 		expect(oldFailure).toBeGreaterThan(0);
 		expect(currentReport).toBeGreaterThan(oldFailure);
-		expect(currentReport).toBe(messages.length - 2);
+		expect(messages[currentReport + 1].content).toStartWith("CURRENT_REQUEST=");
+		expect(currentReport).toBe(messages.length - 3);
 		expect(messages.at(-1).content).toBe(question);
 		expect(h.dialogue.answerText(second.id)).toContain("26度");
 	} finally {
@@ -182,7 +185,7 @@ test("general research exposes available tools without a host invocation recomme
 			"recipe.find",
 			"web.lookup",
 		]);
-		expect(JSON.parse(messages[1].content).nextInvocation).toBeUndefined();
+		expect(workerPacket(messages).nextInvocation).toBeUndefined();
 		expect(h.acquisitions).toBe(2);
 	} finally {
 		await h.close();
@@ -233,7 +236,7 @@ for (const [question, expected] of [
 			expect(h.workerContexts.some((c) => c.includes(forbidden))).toBe(true);
 			expect(h.parentContexts.some((c) => c.includes(forbidden))).toBe(false);
 			expect(h.parentContexts[0]).not.toContain('"quote"');
-			const context = JSON.parse(JSON.parse(h.workerContexts[0]!)[1].content);
+			const context = workerPacket(JSON.parse(h.workerContexts[0]!));
 			expect(context.nextInvocation).toBeUndefined();
 			expect(h.acquisitions).toBe(2);
 			const duplicate = await (await h.request("/api/runs", body)).json();
@@ -715,9 +718,9 @@ test("a long accepted request remains intact when delegated to a research worker
 			(await h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 }))?.status,
 		).toBe("completed");
 		expect(h.dialogue.answerText(run.id)).toContain("26度");
-		expect(
-			JSON.parse(JSON.parse(h.workerContexts[0]!)[1].content).task.question,
-		).toBe(question);
+		expect(workerPacket(JSON.parse(h.workerContexts[0]!)).task.question).toBe(
+			question,
+		);
 	} finally {
 		await h.close();
 	}

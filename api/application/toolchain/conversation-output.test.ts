@@ -66,6 +66,8 @@ for (const mode of ["repair", "repeat"] as const)
 				id = crypto.randomUUID();
 			h.voice.start(session, 1);
 			await h.voice.accept(session, 1, 1, id, wave());
+			await until(() => h.voice.get(id)?.status === "input_ready");
+			await h.voice.commit(id, h.voice.get(id)!.revision);
 			await until(() => waiting && !!h.voice.get(id)?.runId);
 			const runId = h.voice.get(id)!.runId!;
 			stop = h.dialogue.subscribeProgress(runId, (progress) =>
@@ -74,10 +76,17 @@ for (const mode of ["repair", "repeat"] as const)
 			expect(h.dialogue.progress(runId)?.text).toBe("");
 			expect(spoken).toEqual([]);
 			release();
-			await until(() =>
-				["ready", "failed"].includes(h.voice.get(id)?.status ?? ""),
-			);
-			expect(routes).toBe(2);
+			// The spoken announcement must be played before the handoff continues.
+			const played = new Set<number>();
+			await until(() => {
+				for (const chunk of h.voice.get(id)?.audioChunks ?? [])
+					if (chunk.text === "準備します。" && !played.has(chunk.index)) {
+						played.add(chunk.index);
+						void h.voice.played(id, chunk.index);
+					}
+				return ["ready", "failed"].includes(h.voice.get(id)?.status ?? "");
+			});
+			expect(routes).toBe(mode === "repair" ? 3 : 2);
 			expect(
 				visible.every(
 					(text) => !text.includes("create_music") && !text.includes("<|"),
@@ -93,7 +102,7 @@ for (const mode of ["repair", "repeat"] as const)
 				expect(h.music!.list("main")[0]?.state).toBe("completed");
 				expect(f.requests.filter((r) => r.method === "POST")).toHaveLength(1);
 				expect(spoken.length).toBeGreaterThan(0);
-				expect(spoken.join("")).toBe(h.dialogue.answerText(runId)!);
+				expect(spoken).toEqual(["準備します。", h.dialogue.answerText(runId)!]);
 			} else {
 				expect(h.dialogue.get(runId)?.status).toBe("failed");
 				expect(h.dialogue.answerText(runId)).toBeNull();

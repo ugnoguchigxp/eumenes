@@ -16,7 +16,9 @@ export type ReplayData = {
 		createdAt?: string;
 		excerpts: Array<{ reference: string; excerptId?: string; quote: string }>;
 	}>;
-	operations: Array<{
+	operations: unknown[];
+	toolNotes: Array<{
+		tool: string;
 		notes?: {
 			matches?: Array<{ cursor: string }>;
 			scope?: { scanComplete: boolean };

@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { harness, workerPacket } from "./toolchain.fixture";
 
 for (const topic of ["公開イベントのニュース", "製品の更新情報"])
-	test(`Codex research returns linked search snippets without requirement extraction or a grading call: ${topic}`, async () => {
+	test(`Codex research reads the selected candidate and returns a linked report without requirement extraction or a grading call: ${topic}`, async () => {
 		const h = await harness({
 			fullResearch: true,
 			control: (messages) => {
@@ -10,46 +10,74 @@ for (const topic of ["公開イベントのニュース", "製品の更新情報
 				expect(data.requirementContract).toBeUndefined();
 				expect(data.requirementProfiles).toBeUndefined();
 				expect(data.draftReport).toBeUndefined();
-				if (!data.observations.length)
+				if (!data.operations.length)
 					return JSON.stringify({
 						action: "invoke",
 						tool: "web.lookup",
 						arguments: { query: data.task.question },
 					});
-				const hit = data.observations[0];
+				const page = data.observations.find((o: any) => o.basis === "page");
+				if (!page)
+					return JSON.stringify({
+						action: "invoke",
+						tool: "web.read",
+						arguments: { url: data.candidates[0].url },
+					});
 				return JSON.stringify({
 					action: "finish",
 					report: {
-						outcome: "partial",
+						completion: "incomplete",
+						answer: "公開資料では更新が告知されています。",
 						summary: "公開資料では更新が告知されています。",
 						claims: [
 							{
 								text: "更新が告知されています。",
-								evidence: [hit.excerpts[0].reference],
+								status: "verified",
+								evidence: [page.excerpts[0].reference],
 							},
 						],
-						limitations: ["検索抜粋のみ確認。本文は未取得。"],
+						limitations: ["検索抜粋のみ確認で本文は未取得。"],
 					},
 				});
 			},
-			acquire: async () => ({
+			acquire: async (req: any) => ({
 				freshUntilMs: null,
 				result: {
-					provider: "llm-fetch@0.1.3",
+					provider: "llm-fetch@0.1.4",
 					cache: "miss",
 					observedAt: new Date().toISOString(),
-					hits: [
-						{
-							url: "https://example.org/updates",
-							title: "更新のお知らせ",
-							snippet: "更新が告知されています。",
-							provider: "fixture",
-							trust: "untrusted",
-							tainted: true,
-							verification: "search_summary",
-						},
-					],
-					documents: [],
+					hits:
+						req.operation === "lookup"
+							? [
+									{
+										url: "https://example.org/updates",
+										title: "更新のお知らせ",
+										snippet: "更新が告知されています。",
+										provider: "fixture",
+										rank: 1,
+										trust: "untrusted",
+										tainted: true,
+										verification: "search_summary",
+									},
+								]
+							: [],
+					documents:
+						req.operation === "read"
+							? [
+									{
+										url: "https://example.org/updates",
+										title: "本文",
+										text: "更新が告知されています。",
+										fetchedAt: new Date().toISOString(),
+										truncated: false,
+										trust: "untrusted",
+										tainted: true,
+										verification: "source_read",
+										guardDecision: "allow",
+										guardReasonCodes: [],
+									},
+								]
+							: [],
 					failures: [],
 				},
 			}),
@@ -59,7 +87,7 @@ for (const topic of ["公開イベントのニュース", "製品の更新情報
 				expect(report.claims).toHaveLength(1);
 				expect(report.requirements).toBeUndefined();
 				expect(report.coverage).toBe("partial");
-				return `${report.summary} ${report.limitations[0]} [出典](${report.sources[0].url})`;
+				return `${report.summary}${report.limitations[0]}\n\n出典：[example.org](<${report.sources[0].url}>)`;
 			},
 		});
 		try {
@@ -79,11 +107,11 @@ for (const topic of ["公開イベントのニュース", "製品の更新情報
 				.find((t) => t.kind === "worker")!;
 			expect(child).toMatchObject({
 				status: "completed",
-				modelCalls: 2,
-				toolCalls: 1,
+				modelCalls: 3,
+				toolCalls: 2,
 				reportState: "available",
 			});
-			expect(h.acquisitions).toBe(1);
+			expect(h.acquisitions).toBe(2);
 			const report = h.toolchain.agents.report(child.id)!;
 			expect(report).toMatchObject({
 				version: 2,
