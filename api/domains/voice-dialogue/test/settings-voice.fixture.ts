@@ -104,7 +104,7 @@ export async function setup(
 			connectionId: c,
 			purpose: p,
 			model: `fixture-${p}`,
-			contextWindow: p === "llm" ? 8192 : null,
+			contextWindow: p === "llm" ? 262144 : null,
 			voice: p === "tts" ? "test" : null,
 		});
 		value.routes[p].fallbackId = id;

@@ -152,7 +152,7 @@ export interface ApplyResult {
 	prefetch?: {
 		text: string;
 		pins: { messageId: string; digest: string }[];
-		bytes: number;
+		tokens: number;
 	};
 	/** An upkeep step found nothing to change. */
 	quiet?: boolean;

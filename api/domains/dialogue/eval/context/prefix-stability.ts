@@ -1,7 +1,9 @@
 /**
  * Machine metric (spec 5.4 / 7.2): how much of the previous call's prompt the next call shares as a prefix.
- * Prompt caches reuse a byte-identical prefix, so the unit is bytes of the canonical serialization.
+ * Prompt caches reuse a byte-identical prefix, so the shared part is found in bytes of the canonical serialization
+ * and also counted in tokens (the product's estimate).
  */
+import { estimateTextTokens } from "../../../inference";
 import type { ChatMessage } from "../../service/context";
 
 /** JSON with object keys sorted at every level, so equal content serializes identically. */
@@ -35,12 +37,22 @@ export type PrefixPair = {
 	nextBytes: number;
 	/** sharedBytes / previousBytes: the part of the earlier prompt a cache could reuse. 1 when the earlier prompt is empty. */
 	ratio: number;
+	/** Estimated tokens of the shared prefix and of the earlier prompt (the serialization above is what is estimated). */
+	sharedTokens: number;
+	previousTokens: number;
+	/** sharedTokens / previousTokens. 1 when the earlier prompt is empty. */
+	tokenRatio: number;
 };
 export type PrefixStability = {
 	pairs: PrefixPair[];
-	/** Median of the pair ratios, or null with fewer than two calls. */
+	/** Median of the pair byte ratios, or null with fewer than two calls. */
 	medianRatio: number | null;
+	/** Median of the pair token ratios, or null with fewer than two calls. */
+	medianTokenRatio: number | null;
 };
+
+const tokensOf = (bytes: Uint8Array) =>
+	estimateTextTokens(Buffer.from(bytes).toString("utf8"));
 
 export function median(values: readonly number[]): number | null {
 	if (values.length === 0) return null;
@@ -61,13 +73,22 @@ export function prefixStability(
 		const previous = serialized[i]!;
 		const next = serialized[i + 1]!;
 		const sharedBytes = commonPrefixBytes(previous, next);
+		const sharedTokens = tokensOf(previous.subarray(0, sharedBytes));
+		const previousTokens = tokensOf(previous);
 		pairs.push({
 			from: i,
 			sharedBytes,
 			previousBytes: previous.length,
 			nextBytes: next.length,
 			ratio: previous.length === 0 ? 1 : sharedBytes / previous.length,
+			sharedTokens,
+			previousTokens,
+			tokenRatio: previousTokens === 0 ? 1 : sharedTokens / previousTokens,
 		});
 	}
-	return { pairs, medianRatio: median(pairs.map((p) => p.ratio)) };
+	return {
+		pairs,
+		medianRatio: median(pairs.map((p) => p.ratio)),
+		medianTokenRatio: median(pairs.map((p) => p.tokenRatio)),
+	};
 }

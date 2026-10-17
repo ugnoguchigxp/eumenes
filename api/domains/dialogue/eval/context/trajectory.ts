@@ -8,6 +8,7 @@
  * Offline evaluation only. The calls are returned as product assemblies; an arm renders each of them.
  */
 import type { Run } from "../../contracts";
+import { insert } from "../../repository";
 import { renderGoalsLayer } from "../../service/goals-layer";
 import type { ContextAssembly } from "../../service/context-assembly";
 import { compileAssembly } from "../../service/context-compiler";
@@ -244,7 +245,6 @@ async function runMemoryStep(
 	step: MemoryStep,
 	inputs: Map<number, string>,
 	nextSummaryRevision: () => number,
-	turn: number,
 ) {
 	const { store, memory } = wiring;
 	for (const n of step.keep ?? []) await dispose(wiring, inputs.get(n)!, "keep");
@@ -283,7 +283,6 @@ async function runMemoryStep(
 			...(step.notice ? { addNotices: [step.notice] } : {}),
 		}),
 	);
-	void turn;
 }
 
 /**
@@ -338,9 +337,7 @@ export async function materializeTrajectory(
 				createdAt: at,
 				runId: run.id,
 			});
-			db.query(
-				`INSERT INTO dialogue_runs (id, conversation_id, status, revision, input_message_id, source_kind, created_at, updated_at, request_id) VALUES (?, ?, 'running', 1, ?, 'manual', ?, ?, ?)`,
-			).run(run.id, CONVERSATION_ID, `u${n}`, at, at, `req${n}`);
+			insert(db, runRow(run.id, n, at, false));
 		});
 		inputs.set(n, `u${n}`);
 		for (const call of turn.calls) {
@@ -391,9 +388,7 @@ export async function materializeTrajectory(
 			});
 		});
 		if (turn.after)
-			await runMemoryStep(wiring, turn.after, inputs, () => summaryRevision++, n);
+			await runMemoryStep(wiring, turn.after, inputs, () => summaryRevision++);
 	}
 	return calls;
 }
-
-export { runRow };
