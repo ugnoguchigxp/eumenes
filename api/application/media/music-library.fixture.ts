@@ -151,7 +151,14 @@ export function musicLibraryFixture(correctablePlan = false) {
 		transcribe: async () => "",
 		speak: async () => new Uint8Array(),
 		answer: async (messages, _signal, options) => {
-			if (answerAnalysis(messages, options, { kind: "action" })) return "";
+			if (
+				answerAnalysis(options, {
+					call: "music_library",
+					announcement: "準備します。",
+					kind: "action",
+				})
+			)
+				return "";
 			if (options?.tools?.length) {
 				stages.push("route");
 				if (!options.tools.some((t) => t.function.name === "music_library"))
@@ -161,7 +168,6 @@ export function musicLibraryFixture(correctablePlan = false) {
 						id: "playback",
 						name: "music_library",
 						arguments: JSON.stringify({
-							announcement: "準備します。",
 							request: playbackQuestion,
 						}),
 					},

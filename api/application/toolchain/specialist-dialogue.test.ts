@@ -1,9 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import type { LarmPort } from "../../domains/larm";
 import {
-	analysisArgs,
-	ANALYZE,
-	delegatingArgs,
+	analysisReceipt,
 	isAnalysisRound,
 } from "../../domains/dialogue/test/analysis.fixture";
 import { harness } from "./toolchain.fixture";
@@ -107,24 +105,29 @@ async function rig() {
 			// The first round of every main-agent run: the script decides whether the request is delegated.
 			if (isAnalysisRound(options?.tools)) {
 				routeCalls++;
-				const goal = messages.filter((m) => m.role === "user").at(-1)!.content;
-				options!.onToolCalls!([
-					{
-						id: id(),
-						name: ANALYZE,
-						arguments: JSON.stringify(
-							typeof head === "object"
-								? delegatingArgs({ goal, kind: "creation" })
-								: analysisArgs({ goal }),
-						),
-					},
-				]);
+				options!.onToolCalls!(
+					(typeof head === "object"
+						? analysisReceipt("fixture", {
+								name: head.tool,
+								args: { kind: "creation" },
+								announcement:
+									(head.args as { announcement?: string }).announcement ??
+									undefined,
+							})
+						: analysisReceipt("fixture")
+					).toolCalls as never,
+				);
 				return "";
 			}
 			if (options?.tools?.length && typeof head === "object") {
 				script.main.shift();
+				// The notice belongs to the first round; the second round's function takes the request only.
+				const { announcement: _notice, ...request } = head.args as Record<
+					string,
+					unknown
+				>;
 				options!.onToolCalls!([
-					{ id: id(), name: head.tool, arguments: JSON.stringify(head.args) },
+					{ id: id(), name: head.tool, arguments: JSON.stringify(request) },
 				]);
 				return "";
 			}

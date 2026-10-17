@@ -13,6 +13,7 @@ export type PersonaSpec = Parameters<typeof buildSystemPrompt>[0];
  */
 export type HostRuleId =
 	| "no_functions"
+	| "context_sources"
 	| "operation_action"
 	| "operation_recognition"
 	| "operation_delegation"
@@ -27,6 +28,7 @@ export type HostRuleId =
 /** The rules of a conversation generation, in the order the system part writes them. */
 export const CONVERSATION_HOST_RULES: readonly HostRuleId[] = [
 	"no_functions",
+	"context_sources",
 	"operation_action",
 	"operation_recognition",
 	"operation_delegation",

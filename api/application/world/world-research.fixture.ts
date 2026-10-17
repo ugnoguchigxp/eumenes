@@ -201,7 +201,13 @@ export async function boot(steps: Step[], options: BootOptions = {}) {
 					languages: ["ja"],
 					confidence: 0.99,
 				});
-			if (answerAnalysis(messages, callOptions, { kind: "live_info" }))
+			if (
+				answerAnalysis(callOptions, {
+					call: "world_query",
+					announcement: "照会します。",
+					kind: "live_info",
+				})
+			)
 				return "";
 			if (callOptions?.tools?.length) {
 				offered.push(JSON.stringify(callOptions.tools));
@@ -210,7 +216,6 @@ export async function boot(steps: Step[], options: BootOptions = {}) {
 						id: crypto.randomUUID(),
 						name: "world_query",
 						arguments: JSON.stringify({
-							announcement: "照会します。",
 							request: messages.filter((m) => m.role === "user").at(-1)!
 								.content,
 						}),

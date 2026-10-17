@@ -363,3 +363,27 @@ test("ending an idle session refreshes the preview without a screen action", asy
 	);
 	h.cache.clear();
 });
+
+test("a turn too quick to be seen running still refreshes the preview through updatedAt", async () => {
+	const bridge = bridgeOf({ session: session() });
+	let title = "来場者アンケート";
+	const h = setup({
+		bridge,
+		studio: () => studioData({ work: work({ title }) }),
+	});
+	await waitFor(() =>
+		expect(h.hook.result.current.snapshot["ui-studio"]).toMatchObject({
+			work: { title: "来場者アンケート" },
+		}),
+	);
+	// Same state, revision and no active run between two reads: only the turn's touch differs.
+	title = "やわらかいアンケート";
+	bridge.session = session({ updatedAt: "2026-10-17T09:00:05.000Z" });
+	h.hook.rerender();
+	await waitFor(() =>
+		expect(h.hook.result.current.snapshot["ui-studio"]).toMatchObject({
+			work: { title: "やわらかいアンケート" },
+		}),
+	);
+	h.cache.clear();
+});

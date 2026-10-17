@@ -134,7 +134,7 @@ test("seeding an upgraded database leaves only the studio as a launcher", async 
 		.read((db) => capabilities.toolchainsInTransaction(db))
 		.find((d) => d.id === "ui.compose");
 	expect(toolchain).toMatchObject({
-		revisionId: "toolchain:ui.compose@6",
+		revisionId: "toolchain:ui.compose@7",
 		artifactRevisionId: studio,
 	});
 });

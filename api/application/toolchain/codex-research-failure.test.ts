@@ -46,11 +46,15 @@ test("SDK process failure reaches correlated logs and is answered by the fixed r
 				.at(-1)!.content;
 			if (
 				answerAnalysis(
-					messages,
 					options,
 					question === "以前の記録"
-						? { kind: "chat", next: "answer" }
-						: { kind: "live_info", freshness: "live" },
+						? { call: "answer", kind: "chat" }
+						: {
+								call: "web_research",
+								announcement: "調べます。",
+								kind: "live_info",
+								freshness: "live",
+							},
 				)
 			)
 				return "";
@@ -60,10 +64,7 @@ test("SDK process failure reaches correlated logs and is answered by the fixed r
 					{
 						id: "research",
 						name: "web_research",
-						arguments: JSON.stringify({
-							request: question,
-							announcement: "調べます。",
-						}),
+						arguments: JSON.stringify({ request: question }),
 					},
 				]);
 				return "";

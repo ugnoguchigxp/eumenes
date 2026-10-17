@@ -1,3 +1,4 @@
+import { renderedContent } from "./context-source.fixture";
 import { expect, test } from "bun:test";
 import type { ContextGoalEntry } from "../contracts";
 import { renderContext } from "../service/context-render";
@@ -11,19 +12,21 @@ import {
 /** The layer as the `current` format writes it: the message right after the system part. */
 function layerText(goals: ContextGoalEntry[]) {
 	const layer = renderGoalsLayer(goals)!;
-	return renderContext(
-		{
-			stage: "initial",
-			persona: { agentName: "", userName: "", persona: "butler" },
-			hostRules: CONVERSATION_HOST_RULES,
-			stable: [layer.block],
-			history: { turns: [] },
-			working: [],
-			volatile: [],
-			input: { role: "user", content: "依頼" },
-		},
-		"current",
-	).messages[1]!.content;
+	return renderedContent(
+		renderContext(
+			{
+				stage: "initial",
+				persona: { agentName: "", userName: "", persona: "butler" },
+				hostRules: CONVERSATION_HOST_RULES,
+				stable: [layer.block],
+				history: { turns: [] },
+				working: [],
+				volatile: [],
+				input: { role: "user", content: "依頼" },
+			},
+			"current",
+		).messages[1]!,
+	);
 }
 
 const goal = (

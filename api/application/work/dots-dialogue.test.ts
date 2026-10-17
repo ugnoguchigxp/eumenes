@@ -3,7 +3,6 @@ import type { InferencePort, Receipt } from "../../domains/inference";
 import { createDialogueService } from "../../domains/dialogue";
 import {
 	analysisReceipt,
-	delegatingArgs,
 	isAnalysisRound,
 } from "../../domains/dialogue/test/analysis.fixture";
 import { createDotsDialogue } from "./dots-dialogue";
@@ -40,13 +39,10 @@ test("conversation hands the request to the delegation toolchain, whose sub-agen
 		) => {
 			if (isAnalysisRound(tools as Parameters<typeof isAnalysisRound>[0])) {
 				analyses++;
-				return analysisReceipt(
-					"request",
-					delegatingArgs({
-						goal: "プロジェクトの変更を実装する",
-						deliverable: "操作の完了",
-					}),
-				);
+				return analysisReceipt("request", {
+					name: "delegate_project",
+					announcement: "プロジェクトの変更に取りかかります。",
+				});
 			}
 			messages.push(history);
 			calls++;
@@ -57,14 +53,13 @@ test("conversation hands the request to the delegation toolchain, whose sub-agen
 			};
 			if (calls === 1) {
 				expect(JSON.stringify(tools)).toContain("delegate_project");
-				// The conversation passes only the request and its announcement; no operation fields.
+				// The second round passes only the request; the notice was the first round's.
 				expect(JSON.stringify(tools)).not.toContain("projectRef");
 				r.toolCalls = [
 					{
 						id: "call",
 						name: "delegate_project",
 						arguments: JSON.stringify({
-							announcement: "プロジェクトの変更に取りかかります。",
 							request: "プロジェクトの変更を実装。tests passで完了",
 						}),
 					},

@@ -17,17 +17,17 @@ bun run logs -- --id <job-id> --json
 # 再現中の新しいログを追う
 bun run logs -- --follow
 
-# 時間・処理を絞る。JSTの指定も可能
+# 時間・処理を絞る。ゾーンなしの時刻(例 2026-10-08T10:00)はJST
 bun run logs -- --since 2026-10-08T10:00:00+09:00 --component inference --json
 ```
 
-閲覧コマンドは現在のファイルと `.1`〜`.4` の世代を古い順に読み、条件に一致する最後の100件を表示します。`--limit 1000` で件数を増やせます（上限10000件）。`--id` はIDの完全一致で、関連IDを自動で辿る操作ではありません。`--follow` は追加分を毎秒表示し、世代が切り替わっても追従します。壊れた行は件数を stderr に報告し、末尾の未完了行は読み飛ばして、追従時は次回に読み直します。`--json` の stdout は JSONL のみなので、そのまま保存・解析できます。
+閲覧コマンドは現在のファイルと `.1`〜`.4` の世代を古い順に読み、条件に一致する最後の100件を表示します。`--limit 1000` で件数を増やせます（上限10000件）。`--id` はIDの完全一致で、関連IDを自動で辿る操作ではありません。`--follow` は追加分を毎秒表示し、世代が切り替わっても追従します。壊れた行は件数を stderr に報告し、末尾の未完了行は読み飛ばして、追従時は次回に読み直します。表示の時刻はJST（`+09:00`）で、古いUTC行も同じ形式に直して出します。`--json` の stdout は保存された JSONL のみ（時刻は書かれたまま）なので、そのまま保存・解析できます。
 
 ## 追跡に使う項目
 
 | 項目 | 用途 |
 | --- | --- |
-| `time` / `level` / `component` / `event` | UTC時刻、重要度、所有する処理、固定のイベント名 |
+| `time` / `level` / `component` / `event` | JST(`+09:00`)のISO 8601時刻（例 `2026-10-18T05:15:00.123+09:00`）、重要度、所有する処理、固定のイベント名。JST化前に書かれた古い行は `...Z` のUTCで、読み取り側は文字列ではなく時刻として比較する |
 | `bootId` / `pid` / `schemaVersion` | 起動ごとの識別、プロセス、ログ形式の版 |
 | `httpRequestId` | HTTP要求ごとにbackendが発行するID。レスポンスの `X-Request-Id` と一致 |
 | `requestId` / `runId` / `jobId` | 入力要求、回答処理、ジョブ。`dialogue.accepted` が相互の対応を記録 |
@@ -87,11 +87,19 @@ bun run logs -- --since 2026-10-08T10:00:00+09:00 --component inference --json
 
 ## ツールチェーンの選択と手順キャッシュのログ
 
-会話の初動の依頼分析(R1)は `dialogue.request_analyzed`(`kind`・`freshness`・`next`・`impact`・`approved`・`durationMs`。依頼の内容は出ません)で、選定記録には同じ判断だけが残ります。会話の判断は `dialogue.candidates_selected`(`candidateCount`・`retrieval`=fts/embedding/hybrid/none・`durationMs`)と `toolchain.selection_recorded`(`selectionId`・`runId`・`decision`・`toolchainId`)、終了は `toolchain.selection_settled`(`runId`・`outcome`・`reason`)に出ます。`web_search` の手順キャッシュは `recipe.saved`・`recipe.suspended`(`recipeId`・`toolchainId`)です。embeddingの失敗は `toolchain.query_embedding_failed`・`toolchain.vectors_refresh_failed`(1分に1回まで)で、その間は全ツールチェーンを提示して会話を続けます。登録できなかったツールチェーンは `toolchain.registration_failed`(`subjectId`・`reason`)です。
+会話の初動の依頼分類(R1)は `dialogue.request_analyzed`(`kind`・`freshness`・`next`=answer/report_unavailable/toolchain・`durationMs`。依頼の内容は出ません)で、選定記録(`analysis_json`)には `kind`・`freshness`・`impact`・`approved` と `next` が残ります。会話の判断は `dialogue.candidates_selected`(`candidateCount`・`retrieval`=fts/embedding/hybrid/none・`durationMs`)と `toolchain.selection_recorded`(`selectionId`・`runId`・`decision`・`toolchainId`)、終了は `toolchain.selection_settled`(`runId`・`outcome`・`reason`)に出ます。`web_search` の手順キャッシュは `recipe.saved`・`recipe.suspended`(`recipeId`・`toolchainId`)です。embeddingの失敗は `toolchain.query_embedding_failed`・`toolchain.vectors_refresh_failed`(1分に1回まで)で、その間は全ツールチェーンを提示して会話を続けます。登録できなかったツールチェーンは `toolchain.registration_failed`(`subjectId`・`reason`)です。
 
 出さないもの: 発話・依頼文・候補の説明、手順のsignature・URL・読む箇所、取得本文。これらは `GET /api/toolchain-history/selections?runId=<runId>` と `bun run cli -- toolchain-history show <runId>` で確認します。調査は `bun run logs -- --level warn` で runId を得てから、選択の記録を引きます。
 
 旧「取得先学習(research-routes)」は2026-10-12に廃止しました。`research_routes.*` のイベントは出ません。
+
+## エラーレポート（失敗した会話runの診断）
+
+失敗した回答の「詳細」から、LLM（Claude Codeなど）へ貼れる診断テキストを表示・コピーできます。CLIは `bun run cli run <runId> --error-report`、APIは `GET /api/runs/:id/error-report`（失敗していないrunは409）です。対象は `status=failed` のrunと、調査失敗の固定返答で完了したrun（root taskの `errorCode` が `clarification_required` 以外）です。
+
+内容は概要（発生時刻（JST）・bootId・結果・失敗した段階）、経過表、最初の失敗、追跡用IDです。runIdから辿れるjobId・taskId・operationId等で現在分と過去4世代のログを読み、正常系は段階ごとに集約します。warn以上と `*_rejected`・`*_failed`・`*_validation_issue` は個別の行にし、同じ理由の繰返しは `×N` にまとめます。全体は3,000文字以内で、超える場合は古い正常系から省いて件数を書きます。「参考」は理由コードの固定表（`control_*`・`web_*`・`invalid_control_json` は「調査失敗の原因」、`codex_research_*` は「Codex SDKによる調査の失敗」、`llm_json_*` は「LLM生成JSONの補正と拒否」）で、新しい理由コードを足したら `api/domains/dialogue/service/error-report.ts` の表も更新します。表示する項目は同ファイルの許可リスト（`DETAIL_KEYS`）に限ります。
+
+含めるのは許可した運用項目のID・固定コード・型・数値・errorFramesだけです。会話本文・依頼文・認識結果・設定・認証情報・Providerの生応答・モデル出力の値・未知の項目名は出しません。IDやエラー発生箇所が含まれるため、外部へ共有する前に確認してください。ログが保持期間外・無効のときは、runの状態とtaskの失敗コードだけの概要になります。
 
 ## 検証
 

@@ -10,6 +10,7 @@ import {
 } from "node:fs";
 import { dirname } from "node:path";
 import pino, { type DestinationStream, type LevelWithSilent } from "pino";
+import { jstIso } from "./jst-time";
 
 // Only operational metadata crosses this boundary. Never pass request bodies,
 // settings, provider responses, credentials, or raw Error objects to Pino.
@@ -233,7 +234,7 @@ export function rotatingLogFile(
 	function notice(level: string, event: string) {
 		process.stderr.write(
 			JSON.stringify({
-				time: new Date().toISOString(),
+				time: jstIso(Date.now()),
 				level,
 				event,
 				component: "logger",
@@ -337,7 +338,8 @@ export function createLogWriter(
 		{
 			level,
 			base: { service: "eumenes", pid: process.pid, bootId, schemaVersion: 1 },
-			timestamp: pino.stdTimeFunctions.isoTime,
+			// JST with offset: records written before this format are UTC (`Z`); readers compare by instant.
+			timestamp: () => `,"time":"${jstIso(Date.now())}"`,
 			formatters: { level: (label) => ({ level: label }) },
 		},
 		destination,

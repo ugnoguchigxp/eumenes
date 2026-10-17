@@ -7,11 +7,8 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { ToolchainCard } from "../../api/domains/capabilities";
-import {
-	appendConversationPolicy,
-	reportUnavailableTool,
-	toolchainTools,
-} from "../../api/domains/dialogue/service/conversation-tools";
+import { analysisTools } from "../../api/domains/dialogue/service/initial-decision";
+import { systemContext } from "../../api/infrastructure/system-context";
 import { generateConversation } from "../../api/domains/dialogue/service/conversation-generation";
 import { markCurrentRequest } from "../../api/domains/dialogue/service/request-context";
 import type { JudgeFn } from "../../api/domains/dialogue/eval/context/judge";
@@ -61,7 +58,15 @@ export async function createLiveLane(
 		const offered = call.tools === "conversation";
 		const messages = [...call.messages];
 		const current = messages.at(-1)!;
-		if (offered) appendConversationPolicy(messages, current);
+		// The first round's own instruction, right before the request, as production sends it.
+		if (offered)
+			messages.splice(messages.length - 1, 0, {
+				role: "system",
+				content: systemContext(
+					"dialogue.contexts.request-analysis.instruction",
+					{},
+				),
+			});
 		const marked = markCurrentRequest(messages, current, crypto.randomUUID());
 		let repaired = false;
 		try {
@@ -72,30 +77,34 @@ export async function createLiveLane(
 				signal,
 				delta: () => {},
 				briefReply: true,
-				// The selection round: a candidate's function or `report_unavailable`, always a function call.
+				// The first round: a candidate's function, `answer` or `report_unavailable`, always a function call.
 				...(offered
-					? { tools: [...toolchainTools(cards), reportUnavailableTool], cards }
+					? { tools: analysisTools(cards), cards, analysis: true }
 					: {}),
 				repair: () => {
 					repaired = true;
 				},
 				sessionRole: offered ? "auxiliary" : "main",
 			});
+			const first = generated.analysis;
 			return {
 				kind: "ok",
-				text: generated.operation
-					? generated.operation.announcement
-					: generated.text,
-				toolCalls: generated.operation
-					? [
-							{
-								name: generated.operation.functionName,
-								arguments: JSON.stringify({
-									request: generated.operation.request,
-								}),
-							},
-						]
-					: [],
+				// The notice of a hand-over, or the explanation that nothing fits; an answer is written by the next round.
+				text:
+					first?.next === "toolchain"
+						? first.announcement
+						: first?.next === "report_unavailable"
+							? first.reply
+							: generated.text,
+				toolCalls:
+					first?.next === "toolchain"
+						? [
+								{
+									name: first.card.functionName,
+									arguments: JSON.stringify({}),
+								},
+							]
+						: [],
 				repaired: repaired || generated.repaired,
 			};
 		} catch (error) {

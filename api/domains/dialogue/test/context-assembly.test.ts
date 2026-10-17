@@ -137,13 +137,24 @@ test("the session split, the position of the input and the cache marks come from
 	};
 	const rendered = renderContext(assembly, "current");
 	const contents = rendered.messages.map((m) => m.content);
-	expect(contents.slice(1, 5)).toEqual([
-		"長期\n- 好み",
-		"目標",
-		"保持の質問",
-		"保持の答え",
+	expect(contents.slice(1, 3).map((text) => JSON.parse(text))).toEqual([
+		{
+			context: {
+				source: "memory.long_term",
+				authority: "reference",
+				freshness: "stable",
+			},
+			content: "長期\n- 好み",
+		},
+		{
+			context: { source: "goals", authority: "reference", freshness: "stable" },
+			content: "目標",
+		},
 	]);
-	expect(contents[5]).toEndWith("これまでの経緯（要約）\n要約");
+	expect(contents.slice(3, 5)).toEqual(["保持の質問", "保持の答え"]);
+	expect(JSON.parse(contents[5]!).content).toEndWith(
+		"これまでの経緯（要約）\n要約",
+	);
 	expect(contents.slice(6)).toEqual([
 		"未処理の質問",
 		"未処理の答え",

@@ -19,7 +19,7 @@
 		{
 			"kind": "skill",
 			"id": "ui.studio",
-			"revision": 4,
+			"revision": 5,
 			"title": "UI制作の手順",
 			"summary": "初稿・修正・部品・式・画像・図解・保存・会話への戻り方",
 			"aliases": [],
@@ -46,7 +46,7 @@
 		{
 			"kind": "package",
 			"id": "ui.studio",
-			"revision": 4,
+			"revision": 5,
 			"title": "UI自由制作",
 			"summary": "対話で画面を作り、直し、保存する",
 			"aliases": [],
@@ -55,19 +55,19 @@
 			"avoidWhen": ["既存画面の使い方を質問しているだけ"],
 			"dependencies": [
 				"profile:ui.studio@1",
-				"skill:ui.studio@4",
+				"skill:ui.studio@5",
 				"tool:ui.draft.apply@1"
 			],
 			"backend": "ui-compositions",
 			"schemaKey": "uiDraftApply",
 			"profileRevisionId": "profile:ui.studio@1",
-			"requiredSkillRevisionIds": ["skill:ui.studio@4"],
+			"requiredSkillRevisionIds": ["skill:ui.studio@5"],
 			"toolRevisionIds": ["tool:ui.draft.apply@1"]
 		},
 		{
 			"kind": "toolchain",
 			"id": "ui.compose",
-			"revision": 6,
+			"revision": 7,
 			"title": "UI自由制作",
 			"summary": "UI制作の担当と対話して画面を作り、直し、保存する",
 			"aliases": ["UI制作", "フォーム制作"],
@@ -89,8 +89,8 @@
 				"三角測量で月までの距離を求める説明ページを作って",
 				"コーヒー豆のクイズと、旅の紙芝居を作って"
 			],
-			"dependencies": ["package:ui.studio@4"],
-			"packageRevisionId": "package:ui.studio@4",
+			"dependencies": ["package:ui.studio@5"],
+			"packageRevisionId": "package:ui.studio@5",
 			"functionName": "ui_create",
 			"redirects": [],
 			"bindingRevisionId": "binding:ui.studio@2",

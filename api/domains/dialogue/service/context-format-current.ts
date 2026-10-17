@@ -52,6 +52,10 @@ const OPERATIONS: ReadonlyArray<{ source: OperationSource; key: string }> = [
 /** The text of each host rule: it says when it applies, so the system part carries all of them on every turn. */
 const RULE_TEXT: Record<HostRuleId, string> = {
 	no_functions: systemContext("dialogue.contexts.host-rules.no-functions", {}),
+	context_sources: systemContext(
+		"dialogue.contexts.host-rules.context-sources",
+		{},
+	),
 	operation_action: systemContext(
 		"dialogue.contexts.host-rules.operation-action",
 		{},
@@ -118,16 +122,24 @@ function linesText(body: ContextLines, gapBeforeHeading: boolean) {
 
 const system = (content: string): ChatMessage => ({ role: "system", content });
 
+/** Preserve the host-assigned provenance; the body's text cannot supply these fields. */
+function contextMetadata(block: ContextBlock) {
+	const { source, authority, freshness, certainty, covers } = block;
+	return { source, authority, freshness, certainty, covers };
+}
+
 /** The message of one block that is not an operation result or a research result. */
 function blockMessage(block: ContextBlock): ChatMessage {
 	const { body } = block;
+	const reference = (content: string) =>
+		system(JSON.stringify({ context: contextMetadata(block), content }));
 	switch (block.source) {
 		case "memory.long_term":
 			if (body.kind !== "lines") throw new Error("context_block_body");
-			return system(linesText(body, true));
+			return reference(linesText(body, true));
 		case "goals":
 		case "memory.short_term":
-			return system(
+			return reference(
 				body.kind === "lines"
 					? linesText(body, false)
 					: body.kind === "text"
@@ -136,11 +148,15 @@ function blockMessage(block: ContextBlock): ChatMessage {
 			);
 		case "memory.summary":
 			if (body.kind !== "text") throw new Error("context_block_body");
-			return system(`${SUMMARY_FRAME}\nこれまでの経緯（要約）\n${body.text}`);
+			return reference(
+				`${SUMMARY_FRAME}\nこれまでの経緯（要約）\n${body.text}`,
+			);
 		case "memory.notice":
 			if (body.kind !== "lines") throw new Error("context_block_body");
-			return system(`${NOTICE_FRAME}\n${linesText(body, false)}`);
+			return reference(`${NOTICE_FRAME}\n${linesText(body, false)}`);
 		case "memory.recall":
+			if (body.kind !== "text") throw new Error("context_block_body");
+			return reference(body.text);
 		case "world.names":
 			if (body.kind !== "text") throw new Error("context_block_body");
 			return system(body.text);
@@ -227,7 +243,16 @@ export function renderCurrent(
 	const result = a.volatile.find((b) => b.source === "research.result");
 	const reportMessage = (block: ContextBlock): ChatMessage => {
 		if (block.body.kind !== "json") throw new Error("context_block_body");
-		return { role: "user", content: JSON.stringify(block.body.value) };
+		const value = block.body.value;
+		if (!value || typeof value !== "object" || Array.isArray(value))
+			throw new Error("context_block_body");
+		return {
+			role: "user",
+			content: JSON.stringify({
+				...value,
+				context: contextMetadata(block),
+			}),
+		};
 	};
 	// The report of a research is volatile data like the operation results, after them.
 	const report = result ? reportMessage(result) : undefined;

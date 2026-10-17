@@ -5,10 +5,7 @@ import {
 	operation,
 	toolchainTools,
 } from "../service/conversation-tools";
-import {
-	analysisTools,
-	validateAnalysis,
-} from "../service/initial-decision";
+import { analysisTools, validateAnalysis } from "../service/initial-decision";
 
 const card = (
 	id: string,
@@ -248,7 +245,10 @@ test("live or delegated kinds cannot be answered from hand, and any other malfor
 		).toThrow("invalid_conversation_operation");
 	const bad: Array<unknown[]> = [
 		[],
-		[call("web_search", { ...analysis, announcement: "a" }), call("answer", analysis)],
+		[
+			call("web_search", { ...analysis, announcement: "a" }),
+			call("answer", analysis),
+		],
 		[call("conversation_history", { ...analysis, announcement: "a" })],
 		[call("web_search", analysis)],
 		[call("web_search", { ...analysis, announcement: "a", request: "x" })],

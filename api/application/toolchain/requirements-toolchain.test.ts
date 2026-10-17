@@ -31,7 +31,10 @@ for (const c of cases)
 				answer: async (messages, _signal, options) => {
 					calls++;
 					if (
-						answerAnalysis(messages, options, {
+						answerAnalysis(options, {
+							call:
+								c.engine === "codex" ? "web_research" : "conversation_history",
+							announcement: "お調べします。",
 							kind: c.engine === "codex" ? "live_info" : "past_conversation",
 							freshness: c.engine === "codex" ? "live" : "not_live",
 						})
@@ -46,10 +49,7 @@ for (const c of cases)
 										? "web_research"
 										: "conversation_history",
 								// The conversation hands over the request only.
-								arguments: JSON.stringify({
-									announcement: "お調べします。",
-									request: c.request,
-								}),
+								arguments: JSON.stringify({ request: c.request }),
 							},
 						]);
 						return "";

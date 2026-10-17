@@ -48,8 +48,10 @@ test.beforeAll(async () => {
 test.afterAll(() => fixture.stopAll());
 
 async function say(page: Page, text: string) {
-	await page.getByRole("textbox", { name: "メッセージ" }).fill(text);
-	await page.getByRole("button", { name: "送信", exact: true }).click();
+	// The conversation's own send button; a saved work's form has a 送信 button too.
+	const conversation = page.getByRole("region", { name: "会話" });
+	await conversation.getByRole("textbox", { name: "メッセージ" }).fill(text);
+	await conversation.getByRole("button", { name: "送信", exact: true }).click();
 }
 const studioOf = (page: Page) => page.locator(".aui-ui-studio");
 const button = (studio: Locator, name: string) =>
@@ -99,7 +101,10 @@ test("a request switches to the specialist and the draft fills the studio", asyn
 	).toBeVisible();
 	// Messages keep going to the specialist, which may answer without changing the draft.
 	await say(page, requests.explain);
-	await expect(page.getByText("このままで問題ありません。")).toBeVisible();
+	// The reply is also announced through a visually hidden live region; check the shown one.
+	await expect(
+		page.getByText("このままで問題ありません。", { exact: true }),
+	).toBeVisible();
 	await expect(
 		studio.getByRole("heading", { name: "来場者アンケート", level: 2 }).first(),
 	).toBeVisible();
@@ -113,7 +118,9 @@ test("undo, redo and the device switch work on the same draft", async ({
 	await expect(button(studio, "元に戻す")).toBeEnabled();
 	await say(page, requests.soften);
 	await expect(
-		studio.getByRole("heading", { name: "やわらかいアンケート", level: 2 }),
+		studio
+			.getByRole("heading", { name: "やわらかいアンケート", level: 2 })
+			.first(),
 	).toBeVisible();
 	// Display state: typed trial input survives the switch and an update.
 	const comment = studio.getByRole("textbox", { name: "感想" });
@@ -128,7 +135,9 @@ test("undo, redo and the device switch work on the same draft", async ({
 	await expect(studio.locator(".aui-ui-preview-mobile")).toBeVisible();
 	await button(studio, "やり直す").click();
 	await expect(
-		studio.getByRole("heading", { name: "やわらかいアンケート", level: 2 }),
+		studio
+			.getByRole("heading", { name: "やわらかいアンケート", level: 2 })
+			.first(),
 	).toBeVisible();
 	await studio.getByRole("button", { name: /デスクトップ/ }).click();
 	await expect(studio.locator(".aui-ui-preview-desktop")).toBeVisible();
@@ -207,20 +216,29 @@ test("saving makes a work; history shows it and its form takes real answers", as
 	await openFromLauncher(page, "UI自由制作");
 	const reopened = studioOf(page);
 	await reopened.getByRole("button", { name: "作品履歴" }).click();
+	// The file's tests share one backend, so earlier tests may have saved the same title; the
+	// history lists the newest first, which is the work saved above.
 	await page
 		.getByRole("group", { name: "保存した作品" })
 		.getByRole("button", { name: "来場者アンケート" })
+		.first()
 		.click();
 	await expect(reopened.getByText("保存済み", { exact: true })).toBeVisible();
 	await expect(button(reopened, "保存")).toBeDisabled();
 	await reopened.getByRole("radio", { name: "満足" }).check();
-	await reopened.getByRole("button", { name: "フォームを送信" }).click();
+	// A saved work's form submits for real; its button is labelled 送信 (the draft's trial says 送信（試用）).
+	await reopened
+		.getByLabel("組合せ表示")
+		.getByRole("button", { name: "送信", exact: true })
+		.click();
 	await expect(reopened.getByText("送信しました")).toBeVisible();
 	// The viewed work travels with the next message, so the specialist edits that work.
 	await say(page, requests.again);
 	await expect(addressee(page)).toContainText("UI自由制作");
 	await expect(
-		reopened.getByRole("heading", { name: "再編集したアンケート", level: 2 }),
+		reopened
+			.getByRole("heading", { name: "再編集したアンケート", level: 2 })
+			.first(),
 	).toBeVisible();
 });
 

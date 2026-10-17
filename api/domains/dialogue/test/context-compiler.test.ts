@@ -1,3 +1,4 @@
+import { renderedContent } from "./context-source.fixture";
 import { afterEach, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -232,8 +233,8 @@ async function setup() {
 	};
 	return h;
 }
-const texts = (messages: { content: string }[]) =>
-	messages.map((m) => m.content);
+const texts = (messages: { role: string; content: string }[]) =>
+	messages.map(renderedContent);
 
 test("layers in order: system, long-term, kept exchanges, working memory (summary, short-term), unprocessed exchanges, the input; the tail is decided here", async () => {
 	const h = await setup();
@@ -276,7 +277,9 @@ test("layers in order: system, long-term, kept exchanges, working memory (summar
 	expect(messages[0]!.role).toBe("system");
 	expect(messages[1]!.content).toContain("長期に入る好み");
 	expect(texts(messages.slice(2, 4))).toEqual(["保持の質問", "保持の答え"]);
-	expect(messages[4]!.content).toContain("これまでの経緯（要約）\n要約の本文");
+	expect(renderedContent(messages[4]!)).toContain(
+		"これまでの経緯（要約）\n要約の本文",
+	);
 	expect(messages[5]!.content).toContain("最近覚えた好み");
 	expect(messages[5]!.content).not.toContain("長期に入る好み");
 	expect(texts(messages.slice(6, 10))).toEqual([
@@ -552,8 +555,8 @@ test("notices and prefetched text come right before the input, notices first; a 
 	]);
 	const tail = compiled.messages.slice(-3, -1);
 	expect(tail[0]!.content).toContain("記憶の担当からの連絡です");
-	expect(tail[0]!.content).toContain("- 一件目\n- 二件目");
-	expect(tail[1]!.content).toBe("昔のやり取り");
+	expect(renderedContent(tail[0]!)).toContain("- 一件目\n- 二件目");
+	expect(renderedContent(tail[1]!)).toBe("昔のやり取り");
 	// Now the pinned message is among the shown ones.
 	const overlapping = await h.store.write((db) =>
 		h.memory.publishWindowInTransaction(db, "main", {

@@ -97,8 +97,10 @@ export const uiCompositionsWebAdapter: WebArtifactAdapter = {
 		});
 		// A spoken return/discard or expiry can finish an idle work without a local action.
 		// Session transitions must refresh the source even when the busy poll is stopped.
+		// A turn always touches `updatedAt`, so a draft applied by a turn too quick to be seen
+		// running (activeRunId set and cleared between two reads) still refreshes the source.
 		const sessionKey = session
-			? `${session.id}:${session.state}:${session.revision}:${session.activeRunId ?? ""}`
+			? `${session.id}:${session.state}:${session.revision}:${session.activeRunId ?? ""}:${session.updatedAt}`
 			: "none";
 		useEffect(() => {
 			void cache.invalidateQueries({

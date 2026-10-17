@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { jstIso } from "../../../infrastructure/jst-time";
 import type { Database } from "bun:sqlite";
 import type { Settings, Purpose } from "../../settings/contracts";
 import type { SpeechDelivery, SpeechPreparation } from "../../delivery";
@@ -23,7 +24,7 @@ export function controlInstructions(control: ControlContract) {
 /** The current time as prompt data: local ISO 8601 with its offset, so the date is never read in UTC. */
 export function promptTime(ms: number) {
 	return {
-		now: new Date(ms + 9 * 3_600_000).toISOString().replace("Z", "+09:00"),
+		now: jstIso(ms),
 		timeZone: "Asia/Tokyo",
 	};
 }

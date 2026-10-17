@@ -81,6 +81,7 @@ export function createLarmPlayground(config: {
 		return url;
 	};
 	const request = gzipFetch(config.fetch ?? fetch);
+	const controlRequest = gzipFetch(config.fetch ?? fetch, false);
 	function publicUrl(path: string) {
 		const base = larmBase();
 		const url = new URL(path, base);
@@ -99,6 +100,7 @@ export function createLarmPlayground(config: {
 		signal: AbortSignal,
 		init: RequestInit = {},
 		accepted = [200],
+		compressRequest = false,
 	) {
 		const base = larmBase();
 		if (!config.token) throw new Error("larm_unconfigured");
@@ -106,7 +108,7 @@ export function createLarmPlayground(config: {
 		const url = new URL(path, base);
 		if (url.origin !== base.origin || url.username || url.password || url.hash)
 			throw new Error("invalid_larm_url");
-		const r = await request(url, {
+		const r = await (compressRequest ? request : controlRequest)(url, {
 			...init,
 			redirect: "error",
 			signal,
@@ -432,6 +434,8 @@ export function createLarmPlayground(config: {
 									format: input.format ?? "webp",
 									seed: input.seed ?? 0,
 								}),
+								[200],
+								true,
 							),
 						);
 					} catch (e) {
@@ -484,6 +488,7 @@ export function createLarmPlayground(config: {
 							quality: "balanced",
 						}),
 						[202],
+						true,
 					),
 				);
 			} catch (e) {

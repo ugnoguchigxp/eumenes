@@ -13,7 +13,14 @@ export function excalidrawFixture(action: "create" | "library" = "create") {
 		speak: async () => new Uint8Array(),
 		answer: async (messages, _signal, options) => {
 			contexts.push(JSON.stringify(messages));
-			if (answerAnalysis(messages, options, { kind: "creation" })) return "";
+			if (
+				answerAnalysis(options, {
+					call: "drawing_editor",
+					announcement: "準備します。",
+					kind: "creation",
+				})
+			)
+				return "";
 			if (options?.tools?.length) {
 				stages.push("route");
 				options.onToolCalls!([
@@ -21,7 +28,6 @@ export function excalidrawFixture(action: "create" | "library" = "create") {
 						id: crypto.randomUUID(),
 						name: "drawing_editor",
 						arguments: JSON.stringify({
-							announcement: "準備します。",
 							request: "新しい図を描く画面を開く",
 						}),
 					},

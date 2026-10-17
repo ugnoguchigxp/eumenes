@@ -14,7 +14,7 @@ import type {
 } from "../contracts/toolchains";
 import type { DialogueDeps, GenerateInput } from "./context";
 import { currentRequestMessage, markCurrentRequest } from "./request-context";
-import { sessionOffers } from "./specialist-context";
+import { sessionFunctionNames, sessionOffers } from "./specialist-context";
 import {
 	analysisRecord,
 	analysisTrace,
@@ -115,7 +115,8 @@ export type Candidates = {
 	route: ToolchainRoute;
 	/** The embedding of the current request (the recall of the exchanges that left the window reads it too). */
 	query: QueryVector | undefined;
-	sessions: SessionOffers;
+	/** The function names of the session toolchains among the cards (their saved items are listed only for the chosen one). */
+	sessionFunctions: ReadonlySet<string>;
 };
 
 /** The retrieval of the merged cards, told the way the registry tells it. */
@@ -180,7 +181,7 @@ export async function findCandidates(
 		started,
 		route,
 		query: queries[0],
-		sessions: sessionOffers(deps, cards, input.runId),
+		sessionFunctions: sessionFunctionNames(deps, cards),
 	};
 }
 
@@ -241,9 +242,8 @@ export function prepareSelection(
 	const openQuestions = routing.openQuestions.filter(
 		(q) => q.functionName === card.functionName,
 	);
-	const sessions: SessionOffers = new Map(
-		[...found.sessions].filter(([name]) => name === card.functionName),
-	);
+	// The saved items are listed for the chosen toolchain only.
+	const sessions: SessionOffers = sessionOffers(deps, [card], input.runId);
 	// Keep the same scope; appended host results cannot become a request.
 	const requests = [
 		...input.messages

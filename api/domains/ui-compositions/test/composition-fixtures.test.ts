@@ -191,16 +191,16 @@ describe("ui.studio revisions", () => {
 	const skill = find("skill", "ui.studio");
 	const body = String(skill.body);
 
-	test("skill@4, package@4 and toolchain@6 refer to each other", () => {
-		expect(skill.revision).toBe(4);
+	test("skill@5, package@5 and toolchain@7 refer to each other", () => {
+		expect(skill.revision).toBe(5);
 		const pkg = find("package", "ui.studio");
-		expect(pkg.revision).toBe(4);
-		expect(pkg.dependencies).toContain("skill:ui.studio@4");
-		expect(pkg.requiredSkillRevisionIds).toEqual(["skill:ui.studio@4"]);
+		expect(pkg.revision).toBe(5);
+		expect(pkg.dependencies).toContain("skill:ui.studio@5");
+		expect(pkg.requiredSkillRevisionIds).toEqual(["skill:ui.studio@5"]);
 		const toolchain = find("toolchain", "ui.compose");
-		expect(toolchain.revision).toBe(6);
-		expect(toolchain.packageRevisionId).toBe("package:ui.studio@4");
-		expect(toolchain.dependencies).toEqual(["package:ui.studio@4"]);
+		expect(toolchain.revision).toBe(7);
+		expect(toolchain.packageRevisionId).toBe("package:ui.studio@5");
+		expect(toolchain.dependencies).toEqual(["package:ui.studio@5"]);
 		expect(find("profile", "ui.studio").revision).toBe(1);
 	});
 	test("the SKILL body is within 48 KB", () => {

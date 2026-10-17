@@ -81,6 +81,13 @@ export function registerDialogue(app: Hono, service: DialogueService) {
 		const run = service.get(c.req.param("id"));
 		return run ? c.json(run) : c.json({ error: "not_found" }, 404);
 	});
+	app.get("/api/runs/:id/error-report", async (c) => {
+		const report = await service.errorReport(c.req.param("id"));
+		if (report.ok) return c.json({ runId: report.runId, text: report.text });
+		return report.reason === "not_found"
+			? c.json({ error: "not_found" }, 404)
+			: c.json({ error: "error_report_not_applicable" }, 409);
+	});
 	app.post("/api/runs/:id/cancel", async (c) => {
 		const run = await service.cancel(c.req.param("id"));
 		return run ? c.json(run) : c.json({ error: "not_found" }, 404);

@@ -2,7 +2,7 @@
 
 作成日: 2026-10-17
 
-状態: 2026-10-17 利用者が実装を許可。E1〜E3は監督者が推奨案で決定（§6）。実装中。
+状態: 2026-10-17 実装・fixture済み（API・CLI・画面）、独立レビューの指摘（最初の失敗の選び方ほか）を修正済み。E1〜E3は§6で決定。実機での確認は未。build の commit hash は未掲載。操作失敗（actionFailure）で完了した run にも詳細が出る（調査失敗と区別する読み取りが agent-runtime に無いため）。
 
 関連: [ログの確認](../docs/logging.md)、[調査失敗時の返答](research-failure-reply-and-readahead-2026-10-17.md)、[会話の初動](conversation-two-round-initial-analysis-design-2026-10-17.md)。
 

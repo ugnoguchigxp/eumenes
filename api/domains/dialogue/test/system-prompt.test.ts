@@ -11,7 +11,7 @@ const cases = [
 			agentName: "",
 			userName: "",
 		},
-		sha256: "125124fcac0f2d54630d630ccf017018c1c5c5bd4d85e3748e9b3a99626baeb4",
+		sha256: "e7d92c6d6b267768ab2636d65041bb699fbe072a6201f16be1a3b7a24ca1b4ca",
 	},
 	{
 		input: {
@@ -19,7 +19,7 @@ const cases = [
 			agentName: "エウメネス",
 			userName: "野口",
 		},
-		sha256: "2dd8c33595d58aefc33a8103c8470f962da7fb54cf651b667ebda8a1b3791dc9",
+		sha256: "3e968ef732c8963a28c9a58ea1f66fa3b12dcb00d9746bfe868c72bb1fb64b6e",
 	},
 	{
 		input: {
@@ -27,7 +27,7 @@ const cases = [
 			agentName: "<x>\n[[role]]",
 			userName: "「<y>」&",
 		},
-		sha256: "0236d85bf4d462e7aec9d850367a1d8800712e9de12573aec7a2d6dd55cf122c",
+		sha256: "cafe51714e1a0bbbb3cfdbf9ae637bc98e96122b38b15e295f794184106cf601",
 	},
 	{
 		input: {
@@ -35,7 +35,7 @@ const cases = [
 			agentName: "",
 			userName: "",
 		},
-		sha256: "720ab4615338c4e53d13dc7285b4c1b21e78c0d2ab87f46e3a8ff879c49985fc",
+		sha256: "14e6d83865ce98c8af05fcb7c049bd5abc2a2c13e0b66a98441c04119b2525b9",
 	},
 	{
 		input: {
@@ -43,7 +43,7 @@ const cases = [
 			agentName: "エウメネス",
 			userName: "野口",
 		},
-		sha256: "c521514288dfa2413f9c53ac79ba5c4012e1402ee7b5a524bb3900a256056f23",
+		sha256: "095b1ed9a5a8992e56c77d757d5a2a1eea38abcaf0fd3c6b81673f672d62bdbb",
 	},
 	{
 		input: {
@@ -51,7 +51,7 @@ const cases = [
 			agentName: "<x>\n[[role]]",
 			userName: "「<y>」&",
 		},
-		sha256: "bb71a56a473e0293f695c09dd7de1372916d2da8236a304a1906475c5b27b257",
+		sha256: "a42db593d46c43f9f78a887f1cdb6f2981c1897c173f05609a1c695fc319be7a",
 	},
 	{
 		input: {
@@ -59,7 +59,7 @@ const cases = [
 			agentName: "",
 			userName: "",
 		},
-		sha256: "75bd2b6e41684c52fcf9492e8ce9609ef61bbb24d3b0955addae419df5416c3c",
+		sha256: "ff356f92a04d24620628d301fd9352d4596a3b7d15ae72e6ca3d397ca4018efd",
 	},
 	{
 		input: {
@@ -67,7 +67,7 @@ const cases = [
 			agentName: "エウメネス",
 			userName: "野口",
 		},
-		sha256: "f1aa737a7fd60c4bc21b950b6f96cbe87ab2b915bfdba1e337936ab3fe9cf329",
+		sha256: "cc0ba359f233c15f1f8136ca73c4adc41ae7331bebb879c6b757603d9b969770",
 	},
 	{
 		input: {
@@ -75,7 +75,7 @@ const cases = [
 			agentName: "<x>\n[[role]]",
 			userName: "「<y>」&",
 		},
-		sha256: "baa3cbfc173be2ab4ce41008ab83df4011cbc3bc72218dfb83e3cd1465bd7b8e",
+		sha256: "f5704dc830c37937cd19903357291eed967d933edeca1e9de6f0e90c88cefcd0",
 	},
 	{
 		input: {
@@ -83,7 +83,7 @@ const cases = [
 			agentName: "",
 			userName: "",
 		},
-		sha256: "56bff7056e73b50d10e118758106dffba907c6221cb690dce579acc01c372e5d",
+		sha256: "9a3b4dbdd5e88706bb7eb33f88b730c812eccd547c3f92ddeea8cbb146f78913",
 	},
 	{
 		input: {
@@ -91,7 +91,7 @@ const cases = [
 			agentName: "エウメネス",
 			userName: "野口",
 		},
-		sha256: "9618217159f6c6e9b532737636eef9b569a0bb8daf84780ce0257da7b635191e",
+		sha256: "6f852e0ce58142ba35631237586610d8f7334db031176e6eacfef0adc480b382",
 	},
 	{
 		input: {
@@ -99,7 +99,7 @@ const cases = [
 			agentName: "<x>\n[[role]]",
 			userName: "「<y>」&",
 		},
-		sha256: "5fc44f37294b7160cc1e0992cc1a0a572ba86f380532b92286705fb299115853",
+		sha256: "247856633defbd497adc07d24b0d2b33dd360204aa1a5f4372ea87e2f2314f0b",
 	},
 ] as const;
 

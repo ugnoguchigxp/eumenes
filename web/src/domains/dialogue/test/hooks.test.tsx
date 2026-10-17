@@ -23,6 +23,7 @@ function setup() {
 		watchRun: async () => {},
 		run: async (id) => accepted.get(id)!,
 		cancel: async (id) => accepted.get(id)!,
+		runErrorReport: async (id) => ({ runId: id, text: "" }),
 		specialistSession: async () => ({ session: null }),
 		specialistCommand: async () => {
 			throw new Error("not_used");

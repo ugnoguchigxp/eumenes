@@ -147,6 +147,7 @@ export async function buildServices(
 			)
 		: undefined;
 	const dialogue = createDialogueService({
+		logFile: () => config.logFile,
 		objectRecognition: enabled
 			? media.objectRecognition.port(CONVERSATION_DEFAULT_PRINCIPAL)
 			: undefined,

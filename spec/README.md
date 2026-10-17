@@ -8,10 +8,10 @@ archive の基準: その文書が担当した実装がコードにあり、本�
 
 | 文書 | 状態 |
 | --- | --- |
-| [ui-studio-expressive-parts-implementation-plan-2026-10-17.md](ui-studio-expressive-parts-implementation-plan-2026-10-17.md) | 計画範囲は実装し、§10の固定試験まで記録。作業ツリーに検証分離と電卓・グラフ・表・数式の追修正が残る。ブラウザE2E（LARM圧縮通信の対応待ちで保留。再開手順は§11）・live・実機器は未実施 |
+| [ui-studio-expressive-parts-implementation-plan-2026-10-17.md](ui-studio-expressive-parts-implementation-plan-2026-10-17.md) | 実装・固定試験・ブラウザE2E（§11、13件pass）済み。UI自由制作の表現力拡張（見せる部品とテーマ別picsum画像・紙芝居、状態と式・数式・電卓、図解）。live（実モデル）・実機器は未実施 |
 | [conversation-pre-delegation-response-design-2026-10-17.md](conversation-pre-delegation-response-design-2026-10-17.md) | 基本案は実装済み。§7〜§9のfixtureは記録済み。担当探索の省略とliveの意味保持は未解決。§10の修復はコードにあるが、本書に検証結果がない |
 | [conversation-subagent-llm-refactoring-plan-2026-10-17.md](conversation-subagent-llm-refactoring-plan-2026-10-17.md) | 合意済み。Dに依存しないP2/P3はfixture済み（§8）。P0の前提差分は後続コミットでコードに入った。D1〜D13の結論とP1・P4・P5は未了 |
-| [conversation-two-round-initial-analysis-design-2026-10-17.md](conversation-two-round-initial-analysis-design-2026-10-17.md) | R1分析→R2は実装・fixture・live一部確認済み。§8（候補検索をR1前に、R1で担当選択と一時回答、R2は依頼作成または記憶込み回答）は実装途中で終了。再開手順と未決は§9 |
+| [conversation-two-round-initial-analysis-design-2026-10-17.md](conversation-two-round-initial-analysis-design-2026-10-17.md) | R1分析→R2は実装・fixture・live一部確認済み。§8（候補検索をR1前に、R1で担当選択と一時回答、R2は依頼作成または記憶込み回答）は実装・fixture済み、liveは未実施。再開手順と未決は§9 |
 | [research-failure-reply-and-readahead-2026-10-17.md](research-failure-reply-and-readahead-2026-10-17.md) | 実装・fixture済み（音声経路を含む）。readAhead修正後の天気調査はlive成功。失敗時の読み上げのliveは未確認 |
 | [conversation-context-window-design-2026-10-17.md](conversation-context-window-design-2026-10-17.md) | C1〜C3と128k/128k予算は実装・fixture検証済み（§12）。live計測、C4/C5、W1〜W7/W9の確定、履歴境界の注記は未。W8のみ決定 |
 | [context-window-structure-and-evaluation-design-2026-10-17.md](context-window-structure-and-evaluation-design-2026-10-17.md) | P1/P2の基盤は実装・fixture済み（事例72件）。P3のholdout freeze・live・採否とP4は未実施。E1〜E7は推奨案のまま |
@@ -34,7 +34,7 @@ archive の基準: その文書が担当した実装がコードにあり、本�
 | --- | --- |
 | [01-tasks-and-queue.md](.archived/01-tasks-and-queue.md) | 委任タスクの永続台帳。実装とfixture、レビュー再試験を本文に記録。会話配送・モーダル・実CLIは後続計画 |
 | [ocr-larm-connectivity-request-2026-10-17.md](.archived/ocr-larm-connectivity-request-2026-10-17.md) | OCRの正式入口の依頼。Macからの設定保存と画像・動画・取消の受入は [検証記録](verification/ocr-mac-gateway-2026-10-17/README.md) |
-| [run-error-report-design-2026-10-17.md](run-error-report-design-2026-10-17.md) | 実装中（E1〜E3決定）。失敗したrunの診断を固定形式・約3,000文字で組み立て、画面のダイアログ・CLIからLLMへ貼れるようにする |
+| [run-error-report-design-2026-10-17.md](run-error-report-design-2026-10-17.md) | 実装・fixture済み。失敗したrunの診断を固定形式・約3,000文字で組み立て、画面のダイアログ・CLIからLLMへ貼れるようにする |
 | [request-url-boundary-design-2026-10-17.md](.archived/request-url-boundary-design-2026-10-17.md) | 依頼文のURLは「、」「。」で区切る（U2）。`request-urls.test.ts` で確認。助詞直結（U1）は対応しない |
 | [toolchain-specialist-dialogue-implementation-plan-2026-10-17.md](.archived/toolchain-specialist-dialogue-implementation-plan-2026-10-17.md) | 専門担当への共通切替とUI自由制作の対話編集。実装と固定試験を§15に記録。ブラウザE2E・実モデル・実機器は未実施 |
 | [toolchain-specialist-dialogue-p0-contract-2026-10-17.md](.archived/toolchain-specialist-dialogue-p0-contract-2026-10-17.md) | 上記の型契約。コードで固定済み。実モデルの容量測定は未実施 |

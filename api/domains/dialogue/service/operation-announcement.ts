@@ -60,6 +60,7 @@ async function announceOperation(
  * delivered first (a spoken one starts reading here); the second round, which writes the request for the
  * specialist, runs while it is read, and the delegation waits for the reading to finish. A second round that
  * fails stops the reading and fails the run: the notice already delivered is no sign that the work was handed over.
+ * A reading that fails first stops the second round the same way, and the run fails with the reading's error.
  */
 export async function announceAndSelect(
 	deps: DialogueDeps,
@@ -92,12 +93,15 @@ export async function announceAndSelect(
 	if (run.utteranceId && !deps.deliverAnnouncement)
 		throw new Error("announcement_delivery_unavailable");
 	const stop = new AbortController();
+	// A notice that cannot be delivered ends the run, so the second round stops at once instead of running on.
+	const selectionStop = new AbortController();
 	let failure: { error: unknown } | undefined;
 	const delivered = (
 		deps.deliverAnnouncement?.(run, AbortSignal.any([signal, stop.signal])) ??
 		Promise.resolve()
 	).catch((error) => {
 		failure = { error };
+		selectionStop.abort();
 	});
 	let selected: Awaited<ReturnType<typeof generateSelection>>;
 	try {
@@ -106,13 +110,14 @@ export async function announceAndSelect(
 			input,
 			found,
 			analysis,
-			signal,
+			AbortSignal.any([signal, selectionStop.signal]),
 			repair,
 		);
 	} catch (error) {
+		const undelivered = failure;
 		stop.abort();
 		await delivered;
-		throw error;
+		throw undelivered && !signal.aborted ? undelivered.error : error;
 	}
 	await delivered;
 	if (failure) throw failure.error;

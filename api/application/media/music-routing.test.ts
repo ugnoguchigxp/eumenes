@@ -82,6 +82,7 @@ test("the current music request reaches generation after unrelated Web and image
 		] as const)
 			await h.conversation.append({
 				id: crypto.randomUUID(),
+				runId: null,
 				conversationId: "main",
 				role,
 				text,

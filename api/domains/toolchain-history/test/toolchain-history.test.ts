@@ -50,7 +50,7 @@ test("the judgment of the first round is kept with the selection and replaced by
 	const judged = {
 		kind: "live_info" as const,
 		freshness: "live" as const,
-		next: "find_toolchain" as const,
+		next: "toolchain" as const,
 		impact: "none" as const,
 		approved: false,
 	};

@@ -14,7 +14,11 @@ LLMのみの要求は `providers: ["llm"]`、音声の要求は `providers` を�
 
 ## gzip圧縮通信
 
-LLM・TTS・ASR・画像生成・音楽生成の通信は、backendの共通入口で `Accept-Encoding: gzip` を指定します。JSONとASRのmultipart本文はBunの `fetch` の `compress: "gzip"` で送信時に圧縮し、`Content-Encoding: gzip` の付与もBunに委ねます。multipartは境界・音声・送信項目を含めて一度だけBlobへ直列化します。catalog、接続管理、正式token計数、embedding、保存画像・楽曲の取得も同じ入口を使います。
+LLM・TTS・ASR・画像生成・音楽生成の通信は、backendの共通入口で `Accept-Encoding: gzip` を指定します。推論・生成のJSONとASRのmultipart本文はBunの `fetch` の `compress: "gzip"` で送信時に圧縮し、`Content-Encoding: gzip` の付与もBunに委ねます。multipartは境界・音声・送信項目を含めて一度だけBlobへ直列化します。正式token計数とembeddingも同じ圧縮送信を使います。
+
+態度判定などの判断器（`system-one` の判定呼出し）は、本文が小さく応答速度を優先するため、送信・受信とも圧縮しません（`Accept-Encoding: identity`）。
+
+接続の作成・claim・renewなどの管理APIは、送信本文を圧縮しません。2026-10-18の配備先で、gzipの本文はJSON読取り時にHTTP400となり、通常のJSONは入力検証まで進むことを確認しました。catalog・接続管理・保存画像や楽曲の取得も圧縮応答の受信には対応します。送信の圧縮可否は呼出し元のAPI契約で指定し、失敗後の自動再送やURL・本文による推測は行いません。
 
 応答はBunの標準展開（`decompress: true`）を使います。JSON、SSE、音声、画像の既存の読取り・サイズ制限は展開後の本文に適用し、共通入口では応答全体を待ちません。token計数のdigestと入力サイズの検査は圧縮前のJSONを使います。音声のRange取得は保存表現のバイト位置を維持するため `Accept-Encoding: identity` とします。認証、期限、取消、生成POSTの再送禁止は既存経路のままです。
 

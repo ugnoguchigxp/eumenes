@@ -23,12 +23,11 @@ let staleHistory = false;
 const live = createLiveLarm();
 function observed(options?: LarmCallOptions) {
 	const sample = {
-		phase:
-			options?.tools?.[0]?.function.name === "analyze_request"
-				? "analysis"
-				: options?.tools?.length
-					? "selection"
-					: "answer",
+		phase: options?.tools?.some((t) => t.function.name === "answer")
+			? "analysis"
+			: options?.tools?.length
+				? "selection"
+				: "answer",
 		tools: [] as string[],
 		durationMs: 0,
 	};

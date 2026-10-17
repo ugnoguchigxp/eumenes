@@ -72,6 +72,13 @@ contracts("dialogue client", [
 		response: run,
 	},
 	{
+		name: "runErrorReport",
+		call: (c) => c.runErrorReport("r/1"),
+		method: "GET",
+		path: "/api/runs/r%2F1/error-report",
+		response: { runId: "r1", text: "# Eumenes エラーレポート" },
+	},
+	{
 		name: "cancel",
 		call: (c) => c.cancel("r1"),
 		method: "POST",

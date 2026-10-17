@@ -72,7 +72,8 @@ test("JSONL records isolate concurrent context and exclude raw payloads and erro
 		expect(entry.requestId).toBe(entry.runId);
 		expect(entry.level).toBe("error");
 		expect(entry.schemaVersion).toBe(1);
-		expect(Number.isFinite(Date.parse(entry.time))).toBe(true);
+		expect(entry.time).toMatch(/^\d{4}-\d{2}-\d{2}T[\d:.]+\+09:00$/);
+		expect(Math.abs(Date.parse(entry.time) - Date.now())).toBeLessThan(60_000);
 		expect(entry.errorFrames.length).toBeGreaterThan(0);
 	}
 	expect(output.lines.join("")).not.toContain("SECRET");
@@ -203,6 +204,34 @@ test("log reader searches backups, matches exact IDs and skips malformed and par
 			.map((line) => JSON.parse(line).level),
 	).toEqual(["warn", "error"]);
 	expect(result.stderr.toString()).toContain("Skipped 1");
+});
+
+test("the logs script shows UTC and JST records in JST and filters --since by instant", () => {
+	const file = join(temp(), "api.jsonl");
+	const row = (time: string, n: number) =>
+		JSON.stringify({ time, level: "info", component: "t", event: "t.e", n });
+	writeFileSync(
+		`${file}.1`,
+		`${row("2026-10-17T13:00:00.000Z", 1)}\n${row("2026-10-17T20:00:00Z", 2)}\n`,
+	);
+	writeFileSync(file, `${row("2026-10-18T06:00:00.250+09:00", 3)}\n`);
+	const run = (...extra: string[]) =>
+		Bun.spawnSync(
+			[process.execPath, "scripts/logs.ts", "--file", file, ...extra],
+			{ cwd: resolve(import.meta.dir, "../..") },
+		)
+			.stdout.toString()
+			.trim()
+			.split("\n");
+	expect(run().map((text) => text.split(" ")[0])).toEqual([
+		"2026-10-17T22:00:00.000+09:00",
+		"2026-10-18T05:00:00.000+09:00",
+		"2026-10-18T06:00:00.250+09:00",
+	]);
+	// A --since without a zone is JST; 05:30 JST (= 20:30Z) keeps only the last record.
+	expect(run("--since", "2026-10-18T05:30")).toHaveLength(1);
+	expect(run("--since", "2026-10-17T20:30:00Z")).toHaveLength(1);
+	expect(run("--json")[0]).toContain('"time":"2026-10-17T13:00:00.000Z"');
 });
 
 test("following logs survives rotation without duplicates and retries an incomplete final line", async () => {

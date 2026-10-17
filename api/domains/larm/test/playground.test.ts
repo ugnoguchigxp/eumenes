@@ -59,12 +59,16 @@ function fixture(
 			compress: unknown;
 			decompress: unknown;
 		};
-		expect(compression.compress).toBe(init.body == null ? false : "gzip");
+		const u = new URL(String(url));
+		expect(compression.compress).toBe(
+			init.body != null && !u.pathname.startsWith("/v1/agent-connections")
+				? "gzip"
+				: false,
+		);
 		expect(compression.decompress).toBe(true);
 		expect(new Headers(init.headers).get("Accept-Encoding")).toBe(
 			new Headers(init.headers).has("Range") ? "identity" : "gzip",
 		);
-		const u = new URL(String(url));
 		const path = u.pathname;
 		const headers = new Headers(init.headers);
 		const body =

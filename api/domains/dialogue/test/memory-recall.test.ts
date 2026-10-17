@@ -1,3 +1,4 @@
+import { renderedContent } from "./context-source.fixture";
 import { afterEach, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -428,7 +429,7 @@ test("the prefetch and this turn's recall never carry the same message, and a ch
 	expect(blocks).toHaveLength(2);
 	const [first, second] = blocks as [Message, Message];
 	// The prefetch comes first (it is the window's), this turn's recall after it.
-	expect(first.content).toBe(prefetchText);
+	expect(renderedContent(first)).toBe(prefetchText);
 	expect(second.content).toContain(messageText(h, runs[1]!.inputMessageId));
 	expect(second.content).not.toContain(messageText(h, prefetched[0]!));
 	expect(messages.indexOf(first)).toBeLessThan(messages.indexOf(second));

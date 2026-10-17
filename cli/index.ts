@@ -22,6 +22,7 @@ const wait = args.includes("--wait");
 const fresh = args.includes("--fresh");
 const stable = args.includes("--stable");
 const readPages = args.includes("--read-pages");
+const errorReport = args.includes("--error-report");
 let explicitRequestId: string | undefined;
 let conversationId = "main";
 let listCursor: string | undefined;
@@ -33,9 +34,14 @@ const positional: string[] = [];
 for (let i = 0; i < args.length; i++) {
 	const value = args[i];
 	if (
-		["--json", "--wait", "--fresh", "--stable", "--read-pages"].includes(
-			value ?? "",
-		)
+		[
+			"--json",
+			"--wait",
+			"--fresh",
+			"--stable",
+			"--read-pages",
+			"--error-report",
+		].includes(value ?? "")
 	)
 		continue;
 	if (
@@ -118,6 +124,10 @@ if (command !== "web" && (fresh || stable || readPages)) {
 	console.error("--fresh, --stable and --read-pages are web options");
 	process.exit(2);
 }
+if (errorReport && command !== "run") {
+	console.error("--error-report is an option of run");
+	process.exit(2);
+}
 const url = process.env.EUMENES_URL ?? "http://127.0.0.1:8787";
 let client: ReturnType<typeof createClient>;
 try {
@@ -158,6 +168,7 @@ async function main(): Promise<number> {
 		fresh,
 		stable,
 		readPages,
+		errorReport,
 		explicitRequestId,
 		conversationId,
 		listCursor,

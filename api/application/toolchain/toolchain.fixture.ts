@@ -45,10 +45,11 @@ import { createTimerAnnouncements } from "../timers/timer-announcements";
 import { createApp } from "../app";
 import type { LarmPort } from "../../domains/larm";
 import {
-	analysisArgs,
-	ANALYZE,
-	delegatingArgs,
+	analysisReceipt,
+	ANSWER,
 	isAnalysisRound,
+	offeredToolchains,
+	UNAVAILABLE,
 } from "../../domains/dialogue/test/analysis.fixture";
 /** Trusted packet merged with the separate UNTRUSTED_MATERIALS message. */
 export function workerPacket(
@@ -237,32 +238,39 @@ export async function harness(
 				(!!options.timers && /タイマー/.test(question)) ||
 				/天気|株価|weather|stock|調べ|検索|https?:|確認/.test(question);
 			if (isAnalysisRound(callOptions?.tools)) {
-				const goal = question.trim().slice(0, 300) || "依頼の確認";
-				const args = options.clarify
-					? analysisArgs({
-							goal,
-							next: "clarify",
-							missing: ["地域"],
-						})
-					: !delegates
-						? analysisArgs({ goal })
-						: options.history
-							? delegatingArgs({ goal, kind: "past_conversation" })
-							: options.routeTool ||
-								  (options.timers && /タイマー/.test(question))
-								? delegatingArgs({ goal, kind: "action" })
-								: delegatingArgs({
-										goal,
-										kind: "live_info",
-										freshness: "live",
-									});
-				callOptions!.onToolCalls!([
-					{
-						id: "analysis",
-						name: ANALYZE,
-						arguments: JSON.stringify(args),
-					},
-				]);
+				const offered = offeredToolchains(callOptions?.tools);
+				// The first round chooses the function the second round will write the request for.
+				const named = options.history
+					? "conversation_history"
+					: options.routeTool
+						? options.routeTool
+						: options.timers && /タイマー/.test(question)
+							? "timer"
+							: options.fullResearch
+								? "web_research"
+								: "web_search";
+				const chosen = offered.includes(named) ? named : offered[0];
+				const args =
+					options.clarify || !delegates
+						? { name: ANSWER }
+						: !chosen
+							? { name: UNAVAILABLE }
+							: {
+									name: chosen,
+									announcement: options.announcement ?? "お調べします。",
+									args: options.history
+										? { kind: "past_conversation" as const }
+										: options.routeTool ||
+											  (options.timers && /タイマー/.test(question))
+											? { kind: "action" as const }
+											: {
+													kind: "live_info" as const,
+													freshness: "live" as const,
+												},
+								};
+				callOptions!.onToolCalls!(
+					analysisReceipt("fixture", args).toolCalls as never,
+				);
 				return "";
 			}
 			if (callOptions?.tools?.length) {
@@ -273,35 +281,15 @@ export async function harness(
 						question.includes(options.routeGateQuestion))
 				)
 					await options.routeGate;
-				const send = (name: string, args: unknown) => {
-					callOptions.onToolCalls!([
-						{
-							id: crypto.randomUUID(),
-							name,
-							arguments: JSON.stringify({
-								announcement: options.announcement ?? "お調べします。",
-								...(args as object),
-							}),
-						},
-					]);
-					return "";
-				};
-				if (options.routeTool)
-					return send(options.routeTool, { request: question });
-				if (options.timers && /タイマー/.test(question))
-					return send("timer", { request: question });
-				if (
-					options.history ||
-					/天気|株価|weather|stock|調べ|検索|https?:|確認/.test(question)
-				)
-					return send(
-						options.history
-							? "conversation_history"
-							: options.fullResearch
-								? "web_research"
-								: "web_search",
-						{ request: question },
-					);
+				// The second round offers the one function the first round chose.
+				callOptions.onToolCalls!([
+					{
+						id: crypto.randomUUID(),
+						name: callOptions.tools[0]!.function.name,
+						arguments: JSON.stringify({ request: question }),
+					},
+				]);
+				return "";
 			}
 			if (system.includes("あなたはこのツールチェーンの操作担当です")) {
 				commandContexts.push(JSON.stringify(messages));

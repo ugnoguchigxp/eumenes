@@ -5,6 +5,7 @@ import type { EumenesClient } from "../../../client";
 import type { Message } from "../../../api/domains/conversation/contracts";
 import type { Run } from "../../../api/domains/dialogue/contracts";
 import { ResearchTaskCard } from "../domains/agent-runtime";
+import { ErrorReportButton } from "./ErrorReportDialog";
 
 /** Persisted notices and delegated work belonging to this input message. */
 export function RunDetails({
@@ -31,7 +32,18 @@ export function RunDetails({
 					client={client}
 					rootRunId={run.id}
 					title={message.text}
+					// A research that failed ends its run as completed, with the host's fixed reply.
+					failureAction={
+						run.status === "completed" ? (
+							<ErrorReportButton client={client} runId={run.id} />
+						) : undefined
+					}
 				/>
+			)}
+			{run?.status === "failed" && (
+				<div className="run-failure-actions">
+					<ErrorReportButton client={client} runId={run.id} />
+				</div>
 			)}
 		</>
 	);

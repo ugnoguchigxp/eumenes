@@ -1,5 +1,5 @@
 import { measureStage } from "../../../infrastructure/performance";
-import { gzipFetch } from "./gzip-fetch";
+import { gzipFetch, plainFetch } from "./gzip-fetch";
 import type { Capability, LarmPort, LarmCallOptions } from "../contracts";
 import { ttsVoicesSchema } from "../contracts";
 import type { TtsVoices } from "../contracts";
@@ -102,10 +102,14 @@ export function createLarm(config: {
 	const control = createControl({
 		base,
 		token,
-		request,
+		request: gzipFetch(config.fetch ?? fetch, false),
 		lifetime: lifetime.signal,
 	});
 	const infer = createInfer({ request, token });
+	const judgeInfer = createInfer({
+		request: plainFetch(config.fetch ?? fetch),
+		token,
+	});
 	const leases = createLeaseManager({
 		base,
 		token,
@@ -223,7 +227,7 @@ export function createLarm(config: {
 						const sentState = {
 							current_chunk: state.current_chunk ?? state.response ?? "",
 						};
-						const response = await infer(
+						const response = await judgeInfer(
 							p,
 							"systemone",
 							{

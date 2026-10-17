@@ -1,3 +1,4 @@
+import { errorReportSchema } from "../api/domains/dialogue/contracts/error-report";
 import {
 	runSchema,
 	specialistSessionResponseSchema,
@@ -37,6 +38,16 @@ export function dialogueClient(transport: Transport) {
 					await transport.call(`/api/runs/${encodeURIComponent(id)}`, {
 						signal,
 					})
+				).json(),
+			),
+		/** The diagnostic text of a failed run; 404 when it is unknown, 409 when the run did not fail. */
+		runErrorReport: async (id: string, signal?: AbortSignal) =>
+			errorReportSchema.parse(
+				await (
+					await transport.call(
+						`/api/runs/${encodeURIComponent(id)}/error-report`,
+						{ signal },
+					)
 				).json(),
 			),
 		/** The conversation's live specialist session, or null. */

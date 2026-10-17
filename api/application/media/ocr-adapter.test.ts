@@ -11,14 +11,20 @@ test("OCR bundle exposes one artifact and the command agent opens it", async () 
 		transcribe: async () => "",
 		speak: async () => new Uint8Array(),
 		answer: async (messages, _signal, options) => {
-			if (answerAnalysis(messages, options, { kind: "action" })) return "";
+			if (
+				answerAnalysis(options, {
+					call: "ocr",
+					announcement: "準備します。",
+					kind: "action",
+				})
+			)
+				return "";
 			if (options?.tools?.some((tool) => tool.function.name === "ocr")) {
 				options.onToolCalls!([
 					{
 						id: "ocr-call",
 						name: "ocr",
 						arguments: JSON.stringify({
-							announcement: "準備します。",
 							request: "文字を読み取る画面を開いて",
 						}),
 					},

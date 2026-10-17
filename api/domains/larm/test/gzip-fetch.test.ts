@@ -1,11 +1,58 @@
 import { expect, test } from "bun:test";
 import { gzipFetch } from "../service/gzip-fetch";
+import { createLarm } from "..";
 import type { Fetcher } from "../service/profiles";
+import { fixture, freshSignal, makeLarm, question } from "./larm.fixture";
 
 type CompressionOptions = RequestInit & {
 	compress?: boolean | string;
 	decompress?: boolean;
 };
+
+test("management APIs keep plain JSON while inference still uses gzip", async () => {
+	const fake = fixture();
+	let managementPosts = 0,
+		inferencePosts = 0;
+	const larm = makeLarm(async (url, init: CompressionOptions = {}) => {
+		if (init.method === "POST") {
+			const management = new URL(String(url)).pathname.startsWith(
+				"/v1/agent-connections",
+			);
+			if (management) managementPosts++;
+			else inferencePosts++;
+			if (init.compress !== (management ? false : "gzip"))
+				return Response.json(
+					{ error: { code: "bad_request" } },
+					{ status: 400 },
+				);
+		}
+		return fake.fetcher(url, init);
+	});
+	try {
+		await larm.connect();
+		expect(await larm.answer(question, freshSignal())).toBe("承知しました");
+		expect(await larm.transcribe(new Uint8Array(44), freshSignal())).toBe(
+			"こんにちは",
+		);
+		expect((await larm.speak("確認", freshSignal())).length).toBe(44);
+		expect(managementPosts).toBeGreaterThan(0);
+		expect(inferencePosts).toBe(3);
+	} finally {
+		await larm.close();
+	}
+});
+
+test("disabling request compression still negotiates compressed responses", async () => {
+	const body = JSON.stringify({ ttlSeconds: 900 });
+	await gzipFetch(async (_url, init: CompressionOptions = {}) => {
+		expect(init.body).toBe(body);
+		expect(init.compress).toBe(false);
+		expect(init.decompress).toBe(true);
+		expect(new Headers(init.headers).get("Content-Encoding")).toBeNull();
+		expect(new Headers(init.headers).get("Accept-Encoding")).toBe("gzip");
+		return Response.json({ ok: true });
+	}, false)("http://127.0.0.1/renew", { method: "POST", body });
+});
 
 test("JSON requests delegate gzip to Bun without changing the counted body or request contract", async () => {
 	const body = JSON.stringify({
@@ -125,4 +172,45 @@ test("aborted requests never send and network failures never replay a generation
 		send("http://127.0.0.1/generate", { method: "POST", body: "{}" }),
 	).rejects.toBe(failure);
 	expect(calls).toBe(1);
+});
+
+test("the decision classifier is sent and received without compression", async () => {
+	const fake = fixture(false, "test-profile", 60000, "model-tts", true);
+	const judged: Array<{ compress: unknown; accept: string | null }> = [];
+	const larm = createLarm({
+		baseUrl: "http://127.0.0.1:9810",
+		profile: "test-profile",
+		token: "control",
+		fetch: async (input, init: CompressionOptions = {}) => {
+			if (new URL(String(input)).pathname === "/system-one/v1/systemone") {
+				judged.push({
+					compress: init.compress,
+					accept: new Headers(init.headers).get("Accept-Encoding"),
+				});
+				return Response.json({
+					answers: {
+						emotion: { type: "choice", choice: "none", confidence: 0.9 },
+					},
+				});
+			}
+			return fake.fetcher(input, init);
+		},
+	});
+	try {
+		await larm.prepareVoice!(freshSignal());
+		await larm.judge!(
+			{ current_chunk: "こんにちは" },
+			{
+				emotion: {
+					type: "choice",
+					instructions: "choose",
+					criteria: { none: "plain", warmth: "hello" },
+				},
+			},
+			freshSignal(),
+		);
+		expect(judged).toEqual([{ compress: false, accept: "identity" }]);
+	} finally {
+		await larm.close();
+	}
 });

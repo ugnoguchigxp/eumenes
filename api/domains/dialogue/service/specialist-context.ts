@@ -13,6 +13,31 @@ import { specialistBlock } from "./context-blocks";
 import type { SessionOffers } from "./conversation-tools";
 
 /**
+ * The function names of the session toolchains among these cards. The first round only needs to tell them
+ * apart (it never lists saved items), so no adapter is asked.
+ */
+export function sessionFunctionNames(
+	deps: DialogueDeps,
+	cards: readonly ToolchainCard[],
+): ReadonlySet<string> {
+	const toolchains = deps.toolchains;
+	if (!deps.specialist || !toolchains?.sessionSetInTransaction || !cards.length)
+		return new Set();
+	const sessions = deps.store.read(
+		(db) =>
+			new Set(
+				toolchains
+					.catalogInTransaction(db)
+					.filter((entry) => entry.runtime.execution === "session")
+					.map((entry) => entry.revisionId),
+			),
+	);
+	return new Set(
+		cards.filter((c) => sessions.has(c.revisionId)).map((c) => c.functionName),
+	);
+}
+
+/**
  * The session toolchains among these cards with the saved items each may start from. Choices are
  * host-issued (the adapter's own list); a toolchain that cannot be read now is offered without targets.
  */

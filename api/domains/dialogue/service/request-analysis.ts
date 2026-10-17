@@ -105,7 +105,7 @@ export async function analyzeRequest(
 			signal,
 			delta: () => {},
 			briefReply: input.briefReply,
-			tools: analysisTools(found.route.cards, found.sessions),
+			tools: analysisTools(found.route.cards, found.sessionFunctions),
 			cards: found.route.cards,
 			analysis: true,
 			// A one-shot call: its prose is never adopted and it holds no conversation session.

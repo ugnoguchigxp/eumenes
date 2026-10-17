@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, type ReactNode } from "react";
 import type { EumenesClient } from "../../../../client";
 import { ApiError } from "../../../../client";
 import { queryRoots } from "../../queryKeys";
@@ -26,10 +26,13 @@ export function ResearchTaskCard({
 	client,
 	rootRunId,
 	title,
+	failureAction,
 }: {
 	client: EumenesClient;
 	rootRunId: string;
 	title: string;
+	/** Shown once the research has failed and its run is complete (the detail of the failure). */
+	failureAction?: ReactNode;
 }) {
 	const cache = useQueryClient();
 	const tasks = useQuery({
@@ -111,6 +114,7 @@ export function ResearchTaskCard({
 						? "一部未確認"
 						: (phases[phase ?? ""] ?? "調査中")}
 				</output>
+				{terminal && failed && root.status === "completed" && failureAction}
 				{!terminal && (
 					<button
 						type="button"

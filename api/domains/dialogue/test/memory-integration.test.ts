@@ -1,3 +1,4 @@
+import { renderedContent } from "./context-source.fixture";
 import { afterEach, expect, test } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -427,7 +428,7 @@ test("continuity (goal / open question) is part of the recalled context", async 
 	});
 	await h.ask("続きを");
 	const block = h.seen.at(-1)!.find((m) => m.content.includes("参照情報"));
-	expect(block?.content).toContain("目的\n- Rustへ移行する");
+	expect(renderedContent(block!)).toContain("目的\n- Rustへ移行する");
 });
 
 test("a forget during generation prevents adopting the answer", async () => {
@@ -655,7 +656,9 @@ test("a reference text with newlines cannot forge extra lines in the reference b
 	await h.ask("続き");
 	const block = h.seen.at(-1)!.find((m) => m.content.includes("参照情報です"))!;
 	expect(
-		block.content.split("\n").filter((l) => l.startsWith("- ")),
+		renderedContent(block)
+			.split("\n")
+			.filter((l) => l.startsWith("- ")),
 	).toHaveLength(1);
 });
 
@@ -837,7 +840,7 @@ test("a long multibyte conversation id works for continuity and runs", async () 
 		text: "こんにちは",
 	});
 	await until(() => h.dialogue.get(run.id)?.status === "completed");
-	expect(h.seen.at(-1)!.some((m) => m.content.includes("目的\n- 目的"))).toBe(
-		true,
-	);
+	expect(
+		h.seen.at(-1)!.some((m) => renderedContent(m).includes("目的\n- 目的")),
+	).toBe(true);
 });

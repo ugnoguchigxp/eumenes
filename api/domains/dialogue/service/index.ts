@@ -34,6 +34,7 @@ import { createGenerationHandler } from "./generation-handler";
 import { createIntake } from "./intake";
 import { endRun, runEndedInTransaction } from "./run-end";
 import { createProgress } from "./progress";
+import { createErrorReport } from "./error-report";
 import type { MusicPort } from "../contracts/music";
 import type { ImagePort } from "../contracts/image";
 import type { ObjectRecognitionPort } from "../contracts/object-recognition";
@@ -58,6 +59,7 @@ export function createDialogueService({
 	goals,
 	toolchains,
 	specialist,
+	logFile,
 }: {
 	store: SqliteStore;
 	conversation: ConversationService;
@@ -77,6 +79,8 @@ export function createDialogueService({
 	goals?: GoalsLayerPort;
 	toolchains?: import("../contracts/toolchains").ToolchainRoutingPort;
 	specialist?: import("../contracts").SpecialistPort;
+	/** The operational log file the error report reads (`config.logFile`); no log is read when absent. */
+	logFile?: () => string | undefined;
 }) {
 	const deps: DialogueDeps = {
 		store,
@@ -111,6 +115,11 @@ export function createDialogueService({
 	queue.registerHandler(createSpecialistTurnHandler(deps));
 	const specialistOps = createSpecialistOps(deps);
 	const agentSync = createAgentSync(deps);
+	const errorReport = createErrorReport({
+		store,
+		agents,
+		logFile: logFile ?? (() => undefined),
+	});
 	const service = {
 		/** One delivery owner; its disposer cannot remove a newer owner's registration. */
 		setAnnouncementDelivery(
@@ -169,6 +178,8 @@ export function createDialogueService({
 		}) {
 			flushCancelled(deps, cancelled.jobs, cancelled.runs);
 		},
+		/** The diagnostic text of a failed run (`GET /api/runs/:id/error-report`). */
+		errorReport,
 		promptTarget: intake.promptTarget,
 		progress: progress.progress,
 		subscribeProgress: progress.subscribeProgress,

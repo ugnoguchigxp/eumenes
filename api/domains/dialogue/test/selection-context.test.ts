@@ -1,9 +1,25 @@
 import { expect, test } from "bun:test";
 import { currentRequestRules } from "../service/request-context";
-import { prepareAnswer, prepareSelection } from "../service/selection-trace";
+import {
+	findCandidates,
+	prepareAnswer,
+	prepareSelection,
+} from "../service/selection-trace";
+import type { FirstRound } from "../service/initial-decision";
 import type { DialogueDeps, GenerateInput } from "../service/context";
 import type { ToolchainCard } from "../../capabilities";
 import { analysisArgs, delegatingArgs } from "./analysis.fixture";
+
+/** The first round's decisions as the second round and the answer receive them. */
+const toolchain = (
+	over: Partial<ReturnType<typeof delegatingArgs>> = {},
+): FirstRound & { next: "toolchain" } => ({
+	...delegatingArgs(over),
+	next: "toolchain",
+	card,
+	announcement: "お調べします。",
+});
+const answering = (): FirstRound => ({ ...analysisArgs(), next: "answer" });
 
 const card: ToolchainCard = {
 	id: "web.search",
@@ -32,10 +48,12 @@ const deps = {
 		},
 	},
 } as unknown as DialogueDeps;
-const routingOf = () => ({
+const routingOf = (
+	previous: Array<{ role: "user" | "assistant"; content: string }> = [],
+) => ({
 	analysis: {
 		persona: { agentName: "", userName: "", persona: "butler" },
-		previous: [],
+		previous,
 	},
 	available: [card.id],
 	conversationId: "main",
@@ -87,10 +105,10 @@ for (const [previous, current] of [
 			},
 			routing: routingOf(),
 		} as unknown as GenerateInput;
-		const analysis = delegatingArgs({ goal: `${current}の分析` });
-		const decision = await prepareSelection(deps, input, analysis, signal());
+		const found = await findCandidates(deps, input, signal());
+		const decision = prepareSelection(deps, input, found, toolchain());
 		const users = decision.messages.filter((m) => m.role === "user");
-		// The two earlier requests and the current one, and the analysis record between them.
+		// The two earlier requests and the current one.
 		const references = users.filter((m) =>
 			m.content.startsWith("referenceContext"),
 		);
@@ -101,34 +119,18 @@ for (const [previous, current] of [
 			),
 		).toEqual(["以前の別の依頼", previous]);
 		expect(references[1]!.images).toBe(currentMessage.images);
-		expect(users).toHaveLength(4);
+		expect(users).toHaveLength(3);
 		expect(decision.messages.some((m) => m.role === "assistant")).toBe(false);
-		// The record carries the goal, the deliverable, the conditions and the missing items; the kind is not the selection's concern.
-		expect(recordOf(decision.messages)).toEqual({
-			goal: analysis.goal,
-			deliverable: analysis.deliverable,
-			conditions: [],
-			missing: [],
-		});
+		// The second round carries no analysis record, and offers the chosen function only.
+		expect(recordOf(decision.messages)).toBeUndefined();
 		expect(input.messages).toBe(messages);
-		// The candidates are searched by the goal, never by the utterance.
-		expect(searched.embedded.at(-1)).toBe(analysis.goal);
-		expect(searched.routed.at(-1)).toBe(analysis.goal);
-		expect(decision.tools.map((t) => t.function.name)).toEqual([
-			"web_search",
-			"report_unavailable",
-		]);
+		// The candidates were searched by the utterance as said.
+		expect(searched.embedded.at(-1)).toBe(current);
+		expect(searched.routed.at(-1)).toBe(current);
+		expect(decision.tools.map((t) => t.function.name)).toEqual(["web_search"]);
 		// A direct answer keeps the whole conversation as it was, plus the record with the kind before the current request.
-		const answer = await prepareAnswer(
-			deps,
-			input,
-			signal(),
-			analysisArgs({ goal: "説明" }),
-		);
-		expect(recordOf(answer.messages)).toMatchObject({
-			goal: "説明",
-			kind: "knowledge",
-		});
+		const answer = prepareAnswer(deps, input, found, answering());
+		expect(recordOf(answer.messages)).toEqual({ kind: "knowledge" });
 		expect(
 			answer.messages
 				.filter(
@@ -148,35 +150,75 @@ for (const [previous, current] of [
 		expect(answer.messages[marker - 1]!.content).toStartWith("requestAnalysis");
 	});
 
-test("the selection works with no candidate: report_unavailable alone is offered", async () => {
-	const empty = {
-		...deps,
-		toolchains: {
-			...deps.toolchains,
-			routeInTransaction: () => ({ cards: [], past: [], retrieval: "none" }),
-		},
-	} as unknown as DialogueDeps;
+test("a request with no candidate has none to offer, and the search reads the utterance and the user's utterance before it", async () => {
+	const embedded: string[] = [];
+	const routed: string[] = [];
+	const other: ToolchainCard = {
+		...card,
+		id: "music.create",
+		revisionId: "toolchain:music.create@1",
+		functionName: "music",
+	};
+	const search = (cards: (text: string) => ToolchainCard[]) =>
+		({
+			...deps,
+			toolchains: {
+				embedQuery: async (text: string) => {
+					embedded.push(text);
+					return undefined;
+				},
+				routeInTransaction: (_db: unknown, input: { text: string }) => {
+					routed.push(input.text);
+					return { cards: cards(input.text), past: [], retrieval: "none" };
+				},
+			},
+		}) as unknown as DialogueDeps;
 	const current = { role: "user" as const, content: "何かして" };
-	const input = {
-		runId: "run",
-		messages: [current],
-		currentRequest: { messageId: "m", messageIndex: 0 },
-		routing: routingOf(),
-	} as unknown as GenerateInput;
-	const decision = await prepareSelection(
-		empty,
-		input,
-		delegatingArgs(),
+	const input = (previous: Parameters<typeof routingOf>[0]) =>
+		({
+			runId: "run",
+			messages: [current],
+			currentRequest: { messageId: "m", messageIndex: 0 },
+			routing: routingOf(previous),
+		}) as unknown as GenerateInput;
+	const none = await findCandidates(
+		search(() => []),
+		input([]),
 		signal(),
 	);
-	expect(decision.tools.map((t) => t.function.name)).toEqual([
-		"report_unavailable",
+	expect(none.route.cards).toEqual([]);
+	expect(none.route.retrieval).toBe("none");
+	expect(embedded).toEqual(["何かして"]);
+	// The user's utterance before it (not the assistant's reply) is searched as said, and the cards are united.
+	embedded.length = 0;
+	routed.length = 0;
+	const both = await findCandidates(
+		search((text) => (text === "何かして" ? [card] : [other, card])),
+		input([
+			{ role: "user", content: "曲を作って" },
+			{ role: "assistant", content: "作りました" },
+		]),
+		signal(),
+	);
+	expect(embedded.sort()).toEqual(["何かして", "曲を作って"].sort());
+	expect(routed).toEqual(["何かして", "曲を作って"]);
+	expect(both.route.cards.map((c) => c.functionName)).toEqual([
+		"web_search",
+		"music",
 	]);
-	expect(decision.cards).toEqual([]);
-	expect(decision.messages.at(-1)).toBe(current);
-	expect(
-		decision.messages.some((m) => m.content.includes("report_unavailable")),
-	).toBe(true);
+	// The same words twice, or a previous exchange without a user utterance, are searched once.
+	embedded.length = 0;
+	await findCandidates(
+		search(() => [card]),
+		input([{ role: "user", content: "何かして" }]),
+		signal(),
+	);
+	await findCandidates(
+		search(() => [card]),
+		input([{ role: "assistant", content: "はい" }]),
+		signal(),
+	);
+	expect(embedded).toEqual(["何かして", "何かして"]);
 });
 
 for (const mode of ["selection", "answer", "no-routing"] as const)
@@ -200,14 +242,18 @@ for (const mode of ["selection", "answer", "no-routing"] as const)
 			currentRequest: { messageId: "fixed-input-id", messageIndex: 1 },
 			...(mode !== "no-routing" ? { routing: routingOf() } : {}),
 		} as unknown as GenerateInput;
+		const found =
+			mode === "no-routing"
+				? undefined
+				: await findCandidates(deps, input, signal());
 		const decision =
 			mode === "selection"
-				? await prepareSelection(deps, input, delegatingArgs(), signal())
-				: await prepareAnswer(
+				? prepareSelection(deps, input, found!, toolchain())
+				: prepareAnswer(
 						deps,
 						input,
-						signal(),
-						mode === "answer" ? analysisArgs() : undefined,
+						found,
+						mode === "answer" ? answering() : undefined,
 					);
 		const index = decision.messages.findIndex(
 			(m) =>
@@ -239,7 +285,7 @@ test("a turn without an analysis recalls and records nothing", async () => {
 		messages: [current],
 		currentRequest: { messageId: "m", messageIndex: 0 },
 	} as unknown as GenerateInput;
-	const decision = await prepareAnswer(deps, input, signal());
+	const decision = prepareAnswer(deps, input);
 	expect(decision.draft("answer")).toBeUndefined();
 	expect(decision.recallPins).toEqual([]);
 	expect(recordOf(decision.messages)).toBeUndefined();
@@ -253,23 +299,22 @@ test("the trace of a decision carries the judgment of the first round and never 
 		currentRequest: { messageId: "m", messageIndex: 0 },
 		routing: routingOf(),
 	} as unknown as GenerateInput;
-	const analysis = delegatingArgs({
-		kind: "creation",
-		impact: "create",
-		goal: "秘密の依頼内容",
-		conditions: ["秘密の条件"],
-	});
-	const draft = (await prepareSelection(deps, input, analysis, signal())).draft(
-		"answer",
-	);
+	const found = await findCandidates(deps, input, signal());
+	const draft = prepareSelection(
+		deps,
+		input,
+		found,
+		toolchain({ kind: "creation", impact: "create" }),
+	).draft("toolchain");
 	expect(draft?.analysis).toEqual({
 		kind: "creation",
 		freshness: "not_live",
-		next: "find_toolchain",
+		next: "toolchain",
 		impact: "create",
 		approved: false,
 	});
-	expect(JSON.stringify(draft)).not.toContain("秘密");
+	// The candidates found before the first round are traced; the request itself never is.
+	expect(JSON.stringify(draft)).not.toContain("画像を作って");
 	expect(draft?.candidates).toHaveLength(1);
 });
 
@@ -278,12 +323,10 @@ test("a missing run input is refused instead of selecting the last user message"
 		messages: [{ role: "user", content: "execution state" }],
 		currentRequest: { messageId: "missing", messageIndex: -1 },
 	} as GenerateInput;
-	await expect(prepareAnswer(deps, input, signal())).rejects.toThrow(
-		"run_input_missing",
-	);
+	expect(() => prepareAnswer(deps, input)).toThrow("run_input_missing");
 });
 
-test("the recall of a direct answer is embedded from the utterance itself, the candidate search from the goal", async () => {
+test("the recall of both rounds is embedded from the utterance itself", async () => {
 	const withMemory = { ...deps, memory: {} } as unknown as DialogueDeps;
 	const current = { role: "user" as const, content: "明日はどうなる？" };
 	const input = {
@@ -294,19 +337,9 @@ test("the recall of a direct answer is embedded from the utterance itself, the c
 		routing: routingOf(),
 	} as unknown as GenerateInput;
 	searched.embedded.length = 0;
-	await prepareAnswer(
-		withMemory,
-		input,
-		signal(),
-		analysisArgs({ goal: "鎌倉の明日の天気の見通し" }),
-	);
+	const found = await findCandidates(withMemory, input, signal());
+	prepareAnswer(withMemory, input, found, answering());
+	prepareSelection(withMemory, input, found, toolchain());
+	// One embedding of the utterance, searched for the candidates and read by the recall of whichever round follows.
 	expect(searched.embedded).toEqual(["明日はどうなる？"]);
-	searched.embedded.length = 0;
-	await prepareSelection(
-		withMemory,
-		input,
-		delegatingArgs({ goal: "鎌倉の明日の天気" }),
-		signal(),
-	);
-	expect(searched.embedded).toEqual(["鎌倉の明日の天気"]);
 });

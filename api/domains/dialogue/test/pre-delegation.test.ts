@@ -1,7 +1,5 @@
 import { expect, test } from "bun:test";
 import { setup } from "./specialist.fixture";
-import { validateAnalysis } from "../service/initial-decision";
-import { delegatingArgs } from "./analysis.fixture";
 
 const recordOf = (history: Array<{ content: string }>) => {
 	const record = history.find((m) => m.content.startsWith("requestAnalysis"));
@@ -10,7 +8,7 @@ const recordOf = (history: Array<{ content: string }>) => {
 		: undefined;
 };
 
-test("direct answers finish without retrieving candidates or announcing work", async () => {
+test("direct answers finish without a notice or a specialist", async () => {
 	const h = await setup();
 	try {
 		h.state.main.push("おはようございます。");
@@ -23,7 +21,8 @@ test("direct answers finish without retrieving candidates or announcing work", a
 			turnId: run.id,
 			granularity: "answer",
 		});
-		expect(h.state.routeCalls).toBe(0);
+		// The candidates are searched before the first round, whether or not it hands the request over.
+		expect(h.state.routeCalls).toBe(1);
 		expect(run.announcement).toBeNull();
 		expect(await h.session()).toBeNull();
 		// The request was analyzed first; the answer is the second round, with the analysis as a host record and no function.
@@ -48,12 +47,18 @@ test("a notice is visible before a full handoff, survives completion and does no
 		h.state.specialist.push({ action: "reply", text: "こちらで制作します。" });
 		const run = await h.say("新しい案を作る");
 		const seen: number[] = [];
+		const beforeSecondRound: number[] = [];
 		stop = h.dialogue.subscribeProgress(run.id, (p) => {
-			if (p.announcement) seen.push(h.state.specialistPrompts.length);
+			if (p.announcement) {
+				seen.push(h.state.specialistPrompts.length);
+				beforeSecondRound.push(h.state.mainCalls.length);
+			}
 		});
 		await h.finished(run.id);
 		expect(h.dialogue.get(run.id)?.status).toBe("completed");
 		expect(seen[0]).toBe(0);
+		// The notice is shown as soon as the first round chose; the second round has not been asked yet.
+		expect(beforeSecondRound[0]).toBe(0);
 		expect(h.dialogue.get(run.id)?.announcement).toBe(
 			"制作担当に引き継ぎます。",
 		);
@@ -64,7 +69,7 @@ test("a notice is visible before a full handoff, survives completion and does no
 				.messages.some((m) => m.text === "制作担当に引き継ぎます。"),
 		).toBe(false);
 		expect(h.state.analysisCalls[0]?.tools.map((t) => t.function.name)).toEqual(
-			["analyze_request"],
+			["studio_create", "other_create", "answer", "report_unavailable"],
 		);
 		expect(h.state.mainCalls[0]?.tools[0]?.function.description).toContain(
 			"会話相手",
@@ -93,17 +98,18 @@ test("no candidate offers report_unavailable alone and its reply is the answer, 
 		expect(h.dialogue.answerText(run.id)).toBe(
 			"対応できる担当が見つかりませんでした。",
 		);
-		expect(h.state.mainCalls).toHaveLength(1);
-		expect(h.state.mainCalls[0]!.tools.map((t) => t.function.name)).toEqual([
-			"report_unavailable",
-		]);
+		// The first round alone decided: it offered only answer and report_unavailable, and there was no second round.
+		expect(h.state.mainCalls).toHaveLength(0);
+		expect(h.state.analysisCalls[0]!.tools.map((t) => t.function.name)).toEqual(
+			["answer", "report_unavailable"],
+		);
 		expect(h.state.specialistPrompts).toHaveLength(0);
 		// The decision is an answer, traced with the judgment of the first round and no candidate.
 		expect(h.state.recorded).toMatchObject([
 			{
 				decision: "answer",
 				candidates: [],
-				analysis: { kind: "action", next: "find_toolchain" },
+				analysis: { kind: "action", next: "report_unavailable" },
 			},
 		]);
 	} finally {
@@ -157,29 +163,6 @@ test("cancellation after the notice prevents specialist execution", async () => 
 		stop();
 		await h.close();
 	}
-});
-
-test("the analysis cannot execute a tool or carry hidden arguments", () => {
-	const call = (name: string, arguments_: string) => ({
-		id: "c",
-		name,
-		arguments: arguments_,
-	});
-	const args = (over: object = {}) =>
-		JSON.stringify({ ...delegatingArgs(), ...over });
-	expect(validateAnalysis([call("analyze_request", args())])).toEqual(
-		delegatingArgs(),
-	);
-	for (const calls of [
-		[],
-		[call("web_search", args())],
-		[call("analyze_request", args({ execute: true }))],
-		[call("analyze_request", "{}")],
-		[call("analyze_request", args()), call("analyze_request", args())],
-	])
-		expect(() => validateAnalysis(calls)).toThrow(
-			"invalid_conversation_operation",
-		);
 });
 
 test("a specialist may forward the initial run to another specialist, announcing both handoffs", async () => {

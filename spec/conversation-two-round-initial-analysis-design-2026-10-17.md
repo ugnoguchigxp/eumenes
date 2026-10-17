@@ -2,7 +2,7 @@
 
 作成日: 2026-10-17
 
-状態: 2026-10-17、§8の改訂（一時回答までの短縮）に利用者合意、未実装。H1〜H5は本文の表で決着。R1 `analyze_request` から R2 の回答または選定までの本体は実装し、fixture で確認した（§7）。日時の依頼、`past_conversation` から `history.research` を選ぶ受入、`impact=modify_existing` の記録受入、実モデルの live は未。確認の流れ（questionRef）は対象外のまま。
+状態: 2026-10-17、§8の改訂（一時回答までの短縮）は実装・fixture済み、liveは未実施（§9）。H1〜H5は本文の表で決着。R1 `analyze_request` から R2 の回答または選定までの本体は実装し、fixture で確認した（§7）。日時の依頼、`past_conversation` から `history.research` を選ぶ受入、`impact=modify_existing` の記録受入、実モデルの live は未。確認の流れ（questionRef）は対象外のまま。
 
 関連: [委譲前の一時回答](conversation-pre-delegation-response-design-2026-10-17.md)（§3・§5・§9）、[LLM経路リファクタリング](conversation-subagent-llm-refactoring-plan-2026-10-17.md)（§3.2・D8・D9）。
 
@@ -17,6 +17,8 @@
 - 保存済み会話を調べる担当 `history.research`（`capabilities/builtin/history.ts`、`history.search`・`history.read`）は既にある。
 
 ## 2. 方針
+
+> 注: R1 の関数・引数・候補検索の時期は §8 の改訂で置き換えた（R1 前に候補検索、R1 は候補関数・`answer`・`report_unavailable` を共通引数 kind/freshness/impact/approved で呼ぶ）。§2〜§5 は改訂前の設計として残す。現行の正本は §8。
 
 会話エージェントの初動を必ず2ラウンドにする。R1はユーザーの依頼を分析し、何を求めているかと問い合わせの種類を判断する非公開ラウンドで、回答文を作らない。ツールチェーン検索はR1の分析結果で行う。R2は、R1の判断に従って回答するか委譲する。履歴が必要な依頼は、Web調査と同じく担当（`history.research`）として扱う。
 
@@ -210,7 +212,7 @@ LARM が圧縮通信対応の作業中のため、live 受入は 2026-10-18 以�
 | --- | --- |
 | §2〜§6（R1 `analyze_request`→R2） | 実装・fixture 済み。製品サーバーで live 確認済み（下表） |
 | R1 の自然文返答の修正（役割文のみの system、直前1往復を参考データ化、指示の明確化） | 実装・fixture 済み。隔離 host の live で「タイマー起動して」の R1 成功率 0/10→9/10。生データは scratchpad（揮発）にあり、本書の数値が正 |
-| §8（一時回答までの短縮） | **実装担当が作業中のまま終了**。fixture・型・verify までを完了条件とし、live は行わない指示。再開時は作業ツリーの `api/domains/dialogue/**` の差分と、`bun test api/domains/dialogue`・`bun test ./api/application`・`bun run verify -- --domain dialogue` の結果を確認してから live に進む |
+| §8（一時回答までの短縮） | 実装・fixture 済み。`bun test api/domains/dialogue api/domains/toolchain-history api/domains/voice-dialogue` 498件成功、`bun test ./api/application` は既存6件以外成功。live は未実施。live 試行は `bun scripts/first-round-live.ts --run --repeat 3`（隔離 in-process host、ポートなし、保存済み LARM 設定を読み取り専用、逐次。`--fake` で LARM なしの動作確認。出力は `--out`、既定 `verification-reports/first-round-live/<時刻>`）。比較値は天気で一時回答まで11.2秒・R1出力158トークン |
 | タイマー既定3分（`skill:timers.manage@2`、`toolchain:timers.manage@6`、binding@4・artifact@3） | 実装・fixture 済み、製品DB登録済み。live で「タイマー起動して」→3分で開始を確認 |
 | 調査失敗時の「失敗しました。」と readAhead | [別設計書](research-failure-reply-and-readahead-2026-10-17.md) §5 |
 
@@ -227,7 +229,7 @@ LARM が圧縮通信対応の作業中のため、live 受入は 2026-10-18 以�
 
 ### 再開時の手順
 
-1. §8 実装の差分と試験結果を確認する（上表）。不足があれば補う。
+1. `bun scripts/first-round-live.ts --run --repeat 3` で §8 の live 試行（LARM が必要）。
 2. 利用者にサーバー再起動を依頼し、起動ログ（`bun run logs -- --level warn`）で bundle のスキップを確認する。
 3. live: 「明日の鎌倉の天気を教えて」「タイマー起動して」「6分タイマー起動して」「富士山の高さは？」「（天気の後に）明日は？」で、R1 の選択、一時回答の文面と配信までの時間、各呼び出しの入出力・キャッシュトークンを記録し、§8 の改訂前の値と比べる。タイマーを起動したら、試験で起動した timerId だけを取り消す。
 4. 調査失敗時の「失敗しました。」の読み上げを確認する。
@@ -237,4 +239,5 @@ LARM が圧縮通信対応の作業中のため、live 受入は 2026-10-18 以�
 - R1 で関数呼び出しを強制するか（現状 `tool_choice: "auto"` 固定、`api/infrastructure/chat-stream.ts`。LARM 側の対応確認が必要）。
 - `web-guided.bundle.json` が毎起動 `revision_conflict` でスキップされる件（DB 登録済みの `skill:web.guided@1`・`package:web.recipe@2`・`package:web.quick@3` と bundle の本文が不一致）。案A: bundle を DB の内容に戻す、案B: bundle を廃止。
 - `ui-compositions.bundle.json` が `skill:ui.studio@4` の衝突でスキップされる件（本作業外の編集による）。
+- §8 の残り: answer の判断でも trace に候補が残る（以前は none）。直前の利用者発言が600字を超えると省略表記付きで検索文になる。`contexts/system-prompt/conversation.context.toml` の「担当を選んだら実行前の短い予告をfunctionに含めます」は回答 round では古い文言（共有 prefix と golden に影響するため未変更）。
 - 終了予定を過ぎても `active` のまま残るタイマーがあった（10/13〜14 開始の4件、2026-10-17 に監督者が誤って取消済み）。タイマー側の不具合の可能性。

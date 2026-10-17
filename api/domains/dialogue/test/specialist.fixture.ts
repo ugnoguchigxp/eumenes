@@ -174,6 +174,8 @@ export async function setup(options: Options = {}) {
 		/** The specialist's replies in order (objects are JSON-encoded). */
 		specialist: [] as Array<unknown>,
 		mainCalls: [] as Call[],
+		/** When set, the second round and the direct answer wait for it (or for their cancellation). */
+		mainHold: undefined as Promise<void> | undefined,
 		/** The first round's calls (the request analysis), apart from the main calls that follow. */
 		analysisCalls: [] as Call[],
 		/**
@@ -282,8 +284,12 @@ export async function setup(options: Options = {}) {
 			const call = { history: [...history], tools: tools ?? [], preparation };
 			if (isAnalysisRound(tools)) {
 				state.analysisCalls.push(call);
-				const { call: named, announcement, reply, ...over } =
-					state.analyses.shift() ?? {};
+				const {
+					call: named,
+					announcement,
+					reply,
+					...over
+				} = state.analyses.shift() ?? {};
 				const head = state.main[0];
 				const offered = offeredToolchains(tools);
 				const scripted =
@@ -320,6 +326,17 @@ export async function setup(options: Options = {}) {
 				return analysisReceipt(requestId, { name: ANSWER, args: over });
 			}
 			state.mainCalls.push(call);
+			// A held call waits like a provider call and still honours cancellation.
+			if (state.mainHold)
+				await Promise.race([
+					state.mainHold,
+					new Promise<void>((_, reject) => {
+						if (_signal.aborted) reject(new Error("aborted"));
+						_signal.addEventListener("abort", () =>
+							reject(new Error("aborted")),
+						);
+					}),
+				]);
 			const reply = state.main.shift() ?? "了解しました";
 			if (typeof reply !== "string")
 				// The notice belongs to the first round: the second round's function takes the request only.

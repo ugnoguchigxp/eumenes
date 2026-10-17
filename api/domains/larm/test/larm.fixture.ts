@@ -126,10 +126,14 @@ export function fixture(
 			compress: unknown;
 			decompress: unknown;
 		};
-		expect(compression.compress).toBe(init?.body == null ? false : "gzip");
+		const url = new URL(String(input));
+		expect(compression.compress).toBe(
+			init?.body != null && !url.pathname.startsWith("/v1/agent-connections")
+				? "gzip"
+				: false,
+		);
 		expect(compression.decompress).toBe(true);
 		expect(new Headers(init?.headers).get("Accept-Encoding")).toBe("gzip");
-		const url = new URL(String(input));
 		calls.push(`${init?.method ?? "GET"} ${url.pathname}`);
 		if (url.pathname === "/v3/agent-profiles") return result(catalog);
 		if (url.pathname === "/v1/agent-connections" && init?.method === "POST") {

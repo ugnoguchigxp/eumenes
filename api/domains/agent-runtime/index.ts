@@ -12,3 +12,4 @@ export { migrations } from "./repository";
 
 export { RESEARCH_BUDGET } from "./service/exploration";
 export type { SearchReportHook } from "./service/runtime-context";
+export { readStoredReportProjection } from "./service/report-projection";

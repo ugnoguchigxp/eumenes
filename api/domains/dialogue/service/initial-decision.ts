@@ -18,7 +18,6 @@ import {
 	operationRejection,
 	toolchainDescription,
 	unavailableReply,
-	type SessionOffers,
 } from "./conversation-tools";
 
 /** What the first round judges about the request: the same four values in every function it offers. */
@@ -61,8 +60,8 @@ const toolchainChoice = requestAnalysis.extend({
 });
 const unavailableChoice = requestAnalysis.extend(unavailableReply.shape);
 
-export const ANSWER_FUNCTION = "answer";
-export const UNAVAILABLE_FUNCTION = "report_unavailable";
+const ANSWER_FUNCTION = "answer";
+const UNAVAILABLE_FUNCTION = "report_unavailable";
 
 /**
  * The first round's decision. `next` is what the called function means: `answer` is answered from hand in the
@@ -86,7 +85,7 @@ function jsonSchema(schema: z.ZodType) {
  */
 export function analysisTools(
 	cards: readonly ToolchainCard[],
-	sessions: SessionOffers = new Map(),
+	sessions: ReadonlySet<string> = new Set(),
 ): NativeTool[] {
 	const offered = new Set(cards.map((c) => c.functionName));
 	return [
@@ -141,7 +140,11 @@ export function validateAnalysis(
 		throw operationRejection("call_count", undefined, [], calls.length);
 	const call = calls[0]!;
 	const card = cards.find((c) => c.functionName === call.name);
-	if (!card && call.name !== ANSWER_FUNCTION && call.name !== UNAVAILABLE_FUNCTION)
+	if (
+		!card &&
+		call.name !== ANSWER_FUNCTION &&
+		call.name !== UNAVAILABLE_FUNCTION
+	)
 		throw operationRejection("tool_not_offered", call);
 	let args: unknown;
 	try {

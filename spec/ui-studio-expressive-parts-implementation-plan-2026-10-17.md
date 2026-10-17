@@ -4,7 +4,7 @@
 
 改訂: 同日、要合意事項D1〜D6の回答を反映した。picsum画像は依頼のテーマに合わせて選べるようにする。数式表示と、状態に書き込める電卓を加える。紙芝居・タブなど部品内だけの表示状態を認める。グラフはrechartsを使ってよい。SKILLの上限は48 KB。
 
-状態: 計画範囲は実装し、§10 の固定試験まで記録した（2026-10-17）。作業ツリーには composition の検証分離と、電卓・グラフ・表・数式の追修正が残る。ブラウザE2E・live（実モデル）・実機器の受入は未実施。
+状態: 実装・固定試験・ブラウザE2E済み（2026-10-18。§10・§11）。live（実モデル）・実機器の受入は未実施。
 
 UI自由制作（`ui.compose`）で作れる画面を、案内画面とアンケートから、ランディングページ・ECのデモ、計算やシミュレーションが動く画面、仕組みの図解まで広げる。LLMにはコードを書かせず、登録済み部品のJSON定義で表現できる範囲を広げる。
 
@@ -368,25 +368,32 @@ highの指摘は無かった。medium・lowの指摘はまとめて1回で修正
   - 今回の変更の寄与は、`viewRegistry`へ合流した新しいviewのschema（gzipで約4 KB）。残りは、同時期に並行して進んだ別の作業の変更によると見ている（未分離）。
   - 利用者の判断（2026-10-17、バンドルサイズは重視しない）により、`bun scripts/bundle-budget.ts --write`で記録値を現状に更新した。
 
-## 11 再開手順
+## 11 ブラウザE2Eの実施（2026-10-18）
 
-2026-10-17の時点で、ブラウザE2Eの再実行を保留している。LARMで圧縮通信の対応が進行中で、E2Eの環境が使えない可能性があるため（利用者の判断）。次の条件がそろったら、利用者の指示を受けてから再開する。
+LARMの圧縮通信の対応後、利用者の指示で再開した。§10の初回実行で失敗していた`ui-compositions.spec.ts`の原因と対応は次のとおり。
 
-| 条件 | 確認方法 |
+| 原因 | 対応 |
 | --- | --- |
-| LARMの圧縮通信の対応が落ち着いている | 利用者に確認する |
-| 初動の要求分析（`api/domains/dialogue/service/request-analysis.ts`）とfixtureの会話モデルが合っている | `tests/browser/ui-compositions.spec.ts`の最初の試験で、依頼後に`invalid_conversation_operation`が出ないこと |
+| fixtureの台本（`scripts/ui-compositions-fixture-server.ts`）が、会話の初動の要求分析（1回目に委譲先と予告、2回目にその機能への依頼を書く）に未対応で、`invalid_conversation_operation`で止まっていた | API試験と同じく`analysisReceipt`で1回目に`ui_create`と予告を返し、UI以外の依頼は自分で答える |
+| 専門担当のターンが速く、`activeRunId`が設定されて解除されるまでの間にsessionを一度も読めないと、制作画面のソースを再取得しない（下書きの更新が画面に出ない）。製品の不具合 | `web/src/domains/ui-compositions/toolchain-adapter.tsx`の再取得キーに`session.updatedAt`を加えた。ターンの度にsessionは更新される。回帰試験を追加 |
+| specのlocatorの曖昧さ。読上げ用の`aria-live`と本文の重複、作品名の見出しが制作画面とプレビューの2か所、同じファイル内の別の試験が保存した同名作品、保存作品のフォームのボタン名が「送信」（「フォームを送信」ではない）、会話欄とフォームの送信ボタン | `exact`、`.first()`、会話欄への範囲指定、実際のボタン名に修正。初回の計画（専門担当との対話編集）でブラウザE2Eは未実施だったため、今回が初めての実行 |
 
-再開時の作業:
+今回の部品の確認として`tests/browser/ui-composition-parts.spec.ts`を追加した。fixtureの専門担当がU1・U4・U5bの定義と、入力を持つ紙芝居を反映する。
 
-1. `bunx playwright test tests/browser/csp.spec.ts tests/browser/ui-compositions.spec.ts`を実行する。Nodeのままで動く（eumenes-memory 0.0.2以降）。
-2. ui-compositionsの既存7件が通ったら、今回の部品をブラウザで確かめるE2Eを追加する。fixtureの専門担当が`api/domains/ui-compositions/test/fixtures/`の定義（例: U4の老後資金、U5bの三角測量）を反映し、次の点を確かめる。
-   - picsum画像がCSP違反なしで表示されること
-   - グラフの幅が0にならないこと
-   - スライダーを動かすとstatとグラフが更新されること
-   - 電卓の「=」で後続の数式の値が更新されること
-   - 紙芝居で場面を移っても入力が残ること
-   - ダークテーマで文字が読めること
-3. 結果を§10の「未実施・未確認」へ追記し、`spec/README.md`の状態を更新する。
-4. 未実施のまま残る受入: live（実モデル。U1〜U7を1件ずつ依頼し、一回目の反映の成否、失敗時の自己修正、画像のテーマが依頼に合うかを記録）と、実機器（音声での依頼と修正）。
+- picsum画像がCSP違反なしで読み込まれる（`naturalWidth > 0`、`referrerpolicy="no-referrer"`）
+- グラフの描画領域の大きさが0でない。スライダーを動かすとstatとグラフの系列が変わる。年ごとの表が出る
+- 電卓の「=」の結果が`resultBind`経由で、`when`で隠れていたステップ2と数式の値に反映される。数式はKaTeXで描画される
+- 紙芝居で場面を移っても入力が残り、次の場面のstatが作品の状態を共有する
+- ダークテーマで、数式・stat・電卓の見出しの文字が背景に対してコントラスト比4.5以上
 
+結果:
+
+- `bunx playwright test tests/browser/csp.spec.ts tests/browser/ui-compositions.spec.ts tests/browser/ui-composition-parts.spec.ts`: 13件pass。2回続けて実行し、2回ともpass。
+- 各runでViteのキャッシュが空から始まるため、初回の制作画面の表示（rechartsとKaTeXの変換）が20秒を超えることがあった。最初の表示だけ60秒待つ。
+- `bun run verify -- --domain ui-compositions --domain artifact`: pass（bunの試験303件、webの試験84件）。
+
+残る受入:
+
+- live（実モデル）: U1〜U7を1件ずつ依頼し、一回目の反映の成否、失敗時の自己修正、画像のテーマが依頼に合うかを記録する。
+- 実機器（音声での依頼と修正）。
+- Storybookでの見た目の確認は未実施。
