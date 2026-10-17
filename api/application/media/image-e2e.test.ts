@@ -33,7 +33,9 @@ for (const mode of [
 			expect(records).toHaveLength(1);
 			const success = ["success", "library", "studio"].includes(mode);
 			expect(records[0].state).toBe(success ? "completed" : "failed");
-			const posts = f.requests.filter((r) => r.method === "POST");
+			const posts = f.requests.filter(
+				(r) => r.method === "POST" && r.path === "/v1/images/generations",
+			);
 			expect(posts).toHaveLength(
 				["invalid-plan", "library", "studio"].includes(mode) ? 0 : 1,
 			);
@@ -87,15 +89,27 @@ test("cancelled image generation discards a late synchronous response and never 
 				text: imageQuestion,
 			})
 		).json();
-		await waitFor(() => f.requests.some((r) => r.method === "POST"));
-		expect(f.requests.filter((r) => r.method === "POST")).toHaveLength(1);
+		await waitFor(() =>
+			f.requests.some(
+				(r) => r.method === "POST" && r.path === "/v1/images/generations",
+			),
+		);
+		expect(
+			f.requests.filter(
+				(r) => r.method === "POST" && r.path === "/v1/images/generations",
+			),
+		).toHaveLength(1);
 		await h.dialogue.cancel(submitted.id);
 		release();
 		// A negative check: a late result must have real time to (not) be adopted.
 		await Bun.sleep(50);
 		expect(h.image!.list("main")[0]!.state).toBe("cancelled");
 		expect(h.image!.list("main")[0]!.artifactId).toBeNull();
-		expect(f.requests.filter((r) => r.method === "POST")).toHaveLength(1);
+		expect(
+			f.requests.filter(
+				(r) => r.method === "POST" && r.path === "/v1/images/generations",
+			),
+		).toHaveLength(1);
 	} finally {
 		release();
 		await h.close();
@@ -165,8 +179,16 @@ test("capability revocation rejects a generated result at adoption", async () =>
 				text: imageQuestion,
 			})
 		).json();
-		await waitFor(() => f.requests.some((r) => r.method === "POST"));
-		expect(f.requests.filter((r) => r.method === "POST")).toHaveLength(1);
+		await waitFor(() =>
+			f.requests.some(
+				(r) => r.method === "POST" && r.path === "/v1/images/generations",
+			),
+		);
+		expect(
+			f.requests.filter(
+				(r) => r.method === "POST" && r.path === "/v1/images/generations",
+			),
+		).toHaveLength(1);
 		await h.store.write((db) =>
 			h.toolchain.capabilities.setEnabledInTransaction(
 				db,
@@ -179,7 +201,11 @@ test("capability revocation rejects a generated result at adoption", async () =>
 		await h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 });
 		expect(h.image!.list("main")[0]!.state).toBe("failed");
 		expect(h.image!.list("main")[0]!.errorCode).toBe("capability_revoked");
-		expect(f.requests.filter((r) => r.method === "POST")).toHaveLength(1);
+		expect(
+			f.requests.filter(
+				(r) => r.method === "POST" && r.path === "/v1/images/generations",
+			),
+		).toHaveLength(1);
 	} finally {
 		release();
 		await h.close();

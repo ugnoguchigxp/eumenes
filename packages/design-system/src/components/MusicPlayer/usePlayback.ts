@@ -9,15 +9,18 @@ export function usePlayback(autoPlay: boolean, analyse = false) {
 	const [duration, setDuration] = useState(0);
 	const [volume, setVolume] = useState(1);
 	const [error, setError] = useState(false);
+	// Playback intent applies once per mounted track; later changes come from this player's own events.
+	const [initialAutoPlay] = useState(autoPlay);
 	useEffect(() => {
 		const audio = ref.current;
 		let active = true;
-		if (autoPlay) void audio?.play().catch(() => active && setError(true));
+		if (initialAutoPlay)
+			void audio?.play().catch(() => active && setError(true));
 		return () => {
 			active = false;
 			audio?.pause();
 		};
-	}, [autoPlay]);
+	}, [initialAutoPlay]);
 	const seek = (seconds: number) => {
 		if (!ref.current || !duration) return;
 		const next = Math.max(0, Math.min(duration, seconds));

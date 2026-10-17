@@ -44,6 +44,16 @@ function fixture(
 		model: `model-${name}`,
 		capability: name,
 	}));
+	const service = (kind: "image" | "music") => ({
+		name: kind,
+		description: "Synchronous image or asynchronous music generation",
+		model: `model-${kind}`,
+		protocol: `larm.${kind}-generation.v1`,
+		capability: `media.${kind}.generate`,
+		endpoint:
+			kind === "image" ? "/v1/images/generations" : "/v1/music/generations",
+		startupPolicy: { minWarmInstances: 0, idleTtlSeconds: 0 },
+	});
 	const fetcher = async (url: RequestInfo | URL, init: RequestInit = {}) => {
 		const u = new URL(String(url));
 		const path = u.pathname;
@@ -62,15 +72,7 @@ function fixture(
 		if (path === "/openapi.json") return new Response(null, { status: 404 });
 		if (path === "/v3/agent-profiles") {
 			const selector = u.searchParams.get("profile");
-			const service = (kind: "image" | "music") => ({
-				name: kind,
-				model: `model-${kind}`,
-				protocol: `larm.${kind}-generation.v1`,
-				capability: `media.${kind}.generate`,
-				endpoint:
-					kind === "image" ? "/v1/images/generations" : "/v1/music/generations",
-				startupPolicy: { minWarmInstances: 0, idleTtlSeconds: 0 },
-			});
+
 			// The unselected catalog lists every profile without services; a profile fetched by id carries them.
 			const profiles = [
 				{ id: "profile", providers, services: [], withServices: [] },
@@ -105,11 +107,13 @@ function fixture(
 			});
 		}
 		if (path === "/v1/agent-connections") {
-			requested = body.providers;
+			requested = body.providers ?? names;
 			return Response.json(
 				{
 					id: "test",
-					agentProfile: "profile",
+					agentProfile:
+						body.profile === "image-profile" ? "image-profile" : "profile",
+					services: body.profile === "image-profile" ? [service("image")] : [],
 					catalogRevision: revision,
 					status: "ready",
 					providers: providers
@@ -313,7 +317,7 @@ test("semantic health is distinct from catalog presence, and cold diagnosis does
 	);
 	expect(h.calls).toHaveLength(n);
 });
-test("image and music fetch artifacts without making a warm connection", async () => {
+test("image acquires and releases a connection while music remains direct", async () => {
 	const h = fixture();
 	const c = await h.gateway.catalog(AbortSignal.timeout(1000));
 	for (const kind of ["image", "music"]) {
@@ -330,7 +334,26 @@ test("image and music fetch artifacts without making a warm connection", async (
 		expect(r.bytes?.length).toBeGreaterThan(0);
 		expect(progress.some((p) => p.artifact)).toBe(true);
 	}
-	expect(h.calls.some((c) => c.path === "/v1/agent-connections")).toBe(false);
+	expect(
+		h.calls.filter((c) => c.path === "/v1/agent-connections"),
+	).toHaveLength(1);
+	const lifecycle = h.calls.filter(
+		(c) =>
+			c.path.startsWith("/v1/agent-connections") ||
+			c.path === "/v1/images/generations" ||
+			c.path === "/v1/image-artifacts/image-1/content",
+	);
+	expect(lifecycle.map((c) => `${c.method} ${c.path}`)).toEqual([
+		"POST /v1/agent-connections",
+		"POST /v1/images/generations",
+		"GET /v1/image-artifacts/image-1/content",
+		"DELETE /v1/agent-connections/test",
+	]);
+	expect(lifecycle[0]!.body).toMatchObject({
+		profile: "image-profile",
+		expectedCatalogRevision: revision,
+	});
+	expect(lifecycle[0]!.body).not.toHaveProperty("providers");
 });
 test("music requests Opus once and fetches Ogg Opus with Control authentication after completion", async () => {
 	const audio = new Uint8Array(
@@ -688,7 +711,29 @@ test("a missing baseUrl leaves the playground unconfigured", async () => {
 
 test("image uses the discovered service URL and preserves arbitrary dimensions and seed", async () => {
 	const serviceUrl = "http://127.0.0.1:9999/discovered-image-api";
+	let connectionUrl = serviceUrl;
 	const h = fixture((path, _init, url) => {
+		if (path === "/v1/agent-connections")
+			return Response.json(
+				{
+					id: "test",
+					agentProfile: "image-profile",
+					catalogRevision: revision,
+					status: "ready",
+					providers: [],
+					services: [
+						{
+							name: "image",
+							model: "model-image-discovered",
+							protocol: "larm.image-generation.v1",
+							capability: "media.image.generate",
+							url: connectionUrl,
+							description: "Generate a single image",
+						},
+					],
+				},
+				{ status: 201 },
+			);
 		if (
 			path === "/v3/agent-profiles" &&
 			url.searchParams.get("profile") === "image-profile"
@@ -708,7 +753,7 @@ test("image uses the discovered service URL and preserves arbitrary dimensions a
 								protocol: "larm.image-generation.v1",
 								capability: "media.image.generate",
 								endpoint: "/v1/images/generations",
-								url: serviceUrl,
+								url: "http://127.0.0.1:9999/catalog-only-image-api",
 								startupPolicy: { minWarmInstances: 0 },
 							},
 						],
@@ -744,15 +789,16 @@ test("image uses the discovered service URL and preserves arbitrary dimensions a
 		seed: 42,
 		format: "png",
 	});
-	expect(h.calls.some((c) => c.path === "/v1/agent-connections")).toBe(false);
+	expect(h.calls.some((c) => c.path === "/v1/agent-connections")).toBe(true);
+	connectionUrl = "http://192.168.0.99:9810/foreign";
 	await expect(
 		h.gateway.execute(
-			{ ...target, endpoint: "http://192.168.0.99:9810/foreign" },
+			target,
 			{ text: "写真" },
 			AbortSignal.timeout(1000),
 			async () => {},
 		),
-	).rejects.toThrow("invalid_larm_url");
+	).rejects.toThrow("invalid_artifact_origin");
 	expect(h.calls.some((c) => c.url.includes("192.168.0.99"))).toBe(false);
 });
 

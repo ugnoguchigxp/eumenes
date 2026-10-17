@@ -128,7 +128,7 @@ export function createLarmPlayground(config: {
 	async function connection<T>(
 		target: LarmTestTarget,
 		signal: AbortSignal,
-		action: (id: string) => Promise<T>,
+		action: (id: string, binding: LarmTestTarget) => Promise<T>,
 	): Promise<T> {
 		if (!target.selector) throw new Error("invalid_profile_selector");
 		if (
@@ -149,7 +149,9 @@ export function createLarmPlayground(config: {
 							profile: target.selector,
 							audience: config.audience,
 							client: "eumenes-service-tests",
-							providers: [target.name],
+							...(target.mode === "provider"
+								? { providers: [target.name] }
+								: {}),
 							ttlSeconds: 300,
 							allowFallback: false,
 							deploymentPolicy: "existing-only",
@@ -161,7 +163,7 @@ export function createLarmPlayground(config: {
 							Prefer: "wait=1",
 						},
 					},
-					[201, 202],
+					target.mode === "service" ? [201, 202, 503] : [201, 202],
 				),
 			);
 			id = str(state.id);
@@ -173,17 +175,38 @@ export function createLarmPlayground(config: {
 					state.catalogRevision !== target.revision
 				)
 					throw new Error("invalid_connection_contract");
-				const p = list(state.providers).find((p) => p.name === target.name);
-				if (!p || p.model !== target.model || p.protocol !== target.protocol)
-					throw new Error("invalid_provider_binding");
+				const service = target.mode === "service";
+				const p = list(service ? state.services : state.providers).find(
+					(p) => p.name === target.name,
+				);
+				if (
+					!p ||
+					p.model !== target.model ||
+					p.protocol !== target.protocol ||
+					(service &&
+						(p.capability !== target.capability ||
+							typeof p.description !== "string" ||
+							!p.description.trim()))
+				)
+					throw new Error(
+						service ? "invalid_service_binding" : "invalid_provider_binding",
+					);
 				if (
 					state.status === "ready" &&
-					p.claimable === true &&
-					p.readiness === "ready"
+					(service || (p.claimable === true && p.readiness === "ready"))
 				)
-					break;
+					return await action(
+						id,
+						service
+							? {
+									...target,
+									endpoint: publicUrl(str(p.url ?? p.endpoint)).pathname,
+									description: str(p.description),
+								}
+							: target,
+					);
 				if (["failed", "expired", "released"].includes(String(state.status)))
-					throw new Error("provider_not_ready");
+					throw new Error(service ? "service_not_ready" : "provider_not_ready");
 				if (i >= 90) throw new Error("deadline_exceeded");
 				await pause(config.pollMs ?? 1000, signal);
 				state = await json(
@@ -193,7 +216,6 @@ export function createLarmPlayground(config: {
 					),
 				);
 			}
-			return await action(id);
 		} finally {
 			if (id)
 				await control(
@@ -385,49 +407,54 @@ export function createLarmPlayground(config: {
 		if (target.kind === "unsupported")
 			throw new Error("invalid_unsupported_service");
 		if (target.mode === "service") {
-			await progress({ phase: "generating" });
+			await progress({
+				phase: target.kind === "image" ? "connecting" : "generating",
+			});
 			signal.throwIfAborted();
 			if (target.kind === "image") {
-				let data: Record<string, unknown>;
-				try {
-					data = await json(
-						await control(
-							target.endpoint,
-							signal,
-							post({
-								prompt: input.text,
-								model: target.model,
-								width: input.width ?? 512,
-								height: input.height ?? 512,
-								format: input.format ?? "webp",
-								seed: input.seed ?? 0,
-							}),
-						),
-					);
-				} catch (e) {
+				return connection(target, signal, async (_id, service) => {
+					await progress({ phase: "generating" });
+					let data: Record<string, unknown>;
+					try {
+						data = await json(
+							await control(
+								service.endpoint,
+								signal,
+								post({
+									prompt: input.text,
+									model: service.model,
+									width: input.width ?? 512,
+									height: input.height ?? 512,
+									format: input.format ?? "webp",
+									seed: input.seed ?? 0,
+								}),
+							),
+						);
+					} catch (e) {
+						if (
+							signal.aborted ||
+							["network_unavailable", "deadline_exceeded"].includes(code(e))
+						)
+							throw new Error("generation_unknown");
+						throw e;
+					}
+					if (data.status !== "succeeded")
+						throw new Error("invalid_image_result");
+					const a = object(data.artifact ?? list(data.artifacts)[0]);
+					const ref = {
+						id: str(a.id),
+						path: str(a.contentUrl),
+						mime: str(a.mimeType),
+						actualModel: a.model === undefined ? undefined : str(a.model),
+					};
 					if (
-						signal.aborted ||
-						["network_unavailable", "deadline_exceeded"].includes(code(e))
+						publicUrl(ref.path).pathname !==
+						`/v1/image-artifacts/${encodeURIComponent(ref.id)}/content`
 					)
-						throw new Error("generation_unknown");
-					throw e;
-				}
-				if (data.status !== "succeeded")
-					throw new Error("invalid_image_result");
-				const a = object(data.artifact ?? list(data.artifacts)[0]);
-				const ref = {
-					id: str(a.id),
-					path: str(a.contentUrl),
-					mime: str(a.mimeType),
-					actualModel: a.model === undefined ? undefined : str(a.model),
-				};
-				if (
-					publicUrl(ref.path).pathname !==
-					`/v1/image-artifacts/${encodeURIComponent(ref.id)}/content`
-				)
-					throw new Error("invalid_artifact_path");
-				await progress({ phase: "fetching-result", artifact: ref });
-				return artifact(ref, signal);
+						throw new Error("invalid_artifact_path");
+					await progress({ phase: "fetching-result", artifact: ref });
+					return await artifact(ref, signal);
+				});
 			}
 			if (target.kind !== "music")
 				throw new Error("invalid_unsupported_service");

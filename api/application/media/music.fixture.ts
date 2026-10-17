@@ -32,6 +32,15 @@ export function musicFixture(
 		),
 	);
 	const artwork = png(256, 256);
+	const imageService = {
+		name: "image",
+		capability: "media.image.generate",
+		protocol: "larm.image-generation.v1",
+		endpoint: "/v1/images/generations",
+		url: "/v1/images/generations",
+		model: "fixture-image",
+		description: "Image service, synchronous POST, exact dimensions, PNG/WebP",
+	};
 	const gateway = () =>
 		createLarmPlayground({
 			baseUrl: "http://127.0.0.1:9999",
@@ -53,18 +62,7 @@ export function musicFixture(
 						{
 							id: "image-profile",
 							providers: [],
-							services: [
-								{
-									name: "image",
-									capability: "media.image.generate",
-									protocol: "larm.image-generation.v1",
-									endpoint: "/v1/images/generations",
-									url: "/v1/images/generations",
-									model: "fixture-image",
-									description:
-										"Image service, synchronous POST, exact dimensions, PNG/WebP",
-								},
-							],
+							services: [imageService],
 						},
 						{
 							id: "music-profile",
@@ -89,6 +87,23 @@ export function musicFixture(
 							: profiles.map((p) => ({ ...p, services: [] })),
 					});
 				}
+				if (path === "/v1/agent-connections")
+					return Response.json(
+						{
+							id: "image-connection",
+							agentProfile: "image-profile",
+							catalogRevision: "1",
+							status: "ready",
+							providers: [],
+							services: [imageService],
+						},
+						{ status: 201 },
+					);
+				if (
+					path === "/v1/agent-connections/image-connection" &&
+					init.method === "DELETE"
+				)
+					return new Response(null, { status: 204 });
 				if (path === "/v1/images/generations")
 					return fixtureOptions.artworkFailure
 						? new Response(null, { status: 503 })

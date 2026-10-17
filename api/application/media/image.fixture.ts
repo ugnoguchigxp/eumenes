@@ -97,6 +97,17 @@ export function imageFixture(
 		metadata: descriptor("past-image", 320, 240, past),
 		bytes: past,
 	});
+	const imageService = {
+		name: "image",
+		capability: "media.image.generate",
+		protocol: "larm.image-generation.v1",
+		endpoint: "/v1/images/generations",
+		url: "/v1/images/generations",
+		model: "fixture-image",
+		description:
+			"Image service, synchronous POST, exact dimensions, PNG/WebP; no reference editing",
+		startupPolicy: { minWarmInstances: 0 },
+	};
 	const gateway = () =>
 		createLarmPlayground({
 			baseUrl: "http://127.0.0.1:9999",
@@ -123,22 +134,27 @@ export function imageFixture(
 							{
 								id: "image-profile",
 								providers: [],
-								services: [
-									{
-										name: "image",
-										capability: "media.image.generate",
-										protocol: "larm.image-generation.v1",
-										endpoint: "/v1/images/generations",
-										url: "/v1/images/generations",
-										model: "fixture-image",
-										description:
-											"Image service, synchronous POST, exact dimensions, PNG/WebP; no reference editing",
-										startupPolicy: { minWarmInstances: 0 },
-									},
-								],
+								services: [imageService],
 							},
 						],
 					});
+				if (path === "/v1/agent-connections")
+					return Response.json(
+						{
+							id: "image-connection",
+							agentProfile: "image-profile",
+							catalogRevision: "a".repeat(64),
+							status: "ready",
+							providers: [],
+							services: [imageService],
+						},
+						{ status: 201 },
+					);
+				if (
+					path === "/v1/agent-connections/image-connection" &&
+					init.method === "DELETE"
+				)
+					return new Response(null, { status: 204 });
 				if (path === "/v1/images/generations") {
 					if (gate) await gate;
 					if (mode === "failure") return new Response(null, { status: 503 });

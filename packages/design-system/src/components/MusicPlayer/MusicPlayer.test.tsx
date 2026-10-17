@@ -50,6 +50,15 @@ describe("MusicPlayer", () => {
 		});
 		expect(audio.volume).toBe(0.3);
 	});
+	it("keeps playing after the playing intent is recorded", async () => {
+		const { audio } = setup();
+		fireEvent.click(screen.getByRole("button", { name: "再生" }));
+		await screen.findByRole("button", { name: "一時停止" });
+		await new Promise((resolve) => setTimeout(resolve, 20));
+		expect(audio.paused).toBe(false);
+		expect(HTMLMediaElement.prototype.play).toHaveBeenCalledOnce();
+		expect(HTMLMediaElement.prototype.pause).not.toHaveBeenCalled();
+	});
 	it("seeks and clamps ten second jumps to media boundaries", () => {
 		const { audio } = setup();
 		fireEvent.change(screen.getByRole("slider", { name: "再生位置" }), {
