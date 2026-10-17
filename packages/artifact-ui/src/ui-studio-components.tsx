@@ -316,6 +316,7 @@ function StudioMain({
 	onMode,
 	onRefresh,
 	pending,
+	busy,
 }: {
 	heading: string;
 	shown: { definition: unknown; source: unknown; revision: number } | null;
@@ -327,7 +328,11 @@ function StudioMain({
 	onMode: (mode: StudioMode) => void;
 	onRefresh: () => void;
 	pending: boolean;
+	/** A specialist turn holds the work (the first draft may be on its way). */
+	busy: boolean;
 }) {
+	// Nothing to show yet: no work, or a work whose first draft was never accepted.
+	const empty = !shown || shown.definition == null;
 	// Both stay mounted: switching is display state and keeps trial input.
 	return (
 		<section className="aui-ui-preview-panel" aria-labelledby={heading}>
@@ -377,7 +382,7 @@ function StudioMain({
 					</div>
 				)}
 			</div>
-			{shown ? (
+			{!empty ? (
 				<>
 					<div className="aui-ui-preview-stage" hidden={mode !== "preview"}>
 						<StudioPreview
@@ -398,9 +403,19 @@ function StudioMain({
 				<div className="aui-ui-preview-stage">
 					<div className="aui-ui-preview-canvas aui-ui-preview-empty">
 						<LayoutTemplate aria-hidden="true" />
-						<strong>ここに作品を表示します</strong>
+						<strong>
+							{busy
+								? "初稿を作成しています"
+								: mode === "source"
+									? "まだ定義がありません"
+									: "ここに作品を表示します"}
+						</strong>
 						<span>
-							会話で作りたいUIを伝えてください。保存した作品は作品履歴から選べます。
+							{busy
+								? "反映されるとプレビューとソースに表示します。"
+								: mode === "source"
+									? "初稿が反映されると、ここにOpenUI定義のJSONを表示します。"
+									: "会話で作りたいUIを伝えてください。保存した作品は作品履歴から選べます。"}
 						</span>
 					</div>
 				</div>
@@ -638,6 +653,7 @@ function Studio({
 				onMode={onMode}
 				onRefresh={() => send("ui-refresh")}
 				pending={action.pending}
+				busy={busy}
 			/>
 			<Feedback message={action.message} />
 		</div>

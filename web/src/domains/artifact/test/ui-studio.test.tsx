@@ -262,6 +262,20 @@ test("with nothing to show the studio explains how to start", () => {
 	expect((button("破棄") as HTMLButtonElement).disabled).toBe(true);
 });
 
+test("without a definition the source view says so, and a running first turn says it is coming", () => {
+	const { update } = mount(studio({ work: null, session: null }));
+	fireEvent.click(button("ソース"));
+	expect(screen.getByText("まだ定義がありません")).toBeTruthy();
+	update(
+		studio({ work: work({ definition: null, busy: true, dirty: false }) }),
+	);
+	expect(screen.getByText("初稿を作成しています")).toBeTruthy();
+	update(
+		studio({ work: work({ definition: null, busy: false, dirty: false }) }),
+	);
+	expect(screen.getByText("まだ定義がありません")).toBeTruthy();
+});
+
 test("the source view shows exactly the shown definition, read-only, and survives updates", async () => {
 	const { dispatch, update, container } = mount(studio());
 	fireEvent.change(screen.getByRole("textbox", { name: "感想" }), {

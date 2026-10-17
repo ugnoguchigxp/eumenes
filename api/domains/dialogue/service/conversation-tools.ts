@@ -108,11 +108,13 @@ function requestSchemaFor(refs: string[]) {
 		},
 	};
 }
+/** A session option the model may leave empty: null or "" means not given. */
+const unsetEmpty = (v: unknown) => (v === null || v === "" ? undefined : v);
 const sessionRequest = z
 	.object({
 		request: toolchainRequest.shape.request,
-		target: z.string().min(1).max(200).optional(),
-		resolveUnsaved: z.literal("discard").optional(),
+		target: z.preprocess(unsetEmpty, z.string().max(200).optional()),
+		resolveUnsaved: z.preprocess(unsetEmpty, z.literal("discard").optional()),
 	})
 	.strict();
 const answeringRequest = z

@@ -19,6 +19,13 @@ import {
 	type SessionOffers,
 } from "./conversation-tools";
 
+/** An option the model may leave empty: null or "" means not given. */
+const optional = <T extends z.ZodType>(schema: T) =>
+	z.preprocess(
+		(v) => (v === null || v === "" ? undefined : v),
+		schema.optional(),
+	);
+
 const routeSchema = z
 	.object({
 		decision: z.enum(["toolchain", "answer"]),
@@ -26,24 +33,30 @@ const routeSchema = z
 		request: z.string(),
 		questionRef: z.string(),
 		/** A session toolchain's start options (omitted for the others). */
-		target: z.string().optional(),
-		resolveUnsaved: z.literal("discard").optional(),
+		target: optional(z.string()),
+		resolveUnsaved: optional(z.literal("discard")),
 	})
 	.strict();
 
-const outputSchema = {
+const baseProperties = {
+	decision: { enum: ["toolchain", "answer"] },
+	functionName: { type: "string" },
+	request: { type: "string" },
+	questionRef: { type: "string" },
+};
+/** The output schema; the session start options are offered only when a session toolchain is. */
+const outputSchemaFor = (sessions: boolean) => ({
 	type: "object",
-	properties: {
-		decision: { enum: ["toolchain", "answer"] },
-		functionName: { type: "string" },
-		request: { type: "string" },
-		questionRef: { type: "string" },
-		target: { type: "string" },
-		resolveUnsaved: { enum: ["discard"] },
-	},
+	properties: sessions
+		? {
+				...baseProperties,
+				target: { type: "string" },
+				resolveUnsaved: { enum: ["discard"] },
+			}
+		: baseProperties,
 	required: ["decision", "functionName", "request", "questionRef"],
 	additionalProperties: false,
-};
+});
 
 /** Recheck the intent with the same context when the first call returned only prose. */
 export async function routeConversation(input: {
@@ -72,7 +85,7 @@ export async function routeConversation(input: {
 		"\nOPEN_QUESTIONS=" +
 		JSON.stringify(input.openQuestions) +
 		"\nOUTPUT_SCHEMA=" +
-		JSON.stringify(outputSchema);
+		JSON.stringify(outputSchemaFor(!!input.sessions?.size));
 	const receipt = await input.inference.executeControl(
 		input.requestId,
 		[{ role: "system", content: policy }, ...input.messages],

@@ -97,7 +97,8 @@ const renderers = {
 };
 type Node = ArtifactRequest | Layout;
 function RegisteredView({ request }: { request: Node }) {
-	if (request.view === "layout") return <CompositionView request={request} />;
+	if (request.view === "layout")
+		return <CompositionView request={request} nested />;
 	const Component = renderers[request.view];
 	return <Component request={request} />;
 }
@@ -109,7 +110,17 @@ function plain(node: Node | undefined): ArtifactRequest {
 }
 const keyOf = (node: Node) =>
 	node.view === "layout" ? "layout" : (node.source ?? node.view);
-function CompositionView({ request }: { request: Layout }) {
+/**
+ * A layout. A nested stack/grid layout is a section: its title is shown as the section heading. The
+ * outermost layout's title names the composition and stays an accessible label only.
+ */
+function CompositionView({
+	request,
+	nested = false,
+}: {
+	request: Layout;
+	nested?: boolean;
+}) {
 	const [selected, setSelected] = useState("0");
 	const tabs: NonNullable<typeof request.tabs> =
 		request.tabs ??
@@ -219,6 +230,9 @@ function CompositionView({ request }: { request: Layout }) {
 			data-gap={request.gap}
 			data-width={request.width}
 		>
+			{nested && request.title && (
+				<h3 className="aui-composition-section-title">{request.title}</h3>
+			)}
 			{request.children.map((child, index) => (
 				<RegisteredView
 					key={`${index}:${child.view}:${keyOf(child)}`}

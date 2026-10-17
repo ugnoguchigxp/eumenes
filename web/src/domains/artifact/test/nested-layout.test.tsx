@@ -47,6 +47,23 @@ test("layouts nest to four levels and render recursively with tokens", () => {
 	const inner = container.querySelector('[data-gap="compact"]');
 	expect(inner?.getAttribute("data-width")).toBe("narrow");
 	expect(container.querySelector('[data-emphasis="strong"]')).toBeTruthy();
+	// A nested layout's title heads its section; the outermost one only names the composition.
+	expect(screen.queryByRole("heading", { name: "外側" })).toBeNull();
+});
+
+test("a titled nested layout shows its title as the section heading", () => {
+	render(
+		<ArtifactRenderer
+			definition={JSON.stringify(
+				layout([layout([text("本文")], { title: "特徴", direction: "grid" })]),
+			)}
+			runtime={{
+				snapshot,
+				dispatch: async () => ({ status: "accepted", message: "" }),
+			}}
+		/>,
+	);
+	expect(screen.getByRole("heading", { name: "特徴" })).toBeTruthy();
 });
 
 test("depth is limited to four including the root, and one definition holds at most 60 views", () => {

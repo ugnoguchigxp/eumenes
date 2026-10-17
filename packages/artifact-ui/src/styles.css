@@ -397,6 +397,14 @@
 	grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
 	align-items: start;
 }
+/* A nested layout's title heads its section and spans every grid column. */
+.aui-composition > .aui-composition-section-title {
+	grid-column: 1 / -1;
+	margin: 0;
+	font-size: 1.15rem;
+	font-weight: 700;
+	line-height: 1.4;
+}
 .aui-music-workspace {
 	display: flex;
 	flex-direction: column;

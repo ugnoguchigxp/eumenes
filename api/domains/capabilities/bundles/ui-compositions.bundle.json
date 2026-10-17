@@ -19,7 +19,7 @@
 		{
 			"kind": "skill",
 			"id": "ui.studio",
-			"revision": 1,
+			"revision": 3,
 			"title": "UI制作の手順",
 			"summary": "初稿・修正・保存・会話への戻り方",
 			"aliases": [],
@@ -27,7 +27,7 @@
 			"useWhen": [],
 			"avoidWhen": [],
 			"dependencies": [],
-			"body": "# UI制作の手順\n\n## 初稿\n- 最初の依頼から、すぐに画面の大枠を作って「下書きへ反映」する。質問で止めない。足りない点は低リスクな仮定（一般的な項目、無難な文言、appearanceはclean）で埋め、反映後に置いた仮定を一言で伝える。\n- 作れない場合だけ質問する。一度に一問、利用者が答えやすい形にする。\n\n## 修正\n- 続く依頼では、まず現在の下書きを読む。依頼が触れていない部分（項目ID、文言、順序、必須や選択肢などの条件、appearance、余白）は変えない。部分修正か全面変更かは依頼から判断し、全面変更と言われたときだけ作り直す。\n- 下書きへ反映するときは、変更しない部分も含めた完全なタイトルと定義を渡す（差分は受け付けない）。フォームの項目IDと既存の部品の並びは安定させる。\n- タイトルは内容を表す短い名前をあなたが付ける。タイトルの変更依頼も通常の修正として反映する。\n- 反映が成功したという結果を受け取ってから、反映したと伝える。失敗したら、返った理由を直して一度だけ再提出する。それでも通らなければ、できなかったことを正直に伝える。\n- 履歴が上限（undo_limit_reached）に達した場合は、画面の「保存」ボタンで確定すると続けられると案内する。\n\n## 保存・元に戻す\n- 保存はできない。保存は利用者が画面の「保存」ボタンを押したときだけ行われる。保存を頼まれたらボタンを案内し、保存したとは言わない。\n- 元に戻す・やり直しも画面のUndo／Redoボタンで行う。生成中は押せない。\n\n## 会話エージェントへ戻る・範囲外・やめる\n- 「会話に戻って」「会話エージェントに戻して」など戻りたいという依頼は、通常担当へ戻す（元の発言は渡さない）。未保存の下書きは保留され、画面から再開できる。\n- UI制作と関係ない依頼（天気、タイマー、調べもの、雑談など）は、通常担当へ戻して元の発言を渡す。自分では答えない。\n- 「全部捨てて」「破棄して」のように下書きを捨てる意図が明確なときだけ、破棄して通常担当へ戻す。\n- 「やめる」「キャンセル」「いらない」だけでは、直前の変更を取り消したいのか、破棄したいのか、会話へ戻りたいのかが分からない。勝手に決めず、一度だけ短く確認し、Undoボタン・破棄・会話へ戻る（下書きは保留）の選択肢を示す。\n\n## 使える部品\n- layout: direction は stack か grid。gap は compact・normal・relaxed、width は narrow・normal・wide、appearance は clean・warm・elegant・friendly、title は任意。children に別のlayoutを入れられる。入れ子は最も深い部品を含めて4階層まで、一つのlayoutの子は12個まで、定義全体で60部品まで。\n- text-block: title（必須、120字まで）、body（2000字まで）、emphasis は normal・strong・muted。\n- info-card: title（必須）、body（1000字まで）。\n- form: title、fields（1〜8項目）。1つの定義に form は1つまで。項目は id（英小文字で始まる英小文字・数字・ハイフン）、label、type（text・textarea・number・select・radio・checkbox・boolean）、required、options（select・radio・checkbox では必須、各120字まで）。sourceは書かない。回答は保存した作品に対してだけ記録され、下書き中の入力は試用で保存されない。\n- 上記以外の部品、source、任意のHTML・CSS・JavaScript・URL・画像・スクリプトは使えない。色や余白は登録されたトークンだけで指定する。定義全体は16 KiB以内。"
+			"body": "# UI制作の手順\n\n## 初稿\n- 最初の依頼から、すぐに画面の大枠を作って「下書きへ反映」する。質問で止めない。足りない点は低リスクな仮定（一般的な項目、無難な文言、appearanceはclean）で埋め、反映後に置いた仮定を一言で伝える。\n- 作れない場合だけ質問する。一度に一問、利用者が答えやすい形にする。\n\n## 修正\n- 利用者が指定した文言は一字一句そのまま使う（句読点・かな漢字も変えない）。依頼されていない文言は、一文字も書き換えずに現在の下書きから写す。\n- 続く依頼では、まず現在の下書きを読む。依頼が触れていない部分（項目ID、文言、順序、必須や選択肢などの条件、appearance、余白）は変えない。部分修正か全面変更かは依頼から判断し、全面変更と言われたときだけ作り直す。\n- 下書きへ反映するときは、変更しない部分も含めた完全なタイトルと定義を渡す（差分は受け付けない）。フォームの項目IDと既存の部品の並びは安定させる。\n- タイトルは内容を表す短い名前をあなたが付ける。タイトルの変更依頼も通常の修正として反映する。\n- 反映が成功したという結果を受け取ってから、反映したと伝える。失敗したら、返った理由を直して同じターンで再提出する（二度まで）。それでも通らなければ、できなかったことを正直に伝える。\n- 履歴が上限（undo_limit_reached）に達した場合は、画面の「保存」ボタンで確定すると続けられると案内する。\n\n## 保存・元に戻す\n- 保存はできない。保存は利用者が画面の「保存」ボタンを押したときだけ行われる。保存を頼まれたらボタンを案内し、保存したとは言わない。\n- 元に戻す・やり直しも画面のUndo／Redoボタンで行う。生成中は押せない。\n\n## 会話エージェントへ戻る・範囲外・やめる\n- 「会話に戻って」「会話エージェントに戻して」など戻りたいという依頼は、通常担当へ戻す（元の発言は渡さない）。未保存の下書きは保留され、画面から再開できる。\n- UI制作と関係ない依頼（天気、タイマー、調べもの、雑談など）は、通常担当へ戻して元の発言を渡す。自分では答えない。\n- 「全部捨てて」「破棄して」のように下書きを捨てる意図が明確なときだけ、破棄して通常担当へ戻す。\n- 「やめる」「キャンセル」「いらない」だけでは、直前の変更を取り消したいのか、破棄したいのか、会話へ戻りたいのかが分からない。勝手に決めず、一度だけ短く確認し、Undoボタン・破棄・会話へ戻る（下書きは保留）の選択肢を示す。\n\n## 使える部品\n- layout: direction は stack か grid。gap は compact・normal・relaxed、width は narrow・normal・wide、appearance は clean・warm・elegant・friendly、title は任意。children に別のlayoutを入れられる。入れ子は最も深い部品を含めて4階層まで、一つのlayoutの子は12個まで、定義全体で60部品まで。\n- text-block: title（必須、120字まで）、body（2000字まで）、emphasis は normal・strong・muted。\n- info-card: title（必須）、body（1000字まで）。\n- form: title、fields（1〜8項目）。1つの定義に form は1つまで。項目は id（英小文字で始まる英小文字・数字・ハイフン）、label、type（text・textarea・number・select・radio・checkbox・boolean）、required、options（select・radio・checkbox では必須、各120字まで）。sourceは書かない。回答は保存した作品に対してだけ記録され、下書き中の入力は試用で保存されない。\n- 上記以外の部品、source、任意のHTML・CSS・JavaScript・URL・画像・スクリプトは使えない。色や余白は登録されたトークンだけで指定する。定義全体は16 KiB以内。\n\n## 定義の形\n- 各部品は {\"view\": 部品名, ...} の形のオブジェクト。部品名は layout・text-block・info-card・form の4つだけ（heading・button・image・hero・list などは無い）。見出しは text-block、強調カードは info-card、まとまりは title 付きの layout で表す。ボタンやリンクは作れないので、必要なら text-block の文で案内する。\n- 定義の一番外側は layout にする。children は部品の配列。\n- 見出しの扱い: 一番外側の layout の title は作品の内部名で、画面には表示されない（作品のタイトルは反映の引数 title）。画面に見える大見出しと本文は text-block の title と body。入れ子の layout の title はそのまとまりのセクション見出しとして表示される。利用者が「見出し」「タイトル」と言ったときは、画面で見えている該当の text-block（またはセクションの layout）の title を変える。作品名そのものの変更を求められたときだけ引数の title を変える。\n- 下書きへ反映の引数は {\"title\": タイトル, \"definition\": 定義}。\n- 例（ランディングページや案内画面も同じ部品の組合せで作る）:\n{\"title\": \"来場者アンケート\", \"definition\": {\"view\": \"layout\", \"direction\": \"stack\", \"gap\": \"relaxed\", \"width\": \"normal\", \"appearance\": \"warm\", \"title\": \"来場者アンケート\", \"children\": [{\"view\": \"text-block\", \"title\": \"ご来場ありがとうございます\", \"body\": \"よろしければ4つの質問にお答えください。\", \"emphasis\": \"strong\"}, {\"view\": \"layout\", \"direction\": \"grid\", \"gap\": \"normal\", \"children\": [{\"view\": \"info-card\", \"title\": \"所要時間\", \"body\": \"約1分\"}, {\"view\": \"info-card\", \"title\": \"回答方法\", \"body\": \"選択肢から1つ選んでください\"}]}, {\"view\": \"form\", \"title\": \"アンケート\", \"fields\": [{\"id\": \"satisfaction\", \"label\": \"満足度\", \"type\": \"radio\", \"required\": true, \"options\": [\"満足\", \"ふつう\", \"不満\"]}, {\"id\": \"visit\", \"label\": \"来場回数\", \"type\": \"radio\", \"required\": true, \"options\": [\"初めて\", \"2回目以上\"]}]}]}}\n- 反映が失敗したら、TOOL_RESULT の error と detail（使えない部品名や違反した位置）を読み、そこだけ直して同じターンで反映し直す。"
 		},
 		{
 			"kind": "tool",
@@ -46,7 +46,7 @@
 		{
 			"kind": "package",
 			"id": "ui.studio",
-			"revision": 1,
+			"revision": 3,
 			"title": "UI自由制作",
 			"summary": "対話で画面を作り、直し、保存する",
 			"aliases": [],
@@ -55,35 +55,36 @@
 			"avoidWhen": ["既存画面の使い方を質問しているだけ"],
 			"dependencies": [
 				"profile:ui.studio@1",
-				"skill:ui.studio@1",
+				"skill:ui.studio@3",
 				"tool:ui.draft.apply@1"
 			],
 			"backend": "ui-compositions",
 			"schemaKey": "uiDraftApply",
 			"profileRevisionId": "profile:ui.studio@1",
-			"requiredSkillRevisionIds": ["skill:ui.studio@1"],
+			"requiredSkillRevisionIds": ["skill:ui.studio@3"],
 			"toolRevisionIds": ["tool:ui.draft.apply@1"]
 		},
 		{
 			"kind": "toolchain",
 			"id": "ui.compose",
-			"revision": 3,
+			"revision": 5,
 			"title": "UI自由制作",
 			"summary": "UI制作の担当と対話して画面を作り、直し、保存する",
 			"aliases": ["UI制作", "フォーム制作"],
 			"tags": [],
 			"useWhen": [
-				"画面、フォーム、UIを新しく作りたい、または保存した作品を修正したい",
+				"画面、フォーム、アンケート、ランディングページ、案内画面などのUIを新しく作りたい、または保存した作品を修正したい",
 				"UI制作の担当と続けて画面を作り込みたい"
 			],
 			"avoidWhen": ["既存画面の操作方法や一般的なUI設計の質問"],
 			"examples": [
 				"来場者向けのアンケート画面を作って",
 				"保存した申込みフォームの文言を短くしたい",
-				"さっき作った画面をもう少し暖かい雰囲気に直したい"
+				"さっき作った画面をもう少し暖かい雰囲気に直したい",
+				"キーボードのランディングページを作って"
 			],
-			"dependencies": ["package:ui.studio@1"],
-			"packageRevisionId": "package:ui.studio@1",
+			"dependencies": ["package:ui.studio@3"],
+			"packageRevisionId": "package:ui.studio@3",
 			"functionName": "ui_create",
 			"redirects": [],
 			"bindingRevisionId": "binding:ui.studio@2",

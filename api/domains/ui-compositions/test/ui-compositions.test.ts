@@ -661,6 +661,15 @@ test("definitions: only the allowed views, no source, within size and view-count
 		refused(layout([{ view: "question", question: { prompt: "?" } }])),
 	).toBe("ui_view_not_allowed");
 	expect(refused(layout([{ view: "ui-studio" }]))).toBe("ui_view_not_allowed");
+	// The refusal tells the specialist what it may use instead (a repair hint, never data).
+	try {
+		validatedDefinition(layout([{ view: "button", title: "購入" }]));
+	} catch (error) {
+		const detail = (error as { detail?: string }).detail ?? "";
+		expect(detail).toContain('"button"');
+		for (const view of ["layout", "text-block", "info-card", "form"])
+			expect(detail).toContain(view);
+	}
 	expect(refused(layout([{ ...text(), source: "x" }]))).toBe(
 		"ui_source_forbidden",
 	);

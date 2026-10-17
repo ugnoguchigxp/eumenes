@@ -92,3 +92,78 @@ test("an unoffered function cannot start an operation", async () => {
 		),
 	).rejects.toThrow("invalid_conversation_route");
 });
+
+test("empty session options are read as not given, for any toolchain", async () => {
+	const request = "休日の昼に聞く楽曲を作ってください";
+	for (const empty of [null, ""]) {
+		const result = await decide(
+			{
+				decision: "toolchain",
+				functionName: "music",
+				request,
+				questionRef: "",
+				target: empty,
+				resolveUnsaved: empty,
+			},
+			request,
+		);
+		expect(result.operation).toMatchObject({ functionName: "music", request });
+		expect(result.operation).not.toHaveProperty("target");
+		expect(result.operation).not.toHaveProperty("resolveUnsaved");
+	}
+	const answer = await decide(
+		{
+			decision: "answer",
+			functionName: "",
+			request: "",
+			questionRef: "",
+			target: null,
+			resolveUnsaved: null,
+		},
+		"楽曲生成の仕組みを説明して",
+	);
+	expect(answer.decision).toBe("answer");
+});
+
+test("the session start options are offered only with a session toolchain", async () => {
+	let policy = "";
+	const inference = {
+		executeControl: async (
+			requestId: string,
+			messages: Array<{ content: string }>,
+		) => {
+			policy = messages[0]!.content;
+			return {
+				requestId,
+				attemptId: "route",
+				value: JSON.stringify({
+					decision: "answer",
+					functionName: "",
+					request: "",
+					questionRef: "",
+				}),
+			} as Receipt;
+		},
+	} as unknown as InferencePort;
+	await routeConversation({
+		inference,
+		requestId: "request",
+		messages: [{ role: "user", content: "こんにちは" }],
+		tools: [tool],
+		cards: [card],
+		openQuestions: [],
+		signal: new AbortController().signal,
+	});
+	expect(policy).not.toContain("resolveUnsaved");
+	await routeConversation({
+		inference,
+		requestId: "request",
+		messages: [{ role: "user", content: "こんにちは" }],
+		tools: [tool],
+		cards: [card],
+		openQuestions: [],
+		sessions: new Map([["music", []]]),
+		signal: new AbortController().signal,
+	});
+	expect(policy).toContain("resolveUnsaved");
+});

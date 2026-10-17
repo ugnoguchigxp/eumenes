@@ -68,24 +68,46 @@ function walk(
 	depth: number,
 	count: { views: number; forms: number },
 ) {
-	if (!isRecord(node)) return fail("ui_definition_invalid");
-	if (depth > limits.depth) return fail("ui_definition_too_deep");
-	if (++count.views > limits.views) return fail("ui_definition_too_many_views");
-	if ("source" in node) return fail("ui_source_forbidden");
+	if (!isRecord(node))
+		return fail("ui_definition_invalid", 'every part is an object with "view"');
+	if (depth > limits.depth)
+		return fail(
+			"ui_definition_too_deep",
+			`nest layouts at most ${limits.depth} levels including the deepest part`,
+		);
+	if (++count.views > limits.views)
+		return fail(
+			"ui_definition_too_many_views",
+			`at most ${limits.views} parts in total`,
+		);
+	if ("source" in node)
+		return fail("ui_source_forbidden", "remove every source property");
 	const view = node.view;
 	if (typeof view !== "string" || !allowedViews.has(view))
-		return fail("ui_view_not_allowed", String(view).slice(0, 40));
+		return fail(
+			"ui_view_not_allowed",
+			`"view" ${JSON.stringify(String(view).slice(0, 40))} is not allowed; use only ${[...allowedViews].join(", ")}`,
+		);
 	if (view === "layout") {
 		if (
 			node.direction !== undefined &&
 			!allowedDirections.has(node.direction as string)
 		)
-			return fail("ui_layout_direction_not_allowed");
-		if (!Array.isArray(node.children)) return fail("ui_definition_invalid");
+			return fail(
+				"ui_layout_direction_not_allowed",
+				`direction must be ${[...allowedDirections].join(" or ")}`,
+			);
+		if (!Array.isArray(node.children))
+			return fail("ui_definition_invalid", "layout needs a children array");
 		for (const child of node.children) walk(child, depth + 1, count);
 	} else if (view === "form") {
-		if (++count.forms > limits.forms) return fail("ui_form_limit");
-		if (!Array.isArray(node.fields)) return fail("ui_definition_invalid");
+		if (++count.forms > limits.forms)
+			return fail(
+				"ui_form_limit",
+				`at most ${limits.forms} form per definition`,
+			);
+		if (!Array.isArray(node.fields))
+			return fail("ui_definition_invalid", "form needs a fields array");
 	}
 }
 function formOf(node: unknown): Definition | undefined {
@@ -107,10 +129,17 @@ export function validatedDefinition(raw: unknown): {
 	definition: Definition;
 	fields: FormFields | null;
 } {
-	if (!isRecord(raw)) return fail("ui_definition_invalid");
+	if (!isRecord(raw))
+		return fail(
+			"ui_definition_invalid",
+			'definition is one object with "view"',
+		);
 	const json = JSON.stringify(raw);
 	if (new TextEncoder().encode(json).length > limits.definitionBytes)
-		return fail("ui_definition_too_large");
+		return fail(
+			"ui_definition_too_large",
+			`keep the definition JSON within ${limits.definitionBytes} bytes`,
+		);
 	walk(raw, 1, { views: 0, forms: 0 });
 	try {
 		parseDefinition(json);
@@ -125,7 +154,15 @@ export function validatedDefinition(raw: unknown): {
 	}
 	const form = formOf(raw);
 	const fields = form ? formFields.safeParse(form.fields) : null;
-	if (fields && !fields.success) return fail("ui_definition_invalid", "form");
+	if (fields && !fields.success) {
+		const issue = fields.error.issues[0];
+		return fail(
+			"ui_definition_invalid",
+			issue
+				? `form/fields/${issue.path.join("/").slice(0, 60)}: ${issue.message.slice(0, 100)}`
+				: "form fields",
+		);
+	}
 	return { definition: raw, fields: fields?.success ? fields.data : null };
 }
 /** The fields of the definition's inline form, or null when it has none. */
