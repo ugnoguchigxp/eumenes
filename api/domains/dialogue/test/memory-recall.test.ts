@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { migrations as memoryPackageMigrations } from "eumenes-memory/sqlite";
+import { estimateTextTokens } from "../../../infrastructure/context-budget";
 import { sha256Hex } from "../../../infrastructure/digest";
 import { packVector, vectorSpaceKey } from "../../../infrastructure/vector";
 import { openStore, type SqliteStore } from "../../../infrastructure/sqlite";
@@ -414,7 +415,7 @@ test("the prefetch and this turn's recall never carry the same message, and a ch
 					messageId,
 					digest: sha256Hex(messageText(h, messageId)),
 				})),
-				bytes: Buffer.byteLength(prefetchText),
+				tokens: estimateTextTokens(prefetchText),
 			},
 		}),
 	);
@@ -438,12 +439,14 @@ test("the prefetch and this turn's recall never carry the same message, and a ch
 	expect(stale.error).toBe("memory_stale");
 });
 
-test("the recall has no ordinal boundary: runs the size limit cut from the prompt are searched too", async () => {
+test("the recall has no ordinal boundary: runs the budget cut from the prompt are searched too", async () => {
 	const h = await setup();
 	const runs = [];
-	// Twelve exchanges of ~18 KB each (cut to 12 KB in the prompt): the history limit (48 KiB) keeps only the newest few.
-	for (let i = 0; i < 12; i++)
-		runs.push(await h.ask(`話${i}は${"京都".repeat(3000)}`));
+	// A short first exchange, then exchanges of ~24k tokens each: the memory and history budget (128k tokens)
+	// drops the oldest ones, and what is left of the budget after that is room for the short one to be recalled.
+	runs.push(await h.ask("話0は京都"));
+	for (let i = 1; i <= 8; i++)
+		runs.push(await h.ask(`話${i}は${"京都".repeat(12000)}`));
 	const texts = runs.map((r) => messageText(h, r.inputMessageId));
 	for (const r of runs) await h.putVector(r.inputMessageId, KYOTO);
 	const run = await h.ask("京都の話を続けて");
@@ -454,10 +457,11 @@ test("the recall has no ordinal boundary: runs the size limit cut from the promp
 	const recall = recallOf(messages)!;
 	expect(recall).toBeDefined();
 	const recalled = texts.filter((_, i) => recall.content.includes(`話${i}は`));
-	expect(recalled.length).toBeGreaterThan(0);
-	// Nothing recalled is also sent verbatim, and at least one of them is among the ten newest runs.
+	expect(recalled).toContain("話0は京都");
+	// Nothing recalled is also sent verbatim; the oldest are out of the history, the newest are in it.
 	for (const text of recalled) expect(sent(text)).toBe(false);
-	expect(recalled.some((text) => texts.slice(-10).includes(text))).toBe(true);
+	expect(sent(texts[8]!)).toBe(true);
+	expect(sent(texts[1]!)).toBe(false);
 });
 
 test("a prefetch standing on exchanges already shown is left out for the turn, and its messages are not checked", async () => {
@@ -474,7 +478,7 @@ test("a prefetch standing on exchanges already shown is left out for the turn, a
 					messageId,
 					digest: sha256Hex(messageText(h, messageId)),
 				})),
-				bytes: Buffer.byteLength(text),
+				tokens: estimateTextTokens(text),
 			},
 		}),
 	);

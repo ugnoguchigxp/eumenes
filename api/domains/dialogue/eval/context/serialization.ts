@@ -7,7 +7,7 @@
  *   then sent to the same LARM destination as [system, history..., user prompt]. It measures whether a source stays
  *   readable on a path that removes message boundaries.
  */
-import { promptParts } from "../../../inference/adapters/cloud-agents";
+import { promptParts } from "../../../inference";
 import type { ChatMessage } from "../../service/context";
 import type { ContextAssembly } from "../../service/context-assembly";
 import type { ArmOutput, ContextArm } from "./arm";
@@ -27,7 +27,10 @@ export function serialize(
 	const parts = promptParts(out.messages, out.sessionContext);
 	const messages: ChatMessage[] = [
 		{ role: "system", content: parts.system },
-		...parts.history.map((turn) => ({ role: turn.role, content: turn.content })),
+		...parts.history.map((turn) => ({
+			role: turn.role,
+			content: turn.content,
+		})),
 		{ role: "user", content: parts.prompt },
 	];
 	return { messages, currentRequestIndex: messages.length - 1 };
@@ -53,7 +56,9 @@ export function flattenedSourceIssues(
 		.flatMap((m) => arm.sourcesIn!(m.content));
 	const flat = serialize("flattened", out).messages;
 	const flatSources = new Set(
-		[flat[0]!, flat[flat.length - 1]!].flatMap((m) => arm.sourcesIn!(m.content)),
+		[flat[0]!, flat[flat.length - 1]!].flatMap((m) =>
+			arm.sourcesIn!(m.content),
+		),
 	);
 	return [...new Set(original)]
 		.filter((source) => !flatSources.has(source))

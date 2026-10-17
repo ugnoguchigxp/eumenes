@@ -40,6 +40,7 @@ export async function setup(
 		speechText?: (text: string) => string;
 		fetch?: typeof fetch;
 		localMs?: number;
+		llmContextWindow?: LarmPort["llmContextWindow"];
 	} = {},
 ) {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-inference-"));
@@ -88,6 +89,7 @@ export async function setup(
 	const port: LarmPort = {
 		decisionModel: () => (options.dataset ? ATTITUDE_MODEL : null),
 		prepareVoice: options.prepareVoice,
+		llmContextWindow: options.llmContextWindow,
 		status: () => ({ state: "unconfigured", capabilities: [] }),
 		answerStream: options.localStream,
 		judge: options.judge,

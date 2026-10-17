@@ -9,7 +9,7 @@
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `google-accounts` | 0 | `api/domains/google-accounts/index.ts` | `web/src/domains/google-accounts/` | `packages/design-system/src/components/GoogleAccounts/index.tsx` | なし | なし | なし |
 | `excalidraw` | 3 | `api/domains/excalidraw/index.ts` | `web/src/domains/excalidraw/` | なし | `capabilities`、`inference`、`larm`、`queue` | なし | なし |
-| `ocr` | 3 | `api/domains/ocr/index.ts` | `web/src/domains/ocr/index.ts` | `packages/design-system/src/components/OcrWorkspace/index.ts` | `capabilities`、`inference`、`queue` | なし | なし |
+| `ocr` | 3 | `api/domains/ocr/index.ts` | `web/src/domains/ocr/` | `packages/design-system/src/components/OcrWorkspace/index.ts` | `capabilities`、`inference`、`queue` | なし | なし |
 | `object-recognition` | 1 | `api/domains/object-recognition/index.ts` | `web/src/domains/object-recognition/index.ts` | なし | `capabilities`、`queue` | なし | なし |
 | `kanban` | 1 | `api/domains/kanban/index.ts` | `web/src/domains/kanban/index.ts` | なし | `capabilities` | なし | なし |
 | `codex-tasks` | 1 | `api/domains/codex-tasks/index.ts` | `web/src/domains/codex-tasks/` | なし | `coding` | なし | なし |
@@ -78,7 +78,7 @@
 | audio | なし | `web/src/domains/audio/index.ts` | `web/src/domains/audio/test/` |
 | queue | `api/domains/queue/index.ts` | なし | `api/domains/queue/test/` |
 | scheduler | `api/domains/scheduler/index.ts` | なし | `api/domains/scheduler/test/` |
-| ocr | `api/domains/ocr/index.ts` | `web/src/domains/ocr/index.ts`（アーティファクト「文字を読み取る」、`docs/ocr.md`） | `api/domains/ocr/test/`、`api/application/media/ocr-e2e.test.ts`、`api/application/media/ocr-adapter.test.ts`、`tests/browser/ocr.spec.ts` |
+| ocr | `api/domains/ocr/index.ts` | `web/src/domains/ocr/`（アーティファクト「文字を読み取る」、`docs/ocr.md`） | `api/domains/ocr/test/`、`api/application/media/ocr-e2e.test.ts`、`api/application/media/ocr-adapter.test.ts`、`tests/browser/ocr.spec.ts` |
 | terminals | `api/domains/terminals/index.ts` | `web/src/domains/terminals/index.ts`（アーティファクト「ターミナル」、`docs/terminals.md`） | `api/domains/terminals/test/`、`api/application/work/terminals-adapter.test.ts`、`web/src/domains/terminals/connection.test.ts` |
 | timers | `api/domains/timers/index.ts` | `web/src/domains/timers` と `web/src/components/domains/timers/TimerArtifact.tsx` | `api/domains/timers/test/` |
 | dialogue | `api/domains/dialogue/index.ts` | `web/src/domains/dialogue/index.ts` | `api/domains/dialogue/test/`、`web/src/domains/dialogue/test/` |

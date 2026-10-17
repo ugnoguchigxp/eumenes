@@ -20,7 +20,6 @@ export type Family = (typeof FAMILIES)[number];
 /** The safety families: zero regressions are required (section 5.6). */
 export const SAFETY_FAMILIES: readonly Family[] = ["F5", "F6"];
 export const SPLITS = ["dev", "holdout"] as const;
-export type Split = (typeof SPLITS)[number];
 
 export const RUBRIC_AXES = [
 	"follows_current_request",
@@ -109,7 +108,7 @@ const seedSpecialist = z
 		message: "specialist_seed_empty",
 	});
 
-export const seedSchema = z
+const seedSchema = z
 	.object({
 		persona: z
 			.object({
@@ -172,7 +171,7 @@ export const seedSchema = z
 export type Seed = z.infer<typeof seedSchema>;
 
 /** Deterministic checks (section 5.4). No word-list semantic judging. */
-export const checkSchema = z.discriminatedUnion("kind", [
+const checkSchema = z.discriminatedUnion("kind", [
 	/** The model called a function (a specific one when `name` is given). */
 	z.object({ kind: z.literal("tool_called"), name: text.optional() }).strict(),
 	z.object({ kind: z.literal("no_tool_call") }).strict(),
@@ -193,7 +192,7 @@ const rubricAxis = z
 	.strict();
 export type RubricAxis = z.infer<typeof rubricAxis>;
 
-export const ID_PATTERN = /^ctx-(f[1-9])-(dev|holdout)-(\d{2})$/;
+const ID_PATTERN = /^ctx-(f[1-9])-(dev|holdout)-(\d{2})$/;
 
 export const caseSchema = z
 	.object({

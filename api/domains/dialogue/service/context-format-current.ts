@@ -10,7 +10,6 @@ import type {
 	HistoryTurn,
 	HostRuleId,
 } from "./context-assembly";
-import type { ContextSections } from "./context-compiler";
 import type { ChatMessage } from "./context";
 import { researchResultContext } from "./research-result-context";
 import { buildSystemPrompt } from "./system-prompt";
@@ -172,10 +171,19 @@ function turnMessage(turn: HistoryTurn): ChatMessage {
 	};
 }
 
-const MEMORY_TAIL: ReadonlySet<ContextSource> = new Set([
-	"memory.notice",
-	"memory.recall",
-]);
+/** The layers of the context as messages, in the order the list shows them. */
+type Layers = {
+	system: ChatMessage;
+	longTerm: ChatMessage[];
+	goals: ChatMessage[];
+	/** The exchanges kept verbatim. */
+	history: ChatMessage[];
+	/** The summary, then the short-term notes. */
+	working: ChatMessage[];
+	/** Exchanges no memory step has taken out of the prompt yet. */
+	unprocessed: ChatMessage[];
+	input: ChatMessage;
+};
 
 /** The system part (S): the persona and the host's rules, the same on every turn of a conversation. */
 export function systemMessageOf(a: ContextAssembly): ChatMessage {
@@ -187,7 +195,7 @@ export function systemMessageOf(a: ContextAssembly): ChatMessage {
 
 /** The messages of the layers by part, and the message of every volatile block that has one of its own. */
 function layout(a: ContextAssembly) {
-	const sections: ContextSections = {
+	const sections: Layers = {
 		system: systemMessageOf(a),
 		longTerm: a.stable
 			.filter((b) => b.source === "memory.long_term")
@@ -199,7 +207,6 @@ function layout(a: ContextAssembly) {
 			.filter((t) => t.layer === "unprocessed")
 			.map(turnMessage),
 		input: a.input,
-		tail: [],
 	};
 	const volatile = new Map<ContextBlock, ChatMessage>();
 	for (const block of a.volatile) {
@@ -209,20 +216,13 @@ function layout(a: ContextAssembly) {
 			block.source.startsWith("operation.")
 		)
 			continue;
-		const message = blockMessage(block);
-		volatile.set(block, message);
-		if (MEMORY_TAIL.has(block.source)) sections.tail.push(message);
+		volatile.set(block, blockMessage(block));
 	}
 	return { sections, volatile };
 }
 
-/** The layers of the context as messages, without the volatile part's later additions (what `compileContext` lists). */
-export function layoutCurrent(a: ContextAssembly): ContextSections {
-	return layout(a).sections;
-}
-
 /** The list of an answer to a failed research: it drops the layers and carries the failure (see `researchResultContext`). */
-function failureList(sections: ContextSections, block: ContextBlock) {
+function failureList(sections: Layers, block: ContextBlock) {
 	if (block.body.kind !== "json") throw new Error("context_block_body");
 	const failure = block.body.value as {
 		failureCode: string;

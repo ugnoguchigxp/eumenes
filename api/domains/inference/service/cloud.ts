@@ -2,6 +2,7 @@ import { workersSpeechRequest } from "../adapters/workers-ai-speech";
 import { readChatResponse } from "../../../infrastructure/chat-stream";
 import { readBounded } from "../../../infrastructure/bounded-read";
 import {
+	exchangeEnd,
 	estimateMessageTokens,
 	outputReserveTokens,
 } from "../../../infrastructure/context-budget";
@@ -74,7 +75,9 @@ function fitMessages(
 	let split = context;
 	if (row.contextPolicy !== "exact") {
 		while (messages.length > 2 && tokens > budget) {
-			const count = Math.min(2, messages.length - 2);
+			// Whole exchanges go, the oldest first; the first message and the last one stay.
+			const roles = messages.slice(1, -1).map((m) => m.role);
+			const count = exchangeEnd(roles, 0, roles.length);
 			messages.splice(1, count);
 			tokens -= sizes.splice(1, count).reduce((sum, size) => sum + size, 0);
 		}
@@ -89,8 +92,13 @@ function fitMessages(
 		)
 			if (messages[i]!.role !== "system") at.push(i);
 		const gone = new Set<number>();
+		const roles = at.map((i) => messages[i]!.role);
+		// Whole exchanges go, the oldest first, so the history never starts with an assistant message.
 		while (tokens > budget && gone.size < at.length)
-			for (const i of at.slice(gone.size, gone.size + 2)) {
+			for (const i of at.slice(
+				gone.size,
+				exchangeEnd(roles, gone.size, at.length),
+			)) {
 				gone.add(i);
 				tokens -= sizes[i]!;
 			}

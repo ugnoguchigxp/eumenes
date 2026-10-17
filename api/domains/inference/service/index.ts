@@ -24,6 +24,7 @@ import type {
 	BackgroundControl,
 } from "../contracts";
 import { get, bindControlEngine } from "../repository";
+import { snapshotPort } from "./snapshot-port";
 import { executeRequest as runRequest } from "./execute";
 import type {
 	CollectionAdoption,
@@ -400,18 +401,7 @@ export function createInference(
 				)
 					a.controller.abort();
 		},
-		snapshotInTransaction: settings.inTransaction,
-		llmContextWindowInTransaction(db: Database, requestId: string) {
-			const snapshot = get(db, requestId)?.snapshot;
-			const route = snapshot?.routes.llm;
-			if (route?.mode !== "cloud-only") return null;
-			return (
-				snapshot!.resources.find(
-					(resource) =>
-						resource.id === route.fallbackId && resource.purpose === "llm",
-				)?.contextWindow ?? null
-			);
-		},
+		...snapshotPort(settings, port),
 		captureInTransaction: capture,
 		executeRequest: (
 			id: string,

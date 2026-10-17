@@ -63,6 +63,9 @@ export function callOptionsFor(r: Request, attemptId: string): LarmCallOptions {
 		...(r.row.contextPolicy === "exact"
 			? { contextPolicy: "exact" as const }
 			: {}),
+		...(r.row.contextPolicy === "exact" && r.session?.context
+			? { history: r.session.context }
+			: {}),
 		...sessionCallOptions(r.session),
 		...(r.row.outputLimit ? { maxOutputTokens: r.row.outputLimit } : {}),
 

@@ -21,9 +21,7 @@
 			},
 			{
 				"kind": "forbidden_identifier",
-				"identifiers": [
-					"mem-7f3a9c"
-				]
+				"identifiers": ["mem-7f3a9c"]
 			}
 		],
 		"rubric": [

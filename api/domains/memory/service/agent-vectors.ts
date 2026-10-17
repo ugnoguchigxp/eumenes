@@ -34,8 +34,6 @@ const validVector = (vector: number[] | undefined, space: MemoryVectorSpace) =>
  * from. Nothing here throws into the job: embedding failure costs only the vectors (and a stale prefetch).
  */
 export function createAgentVectors(deps: {
-	/** The most (estimated tokens) a prefetch may take: the memory and history budget. */
-	recallBudgetTokens: () => number;
 	conversation: ConversationService;
 	atMs(): number;
 	/** Looked up at each use: the application may create the embedder after memory. */
@@ -154,6 +152,8 @@ export function createAgentVectors(deps: {
 			db: Database,
 			conversationId: string,
 			query: QueryVector | null | undefined,
+			/** The most (estimated tokens) the prefetch may take: the memory and history budget. */
+			maxTokens: number,
 		): WindowPrefetch | undefined {
 			if (!query) return undefined;
 			try {
@@ -162,7 +162,7 @@ export function createAgentVectors(deps: {
 					space: query.space,
 					vector: query.vector,
 					minScore: RECALL_MIN_SCORE,
-					maxTokens: deps.recallBudgetTokens(),
+					maxTokens,
 				});
 				return found ?? { text: "", pins: [], tokens: 0 };
 			} catch (error) {

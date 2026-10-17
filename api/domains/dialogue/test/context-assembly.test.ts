@@ -111,7 +111,6 @@ test("the session split, the position of the input and the cache marks come from
 			},
 		],
 		history: {
-			boundary: {},
 			turns: [
 				turn("user", "保持の質問", "keep", "m1"),
 				turn("assistant", "保持の答え", "keep", "m2"),
@@ -136,7 +135,6 @@ test("the session split, the position of the input and the cache marks come from
 			},
 		],
 		input: { role: "user", content: "今回" },
-		currentRequest: { messageId: "m5" },
 	};
 	const rendered = renderContext(assembly, "current");
 	const contents = rendered.messages.map((m) => m.content);

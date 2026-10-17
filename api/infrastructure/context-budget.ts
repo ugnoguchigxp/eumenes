@@ -26,11 +26,10 @@ export const REFERENCE_WINDOW_TOKENS = 262_144;
 /** The most the memory and conversation history may take (128k tokens). */
 export const MEMORY_HISTORY_MAX_TOKENS = 131_072;
 /** The most of the window kept for the model's answer. */
-export const OUTPUT_RESERVE_MAX_TOKENS = 4096;
+const OUTPUT_RESERVE_MAX_TOKENS = 4096;
 
 // Han (with extension A and the compatibility block), kana, hangul, and the CJK symbols and full-width forms.
-const CJK =
-	/[ᄀ-ᇿ⺀-⿟　-〿぀-ヿ㄀-ㄯ㄰-㆏ㇰ-ㇿ㐀-䶿一-鿿가-힯豈-﫿＀-￯]/u;
+const CJK = /[ᄀ-ᇿ⺀-⿟　-〿぀-ヿ㄀-ㄯ㄰-㆏ㇰ-ㇿ㐀-䶿一-鿿가-힯豈-﫿＀-￯]/u;
 
 /** Tokens of a text: CJK and kana count one per character, the rest by UTF-8 bytes. */
 export function estimateTextTokens(text: string): number {
@@ -48,7 +47,7 @@ export function estimateTextTokens(text: string): number {
 
 const STRUCTURE = /[{}[\]",:]/g;
 /** Tokens of a JSON text: the structure characters are counted apart from the text between them. */
-export function estimateJsonTextTokens(json: string): number {
+function estimateJsonTextTokens(json: string): number {
 	const structure = json.match(STRUCTURE)?.length ?? 0;
 	return (
 		Math.ceil(structure / TOKEN_ESTIMATE.jsonStructureCharsPerToken) +
@@ -82,7 +81,7 @@ export function estimateMessageTokens(
 }
 
 /** The two budgets of a window: memory and conversation history, and the current task. */
-export type ContextBudgets = { memoryHistory: number; task: number };
+type ContextBudgets = { memoryHistory: number; task: number };
 
 /**
  * `min(128k, window / 2)` for the memory and the conversation history; the rest for the current task (the
@@ -99,4 +98,19 @@ export function contextBudgets(windowTokens: number): ContextBudgets {
 /** What a window keeps for the answer: part of the task budget, never the memory and history budget. */
 export function outputReserveTokens(windowTokens: number): number {
 	return Math.min(OUTPUT_RESERVE_MAX_TOKENS, Math.floor(windowTokens / 4));
+}
+
+/**
+ * The end (exclusive) of the exchange that starts at `roles[start]`: the message and those after it up to the next
+ * `user` message, or `end`. A history that loses a whole exchange at a time never starts with an assistant message
+ * (an assistant message left over from a run that had no answer to pair with goes alone). At least one message.
+ */
+export function exchangeEnd(
+	roles: readonly string[],
+	start: number,
+	end: number,
+): number {
+	let next = start + 1;
+	while (next < end && roles[next] !== "user") next++;
+	return next;
 }

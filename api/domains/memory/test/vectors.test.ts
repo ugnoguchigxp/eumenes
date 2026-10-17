@@ -127,7 +127,7 @@ test("a prefetched exchange whose message changed makes the run's window stale",
 			prefetch: {
 				text: "京都の話",
 				pins: [{ messageId: old, digest }],
-				bytes: 12,
+				tokens: 12,
 			},
 		}),
 	);

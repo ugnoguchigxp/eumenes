@@ -2,6 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { Hono } from "hono";
+import { estimateTextTokens } from "../../../infrastructure/context-budget";
 import { configureLogging } from "../../../infrastructure/logger";
 import {
 	conversationQuerySchema,
@@ -132,7 +133,7 @@ test("tendencies are listed; there is no route to change or delete them by hand"
 	).toHaveLength(1);
 });
 
-test("the context endpoint shows both layers against their limits, and is off when memory is", async () => {
+test("the context endpoint shows both layers with their estimated size, and is off when memory is", async () => {
 	const { h, app } = await setup();
 	await h.seed("コーヒーが好き", "drink.coffee");
 	await h.note("c1", { kind: "goal", text: "Rust移行" });
@@ -140,13 +141,14 @@ test("the context endpoint shows both layers against their limits, and is off wh
 	const context = memoryContextSchema.parse(await response.json());
 	if ("disabled" in context && context.disabled) throw new Error("off");
 	expect(context).toMatchObject({
-		longTerm: { limit: 16 * 1024 },
-		shortTerm: { limit: 8 * 1024, pendingAdditions: 0 },
+		shortTerm: { pendingAdditions: 0 },
 		notices: 0,
 	});
 	if (!("longTerm" in context)) throw new Error("off");
 	expect(context.longTerm.text).toContain("コーヒーが好き");
-	expect(context.longTerm.bytes).toBe(Buffer.byteLength(context.longTerm.text));
+	expect(context.longTerm.tokens).toBe(
+		estimateTextTokens(context.longTerm.text),
+	);
 	expect(context.shortTerm.text).toContain("Rust移行");
 	await h.memory.setEnabled(false);
 	expect(

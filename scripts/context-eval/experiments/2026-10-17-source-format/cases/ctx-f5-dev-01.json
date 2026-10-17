@@ -20,6 +20,8 @@
 			"kind": "image",
 			"result": {
 				"id": "4c1d0b52-7a53-4a1e-9b61-0d2f5e3a8c11",
+				"runId": "r-seed",
+				"conversationId": "main",
 				"state": "failed",
 				"action": "generate",
 				"title": "夕焼けの海",
@@ -33,7 +35,9 @@
 				"artifactId": null,
 				"mime": null,
 				"actualModel": null,
-				"errorCode": "image_upstream_timeout"
+				"errorCode": "image_upstream_timeout",
+				"createdAt": 1760630400000,
+				"updatedAt": 1760630460000
 			}
 		}
 	},
@@ -46,9 +50,7 @@
 			},
 			{
 				"kind": "forbidden_identifier",
-				"identifiers": [
-					"image_upstream_timeout"
-				]
+				"identifiers": ["image_upstream_timeout"]
 			}
 		],
 		"rubric": [

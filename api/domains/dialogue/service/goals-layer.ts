@@ -2,7 +2,6 @@ import { systemContext } from "../../../infrastructure/system-context";
 import type { Database } from "bun:sqlite";
 import type { ContextBlock } from "../../inference";
 import type { ContextGoalEntry, GoalsLayerPort } from "../contracts";
-import type { ChatMessage } from "./context";
 
 const GOALS_FRAME = systemContext(
 	"dialogue.contexts.goals-layer.goals-frame",
@@ -17,8 +16,6 @@ export function goalLine(desiredState: string): string {
 export type GoalsLayer = {
 	/** The layer as the context's content: the frame sentence as the header, the goal lines as the one section. */
 	block: ContextBlock;
-	/** The same layer as the message the `current` format writes. */
-	message: ChatMessage;
 	/** The goals the layer lists: all of them. */
 	shown: Array<{ goalId: string; revision: number }>;
 };
@@ -38,7 +35,6 @@ export function renderGoalsLayer(
 		.sort((a, b) => b.goal.priority - a.goal.priority || a.index - b.index)
 		.map(({ goal }) => goal);
 	const items = ordered.map((goal) => goalLine(goal.desiredState));
-	const content = [GOALS_FRAME, ...items].join("\n");
 	return {
 		block: {
 			source: "goals",
@@ -46,7 +42,6 @@ export function renderGoalsLayer(
 			freshness: "stable",
 			body: { kind: "lines", header: GOALS_FRAME, sections: [{ items }] },
 		},
-		message: { role: "system", content },
 		shown: ordered.map(({ goalId, revision }) => ({ goalId, revision })),
 	};
 }

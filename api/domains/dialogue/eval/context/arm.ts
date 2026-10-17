@@ -35,15 +35,13 @@ export type ContextArm = {
 	build(assembly: ContextAssembly): ArmOutput;
 };
 
-export const armOutputOf = (
-	rendered: RenderedContext<ChatMessage>,
-): ArmOutput => ({
+const armOutputOf = (rendered: RenderedContext<ChatMessage>): ArmOutput => ({
 	messages: rendered.messages,
 	sessionContext: rendered.sessionContext,
 	currentRequestIndex: rendered.currentRequestIndex,
 });
 
-export const BASELINE_ARM_ID = "A0";
+const BASELINE_ARM_ID = "A0";
 /** The product's current format: `renderContext(assembly, "current")`. */
 export const baselineArm: ContextArm = {
 	id: BASELINE_ARM_ID,

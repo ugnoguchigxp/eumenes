@@ -10,7 +10,6 @@ import {
 	goalAccessSchema,
 	goalStatuses,
 	goalTransitionSchema,
-	proposeGoalSchema,
 	updateGoalSchema,
 } from "../contracts";
 import type {
@@ -319,11 +318,7 @@ export function createGoalsService(
 		status: "adopted" | "proposed",
 	): { goal: Goal; replayed: boolean } {
 		const access = parseAccess(rawAccess);
-		const value = parse(
-			status === "adopted" ? adoptGoalSchema : proposeGoalSchema,
-			input,
-			"invalid_goal_input",
-		);
+		const value = parse(adoptGoalSchema, input, "invalid_goal_input");
 		assertScope(access, value.scopeKey);
 		const operation = value.operationKey
 			? {

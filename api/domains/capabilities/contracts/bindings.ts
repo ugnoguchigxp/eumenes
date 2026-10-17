@@ -73,7 +73,6 @@ export const commandBindingV1 = z.strictObject({
 	 */
 	questions: z.array(bindingQuestion).max(8).optional(),
 });
-export type CommandBindingV1 = z.infer<typeof commandBindingV1>;
 
 /**
  * A specialist-session toolchain (spec toolchain-specialist-dialogue 2026-10-17 §4.1): after the
@@ -81,7 +80,7 @@ export type CommandBindingV1 = z.infer<typeof commandBindingV1>;
  * `tools` are the operations the specialist model may call (always with a host-fixed work, never a
  * client one). Undo/redo/save and other screen-only operations are artifact actions, not tools.
  */
-export const sessionBindingV1 = z.strictObject({
+const sessionBindingV1 = z.strictObject({
 	kind: z.literal("binding"),
 	id: slug,
 	revision: revisionNumber,
@@ -98,7 +97,6 @@ export const sessionBindingV1 = z.strictObject({
 		targetSchemaRef: schemaRef.optional(),
 	}),
 });
-export type SessionBindingV1 = z.infer<typeof sessionBindingV1>;
 /** Any binding kind; unknown `execution` values are rejected. */
 export const bindingV1 = z.discriminatedUnion("execution", [
 	commandBindingV1,

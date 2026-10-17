@@ -1,4 +1,7 @@
-import { estimateTextTokens } from "../../../../infrastructure/context-budget";
+import {
+	TOKEN_ESTIMATE,
+	estimateTextTokens,
+} from "../../../../infrastructure/context-budget";
 import type { CurationItem, CurationResult } from "../../../memory";
 import {
 	COMPACT_THRESHOLD,
@@ -38,22 +41,27 @@ const SUMMARY_CHARS = 1200;
 // ---- eligibility (the kick asks before it makes a unit) ----
 
 /**
- * Estimated tokens the memory and the verbatim history take of the memory and history budget: the long-term and
- * short-term layers, the summary and the recalled exchanges as the stored window carries them, and the exchanges
- * kept verbatim (each message whole).
+ * Estimated tokens of the layers history compaction cannot reduce: long-term memory, short-term notes and the
+ * summary, as the stored window carries them. The per-turn recall (prefetch) is left out: it is rebuilt every
+ * turn, so counting it would make the trigger flap with the question asked.
  */
-function memoryHistoryTokens(env: StepEnv): number {
-	const { db, deps, conversationId } = env;
-	const window = deps.memory.windows.storedInTransaction(db, conversationId);
-	let tokens = window
+function fixedLayerTokens(env: StepEnv): number {
+	const window = env.deps.memory.windows.storedInTransaction(
+		env.db,
+		env.conversationId,
+	);
+	return window
 		? window.longTerm.tokens +
-			window.shortTerm.tokens +
-			window.prefetch.tokens +
-			estimateTextTokens(window.history.summaryText)
+				window.shortTerm.tokens +
+				estimateTextTokens(window.history.summaryText)
 		: 0;
-	const rows = deps.memory
-		.exchangesInTransaction(db, conversationId)
-		.filter((row) => row.disposition === "keep");
+}
+
+/** The exchanges kept verbatim, oldest first, with the estimated tokens their (unblocked) messages take. */
+function keptExchanges<
+	Row extends { inputMessageId: string; answerMessageId: string | null },
+>(env: StepEnv, rows: readonly Row[]): Array<{ row: Row; tokens: number }> {
+	const { db, deps } = env;
 	const blocked = deps.memory.blockedMessageIdsInTransaction(
 		db,
 		rows.flatMap((r) => [
@@ -61,15 +69,46 @@ function memoryHistoryTokens(env: StepEnv): number {
 			...(r.answerMessageId ? [r.answerMessageId] : []),
 		]),
 	);
-	for (const row of rows) {
+	return rows.map((row) => {
+		let tokens = 0;
 		for (const id of [row.inputMessageId, row.answerMessageId]) {
 			if (id === null || blocked.has(id)) continue;
 			const found = deps.conversation.messageInTransaction(db, id);
-			if (found) tokens += estimateTextTokens(found.message.text);
+			if (found)
+				tokens +=
+					TOKEN_ESTIMATE.messageOverheadTokens +
+					estimateTextTokens(found.message.text);
 		}
-	}
-	return tokens;
+		return { row, tokens };
+	});
 }
+
+/**
+ * What compact-history sees: the tokens of the layers it cannot reduce plus the kept exchanges, against the
+ * trigger (`COMPACT_THRESHOLD` of the memory and history budget). `fold` is as many of the oldest kept exchanges
+ * as it takes to bring the total under the trigger (none when it is already under).
+ */
+function compactNeed<
+	Row extends { inputMessageId: string; answerMessageId: string | null },
+>(env: StepEnv, rows: readonly Row[]): { over: boolean; fold: Row[] } {
+	const trigger = env.deps.memory.historyBudgetTokens() * COMPACT_THRESHOLD;
+	const kept = keptExchanges(env, rows);
+	const total =
+		fixedLayerTokens(env) + kept.reduce((sum, entry) => sum + entry.tokens, 0);
+	const fold: Row[] = [];
+	let remaining = total;
+	for (const entry of kept) {
+		if (remaining < trigger) break;
+		if (entry.tokens === 0) continue;
+		fold.push(entry.row);
+		remaining -= entry.tokens;
+	}
+	return { over: total >= trigger, fold };
+}
+const keepRows = (env: StepEnv) =>
+	env.deps.memory
+		.exchangesInTransaction(env.db, env.conversationId)
+		.filter((row) => row.disposition === "keep");
 const summaryChars = (env: StepEnv): number =>
 	[
 		...(env.deps.memory.summaryInTransaction(env.db, env.conversationId)
@@ -82,10 +121,7 @@ export function eligible(env: StepEnv, step: StepId): boolean {
 		case "consolidate-memory":
 			return activeStateItems(env).length >= 2;
 		case "compact-history":
-			return (
-				memoryHistoryTokens(env) >=
-				env.deps.memory.historyBudgetTokens() * COMPACT_THRESHOLD
-			);
+			return compactNeed(env, keepRows(env)).over;
 		case "refine-summary":
 			return summaryChars(env) >= SUMMARY_CHARS * REFINE_THRESHOLD;
 		case "consolidate-goals":
@@ -317,14 +353,12 @@ type SummaryContext = {
 type CompactOutput = { fold: string[]; summary: string; changed: boolean };
 
 function prepareCompact(env: StepEnv) {
-	if (!eligible(env, "compact-history"))
-		return { status: "stale" as const, reason: "nothing_to_do" };
 	const { db, deps, conversationId } = env;
-	const rows = deps.memory
-		.exchangesInTransaction(db, conversationId)
-		.filter((row) => row.disposition === "keep");
+	// Only as many of the oldest kept exchanges as it takes to get under the trigger are folded.
+	const need = compactNeed(env, keepRows(env));
+	if (!need.over) return { status: "stale" as const, reason: "nothing_to_do" };
 	const loaded: LoadedExchange[] = [];
-	for (const row of rows) {
+	for (const row of need.fold) {
 		const result = loadExchange(env, row);
 		if (result.status === "ok") loaded.push(result.exchange);
 	}

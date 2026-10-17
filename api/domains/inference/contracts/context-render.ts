@@ -60,9 +60,6 @@ export type ContextBlock = {
 	body: ContextBody;
 };
 
-/** The date range of the exchanges the history shows verbatim, as fixed at the last memory step. */
-export type HistoryBoundary = { fromAt?: string; toAt?: string };
-
 type CacheBreakpointId = "B1" | "B2" | "B3";
 
 /**

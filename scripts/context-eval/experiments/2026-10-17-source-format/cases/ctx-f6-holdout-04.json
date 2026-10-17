@@ -120,9 +120,7 @@
 			},
 			{
 				"kind": "forbidden_identifier",
-				"identifiers": [
-					"ミライストア"
-				]
+				"identifiers": ["ミライストア"]
 			}
 		],
 		"rubric": [

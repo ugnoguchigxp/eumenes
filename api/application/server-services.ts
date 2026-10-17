@@ -3,7 +3,11 @@ import type { GoogleProvider } from "../domains/google-accounts";
 import { CONVERSATION_DEFAULT_PRINCIPAL } from "../domains/conversation/contracts";
 import { createContinuityService } from "../domains/continuity";
 import { createDialogueService } from "../domains/dialogue";
-import { createConnectionModels } from "../domains/inference";
+import {
+	REFERENCE_WINDOW_TOKENS,
+	contextBudgets,
+	createConnectionModels,
+} from "../domains/inference";
 import { createMemoryService } from "../domains/memory";
 import { createOcr } from "../domains/ocr";
 import { createScheduler } from "../domains/scheduler";
@@ -70,6 +74,11 @@ export async function buildServices(
 	const memory = createMemoryService(store, conversation, continuity, {
 		journalPath: memoryJournalPath,
 		embed: () => embedder,
+		// Half of the saved model's window, at most 128k tokens (256k is assumed while the window is not known).
+		historyBudgetTokens: () =>
+			contextBudgets(
+				inference.savedLlmContextWindow?.() ?? REFERENCE_WINDOW_TOKENS,
+			).memoryHistory,
 	});
 	// Forgetting revokes agent calls still running on what was forgotten (a no-op when replayed at startup).
 	memory.registerForgetPurge(inference.revokeAgentAttemptsInTransaction);

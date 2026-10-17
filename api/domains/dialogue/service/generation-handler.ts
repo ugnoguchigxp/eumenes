@@ -140,8 +140,8 @@ export function createGenerationHandler(
 		payloadVersions: [1],
 		schema: z.object({
 			runId: z.string(),
-			commandNote: z.string().max(500).optional(),
-			specialistHandoff: z.string().max(500).optional(),
+			commandNote: z.string().optional(),
+			specialistHandoff: z.string().optional(),
 		}),
 		recovery: "interrupt",
 		resourceKey: "inference.llm",

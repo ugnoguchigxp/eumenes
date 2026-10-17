@@ -1,13 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import {
-	appendFileSync,
-	cpSync,
-	mkdtempSync,
-	readFileSync,
-	rmSync,
-	writeFileSync,
-} from "node:fs";
-import { tmpdir } from "node:os";
+import { appendFileSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import {
 	analyzeScores,
@@ -15,9 +7,8 @@ import {
 	rerunTransport,
 	run,
 	score,
-	type Ctx,
 } from "../../../../../scripts/context-eval/commands";
-import { baselineAaArm, baselineCompileArm } from "../../eval/context/arm";
+import { baselineAaArm, baselineArm } from "../../eval/context/arm";
 import { loadCases } from "../../eval/context/case-loader";
 import {
 	frozenFilesOf,
@@ -38,67 +29,34 @@ import {
 } from "../../eval/context/raw";
 import { planJobs, type ConversationRunner } from "../../eval/context/run";
 import { makeCase } from "./case-fixtures";
+import {
+	ALL_CASES,
+	ARMS_MODULE,
+	DEV_CASES,
+	FIXTURE_ARMS,
+	HOLDOUT_CASE,
+	RERUN_FILLED,
+	TRIALS,
+	makeExperiment,
+	repoRoot,
+} from "./experiment-fixture";
 import { openSeedWiring } from "./store-wiring";
 
-const repoRoot = resolve(import.meta.dir, "../../../../..");
 const dirs: string[] = [];
 afterEach(() => {
 	for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
 });
 
-const RERUN_FILLED =
-	"- 再実行の条件: transport_error の呼び出しだけを、新しい run ディレクトリで1回まで再実行する。";
-/** A copy of the example experiment plus one holdout case; `rerun` fills in the preregistered re-run condition. */
-function experiment(rerun = false) {
-	const root = mkdtempSync(join(tmpdir(), "context-eval-integrity-"));
-	dirs.push(root);
-	const dir = join(root, "exp");
-	cpSync(
-		join(repoRoot, "scripts/context-eval/experiments/2026-10-17-source-format"),
-		dir,
-		{ recursive: true },
-	);
-	writeFileSync(
-		join(dir, "cases/ctx-f1-holdout-01.json"),
-		JSON.stringify({
-			id: "ctx-f1-holdout-01",
-			family: "F1",
-			split: "holdout",
-			seed: {},
-			input: "今夜は眠りたいので飲み物を一つ選んで",
-			tools: "none",
-			expect: {
-				checks: [{ kind: "brief_spoken_reply" }],
-				rubric: [
-					{ axis: "follows_current_request", condition: "眠りを妨げない" },
-				],
-			},
-		}),
-	);
-	if (rerun) {
-		const path = join(dir, "PREREGISTRATION.md");
-		writeFileSync(
-			path,
-			readFileSync(path, "utf8").replace(/^- 再実行の条件:.*$/m, RERUN_FILLED),
-		);
-	}
-	let tick = 0;
-	const ctx: Ctx = {
-		repoRoot,
-		outRoot: join(root, "reports"),
-		now: () => new Date(Date.UTC(2026, 9, 17, 9, 0, 0, ++tick)),
-		log: () => {},
-	};
-	return { dir, ctx };
-}
+const experiment = (rerun = false) => makeExperiment(rerun, dirs);
 const base = (dir: string) => ({
 	lane: "fixture" as const,
+	serialization: "larm-messages" as const,
 	runner: createFixtureRunner(loadCases(dir)),
 	openWiring: openSeedWiring,
 });
 const lines = (path: string) => readFileSync(path, "utf8").trim().split("\n");
 
-test("the freeze covers every harness source, and the manifest records each case's baseline prompt", async () => {
+test("the freeze covers every harness source, the arms' module and prose, and the manifest records each case's baseline prompt", async () => {
 	const { dir, ctx } = experiment();
 	const config = loadExperimentConfig(dir);
 	const frozen = frozenFilesOf(repoRoot, dir, config).map((f) => f.path);
@@ -106,6 +64,11 @@ test("the freeze covers every harness source, and the manifest records each case
 		"materialize.ts",
 		"raw.ts",
 		"prefix-stability.ts",
+		"prefix-measure.ts",
+		"trajectory.ts",
+		"render-invariants.ts",
+		"serialization.ts",
+		"ordering.ts",
 		"report.ts",
 		"fixture-lane.ts",
 		"judge-rules.ts",
@@ -114,14 +77,24 @@ test("the freeze covers every harness source, and the manifest records each case
 		expect(frozen).toContain(`api/domains/dialogue/eval/context/${name}`);
 	for (const name of ["live.ts", "commands.ts", "cli.ts", "arms.ts"])
 		expect(frozen).toContain(`scripts/context-eval/${name}`);
+	expect(frozen).toContain(
+		"scripts/context-eval/experiments/2026-10-17-source-format/arms.ts",
+	);
+	for (const name of [
+		"arm-frames",
+		"arm-rule-table",
+		"arm-role-note",
+		"judge-rules",
+	])
+		expect(frozen).toContain(
+			`api/domains/dialogue/contexts/context-eval/${name}.context.toml`,
+		);
+	expect(ARMS_MODULE.endsWith("arms.ts")).toBe(true);
 	expect(harnessSources(repoRoot).length).toBeGreaterThan(15);
 	const { manifest } = await prepare(ctx, dir, openSeedWiring);
-	expect(Object.keys(manifest.baselinePrompts)).toEqual([
-		"ctx-f1-dev-01",
-		"ctx-f1-holdout-01",
-		"ctx-f3-dev-01",
-		"ctx-f9-dev-01",
-	]);
+	expect(Object.keys(manifest.baselinePrompts)).toEqual(
+		[...DEV_CASES, HOLDOUT_CASE].sort(),
+	);
 	for (const hash of Object.values(manifest.baselinePrompts))
 		expect(hash).toMatch(/^[0-9a-f]{64}$/);
 });
@@ -130,15 +103,20 @@ test("a run refuses when the baseline prompt no longer matches the frozen one (p
 	const { dir, ctx } = experiment();
 	await prepare(ctx, dir, openSeedWiring);
 	const changed = {
-		id: "baseline-compile",
-		build: (m: Parameters<typeof baselineCompileArm.build>[0]) => {
-			const out = baselineCompileArm.build(m);
+		id: "A0",
+		build: (assembly: Parameters<typeof baselineArm.build>[0]) => {
+			const out = baselineArm.build(assembly);
 			return {
 				...out,
 				messages: [
 					{ role: "system" as const, content: "追加された規則" },
 					...out.messages,
 				],
+				sessionContext: {
+					...out.sessionContext,
+					instructionCount: out.sessionContext.instructionCount + 1,
+				},
+				currentRequestIndex: out.currentRequestIndex + 1,
 			};
 		},
 	};
@@ -146,12 +124,20 @@ test("a run refuses when the baseline prompt no longer matches the frozen one (p
 		run(ctx, dir, {
 			...base(dir),
 			split: "all",
-			arms: [changed, baselineAaArm],
+			arms: [
+				changed,
+				baselineAaArm,
+				...(
+					await import("../../../../../scripts/context-eval/arms").then((m) =>
+						m.loadArms(dir, loadExperimentConfig(dir)),
+					)
+				).filter((a) => a.id === "A2"),
+			],
 		}),
 	).rejects.toThrow(/context_eval_baseline_prompt_changed:ctx-f1-dev-01/);
 	// Unchanged arms run fine.
 	const ok = await run(ctx, dir, { ...base(dir), split: "all" });
-	expect(ok.rows).toHaveLength(24);
+	expect(ok.rows).toHaveLength(ALL_CASES * FIXTURE_ARMS.length * TRIALS);
 });
 
 test("run.json records the settings snapshot and score.json the judge rules digest", async () => {
@@ -208,10 +194,10 @@ test("score refuses raw rows that do not belong to the run: duplicates, unknown 
 		),
 	).toEqual([
 		"ghost|ctx-f1-dev-01|1: unknown_arm",
-		"baseline-compile|ctx-f1-dev-99|4: unknown_case",
-		"baseline-compile|ctx-f1-dev-99|4: trial_out_of_range",
-		"baseline-compile|ctx-f1-dev-01|1: lane_mismatch",
-		"baseline-compile|ctx-f1-dev-01|1: duplicate_row",
+		"A0|ctx-f1-dev-99|4: unknown_case",
+		"A0|ctx-f1-dev-99|4: trial_out_of_range",
+		"A0|ctx-f1-dev-01|1: lane_mismatch",
+		"A0|ctx-f1-dev-01|1: duplicate_row",
 	]);
 	appendFileSync(join(ran.dir, "raw.jsonl"), `${JSON.stringify(first)}\n`);
 	await expect(score(ctx, dir, ran.dir, judge)).rejects.toThrow(
@@ -243,7 +229,7 @@ test("score refuses a holdout run whose freeze changed; a dev run records a mani
 		"context_eval_run_manifest_mismatch",
 	);
 	writeFileSync(runJson, original);
-	const casePath = join(dir, "cases/ctx-f1-holdout-01.json");
+	const casePath = join(dir, `cases/${HOLDOUT_CASE}.json`);
 	writeFileSync(
 		casePath,
 		readFileSync(casePath, "utf8").replace("眠りたい", "休みたい"),
@@ -253,7 +239,7 @@ test("score refuses a holdout run whose freeze changed; a dev run records a mani
 	);
 });
 
-test("analyze refuses scores whose raw rows changed, malformed score rows, and an invalid or tampered prefix file", async () => {
+test("analyze refuses scores whose raw rows changed, malformed score rows, and an invalid or tampered prefix measurement", async () => {
 	const { dir, ctx } = experiment();
 	const ran = await run(ctx, dir, { ...base(dir), split: "dev" });
 	const scored = await score(ctx, dir, ran.dir, {
@@ -261,29 +247,26 @@ test("analyze refuses scores whose raw rows changed, malformed score rows, and a
 		rules: "R",
 		judgeSource: "toml-source",
 	});
-	const prefixPath = join(dirs[0]!, "prefix.json");
-	writeFileSync(
-		prefixPath,
-		JSON.stringify({
-			"baseline-compile": { medianRatio: 0.9 },
-			"baseline-compile-aa": { medianRatio: 0.9 },
-		}),
-	);
-	const ok = analyzeScores(ctx, dir, scored.dir, { split: "dev", prefixPath });
+	const ok = analyzeScores(ctx, dir, scored.dir, { split: "dev" });
 	const results = JSON.parse(
 		readFileSync(join(ok.dir, "RESULTS.json"), "utf8"),
 	);
+	// The trajectory measurement the run wrote is what criterion 7 read, with its digest in the report.
 	expect(results.prefixSha256).toMatch(/^[0-9a-f]{64}$/);
 	expect(readFileSync(join(ok.dir, "RESULTS.md"), "utf8")).toContain(
 		results.prefixSha256,
 	);
+	const prefixPath = join(ran.dir, "prefix.json");
+	const prefix = readFileSync(prefixPath, "utf8");
 	writeFileSync(
 		prefixPath,
-		JSON.stringify({ "baseline-compile": { medianRatio: 2 } }),
+		JSON.stringify({
+			format: "context-eval.prefix",
+			arms: { A0: { medianRatio: 2 } },
+		}),
 	);
-	expect(() =>
-		analyzeScores(ctx, dir, scored.dir, { split: "dev", prefixPath }),
-	).toThrow();
+	expect(() => analyzeScores(ctx, dir, scored.dir, { split: "dev" })).toThrow();
+	writeFileSync(prefixPath, prefix);
 	// Malformed score row.
 	const scoresPath = join(scored.dir, "scores.jsonl");
 	const good = readFileSync(scoresPath, "utf8");
@@ -331,7 +314,7 @@ test("transport re-run: refused until preregistered; then a NEW run dir holds th
 	});
 	expect(
 		source.rows.filter((r) => r.status === "transport_error"),
-	).toHaveLength(2);
+	).toHaveLength(FIXTURE_ARMS.length);
 	await expect(
 		rerunTransport(closed.ctx, closed.dir, source.dir, base(closed.dir)),
 	).rejects.toThrow("context_eval_rerun_condition_not_preregistered");
@@ -350,15 +333,16 @@ test("transport re-run: refused until preregistered; then a NEW run dir holds th
 	const again = await rerunTransport(ctx, dir, first.dir, base(dir));
 	expect(again.dir).not.toBe(first.dir);
 	expect(again.replaced).toEqual([
-		"baseline-compile-aa|ctx-f9-dev-01|2",
-		"baseline-compile|ctx-f9-dev-01|2",
+		"A0-aa|ctx-f9-dev-01|2",
+		"A0|ctx-f9-dev-01|2",
+		"A2|ctx-f9-dev-01|2",
 	]);
 	// The source run is untouched.
 	expect(readFileSync(join(first.dir, "raw.jsonl"), "utf8")).toBe(originalRaw);
 	const rows = lines(join(again.dir, "raw.jsonl")).map(
 		(l) => JSON.parse(l) as RawRow,
 	);
-	expect(rows).toHaveLength(24);
+	expect(rows).toHaveLength(ALL_CASES * FIXTURE_ARMS.length * TRIALS);
 	expect(rows.filter((r) => r.status === "transport_error")).toHaveLength(0);
 	const before = originalRaw
 		.trim()
@@ -377,7 +361,9 @@ test("transport re-run: refused until preregistered; then a NEW run dir holds th
 		replaced: again.replaced,
 	});
 	expect(meta.rerunOf!.sourceRawSha256).toMatch(/^[0-9a-f]{64}$/);
-	expect(lines(join(again.dir, "replaced.jsonl"))).toHaveLength(2);
+	expect(lines(join(again.dir, "replaced.jsonl"))).toHaveLength(
+		FIXTURE_ARMS.length,
+	);
 	// Nothing left to repeat, and a changed settings snapshot is refused.
 	await expect(rerunTransport(ctx, dir, again.dir, base(dir))).rejects.toThrow(
 		"context_eval_no_transport_errors",
@@ -430,6 +416,7 @@ test("materialize closes the store when seeding throws, and planJobs closes it w
 			cases: [makeCase("ctx-f9-dev-01", "こんにちは")],
 			arms: [explode],
 			trials: 1,
+			serialization: "larm-messages",
 			openWiring: async () => {
 				opened++;
 				const w = await openSeedWiring();

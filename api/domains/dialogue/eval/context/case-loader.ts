@@ -57,7 +57,7 @@ export function loadCases(experimentDir: string): ContextCase[] {
 	return parseCaseFiles(caseFilesOf(experimentDir));
 }
 
-export const experimentConfigSchema = z
+const experimentConfigSchema = z
 	.object({
 		name: z.string().min(1),
 		/** Arm ids in the order the report lists them; the first listed `baseline` is the reference. */
@@ -73,6 +73,21 @@ export const experimentConfigSchema = z
 					.strict(),
 			)
 			.min(1),
+		/**
+		 * Ordering variants measured for the prefix metric only (ContextWindow design 4.1, W1): the arm they reorder and
+		 * the ordering. They are never run against the model unless the preregistration lists them as arms.
+		 */
+		orderingVariants: z
+			.array(
+				z
+					.object({
+						id: z.string().min(1),
+						of: z.string().min(1),
+						ordering: z.enum(["O1", "O2"]),
+					})
+					.strict(),
+			)
+			.default([]),
 		trials: z.number().int().min(1).max(9).default(3),
 		concurrency: z.number().int().min(1).max(2).default(2),
 		/** Fixed function catalog for `tools: "conversation"` cases (live lane). */
@@ -94,6 +109,15 @@ export const experimentConfigSchema = z
 			ctx.addIssue({ code: "custom", message: "duplicate_arm_id" });
 		if (!ids.includes(config.baseline))
 			ctx.addIssue({ code: "custom", message: "baseline_not_in_arms" });
+		const variantIds = config.orderingVariants.map((v) => v.id);
+		if (
+			new Set([...ids, ...variantIds]).size !==
+			ids.length + variantIds.length
+		)
+			ctx.addIssue({ code: "custom", message: "duplicate_variant_id" });
+		for (const variant of config.orderingVariants)
+			if (!ids.includes(variant.of))
+				ctx.addIssue({ code: "custom", message: "variant_of_unknown_arm" });
 	});
 export type ExperimentConfig = z.infer<typeof experimentConfigSchema>;
 

@@ -473,9 +473,7 @@
 			},
 			{
 				"kind": "forbidden_identifier",
-				"identifiers": [
-					"命令を受領"
-				]
+				"identifiers": ["命令を受領"]
 			}
 		],
 		"rubric": [

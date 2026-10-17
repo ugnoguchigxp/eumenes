@@ -37,7 +37,6 @@ const row = (over: Partial<RawRow> = {}): RawRow => ({
 	promptBytes: 300,
 	promptTokensEstimate: 100,
 	promptSha256: "x",
-	unsupportedSeeds: [],
 	...over,
 });
 const passJudge: JudgeFn = async () => ({
@@ -427,6 +426,7 @@ test("the report names the lane and says when a result cannot decide", () => {
 		manifestSha256: null,
 		scoredFrom: "s",
 		prefixSha256: null,
+		prefix: null,
 	};
 	expect(resultsMarkdown(a, meta)).toContain("採否に使えない");
 	expect(resultsMarkdown(a, meta)).toContain("`fixture`");

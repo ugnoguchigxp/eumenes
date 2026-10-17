@@ -1,6 +1,5 @@
 import { promptTime } from "../../inference";
 import { systemContext } from "../../../infrastructure/system-context";
-import type { ContextSections } from "./context-compiler";
 
 type Message = { role: "system" | "user" | "assistant"; content: string };
 const failureRules = systemContext(
@@ -16,7 +15,7 @@ const failureRules = systemContext(
  * user data in the result.
  */
 export function researchResultContext(
-	sections: Pick<ContextSections, "system" | "input">,
+	sections: { system: Message; input: Message },
 	projection: string | undefined,
 	failureCode: string,
 	nowMs: number,

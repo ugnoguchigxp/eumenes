@@ -13,13 +13,13 @@ import {
 	researchFailureBlock,
 	researchResultBlock,
 } from "./context-blocks";
+import { withVolatile } from "./context-volatile";
 import { fitAssembly, memoryHistoryUsed } from "./context-fit";
 import { systemMessageOf } from "./context-format-current";
 import { renderContext } from "./context-render";
 import { prepareRouting } from "./delegate-conversation";
-import type { ContextAssembly } from "./context-assembly";
 import { renderGoalsLayer } from "./goals-layer";
-import { topicTexts, worldNamesHint } from "./topic-texts";
+import { topicTexts, worldNamesBlock } from "./topic-texts";
 import { specialistWorkBlock, viewingBlock } from "./specialist-context";
 import { byId, transition } from "../repository";
 import { endRun } from "./run-end";
@@ -77,28 +77,6 @@ export function createPrepare(
 		const goalsLayer = goals
 			? renderGoalsLayer(goals.adoptedForContextInTransaction(tx))
 			: null;
-		// World is read only by the research sub-agent; the conversation gets the names of the known targets
-		// this turn's wording mentions, as one line of L4 (nothing when none is named or World is unusable).
-		const worldHint =
-			worldContext && !agent?.failureCode && !agent?.actionPayload
-				? worldNamesHint(
-						worldContext.knownNamesInTransaction(tx, {
-							conversationId: run.conversationId,
-							texts: topicTexts(
-								tx,
-								current,
-								conversation,
-								new Set(
-									memory?.blockedMessageIdsOfConversationInTransaction(
-										tx,
-										run.conversationId,
-									) ?? [],
-								),
-								!!deps.specialist,
-							),
-						}),
-					)
-				: null;
 		if (larm.captureInTransaction && !larm.requestFor?.(tx, run.id, "llm")) {
 			const snapshot = larm.snapshotInTransaction?.(tx);
 			if (snapshot) {
@@ -120,7 +98,8 @@ export function createPrepare(
 		// the transport trims the oldest history if the real window is smaller.
 		const llmRequestId = larm.requestFor?.(tx, run.id, "llm");
 		const windowTokens =
-			(llmRequestId && larm.llmContextWindowInTransaction?.(tx, llmRequestId)) ||
+			(llmRequestId &&
+				larm.llmContextWindowInTransaction?.(tx, llmRequestId)) ||
 			REFERENCE_WINDOW_TOKENS;
 		const budgets = contextBudgets(windowTokens);
 		const compiled = compileAssembly(
@@ -134,23 +113,6 @@ export function createPrepare(
 			!!deps.specialist,
 			budgets.memoryHistory,
 		);
-		// What holds for this call only, in the order it is shown: the notices and the prefetch memory decided
-		// (none for a failed research answer), the World names, the specialist records, the operation results.
-		const volatile: ContextBlock[] = [
-			...(!agent?.failureCode ? compiled.assembly.volatile : []),
-			...(worldHint ? [hostTextBlock("world.names", worldHint.content)] : []),
-		];
-		// Specialist work stays out of the conversation's context; the main agent gets a short host record of it.
-		if (deps.specialist && !isSystemPrompt(run.sourceKind) && !agent) {
-			for (const block of [
-				specialistWorkBlock(deps, tx, current),
-				viewingBlock(deps, tx, current),
-				claim.payload.specialistHandoff
-					? hostTextBlock("specialist.handoff", claim.payload.specialistHandoff)
-					: null,
-			])
-				if (block) volatile.push(block);
-		}
 		// This run's context is fixed by the host: the server must neither trim nor reorder it.
 		const requestId = larm.requestFor?.(tx, run.id, "llm");
 		if (requestId) larm.setContextPolicyInTransaction?.(tx, requestId, "exact");
@@ -200,11 +162,56 @@ export function createPrepare(
 			: agent?.projection
 				? [researchResultBlock(JSON.parse(agent.projection), nowMs)]
 				: [];
-		const assembly = {
-			...compiled.assembly,
-			stage: agent || operations.length ? "result" : "initial",
-			volatile: [...volatile, ...operations, ...research],
-		} satisfies ContextAssembly;
+		// What holds for this call only, in the order it is shown (see `withVolatile`).
+		const assembly = withVolatile(compiled.assembly, {
+			memory: compiled.assembly.volatile,
+			...(agent
+				? {
+						answer: {
+							failureCode: agent.failureCode,
+							actionPayload: agent.actionPayload,
+						},
+					}
+				: {}),
+			// World is read only by the research sub-agent; the conversation gets the names of the known targets
+			// this turn's wording mentions, as one line of L4 (nothing when none is named or World is unusable).
+			worldNames: () =>
+				worldContext
+					? worldNamesBlock(
+							worldContext.knownNamesInTransaction(tx, {
+								conversationId: run.conversationId,
+								texts: topicTexts(
+									tx,
+									current,
+									conversation,
+									new Set(
+										memory?.blockedMessageIdsOfConversationInTransaction(
+											tx,
+											run.conversationId,
+										) ?? [],
+									),
+									!!deps.specialist,
+								),
+							}),
+						)
+					: null,
+			// Specialist work stays out of the conversation's context; the main agent gets a short host record of it.
+			specialist: () =>
+				deps.specialist && !isSystemPrompt(run.sourceKind)
+					? [
+							specialistWorkBlock(deps, tx, current),
+							viewingBlock(deps, tx, current),
+							claim.payload.specialistHandoff
+								? hostTextBlock(
+										"specialist.handoff",
+										claim.payload.specialistHandoff,
+									)
+								: null,
+						].filter((block): block is ContextBlock => !!block)
+					: [],
+			operations,
+			research: research[0] ?? null,
+		});
 		// Inside the two budgets of the window: a block over its budget is clipped, never the cause of a failure.
 		const fitted = fitAssembly(
 			assembly,

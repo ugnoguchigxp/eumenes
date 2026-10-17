@@ -23,18 +23,18 @@ export const DEFAULT_THRESHOLDS: AdoptionThresholds = {
 	maxLatencyRatio: 1.15,
 };
 
-/** Prefix stability per arm (see prefix-stability.ts). Filled by a later multi-turn measurement. */
+/** Prefix stability per arm: the median token ratio of the trajectory measurement (prefix-measure.ts). */
 export type PrefixInput = Record<string, { medianRatio: number | null }>;
 
-export type CriterionStatus = "pass" | "fail" | "not_measured";
-export type Criterion = {
+type CriterionStatus = "pass" | "fail" | "not_measured";
+type Criterion = {
 	id: number;
 	name: string;
 	status: CriterionStatus;
 	detail: string;
 };
 
-export type FamilyDelta = { improved: number; regressed: number; net: number };
+type FamilyDelta = { improved: number; regressed: number; net: number };
 export type Comparison = {
 	arm: string;
 	baseline: string;

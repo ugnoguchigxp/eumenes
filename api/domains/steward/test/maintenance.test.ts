@@ -5,8 +5,10 @@ const harnesses: StewardHarness[] = [];
 afterEach(async () => {
 	for (const h of harnesses.splice(0)) await h.close();
 });
-async function setup() {
-	const h = await setupSteward();
+async function setup(historyBudgetTokens?: number) {
+	const h = await setupSteward(
+		historyBudgetTokens ? { historyBudgetTokens } : {},
+	);
 	harnesses.push(h);
 	return h;
 }
@@ -206,7 +208,9 @@ test("the pending limit starts a consolidation without waiting for the foregroun
 });
 
 test("an upkeep round runs at most three steps", async () => {
-	const h = await setup();
+	// The kept history (12 messages of about 3000 tokens) is over three quarters of a 30k-token budget, and
+	// stays so while the rounds fold three exchanges into the summary.
+	const h = await setup(30_000);
 	const long = "あ".repeat(3000);
 	for (let i = 0; i < 6; i++) await h.settledExchange(`${long}${i}`, long);
 	h.inference.script("curate-memory", {
@@ -229,6 +233,44 @@ test("an upkeep round runs at most three steps", async () => {
 		.exchanges("c1")
 		.filter((e) => e.disposition === "summarize" && e.summarized === "done");
 	expect(folded).toHaveLength(3);
+});
+
+test("compact-history waits until the memory and history take three quarters of the budget", async () => {
+	const fold = { fold: ["e1"], summary: "古い往復の要約", changed: true };
+	const round = async (h: StewardHarness) => {
+		for (let i = 0; i < 3; i++)
+			await h.settledExchange(`質問${i}${"あ".repeat(500)}`, "どうも");
+		h.inference.script("curate-memory", empty);
+		h.inference.script("dispose-exchanges", keepAll);
+		h.inference.script("compact-history", fold, fold, fold, fold, fold);
+		await h.run({ user: "いま", end: "completed" });
+		await h.drain();
+		return h.inference.callsOf("compact-history").length;
+	};
+	// About 1,600 tokens of kept history against a 128k budget: nothing to compact.
+	expect(await round(await setup())).toBe(0);
+	// The same history against a 2,000-token budget is over three quarters of it.
+	expect(await round(await setup(2000))).toBeGreaterThan(0);
+});
+
+test("compact-history folds only as many of the oldest kept exchanges as it takes to get under the trigger", async () => {
+	const h = await setup(2600);
+	for (let i = 0; i < 4; i++)
+		await h.settledExchange(`質問${i}${"あ".repeat(500)}`, "どうも");
+	h.inference.script("curate-memory", empty);
+	h.inference.script("dispose-exchanges", keepAll);
+	const fold = { fold: ["e1"], summary: "古い往復の要約", changed: true };
+	h.inference.script("compact-history", fold, fold, fold, fold, fold);
+	await h.run({ user: "いま", end: "completed" });
+	await h.drain();
+	const calls = h.inference.callsOf("compact-history");
+	// About 2,100 tokens kept against a trigger of 1,950: the oldest exchange alone brings it under.
+	expect(calls).toHaveLength(1);
+	const shown = (calls[0]!.data.exchanges as Array<{ user: string }>).map(
+		(e) => e.user,
+	);
+	expect(shown).toHaveLength(1);
+	expect(shown[0]).toContain("質問0");
 });
 
 test("a long summary is rewritten shorter, and an unchanged answer keeps it", async () => {

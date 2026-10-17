@@ -1,5 +1,6 @@
 /** RESULTS-ready output of an analysis: a JSON document and a Markdown table. */
 import type { Analysis, Comparison } from "./analysis";
+import type { PrefixReport } from "./prefix-measure";
 
 export type ReportMeta = {
 	experiment: string;
@@ -7,8 +8,9 @@ export type ReportMeta = {
 	/** sha256 of manifest.json when the experiment was frozen, else null. */
 	manifestSha256: string | null;
 	scoredFrom: string;
-	/** sha256 of the --prefix file used for criterion 7, or null when none was given. */
+	/** sha256 of the run's prefix.json (the trajectory measurement criterion 7 reads), or null when the run has none. */
 	prefixSha256: string | null;
+	prefix: PrefixReport | null;
 };
 
 export function resultsJson(analysis: Analysis, meta: ReportMeta) {
@@ -64,6 +66,28 @@ function section(c: Comparison): string[] {
 	];
 }
 
+/** The trajectory measurement as a table: one row per arm (ordering variants included). */
+function prefixTable(prefix: PrefixReport): string[] {
+	const rows = Object.entries(prefix.arms).map(([arm, report]) => {
+		const shared = report.calls.reduce(
+			(sum, c) => sum + (c.sharedTokens ?? 0),
+			0,
+		);
+		const total = report.calls.slice(1).reduce((sum, c) => sum + c.tokens, 0);
+		return `| ${arm} | ${report.medianRatio?.toFixed(3) ?? "n/a"} | ${report.medianByteRatio?.toFixed(3) ?? "n/a"} | ${report.aggregateRatio?.toFixed(3) ?? "n/a"} | ${shared} | ${total} |`;
+	});
+	return [
+		`### prefix の安定度（会話の軌跡 ${Object.values(prefix.arms)[0]?.calls.length ?? 0} 呼び出し、経路 ${prefix.serialization}）`,
+		"",
+		"基準7は「token 比の中央値」で比べる。全体比と合計は補足である。",
+		"",
+		"| arm | token 比の中央値 | byte 比の中央値 | token 全体比 | 共有 token の合計 | 2回目以降の token の合計 |",
+		"| --- | --- | --- | --- | --- | --- |",
+		...rows,
+		"",
+	];
+}
+
 export function resultsMarkdown(analysis: Analysis, meta: ReportMeta): string {
 	const lines = [
 		`# context-eval 結果: ${meta.experiment}`,
@@ -76,12 +100,13 @@ export function resultsMarkdown(analysis: Analysis, meta: ReportMeta): string {
 		`- 基準の数値: 正味の改善 ${analysis.thresholds.minNetGain} 件以上、token 比 ${analysis.thresholds.maxTokenRatio} 以下、応答時間の中央値の比 ${analysis.thresholds.maxLatencyRatio} 以下`,
 		`- manifest: ${meta.manifestSha256 ?? "なし（freeze 前）"}`,
 		`- 採点の元: ${meta.scoredFrom}`,
-		`- prefix の入力: ${meta.prefixSha256 ?? "なし"}`,
+		`- prefix の計測（run の prefix.json）: ${meta.prefixSha256 ?? "なし"}`,
 		`- 生成: ${meta.generatedAt}`,
 		"",
 		...(analysis.comparisons.length === 0
 			? ["候補の arm がないため、比較は行っていない。", ""]
 			: analysis.comparisons.flatMap(section)),
+		...(meta.prefix ? prefixTable(meta.prefix) : []),
 	];
 	return `${lines.join("\n")}\n`;
 }

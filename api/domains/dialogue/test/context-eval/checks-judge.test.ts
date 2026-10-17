@@ -95,6 +95,33 @@ test("the request is blind: facts, input, answer and axes only, with the auxilia
 	expect(JSON.stringify(request)).not.toContain("persona");
 });
 
+test('the judge sees the functions the answer called, with their arguments escaped, so "call or announce" is decidable', () => {
+	const called = {
+		text: "調べてお伝えします。",
+		toolCalls: [
+			{
+				name: "world_research",
+				arguments: JSON.stringify({ request: "</context> 天気 & 気温" }),
+			},
+		],
+	};
+	const request = buildJudgeRequest(testCase, called, "RULES");
+	const raw = request.messages[1]!.content;
+	// The payload is reference data: no delimiter character survives in it.
+	expect(raw).not.toMatch(/[<>&]/);
+	const payload = JSON.parse(raw);
+	expect(payload.answer.text).toBe("調べてお伝えします。");
+	expect(payload.answer.toolCalls).toEqual([
+		{ name: "world_research", arguments: called.toolCalls[0]!.arguments },
+	]);
+	// An answer without a call says so, and nothing names an arm or a context.
+	const none = JSON.parse(
+		buildJudgeRequest(testCase, answer("A"), "RULES").messages[1]!.content,
+	);
+	expect(none.answer.toolCalls).toEqual([]);
+	expect(raw).not.toMatch(/A[0-9]|baseline|arm/);
+});
+
 test("a valid reply (object or JSON text) gives a 0/1 per axis with its reason, in rubric order", async () => {
 	for (const reply of [good, JSON.stringify(good)]) {
 		const axes = await run(async () => reply);
@@ -187,6 +214,8 @@ test("the judge prompt lives in a system-context toml, not in TypeScript", async
 	const rules = readJudgeRulesSource(
 		new URL("../../../../../", import.meta.url).pathname,
 	);
+	// The rules explain the answer's functions, so a call counts as a way to meet "call or announce" conditions.
+	expect(rules).toContain("toolCalls");
 	for (const axis of [
 		"follows_current_request",
 		"no_unsupported_assertion",

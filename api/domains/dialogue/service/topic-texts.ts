@@ -1,7 +1,8 @@
 import type { Database } from "bun:sqlite";
 import type { ConversationService } from "../../conversation";
 import type { Run } from "../contracts";
-import type { ChatMessage } from "./context";
+import type { ContextBlock } from "../../inference";
+import { hostTextBlock } from "./context-blocks";
 import { recentPriorRuns } from "../repository";
 
 /**
@@ -52,13 +53,13 @@ function cleanName(name: string): string {
  * and shown as quoted data), no claim content and no ids, so the model knows World has something to look up. It does
  * not name a tool: the lookup goes through whatever research the run is offered. Null when no target is named.
  */
-export function worldNamesHint(names: readonly string[]): ChatMessage | null {
+export function worldNamesBlock(names: readonly string[]): ContextBlock | null {
 	const shown = [
 		...new Set(names.map(cleanName).filter((name) => name !== "")),
 	].map((name) => `「${name}」`);
 	if (shown.length === 0) return null;
-	return {
-		role: "system",
-		content: `Worldに記録がある対象: ${shown.join("、")}（引用した名前のみ。詳しい内容は World の調査で確かめられる）`,
-	};
+	return hostTextBlock(
+		"world.names",
+		`Worldに記録がある対象: ${shown.join("、")}（引用した名前のみ。詳しい内容は World の調査で確かめられる）`,
+	);
 }

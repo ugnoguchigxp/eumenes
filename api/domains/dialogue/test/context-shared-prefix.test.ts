@@ -45,11 +45,10 @@ const base = (over: Partial<ContextAssembly> = {}): ContextAssembly => ({
 	persona: { agentName: "", userName: "", persona: "butler" },
 	hostRules: CONVERSATION_HOST_RULES,
 	stable: [],
-	history: { boundary: {}, turns: [] },
+	history: { turns: [] },
 	working: [],
 	volatile: [],
 	input: { role: "user", content: "今回の依頼" },
-	currentRequest: { messageId: "m9" },
 	...over,
 });
 const report = (extra: Record<string, unknown> = {}) => ({
@@ -137,7 +136,6 @@ test("the report is volatile data after the history and the working memory, righ
 		base({
 			stable: [block("memory.long_term", "L1"), block("goals", "目標の層")],
 			history: {
-				boundary: {},
 				turns: [
 					turn("user", "保持の質問", "keep", 1),
 					turn("assistant", "未処理の答え", "unprocessed", 2),
@@ -171,15 +169,12 @@ test("the report is volatile data after the history and the working memory, righ
 	);
 });
 
-test("over the size limit only optional history goes: the kept exchanges first, oldest first, and the layers stay where they were", () => {
-	const old = (i: number, layer: "keep" | "unprocessed") =>
-		turn(i % 2 ? "assistant" : "user", "古い会話".repeat(1500), layer, i);
+test("the render never trims by size: every turn stays in its place and a very large request is kept whole", () => {
 	const keepOld = "古い保持" + "あ".repeat(13000);
 	const rendered = renderContext(
 		base({
 			stable: [block("memory.long_term", "L1")],
 			history: {
-				boundary: {},
 				turns: [
 					turn("user", "最古の保持", "keep", 1),
 					turn("assistant", keepOld, "keep", 2),
@@ -190,50 +185,20 @@ test("over the size limit only optional history goes: the kept exchanges first, 
 			},
 			working: [block("memory.summary", "要約")],
 			volatile: [researchResultBlock(report(), now)],
+			input: { role: "user", content: "必須条件".repeat(20000) },
 		}),
 		"current",
 	);
-	expect(
-		Buffer.byteLength(JSON.stringify(rendered.messages)),
-	).toBeLessThanOrEqual(65536);
 	const contents = rendered.messages.map((m) => m.content);
-	// The oldest kept messages went, two at a time; everything after them is where it was.
 	expect(contents.slice(1, -2)).toEqual([
 		"L1",
+		"最古の保持",
+		keepOld,
 		"新しい保持" + "あ".repeat(13000),
 		expect.stringContaining("要約"),
 		"未処理の質問",
 		"未処理の答え",
 	]);
-	expect(rendered.sessionContext.historyCount).toBe(3);
-
-	// Both lists over the limit: the unprocessed ones go when no kept exchange is left.
-	const heavy = renderContext(
-		base({
-			history: {
-				boundary: {},
-				turns: Array.from({ length: 10 }, (_, i) => old(i, "keep")).concat(
-					Array.from({ length: 10 }, (_, i) => old(i + 10, "unprocessed")),
-				),
-			},
-			volatile: [researchResultBlock(report(), now)],
-		}),
-		"current",
-	);
-	expect(Buffer.byteLength(JSON.stringify(heavy.messages))).toBeLessThanOrEqual(
-		65536,
-	);
-	expect(heavy.messages.at(-1)!.content).toBe("今回の依頼");
-});
-
-test("a request that alone does not fit is refused, never silently cut", () => {
-	expect(() =>
-		renderContext(
-			base({
-				input: { role: "user", content: "必須条件".repeat(20000) },
-				volatile: [researchResultBlock(report(), now)],
-			}),
-			"current",
-		),
-	).toThrow("required_context_overflow");
+	expect(rendered.sessionContext.historyCount).toBe(5);
+	expect(rendered.messages.at(-1)!.content).toBe("必須条件".repeat(20000));
 });

@@ -3,13 +3,19 @@
 		"functionName": "web_research",
 		"title": "Web調査",
 		"summary": "公開Webを調べ、現在の事実（天気・価格・営業状況・ニュースなど）を確認して要約を通常会話へ返す",
-		"useWhen": ["天気・価格・相場・営業時間・混雑など今の事実の確認", "公開情報の調査"]
+		"useWhen": [
+			"天気・価格・相場・営業時間・混雑など今の事実の確認",
+			"公開情報の調査"
+		]
 	},
 	{
 		"functionName": "world_research",
 		"title": "World調査",
 		"summary": "Worldに記録された人・場所・もの・出来事などの対象について、記録の中身を調べて返す",
-		"useWhen": ["Worldに記録がある対象の詳細を確かめる依頼", "記録された過去の出来事や持ち物の確認"]
+		"useWhen": [
+			"Worldに記録がある対象の詳細を確かめる依頼",
+			"記録された過去の出来事や持ち物の確認"
+		]
 	},
 	{
 		"functionName": "image_studio",

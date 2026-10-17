@@ -8,8 +8,27 @@ import { assertAttitudeQuestions } from "./context";
 import { createControl } from "./control";
 import { createInfer } from "./infer";
 import { createLeaseManager } from "./lease-manager";
+import { leasePort } from "./lease-port";
 import { type Fetcher, type Provider } from "./profiles";
 import { localEndpoint, readJson, record, untilAborted } from "./guards";
+
+/** A catalog entry as a conversation profile: generally selectable, not deprecated, with an llm provider. */
+function conversationProfile(item: unknown) {
+	const entry = record(item);
+	if (entry.selectionPolicy !== "default" || entry.deprecated === true)
+		return [];
+	const llm = (
+		Array.isArray(entry.providers) ? entry.providers.map(record) : []
+	).find((p) => p.name === "llm");
+	return llm && typeof entry.id === "string" && entry.id
+		? [
+				{
+					profile: entry.id,
+					model: typeof llm.model === "string" ? llm.model : null,
+				},
+			]
+		: [];
+}
 
 export function createLarm(config: {
 	/** LARM control origin. There is no default: without it the port stays unconfigured. */
@@ -189,8 +208,7 @@ export function createLarm(config: {
 	}
 
 	return {
-		decisionModel: () =>
-			leases.current()?.providers.get("system-one")?.model ?? null,
+		...leasePort(leases),
 		async judge(state, questions, signal) {
 			if (judging) throw new Error("larm_decision_busy");
 			judging = true;
@@ -261,22 +279,7 @@ export function createLarm(config: {
 				);
 				return (
 					Array.isArray(catalog.profiles) ? catalog.profiles : []
-				).flatMap((item) => {
-					const entry = record(item);
-					if (entry.selectionPolicy !== "default" || entry.deprecated === true)
-						return [];
-					const llm = (
-						Array.isArray(entry.providers) ? entry.providers.map(record) : []
-					).find((p) => p.name === "llm");
-					return llm && typeof entry.id === "string" && entry.id
-						? [
-								{
-									profile: entry.id,
-									model: typeof llm.model === "string" ? llm.model : null,
-								},
-							]
-						: [];
-				});
+				).flatMap(conversationProfile);
 			} catch {
 				// The catalog is unreachable; the saved choice stays visible without a model.
 				return profile ? [{ profile, model: null }] : [];

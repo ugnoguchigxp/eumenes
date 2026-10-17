@@ -18,7 +18,7 @@ export function canonicalJson(value: unknown): string {
 }
 
 /** One message per line, so a shared prefix of lines is a shared prefix of messages. */
-export function serializeCall(messages: readonly ChatMessage[]): Buffer {
+function serializeCall(messages: readonly ChatMessage[]): Buffer {
 	return Buffer.from(messages.map((m) => canonicalJson(m)).join("\n"), "utf8");
 }
 
@@ -29,7 +29,7 @@ export function commonPrefixBytes(a: Uint8Array, b: Uint8Array): number {
 	return i;
 }
 
-export type PrefixPair = {
+type PrefixPair = {
 	/** Zero-based index of the earlier call. */
 	from: number;
 	sharedBytes: number;
@@ -49,6 +49,8 @@ export type PrefixStability = {
 	medianRatio: number | null;
 	/** Median of the pair token ratios, or null with fewer than two calls. */
 	medianTokenRatio: number | null;
+	/** Shared tokens over earlier-prompt tokens, summed over all pairs: what a cache saves over the whole conversation. */
+	aggregateTokenRatio: number | null;
 };
 
 const tokensOf = (bytes: Uint8Array) =>
@@ -90,5 +92,13 @@ export function prefixStability(
 		pairs,
 		medianRatio: median(pairs.map((p) => p.ratio)),
 		medianTokenRatio: median(pairs.map((p) => p.tokenRatio)),
+		aggregateTokenRatio:
+			pairs.length === 0
+				? null
+				: pairs.reduce((sum, p) => sum + p.sharedTokens, 0) /
+					Math.max(
+						1,
+						pairs.reduce((sum, p) => sum + p.previousTokens, 0),
+					),
 	};
 }

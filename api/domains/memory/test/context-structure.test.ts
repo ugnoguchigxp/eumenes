@@ -88,20 +88,18 @@ test("L1: tendencies come under their own heading after a blank line, also when 
 	);
 });
 
-test("L1: over the budget the trimmed sections still reproduce the text, and the same input gives the same output", () => {
+test("L1: nothing is left out for size, the sections reproduce the text, and the same input gives the same output", () => {
 	const states = Array.from({ length: 40 }, (_, i) =>
 		state(i, i % 2 ? "preference" : "constraint", {
 			text: `長い${"あ".repeat(60)}${i}`,
 		}),
 	);
 	const tendencies = [tendency(1), tendency(2)];
-	const rendered = renderLongTerm(states, tendencies, 1200);
-	expect(rendered.omitted.length).toBeGreaterThan(0);
-	expect(rendered.bytes).toBeLessThanOrEqual(1200);
+	const rendered = renderLongTerm(states, tendencies);
+	expect(rendered.manifest).toHaveLength(states.length + tendencies.length);
+	expect(rendered.tokens).toBeGreaterThan(2000);
 	expect(longTermText(rendered)).toBe(rendered.text);
-	expect(renderLongTerm([...states].reverse(), tendencies, 1200)).toEqual(
-		rendered,
-	);
+	expect(renderLongTerm([...states].reverse(), tendencies)).toEqual(rendered);
 });
 
 test("L2: recent additions and every kind of note, in screen order, and the text is derived from the sections", () => {
@@ -161,14 +159,15 @@ test("L2: recent additions and every kind of note, in screen order, and the text
 	).toEqual(rendered);
 });
 
-test("L2: empty, and trimmed over the budget", () => {
+test("L2: empty, and no note is left out for size", () => {
 	const empty = renderShortTerm([], []);
 	expect(empty).toMatchObject({ text: "", header: "", sections: [] });
 	const notes = Array.from({ length: 12 }, (_, i) =>
 		note(`n${i}`, "memo", (i % 9) + 1),
 	).map((entry) => ({ ...entry, text: "い".repeat(900) + entry.id }));
-	const rendered = renderShortTerm([], notes, 3000);
-	expect(rendered.omitted).toBeGreaterThan(0);
+	const rendered = renderShortTerm([], notes);
+	expect(rendered.tokens).toBeGreaterThan(10_000);
+	for (const entry of notes) expect(rendered.text).toContain(entry.id);
 	expect(shortTermText(rendered)).toBe(rendered.text);
 });
 
@@ -231,7 +230,6 @@ test("a window stored before the layers carried sections reads back with them, a
 		delete old.longTerm.sections;
 		delete old.shortTerm.header;
 		delete old.shortTerm.sections;
-		delete old.history.boundary;
 		delete old.history.summaryCovers;
 		db.query(
 			"UPDATE memory_context_window SET build_id = 'legacy', snapshot = ? WHERE conversation_id = 'c1'",
@@ -245,6 +243,4 @@ test("a window stored before the layers carried sections reads back with them, a
 	expect(read.shortTerm.text).toBe(built.shortTerm.text);
 	expect(read.shortTerm.header).toBe(built.shortTerm.header);
 	expect(read.shortTerm.sections).toEqual(built.shortTerm.sections);
-	// Its history has no boundary until the next rebuild fills it.
-	expect(read.history.boundary).toBeUndefined();
 });

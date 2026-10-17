@@ -147,8 +147,7 @@ export function verifyFrozen(dir: string, current: Manifest): ManifestChange[] {
 }
 
 /** `20261017T093015123Z`: sortable, millisecond resolution. */
-export const timestampName = (now: Date) =>
-	now.toISOString().replace(/[-:.]/g, "");
+const timestampName = (now: Date) => now.toISOString().replace(/[-:.]/g, "");
 
 /**
  * `<root>/<experiment>/<timestamp>/`, created now. An existing directory is never reused:

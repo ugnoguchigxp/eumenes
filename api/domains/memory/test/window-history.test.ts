@@ -66,7 +66,6 @@ test("the first publish builds the window with an empty history; the layers keep
 		keep: [],
 		summaryText: "",
 		summaryRevision: 0,
-		boundary: {},
 	});
 });
 
@@ -259,28 +258,4 @@ test("a summary on a blocked exchange has no text and no range", async () => {
 	const window = await publish(h);
 	expect(window.history.summaryText).toBe("");
 	expect(window.history.summaryCovers).toBeUndefined();
-});
-
-test("the history boundary is fixed at a memory step and carried over by other rebuilds", async () => {
-	const h = await setup();
-	h.time.now = day(1);
-	const a = await exchange(h, "一日目の質問", "答え");
-	h.time.now = day(2);
-	await exchange(h, "二日目の質問", "答え");
-	await dispose(h, a.inputMessageId, "keep");
-	const first = await publish(h);
-	expect(first.history.boundary).toEqual({ fromAt: day(1), toAt: day(2) });
-	// An exchange after the step does not move the boundary until the next step, whatever else rebuilds the window.
-	h.time.now = day(7);
-	await exchange(h, "七日目の質問", "答え");
-	await h.seed("コーヒーが好き", "food.coffee");
-	const rebuilt = await h.window();
-	expect(rebuilt.version).toBeGreaterThan(first.version);
-	expect(rebuilt.history.boundary).toEqual({ fromAt: day(1), toAt: day(2) });
-	const second = await publish(h);
-	expect(second.history.boundary).toEqual({ fromAt: day(1), toAt: day(7) });
-	// An exchange the steward summarized leaves the range at the next step; the newest two always stay.
-	await dispose(h, a.inputMessageId, "drop");
-	const third = await publish(h);
-	expect(third.history.boundary).toEqual({ fromAt: day(2), toAt: day(7) });
 });

@@ -16,10 +16,10 @@ export const limits = {
 	choices: 20,
 } as const;
 /** The name of the saved form's source inside a saved composition's definition. */
-export const formSource = "composition-form";
+const formSource = "composition-form";
 
 /** A refusal carrying only a safe, lowercase code; `detail` is a short note for repair, never data. */
-export class UiCompositionError extends Error {
+class UiCompositionError extends Error {
 	constructor(
 		readonly code: string,
 		readonly detail?: string,

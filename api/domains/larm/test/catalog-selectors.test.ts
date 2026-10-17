@@ -65,7 +65,7 @@ function fixture(options: { revision?: string; openapiStatus?: number } = {}) {
 test("public selectors discover services absent from internal profile IDs", async () => {
 	const { gateway, calls } = fixture();
 	const catalog = await gateway.catalog(AbortSignal.timeout(1000));
-	for (const kind of ["image", "music"]) {
+	for (const kind of ["image", "music"] as const) {
 		const target = findServiceTarget(catalog.targets, `media.${kind}.generate`);
 		expect(target?.kind).toBe(kind);
 		expect(target?.model).toMatch(/^catalog-model-/);

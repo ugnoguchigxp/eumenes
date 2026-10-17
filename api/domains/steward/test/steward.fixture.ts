@@ -151,6 +151,8 @@ export type FakeInference = ReturnType<typeof createFakeInference>;
 export async function setupSteward(
 	options: {
 		embed?: MemoryEmbed;
+		/** The memory and history budget (tokens) of the model window; absent: the largest it can be (128k). */
+		historyBudgetTokens?: number;
 		runStates?: Record<string, RunLookup>;
 		/** Replaces the memory service the steward is given (a test makes one operation refuse). */
 		wrapMemory?: (memory: MemoryService) => MemoryService;
@@ -191,6 +193,9 @@ export async function setupSteward(
 		clock,
 		id: () => `id-${++counter}`,
 		...(options.embed ? { embed: () => options.embed } : {}),
+		...(options.historyBudgetTokens
+			? { historyBudgetTokens: () => options.historyBudgetTokens! }
+			: {}),
 	});
 	if (!(await memory.recover()).healthy) throw new Error("memory_not_healthy");
 	const queue = createQueue(store, {

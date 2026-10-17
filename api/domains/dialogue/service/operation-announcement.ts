@@ -12,7 +12,7 @@ import {
 import { conversationOutput } from "./conversation-output";
 
 /** Persist before publish/settle. The later delegation must still recheck the same authority. */
-export async function announceOperation(
+async function announceOperation(
 	deps: DialogueDeps,
 	input: GenerateInput,
 	operation: ConversationOperation,

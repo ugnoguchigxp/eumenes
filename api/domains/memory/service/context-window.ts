@@ -230,8 +230,6 @@ export function createContextWindowStore(deps: {
 			prefetch?: WindowPrefetch;
 			addNotices?: string[];
 			clearNoticeIds?: string[];
-			/** A memory step (the steward's publish): the history boundary is read again. Otherwise it is carried over. */
-			step?: boolean;
 		},
 	): WindowSnapshot {
 		const previous = current(db, conversationId);
@@ -293,12 +291,7 @@ export function createContextWindowStore(deps: {
 							policyRevision: previous.inputs.policyRevision,
 						},
 			longTerm,
-			history: buildHistory(
-				db,
-				conversationId,
-				previous?.history,
-				opts.step === true,
-			),
+			history: buildHistory(db, conversationId, previous?.history),
 			shortTerm: {
 				text: shortTerm.text,
 				header: shortTerm.header,
@@ -408,7 +401,6 @@ export function createContextWindowStore(deps: {
 			}
 			return rebuildInTransaction(db, conversationId, {
 				refreshLongTerm: refresh,
-				step: true,
 				...(opts.prefetch ? { prefetch: opts.prefetch } : {}),
 				...(opts.addNotices ? { addNotices: opts.addNotices } : {}),
 			});

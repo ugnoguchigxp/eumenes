@@ -213,10 +213,15 @@ export interface InferencePort {
 	snapshotInTransaction?(db: Database): Settings;
 	/**
 	 * The context window (tokens) of the model a captured LLM request is routed to, from its saved settings: the
-	 * resource's `contextWindow` on a cloud-only route. null when it is not known here (a LARM route: the provider's
-	 * window is known only when the lease is claimed).
+	 * resource's `contextWindow` on a cloud-only route, the held LARM lease's provider window on a LARM route. null
+	 * when it is not known (no lease is held: a claim is made only to serve a call).
 	 */
-	llmContextWindowInTransaction?(db: Database, requestId: string): number | null;
+	llmContextWindowInTransaction?(
+		db: Database,
+		requestId: string,
+	): number | null;
+	/** The same window from the saved settings now, tied to no request: for a budget that is not a run's. */
+	savedLlmContextWindow?(): number | null;
 	requestFor?(db: Database, subject: string, purpose: Purpose): string | null;
 	executeRequest?(
 		requestId: string,

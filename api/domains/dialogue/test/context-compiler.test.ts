@@ -6,11 +6,8 @@ import { openStore, type SqliteStore } from "../../../infrastructure/sqlite";
 import { configureLogging } from "../../../infrastructure/logger";
 import { createConversationService } from "../../conversation";
 import { createContinuityService } from "../../continuity";
-import {
-	HISTORY_MAX_BYTES,
-	HISTORY_MESSAGE_MAX_BYTES,
-	createMemoryService,
-} from "../../memory";
+import { createMemoryService } from "../../memory";
+import { estimateTextTokens } from "../../../infrastructure/context-budget";
 import { memoryMigrations, saveItem } from "./memory-seed";
 import type { WindowSnapshot } from "../../memory";
 import type { Run } from "../contracts";
@@ -21,11 +18,9 @@ import {
 	worldStateMigration,
 } from "..";
 import { insert } from "../repository";
-import {
-	TURN_WINDOW,
-	clipHistoryText,
-	compileContext,
-} from "../service/context-compiler";
+import type { ContextBlock } from "../../inference";
+import { compileAssembly } from "../service/context-compiler";
+import { renderContext } from "../service/context-render";
 
 const dirs: string[] = [];
 const stores: SqliteStore[] = [];
@@ -36,7 +31,7 @@ afterEach(async () => {
 });
 
 const at = "2026-10-13T00:00:00.000Z";
-const bytes = (text: string) => Buffer.byteLength(text, "utf8");
+const tokens = (text: string) => estimateTextTokens(text);
 
 /** A conversation on a real store with memory; exchanges are added one by one and the current run is last. */
 async function setup() {
@@ -190,12 +185,19 @@ async function setup() {
 			}),
 		publish: () =>
 			store.write((db) => memory.publishWindowInTransaction(db, "main", {})),
-		/** compileContext as the prepare phase calls it: with the stored window (or none) and memory. */
+		/**
+		 * compileAssembly as the prepare phase calls it (the stored window or none, and memory), with the assembly
+		 * rendered in the `current` format: the list the model is sent, the notices and the prefetch before the input.
+		 */
 		async compile(
 			runId: string,
 			options: {
 				window?: WindowSnapshot | null;
-				goals?: { role: "system"; content: string } | null;
+				goals?: ContextBlock | null;
+				/** The whole memory and history budget (tokens); absent: the largest (128k). */
+				memoryHistoryTokens?: number;
+				/** Replaces the conversation service (a test counts the messages read). */
+				conversation?: typeof conversation;
 			} = {},
 		) {
 			return store.write((db) => {
@@ -206,19 +208,25 @@ async function setup() {
 					options.window !== undefined
 						? options.window
 						: memory.windowForRunInTransaction(db, "main");
-				return compileContext(
+				const compiled = compileAssembly(
 					db,
 					{
 						id: runId,
 						conversationId: "main",
 						inputMessageId: run.input_message_id as string,
 					} as Run & { seq?: number },
-					conversation,
+					options.conversation ?? conversation,
 					undefined,
 					window,
 					memory,
-					options.goals,
+					options.goals ?? null,
+					false,
+					options.memoryHistoryTokens,
 				);
+				return {
+					...compiled,
+					messages: renderContext(compiled.assembly, "current").messages,
+				};
 			});
 		},
 	};
@@ -262,35 +270,24 @@ test("layers in order: system, long-term, kept exchanges, working memory (summar
 	await h.publish();
 	const run = await h.current("今回の入力");
 	const compiled = await h.compile(run);
-	const { sections } = compiled;
-	expect(sections.longTerm).toHaveLength(1);
-	expect(sections.longTerm[0]!.content).toContain("長期に入る好み");
-	expect(texts(sections.history)).toEqual(["保持の質問", "保持の答え"]);
-	expect(sections.working[0]!.content).toContain(
-		"これまでの経緯（要約）\n要約の本文",
-	);
-	expect(sections.working[1]!.content).toContain("最近覚えた好み");
-	expect(sections.working[1]!.content).not.toContain("長期に入る好み");
-	expect(texts(sections.unprocessed)).toEqual([
+	const { messages } = compiled;
+	// system, long-term, kept exchanges, working memory (summary, short-term), unprocessed exchanges, the input
+	expect(messages).toHaveLength(11);
+	expect(messages[0]!.role).toBe("system");
+	expect(messages[1]!.content).toContain("長期に入る好み");
+	expect(texts(messages.slice(2, 4))).toEqual(["保持の質問", "保持の答え"]);
+	expect(messages[4]!.content).toContain("これまでの経緯（要約）\n要約の本文");
+	expect(messages[5]!.content).toContain("最近覚えた好み");
+	expect(messages[5]!.content).not.toContain("長期に入る好み");
+	expect(texts(messages.slice(6, 10))).toEqual([
 		"未処理の質問",
 		"未処理の答え",
 		"最新の質問",
 		"最新の答え",
 	]);
 	// The summarized exchange is in the summary only.
-	expect(texts(compiled.messages)).not.toContain("要約済みの質問");
-	expect(compiled.messages[0]).toBe(sections.system);
-	expect(compiled.messages.at(-1)).toEqual({
-		role: "user",
-		content: "今回の入力",
-	});
-	const order = [
-		...sections.longTerm,
-		...sections.history,
-		...sections.working,
-		...sections.unprocessed,
-	];
-	expect(compiled.messages.slice(1, -1)).toEqual(order);
+	expect(texts(messages)).not.toContain("要約済みの質問");
+	expect(messages.at(-1)).toEqual({ role: "user", content: "今回の入力" });
 	expect(compiled.shownMessageIds).toEqual([
 		kept.input,
 		kept.answer!,
@@ -300,7 +297,8 @@ test("layers in order: system, long-term, kept exchanges, working memory (summar
 		latest.answer!,
 		run.replace("r", "u"),
 	]);
-	expect(sections.tail).toEqual([]);
+	// Nothing is added for this call: no notice, no prefetch.
+	expect(compiled.assembly.volatile).toEqual([]);
 });
 
 test("section 2.3: dropped exchanges are out, unsummarized ones stay verbatim, a skipped summary keeps them; the newest two are always in", async () => {
@@ -327,9 +325,7 @@ test("section 2.3: dropped exchanges are out, unsummarized ones stay verbatim, a
 	const compiled = await h.compile(await h.current());
 	const shown = texts(compiled.messages);
 	expect(shown).not.toContain("捨てた質問");
-	expect(compiled.sections.history.map((m) => m.content)).toContain(
-		"要約を諦めた質問",
-	);
+	expect(shown).toContain("要約を諦めた質問");
 	expect(shown).toContain("要約待ちの質問");
 	// Dropped, but the newest two exchanges are always sent.
 	for (const text of ["最新その1", "答え1", "最新その2", "答え2"])
@@ -350,16 +346,16 @@ test("the same question five times leaves one exchange in L3", async () => {
 	]);
 });
 
-test("without memory or a window the newest TURN_WINDOW runs are sent in order; cancelled runs and runs the ledger never took stay", async () => {
+test("without memory or a window every earlier run is sent in order, with no count limit; cancelled runs and runs the ledger never took stay", async () => {
 	const h = await setup();
-	for (let i = 1; i <= TURN_WINDOW + 3; i++)
+	for (let i = 1; i <= 13; i++)
 		await h.exchange(`質問${i}`, `回答${i}`, { register: false });
 	const compiled = await h.compile(await h.current(), { window: null });
 	const history = compiled.messages.slice(1, -1);
-	expect(history).toHaveLength(TURN_WINDOW * 2);
-	expect(history[0]!.content).toBe("質問4");
-	expect(compiled.sections.longTerm).toEqual([]);
-	expect(compiled.sections.working).toEqual([]);
+	expect(history).toHaveLength(26);
+	expect(history[0]!.content).toBe("質問1");
+	expect(compiled.assembly.stable).toEqual([]);
+	expect(compiled.assembly.working).toEqual([]);
 	expect(compiled.messages.at(-1)!.content).toBe("今回の入力");
 	expect(compiled.messages.map((m) => m.role).slice(0, 3)).toEqual([
 		"system",
@@ -405,29 +401,90 @@ test("blocked messages are never shown, with a window and without one; the answe
 	}
 });
 
-test("over HISTORY_MAX_BYTES the oldest exchanges go first, L3 and unprocessed alike, and the newest two always stay", async () => {
+test("over the memory and history budget the oldest exchanges go first, L3 and unprocessed alike, and the newest two always stay", async () => {
 	const h = await setup();
-	const big = Math.floor(HISTORY_MAX_BYTES / 3);
 	const made = [];
 	for (let i = 1; i <= 6; i++)
-		made.push(await h.exchange(`質問${i}`, `回答${i}:` + "a".repeat(big)));
+		made.push(await h.exchange(`質問${i}`, `回答${i}:` + "a".repeat(4000)));
 	// An older exchange kept in L3 competes with the unprocessed ones by age.
 	await h.dispose(made[0]!.input, "keep");
 	await h.dispose(made[2]!.input, "keep");
 	await h.publish();
-	const compiled = await h.compile(await h.current());
+	// Each exchange is about 1,000 tokens: the budget holds a little over three of them.
+	const budget = 3300;
+	const compiled = await h.compile(await h.current(), {
+		memoryHistoryTokens: budget,
+	});
 	const history = compiled.messages.slice(1, -1);
-	expect(history.reduce((n, m) => n + bytes(m.content), 0)).toBeLessThanOrEqual(
-		HISTORY_MAX_BYTES,
-	);
+	expect(
+		history.reduce((n, m) => n + tokens(m.content), 0),
+	).toBeLessThanOrEqual(budget);
 	expect(history.length % 2).toBe(0);
 	expect(texts(history)).toContain("質問6");
 	expect(texts(history)).not.toContain("質問1");
 	expect(texts(history)).not.toContain("質問3");
 	expect(texts(history).slice(-2)[0]).toBe("質問6");
+	// The shown ids follow what stayed (a recall must not repeat them).
+	expect(compiled.shownMessageIds).toContain(made[5]!.input);
+	expect(compiled.shownMessageIds).not.toContain(made[0]!.input);
 });
 
-test("a message over 12KB is shown as head 8KB, a marker and the tail; Japanese text is cut on character boundaries and the stored message is unchanged", async () => {
+test("a long conversation is read newest first and only as far as the budget holds, with the ledger or without it", async () => {
+	const h = await setup();
+	const made = [];
+	for (let i = 1; i <= 60; i++)
+		made.push(await h.exchange(`質問${i}`, `回答${i}:` + "a".repeat(1000)));
+	for (const made_ of made.slice(0, 30)) await h.dispose(made_.input, "keep");
+	await h.publish();
+	// Each exchange is about 260 tokens: the budget holds about four of them.
+	const budget = 1100;
+	for (const withWindow of [true, false]) {
+		let reads = 0;
+		const counting = {
+			...h.conversation,
+			messageInTransaction: (
+				...args: Parameters<typeof h.conversation.messageInTransaction>
+			) => {
+				reads++;
+				return h.conversation.messageInTransaction(...args);
+			},
+		};
+		const compiled = await h.compile(await h.current(), {
+			memoryHistoryTokens: budget,
+			conversation: counting,
+			...(withWindow ? {} : { window: null }),
+		});
+		const history = texts(compiled.messages).filter((t) =>
+			/^(質問|回答)/.test(t),
+		);
+		expect(history).toContain("質問60");
+		expect(history).not.toContain("質問1");
+		expect(history.length % 2).toBe(0);
+		// The 120 messages of the 60 exchanges are not all read: only the newest ones the budget can hold.
+		expect(reads).toBeLessThan(40);
+	}
+});
+
+test("the long-term memory, the summary and the notes come off the history's room before any exchange does", async () => {
+	const h = await setup();
+	for (let i = 1; i <= 4; i++)
+		await h.exchange(`質問${i}`, `回答${i}:` + "a".repeat(2000));
+	const window = await h.store.write((db) =>
+		h.memory.publishWindowInTransaction(db, "main", {
+			addNotices: ["あ".repeat(1500)],
+		}),
+	);
+	const current = await h.current();
+	const roomy = await h.compile(current, { window, memoryHistoryTokens: 4000 });
+	const tight = await h.compile(current, { window, memoryHistoryTokens: 2500 });
+	const shown = (c: typeof roomy) =>
+		texts(c.messages).filter((t) => /^質問\d$/.test(t)).length;
+	// The 1,500-token notice left 2,500 tokens of room against 1,000 in the tight case.
+	expect(shown(roomy)).toBeGreaterThan(shown(tight));
+	expect(shown(tight)).toBeGreaterThanOrEqual(2);
+});
+
+test("a long message is shown whole: nothing is cut by the size of one message, and the stored message is unchanged", async () => {
 	const h = await setup();
 	const long = "日本語の長い文章です。".repeat(3000);
 	const answerText = "長い回答の本文。".repeat(2500);
@@ -440,40 +497,25 @@ test("a message over 12KB is shown as head 8KB, a marker and the tail; Japanese 
 	const answer = compiled.messages.find((m) =>
 		m.content.startsWith("長い回答"),
 	)!;
-	for (const [shown, original] of [
-		[user.content, long],
-		[answer.content, answerText],
-	] as const) {
-		expect(bytes(shown)).toBeLessThanOrEqual(HISTORY_MESSAGE_MAX_BYTES);
-		expect(shown).toMatch(/\n（中略：約\d+文字）\n/);
-		expect(shown).not.toContain("�");
-		expect(shown.startsWith(original.slice(0, 2000))).toBe(true);
-		expect(shown.endsWith(original.slice(-500))).toBe(true);
-		const [head, tail] = shown.split(/\n（中略：約\d+文字）\n/);
-		expect(bytes(head!)).toBeLessThanOrEqual(8 * 1024);
-		expect(bytes(head!)).toBeGreaterThan(8 * 1024 - 4);
-		expect(original.startsWith(head!)).toBe(true);
-		expect(original.endsWith(tail!)).toBe(true);
-	}
-	// The conversation itself is untouched.
+	expect(user.content).toBe(long);
+	expect(answer.content).toBe(answerText);
 	const stored = h.conversation
 		.get("main")
 		.messages.find((m) => m.id === made.input)!;
 	expect(stored.text).toBe(long);
 });
 
-test("when the newest two exchanges are all long the history still stays within 48KB and the current input is never cut", async () => {
+test("when the newest two exchanges are all long they stay over a small budget and the current input is never cut", async () => {
 	const h = await setup();
 	const long = (label: string) => `${label}:` + "あいうえお".repeat(4000);
 	await h.exchange(long("古い質問"), long("古い答え"));
 	await h.exchange(long("質問A"), long("答えA"));
 	await h.exchange(long("質問B"), long("答えB"));
 	const input = "今回の長い入力。".repeat(3000);
-	const compiled = await h.compile(await h.current(input));
+	const compiled = await h.compile(await h.current(input), {
+		memoryHistoryTokens: 10_000,
+	});
 	const history = compiled.messages.slice(1, -1);
-	expect(history.reduce((n, m) => n + bytes(m.content), 0)).toBeLessThanOrEqual(
-		HISTORY_MAX_BYTES,
-	);
 	expect(history).toHaveLength(4);
 	expect(history.map((m) => m.content.slice(0, 3))).toEqual([
 		"質問A",
@@ -484,22 +526,7 @@ test("when the newest two exchanges are all long the history still stays within 
 	expect(compiled.messages.at(-1)!.content).toBe(input);
 });
 
-test("clipHistoryText leaves short text alone and cuts a multibyte text exactly at the limit", () => {
-	expect(clipHistoryText("短い")).toBe("短い");
-	const exact = "あ".repeat(HISTORY_MESSAGE_MAX_BYTES / 3);
-	expect(clipHistoryText(exact)).toBe(exact);
-	const clipped = clipHistoryText(
-		"あ".repeat(HISTORY_MESSAGE_MAX_BYTES / 3 + 1),
-	);
-	expect(bytes(clipped)).toBeLessThanOrEqual(HISTORY_MESSAGE_MAX_BYTES);
-	expect(clipped).not.toContain("�");
-	// Four-byte characters (emoji) are not split either.
-	const emoji = clipHistoryText("😀".repeat(5000));
-	expect(emoji).not.toContain("�");
-	expect(bytes(emoji)).toBeLessThanOrEqual(HISTORY_MESSAGE_MAX_BYTES);
-});
-
-test("notices and prefetched text are the tail, notices first; a prefetch standing on a shown message is dropped for the turn", async () => {
+test("notices and prefetched text come right before the input, notices first; a prefetch standing on a shown message is dropped for the turn", async () => {
 	const h = await setup();
 	const shown = await h.exchange("見えている質問", "見えている答え");
 	const hidden = await h.exchange("見えない質問", "見えない答え");
@@ -512,32 +539,37 @@ test("notices and prefetched text are the tail, notices first; a prefetch standi
 			prefetch: {
 				text: "昔のやり取り",
 				pins: [{ messageId: hidden.input, digest: "d" }],
-				bytes: 9,
+				tokens: 9,
 			},
 		}),
 	);
 	const run = await h.current();
 	const compiled = await h.compile(run, { window });
 	expect(compiled.prefetchDropped).toBe(false);
-	expect(compiled.sections.tail).toHaveLength(2);
-	expect(compiled.sections.tail[0]!.content).toContain(
-		"記憶の担当からの連絡です",
-	);
-	expect(compiled.sections.tail[0]!.content).toContain("- 一件目\n- 二件目");
-	expect(compiled.sections.tail[1]!.content).toBe("昔のやり取り");
+	expect(compiled.assembly.volatile.map((b) => b.source)).toEqual([
+		"memory.notice",
+		"memory.recall",
+	]);
+	const tail = compiled.messages.slice(-3, -1);
+	expect(tail[0]!.content).toContain("記憶の担当からの連絡です");
+	expect(tail[0]!.content).toContain("- 一件目\n- 二件目");
+	expect(tail[1]!.content).toBe("昔のやり取り");
 	// Now the pinned message is among the shown ones.
 	const overlapping = await h.store.write((db) =>
 		h.memory.publishWindowInTransaction(db, "main", {
 			prefetch: {
 				text: "重複",
 				pins: [{ messageId: shown.input, digest: "d" }],
-				bytes: 6,
+				tokens: 6,
 			},
 		}),
 	);
 	const dropped = await h.compile(run, { window: overlapping });
 	expect(dropped.prefetchDropped).toBe(true);
-	expect(texts(dropped.sections.tail)).not.toContain("重複");
+	expect(dropped.assembly.volatile.map((b) => b.source)).toEqual([
+		"memory.notice",
+	]);
+	expect(texts(dropped.messages)).not.toContain("重複");
 	expect(dropped.shownMessageIds).toContain(shown.input);
 	expect(dropped.shownMessageIds).not.toContain(hidden.input);
 });
@@ -560,7 +592,12 @@ test("the goals layer sits right after long-term memory and before the kept hist
 			republishLongTerm: true,
 		}),
 	);
-	const goals = { role: "system" as const, content: "目標の層" };
+	const goals: ContextBlock = {
+		source: "goals",
+		authority: "reference",
+		freshness: "stable",
+		body: { kind: "text", text: "目標の層" },
+	};
 	await h.publish();
 	const run = await h.current("今回の入力");
 	const withGoals = await h.compile(run, { goals });
@@ -568,10 +605,12 @@ test("the goals layer sits right after long-term memory and before the kept hist
 	const at = order.indexOf("目標の層");
 	expect(at).toBe(order.findIndex((t) => t.includes("長期に入る好み")) + 1);
 	expect(order.indexOf("保持の質問")).toBeGreaterThan(at);
-	expect(withGoals.sections.goals).toEqual([goals]);
+	expect(withGoals.assembly.stable.at(-1)).toEqual(goals);
 	// Without goals nothing is added and the other layers are as before.
 	const without = await h.compile(run);
-	expect(without.sections.goals).toEqual([]);
+	expect(without.assembly.stable.map((b) => b.source)).toEqual([
+		"memory.long_term",
+	]);
 	expect(texts(without.messages)).toEqual(
 		order.filter((t) => t !== "目標の層"),
 	);

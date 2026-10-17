@@ -30,14 +30,14 @@ export function williamsOrders(n: number): number[][] {
 		: [...rows, ...rows.map((row) => [...row].reverse())];
 }
 
-export type ConversationCall = {
+type ConversationCall = {
 	caseId: string;
 	arm: string;
 	trial: number;
 	messages: ChatMessage[];
 	tools: ContextCase["tools"];
 };
-export type ConversationOutcome =
+type ConversationOutcome =
 	| { kind: "ok"; text: string; toolCalls: ToolCallRecord[]; repaired: boolean }
 	| { kind: "contract_failure"; code: string; repaired: boolean };
 /** Performs one conversation call. A thrown error is a transport error. */

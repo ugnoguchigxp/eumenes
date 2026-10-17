@@ -26,10 +26,8 @@ import {
 	type ContextArm,
 	baselineArm,
 } from "../../../../api/domains/dialogue/eval/context/arm";
-import {
-	parseRecallText,
-	splitRecallText,
-} from "../../../../api/domains/dialogue/eval/context/recall-text";
+import { splitRecallText } from "../../../../api/domains/dialogue/eval/context/recall-text";
+import { parseRecallBlock } from "../../../../api/domains/memory";
 import type { ChatMessage } from "../../../../api/domains/dialogue/service/context";
 import type { ContextAssembly } from "../../../../api/domains/dialogue/service/context-assembly";
 import { renderContext } from "../../../../api/domains/dialogue/service/context-render";
@@ -125,7 +123,7 @@ function dataLines(block: ContextBlock, v: Variant): string[] {
 	if (json !== undefined) return [referenceJson(json)];
 	if (body.kind === "text") {
 		if (block.source === "memory.recall") {
-			const entries = parseRecallText(body.text);
+			const entries = parseRecallBlock(body.text);
 			// Rules variants show the entries only; the others keep the text memory wrote (frame and delimiters).
 			if (v.rules && entries) return [referenceJson(entries)];
 			if (!v.rules) return [body.text];
@@ -136,7 +134,10 @@ function dataLines(block: ContextBlock, v: Variant): string[] {
 }
 
 function attributes(block: ContextBlock): string {
-	const parts = [`authority="${block.authority}"`, `freshness="${block.freshness}"`];
+	const parts = [
+		`authority="${block.authority}"`,
+		`freshness="${block.freshness}"`,
+	];
 	if (block.certainty) parts.push(`certainty="${block.certainty}"`);
 	if (block.covers?.fromAt) parts.push(`covers_from="${block.covers.fromAt}"`);
 	if (block.covers?.toAt) parts.push(`covers_to="${block.covers.toAt}"`);
@@ -149,7 +150,11 @@ const label = (source: string) => frames().get(`label.${source}`) ?? source;
 
 /** The JSON envelope of a block (A4). */
 function jsonEnvelope(block: ContextBlock): string {
-	const frame = frameOf(block, { style: "json", rules: false, userReference: false });
+	const frame = frameOf(block, {
+		style: "json",
+		rules: false,
+		userReference: false,
+	});
 	const { body } = block;
 	const json = jsonData(block);
 	let data: unknown;
@@ -177,8 +182,12 @@ function jsonEnvelope(block: ContextBlock): string {
 function renderBlockText(block: ContextBlock, v: Variant): string {
 	if (v.style === "json") return jsonEnvelope(block);
 	const frame = frameOf(block, v);
-	const lines = [...(frame === undefined ? [] : [frame]), ...dataLines(block, v)];
-	if (v.style === "markdown") return [`## ${label(block.source)}`, ...lines].join("\n");
+	const lines = [
+		...(frame === undefined ? [] : [frame]),
+		...dataLines(block, v),
+	];
+	if (v.style === "markdown")
+		return [`## ${label(block.source)}`, ...lines].join("\n");
 	const open = `<context source="${block.source}"${v.rules ? ` ${attributes(block)}` : ""}>`;
 	return [open, ...lines, "</context>"].join("\n");
 }
@@ -210,7 +219,9 @@ function markdownSources(text: string): string[] {
 	return found;
 }
 
-const turnMessage = (turn: ContextAssembly["history"]["turns"][number]): ChatMessage => ({
+const turnMessage = (
+	turn: ContextAssembly["history"]["turns"][number],
+): ChatMessage => ({
 	role: turn.role,
 	content: turn.content,
 	...(turn.attachments?.length
@@ -222,7 +233,10 @@ const turnMessage = (turn: ContextAssembly["history"]["turns"][number]): ChatMes
 function systemPart(assembly: ContextAssembly, v: Variant): string {
 	const base = renderContext(assembly, "current").messages[0]!.content;
 	if (!v.rules) return base;
-	const table = systemContext("dialogue.contexts.context-eval.arm-rule-table", {});
+	const table = systemContext(
+		"dialogue.contexts.context-eval.arm-rule-table",
+		{},
+	);
 	const note = v.userReference
 		? `\n${systemContext("dialogue.contexts.context-eval.arm-role-note", {})}`
 		: "";
@@ -240,8 +254,13 @@ function build(assembly: ContextAssembly, v: Variant): ArmOutput {
 		content: renderBlockText(block, v),
 	});
 	const kept = assembly.history.turns.filter((t) => t.layer === "keep");
-	const unprocessed = assembly.history.turns.filter((t) => t.layer === "unprocessed");
-	const system: ChatMessage = { role: "system", content: systemPart(assembly, v) };
+	const unprocessed = assembly.history.turns.filter(
+		(t) => t.layer === "unprocessed",
+	);
+	const system: ChatMessage = {
+		role: "system",
+		content: systemPart(assembly, v),
+	};
 	// With reference blocks as user messages the history must come first: the transcript split takes the first
 	// non-system messages after the instructions as the history.
 	const messages: ChatMessage[] = v.userReference
@@ -282,9 +301,34 @@ const armOf = (
 const tag = (text: string) => matches(text, TAG_SOURCE);
 
 export const arms: ContextArm[] = [
-	armOf("A1", { style: "tag", rules: false, userReference: false }, (c) => TAG_WRAPPED.test(c), tag),
-	armOf("A2", { style: "tag", rules: true, userReference: false }, (c) => TAG_WRAPPED.test(c), tag),
-	armOf("A3", { style: "markdown", rules: false, userReference: false }, (c) => MARKDOWN_WRAPPED.test(c), markdownSources),
-	armOf("A4", { style: "json", rules: false, userReference: false }, jsonWrapped, (t) => matches(t, JSON_SOURCE)),
-	armOf("A5", { style: "tag", rules: true, userReference: true }, (c) => TAG_WRAPPED.test(c), tag),
+	armOf(
+		"A1",
+		{ style: "tag", rules: false, userReference: false },
+		(c) => TAG_WRAPPED.test(c),
+		tag,
+	),
+	armOf(
+		"A2",
+		{ style: "tag", rules: true, userReference: false },
+		(c) => TAG_WRAPPED.test(c),
+		tag,
+	),
+	armOf(
+		"A3",
+		{ style: "markdown", rules: false, userReference: false },
+		(c) => MARKDOWN_WRAPPED.test(c),
+		markdownSources,
+	),
+	armOf(
+		"A4",
+		{ style: "json", rules: false, userReference: false },
+		jsonWrapped,
+		(t) => matches(t, JSON_SOURCE),
+	),
+	armOf(
+		"A5",
+		{ style: "tag", rules: true, userReference: true },
+		(c) => TAG_WRAPPED.test(c),
+		tag,
+	),
 ];

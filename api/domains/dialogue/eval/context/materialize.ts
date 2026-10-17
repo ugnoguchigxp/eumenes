@@ -1,7 +1,11 @@
 import type { SqliteStore } from "../../../../infrastructure/sqlite";
 import type { ConversationService } from "../../../conversation";
-import type { MemoryService, WindowSnapshot } from "../../../memory";
-import type { ContextBlock } from "../../../inference";
+import {
+	type MemoryService,
+	type WindowSnapshot,
+	renderRecallBlock,
+} from "../../../memory";
+import { type ContextBlock, estimateTextTokens } from "../../../inference";
 import type { ContextGoalEntry, Run } from "../../contracts";
 import { insert } from "../../repository";
 import type { ContextAssembly } from "../../service/context-assembly";
@@ -15,9 +19,10 @@ import {
 } from "../../service/context-blocks";
 import { compileAssembly } from "../../service/context-compiler";
 import { renderGoalsLayer } from "../../service/goals-layer";
-import { worldNamesHint } from "../../service/topic-texts";
+import { withVolatile } from "../../service/context-volatile";
+import { worldNamesBlock } from "../../service/topic-texts";
 import type { ContextCase, Seed } from "./case-schema";
-import { recallBlockText, recallMinute } from "./recall-text";
+import { recallMinute } from "./recall-text";
 
 export const CONVERSATION_ID = "main";
 const SEED_SOURCE_MESSAGE = "seed-source";
@@ -44,6 +49,11 @@ export interface SeedWiring {
 			text: string;
 		},
 	): Promise<unknown>;
+	/**
+	 * Moves the clock of the memory and continuity services: a ledger row, a memory item and a window carry the time
+	 * the seed says it happened, so history boundaries, `covers` ranges and validity are the case's own.
+	 */
+	setNow(iso: string): void;
 	close(): Promise<void>;
 }
 
@@ -59,9 +69,9 @@ export type Materialized = {
 	close(): Promise<void>;
 };
 
-export const at = (iso: string | undefined) => iso ?? "2026-10-13T00:00:00.000Z";
+const at = (iso: string | undefined) => iso ?? "2026-10-13T00:00:00.000Z";
 
-export async function appendExchange(
+async function appendExchange(
 	wiring: SeedWiring,
 	n: number,
 	exchange: {
@@ -105,7 +115,12 @@ export async function appendExchange(
 	};
 }
 
-export function runRow(id: string, n: number, time: string, completed: boolean): Run {
+export function runRow(
+	id: string,
+	n: number,
+	time: string,
+	completed: boolean,
+): Run {
 	return {
 		id,
 		agentTaskId: null,
@@ -158,10 +173,14 @@ async function seedAndCompile(
 	const ids: Array<{ layer: string; input: string }> = [];
 	let n = 0;
 	for (const exchange of seed.exchanges ?? []) {
+		wiring.setNow(exchange.at);
 		const made = await appendExchange(wiring, ++n, exchange);
 		ids.push({ layer: exchange.layer, input: made.input });
 		if (exchange.layer === "keep") await dispose(wiring, made.input, "keep");
 	}
+	// Everything after the exchanges happens at the time of the turn.
+	const now = at(seed.exchanges?.at(-1)?.at ?? base);
+	wiring.setNow(now);
 	// Source message for the memory items: a message of the conversation that no run owns, so no history shows it.
 	await store.write((db) =>
 		conversation.appendInTransaction(db, {
@@ -190,8 +209,13 @@ async function seedAndCompile(
 				republishLongTerm: true,
 			}),
 		);
-	for (const note of seed.notes ?? [])
+	// Notes carry the time they were added; one millisecond apart keeps their order the seed's (equal times would be
+	// ordered by their random ids, and the same case would give a different prompt on every materialization).
+	for (const [index, note] of (seed.notes ?? []).entries()) {
+		wiring.setNow(new Date(Date.parse(now) + index).toISOString());
 		await addNote(CONVERSATION_ID, { kind: note.kind, text: note.text });
+	}
+	wiring.setNow(now);
 	if (seed.summary) {
 		const covered = ids
 			.filter((e) => e.layer === "summarized")
@@ -213,7 +237,7 @@ async function seedAndCompile(
 		...(entry.user === undefined ? {} : { user: entry.user }),
 		...(entry.assistant === undefined ? {} : { assistant: entry.assistant }),
 	}));
-	const recallText = recalled.length ? recallBlockText(recalled) : "";
+	const recallText = recalled.length ? renderRecallBlock(recalled) : "";
 	const window = await store.write((db) =>
 		memory.publishWindowInTransaction(db, CONVERSATION_ID, {
 			...(seed.notices?.length ? { addNotices: seed.notices } : {}),
@@ -222,7 +246,7 @@ async function seedAndCompile(
 						prefetch: {
 							text: recallText,
 							pins: [],
-							bytes: Buffer.byteLength(recallText),
+							tokens: estimateTextTokens(recallText),
 						},
 					}
 				: {}),
@@ -231,7 +255,6 @@ async function seedAndCompile(
 
 	// The current turn: the last message, with its run still running.
 	const current = ++n;
-	const now = at(seed.exchanges?.at(-1)?.at ?? base);
 	await store.write((db) => {
 		conversation.appendInTransaction(db, {
 			id: `u${current}`,
@@ -307,10 +330,9 @@ function specialistBlocks(specialist: NonNullable<Seed["specialist"]>) {
 }
 
 /**
- * What holds for this call only, in the order `createPrepare` shows it: the notices and the prefetch memory decided
- * (none for a failed research answer), the World names, the specialist records, the operation results, the
- * research report. A research answer has no specialist records; a failed one has no World names either. The block
- * builders are the product's; the sequence is `createPrepare`'s, which needs the full dependency set to run.
+ * The assembly with the volatile part a seed describes. The blocks are the product's builders'; the order and the
+ * branching (what a failed research answer drops, what an answer leaves out) are the product's `withVolatile`,
+ * which `createPrepare` calls too.
  */
 export function assembleVolatile(
 	compiled: ContextAssembly,
@@ -319,42 +341,36 @@ export function assembleVolatile(
 ): ContextAssembly {
 	const research = seed.research;
 	const failed = research?.failureCode !== undefined;
-	const worldHint = failed
-		? null
-		: worldNamesHint((seed.world ?? []).map((target) => target.name));
-	const volatile: ContextBlock[] = [
-		...(failed ? [] : compiled.volatile),
-		...(worldHint ? [hostTextBlock("world.names", worldHint.content)] : []),
-		...(research || !seed.specialist ? [] : specialistBlocks(seed.specialist)),
-		...(seed.operation
+	return withVolatile(compiled, {
+		memory: compiled.volatile,
+		...(research
+			? { answer: failed ? { failureCode: research.failureCode } : {} }
+			: {}),
+		worldNames: () => worldNamesBlock((seed.world ?? []).map((t) => t.name)),
+		specialist: () =>
+			seed.specialist ? specialistBlocks(seed.specialist) : [],
+		operations: seed.operation
 			? [
 					operationBlock(
 						OPERATION_SOURCE[seed.operation.kind],
 						seed.operation.result,
 					),
 				]
-			: []),
-		...(research
-			? [
-					failed
-						? researchFailureBlock(
-								research.failureCode!,
-								research.projection === undefined
-									? undefined
-									: typeof research.projection === "string"
-										? research.projection
-										: JSON.stringify(research.projection),
-								nowMs,
-							)
-						: researchResultBlock(research.projection ?? {}, nowMs),
-				]
-			: []),
-	];
-	return {
-		...compiled,
-		stage: research || seed.operation ? "result" : "initial",
-		volatile,
-	};
+			: [],
+		research: research
+			? failed
+				? researchFailureBlock(
+						research.failureCode!,
+						research.projection === undefined
+							? undefined
+							: typeof research.projection === "string"
+								? research.projection
+								: JSON.stringify(research.projection),
+						nowMs,
+					)
+				: researchResultBlock(research.projection ?? {}, nowMs)
+			: null,
+	});
 }
 
 /** Materializes `testCase`; if seeding or compiling throws, the store is closed before the error propagates. */

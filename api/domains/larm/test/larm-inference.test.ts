@@ -96,7 +96,7 @@ test("context trimming retains the current input after an unanswered prior turn"
 		await larm.answer(
 			[
 				{ role: "system", content: "system" },
-				{ role: "user", content: "x".repeat(4000) },
+				{ role: "user", content: "x".repeat(20_000) },
 				latest,
 			],
 			new AbortController().signal,
@@ -105,6 +105,26 @@ test("context trimming retains the current input after an unanswered prior turn"
 	} finally {
 		await larm.close();
 	}
+});
+test("the LLM window of the lease held now is known without a claim, and unknown while none is held", async () => {
+	const fake = fixture();
+	const larm = createLarm({
+		baseUrl: "http://127.0.0.1:9810",
+		profile: "test-profile",
+		token: "control",
+		fetch: fake.fetcher,
+	});
+	try {
+		expect(larm.llmContextWindow?.()).toBeNull();
+		await larm.answer(
+			[{ role: "user", content: "質問" }],
+			new AbortController().signal,
+		);
+		expect(larm.llmContextWindow?.()).toBeGreaterThan(0);
+	} finally {
+		await larm.close();
+	}
+	expect(larm.llmContextWindow?.()).toBeNull();
 });
 test("native decision shares the voice lease, uses its own auth, and rotates credentials", async () => {
 	const fake = fixture(false, "test-profile", 60000, "model-tts", true);

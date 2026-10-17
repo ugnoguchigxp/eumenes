@@ -162,13 +162,12 @@ type ContextAssembly = {
 	hostRules: HostRuleId[];          // S に入る固定の規則。操作結果・調査成功の規則を含め、会話中は不変（W3）
 	stable: ContextBlock[];           // P
 	history: {
-		boundary: HistoryBoundary;      // §5.3
 		turns: HistoryTurn[];           // 逐語＋未処理。role・本文・添付・messageId・layer・at
+		// 境界の注記（§5.3）は未実装。render が使い始めるときに `boundary` を足す
 	};
 	working: ContextBlock[];          // W
 	volatile: ContextBlock[];         // V
-	input: ChatMessage;               // R
-	currentRequest: { messageId: string };
+	input: ChatMessage;               // R。今回の依頼の指定は input そのもの（別の messageId は持たない）
 };
 
 type ContextBlock = {
@@ -213,6 +212,8 @@ type ContextSource =
 
 ### 5.3 履歴の境界の注記
 
+**未実装。** 現在の `ContextAssembly.history` と memory の `WindowSnapshot.history` に `boundary` は無い（書くだけで読む者が無かったため削除した）。render が注記を使い始めるときに、両方へ足す。
+
 H の先頭に、固定の短い system の注記を1つ置く。内容は、ここから会話履歴が逐語で続くことと、各往復の日付の範囲（`fromAt`〜`toAt`）である。往復ごとの時刻は本文に入れない。本文に入れると、履歴の扱いと role の意味が崩れる。
 
 - 範囲の値は memory の工程でだけ変わる。工程の間は先頭部分を保つため、`toAt` は「工程の時点での最後の往復」とする。今回の工程の後に足された往復には時刻を付けず、V の `host.time`（W7 で決める）で今の時刻を示す。
@@ -250,7 +251,7 @@ type RenderedContext = {
 - `instructionCount`・`historyCount`・`currentRequestIndex` は `render` が決める。今の `createPrepare` の数え直しはやめる。
 - `markCurrentRequest` の並べ替えは `render` に入れる。
 - 全書式の不変条件は次の3つとし、固定試験で検査する。H の過去の user 発言は囲まずに残るので、「囲みのない user メッセージは1つ」という条件は使わない。
-  1. `currentRequestIndex` の位置に、host が指定した `currentRequest.messageId` の入力があり、それが R の最後のメッセージである。
+  1. `currentRequestIndex` の位置に、assembly の `input`（host が指定した今回の依頼）があり、それが R の最後のメッセージである。
   2. H の外（S・P・W・V）に、囲みのない user メッセージがない。V に user role で置くものは、すべて書式の囲み（またはエスケープした JSON）で包む。
   3. H のメッセージは、どれも ledger の messageId に対応する（ホストが作った文が H に紛れ込まない）。
 - リファクタリング計画 §3.5 の「囲みのない user メッセージは現在の依頼ただ一つ」は、履歴を囲む専門担当と agent-runtime の入口の条件である。通常会話では上の 1〜3 に読み替える。部品は共有し、条件は入口ごとに持つ。
@@ -363,13 +364,29 @@ C3 は調整の扱いにしない。規則がいつモデルに見えるか（�
 
 実装済み（fixture の試験で確認。live は未実施）:
 - **C2 の usage の正規化（§7.1）。** `claudeUsage`（`inference/adapters/cloud-agents.ts`）、`chatUsage`（`inference/service/cloud.ts`）、OpenAI 互換の stream に `stream_options.include_usage` を付与、migration `inference/0012-total-input-tokens`。試験は `inference/test/usage-normalization.test.ts`。
-- **C1 の memory 部分。** `WindowSnapshot` の L1・L2 に `header` と `sections` を追加（`text` は byte 単位で不変）。`history.summaryCovers` と `history.boundary`（memory の工程でだけ再計算）を追加。旧スナップショットは保存済みの `text` から構造を復元する。試験は `memory/test/context-structure.test.ts`、`window-history.test.ts`。
+- **C1 の memory 部分。** `WindowSnapshot` の L1・L2 に `header` と `sections` を追加（`text` は byte 単位で不変）。`history.summaryCovers` を追加（`history.boundary` も一度入れたが、読む者が無く削除した。§5.3）。旧スナップショットは保存済みの `text` から構造を復元する。試験は `memory/test/context-structure.test.ts`、`window-history.test.ts`。
 - **評価基盤（評価設計書 P2）の中心部分。** `api/domains/dialogue/eval/context/`、`scripts/context-eval/`、`bun run context:eval`。今は baseline を現行の `compileContext` で組み立てる。
 
 未決・注意:
 - **Codex 経路の usage。** `codex-app-server.ts` は `inputTokens`・`outputTokens` だけを記録し、キャッシュは記録していない。`input_tokens` がキャッシュを含むかをリポジトリ内で確かめられないため、変えていない。集計では、キャッシュ列が null の行をキャッシュ率から外す。実際の出力で確かめてから対応する。
 - **`stream_options.include_usage`。** 未知の項目を拒否する OpenAI 互換の endpoint では、stream が失敗しうる。拒否された場合の扱い（送らない・外して再送）は新しい判断方式なので、必要になったら本書で合意してから入れる。
-- **境界と covers の日時。** `memory_exchange.createdAt`（台帳への登録時刻）であり、メッセージ自体の時刻ではない。
-- **境界の持ち越し。** `boundary` は工程の間は前回の値を持ち越す。工程の後に別の理由で除外された往復の日付が残りうる。render で使い始めるとき（C1 本体）に、除外の扱いを確かめる。
+- **covers の日時。** `memory_exchange.createdAt`（台帳への登録時刻）であり、メッセージ自体の時刻ではない。
+- **境界の注記。** 未実装。足すとき（C1 本体）に、工程の間の持ち越しと、工程の後に別の理由で除外された往復の扱いを決める。
 - verify の size-budget で、別セッションの `generation-handler.ts#createGenerationHandler`（317→319行）が上限を超えている。本作業の範囲外。
 - dialogue の試験のうち `conversation-generation.test.ts` の2件（修復時の並び）が失敗する。別セッションが編集中のファイルであり、本作業の範囲外。
+
+### 2026-10-17 第2段
+
+実装済み（fixture の試験と `bun run verify`（dialogue・memory・inference・larm・steward・voice-dialogue・queue・goals・capabilities・ui-compositions・tool-runtime）で確認。live は未実施）:
+- **C1。** `ContextAssembly`（`dialogue/service/context-assembly.ts`）、ブロックの組み立て（`context-blocks.ts`、`context-volatile.ts`）、`renderContext`（`context-render.ts`、書式 `current` は `context-format-current.ts`）。共通の部品は `inference/contracts/context-render.ts`。golden 23通り（`dialogue/test/context-golden/`）で最終メッセージ列を固定した。`compileContext`・`ContextSections` などの旧い組み立ては削除した。
+- **C3。** 操作結果の規則と調査成功の方針を、S の固定部分に条件付きで常に置く（`dialogue/contexts/host-rules/`）。操作結果・調査成功の回は、初段と S・P・H・W を共有する。調査失敗の経路は変えていない。
+- **§4.4 の容量の予算（利用者の指示）。** token 数の見積もり（`api/infrastructure/context-budget.ts`）、記憶と会話履歴 `min(128k, 窓/2)` と直近のタスクの配分（`dialogue/service/context-fit.ts`、`compileAssembly`）、窓の取得（Cloud は保存済みの resource、LARM は接続中の provider。不明なら 256k を仮定）。予算を超えても失敗させず、古い履歴を往復単位で外すか、V のブロックを構造を保って切り詰める。層ごとのバイト上限と内容側の上限（W8）を廃止した。steward の出力検証の上限（`MAX_TEXT_CHARS`、`SUMMARY_MAX_CHARS` など）は残している。
+- **評価基盤。** 比較案 A0〜A5、並びの変種 A0-o2・A2-o2（計測のみ）、直列化の経路（`larm-messages`・`flattened`）、10往復の prefix 計測の自動化、事例 72件（dev 36・holdout 36）。holdout はまだ freeze していない。
+- 独立レビューを1回行い、指摘（ラベルとジョブ payload の上限の食い違い、型の回帰、調査失敗と想起のブロックを切り詰めたときの破損、compact の発動条件、履歴の先頭に返答だけが残る問題、claim 中の全 run 読み込み）をまとめて修正した。
+- 未使用・到達不能なコードを削除した（`scripts/guided-answer-live.ts`、`web/src/domains/ocr/index.ts`、未使用の export・型、`history.boundary`）。
+
+未実施・未決:
+- live（LARM・Cloud）での F1〜F9 の評価、C3 の live での退行確認、§7.2 の live の計測。
+- 履歴の境界の注記（§5.3）は未実装。
+- `PREREGISTRATION.md` の「再実行の条件」は要合意のまま。
+- Codex 経路の usage のキャッシュ、`stream_options.include_usage` を拒否する endpoint の扱い（第1段の記録のとおり）。

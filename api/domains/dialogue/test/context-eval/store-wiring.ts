@@ -33,11 +33,12 @@ export async function openSeedWiring(): Promise<SeedWiring> {
 		worldStateMigration,
 	]);
 	const conversation = createConversationService(store);
-	const continuity = createContinuityService(store, () => FIXED_TIME);
+	let now = FIXED_TIME;
+	const continuity = createContinuityService(store, () => now);
 	let counter = 0;
 	const memory = createMemoryService(store, conversation, continuity, {
 		journalPath: join(dir, "journal.jsonl"),
-		clock: () => FIXED_TIME,
+		clock: () => now,
 		id: () => `id-${++counter}`,
 	});
 	if (!(await memory.recover()).healthy) {
@@ -49,6 +50,9 @@ export async function openSeedWiring(): Promise<SeedWiring> {
 		store,
 		conversation,
 		memory,
+		setNow: (iso) => {
+			now = iso;
+		},
 		saveItem: (input) => saveItem(store, memory, input),
 		addNote: (conversationId, input) =>
 			addNote(store, continuity, conversationId, input),

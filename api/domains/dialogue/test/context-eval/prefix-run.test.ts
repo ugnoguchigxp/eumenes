@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { baselineAaArm, baselineCompileArm } from "../../eval/context/arm";
+import { baselineAaArm, baselineArm } from "../../eval/context/arm";
 import {
 	canonicalJson,
 	commonPrefixBytes,
@@ -7,6 +7,7 @@ import {
 	prefixStability,
 } from "../../eval/context/prefix-stability";
 import { type Materialized, materialize } from "../../eval/context/materialize";
+import { renderContext } from "../../service/context-render";
 import { executeRun, planJobs, williamsOrders } from "../../eval/context/run";
 import { makeCase } from "./case-fixtures";
 import { openSeedWiring } from "./store-wiring";
@@ -83,13 +84,14 @@ const cases = [
 	makeCase("ctx-f1-dev-01", "旅行の行き先を確認させて"),
 	makeCase("ctx-f9-dev-01", "こんにちは。今日の調子はどう？"),
 ];
-const arms = [baselineCompileArm, baselineAaArm];
+const arms = [baselineArm, baselineAaArm];
 
 test("the run plan orders arms per Williams, trial by trial, and builds every arm from one materialization", async () => {
 	const jobs = await planJobs({
 		cases,
 		arms,
 		trials: 3,
+		serialization: "larm-messages",
 		openWiring: openSeedWiring,
 	});
 	expect(jobs).toHaveLength(2 * 2 * 3);
@@ -104,6 +106,7 @@ test("a run records one row per call; a failing call is a transport_error row an
 	let peak = 0;
 	const result = await executeRun({
 		lane: "fixture",
+		serialization: "larm-messages",
 		cases,
 		arms,
 		trials: 3,
@@ -117,10 +120,10 @@ test("a run records one row per call; a failing call is a transport_error row an
 			if (
 				call.caseId === "ctx-f9-dev-01" &&
 				call.trial === 2 &&
-				call.arm === "baseline-compile"
+				call.arm === "A0"
 			)
 				throw new TypeError("network down");
-			if (call.trial === 3 && call.arm === "baseline-compile-aa")
+			if (call.trial === 3 && call.arm === "A0-aa")
 				return {
 					kind: "contract_failure",
 					code: "invalid_conversation_operation",
@@ -135,37 +138,39 @@ test("a run records one row per call; a failing call is a transport_error row an
 	});
 	expect(result.jobs).toBe(12);
 	expect(rows).toHaveLength(12);
-	expect(rows).toContain(
-		"baseline-compile|ctx-f9-dev-01|2|transport_error|TypeError",
-	);
+	expect(rows).toContain("A0|ctx-f9-dev-01|2|transport_error|TypeError");
 	expect(rows.filter((r) => r.includes("contract_failure"))).toHaveLength(2);
 	expect(peak).toBeLessThanOrEqual(2);
 });
 
-test("the baseline arm reproduces the production placement: tail and World hint just before the input, deterministic across materializations", async () => {
+test("the baseline arm is the product's own current render of the assembly, deterministic across materializations", async () => {
 	const seeded = makeCase("ctx-f8-dev-01", "メモは保存できた？", {
 		seed: {
 			notices: ["メモの保存に失敗しました"],
 			world: [{ name: "音声サービス" }],
-			operation: { kind: "image", result: { status: "failed" } },
 		},
 		expect: { checks: [{ kind: "brief_spoken_reply" }], rubric: [] },
 	});
 	const build = async () => {
 		const m: Materialized = await materialize(seeded, await openSeedWiring());
 		try {
-			return baselineCompileArm.build(m);
+			return {
+				arm: baselineArm.build(m.assembly),
+				product: renderContext(m.assembly, "current"),
+			};
 		} finally {
 			await m.close();
 		}
 	};
 	const a = await build();
-	expect(JSON.stringify(a.messages)).toBe(
-		JSON.stringify((await build()).messages),
+	expect(a.arm.messages).toEqual(a.product.messages);
+	expect(a.arm.sessionContext).toEqual(a.product.sessionContext);
+	expect(a.arm.currentRequestIndex).toBe(a.product.currentRequestIndex);
+	expect(JSON.stringify(a.arm.messages)).toBe(
+		JSON.stringify((await build()).arm.messages),
 	);
-	const texts = a.messages.map((m) => m.content);
+	const texts = a.arm.messages.map((m) => m.content);
 	expect(texts.at(-1)).toBe("メモは保存できた？");
 	expect(texts.at(-2)).toContain("音声サービス");
 	expect(texts.at(-3)).toContain("記憶の担当からの連絡です");
-	expect(a.unsupportedSeeds).toEqual(["operation"]);
 });

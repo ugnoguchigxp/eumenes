@@ -1,7 +1,4 @@
-import {
-	MEMORY_HISTORY_MAX_TOKENS,
-	type ContextBlock,
-} from "../../inference";
+import { MEMORY_HISTORY_MAX_TOKENS, type ContextBlock } from "../../inference";
 import { getLogger } from "../../../infrastructure/logger";
 import type { Tx } from "../../queue";
 import type { ConversationService } from "../../conversation";
@@ -23,34 +20,17 @@ import {
 	summaryBlock,
 } from "./context-blocks";
 import { blockTokens, turnTokens } from "./context-fit";
-import { layoutCurrent } from "./context-format-current";
 
 const log = getLogger("dialogue");
 /** The newest exchanges that are never dropped for size. */
 const LATEST_EXCHANGES = 2;
-
-/** The prompt by layer, in the order `messages` lists them (the layers are what the research context reassembles). */
-export type ContextSections = {
-	/** L0 */
-	system: ChatMessage;
-	/** L1 long-term memory */
-	longTerm: ChatMessage[];
-	/** The adopted goals, right after L1: they change rarely, so the layers behind them keep their cache */
-	goals: ChatMessage[];
-	/** L3 the exchanges kept verbatim, in the order they were appended */
-	history: ChatMessage[];
-	/** L2 working memory: the summary, then the short-term notes and the recently remembered */
-	working: ChatMessage[];
-	/** Exchanges no step has taken out of the prompt yet, and the newest two when the steward dropped them */
-	unprocessed: ChatMessage[];
-	/** L5 */
-	input: ChatMessage;
-	/** L4 decided here (notice, prefetch); the caller adds the rest right before the input. */
-	tail: ChatMessage[];
-};
+/** Earlier runs read at a time while the history is filled from the newest. */
+const PRIOR_PAGE = 24;
 
 type HistoryEntry = {
 	layer: "keep" | "unprocessed";
+	/** The place in the ledger's list (kept ones keep the window's order); -1 for a run the ledger does not list. */
+	index: number;
 	ordinal: number;
 	turns: HistoryTurn[];
 	tokens: number;
@@ -126,47 +106,27 @@ export function compileAssembly(
 				run.conversationId,
 			) ?? [],
 		);
-	// -1: every earlier run (SQLite has no limit then); the budget decides how many are read below.
-	const prior = recentPriorRuns(tx, run, -1, withoutSpecialist);
-	const refs = [
-		...(verbatim?.keep ?? []).map((ref) => ({
-			...ref,
-			layer: "keep" as const,
-		})),
-		...(verbatim?.unprocessed ?? []).map((ref) => ({
-			...ref,
-			layer: "unprocessed" as const,
-		})),
-	];
-	// Runs the ledger never took (cancelled, replaced, from before it) stay as they were. They are read newest
-	// first and no further than the budget can hold: the older ones would be the first to go.
-	const unknown = prior
-		.filter((entry) => !verbatim?.known.has(entry.inputMessageId))
-		.map((entry) => ({
-			inputMessageId: entry.inputMessageId,
-			answerMessageId:
-				entry.status === "completed" ? entry.answerMessageId : null,
-			layer: "unprocessed" as const,
-		}));
-	const newest = new Set(
-		prior
-			.filter(
-				(entry) =>
-					!blocked.has(entry.inputMessageId) ||
-					(entry.status === "completed" &&
-						entry.answerMessageId !== null &&
-						!blocked.has(entry.answerMessageId)),
-			)
-			.slice(-LATEST_EXCHANGES)
-			.map((entry) => entry.inputMessageId),
+	const refs = new Map(
+		[
+			...(verbatim?.keep ?? []).map((ref) => ({
+				...ref,
+				layer: "keep" as const,
+			})),
+			...(verbatim?.unprocessed ?? []).map((ref) => ({
+				...ref,
+				layer: "unprocessed" as const,
+			})),
+		].map((ref, index) => [ref.inputMessageId, { ...ref, index }]),
 	);
-	const known = new Set(refs.map((ref) => ref.inputMessageId));
 
-	const entryOf = (ref: {
-		inputMessageId: string;
-		answerMessageId: string | null;
-		layer: "keep" | "unprocessed";
-	}): HistoryEntry | null => {
+	const entryOf = (
+		ref: {
+			inputMessageId: string;
+			answerMessageId: string | null;
+			layer: "keep" | "unprocessed";
+		},
+		index: number,
+	): HistoryEntry | null => {
 		const turns: HistoryTurn[] = [];
 		let ordinal: number | null = null;
 		if (!blocked.has(ref.inputMessageId)) {
@@ -204,41 +164,81 @@ export function compileAssembly(
 		if (turns.length === 0 || ordinal === null) return null;
 		return {
 			layer: ref.layer,
+			index,
 			ordinal,
 			turns,
 			tokens: turns.reduce((sum, turn) => sum + turnTokens(turn.content), 0),
-			pinned: newest.has(ref.inputMessageId),
+			pinned: false,
 		};
 	};
 
+	// The earlier runs are read newest first, a page at a time, and no further than the budget can hold: what
+	// is older would be the first to go. A run the ledger keeps or has not processed is shown in that layer; a run
+	// the ledger never took (cancelled, replaced, from before it) stays as it was; the newest two stay even when
+	// the ledger had already finished with them.
 	const entries: HistoryEntry[] = [];
-	for (const ref of refs) {
-		const entry = entryOf(ref);
-		if (entry) entries.push(entry);
-	}
+	const seen = new Set<string>();
+	const pinned = new Set<string>();
 	let loaded = 0;
-	const fromPrior: HistoryEntry[] = [];
-	for (const ref of [...unknown].reverse()) {
-		const entry = entryOf(ref);
-		if (!entry) continue;
-		fromPrior.push(entry);
-		loaded += entry.tokens;
-		if (loaded >= room && fromPrior.length > LATEST_EXCHANGES) break;
-	}
-	entries.push(...fromPrior);
-	// The newest two stay even when the ledger had already finished with them.
-	for (const entry of prior
-		.filter((e) => newest.has(e.inputMessageId) && !known.has(e.inputMessageId))
-		.map((e) =>
-			entryOf({
-				inputMessageId: e.inputMessageId,
-				answerMessageId:
-					e.status === "completed" ? e.answerMessageId : null,
-				layer: "unprocessed",
-			}),
-		))
-		if (entry && !entries.some((e) => e.turns[0]!.messageId === entry.turns[0]!.messageId))
+	let reachedBudget = false;
+	for (let offset = 0; !reachedBudget; offset += PRIOR_PAGE) {
+		const page = recentPriorRuns(
+			tx,
+			run,
+			PRIOR_PAGE,
+			withoutSpecialist,
+			offset,
+		).reverse();
+		for (const prior of page) {
+			const id = prior.inputMessageId;
+			seen.add(id);
+			const answer =
+				prior.status === "completed" ? prior.answerMessageId : null;
+			if (
+				pinned.size < LATEST_EXCHANGES &&
+				(!blocked.has(id) || (answer !== null && !blocked.has(answer)))
+			)
+				pinned.add(id);
+			const ref = refs.get(id);
+			if (!ref && verbatim?.known.has(id) && !pinned.has(id)) continue;
+			const entry = ref
+				? entryOf(ref, ref.index)
+				: entryOf(
+						{
+							inputMessageId: id,
+							answerMessageId: answer,
+							layer: "unprocessed",
+						},
+						-1,
+					);
+			if (!entry) continue;
+			entry.pinned = pinned.has(id);
 			entries.push(entry);
+			loaded += entry.tokens;
+			if (pinned.size >= LATEST_EXCHANGES && loaded >= room) {
+				reachedBudget = true;
+				break;
+			}
+		}
+		if (page.length < PRIOR_PAGE) break;
+	}
+	// Every run was read: a ledger exchange that is not among them (none is expected) is shown as it was.
+	if (!reachedBudget)
+		for (const ref of refs.values()) {
+			if (seen.has(ref.inputMessageId)) continue;
+			const entry = entryOf(ref, ref.index);
+			if (entry) entries.push(entry);
+		}
+	// The ledger's order first (kept ones in the window's order), then the other runs oldest first.
+	entries.sort((a, b) =>
+		a.index >= 0 && b.index >= 0
+			? a.index - b.index
+			: a.index >= 0
+				? -1
+				: b.index >= 0
+					? 1
+					: a.ordinal - b.ordinal,
+	);
 	// Over the budget the oldest go, kept and unprocessed alike; the newest two stay.
 	let total = entries.reduce((sum, entry) => sum + entry.tokens, 0);
 	const shown = new Set(entries);
@@ -262,6 +262,7 @@ export function compileAssembly(
 	const turns = [
 		...visible
 			.filter((entry) => entry.layer === "keep")
+			.sort((a, b) => a.index - b.index)
 			.flatMap((entry) => entry.turns),
 		...visible
 			.filter((entry) => entry.layer === "unprocessed")
@@ -300,72 +301,11 @@ export function compileAssembly(
 			persona: general ?? { agentName: "", userName: "", persona: "butler" },
 			hostRules: CONVERSATION_HOST_RULES,
 			stable,
-			history: { boundary: window?.history.boundary ?? {}, turns },
+			history: { turns },
 			working,
 			volatile: [...notices, ...(prefetchDropped ? [] : prefetch)],
 			input,
-			currentRequest: { messageId: currentInput.message.id },
 		},
-		shownMessageIds,
-		prefetchDropped,
-	};
-}
-
-/**
- * The model-visible context of a run up to the volatile part, in the fixed order
- * `[L0 system, L1 long-term?, goals?, L3 kept exchanges, L2 working memory?, unprocessed exchanges, L5 this input]`:
- * `compileAssembly` written in the `current` format. The notices and the prefetched exchanges are `sections.tail`.
- */
-export function compileContext(
-	tx: Tx,
-	run: Run,
-	conversation: ConversationService,
-	general: PersonaSpec | undefined,
-	window: WindowSnapshot | null,
-	memory?: MemoryHistory,
-	goalsLayer?: ChatMessage | null,
-	/** Leave the specialist sessions' runs out of the fallback history. */
-	withoutSpecialist = false,
-	/** The whole memory and history budget (tokens) of the model window. */
-	memoryHistoryTokens?: number,
-): {
-	messages: ChatMessage[];
-	sections: ContextSections;
-	/** Every message the prompt shows verbatim, this input included: a recall must not repeat them. */
-	shownMessageIds: string[];
-	/** The prefetch overlaps the shown messages and is left out of this turn (its pins must not be checked either). */
-	prefetchDropped: boolean;
-} {
-	const { assembly, shownMessageIds, prefetchDropped } = compileAssembly(
-		tx,
-		run,
-		conversation,
-		general,
-		window,
-		memory,
-		goalsLayer
-			? {
-					source: "goals",
-					authority: "reference",
-					freshness: "stable",
-					body: { kind: "text", text: goalsLayer.content },
-				}
-			: null,
-		withoutSpecialist,
-		memoryHistoryTokens,
-	);
-	const sections = layoutCurrent(assembly);
-	return {
-		messages: [
-			sections.system,
-			...sections.longTerm,
-			...sections.goals,
-			...sections.history,
-			...sections.working,
-			...sections.unprocessed,
-			sections.input,
-		],
-		sections,
 		shownMessageIds,
 		prefetchDropped,
 	};

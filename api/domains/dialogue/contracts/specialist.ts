@@ -8,14 +8,9 @@ import { z } from "zod";
  * toolchain's domain owns the work through the application-implemented `SpecialistPort`.
  */
 
-export const specialistStates = [
-	"active",
-	"suspended",
-	"closing",
-	"ended",
-] as const;
+const specialistStates = ["active", "suspended", "closing", "ended"] as const;
 export type SpecialistState = (typeof specialistStates)[number];
-export const specialistEndReasons = [
+const specialistEndReasons = [
 	"closed",
 	"discarded",
 	"returned",
@@ -25,7 +20,7 @@ export const specialistEndReasons = [
 ] as const;
 export type SpecialistEndReason = (typeof specialistEndReasons)[number];
 
-export const specialistSessionSchema = z.object({
+const specialistSessionSchema = z.object({
 	id: z.string(),
 	conversationId: z.string(),
 	toolchainId: z.string(),
@@ -134,7 +129,7 @@ export type SpecialistSet = {
 	targetSchemaRef: string | null;
 };
 
-export type SpecialistWorkState = {
+type SpecialistWorkState = {
 	workRef: string;
 	savedRef: string | null;
 	dirty: boolean;

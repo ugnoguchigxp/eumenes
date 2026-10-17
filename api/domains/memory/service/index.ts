@@ -46,7 +46,7 @@ import { createSeedImport } from "./seeds";
 import { seedEvidence } from "./seed-sources";
 import { createAgentVectors } from "./agent-vectors";
 import { MEMORY_HISTORY_MAX_TOKENS } from "../../../infrastructure/context-budget";
-import { noteLines, renderShortTerm } from "./context-render";
+import { guardContinuity } from "./continuity-guard";
 import { verbatimHistory, verbatimMessageIds } from "./context-history";
 import {
 	createContextWindowStore,
@@ -131,6 +131,12 @@ function itemDto(
 	};
 }
 
+/**
+ * The budget (tokens) of the memory and conversation history half of the model window, looked up at each use:
+ * `min(128k, window / 2)` of the saved model's window. Without one, the largest it can be (128k).
+ */
+const widestBudget = () => MEMORY_HISTORY_MAX_TOKENS;
+
 export function createMemoryService(
 	store: SqliteStore,
 	conversation: ConversationService,
@@ -142,15 +148,10 @@ export function createMemoryService(
 		id?: () => string;
 		/** Embedding for the turn vectors; looked up at each use, so the application may create it after memory. */
 		embed?: () => MemoryEmbed | undefined;
-		/**
-		 * The budget (tokens) of the memory and conversation history half of the model window, looked up at each
-		 * use: `min(128k, window / 2)` of the saved model's window. Absent: the largest it can be (128k).
-		 */
 		historyBudgetTokens?: () => number;
 	},
 ) {
-	const historyBudgetTokens = () =>
-		options.historyBudgetTokens?.() ?? MEMORY_HISTORY_MAX_TOKENS;
+	const historyBudgetTokens = options.historyBudgetTokens ?? widestBudget;
 	const clock = options.clock ?? (() => new Date().toISOString());
 	const newId = options.id ?? (() => crypto.randomUUID());
 	let healthy = false;
@@ -198,10 +199,6 @@ export function createMemoryService(
 		return result.items;
 	}
 
-	function reject(code: string): never {
-		throw new Error(code);
-	}
-
 	/** Removes receipts that reference any of the given items, in one pass over the (pruned, bounded) table. */
 	function purgeUsageFor(db: Database, itemIds: Iterable<string>) {
 		const targets = new Set(itemIds);
@@ -230,15 +227,7 @@ export function createMemoryService(
 		return result;
 	}
 
-	// Continuity additions are checked against the memory and history budget in their own transaction: the notes
-	// alone may not outgrow it.
-	continuity.setGuard((db, conversationId) => {
-		const { tokens } = renderShortTerm(
-			[],
-			noteLines(continuity.snapshotInTransaction(db, conversationId).items),
-		);
-		if (tokens > historyBudgetTokens()) reject("invalid_continuity_limit");
-	});
+	guardContinuity(continuity, historyBudgetTokens);
 
 	conversation.setRetractHook(dropVectorsOnRetract(conversation));
 
@@ -289,7 +278,6 @@ export function createMemoryService(
 		healthy: () => healthy,
 	});
 	const vectors = createAgentVectors({
-		recallBudgetTokens: historyBudgetTokens,
 		conversation,
 		atMs,
 		embed: options.embed,

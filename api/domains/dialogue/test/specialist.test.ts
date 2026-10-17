@@ -24,9 +24,13 @@ const ret = (forward: boolean, text?: string) => ({
 });
 
 /** The main model hands "request" to the studio toolchain and the specialist drafts, then answers. */
-async function startDirty(h: Harness, request = "アンケートを作って") {
+async function startDirty(
+	h: Harness,
+	request = "アンケートを作って",
+	title = "アンケート",
+) {
 	h.startCall({ request });
-	h.state.specialist.push(invoke("アンケート"), reply("作りました"));
+	h.state.specialist.push(invoke(title), reply("作りました"));
 	return h.ask(request);
 }
 
@@ -213,6 +217,34 @@ test("a request outside the specialist's scope is forwarded to the main agent on
 	expect(history).toContain("明日の天気を教えて");
 	expect(history).toContain("明日は雨です");
 	expect(history).not.toContain("作りました");
+});
+
+test("a label longer than the old payload limit still reaches the main agent in a handoff and in a switch confirmation", async () => {
+	const h = await harness();
+	const title = "長い題名".repeat(300);
+	await startDirty(h, "アンケートを作って", title);
+	// Forwarded to the main agent: the handoff record carries the whole label in the queue payload.
+	h.state.specialist.push(ret(true));
+	h.state.main.push("明日は雨です");
+	const forwarded = await h.ask("明日の天気を教えて");
+	expect(forwarded.status).toBe("completed");
+	const handoff = h.state.mainCalls
+		.at(-1)!
+		.history.map((m) => m.content)
+		.join("\n");
+	expect(handoff).toContain("specialistHandoff=");
+	expect(handoff).toContain(title);
+	// A switch while that work stands: the confirmation note carries the label too.
+	h.startCall({ request: "別のものを作って" }, "other_create");
+	h.state.main.push("未保存の作業があります。破棄しますか？");
+	const asked = await h.ask("別のものを作って");
+	expect(asked.status).toBe("completed");
+	expect(
+		h.state.mainCalls
+			.at(-1)!
+			.history.map((m) => m.content)
+			.join("\n"),
+	).toContain(title);
 });
 
 test("a discard ends the session, drops the work and returns the conversation", async () => {

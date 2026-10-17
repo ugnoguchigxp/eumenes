@@ -1,4 +1,7 @@
-import { estimateMessageTokens } from "../../../infrastructure/context-budget";
+import {
+	exchangeEnd,
+	estimateMessageTokens,
+} from "../../../infrastructure/context-budget";
 import { getLogger } from "../../../infrastructure/logger";
 import type { LarmPort } from "../contracts";
 import type { Provider } from "./profiles";
@@ -39,7 +42,9 @@ export function fitContext(
 		let kept = 0;
 		while (kept < selected.length && selected[kept]?.role === "system") kept++;
 		while (selected.length - kept > 1 && tokens > budget) {
-			const count = Math.min(2, selected.length - kept - 1);
+			// Whole exchanges go, the oldest first; the leading system run and the last message stay.
+			const roles = selected.slice(kept, -1).map((m) => m.role);
+			const count = exchangeEnd(roles, 0, roles.length);
 			selected.splice(kept, count);
 			tokens -= sizes.splice(kept, count).reduce((sum, size) => sum + size, 0);
 		}
@@ -56,9 +61,13 @@ export function fitContext(
 			if (selected[i]!.role !== "system") at.push(i);
 		let dropped = 0;
 		const gone = new Set<number>();
+		const roles = at.map((i) => selected[i]!.role);
 		while (tokens > budget && dropped < at.length) {
-			// Whole exchanges go: two messages at a time, the oldest first.
-			for (const i of at.slice(dropped, dropped + 2)) {
+			// Whole exchanges go, the oldest first, so the history never starts with an assistant message.
+			for (const i of at.slice(
+				dropped,
+				exchangeEnd(roles, dropped, at.length),
+			)) {
 				gone.add(i);
 				tokens -= sizes[i]!;
 				dropped++;

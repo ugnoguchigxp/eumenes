@@ -44,7 +44,12 @@ export function startLlmTiming(
 	// The fit check already measured the final messages; no extra serialization.
 	const fitted = formalCount
 		? { messages, bytes: 0 }
-		: fitContext(messages, window, options?.contextPolicy === "exact");
+		: fitContext(
+				messages,
+				window,
+				options?.contextPolicy === "exact",
+				options?.history,
+			);
 	const selected = fitted.messages;
 	let requestBytes = fitted.bytes;
 	const started = performance.now();

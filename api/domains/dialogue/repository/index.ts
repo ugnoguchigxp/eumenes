@@ -214,7 +214,8 @@ export function interruptUnfinished(db: Database, now: string): Run[] {
 	return runs;
 }
 /**
- * The newest `limit` runs accepted before `run`, oldest first (the verbatim part of the model-visible history).
+ * The newest `limit` runs accepted before `run`, oldest first (the verbatim part of the model-visible history),
+ * after skipping the `offset` newest ones (a negative `limit` is every run: SQLite has no limit then).
  * `withoutSpecialist` leaves the specialist sessions' runs out before the limit applies (they are not the
  * conversation's history); it needs the specialist migration, so only a host that wires sessions sets it.
  */
@@ -223,13 +224,17 @@ export function recentPriorRuns(
 	run: Run,
 	limit: number,
 	withoutSpecialist = false,
+	offset = 0,
 ): Run[] {
 	return (
 		db
 			.query(
-				`SELECT ${columns} FROM dialogue_runs WHERE conversation_id = ? AND seq < (SELECT seq FROM dialogue_runs WHERE id = ?)${withoutSpecialist ? " AND specialist_session_id IS NULL" : ""} ORDER BY seq DESC LIMIT ?`,
+				`SELECT ${columns} FROM dialogue_runs WHERE conversation_id = ? AND seq < (SELECT seq FROM dialogue_runs WHERE id = ?)${withoutSpecialist ? " AND specialist_session_id IS NULL" : ""} ORDER BY seq DESC LIMIT ? OFFSET ?`,
 			)
-			.all(run.conversationId, run.id, limit) as Record<string, unknown>[]
+			.all(run.conversationId, run.id, limit, offset) as Record<
+			string,
+			unknown
+		>[]
 	)
 		.map(map)
 		.reverse();

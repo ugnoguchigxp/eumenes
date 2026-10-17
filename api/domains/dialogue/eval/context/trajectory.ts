@@ -7,6 +7,8 @@
  *
  * Offline evaluation only. The calls are returned as product assemblies; an arm renders each of them.
  */
+import { estimateTextTokens } from "../../../inference";
+import { type RecalledEntry, renderRecallBlock } from "../../../memory";
 import type { Run } from "../../contracts";
 import { insert } from "../../repository";
 import { renderGoalsLayer } from "../../service/goals-layer";
@@ -21,20 +23,16 @@ import {
 	dispose,
 	runRow,
 } from "./materialize";
-import {
-	type RecalledEntry,
-	recallBlockText,
-	recallMinute,
-} from "./recall-text";
+import { recallMinute } from "./recall-text";
 
 /** What a call adds to the turn's volatile part. A plain `initial` call adds nothing. */
-export type TrajectoryCall = {
+type TrajectoryCall = {
 	kind: "initial" | "selection" | "result";
 	seed?: VolatileSeed;
 };
 
 /** The memory step after a turn's answer: what the steward and the curator publish for the next turn. */
-export type MemoryStep = {
+type MemoryStep = {
 	/** Turns (1-based) the ledger keeps verbatim from now on. */
 	keep?: number[];
 	/** A summary written over these turns, which then leave the verbatim history. */
@@ -47,7 +45,7 @@ export type MemoryStep = {
 	recall?: RecalledEntry[];
 };
 
-export type TrajectoryTurn = {
+type TrajectoryTurn = {
 	user: string;
 	assistant: string;
 	calls: TrajectoryCall[];
@@ -103,8 +101,18 @@ const RECOGNITION_RESULT = {
 		width: 800,
 		height: 600,
 		objects: [
-			{ label: "マグカップ", score: 0.91, box: [120, 80, 260, 210] },
-			{ label: "ノートパソコン", score: 0.88, box: [300, 40, 760, 380] },
+			{
+				classId: 41,
+				label: "マグカップ",
+				confidence: 0.91,
+				box: [120, 80, 260, 210],
+			},
+			{
+				classId: 63,
+				label: "ノートパソコン",
+				confidence: 0.88,
+				box: [300, 40, 760, 380],
+			},
 		],
 	},
 	createdAt: 1_760_000_100_000,
@@ -247,7 +255,8 @@ async function runMemoryStep(
 	nextSummaryRevision: () => number,
 ) {
 	const { store, memory } = wiring;
-	for (const n of step.keep ?? []) await dispose(wiring, inputs.get(n)!, "keep");
+	for (const n of step.keep ?? [])
+		await dispose(wiring, inputs.get(n)!, "keep");
 	for (const item of step.longTerm ?? [])
 		await wiring.saveItem({
 			conversationId: CONVERSATION_ID,
@@ -267,10 +276,11 @@ async function runMemoryStep(
 				expectedRevision: nextSummaryRevision(),
 			}),
 		);
-		if (!written.ok) throw new Error(`trajectory_summary_rejected:${written.reason}`);
+		if (!written.ok)
+			throw new Error(`trajectory_summary_rejected:${written.reason}`);
 	}
 	const recalled = (step.recall ?? []).map((entry) => ({ ...entry }));
-	const recallText = recalled.length ? recallBlockText(recalled) : "";
+	const recallText = recalled.length ? renderRecallBlock(recalled) : "";
 	// A step replaces the prefetch; an empty one clears the previous.
 	await store.write((db) =>
 		memory.publishWindowInTransaction(db, CONVERSATION_ID, {
@@ -278,7 +288,7 @@ async function runMemoryStep(
 			prefetch: {
 				text: recallText,
 				pins: [],
-				bytes: Buffer.byteLength(recallText),
+				tokens: estimateTextTokens(recallText),
 			},
 			...(step.notice ? { addNotices: [step.notice] } : {}),
 		}),
@@ -294,6 +304,7 @@ export async function materializeTrajectory(
 	trajectory: Trajectory = DEFAULT_TRAJECTORY,
 ): Promise<TrajectoryCallAssembly[]> {
 	const { store, conversation, memory } = wiring;
+	wiring.setNow(turnTime(0));
 	await store.write((db) =>
 		conversation.appendInTransaction(db, {
 			id: "seed-source",
@@ -323,6 +334,7 @@ export async function materializeTrajectory(
 	for (const [index, turn] of trajectory.turns.entries()) {
 		const n = index + 1;
 		const at = turnTime(n);
+		wiring.setNow(at);
 		const run = {
 			id: `r${n}`,
 			conversationId: CONVERSATION_ID,

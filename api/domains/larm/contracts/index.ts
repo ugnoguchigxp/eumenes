@@ -57,6 +57,12 @@ export type LarmCallOptions = {
 	/** Optional effort for SDK-backed control tasks; ignored by providers without this option. */
 	reasoningEffort?: "low";
 	contextPolicy?: "exact";
+	/**
+	 * `exact` only: where the adopted history sits in the host-fixed list (the first `instructionCount` messages are
+	 * instructions, then `historyCount` user/assistant messages). If the list is over the window, the oldest of
+	 * these are dropped first; without it nothing is dropped.
+	 */
+	history?: { instructionCount: number; historyCount: number };
 	onExchange?: (exchange: LarmExchange) => Promise<void>;
 	speechVoice?: string;
 	intonationScale?: number;
@@ -73,6 +79,11 @@ import type { TtsVoices } from "./voices";
 export { ttsVoicesSchema, type TtsVoices } from "./voices";
 export interface LarmPort {
 	decisionModel?(): string | null;
+	/**
+	 * The context window (tokens) of the LLM provider of the lease held now; null when no lease is held (the
+	 * window is part of the provider's claim, and a claim is made only to serve a call).
+	 */
+	llmContextWindow?(): number | null;
 	judge?(
 		state: Record<string, string>,
 		questions: Record<

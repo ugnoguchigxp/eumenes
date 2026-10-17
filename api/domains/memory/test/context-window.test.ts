@@ -9,10 +9,8 @@ import { type ContinuityKind, createContinuityService } from "../../continuity";
 import { createMemoryService } from "..";
 import { memoryTestMigrations, saveItem } from "./memory.fixture";
 import {
-	LONG_TERM_BYTES,
 	renderLongTerm,
 	renderShortTerm,
-	SHORT_TERM_BYTES,
 	type StateLine,
 } from "../service/context-render";
 
@@ -22,7 +20,7 @@ afterEach(async () => {
 	for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
 });
 
-async function setup() {
+async function setup(historyBudgetTokens?: () => number) {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-memory-window-"));
 	const store: SqliteStore = openStore(
 		join(dir, "db.sqlite3"),
@@ -41,6 +39,7 @@ async function setup() {
 		journalPath: join(dir, "journal.jsonl"),
 		clock,
 		id: () => `id-${++counter}`,
+		...(historyBudgetTokens ? { historyBudgetTokens } : {}),
 	});
 	expect((await memory.recover()).healthy).toBe(true);
 	await conversation.append({
@@ -356,12 +355,7 @@ test("an expired period is not rendered; a stated period is", async () => {
 	expect(window.shortTerm.text).not.toContain("昔の習慣");
 });
 
-test("over budget the long-term layer keeps constraints first and logs only the count", async () => {
-	const lines: string[] = [];
-	configureLogging({
-		level: "info",
-		destination: { write: (l) => void lines.push(l) },
-	});
+test("the long-term layer lists every line with constraints first and no line is left out for size", () => {
 	const line = (kind: string, i: number, order: number): StateLine => ({
 		itemId: `state:${kind}${i}`,
 		revision: 1,
@@ -379,22 +373,18 @@ test("over budget the long-term layer keeps constraints first and logs only the 
 	const rendered = renderLongTerm(states, [
 		{ id: "t1", revision: 1, text: "傾向", order: "2026-10-01" },
 	]);
-	expect(rendered.bytes).toBeLessThanOrEqual(LONG_TERM_BYTES);
-	expect(rendered.text).toContain("constraint-0-");
-	// Newest preferences before older ones; habits after preferences.
-	expect(rendered.text).toContain("preference-7-");
-	expect(rendered.text).not.toContain("habit-0-");
-	expect(rendered.omitted.length).toBeGreaterThan(0);
-	expect(rendered.manifest.length + rendered.omitted.length).toBe(
-		states.length + 1,
-	);
-	const logged = lines.map((l) => JSON.parse(l) as Record<string, unknown>);
-	const trimmed = logged.find((l) => l.event === "memory.long_term_trimmed");
-	expect(trimmed?.omitted).toBe(rendered.omitted.length);
-	expect(JSON.stringify(logged)).not.toContain("あああ");
+	expect(rendered.tokens).toBeGreaterThan(24_000);
+	expect(rendered.manifest).toHaveLength(states.length + 1);
+	expect(rendered.text).toContain("habit-0-");
+	// Constraints first, newest preferences before older ones, habits after preferences, tendencies last.
+	const at = (needle: string) => rendered.text.indexOf(needle);
+	expect(at("constraint-0-")).toBeLessThan(at("preference-7-"));
+	expect(at("preference-7-")).toBeLessThan(at("preference-0-"));
+	expect(at("preference-0-")).toBeLessThan(at("habit-7-"));
+	expect(at("habit-0-")).toBeLessThan(at("傾向"));
 });
 
-test("over budget the short-term layer keeps recent additions, then open questions first, and counts what it left out", () => {
+test("the short-term layer lists the recent additions and every note, with no limit of its own", () => {
 	const note = (kind: string, i: number) => ({
 		id: `${kind}${i}`,
 		kind,
@@ -416,13 +406,12 @@ test("over budget the short-term layer keeps recent additions, then open questio
 		order: i,
 	}));
 	const rendered = renderShortTerm(recent, notes);
-	expect(rendered.bytes).toBeLessThanOrEqual(SHORT_TERM_BYTES);
-	expect(rendered.fullBytes).toBeGreaterThan(SHORT_TERM_BYTES);
+	expect(rendered.tokens).toBeGreaterThan(10_000);
 	expect(rendered.pendingAdditions).toBe(6);
-	expect(rendered.omitted).toBeGreaterThan(0);
 	for (let i = 0; i < 6; i++) expect(rendered.text).toContain(`recent-${i}`);
-	expect(rendered.text).toContain("open_question-3-");
-	expect(rendered.text).not.toContain("memo-0-");
+	for (const kind of ["memo", "open_question", "goal"])
+		for (let i = 0; i < 4; i++)
+			expect(rendered.text).toContain(`${kind}-${i}-`);
 });
 
 test("window validation: additions keep a run valid; stop, own-run changes, settings and pins decide the rest", async () => {
@@ -513,8 +502,9 @@ test("usage receipts and notices: adoption records the window; the notice is sho
 	expect(must(await h.read()).version).toBe(version);
 });
 
-test("the continuity guard limits the short-term layer to its budget", async () => {
-	const h = await setup();
+test("the continuity guard limits the short-term layer to the memory and history budget", async () => {
+	// A window of 8k tokens: half of it (4k) is the budget; each note is about 500 tokens.
+	const h = await setup(() => 4000);
 	let count = 0;
 	let error: unknown;
 	try {
@@ -528,7 +518,7 @@ test("the continuity guard limits the short-term layer to its budget", async () 
 	}
 	expect((error as Error).message).toBe("limit_reached");
 	expect(count).toBeGreaterThan(3);
-	expect(count).toBeLessThan(10);
+	expect(count).toBeLessThan(9);
 	// The refused addition rolled back with it.
 	expect(h.continuity.list("c1")).toHaveLength(count);
 });
@@ -668,7 +658,7 @@ test("a validity boundary crossed by time refreshes the layers without waiting f
 	expect(must(await h.read()).version).toBe(started.version);
 });
 
-test("clearing notices is a light edit: no re-render, tolerant of a missing window; notice text is capped", async () => {
+test("clearing notices is a light edit: no re-render, tolerant of a missing window; a long notice is kept whole", async () => {
 	const h = await setup();
 	await h.remember("コーヒーが好き");
 	await h.store.write((db) => {
@@ -678,7 +668,7 @@ test("clearing notices is a light edit: no re-render, tolerant of a missing wind
 		});
 	});
 	const window = must(await h.read());
-	expect([...window.notices[0]!.text]).toHaveLength(200);
+	expect([...window.notices[0]!.text]).toHaveLength(500);
 	await h.store.write((db) =>
 		h.memory.clearNoticesInTransaction(db, "c1", [window.notices[0]!.id]),
 	);
@@ -721,7 +711,7 @@ test("an unhealthy memory fails validation as unavailable", async () => {
 		policyRevision: "1",
 		manifest: [],
 		pins: [],
-		prefetchBytes: 0,
+		prefetchTokens: 0,
 		noticeIds: [],
 		shownMessageIds: [],
 	};

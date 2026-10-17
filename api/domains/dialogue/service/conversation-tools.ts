@@ -300,7 +300,7 @@ export function operation(
  * The fixed layer of the conversation policy: answer, ask, or hand the request to one offered
  * toolchain. How each toolchain works is its own sub-agent's business, never written here.
  */
-export function conversationPolicy(offered: boolean) {
+function conversationPolicy(offered: boolean) {
 	return offered
 		? systemContext(
 				"dialogue.contexts.conversation-tools.conversation-policy",

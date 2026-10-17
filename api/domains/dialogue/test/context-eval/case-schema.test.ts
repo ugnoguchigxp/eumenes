@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import { CaseSetInvalid, parseCaseFiles } from "../../eval/context/case-loader";
 import {
+	FAMILIES,
 	caseIssues,
 	caseSchema,
 	caseSetIssues,
@@ -157,11 +158,13 @@ test("the example experiment's cases validate", async () => {
 		"../../../../../scripts/context-eval/experiments/2026-10-17-source-format",
 		import.meta.url,
 	).pathname;
-	expect(loadCases(dir).map((c) => c.id)).toEqual([
-		"ctx-f1-dev-01",
-		"ctx-f3-dev-01",
-		"ctx-f9-dev-01",
-	]);
+	// The set is the experiment's own (it grows); what must hold is that it validates and covers every family.
+	const cases = loadCases(dir);
+	expect(new Set(cases.map((c) => c.id)).size).toBe(cases.length);
+	for (const family of FAMILIES)
+		expect(cases.some((c) => c.family === family && c.split === "dev")).toBe(
+			true,
+		);
 });
 
 test("seed exchanges must be in time order", () => {

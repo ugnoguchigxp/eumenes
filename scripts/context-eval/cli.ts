@@ -2,10 +2,10 @@
  * context-eval CLI. Usage:
  *   bun scripts/context-eval/cli.ts validate --experiment <dir>
  *   bun scripts/context-eval/cli.ts prepare  --experiment <dir>
- *   bun scripts/context-eval/cli.ts run      --experiment <dir> [--live] [--split dev|holdout|all]
+ *   bun scripts/context-eval/cli.ts run      --experiment <dir> [--live] [--split dev|holdout|all] [--serialization larm-messages|flattened]
  *   bun scripts/context-eval/cli.ts run      --experiment <dir> --rerun-transport <run dir>   (only transport_error calls, into a new run dir)
  *   bun scripts/context-eval/cli.ts score    --experiment <dir> --run <run dir> [--adjudication <file>]
- *   bun scripts/context-eval/cli.ts analyze  --experiment <dir> --scores <scores dir> [--split dev|holdout] [--prefix <file>]
+ *   bun scripts/context-eval/cli.ts analyze  --experiment <dir> --scores <scores dir> [--split dev|holdout]
  * Reports go to verification-reports/context-eval/<experiment>/<timestamp>/ (new directories, never overwritten).
  * `--live` uses the saved LARM connection in this process; it never starts a server. Without it the fixture lane runs.
  */
@@ -17,6 +17,10 @@ import {
 } from "../../api/domains/dialogue/eval/context/fixture-lane";
 import { resolveJudgeRules } from "../../api/domains/dialogue/eval/context/judge-rules";
 import { openSeedWiring } from "../../api/domains/dialogue/test/context-eval/store-wiring";
+import {
+	SERIALIZATIONS,
+	type Serialization,
+} from "../../api/domains/dialogue/eval/context/raw";
 import {
 	type SplitChoice,
 	analyzeScores,
@@ -48,6 +52,13 @@ const splitOf = (fallback: SplitChoice): SplitChoice => {
 	return value;
 };
 
+const serializationOf = (): Serialization => {
+	const value = option("serialization") ?? "larm-messages";
+	const found = SERIALIZATIONS.find((s) => s === value);
+	if (!found) throw new Error("invalid --serialization");
+	return found;
+};
+
 async function main() {
 	const ctx = defaultCtx(repoRoot);
 	const experiment = required("experiment");
@@ -65,11 +76,14 @@ async function main() {
 		case "run": {
 			const rerunFrom = option("rerun-transport");
 			const sourceDir = rerunFrom ? resolve(rerunFrom) : null;
-			// A re-run keeps the lane of the run it repairs.
-			const live = sourceDir
-				? JSON.parse(readFileSync(join(sourceDir, "run.json"), "utf8")).lane ===
-					"live"
-				: flag("live");
+			const sourceMeta = sourceDir
+				? (JSON.parse(readFileSync(join(sourceDir, "run.json"), "utf8")) as {
+						lane: string;
+						serialization: Serialization;
+					})
+				: null;
+			// A re-run keeps the lane and the serialization of the run it repairs.
+			const live = sourceMeta ? sourceMeta.lane === "live" : flag("live");
 			const { config, cases } = validate(experiment);
 			const liveModule = live ? await import("./live") : null;
 			const lane = liveModule
@@ -78,6 +92,9 @@ async function main() {
 			try {
 				const common = {
 					lane: live ? ("live" as const) : ("fixture" as const),
+					serialization: sourceMeta
+						? sourceMeta.serialization
+						: serializationOf(),
 					runner: lane ? lane.runner : createFixtureRunner(cases),
 					openWiring: openSeedWiring,
 					settingsSnapshot: liveModule
@@ -126,11 +143,7 @@ async function main() {
 			const split = splitOf("holdout");
 			if (split === "all")
 				throw new Error("analyze needs --split dev or holdout");
-			const prefixPath = option("prefix");
-			analyzeScores(ctx, experiment, required("scores"), {
-				split,
-				...(prefixPath ? { prefixPath: resolve(prefixPath) } : {}),
-			});
+			analyzeScores(ctx, experiment, required("scores"), { split });
 			return;
 		}
 		default:

@@ -272,7 +272,7 @@ const clip = (text: string) =>
 		: text.length > CONTEXT_TEXT_CHARS
 			? `${text.slice(0, CONTEXT_TEXT_CHARS)}…（以降は省略）`
 			: text;
-const bytes = (used: number, limit: number) => `${used} / ${limit} byte`;
+const tokens = (used: number) => `約 ${used} token`;
 const sha256 = (value: unknown) =>
 	createHash("sha256").update(JSON.stringify(value)).digest("hex");
 
@@ -447,12 +447,8 @@ export function createMemoryAdapter(ports: MemoryAdapterPorts): DomainAdapter {
 									id: "context",
 									state,
 									version: built?.version,
-									longTerm: built
-										? bytes(built.longTerm.bytes, built.longTerm.limit)
-										: undefined,
-									shortTerm: built
-										? bytes(built.shortTerm.bytes, built.shortTerm.limit)
-										: undefined,
+									longTerm: built ? tokens(built.longTerm.tokens) : undefined,
+									shortTerm: built ? tokens(built.shortTerm.tokens) : undefined,
 									pendingAdditions: built?.shortTerm.pendingAdditions,
 									notices: built?.notices,
 									longTermText: built ? clip(built.longTerm.text) : undefined,

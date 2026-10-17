@@ -25,14 +25,7 @@ export type WindowHistory = {
 	 * summary text, or none of its source exchanges is in the ledger any more.
 	 */
 	summaryCovers?: { fromAt: string; toAt: string; turns: number };
-	/**
-	 * The date range of the exchanges the prompt shows verbatim, as fixed at the last memory step. A rebuild that is
-	 * not a step carries it over (the prefix of the prompt must not move between steps). Absent in a window stored
-	 * before this field existed; `{}` when there was no exchange at the step.
-	 */
-	boundary?: HistoryBoundary;
 };
-export type HistoryBoundary = { fromAt?: string; toAt?: string };
 
 /** How an exchange reaches the prompt (the table of section 2.3). */
 type VerbatimClass = "keep" | "unprocessed" | "gone";
@@ -72,23 +65,13 @@ function shownRows(rows: readonly ExchangeDto[]): ExchangeDto[] {
 	return rows.filter((row) => verbatimClass(row) !== "gone" || newest.has(row));
 }
 
-/** The date range of the verbatim exchanges now (the ledger orders them oldest first). */
-function currentBoundary(rows: readonly ExchangeDto[]): HistoryBoundary {
-	const shown = shownRows(rows);
-	const first = shown[0];
-	const last = shown[shown.length - 1];
-	return first && last ? { fromAt: first.createdAt, toAt: last.createdAt } : {};
-}
-
 /**
- * The history to publish: kept exchanges appended to the earlier list, the summary, and the boundary. The boundary
- * is read from the ledger at a memory step (`step`) or when there is none to carry over; otherwise it stays.
+ * The history to publish: kept exchanges appended to the earlier list, and the summary.
  */
 export function buildHistory(
 	db: Database,
 	conversationId: string,
 	previous: WindowHistory | undefined,
-	step: boolean,
 ): WindowHistory {
 	const blocked = new Set(blockedInConversation(db, conversationId));
 	const live = listExchanges(db, conversationId).filter(
@@ -124,8 +107,6 @@ export function buildHistory(
 					},
 				}
 			: {}),
-		boundary:
-			step || !previous?.boundary ? currentBoundary(live) : previous.boundary,
 	};
 }
 

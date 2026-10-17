@@ -1,13 +1,13 @@
 /** One model call as recorded in raw.jsonl. Scoring and analysis re-run offline from these rows. */
 import { z } from "zod";
 
-export const LANES = ["fixture", "live"] as const;
+const LANES = ["fixture", "live"] as const;
 export type Lane = (typeof LANES)[number];
 
 export const SERIALIZATIONS = ["larm-messages", "flattened"] as const;
 export type Serialization = (typeof SERIALIZATIONS)[number];
 
-export const rawRowSchema = z
+const rawRowSchema = z
 	.object({
 		lane: z.enum(LANES),
 		arm: z.string().min(1),

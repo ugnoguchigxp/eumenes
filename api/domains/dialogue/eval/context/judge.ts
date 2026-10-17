@@ -2,9 +2,12 @@
  * Blind judge for the semantic axes (spec 5.4). The judge function is injected; this builds the request,
  * validates the reply with zod, and fails closed: anything unusable is `needs_adjudication`, never a pass or fail.
  * Modeled on scripts/search-answer-evaluation.ts (auxiliary session, exact context, JSON schema, no repair).
- * The request carries seed facts, the current input, the answer and the axes. Never the arm id nor the context text.
+ * The request carries seed facts, the current input, the answer (its text and the functions it called, each with
+ * its arguments) and the axes. Never the arm id nor the context text. The whole payload is escaped as reference
+ * data (`referenceJson`), so nothing in an answer or in an argument can forge a delimiter.
  */
 import { z } from "zod";
+import { referenceJson } from "../../../inference";
 import {
 	type ContextCase,
 	RUBRIC_AXES,
@@ -87,7 +90,7 @@ export function buildJudgeRequest(
 			{ role: "system", content: rules },
 			{
 				role: "user",
-				content: JSON.stringify({
+				content: referenceJson({
 					facts: factsOf(testCase.seed),
 					currentInput: testCase.input,
 					answer: {

@@ -194,10 +194,6 @@ function craftedWindow(
 				toAt: "2026-10-05T00:00:00.000Z",
 				turns: 4,
 			},
-			boundary: {
-				fromAt: "2026-10-06T00:00:00.000Z",
-				toAt: "2026-10-10T00:00:00.000Z",
-			},
 		},
 		prefetch: {
 			text: "関連する過去のやり取り（prefetch）",
@@ -205,7 +201,7 @@ function craftedWindow(
 				kind === "layers-prefetch-dropped" && pinMessageId
 					? [{ messageId: pinMessageId, digest: "x" }]
 					: [],
-			bytes: 40,
+			tokens: 40,
 		},
 		notices: [{ id: "n1", text: "メモを一件整理しました" }],
 	};

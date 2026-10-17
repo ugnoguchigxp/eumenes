@@ -12,7 +12,7 @@
 | --- | --- | --- |
 | bundle | `api/domains/capabilities/bundles/<名前>.bundle.json`（`CapabilityBundleV1`） | 依存revisionのpin、definitions、bindings、artifacts、schemas。コード・URLは実行しない |
 | definition | bundle の `definitions[]`（既存の `Definition`） | profile・skill（本文はJSON内のUTF-8）・tool・package・toolchain。toolchainは会話に出す関数名・説明・例・依存package一つ |
-| binding | bundle の `bindings[]`（`BindingV1` = `execution:"command"` の `CommandBindingV1` または `execution:"session"` の `SessionBindingV1`） | packageの各toolを登録adapterの操作名と入力schema参照へ結ぶ。sessionは専門担当との継続対話で、adapterに `session`（作業の開始・状態・ターン・終了）の実装が要る |
+| binding | bundle の `bindings[]`（`BindingV1` = `execution:"command"` または `execution:"session"`） | packageの各toolを登録adapterの操作名と入力schema参照へ結ぶ。sessionは専門担当との継続対話で、adapterに `session`（作業の開始・状態・ターン・終了）の実装が要る |
 | artifact | bundle の `artifacts[]`（`ArtifactDefinitionV1`） | OpenUI定義のvariant、source（adapterの登録query）、action（既存event→操作・回答・ローカル） |
 | schema | `builtin:<キー>`（`capabilities/contracts` のvalidators）、`domain:<owner>.<名前>@n`（hostの結果schema）、`schema:<id>@n`（bundle内JSON Schemaの有限subset） | 入力・出力・質問の検査。同じ参照をhost・UI・モデル提示で共有する |
 | DomainAdapter | `api/application/<domain>-adapter.ts` | 操作・query・入力変換・projectionの実装。domainの既存公開transaction操作を呼ぶ |

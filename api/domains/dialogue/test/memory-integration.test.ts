@@ -80,6 +80,10 @@ async function setup(
 		policies?: string[];
 		/** Serves the request through `executeRequest` and records the session each call was given. */
 		sessions?: Array<CallSession | undefined>;
+		/** The memory and history budget (tokens) memory guards the notes with; absent: 128k. */
+		historyBudgetTokens?: number;
+		/** The model window (tokens) the run's saved route reports; absent: not known at prepare (256k is assumed). */
+		contextWindow?: number;
 	} = {},
 ) {
 	const dir = options.dir ?? mkdtempSync(join(tmpdir(), "eumenes-memory-"));
@@ -97,6 +101,13 @@ async function setup(
 						requestId: string,
 						policy: string,
 					) => void options.policies!.push(`${requestId}:${policy}`),
+				}
+			: {}),
+		...(options.contextWindow
+			? {
+					requestFor: () => "request-1",
+					llmContextWindowInTransaction: () => options.contextWindow!,
+					setContextPolicyInTransaction: () => {},
 				}
 			: {}),
 		...(options.sessions
@@ -158,6 +169,9 @@ async function setup(
 	const continuity = createContinuityService(store);
 	const memory = createMemoryService(store, conversation, continuity, {
 		journalPath,
+		...(options.historyBudgetTokens
+			? { historyBudgetTokens: () => options.historyBudgetTokens! }
+			: {}),
 	});
 	const recovery = await memory.recover();
 	const queue = createQueue(store);
@@ -672,8 +686,9 @@ async function fillProfile(h: Harness, messageId: string, validFrom?: string) {
 	return { accepted, refused };
 }
 
-test("the item count caps the profile; the long-term layer is trimmed to its budget and runs keep working", async () => {
-	const h = await setup();
+test("the item count caps the profile; the long-term layer lists every item and runs keep working", async () => {
+	// A 6k-token budget guards the notes below (a window of 12k tokens).
+	const h = await setup({ historyBudgetTokens: 6000 });
 	const first = await h.ask("私は辛いものが好きです");
 	const { accepted, refused } = await fillProfile(
 		h,
@@ -684,12 +699,12 @@ test("the item count caps the profile; the long-term layer is trimmed to its bud
 	expect(h.memory.list()).toHaveLength(accepted);
 	const run = await h.ask("確認");
 	expect(run.status).toBe("completed");
-	// 100 values of ~1.2 KB do not fit: the layer is trimmed, never refused.
+	// 100 values of ~1.2 KB are all in the layer: nothing is cut for size.
 	const layer = h.seen.at(-1)![1]!;
-	expect(Buffer.byteLength(layer.content)).toBeLessThanOrEqual(16 * 1024);
 	expect(layer.content).toContain("参照情報です");
+	for (let i = 0; i < 100; i++) expect(layer.content).toContain(`${i}-`);
 
-	// A continuity addition that would overflow its part is refused and rolled back.
+	// A continuity addition that would outgrow the memory and history budget is refused and rolled back.
 	const before = h.continuity.list("main").length;
 	let continuityRefused: string | null = null;
 	for (let i = 0; i < 30 && continuityRefused === null; i++) {
@@ -705,6 +720,32 @@ test("the item count caps the profile; the long-term layer is trimmed to its bud
 	expect(continuityRefused).toBe("invalid_continuity_limit");
 	expect(h.continuity.list("main").length).toBeGreaterThan(before);
 	expect((await h.ask("続き")).status).toBe("completed");
+});
+
+test("the window of the run's route sets the budgets: a smaller window keeps the newest exchanges and drops the oldest, and the run completes", async () => {
+	// A 20k-token window: half of it (10k) is the memory and history budget; each exchange is about 1,500 tokens.
+	const h = await setup({ contextWindow: 20_000 });
+	for (let i = 0; i < 10; i++) await h.ask(`質問${i}:${"あ".repeat(1500)}`);
+	const run = await h.ask("最後の質問");
+	expect(run.status).toBe("completed");
+	const sent = h.seen.at(-1)!;
+	const history = sent.filter(
+		(m) => m.role === "user" && m.content.startsWith("質問"),
+	);
+	expect(history.at(-1)!.content.startsWith("質問9:")).toBe(true);
+	expect(history.some((m) => m.content.startsWith("質問0:"))).toBe(false);
+	expect(history.length).toBeGreaterThanOrEqual(2);
+	expect(history.length).toBeLessThan(10);
+	expect(sent.at(-1)!.content).toBe("最後の質問");
+	// With the reference window (nothing known at prepare) all ten fit.
+	const roomy = await setup();
+	for (let i = 0; i < 10; i++) await roomy.ask(`質問${i}:${"あ".repeat(1500)}`);
+	await roomy.ask("最後の質問");
+	expect(
+		roomy.seen
+			.at(-1)!
+			.filter((m) => m.role === "user" && m.content.startsWith("質問")),
+	).toHaveLength(10);
 });
 
 test("an empty memory does not fix a view: adding a fact mid-run does not fail the run and no receipt is written", async () => {

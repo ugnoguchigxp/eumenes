@@ -421,6 +421,7 @@ export const prepareRecallStep: StepDefinition = {
 					env.db,
 					env.conversationId,
 					extras as RecallVector,
+					env.deps.memory.historyBudgetTokens(),
 				)
 			: { text: "", pins: [], tokens: 0 };
 		return {

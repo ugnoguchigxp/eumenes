@@ -26,7 +26,6 @@ import {
 import { releaseSpecialistTurn } from "./specialist-turn-end";
 import type { TurnInput, TurnOutput } from "./specialist-turn";
 
-
 function failTurn(
 	deps: DialogueDeps,
 	tx: Database,

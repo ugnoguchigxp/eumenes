@@ -25,7 +25,10 @@ import {
 import { describeWorldAdapter, WORLD_ADAPTER_REF } from "./world-adapter";
 
 const bundlePath = (name: string) =>
-	join(import.meta.dir, `../../domains/capabilities/bundles/${name}.bundle.json`);
+	join(
+		import.meta.dir,
+		`../../domains/capabilities/bundles/${name}.bundle.json`,
+	);
 const memoryBundle = JSON.parse(
 	readFileSync(bundlePath("settings-memory"), "utf8"),
 );
@@ -331,6 +334,8 @@ test("tendencies, short-term notes and the context are read", async () => {
 		window!.longTerm.text === "" ? "（空）" : window!.longTerm.text,
 	);
 	expect(built.longTermText).toContain("コーヒーが好き");
+	expect(built.longTerm).toBe(`約 ${window!.longTerm.tokens} token`);
+	expect(built.shortTerm).toBe(`約 ${window!.shortTerm.tokens} token`);
 	expect(built.shortTermText.length).toBeGreaterThan(0);
 });
 

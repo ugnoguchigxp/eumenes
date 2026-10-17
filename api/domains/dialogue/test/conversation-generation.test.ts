@@ -129,10 +129,15 @@ test("the history split and the references reach every main call, the correction
 		{ sessionRole: "main", ...session },
 		{ sessionRole: "main", ...session },
 	]);
-	// The correction keeps the instruction block first and appends the rejected output to this turn's input.
-	expect(answer.seen[1]!.at(-1)!.content).toStartWith(
-		"UNTRUSTED_REJECTED_OUTPUT=",
-	);
+	// The correction keeps the instruction block first and puts the rejected output in this turn's input,
+	// before the anchored current request, which stays last.
+	const corrected = answer.seen[1]!;
+	expect(
+		corrected.findIndex((m) =>
+			m.content.startsWith("UNTRUSTED_REJECTED_OUTPUT="),
+		),
+	).toBeLessThan(corrected.length - 1);
+	expect(corrected.at(-1)!.content).toBe(answer.seen[0]!.at(-1)!.content);
 	const selection = fixture([{ value: "選択" }]);
 	await selection.run("auxiliary", session);
 	expect(selection.sessions).toEqual([
@@ -566,5 +571,14 @@ test("structural repair preserves the anchored request before appended rejected 
 			content: "明日は？",
 		});
 	}
-	expect(h.seen[1]!.at(-1)!.content).toStartWith("UNTRUSTED_REJECTED_OUTPUT=");
+	const repaired = h.seen[1]!;
+	const rejected = repaired.findIndex((m) =>
+		m.content.startsWith("UNTRUSTED_REJECTED_OUTPUT="),
+	);
+	const anchor = repaired.findIndex((m) =>
+		m.content.includes('CURRENT_REQUEST={"messageId":"fixed-input"}'),
+	);
+	expect(rejected).toBeGreaterThanOrEqual(0);
+	expect(rejected).toBeLessThan(anchor);
+	expect(repaired.at(-1)).toMatchObject({ role: "user", content: "明日は？" });
 });

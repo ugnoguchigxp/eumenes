@@ -2,7 +2,7 @@ import { intervalLifecycle, type Lifecycle } from "../lifecycle";
 import type { DialogueService } from "../../domains/dialogue";
 
 /** How often the dialogue's specialist sessions are swept (expiry, closing retries, saved suspended work). */
-export const SPECIALIST_SWEEP_MS = 60_000;
+const SPECIALIST_SWEEP_MS = 60_000;
 
 /**
  * The specialist sessions' lifecycle: at startup every session that was not ended ends as restarted (the

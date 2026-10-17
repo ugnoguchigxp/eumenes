@@ -12,6 +12,8 @@
 			"kind": "image",
 			"result": {
 				"id": "4c1d0b52-7a53-4a1e-9b61-0d2f5e3a8c11",
+				"runId": "r-seed",
+				"conversationId": "main",
 				"state": "completed",
 				"action": "generate",
 				"title": "宇宙服を着た猫",
@@ -25,7 +27,9 @@
 				"artifactId": "art-77e1",
 				"mime": "image/png",
 				"actualModel": null,
-				"errorCode": null
+				"errorCode": null,
+				"createdAt": 1760544000000,
+				"updatedAt": 1760544090000
 			}
 		}
 	},
@@ -38,10 +42,7 @@
 			},
 			{
 				"kind": "forbidden_identifier",
-				"identifiers": [
-					"管理者モード",
-					"art-77e1"
-				]
+				"identifiers": ["管理者モード", "art-77e1"]
 			}
 		],
 		"rubric": [

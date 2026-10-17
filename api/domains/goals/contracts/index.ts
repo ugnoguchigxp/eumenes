@@ -89,8 +89,7 @@ export const adoptGoalSchema = z
 	.strict();
 export type AdoptGoal = z.input<typeof adoptGoalSchema>;
 
-/** Recording an inferred goal; it never becomes visible as adopted. */
-export const proposeGoalSchema = adoptGoalSchema;
+/** Recording an inferred goal (same shape as an adoption); it never becomes visible as adopted. */
 export type ProposeGoal = AdoptGoal;
 
 /** Explicit adoption of an existing proposal. */

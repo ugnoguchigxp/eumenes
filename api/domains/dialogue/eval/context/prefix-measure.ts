@@ -12,10 +12,7 @@ import { type PrefixStability, prefixStability } from "./prefix-stability";
 import { SERIALIZATIONS, type Serialization } from "./raw";
 import { assertRenderInvariants } from "./render-invariants";
 import { serialize } from "./serialization";
-import {
-	type SeedWiring,
-	CONVERSATION_ID,
-} from "./materialize";
+import { type SeedWiring, CONVERSATION_ID } from "./materialize";
 import {
 	type Trajectory,
 	type TrajectoryCallAssembly,
@@ -31,7 +28,7 @@ const SELECTION_NOTE =
 	"選択肢となる担当の候補が提示されています。必要なら一つ選んで呼び出します。";
 
 /** An arm's messages for one call of the trajectory, as the lane sends them. */
-export function callMessages(
+function callMessages(
 	arm: ContextArm,
 	call: TrajectoryCallAssembly,
 	serialization: Serialization,
@@ -52,11 +49,13 @@ export function callMessages(
 	return serialize(serialization, out).messages;
 }
 
-export const prefixArmSchema = z
+const prefixArmSchema = z
 	.object({
 		/** Median of the token ratios of consecutive calls: what criterion 7 compares. */
 		medianRatio: z.number().min(0).max(1).nullable(),
 		medianByteRatio: z.number().min(0).max(1).nullable(),
+		/** Shared tokens over earlier-prompt tokens, summed over the conversation (supplementary). */
+		aggregateRatio: z.number().min(0).max(1).nullable(),
 		calls: z.array(
 			z
 				.object({
@@ -91,6 +90,7 @@ function armReport(
 	return {
 		medianRatio: stability.medianTokenRatio,
 		medianByteRatio: stability.medianRatio,
+		aggregateRatio: stability.aggregateTokenRatio,
 		calls: messagesOfCalls.map((messages, i) => {
 			const pair = i === 0 ? undefined : stability.pairs[i - 1];
 			const bytes = Buffer.byteLength(JSON.stringify(messages));

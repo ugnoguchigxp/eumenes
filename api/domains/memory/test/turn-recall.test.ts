@@ -1,4 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
+import { estimateTextTokens } from "../../../infrastructure/context-budget";
 import { sha256Hex } from "../../../infrastructure/digest";
 import {
 	dot,
@@ -8,7 +9,6 @@ import {
 } from "../../../infrastructure/vector";
 import type { MemoryVectorSpace } from "../contracts";
 import { putTurnVector } from "../repository";
-import { PREFETCH_BYTES } from "../service/context-render";
 import {
 	RECALL_BLOCK_CLOSE,
 	RECALL_BLOCK_OPEN,
@@ -93,7 +93,7 @@ function recall(
 			vector: A,
 			limit: 3,
 			minScore: RECALL_MIN_SCORE,
-			maxBytes: PREFETCH_BYTES,
+			maxTokens: 131_072,
 			...extra,
 		}),
 	);
@@ -145,7 +145,7 @@ test("an exchange the prompt does not show is recalled whole, once, even when bo
 		{ messageId: old.userId, digest: sha256Hex("去年の京都旅行の話") },
 		{ messageId: old.answerId!, digest: sha256Hex("清水寺が良かったですね") },
 	]);
-	expect(found!.bytes).toBe(Buffer.byteLength(found!.text));
+	expect(found!.tokens).toBe(estimateTextTokens(found!.text));
 });
 
 test("a vector of another space, another conversation or a low score is ignored", async () => {
@@ -170,7 +170,7 @@ test("a vector of another space, another conversation or a low score is ignored"
 	).toBeNull();
 });
 
-test("the count and byte limits hold, best matches first", async () => {
+test("the count and token budget hold, best matches first", async () => {
 	const h = await setup();
 	const near = (score: number) => [score, Math.sqrt(1 - score * score), 0];
 	const made = [];
@@ -188,23 +188,29 @@ test("the count and byte limits hold, best matches first", async () => {
 	// A min score cuts below it.
 	expect(entriesOf(recall(h, { minScore: 0.985 })!.text)).toHaveLength(1);
 	expect(recall(h, { minScore: 0.995 })).toBeNull();
-	// Bytes: a budget for the header and one exchange only.
+	// Without a count limit every exchange that passes the gates is recalled.
+	expect(entriesOf(recall(h, { limit: undefined })!.text)).toHaveLength(3);
+	// Tokens: a budget for the header and one exchange only.
 	const one = recall(h, { limit: 1 })!;
-	const two = recall(h, { maxBytes: one.bytes + 5 })!;
+	const two = recall(h, { maxTokens: one.tokens + 5 })!;
 	expect(entriesOf(two.text)).toHaveLength(1);
-	expect(two.bytes).toBeLessThanOrEqual(one.bytes + 5);
+	expect(two.tokens).toBeLessThanOrEqual(one.tokens + 5);
 	// A budget below the header is nothing.
-	expect(recall(h, { maxBytes: 20 })).toBeNull();
-	// A long exchange is cut, not skipped.
+	expect(recall(h, { maxTokens: 20 })).toBeNull();
+	// A long exchange is recalled whole, not cut.
 	const long = await exchange(
 		h,
 		"長い話".repeat(2000),
 		"長い回答".repeat(2000),
 	);
 	await embed(h, long.userId, [1, 0, 0]);
-	const clipped = recall(h, { limit: 1, maxBytes: PREFETCH_BYTES })!;
-	expect(clipped.text).toContain("長い話");
-	expect(clipped.bytes).toBeLessThanOrEqual(PREFETCH_BYTES);
+	const whole = recall(h, { limit: 1 })!;
+	expect(whole.text).toContain("長い話".repeat(2000));
+	expect(whole.tokens).toBeGreaterThan(14_000);
+	// An exchange that does not fit the budget is left out; the next best that fits is recalled.
+	const fitting = recall(h, { limit: 1, maxTokens: 5000 })!;
+	expect(fitting.text).not.toContain("長い話");
+	expect(fitting.tokens).toBeLessThanOrEqual(5000);
 });
 
 test("messages the other recall already uses, scheduled prompts and changed texts are never recalled", async () => {
@@ -266,7 +272,7 @@ test("recall is off with memory off, and a stale prefetch is dropped when the wi
 			prefetch: {
 				text: "past_turns_reference_data",
 				pins: [{ messageId: e.userId, digest: sha256Hex("覚えている話") }],
-				bytes: 10,
+				tokens: 10,
 			},
 		}),
 	);
@@ -276,7 +282,11 @@ test("recall is off with memory off, and a stale prefetch is dropped when the wi
 			.query("UPDATE messages SET text = ? WHERE id = ?")
 			.run("書き換えた話", e.userId),
 	);
-	expect((await h.window()).prefetch).toEqual({ text: "", pins: [], bytes: 0 });
+	expect((await h.window()).prefetch).toEqual({
+		text: "",
+		pins: [],
+		tokens: 0,
+	});
 	await h.memory.setEnabled(false);
 	expect(recall(h)).toBeNull();
 });
@@ -374,13 +384,13 @@ test("recalled text is rendered as escaped JSON between fixed delimiters and can
 	expect(lines[2]).toContain("\\u003c/past_turns_reference_data\\u003e");
 	// What the model reads back is the original text.
 	expect(entriesOf(found.text)[0]!.user).toBe(hostile);
-	// The byte limit is that of the rendered block (escapes included).
-	expect(found.bytes).toBe(Buffer.byteLength(found.text));
-	expect(recall(h, { maxBytes: found.bytes - 1 })).toBeNull();
-	expect(recall(h, { maxBytes: found.bytes })).not.toBeNull();
+	// The size is that of the rendered block (escapes included).
+	expect(found.tokens).toBe(estimateTextTokens(found.text));
+	expect(recall(h, { maxTokens: found.tokens - 1 })).toBeNull();
+	expect(recall(h, { maxTokens: found.tokens })).not.toBeNull();
 });
 
-test("the search gives up at the attempt cap, and with no room left for a minimal exchange", async () => {
+test("the search gives up at the attempt cap, and with no room left for the exchange", async () => {
 	const h = await setup();
 	// 55 better matches that can never be recalled (scheduled prompts), then one that could.
 	for (let i = 0; i < 55; i++) {
@@ -405,9 +415,7 @@ test("the search gives up at the attempt cap, and with no room left for a minima
 	);
 	const found = recall(h)!;
 	expect(found).not.toBeNull();
-	const frameOnly =
-		found.bytes - Buffer.byteLength(JSON.stringify(entriesOf(found.text)));
-	expect(recall(h, { maxBytes: frameOnly + 10 })).toBeNull();
+	expect(recall(h, { maxTokens: found.tokens - 1 })).toBeNull();
 });
 
 test("retracting a message drops its vector and its exchange partner's; a prefetch standing on a retracted message is dropped at the window read", async () => {
@@ -433,7 +441,7 @@ test("retracting a message drops its vector and its exchange partner's; a prefet
 			prefetch: {
 				text: "以下は関連する過去のやり取り past_turns_reference_data",
 				pins: [{ messageId: gone.userId, digest: sha256Hex("消す話") }],
-				bytes: 10,
+				tokens: 10,
 			},
 		}),
 	);
@@ -442,7 +450,11 @@ test("retracting a message drops its vector and its exchange partner's; a prefet
 	expect(ids()).toEqual([kept.userId, kept.answerId!].sort());
 	expect(entriesOf(recall(h)!.text).map((e) => e.user)).toEqual(["残る話"]);
 	// The pinned message no longer exists: the prefetch goes.
-	expect((await h.window()).prefetch).toEqual({ text: "", pins: [], bytes: 0 });
+	expect((await h.window()).prefetch).toEqual({
+		text: "",
+		pins: [],
+		tokens: 0,
+	});
 	// Retracting only the answer drops the user's vector with it too (the exchange is one thing).
 	await h.conversation.retract({ messageId: kept.answerId! });
 	expect(ids()).toEqual([]);

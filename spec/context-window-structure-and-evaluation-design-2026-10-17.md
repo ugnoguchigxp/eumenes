@@ -62,7 +62,7 @@
 | eumenes `scripts/search-answer-evaluation.ts` | 判定役 LLM の型。判定関数を注入し、zod schema と `sessionRole:"auxiliary"`、`contextPolicy:"exact"` で呼ぶ。失敗したら閉じる（不明は不合格） |
 | eumenes `scripts/nl-acceptance/frozen.ts` | 事例と基準の digest lock |
 | eumenes decision-bench、web-search-acceptance | 2段階の流れ。生の応答を一度だけ記録し、採点はオフラインでやり直せるようにする |
-| eumenes `scripts/guided-answer-live.ts` | `generateConversation` を直接呼ぶ live の型。`--quoted-history` で形式を比べた前例 |
+| eumenes `scripts/guided-answer-live.ts`（削除済み。context-eval に置き換え） | `generateConversation` を直接呼ぶ live の型。`--quoted-history` で形式を比べた前例 |
 | eumenes `api/domains/dialogue/test/` | 一時 SQLite と実サービスで ContextWindow を組み立てる部品。`context-compiler.test.ts` の `setup()`、`memory-seed.ts` の `saveItem` と `addNote`、`world-context.test.ts` の `setup()`、`generation-prepare.test.ts` の偽 LarmPort |
 
 ## 3. 方針の全体像
@@ -172,7 +172,7 @@ F5 と F6 を**安全族**とする。
 - **fixture の段階**（verify の中）: materialize、全 arm の render、不変条件、機械的な指標、偽の会話モデルと偽の判定役を使った採点の流れ。数値は「基盤が動くこと」の証明であり、採否には使わない。報告には `lane: "fixture"` と明記する。
 - **live の段階**（verify の外、`bun run context:eval -- run --experiment <dir> --live`）
   - backend プロセス内で `createLiveLarm()` を使う。サーバーは起動しない。保存済み設定のスナップショット識別子を記録し、モデル名・profile 名は書かない。
-  - 会話モデルの呼び出しは、製品と同じ `generateConversation` を通す（`guided-answer-live.ts` と同じ形）。arm ごとに違うのは `render` だけである。
+  - 会話モデルの呼び出しは、製品と同じ `generateConversation` を通す（削除済みの `guided-answer-live.ts` と同じ形）。arm ごとに違うのは `render` だけである。
   - 試行は arm × 事例 × 3回。arm の実行順は Williams 系列で均衡させる。並列数は 2 以下とし、LARM の実際の負荷に合わせる。
   - 再試行・多数決・応答キャッシュで結果を作らない。通信エラーは `transport_error` として別に数える。再実行は `PREREGISTRATION.md` に書いた条件でだけ行う。
   - 生の応答を `raw.jsonl` に記録する。採点（`score`）と分析（`analyze`）は、記録からオフラインでやり直せる。

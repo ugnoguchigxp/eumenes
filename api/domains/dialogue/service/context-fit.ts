@@ -7,6 +7,7 @@ import {
 	type ContextBlock,
 	type ContextSource,
 } from "../../inference";
+import { parseRecallBlock, renderRecallBlock } from "../../memory";
 import { getLogger } from "../../../infrastructure/logger";
 import type { ContextAssembly } from "./context-assembly";
 
@@ -14,6 +15,8 @@ const log = getLogger("dialogue");
 
 /** The room a block's frame sentence takes beyond its body (the frames are short and fixed). */
 const FRAME_TOKENS = 40;
+/** A string inside a JSON value this short is never clipped. */
+const MIN_CLIPPED_STRING_TOKENS = 64;
 
 /** Volatile blocks that memory made: they count against the memory and history budget, the rest against the task. */
 const MEMORY_VOLATILE: ReadonlySet<ContextSource> = new Set([
@@ -54,7 +57,13 @@ const omitted = (chars: number) => `（省略：約${chars}文字）`;
 /** The first characters of a text with an omission mark, `tokens` shorter than it was (at least). */
 function clipText(text: string, reduceBy: number): string {
 	const chars = [...text];
-	const target = Math.max(0, estimateTextTokens(text) - reduceBy);
+	// The mark takes room too: what is cut must cover it, or the clip would undershoot.
+	const target = Math.max(
+		0,
+		estimateTextTokens(text) -
+			reduceBy -
+			estimateTextTokens(omitted(chars.length)),
+	);
 	let low = 0;
 	let high = chars.length;
 	while (low < high) {
@@ -65,14 +74,60 @@ function clipText(text: string, reduceBy: number): string {
 	return `${chars.slice(0, low).join("")}${omitted(chars.length - low)}`;
 }
 
-/** The longest string inside a JSON value, as a way to set it. */
-function longestString(
-	value: unknown,
-): { get: () => string; set: (text: string) => void } | null {
-	let best: { get: () => string; set: (text: string) => void } | null = null;
+type Leaf = { get: () => string; set: (text: string) => void };
+
+/**
+ * The recall block with whole exchanges dropped from its end (the least similar ones), so its frame sentence, its
+ * two delimiter lines and its escaped JSON stay intact: a cut through the middle would lose the closing line and
+ * let recalled text pass for instructions. A text that is not in the recall form is returned as it is.
+ */
+function clipRecallText(text: string, reduceBy: number): string {
+	const entries = parseRecallBlock(text);
+	if (!entries) return text;
+	const goal = estimateTextTokens(text) - reduceBy;
+	const kept = [...entries];
+	while (kept.length > 0 && estimateTextTokens(renderRecallBlock(kept)) > goal)
+		kept.pop();
+	return renderRecallBlock(kept);
+}
+
+/** A string that is itself a JSON object or array (a stored projection), as the parsed value; else null. */
+function embeddedJson(text: string): object | null {
+	if (!/^\s*[{[]/.test(text)) return null;
+	try {
+		const value: unknown = JSON.parse(text);
+		return value && typeof value === "object" ? value : null;
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * The longest string inside a JSON value, as a way to set it. A string that holds JSON is looked into, not
+ * clipped as text: its longest string is the candidate and setting it writes the whole JSON back, so the
+ * embedded document stays parseable.
+ */
+function longestString(value: unknown): Leaf | null {
+	let best: Leaf | null = null;
 	let bestLength = 0;
 	const visit = (node: unknown, assign: (text: string) => void) => {
 		if (typeof node === "string") {
+			const embedded = embeddedJson(node);
+			if (embedded) {
+				const inner = longestString(embedded);
+				const length = inner?.get().length ?? 0;
+				if (inner && length > bestLength) {
+					bestLength = length;
+					best = {
+						get: inner.get,
+						set: (text) => {
+							inner.set(text);
+							assign(JSON.stringify(embedded));
+						},
+					};
+				}
+				return;
+			}
 			if (node.length > bestLength) {
 				bestLength = node.length;
 				best = { get: () => node, set: assign };
@@ -102,7 +157,16 @@ export function clipBlock(block: ContextBlock, reduceBy: number): ContextBlock {
 	const { body } = block;
 	switch (body.kind) {
 		case "text":
-			return { ...block, body: { kind: "text", text: clipText(body.text, reduceBy) } };
+			return {
+				...block,
+				body: {
+					kind: "text",
+					text:
+						block.source === "memory.recall"
+							? clipRecallText(body.text, reduceBy)
+							: clipText(body.text, reduceBy),
+				},
+			};
 		case "lines": {
 			const sections = body.sections.map((section) => ({
 				...section,
@@ -124,13 +188,18 @@ export function clipBlock(block: ContextBlock, reduceBy: number): ContextBlock {
 		}
 		case "json": {
 			const value = structuredClone(body.value);
-			let remaining = reduceBy;
-			for (let guard = 0; guard < 64 && remaining > 0; guard++) {
+			const start = estimateJsonTokens(value);
+			for (let guard = 0; guard < 64; guard++) {
+				const remaining = reduceBy - (start - estimateJsonTokens(value));
 				const leaf = longestString(value);
-				if (!leaf || leaf.get().length <= omitted(0).length + 8) break;
-				const before = estimateTextTokens(leaf.get());
+				// Short strings (a time, a URL) are data, not bulk: a clip that cannot reach the target stops.
+				if (
+					remaining <= 0 ||
+					!leaf ||
+					estimateTextTokens(leaf.get()) <= MIN_CLIPPED_STRING_TOKENS
+				)
+					break;
 				leaf.set(clipText(leaf.get(), remaining));
-				remaining -= before - estimateTextTokens(leaf.get());
 			}
 			return { ...block, body: { kind: "json", value } };
 		}
@@ -162,7 +231,11 @@ function shrink(
 	budget: number,
 ): ContextBlock[] {
 	let current = [...blocks];
-	for (let round = 0; round < blocks.length + 4; round++) {
+	for (
+		let round = 0;
+		round < blocks.length + 4 && current.length > 0;
+		round++
+	) {
 		const sizes = current.map(blockTokens);
 		const excess = fixed + sizes.reduce((sum, size) => sum + size, 0) - budget;
 		if (excess <= 0) break;
@@ -196,7 +269,9 @@ export function fitAssembly(
 	systemTokens: number,
 ): ContextAssembly {
 	const budgets = contextBudgets(windowTokens);
-	const failure = assembly.volatile.some((b) => b.source === "research.failure");
+	const failure = assembly.volatile.some(
+		(b) => b.source === "research.failure",
+	);
 	let { stable, working, volatile } = assembly;
 	if (!failure) {
 		const historyTokens = assembly.history.turns.reduce(

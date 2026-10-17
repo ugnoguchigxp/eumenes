@@ -3,12 +3,14 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { systemContext } from "../../../../infrastructure/system-context";
 
+/** Repository-relative folder of the evaluation's system-context tomls. */
+export const CONTEXT_EVAL_TOML_DIR =
+	"api/domains/dialogue/contexts/context-eval";
 /** Repository-relative source of the judge prompt (a system-context toml); frozen by its sha256. */
-export const JUDGE_RULES_SOURCE =
-	"api/domains/dialogue/contexts/context-eval/judge-rules.context.toml";
+export const JUDGE_RULES_SOURCE = `${CONTEXT_EVAL_TOML_DIR}/judge-rules.context.toml`;
 
 /** The judge's rules text. Needs the system-context catalog to have been rebuilt with the toml. */
-export function loadJudgeRules(): string {
+function loadJudgeRules(): string {
 	return systemContext("dialogue.contexts.context-eval.judge-rules", {});
 }
 

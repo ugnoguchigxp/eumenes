@@ -297,3 +297,37 @@ test("monotonic TTFT separates pre-send preparation and first nonempty content",
 		now.mockRestore();
 	}
 });
+
+test("an exact request is fitted by dropping the oldest history it was told about, and the timing reports the drop", () => {
+	const list = [
+		{ role: "system" as const, content: "policy" },
+		...Array.from({ length: 6 }, (_, i) => ({
+			role: i % 2 ? ("assistant" as const) : ("user" as const),
+			content: `turn${i}-${"x".repeat(4000)}`,
+		})),
+		{ role: "user" as const, content: "request" },
+	];
+	const timing = startLlmTiming(
+		"profile",
+		list,
+		{ maxTokens: 3000, outputReserveTokens: 100, safetyMarginTokens: 100 },
+		{
+			contextPolicy: "exact",
+			history: { instructionCount: 1, historyCount: 6 },
+		},
+		undefined,
+	);
+	expect(timing.selected.length).toBeLessThan(list.length);
+	expect(timing.selected[0]).toEqual(list[0]!);
+	expect(timing.selected.at(-1)).toEqual(list.at(-1)!);
+	expect(timing.selected.map((m) => m.content)).not.toContain(list[1]!.content);
+	// Without the history position nothing is dropped, and nothing fails.
+	const whole = startLlmTiming(
+		"profile",
+		list,
+		{ maxTokens: 3000, outputReserveTokens: 100, safetyMarginTokens: 100 },
+		{ contextPolicy: "exact" },
+		undefined,
+	);
+	expect(whole.selected).toEqual(list);
+});

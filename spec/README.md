@@ -10,6 +10,7 @@ archive の基準: その文書が担当した実装がコードにあり、本�
 | --- | --- |
 | [conversation-pre-delegation-response-design-2026-10-17.md](conversation-pre-delegation-response-design-2026-10-17.md) | 基本案合意・実装済み。自力回答→必要時の選定→予告→結果返却／完全切替。fixture検証済み、live・実機器と関連外の検証失敗は本文に記録 |
 | [conversation-subagent-llm-refactoring-plan-2026-10-17.md](conversation-subagent-llm-refactoring-plan-2026-10-17.md) | 合意済み・P2/P3の一部を実装し、fixture検証済み（§8）。D1〜D13・P1・live受入は未実施。5原則（短く話す・予告→実行・制作は専門担当へ切替・簡潔なSystemContext・依頼と補助情報の区別）に沿った会話／専門担当／agent-runtimeのLLM経路の改修。要合意事項D1〜D13 |
+| [conversation-two-round-initial-analysis-design-2026-10-17.md](conversation-two-round-initial-analysis-design-2026-10-17.md) | 設計案・合意待ち。初動をR1要求分析（種類・鮮度・条件・不足・次の行動。履歴・日時なし、回答文なし）→R2回答または委譲の2ラウンドに固定し、履歴の確認は `history.research` 担当へ委譲。H1〜H3決着。既存を変える・取り消せない依頼は選定後に確認してから実行 |
 | [request-url-boundary-design-2026-10-17.md](request-url-boundary-design-2026-10-17.md) | 決着・実装済み。依頼文のURL抽出で「、」「。」を区切りとする（U2）。助詞直結の境界（U1）は対応しない |
 | [conversation-context-window-design-2026-10-17.md](conversation-context-window-design-2026-10-17.md) | 合意・実装中。会話のContextWindowの区画（変わる頻度順）・ブロックの出所と扱い方・中間表現とrender・LARMとCloud API（OpenAI互換・Claude Agent SDK・Codex SDK）のcached inputを前提にした並びと計測。要合意事項W1〜W7 |
 | [context-window-structure-and-evaluation-design-2026-10-17.md](context-window-structure-and-evaluation-design-2026-10-17.md) | 合意・実装中。会話のContextWindowを内容（ContextAssembly）と形式（render）に分け、出所・扱い方の表し方を事前登録の評価基盤（context-eval）で比べて採否を決める。最初の実験は出所タグ等6案。要合意事項E1〜E7 |

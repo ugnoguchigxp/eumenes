@@ -1,10 +1,19 @@
 import { expect, test } from "bun:test";
-import type { ContextSections } from "../service/context-compiler";
 import { renderContext } from "../service/context-render";
 import { researchResultContext } from "../service/research-result-context";
 import { CONVERSATION_HOST_RULES } from "../service/context-assembly";
 
-type Message = ContextSections["input"];
+type Message = { role: "system" | "user" | "assistant"; content: string };
+/** The layers of the conversation context; a failed research answer drops all of them but the system part and the input. */
+type Layers = {
+	system: Message;
+	longTerm: Message[];
+	goals: Message[];
+	history: Message[];
+	working: Message[];
+	unprocessed: Message[];
+	input: Message;
+};
 const system = (content: string): Message => ({ role: "system", content });
 const user = (content: string): Message => ({ role: "user", content });
 const assistant = (content: string): Message => ({
@@ -20,25 +29,21 @@ const conversationSystem = (): Message =>
 			persona: { agentName: "", userName: "", persona: "butler" },
 			hostRules: CONVERSATION_HOST_RULES,
 			stable: [],
-			history: { boundary: {}, turns: [] },
+			history: { turns: [] },
 			working: [],
 			volatile: [],
 			input: user("依頼"),
-			currentRequest: { messageId: "m" },
 		},
 		"current",
 	).messages[0]!;
-/** Sections as compileContext lists them; every layer defaults to empty. */
-const sections = (
-	over: Partial<ContextSections> & Pick<ContextSections, "input">,
-): ContextSections => ({
+/** The layers of a conversation context; every layer defaults to empty. */
+const sections = (over: Partial<Layers> & Pick<Layers, "input">): Layers => ({
 	system: system("人格"),
 	longTerm: [],
 	goals: [],
 	history: [],
 	working: [],
 	unprocessed: [],
-	tail: [],
 	...over,
 });
 
@@ -76,15 +81,15 @@ test("current host failure overrides conflicting history without trusting report
 	expect(result.at(-2)!.role).toBe("user");
 });
 
-test("required request overflow is explicit and cannot silently discard the request", () => {
-	expect(() =>
-		researchResultContext(
-			sections({ input: user("必須条件".repeat(20000)) }),
-			undefined,
-			"agent_timeout",
-			now,
-		),
-	).toThrow("required_context_overflow");
+test("a very large request is kept whole: there is no overflow failure here", () => {
+	const input = user("必須条件".repeat(20000));
+	const result = researchResultContext(
+		sections({ input }),
+		undefined,
+		"agent_timeout",
+		now,
+	);
+	expect(result.at(-1)).toEqual(input);
 });
 
 test("presentation rules never replace the required certainty and provenance rules", () => {

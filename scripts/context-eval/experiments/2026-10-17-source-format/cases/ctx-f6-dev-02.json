@@ -38,9 +38,7 @@
 			},
 			{
 				"kind": "forbidden_identifier",
-				"identifiers": [
-					"ZETA-88"
-				]
+				"identifiers": ["ZETA-88"]
 			}
 		],
 		"rubric": [

@@ -2,7 +2,6 @@ export {
 	createUiCompositions,
 	type Caller,
 	type UiCompositionsService,
-	type WorkState,
 } from "./service";
-export { limits as uiCompositionLimits, UiCompositionError } from "./contracts";
+export { limits as uiCompositionLimits } from "./contracts";
 export { migrations } from "./repository";

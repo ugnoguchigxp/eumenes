@@ -1,12 +1,30 @@
 import { expect, test } from "bun:test";
 import type { ContextGoalEntry } from "../contracts";
+import { renderContext } from "../service/context-render";
+import { CONVERSATION_HOST_RULES } from "../service/context-assembly";
 import {
-	GOALS_LAYER_MAX_BYTES,
-	GOAL_MAX_CHARS,
 	goalLine,
 	goalsLayerStale,
 	renderGoalsLayer,
 } from "../service/goals-layer";
+
+/** The layer as the `current` format writes it: the message right after the system part. */
+function layerText(goals: ContextGoalEntry[]) {
+	const layer = renderGoalsLayer(goals)!;
+	return renderContext(
+		{
+			stage: "initial",
+			persona: { agentName: "", userName: "", persona: "butler" },
+			hostRules: CONVERSATION_HOST_RULES,
+			stable: [layer.block],
+			history: { turns: [] },
+			working: [],
+			volatile: [],
+			input: { role: "user", content: "依頼" },
+		},
+		"current",
+	).messages[1]!.content;
+}
 
 const goal = (
 	n: number,
@@ -18,26 +36,21 @@ const goal = (
 	revision: 1,
 	...over,
 });
-const bytes = (text: string) => Buffer.byteLength(text, "utf8");
-const chars = (text: string) => Array.from(text).length;
 
-test("30 goals of 500 Japanese characters stay within 2KB: clipped lines, then one 'ほか N 件' line", () => {
+test("30 goals of 500 Japanese characters are all listed whole, in priority order, with no 'ほか N 件' line", () => {
 	const goals = Array.from({ length: 30 }, (_, i) =>
 		goal(i, { desiredState: `${i}:` + "あ".repeat(500), priority: 30 - i }),
 	);
 	const layer = renderGoalsLayer(goals)!;
-	expect(layer.bytes).toBe(bytes(layer.message.content));
-	expect(layer.bytes).toBeLessThanOrEqual(GOALS_LAYER_MAX_BYTES);
-	const lines = layer.message.content.split("\n");
-	const goalLines = lines.filter(
-		(line) => line.startsWith("- ") && !line.startsWith("- ほか"),
-	);
-	expect(goalLines.length).toBe(layer.shown.length);
-	for (const line of goalLines)
-		expect(chars(line.slice(2))).toBeLessThanOrEqual(GOAL_MAX_CHARS);
-	expect(lines.at(-1)).toBe(`- ほか ${30 - layer.shown.length} 件`);
+	const text = layerText(goals);
+	const lines = text.split("\n");
+	const goalLines = lines.filter((line) => line.startsWith("- "));
+	expect(goalLines).toHaveLength(30);
+	expect(text).not.toContain("ほか");
+	for (const [i, line] of goalLines.entries())
+		expect(line).toBe(`- ${i}:${"あ".repeat(500)}`);
 	// Priority order: the highest priority is the first line.
-	expect(layer.shown[0]!.goalId).toBe("g0");
+	expect(layer.shown).toHaveLength(30);
 	expect(layer.shown.map((s) => s.goalId)).toEqual(
 		layer.shown.map((_, i) => `g${i}`),
 	);
@@ -45,7 +58,7 @@ test("30 goals of 500 Japanese characters stay within 2KB: clipped lines, then o
 
 test("when everything fits there is no 'ほか' line, and no goals gives no layer", () => {
 	const layer = renderGoalsLayer([goal(1), goal(2)])!;
-	expect(layer.message.content).not.toContain("ほか");
+	expect(layerText([goal(1), goal(2)])).not.toContain("ほか");
 	expect(layer.shown).toHaveLength(2);
 	expect(renderGoalsLayer([])).toBeNull();
 });
@@ -56,8 +69,7 @@ test("priority orders the goals (stable within one priority); a change of priori
 		goal(2, { priority: 5 }),
 		goal(3, { priority: 1 }),
 	];
-	const text = (goals: ContextGoalEntry[]) =>
-		renderGoalsLayer(goals)!.message.content;
+	const text = layerText;
 	expect(renderGoalsLayer(base)!.shown.map((s) => s.goalId)).toEqual([
 		"g2",
 		"g1",
@@ -79,15 +91,10 @@ test("priority orders the goals (stable within one priority); a change of priori
 	expect(text(raised)).not.toBe(text(base));
 });
 
-test("a goal line is one line, cut on a character boundary and never splits a surrogate pair", () => {
+test("a goal line is one line and is never cut", () => {
 	expect(goalLine("a\nb\r\n  c")).toBe("- a b c");
-	const long = goalLine("😀".repeat(200));
-	expect(Array.from(long.slice(2))).toHaveLength(GOAL_MAX_CHARS);
-	expect(long.endsWith("…")).toBe(true);
-	expect(long).not.toContain("�");
-	expect(goalLine("あ".repeat(GOAL_MAX_CHARS))).toBe(
-		`- ${"あ".repeat(GOAL_MAX_CHARS)}`,
-	);
+	expect(goalLine("😀".repeat(200))).toBe(`- ${"😀".repeat(200)}`);
+	expect(goalLine("あ".repeat(500))).toBe(`- ${"あ".repeat(500)}`);
 });
 
 test("stale only when a goal the layer listed no longer exists", () => {

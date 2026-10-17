@@ -59,7 +59,7 @@ export type InputAdapter = (
 ) => { ok: true; value: unknown } | { ok: false; errors: FieldError[] };
 
 /** The domain's view of one specialist session's work (host data, never model text). */
-export type SessionWorkState = {
+type SessionWorkState = {
 	workRef: string;
 	/** The saved item this work edits; null while a new work was never saved. */
 	savedRef: string | null;

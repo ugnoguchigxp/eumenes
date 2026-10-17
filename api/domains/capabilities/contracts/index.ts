@@ -61,7 +61,6 @@ export {
 	uiDraftApply,
 	uiResponseFields,
 	uiSubmitRequest,
-	uiTargetRef,
 	uiWorkSave,
 	uiWorkStep,
 };

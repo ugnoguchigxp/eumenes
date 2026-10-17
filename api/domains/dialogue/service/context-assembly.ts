@@ -1,4 +1,4 @@
-import type { ContextBlock, HistoryBoundary } from "../../inference";
+import type { ContextBlock } from "../../inference";
 import type { Attachment } from "../../conversation/contracts";
 import type { ChatMessage } from "./context";
 import type { buildSystemPrompt } from "./system-prompt";
@@ -64,7 +64,7 @@ export type HistoryTurn = {
  * - `working`: the summary and the short-term notes (W).
  * - `volatile`: what holds for this call only (V): notices, recalled exchanges, the World names hint, the
  *   specialist records, the operation results, a research report.
- * - `input`, `currentRequest`: the user's input of this run (R) and the host's designation of it.
+ * - `input`: the user's input of this run (R).
  *
  * A failed research answer is not assembled this way: it keeps its own context (`researchResultContext`).
  */
@@ -73,9 +73,8 @@ export type ContextAssembly = {
 	persona: PersonaSpec;
 	hostRules: readonly HostRuleId[];
 	stable: ContextBlock[];
-	history: { boundary: HistoryBoundary; turns: HistoryTurn[] };
+	history: { turns: HistoryTurn[] };
 	working: ContextBlock[];
 	volatile: ContextBlock[];
 	input: ChatMessage;
-	currentRequest: { messageId: string };
 };

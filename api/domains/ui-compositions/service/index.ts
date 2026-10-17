@@ -15,7 +15,7 @@ import {
 	workStateInTransaction,
 } from "./work";
 
-export type { Caller, Outcome, WorkState } from "./shared";
+export type { Caller } from "./shared";
 
 export function createUiCompositions() {
 	return {
