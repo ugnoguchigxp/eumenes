@@ -22,23 +22,10 @@ import {
 	type VectorSpace,
 } from "../contracts";
 
-const RRF_K = 60;
-const MAX_GRAMS = 48;
-
 export { dot, packVector, unpackVector, vectorSpaceKey };
 /** The passages a toolchain is found by: its purpose, use cases and example requests. */
 export function toolchainPassages(d: FixedDefinition) {
 	return [`${d.title}: ${d.summary}`, ...d.useWhen, ...(d.examples ?? [])];
-}
-/** Character trigrams of the request, for the trigram FTS index (no word dictionary). */
-function trigrams(text: string) {
-	const chars = [...text.normalize("NFKC").replace(/\s+/g, " ").trim()];
-	const grams = new Set<string>();
-	for (let i = 0; i + 3 <= chars.length && grams.size < MAX_GRAMS; i++) {
-		const gram = chars.slice(i, i + 3).join("");
-		if (gram.trim().length === 3) grams.add(gram);
-	}
-	return [...grams];
 }
 
 export function createToolchains(
@@ -107,8 +94,8 @@ export function createToolchains(
 		}
 	}
 	/**
-	 * Rank the available toolchains for a request: trigram FTS, vector similarity and toolchains
-	 * chosen before for similar requests, merged with reciprocal rank fusion. Retrieval only:
+	 * Retrieve toolchains by similarity to the current request embedding.
+	 * Past choices are reference data and never change this similarity. Retrieval only:
 	 * the conversation model makes the choice.
 	 */
 	function candidatesInTransaction(
@@ -123,22 +110,6 @@ export function createToolchains(
 	): ToolchainCard[] {
 		const active = activeInTransaction(db).filter((d) => input.available(d.id));
 		const byRevision = new Map(active.map((d) => [d.revisionId, d]));
-		const ftsRank = new Map<string, number>();
-		const grams = trigrams(input.text);
-		if (grams.length)
-			(
-				db
-					.query(
-						"SELECT key,bm25(capability_search) AS rank FROM capability_search WHERE capability_search MATCH ? AND key LIKE 'toolchain:%' ORDER BY rank LIMIT 32",
-					)
-					.all(
-						grams.map((g) => '"' + g.replaceAll('"', '""') + '"').join(" OR "),
-					) as { key: string }[]
-			).forEach((row) => {
-				const d = active.find((x) => `toolchain:${x.id}` === row.key);
-				if (d && !ftsRank.has(d.revisionId))
-					ftsRank.set(d.revisionId, ftsRank.size + 1);
-			});
 		const similarity = new Map<string, number>();
 		if (input.vector) {
 			const key = vectorSpaceKey(input.vector.space);
@@ -155,42 +126,24 @@ export function createToolchains(
 					similarity.set(row.revision_id, score);
 			}
 		}
-		const vectorRank = new Map(
-			[...similarity.entries()]
-				.sort((a, b) => b[1] - a[1])
-				.map(([id], i) => [id, i + 1] as const),
-		);
-		const historyRank = new Map<string, number>();
+		const historical = new Set<string>();
 		for (const id of input.fromHistory ?? []) {
 			const d = active.find((x) => x.id === id);
-			if (d && !historyRank.has(d.revisionId))
-				historyRank.set(d.revisionId, historyRank.size + 1);
+			if (d) historical.add(d.revisionId);
 		}
-		const ranked = active
-			.map((d) => {
-				const ranks = [
-					ftsRank.get(d.revisionId),
-					vectorRank.get(d.revisionId),
-					historyRank.get(d.revisionId),
-				].filter((r): r is number => r !== undefined);
-				return {
-					d,
-					score: ranks.reduce((s, r) => s + 1 / (RRF_K + r), 0),
-					signals: ranks.length,
-				};
-			})
-			.sort((a, b) => b.score - a.score || a.d.id.localeCompare(b.d.id));
-		// Narrowing needs the semantic signal. Without a query vector (provider unavailable or
-		// vectors not yet computed) every available toolchain is offered, ranked by the other
-		// signals, so a missing index never hides a capability.
-		const fused =
-			similarity.size > 0
-				? ranked
-						.filter((x) => x.signals > 0)
-						.slice(0, Math.min(8, Math.max(1, input.limit ?? 4)))
-				: ranked;
+		// Preserve the existing all-capability fallback when embeddings are unavailable.
+		const candidates = similarity.size
+			? active
+					.filter((d) => similarity.has(d.revisionId))
+					.sort(
+						(a, b) =>
+							similarity.get(b.revisionId)! - similarity.get(a.revisionId)! ||
+							a.id.localeCompare(b.id),
+					)
+					.slice(0, Math.min(8, Math.max(1, input.limit ?? 4)))
+			: active;
 		const functionOf = new Map(active.map((d) => [d.id, d.functionName!]));
-		return fused.map(({ d }, i) => ({
+		return candidates.map((d, i) => ({
 			revisionId: d.revisionId,
 			id: d.id,
 			functionName: d.functionName!,
@@ -210,11 +163,11 @@ export function createToolchains(
 			),
 			score: {
 				rank: i + 1,
-				ftsRank: ftsRank.get(d.revisionId) ?? null,
+				ftsRank: null,
 				similarity: similarity.has(d.revisionId)
 					? Number(similarity.get(d.revisionId)!.toFixed(4))
 					: null,
-				fromHistory: historyRank.has(d.revisionId),
+				fromHistory: historical.has(d.revisionId),
 			},
 		}));
 	}

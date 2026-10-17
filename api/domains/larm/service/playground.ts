@@ -1,7 +1,7 @@
 import { createImageLibrary } from "./image-library";
 import { createMusicLibrary } from "./music-library";
 import { createProviderAccess } from "./playground-provider";
-import { createHash } from "node:crypto";
+import { createPlaygroundCatalog } from "./playground-catalog";
 import type {
 	LarmTestTarget,
 	TestHealth,
@@ -117,112 +117,14 @@ export function createLarmPlayground(config: {
 		}
 		return r;
 	}
-	/**
-	 * Targets of the saved profile and of every profile LARM lists. The unselected response
-	 * can omit a profile's services, so a profile without any is fetched again by its id.
-	 */
-	async function catalog(signal: AbortSignal) {
-		const targets = new Map<string, LarmTestTarget>();
-		const errors: string[] = [];
-		let revision: string | undefined;
-		async function fetchProfiles(selector: string) {
-			const data = await json(
-				await control(
-					`/v3/agent-profiles${selector ? `?profile=${encodeURIComponent(selector)}` : ""}`,
-					signal,
-				),
-			);
-			if (
-				data.contractVersion !== "agent-connection.v3" ||
-				(selector && data.requestedProfile !== selector)
-			)
-				throw new Error("invalid_catalog");
-			const rev = str(data.catalogRevision);
-			if (revision && revision !== rev) throw new Error("stale_catalog");
-			revision = rev;
-			return { rev, profiles: list(data.profiles) };
-		}
-		function ingest(
-			selector: string,
-			rev: string,
-			profiles: ReturnType<typeof list>,
-			modes: readonly ("provider" | "service")[],
-		) {
-			for (const p of profiles)
-				for (const mode of modes)
-					for (const item of list(
-						p[mode === "provider" ? "providers" : "services"] ?? [],
-					)) {
-						const protocol = str(item.protocol),
-							endpoint = str(item.endpoint),
-							model = str(item.model),
-							name = str(item.name),
-							profile = str(p.id);
-						const kind = kinds[protocol] ?? "unsupported";
-						const id = createHash("sha256")
-							.update(
-								JSON.stringify([
-									larmBase().origin,
-									mode,
-									profile,
-									name,
-									protocol,
-									model,
-									endpoint,
-								]),
-							)
-							.digest("hex")
-							.slice(0, 32);
-						const previous = targets.get(id);
-						targets.set(id, {
-							id,
-							name,
-							description:
-								typeof item.description === "string"
-									? item.description
-									: undefined,
-							model,
-							capability: str(item.capability),
-							protocol,
-							kind: paths[kind] === endpoint ? kind : "unsupported",
-							mode,
-							endpoint:
-								mode === "service"
-									? publicUrl(str(item.url ?? endpoint)).pathname
-									: endpoint,
-							profile,
-							selector: previous?.selector ?? (selector || undefined),
-							revision: rev,
-							onDemand:
-								mode === "service" &&
-								object(item.startupPolicy ?? {}).minWarmInstances === 0,
-							primary: previous?.primary || !!selector,
-						});
-					}
-		}
-		for (const selector of new Set([config.profile?.trim() ?? "", ""])) {
-			try {
-				const { rev, profiles } = await fetchProfiles(selector);
-				ingest(selector, rev, profiles, ["provider", "service"]);
-				if (selector) continue;
-				for (const p of profiles) {
-					if (list(p.services ?? []).length) continue;
-					const id = str(p.id);
-					try {
-						const again = await fetchProfiles(id);
-						ingest(id, again.rev, again.profiles, ["service"]);
-					} catch (e) {
-						if (code(e) === "stale_catalog") throw e;
-						errors.push(`${id}: ${code(e)}`);
-					}
-				}
-			} catch (e) {
-				if (code(e) === "stale_catalog") throw e;
-				errors.push(`${selector || "all"}: ${code(e)}`);
-			}
-		}
-		return { targets: [...targets.values()], errors, discoveredAt: Date.now() };
-	}
+	const catalog = createPlaygroundCatalog({
+		control,
+		publicUrl,
+		origin: configuredBase?.origin ?? "",
+		profile: config.profile,
+		kinds,
+		paths,
+	});
 	async function connection<T>(
 		target: LarmTestTarget,
 		signal: AbortSignal,

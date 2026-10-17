@@ -33,7 +33,8 @@ export const settingsConditions: Readonly<
 	"condition:settings.larm-intonation@1": capability("intonation_scale"),
 	/** The strength of the automatic intonation matters only while it is on (draft included). */
 	"condition:settings.larm-auto-strength@1": (c) =>
-		capability("intonation_scale")(c) && !!c.effective.larm.autoIntonation,
+		capability("intonation_scale")(c) &&
+		c.effective.larm.autoIntonation !== false,
 	/** The browser can route playback to a chosen output device. */
 	"condition:settings.output-device-selectable@1": (c) =>
 		c.voice.outputSupported,

@@ -59,6 +59,7 @@ function fixture(
 		});
 		const override = await change?.(path, init, u);
 		if (override) return override;
+		if (path === "/openapi.json") return new Response(null, { status: 404 });
 		if (path === "/v3/agent-profiles") {
 			const selector = u.searchParams.get("profile");
 			const service = (kind: "image" | "music") => ({

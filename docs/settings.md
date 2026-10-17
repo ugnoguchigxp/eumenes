@@ -86,4 +86,4 @@ APIキーはAES-256-GCMで暗号化します。暗号鍵は32バイトをBase64�
 
 実装と検証の詳細は [設定画面の検証記録](../spec/verification/settings/README.md) を参照してください。
 
-音声の自動表現は全6候補へのモデル判定と `api/domains/delivery/data/speech-delivery.v1.json` のpresetを使います。本文の語句や句読点による速度・高さ・抑揚補正は行いません。判定失敗時は保存済み設定を維持し、`autoStrength`、`autoIntonation`、sample overrideと数値範囲の検査は適用されます。
+音声の自動表現は全6候補へのモデル判定と `api/domains/delivery/data/speech-delivery.v1.json` のpresetを使います。本文の語句や句読点による速度・高さ・抑揚補正は行いません。判定失敗時は保存済み設定を維持し、`autoStrength`、`autoIntonation`、sample overrideと数値範囲の検査は適用されます。`autoIntonation` は未保存ならON、明示的に `false` を保存した場合だけ判定結果を声へ反映しません（表情判定とアバター動作は続けます）。調子は warmth・curiosity が bright、joy・surprise が excited、empathy が gentle、none が natural です。英語区間には適用しません。

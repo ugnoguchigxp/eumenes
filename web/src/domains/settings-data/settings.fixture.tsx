@@ -269,7 +269,7 @@ const voiceFields: Field[] = [
 	field({
 		fieldId: "speech.local.auto",
 		path: "$.larm.autoIntonation",
-		defaultValue: "false",
+		defaultValue: "true",
 		label: "文章に合わせて抑揚・速さ・高さを変える（簡易）",
 		control: "toggle",
 		group: "speech",

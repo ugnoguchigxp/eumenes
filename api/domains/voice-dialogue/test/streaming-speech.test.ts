@@ -126,7 +126,7 @@ test("each punctuation clause is judged by Ruri and synthesized with its own ton
 			source: "scored",
 			emotion: "joy",
 			motion: "joyful",
-			tone: "bright",
+			tone: "excited",
 		}),
 		expect.objectContaining({
 			source: "scored",
@@ -135,8 +135,8 @@ test("each punctuation clause is judged by Ruri and synthesized with its own ton
 			tone: "gentle",
 		}),
 	]);
-	expect(options[0]?.intonationScale).toBeCloseTo(1.15);
-	expect(options[1]?.intonationScale).toBeCloseTo(0.9);
+	expect(options[0]?.intonationScale).toBeCloseTo(1.45);
+	expect(options[1]?.intonationScale).toBeCloseTo(0.75);
 	source.push("続けましょう");
 	await settle();
 	expect(states).toHaveLength(2);

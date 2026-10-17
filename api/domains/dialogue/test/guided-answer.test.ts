@@ -194,7 +194,7 @@ for (const request of [
 		expect(h.generated()).toBe(1);
 		expect(h.contexts[0]).toContain(request);
 		expect(h.contexts[0]).toContain(report);
-		expect(h.contexts[0]).toContain("最大2点");
+		expect(h.contexts[0]).toContain("最大1点");
 		expect(h.contexts[0]).toContain("詳しく解説");
 		await h.queue.close(100);
 	});

@@ -69,6 +69,7 @@ const stock = "AAPLの株価は250.12 USD、2026-10-08終値です。";
 export async function harness(
 	options: {
 		model?: LarmPort;
+		embed?: import("./toolchain-vectors").Embed;
 		musicGateway?: () => LarmPlayground;
 		imageGateway?: () => LarmPlayground;
 		uiCompositions?: boolean;
@@ -554,6 +555,7 @@ export async function harness(
 		: undefined;
 	const toolchain = await createToolchain(store, queue, inference, web, {
 		...toolchainLinks.options,
+		embed: options.embed,
 		timers,
 		conversation: options.history ? conversation : undefined,
 		reconcileThrottleMs: 0,

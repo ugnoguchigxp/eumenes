@@ -18,8 +18,9 @@ import type { AdapterRegistry } from "../../domains/tool-runtime";
 import type { SchemaProvider } from "./toolchain-adapters";
 
 /**
- * Dialogue's view of the toolchain registry and selection history. Retrieval merges
- * full-text, vector and past-selection ranks; it never decides for the conversation model.
+ * Dialogue's view of the toolchain registry and selection history. Retrieval uses
+ * the current request embedding; past selections are reference data.
+ * It never decides for the conversation model.
  * A toolchain revision with a binding runs through its registered adapter; others keep the
  * host's fixed runtime map (the World investigation also needs World to be usable).
  */

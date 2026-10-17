@@ -25,6 +25,8 @@ function gateway(change: Partial<typeof metadata> = {}) {
 				path: u.pathname,
 				auth: new Headers(init?.headers).get("authorization"),
 			});
+			if (u.pathname === "/openapi.json")
+				return new Response(null, { status: 404 });
 			if (u.pathname === "/v3/agent-profiles")
 				return Response.json({
 					contractVersion: "agent-connection.v3",
@@ -84,7 +86,12 @@ for (const change of [
 test("image discovery reads the saved profile and the catalog and prefers returned service URL", async () => {
 	const { g, calls } = gateway();
 	const catalog = await g.catalog(AbortSignal.timeout(1000));
-	expect(calls).toHaveLength(2);
+	expect(calls.map((c) => c.path)).toEqual([
+		"/v3/agent-profiles",
+		"/v3/agent-profiles",
+		"/openapi.json",
+	]);
+	expect(catalog.errors).toEqual([]);
 	expect(catalog.targets).toHaveLength(1);
 	expect(catalog.targets[0]).toMatchObject({
 		selector: "normal",

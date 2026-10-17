@@ -183,6 +183,7 @@ export const settingsSchema = z
 				style: z.string().trim().min(1).max(200).optional(),
 				pitchScale: z.number().min(-0.15).max(0.15).optional(),
 				intonationScale: z.number().min(0).max(2).optional(),
+				/** Applies the per-phrase delivery to the voice; absent means on. */
 				autoIntonation: z.boolean().optional(),
 				/** Scales how far per-phrase adjustments move from the saved baseline. */
 				autoStrength: z.number().min(0).max(2).optional(),

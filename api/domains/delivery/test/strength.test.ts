@@ -12,9 +12,9 @@ const delivery = {
 test("tone offsets are scaled by autoStrength and stay within bounds", () => {
 	const base = { speed: 1, pitchScale: 0, intonationScale: 1 };
 	expect(speechParameters(delivery, base)).toEqual({
-		speed: 1.08,
-		pitchScale: 0.025,
-		intonationScale: 1.2,
+		speed: 1.1,
+		pitchScale: 0.05,
+		intonationScale: 1.45,
 	});
 	expect(speechParameters(delivery, { ...base, autoStrength: 0 })).toEqual(
 		base,

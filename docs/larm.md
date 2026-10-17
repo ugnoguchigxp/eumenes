@@ -16,6 +16,8 @@ LLMのみの要求は `providers: ["llm"]`、音声の要求は `providers` を�
 
 楽曲生成ツールチェーンは、保存済みControl接続先のcatalogから、capability `media.music.generate` を持つ `services` のサービス（`larm.music-generation.v1`）を発見し、返されたendpointとmodelを使います。複数あるときはcatalogの順で最初のサービスです。生成・状態照会・音声取得にはControl認証を使い、Providerのclaimは行いません。
 
+サービス発見は画像・音楽で共通です。保存済みProfileと全Profileのcatalogを読み、サービスが空のProfileをIDで取り直すほか、同じControlの `GET /openapi.json` が公開する `/v3/agent-profiles` の `profile` queryの `schema.enum` から公開選択名を取得して照会します。公開選択名と内部Profile IDが異なる場合にも対応し、名前やモデルを固定しません。各応答の `catalogRevision` が変わった場合は一覧を採用しません。OpenAPIが404の配備先では従来のProfile取得を続け、それ以外の取得失敗はcatalogの `errors` に返します。一覧取得だけではモデルを起動しません。
+
 2026-10-11に配備先の `GET /openapi.json` で確認した契約に合わせ、`outputFormat: "opus"` を明示します。出力はOgg Opus・64 kbps固定・48 kHzです。完了確認後に `result.audioUrl` と `metadataUrl` をControlのURLとして解決し、音声のMIMEとOgg / Opus識別ヘッダーを検査します。Eumenesで再変換せず、既存の音声保存・認証済み取得APIへ渡します。保存ファイルの拡張子は `.opus` です。既存のMP3・WAV・FLAC結果の取得にも対応します。
 
 担当の指示・schema・package版は変更していません。非同期ジョブ、生成POSTの自動再送禁止、取消後の結果不採用、Artifactの構成も既存経路を使います。ライブラリ・タグ検索・お気に入り・Range中継と再生プレイヤーの拡張は別作業です。

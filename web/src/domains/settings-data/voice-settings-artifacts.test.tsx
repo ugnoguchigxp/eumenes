@@ -231,8 +231,9 @@ test("every registered voice/input setting reaches the shared draft, applies, an
 	set(/話す速さ/, "1.1");
 	set(/声の高さ/, ".05");
 	set(/^抑揚/, "1.4");
-	fireEvent.click(screen.getByLabelText(/文章に合わせて抑揚/));
+	// Automatic delivery is on until turned off, so its strength shows first.
 	set(/自動調整の強さ/, "1.5");
+	fireEvent.click(screen.getByLabelText(/文章に合わせて抑揚/));
 	fireEvent.click(screen.getByRole("button", { name: "聞き取り" }));
 	set("声を検出するしきい値", ".012");
 	set("発話を確定する無音時間（ミリ秒）", "2100");
@@ -274,7 +275,7 @@ test("every registered voice/input setting reaches the shared draft, applies, an
 		speed: 1.1,
 		pitchScale: 0.05,
 		intonationScale: 1.4,
-		autoIntonation: true,
+		autoIntonation: false,
 		autoStrength: 1.5,
 	});
 	expect(saved.resources[0]).toMatchObject({ voice: "nova", speed: 1.2 });

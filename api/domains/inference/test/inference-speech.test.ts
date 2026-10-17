@@ -111,8 +111,8 @@ test("Laya judges the spoken text and carries one decision with bounded immutabl
 		confidence: 0.8,
 	});
 	expect(parameters[0]?.speed).toBeCloseTo(1.15);
-	expect(parameters[0]?.pitchScale).toBeCloseTo(0.03);
-	expect(parameters[0]?.intonationScale).toBeCloseTo(1.35);
+	expect(parameters[0]?.pitchScale).toBeCloseTo(0.04);
+	expect(parameters[0]?.intonationScale).toBeCloseTo(1.5);
 	await h.inference.speak("手動設定", freshSignal());
 	expect(parameters[1]).not.toHaveProperty("speed");
 	expect(parameters[1]).not.toHaveProperty("pitchScale");
@@ -362,8 +362,8 @@ test("Ruri dataset captures real-turn receipt adoption once; a technical collect
 	) as Sample;
 	expect(sample.user_utterance).toBe("設定方法は？");
 	expect(sample.adopted?.source).toBe("scored");
-	expect(sample.adopted?.voice_application).toBe("manual");
-	expect(sample.adopted?.tone).toBeNull();
+	expect(sample.adopted?.voice_application).toBe("preset");
+	expect(sample.adopted?.tone).toBe("natural");
 	expect(sample.primary_label).toBeNull();
 });
 test("each clause routes by its own text; English bypasses the Japanese dictionary; disabling routing keeps the Japanese voice", async () => {

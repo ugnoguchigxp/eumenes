@@ -7,10 +7,6 @@ import { linkAgent } from "../repository";
 import type { DialogueDeps } from "./context";
 import { originalRequestInTransaction } from "./request-context";
 
-/** How much of the preceding conversation joins the current utterance as the retrieval query. */
-const QUERY_CONTEXT_BYTES = 1024;
-const QUERY_CONTEXT_TURNS = 4;
-
 /**
  * Start the research sub-agent of a toolchain. The saved human origin is established in the
  * same transaction; the toolchain's package fixes the profile, SKILL and tools.
@@ -99,19 +95,10 @@ export function prepareRouting(
 		.map((entry) => entry.id);
 	const index = messages.indexOf(currentRequest);
 	if (index < 0) throw new Error("run_input_missing");
-	const turns = messages.slice(0, index).filter((m) => m.role !== "system");
-	let before = "";
-	for (const m of turns.slice(-QUERY_CONTEXT_TURNS).reverse()) {
-		const next = `${m.content}\n${before}`;
-		if (new TextEncoder().encode(next).length > QUERY_CONTEXT_BYTES) break;
-		before = next;
-	}
 	return {
 		routing: {
-			query:
-				(before ? "referenceContext=" + JSON.stringify(before) + "\n" : "") +
-				"currentRequest=" +
-				JSON.stringify(currentRequest.content),
+			// Past turns stay in the LLM's reference context, not in the current request's ranking signal.
+			query: currentRequest.content,
 			available: ids,
 			conversationId: run.conversationId,
 			utteranceId: run.utteranceId ?? null,

@@ -11,6 +11,12 @@ try {
 	for (const scenario of [
 		{ name: "ordinary", question: "今日の新宿の天気は？", history: false },
 		{
+			name: "investigate-without-long-answer",
+			question: "今日の新宿の天気を調べて",
+			history: true,
+			expected: "調査依頼だけで長文にせず、天気の答えと必要な補足1点まで。",
+		},
+		{
 			name: "with-long-history",
 			question: "今日の新宿の天気は？",
 			history: true,
@@ -40,6 +46,16 @@ try {
 			history: true,
 			persona: "butler" as const,
 			failure: true,
+		},
+		{
+			name: "parcel-qualified",
+			question: "荷物はいつ届く？",
+			history: true,
+			persona: "butler" as const,
+			material:
+				"荷物は明日の午後に到着予定ですが、天候により翌日に遅れる可能性があります。送料500円、重さ1kg、発送元は大阪、送り先は東京。配送会社A。",
+			expected:
+				"明日午後の予定と遅延の可能性を保ち、送料・重さ・発送元を足さない。",
 		},
 		{
 			name: "failed-parcel",
@@ -145,7 +161,12 @@ try {
 			sessionRole: "main",
 		});
 		const answer = generated.text;
-		results.push({ name: scenario.name, question, answer });
+		results.push({
+			name: scenario.name,
+			question,
+			answer,
+			...("expected" in scenario ? { expected: scenario.expected } : {}),
+		});
 	}
 } finally {
 	await live.close();

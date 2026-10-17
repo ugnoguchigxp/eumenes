@@ -12,16 +12,16 @@
 	"performance": {
 		"none": { "motion": "neutral", "tone": "natural" },
 		"warmth": { "motion": "agreeing", "tone": "bright" },
-		"joy": { "motion": "joyful", "tone": "bright" },
+		"joy": { "motion": "joyful", "tone": "excited" },
 		"empathy": { "motion": "listening", "tone": "gentle" },
-		"curiosity": { "motion": "curious", "tone": "natural" },
-		"surprise": { "motion": "surprised", "tone": "bright" }
+		"curiosity": { "motion": "curious", "tone": "bright" },
+		"surprise": { "motion": "surprised", "tone": "excited" }
 	},
 	"presets": {
 		"natural": [0, 0, 0],
-		"bright": [0.05, 0.02, 0.15],
-		"gentle": [-0.06, -0.01, -0.1],
+		"bright": [0.05, 0.03, 0.3],
+		"gentle": [-0.08, -0.03, -0.25],
 		"serious": [-0.04, 0, 0.05],
-		"excited": [0.08, 0.025, 0.2]
+		"excited": [0.1, 0.05, 0.45]
 	}
 }

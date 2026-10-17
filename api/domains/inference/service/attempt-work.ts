@@ -162,7 +162,7 @@ export async function chooseTtsDelivery(
 
 	if (
 		delivery.source !== "fallback" &&
-		r.row.snapshot.larm.autoIntonation &&
+		r.row.snapshot.larm.autoIntonation !== false &&
 		args.callOptions.speechLanguage !== "en"
 	)
 		Object.assign(
@@ -283,7 +283,7 @@ export function voiceAdoption(
 	if (r.row.purpose !== "tts") return undefined;
 	if (source !== "larm" || language === "en")
 		return { tone: null, application: "unmeasured" };
-	if (!r.row.snapshot.larm.autoIntonation)
+	if (r.row.snapshot.larm.autoIntonation === false)
 		return { tone: null, application: "manual" };
 	if (delivery.source !== "fallback")
 		return { tone: delivery.tone, application: "preset" };
