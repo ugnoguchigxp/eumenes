@@ -23,6 +23,7 @@ import {
 	createDialogueService,
 	migration as dialogueMigration,
 	queueLinkMigration,
+	announcementMigration,
 } from "..";
 import type { LarmPort } from "../../larm";
 import { createQueue, migration as queueMigration } from "../../queue";
@@ -37,12 +38,7 @@ import {
 	seedImportMigration,
 } from "../../memory";
 import { saveItem } from "./memory-seed";
-import {
-	analysisArgs,
-	analysisReceipt,
-	delegatingArgs,
-	isAnalysisRound,
-} from "./analysis.fixture";
+import { analysisReceipt, isAnalysisRound } from "./analysis.fixture";
 
 import type {
 	QueryVector,
@@ -57,6 +53,7 @@ const MIGRATIONS = [
 	dialogueMigration,
 	queueMigration,
 	queueLinkMigration,
+	announcementMigration,
 	continuityMigration,
 	shortTermMigration,
 	itemSourceMigration,
@@ -89,6 +86,7 @@ afterEach(async () => {
 function routing(
 	query: () => QueryVector | undefined,
 	offered = false,
+	resolvable: () => boolean = () => false,
 ): ToolchainRoutingPort {
 	const card = {
 		revisionId: "toolchain:web.search@1",
@@ -109,7 +107,12 @@ function routing(
 		}),
 		catalogInTransaction: () => [],
 		resolveInTransaction: () => {
-			throw new Error("unexpected_resolve");
+			if (!resolvable()) throw new Error("unexpected_resolve");
+			return {
+				toolchain: { functionName: "web_search" },
+				packageRevisionId: "package:web.search@1",
+				runtime: { execution: "music-create" },
+			} as never;
 		},
 		commandSetInTransaction: () => {
 			throw new Error("unexpected_command");
@@ -134,6 +137,7 @@ async function setup(
 	const during: { current: (() => Promise<void>) | undefined } = {
 		current: undefined,
 	};
+	const resolvable = { current: false };
 	const query: { current: QueryVector | undefined } = {
 		current: { space: SPACE, vector: KYOTO },
 	};
@@ -159,7 +163,9 @@ async function setup(
 			if (isAnalysisRound(tools))
 				return analysisReceipt(
 					"request-1",
-					options.operation ? delegatingArgs() : analysisArgs(),
+					options.operation
+						? { name: "web_search", announcement: "お調べします。" }
+						: {},
 				);
 			seen.push(messages.map((m) => ({ ...m })));
 			await during.current?.();
@@ -172,10 +178,7 @@ async function setup(
 						{
 							id: "call",
 							name: "web_search",
-							arguments: JSON.stringify({
-								request: "京都の天気",
-								announcement: "お調べします。",
-							}),
+							arguments: JSON.stringify({ request: "京都の天気" }),
 						},
 					],
 				};
@@ -212,7 +215,11 @@ async function setup(
 		larm,
 		queue,
 		memory,
-		toolchains: routing(() => query.current, options.operation),
+		toolchains: routing(
+			() => query.current,
+			options.operation,
+			() => resolvable.current,
+		),
 		// A conversation operation needs a toolchain runtime to exist; the stub refuses every toolchain.
 		...(options.operation
 			? { music: { resultInTransaction: () => undefined } as never }
@@ -226,6 +233,7 @@ async function setup(
 		seen,
 		during,
 		query,
+		resolvable,
 		async ask(text: string) {
 			const run = await dialogue.submit({
 				requestId: crypto.randomUUID(),
@@ -548,6 +556,8 @@ test("a toolchain operation is checked against the recalled messages even when t
 	const h = await setup({ operation: true });
 	const runs = await history(h);
 	await h.putVector(runs[0]!.inputMessageId, KYOTO);
+	// The notice of the first round is accepted; the toolchain is refused only where the stub says so.
+	h.resolvable.current = true;
 	h.during.current = () => h.edit(runs[0]!.inputMessageId, "書き換えた");
 	const stale = await h.ask("京都の天気を調べて");
 	expect(recallOf(h.seen.at(-1)!)).toBeDefined();
@@ -555,7 +565,11 @@ test("a toolchain operation is checked against the recalled messages even when t
 	expect(stale.error).toBe("memory_stale");
 	// Without a recall the same edit is not this feature's concern (the stub then refuses the toolchain).
 	h.query.current = undefined;
-	h.during.current = () => h.edit(runs[1]!.inputMessageId, "これも書き換えた");
+	h.during.current = async () => {
+		// The first round's notice was accepted; by the time of the delegation the toolchain is gone.
+		h.resolvable.current = false;
+		await h.edit(runs[1]!.inputMessageId, "これも書き換えた");
+	};
 	const plain = await h.ask("京都の天気を調べて");
 	expect(recallOf(h.seen.at(-1)!)).toBeUndefined();
 	expect(plain.error).toBe("toolchain_unavailable");
