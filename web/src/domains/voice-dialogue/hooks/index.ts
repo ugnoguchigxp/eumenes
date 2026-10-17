@@ -1,8 +1,9 @@
+import { useVoiceTurn } from "./turn";
 import { chunkTiming, timedVoiceAudio } from "./audio-timing";
 import { requestPreview, type RecognitionCandidate } from "./preview";
 import { commitIdleInput } from "./input-commit";
 import { useTranscription } from "./transcription";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { VoiceDialogueClient } from "../../../../../client/voice-dialogue";
 import {
@@ -64,15 +65,7 @@ export function useVoiceDialogue(
 	const [turnId, setTurnId] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [active, setActive] = useState(false);
-	const turn = useQuery({
-		queryKey: [queryRoots.voiceDialogue, client.identity, turnId],
-		enabled: !!turnId,
-		queryFn: () => {
-			if (!turnId) throw new Error("turn_id_missing");
-			return client.voiceTurn(turnId);
-		},
-		retry: 0,
-	});
+	const turn = useVoiceTurn(client, turnId);
 	useEffect(() => {
 		const value = turn.data;
 		if (!value) return;
@@ -291,14 +284,18 @@ export function useVoiceDialogue(
 				controller.current?.pauseInput
 			) {
 				inputEnabled.current = true;
+				store.setState({ inputPhase: "starting" });
 				setActive(true);
 				setInputVersion((v) => v + 1);
 				setError(null);
+				const sessionToken = machine.get().session!.token;
 				try {
 					await controller.current.start();
 				} catch (error) {
+					if (!isCurrent(machine.get(), sessionToken)) return;
 					inputEnabled.current = false;
 					setActive(false);
+					store.setState({ inputPhase: "idle" });
 					setError(describeError(error));
 				}
 			}
@@ -313,6 +310,7 @@ export function useVoiceDialogue(
 		setTurnId(null);
 		const startToken = ++tokens.current;
 		machine.dispatch({ type: "start_requested", token: startToken });
+		store.setState({ inputPhase: "starting" });
 		const cancelled = () => machine.get().startToken !== startToken;
 		setActive(true);
 		const next = { id: crypto.randomUUID(), generation: 1 };
@@ -470,6 +468,7 @@ export function useVoiceDialogue(
 			}
 		} catch (error) {
 			const report = !cancelled();
+			if (report) store.setState({ inputPhase: "idle" });
 			if (live()) await stop();
 			if (report) setError(describeError(error));
 		} finally {
@@ -497,7 +496,7 @@ export function useVoiceDialogue(
 		const audio = controller.current;
 		controller.current = null;
 		setTurnId(null);
-		store.setState({ phase: "idle", level: 0 });
+		store.setState({ phase: "idle", inputPhase: "idle", level: 0 });
 		await audio?.stop();
 		if (active)
 			await client.voiceStop(active.id, active.generation).catch((e) => {

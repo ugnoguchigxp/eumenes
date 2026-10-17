@@ -1,7 +1,7 @@
 import { ChatImageInput, ChatImagePreviews } from "./ChatImageInput";
 import { useStore } from "zustand";
 import type { AudioStore } from "../domains/audio";
-import { Button, Textarea } from "../design-system";
+import { Button, Spinner, Textarea } from "../design-system";
 import { ApiError } from "../../../client/transport";
 import { describeError } from "../errorMessages";
 import type { WorkspaceState } from "./useWorkspace";
@@ -40,11 +40,13 @@ export function ConversationComposer({
 		latestRun,
 		audioError,
 	} = state;
+	const inputPhase = useStore(store, (audio) => audio.inputPhase);
+	const starting = voice.active && inputPhase === "starting";
 	const route = [
 		{
 			id: "microphone",
 			label: "マイク",
-			active: voice.active && phase === "listening",
+			active: voice.active && !starting && phase === "listening",
 		},
 		{ id: "asr", label: "音声認識", active: !!voice.turn && !voice.turn.text },
 		{ id: "llm", label: "回答", active: !!activeRun },
@@ -67,6 +69,16 @@ export function ConversationComposer({
 					</div>
 				))}
 			</div>
+			<output aria-live="polite">
+				{starting ? (
+					<small>
+						<Spinner size="xs" aria-hidden="true" />{" "}
+						音声入力を準備中です。少しお待ちください。
+					</small>
+				) : voice.active && inputPhase === "ready" && phase === "listening" ? (
+					<small>話しかけてください</small>
+				) : null}
+			</output>
 			<form className="chat-composer" onSubmit={send}>
 				<ChatImagePreviews state={state} />
 				<Textarea

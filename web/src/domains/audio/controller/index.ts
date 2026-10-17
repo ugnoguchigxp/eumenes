@@ -5,6 +5,8 @@ import {
 } from "../../../performance";
 export type AudioState = {
 	phase: "idle" | "listening" | "playing" | "error";
+	/** Capture readiness is independent of output playback. */
+	inputPhase?: "idle" | "starting" | "ready";
 	error?: string;
 	level: number;
 };
@@ -204,6 +206,37 @@ async function openRecorderNode(
 		onFrame(new Float32Array(event.inputBuffer.getChannelData(0)));
 	return { kind: "script", node, drain: () => {} };
 }
+async function openMicrophone(
+	options: NonNullable<Parameters<typeof createAudioController>[3]>,
+): Promise<MediaStream> {
+	const audioConstraints = (withDevice: boolean) => ({
+		audio: {
+			deviceId:
+				withDevice && options.inputDevice
+					? { exact: options.inputDevice }
+					: undefined,
+			echoCancellation: options.echoCancellation ?? true,
+			noiseSuppression: options.noiseSuppression ?? true,
+			autoGainControl: options.autoGainControl ?? true,
+		},
+	});
+	try {
+		return await navigator.mediaDevices.getUserMedia(audioConstraints(true));
+	} catch (error) {
+		const name = error instanceof Error ? error.name : "";
+		// A saved device that is no longer present must not silently block voice.
+		if (
+			!options.inputDevice ||
+			(name !== "OverconstrainedError" && name !== "NotFoundError")
+		)
+			throw error;
+		const fallback = await navigator.mediaDevices.getUserMedia(
+			audioConstraints(false),
+		);
+		options.onNotice?.("saved_device_missing");
+		return fallback;
+	}
+}
 /** Output-to-ear latency allowance after playback ends (Bluetooth can add ~300 ms). */
 const OUTPUT_TAIL_MS = 500;
 export function createAudioController(
@@ -246,7 +279,8 @@ export function createAudioController(
 	let finishPlayback: () => void = () => {};
 	let interruptedPlayback: (() => void) | undefined;
 	let disposed = false;
-	let inputPaused = false;
+	let inputPaused = true;
+	let inputReady = false;
 	let inputEpoch = 0;
 	let speaking = false;
 	let detector: VoiceActivityDetector | undefined;
@@ -269,35 +303,6 @@ export function createAudioController(
 		lostReported = true;
 		options.onLost?.(reason);
 	};
-	const audioConstraints = (withDevice: boolean) => ({
-		audio: {
-			deviceId:
-				withDevice && options.inputDevice
-					? { exact: options.inputDevice }
-					: undefined,
-			echoCancellation: options.echoCancellation ?? true,
-			noiseSuppression: options.noiseSuppression ?? true,
-			autoGainControl: options.autoGainControl ?? true,
-		},
-	});
-	async function openMicrophone(): Promise<MediaStream> {
-		try {
-			return await navigator.mediaDevices.getUserMedia(audioConstraints(true));
-		} catch (error) {
-			const name = error instanceof Error ? error.name : "";
-			// A saved device that is no longer present must not silently block voice.
-			if (
-				!options.inputDevice ||
-				(name !== "OverconstrainedError" && name !== "NotFoundError")
-			)
-				throw error;
-			const fallback = await navigator.mediaDevices.getUserMedia(
-				audioConstraints(false),
-			);
-			options.onNotice?.("saved_device_missing");
-			return fallback;
-		}
-	}
 	/** Watches for the microphone, device list or AudioContext disappearing. */
 	function watchDevices(ctx: AudioContext, input: MediaStream) {
 		const cleanups: Array<() => void> = [];
@@ -355,6 +360,7 @@ export function createAudioController(
 	const emit = (phase: AudioState["phase"], error?: string) =>
 		onState({
 			phase: phase === "listening" && !stream ? "idle" : phase,
+			inputPhase: inputPaused ? "idle" : inputReady ? "ready" : "starting",
 			error,
 			level: lastLevel,
 		});
@@ -414,6 +420,7 @@ export function createAudioController(
 		const shouldFlush = speaking;
 		speaking = false;
 		inputPaused = true;
+		inputReady = false;
 		inputEpoch++;
 		releaseWatchers();
 		processor?.disconnect();
@@ -439,10 +446,12 @@ export function createAudioController(
 		async start() {
 			if (disposed || stream) return;
 			inputPaused = false;
+			inputReady = false;
+			emit(playback ? "playing" : "idle");
 			lostReported = false;
 			const recordingEpoch = ++inputEpoch;
 			try {
-				const opened = await openMicrophone();
+				const opened = await openMicrophone(options);
 				if (disposed || inputPaused || recordingEpoch !== inputEpoch) {
 					opened.getTracks().forEach((t) => {
 						t.stop();
@@ -563,7 +572,8 @@ export function createAudioController(
 							flush();
 						}
 					}
-					if (performance.now() - lastEmit > 200) {
+					if (!inputReady || performance.now() - lastEmit > 200) {
+						inputReady = true;
 						lastEmit = performance.now();
 						emit(playback ? "playing" : "listening");
 					}
@@ -718,6 +728,8 @@ export function createAudioController(
 		},
 		async stop() {
 			disposed = true;
+			inputPaused = true;
+			inputReady = false;
 			drainRecorder = undefined;
 			lastLevel = 0;
 			releaseWatchers();

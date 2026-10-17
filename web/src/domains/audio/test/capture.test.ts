@@ -75,6 +75,84 @@ function recorder(sampleRate = 16000, useWorklet = false) {
 	};
 }
 
+test("capture stays preparing until its first frame, including after resume", async () => {
+	const mic = recorder();
+	const state = vi.fn();
+	const audio = createAudioController(
+		state,
+		() => {},
+		() => {},
+	);
+	try {
+		const starting = audio.start();
+		expect(state.mock.lastCall?.[0].inputPhase).toBe("starting");
+		await starting;
+		expect(state.mock.lastCall?.[0].inputPhase).toBe("starting");
+		mic.feed(false, 1);
+		expect(state.mock.lastCall?.[0].inputPhase).toBe("ready");
+		audio.pauseInput();
+		expect(state.mock.lastCall?.[0].inputPhase).toBe("idle");
+		await audio.start();
+		expect(state.mock.lastCall?.[0].inputPhase).toBe("starting");
+		mic.feed(false, 1);
+		expect(state.mock.lastCall?.[0].inputPhase).toBe("ready");
+	} finally {
+		await audio.stop();
+	}
+	expect(state.mock.lastCall?.[0].inputPhase).toBe("idle");
+});
+
+test("cancelled microphone permission cannot make capture ready", async () => {
+	const mic = recorder();
+	let allow!: (stream: {
+		getTracks: () => { stop: typeof mic.stop }[];
+	}) => void;
+	vi.stubGlobal("navigator", {
+		mediaDevices: {
+			getUserMedia: () =>
+				new Promise((resolve) => {
+					allow = resolve;
+				}),
+		},
+	});
+	const state = vi.fn();
+	const audio = createAudioController(
+		state,
+		() => {},
+		() => {},
+	);
+	const starting = audio.start();
+	audio.pauseInput();
+	allow({ getTracks: () => [{ stop: mic.stop }] });
+	await starting;
+	expect(state.mock.lastCall?.[0].inputPhase).toBe("idle");
+	expect(mic.stop).toHaveBeenCalledTimes(1);
+	await audio.stop();
+});
+
+test("microphone failure clears capture preparation", async () => {
+	recorder();
+	vi.stubGlobal("navigator", {
+		mediaDevices: {
+			getUserMedia: async () => {
+				throw new Error("denied");
+			},
+		},
+	});
+	const state = vi.fn();
+	const audio = createAudioController(
+		state,
+		() => {},
+		() => {},
+	);
+	await expect(audio.start()).rejects.toThrow("denied");
+	expect(state.mock.lastCall?.[0]).toMatchObject({
+		phase: "error",
+		inputPhase: "idle",
+	});
+	await audio.stop();
+});
+
 test("a continuous 12-second question stays intact until its final silence", async () => {
 	const mic = recorder(),
 		segment = vi.fn(),

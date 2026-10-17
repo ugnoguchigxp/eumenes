@@ -44,11 +44,12 @@ function harness(send: (...args: unknown[]) => Promise<unknown>) {
 		}),
 		voiceCancel: async () => ({}),
 	} as unknown as VoiceDialogueClient;
-	const hook = renderHook(
-		() => useVoiceDialogue(client, createAudioStore(), createAudio),
-		{ wrapper },
-	);
+	const store = createAudioStore();
+	const hook = renderHook(() => useVoiceDialogue(client, store, createAudio), {
+		wrapper,
+	});
 	return {
+		store,
 		hook,
 		start,
 		pauseInput,
@@ -63,6 +64,81 @@ function harness(send: (...args: unknown[]) => Promise<unknown>) {
 		},
 	};
 }
+
+test("preparation covers the session request and can be cancelled before it returns", async () => {
+	const h = harness(async () => ({}));
+	let release!: () => void;
+	h.voiceStart.mockImplementationOnce(
+		() =>
+			new Promise((resolve) => {
+				release = () => resolve({});
+			}),
+	);
+	try {
+		let starting!: Promise<void>;
+		act(() => {
+			starting = h.hook.result.current.start();
+		});
+		expect(h.store.getState().inputPhase).toBe("starting");
+		expect(h.hook.result.current.active).toBe(true);
+		await act(async () => h.hook.result.current.pause());
+		expect(h.store.getState().inputPhase).toBe("idle");
+		await act(async () => {
+			release();
+			await starting;
+		});
+		expect(h.start).not.toHaveBeenCalled();
+		expect(h.store.getState().inputPhase).toBe("idle");
+	} finally {
+		h.done();
+	}
+});
+
+test("session request failure clears preparation and allows retry", async () => {
+	const h = harness(async () => ({}));
+	h.voiceStart.mockRejectedValueOnce(new Error("unavailable"));
+	try {
+		await act(async () => h.hook.result.current.start());
+		expect(h.store.getState().inputPhase).toBe("idle");
+		expect(h.hook.result.current.active).toBe(false);
+		expect(h.hook.result.current.error).toBeTruthy();
+		await act(async () => h.hook.result.current.start());
+		expect(h.voiceStart).toHaveBeenCalledTimes(2);
+	} finally {
+		h.done();
+	}
+});
+
+test("a late resume failure cannot clear a new session's readiness", async () => {
+	const h = harness(async () => ({}));
+	let reject!: (error: Error) => void;
+	try {
+		await act(async () => h.hook.result.current.start());
+		await act(async () => h.hook.result.current.pause());
+		h.start.mockImplementationOnce(
+			() =>
+				new Promise((_resolve, fail) => {
+					reject = fail;
+				}),
+		);
+		let resuming!: Promise<void>;
+		act(() => {
+			resuming = h.hook.result.current.start();
+		});
+		await act(async () => h.hook.result.current.stop());
+		await act(async () => h.hook.result.current.start());
+		h.store.setState({ inputPhase: "ready" });
+		await act(async () => {
+			reject(new Error("old microphone failed"));
+			await resuming;
+		});
+		expect(h.hook.result.current.active).toBe(true);
+		expect(h.hook.result.current.error).toBeNull();
+		expect(h.store.getState().inputPhase).toBe("ready");
+	} finally {
+		h.done();
+	}
+});
 
 test("backpressure retains the final recording and pauses capture until all queued uploads can finish", async () => {
 	let release!: () => void;
