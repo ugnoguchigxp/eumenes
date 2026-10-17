@@ -328,7 +328,8 @@ test("an api-key call passes only the key and endpoint, with its own config dire
 	expect(seen.params!.options!.persistSession).toBe(false);
 	expect(result).toEqual({
 		text: "hi",
-		inputTokens: 7,
+		// 7 uncached + 40 read + 9 written
+		inputTokens: 56,
 		outputTokens: 2,
 		cacheReadTokens: 40,
 		cacheCreationTokens: 9,

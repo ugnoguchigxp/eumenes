@@ -66,6 +66,33 @@ type AttemptUsage = {
 	costUsd?: unknown;
 };
 
+/**
+ * OpenAI-compatible `usage`: `prompt_tokens` already includes the cached part, so it is the total input and
+ * `prompt_tokens_details.cached_tokens` is the subset read from the cache. The API reports no cache writes.
+ */
+export function chatUsage(usage: unknown): AttemptUsage {
+	const value = (usage ?? {}) as {
+		prompt_tokens?: unknown;
+		completion_tokens?: unknown;
+		prompt_tokens_details?: { cached_tokens?: unknown } | null;
+	};
+	const cached = value.prompt_tokens_details?.cached_tokens;
+	return {
+		input: value.prompt_tokens,
+		output: value.completion_tokens,
+		// A subset of the input: a larger value is not a usable count.
+		cacheRead:
+			typeof cached === "number" &&
+			Number.isSafeInteger(cached) &&
+			cached >= 0 &&
+			typeof value.prompt_tokens === "number" &&
+			cached <= value.prompt_tokens
+				? cached
+				: null,
+		cacheCreation: null,
+	};
+}
+
 /** Token counts, prompt-cache usage, cost and the billing path of the connection that served the attempt. */
 async function recordUsage(
 	env: CloudEnv,
@@ -303,6 +330,8 @@ export async function cloudRequest(
 						}
 					: {}),
 				stream: !!onDelta,
+				// A stream reports usage only on request (in a final chunk without choices).
+				...(onDelta ? { stream_options: { include_usage: true } } : {}),
 				max_tokens: reserve,
 			};
 		}
@@ -328,10 +357,7 @@ export async function cloudRequest(
 			options.onToolCalls(result.toolCalls);
 		}
 		signal.throwIfAborted();
-		await recordUsage(env, attemptId, connection, {
-			input: result.usage?.prompt_tokens,
-			output: result.usage?.completion_tokens,
-		});
+		await recordUsage(env, attemptId, connection, chatUsage(result.usage));
 		return result.text;
 	}
 
@@ -369,13 +395,7 @@ export async function cloudRequest(
 			!(row.purpose === "asr" && row.subject.startsWith("probe:")))
 	)
 		throw new Error("invalid_response_text");
-	const usage = json.usage as
-		| { prompt_tokens?: unknown; completion_tokens?: unknown }
-		| undefined;
 	signal.throwIfAborted();
-	await recordUsage(env, attemptId, connection, {
-		input: usage?.prompt_tokens,
-		output: usage?.completion_tokens,
-	});
+	await recordUsage(env, attemptId, connection, chatUsage(json.usage));
 	return value;
 }

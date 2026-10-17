@@ -66,6 +66,7 @@ test("the first publish builds the window with an empty history; the layers keep
 		keep: [],
 		summaryText: "",
 		summaryRevision: 0,
+		boundary: {},
 	});
 });
 
@@ -196,4 +197,90 @@ test("L1 is republished only when asked or for an immediate change, a policy cha
 	const stopped = await publish(h);
 	expect(stopped.longTerm.text).not.toContain("コーヒーが好き");
 	expect(stopped.longTerm.text).toContain("毎朝走っている");
+});
+
+const day = (n: number) =>
+	`2026-10-${String(n).padStart(2, "0")}T09:00:00.000Z`;
+
+test("the summary records the range of the exchanges it stands on, from the ledger", async () => {
+	const h = await setup();
+	h.time.now = day(1);
+	const a = await exchange(h, "一日目の質問", "答え");
+	h.time.now = day(2);
+	const b = await exchange(h, "二日目の質問", "答え");
+	h.time.now = day(5);
+	const c = await exchange(h, "五日目の質問", "答え");
+	for (const x of [a, b, c]) await dispose(h, x.inputMessageId, "summarize");
+	await h.store.write((db) =>
+		h.memory.writeSummaryInTransaction(db, {
+			conversationId: "c1",
+			text: "一日目と二日目の話。",
+			included: [a.inputMessageId, b.inputMessageId],
+			expectedRevision: 0,
+		}),
+	);
+	const window = await publish(h);
+	expect(window.history.summaryText).toBe("一日目と二日目の話。");
+	expect(window.history.summaryCovers).toEqual({
+		fromAt: day(1),
+		toAt: day(2),
+		turns: 2,
+	});
+	// The next revision stands on the earlier sources too.
+	await h.store.write((db) =>
+		h.memory.writeSummaryInTransaction(db, {
+			conversationId: "c1",
+			text: "五日目までの話。",
+			included: [c.inputMessageId],
+			expectedRevision: 1,
+		}),
+	);
+	expect((await publish(h)).history.summaryCovers).toEqual({
+		fromAt: day(1),
+		toAt: day(5),
+		turns: 3,
+	});
+});
+
+test("a summary on a blocked exchange has no text and no range", async () => {
+	const h = await setup();
+	const a = await exchange(h, "忘れる質問", "忘れる答え");
+	await dispose(h, a.inputMessageId, "summarize");
+	await h.store.write((db) =>
+		h.memory.writeSummaryInTransaction(db, {
+			conversationId: "c1",
+			text: "忘れる質問の要約",
+			included: [a.inputMessageId],
+			expectedRevision: 0,
+		}),
+	);
+	expect((await publish(h)).history.summaryCovers).toBeDefined();
+	await h.forget([], [a.inputMessageId]);
+	const window = await publish(h);
+	expect(window.history.summaryText).toBe("");
+	expect(window.history.summaryCovers).toBeUndefined();
+});
+
+test("the history boundary is fixed at a memory step and carried over by other rebuilds", async () => {
+	const h = await setup();
+	h.time.now = day(1);
+	const a = await exchange(h, "一日目の質問", "答え");
+	h.time.now = day(2);
+	await exchange(h, "二日目の質問", "答え");
+	await dispose(h, a.inputMessageId, "keep");
+	const first = await publish(h);
+	expect(first.history.boundary).toEqual({ fromAt: day(1), toAt: day(2) });
+	// An exchange after the step does not move the boundary until the next step, whatever else rebuilds the window.
+	h.time.now = day(7);
+	await exchange(h, "七日目の質問", "答え");
+	await h.seed("コーヒーが好き", "food.coffee");
+	const rebuilt = await h.window();
+	expect(rebuilt.version).toBeGreaterThan(first.version);
+	expect(rebuilt.history.boundary).toEqual({ fromAt: day(1), toAt: day(2) });
+	const second = await publish(h);
+	expect(second.history.boundary).toEqual({ fromAt: day(1), toAt: day(7) });
+	// An exchange the steward summarized leaves the range at the next step; the newest two always stay.
+	await dispose(h, a.inputMessageId, "drop");
+	const third = await publish(h);
+	expect(third.history.boundary).toEqual({ fromAt: day(2), toAt: day(7) });
 });

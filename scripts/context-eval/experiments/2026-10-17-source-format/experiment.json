@@ -1,0 +1,12 @@
+{
+	"name": "2026-10-17-source-format",
+	"baseline": "baseline-compile",
+	"arms": [{ "id": "baseline-compile" }, { "id": "baseline-compile-aa" }],
+	"trials": 3,
+	"concurrency": 2,
+	"adoption": {
+		"minNetGain": 4,
+		"maxTokenRatio": 1.1,
+		"maxLatencyRatio": 1.15
+	}
+}

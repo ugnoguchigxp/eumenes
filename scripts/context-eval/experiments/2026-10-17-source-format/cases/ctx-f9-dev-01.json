@@ -1,0 +1,19 @@
+{
+	"id": "ctx-f9-dev-01",
+	"family": "F9",
+	"split": "dev",
+	"seed": {
+		"persona": { "agentName": "", "userName": "", "persona": "butler" }
+	},
+	"input": "こんにちは。今日の調子はどう？",
+	"tools": "none",
+	"expect": {
+		"checks": [{ "kind": "brief_spoken_reply" }],
+		"rubric": [
+			{
+				"axis": "follows_current_request",
+				"condition": "挨拶と調子の問いかけに自然に応じている。"
+			}
+		]
+	}
+}

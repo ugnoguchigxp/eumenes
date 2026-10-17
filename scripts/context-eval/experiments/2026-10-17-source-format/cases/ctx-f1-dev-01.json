@@ -1,0 +1,30 @@
+{
+	"id": "ctx-f1-dev-01",
+	"family": "F1",
+	"split": "dev",
+	"seed": {
+		"persona": { "agentName": "", "userName": "", "persona": "maid" },
+		"longTerm": [
+			{ "kind": "preference", "key": "food.spicy", "text": "辛い物が好き" }
+		],
+		"exchanges": [
+			{
+				"user": "昨日の夜は担々麺を食べたよ",
+				"assistant": "辛くて美味しそうですね。",
+				"at": "2026-10-16T20:00:00.000Z",
+				"layer": "unprocessed"
+			}
+		]
+	},
+	"input": "今日は胃が疲れているから、辛くない店で夕食にしたい。どんな料理がいいかな",
+	"tools": "none",
+	"expect": {
+		"checks": [{ "kind": "brief_spoken_reply" }],
+		"rubric": [
+			{
+				"axis": "follows_current_request",
+				"condition": "今回の依頼どおり、辛くない料理や店を提案している。辛い物を勧めていない。"
+			}
+		]
+	}
+}

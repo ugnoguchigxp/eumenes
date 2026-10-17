@@ -668,12 +668,41 @@ async function runClaudeAgent(
 	if (call.onDelta && !streamed) call.onDelta(text);
 	return {
 		text,
-		inputTokens: result.usage.input_tokens,
-		outputTokens: result.usage.output_tokens,
-		cacheReadTokens: result.usage.cache_read_input_tokens,
-		cacheCreationTokens: result.usage.cache_creation_input_tokens,
+		...claudeUsage(result.usage),
 		costUsd: auth === "api-key" ? result.total_cost_usd : null,
 		contextWindow: modelContextWindow(result, call.model),
+	};
+}
+
+/**
+ * Claude's `input_tokens` counts only the part after the last cache breakpoint; the recorded input is the total
+ * (`input + cache read + cache creation`), and the cache counters are subsets of it. A counter the provider did not
+ * report stays null; it counts as 0 in the sum.
+ */
+export function claudeUsage(usage: {
+	input_tokens?: number | null;
+	output_tokens?: number | null;
+	cache_read_input_tokens?: number | null;
+	cache_creation_input_tokens?: number | null;
+}): {
+	inputTokens: number | null;
+	outputTokens: number | null;
+	cacheReadTokens: number | null;
+	cacheCreationTokens: number | null;
+} {
+	const count = (v: number | null | undefined) =>
+		typeof v === "number" && Number.isSafeInteger(v) && v >= 0 ? v : null;
+	const input = count(usage.input_tokens);
+	const cacheRead = count(usage.cache_read_input_tokens);
+	const cacheCreation = count(usage.cache_creation_input_tokens);
+	return {
+		inputTokens:
+			input === null && cacheRead === null && cacheCreation === null
+				? null
+				: (input ?? 0) + (cacheRead ?? 0) + (cacheCreation ?? 0),
+		outputTokens: count(usage.output_tokens),
+		cacheReadTokens: cacheRead,
+		cacheCreationTokens: cacheCreation,
 	};
 }
 

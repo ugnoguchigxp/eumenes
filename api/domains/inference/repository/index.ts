@@ -139,4 +139,18 @@ UPDATE inference_requests SET control_engine_next=CASE WHEN control_engine='larm
 ALTER TABLE inference_requests DROP COLUMN control_engine;
 ALTER TABLE inference_requests RENAME COLUMN control_engine_next TO control_engine;`,
 	},
+	{
+		// `input_tokens` is the total input including the cache. A Claude Agent SDK call used to record only the part
+		// after the last cache breakpoint, so its cache counters are added. The path comes from the saved connection's
+		// kind; an attempt whose connection is gone or of another kind keeps its value.
+		id: "inference/0012-total-input-tokens",
+		after: ["inference/0011-control-engine-codex", "settings/0001-init"],
+		sql: `UPDATE inference_attempts
+SET input_tokens=coalesce(input_tokens,0)+coalesce(cache_read_tokens,0)+coalesce(cache_creation_tokens,0)
+WHERE (cache_read_tokens IS NOT NULL OR cache_creation_tokens IS NOT NULL)
+AND connection_id IN (
+	SELECT json_extract(c.value,'$.id') FROM settings_document d, json_each(d.document,'$.connections') c
+	WHERE json_extract(c.value,'$.kind')='claude-agent-sdk'
+);`,
+	},
 ];

@@ -89,6 +89,60 @@ export function formatPeriod(item: PeriodLike): string {
 	return "";
 }
 
+// ---- structure shared by both layers ----
+
+/** The lines of a layer under one heading (the first group of the long-term layer has none). */
+export type LayerSection = { heading?: string; items: string[] };
+/** A layer before it is written as text: the frame sentence and its lines grouped by heading. */
+export type LayerBlock = { header: string; sections: LayerSection[] };
+
+/**
+ * The one function that writes a layer as text, so `text` and `sections` cannot drift. `gapBeforeHeading`
+ * puts a blank line before each heading (the long-term layer does, the short-term layer does not).
+ * An empty block (no sections) is "".
+ */
+export function layerText(
+	block: LayerBlock,
+	gapBeforeHeading: boolean,
+): string {
+	if (block.sections.length === 0) return "";
+	const lines = [block.header];
+	for (const section of block.sections) {
+		if (section.heading !== undefined) {
+			if (gapBeforeHeading) lines.push("");
+			lines.push(section.heading);
+		}
+		lines.push(...section.items);
+	}
+	return lines.join("\n");
+}
+
+/**
+ * The structure of a layer text stored before windows carried `sections`: the first line is the frame sentence,
+ * a line that is not "- ..." starts a section, blank lines are separators. `layerText` writes the result back to
+ * the same text.
+ */
+function layerFromText(text: string, knownHeader: string): LayerBlock {
+	if (text === "") return { sections: [], header: "" };
+	const header = text.startsWith(knownHeader)
+		? knownHeader
+		: (text.split("\n", 1)[0] ?? "");
+	const sections: LayerSection[] = [];
+	for (const line of text.slice(header.length).split("\n")) {
+		if (line === "") continue;
+		if (line.startsWith("- ")) {
+			const last = sections[sections.length - 1];
+			if (last) last.items.push(line);
+			else sections.push({ items: [line] });
+		} else sections.push({ heading: line, items: [] });
+	}
+	return { header, sections };
+}
+export const longTermFromText = (text: string) =>
+	layerFromText(text, LONG_TERM_HEADER);
+export const shortTermFromText = (text: string) =>
+	layerFromText(text, SHORT_TERM_HEADER);
+
 // ---- long term (L1) ----
 
 export interface StateLine {
@@ -108,7 +162,7 @@ export interface TendencyLine {
 	/** ISO time: later is newer. */
 	order: string;
 }
-export interface RenderedLongTerm {
+export interface RenderedLongTerm extends LayerBlock {
 	text: string;
 	manifest: { itemId: string; revision: string }[];
 	omitted: { itemId: string; revision: string }[];
@@ -128,22 +182,28 @@ const newestTendency = (a: TendencyLine, b: TendencyLine) =>
 function composeLongTerm(
 	states: readonly StateLine[],
 	tendencies: readonly TendencyLine[],
-): string {
-	if (states.length === 0 && tendencies.length === 0) return "";
-	const lines = [LONG_TERM_HEADER];
-	const ordered = [...states].sort(
-		(a, b) =>
-			rank(LONG_TERM_KIND_ORDER, a.kind) - rank(LONG_TERM_KIND_ORDER, b.kind) ||
-			newestState(a, b),
-	);
-	for (const line of ordered) lines.push(stateLineText(line));
-	if (tendencies.length > 0) {
-		lines.push("", TENDENCY_HEADING);
-		for (const line of [...tendencies].sort(newestTendency))
-			lines.push(`- ${oneLine(line.text)}`);
-	}
-	return lines.join("\n");
+): LayerBlock {
+	const sections: LayerSection[] = [];
+	if (states.length > 0)
+		sections.push({
+			items: [...states]
+				.sort(
+					(a, b) =>
+						rank(LONG_TERM_KIND_ORDER, a.kind) -
+							rank(LONG_TERM_KIND_ORDER, b.kind) || newestState(a, b),
+				)
+				.map(stateLineText),
+		});
+	if (tendencies.length > 0)
+		sections.push({
+			heading: TENDENCY_HEADING,
+			items: [...tendencies]
+				.sort(newestTendency)
+				.map((line) => `- ${oneLine(line.text)}`),
+		});
+	return { header: sections.length === 0 ? "" : LONG_TERM_HEADER, sections };
 }
+const longTermText = (block: LayerBlock) => layerText(block, true);
 
 /**
  * The long-term layer. Same input, same string (it is a prefix of the prompt: a changing value
@@ -165,16 +225,18 @@ export function renderLongTerm(
 	const omitted: { itemId: string; revision: string }[] = [];
 	for (const line of priority) {
 		if (
-			bytesOf(composeLongTerm([...keptStates, line], keptTendencies)) <=
-			limitBytes
+			bytesOf(
+				longTermText(composeLongTerm([...keptStates, line], keptTendencies)),
+			) <= limitBytes
 		)
 			keptStates.push(line);
 		else omitted.push({ itemId: line.itemId, revision: String(line.revision) });
 	}
 	for (const line of [...tendencies].sort(newestTendency)) {
 		if (
-			bytesOf(composeLongTerm(keptStates, [...keptTendencies, line])) <=
-			limitBytes
+			bytesOf(
+				longTermText(composeLongTerm(keptStates, [...keptTendencies, line])),
+			) <= limitBytes
 		)
 			keptTendencies.push(line);
 		else
@@ -185,9 +247,12 @@ export function renderLongTerm(
 	}
 	if (omitted.length > 0)
 		log.info("memory.long_term_trimmed", { omitted: omitted.length });
-	const text = composeLongTerm(keptStates, keptTendencies);
+	const block = composeLongTerm(keptStates, keptTendencies);
+	const text = longTermText(block);
 	return {
 		text,
+		header: block.header,
+		sections: block.sections,
 		manifest: [
 			...[...keptStates]
 				.sort(
@@ -218,7 +283,7 @@ export interface NoteLine {
 	/** ISO time: later is newer. */
 	order: string;
 }
-export interface RenderedShortTerm {
+export interface RenderedShortTerm extends LayerBlock {
 	text: string;
 	bytes: number;
 	/** Recently remembered State not yet in the long-term layer, including any left out for space. */
@@ -249,23 +314,26 @@ const newestNote = (a: NoteLine, b: NoteLine) =>
 function composeShortTerm(
 	recent: readonly StateLine[],
 	notes: readonly NoteLine[],
-): string {
-	if (recent.length === 0 && notes.length === 0) return "";
-	const lines = [SHORT_TERM_HEADER];
-	if (recent.length > 0) {
-		lines.push(RECENT_HEADING);
-		for (const line of [...recent].sort(newestState))
-			lines.push(stateLineText(line));
-	}
+): LayerBlock {
+	const sections: LayerSection[] = [];
+	if (recent.length > 0)
+		sections.push({
+			heading: RECENT_HEADING,
+			items: [...recent].sort(newestState).map(stateLineText),
+		});
 	for (const kind of SHORT_TERM_SHOW) {
 		const inKind = notes.filter((note) => note.kind === kind);
 		if (inKind.length === 0) continue;
-		lines.push(label(kind));
-		for (const note of [...inKind].sort(newestNote))
-			lines.push(`- ${oneLine(note.text)}`);
+		sections.push({
+			heading: label(kind),
+			items: [...inKind]
+				.sort(newestNote)
+				.map((note) => `- ${oneLine(note.text)}`),
+		});
 	}
-	return lines.join("\n");
+	return { header: sections.length === 0 ? "" : SHORT_TERM_HEADER, sections };
 }
+const shortTermText = (block: LayerBlock) => layerText(block, false);
 
 /** The short-term layer, rebuilt every time. Over the budget: recent additions first, then notes in SHORT_TERM_KEEP order, newest first. */
 export function renderShortTerm(
@@ -278,7 +346,9 @@ export function renderShortTerm(
 	let omitted = 0;
 	for (const line of [...recent].sort(newestState)) {
 		if (
-			bytesOf(composeShortTerm([...keptRecent, line], keptNotes)) <= limitBytes
+			bytesOf(
+				shortTermText(composeShortTerm([...keptRecent, line], keptNotes)),
+			) <= limitBytes
 		)
 			keptRecent.push(line);
 		else omitted++;
@@ -290,19 +360,24 @@ export function renderShortTerm(
 	);
 	for (const note of noteOrder) {
 		if (
-			bytesOf(composeShortTerm(keptRecent, [...keptNotes, note])) <= limitBytes
+			bytesOf(
+				shortTermText(composeShortTerm(keptRecent, [...keptNotes, note])),
+			) <= limitBytes
 		)
 			keptNotes.push(note);
 		else omitted++;
 	}
 	if (omitted > 0) log.info("memory.short_term_trimmed", { omitted });
-	const text = composeShortTerm(keptRecent, keptNotes);
+	const block = composeShortTerm(keptRecent, keptNotes);
+	const text = shortTermText(block);
 	return {
 		text,
+		header: block.header,
+		sections: block.sections,
 		bytes: bytesOf(text),
 		pendingAdditions: recent.length,
 		omitted,
-		fullBytes: bytesOf(composeShortTerm(recent, notes)),
+		fullBytes: bytesOf(shortTermText(composeShortTerm(recent, notes))),
 	};
 }
 

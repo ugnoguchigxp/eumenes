@@ -27,6 +27,7 @@
 		"test:search:live": "bun scripts/search-agents-live.ts --run",
 		"verify:all": "bun scripts/verify.ts --all",
 		"verify:live": "bun scripts/verify-live.ts",
+		"context:eval": "bun scripts/context-eval/cli.ts",
 		"nl-acceptance": "bun scripts/nl-acceptance.ts",
 		"toolchain:bundle": "bun scripts/toolchain-bundle.ts",
 		"decision:bench": "python3 -B scripts/decision-bench/bench.py",

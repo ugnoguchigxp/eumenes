@@ -20,7 +20,19 @@ export type WindowHistory = {
 	summaryText: string;
 	/** 0: no summary yet. */
 	summaryRevision: number;
+	/**
+	 * The range of exchanges the summary stands on, by the time the ledger registered them. Absent when there is no
+	 * summary text, or none of its source exchanges is in the ledger any more.
+	 */
+	summaryCovers?: { fromAt: string; toAt: string; turns: number };
+	/**
+	 * The date range of the exchanges the prompt shows verbatim, as fixed at the last memory step. A rebuild that is
+	 * not a step carries it over (the prefix of the prompt must not move between steps). Absent in a window stored
+	 * before this field existed; `{}` when there was no exchange at the step.
+	 */
+	boundary?: HistoryBoundary;
 };
+export type HistoryBoundary = { fromAt?: string; toAt?: string };
 
 /** How an exchange reaches the prompt (the table of section 2.3). */
 type VerbatimClass = "keep" | "unprocessed" | "gone";
@@ -51,16 +63,38 @@ const isBlockedRow = (blocked: ReadonlySet<string>, row: ExchangeDto) =>
 	blocked.has(row.inputMessageId) ||
 	(row.answerMessageId !== null && blocked.has(row.answerMessageId));
 
-/** The history to publish: kept exchanges appended to the earlier list, and the summary. */
+/** How many of the newest exchanges the prompt always carries (section 2.4). */
+const LATEST_EXCHANGES = 2;
+
+/** The exchanges the next prompt shows verbatim: not out of it yet, and the newest ones whatever the steward decided. */
+function shownRows(rows: readonly ExchangeDto[]): ExchangeDto[] {
+	const newest = new Set(rows.slice(-LATEST_EXCHANGES));
+	return rows.filter((row) => verbatimClass(row) !== "gone" || newest.has(row));
+}
+
+/** The date range of the verbatim exchanges now (the ledger orders them oldest first). */
+function currentBoundary(rows: readonly ExchangeDto[]): HistoryBoundary {
+	const shown = shownRows(rows);
+	const first = shown[0];
+	const last = shown[shown.length - 1];
+	return first && last ? { fromAt: first.createdAt, toAt: last.createdAt } : {};
+}
+
+/**
+ * The history to publish: kept exchanges appended to the earlier list, the summary, and the boundary. The boundary
+ * is read from the ledger at a memory step (`step`) or when there is none to carry over; otherwise it stays.
+ */
 export function buildHistory(
 	db: Database,
 	conversationId: string,
 	previous: WindowHistory | undefined,
+	step: boolean,
 ): WindowHistory {
 	const blocked = new Set(blockedInConversation(db, conversationId));
-	const keeping = listExchanges(db, conversationId).filter(
-		(row) => !isBlockedRow(blocked, row) && verbatimClass(row) === "keep",
+	const live = listExchanges(db, conversationId).filter(
+		(row) => !isBlockedRow(blocked, row),
 	);
+	const keeping = live.filter((row) => verbatimClass(row) === "keep");
 	const byInput = new Map(keeping.map((row) => [row.inputMessageId, row]));
 	const kept = (previous?.keep ?? []).flatMap((entry) => {
 		const row = byInput.get(entry.inputMessageId);
@@ -69,13 +103,29 @@ export function buildHistory(
 	const had = new Set(kept.map((entry) => entry.inputMessageId));
 	const added = keeping.filter((row) => !had.has(row.inputMessageId)).map(ref);
 	const summary = readSummary(db, conversationId);
+	const summaryText =
+		summary && !summary.sources.some((id) => blocked.has(id))
+			? summary.text
+			: "";
+	const sourceIds = new Set(summaryText === "" ? [] : summary?.sources);
+	const sourceRows = live.filter((row) => sourceIds.has(row.inputMessageId));
+	const firstSource = sourceRows[0];
+	const lastSource = sourceRows[sourceRows.length - 1];
 	return {
 		keep: [...kept, ...added],
-		summaryText:
-			summary && !summary.sources.some((id) => blocked.has(id))
-				? summary.text
-				: "",
+		summaryText,
 		summaryRevision: summary?.revision ?? 0,
+		...(firstSource && lastSource
+			? {
+					summaryCovers: {
+						fromAt: firstSource.createdAt,
+						toAt: lastSource.createdAt,
+						turns: sourceRows.length,
+					},
+				}
+			: {}),
+		boundary:
+			step || !previous?.boundary ? currentBoundary(live) : previous.boundary,
 	};
 }
 
@@ -121,9 +171,6 @@ export function verbatimHistory(
 	};
 }
 
-/** How many of the newest exchanges the prompt always carries (section 2.4). */
-const LATEST_EXCHANGES = 2;
-
 /**
  * The messages the next prompt will show verbatim: what the recall of earlier exchanges must not repeat.
  * The newest exchanges count whatever the steward decided about them.
@@ -136,11 +183,7 @@ export function verbatimMessageIds(
 	const rows = listExchanges(db, conversationId).filter(
 		(row) => !isBlockedRow(blocked, row),
 	);
-	const shown = [
-		...rows.filter((row) => verbatimClass(row) !== "gone"),
-		...rows.slice(-LATEST_EXCHANGES),
-	];
-	return shown.flatMap((row) =>
+	return shownRows(rows).flatMap((row) =>
 		row.answerMessageId
 			? [row.inputMessageId, row.answerMessageId]
 			: [row.inputMessageId],

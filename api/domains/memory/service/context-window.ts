@@ -18,9 +18,12 @@ import {
 } from "../repository";
 import {
 	formatPeriod,
+	longTermFromText,
 	noteLines,
 	renderLongTerm,
 	renderShortTerm,
+	shortTermFromText,
+	type LayerSection,
 	type StateLine,
 	type TendencyLine,
 } from "./context-render";
@@ -53,14 +56,22 @@ export type WindowSnapshot = {
 	buildId: string;
 	inputs: WindowInputs;
 	longTerm: {
+		/** The whole layer as the prompt carries it: `header`, then `sections`, written by one function (layerText). */
 		text: string;
+		/** The frame sentence that is the first line of `text`; "" when the layer is empty. */
+		header: string;
+		/** The lines of `text` after the header, grouped by heading; [] when the layer is empty. */
+		sections: LayerSection[];
 		manifest: { itemId: string; revision: string }[];
 		/** Items the budget left out of `text` (not shown as "recently remembered" either). */
 		omitted: { itemId: string; revision: string }[];
 		bytes: number;
 	};
 	shortTerm: {
+		/** As `longTerm.text`: `header` and `sections` are the same layer in structure. */
 		text: string;
+		header: string;
+		sections: LayerSection[];
 		bytes: number;
 		pendingAdditions: number;
 		/** The State items behind "recently remembered": a usage receipt must name them too (forgetting purges by item). */
@@ -141,6 +152,34 @@ function currentState(db: Database, policyRevision: string, nowMs: number) {
 	return { lines, nextBoundaryMs };
 }
 
+/** The shown notices without the cleared ones, then the added ones (each cut short), keeping the newest few. */
+function nextNotices(
+	shown: WindowSnapshot["notices"],
+	clearIds: readonly string[],
+	added: WindowSnapshot["notices"],
+): WindowSnapshot["notices"] {
+	const cleared = new Set(clearIds);
+	return [
+		...shown.filter((notice) => !cleared.has(notice.id)),
+		...added.map((notice) => ({
+			id: notice.id,
+			text: [...notice.text].slice(0, MAX_NOTICE_CHARS).join(""),
+		})),
+	].slice(-MAX_NOTICES);
+}
+
+/** A window built before the layers carried their structure: it is read back from the stored text, which it reproduces. */
+function withLayerStructure(window: WindowSnapshot) {
+	if (!window.longTerm.sections) {
+		const { header, sections } = longTermFromText(window.longTerm.text);
+		window.longTerm = { ...window.longTerm, header, sections };
+	}
+	if (!window.shortTerm.sections) {
+		const { header, sections } = shortTermFromText(window.shortTerm.text);
+		window.shortTerm = { ...window.shortTerm, header, sections };
+	}
+}
+
 export function createContextWindowStore(deps: {
 	continuity: ContinuityService;
 	clock: () => string;
@@ -180,6 +219,7 @@ export function createContextWindowStore(deps: {
 		const parsed = JSON.parse(row.snapshot) as WindowSnapshot;
 		// Built before the history was part of a window: the next read builds it again.
 		if (!parsed.history) return null;
+		withLayerStructure(parsed);
 		cache.set(conversationId, parsed);
 		return parsed;
 	}
@@ -192,6 +232,8 @@ export function createContextWindowStore(deps: {
 			prefetch?: WindowPrefetch;
 			addNotices?: string[];
 			clearNoticeIds?: string[];
+			/** A memory step (the steward's publish): the history boundary is read again. Otherwise it is carried over. */
+			step?: boolean;
 		},
 	): WindowSnapshot {
 		const previous = current(db, conversationId);
@@ -214,6 +256,8 @@ export function createContextWindowStore(deps: {
 			const rendered = renderLongTerm(states, tendencies);
 			longTerm = {
 				text: rendered.text,
+				header: rendered.header,
+				sections: rendered.sections,
 				manifest: rendered.manifest,
 				omitted: rendered.omitted,
 				bytes: rendered.bytes,
@@ -240,14 +284,11 @@ export function createContextWindowStore(deps: {
 			if (at !== null && (nextExpiryMs === null || at < nextExpiryMs))
 				nextExpiryMs = at;
 		}
-		const cleared = new Set(opts.clearNoticeIds ?? []);
-		const notices = [
-			...(previous?.notices ?? []).filter((notice) => !cleared.has(notice.id)),
-			...(opts.addNotices ?? []).map((text) => ({
-				id: id(),
-				text: [...text].slice(0, MAX_NOTICE_CHARS).join(""),
-			})),
-		].slice(-MAX_NOTICES);
+		const notices = nextNotices(
+			previous?.notices ?? [],
+			opts.clearNoticeIds ?? [],
+			(opts.addNotices ?? []).map((text) => ({ id: id(), text })),
+		);
 		const snapshot: WindowSnapshot = {
 			conversationId,
 			version: (readWindowKey(db, conversationId)?.version ?? 0) + 1,
@@ -262,9 +303,16 @@ export function createContextWindowStore(deps: {
 							policyRevision: previous.inputs.policyRevision,
 						},
 			longTerm,
-			history: buildHistory(db, conversationId, previous?.history),
+			history: buildHistory(
+				db,
+				conversationId,
+				previous?.history,
+				opts.step === true,
+			),
 			shortTerm: {
 				text: shortTerm.text,
+				header: shortTerm.header,
+				sections: shortTerm.sections,
 				bytes: shortTerm.bytes,
 				pendingAdditions: shortTerm.pendingAdditions,
 				recentItemIds: recent.map((line) => line.itemId),
@@ -370,6 +418,7 @@ export function createContextWindowStore(deps: {
 			}
 			return rebuildInTransaction(db, conversationId, {
 				refreshLongTerm: refresh,
+				step: true,
 				...(opts.prefetch ? { prefetch: opts.prefetch } : {}),
 				...(opts.addNotices ? { addNotices: opts.addNotices } : {}),
 			});
