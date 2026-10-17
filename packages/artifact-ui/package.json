@@ -6,6 +6,7 @@
 	"exports": {
 		".": "./src/index.tsx",
 		"./contracts": "./src/contracts.ts",
+		"./composition-checks": "./src/composition-checks.ts",
 		"./styles": {
 			"types": "./src/styles.d.ts",
 			"default": "./src/styles.css"

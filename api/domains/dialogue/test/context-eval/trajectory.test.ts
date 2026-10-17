@@ -53,7 +53,6 @@ test("the trajectory is ten turns with a memory step, an operation result, resea
 		"operation.image",
 		"operation.recognition",
 		"research.result",
-		"research.failure",
 	] as const)
 		expect(sources.has(source)).toBe(true);
 	expect(calls.some((c) => c.assembly.stage === "selection")).toBe(true);

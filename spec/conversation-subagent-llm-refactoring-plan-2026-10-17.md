@@ -2,7 +2,7 @@
 
 作成日: 2026-10-17
 
-状態: 計画に合意済み（2026-10-17）。D 項目に依存しない P2・P3 を実装し、fixture で検証済み（§8）。D1〜D13・P1・P5 は未実施。変更前の測定は行わない（利用者判断、2026-10-17）。そのうえで、§6 の D 項目に依存する改修は、その D 項目が決まるまで実装しない。どの改修がどの D 項目に依存するかは、§3 の各表に「（D◯）」と付ける。依存のない改修が P2・P3 に入る（§4）。
+状態: 計画に合意済み（2026-10-17）。D 項目に依存しない P2・P3 を実装し、fixture で検証済み（§8）。P0 の前提だった委譲前回答の差分は後続コミットでコードに入った。D1〜D13 の結論と、P1・P4・P5 は未了。変更前の測定は行わない（利用者判断、2026-10-17）。§6 の D 項目に依存する改修は、その D 項目が決まるまで実装しない。
 
 ## 1. 目的と原則
 
@@ -83,7 +83,7 @@
 | 引数違反の詳細が捨てられる。`api/application/toolchain/specialist-port.ts` の `parseInvocation` は `specialist_invalid_arguments` しか返さず、モデルは直し方が分からない。SKILL は「error と detail に従って直す」としている | TOOL_RESULT の `detail` に、違反の場所（path）・種類（code）・期待する型だけを入れる。入力値は含めない。最大8件、各200字以内とする。既存の契約にある `detail` を埋めるだけなので、新しい判断は追加しない |
 | 失敗したターンが履歴に残らない。`sessionHistory` は `status === "completed"` だけを採用する | （D12）失敗したターンを、依頼と失敗の短い記録として履歴に残すかを決める |
 | 専門担当が依頼を戻すとき、後ろに詰まっていた発言のほうが、先に通常担当へ届く（`specialist-settle.ts`）。画面の「会話に戻る」（`specialist-commands.ts`）では、詰まっていた発言が `cancelSessionRuns` で黙って取消される | （D5）詰まっていた発言の扱いを決め、2つの経路で揃える |
-| 保留中の下書きがあるときに「新しく作って」と頼むと、保留中の下書きが再開される。`specialist-start.ts` は、`toolchainId` と `savedRef === target` が一致すれば同じ対象とみなす | （D6）[専門担当の計画 §4.4](toolchain-specialist-dialogue-implementation-plan-2026-10-17.md) の再開規則を変えるかを決める |
+| 保留中の下書きがあるときに「新しく作って」と頼むと、保留中の下書きが再開される。`specialist-start.ts` は、`toolchainId` と `savedRef === target` が一致すれば同じ対象とみなす | （D6）[専門担当の計画 §4.4](.archived/toolchain-specialist-dialogue-implementation-plan-2026-10-17.md) の再開規則を変えるかを決める |
 | `api/domains/dialogue/contracts/specialist.ts` の epoch のコメントには「start, return, resume で進む」とあるが、return では進まない。return 後は state が active でなくなり、`addresseeMatches` で拒否されるため、実害はない | コメントを実装に合わせる |
 
 ### 3.4 原則4: サブエージェントのSystemContextを簡潔にする

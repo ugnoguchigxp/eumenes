@@ -1,0 +1,44 @@
+[
+  {
+    "stage": "eumenes-settings",
+    "status": 200,
+    "requestId": "56b0f34b-8aec-4702-8dec-d3285ad82a38",
+    "settings": {
+      "revision": 0,
+      "serviceId": "ocr-host",
+      "baseUrl": null,
+      "credentialConfigured": false
+    }
+  },
+  {
+    "stage": "gateway-auth-read-only",
+    "checks": [
+      {
+        "auth": "missing",
+        "status": 401
+      },
+      {
+        "auth": "invalid",
+        "status": 401
+      },
+      {
+        "auth": "larm",
+        "status": 200,
+        "serviceId": "ocr-host",
+        "state": "stopped"
+      }
+    ]
+  },
+  {
+    "stage": "worker-after-check",
+    "status": 200,
+    "service": {
+      "id": "ocr-host",
+      "revision": "b6d6514aeb4abb3a60847ce66e0c14107f3b4ee06e2260f1f443158ba1fded3e",
+      "generation": 7,
+      "state": "stopped",
+      "busy": null,
+      "activityFresh": false
+    }
+  }
+]

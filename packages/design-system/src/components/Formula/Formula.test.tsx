@@ -38,13 +38,17 @@ describe("Formula", () => {
 		const doc = document.createElement("div");
 		doc.innerHTML = renderFormula(tex).html;
 		// The TeX source stays only as text in <annotation>; nothing it asks for is created.
-		expect(doc.querySelector("a, img, [href], [src], [id], [data-k]")).toBeNull();
+		expect(
+			doc.querySelector("a, img, [href], [src], [id], [data-k]"),
+		).toBeNull();
 		expect(doc.querySelector(".evil")).toBeNull();
 		expect(doc.innerHTML).not.toMatch(/style="[^"]*color:red/);
 	});
 
 	it("リンクを描画しない", () => {
-		const { container } = render(<Formula tex={"\\href{https://example.com}{x}"} />);
+		const { container } = render(
+			<Formula tex={"\\href{https://example.com}{x}"} />,
+		);
 		expect(container.querySelector("a")).toBeNull();
 		expect(container.querySelector("img")).toBeNull();
 	});
@@ -61,7 +65,9 @@ describe("Formula", () => {
 	});
 
 	it("本文の HTML を挿入しない", () => {
-		const { container } = render(<Formula tex={'x<img src=x onerror="alert(1)">'} />);
+		const { container } = render(
+			<Formula tex={'x<img src=x onerror="alert(1)">'} />,
+		);
 		expect(container.querySelector("img")).toBeNull();
 	});
 

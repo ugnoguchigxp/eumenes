@@ -1,13 +1,18 @@
+import type { Receipt } from "../../inference";
 import { systemContext } from "../../../infrastructure/system-context";
 import { getLogger } from "../../../infrastructure/logger";
 import type { DialogueDeps, GenerateInput } from "./context";
 import { omitted } from "./context-fit";
 import type { HistoryTurn, PersonaSpec } from "./context-assembly";
 import { generateConversation } from "./conversation-generation";
-import { analyzeTool, type RequestAnalysis } from "./initial-decision";
+import { analysisTools, type FirstRound } from "./initial-decision";
 import { currentRequestMessage, markCurrentRequest } from "./request-context";
-import { decisionDraft, recordRejected } from "./selection-trace";
-import { buildSystemPrompt } from "./system-prompt";
+import {
+	decisionDraft,
+	recordRejected,
+	type Candidates,
+} from "./selection-trace";
+import { buildRolePrompt } from "./system-prompt";
 
 const log = getLogger("dialogue");
 
@@ -49,28 +54,43 @@ export function previousExchange(
 }
 
 /**
- * The first round of every new conversation decision: one call, only `analyze_request` is accepted, and its
- * prose is neither shown nor adopted. The structural repair is the shared one (once); a second violation fails.
+ * The first round of every new conversation decision: one call, one of the candidates' functions, `answer` or
+ * `report_unavailable`; its prose is neither shown nor adopted. The structural repair is the shared one
+ * (once); a second violation fails.
  */
 export async function analyzeRequest(
 	deps: DialogueDeps,
 	input: GenerateInput,
+	found: Candidates,
 	signal: AbortSignal,
 	repair: () => void,
-): Promise<RequestAnalysis> {
+): Promise<{ analysis: FirstRound; receipt?: Receipt; repaired: boolean }> {
 	const started = Date.now();
 	const analysis = input.routing!.analysis;
 	const current = currentRequestMessage(input);
 	const messages = markCurrentRequest(
 		[
+			{ role: "system", content: buildRolePrompt(analysis.persona) },
+			...(analysis.previous.length
+				? [
+						{
+							role: "user" as const,
+							content:
+								systemContext(
+									"dialogue.contexts.request-analysis.previous",
+									{},
+								) + JSON.stringify(analysis.previous),
+						},
+					]
+				: []),
+			// Right before the request: a reply the previous turn happened to give must not set the form of this call.
 			{
 				role: "system",
-				content:
-					buildSystemPrompt(analysis.persona) +
-					"\n" +
-					systemContext("dialogue.contexts.request-analysis.instruction", {}),
+				content: systemContext(
+					"dialogue.contexts.request-analysis.instruction",
+					{},
+				),
 			},
-			...analysis.previous,
 			current,
 		],
 		current,
@@ -84,7 +104,9 @@ export async function analyzeRequest(
 			requestMessage: current,
 			signal,
 			delta: () => {},
-			tools: [analyzeTool],
+			briefReply: input.briefReply,
+			tools: analysisTools(found.route.cards, found.sessions),
+			cards: found.route.cards,
 			analysis: true,
 			// A one-shot call: its prose is never adopted and it holds no conversation session.
 			sessionRole: "auxiliary",
@@ -97,7 +119,11 @@ export async function analyzeRequest(
 			next: result.next,
 			durationMs: Date.now() - started,
 		});
-		return result;
+		return {
+			analysis: result,
+			receipt: generated.receipt,
+			repaired: generated.repaired,
+		};
 	} catch (error) {
 		if (
 			error instanceof Error &&
@@ -106,7 +132,10 @@ export async function analyzeRequest(
 			await recordRejected(
 				deps,
 				input.runId,
-				decisionDraft(input, started, {}),
+				decisionDraft(input, found.started, {
+					route: found.route,
+					query: found.query,
+				}),
 			);
 		throw error;
 	}

@@ -210,6 +210,23 @@ describe("limits", () => {
 		expect(reason('"abc')).toBe("unterminated_string");
 		expect(reason('"a\\n"')).toBe("bad_escape");
 	});
+	test("min and max over a series spend the step budget too", () => {
+		const points = Array.from({ length: 1200 }, (_, x) => ({ x, y: x }));
+		const scope = {
+			get: (name: string) => (name === "s" ? points : undefined),
+		};
+		for (const source of ["min(s)", "max(s)"]) {
+			const parsed = parseExpression(source);
+			if (!parsed.ok) throw new Error("parse");
+			const budget = createBudget();
+			const results = Array.from({ length: 10 }, () =>
+				evaluateExpression(parsed.ast, scope, budget),
+			);
+			expect(results.filter((value) => value !== null)).toHaveLength(
+				Math.floor(evaluationStepLimit / 1200),
+			);
+		}
+	});
 	test("sum spends the step budget", () => {
 		const points = Array.from({ length: 1200 }, (_, x) => ({ x, y: 1 }));
 		const parsed = parseExpression("sum(s)");

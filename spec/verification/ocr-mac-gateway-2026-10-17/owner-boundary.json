@@ -1,0 +1,43 @@
+{
+  "location": "Mac",
+  "mode": "isolated-in-process-owner-contexts",
+  "actualGatewayUsed": true,
+  "results": [
+    {
+      "owner": "alice",
+      "resource": "result",
+      "status": 200,
+      "expected": 200
+    },
+    {
+      "owner": "alice",
+      "resource": "original",
+      "status": 200,
+      "expected": 200
+    },
+    {
+      "owner": "bob",
+      "resource": "result",
+      "status": 404,
+      "expected": 404
+    },
+    {
+      "owner": "bob",
+      "resource": "original",
+      "status": 404,
+      "expected": 404
+    },
+    {
+      "owner": "bob",
+      "operation": "cancel",
+      "status": 404,
+      "expected": 404
+    },
+    {
+      "owner": "bob",
+      "operation": "remove",
+      "status": 404,
+      "expected": 404
+    }
+  ]
+}

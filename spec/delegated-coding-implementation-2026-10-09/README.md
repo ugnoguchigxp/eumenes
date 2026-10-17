@@ -10,7 +10,7 @@ Eumenes の会話から仕事をタスクとして登録し、独立した監督
 
 | 計画書 | 主な責任範囲 | 先行条件 |
 | --- | --- | --- |
-| [01 タスク基盤と Queue](01-tasks-and-queue.md) | 登録、状態、権限、公開操作、定期確認の契約 | 全体契約の確定 |
+| [01 タスク基盤と Queue](../.archived/01-tasks-and-queue.md) | 登録、状態、権限、公開操作、定期確認の契約。実装とfixture済みで archive | 全体契約の確定 |
 | [02 CLI 実行と MCP](02-coding-runner-and-mcp.md) | workspace、プロセス、出力、復旧、Git 証拠 | 01 の ID と権限契約 |
 | [03 監督サブエージェント](03-coding-supervision.md) | 独立した文脈、観測、判断、レビュー修正ループ | 01 と 02、04 の報告契約 |
 | [04 会話との委任と報告](04-conversation-and-reports.md) | 会話受付、報告配送、追加指示、音声 | 01、03 の公開契約 |

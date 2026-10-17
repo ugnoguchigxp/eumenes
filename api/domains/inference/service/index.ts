@@ -1,5 +1,6 @@
 import { createProbes } from "./probes";
 import { createRequestValidity } from "./request-validity";
+import { createRequestStatus } from "./request-status";
 import { createUsageReader } from "./usage";
 import { createVoiceAccess } from "./voice-access";
 import { createVoiceBinding } from "./voice-binding";
@@ -339,11 +340,6 @@ export function createInference(
 			return runControl(env, id, messages, signal, control, session);
 		},
 		codexResearchAvailable: () => !!options.codexResearch,
-		rejectControlInTransaction(db: Database, receipt: Receipt, _code: string) {
-			db.query(
-				"UPDATE inference_requests SET status='rejected' WHERE id=? AND mode='control' AND status='pending'",
-			).run(receipt.requestId);
-		},
 		setContextPolicyInTransaction(
 			db: Database,
 			requestId: string,
@@ -357,12 +353,6 @@ export function createInference(
 					.run(requestId).changes !== 1
 			)
 				throw new Error("permission_revoked");
-		},
-		cancelRequestsInTransaction(db: Database, requestIds: string[]) {
-			for (const requestId of requestIds)
-				db.query(
-					"UPDATE inference_requests SET status='cancelled' WHERE id=? AND status='pending'",
-				).run(requestId);
 		},
 		revokeAgentAttemptsInTransaction(
 			db: Database,
@@ -471,6 +461,7 @@ export function createInference(
 			return id;
 		},
 		acceptInTransaction: accept,
+		...createRequestStatus(allowed),
 		validateReceiptInTransaction: validateReceipt,
 		requestFor(db: Database, subject: string, purpose: Purpose) {
 			return (
@@ -486,11 +477,6 @@ export function createInference(
 		validInTransaction: valid,
 		validRequest(id: string) {
 			return store.read((db) => valid(db, id));
-		},
-		skipInTransaction(db: Database, subject: string, purpose: Purpose) {
-			db.query(
-				"UPDATE inference_requests SET status='skipped' WHERE subject=? AND purpose=? AND status='pending'",
-			).run(subject, purpose);
 		},
 		connect: () => port(settings.get()).connect(),
 		prepareVoice: (signal: AbortSignal) =>

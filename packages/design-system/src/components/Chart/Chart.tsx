@@ -82,7 +82,9 @@ export const Chart = ({
 				}))
 			: shown;
 	const hasData = plotted.some((s) => s.points.length > 0);
-	const emptyNames = shown.filter((s) => s.points.length === 0).map((s) => s.name);
+	const emptyNames = shown
+		.filter((s) => s.points.length === 0)
+		.map((s) => s.name);
 	const summary = summarize(kind, plotted, formatValue);
 	const label = title ?? "グラフ";
 	const rows = toRows(plotted);
@@ -100,7 +102,11 @@ export const Chart = ({
 	const legend = <Legend wrapperStyle={legendStyle} />;
 	const axes = (
 		<>
-			<CartesianGrid stroke="var(--border)" strokeDasharray="3 3" vertical={false} />
+			<CartesianGrid
+				stroke="var(--border)"
+				strokeDasharray="3 3"
+				vertical={false}
+			/>
 			<XAxis
 				dataKey="x"
 				tick={tickStyle}
@@ -108,7 +114,13 @@ export const Chart = ({
 				tickLine={axisLine}
 				label={
 					xLabel
-						? { value: xLabel, position: "insideBottom", offset: -4, fill: "var(--muted-foreground)", fontSize: 12 }
+						? {
+								value: xLabel,
+								position: "insideBottom",
+								offset: -4,
+								fill: "var(--muted-foreground)",
+								fontSize: 12,
+							}
 						: undefined
 				}
 				height={xLabel ? 48 : 30}
@@ -121,7 +133,14 @@ export const Chart = ({
 				width={yLabel ? 72 : 60}
 				label={
 					yLabel
-						? { value: yLabel, angle: -90, position: "insideLeft", fill: "var(--muted-foreground)", fontSize: 12, style: { textAnchor: "middle" } }
+						? {
+								value: yLabel,
+								angle: -90,
+								position: "insideLeft",
+								fill: "var(--muted-foreground)",
+								fontSize: 12,
+								style: { textAnchor: "middle" },
+							}
 						: undefined
 				}
 			/>
@@ -140,7 +159,10 @@ export const Chart = ({
 		} as const;
 		if (kind === "pie") {
 			const first = plotted[0];
-			const data = (first?.points ?? []).map((p) => ({ name: String(p.x), value: p.y }));
+			const data = (first?.points ?? []).map((p) => ({
+				name: String(p.x),
+				value: p.y,
+			}));
 			return (
 				<PieChart {...common}>
 					<Pie
@@ -152,7 +174,10 @@ export const Chart = ({
 						isAnimationActive={false}
 					>
 						{data.map((d, i) => (
-							<Cell key={`${i}-${d.name}`} fill={sliceColors[i % sliceColors.length]} />
+							<Cell
+								key={`${i}-${d.name}`}
+								fill={sliceColors[i % sliceColors.length]}
+							/>
 						))}
 					</Pie>
 					{tooltip}
@@ -226,7 +251,9 @@ export const Chart = ({
 			)}
 		>
 			{title && (
-				<figcaption className="text-ui font-semibold text-foreground">{title}</figcaption>
+				<figcaption className="text-ui font-semibold text-foreground">
+					{title}
+				</figcaption>
 			)}
 			<p id={summaryId} className="sr-only">
 				{summary}
@@ -238,7 +265,10 @@ export const Chart = ({
 					</ResponsiveContainer>
 				</div>
 			) : (
-				<p role="status" className="py-8 text-center text-ui text-muted-foreground">
+				<p
+					role="status"
+					className="py-8 text-center text-ui text-muted-foreground"
+				>
 					データがありません
 				</p>
 			)}

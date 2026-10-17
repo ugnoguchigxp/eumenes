@@ -6,6 +6,10 @@
 
 backend の `/api/settings/ocr` に、backend 自身から到達できる gateway の URL を保存する。画面にも未設定時の保存欄がある。URL は loopback または私設ネットワークの HTTP(S) に限り、パス・認証情報・query を含めない。`LARM_API_TOKEN` は backend 内だけで参照し、画面・DB の OCR 設定・会話へ出さない。gateway の Linux loopback URL を Mac の backend から使う場合は、到達可能な転送先を設定する。サービス ID は `ocr-host`、ポート番号は永続識別子にしない。
 
+認証はbackend共通のトークン解決を使い、`LARM_API_TOKEN`、未指定時は互換名の`LARM_CONTROL_TOKEN`をBearerとして送る。設定APIの`sharedCredentialAvailable`はトークンがbackendにあるか、`credentialConfigured`は接続先とトークンが両方あるかを示す。いずれも実接続の認証成功を保証する値ではない。接続先の未保存だけでトークン不備と判断しない。2026年10月17日の読取り専用確認では、実gatewayは共通トークンで200、不正・未指定は401だった。Macから到達できる正式入口の依頼は[依頼書](../spec/.archived/ocr-larm-connectivity-request-2026-10-17.md)を参照する。
+
+同日の後続作業で、利用者が指定した正式originを設定APIへ保存し、Macからの認証、状態確認での非起動、合成画像・短い動画の解析、動画の取消、原本の一致、アクセス境界を確認した。[Mac実接続の記録](../spec/verification/ocr-mac-gateway-2026-10-17/README.md)に、gnosis内の過去確認と分けて結果を残す。
+
 画像は JPEG・PNG・WebP、動画は MP4・MOV・WebM。16 MiB 以内の原本を `POST /api/ocr?conversationId=...&requestId=...` に multipart の `file` 一つで渡す。写真・録画とファイル選択は同じ受付を使う。動画30秒、画像16MP、動画の毎秒2フレーム・最大60フレームは上流契約の制限であり、超過時は上流の拒否を画面に示す。PDF は直接送らない。
 
 ## 保存・取消・会話
@@ -17,6 +21,8 @@ OCR domain は原本と結果を所有者・会話・受付 ID ごとに SQLite 
 ## データ駆動 Artifact と担当
 
 `ocr.bundle.json` が profile・Skill・open/read/cancel の tool・package・toolchain・binding・Artifact・入力 schema を版付きで定義する。`adapter:ocr@1` は OCR domain の公開操作に接続する。会話の command 担当は登録された SystemContext と認可済み snapshot から操作を選ぶ。画面は JSON の `layout` に登録 view `ocr-media` と `ocr-panel` を組み合わせる。Web adapter が認証済み API と `uploadFile` bridge を使い、原本の Blob URL は表示時だけ作る。履歴のサムネイルは、見えている項目の保存原本をブラウザで縮小して一時的に表示する。ファイル選択は読み上げ名を持つアイコンボタン。履歴選択・時刻・行選択は local actionで、時刻・行の操作には選択中の資料IDを含める。取消・再確認・削除・会話追加は OCR の認証済み API を呼ぶ local action である。
+
+2026年10月17日に[画像生成した画面案](../spec/design/ocr-2026-10-17-redesign/README.md)を反映した。原本を少し広く取り、結果は「全文」「行ごと」で切り替える。選択行と原本の対応領域は同じ青で示し、選択行の操作は帯へ、原文全体の会話追加は別ボタンへまとめる。採用した補正案は全文タブで開き、原文も比較できる。表示領域が760px未満では縦に並ぶ。[実装・検証記録](../spec/verification/ocr-redesign-2026-10-17/README.md)に実装画面と検証の範囲を残す。
 
 ## LLM補正案
 

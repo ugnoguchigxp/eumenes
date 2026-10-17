@@ -7,11 +7,10 @@ import type { ToolchainCard } from "../../capabilities";
 import { getLogger } from "../../../infrastructure/logger";
 import { ValidationFailure } from "../../../infrastructure/validation-log";
 import { conversationOutput } from "./conversation-output";
-import { validateAnalysis, type RequestAnalysis } from "./initial-decision";
+import { validateAnalysis, type FirstRound } from "./initial-decision";
 import {
 	operation,
 	operationRejection,
-	unavailable,
 	type ConversationOperation,
 	type OpenQuestion,
 	type SessionOffers,
@@ -23,8 +22,9 @@ type Messages = Parameters<InferencePort["answer"]>[0];
 
 /**
  * One call; at most one structural correction of a native operation. Without `tools` it is an ordinary
- * answer. With `analysis` the request-analysis function is the only valid output; with `tools` a function
- * call is (a toolchain's, or `report_unavailable`). Prose is never adopted in those two.
+ * answer. With `analysis` one of the first round's functions (a candidate's, `answer`, `report_unavailable`)
+ * is the only valid output; otherwise `tools` offers the chosen toolchain's function and a call of it is the
+ * only valid output. Prose is never adopted in those two.
  */
 export async function generateConversation(input: {
 	inference: InferencePort;
@@ -37,13 +37,13 @@ export async function generateConversation(input: {
 	preparation?: SpeechPreparation;
 	briefReply?: boolean;
 	tools?: NativeTool[];
-	/** The toolchains behind `tools`; a call resolves to exactly one of them. */
+	/** The toolchains behind `tools` (the first round's candidates, the second round's chosen one). */
 	cards?: ToolchainCard[];
 	/** Open questions a call may answer by `questionRef` (offered to the model with `tools`). */
 	openQuestions?: OpenQuestion[];
 	/** The session toolchains among `cards` and the saved items each may start from. */
 	sessions?: SessionOffers;
-	/** The first round: `tools` holds the request-analysis function and nothing else. */
+	/** The first round: `tools` holds the candidates' functions, `answer` and `report_unavailable`. */
 	analysis?: boolean;
 	repair: () => void;
 	/**
@@ -60,7 +60,7 @@ export async function generateConversation(input: {
 	text: string;
 	receipt?: Receipt;
 	operation?: ConversationOperation;
-	analysis?: RequestAnalysis;
+	analysis?: FirstRound;
 	/** The one structural correction was used. */
 	repaired: boolean;
 }> {
@@ -119,18 +119,26 @@ export async function generateConversation(input: {
 			if (!input.tools)
 				throw operationRejection("tools_not_offered_in_request");
 			if (input.analysis) {
-				const analysis = validateAnalysis(receipt.toolCalls);
+				const analysis = validateAnalysis(receipt.toolCalls, input.cards ?? []);
+				// The notice and the explanation are shown to the user: the same output and spoken-reply checks.
+				if (analysis.next === "toolchain")
+					conversationOutput(() => {}, input.tools).finish(
+						analysis.announcement,
+					);
+				if (analysis.next === "report_unavailable") {
+					if (input.briefReply && !isBriefSpokenReply(analysis.reply))
+						throw operationRejection("spoken_reply_too_long");
+					conversationOutput(() => {}, input.tools, true).finish(
+						analysis.reply,
+					);
+				}
 				if (text.trim()) input.repair();
-				return { text: "", receipt, analysis, repaired: attempt > 0 };
-			}
-			const reply = unavailable(receipt.toolCalls);
-			if (reply !== undefined) {
-				// The explanation is the answer itself, under the same spoken-reply contract.
-				if (input.briefReply && !isBriefSpokenReply(reply))
-					throw operationRejection("spoken_reply_too_long");
-				conversationOutput(() => {}, input.tools, true).finish(reply);
-				if (text.trim()) input.repair();
-				return { text: reply, receipt, repaired: attempt > 0 };
+				return {
+					text: analysis.next === "report_unavailable" ? analysis.reply : "",
+					receipt,
+					analysis,
+					repaired: attempt > 0,
+				};
 			}
 			const result = {
 				text: "",
@@ -144,9 +152,6 @@ export async function generateConversation(input: {
 				),
 				repaired: attempt > 0,
 			};
-			conversationOutput(() => {}, input.tools).finish(
-				result.operation.announcement,
-			);
 			// Some models announce the call first ("調べますね"). A valid call wins; the
 			// streamed preamble is withdrawn and never adopted as an answer.
 			if (text.trim()) {

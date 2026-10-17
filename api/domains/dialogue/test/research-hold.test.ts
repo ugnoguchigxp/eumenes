@@ -1,7 +1,6 @@
 /**
- * A failed research root has no projection, but its answer is still filtered
- * by researchCitations at the end. The body must therefore be held while
- * streaming too, or unfiltered partial text reaches SSE and speech first.
+ * A failed research root is answered by the host: the model is never called, no partial text is streamed, and the
+ * adopted text is the fixed reply that the voice delivery then speaks like any completed answer.
  */
 import { afterEach, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -25,6 +24,7 @@ import {
 	queueLinkMigration,
 	worldStateMigration,
 } from "..";
+import { RESEARCH_FAILURE_REPLY } from "../service/research-failure-reply";
 import { waitFor as until } from "../../../infrastructure/wait-for";
 
 const dirs: string[] = [];
@@ -34,7 +34,7 @@ afterEach(async () => {
 	for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
 });
 
-test("a failed research answer streams no partial text and its final text carries no ungranted URL", async () => {
+test("a failed research is answered by the fixed reply without a model call", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-research-hold-"));
 	dirs.push(dir);
 	const store = openStore(join(dir, "db.sqlite3"), [
@@ -48,30 +48,19 @@ test("a failed research answer streams no partial text and its final text carrie
 		worldStateMigration,
 	]);
 	stores.push(store);
-	const observed: string[] = [];
-	let runId = "";
+	let calls = 0;
 	let dialogue: ReturnType<typeof createDialogueService>;
-	const answerText =
-		"調べられませんでした。詳細は https://evil.example/x を参照。";
 	const larm = {
 		status: () => ({ state: "ready", capabilities: ["llm"] }),
 		connect: async () => {},
-		answerStream: async (
-			_messages: unknown,
-			_signal: unknown,
-			onDelta: (text: string) => void,
-		) => {
-			for (const part of [
-				"調べられませんでした。",
-				"詳細は https://evil.",
-				"example/x を参照。",
-			]) {
-				onDelta(part);
-				observed.push(dialogue.progress(runId)?.text ?? "");
-			}
-			return answerText;
+		answerStream: async () => {
+			calls++;
+			return "model";
 		},
-		answer: async () => answerText,
+		answer: async () => {
+			calls++;
+			return "model";
+		},
 		transcribe: async () => "",
 		speak: async () => new Uint8Array(),
 		close: async () => {},
@@ -110,7 +99,6 @@ test("a failed research answer streams no partial text and its final text carrie
 		conversationId: "main",
 		text: "q",
 	});
-	runId = run.id;
 	await store.write((db) =>
 		db
 			.query("UPDATE dialogue_runs SET agent_task_id='t' WHERE id=?")
@@ -123,10 +111,8 @@ test("a failed research answer streams no partial text and its final text carrie
 		),
 	);
 	expect(dialogue.get(run.id)?.status).toBe("completed");
-	expect(observed.length).toBe(3);
-	expect(observed.every((text) => text === "")).toBe(true);
-	const final = dialogue.progress(run.id)?.text ?? "";
-	expect(final).toContain("調べられませんでした");
-	expect(final).not.toContain("evil.example");
+	expect(calls).toBe(0);
+	expect(dialogue.answerText(run.id)).toBe(RESEARCH_FAILURE_REPLY);
+	expect(dialogue.progress(run.id)?.text ?? "").toBe(RESEARCH_FAILURE_REPLY);
 	await queue.close(100);
 });

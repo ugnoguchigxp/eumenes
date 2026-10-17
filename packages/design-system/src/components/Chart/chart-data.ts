@@ -31,7 +31,10 @@ export const sliceColors = [
 
 export const lineDashes = [undefined, "6 3", "2 3"] as const;
 
-export type ChartRow = { x: number | string } & Record<string, number | string | undefined>;
+export type ChartRow = { x: number | string } & Record<
+	string,
+	number | string | undefined
+>;
 
 export const seriesKey = (index: number) => `s${index}`;
 

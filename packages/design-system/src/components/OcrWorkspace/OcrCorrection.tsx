@@ -1,4 +1,5 @@
 import { Button } from "../Button";
+import { Sparkles } from "lucide-react";
 import type { OcrWorkspaceProps } from "./types";
 
 const correctionLabels = {
@@ -39,9 +40,12 @@ export function OcrCorrection({
 	return (
 		<section className="ocr-correction" aria-label="LLM補正案">
 			<div className="ocr-result-heading">
-				<h3>LLM補正案</h3>
+				<h3>
+					<Sparkles size={17} /> 補正案
+				</h3>
 				<Button
 					size="sm"
+					variant="outline"
 					disabled={!!correcting || props.correctionLoading}
 					onClick={() => props.onCorrectionStart?.(itemId)}
 				>
@@ -49,7 +53,7 @@ export function OcrCorrection({
 				</Button>
 			</div>
 			<p className="ocr-confidence-note">
-				元画像とOCR原文をLLMへ渡します。案は原文を変更せず、確認してから採用できます。
+				元画像と原文をAIに渡して補正案を作ります。原文を残したまま、確認して採用できます。
 			</p>
 			{correcting && (
 				<div role="status">

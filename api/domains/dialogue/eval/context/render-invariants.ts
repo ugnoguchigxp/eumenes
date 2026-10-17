@@ -9,10 +9,6 @@
  *     `current` format is allowed its bare result JSON only).
  *  3. The history messages are exactly the ledger turns of the assembly, in order, in their native roles, and
  *     `sessionContext` counts them; no other assistant message exists; the instructions are system messages.
- *
- * A failed research answer keeps its own context in every format (the product's failure path): it leaves the
- * history out on purpose and carries the failure record as a bare JSON user message, so invariant 3 does not apply
- * to it and invariant 2 holds in the `current` sense.
  */
 import type { ChatMessage } from "../../service/context";
 import type {
@@ -80,9 +76,6 @@ export function renderInvariantIssues(
 ): string[] {
 	const issues: string[] = [];
 	const { messages, sessionContext, currentRequestIndex } = out;
-	const failure = assembly.volatile.some(
-		(b) => b.source === "research.failure",
-	);
 	const request = messages[currentRequestIndex];
 	// 1. The designated request.
 	if (
@@ -93,11 +86,9 @@ export function renderInvariantIssues(
 			(assembly.input.attachments?.length ?? 0)
 	)
 		issues.push("current_request_not_at_designated_index");
-	const history = failure
-		? []
-		: historyIndexes(assembly.history.turns, messages);
+	const history = historyIndexes(assembly.history.turns, messages);
 	if (!history) issues.push("history_not_the_ledger_turns");
-	const current = arm.wrapped === undefined || failure;
+	const current = arm.wrapped === undefined;
 	const trailing = messages.slice(currentRequestIndex + 1);
 	if (
 		current
@@ -119,7 +110,7 @@ export function renderInvariantIssues(
 		}
 	}
 	// 3. The session split.
-	if (!failure && sessionContext.historyCount !== assembly.history.turns.length)
+	if (sessionContext.historyCount !== assembly.history.turns.length)
 		issues.push("history_count_mismatch");
 	if (
 		sessionContext.instructionCount < 1 ||

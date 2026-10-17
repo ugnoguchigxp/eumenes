@@ -19,7 +19,7 @@ import {
 	SettingsDraftBarView,
 } from "./settings-components";
 import { z } from "zod";
-import { useState } from "react";
+import { type ComponentType, lazy, Suspense, useState } from "react";
 import {
 	Slides,
 	Tabs,
@@ -82,13 +82,31 @@ import {
 	TimelineView,
 	ToggleView,
 } from "./composition-content-components";
-import {
-	CalculatorView,
-	ChartView,
-	DataTableView,
-	FormulaView,
-} from "./composition-data-components";
 import { DiagramView, StepperView } from "./composition-diagram-components";
+
+type ViewProps = { request: ArtifactRequest };
+/** Charts, formulas and the calculator pull in recharts and KaTeX; load them on first use. */
+function lazyView(load: () => Promise<ComponentType<ViewProps>>) {
+	const Loaded = lazy(() =>
+		load().then((component) => ({ default: component })),
+	);
+	return function LazyView(props: ViewProps) {
+		return (
+			<Suspense
+				fallback={<p className="aui-composition-loading">読み込み中…</p>}
+			>
+				<Loaded {...props} />
+			</Suspense>
+		);
+	};
+}
+const dataViews = () => import("./composition-data-components");
+const ChartView = lazyView(() => dataViews().then((m) => m.ChartView));
+const DataTableView = lazyView(() => dataViews().then((m) => m.DataTableView));
+const FormulaView = lazyView(() => dataViews().then((m) => m.FormulaView));
+const CalculatorView = lazyView(() =>
+	dataViews().then((m) => m.CalculatorView),
+);
 
 const renderers = {
 	"google-accounts": GoogleAccountsView,

@@ -91,43 +91,14 @@ function clipRecallText(text: string, reduceBy: number): string {
 	return renderRecallBlock(kept);
 }
 
-/** A string that is itself a JSON object or array (a stored projection), as the parsed value; else null. */
-function embeddedJson(text: string): object | null {
-	if (!/^\s*[{[]/.test(text)) return null;
-	try {
-		const value: unknown = JSON.parse(text);
-		return value && typeof value === "object" ? value : null;
-	} catch {
-		return null;
-	}
-}
-
 /**
- * The longest string inside a JSON value, as a way to set it. A string that holds JSON is looked into, not
- * clipped as text: its longest string is the candidate and setting it writes the whole JSON back, so the
- * embedded document stays parseable.
+ * The longest string inside a JSON value, as a way to set it.
  */
 function longestString(value: unknown): Leaf | null {
 	let best: Leaf | null = null;
 	let bestLength = 0;
 	const visit = (node: unknown, assign: (text: string) => void) => {
 		if (typeof node === "string") {
-			const embedded = embeddedJson(node);
-			if (embedded) {
-				const inner = longestString(embedded);
-				const length = inner?.get().length ?? 0;
-				if (inner && length > bestLength) {
-					bestLength = length;
-					best = {
-						get: inner.get,
-						set: (text) => {
-							inner.set(text);
-							assign(JSON.stringify(embedded));
-						},
-					};
-				}
-				return;
-			}
 			if (node.length > bestLength) {
 				bestLength = node.length;
 				best = { get: () => node, set: assign };
@@ -269,30 +240,25 @@ export function fitAssembly(
 	systemTokens: number,
 ): ContextAssembly {
 	const budgets = contextBudgets(windowTokens);
-	const failure = assembly.volatile.some(
-		(b) => b.source === "research.failure",
-	);
 	let { stable, working, volatile } = assembly;
-	if (!failure) {
-		const historyTokens = assembly.history.turns.reduce(
-			(sum, turn) => sum + turnTokens(turn.content),
-			0,
-		);
-		// P, W and the memory-made V as one list, so the largest of them is the one clipped.
-		const all = [
-			...stable,
-			...working,
-			...volatile.filter((b) => MEMORY_VOLATILE.has(b.source)),
-		];
-		const clipped = shrink(all, historyTokens, budgets.memoryHistory);
-		stable = clipped.slice(0, stable.length);
-		working = clipped.slice(stable.length, stable.length + working.length);
-		const memory = clipped.slice(stable.length + working.length);
-		let next = 0;
-		volatile = volatile.map((block) =>
-			MEMORY_VOLATILE.has(block.source) ? memory[next++]! : block,
-		);
-	}
+	const historyTokens = assembly.history.turns.reduce(
+		(sum, turn) => sum + turnTokens(turn.content),
+		0,
+	);
+	// P, W and the memory-made V as one list, so the largest of them is the one clipped.
+	const all = [
+		...stable,
+		...working,
+		...volatile.filter((b) => MEMORY_VOLATILE.has(b.source)),
+	];
+	const memoryClipped = shrink(all, historyTokens, budgets.memoryHistory);
+	stable = memoryClipped.slice(0, stable.length);
+	working = memoryClipped.slice(stable.length, stable.length + working.length);
+	const memory = memoryClipped.slice(stable.length + working.length);
+	let nextMemory = 0;
+	volatile = volatile.map((block) =>
+		MEMORY_VOLATILE.has(block.source) ? memory[nextMemory++]! : block,
+	);
 	const task = volatile.filter((b) => !MEMORY_VOLATILE.has(b.source));
 	const clipped = shrink(
 		task,

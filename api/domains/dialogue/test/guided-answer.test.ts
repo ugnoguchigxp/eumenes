@@ -20,6 +20,7 @@ import {
 	queueLinkMigration,
 	type ToolchainRoutingPort,
 } from "..";
+import { RESEARCH_FAILURE_REPLY } from "../service/research-failure-reply";
 import { waitFor as until } from "../../../infrastructure/wait-for";
 
 const dirs: string[] = [];
@@ -201,27 +202,20 @@ for (const request of [
 	});
 }
 
-test("failed investigation answers from the current failure without borrowing a previous answer", async () => {
+test("a failed investigation is answered by the host without a model call, and its code stays with the run", async () => {
 	const h = setup(
 		{
 			failure: "invalid_control_json",
-			researchProgress: {
-				searchAttempts: 1,
-				searchesSucceeded: 1,
-				readAttempts: 0,
-				verifiedReport: false,
-			},
+			researchProgress: { searchAttempts: 1, verifiedReport: false },
 		},
 		"invalid_control_json",
 	);
-	const first = await submit(h, "古い銘柄は999ドルで時価総額88兆円でした");
-	await until(() => h.dialogue.get(first.id)?.status === "completed");
-	const next = await submit(h, "本日の株価を教えて");
-	await until(() => h.dialogue.get(next.id)?.status === "completed");
-	expect(h.contexts[1]).not.toContain("999ドル");
-	expect(h.contexts[1]).not.toContain("88兆円");
-	expect(h.contexts[1]).toContain("本日の株価を教えて");
-	expect(h.contexts[1]).toContain("verifiedReport");
-	expect(h.contexts[1]).toContain("CURRENT_RESEARCH_FAILURE");
+	const run = await submit(h, "本日の株価を教えて");
+	await until(() => h.dialogue.get(run.id)?.status === "completed");
+	expect(h.generated()).toBe(0);
+	expect(h.dialogue.answerText(run.id)).toBe(RESEARCH_FAILURE_REPLY);
+	expect(h.settled).toEqual([
+		{ outcome: "failed", code: "invalid_control_json" },
+	]);
 	await h.queue.close(100);
 });

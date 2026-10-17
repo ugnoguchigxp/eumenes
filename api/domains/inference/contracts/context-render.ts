@@ -18,7 +18,6 @@ export type ContextSource =
 	| "specialist.viewing"
 	| "specialist.handoff"
 	| "research.result"
-	| "research.failure"
 	| "operation.action"
 	| "operation.recognition"
 	| "operation.delegation"

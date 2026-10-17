@@ -39,7 +39,6 @@ for (const name of [
 	"all-layers",
 	"all-layers-selection",
 	"research-success",
-	"research-failure",
 	"results-together",
 	"command-question",
 ]) {

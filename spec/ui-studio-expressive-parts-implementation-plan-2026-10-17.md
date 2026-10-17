@@ -4,7 +4,7 @@
 
 改訂: 同日、要合意事項D1〜D6の回答を反映した。picsum画像は依頼のテーマに合わせて選べるようにする。数式表示と、状態に書き込める電卓を加える。紙芝居・タブなど部品内だけの表示状態を認める。グラフはrechartsを使ってよい。SKILLの上限は48 KB。
 
-状態: 計画・D1〜D6は決着（§9）。実装前。
+状態: 計画範囲は実装し、§10 の固定試験まで記録した（2026-10-17）。作業ツリーには composition の検証分離と、電卓・グラフ・表・数式の追修正が残る。ブラウザE2E・live（実モデル）・実機器の受入は未実施。
 
 UI自由制作（`ui.compose`）で作れる画面を、案内画面とアンケートから、ランディングページ・ECのデモ、計算やシミュレーションが動く画面、仕組みの図解まで広げる。LLMにはコードを書かせず、登録済み部品のJSON定義で表現できる範囲を広げる。
 
@@ -77,7 +77,7 @@ URLは受け付けず、取得元・テーマ・seedで画像を指定する。�
 
 キーは`source`ではなく`provider`とする。部品の`source`はホストのデータを指す既存の意味があり、UI自由制作では禁止しているため。
 
-**テーマ目録**: picsumの画像IDをテーマ別に分類した目録`picsum-themes.json`をartifact-uiに置き、schemaとSKILLのテーマ一覧はこの目録から作る。
+**テーマ目録**: picsumの画像IDをテーマ別に分類した目録[`picsum-themes.ts`](../packages/artifact-ui/src/picsum-themes.ts)をartifact-uiに置き、schemaとSKILLのテーマ一覧はこの目録から作る。
 
 - 目録はW1で作る。picsumの一覧API（`/v2/list`）からIDを取り、縮小画像を目視で確認して分類する。分類の結果と確認日を作業記録に残す。
 - 目標は1テーマあたり6枚以上、25テーマ程度。テーマ名は英小文字とハイフンにする。候補は次のとおり。
@@ -199,7 +199,7 @@ backendは保存と下書き反映のときにすべての式を構文解析し�
 | --- | --- |
 | `stat` | §4.2 |
 | `chart` | `kind`は`bar`・`line`・`area`・`pie`。`series`は1〜3件で、各件は計算値の`series`名か、定義内の静的な点（120点まで）。軸のラベル・単位・注記を持つ。凡例とツールチップを付ける。配色はアクセント色から作る。描画はrecharts（§9 D3） |
-| `data-table` | 静的な行、または`series`から作る行（列は`x`と式）。200行まで、超える分は「他N行」と表示する |
+| `data-table` | 静的な行（50行まで）、または`series`から作る行（列は`x`・`y`を使う式）。表示は200行までで、超える分は「他N行」と表示する |
 
 数式と電卓:
 
@@ -221,7 +221,7 @@ backendは保存と下書き反映のときにすべての式を構文解析し�
 | view | 内容 |
 | --- | --- |
 | `diagram` | 座標0〜100の`viewBox`に、`shape`（`rect`・`ellipse`・`polygon`）・`line`・`arrow`・`label`・`polyline`・`angle`（角度の弧と記号）の要素を80個まで置く。要素の色は`accent`・`ink`・`muted`・`positive`・`negative`・`warning`のトークン名から選ぶ。座標・長さ・角度・ラベル文字には§5の式を使える（例: 揚力の矢印の長さ`= 10 + lift * 0.4`）。要素ごとに`steps`（表示するステップ番号の配列）と`highlightAt`を持てる |
-| `stepper` | steps（2〜12件。title・body）。前へ・次へのボタンとステップの一覧を表示する。DesignSystemのNavigationStepperを再利用する。現在のステップは部品内の表示状態で持つ。`bind`（number型の状態）を指定したときだけ作品の状態へ反映し、`diagram`の`stepBind`と連動させる |
+| `stepper` | steps（2〜12件。title・body）。前へ・次へのボタンとステップの一覧を表示する。DesignSystemの部品はStepGuideを新設した（既存のNavigationStepperには前後ボタンと本文表示が無く、12件で横にあふれるため）。現在のステップは部品内の表示状態で持つ。`bind`（number型の状態）を指定したときだけ作品の状態へ反映し、`diagram`の`stepBind`と連動させる |
 
 - `diagram`はReactで要素ごとにSVGを組み立てる。文字列でのSVG挿入や`dangerouslySetInnerHTML`は使わない。図には自前のDesignSystem部品`Diagram`を新設する（rechartsでは描かない）。
 
@@ -248,7 +248,7 @@ backendは保存と下書き反映のときにすべての式を構文解析し�
 
 | 単位 | 内容 | 主な変更先 |
 | --- | --- | --- |
-| W1 基盤 | `compositionViews`、画像の型、テーマ目録`picsum-themes.json`の作成、`buildPicsumUrl`、CSP、許可リストのbackend参照、`slides`と`tabs`の許可 | artifact-ui contracts・library、ui-compositions contracts、vite.config.ts、csp.spec.ts |
+| W1 基盤 | `compositionViews`、画像の型、テーマ目録`picsum-themes.ts`の作成、`buildPicsumUrl`、CSP、許可リストのbackend参照、`slides`と`tabs`の許可 | artifact-ui contracts・library、ui-compositions contracts、vite.config.ts、csp.spec.ts |
 | W2 見せる部品 | §4.2の部品（DesignSystem部品・stories・test、view登録、描画adapter、appearanceへの対応）、紙芝居 | design-system components、artifact-ui |
 | W3 状態と式 | パーサ・評価器・検証、`CompositionModelProvider`、入力部品、`when`、`stat`・`chart`（recharts）・`data-table`、`formula`（KaTeX）、Calculatorの`inline`・`scientific`・`preset`・`resultBind` | artifact-ui、design-system、ui-compositions contracts |
 | W4 図解 | `diagram`・`stepper` | design-system、artifact-ui |
@@ -292,3 +292,101 @@ fixtureとliveは分けて記録する。
 | D4 | 電卓の置き方 | 必要なページだけで使う。ページ内に置き、計算式を入力済みにでき、結果を作品の状態へ渡せる。数式表示の`formula`と組み合わせる（§5.3） |
 | D5 | 状態の範囲 | 作品の状態（`model`）は一番外側の`layout`だけが持つ。紙芝居の場面・タブ・開閉など部品内で閉じる表示状態は、`model`なしで部品が持ってよい |
 | D6 | 定義の上限 | 16 KiB・60部品のまま。fixtureで超える例があれば報告し、引き上げは別の機会に検討する |
+
+## 10 実施記録
+
+2026-10-17。監督者1名と作業者7名で実施した。作業者の担当は、DesignSystemの見せる部品、内容・入力部品、グラフ・数式・電卓、図解、式とmodel、画像目録とCSP、SKILL・bundle・fixtureの7つ。共有ファイル（契約、`library.tsx`、`contracts.ts`、DesignSystemの`index.ts`と依存、backendの接続）は監督者が編集した。
+
+### 実装したもの
+
+- 契約: [composition-contracts.ts](../packages/artifact-ui/src/composition-contracts.ts)（22の view、画像の指定、`model`、図解の要素）。`viewRegistry`へ合流し、layoutに`model`・`when`・`slides`を追加した。
+- 式と状態:
+  - [composition-expressions.ts](../packages/artifact-ui/src/composition-expressions.ts)（自前のパーサと評価器）
+  - [composition-compute.ts](../packages/artifact-ui/src/composition-compute.ts)（Reactを使わない計算）
+  - [composition-model.tsx](../packages/artifact-ui/src/composition-model.tsx)（Provider）
+  - [composition-validate.ts](../packages/artifact-ui/src/composition-validate.ts)（意味の検証）
+  - [composition-format.ts](../packages/artifact-ui/src/composition-format.ts)
+- 画像: [composition-images.ts](../packages/artifact-ui/src/composition-images.ts)と、24テーマの目録。目録の作業記録は[picsumテーマ目録](verification/ui-studio-picsum-themes-2026-10-17.md)。
+- 描画adapter: `composition-marketing/content/data/diagram-components.tsx`。グラフ・表・数式・電卓は、rechartsとKaTeXを初回表示時に読み込む（`library.tsx`の`lazyView`）。
+- DesignSystemの部品（新設20、既存の改修1）:
+  - 新設: ContentImage、Hero、MediaCard、ProductCard、FeatureCard、Testimonial、CtaBanner、PricingCard、ComparisonTable、Faq、Timeline、StatTile、Slides、RangeSlider、ChoiceGroup、Chart、Formula、DataTable、Diagram、StepGuide
+  - 改修: Calculator（`inline`・`scientific`・`initialExpression`・`evaluate`）
+  - 依存: `recharts@3.10.1`・`katex@0.16.47`
+- backend: `allowedViews`を`compositionViews`から作るようにした。設定画面専用のlayoutの項目は拒否する。保存と下書き反映で`validateComposition`を呼ぶ。backend向けの関数は`@eumenes/artifact-ui/composition-checks`から読み、Webの初期バンドルへ式エンジンを入れない。
+- プレビュー: `appearance`ごとに`--ds-accent`を設定する（`ui-studio.css`）。
+- SKILLとbundle:
+  - 版: `skill:ui.studio@4`（約29.9 KB）、`package:ui.studio@4`、`toolchain:ui.compose@6`
+  - 例: 7件。すべて`validatedDefinition`を通ることを試験している。
+- CSP: `img-src`へ`https://picsum.photos`と`https://fastly.picsum.photos`を追加した。
+- fixture: U1〜U8（U5は飛行機と三角測量の2件）を`api/domains/ui-compositions/test/fixtures/`に置いた。backendの検証、初期状態の計算値、`ArtifactRenderer`での描画まで試験している。
+- 検証の仕組み: `packages/artifact-ui/src`の試験をbunで実行するよう、`scripts/verification-selection.ts`に規則を追加した。
+
+### 計画からの差分
+
+- 目録は`.ts`にした。図解のステップはStepGuideを新設した。`data-table`の静的な行は50行まで。
+- 三角関数・`rotate`・`angle`の角度は、度で反時計回りを正とする。
+- 式の失敗は`null`（表示は「—」）。予約名（`pi e true false i prev x y`）と、状態と計算値の重名は拒否する。
+- 電卓の結果は12桁で丸める。scientificの電卓では、暗黙の掛け算になる入力（`2π`など）に` * `を補う。
+
+### 独立レビューと修正
+
+highの指摘は無かった。medium・lowの指摘はまとめて1回で修正した。
+
+| 分類 | 修正内容 |
+| --- | --- |
+| 電卓 | 暗黙の掛け算の補完、浮動小数の丸め、`preset`を変えたときの再マウント |
+| 計算量 | 系列を引数にした`min`・`max`も評価の上限に数える。系列の点数は1系列1,200点・全体1万点を検証で拒否（`series_too_long`・`series_budget_exceeded`） |
+| 数式 | 禁止するTeXコマンドを検証で拒否（`tex_command_not_allowed`）。KaTeXの赤字エラーと例外は代替表示にする |
+| 検証の追加 | `bind_range_mismatch`・`choice_initial_not_in_options`・`state_range_invalid`・`expr_without_series` |
+| 紙芝居 | 全場面をマウントし、場面を移っても入力が残る。`when`が偽の場面は場面に数えない |
+| 入力と表示 | ChoiceGroupの無効化。modelが無いときも定数の`stat`式を評価する |
+| グラフ | x が重複する点とpieのkeyの重複を直した |
+| 画像 | 2倍解像度用の寸法で縦横比を保つ |
+
+一番外側を`tabs`にしたときにtitleが見出しとして表示される点は、設定画面と描画を共有しているため描画を変えず、SKILLに明記した。
+
+### 検証結果（fixture）
+
+- `bun run verify -- --domain ui-compositions --domain artifact`: pass。bunの試験303件、webの試験83件、design-systemの型検査とbuildを含む。
+- design-systemの新設・改修部品の単体試験: 22ファイル198件がpass。
+- capabilities・ui-compositionsのadapter・`scripts/verification.test.ts`: 95件がpass。
+- リポジトリ全体の`bun check`: 今回の範囲外の`api/application/media/music-routing.test.ts`（`runId`の欠落）だけが失敗する。
+
+### 未実施・未確認
+
+- ブラウザE2E（2026-10-17、利用者の許可を得て実行）:
+  - 実行方法: 初回の実行時は、`bunx playwright test`（Node 24）でどのspecも読込みに失敗した。`client`が読む`eumenes-memory`がTypeScriptのまま`node_modules`にあり、Nodeの型除去が`node_modules`内を扱わないため。下の対応後は、Nodeのままの`bunx playwright test --list`で全specを認識する。この下の2件の結果は、対応前に`bun --bun x playwright test`で得たもの。
+  - 対応（利用者の指示）: `eumenes-memory`を、ビルド済みのdist（JavaScriptと型宣言）を同梱する0.0.2にし、`vendor/eumenes-memory/eumenes-memory-0.0.2-6643656f3383.tgz`として取り込んだ。
+    - eumenes_memory側: `tsconfig.build.json`、`exports`をdistへ、`files`をdistだけに、`prepack`でbuild。`verify:all`は548件pass。
+    - Eumenes側: 型検査とmemory・worldのverify（314件）がpass。
+  - `tests/browser/csp.spec.ts`: 1件pass。picsumを含むimg-srcで主要画面のCSP違反は無い。
+  - `tests/browser/ui-compositions.spec.ts`: 7件すべてfail。依頼を送った直後に会話が`invalid_conversation_operation`で止まり、専門担当へ切り替わらない。この失敗は、別の作業として進行中の初動の要求分析（`api/domains/dialogue/service/request-analysis.ts`、未追跡）が、fixtureの台本どおりの会話モデルに合わないことによる。今回の変更の範囲外。その作業が落ち着いてから再実行する。
+- Storybookと実ブラウザでの見た目（コントラスト、図解の文字の重なり、KaTeXのフォント）は確認していない。
+- live（実モデル）の受入、実機器（音声）の受入は未実施。
+- `bun run bundle:check`は記録値を超えている。
+  - 測定値: エントリgzip 112,035 B、初期読込み全体259,653 B。記録値はそれぞれ101,087 B・247,357 B。
+  - 今回の変更の寄与は、`viewRegistry`へ合流した新しいviewのschema（gzipで約4 KB）。残りは、同時期に並行して進んだ別の作業の変更によると見ている（未分離）。
+  - 利用者の判断（2026-10-17、バンドルサイズは重視しない）により、`bun scripts/bundle-budget.ts --write`で記録値を現状に更新した。
+
+## 11 再開手順
+
+2026-10-17の時点で、ブラウザE2Eの再実行を保留している。LARMで圧縮通信の対応が進行中で、E2Eの環境が使えない可能性があるため（利用者の判断）。次の条件がそろったら、利用者の指示を受けてから再開する。
+
+| 条件 | 確認方法 |
+| --- | --- |
+| LARMの圧縮通信の対応が落ち着いている | 利用者に確認する |
+| 初動の要求分析（`api/domains/dialogue/service/request-analysis.ts`）とfixtureの会話モデルが合っている | `tests/browser/ui-compositions.spec.ts`の最初の試験で、依頼後に`invalid_conversation_operation`が出ないこと |
+
+再開時の作業:
+
+1. `bunx playwright test tests/browser/csp.spec.ts tests/browser/ui-compositions.spec.ts`を実行する。Nodeのままで動く（eumenes-memory 0.0.2以降）。
+2. ui-compositionsの既存7件が通ったら、今回の部品をブラウザで確かめるE2Eを追加する。fixtureの専門担当が`api/domains/ui-compositions/test/fixtures/`の定義（例: U4の老後資金、U5bの三角測量）を反映し、次の点を確かめる。
+   - picsum画像がCSP違反なしで表示されること
+   - グラフの幅が0にならないこと
+   - スライダーを動かすとstatとグラフが更新されること
+   - 電卓の「=」で後続の数式の値が更新されること
+   - 紙芝居で場面を移っても入力が残ること
+   - ダークテーマで文字が読めること
+3. 結果を§10の「未実施・未確認」へ追記し、`spec/README.md`の状態を更新する。
+4. 未実施のまま残る受入: live（実モデル。U1〜U7を1件ずつ依頼し、一回目の反映の成否、失敗時の自己修正、画像のテーマが依頼に合うかを記録）と、実機器（音声での依頼と修正）。
+

@@ -1,3 +1,5 @@
+/* oxlint-disable jsx-a11y/no-noninteractive-tabindex, jsx-a11y/no-noninteractive-element-interactions --
+   The keypad group takes focus and key presses so numbers can be typed; its buttons stay the interactive parts. */
 import { Calculator as CalculatorIcon } from "lucide-react";
 import { type KeyboardEvent, useCallback, useState } from "react";
 import { Button } from "@/components/Button";
@@ -26,7 +28,8 @@ export interface CalculatorProps {
 
 const ERROR_TEXT = "エラー";
 const OPERATORS = ["+", "-", "*", "/"] as const;
-const isOperator = (value: string) => (OPERATORS as readonly string[]).includes(value);
+const isOperator = (value: string) =>
+	(OPERATORS as readonly string[]).includes(value);
 
 interface Key {
 	/** Text on the key. */
@@ -105,9 +108,7 @@ export const Calculator = ({
 
 	const calculate = (source: string): number | null => {
 		try {
-			const result = evaluate
-				? evaluate(source)
-				: evaluateExpression(source);
+			const result = evaluate ? evaluate(source) : evaluateExpression(source);
 			return result !== null && Number.isFinite(result) ? result : null;
 		} catch {
 			return null;
@@ -142,9 +143,11 @@ export const Calculator = ({
 			return;
 		}
 		const insert = key.insert ?? "";
-		const fresh = expression === ERROR_TEXT || (showsResult && startsOperand(insert));
+		const fresh =
+			expression === ERROR_TEXT || (showsResult && startsOperand(insert));
 		const base = fresh ? "0" : expression;
-		const replacesZero = base === "0" && startsOperand(insert) && insert !== ".";
+		const replacesZero =
+			base === "0" && startsOperand(insert) && insert !== ".";
 		let text =
 			scientific && (isOperator(insert) || insert === "^")
 				? ` ${insert} `

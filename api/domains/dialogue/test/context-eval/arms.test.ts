@@ -241,33 +241,6 @@ test("A5 puts the reference blocks in the user role behind the history; host rec
 	expect(historyIndexes(a.history.turns, a5.messages)).toEqual([1, 2, 3, 4]);
 });
 
-test("a failed research answer is the current assembly in every arm", () => {
-	const failed: ContextAssembly = {
-		...hostile(),
-		volatile: [
-			{
-				source: "research.failure",
-				authority: "host_record",
-				freshness: "this_turn",
-				certainty: "host_confirmed",
-				body: {
-					kind: "json",
-					value: {
-						failureCode: "research_unavailable",
-						projection: undefined,
-						nowMs: 0,
-					},
-				},
-			},
-		],
-	};
-	const expected = renderContext(failed, "current").messages;
-	for (const arm of arms) {
-		const out = assertRenderInvariants(arm, failed, "failure");
-		expect(out.messages).toEqual(expected);
-	}
-});
-
 test("the invariants reject an unwrapped user message, a request that is not last, and a foreign history message", () => {
 	const a = hostile();
 	const good = byId("A2").build(a);

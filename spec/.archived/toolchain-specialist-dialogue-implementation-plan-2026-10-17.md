@@ -32,19 +32,19 @@
 
 ## 2 現行実装と再利用の範囲
 
-以下は計画作成時点のコード確認による。旧方式の実装・検証記録は[従来のUI自由制作計画](.archived/openui-artifact-free-creation-implementation-plan-2026-10-14.md)に残し、新方式の受入結果とは区別する。
+以下は計画作成時点のコード確認による。旧方式の実装・検証記録は[従来のUI自由制作計画](openui-artifact-free-creation-implementation-plan-2026-10-14.md)に残し、新方式の受入結果とは区別する。
 
 | 現行の仕組みと根拠 | 再利用するもの | 今回不足しているもの |
 | --- | --- | --- |
-| [ツールチェーン登録](../api/domains/capabilities/bundles/ui-compositions.bundle.json) | profile、Skill、package、binding、Artifactの版管理と登録adapter | 継続対話の対応宣言、直接応答する実行契約 |
-| [command担当](../api/domains/dialogue/service/toolchain-command.ts) | 指示・公開ツールの合成、保存済みサブエージェント設定、推論receipt検査 | 現状はinvoke／clarifyと通常会話への返却。一回の呼出しで担当sessionを解放する |
-| [確認質問](../api/domains/dialogue/contracts/command-interactions.ts) | 質問の回答契約、版・世代・取消の検査方法 | 一操作の質問用であり、制作中の会話相手を表すものではない |
-| [UI生成](../api/domains/ui-compositions/service/handler.ts) | キュー、入力画像の検査、出力検証、古い結果の拒否 | 旧画面はfieldsだけを渡す。生成はmaintenance controlを使いLARM固定 |
-| [作品保存](../api/domains/ui-compositions/service/index.ts) | 公開transaction操作、scope、receipt、フォーム回答の検査 | 依頼受付で作品を上書きする。下書きと明示保存の分離がない |
-| [UI構成定義](../api/domains/ui-compositions/contracts/index.ts) | 登録部品、型検査、OpenUI parser | 見出し・カード・フォームの固定順序と限定的な外観 |
-| [共通adapter](../api/domains/tool-runtime/contracts/adapters.ts) | 操作の権限、所有者、入出力、冪等性、source取得 | 専門対話中の限定された対象を同じ検査へ接続する |
-| [Webの下書き](../web/src/domains/toolchain-artifacts/drafts.ts) | 未保存状態、保存競合の表示方針 | field単位の変更で、Undo／Redoやbackendの生成案との同期は持たない |
-| [会話画面](../web/src/workspace/useWorkspace.ts) | 入力、添付、進捗、取消、既存会話表示 | 現状はmain固定。専門担当の表示と発言先の固定が必要 |
+| [ツールチェーン登録](../../api/domains/capabilities/bundles/ui-compositions.bundle.json) | profile、Skill、package、binding、Artifactの版管理と登録adapter | 継続対話の対応宣言、直接応答する実行契約 |
+| [command担当](../../api/domains/dialogue/service/toolchain-command.ts) | 指示・公開ツールの合成、保存済みサブエージェント設定、推論receipt検査 | 現状はinvoke／clarifyと通常会話への返却。一回の呼出しで担当sessionを解放する |
+| [確認質問](../../api/domains/dialogue/contracts/command-interactions.ts) | 質問の回答契約、版・世代・取消の検査方法 | 一操作の質問用であり、制作中の会話相手を表すものではない |
+| [UI生成](../../api/domains/ui-compositions/service/handler.ts) | キュー、入力画像の検査、出力検証、古い結果の拒否 | 旧画面はfieldsだけを渡す。生成はmaintenance controlを使いLARM固定 |
+| [作品保存](../../api/domains/ui-compositions/service/index.ts) | 公開transaction操作、scope、receipt、フォーム回答の検査 | 依頼受付で作品を上書きする。下書きと明示保存の分離がない |
+| [UI構成定義](../../api/domains/ui-compositions/contracts/index.ts) | 登録部品、型検査、OpenUI parser | 見出し・カード・フォームの固定順序と限定的な外観 |
+| [共通adapter](../../api/domains/tool-runtime/contracts/adapters.ts) | 操作の権限、所有者、入出力、冪等性、source取得 | 専門対話中の限定された対象を同じ検査へ接続する |
+| [Webの下書き](../../web/src/domains/toolchain-artifacts/drafts.ts) | 未保存状態、保存競合の表示方針 | field単位の変更で、Undo／Redoやbackendの生成案との同期は持たない |
+| [会話画面](../../web/src/workspace/useWorkspace.ts) | 入力、添付、進捗、取消、既存会話表示 | 現状はmain固定。専門担当の表示と発言先の固定が必要 |
 
 まず既存の登録・推論・キュー・検証・保存を再利用する。専用の共通拡張が必要な根拠は、現行commandが通常会話へ返る契約であること、作品の明示保存とUndo／Redoがないこと。意味解釈をコードへ移さず、宛先・作業状態・権限・版の管理だけを追加する。
 
@@ -123,7 +123,7 @@ dialogueが現在の専門対話を所有する。概念上、以下を保持す
 
 期限の正本はdialogueの `expiresAt` に一本化する。初期案の無操作24時間はこの期限を指し、ui-compositionsには独立した期限判定・自動破棄timerを持たせない。その作業への利用者の発言受付、採用された明示編集操作、保留からの再開で期限を更新する。poll、表示切替、LLMの途中出力、保留中の通常会話は延長理由にしない。既に期限切れの作業を新しい発言で延命せず、各ターンの実行期限もsession期限を超えない。
 
-applicationの既存[lifecycle機構](../api/application/server-lifecycles.ts)に定期回収を登録する。dialogueの公開操作で期限切れと回収待ちの候補を列挙し、applicationが同じwriter transactionで「所有domainの破棄、jobの失効、dialogueの終了、宛先の復帰」を行う。取得・入力・結果採用の各入口でも現在時刻と期限を検査するため、定期回収の実行前でも期限切れの案は更新・保存・採用できない。初期の回収間隔は60秒を候補としてP0で確定し、ブラウザ接続がなくても実行する。起動時も同じ終了処理を使い、通常運転中の回収と別の破棄実装を作らない。
+applicationの既存[lifecycle機構](../../api/application/server-lifecycles.ts)に定期回収を登録する。dialogueの公開操作で期限切れと回収待ちの候補を列挙し、applicationが同じwriter transactionで「所有domainの破棄、jobの失効、dialogueの終了、宛先の復帰」を行う。取得・入力・結果採用の各入口でも現在時刻と期限を検査するため、定期回収の実行前でも期限切れの案は更新・保存・採用できない。初期の回収間隔は60秒を候補としてP0で確定し、ブラウザ接続がなくても実行する。起動時も同じ終了処理を使い、通常運転中の回収と別の破棄実装を作らない。
 
 所有domainの破棄に失敗したらtransaction全体をrollbackし、domain側だけ残したまま `ended` にしない。失敗を安全な分類で記録し、別transactionで `closing` と回収待ちを記録して操作を閉じる。期限切れ・権限失効時はこの記録にも失敗しても入口のguardが利用を拒否する。次の定期回収で同じ冪等な終了操作を再試行する。回収失敗を完了扱いせず、重複実行を防ぎ、繰り返す失敗は監視可能な状態で残す。外部processの停止はcommit後に行い、停止が遅れても失効済みの結果を採用しない。
 
@@ -144,7 +144,7 @@ applicationの既存[lifecycle機構](../api/application/server-lifecycles.ts)�
 
 専門担当に渡す情報は、今回の依頼、編集中の会話、現在の成果物、利用者が指定した資料、登録された担当指示・操作とhostの作業状態に限定する。World／Memoryの参照ツール・更新ツールを公開せず、長期記憶、作業要約、recall、Worldの候補提示、記憶由来の追加文脈も合成しない。
 
-会話表示用の保存と、通常担当の文脈・自動学習への利用を分ける。dialogueが受理時に専門対話のmetadataを確定し、conversationが保持する。通常担当の[context compiler](../api/domains/dialogue/service/context-compiler.ts)、routing用履歴、topicTexts、要約・recallの入口では、専門対話の生発言を対象外にする。memoryが無効な場合の直近履歴fallbackも同じ条件を使う。専門対話が大量にあるため直前の通常会話が履歴枠から押し出されないよう、対象を絞ってから件数・容量制限を適用する。
+会話表示用の保存と、通常担当の文脈・自動学習への利用を分ける。dialogueが受理時に専門対話のmetadataを確定し、conversationが保持する。通常担当の[context compiler](../../api/domains/dialogue/service/context-compiler.ts)、routing用履歴、topicTexts、要約・recallの入口では、専門対話の生発言を対象外にする。memoryが無効な場合の直近履歴fallbackも同じ条件を使う。専門対話が大量にあるため直前の通常会話が履歴枠から押し出されないよう、対象を絞ってから件数・容量制限を適用する。
 
 dialogueのrun終了処理から専門対話をMemoryのexchangeへ登録せず、World／Memoryの自動抽出・要約・索引化の対象にしない。conversationの変更outboxを参照するWorld側も、公開されたmetadataで対象を除外し、変更一覧と本文の直接参照の両方を検査する。除外イベントを読み飛ばしてもcursorを進める。既存の `scheduled_prompt` や「忘却」の意味へ便宜的に置き換えず、取り込み可否の明示的な契約を追加する。既存の通常会話の参照・学習方針は変えない。
 
@@ -350,7 +350,7 @@ bunx playwright test tests/browser/ui-compositions.spec.ts tests/browser/toolcha
 
 実施記録には段階、入力条件、変更・登録revision、確認結果、失敗地点、残作業、次の続行条件を残す。実装済み、固定試験済み、実モデル受入済み、実機器受入済みを区別する。サーバーの長時間処理は進捗がある限り経過時間だけで再起動しない。
 
-関連する手順: [登録と拡張](../docs/toolchain-extension.md)、[検証手順](../docs/toolchain-extension-verification.md)、[domain境界](../docs/domains.md)、[OpenUI Artifact](../docs/openui-artifact.md)。
+関連する手順: [登録と拡張](../../docs/toolchain-extension.md)、[検証手順](../../docs/toolchain-extension-verification.md)、[domain境界](../../docs/domains.md)、[OpenUI Artifact](../../docs/openui-artifact.md)。
 
 ## 14 外部レビューと追加指示の反映
 

@@ -1,0 +1,13 @@
+{
+  "stage": "final",
+  "status": 200,
+  "settings": {
+    "revision": 1,
+    "serviceId": "ocr-host",
+    "baseUrl": "http://192.168.0.130:18794",
+    "credentialConfigured": true,
+    "sharedCredentialAvailable": true
+  },
+  "credentialScan": "passed",
+  "productionSourceChangedThisTurn": false
+}

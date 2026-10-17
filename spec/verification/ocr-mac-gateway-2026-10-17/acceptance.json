@@ -1,0 +1,166 @@
+{
+  "records": [
+    "9668ff59-33cc-4773-8d66-1b0251c88646",
+    "69c92a74-3aff-4837-b71e-bfba039b2457"
+  ],
+  "events": [
+    {
+      "stage": "gateway-image-response",
+      "status": 200
+    },
+    {
+      "stage": "gateway-image-validated",
+      "kind": "image",
+      "frames": 1,
+      "lines": 3,
+      "textDetected": true
+    },
+    {
+      "stage": "gateway-video-response",
+      "status": 202
+    },
+    {
+      "stage": "gateway-video-accepted",
+      "jobId": "86f21c8a-cf71-47ea-895c-e5da5bcbb540"
+    },
+    {
+      "stage": "gateway-video-state",
+      "jobId": "86f21c8a-cf71-47ea-895c-e5da5bcbb540",
+      "httpStatus": 200,
+      "state": "running"
+    },
+    {
+      "stage": "gateway-video-state",
+      "jobId": "86f21c8a-cf71-47ea-895c-e5da5bcbb540",
+      "httpStatus": 200,
+      "state": "completed"
+    },
+    {
+      "stage": "gateway-video-validated",
+      "jobId": "86f21c8a-cf71-47ea-895c-e5da5bcbb540",
+      "kind": "video",
+      "frames": 6,
+      "lines": 18,
+      "textDetected": true
+    },
+    {
+      "stage": "backend-upload",
+      "id": "9668ff59-33cc-4773-8d66-1b0251c88646",
+      "file": "synthetic.png",
+      "status": 202,
+      "requestId": "94bc393c-39ae-476a-af2a-53c3c278f7b9"
+    },
+    {
+      "stage": "backend-state",
+      "id": "9668ff59-33cc-4773-8d66-1b0251c88646",
+      "state": "starting",
+      "revision": 1,
+      "errorCode": null
+    },
+    {
+      "stage": "backend-state",
+      "id": "9668ff59-33cc-4773-8d66-1b0251c88646",
+      "state": "completed",
+      "revision": 2,
+      "errorCode": null
+    },
+    {
+      "stage": "backend-image-validated",
+      "id": "9668ff59-33cc-4773-8d66-1b0251c88646",
+      "kind": "image",
+      "frames": 1,
+      "lines": 3,
+      "textDetected": true
+    },
+    {
+      "stage": "backend-original-validated",
+      "id": "9668ff59-33cc-4773-8d66-1b0251c88646",
+      "status": 200,
+      "mime": "image/png",
+      "bytes": 21051,
+      "sha256": "905479335e51e483b7fc747b8c4885f6bef06f86e02bae79ef019bd015dacbbf"
+    },
+    {
+      "stage": "backend-access-denied",
+      "resource": "result",
+      "mode": "missing",
+      "status": 401
+    },
+    {
+      "stage": "backend-access-denied",
+      "resource": "result",
+      "mode": "invalid",
+      "status": 401
+    },
+    {
+      "stage": "backend-access-denied",
+      "resource": "original",
+      "mode": "missing",
+      "status": 401
+    },
+    {
+      "stage": "backend-access-denied",
+      "resource": "original",
+      "mode": "invalid",
+      "status": 401
+    },
+    {
+      "stage": "backend-upload",
+      "id": "69c92a74-3aff-4837-b71e-bfba039b2457",
+      "file": "cancel.mp4",
+      "status": 202,
+      "requestId": "11be3bba-79d8-42bf-9ff5-da4d3b0e4ff3"
+    },
+    {
+      "stage": "backend-state",
+      "id": "69c92a74-3aff-4837-b71e-bfba039b2457",
+      "state": "starting",
+      "revision": 1,
+      "errorCode": null
+    },
+    {
+      "stage": "backend-state",
+      "id": "69c92a74-3aff-4837-b71e-bfba039b2457",
+      "state": "queued",
+      "revision": 2,
+      "errorCode": null
+    },
+    {
+      "stage": "backend-cancel-response",
+      "id": "69c92a74-3aff-4837-b71e-bfba039b2457",
+      "status": 200,
+      "requestId": "9a7fb288-8e8a-4359-997f-416c1d538518"
+    },
+    {
+      "stage": "backend-state",
+      "id": "69c92a74-3aff-4837-b71e-bfba039b2457",
+      "state": "cancelling",
+      "revision": 3,
+      "errorCode": null
+    },
+    {
+      "stage": "backend-state",
+      "id": "69c92a74-3aff-4837-b71e-bfba039b2457",
+      "state": "cancelled",
+      "revision": 4,
+      "errorCode": null
+    },
+    {
+      "stage": "backend-cancellation-validated",
+      "id": "69c92a74-3aff-4837-b71e-bfba039b2457",
+      "state": "cancelled",
+      "resultDiscarded": true,
+      "upstreamCancellationConfirmed": true
+    },
+    {
+      "stage": "late-result-guard",
+      "id": "69c92a74-3aff-4837-b71e-bfba039b2457",
+      "unchanged": true
+    },
+    {
+      "stage": "complete",
+      "gateway": "http://192.168.0.130:18794",
+      "backendSettingsRevision": 1
+    }
+  ]
+}

@@ -55,6 +55,15 @@ function fixture(
 		startupPolicy: { minWarmInstances: 0, idleTtlSeconds: 0 },
 	});
 	const fetcher = async (url: RequestInfo | URL, init: RequestInit = {}) => {
+		const compression = init as RequestInit & {
+			compress: unknown;
+			decompress: unknown;
+		};
+		expect(compression.compress).toBe(init.body == null ? false : "gzip");
+		expect(compression.decompress).toBe(true);
+		expect(new Headers(init.headers).get("Accept-Encoding")).toBe(
+			new Headers(init.headers).has("Range") ? "identity" : "gzip",
+		);
 		const u = new URL(String(url));
 		const path = u.pathname;
 		const headers = new Headers(init.headers);

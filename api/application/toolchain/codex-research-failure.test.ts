@@ -5,10 +5,11 @@ import { join } from "node:path";
 import { createCodexResearch } from "../../domains/inference";
 import type { LarmPort } from "../../domains/larm";
 import { configureLogging } from "../../infrastructure/logger";
+import { RESEARCH_FAILURE_REPLY } from "../../domains/dialogue/service/research-failure-reply";
 import { answerAnalysis } from "./analysis-round.fixture";
 import { harness } from "./toolchain.fixture";
 
-test("SDK process failure reaches correlated logs and current answer context with zero Web operations", async () => {
+test("SDK process failure reaches correlated logs and is answered by the fixed reply with zero Web operations", async () => {
 	const dir = await mkdtemp(join(tmpdir(), "eumenes-sdk-failure-"));
 	const command = join(dir, "codex");
 	await writeFile(
@@ -25,7 +26,7 @@ test("SDK process failure reaches correlated logs and current answer context wit
 			},
 		},
 	});
-	let currentContext = false;
+	let failureAskedOfModel = false;
 	const model: LarmPort = {
 		status: () => ({ state: "ready", capabilities: ["llm"] }),
 		connect: async () => {},
@@ -67,25 +68,8 @@ test("SDK process failure reaches correlated logs and current answer context wit
 				]);
 				return "";
 			}
-			const notice = messages.find(
-				(m) =>
-					m.role === "system" &&
-					m.content.includes("CURRENT_RESEARCH_FAILURE="),
-			)!;
-			expect(
-				JSON.parse(
-					notice.content.split("CURRENT_RESEARCH_FAILURE=")[1]!.split("\n")[0]!,
-				),
-			).toMatchObject({ code: "codex_research_http_401" });
-			// A failed research turn answers from the current request only; earlier history is dropped.
-			expect(messages.some((m) => m.content.includes("制御JSON"))).toBe(false);
-			const result = JSON.parse(messages.at(-3)!.content);
-			expect(result.report.researchProgress).toMatchObject({
-				searchAttempts: 0,
-				readAttempts: 0,
-				verifiedReport: false,
-			});
-			currentContext = true;
+			// The failure is answered by the host: the model is not asked to phrase it.
+			failureAskedOfModel = true;
 			return "調査担当の認証で失敗し、情報を取得できませんでした。";
 		},
 	};
@@ -112,7 +96,8 @@ test("SDK process failure reaches correlated logs and current answer context wit
 		expect(
 			(await h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 }))?.status,
 		).toBe("completed");
-		expect(currentContext).toBe(true);
+		expect(failureAskedOfModel).toBe(false);
+		expect(h.dialogue.answerText(run.id)).toBe(RESEARCH_FAILURE_REPLY);
 		expect(h.acquisitions).toBe(0);
 		const failed = lines
 			.map((l) => JSON.parse(l))

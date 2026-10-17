@@ -25,7 +25,7 @@ export type SelectionAnalysis = {
 		| "creation"
 		| "chat";
 	freshness: "live" | "not_live";
-	next: "answer" | "clarify" | "find_toolchain";
+	next: "answer" | "report_unavailable" | "toolchain";
 	impact: "none" | "create" | "modify_existing" | "irreversible";
 	approved: boolean;
 };

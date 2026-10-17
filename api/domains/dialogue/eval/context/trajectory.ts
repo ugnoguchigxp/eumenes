@@ -2,7 +2,7 @@
  * The conversation trajectory the prefix-stability metric is measured on (ContextWindow design section 7.2): ten
  * turns of one conversation, materialized on the real services, with the calls a turn makes. It includes memory
  * steps (a kept exchange, a long-term item, a summary, a notice, a recalled exchange), an operation result,
- * a research success and a research failure, and a selection call. Fully deterministic: the same code gives the
+ * a research success, and a selection call. Fully deterministic: the same code gives the
  * same assemblies, so a difference between arms is the format's.
  *
  * Offline evaluation only. The calls are returned as product assemblies; an arm renders each of them.
@@ -126,8 +126,8 @@ const RESEARCH_REPORT = {
 };
 
 /**
- * Ten turns. Turn 4 has a selection call, 5 an operation result, 6 a research success, 7 a research failure,
- * 10 an operation result of another kind. The memory steps put a kept exchange and a long-term item in (after 3),
+ * Ten turns. Turn 4 has a selection call, 5 an operation result, 6 a research success, 7 a failed research
+ * (answered by the host, so it has no call of its own), 10 an operation result of another kind. The memory steps put a kept exchange and a long-term item in (after 3),
  * a summary and a notice (after 6) and a recalled exchange (after 8).
  */
 export const DEFAULT_TRAJECTORY: Trajectory = {
@@ -196,14 +196,8 @@ export const DEFAULT_TRAJECTORY: Trajectory = {
 		},
 		{
 			user: "京都の来月の祭りの日程も調べて",
-			assistant: "調査が完了しなかったため、日程は確認できませんでした。",
-			calls: [
-				{ kind: "initial" },
-				{
-					kind: "result",
-					seed: { research: { failureCode: "research_unavailable" } },
-				},
-			],
+			assistant: "失敗しました。",
+			calls: [{ kind: "initial" }],
 		},
 		{
 			user: "宿の予約はまた今度にする",

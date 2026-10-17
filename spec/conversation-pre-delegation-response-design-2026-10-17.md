@@ -2,7 +2,7 @@
 
 作成日: 2026-10-17
 
-状態: 2026-10-17、利用者が基本案に合意。「一部はサブエージェントと完全に入れ替わる」という補足を反映して実装済み。対象fixture検証済み。live・実機器検証は未実施。
+状態: 2026-10-17、基本案は実装済み。§7 と §8 の対象 fixture は記録済み。§9 の発話契約と再生待ちも fixture 済み。担当探索の省略と、live での意味の保持は未解決。§10 の修復はコードに入っているが、本書にはその検証結果をまだ書いていない。live・実機器は未実施。
 
 追記: 同日の実利用で、通常担当が検索をせず天気と出典を生成したこと、および長い返答を読み上げたことを確認。上記は初回実装時点の記録であり、受入完了を意味しない。利用者が改めて示した5条件と修正範囲は§9を正本とする。
 
@@ -16,7 +16,7 @@
 
 ## 2. 現状と再利用する機構
 
-確認した設計は[ツールチェーンの定形セット](.archived/toolchain-set-routing-design-2026-10-12.md)、[専門担当との対話編集](toolchain-specialist-dialogue-implementation-plan-2026-10-17.md)、[ツールチェーンの運用](../docs/toolchain.md)、[通知](../docs/realtime.md)。
+確認した設計は[ツールチェーンの定形セット](.archived/toolchain-set-routing-design-2026-10-12.md)、[専門担当との対話編集](.archived/toolchain-specialist-dialogue-implementation-plan-2026-10-17.md)、[ツールチェーンの運用](../docs/toolchain.md)、[通知](../docs/realtime.md)。
 
 | 現状の根拠 | 変更案 |
 | --- | --- |

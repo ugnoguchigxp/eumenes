@@ -3,32 +3,27 @@ import type {
 	NativeToolCall,
 } from "../../../infrastructure/chat-stream";
 import { systemContext } from "../../../infrastructure/system-context";
+import type { ToolchainCard } from "../../capabilities";
+import {
+	SPOKEN_REPLY_MAX_CHARS,
+	SPOKEN_REPLY_MAX_SENTENCES,
+} from "../../delivery";
 import type { SelectionAnalysis } from "../../toolchain-history";
 import type { ChatMessage } from "./context";
 import { LlmJsonError, parseLlmJson } from "../../../infrastructure/llm-json";
 import { validationIssues } from "../../../infrastructure/validation-log";
 import { z } from "zod";
-import { operationRejection } from "./conversation-tools";
+import {
+	announcementSchema,
+	operationRejection,
+	toolchainDescription,
+	unavailableReply,
+	type SessionOffers,
+} from "./conversation-tools";
 
-/** What the first round judged about the request. It decides the second round; it executes nothing. */
+/** What the first round judges about the request: the same four values in every function it offers. */
 const requestAnalysis = z
 	.object({
-		goal: z
-			.string()
-			.trim()
-			.min(1)
-			.max(500)
-			.describe(
-				"依頼の分析結果。利用者が何を知りたい・してほしいかを、対象と目的が分かる一文で書く。直前の1往復を受けた続きの依頼は、補って完結した依頼にする。相対的な日時は具体的な日付に直さず、原文の表現を残す。",
-			),
-		deliverable: z
-			.string()
-			.trim()
-			.min(1)
-			.max(120)
-			.describe(
-				"期待される成果の形。例: 口頭の答え、根拠付きの調査結果、画像、操作の完了、過去発言の引用。",
-			),
 		kind: z
 			.enum([
 				"knowledge",
@@ -46,25 +41,10 @@ const requestAnalysis = z
 			.describe(
 				"答えが時間とともに変わり、現在時点の情報が必要ならlive。そうでなければnot_live。",
 			),
-		conditions: z
-			.array(z.string().trim().min(1).max(120))
-			.max(20)
-			.describe(
-				"依頼にある対象・場所・日時・数値を原文のまま並べる。相対的な日時は解決しない。なければ空。",
-			),
-		missing: z
-			.array(z.string().trim().min(1).max(120))
-			.max(10)
-			.describe("進めるために欠けている必須情報。なければ空。"),
-		next: z
-			.enum(["answer", "clarify", "find_toolchain"])
-			.describe(
-				"次の段階。answer=手元の知識だけで答える、clarify=欠けた必須情報を尋ねる(missingがあるときだけ)、find_toolchain=担当を探して任せる。",
-			),
 		impact: z
 			.enum(["none", "create", "modify_existing", "irreversible"])
 			.describe(
-				"依頼の影響。none=答える・調べる・参照するだけ、create=新しい成果物を作るだけで既存を変えない、modify_existing=既存の機能・コード・データ・設定・保存物を変える、irreversible=削除・外部送信・公開など取り消せない。",
+				"依頼の種類ではなく、既存のものへの影響。none=答える・調べる・参照するだけ、create=新しいものを設定・作成するだけで既存を変えない、modify_existing=既存の機能・コード・データ・設定・保存物を変える、irreversible=削除・外部送信・公開など取り消せない。",
 			),
 		approved: z
 			.boolean()
@@ -75,37 +55,93 @@ const requestAnalysis = z
 	.strict();
 export type RequestAnalysis = z.infer<typeof requestAnalysis>;
 
-/** The first round's only function: it records the judgment and neither selects a specialist nor executes work. */
-export const analyzeTool: NativeTool = {
-	type: "function",
-	function: {
-		name: "analyze_request",
-		description:
-			"今回の依頼を分析した結果を記録します。依頼の目的、成果の形、問い合わせの種類、情報の鮮度、欠けている必須情報、次の段階を判断します。回答の作成や担当の実行はしません。",
-		parameters: z.toJSONSchema(requestAnalysis) as Record<string, unknown>,
-	},
-};
+/** The function a toolchain's turn into the second round is chosen by: the analysis and the notice to the user. */
+const toolchainChoice = requestAnalysis.extend({
+	announcement: announcementSchema,
+});
+const unavailableChoice = requestAnalysis.extend(unavailableReply.shape);
 
-/** Structure only: the kinds and the freshness that cannot be answered from hand, and when a question is allowed. */
-function consistent(analysis: RequestAnalysis) {
-	const delegated =
-		analysis.kind === "live_info" ||
-		analysis.kind === "past_conversation" ||
-		analysis.kind === "action" ||
-		analysis.kind === "creation" ||
-		analysis.freshness === "live";
-	if (delegated && analysis.next !== "find_toolchain")
-		throw operationRejection("analysis_next_mismatch");
-	if (analysis.next === "clarify" && analysis.missing.length === 0)
-		throw operationRejection("analysis_clarify_without_missing");
+export const ANSWER_FUNCTION = "answer";
+export const UNAVAILABLE_FUNCTION = "report_unavailable";
+
+/**
+ * The first round's decision. `next` is what the called function means: `answer` is answered from hand in the
+ * second round, `report_unavailable` is the answer itself, and a toolchain's function hands the request over
+ * (its `announcement` is the notice to the user before the second round writes the request for it).
+ */
+export type FirstRound = RequestAnalysis &
+	(
+		| { next: "answer" }
+		| { next: "report_unavailable"; reply: string }
+		| { next: "toolchain"; card: ToolchainCard; announcement: string }
+	);
+
+function jsonSchema(schema: z.ZodType) {
+	return z.toJSONSchema(schema) as Record<string, unknown>;
 }
 
-/** The one `analyze_request` call of the first round, checked; anything else goes back for the structural repair. */
-export function validateAnalysis(calls: NativeToolCall[]): RequestAnalysis {
+/**
+ * The functions of the first round: each candidate toolchain, `answer` and `report_unavailable`. All carry the
+ * analysis; the toolchain's also the notice. None writes the answer or the request for the specialist.
+ */
+export function analysisTools(
+	cards: readonly ToolchainCard[],
+	sessions: SessionOffers = new Map(),
+): NativeTool[] {
+	const offered = new Set(cards.map((c) => c.functionName));
+	return [
+		...cards.map((card) => ({
+			type: "function" as const,
+			function: {
+				name: card.functionName,
+				description:
+					toolchainDescription(card, offered, sessions.has(card.functionName)) +
+					"。この担当へ任せるときに呼び、予告(announcement)と依頼の分析だけを書きます",
+				parameters: jsonSchema(toolchainChoice.strict()),
+			},
+		})),
+		{
+			type: "function" as const,
+			function: {
+				name: ANSWER_FUNCTION,
+				description:
+					"手元の知識だけで答えられる説明と雑談のときに呼び、依頼の分析だけを書きます。回答文はこの段階では書かず、次の段階で作ります。現在の外部の情報・保存済みの会話の確認・操作・制作が必要な依頼には使えません。",
+				parameters: jsonSchema(requestAnalysis),
+			},
+		},
+		{
+			type: "function" as const,
+			function: {
+				name: UNAVAILABLE_FUNCTION,
+				description: `提示された担当のどれでも依頼を満たせないときに呼び、その旨を利用者へ短く伝えます。replyがそのまま回答として音声で読み上げられるため、音声整形後の合計${SPOKEN_REPLY_MAX_CHARS}字以内・${SPOKEN_REPLY_MAX_SENTENCES}文以内にします。担当は起動しません。`,
+				parameters: jsonSchema(unavailableChoice.strict()),
+			},
+		},
+	];
+}
+
+/** Structure only: what cannot be answered from hand must not be answered from hand. */
+function consistent(round: FirstRound) {
+	const handed =
+		round.kind === "live_info" ||
+		round.kind === "past_conversation" ||
+		round.kind === "action" ||
+		round.kind === "creation" ||
+		round.freshness === "live";
+	if (handed && round.next === "answer")
+		throw operationRejection("analysis_answer_mismatch");
+}
+
+/** The one function call of the first round, checked; anything else goes back for the structural repair. */
+export function validateAnalysis(
+	calls: NativeToolCall[],
+	cards: readonly ToolchainCard[],
+): FirstRound {
 	if (calls.length !== 1)
 		throw operationRejection("call_count", undefined, [], calls.length);
 	const call = calls[0]!;
-	if (call.name !== analyzeTool.function.name)
+	const card = cards.find((c) => c.functionName === call.name);
+	if (!card && call.name !== ANSWER_FUNCTION && call.name !== UNAVAILABLE_FUNCTION)
 		throw operationRejection("tool_not_offered", call);
 	let args: unknown;
 	try {
@@ -119,42 +155,47 @@ export function validateAnalysis(calls: NativeToolCall[]): RequestAnalysis {
 				: [],
 		);
 	}
-	const parsed = requestAnalysis.safeParse(args);
+	const schema = card
+		? toolchainChoice.strict()
+		: call.name === ANSWER_FUNCTION
+			? requestAnalysis
+			: unavailableChoice.strict();
+	const parsed = schema.safeParse(args);
 	if (!parsed.success)
 		throw operationRejection(
 			"arguments_invalid",
 			call,
 			validationIssues(parsed.error, args),
 		);
-	consistent(parsed.data);
-	return parsed.data;
+	const data = parsed.data as RequestAnalysis & {
+		announcement?: string;
+		reply?: string;
+	};
+	const { announcement, reply, ...analysis } = data;
+	const round: FirstRound = card
+		? { ...analysis, next: "toolchain", card, announcement: announcement! }
+		: call.name === ANSWER_FUNCTION
+			? { ...analysis, next: "answer" }
+			: { ...analysis, next: "report_unavailable", reply: reply! };
+	consistent(round);
+	return round;
 }
 
 /** The judgment of the first round as the selection trace keeps it (never the request itself). */
-export function analysisTrace(analysis: RequestAnalysis): SelectionAnalysis {
-	const { kind, freshness, next, impact, approved } = analysis;
+export function analysisTrace(round: FirstRound): SelectionAnalysis {
+	const { kind, freshness, next, impact, approved } = round;
 	return { kind, freshness, next, impact, approved };
 }
 
 /**
- * The analysis as a host record for the second round, placed next to the current request. It is reference
- * data: the selection call has no use for the kind, the answer does.
+ * The first round's kind as a host record for the answer round, placed next to the current request. It is
+ * reference data: the answer is the only call that has use for it.
  */
-export function analysisRecord(
-	analysis: RequestAnalysis,
-	withKind: boolean,
-): ChatMessage {
-	const { goal, deliverable, kind, conditions, missing } = analysis;
+export function analysisRecord(round: FirstRound): ChatMessage {
 	return {
 		role: "user",
 		content:
 			systemContext("dialogue.contexts.request-analysis.record", {}) +
-			JSON.stringify({
-				goal,
-				deliverable,
-				...(withKind ? { kind } : {}),
-				conditions,
-				missing,
-			}),
+			JSON.stringify({ kind: round.kind }),
 	};
 }

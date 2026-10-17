@@ -186,6 +186,7 @@ export function useOcrRuntime(client: EumenesClient, conversationId = "main") {
 		busy,
 		recording,
 		configured: !!connection.data?.credentialConfigured,
+		sharedCredentialAvailable: connection.data?.sharedCredentialAvailable,
 		connectionRevision: connection.data?.revision ?? 0,
 		baseUrl: connection.data?.baseUrl ?? null,
 		error:

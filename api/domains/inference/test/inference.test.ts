@@ -450,3 +450,109 @@ test("a request revoked mid-stream stops delivering deltas at the next delta", a
 	expect(result).toBeInstanceOf(Error);
 	expect(parts).toEqual(["d0", "d1", "d2", "d3", "d4"]);
 });
+test("a host-fixed answer accepts its pending llm request without an accepted attempt, once, and only while allowed", async () => {
+	const h = await setup();
+	const id = await h.store.write((db) =>
+		h.inference.captureInTransaction(db, "host-run", "llm", Date.now() + 10000),
+	);
+	const attempts = () =>
+		h.store.read(
+			(db) =>
+				(
+					db
+						.query(
+							"SELECT count(*) AS n FROM inference_attempts WHERE request_id=?",
+						)
+						.get(id) as { n: number }
+				).n,
+		);
+	expect(h.store.read((db) => h.inference.validInTransaction(db, id))).toBe(
+		false,
+	);
+	expect(
+		await h.store.write((db) =>
+			h.inference.acceptHostAnswerInTransaction(db, id),
+		),
+	).toBe(true);
+	expect(attempts()).toBe(0);
+	expect(h.store.read((db) => h.inference.validInTransaction(db, id))).toBe(
+		true,
+	);
+	expect(h.inference.usage().every((u) => u.accepted === 0)).toBe(true);
+	// Accepted already: it cannot be accepted again.
+	expect(
+		await h.store.write((db) =>
+			h.inference.acceptHostAnswerInTransaction(db, id),
+		),
+	).toBe(false);
+	// Not an answer request of the llm purpose, nor a request that does not exist.
+	const tts = await h.store.write((db) =>
+		h.inference.captureInTransaction(db, "host-run", "tts", Date.now() + 10000),
+	);
+	expect(
+		await h.store.write((db) =>
+			h.inference.acceptHostAnswerInTransaction(db, tts),
+		),
+	).toBe(false);
+	expect(
+		await h.store.write((db) =>
+			h.inference.acceptHostAnswerInTransaction(db, "missing"),
+		),
+	).toBe(false);
+});
+test("a host-fixed answer follows earlier unadopted rounds, never an adopted answer, and is refused past its deadline", async () => {
+	const h = await setup({ local: async () => "local-answer" });
+	const open = await h.store.write((db) =>
+		h.inference.captureInTransaction(db, "open-run", "llm", Date.now() + 10000),
+	);
+	await h.inference.executeRequest(
+		open,
+		messages,
+		new AbortController().signal,
+	);
+	expect(
+		await h.store.write((db) =>
+			h.inference.acceptHostAnswerInTransaction(db, open),
+		),
+	).toBe(true);
+	expect(
+		h.store.read(
+			(db) =>
+				db
+					.query(
+						"SELECT count(*) AS n FROM inference_attempts WHERE request_id=? AND accepted=1",
+					)
+					.get(open) as { n: number },
+		).n,
+	).toBe(0);
+	const adopted = await h.store.write((db) =>
+		h.inference.captureInTransaction(
+			db,
+			"adopted-run",
+			"llm",
+			Date.now() + 10000,
+		),
+	);
+	const receipt = await h.inference.executeRequest(
+		adopted,
+		messages,
+		new AbortController().signal,
+	);
+	expect(
+		await h.store.write((db) => h.inference.acceptInTransaction(db, receipt)),
+	).toBe(true);
+	expect(
+		await h.store.write((db) =>
+			h.inference.acceptHostAnswerInTransaction(db, adopted),
+		),
+	).toBe(false);
+	// Past its deadline, a request is no longer acceptable: a route needs no revoking, as no provider is involved.
+	const late = await h.store.write((db) =>
+		h.inference.captureInTransaction(db, "late-run", "llm", Date.now() - 1),
+	);
+	expect(
+		await h.store.write((db) =>
+			h.inference.acceptHostAnswerInTransaction(db, late),
+		),
+	).toBe(false);
+});

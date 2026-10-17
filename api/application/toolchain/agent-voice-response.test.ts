@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { configureLogging } from "../../infrastructure/logger";
-import { harness, forbidden } from "./toolchain.fixture";
+import { RESEARCH_FAILURE_REPLY } from "../../domains/dialogue/service/research-failure-reply";
+import { harness } from "./toolchain.fixture";
 import { waitFor } from "../../infrastructure/wait-for";
 
 afterEach(() => configureLogging({ level: "silent" }));
@@ -63,7 +64,7 @@ for (const options of [
 	{ badQuote: true },
 	{ workerReportOutput: '{"action":' },
 ])
-	test(`failed research generates and adopts the agent's response before TTS: ${JSON.stringify(options)}`, async () => {
+	test(`failed research is answered by the host and spoken without a model call: ${JSON.stringify(options)}`, async () => {
 		const lines: string[] = [];
 		configureLogging({
 			level: "info",
@@ -73,12 +74,10 @@ for (const options of [
 				},
 			},
 		});
-		const answer = "わたくしの調査では確認できませんでした。";
 		const h = await harness({
 			...options,
 			fullResearch: true,
 			voiceText: "今日の鎌倉の天気は",
-			failureAnswer: answer,
 		});
 		try {
 			const id = await accept(h);
@@ -87,12 +86,10 @@ for (const options of [
 			);
 			expect(h.voice.get(id)?.status).toBe("ready");
 			const runId = h.voice.get(id)!.runId!;
-			expect(h.dialogue.answerText(runId)).toBe(answer);
-			expect(h.spoken).toEqual(["お調べします。", answer]);
+			expect(h.dialogue.answerText(runId)).toBe(RESEARCH_FAILURE_REPLY);
+			expect(h.spoken).toEqual(["お調べします。", RESEARCH_FAILURE_REPLY]);
 			expect(h.voice.takeAudio(id, 1)).toEqual(wav());
-			expect(h.parentContexts).toHaveLength(1);
-			expect(h.parentContexts[0]).not.toContain(forbidden);
-			expect(h.parentContexts[0]).not.toContain('"quote"');
+			expect(h.parentContexts).toEqual([]);
 			const request = h.store.read((db) =>
 				db
 					.query(
@@ -101,23 +98,6 @@ for (const options of [
 					.get(runId),
 			);
 			expect(request).toEqual({ status: "accepted" });
-			const dataMessage = JSON.parse(h.parentContexts[0]!).find(
-				(message: { content: string }) =>
-					message.content.includes('"researchProgress":'),
-			);
-			const data = JSON.parse(
-				dataMessage.content.slice(dataMessage.content.indexOf("{")),
-			);
-			expect(data.report.researchProgress.verifiedReport).toBe(false);
-			if (options.workerReportOutput) {
-				// One search within budget, then the malformed report fails twice.
-				expect(data.report.researchProgress).toMatchObject({
-					searchAttempts: 1,
-					searchesSucceeded: 1,
-					readAttempts: 1,
-					readsSucceeded: 1,
-				});
-			}
 			const rows = lines.map((line) => JSON.parse(line));
 			expect(
 				rows.find((row) => row.event === "voice.synthesis_started"),
@@ -125,40 +105,13 @@ for (const options of [
 			expect(
 				rows.find((row) => row.event === "voice.synthesis_completed"),
 			).toMatchObject({ runId, count: 1 });
-			expect(lines.join("")).not.toContain(answer);
 			expect(lines.join("")).not.toContain("鎌倉");
 		} finally {
 			await h.close();
 		}
 	});
 
-test("cancelling while the agent phrases a failure discards the late response after its notice", async () => {
-	let release!: () => void;
-	const h = await harness({
-		badJson: true,
-		voiceText: "東京の天気を調べて",
-		answerGate: new Promise<void>((r) => {
-			release = r;
-		}),
-	});
-	try {
-		const id = await accept(h);
-		await until(() => h.parentContexts.length === 1);
-		const runId = h.voice.get(id)!.runId!;
-		await h.voice.cancel(id);
-		release();
-		await until(() => h.queue.stats().resources["inference.llm"]!.inUse === 0);
-		expect(h.voice.get(id)?.status).toBe("cancelled");
-		expect(h.dialogue.answerText(runId)).toBeNull();
-		expect(h.spoken).toEqual(["お調べします。"]);
-		expect(h.voice.takeAudio(id)).toBeNull();
-	} finally {
-		release();
-		await h.close();
-	}
-});
-
-test("failure response honours autoSpeak=false without bypassing the agent", async () => {
+test("a failed research honours autoSpeak=false: the host answer is adopted and nothing is spoken", async () => {
 	const h = await harness({ badJson: true, voiceText: "東京の天気を調べて" });
 	try {
 		const settings = h.settings.get();
@@ -174,7 +127,10 @@ test("failure response honours autoSpeak=false without bypassing the agent", asy
 			["completed", "failed"].includes(h.voice.get(id)?.status ?? ""),
 		);
 		expect(h.voice.get(id)?.status).toBe("completed");
-		expect(h.parentContexts).toHaveLength(1);
+		expect(h.dialogue.answerText(h.voice.get(id)!.runId!)).toBe(
+			RESEARCH_FAILURE_REPLY,
+		);
+		expect(h.parentContexts).toEqual([]);
 		expect(h.spoken).toEqual([]);
 	} finally {
 		await h.close();

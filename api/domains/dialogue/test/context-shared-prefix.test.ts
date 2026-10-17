@@ -84,20 +84,6 @@ test("the system part and everything before the volatile part are the same bytes
 	}
 }, 30_000);
 
-test("a failed research answer keeps the same system part and adds the failure record after it; it drops the layers", async () => {
-	const initial = (await runScenario(LAYERS)).calls.at(-1)!.messages[0]!
-		.content;
-	const failed = (await runScenario(SCENARIOS["research-failure"]!)).calls[0]!
-		.messages;
-	const requestRules = "\nCURRENT_REQUESTだけが今回の依頼です。";
-	const prefix = initial.slice(0, initial.indexOf(requestRules));
-	expect(failed[0]!.content).toStartWith(prefix);
-	expect(failed[0]!.content).toContain("CURRENT_RESEARCH_FAILURE=");
-	// Persona and system rules, the report-bearing result, the marker and the input: nothing of the layers.
-	expect(failed).toHaveLength(4);
-	expect(failed.some((m) => m.content.includes("辛いものが好き"))).toBe(false);
-}, 30_000);
-
 test("the rules of every operation and of the research report are in the system part without a result", () => {
 	const system = renderContext(base(), "current").messages[0]!.content;
 	for (const phrase of [
@@ -108,7 +94,7 @@ test("the rules of every operation and of the research report are in the system 
 		"imageResultがあるときは",
 		"musicResultがあるときは",
 		"commandQuestionがあるときは",
-		"調査の結果（reportまたはfailureを持つ結果メッセージ）があるときは",
+		"調査の結果（reportを持つ結果メッセージ）があるときは",
 		"調査報告のsourcesにkindがworld_claimのものがあるときは",
 		"調査報告のsourcesにkindがworld_documentのものがあるときは",
 		"操作用のfunctionが提示されていないときは",

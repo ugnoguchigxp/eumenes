@@ -1,6 +1,6 @@
 # 監督サブエージェントの実装計画
 
-作成日: 2026-10-09 JST。状態: 監督ロジック・報告先行契約を実装済み、fixture検証済み。本番接続とlive受入は未完了。[全体計画](README.md) の P2〜P6 を担当する。共通状態は [01](01-tasks-and-queue.md)、CLI と証拠は [02](02-coding-runner-and-mcp.md)、報告は [04](04-conversation-and-reports.md) に従う。
+作成日: 2026-10-09 JST。状態: 監督ロジック・報告先行契約を実装済み、fixture検証済み。本番接続とlive受入は未完了。[全体計画](README.md) の P2〜P6 を担当する。共通状態は [01](../.archived/01-tasks-and-queue.md)、CLI と証拠は [02](02-coding-runner-and-mcp.md)、報告は [04](04-conversation-and-reports.md) に従う。
 
 ## 1 役割と完了条件
 

@@ -119,7 +119,6 @@ export async function harness(
 		workerReportOutput?: string;
 		lookupTimeoutOnce?: boolean;
 		voiceText?: string;
-		failureAnswer?: string;
 		parentAnswer?: string;
 		announcement?: string;
 		speechFailure?: boolean;
@@ -432,8 +431,6 @@ export async function harness(
 			parentContexts.push(JSON.stringify(messages));
 			if (options.parent) return options.parent(messages);
 			if (options.answerGate) await options.answerGate;
-			if (messages.some((m) => m.content.includes('"failure":')))
-				return options.failureAnswer ?? "調査結果を確認できませんでした。";
 			const action = messages.find((m) =>
 				m.content.startsWith('{"actionResult":'),
 			);

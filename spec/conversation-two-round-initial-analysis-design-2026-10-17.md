@@ -2,7 +2,7 @@
 
 作成日: 2026-10-17
 
-状態: 設計案。利用者の合意待ち。未実装。
+状態: 2026-10-17、§8の改訂（一時回答までの短縮）に利用者合意、未実装。H1〜H5は本文の表で決着。R1 `analyze_request` から R2 の回答または選定までの本体は実装し、fixture で確認した（§7）。日時の依頼、`past_conversation` から `history.research` を選ぶ受入、`impact=modify_existing` の記録受入、実モデルの live は未。確認の流れ（questionRef）は対象外のまま。
 
 関連: [委譲前の一時回答](conversation-pre-delegation-response-design-2026-10-17.md)（§3・§5・§9）、[LLM経路リファクタリング](conversation-subagent-llm-refactoring-plan-2026-10-17.md)（§3.2・D8・D9）。
 
@@ -22,7 +22,7 @@
 
 ### R1 要求分析（毎ターン必須・非公開）
 
-- **入力:** 役割、現在の依頼、直前の1往復（H1決着）。長期記憶・逐語履歴・要約・短期記憶・想起・現在日時は渡さない（H2決着）。
+- **入力:** 役割（口調・音声の規則を含む会話用systemではなく役割文だけ）、現在の依頼、直前の1往復（H1決着。逐語のまま1つの参考データとして渡し、assistantターンとしては並べない）。長期記憶・逐語履歴・要約・短期記憶・想起・現在日時は渡さない（H2決着）。
 - **出力:** 必須の関数 `analyze_request` を1回呼ぶ。自然文は採用しない。
 
 | 引数 | 内容 |
@@ -150,3 +150,91 @@ bindingの `effect`（write/local/navigate/draft）は不可逆性や既存へ�
 | H3 | 日付・時刻そのものの依頼 | Web調査のサブエージェントへ委譲（利用者指示）。サブエージェントは状態の `now` を持つが、現行SKILLは根拠sourceIdを求めるため、検索なしで日時を答えられるかを受入で確認し、できなければSKILLの改訂を別途相談する |
 | H4 | 担当の未回答質問への返事をR1でどう扱うか | 決着：現状維持。R1は直前の1往復で判断する。担当側が既定値で進められる質問はしない方針（例：タイマーは時間がなければ3分で開始。タイマー担当の改訂で対応） |
 | H5 | R2の担当選びに口調を渡すか | 決着：渡さない。担当選びに余計な入力を足さない |
+
+## 7. 実施記録（2026-10-17）
+
+コードと固定試験を照合した。live は未実施。
+
+実装済み（fixture）:
+- R1 は `api/domains/dialogue/service/request-analysis.ts` と `initial-decision.ts`。入力は役割、直前の1往復、現在の依頼。`analyze_request` の schema は goal、deliverable、kind、freshness、conditions、missing、next に加え、impact と approved を持つ。
+- 指示は `api/domains/dialogue/contexts/request-analysis/`。R2 の分岐は `generation-handler.ts`。
+- 試験は `api/domains/dialogue/test/request-analysis.test.ts`、`analysis.fixture.ts`、`api/application/toolchain/analysis-round.fixture.ts`。ライブ情報の委譲、履歴の旧回答が R1 に入らないこと、続きの依頼の goal 補完、一般知識の直接回答、missing があるときだけの clarify、契約違反の修復、候補0の `report_unavailable` を見ている。
+
+未了:
+- 「今日何日？」が `live_info` になる受入試験はない。
+- `past_conversation` が `history.research` を選ぶ試験はない。能力の登録自体は別にある。
+- `impact=modify_existing` は schema と指示までで、記録の受入試験はない。
+- 実モデルと長い履歴での live は、本書にも検証記録にもない。
+
+## 8. 改訂: 一時回答までの短縮（2026-10-17、利用者合意）
+
+### 実測（改訂前）
+
+run `180ade55-9423-40fa-ba74-cb1c4e735136`（明日の鎌倉の天気）で一時回答の配信まで11.2秒。R1 5.6秒（入力1,242トークン・1.4秒、出力158トークン・2.4秒、LARM内の待ち約1.8秒）、候補検索0.08秒、R2 5.1秒（入力1,977トークン・2.4秒、出力62トークン・0.9秒、待ち約1.7秒）。全呼び出しで `providerCachedTokens=0`。主因はR1の自由記述の出力と、一時回答がR2の後に出ること。
+
+### 方針
+
+**利用者に届く結果（一時回答・回答・委譲先・確認の有無）は変えず、内部の手順だけを変える。**
+
+1. **候補検索をR1の前に行う（LLMなし）。** 検索文は現在の発言の原文と、直前の利用者発言の原文を別々に検索し、候補を和集合（重複除去、既存の件数上限をそれぞれに適用）とする。続きの依頼（「明日は？」）でも前の話題の担当が候補に残る。§2のR1→R2間の `goal` による検索は廃止する。
+2. **R1は候補を関数として受け、1つを呼ぶ。** 提示する関数は、候補のツールチェーン関数・`answer`・`report_unavailable`。分析は省かず、各関数の共通引数として選択肢の値だけを書かせる。
+   - 共通引数: `kind`・`freshness`・`impact`・`approved`（意味は§2の表のとおり）。
+   - ツールチェーン関数: 共通引数＋`announcement`（必須、既存の `announcementSchema`）。
+   - `answer`: 共通引数のみ（回答文はR2で作る。回答の入力と結果は改訂前と同じにするため）。
+   - `report_unavailable`: 共通引数＋`reply`（既存の発話契約）。
+   - 自由記述の分析項目（`goal`・`deliverable`・`conditions`・`missing`）と `next` は書かせない。`next` は呼んだ関数で決まる。
+   - R1の入力は§2のまま（役割、直前の1往復の参考データ、現在の依頼。履歴・記憶・日時なし）に、候補の関数定義が加わる。
+3. **hostの整合検査（構造のみ）。** `kind` が `live_info`・`past_conversation`・`action`・`creation`、または `freshness=live` で `answer` を呼んだら契約違反として既存の上限付き構造修復へ返す。関数呼び出しなし・複数・未知の関数・引数不正も同じ。`clarify` と `missing` の検査は、`missing` を書かせないため廃止する（確認が必要なときはR2の回答生成が既存どおり確認を返す）。
+4. **ツールチェーン関数が呼ばれたら、R1の直後に一時回答を検査・保存・配信する**（既存の `operation-announcement` の検査・保存・配信を使う）。音声の読み上げはここで始まる。
+5. **R2（ツールチェーン）。** R1で選ばれた関数だけを提示し、必ず呼ばせる。引数は担当へ渡す依頼（既存の `request`・`questionRef`・`target`・`resolveUnsaved`）だけで、`announcement` は持たない。入力は改訂前のR2の選定入力（直近の依頼・想起・未回答質問・過去の選定）と同じ。R2は一時回答の読み上げと並行して走り、既存の「再生完了を待ってから委譲」はそのまま。
+6. **R2（answer）。** 改訂前と同じ回答生成（履歴・記憶込み、toolsなし）。R1の記録として渡していた `goal` 等はなくなり、`kind` だけを渡す。
+7. **R1で `report_unavailable`。** その `reply` を回答として採用し、R2は呼ばない。
+
+### 失敗時
+
+- R1の契約違反: 既存の1回修復、連続違反で失敗（改訂前と同じ）。
+- 一時回答の配信後にR2が契約違反を連続した場合: 委譲せず run を失敗とする。配信済みの一時回答を成功の証拠にしない（[委譲前の一時回答 §5](conversation-pre-delegation-response-design-2026-10-17.md)）。
+
+### 見込み（推定）と受入
+
+- 一時回答の配信はR1の1回分（出力30〜40トークン）。改訂前の11.2秒に対し、5〜7秒を見込む。サブエージェントの起動までの合計は大きく変わらないが、R2は読み上げと重なる。
+- 受入: §5の場面で、一時回答・回答・委譲先・確認の有無が改訂前と同じ。天気・タイマー（時間なし・あり）・一般知識・続きの依頼を実機で測り、一時回答までの時間と各呼び出しの入出力トークン・キャッシュを記録する。
+
+## 9. 再開メモ（2026-10-17 終了時点）
+
+LARM が圧縮通信対応の作業中のため、live 受入は 2026-10-18 以降に持ち越す。
+
+### 状態
+
+| 項目 | 状態 |
+| --- | --- |
+| §2〜§6（R1 `analyze_request`→R2） | 実装・fixture 済み。製品サーバーで live 確認済み（下表） |
+| R1 の自然文返答の修正（役割文のみの system、直前1往復を参考データ化、指示の明確化） | 実装・fixture 済み。隔離 host の live で「タイマー起動して」の R1 成功率 0/10→9/10。生データは scratchpad（揮発）にあり、本書の数値が正 |
+| §8（一時回答までの短縮） | **実装担当が作業中のまま終了**。fixture・型・verify までを完了条件とし、live は行わない指示。再開時は作業ツリーの `api/domains/dialogue/**` の差分と、`bun test api/domains/dialogue`・`bun test ./api/application`・`bun run verify -- --domain dialogue` の結果を確認してから live に進む |
+| タイマー既定3分（`skill:timers.manage@2`、`toolchain:timers.manage@6`、binding@4・artifact@3） | 実装・fixture 済み、製品DB登録済み。live で「タイマー起動して」→3分で開始を確認 |
+| 調査失敗時の「失敗しました。」と readAhead | [別設計書](research-failure-reply-and-readahead-2026-10-17.md) §5 |
+
+### 製品サーバーでの live 結果（2026-10-17、§8 適用前）
+
+| run | 依頼 | 結果 |
+| --- | --- | --- |
+| `60c316c6-54fc-4aa0-9193-68cb1f635c94` | 富士山の高さは？ | R1 knowledge/answer → R2 回答。委譲・予告なし |
+| `f14d5c63-f6ee-474b-930b-ec8ee3053a57` | 6分タイマー起動して | R1 action → timers.manage → 予告 → 実行 |
+| `9d13fc64-1484-47e2-972c-20d145c64d5e` | タイマー起動して | R1 失敗（自然文→enum不一致）。上記修正の前 |
+| `8f4d9ce7-8681-4663-b9a8-7b3818050b4e` | タイマー起動して | 修正後。予告「タイマーを起動します。」→3分で開始（試験後に取消） |
+| `bc992888-fbeb-42e1-a6f7-1d41e99cb168` | 明日の鎌倉の天気（main） | 予告まで成功。worker が readAhead 形式違反で失敗→失敗説明が長すぎて run 失敗（readAhead 修正・固定返答の前） |
+| `180ade55-9423-40fa-ba74-cb1c4e735136` | 明日の鎌倉の天気 | 予告→調査→160字以内の根拠付き回答。予告まで11.2秒（§8 の実測） |
+
+### 再開時の手順
+
+1. §8 実装の差分と試験結果を確認する（上表）。不足があれば補う。
+2. 利用者にサーバー再起動を依頼し、起動ログ（`bun run logs -- --level warn`）で bundle のスキップを確認する。
+3. live: 「明日の鎌倉の天気を教えて」「タイマー起動して」「6分タイマー起動して」「富士山の高さは？」「（天気の後に）明日は？」で、R1 の選択、一時回答の文面と配信までの時間、各呼び出しの入出力・キャッシュトークンを記録し、§8 の改訂前の値と比べる。タイマーを起動したら、試験で起動した timerId だけを取り消す。
+4. 調査失敗時の「失敗しました。」の読み上げを確認する。
+
+### 未決（利用者に相談する）
+
+- R1 で関数呼び出しを強制するか（現状 `tool_choice: "auto"` 固定、`api/infrastructure/chat-stream.ts`。LARM 側の対応確認が必要）。
+- `web-guided.bundle.json` が毎起動 `revision_conflict` でスキップされる件（DB 登録済みの `skill:web.guided@1`・`package:web.recipe@2`・`package:web.quick@3` と bundle の本文が不一致）。案A: bundle を DB の内容に戻す、案B: bundle を廃止。
+- `ui-compositions.bundle.json` が `skill:ui.studio@4` の衝突でスキップされる件（本作業外の編集による）。
+- 終了予定を過ぎても `active` のまま残るタイマーがあった（10/13〜14 開始の4件、2026-10-17 に監督者が誤って取消済み）。タイマー側の不具合の可能性。

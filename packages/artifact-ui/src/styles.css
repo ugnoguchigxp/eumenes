@@ -397,6 +397,28 @@
 	grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
 	align-items: start;
 }
+/* The two registered OCR views share a reading surface; other compositions keep their grid. */
+.artifact-ui:has(.ocr-media):has(.ocr-panel) {
+	container-type: inline-size;
+}
+.aui-composition-grid:has(> .ocr-media):has(> .ocr-panel) {
+	grid-template-columns: minmax(0, 1fr);
+	gap: 0;
+	align-items: stretch;
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	background: var(--card);
+	overflow: clip;
+}
+@container (min-width: 760px) {
+	.aui-composition-grid:has(> .ocr-media):has(> .ocr-panel) {
+		grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+	}
+	.aui-composition-grid > .ocr-panel {
+		border-top: 0;
+		border-left: 1px solid var(--border);
+	}
+}
 /* A nested layout's title heads its section and spans every grid column. */
 .aui-composition > .aui-composition-section-title {
 	grid-column: 1 / -1;

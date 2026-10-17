@@ -1,4 +1,5 @@
 import { createImageLibrary } from "./image-library";
+import { gzipFetch } from "./gzip-fetch";
 import { createMusicLibrary } from "./music-library";
 import { createProviderAccess } from "./playground-provider";
 import { createPlaygroundCatalog } from "./playground-catalog";
@@ -79,7 +80,7 @@ export function createLarmPlayground(config: {
 			throw new Error("larm_provider_host_mismatch");
 		return url;
 	};
-	const request = config.fetch ?? fetch;
+	const request = gzipFetch(config.fetch ?? fetch);
 	function publicUrl(path: string) {
 		const base = larmBase();
 		const url = new URL(path, base);

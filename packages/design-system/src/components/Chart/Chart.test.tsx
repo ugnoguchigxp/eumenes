@@ -50,7 +50,9 @@ describe("Chart", () => {
 		["area", ".recharts-area-area"],
 		["pie", ".recharts-pie-sector"],
 	] as const)("%s を描画する", (kind, selector) => {
-		const { container } = render(<Chart kind={kind} title="月別" series={[sales]} />);
+		const { container } = render(
+			<Chart kind={kind} title="月別" series={[sales]} />,
+		);
 		expect(container.querySelectorAll(selector).length).toBeGreaterThan(0);
 		expect(container.querySelector("figcaption")).toHaveTextContent("月別");
 	});
@@ -73,7 +75,9 @@ describe("Chart", () => {
 	});
 
 	it("SVG に aria-label を持ち、要約を読み上げ用に持つ", () => {
-		const { container } = render(<Chart kind="bar" title="月別売上" series={[sales]} />);
+		const { container } = render(
+			<Chart kind="bar" title="月別売上" series={[sales]} />,
+		);
 		expect(container.querySelector(".recharts-wrapper > svg")).toHaveAttribute(
 			"aria-label",
 			"月別売上",
@@ -88,11 +92,21 @@ describe("Chart", () => {
 			<Chart kind="bar" series={[sales]} formatValue={(n) => `${n}円`} />,
 		);
 		expect(container.querySelector(".sr-only")).toHaveTextContent("最大 150円");
-		expect(container.querySelector(".recharts-yAxis-tick-labels")).toHaveTextContent("円");
+		expect(
+			container.querySelector(".recharts-yAxis-tick-labels"),
+		).toHaveTextContent("円");
 	});
 
 	it("軸ラベルと注記を出す", () => {
-		render(<Chart kind="bar" series={[sales]} xLabel="月" yLabel="万円" note="出典: 社内集計" />);
+		render(
+			<Chart
+				kind="bar"
+				series={[sales]}
+				xLabel="月"
+				yLabel="万円"
+				note="出典: 社内集計"
+			/>,
+		);
 		expect(screen.getByText("月")).toBeInTheDocument();
 		expect(screen.getByText("万円")).toBeInTheDocument();
 		expect(screen.getByText("出典: 社内集計")).toBeInTheDocument();
@@ -146,13 +160,26 @@ describe("Chart", () => {
 				]}
 			/>,
 		);
-		expect(container.querySelectorAll(".recharts-bar-rectangle")).toHaveLength(3);
+		expect(container.querySelectorAll(".recharts-bar-rectangle")).toHaveLength(
+			3,
+		);
 		expect(container.querySelector(".sr-only")).toHaveTextContent("3点");
 	});
 
 	it("系列をまたいだ同じ x は同じ行に並ぶ", () => {
 		expect(toRows([sales, cost])).toHaveLength(3);
-		expect(toRows([{ name: "a", points: [{ x: 1, y: 1 }, { x: 1, y: 2 }] }, { name: "b", points: [{ x: 1, y: 9 }] }])).toEqual([
+		expect(
+			toRows([
+				{
+					name: "a",
+					points: [
+						{ x: 1, y: 1 },
+						{ x: 1, y: 2 },
+					],
+				},
+				{ name: "b", points: [{ x: 1, y: 9 }] },
+			]),
+		).toEqual([
 			{ x: 1, s0: 1, s1: 9 },
 			{ x: 1, s0: 2 },
 		]);

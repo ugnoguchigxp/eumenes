@@ -11,7 +11,6 @@ import type {
 	HostRuleId,
 } from "./context-assembly";
 import type { ChatMessage } from "./context";
-import { researchResultContext } from "./research-result-context";
 import { buildSystemPrompt } from "./system-prompt";
 import type { OperationSource } from "./context-blocks";
 
@@ -212,7 +211,6 @@ function layout(a: ContextAssembly) {
 	for (const block of a.volatile) {
 		if (
 			block.source === "research.result" ||
-			block.source === "research.failure" ||
 			block.source.startsWith("operation.")
 		)
 			continue;
@@ -221,47 +219,27 @@ function layout(a: ContextAssembly) {
 	return { sections, volatile };
 }
 
-/** The list of an answer to a failed research: it drops the layers and carries the failure (see `researchResultContext`). */
-function failureList(sections: Layers, block: ContextBlock) {
-	if (block.body.kind !== "json") throw new Error("context_block_body");
-	const failure = block.body.value as {
-		failureCode: string;
-		projection: string | undefined;
-		nowMs: number;
-	};
-	return researchResultContext(
-		sections,
-		failure.projection,
-		failure.failureCode,
-		failure.nowMs,
-	);
-}
-
 /** Render the assembly as the message list the conversation sends. */
 export function renderCurrent(
 	a: ContextAssembly,
 ): RenderedContext<ChatMessage> {
 	const { sections, volatile } = layout(a);
-	const failure = a.volatile.find((b) => b.source === "research.failure");
 	const result = a.volatile.find((b) => b.source === "research.result");
 	const reportMessage = (block: ContextBlock): ChatMessage => {
 		if (block.body.kind !== "json") throw new Error("context_block_body");
 		return { role: "user", content: JSON.stringify(block.body.value) };
 	};
-	// A failed research answer keeps its own context apart from the layers; the report of a successful one is
-	// volatile data like the operation results, after them.
+	// The report of a research is volatile data like the operation results, after them.
 	const report = result ? reportMessage(result) : undefined;
-	const messages: ChatMessage[] = failure
-		? failureList(sections, failure)
-		: [
-				sections.system,
-				...sections.longTerm,
-				...sections.goals,
-				...sections.history,
-				...sections.working,
-				...sections.unprocessed,
-				sections.input,
-			];
+	const messages: ChatMessage[] = [
+		sections.system,
+		...sections.longTerm,
+		...sections.goals,
+		...sections.history,
+		...sections.working,
+		...sections.unprocessed,
+		sections.input,
+	];
 	// Before the input: what the layers' text decided, then the operation results. A drawing result is added
 	// after the input, and the operation results that come after it in this order land between them.
 	const before: ChatMessage[] = [...volatile.values()];

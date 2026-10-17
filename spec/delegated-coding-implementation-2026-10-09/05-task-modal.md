@@ -1,6 +1,6 @@
 # 会話画面のタスクモーダル実装計画
 
-作成日: 2026-10-09 JST。状態: 実装前。2026-10-16 再確認でも、本書の4列モーダルと work_tasks の投影は無い。後続の共通タスクボードは Claude Code / Codex 用で、この画面の代替ではない。[全体計画](README.md) の P1、P3、P5、P6 を担当する。状態と API は [01](01-tasks-and-queue.md)、報告と回答は [04](04-conversation-and-reports.md) を正本とする。
+作成日: 2026-10-09 JST。状態: 実装前。2026-10-16 再確認でも、本書の4列モーダルと work_tasks の投影は無い。後続の共通タスクボードは Claude Code / Codex 用で、この画面の代替ではない。[全体計画](README.md) の P1、P3、P5、P6 を担当する。状態と API は [01](../.archived/01-tasks-and-queue.md)、報告と回答は [04](04-conversation-and-reports.md) を正本とする。
 
 ## 1 目的と画面の位置
 

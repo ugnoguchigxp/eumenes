@@ -3,6 +3,7 @@ import {
 	Image as ImageIcon,
 	Menu,
 	RefreshCw,
+	ScanText,
 	Trash2,
 	Video,
 	X,
@@ -91,6 +92,9 @@ export function OcrMedia(props: OcrWorkspaceProps) {
 	}
 	return (
 		<section className="ocr-media" aria-label="OCRの元資料">
+			<h2 className="ocr-workspace-title">
+				<ScanText size={20} /> 文字を読み取る
+			</h2>
 			<header className="ocr-heading">
 				<Button
 					ref={trigger}
@@ -108,7 +112,16 @@ export function OcrMedia(props: OcrWorkspaceProps) {
 				>
 					<Menu size={16} /> 資料一覧
 				</Button>
-				<h2>文字を読み取る</h2>
+				<div className="ocr-document-info">
+					<span className="ocr-document-name" title={item?.name}>
+						{item?.name ?? "資料を選択"}
+					</span>
+					{item && (
+						<span className="ocr-state-badge" data-state={item.state}>
+							{stateLabels[item.state]}
+						</span>
+					)}
+				</div>
 				<Button
 					variant="ghost"
 					size="icon"
@@ -220,8 +233,17 @@ export function OcrMedia(props: OcrWorkspaceProps) {
 					</div>
 				</>
 			)}
+			<h3 className="ocr-source-heading">元資料</h3>
 			<div className="ocr-preview">
-				{!item && <p>画像ファイルを選ぶか、カメラで撮影してください。</p>}
+				{!item && (
+					<div className="ocr-media-empty">
+						<ImageIcon size={32} aria-hidden="true" />
+						<p>画像・動画の原本をここに表示します。</p>
+					</div>
+				)}
+				{item && !props.mediaUrl && (
+					<p role="status">原本を読み込んでいます。</p>
+				)}
 				{item && props.mediaUrl && (
 					<div
 						className="ocr-media-frame"
@@ -275,6 +297,11 @@ export function OcrMedia(props: OcrWorkspaceProps) {
 					</div>
 				)}
 			</div>
+			{item?.state === "completed" && (
+				<p className="ocr-source-hint">
+					行を選ぶと、元資料の位置を確認できます。
+				</p>
+			)}
 			{item?.result?.kind === "video" && (
 				<div className="ocr-frames" aria-label="動画の解析時刻">
 					{item.result.frames.map((frame, index) => (

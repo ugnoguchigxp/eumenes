@@ -12,6 +12,12 @@ LLMのみの要求は `providers: ["llm"]`、音声の要求は `providers` を�
 
 設定は [setup.md](setup.md)(環境変数)と [settings.md](settings.md)(画面)を参照してください。
 
+## gzip圧縮通信
+
+LLM・TTS・ASR・画像生成・音楽生成の通信は、backendの共通入口で `Accept-Encoding: gzip` を指定します。JSONとASRのmultipart本文はBunの `fetch` の `compress: "gzip"` で送信時に圧縮し、`Content-Encoding: gzip` の付与もBunに委ねます。multipartは境界・音声・送信項目を含めて一度だけBlobへ直列化します。catalog、接続管理、正式token計数、embedding、保存画像・楽曲の取得も同じ入口を使います。
+
+応答はBunの標準展開（`decompress: true`）を使います。JSON、SSE、音声、画像の既存の読取り・サイズ制限は展開後の本文に適用し、共通入口では応答全体を待ちません。token計数のdigestと入力サイズの検査は圧縮前のJSONを使います。音声のRange取得は保存表現のバイト位置を維持するため `Accept-Encoding: identity` とします。認証、期限、取消、生成POSTの再送禁止は既存経路のままです。
+
 ## 楽曲生成の音声形式
 
 楽曲生成ツールチェーンは、保存済みControl接続先のcatalogから、capability `media.music.generate` を持つ `services` のサービス（`larm.music-generation.v1`）を発見し、返されたendpointとmodelを使います。複数あるときはcatalogの順で最初のサービスです。生成・状態照会・音声取得にはControl認証を使い、Providerのclaimは行いません。

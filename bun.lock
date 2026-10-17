@@ -13,7 +13,7 @@
         "@openai/codex-sdk": "0.160.0",
         "@tanstack/react-query": "5.101.0",
         "bmp-ts": "1.0.9",
-        "eumenes-memory": "file:vendor/eumenes-memory/eumenes-memory-0.0.1-1f2c941571da.tgz",
+        "eumenes-memory": "file:vendor/eumenes-memory/eumenes-memory-0.0.2-6643656f3383.tgz",
         "eumenes-world-model": "file:vendor/world/eumenes-world-model-0.0.1.tgz",
         "google-auth-library": "11.1.0",
         "hono": "4.12.34",
@@ -95,9 +95,9 @@
         "@xterm/xterm": "^6.0.0",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
-        "katex": "0.16",
+        "katex": "0.16.47",
         "lucide-react": "^0.556.0",
-        "recharts": "3",
+        "recharts": "3.10.1",
         "sonner": "^2.0.7",
         "tailwind-merge": "^3.4.0",
         "tailwindcss": "^4.1.17",
@@ -1330,7 +1330,7 @@
 
     "etag": ["etag@1.8.1", "", {}, "sha512-aIL5Fx7mawVa300al2BnEE4iNvo1qETxLrPI/o05L7z6go7fCw1J6EQmbK4FmJ2AS7kgVF/KEZWufBfdClMcPg=="],
 
-    "eumenes-memory": ["eumenes-memory@vendor/eumenes-memory/eumenes-memory-0.0.1-1f2c941571da.tgz", {}, "sha512-mE3JPiEW4bhB+215MmKXoeoJBsliZfT1AN4Uly0HS6yfZCwkpEKLvP/iEGRD3vcVneVqL6sWpcuxKczcyvDJ0Q=="],
+    "eumenes-memory": ["eumenes-memory@vendor/eumenes-memory/eumenes-memory-0.0.2-6643656f3383.tgz", {}, "sha512-+MIM2niIoJ+7GaycVEnuyl6zS5ZYH0Y3MAYyU/kEf9gfYZOMdNz99Jjal/ELF/ArdPoBTqhJue98M0J7FYlZAg=="],
 
     "eumenes-world-model": ["eumenes-world-model@vendor/world/eumenes-world-model-0.0.1.tgz", {}, "sha512-NRG/JMrI+xu2MlnwRgKB0A8x4y6snR+8v0ElDJbKhtqf/cKrzTEzhC+JB36uXAseITvoYKEu2Ti1YRl8F24qQg=="],
 

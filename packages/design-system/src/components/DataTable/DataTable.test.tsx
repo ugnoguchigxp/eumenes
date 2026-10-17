@@ -12,15 +12,15 @@ describe("DataTable", () => {
 	it("見出しと行を表にする", () => {
 		render(<DataTable title="人口" columns={columns} rows={rows} />);
 		expect(screen.getByRole("table", { name: "人口" })).toBeInTheDocument();
-		expect(screen.getAllByRole("columnheader").map((c) => c.textContent)).toEqual([
-			"都市",
-			"人口",
-		]);
+		expect(
+			screen.getAllByRole("columnheader").map((c) => c.textContent),
+		).toEqual(["都市", "人口"]);
 		const body = screen.getAllByRole("row").slice(1);
-		expect(within(body[0] as HTMLElement).getAllByRole("cell").map((c) => c.textContent)).toEqual([
-			"東京",
-			"13,960,000",
-		]);
+		expect(
+			within(body[0] as HTMLElement)
+				.getAllByRole("cell")
+				.map((c) => c.textContent),
+		).toEqual(["東京", "13,960,000"]);
 	});
 
 	it("数値の列だけを右寄せにする", () => {

@@ -1,15 +1,16 @@
 import { useEffect, useRef, useState } from "react";
-import { Camera, Copy, FileUp, Video } from "lucide-react";
+import { Camera, FileUp, ScanText, Video } from "lucide-react";
 import { Button } from "../Button";
 import { useCameraCapture } from "../ObjectRecognitionWorkspace/useCameraCapture";
-import { correctionText, OcrCorrection } from "./OcrCorrection";
+import { OcrResult } from "./OcrResult";
 import { stateLabels, type OcrWorkspaceProps } from "./types";
 import "./ocr.css";
 const errors: Record<string, string> = {
 	ocr_busy: "OCRサービスが混雑しています。",
 	ocr_invalid_input: "ファイル形式か動画の長さを確認してください。",
 	ocr_input_too_large: "16 MiBを超えています。",
-	ocr_auth_failed: "backendの認証設定を確認してください。",
+	ocr_auth_failed:
+		"OCRサービスがLARM共通トークンでの認証を拒否しました。接続先とサービス側の認証設定を確認してください。",
 	ocr_connection_failed: "OCRサービスに接続できませんでした。",
 	ocr_connection_changed: "接続先が変更されました。",
 	ocr_submission_unconfirmed:
@@ -44,36 +45,24 @@ export function OcrPanel(props: OcrWorkspaceProps) {
 		// oxlint-disable-next-line react-hooks/exhaustive-deps -- runs only when the listed value changes
 	}, [props.selectedId]);
 	const item = props.items.find((i) => i.id === props.selectedId);
-	const frame =
-		item?.result?.kind === "video"
-			? item.result.frames[props.frameIndex]
-			: undefined;
-	const text =
-		item?.result?.kind === "image" ? item.result.text : (frame?.text ?? "");
-	const lines =
-		item?.result?.kind === "image" ? item.result.lines : (frame?.lines ?? []);
-	const selectedText = props.selectedLines
-		.map((i) => lines[i]?.text ?? "")
-		.join("\n");
 	const active =
 		item &&
 		["queued", "starting", "running", "cancelling"].includes(item.state);
-	const preferred = props.corrections?.find(
-		(c) =>
-			c.id === props.correctionPreferredId &&
-			c.state === "completed" &&
-			c.result,
-	);
-	const displayText = preferred?.result
-		? correctionText(preferred.result)
-		: text;
 	return (
 		<section className="ocr-panel" aria-label="OCR結果と入力">
 			{!props.configured && (
 				<div className="ocr-connection">
+					{!props.baseUrl && (
+						<p>
+							OCRの接続先が未設定です。Eumenesから接続できるOCRサービスのURLを保存してください。
+						</p>
+					)}
 					<p>
-						OCRの接続先が未設定です。backendから到達できるgateway
-						URLを保存してください。認証はLARM共通トークンを使います。
+						{props.sharedCredentialAvailable === false
+							? "LARM共通トークンを読み込めません。Eumenesのサーバー設定を確認してください。"
+							: props.sharedCredentialAvailable === true
+								? "認証には設定済みのLARM共通トークンを使います。別のキーの入力は不要です。"
+								: "認証にはLARM共通トークンを使います。"}
 					</p>
 					<label>
 						接続先 URL
@@ -93,7 +82,7 @@ export function OcrPanel(props: OcrWorkspaceProps) {
 			)}
 			<div className="ocr-controls" aria-label="画像・動画の入力">
 				<Button
-					variant="secondary"
+					variant="outline"
 					size="icon"
 					aria-label="画像・動画ファイルをアップロード"
 					title="画像・動画ファイルをアップロード"
@@ -118,7 +107,7 @@ export function OcrPanel(props: OcrWorkspaceProps) {
 					}}
 				/>
 				<Button
-					variant="secondary"
+					variant="outline"
 					size="icon"
 					aria-label="カメラを開く"
 					title="カメラを開く"
@@ -175,10 +164,9 @@ export function OcrPanel(props: OcrWorkspaceProps) {
 					{props.message}
 				</p>
 			)}
-			{item && (
+			{item && item.state !== "completed" && (
 				<div className="ocr-status" role="status">
-					<strong>{item.name}</strong>
-					<span>{stateLabels[item.state]}</span>
+					<strong>{stateLabels[item.state]}</strong>
 					{item.errorCode && (
 						<p>{errors[item.errorCode] ?? "処理に失敗しました。"}</p>
 					)}
@@ -202,96 +190,22 @@ export function OcrPanel(props: OcrWorkspaceProps) {
 					)}
 				</div>
 			)}
-			{item?.state === "completed" && (
-				<>
-					<div className="ocr-result-heading">
-						<h3>{preferred ? "採用中の補正案" : "読み取った原文"}</h3>
-						<Button
-							size="sm"
-							variant="secondary"
-							disabled={!displayText}
-							onClick={() => props.onCopy?.(displayText)}
-						>
-							<Copy size={15} />
-							表示中の全文をコピー
-						</Button>
+			{item?.state === "completed" ? (
+				<OcrResult
+					key={`${item.id}:${props.frameIndex}:${props.correctionPreferredId ?? ""}`}
+					{...props}
+					item={item}
+				/>
+			) : (
+				!item && (
+					<div className="ocr-result-empty">
+						<ScanText size={28} aria-hidden="true" />
+						<h3>読み取り結果</h3>
+						<p>
+							画像・動画を選ぶか、カメラで撮影すると、ここに文字を表示します。
+						</p>
 					</div>
-					<p className="ocr-confidence-note">
-						confidence は参考値です。元資料と照らして確認してください。
-					</p>
-					<pre className="ocr-raw-text">
-						{displayText || "（文字は検出されませんでした）"}
-					</pre>
-					{preferred && (
-						<>
-							<h4>OCR原文</h4>
-							<pre className="ocr-raw-text">
-								{text || "（文字は検出されませんでした）"}
-							</pre>
-							<Button
-								size="sm"
-								variant="secondary"
-								onClick={() => props.onCopy?.(text)}
-							>
-								原文をコピー
-							</Button>
-						</>
-					)}
-					<div className="ocr-lines" role="group" aria-label="読み取った行">
-						{lines.map((line, index) => (
-							<label
-								key={index}
-								className={
-									props.selectedLines.includes(index) ? "selected" : ""
-								}
-							>
-								<input
-									type="checkbox"
-									checked={props.selectedLines.includes(index)}
-									onChange={() => props.onLine?.(index)}
-								/>
-								<span>{line.text || "（空行）"}</span>
-								<small>{line.confidence.toFixed(2)}</small>
-							</label>
-						))}
-					</div>
-					<div className="ocr-result-actions">
-						<Button
-							size="sm"
-							variant="secondary"
-							disabled={!props.selectedLines.length}
-							onClick={() => props.onCopy?.(selectedText)}
-						>
-							選択箇所をコピー
-						</Button>
-						<Button
-							size="sm"
-							variant="secondary"
-							disabled={!props.selectedLines.length}
-							onClick={() =>
-								props.onIncorporate?.(
-									item.id,
-									item.result?.kind === "video" ? props.frameIndex : undefined,
-									props.selectedLines,
-								)
-							}
-						>
-							選択箇所を会話に追加
-						</Button>
-						<Button
-							size="sm"
-							onClick={() =>
-								props.onIncorporate?.(
-									item.id,
-									item.result?.kind === "video" ? props.frameIndex : undefined,
-								)
-							}
-						>
-							原文を会話に追加
-						</Button>
-					</div>
-					<OcrCorrection {...props} itemId={item.id} />
-				</>
+				)
 			)}
 		</section>
 	);

@@ -21,7 +21,7 @@
 
 `eumenes-memory` の公開SQLite APIをMemory domainから使う。判断は既存のstewardの `prepare → infer → settle` で行い、保存は単一writerのtransactionで行う。単体検証用のExamplesやCodex専用クライアントを会話経路へ組み込まない。モデル・接続先は既存の保存済み設定を使う。
 
-配布物は `vendor/eumenes-memory/eumenes-memory-0.0.1-1f2c941571da.tgz` に固定する。パッケージ版は0.0.1、SQLite契約は8のままで、パッケージ側の初期化や再作成は不要。State一覧の `after / nextCursor` に対応し、ホストの同じ読み取り内で全ページを読む。ホスト側には候補資料と登録済みdigestを保持する追加migration `memory/0007-seed-import` がある。既存のmigration・記憶・設定を削除しない。
+配布物は `vendor/eumenes-memory/eumenes-memory-0.0.2-6643656f3383.tgz` に固定する。パッケージ版は0.0.2で、中身はビルド済みのJavaScriptと型宣言（`dist/`）。bunとNode（Playwrightなど）の両方から読める。SQLite契約は8のままで、パッケージ側の初期化や再作成は不要。State一覧の `after / nextCursor` に対応し、ホストの同じ読み取り内で全ページを読む。ホスト側には候補資料と登録済みdigestを保持する追加migration `memory/0007-seed-import` がある。既存のmigration・記憶・設定を削除しない。
 
 Seedは本人の確認済み発言として扱わない。構造化された候補の分類を受け取り、次のように扱う。
 

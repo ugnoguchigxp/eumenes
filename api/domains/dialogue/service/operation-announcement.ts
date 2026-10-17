@@ -1,28 +1,26 @@
 import type { Receipt } from "../../inference";
-import { chosen, type Decision } from "./selection-trace";
-import type { generateConversation } from "./conversation-generation";
+import { chosen, type Candidates } from "./selection-trace";
+import type { FirstRound } from "./initial-decision";
+import { generateSelection } from "./generate-selection";
 import type { DialogueDeps, GenerateInput } from "./context";
 import { byId, saveAnnouncement } from "../repository";
 import { validAttachmentContext } from "./attachment-context";
 import { operationRejection } from "./operation-authority";
-import {
-	announcementSchema,
-	type ConversationOperation,
-} from "./conversation-tools";
+import { announcementSchema } from "./conversation-tools";
 import { conversationOutput } from "./conversation-output";
 
 /** Persist before publish/settle. The later delegation must still recheck the same authority. */
 async function announceOperation(
 	deps: DialogueDeps,
 	input: GenerateInput,
-	operation: ConversationOperation,
+	selected: { revisionId: string; announcement: string },
 	receipt: Receipt | undefined,
 	recallPins: Array<{ messageId: string; digest: string }>,
 	signal: AbortSignal,
 ) {
 	if (!deps.toolchains || input.agent)
 		throw new Error("invalid_conversation_operation");
-	const text = announcementSchema.parse(operation.announcement);
+	const text = announcementSchema.parse(selected.announcement);
 	conversationOutput(() => {}).finish(text);
 	await deps.store.write((tx) => {
 		signal.throwIfAborted();
@@ -43,7 +41,7 @@ async function announceOperation(
 		});
 		if (rejected) throw new Error(rejected);
 		try {
-			deps.toolchains!.resolveInTransaction(tx, operation.revisionId);
+			deps.toolchains!.resolveInTransaction(tx, selected.revisionId);
 		} catch {
 			throw new Error("toolchain_unavailable");
 		}
@@ -57,27 +55,35 @@ async function announceOperation(
 	});
 }
 
-/** Finish selection by publishing the adopted notice before returning the executable operation. */
-export async function announceSelection(
+/**
+ * The hand-over of a request the first round gave to a toolchain. The notice it chose is checked, saved and
+ * delivered first (a spoken one starts reading here); the second round, which writes the request for the
+ * specialist, runs while it is read, and the delegation waits for the reading to finish. A second round that
+ * fails stops the reading and fails the run: the notice already delivered is no sign that the work was handed over.
+ */
+export async function announceAndSelect(
 	deps: DialogueDeps,
 	input: GenerateInput,
-	selected: {
-		generated: Awaited<ReturnType<typeof generateConversation>>;
-		decision: Decision;
+	handover: {
+		found: Candidates;
+		analysis: FirstRound & { next: "toolchain" };
+		/** The first round's receipt and whether its output needed the one repair. */
+		first: { receipt?: Receipt; repaired: boolean };
 		signal: AbortSignal;
+		repair: () => void;
 		publish: () => void;
 	},
 ) {
-	const { generated, decision, signal, publish } = selected;
-	const operation = generated.operation;
-	if (!operation) throw new Error("invalid_conversation_operation");
-	const { recallPins } = decision;
+	const { found, analysis, first, signal, repair, publish } = handover;
 	await announceOperation(
 		deps,
 		input,
-		operation,
-		generated.receipt,
-		recallPins,
+		{
+			revisionId: analysis.card.revisionId,
+			announcement: analysis.announcement,
+		},
+		first.receipt,
+		[],
 		signal,
 	);
 	publish();
@@ -85,12 +91,41 @@ export async function announceSelection(
 	if (!run) throw new Error("run_changed");
 	if (run.utteranceId && !deps.deliverAnnouncement)
 		throw new Error("announcement_delivery_unavailable");
-	await deps.deliverAnnouncement?.(run, signal);
+	const stop = new AbortController();
+	let failure: { error: unknown } | undefined;
+	const delivered = (
+		deps.deliverAnnouncement?.(run, AbortSignal.any([signal, stop.signal])) ??
+		Promise.resolve()
+	).catch((error) => {
+		failure = { error };
+	});
+	let selected: Awaited<ReturnType<typeof generateSelection>>;
+	try {
+		selected = await generateSelection(
+			deps,
+			input,
+			found,
+			analysis,
+			signal,
+			repair,
+		);
+	} catch (error) {
+		stop.abort();
+		await delivered;
+		throw error;
+	}
+	await delivered;
+	if (failure) throw failure.error;
 	signal.throwIfAborted();
+	const { decision, generated } = selected;
+	if (!generated.operation) throw new Error("invalid_conversation_operation");
 	return {
 		...generated,
-		operation,
-		selection: chosen(decision, generated),
-		recallPins,
+		operation: generated.operation,
+		selection: chosen(decision, {
+			operation: generated.operation,
+			repaired: first.repaired || generated.repaired,
+		}),
+		recallPins: decision.recallPins,
 	};
 }

@@ -2,7 +2,7 @@
 
 作成日: 2026-10-17
 
-状態: P0契約の確定。実装はこの契約に従って並行で進める。親計画は[実装計画](toolchain-specialist-dialogue-implementation-plan-2026-10-17.md)。容量・出力量の実モデル測定は未実施（§9）。
+状態: 型契約はコードで固定済み（2026-10-17）。親計画は[実装計画](toolchain-specialist-dialogue-implementation-plan-2026-10-17.md)。容量・出力量の実モデル測定は未実施（§9）。
 
 ## 1 コードで固定した契約
 

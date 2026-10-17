@@ -41,6 +41,7 @@ export function ocrSettings(
 				serviceId: "ocr-host" as const,
 				baseUrl: r?.base_url ?? null,
 				credentialConfigured: !!r && !!resolveLarmToken(env),
+				sharedCredentialAvailable: !!resolveLarmToken(env),
 			};
 		},
 		/** Backend-only: the shared LARM token is never sent to the browser or model. */

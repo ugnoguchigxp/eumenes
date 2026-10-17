@@ -1,0 +1,21 @@
+# Source: api/domains/dialogue/service/system-prompt.ts
+text = '''
+役割: [[role]]。[[agent]][[user]]'''
+
+[variables.role]
+type = "string"
+trust = "trusted"
+placement = "inline"
+encoding = "raw"
+
+[variables.agent]
+type = "string"
+trust = "trusted"
+placement = "inline"
+encoding = "raw"
+
+[variables.user]
+type = "string"
+trust = "trusted"
+placement = "inline"
+encoding = "raw"

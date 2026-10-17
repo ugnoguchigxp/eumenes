@@ -15,6 +15,14 @@
 - 実施記録に残した VO-1 の follow-up: `api/domains/larm/service/playground-http.ts` は `instanceof TypeError` のまま。`playground.ts` は `EUMENES_LARM_PROVIDER_HOSTS` を読む。`api/domains/queue/service/runner.ts` の `toErrorCode` は 1 引数のローカル関数のまま。
 - 上記以外の WP は 2026-10-10 の実施記録を正とする。
 
+## 2026-10-17 の再確認
+
+各 WP の再試験はしていない。archive はしない。
+
+- FE-15 は入っている。`scripts/bundle-budget.ts` と `scripts/bundle-budget.test.ts`、`scripts/bundle-budget.json` があり、`package.json` の `bundle:check` と `scripts/verify.ts` から呼ばれる。
+- 未着手のまま: FE-4（`scripts/deadcode-budget.ts` は無い）、DT-11（`packages/coding-runner` の `workspace.ts` と `sdk-git-operations.ts` に `spawnSync` が残る）、VO-16（`settle_lost` と `busyInTransaction` は無い）。
+- FE-9、DT-13、VO-1 の follow-up、FE-1、FE-2、FE-16 は 2026-10-16 の記述のまま。`toErrorCode` は `api/domains/queue/service/runner.ts` ではなく `runner-shared.ts` の1引数関数になっている。
+
 ---
 
 ## 0. 作業者への共通規則(全 WP に適用・必読)

@@ -209,7 +209,9 @@ describe("電卓", () => {
 
 		it("display=modal は onResult があってもボタンから開く", async () => {
 			render(<Calculator display="modal" onResult={vi.fn()} />);
-			expect(screen.queryByRole("button", { name: "7" })).not.toBeInTheDocument();
+			expect(
+				screen.queryByRole("button", { name: "7" }),
+			).not.toBeInTheDocument();
 			await user.click(screen.getByRole("button", { name: "電卓" }));
 			expect(screen.getByRole("dialog")).toBeInTheDocument();
 			expect(screen.getByRole("group", { name: "電卓" })).toHaveFocus();
@@ -319,7 +321,9 @@ describe("電卓", () => {
 
 		it("basic には関数キーが無い", () => {
 			render(<Calculator display="inline" />);
-			expect(screen.queryByRole("button", { name: "sin" })).not.toBeInTheDocument();
+			expect(
+				screen.queryByRole("button", { name: "sin" }),
+			).not.toBeInTheDocument();
 		});
 
 		it("⌫ は関数名と演算子を1つ分消す", async () => {
@@ -378,7 +382,9 @@ describe("電卓", () => {
 
 		it("scientific では括弧とべき乗も打てる", async () => {
 			const onResult = vi.fn();
-			render(<Calculator display="inline" mode="scientific" onResult={onResult} />);
+			render(
+				<Calculator display="inline" mode="scientific" onResult={onResult} />,
+			);
 			screen.getByRole("group", { name: "電卓" }).focus();
 			await user.keyboard("(1+2)^2{Enter}");
 			expect(onResult).toHaveBeenCalledWith(9);
@@ -424,7 +430,9 @@ describe("電卓", () => {
 			expect(await typeKeys(["3", "("])).toBe("3 * (");
 		});
 		it(") の後の数字", async () => {
-			expect(await typeKeys(["(", "1", "+", "2", ")", "3"])).toBe("(1 + 2) * 3");
+			expect(await typeKeys(["(", "1", "+", "2", ")", "3"])).toBe(
+				"(1 + 2) * 3",
+			);
 		});
 		it("π の後の数字", async () => {
 			expect(await typeKeys(["π", "2"])).toBe("pi * 2");

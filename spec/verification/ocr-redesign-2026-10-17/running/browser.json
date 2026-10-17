@@ -1,0 +1,20 @@
+{
+  "desktop": {
+    "width": 1130,
+    "columns": "603.344px 524.641px"
+  },
+  "narrow": {
+    "width": 602,
+    "contentWidth": 602
+  },
+  "actions": [
+    "conversation-lines",
+    "correction-create",
+    "correction-adopt",
+    "correction-original"
+  ],
+  "errors": [],
+  "productionBuildRenderedViaBrowserRoutes": false,
+  "existingWebServerUsed": true,
+  "backendMutations": false
+}

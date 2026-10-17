@@ -33,7 +33,12 @@ export const Bar: Story = {
 };
 
 export const Line: Story = {
-	args: { kind: "line", title: "売上と費用", series: [sales, cost], formatValue: yen },
+	args: {
+		kind: "line",
+		title: "売上と費用",
+		series: [sales, cost],
+		formatValue: yen,
+	},
 };
 
 export const Area: Story = {
@@ -70,15 +75,28 @@ export const BarMultiSeries: Story = {
 };
 
 export const Empty: Story = {
-	args: { kind: "line", title: "データなし", series: [{ name: "売上", points: [] }] },
+	args: {
+		kind: "line",
+		title: "データなし",
+		series: [{ name: "売上", points: [] }],
+	},
 };
 
 export const Dark: Story = {
-	args: { kind: "line", title: "売上と費用", series: [sales, cost, profit], formatValue: yen },
+	args: {
+		kind: "line",
+		title: "売上と費用",
+		series: [sales, cost, profit],
+		formatValue: yen,
+	},
 	render: (args) => (
 		<div
 			className="ds-theme-dark"
-			style={{ background: "var(--background)", color: "var(--foreground)", padding: "1.5rem" }}
+			style={{
+				background: "var(--background)",
+				color: "var(--foreground)",
+				padding: "1.5rem",
+			}}
 		>
 			<Chart {...args} />
 		</div>
@@ -90,7 +108,11 @@ export const DarkPie: Story = {
 	render: (args) => (
 		<div
 			className="ds-theme-dark"
-			style={{ background: "var(--background)", color: "var(--foreground)", padding: "1.5rem" }}
+			style={{
+				background: "var(--background)",
+				color: "var(--foreground)",
+				padding: "1.5rem",
+			}}
 		>
 			<Chart {...args} />
 		</div>

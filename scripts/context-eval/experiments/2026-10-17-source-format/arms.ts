@@ -24,7 +24,6 @@ import {
 import {
 	type ArmOutput,
 	type ContextArm,
-	baselineArm,
 } from "../../../../api/domains/dialogue/eval/context/arm";
 import { splitRecallText } from "../../../../api/domains/dialogue/eval/context/recall-text";
 import { parseRecallBlock } from "../../../../api/domains/memory";
@@ -244,9 +243,6 @@ function systemPart(assembly: ContextAssembly, v: Variant): string {
 }
 
 function build(assembly: ContextAssembly, v: Variant): ArmOutput {
-	// A failed research answer is the same in every arm (the current assembly): it drops the layers on purpose.
-	if (assembly.volatile.some((b) => b.source === "research.failure"))
-		return baselineArm.build(assembly);
 	const role = (block: ContextBlock): "system" | "user" =>
 		v.userReference && block.authority === "reference" ? "user" : "system";
 	const message = (block: ContextBlock): ChatMessage => ({

@@ -1,4 +1,5 @@
 import type { EmbeddingSpace, LarmTestTarget } from "../contracts/playground";
+import type { Fetcher } from "./profiles";
 import { json, list, object, post, str } from "./playground-http";
 
 /**
@@ -25,7 +26,7 @@ export function createProviderAccess({
 		action: (id: string) => Promise<T>,
 	) => Promise<T>;
 	providerUrl: (value: string) => URL;
-	request: typeof fetch;
+	request: Fetcher;
 	profile: string;
 	embeddingPath: string;
 }) {

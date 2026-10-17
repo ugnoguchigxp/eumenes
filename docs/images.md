@@ -10,7 +10,7 @@
 
 `toolchain:image.create@1`（会話関数`image`、引数は共通の`request`）から`package:image.create@1`を起動します。`profile:image.create@1`、`skill:image.create@1`、`tool:image.generate@1`を登録し、画像domainの計画担当が生成・編集画面・履歴の意図を解釈します。画面表示だけでは生成APIを呼びません。
 
-LARMの保存済み接続先とbackend内のControl認証を使い、catalogからcapability `media.image.generate`（protocol `larm.image-generation.v1`）を持つサービスを発見します。Profile名・モデル名は固定しません。発見したサービスの公開Profile selectorとcatalog revisionで`POST /v1/agent-connections`に接続を依頼します。画像は生成POSTで起動するため、Providerのreadyを待たずに接続応答のサービスを使います。接続応答の画像サービスを照合して`services[].url`を優先し、`url`がない場合は`endpoint`を使います。`description`を確認し、生成POSTは一度だけ送ります。画像取得後、失敗時、取消時には接続を解放します。詳細は[接続変更の設計](../spec/design/image-larm-connection-2026-10-17.md)を参照してください。同期APIのため取消時にはローカル受付を取り消し、遅い生成結果を採用しません。外部で処理済みの画像がLARMの履歴に残る場合はあります。結果が不明でも生成POSTを自動再送せず、一覧を更新して確認します。
+LARMの保存済み接続先とbackend内のControl認証を使い、catalogからcapability `media.image.generate`（protocol `larm.image-generation.v1`）を持つサービスを発見します。Profile名・モデル名は固定しません。発見したサービスの公開Profile selectorとcatalog revisionで`POST /v1/agent-connections`に接続を依頼します。画像は生成POSTで起動するため、Providerのreadyを待たずに接続応答のサービスを使います。接続応答の画像サービスを照合して`services[].url`を優先し、`url`がない場合は`endpoint`を使います。`description`を確認し、生成POSTは一度だけ送ります。画像取得後、失敗時、取消時には接続を解放します。詳細は[接続変更の設計](../spec/.archived/image-larm-connection-2026-10-17.md)を参照してください。同期APIのため取消時にはローカル受付を取り消し、遅い生成結果を採用しません。外部で処理済みの画像がLARMの履歴に残る場合はあります。結果が不明でも生成POSTを自動再送せず、一覧を更新して確認します。
 
 | API | 用途 |
 | --- | --- |

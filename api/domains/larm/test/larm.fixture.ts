@@ -122,6 +122,13 @@ export function fixture(
 		input: RequestInfo | URL,
 		init?: RequestInit,
 	): Promise<Response> => {
+		const compression = init as RequestInit & {
+			compress: unknown;
+			decompress: unknown;
+		};
+		expect(compression.compress).toBe(init?.body == null ? false : "gzip");
+		expect(compression.decompress).toBe(true);
+		expect(new Headers(init?.headers).get("Accept-Encoding")).toBe("gzip");
 		const url = new URL(String(input));
 		calls.push(`${init?.method ?? "GET"} ${url.pathname}`);
 		if (url.pathname === "/v3/agent-profiles") return result(catalog);
@@ -161,7 +168,10 @@ export function fixture(
 			return result({ choices: [{ message: { content: "承知しました" } }] });
 		}
 		if (url.pathname === "/asr/v1/audio/transcriptions") {
-			const body = init?.body;
+			const body =
+				init?.body instanceof Blob
+					? await new Response(init.body, { headers: init.headers }).formData()
+					: init?.body;
 			expect(body instanceof FormData).toBe(true);
 			if (body instanceof FormData) {
 				expect(body.get("response_format")).toBe("json");

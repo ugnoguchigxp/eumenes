@@ -161,7 +161,6 @@ const seedSchema = z
 		research: z
 			.object({
 				projection: z.unknown().optional(),
-				failureCode: z.string().optional(),
 			})
 			.strict()
 			.optional(),

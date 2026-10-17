@@ -15,7 +15,9 @@ import { settleConversationOperation } from "./generation-operation";
 import type { ConversationOperation } from "./conversation-tools";
 import {
 	agentOutcome,
+	decisionDraft,
 	failedAnswer,
+	findCandidates,
 	prepareAnswer,
 	recordRejected,
 	traceFailure,
@@ -24,9 +26,8 @@ import {
 	type Decision,
 	type SelectionDraft,
 } from "./selection-trace";
-import { generateSelection } from "./generate-selection";
 import { analyzeRequest } from "./request-analysis";
-import { announceSelection } from "./operation-announcement";
+import { announceAndSelect } from "./operation-announcement";
 import { generateConversation } from "./conversation-generation";
 import { researchCitations } from "./research-citations";
 import type { Run } from "../contracts";
@@ -43,6 +44,10 @@ import { flushDeferred } from "./specialist-core";
 import { goalsLayerStale } from "./goals-layer";
 import { adoptMemoryWindow, clearShownNotices } from "./memory-window";
 import type { Progress } from "./progress";
+import {
+	RESEARCH_FAILURE_REPLY,
+	researchFailed,
+} from "./research-failure-reply";
 const log = getLogger("dialogue");
 
 function speaksChunks(deps: DialogueDeps, run: Run | null) {
@@ -71,7 +76,7 @@ function answerCollection(run: Run | null, chunkSpeech: boolean) {
 function verifiedAnswerLinks(text: string, input: GenerateInput) {
 	if (input.mediaResult)
 		return researchCitations(text, null, { preserveLinkLabels: false });
-	if (input.agent?.projection || input.agent?.failureCode)
+	if (input.agent?.projection)
 		return researchCitations(text, input.agent.projection, {
 			requireSources: true,
 		});
@@ -82,7 +87,6 @@ function shouldHoldBody(input: GenerateInput, chunkSpeech = false) {
 	return !!(
 		(!chunkSpeech && ((input.memory && !input.memory.quiet) || input.goals)) ||
 		input.agent?.projection ||
-		input.agent?.failureCode ||
 		(!chunkSpeech && input.agent?.actionPayload) ||
 		input.mediaResult
 	);
@@ -158,6 +162,11 @@ export function createGenerationHandler(
 				},
 				async () => {
 					log.info("dialogue.generation_started");
+					// A failed research is answered by the host: no model call, and the code stays with the run.
+					if (researchFailed(input.agent)) {
+						signal.throwIfAborted();
+						return { text: RESEARCH_FAILURE_REPLY };
+					}
 					const timing = generationTiming();
 					resolveAttachmentContext(deps, input, run!.conversationId);
 					if (input.agent?.actionPayload && agents) {
@@ -188,35 +197,47 @@ export function createGenerationHandler(
 						body.reset();
 						publish(input.runId);
 					};
-					// A new decision first analyzes the request; that round's body is neither shown nor adopted.
-					const analysis =
-						!!input.routing && !input.agent
-							? await analyzeRequest(deps, input, signal, repair)
+					// A new decision finds the candidate toolchains, then analyzes the request: one call that gives it to a
+					// toolchain, answers it, or reports that nothing fits. That round's body is neither shown nor adopted.
+					const found =
+						input.routing && !input.agent
+							? await findCandidates(deps, input, signal)
 							: undefined;
+					const first = found
+						? await analyzeRequest(deps, input, found, signal, repair)
+						: undefined;
+					const analysis = first?.analysis;
 					let decision: Decision;
 					let generated: Awaited<ReturnType<typeof generateConversation>>;
-					if (analysis?.next === "find_toolchain") {
-						({ decision, generated } = await generateSelection(
-							deps,
-							input,
+					if (found && first && analysis?.next === "toolchain") {
+						// The notice is delivered first; the request for the specialist is written while it is read.
+						return announceAndSelect(deps, input, {
+							found,
 							analysis,
+							first,
 							signal,
 							repair,
-						));
-						recallPins.splice(0, recallPins.length, ...decision.recallPins);
-						if (generated.operation) {
-							return announceSelection(deps, input, {
-								generated,
-								decision,
-								signal,
-								publish: () => publish(input.runId),
-							});
-						}
+							publish: () => publish(input.runId),
+						});
+					}
+					if (found && first && analysis?.next === "report_unavailable") {
 						// No offered toolchain fits: the explanation it reported is the answer.
-						holdBody ||= !chunkSpeech && recallPins.length > 0;
+						decision = {
+							draft: decisionDraft(input, found.started, {
+								analysis,
+								route: found.route,
+								query: found.query,
+							}),
+							recallPins: [],
+						};
+						generated = {
+							text: analysis.reply,
+							receipt: first.receipt,
+							repaired: first.repaired,
+						};
 						timing.policy(holdBody);
 					} else {
-						const prepared = await prepareAnswer(deps, input, signal, analysis);
+						const prepared = prepareAnswer(deps, input, found, analysis);
 						decision = prepared;
 						// Streamed text is checked against the exchanges this prompt stands on.
 						recallPins.splice(0, recallPins.length, ...prepared.recallPins);
@@ -247,7 +268,7 @@ export function createGenerationHandler(
 					}
 					const { text, receipt } = generated;
 					const answered = decision.draft("answer", {
-						repaired: generated.repaired,
+						repaired: generated.repaired || !!first?.repaired,
 					});
 					const prefix = partials.get(input.runId) ?? "";
 					if (!text.startsWith(prefix)) throw new Error("chat_stream_diverged");
@@ -324,6 +345,20 @@ export function createGenerationHandler(
 							agents?.failAnswerInTransaction(tx, run.id, adopted.reason);
 						endRun(deps, tx, run, "failed", adopted.reason);
 						return failedAnswer(deps, tx, run.id, adopted.reason);
+					}
+				}
+				// No model was asked: the request is accepted as the host's own answer, so the speech standing on it proceeds.
+				if (researchFailed(input.agent)) {
+					const requestId = larm.requestFor?.(tx, run.id, "llm");
+					if (
+						requestId &&
+						larm.acceptHostAnswerInTransaction &&
+						!larm.acceptHostAnswerInTransaction(tx, requestId)
+					) {
+						if (run.agentTaskId)
+							agents?.failAnswerInTransaction(tx, run.id, "permission_revoked");
+						endRun(deps, tx, run, "failed", "permission_revoked");
+						return failedAnswer(deps, tx, run.id, "permission_revoked");
 					}
 				}
 				if (

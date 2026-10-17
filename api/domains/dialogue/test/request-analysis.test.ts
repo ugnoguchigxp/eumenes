@@ -128,17 +128,17 @@ test("an old answer to the same question, the memory and the time never reach th
 		expect(h.state.routeTexts).toEqual([WEATHER.goal]);
 		const input = h.state.analysisCalls[2]!.history;
 		// The role, the exchange just before, the marker and the request: nothing else.
-		expect(roles(h, 2)).toEqual([
-			"system",
-			"user",
-			"assistant",
-			"system",
-			"user",
+		expect(roles(h, 2)).toEqual(["system", "user", "system", "system", "user"]);
+		expect(
+			JSON.parse(input[1]!.content.slice(input[1]!.content.indexOf("=") + 1)),
+		).toEqual([
+			{ role: "user", content: "ありがとう" },
+			{ role: "assistant", content: "どういたしまして。" },
 		]);
-		expect(input.slice(1, 3).map((m) => m.content)).toEqual([
-			"ありがとう",
-			"どういたしまして。",
-		]);
+		// The role only: the spoken-reply and function rules of the answer prompt would invite a reply here.
+		expect(input[0]!.content).toContain("役割:");
+		expect(input[0]!.content).not.toContain("音声で聞かれます");
+		expect(input[2]!.content).toContain("analyze_request");
 		const text = JSON.stringify(input);
 		expect(text).not.toContain("22度");
 		expect(text).not.toContain("以下は本人について");
@@ -163,22 +163,12 @@ test("a follow-up request is completed from the exchange just before it, and tha
 		h.state.specialist.push(reply("担当が答えます。"));
 		const run = await h.ask("明日は？");
 		expect(run.status).toBe("completed");
-		expect(roles(h, 1)).toEqual([
-			"system",
-			"user",
-			"assistant",
-			"system",
-			"user",
+		expect(roles(h, 1)).toEqual(["system", "user", "system", "system", "user"]);
+		const previous = h.state.analysisCalls[1]!.history[1]!.content;
+		expect(JSON.parse(previous.slice(previous.indexOf("=") + 1))).toEqual([
+			{ role: "user", content: "鎌倉の天気は？" },
+			{ role: "assistant", content: "今日は晴れです。" },
 		]);
-		expect(
-			h.state.analysisCalls[1]!.history.map((m) => m.content).filter(Boolean),
-		).toEqual(
-			expect.arrayContaining([
-				"鎌倉の天気は？",
-				"今日は晴れです。",
-				"明日は？",
-			]),
-		);
 		expect(h.state.analysisCalls[1]!.history.at(-1)!.content).toBe("明日は？");
 		expect(h.state.routeTexts).toEqual(["鎌倉の明日の天気"]);
 	} finally {

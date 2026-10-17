@@ -32,7 +32,11 @@ export const Dark: Story = {
 	render: (args) => (
 		<div
 			className="ds-theme-dark"
-			style={{ background: "var(--background)", color: "var(--foreground)", padding: "1.5rem" }}
+			style={{
+				background: "var(--background)",
+				color: "var(--foreground)",
+				padding: "1.5rem",
+			}}
 		>
 			<DataTable {...args} />
 		</div>

@@ -49,6 +49,8 @@ describe("evaluateExpression", () => {
 
 	it("長すぎる式と深すぎる入れ子を受け付けない", () => {
 		expect(() => evaluateExpression("1+".repeat(300))).toThrow();
-		expect(() => evaluateExpression(`${"(".repeat(80)}1${")".repeat(80)}`)).toThrow();
+		expect(() =>
+			evaluateExpression(`${"(".repeat(80)}1${")".repeat(80)}`),
+		).toThrow();
 	});
 });

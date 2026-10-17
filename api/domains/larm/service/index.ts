@@ -1,4 +1,5 @@
 import { measureStage } from "../../../infrastructure/performance";
+import { gzipFetch } from "./gzip-fetch";
 import type { Capability, LarmPort, LarmCallOptions } from "../contracts";
 import { ttsVoicesSchema } from "../contracts";
 import type { TtsVoices } from "../contracts";
@@ -55,7 +56,7 @@ export function createLarm(config: {
 	const providerHosts =
 		config.providerHosts?.map((host) => host.toLowerCase()) ?? [];
 	const token = config.token?.trim();
-	const request = config.fetch ?? fetch;
+	const request = gzipFetch(config.fetch ?? fetch);
 	// The saved profile is the only source; without it the port reports larm_profile_missing instead of guessing.
 	const profile = config.profile?.trim() ?? "";
 	const audience = config.audience?.trim() || "saaa-desktop";

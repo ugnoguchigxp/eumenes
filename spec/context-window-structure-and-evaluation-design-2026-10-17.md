@@ -2,7 +2,7 @@
 
 作成日: 2026-10-17
 
-状態: 合意・実装中（2026-10-17 利用者の実装開始の指示により着手）。§8 の E 項目は推奨案で進める（E1=(a)、E2=(a)、E3=実験で決定、E4=(b)、E5=(a)、E6=(a)、E7=(a)）。利用者が別案を指示した場合はそちらを正本とする。
+状態: 合意済み。P1（内容と形式の分離）と P2（context-eval の基盤、事例72件、fixture）は 2026-10-17 に実装済み（§11）。P3（holdout の freeze、live、採否）と P4 は未実施。E1〜E7 は推奨案のまま（E1=(a)、E2=(a)、E3=実験で決定、E4=(b)、E5=(a)、E6=(a)、E7=(a)）。利用者が別案を指示した場合はそちらを正本とする。
 
 ## 1. 目的
 
@@ -260,4 +260,11 @@ fixture・live・実機器の結果は分けて記録する。live の実行で 
 
 ## 11. 実施記録
 
-（未着手）
+### 2026-10-17
+
+P1 と P2 の fixture 側は、[ContextWindow 設計書 §12](conversation-context-window-design-2026-10-17.md) の第2段と同じ作業で入った。live の採否は未実施。
+
+- P1: `ContextAssembly` と `render`、書式 `current`、操作結果ブロックの切り出し。golden は `api/domains/dialogue/test/context-golden/`。
+- P2: `api/domains/dialogue/eval/context/`、`scripts/context-eval/`、`bun run context:eval`。比較案 A0〜A5、直列化の経路、事例72件（dev 36、holdout 36）。holdout は freeze していない。
+- P3: 実験ディレクトリに採否の `RESULTS.md` はなく、`spec/verification/context-eval/` もない。判定役の一致率も記録していない。
+- P4: 採否が無いため未着手。E1〜E7 の表は推奨案のままで、決定の記録はない。

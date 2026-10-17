@@ -8,6 +8,7 @@ const ocrConnectionSchema = z.object({
 	serviceId: z.literal("ocr-host"),
 	baseUrl: z.string().nullable(),
 	credentialConfigured: z.boolean(),
+	sharedCredentialAvailable: z.boolean().optional(),
 });
 export function ocrClient(t: Transport) {
 	const root = "/api/ocr";

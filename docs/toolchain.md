@@ -38,7 +38,7 @@ streamでは、function名や制御区切りになり得る末尾だけを保留
 
 ツールチェーンは「サブエージェント・SystemContext・SKILL・ツールの使い方・ツール詳細・Artifact」の一組です([設計](../spec/.archived/toolchain-set-routing-design-2026-10-12.md)、[登録手順](toolchain-extension.md#1-全体像))。通常会話の初動は必ず2ラウンドです。R1は依頼の分析で、役割・現在の依頼・直前の1往復だけを渡し、関数 `analyze_request` を一度呼ばせます(自然文は採用せず、呼ばれなければ構造修復へ返す)。分析は依頼の目的・成果の形・種類(`kind`)・鮮度(`freshness`)・欠けた必須情報・次の段階(`next`: answer/clarify/find_toolchain)・影響(`impact`)・承認(`approved`)を持ちます。`kind` が live_info・past_conversation・action・creation、または `freshness=live` なら `next` は find_toolchain、clarify は欠けた必須情報があるときだけで、hostは構造だけを検査します。answer/clarify なら R2 で既存の回答生成(関数なし)を行います。find_toolchain なら、R1の `goal` を検索文として候補を取得し、R2で候補の関数と `report_unavailable` を提示して、必ず関数を一つ呼ばせます(自然文は採用せず、構造修復へ返す。履歴付きで改めて回答する経路はない)。関数の共通引数は `{ request, announcement }` で、`announcement` は実行前に利用者へ伝える200文字以内の短い予告です。hostが検査・保存・通知してから既存の担当を開始します。予告はrunに保存され、最終回答や会話の記憶には混ぜません（[設計・検証記録](../spec/conversation-pre-delegation-response-design-2026-10-17.md)）。
 
-専門担当へ完全に切り替えるsession型は、hostが発行した保存作品の `target` と、未保存作業を破棄して切り替える `resolveUnsaved` を任意で持ちます。選定時には登録済みの方式が関数説明へ渡され、切替を予告します。成立後の発言は専門担当へ直接届き、通常会話AIの再選定や言い直しを挟みません。担当は既存の返却・終了の契約で通常担当へ戻ります（[計画](../spec/toolchain-specialist-dialogue-implementation-plan-2026-10-17.md)）。結果返却型は担当の結果を通常会話AIが伝えます。内部の経路・ツール・引数は各ツールチェーンのサブエージェントが決めます。
+専門担当へ完全に切り替えるsession型は、hostが発行した保存作品の `target` と、未保存作業を破棄して切り替える `resolveUnsaved` を任意で持ちます。選定時には登録済みの方式が関数説明へ渡され、切替を予告します。成立後の発言は専門担当へ直接届き、通常会話AIの再選定や言い直しを挟みません。担当は既存の返却・終了の契約で通常担当へ戻ります（[計画](../spec/.archived/toolchain-specialist-dialogue-implementation-plan-2026-10-17.md)）。結果返却型は担当の結果を通常会話AIが伝えます。内部の経路・ツール・引数は各ツールチェーンのサブエージェントが決めます。
 
 調査担当には今回の依頼を渡し、検索キーワードは担当が選びます。過去の会話から出典URLを集めて渡しません。URLの直接読取りは今回の依頼に明示されたURL、今回の検索結果、今回の依頼に合う保存済み手順の候補に限ります。
 

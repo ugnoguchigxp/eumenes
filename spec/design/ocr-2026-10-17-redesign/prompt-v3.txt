@@ -1,0 +1,15 @@
+Use case: ui-mockup. Create a polished Japanese desktop OCR tool interface, 1280x1000, flat front-on screenshot, no device or browser chrome. This is a visual proposal for the Eumenes artifact 「文字を読み取る」. Soft off-white, pale cool-gray panels, crisp dark slate Japanese sans-serif typography, restrained medium blue accents, fine dividers, generous practical spacing, subtle 8px corners, no gradients, no decorative illustrations.
+
+Top: slim single header with scan icon and 「文字を読み取る」. Under it a compact toolbar: left 「資料一覧」 menu button, filename notice.jpg, small green 「完了」 badge and refresh icon. Right: upload icon and camera icon, with small muted note 「16 MiBまで・動画30秒まで」.
+
+Main: two large adjacent aligned panels with 24px margins and 24px gutter. Left 54%: heading 「元資料」. A large pale gray stage displaying a realistic photographed white paper notice, neatly centered and naturally lit. Paper contains exactly THREE lines of black English text, each on its own line: “INFORMATION”, “Reception until 15:00”, “Thank you”. All three have fine light gray-blue OCR rectangles. ONLY the second line has a stronger blue border and pale blue fill, indicating selection. Paper is dominant and easy to read. Below the image: small hint 「選択した行を原本で確認できます」.
+
+Right 46%: heading 「読み取った原文」 and compact outline button 「全文をコピー」. Under this a small segmented view selector: 「全文」 inactive, 「行ごと」 active with blue underline. SHOW ONLY THE LINE VIEW, no duplicate full-text preview. Three comfortable rows with square checkboxes, tiny gray line numbers, English content and small gray confidence values:
+01 unchecked: INFORMATION, 0.98
+02 checked: Reception until 15:00, 0.95
+03 unchecked: Thank you, 0.93
+Only the second row has pale blue background and blue checked checkbox, matching the second rectangle on the photo. The row text must match the photo EXACTLY. Clean sans-serif UI typography. A quiet note below: 「confidenceは参考値です」.
+
+Below the rows a subtle pale-blue selection action bar: 「1行を選択中」 at left, outline buttons 「コピー」 and 「会話に追加」 at right. Under it a prominent blue full-width button 「原文を会話に追加」. Lower in the right panel, visually separated by generous whitespace and a fine rule, a modest sparkle icon and heading 「補正案」, small note 「原文を残したまま、補正案を作成します」, outline button 「補正案を作る」. Distinguish this optional operation from primary copy/conversation actions. Leave comfortable breathing room at bottom without a vast empty area.
+
+Make this a sophisticated, implementable productivity tool. Uniform alignment, clear visual hierarchy, light flat surfaces, readable compact buttons. No extra functions, exports, PDF input, editing, zoom controls, extra badges, marketing text, sidebar, or floating decorations. All sample text is illustrative. Correct matching of the three English lines between photo and line view is essential. Japanese interface labels should be rendered carefully in a clean sans-serif font.

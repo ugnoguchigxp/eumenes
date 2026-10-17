@@ -50,7 +50,7 @@
 		"@openai/codex-sdk": "0.160.0",
 		"@tanstack/react-query": "5.101.0",
 		"bmp-ts": "1.0.9",
-		"eumenes-memory": "file:vendor/eumenes-memory/eumenes-memory-0.0.1-1f2c941571da.tgz",
+		"eumenes-memory": "file:vendor/eumenes-memory/eumenes-memory-0.0.2-6643656f3383.tgz",
 		"eumenes-world-model": "file:vendor/world/eumenes-world-model-0.0.1.tgz",
 		"google-auth-library": "11.1.0",
 		"hono": "4.12.34",

@@ -8,6 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { migrations as memoryPackageMigrations } from "eumenes-memory/sqlite";
 import { openStore, type SqliteStore } from "../../../infrastructure/sqlite";
+import { RESEARCH_FAILURE_REPLY } from "../service/research-failure-reply";
 import { waitFor as until } from "../../../infrastructure/wait-for";
 import type { AgentRuntime, AnswerTicket } from "../../agent-runtime";
 import {
@@ -173,6 +174,7 @@ async function generate(failureCode: string | null) {
 	await memory.setEnabled(true);
 	await seed.queue.close(100);
 	const { queue, dialogue } = open();
+	const callsBefore = seen.length;
 	const run = await dialogue.submit({
 		requestId: crypto.randomUUID(),
 		conversationId: "main",
@@ -187,19 +189,18 @@ async function generate(failureCode: string | null) {
 	queue.start();
 	await until(() => dialogue.get(run.id)?.status === "completed");
 	await queue.close(100);
-	return { sent: seen.at(-1)!, session: sessions.at(-1)! };
+	return {
+		sent: seen.at(-1)!,
+		session: sessions.at(-1)!,
+		calls: seen.length - callsBefore,
+		answer: dialogue.answerText(run.id),
+	};
 }
 
-test("a failed research result drops the memory and goals layers, and instructionCount counts only the system messages that remain", async () => {
-	const { sent, session } = await generate("agent_timeout");
-	const { instructionCount } = session.context!;
-	// Persona only: the long-term and goals layers are not in the list.
-	expect(instructionCount).toBe(1);
-	expect(
-		sent.slice(0, instructionCount).every((m) => m.role === "system"),
-	).toBe(true);
-	expect(sent.some((m) => m.content.includes("毎日少し運動する"))).toBe(false);
-	expect(sent.some((m) => m.content.includes("辛いものが好き"))).toBe(false);
+test("a failed research result is answered by the host: no model call is made for it", async () => {
+	const { calls, answer } = await generate("agent_timeout");
+	expect(calls).toBe(0);
+	expect(answer).toBe(RESEARCH_FAILURE_REPLY);
 });
 
 test("without a research result the persona, long-term and goals layers are the instructions", async () => {

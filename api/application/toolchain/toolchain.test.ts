@@ -1,4 +1,5 @@
 import { test, expect } from "bun:test";
+import { RESEARCH_FAILURE_REPLY } from "../../domains/dialogue/service/research-failure-reply";
 import { harness, forbidden, workerPacket } from "./toolchain.fixture";
 import { checkLiveCitations } from "./toolchain-live-check";
 import { settle, waitFor } from "../../infrastructure/wait-for";
@@ -7,8 +8,6 @@ test("adoption removes a fabricated model citation and cannot reuse sources afte
 		parentAnswer:
 			"晴れです。\n\nソース：[example.com](https://example.com/weather)、[旧資料](https://example.com/obsolete)",
 		badQuote: false,
-		failureAnswer:
-			"確認できませんでした。\n\nソース：[example.com](https://example.com/weather)",
 	};
 	const h = await harness(options);
 	try {
@@ -23,7 +22,7 @@ test("adoption removes a fabricated model citation and cannot reuse sources afte
 				(await h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 }))?.status,
 			).toBe("completed");
 			const answer = h.dialogue.answerText(run.id)!;
-			if (badQuote) expect(answer).toBe("確認できませんでした。");
+			if (badQuote) expect(answer).toBe(RESEARCH_FAILURE_REPLY);
 			else {
 				expect(answer).toContain(
 					"[example.com](<https://example.com/weather>)",
@@ -67,10 +66,7 @@ test("a plain weather request carries useful details and actual citations throug
 	}
 });
 test("the current report follows earlier failed answers and stays adjacent to the repeated request", async () => {
-	const options = {
-		badQuote: true,
-		failureAnswer: "前回は取得できませんでした。",
-	};
+	const options = { badQuote: true };
 	const h = await harness(options);
 	try {
 		const question = "今日の鎌倉の天気教えて。";
@@ -80,7 +76,7 @@ test("the current report follows earlier failed answers and stays adjacent to th
 			text: question,
 		});
 		await h.dialogue.waitForTerminal(first.id, { timeoutMs: 5000 });
-		expect(h.dialogue.answerText(first.id)).toBe(options.failureAnswer);
+		expect(h.dialogue.answerText(first.id)).toBe(RESEARCH_FAILURE_REPLY);
 		options.badQuote = false;
 		const second = await h.dialogue.submit({
 			requestId: crypto.randomUUID(),
@@ -90,7 +86,7 @@ test("the current report follows earlier failed answers and stays adjacent to th
 		await h.dialogue.waitForTerminal(second.id, { timeoutMs: 5000 });
 		const messages = JSON.parse(h.parentContexts.at(-1)!);
 		const oldFailure = messages.findIndex(
-			(m: { content: string }) => m.content === options.failureAnswer,
+			(m: { content: string }) => m.content === RESEARCH_FAILURE_REPLY,
 		);
 		const currentReport = messages.findIndex((m: { content: string }) =>
 			m.content.includes('"summary":"東京の天気は晴れ'),
@@ -358,10 +354,8 @@ for (const options of [{ badJson: true }, { badQuote: true }])
 				h.toolchain.agents.report(h.dialogue.get(run.id)!.agentTaskId!),
 			).toBe(null);
 			expect(child.modelCalls).toBeLessThanOrEqual(5);
-			expect(h.parentContexts[0]).not.toContain(forbidden);
-			expect(h.dialogue.answerText(run.id)).toBe(
-				"調査結果を確認できませんでした。",
-			);
+			expect(h.parentContexts).toEqual([]);
+			expect(h.dialogue.answerText(run.id)).toBe(RESEARCH_FAILURE_REPLY);
 			expect(
 				h.store.read((db) =>
 					db
@@ -527,7 +521,7 @@ test("queue capacity failure rolls back child creation and reaches a terminal an
 		await h.close();
 	}
 });
-test("worker deadline cancels acquisition and returns a bounded failure to the parent", async () => {
+test("worker deadline cancels acquisition and fails the research and the host answers it", async () => {
 	let release!: () => void;
 	const h = await harness({
 		gate: new Promise<void>((r) => {
@@ -558,7 +552,8 @@ test("worker deadline cancels acquisition and returns a bounded failure to the p
 			.find((t) => t.kind === "worker")!;
 		expect(child.status).toBe("failed");
 		expect(child.errorCode).toBe("deadline_exceeded");
-		expect(h.parentContexts[0]).not.toContain(forbidden);
+		expect(h.parentContexts).toEqual([]);
+		expect(h.dialogue.answerText(run.id)).toBe(RESEARCH_FAILURE_REPLY);
 	} finally {
 		release();
 		await h.close();

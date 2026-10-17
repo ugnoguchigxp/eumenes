@@ -66,8 +66,10 @@ test("icon upload, raw OCR lines, history and conversation use the registered ar
 		buffer: Buffer.from(bytes),
 	});
 	await expect(panel.getByText("原文のまま", { exact: true })).toBeVisible();
+	await panel.getByRole("tab", { name: "全文", exact: true }).click();
 	await expect(panel.locator(".ocr-raw-text")).toHaveText("原文のまま\n二行目");
 	await expect(panel.locator(".ocr-polygon")).toHaveCount(2);
+	await panel.getByRole("tab", { name: "行ごと", exact: true }).click();
 	await panel.getByRole("checkbox").first().check();
 	await expect(panel.locator(".ocr-polygon.selected")).toHaveCount(1);
 	await panel.getByRole("button", { name: "選択箇所を会話に追加" }).click();
@@ -96,6 +98,7 @@ test("icon upload, raw OCR lines, history and conversation use the registered ar
 		timeout: 15000,
 	});
 	await panel.getByRole("button", { name: "1秒" }).click();
+	await panel.getByRole("tab", { name: "全文", exact: true }).click();
 	await expect(panel.locator(".ocr-raw-text")).toHaveText("二行目");
 	await panel.getByRole("button", { name: "資料一覧" }).click();
 	await expect(panel.locator(".ocr-history-thumbnail img")).toHaveCount(3);

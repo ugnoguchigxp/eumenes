@@ -165,10 +165,7 @@ test("a fully seeded case materializes the product assembly with every part", as
 	);
 });
 
-function researchCase(research: {
-	projection?: unknown;
-	failureCode?: string;
-}) {
+function researchCase(research: { projection?: unknown }) {
 	return caseSchema.parse({
 		id: "ctx-f2-dev-01",
 		family: "F2",
@@ -184,7 +181,7 @@ function researchCase(research: {
 	});
 }
 
-test("a research success is a volatile report block; a failure drops the notices and the World names", async () => {
+test("a research success is a volatile report block after the notices and the World names", async () => {
 	const ok = await materialize(
 		researchCase({ projection: { summary: "晴れ" } }),
 		await openSeedWiring(),
@@ -196,17 +193,6 @@ test("a research success is a volatile report block; a failure drops the notices
 		"world.names",
 		"research.result",
 	]);
-	const failed = await materialize(
-		researchCase({ failureCode: "research_unavailable" }),
-		await openSeedWiring(),
-	);
-	open.push(failed);
-	expect(failed.assembly.volatile.map((b) => b.source)).toEqual([
-		"research.failure",
-	]);
-	// The failure answer is the product's own failure path: the layers are dropped from the list.
-	const out = baselineArm.build(failed.assembly);
-	expect(out.messages.at(out.currentRequestIndex)?.content).toBe("調べて");
 });
 
 test("a case without seed data assembles the system part inputs and the input only", async () => {

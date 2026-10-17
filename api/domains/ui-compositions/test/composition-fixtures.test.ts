@@ -4,8 +4,8 @@ import { join } from "node:path";
 import {
 	type CompositionModelDefinition,
 	computeValues,
-	parseDefinition,
-} from "@eumenes/artifact-ui/contracts";
+} from "@eumenes/artifact-ui/composition-checks";
+import { parseDefinition } from "@eumenes/artifact-ui/contracts";
 import { validatedDefinition } from "../contracts";
 
 /**
@@ -208,7 +208,7 @@ describe("ui.studio revisions", () => {
 			48 * 1024,
 		);
 	});
-	test("every example of the SKILL parses and stays within the limits", () => {
+	test("every example of the SKILL parses, stays within the limits and passes the studio's validation", () => {
 		const examples = body
 			.split("\n")
 			.filter((line) => line.startsWith('{"title"'))
@@ -219,6 +219,7 @@ describe("ui.studio revisions", () => {
 			checkLimits(definition);
 			checkModelReferences(definition);
 			expect(parseVerdict(definition)).toBe("");
+			expect(validatedDefinition(definition).definition).toEqual(definition);
 		}
 	});
 });

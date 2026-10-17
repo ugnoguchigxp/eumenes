@@ -99,6 +99,7 @@ export type OcrWorkspaceProps = {
 	busy?: boolean;
 	recording?: boolean;
 	configured: boolean;
+	sharedCredentialAvailable?: boolean;
 	connectionRevision: number;
 	baseUrl: string | null;
 	error?: string;

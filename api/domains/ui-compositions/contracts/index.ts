@@ -2,9 +2,9 @@ import { z } from "zod";
 import {
 	compositionDirections,
 	compositionViews,
-	parseDefinition,
 	validateComposition,
-} from "@eumenes/artifact-ui/contracts";
+} from "@eumenes/artifact-ui/composition-checks";
+import { parseDefinition } from "@eumenes/artifact-ui/contracts";
 
 /** The only views a composition may use. Every other registered view is refused. */
 const allowedViews = new Set<string>(["layout", ...compositionViews]);

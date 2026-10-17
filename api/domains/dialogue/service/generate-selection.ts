@@ -1,22 +1,27 @@
 import type { DialogueDeps, GenerateInput } from "./context";
 import { generateConversation } from "./conversation-generation";
-import type { RequestAnalysis } from "./initial-decision";
+import type { FirstRound } from "./initial-decision";
 import { answerSession } from "./generation-stream";
 import { currentRequestMessage } from "./request-context";
-import { prepareSelection, recordRejected } from "./selection-trace";
+import {
+	prepareSelection,
+	recordRejected,
+	type Candidates,
+} from "./selection-trace";
 
 /**
- * The second round of a request the analysis sent to the toolchains: one function call, a candidate's or
- * `report_unavailable`. Prose is never adopted; it goes back for the one structural repair.
+ * The second round of a request the first round gave to a toolchain: one call of that toolchain's function,
+ * which carries the request for the specialist. Prose is never adopted; it goes back for the one structural repair.
  */
 export async function generateSelection(
 	deps: DialogueDeps,
 	input: GenerateInput,
-	analysis: RequestAnalysis,
+	found: Candidates,
+	analysis: FirstRound & { next: "toolchain" },
 	signal: AbortSignal,
 	repair: () => void,
 ) {
-	const decision = await prepareSelection(deps, input, analysis, signal);
+	const decision = prepareSelection(deps, input, found, analysis);
 	try {
 		const generated = await generateConversation({
 			inference: deps.larm,

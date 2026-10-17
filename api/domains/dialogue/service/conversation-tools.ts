@@ -28,7 +28,6 @@ export type ConversationOperation = {
 	revisionId: string;
 	functionName: string;
 	request: string;
-	announcement: string;
 	/** The open question this request answers (the toolchain asked it earlier). */
 	questionRef?: string;
 	/** A session toolchain only: the saved item to start from (a host-issued ref). */
@@ -58,10 +57,7 @@ export const announcementSchema = z
 	.describe(
 		"選定した担当へ依頼する前に利用者へ伝える短い一文。これから行うことを説明し、完了は断言しない。会話相手が専門担当へ切り替わる関数では、その引継ぎを伝える。",
 	);
-const announcedRequest = toolchainRequest
-	.extend({ announcement: announcementSchema })
-	.strict();
-const requestSchema = z.toJSONSchema(announcedRequest) as Record<
+const requestSchema = z.toJSONSchema(toolchainRequest) as Record<
 	string,
 	unknown
 >;
@@ -129,7 +125,6 @@ const unsetEmpty = (v: unknown) => (v === null || v === "" ? undefined : v);
 const sessionRequest = z
 	.object({
 		request: toolchainRequest.shape.request,
-		announcement: announcementSchema,
 		target: z.preprocess(unsetEmpty, z.string().max(200).optional()),
 		resolveUnsaved: z.preprocess(unsetEmpty, z.literal("discard").optional()),
 	})
@@ -137,14 +132,33 @@ const sessionRequest = z
 const answeringRequest = z
 	.object({
 		request: toolchainRequest.shape.request,
-		announcement: announcementSchema,
 		questionRef: z.string().min(1).max(64),
 	})
 	.strict();
+/** What a toolchain function says about itself, in the first round (which one) and the second (its arguments). */
+export function toolchainDescription(
+	card: ToolchainCard,
+	offered: ReadonlySet<string>,
+	session: boolean,
+) {
+	return (
+		card.summary +
+		(session
+			? "。会話相手をこの専門担当へ切り替え、以後は直接対話します"
+			: "。担当が作業した結果を通常会話へ返します") +
+		"。使う場面: " +
+		card.useWhen.join("、") +
+		"。" +
+		card.redirects
+			.filter((r) => offered.has(r.functionName))
+			.map((r) => `${r.when}には${r.functionName}を使う。`)
+			.join("")
+	);
+}
 /**
- * One function per offered toolchain, all with the same `{ request }` argument. The
- * description comes from the registered definition; a redirect names only offered functions.
- * A function whose operation asked a question that is still open also accepts its `questionRef`.
+ * The second round's functions: the toolchains it is offered (the one the first round chose), each with the
+ * same `{ request }` argument. The description comes from the registered definition. A function whose
+ * operation asked a question that is still open also accepts its `questionRef`.
  */
 export function toolchainTools(
 	cards: ToolchainCard[],
@@ -156,18 +170,11 @@ export function toolchainTools(
 		type: "function" as const,
 		function: {
 			name: card.functionName,
-			description:
-				card.summary +
-				(sessions.has(card.functionName)
-					? "。会話相手をこの専門担当へ切り替え、以後は直接対話します"
-					: "。担当が作業した結果を通常会話へ返します") +
-				"。使う場面: " +
-				card.useWhen.join("、") +
-				"。" +
-				card.redirects
-					.filter((r) => offered.has(r.functionName))
-					.map((r) => `${r.when}には${r.functionName}を使う。`)
-					.join(""),
+			description: toolchainDescription(
+				card,
+				offered,
+				sessions.has(card.functionName),
+			),
 			parameters: sessions.has(card.functionName)
 				? sessionRequestSchemaFor(sessions.get(card.functionName)!)
 				: requestSchemaFor(
@@ -178,7 +185,8 @@ export function toolchainTools(
 		},
 	}));
 }
-const unavailableReply = z
+/** The explanation of the first round's `report_unavailable`: what is said to the user as the answer. */
+export const unavailableReply = z
 	.object({
 		reply: z
 			.string()
@@ -190,41 +198,6 @@ const unavailableReply = z
 			),
 	})
 	.strict();
-/** Offered with every candidate set (empty too): the explanation that no offered specialist can satisfy the request. */
-export const reportUnavailableTool: NativeTool = {
-	type: "function",
-	function: {
-		name: "report_unavailable",
-		description: `提示された担当のどれでも依頼を満たせないときに呼び、その旨を利用者へ短く伝えます。replyがそのまま回答として音声で読み上げられるため、音声整形後の合計${SPOKEN_REPLY_MAX_CHARS}字以内・${SPOKEN_REPLY_MAX_SENTENCES}文以内にします。担当は起動しません。`,
-		parameters: z.toJSONSchema(unavailableReply) as Record<string, unknown>,
-	},
-};
-/** The reply of a lone `report_unavailable` call; undefined when the calls are something else. */
-export function unavailable(calls: NativeToolCall[]): string | undefined {
-	const call = calls[0];
-	if (calls.length !== 1 || call?.name !== reportUnavailableTool.function.name)
-		return undefined;
-	let args: unknown;
-	try {
-		args = parseLlmJson(call.arguments);
-	} catch (error) {
-		throw operationRejection(
-			"arguments_not_json",
-			call,
-			error instanceof LlmJsonError
-				? [{ validationPath: "arguments", validationCode: error.code }]
-				: [],
-		);
-	}
-	const parsed = unavailableReply.safeParse(args);
-	if (!parsed.success)
-		throw operationRejection(
-			"arguments_invalid",
-			call,
-			validationIssues(parsed.error, args),
-		);
-	return parsed.data.reply;
-}
 /** Every function name a toolchain may use, for detecting call syntax written as text. */
 export const conversationToolNames = new Set([
 	...builtinToolchainFunctions,
@@ -303,7 +276,6 @@ export function operation(
 			revisionId: card.revisionId,
 			functionName: card.functionName,
 			request: parsed.data.request,
-			announcement: parsed.data.announcement,
 			...(parsed.data.target === undefined
 				? {}
 				: { target: parsed.data.target }),
@@ -318,7 +290,7 @@ export function operation(
 		(args as Record<string, unknown>).questionRef !== undefined;
 	const result = answering
 		? answeringRequest.safeParse(args)
-		: announcedRequest.safeParse(args);
+		: toolchainRequest.safeParse(args);
 	if (!result.success)
 		throw operationRejection(
 			"arguments_invalid",
@@ -343,7 +315,6 @@ export function operation(
 		revisionId: card.revisionId,
 		functionName: card.functionName,
 		request: result.data.request,
-		announcement: result.data.announcement,
 		...(questionRef === undefined ? {} : { questionRef }),
 	};
 }

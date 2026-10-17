@@ -246,6 +246,13 @@ export interface InferencePort {
 	): string;
 	liveRequest?(id: string): boolean;
 	acceptInTransaction?(db: Database, receipt: Receipt): boolean;
+	/**
+	 * Accepts a pending answer request whose answer the host fixed itself, so no model answer was adopted: the
+	 * request is `accepted` with no accepted attempt (that absence is the record; earlier rounds of the run may
+	 * have left unaccepted attempts), and what stands on it (speech) proceeds as for a model answer. false: not a
+	 * pending answer request that is still allowed, or an attempt of it was already accepted.
+	 */
+	acceptHostAnswerInTransaction?(db: Database, requestId: string): boolean;
 	/** Check a control receipt before delegation without adopting an answer. */
 	validateReceiptInTransaction?(db: Database, receipt: Receipt): boolean;
 	validRequest?(id: string): boolean;

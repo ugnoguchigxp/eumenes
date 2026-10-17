@@ -21,13 +21,6 @@ import {
 	compositionViewRegistry,
 	expression,
 } from "./composition-contracts";
-export {
-	compositionDirections,
-	compositionViews,
-} from "./composition-contracts";
-export { validateComposition } from "./composition-validate";
-export { computeValues } from "./composition-compute";
-export type { CompositionModelDefinition } from "./composition-contracts";
 import type { ImageWorkspaceResource } from "./image-components";
 export type { ImageWorkspaceResource } from "./image-components";
 import type { RecordsResource } from "./records-components";

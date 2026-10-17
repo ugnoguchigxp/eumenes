@@ -24,7 +24,7 @@
 - 表示部品: KanbanBoard 30件成功。ロゴボタンの絞り込み・解除でwrite callbackを呼ばず、停止キューは対象担当だけを再開する。
 - Web結合: `view.test.tsx`、`toolchain-adapter.test.tsx`計15件成功。
 - 全体: `bun run verify -- --domain kanban --domain artifact`成功。DesignSystemの型・ビルド、関連domainと利用側の検証を通過。KanbanBoardフォルダのlint・format・size-budgetも成功。
-- 静的ブラウザ描画: 1280pxでは3列が横並びでスクロールなし、390pxでは各260pxの3列が横並びで列領域だけ横スクロール。どちらもページ全体の横はみ出しなし。[広い画面](verification/kanban-planning-ui-2026-10-17/board-1280.png)、[狭い画面](verification/kanban-planning-ui-2026-10-17/board-390.png)、[配置の測定](verification/kanban-planning-ui-2026-10-17/layout.json)。静的fixtureの描画であり、稼働中の実画面の受入とは区別する。
+- 静的ブラウザ描画: 1280pxでは3列が横並びでスクロールなし、390pxでは各260pxの3列が横並びで列領域だけ横スクロール。どちらもページ全体の横はみ出しなし。[広い画面](../verification/kanban-planning-ui-2026-10-17/board-1280.png)、[狭い画面](../verification/kanban-planning-ui-2026-10-17/board-390.png)、[配置の測定](../verification/kanban-planning-ui-2026-10-17/layout.json)。静的fixtureの描画であり、稼働中の実画面の受入とは区別する。
 - 既存ブラウザE2Eは独自のbackend・Viteを起動するため未実行。サーバー操作の許可は今回ない。実LLM・実CLIでの作業実行はUI変更の確認に不要なため未実施。実機器は対象外。
 - 最終差分点検: 担当外の既存差分へ変更なし。語句・シナリオで意味判断を置換する処理なし。ブランド対応表はSVGの見た目だけに使用。
 - 検証の見直し: 最初の関連domain検証はpass。その後の最終確認は個別チェックが全件passだったものの、実行中の作業ツリー更新により全体結果は`invalidated`。並行して通知領域の担当外ファイルが更新されており、Kanban対象ファイルの更新時刻は検証開始前だった。製品不具合とは扱わず、最新の作業ツリーを入力に再検証する。再び更新が続く場合は無効な全体結果を成功扱いせず、個別試験と静的描画の結果を分けて報告する。

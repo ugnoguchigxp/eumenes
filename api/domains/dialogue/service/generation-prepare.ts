@@ -10,7 +10,6 @@ import { compileAssembly, windowIsEmpty } from "./context-compiler";
 import {
 	hostTextBlock,
 	operationBlock,
-	researchFailureBlock,
 	researchResultBlock,
 } from "./context-blocks";
 import { withVolatile } from "./context-volatile";
@@ -150,30 +149,15 @@ export function createPrepare(
 		const note = claim.payload.commandNote;
 		if (note)
 			operations.push(operationBlock("operation.command_question", note));
-		// The report of the research sub-agent: a failed answer keeps its own context apart from the layers.
+		// The report of the research sub-agent. A failed one has none: it is answered by the host, not the model.
 		const nowMs = Date.parse(clock());
-		const research: ContextBlock[] = agent?.failureCode
-			? [
-					researchFailureBlock(
-						agent.failureCode,
-						agent.projection ?? undefined,
-						nowMs,
-					),
-				]
-			: agent?.projection
-				? [researchResultBlock(JSON.parse(agent.projection), nowMs)]
-				: [];
+		const research: ContextBlock[] = agent?.projection
+			? [researchResultBlock(JSON.parse(agent.projection), nowMs)]
+			: [];
 		// What holds for this call only, in the order it is shown (see `withVolatile`).
 		const assembly = withVolatile(compiled.assembly, {
 			memory: compiled.assembly.volatile,
-			...(agent
-				? {
-						answer: {
-							failureCode: agent.failureCode,
-							actionPayload: agent.actionPayload,
-						},
-					}
-				: {}),
+			...(agent ? { answer: { actionPayload: agent.actionPayload } } : {}),
 			// World is read only by the research sub-agent; the conversation gets the names of the known targets
 			// this turn's wording mentions, as one line of L4 (nothing when none is named or World is unusable).
 			worldNames: () =>

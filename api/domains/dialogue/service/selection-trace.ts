@@ -5,6 +5,7 @@ import { getLogger } from "../../../infrastructure/logger";
 import { MEMORY_HISTORY_MAX_TOKENS } from "../../inference";
 import { RECALL_MIN_SCORE, type TurnRecall } from "../../memory";
 import type { AnswerTicket } from "../../agent-runtime";
+import type { ToolchainCard } from "../../capabilities";
 import type { SelectionOutcome } from "../../toolchain-history";
 import type {
 	QueryVector,
@@ -17,13 +18,13 @@ import { sessionOffers } from "./specialist-context";
 import {
 	analysisRecord,
 	analysisTrace,
-	type RequestAnalysis,
+	type FirstRound,
 } from "./initial-decision";
 import {
 	appendConversationPolicy,
-	reportUnavailableTool,
 	toolchainTools,
 	type ConversationOperation,
+	type SessionOffers,
 } from "./conversation-tools";
 
 const log = getLogger("dialogue");
@@ -62,7 +63,7 @@ export function agentOutcome(agent: AnswerTicket | undefined): {
 }
 
 type DraftParts = {
-	analysis?: RequestAnalysis;
+	analysis?: FirstRound;
 	route?: ToolchainRoute;
 	query?: QueryVector;
 };
@@ -108,31 +109,101 @@ export type Decision = {
 	recallPins: TurnRecall["pins"];
 };
 
+/** The candidate toolchains of a request, found before the first round (no model call). */
+export type Candidates = {
+	started: number;
+	route: ToolchainRoute;
+	/** The embedding of the current request (the recall of the exchanges that left the window reads it too). */
+	query: QueryVector | undefined;
+	sessions: SessionOffers;
+};
+
+/** The retrieval of the merged cards, told the way the registry tells it. */
+function retrievalOf(cards: ToolchainCard[]): ToolchainRoute["retrieval"] {
+	const fts = cards.some((c) => c.score.ftsRank !== null);
+	const vector = cards.some((c) => c.score.similarity !== null);
+	return fts && vector ? "hybrid" : vector ? "embedding" : fts ? "fts" : "none";
+}
+
 /**
- * The context of a direct answer: the conversation's own, the exchanges recalled for this turn and, after a
- * request analysis, its record next to the current request. A turn without routing recalls nothing. The recall
- * is embedded from the current utterance itself, not from the analysis' goal (which only the candidate search uses).
+ * The candidates of a new conversation decision: the current utterance and the user's utterance just before
+ * it are each embedded and searched as they were said, and the cards are united (the current utterance's
+ * first, each search keeping its own limit). A follow-up ("明日は？") thereby keeps the toolchain of the
+ * utterance it continues. The past selections are those of the current utterance.
  */
-export async function prepareAnswer(
+export async function findCandidates(
 	deps: DialogueDeps,
 	input: GenerateInput,
 	signal: AbortSignal,
-	analysis?: RequestAnalysis,
-) {
+): Promise<Candidates> {
 	const started = Date.now();
-	const current = currentRequestMessage(input);
-	const query =
-		analysis && deps.toolchains && deps.memory && input.memory
-			? await deps.toolchains.embedQuery(current.content, signal)
-			: undefined;
+	const routing = input.routing!;
+	const current = currentRequestMessage(input).content;
+	const before = routing.analysis.previous
+		.filter((m) => m.role === "user")
+		.at(-1)?.content;
+	const texts = before && before !== current ? [current, before] : [current];
+	const queries = await Promise.all(
+		texts.map((text) =>
+			measureStage("dialogue", "query_embedding", () =>
+				deps.toolchains!.embedQuery(text, signal),
+			),
+		),
+	);
 	signal.throwIfAborted();
-	const recalled = recallFor(deps, input, query);
+	const routes = deps.store.read((db) =>
+		texts.map((text, index) =>
+			deps.toolchains!.routeInTransaction(db, {
+				runId: input.runId,
+				text,
+				query: queries[index],
+				available: new Set(routing.available),
+			}),
+		),
+	);
+	const cards = [
+		...new Map(
+			routes.flatMap((r) => r.cards).map((c) => [c.revisionId, c] as const),
+		).values(),
+	];
+	const route: ToolchainRoute = {
+		cards,
+		past: routes[0]!.past,
+		retrieval: routes.length === 1 ? routes[0]!.retrieval : retrievalOf(cards),
+	};
+	log.info("dialogue.candidates_selected", {
+		candidateCount: cards.length,
+		retrieval: route.retrieval,
+		durationMs: Date.now() - started,
+	});
+	return {
+		started,
+		route,
+		query: queries[0],
+		sessions: sessionOffers(deps, cards, input.runId),
+	};
+}
+
+/**
+ * The context of a direct answer: the conversation's own, the exchanges recalled for this turn and, after the
+ * first round, its kind next to the current request. A turn without routing recalls nothing. The recall reads
+ * the embedding of the current utterance itself.
+ */
+export function prepareAnswer(
+	deps: DialogueDeps,
+	input: GenerateInput,
+	found?: Candidates,
+	analysis?: FirstRound,
+) {
+	const started = found?.started ?? Date.now();
+	const current = currentRequestMessage(input);
+	const recalled = recallFor(deps, input, found?.query);
 	const messages = [...input.messages];
 	messages.splice(
 		messages.indexOf(current),
 		0,
 		...(recalled ? [{ role: "system" as const, content: recalled.text }] : []),
-		...(analysis ? [analysisRecord(analysis, true)] : []),
+		...(analysis ? [analysisRecord(analysis)] : []),
 	);
 	return {
 		messages: markCurrentRequest(
@@ -140,42 +211,38 @@ export async function prepareAnswer(
 			current,
 			input.currentRequest.messageId,
 		),
-		draft: decisionDraft(input, started, { analysis, query }),
+		draft: decisionDraft(input, started, {
+			analysis,
+			route: found?.route,
+			query: found?.query,
+		}),
 		recallPins: recalled?.pins ?? [],
 	};
 }
 
 /**
- * The second round of a request that needs a toolchain: retrieve the candidates by the analysis' goal, offer
- * them as functions beside `report_unavailable` (also when there are none), with the fixed policy, the past
- * selections and the analysis record; and keep what is needed to trace the decision.
+ * The second round of a request the first round gave to a toolchain: offer that one function only (with the
+ * questions still open for it and, for a session toolchain, the saved items), the fixed policy, the past
+ * selections, the recalled exchanges and the recent requests; and keep what is needed to trace the decision.
  */
-export async function prepareSelection(
+export function prepareSelection(
 	deps: DialogueDeps,
 	input: GenerateInput,
-	analysis: RequestAnalysis,
-	signal: AbortSignal,
+	found: Candidates,
+	analysis: FirstRound & { next: "toolchain" },
 ) {
-	const routed = Date.now();
 	const current = currentRequestMessage(input);
 	const routing = input.routing!;
-	const query = await measureStage("dialogue", "query_embedding", () =>
-		deps.toolchains!.embedQuery(analysis.goal, signal),
-	);
-	signal.throwIfAborted();
-	const route = deps.store.read((db) =>
-		deps.toolchains!.routeInTransaction(db, {
-			runId: input.runId,
-			text: analysis.goal,
-			query,
-			available: new Set(routing.available),
-		}),
-	);
+	const { route, query } = found;
+	const { card } = analysis;
 	// Earlier exchanges that left the verbatim window, found by this turn's own vector (no model round trip).
 	const recalled = recallFor(deps, input, query);
-	// A question is answerable only through a function that is offered now.
-	const openQuestions = routing.openQuestions.filter((q) =>
-		route.cards.some((c) => c.functionName === q.functionName),
+	// A question is answerable only through the function that is offered now.
+	const openQuestions = routing.openQuestions.filter(
+		(q) => q.functionName === card.functionName,
+	);
+	const sessions: SessionOffers = new Map(
+		[...found.sessions].filter(([name]) => name === card.functionName),
 	);
 	// Keep the same scope; appended host results cannot become a request.
 	const requests = [
@@ -196,11 +263,6 @@ export async function prepareSelection(
 				},
 	);
 	if (recalled) messages.unshift({ role: "system", content: recalled.text });
-	messages.splice(
-		messages.indexOf(current),
-		0,
-		analysisRecord(analysis, false),
-	);
 	appendConversationPolicy(
 		messages,
 		current,
@@ -216,22 +278,13 @@ export async function prepareSelection(
 		current,
 		input.currentRequest.messageId,
 	);
-	const sessions = sessionOffers(deps, route.cards, input.runId);
-	log.info("dialogue.candidates_selected", {
-		candidateCount: route.cards.length,
-		retrieval: route.retrieval,
-		durationMs: Date.now() - routed,
-	});
 	return {
 		messages,
-		tools: [
-			...toolchainTools(route.cards, openQuestions, sessions),
-			reportUnavailableTool,
-		],
-		cards: route.cards,
+		tools: toolchainTools([card], openQuestions, sessions),
+		cards: [card],
 		openQuestions,
 		sessions,
-		draft: decisionDraft(input, routed, { analysis, route, query }),
+		draft: decisionDraft(input, found.started, { analysis, route, query }),
 		recallPins: recalled?.pins ?? [],
 	};
 }

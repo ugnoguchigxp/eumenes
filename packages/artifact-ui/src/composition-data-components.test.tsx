@@ -330,10 +330,14 @@ test("without a model the views draw and the calculator works", async () => {
 test("the calculator accepts pi after a number through the host language", async () => {
 	const view = await mount(
 		definition,
-		<CalculatorView request={req({ view: "calculator", mode: "scientific" })} />,
+		<CalculatorView
+			request={req({ view: "calculator", mode: "scientific" })}
+		/>,
 	);
 	for (const name of ["2", "π", "="]) await press(view.container, name);
-	expect(text(view.container, "[role=group] [role=status]")).toStartWith("6.28318530718");
+	expect(text(view.container, "[role=group] [role=status]")).toStartWith(
+		"6.28318530718",
+	);
 	await view.unmount();
 });
 
@@ -341,7 +345,11 @@ test("float noise is trimmed from the result and from resultBind", async () => {
 	const view = await mount(
 		definition,
 		<CalculatorView
-			request={req({ view: "calculator", preset: "0.1 + 0.2", resultBind: "n" })}
+			request={req({
+				view: "calculator",
+				preset: "0.1 + 0.2",
+				resultBind: "n",
+			})}
 		/>,
 		<FormulaView request={req({ view: "formula", tex: "n", expr: "n" })} />,
 	);
@@ -369,7 +377,11 @@ test("a changed preset or mode starts the calculator over", async () => {
 	expect(text(container, "[role=status]")).toBe("2 * 3");
 	await render("2 * 3", "scientific");
 	expect(container.querySelector("button[aria-label], button")).not.toBeNull();
-	expect([...container.querySelectorAll("button")].some((b) => b.textContent === "sin")).toBe(true);
+	expect(
+		[...container.querySelectorAll("button")].some(
+			(b) => b.textContent === "sin",
+		),
+	).toBe(true);
 	await act(async () => root.unmount());
 });
 

@@ -25,9 +25,9 @@ const PERSONAS = {
 		style: systemContext("dialogue.contexts.system-prompt.sage-style", {}),
 	},
 };
-export function buildSystemPrompt(general: AgentGeneral) {
+function personaParts(general: AgentGeneral) {
 	const persona = PERSONAS[general.persona] ?? PERSONAS.butler;
-	return systemContext("dialogue.contexts.system-prompt.conversation", {
+	return {
 		...persona,
 		agent: general.agentName
 			? systemContext("dialogue.contexts.system-prompt.agent-name", {
@@ -39,5 +39,20 @@ export function buildSystemPrompt(general: AgentGeneral) {
 					name: general.userName,
 				})
 			: "",
+	};
+}
+export function buildSystemPrompt(general: AgentGeneral) {
+	return systemContext(
+		"dialogue.contexts.system-prompt.conversation",
+		personaParts(general),
+	);
+}
+/** The role alone (no tone, no spoken-reply or tool rules), for the hidden analysis round that writes no reply. */
+export function buildRolePrompt(general: AgentGeneral) {
+	const { role, agent, user } = personaParts(general);
+	return systemContext("dialogue.contexts.request-analysis.role", {
+		role,
+		agent,
+		user,
 	});
 }

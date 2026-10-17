@@ -623,17 +623,6 @@ export const SCENARIOS: Record<string, Scenario> = {
 		...LAYERS,
 		agent: { projection: worldReport },
 	},
-	"research-failure": {
-		...LAYERS,
-		agent: { failureCode: "agent_timeout" },
-	},
-	"research-failure-codex": {
-		memory: "layers",
-		agent: {
-			failureCode: "codex_research_failed",
-			projection: JSON.stringify({ failure: "codex_research_failed" }),
-		},
-	},
 	"result-action": {
 		...LAYERS,
 		agent: {

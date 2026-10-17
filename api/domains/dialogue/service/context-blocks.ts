@@ -135,21 +135,3 @@ export function researchResultBlock(
 		body: { kind: "json", value: { ...promptTime(nowMs), report } },
 	};
 }
-
-/**
- * A failed research answer: the failure code, the projection the sub-agent left (if any) and the time. The answer
- * to it is built apart from the layers (see `researchResultContext`), so the block only carries what that needs.
- */
-export function researchFailureBlock(
-	failureCode: string,
-	projection: string | undefined,
-	nowMs: number,
-): ContextBlock {
-	return {
-		source: "research.failure",
-		authority: "host_record",
-		freshness: "this_turn",
-		certainty: "host_confirmed",
-		body: { kind: "json", value: { failureCode, projection, nowMs } },
-	};
-}

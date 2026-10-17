@@ -1,0 +1,46 @@
+[
+  {
+    "stage": "backend-video-upload",
+    "id": "f2258175-7184-4e8f-b0d8-197e8718740d",
+    "status": 202,
+    "requestId": "47de61bf-ebb8-4d09-a178-e3ce81fa227f"
+  },
+  {
+    "stage": "backend-video-state",
+    "id": "f2258175-7184-4e8f-b0d8-197e8718740d",
+    "state": "starting",
+    "revision": 1,
+    "errorCode": null
+  },
+  {
+    "stage": "backend-video-state",
+    "id": "f2258175-7184-4e8f-b0d8-197e8718740d",
+    "state": "queued",
+    "revision": 2,
+    "errorCode": null
+  },
+  {
+    "stage": "backend-video-state",
+    "id": "f2258175-7184-4e8f-b0d8-197e8718740d",
+    "state": "running",
+    "revision": 3,
+    "errorCode": null
+  },
+  {
+    "stage": "backend-video-state",
+    "id": "f2258175-7184-4e8f-b0d8-197e8718740d",
+    "state": "completed",
+    "revision": 4,
+    "errorCode": null
+  },
+  {
+    "stage": "backend-video-validated",
+    "id": "f2258175-7184-4e8f-b0d8-197e8718740d",
+    "state": "completed",
+    "frames": 6,
+    "lines": 18,
+    "textDetectedInAllFrames": true,
+    "originalIdentical": true,
+    "originalStatus": 200
+  }
+]

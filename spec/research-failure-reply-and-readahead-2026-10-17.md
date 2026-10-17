@@ -2,7 +2,7 @@
 
 作成日: 2026-10-17
 
-状態: 利用者合意済み。未実装。
+状態: 利用者合意済み。2026-10-17、fixture の範囲は実装済み（§5）。§4 の実機受入は未記録。`web-guided.bundle.json` と shared-execution の古い SKILL 本文は `readAhead:[{url},…]` のまま。
 
 関連: [会話の初動2ラウンド化](conversation-two-round-initial-analysis-design-2026-10-17.md)、[委譲前の一時回答 §9](conversation-pre-delegation-response-design-2026-10-17.md)。
 
@@ -32,3 +32,15 @@
 
 - fixture: readAheadの文字列配列が受理され、旧objectは拒否される。調査失敗時にLLM呼び出しなしで「失敗しました。」が返り、失敗コードがrunに残る。
 - 実機: 「明日の鎌倉の天気を教えて」で、予告→調査→160字以内の根拠付き回答。サブエージェント失敗時は「失敗しました。」が読み上げられる。
+
+## 5. 実施記録（2026-10-17）
+
+fixture は次のとおり。実機は未実施。
+
+- `readAhead` の契約は `api/domains/agent-runtime/service/guided-contract.ts` で URL 文字列の配列（最大5件）。旧 object は拒否する。利用側は `step-actions.ts`。試験は `guided-contract.test.ts`。
+- 失敗時の返答は `api/domains/dialogue/service/research-failure-reply.ts` の「失敗しました。」。`generation-handler.ts` は失敗コードがあるとき LLM を呼ばない。失敗コードは run に残る。試験は `research-hold.test.ts`、`generation-prepare.test.ts`、`guided-answer.test.ts`。`failure-rules` の context は削除済み。
+- `web-shared-execution.bundle.json` の新しい SKILL 本文は文字列配列を指示する。同じ bundle の古い本文と `web-guided.bundle.json` は `readAhead:[{url},…]` のまま。ここは本書の変更範囲として残る。
+- 音声経路: LLM を呼ばずに確定した回答でも音声配信できるよう、`InferencePort.acceptHostAnswerInTransaction`（`api/domains/inference/service/request-status.ts`）を追加。`generation-handler.ts` の settle で調査失敗時に1回呼ぶ。受理できなければ `permission_revoked` で run を失敗させる。試験は `api/domains/inference/test/inference.test.ts`、`api/application/toolchain/agent-voice-response.test.ts`。
+- 固定返答の対象は調査そのものの失敗だけで、action の失敗（kanban の `revision_conflict` など）は従来どおり会話エージェントが結果を伝える。
+- readAhead の新 revision は `skill:web.guided@4`、`package:web.recipe@5`・`web.search@5`・`web.quick@6`、`toolchain:web.search@6`・`web.research.codex@3`（`web-shared-execution.bundle.json`）。製品DB登録済み（2026-10-17 再起動）。登録後の live で天気の調査が成功（run `180ade55-9423-40fa-ba74-cb1c4e735136`）。
+- 実機で未確認: 調査失敗時の「失敗しました。」の読み上げ。2026-10-18 以降に確認する（[会話の初動 §9](conversation-two-round-initial-analysis-design-2026-10-17.md)）。

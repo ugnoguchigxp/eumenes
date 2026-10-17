@@ -40,6 +40,7 @@ const connection = {
 	serviceId: "ocr-host",
 	baseUrl: "http://127.0.0.1:9000",
 	credentialConfigured: true,
+	sharedCredentialAvailable: true,
 };
 
 function setup(options: { records?: unknown[]; failRecords?: boolean } = {}) {
@@ -118,6 +119,7 @@ test("the snapshot selects the first record and reports the connection", async (
 	expect(resource(h)).toMatchObject({
 		selectedId: "a",
 		configured: true,
+		sharedCredentialAvailable: true,
 		baseUrl: "http://127.0.0.1:9000",
 		busy: false,
 	});

@@ -24,7 +24,8 @@ const tokenize = (expression: string): Token[] => {
 		const match = pattern.exec(source);
 		if (!match) throw new Error("invalid");
 		index = pattern.lastIndex;
-		if (match[1] !== undefined) tokens.push({ type: "num", value: Number(match[1]) });
+		if (match[1] !== undefined)
+			tokens.push({ type: "num", value: Number(match[1]) });
 		else if (match[2] !== undefined)
 			tokens.push({ type: "op", value: match[2] as "+" });
 		else if (match[3] !== undefined)
@@ -89,7 +90,10 @@ export const evaluateExpression = (expression: string): number => {
 		let left = parseUnary();
 		for (;;) {
 			const token = peek();
-			if (token?.type === "op" && (token.value === "*" || token.value === "/")) {
+			if (
+				token?.type === "op" &&
+				(token.value === "*" || token.value === "/")
+			) {
 				next();
 				const right = parseUnary();
 				if (token.value === "/" && right === 0) throw new Error("div0");

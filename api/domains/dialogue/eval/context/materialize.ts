@@ -12,7 +12,6 @@ import type { ContextAssembly } from "../../service/context-assembly";
 import {
 	hostTextBlock,
 	operationBlock,
-	researchFailureBlock,
 	researchResultBlock,
 	specialistBlock,
 	type OperationSource,
@@ -331,7 +330,7 @@ function specialistBlocks(specialist: NonNullable<Seed["specialist"]>) {
 
 /**
  * The assembly with the volatile part a seed describes. The blocks are the product's builders'; the order and the
- * branching (what a failed research answer drops, what an answer leaves out) are the product's `withVolatile`,
+ * branching (what an answer leaves out) are the product's `withVolatile`,
  * which `createPrepare` calls too.
  */
 export function assembleVolatile(
@@ -340,12 +339,9 @@ export function assembleVolatile(
 	nowMs: number,
 ): ContextAssembly {
 	const research = seed.research;
-	const failed = research?.failureCode !== undefined;
 	return withVolatile(compiled, {
 		memory: compiled.volatile,
-		...(research
-			? { answer: failed ? { failureCode: research.failureCode } : {} }
-			: {}),
+		...(research ? { answer: {} } : {}),
 		worldNames: () => worldNamesBlock((seed.world ?? []).map((t) => t.name)),
 		specialist: () =>
 			seed.specialist ? specialistBlocks(seed.specialist) : [],
@@ -358,17 +354,7 @@ export function assembleVolatile(
 				]
 			: [],
 		research: research
-			? failed
-				? researchFailureBlock(
-						research.failureCode!,
-						research.projection === undefined
-							? undefined
-							: typeof research.projection === "string"
-								? research.projection
-								: JSON.stringify(research.projection),
-						nowMs,
-					)
-				: researchResultBlock(research.projection ?? {}, nowMs)
+			? researchResultBlock(research.projection ?? {}, nowMs)
 			: null,
 	});
 }

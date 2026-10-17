@@ -1,0 +1,63 @@
+[
+  {
+    "stage": "mac-auth-before",
+    "status": 200,
+    "id": "ocr-host",
+    "state": "stopped",
+    "generation": 9
+  },
+  {
+    "stage": "mac-unauthenticated",
+    "status": 401
+  },
+  {
+    "stage": "mac-invalid-token",
+    "status": 401
+  },
+  {
+    "stage": "mac-auth-after",
+    "status": 200,
+    "id": "ocr-host",
+    "state": "stopped",
+    "generation": 9
+  },
+  {
+    "stage": "read-only-invariant",
+    "unchanged": true
+  },
+  {
+    "stage": "settings-before",
+    "status": 200,
+    "requestId": "4cab2f08-46e3-4e0e-a261-b51d9aae9f61",
+    "settings": {
+      "revision": 0,
+      "serviceId": "ocr-host",
+      "baseUrl": null,
+      "credentialConfigured": false,
+      "sharedCredentialAvailable": true
+    }
+  },
+  {
+    "stage": "settings-saved",
+    "status": 200,
+    "requestId": "c97a7233-f168-43bb-bf88-9c232150c3bb",
+    "settings": {
+      "revision": 1,
+      "serviceId": "ocr-host",
+      "baseUrl": "http://192.168.0.130:18794",
+      "credentialConfigured": true,
+      "sharedCredentialAvailable": true
+    }
+  },
+  {
+    "stage": "settings-readback",
+    "status": 200,
+    "settings": {
+      "revision": 1,
+      "serviceId": "ocr-host",
+      "baseUrl": "http://192.168.0.130:18794",
+      "credentialConfigured": true,
+      "sharedCredentialAvailable": true
+    }
+  }
+]
