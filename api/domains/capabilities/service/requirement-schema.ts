@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ValidationFailure } from "../../../infrastructure/validation-log";
 import { bytes, type JsonSchema } from "../contracts";
 const types = [
 	"object",
@@ -18,37 +19,40 @@ const keys: Record<string, string[]> = {
 	boolean: [],
 	null: [],
 };
-const fail = (): never => {
-	throw new Error("invalid_requirement_schema");
+/** Only the reason is reported: schema keys and values are model text and are never copied. */
+const fail = (reason: string, limit?: number): never => {
+	throw new ValidationFailure("invalid_requirement_schema", [
+		{
+			validationPath: "valueSchema",
+			validationCode: reason,
+			...(limit === undefined ? {} : { limit }),
+		},
+	]);
 };
 /** Reject unsupported keywords before Zod conversion; never interpret or execute schema text. */
 export function validateRequirementSchema(schema: JsonSchema) {
-	if (bytes(schema) > 4096) fail();
+	if (bytes(schema) > 4096) fail("too_big", 4096);
 	let nodes = 0;
 	function visit(raw: unknown, depth: number) {
-		if (
-			depth > 6 ||
-			++nodes > 128 ||
-			!raw ||
-			typeof raw !== "object" ||
-			Array.isArray(raw)
-		)
-			fail();
+		if (depth > 6) fail("too_deep", 6);
+		if (++nodes > 128) fail("too_many_nodes", 128);
+		if (!raw || typeof raw !== "object" || Array.isArray(raw))
+			fail("schema_not_object");
 		const s = raw as JsonSchema,
 			rawType = s.type;
 		const t = rawType as string;
-		if (typeof t !== "string" || !types.includes(t)) fail();
+		if (typeof t !== "string" || !types.includes(t)) fail("unsupported_type");
 		if (
 			Object.keys(s).some(
 				(k) => !["type", "description", "enum", ...keys[t]!].includes(k),
 			)
 		)
-			fail();
+			fail("unsupported_keyword");
 		if (
 			s.description !== undefined &&
 			(typeof s.description !== "string" || s.description.length > 500)
 		)
-			fail();
+			fail("invalid_description", 500);
 		if (s.enum !== undefined) {
 			if (
 				["object", "array"].includes(t) ||
@@ -56,7 +60,7 @@ export function validateRequirementSchema(schema: JsonSchema) {
 				!s.enum.length ||
 				s.enum.length > 32
 			)
-				fail();
+				fail("invalid_enum", 32);
 			if (
 				(s.enum as unknown[]).some((v) =>
 					t === "null"
@@ -67,7 +71,7 @@ export function validateRequirementSchema(schema: JsonSchema) {
 								(typeof v === "number" && !Number.isFinite(v)),
 				)
 			)
-				fail();
+				fail("enum_type_mismatch");
 		}
 		const bound = (
 			key: string,
@@ -77,7 +81,7 @@ export function validateRequirementSchema(schema: JsonSchema) {
 			const v = s[key];
 			if (v === undefined && !required) return;
 			if (typeof v !== "number" || !Number.isInteger(v) || v < 0 || v > max)
-				fail();
+				fail("invalid_bound");
 		};
 		if (t === "object") {
 			if (
@@ -86,7 +90,7 @@ export function validateRequirementSchema(schema: JsonSchema) {
 				Array.isArray(s.properties) ||
 				s.additionalProperties !== false
 			)
-				fail();
+				fail("invalid_properties");
 			const entries = Object.entries(s.properties as Record<string, unknown>);
 			if (
 				entries.length > 32 ||
@@ -97,7 +101,7 @@ export function validateRequirementSchema(schema: JsonSchema) {
 						["__proto__", "prototype", "constructor"].includes(k),
 				)
 			)
-				fail();
+				fail("invalid_property_names", 32);
 			if (
 				s.required !== undefined &&
 				(!Array.isArray(s.required) ||
@@ -108,13 +112,13 @@ export function validateRequirementSchema(schema: JsonSchema) {
 							!Object.hasOwn(s.properties as object, k),
 					))
 			)
-				fail();
+				fail("invalid_required");
 			for (const [, v] of entries) visit(v, depth + 1);
 		}
 		if (t === "array") {
 			bound("minItems", 32);
 			bound("maxItems", 32, true);
-			if (Number(s.minItems ?? 0) > Number(s.maxItems)) fail();
+			if (Number(s.minItems ?? 0) > Number(s.maxItems)) fail("invalid_range");
 			visit(s.items, depth + 1);
 		}
 		if (t === "string") {
@@ -124,12 +128,12 @@ export function validateRequirementSchema(schema: JsonSchema) {
 				s.maxLength !== undefined &&
 				Number(s.minLength ?? 0) > Number(s.maxLength)
 			)
-				fail();
+				fail("invalid_range");
 			if (
 				s.format !== undefined &&
 				!["date", "date-time", "uri"].includes(String(s.format))
 			)
-				fail();
+				fail("unsupported_format");
 		}
 		if (t === "number" || t === "integer") {
 			for (const k of ["minimum", "maximum"])
@@ -137,13 +141,13 @@ export function validateRequirementSchema(schema: JsonSchema) {
 					s[k] !== undefined &&
 					(typeof s[k] !== "number" || !Number.isFinite(s[k]))
 				)
-					fail();
+					fail("invalid_bound");
 			if (
 				s.minimum !== undefined &&
 				s.maximum !== undefined &&
 				Number(s.minimum) > Number(s.maximum)
 			)
-				fail();
+				fail("invalid_range");
 		}
 	}
 	visit(schema, 1);
@@ -166,7 +170,7 @@ export function validateRequirementSchema(schema: JsonSchema) {
 			conversion(schema) as Parameters<typeof z.fromJSONSchema>[0],
 		);
 	} catch {
-		return fail();
+		return fail("conversion_failed");
 	}
 }
 export function requirementValueMatches(schema: JsonSchema, value: unknown) {

@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import type { z } from "zod";
 import type {
 	SpecialistPort,
 	SpecialistSet,
@@ -12,6 +13,24 @@ import type { SchemaProvider } from "./toolchain-adapters";
 
 /** Saved items a session may start from (the adapter's own list, at most this many). */
 const MAX_TARGETS = 50;
+/** A schema failure the specialist is told about: this many issues of this many characters at most. */
+const MAX_ISSUES = 8;
+const ISSUE_CHARS = 200;
+
+/** Where, what kind and which type was expected; the model's input values stay out (a record's path may name a key the model wrote). */
+function issueLines(error: z.ZodError): string[] {
+	return error.issues.slice(0, MAX_ISSUES).map((issue) => {
+		const expected =
+			"expected" in issue && typeof issue.expected === "string"
+				? issue.expected
+				: "origin" in issue && typeof issue.origin === "string"
+					? issue.origin
+					: null;
+		const path = issue.path.map(String).join(".") || "(root)";
+		const suffix = ` ${issue.code}${expected ? ` expected=${expected}` : ""}`;
+		return path.slice(0, ISSUE_CHARS - suffix.length) + suffix;
+	});
+}
 
 /**
  * Dialogue's access to session toolchains and their domain work (spec toolchain-specialist-dialogue §4.1).
@@ -95,7 +114,11 @@ export function createSpecialistPort(deps: {
 						operationName: tool.operationName,
 						input: parsed.data as Record<string, unknown>,
 					}
-				: { ok: false, code: "specialist_invalid_arguments" };
+				: {
+						ok: false,
+						code: "specialist_invalid_arguments",
+						detail: issueLines(parsed.error),
+					};
 		},
 		invokeInTransaction(db, set, input) {
 			// Only an operation of the session's own set; the work and turn are the host's, not the model's.

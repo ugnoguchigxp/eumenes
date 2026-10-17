@@ -6,6 +6,7 @@ import { getLogger, withLogContext } from "../../../infrastructure/logger";
 import {
 	controlInstructions,
 	delegatedTaskRules,
+	promptTime,
 	type ControlContract,
 } from "../../inference";
 import { recognitionCommand } from "../../capabilities";
@@ -77,6 +78,7 @@ function commandPrompt(
 	tools: Array<{ id: string; description: string; inputSchema: unknown }>,
 	data: Record<string, unknown>,
 	questionRefs: readonly string[],
+	nowMs: number,
 ) {
 	const control: ControlContract = {
 		instructions:
@@ -99,8 +101,7 @@ function commandPrompt(
 				role: "user" as const,
 				content: JSON.stringify({
 					...data,
-					now: new Date().toISOString(),
-					timeZone: "Asia/Tokyo",
+					...promptTime(nowMs),
 				}),
 			},
 		],
@@ -215,6 +216,7 @@ export function createToolchainCommandHandler(
 						: {}),
 				},
 				questionRefsOf(set.binding),
+				Date.parse(clock()),
 			);
 			const requestId = larm.captureControlInTransaction(tx, {
 				subject: `toolchain:${run.id}:command`,

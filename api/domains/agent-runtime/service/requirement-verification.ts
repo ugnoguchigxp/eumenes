@@ -14,7 +14,9 @@ import {
 	type RequirementVerification,
 } from "../contracts/requirements";
 import type { Task, Report } from "../contracts";
-import { delegatedTaskRules } from "../../inference";
+import type { LogFields } from "../../../infrastructure/logger";
+import { ValidationFailure } from "../../../infrastructure/validation-log";
+import { delegatedTaskRules, promptTime } from "../../inference";
 import { EvidenceCatalog } from "./evidence-catalog";
 import {
 	readRequirements,
@@ -69,7 +71,15 @@ export function prepareRequirementVerification(
 		requirementContract: frozen.contract,
 		draftReport: draft,
 		evidence,
-		now: new Date(now).toISOString(),
+		...promptTime(now),
+		// The checks the previous output failed, as data; only paths and codes, never values.
+		lastResult:
+			task.json_repairs && task.error_code
+				? {
+						code: task.error_code,
+						issues: JSON.parse(task.control_repair_json ?? "[]"),
+					}
+				: undefined,
 		operations: tools.invocationsInTransaction(db, task.id).map((o) => ({
 			state: o.state,
 			errorCode:
@@ -123,37 +133,63 @@ function validateVerification(
 		expected.length === actual.length &&
 		new Set(actual).size === actual.length &&
 		expected.every((i) => actual.includes(i));
+	const mismatch: LogFields[] = [];
 	if (
 		!exact(
 			draft.claims.map((_, i) => i),
 			verification.claims.map((c) => c.index),
-		) ||
+		)
+	)
+		mismatch.push({
+			validationPath: "claims",
+			validationCode: "index_mismatch",
+		});
+	if (
 		!exact(
 			draft.checks.map((c) => c.requirementId),
 			verification.checks.map((c) => c.requirementId),
-		) ||
+		)
+	)
+		mismatch.push({
+			validationPath: "checks",
+			validationCode: "requirement_mismatch",
+		});
+	if (
 		!exact(
 			draft.externalRules.map((r) => r.id),
 			verification.externalRules.map((r) => r.id),
 		)
 	)
-		throw new Error("invalid_requirement_verification");
-	if (
-		!verification.requestCovered ||
-		!verification.summarySupported ||
-		!verification.limitationsConsistent ||
-		[
-			...verification.claims,
-			...verification.checks,
-			...verification.externalRules,
-		].some((c) => !c.supported) ||
-		verification.checks.some(
-			(c) =>
-				draft.checks.find((d) => d.requirementId === c.requirementId)!
-					.status !== c.status,
+		mismatch.push({
+			validationPath: "externalRules",
+			validationCode: "rule_mismatch",
+		});
+	if (mismatch.length)
+		throw new ValidationFailure("invalid_requirement_verification", mismatch);
+	// Which items failed is reported by position; the judged text is not.
+	const failed: LogFields[] = [];
+	const flag = (validationPath: string, validationCode: string) =>
+		failed.push({ validationPath, validationCode });
+	if (!verification.requestCovered) flag("requestCovered", "not_covered");
+	if (!verification.summarySupported) flag("summarySupported", "not_supported");
+	if (!verification.limitationsConsistent)
+		flag("limitationsConsistent", "not_consistent");
+	verification.claims.forEach((c, i) => {
+		if (!c.supported) flag(`claims.${i}.supported`, "not_supported");
+	});
+	verification.checks.forEach((c, i) => {
+		if (!c.supported) flag(`checks.${i}.supported`, "not_supported");
+		if (
+			draft.checks.find((d) => d.requirementId === c.requirementId)!.status !==
+			c.status
 		)
-	)
-		throw new Error("requirement_verification_failed");
+			flag(`checks.${i}.status`, "status_mismatch");
+	});
+	verification.externalRules.forEach((r, i) => {
+		if (!r.supported) flag(`externalRules.${i}.supported`, "not_supported");
+	});
+	if (failed.length)
+		throw new ValidationFailure("requirement_verification_failed", failed);
 }
 export function acceptRequirementVerification(
 	db: Database,

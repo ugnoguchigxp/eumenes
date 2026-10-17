@@ -4,6 +4,18 @@ import { bytes } from "../../capabilities";
 import { LlmJsonError, parseLlmJson } from "../../../infrastructure/llm-json";
 export const codeOf = (code: string, fallback: string) =>
 	/^[a-z_]{1,80}$/.test(code) ? code : fallback;
+/** Rejection codes after which the sub-agent gets its one repair; the same codes decide when the repair notice applies. */
+export const controlRepairCodes: ReadonlySet<string> = new Set([
+	"invalid_control_json",
+	"invalid_tool_input",
+	"invalid_evidence",
+	"invalid_report",
+	"invalid_requirement_report",
+	"invalid_requirement_contract",
+	"invalid_requirement_schema",
+	"invalid_requirement_verification",
+	"tool_url_out_of_scope",
+]);
 export const safeCode = (e: unknown) =>
 	e instanceof Error && /^[a-z_]{1,80}$/.test(e.message)
 		? e.message

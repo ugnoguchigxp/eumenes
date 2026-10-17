@@ -11,7 +11,7 @@ import type { Source } from "../../tool-runtime";
 import type { Task } from "../contracts";
 import { requirementVerification } from "../contracts/requirements";
 import { get, byRoot, update } from "../repository";
-import { safeCode } from "./control-output";
+import { controlRepairCodes, safeCode } from "./control-output";
 import type { EvidenceCatalog } from "./evidence-catalog";
 import {
 	isHistory,
@@ -131,7 +131,9 @@ function invokeStepTool(
 		...("readAhead" in action ? (action.readAhead ?? []) : []),
 	];
 	if (calls.length > 1 && !isPageRead(toolRuntimeOf(tool.tool.revisionId)))
-		throw new Error("invalid_tool_input");
+		throw new ValidationFailure("invalid_tool_input", [
+			{ validationPath: "readAhead", validationCode: "read_ahead_unsupported" },
+		]);
 	let lastId = "";
 	for (const [index, args] of calls.entries()) {
 		const budget = explorationBudget(
@@ -146,7 +148,12 @@ function invokeStepTool(
 				budget.reads >= budget.maxReads ||
 				budget.externalCalls >= budget.maxExternalCalls)
 		)
-			throw new Error("invalid_tool_input");
+			throw new ValidationFailure("invalid_tool_input", [
+				{
+					validationPath: "readAhead",
+					validationCode: "read_ahead_over_budget",
+				},
+			]);
 		const inv = tools.invokeInTransaction(
 			db,
 			owner(t),
@@ -366,6 +373,7 @@ export function createStepActions(ctx: RuntimeContext, ops: TaskOps) {
 					)
 				)
 					throw new Error("evidence_invalidated");
+				// The verification call needs room; its repair is reserved by the exploration budget.
 				if (t.model_calls >= modelLimit(p) || t.deadline <= now())
 					throw new Error("requirement_verification_unavailable");
 				saveDraft(db, t, frozen!.digest, draft, now());
@@ -420,16 +428,7 @@ export function createStepActions(ctx: RuntimeContext, ops: TaskOps) {
 		);
 		inference.rejectControlInTransaction?.(db, outcome.result.receipt, code);
 		if (
-			([
-				"invalid_tool_input",
-				"invalid_evidence",
-				"invalid_report",
-				"invalid_requirement_report",
-				"invalid_requirement_contract",
-				"invalid_requirement_schema",
-				"invalid_requirement_verification",
-			].includes(code) ||
-				code === "tool_url_out_of_scope") &&
+			controlRepairCodes.has(code) &&
 			t.kind === "worker" &&
 			t.json_repairs < 1
 		) {

@@ -39,7 +39,10 @@ export const specialistSessionSchema = z.object({
 	endReason: z.enum(specialistEndReasons).nullable(),
 	/** Advances on every state change; clients send it back as `expectedRevision`. */
 	revision: z.number().int(),
-	/** Advances whenever the addressee changes (start, return, resume); stale sends are refused. */
+	/**
+	 * Advances when the addressee is addressed anew: at start and when suspended work resumes. A return
+	 * leaves the epoch as it is and ends the active state, so a send aimed at the session is refused.
+	 */
 	epoch: z.number().int(),
 	activeRunId: z.string().nullable(),
 	/** The work's unsaved/busy state as the domain reports it now. */
@@ -185,14 +188,17 @@ export interface SpecialistPort {
 		workRef: string,
 		mode: "discard" | "close",
 	): void;
-	/** Validate the model's arguments for one tool of the set against its registered schema. */
+	/**
+	 * Validate the model's arguments for one tool of the set against its registered schema. A schema
+	 * failure carries `detail`: at most 8 lines of path, kind and expected type (never an input value).
+	 */
 	parseInvocation(
 		set: SpecialistSet,
 		toolId: string,
 		args: unknown,
 	):
 		| { ok: true; operationName: string; input: Record<string, unknown> }
-		| { ok: false; code: string };
+		| { ok: false; code: string; detail?: string[] };
 	/**
 	 * Run one tool operation for the turn holding the work. Returns the short projection the
 	 * specialist sees next (never the full receipt); throws a safe `/^[a-z_]+$/` code on refusal.

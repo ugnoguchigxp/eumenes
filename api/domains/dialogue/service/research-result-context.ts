@@ -1,3 +1,4 @@
+import { promptTime } from "../../inference";
 import { systemContext } from "../../../infrastructure/system-context";
 import type { ContextSections } from "./context-compiler";
 
@@ -55,7 +56,8 @@ export function researchResultContext(
 		| "input"
 	>,
 	projection: string | undefined,
-	failureCode?: string | null,
+	failureCode: string | null | undefined,
+	nowMs: number,
 ) {
 	const { input, longTerm, goals, working } = sections;
 	// Both lists are oldest first; the kept exchanges are the older part.
@@ -88,8 +90,7 @@ export function researchResultContext(
 	const result: Message = {
 		role: "user",
 		content: JSON.stringify({
-			now: new Date().toISOString(),
-			timeZone: "Asia/Tokyo",
+			...promptTime(nowMs),
 			report: projection ? JSON.parse(projection) : null,
 			failure: failureCode ?? undefined,
 		}),

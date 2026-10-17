@@ -1,5 +1,6 @@
 import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
+import { ValidationFailure } from "../../../infrastructure/validation-log";
 import {
 	bytes,
 	requirementProfileData,
@@ -218,12 +219,20 @@ export function createRequirements(
 			c: RequirementCatalog,
 			refs: string[],
 		) {
-			if (
-				refs.length > 4 ||
-				new Set(refs).size !== refs.length ||
-				refs.some((ref) => !Object.hasOwn(c.snapshots, ref))
-			)
-				throw new Error("requirement_profile_invalidated");
+			// The refs are the sub-agent's choice: report which condition failed, not the refs.
+			const reject = (validationCode: string, limit?: number): never => {
+				throw new ValidationFailure("requirement_profile_invalidated", [
+					{
+						validationPath: "requirementProfiles",
+						validationCode,
+						...(limit === undefined ? {} : { limit }),
+					},
+				]);
+			};
+			if (refs.length > 4) reject("too_big", 4);
+			if (new Set(refs).size !== refs.length) reject("duplicate_ref");
+			if (refs.some((ref) => !Object.hasOwn(c.snapshots, ref)))
+				reject("unknown_ref");
 			const selected = refs
 				.map((ref) => c.snapshots[ref]!)
 				.sort((a, b) => a.revisionId.localeCompare(b.revisionId));

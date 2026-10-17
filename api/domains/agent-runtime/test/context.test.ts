@@ -11,7 +11,10 @@ import type { Prepared } from "../../capabilities";
 import type { Source } from "../../tool-runtime";
 import type { Task } from "../contracts";
 import { controlInstructions, delegatedTaskRules } from "../../inference";
-import { searchAction } from "../service/research-contract";
+import {
+	searchAction,
+	firstResearchAction,
+} from "../service/research-contract";
 import { researchReport } from "../service/research-contract";
 import { z } from "zod";
 import { lookupInput, zSchema } from "../../capabilities";
@@ -606,9 +609,14 @@ test("every route carries the shared rules, and the step contract is also return
 			]);
 			expect(JSON.stringify(examples).length).toBeLessThan(300);
 		} else {
-			expect(context.control.outputSchema).toEqual(
-				JSON.parse(system.split("\nOUTPUT_SCHEMA=")[1]!),
-			);
+			// The requirement-graded route also shows a minimal example, not the whole schema.
+			expect(system).not.toContain("\nOUTPUT_SCHEMA=");
+			const examples = JSON.parse(system.split("\nOUTPUT_FORMAT=")[1]!);
+			expect(examples.map((e: { action: string }) => e.action)).toEqual([
+				"finish",
+			]);
+			for (const example of examples)
+				expect(firstResearchAction.safeParse(example).success).toBe(true);
 		}
 	}
 });

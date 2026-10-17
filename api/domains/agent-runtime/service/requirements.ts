@@ -1,4 +1,9 @@
 import type { Database } from "bun:sqlite";
+import type { LogFields } from "../../../infrastructure/logger";
+import {
+	ValidationFailure,
+	validationIssues,
+} from "../../../infrastructure/validation-log";
 import {
 	bytes,
 	canonicalRequirementJson,
@@ -55,9 +60,32 @@ export function freezeRequirements(
 	)
 		throw new Error("requirement_capacity_exceeded");
 	requests.forEach((r, i) => {
-		if (r.id !== `r${i + 1}` || !originalRequest.includes(r.requestQuote))
-			throw new Error("invalid_requirement_contract");
-		validateRequirementSchema(r.valueSchema);
+		const invalid = (validationPath: string, validationCode: string): never => {
+			throw new ValidationFailure("invalid_requirement_contract", [
+				{
+					validationPath: `requirements.${i}.${validationPath}`,
+					validationCode,
+				},
+			]);
+		};
+		if (r.id !== `r${i + 1}`) invalid("id", "unexpected_id");
+		if (!originalRequest.includes(r.requestQuote))
+			invalid("requestQuote", "quote_not_in_request");
+		try {
+			validateRequirementSchema(r.valueSchema);
+		} catch (e) {
+			// Same code and reasons, located at the failing request item.
+			if (e instanceof ValidationFailure)
+				throw new ValidationFailure(
+					e.message,
+					e.issues.map((issue) => ({
+						...issue,
+						validationPath: `requirements.${i}.valueSchema`,
+					})),
+					e.issueCount,
+				);
+			throw e;
+		}
 	});
 	const requirements = [
 		...requests.map((r) => ({
@@ -145,58 +173,94 @@ export function validateDraft(
 	contract: RequirementContract,
 ): DraftReport {
 	const parsed = draftReport.safeParse(raw);
-	if (!parsed.success) throw new Error("invalid_requirement_report");
+	if (!parsed.success)
+		throw new ValidationFailure(
+			"invalid_requirement_report",
+			validationIssues(parsed.error, raw, ["report"]),
+			parsed.error.issues.length,
+		);
 	const draft = parsed.data;
 	if (bytes(draft) > 32768) throw new Error("requirement_capacity_exceeded");
+	const reject = (issues: LogFields[]): never => {
+		throw new ValidationFailure("invalid_requirement_report", issues);
+	};
 	const ids = draft.checks.map((c) => c.requirementId);
+	if (new Set(ids).size !== ids.length)
+		reject([
+			{
+				validationPath: "report.checks",
+				validationCode: "duplicate_requirement",
+			},
+		]);
 	if (
-		new Set(ids).size !== ids.length ||
 		ids.length !== contract.requirements.length ||
 		contract.requirements.some((r) => !ids.includes(r.id))
 	)
-		throw new Error("invalid_requirement_report");
+		reject([
+			{
+				validationPath: "report.checks",
+				validationCode: "requirements_mismatch",
+			},
+		]);
+	const issues: LogFields[] = [];
 	let total = 0;
-	for (const c of draft.checks) {
+	draft.checks.forEach((c, i) => {
 		const r = contract.requirements.find((r) => r.id === c.requirementId)!;
+		const at = (field: string, validationCode: string) =>
+			issues.push({
+				validationPath: `report.checks.${i}.${field}`,
+				validationCode,
+			});
 		total += bytes(c.value);
-		if (
-			c.status === "satisfied" &&
-			(!c.evidence.length || !requirementValueMatches(r.valueSchema, c.value))
-		)
-			throw new Error("invalid_requirement_report");
-		if (
-			c.status === "unsatisfied" &&
-			(!c.evidence.length ||
-				(c.value !== null && !requirementValueMatches(r.valueSchema, c.value)))
-		)
-			throw new Error("invalid_requirement_report");
+		if (c.status === "satisfied") {
+			if (!c.evidence.length) at("evidence", "evidence_required");
+			if (!requirementValueMatches(r.valueSchema, c.value))
+				at("value", "value_schema_mismatch");
+		}
+		if (c.status === "unsatisfied") {
+			if (!c.evidence.length) at("evidence", "evidence_required");
+			if (c.value !== null && !requirementValueMatches(r.valueSchema, c.value))
+				at("value", "value_schema_mismatch");
+		}
 		if (c.status === "unknown" && c.value !== null)
-			throw new Error("invalid_requirement_report");
-		if (
-			c.status === "not_applicable" &&
-			(!r.allowNotApplicable || c.value !== null || !c.evidence.length)
-		)
-			throw new Error("invalid_requirement_report");
+			at("value", "value_must_be_null");
+		if (c.status === "not_applicable") {
+			if (!r.allowNotApplicable) at("status", "not_applicable_not_allowed");
+			if (c.value !== null) at("value", "value_must_be_null");
+			if (!c.evidence.length) at("evidence", "evidence_required");
+		}
 		if (
 			r.required &&
 			["unknown", "unsatisfied"].includes(c.status) &&
 			draft.outcome === "answered"
 		)
-			throw new Error("invalid_requirement_report");
+			at("status", "required_unmet_but_answered");
 		if (
 			!r.required &&
 			["unknown", "unsatisfied"].includes(c.status) &&
 			!draft.limitations.length
 		)
-			throw new Error("invalid_requirement_report");
-	}
+			issues.push({
+				validationPath: "report.limitations",
+				validationCode: "limitations_required",
+			});
+	});
+	if (issues.length) reject(issues);
 	if (total > 8192) throw new Error("requirement_capacity_exceeded");
-	if (
-		draft.externalRules.some(
-			(r, i) => r.id !== `x${i + 1}` || !ids.includes(r.requirementId),
-		)
-	)
-		throw new Error("invalid_requirement_report");
+	const rules: LogFields[] = [];
+	draft.externalRules.forEach((r, i) => {
+		if (r.id !== `x${i + 1}`)
+			rules.push({
+				validationPath: `report.externalRules.${i}.id`,
+				validationCode: "unexpected_id",
+			});
+		if (!ids.includes(r.requirementId))
+			rules.push({
+				validationPath: `report.externalRules.${i}.requirementId`,
+				validationCode: "unknown_requirement",
+			});
+	});
+	if (rules.length) reject(rules);
 	return draft;
 }
 export const draftReferences = (d: DraftReport) =>

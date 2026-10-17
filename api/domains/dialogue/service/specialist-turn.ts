@@ -29,6 +29,7 @@ import {
 	specialistControl,
 	specialistInput,
 	specialistSystemMessage,
+	specialistViolations,
 	toolResultMessage,
 	type SpecialistAction,
 } from "./specialist-prompt";
@@ -212,6 +213,7 @@ export function createSpecialistTurnHandler(
 								current: work.current,
 								savedRef: work.savedRef,
 								viewing: viewedSpecialistTarget(deps, tx, run),
+								nowMs: Date.parse(clock()),
 							}),
 						},
 					],
@@ -293,9 +295,11 @@ export function createSpecialistTurnHandler(
 			);
 			receipts.push(receipt);
 			const raw = String(receipt.value);
+			let value: unknown;
 			let action: SpecialistAction | null = null;
 			try {
-				action = parseSpecialistAction(parseLlmJson(raw));
+				value = parseLlmJson(raw);
+				action = parseSpecialistAction(value);
 			} catch {
 				action = null;
 			}
@@ -306,7 +310,7 @@ export function createSpecialistTurnHandler(
 				});
 				if (repaired) throw new Error("specialist_invalid_contract");
 				repaired = true;
-				messages.push(correctionMessage(raw));
+				messages.push(correctionMessage(raw, specialistViolations(value)));
 				continue;
 			}
 			if (action.kind !== "invoke") return { receipts, action };
@@ -342,7 +346,11 @@ async function invoke(
 			reason: "specialist_arguments_invalid",
 			validationCode: checked.code,
 		});
-		return { ok: false, error: checked.code };
+		return {
+			ok: false,
+			error: checked.code,
+			...(checked.detail?.length ? { detail: checked.detail } : {}),
+		};
 	}
 	try {
 		const result = await deps.store.write((tx) => {

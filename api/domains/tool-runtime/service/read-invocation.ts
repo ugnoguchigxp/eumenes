@@ -100,7 +100,9 @@ export function createReadInvocation({
 					new URL((parsed.data as { url: string }).url).href,
 			)
 		)
-			throw new Error("tool_url_out_of_scope");
+			throw new ValidationFailure("tool_url_out_of_scope", [
+				{ validationPath: "arguments.url", validationCode: "url_out_of_scope" },
+			]);
 		if (old) {
 			if (
 				old.superseded ||

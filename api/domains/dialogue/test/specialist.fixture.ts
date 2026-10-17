@@ -374,7 +374,11 @@ export async function setup(options: Options = {}) {
 						operationName: tool.operationName,
 						input: { title },
 					}
-				: { ok: false, code: "specialist_invalid_arguments" };
+				: {
+						ok: false,
+						code: "specialist_invalid_arguments",
+						detail: ["title: invalid_type expected=string"],
+					};
 		},
 		invokeInTransaction: (_db, set, input) => {
 			if (state.invokeError)

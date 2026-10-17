@@ -49,18 +49,24 @@ export class EvidenceCatalog {
 				.map(([ref]) => ref),
 		]);
 	}
-	document(reference: string) {
+	document(reference: string, field: "sourceRef" | "messageRef") {
 		const known = [...this.documents].find(([, alias]) => alias === reference);
-		if (!known) throw new Error("invalid_tool_input");
+		if (!known)
+			throw new ValidationFailure("invalid_tool_input", [
+				{
+					validationPath: `arguments.${field}`,
+					validationCode: "unknown_document_ref",
+				},
+			]);
 		return known[0];
 	}
 	arguments(raw: unknown) {
 		if (!raw || typeof raw !== "object" || Array.isArray(raw)) return raw;
 		const args = { ...raw } as Record<string, unknown>;
 		if (typeof args.sourceRef === "string")
-			args.sourceRef = this.document(args.sourceRef);
+			args.sourceRef = this.document(args.sourceRef, "sourceRef");
 		if (typeof args.messageRef === "string")
-			args.messageRef = this.document(args.messageRef);
+			args.messageRef = this.document(args.messageRef, "messageRef");
 		return args;
 	}
 	/** The same World claim revision (same text) read again by a later query is

@@ -1,4 +1,5 @@
 import { test, expect } from "bun:test";
+import { ValidationFailure } from "../../../infrastructure/validation-log";
 import { validateRequirementSchema, requirementValueMatches } from "..";
 test("enum values must also satisfy bounds and formats at every nested node", () => {
 	const number = { type: "number", enum: [-1, 5, 11], minimum: 0, maximum: 10 };
@@ -108,4 +109,26 @@ test("optional string bounds preserve explicit constraints and the overall value
 	expect(() =>
 		validateRequirementSchema({ type: "string", minLength: 4, maxLength: 3 }),
 	).toThrow("invalid_requirement_schema");
+});
+
+test("a rejected value schema reports where and why, never its keys or values", () => {
+	const reasons = (schema: object) => {
+		try {
+			validateRequirementSchema(schema as never);
+		} catch (e) {
+			expect(e).toBeInstanceOf(ValidationFailure);
+			expect((e as Error).message).toBe("invalid_requirement_schema");
+			return (e as ValidationFailure).issues;
+		}
+		throw new Error("accepted");
+	};
+	expect(reasons({ type: "string", pattern: "secret-pattern" })).toEqual([
+		{ validationPath: "valueSchema", validationCode: "unsupported_keyword" },
+	]);
+	expect(reasons({ type: "string", minLength: 4, maxLength: 3 })).toEqual([
+		{ validationPath: "valueSchema", validationCode: "invalid_range" },
+	]);
+	expect(reasons({ type: "uuid" })).toEqual([
+		{ validationPath: "valueSchema", validationCode: "unsupported_type" },
+	]);
 });

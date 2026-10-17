@@ -50,6 +50,53 @@ test("a malformed output is repaired once with the rejected output as data; a se
 	expect((await h.session())!.state).toBe("active");
 });
 
+/** The `issues` the repair call carried for the rejected output (data after REJECTED_OUTPUT=). */
+function rejectedIssues(h: Harness) {
+	const message = h.state.specialistPrompts
+		.at(-1)!
+		.find((m) => m.content.includes("REJECTED_OUTPUT="))!;
+	return {
+		message: message.content,
+		issues: JSON.parse(message.content.split("REJECTED_OUTPUT=")[1]!).issues,
+	};
+}
+
+test("a repair call says where the output broke the contract: schema path and kind, or the reply's measured length, never an internal code name", async () => {
+	const h = await harness();
+	await start(h);
+	// A reply too long: its measured characters, sentences and limits are data.
+	const long = "これは長い説明です。".repeat(5);
+	h.state.specialist.push(reply(long), reply("短く直しました"));
+	const spoken = await h.ask("説明して");
+	expect(spoken.status).toBe("completed");
+	const length = rejectedIssues(h);
+	expect(length.issues).toEqual([
+		{ path: "text", chars: 50, maxChars: 160, sentences: 5, maxSentences: 2 },
+	]);
+	expect(length.message).not.toContain("spoken_reply");
+	// A wrong type: the path and the schema's kind only.
+	h.state.specialist.push({ action: "reply", text: 5 }, reply("直しました"));
+	await h.ask("もう一度");
+	expect(rejectedIssues(h).issues).toEqual([
+		{ path: "text", code: "invalid_type", expected: "string" },
+	]);
+	// A field the action must not carry, and a field it needs.
+	h.state.specialist.push(
+		{ action: "invoke", tool: "draft.apply", forward: true },
+		{ action: "reply" },
+	);
+	const failed = await h.ask("さらにもう一度");
+	expect(failed.error).toBe("specialist_invalid_contract");
+	h.state.specialist.push(
+		{ action: "invoke", tool: "draft.apply", forward: true },
+		reply("直しました"),
+	);
+	await h.ask("最後に");
+	expect(rejectedIssues(h).issues).toEqual([
+		{ action: "invoke", missing: [], unexpected: ["forward"] },
+	]);
+});
+
 test("a turn is bounded by six model calls", async () => {
 	const h = await harness();
 	await start(h);
@@ -72,7 +119,7 @@ test("a refused or invalid operation is data for the next call, never a crash", 
 	const invalid = await h.ask("変更して");
 	expect(invalid.status).toBe("completed");
 	expect(lastPrompt(h)).toContain(
-		'TOOL_RESULT={"ok":false,"error":"specialist_invalid_arguments"}',
+		'TOOL_RESULT={"ok":false,"error":"specialist_invalid_arguments","detail":["title: invalid_type expected=string"]}',
 	);
 	expect(h.state.invocations).toHaveLength(0);
 	h.state.invokeError = "generation_in_progress";
@@ -110,6 +157,9 @@ test("the specialist is not given memory, World, the main prompt or the conversa
 			"viewing",
 		].sort(),
 	);
+	// The time is the host clock as local ISO 8601 with its offset, not a UTC string.
+	expect(input.now).toMatch(/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}\+09:00$/);
+	expect(input.timeZone).toBe("Asia/Tokyo");
 	expect(h.state.captures.every((c) => c.maxOutputTokens === 4096)).toBe(true);
 });
 

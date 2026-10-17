@@ -88,7 +88,12 @@ test("gateway refuses foreign refs and unselected URLs; idempotent invocation an
 					[],
 				),
 			),
-		).rejects.toThrow("tool_url_out_of_scope");
+		).rejects.toMatchObject({
+			message: "tool_url_out_of_scope",
+			issues: [
+				{ validationPath: "arguments.url", validationCode: "url_out_of_scope" },
+			],
+		});
 		expect(calls).toBe(0);
 		const inv = await store.write((db) =>
 			tools.invokeInTransaction(

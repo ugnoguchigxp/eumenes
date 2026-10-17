@@ -21,21 +21,36 @@ export type WorkerTool = {
 	replayOnly?: boolean;
 	tool: { id: string; schemaKey?: SchemaKey; summary?: string };
 };
-const requirementPolicy =
-	systemContext("agent-runtime.contexts.requirements.policy", {}) + "\n";
-const searchPolicy =
-	systemContext("agent-runtime.contexts.search.policy", {}) + "\n";
-const quickSearchPolicy =
-	systemContext("agent-runtime.contexts.quick-search.policy", {}) + "\n";
-/** L1: shared by every route and never replaced by a route policy. */
+const searchPolicy = systemContext("agent-runtime.contexts.search.policy", {});
+const quickSearchPolicy = systemContext(
+	"agent-runtime.contexts.quick-search.policy",
+	{},
+);
+/** L1: shared by every route except the guided one, and never replaced by a route policy. */
 export const commonRules = systemContext(
 	"agent-runtime.contexts.worker-control.common-rules",
 	{},
 );
-const policy = systemContext(
-	"agent-runtime.contexts.worker-control.policy",
+/** The guided route's own SKILL carries its procedure; only the shared boundary is added. */
+const guidedRules = systemContext(
+	"agent-runtime.contexts.worker-control.guided-rules",
 	{},
 );
+/** Reply contract of the routes that return source-linked findings (`report: "search"`). */
+const searchRules = systemContext(
+	"agent-runtime.contexts.worker-control.search-rules",
+	{},
+);
+/** Role, requirement procedure and prohibitions of the requirement-graded research route. */
+const researchPolicy = systemContext(
+	"agent-runtime.contexts.worker-control.research-policy",
+	{},
+);
+const documentRef = {
+	sourceRef: "資料操作の対象。documentの短い参照（d1など）を指定する。",
+	messageRef:
+		"会話記録の参照。documentの短い参照（d1など）を指定する。報告には会話記録のspeakerとcreatedAtを添え、過去のAssistant発言を現在の事実保証にしない。",
+} as const;
 export function createWorkerControl(
 	prepared: Prepared,
 	tools: WorkerTool[],
@@ -66,11 +81,12 @@ export function createWorkerControl(
 				? structuredClone(zSchema(t.tool.schemaKey))
 				: null;
 			if (schema?.properties)
-				for (const key of ["sourceRef", "messageRef"])
+				for (const key of ["sourceRef", "messageRef"] as const)
 					if (key in schema.properties)
 						schema.properties[key] = {
 							type: "string",
 							pattern: "^d[1-9][0-9]*$",
+							description: documentRef[key],
 						};
 			if (t.tool.schemaKey === "readSaved" && schema?.properties) {
 				schema.not = { required: ["cursor", "start"] };
@@ -101,17 +117,7 @@ export function createWorkerControl(
 			? isQuickWeb(prepared)
 				? quickSearchPolicy
 				: searchPolicy
-			: policy +
-				"\n" +
-				requirementPolicy +
-				systemContext(
-					"agent-runtime.contexts.worker-control.route-policy",
-					{},
-				) +
-				systemContext(
-					"agent-runtime.contexts.worker-control.route-policy-2",
-					{},
-				);
+			: researchPolicy;
 	const outputSchema = z.toJSONSchema(
 		guided
 			? guidedActionFor(prepared)
@@ -124,35 +130,10 @@ export function createWorkerControl(
 	const instructionsFor = (contracts: unknown) =>
 		delegatedTaskRules +
 		"\n" +
-		(search && !guided
-			? systemContext(
-					"agent-runtime.contexts.worker-control.instructions-for",
-					{},
-				) + "\n"
-			: "") +
 		routePolicy +
 		"\n" +
-		(guided
-			? systemContext(
-					"agent-runtime.contexts.worker-control.instructions-for-2",
-					{},
-				)
-			: commonRules) +
-		(search && !guided
-			? systemContext(
-					"agent-runtime.contexts.worker-control.instructions-for-3",
-					{},
-				)
-			: "") +
-		(ownSet
-			? systemContext(
-					"agent-runtime.contexts.worker-control.instructions-for-4",
-					{},
-				)
-			: systemContext(
-					"agent-runtime.contexts.worker-control.instructions-for-5",
-					{},
-				)) +
+		(search && !guided ? searchRules + "\n" : "") +
+		(guided ? guidedRules : commonRules) +
 		"\nTOOLS=" +
 		JSON.stringify(contracts);
 	const controlFor = (contracts: ReturnType<typeof contractsFor>) => {
@@ -161,19 +142,18 @@ export function createWorkerControl(
 		const invocable = contracts.find((tool) => tool.mode === "invoke");
 		return {
 			instructions: instructionsFor(contracts),
-			outputSchema:
-				search && examples
-					? {
-							...outputSchema,
-							examples: examples.flatMap((example) =>
-								example.action === "invoke"
-									? invocable
-										? [{ ...example, tool: invocable.id }]
-										: []
-									: [example],
-							),
-						}
-					: outputSchema,
+			outputSchema: examples
+				? {
+						...outputSchema,
+						examples: examples.flatMap((example) =>
+							example.action === "invoke"
+								? invocable
+									? [{ ...example, tool: invocable.id }]
+									: []
+								: [example],
+						),
+					}
+				: outputSchema,
 		};
 	};
 	return { controlFor, contractsFor, dependencies, ownSet, search, guided };

@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openStore } from "../../../infrastructure/sqlite";
+import { ValidationFailure } from "../../../infrastructure/validation-log";
 import {
 	createCapabilities,
 	migrations,
@@ -103,7 +104,26 @@ test("R02/R03/R06 immutable profile revisions, CAS, independent catalogs and inv
 			store.read((db) =>
 				caps.resolveRequirementProfilesInTransaction(db, catalog, ["p99"]),
 			),
-		).toThrow();
+		).toThrow("requirement_profile_invalidated");
+		for (const [refs, validationCode] of [
+			[["p99"], "unknown_ref"],
+			[["p1", "p1"], "duplicate_ref"],
+			[["p1", "p2", "p3", "p4", "p5"], "too_big"],
+		] as const)
+			try {
+				store.read((db) =>
+					caps.resolveRequirementProfilesInTransaction(db, catalog, [...refs]),
+				);
+				throw new Error("accepted");
+			} catch (e) {
+				expect(e).toBeInstanceOf(ValidationFailure);
+				expect((e as ValidationFailure).message).toBe(
+					"requirement_profile_invalidated",
+				);
+				expect((e as ValidationFailure).issues).toMatchObject([
+					{ validationPath: "requirementProfiles", validationCode },
+				]);
+			}
 		expect(
 			store.read((db) =>
 				db

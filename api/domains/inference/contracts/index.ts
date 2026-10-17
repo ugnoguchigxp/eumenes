@@ -20,6 +20,13 @@ export function controlInstructions(control: ControlContract) {
 			: "\nOUTPUT_SCHEMA=" + JSON.stringify(control.outputSchema))
 	);
 }
+/** The current time as prompt data: local ISO 8601 with its offset, so the date is never read in UTC. */
+export function promptTime(ms: number) {
+	return {
+		now: new Date(ms + 9 * 3_600_000).toISOString().replace("Z", "+09:00"),
+		timeZone: "Asia/Tokyo",
+	};
+}
 /**
  * Provider options of a control request: JSON-object generation, plus the output schema when the request was
  * captured with `structuredOutput`. The schema is then enforced as a strict schema (LARM, OpenAI-compatible

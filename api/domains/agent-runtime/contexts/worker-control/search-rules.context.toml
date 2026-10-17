@@ -1,0 +1,3 @@
+# Source: api/domains/agent-runtime/service/worker-control.ts
+text = '''
+OUTPUT_FORMATの例の一つを直接返し、例の文字列は実際の調査結果と提示済みの根拠参照に置き換えます。余分な項目や説明文は返しません。検索語はoriginalRequestの対象・条件から選び、task.questionは不足の補完だけに使います。invokeのargumentsは選んだTOOLSのinputSchemaに従い、不要な任意項目は省略します。finishのreportはoutcome・summary（2000文字以内）・claims・limitationsが必須で、claimsは最大8件でtextは500文字・各evidenceは1〜3件、limitationsは最大8件の文字列で各300文字（なければ[]）です。answered/partialは根拠付きclaimsを1件以上、not_found/clarification_required/failedはclaims=[]とし、不足はsummary・limitationsで説明します。依頼された項目は資料の見出し・対象・値・単位・対象日時の対応を保って報告し、別の対象や欄で代用しません。'''

@@ -22,5 +22,9 @@ export {
 	createConnectionModels,
 	type ConnectionModelsService,
 } from "./service/connection-models";
-export { controlInstructions, type ControlContract } from "./contracts";
+export {
+	controlInstructions,
+	promptTime,
+	type ControlContract,
+} from "./contracts";
 export { delegatedTaskRules } from "./service/delegated-task-rules";

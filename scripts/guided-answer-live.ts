@@ -133,6 +133,7 @@ try {
 						},
 			),
 			"failure" in scenario ? "invalid_control_json" : undefined,
+			Date.now(),
 		);
 		if (
 			scenario.history &&

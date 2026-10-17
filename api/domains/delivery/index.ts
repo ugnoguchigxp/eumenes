@@ -21,7 +21,9 @@ export type { Judge } from "./service";
 export { spokenText, spokenPrefix } from "./service/spoken-text";
 export {
 	isBriefSpokenReply,
+	spokenReplyMeasure,
 	SPOKEN_REPLY_MAX_CHARS,
+	SPOKEN_REPLY_MAX_SENTENCES,
 } from "./service/speech-reply";
 export {
 	speechLanguage,

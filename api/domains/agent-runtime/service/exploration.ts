@@ -62,6 +62,8 @@ export const operationLimits = (p: Prepared | undefined) =>
 				: returnsSearchResults(p)
 					? SEARCH_BUDGET
 					: RESEARCH_BUDGET;
+/** Model calls kept back for the one repair of a research report's verification. */
+const repairReserve = 1;
 export const modelLimit = (p: Prepared | undefined) =>
 	isHistory(p) || isWorld(p)
 		? RESEARCH_BUDGET.historyModelCalls
@@ -118,8 +120,10 @@ export function explorationBudget(
 		maxModelCalls: modelLimit(p),
 		canOperate:
 			// model_calls includes this prepared call. Keep the following finish
-			// (and, for research, verification) calls without reserving it twice.
-			t.model_calls <= modelLimit(p) - (returnsSearchResults(p) ? 1 : 2) &&
+			// (and, for research, verification and its one repair) calls without
+			// reserving it twice.
+			t.model_calls <=
+				modelLimit(p) - (returnsSearchResults(p) ? 1 : 2 + repairReserve) &&
 			t.deadline - now > RESEARCH_BUDGET.operationReserveMilliseconds,
 	};
 }

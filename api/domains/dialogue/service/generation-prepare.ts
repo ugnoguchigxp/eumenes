@@ -18,6 +18,24 @@ import {
 	type GeneratePayload,
 } from "./context";
 
+/**
+ * The instructions are the leading persona, long-term and goals layers that are actually in the
+ * assembled list: a failed research result leaves the memory and goals layers out.
+ */
+function leadingInstructions(
+	messages: ChatMessage[],
+	sections: { longTerm: ChatMessage[]; goals: ChatMessage[] },
+) {
+	const instructionLayers = new Set([...sections.longTerm, ...sections.goals]);
+	let count = 0;
+	while (
+		count < messages.length &&
+		messages[count]!.role === "system" &&
+		(count === 0 || instructionLayers.has(messages[count]!))
+	)
+		count++;
+	return count;
+}
 /** The claim-time half of a generation: fixes memory, goals, the World name hint and history inside the claim transaction. */
 export function createPrepare(
 	deps: DialogueDeps,
@@ -118,6 +136,7 @@ export function createPrepare(
 				compiled.sections,
 				agent.projection ?? undefined,
 				agent.failureCode,
+				Date.parse(clock()),
 			);
 		// Notices, prefetched exchanges and the World name hint come last, right before the current input; the
 		// operation results and the policy added below then land between them and the input.
@@ -256,8 +275,7 @@ export function createPrepare(
 			...compiled.sections.unprocessed,
 		]);
 		const sessionContext = {
-			instructionCount:
-				1 + compiled.sections.longTerm.length + compiled.sections.goals.length,
+			instructionCount: leadingInstructions(messages, compiled.sections),
 			historyCount: messages.filter((m) => adopted.has(m)).length,
 		};
 		// A prefetch left out of this turn is neither sent nor checked at adoption.

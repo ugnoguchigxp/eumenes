@@ -5,9 +5,10 @@ import type { Task } from "../contracts";
 import type { ProfileSnapshot } from "../../capabilities";
 import type { RequirementContract } from "../contracts/requirements";
 import { hashRequirementData } from "../../capabilities";
-import { controlInstructions } from "../../inference";
+import { controlInstructions, promptTime } from "../../inference";
 import { EvidenceCatalog, MATERIAL_BYTES } from "./evidence-catalog";
 import { modelLimit, operationLimits } from "./exploration";
+import { controlRepairCodes } from "./control-output";
 import { createWorkerControl } from "./worker-control";
 const OPERATION_BYTES = 4096;
 const VARIABLE_RESERVE_BYTES = 8192;
@@ -113,8 +114,7 @@ export function workerContext(
 	const visible = [...observations];
 	const data: { [key: string]: unknown } = {
 		...fixed,
-		now: new Date(now).toISOString(),
-		timeZone: "Asia/Tokyo",
+		...promptTime(now),
 		budget: {
 			canInvoke: tools.some((tool) => !tool.replayOnly),
 			remainingMilliseconds: Math.max(0, task.deadline - now),
@@ -154,10 +154,12 @@ export function workerContext(
 				JSON.stringify(materials),
 		},
 	];
+	// The notice says the previous output broke the contract, so it follows the
+	// actual rejection code: a no-progress or unusable-source retry is not one.
 	if (
 		task.json_repairs &&
 		task.error_code &&
-		task.error_code !== "source_unusable"
+		controlRepairCodes.has(task.error_code)
 	)
 		messages.push({
 			role: "system",
@@ -165,7 +167,7 @@ export function workerContext(
 				(guided
 					? systemContext("agent-runtime.contexts.context.content-2", {})
 					: systemContext("agent-runtime.contexts.context.content-3", {})) +
-				(task.error_code ?? "invalid_control_json"),
+				task.error_code,
 		});
 	// Keep the exact request after reference material and repair state without
 	// repeating it or importing the parent's history.

@@ -178,3 +178,35 @@ test("a specialist may forward the initial run to another specialist, announcing
 		await h.close();
 	}
 });
+
+test("one run can be handed back to the main agent twice (A -> main -> B -> main) and the second forward runs", async () => {
+	const h = await setup();
+	try {
+		h.startCall({
+			request: "制作",
+			announcement: "最初の担当に引き継ぎます。",
+		});
+		h.startCall(
+			{ request: "制作", announcement: "別の担当に引き継ぎます。" },
+			"other_create",
+		);
+		h.state.specialist.push(
+			{ action: "return", forward: true },
+			{ action: "return", forward: true },
+		);
+		h.state.main.push("通常担当が答えます。");
+		const run = await h.ask("制作して");
+		expect(run.status).toBe("completed");
+		expect(run.error).toBeNull();
+		expect(h.conversation.message(run.answerMessageId!)!.text).toBe(
+			"通常担当が答えます。",
+		);
+		const forwards = h.rows(
+			"SELECT dedupe_key FROM queue_jobs WHERE dedupe_key LIKE 'specialist-forward:%'",
+		);
+		expect(forwards).toHaveLength(2);
+		expect(new Set(forwards.map((row) => row.dedupe_key)).size).toBe(2);
+	} finally {
+		await h.close();
+	}
+});

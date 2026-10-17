@@ -8,29 +8,82 @@ export const researchReport = draftReport;
 const invoke = z
 	.object({
 		action: z.literal("invoke"),
-		tool: z.string().min(1).max(128),
-		arguments: z.unknown(),
+		tool: z.string().min(1).max(128).describe("現在のTOOLSのid。"),
+		arguments: z
+			.unknown()
+			.describe("選んだTOOLSのinputSchemaに従う。不要な任意項目は省略する。"),
 	})
 	.strict();
 const finish = z
 	.object({ action: z.literal("finish"), report: researchReport })
 	.strict();
-export const researchAction = z.discriminatedUnion("action", [invoke, finish]);
+/** Minimal valid examples; `controlInstructions` renders them as OUTPUT_FORMAT. */
+const invokeExample = { action: "invoke", tool: "TOOLSのid", arguments: {} };
+const reportExample = {
+	outcome: "answered",
+	summary: "調査結果の要約",
+	claims: [{ text: "確認した事実", evidence: ["e1"] }],
+	limitations: [],
+	checks: [
+		{
+			requirementId: "r1",
+			status: "satisfied",
+			value: "取得した値",
+			evidence: ["e1"],
+			reason: "根拠による判断の理由",
+		},
+	],
+	externalRules: [],
+};
+const requirementsExample = [
+	{
+		id: "r1",
+		statement: "依頼から抽出した確認条件",
+		requestQuote: "依頼原文の連続する引用",
+		valueSchema: { type: "string" },
+	},
+];
+export const researchAction = z
+	.discriminatedUnion("action", [invoke, finish])
+	.meta({
+		examples: [invokeExample, { action: "finish", report: reportExample }],
+	});
 /** Refs of the requirement catalog the sub-agent applies; chosen once, at the first step. */
 const profileRefs = z
 	.array(z.string().regex(/^p[1-9][0-9]*$/))
 	.max(4)
-	.optional();
-export const firstResearchAction = z.discriminatedUnion("action", [
-	invoke.extend({
-		requirements: z.array(requestRequirement).min(1).max(12),
-		requirementProfiles: profileRefs,
-	}),
-	finish.extend({
-		requirements: z.array(requestRequirement).min(1).max(12),
-		requirementProfiles: profileRefs,
-	}),
-]);
+	.optional()
+	.describe(
+		"requirementCatalogのref（最大4件）。titleとscopeを依頼に照らして適用するものだけ。合うものがなければ省略。",
+	);
+const firstRequirements = z
+	.array(requestRequirement)
+	.min(1)
+	.max(12)
+	.describe(
+		"原文の依頼要件だけをr1から連番で。profile要件は複製しない（依頼要件とprofile要件の合計は12件以内）。",
+	);
+export const firstResearchAction = z
+	.discriminatedUnion("action", [
+		invoke.extend({
+			requirements: firstRequirements,
+			requirementProfiles: profileRefs,
+		}),
+		finish.extend({
+			requirements: firstRequirements,
+			requirementProfiles: profileRefs,
+		}),
+	])
+	.meta({
+		examples: [
+			{ ...invokeExample, requirements: requirementsExample },
+			{
+				action: "finish",
+				requirements: requirementsExample,
+				report: reportExample,
+			},
+		],
+	});
 const findings = draftReportBase
 	.omit({ checks: true, externalRules: true })
 	.extend({

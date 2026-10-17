@@ -78,7 +78,7 @@ function forwardToMain(
 	const { job } = deps.queue.enqueueInTransaction(tx, {
 		scope: "dialogue",
 		kind: GENERATE_KIND,
-		dedupeKey: `specialist-forward:${run.id}`,
+		dedupeKey: `specialist-forward:${run.id}:${record.id}:${record.epoch}`,
 		payload: { runId: run.id, specialistHandoff: handoff },
 		subjectRef: run.id,
 		lane: "interactive",
