@@ -21,6 +21,7 @@ import {
 import { z } from "zod";
 import { useState } from "react";
 import {
+	Slides,
 	Tabs,
 	TabsContent,
 	TabsList,
@@ -57,12 +58,65 @@ import { RecordsWorkspaceView } from "./records-components";
 import { ServiceTestWorkspaceView } from "./service-test-components";
 import { TextBlockView, InfoCardView } from "./ui-composition-components";
 import { UiStudioView } from "./ui-studio-components";
+import {
+	CompositionModelProvider,
+	useCompositionModel,
+} from "./composition-model";
+import {
+	ContentImageView,
+	CtaBannerView,
+	FeatureCardView,
+	HeroView,
+	MediaCardView,
+	ProductCardView,
+	TestimonialView,
+} from "./composition-marketing-components";
+import {
+	ChoiceView,
+	ComparisonTableView,
+	FaqView,
+	NumberInputView,
+	PricingCardView,
+	SliderView,
+	StatView,
+	TimelineView,
+	ToggleView,
+} from "./composition-content-components";
+import {
+	CalculatorView,
+	ChartView,
+	DataTableView,
+	FormulaView,
+} from "./composition-data-components";
+import { DiagramView, StepperView } from "./composition-diagram-components";
 
 const renderers = {
 	"google-accounts": GoogleAccountsView,
 	"ui-studio": UiStudioView,
 	"text-block": TextBlockView,
 	"info-card": InfoCardView,
+	hero: HeroView,
+	image: ContentImageView,
+	"media-card": MediaCardView,
+	"product-card": ProductCardView,
+	"feature-card": FeatureCardView,
+	testimonial: TestimonialView,
+	"cta-banner": CtaBannerView,
+	"pricing-card": PricingCardView,
+	"comparison-table": ComparisonTableView,
+	faq: FaqView,
+	timeline: TimelineView,
+	stat: StatView,
+	"number-input": NumberInputView,
+	slider: SliderView,
+	choice: ChoiceView,
+	toggle: ToggleView,
+	chart: ChartView,
+	"data-table": DataTableView,
+	formula: FormulaView,
+	calculator: CalculatorView,
+	diagram: DiagramView,
+	stepper: StepperView,
 	"object-recognition-workspace": ObjectRecognitionWorkspaceView,
 	"ocr-media": OcrMediaView,
 	"ocr-panel": OcrPanelView,
@@ -121,7 +175,31 @@ function CompositionView({
 	request: Layout;
 	nested?: boolean;
 }) {
+	// The outermost layout holds the composition's shared state for all of its views.
+	return nested ? (
+		<ShownLayout request={request} nested />
+	) : (
+		<CompositionModelProvider model={request.model}>
+			<ShownLayout request={request} nested={false} />
+		</CompositionModelProvider>
+	);
+}
+/** A layout with `when` shows its children only while the expression is true. */
+function ShownLayout({
+	request,
+	nested,
+}: {
+	request: Layout;
+	nested: boolean;
+}) {
+	const model = useCompositionModel();
+	if (request.when && model && model.evaluate(request.when) !== true)
+		return null;
+	return <LayoutView request={request} nested={nested} />;
+}
+function LayoutView({ request, nested }: { request: Layout; nested: boolean }) {
 	const [selected, setSelected] = useState("0");
+	const model = useCompositionModel();
 	const tabs: NonNullable<typeof request.tabs> =
 		request.tabs ??
 		request.children.map((child, index) => ({
@@ -158,6 +236,37 @@ function CompositionView({
 			})}
 		</>
 	);
+	if (request.direction === "slides")
+		return (
+			<section
+				aria-label={request.title ?? "組合せ表示"}
+				className="aui-composition aui-composition-slides"
+				data-appearance={request.appearance}
+				data-width={request.width}
+			>
+				<Slides
+					title={nested ? request.title : undefined}
+					slides={request.children
+						// A scene whose `when` is false is left out rather than shown blank.
+						.filter(
+							(child) =>
+								child.view !== "layout" ||
+								!child.when ||
+								!model ||
+								model.evaluate(child.when) === true,
+						)
+						.map((child, index) => ({
+							label: child.title ?? `場面 ${index + 1}`,
+							content: (
+								<RegisteredView
+									key={`${index}:${child.view}:${keyOf(child)}`}
+									request={child}
+								/>
+							),
+						}))}
+				/>
+			</section>
+		);
 	if (request.direction === "tabs")
 		return (
 			<section

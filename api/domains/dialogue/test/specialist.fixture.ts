@@ -38,6 +38,15 @@ import {
 	type SpecialistSet,
 	type ToolchainRoutingPort,
 } from "..";
+import {
+	analysisArgs,
+	analysisReceipt,
+	delegatingArgs,
+	isAnalysisRound,
+	unavailableReceipt,
+	UNAVAILABLE,
+} from "./analysis.fixture";
+import type { RequestAnalysis } from "../service/initial-decision";
 
 export const REVISION = "toolchain:fake.studio@1";
 export const OTHER_REVISION = "toolchain:fake.other@1";
@@ -165,8 +174,16 @@ export async function setup(options: Options = {}) {
 		/** The specialist's replies in order (objects are JSON-encoded). */
 		specialist: [] as Array<unknown>,
 		mainCalls: [] as Call[],
+		/** The first round's calls (the request analysis), apart from the main calls that follow. */
+		analysisCalls: [] as Call[],
+		/** The first round's replies in order; without one, a scripted function call (or no candidates) delegates and prose answers. */
+		analyses: [] as Array<Partial<RequestAnalysis>>,
 		noCandidates: false,
 		routeCalls: 0,
+		/** The text each candidate search ran on. */
+		routeTexts: [] as string[],
+		/** What the conversation recorded as its decisions. */
+		recorded: [] as Array<Record<string, unknown>>,
 		specialistPrompts: [] as Array<Array<{ role: string; content: string }>>,
 		specialistSessions: [] as unknown[],
 		captures: [] as Array<Record<string, unknown>>,
@@ -251,25 +268,29 @@ export async function setup(options: Options = {}) {
 			preparation: Call["preparation"],
 			tools: Call["tools"] | undefined,
 		) => {
-			state.mainCalls.push({
-				history: [...history],
-				tools: tools ?? [],
-				preparation,
-			});
-			if (
-				tools?.[0]?.function.name === "find_toolchain" &&
-				(typeof state.main[0] !== "string" || state.noCandidates) &&
-				state.main.length
-			) {
-				return {
+			const call = { history: [...history], tools: tools ?? [], preparation };
+			if (isAnalysisRound(tools)) {
+				state.analysisCalls.push(call);
+				const delegating =
+					(typeof state.main[0] !== "string" || state.noCandidates) &&
+					state.main.length > 0;
+				const scripted = state.analyses.shift();
+				return analysisReceipt(
 					requestId,
-					attemptId: "discovery",
-					value: "",
-					toolCalls: [
-						{ id: "discovery", name: "find_toolchain", arguments: "{}" },
-					],
-				} as Receipt;
+					scripted
+						? { ...analysisArgs(), ...scripted }
+						: delegating
+							? delegatingArgs()
+							: analysisArgs(),
+				);
 			}
+			state.mainCalls.push(call);
+			if (
+				state.noCandidates &&
+				tools?.some((t) => t.function.name === UNAVAILABLE) &&
+				typeof state.main[0] === "string"
+			)
+				return unavailableReceipt(requestId, state.main.shift() as string);
 			const reply = state.main.shift() ?? "了解しました";
 			if (typeof reply !== "string")
 				return {
@@ -403,8 +424,9 @@ export async function setup(options: Options = {}) {
 	];
 	const toolchains: ToolchainRoutingPort = {
 		embedQuery: async () => undefined,
-		routeInTransaction: () => {
+		routeInTransaction: (_db, input) => {
 			state.routeCalls++;
+			state.routeTexts.push(input.text);
 			return {
 				cards: state.noCandidates ? [] : routed,
 				past: [],
@@ -449,7 +471,10 @@ export async function setup(options: Options = {}) {
 		commandSetInTransaction: () => {
 			throw new Error("unexpected_command");
 		},
-		recordSelectionInTransaction: () => "selection",
+		recordSelectionInTransaction: (_db, input) => {
+			state.recorded.push(input as unknown as Record<string, unknown>);
+			return "selection";
+		},
 		linkTaskInTransaction: () => {},
 		settleSelectionInTransaction: (_db, _runId, result) => {
 			state.settled.push(result);

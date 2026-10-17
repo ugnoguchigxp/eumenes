@@ -1,0 +1,189 @@
+{
+	"view": "layout",
+	"direction": "stack",
+	"gap": "relaxed",
+	"width": "wide",
+	"appearance": "elegant",
+	"title": "ひなた書房",
+	"children": [
+		{
+			"view": "text-block",
+			"title": "ひなた書房 サービスのご案内",
+			"body": "小さな本屋が始める、本の定期便です。",
+			"emphasis": "strong"
+		},
+		{
+			"view": "layout",
+			"direction": "grid",
+			"children": [
+				{
+					"view": "stat",
+					"label": "取り扱い冊数",
+					"value": "3,200冊",
+					"trend": "up"
+				},
+				{
+					"view": "stat",
+					"label": "会員の満足度",
+					"value": "4.6 / 5",
+					"caption": "アンケートの平均"
+				},
+				{
+					"view": "stat",
+					"label": "創業",
+					"value": "2012年",
+					"trend": "flat"
+				}
+			]
+		},
+		{
+			"view": "layout",
+			"direction": "tabs",
+			"children": [
+				{
+					"view": "comparison-table",
+					"title": "プラン比較",
+					"columns": ["ライト", "スタンダード", "プレミアム"],
+					"highlightColumn": 1,
+					"rows": [
+						{
+							"label": "毎月の冊数",
+							"values": ["1冊", "2冊", "4冊"]
+						},
+						{
+							"label": "送料",
+							"values": ["別", "無料", "無料"]
+						},
+						{
+							"label": "選書の相談",
+							"values": [false, true, true]
+						},
+						{
+							"label": "しおり",
+							"values": [true, true, true]
+						}
+					]
+				},
+				{
+					"view": "layout",
+					"direction": "grid",
+					"title": "料金",
+					"children": [
+						{
+							"view": "pricing-card",
+							"plan": "ライト",
+							"price": "¥1,200",
+							"period": "月",
+							"features": ["毎月1冊"],
+							"ctaLabel": "選ぶ"
+						},
+						{
+							"view": "pricing-card",
+							"plan": "スタンダード",
+							"price": "¥2,200",
+							"period": "月",
+							"features": ["毎月2冊", "送料無料", "選書の相談"],
+							"ctaLabel": "選ぶ",
+							"highlighted": true
+						},
+						{
+							"view": "pricing-card",
+							"plan": "プレミアム",
+							"price": "¥4,000",
+							"period": "月",
+							"features": ["毎月4冊", "送料無料", "選書の相談"],
+							"ctaLabel": "選ぶ"
+						}
+					]
+				},
+				{
+					"view": "faq",
+					"title": "よくある質問",
+					"items": [
+						{
+							"question": "好みを伝えられますか",
+							"answer": "申込み時のメモと、毎月の相談で伝えられます。"
+						},
+						{
+							"question": "いつでも解約できますか",
+							"answer": "次の発送の5日前までなら手数料なしで解約できます。"
+						},
+						{
+							"question": "同じ本が届くことはありますか",
+							"answer": "過去に送った本は記録しているので、重複しません。"
+						}
+					]
+				},
+				{
+					"view": "timeline",
+					"title": "これまで",
+					"items": [
+						{
+							"label": "2012",
+							"title": "店を開く",
+							"body": "商店街の小さな店からはじめました。"
+						},
+						{
+							"label": "2018",
+							"title": "朗読会",
+							"body": "毎月の朗読会を開始しました。"
+						},
+						{
+							"label": "2024",
+							"title": "定期便",
+							"body": "本の定期便を始めました。"
+						}
+					]
+				}
+			]
+		},
+		{
+			"view": "layout",
+			"direction": "slides",
+			"title": "定期便の流れ",
+			"children": [
+				{
+					"view": "media-card",
+					"eyebrow": "1 / 3",
+					"title": "好みを伝える",
+					"body": "好きな作家や気分を、申込み時に書きます。",
+					"image": {
+						"provider": "picsum",
+						"theme": "books",
+						"seed": "slide-1",
+						"alt": "本棚に並ぶ本"
+					}
+				},
+				{
+					"view": "media-card",
+					"eyebrow": "2 / 3",
+					"title": "選んで包む",
+					"body": "店主が選び、手書きのメモを添えます。",
+					"image": {
+						"provider": "picsum",
+						"theme": "interior",
+						"seed": "slide-2",
+						"alt": "明るい室内"
+					}
+				},
+				{
+					"view": "media-card",
+					"eyebrow": "3 / 3",
+					"title": "ポストに届く",
+					"body": "月に一度、ポストに届きます。",
+					"image": {
+						"provider": "placeholder",
+						"tone": "cool",
+						"alt": ""
+					}
+				}
+			]
+		},
+		{
+			"view": "text-block",
+			"title": "ご注意",
+			"body": "この店は架空の例です。",
+			"emphasis": "muted"
+		}
+	]
+}

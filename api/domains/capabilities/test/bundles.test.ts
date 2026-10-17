@@ -117,11 +117,11 @@ const codes = (issues: BundleIssue[]) => issues.map((i) => i.code).sort();
 test("the shipped bundle's pin is the stored digest and its toolchain is data-driven", async () => {
 	await fixture(async ({ store, caps }) => {
 		await caps.seed();
-		expect(await active(store)).toBe("toolchain:timers.manage@4");
+		expect(await active(store)).toBe("toolchain:timers.manage@6");
 		store.read((db) => {
 			const found = caps.toolchainBindingInTransaction(
 				db,
-				"toolchain:timers.manage@4",
+				"toolchain:timers.manage@6",
 			)!;
 			expect(found.binding.document.tools.map((t) => t.operationId)).toEqual([
 				"timers.start",
@@ -137,9 +137,9 @@ test("the shipped bundle's pin is the stored digest and its toolchain is data-dr
 			expect(caps.artifactsInTransaction(db)).toEqual([
 				{
 					toolchainId: "timers.manage",
-					toolchainRevisionId: "toolchain:timers.manage@4",
+					toolchainRevisionId: "toolchain:timers.manage@6",
 					artifactId: "timers.workspace",
-					artifactRevisionId: "artifact:timers.workspace@2",
+					artifactRevisionId: "artifact:timers.workspace@3",
 					title: "タイマー",
 					adapterRef: "adapter:timers@1",
 					adapterRefs: ["adapter:timers@1"],
@@ -147,12 +147,12 @@ test("the shipped bundle's pin is the stored digest and its toolchain is data-dr
 			]);
 			const set = caps.toolchainSetInTransaction(
 				db,
-				"toolchain:timers.manage@4",
+				"toolchain:timers.manage@6",
 			);
-			expect(set.binding?.revisionId).toBe("binding:timers.command@3");
+			expect(set.binding?.revisionId).toBe("binding:timers.command@4");
 			expect(set.toolchain.title).toBe("タイマー");
 			expect(
-				caps.documentInTransaction(db, "artifact:timers.workspace@2")?.digest,
+				caps.documentInTransaction(db, "artifact:timers.workspace@3")?.digest,
 			).toMatch(/^[0-9a-f]{64}$/);
 			expect(caps.schemaInTransaction(db, "builtin:timerHms")).not.toBeNull();
 			expect(
@@ -211,7 +211,7 @@ test("old revisions keep their JSON and hash, and publication moves back and for
 		const old = await legacy(store, caps);
 		expect(await active(store)).toBe("toolchain:timers.manage@1");
 		await caps.seed();
-		expect(await active(store)).toBe("toolchain:timers.manage@4");
+		expect(await active(store)).toBe("toolchain:timers.manage@6");
 		expect(
 			store.read((db) =>
 				db
@@ -354,11 +354,15 @@ test("the dry run lists every problem and writes nothing", async () => {
 			"binding:timers.command@1",
 			"binding:timers.command@2",
 			"binding:timers.command@3",
+			"binding:timers.command@4",
 			"artifact:timers.workspace@1",
 			"artifact:timers.workspace@2",
+			"artifact:timers.workspace@3",
 			"toolchain:timers.manage@2",
 			"toolchain:timers.manage@3",
 			"toolchain:timers.manage@4",
+			"toolchain:timers.manage@5",
+			"toolchain:timers.manage@6",
 		]);
 		expect(await counts(store)).toEqual(before);
 	});
@@ -513,7 +517,7 @@ test("documents are immutable: the same id with other content is a conflict, the
 		const first = await store.write((db) =>
 			caps.importBundleInTransaction(db, bundleRaw(), host()),
 		);
-		expect(first.registered).toHaveLength(8);
+		expect(first.registered).toHaveLength(12);
 		const again = await store.write((db) =>
 			caps.importBundleInTransaction(db, bundleRaw(), host()),
 		);
@@ -573,7 +577,7 @@ test("a bound tool is prepared with its own schema and only from an active packa
 				caps.prepareBoundInTransaction(
 					db,
 					owner,
-					"package:timers.manage@1",
+					"package:timers.manage@2",
 					tool,
 					input,
 				),
@@ -584,7 +588,7 @@ test("a bound tool is prepared with its own schema and only from an active packa
 			durationSeconds: 60,
 		});
 		expect((await prepare("tool:timer.list@1", {})).package.revisionId).toBe(
-			"package:timers.manage@1",
+			"package:timers.manage@2",
 		);
 		await expect(
 			prepare("tool:timer.start@1", { timerId: crypto.randomUUID() }),
@@ -608,13 +612,70 @@ test("a bound tool is prepared with its own schema and only from an active packa
 				caps.prepareBoundInTransaction(
 					db,
 					owner,
-					"package:timers.manage@1",
+					"package:timers.manage@2",
 					"tool:timer.cancel@1",
 					{ timerId: crypto.randomUUID(), expectedRevision: 0 },
 					{ generation: 99 },
 				),
 			),
 		).rejects.toThrow("capability_revoked");
+	});
+});
+
+test("a timer start without a duration is defined as the 3 minute default, not as a question", async () => {
+	await fixture(async ({ store, caps }) => {
+		await caps.seed();
+		store.read((db) => {
+			const stored = (id: string) =>
+				JSON.parse(
+					(
+						db
+							.query(
+								"SELECT definition_json j FROM capability_revisions WHERE id=?",
+							)
+							.get(id) as { j: string }
+					).j,
+				);
+			const body = (id: string): string => stored(id).body;
+			// Revision 1 is frozen and still asks; revision 2 starts with the default.
+			expect(body("skill:timers.manage@1")).toContain("一つだけ質問します");
+			const latest = body("skill:timers.manage@2");
+			expect(latest).not.toContain("質問します");
+			expect(latest).toContain("聞き返さず");
+			expect(latest).toContain("3分（180秒）");
+			// Revision 5 is registered and frozen; revision 6 stops asking for a duration.
+			const frozen = stored("toolchain:timers.manage@5");
+			expect(frozen.packageRevisionId).toBe("package:timers.manage@2");
+			expect(frozen.bindingRevisionId).toBe("binding:timers.command@3");
+			expect(
+				(
+					caps.documentInTransaction(db, "binding:timers.command@3")!
+						.document as any
+				).questions.map((q: { inputSchemaRef: string }) => q.inputSchemaRef),
+			).toEqual(["builtin:timerDurationAnswer", "builtin:timerTargetAnswer"]);
+			const toolchain = stored("toolchain:timers.manage@6");
+			expect(toolchain.packageRevisionId).toBe("package:timers.manage@2");
+			expect(toolchain.bindingRevisionId).toBe("binding:timers.command@4");
+			expect(toolchain.artifactRevisionId).toBe("artifact:timers.workspace@3");
+			expect(
+				(
+					caps.documentInTransaction(db, "binding:timers.command@4")!
+						.document as any
+				).questions,
+			).toEqual([
+				{ inputSchemaRef: "builtin:timerTargetAnswer", choiceField: "timerId" },
+			]);
+			expect(
+				(
+					caps.documentInTransaction(db, "artifact:timers.workspace@3")!
+						.document as any
+				).actionBindings.find((a: { answer?: boolean }) => a.answer)
+					.inputSchemaRef,
+			).toBe("builtin:timerTargetAnswer");
+			expect(
+				stored("package:timers.manage@2").requiredSkillRevisionIds,
+			).toEqual(["skill:timers.manage@2"]);
+		});
 	});
 });
 
@@ -800,7 +861,7 @@ test("an install already at revision 2 is upgraded to the latest, and revision 2
 				.get(),
 		);
 		await caps.seed();
-		expect(await active(store)).toBe("toolchain:timers.manage@4");
+		expect(await active(store)).toBe("toolchain:timers.manage@6");
 		expect(
 			store.read((db) =>
 				db
@@ -852,7 +913,7 @@ test("toolchain publication over HTTP is compare-and-set and can roll back", asy
 			});
 		const to2 = {
 			revisionId: "toolchain:timers.manage@2",
-			expectedActiveRevisionId: "toolchain:timers.manage@4",
+			expectedActiveRevisionId: "toolchain:timers.manage@6",
 		};
 		// A stale expectation changes nothing.
 		expect(
@@ -863,7 +924,7 @@ test("toolchain publication over HTTP is compare-and-set and can roll back", asy
 				})
 			).status,
 		).toBe(409);
-		expect(await active(store)).toBe("toolchain:timers.manage@4");
+		expect(await active(store)).toBe("toolchain:timers.manage@6");
 		expect((await publish("timers.manage", to2)).status).toBe(200);
 		expect(await active(store)).toBe("toolchain:timers.manage@2");
 		// The same request again is stale now.

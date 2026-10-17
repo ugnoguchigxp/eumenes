@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { createCodexResearch } from "../../domains/inference";
 import type { LarmPort } from "../../domains/larm";
 import { configureLogging } from "../../infrastructure/logger";
+import { answerAnalysis } from "./analysis-round.fixture";
 import { harness } from "./toolchain.fixture";
 
 test("SDK process failure reaches correlated logs and current answer context with zero Web operations", async () => {
@@ -42,13 +43,17 @@ test("SDK process failure reaches correlated logs and current answer context wit
 			const question = messages
 				.filter((m) => m.role === "user")
 				.at(-1)!.content;
-			if (question === "以前の記録") return "制御JSONが不正でした。";
-			if (options?.tools?.[0]?.function.name === "find_toolchain") {
-				options.onToolCalls!([
-					{ id: "discovery", name: "find_toolchain", arguments: "{}" },
-				]);
+			if (
+				answerAnalysis(
+					messages,
+					options,
+					question === "以前の記録"
+						? { kind: "chat", next: "answer" }
+						: { kind: "live_info", freshness: "live" },
+				)
+			)
 				return "";
-			}
+			if (question === "以前の記録") return "制御JSONが不正でした。";
 			if (options?.tools?.length) {
 				options.onToolCalls!([
 					{

@@ -1,0 +1,41 @@
+.ds-range-slider {
+	--ds-range-accent: var(--ds-accent, var(--primary));
+	display: grid;
+	gap: 0.5rem;
+	min-width: 0;
+	color: var(--foreground);
+}
+.ds-range-slider-head {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 0.75rem;
+	font-size: 0.875rem;
+}
+.ds-range-slider-head label {
+	font-weight: 500;
+	overflow-wrap: anywhere;
+}
+.ds-range-slider-value {
+	font-weight: 700;
+	font-variant-numeric: tabular-nums;
+	color: var(--ds-range-accent);
+	white-space: nowrap;
+}
+.ds-range-slider input[type="range"] {
+	width: 100%;
+	height: 1.5rem;
+	margin: 0;
+	background: transparent;
+	cursor: pointer;
+	accent-color: var(--ds-range-accent);
+}
+.ds-range-slider input[type="range"]:focus-visible {
+	outline: 2px solid var(--ring);
+	outline-offset: 2px;
+	border-radius: var(--radius);
+}
+.ds-range-slider input[type="range"]:disabled {
+	cursor: not-allowed;
+	opacity: 0.5;
+}

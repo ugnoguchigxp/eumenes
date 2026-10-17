@@ -36,10 +36,7 @@ test("batch read budgets and URL scopes are enforced atomically before adoption"
 				action: "invoke",
 				tool: "web.read",
 				arguments: { url: urls[0] },
-				readAhead: (foreign
-					? ["https://foreign.example/"]
-					: [...urls, urls[0]]
-				).map((url) => ({ url })),
+				readAhead: foreign ? ["https://foreign.example/"] : [...urls, urls[0]],
 			});
 			expect(h.task(id).state).toBe("queued");
 			expect(h.task(id).error_code).toBe(

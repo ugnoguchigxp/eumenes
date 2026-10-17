@@ -39,10 +39,11 @@ test("the timer adapter issues its timers as the choices of a target question, a
 		expect(
 			choices.every((c) => c.ref.length <= 64 && c.label.length <= 120),
 		).toBe(true);
-		for (const other of ["builtin:answerText", "builtin:timerDurationAnswer"])
-			expect(
-				h.store.read((db) => adapter.choicesInTransaction!(db, other)),
-			).toEqual([]);
+		expect(
+			h.store.read((db) =>
+				adapter.choicesInTransaction!(db, "builtin:answerText"),
+			),
+		).toEqual([]);
 		// Dialogue reaches them only through the bound port, by binding.
 		const routing = createToolchainRouting(
 			h.toolchain.capabilities,

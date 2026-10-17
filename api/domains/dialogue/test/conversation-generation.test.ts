@@ -3,7 +3,12 @@ import { configureLogging } from "../../../infrastructure/logger";
 import type { InferencePort, Receipt } from "../../inference";
 import { markCurrentRequest } from "../service/request-context";
 import { generateConversation } from "../service/conversation-generation";
-import { toolchainTools } from "../service/conversation-tools";
+import {
+	reportUnavailableTool,
+	toolchainTools,
+} from "../service/conversation-tools";
+import { analyzeTool } from "../service/initial-decision";
+import { analysisArgs, delegatingArgs } from "./analysis.fixture";
 import type { ToolchainCard } from "../../capabilities";
 
 const card = (id: string, functionName: string): ToolchainCard => ({
@@ -28,7 +33,10 @@ const chosen = (c: ToolchainCard, request: string) => ({
 	announcement: "確認します。",
 });
 
-function fixture(outputs: Partial<Receipt>[], tools = toolchainTools(CARDS)) {
+/** The functions of a selection call: the candidates and the explanation that none fits. */
+const SELECTION_TOOLS = [...toolchainTools(CARDS), reportUnavailableTool];
+
+function fixture(outputs: Partial<Receipt>[], tools = SELECTION_TOOLS) {
 	const seen: Parameters<InferencePort["answer"]>[0][] = [];
 	const sessions: unknown[] = [];
 	const inference = {
@@ -69,6 +77,7 @@ function fixture(outputs: Partial<Receipt>[], tools = toolchainTools(CARDS)) {
 		run: (
 			sessionRole: "main" | "auxiliary" = "main",
 			session?: Parameters<typeof generateConversation>[0]["session"],
+			extra: Partial<Parameters<typeof generateConversation>[0]> = {},
 		) =>
 			generateConversation({
 				inference,
@@ -88,11 +97,30 @@ function fixture(outputs: Partial<Receipt>[], tools = toolchainTools(CARDS)) {
 				sessionRole,
 				session,
 				repair: () => repairs++,
+				...extra,
 			}),
 	};
 }
+const web = (request = "鎌倉の天気") => ({
+	toolCalls: [
+		{
+			id: "call",
+			name: "web_search",
+			arguments: JSON.stringify({ announcement: "確認します。", request }),
+		},
+	],
+});
+const unavailableOutput = (reply: string) => ({
+	toolCalls: [
+		{
+			id: "u",
+			name: "report_unavailable",
+			arguments: JSON.stringify({ reply }),
+		},
+	],
+});
 test("ordinary dialogue streams one call and keeps preceding conversational context", async () => {
-	const h = fixture([{ value: "明日の予定でございます。" }]);
+	const h = fixture([{ value: "明日の予定でございます。" }], []);
 	const result = await h.run();
 	expect(h.seen).toHaveLength(1);
 	expect(h.seen[0]!.find((m) => m.role === "assistant")!.content).toBe(
@@ -105,13 +133,13 @@ test("every call, including the structural correction, carries the caller's sess
 	const bad = {
 		toolCalls: [{ id: "call", name: "unknown_function", arguments: "{}" }],
 	};
-	const answer = fixture([bad, { value: "明日の予定でございます。" }]);
+	const answer = fixture([bad, { value: "明日の予定でございます。" }], []);
 	await answer.run("main");
 	expect(answer.sessions).toEqual([
 		{ sessionRole: "main" },
 		{ sessionRole: "main" },
 	]);
-	const selection = fixture([{ value: "選択" }]);
+	const selection = fixture([unavailableOutput("選択")]);
 	await selection.run("auxiliary");
 	expect(selection.sessions).toEqual([{ sessionRole: "auxiliary" }]);
 });
@@ -123,7 +151,7 @@ test("the history split and the references reach every main call, the correction
 		context: { instructionCount: 1, historyCount: 2 },
 		refs: { messageIds: ["m1"], itemIds: ["i1"] },
 	};
-	const answer = fixture([bad, { value: "明日の予定でございます。" }]);
+	const answer = fixture([bad, { value: "明日の予定でございます。" }], []);
 	await answer.run("main", session);
 	expect(answer.sessions).toEqual([
 		{ sessionRole: "main", ...session },
@@ -138,7 +166,7 @@ test("the history split and the references reach every main call, the correction
 		),
 	).toBeLessThan(corrected.length - 1);
 	expect(corrected.at(-1)!.content).toBe(answer.seen[0]!.at(-1)!.content);
-	const selection = fixture([{ value: "選択" }]);
+	const selection = fixture([unavailableOutput("選択")]);
 	await selection.run("auxiliary", session);
 	expect(selection.sessions).toEqual([
 		{ sessionRole: "auxiliary", refs: session.refs },
@@ -209,7 +237,7 @@ test("an offered tool is not required to reject control text and return a natura
 });
 test("repeated control text fails after one correction without publishing it", async () => {
 	const rejected = captureLog();
-	const h = fixture([{ value: controlText }, { value: controlText }]);
+	const h = fixture([{ value: controlText }, { value: controlText }], []);
 	await expect(h.run()).rejects.toThrow("invalid_conversation_operation");
 	expect(h.deltas).toEqual([]);
 	expect(h.repairs()).toBe(1);
@@ -225,7 +253,7 @@ test("malformed native arguments get exactly one structural correction", async (
 	const bad = {
 		toolCalls: [{ id: "call", name: "web_search", arguments: "{" }],
 	};
-	const h = fixture([bad, { value: "対象の地域を教えてください。" }]);
+	const h = fixture([bad, unavailableOutput("対象の地域を教えてください。")]);
 	expect((await h.run()).text).toContain("地域");
 	expect(h.repairs()).toBe(1);
 	expect(h.seen).toHaveLength(2);
@@ -263,7 +291,7 @@ test("a duplicate key reaches the informed correction without accepting either v
 				),
 			],
 		},
-		{ value: "確認できません。" },
+		unavailableOutput("確認できません。"),
 	]);
 	expect((await h.run()).operation).toBeUndefined();
 	expect(h.repairs()).toBe(1);
@@ -322,7 +350,7 @@ test("correction never grants an unoffered native tool", async () => {
 				),
 			],
 		},
-		{ value: "確認できません。" },
+		unavailableOutput("確認できません。"),
 	]);
 	expect((await h.run()).operation).toBeUndefined();
 	expect(h.repairs()).toBe(1);
@@ -341,7 +369,7 @@ test("rejected output is bounded untrusted data, never a system instruction", as
 				),
 			],
 		},
-		{ value: "確認できません。" },
+		unavailableOutput("確認できません。"),
 	]);
 	await h.run();
 	const messages = h.seen[1]!;
@@ -538,7 +566,7 @@ test("an argument violation records the contract path and code", async () => {
 				}),
 			],
 		},
-		{ value: "かしこまりました。" },
+		unavailableOutput("かしこまりました。"),
 	]);
 	await h.run();
 	expect(rejected()).toContainEqual(
@@ -581,4 +609,149 @@ test("structural repair preserves the anchored request before appended rejected 
 	expect(rejected).toBeGreaterThanOrEqual(0);
 	expect(rejected).toBeLessThan(anchor);
 	expect(repaired.at(-1)).toMatchObject({ role: "user", content: "明日は？" });
+});
+
+const analyzed = (args: unknown) => ({
+	toolCalls: [
+		{ id: "a", name: "analyze_request", arguments: JSON.stringify(args) },
+	],
+});
+const analysisRun = (outputs: Partial<Receipt>[]) => {
+	const h = fixture(outputs, [analyzeTool]);
+	return { h, run: () => h.run("auxiliary", undefined, { analysis: true }) };
+};
+test("the first round returns the analysis and never adopts prose", async () => {
+	const { h, run } = analysisRun([analyzed(delegatingArgs())]);
+	const result = await run();
+	expect(result.analysis).toEqual(delegatingArgs());
+	expect(result.text).toBe("");
+	expect(h.deltas).toEqual([]);
+	// Prose where the analysis is required goes back once, and a second time it fails.
+	const prose = analysisRun([
+		{ value: "回答します。" },
+		analyzed(analysisArgs()),
+	]);
+	expect((await prose.run()).analysis).toEqual(analysisArgs());
+	expect(prose.h.repairs()).toBe(1);
+	expect(prose.h.seen[1]![0]!.content).toContain("analyze_request");
+	const twice = analysisRun([
+		{ value: "回答します。" },
+		{ value: "回答します。" },
+	]);
+	await expect(twice.run()).rejects.toThrow("invalid_conversation_operation");
+	expect(twice.h.seen).toHaveLength(2);
+});
+for (const [label, args, reason] of [
+	[
+		"a kind that needs a toolchain answered from hand",
+		analysisArgs({ kind: "live_info" }),
+		"analysis_next_mismatch",
+	],
+	[
+		"live information answered from hand",
+		analysisArgs({ freshness: "live" }),
+		"analysis_next_mismatch",
+	],
+	[
+		"an action answered from hand",
+		analysisArgs({ kind: "action", next: "clarify", missing: ["対象"] }),
+		"analysis_next_mismatch",
+	],
+	[
+		"a question without a missing item",
+		analysisArgs({ next: "clarify" }),
+		"analysis_clarify_without_missing",
+	],
+	["an unknown argument", { ...analysisArgs(), extra: 1 }, "arguments_invalid"],
+	[
+		"a goal over the limit",
+		analysisArgs({ goal: "あ".repeat(501) }),
+		"arguments_invalid",
+	],
+	[
+		"too many conditions",
+		analysisArgs({ conditions: Array.from({ length: 21 }, () => "条件") }),
+		"arguments_invalid",
+	],
+	[
+		"too many missing items",
+		analysisArgs({ missing: Array.from({ length: 11 }, () => "不足") }),
+		"arguments_invalid",
+	],
+	[
+		"a condition over its length",
+		analysisArgs({ conditions: ["あ".repeat(121)] }),
+		"arguments_invalid",
+	],
+] as const)
+	test(`an analysis the host finds inconsistent is repaired once, then fails: ${label}`, async () => {
+		const rejected = captureLog();
+		const { h, run } = analysisRun([analyzed(args), analyzed(args)]);
+		await expect(run()).rejects.toThrow("invalid_conversation_operation");
+		expect(h.seen).toHaveLength(2);
+		expect(h.repairs()).toBe(1);
+		expect(rejected().map((row) => row.reason)).toEqual([reason, reason]);
+		const ok = analysisRun([analyzed(args), analyzed(analysisArgs())]);
+		expect((await ok.run()).analysis).toEqual(analysisArgs());
+		expect(ok.h.repairs()).toBe(1);
+	});
+test("the analysis limits: a goal of 500 characters, 20 conditions and 10 missing items are accepted", async () => {
+	const edge = analysisArgs({
+		goal: "あ".repeat(500),
+		conditions: Array.from({ length: 20 }, () => "あ".repeat(120)),
+		missing: Array.from({ length: 10 }, () => "あ".repeat(120)),
+	});
+	expect((await analysisRun([analyzed(edge)]).run()).analysis).toEqual(edge);
+});
+test("a question is allowed with a missing item, and a delegating kind may ask nothing else", async () => {
+	const ask = analysisArgs({ next: "clarify", missing: ["対象の場所"] });
+	expect((await analysisRun([analyzed(ask)]).run()).analysis).toEqual(ask);
+	const live = delegatingArgs({ kind: "live_info", freshness: "live" });
+	expect((await analysisRun([analyzed(live)]).run()).analysis).toEqual(live);
+});
+test("the second round adopts a function call only: prose goes back once and then fails", async () => {
+	const h = fixture([{ value: "お答えします。" }, web()]);
+	expect((await h.run()).operation).toEqual(chosen(WEB, "鎌倉の天気"));
+	expect(h.repairs()).toBe(1);
+	expect(h.seen[1]![0]!.content).toContain("report_unavailable");
+	const twice = fixture([
+		{ value: "お答えします。" },
+		{ value: "お答えします。" },
+	]);
+	await expect(twice.run()).rejects.toThrow("invalid_conversation_operation");
+	expect(twice.seen).toHaveLength(2);
+});
+test("report_unavailable is the answer itself and obeys the spoken-reply contract", async () => {
+	const h = fixture([
+		unavailableOutput("その依頼を任せられる担当がありません。"),
+	]);
+	const result = await h.run("auxiliary", undefined, { briefReply: true });
+	expect(result.operation).toBeUndefined();
+	expect(result.text).toBe("その依頼を任せられる担当がありません。");
+	expect(h.deltas).toEqual([]);
+	const long = "長い説明です。".repeat(30);
+	const repaired = fixture([
+		unavailableOutput(long),
+		unavailableOutput("短く伝えます。"),
+	]);
+	expect(
+		(await repaired.run("auxiliary", undefined, { briefReply: true })).text,
+	).toBe("短く伝えます。");
+	expect(repaired.repairs()).toBe(1);
+	// The repair names the report_unavailable reply and its length contract.
+	expect(repaired.seen[1]![0]!.content).toContain(
+		"report_unavailableのreplyが長すぎて棄却",
+	);
+	expect(repaired.seen[1]![0]!.content).toContain("160字以内");
+	const twice = fixture([unavailableOutput(long), unavailableOutput(long)]);
+	await expect(
+		twice.run("auxiliary", undefined, { briefReply: true }),
+	).rejects.toThrow("invalid_conversation_operation");
+	// A call written as text inside the explanation is control syntax, not an answer.
+	const control = fixture([
+		unavailableOutput("web_search(request: x)"),
+		unavailableOutput("対応できません。"),
+	]);
+	expect((await control.run()).text).toBe("対応できません。");
+	expect(control.repairs()).toBe(1);
 });

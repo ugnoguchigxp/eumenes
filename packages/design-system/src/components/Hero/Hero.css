@@ -1,0 +1,161 @@
+.ds-hero {
+	--ds-hero-accent: var(--ds-accent, var(--primary));
+	--ds-hero-accent-fg: var(--ds-accent-foreground, var(--primary-foreground));
+	container-type: inline-size;
+	position: relative;
+	min-width: 0;
+	color: var(--foreground);
+	background: var(--card);
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	overflow: hidden;
+}
+.ds-hero-inner {
+	position: relative;
+	display: grid;
+	gap: 1.5rem;
+	min-width: 0;
+	padding: 2rem 1.25rem;
+}
+.ds-hero-text {
+	display: grid;
+	gap: 0.75rem;
+	min-width: 0;
+	align-content: center;
+}
+.ds-hero-text h2 {
+	margin: 0;
+	font-size: clamp(1.5rem, 6cqw, 2.5rem);
+	font-weight: 700;
+	line-height: 1.25;
+	overflow-wrap: anywhere;
+}
+.ds-hero-eyebrow {
+	margin: 0;
+	font-size: 0.8125rem;
+	font-weight: 600;
+	letter-spacing: 0.06em;
+	color: var(--ds-hero-accent);
+}
+.ds-hero-body {
+	margin: 0;
+	font-size: 1rem;
+	line-height: 1.75;
+	color: var(--muted-foreground);
+}
+.ds-hero-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.75rem;
+	margin-top: 0.5rem;
+}
+.ds-hero-button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 2.5rem;
+	padding: 0.5rem 1.25rem;
+	border-radius: var(--radius);
+	font-size: 0.9375rem;
+	font-weight: 600;
+	border: 1px solid transparent;
+	cursor: default;
+}
+.ds-hero-button[data-kind="primary"] {
+	background: var(--ds-hero-accent);
+	color: var(--ds-hero-accent-fg);
+}
+.ds-hero-button[data-kind="secondary"] {
+	border-color: currentColor;
+	color: inherit;
+}
+.ds-hero[data-variant="centered"] .ds-hero-inner {
+	text-align: center;
+	justify-items: center;
+}
+.ds-hero[data-variant="centered"] .ds-hero-actions {
+	justify-content: center;
+}
+.ds-hero[data-variant="centered"] .ds-hero-text {
+	max-width: 44rem;
+}
+.ds-hero[data-variant="centered"] .ds-hero-image {
+	width: 100%;
+	max-width: 44rem;
+}
+.ds-hero[data-variant="split"] .ds-hero-inner {
+	align-items: center;
+}
+@container (min-width: 40rem) {
+	.ds-hero[data-variant="split"] .ds-hero-inner {
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+		gap: 2.5rem;
+		padding: 2.5rem;
+	}
+}
+/* background: image fills the section, text sits on a tinted overlay */
+.ds-hero[data-variant="background"] {
+	border: 0;
+	background: var(--muted);
+}
+.ds-hero[data-variant="background"] .ds-hero-inner {
+	padding: 2rem 1.5rem;
+	align-items: center;
+}
+.ds-hero[data-variant="background"][data-height="md"] .ds-hero-inner {
+	min-height: 18rem;
+}
+.ds-hero[data-variant="background"][data-height="lg"] .ds-hero-inner {
+	min-height: 28rem;
+}
+.ds-hero[data-variant="background"] .ds-hero-text {
+	max-width: 40rem;
+}
+.ds-hero[data-variant="background"][data-align="center"] .ds-hero-text {
+	text-align: center;
+	justify-self: center;
+}
+.ds-hero[data-variant="background"][data-align="center"] .ds-hero-actions {
+	justify-content: center;
+}
+.ds-hero-overlay {
+	position: absolute;
+	inset: 0;
+}
+.ds-hero[data-overlay="dark"] .ds-hero-overlay {
+	background: linear-gradient(rgb(0 0 0 / 0.55), rgb(0 0 0 / 0.65));
+}
+.ds-hero[data-overlay="light"] .ds-hero-overlay {
+	background: linear-gradient(rgb(255 255 255 / 0.82), rgb(255 255 255 / 0.88));
+}
+.ds-hero[data-overlay="accent"] .ds-hero-overlay {
+	background: linear-gradient(
+		color-mix(in srgb, var(--ds-hero-accent) 62%, black),
+		color-mix(in srgb, var(--ds-hero-accent) 48%, black)
+	);
+	opacity: 0.92;
+}
+/* text colors depend only on the overlay, never on the app theme */
+.ds-hero[data-overlay="dark"] .ds-hero-text,
+.ds-hero[data-overlay="accent"] .ds-hero-text {
+	color: #fff;
+}
+.ds-hero[data-overlay="light"] .ds-hero-text {
+	color: hsl(215 25% 12%);
+}
+.ds-hero[data-overlay] .ds-hero-eyebrow {
+	color: inherit;
+	opacity: 0.9;
+}
+.ds-hero[data-overlay] .ds-hero-body {
+	color: inherit;
+}
+.ds-hero[data-overlay="dark"] .ds-hero-button[data-kind="primary"],
+.ds-hero[data-overlay="accent"] .ds-hero-button[data-kind="primary"] {
+	background: #fff;
+	color: hsl(215 25% 12%);
+}
+.ds-hero[data-overlay="light"] .ds-hero-button[data-kind="primary"] {
+	background: hsl(215 25% 12%);
+	color: #fff;
+}

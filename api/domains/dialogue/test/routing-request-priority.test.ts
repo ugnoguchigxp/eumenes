@@ -7,7 +7,7 @@ for (const currentText of [
 	"日曜日の朝にぴったりな音楽を作って",
 	"では同じ条件でもう一つ作って",
 ])
-	test(`retrieval uses the current request while earlier turns remain available as context: ${currentText}`, () => {
+	test(`routing hands the first round its own input and keeps the messages as they are: ${currentText}`, () => {
 		const current = { role: "user" as const, content: currentText };
 		const messages = [
 			{ role: "user" as const, content: "前は画像についてWeb検索して" },
@@ -23,6 +23,13 @@ for (const currentText of [
 				],
 			},
 		} as unknown as DialogueDeps;
+		const analysis = {
+			persona: { agentName: "", userName: "", persona: "butler" as const },
+			previous: [
+				{ role: "user" as const, content: "前は画像についてWeb検索して" },
+				{ role: "assistant" as const, content: "過去の調査結果" },
+			],
+		};
 		const result = prepareRouting(
 			{} as never,
 			deps,
@@ -30,8 +37,11 @@ for (const currentText of [
 			messages,
 			current,
 			{ dots: false },
+			analysis,
 		);
-		expect(result?.routing.query).toBe(currentText);
+		// The search text is the analysis' goal, decided in the execute phase; nothing of the utterance is fixed here.
+		expect(result?.routing).not.toHaveProperty("query");
+		expect(result?.routing.analysis).toBe(analysis);
 		expect(result?.routing.available).toEqual(["music.create"]);
 		expect(messages[0]!.content).toBe("前は画像についてWeb検索して");
 		expect(messages.at(-1)).toBe(current);

@@ -1,0 +1,55 @@
+.ds-stat-tile {
+	--ds-stat-accent: var(--ds-accent, var(--primary));
+	display: grid;
+	gap: 0.25rem;
+	min-width: 0;
+	padding: 1rem 1.25rem;
+	color: var(--card-foreground, var(--foreground));
+	background: var(--card);
+	border: 1px solid var(--border);
+	border-inline-start: 4px solid var(--ds-stat-accent);
+	border-radius: var(--radius);
+}
+.ds-stat-tile p {
+	margin: 0;
+}
+.ds-stat-tile-label {
+	font-size: 0.8125rem;
+	color: var(--muted-foreground);
+	overflow-wrap: anywhere;
+}
+.ds-stat-tile-value {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.5rem;
+	font-size: 1.75rem;
+	font-weight: 700;
+	line-height: 1.2;
+	font-variant-numeric: tabular-nums;
+	overflow-wrap: anywhere;
+}
+.ds-stat-tile-trend {
+	display: inline-flex;
+	color: var(--ds-stat-accent);
+}
+.ds-stat-tile-trend svg {
+	width: 1.25rem;
+	height: 1.25rem;
+}
+.ds-stat-tile[data-trend="flat"] .ds-stat-tile-trend {
+	color: var(--muted-foreground);
+}
+.ds-stat-tile-caption {
+	font-size: 0.8125rem;
+	color: var(--muted-foreground);
+	overflow-wrap: anywhere;
+}
+.ds-stat-tile-sr {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	white-space: nowrap;
+}

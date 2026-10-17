@@ -1,0 +1,38 @@
+.ds-feature-card {
+	display: grid;
+	gap: 0.625rem;
+	align-content: start;
+	min-width: 0;
+	padding: 1.25rem;
+	color: var(--card-foreground, var(--foreground));
+	background: var(--card);
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+}
+.ds-feature-card-icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 2.75rem;
+	height: 2.75rem;
+	border-radius: var(--radius);
+	color: var(--ds-accent, var(--primary));
+	background: color-mix(
+		in srgb,
+		var(--ds-accent, var(--primary)) 14%,
+		var(--card)
+	);
+}
+.ds-feature-card h3 {
+	margin: 0;
+	font-size: 1rem;
+	font-weight: 600;
+	line-height: 1.4;
+	overflow-wrap: anywhere;
+}
+.ds-feature-card p {
+	margin: 0;
+	font-size: 0.9375rem;
+	line-height: 1.7;
+	color: var(--muted-foreground);
+}

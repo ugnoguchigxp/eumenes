@@ -61,11 +61,11 @@ test("the model-named Web research toolchain is retired and the model-neutral on
 		).toEqual([
 			{
 				key: "toolchain:web.research.codex",
-				active_revision_id: "toolchain:web.research.codex@2",
+				active_revision_id: "toolchain:web.research.codex@3",
 			},
 			{
 				key: "toolchain:web.search",
-				active_revision_id: "toolchain:web.search@5",
+				active_revision_id: "toolchain:web.search@6",
 			},
 		]);
 	} finally {

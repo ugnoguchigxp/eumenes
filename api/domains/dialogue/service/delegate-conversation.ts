@@ -5,6 +5,7 @@ import type { ConversationService } from "../../conversation";
 import { isSystemPrompt, type Run } from "../contracts";
 import { linkAgent } from "../repository";
 import type { DialogueDeps } from "./context";
+import type { AnalysisInput } from "./request-analysis";
 import { originalRequestInTransaction } from "./request-context";
 
 /**
@@ -54,7 +55,7 @@ export function delegateConversation(
 }
 
 /**
- * The routing input of a new conversation decision: the request text for retrieval and the
+ * The routing input of a new conversation decision: what the first round reads and the
  * toolchains whose runtime is available now. Nothing is offered to system prompts or while
  * an agent task already belongs to the run.
  */
@@ -65,6 +66,7 @@ export function prepareRouting(
 	messages: Array<{ role: "system" | "user" | "assistant"; content: string }>,
 	currentRequest: (typeof messages)[number],
 	available: { dots: boolean },
+	analysis: AnalysisInput,
 ) {
 	const { agents, toolchains } = deps;
 	if (!toolchains || run.agentTaskId || isSystemPrompt(run.sourceKind))
@@ -97,8 +99,7 @@ export function prepareRouting(
 	if (index < 0) throw new Error("run_input_missing");
 	return {
 		routing: {
-			// Past turns stay in the LLM's reference context, not in the current request's ranking signal.
-			query: currentRequest.content,
+			analysis,
 			available: ids,
 			conversationId: run.conversationId,
 			utteranceId: run.utteranceId ?? null,

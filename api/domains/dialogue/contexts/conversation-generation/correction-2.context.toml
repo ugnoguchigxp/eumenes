@@ -1,3 +1,0 @@
-# Source: api/domains/dialogue/service/conversation-generation.ts
-text = '''
-現在の依頼と提示済みのfunctionから、正式な関数呼出し一件か自然な回答本文を返します。操作と本文を混ぜません。'''

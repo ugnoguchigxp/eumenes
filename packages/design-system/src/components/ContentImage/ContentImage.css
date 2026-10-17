@@ -1,0 +1,74 @@
+.ds-content-image {
+	margin: 0;
+	min-width: 0;
+	display: block;
+}
+.ds-content-image[data-fill="true"] {
+	position: absolute;
+	inset: 0;
+}
+.ds-content-image-frame {
+	position: relative;
+	width: 100%;
+	overflow: hidden;
+	background: var(--muted);
+}
+.ds-content-image-frame[data-rounded="true"] {
+	border-radius: var(--radius);
+}
+.ds-content-image-frame[data-aspect="landscape"] {
+	aspect-ratio: 16 / 9;
+}
+.ds-content-image-frame[data-aspect="square"] {
+	aspect-ratio: 1 / 1;
+}
+.ds-content-image-frame[data-aspect="portrait"] {
+	aspect-ratio: 3 / 4;
+}
+.ds-content-image-frame[data-aspect="wide"] {
+	aspect-ratio: 21 / 9;
+}
+.ds-content-image-frame[data-aspect="fill"] {
+	height: 100%;
+}
+.ds-content-image-frame img {
+	display: block;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+.ds-content-image-frame[data-placeholder] {
+	--ds-ci-a: var(--ds-accent, var(--primary));
+	background: linear-gradient(
+		135deg,
+		color-mix(in srgb, var(--ds-ci-a) 80%, var(--card)),
+		color-mix(in srgb, var(--ds-ci-a) 22%, var(--card))
+	);
+}
+.ds-content-image-frame[data-placeholder="neutral"] {
+	background: linear-gradient(
+		135deg,
+		color-mix(in srgb, var(--muted-foreground) 45%, var(--card)),
+		color-mix(in srgb, var(--muted-foreground) 12%, var(--card))
+	);
+}
+.ds-content-image-frame[data-placeholder="warm"] {
+	background: linear-gradient(
+		135deg,
+		color-mix(in srgb, hsl(24 90% 55%) 75%, var(--card)),
+		color-mix(in srgb, hsl(44 95% 60%) 30%, var(--card))
+	);
+}
+.ds-content-image-frame[data-placeholder="cool"] {
+	background: linear-gradient(
+		135deg,
+		color-mix(in srgb, hsl(205 80% 50%) 75%, var(--card)),
+		color-mix(in srgb, hsl(170 65% 50%) 30%, var(--card))
+	);
+}
+.ds-content-image figcaption {
+	margin-top: 0.5rem;
+	font-size: 0.8125rem;
+	line-height: 1.5;
+	color: var(--muted-foreground);
+}

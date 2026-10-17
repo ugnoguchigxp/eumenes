@@ -65,8 +65,10 @@ test("a session starts from the conversation's choice, then talks directly: thre
 	expect(h.state.specialistPrompts[1]!.at(-1)!.content).toContain(
 		'TOOL_RESULT={"ok":true,"result":{"applied":true',
 	);
+	// The analysis and the selection: two model calls before the session.
 	const mainCalls = h.state.mainCalls.length;
-	expect(mainCalls).toBe(2);
+	expect(h.state.analysisCalls).toHaveLength(1);
+	expect(mainCalls).toBe(1);
 	for (const [i, text] of [
 		"第1問を直して",
 		"色を変えて",

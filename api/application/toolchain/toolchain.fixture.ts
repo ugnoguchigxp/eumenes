@@ -44,6 +44,12 @@ import { createToolchainRouting } from "./toolchain-routing";
 import { createTimerAnnouncements } from "../timers/timer-announcements";
 import { createApp } from "../app";
 import type { LarmPort } from "../../domains/larm";
+import {
+	analysisArgs,
+	ANALYZE,
+	delegatingArgs,
+	isAnalysisRound,
+} from "../../domains/dialogue/test/analysis.fixture";
 /** Trusted packet merged with the separate UNTRUSTED_MATERIALS message. */
 export function workerPacket(
 	messages: import("../../domains/inference/contracts").Messages,
@@ -225,10 +231,38 @@ export async function harness(
 			const question = messages
 				.filter((m) => m.role === "user")
 				.at(-1)!.content;
-			if (callOptions?.tools?.[0]?.function.name === "find_toolchain") {
-				if (options.clarify) return "どの地域の天気を調べますか？";
-				callOptions.onToolCalls!([
-					{ id: "discovery", name: "find_toolchain", arguments: "{}" },
+			// The conversation only hands the request to a toolchain; its sub-agent decides the rest.
+			const delegates =
+				!!options.routeTool ||
+				!!options.history ||
+				(!!options.timers && /タイマー/.test(question)) ||
+				/天気|株価|weather|stock|調べ|検索|https?:|確認/.test(question);
+			if (isAnalysisRound(callOptions?.tools)) {
+				const goal = question.trim().slice(0, 300) || "依頼の確認";
+				const args = options.clarify
+					? analysisArgs({
+							goal,
+							next: "clarify",
+							missing: ["地域"],
+						})
+					: !delegates
+						? analysisArgs({ goal })
+						: options.history
+							? delegatingArgs({ goal, kind: "past_conversation" })
+							: options.routeTool ||
+								  (options.timers && /タイマー/.test(question))
+								? delegatingArgs({ goal, kind: "action" })
+								: delegatingArgs({
+										goal,
+										kind: "live_info",
+										freshness: "live",
+									});
+				callOptions!.onToolCalls!([
+					{
+						id: "analysis",
+						name: ANALYZE,
+						arguments: JSON.stringify(args),
+					},
 				]);
 				return "";
 			}
@@ -240,7 +274,6 @@ export async function harness(
 						question.includes(options.routeGateQuestion))
 				)
 					await options.routeGate;
-				if (options.clarify) return "どの地域の天気を調べますか？";
 				const send = (name: string, args: unknown) => {
 					callOptions.onToolCalls!([
 						{
@@ -256,7 +289,6 @@ export async function harness(
 				};
 				if (options.routeTool)
 					return send(options.routeTool, { request: question });
-				// The conversation only hands the request to a toolchain; its sub-agent decides the rest.
 				if (options.timers && /タイマー/.test(question))
 					return send("timer", { request: question });
 				if (
@@ -395,6 +427,8 @@ export async function harness(
 								: { query: data.task.question.slice(0, 400) },
 				});
 			}
+			// The analysis asked for a clarification: the answer round carries the question.
+			if (options.clarify) return "どの地域の天気を調べますか？";
 			parentContexts.push(JSON.stringify(messages));
 			if (options.parent) return options.parent(messages);
 			if (options.answerGate) await options.answerGate;

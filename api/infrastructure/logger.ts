@@ -54,6 +54,8 @@ export interface LogFields {
 	source?: string;
 	reason?: string;
 	kind?: string;
+	freshness?: string;
+	next?: string;
 	durationMs?: number;
 	bytes?: number;
 	count?: number;
@@ -172,6 +174,8 @@ const keys = new Set<keyof LogFields>([
 	"source",
 	"reason",
 	"kind",
+	"freshness",
+	"next",
 	"durationMs",
 	"bytes",
 	"count",

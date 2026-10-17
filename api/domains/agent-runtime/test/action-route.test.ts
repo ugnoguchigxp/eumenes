@@ -7,7 +7,7 @@ afterEach(async () => {
 	for (const close of open.splice(0)) await close();
 });
 
-const PACKAGE = "package:timers.manage@1";
+const PACKAGE = "package:timers.manage@2";
 const TOOL = "tool:timer.start@1";
 const command = (over: Record<string, unknown> = {}) => ({
 	bindingRevisionId: "binding:fake.command@1",

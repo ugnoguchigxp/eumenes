@@ -3,8 +3,6 @@ import {
 	BINDING,
 	PACKAGE,
 	ADAPTER,
-	operationCall,
-	lastUser,
 	until,
 	open,
 	setup,
@@ -14,12 +12,8 @@ afterEach(async () => {
 });
 test("an earlier mistaken answer does not enter the next toolchain choice", async () => {
 	const h = setup({
-		conversation: (call, index) => {
-			if (!call.tools.length || index === 0) return {};
-			return {
-				toolCalls: operationCall({ request: lastUser(call.history) }),
-			};
-		},
+		// The first request is answered from hand; the second goes to the toolchains.
+		analyses: [{ kind: "knowledge", next: "answer" }],
 	});
 	const first = await h.run("操作を実行して");
 	await until(() => h.status(first.id) === "completed");
@@ -36,8 +30,11 @@ test("an earlier mistaken answer does not enter the next toolchain choice", asyn
 	};
 	await h.run("先ほどの操作を実行して");
 	await until(() => h.started.length === 1);
-	const selection = h.conversationCalls[2]!;
-	expect(selection.tools).toHaveLength(1);
+	const selection = h.conversationCalls[1]!;
+	expect(selection.tools.map((t) => t.function.name)).toEqual([
+		"fake_op",
+		"report_unavailable",
+	]);
 	const reference = selection.history.find((m) =>
 		m.content.startsWith("referenceContext"),
 	)!;
@@ -50,25 +47,23 @@ test("an earlier mistaken answer does not enter the next toolchain choice", asyn
 	expect(selection.history.some((m) => m.role === "assistant")).toBe(false);
 	expect(h.started).toHaveLength(1);
 });
-test("a direct answer after toolchain selection retains the full exchange", async () => {
+test("an answer from hand retains the full exchange as the main session", async () => {
 	const h = setup({
-		conversation: (call) => (call.tools.length ? {} : undefined),
+		analyses: [
+			{ kind: "knowledge", next: "answer" },
+			{ kind: "knowledge", next: "answer" },
+		],
 	});
 	const first = await h.run("前の話を覚えておいて");
 	await until(() => h.status(first.id) === "completed");
 	const second = await h.run("その話の続きは？");
 	await until(() => h.status(second.id) === "completed");
-	const selection = h.conversationCalls.at(-2)!;
 	const answer = h.conversationCalls.at(-1)!;
-	expect(selection.tools).toHaveLength(1);
-	// The one-shot selection is auxiliary; only the answer generation is the main session.
-	expect(selection.session).toEqual({ sessionRole: "auxiliary" });
 	// The adopted exchange is the history a resumed session starts from; the system prompt is the one instruction.
 	expect(answer.session).toEqual({
 		sessionRole: "main",
 		context: { instructionCount: 1, historyCount: 2 },
 	});
-	expect(selection.history.some((m) => m.role === "assistant")).toBe(false);
 	expect(answer.tools).toHaveLength(0);
 	expect(
 		answer.history.some(

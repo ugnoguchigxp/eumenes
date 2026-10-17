@@ -1,0 +1,50 @@
+.ds-media-card {
+	container-type: inline-size;
+	min-width: 0;
+	color: var(--card-foreground, var(--foreground));
+	background: var(--card);
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	overflow: hidden;
+}
+.ds-media-card-inner {
+	display: grid;
+	min-width: 0;
+}
+.ds-media-card-text {
+	display: grid;
+	gap: 0.5rem;
+	align-content: start;
+	min-width: 0;
+	padding: 1rem;
+}
+.ds-media-card-text h3 {
+	margin: 0;
+	font-size: 1.0625rem;
+	font-weight: 600;
+	line-height: 1.4;
+	overflow-wrap: anywhere;
+}
+.ds-media-card-eyebrow {
+	margin: 0;
+	font-size: 0.75rem;
+	font-weight: 600;
+	letter-spacing: 0.05em;
+	color: var(--ds-accent, var(--primary));
+}
+.ds-media-card-body {
+	margin: 0;
+	font-size: 0.9375rem;
+	line-height: 1.7;
+	color: var(--muted-foreground);
+}
+@container (min-width: 28rem) {
+	.ds-media-card[data-variant="horizontal"] .ds-media-card-inner {
+		grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+		align-items: stretch;
+	}
+	.ds-media-card[data-variant="horizontal"] .ds-media-card-text {
+		align-content: center;
+		padding: 1.25rem;
+	}
+}

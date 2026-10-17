@@ -90,3 +90,19 @@ export const timerBuiltins: Definition[] = [
 		],
 	},
 ];
+
+const previousSkill = timerBuiltins.find((d) => d.kind === "skill")!;
+timerBuiltins.push({
+	...previousSkill,
+	revision: 2,
+	body: readFileSync(new URL("./timers/SKILL.v2.md", import.meta.url), "utf8"),
+});
+const previousPackage = timerBuiltins.find((d) => d.kind === "package")!;
+timerBuiltins.push({
+	...previousPackage,
+	revision: 2,
+	dependencies: previousPackage.dependencies.map((id) =>
+		id === "skill:timers.manage@1" ? "skill:timers.manage@2" : id,
+	),
+	requiredSkillRevisionIds: ["skill:timers.manage@2"],
+});

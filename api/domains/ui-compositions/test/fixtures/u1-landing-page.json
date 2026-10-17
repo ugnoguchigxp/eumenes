@@ -1,0 +1,153 @@
+{
+	"view": "layout",
+	"direction": "stack",
+	"gap": "relaxed",
+	"width": "wide",
+	"appearance": "warm",
+	"title": "月ノ森珈琲",
+	"children": [
+		{
+			"view": "hero",
+			"variant": "background",
+			"overlay": "dark",
+			"align": "start",
+			"height": "lg",
+			"eyebrow": "自家焙煎の小さな店",
+			"title": "夜明けの一杯を、ていねいに",
+			"body": "産地ごとに焙煎した豆を、毎週お届けします。",
+			"primaryLabel": "豆を見る",
+			"secondaryLabel": "店について",
+			"image": {
+				"provider": "picsum",
+				"theme": "coffee",
+				"seed": "hero",
+				"alt": "湯気の立つコーヒーカップ"
+			}
+		},
+		{
+			"view": "layout",
+			"direction": "grid",
+			"title": "選ばれる理由",
+			"children": [
+				{
+					"view": "feature-card",
+					"icon": "coffee",
+					"title": "注文後に焙煎",
+					"body": "鮮度の高い豆だけを送ります。"
+				},
+				{
+					"view": "feature-card",
+					"icon": "truck",
+					"title": "全国へお届け",
+					"body": "最短で翌々日に届きます。"
+				},
+				{
+					"view": "feature-card",
+					"icon": "leaf",
+					"title": "産地を選べる",
+					"body": "季節ごとに4つの産地から選べます。"
+				},
+				{
+					"view": "feature-card",
+					"icon": "heart",
+					"title": "いつでも休止",
+					"body": "好きなときに配送を止められます。"
+				}
+			]
+		},
+		{
+			"view": "media-card",
+			"variant": "horizontal",
+			"eyebrow": "こだわり",
+			"title": "豆は小さな釜で少しずつ",
+			"body": "一度に焙煎するのは2kgまで。香りの違いが分かるよう、産地ごとに火加減を変えています。",
+			"image": {
+				"provider": "picsum",
+				"theme": "nature",
+				"seed": "farm",
+				"alt": "朝もやの丘の風景"
+			}
+		},
+		{
+			"view": "layout",
+			"direction": "grid",
+			"title": "お客様の声",
+			"children": [
+				{
+					"view": "testimonial",
+					"quote": "朝の香りが変わりました。毎週の楽しみです。",
+					"name": "Tさん",
+					"role": "会社員",
+					"avatar": {
+						"provider": "placeholder",
+						"tone": "warm",
+						"alt": ""
+					}
+				},
+				{
+					"view": "testimonial",
+					"quote": "産地ごとの違いを教えてくれるカードが嬉しい。",
+					"name": "Mさん",
+					"role": "主婦",
+					"avatar": {
+						"provider": "placeholder",
+						"tone": "neutral",
+						"alt": ""
+					}
+				}
+			]
+		},
+		{
+			"view": "layout",
+			"direction": "grid",
+			"title": "料金",
+			"children": [
+				{
+					"view": "pricing-card",
+					"plan": "お試し",
+					"price": "¥1,980",
+					"period": "初回のみ",
+					"features": ["100g×3種", "送料無料"],
+					"ctaLabel": "申し込む"
+				},
+				{
+					"view": "pricing-card",
+					"plan": "定期便",
+					"price": "¥2,800",
+					"period": "月",
+					"features": ["200g×2種", "送料無料", "いつでも休止"],
+					"ctaLabel": "申し込む",
+					"highlighted": true
+				},
+				{
+					"view": "pricing-card",
+					"plan": "たっぷり",
+					"price": "¥4,900",
+					"period": "月",
+					"features": ["200g×4種", "送料無料", "試飲カード付き"],
+					"ctaLabel": "申し込む"
+				}
+			]
+		},
+		{
+			"view": "cta-banner",
+			"variant": "image",
+			"title": "今月の豆を味わう",
+			"body": "最初の1回は、いつでも休止できます。",
+			"primaryLabel": "はじめる",
+			"secondaryLabel": "お問い合わせ",
+			"image": {
+				"provider": "picsum",
+				"theme": "coffee",
+				"seed": "closing",
+				"alt": "挽きたてのコーヒー豆"
+			}
+		},
+		{
+			"view": "text-block",
+			"title": "お知らせ",
+			"body": "この店と商品は架空の例で、実際の注文はできません。",
+			"emphasis": "muted"
+		}
+	]
+}

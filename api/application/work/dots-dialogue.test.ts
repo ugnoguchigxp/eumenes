@@ -1,6 +1,11 @@
 import { afterEach, expect, test } from "bun:test";
 import type { InferencePort, Receipt } from "../../domains/inference";
 import { createDialogueService } from "../../domains/dialogue";
+import {
+	analysisReceipt,
+	delegatingArgs,
+	isAnalysisRound,
+} from "../../domains/dialogue/test/analysis.fixture";
 import { createDotsDialogue } from "./dots-dialogue";
 import { dotsFixture } from "./dots-fixture";
 import { createToolchainHistory } from "../../domains/toolchain-history";
@@ -14,7 +19,8 @@ afterEach(async () => {
 test("conversation hands the request to the delegation toolchain, whose sub-agent builds the command", async () => {
 	const f = await dotsFixture();
 	clean.push(f.close);
-	let calls = 0;
+	let calls = 0,
+		analyses = 0;
 	const messages: Array<Parameters<InferencePort["answer"]>[0]> = [];
 	const commandMessages: Array<Parameters<InferencePort["answer"]>[0]> = [];
 	const larm = {
@@ -32,6 +38,16 @@ test("conversation hands the request to the delegation toolchain, whose sub-agen
 			_p: unknown,
 			tools: unknown,
 		) => {
+			if (isAnalysisRound(tools as Parameters<typeof isAnalysisRound>[0])) {
+				analyses++;
+				return analysisReceipt(
+					"request",
+					delegatingArgs({
+						goal: "プロジェクトの変更を実装する",
+						deliverable: "操作の完了",
+					}),
+				);
+			}
 			messages.push(history);
 			calls++;
 			const r: Receipt = {
@@ -41,13 +57,14 @@ test("conversation hands the request to the delegation toolchain, whose sub-agen
 			};
 			if (calls === 1) {
 				expect(JSON.stringify(tools)).toContain("delegate_project");
-				// The conversation passes only the request; no operation fields.
+				// The conversation passes only the request and its announcement; no operation fields.
 				expect(JSON.stringify(tools)).not.toContain("projectRef");
 				r.toolCalls = [
 					{
 						id: "call",
 						name: "delegate_project",
 						arguments: JSON.stringify({
+							announcement: "プロジェクトの変更に取りかかります。",
 							request: "プロジェクトの変更を実装。tests passで完了",
 						}),
 					},
@@ -107,6 +124,8 @@ test("conversation hands the request to the delegation toolchain, whose sub-agen
 	f.queue.start();
 	const done = await dialogue.waitForTerminal(run.id, { timeoutMs: 3000 });
 	expect(done).toMatchObject({ status: "completed" });
+	// The request analysis, then the selection and the answer.
+	expect(analyses).toBe(1);
 	expect(calls).toBe(2);
 	expect(JSON.stringify(messages[1])).toContain("delegationResult");
 	// The sub-agent loaded the toolchain's set and the catalog; the conversation did not.

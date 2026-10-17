@@ -22,6 +22,7 @@ export type KanbanNoticeView = {
 import type { TimerNotificationDto } from "../../../../../api/domains/timers/contracts";
 import { Button, Drawer, NotificationCard } from "../../../design-system";
 import "./TimerNotifications.css";
+import { useNotificationBanners } from "./useNotificationBanners";
 
 function NotificationIcon({
 	clock = false,
@@ -133,12 +134,21 @@ export function NotificationCenter({
 		item,
 	}));
 	const sorted = sortEntries([...timerEntries, ...kanbanEntries]);
-	// The floating stack carries what still needs a look: timer notices and unread Kanban ones.
-	const floating = sorted.filter(
+	const pending = sorted.filter(
 		(entry) => entry.source === "timer" || !entry.item.read,
 	);
 	const shownError = error ?? kanban?.error ?? null;
 	const drawerError = shownError ?? kanban?.loadError ?? null;
+	const entryKey = (entry: Entry) => `${entry.source}:${entry.id}`;
+	const errorKey = `error:${shownError}`;
+	const isBannerVisible = useNotificationBanners([
+		...pending.map(entryKey),
+		...(onPrepareAudio ? ["audio"] : []),
+		...(shownError ? [errorKey] : []),
+	]);
+	const floating = pending.filter((entry) => isBannerVisible(entryKey(entry)));
+	const showAudioBanner = onPrepareAudio && isBannerVisible("audio");
+	const showErrorBanner = shownError && isBannerVisible(errorKey);
 	const count = notices.length + (kanban?.unread ?? 0);
 	const audioPrompt = onPrepareAudio && (
 		<NotificationCard
@@ -281,7 +291,7 @@ export function NotificationCenter({
 					)}
 				</div>
 			</Drawer>
-			{!open && (floating.length > 0 || audioPrompt || shownError) && (
+			{!open && (floating.length > 0 || showAudioBanner || showErrorBanner) && (
 				<output
 					className="timer-notifications"
 					aria-label={
@@ -292,7 +302,7 @@ export function NotificationCenter({
 					aria-live="polite"
 					aria-relevant="additions"
 				>
-					{audioPrompt}
+					{showAudioBanner && audioPrompt}
 					{floating.slice(0, 3).map((entry) => card(entry, true))}
 					{floating.length > 3 && (
 						<Button
@@ -303,7 +313,7 @@ export function NotificationCenter({
 							ほか{floating.length - 3}件の通知を見る
 						</Button>
 					)}
-					{shownError && (
+					{showErrorBanner && (
 						<p className="notification-error" role="alert">
 							{shownError}
 						</p>

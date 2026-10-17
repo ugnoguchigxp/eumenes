@@ -1,0 +1,95 @@
+{
+	"view": "layout",
+	"direction": "stack",
+	"gap": "normal",
+	"width": "narrow",
+	"appearance": "clean",
+	"title": "割り勘",
+	"model": {
+		"state": {
+			"total": {
+				"type": "number",
+				"initial": 24000,
+				"min": 0,
+				"max": 1000000,
+				"step": 100
+			},
+			"people": {
+				"type": "number",
+				"initial": 4,
+				"min": 1,
+				"max": 30,
+				"step": 1
+			},
+			"roundUp": {
+				"type": "boolean",
+				"initial": true
+			}
+		},
+		"computed": {
+			"raw": "total / people",
+			"per": "roundUp ? ceil(raw / 100) * 100 : ceil(raw)",
+			"surplus": "per * people - total"
+		}
+	},
+	"children": [
+		{
+			"view": "text-block",
+			"title": "割り勘",
+			"body": "合計金額と人数を入れると、一人あたりの金額が出ます。",
+			"emphasis": "strong"
+		},
+		{
+			"view": "number-input",
+			"bind": "total",
+			"label": "合計金額",
+			"unit": "円"
+		},
+		{
+			"view": "slider",
+			"bind": "people",
+			"label": "人数",
+			"format": "integer",
+			"unit": "人"
+		},
+		{
+			"view": "toggle",
+			"bind": "roundUp",
+			"label": "100円単位で切り上げる"
+		},
+		{
+			"view": "layout",
+			"direction": "grid",
+			"children": [
+				{
+					"view": "stat",
+					"label": "一人あたり",
+					"expr": "per",
+					"format": "yen",
+					"trend": "flat"
+				},
+				{
+					"view": "stat",
+					"label": "端数（幹事の余り）",
+					"expr": "surplus",
+					"format": "yen",
+					"caption": "切り上げで集まりすぎる分"
+				},
+				{
+					"view": "stat",
+					"label": "割り切った金額",
+					"expr": "raw",
+					"format": "number",
+					"decimals": 1,
+					"unit": "円"
+				}
+			]
+		},
+		{
+			"view": "text-block",
+			"title": "ご注意",
+			"body": "目安の計算です。実際の精算はお店の会計に合わせてください。",
+			"emphasis": "muted"
+		}
+	]
+}

@@ -6,19 +6,31 @@ export const COLUMNS: ReadonlyArray<{
 	id: KanbanBoardColumn;
 	label: string;
 	empty: string;
+	description: string;
 }> = [
-	{ id: "todo", label: "未着手", empty: "タスクはありません" },
-	{ id: "running", label: "実行中", empty: "実行中のタスクはありません" },
+	{
+		id: "todo",
+		label: "未着手＋Planning",
+		empty: "タスクはありません",
+		description: "計画・編集用。実行するまでキューに入りません",
+	},
+	{
+		id: "running",
+		label: "Ongoing",
+		empty: "実行待ち・実行中のタスクはありません",
+		description: "キュー待ち・実行中",
+	},
 	{
 		id: "finished",
 		label: "Done・Blocker",
+		description: "完了した作業・対応が必要な作業",
 		empty: "終わったタスクはありません",
 	},
 ];
 
 export const MOVE_TARGETS: ReadonlyArray<{ id: MovableColumn; label: string }> =
 	[
-		{ id: "todo", label: "未着手" },
+		{ id: "todo", label: "未着手＋Planning" },
 		{ id: "finished", label: "Done・Blocker" },
 	];
 

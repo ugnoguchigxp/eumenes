@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import { harness } from "../toolchain/toolchain.fixture";
 import { musicFixture, musicQuestion, musicTestPlan } from "./music.fixture";
 import { waitFor } from "../../infrastructure/wait-for";
+import { isAnalysisRound } from "../../domains/dialogue/test/analysis.fixture";
 
 test("a premature creation claim accompanying the selected operation is withheld until music completes", async () => {
 	const f = musicFixture("success");
@@ -14,10 +15,7 @@ test("a premature creation claim accompanying the selected operation is withheld
 		...f.model,
 		answer: async (...args: Parameters<typeof f.model.answer>) => {
 			const [messages, signal, options] = args;
-			if (
-				options?.tools?.length &&
-				options.tools[0]?.function.name !== "find_toolchain"
-			) {
+			if (options?.tools?.length && !isAnalysisRound(options.tools)) {
 				await paused;
 				reviewed++;
 				await f.model.answer(messages, signal, options);

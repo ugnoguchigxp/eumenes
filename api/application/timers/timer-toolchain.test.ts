@@ -106,8 +106,8 @@ test("C01-C03: a relative timer request is saved through the toolchain", async (
 			origin_message_id: run.inputMessageId,
 		});
 		expect(h.acquisitions).toBe(0);
-		// Conversation, the timer sub-agent, and the answer.
-		expect(h.calls).toBe(3);
+		// The request analysis, the toolchain selection, the timer sub-agent, and the answer.
+		expect(h.calls).toBe(4);
 	} finally {
 		await h.close();
 	}
@@ -240,7 +240,7 @@ test("C04: another owner or extra arguments are refused before a timer is saved"
 					h.toolchain.capabilities.prepareActiveByIdInTransaction(
 						db,
 						owner,
-						"package:timers.manage@1",
+						"package:timers.manage@2",
 						{ operation: "start", durationSeconds: 90 },
 					);
 				const bound = h.toolchain.tools.bind(owner, prepared, deadline);
@@ -264,7 +264,7 @@ test("C04: another owner or extra arguments are refused before a timer is saved"
 					h.toolchain.capabilities.prepareActiveByIdInTransaction(
 						db,
 						owner,
-						"package:timers.manage@1",
+						"package:timers.manage@2",
 						{ operation: "start", durationSeconds: 90 },
 					);
 				const bound = h.toolchain.tools.bind(owner, prepared, deadline);
@@ -318,7 +318,7 @@ test("C05: a failure before the action result rolls the timer back, and the same
 			const prepared = h.toolchain.capabilities.prepareActiveByIdInTransaction(
 				db,
 				owner,
-				"package:timers.manage@1",
+				"package:timers.manage@2",
 				{ operation: "start", durationSeconds: 90 },
 			);
 			const bound = h.toolchain.tools.bind(owner, prepared, deadline);
@@ -452,7 +452,7 @@ test("C07: list and cancel stay on one operation when the same step runs again",
 					h.toolchain.capabilities.prepareActiveByIdInTransaction(
 						db,
 						owner,
-						"package:timers.manage@1",
+						"package:timers.manage@2",
 						operation === "list"
 							? { operation: "list" }
 							: {
@@ -563,7 +563,8 @@ test("real dialogue list and cancel select an authoritative timer snapshot", asy
 		expect(h.commandContexts[1]).toContain("revision");
 		expect(await ask("タイマーを止めて")).toContain("取り消");
 		expect(h.timers!.get(timer.id)?.timer.state).toBe("cancelled");
-		expect(h.calls).toBe(9);
+		// Each of the three requests takes the analysis, the selection, the sub-agent and the answer.
+		expect(h.calls).toBe(12);
 	} finally {
 		await h.close();
 	}
@@ -582,7 +583,7 @@ test("a made-up origin cannot authorize a timer through a valid capability refer
 				const p = h.toolchain.capabilities.prepareActiveByIdInTransaction(
 					db,
 					owner,
-					"package:timers.manage@1",
+					"package:timers.manage@2",
 					{ operation: "start", durationSeconds: 90 },
 				);
 				const tool = h.toolchain.tools
@@ -637,7 +638,7 @@ test("cancellation after preparation refreshes the result before the agent phras
 		expect(changed).toBe(true);
 		expect(h.dialogue.answerText(run.id)).toContain("取り消");
 		expect(h.dialogue.answerText(run.id)).not.toContain("開始");
-		expect(h.calls).toBe(3);
+		expect(h.calls).toBe(4);
 	} finally {
 		unsubscribe();
 		await h.close();

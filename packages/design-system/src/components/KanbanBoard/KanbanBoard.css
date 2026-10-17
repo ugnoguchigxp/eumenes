@@ -73,16 +73,78 @@
 	background: color-mix(in srgb, var(--warning) 10%, transparent);
 }
 
+.kanban-executor-controls {
+	display: flex;
+	align-items: stretch;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+.kanban-executor-controls .kanban-queue {
+	padding: 0;
+	max-width: 100%;
+}
+.kanban-executor-button {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	min-height: 56px;
+	max-width: 100%;
+	padding: 8px 12px;
+	border: 0;
+	border-radius: 7px;
+	color: var(--foreground);
+	background: transparent;
+	text-align: left;
+	cursor: pointer;
+}
+.kanban-executor-button > svg {
+	flex: none;
+}
+.kanban-executor-copy {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+	font-size: 12px;
+	color: var(--muted-foreground);
+}
+.kanban-executor-copy strong {
+	color: var(--foreground);
+	font-size: 13px;
+}
+.kanban-executor-button:hover,
+.kanban-executor-button[aria-pressed="true"],
+.kanban-executor-all[aria-pressed="true"] {
+	background: var(--accent);
+	box-shadow: inset 0 0 0 1px var(--primary);
+}
+.kanban-executor-button:focus-visible,
+.kanban-columns:focus-visible {
+	outline: 2px solid var(--ring);
+	outline-offset: 2px;
+}
+.kanban-executor-all {
+	height: auto;
+	min-height: 56px;
+	gap: 8px;
+}
+.kanban-executor-controls .kanban-queue > p,
+.kanban-queue .kanban-queue-manual {
+	padding: 8px 12px;
+}
+.kanban-queue[data-state="paused"] > button:last-child {
+	margin: 8px;
+}
+
 .kanban-columns {
 	display: grid;
-	grid-template-columns: minmax(0, 1fr);
+	grid-template-columns: repeat(3, minmax(260px, 1fr));
 	gap: 12px;
-	align-items: start;
-}
-@container (min-width: 760px) {
-	.kanban-columns {
-		grid-template-columns: repeat(3, minmax(0, 1fr));
-	}
+	align-items: stretch;
+	min-height: 240px;
+	flex: none;
+	overflow-x: auto;
+	padding-bottom: 8px;
 }
 .kanban-column {
 	min-width: 0;
@@ -103,6 +165,13 @@
 	padding: 0 4px;
 	font-size: 14px;
 	font-weight: 600;
+}
+.kanban-column-description {
+	min-height: 36px;
+	margin: 0 4px 12px;
+	font-size: 12px;
+	line-height: 1.5;
+	color: var(--muted-foreground);
 }
 .kanban-count {
 	min-width: 22px;

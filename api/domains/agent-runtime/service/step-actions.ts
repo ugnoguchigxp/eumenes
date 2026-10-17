@@ -128,7 +128,9 @@ function invokeStepTool(
 	];
 	const calls = [
 		action.arguments,
-		...("readAhead" in action ? (action.readAhead ?? []) : []),
+		...("readAhead" in action
+			? (action.readAhead ?? []).map((url) => ({ url }))
+			: []),
 	];
 	if (calls.length > 1 && !isPageRead(toolRuntimeOf(tool.tool.revisionId)))
 		throw new ValidationFailure("invalid_tool_input", [

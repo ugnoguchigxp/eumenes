@@ -9,6 +9,7 @@ import { join } from "node:path";
 import type { ToolchainCard } from "../../api/domains/capabilities";
 import {
 	appendConversationPolicy,
+	reportUnavailableTool,
 	toolchainTools,
 } from "../../api/domains/dialogue/service/conversation-tools";
 import { generateConversation } from "../../api/domains/dialogue/service/conversation-generation";
@@ -60,7 +61,7 @@ export async function createLiveLane(
 		const offered = call.tools === "conversation";
 		const messages = [...call.messages];
 		const current = messages.at(-1)!;
-		if (offered) appendConversationPolicy(messages, true, current);
+		if (offered) appendConversationPolicy(messages, current);
 		const marked = markCurrentRequest(messages, current, crypto.randomUUID());
 		let repaired = false;
 		try {
@@ -71,11 +72,14 @@ export async function createLiveLane(
 				signal,
 				delta: () => {},
 				briefReply: true,
-				...(offered ? { tools: toolchainTools(cards), cards } : {}),
+				// The selection round: a candidate's function or `report_unavailable`, always a function call.
+				...(offered
+					? { tools: [...toolchainTools(cards), reportUnavailableTool], cards }
+					: {}),
 				repair: () => {
 					repaired = true;
 				},
-				sessionRole: "main",
+				sessionRole: offered ? "auxiliary" : "main",
 			});
 			return {
 				kind: "ok",

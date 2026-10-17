@@ -22,8 +22,9 @@ function spaCsp(host: string | undefined, embedded = false): string {
 		"default-src 'self'",
 		"script-src 'self'",
 		"style-src 'self' 'unsafe-inline'",
-		// Images are same-origin API content, blob: object URLs or data: URLs; no remote host.
-		"img-src 'self' blob: data: https://*.googleusercontent.com",
+		// Images are same-origin API content, blob: object URLs or data: URLs, Google account avatars
+		// and the studio's sample pictures from picsum.photos (it redirects to fastly.picsum.photos).
+		"img-src 'self' blob: data: https://*.googleusercontent.com https://picsum.photos https://fastly.picsum.photos",
 		"media-src 'self' blob: data:",
 		"font-src 'self' data:",
 		`connect-src 'self'${ws}`,

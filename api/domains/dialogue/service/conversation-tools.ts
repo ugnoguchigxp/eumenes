@@ -2,6 +2,10 @@ import { systemContext } from "../../../infrastructure/system-context";
 import { LlmJsonError, parseLlmJson } from "../../../infrastructure/llm-json";
 import { z } from "zod";
 import {
+	SPOKEN_REPLY_MAX_CHARS,
+	SPOKEN_REPLY_MAX_SENTENCES,
+} from "../../delivery";
+import {
 	builtinToolchainFunctions,
 	toolchainRequest,
 	type ToolchainCard,
@@ -174,6 +178,53 @@ export function toolchainTools(
 		},
 	}));
 }
+const unavailableReply = z
+	.object({
+		reply: z
+			.string()
+			.trim()
+			.min(1)
+			.max(SPOKEN_REPLY_MAX_CHARS)
+			.describe(
+				`利用者へそのまま伝える短い説明。音声で読み上げられるため、音声整形後の合計${SPOKEN_REPLY_MAX_CHARS}字以内・${SPOKEN_REPLY_MAX_SENTENCES}文以内で、できない理由か足りない点を述べる。担当へ依頼したとは言わない。`,
+			),
+	})
+	.strict();
+/** Offered with every candidate set (empty too): the explanation that no offered specialist can satisfy the request. */
+export const reportUnavailableTool: NativeTool = {
+	type: "function",
+	function: {
+		name: "report_unavailable",
+		description: `提示された担当のどれでも依頼を満たせないときに呼び、その旨を利用者へ短く伝えます。replyがそのまま回答として音声で読み上げられるため、音声整形後の合計${SPOKEN_REPLY_MAX_CHARS}字以内・${SPOKEN_REPLY_MAX_SENTENCES}文以内にします。担当は起動しません。`,
+		parameters: z.toJSONSchema(unavailableReply) as Record<string, unknown>,
+	},
+};
+/** The reply of a lone `report_unavailable` call; undefined when the calls are something else. */
+export function unavailable(calls: NativeToolCall[]): string | undefined {
+	const call = calls[0];
+	if (calls.length !== 1 || call?.name !== reportUnavailableTool.function.name)
+		return undefined;
+	let args: unknown;
+	try {
+		args = parseLlmJson(call.arguments);
+	} catch (error) {
+		throw operationRejection(
+			"arguments_not_json",
+			call,
+			error instanceof LlmJsonError
+				? [{ validationPath: "arguments", validationCode: error.code }]
+				: [],
+		);
+	}
+	const parsed = unavailableReply.safeParse(args);
+	if (!parsed.success)
+		throw operationRejection(
+			"arguments_invalid",
+			call,
+			validationIssues(parsed.error, args),
+		);
+	return parsed.data.reply;
+}
 /** Every function name a toolchain may use, for detecting call syntax written as text. */
 export const conversationToolNames = new Set([
 	...builtinToolchainFunctions,
@@ -296,29 +347,20 @@ export function operation(
 		...(questionRef === undefined ? {} : { questionRef }),
 	};
 }
-/**
- * The fixed layer of the conversation policy: answer, ask, or hand the request to one offered
- * toolchain. How each toolchain works is its own sub-agent's business, never written here.
- */
-function conversationPolicy(offered: boolean) {
-	return offered
-		? systemContext(
-				"dialogue.contexts.conversation-tools.conversation-policy",
-				{},
-			)
-		: systemContext(
-				"dialogue.contexts.conversation-tools.conversation-policy-2",
-				{},
-			);
+/** The fixed layer of the selection policy: hand the request to one offered toolchain, or report that none fits. */
+function conversationPolicy() {
+	return systemContext(
+		"dialogue.contexts.conversation-tools.conversation-policy",
+		{},
+	);
 }
 /**
  * Insert the policy and the reference data right before the current user message. Like `markCurrentRequest` it
- * runs in the execute phase: what it inserts (past selections, open questions, whether functions are offered) is
+ * runs in the execute phase: what it inserts (past selections, open questions) is
  * decided by the routing, which happens after the prepare phase has rendered the context.
  */
 export function appendConversationPolicy(
 	messages: Array<{ role: "system" | "user" | "assistant"; content: string }>,
-	offered: boolean,
 	current: ChatMessage,
 	pastSelections: Array<{
 		request: string;
@@ -343,8 +385,5 @@ export function appendConversationPolicy(
 				systemContext("dialogue.contexts.conversation-tools.content-2", {}) +
 				JSON.stringify(openQuestions),
 		});
-	messages.splice(index, 0, {
-		role: "system",
-		content: conversationPolicy(offered),
-	});
+	messages.splice(index, 0, { role: "system", content: conversationPolicy() });
 }

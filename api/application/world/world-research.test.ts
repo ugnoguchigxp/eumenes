@@ -11,6 +11,13 @@ import {
 } from "./world-research.fixture";
 import { fit, sourceOf, summaryOf } from "./world-research-readings";
 
+/**
+ * A message that carries the saved report's projection. The fixed host rules of every answer name the
+ * `world_claim` kind in prose, so only a source object of that kind (escaped inside the stringified messages) counts.
+ */
+const projectsWorldClaim = (message: string) =>
+	message.includes('\\"kind\\":\\"world_claim\\"');
+
 test("a World question delegates to route world: the sub-agent finds the target, reads claims as sources and the report is projected", async () => {
 	const h = await boot(happy);
 	expect(
@@ -48,7 +55,7 @@ test("a World question delegates to route world: the sub-agent finds the target,
 		completeness: "complete",
 	});
 	// The conversation model sees the projection of the saved report, not the reading.
-	const projected = h.parentMessages.find((m) => m.includes("world_claim"));
+	const projected = h.parentMessages.find(projectsWorldClaim);
 	expect(projected).toBeDefined();
 	// Only the source id, kind and origin cross to the parent: no claim id or revision.
 	expect(projected).toContain("sourceId");
@@ -91,9 +98,7 @@ test("a claim retracted while the research ran keeps the report from being adopt
 		),
 	).toEqual({ error_code: "evidence_invalidated" });
 	// No accepted report: the conversation model never sees the projection.
-	expect(
-		h.parentMessages.find((m) => m.includes("world_claim")),
-	).toBeUndefined();
+	expect(h.parentMessages.find(projectsWorldClaim)).toBeUndefined();
 	expect(
 		h.store.read(
 			(db) =>
@@ -328,9 +333,7 @@ test("a claim revised (disputed) while the research ran keeps the report from be
 	const { done } = await h.ask(QUESTION);
 	expect(done?.status).toBe("completed");
 	expect(workerError(h)).toEqual({ error_code: "evidence_invalidated" });
-	expect(
-		h.parentMessages.find((m) => m.includes("world_claim")),
-	).toBeUndefined();
+	expect(h.parentMessages.find(projectsWorldClaim)).toBeUndefined();
 });
 
 test("a source forgotten while the research ran keeps the report from being adopted, even before World's tombstone is written", async () => {
@@ -351,9 +354,7 @@ test("a source forgotten while the research ran keeps the report from being adop
 	const { done } = await h.ask(QUESTION);
 	expect(done?.status).toBe("completed");
 	expect(workerError(h)).toEqual({ error_code: "evidence_invalidated" });
-	expect(
-		h.parentMessages.find((m) => m.includes("world_claim")),
-	).toBeUndefined();
+	expect(h.parentMessages.find(projectsWorldClaim)).toBeUndefined();
 });
 
 test("a forgotten source whose World tombstone is already written keeps the report from being adopted", async () => {

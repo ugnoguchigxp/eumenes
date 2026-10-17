@@ -1,3 +1,4 @@
+import { answerAnalysis } from "../toolchain/analysis-round.fixture";
 import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { createLarmPlayground, type LarmPort } from "../../domains/larm";
@@ -178,12 +179,7 @@ export function musicFixture(
 		transcribe: async () => "",
 		speak: async () => new Uint8Array(),
 		answer: async (messages, _signal, options) => {
-			if (options?.tools?.[0]?.function.name === "find_toolchain") {
-				options.onToolCalls!([
-					{ id: "discovery", name: "find_toolchain", arguments: "{}" },
-				]);
-				return "";
-			}
+			if (answerAnalysis(messages, options, { kind: "creation" })) return "";
 			if (options?.tools?.length) {
 				stages.push("route");
 				options.onToolCalls!([

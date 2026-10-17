@@ -1,0 +1,164 @@
+{
+	"view": "layout",
+	"direction": "stack",
+	"gap": "normal",
+	"appearance": "clean",
+	"title": "飛行機が飛ぶ仕組み",
+	"model": {
+		"state": {
+			"aoa": {
+				"type": "number",
+				"initial": 6,
+				"min": 0,
+				"max": 15,
+				"step": 1
+			},
+			"step": {
+				"type": "number",
+				"initial": 0,
+				"min": 0,
+				"max": 3,
+				"step": 1
+			}
+		},
+		"computed": {
+			"lift": "clamp(aoa, 0, 15) * 6",
+			"weight": "60"
+		}
+	},
+	"children": [
+		{
+			"view": "text-block",
+			"title": "飛行機が飛ぶ仕組み",
+			"body": "翼が風を受ける角度（迎角）を変えると、上向きの力の大きさがどう変わるかを見ます。",
+			"emphasis": "strong"
+		},
+		{
+			"view": "slider",
+			"bind": "aoa",
+			"label": "迎角",
+			"format": "integer",
+			"unit": "度"
+		},
+		{
+			"view": "diagram",
+			"stepBind": "step",
+			"aspect": "landscape",
+			"title": "翼まわりの力",
+			"caption": "概念図です。実際の飛行機の数値とは一致しません。",
+			"elements": [
+				{
+					"type": "shape",
+					"shape": "ellipse",
+					"x": 30,
+					"y": 23,
+					"w": 40,
+					"h": 10,
+					"color": "muted",
+					"filled": true
+				},
+				{
+					"type": "line",
+					"x1": "50 - 20 * cos(aoa)",
+					"y1": "28 + 20 * sin(aoa)",
+					"x2": "50 + 20 * cos(aoa)",
+					"y2": "28 - 20 * sin(aoa)",
+					"color": "ink",
+					"label": "翼の断面"
+				},
+				{
+					"type": "arrow",
+					"x1": 3,
+					"y1": 22,
+					"x2": 26,
+					"y2": 22,
+					"color": "accent",
+					"label": "風"
+				},
+				{
+					"type": "arrow",
+					"x1": 3,
+					"y1": 34,
+					"x2": 26,
+					"y2": 34,
+					"color": "accent"
+				},
+				{
+					"type": "arrow",
+					"x1": 50,
+					"y1": 28,
+					"x2": 50,
+					"y2": "28 + weight * 0.3",
+					"color": "negative",
+					"label": "重力",
+					"steps": [1, 2, 3]
+				},
+				{
+					"type": "arrow",
+					"x1": 50,
+					"y1": 28,
+					"x2": 50,
+					"y2": "28 - (4 + lift * 0.2)",
+					"color": "positive",
+					"label": "揚力",
+					"steps": [2, 3],
+					"highlightAt": [2]
+				},
+				{
+					"type": "angle",
+					"x": 50,
+					"y": 28,
+					"from": 0,
+					"to": "aoa",
+					"radius": 14,
+					"color": "warning",
+					"steps": [3],
+					"highlightAt": [3]
+				},
+				{
+					"type": "label",
+					"x": 74,
+					"y": 8,
+					"expr": "\"迎角 \" + text(aoa) + \"度\"",
+					"size": "md",
+					"align": "start",
+					"color": "warning",
+					"steps": [3]
+				},
+				{
+					"type": "label",
+					"x": 74,
+					"y": 16,
+					"expr": "\"揚力の目安 \" + text(round(lift, 0))",
+					"size": "sm",
+					"align": "start",
+					"color": "positive",
+					"steps": [2, 3]
+				}
+			]
+		},
+		{
+			"view": "stepper",
+			"bind": "step",
+			"title": "順に見る",
+			"steps": [
+				{
+					"title": "翼に風があたる",
+					"body": "飛行機は進みながら、翼の前から風を受けます。"
+				},
+				{
+					"title": "重力",
+					"body": "機体の重さで、下向きに引かれています。"
+				},
+				{
+					"title": "揚力",
+					"body": "翼が風を下へ押しやると、反対の向きの上向きの力が生まれます。"
+				},
+				{
+					"title": "迎角を変える",
+					"body": "スライダーで角度を変えると、揚力の矢印の長さが変わります。"
+				}
+			]
+		}
+	]
+}

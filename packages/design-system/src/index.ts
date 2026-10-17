@@ -131,3 +131,25 @@ export {
 } from "./components/DrawingWorkspace";
 
 export * from "./components/OcrWorkspace";
+
+// UI studio composition parts
+export * from "./components/ContentImage";
+export * from "./components/Hero";
+export * from "./components/MediaCard";
+export * from "./components/ProductCard";
+export * from "./components/FeatureCard";
+export * from "./components/Testimonial";
+export * from "./components/CtaBanner";
+export * from "./components/PricingCard";
+export * from "./components/ComparisonTable";
+export * from "./components/Faq";
+export * from "./components/Timeline";
+export * from "./components/StatTile";
+export * from "./components/Slides";
+export * from "./components/RangeSlider";
+export * from "./components/ChoiceGroup";
+export * from "./components/Diagram";
+export * from "./components/StepGuide";
+export * from "./components/Chart";
+export * from "./components/Formula";
+export * from "./components/DataTable";

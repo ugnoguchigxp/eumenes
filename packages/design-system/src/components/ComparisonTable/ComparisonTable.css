@@ -1,0 +1,79 @@
+.ds-comparison-table {
+	--ds-comparison-accent: var(--ds-accent, var(--primary));
+	display: grid;
+	gap: 0.75rem;
+	min-width: 0;
+	color: var(--foreground);
+}
+.ds-comparison-table-title {
+	margin: 0;
+	font-size: 1rem;
+	font-weight: 600;
+}
+.ds-comparison-table-scroll {
+	overflow-x: auto;
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	background: var(--card);
+}
+.ds-comparison-table-scroll:focus-visible {
+	outline: 2px solid var(--ring);
+	outline-offset: 2px;
+}
+.ds-comparison-table table {
+	width: 100%;
+	min-width: 28rem;
+	border-collapse: collapse;
+	font-size: 0.875rem;
+}
+.ds-comparison-table th,
+.ds-comparison-table td {
+	padding: 0.625rem 0.875rem;
+	text-align: center;
+	border-bottom: 1px solid var(--border);
+	overflow-wrap: anywhere;
+}
+.ds-comparison-table tbody tr:last-child th,
+.ds-comparison-table tbody tr:last-child td {
+	border-bottom: 0;
+}
+.ds-comparison-table thead th {
+	font-weight: 600;
+	background: var(--muted);
+}
+.ds-comparison-table tbody th {
+	text-align: start;
+	font-weight: 500;
+	color: var(--muted-foreground);
+}
+.ds-comparison-table th[data-highlight="true"],
+.ds-comparison-table td[data-highlight="true"] {
+	background: color-mix(in srgb, var(--ds-comparison-accent) 12%, transparent);
+}
+.ds-comparison-table thead th[data-highlight="true"] {
+	color: var(--primary-foreground);
+	background: var(--ds-comparison-accent);
+}
+.ds-comparison-table-mark {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+}
+.ds-comparison-table-mark svg {
+	width: 1.125rem;
+	height: 1.125rem;
+}
+.ds-comparison-table-mark[data-state="yes"] {
+	color: var(--ds-comparison-accent);
+}
+.ds-comparison-table-mark[data-state="no"] {
+	color: var(--muted-foreground);
+}
+.ds-comparison-table-sr {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	white-space: nowrap;
+}

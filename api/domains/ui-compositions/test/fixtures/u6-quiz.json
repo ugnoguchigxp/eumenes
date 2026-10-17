@@ -1,0 +1,151 @@
+{
+	"view": "layout",
+	"direction": "stack",
+	"gap": "normal",
+	"appearance": "friendly",
+	"title": "コーヒー豆クイズ",
+	"model": {
+		"state": {
+			"a1": {
+				"type": "text",
+				"initial": ""
+			},
+			"a2": {
+				"type": "text",
+				"initial": ""
+			},
+			"a3": {
+				"type": "text",
+				"initial": ""
+			}
+		},
+		"computed": {
+			"score": "(a1 == \"ブラジル\" ? 1 : 0) + (a2 == \"浅煎り\" ? 1 : 0) + (a3 == \"約2万年前\" ? 0 : 1)",
+			"answered": "a1 != \"\" && a2 != \"\" && a3 != \"\"",
+			"rate": "round(score / 3 * 100, 0)"
+		}
+	},
+	"children": [
+		{
+			"view": "text-block",
+			"title": "コーヒー豆クイズ",
+			"body": "3問に答えて、豆の知識を試しましょう。",
+			"emphasis": "strong"
+		},
+		{
+			"view": "choice",
+			"bind": "a1",
+			"label": "Q1 豆の生産量が世界一の国は?",
+			"display": "cards",
+			"options": ["ブラジル", "ノルウェー", "カナダ"]
+		},
+		{
+			"view": "layout",
+			"direction": "stack",
+			"when": "a1 != \"\"",
+			"children": [
+				{
+					"view": "info-card",
+					"title": "Q1の解説",
+					"body": "正解はブラジルです。広い農園で大量に作られています。"
+				}
+			]
+		},
+		{
+			"view": "choice",
+			"bind": "a2",
+			"label": "Q2 酸味が出やすい焙煎は?",
+			"display": "cards",
+			"options": ["浅煎り", "深煎り"]
+		},
+		{
+			"view": "layout",
+			"direction": "stack",
+			"when": "a2 != \"\"",
+			"children": [
+				{
+					"view": "info-card",
+					"title": "Q2の解説",
+					"body": "浅煎りは酸味が残り、深煎りは苦みが強くなります。"
+				}
+			]
+		},
+		{
+			"view": "choice",
+			"bind": "a3",
+			"label": "Q3 コーヒーを最初に飲んだのはいつごろと言われる?",
+			"display": "cards",
+			"options": ["約2万年前", "約千年前", "約100年前"]
+		},
+		{
+			"view": "layout",
+			"direction": "stack",
+			"when": "a3 != \"\"",
+			"children": [
+				{
+					"view": "info-card",
+					"title": "Q3の解説",
+					"body": "9世紀ごろエチオピアで見つかった、という伝承が知られています。"
+				}
+			]
+		},
+		{
+			"view": "layout",
+			"direction": "stack",
+			"when": "answered",
+			"title": "結果",
+			"children": [
+				{
+					"view": "stat",
+					"label": "正解数",
+					"expr": "score",
+					"format": "integer",
+					"unit": "問"
+				},
+				{
+					"view": "stat",
+					"label": "正答率",
+					"expr": "rate",
+					"format": "number",
+					"unit": "%"
+				},
+				{
+					"view": "layout",
+					"direction": "stack",
+					"when": "score == 3",
+					"children": [
+						{
+							"view": "info-card",
+							"title": "全問正解",
+							"body": "豆の達人です。"
+						}
+					]
+				},
+				{
+					"view": "layout",
+					"direction": "stack",
+					"when": "score >= 1 && score < 3",
+					"children": [
+						{
+							"view": "info-card",
+							"title": "もう少し",
+							"body": "解説を読んで、もう一度試してみましょう。"
+						}
+					]
+				},
+				{
+					"view": "layout",
+					"direction": "stack",
+					"when": "score == 0",
+					"children": [
+						{
+							"view": "info-card",
+							"title": "これから",
+							"body": "これから一緒に覚えましょう。"
+						}
+					]
+				}
+			]
+		}
+	]
+}

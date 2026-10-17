@@ -1,3 +1,4 @@
+import { answerAnalysis } from "../toolchain/analysis-round.fixture";
 import { afterEach } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -200,6 +201,8 @@ export async function boot(steps: Step[], options: BootOptions = {}) {
 					languages: ["ja"],
 					confidence: 0.99,
 				});
+			if (answerAnalysis(messages, callOptions, { kind: "live_info" }))
+				return "";
 			if (callOptions?.tools?.length) {
 				offered.push(JSON.stringify(callOptions.tools));
 				callOptions.onToolCalls!([
@@ -207,6 +210,7 @@ export async function boot(steps: Step[], options: BootOptions = {}) {
 						id: crypto.randomUUID(),
 						name: "world_query",
 						arguments: JSON.stringify({
+							announcement: "照会します。",
 							request: messages.filter((m) => m.role === "user").at(-1)!
 								.content,
 						}),

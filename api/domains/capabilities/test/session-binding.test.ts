@@ -45,7 +45,7 @@ function sessionBundle() {
 	) as any;
 	const command = timers.bindings.at(-1);
 	const toolchain = structuredClone(timers.definitions.at(-1));
-	toolchain.revision = 5;
+	toolchain.revision = 7;
 	toolchain.bindingRevisionId = "binding:timers.session@1";
 	return {
 		formatVersion: 1,
@@ -104,7 +104,7 @@ test("a session binding passes the check and registers as a toolchain with the s
 		expect(clean.issues).toEqual([]);
 		expect(clean.registered).toEqual([
 			"binding:timers.session@1",
-			"toolchain:timers.manage@5",
+			"toolchain:timers.manage@7",
 		]);
 		await store.write((db) => {
 			const result = caps.importBundleInTransaction(
@@ -116,24 +116,24 @@ test("a session binding passes the check and registers as a toolchain with the s
 			caps.publishToolchainRevisionInTransaction(
 				db,
 				"timers.manage",
-				"toolchain:timers.manage@5",
+				"toolchain:timers.manage@7",
 			);
 		});
 		store.read((db) => {
 			const found = caps.toolchainBindingInTransaction(
 				db,
-				"toolchain:timers.manage@5",
+				"toolchain:timers.manage@7",
 			)!;
 			expect(found.binding.document.execution).toBe("session");
-			expect(found.artifact.revisionId).toBe("artifact:timers.workspace@2");
+			expect(found.artifact.revisionId).toBe("artifact:timers.workspace@3");
 			const set = caps.toolchainSetInTransaction(
 				db,
-				"toolchain:timers.manage@5",
+				"toolchain:timers.manage@7",
 			);
 			expect(set.binding?.document.execution).toBe("session");
 			expect(caps.artifactsInTransaction(db)).toEqual([
 				expect.objectContaining({
-					toolchainRevisionId: "toolchain:timers.manage@5",
+					toolchainRevisionId: "toolchain:timers.manage@7",
 					adapterRef: "adapter:timers@1",
 				}),
 			]);
@@ -258,7 +258,7 @@ test("the registry refuses a session binding whose tool schema differs from the 
 			{
 				code: "invalid_toolchain",
 				path: "definitions/0",
-				ref: "toolchain:timers.manage@5",
+				ref: "toolchain:timers.manage@7",
 			},
 		]);
 	});

@@ -233,7 +233,7 @@ export const Interactive: Story = {
 			"a",
 		);
 		await userEvent.click(canvas.getByRole("button", { name: "移動する" }));
-		const todo = canvas.getByRole("list", { name: "未着手のタスク" });
+		const todo = canvas.getByRole("list", { name: "未着手＋Planningのタスク" });
 		await expect(
 			within(todo)
 				.getAllByRole("heading", { level: 4 })

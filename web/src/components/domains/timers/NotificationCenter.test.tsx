@@ -1,10 +1,20 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+	act,
+	cleanup,
+	fireEvent,
+	render,
+	screen,
+} from "@testing-library/react";
+import { StrictMode } from "react";
 import { afterEach, expect, test, vi } from "vitest";
 import type { KanbanNoticeView } from "./NotificationCenter";
 import type { TimerNotificationDto } from "../../../../../api/domains/timers/contracts";
 import { NotificationCenter } from "./NotificationCenter";
 
-afterEach(cleanup);
+afterEach(() => {
+	cleanup();
+	vi.useRealTimers();
+});
 
 const timer = (
 	over: Partial<TimerNotificationDto> = {},
@@ -37,31 +47,44 @@ function show(
 		unread?: number;
 		reading?: string[];
 		loadError?: string;
+		error?: string;
+		onPrepareAudio?: () => void;
 	} = {},
 ) {
 	const onStop = vi.fn();
 	const onRead = vi.fn();
 	const onOpenBoard = vi.fn();
-	const items = over.kanban ?? [];
-	render(
-		<NotificationCenter
-			notices={over.notices ?? []}
-			kanban={{
-				notices: items,
-				unread: over.unread ?? items.filter((n) => !n.read).length,
-				readingIds: over.reading ?? [],
-				error: null,
-				loadError: over.loadError ?? null,
-				onOpenBoard,
-				onRead,
-			}}
-			ringingId={null}
-			stoppingIds={[]}
-			onStop={onStop}
-			error={null}
-		/>,
-	);
-	return { onStop, onRead, onOpenBoard };
+	const component = (options = over) => {
+		const items = options.kanban ?? [];
+		return (
+			<StrictMode>
+				<NotificationCenter
+					notices={options.notices ?? []}
+					kanban={{
+						notices: items,
+						unread: options.unread ?? items.filter((n) => !n.read).length,
+						readingIds: options.reading ?? [],
+						error: null,
+						loadError: options.loadError ?? null,
+						onOpenBoard,
+						onRead,
+					}}
+					ringingId={null}
+					stoppingIds={[]}
+					onStop={onStop}
+					error={options.error ?? null}
+					onPrepareAudio={options.onPrepareAudio}
+				/>
+			</StrictMode>
+		);
+	};
+	const view = render(component());
+	return {
+		onStop,
+		onRead,
+		onOpenBoard,
+		update: (options: typeof over) => view.rerender(component(options)),
+	};
 }
 
 test("timer and Kanban notices share one drawer, newest first, with the unread count on the button", async () => {
@@ -142,4 +165,81 @@ test("a list load failure shows in the drawer only, never over the screen", asyn
 	expect(screen.queryByRole("alert")).toBeNull();
 	fireEvent.click(screen.getByRole("button", { name: "通知センター" }));
 	await screen.findByText("タスクの通知を取得できませんでした。");
+});
+
+test("banners collapse after eight seconds without acknowledging notices; the badge and drawer actions remain", () => {
+	vi.useFakeTimers();
+	const h = show({ notices: [timer()], kanban: [notice()] });
+	act(() => vi.advanceTimersByTime(7_999));
+	expect(screen.getByRole("status").querySelectorAll("article")).toHaveLength(
+		2,
+	);
+	act(() => vi.advanceTimersByTime(1));
+	expect(screen.queryByRole("status")).toBeNull();
+	const trigger = screen.getByRole("button", { name: "通知センター、2件" });
+	expect(trigger.querySelector(".notification-center-badge")?.textContent).toBe(
+		"2",
+	);
+	expect(h.onRead).not.toHaveBeenCalled();
+	expect(h.onStop).not.toHaveBeenCalled();
+	fireEvent.click(trigger);
+	expect(screen.getByRole("dialog").querySelectorAll("article")).toHaveLength(
+		2,
+	);
+	fireEvent.click(screen.getByRole("button", { name: "通知を停止" }));
+	fireEvent.click(screen.getByRole("button", { name: "既読にする" }));
+	expect(h.onStop).toHaveBeenCalledWith(expect.objectContaining({ id: "t1" }));
+	expect(h.onRead).toHaveBeenCalledWith(expect.objectContaining({ id: "n1" }));
+	fireEvent.click(screen.getByRole("button", { name: "通知センターを閉じる" }));
+	expect(screen.queryByRole("status")).toBeNull();
+});
+
+test("refreshes do not extend a banner; a later notice gets its own deadline even with the same id in another source", () => {
+	vi.useFakeTimers();
+	const h = show({ notices: [timer()] });
+	act(() => vi.advanceTimersByTime(4_000));
+	h.update({
+		notices: [timer({ revision: 3 })],
+		kanban: [notice({ id: "t1" })],
+	});
+	act(() => vi.advanceTimersByTime(4_000));
+	expect(screen.queryByText("3分のタイマーが終了しました。")).toBeNull();
+	expect(
+		screen.getByText("タスク『README の手順修正』が終わりました"),
+	).toBeTruthy();
+	act(() => vi.advanceTimersByTime(4_000));
+	expect(screen.queryByRole("status")).toBeNull();
+	h.update({ notices: [timer()], kanban: [notice({ id: "t1" })] });
+	expect(screen.queryByRole("status")).toBeNull();
+	expect(
+		screen.getByRole("button", { name: "通知センター、2件" }),
+	).toBeTruthy();
+	h.update({ notices: [timer()], kanban: [notice({ id: "t1", read: true })] });
+	expect(
+		screen.getByRole("button", { name: "通知センター、1件" }),
+	).toBeTruthy();
+	h.update({ notices: [], kanban: [notice({ id: "t1", read: true })] });
+	expect(
+		screen
+			.getByRole("button", { name: "通知センター" })
+			.querySelector(".notification-center-badge"),
+	).toBeNull();
+});
+
+test("audio guidance and errors also collapse and remain available in the drawer", () => {
+	vi.useFakeTimers();
+	const prepareAudio = vi.fn();
+	show({ onPrepareAudio: prepareAudio, error: "通知を停止できませんでした。" });
+	expect(
+		screen.getByRole("button", { name: "通知音を有効にする" }),
+	).toBeTruthy();
+	act(() => vi.advanceTimersByTime(8_000));
+	expect(screen.queryByRole("status")).toBeNull();
+	expect(screen.queryByRole("alert")).toBeNull();
+	fireEvent.click(screen.getByRole("button", { name: "通知センター" }));
+	expect(screen.getByRole("alert").textContent).toBe(
+		"通知を停止できませんでした。",
+	);
+	fireEvent.click(screen.getByRole("button", { name: "通知音を有効にする" }));
+	expect(prepareAudio).toHaveBeenCalledOnce();
 });

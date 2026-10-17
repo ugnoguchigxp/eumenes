@@ -34,6 +34,14 @@ import {
 	type WindowSnapshot,
 } from "../../memory";
 import { createQueue, migration as queueMigration } from "../../queue";
+import {
+	analysisArgs,
+	analysisReceipt,
+	delegatingArgs,
+	isAnalysisRound,
+	unavailableReceipt,
+	UNAVAILABLE,
+} from "./analysis.fixture";
 import type { HandlerDefinition, QueueService } from "../../queue";
 import {
 	createDialogueService,
@@ -95,7 +103,7 @@ export type Scenario = {
 	delegation?: unknown;
 	commandNote?: string;
 	specialistHandoff?: string;
-	/** The routing offers toolchains: the first call asks for discovery, then the selection call and the answer follow. */
+	/** The routing offers toolchains: the analysis delegates, then the selection call follows (otherwise the analysis answers and the answer call follows). */
 	cards?: boolean;
 	/** The earlier-exchange recall finds this text. */
 	recall?: string;
@@ -225,7 +233,6 @@ async function run(
 ): Promise<Captured> {
 	let recording = false;
 	const calls: Captured["calls"] = [];
-	let callCount = 0;
 	const larm = {
 		status: () => ({ state: "ready", capabilities: ["llm"] }),
 		connect: async () => {},
@@ -255,14 +262,13 @@ async function run(
 					: null,
 				tools: (tools ?? []).map((t) => t.function.name),
 			});
-			callCount++;
-			if (callCount === 1 && scenario.cards)
-				return {
-					requestId: "request-1",
-					attemptId: "attempt",
-					value: "",
-					toolCalls: [{ id: "d", name: "find_toolchain", arguments: "{}" }],
-				};
+			if (isAnalysisRound(tools))
+				return analysisReceipt(
+					"request-1",
+					scenario.cards ? delegatingArgs() : analysisArgs(),
+				);
+			if (tools?.some((t) => t.function.name === UNAVAILABLE))
+				return unavailableReceipt("request-1", "了解です");
 			return {
 				requestId: "request-1",
 				attemptId: "attempt",

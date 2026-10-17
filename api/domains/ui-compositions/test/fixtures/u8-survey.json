@@ -1,0 +1,75 @@
+{
+	"view": "layout",
+	"direction": "stack",
+	"gap": "relaxed",
+	"width": "normal",
+	"appearance": "warm",
+	"title": "来場者アンケート",
+	"children": [
+		{
+			"view": "text-block",
+			"title": "ご来場ありがとうございます",
+			"body": "よろしければ6つの質問にお答えください。",
+			"emphasis": "strong"
+		},
+		{
+			"view": "layout",
+			"direction": "grid",
+			"gap": "normal",
+			"children": [
+				{
+					"view": "info-card",
+					"title": "所要時間",
+					"body": "約2分"
+				},
+				{
+					"view": "info-card",
+					"title": "回答方法",
+					"body": "選択肢から選び、最後に自由記述欄へ記入できます。"
+				}
+			]
+		},
+		{
+			"view": "form",
+			"title": "アンケート",
+			"fields": [
+				{
+					"id": "satisfaction",
+					"label": "満足度",
+					"type": "radio",
+					"required": true,
+					"options": ["満足", "ふつう", "不満"]
+				},
+				{
+					"id": "visit",
+					"label": "来場回数",
+					"type": "radio",
+					"required": true,
+					"options": ["初めて", "2回目以上"]
+				},
+				{
+					"id": "interests",
+					"label": "興味のある展示",
+					"type": "checkbox",
+					"options": ["体験コーナー", "講演", "物販"]
+				},
+				{
+					"id": "age",
+					"label": "年代",
+					"type": "select",
+					"options": ["10代", "20代", "30代", "40代", "50代以上"]
+				},
+				{
+					"id": "recommend",
+					"label": "友人に勧めたい",
+					"type": "boolean"
+				},
+				{
+					"id": "comment",
+					"label": "ご意見",
+					"type": "textarea"
+				}
+			]
+		}
+	]
+}

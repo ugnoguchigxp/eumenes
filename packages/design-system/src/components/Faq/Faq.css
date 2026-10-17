@@ -1,0 +1,71 @@
+.ds-faq {
+	--ds-faq-accent: var(--ds-accent, var(--primary));
+	display: grid;
+	gap: 0.75rem;
+	min-width: 0;
+	color: var(--foreground);
+}
+.ds-faq-title {
+	margin: 0;
+	font-size: 1rem;
+	font-weight: 600;
+}
+.ds-faq-list {
+	display: grid;
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	background: var(--card);
+	overflow: hidden;
+}
+.ds-faq-item + .ds-faq-item {
+	border-top: 1px solid var(--border);
+}
+.ds-faq-trigger {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+	width: 100%;
+	padding: 0.875rem 1rem;
+	font: inherit;
+	font-weight: 600;
+	text-align: start;
+	color: inherit;
+	background: transparent;
+	border: 0;
+	cursor: pointer;
+}
+.ds-faq-trigger > span {
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+.ds-faq-trigger:hover {
+	background: color-mix(in srgb, var(--ds-faq-accent) 8%, transparent);
+}
+.ds-faq-trigger:focus-visible {
+	outline: 2px solid var(--ring);
+	outline-offset: -2px;
+}
+.ds-faq-chevron {
+	flex-shrink: 0;
+	width: 1.125rem;
+	height: 1.125rem;
+	color: var(--ds-faq-accent);
+	transition: transform 0.15s ease;
+}
+.ds-faq-trigger[data-state="open"] .ds-faq-chevron {
+	transform: rotate(180deg);
+}
+.ds-faq-answer {
+	padding: 0 1rem 1rem;
+	font-size: 0.875rem;
+	line-height: 1.7;
+	color: var(--muted-foreground);
+	white-space: pre-line;
+	overflow-wrap: anywhere;
+}
+@media (prefers-reduced-motion: reduce) {
+	.ds-faq-chevron {
+		transition: none;
+	}
+}

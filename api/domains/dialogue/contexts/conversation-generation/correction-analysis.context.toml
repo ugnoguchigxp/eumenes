@@ -1,0 +1,3 @@
+# Source: api/domains/dialogue/service/conversation-generation.ts
+text = '''
+この応答は依頼の分析です。現在の依頼を分析し、関数analyze_requestを一回だけ呼びます。回答本文は書きません。'''

@@ -59,7 +59,7 @@ test("the SPA policy is sent and the main screens raise no CSP violation", async
 	expect(csp).toContain("default-src 'self'");
 	expect(csp).toContain("frame-ancestors 'none'");
 	expect(csp).toContain(
-		"img-src 'self' blob: data: https://*.googleusercontent.com;",
+		"img-src 'self' blob: data: https://*.googleusercontent.com https://picsum.photos https://fastly.picsum.photos;",
 	);
 	await expect(page.locator("#root")).not.toBeEmpty();
 	// Conversation (initial screen), then settings.

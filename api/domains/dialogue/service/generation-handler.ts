@@ -16,16 +16,16 @@ import type { ConversationOperation } from "./conversation-tools";
 import {
 	agentOutcome,
 	failedAnswer,
-	prepareDecision,
-	prepareInitialDecision,
+	prepareAnswer,
 	recordRejected,
 	traceFailure,
 	traceOutcome,
 	traceSelection,
+	type Decision,
 	type SelectionDraft,
 } from "./selection-trace";
 import { generateSelection } from "./generate-selection";
-import { discoveryTool } from "./initial-decision";
+import { analyzeRequest } from "./request-analysis";
 import { announceSelection } from "./operation-announcement";
 import { generateConversation } from "./conversation-generation";
 import { researchCitations } from "./research-citations";
@@ -167,11 +167,8 @@ export function createGenerationHandler(
 					const chunkSpeech = speaksChunks(deps, run);
 					let holdBody =
 						!!input.briefReply || shouldHoldBody(input, chunkSpeech);
-					const initial = !!input.routing && !input.agent;
-					let decision = initial
-						? await prepareInitialDecision(deps, input, signal)
-						: await prepareDecision(deps, input, signal);
-					const { recallPins } = decision;
+					// What this turn's prompt stands on: forgetting any of it revokes the call while it runs.
+					const recallPins: Array<{ messageId: string; digest: string }> = [];
 					const body = createAnswerStream(
 						deps,
 						input,
@@ -186,86 +183,67 @@ export function createGenerationHandler(
 					signal = body.signal;
 					const delta = body.delta;
 					const preparation = answerCollection(run, chunkSpeech);
-					// What this turn's prompt stands on: forgetting any of it revokes the call while it runs.
-					holdBody ||=
-						(!chunkSpeech && recallPins.length > 0) ||
-						initial ||
-						!!decision.tools?.length;
-					timing.policy(holdBody);
+					const repair = () => {
+						partials.delete(input.runId);
+						body.reset();
+						publish(input.runId);
+					};
+					// A new decision first analyzes the request; that round's body is neither shown nor adopted.
+					const analysis =
+						!!input.routing && !input.agent
+							? await analyzeRequest(deps, input, signal, repair)
+							: undefined;
+					let decision: Decision;
 					let generated: Awaited<ReturnType<typeof generateConversation>>;
-					try {
-						generated = await generateConversation({
-							inference: larm,
-							requestId: input.requestId,
-							messages: decision.selectionMessages ?? decision.messages,
-							requestMessage: currentRequestMessage(input),
-							signal,
-							delta: decision.selectionMessages ? () => {} : delta,
-							preparation: decision.selectionMessages ? undefined : preparation,
-							briefReply: input.briefReply,
-							tools: initial ? [discoveryTool] : decision.tools,
-							discovery: initial,
-							cards: decision.cards,
-							openQuestions: decision.openQuestions,
-							sessions: decision.sessions,
-							// The selection call is one-shot; a direct call is the answer generation itself.
-							sessionRole: decision.selectionMessages ? "auxiliary" : "main",
-							session: answerSession(input, recallPins),
-							repair: () => {
-								partials.delete(input.runId);
-								body.reset();
-								publish(input.runId);
-							},
-						});
-					} catch (error) {
-						if (
-							error instanceof Error &&
-							error.message === "invalid_conversation_operation"
-						)
-							await recordRejected(deps, input.runId, decision.draft);
-						throw error;
-					}
-					if (generated.needsToolchain) {
+					if (analysis?.next === "find_toolchain") {
 						({ decision, generated } = await generateSelection(
 							deps,
 							input,
+							analysis,
 							signal,
-							body.reset,
-							preparation,
+							repair,
 						));
 						recallPins.splice(0, recallPins.length, ...decision.recallPins);
-					}
-					if (generated.operation) {
-						return announceSelection(deps, input, {
-							generated,
-							decision,
-							signal,
-							publish: () => publish(input.runId),
-						});
-					}
-					if (decision.selectionMessages && decision.answerMessages) {
-						holdBody =
-							!!input.briefReply ||
-							shouldHoldBody(input, chunkSpeech) ||
-							(!chunkSpeech && recallPins.length > 0);
-						// Selection prose has no authority as an answer; answer with the full exchange.
-						generated = await generateConversation({
-							inference: larm,
-							requestId: input.requestId,
-							messages: decision.answerMessages,
-							requestMessage: currentRequestMessage(input),
-							signal,
-							delta,
-							preparation,
-							briefReply: input.briefReply,
-							sessionRole: "main",
-							session: answerSession(input, recallPins),
-							repair: () => {
-								partials.delete(input.runId);
-								body.reset();
-								publish(input.runId);
-							},
-						});
+						if (generated.operation) {
+							return announceSelection(deps, input, {
+								generated,
+								decision,
+								signal,
+								publish: () => publish(input.runId),
+							});
+						}
+						// No offered toolchain fits: the explanation it reported is the answer.
+						holdBody ||= !chunkSpeech && recallPins.length > 0;
+						timing.policy(holdBody);
+					} else {
+						const prepared = await prepareAnswer(deps, input, signal, analysis);
+						decision = prepared;
+						// Streamed text is checked against the exchanges this prompt stands on.
+						recallPins.splice(0, recallPins.length, ...prepared.recallPins);
+						holdBody ||= !chunkSpeech && recallPins.length > 0;
+						timing.policy(holdBody);
+						try {
+							generated = await generateConversation({
+								inference: larm,
+								requestId: input.requestId,
+								messages: prepared.messages,
+								requestMessage: currentRequestMessage(input),
+								signal,
+								delta,
+								preparation,
+								briefReply: input.briefReply,
+								sessionRole: "main",
+								session: answerSession(input, prepared.recallPins),
+								repair,
+							});
+						} catch (error) {
+							if (
+								error instanceof Error &&
+								error.message === "invalid_conversation_operation"
+							)
+								await recordRejected(deps, input.runId, prepared.draft);
+							throw error;
+						}
 					}
 					const { text, receipt } = generated;
 					const answered = decision.draft("answer", {

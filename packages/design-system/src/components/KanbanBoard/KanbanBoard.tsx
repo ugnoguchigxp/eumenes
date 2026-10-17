@@ -1,4 +1,4 @@
-import { OctagonAlert, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import {
 	type DragEvent,
 	type FocusEvent,
@@ -10,6 +10,7 @@ import {
 import { cn } from "@/utils/cn";
 import { Button } from "../Button";
 import { TaskForm } from "./CardForms";
+import { ExecutorQueues } from "./ExecutorQueues";
 import { KanbanColumn } from "./KanbanColumn";
 import { COLUMNS, isNoopMove, type MovableColumn } from "./positions";
 import type { KanbanBoardProps } from "./types";
@@ -19,14 +20,6 @@ const DEFAULT_NOT_RUNNABLE =
 	"この環境では作業の状態を追えないため実行できません";
 
 type DropTarget = { column: MovableColumn; before: string | null };
-
-function queueText(queue: KanbanBoardProps["queue"]) {
-	const parts = [
-		queue.runningTitle ? `実行中: 「${queue.runningTitle}」` : "",
-		queue.waiting > 0 ? `待機中 ${queue.waiting}件` : "",
-	].filter(Boolean);
-	return parts.length > 0 ? parts.join("・") : "実行待ちのタスクはありません";
-}
 
 /**
  * Three-column task board. Keyboard users move a card with its 移動 menu (or Alt+↑/↓ inside a
@@ -117,22 +110,6 @@ export function KanbanBoard(props: KanbanBoardProps) {
 					タスクを追加
 				</Button>
 			</header>
-			{props.executors && (
-				<label className="kanban-executor-filter">
-					表示する担当{" "}
-					<select
-						value={executorFilter}
-						onChange={(event) => setExecutorFilter(event.target.value)}
-					>
-						<option value="">すべて</option>
-						{props.executors.map((entry) => (
-							<option key={entry.id} value={entry.id}>
-								{entry.label}
-							</option>
-						))}
-					</select>
-				</label>
-			)}
 			{adding && (
 				<TaskForm
 					label="タスクを追加"
@@ -171,47 +148,22 @@ export function KanbanBoard(props: KanbanBoardProps) {
 					{notRunnableText ?? DEFAULT_NOT_RUNNABLE}
 				</p>
 			)}
-			{(
-				props.queues ?? [{ ...queue, executorId: "", label: "実行キュー" }]
-			).map((shownQueue) => (
-				<section
-					key={shownQueue.executorId}
-					className="kanban-queue"
-					aria-label={shownQueue.label}
-					data-state={shownQueue.state}
-				>
-					{shownQueue.state === "paused" ? (
-						<>
-							<p role="status">
-								<OctagonAlert aria-hidden="true" size={16} />
-								{shownQueue.label}は停止中:{" "}
-								{shownQueue.reasonText ?? "理由を確認できません"}
-								{shownQueue.waiting > 0 && `（待機中 ${shownQueue.waiting}件）`}
-							</p>
-							<Button
-								type="button"
-								size="sm"
-								variant="outline"
-								disabled={busy}
-								onClick={() =>
-									onResumeQueue(shownQueue.executorId || undefined)
-								}
-							>
-								再開
-							</Button>
-						</>
-					) : (
-						<p>
-							{props.queues && `${shownQueue.label}: `}
-							{queueText(shownQueue)}
-						</p>
-					)}
-					{shownQueue.manualText && (
-						<p className="kanban-queue-manual">{shownQueue.manualText}</p>
-					)}
-				</section>
-			))}
-			<div className="kanban-columns">
+			<ExecutorQueues
+				executors={props.executors}
+				queues={props.queues}
+				queue={queue}
+				filter={executorFilter}
+				onFilter={setExecutorFilter}
+				busy={busy}
+				onResumeQueue={onResumeQueue}
+			/>
+			<div
+				className="kanban-columns"
+				role="group"
+				aria-label="タスクのステータス別一覧"
+				// oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- keyboard users need to focus and scroll the columns
+				tabIndex={0}
+			>
 				{COLUMNS.map((column) => (
 					<KanbanColumn
 						key={column.id}

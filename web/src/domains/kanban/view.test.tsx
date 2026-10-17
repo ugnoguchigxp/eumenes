@@ -51,11 +51,11 @@ test("the snapshot is drawn in three columns with the wording of each run state"
 		within(screen.getByRole("list", { name }))
 			.getAllByRole("heading", { level: 4 })
 			.map((h) => h.textContent);
-	expect(lists("未着手のタスク")).toEqual([
+	expect(lists("未着手＋Planningのタスク")).toEqual([
 		"README の手順修正",
 		"ログ出力の見直し",
 	]);
-	expect(lists("実行中のタスク")).toEqual([
+	expect(lists("Ongoingのタスク")).toEqual([
 		"API の型を整理",
 		"依存パッケージの確認",
 	]);

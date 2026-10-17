@@ -24,8 +24,8 @@ const live = createLiveLarm();
 function observed(options?: LarmCallOptions) {
 	const sample = {
 		phase:
-			options?.tools?.[0]?.function.name === "find_toolchain"
-				? "initial"
+			options?.tools?.[0]?.function.name === "analyze_request"
+				? "analysis"
 				: options?.tools?.length
 					? "selection"
 					: "answer",

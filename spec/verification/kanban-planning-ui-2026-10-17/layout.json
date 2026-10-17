@@ -1,0 +1,46 @@
+[
+  {
+    "width": 1280,
+    "columns": [
+      {
+        "x": 16,
+        "y": 126,
+        "width": 408
+      },
+      {
+        "x": 436,
+        "y": 126,
+        "width": 408
+      },
+      {
+        "x": 856,
+        "y": 126,
+        "width": 408
+      }
+    ],
+    "scroll": false,
+    "bodyOverflow": false
+  },
+  {
+    "width": 390,
+    "columns": [
+      {
+        "x": 16,
+        "y": 192,
+        "width": 260
+      },
+      {
+        "x": 288,
+        "y": 192,
+        "width": 260
+      },
+      {
+        "x": 560,
+        "y": 192,
+        "width": 260
+      }
+    ],
+    "scroll": true,
+    "bodyOverflow": false
+  }
+]

@@ -58,3 +58,33 @@ test("published skill v1 also accepts mission on wait and finish, and current re
 		).toBe(false);
 	}
 });
+
+test("readAhead accepts an array of URL strings and rejects the former object form", () => {
+	const current = guidedActionFor({
+		package: { requiredSkillRevisionIds: ["skill:web.guided@4"] },
+	} as Prepared);
+	const invoke = {
+		action: "invoke",
+		tool: "web.read",
+		arguments: { url: "https://example.com/a" },
+	};
+	const urls = ["https://example.com/b", "https://example.com/c"];
+	expect(current.safeParse({ ...invoke, readAhead: urls }).success).toBe(true);
+	expect(current.safeParse({ ...invoke, readAhead: [] }).success).toBe(true);
+	expect(
+		current.safeParse({ ...invoke, readAhead: urls.map((url) => ({ url })) })
+			.success,
+	).toBe(false);
+	expect(
+		current.safeParse({ ...invoke, readAhead: ["not a url"] }).success,
+	).toBe(false);
+	expect(
+		current.safeParse({
+			...invoke,
+			readAhead: Array.from(
+				{ length: 6 },
+				(_, n) => `https://example.com/${n}`,
+			),
+		}).success,
+	).toBe(false);
+});

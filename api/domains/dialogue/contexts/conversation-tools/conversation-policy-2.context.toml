@@ -1,3 +1,0 @@
-# Source: api/domains/dialogue/service/conversation-tools.ts
-text = '''
-この依頼に合う操作用のfunctionは提示されていません。自然文で回答するか、できないことを短く伝えます。関数呼出しを表す文字列を本文に書きません。'''

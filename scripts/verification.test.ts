@@ -97,6 +97,9 @@ describe("verification selection and runner coverage", () => {
 			),
 		).toBe("design-system");
 		expect(
+			runnerFor("packages/artifact-ui/src/composition-model.test.tsx"),
+		).toBe("bun");
+		expect(
 			groups["design-system"].some((p) => p.includes("GoogleAccounts")),
 		).toBe(true);
 		expect(Object.values(groups).flat().length).toBe(new Set(tests).size);

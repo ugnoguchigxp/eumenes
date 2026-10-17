@@ -29,7 +29,11 @@ export const timerCommand = z.discriminatedUnion("operation", [
 	timerCancel.extend({ operation: z.literal("cancel") }),
 ]);
 
-/** Answers to the questions of a timer command, and the raw h/m/s of the timer form. */
+/**
+ * Answers to the questions of a timer command, and the raw h/m/s of the timer form.
+ * `timerDurationAnswer` is referenced only by the frozen binding@1-3 / artifact@1-2; newer
+ * revisions ask no duration.
+ */
 export const timerDurationAnswer = z.strictObject({
 	durationSeconds: z.number().int().min(1).max(86400),
 });

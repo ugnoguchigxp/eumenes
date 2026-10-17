@@ -87,6 +87,8 @@ export type TestRunner = "bun" | "web" | "client" | "design-system";
 export function runnerFor(path: string): TestRunner | undefined {
 	if (
 		/^(api\/|packages\/(coding-runner|dots-mcp)\/test\/)/.test(path) ||
+		// artifact-ui's own module tests (pure logic; the views install jsdom themselves).
+		/^packages\/artifact-ui\/src\/.*\.test\.tsx?$/.test(path) ||
 		(path.startsWith("scripts/") &&
 			/\.(test|spec)\.[cm]?[jt]sx?$/.test(path)) ||
 		acceptanceFiles.includes(path)

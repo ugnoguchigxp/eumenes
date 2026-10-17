@@ -1,9 +1,21 @@
 import { z } from "zod";
-import { parseDefinition } from "@eumenes/artifact-ui/contracts";
+import {
+	compositionDirections,
+	compositionViews,
+	parseDefinition,
+	validateComposition,
+} from "@eumenes/artifact-ui/contracts";
 
 /** The only views a composition may use. Every other registered view is refused. */
-const allowedViews = new Set(["layout", "text-block", "info-card", "form"]);
-const allowedDirections = new Set(["stack", "grid"]);
+const allowedViews = new Set<string>(["layout", ...compositionViews]);
+const allowedDirections = new Set<string>(compositionDirections);
+/** Layout keys of the settings screens, never of a composition. */
+const settingsLayoutKeys = [
+	"tabs",
+	"headerChildren",
+	"headerLayout",
+	"draftSource",
+];
 export const limits = {
 	definitionBytes: 16_384,
 	depth: 4,
@@ -95,7 +107,13 @@ function walk(
 		)
 			return fail(
 				"ui_layout_direction_not_allowed",
-				`direction must be ${[...allowedDirections].join(" or ")}`,
+				`direction must be one of ${[...allowedDirections].join(", ")}`,
+			);
+		const settingsKey = settingsLayoutKeys.find((key) => key in node);
+		if (settingsKey)
+			return fail(
+				"ui_definition_invalid",
+				`remove "${settingsKey}"; tabs take each child's title as its label`,
 			);
 		if (!Array.isArray(node.children))
 			return fail("ui_definition_invalid", "layout needs a children array");
@@ -152,6 +170,13 @@ export function validatedDefinition(raw: unknown): {
 				: undefined,
 		);
 	}
+	// Meaning: model placement, expressions, references and the types of bound states.
+	const meaning = validateComposition(raw);
+	if (!meaning.ok)
+		return fail(
+			"ui_definition_invalid",
+			`${meaning.path.slice(0, 80)}: ${meaning.rule}`,
+		);
 	const form = formOf(raw);
 	const fields = form ? formFields.safeParse(form.fields) : null;
 	if (fields && !fields.success) {

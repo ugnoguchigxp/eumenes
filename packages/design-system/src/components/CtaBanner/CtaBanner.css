@@ -1,0 +1,101 @@
+.ds-cta-banner {
+	--ds-cta-accent: var(--ds-accent, var(--primary));
+	--ds-cta-accent-fg: var(--ds-accent-foreground, var(--primary-foreground));
+	container-type: inline-size;
+	position: relative;
+	min-width: 0;
+	border-radius: var(--radius);
+	overflow: hidden;
+}
+.ds-cta-banner-inner {
+	position: relative;
+	display: grid;
+	gap: 1.25rem;
+	align-items: center;
+	min-width: 0;
+	padding: 1.75rem 1.5rem;
+}
+.ds-cta-banner-text {
+	display: grid;
+	gap: 0.5rem;
+	min-width: 0;
+}
+.ds-cta-banner-text h2 {
+	margin: 0;
+	font-size: 1.375rem;
+	font-weight: 700;
+	line-height: 1.4;
+	overflow-wrap: anywhere;
+}
+.ds-cta-banner-text p {
+	margin: 0;
+	font-size: 0.9375rem;
+	line-height: 1.7;
+}
+.ds-cta-banner-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.75rem;
+}
+.ds-cta-banner-button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 2.5rem;
+	padding: 0.5rem 1.25rem;
+	border-radius: var(--radius);
+	font-size: 0.9375rem;
+	font-weight: 600;
+	border: 1px solid transparent;
+	cursor: default;
+}
+.ds-cta-banner-button[data-kind="secondary"] {
+	border-color: currentColor;
+	color: inherit;
+}
+@container (min-width: 40rem) {
+	.ds-cta-banner-inner {
+		grid-template-columns: minmax(0, 1fr) auto;
+		gap: 2rem;
+		padding: 2rem;
+	}
+}
+/* accent: filled with the accent color */
+.ds-cta-banner[data-variant="accent"] {
+	background: var(--ds-cta-accent);
+	color: var(--ds-cta-accent-fg);
+}
+.ds-cta-banner[data-variant="accent"]
+	.ds-cta-banner-button[data-kind="primary"] {
+	background: var(--ds-cta-accent-fg);
+	color: var(--ds-cta-accent);
+}
+/* subtle: quiet card */
+.ds-cta-banner[data-variant="subtle"] {
+	background: color-mix(in srgb, var(--ds-cta-accent) 10%, var(--card));
+	color: var(--foreground);
+	border: 1px solid var(--border);
+}
+.ds-cta-banner[data-variant="subtle"] .ds-cta-banner-text p {
+	color: var(--muted-foreground);
+}
+.ds-cta-banner[data-variant="subtle"]
+	.ds-cta-banner-button[data-kind="primary"] {
+	background: var(--ds-cta-accent);
+	color: var(--ds-cta-accent-fg);
+}
+/* image: backdrop with a dark overlay, text independent of the app theme */
+.ds-cta-banner[data-variant="image"] {
+	background: var(--muted);
+	color: #fff;
+}
+.ds-cta-banner-overlay {
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(rgb(0 0 0 / 0.55), rgb(0 0 0 / 0.68));
+}
+.ds-cta-banner[data-variant="image"]
+	.ds-cta-banner-button[data-kind="primary"] {
+	background: #fff;
+	color: hsl(215 25% 12%);
+}

@@ -18,6 +18,7 @@ import { fitAssembly, memoryHistoryUsed } from "./context-fit";
 import { systemMessageOf } from "./context-format-current";
 import { renderContext } from "./context-render";
 import { prepareRouting } from "./delegate-conversation";
+import { previousExchange } from "./request-analysis";
 import { renderGoalsLayer } from "./goals-layer";
 import { topicTexts, worldNamesBlock } from "./topic-texts";
 import { specialistWorkBlock, viewingBlock } from "./specialist-context";
@@ -223,9 +224,18 @@ export function createPrepare(
 		// A new decision: the execute phase retrieves the toolchains for this request.
 		// While an operation's result (or a sub-agent's question) is phrased, nothing new is offered.
 		const routing = !operations.length
-			? prepareRouting(tx, deps, run, messages, compiled.assembly.input, {
-					dots: !!delegated && delegated.available !== false,
-				})
+			? prepareRouting(
+					tx,
+					deps,
+					run,
+					messages,
+					compiled.assembly.input,
+					{ dots: !!delegated && delegated.available !== false },
+					{
+						persona: compiled.assembly.persona,
+						previous: previousExchange(compiled.assembly.history.turns),
+					},
+				)
 			: undefined;
 		// A prefetch left out of this turn is neither sent nor checked at adoption.
 		const prepared =

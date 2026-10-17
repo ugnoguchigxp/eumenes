@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
+import { answerAnalysis } from "./analysis-round.fixture";
 import { workerPacket } from "./toolchain.fixture";
 import { loadEvaluationCases } from "./llm-native-evaluation.fixture";
 import { evaluateRequirements } from "./llm-native-runner.fixture";
@@ -29,16 +30,13 @@ for (const c of cases)
 				speak: async () => new Uint8Array(),
 				answer: async (messages, _signal, options) => {
 					calls++;
-					if (options?.tools?.[0]?.function.name === "find_toolchain") {
-						options.onToolCalls!([
-							{
-								id: crypto.randomUUID(),
-								name: "find_toolchain",
-								arguments: "{}",
-							},
-						]);
+					if (
+						answerAnalysis(messages, options, {
+							kind: c.engine === "codex" ? "live_info" : "past_conversation",
+							freshness: c.engine === "codex" ? "live" : "not_live",
+						})
+					)
 						return "";
-					}
 					if (options?.tools?.length) {
 						options.onToolCalls!([
 							{

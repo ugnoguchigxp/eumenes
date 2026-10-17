@@ -46,6 +46,7 @@ export type SelectionRow = {
 	function_name: string | null;
 	request_text: string | null;
 	repaired: number;
+	analysis_json: string | null;
 	task_id: string | null;
 	outcome: string | null;
 	outcome_code: string | null;
@@ -86,5 +87,11 @@ export const migrations: readonly Migration[] = [
 		after: ["toolchain-history/0001-init"],
 		sql: `UPDATE toolchain_selections SET toolchain_id='web.research.codex' WHERE toolchain_id LIKE 'web.research.%' AND toolchain_id<>'web.research.codex';
 UPDATE toolchain_recipes SET toolchain_id='web.research.codex' WHERE toolchain_id LIKE 'web.research.%' AND toolchain_id<>'web.research.codex';`,
+	},
+	{
+		// The first round's judgment of the request (kind, freshness, next, impact, approved), kept with the selection.
+		id: "toolchain-history/0003-selection-analysis",
+		after: ["toolchain-history/0002-rename-web-research"],
+		sql: "ALTER TABLE toolchain_selections ADD COLUMN analysis_json TEXT;",
 	},
 ];

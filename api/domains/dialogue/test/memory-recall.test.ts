@@ -37,6 +37,12 @@ import {
 	seedImportMigration,
 } from "../../memory";
 import { saveItem } from "./memory-seed";
+import {
+	analysisArgs,
+	analysisReceipt,
+	delegatingArgs,
+	isAnalysisRound,
+} from "./analysis.fixture";
 
 import type {
 	QueryVector,
@@ -131,80 +137,66 @@ async function setup(
 	const query: { current: QueryVector | undefined } = {
 		current: { space: SPACE, vector: KYOTO },
 	};
-	const larm: LarmPort = {
+	const larm = {
 		status: () => ({ state: "ready", capabilities: ["llm"] }),
 		connect: async () => {},
-		...(options.operation
-			? {
-					requestFor: () => "request-1",
-					executeRequest: async () => {
-						throw new Error("unexpected_nonstream");
-					},
-					setContextPolicyInTransaction: () => {},
-					validateReceiptInTransaction: () => true,
-					executeStream: async (
-						_id: string,
-						messages: Message[],
-						_signal: AbortSignal,
-						_delta: unknown,
-						_preparation: unknown,
-						tools: any[],
-					) => {
-						if (tools?.[0]?.function.name === "find_toolchain")
-							return {
-								requestId: "request-1",
-								attemptId: "initial",
-								value: "",
-								toolCalls: [
-									{ id: "d", name: "find_toolchain", arguments: "{}" },
-								],
-							};
-						seen.push(messages.map((m) => ({ ...m })));
-						await during.current?.();
-						return {
-							requestId: "request-1",
-							attemptId: "1",
-							value: "",
-							toolCalls: [
-								{
-									id: "call",
-									name: "web_search",
-									arguments: JSON.stringify({
-										request: "京都の天気",
-										announcement: "お調べします。",
-									}),
-								},
-							],
-						};
-					},
-				}
-			: {}),
-		...(options.stream
-			? {
-					answerStream: async (
-						messages: Message[],
-						_signal: unknown,
-						onDelta: (text: string) => void,
-					) => {
-						seen.push(messages.map((m) => ({ ...m })));
-						for (const part of ["了解", "です"]) {
-							onDelta(part);
-							await pause(5);
-						}
-						await pause(30);
-						return "了解です";
-					},
-				}
-			: {}),
-		answer: async (messages) => {
+		requestFor: () => "request-1",
+		executeRequest: async () => {
+			throw new Error("unexpected_nonstream");
+		},
+		setContextPolicyInTransaction: () => {},
+		validateReceiptInTransaction: () => true,
+		acceptInTransaction: () => true,
+		executeStream: async (
+			_id: string,
+			messages: Message[],
+			_signal: AbortSignal,
+			delta: (text: string) => void,
+			_preparation: unknown,
+			tools: any[],
+		) => {
+			// The request analysis reads none of the memory: a toolchain operation delegates, the rest answers.
+			if (isAnalysisRound(tools))
+				return analysisReceipt(
+					"request-1",
+					options.operation ? delegatingArgs() : analysisArgs(),
+				);
 			seen.push(messages.map((m) => ({ ...m })));
 			await during.current?.();
-			return "了解です";
+			if (options.operation)
+				return {
+					requestId: "request-1",
+					attemptId: "1",
+					value: "",
+					toolCalls: [
+						{
+							id: "call",
+							name: "web_search",
+							arguments: JSON.stringify({
+								request: "京都の天気",
+								announcement: "お調べします。",
+							}),
+						},
+					],
+				};
+			if (options.stream) {
+				for (const part of ["了解", "です"]) {
+					delta(part);
+					await pause(5);
+				}
+				await pause(30);
+			}
+			return {
+				requestId: "request-1",
+				attemptId: "1",
+				value: "了解です",
+			};
 		},
+		answer: async () => "了解です",
 		transcribe: async () => "",
 		speak: async () => new Uint8Array(),
 		close: async () => {},
-	};
+	} as unknown as LarmPort;
 	const store: SqliteStore = openStore(join(dir, "db.sqlite3"), MIGRATIONS);
 	const conversation = createConversationService(store);
 	const continuity = createContinuityService(store);

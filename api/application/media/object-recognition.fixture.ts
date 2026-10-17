@@ -1,3 +1,4 @@
+import { answerAnalysis } from "../toolchain/analysis-round.fixture";
 import type { LarmPort } from "../../domains/larm";
 import { imageFixture } from "./image.fixture";
 export const recognitionFixtureImage = {
@@ -81,12 +82,7 @@ export function objectRecognitionFixture() {
 		speak: async () => new Uint8Array(),
 		answer: async (messages, _signal, options) => {
 			contexts.push(JSON.stringify(messages));
-			if (options?.tools?.some((t) => t.function.name === "find_toolchain")) {
-				options.onToolCalls!([
-					{ id: "discover", name: "find_toolchain", arguments: "{}" },
-				]);
-				return "";
-			}
+			if (answerAnalysis(messages, options, { kind: "action" })) return "";
 			if (
 				options?.tools?.some((t) => t.function.name === "object_recognition")
 			) {

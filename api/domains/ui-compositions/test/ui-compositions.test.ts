@@ -676,9 +676,18 @@ test("definitions: only the allowed views, no source, within size and view-count
 	expect(
 		refused(layout([{ view: "form", source: "composition-form", title: "" }])),
 	).toBe("ui_source_forbidden");
-	expect(refused(layout([text()], { direction: "tabs" }))).toBe(
+	expect(refused(layout([text()], { direction: "form-preview" }))).toBe(
 		"ui_layout_direction_not_allowed",
 	);
+	// Tabs take each child's title; the settings screens' explicit tab arrangement is refused.
+	expect(
+		refused(
+			layout([text()], {
+				direction: "tabs",
+				tabs: [{ label: "a", children: [0] }],
+			}),
+		),
+	).toBe("ui_definition_invalid");
 	expect(refused(layout([{ view: "form", title: "x" }]))).toBe(
 		"ui_definition_invalid",
 	);

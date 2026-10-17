@@ -3,7 +3,6 @@ import type { ConversationService } from "../../conversation";
 import type { InferencePort } from "../../inference";
 import type { QueueService } from "../../queue";
 import type { MemoryService, PreparedWindow } from "../../memory";
-import type { NativeTool } from "../../../infrastructure/chat-stream";
 import {
 	RESEARCH_BUDGET,
 	type AgentRuntime,
@@ -60,14 +59,14 @@ export interface GenerateInput {
 	/** Conversational prose is a short spoken reply; artifact bodies keep their own contract. */
 	briefReply?: boolean;
 	currentRequest: CurrentRequest;
-	tools?: NativeTool[];
 	/**
-	 * A new conversation decision: the execute phase retrieves candidate toolchains for this
-	 * request and offers them as functions. Absent while phrasing an operation's result.
+	 * A new conversation decision: the execute phase analyzes the request, then answers it or
+	 * retrieves candidate toolchains for its goal and offers them as functions. Absent while
+	 * phrasing an operation's result.
 	 */
 	routing?: {
-		/** The current utterance with a short excerpt of the preceding turns. */
-		query: string;
+		/** What the first round (the request analysis) reads besides the current request. */
+		analysis: import("./request-analysis").AnalysisInput;
 		/** Toolchains whose runtime is available on this host now. */
 		available: string[];
 		conversationId: string;

@@ -56,7 +56,7 @@ const watch = { view: "timer-workspace", source: "timer-current" };
 const ask = {
 	view: "question",
 	source: "duration-question",
-	title: "所要時間の確認",
+	title: "対象の確認",
 };
 const artifact = {
 	kind: "artifact",
@@ -100,7 +100,7 @@ const artifact = {
 			eventAction: "answer",
 			source: "duration-question",
 			answer: true,
-			inputSchemaRef: "builtin:timerDurationAnswer",
+			inputSchemaRef: "builtin:timerTargetAnswer",
 			effect: "write",
 		},
 		local("clock-mode", "timer-setup"),
@@ -401,7 +401,7 @@ test("stopwatch and mode changes stay local", async () => {
 	expect(submit).not.toHaveBeenCalled();
 });
 
-test("an open question swaps in the question definition and a worded answer reaches the interactions API", async () => {
+test("an open question swaps in the question definition and a chosen target reaches the interactions API", async () => {
 	const answer = vi.fn(async () => ({}));
 	const interaction = {
 		id: "i1",
@@ -412,8 +412,12 @@ test("an open question swaps in the question definition and a worded answer reac
 		artifactRevisionId: REV,
 		question: {
 			questionId: "40000000-0000-4000-8000-000000000001",
-			prompt: "何分のタイマーにしますか？",
-			inputSchemaRef: "builtin:timerDurationAnswer",
+			prompt: "どのタイマーを止めますか？",
+			inputSchemaRef: "builtin:timerTargetAnswer",
+			choices: [
+				{ ref: "60000000-0000-4000-8000-000000000001", label: "お茶" },
+				{ ref: "60000000-0000-4000-8000-000000000002", label: "パスタ" },
+			],
 			revision: 2,
 			expiresAt: new Date(Date.now() + 3600_000).toISOString(),
 		},
@@ -428,13 +432,8 @@ test("an open question swaps in the question definition and a worded answer reac
 		answerToolchainInteraction: answer,
 	});
 	mount(client);
-	await screen.findByText("何分のタイマーにしますか？");
-	const box = screen.getByLabelText("回答");
-	fireEvent.change(box, { target: { value: "3" } });
-	fireEvent.click(screen.getByRole("button", { name: "回答する" }));
-	await screen.findByText(/単位を付けて入力してください/);
-	expect(answer).not.toHaveBeenCalled();
-	fireEvent.change(box, { target: { value: "3分" } });
+	await screen.findByText("どのタイマーを止めますか？");
+	fireEvent.click(screen.getByRole("radio", { name: "パスタ" }));
 	fireEvent.click(screen.getByRole("button", { name: "回答する" }));
 	await waitFor(() => expect(answer).toHaveBeenCalledOnce());
 	expect(answer.mock.calls[0]).toEqual([
@@ -442,7 +441,7 @@ test("an open question swaps in the question definition and a worded answer reac
 		expect.objectContaining({
 			questionId: "40000000-0000-4000-8000-000000000001",
 			expectedRevision: 2,
-			input: { durationSeconds: 180 },
+			input: { timerId: "60000000-0000-4000-8000-000000000002" },
 		}),
 	]);
 });

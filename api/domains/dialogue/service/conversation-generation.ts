@@ -7,10 +7,11 @@ import type { ToolchainCard } from "../../capabilities";
 import { getLogger } from "../../../infrastructure/logger";
 import { ValidationFailure } from "../../../infrastructure/validation-log";
 import { conversationOutput } from "./conversation-output";
-import { validateDiscovery } from "./initial-decision";
+import { validateAnalysis, type RequestAnalysis } from "./initial-decision";
 import {
 	operation,
 	operationRejection,
+	unavailable,
 	type ConversationOperation,
 	type OpenQuestion,
 	type SessionOffers,
@@ -20,7 +21,11 @@ const log = getLogger("dialogue");
 
 type Messages = Parameters<InferencePort["answer"]>[0];
 
-/** One ordinary call; at most one structural correction of a native operation. */
+/**
+ * One call; at most one structural correction of a native operation. Without `tools` it is an ordinary
+ * answer. With `analysis` the request-analysis function is the only valid output; with `tools` a function
+ * call is (a toolchain's, or `report_unavailable`). Prose is never adopted in those two.
+ */
 export async function generateConversation(input: {
 	inference: InferencePort;
 	requestId?: string;
@@ -38,8 +43,8 @@ export async function generateConversation(input: {
 	openQuestions?: OpenQuestion[];
 	/** The session toolchains among `cards` and the saved items each may start from. */
 	sessions?: SessionOffers;
-	/** The first call can answer or request discovery, before any candidates are retrieved. */
-	discovery?: boolean;
+	/** The first round: `tools` holds the request-analysis function and nothing else. */
+	analysis?: boolean;
 	repair: () => void;
 	/**
 	 * Session lifetime of every call here, including the structural correction: `main` for the answer generation,
@@ -55,7 +60,7 @@ export async function generateConversation(input: {
 	text: string;
 	receipt?: Receipt;
 	operation?: ConversationOperation;
-	needsToolchain?: boolean;
+	analysis?: RequestAnalysis;
 	/** The one structural correction was used. */
 	repaired: boolean;
 }> {
@@ -104,6 +109,8 @@ export async function generateConversation(input: {
 		signal.throwIfAborted();
 		try {
 			if (!receipt?.toolCalls?.length) {
+				if (input.analysis) throw operationRejection("analysis_call_required");
+				if (input.tools?.length) throw operationRejection("tool_call_required");
 				if (input.briefReply && !isBriefSpokenReply(text))
 					throw operationRejection("spoken_reply_too_long");
 				output.finish(text);
@@ -111,15 +118,19 @@ export async function generateConversation(input: {
 			}
 			if (!input.tools)
 				throw operationRejection("tools_not_offered_in_request");
-			if (input.discovery) {
-				validateDiscovery(receipt.toolCalls);
+			if (input.analysis) {
+				const analysis = validateAnalysis(receipt.toolCalls);
 				if (text.trim()) input.repair();
-				return {
-					text: "",
-					receipt,
-					needsToolchain: true,
-					repaired: attempt > 0,
-				};
+				return { text: "", receipt, analysis, repaired: attempt > 0 };
+			}
+			const reply = unavailable(receipt.toolCalls);
+			if (reply !== undefined) {
+				// The explanation is the answer itself, under the same spoken-reply contract.
+				if (input.briefReply && !isBriefSpokenReply(reply))
+					throw operationRejection("spoken_reply_too_long");
+				conversationOutput(() => {}, input.tools, true).finish(reply);
+				if (text.trim()) input.repair();
+				return { text: reply, receipt, repaired: attempt > 0 };
 			}
 			const result = {
 				text: "",
@@ -165,15 +176,20 @@ export async function generateConversation(input: {
 					"dialogue.contexts.conversation-generation.correction",
 					{},
 				) +
-				(input.tools?.length
+				(input.analysis
 					? systemContext(
-							"dialogue.contexts.conversation-generation.correction-2",
+							"dialogue.contexts.conversation-generation.correction-analysis",
 							{},
 						)
-					: systemContext(
-							"dialogue.contexts.conversation-generation.correction-3",
-							{},
-						)) +
+					: input.tools?.length
+						? systemContext(
+								"dialogue.contexts.conversation-generation.correction-selection",
+								{},
+							)
+						: systemContext(
+								"dialogue.contexts.conversation-generation.correction-3",
+								{},
+							)) +
 				systemContext(
 					"dialogue.contexts.conversation-generation.correction-4",
 					{},

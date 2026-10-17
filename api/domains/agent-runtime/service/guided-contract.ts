@@ -40,11 +40,8 @@ const invoke = z
 		action: z.literal("invoke"),
 		tool: z.string().min(1).max(200),
 		arguments: z.record(z.string(), z.unknown()),
-		/** Each planned argument has the same canonical read input as the first call. */
-		readAhead: z
-			.array(z.object({ url: z.string().url().max(2048) }).strict())
-			.max(5)
-			.optional(),
+		/** Further URLs read in the same batch; each becomes a `{url}` read like the first call. */
+		readAhead: z.array(z.string().url().max(2048)).max(5).optional(),
 	})
 	.strict();
 const wait = z.object({ action: z.literal("wait") }).strict();

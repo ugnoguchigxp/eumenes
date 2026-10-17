@@ -7,6 +7,7 @@ import {
 	PACKAGE,
 	ADAPTER,
 	operationCall,
+	unavailableCall,
 	lastUser,
 	until,
 	open,
@@ -282,7 +283,8 @@ test("a reply in natural language answers an open question through its questionR
 				return {
 					toolCalls: operationCall({ request: text, questionRef: ref }),
 				};
-			if (text === "もう一度") return {};
+			if (text === "もう一度")
+				return { toolCalls: unavailableCall("対応できません。") };
 			return undefined;
 		},
 	});

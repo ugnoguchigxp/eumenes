@@ -47,17 +47,17 @@
 ### 確認と提案（利用者方針）
 
 - 実行できる依頼は、提案して返事を待たない（「画像を作りましょうか？」で止めない）。R2で担当を選び、一時回答で宣言し、そのまま実行する。
-- `clarify` は必須情報が欠けて進められないとき。
+- `clarify` は必須情報が欠けて進められないとき。ただし委譲が必要な依頼（`live_info`・`past_conversation`・`action`・`creation`、または `live`）は `find_toolchain` に限られるため、その不足はR2の選定（担当の質問、または `report_unavailable`）で扱う。
 - **既存のものを変える依頼は、実行前に確認する。** Claude Code・Codexへのコード改修、新機能の追加で既存機能を改修する依頼などが該当する。git resetなどで戻せる場合も確認する。削除・外部送信・公開など取り消せない操作も同じ。
 
-R1の `analyze_request` に次の引数を加える。
+R1の `analyze_request` のschemaに次の引数を定義する。**今回はschemaの定義とselection traceへの記録までとし、下記「確認の流れ」は実装しない（利用者指示）。** 今回の実装では `impact` による実行の停止・確認は行わず、既存の挙動のまま実行する。
 
 | 引数 | 内容 |
 | --- | --- |
 | `impact` | `none`（答える・調べる・参照するだけ）/ `create`（新しい成果物を作るだけで既存を変えない。画像生成など）/ `modify_existing`（既存の機能・コード・データ・設定・保存物を変える）/ `irreversible`（削除・外部送信・公開など取り消せない） |
 | `approved` | 直前のアシスタント発言が同じ内容の実行確認で、現在の発言がそれへの承認か（`true` / `false`） |
 
-確認の流れ:
+確認の流れ（将来の実装。今回は対象外）:
 
 1. R1が `impact` を `modify_existing` または `irreversible`、`approved=false` と判断した場合も、候補検索とR2の選定は通常どおり行う。何をどの担当で変えるかを具体的に示すため。
 2. R2は選んだ関数を呼ぶが、`announcement` ではなく確認文 `confirmation`（変更する対象と内容、戻せるかを短く述べ、実行してよいか尋ねる一文）を持たせる。hostは担当を起動せず、確認文を返答として配信し、選定した関数・版・依頼を未回答の確認として保存する。保存は既存の未回答質問（`OpenQuestion` の `questionRef`・`functionName`、`interaction-runs.ts`）の再利用を実装の最初に検討する。
@@ -107,8 +107,8 @@ bindingの `effect`（write/local/navigate/draft）は不可逆性や既存へ�
 | `dialogue/service/conversation-generation.ts` | R1で `analyze_request` を必須にし、自然文を採用しない |
 | `dialogue/service/delegate-conversation.ts`・`selection-trace.ts` | 候補検索の検索文（`routing.query`）をR1の `goal` にする。R1の入力を組み立てる（履歴層・現在日時を除き、§6の範囲だけ）。R2の回答入力にR1の結果を加える。traceに記録 |
 | `dialogue/service/generation-handler.ts` | R1の結果で回答生成または `generateSelection` へ分岐。選定後に関数呼び出しがない場合の回答生成を削除 |
-| `dialogue/service/conversation-tools.ts` | R2の候補に `report_unavailable` を加える。関数引数に `announcement` と排他の `confirmation` を加える |
-| `dialogue/service/interaction-runs.ts` ほか | 確認待ちの選定を未回答の確認として保存し、承認時に `questionRef` で照合する |
+| `dialogue/service/conversation-tools.ts` | R2の候補に `report_unavailable` を加える。|
+| （今回対象外）`conversation-tools.ts`・`interaction-runs.ts` | `confirmation` 引数と確認待ちの保存・照合 |
 | 試験 | `find_toolchain` 前提のfixtureを移す。§5の受入場面を追加 |
 
 旧 `find_toolchain` と、初段で自然文の直接回答を採用する経路は削除する。互換経路は残さない。担当選び・委譲後の回答の入力は今回変えない。
@@ -132,9 +132,9 @@ bindingの `effect`（write/local/navigate/draft）は不可逆性や既存へ�
 | 「前に何て言った？」など | R1が `past_conversation`・`find_toolchain`、`history.research` が選ばれる |
 | 「鎌倉の天気は？」→「明日は？」 | 直前の1往復から `goal` を「鎌倉の明日の天気」と補い、`live_info` で委譲 |
 | 「画像を作って」 | `impact=create`。「作りましょうか？」と提案して待たず、選定→「画像生成の準備をします」→実行 |
-| 「この画面に機能を追加して」（Claude Code・Codex） | `impact=modify_existing`。選定後、変更内容を述べて確認。承認後に宣言→実行。承認前に担当を起動しない |
-| 確認への「やめて」「こう変えて」 | 実行せず、新しい依頼として分析し直す |
-| 必須情報の不足 | R1が `missing` を挙げ `clarify`。R2で確認を一つ返す |
+| 「この画面に機能を追加して」（Claude Code・Codex） | R1が `impact=modify_existing` を返し、traceに記録される（確認の流れは今回対象外） |
+| 必須情報の不足（自分で答える依頼） | R1が `missing` を挙げ `clarify`。R2で確認を一つ返す |
+| 必須情報の不足（委譲が必要な依頼） | R1は `find_toolchain`。不足はR2の選定で担当に渡すか `report_unavailable` で説明する |
 | R1の契約違反 | 1回の修復。連続違反は失敗として返し、回答を公開しない |
 | R2で関数を呼ばず自然文で答えた | 採用せず1回の修復。連続違反は失敗。履歴付きの回答生成へ進まない |
 | 依頼を満たす候補がない | `report_unavailable` で不足を説明し、一時回答を出さない |
@@ -148,3 +148,5 @@ bindingの `effect`（write/local/navigate/draft）は不可逆性や既存へ�
 | H1 | R1に直前の1往復を渡すか | 決着：渡す。音声では「明日は？」のような続きの依頼が多く、原文だけでは `goal` を作れないため |
 | H2 | R1に長期記憶を渡すか | 決着（利用者指示）：渡さない。R2は既存どおり長期記憶を受ける |
 | H3 | 日付・時刻そのものの依頼 | Web調査のサブエージェントへ委譲（利用者指示）。サブエージェントは状態の `now` を持つが、現行SKILLは根拠sourceIdを求めるため、検索なしで日時を答えられるかを受入で確認し、できなければSKILLの改訂を別途相談する |
+| H4 | 担当の未回答質問への返事をR1でどう扱うか | 決着：現状維持。R1は直前の1往復で判断する。担当側が既定値で進められる質問はしない方針（例：タイマーは時間がなければ3分で開始。タイマー担当の改訂で対応） |
+| H5 | R2の担当選びに口調を渡すか | 決着：渡さない。担当選びに余計な入力を足さない |

@@ -52,12 +52,12 @@ const titles = (list: string) =>
 
 test("three columns hold the cards with Done and Blocker named by text", () => {
 	setup({ cards: [...todoCards, runningCard, doneCard, blockerCard] });
-	expect(titles("未着手のタスク")).toEqual([
+	expect(titles("未着手＋Planningのタスク")).toEqual([
 		"README の手順修正",
 		"ログ出力の見直し",
 		"設定画面の文言統一",
 	]);
-	expect(titles("実行中のタスク")).toEqual(["API の型を整理"]);
+	expect(titles("Ongoingのタスク")).toEqual(["API の型を整理"]);
 	expect(titles("Done・Blockerのタスク")).toEqual([
 		"テストの追加",
 		"移行スクリプトの実行",
@@ -67,7 +67,9 @@ test("three columns hold the cards with Done and Blocker named by text", () => {
 	const blocker = cardOf("移行スクリプトの実行");
 	expect(within(blocker).getByText("Blocker")).toBeVisible();
 	expect(within(blocker).getByText(/途中で止まりました/)).toBeVisible();
-	expect(screen.getByRole("region", { name: "未着手" })).toBeVisible();
+	expect(
+		screen.getByRole("region", { name: "未着手＋Planning" }),
+	).toBeVisible();
 });
 
 test("queue status shows the running card, waiting count and the paused reason with resume", async () => {
@@ -244,7 +246,7 @@ function dragFixture() {
 test("dropping a dragged card turns the pointer position into beforeCardId", () => {
 	const { onMove } = dragFixture();
 	const dataTransfer = { setData: vi.fn(), effectAllowed: "", dropEffect: "" };
-	const todo = screen.getByRole("list", { name: "未着手のタスク" });
+	const todo = screen.getByRole("list", { name: "未着手＋Planningのタスク" });
 	fireEvent.dragStart(cardOf("設定画面の文言統一"), { dataTransfer });
 	dragAt("dragOver", todo, 60, dataTransfer);
 	expect(todo.querySelector(".kanban-drop-line")).not.toBeNull();
@@ -271,14 +273,14 @@ test("dropping a card where it already is, or in the running column, does nothin
 	fireEvent.dragStart(cardOf("設定画面の文言統一"), { dataTransfer });
 	dragAt(
 		"drop",
-		screen.getByRole("list", { name: "未着手のタスク" }),
+		screen.getByRole("list", { name: "未着手＋Planningのタスク" }),
 		900,
 		dataTransfer,
 	);
 	fireEvent.dragStart(cardOf("README の手順修正"), { dataTransfer });
 	dragAt(
 		"drop",
-		screen.getByRole("list", { name: "実行中のタスク" }),
+		screen.getByRole("list", { name: "Ongoingのタスク" }),
 		0,
 		dataTransfer,
 	);
@@ -630,8 +632,47 @@ test("queue resume names its executor and display filtering does not call a writ
 		}),
 	);
 	expect(onResumeQueue).toHaveBeenCalledWith("one");
-	await user.selectOptions(screen.getByLabelText("表示する担当"), "one");
-	expect(titles("未着手のタスク")).toEqual([todoCards[0]!.title]);
+	await user.click(screen.getByRole("button", { name: "担当Aを表示" }));
+	expect(titles("未着手＋Planningのタスク")).toEqual([todoCards[0]!.title]);
 	expect(onAction).not.toHaveBeenCalled();
+	expect(onMove).not.toHaveBeenCalled();
+});
+
+test("logo buttons filter locally and toggle back to all cards", async () => {
+	const { user, onAction, onAdd, onMove } = setup({
+		executors: [
+			{ id: "claude-code", label: "Claude Code", available: true },
+			{ id: "codex", label: "Codex", available: true },
+		],
+		queues: [
+			{
+				executorId: "claude-code",
+				label: "Claude Code",
+				state: "running",
+				waiting: 0,
+			},
+			{ executorId: "codex", label: "Codex", state: "running", waiting: 1 },
+		],
+		cards: todoCards.map((card, i) => ({
+			...card,
+			executorId: i === 0 ? "codex" : "claude-code",
+		})),
+	});
+	const codex = screen.getByRole("button", { name: "Codexを表示" });
+	expect(codex.querySelector("svg")).toBeInTheDocument();
+	expect(codex).toHaveTextContent("待機中 1件");
+	expect(
+		screen.getByRole("button", { name: "Claude Codeを表示" }),
+	).toHaveTextContent("待機なし");
+	await user.click(codex);
+	expect(codex).toHaveAttribute("aria-pressed", "true");
+	expect(titles("未着手＋Planningのタスク")).toEqual([todoCards[0]!.title]);
+	await user.click(codex);
+	expect(titles("未着手＋Planningのタスク")).toHaveLength(todoCards.length);
+	await user.click(codex);
+	await user.click(screen.getByRole("button", { name: "すべて" }));
+	expect(titles("未着手＋Planningのタスク")).toHaveLength(todoCards.length);
+	expect(onAction).not.toHaveBeenCalled();
+	expect(onAdd).not.toHaveBeenCalled();
 	expect(onMove).not.toHaveBeenCalled();
 });

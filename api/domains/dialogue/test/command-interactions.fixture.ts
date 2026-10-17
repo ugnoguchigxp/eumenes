@@ -26,7 +26,14 @@ import {
 	type ToolchainRoutingPort,
 } from "..";
 import { COMMAND_KIND } from "../service/context";
+import type { RequestAnalysis } from "../service/initial-decision";
 import { waitFor } from "../../../infrastructure/wait-for";
+import {
+	analysisReceipt,
+	delegatingArgs,
+	isAnalysisRound,
+	UNAVAILABLE,
+} from "./analysis.fixture";
 export const REVISION = "toolchain:fake.manage@1";
 export const BINDING = "binding:fake.command@1";
 export const PACKAGE = "package:fake.manage@1";
@@ -77,6 +84,14 @@ export const operationCall = (args: Record<string, unknown>) => [
 		}),
 	},
 ];
+/** The explanation that no offered function fits. */
+export const unavailableCall = (reply: string) => [
+	{
+		id: "unavailable",
+		name: UNAVAILABLE,
+		arguments: JSON.stringify({ reply }),
+	},
+];
 export const lastUser = (history: Call["history"]) =>
 	[...history].reverse().find((m) => m.role === "user")?.content ?? "";
 export const until = (check: () => boolean, ms = 4000) =>
@@ -100,10 +115,13 @@ export function setup(
 		backend?: string;
 		bound?: boolean;
 		available?: boolean;
+		/** The request analysis of the i-th run, over a delegating one; without it a run delegates. */
+		analyses?: Array<Partial<RequestAnalysis>>;
 		/** The binding's allowed question schemas (default: QUESTIONS). */
 		questions?: BoundCommandSet["questions"];
 	} = {},
 ) {
+	const analyses = [...(options.analyses ?? [])];
 	const set: BoundCommandSet = {
 		...baseSet,
 		questions: options.questions ?? QUESTIONS,
@@ -205,15 +223,11 @@ export function setup(
 			tools: Call["tools"] | undefined,
 			session?: unknown,
 		) => {
-			if (tools?.[0]?.function.name === "find_toolchain")
-				return {
-					requestId,
-					attemptId: "discovery",
-					value: "",
-					toolCalls: [
-						{ id: "discovery", name: "find_toolchain", arguments: "{}" },
-					],
-				} as Receipt;
+			if (isAnalysisRound(tools))
+				return analysisReceipt(requestId, {
+					...delegatingArgs(),
+					...analyses.shift(),
+				});
 			const call = { history, tools: tools ?? [], session };
 			const index = conversationCalls.push(call) - 1;
 			// By default the conversation hands the utterance to the offered function.

@@ -1,5 +1,5 @@
 import type { Receipt } from "../../inference";
-import { chosen, type prepareDecision } from "./selection-trace";
+import { chosen, type Decision } from "./selection-trace";
 import type { generateConversation } from "./conversation-generation";
 import type { DialogueDeps, GenerateInput } from "./context";
 import { byId, saveAnnouncement } from "../repository";
@@ -63,7 +63,7 @@ export async function announceSelection(
 	input: GenerateInput,
 	selected: {
 		generated: Awaited<ReturnType<typeof generateConversation>>;
-		decision: Awaited<ReturnType<typeof prepareDecision>>;
+		decision: Decision;
 		signal: AbortSignal;
 		publish: () => void;
 	},

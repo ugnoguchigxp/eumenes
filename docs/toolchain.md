@@ -36,7 +36,7 @@ streamでは、function名や制御区切りになり得る末尾だけを保留
 
 候補は今回のユーザープロンプトだけをEmbeddingし、登録された機能との類似度で取得します。履歴を検索文に混ぜたり、FTSや過去の選択を加点したりしません。履歴はLLMが省略や指示語を補う参考文脈として扱い、今回の明示された依頼を優先します。候補件数・Embeddingを利用できない場合の全候補提示・権限検査は従来のままです。
 
-ツールチェーンは「サブエージェント・SystemContext・SKILL・ツールの使い方・ツール詳細・Artifact」の一組です([設計](../spec/.archived/toolchain-set-routing-design-2026-10-12.md)、[登録手順](toolchain-extension.md#1-全体像))。通常会話AIは最初に自力で依頼を満たせるか判断し、直接回答・必要な確認、または担当の探索を選びます。探索の場合だけ候補を取得し、提示された関数を一つ選びます。関数の共通引数は `{ request, announcement }` で、`announcement` は実行前に利用者へ伝える200文字以内の短い予告です。hostが検査・保存・通知してから既存の担当を開始します。予告はrunに保存され、最終回答や会話の記憶には混ぜません（[設計・検証記録](../spec/conversation-pre-delegation-response-design-2026-10-17.md)）。
+ツールチェーンは「サブエージェント・SystemContext・SKILL・ツールの使い方・ツール詳細・Artifact」の一組です([設計](../spec/.archived/toolchain-set-routing-design-2026-10-12.md)、[登録手順](toolchain-extension.md#1-全体像))。通常会話の初動は必ず2ラウンドです。R1は依頼の分析で、役割・現在の依頼・直前の1往復だけを渡し、関数 `analyze_request` を一度呼ばせます(自然文は採用せず、呼ばれなければ構造修復へ返す)。分析は依頼の目的・成果の形・種類(`kind`)・鮮度(`freshness`)・欠けた必須情報・次の段階(`next`: answer/clarify/find_toolchain)・影響(`impact`)・承認(`approved`)を持ちます。`kind` が live_info・past_conversation・action・creation、または `freshness=live` なら `next` は find_toolchain、clarify は欠けた必須情報があるときだけで、hostは構造だけを検査します。answer/clarify なら R2 で既存の回答生成(関数なし)を行います。find_toolchain なら、R1の `goal` を検索文として候補を取得し、R2で候補の関数と `report_unavailable` を提示して、必ず関数を一つ呼ばせます(自然文は採用せず、構造修復へ返す。履歴付きで改めて回答する経路はない)。関数の共通引数は `{ request, announcement }` で、`announcement` は実行前に利用者へ伝える200文字以内の短い予告です。hostが検査・保存・通知してから既存の担当を開始します。予告はrunに保存され、最終回答や会話の記憶には混ぜません（[設計・検証記録](../spec/conversation-pre-delegation-response-design-2026-10-17.md)）。
 
 専門担当へ完全に切り替えるsession型は、hostが発行した保存作品の `target` と、未保存作業を破棄して切り替える `resolveUnsaved` を任意で持ちます。選定時には登録済みの方式が関数説明へ渡され、切替を予告します。成立後の発言は専門担当へ直接届き、通常会話AIの再選定や言い直しを挟みません。担当は既存の返却・終了の契約で通常担当へ戻ります（[計画](../spec/toolchain-specialist-dialogue-implementation-plan-2026-10-17.md)）。結果返却型は担当の結果を通常会話AIが伝えます。内部の経路・ツール・引数は各ツールチェーンのサブエージェントが決めます。
 
@@ -44,11 +44,11 @@ streamでは、function名や制御区切りになり得る末尾だけを保留
 
 | 会話の関数 | ツールチェーン | package | 実行 | 検索 | 読取り | 保存本文 | モデル呼出し | 報告 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `web_search` | `web.search` | `package:web.recipe@4` | LARMの調査担当。guided、手順キャッシュ付き | 2 | 4 | local予算4 | 5 | 本文根拠と完成回答 |
-| `web_research` | `web.research.codex` | `package:web.search@4` | 保存済みのCodex調査担当。guided | 2 | 6 | local予算4 | 12 | 本文根拠と完成回答 |
+| `web_search` | `web.search` | `package:web.recipe@5` | LARMの調査担当。guided、手順キャッシュ付き | 2 | 4 | local予算4 | 5 | 本文根拠と完成回答 |
+| `web_research` | `web.research.codex` | `package:web.search@5` | 保存済みのCodex調査担当。guided | 2 | 6 | local予算4 | 12 | 本文根拠と完成回答 |
 | `conversation_history` | `history.research` | `package:history.research@2` | 調査担当 | — | — | 履歴 | 7 | V3報告 |
 | `world_query` | `world.query` | `package:world.query@5` | World有効時の調査担当。ホスト内の読取 | — | — | Worldの主張・収集資料 | 7 | search報告 |
-| `timer` | `timers.manage` | `package:timers.manage@1` | 操作担当→タイマー操作 | — | — | — | 1+回答 | 操作結果 |
+| `timer` | `timers.manage` | `package:timers.manage@2` | 操作担当→タイマー操作 | — | — | — | 1+回答 | 操作結果 |
 | `music` / `music_library` | `music.create` / `music.library` | `package:music.create@2` / `package:music.playback@1` | 音楽domainの計画担当 | — | — | — | 計画+回答 | 音楽結果 |
 | `delegate_project` | `dots.delegate` | `package:dots.orchestrate@2` | 操作担当→dots委任 | — | — | — | 1+回答 | 委任結果 |
 | `ocr` | `ocr.manage` | `package:ocr.manage@1` | 操作担当→OCR | — | — | — | — | 操作結果 |
@@ -57,7 +57,7 @@ streamでは、function名や制御区切りになり得る末尾だけを保留
 | `ui_create` | `ui.compose` | `package:ui.studio@1` | 専門担当へ切替（session）。以後の発言は担当が直接受ける | — | — | — | 1ターン最大6 | 下書き反映・作品参照 |
 | `memory_request` | `steward.request` | `package:steward.request@2` | 記憶担当への依頼 | — | — | — | — | 依頼結果 |
 
-候補の提示: 発話(直前の会話の短い抜粋を含む)に対し、ツールチェーンの`title`・`summary`・`useWhen`・`examples`へのFTS(trigram)、LARMのembedding(multilingual-e5-small、passageとして保存、発話はquery)、似た依頼での過去の選択をRRFで統合し、上位4件を関数として提示します。embeddingを利用できない・ベクトル未生成の間は、利用可能な全ツールチェーンを提示します。候補検索は分類ではなく、選択は会話担当が行います。似た依頼での過去の選択(依頼文・関数名・結果)を最大3件、参考データとして会話担当へ渡します。
+候補の提示: R1の `goal`(続きの依頼は直前の1往復から補った完結した依頼)に対し、ツールチェーンの`title`・`summary`・`useWhen`・`examples`へのFTS(trigram)、LARMのembedding(保存済み設定・catalogのモデルで、passageとして保存、発話はquery)、似た依頼での過去の選択をRRFで統合し、上位4件を関数として提示します。embeddingを利用できない・ベクトル未生成の間は、利用可能な全ツールチェーンを提示します。候補検索は分類ではなく、選択は会話担当が行います。似た依頼での過去の選択(依頼文・関数名・結果)を最大3件、参考データとして会話担当へ渡します。
 
 選択の記録: 会話の判断ごとに、提示した候補(順位・FTS順位・類似度・過去の選択由来)、判断(ツールチェーン・回答・契約違反)、選んだ関数と渡した依頼、サブエージェントのtask、結果(outcome)、手順キャッシュの利用を `toolchain-history` に30日保存します。`/api/toolchain-history/selections`、`bun run cli -- toolchain-history list|show`、設定「ツールチェーンの記録」で確認できます。ログには相関IDと固定分類だけを出し、依頼文は出しません。
 
@@ -65,7 +65,7 @@ streamでは、function名や制御区切りになり得る末尾だけを保留
 
 操作担当(`timer`・`delegate_project`): ツールチェーンのprofile・SKILL・ツール詳細とsnapshot(タイマー一覧・委任catalog)を読み込み、ツールを一つ選んで平坦な引数で返すか、確認質問を一つ返します。ホストは型付きの操作に変換して既存の実行経路で実行します。確認質問は会話担当が自分の言葉で尋ねます。
 
-現行のWeb経路は `package:web.recipe@4`・`package:web.search@4`、schema `guidedResearch`、SKILL `skill:web.guided@3` を使います。検索抜粋は取得先選択の参考とし、主張の根拠にはしません。`web.read` は `{url}` だけを受け、同じ呼出しで確認する追加URLを `readAhead` で最大5件指定できます。主URLを含め残りの読取・外部呼出し上限内に収めます。全操作を共通のツール実行記録とQueueへ登録し、選んだ組の全件が完了・失敗してからモデルを一度再開します。到着ごとのモデル呼出し、2件ずつの追加取得、10秒タイマー、独自の取得状態は使いません。保存済み本文の `web.find` / `web.read_saved` と手順の `recipe.find` はページ読取とは別のlocal予算（4）です。
+現行のWeb経路は `package:web.recipe@5`・`package:web.search@5`、schema `guidedResearch`、SKILL `skill:web.guided@4` を使います。検索抜粋は取得先選択の参考とし、主張の根拠にはしません。`web.read` は `{url}` だけを受け、同じ呼出しで確認する追加URLを `readAhead`（URL文字列の配列 `["https://…", …]`、最大5件。旧 `[{url}]` の object 形は受理しません）で指定できます。主URLを含め残りの読取・外部呼出し上限内に収めます。全操作を共通のツール実行記録とQueueへ登録し、選んだ組の全件が完了・失敗してからモデルを一度再開します。到着ごとのモデル呼出し、2件ずつの追加取得、10秒タイマー、独自の取得状態は使いません。保存済み本文の `web.find` / `web.read_saved` と手順の `recipe.find` はページ読取とは別のlocal予算（4）です。
 
 `finish.report` は `completion`、利用者へ届く `answer`、`summary`、事実ごとの `claims`（`verified` / `unknown` / `conflicting` と本文根拠 `eN`）、`limitations` を持ちます。本文に基づく主張・未確認点・完成回答を同じfinishで返し、要件抽出・追加の意味採点は行いません。不明や矛盾を説明した回答は `complete` にできます。構造や参照が不正な場合の修正（一回まで）、権限・取消・期限の検査を維持します。再試行のcooldownは前の確定receiptからQueueの受付可能時刻へ渡します。
 
@@ -85,7 +85,7 @@ domain の責務は [domains.md](domains.md)、Web 取得は [web-research.md](w
 
 ## 要件profileとV3報告
 
-要件profileとV3報告は `history` 経路だけが使います。Web経路（`web.recipe@4`・`web.search@4`）はprofileを受けず、指定された場合は開始時に `invalid_requirement_contract` で拒否します。
+要件profileとV3報告は `history` 経路だけが使います。Web経路（`web.recipe@5`・`web.search@5`）はprofileを受けず、指定された場合は開始時に `invalid_requirement_contract` で拒否します。
 
 利用者が再利用する確認基準は `kind:requirement` のデータとして登録します。要件profileは実行権限を持たず、package検索・ツールの依存閉包へ入りません。履歴のサブエージェントは、開始時に固定した要件catalogから適用するprofileの短いrefを最初の応答で選びます(最大4件)。会話担当はprofileを選びません。workerは最初の操作と同じ応答で依頼の条件を抽出し、ホストが登録profileと合成して、取得開始前に凍結します。原文、版付きSKILL/profileの本文、選択した要件データがモデル入力へ届きます。
 
@@ -112,7 +112,7 @@ profileは最大12要件・16 KiB、同時選択は4profile、合成後は12要�
 
 ## タイマーと音声
 
-タイマーは bundle 登録の `toolchain:timers.manage@4`（「タイマー」）で、binding `binding:timers.command@3`（確認質問の回答schemaを宣言）と artifact `artifact:timers.workspace@2` を通じて登録 adapter `adapter:timers@1` が実行します（[登録手順](toolchain-extension.md#3-bundleだけで追加改訂する)）。
+タイマーは bundle 登録の `toolchain:timers.manage@6`（「タイマー」。package `@2`・skill `@2`）で、binding `binding:timers.command@4`（確認質問は取消対象の選択だけを宣言）と artifact `artifact:timers.workspace@3` を通じて登録 adapter `adapter:timers@1` が実行します（[登録手順](toolchain-extension.md#3-bundleだけで追加改訂する)）。時間・単位が依頼にない開始は、聞き返さずに既定の3分（180秒）で保存します。既定値はskill本文（`builtin/timers/SKILL.v2.md`）が持ち、会話側のコードには持たせません。時間が示された依頼はその秒数で開始します。
 
 タイマーは権限・操作receiptを再検査したうえで、label、状態、残時間、期限を含む全itemsを回答モデルへ渡します。ページングされた一覧は `complete:false`、失敗は固定codeを含む構造化結果です。回答直前に状態をrefreshし、ユーザー本文を位置・内容検索で書き換えません。操作の再実行やホストでの定型文章化は行いません。
 

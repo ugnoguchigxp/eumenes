@@ -1,0 +1,187 @@
+{
+	"view": "layout",
+	"direction": "stack",
+	"gap": "normal",
+	"width": "wide",
+	"appearance": "elegant",
+	"title": "老後資金の試算",
+	"model": {
+		"state": {
+			"age": {
+				"type": "number",
+				"initial": 40,
+				"min": 20,
+				"max": 70,
+				"step": 1
+			},
+			"retire": {
+				"type": "number",
+				"initial": 65,
+				"min": 50,
+				"max": 75,
+				"step": 1
+			},
+			"start": {
+				"type": "number",
+				"initial": 1000000,
+				"min": 0,
+				"max": 50000000,
+				"step": 100000
+			},
+			"monthly": {
+				"type": "number",
+				"initial": 30000,
+				"min": 0,
+				"max": 500000,
+				"step": 1000
+			},
+			"rate": {
+				"type": "number",
+				"initial": 3,
+				"min": 0,
+				"max": 15,
+				"step": 0.5
+			}
+		},
+		"computed": {
+			"balance": {
+				"series": {
+					"from": "age",
+					"to": "retire",
+					"initial": "start",
+					"expr": "prev * (1 + rate / 100) + monthly * 12"
+				}
+			},
+			"atRetire": "last(balance)",
+			"principal": "start + monthly * 12 * max(retire - age, 0)",
+			"gain": "atRetire - principal",
+			"years": "max(retire - age, 0)"
+		}
+	},
+	"children": [
+		{
+			"view": "text-block",
+			"title": "老後資金のシミュレーター",
+			"body": "年齢、積立額、想定の年利を動かして、退職時の資産の目安を確かめます。",
+			"emphasis": "strong"
+		},
+		{
+			"view": "layout",
+			"direction": "grid",
+			"title": "条件",
+			"children": [
+				{
+					"view": "slider",
+					"bind": "age",
+					"label": "いまの年齢",
+					"format": "integer",
+					"unit": "歳"
+				},
+				{
+					"view": "slider",
+					"bind": "retire",
+					"label": "退職する年齢",
+					"format": "integer",
+					"unit": "歳"
+				},
+				{
+					"view": "number-input",
+					"bind": "start",
+					"label": "いまの貯蓄",
+					"unit": "円"
+				},
+				{
+					"view": "slider",
+					"bind": "monthly",
+					"label": "毎月の積立",
+					"format": "yen"
+				},
+				{
+					"view": "slider",
+					"bind": "rate",
+					"label": "想定年利",
+					"format": "number",
+					"decimals": 1,
+					"unit": "%"
+				}
+			]
+		},
+		{
+			"view": "layout",
+			"direction": "grid",
+			"title": "結果（試算）",
+			"children": [
+				{
+					"view": "stat",
+					"label": "退職時の資産",
+					"expr": "atRetire",
+					"format": "yen",
+					"trend": "up"
+				},
+				{
+					"view": "stat",
+					"label": "積立元本",
+					"expr": "principal",
+					"format": "yen"
+				},
+				{
+					"view": "stat",
+					"label": "運用による増加",
+					"expr": "gain",
+					"format": "yen",
+					"trend": "up"
+				},
+				{
+					"view": "stat",
+					"label": "積み立てる期間",
+					"expr": "years",
+					"format": "integer",
+					"unit": "年"
+				}
+			]
+		},
+		{
+			"view": "chart",
+			"kind": "area",
+			"title": "資産の推移",
+			"series": [
+				{
+					"name": "資産",
+					"from": "balance"
+				}
+			],
+			"xLabel": "年齢",
+			"yLabel": "資産",
+			"format": "yen",
+			"note": "想定年利が毎年一定として計算しています。"
+		},
+		{
+			"view": "data-table",
+			"title": "年ごとの資産",
+			"series": "balance",
+			"columns": [
+				{
+					"header": "年齢",
+					"expr": "x",
+					"format": "integer",
+					"unit": "歳"
+				},
+				{
+					"header": "資産",
+					"expr": "y",
+					"format": "yen"
+				},
+				{
+					"header": "元本",
+					"expr": "start + monthly * 12 * (x - age)",
+					"format": "yen"
+				}
+			]
+		},
+		{
+			"view": "info-card",
+			"title": "前提と注意",
+			"body": "年利は毎年一定、積立は年初にまとめて行うものとし、税金、手数料、物価の変動は考えていません。画面の数字は試算であり、将来の結果を保証するものではありません。"
+		}
+	]
+}

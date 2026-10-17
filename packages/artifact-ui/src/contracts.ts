@@ -16,6 +16,18 @@ export type {
 export type { ObjectRecognitionResource } from "./object-recognition-components";
 import type { DrawingResource } from "./drawing-components";
 import { z } from "zod";
+import {
+	compositionModel,
+	compositionViewRegistry,
+	expression,
+} from "./composition-contracts";
+export {
+	compositionDirections,
+	compositionViews,
+} from "./composition-contracts";
+export { validateComposition } from "./composition-validate";
+export { computeValues } from "./composition-compute";
+export type { CompositionModelDefinition } from "./composition-contracts";
 import type { ImageWorkspaceResource } from "./image-components";
 export type { ImageWorkspaceResource } from "./image-components";
 import type { RecordsResource } from "./records-components";
@@ -127,6 +139,7 @@ const musicCreationOptions = z
 				ctx.addIssue({ code: "custom", message: "unknown music default" });
 	});
 export const viewRegistry = {
+	...compositionViewRegistry,
 	"text-block": {
 		name: "TextBlock",
 		label: "見出しと説明文",
@@ -487,7 +500,13 @@ export function parseRequest(value: unknown): ArtifactRequest {
 }
 const layoutShape = z.strictObject({
 	view: z.literal("layout"),
-	direction: z.enum(["stack", "grid", "tabs", "form-preview"]).default("stack"),
+	direction: z
+		.enum(["stack", "grid", "tabs", "form-preview", "slides"])
+		.default("stack"),
+	/** The composition's shared state; the outermost layout only (`validateComposition`). */
+	model: compositionModel.optional(),
+	/** Shows the children only while this expression is true. */
+	when: expression.optional(),
 	appearance: z.enum(["clean", "warm", "elegant", "friendly"]).optional(),
 	gap: z.enum(layoutGaps).optional(),
 	width: z.enum(layoutWidths).optional(),

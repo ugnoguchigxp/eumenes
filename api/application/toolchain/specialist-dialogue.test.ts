@@ -1,5 +1,11 @@
 import { afterEach, expect, test } from "bun:test";
 import type { LarmPort } from "../../domains/larm";
+import {
+	analysisArgs,
+	ANALYZE,
+	delegatingArgs,
+	isAnalysisRound,
+} from "../../domains/dialogue/test/analysis.fixture";
 import { harness } from "./toolchain.fixture";
 
 /**
@@ -97,17 +103,25 @@ async function rig() {
 				return typeof value === "string" ? value : JSON.stringify(value);
 			}
 			mainPrompts.push(messages.map((m) => ({ ...m })));
-			const discovery = options?.tools?.[0]?.function.name === "find_toolchain";
 			const head = script.main[0];
-			if (discovery) routeCalls++;
-			if (discovery && typeof head === "object") {
+			// The first round of every main-agent run: the script decides whether the request is delegated.
+			if (isAnalysisRound(options?.tools)) {
+				routeCalls++;
+				const goal = messages.filter((m) => m.role === "user").at(-1)!.content;
 				options!.onToolCalls!([
-					{ id: id(), name: "find_toolchain", arguments: "{}" },
+					{
+						id: id(),
+						name: ANALYZE,
+						arguments: JSON.stringify(
+							typeof head === "object"
+								? delegatingArgs({ goal, kind: "creation" })
+								: analysisArgs({ goal }),
+						),
+					},
 				]);
 				return "";
 			}
-			const routing = !!options?.tools?.length && !discovery;
-			if (routing && typeof head === "object") {
+			if (options?.tools?.length && typeof head === "object") {
 				script.main.shift();
 				options!.onToolCalls!([
 					{ id: id(), name: head.tool, arguments: JSON.stringify(head.args) },
@@ -250,7 +264,7 @@ async function rig() {
 		h,
 		script,
 		mainPrompts,
-		/** How many runs the main agent took (each starts with one answer/discovery decision). */
+		/** How many runs the main agent took (each starts with the request analysis). */
 		get mainRuns() {
 			return routeCalls;
 		},

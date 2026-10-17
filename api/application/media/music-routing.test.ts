@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import { harness } from "../toolchain/toolchain.fixture";
 import { musicFixture } from "./music.fixture";
+import { isAnalysisRound } from "../../domains/dialogue/test/analysis.fixture";
 import {
 	toolchainPassages,
 	type VectorSpace,
@@ -21,7 +22,7 @@ test("the current music request reaches generation after unrelated Web and image
 	const model = {
 		...f.model,
 		answer: async (...args: Parameters<typeof f.model.answer>) => {
-			if (args[2]?.tools?.length) {
+			if (args[2]?.tools?.length && !isAnalysisRound(args[2].tools)) {
 				offered = args[2].tools.map((t) => t.function.name);
 				expect(offered).toContain("music");
 				expect(offered[0]).toBe("music");

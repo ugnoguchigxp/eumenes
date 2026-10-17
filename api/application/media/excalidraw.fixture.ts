@@ -1,3 +1,4 @@
+import { answerAnalysis } from "../toolchain/analysis-round.fixture";
 import type { LarmPort } from "../../domains/larm";
 import { drawingFixture } from "../../domains/excalidraw/test/connection.fixture";
 export function excalidrawFixture(action: "create" | "library" = "create") {
@@ -12,12 +13,7 @@ export function excalidrawFixture(action: "create" | "library" = "create") {
 		speak: async () => new Uint8Array(),
 		answer: async (messages, _signal, options) => {
 			contexts.push(JSON.stringify(messages));
-			if (options?.tools?.[0]?.function.name === "find_toolchain") {
-				options.onToolCalls!([
-					{ id: "discovery", name: "find_toolchain", arguments: "{}" },
-				]);
-				return "";
-			}
+			if (answerAnalysis(messages, options, { kind: "creation" })) return "";
 			if (options?.tools?.length) {
 				stages.push("route");
 				options.onToolCalls!([

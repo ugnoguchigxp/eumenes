@@ -5,6 +5,10 @@
 		{
 			"revisionId": "package:timers.manage@1",
 			"digest": "d3520959a10569eefbafcc4fcd38a558ebdc50af003fa89f522538d6c58f3a75"
+		},
+		{
+			"revisionId": "package:timers.manage@2",
+			"digest": "d6da50ac4cfe7645acd84777ad639cee931732bd0cc6328217905190ea61b45f"
 		}
 	],
 	"definitions": [
@@ -89,6 +93,64 @@
 			"redirects": [],
 			"bindingRevisionId": "binding:timers.command@3",
 			"artifactRevisionId": "artifact:timers.workspace@2"
+		},
+		{
+			"kind": "toolchain",
+			"id": "timers.manage",
+			"revision": 5,
+			"title": "タイマー",
+			"summary": "相対時間のタイマーを開始・確認・取消する。時間の指定がなければ3分で開始する",
+			"aliases": ["タイマー"],
+			"tags": [],
+			"useWhen": [
+				"何分後に知らせてほしい",
+				"タイマーを起動したい",
+				"タイマーの残り時間を知りたい",
+				"タイマーを止めたい"
+			],
+			"avoidWhen": ["時刻指定の予定", "繰り返しのアラーム"],
+			"examples": [
+				"3分のタイマーをセットして",
+				"6分タイマー起動して",
+				"タイマー起動して",
+				"タイマーあと何分？",
+				"パスタのタイマーを止めて"
+			],
+			"dependencies": ["package:timers.manage@2"],
+			"packageRevisionId": "package:timers.manage@2",
+			"functionName": "timer",
+			"redirects": [],
+			"bindingRevisionId": "binding:timers.command@3",
+			"artifactRevisionId": "artifact:timers.workspace@2"
+		},
+		{
+			"kind": "toolchain",
+			"id": "timers.manage",
+			"revision": 6,
+			"title": "タイマー",
+			"summary": "相対時間のタイマーを開始・確認・取消する。時間の指定がなければ3分で開始する",
+			"aliases": ["タイマー"],
+			"tags": [],
+			"useWhen": [
+				"何分後に知らせてほしい",
+				"タイマーを起動したい",
+				"タイマーの残り時間を知りたい",
+				"タイマーを止めたい"
+			],
+			"avoidWhen": ["時刻指定の予定", "繰り返しのアラーム"],
+			"examples": [
+				"3分のタイマーをセットして",
+				"6分タイマー起動して",
+				"タイマー起動して",
+				"タイマーあと何分？",
+				"パスタのタイマーを止めて"
+			],
+			"dependencies": ["package:timers.manage@2"],
+			"packageRevisionId": "package:timers.manage@2",
+			"functionName": "timer",
+			"redirects": [],
+			"bindingRevisionId": "binding:timers.command@4",
+			"artifactRevisionId": "artifact:timers.workspace@3"
 		}
 	],
 	"bindings": [
@@ -188,6 +250,40 @@
 				{
 					"inputSchemaRef": "builtin:timerDurationAnswer"
 				},
+				{
+					"inputSchemaRef": "builtin:timerTargetAnswer",
+					"choiceField": "timerId"
+				}
+			]
+		},
+		{
+			"kind": "binding",
+			"id": "timers.command",
+			"revision": 4,
+			"execution": "command",
+			"adapterRef": "adapter:timers@1",
+			"availabilityRef": "availability:timers@1",
+			"tools": [
+				{
+					"toolRevisionId": "tool:timer.start@1",
+					"operationId": "timers.start",
+					"inputSchemaRef": "builtin:timerStart"
+				},
+				{
+					"toolRevisionId": "tool:timer.list@1",
+					"operationId": "timers.list-with-receipt",
+					"inputSchemaRef": "builtin:timerList"
+				},
+				{
+					"toolRevisionId": "tool:timer.cancel@1",
+					"operationId": "timers.cancel",
+					"inputSchemaRef": "builtin:timerCancel"
+				}
+			],
+			"outputSchemaRef": "domain:timers.receipt@1",
+			"resultProjectionRef": "projection:timer-result@1",
+			"artifactRevisionId": "artifact:timers.workspace@3",
+			"questions": [
 				{
 					"inputSchemaRef": "builtin:timerTargetAnswer",
 					"choiceField": "timerId"
@@ -572,6 +668,231 @@
 					"source": "duration-question",
 					"answer": true,
 					"inputSchemaRef": "builtin:timerDurationAnswer",
+					"effect": "write"
+				},
+				{
+					"actionId": "clock-mode-setup",
+					"eventAction": "clock-mode",
+					"source": "timer-setup",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "local"
+				},
+				{
+					"actionId": "stopwatch-start-setup",
+					"eventAction": "stopwatch-start",
+					"source": "timer-setup",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "local"
+				},
+				{
+					"actionId": "stopwatch-stop-setup",
+					"eventAction": "stopwatch-stop",
+					"source": "timer-setup",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "local"
+				},
+				{
+					"actionId": "stopwatch-reset-setup",
+					"eventAction": "stopwatch-reset",
+					"source": "timer-setup",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "local"
+				},
+				{
+					"actionId": "timer-new-setup",
+					"eventAction": "timer-new",
+					"source": "timer-setup",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "local"
+				},
+				{
+					"actionId": "clock-mode-current",
+					"eventAction": "clock-mode",
+					"source": "timer-current",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "local"
+				},
+				{
+					"actionId": "stopwatch-start-current",
+					"eventAction": "stopwatch-start",
+					"source": "timer-current",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "local"
+				},
+				{
+					"actionId": "stopwatch-stop-current",
+					"eventAction": "stopwatch-stop",
+					"source": "timer-current",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "local"
+				},
+				{
+					"actionId": "stopwatch-reset-current",
+					"eventAction": "stopwatch-reset",
+					"source": "timer-current",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "local"
+				},
+				{
+					"actionId": "timer-new-current",
+					"eventAction": "timer-new",
+					"source": "timer-current",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "local"
+				}
+			]
+		},
+		{
+			"kind": "artifact",
+			"id": "timers.workspace",
+			"revision": 3,
+			"title": "タイマー",
+			"variants": [
+				{
+					"id": "standard",
+					"label": "標準",
+					"definition": {
+						"view": "timer-workspace",
+						"source": "timer-current"
+					},
+					"questionDefinition": {
+						"view": "layout",
+						"direction": "stack",
+						"children": [
+							{
+								"view": "timer-workspace",
+								"source": "timer-current"
+							},
+							{
+								"view": "question",
+								"source": "duration-question",
+								"title": "対象の確認"
+							}
+						]
+					}
+				},
+				{
+					"id": "variant-a",
+					"label": "見出し付きの縦並び",
+					"definition": {
+						"view": "layout",
+						"direction": "stack",
+						"title": "タイマー",
+						"children": [
+							{
+								"view": "timer-workspace",
+								"source": "timer-current"
+							}
+						]
+					},
+					"questionDefinition": {
+						"view": "layout",
+						"direction": "stack",
+						"title": "タイマー",
+						"children": [
+							{
+								"view": "timer-workspace",
+								"source": "timer-current"
+							},
+							{
+								"view": "question",
+								"source": "duration-question",
+								"title": "対象の確認"
+							}
+						]
+					}
+				},
+				{
+					"id": "variant-b",
+					"label": "格子配置",
+					"definition": {
+						"view": "layout",
+						"direction": "grid",
+						"children": [
+							{
+								"view": "timer-workspace",
+								"source": "timer-current"
+							}
+						]
+					},
+					"questionDefinition": {
+						"view": "layout",
+						"direction": "grid",
+						"children": [
+							{
+								"view": "question",
+								"source": "duration-question",
+								"title": "対象の確認"
+							},
+							{
+								"view": "timer-workspace",
+								"source": "timer-current"
+							}
+						]
+					}
+				}
+			],
+			"defaultVariant": "standard",
+			"sourceBindings": [
+				{
+					"source": "timer-setup",
+					"adapterRef": "adapter:timers@1",
+					"query": "query:timers.setup@1",
+					"target": "none"
+				},
+				{
+					"source": "timer-current",
+					"adapterRef": "adapter:timers@1",
+					"query": "query:timers.current@1",
+					"target": "required"
+				},
+				{
+					"source": "duration-question",
+					"adapterRef": "adapter:timers@1",
+					"query": "query:timers.question@1",
+					"target": "optional"
+				}
+			],
+			"actionBindings": [
+				{
+					"actionId": "timer-start",
+					"eventAction": "timer-start",
+					"source": "timer-setup",
+					"operationId": "timers.start",
+					"inputSchemaRef": "builtin:timerHms",
+					"inputAdapterRef": "input:timer-hms@1",
+					"effect": "write"
+				},
+				{
+					"actionId": "timer-pause",
+					"eventAction": "timer-pause",
+					"source": "timer-current",
+					"operationId": "timers.pause",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "write"
+				},
+				{
+					"actionId": "timer-resume",
+					"eventAction": "timer-resume",
+					"source": "timer-current",
+					"operationId": "timers.resume",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "write"
+				},
+				{
+					"actionId": "timer-cancel",
+					"eventAction": "timer-cancel",
+					"source": "timer-current",
+					"operationId": "timers.cancel",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "write"
+				},
+				{
+					"actionId": "answer",
+					"eventAction": "answer",
+					"source": "duration-question",
+					"answer": true,
+					"inputSchemaRef": "builtin:timerTargetAnswer",
 					"effect": "write"
 				},
 				{

@@ -45,6 +45,34 @@ const selection = (runId: string, extra: Record<string, unknown> = {}) => ({
 	...extra,
 });
 
+test("the judgment of the first round is kept with the selection and replaced by a retry", async () => {
+	const { store, history } = setup();
+	const judged = {
+		kind: "live_info" as const,
+		freshness: "live" as const,
+		next: "find_toolchain" as const,
+		impact: "none" as const,
+		approved: false,
+	};
+	await store.write((db) => {
+		history.recordSelectionInTransaction(
+			db,
+			selection("run", { analysis: judged }),
+		);
+		history.recordSelectionInTransaction(db, selection("plain"));
+	});
+	expect(history.getSelection("run")?.analysis).toEqual(judged);
+	// A decision made without a first round has no judgment.
+	expect(history.getSelection("plain")).not.toHaveProperty("analysis");
+	await store.write((db) =>
+		history.recordSelectionInTransaction(
+			db,
+			selection("run", { analysis: { ...judged, impact: "create" } }),
+		),
+	);
+	expect(history.getSelection("run")?.analysis?.impact).toBe("create");
+});
+
 test("a retried attempt replaces the decision and the first terminal outcome wins", async () => {
 	const { store, history } = setup();
 	await store.write((db) => {

@@ -72,29 +72,3 @@ export function timerResource(
 		canCreate,
 	};
 }
-
-const DURATION_TEXT =
-	/^(?:(\d{1,5})\s*時間)?\s*(?:(\d{1,5})\s*分)?\s*(?:(\d{1,5})\s*秒)?$/;
-
-/**
- * An answer to "how long?" in words ("3分", "1時間30分", "90秒"). A bare number has no unit and
- * is refused rather than guessed.
- */
-export function parseDurationAnswer(
-	text: string,
-): { ok: true; durationSeconds: number } | { ok: false; message: string } {
-	const normalized = text.normalize("NFKC").trim();
-	const match = DURATION_TEXT.exec(normalized);
-	if (!normalized || !match || (!match[1] && !match[2] && !match[3]))
-		return {
-			ok: false,
-			message: "単位を付けて入力してください（例: 3分、1時間30分、90秒）。",
-		};
-	const durationSeconds =
-		Number(match[1] ?? 0) * 3600 +
-		Number(match[2] ?? 0) * 60 +
-		Number(match[3] ?? 0);
-	if (durationSeconds < 1 || durationSeconds > 86400)
-		return { ok: false, message: "時間は1秒〜24時間で入力してください。" };
-	return { ok: true, durationSeconds };
-}

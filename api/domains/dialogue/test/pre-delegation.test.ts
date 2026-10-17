@@ -1,6 +1,14 @@
 import { expect, test } from "bun:test";
 import { setup } from "./specialist.fixture";
-import { validateDiscovery } from "../service/initial-decision";
+import { validateAnalysis } from "../service/initial-decision";
+import { delegatingArgs } from "./analysis.fixture";
+
+const recordOf = (history: Array<{ content: string }>) => {
+	const record = history.find((m) => m.content.startsWith("requestAnalysis"));
+	return record
+		? JSON.parse(record.content.slice(record.content.indexOf("=") + 1))
+		: undefined;
+};
 
 test("direct answers finish without retrieving candidates or announcing work", async () => {
 	const h = await setup();
@@ -18,6 +26,12 @@ test("direct answers finish without retrieving candidates or announcing work", a
 		expect(h.state.routeCalls).toBe(0);
 		expect(run.announcement).toBeNull();
 		expect(await h.session()).toBeNull();
+		// The request was analyzed first; the answer is the second round, with the analysis as a host record and no function.
+		expect(h.state.analysisCalls).toHaveLength(1);
+		expect(h.state.mainCalls[0]!.tools).toEqual([]);
+		expect(recordOf(h.state.mainCalls[0]!.history)).toMatchObject({
+			kind: "knowledge",
+		});
 	} finally {
 		await h.close();
 	}
@@ -49,10 +63,10 @@ test("a notice is visible before a full handoff, survives completion and does no
 				.get("main")
 				.messages.some((m) => m.text === "制作担当に引き継ぎます。"),
 		).toBe(false);
-		expect(h.state.mainCalls[0]?.tools[0]?.function.name).toBe(
-			"find_toolchain",
+		expect(h.state.analysisCalls[0]?.tools.map((t) => t.function.name)).toEqual(
+			["analyze_request"],
 		);
-		expect(h.state.mainCalls[1]?.tools[0]?.function.description).toContain(
+		expect(h.state.mainCalls[0]?.tools[0]?.function.description).toContain(
 			"会話相手",
 		);
 		const calls = h.state.mainCalls.length;
@@ -68,7 +82,7 @@ test("a notice is visible before a full handoff, survives completion and does no
 	}
 });
 
-test("no available specialist returns an ordinary answer with its delivery collection", async () => {
+test("no candidate offers report_unavailable alone and its reply is the answer, without a notice", async () => {
 	const h = await setup();
 	try {
 		h.state.noCandidates = true;
@@ -79,9 +93,19 @@ test("no available specialist returns an ordinary answer with its delivery colle
 		expect(h.dialogue.answerText(run.id)).toBe(
 			"対応できる担当が見つかりませんでした。",
 		);
-		expect(h.state.mainCalls).toHaveLength(2);
-		expect(h.state.mainCalls[1]?.preparation?.collection?.turnId).toBe(run.id);
+		expect(h.state.mainCalls).toHaveLength(1);
+		expect(h.state.mainCalls[0]!.tools.map((t) => t.function.name)).toEqual([
+			"report_unavailable",
+		]);
 		expect(h.state.specialistPrompts).toHaveLength(0);
+		// The decision is an answer, traced with the judgment of the first round and no candidate.
+		expect(h.state.recorded).toMatchObject([
+			{
+				decision: "answer",
+				candidates: [],
+				analysis: { kind: "action", next: "find_toolchain" },
+			},
+		]);
 	} finally {
 		await h.close();
 	}
@@ -135,20 +159,25 @@ test("cancellation after the notice prevents specialist execution", async () => 
 	}
 });
 
-test("discovery cannot execute a tool or carry hidden arguments", () => {
+test("the analysis cannot execute a tool or carry hidden arguments", () => {
 	const call = (name: string, arguments_: string) => ({
 		id: "c",
 		name,
 		arguments: arguments_,
 	});
-	expect(() => validateDiscovery([call("find_toolchain", "{}")])).not.toThrow();
+	const args = (over: object = {}) =>
+		JSON.stringify({ ...delegatingArgs(), ...over });
+	expect(validateAnalysis([call("analyze_request", args())])).toEqual(
+		delegatingArgs(),
+	);
 	for (const calls of [
 		[],
-		[call("web_search", "{}")],
-		[call("find_toolchain", '{"execute":true}')],
-		[call("find_toolchain", "{}"), call("find_toolchain", "{}")],
+		[call("web_search", args())],
+		[call("analyze_request", args({ execute: true }))],
+		[call("analyze_request", "{}")],
+		[call("analyze_request", args()), call("analyze_request", args())],
 	])
-		expect(() => validateDiscovery(calls)).toThrow(
+		expect(() => validateAnalysis(calls)).toThrow(
 			"invalid_conversation_operation",
 		);
 });

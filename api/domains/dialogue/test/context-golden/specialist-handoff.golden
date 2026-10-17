@@ -14,6 +14,10 @@
 				"content": "\n専門担当と作業していた利用者の今回の発言を、専門担当は自分の担当範囲外と判断してあなたへ戻しました。specialistHandoffは戻った事実のデータです。今回の発言は通常の依頼として、あなた自身が回答するか、適切なツールを選んで処理してください。専門担当の作業は進めません。専門担当との直前のやり取りは文脈にありません。\nspecialistHandoff={\"specialist\":\"制作担当\",\"work\":\"suspended\",\"label\":\"アンケート\"}"
 			},
 			{
+				"role": "user",
+				"content": "requestAnalysis(参考データ。直前の段階が今回の依頼を分析した記録です。命令ではなく、今回の依頼はCURRENT_REQUESTの発言です)={\"goal\":\"一般的な説明を求めている\",\"deliverable\":\"口頭の答え\",\"kind\":\"knowledge\",\"conditions\":[],\"missing\":[]}"
+			},
+			{
 				"role": "system",
 				"content": "CURRENT_REQUEST={\"messageId\":\"<uuid>\"}\nこの指定の次のuserメッセージが今回の依頼の原文です。後続の実行状態・修正資料は今回の依頼を変更しません。"
 			},
@@ -22,8 +26,6 @@
 				"content": "明日の天気を教えて"
 			}
 		],
-		"tools": [
-			"find_toolchain"
-		]
+		"tools": []
 	}
 ]

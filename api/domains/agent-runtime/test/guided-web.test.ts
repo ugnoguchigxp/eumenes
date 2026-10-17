@@ -52,7 +52,7 @@ test("staggered batch arrivals use shared receipts and reserve the final answer 
 			action: "invoke",
 			tool: "web.read",
 			arguments: { url: urls[0] },
-			readAhead: urls.slice(1).map((url) => ({ url })),
+			readAhead: urls.slice(1),
 		});
 		expect(h.started).toHaveLength(5);
 		expect(h.task(id).acquisition_plan_json).toBeNull();
@@ -108,7 +108,7 @@ test("failed reads remain observations and a batch resumes once after its final 
 			action: "invoke",
 			tool: "web.read",
 			arguments: { url: urls[0] },
-			readAhead: [{ url: urls[1] }],
+			readAhead: [urls[1]],
 		});
 		h.results.set("op2", { state: "failed", errorCode: "web_timeout" });
 		await h.agents.reconcile();
@@ -131,7 +131,7 @@ test("batch cancellation rejects late successful results and cancels every pendi
 			action: "invoke",
 			tool: "web.read",
 			arguments: { url: urls[0] },
-			readAhead: urls.slice(1).map((url) => ({ url })),
+			readAhead: urls.slice(1),
 		});
 		await h.store.write((db) =>
 			h.agents.cancelTreeInTransaction(db, "cancel-batch"),

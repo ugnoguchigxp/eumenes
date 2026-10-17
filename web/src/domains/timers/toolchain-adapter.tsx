@@ -12,12 +12,7 @@ import type {
 import { bindServerClock } from "./clock";
 import { useClockWorkspace, withClockControls } from "./clock-runtime";
 import { useDeadline } from "./deadline";
-import {
-	parseDurationAnswer,
-	setupResource,
-	timerResource,
-	type TimerView,
-} from "./timer-resource";
+import { setupResource, timerResource, type TimerView } from "./timer-resource";
 
 export const TIMER_ADAPTER_REF = "adapter:timers@1";
 const SETUP_QUERY = "query:timers.setup@1";
@@ -169,12 +164,6 @@ function useTimerArtifact({
 			return code ? domainMessages[code] : undefined;
 		},
 		answerInput(question, text) {
-			if (question.inputSchemaRef === "builtin:timerDurationAnswer") {
-				const parsed = parseDurationAnswer(text);
-				return parsed.ok
-					? { ok: true, value: { durationSeconds: parsed.durationSeconds } }
-					: parsed;
-			}
 			if (question.inputSchemaRef === "builtin:timerTargetAnswer") {
 				const choice = question.choices?.find((c) => c.label === text);
 				return choice

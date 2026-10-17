@@ -65,6 +65,26 @@ function fixture() {
 	return { store, service, add, run, board };
 }
 
+test("Planning stays outside the queues until explicitly started as Ongoing", async () => {
+	const h = fixture();
+	const planning = await h.add("codex", "計画中の作業");
+	const before = h.board();
+	expect(before.cards.find((card) => card.id === planning.cardId)?.column).toBe(
+		"todo",
+	);
+	expect(before.runs).toHaveLength(0);
+	expect(
+		before.queues.every((queue) => queue.waiting === 0 && !queue.activeRunId),
+	).toBe(true);
+	await h.run(planning.cardId);
+	const after = h.board();
+	expect(after.cards.find((card) => card.id === planning.cardId)?.column).toBe(
+		"running",
+	);
+	expect(after.runs).toHaveLength(1);
+	expect(after.runs[0]?.executorId).toBe("codex");
+});
+
 test("registry-driven queues are independent, FIFO and admit a third executor without a provider branch", async () => {
 	const h = fixture();
 	const ca = await h.add("claude-code", "Claude A");

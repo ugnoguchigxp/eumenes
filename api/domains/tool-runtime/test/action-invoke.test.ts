@@ -80,7 +80,7 @@ test("agent action invocation stores the adapter and operation of its binding an
 			const prepared = caps.prepareActiveByIdInTransaction(
 				db,
 				owner,
-				"package:timers.manage@1",
+				"package:timers.manage@2",
 				{ operation: "start", durationSeconds: 90 },
 			);
 			const start = tools
@@ -116,7 +116,7 @@ test("agent action invocation stores the adapter and operation of its binding an
 			const prepared = caps.prepareActiveByIdInTransaction(
 				db,
 				owner,
-				"package:timers.manage@1",
+				"package:timers.manage@2",
 				{ operation: "start", durationSeconds: 90 },
 			);
 			const start = tools
@@ -141,7 +141,7 @@ test("agent action invocation stores the adapter and operation of its binding an
 				const prepared = caps.prepareActiveByIdInTransaction(
 					db,
 					owner,
-					"package:timers.manage@1",
+					"package:timers.manage@2",
 					{ operation: "start", durationSeconds: 90 },
 				);
 				const start = tools

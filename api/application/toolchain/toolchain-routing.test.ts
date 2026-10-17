@@ -20,8 +20,8 @@ afterEach(() => {
 		rmSync(dir, { recursive: true, force: true });
 });
 
-const SESSION_REVISION = "toolchain:timers.manage@5";
-const COMMAND_REVISION = "toolchain:timers.manage@4";
+const SESSION_REVISION = "toolchain:timers.manage@7";
+const COMMAND_REVISION = "toolchain:timers.manage@6";
 
 /** A session binding over the shipped timer package and artifact (a fixture, not a product bundle). */
 function sessionBundle(targetSchemaRef?: string) {
@@ -30,7 +30,7 @@ function sessionBundle(targetSchemaRef?: string) {
 	) as any;
 	const command = timers.bindings.at(-1);
 	const toolchain = structuredClone(timers.definitions.at(-1));
-	toolchain.revision = 5;
+	toolchain.revision = 7;
 	toolchain.bindingRevisionId = "binding:timers.session@1";
 	return {
 		formatVersion: 1,
@@ -105,7 +105,7 @@ test("a session toolchain's runtime says session and its set carries the binding
 				binding: {
 					bindingRevisionId: "binding:timers.session@1",
 					adapterRef: "adapter:timers@1",
-					artifactRevisionId: "artifact:timers.workspace@2",
+					artifactRevisionId: "artifact:timers.workspace@3",
 					available: true,
 				},
 			});
@@ -115,8 +115,8 @@ test("a session toolchain's runtime says session and its set carries the binding
 				toolchainRevisionId: SESSION_REVISION,
 				bindingRevisionId: "binding:timers.session@1",
 				adapterRef: "adapter:timers@1",
-				artifactRevisionId: "artifact:timers.workspace@2",
-				packageRevisionId: "package:timers.manage@1",
+				artifactRevisionId: "artifact:timers.workspace@3",
+				packageRevisionId: "package:timers.manage@2",
 				targetSchemaRef: "builtin:timerCancel",
 			});
 			expect(set.title.length).toBeGreaterThan(0);

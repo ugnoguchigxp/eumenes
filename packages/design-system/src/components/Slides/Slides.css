@@ -1,0 +1,84 @@
+.ds-slides {
+	--ds-slides-accent: var(--ds-accent, var(--primary));
+	display: grid;
+	gap: 0.75rem;
+	min-width: 0;
+	padding: 1rem;
+	color: var(--foreground);
+	background: var(--card);
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+}
+.ds-slides-title {
+	margin: 0;
+	font-size: 1rem;
+	font-weight: 600;
+}
+.ds-slides-stage {
+	min-width: 0;
+	min-height: 8rem;
+}
+.ds-slides-slide {
+	min-width: 0;
+	animation: ds-slides-in 0.2s ease;
+}
+.ds-slides-slide[hidden] {
+	display: none;
+}
+.ds-slides-controls {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+}
+.ds-slides-position {
+	font-size: 0.875rem;
+	font-variant-numeric: tabular-nums;
+	color: var(--muted-foreground);
+}
+.ds-slides-dots {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	gap: 0.25rem;
+}
+.ds-slides-dot {
+	position: relative;
+	width: 1.5rem;
+	height: 1.5rem;
+	padding: 0;
+	background: transparent;
+	border: 0;
+	cursor: pointer;
+}
+.ds-slides-dot::after {
+	content: "";
+	position: absolute;
+	inset: 0.4375rem;
+	background: var(--muted-foreground);
+	border-radius: 9999px;
+	opacity: 0.45;
+}
+.ds-slides-dot[aria-current="step"]::after {
+	background: var(--ds-slides-accent);
+	opacity: 1;
+	inset: 0.3125rem;
+}
+.ds-slides-dot:hover::after {
+	opacity: 0.8;
+}
+.ds-slides-dot:focus-visible {
+	outline: 2px solid var(--ring);
+	border-radius: 9999px;
+}
+@keyframes ds-slides-in {
+	from {
+		opacity: 0;
+		transform: translateX(0.5rem);
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	.ds-slides-slide {
+		animation: none;
+	}
+}

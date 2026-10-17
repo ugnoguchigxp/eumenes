@@ -6,6 +6,7 @@ import type { KanbanBoardCard, KanbanBoardColumn } from "./types";
 type KanbanColumnProps = Omit<KanbanCardProps, "card" | "dragging"> & {
 	id: KanbanBoardColumn;
 	label: string;
+	description: string;
 	empty: string;
 	draggingId: string | null;
 	/** Where the dragged card would land in this column; undefined when it is not a target. */
@@ -18,6 +19,7 @@ type KanbanColumnProps = Omit<KanbanCardProps, "card" | "dragging"> & {
 export function KanbanColumn({
 	id,
 	label,
+	description,
 	empty,
 	draggingId,
 	dropBefore,
@@ -60,6 +62,7 @@ export function KanbanColumn({
 				<span id={labelId}>{label}</span>
 				<span className="kanban-count">{items.length}</span>
 			</h3>
+			<p className="kanban-column-description">{description}</p>
 			{/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- handles keys or drag events that bubble up from its interactive children */}
 			<ul
 				ref={list}

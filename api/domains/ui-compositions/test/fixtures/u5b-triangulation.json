@@ -1,0 +1,158 @@
+{
+	"view": "layout",
+	"direction": "stack",
+	"gap": "normal",
+	"appearance": "clean",
+	"title": "三角測量で月までの距離を求める",
+	"model": {
+		"state": {
+			"baseline": {
+				"type": "number",
+				"initial": 0
+			},
+			"theta": {
+				"type": "number",
+				"initial": 1.34,
+				"min": 0.5,
+				"max": 3,
+				"step": 0.01
+			}
+		},
+		"computed": {
+			"distance": "baseline > 0 ? baseline / tan(theta) : 0"
+		}
+	},
+	"children": [
+		{
+			"view": "text-block",
+			"title": "三角測量で月までの距離を求める",
+			"body": "離れた2地点から同じ天体を見ると、見える向きに差ができます。この差と2地点の距離から、天体までの距離を計算します。",
+			"emphasis": "strong"
+		},
+		{
+			"view": "diagram",
+			"aspect": "landscape",
+			"title": "2地点から月を見る",
+			"caption": "実際の比率とは異なる概念図です。",
+			"elements": [
+				{
+					"type": "shape",
+					"shape": "ellipse",
+					"x": 5,
+					"y": 43,
+					"w": 6,
+					"h": 6,
+					"color": "accent",
+					"filled": true,
+					"label": "A"
+				},
+				{
+					"type": "shape",
+					"shape": "ellipse",
+					"x": 25,
+					"y": 43,
+					"w": 6,
+					"h": 6,
+					"color": "accent",
+					"filled": true,
+					"label": "B"
+				},
+				{
+					"type": "line",
+					"x1": 11,
+					"y1": 46,
+					"x2": 25,
+					"y2": 46,
+					"color": "ink",
+					"label": "基線AB"
+				},
+				{
+					"type": "shape",
+					"shape": "ellipse",
+					"x": 82,
+					"y": 6,
+					"w": 10,
+					"h": 10,
+					"color": "warning",
+					"filled": true,
+					"label": "月"
+				},
+				{
+					"type": "polyline",
+					"points": [
+						[8, 46],
+						[87, 11],
+						[28, 46]
+					],
+					"color": "muted",
+					"dashed": true
+				},
+				{
+					"type": "angle",
+					"x": 87,
+					"y": 11,
+					"from": 204,
+					"to": 211,
+					"radius": 14,
+					"color": "negative",
+					"label": "θ"
+				}
+			]
+		},
+		{
+			"view": "calculator",
+			"label": "ステップ1 基線ABの長さ（km）",
+			"mode": "scientific",
+			"preset": "2 * 6371 * sin(45)",
+			"resultBind": "baseline"
+		},
+		{
+			"view": "text-block",
+			"title": "基線の求め方",
+			"body": "地球の半径を6371kmとし、2地点が地球の中心から見て90度離れているとして、弦の長さ 2 × 半径 × sin(45度) を計算します。「=」を押すと次の段に値が入ります。",
+			"emphasis": "muted"
+		},
+		{
+			"view": "layout",
+			"direction": "stack",
+			"when": "baseline > 0",
+			"children": [
+				{
+					"view": "slider",
+					"bind": "theta",
+					"label": "月の見える向きの差θ",
+					"format": "number",
+					"decimals": 2,
+					"unit": "度"
+				},
+				{
+					"view": "formula",
+					"label": "ステップ2 月までの距離",
+					"tex": "d = \\frac{AB}{\\tan\\theta}",
+					"expr": "distance",
+					"format": "number",
+					"decimals": 0,
+					"unit": "km"
+				},
+				{
+					"view": "formula",
+					"label": "ステップ3 基線との比",
+					"tex": "\\frac{d}{AB}",
+					"expr": "distance / baseline",
+					"format": "number",
+					"decimals": 1,
+					"caption": "月までの距離は基線の何倍か"
+				},
+				{
+					"view": "stat",
+					"label": "実際の平均距離との差",
+					"expr": "abs(distance - 384400)",
+					"format": "number",
+					"decimals": 0,
+					"unit": "km",
+					"caption": "平均距離は約384,400km"
+				}
+			]
+		}
+	]
+}

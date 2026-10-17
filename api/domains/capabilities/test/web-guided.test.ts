@@ -64,14 +64,14 @@ test("new Web revisions upgrade and reseed without changing archived definitions
 					.all(),
 			);
 		expect(active()).toEqual([
-			{ key: "package:web.quick", active_revision_id: "package:web.quick@5" },
+			{ key: "package:web.quick", active_revision_id: "package:web.quick@6" },
 			{
 				key: "toolchain:web.research.codex",
-				active_revision_id: "toolchain:web.research.codex@2",
+				active_revision_id: "toolchain:web.research.codex@3",
 			},
 			{
 				key: "toolchain:web.search",
-				active_revision_id: "toolchain:web.search@5",
+				active_revision_id: "toolchain:web.search@6",
 			},
 		]);
 		const registered = active();

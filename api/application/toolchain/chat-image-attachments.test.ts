@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { withLocalAnalysis } from "./analysis-round.fixture";
 import { harness } from "./toolchain.fixture";
 import { imageLarmFixture } from "../../domains/larm/test/chat-input.fixture";
 import { syntheticImages } from "../../domains/conversation/test/image.fixture";
@@ -23,7 +24,7 @@ async function upload(
 }
 test("Eumenes upload, atomic acceptance, image-only streaming, ordered history resend and authorization", async () => {
 	const f = imageLarmFixture();
-	const h = await harness({ model: f.p });
+	const h = await harness({ model: withLocalAnalysis(f.p) });
 	try {
 		const files = await syntheticImages();
 		const metas = [];
@@ -82,9 +83,9 @@ test("Eumenes upload, atomic acceptance, image-only streaming, ordered history r
 		const generation = f.requests
 			.filter((r) => r.operation === "generate")
 			.map((r) => JSON.parse(r.body));
-		// Each turn is a single streamed tool-enabled generation.
+		// Each turn is a single streamed generation (the request analysis is answered by the wrapper, not the transport).
 		expect(generation).toHaveLength(2);
-		expect(generation.map((r) => !!r.tools?.length)).toEqual([true, true]);
+		expect(generation.map((r) => !!r.tools?.length)).toEqual([false, false]);
 		expect(generation.map((r) => r.stream)).toEqual([true, true]);
 		for (const sent of generation) {
 			const images = sent.messages.flatMap((m: { content: unknown }) =>
@@ -119,7 +120,7 @@ test("Eumenes upload, atomic acceptance, image-only streaming, ordered history r
 });
 test("fits=false is visible as a failed run and no inference POST is made", async () => {
 	const f = imageLarmFixture({ fits: false });
-	const h = await harness({ model: f.p });
+	const h = await harness({ model: withLocalAnalysis(f.p) });
 	try {
 		const a = await (await upload(h, (await syntheticImages())[1]!)).json();
 		const run = await (
@@ -144,7 +145,7 @@ test("fits=false is visible as a failed run and no inference POST is made", asyn
 test("missing bytes fail instead of omitting images", async () => {
 	const f = imageLarmFixture();
 	const h = await harness({
-		model: f.p,
+		model: withLocalAnalysis(f.p),
 		queueLimits: { total: 1, background: 1, scope: 1 },
 	});
 	try {
@@ -175,7 +176,7 @@ test("missing bytes fail instead of omitting images", async () => {
 test("queue capacity rejection rolls back the message and attachment association", async () => {
 	const f = imageLarmFixture();
 	const h = await harness({
-		model: f.p,
+		model: withLocalAnalysis(f.p),
 		queueLimits: { total: 1, background: 1, scope: 1 },
 	});
 	try {
@@ -218,7 +219,7 @@ test("queue capacity rejection rolls back the message and attachment association
 for (const stage of ["count", "generate"] as const)
 	test(`Eumenes cancel during ${stage} adopts no answer`, async () => {
 		const f = imageLarmFixture({ gate: stage });
-		const h = await harness({ model: f.p });
+		const h = await harness({ model: withLocalAnalysis(f.p) });
 		try {
 			const a = await (await upload(h, (await syntheticImages())[1]!)).json();
 			const run = await (
@@ -252,7 +253,7 @@ test("withdrawn source rejects a late answer even when another live message uses
 		finish = r;
 	});
 	const f = imageLarmFixture({ generationGate: gate });
-	const h = await harness({ model: f.p });
+	const h = await harness({ model: withLocalAnalysis(f.p) });
 	try {
 		const a = await (await upload(h, (await syntheticImages())[1]!)).json();
 		const run = await (

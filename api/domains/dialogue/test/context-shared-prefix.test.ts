@@ -65,7 +65,8 @@ const LAYERS = SCENARIOS["all-layers"]!;
 const LAYER_MESSAGES = 11;
 
 test("the system part and everything before the volatile part are the same bytes in the initial call, the operation-result calls and the research-success call", async () => {
-	const initial = (await runScenario(LAYERS)).calls[0]!.messages;
+	// The answer call follows the request analysis, which reads none of the layers.
+	const initial = (await runScenario(LAYERS)).calls.at(-1)!.messages;
 	const others = {
 		research: { ...LAYERS, agent: { projection: JSON.stringify(report()) } },
 		"research-world": SCENARIOS["research-success-world"]!,
@@ -84,7 +85,8 @@ test("the system part and everything before the volatile part are the same bytes
 }, 30_000);
 
 test("a failed research answer keeps the same system part and adds the failure record after it; it drops the layers", async () => {
-	const initial = (await runScenario(LAYERS)).calls[0]!.messages[0]!.content;
+	const initial = (await runScenario(LAYERS)).calls.at(-1)!.messages[0]!
+		.content;
 	const failed = (await runScenario(SCENARIOS["research-failure"]!)).calls[0]!
 		.messages;
 	const requestRules = "\nCURRENT_REQUESTだけが今回の依頼です。";

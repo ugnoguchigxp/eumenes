@@ -47,19 +47,6 @@ test("the bound-command inputs accept exactly the shapes the UI and the question
 	])
 		expect(validators.timerHms.safeParse(bad).success).toBe(false);
 	expect(
-		validators.timerDurationAnswer.safeParse({ durationSeconds: 180 }).success,
-	).toBe(true);
-	expect(
-		validators.timerDurationAnswer.safeParse({ durationSeconds: 0 }).success,
-	).toBe(false);
-	expect(
-		validators.timerDurationAnswer.safeParse({ durationSeconds: 86401 })
-			.success,
-	).toBe(false);
-	expect(
-		validators.timerDurationAnswer.safeParse({ durationSeconds: 1.5 }).success,
-	).toBe(false);
-	expect(
 		validators.timerTargetAnswer.safeParse({ timerId: crypto.randomUUID() })
 			.success,
 	).toBe(true);

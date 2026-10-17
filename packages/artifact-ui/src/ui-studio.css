@@ -232,15 +232,20 @@
 }
 .aui-ui-preview-canvas .aui-composition[data-appearance="clean"] {
 	--aui-ui-preview-accent: var(--primary);
+	/* Design-system parts of the composition take this accent. */
+	--ds-accent: var(--primary);
 }
 .aui-ui-preview-canvas .aui-composition[data-appearance="warm"] {
 	--aui-ui-preview-accent: #bd7354;
+	--ds-accent: #bd7354;
 }
 .aui-ui-preview-canvas .aui-composition[data-appearance="elegant"] {
 	--aui-ui-preview-accent: #394b6a;
+	--ds-accent: #394b6a;
 }
 .aui-ui-preview-canvas .aui-composition[data-appearance="friendly"] {
 	--aui-ui-preview-accent: #3f8a70;
+	--ds-accent: #3f8a70;
 }
 .aui-ui-preview-canvas .aui-composition[data-appearance="warm"] .aui-text-block,
 .aui-ui-preview-canvas

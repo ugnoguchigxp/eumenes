@@ -3,7 +3,9 @@ import type { ToolchainCard } from "../../capabilities";
 import {
 	appendConversationPolicy,
 	operation,
+	reportUnavailableTool,
 	toolchainTools,
+	unavailable,
 } from "../service/conversation-tools";
 
 const card = (
@@ -112,7 +114,7 @@ test("the policy is placed before the current request and carries past selection
 		{ role: "system" as const, content: "人格" },
 		{ role: "user" as const, content: "鎌倉の天気" },
 	];
-	appendConversationPolicy(messages, true, messages[1]!, [
+	appendConversationPolicy(messages, messages[1]!, [
 		{ request: "横浜の天気", functionName: "web_search", outcome: "answered" },
 	]);
 	expect(messages.at(-1)!.content).toBe("鎌倉の天気");
@@ -120,4 +122,50 @@ test("the policy is placed before the current request and carries past selection
 	expect(messages.at(-3)!.content).toContain("pastSelections");
 	// The fixed layer names no individual toolchain.
 	expect(messages.at(-2)!.content).not.toContain("web_search");
+	// It tells the model how to say that nothing fits.
+	expect(messages.at(-2)!.content).toContain("report_unavailable");
+});
+
+test("report_unavailable takes one strict reply and nothing else", () => {
+	const parameters = reportUnavailableTool.function.parameters as {
+		properties: Record<string, unknown>;
+		required: string[];
+		additionalProperties: boolean;
+	};
+	expect(Object.keys(parameters.properties)).toEqual(["reply"]);
+	expect(parameters.required).toEqual(["reply"]);
+	expect(parameters.additionalProperties).toBe(false);
+	const call = (args: string, name = "report_unavailable") => ({
+		id: "c",
+		name,
+		arguments: args,
+	});
+	expect(unavailable([call('{"reply":"対応できる担当がありません。"}')])).toBe(
+		"対応できる担当がありません。",
+	);
+	// The contract is the spoken reply: the schema and the description say 160 characters and two sentences.
+	expect(
+		(parameters.properties.reply as { maxLength: number; description: string })
+			.maxLength,
+	).toBe(160);
+	expect(
+		(parameters.properties.reply as { description: string }).description,
+	).toContain("音声整形後の合計160字以内・2文以内");
+	expect(reportUnavailableTool.function.description).toContain("音声");
+	expect(reportUnavailableTool.function.description).toContain("160字以内");
+	expect(unavailable([call(JSON.stringify({ reply: "あ".repeat(160) }))])).toBe(
+		"あ".repeat(160),
+	);
+	expect(() =>
+		unavailable([call(JSON.stringify({ reply: "あ".repeat(161) }))]),
+	).toThrow("invalid_conversation_operation");
+	// Another function, or several calls, are not an explanation.
+	expect(unavailable([call("{}", "web_search")])).toBeUndefined();
+	expect(
+		unavailable([call('{"reply":"a"}'), call('{"reply":"b"}')]),
+	).toBeUndefined();
+	for (const args of ["{}", '{"reply":""}', '{"reply":"a","extra":1}', "[1]"])
+		expect(() => unavailable([call(args)])).toThrow(
+			"invalid_conversation_operation",
+		);
 });

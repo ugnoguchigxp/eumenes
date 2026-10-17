@@ -52,7 +52,7 @@ export function blockTokens(block: ContextBlock): number {
 export const turnTokens = (content: string) =>
 	TOKEN_ESTIMATE.messageOverheadTokens + estimateTextTokens(content);
 
-const omitted = (chars: number) => `（省略：約${chars}文字）`;
+export const omitted = (chars: number) => `（省略：約${chars}文字）`;
 
 /** The first characters of a text with an omission mark, `tokens` shorter than it was (at least). */
 function clipText(text: string, reduceBy: number): string {
