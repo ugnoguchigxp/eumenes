@@ -164,9 +164,13 @@ export function CalculatorView({ request }: { request: ArtifactRequest }) {
 			<Calculator
 				display="inline"
 				mode={request.mode ?? "basic"}
+				key={`${request.mode ?? "basic"}:${request.preset ?? ""}`}
 				evaluate={(expression) => {
 					const result = evaluateWith(model, expression);
-					return typeof result === "number" ? result : null;
+					// Trims float noise (0.1 + 0.2) for what is shown and what resultBind receives.
+					return typeof result === "number"
+						? Number(result.toPrecision(12))
+						: null;
 				}}
 				{...(request.preset && { initialExpression: request.preset })}
 				onResult={(result) => {

@@ -218,9 +218,10 @@ const spend = (budget: Budget, steps: number) => {
 const extreme = (pick: (values: number[]) => number): FunctionSpec => ({
 	min: 1,
 	max: 8,
-	run: (args) => {
+	run: (args, budget) => {
 		const [only] = args;
 		if (args.length === 1 && isSeries(only)) {
+			if (!spend(budget, only.length)) return null;
 			const values = only.map((point) => point.y);
 			return values.length ? finite(pick(values)) : null;
 		}

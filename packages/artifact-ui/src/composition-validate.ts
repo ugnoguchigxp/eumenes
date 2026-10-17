@@ -8,10 +8,18 @@
 import type { StateDefinition } from "./composition-contracts";
 import { compositionDirections } from "./composition-contracts";
 import {
+	createBudget,
 	cyclicNames,
+	evaluationStepLimit,
 	parseExpression,
 	reservedNames,
 } from "./composition-expressions";
+import {
+	evaluateSource,
+	maxSeriesPoints,
+	scopeOf,
+	type StateValue,
+} from "./composition-compute";
 
 export type CompositionValidation =
 	| { ok: true }
@@ -40,8 +48,14 @@ const asArray = (value: unknown): unknown[] =>
 const entriesOf = (value: unknown): Array<[string, unknown]> =>
 	isRecord(value) ? Object.entries(value) : [];
 
+type StateInfo = {
+	type: StateDefinition["type"];
+	initial: StateValue | undefined;
+	min: number | undefined;
+	max: number | undefined;
+};
 type Context = {
-	states: ReadonlyMap<string, StateDefinition["type"]>;
+	states: ReadonlyMap<string, StateInfo>;
 	computed: ReadonlyMap<string, "series" | "value">;
 };
 const emptyContext: Context = { states: new Map(), computed: new Map() };
@@ -78,15 +92,45 @@ function checkBind(
 	name: unknown,
 	context: Context,
 	type: StateDefinition["type"],
-) {
-	if (typeof name !== "string") return;
+): StateInfo | undefined {
+	if (typeof name !== "string") return undefined;
 	const actual = context.states.get(name);
 	if (actual === undefined)
-		reject(
+		return reject(
 			path,
 			context.computed.has(name) ? "bind_not_state" : "unknown_bind",
 		);
-	else if (actual !== type) reject(path, "bind_type_mismatch");
+	if (actual.type !== type) return reject(path, "bind_type_mismatch");
+	return actual;
+}
+
+/** An input's own min/max may not reach outside the state's (checked where both are given). */
+function checkInputRange(
+	path: string,
+	view: Record_,
+	state: StateInfo | undefined,
+) {
+	if (!state) return;
+	const { min, max } = view;
+	if (typeof min === "number" && state.min !== undefined && min < state.min)
+		reject(join(path, "min"), "bind_range_mismatch");
+	if (typeof max === "number" && state.max !== undefined && max > state.max)
+		reject(join(path, "max"), "bind_range_mismatch");
+}
+
+/** The text a choice starts with (its state's initial value) must be one of its options. */
+function checkChoice(
+	path: string,
+	view: Record_,
+	state: StateInfo | undefined,
+) {
+	if (
+		state &&
+		typeof state.initial === "string" &&
+		state.initial !== "" &&
+		!asArray(view.options).includes(state.initial)
+	)
+		reject(join(path, "bind"), "choice_initial_not_in_options");
 }
 
 function checkSeriesName(path: string, name: unknown, context: Context) {
@@ -99,15 +143,29 @@ function checkSeriesName(path: string, name: unknown, context: Context) {
 /** Reads the root layout's `model` into a context, checking every computed expression. */
 function checkModel(model: unknown, base: string): Context {
 	if (!isRecord(model)) return emptyContext;
-	const states = new Map<string, StateDefinition["type"]>();
+	const states = new Map<string, StateInfo>();
 	const computed = new Map<string, "series" | "value">();
 	const claim = (path: string, name: string) => {
 		if (reservedNames.has(name)) reject(path, "reserved_name");
 		if (states.has(name) || computed.has(name)) reject(path, "duplicate_name");
 	};
 	for (const [name, state] of entriesOf(model.state)) {
-		claim(join(base, "state", name), name);
-		states.set(name, asRecord(state).type as StateDefinition["type"]);
+		const path = join(base, "state", name);
+		claim(path, name);
+		const record = asRecord(state);
+		const number = (value: unknown) =>
+			typeof value === "number" ? value : undefined;
+		const info: StateInfo = {
+			type: record.type as StateDefinition["type"],
+			initial: ["number", "string", "boolean"].includes(typeof record.initial)
+				? (record.initial as StateValue)
+				: undefined,
+			min: number(record.min),
+			max: number(record.max),
+		};
+		if (info.min !== undefined && info.max !== undefined && info.min > info.max)
+			reject(path, "state_range_invalid");
+		states.set(name, info);
 	}
 	for (const [name, entry] of entriesOf(model.computed)) {
 		claim(join(base, "computed", name), name);
@@ -136,7 +194,90 @@ function checkModel(model: unknown, base: string): Context {
 	const [first] = cyclicNames(graph);
 	if (first !== undefined)
 		reject(join(base, "computed", first), "circular_reference");
+	checkSeriesBudget(model, base, context);
 	return context;
+}
+
+/** How many corner combinations of the states a bound depends on are tried (3 values each). */
+const maxBoundCombinations = 729;
+
+/** The state values worth trying for a bound: the initial value and the ends of the range. */
+function boundCandidates(info: StateInfo): StateValue[] {
+	if (info.type === "boolean") return [true, false];
+	if (info.type === "text")
+		return info.initial === undefined ? [] : [info.initial];
+	return [...new Set([info.initial, info.min, info.max])].filter(
+		(value): value is number => typeof value === "number",
+	);
+}
+
+/**
+ * The most points a series can have. A literal bound is exact; an expression bound is worked
+ * out for the initial values and the ends of the ranges of the states it reads (one corner at a
+ * time), which is an estimate: a value in the middle of a range, or a bound that reads another
+ * computed value, is not tried. Returns 0 when the bounds cannot be worked out.
+ */
+function mostPoints(series: Record_, context: Context): number {
+	const sources = [series.from, series.to].filter(
+		(source): source is string => typeof source === "string",
+	);
+	const read = [
+		...new Set(
+			sources.flatMap((source) => {
+				const parsed = parseExpression(source);
+				return parsed.ok ? parsed.names : [];
+			}),
+		),
+	].filter((name) => context.states.has(name));
+	const candidates = read.map((name) =>
+		boundCandidates(context.states.get(name)!),
+	);
+	let combinations = candidates.reduce((count, list) => count * list.length, 1);
+	const initialOnly = combinations > maxBoundCombinations;
+	if (initialOnly) combinations = 1;
+	const base = new Map<string, StateValue>();
+	for (const [name, info] of context.states)
+		if (info.initial !== undefined) base.set(name, info.initial);
+	let most = 0;
+	for (let combination = 0; combination < combinations; combination += 1) {
+		const values = new Map(base);
+		let rest = combination;
+		read.forEach((name, index) => {
+			const list = candidates[index]!;
+			if (!initialOnly && list.length) {
+				values.set(name, list[rest % list.length]!);
+				rest = Math.floor(rest / list.length);
+			}
+		});
+		const bound = (source: unknown) => {
+			const value =
+				typeof source === "number"
+					? source
+					: typeof source === "string"
+						? evaluateSource(source, scopeOf(values), createBudget())
+						: null;
+			return typeof value === "number" && Number.isFinite(value)
+				? Math.round(value)
+				: null;
+		};
+		const from = bound(series.from);
+		const to = bound(series.to);
+		if (from !== null && to !== null) most = Math.max(most, to - from + 1);
+	}
+	return most;
+}
+
+/** A series over 1,200 points, or all series together over the step budget, would turn null. */
+function checkSeriesBudget(model: Record_, base: string, context: Context) {
+	let total = 0;
+	for (const [name, entry] of entriesOf(model.computed)) {
+		if (typeof entry === "string") continue;
+		const points = mostPoints(asRecord(asRecord(entry).series), context);
+		const path = join(base, "computed", name);
+		if (points > maxSeriesPoints) reject(path, "series_too_long");
+		total += points;
+		if (total > evaluationStepLimit) reject(path, "series_budget_exceeded");
+	}
 }
 
 const diagramNumberKeys = [
@@ -176,20 +317,43 @@ function checkDiagramElement(path: string, element: unknown, context: Context) {
 		);
 }
 
+const forbiddenTexCommand =
+	/^(?:href|url|includegraphics|html[A-Za-z]*|def|gdef|edef|xdef|let|newcommand|renewcommand|providecommand|DeclareMathOperator)$/;
+
+/** Rejects TeX commands that link, fetch or define macros (KaTeX is also configured to refuse them). */
+function checkTex(path: string, tex: unknown) {
+	if (typeof tex !== "string") return;
+	// "\\" is a line break, so its second backslash does not start a command.
+	for (const match of tex.matchAll(/\\(?:([A-Za-z]+)|[^A-Za-z])/g))
+		if (match[1] && forbiddenTexCommand.test(match[1]))
+			reject(path, "tex_command_not_allowed");
+}
+
 function checkView(path: string, view: Record_, context: Context) {
 	const expr = (key: string, value: unknown, locals?: readonly string[]) =>
 		checkExpression(join(path, key), value, context, locals);
 	switch (view.view) {
 		case "stat":
+			expr("expr", view.expr);
+			break;
 		case "formula":
+			checkTex(join(path, "tex"), view.tex);
 			expr("expr", view.expr);
 			break;
 		case "number-input":
 		case "slider":
-			checkBind(join(path, "bind"), view.bind, context, "number");
+			checkInputRange(
+				path,
+				view,
+				checkBind(join(path, "bind"), view.bind, context, "number"),
+			);
 			break;
 		case "choice":
-			checkBind(join(path, "bind"), view.bind, context, "text");
+			checkChoice(
+				path,
+				view,
+				checkBind(join(path, "bind"), view.bind, context, "text"),
+			);
 			break;
 		case "toggle":
 			checkBind(join(path, "bind"), view.bind, context, "boolean");
@@ -218,14 +382,16 @@ function checkView(path: string, view: Record_, context: Context) {
 			break;
 		case "data-table":
 			checkSeriesName(join(path, "series"), view.series, context);
-			asArray(view.columns).forEach((column, index) =>
+			asArray(view.columns).forEach((column, index) => {
+				if (view.rows !== undefined && asRecord(column).expr !== undefined)
+					reject(join(path, "columns", index, "expr"), "expr_without_series");
 				checkExpression(
 					join(path, "columns", index, "expr"),
 					asRecord(column).expr,
 					context,
 					["x", "y"],
-				),
-			);
+				);
+			});
 			break;
 	}
 }

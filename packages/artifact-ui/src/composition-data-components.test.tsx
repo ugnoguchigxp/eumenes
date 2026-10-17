@@ -327,6 +327,52 @@ test("without a model the views draw and the calculator works", async () => {
 	await view.unmount();
 });
 
+test("the calculator accepts pi after a number through the host language", async () => {
+	const view = await mount(
+		definition,
+		<CalculatorView request={req({ view: "calculator", mode: "scientific" })} />,
+	);
+	for (const name of ["2", "π", "="]) await press(view.container, name);
+	expect(text(view.container, "[role=group] [role=status]")).toStartWith("6.28318530718");
+	await view.unmount();
+});
+
+test("float noise is trimmed from the result and from resultBind", async () => {
+	const view = await mount(
+		definition,
+		<CalculatorView
+			request={req({ view: "calculator", preset: "0.1 + 0.2", resultBind: "n" })}
+		/>,
+		<FormulaView request={req({ view: "formula", tex: "n", expr: "n" })} />,
+	);
+	await press(view.container, "=");
+	expect(text(view.container, "[role=group] [role=status]")).toBe("0.3");
+	expect(view.container.textContent).toContain("= 0.3");
+	await view.unmount();
+});
+
+test("a changed preset or mode starts the calculator over", async () => {
+	const container = document.createElement("div");
+	document.body.append(container);
+	const root = createRoot(container);
+	const render = (preset: string, mode: "basic" | "scientific") =>
+		act(async () => {
+			root.render(
+				<CompositionModelProvider model={definition}>
+					<CalculatorView request={req({ view: "calculator", preset, mode })} />
+				</CompositionModelProvider>,
+			);
+		});
+	await render("1 + 1", "basic");
+	expect(text(container, "[role=status]")).toBe("1 + 1");
+	await render("2 * 3", "basic");
+	expect(text(container, "[role=status]")).toBe("2 * 3");
+	await render("2 * 3", "scientific");
+	expect(container.querySelector("button[aria-label], button")).not.toBeNull();
+	expect([...container.querySelectorAll("button")].some((b) => b.textContent === "sin")).toBe(true);
+	await act(async () => root.unmount());
+});
+
 test("a view of another kind renders nothing", async () => {
 	const view = await mount(
 		definition,
