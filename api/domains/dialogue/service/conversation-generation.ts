@@ -61,20 +61,6 @@ export async function generateConversation(input: {
 }> {
 	const { inference, signal } = input;
 	let messages = input.messages;
-	if (!input.tools?.length) {
-		const [first, ...rest] = messages;
-		messages = [
-			{
-				role: "system",
-				content:
-					systemContext(
-						"dialogue.contexts.conversation-generation.content",
-						{},
-					) + (first?.role === "system" ? "\n" + first.content : ""),
-			},
-			...(first?.role === "system" ? rest : messages),
-		];
-	}
 	const originalMessages = messages;
 	const callSession: CallSession = {
 		sessionRole: input.sessionRole,

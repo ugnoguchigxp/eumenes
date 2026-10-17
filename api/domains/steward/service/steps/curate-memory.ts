@@ -1,4 +1,4 @@
-import { PREFETCH_BYTES, RECALL_MIN_SCORE } from "../../../memory";
+import { RECALL_MIN_SCORE } from "../../../memory";
 import { type StepId } from "../../contracts";
 import {
 	type InboxRow,
@@ -330,7 +330,7 @@ async function findCandidates(
 				vector: vector.vector,
 				limit: CANDIDATES_PER_REQUEST,
 				minScore: RECALL_MIN_SCORE,
-				maxBytes: PREFETCH_BYTES,
+				maxTokens: deps.memory.historyBudgetTokens(),
 				excludeMessageIds: [...shown, ...Object.values(map).flat()],
 			});
 			const seen = new Set<string>();

@@ -27,7 +27,6 @@ const SWITCH_NOTE = systemContext(
 	"dialogue.contexts.generation-prepare.specialist-switch",
 	{},
 );
-const LABEL_CHARS = 60;
 
 export type StartResult = { ok: true } | { ok: false; code: string };
 const refuse = (code: string): StartResult => ({ ok: false, code });
@@ -66,11 +65,11 @@ function askToResolve(
 ) {
 	const note = `${SWITCH_NOTE} 現在の作業=${JSON.stringify({
 		specialist: live.title,
-		label: label.slice(0, LABEL_CHARS),
+		label,
 	})} 切替先=${JSON.stringify({
 		specialist: incoming.title,
 		targetRef: incoming.targetRef,
-	})}`.slice(0, 500);
+	})}`;
 	const { job } = deps.queue.enqueueInTransaction(tx, {
 		scope: "dialogue",
 		kind: GENERATE_KIND,

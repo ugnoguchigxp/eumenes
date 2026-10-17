@@ -1,0 +1,42 @@
+{
+	"id": "ctx-f7-holdout-03",
+	"family": "F7",
+	"split": "holdout",
+	"seed": {
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "sage"
+		},
+		"longTerm": [
+			{
+				"kind": "preference",
+				"key": "clothes.style",
+				"text": "服装は動きやすさを重視する"
+			}
+		],
+		"exchanges": [
+			{
+				"user": "明日の服装はどうしよう",
+				"assistant": "もう朝晩が寒いので、上着を持っていくのがよいと思います。",
+				"at": "2026-10-16T21:00:00.000Z",
+				"layer": "unprocessed"
+			}
+		]
+	},
+	"input": "上着を持っていくっていうのは、私が決めたことだっけ？",
+	"tools": "none",
+	"expect": {
+		"checks": [
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "correct_attribution",
+				"condition": "上着を持っていくという話は、利用者が決めたことではなく、アシスタント（自分）がさきほど提案したことだと答えている。利用者の決定や記憶として述べていない。"
+			}
+		]
+	}
+}

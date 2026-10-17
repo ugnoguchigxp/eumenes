@@ -1,6 +1,11 @@
 import { workersSpeechRequest } from "../adapters/workers-ai-speech";
 import { readChatResponse } from "../../../infrastructure/chat-stream";
 import { readBounded } from "../../../infrastructure/bounded-read";
+import {
+	estimateMessageTokens,
+	outputReserveTokens,
+} from "../../../infrastructure/context-budget";
+import { getLogger } from "../../../infrastructure/logger";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import { billingPath } from "../../settings/contracts";
 import {
@@ -23,6 +28,10 @@ import {
 } from "./agent-session";
 import type { CallSessionRole } from "./attempt-record";
 
+const log = getLogger("inference");
+/** Tokens kept free below the window for the estimate's error. */
+const FIT_MARGIN_TOKENS = 512;
+
 export type CloudEnv = {
 	store: SqliteStore;
 	settings: Pick<SettingsService, "credential">;
@@ -38,24 +47,66 @@ function bounded(response: Response, limit: number) {
 	});
 }
 
-/** Drops the oldest turns (after the first message) until the estimate fits the window. */
-function fitMessages(row: RequestRow, resource: Resource, input: Messages) {
+/**
+ * Fits the messages to the resource's window by the token estimate. The answer's reservation and a margin come off
+ * the window as a whole (the reservation belongs to the current task's half, so it never shrinks the memory and
+ * history budget the host assembled for).
+ * - A request the server may trim drops the oldest turns (after the first message) until it fits, or fails with
+ *   `context_window_exceeded` when nothing more can go.
+ * - An `exact` request was fitted by the host; the estimate is not exact, so one that is still over drops the oldest
+ *   adopted history turns (never the system part, this turn's data or the request), logs the count, and is sent as it
+ *   is when nothing more can go: the provider alone may reject it. `context` is the split of the list after that.
+ */
+function fitMessages(
+	row: RequestRow,
+	resource: Resource,
+	input: Messages,
+	context?: { instructionCount: number; historyCount: number },
+) {
 	if (input.some((m) => m.images?.length))
 		throw new Error("image_not_supported");
 	const messages = [...input];
-	const reserve = Math.min(4096, Math.floor((resource.contextWindow ?? 0) / 4));
-	const budget = (resource.contextWindow ?? 0) - reserve - 512;
-	const estimate = () =>
-		new TextEncoder().encode(JSON.stringify(messages)).length +
-		messages.length * 16;
-	while (
-		row.contextPolicy !== "exact" &&
-		messages.length > 2 &&
-		estimate() > budget
-	)
-		messages.splice(1, Math.min(2, messages.length - 2));
-	if (estimate() > budget) throw new Error("context_window_exceeded");
-	return { messages, reserve };
+	const window = resource.contextWindow ?? 0;
+	const reserve = outputReserveTokens(window);
+	const budget = window - reserve - FIT_MARGIN_TOKENS;
+	const sizes = messages.map((message) => estimateMessageTokens([message]));
+	let tokens = sizes.reduce((sum, size) => sum + size, 0);
+	let split = context;
+	if (row.contextPolicy !== "exact") {
+		while (messages.length > 2 && tokens > budget) {
+			const count = Math.min(2, messages.length - 2);
+			messages.splice(1, count);
+			tokens -= sizes.splice(1, count).reduce((sum, size) => sum + size, 0);
+		}
+		if (tokens > budget) throw new Error("context_window_exceeded");
+	} else if (tokens > budget) {
+		// The adopted history: the first `historyCount` non-system messages after the instructions.
+		const at: number[] = [];
+		for (
+			let i = split?.instructionCount ?? 0;
+			split && i < messages.length && at.length < split.historyCount;
+			i++
+		)
+			if (messages[i]!.role !== "system") at.push(i);
+		const gone = new Set<number>();
+		while (tokens > budget && gone.size < at.length)
+			for (const i of at.slice(gone.size, gone.size + 2)) {
+				gone.add(i);
+				tokens -= sizes[i]!;
+			}
+		if (gone.size > 0) {
+			for (let i = messages.length - 1; i >= 0; i--)
+				if (gone.has(i)) messages.splice(i, 1);
+			split = { ...split!, historyCount: split!.historyCount - gone.size };
+		}
+		log.warn("inference.exact_context_over_window", {
+			droppedMessages: gone.size,
+			promptTokens: tokens,
+			limit: budget,
+			reason: tokens > budget ? "still_over" : "history_dropped",
+		});
+	}
+	return { messages, reserve, context: split };
 }
 
 type AttemptUsage = {
@@ -181,11 +232,13 @@ async function agentRequest(
 		throw new Error("image_not_supported");
 	if (row.purpose !== "llm") throw new Error("cloud_agent_purpose_unsupported");
 	if (!env.agents) throw new Error("cloud_agent_unavailable");
+	// Fit first: dropping history turns changes the split the session resumes from.
+	const fitted = fitMessages(row, resource, input, role?.context);
 	const session = await agentSession(
 		env,
 		connection,
 		resource,
-		role,
+		role && fitted.context ? { ...role, context: fitted.context } : role,
 		attemptId,
 	);
 	const result = await env.agents.run({
@@ -196,7 +249,7 @@ async function agentRequest(
 		baseUrl: connection.baseUrl,
 		credential,
 		auth: connection.auth,
-		messages: fitMessages(row, resource, input).messages,
+		messages: fitted.messages,
 		tools: options?.tools,
 		outputSchema: options?.jsonOutput ? options.jsonSchema : undefined,
 		reasoningEffort: options?.reasoningEffort,
@@ -305,6 +358,7 @@ export async function cloudRequest(
 				row,
 				resource,
 				input as Messages,
+				role?.context,
 			);
 			body = {
 				model: resource.model,

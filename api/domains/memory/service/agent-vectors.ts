@@ -8,13 +8,8 @@ import {
 	type TurnRecall,
 } from "../contracts";
 import { isBlocked, putTurnVector } from "../repository";
-import { PREFETCH_BYTES } from "./context-render";
 import type { WindowPrefetch } from "./context-window";
-import {
-	RECALL_LIMIT,
-	RECALL_MIN_SCORE,
-	type RecallInput,
-} from "./turn-recall";
+import { RECALL_MIN_SCORE, type RecallInput } from "./turn-recall";
 
 const log = getLogger("memory");
 /** Embedding is best effort: it never holds the job longer than this. */
@@ -39,6 +34,8 @@ const validVector = (vector: number[] | undefined, space: MemoryVectorSpace) =>
  * from. Nothing here throws into the job: embedding failure costs only the vectors (and a stale prefetch).
  */
 export function createAgentVectors(deps: {
+	/** The most (estimated tokens) a prefetch may take: the memory and history budget. */
+	recallBudgetTokens: () => number;
 	conversation: ConversationService;
 	atMs(): number;
 	/** Looked up at each use: the application may create the embedder after memory. */
@@ -164,11 +161,10 @@ export function createAgentVectors(deps: {
 					conversationId,
 					space: query.space,
 					vector: query.vector,
-					limit: RECALL_LIMIT,
 					minScore: RECALL_MIN_SCORE,
-					maxBytes: PREFETCH_BYTES,
+					maxTokens: deps.recallBudgetTokens(),
 				});
-				return found ?? { text: "", pins: [], bytes: 0 };
+				return found ?? { text: "", pins: [], tokens: 0 };
 			} catch (error) {
 				log.warn(
 					"memory.agent_embedding_failed",

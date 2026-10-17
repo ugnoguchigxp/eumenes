@@ -1,0 +1,51 @@
+{
+	"id": "ctx-f3-dev-03",
+	"family": "F3",
+	"split": "dev",
+	"seed": {
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "butler"
+		},
+		"summary": {
+			"text": "歯医者の予約は十八日の十五時に取った。",
+			"coversTurns": 1
+		},
+		"exchanges": [
+			{
+				"user": "歯医者を予約したいんだけど",
+				"assistant": "十八日の十五時でお取りしました。",
+				"at": "2026-10-09T10:00:00.000Z",
+				"layer": "summarized"
+			},
+			{
+				"user": "仕事の都合で、歯医者は二十日の午前十時に変えてもらったよ",
+				"assistant": "承知しました。二十日の十時ですね。",
+				"at": "2026-10-15T12:30:00.000Z",
+				"layer": "keep"
+			},
+			{
+				"user": "あと牛乳も買わなきゃ",
+				"assistant": "メモしておきます。",
+				"at": "2026-10-16T08:00:00.000Z",
+				"layer": "unprocessed"
+			}
+		]
+	},
+	"input": "歯医者の予約はいつだったっけ",
+	"tools": "none",
+	"expect": {
+		"checks": [
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "uses_newest_fact",
+				"condition": "予約日時を、変更後の二十日の午前十時として答えている。要約にある十八日の十五時を現在の予約として答えていない。"
+			}
+		]
+	}
+}

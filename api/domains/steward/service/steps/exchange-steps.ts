@@ -422,7 +422,7 @@ export const prepareRecallStep: StepDefinition = {
 					env.conversationId,
 					extras as RecallVector,
 				)
-			: { text: "", pins: [], bytes: 0 };
+			: { text: "", pins: [], tokens: 0 };
 		return {
 			applied: prefetch ? 1 : 0,
 			rejected: 0,

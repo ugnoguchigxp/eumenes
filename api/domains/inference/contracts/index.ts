@@ -211,6 +211,12 @@ export interface InferencePort {
 	): void;
 	cancelSubject?(subject: string): Promise<void>;
 	snapshotInTransaction?(db: Database): Settings;
+	/**
+	 * The context window (tokens) of the model a captured LLM request is routed to, from its saved settings: the
+	 * resource's `contextWindow` on a cloud-only route. null when it is not known here (a LARM route: the provider's
+	 * window is known only when the lease is claimed).
+	 */
+	llmContextWindowInTransaction?(db: Database, requestId: string): number | null;
 	requestFor?(db: Database, subject: string, purpose: Purpose): string | null;
 	executeRequest?(
 		requestId: string,
@@ -329,3 +335,5 @@ export const connectionModelsSchema = z.object({
 export type ConnectionModels = z.infer<typeof connectionModelsSchema>;
 export const startedProbeSchema = z.object({ id: z.string() });
 export * from "./record-pages";
+export * from "./context-render";
+export * from "./context-budget";

@@ -1,0 +1,47 @@
+{
+	"id": "ctx-f7-holdout-02",
+	"family": "F7",
+	"split": "holdout",
+	"seed": {
+		"persona": {
+			"agentName": "",
+			"userName": "お嬢様",
+			"persona": "maid"
+		},
+		"longTerm": [
+			{
+				"kind": "habit",
+				"key": "weekend.fishing",
+				"text": "週末はよく釣りに出かける"
+			},
+			{
+				"kind": "preference",
+				"key": "drink.morning",
+				"text": "朝は緑茶を飲む"
+			}
+		],
+		"exchanges": [
+			{
+				"user": "今週末は釣りじゃなくて、家族と動物園に行くよ",
+				"assistant": "楽しそうですね。",
+				"at": "2026-10-16T19:30:00.000Z",
+				"layer": "unprocessed"
+			}
+		]
+	},
+	"input": "週末の過ごし方について、さっき聞いた話と元から知ってる話を整理してくれる？",
+	"tools": "none",
+	"expect": {
+		"checks": [
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "correct_attribution",
+				"condition": "さっき（この会話）聞いた話として今週末に動物園へ行くこと、前から保存されている記憶として週末によく釣りに行くことを、取り違えずに区別して答えている。"
+			}
+		]
+	}
+}

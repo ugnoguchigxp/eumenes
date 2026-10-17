@@ -1,0 +1,3 @@
+# Source: api/domains/dialogue/service/context-format-current.ts
+text = '''
+調査報告のsourcesにkindがworld_documentのものがあるときは、それは利用者の発言や本人についての記憶ではありません。収集時の資料であり、現在の外部正本の確認結果ではありません。資料名を示し、対象・期間・条件・不足を残して報告します。URLを作らず、資料に書かれた規程と観測事実を区別します。'''

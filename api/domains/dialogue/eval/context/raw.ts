@@ -4,6 +4,9 @@ import { z } from "zod";
 export const LANES = ["fixture", "live"] as const;
 export type Lane = (typeof LANES)[number];
 
+export const SERIALIZATIONS = ["larm-messages", "flattened"] as const;
+export type Serialization = (typeof SERIALIZATIONS)[number];
+
 export const rawRowSchema = z
 	.object({
 		lane: z.enum(LANES),
@@ -33,15 +36,12 @@ export const rawRowSchema = z
 		latencyMs: z.number().min(0),
 		messageCount: z.number().int().min(0),
 		promptBytes: z.number().int().min(0),
-		/** ceil(bytes / 3): a stable proxy; only ratios between arms are used. */
+		/** The product's token estimate (`estimateMessageTokens`) of the messages sent; only ratios between arms are used. */
 		promptTokensEstimate: z.number().int().min(0),
 		promptSha256: z.string(),
-		unsupportedSeeds: z.array(z.string()),
 	})
 	.strict();
 export type RawRow = z.infer<typeof rawRowSchema>;
-
-export const estimateTokens = (bytes: number) => Math.ceil(bytes / 3);
 
 export function parseRawLines(text: string): RawRow[] {
 	return text
@@ -62,6 +62,8 @@ export const runMetaSchema = z
 		format: z.literal("context-eval.run"),
 		experiment: z.string().min(1),
 		lane: z.enum(LANES),
+		/** How the arms' messages reached the model (evaluation design section 6.2). */
+		serialization: z.enum(SERIALIZATIONS),
 		split: z.enum(["dev", "holdout", "all"]),
 		startedAt: z.string(),
 		/** sha256 of manifest.json when the run was made, else null (nothing frozen yet). */

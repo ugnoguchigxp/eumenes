@@ -4,12 +4,15 @@
  * No retries, no voting, no caching: a failed call is a row with status `transport_error`.
  */
 import { createHash } from "node:crypto";
+import { estimateMessageTokens } from "../../../inference";
 import type { ChatMessage } from "../../service/context";
 import { type ContextArm, promptHash } from "./arm";
 import type { ContextCase } from "./case-schema";
 import type { ToolCallRecord } from "./checks";
 import { type SeedWiring, materialize } from "./materialize";
-import { type Lane, type RawRow, estimateTokens } from "./raw";
+import type { Lane, RawRow, Serialization } from "./raw";
+import { assertRenderInvariants } from "./render-invariants";
+import { serialize } from "./serialization";
 
 /** Williams design: every arm precedes every other equally often (twice for an odd count). */
 export function williamsOrders(n: number): number[][] {
@@ -49,12 +52,13 @@ type Job = {
 	trial: number;
 	arm: ContextArm;
 	messages: ChatMessage[];
-	unsupportedSeeds: string[];
 	tools: ContextCase["tools"];
 };
 
 export type RunOptions = {
 	lane: Lane;
+	/** How the arms' messages reach the model (evaluation design section 6.2). */
+	serialization: Serialization;
 	cases: readonly ContextCase[];
 	arms: readonly ContextArm[];
 	trials: number;
@@ -80,7 +84,13 @@ const sha = (text: string) => createHash("sha256").update(text).digest("hex");
 export async function planJobs(
 	options: Pick<
 		RunOptions,
-		"cases" | "arms" | "trials" | "openWiring" | "only" | "baseline"
+		| "cases"
+		| "arms"
+		| "trials"
+		| "openWiring"
+		| "only"
+		| "baseline"
+		| "serialization"
 	>,
 ): Promise<Job[]> {
 	const orders = williamsOrders(options.arms.length);
@@ -89,7 +99,11 @@ export async function planJobs(
 	for (const [caseIndex, testCase] of options.cases.entries()) {
 		const m = await materialize(testCase, await options.openWiring());
 		try {
-			const built = options.arms.map((arm) => ({ arm, out: arm.build(m) }));
+			// An arm that breaks a render invariant stops the run before any call.
+			const built = options.arms.map((arm) => ({
+				arm,
+				out: assertRenderInvariants(arm, m.assembly, testCase.id),
+			}));
 			if (options.baseline) {
 				const base = built.find((b) => b.arm.id === options.baseline!.arm);
 				const frozen = options.baseline.prompts[testCase.id];
@@ -113,8 +127,7 @@ export async function planJobs(
 						caseId: testCase.id,
 						trial,
 						arm,
-						messages: out.messages,
-						unsupportedSeeds: out.unsupportedSeeds,
+						messages: serialize(options.serialization, out).messages,
 						tools: testCase.tools,
 					});
 				}
@@ -152,9 +165,8 @@ export async function executeRun(
 			startedAt: new Date().toISOString(),
 			messageCount: job.messages.length,
 			promptBytes: bytes,
-			promptTokensEstimate: estimateTokens(bytes),
+			promptTokensEstimate: estimateMessageTokens(job.messages),
 			promptSha256: sha(serialized),
-			unsupportedSeeds: job.unsupportedSeeds,
 		};
 		const started = clock();
 		try {

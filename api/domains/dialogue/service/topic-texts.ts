@@ -3,12 +3,11 @@ import type { ConversationService } from "../../conversation";
 import type { Run } from "../contracts";
 import type { ChatMessage } from "./context";
 import { recentPriorRuns } from "../repository";
-import { clipHistoryText } from "./context-compiler";
 
 /**
  * The wording known World targets are looked for in: this turn's input first, then the previous
  * exchange (its input and, when it completed, its answer). Messages the memory ledger blocked (forgotten or
- * excluded) are never offered. Each text is cut like the history shows it.
+ * excluded) are never offered.
  */
 export function topicTexts(
 	tx: Database,
@@ -28,47 +27,35 @@ export function topicTexts(
 	for (const id of ids) {
 		if (blocked.has(id)) continue;
 		const message = conversation.messageInTransaction(tx, id);
-		if (message) texts.push(clipHistoryText(message.message.text));
+		if (message) texts.push(message.message.text);
 	}
 	return texts;
 }
 
-/** Longest a target name is shown; a longer one ends with "…". */
-const NAME_MAX_CHARS = 40;
-/** Most names one hint lists. */
-const NAME_MAX_COUNT = 5;
 /** Control and format characters (line breaks, zero-width, bidi marks) and line/paragraph separators. */
 const CONTROL_CHARS = /[\p{Cc}\p{Cf}\u2028\u2029]/gu;
 /** Brackets and quote-like characters: a name must not be able to close or imitate the quoting around it. */
 const FRAME_CHARS =
 	/[()（）[\]［］{}｛｝<>＜＞「」『』【】〔〕〈〉《》"'`“”„‘’＂＇｢｣]/gu;
 
-/** One name as quoted data: control and bracket characters gone, whitespace collapsed, clipped. */
+/** One name as quoted data: control and bracket characters gone, whitespace collapsed. */
 function cleanName(name: string): string {
-	const chars = [
-		...name
-			.replace(CONTROL_CHARS, " ")
-			.replace(FRAME_CHARS, " ")
-			.replace(/\s+/gu, " ")
-			.trim(),
-	];
-	return chars.length > NAME_MAX_CHARS
-		? `${chars
-				.slice(0, NAME_MAX_CHARS - 1)
-				.join("")
-				.trimEnd()}…`
-		: chars.join("");
+	return name
+		.replace(CONTROL_CHARS, " ")
+		.replace(FRAME_CHARS, " ")
+		.replace(/\s+/gu, " ")
+		.trim();
 }
 
 /**
- * The one L4 line naming the known World targets this turn mentions: names only (at most five, each cleaned and
- * shown as quoted data), no claim content and no ids, so the model knows World has something to look up. It does
+ * The one L4 line naming the known World targets this turn mentions: names only (in the order given, each cleaned
+ * and shown as quoted data), no claim content and no ids, so the model knows World has something to look up. It does
  * not name a tool: the lookup goes through whatever research the run is offered. Null when no target is named.
  */
 export function worldNamesHint(names: readonly string[]): ChatMessage | null {
-	const shown = [...new Set(names.map(cleanName).filter((name) => name !== ""))]
-		.slice(0, NAME_MAX_COUNT)
-		.map((name) => `「${name}」`);
+	const shown = [
+		...new Set(names.map(cleanName).filter((name) => name !== "")),
+	].map((name) => `「${name}」`);
 	if (shown.length === 0) return null;
 	return {
 		role: "system",

@@ -1,15 +1,11 @@
-import {
-	type CurationItem,
-	type CurationResult,
-	HISTORY_MAX_BYTES,
-	HISTORY_MESSAGE_MAX_BYTES,
-} from "../../../memory";
+import { estimateTextTokens } from "../../../../infrastructure/context-budget";
+import type { CurationItem, CurationResult } from "../../../memory";
 import {
 	COMPACT_THRESHOLD,
 	REFINE_THRESHOLD,
 	type StepId,
 } from "../../contracts";
-import { byteLength, fitExchanges } from "../budget";
+import { fitExchanges } from "../budget";
 import {
 	type MemoryRef,
 	activeStateItems,
@@ -41,9 +37,20 @@ const SUMMARY_CHARS = 1200;
 
 // ---- eligibility (the kick asks before it makes a unit) ----
 
-/** Bytes the verbatim history (the keep group) would take, each message cut at the history's per-message cap. */
-function keepHistoryBytes(env: StepEnv): number {
+/**
+ * Estimated tokens the memory and the verbatim history take of the memory and history budget: the long-term and
+ * short-term layers, the summary and the recalled exchanges as the stored window carries them, and the exchanges
+ * kept verbatim (each message whole).
+ */
+function memoryHistoryTokens(env: StepEnv): number {
 	const { db, deps, conversationId } = env;
+	const window = deps.memory.windows.storedInTransaction(db, conversationId);
+	let tokens = window
+		? window.longTerm.tokens +
+			window.shortTerm.tokens +
+			window.prefetch.tokens +
+			estimateTextTokens(window.history.summaryText)
+		: 0;
 	const rows = deps.memory
 		.exchangesInTransaction(db, conversationId)
 		.filter((row) => row.disposition === "keep");
@@ -54,19 +61,14 @@ function keepHistoryBytes(env: StepEnv): number {
 			...(r.answerMessageId ? [r.answerMessageId] : []),
 		]),
 	);
-	let bytes = 0;
 	for (const row of rows) {
 		for (const id of [row.inputMessageId, row.answerMessageId]) {
 			if (id === null || blocked.has(id)) continue;
 			const found = deps.conversation.messageInTransaction(db, id);
-			if (found)
-				bytes += Math.min(
-					HISTORY_MESSAGE_MAX_BYTES,
-					byteLength(found.message.text),
-				);
+			if (found) tokens += estimateTextTokens(found.message.text);
 		}
 	}
-	return bytes;
+	return tokens;
 }
 const summaryChars = (env: StepEnv): number =>
 	[
@@ -80,7 +82,10 @@ export function eligible(env: StepEnv, step: StepId): boolean {
 		case "consolidate-memory":
 			return activeStateItems(env).length >= 2;
 		case "compact-history":
-			return keepHistoryBytes(env) >= HISTORY_MAX_BYTES * COMPACT_THRESHOLD;
+			return (
+				memoryHistoryTokens(env) >=
+				env.deps.memory.historyBudgetTokens() * COMPACT_THRESHOLD
+			);
 		case "refine-summary":
 			return summaryChars(env) >= SUMMARY_CHARS * REFINE_THRESHOLD;
 		case "consolidate-goals":

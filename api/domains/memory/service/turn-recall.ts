@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import { estimateTextTokens } from "../../../infrastructure/context-budget";
 import { sha256Hex } from "../../../infrastructure/digest";
 import {
 	dot,
@@ -14,14 +15,11 @@ import { isBlocked, latestTurnVectors } from "../repository";
  * products are commonly 0.7 and above), so a hit must pass an absolute floor and also stay close to the best
  * hit. Both values await calibration against the live embedding model (recorded in the plan's section 10).
  */
-export const RECALL_LIMIT = 3;
 export const RECALL_MIN_SCORE = 0.8;
 /** A hit scoring more than this below the best one is not recalled. */
 const RECALL_RELATIVE_GATE = 0.05;
 /** Candidates examined per recall (each costs reading its exchange). */
 const MAX_ATTEMPTS = 50;
-/** Below this many spare bytes no further exchange can fit (an entry's keys, a date and a few characters). */
-const MIN_ENTRY_BYTES = 64;
 
 /**
  * Past text reaches the model as REFERENCE DATA: a JSON document between two fixed delimiter lines in which
@@ -43,18 +41,16 @@ type RecalledEntry = { at: string; user?: string; assistant?: string };
 function renderBlock(entries: readonly RecalledEntry[]): string {
 	return `${FRAME}\n${RECALL_BLOCK_OPEN}\n${safeJson(entries)}\n${RECALL_BLOCK_CLOSE}`;
 }
-/** One message in a recalled exchange is cut here: a few short exchanges serve better than one long one. */
-const MESSAGE_CHARS = 500;
 
 export type RecallInput = {
 	conversationId: string;
 	space: MemoryVectorSpace;
 	vector: ArrayLike<number>;
-	/** Most exchanges returned. */
-	limit: number;
+	/** Most exchanges returned; absent: as many as pass the gates and fit `maxTokens`. */
+	limit?: number;
 	minScore: number;
-	/** Size of the whole returned text. */
-	maxBytes: number;
+	/** Estimated tokens of the whole returned text at most. */
+	maxTokens: number;
 	/** Messages already in the prompt (shown verbatim, pinned by the other recall): an exchange containing one is skipped. */
 	excludeMessageIds?: Iterable<string> | undefined;
 };
@@ -65,12 +61,6 @@ function localMinute(iso: string): string {
 	const date = new Date(iso);
 	return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
-const clip = (text: string) => {
-	const chars = [...text];
-	return chars.length > MESSAGE_CHARS
-		? `${chars.slice(0, MESSAGE_CHARS).join("")}…`
-		: text;
-};
 
 /**
  * Earlier exchanges of a conversation that resemble `vector`, as one reference block. The vectors are per
@@ -83,8 +73,8 @@ export function recallTurns(
 	conversation: ConversationService,
 	input: RecallInput,
 ): TurnRecall | null {
-	const baseBytes = Buffer.byteLength(renderBlock([]));
-	if (input.limit < 1 || baseBytes + MIN_ENTRY_BYTES > input.maxBytes)
+	const baseTokens = estimateTextTokens(renderBlock([]));
+	if ((input.limit ?? Infinity) < 1 || baseTokens >= input.maxTokens)
 		return null;
 	const skipped = new Set(input.excludeMessageIds ?? []);
 	const dimension = input.space.dimension;
@@ -112,15 +102,15 @@ export function recallTurns(
 	const entries: RecalledEntry[] = [];
 	const pins: TurnRecall["pins"] = [];
 	let text = "";
-	let used = baseBytes;
+	let used = baseTokens;
 	let attempts = 0;
 	for (const hit of scored) {
 		if (
-			entries.length >= input.limit ||
+			entries.length >= (input.limit ?? Infinity) ||
 			hit.score < floor ||
 			++attempts > MAX_ATTEMPTS ||
-			// No room left for even a minimal exchange.
-			input.maxBytes - used < MIN_ENTRY_BYTES
+			// No room left.
+			used >= input.maxTokens
 		)
 			break;
 		const found = conversation.messageInTransaction(db, hit.messageId);
@@ -144,19 +134,19 @@ export function recallTurns(
 			continue;
 		const entry: RecalledEntry = {
 			at: localMinute((user ?? answer)!.message.createdAt),
-			...(user ? { user: clip(user.message.text) } : {}),
-			...(answer ? { assistant: clip(answer.message.text) } : {}),
+			...(user ? { user: user.message.text } : {}),
+			...(answer ? { assistant: answer.message.text } : {}),
 		};
-		// The limit applies to the rendered block, escapes included.
+		// The budget applies to the rendered block, escapes included; an exchange that does not fit is left out.
 		const rendered = renderBlock([...entries, entry]);
-		const renderedBytes = Buffer.byteLength(rendered);
-		if (renderedBytes > input.maxBytes) continue;
+		const renderedTokens = estimateTextTokens(rendered);
+		if (renderedTokens > input.maxTokens) continue;
 		entries.push(entry);
 		text = rendered;
-		used = renderedBytes;
+		used = renderedTokens;
 		for (const { message } of exchange)
 			pins.push({ messageId: message.id, digest: sha256Hex(message.text) });
 	}
 	if (entries.length === 0) return null;
-	return { text, pins, bytes: used };
+	return { text, pins, tokens: used };
 }

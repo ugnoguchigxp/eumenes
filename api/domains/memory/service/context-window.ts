@@ -1,3 +1,4 @@
+import { estimateTextTokens } from "../../../infrastructure/context-budget";
 import { listAllState } from "./state-snapshot";
 import type { Database } from "bun:sqlite";
 import { classifyValidity, periodFromStateMs } from "eumenes-memory";
@@ -48,7 +49,8 @@ export type WindowInputs = {
 export type WindowPrefetch = {
 	text: string;
 	pins: { messageId: string; digest: string }[];
-	bytes: number;
+	/** Estimated tokens of `text`. */
+	tokens: number;
 };
 export type WindowSnapshot = {
 	conversationId: string;
@@ -63,16 +65,15 @@ export type WindowSnapshot = {
 		/** The lines of `text` after the header, grouped by heading; [] when the layer is empty. */
 		sections: LayerSection[];
 		manifest: { itemId: string; revision: string }[];
-		/** Items the budget left out of `text` (not shown as "recently remembered" either). */
-		omitted: { itemId: string; revision: string }[];
-		bytes: number;
+		/** Estimated tokens of `text`. */
+		tokens: number;
 	};
 	shortTerm: {
 		/** As `longTerm.text`: `header` and `sections` are the same layer in structure. */
 		text: string;
 		header: string;
 		sections: LayerSection[];
-		bytes: number;
+		tokens: number;
 		pendingAdditions: number;
 		/** The State items behind "recently remembered": a usage receipt must name them too (forgetting purges by item). */
 		recentItemIds?: string[];
@@ -87,10 +88,7 @@ export type WindowSnapshot = {
 	nextExpiryMs?: number | null;
 };
 
-const EMPTY_PREFETCH: WindowPrefetch = { text: "", pins: [], bytes: 0 };
-const MAX_NOTICES = 5;
-/** A notice is one short sentence; longer text is cut so it cannot crowd out World. */
-const MAX_NOTICE_CHARS = 200;
+const EMPTY_PREFETCH: WindowPrefetch = { text: "", pins: [], tokens: 0 };
 const CONTRACT_VERSION = 1 as const;
 
 /** The package's change counter for the shared profile: it moves whenever State there changes. */
@@ -152,7 +150,7 @@ function currentState(db: Database, policyRevision: string, nowMs: number) {
 	return { lines, nextBoundaryMs };
 }
 
-/** The shown notices without the cleared ones, then the added ones (each cut short), keeping the newest few. */
+/** The shown notices without the cleared ones, then the added ones, oldest first. */
 function nextNotices(
 	shown: WindowSnapshot["notices"],
 	clearIds: readonly string[],
@@ -161,14 +159,11 @@ function nextNotices(
 	const cleared = new Set(clearIds);
 	return [
 		...shown.filter((notice) => !cleared.has(notice.id)),
-		...added.map((notice) => ({
-			id: notice.id,
-			text: [...notice.text].slice(0, MAX_NOTICE_CHARS).join(""),
-		})),
-	].slice(-MAX_NOTICES);
+		...added.map((notice) => ({ id: notice.id, text: notice.text })),
+	];
 }
 
-/** A window built before the layers carried their structure: it is read back from the stored text, which it reproduces. */
+/** A window built before the layers carried their structure or their token counts: both are read back from the stored text. */
 function withLayerStructure(window: WindowSnapshot) {
 	if (!window.longTerm.sections) {
 		const { header, sections } = longTermFromText(window.longTerm.text);
@@ -178,6 +173,9 @@ function withLayerStructure(window: WindowSnapshot) {
 		const { header, sections } = shortTermFromText(window.shortTerm.text);
 		window.shortTerm = { ...window.shortTerm, header, sections };
 	}
+	window.longTerm.tokens ??= estimateTextTokens(window.longTerm.text);
+	window.shortTerm.tokens ??= estimateTextTokens(window.shortTerm.text);
+	window.prefetch.tokens ??= estimateTextTokens(window.prefetch.text);
 }
 
 export function createContextWindowStore(deps: {
@@ -259,19 +257,11 @@ export function createContextWindowStore(deps: {
 				header: rendered.header,
 				sections: rendered.sections,
 				manifest: rendered.manifest,
-				omitted: rendered.omitted,
-				bytes: rendered.bytes,
+				tokens: rendered.tokens,
 			};
-		} else
-			longTerm = {
-				...previous.longTerm,
-				omitted: previous.longTerm.omitted ?? [],
-			};
+		} else longTerm = previous.longTerm;
 		const known = new Map(
-			[...longTerm.manifest, ...longTerm.omitted].map((entry) => [
-				entry.itemId,
-				entry.revision,
-			]),
+			longTerm.manifest.map((entry) => [entry.itemId, entry.revision]),
 		);
 		const recent = states.filter(
 			(line) => known.get(line.itemId) !== String(line.revision),
@@ -313,7 +303,7 @@ export function createContextWindowStore(deps: {
 				text: shortTerm.text,
 				header: shortTerm.header,
 				sections: shortTerm.sections,
-				bytes: shortTerm.bytes,
+				tokens: shortTerm.tokens,
 				pendingAdditions: shortTerm.pendingAdditions,
 				recentItemIds: recent.map((line) => line.itemId),
 			},

@@ -1,0 +1,34 @@
+{
+	"id": "ctx-f8-holdout-02",
+	"family": "F8",
+	"split": "holdout",
+	"seed": {
+		"persona": {
+			"agentName": "",
+			"userName": "旦那様",
+			"persona": "maid"
+		},
+		"notices": [
+			"音声が聞き取れず、「好きなバンド名」を保存できませんでした。もう一度教えてもらうよう伝えてください。"
+		]
+	},
+	"input": "いい天気だから、ちょっと散歩に出ようかな",
+	"tools": "none",
+	"expect": {
+		"checks": [
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "follows_current_request",
+				"condition": "散歩に出ることに自然に応じている。"
+			},
+			{
+				"axis": "no_unsupported_assertion",
+				"condition": "好きなバンド名を保存した、と断定していない。もう一度教えてほしい旨を一言で添えている。"
+			}
+		]
+	}
+}

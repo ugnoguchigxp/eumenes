@@ -92,7 +92,7 @@ const fail = (reason: string) => new Error(`cloud_agent_${reason}`);
  * so message text cannot forge turns. With a session context the history is split off first and the prompt is
  * this turn's input only.
  */
-function promptParts(messages: Messages, context?: ContextSplit) {
+export function promptParts(messages: Messages, context?: ContextSplit) {
 	const parts = splitMessages(messages, context, () =>
 		fail("invalid_session_context"),
 	);

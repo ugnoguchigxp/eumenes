@@ -1,18 +1,23 @@
-/**
- * Seed materializer: builds the real ContextWindow inputs for a case on a temp SQLite store with the real
- * conversation and memory services, then runs the CURRENT production `compileContext` on it.
- * Offline evaluation only. The store wiring (which needs domains below dialogue's own dependencies) is injected.
- */
 import type { SqliteStore } from "../../../../infrastructure/sqlite";
 import type { ConversationService } from "../../../conversation";
 import type { MemoryService, WindowSnapshot } from "../../../memory";
+import type { ContextBlock } from "../../../inference";
 import type { ContextGoalEntry, Run } from "../../contracts";
 import { insert } from "../../repository";
-import type { ChatMessage } from "../../service/context";
-import { compileContext } from "../../service/context-compiler";
+import type { ContextAssembly } from "../../service/context-assembly";
+import {
+	hostTextBlock,
+	operationBlock,
+	researchFailureBlock,
+	researchResultBlock,
+	specialistBlock,
+	type OperationSource,
+} from "../../service/context-blocks";
+import { compileAssembly } from "../../service/context-compiler";
 import { renderGoalsLayer } from "../../service/goals-layer";
 import { worldNamesHint } from "../../service/topic-texts";
 import type { ContextCase, Seed } from "./case-schema";
+import { recallBlockText, recallMinute } from "./recall-text";
 
 export const CONVERSATION_ID = "main";
 const SEED_SOURCE_MESSAGE = "seed-source";
@@ -42,34 +47,21 @@ export interface SeedWiring {
 	close(): Promise<void>;
 }
 
-type General = Parameters<typeof compileContext>[3];
-type Compiled = ReturnType<typeof compileContext>;
-
-/** Seed parts the baseline arm cannot show yet; they travel as data so a later renderer can place them. */
-export type CarriedSeed = Pick<
-	Seed,
-	"operation" | "research" | "specialist" | "recall"
->;
-
 export type Materialized = {
 	case: ContextCase;
 	runId: string;
-	/** The result of the current production `compileContext` on the seeded store. */
-	compiled: Compiled;
-	/** The goals layer message exactly as generation-prepare derives it from the adopted goals, or null. */
-	goalsLayer: ChatMessage | null;
-	/** The World name hint line, or null. */
-	worldHint: ChatMessage | null;
+	/** The product assembly of this turn: every arm renders this same content. */
+	assembly: ContextAssembly;
+	/** Every message the prompt shows verbatim, this input included. */
+	shownMessageIds: string[];
 	window: WindowSnapshot | null;
-	general: General;
-	carried: CarriedSeed;
 	/** Releases the temp store. */
 	close(): Promise<void>;
 };
 
-const at = (iso: string | undefined) => iso ?? "2026-10-13T00:00:00.000Z";
+export const at = (iso: string | undefined) => iso ?? "2026-10-13T00:00:00.000Z";
 
-async function appendExchange(
+export async function appendExchange(
 	wiring: SeedWiring,
 	n: number,
 	exchange: {
@@ -113,7 +105,7 @@ async function appendExchange(
 	};
 }
 
-function runRow(id: string, n: number, time: string, completed: boolean): Run {
+export function runRow(id: string, n: number, time: string, completed: boolean): Run {
 	return {
 		id,
 		agentTaskId: null,
@@ -136,7 +128,7 @@ function runRow(id: string, n: number, time: string, completed: boolean): Run {
 	} as Run;
 }
 
-const dispose = (
+export const dispose = (
 	wiring: SeedWiring,
 	inputMessageId: string,
 	disposition: "keep" | "summarize" | "drop",
@@ -153,7 +145,7 @@ const dispose = (
 	});
 
 /**
- * Seeds `testCase` into the wiring's store and compiles the context of its current turn.
+ * Seeds `testCase` into the wiring's store and assembles the context of its current turn.
  * The caller closes the result (which closes the wiring).
  */
 async function seedAndCompile(
@@ -214,12 +206,27 @@ async function seedAndCompile(
 		);
 		if (!written.ok) throw new Error(`seed_summary_rejected:${written.reason}`);
 	}
+	// Notices and the recalled exchanges travel in the window the way the memory step publishes them. The recall
+	// is seeded as the prefetch text directly: there are no embeddings offline (see recall-text.ts).
+	const recalled = (seed.recall ?? []).map((entry) => ({
+		at: recallMinute(entry.at),
+		...(entry.user === undefined ? {} : { user: entry.user }),
+		...(entry.assistant === undefined ? {} : { assistant: entry.assistant }),
+	}));
+	const recallText = recalled.length ? recallBlockText(recalled) : "";
 	const window = await store.write((db) =>
-		memory.publishWindowInTransaction(
-			db,
-			CONVERSATION_ID,
-			seed.notices?.length ? { addNotices: seed.notices } : {},
-		),
+		memory.publishWindowInTransaction(db, CONVERSATION_ID, {
+			...(seed.notices?.length ? { addNotices: seed.notices } : {}),
+			...(recallText
+				? {
+						prefetch: {
+							text: recallText,
+							pins: [],
+							bytes: Buffer.byteLength(recallText),
+						},
+					}
+				: {}),
+		}),
 	);
 
 	// The current turn: the last message, with its run still running.
@@ -243,42 +250,110 @@ async function seedAndCompile(
 		desiredState: goal.text,
 		revision: 1,
 	}));
-	const goalsLayer = renderGoalsLayer(goals)?.message ?? null;
-	const general: General = seed.persona ?? {
-		agentName: "",
-		userName: "",
-		persona: "butler",
-	};
+	const run = {
+		id: `r${current}`,
+		conversationId: CONVERSATION_ID,
+		inputMessageId: `u${current}`,
+	} as Run;
 	const compiled = await store.write((db) =>
-		compileContext(
+		compileAssembly(
 			db,
-			{
-				id: `r${current}`,
-				conversationId: CONVERSATION_ID,
-				inputMessageId: `u${current}`,
-			} as Run,
+			run,
 			conversation,
-			general,
+			seed.persona ?? { agentName: "", userName: "", persona: "butler" },
 			memory.windowForRunInTransaction(db, CONVERSATION_ID) ?? window,
 			memory,
-			goalsLayer,
+			renderGoalsLayer(goals)?.block,
 		),
 	);
+	const assembly = assembleVolatile(compiled.assembly, seed, Date.parse(now));
 	return {
 		case: testCase,
-		runId: `r${current}`,
-		compiled,
-		goalsLayer,
-		worldHint: worldNamesHint((seed.world ?? []).map((t) => t.name)),
+		runId: run.id,
+		assembly,
+		shownMessageIds: compiled.shownMessageIds,
 		window,
-		general,
-		carried: {
-			...(seed.operation ? { operation: seed.operation } : {}),
-			...(seed.research ? { research: seed.research } : {}),
-			...(seed.specialist ? { specialist: seed.specialist } : {}),
-			...(seed.recall ? { recall: seed.recall } : {}),
-		},
 		close: () => wiring.close(),
+	};
+}
+
+const OPERATION_SOURCE: Record<
+	NonNullable<Seed["operation"]>["kind"],
+	OperationSource
+> = {
+	image: "operation.image",
+	music: "operation.music",
+	drawing: "operation.drawing",
+	recognition: "operation.recognition",
+	delegation: "operation.delegation",
+};
+
+/** The parts of a seed that make a turn's volatile blocks. */
+export type VolatileSeed = Pick<
+	Seed,
+	"world" | "specialist" | "operation" | "research"
+>;
+
+/** The specialist records of a seed, as the blocks `specialistWorkBlock`, `viewingBlock` and the handoff make. */
+function specialistBlocks(specialist: NonNullable<Seed["specialist"]>) {
+	const blocks: ContextBlock[] = [];
+	if (specialist.work)
+		blocks.push(specialistBlock("specialist.work", specialist.work));
+	if (specialist.viewing)
+		blocks.push(specialistBlock("specialist.viewing", specialist.viewing));
+	if (specialist.handoff)
+		blocks.push(hostTextBlock("specialist.handoff", specialist.handoff));
+	return blocks;
+}
+
+/**
+ * What holds for this call only, in the order `createPrepare` shows it: the notices and the prefetch memory decided
+ * (none for a failed research answer), the World names, the specialist records, the operation results, the
+ * research report. A research answer has no specialist records; a failed one has no World names either. The block
+ * builders are the product's; the sequence is `createPrepare`'s, which needs the full dependency set to run.
+ */
+export function assembleVolatile(
+	compiled: ContextAssembly,
+	seed: VolatileSeed,
+	nowMs: number,
+): ContextAssembly {
+	const research = seed.research;
+	const failed = research?.failureCode !== undefined;
+	const worldHint = failed
+		? null
+		: worldNamesHint((seed.world ?? []).map((target) => target.name));
+	const volatile: ContextBlock[] = [
+		...(failed ? [] : compiled.volatile),
+		...(worldHint ? [hostTextBlock("world.names", worldHint.content)] : []),
+		...(research || !seed.specialist ? [] : specialistBlocks(seed.specialist)),
+		...(seed.operation
+			? [
+					operationBlock(
+						OPERATION_SOURCE[seed.operation.kind],
+						seed.operation.result,
+					),
+				]
+			: []),
+		...(research
+			? [
+					failed
+						? researchFailureBlock(
+								research.failureCode!,
+								research.projection === undefined
+									? undefined
+									: typeof research.projection === "string"
+										? research.projection
+										: JSON.stringify(research.projection),
+								nowMs,
+							)
+						: researchResultBlock(research.projection ?? {}, nowMs),
+				]
+			: []),
+	];
+	return {
+		...compiled,
+		stage: research || seed.operation ? "result" : "initial",
+		volatile,
 	};
 }
 

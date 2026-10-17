@@ -1,0 +1,39 @@
+{
+	"id": "ctx-f9-holdout-02",
+	"family": "F9",
+	"split": "holdout",
+	"seed": {
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "butler"
+		},
+		"exchanges": [
+			{
+				"user": "今日は海を見に行ったんだ",
+				"assistant": "良い一日でしたね。",
+				"at": "2026-10-16T18:40:00.000Z",
+				"layer": "unprocessed"
+			}
+		]
+	},
+	"input": "夕焼けの浜辺を犬が走っている絵を作ってほしい",
+	"tools": "conversation",
+	"expect": {
+		"checks": [
+			{
+				"kind": "tool_called",
+				"name": "image_studio"
+			},
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "follows_current_request",
+				"condition": "絵を作る依頼を受け、作る旨を短く伝えている。"
+			}
+		]
+	}
+}

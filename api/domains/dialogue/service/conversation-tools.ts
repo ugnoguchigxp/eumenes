@@ -311,7 +311,11 @@ export function conversationPolicy(offered: boolean) {
 				{},
 			);
 }
-/** Insert the policy and the reference data right before the current user message. */
+/**
+ * Insert the policy and the reference data right before the current user message. Like `markCurrentRequest` it
+ * runs in the execute phase: what it inserts (past selections, open questions, whether functions are offered) is
+ * decided by the routing, which happens after the prepare phase has rendered the context.
+ */
 export function appendConversationPolicy(
 	messages: Array<{ role: "system" | "user" | "assistant"; content: string }>,
 	offered: boolean,

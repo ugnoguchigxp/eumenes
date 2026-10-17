@@ -21,7 +21,14 @@ export function currentRequestMessage(
 	return message;
 }
 
-/** Mark the exact host-selected message without copying its text or changing attachments. */
+/**
+ * Mark the exact host-selected message without copying its text or changing attachments.
+ *
+ * This runs in the execute phase, not in the render of the prepare phase (`renderContext`): the lists it works on
+ * are only known after the routing (the query embedding, the candidate toolchains, the recalled exchanges and the
+ * past selections) has been decided, and the selection call renders a list of its own that no prepare-time
+ * assembly describes. The render decides the position of the input; this adds the marker in front of it.
+ */
 export function markCurrentRequest(
 	messages: ChatMessage[],
 	message: ChatMessage,

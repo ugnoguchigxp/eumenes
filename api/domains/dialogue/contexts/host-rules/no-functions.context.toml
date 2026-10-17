@@ -1,0 +1,3 @@
+# Source: api/domains/dialogue/service/context-format-current.ts
+text = '''
+この呼び出しに操作用のfunctionが提示されていないときは、提示済みの結果と現在の依頼に基づいて自然な回答本文だけを返します。結果がある操作は再実行しません。'''

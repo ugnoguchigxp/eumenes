@@ -2,12 +2,8 @@ import { systemContext } from "../../../infrastructure/system-context";
 import { measureStage } from "../../../infrastructure/performance";
 import type { Database } from "bun:sqlite";
 import { getLogger } from "../../../infrastructure/logger";
-import {
-	PREFETCH_BYTES,
-	RECALL_LIMIT,
-	RECALL_MIN_SCORE,
-	type TurnRecall,
-} from "../../memory";
+import { MEMORY_HISTORY_MAX_TOKENS } from "../../inference";
+import { RECALL_MIN_SCORE, type TurnRecall } from "../../memory";
 import type { AnswerTicket } from "../../agent-runtime";
 import type { SelectionOutcome } from "../../toolchain-history";
 import type {
@@ -278,10 +274,11 @@ function recallFor(
 				conversationId: window.conversationId,
 				space: query.space,
 				vector: query.vector,
-				limit: RECALL_LIMIT,
 				minScore: RECALL_MIN_SCORE,
-				// What the prefetch already uses comes off the same budget.
-				maxBytes: PREFETCH_BYTES - window.prefetchBytes,
+				// What is left of the memory and history budget (the prefetch is already in the prompt).
+				maxTokens:
+					input.memoryRoomTokens ??
+					MEMORY_HISTORY_MAX_TOKENS - window.prefetchTokens,
 				// Blocked messages are left out by the recall itself, at the time it reads them.
 				excludeMessageIds: [
 					...window.shownMessageIds,

@@ -1,7 +1,7 @@
 import { classifyValidity, periodFromStateMs } from "eumenes-memory";
 import type { StateItem } from "eumenes-memory/sqlite";
 import { sha256Hex } from "../../../infrastructure/digest";
-import { LONG_TERM_BYTES } from "../../memory";
+import { estimateJsonTokens } from "../../../infrastructure/context-budget";
 import { byteLength, type ClippedText, clipMessage } from "./budget";
 import type { StepEnv } from "./types";
 
@@ -52,8 +52,8 @@ export function activeStateItems(env: StepEnv): StateItem[] {
 }
 
 /**
- * The long-term list (State, then tendencies) and the live notes, each with a short ref. The list is cut at
- * `LONG_TERM_BYTES`, newest first.
+ * The long-term list (State, then tendencies) and the live notes, each with a short ref. The list is cut where
+ * it would outgrow the memory and history budget (estimated tokens), newest first.
  */
 export function describeMemory(env: StepEnv): MemoryDescription {
 	const { db, deps, conversationId } = env;
@@ -64,11 +64,12 @@ export function describeMemory(env: StepEnv): MemoryDescription {
 			.recentItemIds ?? [],
 	);
 	const recent: string[] = [];
-	let bytes = 0;
+	let tokens = 0;
+	const budget = deps.memory.historyBudgetTokens();
 	const push = (entry: Record<string, unknown>) => {
-		const size = byteLength(JSON.stringify(entry));
-		if (bytes + size > LONG_TERM_BYTES) return false;
-		bytes += size;
+		const size = estimateJsonTokens(entry);
+		if (tokens + size > budget) return false;
+		tokens += size;
 		longTerm.push(entry);
 		return true;
 	};

@@ -401,6 +401,17 @@ export function createInference(
 					a.controller.abort();
 		},
 		snapshotInTransaction: settings.inTransaction,
+		llmContextWindowInTransaction(db: Database, requestId: string) {
+			const snapshot = get(db, requestId)?.snapshot;
+			const route = snapshot?.routes.llm;
+			if (route?.mode !== "cloud-only") return null;
+			return (
+				snapshot!.resources.find(
+					(resource) =>
+						resource.id === route.fallbackId && resource.purpose === "llm",
+				)?.contextWindow ?? null
+			);
+		},
 		captureInTransaction: capture,
 		executeRequest: (
 			id: string,

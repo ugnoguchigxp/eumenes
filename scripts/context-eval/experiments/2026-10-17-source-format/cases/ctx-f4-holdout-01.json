@@ -1,0 +1,40 @@
+{
+	"id": "ctx-f4-holdout-01",
+	"family": "F4",
+	"split": "holdout",
+	"seed": {
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "butler"
+		},
+		"world": [
+			{
+				"name": "青い万年筆"
+			}
+		],
+		"exchanges": [
+			{
+				"user": "書き物をしていた",
+				"assistant": "どのような文章でしょう。",
+				"at": "2026-10-15T21:00:00.000Z",
+				"layer": "unprocessed"
+			}
+		]
+	},
+	"input": "あの青い万年筆を買ったのはいつ頃だったか分かる？",
+	"tools": "conversation",
+	"expect": {
+		"checks": [
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "no_unsupported_assertion",
+				"condition": "万年筆を買った時期・場所・値段を作って述べていない。World に記録があることを示して調べられると伝える、調査の関数を呼ぶ、または分からないと述べている。"
+			}
+		]
+	}
+}

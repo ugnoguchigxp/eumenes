@@ -3,12 +3,6 @@ import type { ContinuityKind } from "../../continuity/contracts";
 import { CONVERSATION_DEFAULT_PRINCIPAL } from "../../conversation/contracts";
 import { continuityItemSchema } from "../../continuity/contracts";
 import type { VectorSpaceShape } from "../../../infrastructure/vector";
-/** Without a ContextWindow (memory off) the newest runs sent verbatim; older ones are not sent. */
-export const TURN_WINDOW = 10;
-/** The verbatim exchanges (L3, unprocessed, the newest two) stay inside this size, whatever their length. */
-export const HISTORY_MAX_BYTES = 48 * 1024;
-/** One message of the history is cut to this size: head and tail stay, the middle is marked as left out. */
-export const HISTORY_MESSAGE_MAX_BYTES = 12 * 1024;
 /** The owner principal; defined once in conversation (the lower domain). */
 export const PRINCIPAL = CONVERSATION_DEFAULT_PRINCIPAL;
 /** The shared profile scope. Per-conversation continuity is composed into it for the active conversation. */
@@ -68,8 +62,8 @@ export type PreparedWindow = {
 	/** Earlier messages the prefetched text stands on: a changed digest expires the run. */
 	pins: { messageId: string; digest: string }[];
 	noticeIds: string[];
-	/** Bytes of the prefetched text already in the prompt (the per-turn recall fills what is left of its budget). */
-	prefetchBytes: number;
+	/** Estimated tokens of the prefetched text already in the prompt (the per-turn recall fills what is left of its budget). */
+	prefetchTokens: number;
 	/** The messages the prompt shows verbatim: the per-turn recall leaves them out. */
 	shownMessageIds: string[];
 };
@@ -88,7 +82,8 @@ export type MemoryEmbed = (
 export type TurnRecall = {
 	text: string;
 	pins: { messageId: string; digest: string }[];
-	bytes: number;
+	/** Estimated tokens of `text`. */
+	tokens: number;
 };
 export type SettleResult =
 	| { ok: true }
@@ -156,19 +151,14 @@ export const memoryTendenciesSchema: z.ZodType<{
 		}),
 	),
 });
-/** The ContextWindow as the screen shows it: sizes against their limits, and the rendered texts. */
+/** The ContextWindow as the screen shows it: the rendered texts and their estimated sizes (tokens). */
 export type MemoryContextDto =
 	| { disabled: true }
 	| {
 			disabled?: undefined;
 			version: number;
-			longTerm: { text: string; bytes: number; limit: number };
-			shortTerm: {
-				text: string;
-				bytes: number;
-				limit: number;
-				pendingAdditions: number;
-			};
+			longTerm: { text: string; tokens: number };
+			shortTerm: { text: string; tokens: number; pendingAdditions: number };
 			/** How many notices wait for the next turn. */
 			notices: number;
 	  };
@@ -176,15 +166,10 @@ export const memoryContextSchema: z.ZodType<MemoryContextDto> = z.union([
 	z.object({ disabled: z.literal(true) }),
 	z.object({
 		version: z.number(),
-		longTerm: z.object({
-			text: z.string(),
-			bytes: z.number(),
-			limit: z.number(),
-		}),
+		longTerm: z.object({ text: z.string(), tokens: z.number() }),
 		shortTerm: z.object({
 			text: z.string(),
-			bytes: z.number(),
-			limit: z.number(),
+			tokens: z.number(),
 			pendingAdditions: z.number(),
 		}),
 		notices: z.number(),

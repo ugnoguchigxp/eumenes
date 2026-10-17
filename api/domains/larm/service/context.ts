@@ -1,32 +1,86 @@
+import { estimateMessageTokens } from "../../../infrastructure/context-budget";
+import { getLogger } from "../../../infrastructure/logger";
 import type { LarmPort } from "../contracts";
 import type { Provider } from "./profiles";
 
 type Messages = Parameters<LarmPort["answer"]>[0];
+const log = getLogger("larm");
+
+/** Where the adopted history sits in a host-fixed list: after `instructionCount` messages, `historyCount` of them. */
+type HistoryRange = { instructionCount: number; historyCount: number };
 
 /**
- * Drops the oldest turns until the request fits the model. The leading system run (policy, memory and reference blocks) and the last message are never dropped.
- * `bytes` is the serialized size of the returned messages, measured by the final fit check, so callers need not serialize them again.
+ * Fits the request to the model window, by the token estimate (never the byte size).
+ *
+ * - A request the server may trim drops the oldest turns until it fits; the leading system run and the last
+ *   message are never dropped, and a request that still does not fit is `context_window_exceeded`.
+ * - An `exact` request was fitted by the host to its budgets. The estimate is not exact, so a list that is still
+ *   over the window is not an error: the oldest adopted history turns go (never the system part, the data of the
+ *   turn or the request), the dropped count is logged, and a list that still does not fit is sent as it is for the
+ *   provider to judge. `history` says where the turns are; without it nothing can be dropped safely.
+ *
+ * `bytes` is the serialized size of the returned messages (for the timing log); `history` the range after dropping.
  */
 export function fitContext(
 	messages: Messages,
 	window: NonNullable<Provider["contextWindow"]>,
 	exact = false,
-): { messages: Messages; bytes: number } {
+	history?: HistoryRange,
+): { messages: Messages; bytes: number; history?: HistoryRange } {
 	const budget =
 		window.maxTokens - window.outputReserveTokens - window.safetyMarginTokens;
 	if (budget <= 0) throw new Error("larm_invalid_context_window");
 	const selected = [...messages];
-	const estimate = (items: Messages) =>
-		new TextEncoder().encode(JSON.stringify(items)).length;
-	let kept = 0;
-	while (kept < selected.length && selected[kept]?.role === "system") kept++;
-	let bytes = estimate(selected);
-	while (!exact && selected.length - kept > 1 && bytes > budget) {
-		selected.splice(kept, Math.min(2, selected.length - kept - 1));
-		bytes = estimate(selected);
+	const sizes = selected.map((message) => estimateMessageTokens([message]));
+	const total = () => sizes.reduce((sum, size) => sum + size, 0);
+	let tokens = total();
+	let range = history ? { ...history } : undefined;
+	if (!exact) {
+		let kept = 0;
+		while (kept < selected.length && selected[kept]?.role === "system") kept++;
+		while (selected.length - kept > 1 && tokens > budget) {
+			const count = Math.min(2, selected.length - kept - 1);
+			selected.splice(kept, count);
+			tokens -= sizes.splice(kept, count).reduce((sum, size) => sum + size, 0);
+		}
+		if (tokens > budget) throw new Error("context_window_exceeded");
+	} else if (tokens > budget) {
+		// The adopted history is the first `historyCount` user/assistant messages after the instructions (system
+		// messages between them, such as the working memory, are not history).
+		const at: number[] = [];
+		for (
+			let i = range?.instructionCount ?? 0;
+			range && i < selected.length && at.length < range.historyCount;
+			i++
+		)
+			if (selected[i]!.role !== "system") at.push(i);
+		let dropped = 0;
+		const gone = new Set<number>();
+		while (tokens > budget && dropped < at.length) {
+			// Whole exchanges go: two messages at a time, the oldest first.
+			for (const i of at.slice(dropped, dropped + 2)) {
+				gone.add(i);
+				tokens -= sizes[i]!;
+				dropped++;
+			}
+		}
+		if (dropped > 0) {
+			for (let i = selected.length - 1; i >= 0; i--)
+				if (gone.has(i)) selected.splice(i, 1);
+			range = { ...range!, historyCount: range!.historyCount - dropped };
+		}
+		log.warn("larm.exact_context_over_window", {
+			droppedMessages: dropped,
+			promptTokens: tokens,
+			limit: budget,
+			reason: tokens > budget ? "still_over" : "history_dropped",
+		});
 	}
-	if (bytes > budget) throw new Error("context_window_exceeded");
-	return { messages: selected, bytes };
+	return {
+		messages: selected,
+		bytes: new TextEncoder().encode(JSON.stringify(selected)).length,
+		...(range ? { history: range } : {}),
+	};
 }
 
 /** An invalid optional credit never invalidates the audio it accompanies. */

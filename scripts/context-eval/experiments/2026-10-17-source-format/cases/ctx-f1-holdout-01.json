@@ -1,0 +1,47 @@
+{
+	"id": "ctx-f1-holdout-01",
+	"family": "F1",
+	"split": "holdout",
+	"seed": {
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "butler"
+		},
+		"longTerm": [
+			{
+				"kind": "preference",
+				"key": "travel.sea",
+				"text": "旅行は海沿いのリゾート地が好き"
+			},
+			{
+				"kind": "personal_fact",
+				"key": "travel.last",
+				"text": "去年の夏は沖縄の離島に行った"
+			}
+		],
+		"exchanges": [
+			{
+				"user": "連休の予定をまだ決めてないんだ",
+				"assistant": "候補を一緒に考えましょう。",
+				"at": "2026-10-14T21:05:00.000Z",
+				"layer": "unprocessed"
+			}
+		]
+	},
+	"input": "次の連休は山奥の静かな温泉宿でのんびりしたい。どんな宿を選べばいいかな",
+	"tools": "none",
+	"expect": {
+		"checks": [
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "follows_current_request",
+				"condition": "山奥の温泉宿という今回の希望に沿って、宿の選び方や条件を答えている。海沿いのリゾートを勧めていない。"
+			}
+		]
+	}
+}

@@ -1,41 +1,36 @@
-import { systemContext } from "../../../infrastructure/system-context";
+import {
+	REFERENCE_WINDOW_TOKENS,
+	contextBudgets,
+	estimateTextTokens,
+	type ContextBlock,
+} from "../../inference";
 import type { AnswerTicket } from "../../agent-runtime";
 import type { HandlerDefinition } from "../../queue";
-import { compileContext, windowIsEmpty } from "./context-compiler";
+import { compileAssembly, windowIsEmpty } from "./context-compiler";
+import {
+	hostTextBlock,
+	operationBlock,
+	researchFailureBlock,
+	researchResultBlock,
+} from "./context-blocks";
+import { fitAssembly, memoryHistoryUsed } from "./context-fit";
+import { systemMessageOf } from "./context-format-current";
+import { renderContext } from "./context-render";
 import { prepareRouting } from "./delegate-conversation";
+import type { ContextAssembly } from "./context-assembly";
 import { renderGoalsLayer } from "./goals-layer";
 import { topicTexts, worldNamesHint } from "./topic-texts";
-import { researchResultContext } from "./research-result-context";
-import { specialistWorkMessage, viewingMessage } from "./specialist-context";
+import { specialistWorkBlock, viewingBlock } from "./specialist-context";
 import { byId, transition } from "../repository";
 import { endRun } from "./run-end";
 import { isSystemPrompt, type Run } from "../contracts";
 import {
 	DEFAULT_DEADLINE_MS,
-	type ChatMessage,
 	type DialogueDeps,
 	type GenerateInput,
 	type GeneratePayload,
 } from "./context";
 
-/**
- * The instructions are the leading persona, long-term and goals layers that are actually in the
- * assembled list: a failed research result leaves the memory and goals layers out.
- */
-function leadingInstructions(
-	messages: ChatMessage[],
-	sections: { longTerm: ChatMessage[]; goals: ChatMessage[] },
-) {
-	const instructionLayers = new Set([...sections.longTerm, ...sections.goals]);
-	let count = 0;
-	while (
-		count < messages.length &&
-		messages[count]!.role === "system" &&
-		(count === 0 || instructionLayers.has(messages[count]!))
-	)
-		count++;
-	return count;
-}
 /** The claim-time half of a generation: fixes memory, goals, the World name hint and history inside the claim transaction. */
 export function createPrepare(
 	deps: DialogueDeps,
@@ -120,69 +115,50 @@ export function createPrepare(
 				);
 			}
 		}
-		const compiled = compileContext(
+		// The model window of this run, from its saved settings: a cloud route's resource. A LARM route's provider
+		// window is known only when its lease is claimed, so the reference window (256k) stands in for it here and
+		// the transport trims the oldest history if the real window is smaller.
+		const llmRequestId = larm.requestFor?.(tx, run.id, "llm");
+		const windowTokens =
+			(llmRequestId && larm.llmContextWindowInTransaction?.(tx, llmRequestId)) ||
+			REFERENCE_WINDOW_TOKENS;
+		const budgets = contextBudgets(windowTokens);
+		const compiled = compileAssembly(
 			tx,
 			current,
 			conversation,
 			larm.snapshotInTransaction?.(tx).general,
 			window,
 			memory,
-			goalsLayer?.message,
+			goalsLayer?.block,
 			!!deps.specialist,
+			budgets.memoryHistory,
 		);
-		let messages = compiled.messages;
-		if (agent?.projection || agent?.failureCode)
-			messages = researchResultContext(
-				compiled.sections,
-				agent.projection ?? undefined,
-				agent.failureCode,
-				Date.parse(clock()),
-			);
-		// Notices, prefetched exchanges and the World name hint come last, right before the current input; the
-		// operation results and the policy added below then land between them and the input.
-		messages.splice(
-			messages.length - 1,
-			0,
-			...(!agent?.failureCode ? compiled.sections.tail : []),
-			...(worldHint ? [worldHint] : []),
-		);
+		// What holds for this call only, in the order it is shown: the notices and the prefetch memory decided
+		// (none for a failed research answer), the World names, the specialist records, the operation results.
+		const volatile: ContextBlock[] = [
+			...(!agent?.failureCode ? compiled.assembly.volatile : []),
+			...(worldHint ? [hostTextBlock("world.names", worldHint.content)] : []),
+		];
 		// Specialist work stays out of the conversation's context; the main agent gets a short host record of it.
-		const specialistLines: ChatMessage[] =
-			deps.specialist && !isSystemPrompt(run.sourceKind) && !agent
-				? [
-						specialistWorkMessage(deps, tx, current),
-						viewingMessage(deps, tx, current),
-						...(claim.payload.specialistHandoff
-							? [
-									{
-										role: "system" as const,
-										content: `${systemContext(
-											"dialogue.contexts.generation-prepare.specialist-handoff",
-											{},
-										)}\nspecialistHandoff=${claim.payload.specialistHandoff}`,
-									},
-								]
-							: []),
-					].filter((line): line is ChatMessage => line !== null)
-				: [];
-		messages.splice(messages.length - 1, 0, ...specialistLines);
+		if (deps.specialist && !isSystemPrompt(run.sourceKind) && !agent) {
+			for (const block of [
+				specialistWorkBlock(deps, tx, current),
+				viewingBlock(deps, tx, current),
+				claim.payload.specialistHandoff
+					? hostTextBlock("specialist.handoff", claim.payload.specialistHandoff)
+					: null,
+			])
+				if (block) volatile.push(block);
+		}
 		// This run's context is fixed by the host: the server must neither trim nor reorder it.
 		const requestId = larm.requestFor?.(tx, run.id, "llm");
 		if (requestId) larm.setContextPolicyInTransaction?.(tx, requestId, "exact");
-		let actionResultIndex: number | undefined;
-		if (agent?.actionPayload) {
-			const operation = JSON.parse(agent.actionPayload);
-			actionResultIndex = messages.length - 1;
-			messages[0]!.content += systemContext(
-				"dialogue.contexts.generation-prepare.create-prepare",
-				{},
+		const operations: ContextBlock[] = [];
+		if (agent?.actionPayload)
+			operations.push(
+				operationBlock("operation.action", JSON.parse(agent.actionPayload)),
 			);
-			messages.splice(messages.length - 1, 0, {
-				role: "user",
-				content: JSON.stringify({ actionResult: operation }),
-			});
-		}
-
 		const delegated =
 			!run.agentTaskId && !isSystemPrompt(run.sourceKind)
 				? deps.delegation?.prepareInTransaction(tx, run)
@@ -192,96 +168,62 @@ export function createPrepare(
 			tx,
 			run.id,
 		);
-		if (recognitionResult) {
-			messages[0]!.content += systemContext(
-				"dialogue.contexts.generation-prepare.create-prepare-2",
-				{},
+		if (recognitionResult)
+			operations.push(
+				operationBlock("operation.recognition", recognitionResult),
 			);
-			messages.splice(messages.length - 1, 0, {
-				role: "user",
-				content: JSON.stringify({ recognitionResult }),
-			});
-		}
 		const imageResult = deps.image?.resultInTransaction(tx, run.id);
 		const musicResult = deps.music?.resultInTransaction(tx, run.id);
-		if (delegated?.receipt) {
-			messages[0]!.content += systemContext(
-				"dialogue.contexts.generation-prepare.create-prepare-3",
-				{},
+		if (delegated?.receipt)
+			operations.push(
+				operationBlock("operation.delegation", delegated.receipt),
 			);
-			messages.splice(messages.length - 1, 0, {
-				role: "user",
-				content: JSON.stringify({ delegationResult: delegated.receipt }),
-			});
-		}
-		if (drawingResult) {
-			messages[0]!.content += systemContext(
-				"dialogue.contexts.generation-prepare.create-prepare-4",
-				{},
-			);
-			messages.push({
-				role: "user",
-				content: JSON.stringify({ drawingResult }),
-			});
-		}
-		if (imageResult) {
-			messages[0]!.content += systemContext(
-				"dialogue.contexts.generation-prepare.create-prepare-5",
-				{},
-			);
-			messages.splice(messages.length - 1, 0, {
-				role: "user",
-				content: JSON.stringify({ imageResult }),
-			});
-		}
-		if (musicResult) {
-			messages[0]!.content += systemContext(
-				"dialogue.contexts.generation-prepare.create-prepare-6",
-				{},
-			);
-			messages.splice(messages.length - 1, 0, {
-				role: "user",
-				content: JSON.stringify({ musicResult }),
-			});
-		}
+		if (drawingResult)
+			operations.push(operationBlock("operation.drawing", drawingResult));
+		if (imageResult)
+			operations.push(operationBlock("operation.image", imageResult));
+		if (musicResult)
+			operations.push(operationBlock("operation.music", musicResult));
 		const note = claim.payload.commandNote;
-		if (note) {
-			messages[0]!.content += systemContext(
-				"dialogue.contexts.generation-prepare.create-prepare-7",
-				{},
-			);
-			messages.splice(messages.length - 1, 0, {
-				role: "user",
-				content: JSON.stringify({ commandQuestion: note }),
-			});
-		}
+		if (note)
+			operations.push(operationBlock("operation.command_question", note));
+		// The report of the research sub-agent: a failed answer keeps its own context apart from the layers.
+		const nowMs = Date.parse(clock());
+		const research: ContextBlock[] = agent?.failureCode
+			? [
+					researchFailureBlock(
+						agent.failureCode,
+						agent.projection ?? undefined,
+						nowMs,
+					),
+				]
+			: agent?.projection
+				? [researchResultBlock(JSON.parse(agent.projection), nowMs)]
+				: [];
+		const assembly = {
+			...compiled.assembly,
+			stage: agent || operations.length ? "result" : "initial",
+			volatile: [...volatile, ...operations, ...research],
+		} satisfies ContextAssembly;
+		// Inside the two budgets of the window: a block over its budget is clipped, never the cause of a failure.
+		const fitted = fitAssembly(
+			assembly,
+			windowTokens,
+			estimateTextTokens(systemMessageOf(assembly).content),
+		);
+		const rendered = renderContext(fitted, "current");
+		const { messages } = rendered;
 		// A new decision: the execute phase retrieves the toolchains for this request.
 		// While an operation's result (or a sub-agent's question) is phrased, nothing new is offered.
-		const routing =
-			!drawingResult &&
-			!recognitionResult &&
-			!imageResult &&
-			!musicResult &&
-			!delegated?.receipt &&
-			!note
-				? prepareRouting(tx, deps, run, messages, compiled.sections.input, {
-						dots: !!delegated && delegated.available !== false,
-					})
-				: undefined;
-		// The history a resumed session starts from is exactly the adopted exchanges this prompt shows (the
-		// kept and the not yet processed ones); the layers around them and everything added later are this turn's input.
-		const adopted = new Set([
-			...compiled.sections.history,
-			...compiled.sections.unprocessed,
-		]);
-		const sessionContext = {
-			instructionCount: leadingInstructions(messages, compiled.sections),
-			historyCount: messages.filter((m) => adopted.has(m)).length,
-		};
+		const routing = !operations.length
+			? prepareRouting(tx, deps, run, messages, compiled.assembly.input, {
+					dots: !!delegated && delegated.available !== false,
+				})
+			: undefined;
 		// A prefetch left out of this turn is neither sent nor checked at adoption.
 		const prepared =
 			window && compiled.prefetchDropped
-				? { ...window, prefetch: { text: "", pins: [], bytes: 0 } }
+				? { ...window, prefetch: { text: "", pins: [], tokens: 0 } }
 				: window;
 		return {
 			status: "ready",
@@ -292,22 +234,14 @@ export function createPrepare(
 				runId: run.id,
 				revision: current.revision,
 				messages,
-				sessionContext,
+				sessionContext: rendered.sessionContext,
 				currentRequest: {
 					messageId: run.inputMessageId,
-					messageIndex: messages.indexOf(compiled.sections.input),
+					messageIndex: rendered.currentRequestIndex,
 				},
-				actionResultIndex,
+				actionResultIndex: rendered.blockIndex["operation.action"],
 				...(imageResult || musicResult ? { mediaResult: true as const } : {}),
-				...(actionResultIndex !== undefined ||
-				delegated?.receipt ||
-				drawingResult ||
-				recognitionResult ||
-				imageResult ||
-				musicResult ||
-				note
-					? { operationResult: true as const }
-					: {}),
+				...(operations.length ? { operationResult: true as const } : {}),
 				...routing,
 				agent,
 				...(goalsLayer
@@ -332,6 +266,10 @@ export function createPrepare(
 						}
 					: {}),
 				requestId: larm.requestFor?.(tx, run.id, "llm") ?? undefined,
+				memoryRoomTokens: Math.max(
+					0,
+					budgets.memoryHistory - memoryHistoryUsed(fitted),
+				),
 			},
 		};
 	};

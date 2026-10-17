@@ -1,0 +1,38 @@
+[
+	{
+		"functionName": "web_research",
+		"title": "Web調査",
+		"summary": "公開Webを調べ、現在の事実（天気・価格・営業状況・ニュースなど）を確認して要約を通常会話へ返す",
+		"useWhen": ["天気・価格・相場・営業時間・混雑など今の事実の確認", "公開情報の調査"]
+	},
+	{
+		"functionName": "world_research",
+		"title": "World調査",
+		"summary": "Worldに記録された人・場所・もの・出来事などの対象について、記録の中身を調べて返す",
+		"useWhen": ["Worldに記録がある対象の詳細を確かめる依頼", "記録された過去の出来事や持ち物の確認"]
+	},
+	{
+		"functionName": "image_studio",
+		"title": "画像制作",
+		"summary": "依頼から画像を作成する、または画像の編集画面・保存画像の一覧を開く",
+		"useWhen": ["絵や画像を作る依頼", "画像の編集画面や保存画像を開く依頼"]
+	},
+	{
+		"functionName": "music_studio",
+		"title": "音楽",
+		"summary": "テーマから曲を作る、または保存した曲を選んで再生画面を開く",
+		"useWhen": ["曲を作る依頼", "保存した曲を流す依頼"]
+	},
+	{
+		"functionName": "timer",
+		"title": "タイマー",
+		"summary": "相対時間のタイマーを開始、照会、取消する",
+		"useWhen": ["現在の依頼がタイマーの開始、確認、取消である"]
+	},
+	{
+		"functionName": "conversation_history",
+		"title": "会話履歴の確認",
+		"summary": "保存済みの過去の会話を日時やキーワードで探して、前に何と言ったかを確認する",
+		"useWhen": ["過去に話した内容や決めたことを会話の記録から探す依頼"]
+	}
+]

@@ -1,12 +1,6 @@
+import { estimateTextTokens } from "../../../infrastructure/context-budget";
 import { systemContext } from "../../../infrastructure/system-context";
-import { getLogger } from "../../../infrastructure/logger";
 
-const log = getLogger("memory");
-
-/** Byte budgets of the layers. */
-export const LONG_TERM_BYTES = 16 * 1024;
-export const SHORT_TERM_BYTES = 8 * 1024;
-export const PREFETCH_BYTES = 6 * 1024;
 /** Additions waiting in the short-term layer before the long-term layer is republished. */
 export const PENDING_LIMIT = 5;
 
@@ -22,7 +16,6 @@ const LABELS: Record<string, string> = {
 	memo: "メモ",
 };
 const label = (kind: string) => LABELS[kind] ?? kind;
-const bytesOf = (text: string) => Buffer.byteLength(text, "utf8");
 const oneLine = (text: string) => text.replace(/\s+/g, " ").trim();
 
 const LONG_TERM_HEADER = systemContext(
@@ -165,8 +158,8 @@ export interface TendencyLine {
 export interface RenderedLongTerm extends LayerBlock {
 	text: string;
 	manifest: { itemId: string; revision: string }[];
-	omitted: { itemId: string; revision: string }[];
-	bytes: number;
+	/** Estimated tokens of `text`. */
+	tokens: number;
 }
 
 const stateLineText = (line: StateLine) =>
@@ -206,55 +199,23 @@ function composeLongTerm(
 const longTermText = (block: LayerBlock) => layerText(block, true);
 
 /**
- * The long-term layer. Same input, same string (it is a prefix of the prompt: a changing value
- * would invalidate the server's KV reuse). Over the budget, kinds are kept constraint first,
- * tendencies last, newest first within a kind; what does not fit is left out, never an error.
+ * The long-term layer: every current State line and tendency, in the order the layer is written (kinds with
+ * constraint first, tendencies last, newest first within a kind). Same input, same string (it is a prefix of the
+ * prompt: a changing value would invalidate the server's KV reuse). The layer has no size limit of its own: the
+ * memory and history budget of the window governs, where the conversation is assembled.
  */
 export function renderLongTerm(
 	states: readonly StateLine[],
 	tendencies: readonly TendencyLine[],
-	limitBytes = LONG_TERM_BYTES,
 ): RenderedLongTerm {
-	const priority = [...states].sort(
-		(a, b) =>
-			rank(LONG_TERM_KIND_ORDER, a.kind) - rank(LONG_TERM_KIND_ORDER, b.kind) ||
-			newestState(a, b),
-	);
-	const keptStates: StateLine[] = [];
-	const keptTendencies: TendencyLine[] = [];
-	const omitted: { itemId: string; revision: string }[] = [];
-	for (const line of priority) {
-		if (
-			bytesOf(
-				longTermText(composeLongTerm([...keptStates, line], keptTendencies)),
-			) <= limitBytes
-		)
-			keptStates.push(line);
-		else omitted.push({ itemId: line.itemId, revision: String(line.revision) });
-	}
-	for (const line of [...tendencies].sort(newestTendency)) {
-		if (
-			bytesOf(
-				longTermText(composeLongTerm(keptStates, [...keptTendencies, line])),
-			) <= limitBytes
-		)
-			keptTendencies.push(line);
-		else
-			omitted.push({
-				itemId: `tendency:${line.id}`,
-				revision: String(line.revision),
-			});
-	}
-	if (omitted.length > 0)
-		log.info("memory.long_term_trimmed", { omitted: omitted.length });
-	const block = composeLongTerm(keptStates, keptTendencies);
+	const block = composeLongTerm(states, tendencies);
 	const text = longTermText(block);
 	return {
 		text,
 		header: block.header,
 		sections: block.sections,
 		manifest: [
-			...[...keptStates]
+			...[...states]
 				.sort(
 					(a, b) =>
 						rank(LONG_TERM_KIND_ORDER, a.kind) -
@@ -264,13 +225,12 @@ export function renderLongTerm(
 					itemId: line.itemId,
 					revision: String(line.revision),
 				})),
-			...[...keptTendencies].sort(newestTendency).map((line) => ({
+			...[...tendencies].sort(newestTendency).map((line) => ({
 				itemId: `tendency:${line.id}`,
 				revision: String(line.revision),
 			})),
 		],
-		omitted,
-		bytes: bytesOf(text),
+		tokens: estimateTextTokens(text),
 	};
 }
 
@@ -285,26 +245,17 @@ export interface NoteLine {
 }
 export interface RenderedShortTerm extends LayerBlock {
 	text: string;
-	bytes: number;
-	/** Recently remembered State not yet in the long-term layer, including any left out for space. */
+	/** Estimated tokens of `text`: what the continuity guard compares to the memory and history budget. */
+	tokens: number;
+	/** Recently remembered State not yet in the long-term layer. */
 	pendingAdditions: number;
-	omitted: number;
-	/** The size with nothing left out: what the continuity guard compares to the budget. */
-	fullBytes: number;
 }
 
-/** Section order on screen; the order they are kept in is SHORT_TERM_KEEP. */
+/** Section order on screen. */
 const SHORT_TERM_SHOW = [
 	"goal",
 	"decision",
 	"open_question",
-	"activity",
-	"memo",
-];
-const SHORT_TERM_KEEP = [
-	"open_question",
-	"decision",
-	"goal",
 	"activity",
 	"memo",
 ];
@@ -335,49 +286,19 @@ function composeShortTerm(
 }
 const shortTermText = (block: LayerBlock) => layerText(block, false);
 
-/** The short-term layer, rebuilt every time. Over the budget: recent additions first, then notes in SHORT_TERM_KEEP order, newest first. */
+/** The short-term layer, rebuilt every time: every recent addition and note, with no limit of its own. */
 export function renderShortTerm(
 	recent: readonly StateLine[],
 	notes: readonly NoteLine[],
-	limitBytes = SHORT_TERM_BYTES,
 ): RenderedShortTerm {
-	const keptRecent: StateLine[] = [];
-	const keptNotes: NoteLine[] = [];
-	let omitted = 0;
-	for (const line of [...recent].sort(newestState)) {
-		if (
-			bytesOf(
-				shortTermText(composeShortTerm([...keptRecent, line], keptNotes)),
-			) <= limitBytes
-		)
-			keptRecent.push(line);
-		else omitted++;
-	}
-	const noteOrder = [...notes].sort(
-		(a, b) =>
-			rank(SHORT_TERM_KEEP, a.kind) - rank(SHORT_TERM_KEEP, b.kind) ||
-			newestNote(a, b),
-	);
-	for (const note of noteOrder) {
-		if (
-			bytesOf(
-				shortTermText(composeShortTerm(keptRecent, [...keptNotes, note])),
-			) <= limitBytes
-		)
-			keptNotes.push(note);
-		else omitted++;
-	}
-	if (omitted > 0) log.info("memory.short_term_trimmed", { omitted });
-	const block = composeShortTerm(keptRecent, keptNotes);
+	const block = composeShortTerm(recent, notes);
 	const text = shortTermText(block);
 	return {
 		text,
 		header: block.header,
 		sections: block.sections,
-		bytes: bytesOf(text),
+		tokens: estimateTextTokens(text),
 		pendingAdditions: recent.length,
-		omitted,
-		fullBytes: bytesOf(shortTermText(composeShortTerm(recent, notes))),
 	};
 }
 

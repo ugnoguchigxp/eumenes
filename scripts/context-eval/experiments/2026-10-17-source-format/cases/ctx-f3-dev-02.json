@@ -1,0 +1,51 @@
+{
+	"id": "ctx-f3-dev-02",
+	"family": "F3",
+	"split": "dev",
+	"seed": {
+		"persona": {
+			"agentName": "",
+			"userName": "ご主人様",
+			"persona": "maid"
+		},
+		"summary": {
+			"text": "ホームパーティーに持ち寄る料理は、ローストビーフにすると決めた。",
+			"coversTurns": 2
+		},
+		"exchanges": [
+			{
+				"user": "土曜のパーティーに何を持っていこう",
+				"assistant": "ローストビーフはいかがでしょう。",
+				"at": "2026-10-08T19:00:00.000Z",
+				"layer": "summarized"
+			},
+			{
+				"user": "それにするよ",
+				"assistant": "では材料を準備しましょう。",
+				"at": "2026-10-08T19:05:00.000Z",
+				"layer": "summarized"
+			},
+			{
+				"user": "ローストビーフは高いから、やっぱりミートローフにする",
+				"assistant": "承知しました。ミートローフに変更ですね。",
+				"at": "2026-10-14T20:00:00.000Z",
+				"layer": "unprocessed"
+			}
+		]
+	},
+	"input": "パーティーに持っていく料理って、何にするんだっけ？",
+	"tools": "none",
+	"expect": {
+		"checks": [
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "uses_newest_fact",
+				"condition": "持っていく料理を、後の発言で決め直したミートローフとして答えている。要約にあるローストビーフを現在の予定として答えていない。"
+			}
+		]
+	}
+}

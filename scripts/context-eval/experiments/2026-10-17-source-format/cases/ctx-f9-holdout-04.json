@@ -1,0 +1,31 @@
+{
+	"id": "ctx-f9-holdout-04",
+	"family": "F9",
+	"split": "holdout",
+	"seed": {
+		"persona": {
+			"agentName": "",
+			"userName": "お嬢様",
+			"persona": "maid"
+		}
+	},
+	"input": "先月の最初の週に私が食べたいって言っていたものを、会話の記録から探してほしい",
+	"tools": "conversation",
+	"expect": {
+		"checks": [
+			{
+				"kind": "tool_called",
+				"name": "conversation_history"
+			},
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "follows_current_request",
+				"condition": "会話の記録を探す依頼を受け、調べる旨を短く伝えている。食べたいと言っていた内容を記録の確認なしに作って述べていない。"
+			}
+		]
+	}
+}

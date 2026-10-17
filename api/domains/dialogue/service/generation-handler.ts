@@ -1,5 +1,6 @@
 import { answerSession, createAnswerStream } from "./generation-stream";
 import { generationTiming } from "./generation-timing";
+import { operationResultMessage } from "./context-format-current";
 import { currentRequestMessage } from "./request-context";
 import {
 	resolveAttachmentContext,
@@ -87,6 +88,35 @@ function shouldHoldBody(input: GenerateInput, chunkSpeech = false) {
 	);
 }
 
+/**
+ * Refresh time/state before an operation's result is phrased, without repeating the operation.
+ * A later change still rejects the generated answer at adoption.
+ */
+async function refreshActionResult(
+	deps: DialogueDeps,
+	agents: NonNullable<DialogueDeps["agents"]>,
+	input: GenerateInput,
+) {
+	const refreshed = await deps.store.write((tx) => {
+		const ticket = agents.prepareAnswerInTransaction(tx, input.runId);
+		if (
+			ticket.revision !== input.agent!.revision ||
+			ticket.dataEpoch !== input.agent!.dataEpoch ||
+			!ticket.actionPayload ||
+			!agents.validAnswerInTransaction(tx, ticket)
+		)
+			throw new Error("report_invalidated");
+		return { ticket, operation: JSON.parse(ticket.actionPayload) };
+	});
+	input.agent = refreshed.ticket;
+	if (input.actionResultIndex === undefined)
+		throw new Error("invalid_action_result");
+	input.messages[input.actionResultIndex] = operationResultMessage(
+		"operation.action",
+		refreshed.operation,
+	);
+}
+
 /** The queue handler of one generation: prepare, execute, settle (adopt) and cancel. */
 export function createGenerationHandler(
 	deps: DialogueDeps,
@@ -131,29 +161,7 @@ export function createGenerationHandler(
 					const timing = generationTiming();
 					resolveAttachmentContext(deps, input, run!.conversationId);
 					if (input.agent?.actionPayload && agents) {
-						// Refresh time/state before phrasing, without repeating the operation.
-						// A later change still rejects this generated answer at adoption.
-						const refreshed = await store.write((tx) => {
-							const ticket = agents.prepareAnswerInTransaction(tx, input.runId);
-							if (
-								ticket.revision !== input.agent!.revision ||
-								ticket.dataEpoch !== input.agent!.dataEpoch ||
-								!ticket.actionPayload ||
-								!agents.validAnswerInTransaction(tx, ticket)
-							)
-								throw new Error("report_invalidated");
-							return {
-								ticket,
-								operation: JSON.parse(ticket.actionPayload),
-							};
-						});
-						input.agent = refreshed.ticket;
-						if (input.actionResultIndex === undefined)
-							throw new Error("invalid_action_result");
-						input.messages[input.actionResultIndex] = {
-							role: "user",
-							content: JSON.stringify({ actionResult: refreshed.operation }),
-						};
+						await refreshActionResult(deps, agents, input);
 						signal.throwIfAborted();
 					}
 					const chunkSpeech = speaksChunks(deps, run);

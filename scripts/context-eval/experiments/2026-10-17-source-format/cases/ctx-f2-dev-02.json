@@ -1,0 +1,47 @@
+{
+	"id": "ctx-f2-dev-02",
+	"family": "F2",
+	"split": "dev",
+	"seed": {
+		"persona": {
+			"agentName": "",
+			"userName": "ご主人様",
+			"persona": "maid"
+		},
+		"exchanges": [
+			{
+				"user": "ワイヤレスイヤホンのAS-300の値段を調べて",
+				"assistant": "十月十三日に確認したところ、AS-300は税込一万二千八百円でした。",
+				"at": "2026-10-13T10:20:00.000Z",
+				"layer": "unprocessed"
+			},
+			{
+				"user": "ちょっと考えるね",
+				"assistant": "かしこまりました。",
+				"at": "2026-10-13T10:22:00.000Z",
+				"layer": "unprocessed"
+			},
+			{
+				"user": "おはよう",
+				"assistant": "おはようございます、ご主人様。",
+				"at": "2026-10-17T08:00:00.000Z",
+				"layer": "unprocessed"
+			}
+		]
+	},
+	"input": "あのイヤホン、今いくらだっけ？",
+	"tools": "none",
+	"expect": {
+		"checks": [
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "no_unsupported_assertion",
+				"condition": "一万二千八百円を現在の価格として断定していない。その金額は数日前に確認した時点のものだと伝える、または今の価格は確認できない旨を述べている。"
+			}
+		]
+	}
+}

@@ -1,6 +1,5 @@
 import type { Database } from "bun:sqlite";
 import type { ToolchainCard } from "../../capabilities";
-import { systemContext } from "../../../infrastructure/system-context";
 import type { Run, SpecialistSet, Viewing } from "../contracts";
 import {
 	liveSession,
@@ -8,18 +7,10 @@ import {
 	runViewing,
 	unreportedEnded,
 } from "../repository";
-import type { ChatMessage, DialogueDeps } from "./context";
+import type { ContextBlock } from "../../inference";
+import type { DialogueDeps } from "./context";
+import { specialistBlock } from "./context-blocks";
 import type { SessionOffers } from "./conversation-tools";
-
-const WORK_FRAME = systemContext(
-	"dialogue.contexts.generation-prepare.specialist-work",
-	{},
-);
-const VIEWING_FRAME = systemContext(
-	"dialogue.contexts.generation-prepare.specialist-viewing",
-	{},
-);
-const LABEL_CHARS = 60;
 
 /**
  * The session toolchains among these cards with the saved items each may start from. Choices are
@@ -77,18 +68,16 @@ export function viewingTargetOf(
 		: null;
 }
 
-const clip = (text: string) => text.slice(0, LABEL_CHARS);
-
 /**
  * What the main agent should know about specialist work, as short host facts (never the work's content):
  * a suspended unsaved work (title, label, unsaved, expiry, a switch waiting for the user), and, once, the
  * reason and label of the session that ended last.
  */
-export function specialistWorkMessage(
+export function specialistWorkBlock(
 	deps: DialogueDeps,
 	tx: Database,
 	run: Run,
-): ChatMessage | null {
+): ContextBlock | null {
 	const port = deps.specialist;
 	if (!port) return null;
 	const record: Record<string, unknown> = {};
@@ -98,7 +87,7 @@ export function specialistWorkMessage(
 		record.suspended = {
 			specialist: live.title,
 			toolchainId: live.toolchainId,
-			label: clip(work?.label ?? live.label),
+			label: work?.label ?? live.label,
 			unsaved: work?.dirty ?? false,
 			savedRef: work?.savedRef ?? null,
 			expiresAt: live.expiresAt,
@@ -110,15 +99,12 @@ export function specialistWorkMessage(
 		record.ended = {
 			specialist: ended.title,
 			reason: ended.endReason,
-			label: clip(ended.label),
+			label: ended.label,
 		};
 		markReported(tx, run.conversationId);
 	}
 	if (!Object.keys(record).length) return null;
-	return {
-		role: "system",
-		content: `${WORK_FRAME}\nspecialistWork=${JSON.stringify(record)}`,
-	};
+	return specialistBlock("specialist.work", record);
 }
 
 /**
@@ -151,7 +137,7 @@ export function viewedSpecialistTarget(
 					specialist: set.title,
 					toolchainId: set.toolchainId,
 					ref: found.ref,
-					label: clip(found.label),
+					label: found.label,
 				};
 		} catch {
 			// An unavailable toolchain issues nothing.
@@ -161,16 +147,11 @@ export function viewedSpecialistTarget(
 }
 
 /** The validated saved item as context for the main agent. */
-export function viewingMessage(
+export function viewingBlock(
 	deps: DialogueDeps,
 	tx: Database,
 	run: Run,
-): ChatMessage | null {
+): ContextBlock | null {
 	const viewing = viewedSpecialistTarget(deps, tx, run);
-	return viewing
-		? {
-				role: "system",
-				content: `${VIEWING_FRAME}\nviewing=${JSON.stringify(viewing)}`,
-			}
-		: null;
+	return viewing ? specialistBlock("specialist.viewing", viewing) : null;
 }

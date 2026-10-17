@@ -4,6 +4,7 @@
 	"arms": [{ "id": "baseline-compile" }, { "id": "baseline-compile-aa" }],
 	"trials": 3,
 	"concurrency": 2,
+	"toolsCatalog": "tools-catalog.json",
 	"adoption": {
 		"minNetGain": 4,
 		"maxTokenRatio": 1.1,

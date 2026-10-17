@@ -1,0 +1,47 @@
+{
+	"id": "ctx-f2-dev-03",
+	"family": "F2",
+	"split": "dev",
+	"seed": {
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "strategist"
+		},
+		"exchanges": [
+			{
+				"user": "今のドル円の相場を教えて",
+				"assistant": "昨夜の時点で一ドルは百四十九円台でした。",
+				"at": "2026-10-16T22:30:00.000Z",
+				"layer": "unprocessed"
+			},
+			{
+				"user": "了解、助かった",
+				"assistant": "お役に立てて何よりです。",
+				"at": "2026-10-16T22:31:00.000Z",
+				"layer": "unprocessed"
+			},
+			{
+				"user": "今日も一日よろしく",
+				"assistant": "かしこまりました。",
+				"at": "2026-10-17T07:50:00.000Z",
+				"layer": "unprocessed"
+			}
+		]
+	},
+	"input": "ドル円は今どのあたり？旅行のために両替するか迷ってる",
+	"tools": "conversation",
+	"expect": {
+		"checks": [
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "no_unsupported_assertion",
+				"condition": "前夜の「百四十九円台」を現在のレートとして断定していない。最新の相場を調べる（関数を呼ぶ、または調べると予告する）か、前夜時点の値だと時点を添えている。"
+			}
+		]
+	}
+}

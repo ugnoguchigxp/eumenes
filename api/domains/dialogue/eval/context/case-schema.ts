@@ -72,7 +72,42 @@ const seedGoal = z
 	.object({ text, priority: z.number().int().min(0).max(100).default(50) })
 	.strict();
 const seedWorldTarget = z.object({ name: text }).strict();
-const seedSpecialist = z.object({ title: text, summary: text }).strict();
+/**
+ * What the host records about a specialist session, in the product's own shapes (`specialistWorkBlock`,
+ * `viewingBlock` in dialogue/service/specialist-context.ts and the handoff text of a switch).
+ */
+const seedSpecialist = z
+	.object({
+		work: z
+			.object({
+				suspended: z
+					.object({
+						specialist: text,
+						toolchainId: text,
+						label: text,
+						unsaved: z.boolean(),
+						savedRef: z.string().nullable(),
+						expiresAt: isoTime,
+					})
+					.strict()
+					.optional(),
+				ended: z
+					.object({ specialist: text, reason: text, label: text })
+					.strict()
+					.optional(),
+			})
+			.strict()
+			.optional(),
+		viewing: z
+			.object({ specialist: text, toolchainId: text, ref: text, label: text })
+			.strict()
+			.optional(),
+		handoff: text.optional(),
+	})
+	.strict()
+	.refine((s) => s.work || s.viewing || s.handoff, {
+		message: "specialist_seed_empty",
+	});
 
 export const seedSchema = z
 	.object({
@@ -91,7 +126,7 @@ export const seedSchema = z
 			.strict()
 			.optional(),
 		exchanges: z.array(seedExchange).optional(),
-		/** Earlier exchanges the memory step recalled for this turn. Carried as data until the renderer exists. */
+		/** Earlier exchanges the memory step recalled for this turn (seeded as the prefetch text; see recall-text.ts). */
 		recall: z
 			.array(
 				z
@@ -107,7 +142,10 @@ export const seedSchema = z
 		/** Known World targets this turn's wording mentions (names only, as the production hint shows them). */
 		world: z.array(seedWorldTarget).optional(),
 		notices: z.array(text).optional(),
-		/** Carried as data: spliced by generation-prepare, which this harness does not reproduce yet. */
+		/**
+		 * The result of the operation the host ran for this turn, in the shape the product's port returns
+		 * (ImageRecord, MusicRecord, the excalidraw record, the recognition command result, the dots receipt).
+		 */
 		operation: z
 			.object({
 				kind: z.enum([

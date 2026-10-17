@@ -2,7 +2,6 @@ import type { SqliteStore } from "../../../infrastructure/sqlite";
 import type { ContinuityItem, ContinuityService } from "../../continuity";
 import type { MemoryContextDto, MemoryTendencyDto } from "../contracts";
 import { listActiveTendencies, readSettings } from "../repository";
-import { LONG_TERM_BYTES, SHORT_TERM_BYTES } from "./context-render";
 import type { ContextWindowStore, WindowSnapshot } from "./context-window";
 
 /**
@@ -21,13 +20,11 @@ export function createMemoryViews(deps: {
 		version: window.version,
 		longTerm: {
 			text: window.longTerm.text,
-			bytes: window.longTerm.bytes,
-			limit: LONG_TERM_BYTES,
+			tokens: window.longTerm.tokens,
 		},
 		shortTerm: {
 			text: window.shortTerm.text,
-			bytes: window.shortTerm.bytes,
-			limit: SHORT_TERM_BYTES,
+			tokens: window.shortTerm.tokens,
 			pendingAdditions: window.shortTerm.pendingAdditions,
 		},
 		notices: window.notices.length,

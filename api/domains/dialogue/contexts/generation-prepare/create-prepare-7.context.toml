@@ -1,4 +1,0 @@
-# Source: api/domains/dialogue/service/generation-prepare.ts
-text = '''
-
-操作担当は依頼を実行する前に確認が必要と判断しました。commandQuestionは担当の確認事項のデータです。その内容を自分の言葉と指定の口調で一つだけ尋ねます。操作は実行していません。'''

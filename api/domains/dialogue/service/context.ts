@@ -90,6 +90,11 @@ export interface GenerateInput {
 	 */
 	sessionContext?: { instructionCount: number; historyCount: number };
 	requestId?: string;
+	/**
+	 * What is left (tokens) of the memory and history budget of the model window after this prompt was assembled:
+	 * the per-turn recall fills at most this. Absent: the whole budget less the prefetch.
+	 */
+	memoryRoomTokens?: number;
 	/** The memory window fixed at prepare time; re-checked in the adoption transaction. */
 	memory?: {
 		window: PreparedWindow;

@@ -1,0 +1,47 @@
+{
+	"id": "ctx-f7-dev-02",
+	"family": "F7",
+	"split": "dev",
+	"seed": {
+		"persona": {
+			"agentName": "",
+			"userName": "ご主人様",
+			"persona": "maid"
+		},
+		"longTerm": [
+			{
+				"kind": "personal_fact",
+				"key": "family.sister",
+				"text": "妹の名前は美咲"
+			},
+			{
+				"kind": "preference",
+				"key": "color.favorite",
+				"text": "好きな色は青"
+			}
+		],
+		"exchanges": [
+			{
+				"user": "今日は新しい自転車を買ったよ",
+				"assistant": "おめでとうございます。",
+				"at": "2026-10-16T17:00:00.000Z",
+				"layer": "unprocessed"
+			}
+		]
+	},
+	"input": "今日話してくれたことと、前から覚えていることを分けて教えて",
+	"tools": "none",
+	"expect": {
+		"checks": [
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "correct_attribution",
+				"condition": "今日の会話で聞いたこととして自転車を買ったこと、前から保存されている記憶として妹の名前（美咲）や好きな色（青）を、取り違えずに区別して答えている。記憶の内容を今日聞いたこととして、または今日の話を前からの記憶として述べていない。"
+			}
+		]
+	}
+}

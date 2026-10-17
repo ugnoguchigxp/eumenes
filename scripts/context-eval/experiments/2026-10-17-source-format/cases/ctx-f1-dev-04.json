@@ -1,0 +1,47 @@
+{
+	"id": "ctx-f1-dev-04",
+	"family": "F1",
+	"split": "dev",
+	"seed": {
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "sage"
+		},
+		"longTerm": [
+			{
+				"kind": "preference",
+				"key": "fashion.color",
+				"text": "服や小物は黒かグレーの落ち着いた色を選ぶ"
+			},
+			{
+				"kind": "personal_fact",
+				"key": "work.dresscode",
+				"text": "普段の仕事はスーツではなく私服で通っている"
+			}
+		],
+		"exchanges": [
+			{
+				"user": "新しいシャツを探してる",
+				"assistant": "お好みの色合いはございますか。",
+				"at": "2026-10-15T20:00:00.000Z",
+				"layer": "keep"
+			}
+		]
+	},
+	"input": "友達の結婚式に着けていくネクタイを買いたい。今回は明るいパステルカラーにしたいんだけど、合わせやすい色を教えて",
+	"tools": "none",
+	"expect": {
+		"checks": [
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "follows_current_request",
+				"condition": "今回の依頼どおり、パステルカラー（淡く明るい色）のネクタイに合わせやすい色を答えている。黒やグレーを勧めることに終始していない。"
+			}
+		]
+	}
+}

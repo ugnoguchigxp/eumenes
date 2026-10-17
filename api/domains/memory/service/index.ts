@@ -45,7 +45,8 @@ import type { MemorySeed } from "../contracts/seeds";
 import { createSeedImport } from "./seeds";
 import { seedEvidence } from "./seed-sources";
 import { createAgentVectors } from "./agent-vectors";
-import { SHORT_TERM_BYTES, noteLines, renderShortTerm } from "./context-render";
+import { MEMORY_HISTORY_MAX_TOKENS } from "../../../infrastructure/context-budget";
+import { noteLines, renderShortTerm } from "./context-render";
 import { verbatimHistory, verbatimMessageIds } from "./context-history";
 import {
 	createContextWindowStore,
@@ -141,8 +142,15 @@ export function createMemoryService(
 		id?: () => string;
 		/** Embedding for the turn vectors; looked up at each use, so the application may create it after memory. */
 		embed?: () => MemoryEmbed | undefined;
+		/**
+		 * The budget (tokens) of the memory and conversation history half of the model window, looked up at each
+		 * use: `min(128k, window / 2)` of the saved model's window. Absent: the largest it can be (128k).
+		 */
+		historyBudgetTokens?: () => number;
 	},
 ) {
+	const historyBudgetTokens = () =>
+		options.historyBudgetTokens?.() ?? MEMORY_HISTORY_MAX_TOKENS;
 	const clock = options.clock ?? (() => new Date().toISOString());
 	const newId = options.id ?? (() => crypto.randomUUID());
 	let healthy = false;
@@ -222,13 +230,14 @@ export function createMemoryService(
 		return result;
 	}
 
-	// Continuity additions are checked against the short-term layer's byte budget in their own transaction.
+	// Continuity additions are checked against the memory and history budget in their own transaction: the notes
+	// alone may not outgrow it.
 	continuity.setGuard((db, conversationId) => {
-		const { fullBytes } = renderShortTerm(
+		const { tokens } = renderShortTerm(
 			[],
 			noteLines(continuity.snapshotInTransaction(db, conversationId).items),
 		);
-		if (fullBytes > SHORT_TERM_BYTES) reject("invalid_continuity_limit");
+		if (tokens > historyBudgetTokens()) reject("invalid_continuity_limit");
 	});
 
 	conversation.setRetractHook(dropVectorsOnRetract(conversation));
@@ -280,6 +289,7 @@ export function createMemoryService(
 		healthy: () => healthy,
 	});
 	const vectors = createAgentVectors({
+		recallBudgetTokens: historyBudgetTokens,
 		conversation,
 		atMs,
 		embed: options.embed,
@@ -569,10 +579,12 @@ export function createMemoryService(
 			)
 				return windows.rebuildInTransaction(db, conversationId, {
 					refreshLongTerm: false,
-					prefetch: { text: "", pins: [], bytes: 0 },
+					prefetch: { text: "", pins: [], tokens: 0 },
 				});
 			return window;
 		},
+		/** The budget (tokens) of the memory and conversation history half of the model window. */
+		historyBudgetTokens,
 		/**
 		 * Earlier exchanges that resemble `vector`, from before the verbatim window (read-only, no tool call).
 		 * null when memory is off or unhealthy, or nothing qualifies.
@@ -632,7 +644,7 @@ export function createMemoryService(
 					...(window.shortTerm.recentItemIds ?? []),
 				],
 				pins: window.prefetch.pins,
-				prefetchBytes: window.prefetch.bytes,
+				prefetchTokens: window.prefetch.tokens,
 				noticeIds: window.notices.map((notice) => notice.id),
 				shownMessageIds: [...shownMessageIds],
 			};

@@ -1,57 +1,33 @@
-import { systemContext } from "../../../infrastructure/system-context";
+import {
+	MEMORY_HISTORY_MAX_TOKENS,
+	type ContextBlock,
+} from "../../inference";
+import { getLogger } from "../../../infrastructure/logger";
 import type { Tx } from "../../queue";
 import type { ConversationService } from "../../conversation";
-import {
-	HISTORY_MAX_BYTES,
-	HISTORY_MESSAGE_MAX_BYTES,
-	TURN_WINDOW,
-	type MemoryService,
-	type WindowSnapshot,
-} from "../../memory";
+import type { MemoryService, WindowSnapshot } from "../../memory";
 import type { Run } from "../contracts";
 import { recentPriorRuns } from "../repository";
 import type { ChatMessage } from "./context";
-import { buildSystemPrompt } from "./system-prompt";
+import {
+	CONVERSATION_HOST_RULES,
+	type ContextAssembly,
+	type HistoryTurn,
+	type PersonaSpec,
+} from "./context-assembly";
+import {
+	longTermBlock,
+	noticeBlock,
+	prefetchBlock,
+	shortTermBlock,
+	summaryBlock,
+} from "./context-blocks";
+import { blockTokens, turnTokens } from "./context-fit";
+import { layoutCurrent } from "./context-format-current";
 
-// The size of the verbatim window is shared with memory.
-export { TURN_WINDOW };
-const HISTORY_HEAD_BYTES = 8 * 1024;
-/** The newest exchanges that are never dropped for size (two cut exchanges always fit the budget). */
+const log = getLogger("dialogue");
+/** The newest exchanges that are never dropped for size. */
 const LATEST_EXCHANGES = 2;
-const SUMMARY_FRAME = systemContext(
-	"dialogue.contexts.context-compiler.summary-frame",
-	{},
-);
-
-const bytesOf = (text: string) => Buffer.byteLength(text, "utf8");
-
-/**
- * The text as the history shows it: at most `limit` bytes, the first 8KB and the end kept, with
- * "（中略：約N文字）" between. Cuts fall on UTF-8 character boundaries; the stored message is untouched.
- */
-export function clipHistoryText(
-	text: string,
-	limit = HISTORY_MESSAGE_MAX_BYTES,
-): string {
-	const bytes = Buffer.from(text, "utf8");
-	if (bytes.length <= limit) return text;
-	const marker = (omitted: number) => `\n（中略：約${omitted}文字）\n`;
-	// The marker counts against the limit, so the clipped text never exceeds it.
-	const tailBudget = limit - HISTORY_HEAD_BYTES - bytesOf(marker(bytes.length));
-	let headEnd = HISTORY_HEAD_BYTES;
-	// A continuation byte (10xxxxxx) at the cut means the cut is inside a character.
-	while (headEnd > 0 && (bytes[headEnd]! & 0xc0) === 0x80) headEnd--;
-	let tailStart = bytes.length - tailBudget;
-	while (tailStart < bytes.length && (bytes[tailStart]! & 0xc0) === 0x80)
-		tailStart++;
-	const omitted = [...bytes.subarray(headEnd, tailStart).toString("utf8")]
-		.length;
-	return (
-		bytes.subarray(0, headEnd).toString("utf8") +
-		marker(omitted) +
-		bytes.subarray(tailStart).toString("utf8")
-	);
-}
 
 /** The prompt by layer, in the order `messages` lists them (the layers are what the research context reassembles). */
 export type ContextSections = {
@@ -76,9 +52,8 @@ export type ContextSections = {
 type HistoryEntry = {
 	layer: "keep" | "unprocessed";
 	ordinal: number;
-	messages: ChatMessage[];
-	messageIds: string[];
-	bytes: number;
+	turns: HistoryTurn[];
+	tokens: number;
 	pinned: boolean;
 };
 type MemoryHistory = Pick<
@@ -87,53 +62,57 @@ type MemoryHistory = Pick<
 	| "blockedMessageIdsOfConversationInTransaction"
 >;
 
-/**
- * The model-visible context of a run, in the fixed order
- * `[L0 system, L1 long-term?, goals?, L3 kept exchanges, L2 working memory?, unprocessed exchanges, L5 this input]`.
- * L4 (notices, prefetched earlier exchanges, World, operation results) is placed by the caller
- * right before L5; `sections.tail` is the part of it that is decided here.
- *
- * The history (L3, unprocessed, the newest two exchanges) stays within HISTORY_MAX_BYTES: each message is
- * cut to HISTORY_MESSAGE_MAX_BYTES, the oldest exchanges go first, the newest two never do. Blocked messages
- * are never shown. Without a window (memory off) the newest TURN_WINDOW runs are the history.
- */
-export function compileContext(
-	tx: Tx,
-	run: Run,
-	conversation: ConversationService,
-	general: Parameters<typeof buildSystemPrompt>[0] | undefined,
-	window: WindowSnapshot | null,
-	memory?: MemoryHistory,
-	goalsLayer?: ChatMessage | null,
-	/** Leave the specialist sessions' runs out of the fallback history before its size limit applies. */
-	withoutSpecialist = false,
-): {
-	messages: ChatMessage[];
-	sections: ContextSections;
+export type CompiledAssembly = {
+	/** Everything the compile step decides; `volatile` holds the notice and the prefetch (the tail). */
+	assembly: ContextAssembly;
 	/** Every message the prompt shows verbatim, this input included: a recall must not repeat them. */
 	shownMessageIds: string[];
 	/** The prefetch overlaps the shown messages and is left out of this turn (its pins must not be checked either). */
 	prefetchDropped: boolean;
-} {
-	const system: ChatMessage = {
-		role: "system",
-		content: buildSystemPrompt(
-			general ?? { agentName: "", userName: "", persona: "butler" },
-		),
-	};
-	// Memory and World are reference data, never an instruction: each layer gets its own labelled message.
-	const longTerm: ChatMessage[] = window?.longTerm.text
-		? [{ role: "system", content: window.longTerm.text }]
-		: [];
-	const goals: ChatMessage[] = goalsLayer ? [goalsLayer] : [];
-	const working: ChatMessage[] = [];
-	if (window?.history.summaryText)
-		working.push({
-			role: "system",
-			content: `${SUMMARY_FRAME}\nこれまでの経緯（要約）\n${window.history.summaryText}`,
-		});
-	if (window?.shortTerm.text)
-		working.push({ role: "system", content: window.shortTerm.text });
+};
+
+/**
+ * The content of a run's context that memory, the ledger and the conversation decide, before any format:
+ * the persona, long-term memory and the goals, the verbatim history, the summary and the short-term notes,
+ * the input, and the notices and prefetch of this turn. The caller adds the rest of the volatile part.
+ *
+ * The history (kept, unprocessed, the newest two exchanges) takes what is left of the memory and history budget
+ * (`memoryHistoryTokens`) after the long-term memory, the goals, the summary, the short-term notes and the
+ * notices and prefetch: the oldest exchanges go first, whole, and the newest two never do. No message is cut
+ * and no count of exchanges limits it. Blocked messages are never shown. Without a window (memory off) the
+ * runs of the conversation are the history, newest first as far as the budget allows.
+ */
+export function compileAssembly(
+	tx: Tx,
+	run: Run,
+	conversation: ConversationService,
+	general: PersonaSpec | undefined,
+	window: WindowSnapshot | null,
+	memory?: MemoryHistory,
+	goals?: ContextBlock | null,
+	/** Leave the specialist sessions' runs out of the fallback history. */
+	withoutSpecialist = false,
+	/** The whole memory and history budget (tokens) of the model window. */
+	memoryHistoryTokens = MEMORY_HISTORY_MAX_TOKENS,
+): CompiledAssembly {
+	const present = (blocks: Array<ContextBlock | null | undefined>) =>
+		blocks.filter((block): block is ContextBlock => !!block);
+	const stable = present([window && longTermBlock(window), goals]);
+	const working = present([
+		window && summaryBlock(window),
+		window && shortTermBlock(window),
+	]);
+	const notices = present([window && noticeBlock(window)]);
+	// The prefetch is counted in full here: whether it overlaps the history is known only once the history is.
+	const prefetch = present([window && prefetchBlock(window)]);
+	const room = Math.max(
+		0,
+		memoryHistoryTokens -
+			[...stable, ...working, ...notices, ...prefetch].reduce(
+				(sum, block) => sum + blockTokens(block),
+				0,
+			),
+	);
 
 	const verbatim =
 		window && memory
@@ -147,8 +126,8 @@ export function compileContext(
 				run.conversationId,
 			) ?? [],
 		);
-	const prior = recentPriorRuns(tx, run, TURN_WINDOW, withoutSpecialist);
-	// Runs the ledger never took (cancelled, replaced, from before it) stay as they were: the newest TURN_WINDOW.
+	// -1: every earlier run (SQLite has no limit then); the budget decides how many are read below.
+	const prior = recentPriorRuns(tx, run, -1, withoutSpecialist);
 	const refs = [
 		...(verbatim?.keep ?? []).map((ref) => ({
 			...ref,
@@ -158,15 +137,17 @@ export function compileContext(
 			...ref,
 			layer: "unprocessed" as const,
 		})),
-		...prior
-			.filter((entry) => !verbatim?.known.has(entry.inputMessageId))
-			.map((entry) => ({
-				inputMessageId: entry.inputMessageId,
-				answerMessageId:
-					entry.status === "completed" ? entry.answerMessageId : null,
-				layer: "unprocessed" as const,
-			})),
 	];
+	// Runs the ledger never took (cancelled, replaced, from before it) stay as they were. They are read newest
+	// first and no further than the budget can hold: the older ones would be the first to go.
+	const unknown = prior
+		.filter((entry) => !verbatim?.known.has(entry.inputMessageId))
+		.map((entry) => ({
+			inputMessageId: entry.inputMessageId,
+			answerMessageId:
+				entry.status === "completed" ? entry.answerMessageId : null,
+			layer: "unprocessed" as const,
+		}));
 	const newest = new Set(
 		prior
 			.filter(
@@ -179,78 +160,114 @@ export function compileContext(
 			.slice(-LATEST_EXCHANGES)
 			.map((entry) => entry.inputMessageId),
 	);
-	for (const entry of prior)
-		if (
-			newest.has(entry.inputMessageId) &&
-			!refs.some((ref) => ref.inputMessageId === entry.inputMessageId)
-		)
-			refs.push({
-				inputMessageId: entry.inputMessageId,
-				answerMessageId:
-					entry.status === "completed" ? entry.answerMessageId : null,
-				layer: "unprocessed",
-			});
+	const known = new Set(refs.map((ref) => ref.inputMessageId));
 
-	const entries: HistoryEntry[] = [];
-	for (const ref of refs) {
-		const pair: ChatMessage[] = [];
-		const messageIds: string[] = [];
+	const entryOf = (ref: {
+		inputMessageId: string;
+		answerMessageId: string | null;
+		layer: "keep" | "unprocessed";
+	}): HistoryEntry | null => {
+		const turns: HistoryTurn[] = [];
 		let ordinal: number | null = null;
 		if (!blocked.has(ref.inputMessageId)) {
 			const input = conversation.messageInTransaction(tx, ref.inputMessageId);
 			if (input) {
-				pair.push({
+				turns.push({
 					role: "user",
-					content: clipHistoryText(input.message.text),
+					content: input.message.text,
 					...(input.message.attachments?.length
 						? {
 								attachments: input.message.attachments,
 								sourceMessageId: input.message.id,
 							}
 						: {}),
+					messageId: input.message.id,
+					layer: ref.layer,
+					at: input.message.createdAt,
 				});
-				messageIds.push(input.message.id);
 				ordinal = input.ordinal;
 			}
 		}
 		if (ref.answerMessageId !== null && !blocked.has(ref.answerMessageId)) {
 			const answer = conversation.messageInTransaction(tx, ref.answerMessageId);
 			if (answer) {
-				pair.push({
+				turns.push({
 					role: "assistant",
-					content: clipHistoryText(answer.message.text),
+					content: answer.message.text,
+					messageId: answer.message.id,
+					layer: ref.layer,
+					at: answer.message.createdAt,
 				});
-				messageIds.push(answer.message.id);
 				ordinal ??= answer.ordinal;
 			}
 		}
-		if (pair.length === 0 || ordinal === null) continue;
-		entries.push({
+		if (turns.length === 0 || ordinal === null) return null;
+		return {
 			layer: ref.layer,
 			ordinal,
-			messages: pair,
-			messageIds,
-			bytes: pair.reduce((sum, message) => sum + bytesOf(message.content), 0),
+			turns,
+			tokens: turns.reduce((sum, turn) => sum + turnTokens(turn.content), 0),
 			pinned: newest.has(ref.inputMessageId),
-		});
+		};
+	};
+
+	const entries: HistoryEntry[] = [];
+	for (const ref of refs) {
+		const entry = entryOf(ref);
+		if (entry) entries.push(entry);
 	}
-	// Over the budget the oldest go, kept and unprocessed alike; the newest two stay (two cut exchanges fit).
-	let total = entries.reduce((sum, entry) => sum + entry.bytes, 0);
+	let loaded = 0;
+	const fromPrior: HistoryEntry[] = [];
+	for (const ref of [...unknown].reverse()) {
+		const entry = entryOf(ref);
+		if (!entry) continue;
+		fromPrior.push(entry);
+		loaded += entry.tokens;
+		if (loaded >= room && fromPrior.length > LATEST_EXCHANGES) break;
+	}
+	entries.push(...fromPrior);
+	// The newest two stay even when the ledger had already finished with them.
+	for (const entry of prior
+		.filter((e) => newest.has(e.inputMessageId) && !known.has(e.inputMessageId))
+		.map((e) =>
+			entryOf({
+				inputMessageId: e.inputMessageId,
+				answerMessageId:
+					e.status === "completed" ? e.answerMessageId : null,
+				layer: "unprocessed",
+			}),
+		))
+		if (entry && !entries.some((e) => e.turns[0]!.messageId === entry.turns[0]!.messageId))
+			entries.push(entry);
+	// Over the budget the oldest go, kept and unprocessed alike; the newest two stay.
+	let total = entries.reduce((sum, entry) => sum + entry.tokens, 0);
 	const shown = new Set(entries);
+	let droppedMessages = 0;
+	let omittedTokens = 0;
 	for (const entry of [...entries].sort((a, b) => a.ordinal - b.ordinal)) {
-		if (total <= HISTORY_MAX_BYTES) break;
+		if (total <= room) break;
 		if (entry.pinned) continue;
 		shown.delete(entry);
-		total -= entry.bytes;
+		total -= entry.tokens;
+		droppedMessages += entry.turns.length;
+		omittedTokens += entry.tokens;
 	}
+	if (droppedMessages > 0)
+		log.info("dialogue.history_trimmed", {
+			droppedMessages,
+			omitted: omittedTokens,
+			limit: room,
+		});
 	const visible = entries.filter((entry) => shown.has(entry));
-	const history = visible
-		.filter((entry) => entry.layer === "keep")
-		.flatMap((entry) => entry.messages);
-	const unprocessed = visible
-		.filter((entry) => entry.layer === "unprocessed")
-		.sort((a, b) => a.ordinal - b.ordinal)
-		.flatMap((entry) => entry.messages);
+	const turns = [
+		...visible
+			.filter((entry) => entry.layer === "keep")
+			.flatMap((entry) => entry.turns),
+		...visible
+			.filter((entry) => entry.layer === "unprocessed")
+			.sort((a, b) => a.ordinal - b.ordinal)
+			.flatMap((entry) => entry.turns),
+	];
 
 	const currentInput = conversation.messageInTransaction(
 		tx,
@@ -268,7 +285,7 @@ export function compileContext(
 			: {}),
 	};
 	const shownMessageIds = [
-		...visible.flatMap((entry) => entry.messageIds),
+		...visible.flatMap((entry) => entry.turns.map((turn) => turn.messageId)),
 		currentInput.message.id,
 	];
 	// A prefetch that stands on messages already shown would repeat them.
@@ -277,44 +294,80 @@ export function compileContext(
 		shownSet.has(pin.messageId),
 	);
 
-	const tail: ChatMessage[] = [];
-	const notice = window ? noticeMessage(window) : null;
-	if (notice) tail.push(notice);
-	if (window && window.prefetch.text !== "" && !prefetchDropped)
-		tail.push({ role: "system", content: window.prefetch.text });
 	return {
-		messages: [
-			system,
-			...longTerm,
-			...goals,
-			...history,
-			...working,
-			...unprocessed,
-			input,
-		],
-		sections: {
-			system,
-			longTerm,
-			goals,
-			history,
+		assembly: {
+			stage: "initial",
+			persona: general ?? { agentName: "", userName: "", persona: "butler" },
+			hostRules: CONVERSATION_HOST_RULES,
+			stable,
+			history: { boundary: window?.history.boundary ?? {}, turns },
 			working,
-			unprocessed,
+			volatile: [...notices, ...(prefetchDropped ? [] : prefetch)],
 			input,
-			tail,
+			currentRequest: { messageId: currentInput.message.id },
 		},
 		shownMessageIds,
 		prefetchDropped,
 	};
 }
 
-/** The one-time notices of the memory step as a system message, or null when there are none. */
-function noticeMessage(window: WindowSnapshot): ChatMessage | null {
-	if (window.notices.length === 0) return null;
+/**
+ * The model-visible context of a run up to the volatile part, in the fixed order
+ * `[L0 system, L1 long-term?, goals?, L3 kept exchanges, L2 working memory?, unprocessed exchanges, L5 this input]`:
+ * `compileAssembly` written in the `current` format. The notices and the prefetched exchanges are `sections.tail`.
+ */
+export function compileContext(
+	tx: Tx,
+	run: Run,
+	conversation: ConversationService,
+	general: PersonaSpec | undefined,
+	window: WindowSnapshot | null,
+	memory?: MemoryHistory,
+	goalsLayer?: ChatMessage | null,
+	/** Leave the specialist sessions' runs out of the fallback history. */
+	withoutSpecialist = false,
+	/** The whole memory and history budget (tokens) of the model window. */
+	memoryHistoryTokens?: number,
+): {
+	messages: ChatMessage[];
+	sections: ContextSections;
+	/** Every message the prompt shows verbatim, this input included: a recall must not repeat them. */
+	shownMessageIds: string[];
+	/** The prefetch overlaps the shown messages and is left out of this turn (its pins must not be checked either). */
+	prefetchDropped: boolean;
+} {
+	const { assembly, shownMessageIds, prefetchDropped } = compileAssembly(
+		tx,
+		run,
+		conversation,
+		general,
+		window,
+		memory,
+		goalsLayer
+			? {
+					source: "goals",
+					authority: "reference",
+					freshness: "stable",
+					body: { kind: "text", text: goalsLayer.content },
+				}
+			: null,
+		withoutSpecialist,
+		memoryHistoryTokens,
+	);
+	const sections = layoutCurrent(assembly);
 	return {
-		role: "system",
-		content: `記憶の担当からの連絡です。必要なら会話の中で一言伝えてください。\n${window.notices
-			.map((notice) => `- ${notice.text}`)
-			.join("\n")}`,
+		messages: [
+			sections.system,
+			...sections.longTerm,
+			...sections.goals,
+			...sections.history,
+			...sections.working,
+			...sections.unprocessed,
+			sections.input,
+		],
+		sections,
+		shownMessageIds,
+		prefetchDropped,
 	};
 }
 

@@ -1,4 +1,3 @@
-import { RECALL_LIMIT } from "../../../memory";
 import { stateKinds as stateKindsOf } from "../../../memory/contracts";
 import {
 	EXCHANGES_PER_UNIT,
@@ -32,7 +31,8 @@ const RESOLVE_ACTIONS = [
 	"update",
 	"none",
 ] as const;
-export const CANDIDATES_PER_REQUEST = RECALL_LIMIT;
+/** The steward's own forget candidates per request (its prompt, not the conversation window). */
+export const CANDIDATES_PER_REQUEST = 3;
 export const CANDIDATES_TOTAL = 6;
 export const CANDIDATE_CHARS = 500;
 export const FORGET_SEARCHES = 3;

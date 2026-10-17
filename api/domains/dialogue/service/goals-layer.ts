@@ -1,40 +1,32 @@
 import { systemContext } from "../../../infrastructure/system-context";
 import type { Database } from "bun:sqlite";
+import type { ContextBlock } from "../../inference";
 import type { ContextGoalEntry, GoalsLayerPort } from "../contracts";
 import type { ChatMessage } from "./context";
 
-/** The whole goals layer message, framing included, is at most this many UTF-8 bytes. */
-export const GOALS_LAYER_MAX_BYTES = 2 * 1024;
-/** One goal shows at most this many characters (code points); a longer one ends with "…". */
-export const GOAL_MAX_CHARS = 120;
 const GOALS_FRAME = systemContext(
 	"dialogue.contexts.goals-layer.goals-frame",
 	{},
 );
 
-const bytesOf = (text: string) => Buffer.byteLength(text, "utf8");
-
-/** One line of one goal: whitespace collapsed (a goal cannot start a new line of its own), cut on a character boundary. */
+/** One line of one goal: whitespace collapsed (a goal cannot start a new line of its own). */
 export function goalLine(desiredState: string): string {
-	const chars = [...desiredState.replace(/\s+/g, " ").trim()];
-	const text =
-		chars.length > GOAL_MAX_CHARS
-			? `${chars.slice(0, GOAL_MAX_CHARS - 1).join("")}…`
-			: chars.join("");
-	return `- ${text}`;
+	return `- ${desiredState.replace(/\s+/g, " ").trim()}`;
 }
 
 export type GoalsLayer = {
+	/** The layer as the context's content: the frame sentence as the header, the goal lines as the one section. */
+	block: ContextBlock;
+	/** The same layer as the message the `current` format writes. */
 	message: ChatMessage;
-	bytes: number;
-	/** The goals the layer lists (the rest is only counted in "ほか N 件"). */
+	/** The goals the layer lists: all of them. */
 	shown: Array<{ goalId: string; revision: number }>;
 };
 
 /**
- * The goals layer, right after L1: the adopted goals in priority order, one clipped line each, the whole message
- * within GOALS_LAYER_MAX_BYTES; what does not fit is one line "ほか N 件". A function of the goals alone (no time,
- * no counters), so unchanged goals give byte-identical text and the prompt cache holds. Null without goals.
+ * The goals layer, right after L1: the adopted goals in priority order, one line each, none left out and none cut
+ * (the memory and history budget of the window governs the size). A function of the goals alone (no time, no
+ * counters), so unchanged goals give byte-identical text and the prompt cache holds. Null without goals.
  */
 export function renderGoalsLayer(
 	goals: readonly ContextGoalEntry[],
@@ -45,22 +37,17 @@ export function renderGoalsLayer(
 		.map((goal, index) => ({ goal, index }))
 		.sort((a, b) => b.goal.priority - a.goal.priority || a.index - b.index)
 		.map(({ goal }) => goal);
-	const lines = ordered.map((goal) => goalLine(goal.desiredState));
-	const textOf = (count: number) =>
-		[
-			GOALS_FRAME,
-			...lines.slice(0, count),
-			...(count < lines.length ? [`- ほか ${lines.length - count} 件`] : []),
-		].join("\n");
-	let count = lines.length;
-	while (count > 0 && bytesOf(textOf(count)) > GOALS_LAYER_MAX_BYTES) count--;
-	const content = textOf(count);
+	const items = ordered.map((goal) => goalLine(goal.desiredState));
+	const content = [GOALS_FRAME, ...items].join("\n");
 	return {
+		block: {
+			source: "goals",
+			authority: "reference",
+			freshness: "stable",
+			body: { kind: "lines", header: GOALS_FRAME, sections: [{ items }] },
+		},
 		message: { role: "system", content },
-		bytes: bytesOf(content),
-		shown: ordered
-			.slice(0, count)
-			.map(({ goalId, revision }) => ({ goalId, revision })),
+		shown: ordered.map(({ goalId, revision }) => ({ goalId, revision })),
 	};
 }
 

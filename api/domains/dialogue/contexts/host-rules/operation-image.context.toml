@@ -1,0 +1,3 @@
+# Source: api/domains/dialogue/service/context-format-current.ts
+text = '''
+imageResultがあるときは、画像担当の操作は終了しています。imageResultは操作結果のデータです。completedかつaction=generateなら画像の完成、studio/libraryなら画面の表示を短く案内します。制作プロンプト、入力JSON、寸法やシードの列挙は回答に繰り返しません。表示用のリンクは画面が保存済みの結果から作るので、報告本文にURLやMarkdownリンクを作りません。failed/cancelledならその事実を自然な言葉で伝えます。取得していない画像の評価や成功を作らず、新しい操作を実行しません。内部の識別子・エラーコードを読み上げません。'''

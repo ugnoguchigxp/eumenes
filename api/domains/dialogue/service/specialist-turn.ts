@@ -12,7 +12,6 @@ import {
 	transition,
 	type SessionRecord,
 } from "../repository";
-import { clipHistoryText } from "./context-compiler";
 import { SPECIALIST_KIND, type ChatMessage } from "./context";
 import type { DialogueDeps, SpecialistTurnPayload } from "./context";
 import { endRun } from "./run-end";
@@ -110,8 +109,8 @@ function sessionHistory(
 		);
 		if (!input || !answer) continue;
 		const pair: ChatMessage[] = [
-			{ role: "user", content: clipHistoryText(input.message.text) },
-			{ role: "assistant", content: clipHistoryText(answer.message.text) },
+			{ role: "user", content: input.message.text },
+			{ role: "assistant", content: answer.message.text },
 		];
 		const size = pair.reduce((sum, m) => sum + Buffer.byteLength(m.content), 0);
 		if (bytes + size > HISTORY_BYTES) break;

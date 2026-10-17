@@ -24,17 +24,8 @@ export type {
 	TurnRecall,
 	SettleResult,
 } from "./contracts";
-export {
-	FORGET_MAX_ITEMS,
-	HISTORY_MAX_BYTES,
-	HISTORY_MESSAGE_MAX_BYTES,
-	TURN_WINDOW,
-} from "./contracts";
-export {
-	LONG_TERM_BYTES,
-	PENDING_LIMIT,
-	PREFETCH_BYTES,
-} from "./service/context-render";
-export { RECALL_LIMIT, RECALL_MIN_SCORE } from "./service/turn-recall";
+export { FORGET_MAX_ITEMS } from "./contracts";
+export { PENDING_LIMIT } from "./service/context-render";
+export { RECALL_MIN_SCORE } from "./service/turn-recall";
 export type { WindowSnapshot } from "./service/context-window";
 export { migrations } from "./repository";

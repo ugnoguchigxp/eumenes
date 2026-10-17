@@ -26,7 +26,6 @@ import {
 import { releaseSpecialistTurn } from "./specialist-turn-end";
 import type { TurnInput, TurnOutput } from "./specialist-turn";
 
-const HANDOFF_LABEL_CHARS = 60;
 
 function failTurn(
 	deps: DialogueDeps,
@@ -73,7 +72,7 @@ function forwardToMain(
 	const handoff = JSON.stringify({
 		specialist: record.title,
 		work: state,
-		label: label.slice(0, HANDOFF_LABEL_CHARS),
+		label,
 	});
 	const { job } = deps.queue.enqueueInTransaction(tx, {
 		scope: "dialogue",
