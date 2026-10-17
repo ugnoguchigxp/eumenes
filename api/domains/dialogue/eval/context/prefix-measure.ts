@@ -5,6 +5,7 @@
  * adoption rules reads; nothing is measured by hand.
  */
 import { z } from "zod";
+import { estimateMessageTokens } from "../../../inference";
 import type { ChatMessage } from "../../service/context";
 import { type ContextArm, promptHash } from "./arm";
 import { type PrefixStability, prefixStability } from "./prefix-stability";
@@ -97,7 +98,7 @@ function armReport(
 				label: labels[i]!,
 				promptSha256: promptHash(messages),
 				bytes,
-				tokens: pair ? pair.nextTokens : stability.firstTokens,
+				tokens: estimateMessageTokens(messages),
 				sharedBytes: pair?.sharedBytes ?? null,
 				sharedTokens: pair?.sharedTokens ?? null,
 				tokenRatio: pair?.tokenRatio ?? null,
