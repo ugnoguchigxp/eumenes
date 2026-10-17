@@ -34,6 +34,7 @@ import {
 	createDialogueService,
 	migration as dialogueMigration,
 	queueLinkMigration,
+	announcementMigration,
 	specialistMigration,
 	type SpecialistPort,
 	type SpecialistSet,
@@ -52,6 +53,7 @@ const MIGRATIONS = [
 	dialogueMigration,
 	queueMigration,
 	queueLinkMigration,
+	announcementMigration,
 	specialistMigration,
 	continuityMigration,
 	shortTermMigration,
@@ -128,9 +130,14 @@ type Work = {
 };
 
 export type Call = {
+	preparation?: import("../../delivery").SpeechPreparation;
 	history: Array<{ role: string; content: string }>;
 	tools: Array<{
-		function: { name: string; parameters: Record<string, unknown> };
+		function: {
+			name: string;
+			description?: string;
+			parameters: Record<string, unknown>;
+		};
 	}>;
 };
 
@@ -162,6 +169,8 @@ export async function setup(options: Options = {}) {
 		/** The specialist's replies in order (objects are JSON-encoded). */
 		specialist: [] as Array<unknown>,
 		mainCalls: [] as Call[],
+		noCandidates: false,
+		routeCalls: 0,
 		specialistPrompts: [] as Array<Array<{ role: string; content: string }>>,
 		specialistSessions: [] as unknown[],
 		captures: [] as Array<Record<string, unknown>>,
@@ -243,10 +252,28 @@ export async function setup(options: Options = {}) {
 			history: Call["history"],
 			_signal: AbortSignal,
 			delta: (text: string) => void,
-			_preparation: unknown,
+			preparation: Call["preparation"],
 			tools: Call["tools"] | undefined,
 		) => {
-			state.mainCalls.push({ history: [...history], tools: tools ?? [] });
+			state.mainCalls.push({
+				history: [...history],
+				tools: tools ?? [],
+				preparation,
+			});
+			if (
+				tools?.[0]?.function.name === "find_toolchain" &&
+				(typeof state.main[0] !== "string" || state.noCandidates) &&
+				state.main.length
+			) {
+				return {
+					requestId,
+					attemptId: "discovery",
+					value: "",
+					toolCalls: [
+						{ id: "discovery", name: "find_toolchain", arguments: "{}" },
+					],
+				} as Receipt;
+			}
 			const reply = state.main.shift() ?? "了解しました";
 			if (typeof reply !== "string")
 				return {
@@ -376,7 +403,14 @@ export async function setup(options: Options = {}) {
 	];
 	const toolchains: ToolchainRoutingPort = {
 		embedQuery: async () => undefined,
-		routeInTransaction: () => ({ cards: routed, past: [], retrieval: "none" }),
+		routeInTransaction: () => {
+			state.routeCalls++;
+			return {
+				cards: state.noCandidates ? [] : routed,
+				past: [],
+				retrieval: "none",
+			};
+		},
 		catalogInTransaction: () =>
 			[REVISION, OTHER_REVISION].map((revisionId) => {
 				const set = setFor(revisionId);
@@ -470,7 +504,16 @@ export async function setup(options: Options = {}) {
 		/** The main model hands the next utterance to the session toolchain. */
 		startCall(args: Record<string, unknown>, name = "studio_create") {
 			state.main.push({
-				toolCalls: [{ id: "call", name, arguments: JSON.stringify(args) }],
+				toolCalls: [
+					{
+						id: "call",
+						name,
+						arguments: JSON.stringify({
+							announcement: "担当に引き継ぎます。",
+							...args,
+						}),
+					},
+				],
 			});
 		},
 		session: () => dialogue.specialistSession("main"),

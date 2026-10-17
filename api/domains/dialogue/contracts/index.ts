@@ -44,6 +44,8 @@ export const runSchema = z.object({
 	revision: z.number().int(),
 	inputMessageId: z.string(),
 	answerMessageId: z.string().nullable(),
+	/** Adopted pre-delegation notice; separate from the final answer and conversation memory. */
+	announcement: z.string().max(65_536).nullable().optional(),
 	error: z.string().nullable(),
 	jobId: z.string().nullable(),
 	deadlineAt: z.string().nullable(),
@@ -73,6 +75,7 @@ export const progressSchema = z.object({
 	runId: z.string(),
 	status: runSchema.shape.status,
 	text: z.string().max(65_536),
+	announcement: z.string().max(65_536).nullable().optional(),
 	/** Machine-readable end reason of a failed run (never body text). */
 	error: z.string().nullable().optional(),
 });

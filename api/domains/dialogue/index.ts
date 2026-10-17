@@ -4,6 +4,7 @@ export {
 	queueLinkMigration,
 	agentLinkMigration,
 	worldStateMigration,
+	announcementMigration,
 	specialistMigration,
 } from "./repository";
 export {

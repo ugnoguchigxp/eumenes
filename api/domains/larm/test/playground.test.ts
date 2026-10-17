@@ -353,7 +353,7 @@ test("image acquires and releases a connection while music remains direct", asyn
 		profile: "image-profile",
 		expectedCatalogRevision: revision,
 	});
-	expect(lifecycle[0]!.body).not.toHaveProperty("providers");
+	expect(lifecycle[0]!.body).toHaveProperty("providers", ["llm"]);
 });
 test("music requests Opus once and fetches Ogg Opus with Control authentication after completion", async () => {
 	const audio = new Uint8Array(

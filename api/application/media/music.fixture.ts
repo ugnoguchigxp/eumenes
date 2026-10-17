@@ -178,6 +178,12 @@ export function musicFixture(
 		transcribe: async () => "",
 		speak: async () => new Uint8Array(),
 		answer: async (messages, _signal, options) => {
+			if (options?.tools?.[0]?.function.name === "find_toolchain") {
+				options.onToolCalls!([
+					{ id: "discovery", name: "find_toolchain", arguments: "{}" },
+				]);
+				return "";
+			}
 			if (options?.tools?.length) {
 				stages.push("route");
 				options.onToolCalls!([
@@ -185,6 +191,7 @@ export function musicFixture(
 						id: "music",
 						name: "music",
 						arguments: JSON.stringify({
+							announcement: "準備します。",
 							request: fixtureOptions.question ?? musicQuestion,
 						}),
 					},

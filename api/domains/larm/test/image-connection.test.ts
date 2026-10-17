@@ -54,7 +54,7 @@ function fixture(
 				const body = JSON.parse(String(init.body));
 				expect(body.profile).toBe(target.selector);
 				expect(body.expectedCatalogRevision).toBe(target.revision);
-				expect(body).not.toHaveProperty("providers");
+				expect(body.providers).toEqual(["llm"]);
 				return Response.json(state(), { status: 201 });
 			}
 			if (path === "/v1/agent-connections/image-connection")
@@ -84,27 +84,31 @@ function fixture(
 			gateway.execute(target, { text: "fixture" }, signal, async () => {}),
 	};
 }
-test("image waits for connection readiness before using the acquired service and releases after content", async () => {
-	const h = fixture((path, init) => {
-		if (path === "/v1/agent-connections")
-			return Response.json({ ...state(), status: "pending" }, { status: 202 });
-		if (
-			path === "/v1/agent-connections/image-connection" &&
-			init.method !== "DELETE"
-		) {
-			expect(h.calls).not.toContain("POST /acquired-image");
-			return Response.json(state());
-		}
+for (const status of ["pending", "probing", "ready"])
+	test(`image uses the acquired on-demand service while provider status is ${status}`, async () => {
+		const h = fixture((path) =>
+			path === "/v1/agent-connections"
+				? Response.json(
+						{
+							...state(),
+							status,
+							providers: [
+								{ name: "llm", readiness: "waiting", claimable: false },
+							],
+						},
+						{ status: status === "ready" ? 201 : 202 },
+					)
+				: undefined,
+		);
+		expect((await h.execute()).mime).toBe("image/png");
+		expect(h.calls).toEqual([
+			"POST /v1/agent-connections",
+			"POST /acquired-image",
+			"GET /v1/image-artifacts/created-image/content",
+			"DELETE /v1/agent-connections/image-connection",
+		]);
 	});
-	expect((await h.execute()).mime).toBe("image/png");
-	expect(h.calls).toEqual([
-		"POST /v1/agent-connections",
-		"GET /v1/agent-connections/image-connection",
-		"POST /acquired-image",
-		"GET /v1/image-artifacts/created-image/content",
-		"DELETE /v1/agent-connections/image-connection",
-	]);
-});
+
 for (const invalid of [
 	"revision",
 	"profile",
@@ -114,6 +118,8 @@ for (const invalid of [
 	"description",
 	"missing-service",
 	"failed",
+	"expired",
+	"released",
 ] as const)
 	test(`image rejects ${invalid} connection without generating and releases it`, async () => {
 		const h = fixture((path) => {
@@ -121,7 +127,12 @@ for (const invalid of [
 			const s = state();
 			if (invalid === "revision") s.catalogRevision = "b".repeat(64);
 			else if (invalid === "profile") s.agentProfile = "different-profile";
-			else if (invalid === "failed") s.status = "failed";
+			else if (
+				invalid === "failed" ||
+				invalid === "expired" ||
+				invalid === "released"
+			)
+				s.status = invalid;
 			else if (invalid === "missing-service") s.services = [];
 			else
 				s.services[0]![invalid] = invalid === "description" ? " " : "different";
@@ -130,7 +141,7 @@ for (const invalid of [
 		await expect(h.execute()).rejects.toThrow(
 			invalid === "revision" || invalid === "profile"
 				? "invalid_connection_contract"
-				: invalid === "failed"
+				: ["failed", "expired", "released"].includes(invalid)
 					? "service_not_ready"
 					: "invalid_service_binding",
 		);

@@ -203,6 +203,12 @@ export function imageFixture(
 		transcribe: async () => "",
 		speak: async () => new Uint8Array(),
 		answer: async (messages, _signal, options) => {
+			if (options?.tools?.[0]?.function.name === "find_toolchain") {
+				options.onToolCalls!([
+					{ id: "discovery", name: "find_toolchain", arguments: "{}" },
+				]);
+				return "";
+			}
 			if (options?.tools?.length) {
 				stages.push("route");
 				options.onToolCalls!([
@@ -210,6 +216,7 @@ export function imageFixture(
 						id: "image",
 						name: "image",
 						arguments: JSON.stringify({
+							announcement: "準備します。",
 							request: messages.filter((m) => m.role === "user").at(-1)!
 								.content,
 						}),

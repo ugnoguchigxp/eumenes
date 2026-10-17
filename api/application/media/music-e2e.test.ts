@@ -3,7 +3,7 @@ import { harness } from "../toolchain/toolchain.fixture";
 import { musicFixture, musicQuestion, musicTestPlan } from "./music.fixture";
 import { waitFor } from "../../infrastructure/wait-for";
 
-test("a prose-only creation claim is withheld and routed to the music agent", async () => {
+test("a premature creation claim accompanying the selected operation is withheld until music completes", async () => {
 	const f = musicFixture("success");
 	const claim = "新しい曲を1曲作りました。再生：https://127.0.0.1:8000/play/";
 	let reviewed = 0;
@@ -14,18 +14,14 @@ test("a prose-only creation claim is withheld and routed to the music agent", as
 		...f.model,
 		answer: async (...args: Parameters<typeof f.model.answer>) => {
 			const [messages, signal, options] = args;
-			if (options?.tools?.length) {
+			if (
+				options?.tools?.length &&
+				options.tools[0]?.function.name !== "find_toolchain"
+			) {
 				await paused;
-				return claim;
-			}
-			if (messages[0]?.content.includes("FUNCTIONS=")) {
 				reviewed++;
-				return JSON.stringify({
-					decision: "toolchain",
-					functionName: "music",
-					request: musicQuestion,
-					questionRef: "",
-				});
+				await f.model.answer(messages, signal, options);
+				return claim;
 			}
 			return f.model.answer(messages, signal, options);
 		},

@@ -36,7 +36,7 @@ import {
 	seedImportMigration,
 } from "../../memory";
 import { saveItem } from "./memory-seed";
-import { conversationPolicy } from "../service/conversation-tools";
+
 import type {
 	QueryVector,
 	ToolchainRoutingPort,
@@ -136,9 +136,28 @@ async function setup(
 		...(options.operation
 			? {
 					requestFor: () => "request-1",
+					executeRequest: async () => {
+						throw new Error("unexpected_nonstream");
+					},
 					setContextPolicyInTransaction: () => {},
 					validateReceiptInTransaction: () => true,
-					executeRequest: async (_id: string, messages: Message[]) => {
+					executeStream: async (
+						_id: string,
+						messages: Message[],
+						_signal: AbortSignal,
+						_delta: unknown,
+						_preparation: unknown,
+						tools: any[],
+					) => {
+						if (tools?.[0]?.function.name === "find_toolchain")
+							return {
+								requestId: "request-1",
+								attemptId: "initial",
+								value: "",
+								toolCalls: [
+									{ id: "d", name: "find_toolchain", arguments: "{}" },
+								],
+							};
 						seen.push(messages.map((m) => ({ ...m })));
 						await during.current?.();
 						return {
@@ -149,7 +168,10 @@ async function setup(
 								{
 									id: "call",
 									name: "web_search",
-									arguments: JSON.stringify({ request: "京都の天気" }),
+									arguments: JSON.stringify({
+										request: "京都の天気",
+										announcement: "お調べします。",
+									}),
 								},
 							],
 						};
@@ -319,8 +341,8 @@ for (const withState of [false, true]) {
 		expect(recall.content).not.toContain(text(3));
 		// Placed after the memory layers and the history, before the conversation policy and the input.
 		const at = messages.indexOf(recall);
-		const policy = messages.findIndex(
-			(m) => m.content === conversationPolicy(false),
+		const policy = messages.findIndex((m) =>
+			m.content.startsWith("CURRENT_REQUEST="),
 		);
 		expect(policy).toBeGreaterThan(at);
 		expect(messages.at(-1)).toEqual({
@@ -464,7 +486,7 @@ test("a prefetch standing on exchanges already shown is left out for the turn, a
 	expect(run.status).toBe("completed");
 });
 
-test("quiet window: no recall means no check, no receipt and a streamed body; a recall means a check, a receipt and a held body", async () => {
+test("quiet window: no recall means no check, no receipt; the initial decision is held; a recall means a check, a receipt and a held body", async () => {
 	const h = await setup({ stream: true });
 	const runs = await history(h);
 	const progress = async (text: string) => {
@@ -487,7 +509,8 @@ test("quiet window: no recall means no check, no receipt and a streamed body; a 
 	// Nothing to recall: even an edit of an old message during the answer cannot expire it.
 	h.query.current = undefined;
 	const plain = await progress("天気は？");
-	expect(plain.streamed.length).toBeGreaterThan(0);
+	// The initial answer/tool decision is held until it is known to be an answer.
+	expect(plain.streamed).toEqual([]);
 	expect(h.memory.usage(plain.run.id)).toBeNull();
 	// With a recalled exchange the body is held until adoption and the run leaves a receipt.
 	await h.putVector(runs[0]!.inputMessageId, KYOTO);

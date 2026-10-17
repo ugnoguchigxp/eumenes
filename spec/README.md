@@ -8,6 +8,7 @@ archive の基準: その文書が担当した実装がコードにあり、本�
 
 | 文書 | 状態 |
 | --- | --- |
+| [conversation-pre-delegation-response-design-2026-10-17.md](conversation-pre-delegation-response-design-2026-10-17.md) | 基本案合意・実装済み。自力回答→必要時の選定→予告→結果返却／完全切替。fixture検証済み、live・実機器と関連外の検証失敗は本文に記録 |
 | [toolchain-specialist-dialogue-implementation-plan-2026-10-17.md](toolchain-specialist-dialogue-implementation-plan-2026-10-17.md) | 実装・固定試験済み。専門担当への共通切替とUI自由制作の対話編集。ブラウザE2E・実モデル受入・実機器受入は未実施 |
 | [toolchain-specialist-dialogue-p0-contract-2026-10-17.md](toolchain-specialist-dialogue-p0-contract-2026-10-17.md) | 上記のP0契約と担当分け。型契約はコードで固定。実装済み。実モデル測定は未実施 |
 | [codex-sdk-task-artifact-plan-2026-10-14.md](codex-sdk-task-artifact-plan-2026-10-14.md) | 共通KanbanとCodex SDK。P1〜P3とP4の隔離commit/pushは記録済み。改訂7の終了確認は実装し、ブラウザなし全件検証はpass。全子孫停止は未保証。P5は継続 |

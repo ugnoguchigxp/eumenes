@@ -42,7 +42,7 @@ const apply = (title: string, gap?: "compact" | "normal" | "relaxed") => ({
 const reply = (text: string) => ({ action: "reply", text });
 const toolCall = (request: string, extra: Record<string, unknown> = {}) => ({
 	tool: "ui_create",
-	args: { request, ...extra },
+	args: { request, announcement: "制作担当に引き継ぎます。", ...extra },
 });
 
 type Prompt = Array<{ role: string; content: string }>;
@@ -97,11 +97,16 @@ async function rig() {
 				return typeof value === "string" ? value : JSON.stringify(value);
 			}
 			mainPrompts.push(messages.map((m) => ({ ...m })));
-			// A turn of the main agent is a routing call (with the toolchain functions) and,
-			// unless it selects one, an answering call without them.
-			const routing = !!options?.tools?.length;
-			if (routing) routeCalls++;
+			const discovery = options?.tools?.[0]?.function.name === "find_toolchain";
 			const head = script.main[0];
+			if (discovery) routeCalls++;
+			if (discovery && typeof head === "object") {
+				options!.onToolCalls!([
+					{ id: id(), name: "find_toolchain", arguments: "{}" },
+				]);
+				return "";
+			}
+			const routing = !!options?.tools?.length && !discovery;
 			if (routing && typeof head === "object") {
 				script.main.shift();
 				options!.onToolCalls!([
@@ -109,7 +114,6 @@ async function rig() {
 				]);
 				return "";
 			}
-			if (routing) return "";
 			const step = script.main.shift() ?? "かしこまりました。";
 			if (typeof step !== "string") throw new Error("script_tool_after_route");
 			return step;
@@ -246,7 +250,7 @@ async function rig() {
 		h,
 		script,
 		mainPrompts,
-		/** How many runs the main agent took (each starts with one routing call). */
+		/** How many runs the main agent took (each starts with one answer/discovery decision). */
 		get mainRuns() {
 			return routeCalls;
 		},
@@ -268,9 +272,9 @@ test("ui_create opens the work and the same run continues as the specialist's tu
 	const r = await rig();
 	const first = await r.start();
 	expect(first.status).toBe("completed");
-	// The main agent was asked once (to choose the toolchain); the specialist answered the run.
+	// The main agent decided, then selected the toolchain; the specialist answered the run.
 	expect(r.mainRuns).toBe(1);
-	expect(r.mainPrompts).toHaveLength(1);
+	expect(r.mainPrompts).toHaveLength(2);
 	expect(r.h.dialogue.answerText(first.id)).toBe("初稿です。");
 	expect(r.h.dialogue.get(first.id)!.specialistSessionId).toBe(
 		(await r.session())!.id,

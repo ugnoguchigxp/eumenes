@@ -10,17 +10,25 @@ import { useRunProgress } from "../domains/dialogue";
 export function LiveMessageList({
 	client,
 	activeRunId,
+	announcement,
 	followLatestIfPinned,
 	...list
 }: Omit<ComponentProps<typeof MessageList>, "streaming"> & {
 	client: EumenesClient;
 	activeRunId: string | undefined;
+	announcement?: string | null;
 	followLatestIfPinned: () => void;
 }) {
 	const streaming = useRunProgress(client, activeRunId);
 	const messageCount = list.conversation?.messages.length ?? 0;
 	useEffect(() => {
 		followLatestIfPinned();
-	}, [messageCount, activeRunId, streaming, followLatestIfPinned]);
+	}, [
+		messageCount,
+		activeRunId,
+		announcement,
+		streaming,
+		followLatestIfPinned,
+	]);
 	return <MessageList client={client} streaming={streaming} {...list} />;
 }

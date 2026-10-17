@@ -35,7 +35,10 @@ test("every offered toolchain function takes one flat request object", () => {
 		const schema = tool.function.parameters as Record<string, unknown>;
 		expect(schema.type).toBe("object");
 		expect("oneOf" in schema || "anyOf" in schema).toBe(false);
-		expect(Object.keys(schema.properties as object)).toEqual(["request"]);
+		expect(Object.keys(schema.properties as object)).toEqual([
+			"request",
+			"announcement",
+		]);
 	}
 });
 
@@ -47,7 +50,10 @@ test("a call resolves to the offered toolchain and keeps the request as given", 
 				{
 					id: "c",
 					name: "web_search",
-					arguments: JSON.stringify({ request: "鎌倉の天気" }),
+					arguments: JSON.stringify({
+						announcement: "確認します。",
+						request: "鎌倉の天気",
+					}),
 				},
 			],
 			tools,
@@ -59,6 +65,7 @@ test("a call resolves to the offered toolchain and keeps the request as given", 
 		revisionId: "toolchain:web.search@1",
 		functionName: "web_search",
 		request: "鎌倉の天気",
+		announcement: "確認します。",
 	});
 });
 

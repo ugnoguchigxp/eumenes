@@ -6,6 +6,7 @@ import type { ToolchainCard } from "../../capabilities";
 import { getLogger } from "../../../infrastructure/logger";
 import { ValidationFailure } from "../../../infrastructure/validation-log";
 import { conversationOutput } from "./conversation-output";
+import { validateDiscovery } from "./initial-decision";
 import {
 	operation,
 	operationRejection,
@@ -33,6 +34,8 @@ export async function generateConversation(input: {
 	openQuestions?: OpenQuestion[];
 	/** The session toolchains among `cards` and the saved items each may start from. */
 	sessions?: SessionOffers;
+	/** The first call can answer or request discovery, before any candidates are retrieved. */
+	discovery?: boolean;
 	repair: () => void;
 	/**
 	 * Session lifetime of every call here, including the structural correction: `main` for the answer generation,
@@ -48,6 +51,7 @@ export async function generateConversation(input: {
 	text: string;
 	receipt?: Receipt;
 	operation?: ConversationOperation;
+	needsToolchain?: boolean;
 	/** The one structural correction was used. */
 	repaired: boolean;
 }> {
@@ -111,6 +115,16 @@ export async function generateConversation(input: {
 			}
 			if (!input.tools)
 				throw operationRejection("tools_not_offered_in_request");
+			if (input.discovery) {
+				validateDiscovery(receipt.toolCalls);
+				if (text.trim()) input.repair();
+				return {
+					text: "",
+					receipt,
+					needsToolchain: true,
+					repaired: attempt > 0,
+				};
+			}
 			const result = {
 				text: "",
 				receipt,
@@ -123,6 +137,9 @@ export async function generateConversation(input: {
 				),
 				repaired: attempt > 0,
 			};
+			conversationOutput(() => {}, input.tools).finish(
+				result.operation.announcement,
+			);
 			// Some models announce the call first ("調べますね"). A valid call wins; the
 			// streamed preamble is withdrawn and never adopted as an answer.
 			if (text.trim()) {

@@ -61,6 +61,58 @@ export function agentOutcome(agent: AnswerTicket | undefined): {
 	}
 }
 
+/** Prepare the answer's context before retrieving toolchain candidates. */
+export async function prepareInitialDecision(
+	deps: DialogueDeps,
+	input: GenerateInput,
+	signal: AbortSignal,
+) {
+	const started = Date.now();
+	const current = currentRequestMessage(input);
+	const query =
+		input.routing && deps.toolchains && deps.memory && input.memory
+			? await deps.toolchains.embedQuery(input.routing.query, signal)
+			: undefined;
+	signal.throwIfAborted();
+	const recalled = recallFor(deps, input, query);
+	const messages = [...input.messages];
+	if (recalled)
+		messages.splice(messages.indexOf(current), 0, {
+			role: "system",
+			content: recalled.text,
+		});
+	const prepared = await prepareDecision(
+		deps,
+		{
+			...input,
+			routing: undefined,
+			messages,
+			currentRequest: {
+				...input.currentRequest,
+				messageIndex: messages.indexOf(current),
+			},
+		},
+		signal,
+	);
+	const routing = input.routing;
+	const draft: typeof prepared.draft = (decision, extra = {}) =>
+		routing
+			? {
+					conversationId: routing.conversationId,
+					utteranceId: routing.utteranceId,
+					requestId: routing.requestId,
+					retrieval: "none",
+					candidates: [],
+					historyRefs: [],
+					decision,
+					query,
+					durationMs: Date.now() - started,
+					...extra,
+				}
+			: undefined;
+	return { ...prepared, draft, recallPins: recalled?.pins ?? [] };
+}
+
 /**
  * A new decision: retrieve the toolchains for this request, offer them as functions with the
  * fixed policy and past selections, and keep what is needed to trace the decision.

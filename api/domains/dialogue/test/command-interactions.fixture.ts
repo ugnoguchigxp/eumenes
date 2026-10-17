@@ -18,6 +18,7 @@ import {
 	createDialogueService,
 	migration as dialogueMigration,
 	queueLinkMigration,
+	announcementMigration,
 	questionChoicesMigration,
 	worldStateMigration,
 	type BoundCommandPort,
@@ -67,7 +68,14 @@ export const card: ToolchainCard = {
 	score: { rank: 1, ftsRank: null, similarity: null, fromHistory: false },
 };
 export const operationCall = (args: Record<string, unknown>) => [
-	{ id: "call", name: "fake_op", arguments: JSON.stringify(args) },
+	{
+		id: "call",
+		name: "fake_op",
+		arguments: JSON.stringify({
+			announcement: "担当に引き継ぎます。",
+			...args,
+		}),
+	},
 ];
 export const lastUser = (history: Call["history"]) =>
 	[...history].reverse().find((m) => m.role === "user")?.content ?? "";
@@ -108,6 +116,7 @@ export function setup(
 		dialogueMigration,
 		queueMigration,
 		queueLinkMigration,
+		announcementMigration,
 		agentLinkMigration,
 		worldStateMigration,
 		commandInteractionsMigration,
@@ -196,6 +205,15 @@ export function setup(
 			tools: Call["tools"] | undefined,
 			session?: unknown,
 		) => {
+			if (tools?.[0]?.function.name === "find_toolchain")
+				return {
+					requestId,
+					attemptId: "discovery",
+					value: "",
+					toolCalls: [
+						{ id: "discovery", name: "find_toolchain", arguments: "{}" },
+					],
+				} as Receipt;
 			const call = { history, tools: tools ?? [], session };
 			const index = conversationCalls.push(call) - 1;
 			// By default the conversation hands the utterance to the offered function.

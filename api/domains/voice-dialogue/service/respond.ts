@@ -76,7 +76,9 @@ export function createVoiceResponder({
 		let unsubscribe = () => {};
 		let streamError: unknown;
 		let sourcePrefix = "";
-		const append = (text: string, final = false) => {
+		let announcement = "";
+		const append = (body: string, final = false) => {
+			const text = announcement ? `${announcement}\n${body}` : body;
 			if (!text.startsWith(sourcePrefix))
 				throw new Error("speech_stream_diverged");
 			sourcePrefix = text;
@@ -119,7 +121,10 @@ export function createVoiceResponder({
 							audio.delete(turn.utteranceId);
 							return;
 						}
-						if (progress.status !== "running" || !progress.text) return;
+						if (progress.announcement) announcement = progress.announcement;
+						if (progress.status !== "running" && progress.status !== "queued")
+							return;
+						if (!progress.text && !announcement) return;
 						try {
 							preparation!.context = {
 								...(dialogue.answerContext?.(run.id) ?? preparation!.context!),
@@ -165,6 +170,7 @@ export function createVoiceResponder({
 				answer,
 				turns: preparation!.context?.turns ?? [],
 			};
+			announcement = final.announcement ?? announcement;
 			append(answer, true);
 			await speech.work;
 			if (controller.signal.aborted) return;

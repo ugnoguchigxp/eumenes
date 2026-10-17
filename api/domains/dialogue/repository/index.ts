@@ -33,6 +33,38 @@ export const agentLinkMigration = `ALTER TABLE dialogue_runs ADD COLUMN agent_ta
 export const worldStateMigration = `ALTER TABLE dialogue_runs ADD COLUMN world_state TEXT CHECK (world_state IN ('used','blocked'));`;
 /** Nothing writes `world_state` any more (the conversation gets no World slice), so the column goes. */
 const worldStateDropMigration = `ALTER TABLE dialogue_runs DROP COLUMN world_state;`;
+export const announcementMigration = `ALTER TABLE dialogue_runs ADD COLUMN announcement TEXT;`;
+type Announcement = { key: string; text: string };
+function announcements(value: unknown): Announcement[] {
+	return typeof value === "string" ? (JSON.parse(value) as Announcement[]) : [];
+}
+export function saveAnnouncement(
+	db: Database,
+	runId: string,
+	revision: number,
+	key: string,
+	text: string,
+) {
+	const row = db
+		.query(
+			"SELECT announcement FROM dialogue_runs WHERE id=? AND revision=? AND status='running'",
+		)
+		.get(runId, revision) as { announcement: string | null } | null;
+	if (!row) throw new Error("run_changed");
+	const notices = announcements(row.announcement);
+	if (notices.some((notice) => notice.key === key)) return;
+	notices.push({ key, text });
+	if (notices.map((notice) => notice.text).join("\n").length > 65536)
+		throw new Error("chat_output_too_large");
+	if (
+		db
+			.query(
+				"UPDATE dialogue_runs SET announcement=? WHERE id=? AND revision=? AND status='running'",
+			)
+			.run(JSON.stringify(notices), runId, revision).changes !== 1
+	)
+		throw new Error("run_changed");
+}
 export * from "./specialist";
 export function linkAgent(
 	db: Database,
@@ -71,6 +103,10 @@ function map(row: Record<string, unknown>): Run {
 		revision: row.revision as number,
 		inputMessageId: row.input_message_id as string,
 		answerMessageId: row.answer_message_id as string | null,
+		announcement:
+			announcements(row.announcement)
+				.map((notice) => notice.text)
+				.join("\n") || null,
 		error: row.error as string | null,
 		jobId: row.job_id as string | null,
 		deadlineAt: row.deadline_at as string | null,
@@ -234,5 +270,10 @@ export const migrations: readonly Migration[] = [
 		id: "dialogue/0008-specialist-sessions",
 		sql: specialistMigration,
 		after: ["dialogue/0007-drop-world-state"],
+	},
+	{
+		id: "dialogue/0009-announcement",
+		sql: announcementMigration,
+		after: ["dialogue/0008-specialist-sessions"],
 	},
 ];

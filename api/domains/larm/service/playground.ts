@@ -149,9 +149,7 @@ export function createLarmPlayground(config: {
 							profile: target.selector,
 							audience: config.audience,
 							client: "eumenes-service-tests",
-							...(target.mode === "provider"
-								? { providers: [target.name] }
-								: {}),
+							providers: [target.mode === "provider" ? target.name : "llm"],
 							ttlSeconds: 300,
 							allowFallback: false,
 							deploymentPolicy: "existing-only",
@@ -191,9 +189,15 @@ export function createLarmPlayground(config: {
 					throw new Error(
 						service ? "invalid_service_binding" : "invalid_provider_binding",
 					);
+				if (["failed", "expired", "released"].includes(String(state.status)))
+					throw new Error(service ? "service_not_ready" : "provider_not_ready");
+				// Services start on POST; connection readiness describes the Providers.
 				if (
-					state.status === "ready" &&
-					(service || (p.claimable === true && p.readiness === "ready"))
+					service
+						? ["pending", "probing", "ready"].includes(String(state.status))
+						: state.status === "ready" &&
+							p.claimable === true &&
+							p.readiness === "ready"
 				)
 					return await action(
 						id,
@@ -205,8 +209,7 @@ export function createLarmPlayground(config: {
 								}
 							: target,
 					);
-				if (["failed", "expired", "released"].includes(String(state.status)))
-					throw new Error(service ? "service_not_ready" : "provider_not_ready");
+				if (service) throw new Error("invalid_connection_contract");
 				if (i >= 90) throw new Error("deadline_exceeded");
 				await pause(config.pollMs ?? 1000, signal);
 				state = await json(

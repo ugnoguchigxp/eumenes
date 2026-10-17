@@ -31,6 +31,7 @@ export function useRunProgress(client: DialogueClient, runId?: string) {
 		void (async () => {
 			let attempt = 0;
 			let terminal = false;
+			let announcement: string | null = null;
 			while (!controller.signal.aborted && !terminal) {
 				try {
 					await client.watchRun(runId, controller.signal, (next) => {
@@ -50,6 +51,10 @@ export function useRunProgress(client: DialogueClient, runId?: string) {
 						) {
 							timing.current.received = performance.now();
 							browserTiming("text_received", { runId });
+						}
+						if (next.announcement && next.announcement !== announcement) {
+							announcement = next.announcement;
+							invalidateDialogueViews(cache, client.identity, "main");
 						}
 						setValue(next);
 					});

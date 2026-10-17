@@ -294,7 +294,7 @@ test("a reply in natural language answers an open question through its questionR
 		Object.keys(
 			(h.conversationCalls[0]!.tools[0]!.function.parameters as any).properties,
 		),
-	).toEqual(["request"]);
+	).toEqual(["request", "announcement"]);
 	const interaction = h.interaction()!;
 	ref = interaction.question!.questionId;
 	h.state.commands.push({

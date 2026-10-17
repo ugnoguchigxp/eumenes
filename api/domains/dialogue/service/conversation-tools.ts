@@ -24,6 +24,7 @@ export type ConversationOperation = {
 	revisionId: string;
 	functionName: string;
 	request: string;
+	announcement: string;
 	/** The open question this request answers (the toolchain asked it earlier). */
 	questionRef?: string;
 	/** A session toolchain only: the saved item to start from (a host-issued ref). */
@@ -45,7 +46,18 @@ export type OpenQuestion = {
 	functionName: string;
 	prompt: string;
 };
-const requestSchema = z.toJSONSchema(toolchainRequest) as Record<
+export const announcementSchema = z
+	.string()
+	.trim()
+	.min(1)
+	.max(200)
+	.describe(
+		"選定した担当へ依頼する前に利用者へ伝える短い一文。これから行うことを説明し、完了は断言しない。会話相手が専門担当へ切り替わる関数では、その引継ぎを伝える。",
+	);
+const announcedRequest = toolchainRequest
+	.extend({ announcement: announcementSchema })
+	.strict();
+const requestSchema = z.toJSONSchema(announcedRequest) as Record<
 	string,
 	unknown
 >;
@@ -113,6 +125,7 @@ const unsetEmpty = (v: unknown) => (v === null || v === "" ? undefined : v);
 const sessionRequest = z
 	.object({
 		request: toolchainRequest.shape.request,
+		announcement: announcementSchema,
 		target: z.preprocess(unsetEmpty, z.string().max(200).optional()),
 		resolveUnsaved: z.preprocess(unsetEmpty, z.literal("discard").optional()),
 	})
@@ -120,6 +133,7 @@ const sessionRequest = z
 const answeringRequest = z
 	.object({
 		request: toolchainRequest.shape.request,
+		announcement: announcementSchema,
 		questionRef: z.string().min(1).max(64),
 	})
 	.strict();
@@ -140,6 +154,9 @@ export function toolchainTools(
 			name: card.functionName,
 			description:
 				card.summary +
+				(sessions.has(card.functionName)
+					? "。会話相手をこの専門担当へ切り替え、以後は直接対話します"
+					: "。担当が作業した結果を通常会話へ返します") +
 				"。使う場面: " +
 				card.useWhen.join("、") +
 				"。" +
@@ -235,6 +252,7 @@ export function operation(
 			revisionId: card.revisionId,
 			functionName: card.functionName,
 			request: parsed.data.request,
+			announcement: parsed.data.announcement,
 			...(parsed.data.target === undefined
 				? {}
 				: { target: parsed.data.target }),
@@ -249,7 +267,7 @@ export function operation(
 		(args as Record<string, unknown>).questionRef !== undefined;
 	const result = answering
 		? answeringRequest.safeParse(args)
-		: toolchainRequest.safeParse(args);
+		: announcedRequest.safeParse(args);
 	if (!result.success)
 		throw operationRejection(
 			"arguments_invalid",
@@ -274,6 +292,7 @@ export function operation(
 		revisionId: card.revisionId,
 		functionName: card.functionName,
 		request: result.data.request,
+		announcement: result.data.announcement,
 		...(questionRef === undefined ? {} : { questionRef }),
 	};
 }

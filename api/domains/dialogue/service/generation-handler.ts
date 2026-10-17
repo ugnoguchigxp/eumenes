@@ -13,16 +13,18 @@ import { settleConversationOperation } from "./generation-operation";
 import type { ConversationOperation } from "./conversation-tools";
 import {
 	agentOutcome,
-	chosen,
 	failedAnswer,
 	prepareDecision,
+	prepareInitialDecision,
 	recordRejected,
 	traceFailure,
 	traceOutcome,
 	traceSelection,
 	type SelectionDraft,
 } from "./selection-trace";
-import { reviewConversationAnswer } from "./conversation-routing";
+import { generateSelection } from "./generate-selection";
+import { discoveryTool } from "./initial-decision";
+import { announceSelection } from "./operation-announcement";
 import { generateConversation } from "./conversation-generation";
 import { researchCitations } from "./research-citations";
 import type { Run } from "../contracts";
@@ -150,7 +152,10 @@ export function createGenerationHandler(
 							(db) => larm.snapshotFor?.(db, run.id)?.voice.autoSpeak ?? true,
 						);
 					let holdBody = shouldHoldBody(input, chunkSpeech);
-					const decision = await prepareDecision(deps, input, signal);
+					const initial = !!input.routing && !input.agent;
+					let decision = initial
+						? await prepareInitialDecision(deps, input, signal)
+						: await prepareDecision(deps, input, signal);
 					const { recallPins } = decision;
 					const body = createAnswerStream(
 						deps,
@@ -167,9 +172,10 @@ export function createGenerationHandler(
 					const delta = body.delta;
 					const preparation = answerCollection(run, chunkSpeech);
 					// What this turn's prompt stands on: forgetting any of it revokes the call while it runs.
-					const callSession = answerSession(input, recallPins);
 					holdBody ||=
-						(!chunkSpeech && recallPins.length > 0) || !!decision.tools?.length;
+						(!chunkSpeech && recallPins.length > 0) ||
+						initial ||
+						!!decision.tools?.length;
 					timing.policy(holdBody);
 					let generated: Awaited<ReturnType<typeof generateConversation>>;
 					try {
@@ -180,13 +186,14 @@ export function createGenerationHandler(
 							signal,
 							delta: decision.selectionMessages ? () => {} : delta,
 							preparation: decision.selectionMessages ? undefined : preparation,
-							tools: decision.tools,
+							tools: initial ? [discoveryTool] : decision.tools,
+							discovery: initial,
 							cards: decision.cards,
 							openQuestions: decision.openQuestions,
 							sessions: decision.sessions,
 							// The selection call is one-shot; a direct call is the answer generation itself.
 							sessionRole: decision.selectionMessages ? "auxiliary" : "main",
-							session: callSession,
+							session: answerSession(input, recallPins),
 							repair: () => {
 								partials.delete(input.runId);
 								body.reset();
@@ -201,25 +208,23 @@ export function createGenerationHandler(
 							await recordRejected(deps, input.runId, decision.draft);
 						throw error;
 					}
-					if (!generated.operation) {
-						const reviewed = await reviewConversationAnswer(
+					if (generated.needsToolchain) {
+						({ decision, generated } = await generateSelection(
 							deps,
-							run!,
 							input,
-							decision,
 							signal,
-						);
-						if (reviewed.operation) generated = { ...generated, ...reviewed };
+							body.reset,
+							preparation,
+						));
+						recallPins.splice(0, recallPins.length, ...decision.recallPins);
 					}
 					if (generated.operation) {
-						if (!deps.toolchains || input.agent)
-							throw new Error("invalid_conversation_operation");
-						partials.delete(input.runId);
-						return {
-							...generated,
-							selection: chosen(decision, generated),
-							recallPins,
-						};
+						return announceSelection(deps, input, {
+							generated,
+							decision,
+							signal,
+							publish: () => publish(input.runId),
+						});
 					}
 					if (decision.selectionMessages && decision.answerMessages) {
 						holdBody =
@@ -234,7 +239,7 @@ export function createGenerationHandler(
 							delta,
 							preparation,
 							sessionRole: "main",
-							session: callSession,
+							session: answerSession(input, recallPins),
 							repair: () => {
 								partials.delete(input.runId);
 								body.reset();

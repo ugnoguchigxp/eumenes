@@ -36,7 +36,9 @@ streamでは、function名や制御区切りになり得る末尾だけを保留
 
 候補は今回のユーザープロンプトだけをEmbeddingし、登録された機能との類似度で取得します。履歴を検索文に混ぜたり、FTSや過去の選択を加点したりしません。履歴はLLMが省略や指示語を補う参考文脈として扱い、今回の明示された依頼を優先します。候補件数・Embeddingを利用できない場合の全候補提示・権限検査は従来のままです。
 
-ツールチェーンは「サブエージェント・SystemContext・SKILL・ツールの使い方・ツール詳細・Artifact」の一組です([設計](../spec/.archived/toolchain-set-routing-design-2026-10-12.md)、[登録手順](toolchain-extension.md#1-全体像))。会話担当の判断は「直接回答する・確認質問を返す・提示された関数を一つ呼ぶ」だけで、関数の引数は全ツールチェーン共通の `{ request }` です（専門担当へ切り替える session 型は、hostが発行した保存作品の `target` と、未保存作業を破棄して切り替える `resolveUnsaved` を任意で持ちます）。経路・ツール・引数はツールチェーン内のサブエージェントが決めます。session 型では切替後の発言が専門担当へ直接届き、担当は会話からの依頼で通常担当へ戻ります（[計画](../spec/toolchain-specialist-dialogue-implementation-plan-2026-10-17.md)）。
+ツールチェーンは「サブエージェント・SystemContext・SKILL・ツールの使い方・ツール詳細・Artifact」の一組です([設計](../spec/.archived/toolchain-set-routing-design-2026-10-12.md)、[登録手順](toolchain-extension.md#1-全体像))。通常会話AIは最初に自力で依頼を満たせるか判断し、直接回答・必要な確認、または担当の探索を選びます。探索の場合だけ候補を取得し、提示された関数を一つ選びます。関数の共通引数は `{ request, announcement }` で、`announcement` は実行前に利用者へ伝える200文字以内の短い予告です。hostが検査・保存・通知してから既存の担当を開始します。予告はrunに保存され、最終回答や会話の記憶には混ぜません（[設計・検証記録](../spec/conversation-pre-delegation-response-design-2026-10-17.md)）。
+
+専門担当へ完全に切り替えるsession型は、hostが発行した保存作品の `target` と、未保存作業を破棄して切り替える `resolveUnsaved` を任意で持ちます。選定時には登録済みの方式が関数説明へ渡され、切替を予告します。成立後の発言は専門担当へ直接届き、通常会話AIの再選定や言い直しを挟みません。担当は既存の返却・終了の契約で通常担当へ戻ります（[計画](../spec/toolchain-specialist-dialogue-implementation-plan-2026-10-17.md)）。結果返却型は担当の結果を通常会話AIが伝えます。内部の経路・ツール・引数は各ツールチェーンのサブエージェントが決めます。
 
 調査担当には今回の依頼を渡し、検索キーワードは担当が選びます。過去の会話から出典URLを集めて渡しません。URLの直接読取りは今回の依頼に明示されたURL、今回の検索結果、今回の依頼に合う保存済み手順の候補に限ります。
 

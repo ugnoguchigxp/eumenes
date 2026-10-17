@@ -12,13 +12,22 @@ export function excalidrawFixture(action: "create" | "library" = "create") {
 		speak: async () => new Uint8Array(),
 		answer: async (messages, _signal, options) => {
 			contexts.push(JSON.stringify(messages));
+			if (options?.tools?.[0]?.function.name === "find_toolchain") {
+				options.onToolCalls!([
+					{ id: "discovery", name: "find_toolchain", arguments: "{}" },
+				]);
+				return "";
+			}
 			if (options?.tools?.length) {
 				stages.push("route");
 				options.onToolCalls!([
 					{
 						id: crypto.randomUUID(),
 						name: "drawing_editor",
-						arguments: JSON.stringify({ request: "新しい図を描く画面を開く" }),
+						arguments: JSON.stringify({
+							announcement: "準備します。",
+							request: "新しい図を描く画面を開く",
+						}),
 					},
 				]);
 				return "";

@@ -62,7 +62,7 @@ test("a session starts from the conversation's choice, then talks directly: thre
 		'TOOL_RESULT={"ok":true,"result":{"applied":true',
 	);
 	const mainCalls = h.state.mainCalls.length;
-	expect(mainCalls).toBe(1);
+	expect(mainCalls).toBe(2);
 	for (const [i, text] of [
 		"第1問を直して",
 		"色を変えて",
@@ -169,7 +169,7 @@ test("a request outside the specialist's scope is forwarded to the main agent on
 	await startDirty(h);
 	h.state.specialist.push(ret(true));
 	// The first call of a decision with tools only selects; the second is the answer.
-	h.state.main.push("選択", "明日は雨です");
+	h.state.main.push("明日は雨です");
 	const requestId = crypto.randomUUID();
 	const run = await h.dialogue.submit({
 		requestId,
@@ -312,7 +312,7 @@ test("a target the host did not issue is refused before anything starts", async 
 
 test("a saved item starts the session from it, and the screen's viewing is shown only when issued", async () => {
 	const h = await harness();
-	h.state.main.push("選択", "見ています");
+	h.state.main.push("見ています");
 	await h.ask("これは何？", {
 		viewing: {
 			artifactRevisionId: "artifact:fake.studio@1",
@@ -325,7 +325,7 @@ test("a saved item starts the session from it, and the screen's viewing is shown
 		.join("\n");
 	expect(shown).toContain("viewing=");
 	expect(shown).toContain('"ref":"item-1"');
-	h.state.main.push("選択", "見えません");
+	h.state.main.push("見えません");
 	await h.ask("あれは？", {
 		viewing: {
 			artifactRevisionId: "artifact:fake.studio@1",
@@ -338,6 +338,9 @@ test("a saved item starts the session from it, and the screen's viewing is shown
 			.history.map((m) => m.content)
 			.join("\n"),
 	).not.toContain("viewing=");
+	h.startCall({ request: "これを直して", target: "item-1" });
+	h.state.specialist.push(reply("開きました"));
+	await h.ask("これを直して");
 	// The tool offers exactly the issued items as the target.
 	const tool = h.state.mainCalls
 		.flatMap((call) => call.tools)
@@ -346,9 +349,7 @@ test("a saved item starts the session from it, and the screen's viewing is shown
 		"item-1",
 		"item-2",
 	]);
-	h.startCall({ request: "これを直して", target: "item-1" });
-	h.state.specialist.push(reply("開きました"));
-	await h.ask("これを直して");
+
 	expect(await h.session()).toMatchObject({ label: "保存済み item-1" });
 	expect(h.work()[0]!.savedRef).toBe("item-1");
 });

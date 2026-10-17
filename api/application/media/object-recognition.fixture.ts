@@ -81,6 +81,12 @@ export function objectRecognitionFixture() {
 		speak: async () => new Uint8Array(),
 		answer: async (messages, _signal, options) => {
 			contexts.push(JSON.stringify(messages));
+			if (options?.tools?.some((t) => t.function.name === "find_toolchain")) {
+				options.onToolCalls!([
+					{ id: "discover", name: "find_toolchain", arguments: "{}" },
+				]);
+				return "";
+			}
 			if (
 				options?.tools?.some((t) => t.function.name === "object_recognition")
 			) {
@@ -90,6 +96,7 @@ export function objectRecognitionFixture() {
 						id: "recognition",
 						name: "object_recognition",
 						arguments: JSON.stringify({
+							announcement: "準備します。",
 							request: messages.filter((m) => m.role === "user").at(-1)!
 								.content,
 						}),

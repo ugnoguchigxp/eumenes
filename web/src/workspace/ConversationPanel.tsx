@@ -6,9 +6,7 @@ import { Button } from "../design-system";
 import { LiveMessageList } from "./LiveMessageList";
 import { ConversationBackground } from "../components/ConversationBackground";
 import { Subtitle } from "../components/domains/subtitle/Subtitle";
-import { ResearchTaskCard } from "../domains/agent-runtime";
-import { MusicResultLink } from "../domains/music/MusicResultLink";
-import { ImageResultLink } from "../domains/image/ImageResultLink";
+import { RunDetails, RunResults } from "./RunDetails";
 import { useConversationModel } from "../domains/settings";
 import { useSpeechModels } from "../domains/settings/useSpeechModels";
 import { SpeechModelSelect } from "./SpeechModelSelect";
@@ -256,34 +254,17 @@ export function ConversationPanel({
 				<LiveMessageList
 					client={client}
 					activeRunId={activeRun?.id}
+					announcement={activeRun?.announcement}
 					followLatestIfPinned={followLatestIfPinned}
 					conversation={conversation.data}
 					renderInsideMessage={(message) =>
 						message.role === "assistant" ? (
-							<>
-								<MusicResultLink
-									runId={message.runId}
-									items={state.musicItems}
-									onOpen={state.openMusic}
-								/>
-								<ImageResultLink
-									runId={message.runId}
-									items={state.imageItems}
-									onOpen={state.openImageResult}
-								/>
-							</>
+							<RunResults runId={message.runId} state={state} />
 						) : null
 					}
-					renderFollowingMessage={(message) => {
-						const run = runs.data?.find((r) => r.inputMessageId === message.id);
-						return run?.agentTaskId ? (
-							<ResearchTaskCard
-								client={client}
-								rootRunId={run.id}
-								title={message.text}
-							/>
-						) : null;
-					}}
+					renderFollowingMessage={(message) => (
+						<RunDetails client={client} message={message} runs={runs.data} />
+					)}
 					agentName={settings.data?.general.agentName}
 					replayingId={replay.playingId}
 					onReplay={(message) =>

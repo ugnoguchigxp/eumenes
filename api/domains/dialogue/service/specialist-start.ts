@@ -36,13 +36,14 @@ function enqueueTurn(
 	deps: DialogueDeps,
 	tx: Database,
 	run: Run,
+	sessionId: string,
 	epoch: number,
 	request: string,
 ) {
 	const { job } = deps.queue.enqueueInTransaction(tx, {
 		scope: "dialogue",
 		kind: SPECIALIST_KIND,
-		dedupeKey: `specialist-turn:${run.id}`,
+		dedupeKey: `specialist-turn:${run.id}:${sessionId}:${epoch}`,
 		payload: { runId: run.id, epoch, request: request.slice(0, 8000) },
 		subjectRef: run.id,
 		lane: "interactive",
@@ -189,7 +190,7 @@ function start(
 				now,
 			);
 			addressTurn(deps, tx, run, live);
-			enqueueTurn(deps, tx, run, epoch, chosen.request);
+			enqueueTurn(deps, tx, run, live.id, epoch, chosen.request);
 			return { ok: true };
 		}
 		const dirty = work?.dirty ?? false;
@@ -264,6 +265,6 @@ function start(
 	};
 	insertSession(tx, session);
 	addressTurn(deps, tx, run, session);
-	enqueueTurn(deps, tx, run, session.epoch, chosen.request);
+	enqueueTurn(deps, tx, run, session.id, session.epoch, chosen.request);
 	return { ok: true };
 }

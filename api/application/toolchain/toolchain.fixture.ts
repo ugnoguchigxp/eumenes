@@ -222,6 +222,13 @@ export async function harness(
 			const question = messages
 				.filter((m) => m.role === "user")
 				.at(-1)!.content;
+			if (callOptions?.tools?.[0]?.function.name === "find_toolchain") {
+				if (options.clarify) return "どの地域の天気を調べますか？";
+				callOptions.onToolCalls!([
+					{ id: "discovery", name: "find_toolchain", arguments: "{}" },
+				]);
+				return "";
+			}
 			if (callOptions?.tools?.length) {
 				routeContexts.push(JSON.stringify(messages));
 				if (
@@ -233,7 +240,14 @@ export async function harness(
 				if (options.clarify) return "どの地域の天気を調べますか？";
 				const send = (name: string, args: unknown) => {
 					callOptions.onToolCalls!([
-						{ id: crypto.randomUUID(), name, arguments: JSON.stringify(args) },
+						{
+							id: crypto.randomUUID(),
+							name,
+							arguments: JSON.stringify({
+								announcement: "お調べします。",
+								...(args as object),
+							}),
+						},
 					]);
 					return "";
 				};

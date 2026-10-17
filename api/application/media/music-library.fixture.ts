@@ -150,6 +150,12 @@ export function musicLibraryFixture(correctablePlan = false) {
 		transcribe: async () => "",
 		speak: async () => new Uint8Array(),
 		answer: async (messages, _signal, options) => {
+			if (options?.tools?.[0]?.function.name === "find_toolchain") {
+				options.onToolCalls!([
+					{ id: "discovery", name: "find_toolchain", arguments: "{}" },
+				]);
+				return "";
+			}
 			if (options?.tools?.length) {
 				stages.push("route");
 				if (!options.tools.some((t) => t.function.name === "music_library"))
@@ -158,7 +164,10 @@ export function musicLibraryFixture(correctablePlan = false) {
 					{
 						id: "playback",
 						name: "music_library",
-						arguments: JSON.stringify({ request: playbackQuestion }),
+						arguments: JSON.stringify({
+							announcement: "準備します。",
+							request: playbackQuestion,
+						}),
 					},
 				]);
 				return "";

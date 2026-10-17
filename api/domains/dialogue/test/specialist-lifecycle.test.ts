@@ -59,7 +59,7 @@ test("an expired session is not extended by a new utterance: it ends and the utt
 	await startDirty(h);
 	const mainCalls = h.state.mainCalls.length;
 	h.state.offsetMs += DAY + 60_000;
-	h.state.main.push("選択", "通常の返答");
+	h.state.main.push("通常の返答");
 	const run = await h.ask("まだ作業中？");
 	expect(run.specialistSessionId).toBeNull();
 	expect(h.state.mainCalls.length).toBeGreaterThan(mainCalls);
@@ -77,7 +77,7 @@ test("an expired session is not extended by a new utterance: it ends and the utt
 			.history.map((m) => m.content)
 			.join("\n"),
 	).toContain('"reason":"expired"');
-	h.state.main.push("選択", "はい");
+	h.state.main.push("はい");
 	await h.ask("次の話");
 	expect(
 		h.state.mainCalls
@@ -328,7 +328,7 @@ test("when the specialist leaves, utterances queued behind it go to the main age
 	});
 	const first = await h.say("戻って");
 	await h.until(() => h.dialogue.get(first.id)?.status === "running");
-	h.state.main.push("選択", "通常の返答");
+	h.state.main.push("通常の返答");
 	const second = await h.say("天気は？");
 	release();
 	await h.finished(first.id);
@@ -354,7 +354,7 @@ test("an expired session with a turn in flight is withdrawn when the next uttera
 	const slow = await h.say("遅い依頼");
 	await h.until(() => h.dialogue.get(slow.id)?.status === "running");
 	h.state.offsetMs += DAY + 60_000;
-	h.state.main.push("選択", "通常です");
+	h.state.main.push("通常です");
 	const next = await h.ask("こんにちは");
 	expect(next.specialistSessionId).toBeNull();
 	await h.finished(slow.id);
@@ -399,7 +399,7 @@ test("context: the main agent's history, topics and memory leave out the special
 		text: "戻ります",
 	});
 	await h.ask("戻って");
-	h.state.main.push("選択", "晴れです");
+	h.state.main.push("晴れです");
 	const run = await h.ask("天気は？");
 	const prompt = h.state.mainCalls.at(-1)!.history.map((m) => m.content);
 	for (const hidden of [
@@ -436,9 +436,9 @@ test("context: without a memory service the specialist runs still leave the fall
 		text: "戻ります",
 	});
 	await h.ask("戻って");
-	h.state.main.push("選択", "通常の返答");
+	h.state.main.push("通常の返答");
 	await h.ask("普通の話1");
-	h.state.main.push("選択", "二つ目の返答");
+	h.state.main.push("二つ目の返答");
 	await h.ask("普通の話2");
 	const prompt = h.state.mainCalls.at(-1)!.history.map((m) => m.content);
 	// The ordinary exchange before is still there although twelve specialist turns came between.

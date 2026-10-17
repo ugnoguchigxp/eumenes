@@ -501,7 +501,7 @@ builtins.push(briefSkill, {
 
 | 接続 | 例で追加する内容 |
 | --- | --- |
-| `seeds/toolchains.json` | `web.brief`ツールチェーン。`useWhen`・`examples`・既存`web.search`との`redirects`を双方に書く。会話の引数は共通の`{request}`のまま |
+| `seeds/toolchains.json` | `web.brief`ツールチェーン。`useWhen`・`examples`・既存`web.search`との`redirects`を双方に書く。登録定義の依頼は共通の`{request}`。会話へ提示する関数にはhostが共通の必須`announcement`を追加し、予告を通知してから委譲する |
 | `runtime-meta.ts` | toolchainsへ`"web.brief": { execution: "research", route: "web" }` |
 | 結合fixture | 呼出しから開始したpackageRevisionIdまで確認。会話の選択と起動先が一致することを試す |
 

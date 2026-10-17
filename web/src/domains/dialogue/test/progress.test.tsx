@@ -10,12 +10,13 @@ import { useRunProgress } from "..";
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => vi.useRealTimers());
 
-function setup(watchRun: DialogueClient["watchRun"]) {
+function setup(
+	watchRun: DialogueClient["watchRun"],
+	cache = new QueryClient(),
+) {
 	const client = { identity: "test", watchRun } as unknown as DialogueClient;
 	const wrapper = ({ children }: PropsWithChildren) => (
-		<QueryClientProvider client={new QueryClient()}>
-			{children}
-		</QueryClientProvider>
+		<QueryClientProvider client={cache}>{children}</QueryClientProvider>
 	);
 	return renderHook(() => useRunProgress(client, "run-1"), { wrapper });
 }
@@ -24,6 +25,28 @@ const frame: RunProgress = {
 	status: "running",
 	text: "partial",
 };
+
+test("refreshes persisted announcements once while keeping them out of answer text", async () => {
+	const cache = new QueryClient();
+	const invalidate = vi.spyOn(cache, "invalidateQueries");
+	let emit: Parameters<DialogueClient["watchRun"]>[2];
+	const hook = setup(async (_id, _signal, onProgress) => {
+		emit = onProgress;
+		await new Promise(() => {});
+	}, cache);
+	await act(async () => {
+		emit({ ...frame, text: "", announcement: "お調べします。" });
+	});
+	const refreshed = invalidate.mock.calls.length;
+	expect(refreshed).toBeGreaterThan(0);
+	expect(hook.result.current).toBe("");
+	await act(async () => {
+		emit({ ...frame, announcement: "お調べします。" });
+	});
+	expect(invalidate).toHaveBeenCalledTimes(refreshed);
+	expect(hook.result.current).toBe("partial");
+	hook.unmount();
+});
 
 test("keeps retrying past five failures and shows the next frame", async () => {
 	const watchRun = vi.fn(async (_id, _signal, onProgress) => {

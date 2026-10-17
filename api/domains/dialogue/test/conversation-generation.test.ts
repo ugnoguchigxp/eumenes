@@ -25,6 +25,7 @@ const chosen = (c: ToolchainCard, request: string) => ({
 	revisionId: c.revisionId,
 	functionName: c.functionName,
 	request,
+	announcement: "確認します。",
 });
 
 function fixture(outputs: Partial<Receipt>[], tools = toolchainTools(CARDS)) {
@@ -144,7 +145,10 @@ test("one native research operation publishes no control text", async () => {
 				{
 					id: "call",
 					name: "web_search",
-					arguments: JSON.stringify({ request: "明日の鎌倉の天気" }),
+					arguments: JSON.stringify({
+						announcement: "確認します。",
+						request: "明日の鎌倉の天気",
+					}),
 				},
 			],
 		},
@@ -164,7 +168,10 @@ test("a control expression in text is repaired through the model, never decoded 
 					{
 						id: "music",
 						name: "music",
-						arguments: JSON.stringify({ request: "夜に合う楽曲を2分間" }),
+						arguments: JSON.stringify({
+							announcement: "確認します。",
+							request: "夜に合う楽曲を2分間",
+						}),
 					},
 				],
 			},
@@ -225,7 +232,14 @@ test("malformed native arguments get exactly one structural correction", async (
 });
 test("syntax correction adopts native arguments without another model call", async () => {
 	const h = fixture([
-		{ toolCalls: [call("web_search", "{request:'鎌倉の天気',}")] },
+		{
+			toolCalls: [
+				call(
+					"web_search",
+					"{request:'鎌倉の天気',announcement:'確認します。',}",
+				),
+			],
+		},
 	]);
 	expect((await h.run()).operation).toEqual(chosen(WEB, "鎌倉の天気"));
 	expect(h.seen).toHaveLength(1);
@@ -265,7 +279,14 @@ test("a duplicate key reaches the informed correction without accepting either v
 test("a contract violation after syntax correction gets one informed model repair", async () => {
 	const h = fixture([
 		{ toolCalls: [call("web_search", "{request:42,}")] },
-		{ toolCalls: [call("web_search", "{request:'鎌倉の天気',}")] },
+		{
+			toolCalls: [
+				call(
+					"web_search",
+					"{request:'鎌倉の天気',announcement:'確認します。',}",
+				),
+			],
+		},
 	]);
 	expect((await h.run()).operation).toEqual(chosen(WEB, "鎌倉の天気"));
 	expect(h.seen).toHaveLength(2);
@@ -287,7 +308,14 @@ test("a second contract violation after correction stops without a third model c
 });
 test("correction never grants an unoffered native tool", async () => {
 	const h = fixture([
-		{ toolCalls: [call("unoffered", "{request:'鎌倉の天気',}")] },
+		{
+			toolCalls: [
+				call(
+					"unoffered",
+					"{request:'鎌倉の天気',announcement:'確認します。',}",
+				),
+			],
+		},
 		{ value: "確認できません。" },
 	]);
 	expect((await h.run()).operation).toBeUndefined();
@@ -399,7 +427,33 @@ function captureLog() {
 const call = (name: string, args: unknown) => ({
 	id: "c",
 	name,
-	arguments: typeof args === "string" ? args : JSON.stringify(args),
+	arguments:
+		typeof args === "string"
+			? args
+			: JSON.stringify({ announcement: "確認します。", ...(args as object) }),
+});
+
+test("control syntax in an announcement uses the bounded repair before adoption", async () => {
+	const invalid = {
+		toolCalls: [
+			call("web_search", {
+				request: "鎌倉の天気",
+				announcement: "<call:web_search>",
+			}),
+		],
+	};
+	const h = fixture([
+		invalid,
+		{ toolCalls: [call("web_search", { request: "鎌倉の天気" })] },
+	]);
+	expect((await h.run()).operation).toEqual(chosen(WEB, "鎌倉の天気"));
+	expect(h.repairs()).toBe(1);
+	expect(h.seen).toHaveLength(2);
+	const repeated = fixture([invalid, invalid]);
+	await expect(repeated.run()).rejects.toThrow(
+		"invalid_conversation_operation",
+	);
+	expect(repeated.seen).toHaveLength(2);
 });
 for (const [label, outputs, expected] of [
 	[

@@ -218,7 +218,7 @@ test("the addressee the screen showed must still listen: otherwise nothing is st
 		});
 	const stored = () => h.rows("SELECT COUNT(*) AS n FROM dialogue_runs")[0]!.n;
 	// Main is listening: a send that saw a specialist is refused, one that saw the main agent goes through.
-	h.state.main.push("選択", "はい");
+	h.state.main.push("はい");
 	expect((await send({ sessionId: "x", epoch: 1 })).status).toBe(409);
 	expect(stored()).toBe(0);
 	expect(h.rows("SELECT COUNT(*) AS n FROM messages")[0]!.n).toBe(0);
@@ -249,7 +249,7 @@ test("the addressee the screen showed must still listen: otherwise nothing is st
 
 test("a saved item older than the recent choices is offered, accepted and shown when it is on screen", async () => {
 	const h = await harness();
-	h.state.main.push("選択", "見ています");
+	h.state.main.push("見ています");
 	await h.ask("これは？", {
 		viewing: {
 			artifactRevisionId: "artifact:fake.studio@1",
@@ -260,12 +260,6 @@ test("a saved item older than the recent choices is offered, accepted and shown 
 		.map((c) => c.history.map((m) => m.content).join("\n"))
 		.join("\n");
 	expect(prompt).toContain('"ref":"item-old"');
-	const tool = h.state.mainCalls
-		.flatMap((call) => call.tools)
-		.find((t) => t.function.name === "studio_create")!;
-	expect((tool.function.parameters.properties as any).target.enum).toContain(
-		"item-old",
-	);
 	h.startCall({ request: "これを直して", target: "item-old" });
 	h.state.specialist.push(reply("開きました"));
 	await h.ask("これを直して", {
@@ -274,6 +268,12 @@ test("a saved item older than the recent choices is offered, accepted and shown 
 			targetRef: "item-old",
 		},
 	});
+	const tool = h.state.mainCalls
+		.flatMap((call) => call.tools)
+		.find((t) => t.function.name === "studio_create")!;
+	expect((tool.function.parameters.properties as any).target.enum).toContain(
+		"item-old",
+	);
 	expect(h.work()[0]!.savedRef).toBe("item-old");
 	// Without the screen showing it, the same ref is not issued.
 	const other = await harness();

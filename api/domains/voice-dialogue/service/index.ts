@@ -17,6 +17,14 @@ import type { InferencePort, SpeechOverride } from "../../inference";
 import type { VoiceTurn } from "../contracts";
 import { activeIds, activeRunIds, get, interrupt, update } from "../repository";
 
+function audibleRun(run: ReturnType<DialogueService["get"]>) {
+	return (
+		!!run &&
+		(["running", "completed"].includes(run.status) ||
+			(run.status === "queued" && !!run.announcement))
+	);
+}
+
 export function createVoiceDialogue(
 	store: SqliteStore,
 	dialogue: DialogueService,
@@ -43,8 +51,7 @@ export function createVoiceDialogue(
 		if (
 			!turn ||
 			!["responding", "synthesizing", "ready"].includes(turn.status) ||
-			!run ||
-			!["running", "completed"].includes(run.status)
+			!audibleRun(run)
 		)
 			return false;
 		const refs = store.read((db) => ({

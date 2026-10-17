@@ -25,6 +25,7 @@ export function createProgress(deps: DialogueDeps) {
 			runId,
 			status: run.status,
 			text: answer ?? live,
+			announcement: run.announcement ?? null,
 			error: run.status === "failed" ? run.error : null,
 		};
 	}
