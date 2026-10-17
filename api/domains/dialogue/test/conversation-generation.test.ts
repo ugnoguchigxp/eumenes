@@ -60,6 +60,7 @@ function fixture(outputs: Partial<Receipt>[], tools = toolchainTools(CARDS)) {
 	} as unknown as InferencePort;
 	let repairs = 0;
 	const deltas: string[] = [];
+	const current = { role: "user" as const, content: "明日は？" };
 	return {
 		seen,
 		sessions,
@@ -72,8 +73,8 @@ function fixture(outputs: Partial<Receipt>[], tools = toolchainTools(CARDS)) {
 			generateConversation({
 				inference,
 				requestId: "request",
+				requestMessage: current,
 				messages: (() => {
-					const current = { role: "user" as const, content: "明日は？" };
 					return markCurrentRequest(
 						[{ role: "assistant", content: "鎌倉の話です。" }, current],
 						current,
@@ -367,6 +368,7 @@ test("aborted generation never starts a correction", async () => {
 		generateConversation({
 			inference,
 			requestId: "r",
+			requestMessage: { role: "user", content: "中断された依頼" },
 			messages: [],
 			signal: AbortSignal.timeout(1000),
 			delta: () => {},
@@ -401,6 +403,7 @@ test("cancellation after the provider returns prevents control repair and pendin
 		generateConversation({
 			inference,
 			requestId: "r",
+			requestMessage: { role: "user", content: "中断された依頼" },
 			messages: [],
 			signal: controller.signal,
 			delta: (s) => published.push(s),

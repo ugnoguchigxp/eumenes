@@ -25,6 +25,8 @@ export async function generateConversation(input: {
 	inference: InferencePort;
 	requestId?: string;
 	messages: Messages;
+	/** The host-selected request; correction data must never become its replacement. */
+	requestMessage: Messages[number];
 	signal: AbortSignal;
 	delta: (text: string) => void;
 	preparation?: SpeechPreparation;
@@ -198,25 +200,37 @@ export async function generateConversation(input: {
 						correction + (first?.role === "system" ? "\n" + first.content : ""),
 				},
 				...(first?.role === "system" ? rest : originalMessages),
-				{
-					role: "user",
-					content:
-						"UNTRUSTED_REJECTED_OUTPUT=" +
-						JSON.stringify({
-							// Bound correction context independently of provider output.
-							textPreview: text.slice(0, 4096),
-							textTruncated: text.length > 4096,
-							toolCalls: (receipt?.toolCalls ?? []).slice(0, 2).map((call) => ({
-								name: input.tools?.some((t) => t.function.name === call.name)
-									? call.name
-									: null,
-								argumentsPreview: call.arguments.slice(0, 4096),
-								truncated: call.arguments.length > 4096,
-							})),
-							issues,
-						}),
-				},
 			];
+			const requestIndex = messages.indexOf(input.requestMessage);
+			if (
+				requestIndex !== messages.length - 1 ||
+				input.requestMessage.role !== "user"
+			)
+				throw new Error("run_input_missing");
+			// Keep the CURRENT_REQUEST marker next to its original message. Repair
+			// material belongs before that host-owned anchor, never after the request.
+			const insertAt =
+				requestIndex > 1 && messages[requestIndex - 1]?.role === "system"
+					? requestIndex - 1
+					: requestIndex;
+			messages.splice(insertAt, 0, {
+				role: "user",
+				content:
+					"UNTRUSTED_REJECTED_OUTPUT=" +
+					JSON.stringify({
+						// Bound correction context independently of provider output.
+						textPreview: text.slice(0, 4096),
+						textTruncated: text.length > 4096,
+						toolCalls: (receipt?.toolCalls ?? []).slice(0, 2).map((call) => ({
+							name: input.tools?.some((t) => t.function.name === call.name)
+								? call.name
+								: null,
+							argumentsPreview: call.arguments.slice(0, 4096),
+							truncated: call.arguments.length > 4096,
+						})),
+						issues,
+					}),
+			});
 		}
 	}
 	throw new Error("invalid_conversation_operation");

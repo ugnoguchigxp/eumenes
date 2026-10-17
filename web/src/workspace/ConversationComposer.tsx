@@ -69,7 +69,7 @@ export function ConversationComposer({
 					</div>
 				))}
 			</div>
-			<output aria-live="polite">
+			<output className="composer-status" aria-live="polite">
 				{starting ? (
 					<small>
 						<Spinner size="xs" aria-hidden="true" />{" "}

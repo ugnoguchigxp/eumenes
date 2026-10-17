@@ -391,6 +391,11 @@ select:focus-visible {
 	gap: 4px;
 	margin: 0 0 11px;
 }
+/* Reserve the line so the composer stays put while voice turns toggle it. */
+.composer-status {
+	display: block;
+	min-height: 1.5rem;
+}
 .route-part {
 	display: flex;
 	align-items: center;

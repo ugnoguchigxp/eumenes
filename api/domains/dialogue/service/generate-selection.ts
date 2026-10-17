@@ -2,6 +2,7 @@ import type { DialogueDeps, GenerateInput } from "./context";
 import type { SpeechPreparation } from "../../delivery";
 import { generateConversation } from "./conversation-generation";
 import { answerSession } from "./generation-stream";
+import { currentRequestMessage } from "./request-context";
 import { prepareDecision, recordRejected } from "./selection-trace";
 
 /** The second phase runs only after the conversation asks for available specialists. */
@@ -18,6 +19,7 @@ export async function generateSelection(
 			inference: deps.larm,
 			requestId: input.requestId,
 			messages: decision.selectionMessages ?? decision.messages,
+			requestMessage: currentRequestMessage(input),
 			signal,
 			delta: () => {},
 			preparation: decision.selectionMessages ? undefined : preparation,

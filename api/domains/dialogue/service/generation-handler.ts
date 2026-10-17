@@ -1,5 +1,6 @@
 import { answerSession, createAnswerStream } from "./generation-stream";
 import { generationTiming } from "./generation-timing";
+import { currentRequestMessage } from "./request-context";
 import {
 	resolveAttachmentContext,
 	validAttachmentContext,
@@ -189,6 +190,7 @@ export function createGenerationHandler(
 							inference: larm,
 							requestId: input.requestId,
 							messages: decision.selectionMessages ?? decision.messages,
+							requestMessage: currentRequestMessage(input),
 							signal,
 							delta: decision.selectionMessages ? () => {} : delta,
 							preparation: decision.selectionMessages ? undefined : preparation,
@@ -243,6 +245,7 @@ export function createGenerationHandler(
 							inference: larm,
 							requestId: input.requestId,
 							messages: decision.answerMessages,
+							requestMessage: currentRequestMessage(input),
 							signal,
 							delta,
 							preparation,

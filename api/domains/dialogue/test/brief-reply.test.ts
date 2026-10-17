@@ -22,6 +22,12 @@ test("a verbose conversation answer is rewritten before any body is published", 
 		}
 		expect(h.dialogue.get(run.id)?.status).toBe("completed");
 		expect(h.state.mainCalls).toHaveLength(2);
+		const repaired = h.state.mainCalls[1]!.history;
+		expect(repaired.at(-1)?.content).toBe("降水確率って何？");
+		expect(repaired.at(-2)?.content.startsWith("CURRENT_REQUEST=")).toBe(true);
+		expect(
+			repaired.some((m) => m.content.startsWith("UNTRUSTED_REJECTED_OUTPUT=")),
+		).toBe(true);
 		expect(h.dialogue.answerText(run.id)).toBe(
 			"降水確率は、雨の降る可能性を表します。",
 		);
