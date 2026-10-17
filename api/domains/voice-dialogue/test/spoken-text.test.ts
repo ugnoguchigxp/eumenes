@@ -17,9 +17,13 @@ test("displayed citations stay out of speech while inline labels and surrounding
 	);
 	expect(spokenText("出典：資料は見つかりませんでした。")).toBe("");
 	for (const marker of ["出典：", "出典:", "出典 ："]) {
-		expect(spokenText(`本文です。${marker}資料名\n補足です。`)).toBe("本文です。");
+		expect(spokenText(`本文です。${marker}資料名\n補足です。`)).toBe(
+			"本文です。",
+		);
 	}
-	expect(spokenText("資料の出典を説明します。")).toBe("資料の出典を説明します。");
+	expect(spokenText("資料の出典を説明します。")).toBe(
+		"資料の出典を説明します。",
+	);
 	expect(
 		spokenText(
 			"本文です。\n出典：https://example.com/report\n参考資料：[example.com](<https://example.com/>)",

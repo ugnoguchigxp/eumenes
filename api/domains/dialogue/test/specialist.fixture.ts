@@ -6,10 +6,8 @@ import { openStore, type SqliteStore } from "../../../infrastructure/sqlite";
 import { waitFor } from "../../../infrastructure/wait-for";
 import type { ToolchainCard } from "../../capabilities";
 import {
-	avatarMotionMigration,
-	answerDeliveryMigration,
 	createConversationService,
-	migration as conversationMigration,
+	migrations as conversationMigrations,
 } from "../../conversation";
 import {
 	createContinuityService,
@@ -47,9 +45,7 @@ export const ADAPTER = "adapter:fake-studio@1";
 export const OTHER_ADAPTER = "adapter:fake-other@1";
 
 const MIGRATIONS = [
-	conversationMigration,
-	avatarMotionMigration,
-	answerDeliveryMigration,
+	...conversationMigrations,
 	dialogueMigration,
 	queueMigration,
 	queueLinkMigration,

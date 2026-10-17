@@ -57,6 +57,8 @@ export type ChatMessage = {
 	images?: import("../../inference").ChatImage[];
 };
 export interface GenerateInput {
+	/** Conversational prose is a short spoken reply; artifact bodies keep their own contract. */
+	briefReply?: boolean;
 	currentRequest: CurrentRequest;
 	tools?: NativeTool[];
 	/**
@@ -158,4 +160,6 @@ export type DialogueDeps = {
 	specialist?: SpecialistPort;
 	/** Set by `createDialogueService` once intake exists (it accepts the resumed runs). */
 	interactions?: CommandInteractions;
+	/** Installed by the voice delivery owner; awaited after publishing, before any operation starts. */
+	deliverAnnouncement?: (run: Run, signal: AbortSignal) => Promise<void>;
 };

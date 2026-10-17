@@ -6,9 +6,7 @@ import pkg from "eumenes-memory/package.json";
 import { migrations as memoryPackageMigrations } from "eumenes-memory/sqlite";
 import { openStore, type SqliteStore } from "../../../infrastructure/sqlite";
 import {
-	migration as conversationMigration,
-	avatarMotionMigration,
-	answerDeliveryMigration,
+	migrations as conversationMigrations,
 	createConversationService,
 } from "../../conversation";
 import {
@@ -39,9 +37,7 @@ import { addNote, saveItem, type SeedInput } from "./memory-seed";
 import { waitFor as until } from "../../../infrastructure/wait-for";
 
 const MIGRATIONS = [
-	conversationMigration,
-	avatarMotionMigration,
-	answerDeliveryMigration,
+	...conversationMigrations,
 	dialogueMigration,
 	queueMigration,
 	queueLinkMigration,
@@ -184,11 +180,15 @@ async function setup(
 		dialogue,
 		seen,
 		recovery,
-		async ask(text: string) {
+		async ask(
+			text: string,
+			presentation: "conversation" | "artifact" = "conversation",
+		) {
 			const run = await dialogue.submit({
 				requestId: crypto.randomUUID(),
 				conversationId: "main",
 				text,
+				presentation,
 			});
 			await until(() =>
 				["completed", "failed", "cancelled"].includes(
@@ -781,7 +781,7 @@ test("a long streamed answer is not double counted for memory-backed runs", asyn
 	const long = "あ".repeat(40000);
 	const h = await setup({ stream: true, streamText: long });
 	await seedFact(h);
-	const run = await h.ask("好みを踏まえて");
+	const run = await h.ask("好みを踏まえて", "artifact");
 	expect(run.status).toBe("completed");
 	expect(h.conversation.get("main").messages.at(-1)?.text).toBe(long);
 });

@@ -2,6 +2,7 @@ import { z } from "zod";
 import { systemContext } from "../../../infrastructure/system-context";
 import { controlInstructions, type ControlContract } from "../../inference";
 import type { SpecialistSet } from "../contracts";
+import { isBriefSpokenReply, SPOKEN_REPLY_MAX_CHARS } from "../../delivery";
 
 /**
  * The specialist's whole contract: one object whose `action` says what the turn does. A flat object
@@ -10,7 +11,12 @@ import type { SpecialistSet } from "../contracts";
 const outputShape = z
 	.object({
 		action: z.enum(["reply", "invoke", "return", "discard"]),
-		text: z.string().trim().max(4000).optional(),
+		text: z
+			.string()
+			.trim()
+			.max(SPOKEN_REPLY_MAX_CHARS)
+			.refine(isBriefSpokenReply)
+			.optional(),
 		tool: z.string().min(1).max(64).optional(),
 		arguments: z.record(z.string(), z.unknown()).optional(),
 		forward: z.boolean().optional(),

@@ -10,6 +10,8 @@ import { toErrorCode } from "../../../infrastructure/error-code";
 const log = getLogger("voice-dialogue");
 import { SpeechSentences } from "./sentences";
 import { spokenText } from "./spoken-text";
+import { recordPlayed } from "./playback";
+import { connectAnnouncementDelivery } from "./announcement-delivery";
 
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import type { DialogueService } from "../../dialogue";
@@ -35,6 +37,12 @@ export function createVoiceDialogue(
 	const controllers = new Map<string, AbortController>();
 
 	const audio = new Map<string, Speech>();
+	const disconnectAnnouncementDelivery = connectAnnouncementDelivery(
+		store,
+		dialogue,
+		larm,
+		audio,
+	);
 	const previews = new Map<
 		string,
 		{ sessionId: string; controller: AbortController }
@@ -364,26 +372,7 @@ export function createVoiceDialogue(
 			return chunk?.wav ?? null;
 		},
 		async played(id: string, index = 0) {
-			const state = audio.get(id);
-			if (!state?.chunks.has(index)) return this.get(id);
-			await store.write((db) => {
-				const current = get(db, id);
-				if (
-					!current ||
-					!["responding", "synthesizing", "ready"].includes(current.status)
-				)
-					return;
-				state.chunks.delete(index);
-				state.wake();
-				update(
-					db,
-					id,
-					current.revision,
-					state.finished && !state.chunks.size ? "played" : current.status,
-					clock(),
-				);
-			});
-			if (state.finished && !state.chunks.size) audio.delete(id);
+			await recordPlayed(store, audio, id, index, clock);
 			return this.get(id);
 		},
 		async cancel(id: string) {
@@ -417,6 +406,7 @@ export function createVoiceDialogue(
 			});
 		},
 		async close() {
+			disconnectAnnouncementDelivery?.();
 			for (const c of controllers.values()) c.abort();
 			controllers.clear();
 			for (const p of previews.values()) p.controller.abort();

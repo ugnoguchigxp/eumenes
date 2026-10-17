@@ -5,7 +5,7 @@ import { harness, workerPacket } from "./toolchain.fixture";
 
 afterEach(() => configureLogging({ level: "silent" }));
 const answer =
-	"本文を確認しました。気温は26度です。雨の予報はありません。確認は以上です。";
+	"本文を確認しました、気温は26度です、雨の予報はありません、確認は以上です。";
 function research(messages: Parameters<typeof workerPacket>[0]) {
 	const data = workerPacket(messages);
 	const page = data.observations.find(
@@ -56,6 +56,15 @@ async function start(h: Awaited<ReturnType<typeof harness>>) {
 			!!h.voice.get(id)?.audioChunks.length ||
 			h.voice.get(id)?.status === "failed",
 	);
+	const notice = h.voice.get(id)!.audioChunks![0]!;
+	expect(notice.text).toBe("お調べします。");
+	expect(h.workerContexts).toHaveLength(0);
+	await h.voice.played(id, notice.index);
+	await waitFor(
+		() =>
+			h.dialogue.get(h.voice.get(id)!.runId!)?.status === "completed" &&
+			!!h.voice.get(id)?.audioChunks.length,
+	);
 	return id;
 }
 
@@ -99,7 +108,7 @@ test("a verified research answer adopts the final LLM receipt and delivers every
 			return h.voice.get(id)?.status === "played";
 		});
 		expect(count).toBe(4);
-		expect(h.spoken.join("")).toBe(answer);
+		expect(h.spoken.slice(1).join("")).toBe(answer);
 		expect(h.voice.get(id)?.audioComplete).toBe(true);
 		expect(
 			(await h.request(`/api/voice/turns/${id}/audio?index=0`)).status,
@@ -140,13 +149,13 @@ for (const action of ["cancel", "revoke"] as const)
 				expect(h.inference.liveRequest(parent)).toBe(false);
 			}
 			expect(
-				(await h.request(`/api/voice/turns/${id}/audio?index=0`)).status,
+				(await h.request(`/api/voice/turns/${id}/audio?index=1`)).status,
 			).toBe(404);
-			await h.voice.played(id, 0);
+			await h.voice.played(id, 1);
 			await settle();
-			expect(h.spoken).toHaveLength(3);
+			expect(h.spoken).toHaveLength(4);
 			expect(
-				h.voice.get(id)?.audioChunks.some((chunk) => chunk.index >= 3),
+				h.voice.get(id)?.audioChunks.some((chunk) => chunk.index >= 4),
 			).toBe(false);
 		} finally {
 			await h.close();

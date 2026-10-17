@@ -74,6 +74,27 @@ test("a bare name at end of an answer is released after completion", () => {
 	expect(visible).toEqual(["research"]);
 });
 
+test("function-selection prose cannot substitute a bare function name for a native call", () => {
+	const tools = [
+		{
+			type: "function" as const,
+			function: {
+				name: "find_toolchain",
+				description: "discover",
+				parameters: {},
+			},
+		},
+	];
+	const output = conversationOutput(() => {}, tools, true);
+	output.delta("find_toolchain\n準備します。");
+	expect(() => output.finish("find_toolchain\n準備します。")).toThrow(
+		"invalid_conversation_operation",
+	);
+	const prose = conversationOutput(() => {}, tools, true);
+	prose.delta("find_toolchain の説明です。");
+	expect(() => prose.finish("find_toolchain の説明です。")).not.toThrow();
+});
+
 test("a natural prefix does not allow subsequent control syntax into the projection", () => {
 	const visible: string[] = [];
 	const output = conversationOutput((s) => visible.push(s));

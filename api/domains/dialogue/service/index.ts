@@ -112,6 +112,16 @@ export function createDialogueService({
 	const specialistOps = createSpecialistOps(deps);
 	const agentSync = createAgentSync(deps);
 	const service = {
+		/** One delivery owner; its disposer cannot remove a newer owner's registration. */
+		setAnnouncementDelivery(
+			deliver: NonNullable<DialogueDeps["deliverAnnouncement"]>,
+		) {
+			deps.deliverAnnouncement = deliver;
+			return () => {
+				if (deps.deliverAnnouncement === deliver)
+					deps.deliverAnnouncement = undefined;
+			};
+		},
 		linkOperationJobInTransaction(db: Database, runId: string, jobId: string) {
 			linkAnswer(db, runId, jobId);
 		},

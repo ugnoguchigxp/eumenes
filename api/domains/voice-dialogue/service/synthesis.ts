@@ -32,8 +32,14 @@ export function createSpeechSynthesis({
 		preparation: SpeechPreparation = {},
 	): Speech {
 		makeRoomForSpeech();
-		const pending: Array<{ text: string; preparation: SpeechPreparation }> = [];
+		const pending: Array<{
+			text: string;
+			preparation: SpeechPreparation;
+			order: number;
+		}> = [];
 		let chunkOrder = 0;
+		const publishedOrders = new Map<number, number>();
+		const playedOrders = new Set<number>();
 		let previousAssistantChunk: string | undefined;
 		const sentences = new SpeechSentences(true);
 		const synthesisStarted = performance.now();
@@ -52,11 +58,45 @@ export function createSpeechSynthesis({
 			chunks: new Map(),
 			finished: false,
 			wake,
+			async waitForPlayback(signal) {
+				const through = chunkOrder;
+				if (!through) throw new Error("announcement_audio_missing");
+				const scoped = AbortSignal.any([signal, controller.signal]);
+				while (
+					Array.from({ length: through }, (_, i) => i).some(
+						(i) => !playedOrders.has(i),
+					)
+				) {
+					scoped.throwIfAborted();
+					if (state.error || state.skipped)
+						throw new Error("announcement_audio_failed");
+					await new Promise<void>((resolve) => {
+						const finish = () => {
+							scoped.removeEventListener("abort", finish);
+							wakes.delete(finish);
+							resolve();
+						};
+						wakes.add(finish);
+						scoped.addEventListener("abort", finish, { once: true });
+						if (scoped.aborted) finish();
+					});
+				}
+				scoped.throwIfAborted();
+			},
+			markPlayed(n) {
+				const order = publishedOrders.get(n);
+				if (order === undefined) return;
+				playedOrders.add(order);
+				publishedOrders.delete(n);
+				wake();
+			},
 			work: Promise.resolve(),
-			append(text, final = false) {
+			append(text, final = false, flush = false) {
 				if (state.error || controller.signal.aborted) return;
-				for (const clause of sentences.append(text, final)) {
+				for (const clause of sentences.append(text, final || flush)) {
+					const order = chunkOrder++;
 					pending.push({
+						order,
 						text: clause,
 						preparation: {
 							...preparation,
@@ -68,7 +108,7 @@ export function createSpeechSynthesis({
 										collection: {
 											...preparation.collection,
 											granularity: "chunk",
-											chunkOrder: chunkOrder++,
+											chunkOrder: order,
 											previousAssistantChunk,
 										},
 									}
@@ -85,7 +125,11 @@ export function createSpeechSynthesis({
 		state.work = (async () => {
 			while (!controller.signal.aborted) {
 				if (pending.length && state.chunks.size < 3) {
-					const { text, preparation: clausePreparation } = pending.shift()!;
+					const {
+						text,
+						preparation: clausePreparation,
+						order,
+					} = pending.shift()!;
 					if (!canSpeak(id, runId, controller.signal))
 						throw new Error("permission_revoked");
 					// A transient LARM failure on one clause must not end the whole turn:
@@ -146,6 +190,7 @@ export function createSpeechSynthesis({
 						// The turn fails only if no clause could be spoken at all.
 						skipError ??= lastError;
 						state.skipped++;
+						wake();
 						log.warn("voice.chunk_skipped", { utteranceId: id, runId });
 						continue;
 					}
@@ -175,10 +220,12 @@ export function createSpeechSynthesis({
 							requestId,
 							...(receipt?.delivery ? { delivery: receipt.delivery } : {}),
 						});
+						publishedOrders.set(n, order);
 						return update(db, id, turn.revision, turn.status, clock());
 					});
 					if (!published) {
 						state.chunks.delete(n);
+						publishedOrders.delete(n);
 						return;
 					}
 

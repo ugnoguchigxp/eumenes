@@ -50,7 +50,7 @@ export const announcementSchema = z
 	.string()
 	.trim()
 	.min(1)
-	.max(200)
+	.max(80)
 	.describe(
 		"選定した担当へ依頼する前に利用者へ伝える短い一文。これから行うことを説明し、完了は断言しない。会話相手が専門担当へ切り替わる関数では、その引継ぎを伝える。",
 	);

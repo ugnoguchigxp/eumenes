@@ -115,6 +115,8 @@ export async function harness(
 		voiceText?: string;
 		failureAnswer?: string;
 		parentAnswer?: string;
+		announcement?: string;
+		speechFailure?: boolean;
 		badQuote?: boolean;
 		badQuoteOnce?: boolean;
 		excerptEvidence?: boolean;
@@ -195,6 +197,7 @@ export async function harness(
 		close: async () => {},
 		transcribe: async () => options.voiceText ?? "fixture speech",
 		speak: async (text) => {
+			if (options.speechFailure) throw new Error("fixture_tts_failed");
 			spoken.push(text);
 			const wav = new Uint8Array(48);
 			wav.set(new TextEncoder().encode("RIFF"));
@@ -244,7 +247,7 @@ export async function harness(
 							id: crypto.randomUUID(),
 							name,
 							arguments: JSON.stringify({
-								announcement: "お調べします。",
+								announcement: options.announcement ?? "お調べします。",
 								...(args as object),
 							}),
 						},

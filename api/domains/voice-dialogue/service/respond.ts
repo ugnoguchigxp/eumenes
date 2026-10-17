@@ -77,12 +77,12 @@ export function createVoiceResponder({
 		let streamError: unknown;
 		let sourcePrefix = "";
 		let announcement = "";
-		const append = (body: string, final = false) => {
+		const append = (body: string, final = false, flush = false) => {
 			const text = announcement ? `${announcement}\n${body}` : body;
 			if (!text.startsWith(sourcePrefix))
 				throw new Error("speech_stream_diverged");
 			sourcePrefix = text;
-			speech!.append(spokenPrefix(text, final), final);
+			speech!.append(spokenPrefix(text, final || flush), final, flush);
 		};
 		try {
 			if (autoSpeak) {
@@ -121,6 +121,8 @@ export function createVoiceResponder({
 							audio.delete(turn.utteranceId);
 							return;
 						}
+						const newNotice =
+							!!progress.announcement && progress.announcement !== announcement;
 						if (progress.announcement) announcement = progress.announcement;
 						if (progress.status !== "running" && progress.status !== "queued")
 							return;
@@ -130,7 +132,7 @@ export function createVoiceResponder({
 								...(dialogue.answerContext?.(run.id) ?? preparation!.context!),
 								answer: spokenText(progress.text),
 							};
-							append(progress.text);
+							append(progress.text, false, newNotice);
 						} catch (error) {
 							streamError = error;
 							speechController.abort();

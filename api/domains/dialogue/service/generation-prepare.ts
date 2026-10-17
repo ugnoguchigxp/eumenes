@@ -268,6 +268,9 @@ export function createPrepare(
 		return {
 			status: "ready",
 			input: {
+				briefReply:
+					conversation.messageInTransaction(tx, run.inputMessageId)?.message
+						.presentation !== "artifact",
 				runId: run.id,
 				revision: current.revision,
 				messages,

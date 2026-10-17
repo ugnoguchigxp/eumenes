@@ -22,6 +22,23 @@ async function accept(h: Awaited<ReturnType<typeof harness>>) {
 	await until(() => h.voice.get(id)?.status !== "recognizing");
 	const turn = h.voice.get(id)!;
 	if (turn.status === "input_ready") await h.voice.commit(id, turn.revision);
+	await until(
+		() =>
+			!!h.voice.get(id)?.runId ||
+			["completed", "failed"].includes(h.voice.get(id)?.status ?? ""),
+	);
+	if (h.voice.get(id)?.runId && h.settings.get().voice.autoSpeak) {
+		await until(
+			() =>
+				!!h.voice.get(id)?.audioChunks?.length ||
+				h.voice.get(id)?.status === "failed",
+		);
+		const notice = h.voice.get(id)!.audioChunks?.[0];
+		if (h.dialogue.get(h.voice.get(id)!.runId!)?.announcement) {
+			expect(notice?.text).toBe("お調べします。");
+			await h.voice.played(id, notice!.index);
+		}
+	}
 	return id;
 }
 test("silence completes without creating a dialogue, cancelling another run or synthesizing speech", async () => {
@@ -71,8 +88,8 @@ for (const options of [
 			expect(h.voice.get(id)?.status).toBe("ready");
 			const runId = h.voice.get(id)!.runId!;
 			expect(h.dialogue.answerText(runId)).toBe(answer);
-			expect(h.spoken).toEqual([answer]);
-			expect(h.voice.takeAudio(id)).toEqual(wav());
+			expect(h.spoken).toEqual(["お調べします。", answer]);
+			expect(h.voice.takeAudio(id, 1)).toEqual(wav());
 			expect(h.parentContexts).toHaveLength(1);
 			expect(h.parentContexts[0]).not.toContain(forbidden);
 			expect(h.parentContexts[0]).not.toContain('"quote"');
@@ -115,7 +132,7 @@ for (const options of [
 		}
 	});
 
-test("cancelling while the agent phrases a failure discards the late response and never speaks", async () => {
+test("cancelling while the agent phrases a failure discards the late response after its notice", async () => {
 	let release!: () => void;
 	const h = await harness({
 		badJson: true,
@@ -133,7 +150,7 @@ test("cancelling while the agent phrases a failure discards the late response an
 		await until(() => h.queue.stats().resources["inference.llm"]!.inUse === 0);
 		expect(h.voice.get(id)?.status).toBe("cancelled");
 		expect(h.dialogue.answerText(runId)).toBeNull();
-		expect(h.spoken).toEqual([]);
+		expect(h.spoken).toEqual(["お調べします。"]);
 		expect(h.voice.takeAudio(id)).toBeNull();
 	} finally {
 		release();
@@ -173,8 +190,11 @@ test("a committed timer result follows the agent generation and speech path with
 		);
 		expect(h.voice.get(id)?.status).toBe("ready");
 		expect(h.parentContexts).toHaveLength(1);
-		expect(h.spoken).toEqual([h.dialogue.answerText(h.voice.get(id)!.runId!)!]);
-		expect(h.spoken[0]).toContain("180秒");
+		expect(h.spoken).toEqual([
+			"お調べします。",
+			h.dialogue.answerText(h.voice.get(id)!.runId!)!,
+		]);
+		expect(h.spoken[1]).toContain("180秒");
 		expect(
 			h.store.read((db) =>
 				db

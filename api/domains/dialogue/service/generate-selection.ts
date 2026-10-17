@@ -21,6 +21,7 @@ export async function generateSelection(
 			signal,
 			delta: () => {},
 			preparation: decision.selectionMessages ? undefined : preparation,
+			briefReply: input.briefReply,
 			tools: decision.tools,
 			cards: decision.cards,
 			openQuestions: decision.openQuestions,

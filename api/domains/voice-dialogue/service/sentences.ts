@@ -61,7 +61,12 @@ export class SpeechSentences {
 			}
 			if (!boundary) {
 				if (final) chunks.push(...parts(this.buffer.trim()));
-				if (final) this.buffer = "";
+				if (final) {
+					this.consumed += this.buffer.length;
+					this.committed =
+						this.consumed - (this.prefix.match(/\s*$/)?.[0].length ?? 0);
+					this.buffer = "";
+				}
 				return chunks;
 			}
 			const chunk = this.buffer.slice(0, boundary).trim();

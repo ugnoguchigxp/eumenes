@@ -1,6 +1,7 @@
 import { systemContext } from "../../../infrastructure/system-context";
 import type { CallSession, InferencePort, Receipt } from "../../inference";
 import type { SpeechPreparation } from "../../delivery";
+import { isBriefSpokenReply } from "../../delivery";
 import type { NativeTool } from "../../../infrastructure/chat-stream";
 import type { ToolchainCard } from "../../capabilities";
 import { getLogger } from "../../../infrastructure/logger";
@@ -27,6 +28,7 @@ export async function generateConversation(input: {
 	signal: AbortSignal;
 	delta: (text: string) => void;
 	preparation?: SpeechPreparation;
+	briefReply?: boolean;
 	tools?: NativeTool[];
 	/** The toolchains behind `tools`; a call resolves to exactly one of them. */
 	cards?: ToolchainCard[];
@@ -81,7 +83,11 @@ export async function generateConversation(input: {
 	};
 	for (let attempt = 0; attempt < 2; attempt++) {
 		signal.throwIfAborted();
-		const output = conversationOutput(input.delta, input.tools);
+		const output = conversationOutput(
+			input.delta,
+			input.tools,
+			!!input.tools?.length,
+		);
 		const receipt =
 			input.requestId && inference.executeRequest
 				? inference.executeStream
@@ -110,6 +116,8 @@ export async function generateConversation(input: {
 		signal.throwIfAborted();
 		try {
 			if (!receipt?.toolCalls?.length) {
+				if (input.briefReply && !isBriefSpokenReply(text))
+					throw operationRejection("spoken_reply_too_long");
 				output.finish(text);
 				return { text, receipt, repaired: attempt > 0 };
 			}

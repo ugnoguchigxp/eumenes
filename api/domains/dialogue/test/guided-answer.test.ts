@@ -194,8 +194,9 @@ for (const request of [
 		expect(h.generated()).toBe(1);
 		expect(h.contexts[0]).toContain(request);
 		expect(h.contexts[0]).toContain(report);
-		expect(h.contexts[0]).toContain("最大1点");
-		expect(h.contexts[0]).toContain("詳しく解説");
+		expect(h.contexts[0]).toContain("必要な補足一文");
+		expect(h.contexts[0]).toContain("読み上げ160字以内");
+		expect(h.contexts[0]).not.toContain("詳しく解説");
 		await h.queue.close(100);
 	});
 }

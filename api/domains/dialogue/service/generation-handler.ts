@@ -43,6 +43,15 @@ import { adoptMemoryWindow, clearShownNotices } from "./memory-window";
 import type { Progress } from "./progress";
 const log = getLogger("dialogue");
 
+function speaksChunks(deps: DialogueDeps, run: Run | null) {
+	return (
+		!!run?.utteranceId &&
+		deps.store.read(
+			(db) => deps.larm.snapshotFor?.(db, run.id)?.voice.autoSpeak ?? true,
+		)
+	);
+}
+
 function answerCollection(run: Run | null, chunkSpeech: boolean) {
 	return run
 		? {
@@ -146,12 +155,9 @@ export function createGenerationHandler(
 						};
 						signal.throwIfAborted();
 					}
-					const chunkSpeech =
-						!!run?.utteranceId &&
-						store.read(
-							(db) => larm.snapshotFor?.(db, run.id)?.voice.autoSpeak ?? true,
-						);
-					let holdBody = shouldHoldBody(input, chunkSpeech);
+					const chunkSpeech = speaksChunks(deps, run);
+					let holdBody =
+						!!input.briefReply || shouldHoldBody(input, chunkSpeech);
 					const initial = !!input.routing && !input.agent;
 					let decision = initial
 						? await prepareInitialDecision(deps, input, signal)
@@ -186,6 +192,7 @@ export function createGenerationHandler(
 							signal,
 							delta: decision.selectionMessages ? () => {} : delta,
 							preparation: decision.selectionMessages ? undefined : preparation,
+							briefReply: input.briefReply,
 							tools: initial ? [discoveryTool] : decision.tools,
 							discovery: initial,
 							cards: decision.cards,
@@ -228,6 +235,7 @@ export function createGenerationHandler(
 					}
 					if (decision.selectionMessages && decision.answerMessages) {
 						holdBody =
+							!!input.briefReply ||
 							shouldHoldBody(input, chunkSpeech) ||
 							(!chunkSpeech && recallPins.length > 0);
 						// Selection prose has no authority as an answer; answer with the full exchange.
@@ -238,6 +246,7 @@ export function createGenerationHandler(
 							signal,
 							delta,
 							preparation,
+							briefReply: input.briefReply,
 							sessionRole: "main",
 							session: answerSession(input, recallPins),
 							repair: () => {

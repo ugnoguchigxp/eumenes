@@ -12,8 +12,11 @@ export type Speech = {
 	skipped: number;
 	chunks: Map<number, Chunk>;
 	finished: boolean;
-	append: (text: string, final?: boolean) => void;
+	append: (text: string, final?: boolean, flush?: boolean) => void;
 	work: Promise<void>;
 	wake: () => void;
+	/** Wait for the clauses already enqueued to be acknowledged by the player. */
+	waitForPlayback: (signal: AbortSignal) => Promise<void>;
+	markPlayed: (index: number) => void;
 	error?: Error;
 };

@@ -149,7 +149,7 @@ test("revoking a cloud answer aborts downstream TTS and never publishes late aud
 	).toHaveLength(0);
 });
 
-test("streaming text starts speech before completion and cancellation removes partial audio", async () => {
+test("provisional text stays silent and cancellation prevents its adoption and speech", async () => {
 	let sink!: ReadableStreamDefaultController<Uint8Array>;
 	const spoken: string[] = [];
 	const h = await setup(async (url, init) => {
@@ -182,21 +182,16 @@ test("streaming text starts speech before completion and cancellation removes pa
 		id = crypto.randomUUID();
 	h.voice.start(session, 1);
 	await say(h, session, id);
-	await until(
-		() =>
-			!!h.voice.get(id)?.runId &&
-			h.dialogue.progress(h.voice.get(id)!.runId!)?.text ===
-				"先にお届けします。",
-	);
+	await until(() => !!sink && !!h.voice.get(id)?.runId);
 	const runId = h.voice.get(id)!.runId!;
 	expect(h.dialogue.get(runId)?.status).toBe("running");
-	expect(h.dialogue.progress(runId)?.text).toBe("先にお届けします。");
+	expect(h.dialogue.progress(runId)?.text).toBe("");
 	expect(h.conversation.get("main").messages.map((m) => m.text)).toEqual([
 		"質問",
 	]);
-	await until(() => h.voice.get(id)?.audioChunks.length === 1);
-	expect(h.voice.takeAudio(id, 0)).toEqual(wav());
-	expect(spoken).toEqual(["先にお届けします。"]);
+	expect(h.voice.get(id)?.audioChunks).toEqual([]);
+	expect(h.voice.takeAudio(id, 0)).toBeNull();
+	expect(spoken).toEqual([]);
 	await h.voice.cancel(id);
 	expect(h.voice.takeAudio(id, 0)).toBeNull();
 	expect(h.dialogue.progress(runId)?.text).toBe("");
@@ -214,7 +209,7 @@ test("streaming text starts speech before completion and cancellation removes pa
 
 test("render ahead is bounded at three clauses and playback releases the next clause", async () => {
 	const spoken: string[] = [];
-	const source = "一。二。三。四。五。六。";
+	const source = "一、二、三、四、五、六。";
 	const h = await setup(async (url, init) => {
 		if (String(url).endsWith("audio/transcriptions"))
 			return Response.json({ text: "質問" });
@@ -233,7 +228,7 @@ test("render ahead is bounded at three clauses and playback releases the next cl
 	await say(h, session, id);
 	await until(() => h.voice.get(id)?.audioChunks?.length === 3);
 	await Bun.sleep(15);
-	expect(spoken).toEqual(["一。", "二。", "三。"]);
+	expect(spoken).toEqual(["一、", "二、", "三、"]);
 	await h.voice.played(id, 0);
 	await until(() => spoken.length === 4);
 	expect(h.voice.get(id)?.audioChunks?.length).toBeLessThanOrEqual(3);
@@ -242,8 +237,25 @@ test("render ahead is bounded at three clauses and playback releases the next cl
 		await h.voice.played(id, index);
 	}
 	await until(() => h.voice.get(id)?.status === "played");
-	expect(spoken).toEqual(["一。", "二。", "三。", "四。", "五。", "六。"]);
+	expect(spoken).toEqual(["一、", "二、", "三、", "四、", "五、", "六。"]);
 });
+test("concurrent playback acknowledgements finish a turn without leaving it ready", async () => {
+	const h = await setup(undefined, {
+		answer: async () => "一、二、三。",
+		speak: async () => wav(),
+	});
+	const session = crypto.randomUUID(),
+		id = crypto.randomUUID();
+	h.voice.start(session, 1);
+	await say(h, session, id);
+	await until(() => h.voice.get(id)?.status === "ready");
+	const chunks = h.voice.get(id)!.audioChunks;
+	expect(chunks).toHaveLength(3);
+	await Promise.all(chunks.map((chunk) => h.voice.played(id, chunk.index)));
+	expect(h.voice.get(id)?.status).toBe("played");
+	expect(h.voice.get(id)?.audioChunks).toEqual([]);
+});
+
 test("final recognition preempts a slow prefix and never submits a late hypothesis", async () => {
 	let first = true,
 		started = false,
@@ -377,7 +389,7 @@ test("audio-off answers retain a whole-answer expression and replay judges each 
 	let judgments = 0;
 	const observed: Array<Record<string, string>> = [];
 	const h = await setup(undefined, {
-		answer: async () => "なるほど。素敵な名前ですね。ありがとうございます。",
+		answer: async () => "なるほど、素敵な名前ですね。ありがとうございます。",
 		speak: async () => wav(),
 		judge: async (state) => {
 			judgments++;
@@ -416,7 +428,7 @@ test("audio-off answers retain a whole-answer expression and replay judges each 
 	});
 	expect(judgments).toBe(1);
 	expect(observed[0]?.response).toBe(
-		"なるほど。素敵な名前ですね。ありがとうございます。",
+		"なるほど、素敵な名前ですね。ありがとうございます。",
 	);
 	expect(observed[0]?.conversation).toContain("大切な猫の名前です。");
 	for (const text of h.voice.replaySentences(h.dialogue.answerText(run.id)!)) {
@@ -435,7 +447,7 @@ test("automatic three-clause speech judges each clause independently", async () 
 	let judgments = 0;
 	const h = await setup(undefined, {
 		transcribe: async () => "大切な猫の名前です。",
-		answer: async () => "なるほど。素敵な名前ですね。ありがとうございます。",
+		answer: async () => "なるほど、素敵な名前ですね。ありがとうございます。",
 		speak: async () => wav(),
 		judge: async () => {
 			judgments++;
@@ -820,7 +832,7 @@ test("a cancelled input is not merged into the next segment", async () => {
 
 test("an adopted mixed answer is routed per language part and synthesis stays bounded until playback acknowledgements", async () => {
 	const source =
-		"最初です。Open the door. 次です。Close the door. 最後です。Thank you.";
+		"最初です、Open the door, 次です、Close the door, 最後です、Thank you.";
 	const spoken: Array<[string, string | undefined]> = [];
 	const h = await setup(undefined, {
 		status: () => ({ state: "ready", capabilities: ["llm", "asr", "tts"] }),
@@ -847,9 +859,9 @@ test("an adopted mixed answer is routed per language part and synthesis stays bo
 	await say(h, session, id);
 	await until(() => h.voice.get(id)?.audioChunks.length === 3);
 	expect(spoken).toEqual([
-		["最初です。", "ja"],
-		["Open the door.", "en"],
-		["次です。", "ja"],
+		["最初です、", "ja"],
+		["Open the door,", "en"],
+		["次です、", "ja"],
 	]);
 	for (let index = 0; index < 6; index++) {
 		await until(() => !!h.voice.takeAudio(id, index));
@@ -857,21 +869,21 @@ test("an adopted mixed answer is routed per language part and synthesis stays bo
 	}
 	await until(() => h.voice.get(id)?.status === "played");
 	expect(spoken.slice(3)).toEqual([
-		["Close the door.", "en"],
-		["最後です。", "ja"],
+		["Close the door,", "en"],
+		["最後です、", "ja"],
 		["Thank you.", "en"],
 	]);
 	const run = h.dialogue.list("main")[0]!;
 	await h.voice.replaySpeech(
-		"Open the door.",
+		"Open the door,",
 		new AbortController().signal,
 		run.id,
 	);
-	expect(spoken.at(-1)).toEqual(["Open the door.", "en"]);
+	expect(spoken.at(-1)).toEqual(["Open the door,", "en"]);
 });
 
 test("without an English voice every clause is still spoken by the Japanese voice", async () => {
-	const source = "First. Second. Third.";
+	const source = "First, Second, Third.";
 	const spoken: Array<[string, string | undefined]> = [];
 	const h = await setup(undefined, {
 		status: () => ({ state: "ready", capabilities: ["llm", "asr", "tts"] }),
@@ -900,8 +912,8 @@ test("without an English voice every clause is still spoken by the Japanese voic
 	await say(h, session, id);
 	await until(() => h.voice.get(id)?.audioChunks.length === 3);
 	expect(spoken).toEqual([
-		["First.", "ja"],
-		["Second.", "ja"],
+		["First,", "ja"],
+		["Second,", "ja"],
 		["Third.", "ja"],
 	]);
 	expect(h.voice.get(id)?.status).not.toBe("failed");

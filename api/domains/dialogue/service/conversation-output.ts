@@ -8,6 +8,7 @@ import {
 export function conversationOutput(
 	publish: (text: string) => void,
 	tools: NativeTool[] = [],
+	rejectBareTools = false,
 ) {
 	const names = [
 		...new Set([
@@ -19,6 +20,9 @@ export function conversationOutput(
 		name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
 	);
 	const callSyntax = new RegExp(`(?:${escaped.join("|")})\\s*[({]`);
+	const bareControl = new RegExp(
+		`(?:^|\\n)[ \\t]*(?:${escaped.join("|")})[ \\t]*(?:\\n|$)`,
+	);
 	// These are provider control delimiters, not ordinary answer text.
 	const delimiters = ["<|", "<call:"];
 	const prefixes = [...names, ...delimiters].flatMap((word) =>
@@ -56,7 +60,11 @@ export function conversationOutput(
 			pending = pending.slice(end);
 		},
 		finish(text: string) {
-			if (blocked || invalid(text))
+			if (
+				blocked ||
+				invalid(text) ||
+				(rejectBareTools && bareControl.test(text))
+			)
 				throw operationRejection("control_text_in_body");
 			if (pending) publish(pending);
 			pending = "";

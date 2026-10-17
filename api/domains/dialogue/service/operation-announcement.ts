@@ -81,6 +81,11 @@ export async function announceSelection(
 		signal,
 	);
 	publish();
+	const run = deps.store.read((tx) => byId(tx, input.runId));
+	if (!run) throw new Error("run_changed");
+	if (run.utteranceId && !deps.deliverAnnouncement)
+		throw new Error("announcement_delivery_unavailable");
+	await deps.deliverAnnouncement?.(run, signal);
 	signal.throwIfAborted();
 	return {
 		...generated,

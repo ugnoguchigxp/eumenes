@@ -78,7 +78,7 @@ async function start(
 	return id;
 }
 
-test("each punctuation clause is judged by Ruri and synthesized with its own tone before the LLM finishes", async () => {
+test("validated short answers keep clause-specific tone without speaking provisional text", async () => {
 	const source = stream();
 	const events: string[] = [];
 	const states: Array<Record<string, string>> = [];
@@ -107,19 +107,21 @@ test("each punctuation clause is judged by Ruri and synthesized with its own ton
 	});
 	const id = await start(h, source);
 	const runId = h.voice.get(id)!.runId!;
-	source.push("よかった、");
-	await until(() => h.voice.get(id)?.audioChunks.length === 1);
-	expect(h.dialogue.get(runId)?.status).toBe("running");
-	expect(h.voice.get(id)?.audioComplete).toBe(false);
+	source.push("よかった、大変でしたね。");
+	await settle();
+	expect(states).toHaveLength(0);
+	expect(h.voice.get(id)?.audioChunks).toEqual([]);
+	source.push("続けましょう");
+	source.finish();
+	await until(() => h.voice.get(id)?.status === "ready");
+	expect(h.dialogue.get(runId)?.status).toBe("completed");
 	expect(h.voice.takeAudio(id, 0)).toEqual(wav());
-	source.push("大変でしたね。");
-	await until(() => h.voice.get(id)?.audioChunks.length === 2);
-	expect(h.dialogue.get(runId)?.status).toBe("running");
 	expect(states.map((state) => state.current_chunk)).toEqual([
 		"よかった、",
 		"大変でしたね。",
+		"続けましょう",
 	]);
-	expect(states[1]?.response).toBe("よかった、大変でしたね。");
+	expect(states[1]?.response).toBe("よかった、大変でしたね。続けましょう");
 	expect(states[0]?.conversation).toContain("話してください。");
 	expect(h.voice.get(id)?.audioChunks.map((chunk) => chunk.delivery)).toEqual([
 		expect.objectContaining({
@@ -134,19 +136,15 @@ test("each punctuation clause is judged by Ruri and synthesized with its own ton
 			motion: "listening",
 			tone: "gentle",
 		}),
+		expect.objectContaining({
+			source: "scored",
+			emotion: "empathy",
+			motion: "listening",
+			tone: "gentle",
+		}),
 	]);
 	expect(options[0]?.intonationScale).toBeCloseTo(1.45);
 	expect(options[1]?.intonationScale).toBeCloseTo(0.75);
-	source.push("続けましょう");
-	await settle();
-	expect(states).toHaveLength(2);
-	source.finish();
-	await until(() => h.voice.get(id)?.status === "ready");
-	expect(states.map((state) => state.current_chunk)).toEqual([
-		"よかった、",
-		"大変でしたね。",
-		"続けましょう",
-	]);
 	expect(events).toEqual([
 		"judge:よかった、",
 		"tts:よかった、",
@@ -186,6 +184,7 @@ for (const stage of ["judge", "tts"] as const)
 		});
 		const id = await start(h, source);
 		source.push("先の句。後ろの句。");
+		source.finish();
 		await until(() => !!active);
 		await h.voice.cancel(id);
 		expect(active?.aborted).toBe(true);
@@ -201,8 +200,9 @@ for (const stage of ["judge", "tts"] as const)
 		expect(
 			h.conversation
 				.get("main")
-				.messages.filter((message) => message.role === "assistant"),
-		).toEqual([]);
+				.messages.filter((message) => message.role === "assistant")
+				.map((message) => message.text),
+		).toEqual(["先の句。後ろの句。"]);
 		expect(judging).toBe(1);
 		expect(speaking).toBe(stage === "judge" ? 0 : 1);
 		expect(
@@ -240,7 +240,7 @@ test("a rejected clause decision does not prevent the next clause from being jud
 	expect(judgments).toBe(2);
 });
 
-test("goal-backed voice answers stream, and forgetting a goal aborts a pending judge without another LLM delta", async () => {
+test("forgetting a goal revokes provisional text before any speech judgment or audio", async () => {
 	const source = stream(),
 		late = gate<void>();
 	let judging: AbortSignal | undefined,
@@ -285,12 +285,13 @@ test("goal-backed voice answers stream, and forgetting a goal aborts a pending j
 	});
 	const id = await start(h, source);
 	source.push("最初の句。");
-	await until(() => !!judging);
+	await settle();
+	expect(judging).toBeUndefined();
 	expect(h.dialogue.get(h.voice.get(id)!.runId!)?.status).toBe("running");
 	await h.store.write((db) => db.query("DELETE FROM streaming_goals").run());
 	await until(() => h.voice.get(id)?.status === "failed");
 	expect(source.signal?.aborted).toBe(true);
-	expect(judging?.aborted).toBe(true);
+	expect(judging).toBeUndefined();
 	late.resolve();
 	source.finish();
 	await settle();
