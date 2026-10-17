@@ -28,6 +28,12 @@ for (const url of [
 	});
 }
 
+test("Japanese commas and periods end a URL even without a space", () => {
+	expect(
+		requestUrls("https://example.com/a、https://example.com/b。比べて"),
+	).toEqual(["https://example.com/a", "https://example.com/b"]);
+});
+
 test("a different path on the same host remains outside the request scope", async () => {
 	const h = await harness(Date.now, false, undefined, true);
 	try {
