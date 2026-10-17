@@ -1,4 +1,4 @@
-import { Copy, MessageSquarePlus } from "lucide-react";
+import { Copy, MessageSquarePlus, Sparkles } from "lucide-react";
 import { Button } from "../Button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../Tabs";
 import { correctionText, OcrCorrection } from "./OcrCorrection";
@@ -29,12 +29,26 @@ export function OcrResult(props: OcrWorkspaceProps & { item: OcrRecord }) {
 		: text;
 	const frameIndex =
 		item.result?.kind === "video" ? props.frameIndex : undefined;
+	const correcting = props.corrections?.some((correction) =>
+		["queued", "running", "cancelling"].includes(correction.state),
+	);
 	return (
 		<div className="ocr-result">
 			<div className="ocr-result-heading">
 				<h3>{preferred ? "採用中の補正案" : "読み取った原文"}</h3>
+			</div>
+			<div
+				className="ocr-result-toolbar"
+				role="group"
+				aria-label="読み取り結果の操作"
+			>
 				<Button
-					size="sm"
+					disabled={correcting || props.correctionLoading}
+					onClick={() => props.onCorrectionStart?.(item.id)}
+				>
+					<Sparkles size={17} /> 読み取り結果を補正
+				</Button>
+				<Button
 					variant="outline"
 					aria-label="表示中の全文をコピー"
 					disabled={!displayText}
@@ -126,7 +140,7 @@ export function OcrResult(props: OcrWorkspaceProps & { item: OcrRecord }) {
 					disabled={!props.selectedLines.length}
 					onClick={() => props.onCopy?.(selectedText)}
 				>
-					コピー
+					選択行をコピー
 				</Button>
 				<Button
 					size="sm"

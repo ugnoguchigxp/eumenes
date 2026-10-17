@@ -204,6 +204,15 @@
 	font-size: 1rem;
 	font-weight: 650;
 }
+.ocr-result-toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.65rem;
+	margin-bottom: 1rem;
+}
+.ocr-result-toolbar > button {
+	flex: 1 1 auto;
+}
 .ocr-result-tabs > .ds-tabs-list {
 	justify-content: flex-start;
 	margin-bottom: 1.1rem;

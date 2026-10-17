@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, test, vi } from "vitest";
 import { OcrPanel } from "./OcrPanel";
@@ -45,6 +45,57 @@ const completed: OcrWorkspaceProps = {
 		},
 	],
 };
+
+test("result toolbar exposes correction and full copy before the results and blocks duplicate corrections", async () => {
+	const user = userEvent.setup();
+	const onCorrectionStart = vi.fn(),
+		onCopy = vi.fn();
+	const { rerender } = render(
+		<OcrPanel
+			{...completed}
+			onCorrectionStart={onCorrectionStart}
+			onCopy={onCopy}
+		/>,
+	);
+	const toolbar = within(
+		screen.getByRole("group", { name: "読み取り結果の操作" }),
+	);
+	await user.click(toolbar.getByRole("button", { name: "読み取り結果を補正" }));
+	expect(onCorrectionStart).toHaveBeenCalledWith("image");
+	await user.click(
+		toolbar.getByRole("button", { name: "表示中の全文をコピー" }),
+	);
+	expect(onCopy).toHaveBeenCalledWith("本日のご案内\n受付は15時まで");
+	rerender(<OcrPanel {...completed} correctionLoading />);
+	expect(
+		toolbar.getByRole("button", { name: "読み取り結果を補正" }),
+	).toBeDisabled();
+	for (const state of ["queued", "running", "cancelling"] as const) {
+		rerender(
+			<OcrPanel
+				{...completed}
+				corrections={[
+					{
+						id: "candidate",
+						sourceId: "image",
+						frameIndex: null,
+						sourceRevision: 1,
+						state,
+						errorCode: null,
+						createdAt: 0,
+						result: null,
+					},
+				]}
+			/>,
+		);
+		expect(
+			toolbar.getByRole("button", { name: "読み取り結果を補正" }),
+		).toBeDisabled();
+		expect(
+			toolbar.getByRole("button", { name: "表示中の全文をコピー" }),
+		).toBeEnabled();
+	}
+});
 
 test("line and full-text views avoid duplicate text and preserve selected-line actions", async () => {
 	const user = userEvent.setup();

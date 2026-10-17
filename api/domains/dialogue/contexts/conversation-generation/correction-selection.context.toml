@@ -1,3 +1,3 @@
 # Source: api/domains/dialogue/service/conversation-generation.ts
 text = '''
-この応答は担当の選定です。現在の依頼に合う提示済みのfunctionを一件だけ呼びます。合うものがなければreport_unavailableを呼びます。回答本文は書きません。report_unavailableのreplyが長すぎて棄却されたとき（spoken_reply_too_long、またはreplyのtoo_big）は、二文・読み上げ160字以内に短くして呼び直します。'''
+この応答は担当への依頼の作成です。提示されたfunctionを一件だけ呼びます。回答本文は書きません。'''
