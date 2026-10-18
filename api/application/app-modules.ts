@@ -12,6 +12,7 @@ import {
 	type ObjectRecognitionService,
 } from "../domains/object-recognition";
 import { CONVERSATION_DEFAULT_PRINCIPAL } from "../domains/conversation/contracts";
+import { recognitionSharing } from "./media/recognition-sharing";
 import { registerImage, type ImageService } from "../domains/image";
 import { registerMusic, type MusicService } from "../domains/music";
 import {
@@ -92,6 +93,10 @@ import {
 	registerServiceTests,
 	type ServiceTests,
 } from "../domains/service-tests";
+import {
+	registerMonitoring,
+	type MonitoringService,
+} from "../domains/monitoring";
 
 /** One independently mountable group of routes. Mounting order is registration order. */
 export type AppModule = { mount(app: Hono): void };
@@ -119,6 +124,8 @@ export type AppServices = {
 	continuity?: ContinuityService;
 	changes?: Changes;
 	serviceTests?: ServiceTests;
+	/** The Spatial background's monitoring snapshot (absent: the route does not exist). */
+	monitoring?: MonitoringService;
 	music?: MusicService;
 	image?: ImageService;
 	excalidraw?: ExcalidrawService;
@@ -176,8 +183,10 @@ export function appModules(services: AppServices): AppModule[] {
 					app,
 					s.objectRecognition!,
 					CONVERSATION_DEFAULT_PRINCIPAL,
-					(text, conversationId, requestId) =>
-						s.dialogue.submit({ text, conversationId, requestId }),
+					recognitionSharing({
+						conversation: s.conversation,
+						submit: (input) => s.dialogue.submit(input),
+					}),
 				),
 		},
 		s.excalidraw && {
@@ -214,6 +223,9 @@ export function appModules(services: AppServices): AppModule[] {
 		},
 		s.serviceTests && {
 			mount: (app) => registerServiceTests(app, s.serviceTests!),
+		},
+		s.monitoring && {
+			mount: (app) => registerMonitoring(app, s.monitoring!),
 		},
 		s.tasks && { mount: (app) => registerTasks(app, s.tasks!) },
 		s.coding && { mount: (app) => registerCoding(app, s.coding!) },

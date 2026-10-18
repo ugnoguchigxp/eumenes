@@ -30,6 +30,8 @@ import type {
 	NativeToolCall,
 } from "../../../infrastructure/chat-stream";
 export type LarmCallOptions = {
+	/** The attempt's own time limit when longer than usual: the stuck-stream guard is never shorter. */
+	attemptMs?: number;
 	/** One-off synthesis values; reuse the claimed connection. Undefined style explicitly resets it. */
 	speechOverride?: {
 		voice?: string;
@@ -112,6 +114,8 @@ export interface LarmPort {
 		signal: AbortSignal,
 	): Promise<Array<{ profile: string; model: string | null }>>;
 	connect(): Promise<void>;
+	/** Repeats the existing Profile request while the main chat has a live UI owner. */
+	retain?(active: boolean): void;
 	prepareVoice?(signal: AbortSignal): Promise<void>;
 	answerStream?(
 		messages: ChatMessage[],

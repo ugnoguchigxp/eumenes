@@ -247,6 +247,7 @@ export function createToolchainRouting(
 				skills: set.skills,
 				tools: boundTools(db, set, doc.tools),
 				targetSchemaRef: doc.session.targetSchemaRef ?? null,
+				timeLimits: doc.timeLimits ?? null,
 			};
 		},
 		bound,

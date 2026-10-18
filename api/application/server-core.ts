@@ -16,6 +16,7 @@ import {
 	createCloudAgents,
 } from "../domains/inference";
 import { createQueue } from "../domains/queue";
+import { createActivityRecorder } from "../domains/larm";
 import { createTtsDictionary } from "../domains/tts-dictionary";
 import { createServiceTests } from "../domains/service-tests";
 import {
@@ -58,6 +59,11 @@ export async function buildCore(
 	const datasetStore = openAttitudeStore(datasetPath);
 	const attitudeDataset = createAttitudeDataset(datasetStore, datasetPath);
 	await attitudeDataset.recover();
+	// Monitoring reads these; the judge and embedding calls leave no attempt record of their own.
+	const activity = {
+		judge: createActivityRecorder(),
+		embedding: createActivityRecorder(),
+	};
 	const inference = createInference(store, settings, {
 		codexResearch: config.webResearchToolsEnabled
 			? createCodexResearch(config.env, config.researchCodexExecutable)
@@ -69,6 +75,7 @@ export async function buildCore(
 		providerHosts: config.larmProviderHosts,
 		speechText: ttsDictionary.apply,
 		attitudeDataset,
+		judgeActivity: activity.judge,
 	});
 	const unsubscribeStatus = inference.onChange(() => changes.publish());
 	const serviceTests = createServiceTests(store, settings, inference, {
@@ -92,6 +99,7 @@ export async function buildCore(
 		unsubscribeStatus,
 		serviceTests,
 		queue,
+		activity,
 	};
 }
 export type Core = Awaited<ReturnType<typeof buildCore>>;

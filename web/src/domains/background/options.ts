@@ -73,5 +73,5 @@ export const healthColors: Record<SpatialState["health"], string> = {
 	pressure: "#ffaf62",
 	fault: "#ff6177",
 	disconnected: "#756a8e",
-	unknown: "#756a8e",
+	unknown: "#a99fd2",
 };

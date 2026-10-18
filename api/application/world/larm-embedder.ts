@@ -1,6 +1,10 @@
 import type { Config } from "../../infrastructure/config";
 import type { SettingsService } from "../../domains/settings";
-import { createLarmPlayground, type LarmPlayground } from "../../domains/larm";
+import {
+	createLarmPlayground,
+	type ActivityRecorder,
+	type LarmPlayground,
+} from "../../domains/larm";
 import type { Embed } from "../toolchain/toolchain-vectors";
 
 /**
@@ -10,16 +14,22 @@ import type { Embed } from "../toolchain/toolchain-vectors";
 function larmEmbedder(
 	create: () => LarmPlayground,
 	connectionKey: () => string,
+	activity: ActivityRecorder,
 ): Embed {
 	let current: { key: string; client: LarmPlayground } | undefined;
 	return (texts, type, signal) => {
 		const key = connectionKey();
 		if (current?.key !== key) current = { key, client: create() };
-		return current.client.embed(texts, type, signal);
+		const client = current.client;
+		return activity.track(() => client.embed(texts, type, signal), signal);
 	};
 }
 
-export function createSavedEmbedder(config: Config, settings: SettingsService) {
+export function createSavedEmbedder(
+	config: Config,
+	settings: SettingsService,
+	activity: ActivityRecorder,
+) {
 	return larmEmbedder(
 		() => {
 			const s = settings.get();
@@ -35,5 +45,6 @@ export function createSavedEmbedder(config: Config, settings: SettingsService) {
 			const s = settings.get();
 			return JSON.stringify([s.larm.baseUrl, s.larm.profile, s.larm.audience]);
 		},
+		activity,
 	);
 }

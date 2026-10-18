@@ -12,6 +12,16 @@ LLMのみの要求は `providers: ["llm"]`、音声の要求は `providers` を�
 
 設定は [setup.md](setup.md)(環境変数)と [settings.md](settings.md)(画面)を参照してください。
 
+## チャット画面表示中のProfile利用依頼
+
+表示中のチャット画面から30秒周期でbackendへ生存通知を送り、有効な通知がある間だけ既存の`POST /v1/agent-connections`を30秒周期で繰り返します。同じclient・Profile・audience・Provider構成・catalog revisionを使い、新しい利用依頼ごとにIdempotency-Keyを発行します。認証は既存の`LARM_API_TOKEN`のままです。専用の所有更新API・別トークン・ダミー推論は使いません。
+
+非表示・画面終了では停止を通知し、通知が届かなくても最後の生存通知から90秒でbackendが定期要求を止めます。複数画面では一つ以上が有効な間継続し、設定変更とbackend終了でも旧接続への送信を止めます。返されたConnectionの対象・Profile・Provider構成を確認し、別Connectionの取得を占有延長の成功として扱いません。
+
+取得済みConnectionの保持応答は、Connection・Profile・Providerの一致とready状態を検証します。`claimable`はLARMの短い疎通確認キャッシュの有無でも変わるため、取得済みclaimを使う保持処理の成功条件にはしません。初回claimと期限更新の既存処理は維持します。
+
+2026-10-18、改修済みEumenesの画面通知APIから実LARMまでの結合試験で、同じConnection・Allocationを6分2秒保持し、`idleReleaseAt`の約6分延長を確認しました。保持区間の推論要求・追加claimは0回。同じKeyの再送では期限が変わらず、送信停止後は最終利用依頼から300.067秒で自動解放されました。利用者によるbackend再起動後、画面通知APIの204と、起動後5分を超えた実画面・status APIの接続済みも確認しています。詳細は[作業記録](../spec/larm-connection-retention-design-2026-10-18.md#12-larm更新後の実接続受入と稼働反映確認)を参照してください。
+
 ## gzip圧縮通信
 
 LLM・TTS・ASR・画像生成・音楽生成の通信は、backendの共通入口で `Accept-Encoding: gzip` を指定します。推論・生成のJSONとASRのmultipart本文はBunの `fetch` の `compress: "gzip"` で送信時に圧縮し、`Content-Encoding: gzip` の付与もBunに委ねます。multipartは境界・音声・送信項目を含めて一度だけBlobへ直列化します。正式token計数とembeddingも同じ圧縮送信を使います。

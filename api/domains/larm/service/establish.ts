@@ -87,7 +87,10 @@ export async function establishLease(
 			fullProfile,
 			hosts: hosts(),
 		});
+		signal?.throwIfAborted();
+		lifetime.throwIfAborted();
 		const current: Lease = {
+			request: { profile, client, audience, fullProfile, catalogRevision },
 			id,
 			expiresAt,
 			providers,

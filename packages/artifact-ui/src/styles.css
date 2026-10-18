@@ -378,6 +378,8 @@
 	display: grid;
 	gap: 1rem;
 	min-width: 0;
+	/* A line break in a definition's text is "\n" (never HTML); show it as one. */
+	white-space: pre-line;
 }
 .aui-composition[data-gap="compact"] {
 	gap: 0.5rem;

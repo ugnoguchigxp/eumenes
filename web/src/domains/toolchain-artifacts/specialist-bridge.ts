@@ -23,6 +23,11 @@ export type SpecialistBridge = {
 	 * session is closed before the tab goes away.
 	 */
 	requestClose(artifactRevisionId: string): Promise<BridgeResult>;
+	/**
+	 * Edit the saved item chosen in the history instead: the active session's work ends (unsaved work
+	 * only when `discardUnsaved`) and a session on the item takes over.
+	 */
+	retarget(targetRef: string, discardUnsaved: boolean): Promise<BridgeResult>;
 	/** Close the session after a successful save while it was suspended. */
 	closeSession(): Promise<BridgeResult>;
 };

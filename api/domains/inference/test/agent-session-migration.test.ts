@@ -22,7 +22,8 @@ test("deployed session migration stays immutable; references upgrade without cle
 			(m) =>
 				m.id !== "inference/0010-attempt-refs" &&
 				m.id !== "inference/0011-control-engine-codex" &&
-				m.id !== "inference/0012-total-input-tokens",
+				m.id !== "inference/0012-total-input-tokens" &&
+				m.id !== "inference/0013-attempt-limit",
 		),
 	]);
 	try {

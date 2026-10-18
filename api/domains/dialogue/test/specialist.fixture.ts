@@ -89,6 +89,10 @@ const card = (
 	score: { rank: 1, ftsRank: null, similarity: null, fromHistory: false },
 });
 
+/** The studio's time limits a test sets (and resets); the other toolchain keeps the host defaults. */
+export const studioLimits: { current: SpecialistSet["timeLimits"] } = {
+	current: null,
+};
 export const setFor = (revisionId: string): SpecialistSet => {
 	const other = revisionId === OTHER_REVISION;
 	return {
@@ -119,6 +123,7 @@ export const setFor = (revisionId: string): SpecialistSet => {
 			},
 		],
 		targetSchemaRef: other ? null : "builtin:fakeTarget",
+		timeLimits: other ? null : studioLimits.current,
 	};
 };
 
@@ -200,6 +205,8 @@ export async function setup(options: Options = {}) {
 		specialistPrompts: [] as Array<Array<{ role: string; content: string }>>,
 		specialistSessions: [] as unknown[],
 		captures: [] as Array<Record<string, unknown>>,
+		/** Model-request deadlines the run moved later (subject and new deadline). */
+		extended: [] as Array<{ subject: string; deadline: number }>,
 		works: new Map<string, Work>(),
 		invocations: [] as Array<Record<string, unknown>>,
 		endWorkFails: false,
@@ -222,6 +229,13 @@ export async function setup(options: Options = {}) {
 			state.released.push(taskId);
 		},
 		snapshotInTransaction: () => ({ subagent: { resourceId: null } }),
+		extendDeadlineInTransaction: (
+			_db: unknown,
+			subject: string,
+			deadline: number,
+		) => {
+			state.extended.push({ subject, deadline });
+		},
 		captureControlInTransaction: (
 			_db: unknown,
 			input: Record<string, unknown>,

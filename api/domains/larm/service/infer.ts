@@ -44,6 +44,7 @@ export function createInfer({
 				init,
 				signal,
 				operation,
+				options?.attemptMs,
 			);
 		} catch (error) {
 			if (signal.aborted)

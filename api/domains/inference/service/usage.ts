@@ -5,6 +5,7 @@ import {
 	type UsagePageQuery,
 	type Usage,
 } from "../contracts";
+import { createActivityReader } from "./activity";
 
 const columns = {
 	started: "a.started",
@@ -32,6 +33,7 @@ const decode = (row: unknown) => {
 /** Queries apply to the complete retained dataset; sort columns never come from raw SQL input. */
 export function createUsageReader(store: SqliteStore) {
 	return {
+		...createActivityReader(store),
 		usage: () =>
 			store.read((db) =>
 				db

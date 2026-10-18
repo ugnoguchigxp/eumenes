@@ -8,6 +8,7 @@ import {
 } from "../contracts";
 import {
 	bumpRevision,
+	deleteComposition,
 	deleteWork,
 	dropSnapshotsAfter,
 	get,
@@ -18,6 +19,7 @@ import {
 	updateComposition,
 	updateWork,
 	work,
+	worksOfComposition,
 	type WorkRow,
 } from "../repository";
 import {
@@ -247,5 +249,29 @@ export function saveInTransaction(
 		revision: row.draft_revision + 1,
 		savedRevision: nextSaved,
 		title: current.title,
+	});
+}
+/** Deleting a saved composition from the screen; a work still built on it keeps it. */
+export function deleteInTransaction(
+	db: Database,
+	caller: Caller,
+	input: { projectId: string; expectedSavedRevision: number },
+	requestId: string,
+): Outcome {
+	const digest = digestOf("delete", input);
+	const replay = replayOf(db, requestId, digest);
+	if (replay) return replay;
+	requireUi(caller);
+	const saved = get(db, input.projectId);
+	if (!saved || saved.scope !== scope) return fail("target_not_found");
+	if (saved.saved_revision !== input.expectedSavedRevision)
+		return fail("revision_conflict");
+	if (worksOfComposition(db, saved.id) > 0) return fail("composition_in_use");
+	deleteComposition(db, saved.id);
+	return accept(db, requestId, digest, {
+		projectId: saved.id,
+		state: "deleted",
+		savedRevision: saved.saved_revision,
+		title: saved.title,
 	});
 }

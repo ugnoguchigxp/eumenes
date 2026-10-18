@@ -32,7 +32,11 @@ import {
 	expiryAfter,
 	flushCancelled,
 } from "./specialist-core";
-import { addresseeMatches, addressedSession } from "./specialist-intake";
+import {
+	addresseeMatches,
+	addressedSession,
+	sessionRunMs,
+} from "./specialist-intake";
 const log = getLogger("dialogue");
 
 /** Input acceptance: idempotent run creation, manual/voice submit, notices and the schedule target. */
@@ -96,8 +100,11 @@ export function createIntake(deps: DialogueDeps) {
 			createdAt: now,
 			runId,
 		});
+		// A session toolchain with its own run time gives the utterance addressed to it that time.
+		const runMs = addressee ? sessionRunMs(deps, db, addressee) : 0;
 		const deadlineAtMs =
-			Date.parse(now) + (input.deadlineMs ?? DEFAULT_DEADLINE_MS);
+			Date.parse(now) +
+			Math.max(input.deadlineMs ?? DEFAULT_DEADLINE_MS, runMs);
 		const generated = queue.enqueueInTransaction(db, {
 			// Scheduled runs get their own scope so background work cannot exhaust interactive acceptance.
 			scope: isSystemPrompt(input.sourceKind)
@@ -157,6 +164,8 @@ export function createIntake(deps: DialogueDeps) {
 				input.transcriptionRequestIds,
 			);
 		else larm.captureInTransaction?.(db, runId, "llm", deadlineAtMs);
+		// A voice turn's requests were captured with the voice deadline: the toolchain's run time reaches them too.
+		if (runMs) larm.extendDeadlineInTransaction?.(db, runId, deadlineAtMs);
 		insert(db, run);
 		if (addressee) {
 			// The utterance belongs to the session: the work is taken for its turn (refused while busy), the

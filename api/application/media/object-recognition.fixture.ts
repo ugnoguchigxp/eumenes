@@ -26,7 +26,16 @@ export const recognitionFixtureVideo = {
 		{ timestampSeconds: 1, objects: [recognitionFixtureImage.objects[1]] },
 	],
 };
-export function objectRecognitionFixture() {
+/** `command` is what the operation picker returns (default: open the screen). */
+export function objectRecognitionFixture(
+	command: Record<string, unknown> = {
+		action: "open",
+		id: "",
+		frameIndex: -1,
+		source: "camera",
+		question: "",
+	},
+) {
 	const calls: { path: string; method: string }[] = [];
 	const jobs = new Map<
 		string,
@@ -115,7 +124,7 @@ export function objectRecognitionFixture() {
 				return JSON.stringify({
 					action: "invoke",
 					tool: "object-recognition.manage",
-					arguments: { action: "open", id: "", frameIndex: -1 },
+					arguments: command,
 				});
 			}
 			stages.push("answer");

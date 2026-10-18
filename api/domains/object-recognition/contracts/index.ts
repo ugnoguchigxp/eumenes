@@ -88,6 +88,8 @@ export const recognitionRecord = z.object({
 	createdAt: z.number(),
 	updatedAt: z.number(),
 	canRecheck: z.boolean().optional(),
+	/** How the still or video was taken; absent on records saved before it was recorded. */
+	origin: z.enum(["camera", "screen", "file"]).optional(),
 });
 export type RecognitionRecord = z.infer<typeof recognitionRecord>;
 const upstreamId = z
@@ -114,9 +116,27 @@ export type Connection = {
 	credential: string;
 	credentialVersion?: string;
 };
+/**
+ * A host-issued request to show an image to the conversation model: a camera or screen still the
+ * user agreed to (the screen takes it), or a saved image on screen ("saved"). The id is the run's.
+ */
+export const handoff = z.object({
+	id: z.string(),
+	conversationId: z.string(),
+	source: z.enum(["camera", "screen", "saved"]),
+	recognitionId: z.string().nullable(),
+	question: z.string(),
+	state: z.enum(["pending", "sent", "cancelled", "expired"]),
+	deadline: z.number(),
+});
+export type Handoff = z.infer<typeof handoff>;
+export const handoffLifetimeMs = 120_000;
 export const errorStatus = {
 	recognition_not_found: 404,
 	recognition_not_ready: 409,
+	recognition_image_required: 409,
+	recognition_handoff_not_found: 404,
+	recognition_handoff_closed: 409,
 	recognition_not_configured: 503,
 	recognition_capacity: 429,
 } as const;

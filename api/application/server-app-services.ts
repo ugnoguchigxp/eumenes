@@ -23,6 +23,7 @@ export function appServices(s: Services) {
 		webResearch: s.webResearch,
 		changes: s.changes,
 		serviceTests: s.serviceTests,
+		monitoring: s.monitoring,
 		music: s.music,
 		image: s.image,
 		excalidraw: s.excalidraw,

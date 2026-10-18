@@ -18,6 +18,7 @@ import {
 	deferFlush,
 	endOrMarkClosing,
 	expiryAfter,
+	extendRunForToolchain,
 	safeCode,
 	sessionExpired,
 } from "./specialist-core";
@@ -31,14 +32,17 @@ const SWITCH_NOTE = systemContext(
 export type StartResult = { ok: true } | { ok: false; code: string };
 const refuse = (code: string): StartResult => ({ ok: false, code });
 
+/** Queue the specialist's turn; a toolchain with its own run time gets it from here. */
 function enqueueTurn(
 	deps: DialogueDeps,
 	tx: Database,
-	run: Run,
+	handed: Run,
+	set: SpecialistSet,
 	sessionId: string,
 	epoch: number,
 	request: string,
 ) {
+	const run = extendRunForToolchain(deps, tx, handed, set);
 	const { job } = deps.queue.enqueueInTransaction(tx, {
 		scope: "dialogue",
 		kind: SPECIALIST_KIND,
@@ -189,7 +193,7 @@ function start(
 				now,
 			);
 			addressTurn(deps, tx, run, live);
-			enqueueTurn(deps, tx, run, live.id, epoch, chosen.request);
+			enqueueTurn(deps, tx, run, set, live.id, epoch, chosen.request);
 			return { ok: true };
 		}
 		const dirty = work?.dirty ?? false;
@@ -232,14 +236,35 @@ function start(
 		deferFlush(deps, switched);
 		if (switched.state === "closing") return refuse("specialist_closing");
 	}
+	const session = openSessionInTransaction(
+		deps,
+		tx,
+		set,
+		run.conversationId,
+		target,
+	);
+	addressTurn(deps, tx, run, session);
+	enqueueTurn(deps, tx, run, set, session.id, session.epoch, chosen.request);
+	return { ok: true };
+}
+
+/** A new active session of this set on the conversation, its work opened from the target (or empty). */
+export function openSessionInTransaction(
+	deps: DialogueDeps,
+	tx: Database,
+	set: SpecialistSet,
+	conversationId: string,
+	target: string | null,
+): SessionRecord {
+	const now = deps.clock();
 	const sessionId = deps.id();
-	const work = port.openWorkInTransaction(tx, set, {
+	const work = deps.specialist!.openWorkInTransaction(tx, set, {
 		sessionId,
 		targetRef: target,
 	});
 	const session: SessionRecord = {
 		id: sessionId,
-		conversationId: run.conversationId,
+		conversationId,
 		toolchainId: set.toolchainId,
 		toolchainRevisionId: set.toolchainRevisionId,
 		title: set.title,
@@ -263,7 +288,5 @@ function start(
 		updatedAt: now,
 	};
 	insertSession(tx, session);
-	addressTurn(deps, tx, run, session);
-	enqueueTurn(deps, tx, run, session.id, session.epoch, chosen.request);
-	return { ok: true };
+	return session;
 }

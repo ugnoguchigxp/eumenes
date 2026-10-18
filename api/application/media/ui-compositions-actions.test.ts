@@ -21,7 +21,7 @@ afterEach(async () => {
 		rmSync(dir, { recursive: true, force: true });
 });
 const id = () => crypto.randomUUID();
-const studio = "artifact:ui.studio@2";
+const studio = "artifact:ui.studio@3";
 const definition = (title: string) => ({
 	view: "layout",
 	direction: "stack",
@@ -134,7 +134,7 @@ test("seeding an upgraded database leaves only the studio as a launcher", async 
 		.read((db) => capabilities.toolchainsInTransaction(db))
 		.find((d) => d.id === "ui.compose");
 	expect(toolchain).toMatchObject({
-		revisionId: "toolchain:ui.compose@8",
+		revisionId: "toolchain:ui.compose@9",
 		artifactRevisionId: studio,
 	});
 });
@@ -200,4 +200,44 @@ test("the screen's string values reach undo, redo and save as the operations' in
 	);
 	expect(again.request.status).toBe("rejected");
 	expect(again.request.errorCode).toBe("nothing_to_save");
+});
+
+test("the screen deletes the viewed saved work once no work is built on it", async () => {
+	const { store, service, send } = await setup();
+	const work = await store.write((db) =>
+		service.openWorkInTransaction(db, { sessionId: id(), targetRef: null }),
+	);
+	const runId = id();
+	await store.write((db) =>
+		service.beginTurnInTransaction(db, work.workRef, runId),
+	);
+	await store.write((db) =>
+		service.applyDraftInTransaction(
+			db,
+			{ kind: "specialist", runId, workRef: work.workRef },
+			{ title: "A", definition: definition("A") },
+			id(),
+		),
+	);
+	await store.write((db) =>
+		service.endTurnInTransaction(db, work.workRef, runId),
+	);
+	await send("save", {
+		workRef: work.workRef,
+		expectedRevision: "1",
+		expectedSavedRevision: "0",
+	});
+	const savedId = store.read((db) => service.listInTransaction(db))[0]!.id;
+	const input = { projectId: savedId, expectedSavedRevision: "1" };
+	const held = await send("delete", input, savedId);
+	expect(held.request.errorCode).toBe("composition_in_use");
+	await store.write((db) =>
+		service.endWorkInTransaction(db, work.workRef, "close"),
+	);
+	await expect(
+		send("delete", { ...input, expectedSavedRevision: "x" }, savedId),
+	).rejects.toThrow("invalid_input");
+	const deleted = await send("delete", input, savedId);
+	expect(deleted.request.status).toBe("accepted");
+	expect(store.read((db) => service.listInTransaction(db))).toEqual([]);
 });

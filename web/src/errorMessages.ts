@@ -23,6 +23,9 @@ const messages: Record<string, string> = {
 	work_unsaved: "未保存の変更があります。保存するか破棄してください。",
 	generation_in_progress: "生成中のため、今は操作できません。",
 	save_conflict: "保存作品が別の場所で更新されています。下書きは残っています。",
+	composition_in_use:
+		"この作品は編集中のため削除できません。保存して会話に戻るか、破棄してから削除してください。",
+	target_not_found: "対象が見つかりません。画面を更新してください。",
 	undo_limit_reached:
 		"元に戻せる変更の上限に達しました。保存すると続けて編集できます。",
 	session_ended: "制作は終了しています。",

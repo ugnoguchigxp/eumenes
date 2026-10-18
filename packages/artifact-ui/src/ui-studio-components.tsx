@@ -1,5 +1,6 @@
 import {
 	Button,
+	ConfirmModal,
 	Popover,
 	PopoverContent,
 	PopoverTrigger,
@@ -174,11 +175,14 @@ function HistoryMenu({
 	hasDraft,
 	viewingId,
 	send,
+	onPick,
 }: {
 	history: UiStudioResource["history"];
 	hasDraft: boolean;
 	viewingId: string | undefined;
 	send: Send;
+	/** Choosing a saved work (the studio asks first when that would drop unsaved work). */
+	onPick: (item: UiStudioResource["history"][number]) => void;
 }) {
 	return (
 		<Disclosure
@@ -208,7 +212,7 @@ function HistoryMenu({
 								className="aui-ui-menu-item"
 								aria-current={viewingId === item.id ? "true" : undefined}
 								onClick={() => {
-									send("ui-select", { id: item.id });
+									onPick(item);
 									close();
 								}}
 							>
@@ -521,6 +525,11 @@ function Studio({
 }) {
 	const { work, viewing, history, session } = data;
 	const heading = useId();
+	const [deleting, setDeleting] = useState(false);
+	const [switching, setSwitching] = useState<{
+		id: string;
+		title: string;
+	} | null>(null);
 	const suspended = session?.state === "suspended";
 	const busy = !!work?.busy;
 	// The draft is what the controls act on; a viewed saved work hides it from the preview.
@@ -580,53 +589,80 @@ function Studio({
 						hasDraft={!!work}
 						viewingId={viewing?.id}
 						send={send}
+						onPick={(item) => {
+							// The active specialist would edit the chosen work instead: unsaved work is not dropped silently.
+							if (
+								session?.state === "active" &&
+								work?.dirty &&
+								!busy &&
+								work.savedRef !== item.id
+							)
+								setSwitching(item);
+							else send("ui-select", { id: item.id });
+						}}
 					/>
-					<Button
-						type="button"
-						variant="outline"
-						size="sm"
-						disabled={!editing || busy || !work?.canUndo || action.pending}
-						onClick={() => step("ui-undo")}
-					>
-						<Undo2 size={14} aria-hidden="true" />
-						元に戻す
-					</Button>
-					<Button
-						type="button"
-						variant="outline"
-						size="sm"
-						disabled={!editing || busy || !work?.canRedo || action.pending}
-						onClick={() => step("ui-redo")}
-					>
-						<Redo2 size={14} aria-hidden="true" />
-						やり直す
-					</Button>
-					<Button
-						type="button"
-						size="sm"
-						disabled={!editing || busy || !work?.dirty || action.pending}
-						onClick={() =>
-							work &&
-							send("ui-save", {
-								workRef: work.workRef,
-								expectedRevision: String(work.revision),
-								expectedSavedRevision: String(work.savedRevision ?? 0),
-							})
-						}
-					>
-						<Save size={14} aria-hidden="true" />
-						保存
-					</Button>
-					<Button
-						type="button"
-						variant="outline-destructive"
-						size="sm"
-						disabled={!work || action.pending}
-						onClick={() => send("ui-discard")}
-					>
-						<Trash2 size={14} aria-hidden="true" />
-						破棄
-					</Button>
+					{/* A viewed saved work is not edited here: deleting it is its only action. */}
+					{viewing ? (
+						<Button
+							type="button"
+							variant="outline-destructive"
+							size="sm"
+							disabled={action.pending}
+							onClick={() => setDeleting(true)}
+						>
+							<Trash2 size={14} aria-hidden="true" />
+							削除
+						</Button>
+					) : (
+						<>
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								disabled={!editing || busy || !work?.canUndo || action.pending}
+								onClick={() => step("ui-undo")}
+							>
+								<Undo2 size={14} aria-hidden="true" />
+								元に戻す
+							</Button>
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								disabled={!editing || busy || !work?.canRedo || action.pending}
+								onClick={() => step("ui-redo")}
+							>
+								<Redo2 size={14} aria-hidden="true" />
+								やり直す
+							</Button>
+							<Button
+								type="button"
+								size="sm"
+								disabled={!editing || busy || !work?.dirty || action.pending}
+								onClick={() =>
+									work &&
+									send("ui-save", {
+										workRef: work.workRef,
+										expectedRevision: String(work.revision),
+										expectedSavedRevision: String(work.savedRevision ?? 0),
+									})
+								}
+							>
+								<Save size={14} aria-hidden="true" />
+								保存
+							</Button>
+							<Button
+								type="button"
+								variant="outline-destructive"
+								size="sm"
+								disabled={!work || action.pending}
+								onClick={() => send("ui-discard")}
+							>
+								<Trash2 size={14} aria-hidden="true" />
+								破棄
+							</Button>
+						</>
+					)}
 					{session?.state === "active" && (
 						<Button
 							type="button"
@@ -656,6 +692,41 @@ function Studio({
 				busy={busy}
 			/>
 			<Feedback message={action.message} />
+			<ConfirmModal
+				open={!!switching}
+				onOpenChange={(open) => {
+					if (!open) setSwitching(null);
+				}}
+				title="未保存の案があります"
+				description={`保存していない案を破棄して、「${switching?.title || "名称未設定"}」の編集に切り替えます。`}
+				confirmText="破棄して切り替える"
+				cancelText="編集を続ける"
+				variant="destructive"
+				onConfirm={() => {
+					if (switching) send("ui-retarget", { id: switching.id });
+					setSwitching(null);
+				}}
+				onCancel={() => setSwitching(null)}
+			/>
+			{viewing && (
+				<ConfirmModal
+					open={deleting}
+					onOpenChange={setDeleting}
+					title="作品を削除しますか"
+					description={`「${viewing.title || "名称未設定"}」を作品履歴から削除します。元に戻せません。`}
+					confirmText="削除する"
+					cancelText="やめる"
+					variant="destructive"
+					onConfirm={() => {
+						setDeleting(false);
+						send("ui-delete", {
+							projectId: viewing.id,
+							expectedSavedRevision: String(viewing.savedRevision),
+						});
+					}}
+					onCancel={() => setDeleting(false)}
+				/>
+			)}
 		</div>
 	);
 }

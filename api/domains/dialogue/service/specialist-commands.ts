@@ -3,6 +3,7 @@ import {
 	specialistCommandKinds,
 	type SpecialistCommand,
 	type SpecialistCommandKind,
+	type SpecialistRetarget,
 	type SpecialistSession,
 } from "../contracts";
 import {
@@ -26,6 +27,7 @@ import {
 	sessionExpired,
 	sessionView,
 } from "./specialist-core";
+import { openSessionInTransaction } from "./specialist-start";
 
 /** Jobs and runs cancelled inside a transaction: aborted once it commits. */
 type Cancelled = { jobs: string[]; runs: string[] };
@@ -157,6 +159,86 @@ export function createSpecialistOps(deps: DialogueDeps) {
 		return result;
 	}
 
+	/**
+	 * The active session goes on with another saved item of its toolchain: a clean work (or a dirty one the
+	 * user chose to discard) ends and a new session opens on the item. The same item keeps the session.
+	 */
+	function retarget(
+		tx: Database,
+		sessionId: string,
+		input: SpecialistRetarget,
+		cancelled: Cancelled,
+	): { session: SpecialistSession } {
+		// The receipt's kind names the choice, so the same request id with another choice is a conflict.
+		const kind = `retarget:${input.targetRef}:${input.discardUnsaved}`;
+		const receipt = receiptById(tx, input.requestId);
+		if (receipt) {
+			if (
+				receipt.sessionId !== sessionId ||
+				receipt.kind !== kind ||
+				receipt.expectedRevision !== input.expectedRevision
+			)
+				throw new Error("request_conflict");
+			return JSON.parse(receipt.resultJson);
+		}
+		const port = deps.specialist!;
+		const record = sessionById(tx, sessionId);
+		if (!record) throw new Error("specialist_session_not_found");
+		if (record.state === "ended") throw new Error("session_ended");
+		if (record.revision !== input.expectedRevision)
+			throw new Error("revision_conflict");
+		if (record.state !== "active") throw new Error("session_not_active");
+		if (sessionExpired(record, clock())) throw new Error("session_expired");
+		const set = port.setInTransaction(tx, record.toolchainRevisionId);
+		if (
+			!port
+				.targetChoicesInTransaction(tx, set, input.targetRef)
+				.some((choice) => choice.ref === input.targetRef)
+		)
+			throw new Error("target_not_found");
+		const work = port.workStateInTransaction(
+			tx,
+			record.adapterRef,
+			record.workRef,
+		);
+		let next = record;
+		if ((work?.savedRef ?? null) !== input.targetRef) {
+			// A turn holding the work, or an utterance accepted for it, is never dropped by a switch.
+			if (work?.busy || record.activeRunId) throw new Error("work_busy");
+			if (work?.dirty && !input.discardUnsaved) throw new Error("work_unsaved");
+			// A refusal of the work's end rolls the whole command back: the session stays as it was.
+			absorb(
+				cancelled,
+				endSessionInTransaction(
+					deps,
+					tx,
+					record,
+					work?.dirty ? "discarded" : "closed",
+				),
+			);
+			next = openSessionInTransaction(
+				deps,
+				tx,
+				set,
+				record.conversationId,
+				input.targetRef,
+			);
+		}
+		const result = { session: sessionView(deps, tx, fresh(tx, next.id)) };
+		insertReceipt(
+			tx,
+			{
+				requestId: input.requestId,
+				sessionId,
+				kind,
+				expectedRevision: input.expectedRevision,
+				resultJson: JSON.stringify(result),
+			},
+			clock(),
+		);
+		return result;
+	}
+
 	/** Sessions past their expiry, closing ones (retried) and suspended ones whose work was saved meanwhile. */
 	function sweepInTransaction(db: Database, now: string): Cancelled {
 		const cancelled = none();
@@ -226,6 +308,18 @@ export function createSpecialistOps(deps: DialogueDeps) {
 			const cancelled = none();
 			const result = await store.write((tx) =>
 				apply(tx, sessionId, kind, input, cancelled),
+			);
+			flushCancelled(deps, cancelled.jobs, cancelled.runs);
+			return result;
+		},
+		async retarget(
+			sessionId: string,
+			input: SpecialistRetarget,
+		): Promise<{ session: SpecialistSession }> {
+			if (!deps.specialist) throw new Error("specialist_unavailable");
+			const cancelled = none();
+			const result = await store.write((tx) =>
+				retarget(tx, sessionId, input, cancelled),
 			);
 			flushCancelled(deps, cancelled.jobs, cancelled.runs);
 			return result;

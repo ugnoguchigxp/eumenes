@@ -16,7 +16,8 @@ export function DetectionPreview({
 }: {
 	item?: RecognitionItem;
 	url?: string;
-	onIncorporate?: (frameIndex?: number) => void;
+	/** Attaches the still and its detections to the chat input; images only. */
+	onIncorporate?: () => void;
 	cameraPreview?: ReactNode;
 	cameraActive?: boolean;
 	onShowCamera?: () => void;
@@ -36,6 +37,10 @@ export function DetectionPreview({
 	const objects =
 		result?.kind === "image" ? result.objects : (frame?.objects ?? []);
 	const hasMedia = !!item && !!url;
+	// A still whose detection ended (even unsuccessfully) can be shown to the conversation model.
+	const shareable =
+		!!item?.mime.startsWith("image/") &&
+		["completed", "failed", "cancelled"].includes(item.state);
 	const emptyMessage = item
 		? "保存した画像・動画を読み込んでいます。"
 		: "カメラで撮影するか、画像・短い動画を選んでください。";
@@ -202,14 +207,11 @@ export function DetectionPreview({
 						</ul>
 					)}
 					<Button
-						onClick={() =>
-							onIncorporate?.(result?.kind === "video" ? index : undefined)
-						}
-						disabled={!onIncorporate || !result}
+						onClick={() => onIncorporate?.()}
+						disabled={!onIncorporate || !shareable}
+						title="画像と検出結果をチャット欄に添付します。送信はしません。"
 					>
-						{cameraActive
-							? "直前の解析結果を会話に追加"
-							: "表示中の結果を会話に追加"}
+						{cameraActive ? "直前の画像を会話に追加" : "会話に追加"}
 					</Button>
 				</section>
 			</aside>

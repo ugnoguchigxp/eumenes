@@ -6,6 +6,7 @@ import type { MemoryService, WindowSnapshot } from "../../memory";
 import type { Run } from "../contracts";
 import { recentPriorRuns } from "../repository";
 import type { ChatMessage } from "./context";
+import { withAttachmentNotes } from "./attachment-context";
 import {
 	CONVERSATION_HOST_RULES,
 	type ContextAssembly,
@@ -134,7 +135,10 @@ export function compileAssembly(
 			if (input) {
 				turns.push({
 					role: "user",
-					content: input.message.text,
+					content: withAttachmentNotes(
+						input.message.text,
+						input.message.attachments,
+					),
 					...(input.message.attachments?.length
 						? {
 								attachments: input.message.attachments,
@@ -277,7 +281,10 @@ export function compileAssembly(
 	if (!currentInput) throw new Error("run_input_missing");
 	const input: ChatMessage = {
 		role: "user",
-		content: currentInput.message.text,
+		content: withAttachmentNotes(
+			currentInput.message.text,
+			currentInput.message.attachments,
+		),
 		...(currentInput.message.attachments?.length
 			? {
 					attachments: currentInput.message.attachments,

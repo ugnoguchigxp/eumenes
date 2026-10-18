@@ -1,6 +1,6 @@
 import type { Database } from "bun:sqlite";
 import type { Migration } from "../../../infrastructure/sqlite";
-import type { RecognitionRecord, Connection } from "../contracts";
+import type { RecognitionRecord, Connection, Handoff } from "../contracts";
 export const migrations: readonly Migration[] = [
 	{
 		id: "object-recognition/0001-init",
@@ -8,6 +8,12 @@ export const migrations: readonly Migration[] = [
 		sql: `CREATE TABLE object_recognition_inputs(id TEXT PRIMARY KEY,owner TEXT NOT NULL,conversation_id TEXT NOT NULL,mime TEXT NOT NULL,bytes BLOB NOT NULL,record_json TEXT NOT NULL,connection_json TEXT NOT NULL,upstream_id TEXT,step INTEGER NOT NULL DEFAULT 0,deadline INTEGER NOT NULL);
 CREATE INDEX object_recognition_owner ON object_recognition_inputs(owner,conversation_id);
 CREATE TABLE object_recognition_commands(run_id TEXT PRIMARY KEY,owner TEXT NOT NULL,conversation_id TEXT NOT NULL,result_json TEXT NOT NULL);`,
+	},
+	{
+		id: "object-recognition/0002-handoffs",
+		after: ["object-recognition/0001-init"],
+		sql: `CREATE TABLE object_recognition_handoffs(id TEXT PRIMARY KEY,owner TEXT NOT NULL,conversation_id TEXT NOT NULL,source TEXT NOT NULL,recognition_id TEXT,question TEXT NOT NULL,state TEXT NOT NULL,created INTEGER NOT NULL,deadline INTEGER NOT NULL);
+CREATE INDEX object_recognition_handoff_owner ON object_recognition_handoffs(owner,conversation_id,state);`,
 	},
 ];
 export type Row = {
@@ -73,4 +79,73 @@ export function list(db: Database, owner: string, conversationId: string) {
 			)
 			.all(owner, conversationId) as Pick<Row, "record_json" | "upstream_id">[]
 	).map(record);
+}
+type HandoffRow = {
+	id: string;
+	owner: string;
+	conversation_id: string;
+	source: Handoff["source"];
+	recognition_id: string | null;
+	question: string;
+	state: Handoff["state"];
+	created: number;
+	deadline: number;
+};
+function handoffOf(r: HandoffRow): Handoff {
+	return {
+		id: r.id,
+		conversationId: r.conversation_id,
+		source: r.source,
+		recognitionId: r.recognition_id,
+		question: r.question,
+		state: r.state === "pending" && r.deadline <= Date.now() ? "expired" : r.state,
+		deadline: r.deadline,
+	};
+}
+export function insertHandoff(
+	db: Database,
+	owner: string,
+	h: Omit<Handoff, "state">,
+) {
+	db.query(
+		"INSERT INTO object_recognition_handoffs VALUES(?,?,?,?,?,?,'pending',?,?)",
+	).run(
+		h.id,
+		owner,
+		h.conversationId,
+		h.source,
+		h.recognitionId,
+		h.question,
+		Date.now(),
+		h.deadline,
+	);
+}
+export function ownedHandoff(db: Database, id: string, owner: string) {
+	const r = db
+		.query("SELECT * FROM object_recognition_handoffs WHERE id=? AND owner=?")
+		.get(id, owner) as HandoffRow | null;
+	if (!r) throw new Error("recognition_handoff_not_found");
+	return handoffOf(r);
+}
+export function pendingHandoffs(
+	db: Database,
+	owner: string,
+	conversationId: string,
+) {
+	return (
+		db
+			.query(
+				"SELECT * FROM object_recognition_handoffs WHERE owner=? AND conversation_id=? AND state='pending' AND deadline>? ORDER BY created",
+			)
+			.all(owner, conversationId, Date.now()) as HandoffRow[]
+	).map(handoffOf);
+}
+export function updateHandoff(
+	db: Database,
+	id: string,
+	change: { state: Handoff["state"]; recognitionId?: string },
+) {
+	db.query(
+		"UPDATE object_recognition_handoffs SET state=?,recognition_id=COALESCE(?,recognition_id) WHERE id=?",
+	).run(change.state, change.recognitionId ?? null, id);
 }

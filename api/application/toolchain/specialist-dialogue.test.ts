@@ -12,7 +12,7 @@ import { harness } from "./toolchain.fixture";
  * adapter, the action ledger) with scripted models. Nothing but the models is faked.
  */
 
-const STUDIO = "artifact:ui.studio@2";
+const STUDIO = "artifact:ui.studio@3";
 const id = () => crypto.randomUUID();
 
 /** A valid definition: a heading text, a radio field and a free-text field. */
@@ -576,6 +576,92 @@ test("closing: unsaved work is refused with work_unsaved; clean work ends", asyn
 	const after = await r.source();
 	expect(after.data.work).toBeNull();
 	expect(after.data.history).toHaveLength(1);
+});
+
+test("choosing a saved work in the history makes it the session's work; unsaved work goes only when the user chose to drop it", async () => {
+	const r = await rig();
+	const retarget = async (
+		targetRef: string,
+		discardUnsaved: boolean,
+		requestId = id(),
+	) => {
+		const live = (await r.session())!;
+		const response = await r.h.request(
+			`/api/specialist-sessions/${live.id}/retarget`,
+			{
+				requestId,
+				expectedRevision: live.revision,
+				targetRef,
+				discardUnsaved,
+			},
+		);
+		return {
+			status: response.status,
+			body: (await response.json()) as Record<string, any>,
+		};
+	};
+	await r.start([apply("作品A"), reply("Aです。")]);
+	expect((await r.act("save")).status).toBe("accepted");
+	expect((await r.command("close")).status).toBe(200);
+	await r.start([apply("作品B"), reply("Bです。")], "別のUIを作ってください");
+	expect((await r.act("save")).status).toBe("accepted");
+	const history = (await r.source()).data.history;
+	const a = history.find((item) => item.title === "作品A")!.id;
+	const b = history.find((item) => item.title === "作品B")!.id;
+	const first = (await r.session())!;
+
+	// A clean work gives way at once: a new session edits the chosen work.
+	const requestId = id();
+	const switched = await retarget(a, false, requestId);
+	expect(switched.status).toBe(200);
+	expect(switched.body.session).toMatchObject({ state: "active" });
+	expect(switched.body.session.id).not.toBe(first.id);
+	// The same request replays its result; the same id with another choice is a conflict.
+	const again = (targetRef: string) =>
+		r.h.request(`/api/specialist-sessions/${first.id}/retarget`, {
+			requestId,
+			expectedRevision: first.revision,
+			targetRef,
+			discardUnsaved: false,
+		});
+	const replayed = await again(a);
+	expect(replayed.status).toBe(200);
+	expect(((await replayed.json()) as Record<string, any>).session.id).toBe(
+		switched.body.session.id,
+	);
+	expect((await again(b)).status).toBe(409);
+	expect((await r.source()).data.work).toMatchObject({
+		savedRef: a,
+		title: "作品A",
+		dirty: false,
+	});
+	r.script.specialist.push(apply("作品A改"), reply("直しました。"));
+	expect((await r.sayAndWait("タイトルを直して")).status).toBe("completed");
+	expect((await r.source()).data.work).toMatchObject({
+		savedRef: a,
+		title: "作品A改",
+		dirty: true,
+	});
+
+	// Unsaved work is refused unless dropped on purpose; the same work keeps its session.
+	const refused = await retarget(b, false);
+	expect(refused).toMatchObject({
+		status: 409,
+		body: { error: "work_unsaved" },
+	});
+	expect((await r.source()).data.work).toMatchObject({ title: "作品A改" });
+	const dropped = await retarget(b, true);
+	expect(dropped.status).toBe(200);
+	expect((await r.source()).data.work).toMatchObject({
+		savedRef: b,
+		dirty: false,
+	});
+	const same = await retarget(b, false);
+	expect(same.body.session.id).toBe(dropped.body.session.id);
+	expect(
+		(await r.source()).data.history.find((item) => item.id === a)?.title,
+	).toBe("作品A");
+	expect((await retarget(id(), false)).status).toBe(404);
 });
 
 test("a session idle past its expiry is ended by the sweep and its work is removed", async () => {

@@ -60,6 +60,8 @@ export interface LogFields {
 	freshness?: string;
 	next?: string;
 	durationMs?: number;
+	/** The time limit that applied (ms). */
+	limitMs?: number;
 	bytes?: number;
 	count?: number;
 	attempt?: number;
@@ -181,6 +183,7 @@ const keys = new Set<keyof LogFields>([
 	"freshness",
 	"next",
 	"durationMs",
+	"limitMs",
 	"bytes",
 	"count",
 	"attempt",

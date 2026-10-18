@@ -4,6 +4,7 @@ import {
 	publicSubmitSchema,
 	specialistCommandKinds,
 	specialistCommandSchema,
+	specialistRetargetSchema,
 	type RunProgress,
 } from "../contracts";
 import { parseJsonBody } from "../../../infrastructure/http";
@@ -18,6 +19,9 @@ const specialistErrorStatus = {
 	session_expired: 409,
 	session_closing: 409,
 	session_not_suspended: 409,
+	session_not_active: 409,
+	target_not_found: 404,
+	capability_unavailable: 503,
 	work_unsaved: 409,
 	work_busy: 409,
 	specialist_unavailable: 503,
@@ -77,6 +81,17 @@ export function registerDialogue(app: Hono, service: DialogueService) {
 				return specialistError(c, error);
 			}
 		});
+	app.post("/api/specialist-sessions/:id/retarget", async (c) => {
+		const parsed = await parseJsonBody(c, specialistRetargetSchema);
+		if (!parsed.ok) return parsed.response;
+		try {
+			return c.json(
+				await service.specialistRetarget(c.req.param("id"), parsed.data),
+			);
+		} catch (error) {
+			return specialistError(c, error);
+		}
+	});
 	app.get("/api/runs/:id", (c) => {
 		const run = service.get(c.req.param("id"));
 		return run ? c.json(run) : c.json({ error: "not_found" }, 404);

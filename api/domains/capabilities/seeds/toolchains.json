@@ -26,6 +26,38 @@
 			"kind": "component",
 			"component": "ObjectRecognitionWorkspace"
 		}
+	},	{
+		"revision": 2,
+		"aliases": [],
+		"tags": [],
+		"kind": "toolchain",
+		"id": "object-recognition.manage",
+		"functionName": "object_recognition",
+		"title": "映っている物を調べる",
+		"avoidWhen": [],
+		"summary": "ブラウザのカメラ・選択した画像や短い動画の物体検出画面を開き、保存済みの物体名・座標・時刻を読む、解析を取消する実操作。利用者の承諾後にカメラや画面を撮影し、表示中の画像と検出結果を会話のLLMに見せる。OCRとは別",
+		"useWhen": [
+			"カメラに映っている物を調べたい",
+			"画像や動画の物体と位置を確認したい",
+			"物体認識の進捗確認・取消",
+			"服装や手元の物・画面の内容をカメラや画面の撮影で見てほしい",
+			"表示中の画像について聞きたい"
+		],
+		"examples": [
+			"カメラで映っている物を調べて",
+			"動画の1秒の時点の物体を教えて",
+			"この画像の物体検出を取消して",
+			"今日の服、どう見える？",
+			"いま画面に出ているものを見て",
+			"この写真に写っているものについて教えて"
+		],
+		"redirects": [],
+		"dependencies": ["package:object-recognition.manage@2"],
+		"packageRevisionId": "package:object-recognition.manage@2",
+		"artifact": {
+			"kind": "component",
+			"component": "ObjectRecognitionWorkspace"
+		}
 	},
 	{
 		"revision": 1,

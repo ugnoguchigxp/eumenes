@@ -33,5 +33,10 @@ export const uiWorkSave = z.strictObject({
 	expectedRevision: z.number().int().min(0),
 	expectedSavedRevision: z.number().int().min(0),
 });
+/** Deleting a saved composition; the screen names the saved revision it showed. */
+export const uiCompositionDelete = z.strictObject({
+	projectId: z.string().uuid(),
+	expectedSavedRevision: z.number().int().positive(),
+});
 /** A saved composition the user may start editing from (host-issued ref). */
 export const uiTargetRef = z.strictObject({ target: z.string().uuid() });

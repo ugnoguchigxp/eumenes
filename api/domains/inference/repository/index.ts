@@ -28,6 +28,8 @@ export interface RequestRow {
 	parents: string[];
 	mode: "answer" | "control";
 	outputLimit: number | null;
+	/** One attempt's own time limit (a toolchain's); null: the LARM and cloud defaults. */
+	attemptMs: number | null;
 	contextPolicy: "legacy" | "exact";
 	/** The control output schema is enforced as a strict provider schema. */
 	structuredOutput: boolean;
@@ -40,6 +42,7 @@ export function get(db: Database, id: string): RequestRow | null {
 				snapshot: string;
 				parents: string;
 				output_limit?: number | null;
+				attempt_ms?: number | null;
 				context_policy?: "legacy" | "exact";
 				control_engine?: "larm" | "codex";
 				control_policy_request_id?: string | null;
@@ -53,6 +56,7 @@ export function get(db: Database, id: string): RequestRow | null {
 				parents: JSON.parse(row.parents) as string[],
 				mode: row.mode ?? "answer",
 				outputLimit: row.output_limit ?? null,
+				attemptMs: row.attempt_ms ?? null,
 				contextPolicy: row.context_policy ?? "legacy",
 				controlEngine: row.control_engine ?? "larm",
 				controlPolicyRequestId: row.control_policy_request_id ?? null,
@@ -152,5 +156,10 @@ AND connection_id IN (
 	SELECT json_extract(c.value,'$.id') FROM settings_document d, json_each(d.document,'$.connections') c
 	WHERE json_extract(c.value,'$.kind')='claude-agent-sdk'
 );`,
+	},
+	{
+		id: "inference/0013-attempt-limit",
+		after: ["inference/0011-control-engine-codex"],
+		sql: "ALTER TABLE inference_requests ADD COLUMN attempt_ms INTEGER;",
 	},
 ];

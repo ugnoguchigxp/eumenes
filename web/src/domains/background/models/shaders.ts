@@ -121,8 +121,10 @@ void main() {
   if (r2>1.0) discard;
   float core = exp(-r2*7.0);
   float halo = exp(-r2*1.7)*mix(0.14,0.24,vDust);
-  float alpha = (core*0.72+halo)*vBrightness*vWeight*uHealthIntensity*uVisibility;
-  vec3 color = uHealthColor*(0.85+0.18*core);
+  float alpha = 2.5*(core*0.72+halo)*vBrightness*vWeight*uHealthIntensity*uVisibility;
+  vec3 color = uHealthColor*(1.05+0.25*core);
   gl_FragColor = vec4(color, alpha);
+  // Colors are linear in the shader; convert like built-in materials do.
+  #include <colorspace_fragment>
 }
 `;

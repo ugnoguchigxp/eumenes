@@ -1,10 +1,12 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Menu } from "lucide-react";
 import { Button } from "../Button";
 import { RecognitionHistory, stateLabel } from "./RecognitionHistory";
 import { DetectionPreview } from "./DetectionPreview";
 import type { ObjectRecognitionWorkspaceProps } from "./types";
-import { useCameraCapture } from "./useCameraCapture";
+import { useCameraCapture, type CaptureOrigin } from "./useCameraCapture";
+/** Seconds between opening the camera for a capture request and taking the still. */
+const handoffCountdown = 2;
 import "./ObjectRecognitionWorkspace.css";
 
 const errors: Record<string, string> = {
@@ -45,11 +47,20 @@ export function ObjectRecognitionWorkspace(
 		historyTrigger.current?.focus();
 	}
 	const disabled = props.busy || !props.configured;
-	const uploading = async (file: File) => {
+	/** The capture request the next still answers; cleared once it is taken or dropped. */
+	const taking = useRef<string | null>(null);
+	const handled = useRef(new Set<string>());
+	const [countdown, setCountdown] = useState<number | null>(null);
+	const uploading = async (
+		file: File,
+		origin: CaptureOrigin | "file",
+	) => {
+		const handoffId = taking.current ?? undefined;
+		taking.current = null;
 		setLocalError("");
 		setSubmitting(true);
 		try {
-			await props.onFile?.(file);
+			await props.onFile?.(file, { origin, ...(handoffId ? { handoffId } : {}) });
 		} catch {
 			setLocalError(
 				"入力を送信できませんでした。接続状態・形式・容量を確認してください。",
@@ -59,6 +70,55 @@ export function ObjectRecognitionWorkspace(
 		}
 	};
 	const { preview, ...camera } = useCameraCapture(uploading);
+	const handoff = props.handoff;
+	const cameraRef = useRef(camera);
+	cameraRef.current = camera;
+	// A camera request opens the camera and takes one still after a short countdown; a screen
+	// request waits for the user's click because browsers allow screen sharing only on a gesture.
+	const cameraHandoff = handoff?.source === "camera" ? handoff.id : undefined;
+	useEffect(() => {
+		if (!cameraHandoff || handled.current.has(cameraHandoff)) return;
+		const id = cameraHandoff;
+		handled.current.add(id);
+		let live = true;
+		let done = false;
+		const timers: ReturnType<typeof setTimeout>[] = [];
+		void cameraRef.current.open("camera").then((opened) => {
+			if (!live || !opened) return;
+			for (let left = handoffCountdown; left > 0; left--)
+				timers.push(
+					setTimeout(
+						() => setCountdown(left),
+						(handoffCountdown - left) * 1000,
+					),
+				);
+			timers.push(
+				setTimeout(() => {
+					done = true;
+					setCountdown(null);
+					taking.current = id;
+					void cameraRef.current.photo().then((taken) => {
+						if (!taken) taking.current = null;
+					});
+				}, handoffCountdown * 1000),
+			);
+		});
+		return () => {
+			live = false;
+			timers.forEach(clearTimeout);
+			setCountdown(null);
+			// An interrupted request (e.g. a remount) is taken again by the next mount.
+			if (!done) handled.current.delete(id);
+		};
+	}, [cameraHandoff]);
+	async function shareScreenForHandoff(id: string) {
+		handled.current.add(id);
+		if (!(await camera.open("screen"))) return;
+		// Let the shared surface paint one frame before it is taken.
+		await new Promise((resolve) => setTimeout(resolve, 600));
+		taking.current = id;
+		if (!(await cameraRef.current.photo())) taking.current = null;
+	}
 	const selectedProgress = item ? progressText(item.progress) : "";
 	const analyzing =
 		item?.state === "queued" ||
@@ -162,6 +222,43 @@ export function ObjectRecognitionWorkspace(
 					{props.message}
 				</p>
 			)}
+			{handoff && (
+				<section
+					className="recognition-handoff"
+					role="status"
+					aria-label="会話からの撮影依頼"
+				>
+					<strong>
+						{handoff.source === "camera"
+							? countdown
+								? `${countdown}秒後に撮影します`
+								: "カメラで撮影して会話に見せます"
+							: "画面を撮影して会話に見せます"}
+					</strong>
+					{handoff.question && <span>{handoff.question}</span>}
+					<div className="recognition-handoff-actions">
+						{handoff.source === "screen" && (
+							<Button
+								disabled={disabled || camera.opened}
+								onClick={() => void shareScreenForHandoff(handoff.id)}
+							>
+								画面を共有して撮影
+							</Button>
+						)}
+						<Button
+							variant="secondary"
+							onClick={() => {
+								handled.current.add(handoff.id);
+								taking.current = null;
+								camera.close();
+								props.onHandoffCancel?.(handoff.id);
+							}}
+						>
+							撮影しない
+						</Button>
+					</div>
+				</section>
+			)}
 			<DetectionPreview
 				key={item?.id ?? "empty"}
 				item={item}
@@ -178,23 +275,30 @@ export function ObjectRecognitionWorkspace(
 					/>
 				}
 				onShowCamera={() => {
-					if (!disabled && !camera.opened) void camera.open();
+					if (!disabled && !camera.opened) void camera.open("camera");
 				}}
 				onShowResults={camera.close}
-				onIncorporate={(frameIndex) =>
-					item && props.onIncorporate?.(item.id, frameIndex)
-				}
+				onIncorporate={() => item && props.onIncorporate?.(item.id)}
 				controls={
 					<section className="recognition-capture-card" aria-label="撮影・録画">
 						<h3>撮影・録画</h3>
 						{!camera.opened && (
-							<Button
-								variant="secondary"
-								disabled={disabled}
-								onClick={() => void camera.open()}
-							>
-								カメラを開く
-							</Button>
+							<div className="recognition-open-buttons">
+								<Button
+									variant="secondary"
+									disabled={disabled}
+									onClick={() => void camera.open("camera")}
+								>
+									カメラを開く
+								</Button>
+								<Button
+									variant="secondary"
+									disabled={disabled}
+									onClick={() => void camera.open("screen")}
+								>
+									画面を共有
+								</Button>
+							</div>
 						)}
 						<Button
 							className={processing ? "recognition-submit-loading" : undefined}
@@ -230,7 +334,7 @@ export function ObjectRecognitionWorkspace(
 						</Button>
 						{camera.opened && (
 							<Button variant="ghost" onClick={camera.close}>
-								カメラを閉じる
+								{camera.origin === "screen" ? "画面共有を終了" : "カメラを閉じる"}
 							</Button>
 						)}
 						<label className="recognition-file">
@@ -243,7 +347,7 @@ export function ObjectRecognitionWorkspace(
 								onChange={(event) => {
 									const file = event.currentTarget.files?.[0];
 									event.currentTarget.value = "";
-									if (file) void uploading(file);
+									if (file) void uploading(file, "file");
 								}}
 							/>
 						</label>

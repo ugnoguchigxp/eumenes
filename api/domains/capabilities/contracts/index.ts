@@ -1,10 +1,15 @@
-import { recognitionManage, recognitionCommand } from "./object-recognition";
+import {
+	recognitionManage,
+	recognitionManageV2,
+	recognitionCommand,
+} from "./object-recognition";
 export { recognitionCommand };
 import { drawingRequest, drawingPlan } from "./excalidraw";
 export { drawingRequest, drawingPlan };
 import { z } from "zod";
 import { guidedResearchInput } from "./guided-research";
 import {
+	uiCompositionDelete,
 	uiDraftApply,
 	uiResponseFields,
 	uiSubmitRequest,
@@ -58,6 +63,7 @@ export {
 	kanbanMove,
 };
 export {
+	uiCompositionDelete,
 	uiDraftApply,
 	uiResponseFields,
 	uiSubmitRequest,
@@ -199,10 +205,12 @@ export const validators = {
 	uiDraftApply,
 	uiWorkStep,
 	uiWorkSave,
+	uiCompositionDelete,
 	uiTargetRef,
 	uiResponseFields,
 	uiSubmitRequest,
 	recognitionManage,
+	recognitionManageV2,
 	drawingRequest,
 	drawingPlan,
 	imageRequest,

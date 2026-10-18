@@ -5,4 +5,8 @@ export {
 	useSubmit,
 } from "./hooks";
 export { useRunProgress } from "./hooks/progress";
-export { useSpecialistCommand, useSpecialistSession } from "./hooks/specialist";
+export {
+	useSpecialistCommand,
+	useSpecialistRetarget,
+	useSpecialistSession,
+} from "./hooks/specialist";

@@ -162,6 +162,7 @@ export function createDialogueService({
 		specialistSessionLiveInTransaction: specialistOps.liveInTransaction,
 		/** return / resume / discard / close from the screen: idempotent by requestId, guarded by the revision. */
 		specialistCommand: specialistOps.command,
+		specialistRetarget: specialistOps.retarget,
 		/**
 		 * The application's periodic sweep: ends sessions past their expiry, retries closing ones and ends
 		 * suspended work that was saved meanwhile. The InTransaction form returns what to flush after commit.

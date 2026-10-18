@@ -10,6 +10,7 @@ const safeEqual = (a: string, b: string) =>
 const maxJsonBytes = 1024 * 1024;
 /** Writes sent per keystroke or pane resize; logged like reads so they do not flood the log. */
 const quietWriteRoutes = new Set([
+	"/api/inference/screen/:id",
 	"/api/terminals/:id/input",
 	"/api/terminals/:id/resize",
 ]);

@@ -163,6 +163,7 @@ const asrLanguageCodes = asrLanguages.map(([code]) => code) as [
 const personas = ["butler", "maid", "strategist", "sage"] as const;
 const backgroundSchema = z.enum(["light-fairy", "spatial"]);
 export type BackgroundKind = z.infer<typeof backgroundSchema>;
+export const backgroundKinds = backgroundSchema.options;
 export const settingsSchema = z
 	.object({
 		revision: z.number().int().nonnegative(),

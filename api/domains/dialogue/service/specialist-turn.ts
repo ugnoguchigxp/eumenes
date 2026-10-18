@@ -66,6 +66,8 @@ export type TurnInput = {
 	messages: ChatMessage[];
 	/** Epoch ms the model calls and operations of this turn must finish by. */
 	deadline: number;
+	/** The turn's time from its start: the shortest of its turn time, the run's and the session's remaining time. */
+	limitMs: number;
 };
 
 /** The session changed under the turn (cancelled, returned, re-addressed, expired): nothing more is done. */
@@ -175,12 +177,20 @@ export function createSpecialistTurnHandler(
 			);
 			if (!input) return failRun(deps, tx, run, "run_input_missing");
 			const remaining = Math.min(
-				TURN_BUDGET_MS,
+				set.timeLimits?.turnMs ?? TURN_BUDGET_MS,
 				Date.parse(run.deadlineAt!) - Date.parse(clock()),
 				Date.parse(session.expiresAt) - Date.parse(clock()),
 			);
 			// Too little time left for one model call and the answer: end with a clear code.
-			if (remaining <= 5000) return failRun(deps, tx, run, "deadline_exceeded");
+			if (remaining <= 5000) {
+				log.warn("dialogue.specialist_turn_timeout", {
+					runId: run.id,
+					toolchainId: set.toolchainId,
+					reason: "deadline_exceeded",
+					limitMs: Math.max(0, remaining),
+				});
+				return failRun(deps, tx, run, "deadline_exceeded");
+			}
 			if (!transition(tx, run.id, run.revision, "running", clock()))
 				return { status: "stale", reason: "run_changed" };
 			const control = specialistControl(set);
@@ -217,6 +227,7 @@ export function createSpecialistTurnHandler(
 						},
 					],
 					deadline: Date.now() + remaining,
+					limitMs: remaining,
 				},
 			};
 		},
@@ -229,8 +240,14 @@ export function createSpecialistTurnHandler(
 				try {
 					return await runTurn(deps, input, signal);
 				} catch (error) {
-					if (timeout.aborted && !caller.aborted)
+					if (timeout.aborted && !caller.aborted) {
+						log.warn("dialogue.specialist_turn_timeout", {
+							runId: input.runId,
+							toolchainId: input.set.toolchainId,
+							limitMs: input.limitMs,
+						});
 						throw new Error("specialist_turn_timeout");
+					}
 					throw error;
 				}
 			});
@@ -280,6 +297,9 @@ export function createSpecialistTurnHandler(
 					policySubject: input.runId,
 					deadline: input.deadline,
 					maxOutputTokens: MAX_OUTPUT_TOKENS,
+					...(input.set.timeLimits
+						? { attemptMs: input.set.timeLimits.inferenceMs }
+						: {}),
 					// The saved sub-agent resource (read in this transaction); none keeps the call on LARM.
 					route: subagentRoute(larm.snapshotInTransaction?.(tx)),
 				});

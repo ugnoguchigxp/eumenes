@@ -338,9 +338,11 @@ export async function executeRequest(
 		throw new Error("invalid_audio");
 	const selected = env.resolve(row);
 	const controller = new AbortController();
+	// A request with its own attempt time (a toolchain's) may run that long; others keep the usual bound.
 	const deadline = Math.min(
 		row.deadline,
-		Date.now() + (row.purpose === "llm" ? 180_000 : 45_000),
+		Date.now() +
+			Math.max(row.purpose === "llm" ? 180_000 : 45_000, row.attemptMs ?? 0),
 	);
 	row.deadline = deadline;
 	await env.store.write((db) =>

@@ -191,14 +191,15 @@ describe("ui.studio revisions", () => {
 	const skill = find("skill", "ui.studio");
 	const body = String(skill.body);
 
-	test("skill@6, package@6 and toolchain@8 refer to each other", () => {
+	test("skill@6, package@6, binding@3 and toolchain@9 refer to each other", () => {
 		expect(skill.revision).toBe(6);
 		const pkg = find("package", "ui.studio");
 		expect(pkg.revision).toBe(6);
 		expect(pkg.dependencies).toContain("skill:ui.studio@6");
 		expect(pkg.requiredSkillRevisionIds).toEqual(["skill:ui.studio@6"]);
 		const toolchain = find("toolchain", "ui.compose");
-		expect(toolchain.revision).toBe(8);
+		expect(toolchain.revision).toBe(9);
+		expect(toolchain.bindingRevisionId).toBe("binding:ui.studio@3");
 		expect(toolchain.packageRevisionId).toBe("package:ui.studio@6");
 		expect(toolchain.dependencies).toEqual(["package:ui.studio@6"]);
 		expect(find("profile", "ui.studio").revision).toBe(1);

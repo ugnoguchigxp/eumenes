@@ -155,14 +155,27 @@ function partIssue(issue: Issue): Issue {
 	return { ...inner, path: [...issue.path, ...inner.path] };
 }
 
+/** An HTML line break the model wrote in a text, which is never HTML: the "\n" it meant. */
+const htmlBreak = /<br\s*\/?>/gi;
+function withLineBreaks(node: unknown): unknown {
+	if (typeof node === "string") return node.replace(htmlBreak, "\n");
+	if (Array.isArray(node)) return node.map(withLineBreaks);
+	if (!isRecord(node)) return node;
+	return Object.fromEntries(
+		Object.entries(node).map(([key, value]) => [key, withLineBreaks(value)]),
+	);
+}
+
 /**
  * A definition the specialist may propose: allowed views only, no `source`, within the size,
- * depth and view-count limits, and valid for the artifact parser. Returns the form's fields.
+ * depth and view-count limits, and valid for the artifact parser. Returns the definition, with
+ * any `<br>` in its texts made the line break it meant, and the form's fields.
  */
-export function validatedDefinition(raw: unknown): {
+export function validatedDefinition(input: unknown): {
 	definition: Definition;
 	fields: FormFields | null;
 } {
+	const raw = withLineBreaks(input);
 	if (!isRecord(raw))
 		return fail(
 			"ui_definition_invalid",

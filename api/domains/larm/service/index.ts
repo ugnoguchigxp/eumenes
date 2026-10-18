@@ -3,6 +3,9 @@ import { gzipFetch, plainFetch } from "./gzip-fetch";
 import type { Capability, LarmPort, LarmCallOptions } from "../contracts";
 import { ttsVoicesSchema } from "../contracts";
 import type { TtsVoices } from "../contracts";
+import type { ActivityRecorder } from "../contracts/activity";
+
+type Judge = Parameters<NonNullable<LarmPort["judge"]>>;
 import { createSpeechSynthesizer } from "./speech";
 import { answerRequest } from "./answer-request";
 import { assertAttitudeQuestions } from "./context";
@@ -48,6 +51,8 @@ export function createLarm(config: {
 	intonationScale?: number;
 	/** Internal timing seam; production follows LARM's 300-second foreground idle policy. */
 	idleTimeoutMs?: number;
+	/** Records attitude judge outcomes for monitoring; the judge has no attempt record of its own. */
+	judgeActivity?: ActivityRecorder;
 }): LarmPort {
 	const baseText = config.baseUrl?.trim();
 	const base = baseText
@@ -212,52 +217,58 @@ export function createLarm(config: {
 		return parsed.data;
 	}
 
+	async function judgeOnce(...[state, questions, signal]: Judge) {
+		judging = true;
+		try {
+			const scoped = AbortSignal.any([signal, lifetime.signal]);
+			return await withProvider(
+				"system-one",
+				scoped,
+				async (p, connectionId) => {
+					assertAttitudeQuestions(questions);
+					const sentState = {
+						current_chunk: state.current_chunk ?? state.response ?? "",
+					};
+					const response = await judgeInfer(
+						p,
+						"systemone",
+						{
+							method: "POST",
+							headers: {
+								"content-type": "application/json",
+								accept: "application/json",
+							},
+							body: JSON.stringify({
+								model: p.model,
+								state: sentState,
+								questions,
+							}),
+						},
+						scoped,
+						connectionId,
+					);
+					const result = await readJson(response);
+					scoped.throwIfAborted();
+					if (!result || typeof result !== "object" || Array.isArray(result))
+						throw new Error("larm_invalid_decision_response");
+					const body = result as Record<string, unknown>;
+					if (body.model !== undefined && body.model !== p.model)
+						throw new Error("larm_decision_model_mismatch");
+					return { ...body, claimed_model: p.model };
+				},
+			);
+		} finally {
+			judging = false;
+		}
+	}
+
 	return {
 		...leasePort(leases),
+		retain: leases.retain,
 		async judge(state, questions, signal) {
 			if (judging) throw new Error("larm_decision_busy");
-			judging = true;
-			try {
-				const scoped = AbortSignal.any([signal, lifetime.signal]);
-				return await withProvider(
-					"system-one",
-					scoped,
-					async (p, connectionId) => {
-						assertAttitudeQuestions(questions);
-						const sentState = {
-							current_chunk: state.current_chunk ?? state.response ?? "",
-						};
-						const response = await judgeInfer(
-							p,
-							"systemone",
-							{
-								method: "POST",
-								headers: {
-									"content-type": "application/json",
-									accept: "application/json",
-								},
-								body: JSON.stringify({
-									model: p.model,
-									state: sentState,
-									questions,
-								}),
-							},
-							scoped,
-							connectionId,
-						);
-						const result = await readJson(response);
-						scoped.throwIfAborted();
-						if (!result || typeof result !== "object" || Array.isArray(result))
-							throw new Error("larm_invalid_decision_response");
-						const body = result as Record<string, unknown>;
-						if (body.model !== undefined && body.model !== p.model)
-							throw new Error("larm_decision_model_mismatch");
-						return { ...body, claimed_model: p.model };
-					},
-				);
-			} finally {
-				judging = false;
-			}
+			const call = () => judgeOnce(state, questions, signal);
+			return config.judgeActivity?.track(call, signal) ?? call();
 		},
 		async voices(signal, language) {
 			return withProvider(

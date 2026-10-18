@@ -1,7 +1,17 @@
 export type { ChatMessage, ChatImage, ChatInput } from "./contracts/chat-input";
-export type { LarmPort, LarmExchange, LarmCallOptions } from "./contracts";
+export type {
+	LarmPort,
+	LarmExchange,
+	LarmCallOptions,
+	LarmStatus,
+} from "./contracts";
 export { registerLarmStatus } from "./controller";
 export { createLarm } from "./service";
+export { createActivityRecorder } from "./service/activity";
+export type {
+	ActivityObservation,
+	ActivityRecorder,
+} from "./contracts/activity";
 export {
 	createLarmPlayground,
 	type LarmPlayground,

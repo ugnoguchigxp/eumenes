@@ -131,6 +131,15 @@ test("a session starting after the first read opens the studio, shows the draft 
 	h.cache.clear();
 });
 
+test("the same specialist taking another saved work says the work changed, not the addressee", async () => {
+	const h = setup(null);
+	await waitFor(() => expect(h.client.specialistSession).toHaveBeenCalled());
+	await h.set(session(), "run-1:running");
+	await h.set(session({ id: "sess-2" }), "run-1:done");
+	expect(h.hook.result.current.ws.notice).toBe("編集する作品を切り替えました");
+	h.cache.clear();
+});
+
 test("an open studio is not duplicated and returns to the draft when a session starts", async () => {
 	const h = setup(null);
 	await waitFor(() => expect(h.client.specialistSession).toHaveBeenCalled());

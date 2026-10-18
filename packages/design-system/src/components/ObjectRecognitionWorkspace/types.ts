@@ -45,11 +45,19 @@ export type ObjectRecognitionWorkspaceProps = {
 	sharedCredentialAvailable?: boolean;
 	hasEndpoint?: boolean;
 	onCredentialSourceChange?: (source: "dedicated" | "larm") => void;
-	onFile?: (file: File) => Promise<void>;
+	/** `origin` is how the file was taken; `handoffId` when it answers the conversation's capture request. */
+	onFile?: (
+		file: File,
+		context: { origin: "camera" | "screen" | "file"; handoffId?: string },
+	) => Promise<void>;
+	/** The conversation's request to take a still now (the user agreed by voice). */
+	handoff?: { id: string; source: "camera" | "screen"; question: string };
+	onHandoffCancel?: (id: string) => void;
 	onSelect?: (id: string) => void;
 	onCancel?: (id: string) => void;
 	onRefresh?: () => void;
 	onRecheck?: (id: string) => void;
 	onRemove?: (id: string) => void;
-	onIncorporate?: (id: string, frameIndex?: number) => void;
+	/** Attaches the still and its detections to the chat input (not sent). */
+	onIncorporate?: (id: string) => void;
 };

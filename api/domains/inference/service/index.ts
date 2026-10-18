@@ -11,7 +11,9 @@ import {
 } from "./background-control";
 import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
-import { createLarm, type LarmPort } from "../../larm";
+import type { LarmPort } from "../../larm";
+import { createConfiguredLarm } from "./configured-larm";
+import { createScreenPresence } from "./screen-presence";
 import type { SpeechPreparation } from "../../delivery/contracts";
 import type { SettingsService, Settings, Purpose } from "../../settings";
 import type {
@@ -39,6 +41,10 @@ import { releaseTaskSessions } from "./agent-session";
 import { revokeAgentAttempts } from "./agent-revoke";
 /** Each clause gets its own short deadline; the turn's authority is still enforced through `parents`. */
 const SPEECH_CHUNK_DEADLINE_MS = 60_000;
+/** The most output a control request may ask for (a long draft); the provider's own limit still applies. */
+const MAX_CONTROL_OUTPUT_TOKENS = 32_768;
+/** The longest one attempt may be given (a toolchain's own limit; its contract allows no more). */
+const MAX_ATTEMPT_MS = 3_600_000;
 type RequestArgs =
 	Parameters<typeof runRequest> extends [unknown, ...infer R] ? R : never;
 type ControlArgs = [
@@ -92,6 +98,10 @@ export function createInference(
 	const active = new Map<string, Running>();
 	const cooldown = new Map<string, number>();
 	const closingPorts = new Set<Promise<void>>();
+	const screen = createScreenPresence(
+		() => port(settings.get()),
+		(changed) => settings.onChange(changed),
+	);
 	function prune() {
 		const keep = new Set([
 			JSON.stringify(settings.get().larm),
@@ -112,20 +122,7 @@ export function createInference(
 		const key = JSON.stringify(s.larm);
 		let p = ports.get(key);
 		if (!p) {
-			p =
-				options.larmFactory?.(s) ??
-				createLarm({
-					baseUrl: s.larm.baseUrl ?? undefined,
-					token: options.token,
-					providerHosts: options.providerHosts,
-					profile: s.larm.profile,
-					audience: s.larm.audience,
-					voice: s.larm.voice || undefined,
-					speed: s.larm.speed,
-					style: s.larm.style,
-					pitchScale: s.larm.pitchScale,
-					intonationScale: s.larm.intonationScale,
-				});
+			p = options.larmFactory?.(s) ?? createConfiguredLarm(s, options);
 			ports.set(key, p);
 			const unsubscribeStatus = p.onChange?.(() => {
 				if (key !== JSON.stringify(settings.get().larm)) return;
@@ -297,6 +294,7 @@ export function createInference(
 				maxOutputTokens: number;
 				engine?: "codex";
 				route?: "larm-only" | { resourceId: string };
+				attemptMs?: number;
 			},
 		) {
 			if (input.engine && (input.engine !== "codex" || !options.codexResearch))
@@ -325,13 +323,26 @@ export function createInference(
 			bindControlEngine(db, requestId, input.engine);
 			bindControlPolicy(db, requestId, root.id);
 			db.query(
-				"UPDATE inference_requests SET mode='control',output_limit=?,context_policy='exact',parents=? WHERE id=? AND status='pending'",
+				"UPDATE inference_requests SET mode='control',output_limit=?,attempt_ms=?,context_policy='exact',parents=? WHERE id=? AND status='pending'",
 			).run(
-				Math.min(4096, Math.max(1, input.maxOutputTokens)),
+				Math.min(MAX_CONTROL_OUTPUT_TOKENS, Math.max(1, input.maxOutputTokens)),
+				input.attemptMs === undefined
+					? null
+					: Math.min(MAX_ATTEMPT_MS, Math.max(1000, input.attemptMs)),
 				JSON.stringify(root.parents),
 				requestId,
 			);
 			return requestId;
+		},
+		extendDeadlineInTransaction(
+			db: Database,
+			subject: string,
+			deadline: number,
+		) {
+			// Every row of the subject: a control request is bounded by its root's deadline even after the root's answer.
+			db.query(
+				"UPDATE inference_requests SET deadline=? WHERE subject=? AND deadline<?",
+			).run(deadline, subject, deadline);
 		},
 		...createIndependentControls(settings.inTransaction, capture),
 		executeControl(...[id, messages, signal, control, session]: ControlArgs) {
@@ -479,6 +490,7 @@ export function createInference(
 			return store.read((db) => valid(db, id));
 		},
 		connect: () => port(settings.get()).connect(),
+		screenPresence: screen.update,
 		prepareVoice: (signal: AbortSignal) =>
 			port(settings.get()).prepareVoice?.(signal) ?? Promise.resolve(),
 		status: () => port(settings.get()).status(),
@@ -548,6 +560,7 @@ export function createInference(
 			await sweeper.start();
 		},
 		async close() {
+			screen.close();
 			unsubscribeCollection();
 			collectionAdoptions.clear();
 			closed = true;

@@ -42,6 +42,7 @@ export function createRefresh({
 				),
 			),
 		);
+		signal?.throwIfAborted();
 		if (state.id !== current.id) throw new Error("larm_invalid_connection");
 		if (["failed", "expired", "released"].includes(String(state.status)))
 			throw new Error(`larm_connection_${state.status}`);

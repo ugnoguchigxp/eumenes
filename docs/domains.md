@@ -30,6 +30,7 @@
 | `toolchain-history` | 1 | `api/domains/toolchain-history/index.ts` | なし | なし | `capabilities` | なし | なし |
 | `web-research` | 1 | `api/domains/web-research/index.ts` | なし | なし | `queue` | なし | なし |
 | `attitude-dataset` | 1 | `api/domains/attitude-dataset/index.ts` | なし | なし | `delivery` | なし | なし |
+| `monitoring` | 3 | `api/domains/monitoring/index.ts` | `web/src/domains/monitoring/index.ts` | なし | `inference`、`larm`、`queue`、`settings` | `background` | なし |
 | `service-tests` | 3 | `api/domains/service-tests/index.ts` | `web/src/domains/service-tests/` | なし | `inference`、`larm`、`settings` | なし | なし |
 | `delivery` | 0 | `api/domains/delivery/index.ts` | なし | なし | なし | なし | なし |
 | `avatar` | 1 | なし | `web/src/domains/avatar/index.ts` | なし | なし | `delivery` | なし |

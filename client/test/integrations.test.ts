@@ -169,6 +169,28 @@ const ocrConnection = {
 	baseUrl: null,
 	credentialConfigured: false,
 };
+const recognitionAttachment = {
+	id: uuid,
+	conversationId: "main",
+	name: "camera.jpg",
+	mime: "image/jpeg",
+	originalMime: "image/jpeg",
+	width: 640,
+	height: 480,
+	size: 1000,
+	digest: "d",
+	createdAt: "2026-10-18T00:00:00.000Z",
+	annotation: { source: "object-recognition", data: {} },
+};
+const recognitionHandoff = {
+	id: "h1",
+	conversationId: "main",
+	source: "camera",
+	recognitionId: null,
+	question: "",
+	state: "cancelled",
+	deadline: 1,
+};
 const recognitionConnection = {
 	revision: 1,
 	serviceId: "object-recognition-host",
@@ -219,12 +241,28 @@ contracts("ocr and object-recognition client answers", [
 		response: recognitionConnection,
 	},
 	{
-		name: "recognitionIncorporate",
-		call: (c) => c.recognitionIncorporate("o1", uuid, 0),
+		name: "recognitionAttach",
+		call: (c) => c.recognitionAttach("o1", uuid),
 		method: "POST",
-		path: "/api/object-recognition/o1/conversation",
-		body: { requestId: uuid, frameIndex: 0 },
+		path: "/api/object-recognition/o1/attachment",
+		body: { requestId: uuid },
+		response: recognitionAttachment,
+	},
+	{
+		name: "recognitionHandoffSend",
+		call: (c) => c.recognitionHandoffSend("h1", uuid),
+		method: "POST",
+		path: "/api/object-recognition/handoffs/h1/send",
+		body: { recognitionId: uuid },
 		response: run,
+	},
+	{
+		name: "recognitionHandoffCancel",
+		call: (c) => c.recognitionHandoffCancel("h1"),
+		method: "POST",
+		path: "/api/object-recognition/handoffs/h1/cancel",
+		body: {},
+		response: recognitionHandoff,
 	},
 ]);
 

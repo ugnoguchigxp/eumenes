@@ -98,3 +98,28 @@ export function list(db: Database, conversationId: string) {
 			.all(conversationId) as { record_json: string }[]
 	).map((r) => JSON.parse(r.record_json) as MusicRecord);
 }
+
+/** Generations running now, and the newest completion and failure since `since` (monitoring). */
+export function activity(db: Database, since: number) {
+	const records = (
+		db
+			.query(
+				"SELECT record_json FROM music_generations ORDER BY rowid DESC LIMIT 50",
+			)
+			.all() as { record_json: string }[]
+	).map((r) => JSON.parse(r.record_json) as MusicRecord);
+	const recent = records
+		.filter((r) => r.updatedAt >= since)
+		.sort((a, b) => b.updatedAt - a.updatedAt);
+	const success = recent.find((r) => r.state === "completed");
+	const failure = recent.find((r) => r.state === "failed");
+	return {
+		running: records.filter(
+			(r) => r.state === "planning" || r.state === "generating",
+		).length,
+		lastSuccessAt: success?.updatedAt ?? null,
+		lastFailure: failure
+			? { at: failure.updatedAt, reason: failure.errorCode ?? "failed" }
+			: null,
+	};
+}

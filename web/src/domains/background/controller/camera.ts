@@ -9,6 +9,8 @@ export type SceneEnvelope = {
 };
 const origin = new Vector3();
 const padding = 1.045;
+// The overview frames the core shapes; the outermost scattered dust may leave the frame.
+const overviewZoom = 1.7;
 export function createCameraController(camera: OrthographicCamera) {
 	const center = new Vector3(),
 		direction = new Vector3(0, -1.5, 1).normalize();
@@ -66,15 +68,15 @@ export function createCameraController(camera: OrthographicCamera) {
 			focusAmount =
 				fromFocusAmount + ((focus ? 1 : 0) - fromFocusAmount) * blend;
 			const laneAspect = Math.max(0.1, (width - reserve) / Math.max(1, height));
-			const halfX =
-				Math.max(1, focus ? bounds.focusRadius : bounds.x) * padding;
+			const fit = focus ? padding : padding / overviewZoom;
+			const halfX = Math.max(1, focus ? bounds.focusRadius : bounds.x) * fit;
 			const halfY =
 				Math.max(
 					1,
 					focus
 						? bounds.focusRadius
 						: bounds.y * direction.z + bounds.z * Math.abs(direction.y),
-				) * padding;
+				) * fit;
 			const targetSize = Math.max(halfY, halfX / laneAspect);
 			size = fromSize + (targetSize - fromSize) * blend;
 			const shift = (size * aspect * reserve) / width;

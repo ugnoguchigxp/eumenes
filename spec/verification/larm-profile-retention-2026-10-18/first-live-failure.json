@@ -1,0 +1,89 @@
+{
+  "success": false,
+  "events": [
+    {
+      "at": "2026-10-18T05:20:14.907Z",
+      "event": "health",
+      "status": "ok",
+      "releaseCommit": "0baea1ede627b6b078f59db4d8cf3215709fe690",
+      "fixedApiToken": true
+    },
+    {
+      "at": "2026-10-18T05:20:15.140Z",
+      "event": "profile_request",
+      "request": 1,
+      "httpStatus": 201,
+      "id": "aconn_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_f803e9d3-716c-407b-b015-fe94f5c60ab2",
+      "allocationId": "alloc_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_fd3647b4-e28e-4d55-bc07-619871a997c5",
+      "status": "ready",
+      "idleReleaseAt": "2026-10-18T05:25:15.179Z",
+      "expiresAt": "2026-10-18T05:35:14.975Z",
+      "phase": "setup"
+    },
+    {
+      "at": "2026-10-18T05:20:15.154Z",
+      "event": "initial_ready",
+      "id": "aconn_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_f803e9d3-716c-407b-b015-fe94f5c60ab2",
+      "allocationId": "alloc_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_fd3647b4-e28e-4d55-bc07-619871a997c5",
+      "status": "ready",
+      "idleReleaseAt": "2026-10-18T05:25:15.179Z",
+      "expiresAt": "2026-10-18T05:35:14.975Z"
+    },
+    {
+      "at": "2026-10-18T05:20:15.171Z",
+      "event": "profile_request",
+      "request": 2,
+      "httpStatus": 201,
+      "id": "aconn_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_f803e9d3-716c-407b-b015-fe94f5c60ab2",
+      "allocationId": "alloc_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_fd3647b4-e28e-4d55-bc07-619871a997c5",
+      "status": "ready",
+      "idleReleaseAt": "2026-10-18T05:25:15.213Z",
+      "expiresAt": "2026-10-18T05:35:15.213Z",
+      "phase": "retaining"
+    },
+    {
+      "at": "2026-10-18T05:20:45.214Z",
+      "event": "retention_observation",
+      "elapsedMs": 30059,
+      "id": "aconn_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_f803e9d3-716c-407b-b015-fe94f5c60ab2",
+      "allocationId": "alloc_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_fd3647b4-e28e-4d55-bc07-619871a997c5",
+      "status": "ready",
+      "idleReleaseAt": "2026-10-18T05:25:15.213Z",
+      "expiresAt": "2026-10-18T05:35:15.213Z"
+    },
+    {
+      "at": "2026-10-18T05:20:45.227Z",
+      "event": "profile_request",
+      "request": 3,
+      "httpStatus": 201,
+      "id": "aconn_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_f803e9d3-716c-407b-b015-fe94f5c60ab2",
+      "allocationId": "alloc_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_fd3647b4-e28e-4d55-bc07-619871a997c5",
+      "status": "ready",
+      "idleReleaseAt": "2026-10-18T05:25:45.269Z",
+      "expiresAt": "2026-10-18T05:35:45.269Z",
+      "phase": "retaining"
+    },
+    {
+      "at": "2026-10-18T05:21:15.222Z",
+      "event": "failure",
+      "code": "port_not_ready_while_visible"
+    },
+    {
+      "at": "2026-10-18T05:21:15.321Z",
+      "event": "cleanup",
+      "id": "aconn_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_f803e9d3-716c-407b-b015-fe94f5c60ab2",
+      "httpStatus": 204
+    },
+    {
+      "at": "2026-10-18T05:21:15.321Z",
+      "event": "result",
+      "success": false,
+      "failure": "port_not_ready_while_visible",
+      "demandRequests": 3,
+      "freshKeys": 3,
+      "connections": 1,
+      "inferenceRequests": 0,
+      "claimsDuringRetention": 0
+    }
+  ]
+}

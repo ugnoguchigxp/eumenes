@@ -199,7 +199,7 @@ test("the device switch is display state: the input and the draft survive it and
 });
 
 test("history selects a saved work; a viewed saved work uses the answer form and disables edit controls", async () => {
-	const { dispatch, update } = mount(studio());
+	const { dispatch, update } = mount(studio({ work: work({ dirty: false }) }));
 	fireEvent.click(button("作品履歴"));
 	const list = screen.getByRole("group", { name: "保存した作品" });
 	fireEvent.click(within(list).getByRole("button", { name: "保存済みの案内" }));
@@ -231,8 +231,10 @@ test("history selects a saved work; a viewed saved work uses the answer form and
 	expect(
 		screen.getByRole("heading", { name: "保存済みの案内", level: 2 }),
 	).toBeTruthy();
-	expect((button("保存") as HTMLButtonElement).disabled).toBe(true);
-	expect((button("元に戻す") as HTMLButtonElement).disabled).toBe(true);
+	// Viewing is not editing: the draft's controls give way to deleting the saved work.
+	for (const name of ["保存", "元に戻す", "やり直す", "破棄"])
+		expect(screen.queryByRole("button", { name })).toBeNull();
+	expect(button("削除")).toBeTruthy();
 	fireEvent.click(screen.getByRole("radio", { name: "満足" }));
 	fireEvent.click(screen.getByRole("button", { name: "フォームを送信" }));
 	await vi.waitFor(() =>
@@ -240,6 +242,68 @@ test("history selects a saved work; a viewed saved work uses the answer form and
 			action: "submit",
 			source: "composition-form",
 		}),
+	);
+});
+
+test("choosing another saved work over unsaved work asks first: discard and switch, or keep editing", async () => {
+	const { dispatch } = mount(studio());
+	const pick = () => {
+		fireEvent.click(button("作品履歴"));
+		fireEvent.click(
+			within(screen.getByRole("group", { name: "保存した作品" })).getByRole(
+				"button",
+				{ name: "保存済みの案内" },
+			),
+		);
+	};
+	pick();
+	const dialog = await screen.findByRole("dialog");
+	expect(
+		within(dialog).getByText(/「保存済みの案内」の編集に切り替えます/),
+	).toBeTruthy();
+	fireEvent.click(within(dialog).getByRole("button", { name: "編集を続ける" }));
+	expect(dispatch).not.toHaveBeenCalled();
+	pick();
+	fireEvent.click(
+		within(await screen.findByRole("dialog")).getByRole("button", {
+			name: "破棄して切り替える",
+		}),
+	);
+	await vi.waitFor(() =>
+		expect(dispatch.mock.calls.map(([e]) => [e.action, e.values])).toEqual([
+			["ui-retarget", { id: "c1" }],
+		]),
+	);
+});
+
+test("deleting a viewed saved work asks first and sends its id and saved revision", async () => {
+	const { dispatch } = mount(
+		studio({
+			work: null,
+			session: null,
+			viewing: {
+				id: "c1",
+				title: "保存済みの案内",
+				definition: survey,
+				savedRevision: 2,
+			},
+		}),
+	);
+	fireEvent.click(button("削除"));
+	const dialog = await screen.findByRole("dialog");
+	expect(within(dialog).getByText(/「保存済みの案内」/)).toBeTruthy();
+	fireEvent.click(within(dialog).getByRole("button", { name: "やめる" }));
+	expect(dispatch).not.toHaveBeenCalled();
+	fireEvent.click(button("削除"));
+	fireEvent.click(
+		within(await screen.findByRole("dialog")).getByRole("button", {
+			name: "削除する",
+		}),
+	);
+	await vi.waitFor(() =>
+		expect(dispatch.mock.calls.map(([e]) => [e.action, e.values])).toEqual([
+			["ui-delete", { projectId: "c1", expectedSavedRevision: "2" }],
+		]),
 	);
 });
 

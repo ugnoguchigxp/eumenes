@@ -1,0 +1,14 @@
+{
+  "serverRestartedBy": "user",
+  "screenNotificationHttpStatus": 204,
+  "at": "2026-10-18T05:30:05.411Z",
+  "event": "running_backend_after_idle_boundary",
+  "httpStatus": 200,
+  "larmState": "ready",
+  "browser": {
+    "at": "2026-10-18T05:29:59.741Z",
+    "title": "Eumenes",
+    "visibility": "visible",
+    "connection": "LARMの接続状態: 接続済み"
+  }
+}

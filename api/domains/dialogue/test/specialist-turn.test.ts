@@ -1,10 +1,11 @@
 import { afterEach, expect, test } from "bun:test";
 import { Hono } from "hono";
 import { registerDialogue } from "../controller";
-import { setup, type Harness } from "./specialist.fixture";
+import { setup, studioLimits, type Harness } from "./specialist.fixture";
 
 const open: Harness[] = [];
 afterEach(async () => {
+	studioLimits.current = null;
 	for (const h of open.splice(0)) await h.close();
 });
 async function harness() {
@@ -163,6 +164,45 @@ test("the specialist is not given memory, World, the main prompt or the conversa
 	expect(h.state.captures.every((c) => c.maxOutputTokens === 24_576)).toBe(
 		true,
 	);
+	// Without time limits of its own the toolchain keeps the host defaults.
+	expect(h.state.captures.every((c) => !("attemptMs" in c))).toBe(true);
+	expect(h.state.extended).toEqual([]);
+});
+
+test("a toolchain's own time limits: the run lasts its run time from the hand-over, each call gets its turn and inference time, and an utterance addressed to it gets the run time too", async () => {
+	studioLimits.current = {
+		runMs: 1_200_000,
+		turnMs: 900_000,
+		inferenceMs: 600_000,
+	};
+	const h = await harness();
+	h.startCall({ request: "作って" });
+	h.state.specialist.push(reply("はじめます"));
+	const handed = await h.ask("作って");
+	expect(handed.status).toBe("completed");
+	const lasts = (run: { deadlineAt: string | null; createdAt: string }) =>
+		Date.parse(run.deadlineAt!) - Date.parse(run.createdAt);
+	expect(lasts(handed)).toBeGreaterThanOrEqual(1_200_000);
+	expect(h.state.extended).toHaveLength(1);
+	expect(h.state.extended[0]!.subject).toBe(handed.id);
+	expect(h.state.extended[0]!.deadline).toBe(Date.parse(handed.deadlineAt!));
+	const first = h.state.captures.at(-1)!;
+	expect(first.attemptMs).toBe(600_000);
+	// The turn's deadline is its turn time (well past the default 120 s), within the run's.
+	expect(Number(first.deadline) - Date.now()).toBeGreaterThan(800_000);
+	expect(Number(first.deadline)).toBeLessThanOrEqual(
+		Date.parse(handed.deadlineAt!),
+	);
+	h.state.specialist.push(reply("直しました"));
+	const addressed = await h.ask("もう少し暖かく");
+	expect(addressed.status).toBe("completed");
+	expect(lasts(addressed)).toBe(1_200_000);
+	// Requests captured before (a voice turn's) are moved to the run's deadline as well.
+	expect(h.state.extended.at(-1)).toEqual({
+		subject: addressed.id,
+		deadline: Date.parse(addressed.deadlineAt!),
+	});
+	expect(h.state.captures.at(-1)!.attemptMs).toBe(600_000);
 });
 
 test("the specialist turn never calls the main conversation model, and a failed turn does not either", async () => {

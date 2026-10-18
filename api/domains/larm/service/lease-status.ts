@@ -1,6 +1,35 @@
 import type { Capability, LarmStatus } from "../contracts";
 import type { Lease } from "./profiles";
 
+/** Notify only actual status changes; a routine Profile-use POST does not flicker ready. */
+export function createStatusChanges(status: () => LarmStatus) {
+	const listeners = new Set<() => void>();
+	let previous = JSON.stringify(status());
+	return {
+		notify() {
+			const next = JSON.stringify(status());
+			if (next === previous) return;
+			previous = next;
+			for (const listener of listeners) {
+				try {
+					listener();
+				} catch {
+					/* Independent subscribers. */
+				}
+			}
+		},
+		onChange(listener: () => void) {
+			listeners.add(listener);
+			return () => {
+				listeners.delete(listener);
+			};
+		},
+		close() {
+			listeners.clear();
+		},
+	};
+}
+
 /** What the port reports about its connection, from the facts the lease manager holds. */
 export function leaseStatus({
 	configured,

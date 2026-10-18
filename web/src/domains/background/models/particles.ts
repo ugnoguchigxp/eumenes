@@ -61,7 +61,7 @@ export function createParticleModel(data: ParticleData): SpatialModel {
 		uOrbitAngle: { value: 0 },
 		uWavePhase: { value: 0 },
 		uHealthColor: { value: new Color(healthColors.unknown) },
-		uHealthIntensity: { value: 0.42 },
+		uHealthIntensity: { value: 0.8 },
 		uVisibility: { value: 1 },
 	};
 	const material = new ShaderMaterial({
@@ -93,7 +93,7 @@ export function createParticleModel(data: ParticleData): SpatialModel {
 			);
 			uniforms.uHealthIntensity.value =
 				(state.health === "unknown"
-					? 0.42
+					? 0.8
 					: state.health === "disconnected"
 						? 0.28
 						: 1) * (state.stale ? 0.45 : 1);

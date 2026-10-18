@@ -10,6 +10,7 @@ import { useArtifactWorkspace } from "../domains/artifact";
 import {
 	useCancel,
 	useSpecialistCommand,
+	useSpecialistRetarget,
 	useSpecialistSession,
 } from "../domains/dialogue";
 import { describeError } from "../errorMessages";
@@ -64,6 +65,7 @@ export function useSpecialistWorkspace({
 	const refetchSession = query.refetch;
 	const session: SpecialistSession | null = query.data ?? null;
 	const command = useSpecialistCommand(client, conversationId);
+	const retarget = useSpecialistRetarget(client, conversationId);
 	const cancel = useCancel(client, conversationId);
 	const sessionRef = useRef(session);
 	const tabsRef = useRef(artifacts.tabs);
@@ -97,7 +99,11 @@ export function useSpecialistWorkspace({
 	}, [refetchSession]);
 
 	// The specialist's artifact opens when its session becomes active and shows the draft.
-	const announced = useRef<{ id: string; active: boolean } | null>(null);
+	const announced = useRef<{
+		id: string;
+		active: boolean;
+		artifact: string;
+	} | null>(null);
 	const loaded = useRef(false);
 	const [notice, setNotice] = useState<string | null>(null);
 	const sessionId = session?.id ?? null;
@@ -109,7 +115,7 @@ export function useSpecialistWorkspace({
 		const before = announced.current;
 		const wasActive = !!before?.active;
 		announced.current = sessionId
-			? { id: sessionId, active: sessionActive }
+			? { id: sessionId, active: sessionActive, artifact: sessionArtifact }
 			: null;
 		const fresh =
 			sessionActive && (!before || !before.active || before.id !== sessionId);
@@ -131,7 +137,11 @@ export function useSpecialistWorkspace({
 		}
 		// The first read is the baseline: only a change after it is announced.
 		if (loaded.current) {
-			if (fresh) setNotice(`サブエージェントに切り替えます（${sessionTitle}）`);
+			// The same specialist taking another saved item is not a change of addressee.
+			if (fresh && wasActive && before?.artifact === sessionArtifact)
+				setNotice("編集する作品を切り替えました");
+			else if (fresh)
+				setNotice(`サブエージェントに切り替えます（${sessionTitle}）`);
 			else if (wasActive && !sessionActive) setNotice("通常の会話に戻りました");
 		}
 		loaded.current = true;
@@ -254,9 +264,23 @@ export function useSpecialistWorkspace({
 				}
 			},
 			requestClose,
+			retarget: async (targetRef, discardUnsaved) => {
+				const current = await freshSession();
+				if (!current) return failure("専門担当との会話は終了しています。");
+				try {
+					await retarget.mutateAsync({
+						session: current,
+						targetRef,
+						discardUnsaved,
+					});
+					return ok;
+				} catch (error) {
+					return failure(describeCommandError(error));
+				}
+			},
 			closeSession: () => run("close"),
 		}),
-		[session, run, cancel, requestClose],
+		[session, run, cancel, requestClose, retarget, freshSession],
 	);
 
 	/** The saved work the focused studio tab shows; sent with the next message. */

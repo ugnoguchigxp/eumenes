@@ -305,6 +305,16 @@ export function setRunSession(
 		"UPDATE dialogue_runs SET specialist_session_id = ? WHERE id = ?",
 	).run(sessionId, runId);
 }
+/** Move an unfinished run's deadline later (a toolchain's own run time); never earlier. */
+export function extendRunDeadline(
+	db: Database,
+	runId: string,
+	deadlineAt: string,
+) {
+	db.query(
+		"UPDATE dialogue_runs SET deadline_at = ? WHERE id = ? AND status IN ('queued','running') AND deadline_at < ?",
+	).run(deadlineAt, runId, deadlineAt);
+}
 export function setRunViewing(db: Database, runId: string, viewing: unknown) {
 	db.query("UPDATE dialogue_runs SET viewing_json = ? WHERE id = ?").run(
 		JSON.stringify(viewing),

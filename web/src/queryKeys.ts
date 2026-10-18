@@ -21,6 +21,7 @@ export const queryRoots = {
 	settings: "settings",
 	settingsDiagnostics: "settings-diagnostics",
 	inferenceUsage: "inference-usage",
+	monitoring: "monitoring",
 	voiceDialogue: "voice-dialogue",
 	timers: "timers",
 	terminals: "terminals",

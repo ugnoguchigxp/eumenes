@@ -24,17 +24,21 @@ const deltaFallback = (r: Request) =>
 /** How long this attempt may run, leaving room for a cloud fallback when one is possible. */
 export function attemptDuration(r: Request, source: Source) {
 	const { options } = r.env;
+	// A request's own limit (a toolchain's) takes the place of both defaults.
+	const cloudMs = r.row.attemptMs ?? options.cloudMs ?? deltaFallback(r);
 	const configured =
 		source === "cloud"
-			? (options.cloudMs ?? deltaFallback(r))
-			: (options.localMs ?? (r.row.purpose === "llm" ? 120_000 : 15_000));
+			? cloudMs
+			: (r.row.attemptMs ??
+				options.localMs ??
+				(r.row.purpose === "llm" ? 120_000 : 15_000));
 	const remaining = Math.max(0, r.deadline - Date.now());
 	const reserve =
 		source === "larm" &&
 		route(r).mode === "larm-preferred" &&
 		r.selected?.connection.enabled &&
 		route(r).cloudAllowed
-			? Math.min(options.cloudMs ?? deltaFallback(r), remaining)
+			? Math.min(cloudMs, remaining)
 			: 0;
 	return Math.min(configured, Math.max(1, remaining - reserve));
 }
@@ -68,6 +72,7 @@ export function callOptionsFor(r: Request, attemptId: string): LarmCallOptions {
 			: {}),
 		...sessionCallOptions(r.session),
 		...(r.row.outputLimit ? { maxOutputTokens: r.row.outputLimit } : {}),
+		...(r.row.attemptMs ? { attemptMs: r.row.attemptMs } : {}),
 
 		onExchange: async (exchange: LarmExchange) => {
 			// A call can use the old lease and one replacement. Keep both for correlation.

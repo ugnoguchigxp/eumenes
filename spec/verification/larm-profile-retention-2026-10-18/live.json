@@ -1,0 +1,470 @@
+{
+  "success": true,
+  "events": [
+    {
+      "at": "2026-10-18T05:21:57.863Z",
+      "event": "health",
+      "status": "ok",
+      "releaseCommit": "0baea1ede627b6b078f59db4d8cf3215709fe690",
+      "fixedApiToken": true
+    },
+    {
+      "at": "2026-10-18T05:21:58.081Z",
+      "event": "profile_request",
+      "request": 1,
+      "httpStatus": 201,
+      "id": "aconn_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_c737f236-28f8-4102-86d8-83edfa4e5307",
+      "allocationId": "alloc_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_23567f0a-9f95-40f8-80cb-22015b91e6fc",
+      "status": "ready",
+      "idleReleaseAt": "2026-10-18T05:26:58.123Z",
+      "expiresAt": "2026-10-18T05:36:57.928Z",
+      "phase": "setup"
+    },
+    {
+      "at": "2026-10-18T05:21:58.104Z",
+      "event": "initial_ready",
+      "id": "aconn_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_c737f236-28f8-4102-86d8-83edfa4e5307",
+      "allocationId": "alloc_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_23567f0a-9f95-40f8-80cb-22015b91e6fc",
+      "status": "ready",
+      "idleReleaseAt": "2026-10-18T05:26:58.123Z",
+      "expiresAt": "2026-10-18T05:36:57.928Z"
+    },
+    {
+      "at": "2026-10-18T05:21:58.132Z",
+      "event": "profile_request",
+      "request": 2,
+      "httpStatus": 201,
+      "id": "aconn_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_c737f236-28f8-4102-86d8-83edfa4e5307",
+      "allocationId": "alloc_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_23567f0a-9f95-40f8-80cb-22015b91e6fc",
+      "status": "ready",
+      "idleReleaseAt": "2026-10-18T05:26:58.173Z",
+      "expiresAt": "2026-10-18T05:36:58.173Z",
+      "phase": "retaining"
+    },
+    {
+      "at": "2026-10-18T05:22:28.230Z",
+      "event": "retention_observation",
+      "elapsedMs": 30126,
+      "id": "aconn_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_c737f236-28f8-4102-86d8-83edfa4e5307",
+      "allocationId": "alloc_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_23567f0a-9f95-40f8-80cb-22015b91e6fc",
+      "status": "ready",
+      "idleReleaseAt": "2026-10-18T05:26:58.173Z",
+      "expiresAt": "2026-10-18T05:36:58.173Z"
+    },
+    {
+      "at": "2026-10-18T05:22:28.242Z",
+      "event": "profile_request",
+      "request": 3,
+      "httpStatus": 201,
+      "id": "aconn_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_c737f236-28f8-4102-86d8-83edfa4e5307",
+      "allocationId": "alloc_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_23567f0a-9f95-40f8-80cb-22015b91e6fc",
+      "status": "ready",
+      "idleReleaseAt": "2026-10-18T05:27:28.283Z",
+      "expiresAt": "2026-10-18T05:37:28.283Z",
+      "phase": "retaining"
+    },
+    {
+      "at": "2026-10-18T05:22:58.339Z",
+      "event": "retention_observation",
+      "elapsedMs": 60235,
+      "id": "aconn_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_c737f236-28f8-4102-86d8-83edfa4e5307",
+      "allocationId": "alloc_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_23567f0a-9f95-40f8-80cb-22015b91e6fc",
+      "status": "ready",
+      "idleReleaseAt": "2026-10-18T05:27:28.283Z",
+      "expiresAt": "2026-10-18T05:37:28.283Z"
+    },
+    {
+      "at": "2026-10-18T05:22:58.345Z",
+      "event": "profile_request",
+      "request": 4,
+      "httpStatus": 201,
+      "id": "aconn_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_c737f236-28f8-4102-86d8-83edfa4e5307",
+      "allocationId": "alloc_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_23567f0a-9f95-40f8-80cb-22015b91e6fc",
+      "status": "ready",
+      "idleReleaseAt": "2026-10-18T05:27:58.388Z",
+      "expiresAt": "2026-10-18T05:37:58.388Z",
+      "phase": "retaining"
+    },
+    {
+      "at": "2026-10-18T05:23:28.356Z",
+      "event": "retention_observation",
+      "elapsedMs": 90252,
+      "id": "aconn_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_c737f236-28f8-4102-86d8-83edfa4e5307",
+      "allocationId": "alloc_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_23567f0a-9f95-40f8-80cb-22015b91e6fc",
+      "status": "ready",
+      "idleReleaseAt": "2026-10-18T05:27:58.388Z",
+      "expiresAt": "2026-10-18T05:37:58.388Z"
+    },
+    {
+      "at": "2026-10-18T05:23:28.367Z",
+      "event": "profile_request",
+      "request": 5,
+      "httpStatus": 201,
+      "id": "aconn_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_c737f236-28f8-4102-86d8-83edfa4e5307",
+      "allocationId": "alloc_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_23567f0a-9f95-40f8-80cb-22015b91e6fc",
+      "status": "ready",
+      "idleReleaseAt": "2026-10-18T05:28:28.410Z",
+      "expiresAt": "2026-10-18T05:38:28.410Z",
+      "phase": "retaining"
+    },
+    {
+      "at": "2026-10-18T05:23:58.363Z",
+      "event": "retention_observation",
+      "elapsedMs": 120259,
+      "id": "aconn_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_c737f236-28f8-4102-86d8-83edfa4e5307",
+      "allocationId": "alloc_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_23567f0a-9f95-40f8-80cb-22015b91e6fc",
+      "status": "ready",
+      "idleReleaseAt": "2026-10-18T05:28:28.410Z",
+      "expiresAt": "2026-10-18T05:38:28.410Z"
+    },
+    {
+      "at": "2026-10-18T05:23:58.380Z",
+      "event": "profile_request",
+      "request": 6,
+      "httpStatus": 201,
+      "id": "aconn_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_c737f236-28f8-4102-86d8-83edfa4e5307",
+      "allocationId": "alloc_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_23567f0a-9f95-40f8-80cb-22015b91e6fc",
+      "status": "ready",
+      "idleReleaseAt": "2026-10-18T05:28:58.423Z",
+      "expiresAt": "2026-10-18T05:38:58.423Z",
+      "phase": "retaining"
+    },
+    {
+      "at": "2026-10-18T05:24:28.451Z",
+      "event": "retention_observation",
+      "elapsedMs": 150347,
+      "id": "aconn_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_c737f236-28f8-4102-86d8-83edfa4e5307",
+      "allocationId": "alloc_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_23567f0a-9f95-40f8-80cb-22015b91e6fc",
+      "status": "ready",
+      "idleReleaseAt": "2026-10-18T05:28:58.423Z",
+      "expiresAt": "2026-10-18T05:38:58.423Z"
+    },
+    {
+      "at": "2026-10-18T05:24:28.457Z",
+      "event": "profile_request",
+      "request": 7,
+      "httpStatus": 201,
+      "id": "aconn_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_c737f236-28f8-4102-86d8-83edfa4e5307",
+      "allocationId": "alloc_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_23567f0a-9f95-40f8-80cb-22015b91e6fc",
+      "status": "ready",
+      "idleReleaseAt": "2026-10-18T05:29:28.500Z",
+      "expiresAt": "2026-10-18T05:39:28.500Z",
+      "phase": "retaining"
+    },
+    {
+      "at": "2026-10-18T05:24:58.555Z",
+      "event": "retention_observation",
+      "elapsedMs": 180451,
+      "id": "aconn_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_c737f236-28f8-4102-86d8-83edfa4e5307",
+      "allocationId": "alloc_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_23567f0a-9f95-40f8-80cb-22015b91e6fc",
+      "status": "ready",
+      "idleReleaseAt": "2026-10-18T05:29:28.500Z",
+      "expiresAt": "2026-10-18T05:39:28.500Z"
+    },
+    {
+      "at": "2026-10-18T05:24:58.562Z",
+      "event": "profile_request",
+      "request": 8,
+      "httpStatus": 201,
+      "id": "aconn_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_c737f236-28f8-4102-86d8-83edfa4e5307",
+      "allocationId": "alloc_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_23567f0a-9f95-40f8-80cb-22015b91e6fc",
+      "status": "ready",
+      "idleReleaseAt": "2026-10-18T05:29:58.604Z",
+      "expiresAt": "2026-10-18T05:39:58.604Z",
+      "phase": "retaining"
+    },
+    {
+      "at": "2026-10-18T05:25:28.660Z",
+      "event": "retention_observation",
+      "elapsedMs": 210556,
+      "id": "aconn_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_c737f236-28f8-4102-86d8-83edfa4e5307",
+      "allocationId": "alloc_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_23567f0a-9f95-40f8-80cb-22015b91e6fc",
+      "status": "ready",
+      "idleReleaseAt": "2026-10-18T05:29:58.604Z",
+      "expiresAt": "2026-10-18T05:39:58.604Z"
+    },
+    {
+      "at": "2026-10-18T05:25:28.668Z",
+      "event": "profile_request",
+      "request": 9,
+      "httpStatus": 201,
+      "id": "aconn_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_c737f236-28f8-4102-86d8-83edfa4e5307",
+      "allocationId": "alloc_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_23567f0a-9f95-40f8-80cb-22015b91e6fc",
+      "status": "ready",
+      "idleReleaseAt": "2026-10-18T05:30:28.710Z",
+      "expiresAt": "2026-10-18T05:40:28.710Z",
+      "phase": "retaining"
+    },
+    {
+      "at": "2026-10-18T05:25:58.765Z",
+      "event": "retention_observation",
+      "elapsedMs": 240661,
+      "id": "aconn_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_c737f236-28f8-4102-86d8-83edfa4e5307",
+      "allocationId": "alloc_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_23567f0a-9f95-40f8-80cb-22015b91e6fc",
+      "status": "ready",
+      "idleReleaseAt": "2026-10-18T05:30:28.710Z",
+      "expiresAt": "2026-10-18T05:40:28.710Z"
+    },
+    {
+      "at": "2026-10-18T05:25:58.772Z",
+      "event": "profile_request",
+      "request": 10,
+      "httpStatus": 201,
+      "id": "aconn_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_c737f236-28f8-4102-86d8-83edfa4e5307",
+      "allocationId": "alloc_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_23567f0a-9f95-40f8-80cb-22015b91e6fc",
+      "status": "ready",
+      "idleReleaseAt": "2026-10-18T05:30:58.814Z",
+      "expiresAt": "2026-10-18T05:40:58.814Z",
+      "phase": "retaining"
+    },
+    {
+      "at": "2026-10-18T05:26:28.867Z",
+      "event": "retention_observation",
+      "elapsedMs": 270763,
+      "id": "aconn_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_c737f236-28f8-4102-86d8-83edfa4e5307",
+      "allocationId": "alloc_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_23567f0a-9f95-40f8-80cb-22015b91e6fc",
+      "status": "ready",
+      "idleReleaseAt": "2026-10-18T05:30:58.814Z",
+      "expiresAt": "2026-10-18T05:40:58.814Z"
+    },
+    {
+      "at": "2026-10-18T05:26:28.874Z",
+      "event": "profile_request",
+      "request": 11,
+      "httpStatus": 201,
+      "id": "aconn_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_c737f236-28f8-4102-86d8-83edfa4e5307",
+      "allocationId": "alloc_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_23567f0a-9f95-40f8-80cb-22015b91e6fc",
+      "status": "ready",
+      "idleReleaseAt": "2026-10-18T05:31:28.916Z",
+      "expiresAt": "2026-10-18T05:41:28.916Z",
+      "phase": "retaining"
+    },
+    {
+      "at": "2026-10-18T05:26:58.978Z",
+      "event": "retention_observation",
+      "elapsedMs": 300874,
+      "id": "aconn_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_c737f236-28f8-4102-86d8-83edfa4e5307",
+      "allocationId": "alloc_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_23567f0a-9f95-40f8-80cb-22015b91e6fc",
+      "status": "ready",
+      "idleReleaseAt": "2026-10-18T05:31:28.916Z",
+      "expiresAt": "2026-10-18T05:41:28.916Z"
+    },
+    {
+      "at": "2026-10-18T05:26:58.989Z",
+      "event": "profile_request",
+      "request": 12,
+      "httpStatus": 201,
+      "id": "aconn_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_c737f236-28f8-4102-86d8-83edfa4e5307",
+      "allocationId": "alloc_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_23567f0a-9f95-40f8-80cb-22015b91e6fc",
+      "status": "ready",
+      "idleReleaseAt": "2026-10-18T05:31:59.032Z",
+      "expiresAt": "2026-10-18T05:41:59.032Z",
+      "phase": "retaining"
+    },
+    {
+      "at": "2026-10-18T05:27:29.083Z",
+      "event": "retention_observation",
+      "elapsedMs": 330979,
+      "id": "aconn_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_c737f236-28f8-4102-86d8-83edfa4e5307",
+      "allocationId": "alloc_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_23567f0a-9f95-40f8-80cb-22015b91e6fc",
+      "status": "ready",
+      "idleReleaseAt": "2026-10-18T05:31:59.032Z",
+      "expiresAt": "2026-10-18T05:41:59.032Z"
+    },
+    {
+      "at": "2026-10-18T05:27:29.093Z",
+      "event": "profile_request",
+      "request": 13,
+      "httpStatus": 201,
+      "id": "aconn_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_c737f236-28f8-4102-86d8-83edfa4e5307",
+      "allocationId": "alloc_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_23567f0a-9f95-40f8-80cb-22015b91e6fc",
+      "status": "ready",
+      "idleReleaseAt": "2026-10-18T05:32:29.134Z",
+      "expiresAt": "2026-10-18T05:42:29.134Z",
+      "phase": "retaining"
+    },
+    {
+      "at": "2026-10-18T05:27:59.181Z",
+      "event": "retention_observation",
+      "elapsedMs": 361077,
+      "id": "aconn_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_c737f236-28f8-4102-86d8-83edfa4e5307",
+      "allocationId": "alloc_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_23567f0a-9f95-40f8-80cb-22015b91e6fc",
+      "status": "ready",
+      "idleReleaseAt": "2026-10-18T05:32:29.134Z",
+      "expiresAt": "2026-10-18T05:42:29.134Z"
+    },
+    {
+      "at": "2026-10-18T05:27:59.189Z",
+      "event": "profile_request",
+      "request": 14,
+      "httpStatus": 201,
+      "id": "aconn_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_c737f236-28f8-4102-86d8-83edfa4e5307",
+      "allocationId": "alloc_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_23567f0a-9f95-40f8-80cb-22015b91e6fc",
+      "status": "ready",
+      "idleReleaseAt": "2026-10-18T05:32:59.231Z",
+      "expiresAt": "2026-10-18T05:42:59.231Z",
+      "phase": "retaining"
+    },
+    {
+      "at": "2026-10-18T05:28:00.214Z",
+      "event": "retention_observation",
+      "elapsedMs": 362110,
+      "id": "aconn_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_c737f236-28f8-4102-86d8-83edfa4e5307",
+      "allocationId": "alloc_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_23567f0a-9f95-40f8-80cb-22015b91e6fc",
+      "status": "ready",
+      "idleReleaseAt": "2026-10-18T05:32:59.231Z",
+      "expiresAt": "2026-10-18T05:42:59.231Z"
+    },
+    {
+      "at": "2026-10-18T05:28:00.234Z",
+      "event": "same_key_replay",
+      "httpStatus": 201,
+      "deadlineUnchanged": true,
+      "id": "aconn_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_c737f236-28f8-4102-86d8-83edfa4e5307",
+      "allocationId": "alloc_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_23567f0a-9f95-40f8-80cb-22015b91e6fc",
+      "status": "ready",
+      "idleReleaseAt": "2026-10-18T05:32:59.231Z",
+      "expiresAt": "2026-10-18T05:42:59.231Z"
+    },
+    {
+      "at": "2026-10-18T05:28:00.235Z",
+      "event": "screen_hidden",
+      "requests": 14,
+      "retentionMs": 362131,
+      "inferenceRequests": 0,
+      "claimsDuringRetention": 0,
+      "id": "aconn_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_c737f236-28f8-4102-86d8-83edfa4e5307",
+      "allocationId": "alloc_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_23567f0a-9f95-40f8-80cb-22015b91e6fc",
+      "status": "ready",
+      "idleReleaseAt": "2026-10-18T05:32:59.231Z",
+      "expiresAt": "2026-10-18T05:42:59.231Z"
+    },
+    {
+      "at": "2026-10-18T05:28:30.249Z",
+      "event": "stopped_observation",
+      "sinceStopMs": 30014,
+      "id": "aconn_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_c737f236-28f8-4102-86d8-83edfa4e5307",
+      "allocationId": "alloc_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_23567f0a-9f95-40f8-80cb-22015b91e6fc",
+      "status": "ready",
+      "idleReleaseAt": "2026-10-18T05:32:59.231Z",
+      "expiresAt": "2026-10-18T05:42:59.231Z"
+    },
+    {
+      "at": "2026-10-18T05:29:00.323Z",
+      "event": "stopped_observation",
+      "sinceStopMs": 60088,
+      "id": "aconn_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_c737f236-28f8-4102-86d8-83edfa4e5307",
+      "allocationId": "alloc_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_23567f0a-9f95-40f8-80cb-22015b91e6fc",
+      "status": "ready",
+      "idleReleaseAt": "2026-10-18T05:32:59.231Z",
+      "expiresAt": "2026-10-18T05:42:59.231Z"
+    },
+    {
+      "at": "2026-10-18T05:29:30.329Z",
+      "event": "stopped_observation",
+      "sinceStopMs": 90094,
+      "id": "aconn_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_c737f236-28f8-4102-86d8-83edfa4e5307",
+      "allocationId": "alloc_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_23567f0a-9f95-40f8-80cb-22015b91e6fc",
+      "status": "ready",
+      "idleReleaseAt": "2026-10-18T05:32:59.231Z",
+      "expiresAt": "2026-10-18T05:42:59.231Z"
+    },
+    {
+      "at": "2026-10-18T05:30:00.454Z",
+      "event": "stopped_observation",
+      "sinceStopMs": 120219,
+      "id": "aconn_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_c737f236-28f8-4102-86d8-83edfa4e5307",
+      "allocationId": "alloc_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_23567f0a-9f95-40f8-80cb-22015b91e6fc",
+      "status": "ready",
+      "idleReleaseAt": "2026-10-18T05:32:59.231Z",
+      "expiresAt": "2026-10-18T05:42:59.231Z"
+    },
+    {
+      "at": "2026-10-18T05:30:30.567Z",
+      "event": "stopped_observation",
+      "sinceStopMs": 150332,
+      "id": "aconn_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_c737f236-28f8-4102-86d8-83edfa4e5307",
+      "allocationId": "alloc_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_23567f0a-9f95-40f8-80cb-22015b91e6fc",
+      "status": "ready",
+      "idleReleaseAt": "2026-10-18T05:32:59.231Z",
+      "expiresAt": "2026-10-18T05:42:59.231Z"
+    },
+    {
+      "at": "2026-10-18T05:31:00.674Z",
+      "event": "stopped_observation",
+      "sinceStopMs": 180439,
+      "id": "aconn_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_c737f236-28f8-4102-86d8-83edfa4e5307",
+      "allocationId": "alloc_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_23567f0a-9f95-40f8-80cb-22015b91e6fc",
+      "status": "ready",
+      "idleReleaseAt": "2026-10-18T05:32:59.231Z",
+      "expiresAt": "2026-10-18T05:42:59.231Z"
+    },
+    {
+      "at": "2026-10-18T05:31:30.780Z",
+      "event": "stopped_observation",
+      "sinceStopMs": 210545,
+      "id": "aconn_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_c737f236-28f8-4102-86d8-83edfa4e5307",
+      "allocationId": "alloc_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_23567f0a-9f95-40f8-80cb-22015b91e6fc",
+      "status": "ready",
+      "idleReleaseAt": "2026-10-18T05:32:59.231Z",
+      "expiresAt": "2026-10-18T05:42:59.231Z"
+    },
+    {
+      "at": "2026-10-18T05:32:00.886Z",
+      "event": "stopped_observation",
+      "sinceStopMs": 240651,
+      "id": "aconn_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_c737f236-28f8-4102-86d8-83edfa4e5307",
+      "allocationId": "alloc_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_23567f0a-9f95-40f8-80cb-22015b91e6fc",
+      "status": "ready",
+      "idleReleaseAt": "2026-10-18T05:32:59.231Z",
+      "expiresAt": "2026-10-18T05:42:59.231Z"
+    },
+    {
+      "at": "2026-10-18T05:32:30.985Z",
+      "event": "stopped_observation",
+      "sinceStopMs": 270750,
+      "id": "aconn_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_c737f236-28f8-4102-86d8-83edfa4e5307",
+      "allocationId": "alloc_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_23567f0a-9f95-40f8-80cb-22015b91e6fc",
+      "status": "ready",
+      "idleReleaseAt": "2026-10-18T05:32:59.231Z",
+      "expiresAt": "2026-10-18T05:42:59.231Z"
+    },
+    {
+      "at": "2026-10-18T05:32:56.290Z",
+      "event": "stopped_observation",
+      "sinceStopMs": 296055,
+      "id": "aconn_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_c737f236-28f8-4102-86d8-83edfa4e5307",
+      "allocationId": "alloc_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_23567f0a-9f95-40f8-80cb-22015b91e6fc",
+      "status": "ready",
+      "idleReleaseAt": "2026-10-18T05:32:59.231Z",
+      "expiresAt": "2026-10-18T05:42:59.231Z"
+    },
+    {
+      "at": "2026-10-18T05:32:59.256Z",
+      "event": "automatic_release",
+      "sinceStopMs": 299021,
+      "sinceLastDemandMs": 300067,
+      "observedDeadlineOffsetMs": 25,
+      "id": "aconn_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_c737f236-28f8-4102-86d8-83edfa4e5307",
+      "allocationId": "alloc_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_23567f0a-9f95-40f8-80cb-22015b91e6fc",
+      "status": "released",
+      "expiresAt": "2026-10-18T05:42:59.231Z"
+    },
+    {
+      "at": "2026-10-18T05:32:59.263Z",
+      "event": "cleanup",
+      "id": "aconn_epoch-7feef8f2-e170-4c23-a858-4354c0f97996_c737f236-28f8-4102-86d8-83edfa4e5307",
+      "httpStatus": 204
+    },
+    {
+      "at": "2026-10-18T05:32:59.263Z",
+      "event": "result",
+      "success": true,
+      "demandRequests": 14,
+      "freshKeys": 14,
+      "connections": 1,
+      "inferenceRequests": 0,
+      "claimsDuringRetention": 0
+    }
+  ]
+}

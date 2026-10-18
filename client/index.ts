@@ -14,6 +14,7 @@ import { dialogueClient } from "./dialogue";
 import { eventsClient } from "./events";
 import { larmClient } from "./larm";
 import { memoryClient } from "./memory";
+import { monitoringClient } from "./monitoring";
 import { queueClient } from "./queue";
 import { toolchainHistoryClient } from "./toolchain-history";
 import { schedulerClient } from "./scheduler";
@@ -53,6 +54,7 @@ export function createClient(baseUrl: string, token?: string) {
 		...ttsDictionaryClient(transport),
 		...memoryClient(transport),
 		...queueClient(transport),
+		...monitoringClient(transport),
 		...schedulerClient(transport),
 		...voiceDialogueClient(transport),
 		...webResearchClient(transport),

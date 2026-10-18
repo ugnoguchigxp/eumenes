@@ -190,6 +190,17 @@ export const domains = {
 		components: null,
 		depends: { api: ["delivery"], web: [], test: [] },
 	},
+	monitoring: {
+		tier: 3,
+		backend: "api/domains/monitoring",
+		web: "web/src/domains/monitoring",
+		components: null,
+		depends: {
+			api: ["inference", "larm", "queue", "settings"],
+			web: ["background"],
+			test: [],
+		},
+	},
 	"service-tests": {
 		tier: 3,
 		backend: "api/domains/service-tests",

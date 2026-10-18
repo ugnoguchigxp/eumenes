@@ -5,7 +5,7 @@ import type { InferencePort } from "../../inference";
 import type { QueueService } from "../../queue";
 import type { LarmPlayground } from "../../larm";
 import type { ImageRecord } from "../contracts";
-import { row, byRun, record, patch, list } from "../repository";
+import { row, byRun, record, patch, list, activity } from "../repository";
 import { registerImageHandlers } from "./handlers";
 /** Read-only source for the registered image screen; the image domain owns this query. */
 export const imageListInTransaction = (db: Database, conversationId: string) =>
@@ -146,6 +146,7 @@ export function createImage(deps: {
 			}),
 		list: (conversationId: string) =>
 			store.read((db) => list(db, conversationId)),
+		activity: (since: number) => store.read((db) => activity(db, since)),
 	};
 }
 export type ImageService = ReturnType<typeof createImage>;

@@ -74,6 +74,19 @@ export const commandBindingV1 = z.strictObject({
 	questions: z.array(bindingQuestion).max(8).optional(),
 });
 
+const limitMs = z.number().int().min(10_000).max(3_600_000);
+/**
+ * How long work of this toolchain may take (spec toolchain-time-limits-design 2026-10-18 §3.1):
+ * the run from the hand-over, one specialist turn, one inference attempt. Omitted: the host defaults.
+ */
+const timeLimitsV1 = z
+	.strictObject({ runMs: limitMs, turnMs: limitMs, inferenceMs: limitMs })
+	.refine(
+		(t) => t.inferenceMs <= t.turnMs && t.turnMs <= t.runMs,
+		"inferenceMs <= turnMs <= runMs",
+	);
+export type TimeLimits = z.infer<typeof timeLimitsV1>;
+
 /**
  * A specialist-session toolchain (spec toolchain-specialist-dialogue 2026-10-17 §4.1): after the
  * conversation hands over, the user talks to the package's specialist directly over several turns.
@@ -96,6 +109,7 @@ const sessionBindingV1 = z.strictObject({
 		 */
 		targetSchemaRef: schemaRef.optional(),
 	}),
+	timeLimits: timeLimitsV1.optional(),
 });
 /**
  * An instant-answer toolchain: the first round of the conversation calls its function with the

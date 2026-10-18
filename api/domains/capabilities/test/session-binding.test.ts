@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openStore } from "../../../infrastructure/sqlite";
 import {
+	bindingV1,
 	createCapabilities,
 	migrations,
 	type BundleHost,
@@ -262,4 +263,31 @@ test("the registry refuses a session binding whose tool schema differs from the 
 			},
 		]);
 	});
+});
+
+test("a session binding may carry its own time limits: each 10 s to 60 min, inference <= turn <= run", () => {
+	const base = sessionBundle().bindings[0];
+	const accepts = (timeLimits: unknown) =>
+		bindingV1.safeParse({ ...base, timeLimits }).success;
+	expect(accepts(undefined)).toBe(true);
+	expect(
+		accepts({ runMs: 1_200_000, turnMs: 900_000, inferenceMs: 600_000 }),
+	).toBe(true);
+	expect(
+		accepts({ runMs: 3_600_000, turnMs: 3_600_000, inferenceMs: 3_600_000 }),
+	).toBe(true);
+	expect(
+		accepts({ runMs: 3_600_001, turnMs: 900_000, inferenceMs: 600_000 }),
+	).toBe(false);
+	expect(accepts({ runMs: 60_000, turnMs: 9_999, inferenceMs: 9_999 })).toBe(
+		false,
+	);
+	// A turn longer than the run, or an inference longer than the turn, is refused.
+	expect(
+		accepts({ runMs: 600_000, turnMs: 900_000, inferenceMs: 600_000 }),
+	).toBe(false);
+	expect(
+		accepts({ runMs: 1_200_000, turnMs: 300_000, inferenceMs: 600_000 }),
+	).toBe(false);
+	expect(accepts({ runMs: 1_200_000, turnMs: 900_000 })).toBe(false);
 });

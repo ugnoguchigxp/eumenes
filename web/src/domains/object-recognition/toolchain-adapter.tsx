@@ -7,8 +7,12 @@ const OBJECT_RECOGNITION_SCREEN_ADAPTER_REF =
 /** Registered view with the existing authenticated media and recognition operations. */
 export const objectRecognitionScreenWebAdapter: WebArtifactAdapter = {
 	adapterRef: OBJECT_RECOGNITION_SCREEN_ADAPTER_REF,
-	useArtifact({ client }) {
-		const { runtime, loading, refresh } = useRecognitionRuntime(client);
+	useArtifact({ client, setTargetRef }) {
+		const { runtime, loading, refresh } = useRecognitionRuntime(
+			client,
+			"main",
+			setTargetRef,
+		);
 		return {
 			phase: loading ? { kind: "loading" } : { kind: "ready" },
 			snapshot: runtime.snapshot,

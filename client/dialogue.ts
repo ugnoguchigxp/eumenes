@@ -5,6 +5,7 @@ import {
 	type PublicSubmit,
 	type SpecialistCommand,
 	type SpecialistCommandKind,
+	type SpecialistRetarget,
 } from "../api/domains/dialogue/contracts";
 import type { Transport } from "./transport";
 import { json } from "./transport";
@@ -70,6 +71,16 @@ export function dialogueClient(transport: Transport) {
 				await (
 					await transport.call(
 						`/api/specialist-sessions/${encodeURIComponent(sessionId)}/${kind}`,
+						json(body),
+					)
+				).json(),
+			),
+		/** Go on with another saved item; a repeated requestId returns the first result. */
+		specialistRetarget: async (sessionId: string, body: SpecialistRetarget) =>
+			specialistSessionResponseSchema.parse(
+				await (
+					await transport.call(
+						`/api/specialist-sessions/${encodeURIComponent(sessionId)}/retarget`,
 						json(body),
 					)
 				).json(),

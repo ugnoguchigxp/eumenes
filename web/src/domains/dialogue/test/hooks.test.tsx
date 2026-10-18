@@ -28,6 +28,9 @@ function setup() {
 		specialistCommand: async () => {
 			throw new Error("not_used");
 		},
+		specialistRetarget: async () => {
+			throw new Error("not_used");
+		},
 		async submit(input: Submit) {
 			let run = accepted.get(input.requestId);
 			if (run && run.inputMessageId !== input.text)

@@ -7,6 +7,7 @@ import { formInTransaction, studioInTransaction } from "./views";
 import {
 	applyDraftInTransaction,
 	beginTurnInTransaction,
+	deleteInTransaction,
 	endTurnInTransaction,
 	endWorkInTransaction,
 	openWorkInTransaction,
@@ -27,6 +28,7 @@ export function createUiCompositions() {
 		applyDraftInTransaction,
 		stepInTransaction,
 		saveInTransaction,
+		deleteInTransaction,
 		submitInTransaction,
 		studioInTransaction,
 		formInTransaction,

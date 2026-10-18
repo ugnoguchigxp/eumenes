@@ -418,6 +418,11 @@ LARMの圧縮通信の対応後、利用者の指示で再開した。§10の初
   - 表現部品: 文字数の上限は4倍、件数はおおむね4倍（項目・手順・FAQ・料金の特長など）、表は列12・行200、グラフは系列8・各600点、図は要素240。
   - SKILLの数値を合わせ、skill@6・package@6・toolchain@8に上げた。
   - 試験の上限値を更新し、`bun run verify -- --domain ui-compositions --domain dialogue --domain capabilities --domain voice-dialogue`はpass（bunの試験650件）。
+- 見出しの`<br>`（2026-10-18の実機）: モデルが改行をHTMLの`<br>`で書き、文字のまま表示された。部品の文字列はHTMLとして解釈しない（安全のため）ので、改行は文字列中の`\n`とする。
+  - 表示: `artifact-ui/src/styles.css`の`.aui-composition`に`white-space: pre-line`を付け、`\n`を改行として描く。
+  - 検証の前の置き換え: `validatedDefinition`が、文字列中の`<br>`・`<br/>`・`<BR />`を`\n`に置き換える（それ以外の`<`はそのまま）。
+  - SKILL（skill@6、未登録のため版は据え置き）に「文字列はHTMLではない。改行は`\n`」を加えた。
+  - 試験: `ui-compositions.test.ts`。`bun run verify -- --domain ui-compositions --domain capabilities`はpass。
 - 残る課題: 1回の推論が長く、作り直しが2回重なると上限に達する。これは[一回推論の下書きと定義の補正](ui-studio-one-shot-draft-design-2026-10-18.md)で扱う（合意待ち）。
 
 残る受入:

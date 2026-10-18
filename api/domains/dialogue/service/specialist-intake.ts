@@ -45,3 +45,22 @@ export function addresseeMatches(
 		? addressee.sessionId === current.id && addressee.epoch === current.epoch
 		: addressee.sessionId === null;
 }
+
+/**
+ * The run time of the session's toolchain (spec toolchain-time-limits-design 2026-10-18 §3.2) for an utterance
+ * addressed to it; 0 keeps the host default, also when the toolchain cannot be read now (the turn refuses then).
+ */
+export function sessionRunMs(
+	deps: DialogueDeps,
+	db: Database,
+	session: SessionRecord,
+): number {
+	try {
+		return (
+			deps.specialist?.setInTransaction(db, session.toolchainRevisionId)
+				.timeLimits?.runMs ?? 0
+		);
+	} catch {
+		return 0;
+	}
+}

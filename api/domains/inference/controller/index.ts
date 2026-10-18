@@ -2,6 +2,7 @@ import type { Hono } from "hono";
 import type { InferenceService } from "../service";
 import type { ConnectionModelsService } from "../service/connection-models";
 import { usagePageQuerySchema } from "../contracts";
+import { registerScreenPresence } from "./screen-presence";
 /** Credential and route failures of a model-list read; anything else is an upstream failure. */
 const modelListStatus = (code: string) =>
 	code === "cloud_credential_unavailable" ? 409 : 502;
@@ -10,6 +11,7 @@ export function registerInference(
 	service: InferenceService,
 	models?: ConnectionModelsService,
 ) {
+	registerScreenPresence(app, service);
 	if (models)
 		app.get("/api/inference/connections/:id/models", async (c) => {
 			const refresh = c.req.query("refresh");

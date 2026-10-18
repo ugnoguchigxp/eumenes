@@ -4,6 +4,7 @@ import type { PropsWithChildren } from "react";
 import { afterEach, expect, test, vi } from "vitest";
 import type { AdapterHostContext } from "../toolchain-artifacts/registry";
 import {
+	type BridgeResult,
 	SpecialistBridgeContext,
 	type SpecialistBridge,
 } from "../toolchain-artifacts/specialist-bridge";
@@ -66,6 +67,10 @@ const bridgeOf = (over: Partial<SpecialistBridge> = {}) => {
 		command: vi.fn(async () => ok),
 		stopRun: vi.fn(async () => ok),
 		requestClose: vi.fn(async () => ok),
+		retarget: vi.fn(
+			async (_targetRef: string, _discard: boolean): Promise<BridgeResult> =>
+				ok,
+		),
 		closeSession: vi.fn(async () => ok),
 	} satisfies SpecialistBridge;
 	return { ...base, ...over } as typeof base;
@@ -386,4 +391,83 @@ test("a turn too quick to be seen running still refreshes the preview through up
 		}),
 	);
 	h.cache.clear();
+});
+
+test("a deleted saved work leaves the view for the draft or the empty state", async () => {
+	const active = bridgeOf({ session: session() });
+	const h = setup({ bridge: active, targetRef: "a" });
+	await waitFor(() => expect(h.hook.result.current.phase.kind).toBe("ready"));
+	const deleted = (id: string) =>
+		({ resultRefs: [{ owner: "ui-compositions", id }] }) as never;
+	await act(async () => {
+		// A late receipt of another work's delete leaves the shown work alone.
+		await h.hook.result.current.settled(
+			binding("ui-delete"),
+			deleted("b"),
+			{} as never,
+			{},
+		);
+	});
+	expect(h.setTargetRef).not.toHaveBeenCalled();
+	await act(async () => {
+		await h.hook.result.current.settled(
+			binding("ui-delete"),
+			deleted("a"),
+			{} as never,
+			{},
+		);
+	});
+	expect(h.setTargetRef).toHaveBeenCalledWith(undefined);
+	expect(active.closeSession).not.toHaveBeenCalled();
+	h.cache.clear();
+});
+
+test("while the specialist is active, choosing a saved work makes it the work it edits", async () => {
+	const failing = { ok: false as const, message: "未保存の変更があります。" };
+	const active = bridgeOf({ session: session() });
+	const h = setup({
+		bridge: active,
+		studio: studioData({ work: work({ dirty: false, savedRef: "a" }) }),
+	});
+	await waitFor(() => expect(h.hook.result.current.phase.kind).toBe("ready"));
+	const { local } = h.hook.result.current;
+	// The draft already is this saved work: it is shown, nothing changes hands.
+	await local(binding("ui-select"), event({ id: "a" }));
+	expect(active.retarget).not.toHaveBeenCalled();
+	expect(h.setTargetRef).toHaveBeenLastCalledWith(undefined);
+	expect(await local(binding("ui-select"), event({ id: "b" }))).toMatchObject({
+		status: "accepted",
+	});
+	expect(active.retarget).toHaveBeenLastCalledWith("b", false);
+	expect(h.setTargetRef).toHaveBeenLastCalledWith(undefined);
+	// Discarding is the user's explicit choice.
+	await local(binding("ui-retarget"), event({ id: "b" }));
+	expect(active.retarget).toHaveBeenLastCalledWith("b", true);
+	h.setTargetRef.mockClear();
+	active.retarget.mockResolvedValueOnce(failing);
+	expect(await local(binding("ui-select"), event({ id: "b" }))).toMatchObject({
+		status: "rejected",
+		message: failing.message,
+	});
+	expect(h.setTargetRef).not.toHaveBeenCalled();
+	h.cache.clear();
+
+	// A running turn, a suspended session or no bridge only change what is shown.
+	const busy = bridgeOf({ session: session() });
+	const b = setup({
+		bridge: busy,
+		studio: studioData({ work: work({ busy: true }) }),
+	});
+	await waitFor(() => expect(b.hook.result.current.phase.kind).toBe("ready"));
+	await b.hook.result.current.local(binding("ui-select"), event({ id: "b" }));
+	expect(busy.retarget).not.toHaveBeenCalled();
+	expect(b.setTargetRef).toHaveBeenLastCalledWith("b");
+	b.cache.clear();
+	const suspended = bridgeOf({ session: session({ state: "suspended" }) });
+	const s = setup({ bridge: suspended });
+	await waitFor(() => expect(s.hook.result.current.phase.kind).toBe("ready"));
+	await s.hook.result.current.local(binding("ui-select"), event({ id: "b" }));
+	expect(suspended.retarget).not.toHaveBeenCalled();
+	expect(s.setTargetRef).toHaveBeenLastCalledWith("b");
+	s.cache.clear();
 });

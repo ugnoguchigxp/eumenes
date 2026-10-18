@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import type { EumenesClient } from "../../../../client";
 import {
+	type BackgroundKind,
 	billingPath,
 	type Settings,
 } from "../../../../api/domains/settings/contracts";
@@ -162,4 +163,38 @@ export function useVoiceMute(client: EumenesClient) {
 		error,
 		toggle,
 	};
+}
+
+/** Switches the conversation background without opening the settings page. */
+export function useBackground(client: EumenesClient) {
+	const cache = useQueryClient();
+	const query = useSettings(client);
+	const [busy, setBusy] = useState(false);
+	const [error, setError] = useState<string | null>(null);
+	const value = query.data;
+	const selected = value?.general.background ?? "light-fairy";
+	async function select(kind: BackgroundKind) {
+		if (!value || busy || kind === selected) return;
+		setBusy(true);
+		setError(null);
+		try {
+			const settings = structuredClone(value);
+			settings.general.background = kind;
+			const saved = await client.applySettings({
+				requestId: crypto.randomUUID(),
+				expectedRevision: value.revision,
+				settings,
+				keys: [],
+			});
+			cache.setQueryData([queryRoots.settings, client.identity], saved);
+		} catch {
+			setError("背景を切り替えられませんでした");
+			void cache.invalidateQueries({
+				queryKey: [queryRoots.settings, client.identity],
+			});
+		} finally {
+			setBusy(false);
+		}
+	}
+	return { ready: !!value, selected, busy, error, select };
 }

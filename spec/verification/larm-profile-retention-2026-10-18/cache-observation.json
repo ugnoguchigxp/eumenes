@@ -1,0 +1,12 @@
+{
+  "at": "2026-10-18T05:24:01.590Z",
+  "httpStatus": 200,
+  "status": "ready",
+  "providers": [
+    {
+      "name": "llm",
+      "readiness": "ready",
+      "claimable": false
+    }
+  ]
+}

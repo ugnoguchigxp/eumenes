@@ -10,6 +10,13 @@ export const attachmentSchema = z.object({
 	size: z.number().int().positive(),
 	digest: z.string(),
 	createdAt: z.string(),
+	/** Host-made reference data shown with the image (e.g. detected objects); never set by clients. */
+	annotation: z
+		.object({
+			source: z.string().min(1).max(80),
+			data: z.record(z.string(), z.unknown()),
+		})
+		.optional(),
 });
 export type Attachment = z.infer<typeof attachmentSchema>;
 /** Eumenes resource caps; the current Provider's possibly lower limits are also enforced. */
@@ -21,6 +28,7 @@ export const attachmentLimits = {
 	maxAspect: 100,
 	pendingHours: 24,
 	pendingBytes: 64 * 1024 * 1024,
+	annotationBytes: 16 * 1024,
 };
 export const attachmentErrors = {
 	image_invalid: 422,
@@ -32,4 +40,5 @@ export const attachmentErrors = {
 	attachment_not_found: 404,
 	attachment_source_unavailable: 409,
 	attachment_capacity: 429,
+	attachment_annotation_too_large: 413,
 } as const;

@@ -168,15 +168,46 @@ export const uiCompositionsWebAdapter: WebArtifactAdapter = {
 				source === "composition-form" ? targetRef : undefined,
 			local: async (binding, event) => {
 				switch (binding.eventAction) {
-					case "ui-select": {
+					case "ui-select":
+					case "ui-retarget": {
 						const id = event.values.id;
 						const known =
 							parsedStudio.success &&
 							parsedStudio.data.history.some((item) => item.id === id);
 						if (typeof id !== "string" || (id && !known))
 							return rejected("作品が見つかりません。");
-						setTargetRef(id || undefined);
-						return { status: "accepted", message: "" };
+						const work = parsedStudio.success ? parsedStudio.data.work : null;
+						// While the specialist is active, the chosen saved work becomes what it edits.
+						const editing =
+							bridge &&
+							work &&
+							session?.state === "active" &&
+							session.artifactRevisionId === artifactRevisionId;
+						if (!id || !editing) {
+							setTargetRef(id || undefined);
+							return { status: "accepted", message: "" };
+						}
+						if (work.savedRef === id) {
+							setTargetRef(undefined);
+							return { status: "accepted", message: "" };
+						}
+						if (work.busy) {
+							setTargetRef(id);
+							return {
+								status: "accepted",
+								message: "制作中のため、表示だけを切り替えました。",
+							};
+						}
+						// `ui-retarget` is the user's choice to discard the unsaved draft for it.
+						const result = await bridge.retarget(
+							id,
+							binding.eventAction === "ui-retarget",
+						);
+						if (result.ok) {
+							setTargetRef(undefined);
+							refresh();
+						}
+						return receiptOf(result, "選んだ作品の編集に切り替えました。");
 					}
 					case "ui-refresh":
 						refresh();
@@ -216,6 +247,14 @@ export const uiCompositionsWebAdapter: WebArtifactAdapter = {
 			},
 			settled: async (binding, result) => {
 				refresh();
+				// A deleted work is gone from the screen: show the draft, or the empty state.
+				if (binding.eventAction === "ui-delete") {
+					const deleted = result.resultRefs.find(
+						(ref) => ref.owner === "ui-compositions",
+					)?.id;
+					if (deleted === targetRef) setTargetRef(undefined);
+					return;
+				}
 				if (binding.eventAction !== "ui-save" || !bridge) return;
 				// A saved work that was only suspended is finished: close it and show the saved copy.
 				if (session?.state === "suspended") {

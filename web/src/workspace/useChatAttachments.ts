@@ -75,6 +75,25 @@ export function useChatAttachments(
 		setItems(current.current);
 		checkConnection();
 	}
+	/** Attachments the host already saved (e.g. a still with its detections from another screen). */
+	function addSaved(saved: { attachment: Attachment; file: File }[]) {
+		setError(undefined);
+		const fresh = saved.filter(
+			(s) => !current.current.some((i) => i.id === s.attachment.id),
+		);
+		if (current.current.length + fresh.length > attachmentLimits.maxImages) {
+			setError("添付は8枚までです。画像を減らしてください。");
+			return;
+		}
+		const appended = fresh.map(({ attachment, file }) => {
+			const url = URL.createObjectURL(file);
+			urls.current.add(url);
+			return { id: attachment.id, file, url, saved: attachment };
+		});
+		current.current = [...current.current, ...appended];
+		setItems(current.current);
+		checkConnection();
+	}
 	function remove(id: string) {
 		const item = current.current.find((i) => i.id === id);
 		if (item) {
@@ -108,5 +127,14 @@ export function useChatAttachments(
 	function clear(snapshot: DraftImage[]) {
 		for (const item of snapshot) remove(item.id);
 	}
-	return { items, add, remove, upload, clear, busy: busy || checking, error };
+	return {
+		items,
+		add,
+		addSaved,
+		remove,
+		upload,
+		clear,
+		busy: busy || checking,
+		error,
+	};
 }

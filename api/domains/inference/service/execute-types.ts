@@ -1,7 +1,7 @@
 import type { Database } from "bun:sqlite";
 import type { AttitudeDataset, VoiceAdoption } from "../../attitude-dataset";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
-import type { LarmPort } from "../../larm";
+import type { ActivityRecorder, LarmPort } from "../../larm";
 import type {
 	SpeechDelivery,
 	SpeechPreparation,
@@ -36,6 +36,8 @@ export type InferenceOptions = {
 	providerHosts?: readonly string[];
 	fetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 	larmFactory?: (s: Settings) => LarmPort;
+	/** Records attitude judge outcomes of the saved LARM connection (monitoring). */
+	judgeActivity?: ActivityRecorder;
 	localMs?: number;
 	cloudMs?: number;
 	decisionMs?: number;

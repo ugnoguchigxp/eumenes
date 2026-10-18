@@ -139,13 +139,26 @@ export function createVoiceResponder({
 						}
 					}) ?? (() => {});
 			}
-			const waitMs = run.deadlineAt
-				? Math.max(0, Date.parse(run.deadlineAt) - Date.now()) + 10_000
-				: undefined;
-			const final = await dialogue.waitForTerminal(run.id, {
+			const waitFor = (deadlineAt: string | null | undefined) =>
+				deadlineAt
+					? Math.max(0, Date.parse(deadlineAt) - Date.now()) + 10_000
+					: undefined;
+			let final = await dialogue.waitForTerminal(run.id, {
 				signal: controller.signal,
-				timeoutMs: waitMs,
+				timeoutMs: waitFor(run.deadlineAt),
 			});
+			// A toolchain with its own run time moved the deadline later meanwhile: keep waiting until that one.
+			while (
+				!controller.signal.aborted &&
+				final &&
+				["queued", "running"].includes(final.status) &&
+				final.deadlineAt &&
+				Date.parse(final.deadlineAt) + 10_000 > Date.now()
+			)
+				final = await dialogue.waitForTerminal(run.id, {
+					signal: controller.signal,
+					timeoutMs: waitFor(final.deadlineAt),
+				});
 			if (controller.signal.aborted) return;
 			if (streamError) throw streamError;
 			if (final && ["queued", "running"].includes(final.status)) {

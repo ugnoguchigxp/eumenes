@@ -21,6 +21,13 @@ export type Control = (
 type Rec = Record<string, unknown>;
 /** Hosts that may receive provider credentials: the LARM base host plus explicit extras. */
 export type ProviderHosts = { base: URL; extra: readonly string[] };
+export type ProfileRequest = {
+	profile: string;
+	client: string;
+	audience: string;
+	fullProfile: boolean;
+	catalogRevision: string;
+};
 
 const terminalStatuses = ["failed", "expired", "released"];
 const providersOf = (value: Rec): Rec[] =>
@@ -68,12 +75,7 @@ export async function fetchCatalog(
 /** Stage 2: create the connection and return its (possibly not yet ready) record. */
 export async function createConnection(
 	control: Control,
-	input: {
-		profile: string;
-		client: string;
-		audience: string;
-		fullProfile: boolean;
-		catalogRevision: string;
+	input: ProfileRequest & {
 		/** Reused for every creation attempt of one connect() so a retry cannot duplicate the connection. */
 		idempotencyKey: string;
 	},

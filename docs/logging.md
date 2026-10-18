@@ -89,6 +89,8 @@ bun run logs -- --since 2026-10-08T10:00:00+09:00 --component inference --json
 
 会話の初動の依頼分類(R1)は `dialogue.request_analyzed`(`kind`・`freshness`・`next`=answer/report_unavailable/toolchain・`durationMs`。依頼の内容は出ません)で、選定記録(`analysis_json`)には `kind`・`freshness`・`impact`・`approved` と `next` が残ります。会話の判断は `dialogue.candidates_selected`(`candidateCount`・`retrieval`=fts/embedding/hybrid/none・`durationMs`)と `toolchain.selection_recorded`(`selectionId`・`runId`・`decision`・`toolchainId`)、終了は `toolchain.selection_settled`(`runId`・`outcome`・`reason`)に出ます。`web_search` の手順キャッシュは `recipe.saved`・`recipe.suspended`(`recipeId`・`toolchainId`)です。embeddingの失敗は `toolchain.query_embedding_failed`・`toolchain.vectors_refresh_failed`(1分に1回まで)で、その間は全ツールチェーンを提示して会話を続けます。登録できなかったツールチェーンは `toolchain.registration_failed`(`subjectId`・`reason`)です。
 
+専門担当のツールチェーンが時間の設定（bindingの `timeLimits`）を持つと、runを渡した時点で `dialogue.deadline_extended`（`runId`・`toolchainId`・`limitMs`=runの持ち時間）をinfoで残します。専門担当の1ターンが時間切れになると `dialogue.specialist_turn_timeout`（`runId`・`toolchainId`・`limitMs`=効いていた1ターンの上限）をwarnで残します。
+
 専門担当の操作が拒否されると `dialogue.operation_rejected`（`reason=specialist_operation_refused`・`validationCode`）に、操作が返した修正の手がかり `repairHint`（位置と規則名だけ。定義や文言の値は含めない。200文字まで）を残します。UI自由制作の下書きが反映されない原因は、ここから調べます。
 
 出さないもの: 発話・依頼文・候補の説明、手順のsignature・URL・読む箇所、取得本文。これらは `GET /api/toolchain-history/selections?runId=<runId>` と `bun run cli -- toolchain-history show <runId>` で確認します。調査は `bun run logs -- --level warn` で runId を得てから、選択の記録を引きます。

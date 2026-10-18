@@ -58,12 +58,9 @@ select:focus-visible {
 	align-items: center;
 	gap: 4px 10px;
 	width: fit-content;
-	max-width: min(
-		640px,
-		calc(
-			100% - 92px - env(safe-area-inset-left, 0px) -
-				env(safe-area-inset-right, 0px)
-		)
+	max-width: calc(
+		100% - 92px - env(safe-area-inset-left, 0px) -
+			env(safe-area-inset-right, 0px)
 	);
 	padding: 8px 12px;
 	border: 1px solid var(--border);
@@ -798,6 +795,16 @@ select:focus-visible {
 	object-fit: contain;
 	background: white;
 	border-radius: 8px;
+}
+.draft-image:has(.draft-image-note) {
+	flex-wrap: wrap;
+	max-width: 112px;
+}
+.draft-image-note {
+	flex-basis: 100%;
+	font-size: 11px;
+	color: var(--muted-foreground);
+	overflow-wrap: anywhere;
 }
 .message-images img {
 	width: 120px;

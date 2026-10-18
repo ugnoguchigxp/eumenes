@@ -68,7 +68,10 @@ function fitMessages(
 		throw new Error("image_not_supported");
 	const messages = [...input];
 	const window = resource.contextWindow ?? 0;
-	const reserve = outputReserveTokens(window);
+	// A control request's own output limit (a long draft) within a quarter of the window; else the default.
+	const reserve = row.outputLimit
+		? Math.min(row.outputLimit, Math.floor(window / 4))
+		: outputReserveTokens(window);
 	const budget = window - reserve - FIT_MARGIN_TOKENS;
 	const sizes = messages.map((message) => estimateMessageTokens([message]));
 	let tokens = sizes.reduce((sum, size) => sum + size, 0);

@@ -75,6 +75,7 @@ export type AdapterState = {
 	uploadFile?(
 		source: string,
 		file: File,
+		context?: Readonly<Record<string, string>>,
 	): Promise<Receipt & { value?: string }>;
 	/** Live PTY sessions of a terminal source (stream, ordered input, resize). */
 	openTerminal?(source: string, sessionId: string): TerminalConnection;

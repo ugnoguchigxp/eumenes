@@ -1,4 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
+import { attemptDuration } from "../service/attempt-work";
 import { cleanup, messages, setup } from "./inference.fixture";
 afterEach(async () => {
 	for (const close of cleanup.splice(0)) await close();
@@ -292,4 +293,112 @@ test("a dedicated resource that can not be used falls back to the conversation r
 		}),
 	);
 	expect(routeOf(plain)).toEqual(larmOnly);
+});
+test("a control request may ask for a long output (a large draft), up to 32k tokens", async () => {
+	let opts: unknown;
+	const h = await setup({
+		local: async (_messages, _signal, options) => {
+			opts = options;
+			return '{"action":"respond"}';
+		},
+	});
+	const capture = (maxOutputTokens: number, n: number) =>
+		h.store.write((db) => {
+			h.inference.captureInTransaction(
+				db,
+				`root-long-${n}`,
+				"llm",
+				Date.now() + 10000,
+			);
+			return h.inference.captureControlInTransaction(db, {
+				subject: `agent:long:${n}`,
+				policySubject: `root-long-${n}`,
+				deadline: Date.now() + 9000,
+				maxOutputTokens,
+			});
+		});
+	await h.inference.executeControl(
+		await capture(24_576, 1),
+		messages,
+		new AbortController().signal,
+	);
+	expect(opts).toMatchObject({ maxOutputTokens: 24_576 });
+	await h.inference.executeControl(
+		await capture(100_000, 2),
+		messages,
+		new AbortController().signal,
+	);
+	expect(opts).toMatchObject({ maxOutputTokens: 32_768 });
+});
+test("a toolchain's own limits: the run's requests are moved later (never earlier) and an attempt carries its own time", async () => {
+	let opts: unknown;
+	const h = await setup({
+		local: async (_messages, _signal, options) => {
+			opts = options;
+			return '{"action":"respond"}';
+		},
+	});
+	const now = Date.now();
+	const deadlineOf = (subject: string) =>
+		h.store.read(
+			(db) =>
+				(
+					db
+						.query("SELECT deadline FROM inference_requests WHERE subject=?")
+						.get(subject) as { deadline: number }
+				).deadline,
+		);
+	const id = await h.store.write((db) => {
+		h.inference.captureInTransaction(db, "root-slow", "llm", now + 10_000);
+		h.inference.extendDeadlineInTransaction(db, "root-slow", now + 900_000);
+		h.inference.extendDeadlineInTransaction(db, "root-slow", now + 5_000);
+		return h.inference.captureControlInTransaction(db, {
+			subject: "agent:slow",
+			policySubject: "root-slow",
+			deadline: now + 800_000,
+			maxOutputTokens: 1000,
+			attemptMs: 600_000,
+		});
+	});
+	expect(deadlineOf("root-slow")).toBe(now + 900_000);
+	expect(deadlineOf("agent:slow")).toBe(now + 800_000);
+	await h.inference.executeControl(id, messages, new AbortController().signal);
+	expect(opts).toMatchObject({ attemptMs: 600_000 });
+	// Running it bounds the request by its own attempt time, not the usual 180 s.
+	expect(deadlineOf("agent:slow")).toBeGreaterThanOrEqual(now + 600_000);
+	expect(deadlineOf("agent:slow")).toBeLessThan(now + 800_000);
+	const plain = await h.store.write((db) => {
+		h.inference.captureInTransaction(db, "root-plain", "llm", now + 10_000);
+		return h.inference.captureControlInTransaction(db, {
+			subject: "agent:plain",
+			policySubject: "root-plain",
+			deadline: now + 9_000,
+			maxOutputTokens: 1000,
+		});
+	});
+	await h.inference.executeControl(
+		plain,
+		messages,
+		new AbortController().signal,
+	);
+	expect(opts).not.toHaveProperty("attemptMs");
+});
+test("an attempt's own time replaces the LARM and cloud defaults, within the request's deadline", () => {
+	const request = (attemptMs: number | null, deadlineIn: number) =>
+		({
+			env: { options: {} },
+			row: {
+				purpose: "llm",
+				attemptMs,
+				snapshot: { routes: { llm: { mode: "larm-only" } } },
+			},
+			deadline: Date.now() + deadlineIn,
+		}) as unknown as Parameters<typeof attemptDuration>[0];
+	expect(attemptDuration(request(null, 900_000), "larm")).toBe(120_000);
+	expect(attemptDuration(request(null, 900_000), "cloud")).toBe(60_000);
+	expect(attemptDuration(request(600_000, 900_000), "larm")).toBe(600_000);
+	expect(attemptDuration(request(600_000, 900_000), "cloud")).toBe(600_000);
+	const short = attemptDuration(request(600_000, 30_000), "cloud");
+	expect(short).toBeLessThanOrEqual(30_000);
+	expect(short).toBeGreaterThan(29_000);
 });

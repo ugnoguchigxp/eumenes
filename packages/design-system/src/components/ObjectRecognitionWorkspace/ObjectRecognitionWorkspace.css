@@ -495,3 +495,21 @@
 		grid-template-columns: minmax(0, 1fr);
 	}
 }
+
+.recognition-handoff {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px 12px;
+	padding: 10px 12px;
+	border: 1px solid var(--recognition-accent);
+	border-radius: 8px;
+	background: var(--accent, #eaf2f3);
+}
+
+.recognition-handoff-actions,
+.recognition-open-buttons {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}

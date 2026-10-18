@@ -25,7 +25,7 @@
 
 ## 状態の契約と将来の取得経路
 
-`SpatialBackground` の `items` が取得側から受け取る唯一の観測入力。Sceneやモデルはhealthを判定しない。将来は取得側が公開APIの結果をこの型へ変換し、同じ実体IDで渡す。モデルとWebGL contextは状態変更だけでは再作成しない。形状サンプルのIDを実際のProviderのIDと混同しない。
+`SpatialBackground` の `items` が取得側から受け取る唯一の観測入力。Sceneやモデルはhealthを判定しない。取得側は `web/src/domains/monitoring`。`GET /api/monitoring/snapshot` を表示中だけ1分ごとに読み、形状（`shape`）で配置へ当て、backend が決めた実体ID（例 `service-llm`、`eumenes-backend`）で渡す。読めなかったときは Eumenes Backend を接続断、他を stale にする。判定規則は [Spatial監視の設計](../spec/spatial-monitoring-eumenes-design-2026-10-18.md) §3。モデルとWebGL contextは状態変更だけでは再作成しない。形状サンプルのIDを実際のProviderのIDと混同しない。
 
 ```ts
 // 型は web/src/domains/background の公開entryからimportする。

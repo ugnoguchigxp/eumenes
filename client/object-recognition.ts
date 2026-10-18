@@ -1,6 +1,10 @@
 import { z } from "zod";
-import { recognitionRecord } from "../api/domains/object-recognition/contracts";
+import {
+	handoff,
+	recognitionRecord,
+} from "../api/domains/object-recognition/contracts";
 import { runSchema } from "../api/domains/dialogue/contracts";
+import { attachmentSchema } from "../api/domains/conversation/contracts";
 import { callJson, json, type Transport } from "./transport";
 
 const recognitionConnectionSchema = z.object({
@@ -66,11 +70,12 @@ export function objectRecognitionClient(t: Transport) {
 			file: File,
 			conversationId: string,
 			requestId: string,
+			origin: "camera" | "screen" | "file" = "file",
 		) => {
 			const body = new FormData();
 			body.append("file", file);
 			return record(
-				`${root}?conversationId=${encodeURIComponent(conversationId)}&requestId=${encodeURIComponent(requestId)}`,
+				`${root}?conversationId=${encodeURIComponent(conversationId)}&requestId=${encodeURIComponent(requestId)}&origin=${origin}`,
 				{ method: "POST", body },
 			);
 		},
@@ -87,16 +92,34 @@ export function objectRecognitionClient(t: Transport) {
 			(
 				await t.call(`${root}/${encodeURIComponent(id)}/content`, { signal })
 			).blob(),
-		recognitionIncorporate: async (
-			id: string,
-			requestId: string,
-			frameIndex?: number,
-		) =>
+		/** A pending chat attachment (the still and its detections); the user sends it. */
+		recognitionAttach: (id: string, requestId: string) =>
+			callJson(
+				t,
+				attachmentSchema,
+				`${root}/${encodeURIComponent(id)}/attachment`,
+				json({ requestId }),
+			),
+		recognitionHandoffs: (conversationId: string, signal?: AbortSignal) =>
+			callJson(
+				t,
+				handoff.array(),
+				`${root}/handoffs?conversationId=${encodeURIComponent(conversationId)}`,
+				{ signal },
+			),
+		recognitionHandoffSend: (id: string, recognitionId?: string) =>
 			callJson(
 				t,
 				runSchema,
-				`${root}/${encodeURIComponent(id)}/conversation`,
-				json({ requestId, frameIndex }),
+				`${root}/handoffs/${encodeURIComponent(id)}/send`,
+				json(recognitionId ? { recognitionId } : {}),
+			),
+		recognitionHandoffCancel: (id: string) =>
+			callJson(
+				t,
+				handoff,
+				`${root}/handoffs/${encodeURIComponent(id)}/cancel`,
+				json({}),
 			),
 	};
 }

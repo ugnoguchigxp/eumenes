@@ -132,8 +132,16 @@ export interface InferencePort {
 			engine?: "codex";
 			/** `larm-only` (default) or the saved cloud LLM resource task sub-agents run on (see `BackgroundControl.route`). */
 			route?: "larm-only" | { resourceId: string };
+			/** How long one attempt may run, in place of the LARM and cloud defaults (a toolchain's own limit). */
+			attemptMs?: number;
 		},
 	): string;
+	/** Move the deadline of a run's requests (subject) later; never earlier. */
+	extendDeadlineInTransaction?(
+		db: Database,
+		subject: string,
+		deadline: number,
+	): void;
 	/** Authorized user action with its own deadline; the caller validates ownership and settles the result. */
 	captureUserControlInTransaction?(
 		db: Database,

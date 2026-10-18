@@ -1,0 +1,198 @@
+import { getLogger } from "../../../infrastructure/logger";
+import type {
+	ActivityObservation,
+	ActivityRecorder,
+	LarmStatus,
+} from "../../larm";
+import type { QueueStatus } from "../../queue";
+import type { Purpose, Settings } from "../../settings/contracts";
+import type {
+	MonitoringItem,
+	MonitoringShape,
+	MonitoringSnapshot,
+} from "../contracts";
+import { createHostMetrics } from "./host";
+import { hostLimits, hostState, serviceState } from "./rules";
+
+const log = getLogger("monitoring");
+/** Outcomes older than this say nothing about the service now (§3). */
+const WINDOW_MS = 10 * 60_000;
+const none: ActivityObservation = {
+	running: 0,
+	lastSuccessAt: null,
+	lastFailure: null,
+};
+
+type Group = "llm" | "asr" | "tts" | "language";
+type Activity = (since: number) => ActivityObservation;
+export type MonitoringDeps = {
+	settings: {
+		get(): Settings;
+		diagnostics(): {
+			connections: { id: string; credentialAvailable: boolean }[];
+		};
+	};
+	larmStatus(): LarmStatus;
+	attempts(since: number): Record<Group, ActivityObservation>;
+	image?: Activity;
+	music?: Activity;
+	embedding: ActivityRecorder;
+	judge: ActivityRecorder;
+	queue: { stats(): QueueStatus };
+	/** The data directory; its volume is the SSD that is measured. */
+	dataDir: string;
+	host?: ReturnType<typeof createHostMetrics>;
+	now?: () => number;
+};
+
+const labels: Record<MonitoringShape, string> = {
+	cpu: "CPU",
+	memory: "Memory",
+	ssd: "SSD",
+	network: "Eumenes Backend",
+	llm: "LLM",
+	asr: "ASR",
+	tts: "TTS",
+	embedding: "Embedding",
+	attitude: "態度判定",
+	language: "言語判定",
+	image: "画像生成",
+	music: "楽曲生成",
+};
+const ids: Record<MonitoringShape, string> = {
+	cpu: "eumenes-host-cpu",
+	memory: "eumenes-host-memory",
+	ssd: "eumenes-host-ssd",
+	network: "eumenes-backend",
+	llm: "service-llm",
+	asr: "service-asr",
+	tts: "service-tts",
+	embedding: "service-embedding",
+	attitude: "service-attitude",
+	language: "service-language",
+	image: "service-image",
+	music: "service-music",
+};
+
+/** Reads only: owner domains supply outcomes, this domain judges health (spec §3). */
+export function createMonitoring(deps: MonitoringDeps) {
+	const now = deps.now ?? Date.now;
+	const host = deps.host ?? createHostMetrics(deps.dataDir);
+	const previous = new Map<string, string>();
+
+	function larmReachable(status: LarmStatus) {
+		return status.state !== "unconfigured" && status.state !== "failed";
+	}
+	/** A route reaches its service when LARM is up, or when its cloud resource is usable. */
+	function routeReachable(purpose: Purpose, settings: Settings, larm: boolean) {
+		const route = settings.routes[purpose];
+		const resource = settings.resources.find((r) => r.id === route.fallbackId);
+		const connection = settings.connections.find(
+			(c) => c.id === resource?.connectionId,
+		);
+		const cloud =
+			!!connection?.enabled &&
+			!!deps.settings
+				.diagnostics()
+				.connections.find((c) => c.id === connection.id)?.credentialAvailable;
+		if (route.mode === "cloud-only") return cloud;
+		if (route.mode === "larm-preferred" && route.cloudAllowed && cloud)
+			return true;
+		return larm;
+	}
+
+	function item(
+		shape: MonitoringShape,
+		state: MonitoringItem["state"],
+	): MonitoringItem {
+		const id = ids[shape];
+		const before = previous.get(id);
+		if (before !== state.health) {
+			previous.set(id, state.health);
+			if (before !== undefined)
+				log.info("monitoring.health_changed", {
+					subjectId: id,
+					status: state.health,
+					...(state.reason ? { reason: state.reason } : {}),
+				});
+		}
+		return { id, shape, label: labels[shape], state };
+	}
+
+	return {
+		async snapshot(): Promise<MonitoringSnapshot> {
+			const observedAt = now();
+			const since = observedAt - WINDOW_MS;
+			const settings = deps.settings.get();
+			const status = deps.larmStatus();
+			const larm = larmReachable(status);
+			const starting = status.state === "connecting";
+			const attempts = deps.attempts(since);
+			const queue = deps.queue.stats();
+			const sample = await host.sample();
+			const busy =
+				Object.values(queue.lanes).some((lane) => lane.running > 0) ||
+				Object.values(attempts).some((a) => a.running > 0);
+			const route = (purpose: Purpose, group: Group) =>
+				serviceState(
+					attempts[group],
+					routeReachable(purpose, settings, larm),
+					// A cloud-only route does not wait for the LARM connection.
+					starting && settings.routes[purpose].mode !== "cloud-only",
+				);
+			const recorded = (o: ActivityObservation) =>
+				serviceState({ ...o, ...recentOnly(o, since) }, larm, starting);
+			return {
+				observedAt,
+				items: [
+					item(
+						"cpu",
+						hostState(sample.cpu, (u) => u > hostLimits.cpuPressure),
+					),
+					item(
+						"memory",
+						hostState(sample.memory, (u) => u > hostLimits.memoryPressure),
+					),
+					item(
+						"ssd",
+						hostState(
+							sample.disk,
+							(u) => 1 - u < hostLimits.diskFreePressure,
+							(u) => 1 - u < hostLimits.diskFreeFault,
+						),
+					),
+					// Answering at all is the backend's health; its load is shown, never coloured (Q7).
+					item("network", {
+						health: "healthy",
+						activity: busy ? "working" : "idle",
+						...(sample.process === undefined
+							? {}
+							: { utilization: sample.process }),
+					}),
+					item("llm", route("llm", "llm")),
+					item("asr", route("asr", "asr")),
+					item("tts", route("tts", "tts")),
+					item("embedding", recorded(deps.embedding.observe())),
+					item("attitude", recorded(deps.judge.observe())),
+					item("language", route("llm", "language")),
+					item("image", recorded(deps.image?.(since) ?? none)),
+					item("music", recorded(deps.music?.(since) ?? none)),
+				],
+			};
+		},
+	};
+}
+
+/** In-memory recorders keep outcomes forever; only the window counts. */
+function recentOnly(o: ActivityObservation, since: number) {
+	return {
+		lastSuccessAt:
+			o.lastSuccessAt !== null && o.lastSuccessAt >= since
+				? o.lastSuccessAt
+				: null,
+		lastFailure:
+			o.lastFailure && o.lastFailure.at >= since ? o.lastFailure : null,
+	};
+}
+
+export type MonitoringService = ReturnType<typeof createMonitoring>;

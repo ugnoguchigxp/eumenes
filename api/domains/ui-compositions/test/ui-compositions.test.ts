@@ -393,6 +393,77 @@ test("editing a saved composition bumps its revision, and a stale save is a conf
 	).rejects.toThrow("target_not_found");
 });
 
+test("the screen deletes a saved composition with its answers, unless a work is still built on it", async () => {
+	const s = setup();
+	const work = await open(s);
+	await turn(s, work.workRef, "A", survey());
+	const projectId = (await save(s, work.workRef, 1, 0)).receipt.projectId;
+	await s.store.write((db) =>
+		s.service.submitInTransaction(
+			db,
+			ui,
+			{
+				projectId,
+				expectedGeneration: 1,
+				values: { name: "A", rating: "満足" },
+			},
+			id(),
+		),
+	);
+	const remove = (
+		expectedSavedRevision: number,
+		requestId = id(),
+		caller: Caller = ui,
+		target = projectId,
+	) =>
+		s.store.write((db) =>
+			s.service.deleteInTransaction(
+				db,
+				caller,
+				{ projectId: target, expectedSavedRevision },
+				requestId,
+			),
+		);
+	// The work that saved it still holds it until the session ends.
+	await expect(remove(1)).rejects.toThrow("composition_in_use");
+	await s.store.write((db) =>
+		s.service.endWorkInTransaction(db, work.workRef, "close"),
+	);
+	await expect(remove(2)).rejects.toThrow("revision_conflict");
+	await expect(
+		remove(1, id(), { kind: "specialist", runId: id(), workRef: id() }),
+	).rejects.toThrow("origin_not_allowed");
+	const requestId = id();
+	const deleted = await remove(1, requestId);
+	expect(deleted).toMatchObject({
+		replay: false,
+		receipt: { projectId, state: "deleted", title: "A", savedRevision: 1 },
+	});
+	expect(saved(s)).toEqual([]);
+	expect(
+		s.store.read((db) => s.service.formInTransaction(db, projectId)),
+	).toBeNull();
+	expect(
+		s.store.read((db) =>
+			db
+				.query(
+					"SELECT COUNT(*) AS n FROM ui_composition_responses WHERE composition_id=?",
+				)
+				.get(projectId),
+		),
+	).toEqual({ n: 0 });
+	expect(await remove(1, requestId)).toMatchObject({ replay: true });
+	await expect(remove(1)).rejects.toThrow("target_not_found");
+	await expect(
+		s.store.write((db) =>
+			s.service.openWorkInTransaction(db, {
+				sessionId: id(),
+				targetRef: projectId,
+			}),
+		),
+	).rejects.toThrow("target_not_found");
+});
+
 test("the undo history is bounded by an explicit error, never by dropping steps", async () => {
 	const s = setup();
 	const work = await open(s);
@@ -699,6 +770,25 @@ test("definitions: only the allowed views, no source, within size and view-count
 	expect(refused(layout([text(), { view: "info-card", title: "t" }]))).toBe(
 		"ui_definition_invalid",
 	);
+});
+
+test("definitions: an HTML line break in a text becomes the newline it meant; other text is kept", () => {
+	const { definition } = validatedDefinition(
+		layout([
+			{
+				view: "hero",
+				title: "一歩ずつ、街を<br>楽しく。",
+				body: "a<BR/>b<br />c",
+			},
+			text("1 < 2"),
+		]),
+	);
+	const [hero, block] = definition.children as Array<Record<string, unknown>>;
+	expect(hero).toMatchObject({
+		title: "一歩ずつ、街を\n楽しく。",
+		body: "a\nb\nc",
+	});
+	expect(block!.title).toBe("1 < 2");
 });
 
 test("definitions: a part's schema refusal names the field of the part's own view, not the whole union", () => {

@@ -1,6 +1,11 @@
 import type { Database } from "bun:sqlite";
 export interface ObjectRecognitionPort {
-	snapshotInTransaction(db: Database, conversationId: string): unknown;
+	/** `viewing` is the run's screen context; the port marks only a record it owns. */
+	snapshotInTransaction(
+		db: Database,
+		conversationId: string,
+		viewing?: { artifactRevisionId: string; targetRef: string } | null,
+	): unknown;
 	invokeInTransaction(
 		db: Database,
 		runId: string,

@@ -72,6 +72,18 @@ export const specialistCommandSchema = z
 	.object({ requestId: z.uuid(), expectedRevision: z.number().int().min(0) })
 	.strict();
 export type SpecialistCommand = z.infer<typeof specialistCommandSchema>;
+/**
+ * `POST /api/specialist-sessions/:id/retarget` from the screen: the active session goes on with the
+ * saved item the user chose in the history. Its own work is ended and a session on that item opens; unsaved
+ * work is refused with `work_unsaved` unless the user chose to discard it.
+ */
+export const specialistRetargetSchema = specialistCommandSchema
+	.extend({
+		targetRef: z.string().min(1).max(64),
+		discardUnsaved: z.boolean(),
+	})
+	.strict();
+export type SpecialistRetarget = z.infer<typeof specialistRetargetSchema>;
 export const specialistCommandKinds = [
 	"return",
 	"resume",
@@ -127,6 +139,8 @@ export type SpecialistSet = {
 	}>;
 	/** Schema whose choices list startable saved items; null when sessions start empty only. */
 	targetSchemaRef: string | null;
+	/** The binding's time limits (run from the hand-over, one turn, one inference); null: the host defaults. */
+	timeLimits: { runMs: number; turnMs: number; inferenceMs: number } | null;
 };
 
 type SpecialistWorkState = {

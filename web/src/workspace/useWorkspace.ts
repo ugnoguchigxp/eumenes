@@ -3,6 +3,10 @@ import { useChatAttachments } from "./useChatAttachments";
 import { useDrawingArtifacts } from "../domains/excalidraw/useDrawingArtifacts";
 import { useOpenDrawing, useOpenPlaylist } from "./open-artifacts";
 import { useRecognitionArtifacts } from "../domains/object-recognition";
+import {
+	recognitionViewing,
+	useRecognitionChatInbox,
+} from "../domains/object-recognition/chat-inbox";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
 	useCallback,
@@ -59,6 +63,13 @@ export function useWorkspace({
 		void openById("object-recognition.workspace");
 	}, [openById]);
 	useRecognitionArtifacts(client, openRecognition);
+	// The recognition screen's "会話に追加" lands in this chat input, not as a sent message.
+	const inboxCount = useRecognitionChatInbox((s) => s.items.length);
+	const addSavedImages = attachments.addSaved;
+	useEffect(() => {
+		if (!inboxCount) return;
+		addSavedImages(useRecognitionChatInbox.getState().take());
+	}, [inboxCount, addSavedImages]);
 	const openClaudeCode = useCallback(() => {
 		void openById("terminals.workspace");
 	}, [openById]);
@@ -251,6 +262,10 @@ export function useWorkspace({
 		toolchain,
 		runSignature: latestRun ? `${latestRun.id}:${latestRun.status}` : "",
 	});
+	const activeTab = useRef(artifacts.active);
+	useEffect(() => {
+		activeTab.current = artifacts.active;
+	}, [artifacts.active]);
 	const send = chatSend(
 		input,
 		setInput,
@@ -258,7 +273,7 @@ export function useWorkspace({
 		submit,
 		automaticInput,
 		watchTimerRun,
-		specialist.viewing,
+		() => specialist.viewing() ?? recognitionViewing(activeTab.current),
 		specialist.addresseeNow,
 	);
 	useEffect(() => {

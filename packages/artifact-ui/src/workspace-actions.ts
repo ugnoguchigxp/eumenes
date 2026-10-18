@@ -6,5 +6,6 @@ export type WorkspaceAction =
 	| "recognition-credential-source"
 	| "recognition-remove"
 	| "recognition-incorporate"
+	| "recognition-handoff-cancel"
 	| "terminal-start"
 	| "terminal-restart";

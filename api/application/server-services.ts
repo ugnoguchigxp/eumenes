@@ -1,4 +1,4 @@
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import type { GoogleProvider } from "../domains/google-accounts";
 import { CONVERSATION_DEFAULT_PRINCIPAL } from "../domains/conversation/contracts";
 import { createContinuityService } from "../domains/continuity";
@@ -19,6 +19,7 @@ import { getLogger } from "../infrastructure/logger";
 import type { Config } from "../infrastructure/config";
 import { createDotsDialogue } from "./work/dots-dialogue";
 import { createSavedEmbedder } from "./world/larm-embedder";
+import { createMonitoring } from "../domains/monitoring";
 import { buildCore, buildWebResearch } from "./server-core";
 import { buildMedia } from "./server-media";
 import { buildTasks } from "./server-tasks";
@@ -68,7 +69,11 @@ export async function buildServices(
 	});
 	const { delegated } = tasks;
 	// One embedder on the saved LARM connection serves both the toolchain routing and the memory turn vectors.
-	const embedder = createSavedEmbedder(config, settings);
+	const embedder = createSavedEmbedder(
+		config,
+		settings,
+		core.activity.embedding,
+	);
 	const continuity = createContinuityService(store);
 	const memoryJournalPath = resolve(config.memoryJournalPath);
 	const memory = createMemoryService(store, conversation, continuity, {
@@ -184,6 +189,17 @@ export async function buildServices(
 	links.attachDialogue(dialogue);
 	stewardAssembly.attachDialogue(dialogue);
 	const voice = createVoiceDialogue(store, dialogue, inference);
+	const monitoring = createMonitoring({
+		settings,
+		larmStatus: () => inference.status(),
+		attempts: inference.attemptActivity,
+		image: media.image.activity,
+		music: media.music.activity,
+		embedding: core.activity.embedding,
+		judge: core.activity.judge,
+		queue,
+		dataDir: dirname(resolve(dbPath)),
+	});
 	scheduler.registerTarget(dialogue.promptTarget);
 	return {
 		store,
@@ -218,6 +234,7 @@ export async function buildServices(
 		toolchain,
 		dialogue,
 		voice,
+		monitoring,
 	};
 }
 export type Services = Awaited<ReturnType<typeof buildServices>>;

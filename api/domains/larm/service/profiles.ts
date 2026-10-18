@@ -1,4 +1,5 @@
 import type { Capability } from "../contracts";
+import type { ProfileRequest } from "./connect";
 
 import type { ChatInput } from "../contracts/chat-input";
 export type ProviderName = Capability | "system-one" | "tts-english";
@@ -22,6 +23,8 @@ export type Provider = {
 	voice?: string;
 };
 export type Lease = {
+	/** Exact original Profile request; periodic use preserves its session scope and revision. */
+	request: ProfileRequest;
 	id: string;
 	expiresAt: number;
 	providers: Map<ProviderName, Provider>;

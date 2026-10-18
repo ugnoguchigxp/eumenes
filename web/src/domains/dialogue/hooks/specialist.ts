@@ -74,3 +74,39 @@ export function useSpecialistCommand(
 			invalidateSpecialistSession(cache, client.identity, conversationId),
 	});
 }
+
+/**
+ * Go on with the saved item chosen in the history (discarding unsaved work only when the user chose to).
+ * A repeated attempt of the same choice on the same session revision reuses its request id.
+ */
+export function useSpecialistRetarget(
+	client: DialogueClient,
+	conversationId: string,
+) {
+	const cache = useQueryClient();
+	const sent = useRef(new Map<string, string>());
+	return useMutation({
+		mutationFn: async ({
+			session,
+			targetRef,
+			discardUnsaved,
+		}: {
+			session: Pick<SpecialistSession, "id" | "revision">;
+			targetRef: string;
+			discardUnsaved: boolean;
+		}) => {
+			const key = `${session.id}:${session.revision}:${targetRef}:${discardUnsaved}`;
+			const requestId = sent.current.get(key) ?? crypto.randomUUID();
+			sent.current.set(key, requestId);
+			return client.specialistRetarget(session.id, {
+				requestId,
+				expectedRevision: session.revision,
+				targetRef,
+				discardUnsaved,
+			});
+		},
+		retry: false,
+		onSettled: () =>
+			invalidateSpecialistSession(cache, client.identity, conversationId),
+	});
+}

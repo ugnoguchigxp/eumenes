@@ -13,9 +13,16 @@ export function createAttachments(store: SqliteStore, principal: string) {
 			conversationId: string,
 			id: string,
 			file: File,
+			annotation?: Attachment["annotation"],
 		): Promise<Attachment> {
 			if (file.size > attachmentLimits.maxBytes)
 				throw new Error("image_too_large");
+			if (
+				annotation &&
+				Buffer.byteLength(JSON.stringify(annotation)) >
+					attachmentLimits.annotationBytes
+			)
+				throw new Error("attachment_annotation_too_large");
 			const original = new Uint8Array(await file.arrayBuffer());
 			const originalDigest = digest(original);
 			const normalized = await normalizeImage(original, file.type);
@@ -56,6 +63,7 @@ export function createAttachments(store: SqliteStore, principal: string) {
 					size: normalized.bytes.length,
 					digest: digest(normalized.bytes),
 					createdAt: new Date().toISOString(),
+					...(annotation ? { annotation } : {}),
 				};
 				db.query(
 					"INSERT INTO conversation_attachments VALUES(?,?,?,?,?,?,?,?,?)",

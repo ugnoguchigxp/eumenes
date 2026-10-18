@@ -14,6 +14,7 @@ export type ObjectRecognitionResource = Omit<
 	| "onRefresh"
 	| "onRecheck"
 	| "onIncorporate"
+	| "onHandoffCancel"
 	| "onRemove"
 	| "message"
 > & { kind: "object-recognition-workspace"; revision: number };
@@ -35,9 +36,9 @@ export function ObjectRecognitionWorkspaceView({
 					credentialSource: source,
 				});
 			}}
-			onFile={async (file) => {
+			onFile={async (file, context) => {
 				if (!runtime.uploadFile) throw new Error("input_unavailable");
-				const receipt = await runtime.uploadFile(action.source, file);
+				const receipt = await runtime.uploadFile(action.source, file, context);
 				if (receipt.status !== "accepted") throw new Error(receipt.message);
 			}}
 			onSelect={(id) => {
@@ -55,11 +56,11 @@ export function ObjectRecognitionWorkspaceView({
 			onRemove={(id) => {
 				void action.send("recognition-remove", { id });
 			}}
-			onIncorporate={(id, frameIndex) => {
-				void action.send("recognition-incorporate", {
-					id,
-					frameIndex: frameIndex === undefined ? "" : String(frameIndex),
-				});
+			onIncorporate={(id) => {
+				void action.send("recognition-incorporate", { id });
+			}}
+			onHandoffCancel={(id) => {
+				void action.send("recognition-handoff-cancel", { id });
 			}}
 		/>
 	);

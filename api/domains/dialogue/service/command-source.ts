@@ -2,6 +2,8 @@ import type { Database } from "bun:sqlite";
 import { z } from "zod";
 import { delegationCommand } from "../contracts/delegation";
 import type { Run } from "../contracts";
+import type { Viewing } from "../contracts/specialist";
+import { runViewing } from "../repository";
 import type { ToolchainRoutingPort } from "../contracts/toolchains";
 import type { DialogueDeps } from "./context";
 
@@ -129,6 +131,7 @@ export function commandSource(
 		snapshot = deps.objectRecognition?.snapshotInTransaction(
 			tx,
 			run.conversationId,
+			runViewing(tx, run.id) as Viewing | null,
 		);
 		tools = set.tools.map((t) => {
 			toolIds[t.id] = "manage";

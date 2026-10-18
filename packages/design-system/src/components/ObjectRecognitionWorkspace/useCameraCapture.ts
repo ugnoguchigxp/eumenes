@@ -1,13 +1,21 @@
 import { useEffect, useRef, useState } from "react";
 
+export type CaptureOrigin = "camera" | "screen";
+/** A screen still is scaled down to this long edge so it fits the chat image limits. */
+const screenEdge = 2560;
+
 /** Browser media is local UI state; the captured File is handed to the host. */
-export function useCameraCapture(onCapture: (file: File) => Promise<void>) {
+export function useCameraCapture(
+	onCapture: (file: File, origin: CaptureOrigin) => Promise<void>,
+) {
 	const preview = useRef<HTMLVideoElement>(null);
 	const stream = useRef<MediaStream | null>(null);
 	const recorder = useRef<MediaRecorder | null>(null);
 	const generation = useRef(0);
 	const timeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const [opened, setOpened] = useState(false);
+	const [origin, setOrigin] = useState<CaptureOrigin>("camera");
+	const originRef = useRef<CaptureOrigin>("camera");
 	const [recording, setRecording] = useState(false);
 	const [error, setError] = useState("");
 
@@ -37,54 +45,78 @@ export function useCameraCapture(onCapture: (file: File) => Promise<void>) {
 		};
 	}, []);
 
-	async function open() {
+	/** Opens the camera, or the browser's screen picker (which needs a click). True once showing. */
+	async function open(kind: CaptureOrigin = "camera") {
 		stop();
 		const token = generation.current;
 		setError("");
+		originRef.current = kind;
+		setOrigin(kind);
 		try {
-			if (!navigator.mediaDevices?.getUserMedia)
-				throw new Error("camera_unavailable");
-			const next = await navigator.mediaDevices.getUserMedia({
-				video: true,
-				audio: false,
-			});
+			const media = navigator.mediaDevices;
+			if (kind === "screen" ? !media?.getDisplayMedia : !media?.getUserMedia)
+				throw new Error("capture_unavailable");
+			const next =
+				kind === "screen"
+					? await media.getDisplayMedia({ video: true, audio: false })
+					: await media.getUserMedia({ video: true, audio: false });
 			if (token !== generation.current) {
 				next.getTracks().forEach((track) => track.stop());
 				return;
 			}
 			stream.current = next;
+			// Ending the share from the browser's own bar closes the capture too.
+			next.getVideoTracks()[0]?.addEventListener("ended", () => {
+				if (stream.current === next) close();
+			});
 			if (preview.current) {
 				preview.current.srcObject = next;
 				await preview.current.play();
 			}
 			setOpened(true);
+			return true;
 		} catch {
 			stop();
 			setOpened(false);
 			setError(
-				"カメラを開けませんでした。ブラウザのカメラ許可を確認してください。",
+				kind === "screen"
+					? "画面を共有できませんでした。共有する画面を選び、ブラウザの画面収録の許可を確認してください。"
+					: "カメラを開けませんでした。ブラウザのカメラ許可を確認してください。",
 			);
+			return false;
 		}
 	}
 
 	async function photo() {
 		const video = preview.current;
-		if (!video?.videoWidth) return;
+		if (!video?.videoWidth) return false;
 		const token = generation.current;
+		const kind = originRef.current;
+		const scale =
+			kind === "screen"
+				? Math.min(1, screenEdge / Math.max(video.videoWidth, video.videoHeight))
+				: 1;
 		const canvas = document.createElement("canvas");
-		canvas.width = video.videoWidth;
-		canvas.height = video.videoHeight;
-		canvas.getContext("2d")?.drawImage(video, 0, 0);
+		canvas.width = Math.round(video.videoWidth * scale);
+		canvas.height = Math.round(video.videoHeight * scale);
+		canvas
+			.getContext("2d")
+			?.drawImage(video, 0, 0, canvas.width, canvas.height);
 		const blob = await new Promise<Blob | null>((resolve) =>
 			canvas.toBlob(resolve, "image/jpeg", 0.9),
 		);
-		if (!blob || token !== generation.current) return;
+		if (!blob || token !== generation.current) return false;
 		stop();
 		setOpened(false);
 		try {
-			await onCapture(new File([blob], "camera.jpg", { type: "image/jpeg" }));
+			await onCapture(
+				new File([blob], `${kind}.jpg`, { type: "image/jpeg" }),
+				kind,
+			);
+			return true;
 		} catch {
 			setError("画像を保存できませんでした。");
+			return false;
 		}
 	}
 
@@ -120,14 +152,16 @@ export function useCameraCapture(onCapture: (file: File) => Promise<void>) {
 				stop();
 				setOpened(false);
 				setRecording(false);
+				const kind = originRef.current;
 				void onCapture(
 					new File(
 						[blob],
-						mime.startsWith("video/mp4") ? "camera.mp4" : "camera.webm",
+						mime.startsWith("video/mp4") ? `${kind}.mp4` : `${kind}.webm`,
 						{
 							type: blob.type,
 						},
 					),
+					kind,
 				).catch(() => setError("動画を保存できませんでした。"));
 			};
 			recorder.current = next;
@@ -152,6 +186,7 @@ export function useCameraCapture(onCapture: (file: File) => Promise<void>) {
 	return {
 		preview,
 		opened,
+		origin,
 		recording,
 		error,
 		open,

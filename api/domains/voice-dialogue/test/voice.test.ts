@@ -212,7 +212,14 @@ test("restart cancels the run of a stale voice turn so no old answer is spoken",
 	}
 });
 
-async function evictionHarness(options: { prepared?: AbortSignal[] } = {}) {
+async function evictionHarness(
+	options: {
+		prepared?: AbortSignal[];
+		/** What the run's waits return first (then completed), and the cancels they caused. */
+		waits?: Array<{ status: string; deadlineAt: string | null }>;
+		cancelled?: string[];
+	} = {},
+) {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-voice-evict-"));
 	const store = openStore(join(dir, "db.sqlite3"), [
 		migration,
@@ -234,12 +241,16 @@ async function evictionHarness(options: { prepared?: AbortSignal[] } = {}) {
 		},
 		get: () => ({ status: "completed" }),
 		subscribeProgress: () => () => {},
-		waitForTerminal: async () => ({
-			status: "completed",
-			answerMessageId: "answer",
-		}),
+		waitForTerminal: async () =>
+			options.waits?.shift() ?? {
+				status: "completed",
+				answerMessageId: "answer",
+			},
 		answerText: () => "回答",
-		cancel: async () => null,
+		cancel: async (runId: string) => {
+			options.cancelled?.push(runId);
+			return null;
+		},
 	} as unknown as ReturnType<typeof createDialogueService>;
 	const larm = withVoiceAuthority({
 		status: () => ({ state: "ready", capabilities: ["llm", "asr", "tts"] }),
@@ -285,6 +296,26 @@ async function evictionHarness(options: { prepared?: AbortSignal[] } = {}) {
 		},
 	};
 }
+
+test("a run whose deadline moved later meanwhile (a toolchain's own run time) is waited for, not cancelled", async () => {
+	const cancelled: string[] = [];
+	const later = new Date(Date.now() + 20 * 60_000).toISOString();
+	const h = await evictionHarness({
+		waits: [
+			{ status: "running", deadlineAt: later },
+			{ status: "running", deadlineAt: later },
+		],
+		cancelled,
+	});
+	try {
+		const sessionId = crypto.randomUUID();
+		h.voice.start(sessionId, 1);
+		await h.turn(sessionId, 1, "ready");
+		expect(cancelled).toEqual([]);
+	} finally {
+		await h.dispose();
+	}
+});
 
 test("a waiting ready turn is never evicted; the ninth is refused", async () => {
 	const h = await evictionHarness();

@@ -2,6 +2,22 @@ import { useRef } from "react";
 import { Button, Modal } from "../design-system";
 import type { WorkspaceState } from "./useWorkspace";
 
+/** A short hint that the image carries detections (sent to the model as reference data). */
+function annotationLabel(data: Record<string, unknown>) {
+	const objects = Array.isArray(data.objects) ? data.objects : null;
+	if (!objects) return "検出情報なし";
+	const labels = [
+		...new Set(
+			objects.flatMap((o) =>
+				o && typeof o === "object" && typeof (o as { label?: unknown }).label === "string"
+					? [(o as { label: string }).label]
+					: [],
+			),
+		),
+	];
+	return labels.length ? `検出: ${labels.slice(0, 4).join(", ")}${labels.length > 4 ? "…" : ""}` : "検出: なし";
+}
+
 export function ChatImageInput({ state }: { state: WorkspaceState }) {
 	const picker = useRef<HTMLInputElement>(null);
 	const images = state.attachments;
@@ -86,6 +102,11 @@ export function ChatImagePreviews({ state }: { state: WorkspaceState }) {
 							>
 								×
 							</Button>
+							{item.saved?.annotation && (
+								<span className="draft-image-note">
+									{annotationLabel(item.saved.annotation.data)}
+								</span>
+							)}
 						</div>
 					))}
 				</div>

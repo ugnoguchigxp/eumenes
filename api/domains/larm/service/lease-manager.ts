@@ -7,8 +7,14 @@ import type { Capability, LarmStatus } from "../contracts";
 import type { Lease } from "./profiles";
 import { type Control, type ProviderHosts } from "./connect";
 import { establishLease } from "./establish";
-import { leaseStatus } from "./lease-status";
+import { drainLease } from "./drain-lease";
+import { leaseStatus, createStatusChanges } from "./lease-status";
 import { createRefresh } from "./refresh";
+import {
+	createProfileRetention,
+	repeatProfile,
+	scheduleCredentialRenewal,
+} from "./profile-retention";
 import { createWithProvider } from "./with-provider";
 import { callerAborted, untilAborted, wait } from "./guards";
 
@@ -45,29 +51,19 @@ export function createLeaseManager({
 	let connecting: Promise<Lease> | undefined;
 	let lastError: string | undefined;
 	let closed = false;
-	const listeners = new Set<() => void>();
+	let retained = false;
+	let checkingProfile = false;
 	const status = (): LarmStatus =>
 		leaseStatus({
 			configured: !!token && !!base && !!profile,
 			baseConfigured: !!base,
 			profileSaved: !!profile,
-			connecting: !!connecting,
+			connecting: !!connecting && !(checkingProfile && lease && !lease.closing),
 			lastError,
 			lease,
 		});
-	let previousStatus = JSON.stringify(status());
-	function notify() {
-		const next = JSON.stringify(status());
-		if (previousStatus === next) return;
-		previousStatus = next;
-		for (const listener of listeners) {
-			try {
-				listener();
-			} catch {
-				/* Independent subscribers. */
-			}
-		}
-	}
+	const changes = createStatusChanges(status);
+	const notify = changes.notify;
 	async function release(current: Lease, force = false) {
 		current.closing = true;
 		if (current.renewTimer) clearTimeout(current.renewTimer);
@@ -100,6 +96,7 @@ export function createLeaseManager({
 	}
 	function scheduleIdle(current: Lease) {
 		clearTimeout(current.idleTimer);
+		if (retained) return;
 		current.idleTimer = setTimeout(
 			() => {
 				if (lease === current && !current.useCount) discard(current);
@@ -109,18 +106,16 @@ export function createLeaseManager({
 		current.idleTimer.unref?.();
 	}
 	function scheduleRenew(current: Lease) {
-		if (current.renewTimer) clearTimeout(current.renewTimer);
-		const delay = Math.max(0, current.expiresAt - Date.now() - 180_000);
-		current.renewTimer = setTimeout(() => {
+		scheduleCredentialRenewal(current, () => {
 			if (lease === current && !closed && !current.closing)
 				void connect(["llm"]).catch(() => {});
-		}, delay);
-		current.renewTimer.unref?.();
+		});
 	}
 	async function connect(
 		required: Capability[],
 		signal?: AbortSignal,
 		force = false,
+		requestProfile = false,
 	): Promise<Lease> {
 		signal?.throwIfAborted();
 		const scopedControl = (
@@ -137,9 +132,11 @@ export function createLeaseManager({
 		if (!base) throw new Error("larm_base_url_unconfigured");
 		if (!token) throw new Error("larm_unconfigured");
 		if (!profile) throw new Error("larm_profile_missing");
-		if (lease && !lease.useCount && lease.idleAt <= Date.now()) discard(lease);
+		if (!retained && lease && !lease.useCount && lease.idleAt <= Date.now())
+			discard(lease);
 		if (
 			!force &&
+			!requestProfile &&
 			lease &&
 			!lease.closing &&
 			lease.expiresAt > Date.now() + 180_000 &&
@@ -170,12 +167,15 @@ export function createLeaseManager({
 				)
 					throw error;
 			}
-			return connect(required, signal, force);
+			return connect(required, signal, force, requestProfile);
 		}
 		const connectStarted = performance.now();
 		// One key per connect(): every attempt to create this connection reuses it.
 		const idempotencyKey = crypto.randomUUID();
-		log.info("larm.connection_started", { count: required.length });
+		checkingProfile = requestProfile;
+		log[requestProfile ? "debug" : "info"]("larm.connection_started", {
+			count: required.length,
+		});
 		connecting = (async () => {
 			if (lease && !lease.closing) {
 				const current = lease;
@@ -185,6 +185,8 @@ export function createLeaseManager({
 						lease === current &&
 						!current.closing
 					) {
+						if (requestProfile) await repeatProfile(control, current, signal);
+						signal?.throwIfAborted();
 						lastError = undefined;
 						return current;
 					}
@@ -231,7 +233,7 @@ export function createLeaseManager({
 		notify();
 		try {
 			const connected = await connecting;
-			log.info("larm.connection_ready", {
+			log[requestProfile ? "debug" : "info"]("larm.connection_ready", {
 				count: connected.providers.size,
 				durationMs: Math.round(performance.now() - connectStarted),
 			});
@@ -256,6 +258,7 @@ export function createLeaseManager({
 			throw error;
 		} finally {
 			connecting = undefined;
+			checkingProfile = false;
 			notify();
 		}
 	}
@@ -276,37 +279,39 @@ export function createLeaseManager({
 		control,
 		idleTimeoutMs,
 	});
+	const retention = createProfileRetention(
+		async (signal) => {
+			if (base && token && profile) await connect(["llm"], signal, true, true);
+		},
+		(active) => {
+			retained = active;
+			if (lease && !closed) scheduleIdle(lease);
+		},
+	);
 	return {
+		retain(active: boolean) {
+			if (!closed) retention.set(active);
+		},
 		status,
 		connect,
 		withProvider,
 		/** The lease in use now, if any. */
 		current: () => lease,
-		onChange(listener: () => void) {
-			listeners.add(listener);
-			return () => {
-				listeners.delete(listener);
-			};
-		},
+		onChange: changes.onChange,
 		/** Ends the port: `beforeRelease` stops the work that still borrows the lease. */
 		async close(beforeRelease: () => Promise<void>) {
 			closed = true;
+			retention.set(false);
+			clearTimeout(lease?.idleTimer);
 			lifetime.abort(new Error("larm_closed"));
 			await beforeRelease();
 			if (connecting) await connecting.catch(() => {});
 			if (lease) {
 				const current = lease;
-				// Let in-flight work finish (up to 5 s) so the DELETE is not skipped.
-				const idle = new AbortController().signal;
-				for (
-					let waited = 0;
-					current.useCount > 0 && waited < 5_000;
-					waited += 100
-				)
-					await wait(100, idle);
+				await drainLease(current);
 				await release(current, true);
 			}
-			listeners.clear();
+			changes.close();
 		},
 	};
 }

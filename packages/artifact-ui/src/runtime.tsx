@@ -16,6 +16,8 @@ export type ArtifactRuntime = {
 	uploadFile?: (
 		source: string,
 		file: File,
+		/** Domain-defined facts about the file (e.g. how a still was taken); never saved in JSON. */
+		context?: Readonly<Record<string, string>>,
 	) => Promise<Receipt & { value?: string }>;
 	dispatch: (event: ArtifactEvent) => Promise<Receipt>;
 	/** Re-read this screen's registered sources after a failed read. */

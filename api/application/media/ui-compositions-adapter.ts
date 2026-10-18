@@ -6,6 +6,7 @@ import type {
 	DomainAdapter,
 } from "../../domains/tool-runtime";
 import {
+	uiCompositionDelete,
 	uiDraftApply,
 	uiResponseFields,
 	uiSubmitRequest,
@@ -25,6 +26,7 @@ const FORM = "query:ui-compositions.form@1";
 const INPUT = "input:ui-compositions.response@1";
 const STEP = "input:ui-compositions.step@1";
 const SAVE = "input:ui-compositions.save@1";
+const DELETE = "input:ui-compositions.delete@1";
 const TARGET_REF = "builtin:uiTargetRef";
 const uiCompositionsReceipt = z.strictObject({
 	projectId: z.string(),
@@ -40,9 +42,9 @@ export const uiCompositionsDomainSchemas = {
 	"domain:ui-compositions.receipt@1": uiCompositionsReceipt,
 };
 /** The screen sends every value as a string; revisions become the operation's integers. */
-function numbers(...names: string[]) {
+function numbers(key: "workRef" | "projectId", ...names: string[]) {
 	return (raw: Record<string, unknown>) => {
-		const value: Record<string, unknown> = { workRef: raw.workRef };
+		const value: Record<string, unknown> = { [key]: raw[key] };
 		const errors = names.flatMap((field) => {
 			const text = raw[field];
 			if (typeof text !== "string" || !/^[0-9]{1,9}$/.test(text))
@@ -75,14 +77,22 @@ export const describeUiCompositionsAdapter = () => ({
 			{ inputSchemaRef: "builtin:uiWorkSave", effect: "write" as const },
 		],
 		[
+			"ui-compositions.delete",
+			{
+				inputSchemaRef: "builtin:uiCompositionDelete",
+				effect: "write" as const,
+			},
+		],
+		[
 			"ui-compositions.submit",
 			{ inputSchemaRef: "builtin:uiSubmitRequest", effect: "write" as const },
 		],
 	]),
 	queries: new Set([STUDIO, FORM]),
 	inputAdapters: new Map([
-		[STEP, numbers("expectedRevision")],
-		[SAVE, numbers("expectedRevision", "expectedSavedRevision")],
+		[STEP, numbers("workRef", "expectedRevision")],
+		[SAVE, numbers("workRef", "expectedRevision", "expectedSavedRevision")],
+		[DELETE, numbers("projectId", "expectedSavedRevision")],
 		[
 			INPUT,
 			(raw: Record<string, unknown>) => {
@@ -227,6 +237,15 @@ export function createUiCompositionsAdapter(
 						db,
 						caller,
 						parseInput(uiWorkSave, request.input),
+						requestId,
+					);
+					return result(outcome.receipt, requestId, outcome.replay);
+				}
+				case "ui-compositions.delete": {
+					const outcome = service.deleteInTransaction(
+						db,
+						caller,
+						parseInput(uiCompositionDelete, request.input),
 						requestId,
 					);
 					return result(outcome.receipt, requestId, outcome.replay);

@@ -128,14 +128,16 @@ test("image result, source and observations persist; owner cannot read/cancel/de
 	expect(h.service.content("alice", id).bytes).toEqual(
 		new Uint8Array([112, 110, 103]),
 	);
-	expect(h.service.conversationText("alice", id)).toContain(
-		"cup [10, 20, 50, 60]",
-	);
+	expect(h.service.attachmentMaterial("alice", id).meta).toMatchObject({
+		source: "object-recognition",
+		captureSource: "file",
+		objects: [{ label: "cup", box: [10, 20, 50, 60], score: 0.86 }],
+	});
 	expect(h.service.list("bob", "main")).toEqual([]);
 	for (const op of [
 		() => h.service.get("bob", id),
 		() => h.service.content("bob", id),
-		() => h.service.conversationText("bob", id),
+		() => h.service.attachmentMaterial("bob", id),
 	])
 		expect(op).toThrow("recognition_not_found");
 	await expect(h.service.cancel("bob", id)).rejects.toThrow(
@@ -188,8 +190,8 @@ test("video captures upstream id, stores numeric progress and timestamp results;
 	await until(() => h.service.get("alice", id).state === "completed");
 	expect(h.service.get("alice", id).result).toEqual(video);
 	expect(posts).toBe(1);
-	expect(h.service.conversationText("alice", id, 1)).toContain(
-		"0.5秒: 検出対象なし",
+	expect(() => h.service.attachmentMaterial("alice", id)).toThrow(
+		"recognition_image_required",
 	);
 });
 test("cancel while initial POST is outstanding captures its receipt and cancels upstream; late completion is discarded", async () => {
@@ -419,4 +421,141 @@ test("a shared credential change invalidates an outstanding result even when the
 		"recognition_connection_changed",
 	);
 	expect(h.service.get("a", id).result).toBeNull();
+});
+test("a capture request binds the taken still once; failed detection still hands the image with empty meta", async () => {
+	const h = setup((async () =>
+		new Response("down", { status: 503 })) as unknown as typeof fetch);
+	const port = h.service.port("alice");
+	const runId = crypto.randomUUID();
+	await h.store.write((db) =>
+		port.invokeInTransaction(db, runId, "main", {
+			operation: "manage",
+			action: "capture",
+			id: "",
+			frameIndex: -1,
+			source: "screen",
+			question: "画面の内容を説明して",
+		}),
+	);
+	expect(h.store.read((db) => port.resultInTransaction(db, runId))).toEqual({
+		action: "capture",
+		state: "awaiting_capture",
+		source: "screen",
+	});
+	expect(h.service.handoffs("alice", "main")).toMatchObject([
+		{ id: runId, source: "screen", state: "pending", recognitionId: null },
+	]);
+	expect(h.service.handoffs("bob", "main")).toEqual([]);
+	const still = crypto.randomUUID();
+	await h.service.upload(
+		"alice",
+		"main",
+		new File(["jpg"], "screen.jpg", { type: "image/jpeg" }),
+		still,
+		"screen",
+	);
+	expect(h.service.get("alice", still).origin).toBe("screen");
+	// The still must exist and be finished; the request needs it for a camera/screen source.
+	await expect(h.service.handoffMaterial("alice", runId)).rejects.toThrow(
+		"request_conflict",
+	);
+	await until(() => h.service.get("alice", still).state === "failed");
+	await expect(
+		h.service.handoffMaterial("bob", runId, still),
+	).rejects.toThrow("recognition_handoff_not_found");
+	const sent = await h.service.handoffMaterial("alice", runId, still);
+	expect(sent.question).toBe("画面の内容を説明して");
+	expect(sent.material.meta).toEqual({});
+	expect(sent.material.mime).toBe("image/jpeg");
+	await h.service.completeHandoff("alice", runId);
+	expect(h.service.handoffs("alice", "main")).toEqual([]);
+	// A resend of the same request returns the same still; another still is a conflict.
+	expect(
+		(await h.service.handoffMaterial("alice", runId, still)).material.name,
+	).toBe("screen.jpg");
+	await expect(
+		h.service.handoffMaterial("alice", runId, crypto.randomUUID()),
+	).rejects.toThrow("request_conflict");
+});
+test("ask hands a saved still on screen; the snapshot marks only an owned shown record; cancel closes a request", async () => {
+	const h = setup((async () => response(image)) as unknown as typeof fetch);
+	const port = h.service.port("alice");
+	const id = crypto.randomUUID();
+	await h.service.upload(
+		"alice",
+		"main",
+		new File(["png"], "desk.png", { type: "image/png" }),
+		id,
+		"camera",
+	);
+	await until(() => h.service.get("alice", id).state === "completed");
+	const viewing = {
+		artifactRevisionId: "artifact:object-recognition.workspace@2",
+		targetRef: id,
+	};
+	const snapshot = h.store.read(
+		(db) => port.snapshotInTransaction(db, "main", viewing) as unknown[],
+	);
+	expect(snapshot).toMatchObject([{ id, kind: "image", shown: true }]);
+	const other = h.store.read(
+		(db) =>
+			h.service
+				.port("bob")
+				.snapshotInTransaction(db, "main", viewing) as unknown[],
+	);
+	expect(other).toEqual([]);
+	const elsewhere = h.store.read(
+		(db) =>
+			port.snapshotInTransaction(db, "main", {
+				artifactRevisionId: "artifact:ui-compositions.studio@1",
+				targetRef: id,
+			}) as Array<Record<string, unknown>>,
+	);
+	expect(elsewhere[0]!.shown).toBeUndefined();
+	const askRun = crypto.randomUUID();
+	await h.store.write((db) =>
+		port.invokeInTransaction(db, askRun, "main", {
+			operation: "manage",
+			action: "ask",
+			id,
+			frameIndex: -1,
+			source: "camera",
+			question: "この写真の服装を見て",
+		}),
+	);
+	const asked = await h.service.handoffMaterial("alice", askRun);
+	expect(asked.material.meta).toMatchObject({
+		captureSource: "camera",
+		image: { width: 100, height: 100 },
+		objects: [{ label: "cup" }],
+	});
+	await expect(
+		h.store.write((db) =>
+			port.invokeInTransaction(db, crypto.randomUUID(), "main", {
+				operation: "manage",
+				action: "ask",
+				id: crypto.randomUUID(),
+				frameIndex: -1,
+				source: "camera",
+				question: "",
+			}),
+		),
+	).rejects.toThrow("recognition_not_found");
+	const captureRun = crypto.randomUUID();
+	await h.store.write((db) =>
+		port.invokeInTransaction(db, captureRun, "main", {
+			operation: "manage",
+			action: "capture",
+			id: "",
+			frameIndex: -1,
+			source: "camera",
+			question: "今日の服どう？",
+		}),
+	);
+	expect((await h.service.cancelHandoff("alice", captureRun)).state).toBe(
+		"cancelled",
+	);
+	await expect(
+		h.service.handoffMaterial("alice", captureRun, id),
+	).rejects.toThrow("recognition_handoff_closed");
 });

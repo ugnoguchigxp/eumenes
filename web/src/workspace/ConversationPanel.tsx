@@ -7,13 +7,16 @@ import { LiveMessageList } from "./LiveMessageList";
 import { ConversationBackground } from "../components/ConversationBackground";
 import { Subtitle } from "../components/domains/subtitle/Subtitle";
 import { RunDetails, RunResults } from "./RunDetails";
-import { useConversationModel } from "../domains/settings";
+import { useBackground, useConversationModel } from "../domains/settings";
 import { useSpeechModels } from "../domains/settings/useSpeechModels";
 import { SpeechModelSelect } from "./SpeechModelSelect";
 import { ConversationModelSelect } from "./ConversationModelSelect";
+import { BackgroundSelect } from "./BackgroundSelect";
 import { describeConnectionState } from "../errorMessages";
+import { useMonitoringItems } from "../domains/monitoring";
 import { ConversationComposer } from "./ConversationComposer";
 import type { WorkspaceState } from "./useWorkspace";
+import { useScreenPresence } from "./useScreenPresence";
 
 export function ConversationPanel({
 	client,
@@ -24,6 +27,7 @@ export function ConversationPanel({
 	store: AudioStore;
 	state: WorkspaceState;
 }) {
+	useScreenPresence(client);
 	const {
 		replay,
 		voice,
@@ -47,6 +51,7 @@ export function ConversationPanel({
 	} = state;
 	const model = useConversationModel(client);
 	const speechModels = useSpeechModels(client);
+	const background = useBackground(client);
 	const panel = useRef<HTMLElement>(null);
 	const depth = useRef(0);
 	const [dragging, setDragging] = useState(false);
@@ -123,6 +128,11 @@ export function ConversationPanel({
 	const subtitleText =
 		replay.subtitle ?? (phase === "playing" ? voice.subtitle : null);
 	const subtitles = settings.data?.general.subtitles;
+	const backgroundKind = settings.data?.general.background ?? "light-fairy";
+	const monitored = useMonitoringItems(
+		client,
+		backgroundKind === "spatial" && !settings.isPending,
+	);
 	const spatial = useMemo(
 		() => spatialPreferences(settings.data?.general),
 		[settings.data?.general],
@@ -135,8 +145,9 @@ export function ConversationPanel({
 				</div>
 			)}
 			<ConversationBackground
-				kind={settings.data?.general.background ?? "light-fairy"}
+				kind={backgroundKind}
 				spatial={spatial}
+				items={monitored}
 				active={!settings.isPending}
 				cue={replay.avatarCue ?? voice.avatarCue}
 				phase={
@@ -178,6 +189,7 @@ export function ConversationPanel({
 						replay.playingId !== null
 					}
 				/>
+				<BackgroundSelect background={background} />
 				<span
 					className="connection-health"
 					data-state={connectionState}
@@ -202,9 +214,9 @@ export function ConversationPanel({
 					</Button>
 				</output>
 			)}
-			{(model.error || speechModels.error) && (
+			{(model.error || speechModels.error || background.error) && (
 				<p className="chat-error" role="alert">
-					{model.error || speechModels.error}
+					{model.error || speechModels.error || background.error}
 				</p>
 			)}
 			{status.isError && (

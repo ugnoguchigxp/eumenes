@@ -1,8 +1,14 @@
 import type { Database } from "bun:sqlite";
 import { getLogger } from "../../../infrastructure/logger";
-import type { SpecialistEndReason, SpecialistSession } from "../contracts";
+import type {
+	Run,
+	SpecialistEndReason,
+	SpecialistSession,
+	SpecialistSet,
+} from "../contracts";
 import {
 	byId,
+	extendRunDeadline,
 	patchSession,
 	unfinishedSessionRuns,
 	type SessionRecord,
@@ -14,8 +20,33 @@ const log = getLogger("dialogue");
 
 /** The only expiry of a session: no user utterance, resume or accepted edit for this long ends it. */
 const SESSION_IDLE_MS = 24 * 60 * 60 * 1000;
-/** One specialist turn (model calls and their operations) never takes longer than this. */
+/** One specialist turn (model calls and their operations) of a toolchain without its own turn time. */
 export const TURN_BUDGET_MS = 120_000;
+
+/**
+ * A toolchain with its own run time (spec toolchain-time-limits-design 2026-10-18 §3.2): from the hand-over the
+ * run, and the model requests it stands on, may last `runMs`. Only ever later. Returns the run as it is now.
+ */
+export function extendRunForToolchain(
+	deps: DialogueDeps,
+	tx: Database,
+	run: Run,
+	set: SpecialistSet,
+): Run {
+	const runMs = set.timeLimits?.runMs;
+	if (!runMs) return run;
+	const until = Date.parse(deps.clock()) + runMs;
+	if (run.deadlineAt && until <= Date.parse(run.deadlineAt)) return run;
+	const deadlineAt = new Date(until).toISOString();
+	extendRunDeadline(tx, run.id, deadlineAt);
+	deps.larm.extendDeadlineInTransaction?.(tx, run.id, until);
+	log.info("dialogue.deadline_extended", {
+		runId: run.id,
+		toolchainId: set.toolchainId,
+		limitMs: runMs,
+	});
+	return { ...run, deadlineAt };
+}
 
 export const expiryAfter = (now: string) =>
 	new Date(Date.parse(now) + SESSION_IDLE_MS).toISOString();

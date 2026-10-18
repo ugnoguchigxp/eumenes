@@ -146,6 +146,21 @@ export function updateComposition(
 	);
 }
 
+/** A saved composition and its answers; its receipts stay to answer a repeated request. */
+export function deleteComposition(db: Database, id: string) {
+	db.query("DELETE FROM ui_composition_responses WHERE composition_id=?").run(
+		id,
+	);
+	db.query("DELETE FROM ui_compositions WHERE id=?").run(id);
+}
+export const worksOfComposition = (db: Database, id: string) =>
+	(
+		db
+			.query(
+				"SELECT COUNT(*) AS n FROM ui_composition_works WHERE composition_id=?",
+			)
+			.get(id) as { n: number }
+	).n;
 export const work = (db: Database, id: string) =>
 	db
 		.query("SELECT * FROM ui_composition_works WHERE id=?")

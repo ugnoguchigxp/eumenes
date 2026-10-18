@@ -3,15 +3,24 @@ import type { Hono } from "hono";
 import { readBounded } from "../../../infrastructure/bounded-read";
 import { maxInputBytes } from "../contracts";
 import type { ObjectRecognitionService } from "../service";
+import type { ImageMaterial } from "../service/handoff";
+/** Conversation operations the application layer composes; this domain never imports them. */
+export type RecognitionSharing = {
+	/** A pending chat attachment (image + detections) for the composer; nothing is sent. */
+	attach(material: ImageMaterial, requestId: string): Promise<unknown>;
+	/** Sends the image with detections as a new user message; idempotent per handoff. */
+	send(
+		material: ImageMaterial,
+		question: string,
+		handoffId: string,
+	): Promise<unknown>;
+};
+const requestBody = z.strictObject({ requestId: z.uuid() });
 export function registerObjectRecognition(
 	app: Hono,
 	service: ObjectRecognitionService,
 	owner: string,
-	incorporate: (
-		text: string,
-		conversationId: string,
-		requestId: string,
-	) => Promise<unknown>,
+	sharing: RecognitionSharing,
 ) {
 	const root = "/api/object-recognition";
 	app.get(`${root}/commands`, (c) =>
@@ -20,11 +29,34 @@ export function registerObjectRecognition(
 	app.get(root, (c) =>
 		c.json(service.list(owner, c.req.query("conversationId") ?? "main")),
 	);
+	app.get(`${root}/handoffs`, (c) =>
+		c.json(service.handoffs(owner, c.req.query("conversationId") ?? "main")),
+	);
+	app.post(`${root}/handoffs/:id/cancel`, async (c) =>
+		c.json(await service.cancelHandoff(owner, c.req.param("id"))),
+	);
+	app.post(`${root}/handoffs/:id/send`, async (c) => {
+		const input = z
+			.strictObject({ recognitionId: z.uuid().optional() })
+			.safeParse(await c.req.json());
+		if (!input.success)
+			return c.json({ error: "invalid_recognition_input" }, 400);
+		const id = c.req.param("id");
+		const { material, question } = await service.handoffMaterial(
+			owner,
+			id,
+			input.data.recognitionId,
+		);
+		const run = await sharing.send(material, question, id);
+		await service.completeHandoff(owner, id);
+		return c.json(run);
+	});
 	app.post(root, async (c) => {
 		const query = z
 			.object({
 				requestId: z.uuid(),
 				conversationId: z.string().min(1).max(120),
+				origin: z.enum(["camera", "screen", "file"]).optional(),
 			})
 			.safeParse(c.req.query());
 		if (!query.success)
@@ -52,6 +84,7 @@ export function registerObjectRecognition(
 				query.data.conversationId,
 				file,
 				query.data.requestId,
+				query.data.origin,
 			),
 			202,
 		);
@@ -77,23 +110,11 @@ export function registerObjectRecognition(
 		await service.remove(owner, c.req.param("id"));
 		return c.body(null, 204);
 	});
-	app.post(`${root}/:id/conversation`, async (c) => {
-		const input = z
-			.strictObject({
-				requestId: z.uuid(),
-				frameIndex: z.number().int().nonnegative().max(59).optional(),
-			})
-			.safeParse(await c.req.json());
+	app.post(`${root}/:id/attachment`, async (c) => {
+		const input = requestBody.safeParse(await c.req.json());
 		if (!input.success)
 			return c.json({ error: "invalid_recognition_input" }, 400);
-		const id = c.req.param("id");
-		const v = service.get(owner, id);
-		return c.json(
-			await incorporate(
-				service.conversationText(owner, id, input.data.frameIndex),
-				v.conversationId,
-				input.data.requestId,
-			),
-		);
+		const material = service.attachmentMaterial(owner, c.req.param("id"));
+		return c.json(await sharing.attach(material, input.data.requestId));
 	});
 }

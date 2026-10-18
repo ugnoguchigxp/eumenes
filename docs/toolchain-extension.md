@@ -77,6 +77,7 @@ Seedに含めるのは再利用する定義だけで、会話、実行・操作�
    | `tools[]` | `toolRevisionId`（packageのtoolの部分集合）、`operationId`（adapterの登録操作名）、`inputSchemaRef`（toolの`schemaKey`なら`builtin:<schemaKey>`と一致。adapter側の操作schemaとも一致） |
    | `outputSchemaRef`・`resultProjectionRef` | domainの結果schemaと会話回答用projection |
    | `artifactRevisionId` | 表示に使うartifact。toolchainの値と一致させる |
+   | `timeLimits`（任意・sessionだけ） | 長い思考や長い生成に時間のかかる担当の時間。`runMs`（専門担当に渡ってからrunが終わるまで）・`turnMs`（専門担当の1ターン）・`inferenceMs`（推論1回）。各10秒〜60分で `inferenceMs ≤ turnMs ≤ runMs`。書かなければ既定（run 180秒・1ターン120秒・推論はLARM 120秒／クラウド60秒）。値はbundleにだけ書く（[設計](../spec/toolchain-time-limits-design-2026-10-18.md)） |
    | `questions`（任意） | command担当が確認質問に使える回答schema。`builtin:answerText`（自由文）は常に使えるので書かない。対象選択の質問は `choiceField` に候補で埋めるfieldを書き、候補はadapterの `choicesInTransaction` がhostのデータから出す（モデルは候補を作らない） |
 
 5. **artifactを書く**:
