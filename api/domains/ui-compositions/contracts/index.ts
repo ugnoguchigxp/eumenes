@@ -293,13 +293,21 @@ export function canonicalText(definition: Definition): string {
 export type DefinitionIssue = { path: string; rule: string };
 /**
  * A definition's text as the work document's next value: read (one syntax correction at the model's boundary),
- * fixed by the composition fixer (it drops what it cannot show and records it), then checked strictly. A
+ * fixed by the composition fixer (it drops what it cannot show and records it) unless `fix` is false, then
+ * checked strictly. A
  * refusal says where and by which rule, never the values.
  */
 export function checkDefinitionText(
 	text: string,
+	/** false: the user's own edit is checked as written, nothing is fixed or dropped silently. */
+	options: { fix?: boolean } = {},
 ):
-	| { ok: true; definition: Definition; fields: FormFields | null; fixes: string[] }
+	| {
+			ok: true;
+			definition: Definition;
+			fields: FormFields | null;
+			fixes: string[];
+	  }
 	| { ok: false; code: string; issues: DefinitionIssue[]; fixes: string[] } {
 	let raw: unknown;
 	try {
@@ -315,7 +323,10 @@ export function checkDefinitionText(
 			fixes: [],
 		};
 	}
-	const fixed = fixDefinition(raw);
+	const fixed =
+		options.fix === false
+			? { ok: true as const, definition: raw, fixes: [] }
+			: fixDefinition(raw);
 	if (!fixed.ok)
 		return {
 			ok: false,
@@ -335,7 +346,10 @@ export function checkDefinitionText(
 			code: error.code,
 			issues: [
 				at >= 0
-					? { path: detail.slice(0, at) || "(root)", rule: detail.slice(at + 2) }
+					? {
+							path: detail.slice(0, at) || "(root)",
+							rule: detail.slice(at + 2),
+						}
 					: { path: "(root)", rule: detail || error.code },
 			],
 			fixes: fixed.fixes,

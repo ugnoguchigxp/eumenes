@@ -12,7 +12,7 @@ import { harness } from "./toolchain.fixture";
  * adapter, the action ledger) with scripted models. Nothing but the models is faked.
  */
 
-const STUDIO = "artifact:ui.studio@3";
+const STUDIO = "artifact:ui.studio@4";
 const id = () => crypto.randomUUID();
 
 /** A valid definition: a heading text, a radio field and a free-text field. */
@@ -38,11 +38,25 @@ const survey = (title: string, gap?: "compact" | "normal" | "relaxed") => ({
 		},
 	],
 });
-const apply = (title: string, gap?: "compact" | "normal" | "relaxed") => ({
-	action: "invoke",
-	tool: "ui.draft.apply",
-	arguments: { title, definition: survey(title, gap) },
-});
+/** The revision of the work document the specialist reads in this call (its CURRENT_DOCUMENT block). */
+const documentRevision = (messages: Prompt) =>
+	Number(
+		/CURRENT_DOCUMENT path=definition\.json revision=(\d+)/.exec(
+			messages.map((m) => m.content).join("\n"),
+		)?.[1] ?? 0,
+	);
+/** A whole write of the survey on the revision the specialist reads. */
+const apply =
+	(title: string, gap?: "compact" | "normal" | "relaxed") =>
+	(_signal: AbortSignal, messages: Prompt) => ({
+		action: "invoke",
+		tool: "doc.write",
+		arguments: {
+			baseRevision: documentRevision(messages),
+			title,
+			content: survey(title, gap),
+		},
+	});
 const reply = (text: string) => ({ action: "reply", text });
 const toolCall = (request: string, extra: Record<string, unknown> = {}) => ({
 	tool: "ui_create",
@@ -51,7 +65,9 @@ const toolCall = (request: string, extra: Record<string, unknown> = {}) => ({
 
 type Prompt = Array<{ role: string; content: string }>;
 type MainStep = string | { tool: string; args: Record<string, unknown> };
-type SpecialistStep = unknown | ((signal: AbortSignal) => Promise<unknown>);
+type SpecialistStep =
+	| unknown
+	| ((signal: AbortSignal, messages: Prompt) => unknown | Promise<unknown>);
 
 const rigs: Array<{ close: () => Promise<void> }> = [];
 afterEach(async () => {
@@ -61,7 +77,9 @@ afterEach(async () => {
 /** The specialist turn's enclosed reference data (the user message after REFERENCE=). */
 function referenceOf(prompt: Prompt) {
 	const message = prompt.find((m) => m.content.includes("REFERENCE="))!;
-	return JSON.parse(message.content.split("REFERENCE=")[1]!);
+	return JSON.parse(
+		message.content.split("REFERENCE=")[1]!.split("\nCURRENT_DOCUMENT")[0]!,
+	);
 }
 
 /** The harness with a model that answers the main agent and the specialist from two scripts. */
@@ -100,8 +118,9 @@ async function rig() {
 				if (step === undefined) throw new Error("script_specialist_missing");
 				const value =
 					typeof step === "function"
-						? await (step as (s: AbortSignal) => Promise<unknown>)(
+						? await (step as (s: AbortSignal, m: Prompt) => Promise<unknown>)(
 								signal ?? new AbortController().signal,
+								messages,
 							)
 						: step;
 				return typeof value === "string" ? value : JSON.stringify(value);
@@ -330,7 +349,7 @@ test("ui_create opens the work and the same run continues as the specialist's tu
 	// The specialist saw the request, the tools of its set and nothing else of the conversation.
 	const prompt = r.specialistPrompts[0]!;
 	expect(prompt.map((m) => m.role)).toEqual(["system", "user", "user"]);
-	expect(prompt[0]!.content).toContain("ui.draft.apply");
+	expect(prompt[0]!.content).toContain('"id":"doc.write"');
 	expect(referenceOf(prompt).course).toEqual([]);
 	expect(prompt[2]!.content).toBe("来場者アンケートのUIを作ってください");
 });
@@ -349,14 +368,18 @@ test("later utterances go to the specialist without the main model; an explanati
 	const afterSoften = (await r.source()).data.work!;
 	expect(afterSoften.title).toBe("やわらかいアンケート");
 	expect(afterSoften.definition.gap).toBe("relaxed");
-	// The specialist's second input carries the first draft as the current work.
+	// The specialist's second input carries the first draft as the work document.
 	const input = referenceOf(r.specialistPrompts.at(-2)!);
-	expect(input.currentWork).toBeTruthy();
+	expect(input.document).toMatchObject({
+		path: "definition.json",
+		revision: 1,
+	});
 	// The first turn is in the session's course, with the operation it ran.
 	expect(input.course).toHaveLength(1);
 	expect(input.course[0].steps[0]).toMatchObject({
-		tool: "ui.draft.apply",
+		tool: "doc.write",
 		ok: true,
+		revision: 1,
 	});
 
 	const explain = await r.sayAndWait("この画面の使い方を教えてください");
@@ -432,11 +455,11 @@ test("only the screen saves: the saved work shows in the history and the special
 	const before = await r.source();
 	expect(before.data.history).toEqual([]);
 	expect(before.data.work).toMatchObject({ dirty: true, savedRevision: 0 });
-	// The tool list the specialist works with is the one registered tool.
+	// The specialist works with the host's document tools only (doc.view only for an outlined document).
 	const tools = JSON.parse(
 		r.specialistPrompts[0]![0]!.content.split("TOOLS=")[1]!.split("\n")[0]!,
 	) as Array<{ id: string }>;
-	expect(tools.map((t) => t.id)).toEqual(["ui.draft.apply"]);
+	expect(tools.map((t) => t.id)).toEqual(["doc.edit", "doc.write"]);
 
 	expect((await r.act("save")).status).toBe("accepted");
 	const saved = await r.source();
@@ -726,8 +749,8 @@ test("the specialist's prompt holds no conversation, World or memory material an
 			[
 				"callsLeft",
 				"course",
-				"currentWork",
 				"dirty",
+				"document",
 				"label",
 				"now",
 				"savedRef",
@@ -758,27 +781,30 @@ test("the specialist's prompt holds no conversation, World or memory material an
 		expect(main).not.toContain(marker);
 });
 
-test("a draft with a view outside the allowed set is refused and neither the draft nor the undo history changes", async () => {
+test("a whole draft with nothing it can show is refused at once, kept for the source view, and neither the draft nor the undo history changes", async () => {
 	const r = await rig();
 	await r.start();
 	const before = (await r.source()).data.work!;
-	r.script.specialist.push(
-		{
-			action: "invoke",
-			tool: "ui.draft.apply",
-			arguments: {
-				title: "不正",
-				definition: { view: "ui-studio", source: "ui-studio", title: "x" },
-			},
+	const calls = r.specialistPrompts.length;
+	r.script.specialist.push((_signal: AbortSignal, messages: Prompt) => ({
+		action: "invoke",
+		tool: "doc.write",
+		arguments: {
+			baseRevision: documentRevision(messages),
+			title: "不正",
+			content: { view: "ui-studio", source: "ui-studio", title: "x" },
 		},
-		reply("反映できませんでした。"),
-	);
+		text: "作りました。",
+	}));
 	const refused = await r.sayAndWait("別の画面を埋め込んでください");
 	expect(refused.status).toBe("completed");
-	const result = r.specialistPrompts.at(-1)!.at(-1)!.content;
-	expect(result).toStartWith("TOOL_RESULT=");
-	expect(result).toContain('"ok":false');
+	// No retry for a whole write: one call, and the host says it could not be shown.
+	expect(r.specialistPrompts.length - calls).toBe(1);
+	expect(r.h.dialogue.answerText(refused.id)).toBe(
+		"反映できませんでした。作った案はソースで確認できます。",
+	);
 	const after = (await r.source()).data.work!;
+	expect(after.rejected).toMatchObject({ title: "不正" });
 	expect(after.title).toBe(before.title);
 	expect(after.revision).toBe(before.revision);
 	// One undo returns to the empty start: the refused draft added nothing.

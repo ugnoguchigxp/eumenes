@@ -92,10 +92,16 @@ async function draft(s: Setup, title: string, targetRef: string | null = null) {
 	await s.store.write((db) =>
 		session.beginTurnInTransaction(db, work.workRef, runId),
 	);
-	const result = await s.invoke(
-		"ui-compositions.draft.apply",
-		{ title, definition: definition(title) },
-		specialist(sessionId, runId, work.workRef),
+	const document = session.document!;
+	const checked = document.check(JSON.stringify(definition(title)));
+	if (!checked.ok) throw new Error(checked.code);
+	const result = await s.store.write((db) =>
+		document.commitInTransaction(db, work.workRef, {
+			baseRevision: document.readInTransaction(db, work.workRef)!.revision,
+			title,
+			value: checked.value,
+			origin: specialist(sessionId, runId, work.workRef),
+		}),
 	);
 	await s.store.write((db) =>
 		session.endTurnInTransaction(db, work.workRef, runId),
@@ -105,28 +111,117 @@ async function draft(s: Setup, title: string, targetRef: string | null = null) {
 const source = (s: Setup, query: string, target?: string) =>
 	s.store.read((db) => s.adapter.sourceInTransaction(db, query, target));
 
-test("draft.apply answers with a short receipt and never the definition", async () => {
+test("the work document: canonical text, a check that fixes and says where, commits only by the holding turn", async () => {
 	const s = setup();
-	const { work, result } = await draft(s, "アンケート");
-	expect(result.answerContext).toEqual({
-		applied: true,
+	const { work, result, sessionId, runId } = await draft(s, "アンケート");
+	expect(result).toEqual({ revision: 1 });
+	const document = s.adapter.session!.document!;
+	const read = () =>
+		s.store.read((db) => document.readInTransaction(db, work.workRef))!;
+	expect(read()).toMatchObject({
 		revision: 1,
 		title: "アンケート",
+		rejected: null,
 	});
-	expect(JSON.stringify(result)).not.toContain("お名前");
-	expect(result.resultRefs).toMatchObject([
-		{
-			owner: "ui-compositions",
-			kind: "ui-work",
-			id: work.workRef,
-			revision: 1,
-		},
+	expect(read().text.split("\n").slice(0, 3)).toEqual([
+		"{",
+		'  "view": "layout",',
+		'  "direction": "stack",',
 	]);
+	// A small mistake is fixed and recorded; what cannot be fixed is refused with a position and a rule.
+	const fixed = document.check(
+		JSON.stringify({
+			...definition(),
+			children: [{ view: "heading", title: "見出し" }],
+		}),
+	);
+	expect(fixed).toMatchObject({
+		ok: true,
+		fixes: ["alias:children/0:heading->text-block"],
+	});
+	expect(document.check("{")).toMatchObject({
+		ok: false,
+		code: "document_parse_failed",
+	});
 	expect(
-		s.store.read((db) =>
-			s.adapter.readInTransaction(db, result.receiptRef.operationId),
+		document.check(JSON.stringify({ view: "layout", children: [] })),
+	).toMatchObject({
+		ok: false,
+		issues: [{ path: "(root)", rule: "nothing_displayable" }],
+	});
+	// The turn that no longer holds the work cannot commit.
+	await expect(
+		s.store.write((db) =>
+			document.commitInTransaction(db, work.workRef, {
+				baseRevision: 1,
+				value: (fixed as { value: unknown }).value,
+				origin: specialist(sessionId, runId, work.workRef),
+			}),
 		),
-	).toMatchObject({ replay: true, receipt: result.receipt });
+	).rejects.toThrow("turn_not_current");
+	await s.store.write((db) =>
+		document.rejectInTransaction(db, work.workRef, {
+			title: "案",
+			text: "{}",
+			issues: [{ path: "(root)", rule: "nothing_displayable" }],
+			fixes: [],
+		}),
+	);
+	const studio = source(s, "query:ui-compositions.studio@1") as {
+		data: {
+			work: { source: string; previousSource: string; rejected: unknown };
+		};
+	};
+	expect(studio.data.work.source).toBe(read().text);
+	expect(studio.data.work.previousSource).toBe("");
+	expect(studio.data.work.rejected).toMatchObject({ title: "案", text: "{}" });
+	expect(describeUiCompositionsAdapter().workspaces).toEqual(
+		new Map([
+			[
+				"workspace:ui-compositions.definition@1",
+				{ path: "definition.json", mediaType: "application/json" },
+			],
+		]),
+	);
+});
+
+test("the screen applies its own source edit as a drafted receipt", async () => {
+	const s = setup();
+	const { work } = await draft(s, "A");
+	const text = s.store
+		.read((db) =>
+			s.adapter.session!.document!.readInTransaction(db, work.workRef),
+		)!
+		.text.replace("本文", "新しい本文");
+	const applied = await s.invoke(
+		"ui-compositions.source.apply",
+		{ workRef: work.workRef, expectedRevision: 1, text },
+		s.uiOrigin(),
+	);
+	expect(applied.receipt).toMatchObject({
+		state: "drafted",
+		revision: 2,
+		title: "A",
+	});
+	expect(applied.resultRefs[0]).toMatchObject({ kind: "ui-work", revision: 2 });
+	expect(applied.answerContext).toEqual({
+		projectId: work.workRef,
+		state: "drafted",
+	});
+	const input = describeUiCompositionsAdapter().inputAdapters.get(
+		"input:ui-compositions.source@1",
+	)!;
+	expect(input({ workRef: work.workRef, expectedRevision: "2", text })).toEqual(
+		{
+			ok: true,
+			value: { workRef: work.workRef, expectedRevision: 2, text },
+		},
+	);
+	expect(
+		input({ workRef: work.workRef, expectedRevision: "2", text: " " }),
+	).toMatchObject({
+		ok: false,
+	});
 });
 
 test("operations accept only their origins and typed input", async () => {

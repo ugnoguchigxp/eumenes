@@ -146,7 +146,13 @@ export function commitDocumentInTransaction(
 	const current = snapshot(db, row.id, row.cursor)!;
 	const title = input.title ?? current.title;
 	const json = JSON.stringify(input.definition);
-	if (current.title === title && current.definition_json === json)
+	// The same definition in another key order is no change: compare the canonical texts.
+	const before = parseJson<Definition>(current.definition_json);
+	if (
+		current.title === title &&
+		before !== null &&
+		canonicalText(before) === canonicalText(input.definition)
+	)
 		return fail("no_change");
 	const next = row.cursor + 1;
 	if (next > limits.changes) return fail("undo_limit_reached");
@@ -167,6 +173,17 @@ export function commitDocumentInTransaction(
 	return { revision: row.draft_revision + 1 };
 }
 
+/** The longest prefix of `text` within `limit` UTF-8 bytes, never splitting a character. */
+function cutToBytes(text: string, limit: number) {
+	let bytes = 0;
+	let end = 0;
+	for (const char of text) {
+		bytes += Buffer.byteLength(char);
+		if (bytes > limit) break;
+		end += char.length;
+	}
+	return text.slice(0, end);
+}
 /** Keep a whole draft that failed its check (replaces the one kept before); the shown revision stays. */
 export function rejectDocumentInTransaction(
 	db: Database,
@@ -174,23 +191,27 @@ export function rejectDocumentInTransaction(
 	draft: Omit<RejectedDraft, "createdAt">,
 ) {
 	const row = loadWork(db, workRef);
-	const bytes = Buffer.from(draft.text);
 	const text =
-		bytes.length > REJECTED_TEXT_BYTES
-			? `${bytes.subarray(0, REJECTED_TEXT_BYTES).toString("utf8")}…`
+		Buffer.byteLength(draft.text) > REJECTED_TEXT_BYTES
+			? `${cutToBytes(draft.text, REJECTED_TEXT_BYTES)}…`
 			: draft.text;
 	const rejected: RejectedDraft = {
 		...draft,
 		text,
 		createdAt: new Date().toISOString(),
 	};
-	updateWork(db, row.id, { rejected_json: JSON.stringify(rejected) }, Date.now());
+	updateWork(
+		db,
+		row.id,
+		{ rejected_json: JSON.stringify(rejected) },
+		Date.now(),
+	);
 	bumpRevision(db, scope);
 }
 
 /**
- * The user's own edit of the source on the screen (spec §7.7): the same check as the specialist's text, then
- * the work's next revision. A refusal names the first issue's position and rule for the screen to show.
+ * The user's own edit of the source on the screen (spec §7.7): the specialist's strict check without the fixer
+ * (nothing the user wrote is dropped silently), then the work's next revision. A refusal names the first issue's position and rule for the screen to show.
  */
 export function applySourceInTransaction(
 	db: Database,
@@ -202,10 +223,13 @@ export function applySourceInTransaction(
 	const replay = replayOf(db, requestId, digest);
 	if (replay) return replay;
 	requireUi(caller);
-	const checked = checkDefinitionText(input.text);
+	const checked = checkDefinitionText(input.text, { fix: false });
 	if (!checked.ok) {
 		const issue = checked.issues[0];
-		return fail(checked.code, issue ? `${issue.path}: ${issue.rule}` : undefined);
+		return fail(
+			checked.code,
+			issue ? `${issue.path}: ${issue.rule}` : undefined,
+		);
 	}
 	const { revision } = commitDocumentInTransaction(db, caller, input.workRef, {
 		baseRevision: input.expectedRevision,

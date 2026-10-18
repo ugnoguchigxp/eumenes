@@ -331,11 +331,16 @@ export function createUiCompositionsAdapter(
 						: checked;
 				},
 				commitInTransaction: (db, workRef, input) =>
-					service.commitDocumentInTransaction(db, callerOf(input.origin), workRef, {
-						baseRevision: input.baseRevision,
-						...(input.title !== undefined ? { title: input.title } : {}),
-						definition: input.value as Record<string, unknown>,
-					}),
+					service.commitDocumentInTransaction(
+						db,
+						callerOf(input.origin),
+						workRef,
+						{
+							baseRevision: input.baseRevision,
+							...(input.title !== undefined ? { title: input.title } : {}),
+							definition: input.value as Record<string, unknown>,
+						},
+					),
 				rejectInTransaction: (db, workRef, draft) =>
 					service.rejectDocumentInTransaction(db, workRef, draft),
 			},

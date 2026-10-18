@@ -403,11 +403,12 @@ export function sessionRunsBefore(
 	error: string | null;
 	inputMessageId: string;
 	answerMessageId: string | null;
+	updatedAt: string;
 }> {
 	return (
 		db
 			.query(
-				`SELECT id, status, error, input_message_id, answer_message_id FROM dialogue_runs
+				`SELECT id, status, error, input_message_id, answer_message_id, updated_at FROM dialogue_runs
 				 WHERE specialist_session_id = ? AND seq < (SELECT seq FROM dialogue_runs WHERE id = ?)
 				 ORDER BY seq DESC LIMIT ?`,
 			)
@@ -417,6 +418,7 @@ export function sessionRunsBefore(
 			error: string | null;
 			input_message_id: string;
 			answer_message_id: string | null;
+			updated_at: string;
 		}>
 	)
 		.map((row) => ({
@@ -425,6 +427,7 @@ export function sessionRunsBefore(
 			error: row.error,
 			inputMessageId: row.input_message_id,
 			answerMessageId: row.answer_message_id,
+			updatedAt: row.updated_at,
 		}))
 		.reverse();
 }

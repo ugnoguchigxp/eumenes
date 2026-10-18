@@ -2,7 +2,7 @@
 
 作成日: 2026-10-18
 
-状態: 設計案・合意待ち（未実装）。要合意事項は A1〜A16（§15）。
+状態: 合意済み（2026-10-18、A1〜A16は推奨案で、動きを見て調整する）。P0〜P2は実装・固定試験済み（§17）。P3は詳細設計の追記待ち、P4は未着手。
 
 関連:
 - [会話モデルとサブエージェントのLLM経路 リファクタリング計画](conversation-subagent-llm-refactoring-plan-2026-10-17.md)。D5・D6・D7・D10・D11・D12 の結論を、本書の §15 で提案する。
@@ -538,3 +538,57 @@ UI自由制作で変えるものは次のとおり。
 - 協働型からの irreversible な操作。
 - 単発型の research のループ・予算・意味検証の中身の変更（リファクタリング計画の範囲）。
 - Excalidraw・設定の協働型への移行の詳細。それぞれ別の設計書で合意を取る。
+
+## 17 実施記録
+
+### 2026-10-18 P0〜P2（実装・固定試験済み）
+
+利用者の指示（2026-10-18）:「概ね良さそう。実装後動きをみて、変える所があったら変えるレベルでよさそう」。
+
+| 段階 | 実装 | 主なファイル |
+| --- | --- | --- |
+| P0 | セッション記録の表 `dialogue_specialist_events`（migration `dialogue/0010-specialist-events`）。引き継ぎの依頼（`handover`）と、操作の結果（`tool`）を記録する。操作の結果は、操作と同じ writer transaction で書く | `dialogue/repository/specialist.ts`、`specialist-start.ts`、`specialist-turn.ts` |
+| P0 | 経過（course）の組み立て。失敗・取消・中断したターンも、その終わり方とコードを付けて入れる。直前のターンが取消で終わっていれば、その発言を今回の依頼の1行目に結合する（`joinsInterrupted`） | `specialist-memory.ts` |
+| P0 | 文脈の並び（D7）: system → 参考資料の囲み（`REFERENCE=` と `CURRENT_DOCUMENT`）→ 利用者の原文だけの user | `specialist-memory.ts`、`contexts/specialist-turn/*.toml` |
+| P0 | D10: 操作の成功後に返答が契約違反なら、ホストの定型文「〈ラベル〉を更新しました。」で完了にする。D5: 画面の「会話に戻る」で、詰まっていた発言を発言順のまま通常担当へ届ける | `specialist-turn.ts`、`specialist-commands.ts` |
+| P1 | binding の `agent`（`workspace`・`turn`・`memory`・`sharedTools`）、`workspace:` ref、adapter の `describe().workspaces` と `session.document`（`WorkDocumentAdapter`） | `capabilities/contracts/bindings.ts`、`tool-runtime/contracts/adapters.ts`、`toolchain-routing.ts`、`specialist-port.ts` |
+| P1 | ホスト共通の文書ツール `doc.edit`・`doc.write`・`doc.view`。`reply` 付きの invoke、ツールごとのやり直し（既定は `doc.edit` 1回、`doc.write` 0回、その他1回）、`callsLeft`、推論の上限（既定4回）、最後の1回の invoke は返答が必須（D11）、修復は出力ごとに1回（D3）、`no_change` は固定文で聞き返して終える | `specialist-agent.ts`、`specialist-turn.ts`、`specialist-prompt.ts` |
+| P1 | UI自由制作の作業文書（`workspace:ui-compositions.definition@1`、`definition.json`）。正規テキスト、補正（`fixDefinition`）と厳密な検証、版の確定（`no_change`・`revision_conflict`・保持中のターンだけ）、反映できなかった案（migration `ui-compositions/0003-rejected-draft`、64 KiBまで）。`ui-compositions.draft.apply` と `uiDraftApply` を削除した | `ui-compositions/contracts`・`service/work.ts`・`service/views.ts`、`ui-compositions-adapter.ts` |
+| P1 | 補正（fixer）。一回推論の設計 §4 の表を実装した。有効な定義はそのまま返す（`fixes: []`） | `packages/artifact-ui/src/composition-fixer.ts` |
+| P1 | bundle: profile@2、skill@7、package@7（tool無し）、binding@4（`tools: []` と `agent`）、artifact@4（`ui-source-apply`）、toolchain@10。package に tool が無いのは、作業文書を持つ session binding のときだけ許す | `ui-compositions.bundle.json`、`capabilities/service/registry.ts`・`bundles.ts` |
+| P2 | ソース表示を正規テキストにし、直前の版との差分を強調する。ソースの手直しと「この内容を反映」（`ui-compositions.source.apply`、画面 origin、同じ検証）。「反映できなかった案」の表示とエディタへの読み込み | `ui-studio-components.tsx`、`ui-studio-diff.ts`、`web/src/domains/ui-compositions/toolchain-adapter.tsx` |
+
+設計からの調整（実装で決めた細部）:
+
+- 各ターンの終わり方（完了・失敗・取消）は、新しい表ではなく `dialogue_runs` の状態とエラーコードから読む。新しい表には、run に無いもの（引き継ぎの依頼と操作の結果）だけを書く。画面操作（Undo・保存など）の記録と `VersionNote` は入れていない。現在の版は作業文書から読む。
+- 成功時の返答は、doc ツールの引数の `reply` ではなく、invoke の `text` に書く（すべての操作で同じ形にするため）。
+- 正規テキストのキー順は、schema 順ではなく次の固定順にした。`view`・`title` が先頭、`model`・`children`・`fields` が末尾、残りは名前順。
+- `doc.write` の `content` は、JSON の文書なら JSON の値をそのまま受ける（文字列に入れると、引用符のエスケープが二重になるため）。
+- 割り込みで取り消された発言（§8.3）は、直前のターンが取消で終わったときに結合する。次の発言による取消と、利用者の明示の取消を区別する信号は今は無いので、区別していない。
+
+検証（fixture）:
+
+- `bun run verify -- --domain dialogue --domain ui-compositions --domain capabilities` pass。
+- `bun test packages/artifact-ui` は330件 pass（fixer 82件を含む）。
+- `bunx vitest run web/src/domains/artifact/test/ui-studio.test.tsx web/src/domains/ui-compositions` は32件 pass。
+- `toolchain:bundle check` 登録可能。
+- 新しい試験: `specialist-memory.test.ts`（2026-10-18 の4ターンの再現を含む）、`specialist-document.test.ts`、`ui-compositions.test.ts`・`ui-compositions-adapter.test.ts` の作業文書とソース反映。
+- ブラウザE2E・live（実モデル）・実機器は未実施。
+
+レビュー後の修正（2026-10-18、独立レビュー1回の指摘を一度に修正）:
+
+- 「変更なし」は正規テキストで比べる（キー順だけが違う同じ定義も `no_change`）。
+- 版の確定で domain が拒否したコード（`undo_limit_reached`・`turn_not_current` など）は、ターンを失敗させず、次の推論へ渡すデータにする。
+- 割り込みの結合は、直前のターンが今回の発言の受付から5秒以内に取り消されたときだけにする（それより前に利用者が止めたターンは経過にだけ出す）。
+- 画面での版の変化（元に戻す・やり直し・手直し）は、セッション記録には書かず、`document.changedOnScreen` で知らせる（最後の操作の版と、現在の版が違うとき）。
+- `applied`（このターンで作業が変わった）は、`doc.view` では立てない。作業が変わった後の `no_change` は、変わったこととして答える。最後の推論での拒否は、ホストの固定文で終える。
+- 出力契約の修復の指示にも `callsLeft` を入れる。取り消されたターンの拒否は、セッション記録に書かない。
+- 「表示できない部分は省きました」は、部品・form・状態を捨てたときだけ添える（未知のキーを消しただけなら添えない）。
+- 画面のソースの手直しは補正をかけずに検証する（利用者の書いたものを黙って変えない）。
+- 置き換えられて検証器の無い tool を持つ古い revision の set は、`capability_unavailable` で解決を断る（TypeError にしない）。
+- 既知の制約: bundle の schema の文字列上限（100,000字）のため、ソースの手直しで反映できる正規テキストは100,000字まで。
+
+未了:
+
+- P3（共有ツール、非同期のツール、ホスト起点のターン）は未実装。調査担当（agent-runtime）のタスクは会話の run 1件につき1つの起点を前提にしていて、完了の通知も会話の回答ジョブへ流れる。専門担当のターンから子タスクとして起動し、結果を受け取り、非同期の完了でターンを起こすには、起点の識別、通知の行き先、取消の連動、キューの新しい種類を決める必要がある。本書にはそれが無いので、追記して合意を取ってから実装する。binding の `agent.sharedTools` は契約と登録検査だけがある。
+- P4（単発型の出力契約と修復の数え方をそろえる。Excalidraw・設定の協働型への移行）は未実装。

@@ -238,6 +238,8 @@ export async function setup(options: Options = {}) {
 		endWorkFails: false,
 		/** A safe code the next operations are refused with. */
 		invokeError: null as string | null,
+		/** A refusal the fake work document's commit throws (as a domain does, a plain Error(code)). */
+		commitError: null as string | null,
 		/** A repair hint the refusal carries (as the ui adapter's errors do). */
 		invokeDetail: null as string | null,
 		calls: [] as string[],
@@ -557,6 +559,7 @@ export async function setup(options: Options = {}) {
 								return fail("turn_not_current");
 							if (input.baseRevision !== work.revision)
 								return fail("revision_conflict");
+							if (state.commitError) return fail(state.commitError);
 							const text = canonical(input.value);
 							const title = input.title ?? work.label;
 							if (text === work.text && title === work.label)

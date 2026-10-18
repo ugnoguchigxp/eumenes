@@ -12,7 +12,7 @@ export const uiSubmitRequest = z.strictObject({
 export const uiSourceApply = z.strictObject({
 	workRef: z.string().uuid(),
 	expectedRevision: z.number().int().min(0),
-	text: z.string().min(1).max(196_608),
+	text: z.string().min(1).max(100_000),
 });
 /** Undo or redo of the work in progress; the host fixes which work, the screen names the revision it saw. */
 export const uiWorkStep = z.strictObject({

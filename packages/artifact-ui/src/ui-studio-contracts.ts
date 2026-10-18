@@ -1,13 +1,27 @@
 /** Snapshot resources of the UI studio and of the read-only JSON view (types only). */
 
+type UiStudioRejected = {
+	title: string;
+	text: string;
+	issues: Array<{ path: string; rule: string }>;
+	fixes: string[];
+	createdAt: string;
+};
+
 type UiStudioWork = {
 	workRef: string;
 	sessionId: string;
 	title: string;
 	/** The adopted draft as a registered OpenUI definition. */
 	definition: unknown;
-	/** Draft revision; sent back as `expectedRevision` by Undo, Redo and Save. */
+	/** Draft revision; sent back as `expectedRevision` by Undo, Redo, Save and source apply. */
 	revision: number;
+	/** The canonical text of the current definition (keys ordered, 2-space indent); "" when empty. */
+	source: string;
+	/** The canonical text of the revision before the current one; "" when there is none. */
+	previousSource: string;
+	/** The last whole draft the specialist wrote that failed the check, until the next accepted change or save. */
+	rejected: UiStudioRejected | null;
 	/** The saved item this draft started from, or null for a new work. */
 	savedRef: string | null;
 	savedRevision: number | null;

@@ -89,7 +89,7 @@ const DOC_TOOLS: Record<
 	"doc.edit": {
 		schema: docEdit,
 		summary: (path) =>
-			`${path}の一部を置き換えて新しい版にする（修正はこれを使う）。成功したらinvokeのtextで一言伝えてターンを終える。`,
+			`${path}の一部を置き換えて新しい版にする（修正はこれを使う）。成功したらinvokeのtextで一言伝えてターンを終える。edit_not_foundでnearがあれば、nearの行（文書の実際の行）からoldを写し直す。`,
 	},
 	"doc.write": {
 		schema: docWrite,
@@ -134,6 +134,9 @@ export type DocOutcome =
 			issues?: Array<{ path: string; rule: string }>;
 			/** A whole-document draft was kept as the work's rejected draft. */
 			kept?: boolean;
+			/** Why an edit's `old` was not found, and the document's exact lines where it most likely was. */
+			mismatch?: Mismatch;
+			near?: string;
 	  };
 
 /** Apply the edits in order to the text; every one must match exactly once, or none is applied. */
@@ -142,11 +145,24 @@ export function applyEdits(
 	edits: ReadonlyArray<{ old: string; new: string }>,
 ):
 	| { ok: true; text: string }
-	| { ok: false; error: string; index: number; count?: number } {
+	| {
+			ok: false;
+			error: string;
+			index: number;
+			count?: number;
+			mismatch?: Mismatch;
+			near?: string;
+	  } {
 	let current = text;
 	for (const [index, edit] of edits.entries()) {
 		const first = current.indexOf(edit.old);
-		if (first < 0) return { ok: false, error: "edit_not_found", index };
+		if (first < 0)
+			return {
+				ok: false,
+				error: "edit_not_found",
+				index,
+				...whyNotFound(current, edit.old),
+			};
 		let count = 1;
 		for (
 			let at = current.indexOf(edit.old, first + 1);
@@ -161,6 +177,45 @@ export function applyEdits(
 			current.slice(first + edit.old.length);
 	}
 	return { ok: true, text: current };
+}
+
+/**
+ * Why an `old` text was not found, as a code (the only thing logged) and, for the next call, the document's
+ * exact lines where it most likely was. `whitespace`: the same lines with other spaces or indentation;
+ * `partial`: its first line is there but the rest differs; `absent`: not even its first line is there.
+ */
+type Mismatch = "whitespace" | "partial" | "absent";
+const NEAR_LINES = 12;
+function whyNotFound(
+	text: string,
+	old: string,
+): { mismatch: Mismatch; near?: string } {
+	const lines = text.split("\n");
+	const wanted = old.split("\n").map((line) => line.trim());
+	while (wanted.length && !wanted.at(-1)) wanted.pop();
+	while (wanted.length && !wanted[0]) wanted.shift();
+	if (!wanted.length) return { mismatch: "absent" };
+	const trimmed = lines.map((line) => line.trim());
+	const starts = trimmed.flatMap((line, i) =>
+		line.includes(wanted[0]!) ? [i] : [],
+	);
+	if (!starts.length) return { mismatch: "absent" };
+	const exactAt = starts.find((start) =>
+		wanted.every((line, k) =>
+			k === 0
+				? trimmed[start]!.endsWith(line)
+				: k === wanted.length - 1
+					? trimmed[start + k]?.startsWith(line)
+					: trimmed[start + k] === line,
+		),
+	);
+	const at = exactAt ?? starts[0]!;
+	const span = Math.min(Math.max(wanted.length, 1), NEAR_LINES);
+	return {
+		mismatch: exactAt !== undefined ? "whitespace" : "partial",
+		// The document's own lines (exactly as they are), to copy into `old` on the next call.
+		near: lines.slice(at, at + span).join("\n"),
+	};
 }
 
 /** The document text as the agent reads it: whole within the budget, else a numbered outline of its lines. */
@@ -280,9 +335,25 @@ export function runDocTool(
 			...(checked.fixes.length ? { fixes: checked.fixes } : {}),
 		};
 	} catch (error) {
-		const code = error instanceof Error ? error.message : "";
-		if (code === "no_change" || code === "revision_conflict")
-			return { ok: false, error: code };
+		// The domain's refusals (a safe code such as no_change, revision_conflict, undo_limit_reached) are data
+		// for the next call; anything else (a stale turn, a store failure) still ends the turn.
+		const own = (error as { code?: unknown }).code;
+		const code =
+			typeof own === "string"
+				? own
+				: error instanceof Error && DOMAIN_REFUSALS.has(error.message)
+					? error.message
+					: null;
+		if (code && /^[a-z_]+$/.test(code)) return { ok: false, error: code };
 		throw error;
 	}
 }
+
+/** Refusals a domain may throw without a `code` property (plain `Error(code)`). */
+const DOMAIN_REFUSALS = new Set([
+	"no_change",
+	"revision_conflict",
+	"undo_limit_reached",
+	"turn_not_current",
+	"work_not_found",
+]);

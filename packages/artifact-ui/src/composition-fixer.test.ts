@@ -89,12 +89,12 @@ describe("identity on valid definitions", () => {
 	)!;
 	const examples = skill.body
 		.split("\n")
-		.filter((line) => line.startsWith('{"title"'))
-		.map((line) => JSON.parse(line) as { title: string; definition: Obj });
+		.filter((line) => line.startsWith('{"baseRevision":0,"title"'))
+		.map((line) => JSON.parse(line) as { title: string; content: Obj });
 	test("the SKILL has examples", () =>
 		expect(examples.length).toBeGreaterThanOrEqual(7));
 	test("every SKILL example comes back unchanged", () => {
-		for (const { definition } of examples)
+		for (const { content: definition } of examples)
 			expect(fixDefinition(definition)).toEqual({
 				ok: true,
 				definition,

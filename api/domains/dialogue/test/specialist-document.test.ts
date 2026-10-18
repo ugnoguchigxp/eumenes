@@ -54,10 +54,12 @@ test("the work document is read as its canonical text, and the host offers its d
 	const reference = JSON.parse(
 		prompt[1]!.content.split("REFERENCE=")[1]!.split("\nCURRENT_DOCUMENT")[0]!,
 	);
+	// The fake work starts at revision 1 with no operation in the course: as if the screen had moved it.
 	expect(reference.document).toEqual({
 		path: "page.json",
 		revision: 1,
 		title: "新規",
+		changedOnScreen: true,
 	});
 	expect(reference.currentWork).toBeUndefined();
 });
@@ -104,7 +106,13 @@ test("an edit whose text is missing or not unique applies nothing and says which
 		.filter((m) => m.content.startsWith("TOOL_RESULT="))
 		.map((m) => JSON.parse(m.content.slice("TOOL_RESULT=".length)));
 	expect(results).toEqual([
-		{ ok: false, error: "edit_not_found", index: 1, callsLeft: 3 },
+		{
+			ok: false,
+			error: "edit_not_found",
+			index: 1,
+			mismatch: "absent",
+			callsLeft: 3,
+		},
 	]);
 	expect(work(h).revision).toBe(1);
 	// The second, ambiguous edit is the second refusal: one retry by default, so the turn ends.
@@ -222,4 +230,87 @@ test("a document larger than the inline budget is an outline, and doc.view reads
 		},
 		callsLeft: 3,
 	});
+});
+
+test("a domain refusal of the commit is data for the next call, and a later screen change is flagged", async () => {
+	const h = await harness();
+	h.state.commitError = "undo_limit_reached";
+	h.state.specialist.push(edit([{ old: '"items": []', new: '"items": [1]' }]), {
+		action: "reply",
+		text: "保存すると続けられます",
+	});
+	const run = await h.ask("直して");
+	expect(answer(h, run.id)).toBe("保存すると続けられます");
+	expect(lastPrompt(h).at(-1)!.content).toBe(
+		'TOOL_RESULT={"ok":false,"error":"undo_limit_reached","callsLeft":3}',
+	);
+	h.state.commitError = null;
+	h.state.specialist.push(
+		edit([{ old: '"items": []', new: '"items": [1]' }], "直しました。"),
+	);
+	await h.ask("もう一度");
+	expect(work(h).revision).toBe(2);
+	// The screen undoes the change: the next turn is told.
+	work(h).revision = 3;
+	h.state.specialist.push({ action: "reply", text: "はい" });
+	await h.ask("見て");
+	const reference = JSON.parse(
+		lastPrompt(h)[1]!
+			.content.split("REFERENCE=")[1]!
+			.split("\nCURRENT_DOCUMENT")[0]!,
+	);
+	expect(reference.document).toMatchObject({
+		revision: 3,
+		changedOnScreen: true,
+	});
+});
+
+test("a later change that adds nothing after one that changed the work is reported as the change", async () => {
+	const h = await harness();
+	h.state.specialist.push(
+		edit([{ old: '"items": []', new: '"items": [1]' }]),
+		edit([{ old: '"page"', new: '"page"' }], undefined, 2),
+	);
+	const run = await h.ask("直して");
+	expect(answer(h, run.id)).toBe("新規を更新しました。");
+	expect(work(h).revision).toBe(2);
+});
+
+test("an edit not found says why and gives the document's own lines to copy on the retry", async () => {
+	const h = await harness();
+	h.state.specialist.push(
+		// Two lines with the indentation dropped: the same lines, other spaces.
+		edit([
+			{
+				old: '"view": "page",\n"items": []',
+				new: '"view": "page",\n"items": [1]',
+			},
+		]),
+		edit(
+			[
+				{
+					old: '  "view": "page",\n  "items": []',
+					new: '  "view": "page",\n  "items": [1]',
+				},
+			],
+			"直しました。",
+		),
+	);
+	const run = await h.ask("直して");
+	expect(answer(h, run.id)).toBe("直しました。");
+	const result = JSON.parse(
+		h.state.specialistPrompts
+			.at(-1)!
+			.at(-1)!
+			.content.slice("TOOL_RESULT=".length),
+	);
+	expect(result).toEqual({
+		ok: false,
+		error: "edit_not_found",
+		index: 0,
+		mismatch: "whitespace",
+		near: '  "view": "page",\n  "items": []',
+		callsLeft: 3,
+	});
+	expect(work(h).revision).toBe(2);
 });

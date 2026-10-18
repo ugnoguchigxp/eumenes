@@ -50,18 +50,23 @@ function model(): LarmPort {
 					languages: ["ja"],
 					confidence: 0.99,
 				});
-			// The specialist: apply a draft, then reply once the tool result is in.
+			// The specialist writes the work document with the reply it speaks once that succeeds: one call.
 			if (system.includes("TOOLS=")) {
-				const applied = messages.at(-1)?.content.startsWith("TOOL_RESULT=");
-				return JSON.stringify(
-					applied
-						? { action: "reply", text: replies[spoken] }
-						: {
-								action: "invoke",
-								tool: "ui.draft.apply",
-								arguments: { title: spoken, definition: definition(spoken) },
-							},
+				const revision = Number(
+					/CURRENT_DOCUMENT path=definition\.json revision=(\d+)/.exec(
+						messages.map((m) => m.content).join("\n"),
+					)?.[1] ?? 0,
 				);
+				return JSON.stringify({
+					action: "invoke",
+					tool: "doc.write",
+					arguments: {
+						baseRevision: revision,
+						title: spoken,
+						content: definition(spoken),
+					},
+					text: replies[spoken],
+				});
 			}
 			// The conversation's first round delegates to the studio; the second writes its request.
 			if (isAnalysisRound(options?.tools)) {

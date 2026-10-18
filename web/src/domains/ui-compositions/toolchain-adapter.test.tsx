@@ -19,6 +19,9 @@ const work = (over: object = {}) => ({
 	title: "来場者アンケート",
 	definition: { view: "text-block", title: "見出し" },
 	revision: 3,
+	source: '{\n  "view": "text-block",\n  "title": "見出し"\n}',
+	previousSource: "",
+	rejected: null,
 	savedRef: null,
 	savedRevision: null,
 	dirty: true,
@@ -140,6 +143,78 @@ test("the studio source becomes the ui-studio resource with the session's state"
 		stoppable: true,
 	});
 	expect(h.hook.result.current.targetOf("ui-studio")).toBeUndefined();
+	h.cache.clear();
+});
+
+test("the canonical source, the previous source and the rejected draft reach the screen", async () => {
+	const rejected = {
+		title: "案",
+		text: "{}",
+		issues: [{ path: "children[0]", rule: "unknown_view" }],
+		fixes: [],
+		createdAt: "2026-10-18T00:00:00.000Z",
+	};
+	const h = setup({
+		studio: studioData({
+			work: work({ previousSource: '{"view":"x"}', rejected }),
+		}),
+	});
+	await waitFor(() => expect(h.hook.result.current.phase.kind).toBe("ready"));
+	expect(h.hook.result.current.snapshot["ui-studio"]).toMatchObject({
+		work: {
+			source: '{\n  "view": "text-block",\n  "title": "見出し"\n}',
+			previousSource: '{"view":"x"}',
+			rejected,
+		},
+	});
+	h.cache.clear();
+	// A work without the canonical text is not the current contract.
+	const old = setup({
+		studio: studioData({ work: { ...work(), source: undefined } }),
+	});
+	await waitFor(() => expect(old.hook.result.current.phase.kind).toBe("error"));
+	old.cache.clear();
+});
+
+test("a refused source apply names the code and the detail; other codes keep the host's wording", async () => {
+	const h = setup({});
+	await waitFor(() => expect(h.hook.result.current.phase.kind).toBe("ready"));
+	const { describeRejection } = h.hook.result.current;
+	expect(describeRejection?.("ui_definition_invalid", [])).toBe(
+		"定義の検査を通りませんでした（ui_definition_invalid）。",
+	);
+	expect(
+		describeRejection?.("ui_definition_invalid", [
+			{ field: "children[0]", message: "unknown_view" },
+		]),
+	).toBe(
+		"定義の検査を通りませんでした（ui_definition_invalid・children[0]: unknown_view）。",
+	);
+	expect(describeRejection?.("document_parse_failed", [])).toContain("JSON");
+	expect(describeRejection?.("generation_in_progress", [])).toContain("制作中");
+	expect(describeRejection?.("revision_conflict", [])).toBeUndefined();
+	expect(describeRejection?.(undefined, [])).toBeUndefined();
+	h.cache.clear();
+});
+
+test("a settled source apply reads the studio again and changes no target", async () => {
+	const h = setup({ bridge: bridgeOf({ session: session() }) });
+	await waitFor(() => expect(h.hook.result.current.phase.kind).toBe("ready"));
+	const before = h.client.toolchainArtifactSource.mock.calls.length;
+	await act(async () => {
+		await h.hook.result.current.settled(
+			binding("ui-source-apply"),
+			{ resultRefs: [] } as never,
+			{} as never,
+			{},
+		);
+	});
+	await waitFor(() =>
+		expect(h.client.toolchainArtifactSource.mock.calls.length).toBeGreaterThan(
+			before,
+		),
+	);
+	expect(h.setTargetRef).not.toHaveBeenCalled();
 	h.cache.clear();
 });
 

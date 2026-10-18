@@ -41,6 +41,35 @@ const absorb = (into: Cancelled, from: { flush: string[]; runs: string[] }) => {
 };
 
 /**
+ * Utterances queued behind the turn in flight go to the main agent in their order (D5). They leave the session
+ * first, so withdrawing the turn afterwards hands the work to none of them.
+ */
+function forwardQueuedToMain(
+	deps: DialogueDeps,
+	tx: Database,
+	record: SessionRecord,
+) {
+	const work = deps.specialist!.workStateInTransaction(
+		tx,
+		record.adapterRef,
+		record.workRef,
+	);
+	for (const queued of unfinishedSessionRuns(tx, record.id)) {
+		const sibling =
+			queued.id === record.activeRunId ? null : byId(tx, queued.id);
+		if (sibling?.status === "queued")
+			forwardToMain(
+				deps,
+				tx,
+				sibling,
+				record,
+				work?.dirty ? "suspended" : "ended",
+				work?.label ?? record.label,
+			);
+	}
+}
+
+/**
  * The session operations the screen and the application use: reading the conversation's session, the
  * commands (idempotent by requestId, guarded by the revision the screen saw), the periodic sweep and the
  * restart recovery. Every write runs in the caller's single writer transaction.
@@ -86,26 +115,7 @@ export function createSpecialistOps(deps: DialogueDeps) {
 				return;
 			}
 			if (record.state === "suspended") return;
-			const before = deps.specialist!.workStateInTransaction(
-				tx,
-				record.adapterRef,
-				record.workRef,
-			);
-			// Utterances queued behind the turn in flight go to the main agent in their order (D5); they leave
-			// the session first, so withdrawing the turn hands the work to none of them.
-			for (const queued of unfinishedSessionRuns(tx, record.id)) {
-				const sibling =
-					queued.id === record.activeRunId ? null : byId(tx, queued.id);
-				if (sibling?.status === "queued")
-					forwardToMain(
-						deps,
-						tx,
-						sibling,
-						record,
-						before?.dirty ? "suspended" : "ended",
-						before?.label ?? record.label,
-					);
-			}
+			forwardQueuedToMain(deps, tx, record);
 			// The turn in flight is withdrawn; the work is then free.
 			absorb(cancelled, cancelSessionRuns(deps, tx, record.id));
 			const current = fresh(tx, record.id);

@@ -52,6 +52,7 @@ export type ArtifactEvent = {
 		| "ui-undo"
 		| "ui-redo"
 		| "ui-save"
+		| "ui-source-apply"
 		| "ui-discard"
 		| "ui-delete"
 		| "ui-return"

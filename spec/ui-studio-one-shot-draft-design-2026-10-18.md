@@ -2,7 +2,7 @@
 
 作成日: 2026-10-18
 
-状態: 設計案・合意待ち。要合意事項はS1〜S6（§6）。
+状態: [サブエージェントの二つの型の設計](subagent-task-and-session-agents-design-2026-10-18.md) §12 に統合して実装済み（fixer、`reply`付きの反映、反映できなかった案の S6 (a)(b)(c)）。要合意事項S1〜S6（§6）の扱いは同 §12。
 
 関連: [専門担当との対話編集](toolchain-specialist-dialogue-implementation-plan-2026-10-17.md)、[表現力拡張](ui-studio-expressive-parts-implementation-plan-2026-10-17.md)
 

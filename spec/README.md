@@ -8,7 +8,7 @@ archive の基準: その文書が担当した実装がコードにあり、本�
 
 | 文書 | 状態 |
 | --- | --- |
-| [subagent-task-and-session-agents-design-2026-10-18.md](subagent-task-and-session-agents-design-2026-10-18.md) | 設計案・合意待ち（未実装）。サブエージェントを単発型（task）と協働型（session）に整理し、共通のエージェント核（文脈の並び・`reply`付きinvokeで1ターン1推論・予算と失敗の扱い）を定める。協働型は作業領域（作業文書＋資産）をコーディングエージェントのように部分置換（`doc.edit`）で直し、セッション記録で失敗・中断した発言も記憶する。共有ツール・非同期ツールも含む。UI自由制作の一回推論設計とD3・D5・D7・D10〜D12を統合。要合意事項A1〜A16 |
+| [subagent-task-and-session-agents-design-2026-10-18.md](subagent-task-and-session-agents-design-2026-10-18.md) | 合意済み。P0〜P2は実装・固定試験済み（§17）。単発型・協働型の整理、共通のエージェント核（参考資料の囲みと現在の依頼、`reply`付きinvoke、ツールごとのやり直し）、セッション記録（失敗・中断も記憶）、作業文書の部分編集（`doc.edit`/`doc.write`）、UI自由制作の移行とソースの手直し。P3（共有・非同期ツール）は詳細設計の追記待ち、P4は未着手。ブラウザE2E・live・実機器は未実施 |
 | [object-recognition-custom-training-concept-2026-10-18.md](object-recognition-custom-training-concept-2026-10-18.md) | コンセプト、着手予定なし。判別機（YOLO26）の追加学習で家の決まった物を検出する。学習はRTX 3080（Windows）が第1候補。10種類×300枚で人の作業7〜12時間の見積もり。ターンテーブル・ロボットアームによる撮影と枠付けの自動化ができたら再検討 |
 | [object-recognition-targets-and-llm-handoff-design-2026-10-18.md](object-recognition-targets-and-llm-handoff-design-2026-10-18.md) | 物体認識で探す物を名前で指定（上流をYOLOE-26へ、上流への依頼が必要）。カメラ・画面キャプチャの静止画1枚と検出結果のメタ情報JSONを、「会話に追加」でチャット欄へ添付、または音声（見せるモード案・viewing＋ask）で会話LLMへ渡す。OCR連携はしない。合意済み（Q3・Q6は上流対応後）、実装中 |
 | [spatial-model-catalog-2026-10-18.md](spatial-model-catalog-2026-10-18.md) | 案・合意待ち。Spatial監視銀河の全17体（Eumenes 13・LARM 4）の形と動きの目録。ChatGPTへのモデリング依頼仕様を兼ねる。使用率では色を変えず、溜まりと出来事で異常を出す。LARMに届かないときは星系ごと消す。将来のContextStill（5〜8体）は別の星系として見込む。要合意事項M1〜M8 |
@@ -16,7 +16,7 @@ archive の基準: その文書が担当した実装がコードにあり、本�
 | [larm-connection-retention-design-2026-10-18.md](larm-connection-retention-design-2026-10-18.md) | 画面表示中の既存Profile利用依頼POSTを実装。backend403件・Web48件成功。同じConnectionを実接続で6分保持・停止後300秒で解放。利用者の再起動後に稼働反映と実画面の接続済みを確認（§12）。認証・自動解放設定は変更なし |
 | [toolchain-time-limits-design-2026-10-18.md](toolchain-time-limits-design-2026-10-18.md) | 合意済み・実装済み（fixture試験済み、live・実機は未了）。打ち切り時間（run・専門担当の1ターン・推論1回）をsession bindingの`timeLimits`で設定する。UI自由制作は run 20分・1ターン15分・推論10分 |
 | [ui-studio-history-focus-design-2026-10-18.md](ui-studio-history-focus-design-2026-10-18.md) | 実装・固定試験済み。UI自由制作で、閲覧中は削除ボタンで保存作品を削除（§2）、専門担当のアクティブ中に履歴で選んだ作品を編集対象にする（§3、未保存は確認）。ブラウザE2E・live・実機器は未実施 |
-| [ui-studio-one-shot-draft-design-2026-10-18.md](ui-studio-one-shot-draft-design-2026-10-18.md) | 設計案・合意待ち。UI自由制作の下書きを1回の推論で作り、ホストの補正（fixer）と検証で反映可否を決める。自動の作り直しはしない。反映できなかった案もJSONで出力する。要合意事項S1〜S6 |
+| [ui-studio-one-shot-draft-design-2026-10-18.md](ui-studio-one-shot-draft-design-2026-10-18.md) | サブエージェントの二つの型の設計 §12 に統合して実装・固定試験済み。fixer（`composition-fixer.ts`）、`reply`付きの反映で1ターン1推論、自動の作り直しは無し（`doc.write`は再試行0回）、反映できなかった案の表示と手直し。live・実機は未実施 |
 | [ui-studio-expressive-parts-implementation-plan-2026-10-17.md](ui-studio-expressive-parts-implementation-plan-2026-10-17.md) | 実装・固定試験・ブラウザE2E（§11、13件pass）済み。UI自由制作の表現力拡張（見せる部品とテーマ別picsum画像・紙芝居、状態と式・数式・電卓、図解）。live（実モデル）・実機器は未実施 |
 | [conversation-pre-delegation-response-design-2026-10-17.md](conversation-pre-delegation-response-design-2026-10-17.md) | 基本案は実装済み。§7〜§9のfixtureは記録済み。担当探索の省略とliveの意味保持は未解決。§10の修復はコードにあるが、本書に検証結果がない |
 | [conversation-subagent-llm-refactoring-plan-2026-10-17.md](conversation-subagent-llm-refactoring-plan-2026-10-17.md) | 合意済み。Dに依存しないP2/P3はfixture済み（§8）。P0の前提差分は後続コミットでコードに入った。D1〜D13の結論とP1・P4・P5は未了 |

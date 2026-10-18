@@ -21,7 +21,7 @@ afterEach(async () => {
 		rmSync(dir, { recursive: true, force: true });
 });
 const id = () => crypto.randomUUID();
-const studio = "artifact:ui.studio@3";
+const studio = "artifact:ui.studio@4";
 const definition = (title: string) => ({
 	view: "layout",
 	direction: "stack",
@@ -134,7 +134,7 @@ test("seeding an upgraded database leaves only the studio as a launcher", async 
 		.read((db) => capabilities.toolchainsInTransaction(db))
 		.find((d) => d.id === "ui.compose");
 	expect(toolchain).toMatchObject({
-		revisionId: "toolchain:ui.compose@9",
+		revisionId: "toolchain:ui.compose@10",
 		artifactRevisionId: studio,
 	});
 });
@@ -147,11 +147,15 @@ test("the screen's string values reach undo, redo and save as the operations' in
 			service.beginTurnInTransaction(db, workRef, runId),
 		);
 		await store.write((db) =>
-			service.applyDraftInTransaction(
+			service.commitDocumentInTransaction(
 				db,
 				{ kind: "specialist", runId, workRef },
-				{ title, definition: definition(title) },
-				id(),
+				workRef,
+				{
+					baseRevision: service.documentInTransaction(db, workRef)!.revision,
+					title,
+					definition: definition(title),
+				},
 			),
 		);
 		await store.write((db) => service.endTurnInTransaction(db, workRef, runId));
@@ -212,11 +216,11 @@ test("the screen deletes the viewed saved work once no work is built on it", asy
 		service.beginTurnInTransaction(db, work.workRef, runId),
 	);
 	await store.write((db) =>
-		service.applyDraftInTransaction(
+		service.commitDocumentInTransaction(
 			db,
 			{ kind: "specialist", runId, workRef: work.workRef },
-			{ title: "A", definition: definition("A") },
-			id(),
+			work.workRef,
+			{ baseRevision: 0, title: "A", definition: definition("A") },
 		),
 	);
 	await store.write((db) =>

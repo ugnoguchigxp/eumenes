@@ -41,20 +41,27 @@ const studioDefinition = JSON.stringify({
 	source: "ui-studio",
 	title: "UI自由制作",
 });
-const work = (over: Partial<NonNullable<UiStudioResource["work"]>> = {}) => ({
-	workRef: "work-1",
-	sessionId: "s1",
-	title: "来場者向けの案",
-	definition: survey,
-	revision: 3,
-	savedRef: null,
-	savedRevision: null,
-	dirty: true,
-	busy: false,
-	canUndo: true,
-	canRedo: false,
-	...over,
-});
+const work = (over: Partial<NonNullable<UiStudioResource["work"]>> = {}) => {
+	const definition = "definition" in over ? over.definition : survey;
+	return {
+		workRef: "work-1",
+		sessionId: "s1",
+		title: "来場者向けの案",
+		definition,
+		revision: 3,
+		savedRef: null,
+		savedRevision: null,
+		dirty: true,
+		busy: false,
+		canUndo: true,
+		canRedo: false,
+		// The host's canonical text of the shown definition (its source view).
+		source: definition ? JSON.stringify(definition, null, 2) : "",
+		previousSource: "",
+		rejected: null,
+		...over,
+	};
+};
 function studio(over: Partial<UiStudioResource> = {}): Snapshot {
 	return {
 		"ui-studio": {

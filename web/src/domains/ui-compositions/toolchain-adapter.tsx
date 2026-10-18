@@ -23,6 +23,17 @@ const workSchema = z.object({
 	title: z.string(),
 	definition: z.unknown(),
 	revision: z.number().int(),
+	source: z.string(),
+	previousSource: z.string(),
+	rejected: z
+		.object({
+			title: z.string(),
+			text: z.string(),
+			issues: z.array(z.object({ path: z.string(), rule: z.string() })),
+			fixes: z.array(z.string()),
+			createdAt: z.string(),
+		})
+		.nullable(),
 	savedRef: z.string().nullable(),
 	savedRevision: z.number().int().nullable(),
 	dirty: z.boolean(),
@@ -54,6 +65,12 @@ const rejected = (message: string) => ({
 	status: "rejected" as const,
 	message,
 });
+/** Wording for a refused source apply; the detail ("path: rule") follows when the server names one. */
+const sourceRefusals: Record<string, string> = {
+	ui_definition_invalid: "定義の検査を通りませんでした",
+	document_parse_failed: "JSONとして読み取れませんでした",
+	generation_in_progress: "制作中のため、今は反映できません",
+};
 const receiptOf = (result: BridgeResult, message: string) =>
 	result.ok
 		? { status: "accepted" as const, message }
@@ -267,6 +284,14 @@ export const uiCompositionsWebAdapter: WebArtifactAdapter = {
 				}
 			},
 			refresh,
+			describeRejection(code, fieldErrors) {
+				const reason = code ? sourceRefusals[code] : undefined;
+				if (!code || !reason) return undefined;
+				const detail = fieldErrors
+					.map(({ field, message }) => `${field}: ${message}`)
+					.join("、");
+				return `${reason}（${code}${detail ? `・${detail}` : ""}）。`;
+			},
 		};
 	},
 };

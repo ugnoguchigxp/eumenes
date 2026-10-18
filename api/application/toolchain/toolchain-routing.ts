@@ -249,7 +249,7 @@ export function createToolchainRouting(
 				tools: boundTools(db, set, doc.tools),
 				targetSchemaRef: doc.session.targetSchemaRef ?? null,
 				timeLimits: doc.timeLimits ?? null,
-				agent: agentOf(doc.agent, adapter.describe().workspaces),
+				agent: agentOf(doc.agent, () => adapter.describe().workspaces),
 			};
 		},
 		bound,
@@ -267,12 +267,13 @@ export function createToolchainRouting(
  */
 function agentOf(
 	agent: AgentV1 | undefined,
-	workspaces:
+	/** Read only for a binding that names a work document. */
+	workspaces: () =>
 		| ReadonlyMap<string, { path: string; mediaType: string }>
 		| undefined,
 ): SpecialistSet["agent"] {
 	const ref = agent?.workspace?.documentRef;
-	const declared = ref ? workspaces?.get(ref) : undefined;
+	const declared = ref ? workspaces()?.get(ref) : undefined;
 	if (ref && !declared) throw new Error("capability_unavailable");
 	return {
 		document:

@@ -69,20 +69,28 @@ const begin = (s: Setup, workRef: string, runId: string) =>
 	s.store.write((db) => s.service.beginTurnInTransaction(db, workRef, runId));
 const end = (s: Setup, workRef: string, runId: string) =>
 	s.store.write((db) => s.service.endTurnInTransaction(db, workRef, runId));
+/** A specialist turn's checked definition as the work's next revision (on the revision it read). */
 const apply = (
 	s: Setup,
 	workRef: string,
 	runId: string,
 	title: string,
 	definition: unknown,
-	requestId = id(),
+	baseRevision?: number,
 ) =>
 	s.store.write((db) =>
-		s.service.applyDraftInTransaction(
+		s.service.commitDocumentInTransaction(
 			db,
 			{ kind: "specialist", runId, workRef },
-			{ title, definition: definition as Record<string, unknown> },
-			requestId,
+			workRef,
+			{
+				baseRevision:
+					baseRevision ??
+					s.service.documentInTransaction(db, workRef)?.revision ??
+					0,
+				title,
+				definition: definition as Record<string, unknown>,
+			},
 		),
 	);
 const state = (s: Setup, workRef: string) =>
@@ -140,7 +148,7 @@ test("a new work stays out of the saved list until the user saves it, collapsing
 	expect(work).toMatchObject({ savedRef: null, dirty: false, busy: false });
 	expect(work.current).toEqual({ title: "", definition: null });
 	const first = await turn(s, work.workRef, "アンケート", survey());
-	expect(first.receipt).toMatchObject({ state: "drafted", revision: 1 });
+	expect(first).toEqual({ revision: 1 });
 	await turn(s, work.workRef, "アンケート2", survey("改題"));
 	expect(state(s, work.workRef)).toMatchObject({ dirty: true, revision: 2 });
 	expect(saved(s)).toEqual([]);
@@ -239,25 +247,26 @@ test("undo and redo move the cursor, redo is dropped by a new change, and a stal
 	});
 });
 
-test("a repeated request replays its receipt and the same id with other input is refused", async () => {
+test("the same definition makes no revision, an old revision is a conflict, and a repeated save replays its receipt", async () => {
 	const s = setup();
 	const work = await open(s);
 	const run = id();
 	await begin(s, work.workRef, run);
-	const requestId = id();
-	const first = await apply(s, work.workRef, run, "A", survey(), requestId);
-	expect(
-		await apply(s, work.workRef, run, "A", survey(), requestId),
-	).toMatchObject({
-		replay: true,
-		receipt: first.receipt,
+	expect(await apply(s, work.workRef, run, "A", survey())).toEqual({
+		revision: 1,
 	});
-	await expect(
-		apply(s, work.workRef, run, "B", survey(), requestId),
-	).rejects.toThrow("request_conflict");
 	// An unchanged proposal adds no undo step.
-	const same = await apply(s, work.workRef, run, "A", survey());
-	expect(same.receipt).toMatchObject({ state: "unchanged", revision: 1 });
+	await expect(apply(s, work.workRef, run, "A", survey())).rejects.toThrow(
+		"no_change",
+	);
+	// The same definition in another key order is no change either.
+	const reordered = Object.fromEntries(Object.entries(survey()).reverse());
+	await expect(apply(s, work.workRef, run, "A", reordered)).rejects.toThrow(
+		"no_change",
+	);
+	await expect(
+		apply(s, work.workRef, run, "B", survey("B"), 0),
+	).rejects.toThrow("revision_conflict");
 	await end(s, work.workRef, run);
 	const requestSave = id();
 	const stored = await save(s, work.workRef, 1, 0, requestSave);
@@ -274,21 +283,102 @@ test("a repeated request replays its receipt and the same id with other input is
 	).toEqual(stored.receipt);
 });
 
-test("only the screen saves, undoes and redoes; only the holding specialist applies", async () => {
+test("the work document is the canonical text; a rejected whole draft is kept until the next change or save", async () => {
 	const s = setup();
 	const work = await open(s);
+	const read = () =>
+		s.store.read((db) => s.service.documentInTransaction(db, work.workRef))!;
+	expect(read()).toEqual({ revision: 0, title: "", text: "", rejected: null });
+	await turn(s, work.workRef, "A", survey());
+	const first = read();
+	expect(first.revision).toBe(1);
+	expect(first.text.startsWith('{\n  "view": "layout",\n  "title":')).toBe(
+		true,
+	);
+	expect(JSON.parse(first.text)).toEqual(
+		validatedDefinition(survey()).definition,
+	);
+	await s.store.write((db) =>
+		s.service.rejectDocumentInTransaction(db, work.workRef, {
+			title: "案",
+			text: '{"view":"nope"}',
+			issues: [{ path: "view", rule: "ui_view_not_allowed" }],
+			fixes: [],
+		}),
+	);
+	expect(read().rejected).toMatchObject({
+		title: "案",
+		text: '{"view":"nope"}',
+		issues: [{ path: "view", rule: "ui_view_not_allowed" }],
+	});
+	expect(read().revision).toBe(1);
+	await turn(s, work.workRef, "B", survey("B"));
+	expect(read().rejected).toBeNull();
+});
+
+test("the screen applies its own source edit with the same check; a refusal says where", async () => {
+	const s = setup();
+	const work = await open(s);
+	await turn(s, work.workRef, "A", survey());
+	const text = s.store
+		.read((db) => s.service.documentInTransaction(db, work.workRef))!
+		.text.replace("お客様アンケート", "来場者アンケート");
+	const source = (
+		input: { expectedRevision: number; text: string },
+		requestId = id(),
+	) =>
+		s.store.write((db) =>
+			s.service.applySourceInTransaction(
+				db,
+				ui,
+				{ workRef: work.workRef, ...input },
+				requestId,
+			),
+		);
+	const requestId = id();
+	const applied = await source({ expectedRevision: 1, text }, requestId);
+	expect(applied.receipt).toMatchObject({ state: "drafted", revision: 2 });
+	expect((await source({ expectedRevision: 1, text }, requestId)).replay).toBe(
+		true,
+	);
+	await expect(
+		source({ expectedRevision: 2, text: '{"view":"layout","children":[]}' }),
+	).rejects.toThrow("ui_definition_invalid");
+	await expect(source({ expectedRevision: 1, text })).rejects.toThrow(
+		"revision_conflict",
+	);
+	// The user's own text is checked as written: a part the fixer would rename is refused, not changed.
+	await expect(
+		source({
+			expectedRevision: 2,
+			text: text.replace('"view": "text-block"', '"view": "heading"'),
+		}),
+	).rejects.toThrow("ui_view_not_allowed");
+	// A turn holding the work keeps the screen out.
 	const run = id();
 	await begin(s, work.workRef, run);
 	await expect(
+		source({ expectedRevision: 2, text: text.replace("来場者", "参加者") }),
+	).rejects.toThrow("generation_in_progress");
+	await end(s, work.workRef, run);
+	// Only the screen applies source edits.
+	await expect(
 		s.store.write((db) =>
-			s.service.applyDraftInTransaction(
+			s.service.applySourceInTransaction(
 				db,
-				ui,
-				{ title: "A", definition: survey() },
+				{ kind: "specialist", runId: run, workRef: work.workRef },
+				{ workRef: work.workRef, expectedRevision: 2, text },
 				id(),
 			),
 		),
 	).rejects.toThrow("origin_not_allowed");
+});
+
+test("only the screen saves, undoes and redoes", async () => {
+	const s = setup();
+	const work = await open(s);
+	const run = id();
+	await begin(s, work.workRef, run);
 	await apply(s, work.workRef, run, "A", survey());
 	await end(s, work.workRef, run);
 	const specialist: Caller = {
@@ -340,8 +430,7 @@ test("closing needs a clean work while discarding drops the draft and keeps save
 	await turn(s, work.workRef, "B", survey("B"));
 	const run = id();
 	await begin(s, work.workRef, run);
-	const kept = id();
-	await apply(s, work.workRef, run, "C", survey("C"), kept);
+	await apply(s, work.workRef, run, "C", survey("C"));
 	await s.store.write((db) =>
 		s.service.endWorkInTransaction(db, work.workRef, "discard"),
 	);
@@ -352,13 +441,10 @@ test("closing needs a clean work while discarding drops the draft and keeps save
 	expect(saved(s)).toMatchObject([
 		{ id: savedId, title: "A", savedRevision: 1 },
 	]);
-	// A late result of the discarded turn cannot come back, and its receipt stays queryable.
-	await expect(apply(s, work.workRef, run, "late", survey())).rejects.toThrow(
-		"work_not_found",
-	);
-	expect(
-		s.store.read((db) => s.service.receiptInTransaction(db, kept)),
-	).toMatchObject({ state: "drafted" });
+	// A late result of the discarded turn cannot come back.
+	await expect(
+		apply(s, work.workRef, run, "late", survey(), 0),
+	).rejects.toThrow("work_not_found");
 	expect(
 		s.store.read((db) => s.service.studioInTransaction(db, undefined).work),
 	).toBeNull();

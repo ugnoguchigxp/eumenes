@@ -191,18 +191,33 @@ describe("ui.studio revisions", () => {
 	const skill = find("skill", "ui.studio");
 	const body = String(skill.body);
 
-	test("skill@6, package@6, binding@3 and toolchain@9 refer to each other", () => {
-		expect(skill.revision).toBe(6);
+	test("profile@2, skill@7, package@7, binding@4 and toolchain@10 refer to each other; the package has no tools of its own", () => {
+		expect(skill.revision).toBe(7);
 		const pkg = find("package", "ui.studio");
-		expect(pkg.revision).toBe(6);
-		expect(pkg.dependencies).toContain("skill:ui.studio@6");
-		expect(pkg.requiredSkillRevisionIds).toEqual(["skill:ui.studio@6"]);
+		expect(pkg.revision).toBe(7);
+		expect(pkg.dependencies).toEqual([
+			"profile:ui.studio@2",
+			"skill:ui.studio@7",
+		]);
+		expect(pkg.requiredSkillRevisionIds).toEqual(["skill:ui.studio@7"]);
+		expect(pkg.toolRevisionIds).toEqual([]);
 		const toolchain = find("toolchain", "ui.compose");
-		expect(toolchain.revision).toBe(9);
-		expect(toolchain.bindingRevisionId).toBe("binding:ui.studio@3");
-		expect(toolchain.packageRevisionId).toBe("package:ui.studio@6");
-		expect(toolchain.dependencies).toEqual(["package:ui.studio@6"]);
-		expect(find("profile", "ui.studio").revision).toBe(1);
+		expect(toolchain.revision).toBe(10);
+		expect(toolchain.bindingRevisionId).toBe("binding:ui.studio@4");
+		expect(toolchain.artifactRevisionId).toBe("artifact:ui.studio@4");
+		expect(toolchain.packageRevisionId).toBe("package:ui.studio@7");
+		expect(toolchain.dependencies).toEqual(["package:ui.studio@7"]);
+		expect(find("profile", "ui.studio").revision).toBe(2);
+		const binding = (
+			bundle as unknown as { bindings: Array<Record<string, unknown>> }
+		).bindings[0]!;
+		expect(binding).toMatchObject({
+			revision: 4,
+			tools: [],
+			agent: {
+				workspace: { documentRef: "workspace:ui-compositions.definition@1" },
+			},
+		});
 	});
 	test("the SKILL body is within 48 KB", () => {
 		expect(new TextEncoder().encode(body).length).toBeLessThanOrEqual(
@@ -212,10 +227,10 @@ describe("ui.studio revisions", () => {
 	test("every example of the SKILL parses, stays within the limits and passes the studio's validation", () => {
 		const examples = body
 			.split("\n")
-			.filter((line) => line.startsWith('{"title"'))
-			.map((line) => JSON.parse(line) as { title: string; definition: Node });
+			.filter((line) => line.startsWith('{"baseRevision":0,"title"'))
+			.map((line) => JSON.parse(line) as { title: string; content: Node });
 		expect(examples.length).toBeGreaterThanOrEqual(7);
-		for (const { title, definition } of examples) {
+		for (const { title, content: definition } of examples) {
 			expect(title.length).toBeGreaterThan(0);
 			checkLimits(definition);
 			checkModelReferences(definition);

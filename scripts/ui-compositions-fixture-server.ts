@@ -14,8 +14,9 @@ import {
  *   `requests.again` to the session toolchain (`ui_create`) and answers anything else itself; its second
  *   round starts `ui_create` with that text, and for `requests.again` (sent while a saved work is
  *   viewed) targets that work;
- * - the specialist answers by the request of its turn: `ui.draft.apply` then a reply, except
- *   `requests.explain`, which is answered without changing the draft.
+ * - the specialist answers by the request of its turn (the last user message): one `doc.write` (a whole
+ *   definition) or `doc.edit` (replacements on the CURRENT_DOCUMENT text) that carries the reply as `text`,
+ *   except `requests.explain`, which is answered without changing the draft.
  */
 const requests = {
 	create: "来場者アンケートのUIを作ってください",
@@ -95,44 +96,58 @@ const survey = (heading: string, gap?: "relaxed") => ({
 		},
 	],
 });
-const draft = (title: string, gap?: "relaxed") => ({
-	action: "invoke",
-	tool: "ui.draft.apply",
-	arguments: { title, definition: survey(title, gap) },
+/** The work document the specialist reads in this call (its CURRENT_DOCUMENT block). */
+type Doc = { revision: number; text: string };
+/** A turn: the document tool call it makes (given the document it reads), and the reply it speaks. */
+type Turn = { call?: (doc: Doc) => Record<string, unknown>; reply: string };
+
+const write = (title: string, definition: unknown) => (doc: Doc) => ({
+	tool: "doc.write",
+	arguments: { baseRevision: doc.revision, title, content: definition },
 });
-const turns: Record<
-	string,
-	{
-		apply?: {
-			action: string;
-			tool: string;
-			arguments: { title: string; definition: unknown };
-		};
-		reply: string;
-	}
-> = {
+const once = (text: string, part: string) => text.split(part).length === 2;
+const surveyWrite = (title: string, gap?: "relaxed") =>
+	write(title, survey(title, gap));
+/**
+ * The same change as an edit of the canonical text (new title, relaxed gap); a document that does not
+ * contain the expected lines exactly once is written whole instead.
+ */
+const soften = (title: string) => (doc: Doc) => {
+	const heading = '"title": "来場者アンケート"';
+	const direction = '"direction": "stack"';
+	if (!once(doc.text, heading) || !once(doc.text, direction))
+		return surveyWrite(title, "relaxed")(doc);
+	return {
+		tool: "doc.edit",
+		arguments: {
+			baseRevision: doc.revision,
+			title,
+			edits: [
+				{ old: heading, new: `"title": "${title}"` },
+				{ old: direction, new: `${direction},\n  "gap": "relaxed"` },
+			],
+		},
+	};
+};
+const turns: Record<string, Turn> = {
 	[requests.create]: {
-		apply: draft("来場者アンケート"),
+		call: surveyWrite("来場者アンケート"),
 		reply: "アンケートの初稿を作りました。",
 	},
 	[requests.soften]: {
-		apply: draft("やわらかいアンケート", "relaxed"),
+		call: soften("やわらかいアンケート"),
 		reply: "雰囲気をやわらかくしました。",
 	},
 	[requests.explain]: { reply: "このままで問題ありません。" },
 	[requests.again]: {
-		apply: draft("再編集したアンケート"),
+		call: surveyWrite("再編集したアンケート"),
 		reply: "見出しを直しました。",
 	},
 	...Object.fromEntries(
 		Object.entries(parts).map(([request, { title, definition }]) => [
 			request,
 			{
-				apply: {
-					action: "invoke",
-					tool: "ui.draft.apply",
-					arguments: { title, definition },
-				},
+				call: write(title, definition),
 				reply: `${title}を作りました。`,
 			},
 		]),
@@ -142,18 +157,22 @@ const turns: Record<
 type Prompt = Parameters<LarmPort["answer"]>[0];
 type Tool = { function?: { name?: string; parameters?: any }; name?: string };
 
-/** The request of the specialist's current turn, and whether its tool result is already in. */
+/**
+ * The specialist's current turn: its request (the last user message that is not a tool result), the
+ * document it reads, and whether a tool result is already in.
+ */
 function specialistTurn(messages: Prompt) {
-	const data = messages
-		.filter((m) => m.role === "user" && !m.content.startsWith("TOOL_RESULT="))
-		.at(-1);
-	let request = "";
-	try {
-		request =
-			(JSON.parse(data?.content ?? "{}") as { request?: string }).request ?? "";
-	} catch {}
+	const request =
+		messages
+			.filter((m) => m.role === "user" && !m.content.startsWith("TOOL_RESULT="))
+			.at(-1)?.content ?? "";
+	const block =
+		/CURRENT_DOCUMENT path=definition\.json revision=(\d+)[^\n]*\n<<<\n([\s\S]*?)\n>>>/.exec(
+			messages.map((m) => m.content).join("\n"),
+		);
 	return {
 		request,
+		doc: { revision: Number(block?.[1] ?? 0), text: block?.[2] ?? "" },
 		applied: messages.at(-1)?.content.startsWith("TOOL_RESULT=") === true,
 	};
 }
@@ -180,13 +199,16 @@ const model: LarmPort = {
 				questionRef: "",
 			});
 		if (system.includes("TOOLS=")) {
-			const { request, applied } = specialistTurn(messages);
-			const turn = turns[request];
+			const { request, doc, applied } = specialistTurn(messages);
+			const turn = Object.entries(turns).find(([text]) =>
+				request.includes(text),
+			)?.[1];
 			if (!turn)
 				return JSON.stringify({ action: "reply", text: "承知しました。" });
+			// The operation carries the reply: the host speaks it once the change is accepted.
 			return JSON.stringify(
-				turn.apply && !applied
-					? turn.apply
+				turn.call && !applied
+					? { action: "invoke", ...turn.call(doc), text: turn.reply }
 					: { action: "reply", text: turn.reply },
 			);
 		}

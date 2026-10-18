@@ -10,13 +10,14 @@ import { createFixture } from "./fixture";
  * - the normal addressee answers a message containing `requests.create` by starting the session
  *   toolchain (`ui_create`) with that text;
  * - the specialist answers by the order of the session's messages:
- *   1. `requests.create`: `ui.draft.apply` with title "来場者アンケート" and the survey layout
+ *   1. `requests.create`: `doc.write` with title "来場者アンケート" and the survey layout
  *      below (text-block 見出し + form "満足度" radio 満足/普通/不満 + text "感想"), then replies
  *      "アンケートの初稿を作りました。";
- *   2. `requests.soften`: `ui.draft.apply` with title "やわらかいアンケート" (same layout,
- *      `gap: "relaxed"`), then replies "雰囲気をやわらかくしました。";
+ *   2. `requests.soften`: `doc.edit` (title "やわらかいアンケート", the layout gets
+ *      `gap: "relaxed"`; `doc.write` when the text lacks the expected lines), then
+ *      replies "雰囲気をやわらかくしました。";
  *   3. `requests.explain`: replies "このままで問題ありません。" without applying anything;
- *   4. `requests.again`: `ui.draft.apply` with title "再編集したアンケート", then replies.
+ *   4. `requests.again`: `doc.write` with title "再編集したアンケート", then replies.
  */
 const requests = {
 	create: "来場者アンケートのUIを作ってください",

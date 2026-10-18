@@ -34,6 +34,7 @@ import { viewedSpecialistTarget } from "./specialist-context";
 import { sessionCourse, specialistTurnMessages } from "./specialist-memory";
 import {
 	agentPolicy,
+	type AgentPolicy,
 	documentTools,
 	documentView,
 	isDocTool,
@@ -52,8 +53,9 @@ const NO_CHANGE_REPLY = "変更点が分かりませんでした。どこを変�
 /** Refusals beyond the tool's retries end the turn (spec §6.5); a kept whole draft can be read in the source. */
 const REFUSED_REPLY = "反映できませんでした。";
 const KEPT_REPLY = "反映できませんでした。作った案はソースで確認できます。";
-/** The domain's fixer dropped parts it could not show (spec §12 S2). */
+/** The domain's fixer dropped parts it could not show (spec §12 S2); a dropped key or option is no part. */
 const DROPPED_NOTE = "表示できない部分は省きました。";
+const DROPPED_PART = /^drop_(part|parts|form|model)(:|$)/;
 /** The work changed but the specialist gave no valid reply: the host says so (spec §6.5, D10). */
 const updatedReply = (label: string) =>
 	`${label.length > 40 ? `${label.slice(0, 40)}…` : label}を更新しました。`;
@@ -97,6 +99,32 @@ function failRun(
 	endRun(deps, tx, run, "failed", code);
 	traceFailure(deps, tx, run.id, "failed", code);
 	return { status: "stale", reason: code };
+}
+
+/**
+ * The session's work document for this turn, read as its canonical text: whole, or an outline (then the agent
+ * gets doc.view to read lines). Null when the binding names none or it cannot be read.
+ */
+function turnDocument(
+	port: NonNullable<DialogueDeps["specialist"]>,
+	set: SpecialistSet,
+	workRef: string,
+	policy: AgentPolicy,
+	tx: Database,
+) {
+	const declared = set.agent.document;
+	const document = declared
+		? port.documentOf(set.adapterRef)?.readInTransaction(tx, workRef)
+		: null;
+	if (!declared || !document) return null;
+	return {
+		path: declared.path,
+		revision: document.revision,
+		title: document.title,
+		...documentView(document.text, policy.inlineBytes),
+		rejected: document.rejected,
+		inlineBytes: policy.inlineBytes,
+	};
 }
 
 /** The specialist turn: the user's utterance goes to the toolchain's specialist, never to the main model. */
@@ -171,18 +199,10 @@ export function createSpecialistTurnHandler(
 			if (!transition(tx, run.id, run.revision, "running", clock()))
 				return { status: "stale", reason: "run_changed" };
 			const policy = agentPolicy(set);
-			// A work document is read as its canonical text: whole, or an outline with doc.view to read lines.
-			const document = set.agent.document
-				? port
-						.documentOf(set.adapterRef)
-						?.readInTransaction(tx, session.workRef)
-				: null;
-			const view = document
-				? documentView(document.text, policy.inlineBytes)
-				: null;
+			const document = turnDocument(port, set, session.workRef, policy, tx);
 			const control = specialistControl(
 				set,
-				documentTools(set, view?.outlined ?? false),
+				documentTools(set, document?.outlined ?? false),
 			);
 			return {
 				status: "ready",
@@ -209,18 +229,7 @@ export function createSpecialistTurnHandler(
 						viewing: viewedSpecialistTarget(deps, tx, run),
 						nowMs: Date.parse(clock()),
 						callsLeft: policy.maxModelCalls,
-						...(document && view && set.agent.document
-							? {
-									document: {
-										path: set.agent.document.path,
-										revision: document.revision,
-										title: document.title,
-										...view,
-										rejected: document.rejected,
-										inlineBytes: policy.inlineBytes,
-									},
-								}
-							: {}),
+						...(document ? { document } : {}),
 					}),
 					deadline: Date.now() + remaining,
 					limitMs: remaining,
@@ -357,7 +366,9 @@ export function createSpecialistTurnHandler(
 					);
 				}
 				repaired = true;
-				messages.push(correctionMessage(raw, specialistViolations(value)));
+				messages.push(
+					correctionMessage(raw, specialistViolations(value), max - call),
+				);
 				continue;
 			}
 			repaired = false;
@@ -376,18 +387,23 @@ export function createSpecialistTurnHandler(
 				signal,
 			);
 			if (result.ok) {
-				applied = true;
+				// Reading the document changes nothing: only an operation that may change the work counts.
+				if (action.tool !== "doc.view") applied = true;
 				// The reply the operation carried ends the turn without another call (spec §6.3).
 				if (action.text)
 					return hostReply(
 						result.dropped ? `${action.text}${DROPPED_NOTE}` : action.text,
 					);
 			} else {
-				if (result.error === "no_change") return hostReply(NO_CHANGE_REPLY);
+				if (result.error === "no_change")
+					return applied ? updated() : hostReply(NO_CHANGE_REPLY);
 				const count = (refusals.get(action.tool) ?? 0) + 1;
 				refusals.set(action.tool, count);
-				if (count > policy.retriesOf(action.tool))
+				// Beyond the tool's retries, or with no call left to retry in, the host ends the turn.
+				if (count > policy.retriesOf(action.tool) || call === max) {
+					if (applied) return updated();
 					return hostReply(result.kept ? KEPT_REPLY : REFUSED_REPLY);
+				}
 			}
 			messages.push({ role: "assistant", content: raw });
 			messages.push(toolResultMessage({ ...result, callsLeft: max - call }));
@@ -436,9 +452,19 @@ async function invoke(
 			},
 			deps.clock(),
 		);
-	/** A refusal is recorded on its own: the operation's transaction rolled back. */
+	/**
+	 * A refusal is recorded on its own (the operation's transaction rolled back), only while the session still
+	 * addresses this turn: a cancelled or ended turn leaves no late record.
+	 */
 	const refused = (error: string) =>
-		deps.store.write((tx) => record(tx, { ok: false, error }));
+		deps.store.write((tx) => {
+			try {
+				stillMine(tx);
+			} catch {
+				return;
+			}
+			record(tx, { ok: false, error });
+		});
 	/** Check the authority of every result used to choose this operation before any mutation. */
 	const authorized = (tx: Database) => {
 		stillMine(tx);
@@ -470,14 +496,17 @@ async function invoke(
 			log.warn("dialogue.operation_rejected", {
 				reason: "specialist_operation_refused",
 				validationCode: outcome.error,
-				// A position and a rule name only, as for an operation's repair hint.
+				// A position and a rule name only, as for an operation's repair hint; for an edit not found, the
+				// edit's position and the kind of mismatch (never the text).
 				...(issue
 					? { repairHint: `${issue.path}: ${issue.rule}`.slice(0, 200) }
-					: {}),
+					: outcome.mismatch
+						? { repairHint: `edits/${outcome.index}: ${outcome.mismatch}` }
+						: {}),
 			});
 			return outcome;
 		}
-		const dropped = outcome.fixes?.some((fix) => fix.startsWith("drop_"));
+		const dropped = outcome.fixes?.some((fix) => DROPPED_PART.test(fix));
 		return { ok: true, result: outcome, ...(dropped ? { dropped } : {}) };
 	}
 	const checked = port.parseInvocation(

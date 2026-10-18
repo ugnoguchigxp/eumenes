@@ -226,13 +226,19 @@ export const specialistSystemMessage = (control: ControlContract) => ({
 export function correctionMessage(
 	raw: string,
 	violations: SpecialistViolation[],
+	/** Model calls the turn has left after this one. */
+	callsLeft: number,
 ) {
 	return {
 		role: "user" as const,
 		content:
 			CORRECTION +
 			"\nREJECTED_OUTPUT=" +
-			JSON.stringify({ preview: raw.slice(0, 2000), issues: violations }),
+			JSON.stringify({
+				preview: raw.slice(0, 2000),
+				issues: violations,
+				callsLeft,
+			}),
 	};
 }
 

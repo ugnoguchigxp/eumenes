@@ -13,6 +13,8 @@ import type { AgentPolicy } from "./specialist-agent";
 
 /** Earlier turns read for the session's course; older ones are not listed. */
 const COURSE_TURNS = 200;
+/** A turn cancelled at most this long before the next utterance was accepted was cut off by it. */
+const SUPERSEDED_MS = 5000;
 /** An older turn keeps this much of its utterance in the course. */
 const COURSE_CHARS = 80;
 
@@ -46,8 +48,8 @@ const clip = (text: string, chars: number) =>
  * The session's course (spec subagent-task-and-session-agents §8.2): every earlier turn of this session, failed
  * and cancelled ones too, with the operations it ran from the session record. The newest turns keep their
  * utterance and reply in full within a budget; older ones a short line. The run being answered is not in it.
- * `interrupted` is the utterance of the turn right before this one when the next utterance cancelled it: it
- * belongs to the current request.
+ * `interrupted` is the utterance of the turn right before this one when this utterance cancelled it (within
+ * `SUPERSEDED_MS`): it belongs to the current request.
  */
 export function sessionCourse(
 	deps: DialogueDeps,
@@ -77,8 +79,12 @@ export function sessionCourse(
 			entry.status === "interrupted",
 	);
 	const last = runs.at(-1);
+	// Cut off by this utterance: cancelled without an answer right before this run was accepted. A turn the
+	// user stopped earlier (no signal tells the two apart) is only in the course.
 	const interrupted =
-		last?.status === "cancelled" && !last.answerMessageId
+		last?.status === "cancelled" &&
+		!last.answerMessageId &&
+		Date.parse(run.createdAt) - Date.parse(last.updatedAt) <= SUPERSEDED_MS
 			? text(last.inputMessageId) || null
 			: null;
 	const course: CourseEntry[] = [];
@@ -181,6 +187,10 @@ export function specialistTurnMessages(input: {
 						revision: document.revision,
 						title: document.title,
 						...(document.outlined ? { outlined: true } : {}),
+						// The screen moved it since the last operation here (undo, redo, the user's own edit).
+						...(document.revision !== lastRevision(course)
+							? { changedOnScreen: true }
+							: {}),
 					},
 				}
 			: { currentWork: input.work.current }),
@@ -221,4 +231,12 @@ export function specialistTurnMessages(input: {
 				: input.utterance,
 		},
 	];
+}
+
+/** The work's revision after the last operation of the course that reported one (0 before any). */
+function lastRevision(course: CourseEntry[]): number {
+	for (const entry of [...course].reverse())
+		for (const step of [...(entry.steps ?? [])].reverse())
+			if (step.revision !== undefined) return step.revision;
+	return 0;
 }

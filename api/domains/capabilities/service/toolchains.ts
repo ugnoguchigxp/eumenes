@@ -15,6 +15,7 @@ import {
 } from "../../../infrastructure/vector";
 import {
 	hash,
+	validators,
 	type FixedDefinition,
 	type FixedDocument,
 	type BindingV1,
@@ -208,6 +209,9 @@ export function createToolchains(
 			tools: (pack.toolRevisionIds ?? []).map((id) => {
 				const tool = byId.get(id);
 				if (!tool) throw new Error("required_context_missing");
+				// A stored revision whose input schema this host no longer has (a replaced tool) is unusable.
+				if (tool.schemaKey && !validators[tool.schemaKey])
+					throw new Error("capability_unavailable");
 				return {
 					id: tool.id,
 					revisionId: tool.revisionId,
