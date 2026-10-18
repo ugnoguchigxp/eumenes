@@ -32,7 +32,7 @@ export type Model3dAssetItem = {
 	createdAt: string;
 	prompt: string | null;
 	warnings: readonly string[];
-	/** The source image shown as a thumbnail; omitted when the asset has none. */
+	/** Static render of the model, never the source image. */
 	thumbnailUrl?: string;
 	/** Same-origin GLB link. */
 	downloadUrl?: string;
@@ -71,6 +71,9 @@ export type Model3dWorkspaceProps = {
 	highlightedGenerationId?: string;
 	sourceImages: readonly Model3dSourceImage[];
 	sourceImagesLoading?: boolean;
+	sourceImagesError?: string;
+	/** An accepted host request; repeating its sequence must not override local navigation. */
+	focus?: { seq: number; kind: "asset" | "generation" | "search" };
 	assets: readonly Model3dAssetItem[];
 	total?: number;
 	hasMore: boolean;
@@ -80,6 +83,8 @@ export type Model3dWorkspaceProps = {
 	selectedAsset?: Model3dAssetItem;
 	/** Places the host-owned 3D viewer for the selected asset. */
 	renderViewer?: (assetId: string) => ReactNode;
+	/** Host draws a lazy static thumbnail using the same authenticated GLB renderer. */
+	renderThumbnail?: (assetId: string) => ReactNode;
 	pending?: boolean;
 	message?: string;
 	onGenerate: (values: Model3dGenerateValues) => Model3dSubmitResult;

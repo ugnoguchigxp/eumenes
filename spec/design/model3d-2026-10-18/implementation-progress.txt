@@ -1,0 +1,106 @@
+2026-10-18 実装作業
+利用者がgallery-and-image-picker-design.txtを承認し、実装とLARM画像取込仕様の文書化を明示依頼。
+
+範囲
+・モデルGridと枠内拡大詳細、下書き・検索・一覧位置の保持。
+・ImageGalleryと3Dから使う共通ImageGrid/ImagePicker、およびLARM一覧の共有取得。
+・実GLBからの可視カード用サムネイル。既存のGLB読込とthree.js描画を再利用。
+・LARM取込APIの提案仕様。アップロード・Googleフォトの本接続は公開契約の合意後。
+LLMの指示や意味判断方式、DB、bundleの業務操作、Googleの権限は変更しない。
+
+計画と依存
+1. 既存設計・実装・基準試験を確認：済。
+2. 共有部品・一覧取得・Gridと詳細の切替：実装済、部分試験済。
+3. サムネイルの直列描画・取消・資源解放：実装済、結合・実WebGLブラウザ試験済。
+4. LARM取込API仕様：文書化。未公開APIの呼出しは行わない。
+5. 部分→Web結合→domain verify→サーバーを使わない明示ブラウザ試験→差分点検：実施済。artifact込みの一括検証だけは担当外の既存サイズ上限超過で停止。
+部分・結合試験で得た証拠に応じてこの残作業を更新する。
+
+完了条件
+・Gridのカードから同じ枠内に詳細を表示し、戻ると検索・下書き・スクロールが保たれる。
+・画像の選択・拡大・確定・取消が分かれ、既存の閲覧・削除が保たれる。
+・サムネイルは元画像の代用ではなくGLBの静止描画で、並列のWebGL生成や取消後の採用をしない。
+・モデル／画像／artifactの所有domain検証と、共通部品・共有hookの試験結果を記録する。
+・ブラウザはサーバーを起動せず、明示した試験ファイルで部品と実WebGLを検証する。
+・LLM判断を置き換える語句依存処理や無関係な修正がないことを最終差分で点検する。
+
+基準試験
+bunx vitest run web/src/domains/model3d web/src/domains/image/image-artifact.test.tsx：7 files / 34 tests pass。
+DesignSystemのModel3dWorkspace/ImageGallery：2 files / 19 tests pass。
+
+途中の部分試験
+DesignSystemのModel3dWorkspace/ImageGallery/ImagePicker：3 files / 24 tests pass。
+DesignSystem typecheck：pass。
+検証中の製品コード編集は行わず、失敗があれば完了後に原因と差分を確認してから修正する。
+
+途中時点の残検証（以下の完了記録で結果を記載）
+・共有画像取得とサムネイルqueueのWeb試験、既存ArtifactRenderer結合試験。
+・bun run verify -- --domain model3d --domain image --domain artifact。
+・共通ImagePickerとweb/src/mediaの試験（既存domain selector外なので明示実行）。
+・サーバーを使わないmodel3d-components.spec.tsで320/440/640/広幅と低い枠、実GLB描画・資源解放。
+・LARM仕様のOpenAPI JSON検査と最終差分点検。
+fixtureと実WebGLの結果を、実LARM・Google連携の受入と区別する。
+
+完了時の記録
+・共通ImageGrid/ImagePicker/ImageFrameを画像スタジオと3Dで使用。既存のスタイル名・確認用selector、拡大・保存・削除確認を維持。
+・LARM一覧をweb/src/media/use-image-library.tsで認証client単位に共有。画像URLは既存の認証proxyを通す。重複した一時Blob URL管理は削除。
+・モデルGridはhost描画の256px静止画。可視カードを直列に処理し、元画像をサムネイルの代わりにしない。
+・枠内詳細と一覧復帰、下書きと検索入力の保持、スクロールとフォーカスの復元を確認。
+・会話からの表示・検索・生成状況を既存のfocus.kind/seqで接続し、過去のseqを再採用しない。
+・同じモデルの再指定、検索で詳細を閉じる動作、同一要求の定期更新で詳細スクロールを戻さない回帰試験を追加。
+・アップロードとGoogleフォトは準備中。未公開APIや実Googleの認証処理を今回の製品から呼ばない。
+・spec/reference/larm-image-import-v1-proposal/README.txt とopenapi.jsonを作成。multipart、同一キー再送、成否照会、画像検証、保存・削除、エラー、既存3Dへの接続を定義。
+
+最終の成功した検証
+1. bun run verify -- --domain model3d --domain image：pass。
+   最新report：verification-reports/runs/2026-10-18T12-16-12-217Z-5e6df490-19e7-43f5-b2d5-dc2f5bd08b3d/report.json
+   backend 25、Web 45、Model3dWorkspace 20件が成功。境界・SystemContext・サイズ・整形・lint・型・部品buildも成功。
+2. 共有部品の明示試験：ImagePicker 3件、ImageGallery 3件 pass。
+3. bunx vitest run web/src/domains/model3d web/src/domains/image web/src/media：11 files / 46 tests pass。
+4. bunx playwright test tests/browser/model3d-components.spec.ts：3 tests pass。
+   HTTPサーバーを使わないfixture。実WebGLでGLB→256px PNG、複数色の描画、可視カードのみの直列取得、一覧復帰を確認。
+   320/440/640/960pxで横方向のはみ出しなし。低い上下分割で画像を選択・確定でき、元フォームの下書きが残る。
+   既存画像スタジオのModal拡大、ダウンロード、削除確認と取消も確認。
+5. bun run typecheck：2,093 files、型エラーなし。
+6. bun run build:web：pass。既存背景moduleの静的・動的import併用と大きなchunkの警告は残る。担当外を変更していない。
+7. 新規・変更箇所の明示lint、整形、size-budget（29 files）、git diff --check：pass。
+8. OpenAPI JSONの構造、19件のローカル参照、正規化後画像の既存契約との整合を検査：pass。
+
+停止した検証と範囲外
+bun run verify -- --domain model3d --domain image --domain artifact はsize-budgetで停止。
+packages/artifact-ui/src/composition-fixer.ts 827行、ui-studio-components.tsx 974行が800行上限を超過。
+両ファイルはHEADも同じ行数で、この作業の差分なし。制限や試験期待を弱めず、担当外の修正はしなかった。
+report：verification-reports/runs/2026-10-18T12-07-38-992Z-c9dd6ac3-3ed8-4c1e-9d84-d63b08ed3857/report.json
+変更したartifact view・runtime・hostの型/lintと、ArtifactRenderer経由のWeb結合試験は別途成功。
+実LARMの3D生成・実Google同意・LARM画像取込は今回の受入に含めない。既存サーバーを停止・起動・再起動していない。
+
+最終差分点検
+LLMのprofile/skill、発話分類、意味判断、業務操作の優先順位を変更していない。
+専用処理はGLBの描画、明示されたhost状態の表示、画像URLの検証と取消・資源管理に限定。
+モデルthumbnail APIが現行契約に無いため既存GLB rendererを再利用し、可視カードごとの常設WebGLを避けた。
+DB・設定・秘密をコピーせず、新規ブランチ・別チャットへの送信・外部認可は行っていない。main上で作業。
+作業中に加わったspec/README.mdとspec/playwright-toolchain-design-2026-10-18.mdは今回の対象外として編集・巻戻ししていない。
+最終点検時にはpackage.json、bun.lock、api/domains/browser/、BrowserWorkspace/、scripts/spikes/にも並行作業の差分が増えていた。今回のモデル・画像実装の変更ではなく、編集・巻戻ししていない。全体型検査の2,093 filesは実行時点の結果であり、その後の担当外追加を含むリポジトリ全体の再保証はしていない。
+
+追加指示：2タブとBrowse（2026-10-18）
+目的と完了条件：提供元をLARM画像／Googleフォトの2タブにし、端末画像の入口を独立Browseへ変更。画像と文章の併用可否は現行公開契約から回答する。未対応の取込を成功と表示しない。
+・既存のTabs、Button、ImageFrameを再利用。BrowseでOSファイル選択を開き、ローカル画像を枠内確認。一時URLは差替え・解除・取消時に解放する。
+・未アップロードの画像を確定できないようにし、保存済みIDとの混同を防ぐ。Googleタブは未接続理由を表示する。
+・保存済み接続先のOpenAPIを再度読み取り、画像取込POSTが無いこと、3D sourceがprompt／image-artifactの二択であることを再確認。画像と補足文の同時入力は未対応。
+・画像取込API案にも併用の制約を追記。画像と文章から元画像を編集して3D化する案は現行契約外であり、実装していない。
+・部分試験：ImagePicker 4件、ImageGallery 3件、Model3dWorkspace 20件、計27件成功。
+・型検査477 files、対象lint／整形／差分点検成功。途中で検出したeffect規約違反とcleanupの戻り値の型を修正後に再確認。
+・domain verifyの最終実行はbackend 25件、Web 45件、Model3dWorkspace 20件を含む全step成功。ただし実行中のSource changed during verificationで総合結果はinvalidated。
+  report：verification-reports/runs/2026-10-18T12-53-03-948Z-4f65fc1d-ed3e-479d-8cc5-ec0118a7c7be/report.json
+  先行実行も同じ変更検知で無効。自分の製品編集は検証中に行っていない。担当外の変更を止めたり巻き戻したりせず、同条件での全体再試行を停止した。
+・通し：サーバー不要のmodel3d-components.spec.ts 3件成功。Browseのfilechooser、実PNGの表示、Google／LARMタブ、取消／確定と下書き保持を確認。ローカル画像のnaturalWidth=32と上部2タブの表示を追加し、対象1件も再度成功。
+・画像はspec/verification/model3d-grid-image-picker-2026-10-18/image-picker-tabs-fixture.png。見本データを使うfixtureであり、実LARM取込・実Google認可の成功ではない。
+・俯瞰評価：部品試験とAPI事実確認により残作業を絞った。全体検証は外部の並行編集で安定しないため、成功した各stepと固定fixtureの結果を分けて報告する方針へ変更。
+・未完了：実アップロード、Googleフォトの選択・取込。前提はLARM取込API公開とPhotos追加認可。本文の意味分類、LLM指示、DB、外部認可、新ブランチ、サーバー操作は変更なし。
+
+参照ボタンの表示反映とGoogleフォト手順（2026-10-18、追加依頼）
+・目的：画像選択のボタンを「参照…」へ統一し、利用中の画面への反映条件を確認。Googleフォトの利用条件を説明する。
+・既存Button、file input、共通Pickerを再利用し、認証・外部API・業務操作は変更しない。未実装Photosを「接続操作だけで使える」と誤解させない文言に訂正。
+・Google CloudでのPhotos Picker API有効化、scope追加、アプリ側の追加同意・選択処理、LARM取込の実装をdocs/google-accounts.mdへ記載。
+・vite.config.tsのserver.hmr=false／watch=nullにより稼働中Webはソース更新を監視しない。反映には再起動が必要だが、AGENTS.mdの明示許可要件に従って勝手に再起動しない。
+・部分→結合→サーバー不要ブラウザfixtureを検証し、ビルド後の画面を提示してから実サーバー再起動の許可を確認する。実Googleの設定・権限変更は対象外。

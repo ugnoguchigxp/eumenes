@@ -20,7 +20,11 @@ import type {
 } from "./contracts";
 import { handleModel3dEvent, type Model3dDeps } from "./dispatch";
 import { model3dArtifactSource, parseSourceData, revisionOf } from "./source";
-import { useBlobUrls } from "./use-blob-urls";
+import {
+	imageContentUrl,
+	imageLibraryKey,
+	useImageLibrary,
+} from "../../media/use-image-library";
 
 const defaultQuery: Model3dQuery = {
 	q: "",
@@ -28,8 +32,6 @@ const defaultQuery: Model3dQuery = {
 	sort: "createdAt",
 	order: "desc",
 };
-/** Source images whose thumbnails are fetched; the rest are still listed by name. */
-const thumbnailLimit = 24;
 const noGenerations: Model3dGeneration[] = [];
 const activeStates = new Set<Model3dGeneration["state"]>([
 	"submitting",
@@ -68,7 +70,6 @@ function toAsset(a: Model3dAsset) {
 		createdAt: a.createdAt,
 		prompt: a.prompt,
 		warnings: a.warnings,
-		thumbnailUrl: a.hasSource ? `${base}/source` : undefined,
 		downloadUrl: `${base}/content`,
 	};
 }
@@ -96,7 +97,8 @@ export function useModel3dRuntime({
 	const [query, setQuery] = useState(defaultQuery);
 	const [selectedId, setSelected] = useState<string>();
 	const [highlightedId, setHighlighted] = useState<string>();
-	const [appliedSeq, setAppliedSeq] = useState(-1);
+	const [appliedFocus, setAppliedFocus] =
+		useState<Model3dSourceData["focus"]>(null);
 	const submission = useRef<{ signature: string; requestId: string } | null>(
 		null,
 	);
@@ -136,8 +138,8 @@ export function useModel3dRuntime({
 
 	// A request from the conversation applies once per increasing sequence number.
 	const focus = sourceData?.focus;
-	if (focus && focus.seq > appliedSeq) {
-		setAppliedSeq(focus.seq);
+	if (focus && focus.seq > (appliedFocus?.seq ?? -1)) {
+		setAppliedFocus(focus);
 		if (focus.kind === "asset") setSelected(focus.assetId);
 		else if (focus.kind === "generation") setHighlighted(focus.generationId);
 		else
@@ -166,18 +168,10 @@ export function useModel3dRuntime({
 	const selected = selectedId
 		? (detail.data ?? items.find((a) => a.id === selectedId))
 		: undefined;
-	const images = useQuery({
-		queryKey: [...root, "images"],
-		queryFn: ({ signal }) => client.imageLibrary(signal),
-		retry: false,
-	});
+	const images = useImageLibrary(client);
 	const imageList = (images.data?.images ?? [])
 		.slice()
 		.sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
-	const thumbnails = useBlobUrls(
-		imageList.slice(0, thumbnailLimit).map((image) => image.id),
-		(id) => client.imageContent(id),
-	);
 
 	// A generation that finished adds an asset, so the list is read again.
 	const active = useRef(new Set<string>());
@@ -202,9 +196,12 @@ export function useModel3dRuntime({
 		sourceImages: imageList.map((image) => ({
 			id: image.id,
 			title: imageTitle(image),
-			thumbnailUrl: thumbnails[image.id],
+			thumbnailUrl: imageContentUrl(image.id),
 		})),
 		sourceImagesLoading: images.isPending,
+		sourceImagesError: images.error
+			? "保存画像を取得できませんでした。一覧を更新してください。"
+			: undefined,
 		assets: items.map(toAsset),
 		total: last?.total,
 		hasMore: !!last?.nextCursor,
@@ -212,6 +209,9 @@ export function useModel3dRuntime({
 		error: assets.error ? "3Dモデルの一覧を取得できませんでした。" : undefined,
 		filter: query,
 		selectedAsset: selected && toAsset(selected),
+		focus: appliedFocus
+			? { seq: appliedFocus.seq, kind: appliedFocus.kind }
+			: undefined,
 	};
 	const resource: Model3dWorkspaceResource = {
 		...content,
@@ -234,7 +234,11 @@ export function useModel3dRuntime({
 		setSelected,
 		setHighlighted,
 		selectedId,
-		refreshAll: () => cache.invalidateQueries({ queryKey: root }),
+		refreshAll: () =>
+			Promise.all([
+				cache.invalidateQueries({ queryKey: root }),
+				cache.invalidateQueries({ queryKey: imageLibraryKey(client) }),
+			]).then(() => {}),
 		refreshGenerations: () => invalidate("source"),
 		refreshAssets: async () => {
 			await Promise.all([invalidate("assets"), invalidate("asset")]);

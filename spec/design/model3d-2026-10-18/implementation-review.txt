@@ -1,0 +1,90 @@
+3Dモデル アーティファクト：実装調査と画面提案
+2026-10-18
+
+修正：アーティファクトの親枠
+初回のcreate-concept.png／library-concept.pngは独立アプリ向けの幅広い構成になっていたため、採用案としない。
+利用者の指摘後、docs/openui-artifact.md、ResizableWorkspace、ArtifactPanel、app.cssを確認した。
+・通常は会話との50:50分割。利用者が25〜75%で比率を変える可変枠。
+・上部はホストのworkspaceタブ。周囲の余白0、内容の外側余白は8px相当。
+・内容欄はmin-width/min-heightが0で、枠内をスクロールする。
+・幅900px以下では会話とアーティファクトが上下に並ぶ。アーティファクトの高さも可変。
+・既存の画像制作もembedded時は一列の構成にしている。
+修正版はartifact-create-concept.png／artifact-library-v2-concept.png、640×960px。
+これは基準幅での見た目を示す画像であり、アーティファクトの固定寸法ではない。
+親枠のタブを使い、独立したロゴ・大見出し・サイドバーを足さず、一列で配置する。
+作成は入力→生成→生成状況、ライブラリは検索→サムネイル→3D表示→情報・操作の順。
+狭い枠・低い枠では縦スクロールし、実装時は横方向のはみ出しを検証する。
+両PNGを目視確認済み。libraryの初稿に生成指示の英語ラベルが出たため、プロンプトの該当表現を変えて再生成し、v2で解消した。
+artifact-library-concept.pngは途中案。現行提案は上記2枚と対応するartifact-create.prompt.txt／artifact-library-v2.prompt.txt。
+修正時の生成は計3回。各回とも生成200・画像取得200・接続解放204を確認した。
+親枠確認で一列化でき、ラベルの1点修正後の目視も完了したため、追加の試行は不要と判断した。
+PNGは見た目の提案であり、正確な文言やタッチ領域、各幅での動作は実装時の確認対象。
+
+目的・範囲・完了条件
+既存の実装を確認し、作成画面とライブラリ画面のデザイン案を画像化する。
+成果物はPNG 2枚と生成プロンプト。製品コード、API、DB、生成担当の判断方式は変更しない。
+設計・実装との機能照合、生成画像の目視、最終差分の確認で完了とする。
+
+確認した経路
+1. docs/model3d.md と spec/instant-3d-model-toolchain-design-2026-10-18.md
+   文章または保存画像からGLBを生成。非同期処理の段階を表示。保存済み素材を検索・表示・更新・削除する。
+2. api/domains/capabilities/bundles/model3d.bundle.json
+   LLMへのprofile・skill、公開操作、OpenUIアーティファクト定義とアクション登録。
+   元画像の指定、対象選択、生成取消と完成品削除の区別、品質上の注意を担当に指示済み。
+3. api/application/media/model3d-adapter.ts
+   会話の操作をmodel3d domainへ接続。ホスト発行refを照合。アーティファクトにqueryを提供。
+4. packages/artifact-ui/src/model3d-components.tsx
+   登録viewがDesignSystem部品を描画。許可されたアクションをdispatch。
+   サムネイルとダウンロードURLを検証し、Webホストの3Dビューアを配置。
+5. packages/design-system/src/components/Model3dWorkspace/
+   Workspace：作成とライブラリの2タブ。
+   GenerationForm：タイトル必須、タグ、文章／保存画像の選択、文章最大2000文字。
+   GenerationList：段階名、取消、状態の再確認、完成品の表示。進捗率は使わない。
+   Library：文章検索、タグAND、並び順、更新、ページ送り、元画像サムネイル。
+   Detail：タイトルとタグの編集、元の文章、警告、GLBダウンロード、確認付き削除。
+6. web/src/domains/model3d/
+   toolchain-adapter.tsx と use-model3d-runtime.ts がAPI・状態・描画を接続。
+   Model3dViewer.tsx と glb-scene.ts：three.jsでGLBを表示。回転・拡縮・視点リセット・背景明暗。
+7. api/domains/model3d/contracts/index.ts と api/domains/larm/service/mesh-library.ts
+   段階名と取得・生成の外部契約。画像・GLBはLARMが正本。画面用に新しい進捗を作らない。
+
+見た目と表示構成の所見
+・フォームの見出し・ラベル・入力枠が同じ強さで縦積みになり、主操作が目立ちにくい。
+・ライブラリ詳細は一覧の下の全幅行で、モデルと一覧を見比べる構成になっていない。
+・添付ではライブラリ選択中に作成フォームが見える。
+  両TabsContentにforceMountがあり、非表示CSSは.model3d-pane[hidden]だけ。
+  インストール済みRadix TabsはforceMount時present=trueとなり、非選択でもhiddenが付かない実装。
+  これは静的な実装照合の所見。稼働画面での再現試験・修正は今回実施していない。
+
+既存機構を使うデザイン方針
+・作成：元にするもの→大きな説明入力→タイトルとタグ→生成ボタン。右側に生成状況。
+・ライブラリ：左に検索と元画像の一覧、中央に大きな3D表示、右に情報・編集。
+・既存のダーク背景と青い操作色を引き継ぐ。小さなタブ、余白、抑えた罫線で強弱をつける。
+・新しいLLM指示や専用判定は不要。既存のデータ・アクション・ビューアで組み替える提案。
+・任意アップロード、メッシュ編集、品質設定、モデル選択、お気に入り等は提案に加えない。
+・画像内の作品・入力値・件数は画面提案用の例であり、実データや実3D生成結果ではない。
+・床面や影など画像上の演出は描画提案。現在のビューアと完全に同一のレンダリングではない。
+
+画像生成
+docs/larm.mdに従い、backend settings domainのreadStoredLarmを既存liveLarmSettingsから利用。
+createLarmPlayground.catalog と findServiceTarget でcapabilityとprotocolにより発見。
+catalogと確保応答のURL・descriptionを確認。既存executeで接続確保、生成、画像取得、接続解放。
+Profile名・モデル名・認証情報を成果物のコードやファイル名に固定しない。
+生成は各画面1回ずつ。POSTの自動再送はしない。画像サイズ1280×900、PNG。
+参照画像編集はAPI非対応のため、添付画像は調査・視覚的参照に使い、文章から新規生成する。
+
+検証範囲
+部分：各画面の表示項目を既存props・操作・外部契約と照合。
+結合：実LARMのcatalog→確保→生成→画像取得→解放を確認。
+通し：完成PNGを目視し、機能構成と主要ラベルを確認。
+製品の実装変更がないためdomain verifyとブラウザE2Eは省略。実機能の受入完了を意味しない。
+
+実施結果
+・create-concept.png と library-concept.png を生成し、両方を目視確認した。
+・生成POSTは計2回とも200、画像取得は計2回とも200、接続解放は計2回とも204。
+・作成画面は説明入力と生成ボタン、ライブラリ画面は3D表示を主役にできている。
+・画像内の細かな文字・日付には生成による揺れがある。作成画面の文字数表示は実装仕様ではない。
+・ライブラリ画像はタグ検索のラベルだけになり、独立した入力欄が省略された。
+  実装へ移す場合は既存のタグAND入力、並び順、検索を別々のコントロールとして維持する。
+・この画像はレイアウトと見た目の提案であり、全コントロールの最終仕様図ではない。
+・最終差分はこのフォルダ内の画像・プロンプト・調査記録のみ。製品コードへの変更はない。

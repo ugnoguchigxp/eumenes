@@ -1,0 +1,21 @@
+{
+  "route": "saved-larm-catalog",
+  "width": 640,
+  "height": 960,
+  "results": [
+    {
+      "variant": "model-grid-v2",
+      "path": "/Users/y.noguchi/Code/eumenes/spec/design/model3d-2026-10-18/model-grid-v2-concept.png",
+      "bytes": 655386,
+      "artifactId": "image_ad880eb88e7e4a06bc117383e5cb7278",
+      "mime": "image/png"
+    },
+    {
+      "variant": "shared-image-picker-v2",
+      "path": "/Users/y.noguchi/Code/eumenes/spec/design/model3d-2026-10-18/shared-image-picker-v2-concept.png",
+      "bytes": 702370,
+      "artifactId": "image_572ee44cfa70436c8815b8f8667fc5dd",
+      "mime": "image/png"
+    }
+  ]
+}

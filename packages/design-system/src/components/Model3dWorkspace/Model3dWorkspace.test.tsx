@@ -118,7 +118,12 @@ describe("Model3dWorkspace generation", () => {
 			screen.getByRole("button", { name: "3Dモデルを生成する" }),
 		);
 		expect(screen.getByText("元にする画像を選んでください。")).toBeTruthy();
-		await user.click(screen.getByLabelText("ロボットの絵"));
+		await user.click(screen.getByRole("button", { name: "画像を選ぶ" }));
+		await user.click(
+			screen.getByRole("button", { name: "ロボットの絵を選ぶ" }),
+		);
+		expect(p.onGenerate).not.toHaveBeenCalled();
+		await user.click(screen.getByRole("button", { name: "この画像を使う" }));
 		await user.click(
 			screen.getByRole("button", { name: "3Dモデルを生成する" }),
 		);
@@ -264,6 +269,7 @@ describe("Model3dWorkspace library", () => {
 			screen.getByRole("button", { name: "青緑のロボットを開く" }),
 		);
 		expect(p.onSelect).toHaveBeenCalledWith("a1");
+		await user.click(screen.getByRole("button", { name: "一覧に戻る" }));
 		await user.click(screen.getByRole("button", { name: "さらに表示" }));
 		expect(p.onMore).toHaveBeenCalledTimes(1);
 	});
@@ -300,6 +306,137 @@ describe("Model3dWorkspace library", () => {
 });
 
 describe("Model3dWorkspace detail", () => {
+	it("a background refresh of the same host request does not reset detail scrolling", () => {
+		const p = props({ selectedAsset: asset });
+		const content = () => (
+			<div style={{ overflowY: "auto" }} data-testid="scroll-owner">
+				<Model3dWorkspace {...p} focus={{ seq: 1, kind: "asset" }} />
+			</div>
+		);
+		const view = render(content());
+		const owner = screen.getByTestId("scroll-owner");
+		owner.scrollTop = 120;
+		view.rerender(content());
+		expect(owner.scrollTop).toBe(120);
+	});
+
+	it("host search opens the grid from detail; generation and repeated asset requests retain their meaning", async () => {
+		const user = userEvent.setup();
+		const p = props({ selectedAsset: asset, highlightedGenerationId: "g1" });
+		const view = render(
+			<Model3dWorkspace {...p} focus={{ seq: 1, kind: "asset" }} />,
+		);
+		expect(screen.getByRole("button", { name: "一覧に戻る" })).toBeTruthy();
+		view.rerender(
+			<Model3dWorkspace
+				{...p}
+				focus={{ seq: 2, kind: "search" }}
+				filter={{ ...p.filter, q: "検索結果" }}
+			/>,
+		);
+		expect(screen.getByRole("search")).toBeTruthy();
+		expect(screen.getByRole("textbox", { name: "検索" })).toHaveProperty(
+			"value",
+			"検索結果",
+		);
+		expect(
+			screen.queryByRole("region", { name: "モデルの拡大詳細" }),
+		).toBeNull();
+		await user.click(
+			screen.getByRole("button", { name: "青緑のロボットを開く" }),
+		);
+		expect(screen.getByRole("button", { name: "一覧に戻る" })).toBeTruthy();
+		view.rerender(
+			<Model3dWorkspace {...p} focus={{ seq: 3, kind: "generation" }} />,
+		);
+		expect(screen.getByRole("form", { name: "3Dモデルの生成" })).toBeTruthy();
+		view.rerender(
+			<Model3dWorkspace {...p} focus={{ seq: 4, kind: "asset" }} />,
+		);
+		expect(
+			screen.getByRole("region", { name: "モデルの拡大詳細" }),
+		).toBeTruthy();
+	});
+
+	it("returns to the grid without losing search or the create draft, and reopens on a repeated host request", async () => {
+		const user = userEvent.setup();
+		const p = props();
+		const view = render(<Model3dWorkspace {...p} />);
+		await user.type(
+			screen.getByRole("textbox", { name: "タイトル" }),
+			"作成中の作品",
+		);
+		await user.click(screen.getByRole("tab", { name: "ライブラリ" }));
+		expect(screen.queryByRole("form", { name: "3Dモデルの生成" })).toBeNull();
+		await user.type(
+			screen.getByRole("textbox", { name: "検索" }),
+			"入力中の検索",
+		);
+		await user.click(
+			screen.getByRole("button", { name: "青緑のロボットを開く" }),
+		);
+		view.rerender(
+			<Model3dWorkspace
+				{...p}
+				selectedAsset={asset}
+				focus={{ seq: 1, kind: "asset" }}
+			/>,
+		);
+		expect(screen.queryByRole("search")).toBeNull();
+		expect(
+			screen.getByRole("region", { name: "モデルの拡大詳細" }),
+		).toBeTruthy();
+		await user.click(screen.getByRole("button", { name: "一覧に戻る" }));
+		expect(screen.getByRole("textbox", { name: "検索" })).toHaveProperty(
+			"value",
+			"入力中の検索",
+		);
+		view.rerender(
+			<Model3dWorkspace
+				{...p}
+				selectedAsset={asset}
+				focus={{ seq: 2, kind: "asset" }}
+			/>,
+		);
+		expect(screen.getByRole("button", { name: "一覧に戻る" })).toBeTruthy();
+		await user.click(screen.getByRole("tab", { name: "作る" }));
+		expect(screen.getByRole("textbox", { name: "タイトル" })).toHaveProperty(
+			"value",
+			"作成中の作品",
+		);
+	});
+
+	it("cancelling the image picker preserves the confirmed image and all form fields", async () => {
+		const user = userEvent.setup();
+		const p = props({
+			sourceImages: [
+				{ id: "i1", title: "ロボット" },
+				{ id: "i2", title: "熊" },
+			],
+		});
+		render(<Model3dWorkspace {...p} />);
+		await user.type(
+			screen.getByRole("textbox", { name: "タイトル" }),
+			"制作途中",
+		);
+		await user.click(screen.getByLabelText("保存した画像から作る"));
+		await user.click(screen.getByRole("button", { name: "画像を選ぶ" }));
+		await user.click(screen.getByRole("button", { name: "ロボットを選ぶ" }));
+		await user.click(screen.getByRole("button", { name: "この画像を使う" }));
+		await user.click(screen.getByRole("button", { name: "画像を変更" }));
+		await user.click(screen.getByRole("button", { name: "熊を選ぶ" }));
+		await user.click(screen.getByRole("button", { name: "キャンセル" }));
+		await user.click(
+			screen.getByRole("button", { name: "3Dモデルを生成する" }),
+		);
+		expect(p.onGenerate).toHaveBeenCalledWith({
+			title: "制作途中",
+			tags: "",
+			prompt: "",
+			imageId: "i1",
+		});
+	});
+
 	function detail(p = props({ selectedAsset: asset })) {
 		const viewer = vi.fn((id: string) => <div>viewer:{id}</div>);
 		render(<Model3dWorkspace {...p} renderViewer={viewer} />);

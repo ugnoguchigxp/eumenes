@@ -109,6 +109,7 @@ export * from "./components/RecordsWorkspace";
 export * from "./components/ServerDataTable";
 
 export * from "./components/ImageWorkspace";
+export * from "./components/ImagePicker";
 
 export * from "./components/FullscreenDialog";
 

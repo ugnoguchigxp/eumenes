@@ -28,6 +28,8 @@ export type GlbScene = {
 	show(glb: ArrayBuffer): Promise<void>;
 	reset(): void;
 	setBackground(mode: GlbBackground): void;
+	capture(): Promise<Blob>;
+	clear(): void;
 	dispose(): void;
 };
 
@@ -52,9 +54,13 @@ export function disposeObject(root: Object3D) {
 export function createGlbScene(
 	container: HTMLElement,
 	background: GlbBackground,
+	/** A static thumbnail uses a fixed square without resize observation. */
+	thumbnailSize?: number,
 ): GlbScene {
 	const renderer = new WebGLRenderer({ antialias: true });
-	renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+	renderer.setPixelRatio(
+		thumbnailSize ? 1 : Math.min(window.devicePixelRatio || 1, 2),
+	);
 	const canvas = renderer.domElement;
 	canvas.style.display = "block";
 	canvas.style.width = "100%";
@@ -80,15 +86,17 @@ export function createGlbScene(
 	};
 	controls.addEventListener("change", render);
 	const resize = () => {
-		const width = Math.max(container.clientWidth, 1);
-		const height = Math.max(container.clientHeight, 1);
+		const width = thumbnailSize ?? Math.max(container.clientWidth, 1);
+		const height = thumbnailSize ?? Math.max(container.clientHeight, 1);
 		renderer.setSize(width, height, false);
 		camera.aspect = width / height;
 		camera.updateProjectionMatrix();
 		render();
 	};
 	const observer =
-		typeof ResizeObserver === "function" ? new ResizeObserver(resize) : null;
+		!thumbnailSize && typeof ResizeObserver === "function"
+			? new ResizeObserver(resize)
+			: null;
 	observer?.observe(container);
 	resize();
 	function fit(object: Object3D) {
@@ -139,6 +147,19 @@ export function createGlbScene(
 		setBackground(mode) {
 			scene.background = new Color(backgrounds[mode]);
 			render();
+		},
+		clear: release,
+		capture() {
+			if (disposed || renderer.getContext().isContextLost())
+				return Promise.reject(new Error("model3d_context_lost"));
+			// Capture in the same task as rendering; preserveDrawingBuffer is not needed.
+			render();
+			return new Promise((resolve, reject) =>
+				canvas.toBlob((blob) => {
+					if (blob) resolve(blob);
+					else reject(new Error("model3d_thumbnail_failed"));
+				}, "image/png"),
+			);
 		},
 		dispose() {
 			if (disposed) return;

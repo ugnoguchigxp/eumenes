@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Download, RefreshCw, Trash2 } from "lucide-react";
 import { Button } from "../Button";
 import { ImageViewer } from "../ImageViewer";
+import { ImageGrid } from "../ImagePicker";
 import { Modal } from "../Modal";
 import type { WorkspaceImage } from "./types";
 export type ImageGalleryProps = {
@@ -29,7 +30,7 @@ export function ImageGallery({
 }: ImageGalleryProps) {
 	const [order, setOrder] = useState("desc");
 	const [preview, setPreview] = useState<WorkspaceImage>();
-	const [failed, setFailed] = useState<Record<string, string>>({});
+	const [gridRevision, setGridRevision] = useState(0);
 	const [deleteId, setDeleteId] = useState<string>();
 	const target = images.find((image) => image.id === deleteId);
 	const visiblePreview = images.find((image) => image.id === preview?.id);
@@ -53,7 +54,7 @@ export function ImageGallery({
 						size="icon"
 						aria-label="一覧を更新"
 						onClick={() => {
-							setFailed({});
+							setGridRevision((value) => value + 1);
 							onRefresh();
 						}}
 						disabled={pending || loading}
@@ -76,77 +77,62 @@ export function ImageGallery({
 			{!images.length && !loading && !error && (
 				<p className="image-gallery-empty">まだ保存された画像はありません。</p>
 			)}
-			<div className="image-gallery-grid">
-				{sorted.map((image) => (
-					<article
-						key={image.id}
-						className="image-gallery-card"
-						data-selected={image.id === selectedId}
-					>
-						<button
-							type="button"
-							className="image-gallery-thumbnail"
-							aria-label={`${image.title}を表示`}
-							onClick={() => {
-								onSelect(image.id);
-								setPreview(image);
-							}}
-							disabled={failed[image.id] === image.url}
+			<ImageGrid
+				key={gridRevision}
+				classNames={{
+					grid: "image-gallery-grid",
+					card: "image-gallery-card",
+					select: "image-gallery-thumbnail",
+					caption: "image-gallery-caption",
+				}}
+				images={sorted.map((image) => ({ ...image, thumbnailUrl: image.url }))}
+				selectedId={selectedId}
+				selectLabel={(image) => `${image.title}を表示`}
+				onSelect={(id) => {
+					const image = images.find((item) => item.id === id);
+					if (image) {
+						onSelect(id);
+						setPreview(image);
+					}
+				}}
+				renderCaption={(image) => (
+					<>
+						<h4>{image.title}</h4>
+						<p>
+							<time dateTime={image.createdAt}>
+								{new Date(image.createdAt).toLocaleDateString("ja-JP")}
+							</time>
+							<span>
+								{image.width} × {image.height}
+							</span>
+						</p>
+					</>
+				)}
+				renderActions={(image) => (
+					<>
+						<a
+							className="image-download"
+							href={image.url}
+							download={`image-${image.id}.${image.format}`}
+							aria-label={`${image.title}をダウンロード`}
 						>
-							{failed[image.id] === image.url ? (
-								<span role="alert">画像を読み込めませんでした。</span>
-							) : (
-								<img
-									src={image.url}
-									alt={image.title}
-									loading="lazy"
-									onError={() =>
-										setFailed((previous) => ({
-											...previous,
-											[image.id]: image.url,
-										}))
-									}
-								/>
-							)}
-						</button>
-						<div className="image-gallery-caption">
-							<div>
-								<h4>{image.title}</h4>
-								<p>
-									<time dateTime={image.createdAt}>
-										{new Date(image.createdAt).toLocaleDateString("ja-JP")}
-									</time>
-									<span>
-										{image.width} × {image.height}
-									</span>
-								</p>
-							</div>
-							<div className="image-gallery-actions">
-								<a
-									className="image-download"
-									href={image.url}
-									download={`image-${image.id}.${image.format}`}
-									aria-label={`${image.title}をダウンロード`}
-								>
-									<Download aria-hidden="true" />
-								</a>
-								{onDelete && (
-									<Button
-										type="button"
-										variant="ghost"
-										size="icon"
-										aria-label={`${image.title}を削除`}
-										disabled={pending || loading}
-										onClick={() => setDeleteId(image.id)}
-									>
-										<Trash2 aria-hidden="true" />
-									</Button>
-								)}
-							</div>
-						</div>
-					</article>
-				))}
-			</div>
+							<Download aria-hidden="true" />
+						</a>
+						{onDelete && (
+							<Button
+								type="button"
+								variant="ghost"
+								size="icon"
+								aria-label={`${image.title}を削除`}
+								disabled={pending || loading}
+								onClick={() => setDeleteId(image.id)}
+							>
+								<Trash2 aria-hidden="true" />
+							</Button>
+						)}
+					</>
+				)}
+			/>
 			<ImageViewer
 				src={visiblePreview?.url ?? ""}
 				alt={visiblePreview?.title}

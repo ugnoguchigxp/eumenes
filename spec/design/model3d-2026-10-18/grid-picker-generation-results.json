@@ -1,0 +1,28 @@
+{
+  "route": "saved-larm-catalog",
+  "width": 640,
+  "height": 960,
+  "results": [
+    {
+      "variant": "model-grid",
+      "path": "/Users/y.noguchi/Code/eumenes/spec/design/model3d-2026-10-18/model-grid-concept.png",
+      "bytes": 704053,
+      "artifactId": "image_6cd7990a66fe4abba771b4ce0eed1b0a",
+      "mime": "image/png"
+    },
+    {
+      "variant": "model-detail",
+      "path": "/Users/y.noguchi/Code/eumenes/spec/design/model3d-2026-10-18/model-detail-concept.png",
+      "bytes": 584481,
+      "artifactId": "image_92ac26fb48cd4e63adfbc1ecf03b00b2",
+      "mime": "image/png"
+    },
+    {
+      "variant": "shared-image-picker",
+      "path": "/Users/y.noguchi/Code/eumenes/spec/design/model3d-2026-10-18/shared-image-picker-concept.png",
+      "bytes": 729816,
+      "artifactId": "image_4342e3a854a04369bab382edeaefeffe",
+      "mime": "image/png"
+    }
+  ]
+}

@@ -2,6 +2,7 @@ import { useId, useState } from "react";
 import { Button } from "../Button";
 import { Input } from "../Input";
 import { Textarea } from "../Textarea";
+import { ImagePicker } from "../ImagePicker";
 import type {
 	Model3dGenerateValues,
 	Model3dSourceImage,
@@ -17,6 +18,8 @@ export type Model3dGenerationFormProps = {
 	unavailableReason?: string | null;
 	sourceImages: readonly Model3dSourceImage[];
 	sourceImagesLoading?: boolean;
+	sourceImagesError?: string;
+	onRefreshImages?: () => void;
 	pending?: boolean;
 	onGenerate: (values: Model3dGenerateValues) => Model3dSubmitResult;
 };
@@ -51,12 +54,18 @@ export function Model3dGenerationForm({
 	unavailableReason,
 	sourceImages,
 	sourceImagesLoading,
+	sourceImagesError,
+	onRefreshImages,
 	pending,
 	onGenerate,
 }: Model3dGenerationFormProps) {
 	const id = useId();
 	const [draft, setDraft] = useState<Draft>(empty);
 	const [submitted, setSubmitted] = useState(false);
+	const [picking, setPicking] = useState(false);
+	const selectedImage = sourceImages.find(
+		(image) => image.id === draft.imageId,
+	);
 	const error = submitted ? problem(draft) : undefined;
 	const disabled = !available || pending;
 	async function submit() {
@@ -74,104 +83,118 @@ export function Model3dGenerationForm({
 		}
 	}
 	return (
-		<form
-			className="model3d-form"
-			aria-label="3Dモデルの生成"
-			onSubmit={(event) => {
-				event.preventDefault();
-				void submit();
-			}}
-		>
-			<h3>3Dモデルを作る</h3>
-			{!available && (
-				<p role="alert" className="model3d-unavailable">
-					現在は生成できません。{unavailableReason ? unavailableReason : ""}
-				</p>
-			)}
-			<label htmlFor={`${id}-title`}>タイトル</label>
-			<Input
-				id={`${id}-title`}
-				value={draft.title}
-				maxLength={titleLimit}
-				disabled={disabled}
-				onChange={(event) => setDraft({ ...draft, title: event.target.value })}
-			/>
-			<label htmlFor={`${id}-tags`}>
-				タグ <small>（読点またはカンマ区切り）</small>
-			</label>
-			<Input
-				id={`${id}-tags`}
-				value={draft.tags}
-				maxLength={tagsLimit}
-				disabled={disabled}
-				onChange={(event) => setDraft({ ...draft, tags: event.target.value })}
-			/>
-			<fieldset className="model3d-mode" disabled={disabled}>
-				<legend>元になるもの</legend>
-				<label>
-					<input
-						type="radio"
-						name={`${id}-mode`}
-						checked={draft.mode === "prompt"}
-						onChange={() => setDraft({ ...draft, mode: "prompt" })}
-					/>
-					文章から作る
-				</label>
-				<label>
-					<input
-						type="radio"
-						name={`${id}-mode`}
-						checked={draft.mode === "image"}
-						onChange={() => setDraft({ ...draft, mode: "image" })}
-					/>
-					保存した画像から作る
-				</label>
-			</fieldset>
-			{draft.mode === "prompt" ? (
-				<>
-					<label htmlFor={`${id}-prompt`}>作りたいもの</label>
-					<Textarea
-						id={`${id}-prompt`}
-						value={draft.prompt}
-						maxLength={promptLimit}
-						rows={4}
-						disabled={disabled}
-						onChange={(event) =>
-							setDraft({ ...draft, prompt: event.target.value })
-						}
-					/>
-				</>
-			) : (
-				<fieldset className="model3d-images" disabled={disabled}>
-					<legend>画像を選ぶ</legend>
-					{sourceImagesLoading && <output>画像を読み込んでいます。</output>}
-					{!sourceImagesLoading && !sourceImages.length && (
-						<p>保存した画像がありません。</p>
-					)}
-					<div className="model3d-image-choices">
-						{sourceImages.map((image) => (
-							<label key={image.id} data-selected={draft.imageId === image.id}>
-								<input
-									type="radio"
-									name={`${id}-image`}
-									checked={draft.imageId === image.id}
-									onChange={() => setDraft({ ...draft, imageId: image.id })}
-								/>
-								{image.thumbnailUrl ? (
-									<img src={image.thumbnailUrl} alt="" />
-								) : (
-									<span className="model3d-thumb-empty" aria-hidden="true" />
-								)}
-								<span>{image.title}</span>
-							</label>
-						))}
-					</div>
+		<section>
+			<form
+				hidden={picking}
+				className="model3d-form"
+				aria-label="3Dモデルの生成"
+				onSubmit={(event) => {
+					event.preventDefault();
+					void submit();
+				}}
+			>
+				<h3>3Dモデルを作る</h3>
+				{!available && (
+					<p role="alert" className="model3d-unavailable">
+						現在は生成できません。{unavailableReason ? unavailableReason : ""}
+					</p>
+				)}
+				<fieldset className="model3d-mode" disabled={disabled}>
+					<legend>元になるもの</legend>
+					<label>
+						<input
+							type="radio"
+							name={`${id}-mode`}
+							checked={draft.mode === "prompt"}
+							onChange={() => setDraft({ ...draft, mode: "prompt" })}
+						/>
+						文章から作る
+					</label>
+					<label>
+						<input
+							type="radio"
+							name={`${id}-mode`}
+							checked={draft.mode === "image"}
+							onChange={() => setDraft({ ...draft, mode: "image" })}
+						/>
+						保存した画像から作る
+					</label>
 				</fieldset>
+				{draft.mode === "prompt" ? (
+					<>
+						<label htmlFor={`${id}-prompt`}>作りたいもの</label>
+						<Textarea
+							id={`${id}-prompt`}
+							value={draft.prompt}
+							maxLength={promptLimit}
+							rows={4}
+							disabled={disabled}
+							onChange={(event) =>
+								setDraft({ ...draft, prompt: event.target.value })
+							}
+						/>
+					</>
+				) : (
+					<div className="model3d-image-source">
+						{selectedImage && (
+							<div className="model3d-selected-image">
+								{selectedImage.thumbnailUrl && (
+									<img src={selectedImage.thumbnailUrl} alt="" />
+								)}
+								<span>{selectedImage.title}</span>
+							</div>
+						)}
+						<Button
+							type="button"
+							variant="outline"
+							disabled={disabled}
+							onClick={() => setPicking(true)}
+						>
+							{selectedImage ? "画像を変更" : "画像を選ぶ"}
+						</Button>
+					</div>
+				)}
+				<label htmlFor={`${id}-title`}>タイトル</label>
+				<Input
+					id={`${id}-title`}
+					value={draft.title}
+					maxLength={titleLimit}
+					disabled={disabled}
+					onChange={(event) =>
+						setDraft({ ...draft, title: event.target.value })
+					}
+				/>
+				<label htmlFor={`${id}-tags`}>
+					タグ <small>（読点またはカンマ区切り）</small>
+				</label>
+				<Input
+					id={`${id}-tags`}
+					value={draft.tags}
+					maxLength={tagsLimit}
+					disabled={disabled}
+					onChange={(event) => setDraft({ ...draft, tags: event.target.value })}
+				/>
+
+				{error && <p role="alert">{error}</p>}
+				<Button type="submit" disabled={disabled}>
+					3Dモデルを生成する
+				</Button>
+			</form>
+			{picking && (
+				<ImagePicker
+					images={sourceImages}
+					selectedId={draft.imageId}
+					loading={sourceImagesLoading}
+					error={sourceImagesError}
+					pending={disabled}
+					onRefresh={onRefreshImages}
+					onCancel={() => setPicking(false)}
+					onConfirm={(imageId) => {
+						setDraft({ ...draft, imageId });
+						setPicking(false);
+					}}
+				/>
 			)}
-			{error && <p role="alert">{error}</p>}
-			<Button type="submit" disabled={disabled}>
-				3Dモデルを生成する
-			</Button>
-		</form>
+		</section>
 	);
 }

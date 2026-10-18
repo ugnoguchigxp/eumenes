@@ -41,6 +41,7 @@ export type ArtifactRuntime = {
 	hostViews?: {
 		"avatar-motion-lab"?: () => ReactNode;
 		"model3d-viewer"?: (props: { assetId: string }) => ReactNode;
+		"model3d-thumbnail"?: (props: { assetId: string }) => ReactNode;
 	};
 	/**
 	 * Connects one live PTY session of a terminal source (output stream, ordered input, resize).

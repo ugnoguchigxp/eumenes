@@ -1,0 +1,14 @@
+{
+  "route": "saved-larm-catalog",
+  "width": 640,
+  "height": 960,
+  "results": [
+    {
+      "variant": "artifact-library-v2",
+      "path": "/Users/y.noguchi/Code/eumenes/spec/design/model3d-2026-10-18/artifact-library-v2-concept.png",
+      "bytes": 595280,
+      "artifactId": "image_5742077b4eb8491b8f183112cbd72920",
+      "mime": "image/png"
+    }
+  ]
+}

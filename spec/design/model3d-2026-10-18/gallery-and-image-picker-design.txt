@@ -1,0 +1,126 @@
+3DモデルGrid・共通画像選択の設計案
+2026-10-18 / 状態：利用者承認後に実装。モデルGrid・枠内詳細・LARM画像の共通選択を実装し、対象検証済み。外部画像取込とGoogleフォト接続は後続。
+
+利用者の「この設計で実装してください」の明示依頼により着手。実装・検証結果はimplementation-progress.txtに記録。
+
+目的
+会話横の可変幅アーティファクト内で、保存モデルをGridから選び、拡大と詳細を見る。
+3D生成に使う画像の選択を共通化し、LARM保存画像・アップロード・Googleフォトを扱う。
+設計提案時の成果物は画面画像と設計案。承認後の製品実装でも、DBと外部接続権限は変更していない。
+
+利用者が指定した表示
+・モデルライブラリはGrid。カードは実際のモデルのサムネイル、タイトル、タグを中心にする。
+・クリックすると同じアーティファクト枠を使う拡大詳細へ移る。「一覧に戻る」で検索・スクロール位置を保って戻る。
+・拡大詳細は3D回転・拡縮・視点リセット・背景明暗、タイトルとタグの編集、元の文章・警告、GLBダウンロード、確認付き削除。
+・会話欄を覆う全画面画面や、常設の詳細サイドバーを加えない。
+・画像から作る場合は「画像を選ぶ」で共通の選択画面へ移る。確定後に元のフォームへ戻り、選択画像を表示する。選択だけでは生成を始めない。
+
+アーティファクトの制約
+docs/openui-artifact.md、ResizableWorkspace、ArtifactPanel、app.cssに従う。
+ホストのworkspaceタブを使い、独立アプリのロゴや大きなヘッダーを加えない。
+画像案は640×960px。これは基準の見本であり固定幅ではない。
+Gridは枠の幅で列数を変える。初期候補は640pxで3列、狭幅で2列、必要なら1列。
+列数の閾値はカードの文字・タッチ領域を実画面で確認して決める。横スクロールを必須にしない。
+検索と並び順をコンパクトに置き、内容は枠内スクロール。作成フォームの下書きは保持する。
+
+既存機構の再利用
+・ImageWorkspace/ImageGallery.tsx：画像Grid、読込・失敗状態、選択、拡大表示。
+  現状は画像生成専用の文言、クリック時の選択と拡大、ダウンロード・削除が一体。
+  純粋な画像Grid／カード表示を抽出し、既存ImageGalleryは閲覧・管理用のwrapperとして使う。
+  共通ImagePickerは選択専用。候補クリックは選択、明示したプレビュー操作は拡大、フッターの「この画像を使う」で確定。
+  画像スタジオの既存クリック拡大動作、ダウンロード、削除を変更しない。
+・既存DesignSystemのボタン・タブ・選択状態・スクロール部品を使う。
+  ImageViewerは現状viewport基準のModalを使うため、そのまま枠内プレビューに流用しない。
+  画像の表示部分を共有し、既存のModalによる閲覧と、新しい枠内プレビューの入れ物を分ける。既存の拡大操作は維持する。
+・/api/images/library と /api/images/:id/content、および認証済みclient取得を共有する。
+  キャッシュと一時URLの生成・取消・解放はWebホストが持ち、各利用domainに同じ取得実装を複製しない。
+・ArtifactRuntimeのuploadFile bridgeを使う。FileやBlob、アクセストークンをOpenUI JSONに入れない。
+・UI部品はprops/eventsのみ。取得・OAuth・取込はWeb adapterとbackendの責務。
+・登録式のview/host操作を用いる。新たなアーティファクト種別や、画像選択専用のLLMを作らない。
+
+モデルサムネイル
+現状：use-model3d-runtime.tsのtoAssetは /api/model3d/assets/:id/source をthumbnailUrlに入れる。これは元画像であり、モデルを描画した画像ではない。
+2026-10-18に保存済みControlのOpenAPIを読み、GLB content・source・metadata・preview HTMLはあるが、モデルthumbnail画像APIは確認できなかった。
+提案：既存GLB取得・three.jsの読込／フィット／照明を再利用し、可視カード用の静止画を生成する。
+カードごとに常設WebGLビューアを作らず、共有の描画機構で順番に処理し、見えなくなったカードの取得を取り消し、不要なGLBと描画資源を解放する。
+GLBと画像の正本は引き続きLARM。サムネイルは再生成できる表示用データとして扱う。
+詳細のビューアも同じ読込・描画設定を使う。LARMのpreview HTMLは実行しない。
+失敗時は読込失敗と再試行を表示し、元画像をモデルの描画画像と偽って代用しない。
+描画時間・メモリ・WebGL復旧を測定してから固定値や永続キャッシュの要否を決める。
+
+共通画像選択
+利用者の追加指示により、提供元のタブは「LARM画像」「Googleフォト」の2つ。アップロードの入口はタブ外の「Browse」ボタン。初回の3D利用は1枚選択。
+現行LARMは画像取込未対応のため、Browseでは端末のファイル選択と枠内確認までを提供し、「未アップロード・3D生成には使えない」と明示する。ローカル画像をLARMの参照IDに見せかけて確定しない。実取込は公開契約の整備後。
+提供元の切替でも元フォームのタイトル・タグ・文章を保持。確定前の取消では元の選択を変えない。
+各提供元は実装済み／未接続／権限不足／読込失敗を区別し、押せるのに何も起きないボタンを作らない。
+・LARM保存画像：既存一覧APIを使ってGrid表示。選択した実在imageArtifactIdを参照し、複製や再生成をしない。
+・アップロード：OSのファイル選択を入口に、選択画像をプレビューして確定。形式・サイズ・画素数・実体をbackendで検証する。
+  conversation.uploadAttachmentの検証手法を参照するが、画像選択を架空の会話メッセージとして保存しない。
+  3D/LARM取込の外部仕様と照合して受付上限を決める。チャット用3MiBを根拠なく共通仕様にしない。
+・Googleフォト：既存連携アカウントを再利用するが、現在の基本scopeだけでは写真は読めない。
+  利用者がこの提供元を使う操作をした時に、同じアカウントで必要なscopeを明示した再認可と追加同意を行う。
+  必要scopeは https://www.googleapis.com/auth/photospicker.mediaitems.readonly 。接続済みというだけで付与されたと判断しない。
+  backendがPhotos Picker sessionを作成し、公式pickerUriを通常の外部ブラウザで開く。
+  アーティファクトは「Googleフォトで選ぶ」「選択を待っています」「選択結果」を表示する。
+  Googleフォト全体をアーティファクト内に勝手に一覧表示しない。iframeへ公式Pickerを埋め込まない。
+  完了後、選んだ写真だけを共通Gridに戻す。動画等は静止画像の選択用途として受け付けない。
+  pollingConfigの間隔・期限に従い、取消・アカウント解除・差替え後の古い結果を採用しない。
+  選択結果のbytes取得後にsessionを片付ける。短命なbaseUrlを永続参照にせず、トークンはbackend内に留める。
+
+共通化の範囲と境界
+共通化するもの：候補Grid、選択・確定・取消、プレビュー、読込／失敗表示、ホストへの取得・取込依頼。
+提供元の認証・API仕様は提供元adapter、生成の業務判断と元画像要件は各利用domainが所有する。
+表示用の明示的source種別で連携先を選ぶことは外部契約への接続であり、発話の意味分類をコード化しない。
+選択結果はホスト発行の参照。LLMやUI JSONに任意URL、File path、Googleアクセストークンを作らせない。
+全domainを一斉に移行せず、既存画像スタジオと3D画像選択から共有化する。OCR等への適用は別途要件確認。
+
+現行契約との差分・実装前の依存
+1. Google連携
+   docs/google-accounts.mdとprovider.tsはopenid/email/profileのみを許可する。
+   Photos scopeの追加、既存アカウントの追加同意、同一sub検証、scope保存・更新・解除単位の設計が必要。
+   既存の連携済み状態を写真アクセス許可済みとみなさない。実アカウントの権限変更は今回行わない。
+2. LARMへの画像取込
+   現行3D APIのsourceはpromptまたはimage-artifact ID。任意URLやファイルを渡す契約ではない。
+   ローカルクライアントと実OpenAPIの /v1/image-artifacts はGET、個別GET/DELETE/content GETのみ。画像取込POSTは確認できない。
+   第一案はアップロード／Google選択画像を検証してLARMへ取り込み、発行されたimageArtifactIdで既存3D生成を使う。
+   取込API、重複防止、上限、エラー、所有権、保持・削除の扱いをLARM側の正式仕様として合意する必要がある。
+   未公開APIを推測したり、外部画像から別の画像を生成して取込の代わりにしたりしない。
+   Googleからの取込は自動で全写真をコピーせず、利用者が確定した対象のみ。選択だけでは3D生成を開始しない。
+   この依存が満たされるまでは、3Dで利用可能なのは既存LARM画像。アップロード／Googleは設計上の予定機能として区別する。
+
+実装順と検証計画
+1. 合意済み画面と既存UI契約を固定し、Grid・選択・拡大の責務を分ける。
+2. 共通画像Grid／選択部品を抽出し、画像スタジオと3Dで接続する。
+3. モデルの静止サムネイルと、枠内の拡大詳細を接続する。
+4. Google追加認可とLARM取込仕様の合意後、アップロードとPhotosを接続する。
+部分：Gridの選択とプレビュー、確定／取消、可変列数、読込失敗、詳細から戻る時の位置と条件保持、元フォームの下書き保持。
+結合：同一clientの共有一覧／認証済み画像取得、参照の検証、取消後の古い応答排除、ファイル実体検証、Google同意とセッションのfixture。
+通し：アーティファクト320／440／640／広幅と低い上下分割、キーボード、Grid→拡大詳細→復帰、各提供元選択→元フォーム→生成。
+所有domainのverifyと影響利用domainのverify、明示したブラウザE2Eを使う。稼働サーバーの起動・再起動は別途許可が必要。
+実Google、実LARM取込、実3D生成はfixtureと分け、利用者が許可した環境でのみ受入確認する。
+今回実施する検証：現行コードと実OpenAPI・公式Photos仕様の照合、画面画像の目視と寸法確認、差分点検。
+
+画面提案と今回の結果
+・model-grid-v2-concept.png：モデルGrid。クリックで別状態の拡大詳細へ進む想定。
+・model-detail-concept.png：枠内の拡大詳細。「一覧に戻る」でGridへ復帰。
+・shared-image-picker-v2-concept.png：共通画像選択。LARM画像／アップロード／Googleフォトの入口と、1枚選択・確定。
+・対応するmodel-grid-v2.prompt.txt、model-detail.prompt.txt、shared-image-picker-v2.prompt.txtを保存。
+・保存済みLARMのcatalog→接続確保→生成→取得→解放を使用。生成は計5回、各回生成200・取得200・解放204を確認。
+・最初のGridと画像選択が明色になったため、暗色の背景・入力・文字色を明示して各1回再生成した。詳細画像は初稿を使用。
+・最終3枚を目視確認した。640×960pxの画像案であり、画像内の見本データ・細かな文言・件数・列数には生成による揺れがある。
+  例：Gridの件数とカード数、見本画像と仮のキャプションが一致していない箇所がある。画像の文字を製品仕様や実データとして転記しない。
+  提供元のタブ・選択確定・Gridと詳細の分離を設計の正本とし、実装では実際の候補データから正確な表示を作る。
+・製品実装、OAuth権限、DBは未変更。製品コードを変えていないため、domain verify／ブラウザE2Eは今回省略。
+・GoogleとLARMの追加契約は設計・依存関係として整理したもので、接続や取込の動作確認済みではない。
+・差分はspec/design/model3d-2026-10-18内の画像と設計資料のみ。
+
+主な根拠
+docs/openui-artifact.md / docs/model3d.md / docs/images.md / docs/google-accounts.md / docs/chat-images.md
+packages/design-system/src/components/ImageWorkspace/ImageGallery.tsx
+web/src/domains/model3d/use-model3d-runtime.ts
+api/domains/larm/contracts/mesh.ts / api/domains/larm/service/image-library.ts
+api/domains/google-accounts/service/provider.ts
+2026-10-18 保存済みLARM接続先のGET /openapi.json（読み取りのみ）
+https://developers.google.com/photos/picker/guides/get-started-picker
+https://developers.google.com/photos/picker/guides/sessions
+https://developers.google.com/photos/picker/guides/media-items

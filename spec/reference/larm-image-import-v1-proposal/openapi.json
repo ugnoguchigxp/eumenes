@@ -1,0 +1,522 @@
+{
+	"openapi": "3.1.0",
+	"info": {
+		"title": "LARM image import API proposal",
+		"version": "0.1.0-proposal",
+		"description": "提案・未公開。現在のLARM APIではない。合意済みUIからアップロード／Google選択画像を取り込むための外部契約案。"
+	},
+	"security": [
+		{
+			"controlBearer": []
+		}
+	],
+	"paths": {
+		"/v1/image-artifacts/imports": {
+			"post": {
+				"operationId": "importImageArtifact",
+				"summary": "静止画のbytesを検証・正規化して保存画像に取り込む",
+				"description": "生成やGPU起動は行わない。同じキーと元bytesは同じ結果。入力形式JPEG/PNG/WebP、16MiB、8192px、33,554,432画素まで。正規化PNGの一覧・取得可能状態で成功を返す。",
+				"parameters": [
+					{
+						"name": "Idempotency-Key",
+						"in": "header",
+						"required": true,
+						"schema": {
+							"type": "string",
+							"format": "uuid"
+						},
+						"description": "利用者が確定した1操作のUUID。少なくとも7日間保持。元bytesが異なる再送は409。"
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"multipart/form-data": {
+							"schema": {
+								"type": "object",
+								"required": ["file"],
+								"properties": {
+									"file": {
+										"type": "string",
+										"format": "binary",
+										"description": "静止JPEG/PNG/WebP、16MiBまで。複数や未知のpart、URLは拒否。"
+									}
+								},
+								"additionalProperties": false
+							},
+							"encoding": {
+								"file": {
+									"contentType": "image/jpeg, image/png, image/webp"
+								}
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "同一要求の成功結果を再送",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"requestId": {
+											"type": "string",
+											"format": "uuid"
+										},
+										"expiresAt": {
+											"type": "string",
+											"format": "date-time"
+										},
+										"status": {
+											"type": "string",
+											"const": "succeeded"
+										},
+										"artifact": {
+											"$ref": "#/components/schemas/ImportedImage"
+										}
+									},
+									"required": ["requestId", "expiresAt", "status", "artifact"],
+									"additionalProperties": false
+								}
+							}
+						}
+					},
+					"201": {
+						"description": "取込・正規化・保存済み",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"requestId": {
+											"type": "string",
+											"format": "uuid"
+										},
+										"expiresAt": {
+											"type": "string",
+											"format": "date-time"
+										},
+										"status": {
+											"type": "string",
+											"const": "succeeded"
+										},
+										"artifact": {
+											"$ref": "#/components/schemas/ImportedImage"
+										}
+									},
+									"required": ["requestId", "expiresAt", "status", "artifact"],
+									"additionalProperties": false
+								}
+							}
+						}
+					},
+					"202": {
+						"description": "同一キーの処理が進行中",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"requestId": {
+											"type": "string",
+											"format": "uuid"
+										},
+										"expiresAt": {
+											"type": "string",
+											"format": "date-time"
+										},
+										"status": {
+											"type": "string",
+											"const": "pending"
+										}
+									},
+									"required": ["requestId", "expiresAt", "status"],
+									"additionalProperties": false
+								}
+							}
+						},
+						"headers": {
+							"Location": {
+								"schema": {
+									"type": "string"
+								},
+								"description": "/v1/image-imports/{requestId}"
+							}
+						}
+					},
+					"400": {
+						"description": "要求形式が不正",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ImportError"
+								}
+							}
+						}
+					},
+					"401": {
+						"description": "認証されていない",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ImportError"
+								}
+							}
+						}
+					},
+					"403": {
+						"description": "権限がない",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ImportError"
+								}
+							}
+						}
+					},
+					"409": {
+						"description": "同一キーで内容が異なる",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ImportError"
+								}
+							}
+						}
+					},
+					"410": {
+						"description": "成果物は明示削除済み",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ImportError"
+								}
+							}
+						}
+					},
+					"413": {
+						"description": "bytes・寸法・画素数の上限超過",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ImportError"
+								}
+							}
+						}
+					},
+					"415": {
+						"description": "未対応の形式",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ImportError"
+								}
+							}
+						}
+					},
+					"422": {
+						"description": "画像が破損",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ImportError"
+								}
+							}
+						}
+					},
+					"429": {
+						"description": "取込枠が使用中",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ImportError"
+								}
+							}
+						},
+						"headers": {
+							"Retry-After": {
+								"schema": {
+									"type": "integer",
+									"minimum": 1
+								},
+								"description": "再開までの秒数。同じキーだけで再開する。"
+							}
+						}
+					},
+					"503": {
+						"description": "取込利用不可",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ImportError"
+								}
+							}
+						}
+					},
+					"507": {
+						"description": "保存容量不足",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ImportError"
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/v1/image-imports/{requestId}": {
+			"get": {
+				"operationId": "getImageImport",
+				"summary": "取込の成否をキーで確認する",
+				"parameters": [
+					{
+						"name": "requestId",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string",
+							"format": "uuid"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "成否・期限・成果物、または安全な失敗コード",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ImportStatus"
+								}
+							}
+						}
+					},
+					"401": {
+						"description": "認証されていない",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ImportError"
+								}
+							}
+						}
+					},
+					"403": {
+						"description": "権限がない",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ImportError"
+								}
+							}
+						}
+					},
+					"404": {
+						"description": "未受付または照会期限外。成功したと推測しない。",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ImportError"
+								}
+							}
+						}
+					},
+					"410": {
+						"description": "成果物は明示削除済み",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ImportError"
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	},
+	"components": {
+		"securitySchemes": {
+			"controlBearer": {
+				"type": "http",
+				"scheme": "bearer",
+				"description": "既存Control認証。Provider tokenやGoogle tokenを使わない。"
+			}
+		},
+		"schemas": {
+			"ImportedImage": {
+				"type": "object",
+				"required": [
+					"id",
+					"createdAt",
+					"format",
+					"mimeType",
+					"width",
+					"height",
+					"hasAlpha",
+					"bytes",
+					"sha256",
+					"contentUrl"
+				],
+				"properties": {
+					"id": {
+						"type": "string",
+						"pattern": "^image_[a-f0-9]{32}$"
+					},
+					"createdAt": {
+						"type": "string",
+						"format": "date-time"
+					},
+					"format": {
+						"type": "string",
+						"const": "png"
+					},
+					"mimeType": {
+						"type": "string",
+						"const": "image/png"
+					},
+					"width": {
+						"type": "integer",
+						"minimum": 1,
+						"maximum": 8192
+					},
+					"height": {
+						"type": "integer",
+						"minimum": 1,
+						"maximum": 8192
+					},
+					"hasAlpha": {
+						"type": "boolean"
+					},
+					"bytes": {
+						"type": "integer",
+						"minimum": 1,
+						"maximum": 32000000
+					},
+					"sha256": {
+						"type": "string",
+						"pattern": "^[a-f0-9]{64}$"
+					},
+					"contentUrl": {
+						"type": "string",
+						"pattern": "^/v1/image-artifacts/image_[a-f0-9]{32}/content$"
+					}
+				},
+				"additionalProperties": false,
+				"description": "保存済みの正規化後PNG。model、seed、stepsを生成した値として付けない。"
+			},
+			"ImportStatus": {
+				"oneOf": [
+					{
+						"type": "object",
+						"properties": {
+							"requestId": {
+								"type": "string",
+								"format": "uuid"
+							},
+							"expiresAt": {
+								"type": "string",
+								"format": "date-time"
+							},
+							"status": {
+								"type": "string",
+								"const": "pending"
+							}
+						},
+						"required": ["requestId", "expiresAt", "status"],
+						"additionalProperties": false
+					},
+					{
+						"type": "object",
+						"properties": {
+							"requestId": {
+								"type": "string",
+								"format": "uuid"
+							},
+							"expiresAt": {
+								"type": "string",
+								"format": "date-time"
+							},
+							"status": {
+								"type": "string",
+								"const": "succeeded"
+							},
+							"artifact": {
+								"$ref": "#/components/schemas/ImportedImage"
+							}
+						},
+						"required": ["requestId", "expiresAt", "status", "artifact"],
+						"additionalProperties": false
+					},
+					{
+						"type": "object",
+						"properties": {
+							"requestId": {
+								"type": "string",
+								"format": "uuid"
+							},
+							"expiresAt": {
+								"type": "string",
+								"format": "date-time"
+							},
+							"status": {
+								"type": "string",
+								"const": "failed"
+							},
+							"error": {
+								"type": "string",
+								"enum": [
+									"invalid_import_request",
+									"unauthorized",
+									"forbidden",
+									"import_not_found",
+									"idempotency_conflict",
+									"imported_asset_deleted",
+									"image_too_large",
+									"unsupported_media_type",
+									"invalid_image",
+									"import_busy",
+									"import_unavailable",
+									"storage_full",
+									"import_interrupted"
+								]
+							}
+						},
+						"required": ["requestId", "expiresAt", "status", "error"],
+						"additionalProperties": false
+					}
+				],
+				"discriminator": {
+					"propertyName": "status"
+				}
+			},
+			"ImportError": {
+				"type": "object",
+				"required": ["error"],
+				"properties": {
+					"error": {
+						"type": "string",
+						"enum": [
+							"invalid_import_request",
+							"unauthorized",
+							"forbidden",
+							"import_not_found",
+							"idempotency_conflict",
+							"imported_asset_deleted",
+							"image_too_large",
+							"unsupported_media_type",
+							"invalid_image",
+							"import_busy",
+							"import_unavailable",
+							"storage_full",
+							"import_interrupted"
+						]
+					}
+				},
+				"additionalProperties": false
+			}
+		}
+	}
+}

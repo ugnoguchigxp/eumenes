@@ -1,7 +1,8 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect } from "react";
 // Shadcn components (assumed existing in project)
 import { Modal } from "@/components/Modal"; // lightweight local implementation
 import { cn } from "@/utils/cn";
+import { ImageFrame } from "./ImageFrame";
 
 interface IImageViewerProps {
 	src: string;
@@ -15,8 +16,6 @@ interface IImageViewerProps {
 /** Responsive image viewer using shadcn dialog */
 export const ImageViewer: React.FC<IImageViewerProps> = React.memo(
 	({ src, alt, open, onOpenChange, maxWidthPx = 900 }) => {
-		const imgRef = useRef<HTMLImageElement | null>(null);
-
 		// Keep the controlled viewer in sync with Escape.
 		useEffect(() => {
 			const handleKey = (e: KeyboardEvent) => {
@@ -38,8 +37,7 @@ export const ImageViewer: React.FC<IImageViewerProps> = React.memo(
 				className="w-[min(900px,calc(100vw-2rem))] max-w-none max-h-[90dvh] p-2 md:p-4 bg-transparent border-none shadow-none"
 			>
 				<div className="flex min-w-0 w-full items-center justify-center">
-					<img
-						ref={imgRef}
+					<ImageFrame
 						src={src || undefined}
 						alt={alt || "Image"}
 						className={cn(

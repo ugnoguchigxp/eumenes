@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { Button } from "../Button";
 import { Input } from "../Input";
 import type { Model3dAssetItem, Model3dFilter } from "./types";
@@ -39,6 +39,7 @@ export type Model3dLibraryProps = {
 	onSelect: (id: string) => void;
 	onMore: () => void;
 	onRefresh: () => void;
+	renderThumbnail?: (assetId: string) => ReactNode;
 };
 
 /** Search, result list and paging. The host owns the cursor and discards it on a new search. */
@@ -54,6 +55,7 @@ export function Model3dLibrary({
 	onSelect,
 	onMore,
 	onRefresh,
+	renderThumbnail,
 }: Model3dLibraryProps) {
 	const id = useId();
 	const applied = JSON.stringify(filter);
@@ -80,44 +82,17 @@ export function Model3dLibrary({
 					});
 				}}
 			>
-				<label htmlFor={`${id}-q`}>検索</label>
-				<Input
-					id={`${id}-q`}
-					value={draft.q}
-					maxLength={200}
-					placeholder="タイトル・元の文章・タグ"
-					onChange={(event) => setDraft({ ...draft, q: event.target.value })}
-				/>
-				<label htmlFor={`${id}-tags`}>タグ（すべて一致）</label>
-				<Input
-					id={`${id}-tags`}
-					value={draft.tags}
-					maxLength={240}
-					onChange={(event) => setDraft({ ...draft, tags: event.target.value })}
-				/>
-				<label>
-					並び順
-					<select
-						value={draft.sort === "relevance" ? "relevance" : draft.order}
-						onChange={(event) =>
-							setDraft({
-								...draft,
-								sort:
-									event.target.value === "relevance"
-										? "relevance"
-										: "createdAt",
-								order: event.target.value === "asc" ? "asc" : "desc",
-							})
-						}
-					>
-						{sortOptions.map((option) => (
-							<option key={option.value} value={option.value}>
-								{option.label}
-							</option>
-						))}
-					</select>
-				</label>
-				<div className="model3d-actions">
+				<div className="model3d-search-row">
+					<label className="model3d-field-label" htmlFor={`${id}-q`}>
+						検索
+					</label>
+					<Input
+						id={`${id}-q`}
+						value={draft.q}
+						maxLength={200}
+						placeholder="タイトル・元の文章・タグ"
+						onChange={(event) => setDraft({ ...draft, q: event.target.value })}
+					/>
 					<Button type="submit" disabled={loading}>
 						検索する
 					</Button>
@@ -129,6 +104,41 @@ export function Model3dLibrary({
 					>
 						更新
 					</Button>
+				</div>
+				<div className="model3d-search-row">
+					<label className="model3d-field-label" htmlFor={`${id}-tags`}>
+						タグ（すべて一致）
+					</label>
+					<Input
+						id={`${id}-tags`}
+						value={draft.tags}
+						maxLength={240}
+						onChange={(event) =>
+							setDraft({ ...draft, tags: event.target.value })
+						}
+					/>
+					<label>
+						<span className="model3d-field-label">並び順</span>
+						<select
+							value={draft.sort === "relevance" ? "relevance" : draft.order}
+							onChange={(event) =>
+								setDraft({
+									...draft,
+									sort:
+										event.target.value === "relevance"
+											? "relevance"
+											: "createdAt",
+									order: event.target.value === "asc" ? "asc" : "desc",
+								})
+							}
+						>
+							{sortOptions.map((option) => (
+								<option key={option.value} value={option.value}>
+									{option.label}
+								</option>
+							))}
+						</select>
+					</label>
 				</div>
 			</form>
 			{loading && <output aria-live="polite">3Dモデルを取得中です。</output>}
@@ -147,33 +157,39 @@ export function Model3dLibrary({
 			<ul className="model3d-results">
 				{assets.map((asset) => (
 					<li key={asset.id} data-selected={asset.id === selectedId}>
-						<button
-							type="button"
-							className="model3d-result"
-							aria-label={`${asset.title}を開く`}
-							aria-pressed={asset.id === selectedId}
-							onClick={() => onSelect(asset.id)}
-						>
-							{asset.thumbnailUrl ? (
-								<img src={asset.thumbnailUrl} alt="" loading="lazy" />
-							) : (
-								<span className="model3d-thumb-empty" aria-hidden="true" />
-							)}
-							<span className="model3d-result-text">
-								<strong>{asset.title}</strong>
-								<time dateTime={asset.createdAt}>
-									{new Date(asset.createdAt).toLocaleDateString("ja-JP")}
-								</time>
-								{asset.tags.length > 0 && (
-									<small>{asset.tags.join("・")}</small>
+						<div className="model3d-result">
+							<div className="model3d-result-preview">
+								{renderThumbnail ? (
+									renderThumbnail(asset.id)
+								) : asset.thumbnailUrl ? (
+									<img src={asset.thumbnailUrl} alt="" loading="lazy" />
+								) : (
+									<span className="model3d-thumb-empty" aria-hidden="true" />
 								)}
-								{asset.warnings.length > 0 && (
-									<small className="model3d-warn-flag">
-										注意 {asset.warnings.length}件
-									</small>
-								)}
-							</span>
-						</button>
+							</div>
+							<button
+								type="button"
+								className="model3d-result-open"
+								aria-label={`${asset.title}を開く`}
+								aria-pressed={asset.id === selectedId}
+								onClick={() => onSelect(asset.id)}
+							>
+								<span className="model3d-result-text">
+									<strong>{asset.title}</strong>
+									<time dateTime={asset.createdAt}>
+										{new Date(asset.createdAt).toLocaleDateString("ja-JP")}
+									</time>
+									{asset.tags.length > 0 && (
+										<small>{asset.tags.join("・")}</small>
+									)}
+									{asset.warnings.length > 0 && (
+										<small className="model3d-warn-flag">
+											注意 {asset.warnings.length}件
+										</small>
+									)}
+								</span>
+							</button>
+						</div>
 					</li>
 				))}
 			</ul>

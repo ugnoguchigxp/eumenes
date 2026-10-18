@@ -1,0 +1,21 @@
+{
+  "route": "saved-larm-catalog",
+  "width": 1280,
+  "height": 900,
+  "results": [
+    {
+      "variant": "create",
+      "path": "/Users/y.noguchi/Code/eumenes/spec/design/model3d-2026-10-18/create-concept.png",
+      "bytes": 926507,
+      "artifactId": "image_95a0cf1ff87545889540b1ed75662f32",
+      "mime": "image/png"
+    },
+    {
+      "variant": "library",
+      "path": "/Users/y.noguchi/Code/eumenes/spec/design/model3d-2026-10-18/library-concept.png",
+      "bytes": 1219472,
+      "artifactId": "image_76aff64d36fa43c9a343ec1390b12ba2",
+      "mime": "image/png"
+    }
+  ]
+}

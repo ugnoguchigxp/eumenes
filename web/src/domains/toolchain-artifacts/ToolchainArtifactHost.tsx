@@ -9,6 +9,7 @@ import { Button } from "@eumenes/design-system";
 import { LightAvatarMotionLab } from "../../components/domains/conversation/LightAvatarMotionLab";
 import { model3dApiFor } from "../model3d/api";
 import { Model3dViewer } from "../model3d/Model3dViewer";
+import { Model3dThumbnail } from "../model3d/Model3dThumbnail";
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import type {
@@ -68,6 +69,9 @@ function hostViewsFor(client: EumenesClient): ArtifactRuntime["hostViews"] {
 		"avatar-motion-lab": () => <LightAvatarMotionLab />,
 		"model3d-viewer": ({ assetId }) => (
 			<Model3dViewer assetId={assetId} api={model3dApiFor(client)} />
+		),
+		"model3d-thumbnail": ({ assetId }) => (
+			<Model3dThumbnail assetId={assetId} api={model3dApiFor(client)} />
 		),
 	};
 }

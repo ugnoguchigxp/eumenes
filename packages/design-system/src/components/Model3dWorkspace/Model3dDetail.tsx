@@ -42,6 +42,9 @@ export function Model3dDetail({
 	const valid = edit.title.trim().length > 0;
 	return (
 		<section className="model3d-detail" aria-label={`${asset.title}の詳細`}>
+			<h3>
+				{asset.title} <small>GLB</small>
+			</h3>
 			<div className="model3d-viewer">{viewer}</div>
 			<p className="model3d-note">{model3dQualityNote}</p>
 			{asset.warnings.length > 0 && (

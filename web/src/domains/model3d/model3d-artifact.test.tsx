@@ -136,11 +136,15 @@ it("places the host viewer for the selected asset, or says it is unavailable", (
 		<div>viewer {assetId}</div>
 	));
 	setup(resource, { "model3d-viewer": viewer });
-	fireEvent.click(screen.getByRole("tab", { name: "ライブラリ" }));
+	fireEvent.keyDown(screen.getByRole("tab", { name: "ライブラリ" }), {
+		key: "Enter",
+	});
 	expect(screen.getByText("viewer a1")).toBeTruthy();
 	cleanup();
 	setup(resource);
-	fireEvent.click(screen.getByRole("tab", { name: "ライブラリ" }));
+	fireEvent.keyDown(screen.getByRole("tab", { name: "ライブラリ" }), {
+		key: "Enter",
+	});
 	expect(screen.getByText(/利用できません/)).toBeTruthy();
 });
 
@@ -196,7 +200,10 @@ it("dispatches generate, cancel and recheck with string values", async () => {
 
 it("dispatches search, more, select, update and a confirmed delete", async () => {
 	const dispatch = setup();
-	fireEvent.click(screen.getByRole("tab", { name: "ライブラリ" }));
+	fireEvent.keyDown(screen.getByRole("tab", { name: "ライブラリ" }), {
+		key: "Enter",
+	});
+	fireEvent.click(screen.getByRole("button", { name: "一覧に戻る" }));
 	const search = within(screen.getByRole("search"));
 	fireEvent.change(search.getByLabelText("検索"), {
 		target: { value: "ロボット" },
@@ -277,10 +284,15 @@ it("shows the unavailable reason and drops URLs the host did not issue", () => {
 			downloadUrl: "https://evil.example/a.glb",
 		},
 	});
+	fireEvent.keyDown(screen.getByRole("tab", { name: "作る" }), {
+		key: "Enter",
+	});
 	expect(screen.getByRole("alert").textContent).toContain(
 		"LARMに接続できません。",
 	);
-	fireEvent.click(screen.getByRole("tab", { name: "ライブラリ" }));
+	fireEvent.keyDown(screen.getByRole("tab", { name: "ライブラリ" }), {
+		key: "Enter",
+	});
 	expect(document.querySelector("img[src^='http://']")).toBeNull();
 	expect(screen.queryByRole("link", { name: "GLBをダウンロード" })).toBeNull();
 });

@@ -138,23 +138,23 @@
 	padding: 0.55rem 0.7rem;
 	font-size: 0.9rem;
 }
-.image-gallery-grid {
+.image-gallery .image-gallery-grid {
 	display: grid;
 	grid-template-columns: repeat(4, minmax(0, 1fr));
 	gap: 1rem;
 }
-.image-gallery-card {
+.image-gallery .image-gallery-card {
 	min-width: 0;
 	border: 1px solid var(--border);
 	border-radius: var(--radius);
 	padding: 0.25rem;
 	background: var(--card);
 }
-.image-gallery-card[data-selected="true"] {
+.image-gallery .image-gallery-card[data-selected="true"] {
 	border-color: var(--primary);
 	box-shadow: 0 0 0 1px var(--primary);
 }
-.image-gallery-thumbnail {
+.image-gallery .image-gallery-thumbnail {
 	display: block;
 	width: 100%;
 	aspect-ratio: 16 / 10;
@@ -165,27 +165,27 @@
 	background: var(--muted);
 	cursor: zoom-in;
 }
-.image-gallery-thumbnail img {
+.image-gallery .image-gallery-thumbnail img {
 	display: block;
 	width: 100%;
 	height: 100%;
 	object-fit: cover;
 }
-.image-gallery-thumbnail:disabled {
+.image-gallery .image-gallery-thumbnail:disabled {
 	cursor: default;
 	color: var(--muted-foreground);
 }
-.image-gallery-caption {
+.image-gallery .image-gallery-caption {
 	display: flex;
 	align-items: center;
 	gap: 0.5rem;
 	padding: 0.55rem 0.5rem 0.4rem;
 }
-.image-gallery-caption > div {
+.image-gallery .image-gallery-caption > div {
 	flex: 1;
 	min-width: 0;
 }
-.image-gallery-caption > .image-gallery-actions,
+.image-gallery .image-gallery-caption > .image-gallery-actions,
 .image-gallery-delete-actions {
 	flex: 0 0 auto;
 	display: flex;
@@ -196,13 +196,13 @@
 	justify-content: flex-end;
 	margin-top: 1rem;
 }
-.image-gallery-caption h4 {
+.image-gallery .image-gallery-caption h4 {
 	font-size: 0.9rem;
 	font-weight: 500;
 	overflow-wrap: anywhere;
 	margin: 0 0 0.3rem;
 }
-.image-gallery-caption p {
+.image-gallery .image-gallery-caption p {
 	display: flex;
 	gap: 0.6rem;
 	flex-wrap: wrap;
@@ -216,12 +216,12 @@
 	color: var(--muted-foreground);
 }
 @container (max-width: 1100px) {
-	.image-gallery-grid {
+	.image-gallery .image-gallery-grid {
 		grid-template-columns: repeat(3, minmax(0, 1fr));
 	}
 }
 @container (max-width: 900px) {
-	.image-gallery-grid {
+	.image-gallery .image-gallery-grid {
 		grid-template-columns: repeat(2, minmax(0, 1fr));
 	}
 }
@@ -231,7 +231,7 @@
 	}
 }
 @container (max-width: 440px) {
-	.image-gallery-grid {
+	.image-gallery .image-gallery-grid {
 		grid-template-columns: minmax(0, 1fr);
 	}
 	.image-gallery-toolbar {

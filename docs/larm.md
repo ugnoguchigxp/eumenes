@@ -89,6 +89,8 @@ ASRの文字起こしは会話入力になり、発話の続き判定のcontrol�
 
 画像生成ツールチェーンと、プロンプト編集・全画面の画像一覧を接続しました。保存画像の一覧と取得はControlの `/v1/image-artifacts` を使用し、生成やProvider claimは不要です。2026-10-13の配備OpenAPIで `DELETE /v1/image-artifacts/{id}`、Bearer認証、HTTP200と`{id,deleted:true}`を確認しました。一覧から保存画像を物理削除し、Eumenesでは応答IDが対象と一致することを検査します。生成履歴は維持し、削除を自動再送しません。詳細は[画像生成](images.md)を参照してください。
 
+画像ファイルとGoogleフォトの選択画像を既存の3D生成へ渡すための[画像取込API提案](../spec/reference/larm-image-import-v1-proposal/README.txt)と[OpenAPI案](../spec/reference/larm-image-import-v1-proposal/openapi.json)を作成した。この取込APIは未公開・未実装であり、既存の画像生成APIとは別の契約である。
+
 ## 保存曲のプレイリストと再生
 
 `open_music_library` は `package:music.playback@1`（同名のprofile/skillと `tool:music.library@1`）を起動する。実行用Skillは `api/domains/capabilities/builtin/music-playback/SKILL.md`。実際のタグ名・全体件数をLLMへ渡し、依頼からq・タグAND・お気に入り・順序を作る。生成担当とは独立し、一覧や音声の取得に生成モデルの起動・Provider claimは使わない。

@@ -1,0 +1,79 @@
+{
+  "date": "2026-10-18",
+  "scope": [
+    "model3d grid and embedded detail",
+    "shared LARM image selection",
+    "LARM image import API proposal"
+  ],
+  "status": "implemented; owned checks passed; artifact aggregate blocked by unchanged baseline",
+  "checks": {
+    "ownedDomainVerify": {
+      "domains": [
+        "model3d",
+        "image"
+      ],
+      "status": "passed",
+      "backendTests": 25,
+      "webTests": 45,
+      "modelComponentTests": 20,
+      "report": "verification-reports/runs/2026-10-18T12-16-12-217Z-5e6df490-19e7-43f5-b2d5-dc2f5bd08b3d/report.json"
+    },
+    "sharedComponentTests": 6,
+    "webTestsIncludingSharedHook": 46,
+    "serverlessBrowserTests": 3,
+    "typecheck": {
+      "status": "passed",
+      "files": 2093
+    },
+    "productionWebBuild": "passed",
+    "changedSourceSizeBudget": {
+      "status": "passed",
+      "files": 29
+    },
+    "proposalLocalReferences": 19,
+    "artifactAggregate": {
+      "status": "blocked",
+      "reason": "unchanged HEAD files exceed existing size budget",
+      "files": {
+        "packages/artifact-ui/src/composition-fixer.ts": 827,
+        "packages/artifact-ui/src/ui-studio-components.tsx": 974
+      },
+      "report": "verification-reports/runs/2026-10-18T12-07-38-992Z-c9dd6ac3-3ed8-4c1e-9d84-d63b08ed3857/report.json"
+    }
+  },
+  "fixtures": {
+    "models": "locally exported cube GLB, real browser WebGL",
+    "images": "local SVG test images",
+    "layoutWidths": [
+      320,
+      440,
+      640,
+      960
+    ],
+    "thumbnailPixels": [
+      256,
+      256
+    ],
+    "serversStarted": false,
+    "liveProvidersUsed": false
+  },
+  "externalIntegration": {
+    "larmExistingImages": "existing API reused",
+    "fileAndGoogleImport": "proposal only; no unpublished endpoint invoked",
+    "googlePhotosAuthorization": "unchanged"
+  },
+  "details": "../../design/model3d-2026-10-18/implementation-progress.txt",
+  "followup": {
+    "scope": "two provider tabs and independent Browse; local preview only",
+    "sharedAndModelComponentTests": 27,
+    "serverlessBrowserTests": 3,
+    "decodedLocalPreviewAndTabsRetest": 1,
+    "designSystemTypecheckFiles": 477,
+    "targetedLintFormatDiff": "passed",
+    "aggregateVerify": "invalidated: Source changed during verification; all steps passed",
+    "report": "verification-reports/runs/2026-10-18T12-53-03-948Z-4f65fc1d-ed3e-479d-8cc5-ec0118a7c7be/report.json",
+    "upload": "not implemented: live LARM has no image import POST",
+    "googlePhotos": "not connected",
+    "imageAndText": "not supported by current live mesh source contract"
+  }
+}

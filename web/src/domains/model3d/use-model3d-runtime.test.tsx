@@ -183,7 +183,6 @@ test("builds the resource from the backend source, the asset list and the image 
 		assets: [
 			{
 				id: "a1",
-				thumbnailUrl: "/api/model3d/assets/a1/source",
 				downloadUrl: "/api/model3d/assets/a1/content",
 			},
 			{ id: "a2" },
@@ -193,10 +192,11 @@ test("builds the resource from the backend source, the asset list and the image 
 	await waitFor(() =>
 		expect(s.resource().sourceImages[0]).toMatchObject({
 			id: "img1",
-			thumbnailUrl: "blob:thumb",
+			thumbnailUrl: "/api/images/img1/content",
 		}),
 	);
-	expect(s.client.imageContent).toHaveBeenCalledWith("img1");
+	expect(s.client.imageContent).not.toHaveBeenCalled();
+	expect(s.resource().assets.every((item) => !item.thumbnailUrl)).toBe(true);
 });
 
 test("more reads the next cursor and a new search discards it", async () => {
@@ -291,6 +291,7 @@ test("a focus request applies once per increasing sequence number", async () => 
 		),
 	);
 	// An older sequence number never moves the screen back.
+	expect(s.resource().focus).toEqual({ seq: 3, kind: "search" });
 	s.state.source = {
 		...s.state.source,
 		focus: { seq: 2, kind: "asset", assetId: "a2" },
@@ -300,6 +301,7 @@ test("a focus request applies once per increasing sequence number", async () => 
 		expect(s.client.toolchainArtifactSource).toHaveBeenCalledTimes(5),
 	);
 	expect(s.resource().selectedAsset?.id).toBe("a1");
+	expect(s.resource().focus).toEqual({ seq: 3, kind: "search" });
 });
 
 test("generate sends the request body and a retry of the same submission keeps the request id", async () => {

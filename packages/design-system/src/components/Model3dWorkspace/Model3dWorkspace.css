@@ -8,14 +8,14 @@
 	container-type: inline-size;
 }
 .model3d-pane {
-	display: grid;
-	grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+	display: flex;
+	flex-direction: column;
 	gap: 1rem;
 	align-items: start;
 	min-width: 0;
 	padding-top: 0.75rem;
 }
-.model3d-pane[hidden] {
+.model3d-workspace [hidden] {
 	display: none;
 }
 .model3d-form,
@@ -182,30 +182,58 @@
 	color: var(--foreground);
 	padding: 0 0.5rem;
 }
-.model3d-result {
+.model3d-results {
 	display: grid;
-	grid-template-columns: 4rem minmax(0, 1fr);
-	gap: 0.6rem;
-	width: 100%;
-	text-align: left;
+	grid-template-columns: repeat(auto-fill, minmax(min(100%, 10rem), 1fr));
+	gap: 0.75rem;
+}
+.model3d-results > li {
+	min-width: 0;
+}
+.model3d-result {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
 	border: 1px solid var(--border);
 	border-radius: var(--radius);
-	background: transparent;
-	color: inherit;
-	padding: 0.4rem;
-	cursor: pointer;
+	overflow: hidden;
+	background: var(--card);
 }
 .model3d-results li[data-selected="true"] .model3d-result {
 	border-color: var(--primary);
-	background: color-mix(in srgb, var(--primary) 10%, transparent);
 }
-.model3d-result img,
-.model3d-result .model3d-thumb-empty {
-	width: 4rem;
-	height: 4rem;
-	object-fit: cover;
-	border-radius: calc(var(--radius) - 2px);
+.model3d-result-preview {
+	width: 100%;
+	aspect-ratio: 1;
 	background: var(--muted);
+}
+.model3d-result-preview > img,
+.model3d-result-preview > .model3d-thumb-empty {
+	display: block;
+	width: 100%;
+	height: 100%;
+	object-fit: contain;
+}
+.model3d-result-open {
+	padding: 0.6rem;
+	text-align: left;
+	border: 0;
+	background: transparent;
+	color: inherit;
+	cursor: zoom-in;
+}
+.model3d-result-open::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+}
+.model3d-result:has(.model3d-result-open:focus-visible) {
+	outline: 2px solid var(--ring);
+	outline-offset: -2px;
+}
+.model3d-result:hover {
+	border-color: var(--primary);
 }
 .model3d-result-text {
 	display: flex;
@@ -304,4 +332,66 @@
 	.model3d-pane {
 		grid-template-columns: minmax(0, 1fr);
 	}
+}
+
+.model3d-pane > *,
+.model3d-focus {
+	min-width: 0;
+	width: 100%;
+}
+.model3d-focus {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+}
+.model3d-focus > button {
+	align-self: flex-start;
+}
+.model3d-detail h3 {
+	margin: 0;
+	font-size: 1.1rem;
+}
+.model3d-detail h3 small {
+	color: var(--muted-foreground);
+	font-size: 0.75rem;
+	font-weight: 400;
+}
+.model3d-selected-image {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	margin-bottom: 0.5rem;
+	overflow-wrap: anywhere;
+}
+.model3d-selected-image img {
+	width: 5rem;
+	height: 5rem;
+	object-fit: contain;
+	border-radius: var(--radius);
+}
+.model3d-form > button[type="submit"] {
+	margin-top: 0.5rem;
+}
+.model3d-search-row {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	min-width: 0;
+	flex-wrap: wrap;
+}
+.model3d-search-row > input {
+	flex: 1 1 10rem;
+	min-width: 0;
+}
+.model3d-search-row > label {
+	flex: 0 1 auto;
+}
+.model3d-field-label {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
 }

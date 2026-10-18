@@ -42,7 +42,22 @@ Webフロントは `/oauth/google/callback` と `/oauth/google/result` を同じ
 - 解除は確認後にGoogleの許可を取り消し、保存情報を削除する。通信に失敗した場合は「解除中」で保存し、再起動後も再試行する。解除中は新しい接続を開始できない。進行中の認証応答を待ち、解除中に届いた認証情報も暗号化して取消対象に含める。自動処理と画面操作が重なっても取消は重複実行しない。
 - Googleの取消APIは当該アプリに与えた許可に影響する。将来別ドメインで権限を増やす際は、OAuthクライアントの共有と解除の単位を改めて設計する。
 
-## 実装と確認
+## Googleフォトの対応状況と必要な作業
+
+現在の連携は基本プロフィール用であり、Googleフォトの写真選択は未実装。既存の接続をやり直しても写真を選べるようにはならない。画像選択画面のGoogleフォトタブも、この未実装状態を表示する。
+
+開発・運営側で必要な作業は次の順序となる。利用者ごとに新しいOAuthクライアントを作成する方式へは変更しない。
+
+1. 既存OAuthクライアントが属するGoogle Cloudプロジェクトで **Google Photos Picker API** を有効にする。「Google Picker API」は別物なので選ばない。同意画面のデータアクセスへ `https://www.googleapis.com/auth/photospicker.mediaitems.readonly` を追加し、テスト中なら使用するGoogleアカウントをテストユーザーに登録する。
+2. Eumenesの認証処理を拡張する。現在は基本scope以外を拒否するため、Cloud側の設定だけでは利用できない。Photosを使う時の追加同意、許可済みscopeの保存と検証、同一アカウント確認、取消・解除後の応答排除を実装する。既存のトークンを写真アクセス許可済みとみなさない。
+3. Photos Pickerのセッション作成、公式`pickerUri`を通常のブラウザで開く操作、選択完了の照会、選択した写真の取得・セッションの片付けを実装する。アプリ内に全写真を一覧取得する方式ではなく、Google側の画面で共有する写真を選ぶ。認証情報はbackend内に留める。
+4. 選択した写真を3Dへ渡すため、LARMの画像取込APIを公開・実装し、発行された保存画像IDを既存3D生成へ渡す。[取込API案](../spec/reference/larm-image-import-v1-proposal/README.txt)は未公開契約案であり、現時点で呼び出さない。
+
+実装後の利用者の操作は「Googleフォトタブ → Googleフォトで選ぶ → 初回の写真選択アクセスを許可 → 写真を選択して完了 → Eumenesでこの画像を使う」とする。この流れは予定であり、現在の画面には写真選択を開始する実装はない。
+
+Google Cloudでの有効化、実アカウントへの追加権限付与、Photosセッション作成は今回行っていない。公式の[アプリ設定](https://developers.google.com/photos/overview/configure-your-app)と[Pickerの処理の流れ](https://developers.google.com/photos/picker/guides/get-started-picker)を根拠に整理した。
+
+## 基本プロフィール連携の実装と確認
 
 `google-accounts` domainが認証・暗号化保存・失効管理を所有する。画面は `artifact:settings.google-accounts@1`、設定入口は `artifact:settings.hub@6`。既存の登録式アーティファクトとWeb adapterを使用する。DomainAdapterは公開状態の読み取りのみで、操作・AI用toolchain・packageは登録しない。
 

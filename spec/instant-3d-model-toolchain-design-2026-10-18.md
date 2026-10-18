@@ -1,6 +1,6 @@
 # インスタント3Dモデル ツールチェーン 設計
 
-状態: 合意済み・実装・固定試験済み（2026-10-18、§15）。Q1はLARMの確定仕様、Q2〜Q8は推奨案で実装の指示を受けた。LARM確定仕様と実装契約は§14。実LARM・会話の受入は未実施。
+状態: 合意済み・実装・固定試験済み（2026-10-18、§15）。Q1はLARMの確定仕様、Q2〜Q8は推奨案で実装の指示を受けた。LARM確定仕様と実装契約は§14。モデルGrid・枠内詳細・共通画像選択は§8.5（承認済みの追加設計）。実LARM・会話の受入、アップロードとGoogleフォトの取込は未実施。
 
 関連: [登録と拡張の手順](../docs/toolchain-extension.md)、[サブエージェントの二つの型](subagent-task-and-session-agents-design-2026-10-18.md)、[LARM](../docs/larm.md)。LARM 3D API の正本は利用者が提示した API 説明（2026-10-18、本書§3に要約）。
 
@@ -205,6 +205,16 @@ LARM の preview HTML を sandbox 付き iframe で出す案は§12 Q2。Bearer 
 
 hostViews の型は現在 `avatar-motion-lab` だけで、引数を持たない。表示する asset を渡せるよう、`ArtifactRuntime.hostViews` に `"model3d-viewer"?: (state) => ReactNode` を足し、Web adapter の選択状態を渡す（artifact-ui の契約の追加）。
 
+### 8.5 モデルGrid・枠内詳細・共通画像選択（2026-10-18 追加）
+
+利用者が承認した追加設計（[設計案](design/model3d-2026-10-18/gallery-and-image-picker-design.txt)、画面案は同じフォルダのPNG）。DB・bundle・LLMの指示・業務操作は変えない。
+
+- ライブラリはアーティファクトの幅で列数を変えるGrid。カードはサムネイル・タイトル・タグ。選ぶと同じ枠内で拡大・詳細（§8.3の表示と編集・削除）を開き、「一覧に戻る」で検索入力・一覧位置・作成フォームの下書きを保つ。全画面表示や常設サイドバーは足さない。
+- サムネイル: LARMにモデルの静止画APIが無いため、`/content` のGLBを詳細と同じ three.js の読込・描画設定で256pxの静止画にする（`hostViews["model3d-thumbnail"]`）。見えているカードだけを1枚ずつ描き、見えなくなった要求は取り消し、描画資源を解放する。元画像をサムネイルの代わりにしない。
+- 元画像の選択: 画像スタジオと共通の `ImageGrid`・`ImagePicker`・`ImageFrame`（DesignSystem）と、認証済みclientごとの画像一覧キャッシュ（`web/src/media`）を使う。候補の選択・枠内プレビュー・「この画像を使う」での確定を分け、取消では確定済みの画像と下書きを変えない。画像スタジオのModal拡大・ダウンロード・削除確認は保つ。
+- 提供元は「LARM画像」「Googleフォト」の2タブと、タブの外の「参照…」（端末のファイル選択）。3D生成に使えるのはLARMの保存画像だけ。端末の画像は枠内で確認できるが「未アップロード」と表示し、確定・生成させない。Googleフォトは未接続の理由を表示する。
+- 現行LARMの source は `prompt` か `image-artifact` の一方だけで、画像と文章を一緒に送る契約は無い。取込は[画像取込API案](reference/larm-image-import-v1-proposal/README.txt)（未公開、呼ばない）。Googleフォトに必要な作業は `docs/google-accounts.md`。
+
 ### 8.4 backend の HTTP API（Web 用）
 
 | API | 内容 |
@@ -359,3 +369,18 @@ type Model3dAsset = {
 | `bun check` | 型エラーなし |
 | `verify --domain artifact`・`larm` | サイズ予算で停止（担当外の `composition-fixer.ts`・`ui-studio-components.tsx`・作業中の `lease-manager.ts`）。該当の試験は個別に実行して pass |
 | ブラウザ E2E・実 LARM（生成・表示・削除）・会話の実モデル受入 | 未実施（サーバーの再起動が必要） |
+
+### 2026-10-18 モデルGrid・共通画像選択（§8.5）
+
+- 実装: モデルGridと枠内詳細、GLBからの直列サムネイル（`Model3dThumbnail`・`thumbnail-queue`）、共通 `ImageGrid`・`ImagePicker`・`ImageFrame`、共有の画像一覧取得（`web/src/media`）。重複していた一時URL管理（`use-blob-urls.ts`）は削除。会話からの表示・検索・生成状況は既存の `focus.seq` で接続し、古い `seq` を再び適用しない。
+- 記録: [実装記録](design/model3d-2026-10-18/implementation-progress.txt)、fixture画像は `spec/verification/model3d-grid-image-picker-2026-10-18/`。
+
+| 確認 | 結果 |
+| --- | --- |
+| `bun run verify -- --domain model3d --domain image` | pass（backend 25件、Web 45件、Model3dWorkspace 20件）。最終の再実行は並行編集の検知（Source changed during verification）で無効になり、各stepは成功 |
+| ImagePicker・ImageGallery・Model3dWorkspace | 27件 pass |
+| `bunx vitest run web/src/domains/model3d web/src/domains/image web/src/media` | 46件 pass |
+| `bunx playwright test tests/browser/model3d-components.spec.ts`（サーバー不要のfixture） | 3件 pass。実WebGLでGLB→256px PNG、可視カードだけの直列取得、一覧復帰、320〜960pxではみ出しなし、参照…のファイル選択と2タブ |
+| `bun run typecheck`・`build:web` | pass |
+| `verify --domain artifact` | サイズ予算で停止（担当外の `composition-fixer.ts`・`ui-studio-components.tsx`） |
+| 実LARM・実アップロード・Googleフォトの取込 | 未実施（LARMの取込APIの公開とPhotosの追加同意が前提） |

@@ -7,6 +7,11 @@ import type { ImageWorkspaceResource } from "@eumenes/artifact-ui/contracts";
 import { useImageCreation } from "./use-image-creation";
 import { queryRoots } from "../../queryKeys";
 import type { ImageCreationOptions } from "@eumenes/design-system";
+import {
+	imageContentUrl,
+	imageLibraryKey,
+	useImageLibrary,
+} from "../../media/use-image-library";
 export const imageStudioSource = "image-studio";
 export function useImageRuntime(
 	client: EumenesClient,
@@ -38,12 +43,7 @@ export function useImageRuntime(
 			? items.find((item) => item.artifactId === targetRef)
 			: undefined) ?? latest;
 	const creation = useImageCreation(client, conversationId, items, latest);
-	const library = useQuery({
-		queryKey: [queryRoots.image, "library"],
-		queryFn: ({ signal }) => client.imageLibrary(signal),
-		refetchInterval: creation.busy ? 2000 : false,
-		retry: false,
-	});
+	const library = useImageLibrary(client, creation.busy ? 2000 : false);
 	const [selection, select] = useState<{ id?: string; latestId?: string }>();
 	const seen = useRef(new Set<string>());
 	const lock = useRef(false);
@@ -62,7 +62,7 @@ export function useImageRuntime(
 				format: a.format,
 				createdAt: a.createdAt,
 				prompt: record?.prompt ?? undefined,
-				url: `/api/images/${encodeURIComponent(a.id)}/content`,
+				url: imageContentUrl(a.id),
 			};
 		});
 	const resource: ImageWorkspaceResource = {
@@ -167,7 +167,7 @@ export function useImageRuntime(
 						status: "rejected",
 						message: "画像が見つかりません。一覧を更新してください。",
 					};
-				const queryKey = [queryRoots.image, "library"];
+				const queryKey = imageLibraryKey(client);
 				await cache.cancelQueries({ queryKey });
 				try {
 					await client.deleteImage(image.id);
