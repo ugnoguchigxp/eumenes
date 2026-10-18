@@ -39,6 +39,8 @@ export interface LogFields {
 	repairAttempt?: number;
 	validationPath?: string;
 	validationCode?: string;
+	/** A rejected operation's repair note: a position and a rule, never a value. */
+	repairHint?: string;
 	expectedType?: string;
 	actualType?: string;
 	issueCount?: number;
@@ -159,6 +161,7 @@ const keys = new Set<keyof LogFields>([
 	"repairAttempt",
 	"validationPath",
 	"validationCode",
+	"repairHint",
 	"expectedType",
 	"actualType",
 	"issueCount",

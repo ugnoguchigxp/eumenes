@@ -51,6 +51,14 @@ import {
 	WORLD_ADAPTER_REF,
 } from "../world/world-adapter";
 import {
+	describeWeatherAdapter,
+	WEATHER_ADAPTER_REF,
+} from "../weather/weather-adapter";
+import {
+	describeStockAdapter,
+	STOCK_ADAPTER_REF,
+} from "../stock/stock-adapter";
+import {
 	describeServiceTestsAdapter,
 	SERVICE_TESTS_ADAPTER_REF,
 } from "../settings/service-tests-adapter";
@@ -129,6 +137,7 @@ export function bundleHostOf(
 					documents: d.documents,
 					conditions: d.conditions,
 					structures: d.structures,
+					instant: d.instant,
 				},
 			]),
 		),
@@ -174,6 +183,8 @@ export const hostAdapterDescriptions: Array<
 	},
 	{ ref: CODEX_TASKS_ADAPTER_REF, describe: describeCodexTasksAdapter },
 	{ ref: STEWARD_ADAPTER_REF, describe: describeStewardAdapter },
+	{ ref: WEATHER_ADAPTER_REF, describe: describeWeatherAdapter },
+	{ ref: STOCK_ADAPTER_REF, describe: describeStockAdapter },
 ];
 
 /** The bundle host as if every adapter were registered (see `hostAdapterDescriptions`). */
@@ -318,7 +329,11 @@ export function questionReader(
 export function toolchainMaintenance(
 	s: {
 		dialogue: { interactions: { maintenance(): Promise<unknown> } };
-		toolchain: { actionRequests: { maintenance(): Promise<unknown> } };
+		toolchain: {
+			actionRequests: { maintenance(): Promise<unknown> };
+			weather?: { maintain(): Promise<unknown> };
+			stock?: { maintain(): Promise<unknown> };
+		};
 	},
 	log: {
 		warn(event: string, fields: { reason: string }, error?: unknown): void;
@@ -337,5 +352,21 @@ export function toolchainMaintenance(
 	return [
 		run("toolchain_interactions", s.dialogue.interactions),
 		run("toolchain_actions", s.toolchain.actionRequests),
+		// The list of forecast areas: read at startup (the first pass) and again once a day.
+		...(s.toolchain.weather
+			? [
+					run("toolchain_weather", {
+						maintenance: () => s.toolchain.weather!.maintain(),
+					}),
+				]
+			: []),
+		// The EDINET list of listed companies: read at startup (the first pass) and again once a day.
+		...(s.toolchain.stock
+			? [
+					run("toolchain_stock", {
+						maintenance: () => s.toolchain.stock!.maintain(),
+					}),
+				]
+			: []),
 	];
 }

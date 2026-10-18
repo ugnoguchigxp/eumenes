@@ -66,6 +66,7 @@ const registryCodes: Record<string, BundleIssue["code"]> = {
 type Parsed = CapabilityBundleV1;
 type CommandBinding = Extract<BindingV1, { execution: "command" }>;
 type SessionBinding = Extract<BindingV1, { execution: "session" }>;
+type InstantBinding = Extract<BindingV1, { execution: "instant" }>;
 type Doc = {
 	kind: DocumentKind;
 	itemId: string;
@@ -295,7 +296,10 @@ function checkBindingBase(c: Check, b: BindingV1, path: string) {
 		issue("unregistered_adapter", `${path}/adapterRef`, b.adapterRef);
 	if (!host.availability.has(b.availabilityRef))
 		issue("unavailable", `${path}/availabilityRef`, b.availabilityRef);
-	if (!c.hasDocument(b.artifactRevisionId, "artifact"))
+	if (
+		b.execution !== "instant" &&
+		!c.hasDocument(b.artifactRevisionId, "artifact")
+	)
 		issue(
 			"unknown_reference",
 			`${path}/artifactRevisionId`,
@@ -325,6 +329,17 @@ function checkSessionBinding(c: Check, b: SessionBinding, path: string) {
 	if (b.session.targetSchemaRef)
 		c.schemaRef(b.session.targetSchemaRef, `${path}/session/targetSchemaRef`);
 	checkBindingBase(c, b, path);
+}
+
+/**
+ * An instant binding names the adapter's operation for its one tool. The toolchain it falls back to is looked
+ * up when the answer fails, not here: bundles are registered in file order, so it may be registered later.
+ */
+function checkInstantBinding(c: Check, b: InstantBinding, path: string) {
+	checkBindingBase(c, b, path);
+	const adapter = c.host.adapters.get(b.adapterRef);
+	if (adapter && !adapter.instant)
+		c.issue("unregistered_adapter", `${path}/adapterRef`, b.adapterRef);
 }
 
 type Artifact = z.infer<typeof artifactDefinitionV1>;
@@ -416,7 +431,9 @@ function checkBindingsAndArtifacts(c: Check) {
 	c.bundle.bindings.forEach((b, i) =>
 		b.execution === "session"
 			? checkSessionBinding(c, b, `bindings/${i}`)
-			: checkCommandBinding(c, b, `bindings/${i}`),
+			: b.execution === "instant"
+				? checkInstantBinding(c, b, `bindings/${i}`)
+				: checkCommandBinding(c, b, `bindings/${i}`),
 	);
 	c.bundle.artifacts.forEach((a, i) => {
 		const path = `artifacts/${i}`;

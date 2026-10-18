@@ -42,10 +42,10 @@ const log = getLogger("dialogue");
 const MAX_MODEL_CALLS = 6;
 /** The turn's own earlier exchanges kept in the prompt, newest first, within these bounds. */
 const HISTORY_RUNS = 12;
-const HISTORY_BYTES = 24 * 1024;
-const MAX_OUTPUT_TOKENS = 4096;
+const HISTORY_BYTES = 192 * 1024;
+const MAX_OUTPUT_TOKENS = 24_576;
 /** The longest repair hint of a refused operation that reaches the specialist. */
-const DETAIL_CHARS = 300;
+const DETAIL_CHARS = 1000;
 
 /** What the specialist prepared for the host to apply at settlement. */
 export type TurnOutput = {
@@ -374,12 +374,16 @@ async function invoke(
 	} catch (error) {
 		if (error instanceof StaleTurn || signal.aborted) throw error;
 		const code = safeCode(error, "operation_failed");
+		// A short repair hint the operation attached (never a definition): data for the next call.
+		const detail = (error as { detail?: unknown }).detail;
 		log.warn("dialogue.operation_rejected", {
 			reason: "specialist_operation_refused",
 			validationCode: code,
+			// The hint names a position and a rule only, so it is safe to keep for finding why drafts fail.
+			...(typeof detail === "string" && detail
+				? { repairHint: detail.slice(0, 200) }
+				: {}),
 		});
-		// A short repair hint the operation attached (never a definition): data for the next call.
-		const detail = (error as { detail?: unknown }).detail;
 		return {
 			ok: false,
 			error: code,

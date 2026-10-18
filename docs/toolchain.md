@@ -40,6 +40,8 @@ streamでは、function名や制御区切りになり得る末尾だけを保留
 
 専門担当へ完全に切り替えるsession型は、hostが発行した保存作品の `target` と、未保存作業を破棄して切り替える `resolveUnsaved` を任意で持ちます。選定時には登録済みの方式が関数説明へ渡され、切替を予告します。成立後の発言は専門担当へ直接届き、通常会話AIの再選定や言い直しを挟みません。担当は既存の返却・終了の契約で通常担当へ戻ります（[計画](../spec/.archived/toolchain-specialist-dialogue-implementation-plan-2026-10-17.md)）。結果返却型は担当の結果を通常会話AIが伝えます。内部の経路・ツール・引数は各ツールチェーンのサブエージェントが決めます。
 
+即時回答型（binding `execution:"instant"`）は、R1の関数に登録定義が宣言した引数（`weather_forecast` は `place`＝言われた地名、`prefecture`＝その都道府県、`day`＝`today`/`tomorrow`/`day_after`。`stock_quote` は `query`＝会社名・ティッカー）を載せ、`announcement` を持ちません。引数は利用者の言った言葉で、地名から予報区域、名前から銘柄への解決はadapterが自分のデータ（気象庁の区域表、EDINETコードリスト等）で行います。adapterの `availableInTransaction` が候補に出すかを決め（天気は区域表を取得できない間は出さない）、R1に入るのはこの担当が候補にある時だけです。この関数が呼ばれると、R2も一時回答もなくadapterを実行し、返った文を通常の確定回答（LLMを経ないhost回答）として保存・配信します。adapterが失敗（ネットワーク・タイムアウト・非200・形式不正）したときだけ、bindingの `fallbackToolchainId`（`web.search`）へ元の発言をそのまま依頼として渡し、同じrunで調査します（一時回答なし）。天気の説明・使う/使わない場面・文の形は、会話の共通SystemContextではなく担当の登録定義・SKILL・adapterに置きます（[天気の設計](../spec/weather-instant-toolchain-design-2026-10-18.md)、[株価の設計](../spec/stock-instant-toolchain-design-2026-10-18.md)）。
+
 調査担当には今回の依頼を渡し、検索キーワードは担当が選びます。過去の会話から出典URLを集めて渡しません。URLの直接読取りは今回の依頼に明示されたURL、今回の検索結果、今回の依頼に合う保存済み手順の候補に限ります。
 
 | 会話の関数 | ツールチェーン | package | 実行 | 検索 | 読取り | 保存本文 | モデル呼出し | 報告 |
@@ -56,6 +58,8 @@ streamでは、function名や制御区切りになり得る末尾だけを保留
 | `claude_code` | `claude-code.request` | `package:claude-code.request@2` | 操作担当→作業依頼表 | — | — | — | — | 受付 |
 | `ui_create` | `ui.compose` | `package:ui.studio@1` | 専門担当へ切替（session）。以後の発言は担当が直接受ける | — | — | — | 1ターン最大6 | 下書き反映・作品参照 |
 | `memory_request` | `steward.request` | `package:steward.request@2` | 記憶担当への依頼 | — | — | — | — | 依頼結果 |
+| `weather_forecast` | `weather.forecast` | `package:weather.forecast@1` | 即時回答型（instant）。R1の関数呼出しの引数（区域・日）から天気予報を取得し、決まった形の文をそのまま回答にする。R2・予告なし。取得に失敗したら同じrunで `web.search` へ切替 | — | — | — | R1の1回のみ | 回答文（ホストが作成） |
+| `stock_quote` | `stock.quote` | `package:stock.quote@1` | 即時回答型（instant）。R1の関数呼出しの引数（`query`＝言われた会社名・ティッカー）から、EDINETの上場会社一覧（日次更新・失敗中は前の一覧）とYahoo検索で一社を特定し（日本株優先、同名は完全一致→前方一致→部分一致）、Yahooのチャートで取得した現在値・前日比・JST時刻を決まった形の文にして回答にする。会社を特定できない・取得に失敗したら同じrunで `web.search` へ切替。履歴・指標・財務・ニュース・複数銘柄比較は対象外 | — | — | — | R1の1回のみ | 回答文（ホストが作成） |
 
 候補の提示: R1の前に、現在の発言の原文と直前の利用者発言の原文のそれぞれ(続きの依頼でも前の話題の担当が残る)に対し、ツールチェーンの`title`・`summary`・`useWhen`・`examples`へのFTS(trigram)、LARMのembedding(保存済み設定・catalogのモデルで、passageとして保存、発話はquery)、似た依頼での過去の選択をRRFで統合し、それぞれ上位4件を取り、重複を除いた和集合をR1に関数として提示します。embeddingを利用できない・ベクトル未生成の間は、利用可能な全ツールチェーンを提示します。候補検索は分類ではなく、選択は会話担当が行います。似た依頼での過去の選択(依頼文・関数名・結果)を現在の発言の分だけ最大3件、R2の参考データとして会話担当へ渡します。
 

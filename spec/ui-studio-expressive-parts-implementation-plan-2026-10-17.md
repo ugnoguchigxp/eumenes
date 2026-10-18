@@ -392,6 +392,34 @@ LARMの圧縮通信の対応後、利用者の指示で再開した。§10の初
 - 各runでViteのキャッシュが空から始まるため、初回の制作画面の表示（rechartsとKaTeXの変換）が20秒を超えることがあった。最初の表示だけ60秒待つ。
 - `bun run verify -- --domain ui-compositions --domain artifact`: pass（bunの試験303件、webの試験84件）。
 
+利用者の実機確認で見つかった不具合（2026-10-18）:
+
+- 現象: 音声でUI自由制作の担当に話しかけると、画面に「接続の権限が取り消されました。」（`permission_revoked`）が出て、返答が読み上げられない。テキスト入力では起きない。最初の音声の依頼で担当へ切り替わる場合も、宛先が担当のままの2回目以降の依頼も同じ。
+- 原因:
+  - 音声の応答は、読み上げに入る前に、runの会話側の推論要求が採用済みかを確かめる（`voice-dialogue/service/index.ts`の`advance`）。
+  - 専門担当の経路では、返答を書くのは専門担当で、会話側の推論要求は採用されずに`pending`のまま残る。宛先が担当の場合は、会話側のモデルが一度も呼ばれない。
+  - そのため、会話のrunは`completed`なのに、音声のターンだけが毎回`permission_revoked`で失敗していた。
+  - 先に疑ったbundleの版の衝突（`skill:ui.studio@4`）とrepairは、原因ではなかった。版の衝突は別に直した（skill@5・package@5・toolchain@7）。
+- 修正: `dialogue/service/specialist-settle.ts`。専門担当の返答でrunを完了する経路（返答、および作業を返して終える返答）で、専門担当の推論結果を採用したあと、同じトランザクションで会話側の推論要求を既存の`acceptHostAnswerInTransaction`（モデルの回答を採用せずにホストが回答を確定する仕組み）で確定する。確定できなければ`permission_revoked`で失敗させる。会話側へ戻す経路（`forward`）は、会話側のモデルが同じ要求で答えるので対象外。
+- 試験: `api/application/toolchain/specialist-voice.test.ts`（音声で切り替わる1回目と、宛先が担当の2回目）。修正前はfail、修正後はpass。`bun run verify -- --domain dialogue --domain voice-dialogue --domain ui-compositions --domain inference`はpass（bunの試験703件、webの試験70件）。実機での再確認は、サーバー再起動後に利用者が行う。
+
+- 現象（2回目）: 音声でランディングページを依頼すると、専門担当の下書きが3回続けて`ui_definition_invalid`で拒否され、4回目の推論の途中で`specialist_turn_timeout`（1ターン120秒）になる。1回の推論は33〜38秒。
+- 原因:
+  - 拒否の理由が「`children/0: Invalid input`」だけだった。部品はすべての部品のschemaの和（union）で検証されるため、zodの最初の指摘は和全体の失敗で、どの部品のどの項目が悪いかを含まない。
+  - モデルは直す手がかりが無く、3回とも同じ案を出し直していた。出力はどれも1261トークンで、入力は毎回、前の出力と拒否の結果の分（約1300トークン）だけ増えていた。出力上限による打ち切りではない（上限は4096）。
+  - 前回足したログの`repairHint`は、ロガーの項目の許可リストに無く、捨てられていた。
+- 修正:
+  - `ui-compositions/contracts`の`validatedDefinition`。和の指摘では、`view`が一致した枝（その部品自身の種類のschema）の最初の指摘を入れ子までたどって返す（例「`children/1/children/0/image/theme: Invalid option: expected one of …`」）。
+  - `infrastructure/logger.ts`の許可リストに`repairHint`を加える。
+- 試験: `ui-compositions.test.ts`（部品の項目を指す理由）、`logger.test.ts`（`repairHint`が残る）。`bun run verify -- --domain ui-compositions`はpass。
+- 制限の緩和（2026-10-18の利用者の指示。モデルの文脈には余裕があり、出力は24kトークンまで見込んでよい）:
+  - 専門担当: 出力上限4096→24576トークン（LARMの出力予約が小さければそちらが効く）、自分の履歴24 KiB→192 KiB、拒否の手がかり300→1000字、操作の結果24,000→96,000字。
+  - 定義: 16 KiB→96 KiB、部品60→240、入れ子4→6階層、layoutの子12→48（artifact-uiの`contracts.ts`とui-compositionsの`limits`）。見出しは120→480字。
+  - 表現部品: 文字数の上限は4倍、件数はおおむね4倍（項目・手順・FAQ・料金の特長など）、表は列12・行200、グラフは系列8・各600点、図は要素240。
+  - SKILLの数値を合わせ、skill@6・package@6・toolchain@8に上げた。
+  - 試験の上限値を更新し、`bun run verify -- --domain ui-compositions --domain dialogue --domain capabilities --domain voice-dialogue`はpass（bunの試験650件）。
+- 残る課題: 1回の推論が長く、作り直しが2回重なると上限に達する。これは[一回推論の下書きと定義の補正](ui-studio-one-shot-draft-design-2026-10-18.md)で扱う（合意待ち）。
+
 残る受入:
 
 - live（実モデル）: U1〜U7を1件ずつ依頼し、一回目の反映の成否、失敗時の自己修正、画像のテーマが依頼に合うかを記録する。

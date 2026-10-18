@@ -128,8 +128,8 @@ test("the shipped bundle's pin is the stored digest and its toolchain is data-dr
 				"timers.list-with-receipt",
 				"timers.cancel",
 			]);
-			expect(found.artifact.document.title).toBe("タイマー");
-			expect(found.artifact.document.variants.map((v) => v.id)).toEqual([
+			expect(found.artifact!.document.title).toBe("タイマー");
+			expect(found.artifact!.document.variants.map((v) => v.id)).toEqual([
 				"standard",
 				"variant-a",
 				"variant-b",

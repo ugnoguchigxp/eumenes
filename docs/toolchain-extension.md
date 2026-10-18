@@ -12,7 +12,7 @@
 | --- | --- | --- |
 | bundle | `api/domains/capabilities/bundles/<名前>.bundle.json`（`CapabilityBundleV1`） | 依存revisionのpin、definitions、bindings、artifacts、schemas。コード・URLは実行しない |
 | definition | bundle の `definitions[]`（既存の `Definition`） | profile・skill（本文はJSON内のUTF-8）・tool・package・toolchain。toolchainは会話に出す関数名・説明・例・依存package一つ |
-| binding | bundle の `bindings[]`（`BindingV1` = `execution:"command"` または `execution:"session"`） | packageの各toolを登録adapterの操作名と入力schema参照へ結ぶ。sessionは専門担当との継続対話で、adapterに `session`（作業の開始・状態・ターン・終了）の実装が要る |
+| binding | bundle の `bindings[]`（`BindingV1` = `execution:"command"`・`"session"`・`"instant"`） | packageの各toolを登録adapterの操作名と入力schema参照へ結ぶ。sessionは専門担当との継続対話で、adapterに `session`（作業の開始・状態・ターン・終了）の実装が要る。instantは即時回答型で、adapterに `instant`（値の列挙 `choices` と実行 `run`）の実装が要る（[§3.2](#32-即時回答型instantを追加する)） |
 | artifact | bundle の `artifacts[]`（`ArtifactDefinitionV1`） | OpenUI定義のvariant、source（adapterの登録query）、action（既存event→操作・回答・ローカル） |
 | schema | `builtin:<キー>`（`capabilities/contracts` のvalidators）、`domain:<owner>.<名前>@n`（hostの結果schema）、`schema:<id>@n`（bundle内JSON Schemaの有限subset） | 入力・出力・質問の検査。同じ参照をhost・UI・モデル提示で共有する |
 | DomainAdapter | `api/application/<domain>-adapter.ts` | 操作・query・入力変換・projectionの実装。domainの既存公開transaction操作を呼ぶ |
@@ -54,7 +54,8 @@ Seedに含めるのは再利用する定義だけで、会話、実行・操作�
 | 旧形式のツールチェーンを移す | [§6](#6-旧形式のツールチェーンを移行する) | §5に加え旧経路の削除 |
 | 新しい画面部品が要る | [§10 E](#10-e-designsystemopenuiartifactを追加する) | DesignSystem部品とOpenUI登録 |
 | 履歴調査の要件profile・dotsの担当 | [§9 A](#9-a-登録apiで追加する) | なし。登録API |
-| 単純なHTTP JSON API | 未対応 | bundleの `bindings` はcommand・session bindingだけを受け付ける。HTTP APIはadapterで実装する |
+| 外部の読取りAPIの結果を決まった文でそのまま答える（R2・一時回答なし） | [§3.2](#32-即時回答型instantを追加する) | adapterの `instant`、bundle |
+| 単純なHTTP JSON API（結果を担当が整理して返す） | 未対応 | bundleの `bindings` はcommand・session bindingだけを受け付ける。HTTP APIはadapterで実装する |
 
 まず「何を入力して何が返れば完了か」「どのadapterを再利用するか」「今回どこまで確認するか」を短く記録する。既存adapterで同じ操作ができるならadapterを増やさず§3を使う。
 
@@ -152,6 +153,16 @@ Seedに含めるのは再利用する定義だけで、会話、実行・操作�
 ```
 
 実在の完全な例は [timers.bundle.json](../api/domains/capabilities/bundles/timers.bundle.json)。既存artifactを参照する場合は bundle に artifact を重複して書かない。
+
+### 3.2 即時回答型（instant）を追加する
+
+会話の最初の判断（R1）の関数呼出しだけで答えが決まる担当（例: 天気予報 `weather_forecast`）に使う。R2・一時回答・サブエージェントを使わず、adapterが返した文をそのまま確定回答にする。実在の例は [weather-forecast.bundle.json](../api/domains/capabilities/bundles/weather-forecast.bundle.json) と [weather-adapter.ts](../api/application/weather/weather-adapter.ts)。
+
+1. bundleに `execution:"instant"` のbindingを書く。`tools` は一件、`fallbackToolchainId` はadapterが答えられないとき同じrunで元の発言を渡す担当のid。`artifactRevisionId` は持たず、toolchainにも書かない（画面を持たない）。
+2. toolの `schemaKey` は `capabilities/contracts` に追加したvalidator（例 `weatherPlace`）。R1の関数には、共通の分析引数に加えてこのschemaの項目が載り、`announcement` は載らない。
+3. 引数は利用者の言った言葉（地名・会社名）で受け、値の解決（地名→区域、名前→銘柄）はadapterが自分のデータで行う。`availableInTransaction` が候補に出すかを決める。`instant.run(operation, input, signal)` が `{ok:true, answer}` か `{ok:false, code}` を返す。ネットワークを使ってよい（transaction外）。外部取得はタイムアウト・サイズ上限・リダイレクト拒否を付ける。取消はsignalで受け、失敗として扱わない。
+4. 使う場面・使わない場面・回答文の形は、toolchainの `summary`・`useWhen`・`redirects`・profile・SKILLとadapterに書く。会話の共通SystemContextとdialogueには足さない。
+5. 試験は、adapter単体（成功・欠けた値・各障害）、R1の関数定義（列挙が入るのは候補にある時だけ）、結合（R2なしで回答、障害でfallback、音声）。fixtureで外部APIを呼ばない。
 
 ## 4. 既存adapterに操作を足す
 

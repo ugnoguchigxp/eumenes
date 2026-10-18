@@ -217,15 +217,21 @@ export function createToolchains(
 			}),
 		};
 	}
-	/** The (command or session) binding and artifact registration a bound toolchain revision names. */
+	/**
+	 * The binding and artifact registration a bound toolchain revision names. An instant binding
+	 * has no screen, so its artifact is null.
+	 */
 	function bindingInTransaction(db: Database, toolchainRevisionId: string) {
 		const d = get(db, toolchainRevisionId);
 		if (d?.kind !== "toolchain" || !d.bindingRevisionId) return null;
 		const binding = storedBindingInTransaction(db, d.bindingRevisionId);
+		if (!binding) return null;
+		if (binding.document.execution === "instant")
+			return d.artifactRevisionId ? null : { binding, artifact: null as null };
 		const artifact = d.artifactRevisionId
 			? artifactInTransaction(db, d.artifactRevisionId)
 			: null;
-		return binding && artifact ? { binding, artifact } : null;
+		return artifact ? { binding, artifact } : null;
 	}
 	/**
 	 * Make an existing revision of a toolchain the published one (also the way back to an

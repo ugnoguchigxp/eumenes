@@ -17,9 +17,9 @@ const settingsLayoutKeys = [
 	"draftSource",
 ];
 export const limits = {
-	definitionBytes: 16_384,
-	depth: 4,
-	views: 60,
+	definitionBytes: 98_304,
+	depth: 6,
+	views: 240,
 	forms: 1,
 	/** Undo steps kept for one work (changes after the saved state). */
 	changes: 50,
@@ -139,6 +139,22 @@ function formOf(node: unknown): Definition | undefined {
 	return undefined;
 }
 
+type Issue = { path: PropertyKey[]; message: string; errors?: Issue[][] };
+/**
+ * A part is checked against every view's schema, so its union issue alone says "Invalid input".
+ * Follow the branch of the part's own view (the one whose `view` matched) down to its first issue.
+ */
+function partIssue(issue: Issue): Issue {
+	const own = issue.errors?.find(
+		(branch) =>
+			branch.length > 0 &&
+			!branch.some((i) => i.path.length === 1 && i.path[0] === "view"),
+	);
+	if (!own) return issue;
+	const inner = partIssue(own[0]!);
+	return { ...inner, path: [...issue.path, ...inner.path] };
+}
+
 /**
  * A definition the specialist may propose: allowed views only, no `source`, within the size,
  * depth and view-count limits, and valid for the artifact parser. Returns the form's fields.
@@ -162,7 +178,10 @@ export function validatedDefinition(raw: unknown): {
 	try {
 		parseDefinition(json);
 	} catch (error) {
-		const issue = error instanceof z.ZodError ? error.issues[0] : undefined;
+		const issue =
+			error instanceof z.ZodError && error.issues[0]
+				? partIssue(error.issues[0])
+				: undefined;
 		return fail(
 			"ui_definition_invalid",
 			issue

@@ -15,9 +15,11 @@ export function reportProjectionInTransaction(db: Database, id: string) {
 		target.report_state !== "available"
 	)
 		throw new Error("report_not_ready");
-	const row = db.query(
-		"SELECT report_digest,safe_projection_json,safe_projection_digest FROM agent_reports WHERE task_id=?",
-	).get(target.id) as {
+	const row = db
+		.query(
+			"SELECT report_digest,safe_projection_json,safe_projection_digest FROM agent_reports WHERE task_id=?",
+		)
+		.get(target.id) as {
 		report_digest: string;
 		safe_projection_json: string | null;
 		safe_projection_digest: string | null;

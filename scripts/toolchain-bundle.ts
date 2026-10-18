@@ -31,6 +31,8 @@ const BACKENDS = [
 	"codex-tasks",
 	"steward",
 	"world-query",
+	"weather",
+	"stock",
 ];
 const USAGE =
 	"使い方: bun scripts/toolchain-bundle.ts pins <revisionId>... | check <file.bundle.json> [--json]";

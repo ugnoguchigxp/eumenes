@@ -28,6 +28,7 @@ import {
 } from "./selection-trace";
 import { analyzeRequest } from "./request-analysis";
 import { announceAndSelect } from "./operation-announcement";
+import { answerInstant } from "./instant-answer";
 import { generateConversation } from "./conversation-generation";
 import { researchCitations } from "./research-citations";
 import type { Run } from "../contracts";
@@ -135,6 +136,8 @@ export function createGenerationHandler(
 			text: string;
 			receipt?: Receipt;
 			operation?: ConversationOperation;
+			/** The text is the host's own answer (an instant toolchain's); no model wrote it. */
+			hostAnswer?: true;
 			/** The decision this attempt made, recorded with its adoption. */
 			selection?: SelectionDraft;
 			recallPins?: Array<{ messageId: string; digest: string }>;
@@ -209,6 +212,13 @@ export function createGenerationHandler(
 					const analysis = first?.analysis;
 					let decision: Decision;
 					let generated: Awaited<ReturnType<typeof generateConversation>>;
+					if (found && first && analysis?.next === "instant")
+						return answerInstant(deps, input, {
+							found,
+							analysis,
+							first,
+							signal,
+						});
 					if (found && first && analysis?.next === "toolchain") {
 						// The notice is delivered first; the request for the specialist is written while it is read.
 						return announceAndSelect(deps, input, {
@@ -348,7 +358,7 @@ export function createGenerationHandler(
 					}
 				}
 				// No model was asked: the request is accepted as the host's own answer, so the speech standing on it proceeds.
-				if (researchFailed(input.agent)) {
+				if (researchFailed(input.agent) || outcome.result.hostAnswer) {
 					const requestId = larm.requestFor?.(tx, run.id, "llm");
 					if (
 						requestId &&

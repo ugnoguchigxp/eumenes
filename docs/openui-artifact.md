@@ -84,7 +84,7 @@ LLM の UI ツール、質問台帳、LARM の実画像生成、永続化、Memo
 
 ## 音楽と生成状態の組合せ（2026-10-11）
 
-DesignSystemのMusicPlayer・Playlist・GenerationStatusをOpenUIに登録した。既存の単一view形式を維持し、次のJSONで他の登録済みviewと組み合わせる。layoutはstack/grid、childrenは1〜12個の登録済みviewまたは子layout。入れ子はrootを含めて深さ4まで、1定義のview数は60まで。layoutは任意の `gap`（compact/normal/relaxed）と `width`（narrow/normal/wide）、text-blockは任意の `emphasis`（normal/strong/muted）を持てる。任意URL・関数・未知のpropsは受け付けない。
+DesignSystemのMusicPlayer・Playlist・GenerationStatusをOpenUIに登録した。既存の単一view形式を維持し、次のJSONで他の登録済みviewと組み合わせる。layoutはstack/grid、childrenは1〜48個の登録済みviewまたは子layout。入れ子はrootを含めて深さ6まで、1定義のview数は240まで、定義のJSONは96KBまで（2026-10-18に緩和）。layoutは任意の `gap`（compact/normal/relaxed）と `width`（narrow/normal/wide）、text-blockは任意の `emphasis`（normal/strong/muted）を持てる。任意URL・関数・未知のpropsは受け付けない。
 
 ```json
 {

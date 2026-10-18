@@ -76,6 +76,11 @@ export interface ToolchainRoutingPort {
 	};
 	/** Host services of bound command toolchains (adapter snapshot, input checks, preparation). */
 	bound?: BoundCommandPort;
+	/** The run of an instant-answer toolchain revision; undefined for any other (or an unavailable one). */
+	instantInTransaction?(
+		db: Database,
+		revisionId: string,
+	): InstantRun | undefined;
 	/**
 	 * The session toolchain a specialist runs with (spec toolchain-specialist-dialogue §4.1).
 	 * Throws `capability_unavailable` for a non-session or unavailable toolchain.
@@ -114,6 +119,24 @@ export interface ToolchainRoutingPort {
 	/** The request text the conversation handed to the toolchain of a run. */
 	requestOfRunInTransaction(db: Database, runId: string): string | undefined;
 }
+
+/**
+ * An instant-answer toolchain prepared for one call (binding execution "instant"): the adapter's answer to
+ * the arguments, and the toolchain the request goes to when the adapter cannot answer.
+ */
+export type InstantRun = {
+	/** The answer sentence, or a safe code for why the adapter has none. Rejects only when aborted. */
+	run(
+		args: Record<string, unknown>,
+		signal: AbortSignal,
+	): Promise<{ ok: true; answer: string } | { ok: false; code: string }>;
+	/** The (available) toolchain the binding names for a failed answer; null when it is not available now. */
+	fallback: {
+		toolchainId: string;
+		revisionId: string;
+		functionName: string;
+	} | null;
+};
 
 /** A bound command toolchain's tools as the command sub-agent is offered them. */
 export type BoundCommandSet = {

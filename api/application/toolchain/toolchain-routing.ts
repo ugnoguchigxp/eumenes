@@ -16,6 +16,7 @@ import type {
 } from "../../domains/dialogue/contracts/toolchains";
 import type { AdapterRegistry } from "../../domains/tool-runtime";
 import type { SchemaProvider } from "./toolchain-adapters";
+import { createInstantRouting } from "./toolchain-instant";
 
 /**
  * Dialogue's view of the toolchain registry and selection history. Retrieval uses
@@ -50,7 +51,9 @@ export function createToolchainRouting(
 			binding: {
 				bindingRevisionId: bound.binding.revisionId,
 				adapterRef: bound.binding.document.adapterRef,
-				artifactRevisionId: bound.artifact.revisionId,
+				...(bound.artifact
+					? { artifactRevisionId: bound.artifact.revisionId }
+					: {}),
 				available: !!adapter && adapter.availableInTransaction(db),
 			},
 		};
@@ -86,6 +89,15 @@ export function createToolchainRouting(
 			};
 		});
 	}
+	const instant = createInstantRouting({
+		capabilities,
+		registry,
+		schemas,
+		fallbackAvailable: (db, d) => {
+			const runtime = runtimeInTransaction(db, d);
+			return !!runtime && (!runtime.binding || runtime.binding.available);
+		},
+	});
 	const bound: BoundCommandPort = {
 		snapshotInTransaction: (db, bindingRevisionId) =>
 			adapterOf(db, bindingRevisionId).snapshotInTransaction(db),
@@ -154,10 +166,11 @@ export function createToolchainRouting(
 				available: (id) => input.available.has(id),
 				fromHistory,
 			});
+			const offered = cards.flatMap((card) => instant.card(db, card));
 			const fts = cards.some((c) => c.score.ftsRank !== null);
 			const vector = cards.some((c) => c.score.similarity !== null);
 			return {
-				cards,
+				cards: offered,
 				past,
 				retrieval:
 					fts && vector
@@ -237,6 +250,7 @@ export function createToolchainRouting(
 			};
 		},
 		bound,
+		instantInTransaction: instant.run,
 		recordSelectionInTransaction: history.recordSelectionInTransaction,
 		linkTaskInTransaction: history.linkTaskInTransaction,
 		settleSelectionInTransaction: history.settleSelectionInTransaction,

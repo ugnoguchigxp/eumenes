@@ -97,10 +97,27 @@ const sessionBindingV1 = z.strictObject({
 		targetSchemaRef: schemaRef.optional(),
 	}),
 });
+/**
+ * An instant-answer toolchain: the first round of the conversation calls its function with the
+ * arguments the one tool's schema declares, and the adapter's answer sentence is the answer. No
+ * sub-agent, no second round, no artifact. When the adapter cannot answer, the request goes to
+ * `fallbackToolchainId` in the same run.
+ */
+const instantBindingV1 = z.strictObject({
+	kind: z.literal("binding"),
+	id: slug,
+	revision: revisionNumber,
+	execution: z.literal("instant"),
+	adapterRef: hostRef("adapter"),
+	availabilityRef: hostRef("availability"),
+	tools: z.array(bindingTool).length(1),
+	fallbackToolchainId: slug,
+});
 /** Any binding kind; unknown `execution` values are rejected. */
 export const bindingV1 = z.discriminatedUnion("execution", [
 	commandBindingV1,
 	sessionBindingV1,
+	instantBindingV1,
 ]);
 export type BindingV1 = z.infer<typeof bindingV1>;
 /** Where one OpenUI source's data comes from: a registered adapter query. */
@@ -554,6 +571,8 @@ export type BundleHost = {
 			conditions?: ReadonlySet<string>;
 			/** Structural draft operations (`structure:` refs) and their input schemas. */
 			structures?: ReadonlyMap<string, { inputSchemaRef: string }>;
+			/** The adapter answers instant bindings (see `DomainAdapter.instant`). */
+			instant?: boolean;
 		}
 	>;
 	availability: ReadonlySet<string>;

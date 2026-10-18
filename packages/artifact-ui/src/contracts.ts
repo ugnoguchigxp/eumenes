@@ -34,13 +34,13 @@ import type {
 } from "./settings-contracts";
 export type { MusicResource, GenerationResource } from "./media-contracts";
 
-const title = z.string().max(120).optional();
+const title = z.string().max(480).optional();
 const emphases = ["normal", "strong", "muted"] as const;
 const layoutGaps = ["compact", "normal", "relaxed"] as const;
 const layoutWidths = ["narrow", "normal", "wide"] as const;
 /** Nested layouts: root included, at most this deep and this many views per definition. */
-const maxLayoutDepth = 4;
-const maxDefinitionViews = 60;
+const maxLayoutDepth = 6;
+const maxDefinitionViews = 240;
 const source = z.string().regex(/^[a-z][a-z0-9-]{0,63}$/);
 const field = z
 	.strictObject({
@@ -479,7 +479,7 @@ export type ArtifactRequest = {
 }[View];
 export type Field = z.infer<typeof field>;
 export type QuestionData = z.infer<typeof question>;
-export const maxDefinitionBytes = 16_384;
+export const maxDefinitionBytes = 98_304;
 export function parseRequest(value: unknown): ArtifactRequest {
 	if (
 		!value ||
@@ -622,7 +622,7 @@ export const layoutSchema: z.ZodType<Layout> = z.lazy(() =>
 					]),
 				)
 				.min(1)
-				.max(12),
+				.max(48),
 		})
 		.superRefine(refineLayout),
 );
@@ -651,7 +651,7 @@ export function definitionName(definition: ArtifactDefinition): string {
 }
 export function parseDefinition(input: string): ArtifactDefinition {
 	if (new TextEncoder().encode(input).length > maxDefinitionBytes)
-		throw new Error("定義が大きすぎます（16KBまで）");
+		throw new Error("定義が大きすぎます（96KBまで）");
 	return parseDocument(JSON.parse(input));
 }
 

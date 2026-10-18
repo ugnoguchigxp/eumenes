@@ -31,6 +31,8 @@ const backends = new Set([
 	"kanban",
 	"codex-tasks",
 	"steward",
+	"weather",
+	"stock",
 	"world-query",
 ]);
 const directory = new URL(

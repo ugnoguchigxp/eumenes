@@ -93,7 +93,7 @@ test("a session starts from the conversation's choice, then talks directly: thre
 	// The call's inference is rooted in the turn's run.
 	expect(h.state.captures.at(-1)).toMatchObject({
 		policySubject: expect.any(String),
-		maxOutputTokens: 4096,
+		maxOutputTokens: 24_576,
 	});
 	expect((await h.session())!.activeRunId).toBeNull();
 	expect(h.work()[0]!.holder).toBeNull();

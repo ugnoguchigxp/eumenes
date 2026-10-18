@@ -1,0 +1,129 @@
+{
+	"formatVersion": 1,
+	"bundleId": "weather-forecast",
+	"pins": [],
+	"definitions": [
+		{
+			"kind": "profile",
+			"id": "weather.forecast",
+			"revision": 1,
+			"title": "天気予報の即答担当",
+			"summary": "今日から3日先までの天気を、気象庁の予報から決まった文で答える",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [],
+			"avoidWhen": [],
+			"dependencies": [],
+			"body": "利用者が知りたい場所と日の天気を、気象庁の予報（一次細分区域ごと）から決まった一文で答える担当。答えるのは予報の天気・最高気温・最低気温・降水確率（6時間ごとの最大値）で、予報にない値は書かない。この担当は作業をせず、会話の最初の判断で選ばれた時点で、取得した予報の文がそのまま回答になる。予報を取得できないときは、同じ依頼をWeb調査に切り替える。"
+		},
+		{
+			"kind": "skill",
+			"id": "weather.forecast",
+			"revision": 2,
+			"title": "天気予報の即答の手順",
+			"summary": "場所と日の書き方、答える範囲、回答文の形",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [],
+			"avoidWhen": [],
+			"dependencies": [],
+			"body": "場所（place・prefecture）: placeには依頼の地名をそのまま書く（例: 鎌倉、横浜、湘南、北海道）。市区町村・地域・都道府県のどれでもよい。prefectureにはその地名がある都道府県を書く（例: 鎌倉なら神奈川県）。予報の区域はhostが地名から決める。\n日（day）: 今日はtoday、明日はtomorrow、明後日はday_after。今日から数えて3日目までが対象。\n対象外: 3日より先の予報、時刻ごとの予報、現在の気温・降水量・風、過去の天気、台風・警報・注意報の詳細は答えられない。これらは選ばず、Web調査を使う。\n回答文: 「明日（10/19）の鎌倉市は曇時々晴、最高26℃・最低19℃、降水確率は最大20%です（神奈川県東部の予報・5時発表）。」の形で、依頼の地名を主語にし、予報にある値だけを順に述べ、予報の区域と発表時刻を添える。値のない項目は省く。地名から区域が決まらないときは、同じ依頼をWeb調査に切り替える。"
+		},
+		{
+			"kind": "tool",
+			"id": "weather.forecast",
+			"revision": 2,
+			"title": "天気予報の取得",
+			"summary": "指定した地名と日の予報を取得して回答文にする（読み取り専用）",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [],
+			"avoidWhen": [],
+			"dependencies": [],
+			"backend": "weather",
+			"schemaKey": "weatherPlace"
+		},
+		{
+			"kind": "package",
+			"id": "weather.forecast",
+			"revision": 2,
+			"title": "天気予報の即答",
+			"summary": "今日・明日・明後日の天気を、気象庁の予報から即答する",
+			"aliases": ["天気予報"],
+			"tags": [],
+			"useWhen": ["今日・明日・明後日の天気、気温、降水確率を知りたい"],
+			"avoidWhen": [
+				"3日より先の予報や時刻ごとの予報を知りたい",
+				"現在の気温や降水量を知りたい"
+			],
+			"dependencies": [
+				"profile:weather.forecast@1",
+				"skill:weather.forecast@2",
+				"tool:weather.forecast@2"
+			],
+			"backend": "weather",
+			"schemaKey": "weatherPlace",
+			"profileRevisionId": "profile:weather.forecast@1",
+			"requiredSkillRevisionIds": ["skill:weather.forecast@2"],
+			"toolRevisionIds": ["tool:weather.forecast@2"]
+		},
+		{
+			"kind": "toolchain",
+			"id": "weather.forecast",
+			"revision": 2,
+			"title": "天気予報",
+			"summary": "今日・明日・明後日の天気予報（天気・最高最低気温・降水確率）を、言われた地名から気象庁の予報で即答する。担当への依頼文や予告は不要で、この関数の呼び出しがそのまま回答になる。今日から3日目までの天気の依頼はWeb検索より先にこの担当を使う。3日より先・時刻ごと・現在の気温は対象外",
+			"aliases": ["天気予報"],
+			"tags": [],
+			"useWhen": [
+				"「今日の天気は？」「明日の横浜の天気を教えて」と、今日・明日・明後日の天気を質問している",
+				"雨が降るか・傘が要るか・気温はどれくらいか・暑いか寒いかなど、今日から3日目までの天気の様子を質問している",
+				"前の発言の続きで「明日は？」「明後日は？」と、別の日の天気を質問している"
+			],
+			"avoidWhen": [
+				"4日以上先の天気や週間予報を質問している",
+				"「午後3時の天気」「夜の気温」など時刻ごとの天気を質問している",
+				"「今の気温」「現在の降水量」など現在の観測値を質問している",
+				"過去の天気や、台風・警報・注意報の詳細を質問している"
+			],
+			"dependencies": ["package:weather.forecast@2"],
+			"examples": [
+				"今日の天気を教えて",
+				"明日の横浜の天気は？",
+				"明後日の大阪は雨が降りそう？",
+				"明日は傘が要る？",
+				"鎌倉の明日の天気と気温を教えて",
+				"明日は？"
+			],
+			"packageRevisionId": "package:weather.forecast@2",
+			"redirects": [
+				{
+					"when": "3日より先の予報、時刻ごとの予報、現在の気温や降水量、台風や警報の詳細を知りたい場合",
+					"toolchainId": "web.search"
+				}
+			],
+			"bindingRevisionId": "binding:weather.forecast@2",
+			"functionName": "weather_forecast"
+		}
+	],
+	"bindings": [
+		{
+			"kind": "binding",
+			"id": "weather.forecast",
+			"revision": 2,
+			"execution": "instant",
+			"adapterRef": "adapter:weather@1",
+			"availabilityRef": "availability:weather@1",
+			"tools": [
+				{
+					"toolRevisionId": "tool:weather.forecast@2",
+					"operationId": "weather.forecast",
+					"inputSchemaRef": "builtin:weatherPlace"
+				}
+			],
+			"fallbackToolchainId": "web.search"
+		}
+	],
+	"artifacts": [],
+	"schemas": []
+}

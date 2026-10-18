@@ -193,6 +193,20 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 				void s.toolchain.refreshVectors();
 			},
 		},
+		{
+			// The forecast areas of the weather toolchain; the task maintenance pass reads them again once a day.
+			name: "weather_areas_start",
+			start: () => {
+				void s.toolchain.weather?.maintain();
+			},
+		},
+		{
+			// The EDINET list of listed companies of the stock toolchain; the task maintenance pass reads it again once a day.
+			name: "stock_codelist_start",
+			start: () => {
+				void s.toolchain.stock?.maintain();
+			},
+		},
 		{ name: "agents_start", start: () => s.toolchain.agents.start() },
 		{ name: "queue_start", start: () => s.queue.start() },
 		{

@@ -34,6 +34,8 @@ import {
 	type MemoryAdapterPorts,
 } from "../world/memory-adapter";
 import { createStewardAdapter } from "../world/steward-adapter";
+import { createStockAdapter } from "../stock/stock-adapter";
+import { createWeatherAdapter } from "../weather/weather-adapter";
 import type { WorldResearchPorts } from "../world/world-research-ports";
 import {
 	createWorldAdapter,
@@ -108,6 +110,10 @@ export async function createToolchain(
 		ttsDictionary?: TtsDictionaryPorts;
 		/** The 記憶 screen (memory and continuity services). */
 		memory?: MemoryAdapterPorts;
+		/** The weather toolchain's adapter and the forecast service it reads (absent: not offered). */
+		weather?: { fetch?: typeof fetch; now?: () => number };
+		/** The stock toolchain's adapter and the services it reads (absent: not offered). */
+		stock?: { fetch?: typeof fetch; now?: () => number };
 		/** The conversation agent's `memory_request` tool (absent: not offered). */
 		steward?: {
 			service: Parameters<typeof createStewardAdapter>[0];
@@ -143,6 +149,8 @@ export async function createToolchain(
 				activity: options.kanbanSdk.activity,
 			},
 		);
+	const weather = options.weather && createWeatherAdapter(options.weather);
+	const stock = options.stock && createStockAdapter(options.stock);
 	// Typed domain adapters this host offers; bundles naming any other adapter are not registered.
 	const registry = createAdapterRegistry([
 		...(shared && options.kanbanSdk
@@ -213,6 +221,8 @@ export async function createToolchain(
 			? [createStewardAdapter(options.steward.service, options.steward.memory)]
 			: []),
 		...(options.world ? [createWorldAdapter(options.world)] : []),
+		...(weather ? [weather] : []),
+		...(stock ? [stock] : []),
 		...(options.serviceTests
 			? [createServiceTestsAdapter(options.serviceTests)]
 			: []),
@@ -231,6 +241,8 @@ export async function createToolchain(
 			...(options.kanban && options.terminals ? ["kanban"] : []),
 			...(options.kanbanSdk ? ["codex-tasks"] : []),
 			...(options.steward ? ["steward"] : []),
+			...(options.weather ? ["weather"] : []),
+			...(options.stock ? ["stock"] : []),
 			...(options.worldResearch ? ["world-query"] : []),
 			...(options.ocr ? ["ocr"] : []),
 			...(options.excalidraw ? ["excalidraw"] : []),
@@ -364,6 +376,10 @@ export async function createToolchain(
 			// a per-user scope would pass its own `authorityEpoch` here.
 		}),
 		schemas: createSchemaProvider(capabilities),
+		/** Keeps the weather toolchain's list of forecast areas read (absent: no weather toolchain). */
+		weather: weather && { maintain: weather.maintain },
+		/** Keeps the stock toolchain's list of listed companies read (absent: no stock toolchain). */
+		stock: stock && { maintain: stock.maintain },
 		/** World is usable now (the World investigation is offered only then); absent: never. */
 		worldAvailable: world?.available,
 		tools,

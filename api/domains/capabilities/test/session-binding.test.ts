@@ -125,7 +125,7 @@ test("a session binding passes the check and registers as a toolchain with the s
 				"toolchain:timers.manage@7",
 			)!;
 			expect(found.binding.document.execution).toBe("session");
-			expect(found.artifact.revisionId).toBe("artifact:timers.workspace@3");
+			expect(found.artifact!.revisionId).toBe("artifact:timers.workspace@3");
 			const set = caps.toolchainSetInTransaction(
 				db,
 				"toolchain:timers.manage@7",

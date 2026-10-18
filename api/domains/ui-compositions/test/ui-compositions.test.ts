@@ -693,7 +693,7 @@ test("definitions: only the allowed views, no source, within size and view-count
 	);
 	const form = survey().children[2]!;
 	expect(refused(layout([form, form]))).toBe("ui_form_limit");
-	expect(refused(layout([text("x".repeat(20_000))]))).toBe(
+	expect(refused(layout([text("x".repeat(100_000))]))).toBe(
 		"ui_definition_too_large",
 	);
 	expect(refused(layout([text(), { view: "info-card", title: "t" }]))).toBe(
@@ -701,14 +701,43 @@ test("definitions: only the allowed views, no source, within size and view-count
 	);
 });
 
+test("definitions: a part's schema refusal names the field of the part's own view, not the whole union", () => {
+	const detail = (definition: unknown) => {
+		try {
+			validatedDefinition(definition);
+		} catch (error) {
+			return (error as { detail?: string }).detail ?? "";
+		}
+		return "accepted";
+	};
+	expect(detail(layout([{ view: "hero", title: 123 }]))).toBe(
+		"children/0/title: Invalid input: expected string, received number",
+	);
+	expect(
+		detail(layout([text(), layout([{ ...text(), extra: 1 }])])),
+	).toStartWith("children/1/children/0: Unrecognized key");
+	expect(
+		detail(
+			layout([
+				{
+					view: "hero",
+					title: "t",
+					image: { provider: "picsum", theme: "nope", alt: "a" },
+				},
+			]),
+		),
+	).toStartWith("children/0/image/theme:");
+});
+
 test("definitions: nesting depth and the view count are limited independently of the artifact parser", () => {
 	const deep = (levels: number): unknown =>
 		levels === 1 ? text() : layout([deep(levels - 1)]);
 	// Walk limits fire before the schema, so these hold whatever the parser allows.
-	expect(refused(deep(5))).toBe("ui_definition_too_deep");
+	expect(refused(deep(6))).toBe("accepted");
+	expect(refused(deep(7))).toBe("ui_definition_too_deep");
 	expect(refused(deep(40))).toBe("ui_definition_too_deep");
 	const wide = layout(
-		Array.from({ length: 11 }, () =>
+		Array.from({ length: 41 }, () =>
 			layout(Array.from({ length: 6 }, () => text())),
 		),
 	);
@@ -728,9 +757,9 @@ test("[needs artifact-ui nested layouts] a nested layout with gap, width and emp
 		{ gap: "relaxed", width: "wide", appearance: "elegant" },
 	);
 	expect(refused(nested)).toBe("accepted");
-	expect(refused(layout([layout([layout([layout([text()])])])]))).toBe(
-		"ui_definition_too_deep",
-	);
+	expect(
+		refused(layout([layout([layout([layout([layout([layout([text()])])])])])])),
+	).toBe("ui_definition_too_deep");
 	const result = validatedDefinition(layout([layout([survey().children[2]])]));
 	expect(result.fields?.map((field) => field.id)).toEqual([
 		"name",

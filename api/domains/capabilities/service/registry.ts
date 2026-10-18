@@ -196,15 +196,20 @@ function validateBinding(
 		return;
 	if (
 		d.bindingRevisionId === undefined ||
-		d.artifactRevisionId === undefined ||
 		!bindingRevisionIdPattern.test(d.bindingRevisionId) ||
-		!artifactRevisionIdPattern.test(d.artifactRevisionId)
+		(d.artifactRevisionId !== undefined &&
+			!artifactRevisionIdPattern.test(d.artifactRevisionId))
 	)
 		throw new Error("invalid_toolchain");
 	const binding = bindingInTransaction(db, d.bindingRevisionId);
 	const pack = dependencies[0]!;
-	if (
-		!binding ||
+	if (!binding) throw new Error("invalid_toolchain");
+	// An instant binding has no screen; every other binding is presented by exactly one artifact.
+	if (binding.document.execution === "instant") {
+		if (d.artifactRevisionId !== undefined)
+			throw new Error("invalid_toolchain");
+	} else if (
+		d.artifactRevisionId === undefined ||
 		binding.document.artifactRevisionId !== d.artifactRevisionId ||
 		!artifactInTransaction(db, d.artifactRevisionId)
 	)

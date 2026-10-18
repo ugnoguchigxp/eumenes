@@ -8,6 +8,7 @@ archive の基準: その文書が担当した実装がコードにあり、本�
 
 | 文書 | 状態 |
 | --- | --- |
+| [ui-studio-one-shot-draft-design-2026-10-18.md](ui-studio-one-shot-draft-design-2026-10-18.md) | 設計案・合意待ち。UI自由制作の下書きを1回の推論で作り、ホストの補正（fixer）と検証で反映可否を決める。自動の作り直しはしない。反映できなかった案もJSONで出力する。要合意事項S1〜S6 |
 | [ui-studio-expressive-parts-implementation-plan-2026-10-17.md](ui-studio-expressive-parts-implementation-plan-2026-10-17.md) | 実装・固定試験・ブラウザE2E（§11、13件pass）済み。UI自由制作の表現力拡張（見せる部品とテーマ別picsum画像・紙芝居、状態と式・数式・電卓、図解）。live（実モデル）・実機器は未実施 |
 | [conversation-pre-delegation-response-design-2026-10-17.md](conversation-pre-delegation-response-design-2026-10-17.md) | 基本案は実装済み。§7〜§9のfixtureは記録済み。担当探索の省略とliveの意味保持は未解決。§10の修復はコードにあるが、本書に検証結果がない |
 | [conversation-subagent-llm-refactoring-plan-2026-10-17.md](conversation-subagent-llm-refactoring-plan-2026-10-17.md) | 合意済み。Dに依存しないP2/P3はfixture済み（§8）。P0の前提差分は後続コミットでコードに入った。D1〜D13の結論とP1・P4・P5は未了 |
@@ -35,6 +36,8 @@ archive の基準: その文書が担当した実装がコードにあり、本�
 | [01-tasks-and-queue.md](.archived/01-tasks-and-queue.md) | 委任タスクの永続台帳。実装とfixture、レビュー再試験を本文に記録。会話配送・モーダル・実CLIは後続計画 |
 | [ocr-larm-connectivity-request-2026-10-17.md](.archived/ocr-larm-connectivity-request-2026-10-17.md) | OCRの正式入口の依頼。Macからの設定保存と画像・動画・取消の受入は [検証記録](verification/ocr-mac-gateway-2026-10-17/README.md) |
 | [run-error-report-design-2026-10-17.md](run-error-report-design-2026-10-17.md) | 実装・fixture済み。失敗したrunの診断を固定形式・約3,000文字で組み立て、画面のダイアログ・CLIからLLMへ貼れるようにする |
+| [weather-instant-toolchain-design-2026-10-18.md](weather-instant-toolchain-design-2026-10-18.md) | 実装・fixture済み。天気専用ツールチェーン（weather.tsukumijima.net）でR1から即時回答、一時回答なし、API障害時はweb_searchへ切替。§7: 地名を気象庁area.jsonでhostが解決（revision 2） |
+| [stock-instant-toolchain-design-2026-10-18.md](stock-instant-toolchain-design-2026-10-18.md) | 実装・fixture済み（実機未確認）。株価専用ツールチェーン（Yahooチャート＋EDINETコードリスト＋Yahoo検索）で即時回答、日本株優先、同順位は資本金の大きい順、障害時はweb_searchへ切替 |
 | [request-url-boundary-design-2026-10-17.md](.archived/request-url-boundary-design-2026-10-17.md) | 依頼文のURLは「、」「。」で区切る（U2）。`request-urls.test.ts` で確認。助詞直結（U1）は対応しない |
 | [toolchain-specialist-dialogue-implementation-plan-2026-10-17.md](.archived/toolchain-specialist-dialogue-implementation-plan-2026-10-17.md) | 専門担当への共通切替とUI自由制作の対話編集。実装と固定試験を§15に記録。ブラウザE2E・実モデル・実機器は未実施 |
 | [toolchain-specialist-dialogue-p0-contract-2026-10-17.md](.archived/toolchain-specialist-dialogue-p0-contract-2026-10-17.md) | 上記の型契約。コードで固定済み。実モデルの容量測定は未実施 |

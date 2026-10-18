@@ -53,6 +53,8 @@ test("every builtin and bundled toolchain registers as a complete set with flat 
 		"object-recognition",
 		"claude-code",
 		"steward",
+		"weather",
+		"stock",
 		"world-query",
 		"ocr",
 		"ui-compositions",

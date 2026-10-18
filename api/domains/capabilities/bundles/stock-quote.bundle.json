@@ -1,0 +1,131 @@
+{
+	"formatVersion": 1,
+	"bundleId": "stock-quote",
+	"pins": [],
+	"definitions": [
+		{
+			"kind": "profile",
+			"id": "stock.quote",
+			"revision": 1,
+			"title": "株価の即答担当",
+			"summary": "上場企業の現在値を、会社名またはティッカーから決まった文で答える",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [],
+			"avoidWhen": [],
+			"dependencies": [],
+			"body": "利用者が知りたい会社の株価（直近の値、前日終値との差、時刻）を、言われた会社名またはティッカーから決まった一文で答える担当。日本の上場企業は証券コードで、それ以外はティッカーで特定する。答えるのは現在値・前日比・取得時刻で、取得できなかった値は書かない。この担当は作業をせず、会話の最初の判断で選ばれた時点で、取得した株価の文がそのまま回答になる。会社を特定できない、または株価を取得できないときは、同じ依頼をWeb調査に切り替える。"
+		},
+		{
+			"kind": "skill",
+			"id": "stock.quote",
+			"revision": 1,
+			"title": "株価の即答の手順",
+			"summary": "会社名の渡し方、答える範囲、回答文の形",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [],
+			"avoidWhen": [],
+			"dependencies": [],
+			"body": "会社（query）: 利用者が言った会社名・ティッカー・証券コードをそのまま書く。「ソフトバンク」「トヨタ自動車」「AAPL」「9434」のように、株価・円・「の」などの語は含めず、言い換えや補完をしない。前の発言の続きで「その会社は？」と言われたときは、前に出た会社名を書く。\n特定: 会社名は日本の上場企業のEDINET提出者名（漢字・英字・ヨミ。株式会社などは無視）とYahoo Financeの検索で照合する。日本株と米国株などの両方があれば日本株を選ぶ。同名の候補が複数あるときは、完全一致、前方一致、部分一致の順で一社に決める。回答文に正式名とコードを入れるので、別の会社だったと利用者が気づける。\n対象外: 過去の値の推移やチャート、PER・配当・業績などの指標や財務、株価に関するニュース、複数の会社の比較、為替・指数・仮想通貨は答えられない。これらは選ばず、Web調査を使う。\n回答文: 「ソフトバンク株式会社（9434）の株価は244.7円、前日比+2.0円（+0.82%）です。10/16 15:30時点。」の形で、取得した値だけを順に述べる。値のない項目は省く。"
+		},
+		{
+			"kind": "tool",
+			"id": "stock.quote",
+			"revision": 1,
+			"title": "株価の取得",
+			"summary": "指定した会社の株価を特定して取得し、回答文にする（読み取り専用）",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [],
+			"avoidWhen": [],
+			"dependencies": [],
+			"backend": "stock",
+			"schemaKey": "stockQuote"
+		},
+		{
+			"kind": "package",
+			"id": "stock.quote",
+			"revision": 1,
+			"title": "株価の即答",
+			"summary": "上場企業の現在の株価を、会社名またはティッカーから即答する",
+			"aliases": ["株価"],
+			"tags": [],
+			"useWhen": ["特定の会社の現在の株価を知りたい"],
+			"avoidWhen": [
+				"過去の値の推移やチャートを知りたい",
+				"PER・配当・業績などの指標や財務を知りたい",
+				"複数の会社の株価を比べたい"
+			],
+			"dependencies": [
+				"profile:stock.quote@1",
+				"skill:stock.quote@1",
+				"tool:stock.quote@1"
+			],
+			"backend": "stock",
+			"schemaKey": "stockQuote",
+			"profileRevisionId": "profile:stock.quote@1",
+			"requiredSkillRevisionIds": ["skill:stock.quote@1"],
+			"toolRevisionIds": ["tool:stock.quote@1"]
+		},
+		{
+			"kind": "toolchain",
+			"id": "stock.quote",
+			"revision": 1,
+			"title": "株価",
+			"summary": "特定の会社の現在の株価（現在値・前日比・時刻）を、言われた会社名またはティッカーから特定して即答する。担当への依頼文や予告は不要で、この関数の呼び出しがそのまま回答になる。一社の現在の株価の依頼はWeb検索より先にこの担当を使う。値動きの推移・チャート、指標や財務、ニュース、複数社の比較は対象外",
+			"aliases": ["株価"],
+			"tags": [],
+			"useWhen": [
+				"「ソフトバンクの株価は？」「トヨタの株価を教えて」と、特定の会社の今の株価を質問している",
+				"「AAPLはいくら？」「アップルの株価」など、ティッカーや米国企業の現在の株価を質問している",
+				"前の発言の続きで「ソニーは？」と、別の会社の株価を質問している"
+			],
+			"avoidWhen": [
+				"過去の値動きの推移やチャート、先週・去年の株価を質問している",
+				"PER・配当・時価総額・業績など、株価以外の指標や財務を質問している",
+				"株価に関するニュースや値動きの理由を質問している",
+				"複数の会社の株価を比べて質問している",
+				"為替・指数・仮想通貨・投資信託の値を質問している"
+			],
+			"dependencies": ["package:stock.quote@1"],
+			"examples": [
+				"ソフトバンクの株価を教えて",
+				"トヨタ自動車の株価はいくら？",
+				"AAPLの株価は？",
+				"9434の株価",
+				"任天堂の今の株価",
+				"ソニーは？"
+			],
+			"packageRevisionId": "package:stock.quote@1",
+			"redirects": [
+				{
+					"when": "株価の推移・チャート、指標や財務、株価のニュース、複数の会社の比較、為替や指数の値を知りたい場合",
+					"toolchainId": "web.search"
+				}
+			],
+			"bindingRevisionId": "binding:stock.quote@1",
+			"functionName": "stock_quote"
+		}
+	],
+	"bindings": [
+		{
+			"kind": "binding",
+			"id": "stock.quote",
+			"revision": 1,
+			"execution": "instant",
+			"adapterRef": "adapter:stock@1",
+			"availabilityRef": "availability:stock@1",
+			"tools": [
+				{
+					"toolRevisionId": "tool:stock.quote@1",
+					"operationId": "stock.quote",
+					"inputSchemaRef": "builtin:stockQuote"
+				}
+			],
+			"fallbackToolchainId": "web.search"
+		}
+	],
+	"artifacts": [],
+	"schemas": []
+}

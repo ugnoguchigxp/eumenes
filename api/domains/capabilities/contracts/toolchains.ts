@@ -38,11 +38,13 @@ export type ToolchainRuntimeMeta = {
 	 * command: a command sub-agent turns the request into one typed operation of the package.
 	 * music-create / music-playback: the music domain's own planner runs the package.
 	 * session: the conversation hands over to the package's specialist for several direct turns.
+	 * instant: the first round's function call carries the arguments and the adapter's sentence is the answer.
 	 */
 	execution:
 		| "research"
 		| "command"
 		| "session"
+		| "instant"
 		| "music-create"
 		| "music-playback"
 		| "image"
@@ -69,7 +71,8 @@ export type ToolchainRuntimeMeta = {
 	binding?: {
 		bindingRevisionId: string;
 		adapterRef: string;
-		artifactRevisionId: string;
+		/** Absent for an instant binding, which has no screen. */
+		artifactRevisionId?: string;
 		available: boolean;
 	};
 };
@@ -84,6 +87,18 @@ export type ToolchainCard = {
 	useWhen: string[];
 	/** Only redirects to toolchains active on this host; the caller drops ones it does not offer. */
 	redirects: Array<ToolchainRedirect & { functionName: string }>;
+	/**
+	 * An instant-answer toolchain only (binding execution "instant"), filled by the host while it
+	 * finds the candidates: the arguments its first-round function takes besides the analysis.
+	 */
+	instant?: {
+		/** JSON Schema (flat object) of those arguments. */
+		parameters: Record<string, unknown>;
+		/** Check the model's arguments against that schema. */
+		parse(
+			args: unknown,
+		): { ok: true; value: Record<string, unknown> } | { ok: false };
+	};
 	/** Ranks and scores that placed it among the candidates; recorded in the selection trace. */
 	score: {
 		rank: number;

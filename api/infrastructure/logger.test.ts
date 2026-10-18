@@ -80,6 +80,9 @@ test("JSONL records isolate concurrent context and exclude raw payloads and erro
 	expect(output.lines.join("")).not.toContain("PRIVATE");
 	log.info("fixture.outside");
 	expect(output.entries().at(-1).requestId).toBeUndefined();
+	// A rejected operation's repair note (a position and a rule) is kept for finding why it failed.
+	log.warn("fixture.rejected", { repairHint: "children/0/title: rule" });
+	expect(output.entries().at(-1).repairHint).toBe("children/0/title: rule");
 });
 
 test("file output rotates with bounded retention and private permissions", () => {

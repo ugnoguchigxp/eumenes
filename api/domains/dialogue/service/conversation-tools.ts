@@ -143,9 +143,11 @@ export function toolchainDescription(
 ) {
 	return (
 		card.summary +
-		(session
-			? "。会話相手をこの専門担当へ切り替え、以後は直接対話します"
-			: "。担当が作業した結果を通常会話へ返します") +
+		(card.instant
+			? "。この呼び出しの引数がそのまま取得の指定になり、担当への依頼文や予告は要りません"
+			: session
+				? "。会話相手をこの専門担当へ切り替え、以後は直接対話します"
+				: "。担当が作業した結果を通常会話へ返します") +
 		"。使う場面: " +
 		card.useWhen.join("、") +
 		"。" +

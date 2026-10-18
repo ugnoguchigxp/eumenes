@@ -146,6 +146,20 @@ export async function harness(
 		/** Model returns a timer command with a forbidden extra field. */
 		timerExtra?: boolean;
 		queueLimits?: { total: number; background: number; scope: number };
+		/** The forecast service the weather toolchain reads (absent: no weather toolchain). */
+		weather?: { fetch: typeof fetch };
+		/** The services the stock toolchain reads (absent: no stock toolchain). */
+		stock?: { fetch: typeof fetch };
+		/**
+		 * The first round's call, written by the test from the functions offered (name and arguments), or
+		 * undefined to leave the round to the default model.
+		 */
+		firstRound?: (
+			tools: ReadonlyArray<{
+				function: { name: string; parameters?: Record<string, unknown> };
+			}>,
+			question: string,
+		) => { name: string; args: Record<string, unknown> } | undefined;
 	} = {},
 ) {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-toolchain-"));
@@ -238,6 +252,17 @@ export async function harness(
 				(!!options.timers && /タイマー/.test(question)) ||
 				/天気|株価|weather|stock|調べ|検索|https?:|確認/.test(question);
 			if (isAnalysisRound(callOptions?.tools)) {
+				const scripted = options.firstRound?.(callOptions!.tools!, question);
+				if (scripted) {
+					callOptions!.onToolCalls!([
+						{
+							id: "analysis",
+							name: scripted.name,
+							arguments: JSON.stringify(scripted.args),
+						},
+					] as never);
+					return "";
+				}
 				const offered = offeredToolchains(callOptions?.tools);
 				// The first round chooses the function the second round will write the request for.
 				const named = options.history
@@ -604,6 +629,8 @@ export async function harness(
 		terminals,
 		kanban,
 		kanbanSdk,
+		weather: options.weather,
+		stock: options.stock,
 	});
 	const music = options.musicGateway
 		? createMusic({

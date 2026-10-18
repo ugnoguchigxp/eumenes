@@ -160,7 +160,9 @@ test("the specialist is not given memory, World, the main prompt or the conversa
 	// The time is the host clock as local ISO 8601 with its offset, not a UTC string.
 	expect(input.now).toMatch(/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}\+09:00$/);
 	expect(input.timeZone).toBe("Asia/Tokyo");
-	expect(h.state.captures.every((c) => c.maxOutputTokens === 4096)).toBe(true);
+	expect(h.state.captures.every((c) => c.maxOutputTokens === 24_576)).toBe(
+		true,
+	);
 });
 
 test("the specialist turn never calls the main conversation model, and a failed turn does not either", async () => {
@@ -338,7 +340,7 @@ test("a refusal's short repair hint reaches the specialist, truncated", async ()
 	const h = await harness();
 	await start(h);
 	h.state.invokeError = "invalid_definition";
-	h.state.invokeDetail = "x".repeat(900);
+	h.state.invokeDetail = "x".repeat(3000);
 	h.state.specialist.push(invoke("案"), reply("直します"));
 	await h.ask("変更して");
 	const result = lastPrompt(h)
@@ -346,5 +348,5 @@ test("a refusal's short repair hint reaches the specialist, truncated", async ()
 		.find((line) => line.startsWith("TOOL_RESULT="))!;
 	const parsed = JSON.parse(result.slice("TOOL_RESULT=".length));
 	expect(parsed).toMatchObject({ ok: false, error: "invalid_definition" });
-	expect(parsed.detail).toHaveLength(300);
+	expect(parsed.detail).toHaveLength(1000);
 });

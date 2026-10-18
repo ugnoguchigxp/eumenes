@@ -86,6 +86,10 @@ import { answerText, emptyInput } from "./inputs";
 export { timerResultContext } from "./timers";
 import { publicUrl } from "./public-url";
 import { toolchainRequest } from "./toolchains";
+import { stockQuote } from "./stock";
+import { weatherPlace } from "./weather";
+export { stockQuote } from "./stock";
+export { weatherPlace, weatherDays } from "./weather";
 export { publicUrl };
 export const researchInput = z
 	.object({
@@ -241,6 +245,8 @@ export const validators = {
 	worldDocuments,
 	worldFind,
 	worldQuery,
+	weatherPlace,
+	stockQuote,
 };
 export type SchemaKey = keyof typeof validators;
 export type Owner = { rootRunId: string; taskId: string; cancelEpoch: number };

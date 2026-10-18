@@ -63,7 +63,7 @@ export function createArtifacts(deps: {
 		toolchainRevisionId: string,
 	) => {
 		binding: FixedDocument<BindingV1>;
-		artifact: FixedDocument<ArtifactDefinitionV1>;
+		artifact: FixedDocument<ArtifactDefinitionV1> | null;
 	} | null;
 	now: () => number;
 }) {
@@ -98,7 +98,7 @@ export function createArtifacts(deps: {
 		const seen = new Set<string>();
 		for (const d of deps.activeToolchains(db)) {
 			const found = deps.bindingOf(db, d.revisionId);
-			if (!found || seen.has(found.artifact.revisionId)) continue;
+			if (!found?.artifact || seen.has(found.artifact.revisionId)) continue;
 			seen.add(found.artifact.revisionId);
 			out.push(entry(found.artifact, d, found.binding.document.adapterRef));
 		}

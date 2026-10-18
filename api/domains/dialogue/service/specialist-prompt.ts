@@ -249,8 +249,8 @@ export function toolResultMessage(result: unknown) {
 		role: "user" as const,
 		content:
 			"TOOL_RESULT=" +
-			(json.length > 24_000
-				? JSON.stringify({ truncated: true, preview: json.slice(0, 24_000) })
+			(json.length > 96_000
+				? JSON.stringify({ truncated: true, preview: json.slice(0, 96_000) })
 				: json),
 	};
 }

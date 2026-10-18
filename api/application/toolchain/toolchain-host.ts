@@ -178,6 +178,8 @@ export async function createHostToolchain(
 			kanban,
 			kanbanSdk: sdkHost,
 			webResearch: s.webResearchEnabled,
+			weather: {},
+			stock: {},
 			embed: s.embed,
 		},
 	);

@@ -114,6 +114,26 @@ export interface SessionWorkAdapter {
 	): void;
 }
 
+/** The outcome of an instant operation: the answer sentence, or a safe code for why there is none. */
+export type InstantResult =
+	| { ok: true; answer: string }
+	| { ok: false; code: string };
+
+/**
+ * What an adapter offers an instant binding (spec weather-instant-toolchain-design 2026-10-18):
+ * the first round of the conversation calls the toolchain's function with arguments, and the
+ * sentence `run` returns is the answer, with no sub-agent and no second round. It runs outside
+ * any transaction, so it may use the network.
+ */
+export interface InstantAdapter {
+	/** Answer one validated call. Never throws for a failure of the service it asks. */
+	run(
+		operationName: string,
+		input: unknown,
+		signal: AbortSignal,
+	): Promise<InstantResult>;
+}
+
 export interface DomainAdapter {
 	/** `adapter:<owner>@<n>` */
 	readonly ref: string;
@@ -141,6 +161,8 @@ export interface DomainAdapter {
 		conditions?: ReadonlySet<string>;
 		/** Structural draft operations this adapter applies inside its document's apply. */
 		structures?: ReadonlyMap<string, { inputSchemaRef: string }>;
+		/** The adapter answers instant bindings (it has `instant`). */
+		instant?: boolean;
 	};
 	/** The adapter's domain is configured and usable on this host now. */
 	availableInTransaction(tx: Database): boolean;
@@ -190,6 +212,8 @@ export interface DomainAdapter {
 	afterCommit?(): void;
 	/** Present when a session binding may use this adapter (spec §4.1). */
 	session?: SessionWorkAdapter;
+	/** Present when an instant binding may use this adapter. */
+	instant?: InstantAdapter;
 }
 
 export interface AdapterRegistry {

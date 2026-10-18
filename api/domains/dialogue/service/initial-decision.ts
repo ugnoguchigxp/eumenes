@@ -73,7 +73,17 @@ export type FirstRound = RequestAnalysis &
 		| { next: "answer" }
 		| { next: "report_unavailable"; reply: string }
 		| { next: "toolchain"; card: ToolchainCard; announcement: string }
+		/** An instant-answer toolchain: its arguments (checked by the card) are all the call carries. */
+		| {
+				next: "instant";
+				card: InstantCard;
+				arguments: Record<string, unknown>;
+		  }
 	);
+/** A card whose toolchain answers at once from the arguments of the first round's call. */
+export type InstantCard = ToolchainCard & {
+	instant: NonNullable<ToolchainCard["instant"]>;
+};
 
 function jsonSchema(schema: z.ZodType) {
 	return z.toJSONSchema(schema) as Record<string, unknown>;
@@ -95,8 +105,12 @@ export function analysisTools(
 				name: card.functionName,
 				description:
 					toolchainDescription(card, offered, sessions.has(card.functionName)) +
-					"。この担当へ任せるときに呼び、予告(announcement)と依頼の分析だけを書きます",
-				parameters: jsonSchema(toolchainChoice.strict()),
+					(card.instant
+						? "。この担当へ任せるときに呼び、依頼の分析と引数を書きます"
+						: "。この担当へ任せるときに呼び、予告(announcement)と依頼の分析だけを書きます"),
+				parameters: card.instant
+					? instantParameters(card.instant.parameters)
+					: jsonSchema(toolchainChoice.strict()),
 			},
 		})),
 		{
@@ -117,6 +131,22 @@ export function analysisTools(
 			},
 		},
 	];
+}
+
+/** The analysis and an instant toolchain's own arguments, in the one flat object the call takes. */
+function instantParameters(own: Record<string, unknown>) {
+	const analysis = jsonSchema(requestAnalysis.strict());
+	const required = (schema: Record<string, unknown>) =>
+		Array.isArray(schema.required) ? (schema.required as string[]) : [];
+	return {
+		...analysis,
+		properties: {
+			...(analysis.properties as Record<string, unknown>),
+			...(own.properties as Record<string, unknown>),
+		},
+		required: [...required(analysis), ...required(own)],
+		additionalProperties: false,
+	};
 }
 
 /** Structure only: what cannot be answered from hand must not be answered from hand. */
@@ -158,6 +188,7 @@ export function validateAnalysis(
 				: [],
 		);
 	}
+	if (card?.instant) return validateInstant(call, card as InstantCard, args);
 	const schema = card
 		? toolchainChoice.strict()
 		: call.name === ANSWER_FUNCTION
@@ -184,10 +215,65 @@ export function validateAnalysis(
 	return round;
 }
 
+/**
+ * The call of an instant toolchain: the four values of the analysis, and nothing but the arguments the card
+ * declares. Whatever the card does not accept goes back for the structural repair.
+ */
+function validateInstant(
+	call: NativeToolCall,
+	card: InstantCard,
+	args: unknown,
+): FirstRound {
+	const record =
+		args && typeof args === "object" && !Array.isArray(args)
+			? (args as Record<string, unknown>)
+			: undefined;
+	if (!record)
+		throw operationRejection("arguments_invalid", call, [
+			{ validationPath: "arguments", validationCode: "invalid_type" },
+		]);
+	const keys = Object.keys(requestAnalysis.shape);
+	const analysis = requestAnalysis.safeParse(
+		Object.fromEntries(
+			keys.filter((k) => k in record).map((k) => [k, record[k]]),
+		),
+	);
+	if (!analysis.success)
+		throw operationRejection(
+			"arguments_invalid",
+			call,
+			validationIssues(analysis.error, args),
+		);
+	const own = card.instant.parse(
+		Object.fromEntries(
+			Object.entries(record).filter(([k]) => !keys.includes(k)),
+		),
+	);
+	if (!own.ok)
+		throw operationRejection("arguments_invalid", call, [
+			{ validationPath: "arguments", validationCode: "invalid_value" },
+		]);
+	const round: FirstRound = {
+		...analysis.data,
+		next: "instant",
+		card,
+		arguments: own.value,
+	};
+	consistent(round);
+	return round;
+}
+
 /** The judgment of the first round as the selection trace keeps it (never the request itself). */
 export function analysisTrace(round: FirstRound): SelectionAnalysis {
 	const { kind, freshness, next, impact, approved } = round;
-	return { kind, freshness, next, impact, approved };
+	// An instant toolchain is handed the request like any other toolchain.
+	return {
+		kind,
+		freshness,
+		next: next === "instant" ? "toolchain" : next,
+		impact,
+		approved,
+	};
 }
 
 /**

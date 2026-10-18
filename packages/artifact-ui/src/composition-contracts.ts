@@ -11,9 +11,9 @@ const noSource = z.never().optional();
 /** Views without a heading still name `title` (absent), as every registered view does. */
 const noTitle = z.never().optional();
 const text = (max: number) => z.string().min(1).max(max);
-const buttonLabel = text(40);
+const buttonLabel = text(160);
 /** An expression of the composition expression language. */
-export const expression = z.string().trim().min(1).max(300);
+export const expression = z.string().trim().min(1).max(1200);
 /** A name of the composition's state or of one of its computed values. */
 export const modelName = z.string().regex(/^[a-z][a-zA-Z0-9]{0,31}$/);
 const numberOrExpression = z.union([z.number(), expression]);
@@ -34,14 +34,14 @@ export const imageSpec = z.discriminatedUnion("provider", [
 			.string()
 			.regex(/^[a-z0-9][a-z0-9-]{0,39}$/)
 			.optional(),
-		alt: text(120),
+		alt: text(480),
 		grayscale: z.boolean().optional(),
 		blur: z.number().int().min(0).max(10).optional(),
 	}),
 	z.strictObject({
 		provider: z.literal("placeholder"),
 		tone: z.enum(placeholderTones).optional(),
-		alt: z.string().max(120).optional(),
+		alt: z.string().max(480).optional(),
 	}),
 ]);
 export type ImageSpec = z.infer<typeof imageSpec>;
@@ -58,7 +58,7 @@ const stateDefinition = z.discriminatedUnion("type", [
 		step: z.number().positive().optional(),
 	}),
 	z.strictObject({ type: z.literal("boolean"), initial: z.boolean() }),
-	z.strictObject({ type: z.literal("text"), initial: z.string().max(120) }),
+	z.strictObject({ type: z.literal("text"), initial: z.string().max(480) }),
 ]);
 export type StateDefinition = z.infer<typeof stateDefinition>;
 const seriesDefinition = z.strictObject({
@@ -96,7 +96,7 @@ export const valueFormats = [
 const valueDisplay = {
 	format: z.enum(valueFormats).optional(),
 	decimals: z.number().int().min(0).max(6).optional(),
-	unit: z.string().min(1).max(20).optional(),
+	unit: z.string().min(1).max(80).optional(),
 };
 
 // --- token colors of diagrams and the icons of feature cards ---
@@ -159,9 +159,9 @@ const exactlyOne =
 // --- diagram elements (coordinates 0–100; numbers may be expressions) ---
 const point = z.tuple([numberOrExpression, numberOrExpression]);
 const steps = z
-	.array(z.number().int().min(0).max(11))
+	.array(z.number().int().min(0).max(47))
 	.min(1)
-	.max(12)
+	.max(48)
 	.optional();
 const elementBase = {
 	color: z.enum(diagramColors).optional(),
@@ -170,7 +170,7 @@ const elementBase = {
 	/** Step numbers at which the element is emphasised. */
 	highlightAt: steps,
 };
-const diagramLabel = z.string().min(1).max(80).optional();
+const diagramLabel = z.string().min(1).max(320).optional();
 export const diagramElement = z.discriminatedUnion("type", [
 	z.strictObject({
 		type: z.literal("shape"),
@@ -187,7 +187,7 @@ export const diagramElement = z.discriminatedUnion("type", [
 	}),
 	z.strictObject({
 		type: z.literal("polygon"),
-		points: z.array(point).min(3).max(24),
+		points: z.array(point).min(3).max(96),
 		rotate: numberOrExpression.optional(),
 		/** Rotation centre; the polygon's bounding-box centre when absent. */
 		origin: point.optional(),
@@ -196,7 +196,7 @@ export const diagramElement = z.discriminatedUnion("type", [
 	}),
 	z.strictObject({
 		type: z.literal("polyline"),
-		points: z.array(point).min(2).max(48),
+		points: z.array(point).min(2).max(192),
 		dashed: z.boolean().optional(),
 		...elementBase,
 	}),
@@ -215,7 +215,7 @@ export const diagramElement = z.discriminatedUnion("type", [
 			type: z.literal("label"),
 			x: numberOrExpression,
 			y: numberOrExpression,
-			text: z.string().min(1).max(80).optional(),
+			text: z.string().min(1).max(320).optional(),
 			/** A text expression shown instead of `text`, e.g. `format(d, "number") + " km"`. */
 			expr: expression.optional(),
 			size: z.enum(["sm", "md", "lg"]).optional(),
@@ -238,10 +238,10 @@ export const diagramElement = z.discriminatedUnion("type", [
 export type DiagramElement = z.infer<typeof diagramElement>;
 
 const chartPoint = z.strictObject({
-	x: z.union([z.number(), z.string().min(1).max(40)]),
+	x: z.union([z.number(), z.string().min(1).max(160)]),
 	y: z.number(),
 });
-const tableCell = z.union([z.string().max(120), z.number()]);
+const tableCell = z.union([z.string().max(480), z.number()]);
 
 /** View schemas added to `viewRegistry`. */
 export const compositionViewRegistry = {
@@ -253,9 +253,9 @@ export const compositionViewRegistry = {
 				view: z.literal("hero"),
 				source: noSource,
 				variant: z.enum(["centered", "split", "background"]).optional(),
-				eyebrow: text(60).optional(),
-				title: text(120),
-				body: z.string().max(400).optional(),
+				eyebrow: text(240).optional(),
+				title: text(480),
+				body: z.string().max(1600).optional(),
 				primaryLabel: buttonLabel.optional(),
 				secondaryLabel: buttonLabel.optional(),
 				image: imageSpec.optional(),
@@ -277,7 +277,7 @@ export const compositionViewRegistry = {
 			title: noTitle,
 			image: imageSpec,
 			aspect,
-			caption: z.string().max(200).optional(),
+			caption: z.string().max(800).optional(),
 			rounded: z.boolean().optional(),
 		}),
 	},
@@ -290,9 +290,9 @@ export const compositionViewRegistry = {
 			variant: cardVariant,
 			image: imageSpec,
 			aspect,
-			eyebrow: text(60).optional(),
-			title: text(120),
-			body: z.string().max(400).optional(),
+			eyebrow: text(240).optional(),
+			title: text(480),
+			body: z.string().max(1600).optional(),
 		}),
 	},
 	"product-card": {
@@ -304,12 +304,12 @@ export const compositionViewRegistry = {
 			title: noTitle,
 			variant: cardVariant,
 			image: imageSpec.optional(),
-			name: text(80),
+			name: text(320),
 			/** Display text, e.g. "¥3,980"; totals are computed with `stat`. */
-			price: text(40),
-			compareAtPrice: text(40).optional(),
+			price: text(160),
+			compareAtPrice: text(160).optional(),
 			badge: z.enum(["new", "sale", "limited", "soldout"]).optional(),
-			body: z.string().max(300).optional(),
+			body: z.string().max(1200).optional(),
 			rating: z.number().min(0).max(5).multipleOf(0.5).optional(),
 		}),
 	},
@@ -320,8 +320,8 @@ export const compositionViewRegistry = {
 			view: z.literal("feature-card"),
 			source: noSource,
 			icon: z.enum(featureIcons).optional(),
-			title: text(120),
-			body: z.string().max(400).optional(),
+			title: text(480),
+			body: z.string().max(1600).optional(),
 		}),
 	},
 	testimonial: {
@@ -331,9 +331,9 @@ export const compositionViewRegistry = {
 			view: z.literal("testimonial"),
 			source: noSource,
 			title: noTitle,
-			quote: text(400),
-			name: text(60),
-			role: text(80).optional(),
+			quote: text(1600),
+			name: text(240),
+			role: text(320).optional(),
 			avatar: imageSpec.optional(),
 		}),
 	},
@@ -344,11 +344,11 @@ export const compositionViewRegistry = {
 			view: z.literal("pricing-card"),
 			source: noSource,
 			title: noTitle,
-			plan: text(60),
-			price: text(40),
-			period: text(20).optional(),
-			body: z.string().max(200).optional(),
-			features: z.array(text(120)).min(1).max(10),
+			plan: text(240),
+			price: text(160),
+			period: text(80).optional(),
+			body: z.string().max(800).optional(),
+			features: z.array(text(480)).min(1).max(40),
 			ctaLabel: buttonLabel.optional(),
 			highlighted: z.boolean().optional(),
 		}),
@@ -361,8 +361,8 @@ export const compositionViewRegistry = {
 				view: z.literal("cta-banner"),
 				source: noSource,
 				variant: z.enum(["accent", "subtle", "image"]).optional(),
-				title: text(120),
-				body: z.string().max(300).optional(),
+				title: text(480),
+				body: z.string().max(1200).optional(),
 				primaryLabel: buttonLabel.optional(),
 				secondaryLabel: buttonLabel.optional(),
 				image: imageSpec.optional(),
@@ -382,22 +382,22 @@ export const compositionViewRegistry = {
 			.strictObject({
 				view: z.literal("comparison-table"),
 				source: noSource,
-				title: text(120).optional(),
+				title: text(480).optional(),
 				/** Headers of the value columns; the first column holds the row labels. */
-				columns: z.array(text(60)).min(1).max(6),
+				columns: z.array(text(240)).min(1).max(12),
 				rows: z
 					.array(
 						z.strictObject({
-							label: text(80),
+							label: text(320),
 							values: z
-								.array(z.union([z.string().max(80), z.boolean()]))
+								.array(z.union([z.string().max(320), z.boolean()]))
 								.min(1)
-								.max(6),
+								.max(12),
 						}),
 					)
 					.min(1)
-					.max(20),
-				highlightColumn: z.number().int().min(0).max(5).optional(),
+					.max(80),
+				highlightColumn: z.number().int().min(0).max(11).optional(),
 			})
 			.superRefine((r, ctx) => {
 				if (r.rows.some((row) => row.values.length !== r.columns.length))
@@ -421,11 +421,11 @@ export const compositionViewRegistry = {
 		schema: z.strictObject({
 			view: z.literal("faq"),
 			source: noSource,
-			title: text(120).optional(),
+			title: text(480).optional(),
 			items: z
-				.array(z.strictObject({ question: text(200), answer: text(1000) }))
+				.array(z.strictObject({ question: text(800), answer: text(4000) }))
 				.min(1)
-				.max(12),
+				.max(48),
 		}),
 	},
 	timeline: {
@@ -434,17 +434,17 @@ export const compositionViewRegistry = {
 		schema: z.strictObject({
 			view: z.literal("timeline"),
 			source: noSource,
-			title: text(120).optional(),
+			title: text(480).optional(),
 			items: z
 				.array(
 					z.strictObject({
-						label: text(40).optional(),
-						title: text(120),
-						body: z.string().max(400).optional(),
+						label: text(160).optional(),
+						title: text(480),
+						body: z.string().max(1600).optional(),
 					}),
 				)
 				.min(1)
-				.max(12),
+				.max(48),
 		}),
 	},
 	stat: {
@@ -455,11 +455,11 @@ export const compositionViewRegistry = {
 				view: z.literal("stat"),
 				source: noSource,
 				title: noTitle,
-				label: text(60),
-				value: text(60).optional(),
+				label: text(240),
+				value: text(240).optional(),
 				expr: expression.optional(),
 				...valueDisplay,
-				caption: z.string().max(200).optional(),
+				caption: z.string().max(800).optional(),
 				trend: z.enum(["up", "down", "flat"]).optional(),
 			})
 			.superRefine(exactlyOne(["value", "expr"], "stat needs value or expr")),
@@ -472,8 +472,8 @@ export const compositionViewRegistry = {
 			source: noSource,
 			title: noTitle,
 			bind: modelName,
-			label: text(60),
-			unit: text(20).optional(),
+			label: text(240),
+			unit: text(80).optional(),
 			min: z.number().optional(),
 			max: z.number().optional(),
 			step: z.number().positive().optional(),
@@ -487,7 +487,7 @@ export const compositionViewRegistry = {
 			source: noSource,
 			title: noTitle,
 			bind: modelName,
-			label: text(60),
+			label: text(240),
 			min: z.number().optional(),
 			max: z.number().optional(),
 			step: z.number().positive().optional(),
@@ -502,8 +502,8 @@ export const compositionViewRegistry = {
 			source: noSource,
 			title: noTitle,
 			bind: modelName,
-			label: text(120).optional(),
-			options: z.array(text(80)).min(2).max(8),
+			label: text(480).optional(),
+			options: z.array(text(320)).min(2).max(24),
 			display: z.enum(["buttons", "cards"]).optional(),
 		}),
 	},
@@ -515,7 +515,7 @@ export const compositionViewRegistry = {
 			source: noSource,
 			title: noTitle,
 			bind: modelName,
-			label: text(60),
+			label: text(240),
 		}),
 	},
 	chart: {
@@ -525,26 +525,26 @@ export const compositionViewRegistry = {
 			view: z.literal("chart"),
 			source: noSource,
 			kind: z.enum(["bar", "line", "area", "pie"]),
-			title: text(120).optional(),
+			title: text(480).optional(),
 			series: z
 				.array(
 					z
 						.strictObject({
-							name: text(40),
+							name: text(160),
 							/** A computed `series` of the model. */
 							from: modelName.optional(),
-							points: z.array(chartPoint).min(1).max(120).optional(),
+							points: z.array(chartPoint).min(1).max(600).optional(),
 						})
 						.superRefine(
 							exactlyOne(["from", "points"], "series needs from or points"),
 						),
 				)
 				.min(1)
-				.max(3),
-			xLabel: text(40).optional(),
-			yLabel: text(40).optional(),
+				.max(8),
+			xLabel: text(160).optional(),
+			yLabel: text(160).optional(),
 			...valueDisplay,
-			note: z.string().max(200).optional(),
+			note: z.string().max(800).optional(),
 		}),
 	},
 	"data-table": {
@@ -554,22 +554,22 @@ export const compositionViewRegistry = {
 			.strictObject({
 				view: z.literal("data-table"),
 				source: noSource,
-				title: text(120).optional(),
+				title: text(480).optional(),
 				/** With `series`, each column's `expr` is evaluated per point with `x` and `y`. */
 				columns: z
 					.array(
 						z.strictObject({
-							header: text(60),
+							header: text(240),
 							expr: expression.optional(),
 							...valueDisplay,
 						}),
 					)
 					.min(1)
-					.max(6),
+					.max(12),
 				rows: z
-					.array(z.array(tableCell).min(1).max(6))
+					.array(z.array(tableCell).min(1).max(12))
 					.min(1)
-					.max(50)
+					.max(200)
 					.optional(),
 				series: modelName.optional(),
 			})
@@ -597,13 +597,13 @@ export const compositionViewRegistry = {
 			view: z.literal("formula"),
 			source: noSource,
 			title: noTitle,
-			label: text(60).optional(),
+			label: text(240).optional(),
 			/** A LaTeX subset rendered by KaTeX without trust (no links, HTML or macros that fetch). */
-			tex: text(500),
+			tex: text(2000),
 			/** Evaluated with the current state and shown after the formula as "= value". */
 			expr: expression.optional(),
 			...valueDisplay,
-			caption: z.string().max(200).optional(),
+			caption: z.string().max(800).optional(),
 		}),
 	},
 	calculator: {
@@ -613,7 +613,7 @@ export const compositionViewRegistry = {
 			view: z.literal("calculator"),
 			source: noSource,
 			title: noTitle,
-			label: text(60).optional(),
+			label: text(240).optional(),
 			mode: z.enum(["basic", "scientific"]).optional(),
 			/** An expression typed in beforehand; the user presses "=" to work it out. */
 			preset: expression.optional(),
@@ -627,12 +627,12 @@ export const compositionViewRegistry = {
 		schema: z.strictObject({
 			view: z.literal("diagram"),
 			source: noSource,
-			title: text(120).optional(),
+			title: text(480).optional(),
 			aspect: z.enum(["landscape", "square", "wide"]).optional(),
 			/** A number state holding the current step (shared with a `stepper`). */
 			stepBind: modelName.optional(),
-			elements: z.array(diagramElement).min(1).max(80),
-			caption: z.string().max(200).optional(),
+			elements: z.array(diagramElement).min(1).max(240),
+			caption: z.string().max(800).optional(),
 		}),
 	},
 	stepper: {
@@ -641,18 +641,18 @@ export const compositionViewRegistry = {
 		schema: z.strictObject({
 			view: z.literal("stepper"),
 			source: noSource,
-			title: text(120).optional(),
+			title: text(480).optional(),
 			/** A number state to share the current step with; kept inside the part when absent. */
 			bind: modelName.optional(),
 			steps: z
 				.array(
 					z.strictObject({
-						title: text(80),
-						body: z.string().max(600).optional(),
+						title: text(320),
+						body: z.string().max(2400).optional(),
 					}),
 				)
 				.min(2)
-				.max(12),
+				.max(48),
 		}),
 	},
 } as const;
