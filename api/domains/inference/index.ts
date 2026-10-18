@@ -42,3 +42,35 @@ export {
 	type RenderedContext,
 } from "./contracts";
 export { delegatedTaskRules } from "./service/delegated-task-rules";
+export {
+	actionFieldViolation,
+	agentControl,
+	agentSystemMessage,
+	rejectedOutputMessage,
+	retriesFor,
+	toolResultMessage,
+	type ActionFields,
+	type AgentTool,
+} from "./contracts/agent-core";
+export {
+	parseTaskAction,
+	parseTaskState,
+	recordOutput,
+	recordToolResult,
+	resolveTaskPolicy,
+	rewriteReferences,
+	startTask,
+	taskCallsLeft,
+	taskCanCall,
+	taskControl,
+	taskMessages,
+	taskViolations,
+	type ReferenceKind,
+	type TaskAction,
+	type TaskFailureCode,
+	type TaskPolicy,
+	type TaskState,
+	type TaskStep,
+	type TaskToolResult,
+	type TaskViolation,
+} from "./contracts/agent-task";

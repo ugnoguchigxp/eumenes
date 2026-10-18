@@ -1,5 +1,6 @@
 import type { Database } from "bun:sqlite";
 import { z } from "zod";
+import { retriesFor } from "../../inference";
 import type { SpecialistDocument, SpecialistSet } from "../contracts";
 
 /**
@@ -30,7 +31,7 @@ export function agentPolicy(set: SpecialistSet): AgentPolicy {
 	const retries = { ...DEFAULTS.retries, ...set.agent.retries };
 	return {
 		maxModelCalls: set.agent.maxModelCalls ?? DEFAULTS.maxModelCalls,
-		retriesOf: (tool) => retries[tool] ?? retries.default ?? 1,
+		retriesOf: (tool) => retriesFor(retries, tool),
 		recentTurns: set.agent.recentTurns ?? DEFAULTS.recentTurns,
 		recentBytes: set.agent.recentBytes ?? DEFAULTS.recentBytes,
 		inlineBytes: set.agent.document?.inlineBytes ?? DEFAULTS.inlineBytes,

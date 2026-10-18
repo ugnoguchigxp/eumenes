@@ -1,6 +1,8 @@
 import { z } from "zod";
 import type { GoogleAccountView } from "../api/domains/google-accounts/contracts";
 import { callJson, json, type Transport } from "./transport";
+import { photosView } from "../api/domains/google-accounts/contracts";
+import { imageImportView } from "../api/domains/image/contracts";
 
 const googleAccountViewSchema: z.ZodType<GoogleAccountView> = z.object({
 	revision: z.number().int().nonnegative(),
@@ -15,6 +17,7 @@ const googleAccountViewSchema: z.ZodType<GoogleAccountView> = z.object({
 		})
 		.optional(),
 	pending: z.boolean(),
+	photosAuthorized: z.boolean().optional(),
 	result: z.enum(["connected", "cancelled", "failed", "expired"]).optional(),
 });
 const connectSchema = z.object({ url: z.string() });
@@ -31,6 +34,50 @@ export function googleAccountsClient(transport: Transport) {
 			json({ expectedRevision }),
 		);
 	return {
+		connectGooglePhotos: (expectedRevision: number) =>
+			callJson(
+				transport,
+				connectSchema,
+				"/api/google-accounts/connect-photos",
+				json({ expectedRevision }),
+			),
+		googlePhotos: (signal?: AbortSignal) =>
+			callJson(
+				transport,
+				photosView.nullable(),
+				"/api/google-accounts/photos",
+				{ signal },
+			),
+		startGooglePhotos: (signal?: AbortSignal) =>
+			callJson(transport, photosView, "/api/google-accounts/photos", {
+				method: "POST",
+				signal,
+			}),
+		readGooglePhotos: (handle: string, signal?: AbortSignal) =>
+			callJson(
+				transport,
+				photosView,
+				`/api/google-accounts/photos/${encodeURIComponent(handle)}`,
+				{ signal },
+			),
+		cancelGooglePhotos: async (handle: string) => {
+			await transport.call(
+				`/api/google-accounts/photos/${encodeURIComponent(handle)}`,
+				{ method: "DELETE" },
+			);
+		},
+		importGooglePhoto: (
+			requestId: string,
+			handle: string,
+			itemId: string,
+			signal?: AbortSignal,
+		) =>
+			callJson(
+				transport,
+				imageImportView,
+				`/api/images/imports/${encodeURIComponent(requestId)}/google-photo`,
+				{ ...json({ handle, itemId }), signal },
+			),
 		googleAccount: (): Promise<GoogleAccountView> =>
 			callJson(transport, googleAccountViewSchema, "/api/google-accounts"),
 		connectGoogleAccount: (

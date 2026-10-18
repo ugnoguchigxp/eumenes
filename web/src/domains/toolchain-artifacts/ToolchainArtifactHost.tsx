@@ -6,6 +6,7 @@ import type {
 	Snapshot,
 } from "@eumenes/artifact-ui/contracts";
 import { Button } from "@eumenes/design-system";
+import { GooglePhotoPicker } from "../../media/GooglePhotoPicker";
 import { LightAvatarMotionLab } from "../../components/domains/conversation/LightAvatarMotionLab";
 import { model3dApiFor } from "../model3d/api";
 import { Model3dViewer } from "../model3d/Model3dViewer";
@@ -66,6 +67,9 @@ const noop = () => {};
 /** Views drawn by this host; the 3D lab and the model viewer load their renderers when shown. */
 function hostViewsFor(client: EumenesClient): ArtifactRuntime["hostViews"] {
 	return {
+		"image-picker-photos": ({ onSelect }) => (
+			<GooglePhotoPicker client={client} onSelect={onSelect} />
+		),
 		"avatar-motion-lab": () => <LightAvatarMotionLab />,
 		"model3d-viewer": ({ assetId }) => (
 			<Model3dViewer assetId={assetId} api={model3dApiFor(client)} />

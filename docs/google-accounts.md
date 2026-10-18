@@ -1,6 +1,6 @@
 # Googleアカウント連携
 
-設定アーティファクトの「Google連携」で、Googleアカウントを1件接続する。基本プロフィール（名前・画像）とメールアドレスだけを取得する。Calendar・Gmailの権限、同期、通知、AI操作は今回の対象に含めない。別アカウントへの切替は、現在の連携を解除してから接続する。
+設定アーティファクトの「Google連携」で、Googleアカウントを1件接続する。基本連携ではプロフィール（名前・画像）とメールアドレスを取得する。Googleフォトの写真選択は、使う時に別途許可を求める。Calendar・Gmailの権限、同期、通知、AI操作は今回の対象に含めない。別アカウントへの切替は、現在の連携を解除してから接続する。
 
 ## 利用者の操作
 
@@ -34,7 +34,7 @@ Webフロントは `/oauth/google/callback` と `/oauth/google/result` を同じ
 ## 接続状態と保存
 
 - 未接続・接続済み・再接続が必要・解除中を表示する。通常の設定の「保存」操作は不要。
-- 許可するscopeは `openid email profile` のみ。追加のサービス権限は要求しない。
+- 基本scopeは `openid email profile`。写真選択時だけ `photospicker.mediaitems.readonly` を追加要求し、実際に付与されたscopeを保存・検査する。
 - IDトークンの署名・発行元・宛先・有効期限をGoogle公式ライブラリで検証し、nonce、メール確認済み状態、安定したアカウントID（`sub`）も検査する。再接続では同じ`sub`を必要とする。
 - 認証要求は10分で失効。state、PKCE、認証要求ごとのHttpOnly/SameSite=Lax Cookieでブラウザと認証応答を対応付け、一度しか処理しない。取消・解除・新規認証後に古い結果が届いても採用しない。
 - トークンと保留中の認証情報はsettingsの既存マスターキーから用途別に派生した鍵でAES-256-GCM暗号化し、専用テーブルに保存する。Webへの返却や共通操作台帳にはトークン・認証コードを含めない。DBと既存キーのバックアップは一組で管理する。
@@ -44,18 +44,22 @@ Webフロントは `/oauth/google/callback` と `/oauth/google/result` を同じ
 
 ## Googleフォトの対応状況と必要な作業
 
-現在の連携は基本プロフィール用であり、Googleフォトの写真選択は未実装。既存の接続をやり直しても写真を選べるようにはならない。画像選択画面のGoogleフォトタブも、この未実装状態を表示する。
+写真選択の追加同意、Photos Picker、選択写真の取得、共通WebP変換とLARMへの取込を実装済み。基本連携済みでも、写真選択を許可するまでは写真を取得しない。実Googleアカウントでの受入は未実施。
 
-開発・運営側で必要な作業は次の順序となる。利用者ごとに新しいOAuthクライアントを作成する方式へは変更しない。
+配布元・開発運営側で、既存OAuthクライアントのGoogle Cloudプロジェクトで **Google Photos Picker API** を有効にする。「Google Picker API」とは異なる。同意画面のデータアクセスへ `https://www.googleapis.com/auth/photospicker.mediaitems.readonly` を追加し、テスト公開なら本人をテストユーザーに登録する。利用者ごとに新しいOAuthクライアントを作る方式へは変更しない。
 
-1. 既存OAuthクライアントが属するGoogle Cloudプロジェクトで **Google Photos Picker API** を有効にする。「Google Picker API」は別物なので選ばない。同意画面のデータアクセスへ `https://www.googleapis.com/auth/photospicker.mediaitems.readonly` を追加し、テスト中なら使用するGoogleアカウントをテストユーザーに登録する。
-2. Eumenesの認証処理を拡張する。現在は基本scope以外を拒否するため、Cloud側の設定だけでは利用できない。Photosを使う時の追加同意、許可済みscopeの保存と検証、同一アカウント確認、取消・解除後の応答排除を実装する。既存のトークンを写真アクセス許可済みとみなさない。
-3. Photos Pickerのセッション作成、公式`pickerUri`を通常のブラウザで開く操作、選択完了の照会、選択した写真の取得・セッションの片付けを実装する。アプリ内に全写真を一覧取得する方式ではなく、Google側の画面で共有する写真を選ぶ。認証情報はbackend内に留める。
-4. 選択した写真を3Dへ渡すため、LARMの画像取込APIを公開・実装し、発行された保存画像IDを既存3D生成へ渡す。[取込API案](../spec/reference/larm-image-import-v1-proposal/README.txt)は未公開契約案であり、現時点で呼び出さない。
+利用者の操作は次の順序。
 
-実装後の利用者の操作は「Googleフォトタブ → Googleフォトで選ぶ → 初回の写真選択アクセスを許可 → 写真を選択して完了 → Eumenesでこの画像を使う」とする。この流れは予定であり、現在の画面には写真選択を開始する実装はない。
+1. 画像選択画面の「Googleフォト」タブで、初回は「写真選択を許可」。通常ブラウザのGoogle画面で、基本連携と同じアカウントの写真アクセスを許可する。
+2. 「Googleフォトで選ぶ」→「Googleフォトを開いて写真を選ぶ」でGoogle公式Pickerへ移り、共有する静止画を1枚選んで完了する。
+3. Eumenesへ戻り、表示された共通Gridの写真を選択して「この写真を取り込む」。写真をEumenes backendで取得・検証・WebP化し、LARMへ保存する。
+4. 共通画像選択の「この画像を使う」で確定し、元フォームの生成ボタンで3D生成を開始する。
 
-Google Cloudでの有効化、実アカウントへの追加権限付与、Photosセッション作成は今回行っていない。公式の[アプリ設定](https://developers.google.com/photos/overview/configure-your-app)と[Pickerの処理の流れ](https://developers.google.com/photos/picker/guides/get-started-picker)を根拠に整理した。
+全写真の一覧同期はしない。Google tokenと写真取得用URLは暗号化したbackend state内に留め、Webへは同一originのthumbnail APIを返す。照会はGoogleのpollingConfigに従い、期限・連携解除・選択取消後の応答は採用しない。取り込み完了・明示取消でGoogle sessionを片付ける。元のGoogle写真を削除しない。Googleの同意やCloud設定はこの実装作業で自動変更していない。
+
+公開操作は `/api/google-accounts/connect-photos` と `/api/google-accounts/photos`（GET状態、POST開始）、`/photos/:handle`（GET照会、DELETE取消）、`/photos/:handle/items/:id/content`（認証済みpreview）。取込はapplication層でgoogle-accountsの公開取得操作とimageの公開取込操作を接続する。任意URLを受け付けない。
+
+公式根拠: [アプリ設定](https://developers.google.com/photos/overview/configure-your-app)、[Pickerセッション](https://developers.google.com/photos/picker/reference/rest/v1/sessions)、[選択画像の取得](https://developers.google.com/photos/picker/guides/media-items)。
 
 ## 基本プロフィール連携の実装と確認
 

@@ -1,6 +1,11 @@
 import { z } from "zod";
 import { systemContext } from "../../../infrastructure/system-context";
-import { controlInstructions, type ControlContract } from "../../inference";
+import {
+	actionFieldViolation,
+	agentControl,
+	rejectedOutputMessage,
+	type ControlContract,
+} from "../../inference";
 import type { SpecialistSet } from "../contracts";
 import {
 	isBriefSpokenReply,
@@ -91,10 +96,10 @@ export function parseSpecialistAction(value: unknown): SpecialistAction | null {
 	const parsed = outputShape.safeParse(value);
 	if (!parsed.success) return null;
 	const out = parsed.data;
-	const fields = ACTION_FIELDS[out.action];
 	if (
-		!fields.needs.every((field) => given(out, field)) ||
-		fields.refuses.some((field) => given(out, field))
+		actionFieldViolation(out.action, ACTION_FIELDS[out.action], (field) =>
+			given(out, field),
+		)
 	)
 		return null;
 	const text = out.text || undefined;
@@ -133,12 +138,12 @@ export function specialistViolations(value: unknown): SpecialistViolation[] {
 	const parsed = outputShape.safeParse(value);
 	if (parsed.success) {
 		const out = parsed.data;
-		const fields = ACTION_FIELDS[out.action];
-		const missing = fields.needs.filter((field) => !given(out, field));
-		const unexpected = fields.refuses.filter((field) => given(out, field));
-		return missing.length || unexpected.length
-			? [{ action: out.action, missing, unexpected }]
-			: [];
+		const found = actionFieldViolation(
+			out.action,
+			ACTION_FIELDS[out.action],
+			(field) => given(out, field),
+		);
+		return found ? [found] : [];
 	}
 	const found = parsed.error.issues.map((issue) => {
 		const path = issue.path.map(String).join(".");
@@ -197,60 +202,26 @@ export function specialistControl(
 		inputSchema: unknown;
 	}> = [],
 ): ControlContract {
-	const tools = [
-		...set.tools.map((tool) => ({
-			id: tool.id,
-			description: tool.summary,
-			inputSchema: tool.schema,
-		})),
-		...hostTools,
-	];
-	return {
-		instructions:
-			set.profile +
-			"\n\n" +
-			set.skills.join("\n\n") +
-			"\n\n" +
-			RULES +
-			"\nTOOLS=" +
-			JSON.stringify(tools),
+	return agentControl({
+		profile: set.profile,
+		skills: set.skills,
+		rules: RULES,
+		tools: [
+			...set.tools.map((tool) => ({
+				id: tool.id,
+				description: tool.summary,
+				inputSchema: tool.schema,
+			})),
+			...hostTools,
+		],
 		outputSchema: z.toJSONSchema(outputShape),
-	};
+	});
 }
-export const specialistSystemMessage = (control: ControlContract) => ({
-	role: "system" as const,
-	content: controlInstructions(control),
-});
 
-/** The rejected output kept short, with where it broke the contract, as data; with the instruction to answer again. */
-export function correctionMessage(
+/** The rejected output as data with where it broke the contract, and the instruction to answer again. */
+export const correctionMessage = (
 	raw: string,
 	violations: SpecialistViolation[],
 	/** Model calls the turn has left after this one. */
 	callsLeft: number,
-) {
-	return {
-		role: "user" as const,
-		content:
-			CORRECTION +
-			"\nREJECTED_OUTPUT=" +
-			JSON.stringify({
-				preview: raw.slice(0, 2000),
-				issues: violations,
-				callsLeft,
-			}),
-	};
-}
-
-/** The tool's result (or the host's refusal code) as the next input of the same turn. */
-export function toolResultMessage(result: unknown) {
-	const json = JSON.stringify(result);
-	return {
-		role: "user" as const,
-		content:
-			"TOOL_RESULT=" +
-			(json.length > 96_000
-				? JSON.stringify({ truncated: true, preview: json.slice(0, 96_000) })
-				: json),
-	};
-}
+) => rejectedOutputMessage(CORRECTION, raw, violations, callsLeft);

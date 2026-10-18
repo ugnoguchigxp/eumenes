@@ -16,6 +16,7 @@ type Attempt = {
 	provider: string;
 	epoch: string;
 	consumed?: boolean;
+	photos?: boolean;
 };
 type State = {
 	viewRevision?: number;
@@ -28,6 +29,7 @@ type State = {
 	result?: GoogleAccountView["result"];
 	retryAt?: number;
 	revocations?: string[];
+	photos?: import("./photos").PhotoSession;
 };
 export const empty = (): State => ({ epoch: random(), status: "disconnected" });
 

@@ -213,6 +213,7 @@ export function createToolchainRouting(
 					packageRevisionId: set.package.revisionId,
 					questions: doc.questions ?? [],
 					tools: boundTools(db, set, doc.tools),
+					...(doc.agent ? { agentTurn: doc.agent.turn } : {}),
 				};
 			}
 			return {

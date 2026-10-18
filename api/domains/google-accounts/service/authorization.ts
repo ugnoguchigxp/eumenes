@@ -19,7 +19,7 @@ export function createAuthorization(
 		void operation.then(remove, remove);
 		return operation;
 	}
-	async function begin(expectedRevision: number) {
+	async function begin(expectedRevision: number, photos = false) {
 		if (!provider) throw new GoogleAccountError("unconfigured");
 		const state = random(),
 			browser = random(),
@@ -30,6 +30,7 @@ export function createAuthorization(
 			nonce,
 			verifier,
 			challenge: digest(verifier),
+			photos,
 		});
 		await store.write((db) => {
 			const saved = load(db);
@@ -51,6 +52,7 @@ export function createAuthorization(
 					expires: now() + 600_000,
 					provider: provider.identity,
 					epoch,
+					photos,
 				},
 			});
 		});
@@ -94,6 +96,7 @@ export function createAuthorization(
 				input.code,
 				attempt.verifier,
 				attempt.nonce,
+				attempt.photos,
 			);
 			const connected = await store.write((db) => {
 				const saved = load(db),

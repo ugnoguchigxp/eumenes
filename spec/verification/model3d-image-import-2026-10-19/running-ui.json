@@ -1,0 +1,30 @@
+{
+  "checkedAt": "2026-10-18T22:01:04.736Z",
+  "route": "Brave native OS file chooser -> ArtifactRuntime.uploadFile -> running Eumenes -> production LARM",
+  "source": {
+    "file": "MW1193-2_001.jpg",
+    "bytes": 65865,
+    "width": 600,
+    "height": 600
+  },
+  "artifact": {
+    "id": "image_10dacf9a5e4d4171beed566f04e74067",
+    "format": "webp",
+    "mimeType": "image/webp",
+    "width": 600,
+    "height": 600,
+    "bytes": 16556,
+    "hasAlpha": false
+  },
+  "contentVerified": true,
+  "libraryDisplayed": true,
+  "embeddedPreviewDisplayed": true,
+  "confirmedFor3d": true,
+  "generationStarted": false,
+  "automaticChooser": {
+    "previewNaturalWidth": 0,
+    "receiptNotAdmitted": true,
+    "nativeChooserSucceeded": true
+  },
+  "serverRestartedBy": "user"
+}

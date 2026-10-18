@@ -2,12 +2,14 @@ import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import {
 	GoogleAccountError,
+	PHOTOS_SCOPE,
 	type GoogleAccountView,
 	type GoogleProvider,
 } from "../contracts";
 import { random } from "./secrets";
 import { createPersistence, empty } from "./state";
 import { createAuthorization } from "./authorization";
+import { createPhotos } from "./photos";
 export function createGoogleAccounts(
 	store: SqliteStore,
 	options: {
@@ -15,6 +17,7 @@ export function createGoogleAccounts(
 		provider?: GoogleProvider;
 		now?: () => number;
 		secureCookies?: boolean;
+		fetch?: typeof fetch;
 	},
 ) {
 	const now = options.now ?? Date.now;
@@ -39,6 +42,8 @@ export function createGoogleAccounts(
 			status,
 			...(s.profile ? { profile: s.profile } : {}),
 			pending: !!s.attempt && s.attempt.expires > now(),
+			photosAuthorized:
+				status === "connected" && !!s.tokens?.scopes?.includes(PHOTOS_SCOPE),
 			result:
 				s.attempt && s.attempt.expires <= now()
 					? "expired"
@@ -139,6 +144,7 @@ export function createGoogleAccounts(
 			)
 				return;
 			const tokens = await provider.refresh(s.tokens.refresh);
+			tokens.scopes ??= s.tokens.scopes;
 			await store.write((db) => {
 				const current = load(db);
 				if (current.revision === saved.revision)
@@ -170,6 +176,14 @@ export function createGoogleAccounts(
 		}
 	}
 	return {
+		photos: createPhotos({
+			store,
+			persistence,
+			provider,
+			now,
+			maintain,
+			fetch: options.fetch,
+		}),
 		secureCookies: options.secureCookies ?? false,
 		viewInTransaction,
 		view: () => store.read(viewInTransaction),

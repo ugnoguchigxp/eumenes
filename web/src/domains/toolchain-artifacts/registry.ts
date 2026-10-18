@@ -76,7 +76,8 @@ export type AdapterState = {
 		source: string,
 		file: File,
 		context?: Readonly<Record<string, string>>,
-	): Promise<Receipt & { value?: string }>;
+		signal?: AbortSignal,
+	): Promise<Receipt & { value?: string; canRetry?: boolean }>;
 	/** Live PTY sessions of a terminal source (stream, ordered input, resize). */
 	openTerminal?(source: string, sessionId: string): TerminalConnection;
 	/** The target the host sends with an event of this source; undefined when it has none. */

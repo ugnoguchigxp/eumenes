@@ -1,4 +1,6 @@
 import { createImageLibrary } from "./image-library";
+import { createImageImports } from "./image-import";
+import { sha256Hex } from "../../../infrastructure/digest";
 import { createMeshLibrary } from "./mesh-library";
 import { gzipFetch } from "./gzip-fetch";
 import { createMusicLibrary } from "./music-library";
@@ -636,6 +638,11 @@ export function createLarmPlayground(config: {
 	return {
 		library: createMusicLibrary(control, publicUrl),
 		images: createImageLibrary(control, publicUrl),
+		imageImports: createImageImports(
+			control,
+			publicUrl,
+			sha256Hex(`${configuredBase?.origin ?? ""}\n${config.token ?? ""}`),
+		),
 		meshes: createMeshLibrary(control, publicUrl),
 		embed,
 		catalog,

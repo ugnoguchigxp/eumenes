@@ -18,7 +18,8 @@ export type ArtifactRuntime = {
 		file: File,
 		/** Domain-defined facts about the file (e.g. how a still was taken); never saved in JSON. */
 		context?: Readonly<Record<string, string>>,
-	) => Promise<Receipt & { value?: string }>;
+		signal?: AbortSignal,
+	) => Promise<Receipt & { value?: string; canRetry?: boolean }>;
 	dispatch: (event: ArtifactEvent) => Promise<Receipt>;
 	/** Re-read this screen's registered sources after a failed read. */
 	refresh?: () => void;
@@ -39,6 +40,13 @@ export type ArtifactRuntime = {
 	 * package never loads their renderer; without an entry the view says it is unavailable.
 	 */
 	hostViews?: {
+		"image-picker-photos"?: (props: {
+			onSelect: (image: {
+				id: string;
+				title: string;
+				thumbnailUrl?: string;
+			}) => void;
+		}) => ReactNode;
 		"avatar-motion-lab"?: () => ReactNode;
 		"model3d-viewer"?: (props: { assetId: string }) => ReactNode;
 		"model3d-thumbnail"?: (props: { assetId: string }) => ReactNode;

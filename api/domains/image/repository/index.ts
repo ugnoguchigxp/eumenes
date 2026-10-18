@@ -14,6 +14,15 @@ CREATE TABLE image_generations (
 CREATE INDEX image_conversation ON image_generations(conversation_id);
 `,
 	},
+	{
+		id: "image/0002-imports",
+		after: ["image/0001-init"],
+		sql: `CREATE TABLE image_imports (
+ request_id TEXT PRIMARY KEY, principal TEXT NOT NULL, connection TEXT NOT NULL,
+ original_digest TEXT NOT NULL, bytes BLOB, attempted INTEGER NOT NULL DEFAULT 0,
+ view_json TEXT NOT NULL, expires_at INTEGER NOT NULL
+);`,
+	},
 ];
 export type Row = {
 	id: string;

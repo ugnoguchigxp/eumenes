@@ -104,3 +104,32 @@ DB・設定・秘密をコピーせず、新規ブランチ・別チャットへ
 ・Google CloudでのPhotos Picker API有効化、scope追加、アプリ側の追加同意・選択処理、LARM取込の実装をdocs/google-accounts.mdへ記載。
 ・vite.config.tsのserver.hmr=false／watch=nullにより稼働中Webはソース更新を監視しない。反映には再起動が必要だが、AGENTS.mdの明示許可要件に従って勝手に再起動しない。
 ・部分→結合→サーバー不要ブラウザfixtureを検証し、ビルド後の画面を提示してから実サーバー再起動の許可を確認する。実Googleの設定・権限変更は対象外。
+・今回の結果：共有部品7件、参照ボタンとPNG確認・Google/LARMタブ・下書き保持のブラウザfixture1件成功。対象lint・整形・git diff --check成功。
+・model3d/image domain verifyは全step成功後、並行編集によるSource changed during verificationでinvalidated。再試行はせず各step成功と総合無効を区別。report：verification-reports/runs/2026-10-18T13-04-05-737Z-a02c91a2-b6c3-4b7f-81df-03f9504e0508/report.json
+・ビルド済み検証画面：spec/verification/model3d-grid-image-picker-2026-10-18/image-picker-reference-fixture.png。実サーバーは再起動許可待ち。
+
+LARMへの画像取込API実装依頼（2026-10-18）
+・利用者による再起動・参照ボタン反映済みの報告を確認。こちらでサーバー操作は行っていない。
+・利用者が「新APIが要るならリクエスト」と明示許可。直後の指示で汎用ファイルAPIを撤回し、画像専用へ限定。
+・送付先は既存3D生成実装とcatalog整備を担当した「AMD機向け3D生成OSSを評価」、threadId 01a14e06-ced7-7a60-a2ec-b76c9151cfad、gnosis。send_message_to_thread成功、送信後のwait_threads即時確認でactive/inProgressを確認。
+・現行OpenAPIに取込POSTが無いことを再確認。取込→既存一覧・content→同一IDで3D生成を必須条件として依頼。
+・API案の上限を3Dのcatalog条件へ照合し、各辺4096px・保存後20 MiBへ訂正。受付16 MiB案、回転補正・メタデータ除去・alpha維持、再送・照会・削除後の再作成防止を提示。パスや状態形式は既存LARM機構に合わせた正式契約の回答を求めた。
+・Eumenesの未公開API呼出しは追加せず、既存uploadFile bridge→backend→画像取込→画像ID→3D生成の接続は正式契約回答待ち。
+・今回の検証はOpenAPI案のJSON/19ローカル参照/3D上限整合、差分点検。検証スクリプトのschema名を実際のImportedImageへ修正して成功。製品コードの変更が無いためdomain verifyとブラウザ試験は省略。API公開・実取込・実3D生成の受入は未実施。
+
+WebP品質75の共通化（2026-10-18）
+・利用者の「既存リソースを共通化」に従い、browserの既存encoderをinfrastructure/webpへ抽出してbrowserとimageのアップロード準備で利用。長辺2000px、非可逆品質75、alpha保持。詳細と検証結果はupload-webp-preparation.txtへ記録。
+・対象固定試験88件、対象型7ファイル、ブラウザ画像選択1件成功。総合verifyは並行browser作業のサイズ/型問題で停止し、担当外を修正していない。LARM実アップロードは正式契約/公開確認待ち。
+
+LARM本番画像取込の接続（2026-10-19）
+・利用者の確定契約と本番OpenAPIを正本として実装。旧提案は履歴と明示し、spec/reference/larm-image-import-v1へ本番schema抜粋を保存。
+・共通WebP処理→永続UUID/bytes→LARM receipt→共有画像一覧→明示選択→既存3D IDを接続。
+・Google Photos追加同意/実付与scope/公式Picker/選択写真取得と同じ取込も実装・fixture済み。
+・本番LARMの3case実送信成功。利用者添付画像、透過2000px、response loss、404後同bytes再送、削除後非復活を確認。実3Dの自動開始はしない。
+・domain verify各step成功、総合は並行ソース変更でinvalidated。追加の型・lint・部品・Chromium試験成功。詳細：spec/verification/model3d-image-import-2026-10-19/README.txt。
+・未完了：稼働Web/backend反映と本人Google追加同意/実写真受入。AGENTS.mdに基づき再起動の明示許可を現在の会話で確認。別チャットへの送信、サーバー操作、新ブランチは行っていない。
+
+再起動後の稼働画面受入（2026-10-19）
+・利用者が自分で再起動し「再起動した」と報告。通常のOS参照で元写真600x600 JPEG→実アップロード→一覧/枠内拡大/選択確定まで成功。WebP16,556bytes、sha256一致。3D生成は開始しない。
+・自動file chooserではローカルFileの読出しに失敗したが、OS通常操作では成功。製品の正常系と自動操作の制約を区別して記録。
+・Google同意画面を開き本人操作待ち。残作業は追加同意後の実Photos session/写真取得/取込受入。証跡：spec/verification/model3d-image-import-2026-10-19/running-ui.json、terminal-upload-ui.jpg。

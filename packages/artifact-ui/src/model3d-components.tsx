@@ -67,6 +67,41 @@ export function Model3dWorkspaceView({
 			}))}
 			sourceImagesLoading={resource.sourceImagesLoading}
 			sourceImagesError={resource.sourceImagesError}
+			onUploadImage={
+				runtime.uploadFile
+					? async (file, requestId, signal) => {
+							const receipt = await runtime.uploadFile!(
+								action.source,
+								file,
+								{ requestId },
+								signal,
+							);
+							if (receipt.status === "accepted" && receipt.value)
+								return {
+									status: "succeeded",
+									image: {
+										id: receipt.value,
+										title: "アップロードした画像",
+										thumbnailUrl: `/api/images/${encodeURIComponent(receipt.value)}/content`,
+									},
+								};
+							return receipt.status === "pending" ||
+								receipt.status === "indeterminate"
+								? { status: "pending", message: receipt.message }
+								: {
+										status: "failed",
+										message: receipt.message,
+										canRetry: receipt.canRetry,
+									};
+						}
+					: undefined
+			}
+			renderGooglePhotos={
+				runtime.hostViews?.["image-picker-photos"]
+					? (onSelect) =>
+							runtime.hostViews!["image-picker-photos"]!({ onSelect })
+					: undefined
+			}
 			focus={resource.focus}
 			assets={resource.assets.map(asset)}
 			total={resource.total}

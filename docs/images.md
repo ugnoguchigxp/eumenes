@@ -8,7 +8,7 @@
 
 ## 接続
 
-画像一覧のカード表示はDesignSystemの共通`ImageGrid`を使い、3Dの`ImagePicker`と共有する。画像スタジオではクリック拡大・ダウンロード・確認付き削除を維持する。選択用途では候補の選択と枠内プレビューを分け、「この画像を使う」で確定する。両画面の一覧取得は認証済みclient単位の共通キャッシュを使い、生成後や削除後の更新を共有する。アップロードとGoogleフォトの取込は[未公開APIの提案仕様](../spec/reference/larm-image-import-v1-proposal/README.txt)として整理し、現在は外部要求を発行しない。
+画像一覧のカード表示はDesignSystemの共通`ImageGrid`を使い、3Dの`ImagePicker`と共有する。画像スタジオではクリック拡大・ダウンロード・確認付き削除を維持する。選択用途では候補の選択と枠内プレビューを分け、「この画像を使う」で確定する。両画面の一覧取得は認証済みclient単位の共通キャッシュを使い、生成後や削除後の更新を共有する。端末画像とGoogleフォトの写真を[本番画像取込契約](../spec/reference/larm-image-import-v1/README.txt)で保存し、同じ画像一覧へ反映する。取込操作だけでは画像生成・3D生成を開始しない。
 
 `toolchain:image.create@1`（会話関数`image`、引数は共通の`request`）から`package:image.create@1`を起動します。`profile:image.create@1`、`skill:image.create@1`、`tool:image.generate@1`を登録し、画像domainの計画担当が生成・編集画面・履歴の意図を解釈します。画面表示だけでは生成APIを呼びません。
 
@@ -33,3 +33,23 @@ WebとclientはAPIを使い、画像URLは同一originの認証proxyを通りま
 
 
 2026-10-13の承認デザインに合わせた画面は[実装記録](../spec/.archived/image-ui-design-implementation-2026-10-13.md)を参照してください。`bun scripts/image-ui-check.ts --run` は隔離backendのUIからLARM保存画像の先頭12枚を読み取り、制作・一覧・取得・狭幅・閉じるを確認します。計画モデルはfixtureで、画像生成POSTは拒否します。既存画像を使うUI確認を実モデルの新規生成成功と混同しません。
+
+アップロード前の画像準備は`image/service/prepare-upload.ts`から共通WebP codec（`api/infrastructure/webp.ts`）を使う。既存ブラウザ撮影の品質75変換を抽出したもので、アップロードはEXIF向き適用・長辺2000px以内・拡大なし・透過保持・非可逆品質75とする。会話添付の保存形式は変更しない。変換済みWebPを本番 `POST /v1/image-artifacts/imports` に送信する。
+
+
+## 画像の取込
+
+「参照…」→ローカル確認→「アップロード」で保存する。成功した候補を「この画像を使う」で確定し、3Dフォームの生成ボタンで初めて生成する。3D入力は縦横とも32px以上。小さい画像はライブラリへ保存できても3D用に選択できない。
+
+| API | 用途 |
+| --- | --- |
+| `POST /api/images/imports?requestId=UUID` | 元画像file一個を受け、共通処理後にLARMへ送信 |
+| `GET /api/images/imports/:id` | 保存済みUUIDの照会のみ。LARMへの画像POSTはしない |
+| `POST /api/images/imports/:id/resume` | 照会し、404の場合だけ保存済みbytesを同じUUIDで再送 |
+| `POST /api/images/imports/:id/google-photo` | `{handle,itemId}`で選択済みGoogle写真を取得し、同じ取込操作へ接続 |
+
+UUID・変換済みbytes・接続/認証のfingerprintを外部送信前にimage domainへ保存する。再送時に画像を再変換しない。失敗・削除・期限切れ・認証変更で自動的に新UUIDを発行しない。失敗後の「もう一度アップロード」は利用者の明示操作として新UUIDを使う。画面の取消は結果の選択採用を取り消すもので、すでに保存された画像を自動削除しない。
+
+未確定の送信bytesは64MiBを上限とし、確定・期限切れで解放する。元ファイル名・画像本文・認証情報は通常ログへ出さない。元画像の安全上限は16MiB、各軸8192px、32×1024×1024画素。JPEG・PNG・WebPの静止画を受け付け、MIME不一致・アニメーション・破損を拒否する。
+
+`bun scripts/image-import-live.ts --run <PNGファイル>` はサーバーを起動せず、隔離したEumenes保存領域と実API routeから本番LARMへ送信する。新しく取り込んだ検証画像だけを削除する。2026-10-19には利用者添付の端末画像、透過2000×2000px、応答断の照会、未受付404後の同一bytes再送、削除後の非復活を確認済み。[結果](../spec/verification/model3d-image-import-2026-10-19/live.json)。Googleフォトの実同意・実写真取得と稼働画面は別途受入対象。

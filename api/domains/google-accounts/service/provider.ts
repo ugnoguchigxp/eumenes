@@ -1,6 +1,7 @@
 import { OAuth2Client, CodeChallengeMethod } from "google-auth-library";
 import {
 	GoogleAccountError,
+	PHOTOS_SCOPE,
 	type GoogleProvider,
 	type Tokens,
 } from "../contracts";
@@ -11,6 +12,7 @@ const allowedScopes = new Set([
 	...scopes,
 	"https://www.googleapis.com/auth/userinfo.email",
 	"https://www.googleapis.com/auth/userinfo.profile",
+	PHOTOS_SCOPE,
 ]);
 function failure(error: unknown): GoogleAccountError {
 	const code = (error as { response?: { data?: { error?: unknown } } })
@@ -55,13 +57,14 @@ export function createGoogleProvider(
 			access: tokens.access_token,
 			refresh: tokens.refresh_token || previous!,
 			expires: tokens.expiry_date,
+			...(tokens.scope ? { scopes: tokens.scope.split(" ") } : {}),
 		};
 	}
 	return {
 		identity: digest(config.clientId + "\n" + config.redirectUri),
 		authorization(input) {
 			return clientFactory().generateAuthUrl({
-				scope: scopes,
+				scope: input.photos ? [...scopes, PHOTOS_SCOPE] : scopes,
 				access_type: "offline",
 				prompt: "consent select_account",
 				state: input.state,
@@ -70,7 +73,7 @@ export function createGoogleProvider(
 				code_challenge_method: CodeChallengeMethod.S256,
 			});
 		},
-		async exchange(code, verifier, nonce) {
+		async exchange(code, verifier, nonce, photos = false) {
 			try {
 				const client = clientFactory();
 				const { tokens } = await client.getToken({
@@ -103,6 +106,9 @@ export function createGoogleProvider(
 					)
 						picture = url.href;
 				}
+				const verifiedTokens = tokenSet(tokens);
+				if (photos && !verifiedTokens.scopes?.includes(PHOTOS_SCOPE))
+					throw new GoogleAccountError("invalid_authorization");
 				return {
 					profile: {
 						sub: profile.sub,
@@ -110,7 +116,7 @@ export function createGoogleProvider(
 						email: profile.email,
 						...(picture ? { picture } : {}),
 					},
-					tokens: tokenSet(tokens),
+					tokens: verifiedTokens,
 				};
 			} catch (error) {
 				throw error instanceof GoogleAccountError ? error : failure(error);

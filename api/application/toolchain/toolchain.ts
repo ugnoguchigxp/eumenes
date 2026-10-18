@@ -4,6 +4,8 @@ import type { createKanbanSdkHost } from "../work/kanban-sdk-host";
 import { createGoogleAccountsAdapter } from "../settings/google-accounts-adapter";
 import { createOcrAdapter } from "../media/ocr-adapter";
 import { createModel3dAdapter } from "../media/model3d-adapter";
+import { createBrowserAdapter } from "../browser/browser-adapter";
+import type { BrowserAssembly } from "../browser/browser-composition";
 import type { SqliteStore } from "../../infrastructure/sqlite";
 import type { QueueService } from "../../domains/queue";
 import type { InferencePort } from "../../domains/inference";
@@ -88,6 +90,8 @@ export async function createToolchain(
 		objectRecognition?: boolean;
 		ocr?: import("../../domains/ocr").OcrService;
 		model3d?: import("../../domains/model3d").Model3dService;
+		/** Brave tabs and local captures (absent: not offered). */
+		browser?: Pick<BrowserAssembly, "service" | "effects" | "requests">;
 		/** PTY sessions for the terminal screen (absent: not offered). */
 		terminals?: import("../../domains/terminals").TerminalsService;
 		/** The task board (needs `terminals` for its runs). */
@@ -185,6 +189,15 @@ export async function createToolchain(
 			: []),
 		...(options.ocr ? [createOcrAdapter(options.ocr)] : []),
 		...(options.model3d ? [createModel3dAdapter(options.model3d)] : []),
+		...(options.browser
+			? [
+					createBrowserAdapter(
+						options.browser.service,
+						options.browser.effects,
+						options.browser.requests,
+					),
+				]
+			: []),
 		...(options.objectRecognition
 			? [createObjectRecognitionScreenAdapter()]
 			: []),
@@ -249,6 +262,7 @@ export async function createToolchain(
 			...(options.worldResearch ? ["world-query"] : []),
 			...(options.ocr ? ["ocr"] : []),
 			...(options.model3d ? ["model3d"] : []),
+			...(options.browser ? ["browser"] : []),
 			...(options.excalidraw ? ["excalidraw"] : []),
 			...(options.conversation && options.history !== false ? ["history"] : []),
 		]),

@@ -27,6 +27,7 @@ const BACKENDS = [
 	"object-recognition",
 	"ocr",
 	"model3d",
+	"browser",
 	"claude-code",
 	"kanban",
 	"codex-tasks",

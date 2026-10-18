@@ -25,6 +25,7 @@ const streamBoundedRoutes = new Set([
 	"/api/voice/turns",
 	"/api/voice/preview",
 	"/api/service-tests/uploads",
+	"/api/images/imports",
 ]);
 
 export type AppOptions = {

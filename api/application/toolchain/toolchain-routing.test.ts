@@ -55,7 +55,29 @@ function sessionBundle(targetSchemaRef?: string) {
 	};
 }
 
-async function setup(available = true) {
+/** The shipped timer command binding with an `agent.turn`, as a newer revision (a fixture). */
+function commandAgentBundle() {
+	const timers = structuredClone(
+		bundleFiles().find((f) => f.name === "timers.bundle.json")!.raw,
+	) as any;
+	const binding = structuredClone(timers.bindings.at(-1));
+	binding.revision = 8;
+	binding.agent = { turn: { maxModelCalls: 12, retries: { default: 1 } } };
+	const toolchain = structuredClone(timers.definitions.at(-1));
+	toolchain.revision = 8;
+	toolchain.bindingRevisionId = "binding:timers.command@8";
+	return {
+		formatVersion: 1,
+		bundleId: "timers-command-agent-fixture",
+		pins: timers.pins,
+		definitions: [toolchain],
+		bindings: [binding],
+		artifacts: [],
+		schemas: [],
+	};
+}
+
+async function setup(available = true, withAgent = false) {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-routing-"));
 	dirs.push(dir);
 	const store = openStore(join(dir, "db"), migrations);
@@ -70,6 +92,14 @@ async function setup(available = true) {
 			offlineBundleHost(),
 		);
 		expect(result.issues).toEqual([]);
+		if (withAgent)
+			expect(
+				capabilities.importBundleInTransaction(
+					db,
+					commandAgentBundle(),
+					offlineBundleHost(),
+				).issues,
+			).toEqual([]);
 	});
 	const adapter = {
 		ref: "adapter:timers@1",
@@ -181,5 +211,25 @@ test("the command set refuses a session toolchain and the session set refuses co
 		});
 	} finally {
 		await down.store.close();
+	}
+});
+
+test("a command binding's agent turn reaches the command set; a binding without one carries none", async () => {
+	const { store, routing, publish } = await setup(true, true);
+	try {
+		store.read((db) =>
+			expect(
+				routing.commandSetInTransaction(db, "toolchain:timers.manage@8").binding
+					?.agentTurn,
+			).toEqual({ maxModelCalls: 12, retries: { default: 1 } }),
+		);
+		await publish(COMMAND_REVISION);
+		store.read((db) => {
+			const plain = routing.commandSetInTransaction(db, COMMAND_REVISION);
+			expect(plain.binding).toBeDefined();
+			expect(plain.binding).not.toHaveProperty("agentTurn");
+		});
+	} finally {
+		await store.close();
 	}
 });

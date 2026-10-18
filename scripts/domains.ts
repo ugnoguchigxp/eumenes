@@ -44,6 +44,13 @@ export const domains = {
 		components: "packages/design-system/src/components/Model3dWorkspace",
 		depends: { api: ["queue"], web: [], test: [] },
 	},
+	browser: {
+		tier: 1,
+		backend: "api/domains/browser",
+		web: "web/src/domains/browser",
+		components: "packages/design-system/src/components/BrowserWorkspace",
+		depends: { api: ["queue"], web: [], test: [] },
+	},
 	kanban: {
 		tier: 1,
 		backend: "api/domains/kanban",

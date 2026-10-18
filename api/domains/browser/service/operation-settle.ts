@@ -1,0 +1,156 @@
+import type { Database } from "bun:sqlite";
+import type { OperationOutcome, ToolKind } from "../contracts";
+import type {
+	DriverAction,
+	DriverActionResult,
+	DriverTab,
+} from "../contracts/ports";
+import {
+	bumpGeneration,
+	openTabs,
+	operationRow,
+	patchTab,
+	transitionOperation,
+	type TabRow,
+} from "../repository";
+import type { Ctx } from "./context";
+import { finishTask } from "./lifecycle";
+import type { CommitGuard } from "./operation-plan";
+import type { TaskRef } from "./operation-checks";
+import {
+	markBlocked,
+	reconcileTabs,
+	type BlockedEntries,
+	type Holder,
+} from "./tabs";
+
+export type Prepared = {
+	opId: string;
+	kind: ToolKind;
+	connectionId: string;
+	tab: TabRow | null;
+	epoch: number;
+	holder: Holder | null;
+	releaseAfter: boolean;
+	task: TaskRef | null;
+	driver: DriverAction | null;
+	newTabUrl: string | null;
+	observation: { ref: string; element: string } | null;
+	commit: CommitGuard | null;
+	generation: number;
+};
+
+/**
+ * Records what the browser answered and what it changed in the inventory (generation, URL, tab list), in one
+ * transaction. `blockedCode` is set when the page the action ended on is one the host must not adopt: the
+ * result is discarded, the tab is blocked and nothing of the page is stored.
+ */
+export function settleOperation(
+	ctx: Ctx,
+	db: Database,
+	p: Prepared,
+	result: DriverActionResult,
+	list: readonly DriverTab[] | null,
+	blocked: BlockedEntries,
+	blockedCode: string | null,
+): OperationOutcome {
+	const now = ctx.now();
+	const base = { operationId: p.opId };
+	if (!result.ok && !result.dispatched) {
+		transitionOperation(
+			db,
+			p.opId,
+			["dispatched"],
+			"failed",
+			{ errorCode: result.code },
+			now,
+		);
+		return { ...base, state: "failed", errorCode: result.code };
+	}
+	if (blockedCode) {
+		const moved = transitionOperation(
+			db,
+			p.opId,
+			["dispatched"],
+			"failed",
+			{ errorCode: blockedCode },
+			now,
+		);
+		if (moved && p.tab) markBlocked(ctx, db, p.tab.tab_ref);
+		if (list) reconcileTabs(ctx, db, p.connectionId, list, blocked);
+		return { ...base, state: "failed", errorCode: blockedCode };
+	}
+	const state = result.ok ? "observed" : "indeterminate";
+	const moved = transitionOperation(
+		db,
+		p.opId,
+		["dispatched"],
+		state,
+		result.ok
+			? { url: result.url, title: result.title }
+			: { errorCode: result.code },
+		now,
+	);
+	if (!moved) {
+		// The connection ended while the call was out: that already made it indeterminate.
+		const current = operationRow(db, p.opId)!;
+		return {
+			...base,
+			state: current.state as OperationOutcome["state"],
+			...(current.error_code ? { errorCode: current.error_code } : {}),
+		};
+	}
+	let tabRef = p.tab?.tab_ref;
+	if (p.tab && p.kind !== "tab_select") bumpGeneration(db, p.tab.tab_ref, now);
+	if (result.ok && p.tab && !["tab_select", "tab_close"].includes(p.kind))
+		patchTab(
+			db,
+			p.tab.tab_ref,
+			{ url: result.url, title: result.title || p.tab.title },
+			now,
+		);
+	if (result.ok && list) {
+		if (p.kind === "tab_close" && p.tab) {
+			patchTab(
+				db,
+				p.tab.tab_ref,
+				{
+					status: "closed",
+					is_current: 0,
+					lease_holder: null,
+					lease_expires_at: null,
+				},
+				now,
+			);
+			for (const t of openTabs(db, p.connectionId))
+				if (t.mcp_index > p.tab.mcp_index)
+					patchTab(db, t.tab_ref, { mcp_index: t.mcp_index - 1 }, now);
+		}
+		const before = new Set(openTabs(db, p.connectionId).map((t) => t.tab_ref));
+		reconcileTabs(ctx, db, p.connectionId, list, blocked, p.kind === "tab_new");
+		if (p.kind === "tab_new") {
+			const fresh = openTabs(db, p.connectionId).filter(
+				(t) => !before.has(t.tab_ref),
+			);
+			tabRef = (fresh.find((t) => t.is_current) ?? fresh.at(-1))?.tab_ref;
+		}
+	}
+	if (!result.ok && p.task)
+		finishTask(
+			ctx,
+			db,
+			p.task.id,
+			"indeterminate",
+			"operation_indeterminate",
+			null,
+		);
+	return result.ok
+		? {
+				...base,
+				state: "observed",
+				...(tabRef ? { tabRef } : {}),
+				url: result.url,
+				title: result.title,
+			}
+		: { ...base, state: "indeterminate", errorCode: result.code };
+}

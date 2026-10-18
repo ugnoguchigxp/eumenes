@@ -7,6 +7,7 @@ import type { LarmPlayground } from "../../larm";
 import type { ImageRecord } from "../contracts";
 import { row, byRun, record, patch, list, activity } from "../repository";
 import { registerImageHandlers } from "./handlers";
+import { createImageUpload } from "./imports";
 /** Read-only source for the registered image screen; the image domain owns this query. */
 export const imageListInTransaction = (db: Database, conversationId: string) =>
 	list(db, conversationId);
@@ -64,6 +65,7 @@ export function createImage(deps: {
 	}
 	registerImageHandlers({ ...deps, enqueue, fail, cancel });
 	return {
+		imports: createImageUpload(deps),
 		library: () => deps.gateway().images,
 		content: async (id: string, signal: AbortSignal) => {
 			const a = await deps.gateway().images.get(id, signal);

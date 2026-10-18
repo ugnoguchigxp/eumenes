@@ -21,6 +21,7 @@ export const model3dWebAdapter: WebArtifactAdapter = {
 					? { kind: "loading" }
 					: { kind: "ready" },
 			snapshot: runtime.snapshot,
+			uploadFile: runtime.uploadFile,
 			targetOf: () => undefined,
 			local: (_binding, event) => runtime.dispatch(event),
 			settled: () => {},

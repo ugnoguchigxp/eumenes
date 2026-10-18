@@ -159,6 +159,14 @@ export type BoundCommandSet = {
 	 * the host fills from its own choices.
 	 */
 	questions: Array<{ inputSchemaRef: string; choiceField?: string }>;
+	/**
+	 * The binding's `agent.turn`: the execution policy of the single-shot task started after acceptance (spec
+	 * playwright-toolchain §5.4). Never applied to the command's own acceptance inference. Absent: no task.
+	 */
+	agentTurn?: {
+		maxModelCalls?: number;
+		retries?: Readonly<Record<string, number>>;
+	};
 };
 
 /**

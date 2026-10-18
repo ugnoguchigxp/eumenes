@@ -1,0 +1,54 @@
+{
+  "checkedAt": "2026-10-18T21:42:56.871Z",
+  "transport": "authenticated in-process Eumenes app + middleware -> production LARM",
+  "serverRestarted": false,
+  "googlePhotos": "not tested live",
+  "threeD": "ID handoff fixture only; no generation",
+  "cases": [
+    {
+      "scenario": "normal",
+      "requestId": "78fc3fd8-e941-43f9-83d0-327ce7011b9b",
+      "width": 1462,
+      "height": 928,
+      "hasAlpha": false,
+      "bytes": 31828,
+      "attempts": 1,
+      "wirePosts": 1,
+      "reads": 1,
+      "byteExact": true,
+      "library": true,
+      "content": true,
+      "deletedReplay": true
+    },
+    {
+      "scenario": "lost-after",
+      "requestId": "c737a1c5-3eab-48a0-b59d-b3c6aa5a0fde",
+      "width": 2000,
+      "height": 2000,
+      "hasAlpha": true,
+      "bytes": 7406,
+      "attempts": 1,
+      "wirePosts": 1,
+      "reads": 2,
+      "byteExact": true,
+      "library": true,
+      "content": true,
+      "deletedReplay": true
+    },
+    {
+      "scenario": "lost-before",
+      "requestId": "a2a4cf44-ec21-411a-a95d-5c1dd9de7644",
+      "width": 2000,
+      "height": 2000,
+      "hasAlpha": true,
+      "bytes": 7406,
+      "attempts": 2,
+      "wirePosts": 1,
+      "reads": 2,
+      "byteExact": true,
+      "library": true,
+      "content": true,
+      "deletedReplay": true
+    }
+  ]
+}

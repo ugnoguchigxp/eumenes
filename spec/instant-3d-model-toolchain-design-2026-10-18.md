@@ -384,3 +384,14 @@ type Model3dAsset = {
 | `bun run typecheck`・`build:web` | pass |
 | `verify --domain artifact` | サイズ予算で停止（担当外の `composition-fixer.ts`・`ui-studio-components.tsx`） |
 | 実LARM・実アップロード・Googleフォトの取込 | 未実施（LARMの取込APIの公開とPhotosの追加同意が前提） |
+
+
+### 2026-10-19 本番画像取込の接続
+
+利用者提示の確定契約と本番OpenAPIに従い、端末画像とGoogleフォトの選択写真を同じ取込へ接続した。[接続設計](design/model3d-2026-10-18/upload-connection-2026-10-19.txt)、[本番契約](reference/larm-image-import-v1/README.txt)、[受入記録](verification/model3d-image-import-2026-10-19/README.txt)を参照。上記の未公開API・未実装という記載は前日の状態。
+
+- 共通WebP変換、UUID/変換済みbytesの送信前永続化、receipt照会・404のみ同bytes再送、認証変更・削除・期限・失敗の制約を実装。
+- 共通Pickerの参照→アップロード→候補確定→既存生成ボタン、Google追加同意と公式Picker、選択写真取得を実装。入力の意味分類・生成先の固定は追加しない。
+- 本番LARMで端末添付PNG、透過2000x2000px、一覧/content/byte一致/断線回復/削除後非復活を確認。取込だけで生成/GPUへは要求しない。
+- Chromium部品試験4件成功。domain verify各stepは成功、並行ソース変更により総合invalidated。後続の全体型検査は担当外の並行browser型変更で停止し、担当範囲の個別試験と区別。
+- 稼働画面への反映・本人の実Google追加同意と写真取得は再起動許可待ち。今回の実3D生成は自動実行していない。

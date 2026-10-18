@@ -30,11 +30,9 @@
 
 「保存した画像から作る」→「画像を選ぶ」で共通の画像選択画面を開く。LARM画像の候補選択、枠内プレビュー、「この画像を使う」での確定を分ける。キャンセルでは確定済み画像を変えず、タイトル・タグ・文章の下書きも保持する。画像スタジオと3Dは共通の画像Gridと、認証済みclientごとの一覧キャッシュを使う。画像の取得は既存の同一origin認証proxyを使う。
 
-提供元は「LARM画像」「Googleフォト」の2タブ。端末の画像はタブとは別の「参照…」ボタンでOSのファイル選択を開き、枠内で確認する。選んだファイルは未アップロードと表示し、保存済みLARM画像のIDと取り違えて確定・生成しない。実際に3D生成へ使えるのはLARMの保存画像である。
+提供元は「LARM画像」「Googleフォト」の2タブ。端末の画像は独立した「参照…」で選び、プレビュー後の「アップロード」で保存する。EXIF向き適用・長辺2000px以内・品質75 WebPへの共通変換後にLARMへ送信し、保存画像IDを候補にする。「この画像を使う」で確定しても生成は始めず、元フォームの「3Dモデルを生成する」で `source:{type:"image-artifact",id}` を既存3D APIへ送る。各辺32px未満は選択不可。
 
-Googleフォトのタブは未実装であることを表示する。現在の基本プロフィール連携とは別に写真選択の同意が必要で、外部画像を3Dへ渡すにはLARMの画像取込が必要。[画像取込APIの提案仕様](../spec/reference/larm-image-import-v1-proposal/README.txt)と[OpenAPI案](../spec/reference/larm-image-import-v1-proposal/openapi.json)は未公開の外部契約案であり、今回の実装からは呼ばない。
-
-利用に必要な準備と実装は[Googleフォトの接続手順](google-accounts.md#googleフォトの対応状況と必要な作業)を参照。現在は設定画面で再接続するだけでは利用できない。
+Googleフォトは基本プロフィールと別の追加同意が必要。Google側のPickerで共有する写真を1枚選び、Eumenesの共通Gridから「この写真を取り込む」でLARMへ保存する。Googleの写真を直接3D APIへ渡さない。[Googleフォトの接続手順](google-accounts.md#googleフォトの対応状況と必要な作業)と[本番画像取込契約](../spec/reference/larm-image-import-v1/README.txt)を参照。
 
 現行LARMの3D生成は、文章から元画像を生成する`source.type=prompt`、または保存画像を使う`source.type=image-artifact`のいずれか。後者に文章を併記する契約は無く、画像と文章の同時入力には未対応。画像選択時に入力済みの文章を保持することと、その文章を生成へ送ることは別である。
 

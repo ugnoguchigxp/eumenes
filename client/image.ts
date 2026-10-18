@@ -1,4 +1,4 @@
-import { imageRecord } from "../api/domains/image/contracts";
+import { imageRecord, imageImportView } from "../api/domains/image/contracts";
 import {
 	imageLibrary,
 	imageArtifactDelete,
@@ -7,6 +7,39 @@ import {
 import type { Transport } from "./transport";
 export function imageClient(t: Transport) {
 	return {
+		importImage: async (
+			requestId: string,
+			file: File,
+			signal?: AbortSignal,
+		) => {
+			const body = new FormData();
+			body.append("file", file);
+			return imageImportView.parse(
+				await (
+					await t.call(
+						`/api/images/imports?requestId=${encodeURIComponent(requestId)}`,
+						{ method: "POST", body, signal },
+					)
+				).json(),
+			);
+		},
+		imageImport: async (requestId: string, signal?: AbortSignal) =>
+			imageImportView.parse(
+				await (
+					await t.call(`/api/images/imports/${encodeURIComponent(requestId)}`, {
+						signal,
+					})
+				).json(),
+			),
+		resumeImageImport: async (requestId: string, signal?: AbortSignal) =>
+			imageImportView.parse(
+				await (
+					await t.call(
+						`/api/images/imports/${encodeURIComponent(requestId)}/resume`,
+						{ method: "POST", signal },
+					)
+				).json(),
+			),
 		deleteImage: async (id: string, signal?: AbortSignal) => {
 			imageArtifactId.parse(id);
 			const result = imageArtifactDelete.parse(

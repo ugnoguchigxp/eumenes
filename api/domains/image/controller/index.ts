@@ -1,7 +1,12 @@
 import type { Hono } from "hono";
 import { imageArtifactId } from "../../larm/contracts";
 import type { ImageService } from "../service";
-export function registerImage(app: Hono, s: ImageService) {
+import { registerImageImports } from "./imports";
+export function registerImage(
+	app: Hono,
+	s: Pick<ImageService, "imports" | "library" | "content" | "list">,
+) {
+	registerImageImports(app, s);
 	app.delete("/api/images/:id", async (c) => {
 		const id = imageArtifactId.safeParse(c.req.param("id"));
 		if (!id.success) return c.json({ error: "invalid_image_id" }, 400);

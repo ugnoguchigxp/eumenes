@@ -1,0 +1,37 @@
+画像アップロード前のWebP変換と共通化（2026-10-18）
+状態：利用者が長辺2000px・非可逆WebP品質75・既存処理共通化を明示指定。
+
+既存資源と変更範囲
+browser/adapters/webp-encoder.tsに品質75・effort6・メタデータ除去・WebP完全decode・RIFF検査・sha256計算がある。
+この処理をapi/infrastructureの共通codecへ抽出する。browser adapterはPNGヘッダーサイズ取得と既存上限2500×2500を持つ薄いwrapperとして残す。
+会話添付のnormalize-image.tsはJPEG/PNG/BMP、白へのalpha合成、3MiB上限の別契約なので、この変更でWebP化しない。
+image domainは同じcodecを使い、アップロード用のJPEG/PNG/WebP実体検証、EXIF向き適用、縦横比を維持した長辺2000px以内への縮小（拡大なし）、alpha保持を追加する。受信原本の安全上限は16MiB・各辺8192・33,554,432画素とし、保存・LARM送信用の出力上限2000pxと区別する。アニメーション・動画・SVGは受け付けない。
+WebP品質75は共通codecの固定値。用途・利用者の入力では変更しない。ブラウザの保存結果・上限・公開portを変更せず、画像変換アルゴリズムを二重実装しない。
+
+依存と接続
+LARMには画像専用APIを依頼済み。Eumenesで圧縮したWebPをPNGへ変換・再圧縮せず、検証して同じbytesとして保存する経路を追加依頼済み。
+LARM正式契約の確認前にendpointを仮定した製品呼出しを追加しない。正式契約確定後、既存uploadFile bridge→image domainで上記変換→LARM保存→返された画像ID→3D生成へ接続する。
+Googleフォトの写真bytesも同じimage domain操作を利用する。OAuth・Photos自体の実装は別の依存として残す。
+
+必要作業と完了条件
+1. browser encoderの既存5試験でbaselineを採取：成功。
+2. codecを共通化しbrowserを移行。image domainのアップロード準備関数を追加する。
+3. 部分：既存browser5試験を保持。画像変換試験で2000px/縦横比/EXIF/alpha/metadata除去/品質75/非可逆/出力量減少/破損・偽MIME・アニメーション・巨大原本拒否/取消を確認。
+4. 結合：browser,image,model3d domain verifyと共通infrastructure試験を明示実行。担当外の失敗は修正せず報告。並行編集で検証無効なら各step成功と総合結果を分ける。
+5. 通し：LARM正式契約が確認できたら取込→保存画像→3D生成を確認。未公開の間はfixtureの変換結果と実LARM取込成功を混同しない。
+サーバー停止・起動・再起動、新規ブランチ、Google権限変更は行わない。対象外の並行browser作業を巻き戻さず、codec adapterだけを抽出する。
+
+実装と検証結果
+・既存browser/adapters/webp-encoder.tsから共通codecをapi/infrastructure/webp.tsへ抽出。PNGヘッダー取得と2500px入力条件はbrowser側に残し、既存のport/API・品質75のbyte一致・不正WebP拒否を保持。hashは既存sha256Hexへ統一。
+・image/service/prepare-upload.tsは同じcodecを使用。JPEG/PNG/WebPの実体・MIME・単一フレーム・原本安全上限を検証し、向き補正後に長辺2000px以内へ縮小。非可逆75、effort6、alpha保持、metadata除去。会話添付は変更なし。
+・部分試験10件成功。圧縮率試験の初期入力がPNGで特に小さくなる周期パターンだったため、再現可能な非周期画素へ変更。同一フレームが単一画像へ最適化されていたアニメーションfixtureも、異なる2フレームであることを確認して修正。要件や製品側の拒否条件は弱めていない。
+・結合試験：image全試験、browser encoder/撮影状態、LARM画像一覧、共通digestの計88件成功。対象codec/adapter/画像処理の型検査7ファイル成功。対象lint、整形、サイズ、git diff --check成功。
+・既存のブラウザfixtureのPNG生成値のundefined型を明示検査へ修正し、model3d-components.spec.tsの画像選択1件をサーバー起動なしで再実行して成功。
+・OpenAPI案19ローカル参照、2000px、WebP保存形式と20MiB上限の整合確認成功。提案仕様は未公開のまま、実LARM成功とは区別。
+・総合verify(browser,image,model3d)は担当外browser/service/captures.ts#createCaptures339行、operations.ts#createOperations528行が300行上限で停止。
+ report：verification-reports/runs/2026-10-18T13-21-26-279Z-530dd94b-a404-4d43-b857-f014c136ef29/report.json
+・verify(image,model3d)も並行開発中artifact-ui/browser-components.tsxのBrowserWorkspace未export由来の型エラー9件で停止。
+ report：verification-reports/runs/2026-10-18T13-21-55-001Z-43b7ddfd-81f3-4fda-a247-d6cec02554b4/report.json
+・リポジトリ全体の型検査にはapplication/browserのadapter未exportもあり、担当外を修正せず対象codecの型検査に切り分けた。以降、同条件で総合検証を反復しない。
+・LARM担当チャットから2000px、WebP圧縮画像データ保持、取込・照会API実装済み・境界/再送/復旧の試験中という進捗を取得。Eumenesの送信接続は正式契約/公開確認待ちであり、未完了。新サーバー・再起動・Google権限変更は行っていない。
+・差分点検：コードによるユーザー発話の意味分類やLLM判断の代替は追加なし。画像デコード/符号化/入力契約検証のみ。並行browser作業の本体は変更せず、利用者が明示したencoder共通化のadapterだけを変更。

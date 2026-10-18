@@ -23,3 +23,4 @@ export const imageRecord = z.object({
 export type ImageRecord = z.infer<typeof imageRecord>;
 
 export { imagePlan } from "../../capabilities/contracts";
+export { imageImportView, type ImageImportView } from "./imports";

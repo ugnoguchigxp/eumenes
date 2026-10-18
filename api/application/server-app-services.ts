@@ -31,6 +31,7 @@ export function appServices(s: Services) {
 		objectRecognition: s.objectRecognition,
 		ocr: s.ocr,
 		model3d: s.model3d,
+		browser: s.browser.service,
 		tasks: s.delegated.tasks,
 		coding: s.codingComposition?.coding,
 		codingSupervision: s.supervision,

@@ -39,6 +39,7 @@ export {
 	type TrackQuery,
 } from "./contracts/music-library";
 export { MusicLibraryError } from "./service/music-library";
+export { ImageImportError } from "./service/image-import";
 export { createLocalServices } from "./service/local-services";
 export type {
 	LocalServiceLease,

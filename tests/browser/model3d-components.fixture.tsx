@@ -73,6 +73,18 @@ function Fixture() {
 							available
 							generations={[]}
 							sourceImages={sourceImages}
+							onUploadImage={
+								document.body.dataset.fixture === "upload"
+									? async () => ({
+											status: "succeeded",
+											image: {
+												id: "image_uploaded",
+												title: "取り込んだ画像",
+												thumbnailUrl: sourceImages[0]!.thumbnailUrl,
+											},
+										})
+									: undefined
+							}
 							assets={items}
 							selectedAsset={selected}
 							total={items.length}

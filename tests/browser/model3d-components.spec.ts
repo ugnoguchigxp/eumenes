@@ -3,6 +3,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { randomUUID } from "node:crypto";
 
 // No HTTP server, backend, credentials or live provider is used by this component acceptance.
 let directory: string;
@@ -27,6 +28,11 @@ async function open(page: Page, mode = "model3d") {
 	await page.setContent(
 		`<html data-theme="dark"><body data-fixture="${mode}"><div id="root"></div></body></html>`,
 	);
+	// setContent has an opaque, insecure origin; production uses secure loopback.
+	await page.evaluate((id) => {
+		if (!crypto.randomUUID)
+			Object.defineProperty(crypto, "randomUUID", { value: () => id });
+	}, randomUUID());
 	for (const name of readdirSync(directory).filter((file) =>
 		file.endsWith(".css"),
 	)) {
@@ -191,7 +197,9 @@ test("narrow and stacked artifacts keep their content contained and image select
 	await expect(page.locator(".image-picker").getByRole("tab")).toHaveCount(2);
 	await page.getByRole("tab", { name: "Googleフォト", exact: true }).click();
 	await expect(
-		page.getByText("Googleフォトからの選択は未実装です。", { exact: false }),
+		page.getByText("Googleフォトの写真選択はこの表示では利用できません。", {
+			exact: false,
+		}),
 	).toBeVisible();
 	const chooser = page.waitForEvent("filechooser");
 	await page.getByRole("button", { name: "参照…", exact: true }).click();
@@ -199,7 +207,9 @@ test("narrow and stacked artifacts keep their content contained and image select
 		const canvas = document.createElement("canvas");
 		canvas.width = canvas.height = 32;
 		canvas.getContext("2d")!.fillRect(0, 0, 32, 32);
-		return canvas.toDataURL("image/png").split(",")[1];
+		const data = canvas.toDataURL("image/png").split(",")[1];
+		if (!data) throw new Error("fixture_image_missing");
+		return data;
 	});
 	await (
 		await chooser
@@ -287,5 +297,43 @@ test("narrow and stacked artifacts keep their content contained and image select
 	);
 	expect(submitted).toEqual([
 		{ title: "入力途中のタイトル", tags: "", prompt: "", imageId: "image-0" },
+	]);
+});
+
+test("a browsed file requires upload and confirmation before the imported ID reaches generation", async ({
+	page,
+}) => {
+	await open(page, "upload");
+	await page
+		.getByRole("textbox", { name: "タイトル" })
+		.fill("アップロード確認");
+	await page.getByLabel("保存した画像から作る").check();
+	await page.getByRole("button", { name: "画像を選ぶ", exact: true }).click();
+	await page.getByLabel("アップロードする画像").setInputFiles({
+		name: "photo.png",
+		mimeType: "image/png",
+		buffer: Buffer.from(
+			"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLttAAAAABJRU5ErkJggg==",
+			"base64",
+		),
+	});
+	await expect(
+		page.getByRole("button", { name: "この画像を使う" }),
+	).toBeDisabled();
+	await page.getByRole("button", { name: "アップロード", exact: true }).click();
+	await expect(
+		page.getByRole("button", { name: "この画像を使う" }),
+	).toBeEnabled();
+	expect(await page.evaluate(() => window.model3dTest.submitted)).toEqual([]);
+	await page.getByRole("button", { name: "この画像を使う" }).click();
+	expect(await page.evaluate(() => window.model3dTest.submitted)).toEqual([]);
+	await page.getByRole("button", { name: "3Dモデルを生成する" }).click();
+	expect(await page.evaluate(() => window.model3dTest.submitted)).toEqual([
+		{
+			title: "アップロード確認",
+			tags: "",
+			prompt: "",
+			imageId: "image_uploaded",
+		},
 	]);
 });

@@ -1,0 +1,32 @@
+LARM本番画像取込接続（2026-10-19）
+利用者が本番契約を提示し、Eumenesの実装と検証を明示依頼。公開OpenAPIを読み取り、ImageImportReceiptのpending/succeeded(deleted false/true)/failed、error.code/messageの形を確認した。
+
+目的・完了条件
+参照→ローカル確認→アップロード（共通の長辺2000px・品質75 WebP）→LARM receipt→選択確定→既存3D生成へ画像IDを渡す。取込だけで3D生成しない。
+通信断・再起動後は保存済みUUIDで照会し、404だけ同一UUID/同一変換済みbytesで再送。failed/deleted/期限切れ/認証または接続変更では自動で作り直さない。
+Googleフォトも同じ画像取込公開操作に接続する。画像取得とOAuth tokenはbackend内に留める。
+
+既存資源と変更範囲
+・既存infrastructure/webpとimage/service/prepare-upload、larmのControl認証と同一origin検証、image一覧キャッシュ、共通ImagePicker、ArtifactRuntime.uploadFileを再利用。
+・image domainにimage_importsの永続化を追加。UUID、認証済みlocal principal、接続/認証のfingerprint、元digest、変換済みbytes、attempted、状態/receipt、期限を送信前に保存する。秘密/原本ファイル名は保存しない。確定後・期限後の送信用bytesを解放し、未確定bytes合計は既存添付と同じ64MiBを上限にする。
+・同じUUIDの処理を直列化。送信前にattemptedを永続化し、応答断はunknownとして保存。再開は照会優先。API結果の採用前にも接続identityが変わっていないか確認する。
+・専用実装の根拠は本番APIの永続Idempotency-Key/7日/認証主体での分離/同一bytes再送契約。LLM判断・発話分類は追加しない。
+・LARM clientに本番schemaとimport/read操作を追加し、失敗receiptと通常errorを区別する。statusUrl/contentUrlは保存先originと対象UUID/画像IDに結び付ける。
+・APIはPOST /api/images/imports?requestId=UUID、GET /api/images/imports/:id、POST /api/images/imports/:id/resume。upload/再開だけがLARM POSTを行い、GETは照会のみ。画像32px未満の辺は3D画面で選択不可とし、ライブラリの画像自体は変更しない。
+・共通Pickerのアップロード操作は候補の取込だけ。アップロード完了後の「この画像を使う」、元フォームの生成操作を分ける。取消・差替え・画面を離れた後の遅い応答を採用しない。
+・GoogleAccountsは既存の暗号化state/同意callbackを再利用。写真選択の操作に限りPhotos scopeを要求し、実付与scopeを保存・検査する。本人同一sub・epochで結果を囲い、基本連携だけを許可済みPhotosと扱わない。
+・Google公式Pickerのsession作成/外部pickerUri/指定pollingConfig/選択した静止画だけ取得/片付けをgoogle-accountsが所有。imageとの連携はapplication層で公開操作をつなぐ。写真への任意URL入力や全ライブラリ同期は追加しない。
+
+計画・検証
+1. OpenAPI・既存指示/公開機構・保存境界を確認：済。
+2. image/LARMの契約・永続化・通信断/再送処理、部分試験。
+3. 共通Picker/uploadFile/認証client接続、32px制限と取消、Web結合・部品試験。
+4. Photos追加同意・セッション/画像取得・同じ取込への接続とfixture試験。
+5. 部分→利用domain verify→明示ブラウザfixture→ライブAPI→実画面/Google本人同意の順に確認。
+Google実同意とサーバー起動/再起動は本人操作または別の明示許可が必要。稼働中サーバーを勝手に再起動しない。準備済みの具体的な画面と差分を示してから確認する。
+実LARMに保存する検証画像は本依頼の受入範囲。削除は検証で新規作成した専用画像だけに限定し、既存ユーザー資産は変更しない。実画像と合成fixture、実3D生成とID引渡し試験を区別する。
+
+実施状況（2026-10-19）
+工程1〜4実装・固定試験済み。工程5は本番LARMの取込/一覧/content/同bytes/透過/境界/断線回復/削除後非復活まで確認済み。稼働画面反映・実Google追加同意/写真選択は再起動許可と本人操作待ち。
+検証・残作業はspec/verification/model3d-image-import-2026-10-19/README.txtとlive.jsonに分離記録。
+・最終接続点検で、共通appのJSON 1MiB capから画像uploadパスを除外し、既存のroute別readBounded上限を使う登録を追加。専用の新判定機構ではなく既存のstreamBoundedRoutesへ同じ形式で登録。認証・origin・framing検証は維持。2MiB/超過/別パスの結合試験済み。

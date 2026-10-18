@@ -54,6 +54,7 @@ import { TimerWorkspaceView } from "./timer-components";
 import { SubtitlePreviewView } from "./subtitle-components";
 import { AvatarMotionLabView } from "./avatar-components";
 import { Model3dWorkspaceView } from "./model3d-components";
+import { BrowserWorkspaceView } from "./browser-components";
 import { CollectionWorkspaceView } from "./collection-components";
 import { RecordsWorkspaceView } from "./records-components";
 import { ServiceTestWorkspaceView } from "./service-test-components";
@@ -152,6 +153,7 @@ const renderers = {
 	"service-test-workspace": ServiceTestWorkspaceView,
 	"avatar-motion-lab": AvatarMotionLabView,
 	"model3d-workspace": Model3dWorkspaceView,
+	"browser-workspace": BrowserWorkspaceView,
 	"subtitle-preview": SubtitlePreviewView,
 	"settings-section": SettingsSectionView,
 	"settings-navigation": SettingsNavigationView,

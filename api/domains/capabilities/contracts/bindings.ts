@@ -54,6 +54,30 @@ const bindingQuestion = z.strictObject({
 		.optional(),
 });
 
+/** A tool id the agent's per-tool settings name: a binding tool's id or a host tool (`doc.edit`). */
+const agentToolId = z.string().regex(/^[a-z][a-z0-9._-]{0,63}$/);
+/**
+ * Model calls and retries of one agent run (spec subagent-task-and-session-agents §6.4, §10): a session turn,
+ * or the single-shot task a command starts after it accepted the request. `retries` is per tool, `default`
+ * for the rest.
+ */
+const agentTurnV1 = z.strictObject({
+	maxModelCalls: z.number().int().min(1).max(12).optional(),
+	retries: z
+		.record(
+			z.union([agentToolId, z.literal("default")]),
+			z.number().int().min(0).max(3),
+		)
+		.optional(),
+});
+export type AgentTurnV1 = z.infer<typeof agentTurnV1>;
+
+/**
+ * What a command binding sets for the single-shot task it starts after acceptance (spec
+ * playwright-toolchain 2026-10-18 §5.4). It never applies to the command's own acceptance inference.
+ */
+const commandAgentV1 = z.strictObject({ turn: agentTurnV1 });
+
 /** A command toolchain executed by a typed host adapter. */
 export const commandBindingV1 = z.strictObject({
 	kind: z.literal("binding"),
@@ -72,6 +96,8 @@ export const commandBindingV1 = z.strictObject({
 	 * choices (the adapter's `choicesInTransaction`); the model never offers choices itself.
 	 */
 	questions: z.array(bindingQuestion).max(8).optional(),
+	/** Execution policy of the single-shot task started after acceptance; omitted: no task, as before. */
+	agent: commandAgentV1.optional(),
 });
 
 const limitMs = z.number().int().min(10_000).max(3_600_000);
@@ -87,8 +113,6 @@ const timeLimitsV1 = z
 	);
 export type TimeLimits = z.infer<typeof timeLimitsV1>;
 
-/** A tool id the agent's per-tool settings name: a binding tool's id or a host tool (`doc.edit`). */
-const agentToolId = z.string().regex(/^[a-z][a-z0-9._-]{0,63}$/);
 /**
  * How the session's agent works (spec subagent-task-and-session-agents 2026-10-18 §10). `workspace` names
  * the work document the adapter declares (`describe().workspaces`): the host then offers its document tools.
@@ -103,17 +127,7 @@ const agentV1 = z.strictObject({
 			inlineBytes: z.number().int().min(1024).max(98_304).optional(),
 		})
 		.optional(),
-	turn: z
-		.strictObject({
-			maxModelCalls: z.number().int().min(1).max(12).optional(),
-			retries: z
-				.record(
-					z.union([agentToolId, z.literal("default")]),
-					z.number().int().min(0).max(3),
-				)
-				.optional(),
-		})
-		.optional(),
+	turn: agentTurnV1.optional(),
 	memory: z
 		.strictObject({
 			recentTurns: z.number().int().min(1).max(50).optional(),

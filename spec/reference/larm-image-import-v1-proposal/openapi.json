@@ -15,7 +15,7 @@
 			"post": {
 				"operationId": "importImageArtifact",
 				"summary": "静止画のbytesを検証・正規化して保存画像に取り込む",
-				"description": "生成やGPU起動は行わない。同じキーと元bytesは同じ結果。入力形式JPEG/PNG/WebP、16MiB、8192px、33,554,432画素まで。正規化PNGの一覧・取得可能状態で成功を返す。",
+				"description": "生成やGPU起動は行わない。同じキーと元bytesは同じ結果。入力JPEG/PNG/WebP、16MiB、各辺2000px、4,000,000画素。Eumenesは事前にWebP品質75へ変換し、WebPはLARMで再圧縮しない。一覧・取得可能状態で成功を返す。",
 				"parameters": [
 					{
 						"name": "Idempotency-Key",
@@ -371,21 +371,21 @@
 					},
 					"format": {
 						"type": "string",
-						"const": "png"
+						"enum": ["png", "webp"]
 					},
 					"mimeType": {
 						"type": "string",
-						"const": "image/png"
+						"enum": ["image/png", "image/webp"]
 					},
 					"width": {
 						"type": "integer",
 						"minimum": 1,
-						"maximum": 8192
+						"maximum": 2000
 					},
 					"height": {
 						"type": "integer",
 						"minimum": 1,
-						"maximum": 8192
+						"maximum": 2000
 					},
 					"hasAlpha": {
 						"type": "boolean"
@@ -393,7 +393,7 @@
 					"bytes": {
 						"type": "integer",
 						"minimum": 1,
-						"maximum": 32000000
+						"maximum": 20971520
 					},
 					"sha256": {
 						"type": "string",
@@ -405,7 +405,7 @@
 					}
 				},
 				"additionalProperties": false,
-				"description": "保存済みの正規化後PNG。model、seed、stepsを生成した値として付けない。"
+				"description": "保存済み画像。Eumenesは事前に長辺2000px・非可逆WebP品質75へ変換。LARMはWebPの圧縮画像データを再圧縮せず保存する。JPEG/PNG直接受付は向き補正後PNG。formatとmimeTypeは対応させ、架空のmodel/seed/stepsを付けない。"
 			},
 			"ImportStatus": {
 				"oneOf": [

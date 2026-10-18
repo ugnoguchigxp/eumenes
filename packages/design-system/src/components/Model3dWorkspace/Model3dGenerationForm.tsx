@@ -2,7 +2,7 @@ import { useId, useState } from "react";
 import { Button } from "../Button";
 import { Input } from "../Input";
 import { Textarea } from "../Textarea";
-import { ImagePicker } from "../ImagePicker";
+import { ImagePicker, type ImagePickerProps } from "../ImagePicker";
 import type {
 	Model3dGenerateValues,
 	Model3dSourceImage,
@@ -20,6 +20,8 @@ export type Model3dGenerationFormProps = {
 	sourceImagesLoading?: boolean;
 	sourceImagesError?: string;
 	onRefreshImages?: () => void;
+	onUploadImage?: ImagePickerProps["onUpload"];
+	renderGooglePhotos?: ImagePickerProps["renderGooglePhotos"];
 	pending?: boolean;
 	onGenerate: (values: Model3dGenerateValues) => Model3dSubmitResult;
 };
@@ -56,6 +58,8 @@ export function Model3dGenerationForm({
 	sourceImagesLoading,
 	sourceImagesError,
 	onRefreshImages,
+	onUploadImage,
+	renderGooglePhotos,
 	pending,
 	onGenerate,
 }: Model3dGenerationFormProps) {
@@ -188,6 +192,8 @@ export function Model3dGenerationForm({
 					error={sourceImagesError}
 					pending={disabled}
 					onRefresh={onRefreshImages}
+					onUpload={onUploadImage}
+					renderGooglePhotos={renderGooglePhotos}
 					onCancel={() => setPicking(false)}
 					onConfirm={(imageId) => {
 						setDraft({ ...draft, imageId });

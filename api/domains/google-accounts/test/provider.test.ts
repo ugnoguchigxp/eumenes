@@ -127,3 +127,31 @@ test("rejects forged signatures and unexpected service scopes", async () => {
 		).exchange("code", "verifier", "nonce"),
 	).rejects.toThrow("invalid_authorization");
 });
+
+test("Photos authorization requests only Picker scope in addition to identity and requires its actual grant", async () => {
+	const scope =
+		"https://www.googleapis.com/auth/photospicker.mediaitems.readonly";
+	const input = {
+		state: "state",
+		nonce: "nonce",
+		verifier: "verifier",
+		challenge: "challenge",
+		photos: true,
+	};
+	expect(new URL(setup().authorization(input)).searchParams.get("scope")).toBe(
+		`openid email profile ${scope}`,
+	);
+	await expect(
+		setup().exchange("code", "verifier", "nonce", true),
+	).rejects.toThrow("invalid_authorization");
+	expect(
+		(
+			await setup({}, false, `openid email profile ${scope}`).exchange(
+				"code",
+				"verifier",
+				"nonce",
+				true,
+			)
+		).tokens.scopes,
+	).toContain(scope);
+});

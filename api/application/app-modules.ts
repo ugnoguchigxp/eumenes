@@ -4,6 +4,7 @@ import {
 } from "../domains/google-accounts";
 import { registerOcr, type OcrService } from "../domains/ocr";
 import { registerModel3d, type Model3dService } from "../domains/model3d";
+import { registerBrowser, type BrowserService } from "../domains/browser";
 import {
 	registerExcalidraw,
 	type ExcalidrawService,
@@ -15,6 +16,7 @@ import {
 import { CONVERSATION_DEFAULT_PRINCIPAL } from "../domains/conversation/contracts";
 import { recognitionSharing } from "./media/recognition-sharing";
 import { registerImage, type ImageService } from "../domains/image";
+import { registerGooglePhotoImport } from "./media/google-photo-import";
 import { registerMusic, type MusicService } from "../domains/music";
 import {
 	registerCodingSupervision,
@@ -134,6 +136,7 @@ export type AppServices = {
 	objectRecognition?: ObjectRecognitionService;
 	ocr?: OcrService;
 	model3d?: Model3dService;
+	browser?: BrowserService;
 	tasks?: TasksService;
 	coding?: CodingService;
 	codingSupervision?: CodingSupervision;
@@ -183,6 +186,10 @@ export function appModules(services: AppServices): AppModule[] {
 			mount: (app) =>
 				registerModel3d(app, s.model3d!, CONVERSATION_DEFAULT_PRINCIPAL),
 		},
+		s.browser && {
+			mount: (app) =>
+				registerBrowser(app, s.browser!, CONVERSATION_DEFAULT_PRINCIPAL),
+		},
 		s.objectRecognition && {
 			mount: (app) =>
 				registerObjectRecognition(
@@ -208,7 +215,13 @@ export function appModules(services: AppServices): AppModule[] {
 					);
 			},
 		},
-		s.image && { mount: (app) => registerImage(app, s.image!) },
+		s.image && {
+			mount: (app) => {
+				registerImage(app, s.image!);
+				if (s.googleAccounts)
+					registerGooglePhotoImport(app, s.image!, s.googleAccounts);
+			},
+		},
 		s.music && { mount: (app) => registerMusic(app, s.music!) },
 		s.capabilities && {
 			mount: (app) => registerCapabilities(app, s.capabilities!),

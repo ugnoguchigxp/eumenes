@@ -10,14 +10,23 @@ export type GoogleAccountView = {
 	status: "disconnected" | "connected" | "reconnect" | "disconnecting";
 	profile?: GoogleProfile;
 	pending: boolean;
+	photosAuthorized?: boolean;
 	result?: "connected" | "cancelled" | "failed" | "expired";
 };
-export type Tokens = { refresh: string; access: string; expires: number };
+export const PHOTOS_SCOPE =
+	"https://www.googleapis.com/auth/photospicker.mediaitems.readonly";
+export type Tokens = {
+	refresh: string;
+	access: string;
+	expires: number;
+	scopes?: string[];
+};
 export type Authorization = {
 	state: string;
 	nonce: string;
 	verifier: string;
 	challenge: string;
+	photos?: boolean;
 };
 export interface GoogleProvider {
 	readonly identity: string;
@@ -26,6 +35,7 @@ export interface GoogleProvider {
 		code: string,
 		verifier: string,
 		nonce: string,
+		photos?: boolean,
 	): Promise<{ profile: GoogleProfile; tokens: Tokens }>;
 	refresh(token: string): Promise<Tokens>;
 	revoke(token: string): Promise<void>;
@@ -42,3 +52,5 @@ export class GoogleAccountError extends Error {
 		super(code);
 	}
 }
+
+export { photosView, type PhotosView } from "./photos";

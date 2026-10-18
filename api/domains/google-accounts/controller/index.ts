@@ -4,11 +4,13 @@ import { z } from "zod";
 import { GoogleAccountError } from "../contracts";
 import type { GoogleAccounts } from "../service";
 import { digest } from "../service/secrets";
+import { registerPhotos } from "./photos";
 const cookieName = (state: string) =>
 	`eumenes_google_${digest(state).slice(0, 20)}`;
 const callback = "/oauth/google/callback";
 const revision = z.strictObject({ expectedRevision: z.number().int().min(0) });
 export function registerGoogleAccounts(app: Hono, service: GoogleAccounts) {
+	registerPhotos(app, service);
 	app.get("/api/google-accounts", (c) => {
 		c.header("Cache-Control", "no-store");
 		try {
@@ -17,14 +19,22 @@ export function registerGoogleAccounts(app: Hono, service: GoogleAccounts) {
 			return c.json({ error: "account_unavailable" }, 503);
 		}
 	});
-	for (const operation of ["connect", "cancel", "disconnect"] as const) {
+	for (const operation of [
+		"connect",
+		"connect-photos",
+		"cancel",
+		"disconnect",
+	] as const) {
 		app.post(`/api/google-accounts/${operation}`, async (c) => {
 			c.header("Cache-Control", "no-store");
 			const body = revision.safeParse(await c.req.json().catch(() => null));
 			if (!body.success) return c.json({ error: "invalid_input" }, 400);
 			try {
-				if (operation === "connect") {
-					const result = await service.begin(body.data.expectedRevision);
+				if (operation === "connect" || operation === "connect-photos") {
+					const result = await service.begin(
+						body.data.expectedRevision,
+						operation === "connect-photos",
+					);
 					setCookie(c, cookieName(result.state), result.browser, {
 						httpOnly: true,
 						sameSite: "Lax",

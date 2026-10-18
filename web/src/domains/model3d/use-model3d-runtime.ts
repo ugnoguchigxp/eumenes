@@ -25,6 +25,7 @@ import {
 	imageLibraryKey,
 	useImageLibrary,
 } from "../../media/use-image-library";
+import { uploadImage } from "../../media/upload-image";
 
 const defaultQuery: Model3dQuery = {
 	q: "",
@@ -197,6 +198,10 @@ export function useModel3dRuntime({
 			id: image.id,
 			title: imageTitle(image),
 			thumbnailUrl: imageContentUrl(image.id),
+			disabledReason:
+				image.width < 32 || image.height < 32
+					? "3D生成には縦横とも32px以上が必要です。"
+					: undefined,
 		})),
 		sourceImagesLoading: images.isPending,
 		sourceImagesError: images.error
@@ -263,6 +268,27 @@ export function useModel3dRuntime({
 		runtime: {
 			snapshot: { [model3dArtifactSource]: resource },
 			dispatch,
+			uploadFile: async (
+				source: string,
+				file: File,
+				context?: Readonly<Record<string, string>>,
+				signal = new AbortController().signal,
+			) => {
+				if (source !== model3dArtifactSource || !context?.requestId)
+					return {
+						status: "rejected" as const,
+						message: "画像の受付情報がありません。",
+					};
+				const result = await uploadImage(
+					client,
+					context.requestId,
+					file,
+					signal,
+				);
+				if (result.status === "accepted")
+					await cache.invalidateQueries({ queryKey: imageLibraryKey(client) });
+				return result;
+			},
 		},
 		refresh: () => cache.invalidateQueries({ queryKey: root }),
 	};

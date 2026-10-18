@@ -16,7 +16,7 @@ const log = getLogger("server");
  * change stream, HTTP, timers, coding, in-flight maintenance (tasks, store retention,
  * timers), world,
  * supervision, delegated, scheduler, service tests, voice, excalidraw, Claude Code sessions,
- * agents, queue,
+ * agents, the browser (its MCP child), queue,
  * web research, dialogue, inference, datasets, store.
  */
 export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
@@ -124,6 +124,13 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 		() => s.excalidraw.tick(),
 		{ exclusive: true },
 	);
+	// Tasks and captures past their deadline end, and temp files no capture owns are removed.
+	const browserSweep = intervalLifecycle(
+		"browser_sweep",
+		30_000,
+		() => s.browser.service.sweep(),
+		{ exclusive: true },
+	);
 	let feedResyncRequired = false;
 	return [
 		// Recovery runs to completion before any worker starts; a failure aborts startup.
@@ -165,6 +172,14 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 		},
 		{ name: "web_research_recovery", recover: () => s.webResearch.recover() },
 		{ name: "queue_recovery", recover: () => s.queue.recover() },
+		{
+			// A connection of the previous process ended with it; what it left running is settled here.
+			name: "browser_recovery",
+			recover: async () => {
+				await s.browser.service.ready;
+				await s.browser.service.sweep();
+			},
+		},
 		{ name: "delegated_recovery", recover: () => s.delegated.recover() },
 		{ name: "dots_recovery", recover: () => s.dots.recover() },
 		{
@@ -224,6 +239,7 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 			name: "timer_maintenance_start",
 			start: () => timerMaintenance.start?.(),
 		},
+		{ name: "browser_sweep_start", start: () => browserSweep.start?.() },
 		{
 			name: "kanban_maintenance_start",
 			start: () => kanbanMaintenance.start?.(),
@@ -241,6 +257,9 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 		createSpecialistSessionsLifecycle(s.dialogue),
 		{ name: "web_research", close: () => s.webResearch.close() },
 		{ name: "queue", close: () => s.queue.close(10_000) },
+		// The MCP child stops before the queue that drives it (reverse order: closed first).
+		{ name: "browser_sweep", close: () => browserSweep.idle() },
+		{ name: "browser", close: () => s.browser.close() },
 		{ name: "capabilities", close: () => s.toolchain.capabilities.close() },
 		{ name: "agents", close: () => s.toolchain.agents.close() },
 		{ name: "kanban", close: () => s.toolchain.kanbanRuns.disconnect() },
@@ -278,6 +297,7 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 				codingHeartbeat.stop();
 				timerMaintenance.stop();
 				kanbanMaintenance.stop();
+				browserSweep.stop();
 				vectorRefresh.stop();
 			},
 		},

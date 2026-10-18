@@ -13,6 +13,7 @@ import {
 export * from "./chat-input";
 export {
 	imageArtifactId,
+	imageArtifact,
 	imageArtifactDelete,
 	imageLibrary,
 } from "./image-library";
@@ -173,3 +174,4 @@ export {
 	musicTags,
 	type TrackQuery,
 } from "./music-library";
+export { imageImportReceipt, type ImageImportReceipt } from "./image-import";

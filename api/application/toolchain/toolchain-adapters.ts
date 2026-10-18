@@ -18,6 +18,11 @@ import {
 	MODEL3D_ADAPTER_REF,
 	model3dDomainSchemas,
 } from "../media/model3d-adapter";
+import {
+	BROWSER_ADAPTER_REF,
+	browserDomainSchemas,
+	describeBrowserAdapter,
+} from "../browser/browser-adapter";
 import type { Database } from "bun:sqlite";
 import type { ZodType } from "zod";
 import {
@@ -119,6 +124,7 @@ const domainSchemas: Readonly<Record<string, ZodType>> = {
 	]),
 	...uiCompositionsDomainSchemas,
 	...model3dDomainSchemas,
+	...browserDomainSchemas,
 	...terminalsDomainSchemas,
 	...kanbanDomainSchemas,
 	...stewardDomainSchemas,
@@ -168,6 +174,7 @@ export const hostAdapterDescriptions: Array<
 	{ ref: TIMER_ADAPTER_REF, describe: describeTimerAdapter },
 	{ ref: OCR_ADAPTER_REF, describe: describeOcrAdapter },
 	{ ref: MODEL3D_ADAPTER_REF, describe: describeModel3dAdapter },
+	{ ref: BROWSER_ADAPTER_REF, describe: describeBrowserAdapter },
 	{ ref: SETTINGS_ADAPTER_REF, describe: describeSettingsAdapter },
 	{ ref: RECORDS_ADAPTER_REF, describe: describeRecordsAdapter },
 	{ ref: INFERENCE_ADAPTER_REF, describe: describeInferenceAdapter },

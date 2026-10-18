@@ -321,7 +321,23 @@ function checkCommandBinding(c: Check, b: CommandBinding, path: string) {
 		);
 	c.schemaRef(b.outputSchemaRef, `${path}/outputSchemaRef`);
 	checkQuestions(c, b.questions ?? [], path);
+	checkTaskRetries(c, b, path);
 	checkBindingBase(c, b, path);
+}
+
+/**
+ * The retries of the single-shot task a command starts name tools of this binding (the package tool's id
+ * is the part of its revision id between `tool:` and `@`), or `default`.
+ */
+function checkTaskRetries(c: Check, b: CommandBinding, path: string) {
+	const retries = b.agent?.turn.retries;
+	if (!retries) return;
+	const ids = new Set(
+		b.tools.map((tool) => tool.toolRevisionId.slice(5).split("@")[0]),
+	);
+	for (const key of Object.keys(retries))
+		if (key !== "default" && !ids.has(key))
+			c.issue("unknown_reference", `${path}/agent/turn/retries/${key}`, key);
 }
 
 /**

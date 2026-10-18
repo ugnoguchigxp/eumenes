@@ -30,6 +30,7 @@ import { buildTasks } from "./server-tasks";
 import { assembleCuration } from "./server-world";
 import { createTimerAnnouncements } from "./timers/timer-announcements";
 import { createSpecialistPort } from "./toolchain/specialist-port";
+import { buildBrowser } from "./browser/browser-composition";
 import { createToolchainRouting } from "./toolchain/toolchain-routing";
 import { createHostToolchain } from "./toolchain/toolchain-host";
 
@@ -112,6 +113,13 @@ export async function buildServices(
 		capabilities: () => ocrCapabilities,
 	});
 	const model3d = buildModel3d(config, { core, conversation });
+	let browserCapabilities: Capabilities | null = null;
+	const browser = buildBrowser(config, {
+		core,
+		conversation,
+		inference,
+		capabilities: () => browserCapabilities,
+	});
 	const { toolchain, links } = await createHostToolchain({
 		dbPath,
 		store,
@@ -119,6 +127,7 @@ export async function buildServices(
 		uiCompositions,
 		ocr,
 		model3d,
+		browser,
 		inference,
 		webResearch,
 		settings,
@@ -141,6 +150,7 @@ export async function buildServices(
 		},
 	});
 	ocrCapabilities = toolchain.capabilities;
+	browserCapabilities = toolchain.capabilities;
 	const enabled = config.toolchainEnabled;
 	const media = buildMedia(config, {
 		core,
@@ -235,6 +245,7 @@ export async function buildServices(
 		objectRecognition: media.objectRecognition,
 		ocr,
 		model3d,
+		browser,
 		music: media.music,
 		queue,
 		webResearch,

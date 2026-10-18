@@ -7,6 +7,7 @@ export type ImageGridItem = {
 	id: string;
 	title: string;
 	thumbnailUrl?: string;
+	disabledReason?: string;
 };
 
 /** Presentation only: selection, preview and management are separate host actions. */
@@ -47,6 +48,7 @@ export function ImageGrid<T extends ImageGridItem>({
 							className={cn("image-grid-select", classNames?.select)}
 							disabled={
 								disabled ||
+								!!image.disabledReason ||
 								(!!image.thumbnailUrl &&
 									failed[image.id] === image.thumbnailUrl)
 							}
@@ -96,6 +98,7 @@ export function ImageGrid<T extends ImageGridItem>({
 					<div className={cn("image-grid-caption", classNames?.caption)}>
 						<div>
 							{renderCaption ? renderCaption(image) : <h4>{image.title}</h4>}
+							{image.disabledReason && <p>{image.disabledReason}</p>}
 						</div>
 						{renderActions && (
 							<div className="image-gallery-actions">

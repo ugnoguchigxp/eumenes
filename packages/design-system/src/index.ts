@@ -97,6 +97,7 @@ export { cn } from "./utils/cn";
 
 export * from "./components/MusicPlayer";
 export * from "./components/Model3dWorkspace";
+export * from "./components/BrowserWorkspace";
 export * from "./components/MusicWorkspace";
 export * from "./components/Playlist";
 export * from "./components/GenerationStatus";

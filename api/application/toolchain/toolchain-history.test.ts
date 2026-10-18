@@ -61,6 +61,7 @@ test("every builtin and bundled toolchain registers as a complete set with flat 
 		"kanban",
 		"codex-tasks",
 		"model3d",
+		"browser",
 	]);
 	const active = store.read((db) => capabilities.toolchainsInTransaction(db));
 	expect(active.map((d) => d.functionName).sort()).toEqual(

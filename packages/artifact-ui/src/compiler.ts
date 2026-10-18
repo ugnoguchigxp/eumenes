@@ -33,16 +33,18 @@ function checkSource(definition: ArtifactDefinition, snapshot: Snapshot) {
 				? "image-workspace"
 				: request.view === "model3d-workspace"
 					? "model3d"
-					: request.view === "music-workspace" ||
-						  request.view === "music-player" ||
-						  request.view === "playlist" ||
-						  request.view === "music-library"
-						? "music"
-						: request.view === "generation-status"
-							? "generation"
-							: request.view === "collection-workspace"
-								? "collection"
-								: request.view;
+					: request.view === "browser-workspace"
+						? "browser"
+						: request.view === "music-workspace" ||
+							  request.view === "music-player" ||
+							  request.view === "playlist" ||
+							  request.view === "music-library"
+							? "music"
+							: request.view === "generation-status"
+								? "generation"
+								: request.view === "collection-workspace"
+									? "collection"
+									: request.view;
 		if (request.source && snapshot[request.source]?.kind !== kind)
 			throw new Error("この表示では参照できない source です");
 	}

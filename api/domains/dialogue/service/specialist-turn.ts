@@ -2,7 +2,12 @@ import { z } from "zod";
 import type { Database } from "bun:sqlite";
 import { parseLlmJson } from "../../../infrastructure/llm-json";
 import { getLogger, withLogContext } from "../../../infrastructure/logger";
-import type { ControlContract, Receipt } from "../../inference";
+import {
+	agentSystemMessage,
+	toolResultMessage,
+	type ControlContract,
+	type Receipt,
+} from "../../inference";
 import type { HandlerDefinition } from "../../queue";
 import type { Run, SpecialistSet } from "../contracts";
 import {
@@ -25,9 +30,7 @@ import {
 	correctionMessage,
 	parseSpecialistAction,
 	specialistControl,
-	specialistSystemMessage,
 	specialistViolations,
-	toolResultMessage,
 	type SpecialistAction,
 } from "./specialist-prompt";
 import { viewedSpecialistTarget } from "./specialist-context";
@@ -217,7 +220,7 @@ export function createSpecialistTurnHandler(
 					set,
 					control,
 					messages: specialistTurnMessages({
-						system: specialistSystemMessage(control),
+						system: agentSystemMessage(control),
 						utterance: input.message.text,
 						course: sessionCourse(deps, tx, session, run, policy),
 						work: {

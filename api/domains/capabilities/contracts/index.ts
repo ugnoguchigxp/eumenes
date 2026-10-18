@@ -101,6 +101,23 @@ import {
 	model3dTarget,
 	model3dUpdate,
 } from "./model3d";
+import {
+	browserCaptureStart,
+	browserCaptureTarget,
+	browserPageCapture,
+	browserPageClick,
+	browserPageHover,
+	browserPagePress,
+	browserPageSelect,
+	browserPageType,
+	browserPageTypeValue,
+	browserPageWait,
+	browserTabOpen,
+	browserTabTarget,
+	browserTaskBegin,
+	browserTaskStart,
+	browserTaskTarget,
+} from "./browser";
 export { stockQuote } from "./stock";
 export { weatherPlace, weatherDays } from "./weather";
 export { publicUrl };
@@ -267,6 +284,21 @@ export const validators = {
 	model3dTarget,
 	model3dUpdate,
 	model3dJobTarget,
+	browserCaptureStart,
+	browserCaptureTarget,
+	browserTabTarget,
+	browserTabOpen,
+	browserTaskStart,
+	browserTaskBegin,
+	browserTaskTarget,
+	browserPageClick,
+	browserPageHover,
+	browserPageType,
+	browserPageTypeValue,
+	browserPageSelect,
+	browserPagePress,
+	browserPageWait,
+	browserPageCapture,
 };
 export type SchemaKey = keyof typeof validators;
 export type Owner = { rootRunId: string; taskId: string; cancelEpoch: number };

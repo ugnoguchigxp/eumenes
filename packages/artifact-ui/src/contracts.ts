@@ -24,8 +24,10 @@ import {
 import type { ImageWorkspaceResource } from "./image-components";
 export type { ImageWorkspaceResource } from "./image-components";
 export type { Model3dWorkspaceResource } from "./model3d-components";
+export type { BrowserWorkspaceResource } from "./browser-components";
 import type { RecordsResource } from "./records-components";
 import type { Model3dWorkspaceResource } from "./model3d-components";
+import type { BrowserWorkspaceResource } from "./browser-components";
 import type { MusicResource, GenerationResource } from "./media-contracts";
 import type { UiStudioResource } from "./ui-studio-contracts";
 import type {
@@ -320,6 +322,15 @@ export const viewRegistry = {
 		label: "3Dモデルの生成・検索・表示",
 		schema: z.strictObject({
 			view: z.literal("model3d-workspace"),
+			source,
+			title,
+		}),
+	},
+	"browser-workspace": {
+		name: "BrowserWorkspace",
+		label: "ブラウザの接続・タブ・撮影",
+		schema: z.strictObject({
+			view: z.literal("browser-workspace"),
 			source,
 			title,
 		}),
@@ -740,6 +751,7 @@ export type Resource =
 	| ActivityResource
 	| ImageWorkspaceResource
 	| Model3dWorkspaceResource
+	| BrowserWorkspaceResource
 	| RecordsResource
 	| SubtitlePreviewResource
 	| SettingsSectionResource

@@ -85,6 +85,14 @@ export type ArtifactEvent = {
 		| "model3d-search"
 		| "model3d-more"
 		| "model3d-refresh"
-		| "model3d-update";
+		| "model3d-update"
+		| "browser-connect"
+		| "browser-disconnect"
+		| "browser-open-url"
+		| "browser-focus-tab"
+		| "browser-close-tab"
+		| "browser-save-path"
+		| "browser-cancel-capture"
+		| "browser-cancel-task";
 	values: Record<string, string | boolean>;
 };

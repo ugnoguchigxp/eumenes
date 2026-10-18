@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import type { ImagePickerProps } from "../ImagePicker";
 
 export type Model3dGenerationState =
 	| "submitting"
@@ -42,6 +43,7 @@ export type Model3dSourceImage = {
 	id: string;
 	title: string;
 	thumbnailUrl?: string;
+	disabledReason?: string;
 };
 
 export type Model3dFilter = {
@@ -96,6 +98,8 @@ export type Model3dWorkspaceProps = {
 	onSearch: (filter: Model3dFilter) => void;
 	onMore: () => void;
 	onRefresh: () => void;
+	onUploadImage?: ImagePickerProps["onUpload"];
+	renderGooglePhotos?: ImagePickerProps["renderGooglePhotos"];
 };
 
 export const model3dQualityNote =

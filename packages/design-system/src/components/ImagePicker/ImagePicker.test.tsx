@@ -1,6 +1,12 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+	cleanup,
+	fireEvent,
+	render,
+	screen,
+	waitFor,
+} from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
-import { ImagePicker } from "./ImagePicker";
+import { ImagePicker, type ImagePickerUploadResult } from "./ImagePicker";
 afterEach(cleanup);
 const images = [
 	{ id: "a", title: "森", thumbnailUrl: "/forest.png" },
@@ -49,7 +55,7 @@ it("does not confirm a removed candidate or an indeterminate library", () => {
 	fireEvent.keyDown(screen.getByRole("tab", { name: "Googleフォト" }), {
 		key: "Enter",
 	});
-	expect(screen.getByRole("status")).toHaveTextContent("未実装");
+	expect(screen.getByRole("status")).toHaveTextContent("利用できません");
 	expect(screen.queryByRole("button", { name: "森を選ぶ" })).toBeNull();
 });
 
@@ -108,4 +114,83 @@ it("can retry a broken thumbnail by refreshing the list", () => {
 	fireEvent.click(screen.getByRole("button", { name: "一覧を更新" }));
 	expect(onRefresh).toHaveBeenCalledTimes(1);
 	expect(screen.getByRole("button", { name: "森を選ぶ" })).not.toBeDisabled();
+});
+
+it("uploads only on explicit action, reconciles with the same UUID, and confirms the imported ID separately", async () => {
+	vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:preview");
+	vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+	const onConfirm = vi.fn();
+	const onUpload = vi
+		.fn()
+		.mockResolvedValueOnce({ status: "pending", message: "未確認" })
+		.mockResolvedValueOnce({
+			status: "succeeded",
+			image: {
+				id: "imported",
+				title: "取り込んだ画像",
+				thumbnailUrl: "/imported",
+			},
+		});
+	render(
+		<ImagePicker
+			images={images}
+			onConfirm={onConfirm}
+			onCancel={() => {}}
+			onUpload={onUpload}
+		/>,
+	);
+	const file = new File(["image"], "photo.png", { type: "image/png" });
+	fireEvent.change(screen.getByLabelText("アップロードする画像"), {
+		target: { files: [file] },
+	});
+	expect(onUpload).not.toHaveBeenCalled();
+	fireEvent.click(screen.getByRole("button", { name: /^アップロード$/ }));
+	await waitFor(() =>
+		expect(screen.getByRole("button", { name: "状態を再確認" })).toBeEnabled(),
+	);
+	const first = onUpload.mock.calls[0]!;
+	expect(first[0]).toBe(file);
+	fireEvent.click(screen.getByRole("button", { name: "状態を再確認" }));
+	await waitFor(() =>
+		expect(
+			screen.getByRole("button", { name: "この画像を使う" }),
+		).toBeEnabled(),
+	);
+	expect(onUpload.mock.calls[1]![1]).toBe(first[1]);
+	expect(onConfirm).not.toHaveBeenCalled();
+	fireEvent.click(screen.getByRole("button", { name: "この画像を使う" }));
+	expect(onConfirm).toHaveBeenCalledWith("imported");
+	vi.restoreAllMocks();
+});
+it("discarding a file aborts its upload and ignores a late successful result", async () => {
+	vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:preview");
+	vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+	let finish!: (value: ImagePickerUploadResult) => void;
+	const onUpload = vi.fn(
+		(_file: File, _id: string, _signal: AbortSignal) =>
+			new Promise<ImagePickerUploadResult>((r) => (finish = r)),
+	);
+	render(
+		<ImagePicker
+			images={images}
+			onConfirm={() => {}}
+			onCancel={() => {}}
+			onUpload={onUpload}
+		/>,
+	);
+	fireEvent.change(screen.getByLabelText("アップロードする画像"), {
+		target: {
+			files: [new File(["image"], "photo.png", { type: "image/png" })],
+		},
+	});
+	fireEvent.click(screen.getByRole("button", { name: /^アップロード$/ }));
+	fireEvent.click(screen.getByRole("button", { name: "ファイル選択を解除" }));
+	expect(onUpload.mock.calls[0]?.[2].aborted).toBe(true);
+	finish({ status: "succeeded", image: { id: "late", title: "old" } });
+	await waitFor(() =>
+		expect(
+			screen.getByRole("button", { name: "この画像を使う" }),
+		).toBeDisabled(),
+	);
+	vi.restoreAllMocks();
 });

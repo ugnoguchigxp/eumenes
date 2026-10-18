@@ -99,6 +99,8 @@ test("the shutdown order is fixed, and a freshly built set of services closes cl
 		"kanban",
 		"agents",
 		"capabilities",
+		"browser",
+		"browser_sweep",
 		"queue",
 		"web_research",
 		"specialist_sessions",

@@ -1,3 +1,6 @@
+履歴資料：この提案は2026-10-19の本番契約で置き換えた。
+現行は../larm-image-import-v1/README.txtと本番GET /openapi.jsonを参照。以下の旧パス・エラー・上限・未実装という記載は検討当時の内容。
+
 LARM 画像取込API v1 提案仕様（未公開・未実装）
 2026-10-18
 
@@ -24,17 +27,18 @@ Google側の画像取得と認証はEumenes backendが担当し、取得したby
 
 受付上限の提案（LARM実装者との合意・計測前の値）
 入力：JPEG、PNG、WebPの静止画。アニメーション・動画・SVGは対象外。
-上限：受信bytes 16 MiB、各辺8192px、総画素数33,554,432、画像数1。
+上限案：LARM受信bytes 16 MiB、各辺2000px、総画素数4,000,000、画像数1。利用者指定で各辺の上限を2000pxへ変更。現行3Dサービスの4096px・20 MiB制約内に収める。
 Content-Lengthだけに頼らず受信中・decode前後で検査する。Content-Typeや拡張子だけで形式を決めない。
 HEIC等はv1の保証対象外。Googleから取得した実体が未対応ならunsupported_media_typeを返し、別形式の写真を案内する。
-LARMはEXIFの向きを適用し、位置を含むEXIF等を除き、静止PNGに正規化する。alphaは保持する。
+Eumenesは既存のブラウザ画像保存codecを共通化し、アップロード前にEXIF向き適用、縦横比維持・拡大なしの長辺2000px以内への縮小、非可逆WebP品質75（effort6）への変換を一回行う。alphaは保持し、EXIF・ICC・XMPは保存しない。Eumenesが受ける変換前の原本には16MiB・各辺8192px・33,554,432画素の安全上限を設け、LARMへ送る2000px出力と区別する。
+LARMはWebPを実体検証し、圧縮画像データを再圧縮せず保存する。PNGへの再変換は行わない。JPEG/PNGの直接受付はLARM側の正式契約で向き補正後PNGとする案だが、Eumenesは事前変換済みWebPを送る。
 保存後の寸法・bytes・sha256・hasAlpha・format・mimeTypeは、保存された正規化後の内容を表す。
-正規化後の保存bytesも32,000,000以下とし、超過は413 image_too_large。既存の画像取得クライアントの上限内に収める。
+正規化後の保存bytesは20 MiB（20,971,520 bytes）以下とし、超過は413 image_too_large。既存の画像取得クライアント上限32,000,000 bytesと、3D入力上限20 MiBの両方を満たす。LARMでは暗黙の縮小や再圧縮を行わない。
 入力上限は既存チャット添付の上限とは別。値を変える場合は両側の契約と試験を更新する。
 
 応答と状態
 初回の成功は201、同じ要求の成功再送は200。本文は{status:"succeeded",artifact:<既存imageArtifact形式>}。
-artifactにはid、createdAt、format:"png"、mimeType:"image/png"、width、height、hasAlpha、bytes、sha256、contentUrlを含む。
+artifactにはid、createdAt、format:"webp"、mimeType:"image/webp"（JPEG/PNGの直接受付ではpng/image/png）、width、height、hasAlpha、bytes、sha256、contentUrlを含む。
 成功・進行中・失敗の状態応答にはrequestIdと照会可能期限expiresAtも含める。OpenAPI案が正確な応答形を定義する。
 contentUrlはControl同一originの /v1/image-artifacts/{id}/content。資格情報をURLに入れない。
 保存した画像と一覧が取得できる状態になってから成功を返す。
@@ -80,7 +84,7 @@ Eumenes側の接続条件
 Google連携は同じアカウントでPhotos Picker scopeへの追加同意が必要。現在のopenid/email/profileだけでは写真を読めない。
 Photosのセッション・pollingConfig・期限・取消・選択bytesの取得・片付けはbackendが所有する。
 外部URLを永続参照として渡さず、選んだ静止画だけを取得・検証・取込する。
-現在3D生成に使えるのはLARM保存画像。「LARM画像」「Googleフォト」の2タブと独立したBrowseボタンを表示する。Browseではファイル選択・ローカル確認まで可能だが、未アップロードと表示し生成用IDとしては確定しない。Googleフォトは未接続理由を表示し、外部要求を発行しない。
+現在3D生成に使えるのはLARM保存画像。「LARM画像」「Googleフォト」の2タブと独立した「参照…」ボタンを表示する。「参照…」ではファイル選択・ローカル確認まで可能だが、未アップロードと表示し生成用IDとしては確定しない。Googleフォトは未接続理由を表示し、外部要求を発行しない。
 
 画像と文章の併用について
 2026-10-18の実OpenAPIを再確認し、3D生成sourceはpromptまたはimage-artifactの排他的な契約で、画像に補足文を添える項目は無い。画像取込APIを追加するだけではこの制約は解消しない。
@@ -101,3 +105,10 @@ api/domains/larm/contracts/image-library.ts / api/domains/larm/contracts/mesh.ts
 https://developers.google.com/photos/picker/guides/get-started-picker
 https://developers.google.com/photos/picker/guides/sessions
 https://developers.google.com/photos/picker/guides/media-items
+
+追加依頼の範囲（2026-10-18）
+利用者の最新指示により画像専用とする。汎用ファイル保管、PDF、音声、動画等の受付は追加しない。LARM側の既存3D実装チャットへ、画像取込APIの実装を依頼する。製品側から未公開APIを呼ぶ処理は正式契約確認後。
+ライブcatalogの3D入力条件を再確認し、初期案の8192px・正規化32,000,000 bytesを4096px・20 MiBへ訂正。これにより、取込に成功した画像を既存3Dへ渡す要件に合わせた。上限は依頼案であり、LARM側の確定応答で再照合する。
+
+品質75と共通化の指定（2026-10-18）
+利用者が長辺2000pxとアップロード前の非可逆WebP品質75を明示指定。画像検証・圧縮はapi/infrastructure/webp.tsへ既存browser encoderから共通化し、browser adapterとimage/service/prepare-upload.tsで利用。会話添付のJPEG/PNG/BMP契約やブラウザ撮影2500px上限は変えない。LARM担当チャットへ2000px・WebP非再圧縮保存の訂正を送信済み。
