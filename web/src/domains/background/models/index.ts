@@ -1,23 +1,12 @@
 import type { SpatialModels } from "../contracts";
 import { createParticleModel, type ParticleData } from "./particles";
 
-export const particleModelIds = [
-	"cpu",
-	"memory",
-	"ssd",
-	"network",
-	"llm",
-	"asr",
-	"tts",
-	"embedding",
-	"attitude",
-	"language",
-	"image",
-	"music",
-] as const;
+import { particleModelIds } from "./catalog";
+export { particleModelIds } from "./catalog";
 const descriptors = import.meta.glob<{
 	id: string;
 	stride: number;
+	componentsPerPoint?: number;
 	pointCount: number;
 	normalizationRadius: number;
 }>("./assets/*.json", { eager: true, import: "default" });
@@ -32,12 +21,13 @@ export function decodeParticles(
 	binary: ArrayBuffer,
 	descriptor: {
 		stride: number;
+		componentsPerPoint?: number;
 		pointCount: number;
 		normalizationRadius: number;
 	},
 ) {
 	if (
-		descriptor.stride !== 8 ||
+		(descriptor.componentsPerPoint ?? descriptor.stride) !== 8 ||
 		binary.byteLength !== descriptor.pointCount * 32 ||
 		!Number.isFinite(descriptor.normalizationRadius) ||
 		descriptor.normalizationRadius <= 0

@@ -51,3 +51,27 @@ test("a call cut by its deadline is a failure, unlike a cancellation", async () 
 		reason: "deadline_exceeded",
 	});
 });
+
+test("a late result after cancellation cannot replace the last observed failure", async () => {
+	const recorder = createActivityRecorder(() => 50);
+	await recorder
+		.track(() => Promise.reject(new Error("larm_failed")))
+		.catch(() => {});
+	const cancel = new AbortController();
+	let finish!: () => void;
+	const pending = recorder.track(
+		() =>
+			new Promise<void>((resolve) => {
+				finish = resolve;
+			}),
+		cancel.signal,
+	);
+	cancel.abort();
+	finish();
+	await expect(pending).rejects.toThrow();
+	expect(recorder.observe()).toEqual({
+		running: 0,
+		lastSuccessAt: null,
+		lastFailure: { at: 50, reason: "larm_failed" },
+	});
+});

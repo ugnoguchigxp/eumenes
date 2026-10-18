@@ -16,7 +16,9 @@ export function createActivityRecorder(now = Date.now): ActivityRecorder {
 		async track(call, signal) {
 			running += 1;
 			try {
+				signal?.throwIfAborted();
 				const value = await call();
+				signal?.throwIfAborted();
 				lastSuccessAt = now();
 				return value;
 			} catch (error) {

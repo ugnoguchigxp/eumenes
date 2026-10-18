@@ -10,3 +10,4 @@ export {
 } from "./composition-contracts";
 export { computeValues } from "./composition-compute";
 export { validateComposition } from "./composition-validate";
+export { fixDefinition, type FixResult } from "./composition-fixer";

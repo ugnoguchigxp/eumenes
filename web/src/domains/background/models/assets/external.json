@@ -1,0 +1,80 @@
+{
+	"id": "external",
+	"version": 2,
+	"shape": {
+		"name": "eight-petal cosmos flower",
+		"description": "eight-petal cosmos flower",
+		"topology": "A central flower disk surrounded by eight broad radial petals, without stem or leaves",
+		"components": [
+			"flower core",
+			"petal 1",
+			"petal 2",
+			"petal 3",
+			"petal 4",
+			"petal 5",
+			"petal 6",
+			"petal 7",
+			"petal 8"
+		],
+		"silhouette": "A central flower disk surrounded by eight broad radial petals, without stem or leaves",
+		"label": "External Integrations"
+	},
+	"count": 2300,
+	"stride": 32,
+	"format": "Float32LE",
+	"attributes": ["x", "y", "z", "phase", "group", "seed", "size", "weight"],
+	"bounds": {
+		"min": [-1.1697927713394165, -1.1699998378753662, -0.16569417715072632],
+		"max": [1.1699497699737549, 1.169999361038208, 0.1999998390674591]
+	},
+	"seed": 4182026,
+	"coordinateSystem": "right-handed Z-up",
+	"animation": "fixed local positions; bounded brightness propagation only; no model-local rigid motion",
+	"geometryChecks": {},
+	"label": "External Integrations",
+	"kind": "external",
+	"category": "service",
+	"pointCount": 2300,
+	"strideBytes": 32,
+	"componentsPerPoint": 8,
+	"binary": "external.bin",
+	"normalizationRadius": 1.1740282022788515,
+	"motion": {
+		"type": "eight-petal-cosmos-flower-brightness",
+		"phaseMeaning": "Core phase 0; each petal root 0 to tip 1. Petals are geometric parts, not service assignments.",
+		"groupMeaning": {
+			"0": "flower core",
+			"1": "petal 1",
+			"2": "petal 2",
+			"3": "petal 3",
+			"4": "petal 4",
+			"5": "petal 5",
+			"6": "petal 6",
+			"7": "petal 7",
+			"8": "petal 8"
+		},
+		"cyclesPerSecond": 0.08333333333333333,
+		"pulseWidth": 0.18,
+		"baseBrightness": 0.7,
+		"peakBrightness": 0.77,
+		"maxDisplacement": 0,
+		"rules": [
+			"Animate brightness only. Local point positions are anchored; do not integrate positions, rigidly rotate, deform, emit, or resize the model.",
+			"Keep all structural points visible in idle, activity zero, disconnected and unlit portions. Keep pointCount, size, seed and weight fixed across states.",
+			"Use one health color across the entire shape; groups control brightness, never independent health colors or monitoring targets.",
+			"Use bounded modulo time. Maximum working speed is 1.3 times the reference, never driven by utilization.",
+			"Cap the combined wave, breathing and utilization brightness uplift at 10 percent. Separate observed static capacity/seat/load brightness from activity uplift.",
+			"Health overrides activity. Fault stops ordinary flow and permits at most idle-strength breathing; a newly identified observed event may flash softly once for about one second, never on repeated retrieval.",
+			"Disconnected and unknown stop all temporal brightness changes. Stale retains health color at 45 percent of normal brightness and stops breathing, flow and event flashes.",
+			"Reduced motion stops breathing, flow, event flashes and value interpolation; retain fixed coordinates, per-point steady brightness and current supplied color/labels.",
+			"The model does not infer health, fabricate activity or missing observations, change monitoring thresholds, or introduce measurement APIs. Missing inputs remain unknown rather than zero.",
+			"Scene placement and orbital transforms are separate from model-local animation. Reference timing is a production proposal, not a monitoring threshold."
+		],
+		"suggestion": "Idle: weak core and petal breathing. Observed working input only: core-to-tip light. Explicit starting input fills roots outward. No petal motion or invented petal-to-service mapping.",
+		"idleBreathingSeconds": 12,
+		"maxSpeedMultiplier": 1.3,
+		"maxCombinedBrightnessUplift": 0.1,
+		"movingWave": true,
+		"specificationStatus": "production-proposal; monitoring rules and APIs are not implemented"
+	}
+}

@@ -65,7 +65,7 @@ test("saved backgrounds render with WebGL, survive reload, and release the previ
 	);
 	await expect(page.locator(".spatial-background")).toHaveAttribute(
 		"data-model-count",
-		"12",
+		"14",
 	);
 	await expect(page.getByRole("textbox", { name: "メッセージ" })).toBeVisible();
 	await page.screenshot({ path: "test-results/spatial-background.png" });

@@ -1,74 +1,39 @@
 # 会話の背景とSpatialのモデル
 
-設定の「表示」→「会話の背景」で光の妖精とSpatialを選び、変更を保存する。旧設定や未選択時は光の妖精を表示する。保存は既存の設定APIを使い、再読込み後も選択と調整値を維持する。
+設定の「表示」→「会話の背景」で光の妖精とSpatialを選び、変更を保存する。旧設定や未選択時は光の妖精を表示する。設定保存は既存APIと共通下書きを使う。
 
-## 監視銀河の移植（2026-10-14）
+## 監視銀河14体の採用（2026-10-18）
 
-監視銀河の採用版からCPU・Memory・SSD・Network・LLM・ASR・TTS・Embedding・態度判定・言語判定・画像生成・楽曲生成の12種類を移植した。元の点群29,952点を変更せず、Eumenes既存のThree.js 0.186.1で描画する。CPUの元座標を保持し、元のCPU変形式を適用してから正規化する。モデル内の活動・自転と、Sceneが持つ公転の変換を分離している。中心には物体や文字を置かない。
+採用済み監視銀河source `2faaae57be7e9d78f74a0b9e2a4cba5538a0c153` の14点群、33,460点を移植。Eumenes10体（CPU・Memory・SSD・Backend・外部連携・LLM・ASR・TTS・Embedding・態度判定）とLARM4体（Core・CPU・Memory・GPU）。旧Networkは二重漏斗のBackendへ置き換え、言語・画像・楽曲の形状を展示から外した。各サービス自体と監視APIは維持する。
 
-これらは展示用の形状サンプルであり、実測したこのMacの機器一覧や導入済みProviderの一覧ではない。データ取得経路は未接続で、通常は全モデルを未確認・待機として表示する。会話・音声・API接続・認証は背景に持たせていない。
+モデル内の元座標・phase・group・seed・size・weightは固定し、光の位相だけを進める。モデル内の自転・変形・噴出は行わない。公転はSceneが別に持つ配置。速度は活動workingでも基準の1.15倍まで、波・呼吸・利用率による発光上乗せは合計10%以内。faultは通常の流れを止め、pressureは加速しない。未確認・接続断・stale・reduced-motionでは時間変化を止める。選択してもhealth色を保持する。
 
-設定の表示画面に粒子・動き・状態プレビューの区分を追加した。旧画面でも同じ保存項目を編集でき、Spatialの見本は下書きを即時表示する。会話背景への反映は保存後になる。
-
-| 項目 | 初期値 | 調整範囲 |
+| 項目 | 初期値 | 範囲 |
 | --- | --- | --- |
-| 粒子の拡散 | 100%（監視銀河の基準） | 0–200% |
-| 元の形を残す割合 | 全体40%、フォーカス60% | 各10–90% |
-| 粒子サイズ | 100% | 50–200% |
-| 明るさ | 80% | 20–100% |
-| 公転速度 | 50% | 0–200%、1%刻み |
-| 自転速度 | 25% | 0–100%、1%刻み |
+| 散らばり | 350% | 0〜500% |
+| 原型を残す割合 | 全景40%、近接60% | 各10〜90%（既存調整契約を維持） |
+| 粒子サイズ | 100% | 50〜200% |
+| 背景の明るさ | 80% | 20〜100% |
+| 公転速度 | 50% | 0〜200%、0で公転のみ停止 |
 
-拡散は各粒子の元座標から行い、seedを10%ずつの層へ分けて滑らかに広げる。別のランダムな雲は生成しない。全モデルが自転し、CPUは利用率にも連動する。公転0%は公転だけを止める。「動きを停止」や「動きを減らす」、端末のreduced-motion設定では動きを停止する。
+初期割合では、拡散する点をseedで約10%ずつ、全景6群・近接4群へ分ける。各群へ最大範囲の1/6〜6/6、1/4〜4/4を割り当てる。ズームでは両端の係数を補間する。カメラの画角は原型から決め、散らばり操作では倍率を変えない。外側の点は画面外へ広がってよい。任意のcore/focusCore設定も既存uniformへ渡す。
 
-設定プレビューのモデルをクリック、または矢印キーで選ぶと、上から見下ろすフォーカスへ約0.85秒のカメラ遷移を行う。選択モデルは白い粒子になり、他のモデルは薄くなる。再クリック・全体に戻る・Escで全体表示へ戻り、選択を解除する。healthは一覧にも残る。
+近接では原型を明るくし、拡散点も見える大きさと不透明度にする。Eumenesの画面出力へ色空間変換を適用し、静的な表示光量を1.5倍に調整した。これは活動の10%上限やhealth判定を変えるものではない。
 
-## 状態の契約と将来の取得経路
+設定画面は `settings.display@10`。旧revisionは不変。廃止したモデル内自転の保存項目は旧文書互換として受理するが、描画では使わず新版画面には表示しない。
 
-`SpatialBackground` の `items` が取得側から受け取る唯一の観測入力。Sceneやモデルはhealthを判定しない。取得側は `web/src/domains/monitoring`。`GET /api/monitoring/snapshot` を表示中だけ1分ごとに読み、形状（`shape`）で配置へ当て、backend が決めた実体ID（例 `service-llm`、`eumenes-backend`）で渡す。読めなかったときは Eumenes Backend を接続断、他を stale にする。判定規則は [Spatial監視の設計](../spec/spatial-monitoring-eumenes-design-2026-10-18.md) §3。モデルとWebGL contextは状態変更だけでは再作成しない。形状サンプルのIDを実際のProviderのIDと混同しない。
+## 実測との接続
 
-```ts
-// 型は web/src/domains/background の公開entryからimportする。
-const item: SpatialItem = {
-  id: "owner-supplied-instance-id",
-  label: "取得側が決める表示名",
-  model: "llm",
-  position: [8, 0, 0],
-  orbit: { radius: 8, phase: 0, speed: 0.75 },
-  state: {
-    health: "unknown",
-    activity: "idle",
-    stale: false,
-    source: "unconfirmed",
-    // utilization / strength / observedAt は取得できた場合だけ渡す。
-  },
-};
-```
+`SpatialBackground.items` が唯一の観測入力。取得側の `web/src/domains/monitoring` が既存 `GET /api/monitoring/snapshot` をSpatial表示中だけ1分ごとに読み、実体IDと状態を渡す。Sceneやモデルはhealthを判断せず、観測値がないことと0を区別する。APIの旧shape=`network`だけはWeb取得境界で新モデル=`backend`へ対応付ける（既存APIの互換接続）。
 
-- health: healthy＝青白、pressure＝橙、fault＝赤、disconnected/unknown＝暗い灰紫。未確認・接続断・staleでは光量も抑える。高利用率だけで赤くしない。
-- activity: idle / starting / working。活動量strengthと利用率utilizationは別の0–1の値。未取得は省略し、0と区別する。
-- stale: 観測情報の古さ。取得側が判定する。古い情報や未確認・接続断では活動の発光を停止する。
-- source: unconfirmed / demo / measurement。取得側が観測の出所を明示できる。
-- 状態プレビューは明示的に有効化した場合だけデモ値を表示する。設定タブで共通health・活動・活動量・利用率・staleを調整し、選択したモデルではhealth・活動・利用率を個別に上書きできる。デモ値は実測値として保存・利用しない。
+CPU・Memory・SSD・Backendと既存5サービスの状態は既存APIを利用する。外部連携とLARM4体の計測APIは未実装なのでunknown/idle/unconfirmedのまま表示し、他サービスの状態を流用しない。言語・画像・楽曲の監視はAPIに残るが新しい形へ勝手に割り当てない。
+
+取得失敗時はBackendをdisconnected、他をstaleへ。明示的な状態プレビューだけはデモ値を優先する。デモは実測として保存・表示しない。既存の監視判定の正本は[実測接続の設計](../spec/spatial-monitoring-eumenes-design-2026-10-18.md)。
 
 ## 描画と資源管理
 
-選択中の背景だけを描画し、設定画面への移動・切替・unmountでSceneを解放する。非表示タブではRAFを停止し、復帰時に経過時間を持ち越さない。表示サイズに合わせてカメラとCanvasを更新し、縦画面でも拡散領域を画角へ収める。
+既存の単一WebGL contextとRAFを使用し、30fps・DPR1.5を上限とする。点群のinterleaved bufferは不変。光の評価器は同じcolor配列を再利用し、状態・時間に応じて更新する。別Canvas、別RAF、追加texture、画面全体のblurやrender targetは追加しない。非表示タブ・停止・背景切替・unmountでは既存の停止/解放経路を使う。
 
-一つのWebGL context、静的なinterleaved点群buffer、ShaderMaterialのuniformを使用する。毎フレームの点群配列再生成やポストプロセス用RenderTargetは追加していない。描画要求は30fpsを上限としDPRは1.5まで。これは性能保証ではなく描画の制限である。
+WebGL初期化・context loss・描画失敗ではGPU資源を解放し、HTML状態一覧と再表示ボタンを出す。HTMLからの選択、Sceneの有限カメラ遷移、reduced-motion即時切替も維持する。会話画面に状態を見るボタンやモデルドロップダウンを追加しない。
 
-WebGL初期化失敗・context loss・描画失敗ではRAFとGPU資源を解放し、HTMLの状態一覧と再表示ボタンを出す。再表示時は新しいcontextを作る。停止中でも有限のカメラ遷移だけは可能で、reduced-motionでは即時切り替える。
-
-点群資産は `models/assets/` に置く（`data/` はリポジトリの除外対象）。資産の取得・検査は `models/index.ts`、モデルのGPU表現は `models/particles.ts`、活動・拡散の式は `models/shaders.ts`。新しいモデルは同じregistryへ登録し、独自Canvasや独自RAFを持たせない。
-
-## 検証
-
-- `bun run verify -- --domain background`
-- `bun run verify -- --domain settings`
-- `bun run toolchain:bundle -- check api/domains/capabilities/bundles/settings.spatial.bundle.json`
-- `bun x playwright test tests/browser/backgrounds.spec.ts tests/browser/spatial-galaxy.spec.ts`
-- `bun check --noEmit` と `bun run build:web`
-
-記録とスクリーンショットは `spec/verification/spatial-galaxy-2026-10-14/`。実測・Provider接続・長時間実機受入は未実施。
-
-2026-10-14のサイズ修正：モデルの局所寸法を1.35倍へ拡大し、実際の拡散範囲から画角を決める。横長は斜めの構図、縦長は上からの構図で形状の見切れを抑える。点数・光量・粒子サイズは変更していない。会話画面の「状態を見る」と会話モデルのドロップダウンは取り除き、モデル名は読み取り専用で表示する。利用先の設定は残している。
+出所と全資産hashは`models/MODEL-SOURCE.md`と`source-hashes.json`。採用設計・確認範囲は[置換計画](../spec/spatial-monitor-galaxy-adoption-2026-10-18.md)。長時間GPU測定とLARM4体の実機計測対応を、この描画移植の完了と混同しない。

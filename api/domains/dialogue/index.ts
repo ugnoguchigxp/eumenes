@@ -6,6 +6,7 @@ export {
 	worldStateMigration,
 	announcementMigration,
 	specialistMigration,
+	specialistEventsMigration,
 } from "./repository";
 export {
 	commandInteractionsMigration,

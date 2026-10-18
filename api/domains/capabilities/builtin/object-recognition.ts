@@ -89,7 +89,8 @@ objectRecognitionBuiltins.push(
 		id: "object-recognition.manage",
 		revision: 2,
 		title: "物体認識",
-		summary: "撮影・選択入力の検出画面と保存済み観測を扱い、撮影画像を会話に見せる",
+		summary:
+			"撮影・選択入力の検出画面と保存済み観測を扱い、撮影画像を会話に見せる",
 		backend: "object-recognition",
 		schemaKey: "toolchainRequest",
 		dependencies: [

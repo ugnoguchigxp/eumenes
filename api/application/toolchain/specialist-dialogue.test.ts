@@ -58,6 +58,12 @@ afterEach(async () => {
 	for (const rig of rigs.splice(0)) await rig.close();
 });
 
+/** The specialist turn's enclosed reference data (the user message after REFERENCE=). */
+function referenceOf(prompt: Prompt) {
+	const message = prompt.find((m) => m.content.includes("REFERENCE="))!;
+	return JSON.parse(message.content.split("REFERENCE=")[1]!);
+}
+
 /** The harness with a model that answers the main agent and the specialist from two scripts. */
 async function rig() {
 	const script = {
@@ -323,11 +329,10 @@ test("ui_create opens the work and the same run continues as the specialist's tu
 	});
 	// The specialist saw the request, the tools of its set and nothing else of the conversation.
 	const prompt = r.specialistPrompts[0]!;
-	expect(prompt.map((m) => m.role)).toEqual(["system", "user"]);
+	expect(prompt.map((m) => m.role)).toEqual(["system", "user", "user"]);
 	expect(prompt[0]!.content).toContain("ui.draft.apply");
-	expect(JSON.parse(prompt[1]!.content).request).toBe(
-		"来場者アンケートのUIを作ってください",
-	);
+	expect(referenceOf(prompt).course).toEqual([]);
+	expect(prompt[2]!.content).toBe("来場者アンケートのUIを作ってください");
 });
 
 test("later utterances go to the specialist without the main model; an explanation does not grow the undo history", async () => {
@@ -345,8 +350,14 @@ test("later utterances go to the specialist without the main model; an explanati
 	expect(afterSoften.title).toBe("やわらかいアンケート");
 	expect(afterSoften.definition.gap).toBe("relaxed");
 	// The specialist's second input carries the first draft as the current work.
-	const input = JSON.parse(r.specialistPrompts.at(-2)!.at(-1)!.content);
+	const input = referenceOf(r.specialistPrompts.at(-2)!);
 	expect(input.currentWork).toBeTruthy();
+	// The first turn is in the session's course, with the operation it ran.
+	expect(input.course).toHaveLength(1);
+	expect(input.course[0].steps[0]).toMatchObject({
+		tool: "ui.draft.apply",
+		ok: true,
+	});
 
 	const explain = await r.sayAndWait("この画面の使い方を教えてください");
 	expect(explain.status).toBe("completed");
@@ -706,18 +717,19 @@ test("the specialist's prompt holds no conversation, World or memory material an
 	for (const prompt of r.specialistPrompts) {
 		expect(text(prompt)).not.toContain("MAIN_MARKER_BLUE");
 		expect(prompt[0]!.role).toBe("system");
-		// Only the instruction and the turn's data (plus the turn's own tool exchange).
-		// The turn's data is the last user message that is not a tool result.
-		const data = prompt
-			.filter((m) => m.role === "user" && !m.content.startsWith("TOOL_RESULT="))
-			.at(-1)!;
-		expect(Object.keys(JSON.parse(data.content)).sort()).toEqual(
+		// Only the instruction, the turn's reference data and the request (plus the turn's own tool exchange).
+		expect(
+			Object.keys(referenceOf(prompt))
+				.filter((key) => key !== "handedOverRequest")
+				.sort(),
+		).toEqual(
 			[
+				"callsLeft",
+				"course",
 				"currentWork",
 				"dirty",
 				"label",
 				"now",
-				"request",
 				"savedRef",
 				"timeZone",
 				"viewing",

@@ -1,7 +1,7 @@
 import {
 	AdditiveBlending,
+	BufferAttribute,
 	BufferGeometry,
-	Color,
 	Group,
 	InterleavedBuffer,
 	InterleavedBufferAttribute,
@@ -9,11 +9,13 @@ import {
 	ShaderMaterial,
 } from "three";
 import type { SpatialModel, SpatialState } from "../contracts";
+import { healthColors } from "../options";
+import { particleModelIds } from "./catalog";
 import {
-	activityStrength,
-	defaultSpatialOptions,
-	healthColors,
-} from "../options";
+	evaluateParticle,
+	type AnimationInput,
+	type ParticleSample,
+} from "./evaluator";
 import { fragmentShader, vertexShader } from "./shaders";
 import { createParticleEnvelope, PARTICLE_MODEL_SCALE } from "./envelope";
 
@@ -23,15 +25,15 @@ export type ParticleData = {
 	radius: number;
 	points: Float32Array;
 };
-const TAU = 2 * Math.PI;
 
-/** One immutable interleaved point buffer; activity, shape diffusion and CPU motion run on GPU. */
+/** Adopted fixed geometry and light evaluator; the existing scene owns the only loop. */
 export function createParticleModel(data: ParticleData): SpatialModel {
+	const id = particleModelIds.find((value) => value === data.id);
+	if (!id) throw new Error("invalid_particle_model");
 	const object = new Group();
 	object.scale.setScalar(PARTICLE_MODEL_SCALE);
-	const bounds = createParticleEnvelope(data);
-	const geometry = new BufferGeometry();
-	const buffer = new InterleavedBuffer(data.points, 8);
+	const geometry = new BufferGeometry(),
+		buffer = new InterleavedBuffer(data.points, 8);
 	geometry.setAttribute(
 		"position",
 		new InterleavedBufferAttribute(buffer, 3, 0),
@@ -47,21 +49,17 @@ export function createParticleModel(data: ParticleData): SpatialModel {
 			name,
 			new InterleavedBufferAttribute(buffer, 1, offset + 3),
 		);
+	const colors = new Float32Array((data.points.length / 8) * 3);
+	const color = new BufferAttribute(colors, 3);
+	geometry.setAttribute("color", color);
 	const uniforms = {
-		uScatter: { value: 1 },
+		pixelRatio: { value: 1 },
+		uScatter: { value: 3.5 },
 		uCoreFraction: { value: 0.4 },
+		uCoreStart: { value: 0.4 },
+		uCoreEnd: { value: 0.6 },
 		uNormalization: { value: 1 / data.radius },
-		uModel: { value: data.index },
-		uPointSize: { value: 2.5 },
-		uActivity: { value: 0 },
-		uActivityState: { value: 0 },
-		uFlowPhase: { value: 0 },
-		uPulsePhase: { value: 0 },
-		uMotion: { value: 1 },
-		uOrbitAngle: { value: 0 },
-		uWavePhase: { value: 0 },
-		uHealthColor: { value: new Color(healthColors.unknown) },
-		uHealthIntensity: { value: 0.8 },
+		uFocus: { value: 0 },
 		uVisibility: { value: 1 },
 	};
 	const material = new ShaderMaterial({
@@ -69,74 +67,86 @@ export function createParticleModel(data: ParticleData): SpatialModel {
 		vertexShader,
 		fragmentShader,
 		transparent: true,
+		vertexColors: true,
 		depthWrite: false,
 		depthTest: false,
 		blending: AdditiveBlending,
 	});
 	const points = new Points(geometry, material);
-	points.frustumCulled = false; // Vertex shader changes the CPU-side bounding sphere.
+	points.frustumCulled = false;
 	object.add(points);
 	let current: SpatialState = {
-		health: "unknown",
-		activity: "idle",
-		stale: false,
+			health: "unknown",
+			activity: "idle",
+			stale: false,
+		},
+		motion = true,
+		selected = false,
+		time = 0,
+		destroyed = false;
+	const sample: ParticleSample = {
+		intensity: 0,
+		baseIntensity: 0,
+		uplift: 0,
+		color: "",
+		size: 0,
 	};
-	let options = defaultSpatialOptions;
-	let destroyed = false;
+	function paint() {
+		const input: AnimationInput = {
+			...current,
+			model: id!,
+			reducedMotion: !motion,
+			utilization: Number.isFinite(current.utilization)
+				? Math.max(0, Math.min(1, current.utilization!))
+				: undefined,
+		};
+		const rgb = parseInt(healthColors[current.health].slice(1), 16),
+			red = ((rgb >> 16) & 255) / 255,
+			green = ((rgb >> 8) & 255) / 255,
+			blue = (rgb & 255) / 255;
+		for (let i = 0; i < data.points.length / 8; i++) {
+			evaluateParticle(data.points, i, time, input, sample);
+			const j = i * 3;
+			colors[j] = red * sample.intensity;
+			colors[j + 1] = green * sample.intensity;
+			colors[j + 2] = blue * sample.intensity;
+		}
+		color.needsUpdate = true;
+	}
 	return {
 		object,
-		bounds,
-		update(state, selected) {
+		bounds: createParticleEnvelope(data),
+		update(state, isSelected) {
 			current = state;
-			uniforms.uHealthColor.value.set(
-				selected ? "#ffffff" : healthColors[state.health],
-			);
-			uniforms.uHealthIntensity.value =
-				(state.health === "unknown"
-					? 0.8
-					: state.health === "disconnected"
-						? 0.28
-						: 1) * (state.stale ? 0.45 : 1);
-			uniforms.uActivity.value = activityStrength(state);
-			uniforms.uActivityState.value =
-				activityStrength(state) === 0
-					? 0
-					: state.activity === "starting"
-						? 1
-						: 2;
+			selected = isSelected;
+			paint();
 		},
 		configure(next, core, motionEnabled, visibility = 1) {
-			options = next;
+			const changed = motion !== motionEnabled;
+			motion = motionEnabled;
 			uniforms.uScatter.value = next.scatter / 100;
 			uniforms.uCoreFraction.value = core / 100;
-			uniforms.uPointSize.value =
-				((2.5 * next.pointSize) / 100) *
-				Math.min(window.devicePixelRatio || 1, 1.5);
-			uniforms.uMotion.value = motionEnabled ? 1 : 0;
+			uniforms.uCoreStart.value = next.core / 100;
+			uniforms.uCoreEnd.value = next.focusCore / 100;
+			const span = next.focusCore - next.core;
+			uniforms.uFocus.value = span
+				? Math.max(0, Math.min(1, (core - next.core) / span))
+				: Number(selected);
+			uniforms.pixelRatio.value =
+				(Math.min(window.devicePixelRatio || 1, 1.5) * next.pointSize) / 100;
 			uniforms.uVisibility.value = (visibility * next.opacity) / 100;
+			if (changed) paint();
 		},
-		animate(_seconds, delta) {
-			const dt = Math.min(0.05, Math.max(0, delta));
-			const strength = activityStrength(current);
-			uniforms.uFlowPhase.value =
-				(uniforms.uFlowPhase.value + (0.13 + 1.6 * strength) * dt) % TAU;
-			uniforms.uPulsePhase.value =
-				(uniforms.uPulsePhase.value + (0.3 + 1.7 * strength) * dt) % TAU;
-			if (data.index === 0) {
-				const utilization = Number.isFinite(current.utilization)
-					? Math.max(0, Math.min(1, current.utilization ?? 0))
-					: 0;
-				uniforms.uOrbitAngle.value =
-					(uniforms.uOrbitAngle.value +
-						(((0.12 + 0.9 * utilization ** 1.5) * options.spinSpeed) / 100) *
-							dt) %
-					TAU;
-				uniforms.uWavePhase.value =
-					(uniforms.uWavePhase.value + (0.5 + 1.5 * strength) * dt) %
-					(Math.PI * 20);
-			} else
-				object.rotation.z =
-					(object.rotation.z + ((0.18 * options.spinSpeed) / 100) * dt) % TAU;
+		animate(seconds) {
+			if (
+				!motion ||
+				current.stale ||
+				current.health === "unknown" ||
+				current.health === "disconnected"
+			)
+				return;
+			time = seconds;
+			paint();
 		},
 		dispose() {
 			if (destroyed) return;

@@ -1,7 +1,7 @@
 import type { Database } from "bun:sqlite";
 import type { Migration } from "../../../infrastructure/sqlite";
 import type { Run } from "../contracts";
-import { specialistMigration } from "./specialist";
+import { specialistEventsMigration, specialistMigration } from "./specialist";
 import {
 	commandInteractionsMigration,
 	questionChoicesMigration,
@@ -280,5 +280,10 @@ export const migrations: readonly Migration[] = [
 		id: "dialogue/0009-announcement",
 		sql: announcementMigration,
 		after: ["dialogue/0008-specialist-sessions"],
+	},
+	{
+		id: "dialogue/0010-specialist-events",
+		sql: specialistEventsMigration,
+		after: ["dialogue/0009-announcement"],
 	},
 ];

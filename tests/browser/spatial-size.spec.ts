@@ -41,7 +41,7 @@ test("Spatial fills wide and portrait viewports without extra overlay controls",
 	page,
 }) => {
 	test.setTimeout(60000);
-	let scatter = 100,
+	let scatter = 350,
 		demo = true;
 	await page.route("**/api/settings", async (route) => {
 		if (route.request().method() !== "GET") return route.continue();
@@ -116,13 +116,13 @@ test("Spatial fills wide and portrait viewports without extra overlay controls",
 			).toHaveCount(0);
 		}
 	}
-	scatter = 200;
+	scatter = 500;
 	await page.reload();
 	await settledScreenshot(page.locator(".spatial-background canvas"), {
 		path: test.info().outputPath(`${phase}-max-scatter-portrait.png`),
 	});
 	demo = false;
-	scatter = 100;
+	scatter = 350;
 	await page.setViewportSize({ width: 2048, height: 862 });
 	await page.reload();
 	await settledScreenshot(page.locator(".spatial-background canvas"), {

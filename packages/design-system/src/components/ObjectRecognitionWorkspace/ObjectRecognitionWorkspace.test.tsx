@@ -40,10 +40,8 @@ it("renders source coordinates in an aspect-preserving SVG; exposes the selected
 	);
 	expect(container.querySelector("rect")?.getAttribute("width")).toBe("200");
 	expect(screen.getByText("[100, 50, 300, 200]")).toBeTruthy();
-	fireEvent.click(
-		screen.getByRole("button", { name: "表示中の結果を会話に追加" }),
-	);
-	expect(add).toHaveBeenCalledWith(undefined);
+	fireEvent.click(screen.getByRole("button", { name: "会話に追加" }));
+	expect(add).toHaveBeenCalledOnce();
 });
 it("seek controls move the actual video to the frame and don't overlay unsampled moments", () => {
 	vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {});
@@ -73,10 +71,11 @@ it("seek controls move the actual video to the frame and don't overlay unsampled
 	fireEvent.click(screen.getByRole("button", { name: "1.5秒 · 1件" }));
 	const video = container.querySelector("video")!;
 	expect(video.currentTime).toBe(1.5);
-	fireEvent.click(
-		screen.getByRole("button", { name: "表示中の結果を会話に追加" }),
-	);
-	expect(add).toHaveBeenCalledWith(1);
+	// Only stills go to the conversation; a video has no "会話に追加".
+	expect(
+		(screen.getByRole("button", { name: "会話に追加" }) as HTMLButtonElement)
+			.disabled,
+	).toBe(true);
 	video.currentTime = 1.2;
 	fireEvent.timeUpdate(video);
 	expect(container.querySelector("svg")).toBeNull();
@@ -288,4 +287,108 @@ it("shows a labeled loading indicator while submitting and analyzing", async () 
 			.getAttribute("aria-busy"),
 	).toBe("false");
 	expect(container.querySelector(".recognition-spinner")).toBeNull();
+});
+
+it("a conversation's camera request opens the camera, counts down and hands one still with its request id", async () => {
+	vi.useFakeTimers();
+	try {
+		const stop = vi.fn();
+		const track = { stop, addEventListener: vi.fn() };
+		Object.defineProperty(navigator, "mediaDevices", {
+			configurable: true,
+			value: {
+				getUserMedia: async () =>
+					({
+						getTracks: () => [track],
+						getVideoTracks: () => [track],
+					}) as unknown as MediaStream,
+			},
+		});
+		vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue();
+		vi.spyOn(HTMLVideoElement.prototype, "videoWidth", "get").mockReturnValue(
+			640,
+		);
+		vi.spyOn(HTMLVideoElement.prototype, "videoHeight", "get").mockReturnValue(
+			480,
+		);
+		vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+			drawImage: vi.fn(),
+		} as unknown as CanvasRenderingContext2D);
+		vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation(
+			(callback) => callback(new Blob(["jpg"], { type: "image/jpeg" })),
+		);
+		const onFile = vi.fn(async () => {});
+		render(
+			<ObjectRecognitionWorkspace
+				items={[]}
+				configured
+				handoff={{ id: "h1", source: "camera", question: "今日の服どう？" }}
+				onFile={onFile}
+			/>,
+		);
+		expect(screen.getByText("今日の服どう？")).toBeTruthy();
+		await act(async () => {
+			await Promise.resolve();
+		});
+		await act(async () => {
+			vi.advanceTimersByTime(1000);
+		});
+		expect(screen.getByText("1秒後に撮影します")).toBeTruthy();
+		await act(async () => {
+			vi.advanceTimersByTime(1000);
+			await Promise.resolve();
+		});
+		expect(onFile).toHaveBeenCalledOnce();
+		const [file, context] = onFile.mock.calls[0] as unknown as [
+			File,
+			{ origin: string; handoffId?: string },
+		];
+		expect(file.name).toBe("camera.jpg");
+		expect(context).toEqual({ origin: "camera", handoffId: "h1" });
+		expect(stop).toHaveBeenCalled();
+	} finally {
+		vi.useRealTimers();
+	}
+});
+it("a screen request waits for the user's click and can be declined", () => {
+	const cancel = vi.fn();
+	const getDisplayMedia = vi.fn();
+	Object.defineProperty(navigator, "mediaDevices", {
+		configurable: true,
+		value: { getDisplayMedia },
+	});
+	render(
+		<ObjectRecognitionWorkspace
+			items={[]}
+			configured
+			handoff={{ id: "h2", source: "screen", question: "" }}
+			onHandoffCancel={cancel}
+		/>,
+	);
+	expect(getDisplayMedia).not.toHaveBeenCalled();
+	expect(
+		screen.getByRole("button", { name: "画面を共有して撮影" }),
+	).toBeTruthy();
+	fireEvent.click(screen.getByRole("button", { name: "撮影しない" }));
+	expect(cancel).toHaveBeenCalledWith("h2");
+});
+it("a camera request that cannot open the camera offers to take it again instead of waiting silently", async () => {
+	Object.defineProperty(navigator, "mediaDevices", {
+		configurable: true,
+		value: {
+			getUserMedia: async () => {
+				throw new Error("NotReadableError");
+			},
+		},
+	});
+	render(
+		<ObjectRecognitionWorkspace
+			items={[]}
+			configured
+			handoff={{ id: "h3", source: "camera", question: "" }}
+		/>,
+	);
+	expect(
+		await screen.findByRole("button", { name: "撮影し直す" }),
+	).toBeTruthy();
 });

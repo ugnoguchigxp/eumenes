@@ -12,8 +12,8 @@ export function fitEnvelope(
 	envelope.x = envelope.y = envelope.z = 1;
 	const core = Math.min(settings.core, settings.focusCore);
 	for (const { item, model } of entries) {
-		const bounds = model.bounds?.(settings.scatter, core) ?? {
-			radius: 1.1 * (1 + (4.6 * settings.scatter) / 100),
+		const bounds = model.bounds?.(0, core) ?? {
+			radius: 1.1,
 			depth: 1.75,
 		};
 		envelope.x = Math.max(
@@ -28,6 +28,7 @@ export function fitEnvelope(
 			envelope.z,
 			Math.abs(item.position[2]) + bounds.depth,
 		);
-		if (item.id === selected) envelope.focusRadius = bounds.radius;
+		if (item.id === selected)
+			envelope.focusRadius = Math.max(1.8, bounds.radius);
 	}
 }

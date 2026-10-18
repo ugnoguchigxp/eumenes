@@ -32,6 +32,70 @@ ALTER TABLE dialogue_runs ADD COLUMN viewing_json TEXT;
 CREATE INDEX dialogue_runs_specialist ON dialogue_runs(specialist_session_id, seq) WHERE specialist_session_id IS NOT NULL;
 `;
 
+/**
+ * The session record (spec subagent-task-and-session-agents §8.1): what a run's own status and messages do not
+ * keep. A hand-over's request and every operation the specialist ran, written in the operation's own
+ * transaction, so a turn that fails afterwards still leaves what it changed.
+ */
+export const specialistEventsMigration = `
+CREATE TABLE dialogue_specialist_events (
+ seq INTEGER PRIMARY KEY AUTOINCREMENT, session_id TEXT NOT NULL, run_id TEXT,
+ kind TEXT NOT NULL CHECK(kind IN ('handover','tool')),
+ data_json TEXT NOT NULL, created_at TEXT NOT NULL
+);
+CREATE INDEX dialogue_specialist_events_session ON dialogue_specialist_events(session_id, seq);
+`;
+
+/** One recorded step: the hand-over's request, or an operation's short outcome (never a work's content). */
+export type SessionEvent =
+	| { kind: "handover"; runId: string; request: string }
+	| {
+			kind: "tool";
+			runId: string;
+			tool: string;
+			ok: boolean;
+			/** The refusal code, when not ok. */
+			error?: string;
+			/** The work's revision after the operation, when it reports one. */
+			revision?: number;
+			/** A short count of what the operation carried (edits, characters), never its content. */
+			size?: Record<string, number>;
+	  };
+
+export function insertSessionEvent(
+	db: Database,
+	sessionId: string,
+	event: SessionEvent,
+	now: string,
+) {
+	const { kind, runId, ...data } = event;
+	db.query(
+		"INSERT INTO dialogue_specialist_events (session_id, run_id, kind, data_json, created_at) VALUES (?,?,?,?,?)",
+	).run(sessionId, runId, kind, JSON.stringify(data), now);
+}
+
+/** The session's recorded steps, oldest first. */
+export function sessionEvents(db: Database, sessionId: string): SessionEvent[] {
+	return (
+		db
+			.query(
+				"SELECT run_id, kind, data_json FROM dialogue_specialist_events WHERE session_id = ? ORDER BY seq",
+			)
+			.all(sessionId) as Array<{
+			run_id: string;
+			kind: SessionEvent["kind"];
+			data_json: string;
+		}>
+	).map(
+		(row) =>
+			({
+				kind: row.kind,
+				runId: row.run_id,
+				...JSON.parse(row.data_json),
+			}) as SessionEvent,
+	);
+}
+
 /** A session row as dialogue stores it (the public `SpecialistSession` adds the domain's work state). */
 export type SessionRecord = {
 	id: string;
@@ -336,19 +400,21 @@ export function sessionRunsBefore(
 ): Array<{
 	id: string;
 	status: string;
+	error: string | null;
 	inputMessageId: string;
 	answerMessageId: string | null;
 }> {
 	return (
 		db
 			.query(
-				`SELECT id, status, input_message_id, answer_message_id FROM dialogue_runs
+				`SELECT id, status, error, input_message_id, answer_message_id FROM dialogue_runs
 				 WHERE specialist_session_id = ? AND seq < (SELECT seq FROM dialogue_runs WHERE id = ?)
 				 ORDER BY seq DESC LIMIT ?`,
 			)
 			.all(sessionId, runId, limit) as Array<{
 			id: string;
 			status: string;
+			error: string | null;
 			input_message_id: string;
 			answer_message_id: string | null;
 		}>
@@ -356,6 +422,7 @@ export function sessionRunsBefore(
 		.map((row) => ({
 			id: row.id,
 			status: row.status,
+			error: row.error,
 			inputMessageId: row.input_message_id,
 			answerMessageId: row.answer_message_id,
 		}))

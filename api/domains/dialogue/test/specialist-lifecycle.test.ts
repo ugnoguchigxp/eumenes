@@ -291,7 +291,7 @@ test("an utterance while a turn holds the work is queued behind it, in order, an
 	expect(h.work()[0]!.holder).toBeNull();
 });
 
-test("the work is never free between two queued turns, and a command withdraws the whole chain", async () => {
+test("the work is never free between two queued turns; a return command withdraws the turn in flight and hands the queued utterances to the main agent in order", async () => {
 	const h = await harness();
 	await startDirty(h);
 	let release!: () => void;
@@ -304,12 +304,22 @@ test("the work is never free between two queued turns, and a command withdraws t
 	const second = await h.say("二つ目");
 	const third = await h.say("三つ目");
 	const chain = (await h.session())!;
+	h.state.main.push("二つ目への返答", "三つ目への返答");
 	const returned = await command(h, "return", chain);
 	expect(returned.session).toMatchObject({ state: "suspended", busy: false });
-	for (const run of [first, second, third])
-		expect(h.dialogue.get(run.id)!.status).toBe("cancelled");
+	expect(h.dialogue.get(first.id)!.status).toBe("cancelled");
 	release();
-	await new Promise((resolve) => setTimeout(resolve, 50));
+	await h.finished(second.id);
+	await h.finished(third.id);
+	for (const [run, answer] of [
+		[second, "二つ目への返答"],
+		[third, "三つ目への返答"],
+	] as const) {
+		const done = h.dialogue.get(run.id)!;
+		expect(done.status).toBe("completed");
+		expect(done.specialistSessionId).toBeNull();
+		expect(h.conversation.message(done.answerMessageId!)!.text).toBe(answer);
+	}
 	expect(h.work()[0]!.holder).toBeNull();
 	expect(h.state.specialistPrompts.length).toBe(3);
 });

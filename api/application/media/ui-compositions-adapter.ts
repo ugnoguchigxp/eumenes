@@ -7,14 +7,15 @@ import type {
 } from "../../domains/tool-runtime";
 import {
 	uiCompositionDelete,
-	uiDraftApply,
 	uiResponseFields,
+	uiSourceApply,
 	uiSubmitRequest,
 	uiWorkSave,
 	uiWorkStep,
 } from "../../domains/capabilities/contracts";
 import type { Database } from "bun:sqlite";
 import {
+	checkUiDefinitionText,
 	uiCompositionLimits,
 	type Caller,
 	type UiCompositionsService,
@@ -27,6 +28,9 @@ const INPUT = "input:ui-compositions.response@1";
 const STEP = "input:ui-compositions.step@1";
 const SAVE = "input:ui-compositions.save@1";
 const DELETE = "input:ui-compositions.delete@1";
+const SOURCE = "input:ui-compositions.source@1";
+/** The work document the session's agent edits (spec subagent-task-and-session-agents §7). */
+export const UI_DEFINITION_DOCUMENT = "workspace:ui-compositions.definition@1";
 const TARGET_REF = "builtin:uiTargetRef";
 const uiCompositionsReceipt = z.strictObject({
 	projectId: z.string(),
@@ -61,8 +65,8 @@ export const describeUiCompositionsAdapter = () => ({
 	owner: "ui-compositions",
 	operations: new Map([
 		[
-			"ui-compositions.draft.apply",
-			{ inputSchemaRef: "builtin:uiDraftApply", effect: "write" as const },
+			"ui-compositions.source.apply",
+			{ inputSchemaRef: "builtin:uiSourceApply", effect: "write" as const },
 		],
 		[
 			"ui-compositions.undo",
@@ -94,6 +98,19 @@ export const describeUiCompositionsAdapter = () => ({
 		[SAVE, numbers("workRef", "expectedRevision", "expectedSavedRevision")],
 		[DELETE, numbers("projectId", "expectedSavedRevision")],
 		[
+			SOURCE,
+			(raw: Record<string, unknown>) => {
+				const base = numbers("workRef", "expectedRevision")(raw);
+				if (!base.ok) return base;
+				return typeof raw.text === "string" && raw.text.trim()
+					? { ok: true as const, value: { ...base.value, text: raw.text } }
+					: {
+							ok: false as const,
+							errors: [{ field: "text", message: "定義を入力してください" }],
+						};
+			},
+		],
+		[
 			INPUT,
 			(raw: Record<string, unknown>) => {
 				const values = uiResponseFields.safeParse(raw);
@@ -108,6 +125,12 @@ export const describeUiCompositionsAdapter = () => ({
 	]),
 	projections: new Set(["projection:ui-compositions.result@1"]),
 	availability: "availability:ui-compositions@1",
+	workspaces: new Map([
+		[
+			UI_DEFINITION_DOCUMENT,
+			{ path: "definition.json", mediaType: "application/json" },
+		],
+	]),
 });
 
 function parseInput<T>(schema: z.ZodType<T>, input: unknown): T {
@@ -134,6 +157,7 @@ const SCREEN_WORK_OPERATIONS = new Set([
 	"ui-compositions.undo",
 	"ui-compositions.redo",
 	"ui-compositions.save",
+	"ui-compositions.source.apply",
 ]);
 
 export function createUiCompositionsAdapter(
@@ -157,9 +181,7 @@ export function createUiCompositionsAdapter(
 		requestId: string,
 		replay: boolean,
 	): AdapterResult {
-		const draft = ["drafted", "unchanged", "undone", "redone"].includes(
-			receipt.state,
-		);
+		const draft = ["drafted", "undone", "redone"].includes(receipt.state);
 		return {
 			receipt,
 			receiptRef: {
@@ -179,16 +201,8 @@ export function createUiCompositionsAdapter(
 				},
 			],
 			replay,
-			// Never the definition itself: the specialist reads the current work as input data.
-			answerContext:
-				receipt.state === "drafted" || receipt.state === "unchanged"
-					? {
-							applied: true,
-							revision: receipt.revision,
-							title: receipt.title,
-							...(receipt.state === "unchanged" ? { unchanged: true } : {}),
-						}
-					: { projectId: receipt.projectId, state: receipt.state },
+			// Never the definition itself.
+			answerContext: { projectId: receipt.projectId, state: receipt.state },
 		};
 	}
 	return {
@@ -212,11 +226,11 @@ export function createUiCompositionsAdapter(
 			if (SCREEN_WORK_OPERATIONS.has(request.operationName))
 				requireLiveSession(db, request.input, requestId);
 			switch (request.operationName) {
-				case "ui-compositions.draft.apply": {
-					const outcome = service.applyDraftInTransaction(
+				case "ui-compositions.source.apply": {
+					const outcome = service.applySourceInTransaction(
 						db,
 						caller,
-						parseInput(uiDraftApply, request.input),
+						parseInput(uiSourceApply, request.input),
 						requestId,
 					);
 					return result(outcome.receipt, requestId, outcome.replay);
@@ -307,6 +321,24 @@ export function createUiCompositionsAdapter(
 				service.endTurnInTransaction(db, workRef, runId),
 			endInTransaction: (db, workRef, mode) =>
 				service.endWorkInTransaction(db, workRef, mode),
+			document: {
+				readInTransaction: (db, workRef) =>
+					service.documentInTransaction(db, workRef),
+				check(text) {
+					const checked = checkUiDefinitionText(text);
+					return checked.ok
+						? { ok: true, value: checked.definition, fixes: checked.fixes }
+						: checked;
+				},
+				commitInTransaction: (db, workRef, input) =>
+					service.commitDocumentInTransaction(db, callerOf(input.origin), workRef, {
+						baseRevision: input.baseRevision,
+						...(input.title !== undefined ? { title: input.title } : {}),
+						definition: input.value as Record<string, unknown>,
+					}),
+				rejectInTransaction: (db, workRef, draft) =>
+					service.rejectDocumentInTransaction(db, workRef, draft),
+			},
 		},
 	};
 }

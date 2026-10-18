@@ -8,19 +8,11 @@ export const uiSubmitRequest = z.strictObject({
 	expectedGeneration: z.number().int().positive(),
 	values: uiResponseFields,
 });
-/** The specialist's complete proposal for the work in progress (title and OpenUI definition). */
-export const uiDraftApply = z.strictObject({
-	title: z
-		.string()
-		.trim()
-		.min(1)
-		.max(120)
-		.describe("作品のタイトル（AIが付ける）"),
-	definition: z
-		.record(z.string(), z.unknown())
-		.describe(
-			"完全なOpenUI定義のJSONオブジェクト。差分ではなく、変更しない部分も含めた全体を渡す",
-		),
+/** The user's own edit of the work's source on the screen: the whole canonical text, checked like the specialist's. */
+export const uiSourceApply = z.strictObject({
+	workRef: z.string().uuid(),
+	expectedRevision: z.number().int().min(0),
+	text: z.string().min(1).max(196_608),
 });
 /** Undo or redo of the work in progress; the host fixes which work, the screen names the revision it saw. */
 export const uiWorkStep = z.strictObject({

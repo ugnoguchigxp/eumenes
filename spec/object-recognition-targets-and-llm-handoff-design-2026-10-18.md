@@ -186,3 +186,42 @@ LLMに見てもらいたい場面で、Macのカメラ映像または画面キ�
 - [YOLOE-26 論文（arXiv 2602.00168）](https://arxiv.org/pdf/2602.00168)、[Ultralytics YOLOE](https://docs.ultralytics.com/models/yoloe)、[PyImageSearch: YOLOE-26](https://pyimagesearch.com/2026/08/24/yolo26-open-vocabulary-object-detection-with-yoloe-26/)
 - [SAM 3: Segment Anything with Concepts（arXiv 2511.16719）](https://arxiv.org/pdf/2511.16719)
 - [Qwen3-VLの検出座標（JAMK）](https://arena.jamk.fi/en/arena-pro/qwen-vl-vlms-for-zero-and-few-shot-object-detection/)、[GroundingME（arXiv 2512.17495）](https://arxiv.org/pdf/2512.17495)、[Roboflow: Qwen3-VLのopen-vocabulary検出](https://blog.roboflow.com/use-qwen3-vl-in-google-colab/)
+
+## 9. 実装記録（2026-10-18、§5.3）
+
+実装済み（fixture試験まで）。§5.1・§5.2（対象指定）は上流の対応待ちで未着手。
+
+| 範囲 | 実装 |
+| --- | --- |
+| conversation | 添付に任意の `annotation {source,data}`（16 KiB以内）。公開のアップロードAPIからは付けられない |
+| dialogue | `withAttachmentNotes` で利用者の本文の後にメタ情報を画像順に置く。command担当の物体認識snapshotへ run の `viewing` を渡す。`recognitionResult` の指示に capture/ask を追加（golden 21件を更新、差分はこの一文のみ） |
+| object-recognition | 入力元 `origin`、撮影依頼テーブル（migration `object-recognition/0002-handoffs`）、`/:id/attachment`・`/handoffs`・`/handoffs/:id/send`・`/handoffs/:id/cancel`。旧 `/:id/conversation` と `conversationText` は削除 |
+| application | `recognition-sharing.ts`：画像を添付に変換（WebP・上限超過はJPEGに縮小）し、メタ情報を付けて添付・submit。添付idとrequestIdは依頼idから決める |
+| capabilities | skill・tool（`recognitionManageV2`）・package・toolchain の revision 2、画面 artifact revision 2。@1 は変更なし |
+| voice-dialogue | 発言の確定（commit）に `viewing` を追加し、`submitVoice` へ渡す |
+| Web | 入力元に画面共有、撮影依頼の表示・自動撮影・取りやめ、「会話に追加」でチャット欄へ添付（検出の短い表示付き）、表示中の画像を `viewing` として入力・音声の発言に付ける |
+
+検証（fixture）: `bun run verify -- --domain object-recognition`・`conversation`・`dialogue`・`capabilities`・`voice-dialogue` 成功。API結合 `api/application/media/object-recognition-e2e.test.ts` 3件、DesignSystem部品12件、Web runtime 4件、Web workspace・toolchain-artifacts・OCR 111件成功。
+
+未実施: ブラウザE2E（`tests/browser/object-recognition.spec.ts` は新しい「会話に追加」に合わせて更新したが、試験用サーバーの起動が必要なため未実行）、実LLM（画像対応モデル）でのlive、MacBook実カメラ・実画面共有の受入、自然言語での「撮影してよいですか？」→承諾→撮影の受入。
+
+既知の担当外の失敗: `client/test/integrations.test.ts` の run を返す3件（OCR既存2件を含む）は、別作業で run schema に追加された `specialistSessionId` が試験データにないため失敗する。
+
+### 9.1 独立レビューと修正（2026-10-18）
+
+重大な指摘はなし。次を一度で修正し、fixture試験で確認した。
+
+| 指摘 | 修正 |
+| --- | --- |
+| 撮影後の画像付き発言が再び撮影依頼になるループ | 発言に画像が付いていれば capture/ask は依頼を作らず `already_attached` を返す（hostで判定）。回答の指示に「添付済みの画像で答える」を追加。golden 21件の差分はこの一文のみ |
+| 並行した `open()` の失敗が後の stream を止める | 失敗時に世代を確認し、古い要求は何もしない |
+| 再読み込み・別タブで2枚目を撮る | アップロード時に `handoffId` で依頼へ紐付け。紐付け済みの依頼は自動撮影しない |
+| 検出が多いとメタ情報が16 KiBを超える | score上位100件、boxを整数に丸め、切り詰めを `notes` に書く |
+| 縮小した添付とboxの座標系がずれる | 縮小時は `attachedImage{width,height}` を加える |
+| 送信中の取りやめが効かない | 添付の準備後、送信直前に依頼の状態を確認 |
+| 撮影失敗後に何も出ない | 「撮影し直す」ボタン |
+| 不正JSONで500 | 400で返す |
+
+残す事項: capture はLLMの承諾判断に依存する（2秒のカウントダウンと「撮影しない」、画面共有のクリック必須で緩和）。履歴の画像ごとにメタ情報がプロンプトに再掲される（1件あたり上限内）。artifact revision 1 の画面を開いたままのタブでは「会話に追加」が入力schemaの違いで拒否される（再読み込みで revision 2 になる）。
+
+補足: §9 の実装は、別作業のコミット `b3bf62e7` に含まれてコミット済み。§9.1 の修正は未コミット。

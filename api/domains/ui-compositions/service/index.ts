@@ -5,18 +5,21 @@ import { submitInTransaction } from "./answers";
 import { scope, summary } from "./shared";
 import { formInTransaction, studioInTransaction } from "./views";
 import {
-	applyDraftInTransaction,
+	applySourceInTransaction,
 	beginTurnInTransaction,
+	commitDocumentInTransaction,
 	deleteInTransaction,
+	documentInTransaction,
 	endTurnInTransaction,
 	endWorkInTransaction,
 	openWorkInTransaction,
+	rejectDocumentInTransaction,
 	saveInTransaction,
 	stepInTransaction,
 	workStateInTransaction,
 } from "./work";
 
-export type { Caller } from "./shared";
+export type { Caller, RejectedDraft } from "./shared";
 
 export function createUiCompositions() {
 	return {
@@ -25,7 +28,10 @@ export function createUiCompositions() {
 		beginTurnInTransaction,
 		endTurnInTransaction,
 		endWorkInTransaction,
-		applyDraftInTransaction,
+		documentInTransaction,
+		commitDocumentInTransaction,
+		rejectDocumentInTransaction,
+		applySourceInTransaction,
 		stepInTransaction,
 		saveInTransaction,
 		deleteInTransaction,

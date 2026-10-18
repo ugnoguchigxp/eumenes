@@ -81,6 +81,11 @@ export function applyCommand(
 			run.id,
 			run.conversationId,
 			result.command,
+			{
+				inputImages:
+					conversation.messageInTransaction(tx, run.inputMessageId)?.message
+						.attachments?.length ?? 0,
+			},
 		);
 		answerJob();
 	} else if (input.backend === "dots") {

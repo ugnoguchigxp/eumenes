@@ -19,7 +19,7 @@ import {
 	row,
 } from "../repository";
 import { registerRecognitionHandlers } from "./handlers";
-import { createHandoffs } from "./handoff";
+import { bindCapture, createHandoffs } from "./handoff";
 const workspaceArtifact = "artifact:object-recognition.workspace@";
 export function createObjectRecognition(deps: {
 	store: SqliteStore;
@@ -73,6 +73,8 @@ export function createObjectRecognition(deps: {
 			file: File,
 			requestId: string,
 			origin: NonNullable<RecognitionRecord["origin"]> = "file",
+			/** The capture request this still answers; bound here so a reload never takes a second one. */
+			handoffId?: string,
 		) {
 			const mime = inputMime.safeParse(file.type);
 			if (!mime.success) throw new Error("invalid_recognition_format");
@@ -82,6 +84,8 @@ export function createObjectRecognition(deps: {
 			if (!connection) throw new Error("recognition_not_configured");
 			const bytes = new Uint8Array(await file.arrayBuffer());
 			return store.write((db) => {
+				if (handoffId)
+					bindCapture(db, owner, handoffId, conversationId, requestId);
 				const existing = row(db, requestId);
 				if (existing) {
 					owned(db, requestId, owner);
@@ -179,10 +183,17 @@ export function createObjectRecognition(deps: {
 					runId: string,
 					conversationId: string,
 					raw: unknown,
+					input?: { inputImages: number },
 				) {
 					const command = recognitionCommand.parse(raw);
 					let result: unknown = { action: "open", state: "ready_for_input" };
-					if (command.action === "capture") {
+					if (
+						(command.action === "capture" || command.action === "ask") &&
+						(input?.inputImages ?? 0) > 0
+					)
+						// The message already carries the image (e.g. a sent capture): show it, don't take another.
+						result = { action: command.action, state: "already_attached" };
+					else if (command.action === "capture") {
 						const source = command.source ?? "camera";
 						insertHandoff(db, owner, {
 							id: runId,

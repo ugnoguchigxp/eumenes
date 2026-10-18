@@ -13,6 +13,8 @@ export type RecognitionSharing = {
 		material: ImageMaterial,
 		question: string,
 		handoffId: string,
+		/** Throws when the request was closed meanwhile; called just before the message is sent. */
+		ensureOpen: () => void,
 	): Promise<unknown>;
 };
 const requestBody = z.strictObject({ requestId: z.uuid() });
@@ -38,7 +40,7 @@ export function registerObjectRecognition(
 	app.post(`${root}/handoffs/:id/send`, async (c) => {
 		const input = z
 			.strictObject({ recognitionId: z.uuid().optional() })
-			.safeParse(await c.req.json());
+			.safeParse(await c.req.json().catch(() => null));
 		if (!input.success)
 			return c.json({ error: "invalid_recognition_input" }, 400);
 		const id = c.req.param("id");
@@ -47,7 +49,10 @@ export function registerObjectRecognition(
 			id,
 			input.data.recognitionId,
 		);
-		const run = await sharing.send(material, question, id);
+		// A request cancelled while the image was being prepared is not sent.
+		const run = await sharing.send(material, question, id, () =>
+			service.assertHandoffOpen(owner, id),
+		);
 		await service.completeHandoff(owner, id);
 		return c.json(run);
 	});
@@ -57,6 +62,7 @@ export function registerObjectRecognition(
 				requestId: z.uuid(),
 				conversationId: z.string().min(1).max(120),
 				origin: z.enum(["camera", "screen", "file"]).optional(),
+				handoffId: z.string().min(1).max(120).optional(),
 			})
 			.safeParse(c.req.query());
 		if (!query.success)
@@ -85,6 +91,7 @@ export function registerObjectRecognition(
 				file,
 				query.data.requestId,
 				query.data.origin,
+				query.data.handoffId,
 			),
 			202,
 		);
@@ -111,7 +118,7 @@ export function registerObjectRecognition(
 		return c.body(null, 204);
 	});
 	app.post(`${root}/:id/attachment`, async (c) => {
-		const input = requestBody.safeParse(await c.req.json());
+		const input = requestBody.safeParse(await c.req.json().catch(() => null));
 		if (!input.success)
 			return c.json({ error: "invalid_recognition_input" }, 400);
 		const material = service.attachmentMaterial(owner, c.req.param("id"));

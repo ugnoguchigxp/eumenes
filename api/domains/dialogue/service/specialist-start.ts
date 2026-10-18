@@ -4,6 +4,7 @@ import { getLogger } from "../../../infrastructure/logger";
 import type { Run, SpecialistSet } from "../contracts";
 import {
 	insertSession,
+	insertSessionEvent,
 	linkAnswer,
 	liveSession,
 	patchSession,
@@ -56,6 +57,13 @@ function enqueueTurn(
 		deadlineAtMs: Date.parse(run.deadlineAt!),
 	});
 	linkAnswer(tx, run.id, job.id);
+	// The hand-over's request stays in the session record even when this turn fails.
+	insertSessionEvent(
+		tx,
+		sessionId,
+		{ kind: "handover", runId: run.id, request: request.slice(0, 8000) },
+		deps.clock(),
+	);
 }
 
 /** The main agent asks the user whether to drop the unsaved work: the switch has not happened. */

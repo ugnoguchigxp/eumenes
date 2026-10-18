@@ -106,3 +106,30 @@ test("attachment owner, conversation, replay identity and restart persistence", 
 		rmSync(dir, { recursive: true, force: true });
 	}
 });
+test("a host annotation is kept with the attachment metadata and bounded in size", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "image-annotation-"));
+	const store = openStore(join(dir, "db"), migrations);
+	try {
+		const c = createConversationService(store, { principal: "owner-a" });
+		const f = (await syntheticImages())[0]!;
+		const annotation = {
+			source: "object-recognition",
+			data: { objects: [{ label: "cup", box: [1, 2, 3, 4], score: 0.5 }] },
+		};
+		const id = crypto.randomUUID();
+		const a = await c.uploadAttachment("main", id, f, annotation);
+		expect(a.annotation).toEqual(annotation);
+		expect(await c.uploadAttachment("main", id, f)).toEqual(a);
+		const plain = await c.uploadAttachment("main", crypto.randomUUID(), f);
+		expect(plain.annotation).toBeUndefined();
+		await expect(
+			c.uploadAttachment("main", crypto.randomUUID(), f, {
+				source: "object-recognition",
+				data: { notes: "x".repeat(20_000) },
+			}),
+		).rejects.toThrow("attachment_annotation_too_large");
+	} finally {
+		await store.close();
+		rmSync(dir, { recursive: true, force: true });
+	}
+});

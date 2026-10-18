@@ -10,7 +10,7 @@ import { z } from "zod";
 import { guidedResearchInput } from "./guided-research";
 import {
 	uiCompositionDelete,
-	uiDraftApply,
+	uiSourceApply,
 	uiResponseFields,
 	uiSubmitRequest,
 	uiTargetRef,
@@ -64,7 +64,7 @@ export {
 };
 export {
 	uiCompositionDelete,
-	uiDraftApply,
+	uiSourceApply,
 	uiResponseFields,
 	uiSubmitRequest,
 	uiWorkSave,
@@ -202,7 +202,7 @@ export const validators = {
 	kanbanFollowup,
 	kanbanList,
 	kanbanNoticeRef,
-	uiDraftApply,
+	uiSourceApply,
 	uiWorkStep,
 	uiWorkSave,
 	uiCompositionDelete,

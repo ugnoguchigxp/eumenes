@@ -26,7 +26,7 @@ test("recognition screen seeds once and exposes its owner-scoped source", async 
 			),
 		).toEqual([
 			expect.objectContaining({
-				artifactRevisionId: "artifact:object-recognition.workspace@1",
+				artifactRevisionId: "artifact:object-recognition.workspace@2",
 				adapterRefs: [OBJECT_RECOGNITION_SCREEN_ADAPTER_REF],
 				title: "映っている物を調べる",
 			}),

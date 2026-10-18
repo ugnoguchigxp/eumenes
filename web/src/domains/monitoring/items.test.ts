@@ -26,8 +26,8 @@ test("before the first read the background keeps its unconfirmed samples", () =>
 
 test("snapshot states replace the samples on the same layout, by shape", () => {
 	const items = monitoringItems(snapshot, false, 0)!;
-	expect(items).toHaveLength(12);
-	const backend = items.find((i) => i.model === "network")!;
+	expect(items).toHaveLength(14);
+	const backend = items.find((i) => i.model === "backend")!;
 	expect(backend.id).toBe("eumenes-backend");
 	expect(backend.label).toBe("Eumenes Backend");
 	expect(backend.state).toEqual({
@@ -49,12 +49,12 @@ test("snapshot states replace the samples on the same layout, by shape", () => {
 
 test("an unanswered read disconnects the backend and makes the rest old", () => {
 	const items = monitoringItems(snapshot, true, 0)!;
-	expect(items.find((i) => i.model === "network")!.state.health).toBe(
+	expect(items.find((i) => i.model === "backend")!.state.health).toBe(
 		"disconnected",
 	);
 	expect(items.every((i) => i.state.stale)).toBe(true);
 	expect(
-		monitoringItems(undefined, true, 0)!.find((i) => i.model === "network")!
+		monitoringItems(undefined, true, 0)!.find((i) => i.model === "backend")!
 			.state.health,
 	).toBe("disconnected");
 	expect(
@@ -62,4 +62,20 @@ test("an unanswered read disconnects the backend and makes the rest old", () => 
 			(i) => i.model === "llm",
 		)!.state.stale,
 	).toBe(true);
+});
+
+test("the five unobserved new shapes never borrow telemetry from removed service samples", () => {
+	const items = monitoringItems(snapshot, false, 0)!;
+	for (const id of [
+		"external",
+		"larm-core",
+		"larm-cpu",
+		"larm-memory",
+		"larm-gpu",
+	]) {
+		const state = items.find((item) => item.model === id)!.state;
+		expect(state.health).toBe("unknown");
+		expect(state.source).toBe("unconfirmed");
+		expect(state.utilization).toBeUndefined();
+	}
 });

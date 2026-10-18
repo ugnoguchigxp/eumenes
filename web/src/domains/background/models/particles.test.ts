@@ -2,15 +2,11 @@ import { resolve } from "node:path";
 import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { expect, test } from "vitest";
-import type { Points, ShaderMaterial } from "three";
+import type { Points } from "three";
 import { createParticleModel } from "./particles";
 import { decodeParticles, particleModelIds } from ".";
-import {
-	activityStrength,
-	defaultSpatialOptions,
-	healthColors,
-} from "../options";
-
+import { defaultSpatialOptions, healthColors } from "../options";
+import hashes from "./source-hashes.json";
 function fixture(id: string) {
 	const descriptor = JSON.parse(
 		readFileSync(
@@ -21,18 +17,24 @@ function fixture(id: string) {
 	const bytes = readFileSync(
 		resolve("web/src/domains/background/models/assets", `${id}.bin`),
 	);
-	const points = decodeParticles(
-		bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
+	return {
 		descriptor,
-	);
-	return { descriptor, bytes, points };
+		bytes,
+		points: decodeParticles(
+			bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
+			descriptor,
+		),
+	};
 }
-
-test("all 12 original interleaved models retain their counts and CPU source coordinates", () => {
+test("all 14 adopted models retain their hashes, 33460 points and immutable local coordinates", () => {
 	let total = 0;
 	for (const [index, id] of particleModelIds.entries()) {
-		const data = fixture(id);
+		const data = fixture(id),
+			before = data.points.slice();
 		total += data.descriptor.pointCount;
+		expect(createHash("sha256").update(data.bytes).digest("hex")).toBe(
+			hashes[id],
+		);
 		const model = createParticleModel({
 			id,
 			index,
@@ -43,70 +45,68 @@ test("all 12 original interleaved models retain their counts and CPU source coor
 		expect(geometry.getAttribute("position").count).toBe(
 			data.descriptor.pointCount,
 		);
-		expect(geometry.getAttribute("aSeed").count).toBe(
-			data.descriptor.pointCount,
-		);
+		model.configure?.(defaultSpatialOptions, 60, true);
+		for (const health of Object.keys(
+			healthColors,
+		) as (keyof typeof healthColors)[]) {
+			model.update(
+				{ health, activity: "working", stale: false, utilization: 1 },
+				true,
+			);
+			model.animate?.(10, 0.05);
+		}
+		expect(data.points).toEqual(before);
+		expect(model.object.rotation.toArray().slice(0, 3)).toEqual([0, 0, 0]);
 		model.dispose();
 		model.dispose();
 	}
-	expect(total).toBe(29952);
-	expect(createHash("sha256").update(fixture("cpu").bytes).digest("hex")).toBe(
-		"0fb9ff086be67b3307dbef48c031a76ce21b03fd79380c79478b00e539fd8e60",
-	);
+	expect(particleModelIds).toHaveLength(14);
+	expect(total).toBe(33460);
 });
-
-test("health, selection, utilization and activity are independent; stale/reduced motion gates activity", () => {
-	const data = fixture("cpu");
-	const model = createParticleModel({
-		id: "cpu",
-		index: 0,
-		radius: data.descriptor.normalizationRadius,
-		points: data.points,
-	});
-	const u = ((model.object.children[0] as Points).material as ShaderMaterial)
-		.uniforms;
+test("health colour survives selection and time only changes healthy light; pause and old observations stop it", () => {
+	const d = fixture("llm"),
+		model = createParticleModel({
+			id: "llm",
+			index: 5,
+			radius: d.descriptor.normalizationRadius,
+			points: d.points,
+		});
+	const attr = (model.object.children[0] as Points).geometry.getAttribute(
+		"color",
+	);
+	const light = () => Array.from(attr.array);
+	model.configure?.(defaultSpatialOptions, 60, true);
 	for (const health of Object.keys(
 		healthColors,
 	) as (keyof typeof healthColors)[]) {
-		model.update(
-			{
-				health,
-				activity: "working",
-				stale: false,
-				utilization: 1,
-				strength: 0.7,
-			},
-			false,
-		);
-		expect("#" + u.uHealthColor!.value.getHexString()).toBe(
-			healthColors[health],
-		);
+		const state = { health, activity: "working" as const, stale: false };
+		model.update(state, false);
+		const before = light();
+		model.update(state, true);
+		expect(light()).toEqual(before);
 	}
-	model.update(
-		{ health: "healthy", activity: "idle", stale: false, utilization: 1 },
-		true,
-	);
-	expect(u.uHealthColor!.value.getHexString()).toBe("ffffff");
-	expect(u.uActivityState!.value).toBe(0);
-	model.update(
-		{ health: "healthy", activity: "working", stale: true, strength: 1 },
-		false,
-	);
-	expect(u.uActivity!.value).toBe(0);
+	model.update({ health: "healthy", activity: "working", stale: false }, true);
+	const before = light();
+	model.animate?.(2, 0.05);
+	expect(light()).not.toEqual(before);
+	for (const state of [
+		{ health: "unknown" as const, stale: false },
+		{ health: "disconnected" as const, stale: false },
+		{ health: "healthy" as const, stale: true },
+	]) {
+		model.update({ ...state, activity: "working" }, false);
+		const before = light();
+		model.animate?.(100, 0.05);
+		expect(light()).toEqual(before);
+	}
+	model.update({ health: "healthy", activity: "working", stale: false }, false);
 	model.configure?.(defaultSpatialOptions, 60, false);
-	expect(u.uMotion!.value).toBe(0);
-	expect(u.uCoreFraction!.value).toBe(0.6);
-	model.update(
-		{ health: "healthy", activity: "working", stale: false, utilization: NaN },
-		false,
-	);
-	for (let i = 0; i < 10000; i++) model.animate?.(i, 100);
-	for (const key of ["uOrbitAngle", "uWavePhase", "uFlowPhase", "uPulsePhase"])
-		expect(Number.isFinite(u[key]!.value)).toBe(true);
+	const stopped = light();
+	model.animate?.(1000, 0.05);
+	expect(light()).toEqual(stopped);
 	model.dispose();
 });
-
-test("malformed assets are rejected and absent observations do not imply activity", () => {
+test("malformed assets are rejected", () => {
 	expect(() =>
 		decodeParticles(new ArrayBuffer(4), {
 			pointCount: 1,
@@ -114,20 +114,4 @@ test("malformed assets are rejected and absent observations do not imply activit
 			normalizationRadius: 1,
 		}),
 	).toThrow();
-	expect(
-		activityStrength({
-			health: "unknown",
-			activity: "working",
-			stale: false,
-			strength: 1,
-		}),
-	).toBe(0);
-	expect(
-		activityStrength({
-			health: "disconnected",
-			activity: "working",
-			stale: false,
-			strength: 1,
-		}),
-	).toBe(0);
 });

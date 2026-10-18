@@ -141,6 +141,72 @@ export type SpecialistSet = {
 	targetSchemaRef: string | null;
 	/** The binding's time limits (run from the hand-over, one turn, one inference); null: the host defaults. */
 	timeLimits: { runMs: number; turnMs: number; inferenceMs: number } | null;
+	/**
+	 * How the agent works, as the binding sets it (spec subagent-task-and-session-agents §10); omitted values
+	 * take the host defaults (`agentPolicy`). `document` is the work document the adapter declares for it.
+	 */
+	agent: {
+		document: {
+			ref: string;
+			path: string;
+			mediaType: string;
+			inlineBytes?: number;
+		} | null;
+		maxModelCalls?: number;
+		retries?: Readonly<Record<string, number>>;
+		recentTurns?: number;
+		recentBytes?: number;
+		sharedTools: ReadonlyArray<{
+			toolchainId: string;
+			as: string;
+			async?: boolean;
+		}>;
+	};
+};
+
+/** Where a work document failed its check: a position and a rule name (never the document's values). */
+export type DocumentIssue = { path: string; rule: string };
+/** A whole-document write that failed its check, kept for the user and the agent. */
+export type RejectedDraft = {
+	title: string;
+	text: string;
+	issues: DocumentIssue[];
+	fixes: string[];
+	createdAt: string;
+};
+/** The work's text document through the binding's adapter (spec §7.2); see `WorkDocumentAdapter`. */
+export type SpecialistDocument = {
+	readInTransaction(
+		db: Database,
+		workRef: string,
+	): {
+		revision: number;
+		title: string;
+		text: string;
+		rejected: RejectedDraft | null;
+	} | null;
+	check(
+		text: string,
+	):
+		| { ok: true; value: unknown; fixes: string[] }
+		| { ok: false; code: string; issues: DocumentIssue[]; fixes: string[] };
+	commitInTransaction(
+		db: Database,
+		workRef: string,
+		input: {
+			baseRevision: number;
+			title?: string;
+			value: unknown;
+			sessionId: string;
+			runId: string;
+			conversationId: string;
+		},
+	): { revision: number };
+	rejectInTransaction(
+		db: Database,
+		workRef: string,
+		draft: Omit<RejectedDraft, "createdAt">,
+	): void;
 };
 
 type SpecialistWorkState = {
@@ -227,4 +293,6 @@ export interface SpecialistPort {
 	): { answerContext: unknown };
 	/** Wake the adapter after the writer transaction committed. */
 	afterCommit(adapterRef: string): void;
+	/** The work document of the binding's adapter; null when it declares none. */
+	documentOf(adapterRef: string): SpecialistDocument | null;
 }

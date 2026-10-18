@@ -36,7 +36,7 @@ export type SpatialModel = {
 		scatterPercent: number,
 		corePercent: number,
 	): { radius: number; depth: number };
-	/** Self-spin and activity motion; the scene independently owns orbital placement. */
+	/** Brightness propagation only; the scene independently owns orbital placement. */
 	animate?(seconds: number, deltaSeconds: number): void;
 	/** Owns all geometry, materials and textures created by this model. */
 	dispose(): void;

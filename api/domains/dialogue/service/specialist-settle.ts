@@ -58,7 +58,7 @@ function appendSpecialistAnswer(
 }
 
 /** Hand the run to the main agent: its user message is the conversation's again, once. */
-function forwardToMain(
+export function forwardToMain(
 	deps: DialogueDeps,
 	tx: Database,
 	run: Run,

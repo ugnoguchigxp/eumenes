@@ -423,8 +423,10 @@ test("a shared credential change invalidates an outstanding result even when the
 	expect(h.service.get("a", id).result).toBeNull();
 });
 test("a capture request binds the taken still once; failed detection still hands the image with empty meta", async () => {
-	const h = setup((async () =>
-		new Response("down", { status: 503 })) as unknown as typeof fetch);
+	const h = setup(
+		(async () =>
+			new Response("down", { status: 503 })) as unknown as typeof fetch,
+	);
 	const port = h.service.port("alice");
 	const runId = crypto.randomUUID();
 	await h.store.write((db) =>
@@ -460,9 +462,9 @@ test("a capture request binds the taken still once; failed detection still hands
 		"request_conflict",
 	);
 	await until(() => h.service.get("alice", still).state === "failed");
-	await expect(
-		h.service.handoffMaterial("bob", runId, still),
-	).rejects.toThrow("recognition_handoff_not_found");
+	await expect(h.service.handoffMaterial("bob", runId, still)).rejects.toThrow(
+		"recognition_handoff_not_found",
+	);
 	const sent = await h.service.handoffMaterial("alice", runId, still);
 	expect(sent.question).toBe("画面の内容を説明して");
 	expect(sent.material.meta).toEqual({});
@@ -558,4 +560,75 @@ test("ask hands a saved still on screen; the snapshot marks only an owned shown 
 	await expect(
 		h.service.handoffMaterial("alice", captureRun, id),
 	).rejects.toThrow("recognition_handoff_closed");
+});
+
+test("a capture is bound to the first still uploaded for it; a run that already carries an image takes none", async () => {
+	const many = {
+		...image,
+		objects: Array.from({ length: 150 }, (_, i) => ({
+			...object,
+			label: `thing${i}`,
+			confidence: i / 1000,
+			box: [10.4, 20.6, 50, 60],
+		})),
+	};
+	const h = setup((async () => response(many)) as unknown as typeof fetch);
+	const port = h.service.port("alice");
+	const runId = crypto.randomUUID();
+	const capture = {
+		operation: "manage",
+		action: "capture",
+		id: "",
+		frameIndex: -1,
+		source: "camera",
+		question: "見て",
+	};
+	await h.store.write((db) =>
+		port.invokeInTransaction(db, runId, "main", capture),
+	);
+	const first = crypto.randomUUID(),
+		second = crypto.randomUUID();
+	const jpg = new File(["jpg"], "camera.jpg", { type: "image/jpeg" });
+	await h.service.upload("alice", "main", jpg, first, "camera", runId);
+	await h.service.upload("alice", "main", jpg, second, "camera", runId);
+	expect(h.service.handoffs("alice", "main")[0]!.recognitionId).toBe(first);
+	await until(() => h.service.get("alice", first).state === "completed");
+	// A request needs no recognition id once the host bound one; another still conflicts.
+	const sent = await h.service.handoffMaterial("alice", runId);
+	await expect(
+		h.service.handoffMaterial("alice", runId, second),
+	).rejects.toThrow("request_conflict");
+	const meta = sent.material.meta as {
+		objects: { label: string; box: number[]; score: number }[];
+		notes: string[];
+	};
+	expect(meta.objects).toHaveLength(100);
+	expect(meta.objects[0]).toEqual({
+		label: "thing149",
+		box: [10, 21, 50, 60],
+		score: 0.149,
+	});
+	expect(meta.notes.at(-1)).toBe(
+		"only the 100 highest-scoring of 150 detections are listed",
+	);
+	expect(JSON.stringify(meta).length).toBeLessThan(16 * 1024);
+	// The sent message carries the image: a capture or ask on it shows that image instead.
+	const followUp = crypto.randomUUID();
+	await h.store.write((db) =>
+		port.invokeInTransaction(db, followUp, "main", capture, {
+			inputImages: 1,
+		}),
+	);
+	expect(h.store.read((db) => port.resultInTransaction(db, followUp))).toEqual({
+		action: "capture",
+		state: "already_attached",
+	});
+	expect(
+		h.service.handoffs("alice", "main").some((x) => x.id === followUp),
+	).toBe(false);
+	// Cancelling while the image was prepared stops the send.
+	await h.service.cancelHandoff("alice", runId);
+	expect(() => h.service.assertHandoffOpen("alice", runId)).toThrow(
+		"recognition_handoff_closed",
+	);
 });

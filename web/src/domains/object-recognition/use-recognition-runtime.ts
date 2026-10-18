@@ -12,8 +12,8 @@ import {
 } from "../../../../api/domains/object-recognition/contracts";
 import { recognitionSource } from "./source";
 import { useRecognitionChatInbox } from "./chat-inbox";
+import { useRecognitionHandoffs } from "./use-recognition-handoffs";
 import { queryRoots } from "../../queryKeys";
-const finished = ["completed", "failed", "cancelled"];
 const origins = new Set(["camera", "screen", "file"]);
 export function useRecognitionRuntime(
 	client: EumenesClient,
@@ -37,20 +37,6 @@ export function useRecognitionRuntime(
 		queryKey: [queryRoots.objectRecognition, client.identity, "connection"],
 		queryFn: ({ signal }) => client.recognitionConnection(signal),
 	});
-	// The conversation's capture or "show this image" requests; polled only while this screen is open.
-	const handoffs = useQuery({
-		queryKey: [queryRoots.objectRecognition, client.identity, "handoffs"],
-		queryFn: ({ signal }) => client.recognitionHandoffs(conversationId, signal),
-		refetchInterval: 1500,
-	});
-	/** Requests being answered: handoff id → the record that answers it. */
-	const [answering, setAnswering] = useState<ReadonlyMap<string, string>>(
-		new Map(),
-	);
-	const answer = (handoffId: string, recognitionId: string) =>
-		setAnswering((m) => new Map(m).set(handoffId, recognitionId));
-	const sending = useRef(new Set<string>());
-	const [dismissed, setDismissed] = useState<ReadonlySet<string>>(new Set());
 	const pushChatImage = useRecognitionChatInbox((s) => s.push);
 	const [selection, setSelection] = useState<string>();
 	const [busy, setBusy] = useState(false);
@@ -90,51 +76,13 @@ export function useRecognitionRuntime(
 	useEffect(() => {
 		setTargetRef?.(selectedImage);
 	}, [selectedImage, setTargetRef]);
-	const pending = (handoffs.data ?? []).filter(
-		(h) => !dismissed.has(h.id) && !answering.has(h.id),
+	const handoffs = useRecognitionHandoffs(
+		client,
+		conversationId,
+		items,
+		setError,
 	);
-	const capture = pending.find((h) => h.source !== "saved");
-	useEffect(() => {
-		for (const h of handoffs.data ?? [])
-			if (h.source === "saved" && h.recognitionId && !dismissed.has(h.id))
-				setAnswering((m) =>
-					m.has(h.id) ? m : new Map(m).set(h.id, h.recognitionId!),
-				);
-	}, [handoffs.data, dismissed]);
-	// Once the answering still's detection ended (even unsuccessfully), it goes to the conversation.
-	const refetchHandoffs = handoffs.refetch;
-	useEffect(() => {
-		for (const [handoffId, recognitionId] of answering) {
-			const r = items.find((i) => i.id === recognitionId);
-			if (!r || !finished.includes(r.state) || sending.current.has(handoffId))
-				continue;
-			sending.current.add(handoffId);
-			const saved = (handoffs.data ?? []).some(
-				(h) => h.id === handoffId && h.source === "saved",
-			);
-			void client
-				.recognitionHandoffSend(handoffId, saved ? undefined : recognitionId)
-				.then(async () => {
-					await cache.invalidateQueries({ queryKey: [queryRoots.conversation] });
-					await cache.invalidateQueries({ queryKey: [queryRoots.dialogue] });
-				})
-				.catch(() =>
-					setError(
-						"撮影した画像を会話に送れませんでした。もう一度依頼してください。",
-					),
-				)
-				.finally(() => {
-					setDismissed((d) => new Set(d).add(handoffId));
-					setAnswering((m) => {
-						const next = new Map(m);
-						next.delete(handoffId);
-						return next;
-					});
-					sending.current.delete(handoffId);
-					void refetchHandoffs();
-				});
-		}
-	}, [answering, items, handoffs.data, client, cache, refetchHandoffs]);
+	const capture = handoffs.capture;
 	const revision =
 		items.reduce((sum, r) => sum + r.revision + 1, 0) +
 		(connection.data?.revision ?? 0) +
@@ -149,7 +97,7 @@ export function useRecognitionRuntime(
 		credentialSource: connection.data?.credentialSource,
 		sharedCredentialAvailable: connection.data?.sharedCredentialAvailable,
 		hasEndpoint: !!connection.data?.baseUrl,
-		...(capture && capture.source !== "saved"
+		...(capture
 			? {
 					handoff: {
 						id: capture.id,
@@ -206,8 +154,9 @@ export function useRecognitionRuntime(
 				conversationId,
 				requestId,
 				origin,
+				handoffId,
 			);
-			if (handoffId) answer(handoffId, r.id);
+			if (handoffId) handoffs.answer(handoffId, r.id);
 			if (viewEpoch.current === epoch) setSelection(r.id);
 			await records.refetch();
 			return { status: "accepted", message: "解析を受け付けました。" };
@@ -215,7 +164,7 @@ export function useRecognitionRuntime(
 			// The durable request id lets the user reconnect without replaying the analyze POST.
 			const r = await client.recognitionGet(requestId).catch(() => null);
 			if (r) {
-				if (handoffId) answer(handoffId, r.id);
+				if (handoffId) handoffs.answer(handoffId, r.id);
 				if (viewEpoch.current === epoch) setSelection(r.id);
 				await records.refetch();
 				return {
@@ -273,9 +222,7 @@ export function useRecognitionRuntime(
 
 		const id = typeof event.values.id === "string" ? event.values.id : "";
 		if (event.action === "recognition-handoff-cancel") {
-			setDismissed((d) => new Set(d).add(id));
-			await client.recognitionHandoffCancel(id).catch(() => null);
-			await handoffs.refetch();
+			await handoffs.cancel(id);
 			return { status: "accepted", message: "撮影を取りやめました。" };
 		}
 		if (!items.some((i) => i.id === id))

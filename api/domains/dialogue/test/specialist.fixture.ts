@@ -34,10 +34,12 @@ import {
 	queueLinkMigration,
 	announcementMigration,
 	specialistMigration,
+	specialistEventsMigration,
 	type SpecialistPort,
 	type SpecialistSet,
 	type ToolchainRoutingPort,
 } from "..";
+import type { RejectedDraft } from "../contracts";
 import {
 	analysisReceipt,
 	ANSWER,
@@ -60,6 +62,7 @@ const MIGRATIONS = [
 	queueLinkMigration,
 	announcementMigration,
 	specialistMigration,
+	specialistEventsMigration,
 	continuityMigration,
 	shortTermMigration,
 	itemSourceMigration,
@@ -93,6 +96,22 @@ const card = (
 export const studioLimits: { current: SpecialistSet["timeLimits"] } = {
 	current: null,
 };
+/** The studio's agent settings a test sets (and resets): a work document makes the host offer doc.* tools. */
+export const studioAgent: { current: SpecialistSet["agent"] | null } = {
+	current: null,
+};
+export const NO_AGENT: SpecialistSet["agent"] = {
+	document: null,
+	sharedTools: [],
+};
+export const DOCUMENT_AGENT: SpecialistSet["agent"] = {
+	document: {
+		ref: "workspace:fake.document@1",
+		path: "page.json",
+		mediaType: "application/json",
+	},
+	sharedTools: [],
+};
 export const setFor = (revisionId: string): SpecialistSet => {
 	const other = revisionId === OTHER_REVISION;
 	return {
@@ -124,8 +143,12 @@ export const setFor = (revisionId: string): SpecialistSet => {
 		],
 		targetSchemaRef: other ? null : "builtin:fakeTarget",
 		timeLimits: other ? null : studioLimits.current,
+		agent: other ? NO_AGENT : (studioAgent.current ?? NO_AGENT),
 	};
 };
+
+/** The fixture document's canonical text: the same value always gives the same text. */
+const canonical = (value: unknown) => JSON.stringify(value, null, 2);
 
 type Work = {
 	workRef: string;
@@ -137,6 +160,9 @@ type Work = {
 	label: string;
 	current: unknown;
 	ended: boolean;
+	/** The work document's canonical text and the whole draft kept after a failed check. */
+	text: string;
+	rejected: RejectedDraft | null;
 };
 
 export type Call = {
@@ -421,6 +447,8 @@ export async function setup(options: Options = {}) {
 				label: input.targetRef ? `保存済み ${input.targetRef}` : "新規",
 				current: { title: "" },
 				ended: false,
+				text: canonical({ view: "page", items: [] }),
+				rejected: null,
 			};
 			state.works.set(work.workRef, work);
 			state.calls.push("open");
@@ -481,6 +509,75 @@ export async function setup(options: Options = {}) {
 			return { answerContext: { applied: true, revision: work.revision } };
 		},
 		afterCommit: () => {},
+		documentOf: (adapterRef) =>
+			adapterRef !== ADAPTER
+				? null
+				: {
+						readInTransaction: (_db, workRef) => {
+							const work = workOf(adapterRef, workRef);
+							return work && !work.ended
+								? {
+										revision: work.revision,
+										title: work.label,
+										text: work.text,
+										rejected: work.rejected,
+									}
+								: null;
+						},
+						// A page is an object whose "view" is "page"; a "dropMe" key is what the fixer drops.
+						check: (text) => {
+							let value: Record<string, unknown>;
+							try {
+								value = JSON.parse(text);
+							} catch {
+								return {
+									ok: false,
+									code: "document_parse_failed",
+									issues: [{ path: "(root)", rule: "json" }],
+									fixes: [],
+								};
+							}
+							const fixes: string[] = [];
+							if ("dropMe" in value) {
+								delete value.dropMe;
+								fixes.push("drop_part:dropMe");
+							}
+							return value.view === "page"
+								? { ok: true, value, fixes }
+								: {
+										ok: false,
+										code: "document_invalid",
+										issues: [{ path: "view", rule: "page_only" }],
+										fixes,
+									};
+						},
+						commitInTransaction: (_db, workRef, input) => {
+							const work = workOf(adapterRef, workRef);
+							if (!work || work.holder !== input.runId)
+								return fail("turn_not_current");
+							if (input.baseRevision !== work.revision)
+								return fail("revision_conflict");
+							const text = canonical(input.value);
+							const title = input.title ?? work.label;
+							if (text === work.text && title === work.label)
+								return fail("no_change");
+							work.text = text;
+							work.label = title;
+							work.revision += 1;
+							work.dirty = true;
+							work.rejected = null;
+							state.invocations.push({ document: text });
+							return { revision: work.revision };
+						},
+						rejectInTransaction: (_db, workRef, draft) => {
+							const work = workOf(adapterRef, workRef);
+							if (work)
+								work.rejected = {
+									...draft,
+									createdAt: "2026-10-18T00:00:00.000Z",
+								};
+						},
+					},
 	};
 	const routed: ToolchainCard[] = [
 		card(REVISION, "fake.studio", "studio_create"),

@@ -324,10 +324,32 @@ function checkCommandBinding(c: Check, b: CommandBinding, path: string) {
 	checkBindingBase(c, b, path);
 }
 
-/** A session binding has no output or projection; its target schema (if any) must resolve. */
+/**
+ * A session binding has no output or projection; its target schema (if any) must resolve, the work document
+ * its agent names must be one the adapter declares, and the agent needs something to work with: a tool or a
+ * work document. Shared tools name toolchains, looked up when they are called (bundles register in file order).
+ */
 function checkSessionBinding(c: Check, b: SessionBinding, path: string) {
 	if (b.session.targetSchemaRef)
 		c.schemaRef(b.session.targetSchemaRef, `${path}/session/targetSchemaRef`);
+	const workspace = b.agent?.workspace?.documentRef;
+	if (
+		workspace &&
+		!c.host.adapters.get(b.adapterRef)?.workspaces?.has(workspace)
+	)
+		c.issue(
+			"unknown_reference",
+			`${path}/agent/workspace/documentRef`,
+			workspace,
+		);
+	if (!b.tools.length && !workspace)
+		c.issue("invalid_format", `${path}/tools`, "tools or agent.workspace");
+	const shared = new Set<string>();
+	b.agent?.sharedTools?.forEach((tool, j) => {
+		if (shared.has(tool.as))
+			c.issue("invalid_format", `${path}/agent/sharedTools/${j}/as`, tool.as);
+		shared.add(tool.as);
+	});
 	checkBindingBase(c, b, path);
 }
 

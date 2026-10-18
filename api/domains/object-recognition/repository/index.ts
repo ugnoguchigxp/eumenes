@@ -98,7 +98,8 @@ function handoffOf(r: HandoffRow): Handoff {
 		source: r.source,
 		recognitionId: r.recognition_id,
 		question: r.question,
-		state: r.state === "pending" && r.deadline <= Date.now() ? "expired" : r.state,
+		state:
+			r.state === "pending" && r.deadline <= Date.now() ? "expired" : r.state,
 		deadline: r.deadline,
 	};
 }

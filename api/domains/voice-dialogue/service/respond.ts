@@ -1,3 +1,4 @@
+import type { Viewing } from "../../dialogue/contracts";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import type { Database } from "bun:sqlite";
 import type { DialogueService } from "../../dialogue";
@@ -39,6 +40,7 @@ export function createVoiceResponder({
 		text: string,
 		transcriptionRequestIds: string[],
 		controller: AbortController,
+		viewing?: Viewing,
 	) => {
 		controller.signal.throwIfAborted();
 		if (!transcriptionRequestIds.every((id) => larm.validRequest?.(id)))
@@ -51,6 +53,7 @@ export function createVoiceResponder({
 					utteranceId: turn.utteranceId,
 					conversationId: "main",
 					text,
+					...(viewing ? { viewing } : {}),
 				},
 				turn.utteranceId,
 				transcriptionRequestIds,

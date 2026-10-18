@@ -18,6 +18,14 @@ export type Caller =
 	| { kind: "ui" }
 	| { kind: "specialist"; runId: string; workRef: string };
 export type Outcome = { receipt: StoredReceipt; replay: boolean };
+/** A whole draft that failed its check: what it was and where it broke (positions and rule names only). */
+export type RejectedDraft = {
+	title: string;
+	text: string;
+	issues: Array<{ path: string; rule: string }>;
+	fixes: string[];
+	createdAt: string;
+};
 /** The work as the dialogue sees it (host data, never model text). */
 export type WorkState = {
 	workRef: string;

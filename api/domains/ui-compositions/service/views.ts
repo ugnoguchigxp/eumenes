@@ -1,12 +1,19 @@
 import type { Database } from "bun:sqlite";
 import {
+	canonicalText,
 	formFields,
 	limits,
 	savedRendering,
 	type Definition,
 } from "../contracts";
-import { currentWork, get, list } from "../repository";
-import { editableDefinition, parseJson, scope, stateOf } from "./shared";
+import { currentWork, get, list, snapshot } from "../repository";
+import {
+	editableDefinition,
+	parseJson,
+	scope,
+	stateOf,
+	type RejectedDraft,
+} from "./shared";
 
 // --- reads for the screens ---
 export function studioInTransaction(
@@ -35,6 +42,12 @@ export function studioInTransaction(
 						busy: state.busy,
 						canUndo: !state.busy && row.cursor > 0,
 						canRedo: !state.busy && row.cursor < row.snapshot_count - 1,
+						/** The canonical text the specialist edits, and the one before it (the screen shows the change). */
+						source: state.current.definition
+							? canonicalText(state.current.definition)
+							: "",
+						previousSource: previousSource(db, row.id, row.cursor),
+						rejected: parseJson<RejectedDraft>(row.rejected_json),
 					}
 				: null,
 		viewing:
@@ -52,6 +65,14 @@ export function studioInTransaction(
 			({ id, title, updated_at }) => ({ id, title, updatedAt: updated_at }),
 		),
 	};
+}
+/** The revision before the current one as canonical text (empty for the first). */
+function previousSource(db: Database, workId: string, cursor: number) {
+	if (cursor === 0) return "";
+	const definition = parseJson<Definition>(
+		snapshot(db, workId, cursor - 1)?.definition_json ?? null,
+	);
+	return definition ? canonicalText(definition) : "";
 }
 export function formInTransaction(db: Database, id: string) {
 	const row = get(db, id);

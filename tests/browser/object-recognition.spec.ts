@@ -83,11 +83,10 @@ test("recognition stays inside artifact: selected image, camera capture, video s
 	await expect(workspace.getByText("解析完了", { exact: true })).toBeVisible();
 	await expect(workspace.locator(".recognition-boxes rect")).toHaveCount(2);
 	await expect(workspace.getByRole("img", { name: "desk.png" })).toBeVisible();
-	await workspace
-		.getByRole("button", { name: "表示中の結果を会話に追加" })
-		.click();
+	// "会話に追加" attaches the still with its detections to the chat input; nothing is sent.
+	await workspace.getByRole("button", { name: "会話に追加" }).click();
 	await expect(
-		page.getByText(/物体検出の観測結果（資料: desk.png/),
+		page.getByLabel("送信する添付画像").getByText("検出: cup, laptop"),
 	).toBeVisible();
 	await workspace.getByRole("button", { name: "カメラを開く" }).click();
 	await expect(workspace.getByLabel("カメラプレビュー")).toBeVisible();

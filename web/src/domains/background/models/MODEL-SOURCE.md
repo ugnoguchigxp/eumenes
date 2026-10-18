@@ -1,11 +1,9 @@
 # モデルの出所
 
-ユーザー提供の `monitor_galaxy_12_models_input.zip`（Library ID: `libfile_8248a1da1e2881918f497e0294956c3f`）をMacへmaterialize済みの監視銀河sourceから移植した。
+採用元: 監視銀河Site、commit `2faaae57be7e9d78f74a0b9e2a4cba5538a0c153`（2026-10-18利用者承認）。
 
-採用したSite source: 監視銀河 v11、commit `0eb20e1f640678585afd9c89ec64d1d951507209`。
+14体、33,460点。全点群を元と同じFloat32LE・8成分/32 bytesで保存。元座標・phase・group・seed・size・weightは変更しない。JSONのcomponentsPerPointまたはstrideを検査する。全バイナリのSHA-256は`source-hashes.json`、テストで一致を確認する。旧12体の点群から今回の14体へ置換した。廃止形状のサービス機能や監視APIは削除していない。
 
-`assets/*.bin` は元データと同じFloat32 little-endian・stride 8（32 bytes/点）。元座標・phase・group・seed・size・weightを保持する。全12モデル計29,952点。CPUのSHA-256は `0fb9ff086be67b3307dbef48c031a76ce21b03fd79380c79478b00e539fd8e60`。JSONはメタデータとして取り込み、整形だけを変更した。
+`evaluator.ts`は採用元`particles.mjs`の固定座標・有界発光評価器を型付けして移植。`diffusion.ts`と`shaders.ts`は採用済みの6/4群の拡散と原型・拡散点の表示式を再利用する。Eumenes既存のThree.jsを使いvendor JSや別RAFは持ち込まない。選択してもhealth色を保持する。モデル内の自転・変形はしない。
 
-CPUのGLSL・役割別発光・10%の段階的拡散はSiteの `motion.js` / `shaders.js` / `scatter.js` の採用式から移植。Eumenes既存のThree.js packageを使うため、Siteのvendor JSは複製していない。Three.jsのライセンスは依存packageに含まれる。
-
-12種類は展示用サンプルで、導入済みのProviderや取得済み機器を表さない。Blenderファイルは含めていない。
+実測は既存snapshotのみ。外部連携とLARM4体は未観測であり、形状の採用を実機器の計測対応と混同しない。

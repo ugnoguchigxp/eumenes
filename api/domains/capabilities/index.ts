@@ -29,8 +29,11 @@ import { bundleToolchainFunctions } from "./service/bundle-files";
  * call syntax written as text).
  */
 export const builtinToolchainFunctions: readonly string[] = [
-	...registeredToolchains.map((d) => d.functionName!),
-	...bundleToolchainFunctions(),
+	// A toolchain keeps its function name across revisions.
+	...new Set([
+		...registeredToolchains.map((d) => d.functionName!),
+		...bundleToolchainFunctions(),
+	]),
 ];
 
 export { drawingRequest, drawingPlan } from "./contracts/excalidraw";

@@ -7,10 +7,12 @@ import {
 	recognitionViewing,
 	useRecognitionChatInbox,
 } from "../domains/object-recognition/chat-inbox";
+import { useCurrentViewing } from "./useCurrentViewing";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
 	useCallback,
 	useEffect,
+	useMemo,
 	useRef,
 	useState,
 	useSyncExternalStore,
@@ -127,8 +129,20 @@ export function useWorkspace({
 	const watchTimerRun = useTimerArtifacts(client, openTimer, runs.data);
 	const submit = useSubmit(client, "main");
 	const cancel = useCancel(client, "main");
+	// Filled once the screens are known below; a spoken message refers to what is shown, like a typed one.
+	const viewingNow = useRef<() => ReturnType<typeof recognitionViewing>>(
+		() => undefined,
+	);
+	const voiceClient = useMemo(
+		() => ({
+			...client,
+			voiceCommit: (id: string, revision: number) =>
+				client.voiceCommit(id, revision, viewingNow.current()),
+		}),
+		[client],
+	);
 	const voice = useVoiceDialogue(
-		client,
+		voiceClient,
 		store,
 		undefined,
 		settings.data?.voice,
@@ -262,10 +276,13 @@ export function useWorkspace({
 		toolchain,
 		runSignature: latestRun ? `${latestRun.id}:${latestRun.status}` : "",
 	});
-	const activeTab = useRef(artifacts.active);
+	const currentViewing = useCurrentViewing(
+		specialist.viewing,
+		artifacts.active,
+	);
 	useEffect(() => {
-		activeTab.current = artifacts.active;
-	}, [artifacts.active]);
+		viewingNow.current = currentViewing;
+	}, [currentViewing]);
 	const send = chatSend(
 		input,
 		setInput,
@@ -273,7 +290,7 @@ export function useWorkspace({
 		submit,
 		automaticInput,
 		watchTimerRun,
-		() => specialist.viewing() ?? recognitionViewing(activeTab.current),
+		currentViewing,
 		specialist.addresseeNow,
 	);
 	useEffect(() => {

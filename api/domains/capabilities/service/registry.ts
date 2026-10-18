@@ -66,7 +66,8 @@ export function registerRevision(
 			!has(d.profileRevisionId, "profile") ||
 			!d.requiredSkillRevisionIds?.length ||
 			d.requiredSkillRevisionIds.some((id) => !has(id, "skill")) ||
-			!d.toolRevisionIds?.length ||
+			// No tools only for an agent that edits a work document with the host's tools (checked per toolchain).
+			!d.toolRevisionIds ||
 			d.toolRevisionIds.some((id) => !has(id, "tool"))
 		)
 			throw new Error("invalid_capability_bundle");
@@ -151,7 +152,7 @@ export function validateToolchain(
 		pack.kind !== "package" ||
 		!pack.profileRevisionId ||
 		!pack.requiredSkillRevisionIds?.length ||
-		!pack.toolRevisionIds?.length ||
+		!pack.toolRevisionIds ||
 		!d.useWhen.length ||
 		(d.examples?.length ?? 0) < 3 ||
 		d.examples!.some((e) => !e.trim() || e.length > 200) ||
@@ -192,8 +193,11 @@ function validateBinding(
 	d: Definition,
 	dependencies: FixedDefinition[],
 ) {
-	if (d.bindingRevisionId === undefined && d.artifactRevisionId === undefined)
+	if (d.bindingRevisionId === undefined && d.artifactRevisionId === undefined) {
+		if (!dependencies[0]?.toolRevisionIds?.length)
+			throw new Error("invalid_toolchain");
 		return;
+	}
 	if (
 		d.bindingRevisionId === undefined ||
 		!bindingRevisionIdPattern.test(d.bindingRevisionId) ||
@@ -204,6 +208,15 @@ function validateBinding(
 	const binding = bindingInTransaction(db, d.bindingRevisionId);
 	const pack = dependencies[0]!;
 	if (!binding) throw new Error("invalid_toolchain");
+	// A package without tools is only for a session agent working on a work document (spec §10).
+	if (
+		!pack.toolRevisionIds?.length &&
+		!(
+			binding.document.execution === "session" &&
+			binding.document.agent?.workspace
+		)
+	)
+		throw new Error("invalid_toolchain");
 	// An instant binding has no screen; every other binding is presented by exactly one artifact.
 	if (binding.document.execution === "instant") {
 		if (d.artifactRevisionId !== undefined)

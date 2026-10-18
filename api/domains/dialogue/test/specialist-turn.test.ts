@@ -98,19 +98,38 @@ test("a repair call says where the output broke the contract: schema path and ki
 	]);
 });
 
-test("a turn is bounded by six model calls", async () => {
+test("a turn is bounded by its model calls; the last one must carry its reply, and work changed before the limit is reported by the host", async () => {
 	const h = await harness();
 	await start(h);
 	const before = h.state.specialistPrompts.length;
 	for (let i = 0; i < 8; i++) h.state.specialist.push(invoke(`案${i}`));
 	const run = await h.ask("延々と変更して");
-	expect(run).toMatchObject({
-		status: "failed",
-		error: "specialist_turn_limit",
-	});
-	expect(h.state.specialistPrompts.length - before).toBe(6);
-	// What the operations did before the limit stays: it is the work's own history.
-	expect(h.state.invocations).toHaveLength(6);
+	expect(run.status).toBe("completed");
+	expect(h.conversation.message(run.answerMessageId!)!.text).toBe(
+		"案2を更新しました。",
+	);
+	// Four calls by default; the fourth invoke has no reply and cannot read a result, so it does not run.
+	expect(h.state.specialistPrompts.length - before).toBe(4);
+	expect(h.state.invocations).toHaveLength(3);
+	expect(h.state.specialistPrompts.at(-1)!.at(-1)!.content).toContain(
+		'"callsLeft":1',
+	);
+});
+
+test("refusals beyond the tool's retries end the turn with the host's words", async () => {
+	const h = await harness();
+	await start(h);
+	h.state.specialist.splice(0);
+	h.state.invokeError = "generation_in_progress";
+	const before = h.state.specialistPrompts.length;
+	h.state.specialist.push(invoke("一"), invoke("二"), invoke("三"));
+	const run = await h.ask("変更して");
+	expect(run.status).toBe("completed");
+	expect(h.conversation.message(run.answerMessageId!)!.text).toBe(
+		"反映できませんでした。",
+	);
+	// One retry by default: the second refusal ends the turn.
+	expect(h.state.specialistPrompts.length - before).toBe(2);
 });
 
 test("a refused or invalid operation is data for the next call, never a crash", async () => {
@@ -120,7 +139,7 @@ test("a refused or invalid operation is data for the next call, never a crash", 
 	const invalid = await h.ask("変更して");
 	expect(invalid.status).toBe("completed");
 	expect(lastPrompt(h)).toContain(
-		'TOOL_RESULT={"ok":false,"error":"specialist_invalid_arguments","detail":["title: invalid_type expected=string"]}',
+		'TOOL_RESULT={"ok":false,"error":"specialist_invalid_arguments","detail":["title: invalid_type expected=string"],"callsLeft":3}',
 	);
 	expect(h.state.invocations).toHaveLength(0);
 	h.state.invokeError = "generation_in_progress";
@@ -144,15 +163,18 @@ test("the specialist is not given memory, World, the main prompt or the conversa
 	expect(prompt[0]!.content).toContain("制作の専門担当");
 	expect(prompt[0]!.content).toContain("TOOLS=");
 	expect(prompt[0]!.content).not.toContain("執事");
-	expect(prompt).toHaveLength(2);
-	const input = JSON.parse(prompt.at(-1)!.content);
+	expect(prompt).toHaveLength(3);
+	// The current request alone, as the user said it, after the enclosed reference data.
+	expect(prompt.at(-1)!.content).toBe("作って");
+	const input = JSON.parse(prompt[1]!.content.split("REFERENCE=")[1]!);
 	expect(Object.keys(input).sort()).toEqual(
 		[
+			"callsLeft",
+			"course",
 			"currentWork",
 			"dirty",
 			"label",
 			"now",
-			"request",
 			"timeZone",
 			"savedRef",
 			"viewing",

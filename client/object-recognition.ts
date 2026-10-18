@@ -71,11 +71,12 @@ export function objectRecognitionClient(t: Transport) {
 			conversationId: string,
 			requestId: string,
 			origin: "camera" | "screen" | "file" = "file",
+			handoffId?: string,
 		) => {
 			const body = new FormData();
 			body.append("file", file);
 			return record(
-				`${root}?conversationId=${encodeURIComponent(conversationId)}&requestId=${encodeURIComponent(requestId)}&origin=${origin}`,
+				`${root}?conversationId=${encodeURIComponent(conversationId)}&requestId=${encodeURIComponent(requestId)}&origin=${origin}${handoffId ? `&handoffId=${encodeURIComponent(handoffId)}` : ""}`,
 				{ method: "POST", body },
 			);
 		},

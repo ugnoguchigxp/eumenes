@@ -19,13 +19,13 @@ export type SpatialOptions = {
 	demoStale: boolean;
 };
 export const defaultSpatialOptions: SpatialOptions = {
-	scatter: 100,
+	scatter: 350,
 	core: 40,
 	focusCore: 60,
 	pointSize: 100,
 	opacity: 80,
 	orbitSpeed: 50,
-	spinSpeed: 25,
+	spinSpeed: 0,
 	paused: false,
 	reducedMotion: false,
 	view: "oblique",
@@ -43,7 +43,7 @@ export function normalizeOptions(
 ): SpatialOptions {
 	const out = { ...defaultSpatialOptions, ...input };
 	for (const [key, lo, hi] of [
-		["scatter", 0, 200],
+		["scatter", 0, 500],
 		["core", 10, 90],
 		["focusCore", 10, 90],
 		["pointSize", 50, 200],

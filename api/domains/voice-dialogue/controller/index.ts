@@ -88,7 +88,11 @@ export function registerVoiceDialogue(
 		const parsed = await parseJsonBody(c, inputCommitSchema);
 		if (!parsed.ok) return parsed.response;
 		return c.json(
-			await service.commit(c.req.param("id"), parsed.data.revision),
+			await service.commit(
+				c.req.param("id"),
+				parsed.data.revision,
+				parsed.data.viewing,
+			),
 			202,
 		);
 	});

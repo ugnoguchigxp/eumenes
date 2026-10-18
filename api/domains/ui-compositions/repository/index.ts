@@ -57,6 +57,12 @@ CREATE TABLE ui_composition_revisions (
 );
 `,
 	},
+	{
+		// The last whole draft that failed its check (spec subagent-task-and-session-agents §7.6).
+		id: "ui-compositions/0003-rejected-draft",
+		after: ["ui-compositions/0002-draft-works"],
+		sql: `ALTER TABLE ui_composition_works ADD COLUMN rejected_json TEXT;`,
+	},
 ];
 
 /** A saved composition (`ready`); other states are rows of the removed one-shot generation. */
@@ -82,6 +88,8 @@ export type WorkRow = {
 	cursor: number;
 	snapshot_count: number;
 	updated_at: number;
+	/** The last whole draft that failed its check, cleared by the next accepted change. */
+	rejected_json: string | null;
 };
 export type SnapshotRow = {
 	work_id: string;
@@ -202,6 +210,7 @@ export function updateWork(
 			| "busy_run_id"
 			| "cursor"
 			| "snapshot_count"
+			| "rejected_json"
 		>
 	>,
 	now: number,

@@ -74,12 +74,16 @@ export function voiceDialogueClient(transport: Transport) {
 			});
 			return previewResultSchema.parse(await response.json());
 		},
-		voiceCommit: async (id: string, revision: number) =>
+		voiceCommit: async (
+			id: string,
+			revision: number,
+			viewing?: { artifactRevisionId: string; targetRef: string },
+		) =>
 			voiceTurnSchema.parse(
 				await (
 					await transport.call(
 						`/api/voice/turns/${encodeURIComponent(id)}/commit`,
-						json({ revision }),
+						json(viewing ? { revision, viewing } : { revision }),
 					)
 				).json(),
 			),

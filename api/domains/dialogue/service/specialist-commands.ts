@@ -7,6 +7,7 @@ import {
 	type SpecialistSession,
 } from "../contracts";
 import {
+	byId,
 	insertReceipt,
 	liveSession,
 	patchSession,
@@ -14,6 +15,7 @@ import {
 	sessionById,
 	sweepCandidates,
 	suspendedSessions,
+	unfinishedSessionRuns,
 	unfinishedSessions,
 	type SessionRecord,
 } from "../repository";
@@ -27,6 +29,7 @@ import {
 	sessionExpired,
 	sessionView,
 } from "./specialist-core";
+import { forwardToMain } from "./specialist-settle";
 import { openSessionInTransaction } from "./specialist-start";
 
 /** Jobs and runs cancelled inside a transaction: aborted once it commits. */
@@ -83,7 +86,27 @@ export function createSpecialistOps(deps: DialogueDeps) {
 				return;
 			}
 			if (record.state === "suspended") return;
-			// The turn in flight and any queued behind it are withdrawn first; the work is then free.
+			const before = deps.specialist!.workStateInTransaction(
+				tx,
+				record.adapterRef,
+				record.workRef,
+			);
+			// Utterances queued behind the turn in flight go to the main agent in their order (D5); they leave
+			// the session first, so withdrawing the turn hands the work to none of them.
+			for (const queued of unfinishedSessionRuns(tx, record.id)) {
+				const sibling =
+					queued.id === record.activeRunId ? null : byId(tx, queued.id);
+				if (sibling?.status === "queued")
+					forwardToMain(
+						deps,
+						tx,
+						sibling,
+						record,
+						before?.dirty ? "suspended" : "ended",
+						before?.label ?? record.label,
+					);
+			}
+			// The turn in flight is withdrawn; the work is then free.
 			absorb(cancelled, cancelSessionRuns(deps, tx, record.id));
 			const current = fresh(tx, record.id);
 			const work = deps.specialist!.workStateInTransaction(

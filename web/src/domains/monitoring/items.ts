@@ -18,8 +18,11 @@ export function monitoringItems(
 	if (!snapshot && !failed) return undefined;
 	const old = failed || !snapshot || ageMs > STALE_AFTER_MS;
 	return initialSpatialItems.map((layout) => {
-		const item = snapshot?.items.find((i) => i.shape === layout.model);
-		if (layout.model === "network" && failed)
+		const item = snapshot?.items.find(
+			(i) =>
+				i.shape === (layout.model === "backend" ? "network" : layout.model),
+		);
+		if (layout.model === "backend" && failed)
 			return {
 				...layout,
 				id: item?.id ?? layout.id,

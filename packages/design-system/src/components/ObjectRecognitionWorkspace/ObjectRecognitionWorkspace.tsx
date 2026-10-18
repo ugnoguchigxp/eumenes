@@ -51,16 +51,18 @@ export function ObjectRecognitionWorkspace(
 	const taking = useRef<string | null>(null);
 	const handled = useRef(new Set<string>());
 	const [countdown, setCountdown] = useState<number | null>(null);
-	const uploading = async (
-		file: File,
-		origin: CaptureOrigin | "file",
-	) => {
+	/** A request whose still could not be taken; the user can take it again. */
+	const [retry, setRetry] = useState<string | null>(null);
+	const uploading = async (file: File, origin: CaptureOrigin | "file") => {
 		const handoffId = taking.current ?? undefined;
 		taking.current = null;
 		setLocalError("");
 		setSubmitting(true);
 		try {
-			await props.onFile?.(file, { origin, ...(handoffId ? { handoffId } : {}) });
+			await props.onFile?.(file, {
+				origin,
+				...(handoffId ? { handoffId } : {}),
+			});
 		} catch {
 			setLocalError(
 				"入力を送信できませんでした。接続状態・形式・容量を確認してください。",
@@ -72,19 +74,27 @@ export function ObjectRecognitionWorkspace(
 	const { preview, ...camera } = useCameraCapture(uploading);
 	const handoff = props.handoff;
 	const cameraRef = useRef(camera);
-	cameraRef.current = camera;
+	useEffect(() => {
+		cameraRef.current = camera;
+	});
 	// A camera request opens the camera and takes one still after a short countdown; a screen
 	// request waits for the user's click because browsers allow screen sharing only on a gesture.
 	const cameraHandoff = handoff?.source === "camera" ? handoff.id : undefined;
 	useEffect(() => {
 		if (!cameraHandoff || handled.current.has(cameraHandoff)) return;
 		const id = cameraHandoff;
-		handled.current.add(id);
+		const taken = handled.current;
+		taken.add(id);
 		let live = true;
 		let done = false;
 		const timers: ReturnType<typeof setTimeout>[] = [];
 		void cameraRef.current.open("camera").then((opened) => {
-			if (!live || !opened) return;
+			if (!live) return;
+			if (!opened) {
+				done = true;
+				setRetry(id);
+				return;
+			}
 			for (let left = handoffCountdown; left > 0; left--)
 				timers.push(
 					setTimeout(
@@ -98,7 +108,9 @@ export function ObjectRecognitionWorkspace(
 					setCountdown(null);
 					taking.current = id;
 					void cameraRef.current.photo().then((taken) => {
-						if (!taken) taking.current = null;
+						if (taken) return;
+						taking.current = null;
+						setRetry(id);
 					});
 				}, handoffCountdown * 1000),
 			);
@@ -108,16 +120,24 @@ export function ObjectRecognitionWorkspace(
 			timers.forEach(clearTimeout);
 			setCountdown(null);
 			// An interrupted request (e.g. a remount) is taken again by the next mount.
-			if (!done) handled.current.delete(id);
+			if (!done) taken.delete(id);
 		};
 	}, [cameraHandoff]);
-	async function shareScreenForHandoff(id: string) {
+	/** Takes the request's still on a click: the screen (a browser gesture is required) or a camera retry. */
+	async function takeForHandoff(id: string, kind: CaptureOrigin) {
 		handled.current.add(id);
-		if (!(await camera.open("screen"))) return;
-		// Let the shared surface paint one frame before it is taken.
+		setRetry(null);
+		if (!(await camera.open(kind))) {
+			setRetry(id);
+			return;
+		}
+		// Let the shared surface or camera paint one frame before it is taken.
 		await new Promise((resolve) => setTimeout(resolve, 600));
 		taking.current = id;
-		if (!(await cameraRef.current.photo())) taking.current = null;
+		if (!(await cameraRef.current.photo())) {
+			taking.current = null;
+			setRetry(id);
+		}
 	}
 	const selectedProgress = item ? progressText(item.progress) : "";
 	const analyzing =
@@ -237,12 +257,14 @@ export function ObjectRecognitionWorkspace(
 					</strong>
 					{handoff.question && <span>{handoff.question}</span>}
 					<div className="recognition-handoff-actions">
-						{handoff.source === "screen" && (
+						{(handoff.source === "screen" || retry === handoff.id) && (
 							<Button
 								disabled={disabled || camera.opened}
-								onClick={() => void shareScreenForHandoff(handoff.id)}
+								onClick={() => void takeForHandoff(handoff.id, handoff.source)}
 							>
-								画面を共有して撮影
+								{handoff.source === "screen"
+									? "画面を共有して撮影"
+									: "撮影し直す"}
 							</Button>
 						)}
 						<Button
@@ -334,7 +356,9 @@ export function ObjectRecognitionWorkspace(
 						</Button>
 						{camera.opened && (
 							<Button variant="ghost" onClick={camera.close}>
-								{camera.origin === "screen" ? "画面共有を終了" : "カメラを閉じる"}
+								{camera.origin === "screen"
+									? "画面共有を終了"
+									: "カメラを閉じる"}
 							</Button>
 						)}
 						<label className="recognition-file">

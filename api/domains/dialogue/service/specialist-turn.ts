@@ -7,10 +7,9 @@ import type { HandlerDefinition } from "../../queue";
 import type { Run, SpecialistSet } from "../contracts";
 import {
 	byId,
+	insertSessionEvent,
 	sessionById,
-	sessionRunsBefore,
 	transition,
-	type SessionRecord,
 } from "../repository";
 import { SPECIALIST_KIND, type ChatMessage } from "./context";
 import type { DialogueDeps, SpecialistTurnPayload } from "./context";
@@ -26,26 +25,38 @@ import {
 	correctionMessage,
 	parseSpecialistAction,
 	specialistControl,
-	specialistInput,
 	specialistSystemMessage,
 	specialistViolations,
 	toolResultMessage,
 	type SpecialistAction,
 } from "./specialist-prompt";
 import { viewedSpecialistTarget } from "./specialist-context";
+import { sessionCourse, specialistTurnMessages } from "./specialist-memory";
+import {
+	agentPolicy,
+	documentTools,
+	documentView,
+	isDocTool,
+	runDocTool,
+} from "./specialist-agent";
 import { settleSpecialistTurn } from "./specialist-settle";
 import { subagentRoute } from "./toolchain-command";
 
 const log = getLogger("dialogue");
 
-/** Model calls of one turn (an invoke's follow-up and the one structural repair count). */
-const MAX_MODEL_CALLS = 6;
-/** The turn's own earlier exchanges kept in the prompt, newest first, within these bounds. */
-const HISTORY_RUNS = 12;
-const HISTORY_BYTES = 192 * 1024;
 const MAX_OUTPUT_TOKENS = 24_576;
 /** The longest repair hint of a refused operation that reaches the specialist. */
 const DETAIL_CHARS = 1000;
+/** A refusal that a retry does not fix: the request named nothing to change (spec §7.5). */
+const NO_CHANGE_REPLY = "変更点が分かりませんでした。どこを変えますか。";
+/** Refusals beyond the tool's retries end the turn (spec §6.5); a kept whole draft can be read in the source. */
+const REFUSED_REPLY = "反映できませんでした。";
+const KEPT_REPLY = "反映できませんでした。作った案はソースで確認できます。";
+/** The domain's fixer dropped parts it could not show (spec §12 S2). */
+const DROPPED_NOTE = "表示できない部分は省きました。";
+/** The work changed but the specialist gave no valid reply: the host says so (spec §6.5, D10). */
+const updatedReply = (label: string) =>
+	`${label.length > 40 ? `${label.slice(0, 40)}…` : label}を更新しました。`;
 
 /** What the specialist prepared for the host to apply at settlement. */
 export type TurnOutput = {
@@ -86,40 +97,6 @@ function failRun(
 	endRun(deps, tx, run, "failed", code);
 	traceFailure(deps, tx, run.id, "failed", code);
 	return { status: "stale", reason: code };
-}
-
-/** The session's own earlier exchanges (completed turns), oldest first, within a size budget. */
-function sessionHistory(
-	deps: DialogueDeps,
-	tx: Database,
-	session: SessionRecord,
-	run: Run,
-): ChatMessage[] {
-	const entries: ChatMessage[][] = [];
-	let bytes = 0;
-	const runs = sessionRunsBefore(tx, session.id, run.id, HISTORY_RUNS).filter(
-		(entry) => entry.status === "completed" && entry.answerMessageId,
-	);
-	for (const entry of runs.reverse()) {
-		const input = deps.conversation.messageInTransaction(
-			tx,
-			entry.inputMessageId,
-		);
-		const answer = deps.conversation.messageInTransaction(
-			tx,
-			entry.answerMessageId!,
-		);
-		if (!input || !answer) continue;
-		const pair: ChatMessage[] = [
-			{ role: "user", content: input.message.text },
-			{ role: "assistant", content: answer.message.text },
-		];
-		const size = pair.reduce((sum, m) => sum + Buffer.byteLength(m.content), 0);
-		if (bytes + size > HISTORY_BYTES) break;
-		bytes += size;
-		entries.unshift(pair);
-	}
-	return entries.flat();
 }
 
 /** The specialist turn: the user's utterance goes to the toolchain's specialist, never to the main model. */
@@ -193,8 +170,20 @@ export function createSpecialistTurnHandler(
 			}
 			if (!transition(tx, run.id, run.revision, "running", clock()))
 				return { status: "stale", reason: "run_changed" };
-			const control = specialistControl(set);
-			const handedOver = claim.payload.request;
+			const policy = agentPolicy(set);
+			// A work document is read as its canonical text: whole, or an outline with doc.view to read lines.
+			const document = set.agent.document
+				? port
+						.documentOf(set.adapterRef)
+						?.readInTransaction(tx, session.workRef)
+				: null;
+			const view = document
+				? documentView(document.text, policy.inlineBytes)
+				: null;
+			const control = specialistControl(
+				set,
+				documentTools(set, view?.outlined ?? false),
+			);
 			return {
 				status: "ready",
 				input: {
@@ -207,25 +196,32 @@ export function createSpecialistTurnHandler(
 					conversationId: run.conversationId,
 					set,
 					control,
-					messages: [
-						specialistSystemMessage(control),
-						...sessionHistory(deps, tx, session, run),
-						{
-							role: "user",
-							content: specialistInput({
-								request: handedOver ?? input.message.text,
-								...(handedOver && handedOver !== input.message.text
-									? { userUtterance: input.message.text }
-									: {}),
-								label: work.label,
-								dirty: work.dirty,
-								current: work.current,
-								savedRef: work.savedRef,
-								viewing: viewedSpecialistTarget(deps, tx, run),
-								nowMs: Date.parse(clock()),
-							}),
+					messages: specialistTurnMessages({
+						system: specialistSystemMessage(control),
+						utterance: input.message.text,
+						course: sessionCourse(deps, tx, session, run, policy),
+						work: {
+							label: work.label,
+							dirty: work.dirty,
+							current: work.current,
+							savedRef: work.savedRef,
 						},
-					],
+						viewing: viewedSpecialistTarget(deps, tx, run),
+						nowMs: Date.parse(clock()),
+						callsLeft: policy.maxModelCalls,
+						...(document && view && set.agent.document
+							? {
+									document: {
+										path: set.agent.document.path,
+										revision: document.revision,
+										title: document.title,
+										...view,
+										rejected: document.rejected,
+										inlineBytes: policy.inlineBytes,
+									},
+								}
+							: {}),
+					}),
 					deadline: Date.now() + remaining,
 					limitMs: remaining,
 				},
@@ -273,7 +269,34 @@ export function createSpecialistTurnHandler(
 	): Promise<TurnOutput> {
 		const messages = [...input.messages];
 		const receipts: Receipt[] = [];
+		const policy = agentPolicy(input.set);
+		const max = policy.maxModelCalls;
+		/** The current output was rejected once; a valid action resets it (one repair per output, D3). */
 		let repaired = false;
+		/** An operation of this turn succeeded: the turn is not lost when its reply is. */
+		let applied = false;
+		/** Refusals per tool in this turn, against the tool's retries (spec §7.4). */
+		const refusals = new Map<string, number>();
+		const updated = (): TurnOutput => {
+			const work = deps.store.read((tx) =>
+				deps.specialist!.workStateInTransaction(
+					tx,
+					input.adapterRef,
+					input.workRef,
+				),
+			);
+			return {
+				receipts,
+				action: {
+					kind: "reply",
+					text: updatedReply(work?.label ?? input.set.title),
+				},
+			};
+		};
+		const hostReply = (text: string): TurnOutput => ({
+			receipts,
+			action: { kind: "reply", text },
+		});
 		/** The session still addresses this turn; checked in the same transaction as each capture/operation. */
 		const stillMine = (tx: Database) => {
 			const run = byId(tx, input.runId);
@@ -288,7 +311,7 @@ export function createSpecialistTurnHandler(
 					: "specialist_session_changed";
 			if (refusal) throw new StaleTurn(refusal);
 		};
-		for (let call = 1; call <= MAX_MODEL_CALLS; call++) {
+		for (let call = 1; call <= max; call++) {
 			signal.throwIfAborted();
 			const requestId = await store.write((tx) => {
 				stillMine(tx);
@@ -327,23 +350,65 @@ export function createSpecialistTurnHandler(
 					reason: "invalid_contract",
 					repairAttempt: repaired ? 1 : 0,
 				});
-				if (repaired) throw new Error("specialist_invalid_contract");
+				if (repaired || call === max) {
+					if (applied) return updated();
+					throw new Error(
+						repaired ? "specialist_invalid_contract" : "specialist_turn_limit",
+					);
+				}
 				repaired = true;
 				messages.push(correctionMessage(raw, specialistViolations(value)));
 				continue;
 			}
+			repaired = false;
 			if (action.kind !== "invoke") return { receipts, action };
-			messages.push({ role: "assistant", content: raw });
-			messages.push(
-				toolResultMessage(
-					await invoke(deps, input, action, stillMine, receipts, signal),
-				),
+			// The last call cannot read a tool's result: an operation then must carry its reply (D11).
+			if (call === max && !action.text) {
+				if (applied) return updated();
+				throw new Error("specialist_turn_limit");
+			}
+			const result = await invoke(
+				deps,
+				input,
+				action,
+				stillMine,
+				receipts,
+				signal,
 			);
+			if (result.ok) {
+				applied = true;
+				// The reply the operation carried ends the turn without another call (spec §6.3).
+				if (action.text)
+					return hostReply(
+						result.dropped ? `${action.text}${DROPPED_NOTE}` : action.text,
+					);
+			} else {
+				if (result.error === "no_change") return hostReply(NO_CHANGE_REPLY);
+				const count = (refusals.get(action.tool) ?? 0) + 1;
+				refusals.set(action.tool, count);
+				if (count > policy.retriesOf(action.tool))
+					return hostReply(result.kept ? KEPT_REPLY : REFUSED_REPLY);
+			}
+			messages.push({ role: "assistant", content: raw });
+			messages.push(toolResultMessage({ ...result, callsLeft: max - call }));
 		}
+		if (applied) return updated();
 		// The specialist neither answered nor handed back within its calls.
 		throw new Error("specialist_turn_limit");
 	}
 }
+
+/** What the next call reads of an operation, and what the turn decides by. */
+type InvokeResult =
+	| { ok: true; result: unknown; dropped?: boolean }
+	| {
+			ok: false;
+			error: string;
+			detail?: string | string[];
+			/** A whole-document write failed its check and was kept as the rejected draft. */
+			kept?: boolean;
+			[key: string]: unknown;
+	  };
 
 /** One operation of the set, run in its own writer transaction; a refusal is data for the next call. */
 async function invoke(
@@ -353,8 +418,68 @@ async function invoke(
 	stillMine: (tx: Database) => void,
 	receipts: Receipt[],
 	signal: AbortSignal,
-): Promise<unknown> {
+): Promise<InvokeResult> {
 	const port = deps.specialist!;
+	const record = (
+		tx: Database,
+		outcome: { ok: boolean; error?: string; revision?: number },
+	) =>
+		insertSessionEvent(
+			tx,
+			input.sessionId,
+			{
+				kind: "tool",
+				runId: input.runId,
+				tool: action.tool,
+				...outcome,
+				...sizeOf(action.arguments),
+			},
+			deps.clock(),
+		);
+	/** A refusal is recorded on its own: the operation's transaction rolled back. */
+	const refused = (error: string) =>
+		deps.store.write((tx) => record(tx, { ok: false, error }));
+	/** Check the authority of every result used to choose this operation before any mutation. */
+	const authorized = (tx: Database) => {
+		stillMine(tx);
+		signal.throwIfAborted();
+		for (const receipt of receipts)
+			if (!deps.larm.validateReceiptInTransaction?.(tx, receipt))
+				throw new StaleTurn("permission_revoked");
+	};
+	if (isDocTool(action.tool) && input.set.agent.document) {
+		const document = port.documentOf(input.adapterRef);
+		if (!document) {
+			await refused("workspace_unavailable");
+			return { ok: false, error: "workspace_unavailable" };
+		}
+		const tool = action.tool;
+		const outcome = await deps.store.write((tx) => {
+			authorized(tx);
+			const done = runDocTool(tx, document, tool, action.arguments, input);
+			record(tx, {
+				ok: done.ok,
+				...(!done.ok ? { error: done.error } : {}),
+				...(done.revision !== undefined ? { revision: done.revision } : {}),
+			});
+			return done;
+		});
+		port.afterCommit(input.adapterRef);
+		if (!outcome.ok) {
+			const issue = outcome.issues?.[0];
+			log.warn("dialogue.operation_rejected", {
+				reason: "specialist_operation_refused",
+				validationCode: outcome.error,
+				// A position and a rule name only, as for an operation's repair hint.
+				...(issue
+					? { repairHint: `${issue.path}: ${issue.rule}`.slice(0, 200) }
+					: {}),
+			});
+			return outcome;
+		}
+		const dropped = outcome.fixes?.some((fix) => fix.startsWith("drop_"));
+		return { ok: true, result: outcome, ...(dropped ? { dropped } : {}) };
+	}
 	const checked = port.parseInvocation(
 		input.set,
 		action.tool,
@@ -365,6 +490,7 @@ async function invoke(
 			reason: "specialist_arguments_invalid",
 			validationCode: checked.code,
 		});
+		await refused(checked.code);
 		return {
 			ok: false,
 			error: checked.code,
@@ -373,13 +499,8 @@ async function invoke(
 	}
 	try {
 		const result = await deps.store.write((tx) => {
-			stillMine(tx);
-			signal.throwIfAborted();
-			// Check the authority of every result used to choose this operation before any mutation.
-			for (const receipt of receipts)
-				if (!deps.larm.validateReceiptInTransaction?.(tx, receipt))
-					throw new StaleTurn("permission_revoked");
-			return port.invokeInTransaction(tx, input.set, {
+			authorized(tx);
+			const done = port.invokeInTransaction(tx, input.set, {
 				operationName: checked.operationName,
 				input: checked.input,
 				requestId: crypto.randomUUID(),
@@ -388,6 +509,13 @@ async function invoke(
 				conversationId: input.conversationId,
 				workRef: input.workRef,
 			});
+			const revision = (done.answerContext as { revision?: unknown } | null)
+				?.revision;
+			record(tx, {
+				ok: true,
+				...(typeof revision === "number" ? { revision } : {}),
+			});
+			return done;
 		});
 		port.afterCommit(input.adapterRef);
 		return { ok: true, result: result.answerContext };
@@ -396,6 +524,7 @@ async function invoke(
 		const code = safeCode(error, "operation_failed");
 		// A short repair hint the operation attached (never a definition): data for the next call.
 		const detail = (error as { detail?: unknown }).detail;
+		await refused(code);
 		log.warn("dialogue.operation_rejected", {
 			reason: "specialist_operation_refused",
 			validationCode: code,
@@ -412,4 +541,16 @@ async function invoke(
 				: {}),
 		};
 	}
+}
+
+/** What an operation carried, as counts only (spec §8.1): edits, or the characters of a whole text. */
+function sizeOf(args: Record<string, unknown>): {
+	size?: Record<string, number>;
+} {
+	const size: Record<string, number> = {};
+	if (Array.isArray(args.edits)) size.edits = args.edits.length;
+	if (typeof args.text === "string") size.chars = args.text.length;
+	if (args.definition !== undefined)
+		size.chars = JSON.stringify(args.definition).length;
+	return Object.keys(size).length ? { size } : {};
 }

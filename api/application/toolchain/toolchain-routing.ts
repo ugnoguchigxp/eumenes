@@ -2,6 +2,7 @@ import type { Database } from "bun:sqlite";
 import { z } from "zod";
 import {
 	toolchainRuntimeOf,
+	type AgentV1,
 	type BindingV1,
 	type Capabilities,
 	type FixedDefinition,
@@ -248,6 +249,7 @@ export function createToolchainRouting(
 				tools: boundTools(db, set, doc.tools),
 				targetSchemaRef: doc.session.targetSchemaRef ?? null,
 				timeLimits: doc.timeLimits ?? null,
+				agent: agentOf(doc.agent, adapter.describe().workspaces),
 			};
 		},
 		bound,
@@ -256,5 +258,43 @@ export function createToolchainRouting(
 		linkTaskInTransaction: history.linkTaskInTransaction,
 		settleSelectionInTransaction: history.settleSelectionInTransaction,
 		requestOfRunInTransaction: history.requestOfRunInTransaction,
+	};
+}
+
+/**
+ * The binding's agent settings as the specialist runs them. The work document is the adapter's own
+ * declaration; one it does not declare makes the toolchain unusable (registration refuses it too).
+ */
+function agentOf(
+	agent: AgentV1 | undefined,
+	workspaces:
+		| ReadonlyMap<string, { path: string; mediaType: string }>
+		| undefined,
+): SpecialistSet["agent"] {
+	const ref = agent?.workspace?.documentRef;
+	const declared = ref ? workspaces?.get(ref) : undefined;
+	if (ref && !declared) throw new Error("capability_unavailable");
+	return {
+		document:
+			ref && declared
+				? {
+						ref,
+						...declared,
+						...(agent?.workspace?.inlineBytes !== undefined
+							? { inlineBytes: agent.workspace.inlineBytes }
+							: {}),
+					}
+				: null,
+		...(agent?.turn?.maxModelCalls !== undefined
+			? { maxModelCalls: agent.turn.maxModelCalls }
+			: {}),
+		...(agent?.turn?.retries ? { retries: agent.turn.retries } : {}),
+		...(agent?.memory?.recentTurns !== undefined
+			? { recentTurns: agent.memory.recentTurns }
+			: {}),
+		...(agent?.memory?.recentBytes !== undefined
+			? { recentBytes: agent.memory.recentBytes }
+			: {}),
+		sharedTools: agent?.sharedTools ?? [],
 	};
 }

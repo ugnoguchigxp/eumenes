@@ -10,7 +10,7 @@ export type SceneEnvelope = {
 const origin = new Vector3();
 const padding = 1.045;
 // The overview frames the core shapes; the outermost scattered dust may leave the frame.
-const overviewZoom = 1.7;
+const overviewZoom = 1;
 export function createCameraController(camera: OrthographicCamera) {
 	const center = new Vector3(),
 		direction = new Vector3(0, -1.5, 1).normalize();
@@ -57,11 +57,13 @@ export function createCameraController(camera: OrthographicCamera) {
 			const blend = x * x * x * (x * (6 * x - 15) + 10);
 			const aspect = width / Math.max(1, height);
 			const tilt =
-				focus || options.view === "top"
+				options.view === "top"
 					? 0
-					: 1.5 * Math.max(0, Math.min(1, (aspect - 0.8) / 0.8));
+					: (10 / 24) * Math.max(0, Math.min(1, (aspect - 0.8) / 0.8));
 			center.copy(fromCenter).lerp(focus ?? origin, blend);
-			targetDirection.set(0, -tilt, 1).normalize();
+			if (focus && options.view !== "top")
+				targetDirection.set(4, -6, 5).normalize();
+			else targetDirection.set(0, -tilt, 1).normalize();
 			direction.copy(fromDirection).lerp(targetDirection, blend).normalize();
 			const targetReserve = focus ? Math.min(280, width * 0.45) + 24 : 0;
 			reserve = fromReserve + (targetReserve - fromReserve) * blend;
@@ -85,7 +87,12 @@ export function createCameraController(camera: OrthographicCamera) {
 			camera.top = size;
 			camera.bottom = -size;
 			camera.position.copy(center).addScaledVector(direction, 40);
-			camera.up.set(0, 1, 0);
+			camera.up.set(
+				0,
+				tilt === 0 && !focus ? 1 : 0,
+				tilt === 0 && !focus ? 0 : 1,
+			);
+			if (options.view === "top") camera.up.set(0, 1, 0);
 			camera.lookAt(center);
 			camera.updateProjectionMatrix();
 			camera.updateMatrixWorld();

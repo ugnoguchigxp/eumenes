@@ -1,7 +1,7 @@
 import { z } from "zod";
 /** Saved presentation settings; demo values never claim to be telemetry. */
 export const spatialSettingsShape = {
-	spatialScatter: z.number().min(0).max(200).optional(),
+	spatialScatter: z.number().min(0).max(500).optional(),
 	spatialCore: z.number().min(10).max(90).optional(),
 	spatialFocusCore: z.number().min(10).max(90).optional(),
 	spatialPointSize: z.number().min(50).max(200).optional(),
@@ -30,11 +30,11 @@ export const spatialControls = [
 		label: "粒子の拡散（%）",
 		control: "range",
 		group: "particles",
-		defaultValue: "100",
+		defaultValue: "350",
 		min: 0,
-		max: 200,
+		max: 500,
 		step: 1,
-		help: "元の粒子座標から段階的に拡散します。100%が監視銀河の基準です。",
+		help: "原型を残し、10%ずつの群を段階的に拡散します。初期350%、最大500%。カメラの倍率は変えません。",
 	},
 	{
 		fieldId: "spatial.core",
@@ -96,19 +96,6 @@ export const spatialControls = [
 		max: 200,
 		step: 1,
 		help: "0%で公転だけを停止します。",
-	},
-	{
-		fieldId: "spatial.spin-speed",
-		document: "document:settings@1",
-		path: "$.general.spatialSpinSpeed",
-		label: "自転速度（%）",
-		control: "range",
-		group: "motion",
-		defaultValue: "25",
-		min: 0,
-		max: 100,
-		step: 1,
-		help: "全モデルが自転します。CPUの自転は利用率にも連動します。",
 	},
 	{
 		fieldId: "spatial.paused",

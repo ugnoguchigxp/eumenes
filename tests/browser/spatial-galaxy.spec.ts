@@ -45,7 +45,7 @@ async function save(page: Page) {
 	await closeArtifact(page, "設定");
 }
 
-test("12 models, saved zero-speed pause, demo health, resize, context loss and recovery", async ({
+test("14 models, saved zero-speed pause, demo health, resize, context loss and recovery", async ({
 	page,
 }) => {
 	test.setTimeout(60000);
@@ -80,7 +80,7 @@ test("12 models, saved zero-speed pause, demo health, resize, context loss and r
 	});
 	await save(page);
 	const host = page.locator(".chat-panel .spatial-background");
-	await expect(host).toHaveAttribute("data-model-count", "12");
+	await expect(host).toHaveAttribute("data-model-count", "14");
 	await expect(host).toHaveAttribute("data-background-state", "paused");
 	await expect(
 		page.getByRole("button", { name: "状態を見る", exact: true }),
@@ -131,7 +131,7 @@ test("12 models, saved zero-speed pause, demo health, resize, context loss and r
 	).toBeVisible();
 	await expect(
 		page.locator(".spatial-background-summary li button"),
-	).toHaveCount(12);
+	).toHaveCount(14);
 	await expect(
 		page.getByRole("button", { name: "CPU：正常", exact: true }),
 	).toBeVisible();

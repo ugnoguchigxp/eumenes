@@ -11,6 +11,8 @@ export interface ObjectRecognitionPort {
 		runId: string,
 		conversationId: string,
 		command: unknown,
+		/** Images already on the run's input: the model sees them, so nothing is taken again. */
+		input?: { inputImages: number },
 	): void;
 	resultInTransaction(db: Database, runId: string): unknown | null;
 }

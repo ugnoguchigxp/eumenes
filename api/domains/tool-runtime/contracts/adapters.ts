@@ -75,6 +75,62 @@ type SessionWorkState = {
 	current: unknown;
 };
 
+/** Where a work document failed its check: a position and a rule name, never the document's values. */
+export type DocumentIssue = { path: string; rule: string };
+
+/** The draft of a whole-document write that failed its check, kept so the user and the agent can see it. */
+export type RejectedDraft = {
+	title: string;
+	text: string;
+	issues: DocumentIssue[];
+	fixes: string[];
+	createdAt: string;
+};
+
+/**
+ * The text document of a work (spec subagent-task-and-session-agents 2026-10-18 §7.2). The domain owns
+ * its canonical text (the same value always gives the same text), its fixing and its strict check; the
+ * host's document tools read, replace and write that text and hand the result back for a new revision.
+ */
+export interface WorkDocumentAdapter {
+	/** The current revision's canonical text, with the rejected draft kept since; null when ended. */
+	readInTransaction(
+		tx: Database,
+		workRef: string,
+	): {
+		revision: number;
+		title: string;
+		text: string;
+		rejected: RejectedDraft | null;
+	} | null;
+	/** Read text into a value, fix what the domain fixes, check it strictly. Makes no revision. */
+	check(
+		text: string,
+	):
+		| { ok: true; value: unknown; fixes: string[] }
+		| { ok: false; code: string; issues: DocumentIssue[]; fixes: string[] };
+	/**
+	 * A checked value as the work's next revision. Throws `revision_conflict` when `baseRevision` is
+	 * not the current one and `no_change` when nothing differs. Clears the rejected draft.
+	 */
+	commitInTransaction(
+		tx: Database,
+		workRef: string,
+		input: {
+			baseRevision: number;
+			title?: string;
+			value: unknown;
+			origin: AdapterOrigin;
+		},
+	): { revision: number };
+	/** Keep a whole-document write that failed its check (replaces the one kept before). */
+	rejectInTransaction(
+		tx: Database,
+		workRef: string,
+		draft: Omit<RejectedDraft, "createdAt">,
+	): void;
+}
+
 /**
  * The work a domain keeps for a specialist session (spec §4.5, §5). Dialogue owns the session,
  * its expiry and the conversation's addressee; the domain owns the draft and its history. Every
@@ -112,6 +168,8 @@ export interface SessionWorkAdapter {
 		workRef: string,
 		mode: "discard" | "close",
 	): void;
+	/** The work's text document, when the adapter declares one in `describe().workspaces`. */
+	document?: WorkDocumentAdapter;
 }
 
 /** The outcome of an instant operation: the answer sentence, or a safe code for why there is none. */
@@ -163,6 +221,11 @@ export interface DomainAdapter {
 		structures?: ReadonlyMap<string, { inputSchemaRef: string }>;
 		/** The adapter answers instant bindings (it has `instant`). */
 		instant?: boolean;
+		/**
+		 * Work documents of its session (`workspace:` refs a session binding's `agent.workspace` may name):
+		 * the file name shown to the agent and the media type of the text.
+		 */
+		workspaces?: ReadonlyMap<string, { path: string; mediaType: string }>;
 	};
 	/** The adapter's domain is configured and usable on this host now. */
 	availableInTransaction(tx: Database): boolean;

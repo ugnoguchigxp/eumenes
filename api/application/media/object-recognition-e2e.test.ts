@@ -255,11 +255,21 @@ test("an agreed capture request: the screen's still and its detections become on
 			source: "object-recognition",
 			data: { captureSource: "camera", recognitionId: id },
 		});
-		// The fixture model answers every run with a capture, so only this request is checked.
-		const after = await (
-			await h.request("/api/object-recognition/handoffs?conversationId=main")
-		).json();
-		expect(after.some((x: { id: string }) => x.id === run.id)).toBe(false);
+		// The fixture model picks capture again for the sent message, but that message already
+		// carries the image: the host shows it instead of asking for another still.
+		await h.dialogue.waitForTerminal(sent.id, { timeoutMs: 5000 });
+		expect(
+			await (
+				await h.request("/api/object-recognition/handoffs?conversationId=main")
+			).json(),
+		).toEqual([]);
+		expect(
+			h.store.read((db) =>
+				h
+					.objectRecognition!.port("local:owner")
+					.resultInTransaction(db, sent.id),
+			),
+		).toEqual({ action: "capture", state: "already_attached" });
 		const cancelled = await h.request(
 			`/api/object-recognition/handoffs/${run.id}/cancel`,
 			{},

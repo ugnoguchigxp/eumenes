@@ -76,6 +76,8 @@ export function useCameraCapture(
 			setOpened(true);
 			return true;
 		} catch {
+			// A later open() owns the stream now; this failure must not stop it.
+			if (token !== generation.current) return false;
 			stop();
 			setOpened(false);
 			setError(
@@ -94,7 +96,10 @@ export function useCameraCapture(
 		const kind = originRef.current;
 		const scale =
 			kind === "screen"
-				? Math.min(1, screenEdge / Math.max(video.videoWidth, video.videoHeight))
+				? Math.min(
+						1,
+						screenEdge / Math.max(video.videoWidth, video.videoHeight),
+					)
 				: 1;
 		const canvas = document.createElement("canvas");
 		canvas.width = Math.round(video.videoWidth * scale);

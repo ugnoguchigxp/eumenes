@@ -12,7 +12,7 @@ const revisionNumber = z.number().int().min(1).max(1_000_000);
 const slug = z.string().regex(/^[a-z][a-z0-9._-]{0,100}$/);
 /** `adapter:timers@1`, `availability:timers@1`, `input:timer-hms@1`, `projection:timer-result@1`. */
 const hostRefPattern =
-	/^(adapter|availability|input|projection|connection|query|document|condition|structure):[a-z][a-z0-9._-]{0,80}(@[1-9][0-9]*)?$/;
+	/^(adapter|availability|input|projection|connection|query|document|condition|structure|workspace):[a-z][a-z0-9._-]{0,80}(@[1-9][0-9]*)?$/;
 const hostRef = (kind: string) =>
 	z
 		.string()
@@ -87,6 +87,56 @@ const timeLimitsV1 = z
 	);
 export type TimeLimits = z.infer<typeof timeLimitsV1>;
 
+/** A tool id the agent's per-tool settings name: a binding tool's id or a host tool (`doc.edit`). */
+const agentToolId = z.string().regex(/^[a-z][a-z0-9._-]{0,63}$/);
+/**
+ * How the session's agent works (spec subagent-task-and-session-agents 2026-10-18 §10). `workspace` names
+ * the work document the adapter declares (`describe().workspaces`): the host then offers its document tools.
+ * `turn` bounds one turn's model calls and the retries after a refusal per tool (`default` for the rest);
+ * `memory` bounds the earlier turns kept in full. Every field is optional: the host defaults apply.
+ */
+const agentV1 = z.strictObject({
+	workspace: z
+		.strictObject({
+			documentRef: hostRef("workspace"),
+			/** The current document goes into the turn's input whole up to this size; above it, an outline. */
+			inlineBytes: z.number().int().min(1024).max(98_304).optional(),
+		})
+		.optional(),
+	turn: z
+		.strictObject({
+			maxModelCalls: z.number().int().min(1).max(12).optional(),
+			retries: z
+				.record(
+					z.union([agentToolId, z.literal("default")]),
+					z.number().int().min(0).max(3),
+				)
+				.optional(),
+		})
+		.optional(),
+	memory: z
+		.strictObject({
+			recentTurns: z.number().int().min(1).max(50).optional(),
+			recentBytes: z.number().int().min(4096).max(393_216).optional(),
+		})
+		.optional(),
+	/**
+	 * One-shot toolchains the agent may call as tools without leaving the session (spec §9.3). `as` is the
+	 * tool id the agent uses; `async` starts it in the background and answers when it completes (§9.4).
+	 */
+	sharedTools: z
+		.array(
+			z.strictObject({
+				toolchainId: slug,
+				as: z.string().regex(/^[a-z][a-z0-9_]{0,40}$/),
+				async: z.boolean().optional(),
+			}),
+		)
+		.max(8)
+		.optional(),
+});
+export type AgentV1 = z.infer<typeof agentV1>;
+
 /**
  * A specialist-session toolchain (spec toolchain-specialist-dialogue 2026-10-17 §4.1): after the
  * conversation hands over, the user talks to the package's specialist directly over several turns.
@@ -100,7 +150,7 @@ const sessionBindingV1 = z.strictObject({
 	execution: z.literal("session"),
 	adapterRef: hostRef("adapter"),
 	availabilityRef: hostRef("availability"),
-	tools: z.array(bindingTool).min(1).max(16),
+	tools: z.array(bindingTool).max(16),
 	artifactRevisionId: z.string().regex(artifactRevisionIdPattern),
 	session: z.strictObject({
 		/**
@@ -110,6 +160,7 @@ const sessionBindingV1 = z.strictObject({
 		targetSchemaRef: schemaRef.optional(),
 	}),
 	timeLimits: timeLimitsV1.optional(),
+	agent: agentV1.optional(),
 });
 /**
  * An instant-answer toolchain: the first round of the conversation calls its function with the
@@ -587,6 +638,8 @@ export type BundleHost = {
 			structures?: ReadonlyMap<string, { inputSchemaRef: string }>;
 			/** The adapter answers instant bindings (see `DomainAdapter.instant`). */
 			instant?: boolean;
+			/** Work documents its session offers (`workspace:` refs, see `DomainAdapter.workspaces`). */
+			workspaces?: ReadonlySet<string>;
 		}
 	>;
 	availability: ReadonlySet<string>;

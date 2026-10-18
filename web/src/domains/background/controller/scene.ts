@@ -144,8 +144,7 @@ export function createSpatialScene(
 				[...entries.values()].some(
 					({ item, model }) =>
 						(item.orbit && settings.orbitSpeed > 0) ||
-						(model.animate &&
-							(moving(item) || (model.configure && settings.spinSpeed > 0))),
+						(model.animate && (moving(item) || model.configure)),
 				))
 		);
 	}
@@ -158,9 +157,9 @@ export function createSpatialScene(
 					: 0;
 				previousTime = lastFrame = time;
 				if (motionEnabled()) {
-					seconds = (seconds + delta) % 3600;
+					seconds = (seconds + delta) % 33600;
 					orbit =
-						(orbit + ((0.075 * settings.orbitSpeed) / 100) * delta) %
+						(orbit + ((0.025 * settings.orbitSpeed) / 100) * delta) %
 						(Math.PI * 8);
 					for (const { item, model } of entries.values())
 						if (moving(item) || model.configure)

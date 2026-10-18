@@ -1,9 +1,10 @@
 import type { Database } from "bun:sqlite";
 import {
+	canonicalText,
+	checkDefinitionText,
 	fail,
 	fieldsOfDefinition,
 	limits,
-	validatedDefinition,
 	type Definition,
 } from "../contracts";
 import {
@@ -34,6 +35,7 @@ import {
 	stateOf,
 	type Caller,
 	type Outcome,
+	type RejectedDraft,
 	type WorkState,
 } from "./shared";
 
@@ -105,36 +107,51 @@ export function endWorkInTransaction(
 	bumpRevision(db, scope);
 }
 
-// --- draft operations ---
-export function applyDraftInTransaction(
+// --- the work document (spec subagent-task-and-session-agents §7.2) ---
+/** The rejected draft is kept within this size; a longer text is cut (its issues stay whole). */
+const REJECTED_TEXT_BYTES = 64 * 1024;
+
+/** The work's current revision as its canonical text, with the rejected draft kept since. */
+export function documentInTransaction(db: Database, workRef: string) {
+	const row = work(db, workRef);
+	if (!row) return null;
+	const current = snapshot(db, row.id, row.cursor)!;
+	const definition = parseJson<Definition>(current.definition_json);
+	return {
+		revision: row.draft_revision,
+		title: current.title,
+		text: definition ? canonicalText(definition) : "",
+		rejected: parseJson<RejectedDraft>(row.rejected_json),
+	};
+}
+
+/**
+ * A checked definition as the work's next revision: from the specialist turn that holds the work, or from the
+ * screen while no turn does. `no_change` when it is the current one, `revision_conflict` on another revision.
+ * Clears the rejected draft.
+ */
+export function commitDocumentInTransaction(
 	db: Database,
 	caller: Caller,
-	input: { title: string; definition: Record<string, unknown> },
-	requestId: string,
-): Outcome {
-	const digest = digestOf("draft.apply", input);
-	const replay = replayOf(db, requestId, digest);
-	if (replay) return replay;
-	if (caller.kind !== "specialist") return fail("origin_not_allowed");
-	const row = loadWork(db, caller.workRef);
-	if (row.busy_run_id !== caller.runId) return fail("turn_not_current");
-	const { definition } = validatedDefinition(input.definition);
-	const json = JSON.stringify(definition);
+	workRef: string,
+	input: { baseRevision: number; title?: string; definition: Definition },
+): { revision: number } {
+	const row = loadWork(db, workRef);
+	if (caller.kind === "specialist") {
+		if (caller.workRef !== row.id || row.busy_run_id !== caller.runId)
+			return fail("turn_not_current");
+	} else if (row.busy_run_id !== null) return fail("generation_in_progress");
+	if (row.draft_revision !== input.baseRevision)
+		return fail("revision_conflict");
 	const current = snapshot(db, row.id, row.cursor)!;
-	const same =
-		current.title === input.title && current.definition_json === json;
-	if (same)
-		return accept(db, requestId, digest, {
-			projectId: row.id,
-			state: "unchanged",
-			workRef: row.id,
-			revision: row.draft_revision,
-			title: input.title,
-		});
+	const title = input.title ?? current.title;
+	const json = JSON.stringify(input.definition);
+	if (current.title === title && current.definition_json === json)
+		return fail("no_change");
 	const next = row.cursor + 1;
 	if (next > limits.changes) return fail("undo_limit_reached");
 	dropSnapshotsAfter(db, row.id, row.cursor);
-	putSnapshot(db, row.id, next, input.title, json);
+	putSnapshot(db, row.id, next, title, json);
 	updateWork(
 		db,
 		row.id,
@@ -142,15 +159,65 @@ export function applyDraftInTransaction(
 			cursor: next,
 			snapshot_count: next + 1,
 			draft_revision: row.draft_revision + 1,
+			rejected_json: null,
 		},
 		Date.now(),
 	);
+	bumpRevision(db, scope);
+	return { revision: row.draft_revision + 1 };
+}
+
+/** Keep a whole draft that failed its check (replaces the one kept before); the shown revision stays. */
+export function rejectDocumentInTransaction(
+	db: Database,
+	workRef: string,
+	draft: Omit<RejectedDraft, "createdAt">,
+) {
+	const row = loadWork(db, workRef);
+	const bytes = Buffer.from(draft.text);
+	const text =
+		bytes.length > REJECTED_TEXT_BYTES
+			? `${bytes.subarray(0, REJECTED_TEXT_BYTES).toString("utf8")}…`
+			: draft.text;
+	const rejected: RejectedDraft = {
+		...draft,
+		text,
+		createdAt: new Date().toISOString(),
+	};
+	updateWork(db, row.id, { rejected_json: JSON.stringify(rejected) }, Date.now());
+	bumpRevision(db, scope);
+}
+
+/**
+ * The user's own edit of the source on the screen (spec §7.7): the same check as the specialist's text, then
+ * the work's next revision. A refusal names the first issue's position and rule for the screen to show.
+ */
+export function applySourceInTransaction(
+	db: Database,
+	caller: Caller,
+	input: { workRef: string; expectedRevision: number; text: string },
+	requestId: string,
+): Outcome {
+	const digest = digestOf("source.apply", input);
+	const replay = replayOf(db, requestId, digest);
+	if (replay) return replay;
+	requireUi(caller);
+	const checked = checkDefinitionText(input.text);
+	if (!checked.ok) {
+		const issue = checked.issues[0];
+		return fail(checked.code, issue ? `${issue.path}: ${issue.rule}` : undefined);
+	}
+	const { revision } = commitDocumentInTransaction(db, caller, input.workRef, {
+		baseRevision: input.expectedRevision,
+		definition: checked.definition,
+	});
+	const row = loadWork(db, input.workRef);
 	return accept(db, requestId, digest, {
 		projectId: row.id,
 		state: "drafted",
 		workRef: row.id,
-		revision: row.draft_revision + 1,
-		title: input.title,
+		revision,
+		title: snapshot(db, row.id, row.cursor)!.title,
 	});
 }
 export function stepInTransaction(
@@ -239,6 +306,7 @@ export function saveInTransaction(
 			cursor: 0,
 			snapshot_count: 1,
 			draft_revision: row.draft_revision + 1,
+			rejected_json: null,
 		},
 		now,
 	);

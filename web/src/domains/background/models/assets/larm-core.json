@@ -1,0 +1,78 @@
+{
+	"id": "larm-core",
+	"version": 2,
+	"shape": {
+		"name": "core with six seats",
+		"description": "central hub and six satellites",
+		"topology": "Dense small spherical core, six equally spaced seats, and thin connecting ring",
+		"components": [
+			"core",
+			"seat 1",
+			"seat 2",
+			"seat 3",
+			"seat 4",
+			"seat 5",
+			"seat 6",
+			"connecting ring"
+		],
+		"silhouette": "Dense small spherical core, six equally spaced seats, and thin connecting ring",
+		"label": "LARM Core"
+	},
+	"count": 2300,
+	"stride": 32,
+	"format": "Float32LE",
+	"attributes": ["x", "y", "z", "phase", "group", "seed", "size", "weight"],
+	"bounds": {
+		"min": [-1.0785439014434814, -0.9537579417228699, -0.22619006037712097],
+		"max": [1.0783854722976685, 0.9536349773406982, 0.22971543669700623]
+	},
+	"seed": 4182026,
+	"coordinateSystem": "right-handed Z-up",
+	"animation": "fixed local positions; bounded brightness propagation only; no model-local rigid motion",
+	"geometryChecks": {},
+	"label": "LARM Core",
+	"kind": "larm-core",
+	"category": "larm",
+	"pointCount": 2300,
+	"strideBytes": 32,
+	"componentsPerPoint": 8,
+	"binary": "larm-core.bin",
+	"normalizationRadius": 1.0798285573570308,
+	"motion": {
+		"type": "core-with-six-seats-brightness",
+		"phaseMeaning": "Each seat bottom 0 to top 1. Ring azimuth 0 to 1. Core is used for breathing only.",
+		"groupMeaning": {
+			"0": "core",
+			"1": "seat 1",
+			"2": "seat 2",
+			"3": "seat 3",
+			"4": "seat 4",
+			"5": "seat 5",
+			"6": "seat 6",
+			"7": "connecting ring"
+		},
+		"cyclesPerSecond": 0.0625,
+		"pulseWidth": 0.18,
+		"baseBrightness": 0.7,
+		"peakBrightness": 0.77,
+		"maxDisplacement": 0,
+		"rules": [
+			"Animate brightness only. Local point positions are anchored; do not integrate positions, rigidly rotate, deform, emit, or resize the model.",
+			"Keep all structural points visible in idle, activity zero, disconnected and unlit portions. Keep pointCount, size, seed and weight fixed across states.",
+			"Use one health color across the entire shape; groups control brightness, never independent health colors or monitoring targets.",
+			"Use bounded modulo time. Maximum working speed is 1.3 times the reference, never driven by utilization.",
+			"Cap the combined wave, breathing and utilization brightness uplift at 10 percent. Separate observed static capacity/seat/load brightness from activity uplift.",
+			"Health overrides activity. Fault stops ordinary flow and permits at most idle-strength breathing; a newly identified observed event may flash softly once for about one second, never on repeated retrieval.",
+			"Disconnected and unknown stop all temporal brightness changes. Stale retains health color at 45 percent of normal brightness and stops breathing, flow and event flashes.",
+			"Reduced motion stops breathing, flow, event flashes and value interpolation; retain fixed coordinates, per-point steady brightness and current supplied color/labels.",
+			"The model does not infer health, fabricate activity or missing observations, change monitoring thresholds, or introduce measurement APIs. Missing inputs remain unknown rather than zero.",
+			"Scene placement and orbital transforms are separate from model-local animation. Reference timing is a production proposal, not a monitoring threshold."
+		],
+		"suggestion": "Idle core breathing and static observed loaded-seat brightness; empty seats remain visible. Starting fills only observed loading seats bottom-to-top. Working circles ring. Seat changes interpolate for 1–2 seconds. More than six models require a future aggregation contract.",
+		"idleBreathingSeconds": 12,
+		"maxSpeedMultiplier": 1.3,
+		"maxCombinedBrightnessUplift": 0.1,
+		"movingWave": true,
+		"specificationStatus": "production-proposal; monitoring rules and APIs are not implemented"
+	}
+}

@@ -138,6 +138,7 @@ export function bundleHostOf(
 					conditions: d.conditions,
 					structures: d.structures,
 					instant: d.instant,
+					...(d.workspaces ? { workspaces: new Set(d.workspaces.keys()) } : {}),
 				},
 			]),
 		),

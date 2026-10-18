@@ -960,3 +960,32 @@ test("sample HTTP route executes inference with English speech routing and draft
 		h.inference.usage().some((r) => r.purpose === "tts" && r.accepted),
 	).toBe(true);
 });
+
+test("a committed utterance carries the saved item on screen to its run, like a typed message", async () => {
+	const h = await setup(undefined, {
+		status: ready,
+		transcribe: async () => "この写真について教えて",
+		answer: async () => "確認します。",
+		speak: async () => wav(),
+	});
+	// This fixture's schema has no run viewing column; the dialogue's own tests cover how it is kept.
+	const received: unknown[] = [];
+	const submitVoice = h.dialogue.submitVoice;
+	h.dialogue.submitVoice = (input, ...rest) => {
+		const { viewing, ...plain } = input;
+		received.push(viewing);
+		return submitVoice(plain, ...rest);
+	};
+	const session = crypto.randomUUID(),
+		id = crypto.randomUUID();
+	h.voice.start(session, 1);
+	await h.voice.accept(session, 1, 1, id, wav());
+	await until(() => h.voice.get(id)!.status === "input_ready");
+	const viewing = {
+		artifactRevisionId: "artifact:object-recognition.workspace@2",
+		targetRef: crypto.randomUUID(),
+	};
+	await h.voice.commit(id, h.voice.get(id)!.revision, viewing);
+	await until(() => !!h.voice.get(id)!.runId);
+	expect(received).toEqual([viewing]);
+});

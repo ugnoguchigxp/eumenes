@@ -2,8 +2,10 @@ import { z } from "zod";
 import {
 	compositionDirections,
 	compositionViews,
+	fixDefinition,
 	validateComposition,
 } from "@eumenes/artifact-ui/composition-checks";
+import { decodeLlmJson } from "../../../infrastructure/llm-json";
 import { parseDefinition } from "@eumenes/artifact-ui/contracts";
 
 /** The only views a composition may use. Every other registered view is refused. */
@@ -259,4 +261,84 @@ export function inlineForm(
 		const { source: _source, ...rest } = form;
 		return { ...rest, fields };
 	}) as Definition;
+}
+
+/** Keys first in a part (what it is and its heading) and last (what it contains), for a stable reading order. */
+const FIRST_KEYS = ["view", "title"];
+const LAST_KEYS = ["model", "children", "fields"];
+const keyRank = (key: string) =>
+	FIRST_KEYS.includes(key)
+		? FIRST_KEYS.indexOf(key) - FIRST_KEYS.length
+		: LAST_KEYS.includes(key)
+			? LAST_KEYS.indexOf(key) + 1
+			: 0;
+function ordered(value: unknown): unknown {
+	if (Array.isArray(value)) return value.map(ordered);
+	if (!isRecord(value)) return value;
+	return Object.fromEntries(
+		Object.keys(value)
+			.sort((a, b) => keyRank(a) - keyRank(b) || (a < b ? -1 : a > b ? 1 : 0))
+			.map((key) => [key, ordered(value[key])]),
+	);
+}
+/**
+ * The definition's canonical text (spec subagent-task-and-session-agents §7.2): keys in a fixed order (`view`
+ * and `title` first, `model`, `children` and `fields` last, the rest by name) and two-space indentation. The
+ * same definition always gives the same text; the screen's source view and the specialist read this text.
+ */
+export function canonicalText(definition: Definition): string {
+	return JSON.stringify(ordered(definition), null, 2);
+}
+
+export type DefinitionIssue = { path: string; rule: string };
+/**
+ * A definition's text as the work document's next value: read (one syntax correction at the model's boundary),
+ * fixed by the composition fixer (it drops what it cannot show and records it), then checked strictly. A
+ * refusal says where and by which rule, never the values.
+ */
+export function checkDefinitionText(
+	text: string,
+):
+	| { ok: true; definition: Definition; fields: FormFields | null; fixes: string[] }
+	| { ok: false; code: string; issues: DefinitionIssue[]; fixes: string[] } {
+	let raw: unknown;
+	try {
+		raw = decodeLlmJson(text, limits.definitionBytes * 2).value;
+	} catch (error) {
+		const code = (error as { code?: unknown }).code;
+		return {
+			ok: false,
+			code: "document_parse_failed",
+			issues: [
+				{ path: "(root)", rule: typeof code === "string" ? code : "json" },
+			],
+			fixes: [],
+		};
+	}
+	const fixed = fixDefinition(raw);
+	if (!fixed.ok)
+		return {
+			ok: false,
+			code: "ui_definition_invalid",
+			issues: [{ path: "(root)", rule: "nothing_displayable" }],
+			fixes: fixed.fixes,
+		};
+	try {
+		const checked = validatedDefinition(fixed.definition);
+		return { ok: true, ...checked, fixes: fixed.fixes };
+	} catch (error) {
+		if (!(error instanceof UiCompositionError)) throw error;
+		const detail = error.detail ?? "";
+		const at = detail.indexOf(": ");
+		return {
+			ok: false,
+			code: error.code,
+			issues: [
+				at >= 0
+					? { path: detail.slice(0, at) || "(root)", rule: detail.slice(at + 2) }
+					: { path: "(root)", rule: detail || error.code },
+			],
+			fixes: fixed.fixes,
+		};
+	}
 }

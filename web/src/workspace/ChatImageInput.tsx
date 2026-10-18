@@ -9,13 +9,17 @@ function annotationLabel(data: Record<string, unknown>) {
 	const labels = [
 		...new Set(
 			objects.flatMap((o) =>
-				o && typeof o === "object" && typeof (o as { label?: unknown }).label === "string"
+				o &&
+				typeof o === "object" &&
+				typeof (o as { label?: unknown }).label === "string"
 					? [(o as { label: string }).label]
 					: [],
 			),
 		),
 	];
-	return labels.length ? `検出: ${labels.slice(0, 4).join(", ")}${labels.length > 4 ? "…" : ""}` : "検出: なし";
+	return labels.length
+		? `検出: ${labels.slice(0, 4).join(", ")}${labels.length > 4 ? "…" : ""}`
+		: "検出: なし";
 }
 
 export function ChatImageInput({ state }: { state: WorkspaceState }) {

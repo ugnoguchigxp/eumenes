@@ -1,29 +1,31 @@
 import type { SpatialItem } from "./contracts";
 
-/** Twelve accepted shape samples. This is not a discovered machine/provider inventory. */
+/** Adopted 14 shapes; missing measurements remain explicitly unconfirmed. */
 export const initialSpatialItems: readonly SpatialItem[] = [
 	["mac-cpu", "CPU", "cpu"],
 	["mac-memory", "Memory", "memory"],
 	["mac-ssd", "SSD", "ssd"],
-	["mac-network", "Network", "network"],
+	["eumenes-backend", "Eumenes Backend", "backend"],
+	["external", "外部連携", "external"],
 	["sample-llm", "LLM", "llm"],
 	["sample-asr", "ASR", "asr"],
 	["sample-tts", "TTS", "tts"],
 	["sample-embedding", "Embedding", "embedding"],
 	["sample-attitude", "態度判定", "attitude"],
-	["sample-language", "言語判定", "language"],
-	["sample-image", "画像生成", "image"],
-	["sample-music", "楽曲生成", "music"],
+	["larm-core", "LARM Core", "larm-core"],
+	["larm-cpu", "LARM CPU", "larm-cpu"],
+	["larm-memory", "LARM Memory", "larm-memory"],
+	["larm-gpu", "LARM GPU", "larm-gpu"],
 ].map(([id, label, model], i) => {
 	const phase =
-		i < 4 ? (i / 4 + 0.125) * Math.PI * 2 : ((i - 4) / 8 + 0.065) * Math.PI * 2;
-	const radius = i < 4 ? 3.7 : 8.4;
+		i < 10 ? (i / 10) * Math.PI * 2 + 0.2 : ((i - 10) / 4) * Math.PI * 2 + 0.65;
+	const radius = i < 10 ? 6.7 : 10.7;
 	return {
 		id: id!,
 		label: label!,
 		model: model!,
 		position: [Math.cos(phase) * radius, Math.sin(phase) * radius, 0] as const,
-		orbit: { radius, phase, speed: i < 4 ? 1 : 0.75 },
+		orbit: { radius, phase, speed: i < 10 ? 1 : 0.75 },
 		state: {
 			health: "unknown",
 			activity: "idle",

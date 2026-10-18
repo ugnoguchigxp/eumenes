@@ -189,9 +189,7 @@
 						"minLength": 1
 					}
 				},
-				"required": [
-					"id"
-				]
+				"required": ["id"]
 			}
 		},
 		{
@@ -204,15 +202,10 @@
 				"properties": {
 					"credentialSource": {
 						"type": "string",
-						"enum": [
-							"dedicated",
-							"larm"
-						]
+						"enum": ["dedicated", "larm"]
 					}
 				},
-				"required": [
-					"credentialSource"
-				]
+				"required": ["credentialSource"]
 			}
 		},
 		{
@@ -231,10 +224,7 @@
 						"type": "string"
 					}
 				},
-				"required": [
-					"id",
-					"frameIndex"
-				]
+				"required": ["id", "frameIndex"]
 			}
 		}
 	]

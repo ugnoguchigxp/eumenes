@@ -1,10 +1,6 @@
 import { z } from "zod";
 import { systemContext } from "../../../infrastructure/system-context";
-import {
-	controlInstructions,
-	promptTime,
-	type ControlContract,
-} from "../../inference";
+import { controlInstructions, type ControlContract } from "../../inference";
 import type { SpecialistSet } from "../contracts";
 import {
 	isBriefSpokenReply,
@@ -27,7 +23,7 @@ const outputShape = z
 			.describe(
 				[
 					'reply=利用者への短い説明・質問・完了報告。必須条件が欠けるとき、または停止・破棄・復帰の意図が曖昧なときは、確認を一つだけ尋ねる。例 {"action":"reply","text":"どの題材にしますか。"}',
-					'invoke=TOOLSの登録操作を一つ実行する。結果が成功するまで反映・完了と言わない。TOOL_RESULTがok:falseなら、errorとdetailを基に直して同じターンでinvokeし直す。二度直しても通らない、または直し方が分からないときは、replyで短く失敗を伝える。例 {"action":"invoke","tool":"<TOOLSのid>","arguments":{}}',
+					'invoke=TOOLSの登録操作を一つ実行する。textを付けると、操作が成功したときにそのtextで利用者へ答えてターンを終える（次の推論はしない）。textを付けないと、TOOL_RESULTを読んでから次を決める。TOOL_RESULTがok:falseなら、errorとdetail・issuesを基に直して同じターンでinvokeし直す。callsLeftが1のときのinvokeには必ずtextを付ける。例 {"action":"invoke","tool":"<TOOLSのid>","arguments":{},"text":"見出しを大きくしました。"}',
 					'return=担当範囲外の依頼、または復帰の依頼で、担当を離れる。例 {"action":"return","forward":true}',
 					'discard=利用者が未保存作業の破棄を明示したときだけ使う。例 {"action":"discard","text":"破棄しました。"}',
 				].join("\n"),
@@ -39,7 +35,7 @@ const outputShape = z
 			.refine(isBriefSpokenReply)
 			.optional()
 			.describe(
-				"reply・return・discardの短い返答(replyでは必須、invokeには付けない)。音声で聞かれるため通常一文、補足込みでも二文・160字以内。制作物や実装内容は読み上げない。",
+				"短い返答。replyでは必須。invokeでは操作が成功したときの返答（任意）。音声で聞かれるため通常一文、補足込みでも二文・160字以内。制作物や実装内容は読み上げない。",
 			),
 		tool: z
 			.string()
@@ -67,14 +63,20 @@ const outputShape = z
 
 export type SpecialistAction =
 	| { kind: "reply"; text: string }
-	| { kind: "invoke"; tool: string; arguments: Record<string, unknown> }
+	| {
+			kind: "invoke";
+			tool: string;
+			arguments: Record<string, unknown>;
+			/** The reply when the operation succeeds: the turn then ends without another call. */
+			text?: string;
+	  }
 	| { kind: "return"; forward: boolean; text?: string }
 	| { kind: "discard"; text?: string };
 
 /** Per action: the fields it needs and the fields it must not carry (`arguments` is ignored outside invoke). */
 const ACTION_FIELDS = {
 	reply: { needs: ["text"], refuses: ["tool", "forward"] },
-	invoke: { needs: ["tool"], refuses: ["text", "forward"] },
+	invoke: { needs: ["tool"], refuses: ["forward"] },
 	return: { needs: ["forward"], refuses: ["tool"] },
 	discard: { needs: [], refuses: ["tool", "forward"] },
 } as const;
@@ -98,7 +100,12 @@ export function parseSpecialistAction(value: unknown): SpecialistAction | null {
 	const text = out.text || undefined;
 	if (out.action === "reply") return { kind: "reply", text: text! };
 	if (out.action === "invoke")
-		return { kind: "invoke", tool: out.tool!, arguments: out.arguments ?? {} };
+		return {
+			kind: "invoke",
+			tool: out.tool!,
+			arguments: out.arguments ?? {},
+			...(text ? { text } : {}),
+		};
 	if (out.action === "return")
 		return { kind: "return", forward: out.forward!, ...(text ? { text } : {}) };
 	return { kind: "discard", ...(text ? { text } : {}) };
@@ -179,14 +186,25 @@ const CORRECTION = systemContext(
 
 /**
  * The specialist's fixed instructions: the package's profile and SKILL, the generic specialist rules and
- * the tools. No conversation, memory or World layer joins them.
+ * the tools (the binding's and the host's). No conversation, memory or World layer joins them.
  */
-export function specialistControl(set: SpecialistSet): ControlContract {
-	const tools = set.tools.map((tool) => ({
-		id: tool.id,
-		description: tool.summary,
-		inputSchema: tool.schema,
-	}));
+export function specialistControl(
+	set: SpecialistSet,
+	/** The host's tools for this session (document tools, shared toolchains), after the binding's own. */
+	hostTools: ReadonlyArray<{
+		id: string;
+		description: string;
+		inputSchema: unknown;
+	}> = [],
+): ControlContract {
+	const tools = [
+		...set.tools.map((tool) => ({
+			id: tool.id,
+			description: tool.summary,
+			inputSchema: tool.schema,
+		})),
+		...hostTools,
+	];
 	return {
 		instructions:
 			set.profile +
@@ -203,30 +221,6 @@ export const specialistSystemMessage = (control: ControlContract) => ({
 	role: "system" as const,
 	content: controlInstructions(control),
 });
-
-/** The turn's input as data: the request, the current work and when it is. */
-export function specialistInput(input: {
-	request: string;
-	userUtterance?: string;
-	label: string;
-	dirty: boolean;
-	current: unknown;
-	savedRef: string | null;
-	viewing: { toolchainId: string; ref: string; label: string } | null;
-	/** The turn's time, epoch ms (the host's clock). */
-	nowMs: number;
-}) {
-	return JSON.stringify({
-		request: input.request,
-		...(input.userUtterance ? { userUtterance: input.userUtterance } : {}),
-		currentWork: input.current,
-		savedRef: input.savedRef,
-		viewing: input.viewing,
-		label: input.label,
-		dirty: input.dirty,
-		...promptTime(input.nowMs),
-	});
-}
 
 /** The rejected output kept short, with where it broke the contract, as data; with the instruction to answer again. */
 export function correctionMessage(

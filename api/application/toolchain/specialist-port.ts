@@ -140,5 +140,30 @@ export function createSpecialistPort(deps: {
 			return { answerContext: result.answerContext ?? null };
 		},
 		afterCommit: (adapterRef) => registry.get(adapterRef)?.afterCommit?.(),
+		documentOf(adapterRef) {
+			const document = registry.get(adapterRef)?.session?.document;
+			if (!document) return null;
+			return {
+				readInTransaction: (db, workRef) =>
+					document.readInTransaction(db, workRef),
+				check: (text) => document.check(text),
+				// The work and turn are the host's: the origin says which turn of which session writes.
+				commitInTransaction: (db, workRef, input) =>
+					document.commitInTransaction(db, workRef, {
+						baseRevision: input.baseRevision,
+						...(input.title !== undefined ? { title: input.title } : {}),
+						value: input.value,
+						origin: {
+							kind: "specialist",
+							sessionId: input.sessionId,
+							runId: input.runId,
+							conversationId: input.conversationId,
+							workRef,
+						},
+					}),
+				rejectInTransaction: (db, workRef, draft) =>
+					document.rejectInTransaction(db, workRef, draft),
+			};
+		},
 	};
 }
