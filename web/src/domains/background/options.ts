@@ -75,3 +75,16 @@ export const healthColors: Record<SpatialState["health"], string> = {
 	disconnected: "#756a8e",
 	unknown: "#a99fd2",
 };
+
+/** Rendering tuning only; these do not classify measurements or change motion. */
+export const particleColorOptions = {
+	coolPalette: ["#4c7dff", "#38d9ed", "#a36aff"],
+	warmPalette: ["#ffd27d", "#ffb67f"],
+	// One transition is half of a cosine cycle. All cycles divide the bounded scene clock.
+	transitionSeconds: [6, 8, 10, 12, 14],
+	animatedFraction: { idle: 0.45, starting: 0.6, working: 0.7 },
+	warmFractionAtFullUtilization: 0.4,
+	stateTransitionSeconds: 8,
+	selectionBlend: 0.1,
+	warmSelectionBlend: 0.16,
+} as const;

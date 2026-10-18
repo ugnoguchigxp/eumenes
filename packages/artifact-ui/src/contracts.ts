@@ -23,7 +23,9 @@ import {
 } from "./composition-contracts";
 import type { ImageWorkspaceResource } from "./image-components";
 export type { ImageWorkspaceResource } from "./image-components";
+export type { Model3dWorkspaceResource } from "./model3d-components";
 import type { RecordsResource } from "./records-components";
+import type { Model3dWorkspaceResource } from "./model3d-components";
 import type { MusicResource, GenerationResource } from "./media-contracts";
 import type { UiStudioResource } from "./ui-studio-contracts";
 import type {
@@ -310,6 +312,15 @@ export const viewRegistry = {
 			view: z.literal("avatar-motion-lab"),
 			// z.undefined() cannot be expressed in JSON Schema and would break the whole library.
 			source: z.never().optional(),
+			title,
+		}),
+	},
+	"model3d-workspace": {
+		name: "Model3dWorkspace",
+		label: "3Dモデルの生成・検索・表示",
+		schema: z.strictObject({
+			view: z.literal("model3d-workspace"),
+			source,
 			title,
 		}),
 	},
@@ -728,6 +739,7 @@ export type Resource =
 	| KanbanResource
 	| ActivityResource
 	| ImageWorkspaceResource
+	| Model3dWorkspaceResource
 	| RecordsResource
 	| SubtitlePreviewResource
 	| SettingsSectionResource

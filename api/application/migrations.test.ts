@@ -569,7 +569,7 @@ test("host migrations are frozen: the count and the retired slot never move", ()
 test("every migration is named once, and none outside the frozen order exists yet without `after`", () => {
 	expect(new Set(ids(migrations)).size).toBe(migrations.length);
 	for (const m of migrations)
-		expect(m.id).toMatch(/^[a-z-]+\/\d{4}(-[a-z-]+)?$/);
+		expect(m.id).toMatch(/^[a-z][a-z0-9-]*\/\d{4}(-[a-z-]+)?$/);
 	for (const m of migrations.filter((x) => !legacyOrder.includes(x.id)))
 		expect(m.after?.length).toBeGreaterThan(0);
 });

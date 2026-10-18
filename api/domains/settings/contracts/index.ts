@@ -170,6 +170,9 @@ export const settingsSchema = z
 		larm: z
 			.object({
 				baseUrl: endpoint.nullable(),
+				/** Optional opaque monitor targets. A unique target is selected automatically. */
+				monitoringNodeId: z.string().min(1).max(192).optional(),
+				monitoringGpuId: z.string().min(1).max(192).optional(),
 				/** The Agent Profile selector chosen by the user; absent until saved. */
 				profile: z.string().trim().min(1).max(200).optional(),
 				audience: z.enum(["saaa-desktop", "same-host"]),

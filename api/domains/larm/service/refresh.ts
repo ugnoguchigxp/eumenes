@@ -2,6 +2,7 @@ import type { Capability } from "../contracts";
 import { renewProviders, type Control, type ProviderHosts } from "./connect";
 import { callerAborted, readJson, record, string, wait } from "./guards";
 import type { Lease } from "./profiles";
+import { withLogContext } from "../../../infrastructure/logger";
 
 /** Checks the lease against LARM and renews its claims when they are close to expiring. */
 export function createRefresh({
@@ -32,7 +33,11 @@ export function createRefresh({
 			path: string,
 			init: RequestInit,
 			accepted: number[],
-		) => control(path, { ...init, signal }, accepted);
+		) =>
+			withLogContext(
+				{ connectionId: current.id, leaseExpiresAt: current.expiresAt },
+				() => control(path, { ...init, signal }, accepted),
+			);
 		const state = record(
 			await readJson(
 				await scopedControl(

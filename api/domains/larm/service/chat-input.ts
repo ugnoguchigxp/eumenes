@@ -8,6 +8,14 @@ import { readBounded } from "../../../infrastructure/bounded-read";
 import type { Provider } from "./profiles";
 import { chatRequest } from "./chat-request";
 import type { LarmCallOptions, LarmPort } from "../contracts";
+import { getLogger, type LogFields } from "../../../infrastructure/logger";
+import {
+	tokenCountRejection,
+	tokenCountResponseHeaders,
+	tokenCountResponseIds,
+} from "./token-count-diagnostics";
+
+const log = getLogger("larm");
 
 /** Read the deployed contract; never infer image support from model names. */
 export function providerChatInput(
@@ -87,52 +95,97 @@ export async function countChatBody(
 		url.hash
 	)
 		throw new Error("larm_endpoint_mismatch");
-	const response = await send(url, {
-		method: "POST",
-		headers: {
-			Authorization: `Bearer ${p.token}`,
-			"Content-Type": "application/json",
-		},
-		body: serialized,
-		signal,
-		redirect: "error",
-	});
-	if (!response.ok) {
-		await response.body?.cancel();
-		throw new Error("chat_token_count_unavailable");
-	}
-	const bytes = await readBounded(response.body, {
-		limit: 32768,
-		tooLarge: "chat_token_count_unavailable",
-		missing: "chat_token_count_unavailable",
-		signal,
-	});
-	let payload: unknown;
+	const started = performance.now();
+	const fields: LogFields = {
+		providerOrigin: url.origin,
+		route: url.pathname,
+		requestBytes: Buffer.byteLength(serialized, "utf8"),
+	};
+	let phase = "transport";
+	let responseFields: LogFields = {};
+	log.info("larm.token_count_started", fields);
 	try {
-		payload = JSON.parse(new TextDecoder().decode(bytes));
-	} catch {
-		throw new Error("chat_token_count_unavailable");
+		const response = await send(url, {
+			method: "POST",
+			headers: {
+				Authorization: `Bearer ${p.token}`,
+				"Content-Type": "application/json",
+			},
+			body: serialized,
+			signal,
+			redirect: "error",
+		});
+		responseFields = tokenCountResponseHeaders(response, p.token);
+		phase = "response_status";
+		if (!response.ok) {
+			responseFields = {
+				...responseFields,
+				...(await tokenCountRejection(response, signal, p.token)),
+			};
+			throw new Error("chat_token_count_unavailable");
+		}
+		phase = "response_body";
+		const bytes = await readBounded(response.body, {
+			limit: 32768,
+			tooLarge: "chat_token_count_unavailable",
+			missing: "chat_token_count_unavailable",
+			signal,
+		});
+		let payload: unknown;
+		phase = "response_json";
+		try {
+			payload = JSON.parse(new TextDecoder().decode(bytes));
+		} catch {
+			throw new Error("chat_token_count_unavailable");
+		}
+		const result = tokenCountSchema.safeParse(payload);
+		phase = "response_contract";
+		if (result.success)
+			responseFields = {
+				...responseFields,
+				...tokenCountResponseIds(result.data, p.token),
+			};
+		signal.throwIfAborted();
+		if (
+			!result.success ||
+			result.data.requestDigest !==
+				createHash("sha256").update(serialized).digest("hex") ||
+			result.data.inputBudgetTokens !==
+				p.contextWindow!.maxTokens -
+					body.max_tokens -
+					p.contextWindow!.safetyMarginTokens ||
+			result.data.model !== p.model ||
+			result.data.imageCount !== count ||
+			result.data.requestedOutputTokens !== body.max_tokens ||
+			result.data.maxContextTokens !== p.contextWindow?.maxTokens ||
+			result.data.safetyMarginTokens !== p.contextWindow?.safetyMarginTokens
+		)
+			throw new Error("chat_token_count_unavailable");
+		phase = "input_budget";
+		if (
+			!result.data.fits ||
+			result.data.promptTokens > result.data.inputBudgetTokens
+		)
+			throw new Error("context_budget_exceeded");
+		log.info("larm.token_count_completed", {
+			...fields,
+			...responseFields,
+			promptTokens: result.data.promptTokens,
+			limit: result.data.inputBudgetTokens,
+			durationMs: performance.now() - started,
+		});
+	} catch (error) {
+		log.warn("larm.token_count_failed", {
+			...fields,
+			...responseFields,
+			phase,
+			reason: signal.aborted
+				? "cancelled"
+				: phase === "input_budget"
+					? "context_budget_exceeded"
+					: "chat_token_count_unavailable",
+			durationMs: performance.now() - started,
+		});
+		throw error;
 	}
-	const result = tokenCountSchema.safeParse(payload);
-	signal.throwIfAborted();
-	if (
-		!result.success ||
-		result.data.requestDigest !==
-			createHash("sha256").update(serialized).digest("hex") ||
-		result.data.inputBudgetTokens !==
-			p.contextWindow!.maxTokens -
-				body.max_tokens -
-				p.contextWindow!.safetyMarginTokens ||
-		result.data.model !== p.model ||
-		result.data.imageCount !== count ||
-		result.data.requestedOutputTokens !== body.max_tokens ||
-		result.data.maxContextTokens !== p.contextWindow?.maxTokens ||
-		result.data.safetyMarginTokens !== p.contextWindow?.safetyMarginTokens
-	)
-		throw new Error("chat_token_count_unavailable");
-	if (
-		!result.data.fits ||
-		result.data.promptTokens > result.data.inputBudgetTokens
-	)
-		throw new Error("context_budget_exceeded");
 }

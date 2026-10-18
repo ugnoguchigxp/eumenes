@@ -8,6 +8,7 @@ archive の基準: その文書が担当した実装がコードにあり、本�
 
 | 文書 | 状態 |
 | --- | --- |
+| [instant-3d-model-toolchain-design-2026-10-18.md](instant-3d-model-toolchain-design-2026-10-18.md) | 合意済み・実装・固定試験済み（§15）。実LARM・ブラウザE2E・会話の受入は未実施。インスタント3Dモデル（LARM 3D API、catalogの `media.mesh.generate`）を単発型commandで登録する。生成はキューのジョブで受付・進捗・取消、保存済みの検索・表示・名前とタグの変更・削除、three.jsでの表示、完了の会話通知。LARM確定仕様と実装契約は§14 |
 | [subagent-task-and-session-agents-design-2026-10-18.md](subagent-task-and-session-agents-design-2026-10-18.md) | 合意済み。P0〜P2は実装・固定試験済み（§17）。単発型・協働型の整理、共通のエージェント核（参考資料の囲みと現在の依頼、`reply`付きinvoke、ツールごとのやり直し）、セッション記録（失敗・中断も記憶）、作業文書の部分編集（`doc.edit`/`doc.write`）、UI自由制作の移行とソースの手直し。P3（共有・非同期ツール）は詳細設計の追記待ち、P4は未着手。ブラウザE2E・live・実機器は未実施 |
 | [object-recognition-custom-training-concept-2026-10-18.md](object-recognition-custom-training-concept-2026-10-18.md) | コンセプト、着手予定なし。判別機（YOLO26）の追加学習で家の決まった物を検出する。学習はRTX 3080（Windows）が第1候補。10種類×300枚で人の作業7〜12時間の見積もり。ターンテーブル・ロボットアームによる撮影と枠付けの自動化ができたら再検討 |
 | [object-recognition-targets-and-llm-handoff-design-2026-10-18.md](object-recognition-targets-and-llm-handoff-design-2026-10-18.md) | 物体認識で探す物を名前で指定（上流をYOLOE-26へ、上流への依頼が必要）。カメラ・画面キャプチャの静止画1枚と検出結果のメタ情報JSONを、「会話に追加」でチャット欄へ添付、または音声（見せるモード案・viewing＋ask）で会話LLMへ渡す。OCR連携はしない。合意済み（Q3・Q6は上流対応後）、実装中 |

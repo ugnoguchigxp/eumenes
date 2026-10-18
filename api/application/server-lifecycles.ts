@@ -237,6 +237,7 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 			close: () => Promise.race([s.inference.close(), Bun.sleep(5_000)]),
 		},
 		{ name: "dialogue", close: () => s.dialogue.close() },
+		{ name: "monitoring", close: () => s.monitoring.close() },
 		createSpecialistSessionsLifecycle(s.dialogue),
 		{ name: "web_research", close: () => s.webResearch.close() },
 		{ name: "queue", close: () => s.queue.close(10_000) },

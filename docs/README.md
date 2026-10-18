@@ -59,6 +59,7 @@
 | --- | --- |
 | [openui-artifact.md](openui-artifact.md) | OpenUI Artifact |
 | [images.md](images.md) | 画像生成・一覧・削除 |
+| [model3d.md](model3d.md) | インスタント3Dモデル（LARMの3D生成・保存済みモデルの検索・表示・変更・削除）。実LARMの受入は未実施 |
 | [chat-images.md](chat-images.md) | チャット入力へのJPG・PNG・BMP添付 |
 | [excalidraw.md](excalidraw.md) | Excalidrawの編集・保存・再表示 |
 | [object-recognition.md](object-recognition.md) | 静止画・短い動画の物体検出 |

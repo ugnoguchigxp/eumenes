@@ -6,6 +6,8 @@ import {
 	registerDrawingOperations,
 } from "../domains/excalidraw";
 import { createImage } from "../domains/image";
+import type { ConversationService } from "../domains/conversation";
+import { createModel3d } from "../domains/model3d";
 import { createLarmPlayground, createLocalServices } from "../domains/larm";
 import { createMusic } from "../domains/music";
 import { createObjectRecognition } from "../domains/object-recognition";
@@ -90,4 +92,46 @@ export function buildMedia(
 		drawingOperations,
 		objectRecognition,
 	};
+}
+
+/**
+ * 3D generation on LARM's mesh service, over the saved Control connection and its Bearer. It is
+ * built before the toolchain (its adapter is registered there); finished generations are reported
+ * into the asking conversation in the same writer transaction.
+ */
+export function buildModel3d(
+	config: Config,
+	deps: {
+		core: Pick<Core, "store" | "queue" | "settings">;
+		conversation: ConversationService;
+	},
+) {
+	const { store, queue, settings } = deps.core;
+	return createModel3d({
+		store,
+		queue,
+		larm: () => {
+			const s = settings.get();
+			if (!s.larm.baseUrl || !config.larmToken) return null;
+			return createLarmPlayground({
+				baseUrl: s.larm.baseUrl,
+				token: config.larmToken,
+				profile: s.larm.profile,
+				audience: s.larm.audience,
+				providerHosts: config.larmProviderHosts,
+			}).meshes;
+		},
+		announceInTransaction(tx, notice) {
+			const id = `model3d-notice:${notice.id}`;
+			if (deps.conversation.messageInTransaction(tx, id)) return;
+			deps.conversation.appendInTransaction(tx, {
+				id,
+				conversationId: notice.conversationId,
+				role: "assistant",
+				text: notice.message,
+				createdAt: notice.at,
+				runId: null,
+			});
+		},
+	});
 }

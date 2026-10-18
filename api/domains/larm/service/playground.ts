@@ -1,4 +1,5 @@
 import { createImageLibrary } from "./image-library";
+import { createMeshLibrary } from "./mesh-library";
 import { gzipFetch } from "./gzip-fetch";
 import { createMusicLibrary } from "./music-library";
 import { createProviderAccess } from "./playground-provider";
@@ -635,6 +636,7 @@ export function createLarmPlayground(config: {
 	return {
 		library: createMusicLibrary(control, publicUrl),
 		images: createImageLibrary(control, publicUrl),
+		meshes: createMeshLibrary(control, publicUrl),
 		embed,
 		catalog,
 		health,

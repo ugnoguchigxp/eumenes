@@ -21,27 +21,6 @@ export function useMonitoringItems(client: EumenesClient, enabled: boolean) {
 		return () => document.removeEventListener("visibilitychange", changed);
 	}, []);
 	const polling = enabled && visible;
-	// An external clock refreshes when observation resumes, before cached data is painted.
-	const [clock] = useState(() => {
-		let at = Date.now();
-		return {
-			read: () => at,
-			subscribe(notify: () => void) {
-				const tick = () => {
-					at = Date.now();
-					notify();
-				};
-				tick();
-				const timer = setInterval(tick, 30_000);
-				return () => clearInterval(timer);
-			},
-		};
-	});
-	const subscribe = useCallback(
-		(notify: () => void) => (polling ? clock.subscribe(notify) : () => {}),
-		[polling, clock],
-	);
-	const now = useSyncExternalStore(subscribe, clock.read);
 	const query = useQuery({
 		queryKey: [queryRoots.monitoring, client.identity],
 		queryFn: ({ signal }) => client.monitoringSnapshot(signal),
@@ -49,6 +28,30 @@ export function useMonitoringItems(client: EumenesClient, enabled: boolean) {
 		refetchInterval: 60_000,
 		retry: 0,
 	});
+	// LARM has per-measurement deadlines as short as ten seconds; this clock does not fetch.
+	const clockInterval = query.data?.larm ? 1000 : 30_000;
+	// An external clock refreshes when observation resumes, before cached data is painted.
+	const [clock] = useState(() => {
+		let at = Date.now();
+		return {
+			read: () => at,
+			subscribe(notify: () => void, interval: number) {
+				const tick = () => {
+					at = Date.now();
+					notify();
+				};
+				tick();
+				const timer = setInterval(tick, interval);
+				return () => clearInterval(timer);
+			},
+		};
+	});
+	const subscribe = useCallback(
+		(notify: () => void) =>
+			polling ? clock.subscribe(notify, clockInterval) : () => {},
+		[polling, clock, clockInterval],
+	);
+	const now = useSyncExternalStore(subscribe, clock.read);
 	const failed = query.isError;
 	const { data, dataUpdatedAt } = query;
 	return useMemo(

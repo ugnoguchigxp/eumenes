@@ -1,4 +1,10 @@
 import { z } from "zod";
+export {
+	monitoringSnapshotSchema,
+	monitoringEventsSchema,
+	monitoringEventSchema,
+} from "./monitoring-v1";
+export type { MonitoringEvent, MonitoringObservation } from "./monitoring-v1";
 import {
 	chatInputSchema,
 	type ChatInput,

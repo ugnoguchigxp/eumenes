@@ -19,9 +19,13 @@ import { getLogger } from "../infrastructure/logger";
 import type { Config } from "../infrastructure/config";
 import { createDotsDialogue } from "./work/dots-dialogue";
 import { createSavedEmbedder } from "./world/larm-embedder";
-import { createMonitoring } from "../domains/monitoring";
+import {
+	createMonitoring,
+	createLarmCollector,
+	createLarmRepository,
+} from "../domains/monitoring";
 import { buildCore, buildWebResearch } from "./server-core";
-import { buildMedia } from "./server-media";
+import { buildMedia, buildModel3d } from "./server-media";
 import { buildTasks } from "./server-tasks";
 import { assembleCuration } from "./server-world";
 import { createTimerAnnouncements } from "./timers/timer-announcements";
@@ -107,12 +111,14 @@ export async function buildServices(
 		inference,
 		capabilities: () => ocrCapabilities,
 	});
+	const model3d = buildModel3d(config, { core, conversation });
 	const { toolchain, links } = await createHostToolchain({
 		dbPath,
 		store,
 		queue,
 		uiCompositions,
 		ocr,
+		model3d,
 		inference,
 		webResearch,
 		settings,
@@ -190,6 +196,14 @@ export async function buildServices(
 	stewardAssembly.attachDialogue(dialogue);
 	const voice = createVoiceDialogue(store, dialogue, inference);
 	const monitoring = createMonitoring({
+		remote: createLarmCollector({
+			config: () => ({
+				baseUrl: settings.get().larm.baseUrl,
+				token: config.larmToken,
+			}),
+			onChange: settings.onChange,
+			repository: createLarmRepository(store),
+		}),
 		settings,
 		larmStatus: () => inference.status(),
 		attempts: inference.attemptActivity,
@@ -220,6 +234,7 @@ export async function buildServices(
 		uiCompositions,
 		objectRecognition: media.objectRecognition,
 		ocr,
+		model3d,
 		music: media.music,
 		queue,
 		webResearch,

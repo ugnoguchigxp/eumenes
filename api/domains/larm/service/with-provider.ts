@@ -1,4 +1,5 @@
 import { measureStage } from "../../../infrastructure/performance";
+import { withLogContext } from "../../../infrastructure/logger";
 import type { Capability } from "../contracts";
 import type { Lease, Provider, ProviderName } from "./profiles";
 import type { Control } from "./connect";
@@ -82,9 +83,13 @@ export function createWithProvider({
 				throw new Error("larm_credential_expired");
 			current.useCount++;
 			clearTimeout(current.idleTimer);
+			const selected = provider;
 			try {
 				signal.throwIfAborted();
-				return await use(provider, current.id);
+				return await withLogContext(
+					{ connectionId: current.id, leaseExpiresAt: current.expiresAt },
+					() => use(selected, current.id),
+				);
 			} catch (error) {
 				let unusable =
 					error instanceof LarmInferenceError &&

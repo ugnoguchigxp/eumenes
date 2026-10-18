@@ -1,5 +1,6 @@
 import { migrations as googleAccountsMigrations } from "../domains/google-accounts";
 import { migrations as ocrMigrations } from "../domains/ocr";
+import { migrations as model3dMigrations } from "../domains/model3d";
 import { migrations as excalidrawMigrations } from "../domains/excalidraw";
 import { migrations as objectRecognitionMigrations } from "../domains/object-recognition";
 import { migrations as imageMigrations } from "../domains/image";
@@ -27,6 +28,7 @@ import { migrations as toolchainHistoryMigrations } from "../domains/toolchain-h
 import { migrations as schedulerMigrations } from "../domains/scheduler";
 import { migrations as serviceTestsMigrations } from "../domains/service-tests";
 import { migrations as settingsMigrations } from "../domains/settings";
+import { migrations as monitoringMigrations } from "../domains/monitoring";
 import { migrations as taskReportsMigrations } from "../domains/task-reports";
 import { migrations as dotsMigrations } from "../domains/dots";
 import { migrations as tasksMigrations } from "../domains/tasks";
@@ -149,6 +151,7 @@ const catalog: readonly Migration[] = [
 	...codexTasksMigrations,
 	...schedulerMigrations,
 	...settingsMigrations,
+	...monitoringMigrations,
 	...inferenceMigrations,
 	...ttsDictionaryMigrations,
 	...continuityMigrations,
@@ -162,6 +165,7 @@ const catalog: readonly Migration[] = [
 	...excalidrawMigrations,
 	...objectRecognitionMigrations,
 	...ocrMigrations,
+	...model3dMigrations,
 	...webResearchMigrations,
 	...capabilitiesMigrations,
 	...toolRuntimeMigrations,

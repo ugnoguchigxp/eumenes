@@ -13,6 +13,8 @@ import type {
 } from "../contracts";
 import { createHostMetrics } from "./host";
 import { hostLimits, hostState, serviceState } from "./rules";
+import type { LarmCollector } from "./larm-collector";
+import { larmItems } from "./larm-items";
 
 const log = getLogger("monitoring");
 /** Outcomes older than this say nothing about the service now (§3). */
@@ -43,6 +45,7 @@ export type MonitoringDeps = {
 	dataDir: string;
 	host?: ReturnType<typeof createHostMetrics>;
 	now?: () => number;
+	remote?: LarmCollector;
 };
 
 const labels: Record<MonitoringShape, string> = {
@@ -58,6 +61,10 @@ const labels: Record<MonitoringShape, string> = {
 	language: "言語判定",
 	image: "画像生成",
 	music: "楽曲生成",
+	"larm-core": "LARM Core",
+	"larm-cpu": "LARM CPU",
+	"larm-memory": "LARM Memory",
+	"larm-gpu": "LARM GPU",
 };
 const ids: Record<MonitoringShape, string> = {
 	cpu: "eumenes-host-cpu",
@@ -72,6 +79,10 @@ const ids: Record<MonitoringShape, string> = {
 	language: "service-language",
 	image: "service-image",
 	music: "service-music",
+	"larm-core": "larm-core",
+	"larm-cpu": "larm-cpu",
+	"larm-memory": "larm-memory",
+	"larm-gpu": "larm-gpu",
 };
 
 /** Reads only: owner domains supply outcomes, this domain judges health (spec §3). */
@@ -120,7 +131,11 @@ export function createMonitoring(deps: MonitoringDeps) {
 	}
 
 	return {
+		close: async () => {
+			await deps.remote?.close();
+		},
 		async snapshot(): Promise<MonitoringSnapshot> {
+			const remote = await deps.remote?.read();
 			const observedAt = now();
 			const since = observedAt - WINDOW_MS;
 			const settings = deps.settings.get();
@@ -144,6 +159,7 @@ export function createMonitoring(deps: MonitoringDeps) {
 				serviceState({ ...o, ...recentOnly(o, since) }, larm, starting);
 			return {
 				observedAt,
+				...(remote ? { larm: remote } : {}),
 				items: [
 					item(
 						"cpu",
@@ -177,6 +193,7 @@ export function createMonitoring(deps: MonitoringDeps) {
 					item("language", route("llm", "language")),
 					item("image", recorded(deps.image?.(since) ?? none)),
 					item("music", recorded(deps.music?.(since) ?? none)),
+					...(remote ? larmItems(remote, settings.larm, now()) : []),
 				],
 			};
 		},

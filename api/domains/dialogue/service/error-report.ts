@@ -56,6 +56,10 @@ const REFERENCES: Array<{
 	},
 	{ section: "Codex SDKによる調査の失敗", prefixes: ["codex_research_"] },
 	{ section: "LLM生成JSONの補正と拒否", prefixes: ["llm_json_"] },
+	{
+		section: "LARM正式計数の診断",
+		codes: ["chat_token_count_unavailable", "context_budget_exceeded"],
+	},
 ];
 
 function referenceFor(...codes: Array<string | undefined>) {
@@ -106,6 +110,9 @@ const COMPONENT_LABELS: Record<string, string> = {
 
 /** Fields printed with a failure record, in this order; every other field is left out. */
 const DETAIL_KEYS: Array<[label: string, key: string]> = [
+	["connection", "connectionId"],
+	["upstreamRequest", "upstreamRequestId"],
+	["code", "validationCode"],
 	["phase", "phase"],
 	["action", "controlAction"],
 	["schema", "controlSchema"],

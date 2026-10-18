@@ -97,6 +97,12 @@ export interface LogFields {
 	requestedRejected?: number;
 	/** Saved connection id (an opaque id, never a URL or credential). */
 	connectionId?: string;
+	/** LARM diagnostics: validated endpoint without credentials/query, opaque response IDs and lease deadline. */
+	providerOrigin?: string;
+	upstreamRequestId?: string;
+	leaseExpiresAt?: number;
+	bootEpoch?: string;
+	configRevision?: string;
 	/** Agent connection auth: `subscription` or `api-key`. */
 	auth?: string;
 	/** Billing path the call ran or would have run on. */
@@ -108,6 +114,11 @@ export interface LogFields {
 }
 const keys = new Set<keyof LogFields>([
 	"connectionId",
+	"providerOrigin",
+	"upstreamRequestId",
+	"leaseExpiresAt",
+	"bootEpoch",
+	"configRevision",
 	"auth",
 	"billingPath",
 	"apiProvider",

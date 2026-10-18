@@ -6,6 +6,10 @@ import type { EumenesClient } from "../../../../client";
 import type { MonitoringSnapshot } from "../../../../api/domains/monitoring/contracts";
 import { useMonitoringItems } from ".";
 import { STALE_AFTER_MS } from "./items";
+import {
+	emptyLarm,
+	larmViewSchema,
+} from "../../../../api/domains/monitoring/contracts/larm";
 
 const snapshot: MonitoringSnapshot = {
 	observedAt: 1000,
@@ -127,4 +131,52 @@ test("returning to an old cached snapshot marks it stale while its new read is p
 	h.monitoringSnapshot.mockImplementationOnce(() => new Promise(() => {}));
 	h.rerender({ enabled: true });
 	expect(backend(h.result.current)?.stale).toBe(true);
+});
+
+test("LARM's ten-second expiry updates between minute polls without adding requests", async () => {
+	const h = setup(false);
+	const larm = larmViewSchema.parse({
+		...emptyLarm(1000000),
+		history: {
+			hasMore: false,
+			coverageComplete: false,
+			events: [],
+			faults: [],
+			results: {
+				succeeded: "0",
+				failed: "0",
+				timed_out: "0",
+				cancelled: "0",
+				rejected: "0",
+			},
+		},
+	});
+	h.monitoringSnapshot.mockResolvedValue({
+		observedAt: 1000000,
+		larm,
+		items: [
+			{
+				id: "larm-cpu",
+				shape: "larm-cpu",
+				label: "LARM CPU",
+				state: {
+					health: "healthy",
+					activity: "idle",
+					observations: [
+						{ status: "ok", observedAt: 1000000, ageMs: 0, maxAgeMs: 10000 },
+					],
+				},
+			},
+		],
+	});
+	h.visible(true);
+	await advance();
+	expect(
+		h.result.current?.find((i) => i.model === "larm-cpu")?.state.stale,
+	).toBe(false);
+	await advance(11000);
+	expect(
+		h.result.current?.find((i) => i.model === "larm-cpu")?.state.stale,
+	).toBe(true);
+	expect(h.monitoringSnapshot).toHaveBeenCalledTimes(1);
 });

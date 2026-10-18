@@ -72,11 +72,15 @@ export function createLeaseManager({
 		if (lease === current) lease = undefined;
 		notify();
 		try {
-			await control(
+			const response = await control(
 				`/v1/agent-connections/${encodeURIComponent(current.id)}`,
 				{ method: "DELETE" },
 				[204, 200, 404, 410],
 			);
+			log.info("larm.connection_released", {
+				connectionId: current.id,
+				status: response.status,
+			});
 		} catch {
 			if (!lease) {
 				lastError = "larm_release_unconfirmed";
@@ -234,6 +238,8 @@ export function createLeaseManager({
 		try {
 			const connected = await connecting;
 			log[requestProfile ? "debug" : "info"]("larm.connection_ready", {
+				connectionId: connected.id,
+				leaseExpiresAt: connected.expiresAt,
 				count: connected.providers.size,
 				durationMs: Math.round(performance.now() - connectStarted),
 			});
@@ -248,7 +254,11 @@ export function createLeaseManager({
 			else {
 				log.warn(
 					"larm.connection_failed",
-					{ durationMs: Math.round(performance.now() - connectStarted) },
+					{
+						connectionId: lease?.id,
+						leaseExpiresAt: lease?.expiresAt,
+						durationMs: Math.round(performance.now() - connectStarted),
+					},
 					error,
 				);
 				lastError = isNetworkError(error)

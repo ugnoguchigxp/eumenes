@@ -79,6 +79,14 @@ bun run logs -- --since 2026-10-08T10:00:00+09:00 --component inference --json
 
 ブラウザの録音・再生・WebGL内部のログ収集は今回の対象に含めていません。backendログとNetwork欄でAPIまでの経路を確認し、機器側の問題はブラウザのConsoleと実機器受入で確認します。
 
+## LARM正式計数の診断
+
+`larm.token_count_started`、`larm.token_count_completed`、`larm.token_count_failed`は、生成前の正式計数を記録します。既存のrunId・inferenceId・attemptIdに、実際に選択したclaimの`connectionId`・`leaseExpiresAt`（Unixミリ秒）、送信先の`providerOrigin`・queryを含まない`route`・`requestBytes`を対応させます。本文・画像・credential・要求digestは記録しません。計数失敗時も既存のエラーと再試行方針を維持します。
+
+応答の`status`と、文字種・長さを検査した`X-Request-Id`を`upstreamRequestId`として記録します。拒否本文は最大16 KiB・1秒で読み、既知の固定コードだけを`validationCode`へ残します。未知コードは`unknown`、読取り・JSON解析不能は`unavailable`です。本文やmessageは出しません。`phase`は`transport`・`response_status`・`response_body`・`response_json`・`response_contract`・`input_budget`を区別します。計数成功時の容量超過は`reason=context_budget_exceeded`、計数不能は`chat_token_count_unavailable`です。
+
+応答に契約に合う`bootEpoch`・`configRevision`がある場合だけ保持し、現在値で過去の情報を埋めません。既知のcredentialと同じ値は相関情報からも除外します。主会話と補助接続の対応は`larm.connection_ready`・計数イベント・`larm.connection_released`のconnectionIdで追います。状態確認の失敗にも同じIDとclaimの期限を残します。失敗した会話のエラーレポートにも接続ID・上流要求ID・固定コードを表示します。これらのログは接続先の応答を診断するもので、新しいヘッダーや接続の再確保・自動再送は追加しません。
+
 ## 保存と取扱い
 
 `EUMENES_LOG_FILE` で保存先を変更できます。空欄は既定の保存先、`-` は stderr のみ。ファイルは10 MiBを超える前に世代を切り替え、現在分と過去4世代を保持します（約50 MiB）。ファイルの権限は `0600`、新規ログディレクトリは `0700`。ファイル保存に失敗した場合は `logging.file_unavailable` を一度 stderr に通知し、stderr出力で継続します。ファイル出力の復旧にはbackendを再起動します。

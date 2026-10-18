@@ -96,6 +96,7 @@ export { DEFAULT_THEME, THEME_COLORS, THEME_CONSTANTS } from "./styles/themes";
 export { cn } from "./utils/cn";
 
 export * from "./components/MusicPlayer";
+export * from "./components/Model3dWorkspace";
 export * from "./components/MusicWorkspace";
 export * from "./components/Playlist";
 export * from "./components/GenerationStatus";

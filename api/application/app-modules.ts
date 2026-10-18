@@ -3,6 +3,7 @@ import {
 	type GoogleAccounts,
 } from "../domains/google-accounts";
 import { registerOcr, type OcrService } from "../domains/ocr";
+import { registerModel3d, type Model3dService } from "../domains/model3d";
 import {
 	registerExcalidraw,
 	type ExcalidrawService,
@@ -132,6 +133,7 @@ export type AppServices = {
 	drawingOperations?: { list: (conversationId: string) => unknown };
 	objectRecognition?: ObjectRecognitionService;
 	ocr?: OcrService;
+	model3d?: Model3dService;
 	tasks?: TasksService;
 	coding?: CodingService;
 	codingSupervision?: CodingSupervision;
@@ -176,6 +178,10 @@ export function appModules(services: AppServices): AppModule[] {
 					(text, conversationId, requestId) =>
 						s.dialogue.submit({ text, conversationId, requestId }),
 				),
+		},
+		s.model3d && {
+			mount: (app) =>
+				registerModel3d(app, s.model3d!, CONVERSATION_DEFAULT_PRINCIPAL),
 		},
 		s.objectRecognition && {
 			mount: (app) =>

@@ -7,6 +7,8 @@ import type {
 } from "@eumenes/artifact-ui/contracts";
 import { Button } from "@eumenes/design-system";
 import { LightAvatarMotionLab } from "../../components/domains/conversation/LightAvatarMotionLab";
+import { model3dApiFor } from "../model3d/api";
+import { Model3dViewer } from "../model3d/Model3dViewer";
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import type {
@@ -60,10 +62,15 @@ export type ToolchainArtifactHostProps = {
 
 const noop = () => {};
 
-/** Views drawn by this host; the 3D lab loads its renderer only when shown. */
-const hostViews: ArtifactRuntime["hostViews"] = {
-	"avatar-motion-lab": () => <LightAvatarMotionLab />,
-};
+/** Views drawn by this host; the 3D lab and the model viewer load their renderers when shown. */
+function hostViewsFor(client: EumenesClient): ArtifactRuntime["hostViews"] {
+	return {
+		"avatar-motion-lab": () => <LightAvatarMotionLab />,
+		"model3d-viewer": ({ assetId }) => (
+			<Model3dViewer assetId={assetId} api={model3dApiFor(client)} />
+		),
+	};
+}
 /**
  * The event's binding: the one registered for this event and source (a registration holds at
  * most one), else the only binding of that event. Panels with several actions register one
@@ -375,6 +382,7 @@ function AdapterScreen({
 				: null,
 		[variant, question],
 	);
+	const hostViews = useMemo(() => hostViewsFor(client), [client]);
 	const runtime = useMemo<ArtifactRuntime>(
 		() => ({
 			snapshot,
@@ -395,6 +403,7 @@ function AdapterScreen({
 			dispatch,
 			settledEpoch,
 			client,
+			hostViews,
 			state.uploadFile,
 			state.openTerminal,
 			state.refresh,

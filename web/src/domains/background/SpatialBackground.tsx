@@ -187,6 +187,9 @@ export function SpatialBackground({
 							{selection && (
 								<div className="spatial-selection-detail">
 									<output>選択中：{selection.label}</output>
+									{selection.state.details?.map((note, index) => (
+										<p key={index}>{note}</p>
+									))}
 									<p>
 										活動：
 										{

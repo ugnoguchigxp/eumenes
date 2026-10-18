@@ -5,9 +5,81 @@ import { join } from "node:path";
 import { createFixture } from "./fixture";
 import { closeArtifact, openSettings, saveSettings } from "./artifact-launcher";
 import { settledScreenshot } from "./canvas";
+import idleMonitoring from "../../spec/reference/larm-monitoring-v1/snapshot-idle.json";
+import cancelledEvents from "../../spec/reference/larm-monitoring-v1/events-cancelled.json";
+import {
+	monitoringSnapshotSchema,
+	monitoringEventsSchema,
+} from "../../api/domains/larm/contracts/monitoring-v1";
+import { emptyLarm } from "../../api/domains/monitoring/contracts/larm";
+import { larmView } from "../../api/domains/monitoring/service/larm-history";
+import { larmItems } from "../../api/domains/monitoring/service/larm-items";
 
 const fixture = createFixture();
 let webPort: number, dir: string;
+
+test("LARM measurement quality reaches the existing fourteen-shape fallback without exposing authentication", async ({
+	page,
+}) => {
+	const sample = monitoringSnapshotSchema.parse(idleMonitoring);
+	const unavailable = sample.nodes[0]!.cpu.utilization;
+	unavailable.status = "permission_denied";
+	unavailable.observedAt = null;
+	unavailable.interval = null;
+	delete unavailable.value;
+	const now = Date.parse(sample.generatedAt),
+		state = emptyLarm(now);
+	state.snapshot = sample;
+	state.snapshotReceivedAt = now;
+	state.bootEpoch = sample.bootEpoch;
+	state.snapshotStatus = state.eventsStatus = { status: "ok", at: now };
+	const { events, ...pageInfo } = monitoringEventsSchema.parse(cancelledEvents);
+	state.page = pageInfo;
+	const view = larmView(state, events);
+	await page.route("**/api/settings", async (route) => {
+		const response = await route.fetch();
+		const settings = await response.json();
+		await route.fulfill({
+			json: {
+				...settings,
+				general: {
+					...settings.general,
+					background: "spatial",
+					spatialDemoEnabled: false,
+				},
+			},
+		});
+	});
+	await page.route("**/api/monitoring/snapshot", (route) =>
+		route.fulfill({
+			json: { observedAt: now, items: larmItems(view, {}, now), larm: view },
+		}),
+	);
+	await page.goto(`http://127.0.0.1:${webPort}/`);
+	const host = page.locator(".chat-panel .spatial-background");
+	await expect(host).toHaveAttribute("data-background-state", "ready");
+	await expect(host).toHaveAttribute("data-model-count", "14");
+	await page.evaluate(() => {
+		const canvas = document.querySelector<HTMLCanvasElement>(
+			".chat-panel .spatial-background canvas",
+		)!;
+		canvas
+			.getContext("webgl2")!
+			.getExtension("WEBGL_lose_context")!
+			.loseContext();
+	});
+	await expect(host).toHaveAttribute("data-background-state", "failed");
+	await page
+		.getByRole("button", { name: "LARM CPU：未確認", exact: true })
+		.click();
+	await expect(page.getByText("計測権限なし", { exact: true })).toBeVisible();
+	await expect(
+		page.getByText("利用率：未取得", { exact: false }),
+	).toBeVisible();
+	await page.screenshot({
+		path: test.info().outputPath("spatial-larm-measurement-quality.png"),
+	});
+});
 test.beforeAll(async () => {
 	const apiPort = await fixture.port();
 	webPort = await fixture.port();

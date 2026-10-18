@@ -30,6 +30,7 @@ export function appServices(s: Services) {
 		drawingOperations: s.drawingOperations,
 		objectRecognition: s.objectRecognition,
 		ocr: s.ocr,
+		model3d: s.model3d,
 		tasks: s.delegated.tasks,
 		coding: s.codingComposition?.coding,
 		codingSupervision: s.supervision,

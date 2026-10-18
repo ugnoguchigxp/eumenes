@@ -76,6 +76,15 @@ export type ArtifactEvent = {
 		| "music-favorite"
 		| "music-delete"
 		| "generation-cancel"
-		| "generation-retry";
+		| "generation-retry"
+		| "model3d-generate"
+		| "model3d-cancel"
+		| "model3d-recheck"
+		| "model3d-select"
+		| "model3d-delete"
+		| "model3d-search"
+		| "model3d-more"
+		| "model3d-refresh"
+		| "model3d-update";
 	values: Record<string, string | boolean>;
 };

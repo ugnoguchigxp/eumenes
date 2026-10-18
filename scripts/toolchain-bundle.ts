@@ -26,6 +26,7 @@ const BACKENDS = [
 	"excalidraw",
 	"object-recognition",
 	"ocr",
+	"model3d",
 	"claude-code",
 	"kanban",
 	"codex-tasks",

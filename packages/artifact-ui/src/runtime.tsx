@@ -35,10 +35,13 @@ export type ArtifactRuntime = {
 	/** Theme controlled by the host's preview toolbar, when present. */
 	previewTheme?: "light" | "dark";
 	/**
-	 * Views the host draws itself (e.g. the WebGL avatar preview). The package never loads
-	 * their renderer; without an entry the view says the preview is unavailable.
+	 * Views the host draws itself (e.g. the WebGL avatar preview, the 3D model viewer). The
+	 * package never loads their renderer; without an entry the view says it is unavailable.
 	 */
-	hostViews?: { "avatar-motion-lab"?: () => ReactNode };
+	hostViews?: {
+		"avatar-motion-lab"?: () => ReactNode;
+		"model3d-viewer"?: (props: { assetId: string }) => ReactNode;
+	};
 	/**
 	 * Connects one live PTY session of a terminal source (output stream, ordered input, resize).
 	 * Called once per session run; the stream opens on subscribe and closes on unsubscribe.

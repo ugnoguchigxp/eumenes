@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { larmViewSchema } from "./larm";
 
 /** The Spatial shape each monitored item is drawn with; `network` draws the Eumenes backend. */
 export const monitoringShapes = [
@@ -14,6 +15,10 @@ export const monitoringShapes = [
 	"language",
 	"image",
 	"music",
+	"larm-core",
+	"larm-cpu",
+	"larm-memory",
+	"larm-gpu",
 ] as const;
 export type MonitoringShape = (typeof monitoringShapes)[number];
 
@@ -38,6 +43,27 @@ export const monitoringItemSchema = z.object({
 		utilization: z.number().min(0).max(1).optional(),
 		/** Machine-readable code of the newest failure behind a fault or disconnection. */
 		reason: z.string().optional(),
+		stale: z.boolean().optional(),
+		observations: z
+			.array(
+				z.object({
+					status: z.enum([
+						"ok",
+						"stale",
+						"unsupported",
+						"permission_denied",
+						"error",
+						"unavailable",
+					]),
+					observedAt: z.number().nullable(),
+					ageMs: z.number().nonnegative(),
+					maxAgeMs: z.number().positive(),
+				}),
+			)
+			.optional(),
+		diagnostics: z.array(z.string()).optional(),
+		faultRemainingMs: z.number().nonnegative().optional(),
+		settledHealth: monitoringHealthSchema.optional(),
 	}),
 });
 export type MonitoringItem = z.infer<typeof monitoringItemSchema>;
@@ -45,5 +71,6 @@ export type MonitoringItem = z.infer<typeof monitoringItemSchema>;
 export const monitoringSnapshotSchema = z.object({
 	observedAt: z.number(),
 	items: z.array(monitoringItemSchema),
+	larm: larmViewSchema.optional(),
 });
 export type MonitoringSnapshot = z.infer<typeof monitoringSnapshotSchema>;

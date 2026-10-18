@@ -8,6 +8,12 @@ export type {
 export { registerLarmStatus } from "./controller";
 export { createLarm } from "./service";
 export { createActivityRecorder } from "./service/activity";
+export {
+	createMonitoringClient,
+	MONITORING_BODY_LIMIT,
+	type MonitoringClient,
+	type MonitoringRead,
+} from "./service/monitoring";
 export type {
 	ActivityObservation,
 	ActivityRecorder,

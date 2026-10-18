@@ -13,6 +13,11 @@ import {
 import { z } from "zod";
 import { ocrRecord } from "../../domains/ocr/contracts";
 import { describeOcrAdapter, OCR_ADAPTER_REF } from "../media/ocr-adapter";
+import {
+	describeModel3dAdapter,
+	MODEL3D_ADAPTER_REF,
+	model3dDomainSchemas,
+} from "../media/model3d-adapter";
 import type { Database } from "bun:sqlite";
 import type { ZodType } from "zod";
 import {
@@ -113,6 +118,7 @@ const domainSchemas: Readonly<Record<string, ZodType>> = {
 		}),
 	]),
 	...uiCompositionsDomainSchemas,
+	...model3dDomainSchemas,
 	...terminalsDomainSchemas,
 	...kanbanDomainSchemas,
 	...stewardDomainSchemas,
@@ -161,6 +167,7 @@ export const hostAdapterDescriptions: Array<
 > = [
 	{ ref: TIMER_ADAPTER_REF, describe: describeTimerAdapter },
 	{ ref: OCR_ADAPTER_REF, describe: describeOcrAdapter },
+	{ ref: MODEL3D_ADAPTER_REF, describe: describeModel3dAdapter },
 	{ ref: SETTINGS_ADAPTER_REF, describe: describeSettingsAdapter },
 	{ ref: RECORDS_ADAPTER_REF, describe: describeRecordsAdapter },
 	{ ref: INFERENCE_ADAPTER_REF, describe: describeInferenceAdapter },

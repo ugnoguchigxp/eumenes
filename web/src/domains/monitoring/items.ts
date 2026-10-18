@@ -1,5 +1,6 @@
 import type { MonitoringSnapshot } from "../../../../api/domains/monitoring/contracts";
 import { initialSpatialItems, type SpatialItem } from "../background";
+import { monitoringDetails } from "./details";
 
 /** Three missed one-minute reads make an observation old (spec §3). */
 export const STALE_AFTER_MS = 3 * 60_000;
@@ -35,19 +36,44 @@ export function monitoringItems(
 				},
 			};
 		if (!item) return { ...layout, state: { ...layout.state, stale: old } };
+		const observations = item.state.observations;
+		const stale =
+			old ||
+			!!item.state.stale ||
+			!!observations?.some(
+				(o) =>
+					o.status === "stale" ||
+					(o.observedAt !== null && o.ageMs + ageMs > o.maxAgeMs),
+			);
+		const observed = observations?.flatMap((o) =>
+			o.observedAt === null ? [] : [o.observedAt],
+		);
+		const health =
+			item.state.faultRemainingMs !== undefined &&
+			ageMs >= item.state.faultRemainingMs
+				? (item.state.settledHealth ?? item.state.health)
+				: item.state.health;
 		return {
 			...layout,
 			id: item.id,
 			label: item.label,
 			state: {
-				health: item.state.health,
+				health,
 				activity: item.state.activity,
-				stale: old,
+				stale,
 				...(item.state.utilization === undefined
 					? {}
 					: { utilization: item.state.utilization }),
-				source: "measurement",
-				observedAt: snapshot!.observedAt,
+				source:
+					observations && !observed?.length ? "unconfirmed" : "measurement",
+				...(observations
+					? observed?.length
+						? { observedAt: Math.min(...observed) }
+						: {}
+					: { observedAt: snapshot!.observedAt }),
+				...(observations
+					? { details: monitoringDetails(item.state, ageMs) }
+					: {}),
 			},
 		};
 	});

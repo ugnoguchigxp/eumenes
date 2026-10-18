@@ -23,7 +23,7 @@ export function createControl({
 	return async function control(
 		path: string,
 		init: RequestInit,
-		accepted: number[],
+		accepted: number[] | null,
 	): Promise<Response> {
 		if (!base) throw new Error("larm_base_url_unconfigured");
 		if (!token) throw new Error("larm_unconfigured");
@@ -51,7 +51,7 @@ export function createControl({
 							...(init.signal ? [init.signal] : []),
 						]),
 		});
-		if (!accepted.includes(response.status)) {
+		if (accepted && !accepted.includes(response.status)) {
 			log.warn("larm.control_rejected", {
 				route: path
 					.split("?")[0]!

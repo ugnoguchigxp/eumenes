@@ -27,6 +27,7 @@ const backends = new Set([
 	"excalidraw",
 	"object-recognition",
 	"ocr",
+	"model3d",
 	"claude-code",
 	"kanban",
 	"codex-tasks",

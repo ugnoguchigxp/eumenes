@@ -18,6 +18,42 @@ import {
 
 afterEach(cleanup);
 
+test("token counting refusal includes the connection and upstream correlation without raw provider text", async () => {
+	const s = await scenario({
+		error: "chat_token_count_unavailable",
+		lines: ({ run, request, job }) => [
+			entry(
+				"warn",
+				100,
+				"larm",
+				"larm.token_count_failed",
+			)({
+				runId: run,
+				requestId: request,
+				jobId: job,
+				connectionId: "fixture-connection",
+				upstreamRequestId: "fixture-upstream",
+				phase: "response_status",
+				reason: "chat_token_count_unavailable",
+				validationCode: "unauthorized",
+				status: 401,
+				errorMessage: "PRIVATE_PROVIDER_RESPONSE",
+			}),
+		],
+	});
+	try {
+		const text = (await s.report()) as string;
+		expect(text).toContain("connection=fixture-connection");
+		expect(text).toContain("upstreamRequest=fixture-upstream");
+		expect(text).toContain("code=unauthorized");
+		expect(text).toContain("status=401");
+		expect(text).toContain("LARM正式計数の診断");
+		expect(text).not.toContain("PRIVATE_PROVIDER_RESPONSE");
+	} finally {
+		await s.close();
+	}
+});
+
 test("records written in UTC before the JST format and JST records mix in one correct timeline", async () => {
 	const s = await scenario({
 		error: "invalid_conversation_operation",

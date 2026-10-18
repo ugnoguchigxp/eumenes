@@ -11,6 +11,8 @@ export type SpatialState = {
 	strength?: number;
 	source?: "unconfirmed" | "demo" | "measurement";
 	observedAt?: number;
+	/** Owner-supplied observation notes; the background does not classify measurements. */
+	details?: readonly string[];
 };
 export type SpatialItem = {
 	id: string;

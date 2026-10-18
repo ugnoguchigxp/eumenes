@@ -94,6 +94,13 @@ import { publicUrl } from "./public-url";
 import { toolchainRequest } from "./toolchains";
 import { stockQuote } from "./stock";
 import { weatherPlace } from "./weather";
+import {
+	model3dFind,
+	model3dGenerate,
+	model3dJobTarget,
+	model3dTarget,
+	model3dUpdate,
+} from "./model3d";
 export { stockQuote } from "./stock";
 export { weatherPlace, weatherDays } from "./weather";
 export { publicUrl };
@@ -255,6 +262,11 @@ export const validators = {
 	worldQuery,
 	weatherPlace,
 	stockQuote,
+	model3dGenerate,
+	model3dFind,
+	model3dTarget,
+	model3dUpdate,
+	model3dJobTarget,
 };
 export type SchemaKey = keyof typeof validators;
 export type Owner = { rootRunId: string; taskId: string; cancelEpoch: number };

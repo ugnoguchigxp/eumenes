@@ -77,3 +77,38 @@ test("normal background has no state toggle", async () => {
 	await waitFor(() => expect(createSpatialScene).toHaveBeenCalledOnce());
 	expect(screen.queryByRole("button", { name: "状態を見る" })).toBeNull();
 });
+
+test("fallback details keep the owner-provided measurement quality and history gap visible", async () => {
+	vi.mocked(createSpatialScene).mockImplementationOnce(() => {
+		throw new Error("WebGL unavailable");
+	});
+	render(
+		<SpatialBackground
+			active
+			items={[
+				{
+					id: "larm-cpu",
+					model: "larm-cpu",
+					label: "LARM CPU",
+					position: [0, 0, 0],
+					state: {
+						health: "unknown",
+						activity: "idle",
+						stale: true,
+						details: ["計測権限なし", "過去の履歴に欠落があります"],
+					},
+				},
+			]}
+		/>,
+	);
+	await waitFor(() =>
+		expect(
+			screen.getByRole("button", { name: "LARM CPU：未確認（情報が古い）" }),
+		).toBeTruthy(),
+	);
+	fireEvent.click(
+		screen.getByRole("button", { name: "LARM CPU：未確認（情報が古い）" }),
+	);
+	expect(screen.getByText("計測権限なし")).toBeTruthy();
+	expect(screen.getByText("過去の履歴に欠落があります")).toBeTruthy();
+});
