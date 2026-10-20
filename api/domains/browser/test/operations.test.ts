@@ -492,3 +492,28 @@ test("a grant expires with its time, and typing needs a task", async () => {
 		}),
 	).rejects.toThrow("grant_not_found");
 });
+
+test("a late response from a revoked connection is not adopted into the operation result or tab state", async () => {
+	let revision = 1;
+	const env = setup({ credentialRevision: () => revision });
+	const tabRef = await connect(env);
+	const original = env.service.tabs().find((t) => t.tabRef === tabRef)!;
+	let release!: () => void;
+	env.driver.actGate = new Promise<void>((r) => (release = r));
+	const pending = operate(env, tabRef, { kind: "back" });
+	await until(() => env.driver.calls.includes("act:back"));
+	revision++;
+	env.driver.tabs[0]!.title = "revoked-driver-response";
+	release();
+	expect(await pending).toMatchObject({
+		state: "indeterminate",
+		errorCode: "browser_disconnected",
+	});
+	expect(env.service.tabs().find((t) => t.tabRef === tabRef)?.title).toBe(
+		original.title,
+	);
+	const rows = env.store.read((db) =>
+		db.query("SELECT result_title FROM browser_operations").all(),
+	);
+	expect(rows).toEqual([{ result_title: null }]);
+});

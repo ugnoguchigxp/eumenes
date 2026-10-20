@@ -27,6 +27,7 @@ export type OpenQuestion = {
 };
 
 export type AdapterHostContext = {
+	conversationId?: string;
 	client: EumenesClient;
 	artifact: ArtifactDefinitionV1;
 	artifactRevisionId: string;

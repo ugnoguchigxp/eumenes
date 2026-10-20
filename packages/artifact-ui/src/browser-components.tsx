@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import {
+	BrowserSettings,
 	BrowserWorkspace,
 	type BrowserWorkspaceProps,
 } from "@eumenes/design-system";
@@ -13,12 +14,24 @@ export type BrowserWorkspaceResource = Pick<
 	| "availability"
 	| "connection"
 	| "executablePath"
+	| "suggestedExecutablePath"
+	| "pickedExecutable"
+	| "canBrowseExecutable"
 	| "tabs"
 	| "tasks"
 	| "captures"
 	| "loading"
 	| "error"
-> & { kind: "browser"; revision: number };
+> & {
+	kind: "browser";
+	revision: number;
+	bridge?: {
+		revision: number;
+		enabled: boolean;
+		configured: boolean;
+		available: boolean;
+	};
+};
 
 const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 /** A capture image is read through the authenticated host, from this one path shape only. */
@@ -75,15 +88,20 @@ export function BrowserWorkspaceView({
 			resource={resource}
 			action={action}
 			title={request.title}
+			settings={request.view === "browser-settings"}
 		/>
 	);
 }
 
+export const BrowserSettingsView = BrowserWorkspaceView;
+
 function BrowserWorkspaceBody({
+	settings,
 	resource,
 	action,
 	title,
 }: {
+	settings?: boolean;
 	resource: BrowserWorkspaceResource;
 	action: ReturnType<typeof useAction>;
 	title?: string;
@@ -114,12 +132,28 @@ function BrowserWorkspaceBody({
 			})
 			.catch(() => setDownloadError("画像をダウンロードできませんでした。"));
 	}
+	const Content = settings ? BrowserSettings : BrowserWorkspace;
 	return (
-		<BrowserWorkspace
+		<Content
 			title={title}
+			bridge={resource.bridge}
+			onOpenBrowser={() => send("browser-open-workspace")}
+			onOpenSettings={() => send("browser-settings")}
+			onSaveBridge={(input) =>
+				action.send("browser-bridge-save", {
+					token: input.token,
+					enabled: input.enabled,
+					clear: input.clear,
+					expectedRevision: String(input.expectedRevision),
+				})
+			}
 			availability={resource.availability}
 			connection={resource.connection}
 			executablePath={resource.executablePath}
+			suggestedExecutablePath={resource.suggestedExecutablePath}
+			pickedExecutable={resource.pickedExecutable}
+			canBrowseExecutable={resource.canBrowseExecutable}
+			onBrowseExecutablePath={() => send("browser-browse-path")}
 			tabs={resource.tabs}
 			tasks={resource.tasks}
 			captures={resource.captures}

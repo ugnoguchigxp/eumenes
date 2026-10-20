@@ -26,12 +26,13 @@ const rejections: Record<string, string> = {
  */
 export const browserWebAdapter: WebArtifactAdapter = {
 	adapterRef: BROWSER_ADAPTER_REF,
-	useArtifact({ client, artifactRevisionId, visible }) {
+	useArtifact({ client, artifactRevisionId, visible, conversationId }) {
 		const { resource, loading, error, local, refresh } = useBrowserRuntime({
 			client,
 			api: browserApiFor(client),
 			artifactRevisionId,
 			visible,
+			conversationId,
 		});
 		return {
 			phase: error

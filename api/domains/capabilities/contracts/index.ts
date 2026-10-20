@@ -105,6 +105,7 @@ import {
 import {
 	browserCaptureStart,
 	browserCaptureTarget,
+	browserScriptPublish,
 	browserPageCapture,
 	browserPageClick,
 	browserPageHover,
@@ -300,6 +301,7 @@ export const validators = {
 	browserPageSelect,
 	browserPagePress,
 	browserPageWait,
+	browserScriptPublish,
 	browserPageCapture,
 };
 export type SchemaKey = keyof typeof validators;

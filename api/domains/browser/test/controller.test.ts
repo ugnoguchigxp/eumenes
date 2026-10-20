@@ -20,12 +20,17 @@ function app(env: ReturnType<typeof setup>, owner = OWNER) {
 }
 
 test("the setting is read and saved over HTTP, and a relative path is refused", async () => {
-	const env = setup();
+	const env = setup({ standardPaths: [] });
 	const path = fakeBrave(env.dir);
 	const a = app(env);
 	expect(await (await a.request("/api/browser/setting")).json()).toEqual({
 		executablePath: null,
+		suggestedPath: null,
+		canBrowse: false,
 	});
+	expect(
+		(await a.request("/api/browser/setting/browse", { method: "POST" })).status,
+	).toBe(501);
 	const put = (body: unknown) =>
 		a.request("/api/browser/setting", {
 			method: "PUT",
@@ -40,6 +45,8 @@ test("the setting is read and saved over HTTP, and a relative path is refused", 
 	});
 	expect(await (await a.request("/api/browser/setting")).json()).toEqual({
 		executablePath: path,
+		suggestedPath: null,
+		canBrowse: false,
 	});
 });
 
@@ -121,4 +128,41 @@ test("capture content is served only to its owner, as an inline lossy WebP", asy
 		captures: unknown[];
 	};
 	expect(list.captures).toHaveLength(1);
+});
+
+test("a conversation keeps its own recent tasks even after more than twenty tasks in other chats", async () => {
+	const env = setup({
+		runTaskStep: async () => ({
+			kind: "done",
+			state: "completed",
+			coreState: null,
+			text: "確認済み",
+		}),
+	});
+	const tabRef = await connect(env);
+	const make = async (conversationId: string, owner = OWNER) => {
+		const t = await env.service.startTask({
+			owner,
+			conversationId,
+			origin: "screen",
+			requestId: crypto.randomUUID(),
+			request: "表示確認",
+			tabRef,
+		});
+		await until(() => env.service.taskRow(t.taskId)?.state === "completed");
+		return t;
+	};
+	const own = await make("current-chat");
+	for (let i = 0; i < 21; i++) await make("another-chat");
+	await make("current-chat", "different-owner");
+	const response = await app(env).request(
+		"/api/browser/tasks?conversationId=current-chat",
+	);
+	expect(response.status).toBe(200);
+	expect(response.headers.get("Cache-Control")).toBe("no-store");
+	const body = await response.json();
+	expect(body.tasks.map((t: { taskId: string }) => t.taskId)).toEqual([
+		own.taskId,
+	]);
+	expect((await app(env).request("/api/browser/tasks")).status).toBe(400);
 });

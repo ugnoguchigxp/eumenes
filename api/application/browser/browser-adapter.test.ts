@@ -108,6 +108,7 @@ test("the adapter registers the operations of the capture toolchain and the scre
 		"browser.tab.close": "write builtin:browserTabTarget",
 		"browser.task.start": "write builtin:browserTaskStart",
 		"browser.task.begin": "write builtin:browserTaskBegin",
+		"browser.task.scripted": "write builtin:browserTaskBegin",
 		"browser.task.status": "read builtin:browserTaskTarget",
 		"browser.task.cancel": "write builtin:browserTaskTarget",
 	});
@@ -587,8 +588,10 @@ const bundle = JSON.parse(
 		schemaKey?: string;
 	}>;
 	bindings: Array<{
+		id: string;
 		revision: number;
 		adapterRef: string;
+		artifactRevisionId: string;
 		tools: Array<{
 			toolRevisionId: string;
 			operationId: string;
@@ -601,6 +604,7 @@ const bundle = JSON.parse(
 		actionBindings: Array<{
 			actionId: string;
 			eventAction: string;
+			source: string;
 			operationId?: string;
 			inputSchemaRef: string;
 			effect: string;
@@ -610,7 +614,22 @@ const bundle = JSON.parse(
 
 test("each binding of the bundle names only operations, schemas and queries this adapter registers", () => {
 	const { operations, queries } = describeBrowserAdapter();
-	expect(bundle.bindings).toHaveLength(3);
+	expect(bundle.bindings.map((b) => `${b.id}@${b.revision}`)).toEqual([
+		"browser.capture@1",
+		"browser.capture@2",
+		"browser.capture@3",
+		"browser.operate@1",
+		"browser.operate@2",
+		"browser.operate@3",
+		"browser.operate@4",
+		"browser.capture@4",
+	]);
+	const binding = (id: string, revision: number) =>
+		bundle.bindings.find((b) => b.id === id && b.revision === revision)!;
+	const operationsOf = (id: string, revision: number) =>
+		binding(id, revision)
+			.tools.map((t) => t.operationId)
+			.sort();
 	for (const binding of bundle.bindings) {
 		expect(binding.adapterRef).toBe(BROWSER_ADAPTER_REF);
 		for (const tool of binding.tools) {
@@ -628,7 +647,7 @@ test("each binding of the bundle names only operations, schemas and queries this
 		}
 	}
 	// The capture toolchain offers the capture operations plus connecting and opening the screen.
-	expect(bundle.bindings[0]!.tools.map((t) => t.operationId).sort()).toEqual([
+	expect(operationsOf("browser.capture", 1)).toEqual([
 		"browser.capture.cancel",
 		"browser.capture.start",
 		"browser.capture.status",
@@ -636,7 +655,7 @@ test("each binding of the bundle names only operations, schemas and queries this
 		"browser.workspace.open",
 	]);
 	// The operate toolchain offers the task operations plus connecting and opening the screen.
-	expect(bundle.bindings[1]!.tools.map((t) => t.operationId).sort()).toEqual([
+	expect(operationsOf("browser.operate", 1)).toEqual([
 		"browser.connect",
 		"browser.task.cancel",
 		"browser.task.start",
@@ -644,15 +663,25 @@ test("each binding of the bundle names only operations, schemas and queries this
 		"browser.workspace.open",
 	]);
 	// Revision 2 of it starts tasks with the schema that can continue after an approval; the rest is as it was.
-	expect(bundle.bindings[2]!.revision).toBe(2);
-	expect(bundle.bindings[2]!.tools.map((t) => t.operationId).sort()).toEqual([
+	expect(operationsOf("browser.operate", 2)).toEqual([
 		"browser.connect",
 		"browser.task.begin",
 		"browser.task.cancel",
 		"browser.task.status",
 		"browser.workspace.open",
 	]);
-	expect(bundle.artifacts.map((a) => a.revision)).toEqual([1, 2]);
+	// Later revisions only move both toolchains onto the newest screen, so the launcher lists it once.
+	for (const [id, revision] of [
+		["browser.capture", 2],
+		["browser.capture", 3],
+		["browser.operate", 3],
+	] as const) {
+		expect(operationsOf(id, revision)).toEqual(operationsOf(id, revision - 1));
+		expect(binding(id, revision).artifactRevisionId).toBe(
+			`artifact:browser.workspace@${revision}`,
+		);
+	}
+	expect(bundle.artifacts.map((a) => a.revision)).toEqual([1, 2, 3, 4, 1]);
 	for (const artifact of bundle.artifacts) {
 		for (const source of artifact.sourceBindings) {
 			expect(source.adapterRef).toBe(BROWSER_ADAPTER_REF);
@@ -679,6 +708,22 @@ test("each binding of the bundle names only operations, schemas and queries this
 		operationId: "browser.task.cancel",
 		inputSchemaRef: "builtin:browserTaskTarget",
 		effect: "write",
+	});
+	// Revision 3 adds choosing the Brave file in the OS dialog before saving the path.
+	const third = bundle.artifacts[2];
+	expect(ids(third)).toEqual(
+		ids(second).flatMap((id) =>
+			id === "save-path" ? ["browse-path", id] : [id],
+		),
+	);
+	expect(
+		third!.actionBindings.find((a) => a.actionId === "browse-path"),
+	).toEqual({
+		actionId: "browse-path",
+		eventAction: "browser-browse-path",
+		source: "browser",
+		inputSchemaRef: "builtin:emptyInput",
+		effect: "local",
 	});
 });
 
@@ -707,4 +752,23 @@ test("the tool schemas the model sees are flat objects", () => {
 			quality: 100,
 		}).success,
 	).toBe(false);
+});
+
+test("the scripted task entry accepts a new disconnected request only with saved connection authorization", async () => {
+	const s = setup({ runTaskStep: parkedRunner, canAutoConnect: () => true });
+	await s.env.service.setting.save(fakeBrave(s.env.dir));
+	const out = await s.invoke("browser.task.scripted", {
+		request: "ページを確認して",
+	});
+	expect(out).toMatchObject({ receipt: { action: "task.start" } });
+	const row = s.env.store.read((db) =>
+		db.query("SELECT script_required FROM browser_tasks").get(),
+	);
+	expect(row).toEqual({ script_required: 1 });
+	expect(s.env.driver.connectCount).toBe(0);
+	const manual = setup({ runTaskStep: parkedRunner });
+	await manual.env.service.setting.save(fakeBrave(manual.env.dir));
+	await expect(
+		manual.invoke("browser.task.scripted", { request: "ページを確認して" }),
+	).rejects.toThrow("browser_disconnected");
 });

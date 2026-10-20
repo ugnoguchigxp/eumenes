@@ -1,0 +1,15 @@
+Use case: ui-mockup
+Asset type: high-fidelity proposed Japanese desktop browser artifact for Eumenes, one single screen image.
+Create a polished flat front-on UI design, landscape 1536x1024. Single contained application artifact filling most of frame, no laptop/device, no perspective. Match a restrained shadcn-like Japanese dark UI: background #10151e, charcoal panels #18202d, thin blue-gray borders #303c4e, off-white text, muted secondary text, clear medium blue accents, soft green completed checks. Rounded corners 8px, understated line icons, excellent spacing, crisp readable Japanese sans-serif typography.
+The MAIN CONTENT is the user request, action Script and real execution progress. No website screenshot, no image gallery, no video thumbnail or fake live preview. Three-level hierarchy: compact chrome; request composer; dominant action Script with progress.
+Header: small browser outline icon and title 'ブラウザ' left; small green dot '接続中' and understated target '対象: YouTube' right; tiny gear link '設定'.
+Under header a tab bar: '操作' selected with blue underline, '接続・タブ' inactive, '撮影画像' inactive. Connection controls, tab lists, and captures exist ONLY behind inactive tabs and must not be displayed in the selected operation pane.
+Top of operation pane: label '依頼'; a comfortable wide textarea containing 'なんか面白い動画見せて'. Small chip above/alongside reads '音声から入力'. Bottom of composer has microphone icon with '音声入力', a muted hint 'テキストでも依頼できます', and an outline '内容を変更' button at right. This screenshot depicts an active run; do NOT show an enabled start button or a second conflicting execution action.
+Dominant section with heading '実行Script'; next to heading small blue spinner badge '実行中'. Visible natural-language interpretation in a subtle inset 'YouTubeのおすすめから、面白そうな動画を1本選んで再生します。'. Below, an elegant vertical step timeline with roomy rows. Each row a small status icon, concrete step title, and useful concise status at the far right:
+green check 'YouTubeを開く' / '完了'
+green check 'おすすめを確認する' / '完了'
+blue active ring '動画を選ぶ' / '実行中'
+gray hollow circle '再生を確認する' / '未着手'
+Under the active third step, short subdued line 'おすすめの候補を確認しています。'. Timeline makes current step and completed steps obvious, without invented percentage or duration estimate.
+Below timeline a muted expandable row '実行履歴を表示' with chevron and a low emphasis outline button '実行を中止' right aligned. A modest footer can read '予定の変更や確認待ちも、ここに表示します。'.
+Ensure UI is about inspectable intent and planned actions, not raw JavaScript code or model internal reasoning. No code editor, no terminal, no command syntax, no path inputs or browser settings. No fake preview. All Japanese text spelled carefully, small number of labels, generous readable size. This is a proposed state using the user's YouTube example, not an actual screenshot.

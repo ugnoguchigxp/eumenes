@@ -44,7 +44,31 @@ export const sampleTabs: BrowserTabItem[] = [
 ];
 
 export const sampleTasks: BrowserTaskItem[] = [
-	{ taskId: "k1", requestSummary: "明日の天気を調べる", state: "running" },
+	{
+		taskId: "k1",
+		requestSummary: "明日の天気を調べる",
+		state: "running",
+		script: {
+			revision: 1,
+			summary: "対象地域の予報を開き、明日の天気を確認します。",
+			updatedAt: 1792454400000,
+			history: [],
+			steps: [
+				{
+					stepId: "weather",
+					label: "明日の予報を確認",
+					expectation: "地域と日付に合う予報が表示される",
+					state: "running",
+				},
+				{
+					stepId: "report",
+					label: "天気を伝える",
+					expectation: "予報を確認して回答する",
+					state: "pending",
+				},
+			],
+		},
+	},
 	{
 		taskId: "k2",
 		requestSummary: "ニュースの見出しを読む",

@@ -51,4 +51,9 @@ export const migrations: readonly Migration[] = [
 		after: ["settings/0002-epochs"],
 		sql: `CREATE TABLE settings_ocr(id INTEGER PRIMARY KEY CHECK(id=1),revision INTEGER NOT NULL,base_url TEXT NOT NULL);`,
 	},
+	{
+		id: "settings/0007-browser-bridge",
+		after: ["settings/0006-ocr"],
+		sql: `CREATE TABLE settings_browser_bridge(id INTEGER PRIMARY KEY CHECK(id=1),revision INTEGER NOT NULL,enabled INTEGER NOT NULL,encrypted TEXT NOT NULL);`,
+	},
 ];

@@ -1,19 +1,67 @@
+import { z } from "zod";
 import type { EumenesClient } from "../../../../client";
 import { createTransport, json } from "../../../../client/transport";
 import {
+	browserBrowseResult,
 	browserSetting,
 	browserTabList,
+	browserTaskList,
 	type BrowserTabData,
 } from "./contracts";
+
+export type BrowserPathSetting = {
+	executablePath: string;
+	suggestedPath: string;
+	canBrowse: boolean;
+};
 
 function browserApi(client: EumenesClient) {
 	const t = createTransport(client.identity);
 	return {
-		/** The saved Brave executable, or "" when none is saved. */
-		setting: async (signal?: AbortSignal): Promise<string> =>
-			browserSetting.parse(
+		tasks: async (conversationId: string, signal?: AbortSignal) =>
+			browserTaskList.parse(
+				await (
+					await t.call(
+						`/api/browser/tasks?${new URLSearchParams({ conversationId })}`,
+						{ signal },
+					)
+				).json(),
+			).tasks,
+		bridge: async (signal?: AbortSignal) =>
+			z
+				.object({
+					revision: z.number(),
+					enabled: z.boolean(),
+					configured: z.boolean(),
+					available: z.boolean(),
+				})
+				.parse(
+					await (
+						await t.call("/api/settings/browser-bridge", { signal })
+					).json(),
+				),
+		saveBridge: async (input: {
+			expectedRevision: number;
+			enabled: boolean;
+			clear: boolean;
+			token?: string;
+		}) => {
+			await t.call("/api/settings/browser-bridge", {
+				...json(input),
+				method: "PUT",
+			});
+		},
+		/** The saved Brave executable ("" when none) and a standard install to offer meanwhile. */
+		setting: async (signal?: AbortSignal): Promise<BrowserPathSetting> => {
+			const setting = browserSetting.parse(
 				await (await t.call("/api/browser/setting", { signal })).json(),
-			).executablePath ?? "",
+			);
+			return {
+				executablePath: setting.executablePath ?? "",
+				suggestedPath: setting.suggestedPath ?? "",
+				canBrowse: setting.canBrowse ?? false,
+			};
+		},
 		saveSetting: async (executablePath: string): Promise<string> =>
 			browserSetting.parse(
 				await (
@@ -23,6 +71,13 @@ function browserApi(client: EumenesClient) {
 					})
 				).json(),
 			).executablePath ?? "",
+		/** Opens the OS file dialog on the backend's computer; null when the user cancels. Nothing is saved. */
+		browse: async (): Promise<string | null> =>
+			browserBrowseResult.parse(
+				await (
+					await t.call("/api/browser/setting/browse", { method: "POST" })
+				).json(),
+			).path,
 		/** Asks the backend to read the tabs from Brave again. */
 		tabs: async (signal?: AbortSignal): Promise<BrowserTabData[]> =>
 			browserTabList.parse(

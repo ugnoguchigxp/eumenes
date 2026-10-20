@@ -329,3 +329,59 @@ test("adopted images no row points at are removed too, and a capture's own image
 	await env.service.sweep();
 	expect([...env.files.final.keys()]).toEqual([`${c.captureId}.webp`]);
 });
+
+test("cancelling a task during capture encoding prevents the late image from being adopted", async () => {
+	const env = setup({ runTaskStep: parkedRunner, renewMs: 60000 });
+	const tabRef = await connect(env);
+	const taskId = await startRunningTask(env, tabRef);
+	let release!: () => void;
+	const gate = new Promise<void>((r) => (release = r));
+	const encode = env.encoder.encodeWebp.bind(env.encoder);
+	env.encoder.encodeWebp = async (bytes) => {
+		await gate;
+		return encode(bytes);
+	};
+	const c = await start(env, tabRef, { taskId });
+	await until(
+		() => env.service.captureStatus(OWNER, c.captureId).state === "encoding",
+	);
+	await env.service.cancelTask(OWNER, taskId);
+	release();
+	const result = await settled(env, c.captureId);
+	expect(result.state).toBe("cancelled");
+	await until(() =>
+		env.queue
+			.list({ subjectRef: c.captureId })
+			.items.every(
+				(j) =>
+					!["queued", "running", "retry_wait", "cancel_requested"].includes(
+						j.state,
+					),
+			),
+	);
+	expect(env.files.temp.size).toBe(0);
+	expect(env.files.final.size).toBe(0);
+});
+test("a credential revision change during encoding prevents adopting an image from the old connection", async () => {
+	let revision = 1;
+	const env = setup({ credentialRevision: () => revision });
+	const tabRef = await connect(env);
+	let release!: () => void;
+	const gate = new Promise<void>((r) => (release = r));
+	const encode = env.encoder.encodeWebp.bind(env.encoder);
+	env.encoder.encodeWebp = async (bytes) => {
+		await gate;
+		return encode(bytes);
+	};
+	const c = await start(env, tabRef);
+	await until(
+		() => env.service.captureStatus(OWNER, c.captureId).state === "encoding",
+	);
+	revision++;
+	release();
+	expect(await settled(env, c.captureId)).toMatchObject({
+		state: "failed",
+		errorCode: "browser_disconnected",
+	});
+	expect(env.files.temp.size + env.files.final.size).toBe(0);
+});

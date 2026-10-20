@@ -314,6 +314,27 @@ const declared = (effect: string | undefined) =>
 	effect === "commit" ? { effect: "commit" as const } : {};
 
 export const PAGE_TOOLS: Readonly<Record<string, Spec<SchemaKey>>> = {
+	"browser.page.script": spec({
+		schemaKey: "browserScriptPublish",
+		async run(args, env) {
+			const { history: _history, ...script } =
+				await env.api.publishScript(args);
+			return result({ ok: true, script });
+		},
+	}),
+	"browser.page.connect": spec({
+		schemaKey: "emptyInput",
+		async run(_args, env) {
+			return result({
+				ok: true,
+				connection: await env.api.connect(),
+				tabs: (await env.api.tabs())
+					.filter((t) => t.status !== "closed")
+					.slice(0, 20)
+					.map(tabLine),
+			});
+		},
+	}),
 	"browser.page.tabs": spec({
 		schemaKey: "emptyInput",
 		async run(_args, env) {

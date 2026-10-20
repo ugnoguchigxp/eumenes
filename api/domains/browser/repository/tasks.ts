@@ -8,13 +8,18 @@ import {
 	type OperationView,
 	type TaskState,
 	type TaskView,
+	type TaskPhase,
 	type ToolKind,
 } from "../contracts";
 import { originPath } from "../contracts/url";
 import { patchRow } from "./sql";
 
 export type TaskRow = {
+	phase: TaskPhase;
 	id: string;
+	script_required: number;
+	script_json: string | null;
+	continued_from: string | null;
 	owner: string;
 	conversation_id: string;
 	origin: "conversation" | "screen";
@@ -51,6 +56,10 @@ export function ownedTask(db: Database, id: string, owner: string) {
 export function taskView(r: TaskRow): TaskView {
 	return {
 		taskId: r.id,
+		phase: activeTaskStates.includes(r.state) ? r.phase : null,
+		conversationId: r.conversation_id,
+		continuedFrom: r.continued_from,
+		script: r.script_json ? JSON.parse(r.script_json) : null,
 		requestSummary: r.request.slice(0, SUMMARY_CHARS),
 		state: r.state,
 		...(r.result_text
@@ -108,6 +117,8 @@ type TaskChange = Partial<
 	Pick<
 		TaskRow,
 		| "tab_ref"
+		| "script_json"
+		| "phase"
 		| "core_state_json"
 		| "state"
 		| "epoch"
@@ -127,14 +138,23 @@ export function patchTask(
 	return taskRow(db, id)!;
 }
 
-export const listTasks = (db: Database, owner: string, limit = 20) =>
+export const listTasks = (
+	db: Database,
+	owner: string,
+	limit = 20,
+	conversationId?: string,
+) =>
 	(
 		db
 			.query(
-				"SELECT * FROM browser_tasks WHERE owner=? ORDER BY created_at DESC, rowid DESC LIMIT ?",
+				`SELECT * FROM browser_tasks WHERE owner=? ${conversationId === undefined ? "" : "AND conversation_id=?"} ORDER BY created_at DESC, rowid DESC LIMIT ?`,
 			)
-			.all(owner, limit) as TaskRow[]
-	).map(taskView);
+			.all(
+				owner,
+				...(conversationId === undefined ? [] : [conversationId]),
+				limit,
+			) as TaskRow[]
+	).map((r) => ({ ...taskView(r), operations: taskOperations(db, r.id) }));
 
 export const activeTaskCount = (db: Database, owner: string) =>
 	(
@@ -158,6 +178,8 @@ export const activeTasks = (db: Database) =>
 		.all() as TaskRow[];
 
 export type OperationRow = {
+	script_revision: number | null;
+	script_step_id: string | null;
 	id: string;
 	task_id: string | null;
 	tab_ref: string;
@@ -249,7 +271,13 @@ export const taskOperations = (db: Database, taskId: string): OperationView[] =>
 				"SELECT * FROM browser_operations WHERE task_id=? ORDER BY created_at, rowid",
 			)
 			.all(taskId) as OperationRow[]
-	).map((o) => ({
+	).map((o, index) => ({
+		sequence: index + 1,
+		scriptRevision: o.script_revision,
+		stepId: o.script_step_id,
+		observedAt: o.updated_at,
+		observationRef: o.observation_ref,
+		errorLabel: errorLabel(o.error_code),
 		operationId: o.id,
 		toolKind: o.tool_kind,
 		state: o.state,

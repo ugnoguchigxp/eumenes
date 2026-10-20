@@ -2,6 +2,7 @@ import { dirname, join, resolve } from "node:path";
 import {
 	createBrowser,
 	createCaptureFiles,
+	createExecutablePicker,
 	createMcpBrowserDriver,
 	createWebpEncoder,
 	type BrowserCompletion,
@@ -62,6 +63,10 @@ export function buildBrowser(
 	config: Config,
 	deps: {
 		core: Pick<Core, "store" | "queue">;
+		settings?: Pick<
+			import("../../domains/settings").SettingsService,
+			"browserBridge" | "browserBridgeCredential" | "onBrowserBridgeChange"
+		>;
 		conversation: ConversationService;
 		/**
 		 * The model calls and capability registry of page-operation tasks. Both are assembled after the browser, so
@@ -81,15 +86,25 @@ export function buildBrowser(
 		create:
 			deps.createDriver ??
 			((executablePath) =>
-				createMcpBrowserDriver({ executablePath, outputDir })),
+				createMcpBrowserDriver({
+					executablePath,
+					outputDir,
+					extensionToken: deps.settings?.browserBridgeCredential() ?? undefined,
+				})),
 	});
 	service = createBrowser({
 		store,
 		queue,
+		canAutoConnect: () => {
+			const s = deps.settings?.browserBridge();
+			return !!s?.enabled && s.configured && s.available;
+		},
+		credentialRevision: () => deps.settings?.browserBridge().revision ?? 0,
 		driver,
 		encoder: createWebpEncoder(),
 		files: createCaptureFiles({ directory: captureDir }),
 		webOrigins: [config.origin],
+		pickExecutable: createExecutablePicker(),
 		announceInTransaction: browserAnnouncement(deps.conversation),
 		...(deps.inference
 			? {
@@ -101,13 +116,19 @@ export function buildBrowser(
 				}
 			: {}),
 	});
+	const unsubscribe = deps.settings?.onBrowserBridgeChange(async () => {
+		await service!.disconnect();
+	});
 	const effects = registerBrowserEffects({ queue, service });
 	return {
 		service,
 		effects,
 		requests: browserRequests(deps.conversation),
 		/** Stops the MCP child when the process goes away; the user's browser is left as it is. */
-		close: () => driver.close(),
+		close: () => {
+			unsubscribe?.();
+			return driver.close();
+		},
 	};
 }
 export type BrowserAssembly = ReturnType<typeof buildBrowser>;

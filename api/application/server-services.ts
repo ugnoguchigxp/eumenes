@@ -116,6 +116,7 @@ export async function buildServices(
 	let browserCapabilities: Capabilities | null = null;
 	const browser = buildBrowser(config, {
 		core,
+		settings,
 		conversation,
 		inference,
 		capabilities: () => browserCapabilities,

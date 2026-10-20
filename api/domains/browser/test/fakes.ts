@@ -17,6 +17,7 @@ import {
 	type DriverTab,
 	type EncodedWebp,
 	type ImageEncoder,
+	type ExecutablePicker,
 	type HostResolver,
 	type PlannedSize,
 	type TargetInfo,
@@ -267,6 +268,8 @@ export async function runCleanup() {
 export function setup(
 	options: {
 		runTaskStep?: TaskStepRunner;
+		canAutoConnect?: () => boolean;
+		credentialRevision?: () => number;
 		leaseMs?: number;
 		renewMs?: number;
 		taskMs?: number;
@@ -274,6 +277,8 @@ export function setup(
 		now?: () => number;
 		dir?: string;
 		resolveHost?: HostResolver;
+		standardPaths?: readonly string[];
+		pickExecutable?: ExecutablePicker;
 	} = {},
 ) {
 	const dir = options.dir ?? mkdtempSync(join(tmpdir(), "eumenes-browser-"));

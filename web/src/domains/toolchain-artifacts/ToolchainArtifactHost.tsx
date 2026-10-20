@@ -186,6 +186,7 @@ function AdapterScreen({
 	} = useDocumentFields(client, artifact, artifactRevisionId, catalog);
 	const drafts = useDraftViews(client.identity, documents);
 	const own: AdapterState = adapter.useArtifact({
+		conversationId,
 		client,
 		artifact,
 		artifactRevisionId,

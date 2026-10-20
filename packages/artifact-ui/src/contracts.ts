@@ -1,3 +1,4 @@
+import { browserViews } from "./browser-contracts";
 import type { GoogleAccountsResource } from "./google-accounts-components";
 import type { OcrResource } from "./ocr-components";
 export type { OcrResource } from "./ocr-components";
@@ -326,15 +327,7 @@ export const viewRegistry = {
 			title,
 		}),
 	},
-	"browser-workspace": {
-		name: "BrowserWorkspace",
-		label: "ブラウザの接続・タブ・撮影",
-		schema: z.strictObject({
-			view: z.literal("browser-workspace"),
-			source,
-			title,
-		}),
-	},
+	...browserViews(source, title),
 	"subtitle-preview": {
 		name: "SubtitlePreview",
 		label: "字幕の見本",

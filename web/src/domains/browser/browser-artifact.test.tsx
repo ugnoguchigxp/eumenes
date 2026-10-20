@@ -116,6 +116,10 @@ it("compiles only the strict view over a browser source", () => {
 
 it("sends each screen event with the source revision and its own values", async () => {
 	const dispatch = setup();
+	fireEvent.mouseDown(screen.getByRole("tab", { name: "接続・タブ" }), {
+		button: 0,
+		ctrlKey: false,
+	});
 	fireEvent.click(screen.getByRole("button", { name: "切断" }));
 	await waitFor(() =>
 		expect(last(dispatch)?.action).toBe("browser-disconnect"),
@@ -135,26 +139,28 @@ it("sends each screen event with the source revision and its own values", async 
 	expect(last(dispatch)?.values).toEqual({ url: "https://example.org/a" });
 });
 
-it("connects from a disconnected screen and saves the path as typed", async () => {
+it("connects through the connection tab and keeps path settings out of the workspace", async () => {
 	const dispatch = setup({
 		...resource,
-		connection: { state: "disconnected", endReason: "user_disconnected" },
+		connection: { state: "disconnected" },
 		availability: { available: false, reason: "browser_disconnected" },
 		tabs: [],
 	});
+	fireEvent.mouseDown(screen.getByRole("tab", { name: "接続・タブ" }), {
+		button: 0,
+		ctrlKey: false,
+	});
 	fireEvent.click(screen.getByRole("button", { name: "ブラウザに接続" }));
 	await waitFor(() => expect(last(dispatch)?.action).toBe("browser-connect"));
-	expect(last(dispatch)?.values).toEqual({});
-	fireEvent.change(screen.getByLabelText("Braveの実行ファイルのパス"), {
-		target: { value: "/Applications/Brave/brave" },
-	});
-	fireEvent.click(screen.getByRole("button", { name: "保存" }));
-	await waitFor(() => expect(last(dispatch)?.action).toBe("browser-save-path"));
-	expect(last(dispatch)?.values).toEqual({ path: "/Applications/Brave/brave" });
+	expect(screen.queryByLabelText("Braveの実行ファイルのパス")).toBeNull();
 });
 
 it("cancels only a capture still in progress", async () => {
 	const dispatch = setup();
+	fireEvent.mouseDown(screen.getByRole("tab", { name: "撮影画像" }), {
+		button: 0,
+		ctrlKey: false,
+	});
 	fireEvent.click(screen.getByRole("button", { name: /撮影を取り消す/ }));
 	await waitFor(() =>
 		expect(last(dispatch)?.action).toBe("browser-cancel-capture"),
@@ -182,6 +188,10 @@ it("reads a selected capture through the host and revokes its object URL", async
 			async () => new Blob(["x"], { type: "image/webp" }),
 		);
 		setup(resource, fetchMedia);
+		fireEvent.mouseDown(screen.getByRole("tab", { name: "撮影画像" }), {
+			button: 0,
+			ctrlKey: false,
+		});
 		fireEvent.click(screen.getAllByRole("button", { name: /を選ぶ/ })[0]!);
 		await waitFor(() => expect(fetchMedia).toHaveBeenCalled());
 		expect(fetchMedia).toHaveBeenCalledWith(
@@ -209,6 +219,10 @@ it("refuses a capture id that is not a plain identifier", async () => {
 		},
 		fetchMedia,
 	);
+	fireEvent.mouseDown(screen.getByRole("tab", { name: "撮影画像" }), {
+		button: 0,
+		ctrlKey: false,
+	});
 	fireEvent.click(screen.getByRole("button", { name: /を選ぶ/ }));
 	await new Promise((resolve) => setTimeout(resolve, 20));
 	expect(fetchMedia).not.toHaveBeenCalled();
@@ -228,6 +242,10 @@ it("downloads the selected capture as a file named by its id", async () => {
 		});
 	try {
 		setup(resource, fetchMedia);
+		fireEvent.mouseDown(screen.getByRole("tab", { name: "撮影画像" }), {
+			button: 0,
+			ctrlKey: false,
+		});
 		fireEvent.click(screen.getAllByRole("button", { name: /を選ぶ/ })[0]!);
 		await waitFor(() => screen.getByRole("button", { name: "ダウンロード" }));
 		fireEvent.click(screen.getByRole("button", { name: "ダウンロード" }));
@@ -238,4 +256,50 @@ it("downloads the selected capture as a file named by its id", async () => {
 		URL.createObjectURL = originalCreate;
 		URL.revokeObjectURL = originalRevoke;
 	}
+});
+
+it("renders browser settings as an artifact and clears the write-only token after saving", async () => {
+	const dispatch = vi.fn(async (): Promise<Receipt> => ({
+		status: "accepted",
+		message: "保存しました",
+	}));
+	render(
+		<ArtifactRenderer
+			definition={JSON.stringify({
+				view: "browser-settings",
+				source: "browser",
+				title: "ブラウザの設定",
+			})}
+			runtime={{
+				snapshot: {
+					browser: {
+						...resource,
+						bridge: {
+							revision: 4,
+							enabled: false,
+							configured: false,
+							available: true,
+						},
+					},
+				},
+				dispatch,
+			}}
+		/>,
+	);
+	expect(screen.queryByRole("tab", { name: "操作" })).toBeNull();
+	const input = screen.getByLabelText("接続トークン") as HTMLInputElement;
+	expect(input.type).toBe("password");
+	fireEvent.change(input, { target: { value: "fixture-secret" } });
+	fireEvent.click(screen.getByLabelText("接続時の手動承認を省略"));
+	fireEvent.click(screen.getByRole("button", { name: "承認の設定を保存" }));
+	await waitFor(() => expect(input.value).toBe(""));
+	expect(last(dispatch)).toMatchObject({
+		action: "browser-bridge-save",
+		values: {
+			token: "fixture-secret",
+			enabled: true,
+			clear: false,
+			expectedRevision: "4",
+		},
+	});
 });

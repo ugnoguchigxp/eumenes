@@ -1,21 +1,24 @@
 import { useId, useState } from "react";
 import { Button } from "../Button";
 import { Input } from "../Input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../Tabs";
 import { BrowserCaptureList } from "./BrowserCaptureList";
 import { BrowserConnectionPanel } from "./BrowserConnectionPanel";
 import { BrowserTabList } from "./BrowserTabList";
-import { BrowserTaskList } from "./BrowserTaskList";
-import { disconnectedNote, unavailableLabel } from "./labels";
+import { BrowserScriptPanel } from "./BrowserScriptPanel";
+import {
+	connectionStateLabels,
+	disconnectedNote,
+	unavailableLabel,
+} from "./labels";
 import type { BrowserWorkspaceProps } from "./types";
 import "./BrowserWorkspace.css";
-
 export type { BrowserWorkspaceProps } from "./types";
 
 function urlProblem(value: string): string | undefined {
-	const text = value.trim();
-	if (!text) return "開きたいURLを入力してください。";
+	if (!value.trim()) return "開きたいURLを入力してください。";
 	try {
-		const url = new URL(text);
+		const url = new URL(value.trim());
 		if (url.protocol !== "http:" && url.protocol !== "https:")
 			return "http または https のURLを入力してください。";
 	} catch {
@@ -24,138 +27,124 @@ function urlProblem(value: string): string | undefined {
 	return undefined;
 }
 
-/** Props only: the host supplies every tab, task and capture and handles each event. */
-export function BrowserWorkspace({
-	title = "ブラウザ",
-	availability,
-	connection,
-	executablePath,
-	tabs,
-	tasks,
-	captures,
-	selectedCaptureId,
-	previewSrc,
-	pending,
-	loading,
-	error,
-	message,
-	onConnect,
-	onDisconnect,
-	onSaveExecutablePath,
-	onOpenUrl,
-	onFocusTab,
-	onCloseTab,
-	onSelectCapture,
-	onDownloadCapture,
-	onCancelTask,
-	onCancelCapture,
-}: BrowserWorkspaceProps) {
+/** Content inside the shared ArtifactPanel. Requests and answers remain in the conversation. */
+export function BrowserWorkspace(props: BrowserWorkspaceProps) {
 	const id = useId();
 	const [url, setUrl] = useState("");
+	const [activeView, setActiveView] = useState("operation");
 	const [submitted, setSubmitted] = useState(false);
-	const available = availability.available;
+	const { connection, availability, pending, tabs, tasks, captures } = props;
 	const connected = connection.state === "connected";
-	const disabled = !available || pending;
+	const disabled = !availability.available || pending;
 	const problem = submitted ? urlProblem(url) : undefined;
-	function submit() {
-		setSubmitted(true);
-		if (urlProblem(url)) return;
-		onOpenUrl(url.trim());
-		setUrl("");
-		setSubmitted(false);
-	}
 	return (
 		<section
 			className="browser-workspace"
-			aria-label={title}
-			aria-busy={loading || undefined}
+			aria-label={props.title ?? "ブラウザ"}
+			aria-busy={props.loading || undefined}
 		>
-			{!availability.available && (
-				<p role="alert" className="browser-workspace-unavailable">
-					現在は使えません。{unavailableLabel(availability.reason)}
-				</p>
-			)}
-			<BrowserConnectionPanel
-				connection={connection}
-				executablePath={executablePath}
-				pending={pending}
-				onConnect={onConnect}
-				onDisconnect={onDisconnect}
-				onSaveExecutablePath={onSaveExecutablePath}
-			/>
-			{connected ? (
-				<>
-					<form
-						className="browser-workspace-section"
-						aria-label="新しくURLを開く"
-						onSubmit={(event) => {
-							event.preventDefault();
-							submit();
-						}}
-					>
-						<h3>新しくURLを開く</h3>
-						<div className="browser-workspace-open">
-							<Input
-								id={`${id}-url`}
-								type="url"
-								inputMode="url"
-								aria-label="開くURL"
-								aria-invalid={problem ? true : undefined}
-								aria-describedby={problem ? `${id}-url-error` : undefined}
-								placeholder="https://example.com"
-								value={url}
-								disabled={disabled}
-								onChange={(event) => setUrl(event.target.value)}
-							/>
-							<Button type="submit" disabled={disabled}>
-								新しく開く
-							</Button>
-						</div>
-						{problem && (
-							<p
-								id={`${id}-url-error`}
-								role="alert"
-								className="browser-workspace-problem"
-							>
-								{problem}
-							</p>
-						)}
-					</form>
-					<BrowserTabList
-						tabs={tabs}
-						disabled={disabled}
-						onFocusTab={onFocusTab}
-						onCloseTab={onCloseTab}
+			<div className="browser-workspace-toolbar">
+				<span data-connected={connected}>
+					{connectionStateLabels[connection.state]}
+				</span>
+				<span className="browser-workspace-target">
+					対象: {tabs.find((t) => t.active)?.title || "未選択"}
+				</span>
+				{props.onOpenSettings && (
+					<Button variant="ghost" size="sm" onClick={props.onOpenSettings}>
+						設定
+					</Button>
+				)}
+			</div>
+			<Tabs value={activeView} onValueChange={setActiveView}>
+				<TabsList aria-label="ブラウザの表示">
+					<TabsTrigger value="operation">操作</TabsTrigger>
+					<TabsTrigger value="connection">接続・タブ</TabsTrigger>
+					<TabsTrigger value="captures">撮影画像</TabsTrigger>
+				</TabsList>
+				<TabsContent
+					value="operation"
+					forceMount
+					hidden={activeView !== "operation"}
+				>
+					<BrowserScriptPanel
+						tasks={tasks}
+						pending={pending}
+						onCancelTask={props.onCancelTask}
 					/>
-				</>
-			) : (
-				<p className="browser-workspace-empty">{disconnectedNote}</p>
-			)}
-			<BrowserTaskList
-				tasks={tasks}
-				disabled={pending}
-				onCancelTask={onCancelTask}
-			/>
-			<BrowserCaptureList
-				captures={captures}
-				selectedCaptureId={selectedCaptureId}
-				previewSrc={previewSrc}
-				disabled={pending}
-				onSelectCapture={onSelectCapture}
-				onDownloadCapture={onDownloadCapture}
-				onCancelCapture={onCancelCapture}
-			/>
-			{loading && (
+				</TabsContent>
+				<TabsContent value="connection">
+					{!availability.available && (
+						<p role="status">{unavailableLabel(availability.reason)}</p>
+					)}
+					<BrowserConnectionPanel {...props} connectionOnly />
+					{connected ? (
+						<>
+							<form
+								className="browser-workspace-section"
+								aria-label="新しくURLを開く"
+								onSubmit={(e) => {
+									e.preventDefault();
+									setSubmitted(true);
+									if (urlProblem(url)) return;
+									props.onOpenUrl(url.trim());
+									setUrl("");
+									setSubmitted(false);
+								}}
+							>
+								<h3>新しくURLを開く</h3>
+								<div className="browser-workspace-open">
+									<Input
+										id={`${id}-url`}
+										aria-label="開くURL"
+										type="url"
+										inputMode="url"
+										placeholder="https://example.com"
+										aria-invalid={problem ? true : undefined}
+										value={url}
+										disabled={disabled}
+										onChange={(e) => setUrl(e.target.value)}
+									/>
+									<Button type="submit" disabled={disabled}>
+										新しく開く
+									</Button>
+								</div>
+								{problem && <p role="alert">{problem}</p>}
+							</form>
+							<BrowserTabList
+								tabs={tabs}
+								disabled={disabled}
+								onFocusTab={props.onFocusTab}
+								onCloseTab={props.onCloseTab}
+							/>
+						</>
+					) : (
+						<p className="browser-workspace-empty">{disconnectedNote}</p>
+					)}
+				</TabsContent>
+				<TabsContent value="captures">
+					<BrowserCaptureList
+						captures={captures}
+						selectedCaptureId={props.selectedCaptureId}
+						previewSrc={props.previewSrc}
+						disabled={pending}
+						onSelectCapture={props.onSelectCapture}
+						onDownloadCapture={props.onDownloadCapture}
+						onCancelCapture={props.onCancelCapture}
+					/>
+				</TabsContent>
+			</Tabs>
+			{props.loading && (
 				<output className="browser-workspace-feedback">読み込み中です。</output>
 			)}
-			{error && (
+			{props.error && (
 				<p role="alert" className="browser-workspace-problem">
-					{error}
+					{props.error}
 				</p>
 			)}
-			{message && (
-				<output className="browser-workspace-feedback" aria-live="polite">
-					{message}
+			{props.message && (
+				<output aria-live="polite" className="browser-workspace-feedback">
+					{props.message}
 				</output>
 			)}
 		</section>

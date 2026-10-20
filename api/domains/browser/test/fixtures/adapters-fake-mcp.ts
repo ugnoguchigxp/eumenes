@@ -14,6 +14,7 @@ import {
 import { dirname, join } from "node:path";
 
 type Config = {
+	initialUrl?: string;
 	/** Delay the first tools/call (the connect page). */
 	connectDelayMs?: number;
 	/** First tools/call answers with an error result. */
@@ -50,7 +51,9 @@ const INLINE_SNAPSHOT = [
 	'  - textbox "検索" [ref=e5]',
 ].join("\n");
 
-let tabs = [{ title: "Eumenes", url: "http://127.0.0.1:5173/" }];
+let tabs = [
+	{ title: "Eumenes", url: config().initialUrl ?? "http://127.0.0.1:5173/" },
+];
 let selected = 0;
 let calls = 0;
 const stamp = () => new Date().toISOString().replace(/[:.]/g, "-");

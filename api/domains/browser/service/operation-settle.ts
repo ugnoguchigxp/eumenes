@@ -14,6 +14,7 @@ import {
 	type TabRow,
 } from "../repository";
 import type { Ctx } from "./context";
+import { connectedConnection } from "./connection";
 import { finishTask } from "./lifecycle";
 import type { CommitGuard } from "./operation-plan";
 import type { TaskRef } from "./operation-checks";
@@ -66,6 +67,39 @@ export function settleOperation(
 			now,
 		);
 		return { ...base, state: "failed", errorCode: result.code };
+	}
+	// A credential change makes the connection unusable before its asynchronous disconnect settles.
+	let live = false;
+	try {
+		live = connectedConnection(ctx, db).id === p.connectionId;
+	} catch (error) {
+		if (!(error instanceof Error) || error.message !== "browser_disconnected")
+			throw error;
+	}
+	if (!live) {
+		transitionOperation(
+			db,
+			p.opId,
+			["dispatched"],
+			"indeterminate",
+			{ errorCode: "browser_disconnected" },
+			now,
+		);
+		if (p.task)
+			finishTask(
+				ctx,
+				db,
+				p.task.id,
+				"indeterminate",
+				"operation_indeterminate",
+				null,
+			);
+		const current = operationRow(db, p.opId)!;
+		return {
+			...base,
+			state: current.state as OperationOutcome["state"],
+			...(current.error_code ? { errorCode: current.error_code } : {}),
+		};
 	}
 	if (blockedCode) {
 		const moved = transitionOperation(

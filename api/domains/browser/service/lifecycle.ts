@@ -89,6 +89,19 @@ export function finishTask(
 		},
 		now,
 	);
+	for (const c of activeCaptures(db))
+		if (c.task_id === id)
+			finishCapture(
+				ctx,
+				db,
+				c.id,
+				state === "cancelled"
+					? "cancelled"
+					: state === "expired"
+						? "expired"
+						: "failed",
+				state === "cancelled" ? null : (code ?? "task_not_active"),
+			);
 	clearLeases(db, id, now);
 	revokeGrants(db, id, now);
 	endTaskApprovals(db, id, now);

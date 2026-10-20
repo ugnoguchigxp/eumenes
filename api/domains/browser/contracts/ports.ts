@@ -153,3 +153,6 @@ export interface CaptureFiles {
 	/** Adopted files (`<captureId>.webp`); the domain removes those no capture row points at. */
 	listAdopted(): Promise<string[]>;
 }
+
+/** The OS file dialog for choosing Brave; null when the user cancels. It only reads a path, never launches it. */
+export type ExecutablePicker = () => Promise<string | null>;

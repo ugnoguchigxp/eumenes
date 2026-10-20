@@ -6,6 +6,8 @@
 
 関連: [登録と拡張の手順](../docs/toolchain-extension.md)、[検証手順](../docs/toolchain-extension-verification.md)、[サブエージェントの二つの型](subagent-task-and-session-agents-design-2026-10-18.md)、[LARM](../docs/larm.md)、[画像ライブラリー](../docs/images.md)、[LARM画像取込API提案](reference/larm-image-import-v1-proposal/README.txt)。
 
+追補（2026-10-20）: [実行Script・進捗を主体とするUIと接続承認省略の設計案](browser-script-progress-ui-design-2026-10-20.md)。入力のチャット統一、設定アーティファクトへの移設、§12 Q1の承認省略を具体化する。追補は未実装・実機未検証であり、本書の現行実装・検証状況を置き換えない。
+
 ## 1 目的と決定事項
 
 Eumenesを開いている利用者のBraveで、Eumenes自身のタブ、Eumenesが開いたタブ、Eumenes上のリンクから開いたタブを、会話から操作・撮影できるようにする。撮影した画像は非可逆WebPで保存し、表示・取得できるようにする。
@@ -72,7 +74,7 @@ browser domainはLARM・dialogueのrepositoryへ直接アクセスしない。�
 ### 4.1 依存と設定
 
 - `@playwright/mcp`を固定版でdependenciesへ追加し、backendはインストール済みのパッケージを子プロセスで起動する。実行時に`npx`で取得しない。同梱のplaywright-coreの版は`@playwright/mcp`に従い、Eumenesの`@playwright/test`（E2E用）とは独立に扱う。旧案で追加した`playwright-core`の直接依存は削除する。
-- Braveの実行ファイルのパスはSQLiteの設定として保存し、設定APIから登録する。環境変数を要求しない。未設定の間は`browser_not_configured`で利用不可とする。
+- Braveの実行ファイルのパスはSQLiteの設定として保存し、設定APIから登録する。環境変数を要求しない。未設定の間は`browser_not_configured`で利用不可とする。**（2026-10-20 利用者決定）** 未設定の間だけ、backendはOS標準のインストール先（macOSは`/Applications`と`~/Applications`のBrave、Linuxは`/usr/bin/brave-browser`等）に実行可能なファイルがあれば`GET /api/browser/setting`の`suggestedPath`で返し、画面は入力欄に入れて提案する。保存されるまで使わず、利用不可の扱いは変えない。**（2026-10-20 利用者決定）** macOSでは設定の「参照…」で、backendが`osascript`の`choose file`（OS標準のファイル選択）を開く（`POST /api/browser/setting/browse`、同時に一つ、5分で閉じる）。`.app`を選ぶと`Info.plist`の`CFBundleExecutable`から実行ファイルのパスに直し、実行可能なファイルか確かめて入力欄へ返す。保存は「保存」で行う。ダイアログはbackendと同じコンピュータの画面に出る。macOS以外は`canBrowse:false`で「参照…」を出さない。画面の操作は`artifact:browser.workspace@3`の`browse-path`（local）。
 - 子プロセスへ渡す環境変数は`PATH`・`HOME`・`PLAYWRIGHT_MCP_EXECUTABLE_PATH`だけとする。backendのtoken・LARM設定・その他の環境変数を渡さない。
 - MCPの出力ディレクトリ（`--output-dir`等）はbrowser domainの管理ディレクトリ配下の一時領域に固定する。書き出されたスナップショット・コンソールログはページ本文を含むため、読んだ後に削除し、リポジトリ・通常ログへ残さない。
 - Bridge拡張機能の導入は利用者が行う。導入手順と、Braveでストア版を入れられることを`docs/`に記載する。

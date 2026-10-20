@@ -4674,6 +4674,62 @@
 					}
 				}
 			]
+		},
+		{
+			"kind": "artifact",
+			"id": "settings.hub",
+			"revision": 7,
+			"title": "設定",
+			"variants": [
+				{
+					"id": "standard",
+					"label": "標準",
+					"definition": {
+						"view": "settings-navigation",
+						"source": "settings-hub",
+						"title": "設定"
+					}
+				}
+			],
+			"defaultVariant": "standard",
+			"sourceBindings": [
+				{
+					"source": "settings-hub",
+					"adapterRef": "adapter:settings@1",
+					"query": "query:settings.document@1",
+					"target": "none"
+				}
+			],
+			"actionBindings": [
+				{
+					"actionId": "open",
+					"eventAction": "settings-open",
+					"source": "settings-hub",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "navigate",
+					"navigateTo": {
+						"byValue": "id",
+						"artifacts": {
+							"conversation": "settings.conversation",
+							"voice": "settings.voice-input",
+							"display": "settings.display",
+							"records": "settings.records",
+							"ai": "settings.ai-connections",
+							"external": "settings.external-work",
+							"dictionary": "settings.dictionary",
+							"memory": "settings.memory",
+							"world": "settings.world",
+							"service-tests": "settings.service-tests",
+							"google": "settings.google-accounts",
+							"browser": "settings.browser"
+						}
+					}
+				}
+			],
+			"launcher": {
+				"label": "設定",
+				"order": 100
+			}
 		}
 	],
 	"schemas": [

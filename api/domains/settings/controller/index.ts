@@ -3,6 +3,33 @@ import type { Hono } from "hono";
 import { applySchema } from "../contracts";
 import type { SettingsService } from "../service";
 export function registerSettings(app: Hono, settings: SettingsService) {
+	app.get("/api/settings/browser-bridge", (c) =>
+		c.json(settings.browserBridge(), 200, { "Cache-Control": "no-store" }),
+	);
+	app.put("/api/settings/browser-bridge", async (c) => {
+		const raw = await readBounded(c.req.raw.body, {
+			limit: 8192,
+			tooLarge: "invalid_body_size",
+			missing: "invalid_body",
+		});
+		let input: unknown;
+		try {
+			input = JSON.parse(new TextDecoder().decode(raw));
+		} catch {
+			throw new Error("invalid_browser_bridge");
+		}
+		try {
+			return c.json(await settings.configureBrowserBridge(input), 200, {
+				"Cache-Control": "no-store",
+			});
+		} catch (error) {
+			if (error instanceof Error && error.message === "conflict_browser_bridge")
+				return c.json({ error: "conflict_browser_bridge" }, 409, {
+					"Cache-Control": "no-store",
+				});
+			throw error;
+		}
+	});
 	app.get("/api/settings/excalidraw", (c) =>
 		c.json(settings.excalidrawConnection()),
 	);

@@ -20,6 +20,8 @@ import {
 	patchCapture,
 	tabRow,
 } from "../repository";
+import { checkScript } from "./script";
+import type { ScriptBinding } from "../contracts/script";
 import { runCapture } from "./capture-run";
 import type { Ctx } from "./context";
 import { connectedConnection } from "./connection";
@@ -42,6 +44,7 @@ const managedRef = (ref: string) =>
 	!ref.split("/").includes("..");
 
 export type StartCaptureInput = CaptureStart & {
+	scriptBinding?: ScriptBinding;
 	owner: string;
 	conversationId: string;
 	origin: "conversation" | "screen";
@@ -156,6 +159,7 @@ export function createCaptures(ctx: Ctx) {
 		let deadline = ctx.now() + ctx.captureMs;
 		if (taskId) {
 			const t = ownedTask(db, taskId, input.owner);
+			checkScript(t, input.scriptBinding);
 			if (t.state !== "running") throw new Error("task_not_active");
 			deadline = Math.min(deadline, t.deadline);
 		}
@@ -187,6 +191,10 @@ export function createCaptures(ctx: Ctx) {
 			},
 			ctx.now(),
 		);
+		if (input.scriptBinding)
+			db.query(
+				"UPDATE browser_captures SET script_revision=?,script_step_id=? WHERE id=?",
+			).run(input.scriptBinding.revision, input.scriptBinding.stepId, id);
 		enqueue(db, id);
 		return captureView(captureRow(db, id)!);
 	}

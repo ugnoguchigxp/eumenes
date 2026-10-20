@@ -86,12 +86,16 @@ export type ArtifactEvent = {
 		| "model3d-more"
 		| "model3d-refresh"
 		| "model3d-update"
+		| "browser-settings"
+		| "browser-open-workspace"
+		| "browser-bridge-save"
 		| "browser-connect"
 		| "browser-disconnect"
 		| "browser-open-url"
 		| "browser-focus-tab"
 		| "browser-close-tab"
 		| "browser-save-path"
+		| "browser-browse-path"
 		| "browser-cancel-capture"
 		| "browser-cancel-task";
 	values: Record<string, string | boolean>;

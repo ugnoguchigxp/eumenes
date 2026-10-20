@@ -36,6 +36,7 @@ const PAYLOAD = z.object({ id: z.uuid(), step: z.number().int() });
 function stepInput(r: TaskRow): TaskStepInput {
 	return {
 		taskId: r.id,
+		scriptRequired: !!r.script_required,
 		owner: r.owner,
 		request: r.request,
 		tabRef: r.tab_ref,
@@ -48,6 +49,7 @@ function stepInput(r: TaskRow): TaskStepInput {
 }
 
 export type StartTaskInput = {
+	scriptRequired?: boolean;
 	owner: string;
 	conversationId: string;
 	origin: "conversation" | "screen";
@@ -222,6 +224,7 @@ export function createTasks(
 		const existing = taskByRequest(db, input.requestId);
 		if (existing) {
 			if (
+				existing.script_required !== (input.scriptRequired ? 1 : 0) ||
 				existing.owner !== input.owner ||
 				existing.request !== request ||
 				existing.tab_ref !== (input.tabRef ?? null) ||
@@ -230,7 +233,8 @@ export function createTasks(
 				throw new Error("request_conflict");
 			return started(db, existing);
 		}
-		connectedConnection(ctx, db);
+		if (!input.scriptRequired || !ctx.canAutoConnect())
+			connectedConnection(ctx, db);
 		if (input.tabRef) openTab(tabRow(db, input.tabRef));
 		if (input.url) {
 			const v = checkNavigationTarget(input.url, ctx.webOrigins);
@@ -256,6 +260,9 @@ export function createTasks(
 			},
 			ctx.now(),
 		);
+		db.query(
+			"UPDATE browser_tasks SET script_required=?, continued_from=? WHERE id=?",
+		).run(input.scriptRequired ? 1 : 0, input.continueFrom ?? null, id);
 		if (input.continueFrom && input.approvePending)
 			approvals.transferInTransaction(db, {
 				owner: input.owner,
@@ -285,6 +292,14 @@ export function createTasks(
 		);
 		for (const o of ops)
 			ctx.inflight.get(`op:${o.id}`)?.abort(new Error("task_not_active"));
+		const captures = ctx.store.read(
+			(db) =>
+				db.query("SELECT id FROM browser_captures WHERE task_id=?").all(id) as {
+					id: string;
+				}[],
+		);
+		for (const c of captures)
+			ctx.inflight.get(`capture:${c.id}`)?.abort(new Error("task_not_active"));
 	}
 
 	return {

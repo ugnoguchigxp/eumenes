@@ -33,7 +33,7 @@ function checkSource(definition: ArtifactDefinition, snapshot: Snapshot) {
 				? "image-workspace"
 				: request.view === "model3d-workspace"
 					? "model3d"
-					: request.view === "browser-workspace"
+					: ["browser-workspace", "browser-settings"].includes(request.view)
 						? "browser"
 						: request.view === "music-workspace" ||
 							  request.view === "music-player" ||

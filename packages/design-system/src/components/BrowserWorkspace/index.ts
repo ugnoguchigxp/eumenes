@@ -8,9 +8,12 @@ export type {
 	BrowserCaptureRange,
 	BrowserCaptureState,
 	BrowserTabItem,
+	BrowserPickedPath,
 	BrowserTabStatus,
 	BrowserTaskItem,
 	BrowserTaskState,
 	BrowserUnavailableReason,
 	BrowserWorkspaceProps,
 } from "./types";
+
+export { BrowserSettings } from "./BrowserSettings";

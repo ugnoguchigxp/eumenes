@@ -1,3 +1,4 @@
+import type { Database } from "bun:sqlite";
 import { getLogger } from "../../../infrastructure/logger";
 import { CAPTURE_MAX_SIDE, activeCaptureStates } from "../contracts";
 import {
@@ -7,7 +8,9 @@ import {
 	patchCapture,
 	tabRow,
 	taskRow,
+	type CaptureRow,
 } from "../repository";
+import { checkScript } from "./script";
 import { connectedConnection } from "./connection";
 import { codeOf, type Ctx } from "./context";
 import { finishCapture, readyNotice } from "./lifecycle";
@@ -27,6 +30,27 @@ const tooBig = (s: { width: number; height: number }) =>
 const empty = (s: { width: number; height: number }) =>
 	!(s.width >= 1 && s.height >= 1);
 
+/** A late stage still belongs to an active task and the authorized connection. */
+function checkCaptureContext(ctx: Ctx, db: Database, row: CaptureRow) {
+	const conn = connectedConnection(ctx, db);
+	if (tabRow(db, row.tab_ref)?.connection_id !== conn.id)
+		throw new Error("tab_lost");
+	const task = row.task_id ? taskRow(db, row.task_id) : null;
+	if (
+		row.task_id &&
+		(!task || task.state !== "running" || ctx.now() >= task.deadline)
+	)
+		throw new Error("task_not_active");
+	if (task)
+		checkScript(
+			task,
+			row.script_revision && row.script_step_id
+				? { revision: row.script_revision, stepId: row.script_step_id }
+				: undefined,
+		);
+	return { conn, task };
+}
+
 /** Moves a live capture forward; a cancelled, expired or replaced one refuses with `capture_stale`. */
 export function advanceCapture(
 	ctx: Ctx,
@@ -42,6 +66,7 @@ export function advanceCapture(
 			finishCapture(ctx, db, id, "expired", null);
 			throw new Error("capture_stale");
 		}
+		checkCaptureContext(ctx, db, r);
 		return patchCapture(db, id, change, ctx.now());
 	});
 }
@@ -70,10 +95,7 @@ export async function runCapture(
 		const lease = await ctx.store.write((db) => {
 			const r = captureRow(db, id);
 			if (!r || r.epoch !== epoch) throw new Error("capture_stale");
-			const conn = connectedConnection(ctx, db);
-			const task = r.task_id ? taskRow(db, r.task_id) : null;
-			if (r.task_id && (!task || task.state !== "running"))
-				throw new Error("task_not_active");
+			const { conn, task } = checkCaptureContext(ctx, db, r);
 			holder = task
 				? { id: task.id, deadline: Math.min(task.deadline, r.deadline) }
 				: { id: `capture:${id}`, deadline: r.deadline };
@@ -86,6 +108,15 @@ export async function runCapture(
 		const shot = await ctx.serialOf(lease.conn).run(async () => {
 			await selectMatched(ctx, lease.conn, lease.tab);
 			const before = ctx.store.read((db) => {
+				const current = captureRow(db, id);
+				if (
+					!current ||
+					current.epoch !== epoch ||
+					!activeCaptureStates.includes(current.state) ||
+					ctx.now() >= current.deadline
+				)
+					throw new Error("capture_stale");
+				checkCaptureContext(ctx, db, current);
 				const t = openTab(tabRow(db, row.tab_ref));
 				if (row.range === "element")
 					assertActionable(
@@ -155,6 +186,7 @@ export async function runCapture(
 				ctx.now() >= r.deadline
 			)
 				return false;
+			checkCaptureContext(ctx, db, r);
 			const done = patchCapture(
 				db,
 				id,

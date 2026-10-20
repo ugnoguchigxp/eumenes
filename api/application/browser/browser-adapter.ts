@@ -36,6 +36,7 @@ const operations = [
 	["browser.tab.close", "builtin:browserTabTarget", "write"],
 	["browser.task.start", "builtin:browserTaskStart", "write"],
 	["browser.task.begin", "builtin:browserTaskBegin", "write"],
+	["browser.task.scripted", "builtin:browserTaskBegin", "write"],
 	["browser.task.status", "builtin:browserTaskTarget", "read"],
 	["browser.task.cancel", "builtin:browserTaskTarget", "write"],
 ] as const;
@@ -132,6 +133,7 @@ function connectionAnswer(data: Source["data"]) {
 	return {
 		state: c.state,
 		configured: c.configured,
+		autoConnectAvailable: c.autoConnectAvailable ?? false,
 		available: c.availability.available,
 		...(c.availability.available ? {} : { reason: c.availability.reason }),
 	};
@@ -357,7 +359,8 @@ export function createBrowserAdapter(
 					);
 				}
 				case "browser.task.start":
-				case "browser.task.begin": {
+				case "browser.task.begin":
+				case "browser.task.scripted": {
 					if (input.tabRef) needTab();
 					// A task continued after the user's approval keeps to the tab the approval was asked for.
 					const continued = input.continueFrom
@@ -382,6 +385,7 @@ export function createBrowserAdapter(
 							: undefined;
 					const text = said && said.length <= TASK_REQUEST_CHARS ? said : brief;
 					const view = service.startTaskInTransaction(db, {
+						scriptRequired: request.operationName === "browser.task.scripted",
 						owner: OWNER,
 						conversationId,
 						origin: fromUser ? "screen" : "conversation",

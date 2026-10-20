@@ -9,6 +9,8 @@ import type { CaptureRange } from "../contracts/ports";
 import { patchRow } from "./sql";
 
 export type CaptureRow = {
+	script_revision: number | null;
+	script_step_id: string | null;
 	id: string;
 	owner: string;
 	conversation_id: string;

@@ -11,6 +11,7 @@ import type {
 	TabView,
 	TaskStepInput,
 	TaskStepOutcome,
+	TaskPhase,
 } from "../contracts";
 import type {
 	BrowserDriver,
@@ -47,6 +48,13 @@ export type Serial = ReturnType<typeof createSerial>;
 
 /** What a task step may do, bound to its task: every call is checked against the task's lease, epoch and grants. */
 export type TaskApi = {
+	progress(phase: TaskPhase): Promise<void>;
+	connection(): import("../contracts").ConnectionView;
+	connect(): Promise<import("../contracts").ConnectionView>;
+	publishScript(
+		input: unknown,
+	): Promise<import("../contracts/script").ScriptView>;
+
 	tabs(): Promise<TabView[]>;
 	observe(tabRef: string): Promise<Observation>;
 	operate(
@@ -93,6 +101,8 @@ export type Ctx = {
 	/** Recent answers of `resolveHost`, by host name (null: it did not resolve). */
 	dnsCache: Map<string, { at: number; addresses: string[] | null }>;
 	runTaskStep?: TaskStepRunner;
+	canAutoConnect: () => boolean;
+	credentialRevision: () => number;
 	leaseMs: number;
 	renewMs: number;
 	taskMs: number;

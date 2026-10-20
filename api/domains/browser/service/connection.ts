@@ -37,7 +37,9 @@ export function connectionView(ctx: Ctx, db: Database): ConnectionView {
 	const row = lastConnection(db);
 	const state = row?.state ?? "disconnected";
 	const live =
-		row?.state === "connected" && ctx.driver.state().state === "connected";
+		row?.state === "connected" &&
+		ctx.driver.state().state === "connected" &&
+		row.credential_revision === ctx.credentialRevision();
 	return {
 		connectionId: row?.id ?? null,
 		state,
@@ -46,6 +48,7 @@ export function connectionView(ctx: Ctx, db: Database): ConnectionView {
 		endedAt: iso(row?.ended_at ?? null),
 		endReason: row?.end_reason ?? null,
 		configured,
+		autoConnectAvailable: ctx.canAutoConnect(),
 		availability:
 			configured && live
 				? { available: true }
@@ -70,7 +73,8 @@ export function connectedConnection(ctx: Ctx, db: Database) {
 	if (
 		!row ||
 		row.state !== "connected" ||
-		ctx.driver.state().state !== "connected"
+		ctx.driver.state().state !== "connected" ||
+		row.credential_revision !== ctx.credentialRevision()
 	)
 		throw new Error("browser_disconnected");
 	return row;
@@ -187,6 +191,12 @@ export function createConnection(ctx: Ctx) {
 				const list = await ctx.driver.listTabs();
 				await reconcileChecked(ctx, entry.id, list);
 			});
+			if (
+				!ctx.store.read((db) => connectionView(ctx, db).availability.available)
+			) {
+				await end(entry.id, "user");
+				return;
+			}
 			log.info("browser.connected", { connectionId: entry.id });
 		} catch {
 			await ctx.driver.disconnect().catch(() => undefined);
@@ -199,14 +209,18 @@ export function createConnection(ctx: Ctx) {
 		/** Resolves when the connection attempt in progress has finished (for shutdown and tests). */
 		settled: () => running?.done ?? Promise.resolve(),
 		/** Starts connecting and returns at once; the user picks the tab in Brave. Idempotent while one is live. */
-		async connect() {
+		async connect(beforeStart?: (db: Database) => void) {
 			await ready;
 			const started = await ctx.store.write((db) => {
+				beforeStart?.(db);
 				if (!executablePath(db)) throw new Error("browser_not_configured");
 				const active = activeConnection(db);
 				if (active) return { id: active.id, fresh: false };
 				const id = crypto.randomUUID();
 				insertConnection(db, id, ctx.now());
+				db.query(
+					"UPDATE browser_connections SET credential_revision=? WHERE id=?",
+				).run(ctx.credentialRevision(), id);
 				return { id, fresh: true };
 			});
 			if (started.fresh) {

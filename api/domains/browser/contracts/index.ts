@@ -1,3 +1,4 @@
+export * from "./script";
 import { isAbsolute } from "node:path";
 import { z } from "zod";
 import type { CaptureRange, DriverDisconnectReason } from "./ports";
@@ -272,6 +273,7 @@ export type ConnectionView = {
 	endedAt: string | null;
 	endReason: string | null;
 	configured: boolean;
+	autoConnectAvailable?: boolean;
 	availability: BrowserAvailability;
 };
 
@@ -285,14 +287,33 @@ export type TabView = {
 };
 
 export type OperationView = {
+	sequence: number;
+	scriptRevision: number | null;
+	stepId: string | null;
+	observedAt: number;
+	observationRef: string | null;
+	errorLabel: string | null;
 	operationId: string;
 	toolKind: ToolKind;
 	state: OperationState;
 	errorCode: string | null;
 };
 
+export type TaskPhase =
+	| "preparing"
+	| "thinking"
+	| "connecting"
+	| "observing"
+	| "operating"
+	| "capturing";
+
 export type TaskView = {
+	phase: TaskPhase | null;
+	operations?: OperationView[];
 	taskId: string;
+	conversationId: string;
+	continuedFrom: string | null;
+	script: import("./script").ScriptView | null;
 	requestSummary: string;
 	state: TaskState;
 	resultSummary?: string;
@@ -339,6 +360,13 @@ const unavailableReasons = {
 } as const;
 
 const errorLabels: Record<string, string> = {
+	script_not_ready: "実行Scriptがまだ公開されていません",
+	script_revision_conflict:
+		"Scriptが更新されたため、現在の予定を確認してください",
+	script_revision_limit: "Scriptの更新回数の上限に達しました",
+	script_evidence_invalid: "手順の完了を確認できる最新の観測がありません",
+	browser_manual_connection_required:
+		"設定または接続画面でブラウザへの接続を確認してください",
 	...unavailableReasons,
 	tab_lost: "対象のタブが見つかりません。タブ一覧を取り直してください",
 	tab_busy: "このタブは別の作業が使っています",
@@ -395,6 +423,7 @@ export function unavailableReason(
 
 /** What the later single-shot task worker (S2) provides: one step of the model loop per queue job. */
 export type TaskStepInput = {
+	scriptRequired?: boolean;
 	taskId: string;
 	owner: string;
 	request: string;

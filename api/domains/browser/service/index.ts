@@ -1,14 +1,9 @@
 import type { Database } from "bun:sqlite";
-import { stat } from "node:fs/promises";
-import { isAbsolute } from "node:path";
 import { createHostResolver } from "../adapters/host-resolver";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import type { QueueService } from "../../queue";
 import {
-	captureStart,
-	settingSave,
 	type BrowserCompletion,
-	type CaptureView,
 	CAPTURE_MS,
 	LEASE_MS,
 	LEASE_RENEW_MS,
@@ -18,6 +13,7 @@ import {
 import type {
 	BrowserDriver,
 	CaptureFiles,
+	ExecutablePicker,
 	HostResolver,
 	ImageEncoder,
 } from "../contracts/ports";
@@ -25,19 +21,19 @@ import {
 	activeConnection,
 	capturesRevision,
 	connectionCount,
-	executablePath,
 	listCaptures,
 	expireApprovals,
 	listTasks,
 	purgeEnded,
-	saveExecutablePath,
 	tabsRevision,
 	tasksRevision,
 	taskRow,
 	type TaskRow,
 } from "../repository";
+import { taskApi } from "./task-api";
 import { createApprovals } from "./approvals";
 import { createCaptures, type StartCaptureInput } from "./captures";
+import { createSetting } from "./setting";
 import { connectionView, createConnection } from "./connection";
 import {
 	createSerial,
@@ -74,6 +70,12 @@ export function createBrowser(deps: {
 	renewMs?: number;
 	taskMs?: number;
 	captureMs?: number;
+	/** Where Brave is installed by default; the first executable one is offered while no path is saved. */
+	standardPaths?: readonly string[];
+	/** The OS file dialog for choosing Brave; without it the path is only typed in. */
+	pickExecutable?: ExecutablePicker;
+	canAutoConnect?: () => boolean;
+	credentialRevision?: () => number;
 }) {
 	const { store } = deps;
 	const serials = new Map<string, Serial>();
@@ -89,6 +91,8 @@ export function createBrowser(deps: {
 		resolveHost: deps.resolveHost ?? createHostResolver(),
 		dnsCache: new Map(),
 		runTaskStep: deps.runTaskStep,
+		canAutoConnect: deps.canAutoConnect ?? (() => false),
+		credentialRevision: deps.credentialRevision ?? (() => 0),
 		leaseMs: deps.leaseMs ?? LEASE_MS,
 		renewMs: deps.renewMs ?? LEASE_RENEW_MS,
 		taskMs: deps.taskMs ?? TASK_MS,
@@ -118,36 +122,14 @@ export function createBrowser(deps: {
 		return store.write((db) => captures.startInTransaction(db, input));
 	}
 	function apiFor(task: TaskRow, signal: AbortSignal): TaskApi {
-		const owner = task.owner;
-		return {
-			tabs: () => refreshTabs(),
-			observe: (tabRef) =>
-				operations.observe({ owner, taskId: task.id, tabRef }, signal),
-			operate: (tabRef, action) =>
-				operations.operate({ owner, taskId: task.id, tabRef, action }, signal),
-			grantFromRequest: (input) =>
-				store.write((db) =>
-					grants.fromRequestInTransaction(db, owner, task.id, input),
-				),
-			approvals: () => store.read((db) => approvals.approved(db, task.id)),
-			capture: (input): Promise<CaptureView> =>
-				startCapture({
-					...captureStart.parse({
-						...input,
-						requestId: input.requestId ?? crypto.randomUUID(),
-					}),
-					owner,
-					conversationId: task.conversation_id,
-					origin: "conversation",
-					taskId: task.id,
-				}),
-			captureStatus: (captureId) => {
-				const view = store.read((db) => captures.status(db, owner, captureId));
-				if (view.taskId !== task.id)
-					throw new Error("browser_capture_not_found");
-				return view;
-			},
-		};
+		return taskApi(ctx, task, signal, {
+			connection,
+			operations,
+			grants,
+			approvals,
+			captures,
+			refreshTabs,
+		});
 	}
 
 	/** Re-lists the tabs unless a call sequence is running (the screen must not wait on a long operation). */
@@ -176,21 +158,12 @@ export function createBrowser(deps: {
 	};
 
 	const service = {
-		setting: {
-			get: () => ({ executablePath: store.read(executablePath) }),
-			save: async (path: string) => {
-				const parsed = settingSave.parse({ executablePath: path });
-				if (
-					parsed.executablePath &&
-					!(await isExecutableFile(parsed.executablePath))
-				)
-					throw new Error("browser_executable_invalid");
-				return store.write((db) => {
-					saveExecutablePath(db, parsed.executablePath, ctx.now());
-					return { executablePath: executablePath(db) };
-				});
-			},
-		},
+		setting: createSetting({
+			store,
+			now: ctx.now,
+			standardPaths: deps.standardPaths,
+			pickExecutable: deps.pickExecutable,
+		}),
 		ready: connection.ready,
 		connection: () => store.read((db) => connectionView(ctx, db)),
 		connect: connection.connect,
@@ -273,7 +246,8 @@ export function createBrowser(deps: {
 		abortTask: tasks.abortRunning,
 		taskStatus: (owner: string, id: string) =>
 			store.read((db) => tasks.status(db, owner, id)),
-		listTasks: (owner: string) => store.read((db) => listTasks(db, owner)),
+		listTasks: (owner: string, conversationId?: string) =>
+			store.read((db) => listTasks(db, owner, 20, conversationId)),
 		/** The step the S2 worker's runner drives; exposed for tests of the hook. */
 		taskRow: (id: string) => store.read((db) => taskRow(db, id)),
 		startCaptureInTransaction: (db: Database, input: StartCaptureInput) =>
@@ -340,14 +314,3 @@ export function createBrowser(deps: {
 	return service;
 }
 export type BrowserService = ReturnType<typeof createBrowser>;
-
-/** The Brave setting must name a file that exists, is a regular file and has an execute bit; nothing else is ever launched. */
-async function isExecutableFile(path: string) {
-	if (!isAbsolute(path)) return false;
-	try {
-		const info = await stat(path);
-		return info.isFile() && (info.mode & 0o111) !== 0;
-	} catch {
-		return false;
-	}
-}

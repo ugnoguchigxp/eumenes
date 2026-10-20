@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
+import { BrowserSettings } from "./BrowserSettings";
 import { BrowserWorkspace } from "./BrowserWorkspace";
 import { sampleCaptures, sampleTabs, sampleTasks } from "./fixtures";
 import type { BrowserWorkspaceProps } from "./types";
@@ -80,4 +81,15 @@ export const Unavailable: Story = {
 		availability: { available: false, reason: "browser_mcp_unavailable" },
 		connection: { state: "disconnected" },
 	},
+};
+
+export const Settings: Story = {
+	render: (props) => (
+		<BrowserSettings
+			{...props}
+			bridge={{ revision: 1, enabled: true, configured: true, available: true }}
+			onSaveBridge={async () => true}
+			onOpenBrowser={() => {}}
+		/>
+	),
 };

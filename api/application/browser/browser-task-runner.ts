@@ -261,19 +261,22 @@ export function createTaskRunner(ports: TaskRunnerPorts): TaskStepRunner {
 		const target = input.tabRef
 			? tabs.find((t) => t.tabRef === input.tabRef)
 			: (tabs.find((t) => t.active) ?? tabs[0]);
-		if (!target) throw new Error("tab_lost");
-		const observation = await api.observe(target.tabRef);
+		if (!target && !input.scriptRequired) throw new Error("tab_lost");
+		const safeTarget = target?.status === "blocked" ? undefined : target;
+		const observation = safeTarget
+			? await api.observe(safeTarget.tabRef)
+			: null;
 		const approved = api.approvals();
 		const work: Work = {
-			tabRef: target.tabRef,
-			origin: originOf(observation.url),
+			tabRef: safeTarget?.tabRef ?? null,
+			origin: observation ? originOf(observation.url) : null,
 			tools: operator.toolIds,
 			seen: addSeen(
 				[],
 				...tabs.map((t) => t.title),
-				`${observation.title}\n${observation.text}`,
+				observation ? `${observation.title}\n${observation.text}` : "",
 			),
-			evidence: [observation.observationRef],
+			evidence: observation ? [observation.observationRef] : [],
 			captures: [],
 		};
 		const core = startTask({
@@ -287,11 +290,16 @@ export function createTaskRunner(ports: TaskRunnerPorts): TaskStepRunner {
 			...(frozen.brief ? { brief: frozen.brief } : {}),
 			reference: {
 				...(input.url ? { requestedUrl: input.url } : {}),
-				target: {
-					tabRef: target.tabRef,
-					title: clip(observation.title, 100),
-					place: placeOf(observation.url),
-				},
+				connection: api.connection(),
+				scriptRequired: !!input.scriptRequired,
+				target:
+					safeTarget && observation
+						? {
+								tabRef: safeTarget.tabRef,
+								title: clip(observation.title, 100),
+								place: placeOf(observation.url),
+							}
+						: null,
 				tabs: tabs.slice(0, 20).map((t) => ({
 					tabRef: t.tabRef,
 					title: clip(t.title, 100),
@@ -299,7 +307,7 @@ export function createTaskRunner(ports: TaskRunnerPorts): TaskStepRunner {
 					active: t.active,
 					status: t.status,
 				})),
-				observation: observationView(observation),
+				observation: observation ? observationView(observation) : null,
 				...(approved.length ? { approved: approvedView(approved) } : {}),
 			},
 			referenceIntro: REFERENCE_INTRO,
@@ -368,6 +376,8 @@ export function createTaskRunner(ports: TaskRunnerPorts): TaskStepRunner {
 		const messages = taskMessages(p.core);
 		if (!fits(messages))
 			return taskFailed(p.core, p.work, "observation_budget_exceeded");
+		await env.api.progress("thinking");
+		signal.throwIfAborted();
 		const raw = await infer(input, messages, signal);
 		signal.throwIfAborted();
 		const { state: core, step } = recordOutput(p.core, raw);

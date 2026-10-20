@@ -31,3 +31,10 @@ export { createMcpBrowserDriver } from "./adapters/mcp-driver";
 export { createWebpEncoder } from "./adapters/webp-encoder";
 export { createCaptureFiles } from "./adapters/capture-files";
 export { createHostResolver } from "./adapters/host-resolver";
+export { createExecutablePicker } from "./adapters/executable-picker";
+
+export type {
+	ScriptView,
+	ScriptPublish,
+	ScriptBinding,
+} from "./contracts/script";

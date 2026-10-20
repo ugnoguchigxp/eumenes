@@ -85,7 +85,12 @@ export function fakeInference(script: Reply[]) {
 /** The real browser domain, the shipped bundle in a real registry, the real runner; the model and the driver are fakes. */
 export async function setup(
 	script: Reply[],
-	options: { taskMs?: number; now?: () => number } = {},
+	options: {
+		taskMs?: number;
+		now?: () => number;
+		canAutoConnect?: () => boolean;
+		credentialRevision?: () => number;
+	} = {},
 ) {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-browser-runner-"));
 	dirs.push(dir);

@@ -1,0 +1,17 @@
+Use case: ui-mockup
+Asset type: corrected Eumenes browser ARTIFACT content pane, single portrait image.
+Create a high-fidelity FLAT UI SCREENSHOT of ONLY an existing chat app's narrow ARTIFACT PANE, about 520 logical pixels wide by 760 high, rendered sharply at 1024x1536. It is NOT a standalone application or full browser page, NOT a mobile app. Crop to edges of pane. No device, phone status bar, desktop app branding, top-level navigation sidebar, browser address bar, page-wide header, or breadcrumb.
+Use the same real Eumenes artifact structure: tiny workspace host tab strip on top with active tab 'ブラウザ ×' and inactive tab '設定 ×'. This host tab strip already supplies the artifact title; DO NOT add a redundant big browser title or standalone application toolbar.
+Light cool gray-blue background, nearly white surfaces, thin cool-gray borders, dark ink text, muted secondary text, medium blue accent and soft green completed checks. Restrained Japanese shadcn-like design, compact readable Japanese sans-serif, 8px radii, 16px pane padding.
+Immediately below host tabs a small local tab bar with '操作' selected, '接続・タブ', '撮影画像'. Only '操作' content is visible. A tiny unobtrusive status line reads green dot '接続中' then '対象: YouTube' and a small '設定' link at far right.
+THE EXECUTION SCRIPT IS THE MAIN CONTENT. All requests, both speech and typed prompts, originate in the EXISTING CHAT COMPOSER OUTSIDE THIS ARTIFACT. Therefore absolutely NO prompt input box, NO textarea, NO editable request, NO chat composer, NO microphone, NO audio button, NO send/submit button, NO '内容を変更' input controls anywhere in the image.
+At most a single small read-only context line: 'チャットからの依頼' followed by the quoted text 'なんか面白い動画見せて'. This is metadata, not a card taking up the top third.
+Main heading '実行Script', small blue status badge '実行中'. Below it one concise human-readable intent sentence: 'YouTubeのおすすめから1本選んで再生します。'. Not raw JavaScript and not internal reasoning.
+A dominant VERTICAL ACTION TIMELINE, four steps with ample readable text:
+1 green check icon, title 'YouTubeを開く', small state '完了'
+2 green check icon, title 'おすすめを確認する', small state '完了'
+3 blue active ring, title '動画を選ぶ', small state '実行中', secondary line 'おすすめの候補を確認しています。'
+4 gray hollow circle, title '再生を確認する', small state '未着手'
+Make the active third row subtly blue tinted. Thin timeline connector, completed and unstarted states easy to distinguish. No percentages, fabricated timer or charts.
+Below timeline a thin divider and a compact expandable row '実行履歴'. Bottom-right small outline button '実行を中止'. A low-emphasis one-line hint '依頼の変更はチャットから'.
+Connection details, website tabs and captured images are available behind inactive local tabs ONLY, none displayed in main view. No website screenshot, no video thumbnail, no static image preview, no pretend PiP. Main visual hierarchy should be SCRIPT FIRST, active step second, small source request metadata third. Precise readable Japanese and realistic compact artifact layout.

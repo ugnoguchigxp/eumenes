@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { BrowserWorkspace } from "./BrowserWorkspace";
@@ -35,6 +35,10 @@ describe("BrowserWorkspace tabs", () => {
 	it("shows tab state and sends focus and close events", async () => {
 		const p = props();
 		render(<BrowserWorkspace {...p} />);
+		fireEvent.mouseDown(screen.getByRole("tab", { name: "接続・タブ" }), {
+			button: 0,
+			ctrlKey: false,
+		});
 		const tabs = screen.getByRole("region", { name: "タブ" });
 		expect(within(tabs).getByText("現在のタブ")).toBeTruthy();
 		expect(within(tabs).getByText("作業: 明日の天気を調べる")).toBeTruthy();
@@ -51,6 +55,10 @@ describe("BrowserWorkspace tabs", () => {
 
 	it("shows a tab the host stopped for safety and offers no switching or closing for it", () => {
 		render(<BrowserWorkspace {...props()} />);
+		fireEvent.mouseDown(screen.getByRole("tab", { name: "接続・タブ" }), {
+			button: 0,
+			ctrlKey: false,
+		});
 		const tabs = screen.getByRole("region", { name: "タブ" });
 		expect(within(tabs).getByText("保護のため停止")).toBeTruthy();
 		expect(
@@ -67,6 +75,10 @@ describe("BrowserWorkspace tabs", () => {
 
 	it("blocks switching and closing for the active, busy, lost and closed tabs", () => {
 		render(<BrowserWorkspace {...props()} />);
+		fireEvent.mouseDown(screen.getByRole("tab", { name: "接続・タブ" }), {
+			button: 0,
+			ctrlKey: false,
+		});
 		for (const name of [
 			"天気予報へ切り替える",
 			"天気予報を閉じる",
@@ -84,6 +96,10 @@ describe("BrowserWorkspace tabs", () => {
 	it("opens a new URL separately from switching tabs", async () => {
 		const p = props();
 		render(<BrowserWorkspace {...p} />);
+		fireEvent.mouseDown(screen.getByRole("tab", { name: "接続・タブ" }), {
+			button: 0,
+			ctrlKey: false,
+		});
 		await userEvent.type(
 			screen.getByLabelText("開くURL"),
 			" https://a.test/x ",
@@ -96,6 +112,10 @@ describe("BrowserWorkspace tabs", () => {
 	it("rejects an empty or non-http URL without emitting", async () => {
 		const p = props();
 		render(<BrowserWorkspace {...p} />);
+		fireEvent.mouseDown(screen.getByRole("tab", { name: "接続・タブ" }), {
+			button: 0,
+			ctrlKey: false,
+		});
 		await userEvent.click(screen.getByRole("button", { name: "新しく開く" }));
 		expect((await screen.findByRole("alert")).textContent).toContain(
 			"URLを入力",
@@ -110,34 +130,96 @@ describe("BrowserWorkspace tabs", () => {
 	});
 });
 
-describe("BrowserWorkspace tasks", () => {
-	it("labels every state and cancels only queued or running tasks", async () => {
+describe("BrowserWorkspace Script", () => {
+	it("starts with Script only, keeps input in chat, and cancels the selected task", async () => {
+		const p = props({ onOpenSettings: vi.fn() });
+		render(<BrowserWorkspace {...p} />);
+		expect(
+			screen.getByRole("tab", { name: "操作" }).getAttribute("aria-selected"),
+		).toBe("true");
+		expect(screen.getByRole("region", { name: "実行Script" })).toBeTruthy();
+		expect(screen.queryByRole("textbox")).toBeNull();
+		expect(screen.queryByRole("region", { name: "タブ" })).toBeNull();
+		expect(screen.queryByRole("region", { name: "撮影した画像" })).toBeNull();
+		expect(screen.queryByLabelText("Braveの実行ファイルのパス")).toBeNull();
+		expect(screen.queryByRole("button", { name: /音声|マイク/ })).toBeNull();
+		await userEvent.click(screen.getByRole("button", { name: "実行を中止" }));
+		expect(p.onCancelTask).toHaveBeenCalledWith("k1");
+		await userEvent.click(screen.getByRole("button", { name: "設定" }));
+		expect(p.onOpenSettings).toHaveBeenCalledOnce();
+	});
+	it("keeps the selected task across progress refreshes and does not invent completion", async () => {
+		const script = {
+			revision: 2,
+			summary: "対象を開き、表示を確認します。",
+			updatedAt: 2,
+			history: [
+				{
+					revision: 1,
+					summary: "最初の計画",
+					steps: [
+						{
+							stepId: "s1",
+							label: "一覧を見る",
+							expectation: "一覧が表示される",
+							state: "running" as const,
+						},
+					],
+					updatedAt: 1,
+				},
+			],
+			steps: [
+				{
+					stepId: "s1",
+					label: "表示を確認",
+					expectation: "対象が表示される",
+					state: "running" as const,
+				},
+			],
+			change: "一覧から対象を選択",
+		};
 		const p = props({
 			tasks: [
-				...sampleTasks,
-				{ taskId: "k5", requestSummary: "待機の依頼", state: "queued" },
+				sampleTasks[0]!,
+				{
+					taskId: "second",
+					state: "running",
+					requestSummary: "別の依頼",
+					script,
+				},
 			],
 		});
-		render(<BrowserWorkspace {...p} />);
-		const tasks = screen.getByRole("region", { name: "作業" });
-		for (const text of ["実行中", "完了", "入力待ち", "結果不明", "待機中"])
-			expect(within(tasks).getAllByText(text).length).toBeGreaterThan(0);
-		expect(
-			within(tasks).getByText("住所の入力で止まっています。"),
-		).toBeTruthy();
-		expect(within(tasks).getAllByRole("button")).toHaveLength(2);
-		await userEvent.click(
-			screen.getByRole("button", {
-				name: "作業「明日の天気を調べる」を取り消す",
-			}),
+		const { rerender } = render(<BrowserWorkspace {...p} />);
+		await userEvent.selectOptions(
+			screen.getByLabelText("表示する作業"),
+			"second",
 		);
-		expect(p.onCancelTask).toHaveBeenCalledWith("k1");
+		expect(screen.getByText(script.summary)).toBeTruthy();
+		rerender(
+			<BrowserWorkspace
+				{...p}
+				tasks={[...p.tasks]
+					.reverse()
+					.map((t) => ({ ...t, state: "indeterminate" as const }))}
+			/>,
+		);
+		expect(
+			(screen.getByLabelText("表示する作業") as HTMLSelectElement).value,
+		).toBe("second");
+		expect(screen.getAllByText("結果不明").length).toBeGreaterThan(0);
+		expect(screen.queryByRole("button", { name: "実行を中止" })).toBeNull();
+		await userEvent.click(screen.getByText("実行履歴"));
+		expect(screen.getByText("一覧を見る · 実行中")).toBeTruthy();
 	});
 });
 
 describe("BrowserWorkspace captures", () => {
 	it("lists captures with size, reduction and a neutral library label", () => {
 		render(<BrowserWorkspace {...props()} />);
+		fireEvent.mouseDown(screen.getByRole("tab", { name: "撮影画像" }), {
+			button: 0,
+			ctrlKey: false,
+		});
 		const list = screen.getByRole("region", { name: "撮影した画像" });
 		expect(within(list).getByText(/1280 × 720 px/)).toBeTruthy();
 		expect(within(list).getByText(/削減 86%/)).toBeTruthy();
@@ -153,6 +235,10 @@ describe("BrowserWorkspace captures", () => {
 	it("selects, downloads and cancels captures", async () => {
 		const p = props({ selectedCaptureId: "c1", previewSrc: preview });
 		render(<BrowserWorkspace {...p} />);
+		fireEvent.mouseDown(screen.getByRole("tab", { name: "撮影画像" }), {
+			button: 0,
+			ctrlKey: false,
+		});
 		await userEvent.click(
 			screen.getByRole("button", { name: /ページ全体.*を選ぶ/ }),
 		);
@@ -174,6 +260,10 @@ describe("BrowserWorkspace captures", () => {
 				{...props({ selectedCaptureId: "c2", previewSrc: preview })}
 			/>,
 		);
+		fireEvent.mouseDown(screen.getByRole("tab", { name: "撮影画像" }), {
+			button: 0,
+			ctrlKey: false,
+		});
 		expect(screen.queryByRole("img", { name: /撮影画像/ })).toBeNull();
 		expect(screen.queryByRole("button", { name: "ダウンロード" })).toBeNull();
 		expect(screen.getByText("撮影が終わるとここに表示します。")).toBeTruthy();
@@ -187,7 +277,11 @@ describe("BrowserWorkspace connection", () => {
 			connection: { state: "disconnected" },
 		});
 		render(<BrowserWorkspace {...p} />);
-		expect(screen.getByRole("alert").textContent).toContain(
+		fireEvent.mouseDown(screen.getByRole("tab", { name: "接続・タブ" }), {
+			button: 0,
+			ctrlKey: false,
+		});
+		expect(screen.getByRole("status").textContent).toContain(
 			"ブラウザに接続されていません",
 		);
 		expect(screen.queryByRole("button", { name: "切断" })).toBeNull();
@@ -209,6 +303,10 @@ describe("BrowserWorkspace connection", () => {
 				})}
 			/>,
 		);
+		fireEvent.mouseDown(screen.getByRole("tab", { name: "接続・タブ" }), {
+			button: 0,
+			ctrlKey: false,
+		});
 		expect(screen.getByText(/Braveが終了した/)).toBeTruthy();
 	});
 
@@ -221,6 +319,10 @@ describe("BrowserWorkspace connection", () => {
 				})}
 			/>,
 		);
+		fireEvent.mouseDown(screen.getByRole("tab", { name: "接続・タブ" }), {
+			button: 0,
+			ctrlKey: false,
+		});
 		expect(
 			screen.getByText(
 				"Braveに表示された接続ページで、操作させるタブを選んでください",
@@ -233,47 +335,13 @@ describe("BrowserWorkspace connection", () => {
 	it("offers disconnect when connected", async () => {
 		const p = props();
 		render(<BrowserWorkspace {...p} />);
+		fireEvent.mouseDown(screen.getByRole("tab", { name: "接続・タブ" }), {
+			button: 0,
+			ctrlKey: false,
+		});
 		expect(screen.queryByRole("button", { name: "ブラウザに接続" })).toBeNull();
 		await userEvent.click(screen.getByRole("button", { name: "切断" }));
 		expect(p.onDisconnect).toHaveBeenCalledTimes(1);
-	});
-
-	it("saves the Brave executable path and blocks connecting until it is set", async () => {
-		const p = props({
-			availability: { available: false, reason: "browser_not_configured" },
-			connection: { state: "disconnected" },
-			executablePath: undefined,
-		});
-		render(<BrowserWorkspace {...p} />);
-		expect(
-			(
-				screen.getByRole("button", {
-					name: "ブラウザに接続",
-				}) as HTMLButtonElement
-			).disabled,
-		).toBe(true);
-		const save = screen.getByRole("button", {
-			name: "保存",
-		}) as HTMLButtonElement;
-		expect(save.disabled).toBe(true);
-		await userEvent.type(
-			screen.getByLabelText("Braveの実行ファイルのパス"),
-			" /opt/brave/brave ",
-		);
-		await userEvent.click(save);
-		expect(p.onSaveExecutablePath).toHaveBeenCalledWith("/opt/brave/brave");
-	});
-
-	it("keeps the path editable from the settings area once configured", async () => {
-		const p = props();
-		render(<BrowserWorkspace {...p} />);
-		const input = screen.getByLabelText(
-			"Braveの実行ファイルのパス",
-		) as HTMLInputElement;
-		expect(input.value).toBe("/opt/brave/brave");
-		await userEvent.type(input, "2");
-		await userEvent.click(screen.getByRole("button", { name: "保存" }));
-		expect(p.onSaveExecutablePath).toHaveBeenCalledWith("/opt/brave/brave2");
 	});
 });
 
@@ -289,7 +357,11 @@ describe("BrowserWorkspace availability", () => {
 				{...props({ availability: { available: false, reason } })}
 			/>,
 		);
-		expect(screen.getByRole("alert").textContent).toContain(text);
+		fireEvent.mouseDown(screen.getByRole("tab", { name: "接続・タブ" }), {
+			button: 0,
+			ctrlKey: false,
+		});
+		expect(screen.getByRole("status").textContent).toContain(text);
 		expect(
 			(screen.getByRole("button", { name: "新しく開く" }) as HTMLButtonElement)
 				.disabled,
@@ -314,13 +386,49 @@ describe("BrowserWorkspace availability", () => {
 				})}
 			/>,
 		);
-		expect(screen.getByRole("alert").textContent).toContain(
+		fireEvent.mouseDown(screen.getByRole("tab", { name: "接続・タブ" }), {
+			button: 0,
+			ctrlKey: false,
+		});
+		expect(screen.getByRole("status").textContent).toContain(
 			"現在ブラウザを利用できません。",
 		);
 	});
 
 	it("has no quality or compression controls", () => {
 		render(<BrowserWorkspace {...props()} />);
+		fireEvent.mouseDown(screen.getByRole("tab", { name: "接続・タブ" }), {
+			button: 0,
+			ctrlKey: false,
+		});
 		expect(screen.queryByText(/品質|圧縮率/)).toBeNull();
 	});
+});
+
+it("keeps the selected task and its open history when switching supplementary tabs", async () => {
+	const p = props();
+	render(<BrowserWorkspace {...p} />);
+	await userEvent.selectOptions(screen.getByLabelText("表示する作業"), "k3");
+	await userEvent.click(screen.getByText("チャットからの依頼"));
+	await userEvent.click(screen.getByRole("tab", { name: "接続・タブ" }));
+	await userEvent.click(screen.getByRole("tab", { name: "操作" }));
+	expect(
+		(screen.getByLabelText("表示する作業") as HTMLSelectElement).value,
+	).toBe("k3");
+	expect(
+		screen.getByText("チャットからの依頼").parentElement?.getAttribute("open"),
+	).not.toBeNull();
+});
+
+it("shows the persisted execution phase and clears it when the task ends", () => {
+	const p = props({ tasks: [{ ...sampleTasks[0]!, phase: "operating" }] });
+	const { rerender } = render(<BrowserWorkspace {...p} />);
+	expect(screen.getByText("ブラウザ操作を確認・実行中")).toBeTruthy();
+	rerender(
+		<BrowserWorkspace
+			{...p}
+			tasks={[{ ...p.tasks[0]!, state: "cancelled" }]}
+		/>,
+	);
+	expect(screen.queryByText("ブラウザ操作を確認・実行中")).toBeNull();
 });

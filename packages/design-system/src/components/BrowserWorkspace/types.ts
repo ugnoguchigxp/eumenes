@@ -55,7 +55,45 @@ export type BrowserTaskState =
 	| "expired"
 	| "indeterminate";
 
+export type BrowserScriptRevision = {
+	revision: number;
+	summary: string;
+	change?: string;
+	updatedAt: number;
+	steps: {
+		stepId: string;
+		label: string;
+		expectation: string;
+		state: "pending" | "running" | "completed" | "skipped";
+		evidenceRef?: string;
+	}[];
+};
 export type BrowserTaskItem = {
+	phase?:
+		| "preparing"
+		| "thinking"
+		| "connecting"
+		| "observing"
+		| "operating"
+		| "capturing"
+		| null;
+	operations?: {
+		operationId: string;
+		sequence: number;
+		scriptRevision: number | null;
+		stepId: string | null;
+		toolKind: string;
+		state: "prepared" | "dispatched" | "observed" | "failed" | "indeterminate";
+		observedAt: number;
+		observationRef: string | null;
+		errorLabel: string | null;
+	}[];
+	conversationId?: string;
+	continuedFrom?: string | null;
+	errorLabel?: string;
+	script?:
+		| (BrowserScriptRevision & { history: BrowserScriptRevision[] })
+		| null;
 	taskId: string;
 	/** 元の依頼の要約。 */
 	requestSummary: string;
@@ -86,14 +124,24 @@ export type BrowserCaptureItem = {
 	/** 元PNGに対する容量の削減率（0〜100）。 */
 	reductionPercent: number;
 	state: BrowserCaptureState;
+	errorLabel?: string;
 };
 
+export type BrowserPickedPath = { path: string; pickId: number };
+
 export type BrowserWorkspaceProps = {
+	onOpenSettings?: () => void;
 	title?: string;
 	availability: BrowserAvailability;
 	connection: BrowserConnection;
 	/** 保存済みのBraveの実行ファイルのパス。未設定なら空または省略。 */
 	executablePath?: string;
+	/** 未設定のとき、標準の場所で見つかったBraveのパス。保存するまでは使わない。 */
+	suggestedExecutablePath?: string;
+	/** OSのファイル選択で選んだ、まだ保存していないパス。選ぶたびに pickId が変わり、入力欄に入る。 */
+	pickedExecutable?: BrowserPickedPath;
+	/** OSのファイル選択を開けるとき true。「参照…」を出す。 */
+	canBrowseExecutable?: boolean;
 	tabs: readonly BrowserTabItem[];
 	tasks: readonly BrowserTaskItem[];
 	captures: readonly BrowserCaptureItem[];
@@ -109,6 +157,8 @@ export type BrowserWorkspaceProps = {
 	onDisconnect: () => void;
 	/** Braveの実行ファイルのパスを保存する。 */
 	onSaveExecutablePath: (path: string) => void;
+	/** OSのファイル選択を開く。選んだパスは pickedExecutable で戻る。 */
+	onBrowseExecutablePath?: () => void;
 	/** 新しくURLを開く。 */
 	onOpenUrl: (url: string) => void;
 	/** 既存のタブへ切り替える。 */

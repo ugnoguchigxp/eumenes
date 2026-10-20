@@ -84,6 +84,24 @@ ALTER TABLE browser_input_grants_next RENAME TO browser_input_grants;
 CREATE INDEX browser_input_grants_task ON browser_input_grants(task_id);
 `,
 	},
+	{
+		id: "browser/0003-scripts",
+		after: ["browser/0002-approvals"],
+		sql: `ALTER TABLE browser_tasks ADD COLUMN script_required INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE browser_tasks ADD COLUMN script_json TEXT;
+ALTER TABLE browser_tasks ADD COLUMN continued_from TEXT;
+ALTER TABLE browser_operations ADD COLUMN script_revision INTEGER;
+ALTER TABLE browser_operations ADD COLUMN script_step_id TEXT;
+ALTER TABLE browser_connections ADD COLUMN credential_revision INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE browser_captures ADD COLUMN script_revision INTEGER;
+ALTER TABLE browser_captures ADD COLUMN script_step_id TEXT;`,
+	},
+	{
+		id: "browser/0004-progress",
+		after: ["browser/0003-scripts"],
+		sql: `ALTER TABLE browser_tasks ADD COLUMN phase TEXT NOT NULL DEFAULT 'preparing';
+ CREATE INDEX browser_tasks_conversation ON browser_tasks(owner,conversation_id,created_at);`,
+	},
 ];
 
 export * from "./settings";

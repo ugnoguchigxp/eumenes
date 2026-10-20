@@ -47,6 +47,62 @@ test("the setting must be an existing executable regular file", async () => {
 	expect(await service.setting.save(plain)).toEqual({ executablePath: plain });
 });
 
+test("an existing standard install is offered only while no path is saved", async () => {
+	const installs = mkdtempSync(join(tmpdir(), "eumenes-browser-standard-"));
+	try {
+		const brave = fakeBrave(installs);
+		const { service } = setup({
+			standardPaths: [join(installs, "missing"), brave],
+		});
+		expect(await service.setting.suggest()).toBe(brave);
+		expect(service.connection().configured).toBe(false);
+		await service.setting.save(brave);
+		expect(await service.setting.suggest()).toBeNull();
+	} finally {
+		rmSync(installs, { recursive: true, force: true });
+	}
+});
+
+test("the chosen file is checked but not saved, and a cancelled dialog chooses nothing", async () => {
+	const picks: (string | null)[] = [];
+	const { service, dir } = setup({
+		pickExecutable: async () => picks.shift() ?? null,
+	});
+	const brave = fakeBrave(dir);
+	picks.push(brave, null, join(dir, "missing"));
+	expect(service.setting.canBrowse).toBe(true);
+	expect(await service.setting.browse()).toEqual({ path: brave });
+	expect(service.setting.get().executablePath).toBeNull();
+	expect(await service.setting.browse()).toEqual({ path: null });
+	await expect(service.setting.browse()).rejects.toThrow(
+		"browser_executable_invalid",
+	);
+});
+
+test("one dialog at a time, and none without a picker", async () => {
+	let close: (path: string | null) => void = () => undefined;
+	const { service } = setup({
+		pickExecutable: () =>
+			new Promise((resolve) => {
+				close = resolve;
+			}),
+	});
+	const first = service.setting.browse();
+	await expect(service.setting.browse()).rejects.toThrow("browser_browse_busy");
+	close(null);
+	expect(await first).toEqual({ path: null });
+	const plain = setup();
+	expect(plain.service.setting.canBrowse).toBe(false);
+	await expect(plain.service.setting.browse()).rejects.toThrow(
+		"browser_browse_unsupported",
+	);
+});
+
+test("nothing is offered when no standard install exists", async () => {
+	const { service } = setup({ standardPaths: [] });
+	expect(await service.setting.suggest()).toBeNull();
+});
+
 test("connecting waits for the user's tab, then the tabs get refs and the browser is available", async () => {
 	const env = setup();
 	const { service, driver } = env;

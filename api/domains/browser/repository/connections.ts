@@ -3,6 +3,7 @@ import type { ConnectionState } from "../contracts";
 import { patchRow } from "./sql";
 
 export type ConnectionRow = {
+	credential_revision: number;
 	id: string;
 	state: ConnectionState;
 	started_at: number;

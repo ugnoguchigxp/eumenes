@@ -14,6 +14,7 @@ import {
 import {
 	bumpGeneration,
 	insertOperation,
+	taskRow,
 	operationRow,
 	tabRow,
 	transitionOperation,
@@ -31,7 +32,10 @@ import { keepLease, releaseLease, selectMatched } from "./tabs";
 
 const log = getLogger("browser");
 
+import { checkScript } from "./script";
+
 /** Page operations of a tab: the host-side checks, the approval guard, the ledger and the serial driver calls. */
+
 export function createOperations(
 	ctx: Ctx,
 	grants: Grants,
@@ -64,6 +68,7 @@ export function createOperations(
 			taskId: string | null;
 			tabRef?: string;
 			action: unknown;
+			scriptBinding?: import("../contracts/script").ScriptBinding;
 		},
 		signal?: AbortSignal,
 	): Promise<OperationOutcome> {
@@ -87,6 +92,7 @@ export function createOperations(
 				needsTab,
 				opId,
 			);
+			if (b.task) checkScript(taskRow(db, b.task.id)!, input.scriptBinding);
 			const planned = planOperation(ctx, grants, db, action, b.tab, b.task);
 			insertOperation(
 				db,
@@ -101,6 +107,10 @@ export function createOperations(
 				},
 				ctx.now(),
 			);
+			if (input.scriptBinding)
+				db.query(
+					"UPDATE browser_operations SET script_revision=?,script_step_id=? WHERE id=?",
+				).run(input.scriptBinding.revision, input.scriptBinding.stepId, opId);
 			return {
 				opId,
 				kind: action.kind,
@@ -198,6 +208,8 @@ export function createOperations(
 		const needsApprovalNow = p.commit ? await commitNeeded(p.commit) : false;
 		await ctx.store.write((db) => {
 			guard(ctx, db, p);
+			if (p.task)
+				checkScript(taskRow(db, p.task.id)!, inputBinding(db, p.opId));
 			if (p.tab && p.observation) {
 				const t = tabRow(db, p.tab.tab_ref)!;
 				checkRef(db, t, p.task, p.observation.ref, p.observation.element);
@@ -267,3 +279,17 @@ export function createOperations(
 	return { operate, observe: createObserve(ctx) };
 }
 export type Operations = ReturnType<typeof createOperations>;
+
+function inputBinding(db: Database, id: string) {
+	const r = db
+		.query(
+			"SELECT script_revision,script_step_id FROM browser_operations WHERE id=?",
+		)
+		.get(id) as {
+		script_revision: number | null;
+		script_step_id: string | null;
+	};
+	return r.script_revision !== null && r.script_step_id
+		? { revision: r.script_revision, stepId: r.script_step_id }
+		: undefined;
+}

@@ -41,8 +41,8 @@ afterEach(async () => {
 });
 
 const noRequests = { userMessageInTransaction: () => null };
-const REVISION = "toolchain:browser.capture@1";
-const BINDING = "binding:browser.capture@1";
+const REVISION = "toolchain:browser.capture@4";
+const BINDING = "binding:browser.capture@4";
 const conversation: AdapterOrigin = {
 	kind: "conversation",
 	owner: { rootRunId: "run-1", taskId: "task-1", cancelEpoch: 0 },
@@ -52,7 +52,12 @@ const conversation: AdapterOrigin = {
 };
 
 /** The shipped bundle over the real adapter, the real routing and the real browser domain (fake driver). */
-async function setup() {
+async function setup(
+	beforeSeed?: (
+		caps: ReturnType<typeof createCapabilities>,
+		store: ReturnType<typeof openStore>,
+	) => Promise<void>,
+) {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-browser-toolchain-"));
 	dirs.push(dir);
 	const store = openStore(join(dir, "db"), migrations);
@@ -82,6 +87,7 @@ async function setup() {
 		new Set(["browser", "web", "timer", "image"]),
 		{ bundleHost: offlineBundleHost },
 	);
+	await beforeSeed?.(capabilities, store);
 	await capabilities.seed();
 	const routing = createToolchainRouting(
 		capabilities,
@@ -118,11 +124,23 @@ test("the capture toolchain is a command toolchain whose adapter is available be
 			binding: {
 				bindingRevisionId: BINDING,
 				adapterRef: "adapter:browser@1",
-				artifactRevisionId: "artifact:browser.workspace@1",
+				artifactRevisionId: "artifact:browser.workspace@4",
 				available: true,
 			},
 		},
 	});
+});
+
+test("capture and operate share one browser screen, so the launcher shows it once", async () => {
+	const s = await setup();
+	const entries = s.store.read((db) =>
+		s.capabilities
+			.artifactsInTransaction(db)
+			.filter((a) => a.artifactId === "browser.workspace"),
+	);
+	expect(entries.map((a) => a.artifactRevisionId)).toEqual([
+		"artifact:browser.workspace@4",
+	]);
 });
 
 test("the command specialist gets the capture tools with flat schemas and the tabs it may name", async () => {
@@ -183,8 +201,8 @@ test("a validated invocation reaches the adapter and starts a capture of that ta
 	await until(() => s.driver.calls.includes("measure"));
 });
 
-const OPERATE = "toolchain:browser.operate@2";
-const OPERATE_BINDING = "binding:browser.operate@2";
+const OPERATE = "toolchain:browser.operate@4";
+const OPERATE_BINDING = "binding:browser.operate@4";
 
 test("the operate toolchain is a command toolchain that starts a single-shot task with the binding's policy", async () => {
 	const s = await setup();
@@ -198,7 +216,7 @@ test("the operate toolchain is a command toolchain that starts a single-shot tas
 			binding: {
 				bindingRevisionId: OPERATE_BINDING,
 				adapterRef: "adapter:browser@1",
-				artifactRevisionId: "artifact:browser.workspace@2",
+				artifactRevisionId: "artifact:browser.workspace@4",
 				available: true,
 			},
 		},
@@ -214,12 +232,12 @@ test("the operate toolchain is a command toolchain that starts a single-shot tas
 	expect(set.binding?.tools.map((t) => t.operationName)).toEqual([
 		"browser.workspace.open",
 		"browser.connect",
-		"browser.task.begin",
+		"browser.task.scripted",
 		"browser.task.status",
 		"browser.task.cancel",
 	]);
 	const start = set.binding!.tools.find(
-		(t) => t.operationName === "browser.task.begin",
+		(t) => t.operationName === "browser.task.scripted",
 	)!;
 	expect(start.schema.type).toBe("object");
 	const tabRef = crypto.randomUUID();
@@ -228,7 +246,7 @@ test("the operate toolchain is a command toolchain that starts a single-shot tas
 			request: "このタブで商品名を検索して",
 			tabRef,
 		}),
-	).toMatchObject({ ok: true, operationName: "browser.task.begin" });
+	).toMatchObject({ ok: true, operationName: "browser.task.scripted" });
 	// A follow-up after the user's approval names the task it continues.
 	expect(
 		s.routing.bound!.parseInvocation(set.binding!, start.id, {
@@ -236,7 +254,7 @@ test("the operate toolchain is a command toolchain that starts a single-shot tas
 			continueFrom: crypto.randomUUID(),
 			approvePending: true,
 		}),
-	).toMatchObject({ ok: true, operationName: "browser.task.begin" });
+	).toMatchObject({ ok: true, operationName: "browser.task.scripted" });
 	for (const bad of [
 		{},
 		{ request: "" },
@@ -257,24 +275,24 @@ test("the acceptance package, with the operator package it runs, still fits the 
 		s.capabilities.prepareBoundInTransaction(
 			db,
 			owner,
-			"package:browser.operate@2",
-			"tool:browser.task.start@2",
+			"package:browser.operate@3",
+			"tool:browser.task.start@3",
 			{ request: "このタブで商品名を検索して" },
 		),
 	);
 	expect(prepared.dependencies.map((d) => d.revisionId)).toContain(
-		"package:browser.page-operator@2",
+		"package:browser.page-operator@3",
 	);
 	// The operator is fixed on its own too: the exact revision the runner prepares.
 	const operator = s.store.read((db) =>
 		s.capabilities.prepareActiveByIdInTransaction(
 			db,
 			owner,
-			"package:browser.page-operator@2",
+			"package:browser.page-operator@3",
 			{ request: "x" },
 		),
 	);
-	expect(operator.package.toolRevisionIds).toHaveLength(14);
+	expect(operator.package.toolRevisionIds).toHaveLength(16);
 });
 
 test("every tool the operator package offers has a flat schema the host also checks", async () => {
@@ -284,7 +302,7 @@ test("every tool the operator package offers has a flat schema the host also che
 		s.capabilities.prepareActiveByIdInTransaction(
 			db,
 			owner,
-			"package:browser.page-operator@2",
+			"package:browser.page-operator@3",
 			{ request: "x" },
 		),
 	);
@@ -302,4 +320,62 @@ test("every tool the operator package offers has a flat schema the host also che
 		expect(schema.type).toBe("object");
 		expect(schema.additionalProperties).toBe(false);
 	}
+});
+
+test("upgrading the old browser bundle preserves its definitions and is idempotent", async () => {
+	const shipped = await Bun.file(
+		new URL(
+			"../../domains/capabilities/bundles/browser.bundle.json",
+			import.meta.url,
+		),
+	).json();
+	const old = structuredClone(shipped);
+	old.definitions = old.definitions.filter(
+		(d: { kind: string; id: string; revision: number }) => {
+			if (d.id === "browser.page.script" || d.id === "browser.page.connect")
+				return false;
+			if (d.kind === "toolchain") return d.revision <= 3;
+			if (["skill", "package"].includes(d.kind)) return d.revision <= 2;
+			if (d.kind === "tool" && d.id === "browser.task.start")
+				return d.revision <= 2;
+			return true;
+		},
+	);
+	old.bindings = old.bindings.filter(
+		(b: { revision: number }) => b.revision <= 3,
+	);
+	old.artifacts = old.artifacts.filter(
+		(a: { id: string; revision: number }) =>
+			a.id === "browser.workspace" && a.revision <= 3,
+	);
+	old.schemas = old.schemas.filter(
+		(s: { id: string }) => s.id !== "browser-bridge-setting",
+	);
+	let saved: unknown[] = [];
+	const s = await setup(async (caps, store) => {
+		await store.write((db) =>
+			caps.importBundleInTransaction(db, old, offlineBundleHost()),
+		);
+		saved = store.read((db) =>
+			db.query("SELECT * FROM capability_revisions").all(),
+		);
+	});
+	for (const row of saved as { id: string }[])
+		expect(
+			s.store.read((db) =>
+				db.query("SELECT * FROM capability_revisions WHERE id=?").get(row.id),
+			),
+		).toEqual(row);
+	const counts = () =>
+		s.store.read((db) =>
+			db.query("SELECT COUNT(*) n FROM capability_revisions").get(),
+		);
+	const before = counts();
+	await s.capabilities.seed();
+	expect(counts()).toEqual(before);
+	expect(
+		s.store
+			.read((db) => s.capabilities.artifactsInTransaction(db))
+			.some((a) => a.artifactRevisionId === "artifact:settings.browser@1"),
+	).toBe(true);
 });

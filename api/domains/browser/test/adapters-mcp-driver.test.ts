@@ -42,6 +42,7 @@ const drivers: BrowserDriver[] = [];
 function setup(
 	config: Record<string, unknown> = {},
 	options: {
+		extensionToken?: string;
 		connectTimeoutMs?: number;
 		callTimeoutMs?: number;
 		executablePath?: string;
@@ -55,6 +56,7 @@ function setup(
 	setConfig(config);
 	const driver = createMcpBrowserDriver({
 		executablePath: options.executablePath ?? "/fake/brave",
+		extensionToken: options.extensionToken,
 		outputDir,
 		connectTimeoutMs: options.connectTimeoutMs ?? 10_000,
 		callTimeoutMs: options.callTimeoutMs ?? 10_000,
@@ -645,4 +647,23 @@ test("calls before connect or after disconnect are refused without reaching a ch
 		dispatched: false,
 	});
 	expect(ctx.log()).toEqual([]);
+});
+
+test("Bridge token is only passed as child env and extension tabs never leave the adapter", async () => {
+	const token = "fixture-bridge-secret";
+	const ctx = setup(
+		{ initialUrl: `chrome-extension://fixture/connect.html?token=${token}` },
+		{ extensionToken: token },
+	);
+	expect((await ctx.driver.connect(NEVER)).state).toBe("connected");
+	expect(ctx.start().envKeys).toEqual(
+		[
+			"HOME",
+			"PATH",
+			"PLAYWRIGHT_MCP_EXECUTABLE_PATH",
+			"PLAYWRIGHT_MCP_EXTENSION_TOKEN",
+		].sort(),
+	);
+	expect(await ctx.driver.listTabs()).toEqual([]);
+	expect(JSON.stringify(ctx.log())).not.toContain(token);
 });

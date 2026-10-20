@@ -1,3 +1,7 @@
+import {
+	browserBridgeSettings,
+	storedBridgeCiphertext,
+} from "./browser-bridge";
 import { ocrSettings } from "./ocr";
 import {
 	objectRecognitionSettings,
@@ -90,6 +94,7 @@ export async function createSettings(
 		.map((v) => v.trim())
 		.filter(Boolean);
 	const recognitionCiphertext = storedRecognitionCiphertext(store);
+	const bridgeCiphertext = storedBridgeCiphertext(store);
 	const localServiceCiphertexts = storedLocalServiceCiphertexts(store);
 	let key: Buffer | null = null;
 	let keyError: string | null = null;
@@ -103,6 +108,7 @@ export async function createSettings(
 			key = Buffer.from(env.EUMENES_SECRET_KEY, "base64");
 		else if (existsSync(path)) key = readFileSync(path);
 		else if (
+			bridgeCiphertext ||
 			localServiceCiphertexts.length > 0 ||
 			recognitionCiphertext ||
 			store.read(
@@ -123,6 +129,7 @@ export async function createSettings(
 			if (!createFileExclusive(path, key)) key = readFileSync(path);
 		}
 		if (key.length !== 32) throw new Error("secret_key_invalid");
+		if (bridgeCiphertext) decrypt(bridgeCiphertext, "browser:bridge");
 		if (recognitionCiphertext)
 			decrypt(recognitionCiphertext, "object-recognition:credential");
 		for (const row of localServiceCiphertexts) decrypt(row.encrypted, row.id);
@@ -217,6 +224,7 @@ export async function createSettings(
 					)
 				: undefined;
 		},
+		...browserBridgeSettings(store, encrypt, decrypt, () => key !== null),
 		...localServiceSettings(store, encrypt, decrypt),
 		...objectRecognitionSettings(store, encrypt, decrypt, env),
 		...ocrSettings(store, env),

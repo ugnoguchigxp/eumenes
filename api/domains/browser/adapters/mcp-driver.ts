@@ -94,6 +94,7 @@ const REF = /^(?:f\d+)?e\d+$/;
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 
 export type McpBrowserDriverOptions = {
+	extensionToken?: string;
 	/** Saved Brave executable. Empty or missing: `connect` ends as `not_configured`. */
 	executablePath: string | undefined;
 	/** Managed temp directory for MCP output; also the child's working directory. */
@@ -180,7 +181,7 @@ export function createMcpBrowserDriver(
 				"--no-webmcp",
 			],
 			cwd: options.outputDir,
-			env: childEnv(options.executablePath ?? ""),
+			env: childEnv(options.executablePath ?? "", options.extensionToken),
 		};
 		return startMcpSession(spec);
 	};
@@ -328,7 +329,7 @@ export function createMcpBrowserDriver(
 		const parsed = await callTool("browser_tabs", args);
 		const tabs = parseTabList(parsed.result);
 		if (!tabs) throw new BrowserDriverError("mcp_response_unrecognized", true);
-		return tabs;
+		return tabs.filter((tab) => !tab.url.startsWith("chrome-extension:"));
 	};
 
 	const pageOf = async (parsed: ParsedToolResult) => {
@@ -461,11 +462,15 @@ function createReaders(
 	};
 }
 
-/** Only these three variables reach the child: no backend token, LARM setting or other env. */
-function childEnv(executablePath: string): Record<string, string> {
+/** Only the browser path, PATH/HOME and optional Bridge token reach this child. */
+function childEnv(
+	executablePath: string,
+	extensionToken?: string,
+): Record<string, string> {
 	const env: Record<string, string> = {
 		PLAYWRIGHT_MCP_EXECUTABLE_PATH: executablePath,
 	};
+	if (extensionToken) env.PLAYWRIGHT_MCP_EXTENSION_TOKEN = extensionToken;
 	if (process.env.PATH !== undefined) env.PATH = process.env.PATH;
 	if (process.env.HOME !== undefined) env.HOME = process.env.HOME;
 	return env;

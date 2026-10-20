@@ -33,6 +33,7 @@ const resourceOf = (
 		data: value,
 		tabs: undefined,
 		executablePath: "/Brave",
+		suggestedExecutablePath: undefined,
 		loading: false,
 		error: undefined,
 		...over,
@@ -54,6 +55,7 @@ it("maps the connected source and hides closed tabs", () => {
 		availability: { available: true },
 		connection: { state: "connected" },
 		executablePath: "/Brave",
+		suggestedExecutablePath: undefined,
 	});
 	expect(resource.tabs.map((t) => [t.tabRef, t.status])).toEqual([
 		["t1", "open"],
@@ -183,4 +185,44 @@ it("carries captures and tasks through as the screen part's items", () => {
 	expect(resource.tasks).toEqual([
 		{ taskId: "k1", requestSummary: "開く", state: "running" },
 	]);
+});
+
+it("keeps Script progress and errors for the current conversation only", () => {
+	const script = {
+		revision: 1,
+		summary: "表示を確認します",
+		updatedAt: 1,
+		history: [],
+		steps: [
+			{
+				stepId: "step",
+				label: "表示確認",
+				expectation: "対象が見える",
+				state: "running",
+			},
+		],
+	};
+	const tasks = [
+		{
+			taskId: "own",
+			conversationId: "current",
+			requestSummary: "依頼",
+			state: "failed",
+			script,
+			errorLabel: "中断されました",
+		},
+		{
+			taskId: "other",
+			conversationId: "another",
+			requestSummary: "別の依頼",
+			state: "running",
+		},
+	];
+	const r = resourceOf(data({ tasks }), { conversationId: "current" });
+	expect(r.tasks).toHaveLength(1);
+	expect(r.tasks[0]).toMatchObject({
+		taskId: "own",
+		script,
+		errorLabel: "中断されました",
+	});
 });

@@ -60,6 +60,7 @@ const captureOf = (c: BrowserCaptureData) => ({
 	bytes: c.bytes,
 	reductionPercent: c.reductionPercent,
 	state: c.state,
+	...(c.errorLabel ? { errorLabel: c.errorLabel } : {}),
 });
 
 /** The `browser` resource: closed tabs are history, not choices, so they are not listed. */
@@ -67,12 +68,18 @@ export function browserResource(input: {
 	data: BrowserSourceData | undefined;
 	tabs: readonly BrowserTabData[] | undefined;
 	executablePath: string | undefined;
+	suggestedExecutablePath: string | undefined;
+	pickedExecutable?: BrowserWorkspaceResource["pickedExecutable"];
+	canBrowseExecutable?: boolean;
+	bridge?: BrowserWorkspaceResource["bridge"];
+	conversationId?: string;
 	loading: boolean;
 	error: string | undefined;
 }): BrowserWorkspaceResource {
 	const { data } = input;
 	const content = {
 		kind: "browser" as const,
+		bridge: input.bridge,
 		availability: data
 			? availabilityOf(data.connection)
 			: ({ available: false, reason: "browser_disconnected" } as const),
@@ -80,15 +87,30 @@ export function browserResource(input: {
 			? connectionOf(data.connection)
 			: { state: "disconnected" as const },
 		executablePath: input.executablePath,
+		suggestedExecutablePath: input.suggestedExecutablePath,
+		pickedExecutable: input.pickedExecutable,
+		canBrowseExecutable: input.canBrowseExecutable ?? false,
 		tabs: (input.tabs ?? data?.tabs ?? [])
 			.filter((t) => t.status !== "closed")
 			.map(tabOf),
-		tasks: (data?.tasks ?? []).map((t) => ({
-			taskId: t.taskId,
-			requestSummary: t.requestSummary,
-			state: t.state,
-			...(t.resultSummary ? { resultSummary: t.resultSummary } : {}),
-		})),
+		tasks: (data?.tasks ?? [])
+			.filter(
+				(t) =>
+					!t.conversationId ||
+					t.conversationId === (input.conversationId ?? "main"),
+			)
+			.map((t) => ({
+				taskId: t.taskId,
+				phase: t.phase,
+				conversationId: t.conversationId,
+				continuedFrom: t.continuedFrom,
+				script: t.script,
+				operations: t.operations,
+				...(t.errorLabel ? { errorLabel: t.errorLabel } : {}),
+				requestSummary: t.requestSummary,
+				state: t.state,
+				...(t.resultSummary ? { resultSummary: t.resultSummary } : {}),
+			})),
 		captures: (data?.captures ?? []).map(captureOf),
 		loading: input.loading,
 		error: input.error,

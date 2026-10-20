@@ -176,3 +176,68 @@
 		grid-template-columns: minmax(0, 1fr);
 	}
 }
+.browser-workspace-toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.5rem;
+	color: var(--muted-foreground);
+	font-size: 0.85rem;
+}
+.browser-workspace-toolbar [data-connected="true"] {
+	color: var(--success);
+}
+.browser-workspace-target {
+	flex: 1;
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+.browser-script-summary {
+	margin: 0.25rem 0 0.75rem;
+}
+.browser-script-steps {
+	margin: 0;
+	padding: 0 0 0 1.75rem;
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+}
+.browser-script-steps li {
+	padding: 0.75rem;
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	overflow-wrap: anywhere;
+}
+.browser-script-steps li[data-state="running"] {
+	background: var(--accent);
+	border-color: var(--primary);
+}
+.browser-script-steps li[data-state="completed"]::marker {
+	color: var(--success);
+}
+.browser-script-steps li span {
+	display: block;
+	color: var(--muted-foreground);
+	font-size: 0.85rem;
+}
+.browser-script-steps li p {
+	margin: 0.35rem 0 0;
+	color: var(--muted-foreground);
+	font-size: 0.9rem;
+}
+.browser-script-history {
+	padding: 0.5rem 0;
+	border-bottom: 1px solid var(--border);
+}
+.browser-workspace select {
+	max-width: 100%;
+	display: block;
+	color: var(--foreground);
+	background: var(--background);
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	padding: 0.4rem;
+}
+.browser-workspace input {
+	max-width: 100%;
+}

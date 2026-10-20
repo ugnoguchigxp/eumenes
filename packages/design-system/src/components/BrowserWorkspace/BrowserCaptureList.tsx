@@ -84,6 +84,9 @@ export function BrowserCaptureList({
 									{Math.round(capture.reductionPercent)}%
 								</span>
 								<span className="browser-workspace-upload">{uploadLabel}</span>
+								{capture.errorLabel && (
+									<span role="alert">{capture.errorLabel}</span>
+								)}
 							</button>
 							<div className="browser-workspace-badges">
 								<span
