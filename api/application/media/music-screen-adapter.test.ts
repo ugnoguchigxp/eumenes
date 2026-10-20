@@ -24,9 +24,9 @@ test("music screen bundle seeds one registered screen and reads the music domain
 			entries.filter((entry) => entry.artifactId === "music.generation"),
 		).toEqual([
 			expect.objectContaining({
-				artifactRevisionId: "artifact:music.generation@2",
+				artifactRevisionId: "artifact:music.generation@3",
 				adapterRefs: [MUSIC_SCREEN_ADAPTER_REF],
-				title: "楽曲生成",
+				title: "音楽・効果音生成",
 			}),
 		]);
 		await caps.seed();

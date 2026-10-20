@@ -160,12 +160,24 @@ export const defaultMusicCreationOptions: MusicCreationOptions = {
 		language: "日本語",
 	},
 };
+export type MusicDurationModel = {
+	task: "music" | "vocals" | "sound-effect";
+	defaultDurationSeconds?: number;
+	maxDurationSeconds: number;
+};
+export type MusicCreationInput = {
+	task: "music" | "sound-effect";
+	instrumental?: boolean;
+	durationSeconds?: number;
+	lyrics?: string;
+};
 export type MusicSelection = {
 	genres: string[];
 	moods: string[];
 	instruments: string[];
 	tempo: string;
 	duration: string;
+	soundEffect?: boolean;
 	vocals: boolean;
 	gender: string;
 	range: string;
@@ -181,7 +193,7 @@ export const emptyMusicSelection = (
 	moods: [],
 	instruments: [],
 	tempo: options.defaults.tempo,
-	duration: String(options.defaults.duration),
+	duration: "",
 	vocals: false,
 	gender: options.defaults.vocalist,
 	range: options.defaults.range,
@@ -192,12 +204,18 @@ export const emptyMusicSelection = (
 });
 /** Serialize explicitly selected values only; the music worker interprets them. */
 export function musicSelectionText(value: MusicSelection) {
+	if (value.soundEffect)
+		return [
+			"用途：効果音",
+			value.duration ? `長さ：${value.duration}秒` : "長さ：おまかせ",
+		].join("\n");
 	return [
+		`用途：${value.vocals ? "ボーカル" : "歌なし音楽"}`,
 		value.genres.length ? `ジャンル：${value.genres.join("、")}` : "",
 		value.moods.length ? `雰囲気：${value.moods.join("、")}` : "",
 		value.instruments.length ? `楽器：${value.instruments.join("、")}` : "",
 		`テンポ：${value.tempo}`,
-		`長さ：${value.duration}秒`,
+		value.duration ? `長さ：${value.duration}秒` : "長さ：おまかせ",
 		`歌声：${value.vocals ? "あり" : "なし（インストゥルメンタル）"}`,
 		...(value.vocals
 			? [
@@ -209,11 +227,23 @@ export function musicSelectionText(value: MusicSelection) {
 					`歌い方：${value.singing}`,
 					`歌詞の言語：${value.language}`,
 					value.lyrics
-						? `歌詞：\n${value.lyrics}`
+						? "歌詞：入力した歌詞を使用"
 						: "歌詞：テーマに合わせて作成",
 				]
 			: []),
 	]
 		.filter(Boolean)
 		.join("\n");
+}
+
+/** Only selected contract fields; hidden vocal data never enters a sound effect request. */
+export function musicSelectionInput(value: MusicSelection): MusicCreationInput {
+	return {
+		task: value.soundEffect ? "sound-effect" : "music",
+		...(!value.soundEffect ? { instrumental: !value.vocals } : {}),
+		...(value.duration ? { durationSeconds: Number(value.duration) } : {}),
+		...(value.vocals && !value.soundEffect && value.lyrics
+			? { lyrics: value.lyrics }
+			: {}),
+	};
 }

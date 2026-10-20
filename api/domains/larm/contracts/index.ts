@@ -174,4 +174,9 @@ export {
 	musicTags,
 	type TrackQuery,
 } from "./music-library";
+export {
+	musicProviders,
+	musicGenerationInput,
+	type MusicProviders,
+} from "./music-generation";
 export { imageImportReceipt, type ImageImportReceipt } from "./image-import";

@@ -23,7 +23,9 @@ export function MusicTrackDetails({
 				<dd>
 					{track.durationSeconds === undefined
 						? "不明"
-						: formatClockSeconds(track.durationSeconds)}
+						: Number.isInteger(track.durationSeconds)
+							? formatClockSeconds(track.durationSeconds)
+							: `${track.durationSeconds}秒`}
 				</dd>
 				{track.subtitle && (
 					<>
@@ -39,12 +41,32 @@ export function MusicTrackDetails({
 				)}
 				<dt>タグ</dt>
 				<dd>{track.tags?.length ? track.tags.join(" · ") : "タグなし"}</dd>
+				{track.task && (
+					<>
+						<dt>用途</dt>
+						<dd>
+							{track.task === "sound-effect"
+								? "効果音"
+								: track.instrumental
+									? "歌なし音楽"
+									: "ボーカル"}
+						</dd>
+					</>
+				)}
+				{track.runtime && (
+					<>
+						<dt>Runtime</dt>
+						<dd>{track.runtime}</dd>
+					</>
+				)}
 				<dt>歌詞</dt>
 				<dd>
-					{track.lyrics ||
-						(track.instrumental
-							? "インストゥルメンタルのため歌詞はありません。"
-							: "歌詞の情報はありません。")}
+					{track.task === "sound-effect"
+						? "効果音のため歌詞はありません。"
+						: track.lyrics ||
+							(track.instrumental
+								? "インストゥルメンタルのため歌詞はありません。"
+								: "歌詞の情報はありません。")}
 				</dd>
 				{track.model && (
 					<>
@@ -72,7 +94,7 @@ export function MusicTrackDetails({
 			<div className="music-track-details-actions">
 				{download && (
 					<a href={download.url} download={download.name ?? "music"}>
-						楽曲を保存
+						{track.task === "sound-effect" ? "効果音を保存" : "楽曲を保存"}
 					</a>
 				)}
 				{onDelete && (

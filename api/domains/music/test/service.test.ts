@@ -294,7 +294,7 @@ test("an invalid plan or generation result fails the record with a stable code",
 		[{ audio: { mime: "image/png" } }, "music_audio_missing"],
 		[{ audio: { bytes: new Uint8Array() } }, "music_audio_missing"],
 		[
-			{ audio: { bytes: new Uint8Array(32 * 1024 * 1024 + 1) } },
+			{ audio: { bytes: new Uint8Array(256 * 1024 * 1024 + 1) } },
 			"music_audio_too_large",
 		],
 		[{ accept: false }, "music_plan_invalidated"],

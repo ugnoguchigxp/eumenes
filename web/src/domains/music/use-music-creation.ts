@@ -51,7 +51,10 @@ export function useMusicCreation(
 		])
 			void cache.invalidateQueries({ queryKey: [root] });
 	};
-	const generate = async (prompt: string) => {
+	const generate = async (prompt: string, input?: Record<string, unknown>) => {
+		if (input && Object.keys(input).length)
+			prompt += `\n\n制作条件（構造化選択）：${JSON.stringify(input)}`;
+		if (prompt.length > 7900) throw new Error("music_request_too_long");
 		const request =
 			pending.current?.prompt === prompt
 				? pending.current
@@ -60,7 +63,7 @@ export function useMusicCreation(
 		const result = await client.submit({
 			requestId: request.requestId,
 			conversationId,
-			text: `次の制作プロンプトで楽曲を1曲作成してください。\n\n${prompt}`,
+			text: `次の制作プロンプトで音楽または効果音を1件作成してください。\n\n${prompt}`,
 		});
 		pending.current = undefined;
 		cache.setQueryData(
@@ -85,19 +88,19 @@ export function useMusicCreation(
 	const runCancelled = run.data?.status === "cancelled";
 	const missingResult = run.data?.status === "completed" && !submitted;
 	const status: NonNullable<MusicResource["creation"]>["status"] =
-		runFailed || run.error || missingResult
-			? "failed"
-			: runCancelled
-				? "cancelled"
+		statusItem?.state === "cancelled" || runCancelled
+			? "cancelled"
+			: runFailed ||
+				  run.error ||
+				  missingResult ||
+				  statusItem?.state === "failed"
+				? "failed"
 				: statusItem?.state === "planning"
 					? "pending"
 					: statusItem?.state === "generating" || running(run.data?.status)
 						? "running"
-						: statusItem?.state === "failed"
-							? "failed"
-							: statusItem?.state === "cancelled"
-								? "cancelled"
-								: undefined;
+						: undefined;
+
 	return {
 		runId,
 		submitted,
@@ -115,11 +118,19 @@ export function useMusicCreation(
 						? "楽曲の制作を取り消しました"
 						: "楽曲を生成しています",
 			description:
-				statusItem?.state === "planning"
-					? "テーマから曲調を考えています。"
-					: running(run.data?.status) && !submitted
-						? "制作依頼を受け付けました。"
-						: undefined,
+				status === "failed" &&
+				[
+					"larm_http_400",
+					"music_request_invalid",
+					"music_plan_invalid_contract",
+					"music_duration_exceeded",
+				].includes(statusItem?.errorCode ?? "")
+					? "用途・長さ・歌詞・生成オプションの指定を確認してください。上限を超えた長さや矛盾する条件は送れません。"
+					: statusItem?.state === "planning"
+						? "テーマから曲調を考えています。"
+						: running(run.data?.status) && !submitted
+							? "制作依頼を受け付けました。"
+							: undefined,
 			canCancel: !!cancelRunId,
 		},
 	};

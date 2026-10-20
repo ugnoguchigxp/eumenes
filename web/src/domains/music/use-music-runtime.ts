@@ -1,3 +1,4 @@
+import { parseMusicSelection } from "./creation-selection";
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { EumenesClient } from "../../../../client";
@@ -35,6 +36,11 @@ export function useMusicRuntime(
 			)
 				? 1000
 				: false,
+	});
+	const providers = useQuery({
+		queryKey: [queryRoots.music, "providers"],
+		queryFn: ({ signal }) => client.musicProviders(signal),
+		retry: false,
 	});
 	const items = query.data ?? [];
 	const sources = (() => {
@@ -130,7 +136,10 @@ export function useMusicRuntime(
 							status: "failed",
 							title: "音声を取得できませんでした",
 						}
-					: creation.creation,
+					: {
+							...creation.creation,
+							models: providers.data?.providers.flatMap((p) => p.models ?? []),
+						},
 			tracks: items.map((item) => ({
 				id: item.id,
 				title: item.title,
@@ -139,6 +148,8 @@ export function useMusicRuntime(
 				model: item.actualModel ?? undefined,
 				lyrics: item.lyrics,
 				instrumental: item.instrumental,
+				task: item.task,
+				runtime: item.runtime,
 				createdAt: new Date(item.createdAt).toISOString(),
 				durationSeconds: item.durationSeconds ?? undefined,
 				disabled: item.state !== "completed",
@@ -253,7 +264,14 @@ export function useMusicRuntime(
 			operation.current = true;
 			try {
 				if (event.action === "music-generate") {
-					await creation.generate(String(event.values.prompt));
+					const { prompt, generation } = event.values;
+					const input = parseMusicSelection(prompt, generation);
+					if (input === null)
+						return {
+							status: "rejected",
+							message: "用途・長さ・歌詞の指定を確認してください。",
+						};
+					await creation.generate(String(prompt), input);
 					setSelected(undefined);
 					setTargetRef?.(undefined);
 				} else await creation.cancel();

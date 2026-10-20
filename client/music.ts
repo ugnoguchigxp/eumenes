@@ -3,6 +3,7 @@ import {
 	musicTrack,
 	musicTracks,
 	musicTags,
+	musicProviders,
 	type TrackQuery,
 } from "../api/domains/larm/contracts";
 import type { z } from "zod";
@@ -17,6 +18,8 @@ export function musicClient(t: Transport) {
 	const read = async (path: string, signal?: AbortSignal) =>
 		(await t.call(path, { signal })).json();
 	return {
+		musicProviders: async (signal?: AbortSignal) =>
+			musicProviders.parse(await read("/api/music/providers", signal)),
 		musicPlaylists: async (conversationId: string, signal?: AbortSignal) =>
 			playlistRecord
 				.array()

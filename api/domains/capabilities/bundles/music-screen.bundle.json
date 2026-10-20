@@ -252,6 +252,201 @@
 				"label": "楽曲生成",
 				"order": 30
 			}
+		},
+		{
+			"kind": "artifact",
+			"id": "music.generation",
+			"revision": 3,
+			"title": "音楽・効果音生成",
+			"variants": [
+				{
+					"id": "standard",
+					"label": "標準",
+					"definition": {
+						"view": "music-workspace",
+						"source": "music-studio",
+						"title": "音楽・効果音生成",
+						"creationOptions": {
+							"genreGroups": [
+								{
+									"label": "ポップ・ロック",
+									"options": [
+										"ポップ",
+										"J-pop",
+										"K-pop",
+										"ロック",
+										"インディー",
+										"オルタナティブ",
+										"パンク",
+										"メタル",
+										"ファンク",
+										"ディスコ",
+										"シティポップ",
+										"バラード"
+									]
+								},
+								{
+									"label": "エレクトロニック",
+									"options": [
+										"Lo-fi",
+										"Ambient",
+										"House",
+										"Techno",
+										"EDM",
+										"Synthwave",
+										"Drum & Bass",
+										"Chiptune",
+										"Trance",
+										"Dubstep",
+										"Downtempo",
+										"エレクトロポップ"
+									]
+								},
+								{
+									"label": "ジャズ・アコースティック",
+									"options": [
+										"ジャズ",
+										"ボサノバ",
+										"R&B",
+										"ソウル",
+										"アコースティック",
+										"フォーク",
+										"ブルース",
+										"ゴスペル",
+										"スウィング",
+										"フュージョン",
+										"カントリー",
+										"ブルーグラス"
+									]
+								},
+								{
+									"label": "クラシック・映像",
+									"options": [
+										"クラシック",
+										"オーケストラ",
+										"シネマティック",
+										"ゲーム音楽",
+										"室内楽",
+										"ピアノソロ",
+										"ミニマル",
+										"ワルツ",
+										"バロック",
+										"オペラ",
+										"ミュージカル",
+										"ニューエイジ"
+									]
+								},
+								{
+									"label": "ヒップホップ・世界の音楽",
+									"options": [
+										"ヒップホップ",
+										"トラップ",
+										"ラップ",
+										"レゲエ",
+										"ダブ",
+										"ラテン",
+										"サンバ",
+										"タンゴ",
+										"フラメンコ",
+										"ケルト",
+										"和風",
+										"アフロビート"
+									]
+								}
+							],
+							"moods": [
+								"落ち着いた",
+								"温かい",
+								"明るい",
+								"切ない",
+								"幻想的",
+								"力強い",
+								"壮大",
+								"緊張感",
+								"軽快",
+								"ダーク"
+							],
+							"instruments": [
+								"ピアノ",
+								"シンセ",
+								"ギター",
+								"ストリングス",
+								"ドラム",
+								"ベース",
+								"ブラス",
+								"木管",
+								"ハープ",
+								"打楽器"
+							],
+							"tempos": ["おまかせ", "ゆったり", "中くらい", "速め"],
+							"durations": [10, 30, 60, 90, 120, 180, 300, 600],
+							"vocalists": ["おまかせ", "男性ボーカル", "女性ボーカル"],
+							"ranges": ["おまかせ", "低め", "中間", "高め"],
+							"voiceQualities": [
+								"透明感",
+								"柔らかい",
+								"温かい",
+								"ハスキー",
+								"力強い",
+								"息を含んだ"
+							],
+							"singingStyles": ["ソロ", "デュエット", "コーラス", "ラップ"],
+							"languages": ["日本語", "英語", "おまかせ"],
+							"defaults": {
+								"tempo": "おまかせ",
+								"duration": 30,
+								"vocalist": "おまかせ",
+								"range": "おまかせ",
+								"singingStyle": "ソロ",
+								"language": "日本語"
+							}
+						}
+					}
+				}
+			],
+			"defaultVariant": "standard",
+			"sourceBindings": [
+				{
+					"source": "music-studio",
+					"adapterRef": "adapter:music-screen@1",
+					"query": "query:music-screen.list@1",
+					"target": "none"
+				}
+			],
+			"actionBindings": [
+				{
+					"actionId": "select",
+					"eventAction": "music-select",
+					"source": "music-studio",
+					"inputSchemaRef": "schema:music-screen-select@1",
+					"effect": "local"
+				},
+				{
+					"actionId": "generate",
+					"eventAction": "music-generate",
+					"source": "music-studio",
+					"inputSchemaRef": "schema:music-screen-generate@2",
+					"effect": "local"
+				},
+				{
+					"actionId": "cancel",
+					"eventAction": "music-cancel",
+					"source": "music-studio",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "local"
+				},
+				{
+					"actionId": "artwork",
+					"eventAction": "music-artwork",
+					"source": "music-studio",
+					"inputSchemaRef": "schema:music-screen-select@1",
+					"effect": "local"
+				}
+			],
+			"launcher": {
+				"label": "音楽・効果音生成",
+				"order": 30
+			}
 		}
 	],
 	"schemas": [
@@ -283,6 +478,28 @@
 						"type": "string",
 						"minLength": 1,
 						"maxLength": 7600
+					}
+				},
+				"required": ["prompt"]
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "music-screen-generate",
+			"revision": 2,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"prompt": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 7600
+					},
+					"generation": {
+						"type": "string",
+						"minLength": 2,
+						"maxLength": 4500
 					}
 				},
 				"required": ["prompt"]

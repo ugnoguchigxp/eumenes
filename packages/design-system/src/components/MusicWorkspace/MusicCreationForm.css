@@ -156,7 +156,8 @@
 	gap: 0.5rem;
 	font-size: 0.75rem;
 }
-.music-creation-select select {
+.music-creation-select select,
+.music-creation-select input {
 	color: var(--foreground);
 	background: var(--background);
 	border: 1px solid var(--border);

@@ -44,13 +44,21 @@ LLM・TTS・ASR・画像生成・音楽生成の通信は、backendの共通入�
 
 ## 楽曲生成の音声形式
 
-楽曲生成ツールチェーンは、保存済みControl接続先のcatalogから、capability `media.music.generate` を持つ `services` のサービス（`larm.music-generation.v1`）を発見し、返されたendpointとmodelを使います。複数あるときはcatalogの順で最初のサービスです。生成・状態照会・音声取得にはControl認証を使い、Providerのclaimは行いません。
+楽曲生成ツールチェーンは、保存済みControl接続先のcatalogから、capability `media.music.generate` を持つ `services` のサービス（`larm.music-generation.v1`）を発見し、返されたendpointを使い、生成要求のmodelは自動選択の`auto`を送ります。複数あるときはcatalogの順で最初のサービスです。生成・状態照会・音声取得にはControl認証を使い、Providerのclaimは行いません。
 
 サービス発見は画像・音楽で共通です。保存済みProfileと全Profileのcatalogを読み、サービスが空のProfileをIDで取り直すほか、同じControlの `GET /openapi.json` が公開する `/v3/agent-profiles` の `profile` queryの `schema.enum` から公開選択名を取得して照会します。公開選択名と内部Profile IDが異なる場合にも対応し、名前やモデルを固定しません。各応答の `catalogRevision` が変わった場合は一覧を採用しません。OpenAPIが404の配備先では従来のProfile取得を続け、それ以外の取得失敗はcatalogの `errors` に返します。一覧取得だけではモデルを起動しません。
 
-2026-10-11に配備先の `GET /openapi.json` で確認した契約に合わせ、`outputFormat: "opus"` を明示します。出力はOgg Opus・64 kbps固定・48 kHzです。完了確認後に `result.audioUrl` と `metadataUrl` をControlのURLとして解決し、音声のMIMEとOgg / Opus識別ヘッダーを検査します。Eumenesで再変換せず、既存の音声保存・認証済み取得APIへ渡します。保存ファイルの拡張子は `.opus` です。既存のMP3・WAV・FLAC結果の取得にも対応します。
+音楽・ボーカル・効果音は同じ `POST /v1/music/generations` へ送ります。歌なし音楽は `task: "music", instrumental: true`、ボーカルは `task: "music", instrumental: false` と歌詞を `lyrics`、効果音は `task: "sound-effect"` とし歌詞・歌詞言語を送りません。用途の解釈は担当LLMが行い、promptの語句をコードで判別しません。`instrumental: true` と歌詞、効果音と歌詞の混在は拒否します。
 
-担当の指示・schema・package版は変更していません。非同期ジョブ、生成POSTの自動再送禁止、取消後の結果不採用、Artifactの構成も既存経路を使います。ライブラリ・タグ検索・お気に入り・Range中継と再生プレイヤーの拡張は別作業です。
+`GET /v1/music/providers` の `providers[].models`（id、task、defaultDurationSeconds、maxDurationSeconds）を、backend・担当への情報・画面へ渡します。ここでのtask=vocalsはモデル情報の分類で、生成要求のtaskには使いません。秒数は小数を保持し、未指定なら送信を省略します。現在のLARM契約は歌なし1〜120秒（省略120秒）、ボーカル1〜600秒（省略180秒）、効果音1〜120秒（省略5秒）です。指定値を短縮せず、modelsの用途別上限を超える場合は生成POST前に拒否します。`GET /api/music/providers` は認証済みWeb向けにこの情報だけを返します。
+
+`outputFormat` はopus・wav・flac・mp3、既定はopus。`quality` はfast・balanced・high、既定はbalancedで、highによる音質改善は保証しません。bpm・key・timeSignatureは生成へのヒントです。`providerOptions` はguidance_scale（0〜10）だけを受け付け、内部オプションや参照音源編集は公開しません。HTTP400は用途・長さ・歌詞・オプションを確認する案内として表示します。
+
+202応答のjobIdで状態照会し、queued・loading・generating・encodingを待ちます。完了までPOSTを再送しません。取消は同じjobIdへのDELETEで行い、取消後の結果は採用しません。failed・cancelledは再生可能な成功にしません。`result.audioUrl` とmetadataUrlをControlのURLとして解決し、既存のMIME・内容検査と保存経路を使います。`result.model` と `result.metadata.runtime` を記録します。Provider識別子やモデル名への固定分岐はありません。過去の音声の再生・保存・検索・タグ・お気に入りは従来経路を維持します。
+
+`music.create@3`・`music.generate@3`・担当手順は `music-routing.bundle.json`、操作画面は `music.generation@3` です。旧V1/V2の登録定義・契約は保持し、既存music planner/generatorと登録済みmusic-screen adapterを再利用します。画面では3用途を選べ、効果音も共通プレイヤー、Visualizer、履歴・詳細・保存を使います。表示JSONに実行時URLや音声を保存しません。詳細は[今回の作業記録](../spec/audio-routing-work-record-2026-10-20.md)。
+
+サーバーを起動せず実LARMの3用途を1回ずつ確認するには `bun scripts/music-routing-live.ts --run` を使います。保存済み接続と認証で短い音声を生成し、デコード・長さ・ブラウザ再生を確認します。この実行が生成した確認音声だけをLARMから削除します。実スピーカーの聴取とは区別します。
 
 楽曲イメージは楽曲と同時には作りません。完成した楽曲の「楽曲イメージ」表示で利用者が「イメージを作成」を押すと、`POST /api/music/:id/artwork` が music domain のジョブ `music.artwork` を積み、その曲のタイトル・説明・制作プロンプトから画像プロンプトを組み立てて 画像生成サービス（capability `media.image.generate`）で256×256のPNGを1枚生成します（文字は描かせず、曲名は画面側で重ねて表示）。画像は楽曲行に保存し、`GET /api/music/:id/artwork` で取得します。LARM側に作られた画像は取得後に削除し、画像スタジオの一覧には残しません。完成後は「作り直す」で新しいrevisionとして再生成でき、古いジョブの結果は採用しません。画面操作は `artifact:music.generation@2` の `music-artwork` actionです。プレイリストでは、LARMのtrack idが生成時のLARM job id（`music_<uuid>`）と一致する楽曲だけ、`GET /api/music/tracks/:id/generation` で生成レコードを引き、同じ画像の表示・作り直しができます。Eumenesで生成していないLARMの楽曲には画像がありません。
 

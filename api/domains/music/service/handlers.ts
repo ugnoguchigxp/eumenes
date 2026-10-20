@@ -1,14 +1,17 @@
 import { parseLlmJson } from "../../../infrastructure/llm-json";
 import type { Database } from "bun:sqlite";
 import { z } from "zod";
-import { musicPlan, musicPlanV2, type Prepared } from "../../capabilities";
+import { musicPlanV3, type Prepared } from "../../capabilities";
 import type { Receipt } from "../../inference";
 import type { HandlerDefinition } from "../../queue";
 import { findServiceTarget, type TestOutput } from "../../larm";
 import type { MusicRecord } from "../contracts";
 import { row, record, patch } from "../repository";
-import { musicContext } from "./context";
+import { musicContext, musicSchema } from "./context";
 import type { createMusic } from "./index";
+type GenerationPlan = Omit<z.infer<typeof musicPlanV3>, "task"> & {
+	task?: "music" | "sound-effect";
+};
 const payload = z.object({ id: z.string() });
 const active = (r: MusicRecord) =>
 	r.state === "planning" || r.state === "generating";
@@ -39,7 +42,7 @@ export function registerMusicHandlers(
 	const planHandler: HandlerDefinition<
 		{ id: string },
 		PlanInput,
-		{ receipt: Receipt; plan: z.infer<typeof musicPlanV2> }
+		{ receipt: Receipt; plan: GenerationPlan }
 	> = {
 		kind: "music.plan",
 		payloadVersions: [1],
@@ -71,9 +74,17 @@ export function registerMusicHandlers(
 			};
 		},
 		async execute(input, { signal }) {
+			const messages = [...input.context.messages];
+			if (input.prepared.package.revision >= 3) {
+				const providers = await deps.gateway().musicProviders(signal);
+				messages.push({
+					role: "user",
+					content: JSON.stringify({ musicProviders: providers }),
+				});
+			}
 			const receipt = await inference.executeControl!(
 				input.requestId,
-				input.context.messages,
+				messages,
 				signal,
 				input.context.control,
 			);
@@ -83,11 +94,13 @@ export function registerMusicHandlers(
 			} catch {
 				throw new Error("music_plan_invalid_json");
 			}
-			const schema =
-				input.prepared.package.revision >= 2 ? musicPlanV2 : musicPlan;
+			const schema = musicSchema(input.prepared);
 			const parsed = schema.safeParse(value);
 			if (!parsed.success) throw new Error("music_plan_invalid_contract");
-			return { receipt, plan: { instrumental: true, ...parsed.data } };
+			return {
+				receipt,
+				plan: parsed.data,
+			};
 		},
 		classify: () => "fail",
 		settleInTransaction(db, claim, input, outcome) {
@@ -124,7 +137,7 @@ export function registerMusicHandlers(
 	};
 	type GenerateInput = {
 		id: string;
-		plan: z.infer<typeof musicPlanV2>;
+		plan: GenerationPlan;
 		prepared: Prepared;
 	};
 	const generateHandler: HandlerDefinition<
@@ -149,9 +162,7 @@ export function registerMusicHandlers(
 					id: r.id,
 					plan: {
 						instrumental: true,
-						...(prepared.package.revision >= 2 ? musicPlanV2 : musicPlan).parse(
-							JSON.parse(r.plan_json),
-						),
+						...musicSchema(prepared).parse(JSON.parse(r.plan_json)),
 					},
 					prepared,
 				},
@@ -170,10 +181,21 @@ export function registerMusicHandlers(
 					target,
 					{
 						text: input.plan.prompt,
+						task: input.plan.task,
+						instrumental:
+							input.plan.task === "sound-effect"
+								? undefined
+								: input.plan.instrumental,
 						durationSeconds: input.plan.durationSeconds,
-						instrumental: input.plan.instrumental,
-						lyrics: input.plan.instrumental ? undefined : input.plan.lyrics,
-						language: input.plan.instrumental ? undefined : input.plan.language,
+						lyrics: input.plan.lyrics,
+						language: input.plan.language,
+						outputFormat: input.plan.outputFormat,
+						quality: input.plan.quality,
+						bpm: input.plan.bpm,
+						key: input.plan.key,
+						timeSignature: input.plan.timeSignature,
+						seed: input.plan.seed,
+						providerOptions: input.plan.providerOptions,
 					},
 					signal,
 					async (p) => {
@@ -189,8 +211,9 @@ export function registerMusicHandlers(
 				);
 				if (!output.bytes?.length || !output.mime?.startsWith("audio/"))
 					throw new Error("music_audio_missing");
-				// Bound persistent media storage per track. Existing LARM reads are bounded too.
-				if (output.bytes.length > 32 * 1024 * 1024)
+				// Up to 600s of stereo 48kHz 32-bit PCM plus container headers fits in 256 MiB.
+				// Keep the same bound as the LARM audio read; never shorten requested audio.
+				if (output.bytes.length > 256 * 1024 * 1024)
 					throw new Error("music_audio_too_large");
 				return output;
 			} catch (e) {
@@ -226,6 +249,10 @@ export function registerMusicHandlers(
 				state: "completed",
 				phase: "completed",
 				mime: output.mime!,
+				...(output.durationSeconds !== undefined
+					? { durationSeconds: output.durationSeconds }
+					: {}),
+				...(output.runtime ? { runtime: output.runtime } : {}),
 				actualModel: output.actualModel ?? output.artifact?.actualModel ?? null,
 			});
 			deps.onFinished(db, r.run_id);

@@ -5,6 +5,11 @@ export type MusicResource = {
 	/** The host can generate artwork from the current track's prompt. */
 	canArtwork?: boolean;
 	creation?: {
+		models?: {
+			task: "music" | "vocals" | "sound-effect";
+			defaultDurationSeconds?: number;
+			maxDurationSeconds: number;
+		}[];
 		busy: boolean;
 		status?: GenerationResource["status"];
 		title?: string;
@@ -42,6 +47,8 @@ export type MusicResource = {
 		prompt?: string;
 		model?: string;
 		format?: string;
+		task?: "music" | "sound-effect";
+		runtime?: string;
 		instrumental?: boolean;
 	}[];
 };

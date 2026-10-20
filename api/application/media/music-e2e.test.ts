@@ -321,6 +321,8 @@ test("artwork is generated on request from the completed track's prompt at 256×
 		expect(linked.status).toBe(200);
 		expect(await linked.json()).toEqual({
 			id: music.id,
+			task: "music",
+			runtime: "fixture-runtime",
 			artwork: { state: "completed", revision: 2, errorCode: null },
 		});
 		expect(

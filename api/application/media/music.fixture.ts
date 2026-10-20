@@ -1,3 +1,4 @@
+import { musicProviderFixture } from "../../domains/larm/test/music-generation.fixture";
 import { answerAnalysis } from "../toolchain/analysis-round.fixture";
 import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
@@ -10,6 +11,7 @@ export const musicTestPlan = {
 	prompt:
 		"An instrumental chiptune inspired by falling blocks, bright square wave melody, lively arpeggios and a clear ending.",
 	durationSeconds: 30,
+	task: "music",
 	instrumental: true,
 };
 export function musicFixture(
@@ -23,10 +25,13 @@ export function musicFixture(
 		plan?: Record<string, unknown>;
 		question?: string;
 		artworkFailure?: boolean;
+		jobStatuses?: string[];
+		postStatus?: number;
 	} = {},
 ) {
 	const requests: Array<{ method: string; path: string; body: unknown }> = [];
 	const stages: string[] = [];
+	const statuses = [...(fixtureOptions.jobStatuses ?? ["completed"])];
 	const audio = new Uint8Array(
 		readFileSync(
 			new URL("../../../tests/browser/fixtures/silence.opus", import.meta.url),
@@ -130,7 +135,14 @@ export function musicFixture(
 					return new Response(artwork, {
 						headers: { "Content-Type": "image/png" },
 					});
+				if (path === "/v1/music/providers")
+					return Response.json(musicProviderFixture);
 				if (path === "/v1/music/generations") {
+					if (fixtureOptions.postStatus)
+						return Response.json(
+							{ error: "invalid_request" },
+							{ status: fixtureOptions.postStatus },
+						);
 					if (mode === "failure")
 						return Response.json({ error: "unavailable" }, { status: 503 });
 					return Response.json(
@@ -154,10 +166,19 @@ export function musicFixture(
 						});
 					return Response.json({
 						jobId: "track",
-						status: "completed",
+						status: statuses.length > 1 ? statuses.shift() : statuses[0],
 						result: {
 							id: "track",
-							model: "fixture-music",
+							model: "fixture-runtime-model",
+							provider: "local-audio",
+							metadata: { runtime: "fixture-runtime" },
+							durationSeconds:
+								fixtureOptions.plan?.durationSeconds ??
+								(fixtureOptions.plan?.task === "sound-effect"
+									? 5
+									: fixtureOptions.plan?.instrumental === false
+										? 180
+										: 120),
 							format: "opus",
 							audioUrl: "/v1/music/generations/track/audio",
 							metadataUrl: "/v1/music/generations/track/metadata",

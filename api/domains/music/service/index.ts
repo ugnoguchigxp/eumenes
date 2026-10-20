@@ -61,7 +61,8 @@ export function createMusic(deps: {
 	function fail(db: Database, id: string, code: string) {
 		const r = row(db, id);
 		if (!r || !active(record(r))) return;
-		patch(db, id, { state: "failed", errorCode: code, phase: "failed" });
+		const state = code === "provider_cancelled" ? "cancelled" : "failed";
+		patch(db, id, { state, errorCode: code, phase: state });
 		deps.onFinished(db, r.run_id);
 	}
 	function cancel(db: Database, job: { payload: { id: string } }) {
@@ -78,6 +79,8 @@ export function createMusic(deps: {
 	const artwork = createArtwork(deps);
 	return {
 		playback,
+		musicProviders: (signal: AbortSignal) =>
+			deps.gateway().musicProviders(signal),
 		requestArtwork: artwork.request,
 		artwork: artwork.content,
 		library: () => deps.gateway().library,
@@ -99,7 +102,7 @@ export function createMusic(deps: {
 			const prepared = capabilities.prepareActiveByIdInTransaction(
 				db,
 				{ rootRunId: input.runId, taskId: id, cancelEpoch: 0 },
-				"package:music.create@2",
+				"package:music.create@3",
 				request,
 			);
 			const now = Date.now();
@@ -150,8 +153,13 @@ export function createMusic(deps: {
 			store.read((db) => {
 				const r = byTrack(db, trackId);
 				if (!r) return null;
-				const { id, artwork } = record(r);
-				return { id, ...(artwork ? { artwork } : {}) };
+				const { id, artwork, task, runtime } = record(r);
+				return {
+					id,
+					...(artwork ? { artwork } : {}),
+					...(task ? { task } : {}),
+					...(runtime ? { runtime } : {}),
+				};
 			}),
 		list: (conversationId: string) =>
 			store.read((db) => list(db, conversationId)),

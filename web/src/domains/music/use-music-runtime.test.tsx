@@ -63,6 +63,7 @@ function setup(
 			];
 	const run = { id: "new-run", status: "queued", revision: 1 };
 	const api = {
+		musicProviders: vi.fn(async () => ({ providers: [] })),
 		musicList: vi.fn(async () => structuredClone(items)),
 		musicAudio: vi.fn(async () => new Blob(["fixture"])),
 		musicArtwork: vi.fn(async () => new Blob(["png"])),
@@ -270,4 +271,34 @@ test("artwork is requested for the selected completed track and its image is sho
 	expect(
 		await none.dispatch(none.event("music-artwork", { id: "a" })),
 	).toMatchObject({ status: "rejected" });
+});
+
+test("structured SFX selections survive submission and mixed lyrics are rejected", async () => {
+	const r = setup("completed", { studio: true, empty: true });
+	await waitFor(() => expect(r.result.current.loading).toBe(false));
+	const invalid = {
+		task: "sound-effect",
+		lyrics: "hidden words",
+		durationSeconds: 1.5,
+	};
+	expect(
+		await r.dispatch(
+			r.event("music-generate", {
+				prompt: "chime",
+				generation: JSON.stringify(invalid),
+			}),
+		),
+	).toMatchObject({ status: "rejected" });
+	expect(r.api.submit).not.toHaveBeenCalled();
+	const input = { task: "sound-effect", durationSeconds: 1.5 };
+	expect(
+		await r.dispatch(
+			r.event("music-generate", {
+				prompt: "chime",
+				generation: JSON.stringify(input),
+			}),
+		),
+	).toMatchObject({ status: "accepted" });
+	expect(r.api.submit.mock.calls[0]![0].text).toContain(JSON.stringify(input));
+	expect(r.api.submit.mock.calls[0]![0].text).not.toContain("hidden words");
 });

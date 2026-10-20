@@ -4,6 +4,9 @@ import type { MusicService } from "../service";
 import { MusicArtworkError } from "../service/artwork";
 export function registerMusic(app: Hono, s: MusicService) {
 	registerLibrary(app, s);
+	app.get("/api/music/providers", async (c) =>
+		c.json(await s.musicProviders(c.req.raw.signal)),
+	);
 	app.get("/api/music", (c) =>
 		c.json(s.list(c.req.query("conversationId") ?? "main")),
 	);

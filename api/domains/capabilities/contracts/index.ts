@@ -76,9 +76,10 @@ import {
 	musicRequest,
 	musicPlan,
 	musicPlanV2,
+	musicPlanV3,
 	musicPlaybackPlan,
 } from "./music";
-export { musicRequest, musicPlan, musicPlanV2, musicPlaybackPlan };
+export { musicRequest, musicPlan, musicPlanV2, musicPlanV3, musicPlaybackPlan };
 import {
 	timerCancel,
 	timerCommand,
@@ -242,6 +243,7 @@ export const validators = {
 	musicRequest,
 	musicPlan,
 	musicPlanV2,
+	musicPlanV3,
 	musicPlaybackPlan,
 	dotsDelegation: z.strictObject({}),
 	find: savedFindInput,

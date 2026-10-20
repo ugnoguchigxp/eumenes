@@ -3,6 +3,8 @@ import { createImageImports } from "./image-import";
 import { sha256Hex } from "../../../infrastructure/digest";
 import { createMeshLibrary } from "./mesh-library";
 import { gzipFetch } from "./gzip-fetch";
+import { musicProviders as musicProvidersSchema } from "../contracts/music-generation";
+import { musicRequest } from "./music-request";
 import { createMusicLibrary } from "./music-library";
 import { createProviderAccess } from "./playground-provider";
 import { createPlaygroundCatalog } from "./playground-catalog";
@@ -326,7 +328,7 @@ export function createLarmPlayground(config: {
 		}
 		const content = await bytes(
 			r,
-			mime.startsWith("image/") ? 32_000_000 : 128_000_000,
+			mime.startsWith("image/") ? 32_000_000 : 256 * 1024 * 1024,
 		);
 		assertArtifactContent(content, mime);
 		return {
@@ -335,6 +337,11 @@ export function createLarmPlayground(config: {
 			artifact: ref,
 			actualModel: ref.actualModel,
 		};
+	}
+	async function musicProviders(signal: AbortSignal) {
+		return musicProvidersSchema.parse(
+			await json(await control("/v1/music/providers", signal)),
+		);
 	}
 	async function musicJob(
 		target: LarmTestTarget,
@@ -390,7 +397,18 @@ export function createLarmPlayground(config: {
 					if (publicUrl(ref.path).pathname !== `${path}/audio`)
 						throw new Error("invalid_artifact_path");
 					await progress({ phase: "fetching-result", jobId, artifact: ref });
-					return await artifact(ref, signal);
+					const output = await artifact(ref, signal);
+					return {
+						...output,
+						durationSeconds:
+							typeof result.durationSeconds === "number"
+								? result.durationSeconds
+								: undefined,
+						runtime:
+							typeof object(result.metadata ?? {}).runtime === "string"
+								? String(object(result.metadata).runtime)
+								: undefined,
+					};
 				}
 				await pause(config.pollMs ?? 2000, signal);
 			}
@@ -469,6 +487,8 @@ export function createLarmPlayground(config: {
 			}
 			if (target.kind !== "music")
 				throw new Error("invalid_unsupported_service");
+			const requestBody = musicRequest(input, await musicProviders(signal));
+			signal.throwIfAborted();
 			// Collect a late 202 even after local cancellation, then send DELETE to the same job.
 			let j: Record<string, unknown>;
 			try {
@@ -476,20 +496,7 @@ export function createLarmPlayground(config: {
 					await control(
 						target.endpoint,
 						AbortSignal.timeout(60_000),
-						post({
-							prompt: input.text,
-							model: target.model,
-							durationSeconds: input.durationSeconds ?? 10,
-							instrumental: input.instrumental ?? true,
-							...(input.instrumental === false && input.lyrics !== undefined
-								? { lyrics: input.lyrics }
-								: {}),
-							...(input.instrumental === false && input.language
-								? { language: input.language }
-								: {}),
-							outputFormat: "opus",
-							quality: "balanced",
-						}),
+						post(requestBody),
 						[202],
 						true,
 					),
@@ -636,6 +643,7 @@ export function createLarmPlayground(config: {
 		});
 	}
 	return {
+		musicProviders,
 		library: createMusicLibrary(control, publicUrl),
 		images: createImageLibrary(control, publicUrl),
 		imageImports: createImageImports(

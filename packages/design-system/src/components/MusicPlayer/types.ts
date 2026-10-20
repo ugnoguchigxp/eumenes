@@ -13,6 +13,8 @@ export type PlaylistTrack = {
 	prompt?: string;
 	model?: string;
 	format?: string;
+	task?: "music" | "sound-effect";
+	runtime?: string;
 	instrumental?: boolean;
 };
 

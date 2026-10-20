@@ -41,7 +41,14 @@ export interface TestInput {
 	format?: "png" | "webp";
 	seed?: number;
 	durationSeconds?: number;
+	task?: "music" | "sound-effect";
 	instrumental?: boolean;
+	outputFormat?: "opus" | "wav" | "flac" | "mp3";
+	quality?: "fast" | "balanced" | "high";
+	bpm?: number;
+	key?: string;
+	timeSignature?: string;
+	providerOptions?: { guidance_scale?: number };
 	lyrics?: string;
 	language?: string;
 	audio?: Uint8Array;
@@ -53,6 +60,8 @@ export interface TestArtifact {
 	actualModel?: string;
 }
 export interface TestOutput {
+	runtime?: string;
+	durationSeconds?: number;
 	actualModel?: string;
 	text?: string;
 	bytes?: Uint8Array;

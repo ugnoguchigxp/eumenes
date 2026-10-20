@@ -1,3 +1,4 @@
+import { musicProviderFixture } from "./music-generation.fixture";
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import {
@@ -82,6 +83,8 @@ function fixture(
 		});
 		const override = await change?.(path, init, u);
 		if (override) return override;
+		if (path === "/v1/music/providers")
+			return Response.json(musicProviderFixture);
 		if (path === "/openapi.json") return new Response(null, { status: 404 });
 		if (path === "/v3/agent-profiles") {
 			const selector = u.searchParams.get("profile");
@@ -428,7 +431,7 @@ test("music requests Opus once and fetches Ogg Opus with Control authentication 
 	const posts = h.calls.filter((c) => c.method === "POST");
 	expect(posts).toHaveLength(1);
 	expect(posts[0]!.body).toMatchObject({
-		model: "model-music",
+		model: "auto",
 		outputFormat: "opus",
 		durationSeconds: 30,
 	});

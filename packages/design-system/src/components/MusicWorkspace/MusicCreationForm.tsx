@@ -4,9 +4,12 @@ import { Button } from "../Button";
 import {
 	emptyMusicSelection,
 	musicSelectionText,
+	musicSelectionInput,
 	defaultMusicCreationOptions,
 	type MusicCreationOptions,
 	type MusicSelection,
+	type MusicCreationInput,
+	type MusicDurationModel,
 } from "./music-creation-options";
 import "./MusicCreationForm.css";
 
@@ -78,16 +81,6 @@ function VocalChoices({
 }) {
 	return (
 		<section className="music-creation-vocals">
-			<label className="music-creation-vocal-toggle">
-				<input
-					type="checkbox"
-					checked={selection.vocals}
-					onChange={(event) =>
-						update({ ...selection, vocals: event.target.checked })
-					}
-				/>
-				歌声を入れる
-			</label>
 			{selection.vocals ? (
 				<>
 					<div className="music-creation-selects">
@@ -149,19 +142,65 @@ function VocalChoices({
 	);
 }
 
+function DurationChoice({
+	selection,
+	update,
+	limits,
+	valid: durationValid,
+}: {
+	selection: MusicSelection;
+	update: (value: MusicSelection) => void;
+	limits?: MusicDurationModel;
+	valid: boolean;
+}) {
+	return (
+		<label className="music-creation-select">
+			<span>長さ</span>
+			<input
+				type="number"
+				min={1}
+				max={limits?.maxDurationSeconds}
+				step="any"
+				value={selection.duration}
+				placeholder={
+					limits?.defaultDurationSeconds
+						? `${limits.defaultDurationSeconds}秒（おまかせ）`
+						: "おまかせ"
+				}
+				onChange={(event) =>
+					update({ ...selection, duration: event.target.value })
+				}
+			/>
+			<small>
+				{limits
+					? `1〜${limits.maxDurationSeconds}秒／省略時${limits.defaultDurationSeconds ?? "おまかせ"}秒`
+					: "用途別の長さは生成サービスで確認します"}
+			</small>
+			{!durationValid && (
+				<span role="alert">
+					長さを指定可能な範囲に直してください。自動では短縮しません。
+				</span>
+			)}
+		</label>
+	);
+}
+
 export type MusicCreationFormProps = {
 	busy?: boolean;
 	initialPrompt?: string;
 	options?: MusicCreationOptions;
-	onGenerate: (prompt: string) => void;
+	models?: readonly MusicDurationModel[];
+	onGenerate: (prompt: string, input?: MusicCreationInput) => void;
 };
 export function MusicCreationForm({
 	busy,
 	initialPrompt,
 	options = defaultMusicCreationOptions,
 	onGenerate,
+	models,
 }: MusicCreationFormProps) {
 	const id = useId();
+
 	const [selection, setSelection] = useState(() =>
 		emptyMusicSelection(options),
 	);
@@ -191,6 +230,20 @@ export function MusicCreationForm({
 		setPending(false);
 		setSearch("");
 	};
+	const kind = selection.soundEffect
+		? "sound-effect"
+		: selection.vocals
+			? "vocals"
+			: "music";
+	const limits = models?.find((m) => m.task === kind);
+	const durationValid =
+		!selection.duration ||
+		(Number(selection.duration) >= 1 &&
+			(limits === undefined ||
+				Number(selection.duration) <= limits.maxDurationSeconds));
+	const lengthValid =
+		prompt.length + JSON.stringify(musicSelectionInput(selection)).length <=
+		7600;
 	const groups = options.genreGroups
 		.map((group) => ({
 			...group,
@@ -204,112 +257,152 @@ export function MusicCreationForm({
 			className="music-creation-form"
 			onSubmit={(event) => {
 				event.preventDefault();
-				if (!busy && !pending && prompt.trim() && prompt.length <= 7600)
-					onGenerate(prompt.trim());
+				if (
+					!busy &&
+					!pending &&
+					durationValid &&
+					lengthValid &&
+					prompt.trim() &&
+					prompt.length <= 7600
+				)
+					onGenerate(prompt.trim(), musicSelectionInput(selection));
 			}}
 		>
 			<div className="music-creation-scroll">
 				<header className="music-creation-heading">
-					<h3>どんな楽曲にしますか？</h3>
+					<h3>
+						{selection.soundEffect
+							? "どんな効果音にしますか？"
+							: "どんな楽曲にしますか？"}
+					</h3>
 					<Button type="button" variant="ghost" size="sm" onClick={reset}>
 						リセット
 					</Button>
 				</header>
-				<Choices
-					label="雰囲気"
-					options={options.moods}
-					selected={selection.moods}
-					onChange={(moods) => update({ ...selection, moods })}
-				/>
-				<Choices
-					label="楽器"
-					options={options.instruments}
-					selected={selection.instruments}
-					onChange={(instruments) => update({ ...selection, instruments })}
-				/>
-				<div className="music-creation-selects">
-					<SelectChoice
-						label="テンポ"
-						value={selection.tempo}
-						options={options.tempos}
-						onChange={(tempo) => update({ ...selection, tempo })}
-					/>
-					<label className="music-creation-select">
-						<span>長さ</span>
-						<select
-							value={selection.duration}
-							onChange={(event) =>
-								update({ ...selection, duration: event.target.value })
-							}
-						>
-							{options.durations.map((seconds) => (
-								<option key={seconds} value={seconds}>
-									{seconds < 60 ? `${seconds}秒` : `${seconds / 60}分`}
-								</option>
-							))}
-						</select>
-					</label>
-				</div>
-				<div className="music-creation-genre-heading">
-					<h4>
-						ジャンル <small>複数選択できます</small>
-					</h4>
-					<label className="music-creation-search">
-						<Search aria-hidden="true" />
-						<input
-							aria-label="ジャンルを探す"
-							placeholder="ジャンルを探す"
-							value={search}
-							onChange={(event) => setSearch(event.target.value)}
-						/>
-					</label>
-				</div>
-				<div
-					className="music-creation-genres"
-					role="region"
-					aria-label="ジャンル一覧"
-					// oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- scrollable or keyboard-reachable region needs to take focus
-					tabIndex={0}
-				>
-					{groups.map((group) => (
-						<details key={group.label} open>
-							<summary>{group.label}</summary>
-							<Choices
-								label={group.label}
-								options={group.options}
-								selected={selection.genres}
-								onChange={(genres) => update({ ...selection, genres })}
-							/>
-						</details>
-					))}
-					{!groups.length && <p>該当するジャンルはありません。</p>}
-				</div>
-				{selection.genres.length > 0 && (
-					<div
-						className="music-creation-selected"
-						aria-label="選択したジャンル"
+				<label className="music-creation-select">
+					<span>用途</span>
+					<select
+						value={kind}
+						onChange={(event) =>
+							update({
+								...selection,
+								soundEffect: event.target.value === "sound-effect",
+								vocals: event.target.value === "vocals",
+							})
+						}
 					>
-						{selection.genres.map((genre) => (
-							<Button
-								key={genre}
-								type="button"
-								size="sm"
-								variant="secondary"
-								aria-label={`${genre}を解除`}
-								onClick={() =>
-									update({
-										...selection,
-										genres: selection.genres.filter((item) => item !== genre),
-									})
-								}
-							>
-								{genre}
-								<X aria-hidden="true" />
-							</Button>
-						))}
-					</div>
+						<option value="music">歌なし音楽</option>
+						<option value="vocals">ボーカル</option>
+						<option value="sound-effect">効果音</option>
+					</select>
+				</label>
+				{!selection.soundEffect && (
+					<Choices
+						label="雰囲気"
+						options={options.moods}
+						selected={selection.moods}
+						onChange={(moods) => update({ ...selection, moods })}
+					/>
 				)}
-				<VocalChoices selection={selection} update={update} options={options} />
+				{!selection.soundEffect && (
+					<Choices
+						label="楽器"
+						options={options.instruments}
+						selected={selection.instruments}
+						onChange={(instruments) => update({ ...selection, instruments })}
+					/>
+				)}
+				<div className="music-creation-selects">
+					{!selection.soundEffect && (
+						<SelectChoice
+							label="テンポ"
+							value={selection.tempo}
+							options={options.tempos}
+							onChange={(tempo) => update({ ...selection, tempo })}
+						/>
+					)}
+					<DurationChoice
+						selection={selection}
+						update={update}
+						limits={limits}
+						valid={durationValid}
+					/>
+				</div>
+				{!selection.soundEffect && (
+					<>
+						<div className="music-creation-genre-heading">
+							<h4>
+								ジャンル <small>複数選択できます</small>
+							</h4>
+							<label className="music-creation-search">
+								<Search aria-hidden="true" />
+								<input
+									aria-label="ジャンルを探す"
+									placeholder="ジャンルを探す"
+									value={search}
+									onChange={(event) => setSearch(event.target.value)}
+								/>
+							</label>
+						</div>
+						<div
+							className="music-creation-genres"
+							role="region"
+							aria-label="ジャンル一覧"
+							// oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- scrollable or keyboard-reachable region needs to take focus
+							tabIndex={0}
+						>
+							{groups.map((group) => (
+								<details key={group.label} open>
+									<summary>{group.label}</summary>
+									<Choices
+										label={group.label}
+										options={group.options}
+										selected={selection.genres}
+										onChange={(genres) => update({ ...selection, genres })}
+									/>
+								</details>
+							))}
+							{!groups.length && <p>該当するジャンルはありません。</p>}
+						</div>
+						{selection.genres.length > 0 && (
+							<div
+								className="music-creation-selected"
+								aria-label="選択したジャンル"
+							>
+								{selection.genres.map((genre) => (
+									<Button
+										key={genre}
+										type="button"
+										size="sm"
+										variant="secondary"
+										aria-label={`${genre}を解除`}
+										onClick={() =>
+											update({
+												...selection,
+												genres: selection.genres.filter(
+													(item) => item !== genre,
+												),
+											})
+										}
+									>
+										{genre}
+										<X aria-hidden="true" />
+									</Button>
+								))}
+							</div>
+						)}
+						<VocalChoices
+							selection={selection}
+							update={update}
+							options={options}
+						/>
+					</>
+				)}
+				{selection.soundEffect && (
+					<p className="music-creation-hint">
+						素材・動き・響きなどをプロンプトに書いてください。効果音には歌詞を送りません。
+					</p>
+				)}
 			</div>
 			<div className="music-creation-prompt">
 				<div className="music-creation-prompt-heading">
@@ -349,6 +442,11 @@ export function MusicCreationForm({
 						setEdited(true);
 					}}
 				/>
+				{!lengthValid && (
+					<p role="alert">
+						プロンプトと歌詞の合計が長すぎます。内容を短くしてください。
+					</p>
+				)}
 				<div className="music-creation-actions">
 					<span className="music-creation-hint">自由に編集できます</span>
 					{previous !== undefined && (
@@ -368,10 +466,21 @@ export function MusicCreationForm({
 					)}
 					<Button
 						type="submit"
-						disabled={busy || pending || !prompt.trim() || prompt.length > 7600}
+						disabled={
+							busy ||
+							pending ||
+							!durationValid ||
+							!lengthValid ||
+							!prompt.trim() ||
+							prompt.length > 7600
+						}
 					>
 						<Sparkles aria-hidden="true" />
-						{busy ? "生成処理中" : "楽曲を生成"}
+						{busy
+							? "生成処理中"
+							: selection.soundEffect
+								? "効果音を生成"
+								: "楽曲を生成"}
 					</Button>
 				</div>
 			</div>

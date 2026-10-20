@@ -8,6 +8,7 @@ archive の基準: その文書が担当した実装がコードにあり、本�
 
 | 文書 | 状態 |
 | --- | --- |
+| [compute-toolchain-design-2026-10-20.md](compute-toolchain-design-2026-10-20.md) | 案・合意待ち（§12 Q1〜Q9）。即時計算 `calculate`（mathjs、instant）と、LARM 計算サービス（capability `compute.python.execute`、SciPy・scikit-learn・PyTorch 等）でジョブ実行する計算担当 `compute_python`（command）の2段。LARM 側 API は依頼仕様の案（§4）で未構築 |
 | [browser-tabs-toolchain-design-2026-10-18.md](browser-tabs-toolchain-design-2026-10-18.md) | 合意済み・S0〜S2実装中。利用者の普段のBraveをPlaywright MCP Bridge拡張機能とbackendの子プロセス`@playwright/mcp`で操作・撮影する（Eumenes自身のタブ、Eumenesが開いたタブ・リンクから開いたタブを含む）。品質75固定WebP、各辺2,500px超過の拒否。S1接続とローカル撮影、S2操作ループ、S3 LARM送信（保留）。実機でBraveへの接続・スナップショット・撮影・タブの捕捉を確認済み。専用Chromium案（archive）を置換え |
 | [instant-3d-model-toolchain-design-2026-10-18.md](instant-3d-model-toolchain-design-2026-10-18.md) | 合意済み・実装・固定試験済み（§15）。モデルGrid・枠内詳細・共通画像選択（§8.5）も実装・fixture試験済み。端末画像の本番取込・一覧・content・断線回復・削除後非復活を確認済み。Google写真取込は実装・fixture済み、本人同意と稼働画面の受入は未実施。インスタント3Dモデル（LARM 3D API、catalogの `media.mesh.generate`）を単発型commandで登録する。生成はキューのジョブで受付・進捗・取消、保存済みの検索・表示・名前とタグの変更・削除、three.jsでの表示、完了の会話通知。LARM確定仕様と実装契約は§14 |
 | [subagent-task-and-session-agents-design-2026-10-18.md](subagent-task-and-session-agents-design-2026-10-18.md) | 合意済み。P0〜P2は実装・固定試験済み（§17）。単発型・協働型の整理、共通のエージェント核（参考資料の囲みと現在の依頼、`reply`付きinvoke、ツールごとのやり直し）、セッション記録（失敗・中断も記憶）、作業文書の部分編集（`doc.edit`/`doc.write`）、UI自由制作の移行とソースの手直し。P3（共有・非同期ツール）は詳細設計の追記待ち、P4は未着手。ブラウザE2E・live・実機器は未実施 |

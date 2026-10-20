@@ -1,10 +1,21 @@
-import { musicPlan, musicPlanV2, type Prepared } from "../../capabilities";
+import {
+	musicPlan,
+	musicPlanV2,
+	musicPlanV3,
+	type Prepared,
+} from "../../capabilities";
 import { z } from "zod";
 import { delegatedTaskRules } from "../../inference";
+export const musicSchema = (prepared: Prepared) =>
+	prepared.package.revision >= 3
+		? musicPlanV3
+		: prepared.package.revision >= 2
+			? musicPlanV2
+			: musicPlan;
 export function musicContext(
 	prepared: Prepared,
 	request: unknown,
-	schema: z.ZodType = prepared.package.revision >= 2 ? musicPlanV2 : musicPlan,
+	schema: z.ZodType = musicSchema(prepared),
 ) {
 	const required = [
 		prepared.package.profileRevisionId,

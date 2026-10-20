@@ -13,6 +13,8 @@ export const musicRecord = z.object({
 	description: z.string(),
 	prompt: z.string().nullable(),
 	durationSeconds: z.number().nullable(),
+	task: z.enum(["music", "sound-effect"]).optional(),
+	runtime: z.string().optional(),
 	instrumental: z.boolean().optional(),
 	lyrics: z.string().optional(),
 	language: z.string().optional(),
@@ -28,7 +30,12 @@ export const musicRecord = z.object({
 });
 export type MusicRecord = z.infer<typeof musicRecord>;
 /** The generation that produced a library track (LARM-only tracks have none). */
-export const trackGeneration = musicRecord.pick({ id: true, artwork: true });
+export const trackGeneration = musicRecord.pick({
+	id: true,
+	artwork: true,
+	task: true,
+	runtime: true,
+});
 
 import { trackQuery, trackId } from "../../larm/contracts";
 export const playlistRecord = z.object({
@@ -51,4 +58,4 @@ export const playlistUpdate = z.strictObject({
 	currentId: trackId.nullable().optional(),
 });
 
-export { trackQuery } from "../../larm/contracts";
+export { trackQuery, musicGenerationInput } from "../../larm/contracts";

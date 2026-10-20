@@ -192,8 +192,12 @@ export function MusicWorkspaceView({ request }: { request: ArtifactRequest }) {
 										? request.creationOptions
 										: undefined,
 								busy: data.creation.busy,
-								onGenerate: (prompt) => {
-									void send("music-generate", { prompt });
+								models: data.creation.models,
+								onGenerate: (prompt, input) => {
+									void send("music-generate", {
+										prompt,
+										...(input ? { generation: JSON.stringify(input) } : {}),
+									});
 								},
 								status:
 									data.creation.status && data.creation.title

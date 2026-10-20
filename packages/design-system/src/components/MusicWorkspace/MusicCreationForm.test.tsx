@@ -30,7 +30,10 @@ it("selects multiple genres including orchestra, filters the catalogue and remov
 	expect(prompt().value).toContain("オーケストラ");
 	expect(prompt().value).not.toContain("Ambient");
 	fireEvent.click(screen.getByRole("button", { name: "楽曲を生成" }));
-	expect(generate).toHaveBeenCalledWith(prompt().value);
+	expect(generate).toHaveBeenCalledWith(prompt().value, {
+		task: "music",
+		instrumental: true,
+	});
 });
 it("preserves a hand-written prompt, requires a decision on changed choices and allows restoring overwritten text", () => {
 	render(<MusicCreationForm onGenerate={vi.fn()} />);
@@ -48,7 +51,9 @@ it("preserves a hand-written prompt, requires a decision on changed choices and 
 });
 it("reflects vocal characteristics and exact lyric line breaks, and removes them when vocals are turned off", () => {
 	render(<MusicCreationForm onGenerate={vi.fn()} />);
-	fireEvent.click(screen.getByRole("checkbox", { name: "歌声を入れる" }));
+	fireEvent.change(screen.getByRole("combobox", { name: "用途" }), {
+		target: { value: "vocals" },
+	});
 	fireEvent.change(screen.getByRole("combobox", { name: "ボーカル" }), {
 		target: { value: "女性ボーカル" },
 	});
@@ -67,8 +72,11 @@ it("reflects vocal characteristics and exact lyric line breaks, and removes them
 	expect(prompt().value).toContain("歌声：あり");
 	expect(prompt().value).toContain("女性ボーカル");
 	expect(prompt().value).toContain("声質：柔らかい");
-	expect(prompt().value).toContain(lyrics);
-	fireEvent.click(screen.getByRole("checkbox", { name: "歌声を入れる" }));
+	expect(prompt().value).not.toContain(lyrics);
+	expect(prompt().value).toContain("入力した歌詞を使用");
+	fireEvent.change(screen.getByRole("combobox", { name: "用途" }), {
+		target: { value: "music" },
+	});
 	expect(prompt().value).toContain("歌声：なし");
 	expect(prompt().value).not.toContain(lyrics);
 	expect(
@@ -100,4 +108,81 @@ it("uses registered choices and defaults when a screen supplies them", () => {
 	expect(screen.queryByRole("checkbox", { name: "オーケストラ" })).toBeNull();
 	fireEvent.click(screen.getByRole("checkbox", { name: "和風アンビエント" }));
 	expect(prompt().value).toContain("ジャンル：和風アンビエント");
+});
+
+it("sends SFX as structured data without hidden lyrics and accepts a decimal duration", () => {
+	const generate = vi.fn();
+	const models = [
+		{
+			task: "music" as const,
+			defaultDurationSeconds: 120,
+			maxDurationSeconds: 120,
+		},
+		{
+			task: "vocals" as const,
+			defaultDurationSeconds: 180,
+			maxDurationSeconds: 600,
+		},
+		{
+			task: "sound-effect" as const,
+			defaultDurationSeconds: 5,
+			maxDurationSeconds: 120,
+		},
+	];
+	render(<MusicCreationForm models={models} onGenerate={generate} />);
+	expect(screen.getByRole("spinbutton", { name: /長さ/ })).toHaveAttribute(
+		"max",
+		"120",
+	);
+	fireEvent.change(screen.getByRole("combobox", { name: "用途" }), {
+		target: { value: "vocals" },
+	});
+	fireEvent.change(screen.getByRole("textbox", { name: "歌詞（任意）" }), {
+		target: { value: "[Verse]\n秘密の歌詞" },
+	});
+	expect(screen.getByRole("spinbutton", { name: /長さ/ })).toHaveAttribute(
+		"max",
+		"600",
+	);
+	fireEvent.change(screen.getByRole("combobox", { name: "用途" }), {
+		target: { value: "sound-effect" },
+	});
+	expect(screen.queryByRole("textbox", { name: "歌詞（任意）" })).toBeNull();
+	expect(screen.getByText("1〜120秒／省略時5秒")).toBeVisible();
+	fireEvent.change(screen.getByRole("spinbutton", { name: /長さ/ }), {
+		target: { value: "1.5" },
+	});
+	fireEvent.click(screen.getByRole("button", { name: "効果音を生成" }));
+	expect(generate).toHaveBeenCalledWith(expect.any(String), {
+		task: "sound-effect",
+		durationSeconds: 1.5,
+	});
+	expect(prompt().value).not.toContain("秘密の歌詞");
+});
+it("preserves a long vocal duration when switching to BGM and blocks it without clamping", () => {
+	render(
+		<MusicCreationForm
+			models={[
+				{ task: "music", maxDurationSeconds: 120, defaultDurationSeconds: 120 },
+				{
+					task: "vocals",
+					maxDurationSeconds: 600,
+					defaultDurationSeconds: 180,
+				},
+			]}
+			onGenerate={vi.fn()}
+		/>,
+	);
+	fireEvent.change(screen.getByRole("combobox", { name: "用途" }), {
+		target: { value: "vocals" },
+	});
+	fireEvent.change(screen.getByRole("spinbutton", { name: /長さ/ }), {
+		target: { value: "180.5" },
+	});
+	fireEvent.change(screen.getByRole("combobox", { name: "用途" }), {
+		target: { value: "music" },
+	});
+	expect(screen.getByRole("spinbutton", { name: /長さ/ })).toHaveValue(180.5);
+	expect(screen.getByRole("button", { name: "楽曲を生成" })).toBeDisabled();
+	expect(screen.getByRole("alert")).toHaveTextContent("自動では短縮しません");
 });

@@ -70,6 +70,8 @@ export function useTrackArtwork(
 			t.id === trackId
 				? {
 						...t,
+						...(g?.task ? { task: g.task } : {}),
+						...(g?.runtime ? { runtime: g.runtime } : {}),
 						artworkStatus: artwork?.failed ? ("failed" as const) : state,
 						artworkUrl: artwork?.url,
 					}
