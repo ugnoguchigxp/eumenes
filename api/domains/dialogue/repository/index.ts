@@ -1,6 +1,15 @@
 import type { Database } from "bun:sqlite";
 import type { Migration } from "../../../infrastructure/sqlite";
 import { retainedToolchainsMigration } from "./retained-toolchains";
+import {
+	continuationConditionsMigration,
+	continuationsMigration,
+} from "./continuations";
+export {
+	continuationOf,
+	insertContinuation,
+	type Continuation,
+} from "./continuations";
 export { retainedToolchainsMigration } from "./retained-toolchains";
 import type { Run } from "../contracts";
 import { specialistEventsMigration, specialistMigration } from "./specialist";
@@ -299,6 +308,16 @@ export const migrations: readonly Migration[] = [
 		id: "dialogue/0012-deadline-policy",
 		after: ["dialogue/0011-retained-toolchains"],
 		sql: "ALTER TABLE dialogue_runs ADD COLUMN deadline_fixed INTEGER NOT NULL DEFAULT 1;",
+	},
+	{
+		id: "dialogue/0013-continuations",
+		after: ["dialogue/0012-deadline-policy"],
+		sql: continuationsMigration,
+	},
+	{
+		id: "dialogue/0014-continuation-conditions",
+		after: ["dialogue/0013-continuations"],
+		sql: continuationConditionsMigration,
 	},
 ];
 

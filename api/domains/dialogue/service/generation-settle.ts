@@ -21,6 +21,7 @@ import { endRun, type RunEndState } from "./run-end";
 import { researchFailed } from "./research-failure-reply";
 import type { FirstRound } from "./initial-decision";
 import { executionSourceInTransaction } from "./execution-source";
+import { chainSuperseded, continuationText } from "./completion-check";
 import { executionStatusText, validExecutionNotice } from "./execution-notices";
 
 export type GenerationResult = {
@@ -32,6 +33,8 @@ export type GenerationResult = {
 	selection?: SelectionDraft;
 	recallPins?: Array<{ messageId: string; digest: string }>;
 	taskDecision?: Extract<FirstRound, { next: "execute_task" | "task_control" }>;
+	/** The completion check found the request not yet achieved: the next step it names. */
+	continuation?: { achieved: string; need: string; conditions: string[] };
 };
 export type GenerationHandler = HandlerDefinition<
 	GeneratePayload,
@@ -228,6 +231,37 @@ export function createGenerationSettlement(
 						outcome.result.taskDecision.card.revisionId,
 					);
 				traceOutcome(deps, tx, run.id, agentOutcome(input.agent));
+				const next = outcome.result.continuation;
+				const check = input.completionCheck;
+				// The answer that reports this step is adopted; the request goes on as a hidden continuation run,
+				// unless the user wrote again or withdrew the request. A continuation that cannot be accepted ends the
+				// chain without withdrawing the adopted answer.
+				if (
+					next &&
+					check &&
+					deps.continueInTransaction &&
+					!chainSuperseded(conversation, tx, check.rootRunId)
+				) {
+					tx.exec("SAVEPOINT dialogue_continuation");
+					try {
+						deps.continueInTransaction(tx, {
+							conversationId: run.conversationId,
+							text: continuationText(check, next.achieved, next.need),
+							continuation: {
+								rootRunId: check.rootRunId,
+								hop: check.hop + 1,
+								originalRequest: check.originalRequest,
+								achieved: next.achieved,
+								need: next.need,
+								conditions: next.conditions,
+							},
+						});
+						tx.exec("RELEASE dialogue_continuation");
+					} catch {
+						tx.exec("ROLLBACK TO dialogue_continuation");
+						tx.exec("RELEASE dialogue_continuation");
+					}
+				}
 				if (outcome.result.hostAnswer)
 					retainAdopted(
 						deps,

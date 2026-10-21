@@ -10,6 +10,20 @@ type Tools = ReadonlyArray<{ function: { name: string } }> | undefined;
 /** A fake model recognizes the first round by its `answer` function: the second round never offers it. */
 export const isAnalysisRound = (tools: Tools) =>
 	!!tools?.some((t) => t.function.name === ANSWER);
+/** The completion check of a delegated result offers `check_request`; nothing else does. */
+export const COMPLETION = "check_request";
+export const isCompletionCheck = (tools: Tools) =>
+	!!tools?.some((t) => t.function.name === COMPLETION);
+/** The completion check's call that every condition of the request was satisfied by its first step. */
+export const finishCall = () => ({
+	id: crypto.randomUUID(),
+	name: COMPLETION,
+	arguments: JSON.stringify({
+		conditions: [{ condition: "依頼", step: 1 }],
+		achieved: "",
+		need: "",
+	}),
+});
 /** The toolchain functions among the first round's offer, in order. */
 export const offeredToolchains = (tools: Tools) =>
 	(tools ?? [])

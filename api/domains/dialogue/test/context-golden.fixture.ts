@@ -277,6 +277,24 @@ async function run(
 							}
 						: {},
 				);
+			// The completion check of a delegated result: the request is achieved by this step.
+			if (tools?.some((tool) => tool.function.name === "check_request"))
+				return {
+					requestId: "request-1",
+					attemptId: "attempt",
+					value: "",
+					toolCalls: [
+						{
+							id: "call",
+							name: "check_request",
+							arguments: JSON.stringify({
+								conditions: [{ condition: "依頼", step: 1 }],
+								achieved: "",
+								need: "",
+							}),
+						},
+					],
+				};
 			// The second round: the one offered function, with the request for the specialist.
 			if (tools?.length)
 				return {

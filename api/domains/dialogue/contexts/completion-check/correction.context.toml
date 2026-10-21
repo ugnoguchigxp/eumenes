@@ -1,0 +1,3 @@
+# Source: api/domains/dialogue/service/completion-check.ts
+text = '''
+前の出力は照合の契約に合いませんでした。check_requestを一つだけ、定義どおりの引数で呼びます。提示された条件があれば、それをそのまま一つずつ書きます。stepには実際に結果が出た手順の番号だけを書き、まだ満たしていない条件はnullにします。'''

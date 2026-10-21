@@ -1,3 +1,8 @@
+import type { Database } from "bun:sqlite";
+import {
+	completionCheckInTransaction,
+	continuationEnded,
+} from "./completion-check";
 import {
 	executionNoticeContext,
 	executionNoticeInTransaction,
@@ -37,6 +42,7 @@ import { isSystemPrompt, type Run } from "../contracts";
 import { fitTaskOffer } from "./task-offer";
 import {
 	DEFAULT_DEADLINE_MS,
+	type ChatMessage,
 	type DialogueDeps,
 	type GenerateInput,
 	type GeneratePayload,
@@ -131,6 +137,10 @@ export function createPrepare(
 		if (executionNotice?.stale) {
 			endRun(deps, tx, current, "cancelled", "execution_notice_stale");
 			return { status: "stale", reason: "execution_notice_stale" };
+		}
+		if (continuationEnded(conversation, tx, current)) {
+			endRun(deps, tx, current, "cancelled", "continuation_superseded");
+			return { status: "stale", reason: "continuation_superseded" };
 		}
 		const operations: ContextBlock[] = [];
 		if (executionNotice) {
@@ -261,31 +271,23 @@ export function createPrepare(
 				const offered = fitTaskOffer(routing.routing.tasks);
 				routing.routing.tasks = { ...offered, card: offered.card };
 			}
-			const base = {
-				routing: routing.routing,
+			attachRetained(deps, tx, run, routing.routing, {
 				messages,
-				currentRequest: {
-					messageId: run.inputMessageId,
-					messageIndex: rendered.currentRequestIndex,
-				},
-			};
-			const room =
-				budgets.task -
-				outputReserveTokens(windowTokens) -
-				estimateMessageTokens(analysisMessages(base)) -
-				estimateJsonTokens(
-					analysisTools([], new Set(), true, routing.routing.tasks, false),
-				);
-			Object.assign(routing.routing, {
-				retained: prepareRetained(
-					deps,
-					tx,
-					run,
-					new Set(routing.routing.available),
-					room,
-				),
+				currentRequestIndex: rendered.currentRequestIndex,
+				room: budgets.task - outputReserveTokens(windowTokens),
 			});
 		}
+		const completionCheck = completionCheckInTransaction(
+			conversation,
+			tx,
+			run,
+			{
+				routing: routing?.routing,
+				delegatedResult: operations.length > 0 || research.length > 0,
+				hostAside:
+					!!note || !!executionNotice || !!claim.payload.specialistHandoff,
+			},
+		);
 		// A prefetch left out of this turn is neither sent nor checked at adoption.
 		const prepared =
 			window && compiled.prefetchDropped
@@ -310,6 +312,7 @@ export function createPrepare(
 				...(imageResult || musicResult ? { mediaResult: true as const } : {}),
 				...(operations.length ? { operationResult: true as const } : {}),
 				...routing,
+				...(completionCheck ? { completionCheck } : {}),
 				agent,
 				...(goalsLayer
 					? { goals: { goalIds: goalsLayer.shown.map((g) => g.goalId) } }
@@ -340,4 +343,40 @@ export function createPrepare(
 			},
 		};
 	};
+}
+
+/**
+ * The retained toolchains of the first round, fitted to what the task budget leaves after the analysis prompt and
+ * the control definitions. A continuation has none: it searches the purpose it names, and its host-written input
+ * is no source a retained toolchain can stand on.
+ */
+function attachRetained(
+	deps: DialogueDeps,
+	tx: Database,
+	run: Run,
+	routing: NonNullable<ReturnType<typeof prepareRouting>>["routing"],
+	prompt: {
+		messages: ChatMessage[];
+		currentRequestIndex: number;
+		room: number;
+	},
+) {
+	if (run.sourceKind === "continuation") return;
+	const base = {
+		routing,
+		messages: prompt.messages,
+		currentRequest: {
+			messageId: run.inputMessageId,
+			messageIndex: prompt.currentRequestIndex,
+		},
+	};
+	const room =
+		prompt.room -
+		estimateMessageTokens(analysisMessages(base)) -
+		estimateJsonTokens(
+			analysisTools([], new Set(), true, routing.tasks, false),
+		);
+	Object.assign(routing, {
+		retained: prepareRetained(deps, tx, run, new Set(routing.available), room),
+	});
 }

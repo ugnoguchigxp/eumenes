@@ -278,6 +278,13 @@ try {
 					break;
 				await Bun.sleep(250);
 			}
+		// A request goes on as hidden continuation runs: it is settled when none is queued or running.
+		while (performance.now() - start < 500000) {
+			const runs = await c.runs(conv);
+			if (runs.every((r) => !["queued", "running"].includes(r.status))) break;
+			await Bun.sleep(250);
+		}
+		const chain = await c.runs(conv);
 		let ambiguitySafe = true;
 		if (suite === "ambiguity") {
 			const follow = await c.submit({
@@ -327,7 +334,9 @@ try {
 		const active = timers.items.filter((t) => t.state === "active");
 		const a = active.find((t) => t.label === "受入A"),
 			b = active.find((t) => t.label === "受入B");
-		const completed = works.some((w) => w.status === "completed");
+		const completed =
+			works.some((w) => w.status === "completed") ||
+			(chain.length > 0 && chain.every((r) => r.status === "completed"));
 		// Owned results in the isolated DB: a generated image, and a 3D model made from that image rather than a prompt.
 		let media: {
 			images: Array<{ id: string; record: string }>;
@@ -406,8 +415,8 @@ try {
 							active.some(
 								(t) => t.label === "確認済み" && t.durationSeconds === 5400,
 							) &&
-							usage.some((u) => u.subject.startsWith("execution-research:")) &&
-							usage.some((u) => u.subject.startsWith("execution-command:"))
+							chain.length >= 2 &&
+							answers.some((x) => x.includes("bun test"))
 						: suite === "image3d"
 							? completed &&
 								media.images.length > 0 &&
@@ -465,6 +474,12 @@ try {
 			elapsedMs: Math.round(performance.now() - start),
 			run,
 			works,
+			chain: chain.map((r) => ({
+				id: r.id,
+				sourceKind: r.sourceKind,
+				status: r.status,
+				error: r.error,
+			})),
 			timers,
 			...(suite === "image3d" ? { media } : {}),
 			...(suite === "video" ? { browser } : {}),

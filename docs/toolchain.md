@@ -42,6 +42,8 @@ streamでは、function名や制御区切りになり得る末尾だけを保留
 
 即時回答型（binding `execution:"instant"`）は、R1の関数に登録定義が宣言した引数（`weather_forecast` は `place`＝言われた地名、`prefecture`＝その都道府県、`day`＝`today`/`tomorrow`/`day_after`。`stock_quote` は `query`＝会社名・ティッカー）を載せ、`announcement` を持ちません。引数は利用者の言った言葉で、地名から予報区域、名前から銘柄への解決はadapterが自分のデータ（気象庁の区域表、EDINETコードリスト等）で行います。adapterの `availableInTransaction` が候補に出すかを決め（天気は区域表を取得できない間は出さない）、R1に入るのはこの担当が候補にある時だけです。この関数が呼ばれると、R2も一時回答もなくadapterを実行し、返った文を通常の確定回答（LLMを経ないhost回答）として保存・配信します。adapterが失敗（ネットワーク・タイムアウト・非200・形式不正）したときだけ、bindingの `fallbackToolchainId`（`web.search`）へ元の発言をそのまま依頼として渡し、同じrunで調査します（一時回答なし）。天気の説明・使う/使わない場面・文の形は、会話の共通SystemContextではなく担当の登録定義・SKILL・adapterに置きます（[天気の設計](../spec/weather-instant-toolchain-design-2026-10-18.md)、[株価の設計](../spec/stock-instant-toolchain-design-2026-10-18.md)）。
 
+結果の照合と継続: session型を除き、担当の結果が会話へ戻って回答を書く前に、会話担当は利用者の依頼の原文と結果を照合します（[設計](../spec/step-and-check-multi-operation-design-2026-10-21.md)）。提示する関数は `finish_request`（原文の条件ごとに、それを満たした手順の番号を書く）と `continue_request`（済んだこと `achieved` と、次に行う一つの作業の用途 `need`）だけです。hostは、番号が実際に行った手順を指すことと関数・引数の形だけを検査し、一回の構造修正の後も不正なら継続しません。`continue_request` のとき、回答は今回の結果と続けて行うことを伝え、hostは同じtransactionで利用者に見えない継続run（`sourceKind: "continuation"`）を受け付けます。継続runは `need` で一度だけ担当を検索し、R1・R2の通常の委譲を行います。照合の基準は継続runでも利用者の原文で、操作の権限は元の手入力・音声入力に結びます。継続は最初の手順の後に最大3回で、最後の手順では `finish_request` だけを提示します。利用者に確認せず続け、取消は既存の会話の取消に従います。継続runの入力と回答はMemoryに学習させません。即時回答型（instant）の結果は今は照合しません。
+
 調査担当には今回の依頼を渡し、検索キーワードは担当が選びます。過去の会話から出典URLを集めて渡しません。URLの直接読取りは今回の依頼に明示されたURL、今回の検索結果、今回の依頼に合う保存済み手順の候補に限ります。
 
 | 会話の関数 | ツールチェーン | package | 実行 | 検索 | 読取り | 保存本文 | モデル呼出し | 報告 |

@@ -1,3 +1,5 @@
+import { dormantBundleFile } from "../../domains/capabilities";
+import { bundleHostOf } from "./toolchain-adapters";
 import { computeAnnouncements } from "../compute/compute-composition";
 import { createCompute, type ComputePort } from "../../domains/compute";
 import { fixtureDiscovery } from "./discovery.fixture";
@@ -87,6 +89,11 @@ export async function harness(
 		discoveryTarget?: (query: string) => string;
 		acquisition?: AcquisitionPort;
 		taskStep?: (
+			tools: import("../../infrastructure/chat-stream").NativeTool[],
+			messages: import("../../domains/inference/contracts").Messages,
+		) => { name: string; arguments: Record<string, unknown> };
+		/** The completion check of a delegated result; without it every request is achieved by its first step. */
+		completion?: (
 			tools: import("../../infrastructure/chat-stream").NativeTool[],
 			messages: import("../../domains/inference/contracts").Messages,
 		) => { name: string; arguments: Record<string, unknown> };
@@ -232,6 +239,7 @@ export async function harness(
 	const parentContexts: string[] = [],
 		workerContexts: string[] = [],
 		routeContexts: string[] = [],
+		completionContexts: string[] = [],
 		commandContexts: string[] = [];
 	const spoken: string[] = [];
 	let calls = 0,
@@ -350,6 +358,27 @@ export async function harness(
 				callOptions!.onToolCalls!(
 					analysisReceipt("fixture", args).toolCalls as never,
 				);
+				return "";
+			}
+			if (
+				callOptions?.tools?.some((t) => t.function.name === "check_request")
+			) {
+				completionContexts.push(JSON.stringify(messages));
+				const step = options.completion?.(callOptions.tools, messages) ?? {
+					name: "check_request",
+					arguments: {
+						conditions: [{ condition: question, step: 1 }],
+						achieved: "",
+						need: "",
+					},
+				};
+				callOptions.onToolCalls!([
+					{
+						id: crypto.randomUUID(),
+						name: step.name,
+						arguments: JSON.stringify(step.arguments),
+					},
+				]);
 				return "";
 			}
 			if (callOptions?.tools?.length) {
@@ -826,7 +855,17 @@ export async function harness(
 		}),
 	});
 	toolchainLinks.attachDialogue(dialogue);
-	if (options.everyday)
+	if (options.everyday) {
+		// The everyday task agent is suspended: its bundle is never seeded, so the fixtures of that
+		// implementation register it explicitly.
+		const registered = await store.write((db) =>
+			toolchain.capabilities.importBundleInTransaction(
+				db,
+				dormantBundleFile("task-execution"),
+				bundleHostOf(toolchain.registry),
+			),
+		);
+		if (registered.issues.length) throw new Error("dormant_bundle_rejected");
 		configureTaskExecution({
 			queue,
 			childOperations: toolchain.childOperations,
@@ -842,6 +881,7 @@ export async function harness(
 			media: taskMediaPorts({ image, music, excalidraw: drawingOperations }),
 			legacy: taskLegacyPorts(dialogue),
 		});
+	}
 	const voice = createVoiceDialogue(store, dialogue, inference);
 	if (terminals) reportFinishedTasks(terminals, dialogue);
 	const app = createApp({
@@ -910,6 +950,7 @@ export async function harness(
 		spoken,
 		workerContexts,
 		routeContexts,
+		completionContexts,
 		commandContexts,
 		get acquisitions() {
 			return acquisitions;

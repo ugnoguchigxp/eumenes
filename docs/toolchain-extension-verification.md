@@ -153,7 +153,7 @@ bunx playwright test tests/browser/<domain>.spec.ts
 [実装計画](../spec/everyday-task-agent-implementation-plan-2026-10-21.md)と[契約表](../spec/verification/everyday-task-agent/contract-matrix.md)を正本とする。登録だけでなく、公開会話入口→親→既存adapter→確定結果→会話での採用を検証する。
 
 ```sh
-bun run toolchain:bundle -- check api/domains/capabilities/bundles/task-execution.bundle.json
+bun run toolchain:bundle -- check api/domains/capabilities/bundles/task-execution.bundle.dormant.json
 bun test api/domains/capabilities/test/task-binding.test.ts api/domains/agent-runtime/test/task-execution.test.ts api/domains/dialogue/test/task-delegation.test.ts api/domains/dialogue/test/execution-notices.test.ts
 bun test api/application/toolchain/task-execution.test.ts api/application/toolchain/task-execution-browser.test.ts api/application/toolchain/task-execution-media.test.ts
 ```

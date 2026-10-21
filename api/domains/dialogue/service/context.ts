@@ -79,7 +79,14 @@ export interface GenerateInput {
 		requestId: string | null;
 		/** Questions a toolchain's command sub-agent asked and the user has not answered yet. */
 		openQuestions: import("./conversation-tools").OpenQuestion[];
+		/** A continuation run: its discovery searches this purpose instead of offering the retained toolchains. */
+		continuation?: { need: string };
 	};
+	/**
+	 * A delegated step's result is being phrased for a user's request: before the answer, the conversation checks
+	 * it against the request's original text and either finishes or names what is still missing.
+	 */
+	completionCheck?: CompletionCheck;
 	actionResultIndex?: number;
 	/** Media result replies have no host-granted URLs; hold and check the body before showing it. */
 	mediaResult?: true;
@@ -142,7 +149,24 @@ export interface Accept {
 	viewing?: Viewing;
 	/** The addressee the sender saw; checked in the acceptance transaction. */
 	addressee?: Addressee;
+	/** A continuation run's place in its request's chain (`sourceKind: "continuation"` only). */
+	continuation?: Omit<
+		import("../repository").Continuation,
+		"runId" | "createdAt"
+	>;
 }
+/** What the completion check of one delegated step reads besides the answer's prompt. */
+export type CompletionCheck = {
+	/** The user's own text of the request; the summaries the conversation wrote are never the standard. */
+	originalRequest: string;
+	/** The human run the chain started from. */
+	rootRunId: string;
+	/** Steps of this request before this one (0 for the first) and what they achieved. */
+	hop: number;
+	achieved: string;
+	/** The request's conditions the chain's first check fixed (absent at the first step). */
+	conditions?: string[];
+};
 
 /** Everything the dialogue service parts share: the injected ports. */
 export type DialogueDeps = {
@@ -169,6 +193,15 @@ export type DialogueDeps = {
 	specialist?: SpecialistPort;
 	/** Set by `createDialogueService` once intake exists (it accepts the resumed runs). */
 	interactions?: CommandInteractions;
+	/** Set by `createDialogueService` once intake exists: accepts a continuation run of a user's request. */
+	continueInTransaction?: (
+		db: import("bun:sqlite").Database,
+		input: {
+			conversationId: string;
+			text: string;
+			continuation: NonNullable<Accept["continuation"]>;
+		},
+	) => Run;
 	/** Installed by the voice delivery owner; awaited after publishing, before any operation starts. */
 	deliverAnnouncement?: (run: Run, signal: AbortSignal) => Promise<void>;
 };

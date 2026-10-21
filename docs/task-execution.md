@@ -1,10 +1,12 @@
 # 日常の複数操作担当
 
+状態: 休止中（2026-10-21）。bundleは `task-execution.bundle.dormant.json` に改名して登録対象から外し、会話から `execute_task` / `task_control` は提示されない。実装・固定試験は残す。複数操作は会話担当の[結果の照合と継続](toolchain.md#会話から担当への経路)で扱う。復元の手順は[設計 §10](../spec/step-and-check-multi-operation-design-2026-10-21.md)。
+
 会話担当は、一つの結果から次の能力を使う必要がある依頼を `execute_task` へ渡す。意味の判断と完了の判定はLLM、台帳・権限・予算・副作用の実行はhostが担当する。Pursuitへの自動転送や長期探索は含まない。
 
 ## 入口と状態
 
-登録は `capabilities/bundles/task-execution.bundle.json`（skill@8 / package@8 / toolchain@9）と `adapter:task-execution@1`。専用Artifactはない。質問と結果は既存の会話通知を使う。R1には既に組み立てたMemory/Worldの背景とhost発行ref、同じ会話の短い作業projectionだけを追加し、開始時の追加分類・planner・能力探索を行わない。R1の `execute_task.contextRefs` も親と同じく提示済みrefだけを列挙し、参照がなければ空配列だけを許す。
+登録（休止中）は `capabilities/bundles/task-execution.bundle.dormant.json`（skill@8 / package@8 / toolchain@9）と `adapter:task-execution@1`。専用Artifactはない。質問と結果は既存の会話通知を使う。R1には既に組み立てたMemory/Worldの背景とhost発行ref、同じ会話の短い作業projectionだけを追加し、開始時の追加分類・planner・能力探索を行わない。R1の `execute_task.contextRefs` も親と同じく提示済みrefだけを列挙し、参照がなければ空配列だけを許す。
 
 親実行のIDと原発言の会話runを分離する。会話が回答を終えたり画面を離れたりしても親は継続できる。作業の操作はR1の `task_control` で `workRef`、`expectedRevision`、action（status / answer / amend / cancel）を指定する。回答には質問refと所有domainのschemaに一致する入力が必要で、別会話・古い版・回答済みの質問は再開できない。進捗照会は制御適用後の状態を返す。
 

@@ -3,6 +3,7 @@ import { getLogger } from "../../../infrastructure/logger";
 import type { TargetDefinition } from "../../scheduler";
 import type { Tx } from "../../queue";
 import {
+	isHostPrompt,
 	isSystemPrompt,
 	noticeSchema,
 	promptTargetSchema,
@@ -15,6 +16,7 @@ import {
 	byRequest,
 	byUtterance,
 	insert,
+	insertContinuation,
 	patchSession,
 	setRunSession,
 	setRunViewing,
@@ -77,7 +79,7 @@ export function createIntake(deps: DialogueDeps) {
 		const messageId = id();
 		// An active specialist session takes the utterance directly: no main-agent generation at all.
 		const { session: addressee, cancelled } =
-			!isSystemPrompt(input.sourceKind) && !input.resume
+			!isHostPrompt(input.sourceKind) && !input.resume
 				? addressedSession(deps, db, input.conversationId, now)
 				: { session: null, cancelled: { flush: [], runs: [] } };
 		// What the screen showed when the user sent must still be who listens, or nothing is stored.
@@ -188,8 +190,14 @@ export function createIntake(deps: DialogueDeps) {
 			patchSession(db, addressee.id, { expiresAt: expiryAfter(now) }, now);
 		}
 		if (input.viewing) setRunViewing(db, runId, input.viewing);
-		// A scheduled prompt is stored as a user message but is the system's: it is never learned from.
-		if (isSystemPrompt(input.sourceKind))
+		if (input.continuation)
+			insertContinuation(db, {
+				...input.continuation,
+				runId,
+				createdAt: now,
+			});
+		// A scheduled prompt or a continuation is stored as a user message but is the host's: it is never learned from.
+		if (isHostPrompt(input.sourceKind))
 			memory?.blockMessagesInTransaction(db, {
 				conversationId: input.conversationId,
 				messageIds: [messageId],
@@ -250,6 +258,24 @@ export function createIntake(deps: DialogueDeps) {
 			);
 			if (accepted.fresh) queue.wake();
 			return accepted.run;
+		},
+		/** The next step of a user's request that a delegated step did not achieve: a hidden input with toolchains. */
+		continueInTransaction(
+			db: Tx,
+			input: {
+				conversationId: string;
+				text: string;
+				continuation: NonNullable<Accept["continuation"]>;
+			},
+		) {
+			return acceptInTransaction(db, {
+				requestId: `continuation:${input.continuation.rootRunId}:${input.continuation.hop}`,
+				conversationId: input.conversationId,
+				text: input.text,
+				presentation: "artifact",
+				sourceKind: "continuation",
+				continuation: input.continuation,
+			}).run;
 		},
 		/** The system's notice: a hidden input the conversation answers (e.g. a task finished). */
 		notifyInTransaction(db: Tx, input: Notice) {

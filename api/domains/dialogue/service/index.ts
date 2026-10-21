@@ -130,6 +130,7 @@ export function createDialogueService({
 		intake.acceptInTransaction,
 	);
 	deps.interactions = interactions;
+	deps.continueInTransaction = intake.continueInTransaction;
 	registerHandlers(deps, progress);
 	const specialistOps = createSpecialistOps(deps);
 	const agentSync = createAgentSync(deps);

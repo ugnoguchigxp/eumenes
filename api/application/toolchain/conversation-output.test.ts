@@ -1,5 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { harness } from "./toolchain.fixture";
+import { isCompletionCheck } from "../../domains/dialogue/test/analysis.fixture";
 import { musicFixture } from "../media/music.fixture";
 import type { LarmPort } from "../../domains/larm";
 import { configureLogging } from "../../infrastructure/logger";
@@ -46,7 +47,11 @@ for (const mode of ["repair", "repeat"] as const)
 						})
 					: f.model.answer(messages, signal, options),
 			answerStream: async (messages, signal, delta, options) => {
-				if (options?.tools?.length && (++routes === 1 || mode === "repeat")) {
+				if (
+					options?.tools?.length &&
+					!isCompletionCheck(options.tools) &&
+					(++routes === 1 || mode === "repeat")
+				) {
 					for (const character of control) delta(character);
 					if (routes === 1) {
 						waiting = true;

@@ -1,4 +1,9 @@
 import {
+	judgeCompletion,
+	progressLine,
+	type CompletionDecision,
+} from "./completion-check";
+import {
 	createGenerationSettlement,
 	type GenerationHandler,
 } from "./generation-settle";
@@ -225,6 +230,7 @@ export function createGenerationHandler(
 						};
 					let decision: Decision;
 					let generated: Awaited<ReturnType<typeof generateConversation>>;
+					let completion: CompletionDecision | undefined;
 					if (found && first && analysis?.next === "instant")
 						return answerInstant(deps, input, {
 							found,
@@ -262,32 +268,53 @@ export function createGenerationHandler(
 					} else {
 						const prepared = prepareAnswer(deps, input, found, analysis);
 						decision = prepared;
+						// A delegated step's result: check it against the request before answering. A step that does not
+						// achieve the request names what is missing; its answer is the host's fixed progress line (the
+						// next step announces itself), so no model reply can break the spoken contract mid-request.
+						completion = input.completionCheck
+							? await judgeCompletion(
+									deps,
+									{
+										requestId: input.requestId,
+										completionCheck: input.completionCheck,
+									},
+									prepared.messages,
+									signal,
+								)
+							: undefined;
 						// Streamed text is checked against the exchanges this prompt stands on.
 						recallPins.splice(0, recallPins.length, ...prepared.recallPins);
 						holdBody ||= !chunkSpeech && recallPins.length > 0;
 						timing.policy(holdBody);
-						try {
-							generated = await generateConversation({
-								inference: larm,
-								requestId: input.requestId,
-								messages: prepared.messages,
-								requestMessage: currentRequestMessage(input),
-								signal,
-								delta,
-								preparation,
-								briefReply: input.briefReply,
-								sessionRole: "main",
-								session: answerSession(input, prepared.recallPins),
-								repair,
-							});
-						} catch (error) {
-							if (
-								error instanceof Error &&
-								error.message === "invalid_conversation_operation"
-							)
-								await recordRejected(deps, input.runId, prepared.draft);
-							throw error;
-						}
+						if (completion?.status === "continue")
+							generated = {
+								text: progressLine(),
+								receipt: completion.receipt,
+								repaired: false,
+							};
+						else
+							try {
+								generated = await generateConversation({
+									inference: larm,
+									requestId: input.requestId,
+									messages: prepared.messages,
+									requestMessage: currentRequestMessage(input),
+									signal,
+									delta,
+									preparation,
+									briefReply: input.briefReply,
+									sessionRole: "main",
+									session: answerSession(input, prepared.recallPins),
+									repair,
+								});
+							} catch (error) {
+								if (
+									error instanceof Error &&
+									error.message === "invalid_conversation_operation"
+								)
+									await recordRejected(deps, input.runId, prepared.draft);
+								throw error;
+							}
 					}
 					const { text, receipt } = generated;
 					const answered = decision.draft("answer", {
@@ -306,6 +333,15 @@ export function createGenerationHandler(
 						receipt,
 						selection: answered,
 						recallPins,
+						...(completion?.status === "continue"
+							? {
+									continuation: {
+										achieved: completion.achieved,
+										need: completion.need,
+										conditions: completion.conditions,
+									},
+								}
+							: {}),
 					};
 				},
 			)

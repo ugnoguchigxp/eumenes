@@ -1,6 +1,6 @@
 import type { Database } from "bun:sqlite";
 import { getLogger } from "../../../infrastructure/logger";
-import { isSystemPrompt, type Run } from "../contracts";
+import { isHostPrompt, type Run } from "../contracts";
 import { endTransition } from "../repository";
 import type { DialogueDeps } from "./context";
 import { releaseSpecialistTurn } from "./specialist-turn-end";
@@ -28,7 +28,7 @@ export function runEndedInTransaction(
 		releaseSpecialistTurn(deps, tx, run);
 		return;
 	}
-	if (state !== "cancelled" && !isSystemPrompt(run.sourceKind)) {
+	if (state !== "cancelled" && !isHostPrompt(run.sourceKind)) {
 		try {
 			deps.memory?.recordExchangeInTransaction(tx, {
 				conversationId: run.conversationId,

@@ -1,0 +1,3 @@
+# Source: api/domains/dialogue/service/completion-check.ts
+text = '''
+依頼の原文の条件を照合する。conditionsには原文の対象・条件・個数を一つずつ書き（提示された条件があればそれをそのまま使い）、それぞれについて、満たした結果の手順番号をstepに書く。まだどの結果も満たしていない条件はstepをnullにする。stepは1から始まり、今回の結果がstepCountで、それより大きい番号は書かない。achievedにはこれまでに済んだことを書く。needは、conditionsに書けなかった残りの作業があるときだけ、その用途を一つ書き、ないときは空文字にする。次に行う作業は、hostが満たしていない最初の条件から決める。'''

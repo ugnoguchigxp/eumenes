@@ -4,13 +4,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openStore } from "../../../infrastructure/sqlite";
 import { bindingV1, createCapabilities, migrations } from "..";
-import { bundleFiles } from "../service/bundle-files";
+import { dormantBundleFile } from "../service/bundle-files";
 import { offlineBundleHost } from "../../../application/toolchain/toolchain-adapters";
 
 const bundle = () =>
-	structuredClone(
-		bundleFiles().find((f) => f.name === "task-execution.bundle.json")!.raw,
-	) as { bindings: Array<Record<string, unknown>> };
+	structuredClone(dormantBundleFile("task-execution")) as {
+		bindings: Array<Record<string, unknown>>;
+	};
 test("task binding is bounded, has no artifact and rejects unknown execution kinds", () => {
 	const doc = bundle().bindings[0]!;
 	expect(bindingV1.safeParse(doc).success).toBe(true);
@@ -25,7 +25,7 @@ test("task binding is bounded, has no artifact and rejects unknown execution kin
 	])
 		expect(bindingV1.safeParse(value).success).toBe(false);
 });
-test("the task bundle registers without a dummy artifact and reseeds immutable revisions", async () => {
+test("the dormant task bundle is never seeded, registers explicitly without a dummy artifact, and survives reseeding", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-task-binding-"));
 	const store = openStore(join(dir, "db"), migrations);
 	const host = offlineBundleHost();
@@ -34,8 +34,15 @@ test("the task bundle registers without a dummy artifact and reseeds immutable r
 	});
 	try {
 		await caps.seed();
+		expect(
+			store.read((db) =>
+				caps
+					.toolchainsInTransaction(db)
+					.some((d) => d.functionName === "execute_task"),
+			),
+		).toBe(false);
 		const result = await store.write((db) =>
-			caps.importBundleInTransaction(db, bundle(), host, { dryRun: true }),
+			caps.importBundleInTransaction(db, bundle(), host),
 		);
 		expect(result.issues).toEqual([]);
 		const first = store.read((db) =>
@@ -119,8 +126,11 @@ test("a host with the earlier task result schema upgrades by new revisions and p
 		await store.write((db) =>
 			caps.setEnabledInTransaction(db, "toolchain", "task.execute", false),
 		);
-		await caps.seed();
-		await caps.seed();
+		// The dormant bundle is registered only explicitly; registering it twice is a no-op.
+		for (let i = 0; i < 2; i++)
+			await store.write((db) =>
+				caps.importBundleInTransaction(db, bundle(), host),
+			);
 		expect(
 			store.read((db) =>
 				caps.getDefinitionInTransaction(db, "toolchain:task.execute@9"),

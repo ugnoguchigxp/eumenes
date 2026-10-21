@@ -4,7 +4,9 @@ import {
 	analysisReceipt,
 	ANSWER,
 	DISCOVERY,
+	finishCall,
 	isAnalysisRound,
+	isCompletionCheck,
 	offeredToolchains,
 	UNAVAILABLE,
 } from "../../domains/dialogue/test/analysis.fixture";
@@ -29,14 +31,19 @@ function call(options: RoundOptions, name: string, announcement?: string) {
 }
 
 /**
- * The fake model's answer of the first round. When the call is the first round it calls `over.call` (or the
- * first toolchain offered, or `report_unavailable` when none is) with the analysis `over` and returns true;
- * any other call is left to the caller, whose second round then writes the request for that function.
+ * The fake model's answer of the host's control rounds. The completion check of a delegated result is achieved
+ * by its first step. When the call is the first round it calls `over.call` (or the first toolchain offered, or
+ * `report_unavailable` when none is) with the analysis `over` and returns true; any other call is left to the
+ * caller, whose second round then writes the request for that function.
  */
 export function answerAnalysis(
 	options: RoundOptions,
 	over: Partial<RequestAnalysis> & Choice = {},
 ): boolean {
+	if (isCompletionCheck(options?.tools)) {
+		options!.onToolCalls!([finishCall()]);
+		return true;
+	}
 	if (!isAnalysisRound(options?.tools)) return false;
 	const { call: named, announcement, ...analysis } = over;
 	options!.onToolCalls!(
@@ -67,6 +74,10 @@ export function withLocalAnalysis<T extends LarmPort>(model: T): T {
 		_messages: Messages,
 		options: RoundOptions,
 	): string | undefined => {
+		if (isCompletionCheck(options?.tools)) {
+			options!.onToolCalls!([finishCall()]);
+			return "";
+		}
 		if (!isAnalysisRound(options?.tools)) return undefined;
 		call(options, ANSWER);
 		return "";

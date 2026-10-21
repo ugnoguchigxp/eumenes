@@ -2,7 +2,10 @@ import { expect, test } from "bun:test";
 import { harness } from "../toolchain/toolchain.fixture";
 import { musicFixture, musicQuestion, musicTestPlan } from "./music.fixture";
 import { waitFor } from "../../infrastructure/wait-for";
-import { isAnalysisRound } from "../../domains/dialogue/test/analysis.fixture";
+import {
+	isAnalysisRound,
+	isCompletionCheck,
+} from "../../domains/dialogue/test/analysis.fixture";
 
 test("a premature creation claim accompanying the selected operation is withheld until music completes", async () => {
 	const f = musicFixture("success");
@@ -15,7 +18,11 @@ test("a premature creation claim accompanying the selected operation is withheld
 		...f.model,
 		answer: async (...args: Parameters<typeof f.model.answer>) => {
 			const [messages, signal, options] = args;
-			if (options?.tools?.length && !isAnalysisRound(options.tools)) {
+			if (
+				options?.tools?.length &&
+				!isAnalysisRound(options.tools) &&
+				!isCompletionCheck(options.tools)
+			) {
 				await paused;
 				reviewed++;
 				await f.model.answer(messages, signal, options);
@@ -72,6 +79,7 @@ test("completed vocal music answers and repairs without re-offering entry operat
 		...f.model,
 		answer: async (...args: Parameters<typeof f.model.answer>) => {
 			const [messages, , options] = args;
+			if (isCompletionCheck(options?.tools)) return f.model.answer(...args);
 			if (messages.some((m) => m.content.includes('"musicResult":'))) {
 				expect(options?.tools).toBeUndefined();
 				answers.push(messages);

@@ -50,7 +50,7 @@ export const runSchema = z.object({
 	jobId: z.string().nullable(),
 	deadlineAt: z.string().nullable(),
 	deadlineFixed: z.boolean().optional(),
-	sourceKind: z.enum(["manual", "voice", "schedule", "notice"]),
+	sourceKind: z.enum(["manual", "voice", "schedule", "notice", "continuation"]),
 	scheduleId: z.string().nullable(),
 	occurrenceId: z.string().nullable(),
 	/** The specialist session this run is a turn of; null for the main conversation's runs. */
@@ -65,6 +65,13 @@ export type Run = z.infer<typeof runSchema>;
  */
 export const isSystemPrompt = (kind: Run["sourceKind"]) =>
 	kind === "schedule" || kind === "notice";
+/**
+ * A text the host wrote rather than the user: a system prompt, or a continuation that carries a user's request on
+ * after a delegated step. Never learned from and never addressed to a specialist session. Unlike a system prompt, a
+ * continuation is offered toolchains: it acts for the human request it continues.
+ */
+export const isHostPrompt = (kind: Run["sourceKind"]) =>
+	isSystemPrompt(kind) || kind === "continuation";
 /** A notice the host asks the conversation to report on; its text is hidden from the chat. */
 export const noticeSchema = z.object({
 	requestId: z.string().min(1).max(200),

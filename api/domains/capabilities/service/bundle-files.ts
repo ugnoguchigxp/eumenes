@@ -36,3 +36,13 @@ export function bundleToolchainFunctions(): string[] {
 	});
 	return [...new Set(names)];
 }
+
+/**
+ * A suspended bundle kept beside the shipped ones (`<name>.bundle.dormant.json`): never seeded, so its
+ * toolchain is offered nowhere. Only the fixtures of the suspended implementation register it explicitly.
+ */
+export function dormantBundleFile(name: string): unknown {
+	return JSON.parse(
+		readFileSync(new URL(`${name}.bundle.dormant.json`, directory), "utf8"),
+	);
+}

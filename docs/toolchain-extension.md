@@ -28,7 +28,9 @@ CPU計算は `compute.bundle.json` と `adapter:compute@1` で追加する。4�
 
 ### 日常の複数操作を接続するtask型
 
-`task-execution.bundle.json` の `task.execute` は画面・通常toolを持たない担当で、登録adapterの `task` lifecycleに結ぶ。R1の `execute_task` で目的とhost発行の背景refを受け、agent-runtimeが会話runとは独立した親実行を所有する。R2のcommand翻訳を親の開始に追加しない。
+休止中（2026-10-21）。`task-execution.bundle.dormant.json` は登録されない。以下は休止中の実装の契約。
+
+`task-execution.bundle.dormant.json`（休止中）の `task.execute` は画面・通常toolを持たない担当で、登録adapterの `task` lifecycleに結ぶ。R1の `execute_task` で目的とhost発行の背景refを受け、agent-runtimeが会話runとは独立した親実行を所有する。R2のcommand翻訳を親の開始に追加しない。
 
 親は `find_toolchain` の上位4件からLLMが一つを選び、子の確定結果から次の能力を選ぶ。instantは登録済みの実引数schema、その他は `stepRequest` と `contextRefs` を使う。commandは既存の翻訳・snapshot・adapterを通す。非同期adapterは `execution.currentInTransaction` / `cancelInTransaction` と必要なwriter外の `stop` を実装し、受付を実行完了と扱わない。共通契約に接続できない能力は公開候補から除く。
 
