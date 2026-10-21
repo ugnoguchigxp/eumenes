@@ -143,6 +143,23 @@ export function createToolchainRouting(
 	};
 	return {
 		embedQuery,
+		cardInTransaction(db, revisionId) {
+			const d = capabilities
+				.toolchainsInTransaction(db)
+				.find((d) => d.revisionId === revisionId);
+			if (!d) return undefined;
+			const runtime = runtimeInTransaction(db, d);
+			if (!runtime || (runtime.binding && !runtime.binding.available))
+				return undefined;
+			const card = capabilities
+				.toolchainCandidatesInTransaction(db, {
+					text: "",
+					// Preserve redirect identities; only this exact revision is returned and enriched.
+					available: () => true,
+				})
+				.find((c) => c.revisionId === revisionId);
+			return card ? instant.card(db, card)[0] : undefined;
+		},
 		routeInTransaction(db, input) {
 			const active = capabilities
 				.toolchainsInTransaction(db)
@@ -166,6 +183,9 @@ export function createToolchainRouting(
 					: undefined,
 				available: (id) => input.available.has(id),
 				fromHistory,
+				excludeRevisionIds: input.excludeRevisionIds,
+				strict: input.strict,
+				limit: input.strict ? 4 : undefined,
 			});
 			const offered = cards.flatMap((card) => instant.card(db, card));
 			const fts = cards.some((c) => c.score.ftsRank !== null);
@@ -259,6 +279,7 @@ export function createToolchainRouting(
 		linkTaskInTransaction: history.linkTaskInTransaction,
 		settleSelectionInTransaction: history.settleSelectionInTransaction,
 		requestOfRunInTransaction: history.requestOfRunInTransaction,
+		usageOfRunInTransaction: history.usageOfRunInTransaction,
 	};
 }
 

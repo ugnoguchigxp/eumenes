@@ -469,6 +469,8 @@ function stubToolchains(): import("../contracts/toolchains").ToolchainRoutingPor
 		score: { rank: 1, ftsRank: null, similarity: null, fromHistory: false },
 	};
 	return {
+		cardInTransaction: (_db, revisionId) =>
+			card.revisionId === revisionId ? card : undefined,
 		embedQuery: async () => undefined,
 		routeInTransaction: () => ({ cards: [card], past: [], retrieval: "none" }),
 		catalogInTransaction: () => [

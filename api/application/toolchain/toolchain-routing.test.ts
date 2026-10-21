@@ -120,7 +120,7 @@ async function setup(available = true, withAgent = false) {
 				revisionId,
 			),
 		);
-	return { store, routing, publish };
+	return { store, routing, publish, capabilities };
 }
 
 test("a session toolchain's runtime says session and its set carries the binding's contract", async () => {
@@ -228,6 +228,70 @@ test("a command binding's agent turn reaches the command set; a binding without 
 			const plain = routing.commandSetInTransaction(db, COMMAND_REVISION);
 			expect(plain.binding).toBeDefined();
 			expect(plain.binding).not.toHaveProperty("agentTurn");
+		});
+	} finally {
+		await store.close();
+	}
+});
+
+test("rehydrating an exact revision preserves its redirect conditions without expanding the offered context", async () => {
+	const { store, routing, capabilities } = await setup();
+	try {
+		await store.write((db) => {
+			const bundle = sessionBundle("builtin:timerCancel");
+			const source = bundle.definitions[0];
+			const redirectBundle = {
+				...bundle,
+				bundleId: "retained-redirect-fixture",
+				definitions: [
+					{
+						...source,
+						id: "timers.other",
+						revision: 1,
+						functionName: "timer_other",
+						redirects: [],
+					},
+					{
+						...source,
+						revision: 9,
+						redirects: [{ when: "別の用途", toolchainId: "timers.other" }],
+					},
+				],
+			};
+			expect(
+				capabilities.importBundleInTransaction(
+					db,
+					redirectBundle,
+					offlineBundleHost(),
+					{ dryRun: true },
+				).issues,
+			).toEqual([]);
+			expect(
+				capabilities.importBundleInTransaction(
+					db,
+					redirectBundle,
+					offlineBundleHost(),
+				).issues,
+			).toEqual([]);
+		});
+		store.read((db) => {
+			const available = new Set(
+				routing.catalogInTransaction(db).map((item) => item.id),
+			);
+			const route = routing.routeInTransaction(db, {
+				runId: "reference",
+				text: "",
+				available,
+			});
+			const expected = route.cards.find((card) => card.redirects.length > 0);
+			expect(expected).toBeDefined();
+			const retained = routing.cardInTransaction(db, expected!.revisionId);
+			expect(retained?.revisionId).toBe(expected!.revisionId);
+			expect(retained?.redirects).toEqual(expected!.redirects);
+			expect(retained?.useWhen).toEqual(expected!.useWhen);
+			expect(
+				routing.cardInTransaction(db, "toolchain:missing@1"),
+			).toBeUndefined();
 		});
 	} finally {
 		await store.close();

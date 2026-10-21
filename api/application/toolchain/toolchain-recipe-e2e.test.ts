@@ -115,8 +115,9 @@ test("the conversation sees one flat request function per offered toolchain", as
 		await h.dialogue.waitForTerminal(run.id, { timeoutMs: 8000 });
 		const trace = h.toolchain.history.getSelection(run.id)!;
 		expect(trace.candidates.map((c) => c.functionName)).toContain("web_search");
-		// Without embeddings every available toolchain is offered.
-		expect(trace.retrieval === "fts" || trace.retrieval === "none").toBe(true);
+		// Discovery is bounded by explicit fixture embeddings, with no all-catalog fallback.
+		expect(trace.retrieval).toBe("embedding");
+		expect(trace.candidates.length).toBeLessThanOrEqual(4);
 	} finally {
 		await h.close();
 	}

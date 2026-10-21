@@ -1,11 +1,15 @@
 import { systemContext } from "../../../infrastructure/system-context";
+import {
+	retainedOffer,
+	usageMessage,
+	type UsageReference,
+} from "./retained-toolchains";
 import { measureStage } from "../../../infrastructure/performance";
 import type { Database } from "bun:sqlite";
 import { getLogger } from "../../../infrastructure/logger";
 import { MEMORY_HISTORY_MAX_TOKENS } from "../../inference";
 import { RECALL_MIN_SCORE, type TurnRecall } from "../../memory";
 import type { AnswerTicket } from "../../agent-runtime";
-import type { ToolchainCard } from "../../capabilities";
 import type { SelectionOutcome } from "../../toolchain-history";
 import type {
 	QueryVector,
@@ -112,77 +116,91 @@ export type Decision = {
 /** The candidate toolchains of a request, found before the first round (no model call). */
 export type Candidates = {
 	started: number;
+	allowDiscovery?: boolean;
+	notes?: UsageReference[];
+	discovery?: "completed" | "embedding_unavailable";
 	route: ToolchainRoute;
 	/** The embedding of the current request (the recall of the exchanges that left the window reads it too). */
 	query: QueryVector | undefined;
+	queryText?: string;
+	recall?: { query: QueryVector | undefined };
 	/** The function names of the session toolchains among the cards (their saved items are listed only for the chosen one). */
 	sessionFunctions: ReadonlySet<string>;
 };
 
-/** The retrieval of the merged cards, told the way the registry tells it. */
-function retrievalOf(cards: ToolchainCard[]): ToolchainRoute["retrieval"] {
-	const fts = cards.some((c) => c.score.ftsRank !== null);
-	const vector = cards.some((c) => c.score.similarity !== null);
-	return fts && vector ? "hybrid" : vector ? "embedding" : fts ? "fts" : "none";
+/** First offer: retained callable functions only, with no embedding or search. */
+export function retainedCandidates(
+	deps: DialogueDeps,
+	input: GenerateInput,
+): Candidates {
+	const offer = deps.store.read((db) => retainedOffer(deps, db, input));
+	return {
+		started: Date.now(),
+		route: { cards: offer.cards, past: [], retrieval: "none" },
+		query: undefined,
+		allowDiscovery: true,
+		notes: offer.notes,
+		sessionFunctions: sessionFunctionNames(deps, offer.cards),
+	};
 }
-
-/**
- * The candidates of a new conversation decision: the current utterance and the user's utterance just before
- * it are each embedded and searched as they were said, and the cards are united (the current utterance's
- * first, each search keeping its own limit). A follow-up ("明日は？") thereby keeps the toolchain of the
- * utterance it continues. The past selections are those of the current utterance.
- */
+/** One LLM-requested search, excluding already offered revisions before ranking and the four-card limit. */
 export async function findCandidates(
 	deps: DialogueDeps,
 	input: GenerateInput,
 	signal: AbortSignal,
+	searchText = currentRequestMessage(input).content,
+	excluded: ReadonlySet<string> = new Set(),
 ): Promise<Candidates> {
 	const started = Date.now();
 	const routing = input.routing!;
-	const current = currentRequestMessage(input).content;
-	const before = routing.analysis.previous
-		.filter((m) => m.role === "user")
-		.at(-1)?.content;
-	const texts = before && before !== current ? [current, before] : [current];
-	const queries = await Promise.all(
-		texts.map((text) =>
-			measureStage("dialogue", "query_embedding", () =>
-				deps.toolchains!.embedQuery(text, signal),
-			),
-		),
+	const query = await measureStage("dialogue", "query_embedding", () =>
+		deps.toolchains!.embedQuery(searchText, signal),
 	);
 	signal.throwIfAborted();
-	const routes = deps.store.read((db) =>
-		texts.map((text, index) =>
-			deps.toolchains!.routeInTransaction(db, {
-				runId: input.runId,
-				text,
-				query: queries[index],
-				available: new Set(routing.available),
-			}),
-		),
+	const route = deps.store.read((db) =>
+		deps.toolchains!.routeInTransaction(db, {
+			runId: input.runId,
+			text: searchText,
+			query,
+			available: new Set(routing.available),
+			excludeRevisionIds: excluded,
+			strict: true,
+		}),
 	);
-	const cards = [
-		...new Map(
-			routes.flatMap((r) => r.cards).map((c) => [c.revisionId, c] as const),
-		).values(),
-	];
-	const route: ToolchainRoute = {
-		cards,
-		past: routes[0]!.past,
-		retrieval: routes.length === 1 ? routes[0]!.retrieval : retrievalOf(cards),
-	};
 	log.info("dialogue.candidates_selected", {
-		candidateCount: cards.length,
+		candidateCount: route.cards.length,
 		retrieval: route.retrieval,
 		durationMs: Date.now() - started,
 	});
 	return {
 		started,
 		route,
-		query: queries[0],
-		sessionFunctions: sessionFunctionNames(deps, cards),
+		query,
+		queryText: searchText,
+		allowDiscovery: false,
+		discovery: query ? "completed" : "embedding_unavailable",
+		sessionFunctions: sessionFunctionNames(deps, route.cards),
 	};
+}
+
+/** Keep existing conversation recall independent of capability discovery; never searches the tool catalog. */
+export async function prepareRecallQuery(
+	deps: DialogueDeps,
+	input: GenerateInput,
+	found: Candidates,
+	signal: AbortSignal,
+) {
+	if (!deps.memory || !input.memory?.window || !deps.toolchains) return;
+	const text = currentRequestMessage(input).content;
+	found.recall = {
+		query:
+			found.queryText === text
+				? found.query
+				: await measureStage("dialogue", "memory_recall_embedding", () =>
+						deps.toolchains!.embedQuery(text, signal),
+					),
+	};
+	signal.throwIfAborted();
 }
 
 /**
@@ -198,7 +216,11 @@ export function prepareAnswer(
 ) {
 	const started = found?.started ?? Date.now();
 	const current = currentRequestMessage(input);
-	const recalled = recallFor(deps, input, found?.query);
+	const recalled = recallFor(
+		deps,
+		input,
+		found?.recall ? found.recall.query : found?.query,
+	);
 	const messages = [...input.messages];
 	messages.splice(
 		messages.indexOf(current),
@@ -237,7 +259,11 @@ export function prepareSelection(
 	const { route, query } = found;
 	const { card } = analysis;
 	// Earlier exchanges that left the verbatim window, found by this turn's own vector (no model round trip).
-	const recalled = recallFor(deps, input, query);
+	const recalled = recallFor(
+		deps,
+		input,
+		found.recall ? found.recall.query : query,
+	);
 	// A question is answerable only through the function that is offered now.
 	const openQuestions = routing.openQuestions.filter(
 		(q) => q.functionName === card.functionName,
@@ -262,6 +288,10 @@ export function prepareSelection(
 						JSON.stringify(m.content),
 				},
 	);
+	const note = found.notes?.filter(
+		(note) => note.revisionId === card.revisionId,
+	);
+	if (note?.length) messages.unshift(usageMessage(note));
 	if (recalled) messages.unshift({ role: "system", content: recalled.text });
 	appendConversationPolicy(
 		messages,
@@ -375,8 +405,9 @@ export function traceSelection(
 	runId: string,
 	selection: SelectionDraft | undefined,
 ) {
-	if (selection)
-		deps.toolchains?.recordSelectionInTransaction(tx, { runId, ...selection });
+	return selection
+		? deps.toolchains?.recordSelectionInTransaction(tx, { runId, ...selection })
+		: undefined;
 }
 export function traceOutcome(
 	deps: DialogueDeps,

@@ -53,8 +53,41 @@ test("new Web revisions upgrade and reseed without changing archived definitions
 					.all(),
 			);
 		const before = archived();
+		const shared = capabilityBundleV1.parse(
+			JSON.parse(
+				readFileSync(
+					new URL(
+						"../bundles/web-shared-execution.bundle.json",
+						import.meta.url,
+					),
+					"utf8",
+				),
+			),
+		);
+		const sharedBoundary = shared.definitions.findIndex(
+			(d) => d.kind === "skill" && d.id === "web.guided" && d.revision === 5,
+		);
+		expect(sharedBoundary).toBeGreaterThan(0);
+		await store.write((db) =>
+			caps.importBundleInTransaction(
+				db,
+				{ ...shared, definitions: shared.definitions.slice(0, sharedBoundary) },
+				host(),
+			),
+		);
+		const previousShared = () =>
+			store.read((db) =>
+				db
+					.query(
+						"SELECT id,definition_hash FROM capability_revisions WHERE id IN ('skill:web.guided@4','package:web.recipe@5','package:web.search@5','package:web.quick@6','toolchain:web.search@6','toolchain:web.research.codex@3') ORDER BY id",
+					)
+					.all(),
+			);
+		const previous = previousShared();
+		expect(previous).toHaveLength(6);
 		await caps.seed();
 		expect(archived()).toEqual(before);
+		expect(previousShared()).toEqual(previous);
 		const active = () =>
 			store.read((db) =>
 				db
@@ -64,20 +97,21 @@ test("new Web revisions upgrade and reseed without changing archived definitions
 					.all(),
 			);
 		expect(active()).toEqual([
-			{ key: "package:web.quick", active_revision_id: "package:web.quick@6" },
+			{ key: "package:web.quick", active_revision_id: "package:web.quick@7" },
 			{
 				key: "toolchain:web.research.codex",
-				active_revision_id: "toolchain:web.research.codex@3",
+				active_revision_id: "toolchain:web.research.codex@4",
 			},
 			{
 				key: "toolchain:web.search",
-				active_revision_id: "toolchain:web.search@6",
+				active_revision_id: "toolchain:web.search@7",
 			},
 		]);
 		const registered = active();
 		await caps.seed();
 		expect(active()).toEqual(registered);
 		expect(archived()).toEqual(before);
+		expect(previousShared()).toEqual(previous);
 	} finally {
 		await store.close();
 		rmSync(dir, { recursive: true, force: true });

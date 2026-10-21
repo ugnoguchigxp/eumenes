@@ -34,12 +34,17 @@ import {
 	type WindowSnapshot,
 } from "../../memory";
 import { createQueue, migration as queueMigration } from "../../queue";
-import { analysisReceipt, isAnalysisRound } from "./analysis.fixture";
+import {
+	analysisReceipt,
+	DISCOVERY,
+	isAnalysisRound,
+} from "./analysis.fixture";
 import type { HandlerDefinition, QueueService } from "../../queue";
 import {
 	createDialogueService,
 	agentLinkMigration,
 	migration as dialogueMigration,
+	retainedToolchainsMigration,
 	queueLinkMigration,
 	announcementMigration,
 	worldStateMigration,
@@ -56,6 +61,7 @@ import {
 const MIGRATIONS = [
 	...conversationMigrations,
 	dialogueMigration,
+	retainedToolchainsMigration,
 	queueMigration,
 	queueLinkMigration,
 	announcementMigration,
@@ -260,7 +266,16 @@ async function run(
 			if (isAnalysisRound(tools))
 				return analysisReceipt(
 					"request-1",
-					scenario.cards ? { name: "studio_create" } : {},
+					scenario.cards
+						? {
+								name: tools?.some((tool) => tool.function.name === DISCOVERY)
+									? DISCOVERY
+									: "studio_create",
+								args: tools?.some((tool) => tool.function.name === DISCOVERY)
+									? { query: messages.at(-1)!.content }
+									: {},
+							}
+						: {},
 				);
 			// The second round: the one offered function, with the request for the specialist.
 			if (tools?.length)
@@ -394,6 +409,9 @@ async function run(
 		? ({
 				embedQuery: async () =>
 					scenario.recall ? { space: "s", vector: [1] } : undefined,
+				cardInTransaction: (_db: unknown, revisionId: string) => ({
+					revisionId,
+				}),
 				routeInTransaction: () => ({
 					cards: [
 						{
@@ -439,6 +457,9 @@ async function run(
 		: scenario.recall
 			? ({
 					embedQuery: async () => ({ space: "s", vector: [1] }),
+					cardInTransaction: (_db: unknown, revisionId: string) => ({
+						revisionId,
+					}),
 					routeInTransaction: () => ({
 						cards: [],
 						past: [],
@@ -448,6 +469,9 @@ async function run(
 				} as never)
 			: ({
 					embedQuery: async () => undefined,
+					cardInTransaction: (_db: unknown, revisionId: string) => ({
+						revisionId,
+					}),
 					routeInTransaction: () => ({
 						cards: [],
 						past: [],

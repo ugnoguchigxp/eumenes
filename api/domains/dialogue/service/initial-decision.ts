@@ -48,7 +48,7 @@ const requestAnalysis = z
 		approved: z
 			.boolean()
 			.describe(
-				"直前のアシスタント発言が同じ内容の実行確認で、今回の発言がそれへの承認ならtrue。",
+				"直前のアシスタント発言が同じ内容の実行確認で、今回の発言がそれへの承認ならtrue。それ以外はfalse。通常の質問・新規依頼・前回の回答や作業完了報告への続きはfalse。過去の承認は引き継がない。",
 			),
 	})
 	.strict();
@@ -60,6 +60,19 @@ const toolchainChoice = requestAnalysis.extend({
 });
 const unavailableChoice = requestAnalysis.extend(unavailableReply.shape);
 
+const discoveryChoice = requestAnalysis
+	.extend({
+		query: z
+			.string()
+			.trim()
+			.min(1)
+			.max(2000)
+			.describe(
+				"今回の依頼に必要な担当の用途を表す検索文。対象・時点・条件を保ちます。",
+			),
+	})
+	.strict();
+const DISCOVERY_FUNCTION = "find_toolchain";
 const ANSWER_FUNCTION = "answer";
 const UNAVAILABLE_FUNCTION = "report_unavailable";
 
@@ -71,6 +84,7 @@ const UNAVAILABLE_FUNCTION = "report_unavailable";
 export type FirstRound = RequestAnalysis &
 	(
 		| { next: "answer" }
+		| { next: "find_toolchain"; query: string }
 		| { next: "report_unavailable"; reply: string }
 		| { next: "toolchain"; card: ToolchainCard; announcement: string }
 		/** An instant-answer toolchain: its arguments (checked by the card) are all the call carries. */
@@ -96,9 +110,23 @@ function jsonSchema(schema: z.ZodType) {
 export function analysisTools(
 	cards: readonly ToolchainCard[],
 	sessions: ReadonlySet<string> = new Set(),
+	allowDiscovery = false,
 ): NativeTool[] {
 	const offered = new Set(cards.map((c) => c.functionName));
 	return [
+		...(allowDiscovery
+			? [
+					{
+						type: "function" as const,
+						function: {
+							name: DISCOVERY_FUNCTION,
+							description:
+								"提示された使用済みの担当では今回の用途を満たせず、別の担当が必要なときだけ呼びます。検索は一度だけ、最大4候補です。今回の依頼と参考文脈から用途の検索文を作ります。実行は行いません。",
+							parameters: jsonSchema(discoveryChoice),
+						},
+					},
+				]
+			: []),
 		...cards.map((card) => ({
 			type: "function" as const,
 			function: {
@@ -126,7 +154,7 @@ export function analysisTools(
 			type: "function" as const,
 			function: {
 				name: UNAVAILABLE_FUNCTION,
-				description: `提示された担当のどれでも依頼を満たせないときに呼び、その旨を利用者へ短く伝えます。replyがそのまま回答として音声で読み上げられるため、音声整形後の合計${SPOKEN_REPLY_MAX_CHARS}字以内・${SPOKEN_REPLY_MAX_SENTENCES}文以内にします。担当は起動しません。`,
+				description: `提示された情報では今回の依頼を進められないときに呼びます。必須の対象・条件が曖昧なら短く確認し、候補が適合しなければ不足を伝えます。replyがそのまま回答として音声で読み上げられるため、音声整形後の合計${SPOKEN_REPLY_MAX_CHARS}字以内・${SPOKEN_REPLY_MAX_SENTENCES}文以内にします。担当は起動しません。`,
 				parameters: jsonSchema(unavailableChoice.strict()),
 			},
 		},
@@ -165,6 +193,7 @@ function consistent(round: FirstRound) {
 export function validateAnalysis(
 	calls: NativeToolCall[],
 	cards: readonly ToolchainCard[],
+	allowDiscovery = false,
 ): FirstRound {
 	if (calls.length !== 1)
 		throw operationRejection("call_count", undefined, [], calls.length);
@@ -173,7 +202,8 @@ export function validateAnalysis(
 	if (
 		!card &&
 		call.name !== ANSWER_FUNCTION &&
-		call.name !== UNAVAILABLE_FUNCTION
+		call.name !== UNAVAILABLE_FUNCTION &&
+		!(allowDiscovery && call.name === DISCOVERY_FUNCTION)
 	)
 		throw operationRejection("tool_not_offered", call);
 	let args: unknown;
@@ -193,7 +223,9 @@ export function validateAnalysis(
 		? toolchainChoice.strict()
 		: call.name === ANSWER_FUNCTION
 			? requestAnalysis
-			: unavailableChoice.strict();
+			: call.name === DISCOVERY_FUNCTION
+				? discoveryChoice
+				: unavailableChoice.strict();
 	const parsed = schema.safeParse(args);
 	if (!parsed.success)
 		throw operationRejection(
@@ -204,13 +236,16 @@ export function validateAnalysis(
 	const data = parsed.data as RequestAnalysis & {
 		announcement?: string;
 		reply?: string;
+		query?: string;
 	};
-	const { announcement, reply, ...analysis } = data;
+	const { announcement, reply, query, ...analysis } = data;
 	const round: FirstRound = card
 		? { ...analysis, next: "toolchain", card, announcement: announcement! }
 		: call.name === ANSWER_FUNCTION
 			? { ...analysis, next: "answer" }
-			: { ...analysis, next: "report_unavailable", reply: reply! };
+			: call.name === DISCOVERY_FUNCTION
+				? { ...analysis, next: "find_toolchain", query: query! }
+				: { ...analysis, next: "report_unavailable", reply: reply! };
 	consistent(round);
 	return round;
 }
@@ -265,6 +300,8 @@ function validateInstant(
 
 /** The judgment of the first round as the selection trace keeps it (never the request itself). */
 export function analysisTrace(round: FirstRound): SelectionAnalysis {
+	if (round.next === "find_toolchain")
+		throw new Error("discovery_not_selection");
 	const { kind, freshness, next, impact, approved } = round;
 	// An instant toolchain is handed the request like any other toolchain.
 	return {

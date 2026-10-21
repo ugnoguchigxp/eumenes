@@ -2,6 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import type { LarmPort } from "../../domains/larm";
 import {
 	analysisReceipt,
+	DISCOVERY,
 	isAnalysisRound,
 } from "../../domains/dialogue/test/analysis.fixture";
 import { harness } from "./toolchain.fixture";
@@ -129,6 +130,18 @@ async function rig() {
 			const head = script.main[0];
 			// The first round of every main-agent run: the script decides whether the request is delegated.
 			if (isAnalysisRound(options?.tools)) {
+				if (
+					options?.tools?.some((t) => t.function.name === DISCOVERY) &&
+					!options.tools.some((t) => t.function.name === "ui_create")
+				) {
+					options!.onToolCalls!(
+						analysisReceipt("fixture", {
+							name: DISCOVERY,
+							args: { query: messages.at(-1)!.content },
+						}).toolCalls as never,
+					);
+					return "";
+				}
 				routeCalls++;
 				options!.onToolCalls!(
 					(typeof head === "object"
@@ -316,7 +329,7 @@ test("ui_create opens the work and the same run continues as the specialist's tu
 	expect(first.status).toBe("completed");
 	// The main agent decided, then selected the toolchain; the specialist answered the run.
 	expect(r.mainRuns).toBe(1);
-	expect(r.mainPrompts).toHaveLength(2);
+	expect(r.mainPrompts).toHaveLength(3);
 	expect(r.h.dialogue.answerText(first.id)).toBe("初稿です。");
 	expect(r.h.dialogue.get(first.id)!.specialistSessionId).toBe(
 		(await r.session())!.id,

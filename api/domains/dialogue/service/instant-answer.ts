@@ -1,3 +1,4 @@
+import { validRetainedSources } from "./retained-toolchains";
 import { z } from "zod";
 import type { Receipt } from "../../inference";
 import { getLogger } from "../../../infrastructure/logger";
@@ -36,9 +37,12 @@ export async function answerInstant(
 		route: found.route,
 		query: found.query,
 	});
-	const prepared = deps.store.read((db) =>
-		deps.toolchains?.instantInTransaction?.(db, card.revisionId),
-	);
+	const prepared = deps.store.read((db) => {
+		if (!validRetainedSources(deps, db, input))
+			throw new Error("toolchain_context_stale");
+		deps.toolchains?.resolveInTransaction(db, card.revisionId);
+		return deps.toolchains?.instantInTransaction?.(db, card.revisionId);
+	});
 	if (!prepared) throw new Error("toolchain_unavailable");
 	const started = Date.now();
 	const result = await prepared.run(analysis.arguments, signal);

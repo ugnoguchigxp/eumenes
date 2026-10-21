@@ -145,6 +145,7 @@ export function validateToolchain(
 	if (
 		!d.functionName ||
 		!toolchainFunctionPattern.test(d.functionName) ||
+		d.functionName === "find_toolchain" ||
 		!d.packageRevisionId ||
 		d.dependencies.length !== 1 ||
 		d.dependencies[0] !== d.packageRevisionId ||

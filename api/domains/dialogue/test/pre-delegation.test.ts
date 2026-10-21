@@ -21,8 +21,8 @@ test("direct answers finish without a notice or a specialist", async () => {
 			turnId: run.id,
 			granularity: "answer",
 		});
-		// The candidates are searched before the first round, whether or not it hands the request over.
-		expect(h.state.routeCalls).toBe(1);
+		// An answer needs no capability discovery.
+		expect(h.state.routeCalls).toBe(0);
 		expect(run.announcement).toBeNull();
 		expect(await h.session()).toBeNull();
 		// The request was analyzed first; the answer is the second round, with the analysis as a host record and no function.
@@ -101,7 +101,7 @@ test("no candidate offers report_unavailable alone and its reply is the answer, 
 		// The first round alone decided: it offered only answer and report_unavailable, and there was no second round.
 		expect(h.state.mainCalls).toHaveLength(0);
 		expect(h.state.analysisCalls[0]!.tools.map((t) => t.function.name)).toEqual(
-			["answer", "report_unavailable"],
+			["find_toolchain", "answer", "report_unavailable"],
 		);
 		expect(h.state.specialistPrompts).toHaveLength(0);
 		// The decision is an answer, traced with the judgment of the first round and no candidate.

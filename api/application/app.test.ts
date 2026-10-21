@@ -12,6 +12,7 @@ import {
 import {
 	createDialogueService,
 	migration as dialogueMigration,
+	retainedToolchainsMigration,
 	queueLinkMigration,
 } from "../domains/dialogue";
 import type { LarmPort } from "../domains/larm";
@@ -59,6 +60,7 @@ function setup() {
 		conversationAvatarMotionMigration,
 		conversationAnswerDeliveryMigration,
 		dialogueMigration,
+		retainedToolchainsMigration,
 		voiceMigration,
 		queueMigration,
 		schedulerMigration,

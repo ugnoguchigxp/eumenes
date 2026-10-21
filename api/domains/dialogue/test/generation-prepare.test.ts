@@ -38,6 +38,7 @@ import {
 	createDialogueService,
 	agentLinkMigration,
 	migration as dialogueMigration,
+	retainedToolchainsMigration,
 	queueLinkMigration,
 	worldStateMigration,
 } from "..";
@@ -46,6 +47,7 @@ import { saveItem } from "./memory-seed";
 const MIGRATIONS = [
 	...conversationMigrations,
 	dialogueMigration,
+	retainedToolchainsMigration,
 	queueMigration,
 	queueLinkMigration,
 	agentLinkMigration,

@@ -288,6 +288,24 @@ export function createSelections(store: SqliteStore, now: () => number) {
 		markRecipeInTransaction,
 		toolchainOfRunInTransaction,
 		requestOfRunInTransaction,
+		usageOfRunInTransaction(db: Database, runId: string) {
+			const row = db
+				.query(
+					"SELECT id,request_text,outcome,outcome_code FROM toolchain_selections WHERE run_id=? AND decision='toolchain'",
+				)
+				.get(runId) as Pick<
+				SelectionRow,
+				"id" | "request_text" | "outcome" | "outcome_code"
+			> | null;
+			return row
+				? {
+						selectionId: row.id,
+						request: row.request_text,
+						outcome: row.outcome as SelectionOutcome | null,
+						code: row.outcome_code,
+					}
+				: undefined;
+		},
 		queryOfRunInTransaction,
 		similarSelectionsInTransaction,
 		listSelections,

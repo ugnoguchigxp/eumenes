@@ -2,6 +2,9 @@ import {
 	REFERENCE_WINDOW_TOKENS,
 	contextBudgets,
 	estimateTextTokens,
+	estimateMessageTokens,
+	estimateJsonTokens,
+	outputReserveTokens,
 	type ContextBlock,
 } from "../../inference";
 import type { AnswerTicket } from "../../agent-runtime";
@@ -17,7 +20,9 @@ import { fitAssembly, memoryHistoryUsed } from "./context-fit";
 import { systemMessageOf } from "./context-format-current";
 import { renderContext } from "./context-render";
 import { prepareRouting } from "./delegate-conversation";
-import { previousExchange } from "./request-analysis";
+import { prepareRetained } from "./retained-toolchains";
+import { analysisTools } from "./initial-decision";
+import { analysisMessages, previousExchange } from "./request-analysis";
 import { renderGoalsLayer } from "./goals-layer";
 import { topicTexts, worldNamesBlock } from "./topic-texts";
 import { specialistWorkBlock, viewingBlock } from "./specialist-context";
@@ -221,6 +226,30 @@ export function createPrepare(
 					},
 				)
 			: undefined;
+		if (routing) {
+			const base = {
+				routing: routing.routing,
+				messages,
+				currentRequest: {
+					messageId: run.inputMessageId,
+					messageIndex: rendered.currentRequestIndex,
+				},
+			};
+			const room =
+				budgets.task -
+				outputReserveTokens(windowTokens) -
+				estimateMessageTokens(analysisMessages(base)) -
+				estimateJsonTokens(analysisTools([], new Set(), true));
+			Object.assign(routing.routing, {
+				retained: prepareRetained(
+					deps,
+					tx,
+					run,
+					new Set(routing.routing.available),
+					room,
+				),
+			});
+		}
 		// A prefetch left out of this turn is neither sent nor checked at adoption.
 		const prepared =
 			window && compiled.prefetchDropped

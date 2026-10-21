@@ -2,6 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import type { LarmPort } from "../../domains/larm";
 import {
 	analysisReceipt,
+	DISCOVERY,
 	isAnalysisRound,
 } from "../../domains/dialogue/test/analysis.fixture";
 import { waitFor } from "../../infrastructure/wait-for";
@@ -70,6 +71,18 @@ function model(): LarmPort {
 			}
 			// The conversation's first round delegates to the studio; the second writes its request.
 			if (isAnalysisRound(options?.tools)) {
+				if (
+					options?.tools?.some((t) => t.function.name === DISCOVERY) &&
+					!options.tools.some((t) => t.function.name === "ui_create")
+				) {
+					options!.onToolCalls!(
+						analysisReceipt("fixture", {
+							name: DISCOVERY,
+							args: { query: messages.at(-1)!.content },
+						}).toolCalls as never,
+					);
+					return "";
+				}
 				options!.onToolCalls!(
 					analysisReceipt("fixture", {
 						name: "ui_create",

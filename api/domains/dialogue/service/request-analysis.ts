@@ -1,3 +1,4 @@
+import { validRetainedSources, usageMessage } from "./retained-toolchains";
 import type { Receipt } from "../../inference";
 import { systemContext } from "../../../infrastructure/system-context";
 import { getLogger } from "../../../infrastructure/logger";
@@ -53,22 +54,14 @@ export function previousExchange(
 	).map(({ role, content }) => ({ role, content: clipMessage(content) }));
 }
 
-/**
- * The first round of every new conversation decision: one call, one of the candidates' functions, `answer` or
- * `report_unavailable`; its prose is neither shown nor adopted. The structural repair is the shared one
- * (once); a second violation fails.
- */
-export async function analyzeRequest(
-	deps: DialogueDeps,
-	input: GenerateInput,
-	found: Candidates,
-	signal: AbortSignal,
-	repair: () => void,
-): Promise<{ analysis: FirstRound; receipt?: Receipt; repaired: boolean }> {
-	const started = Date.now();
+/** Same host-owned framing for budget estimation and delivery. */
+export function analysisMessages(
+	input: Pick<GenerateInput, "routing" | "messages" | "currentRequest">,
+	found?: Candidates,
+) {
 	const analysis = input.routing!.analysis;
 	const current = currentRequestMessage(input);
-	const messages = markCurrentRequest(
+	return markCurrentRequest(
 		[
 			{ role: "system", content: buildRolePrompt(analysis.persona) },
 			...(analysis.previous.length
@@ -80,6 +73,21 @@ export async function analyzeRequest(
 									"dialogue.contexts.request-analysis.previous",
 									{},
 								) + JSON.stringify(analysis.previous),
+						},
+					]
+				: []),
+			...(found?.notes?.length ? [usageMessage(found.notes)] : []),
+			...(found?.discovery
+				? [
+						{
+							role: "user" as const,
+							content:
+								"toolchainDiscoveryReference=" +
+								JSON.stringify({
+									status: found.discovery,
+									query: found.queryText,
+									candidateCount: found.route.cards.length,
+								}),
 						},
 					]
 				: []),
@@ -96,18 +104,51 @@ export async function analyzeRequest(
 		current,
 		input.currentRequest.messageId,
 	);
+}
+
+/**
+ * The first round of every new conversation decision: one call, one of the candidates' functions, `answer` or
+ * `report_unavailable`; its prose is neither shown nor adopted. The structural repair is the shared one
+ * (once); a second violation fails.
+ */
+export async function analyzeRequest(
+	deps: DialogueDeps,
+	input: GenerateInput,
+	found: Candidates,
+	signal: AbortSignal,
+	repair: () => void,
+): Promise<{ analysis: FirstRound; receipt?: Receipt; repaired: boolean }> {
+	const started = Date.now();
+	const messages = analysisMessages(input, found);
+	input.routing!.offeredRevisionIds = [
+		...new Set([
+			...(input.routing!.offeredRevisionIds ?? []),
+			...found.route.cards.map((card) => card.revisionId),
+		]),
+	];
+
 	try {
+		if (!deps.store.read((db) => validRetainedSources(deps, db, input)))
+			throw new Error("toolchain_context_stale");
 		const generated = await generateConversation({
 			inference: deps.larm,
 			requestId: input.requestId,
 			messages,
-			requestMessage: current,
+			requestMessage: currentRequestMessage(input),
 			signal,
 			delta: () => {},
 			briefReply: input.briefReply,
-			tools: analysisTools(found.route.cards, found.sessionFunctions),
+			tools: analysisTools(
+				found.route.cards,
+				found.sessionFunctions,
+				found.allowDiscovery,
+			),
 			cards: found.route.cards,
 			analysis: true,
+			approvalReference: input.routing!.analysis.previous.some(
+				(message) => message.role === "assistant",
+			),
+			allowDiscovery: found.allowDiscovery,
 			// A one-shot call: its prose is never adopted and it holds no conversation session.
 			sessionRole: "auxiliary",
 			repair,

@@ -18,6 +18,7 @@ import {
 	createDialogueService,
 	type GoalsLayerPort,
 	migration as dialogueMigration,
+	retainedToolchainsMigration,
 	queueLinkMigration,
 } from "../../dialogue";
 import { createQueue, migration as queueMigration } from "../../queue";
@@ -71,6 +72,7 @@ export async function setup(
 		conversationAvatarMotionMigration,
 		conversationAnswerDeliveryMigration,
 		dialogueMigration,
+		retainedToolchainsMigration,
 		migration,
 		queueMigration,
 		schedulerMigration,

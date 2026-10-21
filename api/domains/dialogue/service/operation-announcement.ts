@@ -1,3 +1,4 @@
+import { validRetainedSources } from "./retained-toolchains";
 import type { Receipt } from "../../inference";
 import { chosen, type Candidates } from "./selection-trace";
 import type { FirstRound } from "./initial-decision";
@@ -29,6 +30,8 @@ async function announceOperation(
 			throw new Error("run_changed");
 		if (!validAttachmentContext(deps, tx, input, run.conversationId))
 			throw new Error("attachment_source_unavailable");
+		if (!validRetainedSources(deps, tx, input))
+			throw new Error("toolchain_context_stale");
 		const rejected = operationRejection(tx, {
 			inference: deps.larm,
 			receipt,

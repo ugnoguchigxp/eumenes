@@ -17,6 +17,7 @@ import {
 	commandInteractionsMigration,
 	createDialogueService,
 	migration as dialogueMigration,
+	retainedToolchainsMigration,
 	queueLinkMigration,
 	announcementMigration,
 	questionChoicesMigration,
@@ -30,6 +31,7 @@ import type { RequestAnalysis } from "../service/initial-decision";
 import { waitFor } from "../../../infrastructure/wait-for";
 import {
 	analysisReceipt,
+	DISCOVERY,
 	isAnalysisRound,
 	offeredToolchains,
 	UNAVAILABLE,
@@ -124,6 +126,7 @@ export function setup(
 		avatarMotionMigration,
 		answerDeliveryMigration,
 		dialogueMigration,
+		retainedToolchainsMigration,
 		queueMigration,
 		queueLinkMigration,
 		announcementMigration,
@@ -216,6 +219,15 @@ export function setup(
 			session?: unknown,
 		) => {
 			if (isAnalysisRound(tools)) {
+				if (
+					tools?.some((tool) => tool.function.name === DISCOVERY) &&
+					!offeredToolchains(tools).length &&
+					(!analyses[0]?.call || analyses[0]?.call === card.functionName)
+				)
+					return analysisReceipt(requestId, {
+						name: DISCOVERY,
+						args: { query: lastUser(history) },
+					});
 				const { call: named, ...over } = analyses.shift() ?? {};
 				return analysisReceipt(requestId, {
 					name: named ?? offeredToolchains(tools)[0] ?? UNAVAILABLE,
@@ -331,6 +343,8 @@ export function setup(
 				}),
 	});
 	const toolchains: ToolchainRoutingPort = {
+		cardInTransaction: (_db, revisionId) =>
+			revisionId === state.activeRevision ? { ...card, revisionId } : undefined,
 		embedQuery: async () => undefined,
 		routeInTransaction: (_db, input) => {
 			routed.push([...input.available]);

@@ -3,6 +3,7 @@ import type { RequestAnalysis } from "../../domains/dialogue/service/initial-dec
 import {
 	analysisReceipt,
 	ANSWER,
+	DISCOVERY,
 	isAnalysisRound,
 	offeredToolchains,
 	UNAVAILABLE,
@@ -40,7 +41,15 @@ export function answerAnalysis(
 	const { call: named, announcement, ...analysis } = over;
 	options!.onToolCalls!(
 		analysisReceipt("analysis", {
-			name: named ?? offeredToolchains(options?.tools)[0] ?? UNAVAILABLE,
+			name:
+				options?.tools?.some((t) => t.function.name === DISCOVERY) &&
+				(!offeredToolchains(options?.tools).length ||
+					(named &&
+						named !== ANSWER &&
+						named !== UNAVAILABLE &&
+						!offeredToolchains(options?.tools).includes(named)))
+					? DISCOVERY
+					: (named ?? offeredToolchains(options?.tools)[0] ?? UNAVAILABLE),
 			args: analysis,
 			announcement,
 		}).toolCalls as never,

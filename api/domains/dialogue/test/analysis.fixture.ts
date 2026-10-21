@@ -2,6 +2,7 @@ import type { Receipt } from "../../inference";
 import type { RequestAnalysis } from "../service/initial-decision";
 
 /** The first round's functions that no toolchain owns. */
+export const DISCOVERY = "find_toolchain";
 export const ANSWER = "answer";
 export const UNAVAILABLE = "report_unavailable";
 
@@ -13,7 +14,9 @@ export const isAnalysisRound = (tools: Tools) =>
 export const offeredToolchains = (tools: Tools) =>
 	(tools ?? [])
 		.map((t) => t.function.name)
-		.filter((name) => name !== ANSWER && name !== UNAVAILABLE);
+		.filter(
+			(name) => name !== ANSWER && name !== UNAVAILABLE && name !== DISCOVERY,
+		);
 
 /** The analysis of a request that is answered from hand (general knowledge). */
 export function analysisArgs(
@@ -65,9 +68,11 @@ export function analysisReceipt(
 					...base,
 					...(name === UNAVAILABLE
 						? { reply: call.reply ?? "お任せできる担当がありません。" }
-						: name === ANSWER
-							? {}
-							: { announcement: call.announcement ?? NOTICE }),
+						: name === DISCOVERY
+							? { query: "今回の依頼を実行する担当" }
+							: name === ANSWER
+								? {}
+								: { announcement: call.announcement ?? NOTICE }),
 					...call.args,
 				}),
 			},

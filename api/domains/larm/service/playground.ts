@@ -156,7 +156,8 @@ export function createLarmPlayground(config: {
 						...post({
 							profile: target.selector,
 							audience: config.audience,
-							client: "eumenes-service-tests",
+							// This call owns its release; a concurrent call must never share its credential.
+							client: `eumenes-service-${crypto.randomUUID()}`,
 							providers: [target.mode === "provider" ? target.name : "llm"],
 							ttlSeconds: 300,
 							allowFallback: false,

@@ -23,6 +23,7 @@ import {
 import {
 	createDialogueService,
 	migration as dialogueMigration,
+	retainedToolchainsMigration,
 	queueLinkMigration,
 	announcementMigration,
 } from "..";
@@ -39,7 +40,11 @@ import {
 	seedImportMigration,
 } from "../../memory";
 import { saveItem } from "./memory-seed";
-import { analysisReceipt, isAnalysisRound } from "./analysis.fixture";
+import {
+	analysisReceipt,
+	DISCOVERY,
+	isAnalysisRound,
+} from "./analysis.fixture";
 
 import type {
 	QueryVector,
@@ -52,6 +57,7 @@ const MIGRATIONS = [
 	avatarMotionMigration,
 	answerDeliveryMigration,
 	dialogueMigration,
+	retainedToolchainsMigration,
 	queueMigration,
 	queueLinkMigration,
 	announcementMigration,
@@ -100,6 +106,8 @@ function routing(
 		score: { rank: 1, ftsRank: null, similarity: null, fromHistory: false },
 	};
 	return {
+		cardInTransaction: (_db, revisionId) =>
+			card.revisionId === revisionId ? card : undefined,
 		embedQuery: async () => query(),
 		routeInTransaction: () => ({
 			cards: offered ? [card] : [],
@@ -165,7 +173,12 @@ async function setup(
 				return analysisReceipt(
 					"request-1",
 					options.operation
-						? { name: "web_search", announcement: "お調べします。" }
+						? {
+								name: tools?.some((tool) => tool.function.name === DISCOVERY)
+									? DISCOVERY
+									: "web_search",
+								announcement: "お調べします。",
+							}
 						: {},
 				);
 			seen.push(messages.map((m) => ({ ...m })));

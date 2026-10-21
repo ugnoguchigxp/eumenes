@@ -163,7 +163,7 @@ for (const [fullResearch, invalidateLatest] of [
 					.list(id)
 					.find((t) => t.kind === "worker")!;
 				expect(child.packageRevisionId).toBe(
-					fullResearch ? "package:web.search@5" : "package:web.recipe@5",
+					fullResearch ? "package:web.search@6" : "package:web.recipe@6",
 				);
 				expect(child.modelCalls).toBe(invalidateLatest ? 4 : 3);
 			}

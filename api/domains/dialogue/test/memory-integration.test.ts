@@ -19,6 +19,7 @@ import {
 import {
 	createDialogueService,
 	migration as dialogueMigration,
+	retainedToolchainsMigration,
 	queueLinkMigration,
 } from "..";
 import type { CallSession } from "../../inference";
@@ -40,6 +41,7 @@ import { waitFor as until } from "../../../infrastructure/wait-for";
 const MIGRATIONS = [
 	...conversationMigrations,
 	dialogueMigration,
+	retainedToolchainsMigration,
 	queueMigration,
 	queueLinkMigration,
 	continuityMigration,

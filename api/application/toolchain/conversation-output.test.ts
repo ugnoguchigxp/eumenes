@@ -86,7 +86,7 @@ for (const mode of ["repair", "repeat"] as const)
 					}
 				return ["ready", "failed"].includes(h.voice.get(id)?.status ?? "");
 			});
-			expect(routes).toBe(mode === "repair" ? 3 : 2);
+			expect(routes).toBe(mode === "repair" ? 4 : 2);
 			expect(
 				visible.every(
 					(text) => !text.includes("create_music") && !text.includes("<|"),

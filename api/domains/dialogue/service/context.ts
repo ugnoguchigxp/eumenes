@@ -66,6 +66,8 @@ export interface GenerateInput {
 	 */
 	routing?: {
 		/** What the first round (the request analysis) reads besides the current request. */
+		offeredRevisionIds?: string[];
+		retained?: import("./retained-toolchains").PreparedToolchains;
 		analysis: import("./request-analysis").AnalysisInput;
 		/** Toolchains whose runtime is available on this host now. */
 		available: string[];

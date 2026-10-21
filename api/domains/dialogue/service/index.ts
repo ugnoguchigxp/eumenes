@@ -1,3 +1,4 @@
+import { resetToolchainOperation } from "./retained-toolchains";
 import { createToolchainCommandHandler } from "./toolchain-command";
 import { createSpecialistOps } from "./specialist-commands";
 import { flushCancelled } from "./specialist-core";
@@ -39,6 +40,15 @@ import type { MusicPort } from "../contracts/music";
 import type { ImagePort } from "../contracts/image";
 import type { ObjectRecognitionPort } from "../contracts/object-recognition";
 const log = getLogger("dialogue");
+
+function registerHandlers(
+	deps: DialogueDeps,
+	progress: ReturnType<typeof createProgress>,
+) {
+	deps.queue.registerHandler(createGenerationHandler(deps, progress));
+	deps.queue.registerHandler(createToolchainCommandHandler(deps));
+	deps.queue.registerHandler(createSpecialistTurnHandler(deps));
+}
 
 export function createDialogueService({
 	store,
@@ -110,9 +120,7 @@ export function createDialogueService({
 		intake.acceptInTransaction,
 	);
 	deps.interactions = interactions;
-	queue.registerHandler(createGenerationHandler(deps, progress));
-	queue.registerHandler(createToolchainCommandHandler(deps));
-	queue.registerHandler(createSpecialistTurnHandler(deps));
+	registerHandlers(deps, progress);
 	const specialistOps = createSpecialistOps(deps);
 	const agentSync = createAgentSync(deps);
 	const errorReport = createErrorReport({
@@ -156,6 +164,7 @@ export function createDialogueService({
 			linkAnswer(db, runId, job.id);
 		},
 		interactions,
+		resetToolchains: resetToolchainOperation(deps),
 		/** The conversation's live specialist session, or null (`GET /api/conversations/:id/specialist`). */
 		specialistSession: specialistOps.session,
 		/** True only for an active or suspended session that has not expired (the guard of the work's screen operations). */

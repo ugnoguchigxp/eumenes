@@ -91,6 +91,12 @@ test("a retried attempt replaces the decision and the first terminal outcome win
 		request: "鎌倉市の天気",
 		outcome: "answered",
 	});
+	expect(
+		store.read((db) => history.usageOfRunInTransaction(db, "run")),
+	).toMatchObject({ request: "鎌倉市の天気", outcome: "answered", code: null });
+	expect(
+		store.read((db) => history.usageOfRunInTransaction(db, "missing")),
+	).toBeUndefined();
 	expect(store.read((db) => history.requestOfRunInTransaction(db, "run"))).toBe(
 		"鎌倉市の天気",
 	);

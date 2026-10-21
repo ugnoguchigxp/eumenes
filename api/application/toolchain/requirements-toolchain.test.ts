@@ -158,7 +158,7 @@ for (const c of cases)
 				expect(result.counts.verify).toEqual({ n: 0 });
 			} else expect(result.structureMatched).toBe(true);
 			expect(result.counts.worker).toBe(search ? 2 : 3);
-			expect(calls).toBe(search ? 5 : 6);
+			expect(calls).toBe(search ? 6 : 7);
 			expect(result.semanticChecks.every((v) => v.status === "unchecked")).toBe(
 				true,
 			);

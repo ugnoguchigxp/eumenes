@@ -1,49 +1,36 @@
+import {
+	createGenerationSettlement,
+	type GenerationHandler,
+} from "./generation-settle";
 import { answerSession, createAnswerStream } from "./generation-stream";
 import { generationTiming } from "./generation-timing";
 import { operationResultMessage } from "./context-format-current";
 import { currentRequestMessage } from "./request-context";
-import {
-	resolveAttachmentContext,
-	validAttachmentContext,
-} from "./attachment-context";
+import { resolveAttachmentContext } from "./attachment-context";
 import { z } from "zod";
 import { getLogger, withLogContext } from "../../../infrastructure/logger";
-import type { Receipt } from "../../inference";
-import type { SettleResult } from "../../memory";
-import type { HandlerDefinition } from "../../queue";
-import { settleConversationOperation } from "./generation-operation";
-import type { ConversationOperation } from "./conversation-tools";
 import {
-	agentOutcome,
 	decisionDraft,
-	failedAnswer,
-	findCandidates,
 	prepareAnswer,
 	recordRejected,
 	traceFailure,
-	traceOutcome,
-	traceSelection,
 	type Decision,
-	type SelectionDraft,
 } from "./selection-trace";
-import { analyzeRequest } from "./request-analysis";
+import { analyzeInitialRequest } from "./initial-request";
 import { announceAndSelect } from "./operation-announcement";
 import { answerInstant } from "./instant-answer";
 import { generateConversation } from "./conversation-generation";
 import { researchCitations } from "./research-citations";
 import type { Run } from "../contracts";
-import { byId, transition } from "../repository";
-import { endRun, type RunEndState } from "./run-end";
+import { byId } from "../repository";
+import { endRun } from "./run-end";
 import {
 	GENERATE_KIND,
 	type DialogueDeps,
 	type GenerateInput,
-	type GeneratePayload,
 } from "./context";
 import { createPrepare } from "./generation-prepare";
 import { flushDeferred } from "./specialist-core";
-import { goalsLayerStale } from "./goals-layer";
-import { adoptMemoryWindow, clearShownNotices } from "./memory-window";
 import type { Progress } from "./progress";
 import {
 	RESEARCH_FAILURE_REPLY,
@@ -127,22 +114,9 @@ export function createGenerationHandler(
 	deps: DialogueDeps,
 	{ partials, publish }: Pick<Progress, "partials" | "publish">,
 ) {
-	const { store, conversation, larm, clock, id, memory, agents } = deps;
+	const { store, larm, agents } = deps;
 
-	const handler: HandlerDefinition<
-		GeneratePayload,
-		GenerateInput,
-		{
-			text: string;
-			receipt?: Receipt;
-			operation?: ConversationOperation;
-			/** The text is the host's own answer (an instant toolchain's); no model wrote it. */
-			hostAnswer?: true;
-			/** The decision this attempt made, recorded with its adoption. */
-			selection?: SelectionDraft;
-			recallPins?: Array<{ messageId: string; digest: string }>;
-		}
-	> = {
+	const handler: GenerationHandler = {
 		kind: GENERATE_KIND,
 		payloadVersions: [1],
 		schema: z.object({
@@ -156,6 +130,9 @@ export function createGenerationHandler(
 		async execute(input, { signal: caller }) {
 			let signal = caller;
 			let closeStream = () => {};
+			let rethrow = (error: unknown): never => {
+				throw error;
+			};
 			const run = store.read((db) => byId(db, input.runId));
 			return withLogContext(
 				{
@@ -192,6 +169,7 @@ export function createGenerationHandler(
 						recallPins,
 					);
 					closeStream = body.close;
+					rethrow = body.rethrow;
 					signal = body.signal;
 					const delta = body.delta;
 					const preparation = answerCollection(run, chunkSpeech);
@@ -202,13 +180,12 @@ export function createGenerationHandler(
 					};
 					// A new decision finds the candidate toolchains, then analyzes the request: one call that gives it to a
 					// toolchain, answers it, or reports that nothing fits. That round's body is neither shown nor adopted.
-					const found =
-						input.routing && !input.agent
-							? await findCandidates(deps, input, signal)
-							: undefined;
-					const first = found
-						? await analyzeRequest(deps, input, found, signal, repair)
-						: undefined;
+					const { found, first } = await analyzeInitialRequest(
+						deps,
+						input,
+						signal,
+						repair,
+					);
 					const analysis = first?.analysis;
 					let decision: Decision;
 					let generated: Awaited<ReturnType<typeof generateConversation>>;
@@ -295,137 +272,11 @@ export function createGenerationHandler(
 						recallPins,
 					};
 				},
-			).finally(() => closeStream());
+			)
+				.catch((error) => rethrow(error))
+				.finally(() => closeStream());
 		},
-		settleInTransaction(tx, claim, input, outcome) {
-			const run = byId(tx, claim.payload.runId);
-			if (!run) return "stale";
-			if (outcome.type === "success") {
-				const answerText = outcome.result.text;
-				if (
-					!input ||
-					run.status !== "running" ||
-					run.revision !== input.revision
-				) {
-					return "stale";
-				}
-				if (!validAttachmentContext(deps, tx, input, run.conversationId)) {
-					endRun(deps, tx, run, "failed", "attachment_source_unavailable");
-					return failedAnswer(
-						deps,
-						tx,
-						run.id,
-						"attachment_source_unavailable",
-					);
-				}
-				traceSelection(deps, tx, run.id, outcome.result.selection);
-				if (outcome.result.operation)
-					return settleConversationOperation(
-						deps,
-						partials,
-						tx,
-						claim,
-						run,
-						input,
-						{ ...outcome.result, operation: outcome.result.operation },
-					);
-				if (
-					input.agent &&
-					agents &&
-					!agents.validAnswerInTransaction(tx, input.agent)
-				) {
-					endRun(deps, tx, run, "failed", "report_invalidated");
-					agents.failAnswerInTransaction(tx, run.id, "report_invalidated");
-					return failedAnswer(deps, tx, run.id, "report_invalidated");
-				}
-				// The goals layer stands apart from the memory window: a quiet window still has to see its goals change.
-				const goalsStale = goalsLayerStale(deps.goals, tx, input.goals);
-				if (goalsStale || (input.memory && memory)) {
-					const adopted: SettleResult = goalsStale
-						? { ok: false, reason: "memory_stale" }
-						: adoptMemoryWindow(
-								memory!,
-								tx,
-								run,
-								input.memory!,
-								outcome.result.recallPins,
-							);
-					if (!adopted.ok) {
-						if (run.agentTaskId)
-							agents?.failAnswerInTransaction(tx, run.id, adopted.reason);
-						endRun(deps, tx, run, "failed", adopted.reason);
-						return failedAnswer(deps, tx, run.id, adopted.reason);
-					}
-				}
-				// No model was asked: the request is accepted as the host's own answer, so the speech standing on it proceeds.
-				if (researchFailed(input.agent) || outcome.result.hostAnswer) {
-					const requestId = larm.requestFor?.(tx, run.id, "llm");
-					if (
-						requestId &&
-						larm.acceptHostAnswerInTransaction &&
-						!larm.acceptHostAnswerInTransaction(tx, requestId)
-					) {
-						if (run.agentTaskId)
-							agents?.failAnswerInTransaction(tx, run.id, "permission_revoked");
-						endRun(deps, tx, run, "failed", "permission_revoked");
-						return failedAnswer(deps, tx, run.id, "permission_revoked");
-					}
-				}
-				if (
-					outcome.result.receipt &&
-					!larm.acceptInTransaction?.(tx, outcome.result.receipt)
-				) {
-					memory?.discardUsageInTransaction(tx, run.id);
-					if (run.agentTaskId)
-						agents?.failAnswerInTransaction(tx, run.id, "permission_revoked");
-					endRun(deps, tx, run, "failed", "permission_revoked");
-					return failedAnswer(deps, tx, run.id, "permission_revoked");
-				}
-				if (input.agent && agents)
-					agents.completeAnswerInTransaction(tx, input.agent);
-				const messageId = id();
-				conversation.appendInTransaction(tx, {
-					id: messageId,
-					conversationId: run.conversationId,
-					role: "assistant",
-					text: answerText,
-					createdAt: clock(),
-					runId: run.id,
-				});
-				// The notices this answer carried are shown once: only an adopted answer clears them.
-				if (input.memory && memory)
-					clearShownNotices(memory, tx, run, input.memory);
-				if (outcome.result.receipt?.delivery?.version === 2)
-					conversation.recordAnswerDeliveryInTransaction(
-						tx,
-						run.id,
-						run.conversationId,
-						outcome.result.receipt.delivery,
-					);
-				const done = endRun(deps, tx, run, "completed", null, messageId);
-				if (done) traceOutcome(deps, tx, run.id, agentOutcome(input.agent));
-				return done ? "applied" : "stale";
-			}
-			// A run that is already terminal (e.g. cancelled) keeps its state.
-			if (run.status !== "queued" && run.status !== "running") return "applied";
-			const next: [RunEndState | "queued", string | null] =
-				outcome.type === "retry"
-					? ["queued", outcome.errorCode]
-					: outcome.type === "failed"
-						? ["failed", outcome.errorCode]
-						: outcome.type === "expired"
-							? ["failed", "deadline_exceeded"]
-							: ["interrupted", outcome.errorCode];
-			if (run.agentTaskId)
-				agents?.failAnswerInTransaction(tx, run.id, next[1] ?? "answer_failed");
-			if (next[0] !== "queued")
-				traceFailure(deps, tx, run.id, outcome.type, next[1]);
-			const moved =
-				next[0] === "queued"
-					? transition(tx, run.id, run.revision, "queued", clock(), next[1])
-					: endRun(deps, tx, run, next[0], next[1]);
-			return moved ? "applied" : "stale";
-		},
+		settleInTransaction: createGenerationSettlement(deps, partials),
 		// A session switched or ended while this settled: abort what that withdrew.
 		afterCommit: () => flushDeferred(deps),
 		cancelInTransaction(tx, job) {

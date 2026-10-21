@@ -1,3 +1,4 @@
+import { validRetainedSources } from "./retained-toolchains";
 import type { DialogueDeps, GenerateInput } from "./context";
 import type { Progress } from "./progress";
 import type { generationTiming } from "./generation-timing";
@@ -27,6 +28,8 @@ export function createAnswerStream(
 				return "cancelled";
 			if (!validAttachmentContext(deps, db, input, run.conversationId))
 				return "attachment_source_unavailable";
+			if (!validRetainedSources(deps, db, input))
+				return "toolchain_context_stale";
 			if (goalsLayerStale(deps.goals, db, input.goals)) return "memory_stale";
 			if (
 				input.agent &&
@@ -50,13 +53,15 @@ export function createAnswerStream(
 	};
 	// Voice may release clauses before final adoption. Invalidate them immediately on a commit,
 	// including while no new LLM delta arrives and a downstream classifier is still pending.
-	const stop = store.read((db) => byId(db, input.runId))?.utteranceId
-		? store.onCommit(() => {
-				const run = store.read((db) => byId(db, input.runId));
-				if (run?.status === "completed") return;
-				validate();
-			})
-		: () => {};
+	const stop =
+		store.read((db) => byId(db, input.runId))?.utteranceId ||
+		input.routing?.retained
+			? store.onCommit(() => {
+					const run = store.read((db) => byId(db, input.runId));
+					if (run?.status === "completed") return;
+					validate();
+				})
+			: () => {};
 	let held = 0;
 	const delta = (text: string) => {
 		scoped.throwIfAborted();
@@ -81,6 +86,10 @@ export function createAnswerStream(
 		delta,
 		signal: scoped,
 		close: stop,
+		/** Transport cancellation must not erase the source/authority failure that caused it. */
+		rethrow(error: unknown): never {
+			throw abort.signal.aborted ? abort.signal.reason : error;
+		},
 		reset() {
 			held = 0;
 		},

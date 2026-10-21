@@ -47,7 +47,7 @@ async function weatherHarness(
 	return { h, service, offers };
 }
 
-test("a weather request is answered from the first round alone: fixed sentence, no second round, no notice", async () => {
+test("a cold weather request is answered after one discovery and instant selection: fixed sentence, no second round, no notice", async () => {
 	const { h, service, offers } = await weatherHarness();
 	try {
 		const run = await h.dialogue.submit({
@@ -59,9 +59,9 @@ test("a weather request is answered from the first round alone: fixed sentence, 
 			(await h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 }))?.status,
 		).toBe("completed");
 		expect(h.dialogue.answerText(run.id)).toBe(tomorrowKamakura);
-		// One model call (the first round); nothing reached a worker, the web, or a second round.
+		// Cold discovery and candidate selection; nothing reached a worker, the web, or answer generation.
 		expect(offers).toHaveLength(1);
-		expect(h.calls).toBe(1);
+		expect(h.calls).toBe(2);
 		expect(h.workerContexts).toHaveLength(0);
 		expect(h.routeContexts).toHaveLength(0);
 		expect(h.acquisitions).toBe(0);

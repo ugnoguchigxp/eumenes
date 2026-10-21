@@ -1,0 +1,485 @@
+{
+  "date": "2026-10-21",
+  "lanes": {
+    "fixture": "temporary SQLite and fake providers",
+    "live": "saved LARM settings, real model and embeddings, fixed external weather responses; no production operations or devices"
+  },
+  "samples": [
+    {
+      "id": "before-1-0",
+      "arm": "before",
+      "input": "鎌倉の今日の天気を教えて",
+      "next": "instant",
+      "kind": "live_info",
+      "approved": false,
+      "functionName": "weather_forecast",
+      "target": "鎌倉",
+      "day": "today",
+      "searches": 1,
+      "embeddings": 1,
+      "modelCalls": 1,
+      "requestBytes": [
+        16287
+      ],
+      "repairs": 0,
+      "announcementMs": 8339.243,
+      "finalMs": 8339.250166,
+      "repeat": 1,
+      "phase": "cold",
+      "passed": true,
+      "promptTokens": 3812,
+      "cachedTokens": 0
+    },
+    {
+      "id": "before-1-1",
+      "arm": "before",
+      "input": "明日は？",
+      "next": "instant",
+      "kind": "knowledge",
+      "approved": false,
+      "functionName": "weather_forecast",
+      "target": "鎌倉",
+      "day": "tomorrow",
+      "searches": 2,
+      "embeddings": 2,
+      "modelCalls": 1,
+      "requestBytes": [
+        18895
+      ],
+      "repairs": 0,
+      "announcementMs": 9067.404125,
+      "finalMs": 9067.408249999999,
+      "repeat": 1,
+      "phase": "warm",
+      "passed": true,
+      "promptTokens": 4144,
+      "cachedTokens": 0
+    },
+    {
+      "id": "before-2-0",
+      "arm": "before",
+      "input": "鎌倉の今日の天気を教えて",
+      "next": "instant",
+      "kind": "live_info",
+      "approved": false,
+      "functionName": "weather_forecast",
+      "target": "鎌倉",
+      "day": "today",
+      "searches": 1,
+      "embeddings": 1,
+      "modelCalls": 1,
+      "requestBytes": [
+        16287
+      ],
+      "repairs": 0,
+      "announcementMs": 9104.096250000002,
+      "finalMs": 9104.105917,
+      "repeat": 2,
+      "phase": "cold",
+      "passed": true,
+      "promptTokens": 3812,
+      "cachedTokens": 0
+    },
+    {
+      "id": "before-2-1",
+      "arm": "before",
+      "input": "明日は？",
+      "next": "instant",
+      "kind": "live_info",
+      "approved": false,
+      "functionName": "weather_forecast",
+      "target": "鎌倉",
+      "day": "tomorrow",
+      "searches": 2,
+      "embeddings": 2,
+      "modelCalls": 1,
+      "requestBytes": [
+        18895
+      ],
+      "repairs": 0,
+      "announcementMs": 10386.428999999996,
+      "finalMs": 10386.438374999998,
+      "repeat": 2,
+      "phase": "warm",
+      "passed": true,
+      "promptTokens": 4144,
+      "cachedTokens": 0
+    },
+    {
+      "id": "before-3-0",
+      "arm": "before",
+      "input": "鎌倉の今日の天気を教えて",
+      "next": "instant",
+      "kind": "live_info",
+      "approved": false,
+      "functionName": "weather_forecast",
+      "target": "鎌倉",
+      "day": "today",
+      "searches": 1,
+      "embeddings": 1,
+      "modelCalls": 1,
+      "requestBytes": [
+        16287
+      ],
+      "repairs": 0,
+      "announcementMs": 9087.262457999997,
+      "finalMs": 9087.268499999991,
+      "repeat": 3,
+      "phase": "cold",
+      "passed": true,
+      "promptTokens": 3812,
+      "cachedTokens": 0
+    },
+    {
+      "id": "before-3-1",
+      "arm": "before",
+      "input": "明日は？",
+      "next": "instant",
+      "kind": "live_info",
+      "approved": false,
+      "functionName": "weather_forecast",
+      "target": "鎌倉",
+      "day": "tomorrow",
+      "searches": 2,
+      "embeddings": 2,
+      "modelCalls": 1,
+      "requestBytes": [
+        18895
+      ],
+      "repairs": 0,
+      "announcementMs": 9361.20137499999,
+      "finalMs": 9361.208457999994,
+      "repeat": 3,
+      "phase": "warm",
+      "passed": true,
+      "promptTokens": 4144,
+      "cachedTokens": 0
+    },
+    {
+      "id": "v3-after-1-0",
+      "arm": "after",
+      "input": "鎌倉の今日の天気を教えて",
+      "next": "instant",
+      "kind": "live_info",
+      "approved": false,
+      "functionName": "weather_forecast",
+      "target": "鎌倉",
+      "day": "today",
+      "searches": 1,
+      "embeddings": 1,
+      "modelCalls": 2,
+      "requestBytes": [
+        9771,
+        18729
+      ],
+      "repairs": 0,
+      "announcementMs": 14447.6525,
+      "finalMs": 14447.662917,
+      "repeat": 1,
+      "phase": "cold",
+      "passed": true,
+      "promptTokens": 6010,
+      "cachedTokens": 0
+    },
+    {
+      "id": "v3-after-1-1",
+      "arm": "after",
+      "input": "明日は？",
+      "next": "instant",
+      "kind": "live_info",
+      "approved": false,
+      "functionName": "weather_forecast",
+      "target": "鎌倉",
+      "day": "tomorrow",
+      "searches": 0,
+      "embeddings": 0,
+      "modelCalls": 1,
+      "requestBytes": [
+        13910
+      ],
+      "repairs": 0,
+      "announcementMs": 6874.645542,
+      "finalMs": 6874.64825,
+      "repeat": 1,
+      "phase": "warm",
+      "passed": true,
+      "promptTokens": 2717,
+      "cachedTokens": 0
+    },
+    {
+      "id": "v3-after-2-0",
+      "arm": "after",
+      "input": "鎌倉の今日の天気を教えて",
+      "next": "instant",
+      "kind": "live_info",
+      "approved": false,
+      "functionName": "weather_forecast",
+      "target": "鎌倉",
+      "day": "today",
+      "searches": 1,
+      "embeddings": 1,
+      "modelCalls": 2,
+      "requestBytes": [
+        9771,
+        18754
+      ],
+      "repairs": 0,
+      "announcementMs": 15441.601958,
+      "finalMs": 15441.605582999997,
+      "repeat": 2,
+      "phase": "cold",
+      "passed": true,
+      "promptTokens": 6008,
+      "cachedTokens": 0
+    },
+    {
+      "id": "v3-after-2-1",
+      "arm": "after",
+      "input": "明日は？",
+      "next": "instant",
+      "kind": "live_info",
+      "approved": false,
+      "functionName": "weather_forecast",
+      "target": "鎌倉",
+      "day": "tomorrow",
+      "searches": 0,
+      "embeddings": 0,
+      "modelCalls": 1,
+      "requestBytes": [
+        13910
+      ],
+      "repairs": 0,
+      "announcementMs": 7485.844624999998,
+      "finalMs": 7485.850832999997,
+      "repeat": 2,
+      "phase": "warm",
+      "passed": true,
+      "promptTokens": 2717,
+      "cachedTokens": 0
+    },
+    {
+      "id": "v3-after-3-0",
+      "arm": "after",
+      "input": "鎌倉の今日の天気を教えて",
+      "next": "instant",
+      "kind": "live_info",
+      "approved": false,
+      "functionName": "weather_forecast",
+      "target": "鎌倉",
+      "day": "today",
+      "searches": 1,
+      "embeddings": 1,
+      "modelCalls": 2,
+      "requestBytes": [
+        9771,
+        18714
+      ],
+      "repairs": 0,
+      "announcementMs": 15149.305415999996,
+      "finalMs": 15149.307207999998,
+      "repeat": 3,
+      "phase": "cold",
+      "passed": true,
+      "promptTokens": 6006,
+      "cachedTokens": 0
+    },
+    {
+      "id": "v3-after-3-1",
+      "arm": "after",
+      "input": "明日は？",
+      "next": "instant",
+      "kind": "live_info",
+      "approved": false,
+      "functionName": "weather_forecast",
+      "target": "鎌倉",
+      "day": "tomorrow",
+      "searches": 0,
+      "embeddings": 0,
+      "modelCalls": 1,
+      "requestBytes": [
+        13910
+      ],
+      "repairs": 0,
+      "announcementMs": 7246.875540999994,
+      "finalMs": 7246.880666000005,
+      "repeat": 3,
+      "phase": "warm",
+      "passed": true,
+      "promptTokens": 2717,
+      "cachedTokens": 0
+    }
+  ],
+  "approvalSamples": [
+    {
+      "id": "approval-1-read_followup",
+      "repeat": 1,
+      "approved": false,
+      "next": "instant",
+      "kind": "live_info",
+      "repairs": 0,
+      "passed": true
+    },
+    {
+      "id": "approval-1-new_request_after_past_approval",
+      "repeat": 1,
+      "approved": false,
+      "next": "toolchain",
+      "kind": "action",
+      "repairs": 0,
+      "passed": true
+    },
+    {
+      "id": "approval-1-explicit_confirmation",
+      "repeat": 1,
+      "approved": true,
+      "next": "toolchain",
+      "kind": "action",
+      "repairs": 0,
+      "passed": true
+    },
+    {
+      "id": "approval-2-read_followup",
+      "repeat": 2,
+      "approved": false,
+      "next": "instant",
+      "kind": "live_info",
+      "repairs": 0,
+      "passed": true
+    },
+    {
+      "id": "approval-2-new_request_after_past_approval",
+      "repeat": 2,
+      "approved": false,
+      "next": "toolchain",
+      "kind": "action",
+      "repairs": 0,
+      "passed": true
+    },
+    {
+      "id": "approval-2-explicit_confirmation",
+      "repeat": 2,
+      "approved": true,
+      "next": "toolchain",
+      "kind": "action",
+      "repairs": 0,
+      "passed": true
+    },
+    {
+      "id": "approval-3-read_followup",
+      "repeat": 3,
+      "approved": false,
+      "next": "instant",
+      "kind": "live_info",
+      "repairs": 0,
+      "passed": true
+    },
+    {
+      "id": "approval-3-new_request_after_past_approval",
+      "repeat": 3,
+      "approved": false,
+      "next": "toolchain",
+      "kind": "action",
+      "repairs": 0,
+      "passed": true
+    },
+    {
+      "id": "approval-3-explicit_confirmation",
+      "repeat": 3,
+      "approved": true,
+      "next": "toolchain",
+      "kind": "action",
+      "repairs": 0,
+      "passed": true
+    }
+  ],
+  "pipeline": [
+    {
+      "input": "鎌倉の今日の天気を教えて",
+      "status": "completed",
+      "queryEmbeddings": 1,
+      "modelCalls": 2,
+      "arguments": [
+        {
+          "kind": "live_info",
+          "freshness": "live",
+          "impact": "none",
+          "approved": false,
+          "place": "鎌倉",
+          "prefecture": "神奈川県",
+          "day": "today"
+        }
+      ]
+    },
+    {
+      "input": "明日は？",
+      "status": "completed",
+      "queryEmbeddings": 0,
+      "modelCalls": 1,
+      "arguments": [
+        {
+          "kind": "live_info",
+          "freshness": "live",
+          "impact": "none",
+          "approved": false,
+          "place": "鎌倉",
+          "prefecture": "神奈川県",
+          "day": "tomorrow"
+        }
+      ]
+    },
+    {
+      "input": "横浜なら明日は？",
+      "status": "completed",
+      "queryEmbeddings": 0,
+      "modelCalls": 1,
+      "arguments": [
+        {
+          "kind": "live_info",
+          "freshness": "live",
+          "impact": "none",
+          "approved": false,
+          "place": "横浜",
+          "prefecture": "神奈川県",
+          "day": "tomorrow"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "domains": [
+      "dialogue",
+      "capabilities",
+      "toolchain-history",
+      "inference",
+      "memory",
+      "agent-runtime",
+      "voice-dialogue"
+    ],
+    "bun": 1053,
+    "vitest": 69,
+    "report": "verification-reports/runs/2026-10-20T22-45-04-110Z-4b111772-69a8-48f2-8164-64f38550599d/report.json",
+    "applicationSuite": {
+      "passed": 171,
+      "failed": 1,
+      "existingFailure": "api/application/toolchain/delegation-context.test.ts: music expects 2 messages; unchanged music handler appends musicProviders as third message"
+    },
+    "routingSupplement": {
+      "passed": 4,
+      "failed": 0
+    },
+    "finalSupplements": {
+      "retentionAndHistory": 23,
+      "routing": 4
+    }
+  },
+  "serverRestarted": false,
+  "contextTools": {
+    "initial_instructions": "already run once in this conversation; not repeated",
+    "context_compile": 1,
+    "compile_eval": 1
+  },
+  "sampleChecks": {
+    "before": "original baseline pass field checks selected function, target and day; classification is retained as observed",
+    "after": "selected function, target, day, kind=live_info, approved=false"
+  }
+}

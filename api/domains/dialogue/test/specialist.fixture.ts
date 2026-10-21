@@ -31,6 +31,7 @@ import { createQueue, migration as queueMigration } from "../../queue";
 import {
 	createDialogueService,
 	migration as dialogueMigration,
+	retainedToolchainsMigration,
 	queueLinkMigration,
 	announcementMigration,
 	specialistMigration,
@@ -43,6 +44,7 @@ import type { RejectedDraft } from "../contracts";
 import {
 	analysisReceipt,
 	ANSWER,
+	DISCOVERY,
 	isAnalysisRound,
 	NOTICE,
 	offeredToolchains,
@@ -58,6 +60,7 @@ export const OTHER_ADAPTER = "adapter:fake-other@1";
 const MIGRATIONS = [
 	...conversationMigrations,
 	dialogueMigration,
+	retainedToolchainsMigration,
 	queueMigration,
 	queueLinkMigration,
 	announcementMigration,
@@ -215,6 +218,7 @@ export async function setup(options: Options = {}) {
 		 * (its `announcement` is the notice), a prose reply with no candidates is reported as unavailable, and
 		 * any other prose answers.
 		 */
+		discoveryCalls: [] as Call[],
 		analyses: [] as Array<
 			Partial<RequestAnalysis> & {
 				call?: string;
@@ -325,6 +329,25 @@ export async function setup(options: Options = {}) {
 		) => {
 			const call = { history: [...history], tools: tools ?? [], preparation };
 			if (isAnalysisRound(tools)) {
+				const intended = state.analyses[0]?.call;
+				const headCall = state.main[0];
+				const wanted =
+					intended ??
+					(typeof headCall === "object"
+						? headCall.toolCalls[0]?.name
+						: undefined);
+				if (
+					tools?.some((tool) => tool.function.name === DISCOVERY) &&
+					wanted &&
+					routed.some((card) => card.functionName === wanted) &&
+					!offeredToolchains(tools).includes(wanted)
+				) {
+					state.discoveryCalls.push(call);
+					return analysisReceipt(requestId, {
+						name: DISCOVERY,
+						args: { query: history.at(-1)!.content },
+					});
+				}
 				state.analysisCalls.push(call);
 				const {
 					call: named,
@@ -358,7 +381,11 @@ export async function setup(options: Options = {}) {
 					});
 				if (
 					chosen === UNAVAILABLE ||
-					(!chosen && !offered.length && typeof head === "string" && !named)
+					(!chosen &&
+						state.noCandidates &&
+						!offered.length &&
+						typeof head === "string" &&
+						!named)
 				)
 					return analysisReceipt(requestId, {
 						name: UNAVAILABLE,
@@ -587,6 +614,8 @@ export async function setup(options: Options = {}) {
 		card(OTHER_REVISION, "fake.other", "other_create"),
 	];
 	const toolchains: ToolchainRoutingPort = {
+		cardInTransaction: (_db, revisionId) =>
+			routed.find((card) => card.revisionId === revisionId),
 		embedQuery: async () => undefined,
 		routeInTransaction: (_db, input) => {
 			state.routeCalls++;

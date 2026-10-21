@@ -14,6 +14,7 @@ import {
 import {
 	createDialogueService,
 	migration as dialogueMigration,
+	retainedToolchainsMigration,
 	queueLinkMigration,
 } from "../../dialogue";
 import { createQueue, migration as queueMigration } from "../../queue";
@@ -74,6 +75,7 @@ test("voice capture to ASR, dialogue, TTS; duplicate utterance is ignored", asyn
 			conversationAvatarMotionMigration,
 			conversationAnswerDeliveryMigration,
 			dialogueMigration,
+			retainedToolchainsMigration,
 			migration,
 			queueMigration,
 			queueLinkMigration,
@@ -163,6 +165,7 @@ test("restart cancels the run of a stale voice turn so no old answer is spoken",
 			conversationAvatarMotionMigration,
 			conversationAnswerDeliveryMigration,
 			dialogueMigration,
+			retainedToolchainsMigration,
 			migration,
 			queueMigration,
 			queueLinkMigration,
@@ -675,6 +678,7 @@ async function raceFixture(prefix: string) {
 		conversationAvatarMotionMigration,
 		conversationAnswerDeliveryMigration,
 		dialogueMigration,
+		retainedToolchainsMigration,
 		migration,
 		queueMigration,
 		queueLinkMigration,

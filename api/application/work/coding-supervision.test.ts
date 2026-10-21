@@ -28,6 +28,7 @@ import {
 import {
 	createDialogueService,
 	migration as dialogueMigration,
+	retainedToolchainsMigration,
 	queueLinkMigration,
 } from "../../domains/dialogue";
 import {
@@ -160,6 +161,7 @@ test("HTTP/client authenticate report and supervisor reads and omit private CLI 
 			schedulerMigration,
 			conversationMigration,
 			dialogueMigration,
+			retainedToolchainsMigration,
 			queueLinkMigration,
 			voiceMigration,
 		],

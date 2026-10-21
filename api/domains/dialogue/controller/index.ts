@@ -36,6 +36,10 @@ function specialistError(c: import("hono").Context, error: unknown) {
 	);
 }
 export function registerDialogue(app: Hono, service: DialogueService) {
+	app.post("/api/conversations/:id/toolchains/reset", async (c) => {
+		await service.resetToolchains(c.req.param("id"));
+		return c.body(null, 204);
+	});
 	app.get("/api/runs/:id/stream", (c) => {
 		const id = c.req.param("id");
 		if (!service.get(id)) return c.json({ error: "not_found" }, 404);

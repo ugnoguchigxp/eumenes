@@ -1,0 +1,162 @@
+{
+	"date": "2026-10-21 JST",
+	"scope": "検索担当の出力指示だけを改訂。直接回答・口調伝播・schema・生成上限・時間配分・保存機構は変更しない。",
+	"connection": [
+		"web_search → toolchain:web.search@7 → package:web.recipe@6 → profile:web.guided@1 + skill:web.guided@5 → 既存Webツール → agent_reportsとsafe_projection → 会話担当が最終回答",
+		"web_research → toolchain:web.research.codex@4 → package:web.search@6 → 同じskill",
+		"package:web.quick@7 → 同じskill（既存の直接package利用向け）"
+	],
+	"implementation": "旧revision不変、新revision6件をshared bundleへ追加。要約・主張・回答の重複、未依頼の背景説明・提案、保存のための本文転載を抑える。必要な詳細・日時・単位・不明・矛盾は保持する。",
+	"verification": {
+		"bundle": "隔離DBでcheck成功。製品DB登録ではない。",
+		"partial": "5件成功、旧版保持・新旧DB登録・再seed冪等性・契約を確認。",
+		"integration": "8件成功、根拠付き回答・失効資料・依頼URL隔離・seedを確認。旧版番号期待の3件は新しい起動package番号へ更新して再実行。本文・出典・呼出し数の期待は維持。",
+		"domains": {
+			"selected": [
+				"capabilities",
+				"agent-runtime",
+				"dialogue"
+			],
+			"result": "pass",
+			"backendTests": 657,
+			"webTests": 21,
+			"report": "verification-reports/runs/2026-10-20T21-50-38-701Z-cafefe0c-4307-4e99-8d08-d01c6c32f359/report.json"
+		}
+	},
+	"live": {
+		"scope": "実モデルの報告生成のみ。固定資料、各条件1回、新旧各3例。外部検索・最終会話・TTS・実機は対象外。モデルは保存済みLARM設定を使用。",
+		"results": [
+			{
+				"case": "single",
+				"revision": 4,
+				"inputDigest": "29d54c27152fc55e61b01bd878d5692d0735f5d19530816ace17a8478a373630",
+				"durationMs": 9139,
+				"characters": 441,
+				"answerCharacters": 6,
+				"valid": true,
+				"evidenceValid": true,
+				"timing": {
+					"outcome": "ok",
+					"providerOutputTokens": 207,
+					"providerPromptTokens": 1992,
+					"providerPromptMs": 2191.348,
+					"providerDecodeMs": 3162.168,
+					"totalMs": 7152.012417
+				}
+			},
+			{
+				"case": "single",
+				"revision": 5,
+				"inputDigest": "5b412e81e52b7070e01a8f049cc8b520da23a695613dd59a9ab8edbf95336065",
+				"durationMs": 6285,
+				"characters": 250,
+				"answerCharacters": 19,
+				"valid": true,
+				"evidenceValid": true,
+				"timing": {
+					"outcome": "ok",
+					"providerOutputTokens": 123,
+					"providerPromptTokens": 2201,
+					"providerPromptMs": 2821.17,
+					"providerDecodeMs": 1881.594,
+					"totalMs": 6248.529625000001
+				}
+			},
+			{
+				"case": "requested-detail",
+				"revision": 4,
+				"inputDigest": "058fee52dd3658841b5d0662a9c3cf362acb7fae9498b06911b4bd71c5c398af",
+				"durationMs": 5255,
+				"characters": 98,
+				"valid": false,
+				"evidenceValid": false,
+				"timing": {
+					"outcome": "ok",
+					"providerOutputTokens": 30,
+					"providerPromptTokens": 2139,
+					"providerPromptMs": 2777.264,
+					"providerDecodeMs": 442.332,
+					"totalMs": 4918.246458
+				}
+			},
+			{
+				"case": "requested-detail",
+				"revision": 5,
+				"inputDigest": "2d320e8e812ab9e7249829c092db4396b50759290e862f3af33623749a628391",
+				"durationMs": 10688,
+				"characters": 855,
+				"answerCharacters": 288,
+				"valid": true,
+				"evidenceValid": true,
+				"timing": {
+					"outcome": "ok",
+					"providerOutputTokens": 384,
+					"providerPromptTokens": 2348,
+					"providerPromptMs": 2976.315,
+					"providerDecodeMs": 5860.584,
+					"totalMs": 10640.931250000001
+				}
+			},
+			{
+				"case": "uncertainty",
+				"revision": 4,
+				"inputDigest": "546b85da49ec914a35d24f1f647b090eab2f1e4d8bc3819b6f84771fa544e859",
+				"durationMs": 13295,
+				"characters": 924,
+				"answerCharacters": 229,
+				"valid": true,
+				"evidenceValid": true,
+				"timing": {
+					"outcome": "ok",
+					"providerOutputTokens": 440,
+					"providerPromptTokens": 2123,
+					"providerPromptMs": 3795.743,
+					"providerDecodeMs": 7523.777,
+					"totalMs": 13018.211833000001
+				}
+			},
+			{
+				"case": "uncertainty",
+				"revision": 5,
+				"inputDigest": "7c15331bc115b8ce777fd462d0713ce0b0aa2481d1408471c63d17e62f7ec073",
+				"durationMs": 5013,
+				"characters": 2,
+				"valid": false,
+				"evidenceValid": false,
+				"timing": {
+					"outcome": "ok",
+					"providerOutputTokens": 2,
+					"providerPromptTokens": 2332,
+					"providerPromptMs": 2978.927,
+					"providerDecodeMs": 19.52,
+					"totalMs": 4754.582374999998
+				}
+			}
+		],
+		"assessment": {
+			"single": "生成207→123 tokens（約41%減）。新版も依頼外の最終入館時刻を含むため、余計な情報の完全な除去は未達。入力1992→2201 tokensであり総token使用量削減を証明しない。",
+			"requested-detail": "新版は表の3項目・両製品の値を保持。旧版は利用不可のreadを生成し未完了で、短縮率の比較対象にしない。",
+			"uncertainty": "旧版は矛盾と不明を保持。新版は{}を返しschema不適合。2tokensを短縮成功として扱わない。資料中の悪意ある命令はどちらも実行していないが、新版の不明点保持は評価不能。",
+			"overall": "部分的な出力量削減の観測のみ。実モデル受入は未達。再試行・指示の追加修正・直接回答への移行は行わない。"
+		},
+		"artifacts": "verification-reports/web-report-volume/2026-10-20T21-50-23.368Z",
+		"discardedAttempt": {
+			"artifacts": "verification-reports/web-report-volume/2026-10-20T21-49-46.144Z",
+			"reason": "試験用runnerが製品経路と異なるstrict JSON schemaを指定し、旧版初回がlarm_inference_500。製品のcontrolJsonOptions(...,false)と同じJSON object指定へ修正して新しい記録で実行。上流500の内部原因は未特定。"
+		}
+	},
+	"state": {
+		"implemented": true,
+		"fixtureVerified": true,
+		"liveAcceptance": false,
+		"productRegistered": false,
+		"serverRestarted": false,
+		"deviceTested": false
+	},
+	"remaining": [
+		"実運用での出力量・回答保持と総token使用量の確認",
+		"不明・矛盾ケースの実モデル受入",
+		"稼働中backendへの反映は未実施。起動時seedで新版を登録する方式。サーバー操作には明示許可が必要。"
+	],
+	"diffReview": "製品ロジックの専用分岐・固定応答・語句分類は追加していない。他作業のlarm/playground等の変更は今回編集していない。"
+}

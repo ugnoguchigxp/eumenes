@@ -45,6 +45,9 @@ export async function generateConversation(input: {
 	sessions?: SessionOffers;
 	/** The first round: `tools` holds the candidates' functions, `answer` and `report_unavailable`. */
 	analysis?: boolean;
+	allowDiscovery?: boolean;
+	/** A true approval must at least have a preceding assistant exchange to stand on. Meaning is judged by the model. */
+	approvalReference?: boolean;
 	repair: () => void;
 	/**
 	 * Session lifetime of every call here, including the structural correction: `main` for the answer generation,
@@ -119,7 +122,13 @@ export async function generateConversation(input: {
 			if (!input.tools)
 				throw operationRejection("tools_not_offered_in_request");
 			if (input.analysis) {
-				const analysis = validateAnalysis(receipt.toolCalls, input.cards ?? []);
+				const analysis = validateAnalysis(
+					receipt.toolCalls,
+					input.cards ?? [],
+					input.allowDiscovery,
+				);
+				if (analysis.approved && input.approvalReference === false)
+					throw operationRejection("approval_reference_missing");
 				// The notice and the explanation are shown to the user: the same output and spoken-reply checks.
 				if (analysis.next === "toolchain")
 					conversationOutput(() => {}, input.tools).finish(

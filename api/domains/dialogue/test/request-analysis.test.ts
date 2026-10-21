@@ -97,8 +97,9 @@ test("live information is classified with the candidates, announced by the first
 		expect(JSON.stringify(h.state.recorded[0]!.analysis)).not.toContain("鎌倉");
 		// The log has the judgment only.
 		const analyzed = events("dialogue.request_analyzed");
-		expect(analyzed).toHaveLength(1);
-		expect(analyzed[0]).toMatchObject({
+		expect(analyzed).toHaveLength(2);
+		expect(analyzed[0].next).toBe("find_toolchain");
+		expect(analyzed[1]).toMatchObject({
 			kind: "live_info",
 			freshness: "live",
 			next: "toolchain",
@@ -225,7 +226,14 @@ test("an old answer to the same question, the memory and the time never reach th
 		expect(again.status).toBe("completed");
 		const input = h.state.analysisCalls[2]!.history;
 		// The role, the exchange just before, the marker and the request: nothing else.
-		expect(roles(h, 2)).toEqual(["system", "user", "system", "system", "user"]);
+		expect(roles(h, 2)).toEqual([
+			"system",
+			"user",
+			"user",
+			"system",
+			"system",
+			"user",
+		]);
 		expect(
 			JSON.parse(input[1]!.content.slice(input[1]!.content.indexOf("=") + 1)),
 		).toEqual([
@@ -235,7 +243,13 @@ test("an old answer to the same question, the memory and the time never reach th
 		// The role only: the spoken-reply and function rules of the answer prompt would invite a reply here.
 		expect(input[0]!.content).toContain("役割:");
 		expect(input[0]!.content).not.toContain("音声で聞かれます");
-		expect(input[2]!.content).toContain("report_unavailable");
+		expect(
+			input.find(
+				(message) =>
+					message.role === "system" &&
+					message.content.includes("report_unavailable"),
+			),
+		).toBeDefined();
 		const text = JSON.stringify(input);
 		expect(text).not.toContain("22度");
 		expect(text).not.toContain("以下は本人について");
@@ -246,7 +260,7 @@ test("an old answer to the same question, the memory and the time never reach th
 	}
 });
 
-test("a follow-up is searched by its own words and by the user's utterance before it, so the earlier toolchain stays a candidate", async () => {
+test("a cold follow-up searches once using the current request anchor and the available prior exchange", async () => {
 	const h = await setup();
 	try {
 		h.state.main.push("今日は晴れです。");
@@ -256,7 +270,14 @@ test("a follow-up is searched by its own words and by the user's utterance befor
 		h.state.specialist.push(reply("担当が答えます。"));
 		const run = await h.ask("明日は？");
 		expect(run.status).toBe("completed");
-		expect(roles(h, 1)).toEqual(["system", "user", "system", "system", "user"]);
+		expect(roles(h, 1)).toEqual([
+			"system",
+			"user",
+			"user",
+			"system",
+			"system",
+			"user",
+		]);
 		const previous = h.state.analysisCalls[1]!.history[1]!.content;
 		expect(JSON.parse(previous.slice(previous.indexOf("=") + 1))).toEqual([
 			{ role: "user", content: "鎌倉の天気は？" },
@@ -264,11 +285,7 @@ test("a follow-up is searched by its own words and by the user's utterance befor
 		]);
 		expect(h.state.analysisCalls[1]!.history.at(-1)!.content).toBe("明日は？");
 		// The first request was searched alone (nothing before it); the follow-up by both utterances, as said.
-		expect(h.state.routeTexts).toEqual([
-			"鎌倉の天気は？",
-			"明日は？",
-			"鎌倉の天気は？",
-		]);
+		expect(h.state.routeTexts).toEqual(["明日は？"]);
 	} finally {
 		await h.close();
 	}

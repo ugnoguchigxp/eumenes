@@ -40,8 +40,16 @@ export interface ToolchainRoutingPort {
 			text: string;
 			query?: QueryVector;
 			available: ReadonlySet<string>;
+			excludeRevisionIds?: ReadonlySet<string>;
+			/** Discovery must not expand the catalog when embedding retrieval fails. */
+			strict?: boolean;
 		},
 	): ToolchainRoute;
+	/** Rebuild a callable card from its exact active revision without retrieval. */
+	cardInTransaction(
+		db: Database,
+		revisionId: string,
+	): ToolchainCard | undefined;
 	resolveInTransaction(
 		db: Database,
 		revisionId: string,
@@ -116,6 +124,18 @@ export interface ToolchainRoutingPort {
 		runId: string,
 		result: { outcome: SelectionOutcome; code?: string | null },
 	): void;
+	/** Optional status metadata for a usage reference; no output body or prior approval is exposed. */
+	usageOfRunInTransaction?(
+		db: Database,
+		runId: string,
+	):
+		| {
+				selectionId: string;
+				request: string | null;
+				outcome: SelectionOutcome | null;
+				code: string | null;
+		  }
+		| undefined;
 	/** The request text the conversation handed to the toolchain of a run. */
 	requestOfRunInTransaction(db: Database, runId: string): string | undefined;
 }

@@ -1,3 +1,4 @@
+import { fixtureDiscovery } from "./discovery.fixture";
 import { createOcr } from "../../domains/ocr";
 import {
 	createExcalidraw,
@@ -47,6 +48,7 @@ import type { LarmPort } from "../../domains/larm";
 import {
 	analysisReceipt,
 	ANSWER,
+	DISCOVERY,
 	isAnalysisRound,
 	offeredToolchains,
 	UNAVAILABLE,
@@ -252,6 +254,20 @@ export async function harness(
 				(!!options.timers && /タイマー/.test(question)) ||
 				/天気|株価|weather|stock|調べ|検索|https?:|確認/.test(question);
 			if (isAnalysisRound(callOptions?.tools)) {
+				if (
+					delegates &&
+					!options.clarify &&
+					callOptions?.tools?.some((t) => t.function.name === DISCOVERY) &&
+					!offeredToolchains(callOptions?.tools).length
+				) {
+					callOptions!.onToolCalls!(
+						analysisReceipt("fixture", {
+							name: DISCOVERY,
+							args: { query: question },
+						}).toolCalls as never,
+					);
+					return "";
+				}
 				const scripted = options.firstRound?.(callOptions!.tools!, question);
 				if (scripted) {
 					callOptions!.onToolCalls!([
@@ -692,7 +708,24 @@ export async function harness(
 	const routing = createToolchainRouting(
 		toolchain.capabilities,
 		toolchain.history,
-		toolchain.embedQuery,
+		options.embed
+			? toolchain.embedQuery
+			: fixtureDiscovery(store, toolchain.capabilities, (query) =>
+					options.history
+						? "conversation_history"
+						: (options.routeTool ??
+							(options.uiCompositions
+								? "ui_create"
+								: options.weather && /天気/.test(query)
+									? "weather_forecast"
+									: options.stock && /株価/.test(query)
+										? "stock_quote"
+										: options.timers && /タイマー/.test(query)
+											? "timer"
+											: options.fullResearch
+												? "web_research"
+												: "web_search")),
+				),
 		toolchain.registry,
 		toolchain.schemas,
 	);

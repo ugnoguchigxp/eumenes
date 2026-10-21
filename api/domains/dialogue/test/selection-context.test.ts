@@ -150,7 +150,7 @@ for (const [previous, current] of [
 		expect(answer.messages[marker - 1]!.content).toStartWith("requestAnalysis");
 	});
 
-test("a request with no candidate has none to offer, and the search reads the utterance and the user's utterance before it", async () => {
+test("one discovery searches the requested query only, never unions the previous utterance", async () => {
 	const embedded: string[] = [];
 	const routed: string[] = [];
 	const other: ToolchainCard = {
@@ -200,12 +200,9 @@ test("a request with no candidate has none to offer, and the search reads the ut
 		]),
 		signal(),
 	);
-	expect(embedded.sort()).toEqual(["何かして", "曲を作って"].sort());
-	expect(routed).toEqual(["何かして", "曲を作って"]);
-	expect(both.route.cards.map((c) => c.functionName)).toEqual([
-		"web_search",
-		"music",
-	]);
+	expect(embedded).toEqual(["何かして"]);
+	expect(routed).toEqual(["何かして"]);
+	expect(both.route.cards.map((c) => c.functionName)).toEqual(["web_search"]);
 	// The same words twice, or a previous exchange without a user utterance, are searched once.
 	embedded.length = 0;
 	await findCandidates(

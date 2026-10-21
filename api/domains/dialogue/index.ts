@@ -1,6 +1,7 @@
 export { registerDialogue, registerCommandInteractions } from "./controller";
 export {
 	migration,
+	retainedToolchainsMigration,
 	queueLinkMigration,
 	agentLinkMigration,
 	worldStateMigration,
