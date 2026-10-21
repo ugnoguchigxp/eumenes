@@ -1,6 +1,9 @@
 import { packageRuntimeOf } from "../../capabilities";
 import { extendRunDeadline } from "../repository";
-import { originalRequestInTransaction } from "./request-context";
+import {
+	originalRequestInTransaction,
+	priorStepsInTransaction,
+} from "./request-context";
 import type { Database } from "bun:sqlite";
 import type { Run } from "../contracts";
 import type { Receipt } from "../../inference";
@@ -106,6 +109,7 @@ export function settleConversationOperation(
 			conversationId: run.conversationId,
 			question: chosen.request,
 			originalRequest: original,
+			priorSteps: priorStepsInTransaction(tx, run),
 			deadline: Date.parse(run.deadlineAt!),
 		});
 		linkAnswer(tx, run.id, saved.jobId);
@@ -117,6 +121,7 @@ export function settleConversationOperation(
 			conversationId: run.conversationId,
 			question: chosen.request,
 			originalRequest: original,
+			priorSteps: priorStepsInTransaction(tx, run),
 			deadline: Date.parse(run.deadlineAt!),
 		});
 		linkAnswer(tx, run.id, saved.jobId);
@@ -136,6 +141,7 @@ export function settleConversationOperation(
 			conversationId: run.conversationId,
 			question: chosen.request,
 			originalRequest: original,
+			priorSteps: priorStepsInTransaction(tx, run),
 			deadline: Date.parse(run.deadlineAt!),
 		});
 		linkAnswer(tx, run.id, saved.jobId);

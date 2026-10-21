@@ -15,6 +15,9 @@ import { createQueue, migration as queueMigration } from "../../queue";
 import {
 	agentLinkMigration,
 	commandInteractionsMigration,
+	continuationConditionsMigration,
+	continuationStepsMigration,
+	continuationsMigration,
 	createDialogueService,
 	migration as dialogueMigration,
 	retainedToolchainsMigration,
@@ -134,6 +137,9 @@ export function setup(
 		worldStateMigration,
 		commandInteractionsMigration,
 		questionChoicesMigration,
+		continuationsMigration,
+		continuationConditionsMigration,
+		continuationStepsMigration,
 	]);
 	const conversation = createConversationService(store);
 	const state = {

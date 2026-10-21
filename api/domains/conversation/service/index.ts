@@ -76,13 +76,13 @@ export function createConversationService(
 			{ messageId: input.messageId, text: input.text, at: input.at ?? clock() },
 			outbox,
 		);
-	/** Called inside every retraction, before the message is tombstoned (a higher domain drops what it derived from it). */
-	let retractHook: ((db: Database, messageId: string) => void) | undefined;
+	/** Called inside every retraction, before the message is tombstoned (each higher domain drops what it derived from it). */
+	const retractHooks: Array<(db: Database, messageId: string) => void> = [];
 	const retractInTransaction = (
 		db: Database,
 		input: { messageId: string; at?: string },
 	): ChangeResult => {
-		retractHook?.(db, input.messageId);
+		for (const hook of retractHooks) hook(db, input.messageId);
 		return retractMessage(
 			db,
 			{ messageId: input.messageId, at: input.at ?? clock() },
@@ -116,11 +116,11 @@ export function createConversationService(
 			return store.write((db) => correctInTransaction(db, input));
 		},
 		/**
-		 * Registers the function run in the transaction of every retraction, while the message can still be read.
-		 * Conversation imports nothing of its users: they inject what must follow a retraction.
+		 * Adds a function run in the transaction of every retraction, while the message can still be read.
+		 * Conversation imports nothing of its users: each injects what must follow a retraction.
 		 */
-		setRetractHook(hook: (db: Database, messageId: string) => void) {
-			retractHook = hook;
+		addRetractHook(hook: (db: Database, messageId: string) => void) {
+			retractHooks.push(hook);
 		},
 		/** True when the retraction tombstone column exists on this connection. */
 		retractionReadyInTransaction(db: Database): boolean {

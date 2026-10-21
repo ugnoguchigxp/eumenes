@@ -3,9 +3,13 @@ import { z } from "zod";
 import { delegationCommand } from "../contracts/delegation";
 import type { Run } from "../contracts";
 import type { Viewing } from "../contracts/specialist";
-import { runViewing } from "../repository";
+import { runViewing, type PriorStep } from "../repository";
 import type { ToolchainRoutingPort } from "../contracts/toolchains";
 import type { DialogueDeps } from "./context";
+import {
+	originalRequestInTransaction,
+	priorStepsInTransaction,
+} from "./request-context";
 
 /** dots operations offered one tool each, so every input schema is a flat object. */
 export const dotsTools = delegationCommand.options.map((option) => {
@@ -44,6 +48,8 @@ type CommandTool = {
 export type CommandSource = {
 	request: string;
 	original: string;
+	/** The earlier steps of a continued request, the question's own when the run resumes one. */
+	priorSteps: PriorStep[];
 	/** Present when the run resumes an interaction: its generation, epoch and past questions. */
 	resume?: {
 		generation: number;
@@ -81,6 +87,7 @@ export function commandSource(
 		| undefined;
 	let request: string | undefined;
 	let original: string | undefined;
+	let priorSteps: PriorStep[] = [];
 	if (execution) {
 		request = execution.request;
 		original = execution.source.request;
@@ -112,11 +119,15 @@ export function commandSource(
 		resume = context;
 		request = context.request;
 		original = context.originalRequest ?? undefined;
+		priorSteps = context.priorSteps;
 	} else {
 		request = toolchains.requestOfRunInTransaction(tx, run.id);
-		original = conversation
-			.messagesInTransaction(tx, run.conversationId)
-			.find((m) => m.id === run.inputMessageId)?.text;
+		try {
+			original = originalRequestInTransaction(tx, conversation, run);
+		} catch {
+			original = undefined;
+		}
+		priorSteps = priorStepsInTransaction(tx, run);
 	}
 	if (!request || !original)
 		return { ok: false, code: "required_context_missing" };
@@ -168,6 +179,14 @@ export function commandSource(
 	}
 	return {
 		ok: true,
-		source: { request, original, resume, snapshot, tools, toolIds },
+		source: {
+			request,
+			original,
+			priorSteps,
+			resume,
+			snapshot,
+			tools,
+			toolIds,
+		},
 	};
 }

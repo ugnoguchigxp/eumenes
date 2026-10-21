@@ -98,6 +98,7 @@ export function createMusic(deps: {
 				conversationId: string;
 				question: string;
 				originalRequest: string;
+				priorSteps?: unknown[];
 				deadline: number;
 				execution?: ChildExecution;
 			},
@@ -147,6 +148,7 @@ export function createMusic(deps: {
 				JSON.stringify({
 					...request,
 					originalRequest: input.originalRequest,
+					...(input.priorSteps?.length ? { priorSteps: input.priorSteps } : {}),
 					...(input.execution
 						? { execution: input.execution, references: input.execution.refs }
 						: {}),

@@ -13,6 +13,11 @@ export {
 	commandInteractionsMigration,
 	questionChoicesMigration,
 } from "./repository/interactions";
+export {
+	continuationConditionsMigration,
+	continuationStepsMigration,
+	continuationsMigration,
+} from "./repository/continuations";
 export type { DialogueService } from "./service";
 export { createDialogueService } from "./service";
 export { readActionOriginInTransaction } from "./service/action-origin";

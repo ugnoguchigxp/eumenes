@@ -1,6 +1,7 @@
 import type { Database } from "bun:sqlite";
 import {
 	completionCheckInTransaction,
+	withPriorSteps,
 	continuationEnded,
 } from "./completion-check";
 import {
@@ -37,6 +38,7 @@ import { renderGoalsLayer } from "./goals-layer";
 import { topicTexts, worldNamesBlock } from "./topic-texts";
 import { specialistWorkBlock, viewingBlock } from "./specialist-context";
 import { byId, transition } from "../repository";
+import { priorStepsInTransaction } from "./request-context";
 import { endRun } from "./run-end";
 import { isSystemPrompt, type Run } from "../contracts";
 import { fitTaskOffer } from "./task-offer";
@@ -237,7 +239,10 @@ export function createPrepare(
 			windowTokens,
 			estimateTextTokens(systemMessageOf(assembly).content),
 		);
-		const rendered = renderContext(fitted, "current");
+		const rendered = withPriorSteps(
+			renderContext(fitted, "current"),
+			priorStepsInTransaction(tx, run),
+		);
 		const { messages } = rendered;
 		// A new decision: the execute phase retrieves the toolchains for this request.
 		// While an operation's result (or a sub-agent's question) is phrased, nothing new is offered.
@@ -277,17 +282,12 @@ export function createPrepare(
 				room: budgets.task - outputReserveTokens(windowTokens),
 			});
 		}
-		const completionCheck = completionCheckInTransaction(
-			conversation,
-			tx,
-			run,
-			{
-				routing: routing?.routing,
-				delegatedResult: operations.length > 0 || research.length > 0,
-				hostAside:
-					!!note || !!executionNotice || !!claim.payload.specialistHandoff,
-			},
-		);
+		const completionCheck = completionCheckInTransaction(deps, tx, run, {
+			routing: routing?.routing,
+			results: [...operations, ...research],
+			hostAside:
+				!!note || !!executionNotice || !!claim.payload.specialistHandoff,
+		});
 		// A prefetch left out of this turn is neither sent nor checked at adoption.
 		const prepared =
 			window && compiled.prefetchDropped

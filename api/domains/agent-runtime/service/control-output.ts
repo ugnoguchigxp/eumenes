@@ -17,7 +17,7 @@ export const controlRepairCodes: ReadonlySet<string> = new Set([
 	"tool_url_out_of_scope",
 ]);
 export const safeCode = (e: unknown) =>
-	e instanceof Error && /^[a-z_]{1,80}$/.test(e.message)
+	e instanceof Error && /^[a-z][a-z0-9_]{0,79}$/.test(e.message)
 		? e.message
 		: "agent_failed";
 export function parseControlOutput(value: unknown): {

@@ -2,6 +2,7 @@ import { systemContext } from "../../../infrastructure/system-context";
 import type { Database } from "bun:sqlite";
 import type { ConversationService } from "../../conversation";
 import type { Run } from "../contracts";
+import { continuationOf } from "../repository";
 import type { ChatMessage, GenerateInput } from "./context";
 
 /** Host-owned identity and position, fixed before results or repair data can be added. */
@@ -64,14 +65,29 @@ export function markCurrentRequest(
 	return marked;
 }
 
-/** Every delegation reads the original from this run's input, never a recalled selection. */
+/**
+ * Every delegation reads the original from this run's input, never a recalled selection. A continuation's input is
+ * the host's: its original is the user's own text of the request it carries on.
+ */
 export function originalRequestInTransaction(
 	db: Database,
 	conversation: ConversationService,
 	run: Run,
 ) {
+	if (run.sourceKind === "continuation") {
+		const continuation = continuationOf(db, run.id);
+		if (!continuation) throw new Error("run_input_missing");
+		return continuation.originalRequest;
+	}
 	const input = conversation.messageInTransaction(db, run.inputMessageId);
 	if (!input || input.message.conversationId !== run.conversationId)
 		throw new Error("run_input_missing");
 	return input.message.text;
+}
+
+/** The earlier steps of a continuation's request, as the host copied them; none for any other run. */
+export function priorStepsInTransaction(db: Database, run: Run) {
+	return run.sourceKind === "continuation"
+		? (continuationOf(db, run.id)?.steps ?? [])
+		: [];
 }

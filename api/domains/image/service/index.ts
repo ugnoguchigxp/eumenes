@@ -92,6 +92,7 @@ export function createImage(deps: {
 				conversationId: string;
 				question: string;
 				originalRequest: string;
+				priorSteps?: unknown[];
 				deadline: number;
 				execution?: ChildExecution;
 			},
@@ -145,6 +146,7 @@ export function createImage(deps: {
 				JSON.stringify({
 					...request,
 					originalRequest: input.originalRequest,
+					...(input.priorSteps?.length ? { priorSteps: input.priorSteps } : {}),
 					...(input.execution
 						? { execution: input.execution, references: input.execution.refs }
 						: {}),
@@ -160,6 +162,21 @@ export function createImage(deps: {
 		resultInTransaction(db: Database, runId: string) {
 			const r = byRun(db, runId);
 			return r ? record(r) : null;
+		},
+		referenceInTransaction(db: Database, runId: string) {
+			const r = byRun(db, runId);
+			if (!r) return null;
+			const v = record(r);
+			return {
+				state: v.state,
+				title: v.title,
+				prompt: v.prompt,
+				errorCode: v.errorCode,
+				imageRef: v.artifactId,
+				url: v.artifactId
+					? `/api/images/${encodeURIComponent(v.artifactId)}/content`
+					: null,
+			};
 		},
 		purgeCallInTransaction(db: Database, id: string) {
 			db.query(

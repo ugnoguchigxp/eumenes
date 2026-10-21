@@ -6,7 +6,10 @@ import { isSystemPrompt, type Run } from "../contracts";
 import { linkAgent } from "../repository";
 import type { DialogueDeps } from "./context";
 import type { AnalysisInput } from "./request-analysis";
-import { originalRequestInTransaction } from "./request-context";
+import {
+	originalRequestInTransaction,
+	priorStepsInTransaction,
+} from "./request-context";
 import { hash } from "../../capabilities";
 
 /**
@@ -32,12 +35,14 @@ export function delegateConversation(
 	},
 ) {
 	const original = originalRequestInTransaction(db, conversation, run);
+	const prior = priorStepsInTransaction(db, run);
 	const root = agents.startInTransaction(db, {
 		rootRunId: run.id,
 		input: {
 			kind: selected.route,
 			question: selected.request,
 			originalRequest: original,
+			...(prior.length ? { priorSteps: prior } : {}),
 			...(selected.packageRevisionId
 				? { packageRevisionId: selected.packageRevisionId }
 				: {}),

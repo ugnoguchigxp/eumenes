@@ -156,10 +156,15 @@ export function workerContext(
 	// recent ones are kept. Registered evidence is never trimmed.
 	while (bytes(operationList) > OPERATION_BYTES && operationList.length)
 		operationList.shift();
+	// The earlier steps of a continued request are results, so they travel with the reference material.
+	const priorSteps = JSON.parse(task.input_json ?? "{}").priorSteps as
+		| unknown[]
+		| undefined;
 	const materials = {
 		...(execution?.referenceData?.length
 			? { delegatedReferences: execution.referenceData }
 			: {}),
+		...(priorSteps?.length ? { priorSteps } : {}),
 		evidence: data.evidence,
 		observations: visible,
 		...(guided ? { candidates, toolNotes } : {}),

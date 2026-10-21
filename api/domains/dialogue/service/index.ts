@@ -26,6 +26,7 @@ import type {
 import {
 	byId,
 	byRequest,
+	deleteContinuationsOfInput,
 	interruptUnfinished,
 	listRuns,
 	linkAnswer,
@@ -131,6 +132,9 @@ export function createDialogueService({
 	);
 	deps.interactions = interactions;
 	deps.continueInTransaction = intake.continueInTransaction;
+	conversation.addRetractHook((db, messageId) =>
+		deleteContinuationsOfInput(db, messageId),
+	);
 	registerHandlers(deps, progress);
 	const specialistOps = createSpecialistOps(deps);
 	const agentSync = createAgentSync(deps);

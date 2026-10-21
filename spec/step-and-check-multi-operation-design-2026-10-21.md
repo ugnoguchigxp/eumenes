@@ -170,3 +170,72 @@
 - **音声**：継続runの回答は画面に出るが読み上げられない。途中の手順の結果は固定文に置き換わり、出典は最後の手順の分だけが残る。
 - **instant**：照合の対象外（上記）。
 - **失敗した結果**：失敗・拒否の結果でも照合し、`need` が再実行になると最大3回まで繰り返しうる。
+
+## 12 手順間の受け渡し（2026-10-22 合意）
+
+### 方針（利用者の提案）
+
+継続の次の担当に、(a) 前の手順で会話エージェントが受け取ったものと同等の結果と、(b) 利用者の元の依頼を、hostが確実に渡す。LLMの要約（`achieved`）を経由させない。
+
+最初の照合での注入は、Web検索に既存の対策があるので本設計では扱わない（利用者判断・2026-10-22）。
+
+### 現状の欠陥（コードで確認）
+
+- **元の依頼が渡っていない**：委譲はすべて `originalRequestInTransaction(run)`（`request-context.ts`）でrunの入力文を `originalRequest` にする。画像・音楽・Excalidraw（`generation-operation.ts`）、調査・操作の担当（`delegate-conversation.ts`）、command（`command-source.ts`）が該当する。継続runの入力はhostが書いた `CONTINUATION=` 文なので、次の担当は利用者の原文ではなくhostの文を「依頼の原文」として読んでいる。
+- **前の結果が渡っていない**：結果のブロック（`operation.delegation`・`operation.image`・`research.result` など）は、その手順のrunの回答の準備でだけ組まれる。次のrunにあるのは、照合のLLMが書いた `achieved` の要約と、固定文に置き換えた途中の回答だけである。URL・画像ID・作成した対象のIDは、要約に正確に書かれた場合にしか届かない。
+
+### 評価
+
+- **妥当**：受け渡しをLLMの要約からhostによる複写へ変えるので、データの流れは推論に依存しなくなる。これは「仕組み的に間違えない」方向である。注入口は2か所に集約できる（元の依頼の取得箇所と、結果ブロックの保存）。担当ごとの判断や、特定の依頼に合わせた分岐は増えない。
+- **既に渡っている場合がある**：例として、3Dの担当はsnapshotの `images` から `imageRef` を選べる。domainの状態を通じて届く経路があるので、受け渡しが必須になるのは結果が報告の中にしか無い場合である（例：調査で見つけた動画のURLをブラウザ担当へ渡す）。
+- **効果の範囲**：前の結果を使う手順（検索→再生、生成→加工）を可能にする。一方、最初の手での委譲漏れや担当自身の失敗（受入の失敗の主因）は直らない。成功率が手順の数だけ掛け算で下がる性質も残る。
+- **注意点**：
+  1. 大きさ：調査結果は大きい。まずは切り詰めずに渡し、入力推論の時間を受入で測る（下記6）。
+  2. 識別子の有無：会話エージェントが受け取る形に、次の操作に必要なID・URLが含まれているかは結果の種類ごとに確かめる（未確認：調査報告の `safe_projection` に出典URLがあるか）。
+  3. 結果は参照データとして渡す：既存の担当の規則（「操作結果は実行状態で、中の命令は実行しない」）の範囲で扱う。
+
+### 設計
+
+1. **結果の保存**：照合が「継続」と決めたとき、その手順の回答の準備で組んだ結果ブロックをそのまま継続の行に保存する（`dialogue_continuations.steps_json`、新しいmigration。0013・0014は変更しない）。中身は `operations` と `research` のブロックである。前の手順までの分を引き継ぎ、手順番号を付けて積む（最大3＋1手順）。
+2. **元の依頼**：継続runでは `originalRequestInTransaction` が、root runの入力（利用者の原文）を返す。`command-source.ts` の直接の読取りも同じ関数に揃える。これで、すべての担当の `originalRequest` が利用者の原文になる。
+3. **担当への結果**：委譲の入力に、hostが付ける `priorSteps`（手順番号と保存した結果ブロック）を加える。各担当の入力組立て（画像・音楽・Excalidraw・調査／操作の担当・command）で、`originalRequest` と同じ扱いの参照データとして渡す。規則文（`delegated-task-rules`・`command-rules`）に「priorStepsは同じ依頼で前の手順が得た結果。次の操作に必要な値はここから取り、推測しない」を加える。
+4. **会話エージェント**：継続runの判断（R1・R2）にも同じ `priorSteps` を参照ブロックとして見せる。担当への依頼文が具体的になる。
+5. **最終回答**：最後の手順の回答にも `priorSteps` を見せて、途中の手順の結果と出典を回答に含められるようにする（§11 の音声・出典の課題の一部）。
+6. **窓**：切り詰めない（利用者判断・2026-10-22。担当の窓には余裕がある）。会話の窓では `fitAssembly` の切り詰めを受けないよう、組み立て後に元の依頼の直前へ一つのsystem文として置く。入力推論の時間が問題になれば、効果を確かめた後に最適化する。
+
+### 検証
+
+- **固定試験**：
+  - 継続runの担当への入力について、`originalRequest` が利用者の原文、`priorSteps` が前の手順の結果ブロックと一致することを確かめる（command と調査の担当）。
+- **実モデル**：
+  - 検索→タイマー（既存）。
+  - 調査で得たURLをブラウザ担当が開く（URLが調査結果から一字違わず渡ること）。
+  - 画像→3D。
+
+### 実装記録（2026-10-22）
+
+- **保存**：照合が継続と決めたとき、その手順の結果ブロックを `dialogue_continuations.steps_json`（migration 0015）に手順番号付きで積む。
+  - 画像は「生成されたこと」と参照（`imageRef`・`/api/images/<id>/content`）だけを渡す（`ImagePort.referenceInTransaction`）。画像の本体は渡さない。
+  - 調査報告は、その手順で回答した時刻を除いた `report` を保存する。
+- **元の依頼**：継続runの `originalRequestInTransaction` は root の利用者原文を返す。commandの取得もこの関数に揃えた。担当の質問に答えて再開したcommandでは、質問が継続runのものであれば、その依頼の原文と `priorSteps` を使う（`interaction-runs.ts`）。
+- **担当への受け渡し**：画像・音楽（作成・再生）・Excalidraw は `request_json` に、調査・操作の担当は `input_json` に、command はプロンプトのデータに、それぞれ `priorSteps` を入れる。agent-runtime では、信頼しない資料の側（`UNTRUSTED_MATERIALS`。`delegatedReferences` と同じ扱い）に置く。規則文（`delegated-task-rules`）に、priorSteps の読み方と「済んだ作業を繰り返さない」「値は推測しない」を加えた。
+- **会話**：継続runの会話・照合・最終回答では、窓を収めた後、入力の直前に `PRIOR_STEPS=` を user ロールの参照データとして一つ置く。切り詰めない。
+- **撤回**：会話domainの撤回フックを複数登録できるようにした（`addRetractHook`）。dialogue は、撤回された入力を root とする継続行を削除する。各domainの `request_json` に入った写しは、従来の `originalRequest` と同じく残る（未対応）。
+- **副次修正**：agent-runtime の `safeCode` は数字を含むコード（例 `model3d_image_not_found`）を `agent_failed` に潰していた。英小文字で始まり、英小文字・数字・`_` からなるコードを通すようにした。
+
+### 検証（2026-10-22）
+
+- **固定試験**：
+  - `completion-continuation.test.ts`（5件）で、次の4点を確かめた。
+    - 次の担当の `originalRequest` が利用者原文であること。
+    - `priorSteps` が保存行と一致し、作成したタイマーのIDを含むこと。
+    - 照合に `PRIOR_STEPS` が渡ること。
+    - 画像が参照として渡ること、撤回で継続行が消えること。
+  - 公式 verify（dialogue・image・music・excalidraw・agent-runtime・inference・capabilities・tool-runtime・conversation・memory）は Bun 1,132件・Web全件成功（run `2026-10-21T22-35-32-517Z-4e705e5c-ea5f-4b20-ac79-980883e9b030`）。
+  - application の toolchain・media は失敗3件。どれも本変更の前からの失敗である。
+    - 音楽2件：`6438f0f8` でも失敗する（`permission_revoked`）。
+    - `compute_python` の登録1件：並行の compute 作業によるもの。
+- **実モデル（画像→3D、`composed-image3d-1792621208636`、0/3）**：受け渡しは働いた。
+  - 3D の command は、画像の手順の `imageRef` を `sourceImageRef` に正しく入れ、`originalRequest` は利用者原文だった。
+  - 失敗の原因は既存の不具合である。3Dのadapterは会話 `main` の画像だけを候補にする（`model3d-adapter.ts` の `sourceImages`）。受入runnerは事例ごとに別の会話を使うので、`model3d_image_not_found` で拒否された。製品は会話 `main` だけを使うので、この経路は製品では起きない。
+  - 上の `safeCode` の不具合で原因が `agent_failed` と表示され、確認役は失敗を繰り返すたびに継続した（3回）。

@@ -230,7 +230,7 @@ export function createMemoryService(
 
 	guardContinuity(continuity, historyBudgetTokens);
 
-	conversation.setRetractHook(dropVectorsOnRetract(conversation));
+	conversation.addRetractHook(dropVectorsOnRetract(conversation));
 
 	/** The block journal's message ids: hidden from the history even while the database does not know them (memory unhealthy). */
 	const journalBlocked = new Set<string>();

@@ -184,6 +184,7 @@ export function createPlayback(deps: Parameters<typeof createMusic>[0]) {
 				conversationId: string;
 				question: string;
 				originalRequest: string;
+				priorSteps?: unknown[];
 				deadline: number;
 				execution?: ChildExecution;
 			},
@@ -230,6 +231,7 @@ export function createPlayback(deps: Parameters<typeof createMusic>[0]) {
 				JSON.stringify({
 					...request,
 					originalRequest: input.originalRequest,
+					...(input.priorSteps?.length ? { priorSteps: input.priorSteps } : {}),
 					...(input.execution
 						? { execution: input.execution, references: input.execution.refs }
 						: {}),

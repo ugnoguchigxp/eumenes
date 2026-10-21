@@ -3,12 +3,15 @@ import type { Migration } from "../../../infrastructure/sqlite";
 import { retainedToolchainsMigration } from "./retained-toolchains";
 import {
 	continuationConditionsMigration,
+	continuationStepsMigration,
 	continuationsMigration,
 } from "./continuations";
 export {
 	continuationOf,
+	deleteContinuationsOfInput,
 	insertContinuation,
 	type Continuation,
+	type PriorStep,
 } from "./continuations";
 export { retainedToolchainsMigration } from "./retained-toolchains";
 import type { Run } from "../contracts";
@@ -318,6 +321,11 @@ export const migrations: readonly Migration[] = [
 		id: "dialogue/0014-continuation-conditions",
 		after: ["dialogue/0013-continuations"],
 		sql: continuationConditionsMigration,
+	},
+	{
+		id: "dialogue/0015-continuation-steps",
+		after: ["dialogue/0014-continuation-conditions"],
+		sql: continuationStepsMigration,
 	},
 ];
 

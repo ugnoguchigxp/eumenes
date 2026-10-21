@@ -5,7 +5,9 @@ import {
 	chainSuperseded,
 	MAX_CONTINUATIONS,
 	progressLine,
+	stepResultsInTransaction,
 } from "../../domains/dialogue/service/completion-check";
+import { Database } from "bun:sqlite";
 
 type Step = { name: string; arguments: Record<string, unknown> };
 const FIRST = "一つ目のタイマー",
@@ -117,6 +119,35 @@ test("a request a delegated step did not achieve continues as a hidden run that 
 			stepCount: 2,
 			conditions: [FIRST, SECOND],
 		});
+		// The next step's sub-agent reads the user's own text and the first step's result as the host copied it,
+		// not the host-written continuation or a summary the check wrote.
+		const commandInput = (i: number) =>
+			JSON.parse(
+				(JSON.parse(h.commandContexts[i]!) as Array<{ content: string }>).at(
+					-1,
+				)!.content,
+			) as {
+				originalRequest: string;
+				priorSteps?: Array<{
+					step: number;
+					results: Array<{ source: string; value: unknown }>;
+				}>;
+			};
+		expect(commandInput(0).originalRequest).toBe(text);
+		expect(commandInput(0).priorSteps).toBeUndefined();
+		const second = commandInput(1);
+		expect(second.originalRequest).toBe(text);
+		expect(second.priorSteps?.map((s) => s.step)).toEqual([1]);
+		expect(second.priorSteps![0]!.results.length).toBeGreaterThan(0);
+		const stored = h.store.read(
+			(db) =>
+				db.query("SELECT steps_json FROM dialogue_continuations").get() as {
+					steps_json: string;
+				},
+		);
+		expect(JSON.parse(stored.steps_json)).toEqual(second.priorSteps);
+		// The conversation and the later check see the same steps, whole.
+		expect(h.completionContexts[1]).toContain("PRIOR_STEPS=");
 		const hidden = h.store.read(
 			(db) =>
 				db
@@ -139,6 +170,22 @@ test("a request a delegated step did not achieve continues as a hidden run that 
 		expect(
 			h.store.read((db) => chainSuperseded(h.conversation, db, run.id)),
 		).toBe(true);
+		// A retracted request leaves no copy of its text or its steps' results in the chain.
+		await h.store.write((db) =>
+			h.conversation.retractInTransaction(db, {
+				messageId: run.inputMessageId,
+			}),
+		);
+		expect(
+			h.store.read(
+				(db) =>
+					(
+						db
+							.query("SELECT COUNT(*) AS n FROM dialogue_continuations")
+							.get() as { n: number }
+					).n,
+			),
+		).toBe(0);
 	} finally {
 		await h.close();
 	}
@@ -244,4 +291,47 @@ test("a later check may not add, drop or rename the fixed conditions; a result c
 	} finally {
 		await h.close();
 	}
+});
+
+test("a step's results travel as the conversation received them; an image as the fact it was made and its reference", () => {
+	const db = new Database(":memory:");
+	const block = (source: string, value: unknown) =>
+		({
+			source,
+			authority: "host_record",
+			freshness: "this_turn",
+			certainty: "host_confirmed",
+			body: { kind: "json", value },
+		}) as const;
+	const reference = {
+		state: "completed",
+		imageRef: "img1",
+		url: "/api/images/img1/content",
+	};
+	const results = stepResultsInTransaction(
+		{
+			image: {
+				startInTransaction: () => ({ id: "", jobId: "" }),
+				resultInTransaction: () => null,
+				referenceInTransaction: () => reference,
+			},
+		},
+		db,
+		"run1",
+		[
+			block("operation.action", {
+				kind: "timer_action",
+				items: [{ id: "t1" }],
+			}),
+			block("operation.image", { id: "g1", artifactId: "img1", prompt: "p" }),
+		] as never,
+	);
+	expect(results).toEqual([
+		{
+			source: "operation.action",
+			value: { kind: "timer_action", items: [{ id: "t1" }] },
+		},
+		{ source: "operation.image", value: reference },
+	]);
+	db.close();
 });

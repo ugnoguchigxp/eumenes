@@ -7,7 +7,8 @@ import type { Database } from "bun:sqlite";
 import type { ConversationService } from "../../conversation";
 import type { Receipt } from "../../inference";
 import type { Run } from "../contracts";
-import { byId, continuationOf } from "../repository";
+import { byId, continuationOf, type PriorStep } from "../repository";
+import type { ContextBlock } from "../../inference";
 import type { ChatMessage, CompletionCheck, DialogueDeps } from "./context";
 
 const log = getLogger("dialogue");
@@ -220,6 +221,71 @@ export function continuationText(
 	);
 }
 
+/**
+ * This step's results, as the conversation received them, for the steps after it. An image travels as the fact
+ * that it was made and its reference, not its content.
+ */
+export function stepResultsInTransaction(
+	deps: Pick<DialogueDeps, "image">,
+	tx: Database,
+	runId: string,
+	blocks: ContextBlock[],
+): PriorStep["results"] {
+	return blocks.flatMap((block) =>
+		block.body.kind !== "json"
+			? []
+			: [
+					{
+						source: block.source,
+						value:
+							block.source === "operation.image"
+								? (deps.image?.referenceInTransaction?.(tx, runId) ??
+									block.body.value)
+								: block.source === "research.result"
+									? // The time the report was phrased at is this step's; a later step has its own.
+										{ report: (block.body.value as { report: unknown }).report }
+									: block.body.value,
+					},
+				],
+	);
+}
+
+/**
+ * A continuation's earlier steps, whole, as one reference message just before the request's input: placed after the
+ * window was fitted, so no step is clipped. The indices at or after it move by one.
+ */
+export function withPriorSteps<
+	R extends {
+		messages: ChatMessage[];
+		currentRequestIndex: number;
+		blockIndex: Partial<Record<string, number>>;
+	},
+>(rendered: R, steps: PriorStep[]): R {
+	if (!steps.length) return rendered;
+	const at = rendered.currentRequestIndex;
+	const messages = [...rendered.messages];
+	// Results, like the operation results and reports: data in a user message, never a system instruction.
+	messages.splice(at, 0, {
+		role: "user",
+		content:
+			systemContext("dialogue.contexts.completion-check.prior-steps", {}) +
+			"\nPRIOR_STEPS=" +
+			JSON.stringify(steps),
+	});
+	const shift = (i: number) => (i >= at ? i + 1 : i);
+	return {
+		...rendered,
+		messages,
+		currentRequestIndex: at + 1,
+		blockIndex: Object.fromEntries(
+			Object.entries(rendered.blockIndex).map(([k, i]) => [
+				k,
+				i === undefined ? i : shift(i),
+			]),
+		),
+	};
+}
+
 /** The answer of a step after which the request goes on: the host's fixed line; the next step announces itself. */
 export function progressLine() {
 	return systemContext("dialogue.contexts.completion-check.progress", {});
@@ -270,12 +336,13 @@ export function chainSuperseded(
  * resumed a toolchain's question, or the chain's last step. A continuation's new decision searches the purpose it names instead.
  */
 export function completionCheckInTransaction(
-	conversation: ConversationService,
+	deps: Pick<DialogueDeps, "conversation" | "image">,
 	tx: Database,
 	run: Run,
 	phase: {
 		routing?: object;
-		delegatedResult: boolean;
+		/** The delegated step's results this answer phrases; none for anything else. */
+		results: ContextBlock[];
 		hostAside: boolean;
 	},
 ): CompletionCheck | undefined {
@@ -286,7 +353,7 @@ export function completionCheckInTransaction(
 	const hop = continuation?.hop ?? 0;
 	const checked =
 		!phase.routing &&
-		phase.delegatedResult &&
+		phase.results.length > 0 &&
 		!phase.hostAside &&
 		!run.specialistSessionId &&
 		hop < MAX_CONTINUATIONS &&
@@ -296,7 +363,8 @@ export function completionCheckInTransaction(
 		!resumedQuestion(tx, run.id);
 	const originalRequest =
 		continuation?.originalRequest ??
-		conversation.messageInTransaction(tx, run.inputMessageId)?.message.text;
+		deps.conversation.messageInTransaction(tx, run.inputMessageId)?.message
+			.text;
 	return checked && originalRequest
 		? {
 				originalRequest,
@@ -304,6 +372,13 @@ export function completionCheckInTransaction(
 				hop,
 				achieved: continuation?.achieved ?? "",
 				...(continuation ? { conditions: continuation.conditions } : {}),
+				steps: [
+					...(continuation?.steps ?? []),
+					{
+						step: hop + 1,
+						results: stepResultsInTransaction(deps, tx, run.id, phase.results),
+					},
+				],
 			}
 		: undefined;
 }

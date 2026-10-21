@@ -166,6 +166,8 @@ export type CompletionCheck = {
 	achieved: string;
 	/** The request's conditions the chain's first check fixed (absent at the first step). */
 	conditions?: string[];
+	/** The chain's steps up to this one, with this step's results as the conversation received them. */
+	steps: import("../repository").PriorStep[];
 };
 
 /** Everything the dialogue service parts share: the injected ports. */

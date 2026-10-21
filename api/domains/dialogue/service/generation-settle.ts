@@ -254,6 +254,7 @@ export function createGenerationSettlement(
 								achieved: next.achieved,
 								need: next.need,
 								conditions: next.conditions,
+								steps: check.steps,
 							},
 						});
 						tx.exec("RELEASE dialogue_continuation");

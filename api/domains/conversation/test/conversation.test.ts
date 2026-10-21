@@ -280,7 +280,7 @@ test("the retract hook runs inside the retraction while the message is still rea
 		const service = createConversationService(store);
 		const seen: Array<{ id: string; text: string | undefined; run: string[] }> =
 			[];
-		service.setRetractHook((db, messageId) => {
+		service.addRetractHook((db, messageId) => {
 			const found = service.messageInTransaction(db, messageId);
 			seen.push({
 				id: messageId,
