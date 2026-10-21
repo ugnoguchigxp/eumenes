@@ -39,7 +39,7 @@ test("the task bundle registers without a dummy artifact and reseeds immutable r
 		);
 		expect(result.issues).toEqual([]);
 		const first = store.read((db) =>
-			caps.toolchainSetInTransaction(db, "toolchain:task.execute@7"),
+			caps.toolchainSetInTransaction(db, "toolchain:task.execute@8"),
 		);
 		expect(first.binding?.document.execution).toBe("task");
 		expect(
@@ -51,7 +51,7 @@ test("the task bundle registers without a dummy artifact and reseeds immutable r
 		expect(
 			store.read(
 				(db) =>
-					caps.toolchainSetInTransaction(db, "toolchain:task.execute@7")
+					caps.toolchainSetInTransaction(db, "toolchain:task.execute@8")
 						.binding,
 			),
 		).toEqual(first.binding);
@@ -123,7 +123,7 @@ test("a host with the earlier task result schema upgrades by new revisions and p
 		await caps.seed();
 		expect(
 			store.read((db) =>
-				caps.getDefinitionInTransaction(db, "toolchain:task.execute@7"),
+				caps.getDefinitionInTransaction(db, "toolchain:task.execute@8"),
 			),
 		).toBeNull();
 		await store.write((db) =>
@@ -139,7 +139,7 @@ test("a host with the earlier task result schema upgrades by new revisions and p
 		expect(
 			store.read(
 				(db) =>
-					caps.toolchainSetInTransaction(db, "toolchain:task.execute@7").binding
+					caps.toolchainSetInTransaction(db, "toolchain:task.execute@8").binding
 						?.document,
 			),
 		).toMatchObject({ revision: 2, outputSchemaRef: "schema:task.result@2" });

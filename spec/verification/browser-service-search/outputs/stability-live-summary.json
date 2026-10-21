@@ -1,0 +1,643 @@
+{
+  "scope": "fixed delegation only; real worker, browser, guard and external search; no domain registry",
+  "nativePackage": "package:browser.service-search@6",
+  "caveats": [
+    "YouTube native collection and worker completed, but conversation failed spoken_reply_too_long",
+    "latest Wikipedia native search reached article but skipped collection",
+    "empty collection is rejected; real domain-preserving fallback and read succeeded, but worker final report failed invalid_control_json (report unrecognized_keys)",
+    "X and Instagram were not tested live"
+  ],
+  "cases": [
+    {
+      "case": "youtube_native_three",
+      "sourceDirectory": "verification-reports/service-search/2026-10-21T08-20-49.253Z",
+      "runId": "c52bfcaf-9e2d-4709-a061-516d82be20ea",
+      "runStatus": "failed",
+      "worker": {
+        "id": "754004e3-551e-4113-acc2-8618573c3da5",
+        "kind": "worker",
+        "rootRunId": "c52bfcaf-9e2d-4709-a061-516d82be20ea",
+        "parentTaskId": "4008342f-38f2-4578-84ed-fa2755ab6a0e",
+        "packageRevisionId": "package:web.service-search@3",
+        "status": "completed",
+        "phase": "completed",
+        "modelCalls": 3,
+        "toolCalls": 1,
+        "errorCode": null,
+        "createdAt": "2026-10-21T08:21:15.024Z",
+        "deadlineAt": "2026-10-21T08:26:44.932Z",
+        "reportState": "available",
+        "acquisitionMode": null,
+        "toolOutcomes": [
+          {
+            "toolRevisionId": "tool:browser.research@1",
+            "state": "succeeded",
+            "errorCode": null,
+            "sourceCount": 3
+          }
+        ]
+      },
+      "browser": [
+        {
+          "state": "completed",
+          "errorCode": null,
+          "operationCount": 1
+        }
+      ],
+      "candidateResults": [
+        {
+          "reference": "c1",
+          "sourceId": "abac367b-4bbf-4108-b278-d5e0a7d22393",
+          "url": "https://www.youtube.com/watch?v=tCMl1AWfhQQ&pp=ygUYcHl0aG9uMyDml6XmnKzoqp4g5YWl6ZaA",
+          "title": "【Python入門】プログラミングの基本を2時間半で学ぶ！〜初心者用チュートリアル〜 Python速習 2 hours, 29 minutes",
+          "fetchedAt": "2026-10-21T08:22:10.155Z",
+          "provider": "browser",
+          "contentStatus": "unverified"
+        },
+        {
+          "reference": "c2",
+          "sourceId": "c614654a-8e34-4ebc-bf90-ca3dfde04b4a",
+          "url": "https://www.youtube.com/watch?v=CPpRu_AJrW8&pp=ygUYcHl0aG9uMyDml6XmnKzoqp4g5YWl6ZaA",
+          "title": "Python入門講座【最新のPython3対応】🔰初心者向けPython入門パーフェクトガイド 1 hour, 13 minutes",
+          "fetchedAt": "2026-10-21T08:22:10.155Z",
+          "provider": "browser",
+          "contentStatus": "unverified"
+        },
+        {
+          "reference": "c3",
+          "sourceId": "4fac1e4a-826d-4855-9d20-8138bb0c282a",
+          "url": "https://www.youtube.com/watch?v=HyU3XL2F9GE&pp=ygUYcHl0aG9uMyDml6XmnKzoqp4g5YWl6ZaA",
+          "title": "Python超入門コース 合併版｜Pythonの超基本的な部分をたった1時間で学べます【プログラミング初心者向け入門講座】 1 hour, 14 minutes",
+          "fetchedAt": "2026-10-21T08:22:10.155Z",
+          "provider": "browser",
+          "contentStatus": "unverified"
+        }
+      ],
+      "events": [
+        {
+          "at": "2026-10-21T08:21:21.012Z",
+          "stage": "model_decision",
+          "action": "invoke",
+          "tool": "browser.research",
+          "argumentKeys": [
+            "request",
+            "url"
+          ],
+          "url": "https://www.youtube.com/",
+          "durationMs": 5979
+        },
+        {
+          "at": "2026-10-21T08:21:42.935Z",
+          "stage": "model_decision",
+          "action": "invoke",
+          "tool": "browser.page.type",
+          "argumentKeys": [
+            "observationRef",
+            "ref",
+            "element",
+            "value",
+            "quote",
+            "purpose",
+            "submit",
+            "effect"
+          ],
+          "inputSource": {
+            "valueInOriginal": true,
+            "quoteInOriginal": true,
+            "sameValueAndQuote": true,
+            "valueCharacters": 14,
+            "quoteCharacters": 14
+          },
+          "durationMs": 21801
+        },
+        {
+          "at": "2026-10-21T08:21:43.546Z",
+          "stage": "browser_action",
+          "kind": "type",
+          "text": "python3 日本語 入門",
+          "submit": true
+        },
+        {
+          "at": "2026-10-21T08:21:45.440Z",
+          "stage": "browser_action_result",
+          "ok": true,
+          "url": "https://www.youtube.com/results?search_query=python3+%E6%97%A5%E6%9C%AC%E8%AA%9E+%E5%85%A5%E9%96%80",
+          "title": "python3 日本語 入門 - YouTube"
+        },
+        {
+          "at": "2026-10-21T08:22:10.144Z",
+          "stage": "model_decision",
+          "action": "invoke",
+          "tool": "browser.page.collect",
+          "argumentKeys": [
+            "observationRef",
+            "blockRefs",
+            "purpose",
+            "linkBlockRefs"
+          ],
+          "collectionSelection": {
+            "blockRefs": [
+              "b89",
+              "b108",
+              "b177"
+            ],
+            "linkBlockRefs": [
+              "b89",
+              "b108",
+              "b177"
+            ]
+          },
+          "durationMs": 24585
+        },
+        {
+          "at": "2026-10-21T08:22:15.011Z",
+          "stage": "model_decision",
+          "durationMs": 4849,
+          "documentKind": "source_content",
+          "classificationCount": 0,
+          "classificationKeys": []
+        },
+        {
+          "at": "2026-10-21T08:22:40.891Z",
+          "stage": "model_decision",
+          "action": "finish",
+          "durationMs": 25853
+        },
+        {
+          "at": "2026-10-21T08:22:51.104Z",
+          "stage": "model_decision",
+          "action": "finish",
+          "durationMs": 10194,
+          "completion": "complete",
+          "candidateRefs": [
+            "c1",
+            "c2",
+            "c3"
+          ]
+        },
+        {
+          "at": "2026-10-21T08:22:59.070Z",
+          "stage": "model_decision",
+          "action": "finish",
+          "durationMs": 7947,
+          "completion": "complete",
+          "candidateRefs": [
+            "c1",
+            "c2",
+            "c3"
+          ]
+        }
+      ]
+    },
+    {
+      "case": "wikipedia_before_url_presentation",
+      "sourceDirectory": "verification-reports/service-search/2026-10-21T08-24-56.884Z",
+      "runId": "041d3f95-f8f9-4e87-9610-f2ac24043549",
+      "runStatus": "completed",
+      "worker": {
+        "id": "1bf45c7d-14aa-450f-aadc-dcb9188806a1",
+        "kind": "worker",
+        "rootRunId": "041d3f95-f8f9-4e87-9610-f2ac24043549",
+        "parentTaskId": "2ed849a2-e5f2-477e-b53e-13b23200c492",
+        "packageRevisionId": "package:web.service-search@3",
+        "status": "failed",
+        "phase": "failed",
+        "modelCalls": 3,
+        "toolCalls": 2,
+        "errorCode": "research_no_progress",
+        "createdAt": "2026-10-21T08:25:12.707Z",
+        "deadlineAt": "2026-10-21T08:30:42.632Z",
+        "reportState": "none",
+        "acquisitionMode": null,
+        "toolOutcomes": [
+          {
+            "toolRevisionId": "tool:browser.research@1",
+            "state": "partial",
+            "errorCode": null,
+            "sourceCount": 0
+          },
+          {
+            "toolRevisionId": "tool:web.lookup@2",
+            "state": "succeeded",
+            "errorCode": null,
+            "sourceCount": 5
+          }
+        ]
+      },
+      "browser": [
+        {
+          "state": "failed",
+          "errorCode": "deadline_exceeded",
+          "operationCount": 0
+        }
+      ],
+      "candidateResults": [],
+      "events": [
+        {
+          "at": "2026-10-21T08:25:19.054Z",
+          "stage": "model_decision",
+          "action": "invoke",
+          "tool": "browser.research",
+          "argumentKeys": [
+            "request",
+            "url"
+          ],
+          "url": "https://ja.wikipedia.org/",
+          "durationMs": 6330
+        },
+        {
+          "at": "2026-10-21T08:25:48.796Z",
+          "stage": "model_decision",
+          "action": "invoke",
+          "tool": "browser.page.type",
+          "argumentKeys": [
+            "observationRef",
+            "ref",
+            "element",
+            "value",
+            "purpose",
+            "submit",
+            "effect"
+          ],
+          "inputSource": {
+            "valueInOriginal": true,
+            "quoteInOriginal": false,
+            "sameValueAndQuote": false,
+            "valueCharacters": 6
+          },
+          "durationMs": 29658
+        },
+        {
+          "at": "2026-10-21T08:25:48.822Z",
+          "stage": "browser_refusal",
+          "code": "invalid_arguments",
+          "issues": [
+            {
+              "path": "",
+              "code": "custom"
+            }
+          ]
+        },
+        {
+          "at": "2026-10-21T08:26:25.430Z",
+          "stage": "model_decision",
+          "action": "invoke",
+          "tool": "web.lookup",
+          "argumentKeys": [
+            "query",
+            "language",
+            "region"
+          ],
+          "durationMs": 6593
+        },
+        {
+          "at": "2026-10-21T08:26:25.447Z",
+          "stage": "external_started",
+          "operation": "lookup",
+          "query": "Python プログラミング言語 site:ja.wikipedia.org"
+        },
+        {
+          "at": "2026-10-21T08:26:26.909Z",
+          "stage": "external_completed",
+          "hitCount": 5,
+          "documents": 0,
+          "failures": []
+        },
+        {
+          "at": "2026-10-21T08:26:32.259Z",
+          "stage": "model_decision",
+          "action": "wait",
+          "durationMs": 5338
+        }
+      ]
+    },
+    {
+      "case": "wikipedia_latest_view_before_empty_check",
+      "sourceDirectory": "verification-reports/service-search/2026-10-21T09-16-57.106Z",
+      "runId": "11180d32-a933-4dd0-8c0f-5268a17bfbdb",
+      "runStatus": "completed",
+      "worker": {
+        "id": "825f421b-6262-435d-9d77-c0553f1c55d4",
+        "kind": "worker",
+        "rootRunId": "11180d32-a933-4dd0-8c0f-5268a17bfbdb",
+        "parentTaskId": "82f2d75c-6f8e-40ee-8544-06fa5e90e175",
+        "packageRevisionId": "package:web.service-search@3",
+        "status": "failed",
+        "phase": "failed",
+        "modelCalls": 2,
+        "toolCalls": 1,
+        "errorCode": "candidate_invalidated",
+        "createdAt": "2026-10-21T09:17:02.600Z",
+        "deadlineAt": "2026-10-21T09:22:32.532Z",
+        "reportState": "none",
+        "acquisitionMode": null,
+        "toolOutcomes": [
+          {
+            "toolRevisionId": "tool:browser.research@1",
+            "state": "succeeded",
+            "errorCode": null,
+            "sourceCount": 0
+          }
+        ]
+      },
+      "browser": [
+        {
+          "state": "completed",
+          "errorCode": null,
+          "operationCount": 1
+        }
+      ],
+      "candidateResults": [],
+      "events": [
+        {
+          "at": "2026-10-21T09:17:08.409Z",
+          "stage": "model_decision",
+          "action": "invoke",
+          "tool": "browser.research",
+          "argumentKeys": [
+            "request",
+            "url"
+          ],
+          "url": "https://ja.wikipedia.org/",
+          "durationMs": 5801
+        },
+        {
+          "at": "2026-10-21T09:17:32.488Z",
+          "stage": "model_decision",
+          "action": "invoke",
+          "tool": "browser.page.type",
+          "argumentKeys": [
+            "observationRef",
+            "ref",
+            "element",
+            "value",
+            "quote",
+            "purpose",
+            "submit",
+            "effect"
+          ],
+          "inputSource": {
+            "valueInOriginal": true,
+            "quoteInOriginal": true,
+            "sameValueAndQuote": false,
+            "valueCharacters": 6,
+            "quoteCharacters": 12
+          },
+          "durationMs": 23964
+        },
+        {
+          "at": "2026-10-21T09:17:33.063Z",
+          "stage": "browser_action",
+          "kind": "type",
+          "text": "Python",
+          "submit": true
+        },
+        {
+          "at": "2026-10-21T09:17:34.281Z",
+          "stage": "browser_action_result",
+          "ok": true,
+          "url": "https://ja.wikipedia.org/wiki/Python",
+          "title": "Python - Wikipedia"
+        },
+        {
+          "at": "2026-10-21T09:17:55.993Z",
+          "stage": "model_decision",
+          "action": "finish",
+          "durationMs": 21598
+        },
+        {
+          "at": "2026-10-21T09:18:01.748Z",
+          "stage": "model_decision",
+          "action": "invoke",
+          "tool": "web.read",
+          "argumentKeys": [
+            "candidateRef"
+          ],
+          "durationMs": 5746
+        }
+      ]
+    },
+    {
+      "case": "wikipedia_empty_check_and_external_fallback",
+      "sourceDirectory": "verification-reports/service-search/2026-10-21T09-22-26.674Z",
+      "runId": "de867ea9-dd8b-44cb-ac63-5ee0ebc3ce83",
+      "runStatus": "completed",
+      "worker": {
+        "id": "c1544d03-a2ca-4527-b3be-a99aabdd63ab",
+        "kind": "worker",
+        "rootRunId": "de867ea9-dd8b-44cb-ac63-5ee0ebc3ce83",
+        "parentTaskId": "0dd9fc13-5e92-442c-ac96-7221e284e1fd",
+        "packageRevisionId": "package:web.service-search@3",
+        "status": "failed",
+        "phase": "failed",
+        "modelCalls": 5,
+        "toolCalls": 3,
+        "errorCode": "invalid_control_json",
+        "createdAt": "2026-10-21T09:22:34.793Z",
+        "deadlineAt": "2026-10-21T09:28:04.707Z",
+        "reportState": "none",
+        "acquisitionMode": null,
+        "toolOutcomes": [
+          {
+            "toolRevisionId": "tool:browser.research@1",
+            "state": "failed",
+            "errorCode": "browser_collection_missing",
+            "sourceCount": 0
+          },
+          {
+            "toolRevisionId": "tool:web.lookup@2",
+            "state": "succeeded",
+            "errorCode": null,
+            "sourceCount": 5
+          },
+          {
+            "toolRevisionId": "tool:web.read@2",
+            "state": "succeeded",
+            "errorCode": null,
+            "sourceCount": 1
+          }
+        ]
+      },
+      "browser": [
+        {
+          "state": "completed",
+          "errorCode": null,
+          "operationCount": 1
+        }
+      ],
+      "candidateResults": [],
+      "events": [
+        {
+          "at": "2026-10-21T09:22:40.288Z",
+          "stage": "model_decision",
+          "action": "invoke",
+          "tool": "browser.research",
+          "argumentKeys": [
+            "request",
+            "url"
+          ],
+          "url": "https://ja.wikipedia.org/",
+          "durationMs": 5487
+        },
+        {
+          "at": "2026-10-21T09:23:03.818Z",
+          "stage": "model_decision",
+          "action": "invoke",
+          "tool": "browser.page.type",
+          "argumentKeys": [
+            "observationRef",
+            "ref",
+            "element",
+            "value",
+            "purpose",
+            "submit",
+            "effect"
+          ],
+          "inputSource": {
+            "valueInOriginal": true,
+            "quoteInOriginal": false,
+            "sameValueAndQuote": false,
+            "valueCharacters": 6
+          },
+          "durationMs": 23430
+        },
+        {
+          "at": "2026-10-21T09:23:03.835Z",
+          "stage": "browser_refusal",
+          "code": "invalid_arguments",
+          "issues": [
+            {
+              "path": "quote",
+              "code": "invalid_type"
+            }
+          ]
+        },
+        {
+          "at": "2026-10-21T09:23:27.463Z",
+          "stage": "model_decision",
+          "action": "invoke",
+          "tool": "browser.page.type",
+          "argumentKeys": [
+            "observationRef",
+            "ref",
+            "element",
+            "value",
+            "purpose",
+            "quote",
+            "submit",
+            "effect"
+          ],
+          "inputSource": {
+            "valueInOriginal": true,
+            "quoteInOriginal": true,
+            "sameValueAndQuote": false,
+            "valueCharacters": 6,
+            "quoteCharacters": 12
+          },
+          "durationMs": 23627
+        },
+        {
+          "at": "2026-10-21T09:23:28.060Z",
+          "stage": "browser_action",
+          "kind": "type",
+          "text": "Python",
+          "submit": true
+        },
+        {
+          "at": "2026-10-21T09:23:29.242Z",
+          "stage": "browser_action_result",
+          "ok": true,
+          "url": "https://ja.wikipedia.org/wiki/Python",
+          "title": "Python - Wikipedia"
+        },
+        {
+          "at": "2026-10-21T09:23:29.373Z",
+          "stage": "browser_refusal",
+          "code": "invalid_arguments",
+          "issues": [
+            {
+              "path": "quote",
+              "code": "invalid_type"
+            }
+          ]
+        },
+        {
+          "at": "2026-10-21T09:23:50.962Z",
+          "stage": "model_decision",
+          "action": "finish",
+          "durationMs": 21589
+        },
+        {
+          "at": "2026-10-21T09:23:57.013Z",
+          "stage": "model_decision",
+          "action": "invoke",
+          "tool": "browser.research",
+          "argumentKeys": [
+            "request",
+            "url"
+          ],
+          "url": "https://ja.wikipedia.org/",
+          "durationMs": 6034
+        },
+        {
+          "at": "2026-10-21T09:24:02.827Z",
+          "stage": "model_decision",
+          "action": "invoke",
+          "tool": "web.lookup",
+          "argumentKeys": [
+            "query",
+            "region"
+          ],
+          "durationMs": 5798
+        },
+        {
+          "at": "2026-10-21T09:24:02.842Z",
+          "stage": "external_started",
+          "operation": "lookup",
+          "query": "Python プログラミング言語 site:ja.wikipedia.org"
+        },
+        {
+          "at": "2026-10-21T09:24:04.688Z",
+          "stage": "external_completed",
+          "hitCount": 5,
+          "documents": 0,
+          "failures": []
+        },
+        {
+          "at": "2026-10-21T09:24:10.986Z",
+          "stage": "model_decision",
+          "action": "invoke",
+          "tool": "web.read",
+          "argumentKeys": [
+            "url"
+          ],
+          "url": "https://ja.wikipedia.org/wiki/Python",
+          "durationMs": 6285
+        },
+        {
+          "at": "2026-10-21T09:24:11.001Z",
+          "stage": "external_started",
+          "operation": "read",
+          "url": "https://ja.wikipedia.org/wiki/Python"
+        },
+        {
+          "at": "2026-10-21T09:24:11.618Z",
+          "stage": "external_completed",
+          "hitCount": 0,
+          "documents": 1,
+          "failures": []
+        },
+        {
+          "at": "2026-10-21T09:24:22.084Z",
+          "stage": "model_decision",
+          "action": "finish",
+          "durationMs": 10445,
+          "completion": "complete",
+          "candidateRefs": [
+            "c3"
+          ]
+        }
+      ]
+    }
+  ]
+}

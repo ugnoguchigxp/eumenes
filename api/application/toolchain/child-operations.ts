@@ -69,6 +69,9 @@ export function createChildOperations(
 							? "browser_input_required"
 							: "browser_task_failed"),
 				};
+			// Completion text cannot substitute for material accepted by the collection contract.
+			if (task.state === "completed" && !pages.length)
+				return { state: "failed", errorCode: "browser_collection_missing" };
 			const readings: Source[] = pages.flatMap<Source>((page) =>
 				page.purpose === "facts"
 					? [

@@ -1,0 +1,73 @@
+bun test v1.4.3 (c6da4a4d3)
+
+api/application/browser/browser-task-runner.test.ts:
+(pass) the collection view keeps action refs and long or malformed labels without duplicating complete links [0.29ms]
+(pass) observe, type with a grant, click, re-observe, finish: one inference per job and the page only as data [402.63ms]
+(pass) the first call has the D7 context: system layer, enclosed reference with the observation, the original request last [367.09ms]
+(pass) a clarify ends the task as needs_input with the question [345.82ms]
+(pass) the last of the 12 calls is reserved: callsLeft is shown every call, and an invoke there fails the task [371.50ms]
+(pass) a finish on the last call still completes the task [369.85ms]
+(pass) a rejected output is repaired once and the repair counts against the budget [705.45ms]
+(pass) a refused tool goes back as data and is retried once; the second refusal ends the task [686.12ms]
+(pass) unknown tools, invalid arguments and blocked addresses are refusals, not crashes [344.64ms]
+(pass) submitting a typed value needs a declared effect [344.24ms]
+(pass) a value is typed on a quote from the request, however it was reformatted [345.19ms]
+(pass) a missing source quotation receives the existing repair hint before any input is sent [344.75ms]
+(pass) readable link URLs keep the exact observed target and never double-decode escapes [0.12ms]
+(pass) an operation that may have reached the page stops the task as indeterminate and no further call is made [335.91ms]
+(pass) an operation the browser refused before sending is a refusal the model may answer [333.75ms]
+(pass) cancelling aborts the model call in flight and the task stays cancelled and quiet [383.25ms]
+(pass) a task past its deadline expires, aborts the call in flight and makes no further call [382.44ms]
+(pass) losing the connection ends the task and aborts the call in flight [332.62ms]
+(pass) an element capture inside the task is saved before the task finishes [496.87ms]
+(pass) a capture over the size limit is a refusal with its reason [518.53ms]
+(pass) tabs can be listed and a new tab becomes the target [364.55ms]
+(pass) a newer observation turns the older ones into a one-line stub, and nothing else changes [339.65ms]
+(pass) a tab the request named that is gone stops the task; it never moves to another tab [350.37ms]
+(pass) a page the host blocks goes back to the model as a refusal it can answer [340.41ms]
+(pass) too large a context stops the task before a call is made [353.66ms]
+(pass) a revoked model call ends the task and its request is dropped [342.90ms]
+(pass) a conversation request reaches the loop through the adapter with the user's own words [342.97ms]
+
+api/application/browser/browser-task-approvals.test.ts:
+(pass) an operation the model declares as commit is held by the host: the task asks the user, says what it would do and keeps the pending approval [1014.66ms]
+(pass) the host judges the form itself: a POST submit is held without any declaration, a GET search and a plain button run [672.65ms]
+(pass) the user's approval reaches the follow-up task, which shows it to the model and runs the held operation once [344.38ms]
+(pass) without the user's approval nothing moves: the follow-up task is held again [345.17ms]
+(pass) a value read from the page is not typed: the task shows it to the user and the approved value is typed by reference [350.07ms]
+(pass) a short value, or one that is in the request, is not taken for a page value [337.01ms]
+(pass) a quote that is not in the request gets no grant: the task shows the value to the user instead of asking the model [334.54ms]
+
+api/application/toolchain/service-search.test.ts:
+(pass) conversation → browser child → native candidates → saved answer [460.88ms]
+(pass) conversation → browser child → external fallback → saved answer [443.87ms]
+(pass) conversation → browser child → empty connected browser → saved answer [437.88ms]
+
+api/application/toolchain/service-search-lifecycle.test.ts:
+(pass) delegated prose cannot manufacture a quotation that authorizes browser input [333.82ms]
+(pass) revoked parent cannot adopt a late browser finish or emit a second conversation notice [350.33ms]
+(pass) native work expires while the parent's fallback reserve remains [339.52ms]
+(pass) accepted candidates survive native expiry for partial adoption [337.17ms]
+(pass) accepted candidates are discarded after authority revocation [355.67ms]
+
+api/domains/browser/test/research-collection.test.ts:
+(pass) collect returns actual observed hrefs and non-actionable text across arbitrary sites [0.35ms]
+(pass) the link inventory preserves observed item and collection links without classifying them [0.16ms]
+(pass) stale, invented, oversized and excess selections are refused without loss of accepted pages [0.22ms]
+(pass) guard attempts remain bounded even when no collection was accepted [0.03ms]
+(pass) ARIA annotations are not link labels and quoted labels retain their actual text [0.06ms]
+
+api/domains/browser/test/observation.test.ts:
+(pass) the limits are 32 KiB, depth 12 and 200 refs
+(pass) a small snapshot passes whole with its refs [0.03ms]
+(pass) the cut falls between whole nodes and only refs in the text are actionable [1.17ms]
+(pass) the byte limit counts UTF-8 and never cuts inside a node [0.62ms]
+(pass) a node's continuation lines stay with it [0.03ms]
+(pass) nodes deeper than the limit are left out with their subtree [0.04ms]
+(pass) collection compaction keeps deeply wrapped links actionable within the existing limits [0.09ms]
+(pass) compaction preserves named, stateful, interactive and text-bearing generic nodes [0.01ms]
+
+ 55 pass
+ 0 fail
+ 652 expect() calls
+Ran 55 tests across 6 files. [16.99s]

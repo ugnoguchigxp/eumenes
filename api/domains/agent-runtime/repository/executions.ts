@@ -73,12 +73,15 @@ export type ParentState = {
 		revision: number;
 		requestRevision: number;
 		observedAt: number;
+		goal: string;
+		report: string;
 		items: ExecutionPlanItem[];
 	};
 };
 export type ExecutionPlanItem = {
 	stepRef: string;
 	request: string;
+	check: string;
 	dependsOn: string[];
 	childId: string;
 	inputDigest?: string;

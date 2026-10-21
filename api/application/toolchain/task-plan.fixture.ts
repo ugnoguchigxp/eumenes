@@ -2,11 +2,13 @@
 export const taskPlan = (...requests: string[]) => ({
 	name: "set_plan",
 	arguments: {
-		expectedPlanRevision: 0,
+		goal: requests.join(" / "),
 		items: requests.map((request, index) => ({
 			request,
+			check: "",
 			dependsOn: index ? [index - 1] : [],
 		})),
+		report: "summarize the results",
 	},
 });
 export const taskItem = (

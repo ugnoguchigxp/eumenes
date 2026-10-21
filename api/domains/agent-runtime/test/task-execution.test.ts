@@ -220,11 +220,13 @@ const finish = (context: DecisionContext): Call => ({
 const plan = (...requests: string[]): Call => ({
 	name: "set_plan",
 	arguments: {
-		expectedPlanRevision: 0,
+		goal: requests.join(" / "),
 		items: requests.map((request, index) => ({
 			request,
+			check: "",
 			dependsOn: index ? [index - 1] : [],
 		})),
+		report: "summarize the results",
 	},
 });
 const invoke =
@@ -749,8 +751,11 @@ test("a revised pending plan preserves executed receipts, invalidates removed st
 		(context) => ({
 			name: "set_plan",
 			arguments: {
-				expectedPlanRevision: context.plan.revision,
-				items: [{ request: "new followup from the result", dependsOn: [] }],
+				goal: "goal",
+				report: "report",
+				items: [
+					{ request: "new followup from the result", check: "", dependsOn: [] },
+				],
 			},
 		}),
 		invoke("operate", 1),
@@ -809,14 +814,16 @@ test("unknown, removed and dependency-blocked steps are rejected before dispatch
 	).not.toContain("set_plan");
 	expect(() =>
 		acceptExecutionPlan(state, 0, {
-			expectedPlanRevision: 1,
-			items: [{ request: "premature", dependsOn: [] }],
+			goal: "goal",
+			report: "report",
+			items: [{ request: "premature", check: "", dependsOn: [] }],
 		}),
 	).toThrow("execution_plan_observation_required");
 	state.searches++;
 	acceptExecutionPlan(state, 0, {
-		expectedPlanRevision: 1,
-		items: [{ request: "replacement", dependsOn: [] }],
+		goal: "goal",
+		report: "report",
+		items: [{ request: "replacement", check: "", dependsOn: [] }],
 	});
 	expect(() => parse(first.stepRef)).toThrow("execution_step_not_offered");
 	state.plan!.items[0]!.inputDigest = "digest";
@@ -826,8 +833,9 @@ test("unknown, removed and dependency-blocked steps are rejected before dispatch
 	).toEqual(["complete_task", "report_partial"]);
 	expect(() =>
 		acceptExecutionPlan(state, 0, {
-			expectedPlanRevision: 2,
-			items: [{ request: "extra", dependsOn: [] }],
+			goal: "goal",
+			report: "report",
+			items: [{ request: "extra", check: "", dependsOn: [] }],
 		}),
 	).toThrow("execution_plan_closed");
 });
@@ -845,23 +853,36 @@ test("plan structural conflicts never alter the accepted plan or reset counters"
 	state.searches++;
 	const before = structuredClone(state);
 	for (const input of [
-		{ expectedPlanRevision: 0, items: [{ request: "stale", dependsOn: [] }] },
 		{
-			expectedPlanRevision: 1,
-			items: [{ request: "self cycle", dependsOn: [0] }],
-		},
-		{
-			expectedPlanRevision: 1,
+			goal: "goal",
+			report: "report",
 			items: [
-				{ request: "forward", dependsOn: [1] },
-				{ request: "other", dependsOn: [] },
+				{
+					request: "pending dependency",
+					check: "",
+					dependsOn: [state.plan!.items[0]!.stepRef],
+				},
 			],
 		},
 		{
-			expectedPlanRevision: 1,
+			goal: "goal",
+			report: "report",
+			items: [{ request: "self cycle", check: "", dependsOn: [0] }],
+		},
+		{
+			goal: "goal",
+			report: "report",
 			items: [
-				{ request: "too many", dependsOn: [] },
-				{ request: "other", dependsOn: [] },
+				{ request: "forward", check: "", dependsOn: [1] },
+				{ request: "other", check: "", dependsOn: [] },
+			],
+		},
+		{
+			goal: "goal",
+			report: "report",
+			items: [
+				{ request: "too many", check: "", dependsOn: [] },
+				{ request: "other", check: "", dependsOn: [] },
 			],
 		},
 	]) {
@@ -879,8 +900,11 @@ test("an amended request requires a new plan while preserving past receipts as f
 		(context) => ({
 			name: "set_plan",
 			arguments: {
-				expectedPlanRevision: context.plan.revision,
-				items: [{ request: "amended remaining operation", dependsOn: [] }],
+				goal: "goal",
+				report: "report",
+				items: [
+					{ request: "amended remaining operation", check: "", dependsOn: [] },
+				],
 			},
 		}),
 		invoke("operate", 1),
@@ -917,7 +941,11 @@ test("candidate selection keeps its frozen offer until a child result; a later r
 		executionState(executionRow(db, work.id)!),
 	);
 	expect(() =>
-		acceptExecutionPlan(state, 0, { expectedPlanRevision: 0, items: [] }),
+		acceptExecutionPlan(state, 0, {
+			goal: "goal",
+			items: [],
+			report: "report",
+		}),
 	).toThrow("execution_plan_invalid");
 	acceptExecutionPlan(state, 0, plan("perform", "possible followup").arguments);
 	state.searches++;
@@ -926,7 +954,11 @@ test("candidate selection keeps its frozen offer until a child result; a later r
 		executionTools(state, [card("lookup")]).map((tool) => tool.function.name),
 	).not.toContain("set_plan");
 	expect(() =>
-		acceptExecutionPlan(state, 0, { expectedPlanRevision: 1, items: [] }),
+		acceptExecutionPlan(state, 0, {
+			goal: "goal",
+			items: [],
+			report: "report",
+		}),
 	).toThrow("execution_plan_observation_required");
 	state.selecting = false;
 	const first = state.plan!.items[0]!;
@@ -940,7 +972,7 @@ test("candidate selection keeps its frozen offer until a child result; a later r
 		refs: ["receipt"],
 	});
 	state.children = 1;
-	acceptExecutionPlan(state, 0, { expectedPlanRevision: 1, items: [] });
+	acceptExecutionPlan(state, 0, { goal: "goal", items: [], report: "report" });
 	expect(state.plan!.items).toEqual([first]);
 	expect(state.plan!.revision).toBe(2);
 	expect(state.children).toBe(1);
@@ -949,13 +981,87 @@ test("candidate selection keeps its frozen offer until a child result; a later r
 	).toEqual(["complete_task", "report_partial"]);
 });
 
+test("a revision depends on executed items by stepRef, never on pending items, and the host owns the plan version", async () => {
+	const h = await setup([], done(), true),
+		work = await h.start();
+	const state = h.store.read((db) =>
+		executionState(executionRow(db, work.id)!),
+	);
+	acceptExecutionPlan(state, 0, plan("perform", "followup").arguments);
+	const [first, second] = state.plan!.items;
+	first!.inputDigest = "digest";
+	first!.resultRef = "receipt";
+	first!.resultState = "completed";
+	state.notes.push({
+		id: first!.childId,
+		state: "completed",
+		summary: "done",
+		refs: ["receipt"],
+	});
+	state.children = 1;
+	const tool = executionTools(state, [card("lookup")]).find(
+		(t) => t.function.name === "set_plan",
+	)!;
+	const call = (input: Record<string, unknown>) =>
+		parseExecutionDecision(
+			[{ id: "call", name: "set_plan", arguments: JSON.stringify(input) }],
+			[tool],
+			[],
+			[],
+		);
+	expect(() =>
+		call({
+			goal: "goal",
+			items: [{ request: "x", check: "", dependsOn: [second!.stepRef] }],
+			report: "report",
+		}),
+	).toThrow("execution_plan_invalid");
+	expect(() =>
+		call({
+			expectedPlanRevision: 1,
+			goal: "goal",
+			items: [],
+			report: "report",
+		}),
+	).toThrow("execution_plan_arguments_invalid");
+	const accepted = call({
+		goal: "goal",
+		items: [
+			{
+				request: "use the result",
+				check: "matches",
+				dependsOn: [first!.stepRef],
+			},
+			{ request: "after", check: "", dependsOn: [0] },
+		],
+		report: "report",
+	});
+	acceptExecutionPlan(state, 0, accepted.arguments);
+	const [, revised, after] = state.plan!.items;
+	expect(state.plan).toMatchObject({
+		revision: 2,
+		goal: "goal",
+		report: "report",
+	});
+	expect(revised).toMatchObject({
+		request: "use the result",
+		check: "matches",
+		dependsOn: [first!.stepRef],
+	});
+	expect(after!.dependsOn).toEqual([revised!.stepRef]);
+	expect(runnablePlanItems(state)).toEqual([revised!]);
+});
+
 test("the existing one-time repair explains plan schema fields without accepting model-authored progress", async () => {
 	const h = await setup([
 		{
 			name: "set_plan",
 			arguments: {
-				expectedPlanRevision: 0,
-				items: [{ request: "lookup", dependsOn: [], state: "executed" }],
+				goal: "goal",
+				report: "report",
+				items: [
+					{ request: "lookup", check: "", dependsOn: [], state: "executed" },
+				],
 			},
 		},
 		plan("lookup"),

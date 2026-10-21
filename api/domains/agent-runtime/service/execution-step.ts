@@ -180,7 +180,6 @@ export function executionStep(
 					"execution_completion_incomplete",
 					"execution_completion_unreferenced",
 					"execution_step_not_offered",
-					"execution_plan_revision_conflict",
 					"execution_plan_invalid",
 					"execution_plan_arguments_invalid",
 				];

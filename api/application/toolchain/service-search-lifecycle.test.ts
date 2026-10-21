@@ -11,6 +11,26 @@ import {
 import { until } from "../../domains/browser/test/fakes";
 
 afterEach(cleanup);
+test("an uncollected browser finish does not issue a successful research result", async () => {
+	const s = await setup([
+		finish("記事へ到着しました。https://example.org/result"),
+	]);
+	const { connect } = await import("../../domains/browser/test/fakes");
+	await connect(s.env);
+	const children = createChildOperations(s.service, () => true);
+	const started = await s.store.write((db) =>
+		children.startInTransaction(db, input()),
+	);
+	await until(() => children.get(started.operationId)?.state !== "pending");
+	expect(
+		s.service.taskRow(started.operationId.slice("browser-child:".length))
+			?.state,
+	).toBe("completed");
+	expect(children.get(started.operationId)).toEqual({
+		state: "failed",
+		errorCode: "browser_collection_missing",
+	});
+});
 test("delegated prose cannot manufacture a quotation that authorizes browser input", async () => {
 	const s = await setup([typeInto("秘密の値", "秘密の値")]);
 	const { connect } = await import("../../domains/browser/test/fakes");

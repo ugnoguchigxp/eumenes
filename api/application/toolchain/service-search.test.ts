@@ -19,12 +19,14 @@ import {
 import { createTaskRunner } from "../browser/browser-task-runner";
 import { registerBrowserEffects } from "../browser/browser-effects";
 
-for (const [blocked, empty] of [
-	[false, false],
-	[true, false],
-	[false, true],
+for (const [blocked, empty, uncollected] of [
+	[false, false, false],
+	[true, false, false],
+	[false, true, false],
+	[false, false, true],
 ])
-	test(`conversation → browser child → ${empty ? "empty connected browser" : blocked ? "external fallback" : "native candidates"} → saved answer`, async () => {
+	test(`conversation → browser child → ${uncollected ? "uncollected finish fallback" : empty ? "empty connected browser" : blocked ? "external fallback" : "native candidates"} → saved answer`, async () => {
+		const fallback = blocked || uncollected;
 		const driver = new FakeDriver();
 		driver.tabs = empty
 			? []
@@ -55,43 +57,45 @@ for (const [blocked, empty] of [
 		const browserModel = fakeInference(
 			blocked
 				? [clarify("ログインが必要です")]
-				: [
-						...(empty
-							? [
-									invoke("browser.page.tab_new", {
-										url: "https://www.youtube.com/",
-									}),
-								]
-							: []),
-						(messages) => {
-							const o = observation(messages);
-							expect(o.links).toHaveLength(4);
-							expect(o.text).toContain("[ref=e1]");
-							expect(o.text).not.toContain("/watch?v=native");
-							expect(o.links[0].url).toBe("https://www.youtube.com/results");
-							const chosen = o.links
-								.slice(1)
-								.map((link: { blockRef: string }) => link.blockRef);
-							return invoke("browser.page.collect", {
-								observationRef: o.observationRef,
-								blockRefs: chosen,
-								linkBlockRefs: chosen,
-								purpose: "candidates",
-							});
-						},
-						(messages) => {
-							const collected = lastResult(messages).collected;
-							expect(collected.links).toBe(3);
-							expect(
-								collected.candidates.map((c: { url: string }) => c.url),
-							).toEqual(
-								[1, 2, 3].map(
-									(n) => `https://www.youtube.com/watch?v=native${n}`,
-								),
-							);
-							return finish("検索結果から候補を3件収集しました");
-						},
-					],
+				: uncollected
+					? [finish("候補のページへ到着しました")]
+					: [
+							...(empty
+								? [
+										invoke("browser.page.tab_new", {
+											url: "https://www.youtube.com/",
+										}),
+									]
+								: []),
+							(messages) => {
+								const o = observation(messages);
+								expect(o.links).toHaveLength(4);
+								expect(o.text).toContain("[ref=e1]");
+								expect(o.text).not.toContain("/watch?v=native");
+								expect(o.links[0].url).toBe("https://www.youtube.com/results");
+								const chosen = o.links
+									.slice(1)
+									.map((link: { blockRef: string }) => link.blockRef);
+								return invoke("browser.page.collect", {
+									observationRef: o.observationRef,
+									blockRefs: chosen,
+									linkBlockRefs: chosen,
+									purpose: "candidates",
+								});
+							},
+							(messages) => {
+								const collected = lastResult(messages).collected;
+								expect(collected.links).toBe(3);
+								expect(
+									collected.candidates.map((c: { url: string }) => c.url),
+								).toEqual(
+									[1, 2, 3].map(
+										(n) => `https://www.youtube.com/watch?v=native${n}`,
+									),
+								);
+								return finish("検索結果から候補を3件収集しました");
+							},
+						],
 		);
 		const queries: string[] = [];
 		let guarded = 0;
@@ -133,7 +137,7 @@ for (const [blocked, empty] of [
 						tool: "browser.research",
 						arguments: { request: d.originalRequest },
 					});
-				if (blocked && !d.candidates.length)
+				if (fallback && !d.candidates.length)
 					return JSON.stringify({
 						action: "invoke",
 						tool: "web.lookup",
@@ -143,7 +147,7 @@ for (const [blocked, empty] of [
 					action: "finish",
 					report: {
 						completion: "complete",
-						answer: blocked
+						answer: fallback
 							? "サイト内検索が利用できず外部検索で補いました。本文は未確認です。"
 							: "サイト内で候補を見つけました。本文は未確認です。",
 						summary: "動画候補",
@@ -188,7 +192,7 @@ for (const [blocked, empty] of [
 					messages.find((m) => m.content.includes('"delivery":"guided-web"'))!
 						.content,
 				).report;
-				return `${blocked ? "サイト内検索が利用できず外部検索で見つけた" : "サイト内で見つけた"}本文未確認の[候補](<${report.candidateResults[0].url}>)です。`;
+				return `${fallback ? "サイト内検索が利用できず外部検索で見つけた" : "サイト内で見つけた"}本文未確認の[候補](<${report.candidateResults[0].url}>)です。`;
 			},
 		});
 		try {
@@ -204,17 +208,19 @@ for (const [blocked, empty] of [
 			const run = (await h.dialogue.waitForTerminal(id, { timeoutMs: 5000 }))!;
 			expect(run.status).toBe("completed");
 			const answer = h.conversation.message(run.answerMessageId!)!.text;
-			expect(answer).toContain(blocked ? "watch?v=external" : "watch?v=native");
+			expect(answer).toContain(
+				fallback ? "watch?v=external" : "watch?v=native",
+			);
 			expect(answer).toContain("本文未確認");
-			expect(queries).toEqual(blocked ? ["python3 youtube.com"] : []);
-			expect(guarded).toBe(blocked ? 0 : 1);
+			expect(queries).toEqual(fallback ? ["python3 youtube.com"] : []);
+			expect(guarded).toBe(fallback ? 0 : 1);
 			const worker = h.toolchain.agents
 				.list(id)
 				.find((t) => t.kind === "worker")!;
 			expect(worker.packageRevisionId).toBe("package:web.service-search@3");
 			const report = h.toolchain.agents.report(worker.id);
 			expect(report).not.toBeNull();
-			expect(report!.candidateResults).toHaveLength(blocked ? 1 : 3);
+			expect(report!.candidateResults).toHaveLength(fallback ? 1 : 3);
 			expect(
 				h.browser!.service.researchPages(
 					h.browser!.service.listTasks(worker.id)[0]!.taskId,
