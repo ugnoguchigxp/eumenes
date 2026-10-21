@@ -19,7 +19,8 @@ export type ToolRuntimeMeta = {
 		| "history"
 		| "world"
 		| "recipe"
-		| "local_action";
+		| "local_action"
+		| "child";
 	/**
 	 * The tool takes a URL that must be one the user gave or an earlier observation returned.
 	 * Tools with a scope are page reads: they use the per-task read budget, other reads allow one call.
@@ -35,7 +36,7 @@ export type PackageRuntimeMeta = {
 	 * quick: the small web budget (one search, one read, fewer model calls).
 	 * recipe: quick plus one saved-procedure lookup and one extra read for a failed fixed URL.
 	 */
-	budget?: "quick" | "recipe";
+	budget?: "quick" | "recipe" | "service";
 	/** Return source-linked findings directly, without requirement extraction or grading. */
 	report?: "search";
 	/**
@@ -46,6 +47,7 @@ export type PackageRuntimeMeta = {
 };
 
 const tools: Readonly<Record<string, ToolRuntimeMeta>> = {
+	"browser.research": { operation: "child" },
 	"web.lookup": { operation: "search" },
 	"web.read": { operation: "read", urlScope: "request_or_observed" },
 	"web.forecast": { operation: "read" },
@@ -63,6 +65,7 @@ const tools: Readonly<Record<string, ToolRuntimeMeta>> = {
 	"timer.list": { operation: "local_action" },
 };
 const packages: Readonly<Record<string, PackageRuntimeMeta>> = {
+	"web.service-search": { budget: "service", report: "search", context: "set" },
 	"web.quick": { budget: "quick", report: "search" },
 	"web.search": { report: "search" },
 	"web.recipe": { budget: "recipe", report: "search", context: "set" },
@@ -72,6 +75,7 @@ const toolchains: Readonly<
 	Record<string, import("./toolchains").ToolchainRuntimeMeta>
 > = {
 	"web.search": { execution: "research", route: "web" },
+	"web.service-search": { execution: "research", route: "web" },
 	"web.research.codex": {
 		execution: "research",
 		route: "web",

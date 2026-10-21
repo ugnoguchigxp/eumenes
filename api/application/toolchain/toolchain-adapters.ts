@@ -11,6 +11,10 @@ import {
 	describeGoogleAccountsAdapter,
 } from "../settings/google-accounts-adapter";
 import { z } from "zod";
+import {
+	TASK_ADAPTER_REF,
+	describeTaskAdapter,
+} from "./task-execution-adapter";
 import { ocrRecord } from "../../domains/ocr/contracts";
 import { describeOcrAdapter, OCR_ADAPTER_REF } from "../media/ocr-adapter";
 import {
@@ -150,6 +154,7 @@ export function bundleHostOf(
 					conditions: d.conditions,
 					structures: d.structures,
 					instant: d.instant,
+					task: d.task,
 					...(d.workspaces ? { workspaces: new Set(d.workspaces.keys()) } : {}),
 				},
 			]),
@@ -171,6 +176,7 @@ export function bundleHostOf(
 export const hostAdapterDescriptions: Array<
 	Pick<DomainAdapter, "ref" | "describe">
 > = [
+	{ ref: TASK_ADAPTER_REF, describe: describeTaskAdapter },
 	{ ref: TIMER_ADAPTER_REF, describe: describeTimerAdapter },
 	{ ref: OCR_ADAPTER_REF, describe: describeOcrAdapter },
 	{ ref: MODEL3D_ADAPTER_REF, describe: describeModel3dAdapter },
@@ -263,7 +269,13 @@ export function createRegistryActions(
 				Number(epoch) !== request.owner.cancelEpoch
 			)
 				throw new Error("origin_invalid");
-			const source = readActionOriginInTransaction(db, runId!);
+			const execution = agents().executionOriginInTransaction(
+				db,
+				request.owner,
+			);
+			const source = execution
+				? { ...execution.source, taskId: request.owner.taskId }
+				: readActionOriginInTransaction(db, runId!);
 			if (!source || source.taskId !== request.owner.taskId)
 				throw new Error("origin_invalid");
 			const adapter = adapterOf(request.adapterRef);
@@ -275,7 +287,9 @@ export function createRegistryActions(
 				requestId: request.requestId,
 				issuedAt: request.issuedAt,
 				origin: {
-					kind: "conversation",
+					...(execution
+						? { kind: "task" as const, execution }
+						: { kind: "conversation" as const }),
 					owner: request.owner,
 					runId: request.owner.rootRunId,
 					conversationId: source.conversationId,

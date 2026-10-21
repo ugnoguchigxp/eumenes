@@ -60,7 +60,9 @@ export function imageFixture(
 		| "studio"
 		| "fetch-failure" = "success",
 	gate?: Promise<void>,
+	artifactId: (ordinal: number) => string = () => "new-image",
 ) {
+	let generated = 0;
 	const requests: Array<{
 		method: string;
 		path: string;
@@ -161,7 +163,7 @@ export function imageFixture(
 					if (mode === "failure") return new Response(null, { status: 503 });
 					const bytes = png(body.width, body.height);
 					const metadata = descriptor(
-						"new-image",
+						artifactId(++generated),
 						body.width,
 						body.height,
 						bytes,

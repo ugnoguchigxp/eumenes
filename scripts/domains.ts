@@ -18,7 +18,7 @@ export const domains = {
 		web: "web/src/domains/excalidraw",
 		components: null,
 		depends: {
-			api: ["capabilities", "inference", "larm", "queue"],
+			api: ["capabilities", "inference", "larm", "queue", "tool-runtime"],
 			web: [],
 			test: [],
 		},
@@ -85,7 +85,7 @@ export const domains = {
 		web: "web/src/domains/image",
 		components: null,
 		depends: {
-			api: ["capabilities", "inference", "larm", "queue"],
+			api: ["capabilities", "inference", "larm", "queue", "tool-runtime"],
 			web: [],
 			test: [],
 		},
@@ -107,7 +107,7 @@ export const domains = {
 		web: "web/src/domains/music",
 		components: "web/src/components/domains/music",
 		depends: {
-			api: ["capabilities", "inference", "larm", "queue"],
+			api: ["capabilities", "inference", "larm", "queue", "tool-runtime"],
 			web: [],
 			test: [],
 		},
@@ -302,7 +302,11 @@ export const domains = {
 		backend: "api/domains/memory",
 		web: null,
 		components: null,
-		depends: { api: ["continuity", "conversation"], web: [], test: [] },
+		depends: {
+			api: ["continuity", "conversation", "tool-runtime"],
+			web: [],
+			test: [],
+		},
 	},
 	steward: {
 		tier: 5,
@@ -366,6 +370,7 @@ export const domains = {
 				"queue",
 				"scheduler",
 				"toolchain-history",
+				"tool-runtime",
 			],
 			web: ["conversation"],
 			test: ["world"],

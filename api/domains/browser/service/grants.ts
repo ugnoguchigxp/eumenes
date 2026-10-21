@@ -79,13 +79,18 @@ export function createGrants(ctx: Ctx) {
 		) {
 			const task = ownedTask(db, taskId, owner);
 			const quote = squash(input.quote);
+			const source =
+				task.origin === "task"
+					? ctx.taskExecutionSource?.(db, JSON.parse(task.frozen_json ?? "{}"))
+					: task.request;
 			// A reformatted value is allowed, but a value much longer than the passage it came from, or a
 			// passage too short to mean anything, is not a quotation of the request.
 			if (
 				quote.length < QUOTE_MIN ||
 				input.value.length >
 					QUOTE_VALUE_FACTOR * quote.length + QUOTE_VALUE_SLACK ||
-				!squash(task.request).includes(quote)
+				!source ||
+				!squash(source).includes(quote)
 			)
 				throw new Error("grant_source_mismatch");
 			return create(db, owner, taskId, "request", input);

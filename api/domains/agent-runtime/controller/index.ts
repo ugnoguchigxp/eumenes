@@ -5,6 +5,17 @@ export function registerAgentRuntime(
 	service: AgentRuntime,
 	cancelRoot: (rootRunId: string) => Promise<unknown>,
 ) {
+	app.get("/api/agent-executions", (c) => {
+		const conversationId = c.req.query("conversationId");
+		if (!conversationId || conversationId.length > 120)
+			throw new Error("invalid_conversation_id");
+		return c.json(service.executions.list(conversationId));
+	});
+	app.get("/api/agent-executions/:id", (c) => {
+		const view = service.executions.get(c.req.param("id"));
+		if (!view) throw new Error("execution_not_found");
+		return c.json(view);
+	});
 	app.get("/api/agent-tasks", (c) => {
 		const root = c.req.query("rootRunId");
 		if (!root || root.length > 120) throw new Error("invalid_root_run_id");

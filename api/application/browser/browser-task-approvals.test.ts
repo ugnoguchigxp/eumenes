@@ -149,6 +149,13 @@ test("a value read from the page is not typed: the task shows it to the user and
 		(messages) => {
 			const reference = tag(messages[1]!.content, "REFERENCE");
 			expect(reference.approved).toHaveLength(1);
+			const typeTool = JSON.parse(
+				messages[0]!.content
+					.split("\n")
+					.find((line) => line.startsWith("TOOLS="))!
+					.slice(6),
+			).find((tool: { id: string }) => tool.id === "browser.page.type");
+			expect(typeTool.inputSchema.properties).toHaveProperty("inputValueRef");
 			const [item] = reference.approved;
 			expect(item).toMatchObject({ kind: "input_value", purpose: "検索" });
 			expect(JSON.stringify(item)).not.toContain("MBR-2026");

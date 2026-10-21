@@ -56,7 +56,7 @@ export type GenerationRow = {
 	id: string;
 	owner: string;
 	conversation_id: string;
-	origin: "conversation" | "screen";
+	origin: "conversation" | "screen" | "task";
 	request_id: string;
 	idempotency_key: string;
 	title: string;

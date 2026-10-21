@@ -181,6 +181,7 @@ export function createReadInvocation({
 			? { operationId: `local:${localId}`, jobId: parentJobId }
 			: adapter.startInTransaction(db, {
 					requestId,
+					invocationId,
 					tool: ref.tool,
 					arguments: parsed.data,
 					owner,

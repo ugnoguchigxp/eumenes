@@ -3,6 +3,9 @@ import type { GoogleProvider } from "../domains/google-accounts";
 import { CONVERSATION_DEFAULT_PRINCIPAL } from "../domains/conversation/contracts";
 import { createContinuityService } from "../domains/continuity";
 import { createDialogueService } from "../domains/dialogue";
+import { configureTaskExecution } from "./toolchain/task-execution-port";
+import { taskMediaPorts } from "./toolchain/task-media-execution";
+import { taskLegacyPorts } from "./toolchain/task-legacy-execution";
 import {
 	REFERENCE_WINDOW_TOKENS,
 	contextBudgets,
@@ -155,6 +158,7 @@ export async function buildServices(
 	const enabled = config.toolchainEnabled;
 	const media = buildMedia(config, {
 		core,
+		agents: toolchain.agents,
 		capabilities: toolchain.capabilities,
 		dialogue: () => dialogue,
 	});
@@ -204,7 +208,31 @@ export async function buildServices(
 			: {}),
 	});
 	links.attachDialogue(dialogue);
+	if (enabled && toolchains)
+		configureTaskExecution({
+			queue,
+			childOperations: toolchain.childOperations,
+			store,
+			capabilities: toolchain.capabilities,
+			agents: toolchain.agents,
+			routing: toolchains,
+			registry: toolchain.registry,
+			dialogue,
+			conversation,
+			memory,
+			inference,
+			browser: browser.service,
+			media: taskMediaPorts({
+				image: media.image,
+				music: media.music,
+				excalidraw: media.drawingOperations,
+			}),
+			legacy: taskLegacyPorts(dialogue),
+		});
 	stewardAssembly.attachDialogue(dialogue);
+	memory.registerForgetPurge(
+		toolchain.agents.executions.purgeSourcesInTransaction,
+	);
 	const voice = createVoiceDialogue(store, dialogue, inference);
 	const monitoring = createMonitoring({
 		remote: createLarmCollector({

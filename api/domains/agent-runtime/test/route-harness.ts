@@ -73,6 +73,7 @@ export async function harness(
 	actions?: ActionAdapter,
 	/** Opt in to the versioned Web bundle; archived-route tests keep their old contracts. */
 	guided = false,
+	serviceSearch = false,
 ) {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-route-"));
 	const store = openStore(join(dir, "db"), [
@@ -92,7 +93,10 @@ export async function harness(
 	]);
 	const caps = createCapabilities(
 		store,
-		new Set(actions ? ["web", "history", "timer"] : ["web", "history"]),
+		new Set([
+			...(actions ? ["web", "history", "timer"] : ["web", "history"]),
+			...(serviceSearch ? ["browser"] : []),
+		]),
 		guided
 			? {
 					bundleHost: () => ({
@@ -106,6 +110,18 @@ export async function harness(
 			: {},
 	);
 	await caps.seed();
+	if (serviceSearch)
+		await store.write((db) => {
+			const bundle = require("../../capabilities/bundles/web-service-search.bundle.json");
+			// Domain fixture imports only the Web half; the application tests connect the actual browser child.
+			for (const d of bundle.definitions.filter(
+				(d: Definition) =>
+					(d.id === "web.service-search" && d.kind !== "toolchain") ||
+					d.id === "browser.research" ||
+					d.id === "web.read",
+			))
+				caps.registerBuiltinInTransaction(db, d);
+		});
 	await store.write((db) => {
 		for (const d of learnedPair()) caps.registerLearnedInTransaction(db, d);
 	});

@@ -123,6 +123,7 @@ export function buildWebResearch(
 		store,
 		queue,
 		cache: webCache,
+		review: createWebReview(store, inference),
 		acquisition: createWebAcquisition({
 			review: createWebReview(store, inference),
 		}),

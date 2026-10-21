@@ -1,0 +1,28 @@
+bun test v1.4.3 (c6da4a4d3)
+
+api/application/toolchain/service-search.test.ts:
+(pass) conversation → browser child → native candidates → saved answer [551.47ms]
+(pass) conversation → browser child → external fallback → saved answer [486.74ms]
+(pass) conversation → browser child → empty connected browser → saved answer [451.55ms]
+
+api/application/toolchain/service-search-lifecycle.test.ts:
+(pass) delegated prose cannot manufacture a quotation that authorizes browser input [340.12ms]
+(pass) revoked parent cannot adopt a late browser finish or emit a second conversation notice [337.87ms]
+(pass) native work expires while the parent's fallback reserve remains [333.12ms]
+(pass) accepted candidates survive native expiry for partial adoption [366.25ms]
+(pass) accepted candidates are discarded after authority revocation [352.58ms]
+
+api/domains/agent-runtime/test/guided-candidates.test.ts:
+(pass) the service route's candidate-only example satisfies its own contract without body evidence [0.37ms]
+(pass) only displayed live candidates may be returned or resolved into reads [0.13ms]
+(pass) candidate references never stand in for body facts [0.60ms]
+
+api/domains/agent-runtime/test/service-search-budget.test.ts:
+(pass) service budgets preserve fallback and final answer without changing existing budgets [0.04ms]
+(pass) revoking the frozen package revokes a research child's caller authority [55.01ms]
+(pass) native refusal continues through external lookup and host-issued candidate result [58.45ms]
+
+ 14 pass
+ 0 fail
+ 84 expect() calls
+Ran 14 tests across 4 files. [3.88s]

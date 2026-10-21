@@ -62,6 +62,11 @@ test("live information is classified with the candidates, announced by the first
 		// The first round offers the candidates, answer and report_unavailable; none of them takes the request.
 		expect(h.state.analysisCalls).toHaveLength(1);
 		const first = h.state.analysisCalls[0]!.tools;
+		for (const tool of first)
+			expect(
+				(tool.function.parameters.properties as Record<string, unknown>)
+					.approved,
+			).toMatchObject({ const: false });
 		expect(first.map((t) => t.function.name)).toEqual([
 			"studio_create",
 			"other_create",

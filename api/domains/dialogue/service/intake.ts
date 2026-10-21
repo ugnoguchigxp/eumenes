@@ -1,3 +1,4 @@
+import { saveDeadlinePolicy } from "../repository";
 import { getLogger } from "../../../infrastructure/logger";
 import type { TargetDefinition } from "../../scheduler";
 import type { Tx } from "../../queue";
@@ -167,6 +168,7 @@ export function createIntake(deps: DialogueDeps) {
 		// A voice turn's requests were captured with the voice deadline: the toolchain's run time reaches them too.
 		if (runMs) larm.extendDeadlineInTransaction?.(db, runId, deadlineAtMs);
 		insert(db, run);
+		saveDeadlinePolicy(db, run.id, input.deadlineMs !== undefined);
 		if (addressee) {
 			// The utterance belongs to the session: the work is taken for its turn (refused while busy), the
 			// message is kept from memory and the main agent's context, and the idle expiry restarts.
@@ -250,6 +252,13 @@ export function createIntake(deps: DialogueDeps) {
 			return accepted.run;
 		},
 		/** The system's notice: a hidden input the conversation answers (e.g. a task finished). */
+		notifyInTransaction(db: Tx, input: Notice) {
+			return acceptInTransaction(db, {
+				...noticeSchema.parse(input),
+				presentation: "artifact",
+				sourceKind: "notice",
+			}).run;
+		},
 		async notify(input: Notice): Promise<Run> {
 			const notice = noticeSchema.parse(input);
 			const accepted = await store.write((db) =>

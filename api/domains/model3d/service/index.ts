@@ -22,6 +22,7 @@ import {
 	ownedGeneration,
 	patchGeneration,
 	setFocus,
+	settleOperation,
 	type GenerationRow,
 } from "../repository";
 import { registerModel3dHandlers, type Stage } from "./handlers";
@@ -108,6 +109,14 @@ export function createModel3d(deps: {
 	}
 	function notifyOperation(db: Database, id: string) {
 		const o = operationRow(db, id)!;
+		if (
+			db
+				.query(
+					"SELECT 1 FROM model3d_commands WHERE json_extract(result_json,'$.operationRef')=? AND json_extract(input_json,'$.execution') IS NOT NULL",
+				)
+				.get(id)
+		)
+			return;
 		if (o.state !== "failed") return;
 		announce(
 			db,
@@ -135,7 +144,8 @@ export function createModel3d(deps: {
 		input: {
 			owner: string;
 			conversationId: string;
-			origin: "conversation" | "screen";
+			origin: "conversation" | "screen" | "task";
+			deadline?: number;
 			requestId: string;
 			title: string;
 			tags: string[];
@@ -177,7 +187,7 @@ export function createModel3d(deps: {
 			crypto.getRandomValues(new Uint32Array(1))[0]! % 2_147_483_647,
 			"submitting",
 			null,
-			now + (deps.followMs ?? FOLLOW_MS),
+			Math.min(now + (deps.followMs ?? FOLLOW_MS), input.deadline ?? Infinity),
 			now,
 			now,
 		);
@@ -234,11 +244,25 @@ export function createModel3d(deps: {
 				resourceKey: "model3d",
 				concurrencyKey: `model3d:${row.assetId}`,
 				maxAttempts: 1,
+				deadlineAtMs: row.deadline,
 			});
 		},
 	});
 	return {
 		...commands,
+		cancelCommandExecutionInTransaction: (
+			db: Database,
+			owner: string,
+			requestId: string,
+		) =>
+			cancelCommandExecution(
+				db,
+				owner,
+				requestId,
+				commands,
+				queue,
+				cancelInTransaction,
+			),
 		createInTransaction,
 		cancelInTransaction,
 		availableInTransaction: () => deps.larm() !== null,
@@ -309,3 +333,40 @@ export function createModel3d(deps: {
 	};
 }
 export type Model3dService = ReturnType<typeof createModel3d>;
+
+function cancelCommandExecution(
+	db: Database,
+	owner: string,
+	requestId: string,
+	commands: ReturnType<typeof createModel3dCommands>,
+	queue: QueueService,
+	cancelInTransaction: (db: Database, owner: string, id: string) => unknown,
+) {
+	const state = commands.commandExecutionInTransaction(db, owner, requestId);
+	if (state?.generation) {
+		const row = ownedGeneration(db, state.generation.id, owner);
+		if (
+			["submitting", "queued", "running"].includes(row.state) &&
+			(row.request_json || row.job_id)
+		)
+			patchGeneration(db, row.id, { error_code: "model3d_cancel_pending" });
+		cancelInTransaction(db, owner, row.id);
+	}
+	if (state?.operation?.state === "pending") {
+		const job = queue.findByDedupeInTransaction(
+			db,
+			"model3d",
+			"model3d.operation",
+			state.operation.id,
+		);
+		const running = job
+			? queue.cancelInTransaction(db, job.id, "execution_cancelled")?.wasRunning
+			: false;
+		settleOperation(
+			db,
+			state.operation.id,
+			"failed",
+			running ? "model3d_operation_unconfirmed" : "cancel_requested",
+		);
+	}
+}

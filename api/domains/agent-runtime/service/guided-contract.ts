@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { Prepared } from "../../capabilities";
 
 export const guidedWeb = (p: Prepared | undefined) =>
-	p?.package.schemaKey === "guidedResearch";
+	["guidedResearch", "guidedCandidates"].includes(p?.package.schemaKey ?? "");
 const claim = z
 	.object({
 		text: z.string().min(1).max(500),
@@ -54,6 +54,58 @@ export const guidedAction = z.discriminatedUnion("action", [
 	finish,
 ]);
 
+export const candidateReport = guidedReport
+	.omit({ recipe: true })
+	.extend({
+		resultKind: z
+			.enum(["candidates", "facts", "mixed"])
+			.describe(
+				"candidates: candidateRefsを1件以上選び、claimsのevidenceは空。facts: candidateRefsは空。mixed: candidateRefsを1件以上選び、本文根拠eNを持つclaimも1件以上必要。候補だけなら本文読取は不要。",
+			),
+		candidateRefs: z
+			.array(z.string().regex(/^c[1-9][0-9]*$/))
+			.max(5)
+			.describe(
+				"提示されたcNのみ。resultKindがfactsなら[]、candidatesまたはmixedなら1〜5件。cNをclaims.evidenceへ入れない。",
+			),
+	})
+	.superRefine((value, ctx) => {
+		if (
+			(value.resultKind === "facts" && value.candidateRefs.length) ||
+			(value.resultKind === "candidates" &&
+				value.claims.some((c) => c.evidence.length)) ||
+			(value.resultKind === "mixed" &&
+				!value.claims.some((c) => c.evidence.length)) ||
+			(value.resultKind !== "facts" && !value.candidateRefs.length)
+		)
+			ctx.addIssue({
+				code: "custom",
+				path: ["candidateRefs"],
+				message: "candidate required",
+			});
+	})
+	.meta({
+		examples: [
+			{
+				completion: "incomplete",
+				answer:
+					"外部検索で候補を1件見つけました。本文は未確認で、要求された残りの件数は不足しています。",
+				summary: "候補1件、残り不足",
+				resultKind: "candidates",
+				candidateRefs: ["c1"],
+				claims: [],
+				limitations: ["本文未確認", "要求件数に不足"],
+			},
+		],
+	});
+// Top-level examples replace the whole output schema in controlInstructions.
+// Keep the report example nested so invoke/wait/finish remain visible to the model.
+const candidateAction = z.discriminatedUnion("action", [
+	invoke,
+	wait,
+	z.object({ action: z.literal("finish"), report: candidateReport }).strict(),
+]);
+
 // Published skill v1 asks for this field. Keep its output contract readable,
 // without storing or comparing a second copy of the user's request.
 // Reachable condition: a task binds its package revision when it starts, and
@@ -76,8 +128,13 @@ const archivedAction = z.discriminatedUnion("action", [
 	finish.extend({ mission: legacyMission.optional() }),
 ]);
 export const guidedActionFor = (p: Prepared) =>
-	p.package.requiredSkillRevisionIds?.includes("skill:web.guided@1")
-		? archivedAction
-		: guidedAction;
+	p.package.schemaKey === "guidedCandidates"
+		? candidateAction
+		: p.package.requiredSkillRevisionIds?.includes("skill:web.guided@1")
+			? archivedAction
+			: guidedAction;
 export type GuidedAction = z.infer<typeof guidedAction>;
-export type GuidedReport = z.infer<typeof guidedReport>;
+export type GuidedReport = z.infer<typeof guidedReport> & {
+	resultKind?: "candidates" | "facts" | "mixed";
+	candidateRefs?: string[];
+};

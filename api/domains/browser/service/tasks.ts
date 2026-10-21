@@ -12,6 +12,7 @@ import {
 } from "../contracts";
 import {
 	activeTaskCount,
+	endTaskApprovals,
 	dueTasks,
 	ownedTask,
 	patchTask,
@@ -49,10 +50,11 @@ function stepInput(r: TaskRow): TaskStepInput {
 }
 
 export type StartTaskInput = {
+	deadline?: number;
 	scriptRequired?: boolean;
 	owner: string;
 	conversationId: string;
-	origin: "conversation" | "screen";
+	origin: "conversation" | "screen" | "child" | "task";
 	requestId: string;
 	request: string;
 	tabRef?: string;
@@ -71,7 +73,10 @@ export type StartTaskInput = {
 };
 
 /** A started task and the approvals it holds from the start. */
-export type StartedTask = TaskView & { approved: ApprovedItem[] };
+export type StartedTask = TaskView & {
+	approved: ApprovedItem[];
+	jobId: string;
+};
 
 /** Single-shot page-operation tasks: accepted in one transaction, then run one queue job per model step. */
 export function createTasks(
@@ -91,6 +96,7 @@ export function createTasks(
 			subjectRef: id,
 			lane: "interactive",
 			concurrencyKey: `browser:task:${id}`,
+			deadlineAtMs: r.deadline,
 			availableAtMs: ctx.now() + delayMs,
 			maxAttempts: 1,
 		});
@@ -116,11 +122,32 @@ export function createTasks(
 		prepareInTransaction(db, claim) {
 			const r = taskRow(db, claim.payload.id);
 			if (
+				r?.origin === "task" &&
+				!ctx.taskExecutionSource?.(db, JSON.parse(r.frozen_json ?? "{}"))
+			) {
+				finishTask(
+					ctx,
+					db,
+					r.id,
+					"cancelled",
+					"execution_source_invalid",
+					null,
+				);
+				return { status: "stale", reason: "execution_source_invalid" };
+			}
+			if (
 				!r ||
 				r.step !== claim.payload.step ||
 				!activeTaskStates.includes(r.state)
 			)
 				return { status: "stale", reason: "browser_task_state_changed" };
+			if (
+				r.origin === "child" &&
+				!ctx.childValid?.(db, JSON.parse(r.frozen_json ?? "{}").caller)
+			) {
+				finishTask(ctx, db, r.id, "cancelled", "child_authority_revoked", null);
+				return { status: "stale", reason: "child_authority_revoked" };
+			}
 			if (ctx.now() >= r.deadline) {
 				finishTask(ctx, db, r.id, "expired", "task_expired", null);
 				return { status: "stale", reason: "task_expired" };
@@ -167,8 +194,24 @@ export function createTasks(
 		classify: () => "fail",
 		settleInTransaction(db, claim, _input, outcome) {
 			const r = taskRow(db, claim.payload.id);
-			if (!r || r.state !== "running" || r.step !== claim.payload.step)
+			if (
+				!r ||
+				r.step !== claim.payload.step ||
+				!activeTaskStates.includes(r.state)
+			)
 				return "stale";
+			if (outcome.type === "expired" || ctx.now() >= r.deadline) {
+				finishTask(ctx, db, r.id, "expired", "task_expired", null);
+				return "applied";
+			}
+			if (r.state !== "running") return "stale";
+			if (
+				r.origin === "child" &&
+				!ctx.childValid?.(db, JSON.parse(r.frozen_json ?? "{}").caller)
+			) {
+				finishTask(ctx, db, r.id, "cancelled", "child_authority_revoked", null);
+				return "stale";
+			}
 			if (outcome.type === "retry") return "applied";
 			if (outcome.type === "success") {
 				const out = outcome.result;
@@ -191,9 +234,7 @@ export function createTasks(
 				}
 				return "applied";
 			}
-			if (outcome.type === "expired" || ctx.now() >= r.deadline)
-				finishTask(ctx, db, r.id, "expired", "task_expired", null);
-			else if (outcome.type === "interrupted")
+			if (outcome.type === "interrupted")
 				finishTask(ctx, db, r.id, "failed", "task_interrupted", null);
 			else
 				finishTask(ctx, db, r.id, "failed", safeCode(outcome.errorCode), null);
@@ -210,6 +251,12 @@ export function createTasks(
 
 	const started = (db: Database, r: TaskRow): StartedTask => ({
 		...taskView(r),
+		jobId: ctx.queue.findByDedupeInTransaction(
+			db,
+			"browser",
+			"browser.task.step",
+			`${r.id}:${r.step}`,
+		)!.id,
 		approved: approvals.approved(db, r.id),
 	});
 
@@ -219,7 +266,7 @@ export function createTasks(
 	): StartedTask {
 		if (!ctx.runTaskStep) throw new Error("browser_task_runner_missing");
 		const request = input.request.trim();
-		if (!request || request.length > 4000)
+		if (!request || request.length > (input.origin === "child" ? 8000 : 4000))
 			throw new Error("invalid_browser_request");
 		const existing = taskByRequest(db, input.requestId);
 		if (existing) {
@@ -228,12 +275,18 @@ export function createTasks(
 				existing.owner !== input.owner ||
 				existing.request !== request ||
 				existing.tab_ref !== (input.tabRef ?? null) ||
-				existing.start_url !== (input.url ?? null)
+				existing.start_url !== (input.url ?? null) ||
+				existing.origin !== input.origin ||
+				existing.frozen_json !==
+					(input.frozen == null ? null : JSON.stringify(input.frozen))
 			)
 				throw new Error("request_conflict");
 			return started(db, existing);
 		}
-		if (!input.scriptRequired || !ctx.canAutoConnect())
+		if (
+			input.origin !== "child" &&
+			(!input.scriptRequired || !ctx.canAutoConnect())
+		)
 			connectedConnection(ctx, db);
 		if (input.tabRef) openTab(tabRow(db, input.tabRef));
 		if (input.url) {
@@ -256,7 +309,7 @@ export function createTasks(
 				startUrl: input.url ?? null,
 				frozen: input.frozen,
 				coreState: input.coreState,
-				deadline: ctx.now() + ctx.taskMs,
+				deadline: Math.min(ctx.now() + ctx.taskMs, input.deadline ?? Infinity),
 			},
 			ctx.now(),
 		);
@@ -276,6 +329,10 @@ export function createTasks(
 
 	function cancelInTransaction(db: Database, owner: string, id: string) {
 		const r = ownedTask(db, id, owner);
+		if (r.state === "needs_input") {
+			endTaskApprovals(db, id, ctx.now());
+			patchTask(db, id, { state: "cancelled", epoch: r.epoch + 1 }, ctx.now());
+		}
 		finishTask(ctx, db, id, "cancelled", null, null);
 		return taskView(taskRow(db, r.id)!);
 	}

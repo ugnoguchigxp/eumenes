@@ -1,5 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { connect, until, WEB } from "../../domains/browser/test/fakes";
+import { argumentHints, observationView } from "./browser-task-tools";
 import {
 	ASKED,
 	begin,
@@ -20,6 +21,55 @@ import {
 } from "./browser-task-kit";
 
 afterEach(cleanup);
+
+test("the collection view keeps action refs and long or malformed labels without duplicating complete links", () => {
+	const long = "a".repeat(220);
+	const blocks = [
+		{
+			blockRef: "b1",
+			text: '- link "entry" [ref=e1] [cursor=pointer]:\n  - /url: /entry',
+		},
+		{ blockRef: "b2", text: `- link "${long}" [ref=e2]:\n  - /url: /long` },
+		{ blockRef: "b3", text: '- link "bad\\q" [ref=e3]:\n  - /url: /bad' },
+		{
+			blockRef: "b4",
+			text: '- link "entry details" [ref=e4]:\n  - /url: /details\n  descriptive continuation',
+		},
+	];
+	const links = [
+		{ blockRef: "b1", title: "entry", url: "https://example.org/entry" },
+		{
+			blockRef: "b2",
+			title: long.slice(0, 200),
+			url: "https://example.org/long",
+		},
+		{ blockRef: "b3", title: "bad", url: "https://example.org/bad" },
+		{
+			blockRef: "b4",
+			title: "entry details",
+			url: "https://example.org/details",
+		},
+	];
+	const view = observationView({
+		observationRef: crypto.randomUUID(),
+		tabRef: crypto.randomUUID(),
+		url: "https://example.org/",
+		title: "page",
+		generation: 1,
+		text: blocks.map((b) => b.text).join("\n"),
+		blocks,
+		links,
+		truncated: false,
+		reasons: [],
+		refCount: 4,
+	});
+	expect(view.text).toContain("[b1]\n- link [ref=e1] [cursor=pointer]");
+	expect(view.text).not.toContain("/url: /entry");
+	expect(view.links).toEqual(links);
+	expect(view.text).toContain(long);
+	expect(view.text).toContain("bad\\q");
+	expect(view.text).toContain("descriptive continuation");
+});
 
 test("observe, type with a grant, click, re-observe, finish: one inference per job and the page only as data", async () => {
 	let seen: string[] = [];
@@ -82,6 +132,16 @@ test("the first call has the D7 context: system layer, enclosed reference with t
 	});
 	await ended(s, taskId);
 	const [system, reference, request] = s.model.state.calls[0]!;
+	const typeTool = JSON.parse(
+		system!.content
+			.split("\n")
+			.find((line) => line.startsWith("TOOLS="))!
+			.slice(6),
+	).find((tool: { id: string }) => tool.id === "browser.page.type");
+	expect(typeTool.inputSchema.required).toEqual(
+		expect.arrayContaining(["value", "quote"]),
+	);
+	expect(typeTool.inputSchema.properties).not.toHaveProperty("inputValueRef");
 	expect(s.model.state.calls[0]).toHaveLength(3);
 	expect(system!.role).toBe("system");
 	for (const id of [
@@ -218,6 +278,9 @@ test("a refused tool goes back as data and is retried once; the second refusal e
 	expect(twice.service.taskStatus(OWNER, t2.taskId)).toMatchObject({
 		state: "failed",
 		errorCode: "tool_refused",
+		resultSummary: expect.stringMatching(
+			/observation_stale|ref_not_actionable/,
+		),
 	});
 	expect(twice.driver.calls).not.toContain("act:click");
 	expect(twice.model.state.calls).toHaveLength(2);
@@ -285,6 +348,77 @@ test("a value is typed on a quote from the request, however it was reformatted",
 	await ended(s, taskId);
 	expect(s.service.taskStatus(OWNER, taskId).state).toBe("completed");
 	expect(s.typed).toEqual(["wireless earphones"]);
+});
+
+test("a missing source quotation receives the existing repair hint before any input is sent", async () => {
+	const s = await setup([
+		onPage("browser.page.type", () => ({
+			ref: "e2",
+			element: "検索ボックス",
+			value: "ワイヤレスイヤホン",
+			purpose: "検索",
+			submit: true,
+			effect: "navigate",
+		})),
+		(messages) => {
+			const refused = lastResult(messages);
+			expect(refused).toMatchObject({
+				ok: false,
+				error: "invalid_arguments",
+				detail: expect.stringContaining("valueとquote"),
+			});
+			expect(JSON.stringify(refused)).not.toContain("ワイヤレスイヤホン");
+			expect(refused.issues).toContainEqual({
+				path: "quote",
+				code: "invalid_type",
+			});
+			expect(s.typed).toEqual([]);
+			return typeInto("ワイヤレスイヤホン", "ワイヤレスイヤホン", {
+				submit: true,
+				effect: "navigate",
+			})(messages, 2);
+		},
+		finish("検索しました。"),
+	]);
+	const { taskId } = await start(s);
+	await ended(s, taskId);
+	expect(s.service.taskStatus(OWNER, taskId).state).toBe("completed");
+	expect(s.typed).toEqual(["ワイヤレスイヤホン"]);
+	expect(
+		argumentHints([
+			{ code: "custom", path: [], message: "private unregistered value" },
+		]),
+	).toBe("");
+});
+
+test("readable link URLs keep the exact observed target and never double-decode escapes", () => {
+	const urls = [
+		"https://example.org/%E6%97%A5%E6%9C%AC?q=%E5%85%A5%E9%96%80&part=one%2Ftwo",
+		"https://example.org/%25E6%2597%25A5",
+		"https://example.org/%E0%A4",
+		"https://example.org/a%20b",
+	];
+	const view = observationView({
+		observationRef: crypto.randomUUID(),
+		tabRef: crypto.randomUUID(),
+		url: "https://example.org/",
+		title: "page",
+		generation: 1,
+		text: "",
+		links: urls.map((url, i) => ({
+			blockRef: `b${i + 1}`,
+			title: "link",
+			url,
+		})),
+		truncated: false,
+		reasons: [],
+		refCount: 0,
+	});
+	expect(view.links![0]!.url).toBe(
+		"https://example.org/日本?q=入門&part=one%2Ftwo",
+	);
+	expect(view.links!.map((link) => new URL(link.url).href)).toEqual(urls);
+	expect(view.links!.slice(1).map((link) => link.url)).toEqual(urls.slice(1));
 });
 
 test("an operation that may have reached the page stops the task as indeterminate and no further call is made", async () => {

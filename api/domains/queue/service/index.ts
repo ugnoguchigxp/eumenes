@@ -190,6 +190,7 @@ export function createQueue(
 			return result;
 		},
 		getInTransaction: (tx: Tx, id: string) => getJob(tx, id),
+		findByDedupeInTransaction: findByDedupe,
 		/** Deletes settled jobs older than 14 days and outcome_unknown ones older than 90; their dedupe keys become reusable. */
 		pruneInTransaction: (tx: Tx, at: number, limit = 500) =>
 			pruneTerminal(

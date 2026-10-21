@@ -29,7 +29,7 @@ export type RunRow = {
 	body: string;
 	claudeSessionId: string;
 	projectId: string;
-	origin: "board" | "conversation";
+	origin: "board" | "conversation" | "execution";
 	conversationId: string | null;
 	stopRequested: boolean;
 	createdAt: number;
@@ -56,7 +56,7 @@ type RawRun = {
 	body: string;
 	claude_session_id: string;
 	project_id: string;
-	origin: "board" | "conversation";
+	origin: "board" | "conversation" | "execution";
 	conversation_id: string | null;
 	stop_requested: number;
 	created_at: number;

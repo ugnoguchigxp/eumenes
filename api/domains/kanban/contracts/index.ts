@@ -79,7 +79,7 @@ export type KanbanRunView = {
 	title: string;
 	prompt: string;
 	claudeSessionId: string;
-	origin: "board" | "conversation";
+	origin: "board" | "conversation" | "execution";
 	/** Terminals request detail for display (filled by the application's board query). */
 	requestState?: string;
 	activity?: "working" | "idle" | "waiting";
@@ -161,7 +161,7 @@ export type KanbanDispatch = {
 	projectId: string;
 	prompt: string;
 	task: string;
-	origin: "board" | "conversation";
+	origin: "board" | "conversation" | "execution";
 	conversationId?: string;
 };
 
@@ -205,7 +205,7 @@ export type KanbanFollowupInput = z.infer<typeof kanbanFollowup>;
 
 /** Who asked and what the host can do now; decided by the application, never by the client. */
 export type KanbanOperationContext = {
-	origin: "board" | "conversation";
+	origin: "board" | "conversation" | "execution";
 	conversationId?: string;
 	/** Runs can be tracked on this host (terminals hooks available). */
 	runnable: boolean;

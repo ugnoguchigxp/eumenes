@@ -145,7 +145,12 @@ export interface InferencePort {
 	/** Authorized user action with its own deadline; the caller validates ownership and settles the result. */
 	captureUserControlInTransaction?(
 		db: Database,
-		input: { subject: string; deadline: number; maxOutputTokens: number },
+		input: {
+			subject: string;
+			deadline: number;
+			maxOutputTokens: number;
+			route?: "subagent";
+		},
 	): string;
 	executeControl?(
 		requestId: string,

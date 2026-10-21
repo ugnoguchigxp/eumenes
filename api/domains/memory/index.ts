@@ -8,6 +8,7 @@ export {
 	forgetClosureMigration,
 	seedImportMigration,
 	specialistBlockReasonMigration,
+	executionReferencesMigration,
 } from "./repository";
 export type { MemoryService } from "./service";
 export { createMemoryService } from "./service";

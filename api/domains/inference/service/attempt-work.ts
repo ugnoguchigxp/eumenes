@@ -58,7 +58,7 @@ export function callOptionsFor(r: Request, attemptId: string): LarmCallOptions {
 					},
 				}
 			: {}),
-		...(r.row.mode === "control"
+		...(r.row.mode === "control" && !r.tools?.length
 			? controlJsonOptions(r.control, r.row.structuredOutput)
 			: {}),
 		...(r.row.mode === "control" && r.control?.reasoningEffort

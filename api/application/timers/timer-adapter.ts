@@ -104,7 +104,7 @@ export function createTimerAdapter(
 ): DomainAdapter {
 	const scope = timers.scope ?? DEFAULT_TIMER_SCOPE;
 	function originOf(origin: AdapterOrigin, operationName: string): TimerOrigin {
-		return origin.kind === "conversation"
+		return origin.kind === "conversation" || origin.kind === "task"
 			? {
 					scope,
 					conversationId: origin.conversationId,
@@ -112,7 +112,11 @@ export function createTimerAdapter(
 					messageId: origin.messageId,
 					// One conversation run starts at most one timer.
 					originKey:
-						operationName === "timers.start" ? `${origin.runId}:timer:0` : null,
+						operationName === "timers.start"
+							? origin.kind === "task"
+								? `${origin.execution.dispatchId ?? origin.execution.id}:timer:0`
+								: `${origin.runId}:timer:0`
+							: null,
 				}
 			: {
 					scope,
@@ -190,7 +194,9 @@ export function createTimerAdapter(
 				state?: "active" | "elapsed" | "cancelled";
 				expectedRevision?: number;
 			};
-			const conversation = request.origin.kind === "conversation";
+			const conversation =
+				request.origin.kind === "conversation" ||
+				request.origin.kind === "task";
 			if (conversation) checkTarget(tx, request.operationName, input);
 			const stamp = {
 				requestId: request.requestId,

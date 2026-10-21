@@ -40,6 +40,8 @@ export function chatRequest(
 				}
 			: {}),
 		...nativeToolOptions(options?.tools),
+		// Function-selection turns have a checked output contract, like JSON control turns.
+		...(options?.tools?.length ? { temperature: 0 } : {}),
 		stream,
 		max_tokens: Math.min(
 			provider.contextWindow!.outputReserveTokens,

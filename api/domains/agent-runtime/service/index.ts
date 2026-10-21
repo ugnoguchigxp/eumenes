@@ -14,6 +14,8 @@ import { createRuntimeState, type SearchReportHook } from "./runtime-context";
 import { createStartTask } from "./start-task";
 import { createStepHandler } from "./step-handler";
 import { createTaskOps } from "./task-ops";
+import { createTaskExecutions } from "./executions";
+import { executionChildren } from "./execution-children";
 
 export function createAgentRuntime({
 	store,
@@ -61,14 +63,30 @@ export function createAgentRuntime({
 	const { handler } = createStepHandler(ctx, ops);
 	const flush = createFlush(ctx);
 	const reconcile = createReconcile(ctx, ops, flush);
-	const maintenance = createMaintenance(ctx, ops);
+	const executions = createTaskExecutions({ store, queue, inference, now });
+	const maintenance = createMaintenance(ctx, ops, executions.maintenance);
+	const lifecycle = createLifecycle(ctx, ops, reconcile, maintenance, flush);
 	return {
+		executions,
+		...executionChildren(ctx, answer, ops),
 		handler,
 		cancelTreeInTransaction: ops.cancelTreeInTransaction,
 		...createQueries(ctx, answer),
 		...createStartTask(ctx, ops),
 		...answer.api,
-		...createLifecycle(ctx, ops, reconcile, maintenance, flush),
+		...lifecycle,
+		start() {
+			lifecycle.start();
+			executions.start();
+		},
+		async recover() {
+			await executions.recover();
+			await lifecycle.recover();
+		},
+		async close() {
+			await executions.close();
+			await lifecycle.close();
+		},
 	};
 }
 export type AgentRuntime = ReturnType<typeof createAgentRuntime>;

@@ -103,6 +103,9 @@ export function verifyReport(
 export function parentProjection(report: Report) {
 	return {
 		summary: report.summary,
+		...(report.candidateResults?.length
+			? { candidateResults: report.candidateResults }
+			: {}),
 		...(report.version === 3
 			? {
 					requirements: {

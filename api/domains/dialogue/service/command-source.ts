@@ -8,7 +8,7 @@ import type { ToolchainRoutingPort } from "../contracts/toolchains";
 import type { DialogueDeps } from "./context";
 
 /** dots operations offered one tool each, so every input schema is a flat object. */
-const dotsTools = delegationCommand.options.map((option) => {
+export const dotsTools = delegationCommand.options.map((option) => {
 	const operation = option.shape.operation.value;
 	return {
 		id: `dots.${operation}`,
@@ -67,6 +67,7 @@ export function commandSource(
 	run: Run,
 	set: ReturnType<ToolchainRoutingPort["commandSetInTransaction"]>,
 	payload: { toolchainRevisionId: string; interactionId?: string },
+	execution?: import("../../tool-runtime").ChildExecution,
 ): { ok: true; source: CommandSource } | { ok: false; code: string } {
 	const { conversation, toolchains } = deps;
 	if (!toolchains) return { ok: false, code: "toolchain_unavailable" };
@@ -80,7 +81,21 @@ export function commandSource(
 		| undefined;
 	let request: string | undefined;
 	let original: string | undefined;
-	if (payload.interactionId) {
+	if (execution) {
+		request = execution.request;
+		original = execution.source.request;
+		if (execution.resume)
+			resume = {
+				generation: execution.revision,
+				epoch: execution.revision,
+				exchanges: [
+					{
+						question: execution.resume.questionId,
+						answer: execution.resume.input,
+					},
+				],
+			};
+	} else if (payload.interactionId) {
 		const context = deps.interactions?.resumeContextInTransaction(
 			tx,
 			payload.interactionId,

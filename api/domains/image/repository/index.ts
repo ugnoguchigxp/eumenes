@@ -23,6 +23,17 @@ CREATE INDEX image_conversation ON image_generations(conversation_id);
  view_json TEXT NOT NULL, expires_at INTEGER NOT NULL
 );`,
 	},
+	{
+		id: "image/0003-execution-calls",
+		after: ["image/0002-imports"],
+		sql: `
+CREATE TABLE image_generations_next (id TEXT PRIMARY KEY,run_id TEXT NOT NULL,conversation_id TEXT NOT NULL,record_json TEXT NOT NULL,request_json TEXT NOT NULL,plan_json TEXT,bindings_json TEXT NOT NULL,deadline INTEGER NOT NULL,queue_job_id TEXT);
+INSERT INTO image_generations_next SELECT * FROM image_generations;
+DROP TABLE image_generations;
+ALTER TABLE image_generations_next RENAME TO image_generations;
+CREATE INDEX image_conversation ON image_generations(conversation_id);
+CREATE UNIQUE INDEX image_source_once ON image_generations(run_id) WHERE json_extract(request_json,'$.execution') IS NULL;`,
+	},
 ];
 export type Row = {
 	id: string;
@@ -42,7 +53,9 @@ export function row(db: Database, id: string) {
 }
 export function byRun(db: Database, id: string) {
 	return db
-		.query("SELECT * FROM image_generations WHERE run_id=?")
+		.query(
+			"SELECT * FROM image_generations WHERE run_id=? AND json_extract(request_json,'$.execution') IS NULL",
+		)
 		.get(id) as Row | null;
 }
 export function record(r: Row): ImageRecord {

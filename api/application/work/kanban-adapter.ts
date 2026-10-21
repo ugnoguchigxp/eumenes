@@ -5,6 +5,7 @@ import type {
 	InputAdapter,
 } from "../../domains/tool-runtime";
 import type { Database } from "bun:sqlite";
+import { kanbanExecution } from "./kanban-execution";
 import {
 	kanbanAdd,
 	kanbanCardRef,
@@ -332,6 +333,16 @@ export function createKanbanAdapter(
 	};
 	return {
 		ref: KANBAN_ADAPTER_REF,
+		execution: kanbanExecution(kanban, {
+			cancel: (db, runId) =>
+				connection().terminals.cancelQueuedInTransaction(db, runId),
+			stop: async (operationId) => {
+				const run = kanban.executionRun(operationId);
+				return (
+					!run || (await connection().terminals.stop(run.id)) !== "unconfirmed"
+				);
+			},
+		}),
 		describe: describeKanbanAdapter,
 		availableInTransaction: () => true,
 		snapshotInTransaction: (tx) => kanbanSnapshot(boardOf(tx)),
@@ -355,8 +366,13 @@ export function createKanbanAdapter(
 				throw new Error("kanban_executor_mismatch");
 			const outcome = handler(tx, request.input, request.requestId, {
 				origin:
-					request.origin.kind === "conversation" ? "conversation" : "board",
-				...(request.origin.kind === "conversation"
+					request.origin.kind === "task"
+						? "execution"
+						: request.origin.kind === "conversation"
+							? "conversation"
+							: "board",
+				...(request.origin.kind === "conversation" ||
+				request.origin.kind === "task"
 					? { conversationId: request.origin.conversationId }
 					: {}),
 				runnable: options.runnable(),

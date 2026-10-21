@@ -1,6 +1,7 @@
 import type { Database } from "bun:sqlite";
 import type { Migration } from "../../../infrastructure/sqlite";
 import type { AcquisitionMode, Task, TaskDto } from "../contracts";
+import { taskExecutionMigration } from "./executions";
 export const migration = `
 CREATE TABLE agent_tasks(id TEXT PRIMARY KEY,kind TEXT NOT NULL,root_run_id TEXT NOT NULL,parent_task_id TEXT,package_revision_id TEXT,input_json TEXT,state TEXT NOT NULL,phase TEXT NOT NULL,revision INTEGER NOT NULL DEFAULT 0,cancel_epoch INTEGER NOT NULL DEFAULT 0,data_epoch INTEGER NOT NULL DEFAULT 0,report_state TEXT NOT NULL DEFAULT 'none',report_task_id TEXT,current_step INTEGER NOT NULL DEFAULT 0,deadline INTEGER NOT NULL,model_calls INTEGER NOT NULL DEFAULT 0,tool_calls INTEGER NOT NULL DEFAULT 0,json_repairs INTEGER NOT NULL DEFAULT 0,refinements INTEGER NOT NULL DEFAULT 0,job_id TEXT,invocation_id TEXT,error_code TEXT,created_at INTEGER NOT NULL,updated_at INTEGER NOT NULL);
 CREATE UNIQUE INDEX agent_root_once ON agent_tasks(root_run_id) WHERE kind='coordinator';
@@ -31,12 +32,25 @@ CREATE TABLE agent_action_results (
 `;
 export const get = (db: Database, id: string) =>
 	db.query("SELECT * FROM agent_tasks WHERE id=?").get(id) as Task | null;
+export const hasExecutionScope = (db: Database) =>
+	(db.query("PRAGMA table_info(agent_tasks)").all() as { name: string }[]).some(
+		(c) => c.name === "execution_call_id",
+	);
 export const byRoot = (db: Database, id: string) =>
 	db
 		.query(
-			"SELECT * FROM agent_tasks WHERE root_run_id=? AND kind='coordinator'",
+			`SELECT * FROM agent_tasks WHERE root_run_id=? AND kind='coordinator'${hasExecutionScope(db) ? " AND execution_call_id IS NULL" : ""}`,
 		)
 		.get(id) as Task | null;
+/** A worker's own coordinator, independent of the originating conversation run. */
+export const taskRoot = (db: Database, task: Task) =>
+	task.parent_task_id ? get(db, task.parent_task_id) : task;
+export const byExecutionCall = (db: Database, callId: string) =>
+	db
+		.query(
+			"SELECT * FROM agent_tasks WHERE kind='coordinator' AND execution_call_id=?",
+		)
+		.get(callId) as Task | null;
 /** Coordinators that are not yet in a terminal state. */
 export const activeCoordinators = (db: Database) =>
 	db
@@ -141,5 +155,19 @@ export const migrations: readonly Migration[] = [
 		id: "agent-runtime/0006-control-repair",
 		sql: controlRepairMigration,
 		after: ["agent-runtime/0005-requirements"],
+	},
+	{
+		id: "agent-runtime/0007-task-executions",
+		sql: taskExecutionMigration,
+		after: ["agent-runtime/0006-control-repair"],
+	},
+	{
+		id: "agent-runtime/0008-execution-children",
+		sql: `DROP INDEX agent_root_once;
+ALTER TABLE agent_tasks ADD COLUMN execution_call_id TEXT;
+CREATE UNIQUE INDEX agent_root_once ON agent_tasks(root_run_id) WHERE kind='coordinator' AND execution_call_id IS NULL;
+CREATE UNIQUE INDEX agent_execution_call_once ON agent_tasks(execution_call_id) WHERE kind='coordinator' AND execution_call_id IS NOT NULL;
+CREATE TABLE agent_execution_model_reservations(id TEXT PRIMARY KEY,task_id TEXT NOT NULL,allocation INTEGER NOT NULL);`,
+		after: ["agent-runtime/0007-task-executions"],
 	},
 ];

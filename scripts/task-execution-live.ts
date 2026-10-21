@@ -1,0 +1,341 @@
+/** Explicit live acceptance against isolated production composition and saved LARM settings. */
+import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { loadConfig } from "../api/infrastructure/config";
+import { configureLogging } from "../api/infrastructure/logger";
+import { resolveApiToken } from "../api/infrastructure/auth-config";
+import { buildServices } from "../api/application/server-services";
+import { createLifecycleRunner } from "../api/application/lifecycle";
+import { createLifecycles } from "../api/application/server-lifecycles";
+import { createApp } from "../api/application/app";
+import { appModules } from "../api/application/app-modules";
+import { appServices } from "../api/application/server-app-services";
+import { createClient } from "../client";
+import { liveLarmSettings } from "../scripts/live-larm";
+const args = process.argv.slice(2);
+if (args[0] !== "--run") throw Error("explicit_--run_required");
+const suite = args[1] ?? "timers",
+	count = Number(args[2] ?? 3);
+if (
+	![
+		"simple",
+		"timers",
+		"search",
+		"multi",
+		"ambiguity",
+		"memory",
+		"amend",
+	].includes(suite) ||
+	!Number.isInteger(count) ||
+	count < 1 ||
+	count > 10
+)
+	throw Error("invalid_suite_or_count");
+const dir = mkdtempSync(join(tmpdir(), "eumenes-composed-live-"));
+const report = `verification-reports/everyday-task-agent/composed-${suite}-${Date.now()}`;
+mkdirSync(report, { recursive: true, mode: 0o700 });
+const rows: any[] = [];
+const record = (r: any) => {
+	rows.push(r);
+	writeFileSync(join(report, "results.json"), JSON.stringify(rows, null, 2), {
+		mode: 0o600,
+	});
+	console.log(JSON.stringify(r));
+};
+const config = loadConfig({
+	...process.env,
+	EUMENES_DB: join(dir, "db.sqlite3"),
+	EUMENES_LOG_FILE: join(dir, "api.jsonl"),
+	EUMENES_ATTITUDE_DATASET: join(dir, "attitude.sqlite3"),
+	EUMENES_MEMORY_JOURNAL: join(dir, "journal.jsonl"),
+	EUMENES_PORT: "0",
+	EUMENES_TOOLCHAIN_ENABLED: "1",
+});
+configureLogging({ file: config.logFile, level: "warn" });
+const saved = liveLarmSettings(),
+	s = await buildServices(config);
+let server: ReturnType<typeof Bun.serve> | undefined;
+const life = createLifecycleRunner(
+	createLifecycles(s, { name: "http", close: () => server?.stop(true) }),
+);
+const execute = s.inference.executeStream.bind(s.inference);
+let n = 0;
+s.inference.executeStream = async (...args) => {
+	const tools = args[5],
+		call = ++n;
+	record({
+		stage: "offered",
+		call,
+		functions: tools?.map((t) => t.function.name),
+	});
+	if (tools?.some((tool) => tool.function.name === "report_partial"))
+		record({
+			stage: "parent_input",
+			call,
+			packet: JSON.parse(args[1].at(-1)!.content),
+		});
+	const result = await execute(...args);
+	if (tools?.length && !result.toolCalls?.length)
+		record({ stage: "missing_function", call, text: result.value });
+	if (result.toolCalls)
+		record({
+			stage: "selected",
+			call,
+			calls: result.toolCalls.map((c) => ({
+				name: c.name,
+				arguments: JSON.parse(c.arguments),
+			})),
+		});
+	return result;
+};
+try {
+	const initial = s.settings.get();
+	await s.settings.apply({
+		requestId: crypto.randomUUID(),
+		expectedRevision: initial.revision,
+		settings: { ...initial, larm: saved },
+		keys: [],
+	});
+	await life.recoverAll();
+	await s.inference.connect();
+	await s.toolchain.refreshVectors();
+	life.startAll();
+	const token = resolveApiToken({ EUMENES_DB: config.dbPath });
+	server = Bun.serve({
+		port: 0,
+		hostname: "127.0.0.1",
+		idleTimeout: 60,
+		fetch: createApp({
+			token,
+			origin: config.origin,
+			modules: appModules(appServices(s)),
+		}).fetch,
+	});
+	const c = createClient(`http://127.0.0.1:${server.port}`, token);
+	record({ stage: "ready", directory: dir, report });
+	const inputs: Record<string, string> = {
+		simple: "12たす30はいくつですか。答えだけ教えてください。",
+		timers:
+			"「受入A」という名前の90分タイマーを作り、作成結果を確認してから「受入B」という名前の100分タイマーを作ってください。二つの作成結果をまとめてください。",
+		search:
+			"Bunの公式ドキュメントを検索して、テストを実行するコマンドを一つ教えてください。ブラウザーを開く操作は不要です。",
+		multi:
+			"Bun公式ドキュメントでテストを実行するコマンドをWebで確認し、その確認が終わったら「確認済み」という名前の90分タイマーを作成してください。確認結果と作成結果をまとめてください。",
+	};
+	for (let i = 0; i < count; i++) {
+		const conv = `composed-${crypto.randomUUID()}`;
+		if (suite === "memory") {
+			const pref = await c.submit({
+				requestId: crypto.randomUUID(),
+				conversationId: conv,
+				text: "私は普段、タイマーを3分にするのが好きです。この好みを覚えてください。",
+			});
+			await s.dialogue.waitForTerminal(pref.id, { timeoutMs: 180000 });
+			const until = Date.now() + 60000;
+			while (
+				Date.now() < until &&
+				!s.memory.list().some((item) => JSON.stringify(item).includes("3分"))
+			)
+				await Bun.sleep(500);
+			if (
+				!s.memory.list().some((item) => JSON.stringify(item).includes("3分"))
+			) {
+				record({
+					stage: "setup_failed",
+					suite,
+					i,
+					reason: "memory_preference_not_stored",
+				});
+				continue;
+			}
+		}
+		const prior = new Set((await c.inferenceUsage()).map((u) => u.id)),
+			start = performance.now();
+		let run = await c.submit({
+			requestId: crypto.randomUUID(),
+			conversationId: conv,
+			text: inputs[suite] ?? inputs.timers!,
+		});
+		if (suite === "amend") {
+			const until = Date.now() + 180000;
+			let amended = false;
+			while (Date.now() < until) {
+				const timers = await c.timers({ conversationId: conv }),
+					works = s.toolchain.agents.executions.list(conv);
+				if (
+					timers.items.some((t) => t.label === "受入A") &&
+					works.some((w) =>
+						["queued", "deciding", "waiting_child"].includes(w.status),
+					)
+				) {
+					const update = await c.submit({
+						requestId: crypto.randomUUID(),
+						conversationId: conv,
+						text: "進行中の依頼を訂正します。受入Aは90分のまま、受入Bを120分にしてください。",
+					});
+					await s.dialogue.waitForTerminal(update.id, { timeoutMs: 180000 });
+					amended = true;
+					break;
+				}
+				if (
+					works.length &&
+					works.every(
+						(w) => !["queued", "deciding", "waiting_child"].includes(w.status),
+					)
+				)
+					break;
+				await Bun.sleep(200);
+			}
+			record({ stage: "amendment", i, amended });
+		}
+		await s.dialogue.waitForTerminal(run.id, { timeoutMs: 180000 });
+		run = await c.run(run.id);
+		let works = s.toolchain.agents.executions.list(conv);
+		while (
+			works.some((w) =>
+				["queued", "deciding", "waiting_child"].includes(w.status),
+			) &&
+			performance.now() - start < 350000
+		) {
+			await Bun.sleep(500);
+			works = s.toolchain.agents.executions.list(conv);
+		}
+		if (
+			works.length &&
+			works.every(
+				(w) =>
+					!["queued", "deciding", "waiting_child", "waiting_user"].includes(
+						w.status,
+					),
+			)
+		)
+			while (performance.now() - start < 500000) {
+				const runs = await c.runs(conv);
+				if (
+					runs.length > 1 &&
+					runs.every((r) => !["queued", "running"].includes(r.status))
+				)
+					break;
+				await Bun.sleep(250);
+			}
+		let ambiguitySafe = true;
+		if (suite === "ambiguity") {
+			const follow = await c.submit({
+				requestId: crypto.randomUUID(),
+				conversationId: conv,
+				text: "そのタイマーを取り消してください。",
+			});
+			await s.dialogue.waitForTerminal(follow.id, { timeoutMs: 180000 });
+			const unchanged = await c.timers({ conversationId: conv });
+			ambiguitySafe =
+				(await c.run(follow.id)).status === "completed" &&
+				unchanged.items.length === 2 &&
+				unchanged.items.every((t) => t.state === "active") &&
+				unchanged.items.some(
+					(t) => t.label === "受入A" && t.durationSeconds === 5400,
+				) &&
+				unchanged.items.some(
+					(t) => t.label === "受入B" && t.durationSeconds === 6000,
+				);
+			record({
+				stage: "ambiguity_checkpoint",
+				i,
+				ambiguitySafe,
+				timers: unchanged,
+			});
+			const answer = await c.submit({
+				requestId: crypto.randomUUID(),
+				conversationId: conv,
+				text: "受入Bのほうです。受入Aはそのまま残してください。",
+			});
+			await s.dialogue.waitForTerminal(answer.id, { timeoutMs: 180000 });
+			while (
+				performance.now() - start < 500000 &&
+				s.toolchain.agents.executions
+					.list(conv)
+					.some((w) =>
+						["queued", "deciding", "waiting_child"].includes(w.status),
+					)
+			)
+				await Bun.sleep(500);
+		}
+		const timers = await c.timers({ conversationId: conv });
+		const answers = (await c.conversation(conv)).messages
+			.filter((m) => m.role === "assistant")
+			.map((m) => m.text);
+		const usage = (await c.inferenceUsage()).filter((u) => !prior.has(u.id));
+		const active = timers.items.filter((t) => t.state === "active");
+		const a = active.find((t) => t.label === "受入A"),
+			b = active.find((t) => t.label === "受入B");
+		const completed = works.some((w) => w.status === "completed");
+		const pass =
+			suite === "simple"
+				? run.status === "completed" &&
+					works.length === 0 &&
+					answers.some((x) =>
+						/^(?:答え(?:は|：|:)\s*)?(?:42|四十二)(?:です|になります)?[。.!！]?$/u.test(
+							x.trim(),
+						),
+					)
+				: suite === "search"
+					? run.status === "completed" &&
+						works.length === 0 &&
+						!!run.agentTaskId &&
+						answers.some((x) => x.includes("bun test"))
+					: suite === "multi"
+						? completed &&
+							active.length === 1 &&
+							active.some(
+								(t) => t.label === "確認済み" && t.durationSeconds === 5400,
+							) &&
+							usage.some((u) => u.subject.startsWith("execution-research:")) &&
+							usage.some((u) => u.subject.startsWith("execution-command:"))
+						: suite === "ambiguity"
+							? ambiguitySafe &&
+								completed &&
+								active.length === 1 &&
+								a?.durationSeconds === 5400 &&
+								timers.items.some(
+									(t) => t.label === "受入B" && t.state === "cancelled",
+								) &&
+								!b
+							: suite === "amend"
+								? works.some(
+										(w) => w.revision > 0 && w.status === "completed",
+									) &&
+									active.length === 2 &&
+									a?.durationSeconds === 5400 &&
+									b?.durationSeconds === 7200
+								: completed &&
+									active.length === 2 &&
+									a?.durationSeconds === 5400 &&
+									b?.durationSeconds === 6000;
+		if (!pass) process.exitCode = 1;
+		record({
+			stage: "case",
+			i,
+			conv,
+			pass,
+			elapsedMs: Math.round(performance.now() - start),
+			run,
+			works,
+			timers,
+			answers,
+			usage: usage.map((u) => ({
+				subject: u.subject,
+				status: u.status,
+				inputTokens: u.inputTokens,
+				outputTokens: u.outputTokens,
+				started: u.started,
+				ended: u.ended,
+			})),
+		});
+	}
+} catch (e) {
+	record({ stage: "error", code: String(e) });
+	process.exitCode = 1;
+} finally {
+	await life.closeAll(30000);
+	console.log(JSON.stringify({ report }));
+}

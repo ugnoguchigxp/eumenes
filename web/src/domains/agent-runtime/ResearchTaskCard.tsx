@@ -97,6 +97,8 @@ export function ResearchTaskCard({
 			? child?.phase
 			: root.phase;
 	const data = root.reportState === "available" ? report.data : undefined;
+	const candidates =
+		data && "candidateResults" in data ? data.candidateResults : undefined;
 	const mode = modes[child?.acquisitionMode ?? root.acquisitionMode ?? ""];
 	const unavailable =
 		["deleted", "expired"].includes(root.reportState) ||
@@ -143,6 +145,18 @@ export function ResearchTaskCard({
 					{data && (
 						<div>
 							<p>{data.summary}</p>
+							{!!candidates?.length && (
+								<ul aria-label="見つかった候補">
+									{candidates.map((c) => (
+										<li key={c.reference}>
+											<a href={c.url} target="_blank" rel="noopener noreferrer">
+												{c.title || c.url}
+											</a>{" "}
+											— 本文未確認
+										</li>
+									))}
+								</ul>
+							)}
 							<ul>
 								{data.claims.map((c, i) => (
 									<li key={i}>{c.text}</li>
@@ -152,15 +166,19 @@ export function ResearchTaskCard({
 								<p>{data.limitations.join(" / ")}</p>
 							)}
 							<ul>
-								{data.sources.map((s) => (
-									<li key={s.sourceId}>
-										<a href={s.url} target="_blank" rel="noopener noreferrer">
-											{s.title || s.url}
-										</a>{" "}
-										— {s.basis === "snippet" ? "検索要約のみ" : "本文確認"} /
-										取得 {new Date(s.fetchedAt).toLocaleString("ja-JP")}
-									</li>
-								))}
+								{data.sources
+									.filter(
+										(s) => !candidates?.some((c) => c.sourceId === s.sourceId),
+									)
+									.map((s) => (
+										<li key={s.sourceId}>
+											<a href={s.url} target="_blank" rel="noopener noreferrer">
+												{s.title || s.url}
+											</a>{" "}
+											— {s.basis === "snippet" ? "検索要約のみ" : "本文確認"} /
+											取得 {new Date(s.fetchedAt).toLocaleString("ja-JP")}
+										</li>
+									))}
 							</ul>
 							<small>
 								出典との対応を確認しています。内容の正しさを保証する表示ではありません。

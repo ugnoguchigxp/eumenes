@@ -122,6 +122,10 @@ export function createToolchainRouting(
 				db,
 				inputSchemaRef,
 			) ?? [],
+		answerSchema(inputSchemaRef) {
+			const schema = schemas.get(inputSchemaRef);
+			return schema ? z.toJSONSchema(schema) : null;
+		},
 		parseAnswer(inputSchemaRef, input) {
 			const schema = schemas.get(inputSchemaRef);
 			if (!schema) return { ok: false, code: "unsupported_schema" };

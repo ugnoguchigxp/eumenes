@@ -91,6 +91,7 @@ export function createCodexTasksAdapter(options: {
 	const { tasks, kanban, shared } = options;
 	return {
 		ref: CODEX_TASKS_ADAPTER_REF,
+		execution: shared.execution,
 		describe: describeCodexTasksAdapter,
 		availableInTransaction: () => true,
 		snapshotInTransaction: shared.snapshotInTransaction,

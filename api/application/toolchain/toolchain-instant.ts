@@ -1,5 +1,6 @@
 import type { Database } from "bun:sqlite";
 import { z } from "zod";
+import { toolchainRuntimeOf } from "../../domains/capabilities";
 import type {
 	Capabilities,
 	FixedDefinition,
@@ -33,6 +34,10 @@ export function createInstantRouting(deps: {
 				card.revisionId,
 			);
 			const binding = found?.binding.document;
+			card = {
+				...card,
+				execution: binding?.execution ?? toolchainRuntimeOf(card.id)?.execution,
+			};
 			if (binding?.execution !== "instant") return [card];
 			const tool = binding.tools[0]!;
 			const schema = schemas.resolveInTransaction(db, tool.inputSchemaRef);

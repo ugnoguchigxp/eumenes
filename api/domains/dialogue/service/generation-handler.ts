@@ -76,7 +76,8 @@ function shouldHoldBody(input: GenerateInput, chunkSpeech = false) {
 		(!chunkSpeech && ((input.memory && !input.memory.quiet) || input.goals)) ||
 		input.agent?.projection ||
 		(!chunkSpeech && input.agent?.actionPayload) ||
-		input.mediaResult
+		input.mediaResult ||
+		input.executionNotice
 	);
 }
 
@@ -147,6 +148,13 @@ export function createGenerationHandler(
 						signal.throwIfAborted();
 						return { text: RESEARCH_FAILURE_REPLY };
 					}
+					if (input.executionNoticeReply) {
+						signal.throwIfAborted();
+						return {
+							text: input.executionNoticeReply,
+							hostAnswer: true as const,
+						};
+					}
 					const timing = generationTiming();
 					resolveAttachmentContext(deps, input, run!.conversationId);
 					if (input.agent?.actionPayload && agents) {
@@ -187,6 +195,34 @@ export function createGenerationHandler(
 						repair,
 					);
 					const analysis = first?.analysis;
+					if (
+						first &&
+						found &&
+						(analysis?.next === "execute_task" ||
+							analysis?.next === "task_control")
+					)
+						return {
+							text: analysis.announcement,
+							receipt: first.receipt,
+							taskDecision: analysis,
+							...(analysis.next === "execute_task"
+								? {
+										selection: decisionDraft(input, found.started, {
+											analysis,
+											route: {
+												...found.route,
+												cards: [...found.route.cards, analysis.card],
+											},
+											query: found.query,
+										})("toolchain", {
+											toolchainId: analysis.card.id,
+											toolchainRevisionId: analysis.card.revisionId,
+											functionName: analysis.card.functionName,
+											request: analysis.request,
+										}),
+									}
+								: {}),
+						};
 					let decision: Decision;
 					let generated: Awaited<ReturnType<typeof generateConversation>>;
 					if (found && first && analysis?.next === "instant")

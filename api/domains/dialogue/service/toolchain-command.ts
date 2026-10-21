@@ -39,7 +39,7 @@ export const subagentRoute = (settings?: {
  * The sub-agent's whole contract: one tool of the set with flat arguments, or one question
  * back to the user. No discriminated union: the model fills one object.
  */
-function commandOutputFor(questionRefs: readonly string[]) {
+export function commandOutputFor(questionRefs: readonly string[]) {
 	return z
 		.object({
 			action: z.enum(["invoke", "clarify"]),
@@ -73,7 +73,7 @@ const COMMAND_RULES = systemContext(
 );
 
 /** The fixed set as the sub-agent's SystemContext, and the request as data. */
-function commandPrompt(
+export function commandPrompt(
 	set: { profile: string; skills: string[] },
 	tools: Array<{ id: string; description: string; inputSchema: unknown }>,
 	data: Record<string, unknown>,
@@ -108,7 +108,7 @@ function commandPrompt(
 	};
 }
 
-function parseToolCommand(
+export function parseToolCommand(
 	input: Pick<CommandInput, "backend" | "toolIds">,
 	out: z.infer<ReturnType<typeof commandOutputFor>>,
 ) {

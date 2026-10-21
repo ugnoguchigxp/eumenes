@@ -140,13 +140,16 @@ export function createTimers(
 					...active.items,
 					...paused.items,
 					...recentNotifiedTimers(tx, scope, 8).map((row) => toDto(row, at)),
-				].map(({ id, revision, state, label, remainingSeconds }) => ({
-					id,
-					revision,
-					state,
-					label,
-					remainingSeconds,
-				})),
+				].map(
+					({ id, revision, state, label, remainingSeconds, originRunId }) => ({
+						id,
+						revision,
+						state,
+						label,
+						remainingSeconds,
+						originRunId,
+					}),
+				),
 			};
 		},
 		startInTransaction: (tx: Database, command: unknown, origin: TimerOrigin) =>

@@ -33,7 +33,12 @@ import {
 } from "../repository";
 import { createRecovery } from "./recovery";
 import { createRuns } from "./runs";
-import { listNotices, markNoticeRead, unreadNotices } from "../repository/runs";
+import {
+	getRun,
+	listNotices,
+	markNoticeRead,
+	unreadNotices,
+} from "../repository/runs";
 
 export type { KanbanOutcome } from "./core";
 export type { KanbanRecoverPorts } from "./recovery";
@@ -301,6 +306,7 @@ export function createKanban(options: {
 		sharedBoardInTransaction: (tx: Database, view: KanbanViewContext) =>
 			sharedBoardInTransaction(tx, view, core.executors),
 		cardInTransaction,
+		...executionAccess(options.store, runOperations),
 		receiptInTransaction: (tx: Database, requestId: string) =>
 			getReceipt(tx, requestId)?.receipt ?? null,
 		noticesInTransaction: notices,
@@ -331,3 +337,70 @@ export function createKanban(options: {
 }
 
 export type KanbanService = ReturnType<typeof createKanban>;
+
+function executionAccess(
+	store: SqliteStore,
+	runOperations: Pick<ReturnType<typeof createRuns>, "stopInTransaction">,
+) {
+	const options = { store };
+	return {
+		executionInTransaction(tx: Database, operationId: string) {
+			const receipt = getReceipt(tx, operationId)?.receipt;
+			const run =
+				receipt && "runId" in receipt && receipt.runId
+					? getRun(tx, receipt.runId)
+					: null;
+			const card = run ? getCard(tx, run.cardId) : null;
+			return {
+				receipt,
+				run: run
+					? {
+							id: run.id,
+							state: run.state,
+							reason: run.reason,
+							executorId: run.executorId,
+							cardId: run.cardId,
+							stopped: run.executionStopped,
+						}
+					: null,
+				report: card?.currentRunId === run?.id ? card?.lastReport : null,
+			};
+		},
+		executionRun: (operationId: string) =>
+			options.store.readSnapshot((tx) => {
+				const receipt = getReceipt(tx, operationId)?.receipt;
+				const run =
+					receipt && "runId" in receipt && receipt.runId
+						? getRun(tx, receipt.runId)
+						: null;
+				return run
+					? { id: run.id, executorId: run.executorId, state: run.state }
+					: null;
+			}),
+		stopExecutionInTransaction(
+			tx: Database,
+			operationId: string,
+			cancel: (db: Database, runId: string, cardId: string) => boolean,
+		) {
+			const receipt = getReceipt(tx, operationId)?.receipt;
+			const run =
+				receipt && "runId" in receipt && receipt.runId
+					? getRun(tx, receipt.runId)
+					: null;
+			if (
+				!run ||
+				run.stopRequested ||
+				["completed", "cancelled", "blocked", "unknown"].includes(run.state)
+			)
+				return;
+			const card = getCard(tx, run.cardId);
+			if (!card || card.currentRunId !== run.id) return;
+			runOperations.stopInTransaction(
+				tx,
+				{ cardId: card.id, expectedRevision: card.revision },
+				crypto.randomUUID(),
+				(runId) => cancel(tx, runId, card.id),
+			);
+		},
+	};
+}

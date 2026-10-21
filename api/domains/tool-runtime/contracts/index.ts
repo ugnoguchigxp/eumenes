@@ -64,6 +64,8 @@ export type Source = {
 };
 export type SourceMetadata = Omit<Source, "body">;
 export type AdapterOperation = {
+	/** The owner domain, rather than a single initial queue job, tracks continuation. */
+	continuing?: boolean;
 	state:
 		| "pending"
 		| "succeeded"
@@ -140,6 +142,7 @@ export interface ToolAdapter {
 		tx: Database,
 		request: {
 			requestId: string;
+			invocationId: string;
 			tool: FixedDefinition;
 			arguments: unknown;
 			owner: Owner;
@@ -180,3 +183,6 @@ export type Invocation = {
 };
 
 export * from "./adapters";
+export * from "./task-execution";
+
+export type { ChildCaller, ChildOperationPort } from "./child-operation";

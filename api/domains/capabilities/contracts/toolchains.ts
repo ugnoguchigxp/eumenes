@@ -45,6 +45,7 @@ export type ToolchainRuntimeMeta = {
 		| "command"
 		| "session"
 		| "instant"
+		| "task"
 		| "music-create"
 		| "music-playback"
 		| "image"
@@ -79,6 +80,8 @@ export type ToolchainRuntimeMeta = {
 
 /** One candidate toolchain offered to the conversation model. */
 export type ToolchainCard = {
+	/** Host-declared execution contract, exposed for the LLM to assess delegation scope. */
+	execution?: ToolchainRuntimeMeta["execution"];
 	revisionId: string;
 	id: string;
 	functionName: string;

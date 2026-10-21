@@ -1,0 +1,11 @@
+--- a/api/domains/dialogue/service/initial-decision.ts
++++ b/api/domains/dialogue/service/initial-decision.ts
+@@ -155,7 +155,7 @@
+ 							name: tasks.card.functionName,
+ 							description:
+ 								tasks.card.summary +
+-								"。前の結果を使って別の操作へ進む依頼はこの担当へ。手元の参考情報から必要なcontextRefsだけを選び、原依頼の条件を保つrequestと予告を書きます。",
++								"。一つの担当の結果を使って、別の能力を選び実行する必要がある依頼に使います。一担当内の検索・読取・候補選択・補完だけで終わる依頼は、その個別担当へ渡し、未提示ならfind_toolchainで探します。手順が複数あるだけではこの担当を選びません。利用者がこの担当を除外している場合も選びません。手元の参考情報から必要なcontextRefsだけを選び、原依頼の条件を保つrequestと予告を書きます。",
+ 							parameters: jsonSchema(taskChoice),
+ 						},
+ 					},

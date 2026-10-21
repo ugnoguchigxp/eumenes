@@ -10,10 +10,16 @@ import * as repo from "../repository";
 
 export function createInbox(now: () => number) {
 	return {
-		dialogueReceiptInTransaction(db: Database, runId: string) {
+		dialogueReceiptInTransaction(db: Database, runId: string, callId?: string) {
 			const r = db
-				.query("SELECT receipt_json FROM dots_dialogue_receipts WHERE run_id=?")
-				.get(runId) as { receipt_json: string } | null;
+				.query(
+					callId
+						? "SELECT receipt_json FROM dots_execution_receipts WHERE run_id=? AND call_id=?"
+						: "SELECT receipt_json FROM dots_dialogue_receipts WHERE run_id=?",
+				)
+				.get(...(callId ? [runId, callId] : [runId])) as {
+				receipt_json: string;
+			} | null;
 			return r ? (JSON.parse(r.receipt_json) as unknown) : null;
 		},
 		saveDialogueReceiptInTransaction(
@@ -22,7 +28,18 @@ export function createInbox(now: () => number) {
 			conversationId: string,
 			taskId: string,
 			receipt: unknown,
+			callId?: string,
 		) {
+			if (callId) {
+				db.query("INSERT INTO dots_execution_receipts VALUES(?,?,?,?,?)").run(
+					callId,
+					runId,
+					conversationId,
+					taskId,
+					JSON.stringify(receipt),
+				);
+				return;
+			}
 			db.query("INSERT INTO dots_dialogue_receipts VALUES(?,?,?,?)").run(
 				runId,
 				conversationId,

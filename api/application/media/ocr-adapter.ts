@@ -71,7 +71,7 @@ export function createOcrAdapter(service: OcrService): DomainAdapter {
 				throw new Error("unsupported_operation");
 			const input = request.input as { id?: string };
 			const conversationId =
-				request.origin.kind === "conversation"
+				request.origin.kind === "conversation" || request.origin.kind === "task"
 					? request.origin.conversationId
 					: "main";
 			const saved = service.commandInTransaction(

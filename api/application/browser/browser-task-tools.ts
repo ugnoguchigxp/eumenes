@@ -66,6 +66,10 @@ export const FATAL_CODES: ReadonlySet<string> = new Set([
 
 /** What a model can do about a refusal; the code alone is not always enough. */
 const HINTS: Record<string, string> = {
+	collection_ref_invalid:
+		"直近観測のbNだけを重複なく選び、linkBlockRefsの全bNをblockRefsにも含めてください。",
+	observed_link_missing:
+		"選んだリンクのブロックに/urlがありません。/urlを持つブロックを選ぶか、詳細ページへ到着済みなら見出し等をblockRefsで選びlinkBlockRefs:[]で到着先を採取してください。",
 	observation_stale:
 		"ページが変わりました。結果の最新のobservationを使うか、observeで観測し直してください。",
 	ref_not_actionable:
@@ -77,6 +81,8 @@ const HINTS: Record<string, string> = {
 		"ホスト名を確認できないため開けません。別のURLを試すか、利用者に伝えてください。",
 	grant_mismatch:
 		"入力先のサイトか用途が、値を作ったときと違います。入力先のページで改めて入力してください。",
+	grant_not_found:
+		"その入力許可番号は存在しません。原文の語句を入力する場合はinputValueRefを省き、valueと原文中のquoteを両方指定してください。原文にない値には利用者の許可が必要です。",
 	tab_lost: "そのタブは見つかりません。tabsで一覧を取り直してください。",
 	tab_busy: "そのタブは別の作業が使っています。",
 	no_target_tab:
@@ -92,6 +98,18 @@ const HINTS: Record<string, string> = {
 	capture_dimensions_exceeded: "撮影範囲が大きすぎます（各辺2500pxまで）。",
 };
 
+/** Only authored contract hints may be returned; validator messages can otherwise contain input data. */
+export const argumentHints = (issues: readonly z.core.$ZodIssue[]) =>
+	[
+		...new Set(
+			issues.flatMap((issue) =>
+				issue.code === "custom" && Object.hasOwn(HINTS, issue.message)
+					? [HINTS[issue.message]!]
+					: [],
+			),
+		),
+	].join("\n");
+
 const tabLine = (t: {
 	tabRef: string;
 	title: string;
@@ -106,14 +124,55 @@ const tabLine = (t: {
 	status: t.status,
 });
 
+/** Link labels and URLs live once in the inventory; keep every action ref and state in the text. */
+function blockView(
+	block: { blockRef: string; text: string },
+	links: NonNullable<Observation["links"]>,
+) {
+	const link = links.find((item) => item.blockRef === block.blockRef);
+	if (!link || !/^\s*- link\b/.test(block.text)) return block.text;
+	const [first = "", ...continuation] = block.text.split("\n");
+	if (continuation.some((line) => !/^\s*- \/url: /.test(line)))
+		return block.text;
+	const quoted = first.match(/^\s*- link ("(?:[^"\\]|\\.)*")/);
+	if (quoted) {
+		try {
+			if (JSON.parse(quoted[1]!) !== link.title) return block.text;
+		} catch {
+			return block.text;
+		}
+	}
+	return first.replace(/^(\s*- link) "(?:[^"\\]|\\.)*"/, "$1");
+}
+
+/** Readable IRI presentation only when the URL round-trips to the identical observed target. */
+function visibleUrl(url: string) {
+	try {
+		const readable = decodeURI(url);
+		if (
+			!/[\u0000-\u0020\u007f]/.test(readable) &&
+			new URL(readable).href === url
+		)
+			return readable;
+	} catch {}
+	return url;
+}
+
 export const observationView = (o: Observation) => ({
 	observationRef: o.observationRef,
 	title: clip(o.title, 200),
 	place: placeOf(o.url),
-	text: o.text,
+	text: o.blocks
+		? o.blocks
+				.map((b) => `[${b.blockRef}]\n${blockView(b, o.links ?? [])}`)
+				.join("\n")
+		: o.text,
 	truncated: o.truncated,
 	...(o.reasons.length ? { reasons: o.reasons } : {}),
 	refCount: o.refCount,
+	...(o.links
+		? { links: o.links.map((link) => ({ ...link, url: visibleUrl(link.url) })) }
+		: {}),
 });
 
 /** What the user already allowed this task (REFERENCE.approved): operations as described, values by ref, never raw. */
@@ -314,6 +373,16 @@ const declared = (effect: string | undefined) =>
 	effect === "commit" ? { effect: "commit" as const } : {};
 
 export const PAGE_TOOLS: Readonly<Record<string, Spec<SchemaKey>>> = {
+	"browser.page.collect": spec({
+		schemaKey: "browserResearchCollect",
+		async run(args, env) {
+			if (!env.api.collect) throw new Error("collection_not_allowed");
+			return {
+				kind: "result",
+				result: { ok: true, collected: await env.api.collect(args) },
+			};
+		},
+	}),
 	"browser.page.script": spec({
 		schemaKey: "browserScriptPublish",
 		async run(args, env) {

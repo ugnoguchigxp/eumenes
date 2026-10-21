@@ -47,29 +47,35 @@ const RECIPE_WEB_BUDGET = Object.freeze({
 	reads: 2,
 });
 const SEARCH_BUDGET = Object.freeze({ ...RESEARCH_BUDGET, searches: 1 });
+export const serviceBudget = (p: Prepared | undefined) =>
+	!!p && packageRuntimeOf(p.package.id)?.budget === "service";
 export const operationLimits = (p: Prepared | undefined) =>
-	guidedWeb(p)
-		? {
-				...RESEARCH_BUDGET,
-				localCalls: 4,
-				externalCalls: isQuickWeb(p) ? 6 : 8,
-				reads: isQuickWeb(p) ? 4 : 6,
-			}
-		: isRecipeWeb(p)
-			? RECIPE_WEB_BUDGET
-			: isQuickWeb(p)
-				? QUICK_WEB_BUDGET
-				: returnsSearchResults(p)
-					? SEARCH_BUDGET
-					: RESEARCH_BUDGET;
+	serviceBudget(p)
+		? { localCalls: 0, externalCalls: 3, searches: 1, reads: 1 }
+		: guidedWeb(p)
+			? {
+					...RESEARCH_BUDGET,
+					localCalls: 4,
+					externalCalls: isQuickWeb(p) ? 6 : 8,
+					reads: isQuickWeb(p) ? 4 : 6,
+				}
+			: isRecipeWeb(p)
+				? RECIPE_WEB_BUDGET
+				: isQuickWeb(p)
+					? QUICK_WEB_BUDGET
+					: returnsSearchResults(p)
+						? SEARCH_BUDGET
+						: RESEARCH_BUDGET;
 /** Model calls kept back for the one repair of a research report's verification. */
 const repairReserve = 1;
 export const modelLimit = (p: Prepared | undefined) =>
-	isHistory(p) || isWorld(p)
-		? RESEARCH_BUDGET.historyModelCalls
-		: isQuickWeb(p)
-			? QUICK_WEB_BUDGET.modelCalls
-			: RESEARCH_BUDGET.webModelCalls;
+	serviceBudget(p)
+		? 5
+		: isHistory(p) || isWorld(p)
+			? RESEARCH_BUDGET.historyModelCalls
+			: isQuickWeb(p)
+				? QUICK_WEB_BUDGET.modelCalls
+				: RESEARCH_BUDGET.webModelCalls;
 /** Reads that stay inside the host (saved bodies, history, World) and use the local-call budget. */
 export const localTool = (meta: ToolRuntimeMeta | undefined) =>
 	meta?.operation === "saved_read" ||
@@ -81,16 +87,26 @@ export const isSearch = (meta: ToolRuntimeMeta | undefined) =>
 /** A read of a URL-addressed page: the only reads that use the per-task read limit. */
 export const isPageRead = (meta: ToolRuntimeMeta | undefined) =>
 	meta?.operation === "read" && !!meta.urlScope;
-export function workerDeadline(parentDeadline: number, now: number) {
+export function workerDeadline(
+	parentDeadline: number,
+	now: number,
+	packageId?: string,
+) {
 	const deadline = Math.min(
-		now + RESEARCH_BUDGET.workerMilliseconds,
+		now +
+			(packageRuntimeOf(packageId ?? "")?.budget === "service"
+				? 330000
+				: RESEARCH_BUDGET.workerMilliseconds),
 		parentDeadline - RESEARCH_BUDGET.parentMilliseconds,
 	);
 	if (deadline <= now) throw new Error("agent_budget_exhausted");
 	return deadline;
 }
-export function stepDeadline(t: Task, now: number) {
-	return Math.min(t.deadline, now + RESEARCH_BUDGET.modelStepMilliseconds);
+export function stepDeadline(t: Task, now: number, p?: Prepared) {
+	return Math.min(
+		t.deadline,
+		now + (serviceBudget(p) ? 30000 : RESEARCH_BUDGET.modelStepMilliseconds),
+	);
 }
 export function explorationBudget(
 	t: Task,

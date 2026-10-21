@@ -112,6 +112,8 @@ function map(row: Record<string, unknown>): Run {
 		error: row.error as string | null,
 		jobId: row.job_id as string | null,
 		deadlineAt: row.deadline_at as string | null,
+		deadlineFixed:
+			row.deadline_fixed === undefined ? true : !!row.deadline_fixed,
 		sourceKind: row.source_kind as Run["sourceKind"],
 		scheduleId: row.schedule_id as string | null,
 		occurrenceId: row.occurrence_id as string | null,
@@ -293,4 +295,22 @@ export const migrations: readonly Migration[] = [
 		sql: retainedToolchainsMigration,
 		after: ["dialogue/0010-specialist-events"],
 	},
+	{
+		id: "dialogue/0012-deadline-policy",
+		after: ["dialogue/0011-retained-toolchains"],
+		sql: "ALTER TABLE dialogue_runs ADD COLUMN deadline_fixed INTEGER NOT NULL DEFAULT 1;",
+	},
 ];
+
+/** Explicit caller deadlines stay fixed; old installations without the column keep their current policy. */
+export function saveDeadlinePolicy(db: Database, id: string, fixed: boolean) {
+	if (
+		(
+			db.query("PRAGMA table_info(dialogue_runs)").all() as { name: string }[]
+		).some((c) => c.name === "deadline_fixed")
+	)
+		db.query("UPDATE dialogue_runs SET deadline_fixed=? WHERE id=?").run(
+			fixed ? 1 : 0,
+			id,
+		);
+}

@@ -193,10 +193,29 @@ const instantBindingV1 = z.strictObject({
 	fallbackToolchainId: slug,
 });
 /** Any binding kind; unknown `execution` values are rejected. */
+export const taskBindingV1 = z.strictObject({
+	kind: z.literal("binding"),
+	id: slug,
+	revision: revisionNumber,
+	execution: z.literal("task"),
+	adapterRef: hostRef("adapter"),
+	availabilityRef: hostRef("availability"),
+	tools: z.array(bindingTool).max(0),
+	inputSchemaRef: schemaRef,
+	outputSchemaRef: schemaRef,
+	timeLimits: timeLimitsV1,
+	limits: z.strictObject({
+		parentCalls: z.number().int().min(2).max(12),
+		childCalls: z.number().int().min(1).max(6),
+		searches: z.number().int().min(1).max(3),
+		modelCalls: z.number().int().min(2).max(48),
+	}),
+});
 export const bindingV1 = z.discriminatedUnion("execution", [
 	commandBindingV1,
 	sessionBindingV1,
 	instantBindingV1,
+	taskBindingV1,
 ]);
 export type BindingV1 = z.infer<typeof bindingV1>;
 /** Where one OpenUI source's data comes from: a registered adapter query. */
@@ -652,6 +671,7 @@ export type BundleHost = {
 			structures?: ReadonlyMap<string, { inputSchemaRef: string }>;
 			/** The adapter answers instant bindings (see `DomainAdapter.instant`). */
 			instant?: boolean;
+			task?: boolean;
 			/** Work documents its session offers (`workspace:` refs, see `DomainAdapter.workspaces`). */
 			workspaces?: ReadonlySet<string>;
 		}

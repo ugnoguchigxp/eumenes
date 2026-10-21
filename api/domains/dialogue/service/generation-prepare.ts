@@ -1,4 +1,9 @@
 import {
+	executionNoticeContext,
+	executionNoticeInTransaction,
+	renderExecutionNotice,
+} from "./execution-notices";
+import {
 	REFERENCE_WINDOW_TOKENS,
 	contextBudgets,
 	estimateTextTokens,
@@ -29,6 +34,7 @@ import { specialistWorkBlock, viewingBlock } from "./specialist-context";
 import { byId, transition } from "../repository";
 import { endRun } from "./run-end";
 import { isSystemPrompt, type Run } from "../contracts";
+import { fitTaskOffer } from "./task-offer";
 import {
 	DEFAULT_DEADLINE_MS,
 	type DialogueDeps,
@@ -121,7 +127,20 @@ export function createPrepare(
 		// This run's context is fixed by the host: the server must neither trim nor reorder it.
 		const requestId = larm.requestFor?.(tx, run.id, "llm");
 		if (requestId) larm.setContextPolicyInTransaction?.(tx, requestId, "exact");
+		const executionNotice = executionNoticeInTransaction(deps, tx, current);
+		if (executionNotice?.stale) {
+			endRun(deps, tx, current, "cancelled", "execution_notice_stale");
+			return { status: "stale", reason: "execution_notice_stale" };
+		}
 		const operations: ContextBlock[] = [];
+		if (executionNotice) {
+			const renderedNotice = renderExecutionNotice(
+				executionNotice.data,
+				compiled.assembly.input,
+			);
+			operations.push(renderedNotice.block);
+			compiled.assembly.input = renderedNotice.input;
+		}
 		if (agent?.actionPayload)
 			operations.push(
 				operationBlock("operation.action", JSON.parse(agent.actionPayload)),
@@ -223,10 +242,25 @@ export function createPrepare(
 					{
 						persona: compiled.assembly.persona,
 						previous: previousExchange(compiled.assembly.history.turns),
+						background: JSON.stringify(
+							[...fitted.stable, ...fitted.working, ...fitted.volatile].filter(
+								(block) =>
+									block.source.startsWith("memory.") ||
+									block.source.startsWith("world."),
+							),
+						),
 					},
 				)
 			: undefined;
 		if (routing) {
+			if (routing.routing.tasks && window && memory)
+				routing.routing.tasks.references.push(
+					...memory.executionReferencesInTransaction(tx, window),
+				);
+			if (routing.routing.tasks) {
+				const offered = fitTaskOffer(routing.routing.tasks);
+				routing.routing.tasks = { ...offered, card: offered.card };
+			}
 			const base = {
 				routing: routing.routing,
 				messages,
@@ -239,7 +273,9 @@ export function createPrepare(
 				budgets.task -
 				outputReserveTokens(windowTokens) -
 				estimateMessageTokens(analysisMessages(base)) -
-				estimateJsonTokens(analysisTools([], new Set(), true));
+				estimateJsonTokens(
+					analysisTools([], new Set(), true, routing.routing.tasks, false),
+				);
 			Object.assign(routing.routing, {
 				retained: prepareRetained(
 					deps,
@@ -262,6 +298,7 @@ export function createPrepare(
 					conversation.messageInTransaction(tx, run.inputMessageId)?.message
 						.presentation !== "artifact",
 				runId: run.id,
+				...executionNoticeContext(executionNotice),
 				revision: current.revision,
 				messages,
 				sessionContext: rendered.sessionContext,

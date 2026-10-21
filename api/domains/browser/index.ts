@@ -38,3 +38,5 @@ export type {
 	ScriptPublish,
 	ScriptBinding,
 } from "./contracts/script";
+
+export type { CollectedPage } from "./service/research-collection";

@@ -2,9 +2,11 @@
 
 作成日: 2026年10月21日
 
-状態: 文書レビューを反映した計画案。製品実装・移行・実行検証は未着手。利用者はこのリポジトリ内での実装計画の作成と、必要な実行型の追加を許可している。本書への合意後、下記の順序で実装する。
+状態: 利用者の実装指示を受け、P0〜P5の実装・固定試験を実施済み。P6の実モデル受入は不合格、実ブラウザー再生は未達で、全体は未完成。製品DBでは新担当だけを無効にし、既存担当とサーバーを復帰した。改訂後の最新の成否と残作業は[進行契約の検証記録](verification/everyday-task-agent/progress-contract-verification-2026-10-21.md)を正本とする。
 
 本書の `task` は新しいbindingの実行型を指す。既存の単発処理用の `TaskState`、調査の `agent_tasks`、browserのtaskとは区別する。以下、複数操作全体を「親実行」、一つの能力への依頼を「子呼出し」と呼ぶ。
+
+追記: [実装レビューと改善記録](verification/everyday-task-agent/implementation-review-2026-10-21.md)の実モデル受入は未達。2026-10-21に[進行契約の改訂案](everyday-task-agent-progress-contract-proposal-2026-10-21.md)への利用者合意を受領した。以後の進行契約は同改訂を適用した。現行bundleはskill@6 / package@6 / toolchain@7。固定検証は成功したが、改訂後も実モデル受入は0/3で、受入完了まで無効を維持する。
 
 ## 1 目的と完了の定義
 
@@ -239,7 +241,7 @@ browserが `needs_input` で終了した場合は、親を `waiting_user` にし
 
 P3の動画例は代表的な結合試験であり、製品コードへ動画専用分岐を追加する理由にはしない。P4とP5が残っている段階で「既存ツールを使える担当が完成」としない。
 
-P0の成果物は `spec/verification/everyday-task-agent/contract-matrix.md` にまとめる。これは実装時に作る予定パスであり、現在存在する検証結果ではない。最低限、次を空欄なく確定してからP1へ進む。
+P0の成果物は [契約・基準](verification/everyday-task-agent/contract-matrix.md) に記録済み。以下を確定してP1へ進めた。
 
 | 契約 | P0で固定する内容 |
 | --- | --- |
@@ -334,7 +336,17 @@ bunx playwright test tests/browser/task-execution.spec.ts tests/browser/browser-
 
 ## 14 作業管理と実装開始前の確認
 
-残作業はP0〜P6の全段階。実装中は各段階について「未着手・実装済み・固定試験済み・実モデル確認済み・実機確認済み」を区別し、対応したケース・結果・未解決事項・次の依存を更新する。計画を書いたことを実装・受入の完了にしない。
+| 段階 | 現在の状態 |
+| --- | --- |
+| P0 | 契約、容量、性能の基準を確定・記録済み |
+| P1〜P2 | 登録、移行、台帳、動的native schema、一手ループ、参照、予算、復旧を実装・固定試験済み |
+| P3〜P4 | 型ごとの既存公開操作に接続。検索とbrowser、同型二回生成、再送、session引継ぎを固定試験済み |
+| P5 | 公開会話入口の委譲、質問回答、通知の採用と失効を実装・固定試験済み |
+| P6 | 主13領域と後続修正の正式検証成功。実モデルの重複・誤完了・不要な委譲が残り、再生も未達。公開を取り下げ、[検証記録](verification/everyday-task-agent/implementation-verification-2026-10-21.md)へ再開条件を記載 |
+
+当初のP5実装時に登録したtaskの旧revisionを保持するため、その時点の登録版は `skill:task.executor@4`、`package:task.execute@4`、`toolchain:task.execute@5`、`binding:task.execute@2`、結果schema@2。§4.2の初期計画値を同一revisionで上書きしてはいない。公開の可否はP6の受入と[検証記録](verification/everyday-task-agent/implementation-verification-2026-10-21.md)に従う。
+
+利用者は2026-10-21に以後の必要なサーバー再起動を許可済み。同時作業の稼働と実行中ジョブを確認して操作し、別チャットへのメッセージ送信は行わない。実モデル・実機の成功を固定試験の成功で代替しない。
 
 本書で明示的に追加する仕様は、task実行型、会話で使える委譲/作業操作の入口、通常R1でのMemory利用、背景情報の参照projection、会話runと作業の寿命分離、子完了の配送先、別能力への再探索、呼出し単位の保存、既存の承認と質問の引継ぎ、親子の予算強制である。必要なバリエーションの追加は許可済みだが、これらを含む計画全体の合意を確認して製品実装へ進む。
 

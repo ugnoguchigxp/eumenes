@@ -15,6 +15,27 @@ export type BoundedSnapshot = {
 const REF = /\[ref=([A-Za-z0-9_-]+)\]/g;
 const encoder = new TextEncoder();
 
+/** Remove only bare layout wrappers; retain labels, states, actions and all substantive lines. */
+export function compactSnapshot(snapshot: string) {
+	const skipped: number[] = [];
+	const lines: string[] = [];
+	for (const node of snapshotNodes(snapshot)) {
+		while (skipped.length && skipped.at(-1)! >= node.level) skipped.pop();
+		if (
+			node.lines.length === 1 &&
+			/^\s*- generic(?: \[ref=[A-Za-z0-9_-]+\])?:?$/.test(node.lines[0]!)
+		) {
+			skipped.push(node.level);
+			continue;
+		}
+		for (const line of node.lines) {
+			const indentation = line.match(/^ */)![0].length;
+			lines.push(line.slice(Math.min(indentation, skipped.length * 2)));
+		}
+	}
+	return lines.join("\n");
+}
+
 /**
  * Cuts an ARIA snapshot at whole-node boundaries (a node is a `- ` line with its continuation lines).
  * Nodes are taken in document order until the byte or ref budget would be exceeded; nodes deeper than
@@ -28,19 +49,7 @@ export function boundSnapshot(
 		refs: SNAPSHOT_MAX_REFS,
 	},
 ): BoundedSnapshot {
-	const nodes: { level: number; lines: string[] }[] = [];
-	for (const raw of snapshot.split("\n")) {
-		const line = raw.replace(/\r$/, "").replace(/\t/g, "  ");
-		if (!line.trim()) continue;
-		const trimmed = line.trimStart();
-		const last = nodes.at(-1);
-		if (trimmed.startsWith("- ") || !last)
-			nodes.push({
-				level: Math.floor((line.length - trimmed.length) / 2),
-				lines: [line],
-			});
-		else last.lines.push(line);
-	}
+	const nodes = snapshotNodes(snapshot);
 	const kept: string[] = [];
 	const refs: string[] = [];
 	const reasons = new Set<"bytes" | "depth" | "refs">();
@@ -71,4 +80,22 @@ export function boundSnapshot(
 		reasons: [...reasons],
 		refs,
 	};
+}
+
+/** Shared ARIA node boundaries for bounding and referenced collection. */
+export function snapshotNodes(snapshot: string) {
+	const nodes: { level: number; lines: string[] }[] = [];
+	for (const raw of snapshot.split("\n")) {
+		const line = raw.replace(/\r$/, "").replace(/\t/g, "  ");
+		if (!line.trim()) continue;
+		const trimmed = line.trimStart();
+		const last = nodes.at(-1);
+		if ((trimmed.startsWith("- ") && !trimmed.startsWith("- /url:")) || !last)
+			nodes.push({
+				level: Math.floor((line.length - trimmed.length) / 2),
+				lines: [line],
+			});
+		else last.lines.push(line);
+	}
+	return nodes;
 }

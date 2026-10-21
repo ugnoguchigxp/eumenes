@@ -23,6 +23,7 @@ export function buildMedia(
 	deps: {
 		core: Pick<Core, "store" | "queue" | "inference" | "settings">;
 		capabilities: Capabilities;
+		agents?: import("../domains/agent-runtime").AgentRuntime;
 		dialogue: () => DialogueService;
 	},
 ) {
@@ -38,6 +39,8 @@ export function buildMedia(
 		});
 	};
 	const mediaDependencies = {
+		validateExecutionInTransaction:
+			deps.agents?.executions.authorizeChildInTransaction,
 		store,
 		queue,
 		inference,

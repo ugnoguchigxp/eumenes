@@ -1,3 +1,4 @@
+import { executionCallSession } from "../../tool-runtime";
 import { z } from "zod";
 import {} from "../../../infrastructure/validation-log";
 import { type ProfileSnapshot } from "../../capabilities";
@@ -19,6 +20,11 @@ import { STEP_KIND, active, type RuntimeContext } from "./runtime-context";
 import type { TaskOps } from "./task-ops";
 import { createToolSelection } from "./tool-selection";
 import { guidedWeb, guidedActionFor } from "./guided-contract";
+import {
+	activeExecutionChild,
+	reservedExecutionCalls,
+} from "./execution-children";
+import type { ChildExecution } from "../../tool-runtime";
 
 import {
 	createStepActions,
@@ -63,6 +69,18 @@ export function createStepHandler(ctx: RuntimeContext, ops: TaskOps) {
 			const t = get(db, claim.payload.taskId);
 			if (!t || t.state !== "queued" || t.job_id !== claim.jobId)
 				return { status: "stale", reason: "task_not_queued" };
+			const execution = JSON.parse(t.input_json ?? "{}").execution as
+				| ChildExecution
+				| undefined;
+			if (
+				execution &&
+				(!activeExecutionChild(db, execution) ||
+					t.model_calls + reservedExecutionCalls(db, t.id) >=
+						execution.modelCalls)
+			) {
+				fail(db, t, "execution_budget_exhausted");
+				return { status: "stale", reason: "execution_budget_exhausted" };
+			}
 			if (
 				t.deadline <= now() ||
 				t.model_calls >=
@@ -135,7 +153,7 @@ export function createStepHandler(ctx: RuntimeContext, ops: TaskOps) {
 								now(),
 								{ profiles, contract: frozen?.contract ?? null },
 							);
-				const requestId = inference.captureControlInTransaction(db, {
+				const capture = {
 					subject: `agent:${t.id}:step:${t.current_step}`,
 					policySubject: t.root_run_id,
 					deadline: claim.deadlineAtMs ?? t.deadline,
@@ -143,7 +161,15 @@ export function createStepHandler(ctx: RuntimeContext, ops: TaskOps) {
 					engine: JSON.parse(t.input_json ?? "{}").researcher,
 					// The saved sub-agent resource (read in this transaction); none keeps the step on LARM.
 					route: subagentRoute(inference.snapshotInTransaction?.(db)),
-				});
+				};
+				const requestId = execution
+					? inference.captureUserControlInTransaction!(db, {
+							subject: `execution-research:${t.id}-${t.current_step}`,
+							deadline: Math.min(capture.deadline, now() + 45_000),
+							maxOutputTokens: capture.maxOutputTokens,
+							route: "subagent",
+						})
+					: inference.captureControlInTransaction(db, capture);
 				const current = update(db, t, "running", t.phase);
 				db.query(
 					"UPDATE agent_tasks SET model_calls=model_calls+1 WHERE id=?",
@@ -159,6 +185,7 @@ export function createStepHandler(ctx: RuntimeContext, ops: TaskOps) {
 						search,
 						guided,
 						first: !frozen,
+						execution,
 						taskId: t.id,
 						stepId: claim.payload.stepId,
 						revision: current.revision,
@@ -181,7 +208,9 @@ export function createStepHandler(ctx: RuntimeContext, ops: TaskOps) {
 				input.messages,
 				signal,
 				input.control,
-				{ sessionRole: "subagent", taskId: input.taskId },
+				input.execution
+					? executionCallSession(input.execution)
+					: { sessionRole: "subagent", taskId: input.taskId },
 			);
 			return { receipt, ...parseControlOutput(receipt.value) };
 		},

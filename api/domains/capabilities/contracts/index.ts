@@ -210,6 +210,19 @@ const recipeFindInput = z
 	})
 	.strict();
 export const validators = {
+	browserResearchCollect: z.strictObject({
+		observationRef: z.uuid(),
+		blockRefs: z
+			.array(z.string().regex(/^b[1-9][0-9]*$/))
+			.min(1)
+			.max(80),
+		purpose: z.enum(["candidates", "facts"]),
+		linkBlockRefs: z.array(z.string().regex(/^b[1-9][0-9]*$/)).max(5),
+	}),
+	browserResearch: z.strictObject({
+		request: z.string().trim().min(1).max(4000),
+		url: publicUrl.optional(),
+	}),
 	kanbanSharedAdd,
 	kanbanExecutorRef,
 	kanbanSelectExecutor,
@@ -256,6 +269,17 @@ export const validators = {
 	quote: quoteInput,
 	research: researchInput,
 	guidedResearch: guidedResearchInput,
+	guidedCandidates: guidedResearchInput,
+	readCandidate: z
+		.object({
+			url: publicUrl.optional(),
+			candidateRef: z
+				.string()
+				.regex(/^c[1-9][0-9]*$/)
+				.optional(),
+		})
+		.strict()
+		.refine((v) => !!v.url !== !!v.candidateRef),
 	lookup: lookupInputV1,
 	lookupV2: lookupInput,
 	read: readInput,

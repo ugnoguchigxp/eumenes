@@ -1,0 +1,58 @@
+bun test v1.4.3 (c6da4a4d3)
+
+api/application/browser/browser-task-runner.test.ts:
+(pass) observe, type with a grant, click, re-observe, finish: one inference per job and the page only as data [419.04ms]
+(pass) the first call has the D7 context: system layer, enclosed reference with the observation, the original request last [588.37ms]
+(pass) a clarify ends the task as needs_input with the question [610.73ms]
+(pass) the last of the 12 calls is reserved: callsLeft is shown every call, and an invoke there fails the task [358.43ms]
+(pass) a finish on the last call still completes the task [357.77ms]
+(pass) a rejected output is repaired once and the repair counts against the budget [678.80ms]
+(pass) a refused tool goes back as data and is retried once; the second refusal ends the task [682.73ms]
+(pass) unknown tools, invalid arguments and blocked addresses are refusals, not crashes [334.58ms]
+(pass) submitting a typed value needs a declared effect [334.79ms]
+(pass) a value is typed on a quote from the request, however it was reformatted [335.48ms]
+(pass) an operation that may have reached the page stops the task as indeterminate and no further call is made [330.13ms]
+(pass) an operation the browser refused before sending is a refusal the model may answer [333.50ms]
+(pass) cancelling aborts the model call in flight and the task stays cancelled and quiet [369.87ms]
+(pass) a task past its deadline expires, aborts the call in flight and makes no further call [367.79ms]
+(pass) losing the connection ends the task and aborts the call in flight [338.87ms]
+(pass) an element capture inside the task is saved before the task finishes [486.56ms]
+(pass) a capture over the size limit is a refusal with its reason [504.06ms]
+(pass) tabs can be listed and a new tab becomes the target [341.94ms]
+(pass) a newer observation turns the older ones into a one-line stub, and nothing else changes [348.74ms]
+(pass) a tab the request named that is gone stops the task; it never moves to another tab [333.62ms]
+(pass) a page the host blocks goes back to the model as a refusal it can answer [336.69ms]
+(pass) too large a context stops the task before a call is made [351.79ms]
+(pass) a revoked model call ends the task and its request is dropped [348.47ms]
+(pass) a conversation request reaches the loop through the adapter with the user's own words [351.52ms]
+
+api/application/browser/browser-task-approvals.test.ts:
+(pass) an operation the model declares as commit is held by the host: the task asks the user, says what it would do and keeps the pending approval [1013.78ms]
+(pass) the host judges the form itself: a POST submit is held without any declaration, a GET search and a plain button run [671.54ms]
+(pass) the user's approval reaches the follow-up task, which shows it to the model and runs the held operation once [342.38ms]
+(pass) without the user's approval nothing moves: the follow-up task is held again [355.24ms]
+(pass) a value read from the page is not typed: the task shows it to the user and the approved value is typed by reference [581.40ms]
+(pass) a short value, or one that is in the request, is not taken for a page value [333.14ms]
+(pass) a quote that is not in the request gets no grant: the task shows the value to the user instead of asking the model [351.63ms]
+
+api/application/toolchain/service-search.test.ts:
+(pass) conversation → browser child → native candidates → saved answer [454.61ms]
+(pass) conversation → browser child → external fallback → saved answer [431.15ms]
+(pass) conversation → browser child → empty connected browser → saved answer [444.77ms]
+
+api/application/toolchain/service-search-lifecycle.test.ts:
+(pass) delegated prose cannot manufacture a quotation that authorizes browser input [343.04ms]
+(pass) revoked parent cannot adopt a late browser finish or emit a second conversation notice [325.38ms]
+(pass) native work expires while the parent's fallback reserve remains [333.17ms]
+(pass) accepted candidates survive native expiry for partial adoption [343.17ms]
+(pass) accepted candidates are discarded after authority revocation [334.81ms]
+
+api/domains/agent-runtime/test/guided-candidates.test.ts:
+(pass) the service route's candidate-only example satisfies its own contract without body evidence [0.38ms]
+(pass) only displayed live candidates may be returned or resolved into reads [0.12ms]
+(pass) candidate references never stand in for body facts [0.82ms]
+
+ 42 pass
+ 0 fail
+ 245 expect() calls
+Ran 42 tests across 5 files. [17.05s]

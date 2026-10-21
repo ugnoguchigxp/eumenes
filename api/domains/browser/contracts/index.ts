@@ -179,6 +179,9 @@ export type OperationOutcome = {
 };
 
 export type Observation = {
+	blocks?: { blockRef: string; text: string }[];
+	/** Links present in this bounded observation; no relevance or item-type classification. */
+	links?: { blockRef: string; title: string; url: string }[];
 	observationRef: string;
 	tabRef: string;
 	generation: number;
@@ -320,7 +323,7 @@ export type TaskView = {
 	errorCode: string | null;
 	errorLabel: string | null;
 	tabRef: string | null;
-	origin: "conversation" | "screen";
+	origin: "conversation" | "screen" | "child" | "task";
 	createdAt: number;
 	updatedAt: number;
 	revision: number;

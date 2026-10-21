@@ -1,3 +1,4 @@
+import { purgeTaskExecution } from "./execution-data";
 import type { Database } from "bun:sqlite";
 import { createHostResolver } from "../adapters/host-resolver";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
@@ -28,8 +29,10 @@ import {
 	tabsRevision,
 	tasksRevision,
 	taskRow,
+	taskByRequest,
 	type TaskRow,
 } from "../repository";
+import { ResearchCollection } from "./research-collection";
 import { taskApi } from "./task-api";
 import { createApprovals } from "./approvals";
 import { createCaptures, type StartCaptureInput } from "./captures";
@@ -80,6 +83,7 @@ export function createBrowser(deps: {
 	const { store } = deps;
 	const serials = new Map<string, Serial>();
 	const ctx: Ctx = {
+		research: new ResearchCollection(),
 		store,
 		queue: deps.queue,
 		driver: deps.driver,
@@ -158,6 +162,43 @@ export function createBrowser(deps: {
 	};
 
 	const service = {
+		purgeTaskExecutionInTransaction: (db: Database, executionId: string) =>
+			purgeTaskExecution(db, executionId, tasks.cancelInTransaction),
+		setTaskExecutionSource(read: NonNullable<Ctx["taskExecutionSource"]>) {
+			ctx.taskExecutionSource = read;
+		},
+		taskExecutionSourceInTransaction: (db: Database, frozen: unknown) =>
+			ctx.taskExecutionSource?.(db, frozen) ?? null,
+		taskExecutionResultInTransaction(db: Database, owner: string, id: string) {
+			const view = tasks.status(db, owner, id),
+				row = taskRow(db, id)!;
+			const core = JSON.parse(row.core_state_json ?? "{}");
+			return {
+				...view,
+				callsMade: core.callsMade ?? core.core?.callsMade ?? 0,
+				result: row.result_text,
+				deadline: row.deadline,
+			};
+		},
+		taskStatusInTransaction: (db: Database, owner: string, id: string) =>
+			tasks.status(db, owner, id),
+		taskByRequestInTransaction: (db: Database, requestId: string) =>
+			taskByRequest(db, requestId),
+		captureStatusInTransaction: (db: Database, owner: string, id: string) =>
+			captures.status(db, owner, id),
+		setResearchReview(review: NonNullable<Ctx["reviewResearch"]>) {
+			ctx.reviewResearch = review;
+		},
+		setChildAuthority(check: NonNullable<Ctx["childValid"]>) {
+			ctx.childValid = check;
+		},
+		researchPages: (id: string) => ctx.research.read(id),
+		releaseResearch: (id: string) => ctx.research.clear(id),
+		releaseResearchOwner: (owner: string) =>
+			store.read((db) => {
+				for (const t of listTasks(db, owner, 1000))
+					ctx.research.clear(t.taskId);
+			}),
 		setting: createSetting({
 			store,
 			now: ctx.now,

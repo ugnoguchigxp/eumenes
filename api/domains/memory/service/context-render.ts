@@ -139,6 +139,7 @@ export const shortTermFromText = (text: string) =>
 // ---- long term (L1) ----
 
 export interface StateLine {
+	validUntilMs?: number | null;
 	itemId: string;
 	revision: number;
 	kind: string;

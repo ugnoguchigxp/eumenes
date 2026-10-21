@@ -1,3 +1,5 @@
+import { packageRuntimeOf } from "../../capabilities";
+import { extendRunDeadline } from "../repository";
 import { originalRequestInTransaction } from "./request-context";
 import type { Database } from "bun:sqlite";
 import type { Run } from "../contracts";
@@ -185,6 +187,20 @@ export function settleConversationOperation(
 	} else {
 		if (!agents || !runtime.route)
 			throw new Error("invalid_conversation_operation");
+		// Only the selected package receives its declared research time; explicit outer deadlines stay fixed.
+		const serviceTime =
+			packageRuntimeOf(packageRevisionId.replace(/^package:|@\d+$/g, ""))
+				?.budget === "service"
+				? 360000
+				: 0;
+		if (serviceTime && run.deadlineFixed === false) {
+			const until = Date.parse(run.createdAt) + serviceTime;
+			if (until > Date.parse(run.deadlineAt!)) {
+				extendRunDeadline(tx, run.id, new Date(until).toISOString());
+				deps.larm.extendDeadlineInTransaction?.(tx, run.id, until);
+				run = { ...run, deadlineAt: new Date(until).toISOString() };
+			}
+		}
 		const root = delegateConversation(
 			tx,
 			agents,

@@ -46,6 +46,7 @@ export async function generateConversation(input: {
 	/** The first round: `tools` holds the candidates' functions, `answer` and `report_unavailable`. */
 	analysis?: boolean;
 	allowDiscovery?: boolean;
+	tasks?: import("./initial-decision").TaskOffer;
 	/** A true approval must at least have a preceding assistant exchange to stand on. Meaning is judged by the model. */
 	approvalReference?: boolean;
 	repair: () => void;
@@ -126,11 +127,17 @@ export async function generateConversation(input: {
 					receipt.toolCalls,
 					input.cards ?? [],
 					input.allowDiscovery,
+					input.tasks,
 				);
 				if (analysis.approved && input.approvalReference === false)
 					throw operationRejection("approval_reference_missing");
 				// The notice and the explanation are shown to the user: the same output and spoken-reply checks.
-				if (analysis.next === "toolchain")
+				if (
+					["toolchain", "execute_task", "task_control"].includes(
+						analysis.next,
+					) &&
+					"announcement" in analysis
+				)
 					conversationOutput(() => {}, input.tools).finish(
 						analysis.announcement,
 					);

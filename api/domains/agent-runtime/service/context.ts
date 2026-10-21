@@ -33,8 +33,20 @@ export function workerContext(
 	tools = tools.filter((tool) => !tool.replayOnly);
 	const { controlFor, contractsFor, dependencies, ownSet, search, guided } =
 		createWorkerControl(prepared, tools, requirements);
+	const execution = JSON.parse(task.input_json ?? "{}").execution as
+		| import("../../tool-runtime").ChildExecution
+		| undefined;
 	const fixed = {
+		...(execution?.source.amendments
+			? { requestUpdates: execution.source.amendments }
+			: {}),
 		task: prepared.input,
+		...(execution?.resume
+			? {
+					previousQuestion: execution.resume.previous,
+					answer: execution.resume.input,
+				}
+			: {}),
 		// The set's bodies are already the system policy; only their versions travel as data.
 		guidance: dependencies.map(({ revisionId, hash, kind, body }) =>
 			ownSet ? { revisionId, hash, kind } : { revisionId, hash, kind, body },
@@ -69,17 +81,25 @@ export function workerContext(
 			VARIABLE_RESERVE_BYTES,
 	);
 	if (materialLimit < 4096) throw new Error("required_context_overflow");
-	const candidates = guided
-		? sources
-				.filter((s) => s.basis !== "page")
-				.map((s) => ({
-					title: s.title.slice(0, 80),
-					url: s.url,
-					snippet: s.body.slice(0, 160),
-					provider: s.source?.provider,
-					rank: s.source?.rank,
-				}))
-		: [];
+	const candidates =
+		prepared.package.schemaKey === "guidedCandidates"
+			? catalog.candidates.observe(sources)
+			: guided
+				? sources
+						.filter((s) => s.basis !== "page")
+						.map((s) => ({
+							title: s.title.slice(0, 80),
+							url: s.url,
+							snippet: s.body.slice(0, 160),
+							provider: s.source?.provider,
+							rank: s.source?.rank,
+						}))
+				: [];
+	if (
+		prepared.package.schemaKey === "guidedCandidates" &&
+		bytes(candidates) > 4096
+	)
+		throw new Error("candidate_capacity");
 	while (bytes(candidates) > 4096) candidates.pop();
 	const toolNotes =
 		guided && Array.isArray(operations)
@@ -137,6 +157,9 @@ export function workerContext(
 	while (bytes(operationList) > OPERATION_BYTES && operationList.length)
 		operationList.shift();
 	const materials = {
+		...(execution?.referenceData?.length
+			? { delegatedReferences: execution.referenceData }
+			: {}),
 		evidence: data.evidence,
 		observations: visible,
 		...(guided ? { candidates, toolNotes } : {}),

@@ -1,0 +1,14 @@
+bun test v1.4.3 (c6da4a4d3)
+
+api/domains/agent-runtime/test/candidate-reading.test.ts:
+(pass) a candidate read resolves its observed URL and then supports body evidence [81.59ms]
+
+api/domains/agent-runtime/test/service-search-budget.test.ts:
+(pass) service budgets preserve fallback and final answer without changing existing budgets [0.07ms]
+(pass) revoking the frozen package revokes a research child's caller authority [54.57ms]
+(pass) native refusal continues through external lookup and host-issued candidate result [57.09ms]
+
+ 4 pass
+ 0 fail
+ 18 expect() calls
+Ran 4 tests across 2 files. [447.00ms]

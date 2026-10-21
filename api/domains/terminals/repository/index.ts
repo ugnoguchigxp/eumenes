@@ -62,7 +62,7 @@ export type RequestRow = {
 	projectId: string;
 	task: string;
 	prompt: string;
-	origin: "board" | "conversation";
+	origin: "board" | "conversation" | "execution";
 	conversationId?: string;
 	claudeSessionId?: string;
 	exclusiveGroup?: "kanban";

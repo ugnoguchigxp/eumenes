@@ -1,5 +1,5 @@
 import { captureStart, type TabView, type TaskPhase } from "../contracts";
-import { taskRow, patchTask, type TaskRow } from "../repository";
+import { tabRow, taskRow, patchTask, type TaskRow } from "../repository";
 import { bindingOf, checkScript, publishScript } from "./script";
 import { connectionView, type createConnection } from "./connection";
 import type { createOperations } from "./operations";
@@ -45,7 +45,28 @@ export function taskApi(
 			throw new Error("task_not_active");
 		return current;
 	};
-	const assertActive = (db: Database) => checkScript(currentTask(db), binding);
+	const assertActive = (db: Database) => {
+		const current = currentTask(db);
+		if (
+			current.origin === "child" &&
+			!ctx.childValid?.(db, JSON.parse(current.frozen_json ?? "{}").caller)
+		)
+			throw new Error("child_authority_revoked");
+		if (
+			current.origin === "task" &&
+			!ctx.taskExecutionSource?.(db, JSON.parse(current.frozen_json ?? "{}"))
+		)
+			throw new Error("execution_source_invalid");
+		return checkScript(current, binding);
+	};
+	const assertObserved = (db: Database) => {
+		const observed = ctx.research.current(task.id);
+		if (
+			!observed ||
+			tabRow(db, observed.tabRef)?.observation_ref !== observed.observationRef
+		)
+			throw new Error("observation_stale");
+	};
 	const progress = (phase: TaskPhase) =>
 		store.write((db) => {
 			const current = currentTask(db);
@@ -53,6 +74,30 @@ export function taskApi(
 		});
 	return {
 		progress,
+		collect: async (input) => {
+			const page = await store.write((db) => {
+				assertActive(db);
+				if (task.origin !== "child") throw new Error("collection_not_allowed");
+				assertObserved(db);
+				const page = ctx.research.collect(task.id, input, ctx.now());
+				ctx.research.beginReview(task.id);
+				return page;
+			});
+			if (!ctx.reviewResearch || !(await ctx.reviewResearch(page, signal)))
+				throw new Error("collection_guard_rejected");
+			return store.write((db) => {
+				assertActive(db);
+				signal.throwIfAborted();
+				assertObserved(db);
+				ctx.research.accept(task.id, page);
+				return {
+					observationRef: page.observationRef,
+					purpose: page.purpose,
+					links: page.links.length,
+					candidates: page.links.map(({ title, url }) => ({ title, url })),
+				};
+			});
+		},
 		connection: () => store.read((db) => connectionView(ctx, db)),
 		connect: async () => {
 			await store.write((db) => assertActive(db));

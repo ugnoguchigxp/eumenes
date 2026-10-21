@@ -89,7 +89,7 @@ export function createDotsDialogue(input: {
 				available: targets.projects.length > 0 || targets.tasks.length > 0,
 			};
 		},
-		invokeInTransaction(db, run, command, snapshot) {
+		invokeInTransaction(db, run, command, snapshot, execution) {
 			if (!["manual", "voice"].includes(run.sourceKind) || run.agentTaskId)
 				throw new Error("dots_permission_denied");
 			const original = conversation.messageInTransaction(
@@ -102,7 +102,7 @@ export function createDotsDialogue(input: {
 				original.role !== "user"
 			)
 				throw new Error("dots_permission_denied");
-			const old = receipt(db, run.id);
+			const old = receipt(db, run.id, execution?.callId);
 			if (old) return old;
 			const current = catalog(db, run),
 				selected = snapshot as typeof current;
@@ -131,7 +131,9 @@ export function createDotsDialogue(input: {
 							projectRef: p.ref,
 							operations: command.operations,
 							maxSessions: command.maxSessions,
-							expiresAt: new Date(now() + 7200000).toISOString(),
+							expiresAt: new Date(
+								Math.min(now() + 7200000, execution?.deadline ?? Infinity),
+							).toISOString(),
 						},
 					},
 					{
@@ -140,7 +142,7 @@ export function createDotsDialogue(input: {
 							conversationId: run.conversationId,
 							messageId: run.inputMessageId,
 							runId: run.id,
-							operationKey: "dots:0",
+							operationKey: execution ? `dots:${execution.callId}` : "dots:0",
 						},
 					},
 				);
@@ -182,8 +184,36 @@ export function createDotsDialogue(input: {
 					? (saved as { taskId: string }).taskId
 					: command.taskRef,
 				result,
+				execution?.callId,
 			);
 			return result;
+		},
+		executionTaskInTransaction(db, conversationId, taskId) {
+			const task = tasks.getInTransaction(db, taskId);
+			if (
+				!task ||
+				task.origin.source !== "conversation" ||
+				task.origin.conversationId !== conversationId
+			)
+				return null;
+			return {
+				...task,
+				question: tasks.openQuestionInTransaction(db, taskId),
+			};
+		},
+		cancelExecutionTaskInTransaction(db, conversationId, taskId) {
+			const task = tasks.getInTransaction(db, taskId);
+			if (
+				!task ||
+				task.origin.source !== "conversation" ||
+				task.origin.conversationId !== conversationId
+			)
+				return;
+			tasks.requestStopInTransaction(db, taskId, {
+				requestId: crypto.randomUUID(),
+				expectedRevision: task.revision,
+				intent: "cancel",
+			});
 		},
 	};
 }

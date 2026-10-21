@@ -12,6 +12,14 @@ import type { Owner } from "../../capabilities/contracts";
 /** Where an operation comes from. The adapter never trusts an owner the client declares. */
 export type AdapterOrigin =
 	| {
+			kind: "task";
+			owner: Owner;
+			runId: string;
+			conversationId: string;
+			messageId: string;
+			execution: import("./task-execution").ChildExecution;
+	  }
+	| {
 			kind: "conversation";
 			owner: Owner;
 			runId: string;
@@ -193,6 +201,47 @@ export interface InstantAdapter {
 }
 
 export interface DomainAdapter {
+	/** Registered lifecycle of an artifact-free task binding. */
+	task?: {
+		startInTransaction(
+			db: Database,
+			input: {
+				source: import("./task-execution").ExecutionSource;
+				request: string;
+				references: import("./task-execution").ExecutionReference[];
+			},
+		): import("./task-execution").ExecutionView;
+		controlInTransaction(
+			db: Database,
+			conversationId: string,
+			input: unknown,
+			messageId: string,
+		): import("./task-execution").ExecutionView;
+		viewInTransaction(
+			db: Database,
+			id: string,
+		): import("./task-execution").ExecutionView | null;
+	};
+	/** Domain-owned follow-up of an accepted asynchronous operation. No intent dispatch lives here. */
+	execution?: {
+		/** External processes stop outside the writer; false means stopping could not be confirmed. */
+		stop?(operationId: string): Promise<boolean>;
+		currentInTransaction(
+			db: Database,
+			operationId: string,
+			child: import("./task-execution").ChildExecution,
+		): import("./task-execution").ChildResult;
+		cancelInTransaction(
+			db: Database,
+			operationId: string,
+			child: import("./task-execution").ChildExecution,
+		): void;
+		validateAnswerInTransaction(
+			db: Database,
+			operationId: string,
+			input: unknown,
+		): boolean;
+	};
 	/** `adapter:<owner>@<n>` */
 	readonly ref: string;
 	describe(): {
@@ -221,6 +270,7 @@ export interface DomainAdapter {
 		structures?: ReadonlyMap<string, { inputSchemaRef: string }>;
 		/** The adapter answers instant bindings (it has `instant`). */
 		instant?: boolean;
+		task?: boolean;
 		/**
 		 * Work documents of its session (`workspace:` refs a session binding's `agent.workspace` may name):
 		 * the file name shown to the agent and the media type of the text.

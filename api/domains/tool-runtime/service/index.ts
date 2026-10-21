@@ -20,6 +20,15 @@ import { createActionInvocations } from "./action-invocation";
 import { resultSources } from "./source-results";
 import { get, hasReadMetadata, hasSupersededColumn } from "../repository";
 import { invocationHistory } from "../repository/read-history";
+function pendingJobError(db: Database, inv: Invocation, queue: QueueService) {
+	const job = queue.getInTransaction(db, inv.job_id);
+	return !job ||
+		["failed", "expired", "interrupted", "cancelled", "completed"].includes(
+			job.state,
+		)
+		? (job?.errorCode ?? "operation_missing")
+		: null;
+}
 export function createToolRuntime(
 	store: SqliteStore,
 	capabilities: Capabilities,
@@ -173,17 +182,12 @@ export function createToolRuntime(
 			state = "failed";
 			code = "deadline_exceeded";
 		}
+		if (state === "pending" && operation?.continuing) return false;
 		if (state === "pending") {
-			const job = queue.getInTransaction(db, inv.job_id);
-			if (
-				!job ||
-				["failed", "expired", "interrupted", "cancelled", "completed"].includes(
-					job.state,
-				)
-			) {
-				state = "failed";
-				code = job?.errorCode ?? "operation_missing";
-			} else return false;
+			const error = pendingJobError(db, inv, queue);
+			if (error === null) return false;
+			state = "failed";
+			code = error;
 		}
 		if (state === "succeeded" || state === "partial") {
 			if (!operation?.result) {

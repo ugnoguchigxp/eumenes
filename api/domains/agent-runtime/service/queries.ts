@@ -1,7 +1,7 @@
 import type { Database } from "bun:sqlite";
 import type { Owner } from "../../capabilities";
 import type { Task } from "../contracts";
-import { get, byRoot, dto } from "../repository";
+import { get, byRoot, taskRoot, dto } from "../repository";
 import type { Answer } from "./answer";
 import { active, type RuntimeContext } from "./runtime-context";
 
@@ -16,19 +16,28 @@ export function createQueries(ctx: RuntimeContext, answer: Answer) {
 			stage: "read" | "adopt",
 		) {
 			const task = get(db, input.taskId),
-				root = byRoot(db, input.rootRunId);
+				root = task ? taskRoot(db, task) : null;
+			const completedExecutionResult =
+				stage === "adopt" &&
+				root?.state === "completed" &&
+				!!(root as Task & { execution_call_id?: string | null })
+					.execution_call_id;
 			if (
 				!task ||
 				!root ||
 				task.root_run_id !== input.rootRunId ||
 				task.cancel_epoch !== input.cancelEpoch ||
 				task.kind !== "worker" ||
-				root.deadline <= now() ||
-				!["waiting_child", "ready_for_answer"].includes(root.state) ||
+				(!completedExecutionResult && root.deadline <= now()) ||
+				(!completedExecutionResult &&
+					!["waiting_child", "ready_for_answer"].includes(root.state)) ||
 				(stage === "read" && (!active(task) || task.deadline <= now())) ||
 				["cancelled", "failed", "interrupted"].includes(task.state)
 			)
 				throw new Error("source_ref_invalid");
+			const binding = prepared.get(task.id);
+			if (stage === "read" && binding)
+				capabilities.validateInTransaction(db, binding);
 			return { deadline: root.deadline };
 		},
 		usesViewEvidenceInTransaction(db: Database, taskId: string) {

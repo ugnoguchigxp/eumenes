@@ -19,6 +19,9 @@ import { adoptMemoryWindow, clearShownNotices } from "./memory-window";
 import { byId, transition } from "../repository";
 import { endRun, type RunEndState } from "./run-end";
 import { researchFailed } from "./research-failure-reply";
+import type { FirstRound } from "./initial-decision";
+import { executionSourceInTransaction } from "./execution-source";
+import { executionStatusText, validExecutionNotice } from "./execution-notices";
 
 export type GenerationResult = {
 	text: string;
@@ -28,6 +31,7 @@ export type GenerationResult = {
 	hostAnswer?: true;
 	selection?: SelectionDraft;
 	recallPins?: Array<{ messageId: string; digest: string }>;
+	taskDecision?: Extract<FirstRound, { next: "execute_task" | "task_control" }>;
 };
 export type GenerationHandler = HandlerDefinition<
 	GeneratePayload,
@@ -44,13 +48,25 @@ export function createGenerationSettlement(
 		const run = byId(tx, claim.payload.runId);
 		if (!run) return "stale";
 		if (outcome.type === "success") {
-			const answerText = outcome.result.text;
+			let answerText = outcome.result.text;
 			if (
 				!input ||
 				run.status !== "running" ||
 				run.revision !== input.revision
 			) {
 				return "stale";
+			}
+			if (
+				input.executionNotice &&
+				!validExecutionNotice(
+					deps,
+					tx,
+					run.conversationId,
+					input.executionNotice,
+				)
+			) {
+				endRun(deps, tx, run, "cancelled", "execution_notice_stale");
+				return "applied";
 			}
 			if (!validAttachmentContext(deps, tx, input, run.conversationId)) {
 				endRun(deps, tx, run, "failed", "attachment_source_unavailable");
@@ -152,6 +168,35 @@ export function createGenerationSettlement(
 			}
 			if (input.agent && agents)
 				agents.completeAnswerInTransaction(tx, input.agent);
+			if (outcome.result.taskDecision) {
+				if (!agents || !input.routing?.tasks)
+					throw new Error("execution_unavailable");
+				const decision = outcome.result.taskDecision;
+				if (decision.next === "execute_task") {
+					const source = executionSourceInTransaction(deps, tx, run.id);
+					if (
+						!source ||
+						input.routing.tasks.card?.revisionId !== decision.card.revisionId
+					)
+						throw new Error("execution_source_invalid");
+					agents.executions.startInTransaction(tx, {
+						source,
+						request: decision.request,
+						references: input.routing.tasks.references.filter((r) =>
+							decision.contextRefs.includes(r.ref),
+						),
+					});
+				} else {
+					const view = agents.executions.controlInTransaction(
+						tx,
+						run.conversationId,
+						decision.control,
+						run.inputMessageId,
+					);
+					if (decision.control.action === "status" || view.result)
+						answerText = executionStatusText(view);
+				}
+			}
 			const messageId = id();
 			conversation.appendInTransaction(tx, {
 				id: messageId,
@@ -173,6 +218,15 @@ export function createGenerationSettlement(
 				);
 			const done = endRun(deps, tx, run, "completed", null, messageId);
 			if (done) {
+				if (outcome.result.taskDecision?.next === "execute_task")
+					retainAdopted(
+						deps,
+						tx,
+						run,
+						input,
+						selectionId,
+						outcome.result.taskDecision.card.revisionId,
+					);
 				traceOutcome(deps, tx, run.id, agentOutcome(input.agent));
 				if (outcome.result.hostAnswer)
 					retainAdopted(

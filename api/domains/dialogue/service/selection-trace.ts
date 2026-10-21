@@ -136,7 +136,13 @@ export function retainedCandidates(
 	const offer = deps.store.read((db) => retainedOffer(deps, db, input));
 	return {
 		started: Date.now(),
-		route: { cards: offer.cards, past: [], retrieval: "none" },
+		route: {
+			cards: offer.cards.filter(
+				(c) => c.revisionId !== input.routing?.tasks?.card?.revisionId,
+			),
+			past: [],
+			retrieval: "none",
+		},
 		query: undefined,
 		allowDiscovery: true,
 		notes: offer.notes,
@@ -162,7 +168,9 @@ export async function findCandidates(
 			runId: input.runId,
 			text: searchText,
 			query,
-			available: new Set(routing.available),
+			available: new Set(
+				routing.available.filter((id) => id !== routing.tasks?.card?.id),
+			),
 			excludeRevisionIds: excluded,
 			strict: true,
 		}),

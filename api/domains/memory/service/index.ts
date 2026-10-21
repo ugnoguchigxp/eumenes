@@ -65,6 +65,7 @@ import { dropVectorsOnRetract } from "./retract-vectors";
 import { createMemoryViews } from "./views";
 import { validityOf } from "./validity";
 import pkg from "eumenes-memory/package.json";
+import { executionReferences } from "./execution-references";
 
 const PACKAGE_VERSION = pkg.version;
 const sha = (text: string) => sha256Hex(text);
@@ -252,9 +253,12 @@ export function createMemoryService(
 	};
 	const curation = createCuration(curationDeps);
 	const seedImport = createSeedImport(curationDeps);
-	const purgeHooks: Array<(db: Database, purge: ForgetPurge) => void> = [
-		purgeSeedSources,
-	];
+	const executionRefs = executionReferences({
+		access,
+		ready: (db) => healthy && readSettings(db).enabled,
+		now: atMs,
+	});
+	const purgeHooks = referencePurgeHooks(executionRefs);
 	const blockJournalPath = blockJournalPathOf(options.journalPath);
 	const forgetter = createForget({
 		journalPath: options.journalPath,
@@ -488,6 +492,8 @@ export function createMemoryService(
 			stateItems(db, includeInactive, "memory.steward"),
 		/** A State item as the screen shows it. */
 		itemDtoInTransaction: toDto,
+		executionReferencesInTransaction: executionRefs.issueInTransaction,
+		executionReferenceInTransaction: executionRefs.readInTransaction,
 		/**
 		 * The steward's save (section 3.1), element by element: host-built evidence, normalized keys, replaces,
 		 * origin. Each result says applied or rejected with a reason. Throws `memory_unavailable` while memory is not usable.
@@ -675,3 +681,12 @@ export function createMemoryService(
 	};
 }
 export type MemoryService = ReturnType<typeof createMemoryService>;
+
+function referencePurgeHooks(
+	refs: ReturnType<typeof executionReferences>,
+): Array<(db: Database, purge: ForgetPurge) => void> {
+	return [
+		purgeSeedSources,
+		(db, purge) => refs.purgeInTransaction(db, purge.itemIds),
+	];
+}

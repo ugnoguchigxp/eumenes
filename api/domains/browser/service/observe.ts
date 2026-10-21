@@ -1,9 +1,9 @@
 import { getLogger } from "../../../infrastructure/logger";
 import type { Observation } from "../contracts";
 import { BrowserDriverError } from "../contracts/ports";
-import { insertObservation, patchTab, tabRow } from "../repository";
+import { insertObservation, patchTab, tabRow, taskRow } from "../repository";
 import type { Ctx } from "./context";
-import { boundSnapshot } from "./observation";
+import { boundSnapshot, compactSnapshot } from "./observation";
 import { begin, guard } from "./operation-checks";
 import { urlVerdict } from "./policy";
 import { keepLease, markBlocked, releaseLease, selectMatched } from "./tabs";
@@ -31,7 +31,12 @@ export function createObserve(ctx: Ctx) {
 				true,
 				opId,
 			);
-			return { ...b, tab: b.tab!, holder: b.holder! };
+			return {
+				...b,
+				tab: b.tab!,
+				holder: b.holder!,
+				collection: !!b.task && taskRow(db, b.task.id)?.origin === "child",
+			};
 		});
 		const controller = new AbortController();
 		const link = signal
@@ -55,7 +60,9 @@ export function createObserve(ctx: Ctx) {
 					await ctx.store.write((db) => markBlocked(ctx, db, p.tab.tab_ref));
 					throw new Error(verdict.code);
 				}
-				const bounded = boundSnapshot(snapshot.snapshot);
+				const bounded = boundSnapshot(
+					p.collection ? compactSnapshot(snapshot.snapshot) : snapshot.snapshot,
+				);
 				const ref = crypto.randomUUID();
 				return ctx.store.write((db) => {
 					guard(ctx, db, {
@@ -84,7 +91,7 @@ export function createObserve(ctx: Ctx) {
 						},
 						ctx.now(),
 					);
-					return {
+					const observation: Observation = {
 						observationRef: ref,
 						tabRef: t.tab_ref,
 						generation: t.generation,
@@ -95,6 +102,9 @@ export function createObserve(ctx: Ctx) {
 						reasons: bounded.reasons,
 						refCount: bounded.refs.length,
 					};
+					return p.task && p.collection
+						? ctx.research.observe(p.task.id, observation)
+						: observation;
 				});
 			}, link);
 		} finally {

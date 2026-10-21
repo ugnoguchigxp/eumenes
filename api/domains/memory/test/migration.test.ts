@@ -12,6 +12,7 @@ import {
 	createMemoryService,
 	migrations as hostMemoryMigrations,
 	seedImportMigration,
+	executionReferencesMigration,
 	specialistBlockReasonMigration,
 	stewardLedgersMigration,
 } from "..";
@@ -36,6 +37,7 @@ test("adding the Seed migration preserves existing memory, conversation and conn
 		path,
 		all.filter(
 			(m) =>
+				m.sql !== executionReferencesMigration &&
 				m.sql !== seedImportMigration &&
 				m.sql !== specialistBlockReasonMigration,
 		),

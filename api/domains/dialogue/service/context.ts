@@ -56,6 +56,8 @@ export type ChatMessage = {
 	images?: import("../../inference").ChatImage[];
 };
 export interface GenerateInput {
+	executionNotice?: import("./execution-notices").ExecutionNoticeBinding;
+	executionNoticeReply?: string;
 	/** Conversational prose is a short spoken reply; artifact bodies keep their own contract. */
 	briefReply?: boolean;
 	currentRequest: CurrentRequest;
@@ -69,6 +71,7 @@ export interface GenerateInput {
 		offeredRevisionIds?: string[];
 		retained?: import("./retained-toolchains").PreparedToolchains;
 		analysis: import("./request-analysis").AnalysisInput;
+		tasks?: import("./initial-decision").TaskOffer;
 		/** Toolchains whose runtime is available on this host now. */
 		available: string[];
 		conversationId: string;

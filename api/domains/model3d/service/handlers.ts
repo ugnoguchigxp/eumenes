@@ -486,6 +486,11 @@ function registerCancel(deps: Deps) {
 				deps.enqueue(db, r.id, "cancel", outcome.result.waitMs);
 				return "applied";
 			}
+			if (
+				outcome.type === "success" ||
+				("errorCode" in outcome && outcome.errorCode === "model3d_not_found")
+			)
+				patchGeneration(db, r.id, { error_code: null });
 			// A job LARM no longer knows is as good as cancelled.
 			if (
 				outcome.type !== "success" &&

@@ -1,0 +1,11 @@
+$ bun scripts/verify.ts --domain browser --domain capabilities --domain tool-runtime --domain agent-runtime --domain web-research --domain dialogue --domain queue
+[verify] selected=browser,capabilities,tool-runtime,agent-runtime,web-research,dialogue,queue dependencyClosure=queue,browser,capabilities,tool-runtime,delivery,attitude-dataset,larm,settings,inference,agent-runtime,web-research,conversation,continuity,memory,scheduler,toolchain-history,dialogue,avatar
+[verify] Shared DesignSystem dist: do not overlap dev, browser tests or other builds; endpoint hashes cannot detect change-and-restore.
+[verify] inventory
+[verify] boundaries
+[verify] fail: 701 ms; /Users/y.noguchi/Code/eumenes/verification-reports/runs/2026-10-21T01-43-32-840Z-b8abedda-d7bf-4287-90b8-bf84b76dabac/report.json
+Error: api/domains/dialogue/service/command-source.ts: forbidden dependency dialogue -> tool-runtime
+api/domains/dialogue/service/execution-command.ts: forbidden dependency dialogue -> tool-runtime
+api/domains/dialogue/service/execution-source.ts: forbidden dependency dialogue -> tool-runtime
+api/domains/dialogue/service/initial-decision.ts: forbidden dependency dialogue -> tool-runtime
+error: script "verify" exited with code 1

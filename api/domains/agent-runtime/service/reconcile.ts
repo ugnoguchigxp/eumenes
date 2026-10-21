@@ -1,7 +1,7 @@
 import { isTransientStoreError } from "../../../infrastructure/error-code";
 import type { LogFields } from "../../../infrastructure/logger";
 import type { Task } from "../contracts";
-import { get, byRoot } from "../repository";
+import { get, taskRoot } from "../repository";
 import { codeOf } from "./control-output";
 import {
 	active,
@@ -84,9 +84,7 @@ export function createReconcile(
 				])) {
 					try {
 						const task = store.read((db) => get(db, taskId));
-						const root = task
-							? store.read((db) => byRoot(db, task.root_run_id))
-							: null;
+						const root = task ? store.read((db) => taskRoot(db, task)) : null;
 						if (!task || !root || terminal.has(root.state)) {
 							tools.release(taskId);
 							capabilities.releaseOwner(taskId);
@@ -213,6 +211,7 @@ export function createReconcile(
 									t.root_run_id,
 									"deadline_exceeded",
 									"failed",
+									t.id,
 								);
 							} else {
 								for (const id of tools.cancelInTransaction(db, t.id))

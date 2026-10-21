@@ -1,6 +1,6 @@
 import type { Database } from "bun:sqlite";
 import type { Task } from "../contracts";
-import { get, update } from "../repository";
+import { get, update, hasExecutionScope } from "../repository";
 import { stepDeadline } from "./exploration";
 import { safeCode } from "./control-output";
 import {
@@ -74,7 +74,7 @@ export function createTaskOps(ctx: RuntimeContext) {
 			resourceKey: "inference.llm",
 			concurrencyKey: `agent:${t.id}`,
 			maxAttempts: 1,
-			deadlineAtMs: stepDeadline(t, now()),
+			deadlineAtMs: stepDeadline(t, now(), ctx.state.prepared.get(t.id)),
 		});
 		db.query(
 			"INSERT INTO agent_steps(id,task_id,ordinal,state,job_id) VALUES(?,?,?,'queued',?)",
@@ -95,8 +95,13 @@ export function createTaskOps(ctx: RuntimeContext) {
 		parentTaskId: string | null = null,
 	) {
 		const id = crypto.randomUUID();
+		const execution = (
+			input as { execution?: { id: string; dispatchId?: string } }
+		).execution;
+		const scoped = hasExecutionScope(db);
+		if (execution && !scoped) throw new Error("execution_schema_unavailable");
 		db.query(
-			"INSERT INTO agent_tasks(id,kind,root_run_id,parent_task_id,input_json,state,phase,deadline,created_at,updated_at) VALUES(?,?,?,?,?,'queued',?,?,?,?)",
+			`INSERT INTO agent_tasks(id,kind,root_run_id,parent_task_id,input_json,state,phase,deadline,created_at,updated_at${scoped ? ",execution_call_id" : ""}) VALUES(?,?,?,?,?,'queued',?,?,?,?${scoped ? ",?" : ""})`,
 		).run(
 			id,
 			kind,
@@ -107,6 +112,9 @@ export function createTaskOps(ctx: RuntimeContext) {
 			deadline,
 			now(),
 			now(),
+			...(scoped
+				? [execution ? (execution.dispatchId ?? execution.id) : null]
+				: []),
 		);
 		return get(db, id)!;
 	}
@@ -175,12 +183,17 @@ export function createTaskOps(ctx: RuntimeContext) {
 		rootRunId: string,
 		reason = "cancel_requested",
 		state = "cancelled",
+		rootTaskId?: string,
 	) {
 		const jobs = new Set<string>();
 		const requests = new Set<string>();
 		const rows = db
-			.query("SELECT * FROM agent_tasks WHERE root_run_id=? ORDER BY kind")
-			.all(rootRunId) as Task[];
+			.query(
+				rootTaskId
+					? "SELECT * FROM agent_tasks WHERE id=? OR parent_task_id=? ORDER BY kind"
+					: "SELECT * FROM agent_tasks WHERE root_run_id=? ORDER BY kind",
+			)
+			.all(...(rootTaskId ? [rootTaskId, rootTaskId] : [rootRunId])) as Task[];
 		for (const t of rows) {
 			traceIds.add(t.id);
 			// Mark the task before queue callbacks, which may re-enter cancellation.
@@ -202,10 +215,13 @@ export function createTaskOps(ctx: RuntimeContext) {
 			for (const job of tools.cancelInTransaction(db, t.id)) jobs.add(job);
 			releases.add(t.id);
 		}
-		db.query(
-			"UPDATE agent_events SET state='cancelled' WHERE root_run_id=? AND state!='consumed'",
-		).run(rootRunId);
-		const answerId = inference.requestFor?.(db, rootRunId, "llm");
+		for (const t of rows)
+			db.query(
+				"UPDATE agent_events SET state='cancelled' WHERE task_id=? AND state!='consumed'",
+			).run(t.id);
+		const answerId = rootTaskId
+			? undefined
+			: inference.requestFor?.(db, rootRunId, "llm");
 		if (answerId) requests.add(answerId);
 		// Only this tree may be mutated. Deferred effects can contain identifiers
 		// from rolled-back transactions; those are rechecked against committed state.

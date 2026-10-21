@@ -28,13 +28,25 @@ export const reportSchema = z
 		limitations: z.array(z.string().max(300)).max(8),
 	})
 	.strict();
+export const candidateResultSchema = z.object({
+	reference: z.string(),
+	sourceId: z.string(),
+	url: z.string().url(),
+	title: z.string(),
+	fetchedAt: z.string(),
+	provider: z.string().optional(),
+	contentStatus: z.literal("unverified"),
+});
+export type CandidateResult = z.infer<typeof candidateResultSchema>;
 type ReportBase = z.infer<typeof reportSchema> & {
 	sources: SourceMetadata[];
+	candidateResults?: CandidateResult[];
 	coverage: "complete" | "partial";
 	verification: "evidence_linked";
 	exploration?: string[];
 };
 type ReportOutcome =
+	| "candidates_found"
 	| "answered"
 	| "partial"
 	| "not_found"
@@ -93,11 +105,13 @@ export const reportV2Schema = z
 		version: z.literal(2),
 		outcome: z.enum([
 			"answered",
+			"candidates_found",
 			"partial",
 			"not_found",
 			"clarification_required",
 			"failed",
 		]),
+		candidateResults: z.array(candidateResultSchema).max(5).optional(),
 		summary: z.string().min(1).max(2000),
 		claims: z
 			.array(
@@ -114,9 +128,11 @@ export const reportV2Schema = z
 	})
 	.strict()
 	.refine((v) =>
-		["answered", "partial"].includes(v.outcome)
-			? v.claims.length > 0
-			: v.claims.length === 0,
+		v.outcome === "candidates_found"
+			? !!v.candidateResults?.length && v.claims.length === 0
+			: ["answered", "partial"].includes(v.outcome)
+				? v.claims.length > 0
+				: v.claims.length === 0,
 	);
 export type Task = {
 	id: string;

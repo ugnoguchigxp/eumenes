@@ -26,6 +26,7 @@ import {
 	forgetClosureMigration,
 	seedImportMigration,
 	specialistBlockReasonMigration,
+	executionReferencesMigration,
 	contextWindowMigration,
 	createMemoryService,
 	migration,
@@ -56,6 +57,7 @@ export const memoryTestMigrations = [
 	forgetClosureMigration,
 	seedImportMigration,
 	specialistBlockReasonMigration,
+	executionReferencesMigration,
 	...memoryPackageMigrations,
 ];
 

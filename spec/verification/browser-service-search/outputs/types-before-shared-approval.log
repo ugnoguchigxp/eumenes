@@ -1,0 +1,8 @@
+api/application/work/terminals-adapter.ts(98,58): error TS2551: Property 'cancelQueuedInTransaction' does not exist on type 'Pick<{ startGuarded(request: { title?: string | undefined; } & TerminalSize): Promise<TerminalSessionView>; restartGuarded(id: string, size: TerminalSize): Promise<...>; ... 25 more ...; closeAll(): void; }, "available" | ... 2 more ... | "requestInTransaction">'. Did you mean 'enqueueInTransaction'?
+api/application/work/terminals-adapter.ts(99,48): error TS2339: Property 'stop' does not exist on type 'Pick<{ startGuarded(request: { title?: string | undefined; } & TerminalSize): Promise<TerminalSessionView>; restartGuarded(id: string, size: TerminalSize): Promise<...>; ... 25 more ...; closeAll(): void; }, "available" | ... 2 more ... | "requestInTransaction">'.
+api/domains/dialogue/service/generation-prepare.ts(233,31): error TS2322: Type 'TaskOffer' is not assignable to type '{ card: ToolchainCard | undefined; works: ExecutionView[]; references: { ref: string; owner: string; id: string; revision: string; digest: string; label: string; kind: "artifact" | ... 3 more ... | "world"; preview: string; }[]; }'.
+  Property 'card' is optional in type 'TaskOffer' but required in type '{ card: ToolchainCard | undefined; works: ExecutionView[]; references: { ref: string; owner: string; id: string; revision: string; digest: string; label: string; kind: "artifact" | ... 3 more ... | "world"; preview: string; }[]; }'.
+Found 3 errors in 2 files, checked 2,265 files [761.92ms]
+
+  2  api/application/work/terminals-adapter.ts:98
+  1  api/domains/dialogue/service/generation-prepare.ts:233

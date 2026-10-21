@@ -3,6 +3,7 @@ import {
 	taskDtoSchema,
 	reportSchema,
 	reportRequirements,
+	candidateResultSchema,
 } from "../api/domains/agent-runtime/contracts";
 import { publicUrl } from "../api/domains/capabilities/contracts";
 import type { Transport } from "./transport";
@@ -46,11 +47,13 @@ const canonicalBase = z.object({
 	version: z.literal(2),
 	outcome: z.enum([
 		"answered",
+		"candidates_found",
 		"partial",
 		"not_found",
 		"clarification_required",
 		"failed",
 	]),
+	candidateResults: z.array(candidateResultSchema).max(5).optional(),
 	summary: z.string(),
 	claims: z.array(
 		z.object({
@@ -70,10 +73,16 @@ const canonicalBase = z.object({
 	verification: z.literal("evidence_linked"),
 	sources: z.array(sourceV2),
 });
-const consistent = (v: { outcome: string; claims: unknown[] }) =>
-	["answered", "partial"].includes(v.outcome)
-		? v.claims.length > 0
-		: v.claims.length === 0;
+const consistent = (v: {
+	outcome: string;
+	claims: unknown[];
+	candidateResults?: unknown[];
+}) =>
+	v.outcome === "candidates_found"
+		? !!v.candidateResults?.length && !v.claims.length
+		: ["answered", "partial"].includes(v.outcome)
+			? v.claims.length > 0
+			: v.claims.length === 0;
 const canonicalV2 = canonicalBase.refine(consistent);
 const canonicalV3 = canonicalBase
 	.extend({ version: z.literal(3), requirements: reportRequirements })

@@ -8,6 +8,7 @@ import type { ImageRecord } from "../contracts";
 import { row, byRun, record, patch, list, activity } from "../repository";
 import { registerImageHandlers } from "./handlers";
 import { createImageUpload } from "./imports";
+import type { ChildExecution } from "../../tool-runtime";
 /** Read-only source for the registered image screen; the image domain owns this query. */
 export const imageListInTransaction = (db: Database, conversationId: string) =>
 	list(db, conversationId);
@@ -21,6 +22,10 @@ export function createImage(deps: {
 	gateway: () => LarmPlayground;
 	onJob: (db: Database, runId: string, jobId: string) => void;
 	onFinished: (db: Database, runId: string) => void;
+	validateExecutionInTransaction?: (
+		db: Database,
+		child: ChildExecution,
+	) => boolean;
 }) {
 	const { store, queue, capabilities } = deps;
 	function enqueue(
@@ -45,14 +50,15 @@ export function createImage(deps: {
 			job.id,
 			id,
 		);
-		deps.onJob(db, runId, job.id);
+		if (!JSON.parse(row(db, id)!.request_json).execution)
+			deps.onJob(db, runId, job.id);
 		return job.id;
 	}
 	function fail(db: Database, id: string, code: string) {
 		const r = row(db, id);
 		if (!r || !active(record(r))) return;
 		patch(db, id, { state: "failed", errorCode: code, phase: "failed" });
-		deps.onFinished(db, r.run_id);
+		if (!JSON.parse(r.request_json).execution) deps.onFinished(db, r.run_id);
 	}
 	function cancel(db: Database, job: { payload: { id: string } }) {
 		const r = row(db, job.payload.id);
@@ -87,12 +93,20 @@ export function createImage(deps: {
 				question: string;
 				originalRequest: string;
 				deadline: number;
+				execution?: ChildExecution;
 			},
 		) {
-			const existing = byRun(db, input.runId);
+			const existing = input.execution
+				? row(db, input.execution.id)
+				: byRun(db, input.runId);
 			if (existing) return { id: existing.id, jobId: existing.queue_job_id! };
 			const request = imageRequest.parse({ question: input.question });
-			const id = crypto.randomUUID();
+			if (
+				input.execution &&
+				!deps.validateExecutionInTransaction?.(db, input.execution)
+			)
+				throw new Error("execution_changed");
+			const id = input.execution?.id ?? crypto.randomUUID();
 			const prepared = capabilities.prepareActiveByIdInTransaction(
 				db,
 				{ rootRunId: input.runId, taskId: id, cancelEpoch: 0 },
@@ -128,7 +142,13 @@ export function createImage(deps: {
 				input.runId,
 				input.conversationId,
 				JSON.stringify(view),
-				JSON.stringify({ ...request, originalRequest: input.originalRequest }),
+				JSON.stringify({
+					...request,
+					originalRequest: input.originalRequest,
+					...(input.execution
+						? { execution: input.execution, references: input.execution.refs }
+						: {}),
+				}),
 				JSON.stringify(prepared),
 				input.deadline,
 			);
@@ -140,6 +160,22 @@ export function createImage(deps: {
 		resultInTransaction(db: Database, runId: string) {
 			const r = byRun(db, runId);
 			return r ? record(r) : null;
+		},
+		purgeCallInTransaction(db: Database, id: string) {
+			db.query(
+				"UPDATE image_generations SET request_json=json_object('execution',json_object('id',id,'erased',1)) WHERE id=? AND json_extract(request_json,'$.execution') IS NOT NULL",
+			).run(id);
+		},
+		resultForCallInTransaction(db: Database, id: string) {
+			const r = row(db, id);
+			return r ? record(r) : null;
+		},
+		cancelCallInTransaction(db: Database, id: string) {
+			const r = row(db, id);
+			if (r?.queue_job_id && active(record(r))) {
+				cancel(db, { payload: { id } });
+				queue.cancelInTransaction(db, r.queue_job_id, "execution_cancelled");
+			}
 		},
 		get: (id: string) =>
 			store.read((db) => {

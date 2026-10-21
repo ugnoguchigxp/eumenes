@@ -108,6 +108,8 @@ export function finishTask(
 	db.query(
 		"UPDATE browser_operations SET state='failed', error_code='task_ended', updated_at=? WHERE task_id=? AND state='prepared'",
 	).run(now, id);
+	// Accepted observations already passed review; a bounded failure can return them as partial.
+	ctx.research.clear(id, state === "cancelled" || state === "indeterminate");
 	const message = taskMessage(row, state, text);
 	if (message && row.origin === "conversation" && !row.announced) {
 		patchTask(db, id, { announced: 1 }, now);

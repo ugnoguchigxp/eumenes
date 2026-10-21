@@ -8,8 +8,8 @@ archive の基準: その文書が担当した実装がコードにあり、本�
 
 | 文書 | 状態 |
 | --- | --- |
-| [browser-service-search-design-2026-10-21.md](browser-service-search-design-2026-10-21.md) | 設計案・実装前。Web担当が既存ブラウザ担当を使い、指定サイトの検索機能をLLMの観測判断で操作する。YouTube・X・Instagram・各種Wikiは受入例で固定対応リストにしない。観測の根拠採取、非同期完了、原文・承認・取消・予算の接続を定義。公式API・サイト専用分岐は対象外 |
-| [everyday-task-agent-implementation-plan-2026-10-21.md](everyday-task-agent-implementation-plan-2026-10-21.md) | 文書レビュー反映済みの計画案・実装未着手。task実行型、会話からの委譲/作業操作、必要時の能力探索、既存実行型との接続、原文とMemory等の参照、非同期完了・質問・訂正・取消、親子の予算、P0〜P6の検証・公開条件を定義。Pursuit/Harness2の取込は対象外 |
+| [browser-service-search-design-2026-10-21.md](browser-service-search-design-2026-10-21.md) | 自己評価を反映した設計案・実装前。共通子実行を再利用し、指定サイトの検索不能時は既存外部検索で補完。候補refと本文根拠の別契約、部分採取、330秒worker内の補完150秒予約、既存入口での早期観測→最小結合→複数サイト受入を定義 |
+| [everyday-task-agent-implementation-plan-2026-10-21.md](everyday-task-agent-implementation-plan-2026-10-21.md) | 実装・固定検証済み、実モデル受入未達で無効を維持。合意済みの進行契約改訂を含む。task実行型、会話からの委譲/作業操作、必要時の能力探索、既存実行型との接続、原文とMemory等の参照、非同期完了・質問・訂正・取消、親子の予算、P0〜P6の検証・公開条件を定義。Pursuit/Harness2の取込は対象外 |
 | [conversation-toolchain-context-retention-design-2026-10-21.md](conversation-toolchain-context-retention-design-2026-10-21.md) | 合意済み・実装・fixture/live検証済み。使用済み最大4件・4,096推定トークンを保持し、継続時の探索を省く。新規探索1回・上位4件で打切り、忘却・版変更・容量・リセットに対応。稼働backendの再起動と実機受入は未実施 |
 | [compute-toolchain-design-2026-10-20.md](compute-toolchain-design-2026-10-20.md) | 案・合意待ち（§12 Q1〜Q9）。即時計算 `calculate`（mathjs、instant）と、LARM 計算サービス（capability `compute.python.execute`、SciPy・scikit-learn・PyTorch 等）でジョブ実行する計算担当 `compute_python`（command）の2段。LARM 側 API は依頼仕様の案（§4）で未構築 |
 | [browser-tabs-toolchain-design-2026-10-18.md](browser-tabs-toolchain-design-2026-10-18.md) | 合意済み・S0〜S2実装中。利用者の普段のBraveをPlaywright MCP Bridge拡張機能とbackendの子プロセス`@playwright/mcp`で操作・撮影する（Eumenes自身のタブ、Eumenesが開いたタブ・リンクから開いたタブを含む）。品質75固定WebP、各辺2,500px超過の拒否。S1接続とローカル撮影、S2操作ループ、S3 LARM送信（保留）。実機でBraveへの接続・スナップショット・撮影・タブの捕捉を確認済み。専用Chromium案（archive）を置換え |

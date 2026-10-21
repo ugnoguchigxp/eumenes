@@ -49,6 +49,7 @@ export const runSchema = z.object({
 	error: z.string().nullable(),
 	jobId: z.string().nullable(),
 	deadlineAt: z.string().nullable(),
+	deadlineFixed: z.boolean().optional(),
 	sourceKind: z.enum(["manual", "voice", "schedule", "notice"]),
 	scheduleId: z.string().nullable(),
 	occurrenceId: z.string().nullable(),

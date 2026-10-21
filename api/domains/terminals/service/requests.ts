@@ -48,7 +48,7 @@ export const enqueueRequestSchema = z
 				message: "terminal_prompt_invalid",
 			}),
 		task: z.string().min(1).max(40),
-		origin: z.enum(["board", "conversation"]),
+		origin: z.enum(["board", "conversation", "execution"]),
 		conversationId: z.string().min(1).max(200).optional(),
 		exclusiveGroup: z.literal("kanban").optional(),
 	})

@@ -1,0 +1,18 @@
+bun test v1.4.3 (c6da4a4d3)
+
+api/infrastructure/validation-log.test.ts:
+(pass) validation diagnostics expose paths, types and bounds, but never values, unknown keys or Zod messages [1.73ms]
+(pass) many invalid entries keep the first eight field locations, including array indices [0.36ms]
+
+api/application/toolchain/service-search.test.ts:
+(pass) conversation → browser child → native candidates → saved answer [528.61ms]
+(pass) conversation → browser child → external fallback → saved answer [465.96ms]
+
+api/domains/agent-runtime/test/guided-candidates.test.ts:
+(pass) only displayed live candidates may be returned or resolved into reads [0.73ms]
+(pass) candidate references never stand in for body facts [0.61ms]
+
+ 6 pass
+ 0 fail
+ 42 expect() calls
+Ran 6 tests across 3 files. [1.76s]

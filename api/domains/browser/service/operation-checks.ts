@@ -44,6 +44,7 @@ export function begin(
 ) {
 	const conn = connectedConnection(ctx, db);
 	const task = taskFor(db, owner, taskId);
+	if (task) assertChild(ctx, db, task.id);
 	if (!needsTab)
 		return {
 			conn,
@@ -77,6 +78,7 @@ export function guard(
 	if (connectedConnection(ctx, db).id !== p.connectionId)
 		throw new Error("browser_disconnected");
 	if (p.task) {
+		assertChild(ctx, db, p.task.id);
 		const t = taskRow(db, p.task.id);
 		if (!t || t.state !== "running" || t.epoch !== p.task.epoch)
 			throw new Error("task_not_active");
@@ -86,4 +88,13 @@ export function guard(
 		if (!leaseHeld(ctx, db, t.tab_ref, p.holder, p.epoch))
 			throw new Error("lease_lost");
 	}
+}
+
+function assertChild(ctx: Ctx, db: Database, id: string) {
+	const row = taskRow(db, id);
+	if (
+		row?.origin === "child" &&
+		!ctx.childValid?.(db, JSON.parse(row.frozen_json ?? "{}").caller)
+	)
+		throw new Error("child_authority_revoked");
 }

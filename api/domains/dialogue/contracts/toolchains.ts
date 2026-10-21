@@ -219,6 +219,7 @@ export interface BoundCommandPort {
 		inputSchemaRef: string,
 	): Array<{ ref: string; label: string }>;
 	/** Validate an interaction answer against a registered question schema. */
+	answerSchema?(inputSchemaRef: string): Record<string, unknown> | null;
 	parseAnswer(
 		inputSchemaRef: string,
 		input: unknown,

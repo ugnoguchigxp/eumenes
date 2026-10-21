@@ -145,7 +145,14 @@ export function validateToolchain(
 	if (
 		!d.functionName ||
 		!toolchainFunctionPattern.test(d.functionName) ||
-		d.functionName === "find_toolchain" ||
+		[
+			"find_toolchain",
+			"task_control",
+			"read_reference",
+			"ask_user",
+			"complete_task",
+			"report_partial",
+		].includes(d.functionName) ||
 		!d.packageRevisionId ||
 		d.dependencies.length !== 1 ||
 		d.dependencies[0] !== d.packageRevisionId ||
@@ -166,6 +173,13 @@ export function validateToolchain(
 		if (tool.schemaKey && !flatObjectSchema(zSchema(tool.schemaKey)))
 			throw new Error("invalid_toolchain_tool_schema");
 	validateBinding(db, d, dependencies);
+	if (
+		(d.functionName === "execute_task") !==
+		(d.bindingRevisionId !== undefined &&
+			bindingInTransaction(db, d.bindingRevisionId)?.document.execution ===
+				"task")
+	)
+		throw new Error("toolchain_function_conflict");
 	const taken = db
 		.query(
 			"SELECT i.id FROM capability_items i JOIN capability_revisions r ON r.id=i.active_revision_id WHERE i.kind='toolchain' AND i.id<>? AND json_extract(r.definition_json,'$.functionName')=?",
@@ -212,6 +226,7 @@ function validateBinding(
 	// A package without tools is only for a session agent working on a work document (spec §10).
 	if (
 		!pack.toolRevisionIds?.length &&
+		binding.document.execution !== "task" &&
 		!(
 			binding.document.execution === "session" &&
 			binding.document.agent?.workspace
@@ -219,7 +234,10 @@ function validateBinding(
 	)
 		throw new Error("invalid_toolchain");
 	// An instant binding has no screen; every other binding is presented by exactly one artifact.
-	if (binding.document.execution === "instant") {
+	if (
+		binding.document.execution === "instant" ||
+		binding.document.execution === "task"
+	) {
 		if (d.artifactRevisionId !== undefined)
 			throw new Error("invalid_toolchain");
 	} else if (

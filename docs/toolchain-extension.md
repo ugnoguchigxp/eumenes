@@ -1,6 +1,6 @@
 # ツールチェーンの登録と拡張
 
-更新日: 2026年10月14日。ツールチェーンはデータドリブン形式（bundle＋登録adapter）で追加する。設計は[タイマー設計書](../spec/.archived/timer-data-driven-ui-acceptance-design-2026-10-13.md)、実装契約は[実装契約](../spec/.archived/timer-data-driven-implementation-contracts-2026-10-13.md)。
+更新日: 2026年10月21日。ツールチェーンはデータドリブン形式（bundle＋登録adapter）で追加する。設計は[タイマー設計書](../spec/.archived/timer-data-driven-ui-acceptance-design-2026-10-13.md)、実装契約は[実装契約](../spec/.archived/timer-data-driven-implementation-contracts-2026-10-13.md)。
 
 移行状況: `timers.manage`（「タイマー」）が移行済み。楽曲生成**画面**は `music-screen.bundle.json` の単独公開artifactと登録adapterへ移し、ジャンル・雰囲気・楽器・テンポ・長さ・歌声の選択肢と初期値も画面定義へ登録した。生成・取消は既存の認証済み会話APIを使い、会話の `music.create` / `music.library` と音楽プレイリスト画面は旧形式のまま。物体認識**画面**も `object-recognition-screen.bundle.json` の単独公開artifactと登録adapterへ移し、会話の `object-recognition.manage` は旧形式のまま。Web検索・会話履歴・画像・Excalidraw・dotsも未移行。Claude Code（`claude-code.request`、画面 `terminals.workspace@2`）は新規にデータドリブン形式で追加した（[Claude Code 画面](terminals.md)）。旧形式の保守は[付録](#付録-旧形式固定runtime-mapの保守)、ツールチェーン全体の移行は[§6](#6-旧形式のツールチェーンを移行する)。
 
@@ -12,7 +12,7 @@
 | --- | --- | --- |
 | bundle | `api/domains/capabilities/bundles/<名前>.bundle.json`（`CapabilityBundleV1`） | 依存revisionのpin、definitions、bindings、artifacts、schemas。コード・URLは実行しない |
 | definition | bundle の `definitions[]`（既存の `Definition`） | profile・skill（本文はJSON内のUTF-8）・tool・package・toolchain。toolchainは会話に出す関数名・説明・例・依存package一つ |
-| binding | bundle の `bindings[]`（`BindingV1` = `execution:"command"`・`"session"`・`"instant"`） | packageの各toolを登録adapterの操作名と入力schema参照へ結ぶ。sessionは専門担当との継続対話で、adapterに `session`（作業の開始・状態・ターン・終了）の実装が要る。instantは即時回答型で、adapterに `instant`（値の列挙 `choices` と実行 `run`）の実装が要る（[§3.2](#32-即時回答型instantを追加する)） |
+| binding | bundle の `bindings[]`（`BindingV1` = `execution:"command"`・`"session"`・`"instant"`・`"task"`） | packageの各toolを登録adapterの操作名と入力schema参照へ結ぶ。sessionは専門担当との継続対話で、adapterに `session`（作業の開始・状態・ターン・終了）の実装が要る。instantは即時回答型で、adapterに `instant`（値の列挙 `choices` と実行 `run`）の実装が要る（[§3.2](#32-即時回答型instantを追加する)） |
 | artifact | bundle の `artifacts[]`（`ArtifactDefinitionV1`） | OpenUI定義のvariant、source（adapterの登録query）、action（既存event→操作・回答・ローカル） |
 | schema | `builtin:<キー>`（`capabilities/contracts` のvalidators）、`domain:<owner>.<名前>@n`（hostの結果schema）、`schema:<id>@n`（bundle内JSON Schemaの有限subset） | 入力・出力・質問の検査。同じ参照をhost・UI・モデル提示で共有する |
 | DomainAdapter | `api/application/<domain>-adapter.ts` | 操作・query・入力変換・projectionの実装。domainの既存公開transaction操作を呼ぶ |
@@ -23,6 +23,16 @@
 - **会話**: 候補は「有効catalog ∩ host対応adapter ∩ 現在の可用性」。会話担当がtoolchainの関数を選ぶ → command担当がbindingのtoolsだけを見て一操作（invoke）か確認質問（clarify）を返す → agent-runtimeの`action`経路 → tool-runtime → registry → adapter → domain。
 - **UI**: ランチャーは `GET /api/toolchain-artifacts` の一件ずつ。共通host（`web/src/domains/toolchain-artifacts`）が登録artifactを開き、書込みは `POST /api/toolchain-actions` が受付・domain実行・receipt参照を一つのtransactionで保存する。
 - **質問**: clarifyは `command_interactions` に保存され、UI（`POST /api/toolchain-interactions/:id/answers`）または会話の次の発話で回答して同じ凍結revisionで再開する。
+
+### 日常の複数操作を接続するtask型
+
+`task-execution.bundle.json` の `task.execute` は画面・通常toolを持たない担当で、登録adapterの `task` lifecycleに結ぶ。R1の `execute_task` で目的とhost発行の背景refを受け、agent-runtimeが会話runとは独立した親実行を所有する。R2のcommand翻訳を親の開始に追加しない。
+
+親は `find_toolchain` の上位4件からLLMが一つを選び、子の確定結果から次の能力を選ぶ。instantは登録済みの実引数schema、その他は `stepRequest` と `contextRefs` を使う。commandは既存の翻訳・snapshot・adapterを通す。非同期adapterは `execution.currentInTransaction` / `cancelInTransaction` と必要なwriter外の `stop` を実装し、受付を実行完了と扱わない。共通契約に接続できない能力は公開候補から除く。
+
+制御名 `find_toolchain`、`task_control`、`read_reference`、`ask_user`、`complete_task`、`report_partial` は通常のツールチェーン名として登録しない。`execute_task` はtask binding専用で、重複登録は拒否する。session型は公開状態と未保存確認を検査して会話へ引き継ぐ。親から隠れたsessionを開かない。
+
+開始・回答・訂正・取消・期限・再起動・忘却は [日常の複数操作担当](task-execution.md) を参照。数値上限と適合性の意味判断をadapter独自の処理で変更しない。
 
 ### 1.1 Seedと初期化
 

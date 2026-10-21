@@ -143,6 +143,7 @@ export function toolchainDescription(
 ) {
 	return (
 		card.summary +
+		(card.execution ? `。実行形式: ${card.execution}` : "") +
 		(card.instant
 			? "。この呼び出しの引数がそのまま取得の指定になり、担当への依頼文や予告は要りません"
 			: session

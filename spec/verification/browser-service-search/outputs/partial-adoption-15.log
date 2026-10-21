@@ -1,0 +1,25 @@
+bun test v1.4.3 (c6da4a4d3)
+
+api/application/toolchain/service-search-lifecycle.test.ts:
+(pass) delegated prose cannot manufacture a quotation that authorizes browser input [372.14ms]
+(pass) revoked parent cannot adopt a late browser finish or emit a second conversation notice [368.56ms]
+(pass) native work expires while the parent's fallback reserve remains [316.46ms]
+(pass) accepted candidates survive native expiry for partial adoption [329.44ms]
+(pass) accepted candidates are discarded after authority revocation [324.56ms]
+
+api/domains/browser/test/tasks.test.ts:
+(pass) a task needs the step runner, a live connection, a known tab and an allowed URL [30.21ms]
+(pass) each model step is one queue job; the core state is stored as JSON and handed to the next step [20.28ms]
+(pass) the runner acts through the task's api: observe, operate, grants and captures [29.70ms]
+(pass) needs_input and failed endings carry their text and code [26.37ms]
+(pass) a runner that throws ends the task as failed with a safe code [17.51ms]
+(pass) the same request starts one task and a changed one conflicts [15.99ms]
+(pass) cancelling aborts the running step and nothing runs after it [59.74ms]
+(pass) a task past its deadline expires, announces it and refuses further operations [19.70ms]
+(pass) losing the connection fails a task that had nothing in flight [18.79ms]
+(pass) the screen's source reports availability, tabs, tasks and captures with a changing revision [16.99ms]
+
+ 15 pass
+ 0 fail
+ 53 expect() calls
+Ran 15 tests across 2 files. [2.45s]

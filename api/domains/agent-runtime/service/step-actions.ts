@@ -10,7 +10,7 @@ import type { HandlerDefinition } from "../../queue";
 import type { Source } from "../../tool-runtime";
 import type { Task } from "../contracts";
 import { requirementVerification } from "../contracts/requirements";
-import { get, byRoot, update } from "../repository";
+import { get, taskRoot, update } from "../repository";
 import { controlRepairCodes, safeCode } from "./control-output";
 import type { EvidenceCatalog } from "./evidence-catalog";
 import {
@@ -46,6 +46,7 @@ export type StepInput = {
 	search: boolean;
 	guided?: boolean;
 	first: boolean;
+	execution?: import("../../tool-runtime").ChildExecution;
 	taskId: string;
 	stepId: string;
 	revision: number;
@@ -270,7 +271,7 @@ export function createStepActions(ctx: RuntimeContext, ops: TaskOps) {
 		const p = prepared.get(t.id);
 		if (!p) throw new Error("capability_ref_invalid");
 		capabilities.validateInTransaction(db, p);
-		const root = byRoot(db, t.root_run_id);
+		const root = taskRoot(db, t);
 		if (
 			!active(root) ||
 			root.state !== "waiting_child" ||

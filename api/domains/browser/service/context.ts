@@ -48,6 +48,7 @@ export type Serial = ReturnType<typeof createSerial>;
 
 /** What a task step may do, bound to its task: every call is checked against the task's lease, epoch and grants. */
 export type TaskApi = {
+	collect?(input: unknown): Promise<unknown>;
 	progress(phase: TaskPhase): Promise<void>;
 	connection(): import("../contracts").ConnectionView;
 	connect(): Promise<import("../contracts").ConnectionView>;
@@ -87,6 +88,12 @@ export type TaskStepRunner = (
 ) => Promise<TaskStepOutcome>;
 
 export type Ctx = {
+	research: import("./research-collection").ResearchCollection;
+	reviewResearch?: (
+		page: import("./research-collection").CollectedPage,
+		signal: AbortSignal,
+	) => Promise<boolean>;
+	childValid?: (db: Database, caller: unknown) => boolean;
 	store: SqliteStore;
 	queue: QueueService;
 	driver: BrowserDriver;
@@ -101,6 +108,7 @@ export type Ctx = {
 	/** Recent answers of `resolveHost`, by host name (null: it did not resolve). */
 	dnsCache: Map<string, { at: number; addresses: string[] | null }>;
 	runTaskStep?: TaskStepRunner;
+	taskExecutionSource?: (db: Database, frozen: unknown) => string | null;
 	canAutoConnect: () => boolean;
 	credentialRevision: () => number;
 	leaseMs: number;

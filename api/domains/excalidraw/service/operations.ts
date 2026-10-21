@@ -1,3 +1,4 @@
+import { executionCallSession } from "../../tool-runtime";
 import { z } from "zod";
 import type { Database } from "bun:sqlite";
 import { parseLlmJson } from "../../../infrastructure/llm-json";
@@ -16,6 +17,7 @@ import {
 import type { QueueService, HandlerDefinition } from "../../queue";
 import { references } from "../repository";
 import type { ExcalidrawService } from "./index";
+import type { ChildExecution } from "../../tool-runtime";
 type RecordValue = {
 	id: string;
 	runId: string;
@@ -57,8 +59,12 @@ export function registerDrawingOperations(deps: {
 	service: ExcalidrawService;
 	onJob: (db: Database, runId: string, jobId: string) => void;
 	onFinished: (db: Database, runId: string) => void;
+	validateExecutionInTransaction?: (
+		db: Database,
+		child: ChildExecution,
+	) => boolean;
 }) {
-	const { store, queue, inference, capabilities, service } = deps;
+	const { queue, inference, capabilities, service } = deps;
 	function enqueue(db: Database, r: Row, stage: "plan" | "open") {
 		const { job } = queue.enqueueInTransaction(db, {
 			scope: "excalidraw",
@@ -75,12 +81,12 @@ export function registerDrawingOperations(deps: {
 			job.id,
 			r.id,
 		);
-		deps.onJob(db, r.run_id, job.id);
+		if (!JSON.parse(r.request_json).execution) deps.onJob(db, r.run_id, job.id);
 		return job.id;
 	}
 	const fail = (db: Database, r: Row, code: string) => {
 		patch(db, r, { state: "failed", errorCode: code });
-		deps.onFinished(db, r.run_id);
+		if (!JSON.parse(r.request_json).execution) deps.onFinished(db, r.run_id);
 	};
 	const cancel = (db: Database, job: { payload: { id: string } }) => {
 		const r = read(db, job.payload.id);
@@ -133,12 +139,22 @@ export function registerDrawingOperations(deps: {
 				"\nOUTPUT_SCHEMA=" +
 				JSON.stringify(outputSchema);
 			const control = { instructions, outputSchema };
-			const requestId = inference.captureControlInTransaction(db, {
+			const execution = JSON.parse(r.request_json).execution;
+			if (execution && !deps.validateExecutionInTransaction?.(db, execution))
+				throw new Error("execution_changed");
+			const capture = {
 				subject: `excalidraw:${r.id}:plan`,
 				policySubject: r.run_id,
 				deadline: Math.min(r.deadline - 15000, Date.now() + 45000),
 				maxOutputTokens: 2048,
-			});
+			};
+			const requestId = execution
+				? inference.captureUserControlInTransaction!(db, {
+						...capture,
+						subject: `drawing-task:${r.id}-plan`,
+						route: "subagent",
+					})
+				: inference.captureControlInTransaction(db, capture);
 			return {
 				status: "ready",
 				input: {
@@ -165,6 +181,9 @@ export function registerDrawingOperations(deps: {
 				input.messages,
 				signal,
 				input.control,
+				JSON.parse(input.row.request_json).execution
+					? executionCallSession(JSON.parse(input.row.request_json).execution)
+					: undefined,
 			);
 			return { receipt, plan: drawingPlan.parse(parseLlmJson(receipt.value)) };
 		},
@@ -205,9 +224,10 @@ export function registerDrawingOperations(deps: {
 			// A plan is not an external success. The second job starts after the accepted receipt commits.
 			db.query(
 				"UPDATE excalidraw_operations SET request_json=? WHERE id=?",
-			).run(JSON.stringify(plan), r.id);
+			).run(JSON.stringify({ ...JSON.parse(r.request_json), ...plan }), r.id);
 			if (opens) enqueue(db, r, "open");
-			else deps.onFinished(db, r.run_id);
+			else if (!JSON.parse(r.request_json).execution)
+				deps.onFinished(db, r.run_id);
 			return "applied";
 		},
 		cancelInTransaction: cancel,
@@ -230,7 +250,14 @@ export function registerDrawingOperations(deps: {
 			return { status: "ready", input: r };
 		},
 		async execute(r, { signal }) {
-			const plan = drawingPlan.parse(JSON.parse(r.request_json));
+			const raw = JSON.parse(r.request_json);
+			const plan = drawingPlan.parse(
+				Object.fromEntries(
+					Object.keys(drawingPlan.shape)
+						.filter((key) => key in raw)
+						.map((key) => [key, raw[key]]),
+				),
+			);
 			const s = await service.session({
 				requestId: r.id,
 				conversationId: r.conversation_id,
@@ -278,13 +305,22 @@ export function registerDrawingOperations(deps: {
 				url: s.url,
 				title: s.title,
 			});
-			deps.onFinished(db, r.run_id);
+			if (!JSON.parse(r.request_json).execution) deps.onFinished(db, r.run_id);
 			return "applied";
 		},
 		cancelInTransaction: cancel,
 	};
 	queue.registerHandler(handler);
 	queue.registerHandler(opener);
+	return drawingOperations(deps, enqueue, cancel);
+}
+
+function drawingOperations(
+	deps: Parameters<typeof registerDrawingOperations>[0],
+	enqueue: (db: Database, r: Row, stage: "plan" | "open") => string,
+	cancel: (db: Database, job: { payload: { id: string } }) => void,
+) {
+	const { store, capabilities, queue } = deps;
 	return {
 		startInTransaction(
 			db: Database,
@@ -294,13 +330,23 @@ export function registerDrawingOperations(deps: {
 				question: string;
 				originalRequest: string;
 				deadline: number;
+				execution?: ChildExecution;
 			},
 		) {
-			const existing = db
-				.query("SELECT * FROM excalidraw_operations WHERE run_id=?")
-				.get(input.runId) as Row | null;
+			const existing = input.execution
+				? read(db, input.execution.id)
+				: (db
+						.query(
+							"SELECT * FROM excalidraw_operations WHERE run_id=? AND json_extract(request_json,'$.execution') IS NULL",
+						)
+						.get(input.runId) as Row | null);
 			if (existing) return { id: existing.id, jobId: existing.job_id! };
-			const id = crypto.randomUUID(),
+			if (
+				input.execution &&
+				!deps.validateExecutionInTransaction?.(db, input.execution)
+			)
+				throw new Error("execution_changed");
+			const id = input.execution?.id ?? crypto.randomUUID(),
 				request = drawingRequest.parse({ question: input.question });
 			const prepared = capabilities.prepareActiveByIdInTransaction(
 				db,
@@ -325,7 +371,13 @@ export function registerDrawingOperations(deps: {
 				input.runId,
 				input.conversationId,
 				JSON.stringify(record),
-				JSON.stringify({ ...request, originalRequest: input.originalRequest }),
+				JSON.stringify({
+					...request,
+					originalRequest: input.originalRequest,
+					...(input.execution
+						? { execution: input.execution, references: input.execution.refs }
+						: {}),
+				}),
 				JSON.stringify(prepared),
 				input.deadline,
 				null,
@@ -334,9 +386,27 @@ export function registerDrawingOperations(deps: {
 		},
 		resultInTransaction(db: Database, runId: string) {
 			const r = db
-				.query("SELECT * FROM excalidraw_operations WHERE run_id=?")
+				.query(
+					"SELECT * FROM excalidraw_operations WHERE run_id=? AND json_extract(request_json,'$.execution') IS NULL",
+				)
 				.get(runId) as Row | null;
 			return r ? view(r) : null;
+		},
+		purgeCallInTransaction(db: Database, id: string) {
+			db.query(
+				"UPDATE excalidraw_operations SET request_json=json_object('execution',json_object('id',id,'erased',1)) WHERE id=? AND json_extract(request_json,'$.execution') IS NOT NULL",
+			).run(id);
+		},
+		resultForCallInTransaction(db: Database, id: string) {
+			const r = read(db, id);
+			return r ? view(r) : null;
+		},
+		cancelCallInTransaction(db: Database, id: string) {
+			const r = read(db, id);
+			if (r?.job_id && ["planning", "starting"].includes(view(r).state)) {
+				cancel(db, { payload: { id } });
+				queue.cancelInTransaction(db, r.job_id, "execution_cancelled");
+			}
 		},
 		list: (conversationId: string) =>
 			store.read((db) =>

@@ -70,5 +70,16 @@ export interface DelegationPort {
 		run: Run,
 		command: DelegationCommand,
 		snapshot: unknown,
+		execution?: { callId: string; deadline: number },
 	): unknown;
+	executionTaskInTransaction?(
+		db: Database,
+		conversationId: string,
+		taskId: string,
+	): unknown;
+	cancelExecutionTaskInTransaction?(
+		db: Database,
+		conversationId: string,
+		taskId: string,
+	): void;
 }

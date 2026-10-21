@@ -1,7 +1,7 @@
 import type { Database } from "bun:sqlite";
 import { hash, toolRuntimeOf } from "../../capabilities";
 import type { AdoptedEvidence, AnswerTicket, Report, Task } from "../contracts";
-import { get, byRoot, update } from "../repository";
+import { get, byRoot, update, hasExecutionScope } from "../repository";
 import { isPageRead, isSearch } from "./exploration";
 import { validateRequirementAdoption } from "./requirement-verification";
 import { active, owner, type RuntimeContext } from "./runtime-context";
@@ -68,8 +68,9 @@ export function createAnswer(ctx: RuntimeContext, ops: TaskOps) {
 	function prepareAnswerInTransaction(
 		db: Database,
 		rootRunId: string,
+		rootTaskId?: string,
 	): AnswerTicket {
-		const root = byRoot(db, rootRunId);
+		const root = rootTaskId ? get(db, rootTaskId) : byRoot(db, rootRunId);
 		if (!root || root.state !== "ready_for_answer")
 			throw new Error("task_not_ready");
 		const event = db
@@ -279,7 +280,7 @@ export function createAnswer(ctx: RuntimeContext, ops: TaskOps) {
 					(db) =>
 						db
 							.query(
-								"SELECT * FROM agent_events WHERE state='pending' ORDER BY created_at LIMIT 100",
+								`SELECT e.* FROM agent_events e JOIN agent_tasks t ON t.id=e.task_id WHERE e.state='pending'${hasExecutionScope(db) ? " AND t.execution_call_id IS NULL" : ""} ORDER BY e.created_at LIMIT 100`,
 							)
 							.all() as { id: string; task_id: string; root_run_id: string }[],
 				),

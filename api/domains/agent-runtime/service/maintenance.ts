@@ -4,7 +4,11 @@ import { deleteRequirementData } from "../repository/requirements";
 import type { RuntimeContext } from "./runtime-context";
 import type { TaskOps } from "./task-ops";
 
-export function createMaintenance(ctx: RuntimeContext, ops: TaskOps) {
+export function createMaintenance(
+	ctx: RuntimeContext,
+	ops: TaskOps,
+	extra?: () => Promise<void>,
+) {
 	const { store, tools, now } = ctx.deps;
 	const { state } = ctx;
 	const { cancelTreeInTransaction } = ops;
@@ -17,6 +21,7 @@ export function createMaintenance(ctx: RuntimeContext, ops: TaskOps) {
 		return state.maintaining;
 	}
 	async function runMaintenance() {
+		await extra?.();
 		const cutoff = now() - 14 * 86400000;
 		const roots = store.read(
 			(db) =>

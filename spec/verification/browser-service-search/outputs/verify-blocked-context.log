@@ -1,0 +1,12 @@
+$ bun scripts/verify.ts --domain browser --domain capabilities --domain tool-runtime --domain agent-runtime --domain web-research --domain queue
+[verify] selected=browser,capabilities,tool-runtime,agent-runtime,web-research,queue dependencyClosure=queue,browser,capabilities,tool-runtime,delivery,attitude-dataset,larm,settings,inference,agent-runtime,web-research
+[verify] Shared DesignSystem dist: do not overlap dev, browser tests or other builds; endpoint hashes cannot detect change-and-restore.
+[verify] inventory
+[verify] boundaries
+[verify] system-context: /Users/y.noguchi/.bun/bin/bun run context:check
+$ s11tnext build --check --release-profile application
+/Users/y.noguchi/Code/eumenes/.s11tnext/catalog.json: error S11TNEXT_BUILD_STALE: Generated output is missing or stale
+error: script "context:check" exited with code 1
+[verify] fail: 695 ms; /Users/y.noguchi/Code/eumenes/verification-reports/runs/2026-10-21T01-46-03-977Z-9ff85c81-06b1-4815-88c9-816937d951ea/report.json
+Error: system-context failed (1)
+error: script "verify" exited with code 1

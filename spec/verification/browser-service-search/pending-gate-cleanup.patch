@@ -1,0 +1,61 @@
+--- a/api/domains/dialogue/service/index.ts
++++ b/api/domains/dialogue/service/index.ts
+@@ -52,6 +52,28 @@
+ 	deps.queue.registerHandler(createSpecialistTurnHandler(deps));
+ }
+ 
++interface DialogueServiceOptions {
++	store: SqliteStore;
++	conversation: ConversationService;
++	larm: InferencePort;
++	queue: QueueService;
++	clock?: () => string;
++	id?: () => string;
++	memory?: MemoryService;
++	steward?: StewardPort;
++	agents?: AgentRuntime;
++	music?: MusicPort;
++	excalidraw?: ImagePort;
++	image?: ImagePort;
++	objectRecognition?: ObjectRecognitionPort;
++	delegation?: import("../contracts/delegation").DelegationPort;
++	worldContext?: WorldContextPort;
++	goals?: GoalsLayerPort;
++	toolchains?: import("../contracts/toolchains").ToolchainRoutingPort;
++	specialist?: import("../contracts").SpecialistPort;
++	/** The operational log file the error report reads (`config.logFile`); no log is read when absent. */
++	logFile?: () => string | undefined;
++}
+ export function createDialogueService({
+ 	store,
+ 	conversation,
+@@ -72,28 +94,7 @@
+ 	toolchains,
+ 	specialist,
+ 	logFile,
+-}: {
+-	store: SqliteStore;
+-	conversation: ConversationService;
+-	larm: InferencePort;
+-	queue: QueueService;
+-	clock?: () => string;
+-	id?: () => string;
+-	memory?: MemoryService;
+-	steward?: StewardPort;
+-	agents?: AgentRuntime;
+-	music?: MusicPort;
+-	excalidraw?: ImagePort;
+-	image?: ImagePort;
+-	objectRecognition?: ObjectRecognitionPort;
+-	delegation?: import("../contracts/delegation").DelegationPort;
+-	worldContext?: WorldContextPort;
+-	goals?: GoalsLayerPort;
+-	toolchains?: import("../contracts/toolchains").ToolchainRoutingPort;
+-	specialist?: import("../contracts").SpecialistPort;
+-	/** The operational log file the error report reads (`config.logFile`); no log is read when absent. */
+-	logFile?: () => string | undefined;
+-}) {
++}: DialogueServiceOptions) {
+ 	const deps: DialogueDeps = {
+ 		store,
+ 		conversation,

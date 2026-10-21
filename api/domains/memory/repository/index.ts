@@ -201,6 +201,8 @@ CREATE INDEX memory_message_block_conversation ON memory_message_block(conversat
 `;
 
 /** Named migrations of this domain; the SQL above is frozen once deployed. */
+export const executionReferencesMigration =
+	"CREATE TABLE memory_execution_refs(ref TEXT PRIMARY KEY,item_id TEXT NOT NULL,revision TEXT NOT NULL,body TEXT NOT NULL,digest TEXT NOT NULL,change_seq INTEGER NOT NULL,policy_revision TEXT NOT NULL,expires_at INTEGER NOT NULL);";
 export const migrations: readonly Migration[] = [
 	{ id: "memory/0001-init", sql: migration },
 	{
@@ -237,5 +239,10 @@ export const migrations: readonly Migration[] = [
 		id: "memory/0008-specialist-block-reason",
 		sql: specialistBlockReasonMigration,
 		after: ["memory/0007-seed-import"],
+	},
+	{
+		id: "memory/0009-execution-references",
+		after: ["memory/0008-specialist-block-reason"],
+		sql: executionReferencesMigration,
 	},
 ];

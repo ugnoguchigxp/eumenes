@@ -1,3 +1,7 @@
+import {
+	executionCallSession,
+	type ChildExecution,
+} from "../../domains/tool-runtime";
 import type { Database } from "bun:sqlite";
 import { z } from "zod";
 import { systemContext } from "../../infrastructure/system-context";
@@ -34,6 +38,7 @@ import {
 	FATAL_CODES,
 	PAGE_TOOLS,
 	approvedView,
+	argumentHints,
 	TOOLCHAIN_ID,
 	observationView,
 	refusal,
@@ -65,8 +70,14 @@ const CORRECTION = systemContext(
 
 /** What the adapter stores at start, beside the user's own words (the task's `request`). */
 const frozenSchema = z.strictObject({
+	/** Host-owned originating-message reference and remaining parent budget. */
+	execution: z.unknown().optional(),
 	/** The request as the conversation's command step wrote it; shown beside the original, never in its place. */
 	brief: z.string().max(4000).optional(),
+	packageRevisionId: z.string().optional(),
+	caller: z.unknown().optional(),
+	modelStepMs: z.number().int().min(5000).max(90000).optional(),
+	maxModelCalls: z.number().int().min(1).max(12).optional(),
 });
 
 /** The persisted job state: the single-shot core's state and what the host keeps for the tools. */
@@ -78,6 +89,10 @@ const persistedSchema = z.strictObject({
 type Persisted = { v: 1; core: TaskState; work: Work };
 
 export type TaskRunnerPorts = {
+	taskExecutionSourceInTransaction?: (
+		db: Database,
+		frozen: unknown,
+	) => string | null;
 	store: SqliteStore;
 	/** The model calls of a task: user-authorized single-shot control requests, one per job. */
 	inference: Pick<
@@ -142,6 +157,7 @@ function operatorOf(
 	caps: NonNullable<ReturnType<TaskRunnerPorts["capabilities"]>>,
 	input: TaskStepInput,
 ): Operator {
+	const frozen = frozenSchema.parse(input.frozen ?? {});
 	const toolchain = caps
 		.toolchainsInTransaction(db)
 		.find((d: FixedDefinition) => d.id === TOOLCHAIN_ID);
@@ -159,7 +175,7 @@ function operatorOf(
 	const prepared = caps.prepareActiveByIdInTransaction(
 		db,
 		owner,
-		operators[0]!,
+		frozen.packageRevisionId ?? operators[0]!,
 		{ request: clip(input.request, 8000) },
 	);
 	const pack = prepared.package;
@@ -196,52 +212,7 @@ function operatorOf(
 export function createTaskRunner(ports: TaskRunnerPorts): TaskStepRunner {
 	const { store, inference } = ports;
 
-	async function infer(
-		input: TaskStepInput,
-		messages: ReturnType<typeof taskMessages>,
-		signal: AbortSignal,
-	) {
-		if (!inference.captureUserControlInTransaction || !inference.executeControl)
-			throw new Error("control_unavailable");
-		const deadline = Math.min(Date.now() + CALL_MS, input.deadline);
-		if (deadline < Date.now() + MIN_CALL_MS) throw new Error("task_expired");
-		const requestId = await store.write((db) =>
-			inference.captureUserControlInTransaction!(db, {
-				subject: `browser-task:${input.taskId}-${input.step}`,
-				deadline,
-				maxOutputTokens: OUTPUT_TOKENS,
-			}),
-		);
-		const discard = () =>
-			store
-				.write((db) => inference.cancelRequestsInTransaction?.(db, [requestId]))
-				.catch(() => undefined);
-		let receipt: Awaited<
-			ReturnType<NonNullable<typeof inference.executeControl>>
-		>;
-		try {
-			receipt = await inference.executeControl(
-				requestId,
-				messages,
-				signal,
-				undefined,
-				{ sessionRole: "subagent", taskId: input.taskId },
-			);
-		} catch (e) {
-			await discard();
-			throw e;
-		}
-		const accepted = await store.write(
-			(db) => inference.acceptInTransaction?.(db, receipt) ?? false,
-		);
-		if (!accepted) {
-			await discard();
-			throw new Error("permission_revoked");
-		}
-		if (typeof receipt.value !== "string")
-			throw new Error("invalid_inference_result");
-		return receipt.value;
-	}
+	const infer = taskInference(ports);
 
 	/** The total must fit the saved model's window before a call is made (spec §5.5). */
 	function fits(messages: ReturnType<typeof taskMessages>) {
@@ -255,18 +226,34 @@ export function createTaskRunner(ports: TaskRunnerPorts): TaskStepRunner {
 		const caps = ports.capabilities();
 		if (!caps) throw new Error("capability_unavailable");
 		const frozen = frozenSchema.parse(input.frozen ?? {});
+		const source = frozen.execution
+			? store.read((db) => ports.taskExecutionSourceInTransaction?.(db, frozen))
+			: input.request;
+		if (!source) throw new Error("execution_source_invalid");
 		const operator = store.read((db) => operatorOf(db, caps, input));
+		if (frozen.caller && !api.connection().availability.available)
+			await api.connect();
 		const tabs = (await api.tabs()).filter((t) => t.status !== "closed");
 		// A tab the request named is that tab or none: the task never moves to another one.
 		const target = input.tabRef
 			? tabs.find((t) => t.tabRef === input.tabRef)
 			: (tabs.find((t) => t.active) ?? tabs[0]);
-		if (!target && !input.scriptRequired) throw new Error("tab_lost");
+		if (!target && (input.tabRef || (!input.scriptRequired && !frozen.caller)))
+			throw new Error("tab_lost");
 		const safeTarget = target?.status === "blocked" ? undefined : target;
 		const observation = safeTarget
 			? await api.observe(safeTarget.tabRef)
 			: null;
 		const approved = api.approvals();
+		// With no issued input reference, the only available input source is a request quotation.
+		// Present that existing contract with its required pair, rather than two optional sources.
+		const tools = approved.some((item) => item.kind === "input_value")
+			? operator.tools
+			: operator.tools.map((tool) =>
+					tool.id === "browser.page.type"
+						? { ...tool, inputSchema: zSchema("browserPageType") }
+						: tool,
+				);
 		const work: Work = {
 			tabRef: safeTarget?.tabRef ?? null,
 			origin: observation ? originOf(observation.url) : null,
@@ -284,9 +271,9 @@ export function createTaskRunner(ports: TaskRunnerPorts): TaskStepRunner {
 				profile: operator.profile,
 				skills: operator.skills,
 				rules: RULES,
-				tools: operator.tools,
+				tools,
 			}),
-			request: input.request,
+			request: source,
 			...(frozen.brief ? { brief: frozen.brief } : {}),
 			reference: {
 				...(input.url ? { requestedUrl: input.url } : {}),
@@ -312,7 +299,12 @@ export function createTaskRunner(ports: TaskRunnerPorts): TaskStepRunner {
 			},
 			referenceIntro: REFERENCE_INTRO,
 			correction: CORRECTION,
-			policy: resolveTaskPolicy(operator.turn, DEFAULT_MODEL_CALLS),
+			policy: resolveTaskPolicy(
+				frozen.maxModelCalls
+					? { ...operator.turn, maxModelCalls: frozen.maxModelCalls }
+					: operator.turn,
+				DEFAULT_MODEL_CALLS,
+			),
 			nowMs: Date.now(),
 		});
 		return { v: 1, core, work };
@@ -339,16 +331,27 @@ export function createTaskRunner(ports: TaskRunnerPorts): TaskStepRunner {
 		const host = env.work.tools.includes(tool) ? PAGE_TOOLS[tool] : undefined;
 		if (!host) return { kind: "result", result: refusal("unknown_tool") };
 		const parsed = validators[host.schemaKey].safeParse(args);
-		if (!parsed.success)
+		if (!parsed.success) {
+			const detail = argumentHints(parsed.error.issues);
+			// Diagnose the supplied source branch without changing the authoritative validation above.
+			const paired =
+				host.schemaKey === "browserPageTypeValue" &&
+				!Object.hasOwn(args, "inputValueRef")
+					? validators.browserPageType.safeParse(args)
+					: null;
+			const issues =
+				paired && !paired.success ? paired.error.issues : parsed.error.issues;
 			return {
 				kind: "result",
 				result: refusal("invalid_arguments", {
-					issues: parsed.error.issues.slice(0, 8).map((issue) => ({
+					...(detail ? { detail } : {}),
+					issues: issues.slice(0, 8).map((issue) => ({
 						path: issue.path.map(String).join("."),
 						code: issue.code,
 					})),
 				}),
 			};
+		}
 		try {
 			return await host.run(parsed.data as never, env);
 		} catch (e) {
@@ -441,6 +444,9 @@ export function createTaskRunner(ports: TaskRunnerPorts): TaskStepRunner {
 						recorded.state,
 						p.work,
 						sent ? "operation_indeterminate" : recorded.step.code,
+						!out.result.ok
+							? `ブラウザ操作を続けられません（${out.result.error}）。`
+							: "",
 					);
 				}
 				return cont(p, recorded.state);
@@ -469,4 +475,71 @@ export function createTaskRunner(ports: TaskRunnerPorts): TaskStepRunner {
 				inference.releaseTaskSession?.(input.taskId).catch(() => undefined);
 		}
 	};
+}
+
+function taskInference(ports: TaskRunnerPorts) {
+	const { store, inference } = ports;
+	async function infer(
+		input: TaskStepInput,
+		messages: ReturnType<typeof taskMessages>,
+		signal: AbortSignal,
+	) {
+		if (!inference.captureUserControlInTransaction || !inference.executeControl)
+			throw new Error("control_unavailable");
+		const deadline = Math.min(
+			Date.now() +
+				(frozenSchema.parse(input.frozen ?? {}).modelStepMs ?? CALL_MS),
+			input.deadline,
+		);
+		if (deadline < Date.now() + MIN_CALL_MS) throw new Error("task_expired");
+		const requestId = await store.write((db) =>
+			inference.captureUserControlInTransaction!(db, {
+				subject: `browser-task:${input.taskId}-${input.step}`,
+				deadline,
+				maxOutputTokens: OUTPUT_TOKENS,
+				...(frozenSchema.parse(input.frozen ?? {}).execution
+					? { route: "subagent" as const }
+					: {}),
+			}),
+		);
+		const discard = () =>
+			store
+				.write((db) => inference.cancelRequestsInTransaction?.(db, [requestId]))
+				.catch(() => undefined);
+		let receipt: Awaited<
+			ReturnType<NonNullable<typeof inference.executeControl>>
+		>;
+		try {
+			receipt = await inference.executeControl(
+				requestId,
+				messages,
+				signal,
+				undefined,
+				frozenSchema.parse(input.frozen ?? {}).execution
+					? {
+							...executionCallSession(
+								frozenSchema.parse(input.frozen ?? {})
+									.execution as ChildExecution,
+							),
+							taskId: input.taskId,
+						}
+					: { sessionRole: "subagent", taskId: input.taskId },
+			);
+		} catch (e) {
+			await discard();
+			throw e;
+		}
+		const accepted = await store.write(
+			(db) => inference.acceptInTransaction?.(db, receipt) ?? false,
+		);
+		if (!accepted) {
+			await discard();
+			throw new Error("permission_revoked");
+		}
+		if (typeof receipt.value !== "string")
+			throw new Error("invalid_inference_result");
+		return receipt.value;
+	}
+
+	return infer;
 }

@@ -51,6 +51,7 @@ export function createLifecycle(
 						t.root_run_id,
 						"backend_restarted",
 						"interrupted",
+						t.id,
 					);
 			});
 			flush();
@@ -93,6 +94,7 @@ export function createLifecycle(
 							t.root_run_id,
 							"backend_stopped",
 							"interrupted",
+							t.id,
 						);
 				});
 			} catch (error) {

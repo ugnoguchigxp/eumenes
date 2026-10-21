@@ -53,7 +53,8 @@ export function createTerminalsAdapter(
 	terminals: Pick<
 		TerminalsService,
 		"available" | "list" | "enqueueInTransaction" | "requestInTransaction"
-	>,
+	> &
+		Partial<Pick<TerminalsService, "cancelQueuedInTransaction" | "stop">>,
 ): DomainAdapter {
 	function result(
 		receipt: ClaudeCodeReceipt,
@@ -89,6 +90,39 @@ export function createTerminalsAdapter(
 	}
 	return {
 		ref: TERMINALS_ADAPTER_REF,
+		execution: {
+			currentInTransaction(db, operationId) {
+				const request = terminals.requestInTransaction(
+					db,
+					attemptIdOf(operationId),
+				);
+				const state = !request
+					? "failed"
+					: request.state === "completed"
+						? "completed"
+						: request.state === "cancelled"
+							? "cancelled"
+							: ["unknown", "ended", "interrupted"].includes(request.state)
+								? "indeterminate"
+								: "running";
+				return {
+					state,
+					ref: { attemptId: attemptIdOf(operationId) },
+					summary: request?.lastReport ?? request?.state ?? "request_missing",
+					output: request,
+					modelCalls: 0,
+					references: [],
+					...(request?.reason ? { code: request.reason } : {}),
+				};
+			},
+			cancelInTransaction: (db, operationId) => {
+				terminals.cancelQueuedInTransaction?.(db, attemptIdOf(operationId));
+			},
+			stop: async (operationId) =>
+				!!terminals.stop &&
+				(await terminals.stop(attemptIdOf(operationId))) !== "unconfirmed",
+			validateAnswerInTransaction: () => false,
+		},
 		describe: describeTerminalsAdapter,
 		availableInTransaction: () => terminals.available(),
 		snapshotInTransaction: () => {
@@ -128,8 +162,13 @@ export function createTerminalsAdapter(
 				prompt: input.prompt,
 				task: input.task,
 				origin:
-					request.origin.kind === "conversation" ? "conversation" : "board",
-				...(request.origin.kind === "conversation"
+					request.origin.kind === "task"
+						? "execution"
+						: request.origin.kind === "conversation"
+							? "conversation"
+							: "board",
+				...(request.origin.kind === "conversation" ||
+				request.origin.kind === "task"
 					? { conversationId: request.origin.conversationId }
 					: {}),
 			});

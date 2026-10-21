@@ -1,0 +1,66 @@
+bun test v1.4.3 (c6da4a4d3)
+
+api/application/browser/browser-task-runner.test.ts:
+(pass) observe, type with a grant, click, re-observe, finish: one inference per job and the page only as data [399.40ms]
+(pass) the first call has the D7 context: system layer, enclosed reference with the observation, the original request last [359.50ms]
+(pass) a clarify ends the task as needs_input with the question [360.79ms]
+(pass) the last of the 12 calls is reserved: callsLeft is shown every call, and an invoke there fails the task [372.00ms]
+(pass) a finish on the last call still completes the task [363.00ms]
+(pass) a rejected output is repaired once and the repair counts against the budget [693.78ms]
+(pass) a refused tool goes back as data and is retried once; the second refusal ends the task [672.61ms]
+(pass) unknown tools, invalid arguments and blocked addresses are refusals, not crashes [333.92ms]
+(pass) submitting a typed value needs a declared effect [323.66ms]
+(pass) a value is typed on a quote from the request, however it was reformatted [325.13ms]
+(pass) an operation that may have reached the page stops the task as indeterminate and no further call is made [400.80ms]
+(pass) an operation the browser refused before sending is a refusal the model may answer [327.64ms]
+(pass) cancelling aborts the model call in flight and the task stays cancelled and quiet [352.06ms]
+(pass) a task past its deadline expires, aborts the call in flight and makes no further call [358.68ms]
+(pass) losing the connection ends the task and aborts the call in flight [330.56ms]
+(pass) an element capture inside the task is saved before the task finishes [476.32ms]
+(pass) a capture over the size limit is a refusal with its reason [485.78ms]
+(pass) tabs can be listed and a new tab becomes the target [329.14ms]
+(pass) a newer observation turns the older ones into a one-line stub, and nothing else changes [320.10ms]
+(pass) a tab the request named that is gone stops the task; it never moves to another tab [320.44ms]
+(pass) a page the host blocks goes back to the model as a refusal it can answer [322.38ms]
+(pass) too large a context stops the task before a call is made [321.28ms]
+(pass) a revoked model call ends the task and its request is dropped [319.95ms]
+(pass) a conversation request reaches the loop through the adapter with the user's own words [325.71ms]
+
+api/application/toolchain/service-search.test.ts:
+(pass) conversation → browser child → native candidates → saved answer [440.69ms]
+(pass) conversation → browser child → external fallback → saved answer [429.85ms]
+
+api/application/toolchain/service-search-lifecycle.test.ts:
+(pass) delegated prose cannot manufacture a quotation that authorizes browser input [324.48ms]
+(pass) revoked parent cannot adopt a late browser finish or emit a second conversation notice [327.13ms]
+(pass) native work expires while the parent's fallback reserve remains [321.55ms]
+
+api/domains/browser/test/tasks.test.ts:
+(pass) a task needs the step runner, a live connection, a known tab and an allowed URL [32.03ms]
+(pass) each model step is one queue job; the core state is stored as JSON and handed to the next step [21.87ms]
+(pass) the runner acts through the task's api: observe, operate, grants and captures [29.83ms]
+(pass) needs_input and failed endings carry their text and code [26.54ms]
+(pass) a runner that throws ends the task as failed with a safe code [19.98ms]
+(pass) the same request starts one task and a changed one conflicts [15.76ms]
+(pass) cancelling aborts the running step and nothing runs after it [61.48ms]
+(pass) a task past its deadline expires, announces it and refuses further operations [23.23ms]
+(pass) losing the connection fails a task that had nothing in flight [21.25ms]
+(pass) the screen's source reports availability, tabs, tasks and captures with a changing revision [19.25ms]
+
+api/domains/browser/test/approvals.test.ts:
+(pass) a click that submits a non-GET form needs approval and nothing is dispatched [22.27ms]
+(pass) GET forms, dialog forms, links and controls outside forms run without approval [24.12ms]
+(pass) the model's own commit declaration needs approval without any inspection [21.40ms]
+(pass) pressing Enter or Space inspects the focused element; other keys do not [21.93ms]
+(pass) typing with submit inspects the field; typing without submit does not [22.68ms]
+(pass) a failing inspection stops the operation before it is sent [21.75ms]
+(pass) a task that ends needs_input stores pending approvals; a follow-up that approves moves them and the operation runs once [39.48ms]
+(pass) without approvePending, from another conversation or owner, or after 10 minutes nothing moves [44.09ms]
+(pass) an approval is bound to the page, element and action it was given for [30.43ms]
+(pass) a value the request did not contain is approved as an input grant and its digest ties the typing to the approval [31.70ms]
+(pass) an approval for another typed value does not match [22.38ms]
+
+ 50 pass
+ 0 fail
+ 253 expect() calls
+Ran 50 tests across 5 files. [12.15s]

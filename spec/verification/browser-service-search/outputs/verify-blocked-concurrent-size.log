@@ -1,0 +1,13 @@
+$ bun scripts/verify.ts --domain browser --domain capabilities --domain tool-runtime --domain agent-runtime --domain web-research --domain dialogue --domain queue
+[verify] selected=browser,capabilities,tool-runtime,agent-runtime,web-research,dialogue,queue dependencyClosure=queue,browser,capabilities,tool-runtime,delivery,attitude-dataset,larm,settings,inference,agent-runtime,web-research,conversation,continuity,memory,scheduler,toolchain-history,dialogue,avatar
+[verify] Shared DesignSystem dist: do not overlap dev, browser tests or other builds; endpoint hashes cannot detect change-and-restore.
+[verify] inventory
+[verify] boundaries
+[verify] system-context: /Users/y.noguchi/.bun/bin/bun run context:check
+$ s11tnext build --check --release-profile application
+Generated outputs are current (sha256:c88218871bd9f2302899db37327abca5ca7d5789e43b93d9320601a7c02bb228).
+[verify] size-budget: /Users/y.noguchi/.bun/bin/bun scripts/size-budget.ts api/domains/browser web/src/domains/browser packages/design-system/src/components/BrowserWorkspace api/domains/capabilities api/domains/tool-runtime api/domains/agent-runtime web/src/domains/agent-runtime api/domains/web-research api/domains/dialogue web/src/domains/dialogue api/domains/queue
+size-budget: new function over 300 lines: api/domains/agent-runtime/service/executions.ts#createTaskExecutions (644)
+[verify] fail: 1126 ms; /Users/y.noguchi/Code/eumenes/verification-reports/runs/2026-10-21T02-01-47-540Z-feb7ebef-de06-4a38-8292-c38faad95f7f/report.json
+Error: size-budget failed (1)
+error: script "verify" exited with code 1

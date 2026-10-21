@@ -1,0 +1,327 @@
+[
+	{
+		"case": "wikipedia-native-ui",
+		"recordedAt": "2026-10-21T02:53:14.103Z",
+		"runId": "f6a2379b-d93b-4902-8f76-3cd25ad677b8",
+		"runStatus": "completed",
+		"worker": {
+			"id": "ff4fb015-baff-45bc-9b5e-889f27bb7f2b",
+			"packageRevisionId": "package:web.service-search@2",
+			"status": "failed",
+			"errorCode": "invalid_control_json",
+			"modelCalls": 3,
+			"toolCalls": 1
+		},
+		"browser": [
+			{
+				"taskId": "a68cd715-e9ec-498f-a8fd-b65caa81ca4b",
+				"state": "completed",
+				"errorCode": null,
+				"resultSummary": "Wikipediaのサイト内検索で「Python」を検索しました。プログラミング言語のPythonの記事はこれです。\n\n記事リンク: https://ja.wikipedia.org/wiki/Python",
+				"operations": [
+					{
+						"kind": "tab_new",
+						"state": "observed"
+					},
+					{
+						"kind": "type",
+						"state": "observed"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"at": "2026-10-21T02:53:19.680Z",
+				"stage": "browser_connection",
+				"state": "connected",
+				"reason": null
+			},
+			{
+				"at": "2026-10-21T02:54:03.649Z",
+				"stage": "browser_action",
+				"kind": "type",
+				"text": "Python",
+				"submit": true
+			},
+			{
+				"at": "2026-10-21T02:54:04.870Z",
+				"stage": "browser_action_result",
+				"ok": true,
+				"url": "https://ja.wikipedia.org/wiki/Python",
+				"title": "Python - Wikipedia"
+			},
+			{
+				"at": "2026-10-21T02:54:47.009Z",
+				"stage": "finished",
+				"status": "completed",
+				"workerStatus": "failed",
+				"output": "verification-reports/service-search/2026-10-21T02-53-12.362Z"
+			}
+		],
+		"report": {
+			"outcome": null,
+			"coverage": null,
+			"limitations": null,
+			"candidateResults": null
+		},
+		"answer": "失敗しました。"
+	},
+	{
+		"case": "youtube-native-and-fallback",
+		"recordedAt": "2026-10-21T03:12:48.933Z",
+		"runId": "076bfde8-5d8a-45e4-980f-193d70a62e13",
+		"runStatus": "completed",
+		"worker": {
+			"id": "6ae4baea-f5d1-4168-9f0a-1bca75625473",
+			"packageRevisionId": "package:web.service-search@3",
+			"status": "completed",
+			"errorCode": null,
+			"modelCalls": 4,
+			"toolCalls": 3
+		},
+		"browser": [
+			{
+				"taskId": "e6e527f6-f90f-4f0a-bb6b-cb07741000c3",
+				"state": "expired",
+				"errorCode": "task_expired",
+				"resultSummary": null,
+				"operations": [
+					{
+						"kind": "tab_new",
+						"state": "observed"
+					},
+					{
+						"kind": "type",
+						"state": "observed"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"at": "2026-10-21T03:13:05.044Z",
+				"stage": "browser_connection",
+				"state": "connected",
+				"reason": null
+			},
+			{
+				"at": "2026-10-21T03:14:29.891Z",
+				"stage": "browser_action",
+				"kind": "type",
+				"text": "python3 日本語 入門",
+				"submit": true
+			},
+			{
+				"at": "2026-10-21T03:14:31.540Z",
+				"stage": "browser_action_result",
+				"ok": true,
+				"url": "https://www.youtube.com/results?search_query=python3+%E6%97%A5%E6%9C%AC%E8%AA%9E+%E5%85%A5%E9%96%80",
+				"title": "python3 日本語 入門 - YouTube"
+			},
+			{
+				"at": "2026-10-21T03:14:48.653Z",
+				"stage": "external_started",
+				"operation": "lookup",
+				"query": "python3 日本語 入門 site:youtube.com"
+			},
+			{
+				"at": "2026-10-21T03:15:01.259Z",
+				"stage": "external_started",
+				"operation": "read",
+				"url": "https://www.youtube.com/playlist?list=PLHPmh91LsTgyDBFW2XIXZG2BvV6QXilEg"
+			},
+			{
+				"at": "2026-10-21T03:15:32.697Z",
+				"stage": "finished",
+				"status": "completed",
+				"workerStatus": "completed",
+				"output": "verification-reports/service-search/2026-10-21T03-12-47.205Z"
+			}
+		],
+		"report": {
+			"outcome": "candidates_found",
+			"coverage": "partial",
+			"limitations": [
+				"YouTube内検索は期限切れで失敗",
+				"外部検索で2本のみ確認、3本には不足",
+				"動画内容の確認は未実施"
+			],
+			"candidateResults": [
+				{
+					"reference": "c4",
+					"sourceId": "8b480d32-d840-4f6f-bfbf-6ecb8d694c24",
+					"url": "https://www.youtube.com/watch?v=iqNBNzlO_-4",
+					"title": "【2026年最新】宇宙一簡単なPython入門講座!インストール ...",
+					"fetchedAt": "2026-10-21T03:14:48.658Z",
+					"provider": "duckduckgo",
+					"contentStatus": "unverified"
+				},
+				{
+					"reference": "c5",
+					"sourceId": "65b098a9-5f26-415d-8488-ef3ca9b50809",
+					"url": "https://www.youtube.com/watch?v=W1cnEb8LwVU",
+					"title": "【永久保存版】Python入門完全攻略 - YouTube",
+					"fetchedAt": "2026-10-21T03:14:48.658Z",
+					"provider": "duckduckgo",
+					"contentStatus": "unverified"
+				}
+			]
+		},
+		"answer": "YouTube内検索が期限切れで失敗し、外部検索でも日本語の入門動画は2本しか確認できていません。本日は3本のお求めには届いておりません。"
+	},
+	{
+		"case": "youtube-first-call-timeout-1",
+		"recordedAt": "2026-10-21T03:20:34.193Z",
+		"runId": "eed24c2d-ba63-459f-be26-f249d19987c8",
+		"runStatus": "completed",
+		"worker": {
+			"id": "6954152e-7884-4e7c-a8d8-7646cc65a65a",
+			"packageRevisionId": "package:web.service-search@3",
+			"status": "failed",
+			"errorCode": "deadline_exceeded",
+			"modelCalls": 1,
+			"toolCalls": 0
+		},
+		"browser": [],
+		"events": [
+			{
+				"at": "2026-10-21T03:20:46.787Z",
+				"stage": "browser_connection",
+				"state": "connected",
+				"reason": null
+			},
+			{
+				"at": "2026-10-21T03:21:06.871Z",
+				"stage": "finished",
+				"status": "completed",
+				"workerStatus": "failed",
+				"output": "verification-reports/service-search/2026-10-21T03-20-32.438Z"
+			}
+		],
+		"report": {
+			"outcome": null,
+			"coverage": null,
+			"limitations": null,
+			"candidateResults": null
+		},
+		"answer": "失敗しました。"
+	},
+	{
+		"case": "wikipedia-source-approval",
+		"recordedAt": "2026-10-21T03:22:50.940Z",
+		"runId": "ce277a89-1751-4754-b068-e94e43e0a66b",
+		"runStatus": "completed",
+		"worker": {
+			"id": "51955e1c-654c-4356-82b8-e6ad66cc57d7",
+			"packageRevisionId": "package:web.service-search@3",
+			"status": "failed",
+			"errorCode": "invalid_tool_input",
+			"modelCalls": 3,
+			"toolCalls": 1
+		},
+		"browser": [
+			{
+				"taskId": "6a6b8cce-a9f7-402c-ad47-5996529d85f0",
+				"state": "needs_input",
+				"errorCode": null,
+				"resultSummary": "「Python」をhttps://ja.wikipedia.orgの「Pythonで検索する」に入力してよいですか。依頼の文から確認できない値のため止めました。",
+				"operations": [
+					{
+						"kind": "tab_new",
+						"state": "observed"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"at": "2026-10-21T03:23:08.659Z",
+				"stage": "browser_connection",
+				"state": "connected",
+				"reason": null
+			},
+			{
+				"at": "2026-10-21T03:24:06.926Z",
+				"stage": "finished",
+				"status": "completed",
+				"workerStatus": "failed",
+				"output": "verification-reports/service-search/2026-10-21T03-22-39.999Z"
+			}
+		],
+		"report": {
+			"outcome": null,
+			"coverage": null,
+			"limitations": null,
+			"candidateResults": null
+		},
+		"answer": "失敗しました。"
+	},
+	{
+		"case": "youtube-first-call-timeout-2",
+		"recordedAt": "2026-10-21T03:28:12.203Z",
+		"runId": "8cd236e1-2367-465f-99f9-6cec18e253cd",
+		"runStatus": "completed",
+		"worker": {
+			"id": "3101ec5a-01a8-48aa-b163-66a5e7682b90",
+			"packageRevisionId": "package:web.service-search@3",
+			"status": "failed",
+			"errorCode": "deadline_exceeded",
+			"modelCalls": 1,
+			"toolCalls": 0
+		},
+		"browser": [],
+		"events": [
+			{
+				"at": "2026-10-21T03:28:24.024Z",
+				"stage": "browser_connection",
+				"state": "connected",
+				"reason": null
+			},
+			{
+				"at": "2026-10-21T03:28:44.106Z",
+				"stage": "finished",
+				"status": "completed",
+				"workerStatus": "failed",
+				"output": "verification-reports/service-search/2026-10-21T03-28-07.472Z"
+			}
+		],
+		"report": {
+			"outcome": null,
+			"coverage": null,
+			"limitations": null,
+			"candidateResults": null
+		},
+		"answer": "失敗しました。"
+	},
+	{
+		"case": "latest-mac-locked",
+		"recordedAt": "2026-10-21T03:32:20.448Z",
+		"runId": null,
+		"runStatus": null,
+		"worker": {
+			"id": null,
+			"packageRevisionId": null,
+			"status": null,
+			"errorCode": null,
+			"modelCalls": null,
+			"toolCalls": null
+		},
+		"browser": [],
+		"events": [
+			{
+				"at": "2026-10-21T03:33:50.464Z",
+				"stage": "browser_connection",
+				"state": "failed",
+				"reason": "connect_timeout"
+			}
+		],
+		"report": {
+			"outcome": null,
+			"coverage": null,
+			"limitations": null,
+			"candidateResults": null
+		},
+		"answer": null
+	}
+]

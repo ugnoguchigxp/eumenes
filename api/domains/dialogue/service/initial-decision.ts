@@ -14,6 +14,11 @@ import { LlmJsonError, parseLlmJson } from "../../../infrastructure/llm-json";
 import { validationIssues } from "../../../infrastructure/validation-log";
 import { z } from "zod";
 import {
+	executionControl,
+	type ExecutionReference,
+	type ExecutionView,
+} from "../../tool-runtime";
+import {
 	announcementSchema,
 	operationRejection,
 	toolchainDescription,
@@ -58,6 +63,26 @@ export type RequestAnalysis = z.infer<typeof requestAnalysis>;
 const toolchainChoice = requestAnalysis.extend({
 	announcement: announcementSchema,
 });
+const taskChoice = toolchainChoice
+	.extend({
+		request: z
+			.string()
+			.trim()
+			.min(1)
+			.max(8000)
+			.describe("依頼全体の目的と明示条件。最初の一操作だけに縮めない。"),
+		contextRefs: z.array(z.string().max(160)).max(32),
+	})
+	.strict();
+const controlChoice = requestAnalysis
+	.extend(executionControl.shape)
+	.extend({ announcement: announcementSchema })
+	.strict();
+export type TaskOffer = {
+	card: ToolchainCard | undefined;
+	references: ExecutionReference[];
+	works: ExecutionView[];
+};
 const unavailableChoice = requestAnalysis.extend(unavailableReply.shape);
 
 const discoveryChoice = requestAnalysis
@@ -87,6 +112,18 @@ export type FirstRound = RequestAnalysis &
 		| { next: "find_toolchain"; query: string }
 		| { next: "report_unavailable"; reply: string }
 		| { next: "toolchain"; card: ToolchainCard; announcement: string }
+		| {
+				next: "execute_task";
+				card: ToolchainCard;
+				announcement: string;
+				request: string;
+				contextRefs: string[];
+		  }
+		| {
+				next: "task_control";
+				announcement: string;
+				control: z.infer<typeof executionControl>;
+		  }
 		/** An instant-answer toolchain: its arguments (checked by the card) are all the call carries. */
 		| {
 				next: "instant";
@@ -103,6 +140,22 @@ function jsonSchema(schema: z.ZodType) {
 	return z.toJSONSchema(schema) as Record<string, unknown>;
 }
 
+/** Common analysis fields are already defined by the R1 policy and the other offered functions. */
+function taskParameters(schema: z.ZodType) {
+	const json = jsonSchema(schema);
+	delete json.$schema;
+	const properties = json.properties as Record<
+		string,
+		{ description?: string }
+	>;
+	for (const name of [...Object.keys(requestAnalysis.shape), "announcement"])
+		delete properties[name]?.description;
+	for (const name of ["workRef", "questionRef"])
+		if (properties[name])
+			delete (properties[name] as { pattern?: string }).pattern;
+	return json;
+}
+
 /**
  * The functions of the first round: each candidate toolchain, `answer` and `report_unavailable`. All carry the
  * analysis; the toolchain's also the notice. None writes the answer or the request for the specialist.
@@ -111,9 +164,38 @@ export function analysisTools(
 	cards: readonly ToolchainCard[],
 	sessions: ReadonlySet<string> = new Set(),
 	allowDiscovery = false,
+	tasks?: TaskOffer,
+	approvalReference = true,
 ): NativeTool[] {
 	const offered = new Set(cards.map((c) => c.functionName));
-	return [
+	const tools: NativeTool[] = [
+		...(tasks?.card
+			? [
+					{
+						type: "function" as const,
+						function: {
+							name: tasks.card.functionName,
+							description:
+								tasks.card.summary +
+								"。複数の担当呼出しが必要な依頼に使う。一担当で完結する依頼はfind_toolchainで探して直接使う。requestに依頼全体、contextRefsに必要な提示済み参照を書く。",
+							parameters: taskParameters(taskChoice),
+						},
+					},
+				]
+			: []),
+		...(tasks?.works.length
+			? [
+					{
+						type: "function" as const,
+						function: {
+							name: "task_control",
+							description:
+								"提示された同じ会話の作業について状態確認、質問への回答、依頼訂正、取消を行う。expectedRevisionは依頼の版。対象が不明なら会話で確認する。終了した作業を復活させない。",
+							parameters: taskParameters(controlChoice),
+						},
+					},
+				]
+			: []),
 		...(allowDiscovery
 			? [
 					{
@@ -127,20 +209,26 @@ export function analysisTools(
 					},
 				]
 			: []),
-		...cards.map((card) => ({
-			type: "function" as const,
-			function: {
-				name: card.functionName,
-				description:
-					toolchainDescription(card, offered, sessions.has(card.functionName)) +
-					(card.instant
-						? "。この担当へ任せるときに呼び、依頼の分析と引数を書きます"
-						: "。この担当へ任せるときに呼び、予告(announcement)と依頼の分析だけを書きます"),
-				parameters: card.instant
-					? instantParameters(card.instant.parameters)
-					: jsonSchema(toolchainChoice.strict()),
-			},
-		})),
+		...cards
+			.filter((card) => card.functionName !== tasks?.card?.functionName)
+			.map((card) => ({
+				type: "function" as const,
+				function: {
+					name: card.functionName,
+					description:
+						toolchainDescription(
+							card,
+							offered,
+							sessions.has(card.functionName),
+						) +
+						(card.instant
+							? "。この担当へ任せるときに呼び、依頼の分析と引数を書きます"
+							: "。この担当へ任せるときに呼び、予告(announcement)と依頼の分析だけを書きます"),
+					parameters: card.instant
+						? instantParameters(card.instant.parameters)
+						: jsonSchema(toolchainChoice.strict()),
+				},
+			})),
 		{
 			type: "function" as const,
 			function: {
@@ -159,6 +247,15 @@ export function analysisTools(
 			},
 		},
 	];
+	if (!approvalReference)
+		for (const tool of tools) {
+			const properties = tool.function.parameters.properties as Record<
+				string,
+				unknown
+			>;
+			properties.approved = { type: "boolean", const: false };
+		}
+	return tools;
 }
 
 /** The analysis and an instant toolchain's own arguments, in the one flat object the call takes. */
@@ -194,6 +291,7 @@ export function validateAnalysis(
 	calls: NativeToolCall[],
 	cards: readonly ToolchainCard[],
 	allowDiscovery = false,
+	tasks?: TaskOffer,
 ): FirstRound {
 	if (calls.length !== 1)
 		throw operationRejection("call_count", undefined, [], calls.length);
@@ -203,7 +301,9 @@ export function validateAnalysis(
 		!card &&
 		call.name !== ANSWER_FUNCTION &&
 		call.name !== UNAVAILABLE_FUNCTION &&
-		!(allowDiscovery && call.name === DISCOVERY_FUNCTION)
+		!(allowDiscovery && call.name === DISCOVERY_FUNCTION) &&
+		!(tasks?.card?.functionName === call.name) &&
+		!(tasks?.works.length && call.name === "task_control")
 	)
 		throw operationRejection("tool_not_offered", call);
 	let args: unknown;
@@ -219,6 +319,54 @@ export function validateAnalysis(
 		);
 	}
 	if (card?.instant) return validateInstant(call, card as InstantCard, args);
+	if (tasks?.card?.functionName === call.name) {
+		const parsed = taskChoice.safeParse(args);
+		if (
+			!parsed.success ||
+			parsed.data.contextRefs.some(
+				(ref) => !tasks.references.some((r) => r.ref === ref),
+			)
+		)
+			throw operationRejection("arguments_invalid", call);
+		return { ...parsed.data, next: "execute_task", card: tasks.card };
+	}
+	if (call.name === "task_control" && tasks?.works.length) {
+		const parsed = controlChoice.safeParse(args);
+		if (!parsed.success) throw operationRejection("arguments_invalid", call);
+		const {
+			workRef,
+			expectedRevision,
+			action,
+			questionRef,
+			input,
+			request,
+			announcement,
+			...analysis
+		} = parsed.data;
+		const work = tasks.works.find(
+			(w) => w.id === workRef && w.revision === expectedRevision,
+		);
+		if (
+			!work ||
+			(action === "answer" &&
+				(!work.question || work.question.id !== questionRef)) ||
+			(action === "amend" && !request)
+		)
+			throw operationRejection("arguments_invalid", call);
+		return {
+			...analysis,
+			next: "task_control",
+			announcement,
+			control: {
+				workRef,
+				expectedRevision,
+				action,
+				questionRef,
+				input,
+				request,
+			},
+		};
+	}
 	const schema = card
 		? toolchainChoice.strict()
 		: call.name === ANSWER_FUNCTION
@@ -307,7 +455,10 @@ export function analysisTrace(round: FirstRound): SelectionAnalysis {
 	return {
 		kind,
 		freshness,
-		next: next === "instant" ? "toolchain" : next,
+		next:
+			next === "instant" || next === "execute_task" || next === "task_control"
+				? "toolchain"
+				: next,
 		impact,
 		approved,
 	};

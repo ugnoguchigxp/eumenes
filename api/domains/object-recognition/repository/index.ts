@@ -15,6 +15,11 @@ CREATE TABLE object_recognition_commands(run_id TEXT PRIMARY KEY,owner TEXT NOT 
 		sql: `CREATE TABLE object_recognition_handoffs(id TEXT PRIMARY KEY,owner TEXT NOT NULL,conversation_id TEXT NOT NULL,source TEXT NOT NULL,recognition_id TEXT,question TEXT NOT NULL,state TEXT NOT NULL,created INTEGER NOT NULL,deadline INTEGER NOT NULL);
 CREATE INDEX object_recognition_handoff_owner ON object_recognition_handoffs(owner,conversation_id,state);`,
 	},
+	{
+		id: "object-recognition/0003-execution-calls",
+		after: ["object-recognition/0002-handoffs"],
+		sql: "CREATE TABLE object_recognition_execution_commands(call_id TEXT PRIMARY KEY,run_id TEXT NOT NULL,owner TEXT NOT NULL,conversation_id TEXT NOT NULL,result_json TEXT NOT NULL);",
+	},
 ];
 export type Row = {
 	id: string;

@@ -1,3 +1,4 @@
+import { executionCallSession } from "../../tool-runtime";
 import { parseLlmJson } from "../../../infrastructure/llm-json";
 import type { Database } from "bun:sqlite";
 import { z } from "zod";
@@ -19,6 +20,7 @@ import {
 } from "../repository/playlists";
 import { musicContext } from "./context";
 import type { createMusic } from "./index";
+import type { ChildExecution } from "../../tool-runtime";
 export function createPlayback(deps: Parameters<typeof createMusic>[0]) {
 	const { store, queue, inference, capabilities } = deps;
 	const fail = (
@@ -30,7 +32,8 @@ export function createPlayback(deps: Parameters<typeof createMusic>[0]) {
 		const r = playlistRow(db, id);
 		if (!r || playlistRecordOf(r).state !== "planning") return;
 		patchPlaylist(db, id, { state, errorCode: code });
-		if (state !== "cancelled") deps.onFinished(db, r.run_id);
+		if (state !== "cancelled" && !JSON.parse(r.request_json).execution)
+			deps.onFinished(db, r.run_id);
 	};
 	type Input = {
 		id: string;
@@ -58,12 +61,22 @@ export function createPlayback(deps: Parameters<typeof createMusic>[0]) {
 				throw new Error("music_inference_unavailable");
 			const prepared = JSON.parse(r.bindings_json) as Prepared;
 			capabilities.validateInTransaction(db, prepared);
-			const requestId = inference.captureControlInTransaction(db, {
+			const execution = JSON.parse(r.request_json).execution;
+			if (execution && !deps.validateExecutionInTransaction?.(db, execution))
+				throw new Error("execution_changed");
+			const capture = {
 				subject: `music:${r.id}:playback`,
 				policySubject: r.run_id,
 				deadline: Math.min(r.deadline - 15000, Date.now() + 45000),
 				maxOutputTokens: 2048,
-			});
+			};
+			const requestId = execution
+				? inference.captureUserControlInTransaction!(db, {
+						...capture,
+						subject: `music-task:${r.id}-playback`,
+						route: "subagent",
+					})
+				: inference.captureControlInTransaction(db, capture);
 			return {
 				status: "ready",
 				input: {
@@ -87,6 +100,19 @@ export function createPlayback(deps: Parameters<typeof createMusic>[0]) {
 				context.messages,
 				signal,
 				context.control,
+				(
+					input.request as {
+						execution?: import("../../tool-runtime").ChildExecution;
+					}
+				).execution
+					? executionCallSession(
+							(
+								input.request as {
+									execution: import("../../tool-runtime").ChildExecution;
+								}
+							).execution,
+						)
+					: undefined,
 			);
 			let value: unknown;
 			try {
@@ -142,7 +168,7 @@ export function createPlayback(deps: Parameters<typeof createMusic>[0]) {
 				trackIds,
 				currentId: trackIds[0] ?? null,
 			});
-			deps.onFinished(db, r.run_id);
+			if (!JSON.parse(r.request_json).execution) deps.onFinished(db, r.run_id);
 			return "applied";
 		},
 		cancelInTransaction(db, job) {
@@ -159,12 +185,20 @@ export function createPlayback(deps: Parameters<typeof createMusic>[0]) {
 				question: string;
 				originalRequest: string;
 				deadline: number;
+				execution?: ChildExecution;
 			},
 		) {
-			const existing = playlistByRun(db, input.runId);
+			const existing = input.execution
+				? playlistRow(db, input.execution.id)
+				: playlistByRun(db, input.runId);
 			if (existing) return { id: existing.id, jobId: existing.queue_job_id! };
 			const request = musicRequest.parse({ question: input.question }),
-				id = crypto.randomUUID();
+				id = input.execution?.id ?? crypto.randomUUID();
+			if (
+				input.execution &&
+				!deps.validateExecutionInTransaction?.(db, input.execution)
+			)
+				throw new Error("execution_changed");
 			const prepared = capabilities.prepareActiveByIdInTransaction(
 				db,
 				{ rootRunId: input.runId, taskId: id, cancelEpoch: 0 },
@@ -193,7 +227,13 @@ export function createPlayback(deps: Parameters<typeof createMusic>[0]) {
 				input.runId,
 				input.conversationId,
 				JSON.stringify(view),
-				JSON.stringify({ ...request, originalRequest: input.originalRequest }),
+				JSON.stringify({
+					...request,
+					originalRequest: input.originalRequest,
+					...(input.execution
+						? { execution: input.execution, references: input.execution.refs }
+						: {}),
+				}),
 				JSON.stringify(prepared),
 				input.deadline,
 			);
@@ -212,12 +252,28 @@ export function createPlayback(deps: Parameters<typeof createMusic>[0]) {
 				job.id,
 				id,
 			);
-			deps.onJob(db, input.runId, job.id);
+			if (!input.execution) deps.onJob(db, input.runId, job.id);
 			return { id, jobId: job.id };
 		},
 		resultInTransaction(db: Database, runId: string) {
 			const r = playlistByRun(db, runId);
 			return r ? playlistRecordOf(r) : null;
+		},
+		purgeCallInTransaction(db: Database, id: string) {
+			db.query(
+				"UPDATE music_playlists SET request_json=json_object('execution',json_object('id',id,'erased',1)) WHERE id=? AND json_extract(request_json,'$.execution') IS NOT NULL",
+			).run(id);
+		},
+		resultForCallInTransaction(db: Database, id: string) {
+			const r = playlistRow(db, id);
+			return r ? playlistRecordOf(r) : null;
+		},
+		cancelCallInTransaction(db: Database, id: string) {
+			const r = playlistRow(db, id);
+			if (r?.queue_job_id && playlistRecordOf(r).state === "planning") {
+				fail(db, id, "execution_cancelled", "cancelled");
+				queue.cancelInTransaction(db, r.queue_job_id, "execution_cancelled");
+			}
 		},
 		list: (conversationId: string) =>
 			store.read((db) => playlists(db, conversationId)),

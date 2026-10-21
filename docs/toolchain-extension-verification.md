@@ -147,3 +147,15 @@ bunx playwright test tests/browser/<domain>.spec.ts
 報告には、目的、実装した経路、変更した契約、試験段階ごとの結果、スキップ・未確認、失敗分析、残作業、次の続行条件を記載する。「実装済み」「固定試験済み」「実LLM受入済み」「実機器受入済み」を使い分ける。
 
 実装後、確認段階の途中、原因分析後のいずれでも終了できる。その場合は未完了の段階を明示する。確認に成功しても、依頼された範囲を超えて次の検証・改修・モデル変更へ進まない。
+
+## task型の日常担当を変更する場合
+
+[実装計画](../spec/everyday-task-agent-implementation-plan-2026-10-21.md)と[契約表](../spec/verification/everyday-task-agent/contract-matrix.md)を正本とする。登録だけでなく、公開会話入口→親→既存adapter→確定結果→会話での採用を検証する。
+
+```sh
+bun run toolchain:bundle -- check api/domains/capabilities/bundles/task-execution.bundle.json
+bun test api/domains/capabilities/test/task-binding.test.ts api/domains/agent-runtime/test/task-execution.test.ts api/domains/dialogue/test/task-delegation.test.ts api/domains/dialogue/test/execution-notices.test.ts
+bun test api/application/toolchain/task-execution.test.ts api/application/toolchain/task-execution-browser.test.ts api/application/toolchain/task-execution-media.test.ts
+```
+
+同じ生成型の二回呼出しと再送、確認後の新しい物理browser task、共有予算と元の期限、忘却・取消・訂正後の遅い結果、再起動時の全待機状態を含める。原文の後半がbriefで置き換わらないこと、result refの版と所有会話が一致することを確認する。固定モデルの成功、実モデルの意図判断、実ブラウザーの再生観測は別々に記録する。実モデルの正式usageが未報告なら不明と記載する。

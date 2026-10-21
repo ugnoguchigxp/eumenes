@@ -16,6 +16,7 @@ import { createCapabilities } from "../api/domains/capabilities";
 import { openStore } from "../api/infrastructure/sqlite";
 
 const BACKENDS = [
+	"task-execution",
 	"web",
 	"history",
 	"timer",

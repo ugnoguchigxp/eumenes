@@ -112,6 +112,8 @@ export function buildBrowser(
 						store,
 						inference: deps.inference,
 						capabilities: deps.capabilities ?? (() => null),
+						taskExecutionSourceInTransaction: (db, frozen) =>
+							service?.taskExecutionSourceInTransaction(db, frozen) ?? null,
 					}),
 				}
 			: {}),

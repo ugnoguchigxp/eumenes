@@ -1,0 +1,24 @@
+--- a/scripts/domains.ts
++++ b/scripts/domains.ts
+@@ -366,6 +366,7 @@
+ 				"queue",
+ 				"scheduler",
+ 				"toolchain-history",
++				"tool-runtime",
+ 			],
+ 			web: ["conversation"],
+ 			test: ["world"],
+--- a/api/domains/dialogue/service/generation-prepare.ts
++++ b/api/domains/dialogue/service/generation-prepare.ts
+@@ -230,7 +230,10 @@
+ 			: undefined;
+ 		if (routing) {
+ 			if (routing.routing.tasks && window && memory) routing.routing.tasks.references.push(...memory.executionReferencesInTransaction(tx, window));
+-			if (routing.routing.tasks) routing.routing.tasks = fitTaskOffer(routing.routing.tasks);
++			if (routing.routing.tasks) {
++				const offered = fitTaskOffer(routing.routing.tasks);
++				routing.routing.tasks = { ...offered, card: offered.card };
++			}
+ 			const base = {
+ 				routing: routing.routing,
+ 				messages,

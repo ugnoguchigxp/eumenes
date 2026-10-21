@@ -183,9 +183,19 @@ export function createObjectRecognition(deps: {
 					runId: string,
 					conversationId: string,
 					raw: unknown,
-					input?: { inputImages: number },
+					input?: { inputImages: number; callId?: string },
 				) {
 					const command = recognitionCommand.parse(raw);
+					const operationId = input?.callId ?? runId;
+					if (
+						input?.callId &&
+						db
+							.query(
+								"SELECT 1 FROM object_recognition_execution_commands WHERE call_id=? AND run_id=? AND owner=?",
+							)
+							.get(input.callId, runId, owner)
+					)
+						return;
 					let result: unknown = { action: "open", state: "ready_for_input" };
 					if (
 						(command.action === "capture" || command.action === "ask") &&
@@ -196,7 +206,7 @@ export function createObjectRecognition(deps: {
 					else if (command.action === "capture") {
 						const source = command.source ?? "camera";
 						insertHandoff(db, owner, {
-							id: runId,
+							id: operationId,
 							conversationId,
 							source,
 							recognitionId: null,
@@ -211,7 +221,7 @@ export function createObjectRecognition(deps: {
 						if (!r.mime.startsWith("image/"))
 							throw new Error("recognition_image_required");
 						insertHandoff(db, owner, {
-							id: runId,
+							id: operationId,
 							conversationId,
 							source: "saved",
 							recognitionId: r.id,
@@ -246,9 +256,20 @@ export function createObjectRecognition(deps: {
 									: v.result,
 						};
 					}
-					db.query(
-						"INSERT INTO object_recognition_commands VALUES(?,?,?,?)",
-					).run(runId, owner, conversationId, JSON.stringify(result));
+					if (input?.callId)
+						db.query(
+							"INSERT INTO object_recognition_execution_commands VALUES(?,?,?,?,?)",
+						).run(
+							input.callId,
+							runId,
+							owner,
+							conversationId,
+							JSON.stringify(result),
+						);
+					else
+						db.query(
+							"INSERT INTO object_recognition_commands VALUES(?,?,?,?)",
+						).run(runId, owner, conversationId, JSON.stringify(result));
 				},
 				resultInTransaction(db: Database, runId: string) {
 					const r = db
@@ -256,6 +277,14 @@ export function createObjectRecognition(deps: {
 							"SELECT result_json FROM object_recognition_commands WHERE run_id=? AND owner=?",
 						)
 						.get(runId, owner) as { result_json: string } | null;
+					return r ? JSON.parse(r.result_json) : null;
+				},
+				resultForCallInTransaction(db: Database, callId: string) {
+					const r = db
+						.query(
+							"SELECT result_json FROM object_recognition_execution_commands WHERE call_id=? AND owner=?",
+						)
+						.get(callId, owner) as { result_json: string } | null;
 					return r ? JSON.parse(r.result_json) : null;
 				},
 			};

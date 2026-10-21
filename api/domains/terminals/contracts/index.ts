@@ -142,7 +142,7 @@ export type EnqueueRequest = {
 	prompt: string;
 	/** Short task name (at most 40 characters) used in reports and notifications. */
 	task: string;
-	origin: "board" | "conversation";
+	origin: "board" | "conversation" | "execution";
 	conversationId?: string;
 	/**
 	 * Requests of one group are never sent while a live PTY of that group is `working` or
@@ -160,7 +160,7 @@ export type TerminalRequestView = {
 	mode: SessionMode;
 	projectId: string;
 	task: string;
-	origin: "board" | "conversation";
+	origin: "board" | "conversation" | "execution";
 	conversationId?: string;
 	claudeSessionId?: string;
 	/** The PTY session the request was sent to (after `sending`). */
@@ -181,7 +181,7 @@ export type TerminalRequestFinished = {
 	state: Exclude<RequestState, "queued" | "sending" | "delivered" | "started">;
 	reason?: RequestReason;
 	owner: SessionOwner;
-	origin: "board" | "conversation";
+	origin: "board" | "conversation" | "execution";
 	conversationId?: string;
 	task: string;
 	lastReport: string;

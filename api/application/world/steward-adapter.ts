@@ -78,7 +78,10 @@ export function createStewardAdapter(
 			if (request.operationName !== REQUEST)
 				throw new Error("unsupported_operation");
 			// A request is the conversation agent's: the screens have no way to make one.
-			if (request.origin.kind !== "conversation")
+			if (
+				request.origin.kind !== "conversation" &&
+				request.origin.kind !== "task"
+			)
 				throw new Error("unsupported_origin");
 			const parsed = memoryRequestInput.safeParse(request.input);
 			if (!parsed.success) throw new Error("invalid_input");

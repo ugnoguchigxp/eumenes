@@ -42,6 +42,9 @@ import { createToolchainHostLinks } from "./toolchain-host";
 import { createTimers } from "../../domains/timers";
 import { createSpecialistPort } from "./specialist-port";
 import { createToolchainRouting } from "./toolchain-routing";
+import { configureTaskExecution } from "./task-execution-port";
+import { taskMediaPorts } from "./task-media-execution";
+import { taskLegacyPorts } from "./task-legacy-execution";
 import { createTimerAnnouncements } from "../timers/timer-announcements";
 import { createApp } from "../app";
 import type { LarmPort } from "../../domains/larm";
@@ -77,12 +80,30 @@ const weather =
 const stock = "AAPLの株価は250.12 USD、2026-10-08終値です。";
 export async function harness(
 	options: {
+		everyday?: boolean;
+		discoveryTarget?: (query: string) => string;
+		acquisition?: AcquisitionPort;
+		taskStep?: (
+			tools: import("../../infrastructure/chat-stream").NativeTool[],
+			messages: import("../../domains/inference/contracts").Messages,
+		) => { name: string; arguments: Record<string, unknown> };
 		model?: LarmPort;
 		embed?: import("./toolchain-vectors").Embed;
 		musicGateway?: () => LarmPlayground;
 		imageGateway?: () => LarmPlayground;
 		uiCompositions?: boolean;
 		routeTool?: string;
+		browser?: (
+			store: import("../../infrastructure/sqlite").SqliteStore,
+			queue: import("../../domains/queue").QueueService,
+			capabilities: () => import("../../domains/capabilities").Capabilities,
+		) => Pick<
+			import("../browser/browser-composition").BrowserAssembly,
+			"service" | "effects" | "requests"
+		>;
+		review?: (
+			input: import("llm-fetch").GuardReviewInput,
+		) => Promise<import("llm-fetch").GuardReviewDecision>;
 		command?: (
 			messages: import("../../domains/inference/contracts").Messages,
 		) => string;
@@ -253,6 +274,20 @@ export async function harness(
 				!!options.history ||
 				(!!options.timers && /タイマー/.test(question)) ||
 				/天気|株価|weather|stock|調べ|検索|https?:|確認/.test(question);
+			if (
+				callOptions?.tools?.some((t) => t.function.name === "report_partial")
+			) {
+				const step = options.taskStep?.(callOptions.tools, messages);
+				if (!step) throw new Error("fixture_task_step_missing");
+				callOptions.onToolCalls!([
+					{
+						id: crypto.randomUUID(),
+						name: step.name,
+						arguments: JSON.stringify(step.arguments),
+					},
+				]);
+				return "";
+			}
 			if (isAnalysisRound(callOptions?.tools)) {
 				if (
 					delegates &&
@@ -465,6 +500,7 @@ export async function harness(
 			);
 			if (action) {
 				const result = JSON.parse(action.content).actionResult;
+				if (result.kind === "task_result") return result.summary;
 				if (result.items[0]?.state === "cancelled")
 					return "タイマーを取り消しました";
 				if (result.action === "started")
@@ -597,8 +633,9 @@ export async function harness(
 	const web = createWebResearch({
 		store,
 		queue,
-		acquisition,
+		acquisition: options.acquisition ?? acquisition,
 		acquisitionTimeoutMs: options.acquisitionTimeoutMs,
+		review: options.review,
 	});
 	const scheduler = createScheduler(store, queue, { now: options.timerNow });
 	const timers = options.timers
@@ -630,7 +667,17 @@ export async function harness(
 				fetcher: options.ocrFetcher,
 			})
 		: undefined;
+	let activeCapabilities: import("../../domains/capabilities").Capabilities;
+	const browser = options.browser?.(store, queue, () => activeCapabilities);
+	if (browser)
+		browser.requests = {
+			userMessageInTransaction: (db, id) => {
+				const message = conversation.messageInTransaction(db, id)?.message;
+				return message?.role === "user" ? message.text : null;
+			},
+		};
 	const toolchain = await createToolchain(store, queue, inference, web, {
+		browser,
 		...toolchainLinks.options,
 		embed: options.embed,
 		timers,
@@ -648,8 +695,11 @@ export async function harness(
 		weather: options.weather,
 		stock: options.stock,
 	});
+	activeCapabilities = toolchain.capabilities;
 	const music = options.musicGateway
 		? createMusic({
+				validateExecutionInTransaction:
+					toolchain.agents.executions.authorizeChildInTransaction,
 				store,
 				queue,
 				inference,
@@ -663,6 +713,8 @@ export async function harness(
 		: undefined;
 	const image = options.imageGateway
 		? createImage({
+				validateExecutionInTransaction:
+					toolchain.agents.executions.authorizeChildInTransaction,
 				store,
 				queue,
 				inference,
@@ -686,6 +738,8 @@ export async function harness(
 		: undefined;
 	const drawingOperations = excalidraw
 		? registerDrawingOperations({
+				validateExecutionInTransaction:
+					toolchain.agents.executions.authorizeChildInTransaction,
 				store,
 				queue,
 				inference,
@@ -710,21 +764,25 @@ export async function harness(
 		toolchain.history,
 		options.embed
 			? toolchain.embedQuery
-			: fixtureDiscovery(store, toolchain.capabilities, (query) =>
-					options.history
-						? "conversation_history"
-						: (options.routeTool ??
-							(options.uiCompositions
-								? "ui_create"
-								: options.weather && /天気/.test(query)
-									? "weather_forecast"
-									: options.stock && /株価/.test(query)
-										? "stock_quote"
-										: options.timers && /タイマー/.test(query)
-											? "timer"
-											: options.fullResearch
-												? "web_research"
-												: "web_search")),
+			: fixtureDiscovery(
+					store,
+					toolchain.capabilities,
+					(query) =>
+						options.discoveryTarget?.(query) ??
+						(options.history
+							? "conversation_history"
+							: (options.routeTool ??
+								(options.uiCompositions
+									? "ui_create"
+									: options.weather && /天気/.test(query)
+										? "weather_forecast"
+										: options.stock && /株価/.test(query)
+											? "stock_quote"
+											: options.timers && /タイマー/.test(query)
+												? "timer"
+												: options.fullResearch
+													? "web_research"
+													: "web_search"))),
 				),
 		toolchain.registry,
 		toolchain.schemas,
@@ -748,6 +806,22 @@ export async function harness(
 		}),
 	});
 	toolchainLinks.attachDialogue(dialogue);
+	if (options.everyday)
+		configureTaskExecution({
+			queue,
+			childOperations: toolchain.childOperations,
+			store,
+			capabilities: toolchain.capabilities,
+			agents: toolchain.agents,
+			routing,
+			registry: toolchain.registry,
+			dialogue,
+			conversation,
+			inference,
+			browser: browser?.service,
+			media: taskMediaPorts({ image, music, excalidraw: drawingOperations }),
+			legacy: taskLegacyPorts(dialogue),
+		});
 	const voice = createVoiceDialogue(store, dialogue, inference);
 	if (terminals) reportFinishedTasks(terminals, dialogue);
 	const app = createApp({
@@ -788,6 +862,7 @@ export async function harness(
 		});
 	return {
 		dir,
+		browser,
 		terminals,
 		kanban,
 		excalidraw,
@@ -821,6 +896,7 @@ export async function harness(
 			return calls;
 		},
 		async close() {
+			await browser?.service.disconnect();
 			await kanbanRuns?.disconnect();
 			terminals?.closeAll();
 			unsubscribeChanges();

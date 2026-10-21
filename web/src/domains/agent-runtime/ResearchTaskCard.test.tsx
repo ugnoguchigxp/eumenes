@@ -5,6 +5,54 @@ import type { EumenesClient } from "../../../../client";
 import { queryRoots } from "../../queryKeys";
 import { ResearchTaskCard } from "./ResearchTaskCard";
 afterEach(cleanup);
+test("candidate links remain explicitly unverified and are not duplicated as facts", async () => {
+	const client = {
+		identity: "candidates",
+		agentTasks: async () => [root],
+		toolchainSelections: async () => ({ items: [], nextCursor: null }),
+		agentReport: async () => ({
+			summary: "候補",
+			claims: [],
+			limitations: [],
+			coverage: "partial",
+			candidateResults: [
+				{
+					reference: "c1",
+					sourceId: "s1",
+					url: "https://example.org/video",
+					title: "入門動画",
+					contentStatus: "unverified",
+				},
+			],
+			sources: [
+				{
+					sourceId: "s1",
+					url: "https://example.org/video",
+					title: "入門動画",
+					basis: "snippet",
+					fetchedAt: new Date().toISOString(),
+				},
+			],
+		}),
+	} as unknown as EumenesClient;
+	const cache = new QueryClient({
+		defaultOptions: { queries: { retry: false } },
+	});
+	try {
+		render(
+			<QueryClientProvider client={cache}>
+				<ResearchTaskCard client={client} rootRunId="run" title="動画検索" />
+			</QueryClientProvider>,
+		);
+		const link = await screen.findByRole("link", { name: "入門動画" });
+		expect(link.getAttribute("href")).toBe("https://example.org/video");
+		expect(screen.getAllByRole("link", { name: "入門動画" })).toHaveLength(1);
+		expect(screen.getByText(/本文未確認/)).toBeTruthy();
+		expect(screen.queryByText(/本文確認/)).toBeNull();
+	} finally {
+		cache.clear();
+	}
+});
 const root = {
 	id: "root",
 	kind: "coordinator" as const,

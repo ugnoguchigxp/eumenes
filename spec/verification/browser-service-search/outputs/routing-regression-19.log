@@ -1,0 +1,29 @@
+bun test v1.4.3 (c6da4a4d3)
+
+api/domains/dialogue/test/request-analysis.test.ts:
+(pass) live information is classified with the candidates, announced by the first round and written for the specialist by the second [46.59ms]
+(pass) the notice is delivered before the second round, which runs while it is read; the specialist waits for the reading [28.05ms]
+(pass) a second round that fails after the notice stops the reading and fails the run without a delegation [26.61ms]
+(pass) a notice that cannot be delivered stops the second round and fails the run with the delivery's error [26.96ms]
+(pass) an old answer to the same question, the memory and the time never reach the first round [34.94ms]
+(pass) a cold follow-up searches once using the current request anchor and the available prior exchange [30.72ms]
+(pass) general knowledge is classified as answer and answered in the second round with the kind only, no notice and no specialist [25.22ms]
+(pass) report_unavailable of the first round is the answer itself, with no second round [27.25ms]
+(pass) a function that is not offered, or live information answered from hand, gets one repair; two in a row fail without publishing anything [30.84ms]
+(pass) prose in the second round is not adopted: one repair, then failure, and no answer is generated from history [54.94ms]
+(pass) each message of the previous exchange is cut to the limit with the omission mark; shorter ones stay verbatim [0.16ms]
+
+api/domains/dialogue/test/toolchain-tools.test.ts:
+(pass) every offered toolchain function takes one flat request object [0.06ms]
+(pass) a call resolves to the offered toolchain and keeps the request as given [0.14ms]
+(pass) a function that was not offered, extra arguments or two calls are rejected [0.31ms]
+(pass) a description names another function only when that function is offered [0.02ms]
+(pass) the policy is placed before the current request and carries past selections as data [0.08ms]
+(pass) the first round offers each candidate with the analysis and the notice, beside answer and report_unavailable [0.31ms]
+(pass) a first-round call is told by the function: a toolchain's, answer or report_unavailable [0.26ms]
+(pass) live or delegated kinds cannot be answered from hand, and any other malformed first-round call is rejected [0.65ms]
+
+ 19 pass
+ 0 fail
+ 135 expect() calls
+Ran 19 tests across 2 files. [650.00ms]

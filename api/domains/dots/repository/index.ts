@@ -32,6 +32,11 @@ INSERT INTO dots_sessions SELECT thread_id,task_id,data_json FROM dots_sessions_
 DROP TABLE dots_sessions_v1;
 CREATE INDEX dots_sessions_thread ON dots_sessions(thread_id);`,
 	},
+	{
+		id: "dots/0003-execution-receipts",
+		after: ["dots/0002-session-associations"],
+		sql: "CREATE TABLE dots_execution_receipts(call_id TEXT PRIMARY KEY,run_id TEXT NOT NULL,conversation_id TEXT NOT NULL,task_id TEXT NOT NULL,receipt_json TEXT NOT NULL);",
+	},
 ];
 function read<T>(db: Database, sql: string, ...args: string[]): T | null {
 	const row = db.query(sql).get(...args) as { data_json: string } | null;

@@ -34,6 +34,23 @@ ALTER TABLE music_generations ADD COLUMN artwork BLOB;
 ALTER TABLE music_generations ADD COLUMN artwork_mime TEXT;
 `,
 	},
+	{
+		id: "music/0004-execution-calls",
+		after: ["music/0002-playlists", "music/0003-artwork"],
+		sql: `
+CREATE TABLE music_generations_next (id TEXT PRIMARY KEY,run_id TEXT NOT NULL,conversation_id TEXT NOT NULL,record_json TEXT NOT NULL,request_json TEXT NOT NULL,plan_json TEXT,bindings_json TEXT NOT NULL,deadline INTEGER NOT NULL,queue_job_id TEXT,audio BLOB,artwork BLOB,artwork_mime TEXT);
+INSERT INTO music_generations_next SELECT * FROM music_generations;
+DROP TABLE music_generations;
+ALTER TABLE music_generations_next RENAME TO music_generations;
+CREATE INDEX music_conversation ON music_generations(conversation_id);
+CREATE UNIQUE INDEX music_source_once ON music_generations(run_id) WHERE json_extract(request_json,'$.execution') IS NULL;
+CREATE TABLE music_playlists_next (id TEXT PRIMARY KEY,run_id TEXT NOT NULL,conversation_id TEXT NOT NULL,record_json TEXT NOT NULL,request_json TEXT NOT NULL,bindings_json TEXT NOT NULL,deadline INTEGER NOT NULL,queue_job_id TEXT);
+INSERT INTO music_playlists_next SELECT * FROM music_playlists;
+DROP TABLE music_playlists;
+ALTER TABLE music_playlists_next RENAME TO music_playlists;
+CREATE INDEX music_playlist_conversation ON music_playlists(conversation_id);
+CREATE UNIQUE INDEX music_playlist_source_once ON music_playlists(run_id) WHERE json_extract(request_json,'$.execution') IS NULL;`,
+	},
 ];
 const COLUMNS =
 	"id, run_id, conversation_id, record_json, request_json, plan_json, bindings_json, deadline, queue_job_id";
@@ -65,7 +82,9 @@ export function media(db: Database, id: string, kind: "audio" | "artwork") {
 }
 export function byRun(db: Database, id: string) {
 	return db
-		.query(`SELECT ${COLUMNS} FROM music_generations WHERE run_id=?`)
+		.query(
+			`SELECT ${COLUMNS} FROM music_generations WHERE run_id=? AND json_extract(request_json,'$.execution') IS NULL`,
+		)
 		.get(id) as Row | null;
 }
 /** A LARM library track id is the LARM job id recorded while the track was generated here. */

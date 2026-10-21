@@ -1,0 +1,26 @@
+bun test v1.4.3 (c6da4a4d3)
+
+api/infrastructure/validation-log.test.ts:
+(pass) validation diagnostics expose paths, types and bounds, but never values, unknown keys or Zod messages [1.78ms]
+(pass) many invalid entries keep the first eight field locations, including array indices [0.38ms]
+
+api/application/toolchain/service-search.test.ts:
+(pass) conversation → browser child → native candidates → saved answer [528.19ms]
+(pass) conversation → browser child → external fallback → saved answer [466.21ms]
+(pass) conversation → browser child → empty connected browser → saved answer [446.68ms]
+
+api/application/toolchain/service-search-lifecycle.test.ts:
+(pass) delegated prose cannot manufacture a quotation that authorizes browser input [360.27ms]
+(pass) revoked parent cannot adopt a late browser finish or emit a second conversation notice [356.63ms]
+(pass) native work expires while the parent's fallback reserve remains [344.80ms]
+(pass) accepted candidates survive native expiry for partial adoption [342.96ms]
+(pass) accepted candidates are discarded after authority revocation [337.34ms]
+
+api/domains/agent-runtime/test/guided-candidates.test.ts:
+(pass) only displayed live candidates may be returned or resolved into reads [0.15ms]
+(pass) candidate references never stand in for body facts [0.60ms]
+
+ 12 pass
+ 0 fail
+ 70 expect() calls
+Ran 12 tests across 4 files. [3.83s]

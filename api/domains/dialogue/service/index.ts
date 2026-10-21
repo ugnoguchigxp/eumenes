@@ -23,7 +23,13 @@ import type {
 	GoalsLayerPort,
 	WorldContextPort,
 } from "../contracts";
-import { byId, interruptUnfinished, listRuns, linkAnswer } from "../repository";
+import {
+	byId,
+	byRequest,
+	interruptUnfinished,
+	listRuns,
+	linkAnswer,
+} from "../repository";
 import { createAgentSync } from "./agent-sync";
 import {
 	DEFAULT_DEADLINE_MS,
@@ -36,6 +42,9 @@ import { createIntake } from "./intake";
 import { endRun, runEndedInTransaction } from "./run-end";
 import { createProgress } from "./progress";
 import { createErrorReport } from "./error-report";
+import { executionSourceInTransaction } from "./execution-source";
+import { executionCommands } from "./execution-command";
+import { revokeExecutionNotice } from "./execution-notices";
 import type { MusicPort } from "../contracts/music";
 import type { ImagePort } from "../contracts/image";
 import type { ObjectRecognitionPort } from "../contracts/object-recognition";
@@ -50,27 +59,7 @@ function registerHandlers(
 	deps.queue.registerHandler(createSpecialistTurnHandler(deps));
 }
 
-export function createDialogueService({
-	store,
-	conversation,
-	larm,
-	queue,
-	clock = () => new Date().toISOString(),
-	id = () => crypto.randomUUID(),
-	memory,
-	steward,
-	agents,
-	delegation,
-	objectRecognition,
-	excalidraw,
-	image,
-	music,
-	worldContext,
-	goals,
-	toolchains,
-	specialist,
-	logFile,
-}: {
+interface DialogueServiceOptions {
 	store: SqliteStore;
 	conversation: ConversationService;
 	larm: InferencePort;
@@ -91,7 +80,28 @@ export function createDialogueService({
 	specialist?: import("../contracts").SpecialistPort;
 	/** The operational log file the error report reads (`config.logFile`); no log is read when absent. */
 	logFile?: () => string | undefined;
-}) {
+}
+export function createDialogueService({
+	store,
+	conversation,
+	larm,
+	queue,
+	clock = () => new Date().toISOString(),
+	id = () => crypto.randomUUID(),
+	memory,
+	steward,
+	agents,
+	delegation,
+	objectRecognition,
+	excalidraw,
+	image,
+	music,
+	worldContext,
+	goals,
+	toolchains,
+	specialist,
+	logFile,
+}: DialogueServiceOptions) {
 	const deps: DialogueDeps = {
 		store,
 		conversation,
@@ -129,6 +139,20 @@ export function createDialogueService({
 		logFile: logFile ?? (() => undefined),
 	});
 	const service = {
+		executionCommands: executionCommands(deps),
+		executionSourceInTransaction: (db: Database, runId: string) =>
+			executionSourceInTransaction(deps, db, runId),
+		notifyInTransaction: intake.notifyInTransaction,
+		revokeExecutionNoticeInTransaction: (db: Database, eventId: string) =>
+			revokeExecutionNotice(deps, db, eventId),
+		noticeDeliveryInTransaction(db: Database, requestId: string) {
+			const run = byRequest(db, requestId);
+			return !run || run.status === "queued" || run.status === "running"
+				? ("pending" as const)
+				: run.status === "completed" && run.answerMessageId
+					? ("delivered" as const)
+					: ("failed" as const);
+		},
 		/** One delivery owner; its disposer cannot remove a newer owner's registration. */
 		setAnnouncementDelivery(
 			deliver: NonNullable<DialogueDeps["deliverAnnouncement"]>,

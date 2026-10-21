@@ -1,5 +1,5 @@
 import type { Database } from "bun:sqlite";
-import { hash } from "../../capabilities";
+import { hash, bytes } from "../../capabilities";
 import type { ToolRuntime } from "../../tool-runtime";
 import type { Task } from "../contracts";
 import type { EvidenceCatalog } from "./evidence-catalog";
@@ -18,13 +18,14 @@ export function saveGuidedReport(
 	now: number,
 	accepted: { hook?: SearchReportHook; packageId?: string } = {},
 ) {
+	const candidateResults = catalog.candidates.results(raw.candidateRefs ?? []);
 	const claims = raw.claims
 		.filter((c) => c.evidence.length > 0)
 		.map(({ text, evidence }) => ({ text, evidence }));
 	const refs = raw.claims.flatMap((c) => c.evidence);
 	if (catalog.referencedSources(refs).some((s) => s.basis !== "page" || !s.url))
 		throw new Error("invalid_evidence");
-	const report = verifyReport(
+	const baseReport = verifyReport(
 		catalog.report(
 			{
 				outcome: claims.length
@@ -46,12 +47,41 @@ export function saveGuidedReport(
 		true,
 		true,
 	);
+	const candidateSources = (raw.candidateRefs ?? []).map((ref) => {
+		const { body: _body, ...metadata } = catalog.candidates.source(ref);
+		return metadata;
+	});
+	if (!tools.validateEvidenceInTransaction(db, owner(task), candidateSources))
+		throw new Error("candidate_invalidated");
+	const report = {
+		...baseReport,
+		...(candidateResults.length
+			? {
+					candidateResults,
+					outcome: !claims.length
+						? ("candidates_found" as const)
+						: baseReport.outcome,
+					sources: [
+						...baseReport.sources,
+						...candidateSources.filter(
+							(s) => !baseReport.sources.some((b) => b.sourceId === s.sourceId),
+						),
+					],
+				}
+			: {}),
+	};
+	if (bytes(report) > 16384) throw new Error("report_too_large");
 	if (!tools.validateEvidenceInTransaction(db, owner(task), report.sources))
 		throw new Error("evidence_invalidated");
 	const projection = {
 		...parentProjection(report),
 		delivery: "guided-web",
-		answer: raw.answer,
+		answer: candidateResults.length
+			? `${raw.answer}\n\n${candidateResults.map((c) => `- [${c.title.replace(/[[\]\\]/g, "")}](<${c.url}>)（本文未確認）`).join("\n")}`
+			: raw.answer,
+		...(candidateResults.length
+			? { candidateResults, outcome: report.outcome }
+			: {}),
 		completion: raw.completion,
 		factStates: raw.claims.map(({ text, status }) => ({ text, status })),
 	};

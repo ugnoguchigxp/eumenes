@@ -1,3 +1,4 @@
+import { executionCallSession, type ChildExecution } from "../../tool-runtime";
 import { parseLlmJson } from "../../../infrastructure/llm-json";
 import type { Database } from "bun:sqlite";
 import { z } from "zod";
@@ -37,6 +38,7 @@ export function registerMusicHandlers(
 		id: string;
 		requestId: string;
 		prepared: Prepared;
+		execution?: ChildExecution;
 		context: ReturnType<typeof musicContext>;
 	};
 	const planHandler: HandlerDefinition<
@@ -57,17 +59,28 @@ export function registerMusicHandlers(
 				throw new Error("music_inference_unavailable");
 			const prepared = JSON.parse(r.bindings_json) as Prepared;
 			capabilities.validateInTransaction(db, prepared);
-			const requestId = inference.captureControlInTransaction(db, {
+			const execution = JSON.parse(r.request_json).execution;
+			if (execution && !deps.validateExecutionInTransaction?.(db, execution))
+				throw new Error("execution_changed");
+			const capture = {
 				subject: `music:${r.id}:plan`,
 				policySubject: r.run_id,
 				deadline: Math.min(r.deadline - 15000, Date.now() + 45000),
 				maxOutputTokens: prepared.package.revision >= 2 ? 4096 : 2048,
-			});
+			};
+			const requestId = execution
+				? inference.captureUserControlInTransaction!(db, {
+						...capture,
+						subject: `music-task:${r.id}-plan`,
+						route: "subagent",
+					})
+				: inference.captureControlInTransaction(db, capture);
 			return {
 				status: "ready",
 				input: {
 					id: r.id,
 					requestId,
+					execution,
 					prepared,
 					context: musicContext(prepared, JSON.parse(r.request_json)),
 				},
@@ -87,6 +100,7 @@ export function registerMusicHandlers(
 				messages,
 				signal,
 				input.context.control,
+				input.execution ? executionCallSession(input.execution) : undefined,
 			);
 			let value: unknown;
 			try {
@@ -139,6 +153,7 @@ export function registerMusicHandlers(
 		id: string;
 		plan: GenerationPlan;
 		prepared: Prepared;
+		execution?: ChildExecution;
 	};
 	const generateHandler: HandlerDefinition<
 		{ id: string },
@@ -255,7 +270,7 @@ export function registerMusicHandlers(
 				...(output.runtime ? { runtime: output.runtime } : {}),
 				actualModel: output.actualModel ?? output.artifact?.actualModel ?? null,
 			});
-			deps.onFinished(db, r.run_id);
+			if (!JSON.parse(r.request_json).execution) deps.onFinished(db, r.run_id);
 			return "applied";
 		},
 		cancelInTransaction: cancel,

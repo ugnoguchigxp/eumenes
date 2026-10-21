@@ -237,7 +237,10 @@ export function createToolchains(
 		if (d?.kind !== "toolchain" || !d.bindingRevisionId) return null;
 		const binding = storedBindingInTransaction(db, d.bindingRevisionId);
 		if (!binding) return null;
-		if (binding.document.execution === "instant")
+		if (
+			binding.document.execution === "instant" ||
+			binding.document.execution === "task"
+		)
 			return d.artifactRevisionId ? null : { binding, artifact: null as null };
 		const artifact = d.artifactRevisionId
 			? artifactInTransaction(db, d.artifactRevisionId)

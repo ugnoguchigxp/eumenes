@@ -11,5 +11,6 @@ export type {
 	WorkTask,
 	CodingWorkTask,
 	OrchestrationWorkTask,
+	TaskQuestion,
 } from "./contracts";
 export { migrations } from "./repository";

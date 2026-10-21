@@ -11,6 +11,16 @@ CREATE TABLE excalidraw_sessions(id TEXT PRIMARY KEY,request_id TEXT NOT NULL UN
 CREATE TABLE excalidraw_operations(id TEXT PRIMARY KEY,run_id TEXT NOT NULL UNIQUE,conversation_id TEXT NOT NULL,record_json TEXT NOT NULL,request_json TEXT NOT NULL,bindings_json TEXT NOT NULL,deadline INTEGER NOT NULL,job_id TEXT);
 `,
 	},
+	{
+		id: "excalidraw/0002-execution-calls",
+		after: ["excalidraw/0001-init"],
+		sql: `
+CREATE TABLE excalidraw_operations_next(id TEXT PRIMARY KEY,run_id TEXT NOT NULL,conversation_id TEXT NOT NULL,record_json TEXT NOT NULL,request_json TEXT NOT NULL,bindings_json TEXT NOT NULL,deadline INTEGER NOT NULL,job_id TEXT);
+INSERT INTO excalidraw_operations_next SELECT * FROM excalidraw_operations;
+DROP TABLE excalidraw_operations;
+ALTER TABLE excalidraw_operations_next RENAME TO excalidraw_operations;
+CREATE UNIQUE INDEX excalidraw_source_once ON excalidraw_operations(run_id) WHERE json_extract(request_json,'$.execution') IS NULL;`,
+	},
 ];
 export function getSession(db: Database, id: string): DrawingSession | null {
 	const r = db

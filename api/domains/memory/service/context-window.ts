@@ -53,6 +53,7 @@ export type WindowPrefetch = {
 	tokens: number;
 };
 export type WindowSnapshot = {
+	referenceItems?: StateLine[];
 	conversationId: string;
 	version: number;
 	buildId: string;
@@ -139,6 +140,7 @@ function currentState(db: Database, policyRevision: string, nowMs: number) {
 			return validity === "current" || validity === "unknown";
 		})
 		.map((item): StateLine => ({
+			validUntilMs: item.validUntilMs,
 			itemId: item.itemId,
 			revision: item.revision,
 			kind: item.kind,
@@ -278,6 +280,11 @@ export function createContextWindowStore(deps: {
 			(opts.addNotices ?? []).map((text) => ({ id: id(), text })),
 		);
 		const snapshot: WindowSnapshot = {
+			referenceItems: states.filter(
+				(line) =>
+					longTerm.manifest.some((m) => m.itemId === line.itemId) ||
+					recent.some((m) => m.itemId === line.itemId),
+			),
 			conversationId,
 			version: (readWindowKey(db, conversationId)?.version ?? 0) + 1,
 			buildId: id(),
@@ -338,7 +345,7 @@ export function createContextWindowStore(deps: {
 			conversationId: string,
 		): WindowSnapshot {
 			let snapshot = current(db, conversationId);
-			if (!snapshot)
+			if (!snapshot || !snapshot.referenceItems)
 				return rebuildInTransaction(db, conversationId, {
 					refreshLongTerm: true,
 				});

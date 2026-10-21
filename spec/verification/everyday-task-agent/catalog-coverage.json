@@ -1,0 +1,173 @@
+{
+  "kind": "offline registered catalog; runtime availability is checked separately",
+  "rows": [
+    {
+      "id": "browser.capture",
+      "revision": "toolchain:browser.capture@4",
+      "functionName": "browser_capture",
+      "execution": "command",
+      "adapter": "adapter:browser@1"
+    },
+    {
+      "id": "browser.operate",
+      "revision": "toolchain:browser.operate@4",
+      "functionName": "browser_operate",
+      "execution": "command",
+      "adapter": "adapter:browser@1"
+    },
+    {
+      "id": "claude-code.request",
+      "revision": "toolchain:claude-code.request@2",
+      "functionName": "claude_code",
+      "execution": "command",
+      "adapter": "adapter:terminals@1"
+    },
+    {
+      "id": "codex-tasks.manage",
+      "revision": "toolchain:codex-tasks.manage@2",
+      "functionName": "codex_tasks",
+      "execution": "command",
+      "adapter": "adapter:codex-tasks@1"
+    },
+    {
+      "id": "dots.delegate",
+      "revision": "toolchain:dots.delegate@1",
+      "functionName": "delegate_project",
+      "execution": "command",
+      "adapter": null
+    },
+    {
+      "id": "excalidraw.edit",
+      "revision": "toolchain:excalidraw.edit@1",
+      "functionName": "drawing_editor",
+      "execution": "excalidraw",
+      "adapter": null
+    },
+    {
+      "id": "history.research",
+      "revision": "toolchain:history.research@1",
+      "functionName": "conversation_history",
+      "execution": "research",
+      "adapter": null
+    },
+    {
+      "id": "image.create",
+      "revision": "toolchain:image.create@1",
+      "functionName": "image",
+      "execution": "image",
+      "adapter": null
+    },
+    {
+      "id": "kanban.manage",
+      "revision": "toolchain:kanban.manage@4",
+      "functionName": "kanban",
+      "execution": "command",
+      "adapter": "adapter:kanban@2"
+    },
+    {
+      "id": "model3d.studio",
+      "revision": "toolchain:model3d.studio@1",
+      "functionName": "model3d_studio",
+      "execution": "command",
+      "adapter": "adapter:model3d@1"
+    },
+    {
+      "id": "music.create",
+      "revision": "toolchain:music.create@2",
+      "functionName": "music",
+      "execution": "music-create",
+      "adapter": null
+    },
+    {
+      "id": "music.library",
+      "revision": "toolchain:music.library@1",
+      "functionName": "music_library",
+      "execution": "music-playback",
+      "adapter": null
+    },
+    {
+      "id": "object-recognition.manage",
+      "revision": "toolchain:object-recognition.manage@2",
+      "functionName": "object_recognition",
+      "execution": "command",
+      "adapter": null
+    },
+    {
+      "id": "ocr.manage",
+      "revision": "toolchain:ocr.manage@4",
+      "functionName": "ocr",
+      "execution": "command",
+      "adapter": "adapter:ocr@1"
+    },
+    {
+      "id": "steward.request",
+      "revision": "toolchain:steward.request@3",
+      "functionName": "memory_request",
+      "execution": "command",
+      "adapter": "adapter:steward@1"
+    },
+    {
+      "id": "stock.quote",
+      "revision": "toolchain:stock.quote@1",
+      "functionName": "stock_quote",
+      "execution": "instant",
+      "adapter": "adapter:stock@1"
+    },
+    {
+      "id": "task.execute",
+      "revision": "toolchain:task.execute@5",
+      "functionName": "execute_task",
+      "execution": "task",
+      "adapter": "adapter:task-execution@1"
+    },
+    {
+      "id": "timers.manage",
+      "revision": "toolchain:timers.manage@6",
+      "functionName": "timer",
+      "execution": "command",
+      "adapter": "adapter:timers@1"
+    },
+    {
+      "id": "ui.compose",
+      "revision": "toolchain:ui.compose@10",
+      "functionName": "ui_create",
+      "execution": "session",
+      "adapter": "adapter:ui-compositions@1"
+    },
+    {
+      "id": "weather.forecast",
+      "revision": "toolchain:weather.forecast@2",
+      "functionName": "weather_forecast",
+      "execution": "instant",
+      "adapter": "adapter:weather@1"
+    },
+    {
+      "id": "web.research.codex",
+      "revision": "toolchain:web.research.codex@4",
+      "functionName": "web_research",
+      "execution": "research",
+      "adapter": null
+    },
+    {
+      "id": "web.search",
+      "revision": "toolchain:web.search@7",
+      "functionName": "web_search",
+      "execution": "research",
+      "adapter": null
+    },
+    {
+      "id": "web.service-search",
+      "revision": "toolchain:web.service-search@3",
+      "functionName": "service_search",
+      "execution": "research",
+      "adapter": null
+    },
+    {
+      "id": "world.query",
+      "revision": "toolchain:world.query@7",
+      "functionName": "world_query",
+      "execution": "research",
+      "adapter": null
+    }
+  ]
+}

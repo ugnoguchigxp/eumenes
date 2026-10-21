@@ -89,6 +89,45 @@ export function createModel3dAdapter(service: Model3dService): DomainAdapter {
 	}
 	return {
 		ref: MODEL3D_ADAPTER_REF,
+		execution: {
+			currentInTransaction(db, operationId) {
+				const current = service.commandExecutionInTransaction(
+					db,
+					OWNER,
+					operationId,
+				);
+				const domain = current?.generation ?? current?.operation;
+				const state = !current
+					? "failed"
+					: !domain || domain.state === "completed"
+						? "completed"
+						: domain.state === "cancelled"
+							? "errorCode" in domain &&
+								domain.errorCode === "model3d_cancel_pending"
+								? "running"
+								: "errorCode" in domain &&
+									  domain.errorCode === "model3d_cancel_unconfirmed"
+									? "indeterminate"
+									: "cancelled"
+							: domain.state === "failed"
+								? "error_code" in domain &&
+									domain.error_code === "model3d_operation_unconfirmed"
+									? "indeterminate"
+									: "failed"
+								: "running";
+				return {
+					state,
+					ref: { operationId },
+					summary: JSON.stringify(current).slice(0, 2000),
+					output: current,
+					modelCalls: 0,
+					references: [],
+				};
+			},
+			cancelInTransaction: (db, operationId) =>
+				service.cancelCommandExecutionInTransaction(db, OWNER, operationId),
+			validateAnswerInTransaction: () => false,
+		},
 		describe: describeModel3dAdapter,
 		availableInTransaction: () => service.availableInTransaction(),
 		snapshotInTransaction: snapshot,
@@ -101,7 +140,10 @@ export function createModel3dAdapter(service: Model3dService): DomainAdapter {
 				generationRef?: string;
 				sourceImageRef?: string;
 			};
-			if (request.origin.kind === "conversation") {
+			if (
+				request.origin.kind === "conversation" ||
+				request.origin.kind === "task"
+			) {
 				// The conversation may only name what its snapshot showed.
 				const shown = snapshot(db);
 				if (
@@ -123,7 +165,7 @@ export function createModel3dAdapter(service: Model3dService): DomainAdapter {
 					throw new Error("model3d_image_not_found");
 			}
 			const conversationId =
-				request.origin.kind === "conversation"
+				request.origin.kind === "conversation" || request.origin.kind === "task"
 					? request.origin.conversationId
 					: "main";
 			const saved = service.commandInTransaction(
@@ -133,6 +175,9 @@ export function createModel3dAdapter(service: Model3dService): DomainAdapter {
 				op,
 				request.input as Parameters<Model3dService["commandInTransaction"]>[4],
 				request.requestId,
+				request.origin.kind === "task"
+					? { deadline: request.origin.execution.deadline }
+					: undefined,
 			);
 			return result(saved.value, request.requestId, saved.replay);
 		},

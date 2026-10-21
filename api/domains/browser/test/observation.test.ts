@@ -4,7 +4,7 @@ import {
 	SNAPSHOT_MAX_DEPTH,
 	SNAPSHOT_MAX_REFS,
 } from "../contracts";
-import { boundSnapshot } from "../service/observation";
+import { boundSnapshot, compactSnapshot } from "../service/observation";
 
 test("the limits are 32 KiB, depth 12 and 200 refs", () => {
 	expect(SNAPSHOT_MAX_BYTES).toBe(32768);
@@ -68,4 +68,39 @@ test("nodes deeper than the limit are left out with their subtree", () => {
 	expect(r.refs).toContain("e11");
 	expect(r.refs).not.toContain("e12");
 	expect(r.refs).toContain("e99");
+});
+
+test("collection compaction keeps deeply wrapped links actionable within the existing limits", () => {
+	const wrappers = Array.from(
+		{ length: 14 },
+		(_, i) => `${"  ".repeat(i)}- generic [ref=e${i}]:`,
+	);
+	const link = `${"  ".repeat(14)}- link "entry" [ref=e99]:\n${"  ".repeat(15)}- /url: /entry`;
+	const raw = [...wrappers, link, '- button "Next" [ref=e100]'].join("\n");
+	expect(boundSnapshot(raw).refs).not.toContain("e99");
+	const compact = compactSnapshot(raw);
+	expect(compact).toBe(
+		'- link "entry" [ref=e99]:\n  - /url: /entry\n- button "Next" [ref=e100]',
+	);
+	expect(boundSnapshot(compact)).toMatchObject({
+		refs: ["e99", "e100"],
+		truncated: false,
+	});
+	// Structurally meaningful groups still obey depth 12; compaction does not raise the limits.
+	const groups = Array.from(
+		{ length: 14 },
+		(_, i) => `${"  ".repeat(i)}- group "part" [ref=e${i}]:`,
+	).join("\n");
+	expect(boundSnapshot(compactSnapshot(groups)).refs).not.toContain("e12");
+});
+
+test("compaction preserves named, stateful, interactive and text-bearing generic nodes", () => {
+	const raw =
+		'- generic "label" [ref=e1]:\n  - text: content\n- generic [ref=e2] [cursor=pointer]:\n  - text: action\n- generic [expanded] [ref=e3]:\n  - text: state\n- generic [ref=e4]:\n    continuation\nplain continuation';
+	expect(compactSnapshot(raw)).toBe(raw);
+	const wrapped =
+		"- generic [ref=e0]:\n  - paragraph [ref=e5]:\nplain continuation";
+	expect(compactSnapshot(wrapped)).toBe(
+		"- paragraph [ref=e5]:\nplain continuation",
+	);
 });

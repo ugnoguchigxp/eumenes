@@ -1,6 +1,7 @@
 import type { Database } from "bun:sqlite";
 import type { ProfileSnapshot, Prepared } from "../../capabilities";
-import { get, byRoot, update } from "../repository";
+import { get, byRoot, byExecutionCall, update } from "../repository";
+import type { ChildExecution } from "../../tool-runtime";
 import { safeCode } from "./control-output";
 import { requestUrls } from "./request-urls";
 import { workerDeadline } from "./exploration";
@@ -33,15 +34,22 @@ export function createStartTask(ctx: RuntimeContext, ops: TaskOps) {
 				actionCapability?: Prepared;
 				requirementProfiles?: ProfileSnapshot[];
 				onCreated?: (taskId: string) => void;
+				execution?: ChildExecution;
 			},
 		) {
-			const existing = byRoot(db, input.rootRunId);
+			const existing = input.execution
+				? byExecutionCall(db, input.execution.dispatchId ?? input.execution.id)
+				: byRoot(db, input.rootRunId);
 			if (existing)
 				return {
 					taskId: existing.id,
 					jobId: existing.job_id ?? input.parentJobId ?? existing.id,
 				};
-			const request = input.input as {
+			const request = {
+				...(input.input as Record<string, unknown>),
+				...(input.execution ? { execution: input.execution } : {}),
+			} as {
+				execution?: ChildExecution;
 				kind?: "web" | "history" | "world" | "action";
 				question: string;
 				originalRequest?: string;
@@ -134,6 +142,9 @@ export function createStartTask(ctx: RuntimeContext, ops: TaskOps) {
 					root.root_run_id,
 					{
 						...workerInput,
+						...(request.execution?.referenceData
+							? { references: request.execution.referenceData }
+							: {}),
 						originalRequest: request.originalRequest ?? request.question,
 						requirementProfiles: input.requirementProfiles ?? [],
 						// The history sub-agent chooses applicable profiles from this snapshot.
@@ -144,8 +155,13 @@ export function createStartTask(ctx: RuntimeContext, ops: TaskOps) {
 								}
 							: {}),
 						researcher: request.researcher,
+						execution: request.execution,
 					},
-					workerDeadline(root.deadline, now()),
+					workerDeadline(
+						root.deadline,
+						now(),
+						packageId.replace(/^package:|@\d+$/g, ""),
+					),
 					root.id,
 				);
 				childId = child.id;

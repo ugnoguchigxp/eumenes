@@ -22,7 +22,7 @@ export type TaskRow = {
 	continued_from: string | null;
 	owner: string;
 	conversation_id: string;
-	origin: "conversation" | "screen";
+	origin: "conversation" | "screen" | "child" | "task";
 	request_id: string;
 	request: string;
 	tab_ref: string | null;
@@ -81,7 +81,7 @@ export function insertTask(
 		id: string;
 		owner: string;
 		conversationId: string;
-		origin: "conversation" | "screen";
+		origin: "conversation" | "screen" | "child" | "task";
 		requestId: string;
 		request: string;
 		tabRef: string | null;

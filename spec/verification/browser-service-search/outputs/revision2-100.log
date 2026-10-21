@@ -1,0 +1,156 @@
+bun test v1.4.3 (c6da4a4d3)
+
+api/application/toolchain/service-search.test.ts:
+(pass) conversation → browser child → native candidates → saved answer [523.17ms]
+(pass) conversation → browser child → external fallback → saved answer [451.48ms]
+(pass) conversation → browser child → empty connected browser → saved answer [442.21ms]
+
+api/application/toolchain/service-search-lifecycle.test.ts:
+(pass) delegated prose cannot manufacture a quotation that authorizes browser input [328.64ms]
+(pass) revoked parent cannot adopt a late browser finish or emit a second conversation notice [324.23ms]
+(pass) native work expires while the parent's fallback reserve remains [321.85ms]
+(pass) accepted candidates survive native expiry for partial adoption [327.01ms]
+(pass) accepted candidates are discarded after authority revocation [322.92ms]
+
+api/domains/capabilities/test/command-agent-binding.test.ts:
+(pass) a command binding takes agent.turn as the policy of its single-shot task, and stays valid without it [3.29ms]
+(pass) the bundle check accepts the existing command binding with or without agent.turn [84.47ms]
+(pass) the bundle check refuses retries that name a tool the binding does not have [77.67ms]
+
+api/domains/capabilities/test/prepare-learned.test.ts:
+(pass) C01 learned registration rejects conflicts, bad bundles and oversize; builtin hashes unchanged [17.53ms]
+(pass) C01 5000 learned definitions never enter FTS/alias/list and do not displace builtins [261.06ms]
+(pass) seed adds newer research rules and packages without touching old revisions [14.04ms]
+(pass) new research packages expose generic acquisition without topic-specific tools or skills [12.56ms]
+(pass) C02 prepare by ID keeps shared checks; independent registration does not disturb A; GC spares builtins/protected [14.02ms]
+
+api/domains/capabilities/test/requirement-schema.test.ts:
+(pass) enum values must also satisfy bounds and formats at every nested node [1.80ms]
+(pass) R04 unsupported keywords, incompatible keywords and resource limits reject before conversion [0.11ms]
+(pass) R05 standard schema conversion is strict and does not coerce, default or ignore fields [0.74ms]
+(pass) optional string bounds preserve explicit constraints and the overall value capacity [0.13ms]
+(pass) a rejected value schema reports where and why, never its keys or values [0.04ms]
+
+api/domains/capabilities/test/instant-binding.test.ts:
+(pass) the shipped weather bundle is seeded: an instant toolchain with a binding and no artifact [34.93ms]
+(pass) an instant binding has no field filled from the host's values: its arguments are the model's [38.50ms]
+(pass) an adapter that does not answer instant bindings is refused [35.31ms]
+(pass) an instant toolchain that also names an artifact is refused [35.86ms]
+(pass) an instant binding takes exactly one tool [40.23ms]
+(pass) the shipped stock bundle is an instant toolchain [35.98ms]
+
+api/domains/capabilities/test/capabilities.test.ts:
+(pass) quick Web capability grants only lookup and read and preserves deep research tools [0.81ms]
+(pass) 5000 capability catalogue: bounded discovery, exact aliases, immutable revisions and owner isolation [5012.38ms]
+(pass) builtin SKILL is mandatory; disabling survives seed and dependency failure hides package [29.36ms]
+(pass) revoking a dependency permanently invalidates already issued candidates, even after re-enabling [15.41ms]
+(pass) builtin bundle upgrade preserves revision 1 fingerprints and activates a new revision for the larger input contract [17.19ms]
+(pass) deployed research skill v3 upgrades without a revision conflict and restart preserves hashes [25.65ms]
+(pass) seed still rejects a changed newest builtin revision [10.23ms]
+(pass) history and web catalogue selection can be enabled independently without editing archived revisions [24.61ms]
+
+api/domains/capabilities/test/toolchain-candidates.test.ts:
+(pass) the current request embedding selects music.create despite past choices and unrelated text matches [21.21ms]
+(pass) the current request embedding selects image.create despite past choices and unrelated text matches [20.98ms]
+(pass) the current request embedding selects excalidraw.edit despite past choices and unrelated text matches [20.58ms]
+(pass) strict discovery has no all-catalog fallback and excludes retained revisions before the top four [22.49ms]
+
+api/domains/capabilities/test/web-research-rename.test.ts:
+(pass) the model-named Web research toolchain is retired and the model-neutral one registers in its place [57.02ms]
+
+api/domains/capabilities/test/task-binding.test.ts:
+(pass) task binding is bounded, has no artifact and rejects unknown execution kinds [3.98ms]
+(pass) the task bundle registers without a dummy artifact and reseeds immutable revisions [127.42ms]
+
+api/domains/capabilities/test/timer-compatibility.test.ts:
+(pass) timer UI pausing keeps the deployed version 1 input schemas and accepts paused result state [0.63ms]
+(pass) the bound-command inputs accept exactly the shapes the UI and the questions send [0.42ms]
+
+api/domains/capabilities/test/music-versions.test.ts:
+(pass) installed V1 music definitions survive the V3 upgrade and repeated seeding [25.13ms]
+(pass) V1 keeps its schema while V2 enforces the verified integer duration and vocal fields [0.47ms]
+(pass) V3 describes music/vocals/SFX without changing historical schemas [0.60ms]
+
+api/domains/capabilities/test/requirements.test.ts:
+(pass) profile validity compares instants with mixed fractional-second precision [0.55ms]
+(pass) R02/R03/R06 immutable profile revisions, CAS, independent catalogs and invalidation [15.86ms]
+
+api/domains/capabilities/test/learned.test.ts:
+
+api/domains/capabilities/test/lookup-upgrade.test.ts:
+(pass) deployed search schemas survive upgrade; current packages use the new tool revision and reseed safely [65.80ms]
+
+api/domains/capabilities/test/image.test.ts:
+(pass) image seed is additive, repeatable and published with one flat request schema [21.61ms]
+
+api/domains/capabilities/test/standalone-artifacts-forms.test.ts:
+(pass) structure actions must be registered by the document's adapter with its input schema [9.22ms]
+(pass) collection sources, paging and row actions are checked against this artifact's bindings [9.18ms]
+(pass) row input keys must be top-level properties of the action's input, on write and structure actions only [8.48ms]
+(pass) the create form must match the action input and keep secrets declared [10.24ms]
+(pass) form options come from fixed values or a registered query of the source's adapter [10.36ms]
+(pass) a row edit form adds fields to the row-built input without overlapping it [9.11ms]
+(pass) form defaults fit their control, and refresh-while keeps to an existing source [10.40ms]
+(pass) structure actions can be row actions and create actions, and ids may be generated [9.31ms]
+(pass) a clean-draft requirement names a registered document that the artifact uses [7.47ms]
+
+api/domains/capabilities/test/bundles.test.ts:
+(pass) the shipped bundle's pin is the stored digest and its toolchain is data-driven [67.68ms]
+(pass) a bundle the host cannot run is skipped whole, and without a host nothing is added [77.15ms]
+(pass) old revisions keep their JSON and hash, and publication moves back and forth [60.55ms]
+(pass) rolling the pointer back to the unbound revision removes the chain from the offer until a bound revision is published [42.79ms]
+(pass) the dry run lists every problem and writes nothing [24.74ms]
+(pass) each kind of reference problem is refused [137.88ms]
+(pass) a failing toolchain rolls back its documents and keeps the published revision [19.47ms]
+(pass) documents are immutable: the same id with other content is a conflict, the same content a no-op [26.77ms]
+(pass) binding fields belong to toolchains only and need a matching binding [12.97ms]
+(pass) a bound tool is prepared with its own schema and only from an active package [39.59ms]
+(pass) a timer start without a duration is defined as the 3 minute default, not as a question [37.30ms]
+(pass) stored schemas are served as validators; unknown and domain references are not [16.02ms]
+(pass) a bound toolchain is shown by its artifact registration: artifact is optional there, and unbound ones still need one [36.68ms]
+(pass) question schemas must be readable validators and the choice field one of their fields [62.10ms]
+(pass) an install already at revision 2 is upgraded to the latest, and revision 2 stays a valid rollback target [50.11ms]
+(pass) toolchain publication over HTTP is compare-and-set and can roll back [41.85ms]
+
+api/domains/capabilities/test/session-binding.test.ts:
+(pass) a session binding passes the check and registers as a toolchain with the session execution [44.33ms]
+(pass) a session binding's references are all checked [72.02ms]
+(pass) a session binding with command-only fields or an unknown execution is refused [40.85ms]
+(pass) the registry refuses a session binding whose tool schema differs from the package tool's [35.30ms]
+(pass) a session binding may carry its own time limits: each 10 s to 60 min, inference <= turn <= run [3.06ms]
+
+api/domains/capabilities/test/settings-google.test.ts:
+(pass) Google settings bundle exposes no AI definitions or bindings
+
+api/domains/capabilities/test/standalone-artifacts.test.ts:
+(pass) launcher artifacts are published without a toolchain, with the final entry shape [9.21ms]
+(pass) a newer revision switches the published pointer, an old one is a rollback, and re-import keeps the choice [10.35ms]
+(pass) fields are checked against the adapter that owns the document [8.81ms]
+(pass) a field id is unique across the whole published catalog, but a revision may keep its own [9.85ms]
+(pass) draft documents, navigation targets and apply operations must be registered [9.13ms]
+(pass) a refused bundle publishes nothing [10.96ms]
+(pass) a navigate-by-value map is checked for every target, and a default value stays display-only [11.04ms]
+(pass) a field must agree with what the document schema says about its path [9.81ms]
+(pass) confidential values travel only in declared input properties of every write that applies the document [8.83ms]
+(pass) source params schemas must resolve [7.56ms]
+(pass) revisions of one artifact id inside a bundle may carry the same fields [7.32ms]
+(pass) artifact publication over HTTP is compare-and-set [8.19ms]
+
+api/domains/capabilities/test/json-schema-subset.test.ts:
+(pass) the finite subset becomes a strict validator with the stated bounds [0.55ms]
+(pass) anything outside the subset is refused with its path, never dropped [0.15ms]
+
+api/domains/capabilities/test/requirement-controller.test.ts:
+(pass) management API validates bodies, exposes CAS state and keeps requirement profiles out of executable catalog [9.86ms]
+
+api/domains/capabilities/test/web-guided.test.ts:
+(pass) new Web revisions upgrade and reseed without changing archived definitions [78.09ms]
+
+api/domains/agent-runtime/test/guided-candidates.test.ts:
+(pass) only displayed live candidates may be returned or resolved into reads [0.17ms]
+(pass) candidate references never stand in for body facts [0.58ms]
+
+ 100 pass
+ 0 fail
+ 924 expect() calls
+Ran 100 tests across 25 files. [11.43s]

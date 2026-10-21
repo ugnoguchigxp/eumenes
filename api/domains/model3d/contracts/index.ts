@@ -56,7 +56,7 @@ export const model3dGeneration = z.object({
 	warnings: z.array(z.string()),
 	errorCode: z.string().nullable(),
 	errorLabel: z.string().nullable(),
-	origin: z.enum(["conversation", "screen"]),
+	origin: z.enum(["conversation", "screen", "task"]),
 	createdAt: z.number(),
 	updatedAt: z.number(),
 	revision: z.number().int(),

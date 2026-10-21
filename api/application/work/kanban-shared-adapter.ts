@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import { kanbanExecution } from "./kanban-execution";
 import {
 	kanbanSharedAdd,
 	kanbanExecutorRef,
@@ -221,6 +222,19 @@ export function extendKanbanAdapter(
 	return {
 		...base,
 		ref: SHARED_KANBAN_ADAPTER_REF,
+		execution: kanbanExecution(kanban, {
+			cancel: (db, runId, cardId) =>
+				registry
+					.port(kanban.cardExecutorInTransaction(db, cardId).id)
+					?.cancelQueuedInTransaction(db, runId) ?? false,
+			stop: async (operationId) => {
+				const run = kanban.executionRun(operationId);
+				return (
+					!run ||
+					(await registry.port(run.executorId)?.stop(run.id)) === "confirmed"
+				);
+			},
+		}),
 		describe: () => describeSharedKanbanAdapter(base.describe()),
 		snapshotInTransaction: (tx) => {
 			const current = board(tx);
@@ -262,9 +276,14 @@ export function extendKanbanAdapter(
 				return base.invokeInTransaction(tx, request);
 			const context: KanbanOperationContext = {
 				origin:
-					request.origin.kind === "conversation" ? "conversation" : "board",
+					request.origin.kind === "task"
+						? "execution"
+						: request.origin.kind === "conversation"
+							? "conversation"
+							: "board",
 				conversationId:
-					request.origin.kind === "conversation"
+					request.origin.kind === "conversation" ||
+					request.origin.kind === "task"
 						? request.origin.conversationId
 						: undefined,
 				runnable: runnable(),

@@ -1,3 +1,4 @@
+import { CandidateCatalog } from "./candidate-catalog";
 import { ValidationFailure } from "../../../infrastructure/validation-log";
 import { bytes } from "../../capabilities";
 import type { Source } from "../../tool-runtime";
@@ -13,6 +14,7 @@ export const MATERIAL_BYTES = 32768;
 const MATERIAL_RESERVE_BYTES = 512;
 /** Task-scoped immutable references. Bodies remain in the tool vault; no durable copy. */
 export class EvidenceCatalog {
+	candidates = new CandidateCatalog();
 	constructor(private structuredWeb = false) {}
 	private documents = new Map<string, string>();
 	private entries = new Map<
@@ -27,6 +29,7 @@ export class EvidenceCatalog {
 	full = false;
 	copy() {
 		const copy = new EvidenceCatalog(this.structuredWeb);
+		copy.candidates = this.candidates.copy();
 		copy.documents = new Map(this.documents);
 		copy.entries = new Map(this.entries);
 		copy.identities = new Map(this.identities);
@@ -63,6 +66,11 @@ export class EvidenceCatalog {
 	arguments(raw: unknown) {
 		if (!raw || typeof raw !== "object" || Array.isArray(raw)) return raw;
 		const args = { ...raw } as Record<string, unknown>;
+		if (typeof args.candidateRef === "string") {
+			if (args.url !== undefined) throw new Error("invalid_tool_input");
+			args.url = this.candidates.source(args.candidateRef).url;
+			delete args.candidateRef;
+		}
 		if (typeof args.sourceRef === "string")
 			args.sourceRef = this.document(args.sourceRef, "sourceRef");
 		if (typeof args.messageRef === "string")

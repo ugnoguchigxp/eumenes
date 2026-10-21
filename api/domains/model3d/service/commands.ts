@@ -7,6 +7,8 @@ import {
 	knownAsset,
 	listGenerations,
 	ownedGeneration,
+	generationView,
+	operationRow,
 	pendingOperations,
 	recentAssets,
 	setFocus,
@@ -37,7 +39,8 @@ export function createModel3dCommands(deps: {
 		input: {
 			owner: string;
 			conversationId: string;
-			origin: "conversation";
+			origin: "conversation" | "task";
+			deadline?: number;
 			requestId: string;
 			title: string;
 			tags: string[];
@@ -49,7 +52,10 @@ export function createModel3dCommands(deps: {
 		owner: string,
 		id: string,
 	): Model3dGeneration;
-	enqueueOperation(db: Database, row: { id: string; assetId: string }): void;
+	enqueueOperation(
+		db: Database,
+		row: { id: string; assetId: string; deadline?: number },
+	): void;
 }) {
 	function asset(db: Database, owner: string, id: string | undefined) {
 		const a = id ? knownAsset(db, owner, id) : null;
@@ -63,6 +69,7 @@ export function createModel3dCommands(deps: {
 		kind: "update" | "delete",
 		assetId: string,
 		patch: { title?: string; tags?: string[] } | null,
+		deadline?: number,
 	) {
 		const id = crypto.randomUUID();
 		const now = Date.now();
@@ -79,7 +86,8 @@ export function createModel3dCommands(deps: {
 			now,
 			now,
 		);
-		deps.enqueueOperation(db, { id, assetId });
+		deps.enqueueOperation(db, { id, assetId, deadline });
+		return id;
 	}
 	function run(
 		db: Database,
@@ -88,6 +96,7 @@ export function createModel3dCommands(deps: {
 		op: Model3dOperation,
 		input: Model3dCommandInput,
 		requestId: string,
+		execution?: { deadline: number },
 	): unknown {
 		switch (op) {
 			case "open":
@@ -99,7 +108,8 @@ export function createModel3dCommands(deps: {
 				const generation = deps.createInTransaction(db, {
 					owner,
 					conversationId,
-					origin: "conversation",
+					origin: execution ? "task" : "conversation",
+					deadline: execution?.deadline,
 					requestId: `conversation:${requestId}`,
 					title: input.title ?? "",
 					tags: input.tags ?? [],
@@ -151,10 +161,19 @@ export function createModel3dCommands(deps: {
 				};
 				if (!patch.title && !patch.tags)
 					throw new Error("model3d_empty_update");
-				operation(db, owner, conversationId, "update", a.id, patch);
+				const operationRef = operation(
+					db,
+					owner,
+					conversationId,
+					"update",
+					a.id,
+					patch,
+					execution?.deadline,
+				);
 				setFocus(db, owner, FOCUS_SLOT, { kind: "asset", assetId: a.id });
 				return {
 					action: "update",
+					...(execution ? { operationRef } : {}),
 					state: "accepted",
 					asset: {
 						assetRef: a.id,
@@ -165,9 +184,18 @@ export function createModel3dCommands(deps: {
 			}
 			case "delete": {
 				const a = asset(db, owner, input.assetRef);
-				operation(db, owner, conversationId, "delete", a.id, null);
+				const operationRef = operation(
+					db,
+					owner,
+					conversationId,
+					"delete",
+					a.id,
+					null,
+					execution?.deadline,
+				);
 				return {
 					action: "delete",
+					...(execution ? { operationRef } : {}),
 					state: "accepted",
 					asset: { assetRef: a.id, title: a.title },
 					note: "元の画像ライブラリの画像は残ります。",
@@ -197,8 +225,11 @@ export function createModel3dCommands(deps: {
 			op: Model3dOperation,
 			input: Model3dCommandInput,
 			requestId: string,
+			execution?: { deadline: number },
 		) {
-			const inputJson = JSON.stringify(input);
+			const inputJson = JSON.stringify(
+				execution ? { ...input, execution } : input,
+			);
 			const previous = db
 				.query(
 					"SELECT owner,conversation_id,operation,input_json,result_json FROM model3d_commands WHERE request_id=?",
@@ -220,7 +251,15 @@ export function createModel3dCommands(deps: {
 					throw new Error("request_conflict");
 				return { value: JSON.parse(previous.result_json), replay: true };
 			}
-			const value = run(db, owner, conversationId, op, input, requestId);
+			const value = run(
+				db,
+				owner,
+				conversationId,
+				op,
+				input,
+				requestId,
+				execution,
+			);
 			db.query(
 				"INSERT INTO model3d_commands(request_id,owner,conversation_id,operation,input_json,result_json) VALUES(?,?,?,?,?,?)",
 			).run(
@@ -242,6 +281,7 @@ export function createModel3dCommands(deps: {
 			return r ? JSON.parse(r.result_json) : null;
 		},
 		/** What the command specialist may target: host refs only, never IDs the model invents. */
+		commandExecutionInTransaction,
 		snapshotInTransaction(db: Database, owner: string) {
 			const focus = focusOf(db, owner, FOCUS_SLOT);
 			const recent = recentAssets(db, owner, 10);
@@ -284,5 +324,33 @@ export function createModel3dCommands(deps: {
 				return false;
 			}
 		},
+	};
+}
+
+function commandExecutionInTransaction(
+	db: Database,
+	owner: string,
+	requestId: string,
+) {
+	const row = db
+		.query(
+			"SELECT result_json FROM model3d_commands WHERE request_id=? AND owner=?",
+		)
+		.get(requestId, owner) as { result_json: string } | null;
+	if (!row) return null;
+	const receipt = JSON.parse(row.result_json) as {
+		generation?: { generationRef: string };
+		operationRef?: string;
+	};
+	return {
+		receipt,
+		generation: receipt.generation?.generationRef
+			? generationView(
+					ownedGeneration(db, receipt.generation.generationRef, owner),
+				)
+			: null,
+		operation: receipt.operationRef
+			? operationRow(db, receipt.operationRef)
+			: null,
 	};
 }

@@ -90,22 +90,13 @@ function validateTimeout(acquisitionTimeoutMs: number) {
 	)
 		throw new Error("invalid_web_timeout");
 }
-export function createWebResearch({
-	store,
-	queue,
-	cache,
-	acquisition = createWebAcquisition(),
-	now = Date.now,
-	id = () => crypto.randomUUID(),
-	acquisitionTimeoutMs = 30000,
-	timers = {
-		set: (fn: () => void, ms: number): unknown => setTimeout(fn, ms),
-		clear: (handle: unknown) => clearTimeout(handle as never),
-	},
-}: {
+interface WebResearchOptions {
 	store: SqliteStore;
 	queue: QueueService;
 	cache?: WebCache;
+	review?: (
+		input: import("llm-fetch").GuardReviewInput,
+	) => Promise<import("llm-fetch").GuardReviewDecision>;
 	acquisition?: AcquisitionPort;
 	now?: () => number;
 	id?: () => string;
@@ -115,7 +106,21 @@ export function createWebResearch({
 		set(fn: () => void, ms: number): unknown;
 		clear(handle: unknown): void;
 	};
-}) {
+}
+export function createWebResearch({
+	store,
+	queue,
+	cache,
+	review,
+	acquisition = createWebAcquisition(),
+	now = Date.now,
+	id = () => crypto.randomUUID(),
+	acquisitionTimeoutMs = 30000,
+	timers = {
+		set: (fn: () => void, ms: number): unknown => setTimeout(fn, ms),
+		clear: (handle: unknown) => clearTimeout(handle as never),
+	},
+}: WebResearchOptions) {
 	validateTimeout(acquisitionTimeoutMs);
 	// Delivery buffer, not a persistent search cache. Completed results expire after 15 minutes.
 	const savedBodies = createSavedBodies(now);
@@ -522,6 +527,8 @@ export function createWebResearch({
 		return [run.job_id];
 	}
 	return {
+		reviewCollected: async (input: import("llm-fetch").GuardReviewInput) =>
+			(await review?.(input))?.decision === "source_content",
 		savedBodies,
 		submitInTransaction,
 		cancelInTransaction,

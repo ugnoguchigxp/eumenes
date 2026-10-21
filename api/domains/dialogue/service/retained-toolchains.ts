@@ -106,8 +106,14 @@ function cost(
 	const cards = entries
 		.map((entry) => entry.card)
 		.sort((a, b) => a.revisionId.localeCompare(b.revisionId));
-	const tools = analysisTools(cards, sessionFunctionNames(deps, cards));
-	const common = analysisTools([]);
+	const tools = analysisTools(
+		cards,
+		sessionFunctionNames(deps, cards),
+		false,
+		undefined,
+		false,
+	);
+	const common = analysisTools([], new Set(), false, undefined, false);
 	return (
 		estimateJsonTokens(tools) -
 		estimateJsonTokens(common) +
