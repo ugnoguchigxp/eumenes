@@ -47,7 +47,14 @@ function usableAdapters(
 	const adapters = new Map<string, DomainAdapter>();
 	for (const ref of refs) {
 		const adapter = ctx.registry.get(ref);
-		if (!adapter || !adapter.availableInTransaction(db)) return undefined;
+		if (
+			!adapter ||
+			!(
+				adapter.artifactAvailableInTransaction?.(db) ??
+				adapter.availableInTransaction(db)
+			)
+		)
+			return undefined;
 		adapters.set(ref, adapter);
 	}
 	return adapters;

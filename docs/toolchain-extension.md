@@ -6,6 +6,8 @@
 
 [作業規則](../AGENTS.md)を守る。依頼の解釈・担当選択・不足情報の判断はLLMに任せ、発話の語句・企業名・地域による振り分けを追加しない。コードで書くのは、登録済みの操作をdomainへ接続する型付きadapterだけにする。
 
+CPU計算は `compute.bundle.json` と `adapter:compute@1` で追加する。4操作、永続ジョブ、取消、成果物表示の契約は [Python計算](compute.md) と [CPU統合設計](../spec/compute-cpu-integration-design-2026-10-21.md)。外部サービスは保存済みControlと同一originの広告から発見し、環境取得に成功したときに新規実行を公開する。
+
 ## 1. 全体像
 
 | 単位 | 置き場所 | 持つもの |
@@ -192,7 +194,8 @@ Seedに含めるのは再利用する定義だけで、会話、実行・操作�
 | メソッド | 役割 |
 | --- | --- |
 | `ref`・`describe()` | `adapter:<owner>@1`、操作（入力schema・effect）、query、入力変換、projection、可用性 |
-| `availableInTransaction` | このhostで今使えるか。falseなら会話にもランチャーにも出ない |
+| `availableInTransaction` | このhostで今実行できるか。falseなら会話の候補に出ない。画面の利用可否も指定がなければこれを使う |
+| `artifactAvailableInTransaction`（任意） | 未接続でもローカル履歴・空状態を開ける画面の利用可否。省略時は従来の `availableInTransaction`。登録・所有者・source・actionの検査は維持する |
 | `snapshotInTransaction` | command担当に見せる対象一覧（hostのデータ。モデル生成IDを含めない） |
 | `invokeInTransaction` | 検証済み入力で一操作。domainの既存公開transaction操作を呼び、receipt・receiptRef・resultRefs・replay・会話回答用 `answerContext` を返す。拒否は `/^[a-z_]+$/` のcodeで投げる |
 | `readInTransaction` | 保存済みreceiptの再読込み（回答直前のrefresh・照合） |

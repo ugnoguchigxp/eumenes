@@ -3,6 +3,7 @@ import {
 	type GoogleAccounts,
 } from "../domains/google-accounts";
 import { registerOcr, type OcrService } from "../domains/ocr";
+import { registerCompute, type ComputeService } from "../domains/compute";
 import { registerModel3d, type Model3dService } from "../domains/model3d";
 import { registerBrowser, type BrowserService } from "../domains/browser";
 import {
@@ -136,6 +137,7 @@ export type AppServices = {
 	objectRecognition?: ObjectRecognitionService;
 	ocr?: OcrService;
 	model3d?: Model3dService;
+	compute?: ComputeService;
 	browser?: BrowserService;
 	tasks?: TasksService;
 	coding?: CodingService;
@@ -181,6 +183,10 @@ export function appModules(services: AppServices): AppModule[] {
 					(text, conversationId, requestId) =>
 						s.dialogue.submit({ text, conversationId, requestId }),
 				),
+		},
+		s.compute && {
+			mount: (app) =>
+				registerCompute(app, s.compute!, CONVERSATION_DEFAULT_PRINCIPAL),
 		},
 		s.model3d && {
 			mount: (app) =>

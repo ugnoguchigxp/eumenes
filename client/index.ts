@@ -1,3 +1,4 @@
+import { computeClient } from "./compute";
 import { googleAccountsClient } from "./google-accounts";
 import { ocrClient } from "./ocr";
 import { objectRecognitionClient } from "./object-recognition";
@@ -36,6 +37,7 @@ export { ApiError, ApiConnectionError } from "./transport";
 export function createClient(baseUrl: string, token?: string) {
 	const transport = createTransport(baseUrl, token);
 	return {
+		...computeClient(transport),
 		...musicClient(transport),
 		...imageClient(transport),
 		...objectRecognitionClient(transport),

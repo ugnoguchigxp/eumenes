@@ -13,7 +13,7 @@ import {
 	planFinished,
 	runnablePlanItems,
 	canPlan,
-	executedStepRefs,
+	completedStepRefs,
 } from "./execution-plan";
 
 const refs = z.array(z.string().min(1).max(160)).max(32);
@@ -26,7 +26,7 @@ export const finishExecution = z.strictObject({
 const controls = {
 	set_plan: {
 		description:
-			"最初に、依頼全体の達成条件、一子呼出しごとの小さい操作計画、最終報告の内容を作る。途中の改訂は未実行部分だけを置き換える。実行済みの操作は追加せず、結果を再利用する。予算・期限は戻らない。",
+			"最初に、依頼全体の達成条件、一子呼出しごとの小さい操作計画、最終報告の内容を作る。途中の改訂は未実行部分だけを置き換える。itemsのキーはrequest、check、dependsOnだけにし、stepRef・state・resultRefは含めない。実行済みの操作は追加せず、結果を再利用する。予算・期限は戻らない。",
 		schema: executionPlanInput,
 	},
 	find_toolchain: {
@@ -138,6 +138,7 @@ export function executionTools(
 		if (
 			name === "find_toolchain" &&
 			(state.selecting ||
+				!steps.length ||
 				state.searches >= state.limits.searches ||
 				state.children >= state.limits.childCalls)
 		)
@@ -155,7 +156,7 @@ export function executionTools(
 			properties.items.maxItems = state.limits.childCalls - state.children;
 			properties.items.minItems = state.plan ? 0 : 1;
 			const dependency = properties.items.items.properties.dependsOn.items;
-			const executed = executedStepRefs(state);
+			const executed = completedStepRefs(state);
 			dependency.anyOf = executed.length
 				? dependency.anyOf.map((option: Record<string, unknown>) =>
 						option.type === "string" ? { ...option, enum: executed } : option,
@@ -293,7 +294,7 @@ export function executionRepair(code: string) {
 		"execution_plan_arguments_invalid",
 		"execution_plan_invalid",
 	].includes(code)
-		? " set_plan takes goal:string, report:string and items whose keys are only request:string, check:string and dependsOn. dependsOn lists earlier indexes within the new items or stepRefs of executed items. Omit stepRef, state and result fields in items: the host owns execution progress."
+		? " set_plan takes goal:string, report:string and items whose keys are request:string, dependsOn and check:string, all required. dependsOn lists earlier indexes within the new items or stepRefs of completed items. Omit stepRef, state and result fields in items: the host owns execution progress."
 		: "";
 	return `Contract error: ${code}. Return exactly one offered function with valid arguments and only offered references.${hint}`;
 }

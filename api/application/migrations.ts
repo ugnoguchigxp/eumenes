@@ -1,5 +1,6 @@
 import { migrations as googleAccountsMigrations } from "../domains/google-accounts";
 import { migrations as ocrMigrations } from "../domains/ocr";
+import { migrations as computeMigrations } from "../domains/compute";
 import { migrations as model3dMigrations } from "../domains/model3d";
 import { migrations as browserMigrations } from "../domains/browser";
 import { migrations as excalidrawMigrations } from "../domains/excalidraw";
@@ -167,6 +168,7 @@ const catalog: readonly Migration[] = [
 	...objectRecognitionMigrations,
 	...ocrMigrations,
 	...model3dMigrations,
+	...computeMigrations,
 	...browserMigrations,
 	...webResearchMigrations,
 	...capabilitiesMigrations,

@@ -1,3 +1,4 @@
+import { computeWebAdapter } from "../domains/compute/toolchain-adapter";
 import { codexTasksWebAdapter } from "../domains/codex-tasks/toolchain-adapter";
 import { googleAccountsWebAdapter } from "../domains/google-accounts/toolchain-adapter";
 import { ocrWebAdapter } from "../domains/ocr/toolchain-adapter";
@@ -24,6 +25,7 @@ export const toolchainWebAdapters = createWebAdapterRegistry([
 	musicScreenWebAdapter,
 	imageScreenWebAdapter,
 	model3dWebAdapter,
+	computeWebAdapter,
 	browserWebAdapter,
 	uiCompositionsWebAdapter,
 	objectRecognitionScreenWebAdapter,

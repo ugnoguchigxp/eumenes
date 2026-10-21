@@ -116,6 +116,12 @@ import {
 	uiCompositionsDomainSchemas,
 } from "../media/ui-compositions-adapter";
 
+import {
+	COMPUTE_ADAPTER_REF,
+	describeComputeAdapter,
+	computeDomainSchemas,
+} from "../compute/compute-adapter";
+
 /** `domain:` result schemas registered by the host's adapters. */
 const domainSchemas: Readonly<Record<string, ZodType>> = {
 	...timerDomainSchemas,
@@ -128,6 +134,7 @@ const domainSchemas: Readonly<Record<string, ZodType>> = {
 	]),
 	...uiCompositionsDomainSchemas,
 	...model3dDomainSchemas,
+	...computeDomainSchemas,
 	...browserDomainSchemas,
 	...terminalsDomainSchemas,
 	...kanbanDomainSchemas,
@@ -180,6 +187,7 @@ export const hostAdapterDescriptions: Array<
 	{ ref: TIMER_ADAPTER_REF, describe: describeTimerAdapter },
 	{ ref: OCR_ADAPTER_REF, describe: describeOcrAdapter },
 	{ ref: MODEL3D_ADAPTER_REF, describe: describeModel3dAdapter },
+	{ ref: COMPUTE_ADAPTER_REF, describe: describeComputeAdapter },
 	{ ref: BROWSER_ADAPTER_REF, describe: describeBrowserAdapter },
 	{ ref: SETTINGS_ADAPTER_REF, describe: describeSettingsAdapter },
 	{ ref: RECORDS_ADAPTER_REF, describe: describeRecordsAdapter },

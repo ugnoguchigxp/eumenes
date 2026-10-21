@@ -1,7 +1,8 @@
 /** Explicit live acceptance against isolated production composition and saved LARM settings. */
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { Database } from "bun:sqlite";
+import { existsSync, mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { loadConfig } from "../api/infrastructure/config";
 import { configureLogging } from "../api/infrastructure/logger";
 import { resolveApiToken } from "../api/infrastructure/auth-config";
@@ -26,6 +27,8 @@ if (
 		"ambiguity",
 		"memory",
 		"amend",
+		"image3d",
+		"video",
 	].includes(suite) ||
 	!Number.isInteger(count) ||
 	count < 1 ||
@@ -43,8 +46,25 @@ const record = (r: any) => {
 	});
 	console.log(JSON.stringify(r));
 };
+const productDb = process.env.EUMENES_DB || "./data/eumenes.sqlite3";
+const productKeys =
+	process.env.EUMENES_KEY_DIR || join(dirname(productDb), "keys");
+// Sharing the key directory must never create a key there: every file the isolated host would read must exist.
+if (
+	suite === "video" &&
+	!["settings.key", "api.token", "world-cursor.key"].every((name) =>
+		existsSync(join(productKeys, name)),
+	)
+)
+	throw Error("product_key_files_missing");
 const config = loadConfig({
 	...process.env,
+	// The real-browser suite decrypts the saved Bridge credential with the product key; it is never read as text here.
+	...(suite === "video"
+		? {
+				EUMENES_KEY_DIR: productKeys,
+			}
+		: {}),
 	EUMENES_DB: join(dir, "db.sqlite3"),
 	EUMENES_LOG_FILE: join(dir, "api.jsonl"),
 	EUMENES_ATTITUDE_DATASET: join(dir, "attitude.sqlite3"),
@@ -97,6 +117,41 @@ try {
 		settings: { ...initial, larm: saved },
 		keys: [],
 	});
+	if (suite === "video") {
+		// The saved Brave path and the encrypted Bridge row are copied as stored; the product DB is opened read-only.
+		const product = new Database(productDb, { readonly: true });
+		const isolated = new Database(config.dbPath);
+		try {
+			const bridge = product
+				.query(
+					"SELECT revision, enabled, encrypted FROM settings_browser_bridge WHERE id=1",
+				)
+				.get() as {
+				revision: number;
+				enabled: number;
+				encrypted: string;
+			} | null;
+			const paths = product
+				.query("SELECT key, value, updated_at FROM browser_settings")
+				.all() as Array<{ key: string; value: string; updated_at: number }>;
+			if (!bridge?.enabled || !bridge.encrypted || !paths.length)
+				throw Error("saved_browser_setting_unavailable");
+			isolated
+				.query(
+					"INSERT OR REPLACE INTO settings_browser_bridge(id,revision,enabled,encrypted) VALUES(1,?,?,?)",
+				)
+				.run(bridge.revision, bridge.enabled, bridge.encrypted);
+			for (const row of paths)
+				isolated
+					.query(
+						"INSERT OR REPLACE INTO browser_settings(key,value,updated_at) VALUES(?,?,?)",
+					)
+					.run(row.key, row.value, row.updated_at);
+		} finally {
+			product.close();
+			isolated.close();
+		}
+	}
 	await life.recoverAll();
 	await s.inference.connect();
 	await s.toolchain.refreshVectors();
@@ -122,6 +177,10 @@ try {
 			"Bunの公式ドキュメントを検索して、テストを実行するコマンドを一つ教えてください。ブラウザーを開く操作は不要です。",
 		multi:
 			"Bun公式ドキュメントでテストを実行するコマンドをWebで確認し、その確認が終わったら「確認済み」という名前の90分タイマーを作成してください。確認結果と作成結果をまとめてください。",
+		image3d:
+			"猫のマスコットの画像を1枚作って、できた画像をもとに3Dモデルを作ってください。作った画像と3Dモデルの結果を教えてください。",
+		video:
+			"Webでおすすめの動画をYouTubeから一つ探して、ブラウザーの別タブで開いて再生してください。再生できたら動画のタイトルとURLを教えてください。",
 	};
 	for (let i = 0; i < count; i++) {
 		const conv = `composed-${crypto.randomUUID()}`;
@@ -269,6 +328,64 @@ try {
 		const a = active.find((t) => t.label === "受入A"),
 			b = active.find((t) => t.label === "受入B");
 		const completed = works.some((w) => w.status === "completed");
+		// Owned results in the isolated DB: a generated image, and a 3D model made from that image rather than a prompt.
+		let media: {
+			images: Array<{ id: string; record: string }>;
+			models: Array<{ state: string; source: string }>;
+		} = { images: [], models: [] };
+		let browser: {
+			tasks: Array<{
+				state: string;
+				result: string | null;
+				error: string | null;
+			}>;
+			tabs: Array<{ url: string; title: string; status: string }>;
+			operations: Array<{ kind: string; state: string; url: string | null }>;
+		} = { tasks: [], tabs: [], operations: [] };
+		if (suite === "video") {
+			const db = new Database(config.dbPath, { readonly: true });
+			try {
+				browser = {
+					tasks: db
+						.query(
+							"SELECT state, result_text AS result, error_code AS error FROM browser_tasks WHERE conversation_id=?",
+						)
+						.all(conv) as typeof browser.tasks,
+					// Only tabs this conversation's operations reached; the user's other tabs are never read out.
+					tabs: db
+						.query(
+							"SELECT DISTINCT b.url, b.title, b.status FROM browser_tabs b JOIN browser_operations o ON o.tab_ref=b.tab_ref JOIN browser_tasks t ON t.id=o.task_id WHERE t.conversation_id=?",
+						)
+						.all(conv) as typeof browser.tabs,
+					operations: db
+						.query(
+							"SELECT o.tool_kind AS kind, o.state, o.result_url AS url FROM browser_operations o JOIN browser_tasks t ON t.id=o.task_id WHERE t.conversation_id=? ORDER BY o.created_at",
+						)
+						.all(conv) as typeof browser.operations,
+				};
+			} finally {
+				db.close();
+			}
+		}
+		if (suite === "image3d") {
+			const db = new Database(config.dbPath, { readonly: true });
+			try {
+				media = {
+					images: db
+						.query(
+							"SELECT id, record_json AS record FROM image_generations WHERE conversation_id=?",
+						)
+						.all(conv) as Array<{ id: string; record: string }>,
+					models: db
+						.query(
+							"SELECT state, source_json AS source FROM model3d_generations WHERE conversation_id=? AND deleted=0",
+						)
+						.all(conv) as Array<{ state: string; source: string }>,
+				};
+			} finally {
+				db.close();
+			}
+		}
 		const pass =
 			suite === "simple"
 				? run.status === "completed" &&
@@ -291,26 +408,54 @@ try {
 							) &&
 							usage.some((u) => u.subject.startsWith("execution-research:")) &&
 							usage.some((u) => u.subject.startsWith("execution-command:"))
-						: suite === "ambiguity"
-							? ambiguitySafe &&
-								completed &&
-								active.length === 1 &&
-								a?.durationSeconds === 5400 &&
-								timers.items.some(
-									(t) => t.label === "受入B" && t.state === "cancelled",
-								) &&
-								!b
-							: suite === "amend"
-								? works.some(
-										(w) => w.revision > 0 && w.status === "completed",
-									) &&
-									active.length === 2 &&
-									a?.durationSeconds === 5400 &&
-									b?.durationSeconds === 7200
-								: completed &&
-									active.length === 2 &&
-									a?.durationSeconds === 5400 &&
-									b?.durationSeconds === 6000;
+						: suite === "image3d"
+							? completed &&
+								media.images.length > 0 &&
+								media.models.some((m) => {
+									const source = JSON.parse(m.source) as {
+										type: string;
+										id?: string;
+									};
+									return (
+										m.state === "completed" &&
+										source.type === "image-artifact" &&
+										media.images.some(
+											(image) =>
+												image.id === source.id ||
+												image.record.includes(source.id!),
+										)
+									);
+								})
+							: suite === "video"
+								? completed &&
+									browser.tasks.some((t) => t.state === "completed") &&
+									browser.operations.some(
+										(o) =>
+											o.state === "observed" &&
+											/^https:\/\/(www\.|m\.)?youtube\.com\/watch\?/.test(
+												o.url ?? "",
+											),
+									)
+								: suite === "ambiguity"
+									? ambiguitySafe &&
+										completed &&
+										active.length === 1 &&
+										a?.durationSeconds === 5400 &&
+										timers.items.some(
+											(t) => t.label === "受入B" && t.state === "cancelled",
+										) &&
+										!b
+									: suite === "amend"
+										? works.some(
+												(w) => w.revision > 0 && w.status === "completed",
+											) &&
+											active.length === 2 &&
+											a?.durationSeconds === 5400 &&
+											b?.durationSeconds === 7200
+										: completed &&
+											active.length === 2 &&
+											a?.durationSeconds === 5400 &&
+											b?.durationSeconds === 6000;
 		if (!pass) process.exitCode = 1;
 		record({
 			stage: "case",
@@ -321,6 +466,8 @@ try {
 			run,
 			works,
 			timers,
+			...(suite === "image3d" ? { media } : {}),
+			...(suite === "video" ? { browser } : {}),
 			answers,
 			usage: usage.map((u) => ({
 				subject: u.subject,

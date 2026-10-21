@@ -156,6 +156,26 @@ function taskParameters(schema: z.ZodType) {
 	return json;
 }
 
+/** Like the parent's reference fields: only host-issued refs, and an empty list when none is presented. */
+function taskReferenceParameters(
+	json: Record<string, unknown>,
+	references: readonly ExecutionReference[],
+) {
+	const refs = references.map((r) => r.ref);
+	(json.properties as Record<string, unknown>).contextRefs = {
+		type: "array",
+		description:
+			"提示された参照のrefだけを選ぶ。URLや資料名を参照として作らない。参照が不要な場合は空配列。",
+		items: {
+			type: "string",
+			maxLength: 160,
+			...(refs.length ? { enum: refs } : {}),
+		},
+		maxItems: refs.length ? 32 : 0,
+	};
+	return json;
+}
+
 /**
  * The functions of the first round: each candidate toolchain, `answer` and `report_unavailable`. All carry the
  * analysis; the toolchain's also the notice. None writes the answer or the request for the specialist.
@@ -178,7 +198,10 @@ export function analysisTools(
 							description:
 								tasks.card.summary +
 								"。複数の担当呼出しが必要な依頼に使う。一担当で完結する依頼はfind_toolchainで探して直接使う。requestに依頼全体、contextRefsに必要な提示済み参照を書く。",
-							parameters: taskParameters(taskChoice),
+							parameters: taskReferenceParameters(
+								taskParameters(taskChoice),
+								tasks.references,
+							),
 						},
 					},
 				]

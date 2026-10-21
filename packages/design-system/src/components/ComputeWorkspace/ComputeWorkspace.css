@@ -1,0 +1,110 @@
+.compute-workspace {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	gap: 1rem;
+	padding: 1rem;
+	min-width: 0;
+}
+.compute-workspace header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+}
+.compute-workspace-library {
+	min-width: 0;
+	overflow-x: auto;
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+}
+.compute-workspace-library table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 0.875rem;
+}
+.compute-workspace-library caption {
+	text-align: left;
+	font-weight: 600;
+	padding: 0.75rem;
+}
+.compute-workspace-library th,
+.compute-workspace-library td {
+	padding: 0.75rem;
+	text-align: left;
+	border-top: 1px solid var(--border);
+}
+.compute-workspace-library thead {
+	background: var(--muted);
+}
+.compute-workspace-library tr[data-selected="true"] {
+	background: var(--accent);
+}
+.compute-workspace article {
+	display: grid;
+	gap: 0.75rem;
+	min-width: 0;
+}
+.compute-workspace pre {
+	max-height: 24rem;
+	overflow: auto;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+	padding: 0.75rem;
+	background: var(--color-surface-secondary, #80808014);
+	border-radius: 0.5rem;
+}
+.compute-workspace-accordion {
+	min-width: 0;
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+}
+.compute-workspace-accordion h4 {
+	margin: 0;
+}
+.compute-workspace-trigger {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+	width: 100%;
+	padding: 0.875rem 1rem;
+	font: inherit;
+	font-weight: 600;
+	text-align: start;
+	color: inherit;
+	background: transparent;
+	border: 0;
+	border-radius: inherit;
+	cursor: pointer;
+}
+.compute-workspace-trigger:focus-visible {
+	outline: 2px solid var(--ring);
+	outline-offset: -2px;
+}
+.compute-workspace-trigger svg {
+	width: 1.125rem;
+	height: 1.125rem;
+	flex-shrink: 0;
+}
+.compute-workspace-trigger[data-state="open"] svg {
+	transform: rotate(180deg);
+}
+.compute-workspace-content[data-state="open"] {
+	display: grid;
+	gap: 0.75rem;
+	min-width: 0;
+	padding: 0 1rem 1rem;
+}
+.compute-workspace figure {
+	margin: 0;
+	display: grid;
+	gap: 0.5rem;
+}
+.compute-workspace img {
+	width: auto;
+	max-width: 100%;
+	max-height: 36rem;
+	object-fit: contain;
+	background: white;
+	border-radius: 0.5rem;
+}

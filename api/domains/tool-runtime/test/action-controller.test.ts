@@ -179,3 +179,29 @@ test("source params are URL-encoded JSON of at most 4 KiB validated by the sourc
 	expect(noSchema.status).toBe(400);
 	expect(h.ledger()).toBe(0);
 });
+
+test("artifact availability can remain readable independently of execution, with the default still fail closed", async () => {
+	const { hono } = app();
+	h.setAvailable(() => false);
+	expect(
+		(await hono.request(`/api/toolchain-artifacts/${ARTIFACT_ID}`)).status,
+	).toBe(503);
+	h.adapter.artifactAvailableInTransaction = () => true;
+	expect(
+		(await hono.request(`/api/toolchain-artifacts/${ARTIFACT_ID}`)).status,
+	).toBe(200);
+	const source = await hono.request(
+		`/api/toolchain-artifacts/${ARTIFACT_ID}/sources/setup`,
+	);
+	expect(source.status).toBe(200);
+	expect(
+		JSON.stringify(
+			await (await hono.request("/api/toolchain-artifacts")).json(),
+		),
+	).toContain(ARTIFACT_ID);
+	h.adapter.artifactAvailableInTransaction = () => false;
+	h.setAvailable(() => true);
+	expect(
+		(await hono.request(`/api/toolchain-artifacts/${ARTIFACT_ID}`)).status,
+	).toBe(503);
+});

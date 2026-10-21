@@ -1,3 +1,5 @@
+import { computeAnnouncements } from "../compute/compute-composition";
+import { createCompute, type ComputePort } from "../../domains/compute";
 import { fixtureDiscovery } from "./discovery.fixture";
 import { createOcr } from "../../domains/ocr";
 import {
@@ -81,6 +83,7 @@ const stock = "AAPLの株価は250.12 USD、2026-10-08終値です。";
 export async function harness(
 	options: {
 		everyday?: boolean;
+		computePort?: ComputePort;
 		discoveryTarget?: (query: string) => string;
 		acquisition?: AcquisitionPort;
 		taskStep?: (
@@ -649,6 +652,22 @@ export async function harness(
 				},
 			)
 		: undefined;
+	const compute = options.computePort
+		? createCompute({
+				store,
+				queue,
+				port: () => options.computePort!,
+				pollMs: 5,
+				onFinished: computeAnnouncements(conversation),
+				validInTransaction: (db, r) =>
+					!r.authorization_json ||
+					toolchain.agents.executions.authorizeChildInTransaction(
+						db,
+						JSON.parse(r.authorization_json),
+					),
+			})
+		: undefined;
+	await compute?.refresh();
 	// The data-driven settings and records screens, as the server composes them.
 	const toolchainLinks = createToolchainHostLinks({
 		settings,
@@ -677,6 +696,7 @@ export async function harness(
 			},
 		};
 	const toolchain = await createToolchain(store, queue, inference, web, {
+		compute,
 		browser,
 		...toolchainLinks.options,
 		embed: options.embed,
@@ -833,6 +853,7 @@ export async function harness(
 		image,
 		objectRecognition,
 		ocr,
+		compute,
 		music,
 		settings,
 		conversation,
@@ -871,6 +892,7 @@ export async function harness(
 		uiCompositions,
 		objectRecognition,
 		ocr,
+		compute,
 		music,
 		app,
 		store,

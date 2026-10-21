@@ -156,3 +156,9 @@ export * from "./components/StepGuide";
 export * from "./components/Chart";
 export * from "./components/Formula";
 export * from "./components/DataTable";
+
+export {
+	ComputeWorkspace,
+	type ComputeWorkspaceProps,
+	type ComputeJob,
+} from "./components/ComputeWorkspace";

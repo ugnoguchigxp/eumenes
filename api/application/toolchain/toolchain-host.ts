@@ -130,6 +130,7 @@ export async function createHostToolchain(
 		queue: QueueService;
 		uiCompositions?: UiCompositionsService;
 		ocr?: import("../../domains/ocr").OcrService;
+		compute?: import("../../domains/compute").ComputeService;
 		model3d?: import("../../domains/model3d").Model3dService;
 		browser?: import("../browser/browser-composition").BrowserAssembly;
 		inference: InferencePort &
@@ -170,6 +171,7 @@ export async function createHostToolchain(
 			uiCompositions: s.uiCompositions,
 			ocr: s.ocr,
 			model3d: s.model3d,
+			compute: s.compute,
 			browser: s.browser,
 			...links.options,
 			history: s.history,

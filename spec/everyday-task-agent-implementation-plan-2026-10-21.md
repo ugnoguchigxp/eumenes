@@ -6,7 +6,7 @@
 
 本書の `task` は新しいbindingの実行型を指す。既存の単発処理用の `TaskState`、調査の `agent_tasks`、browserのtaskとは区別する。以下、複数操作全体を「親実行」、一つの能力への依頼を「子呼出し」と呼ぶ。
 
-追記: [実装レビューと改善記録](verification/everyday-task-agent/implementation-review-2026-10-21.md)の実モデル受入は未達。2026-10-21に[進行契約の改訂案](everyday-task-agent-progress-contract-proposal-2026-10-21.md)への利用者合意を受領した。以後の進行契約は同改訂を適用した。現行bundleはskill@6 / package@6 / toolchain@7。固定検証は成功したが、改訂後も実モデル受入は0/3で、受入完了まで無効を維持する。
+追記: [実装レビューと改善記録](verification/everyday-task-agent/implementation-review-2026-10-21.md)の実モデル受入は未達。2026-10-21に[進行契約の改訂案](everyday-task-agent-progress-contract-proposal-2026-10-21.md)への利用者合意を受領した。以後の進行契約は同改訂を適用した。現行bundleはskill@8 / package@8 / toolchain@9。計画欄・改訂条件・失敗依存の改訂後、二操作は改訂条件の追加後の15件で12件成功（失敗3件は推論時間・通信）。複数能力の組合せシナリオは未達のため無効を維持する。
 
 ## 1 目的と完了の定義
 

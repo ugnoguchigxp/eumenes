@@ -136,7 +136,12 @@ const musicCreationOptions = z
 			if (!(options as readonly (string | number)[]).includes(selected))
 				ctx.addIssue({ code: "custom", message: "unknown music default" });
 	});
+import { computeViewRegistry } from "./compute-contracts";
+import type { ComputeWorkspaceResource } from "./compute-components";
+export type { ComputeWorkspaceResource } from "./compute-components";
+
 export const viewRegistry = {
+	...computeViewRegistry,
 	...compositionViewRegistry,
 	"text-block": {
 		name: "TextBlock",
@@ -744,6 +749,7 @@ export type Resource =
 	| ActivityResource
 	| ImageWorkspaceResource
 	| Model3dWorkspaceResource
+	| ComputeWorkspaceResource
 	| BrowserWorkspaceResource
 	| RecordsResource
 	| SubtitlePreviewResource

@@ -1,0 +1,116 @@
+import type { Context, Hono } from "hono";
+import { bodyLimit } from "hono/body-limit";
+import { z } from "zod";
+import type { ComputeService } from "../service";
+import { submitInput } from "../contracts";
+
+function failed(c: Context, e: unknown) {
+	if (e instanceof z.ZodError || e instanceof SyntaxError)
+		return c.json({ error: "invalid_request" }, 400);
+	const code = e instanceof Error ? e.message : "";
+	if (["compute_not_found", "compute_artifact_not_found"].includes(code))
+		return c.json({ error: code }, 404);
+	if (code === "request_conflict") return c.json({ error: code }, 409);
+	if (code === "compute_capacity") return c.json({ error: code }, 429);
+	if (["invalid_request", "limit_exceeded"].includes(code))
+		return c.json({ error: code }, 400);
+	if (["compute_not_reconcilable", "compute_connection_changed"].includes(code))
+		return c.json({ error: code }, 409);
+	return c.json({ error: "compute_service_unavailable" }, 503);
+}
+/** Authentication and Origin checks are the application's existing middleware. */
+export function registerCompute(
+	app: Hono,
+	service: ComputeService,
+	owner: string,
+) {
+	app.use(
+		"/api/compute/*",
+		bodyLimit({
+			maxSize: 2 * 1024 * 1024,
+			onError: (c) => c.json({ error: "limit_exceeded" }, 413),
+		}),
+	);
+	app.get("/api/compute/environment", async (c) => {
+		await service.refresh();
+		return c.json(service.environment(), 200, { "Cache-Control": "no-store" });
+	});
+	app.get("/api/compute/jobs", (c) =>
+		c.json({ jobs: service.list(owner) }, 200, { "Cache-Control": "no-store" }),
+	);
+	app.post("/api/compute/jobs", async (c) => {
+		try {
+			const key = z.uuid().parse(c.req.header("Idempotency-Key"));
+			const input = submitInput.safeParse(await c.req.json());
+			if (!input.success) return c.json({ error: "invalid_request" }, 400);
+			return c.json(await service.submit(owner, "main", input.data, key), 202);
+		} catch (e) {
+			return e instanceof z.ZodError
+				? c.json({ error: "invalid_request" }, 400)
+				: failed(c, e);
+		}
+	});
+	app.get("/api/compute/jobs/:id", (c) => {
+		try {
+			return c.json(
+				service.get(owner, z.uuid().parse(c.req.param("id"))),
+				200,
+				{ "Cache-Control": "no-store" },
+			);
+		} catch (e) {
+			return failed(c, e);
+		}
+	});
+	app.post("/api/compute/jobs/:id/cancel", async (c) => {
+		try {
+			return c.json(
+				await service.cancel(owner, z.uuid().parse(c.req.param("id"))),
+				202,
+			);
+		} catch (e) {
+			return failed(c, e);
+		}
+	});
+	app.post("/api/compute/jobs/:id/reconcile", async (c) => {
+		try {
+			return c.json(
+				await service.reconcile(owner, z.uuid().parse(c.req.param("id"))),
+				202,
+			);
+		} catch (e) {
+			return failed(c, e);
+		}
+	});
+	app.delete("/api/compute/jobs/:id", async (c) => {
+		try {
+			const job = await service.delete(
+				owner,
+				z.uuid().parse(c.req.param("id")),
+			);
+			return job.state === "deleted" ? c.body(null, 204) : c.json(job, 202);
+		} catch (e) {
+			return failed(c, e);
+		}
+	});
+	app.get("/api/compute/jobs/:id/artifacts/:artifactId", (c) => {
+		try {
+			const a = service.artifact(
+				owner,
+				z.uuid().parse(c.req.param("id")),
+				z.uuid().parse(c.req.param("artifactId")),
+			);
+			return new Response(new Uint8Array(a.content), {
+				headers: {
+					"Content-Type": a.mime,
+					"Content-Length": String(a.content.byteLength),
+					"Cache-Control": "no-store",
+					"X-Content-Type-Options": "nosniff",
+					"Content-Security-Policy": "sandbox; default-src 'none'",
+					"Content-Disposition": `${a.mime === "image/png" ? "inline" : "attachment"}; filename="artifact"; filename*=UTF-8''${encodeURIComponent(a.name).replace(/'/g, "%27")}`,
+				},
+			});
+		} catch (e) {
+			return failed(c, e);
+		}
+	});
+}

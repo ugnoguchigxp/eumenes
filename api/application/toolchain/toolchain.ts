@@ -5,6 +5,7 @@ import { createCodexTasksAdapter } from "../work/codex-tasks-adapter";
 import type { createKanbanSdkHost } from "../work/kanban-sdk-host";
 import { createGoogleAccountsAdapter } from "../settings/google-accounts-adapter";
 import { createOcrAdapter } from "../media/ocr-adapter";
+import { createComputeAdapter } from "../compute/compute-adapter";
 import { createModel3dAdapter } from "../media/model3d-adapter";
 import { createBrowserAdapter } from "../browser/browser-adapter";
 import { createTaskAdapter } from "./task-execution-adapter";
@@ -87,6 +88,7 @@ type ToolchainOptions = {
 	) => boolean;
 	objectRecognition?: boolean;
 	ocr?: import("../../domains/ocr").OcrService;
+	compute?: import("../../domains/compute").ComputeService;
 	model3d?: import("../../domains/model3d").Model3dService;
 	/** Brave tabs and local captures (absent: not offered). */
 	browser?: Pick<BrowserAssembly, "service" | "effects" | "requests">;
@@ -198,6 +200,7 @@ export async function createToolchain(
 			: []),
 		...(options.ocr ? [createOcrAdapter(options.ocr)] : []),
 		...(options.model3d ? [createModel3dAdapter(options.model3d)] : []),
+		...(options.compute ? [createComputeAdapter(options.compute)] : []),
 		...(options.browser
 			? [
 					createBrowserAdapter(
@@ -272,6 +275,7 @@ export async function createToolchain(
 			...(options.worldResearch ? ["world-query"] : []),
 			...(options.ocr ? ["ocr"] : []),
 			...(options.model3d ? ["model3d"] : []),
+			...(options.compute ? ["compute"] : []),
 			...(options.browser ? ["browser"] : []),
 			...(options.excalidraw ? ["excalidraw"] : []),
 			...(options.conversation && options.history !== false ? ["history"] : []),

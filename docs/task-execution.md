@@ -4,7 +4,7 @@
 
 ## 入口と状態
 
-登録は `capabilities/bundles/task-execution.bundle.json` と `adapter:task-execution@1`。専用Artifactはない。質問と結果は既存の会話通知を使う。R1には既に組み立てたMemory/Worldの背景とhost発行ref、同じ会話の短い作業projectionだけを追加し、開始時の追加分類・planner・能力探索を行わない。
+登録は `capabilities/bundles/task-execution.bundle.json`（skill@8 / package@8 / toolchain@9）と `adapter:task-execution@1`。専用Artifactはない。質問と結果は既存の会話通知を使う。R1には既に組み立てたMemory/Worldの背景とhost発行ref、同じ会話の短い作業projectionだけを追加し、開始時の追加分類・planner・能力探索を行わない。R1の `execute_task.contextRefs` も親と同じく提示済みrefだけを列挙し、参照がなければ空配列だけを許す。
 
 親実行のIDと原発言の会話runを分離する。会話が回答を終えたり画面を離れたりしても親は継続できる。作業の操作はR1の `task_control` で `workRef`、`expectedRevision`、action（status / answer / amend / cancel）を指定する。回答には質問refと所有domainのschemaに一致する入力が必要で、別会話・古い版・回答済みの質問は再開できない。進捗照会は制御適用後の状態を返す。
 
@@ -12,7 +12,7 @@
 
 ## 子の実行と確認
 
-親は一推論で一つのnative functionを選ぶ。最初の親推論はset_planで一子呼出しごとの操作本文と依存を決め、hostがstepRefを発行する。計画推論も親12回・総48回に含める。子呼出しは未実行で依存が終了したstepRefだけを指定し、保存した本文と選択した参照を使う。同じstepRef・同じ入力の再送は同じ子とreceiptを返し、入力変更は競合とする。同内容でも別項目なら別操作になる。全項目実行後はcomplete_task/report_partialだけを提示し、能力探索・読取り・追加計画を止める。不足があればpartialで返す。検索で提示するのは上位4候補。子が終わるまでは同じ選択のための検索を繰り返さない。使用済み能力は最大4件、定義4,096推定token以内を保持する。全文の実行履歴や全catalogを毎回渡さない。
+親は一推論で一つのnative functionを選ぶ。最初の親推論はset_planで、依頼全体の達成条件（goal）、一子呼出しごとの操作本文・結果で確かめる点（check）・依存、最終報告でまとめる内容（report）を決め、hostがstepRefを発行する。モデルに見せる未着手項目はset_planのitemsと同じrequest・dependsOn・checkだけにし、stepRefと実行状態はstepsに、結果が確定した項目はexecutedに分ける。実行中で結果未確定の項目はstepsのstate runningだけに出す。確認・まとめ・能力探索は子項目にせず、goalは各段階で提示して完了判断の基準にする。計画の版はhostが準備時の状態で固定し、LLMには書かせない。計画推論も親12回・総48回に含める。子呼出しは未実行で依存が終了したstepRefだけを指定し、保存した本文と選択した参照を使う。同じstepRef・同じ入力の再送は同じ子とreceiptを返し、入力変更は競合とする。同内容でも別項目なら別操作になる。全項目実行後はcomplete_task/report_partialだけを提示し、能力探索・読取り・追加計画を止める。未実行項目が既存結果の確認・まとめだけならLLMが子を呼ばずに完了を判断できる。不足があればpartialで返す。検索で提示するのは上位4候補。子が終わるまでは同じ選択のための検索を繰り返さない。使用済み能力は最大4件、定義4,096推定token以内を保持する。全文の実行履歴や全catalogを毎回渡さない。
 
 参照引数のnative schemaにはhostが発行済みのIDだけを列挙する。参照がなければ空配列のみを許し、読取り関数は提示しない。URLや資料名をIDとして送った場合は拒否する。未完了の最終通知は既存のhost回答経路で状態と実行担当の報告を表示し、追加の会話推論が取得結果や将来の実行を補完しない。確認済みの部分結果も保持する。通知は作業の版・質問・結果digestを準備時と採用時に照合する。
 
@@ -41,7 +41,7 @@ browserには原文と短い作業説明を別々に渡す。承認待ちで物�
 
 外部のcoding担当内部の推論数は取得できないため48回に加算せず、外部担当の予算、親の絶対期限、停止操作で制約する。取得可能なEumenesの子推論は予約してから開始し、失敗で未確定の消費は予約上限まで使用済みと扱う。
 
-計画版は依頼版と区別する。実行途中のset_planは未実行部分だけを置き換え、実行済み項目とreceiptは残す。訂正は依頼版を進め、実行中の古い子を止めてから残りの計画を作り直す。過去の実行を新条件の達成と自動的に扱わない。停止が確認できない書込みは不足・未確定として返し、自動で新しい操作を送らない。取消は後続操作を止め、既に発生した外部の副作用を自動で巻き戻さない。
+計画版は依頼版と区別する。実行途中のset_planは未実行部分だけを置き換え、実行済み項目とreceiptは残す。新しい項目のdependsOnには新items内の番号かcompletedになった項目のstepRefを指定する。依存はcompletedの結果でだけ満たされ、依存先が失敗した項目は実行可能にならない。やり直しは失敗の後の改訂で新しい項目にする。実行可能な項目がない間は能力探索を提示しない。直前の観測が計画項目の子のcompletedなら改訂を提示・受理せず、子の失敗・partial、範囲読取り、質問への回答の後だけ改訂できる。候補選択中も改訂しない。訂正は依頼版を進め、実行中の古い子を止めてから残りの計画を作り直す。過去の実行を新条件の達成と自動的に扱わない。停止が確認できない書込みは不足・未確定として返し、自動で新しい操作を送らない。取消は後続操作を止め、既に発生した外部の副作用を自動で巻き戻さない。
 
 起動時はqueued・判断中・子待ち・質問待ちをすべてinterruptedにする。副作用を自動再送しない。質問待ちにも期限を適用する。入力・質問・手順本文は14日、最小receiptは30日で回収する。忘却時は元資料と結果refを失効し、親・子の派生コピーを消去し、未配送通知を取消す。既に会話へ採用された回答の扱いは既存の会話・Memoryの忘却規則に従う。
 
@@ -49,7 +49,7 @@ browserには原文と短い作業説明を別々に渡す。承認待ちで物�
 
 2026-10-21の実モデル受入は未達。現在の製品DBではtask.executeを無効化し、実装と登録revisionを保持している。固定試験の成功だけで有効化しない。成否と再開条件は下記の検証記録を参照する。
 
-[実装レビュー](../spec/verification/everyday-task-agent/implementation-review-2026-10-21.md)で情報・契約の不具合を修正したが、最新の二操作3件は0/3で重複実行が残る。[進行契約の改訂](../spec/everyday-task-agent-progress-contract-proposal-2026-10-21.md)は利用者合意後に実装した。[新契約の検証](../spec/verification/everyday-task-agent/progress-contract-verification-2026-10-21.md)は公式Bun764件・Web75件成功、二操作の実モデル受入は0/3。以前の0/3と区別して記録し、有効化しない。
+[実装レビュー](../spec/verification/everyday-task-agent/implementation-review-2026-10-21.md)で情報・契約の不具合を修正した。[進行契約の改訂](../spec/everyday-task-agent-progress-contract-proposal-2026-10-21.md)は利用者合意後に実装した。[新契約の検証](../spec/verification/everyday-task-agent/progress-contract-verification-2026-10-21.md)の公式Bun764件・Web75件は成功。その時点の二操作は0/3。その後の表示分離を含む `composed-timers-1792577463743` は2/3で、失敗1件は能力探索の推論が45秒で切れた。3/3ではないため有効化しない。
 
 実装箇所はagent-runtimeの `execution-*`、application/toolchainの `task-execution-*`、所有domainの公開操作。domainをまたぐSQLや、題材・発話の語句で判断する分岐を追加しない。
 

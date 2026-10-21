@@ -28,6 +28,7 @@ import {
 	createLarmRepository,
 } from "../domains/monitoring";
 import { buildCore, buildWebResearch } from "./server-core";
+import { buildCompute } from "./compute/compute-composition";
 import { buildMedia, buildModel3d } from "./server-media";
 import { buildTasks } from "./server-tasks";
 import { assembleCuration } from "./server-world";
@@ -116,6 +117,12 @@ export async function buildServices(
 		capabilities: () => ocrCapabilities,
 	});
 	const model3d = buildModel3d(config, { core, conversation });
+	const compute = buildCompute(config, {
+		core,
+		conversation,
+		validChild: (db, child) =>
+			toolchain.agents.executions.authorizeChildInTransaction(db, child),
+	});
 	let browserCapabilities: Capabilities | null = null;
 	const browser = buildBrowser(config, {
 		core,
@@ -131,6 +138,7 @@ export async function buildServices(
 		uiCompositions,
 		ocr,
 		model3d,
+		compute,
 		browser,
 		inference,
 		webResearch,
@@ -274,6 +282,7 @@ export async function buildServices(
 		objectRecognition: media.objectRecognition,
 		ocr,
 		model3d,
+		compute,
 		browser,
 		music: media.music,
 		queue,

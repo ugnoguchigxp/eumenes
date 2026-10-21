@@ -45,3 +45,8 @@ export type {
 	LocalServiceLease,
 	LocalServicesPort,
 } from "./contracts/local-services";
+
+export {
+	createComputeClient,
+	ComputeHttpError,
+} from "./service/compute-client";

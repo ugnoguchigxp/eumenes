@@ -209,7 +209,16 @@ const recipeFindInput = z
 			.describe("現在の依頼を対象と知りたい内容で短く表した文。"),
 	})
 	.strict();
+import {
+	computePythonSubmit,
+	computeJobTarget,
+	computeArtifactTarget,
+} from "./compute";
+
 export const validators = {
+	computePythonSubmit,
+	computeJobTarget,
+	computeArtifactTarget,
 	browserResearchCollect: z.strictObject({
 		observationRef: z.uuid(),
 		blockRefs: z

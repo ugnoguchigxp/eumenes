@@ -279,6 +279,10 @@ export interface DomainAdapter {
 	};
 	/** The adapter's domain is configured and usable on this host now. */
 	availableInTransaction(tx: Database): boolean;
+	/** Local artifact/source access may remain available when external execution is offline.
+	 * Absent: use availableInTransaction. Registration, ownership and action validation still apply.
+	 */
+	artifactAvailableInTransaction?(tx: Database): boolean;
 	/** Targets the command sub-agent may name (host data, no model-generated ids). */
 	snapshotInTransaction(tx: Database): unknown;
 	/**

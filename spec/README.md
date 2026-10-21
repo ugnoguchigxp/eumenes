@@ -8,6 +8,7 @@ archive の基準: その文書が担当した実装がコードにあり、本�
 
 | 文書 | 状態 |
 | --- | --- |
+| [step-and-check-multi-operation-design-2026-10-21.md](step-and-check-multi-operation-design-2026-10-21.md) | 案・合意待ち（方向性は合意済み、§9の決定事項は未合意）。最初の計画とタスク数の予測をやめ、R1が最初の一手だけを検索・委譲し、結果確定後に利用者の原文と照合して足りない要素を探し直す。完了には結果refの根拠を必須にし、`done` 後の利用者の不足の指摘を経験として次の照合に提示する。`execute_task` の別枠提示と `set_plan` を廃止し、台帳・取消・予算は再利用 |
 | [browser-service-search-design-2026-10-21.md](browser-service-search-design-2026-10-21.md) | 自己評価を反映した設計案・実装前。共通子実行を再利用し、指定サイトの検索不能時は既存外部検索で補完。候補refと本文根拠の別契約、部分採取、330秒worker内の補完150秒予約、既存入口での早期観測→最小結合→複数サイト受入を定義 |
 | [everyday-task-agent-implementation-plan-2026-10-21.md](everyday-task-agent-implementation-plan-2026-10-21.md) | 実装・固定検証済み、実モデル受入未達で無効を維持。合意済みの進行契約改訂を含む。task実行型、会話からの委譲/作業操作、必要時の能力探索、既存実行型との接続、原文とMemory等の参照、非同期完了・質問・訂正・取消、親子の予算、P0〜P6の検証・公開条件を定義。Pursuit/Harness2の取込は対象外 |
 | [conversation-toolchain-context-retention-design-2026-10-21.md](conversation-toolchain-context-retention-design-2026-10-21.md) | 合意済み・実装・fixture/live検証済み。使用済み最大4件・4,096推定トークンを保持し、継続時の探索を省く。新規探索1回・上位4件で打切り、忘却・版変更・容量・リセットに対応。稼働backendの再起動と実機受入は未実施 |

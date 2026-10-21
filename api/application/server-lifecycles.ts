@@ -75,6 +75,7 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 						error,
 					),
 				),
+			s.compute.refresh(),
 			...toolchainMaintenance(s, log),
 		]),
 	);
@@ -171,6 +172,7 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 			recover: () => s.store.write((db) => recoverSteward(s.steward, db)),
 		},
 		{ name: "web_research_recovery", recover: () => s.webResearch.recover() },
+		{ name: "compute_discovery", recover: () => s.compute.refresh() },
 		{ name: "queue_recovery", recover: () => s.queue.recover() },
 		{
 			// A connection of the previous process ended with it; what it left running is settled here.

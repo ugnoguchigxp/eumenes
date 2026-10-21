@@ -12,6 +12,6 @@ export const taskPlan = (...requests: string[]) => ({
 	},
 });
 export const taskItem = (
-	packet: { plan: { items: Array<{ stepRef: string }> } },
+	packet: { plan: { steps: Array<{ stepRef: string }> } },
 	index = 0,
-) => packet.plan.items[index]!.stepRef;
+) => packet.plan.steps[index]!.stepRef;
