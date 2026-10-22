@@ -26,6 +26,7 @@ import {
 	nthLatestUserOrdinal,
 	tailMessages,
 	listOutbox,
+	outboxHead,
 	outboxReady,
 	retractionReady,
 	revision,
@@ -138,6 +139,10 @@ export function createConversationService(
 			limit: number,
 		): OutboxEvent[] {
 			return listOutbox(db, after, limit);
+		},
+		/** The newest outbox seq (0 when there is none): where a consumer that skips the past starts. */
+		outboxHeadInTransaction(db: Database): number {
+			return outboxHead(db);
 		},
 		/** Current source state of a message: available / retracted / missing. */
 		sourceInTransaction(db: Database, id: string): ConversationSourceState {

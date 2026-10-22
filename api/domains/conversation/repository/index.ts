@@ -214,6 +214,16 @@ export function listOutbox(
 			.all(after, limit) as OutboxRow[]
 	).map(outboxEvent);
 }
+/** The newest outbox seq; 0 when the outbox is empty or not migrated. */
+export function outboxHead(db: Database): number {
+	if (!outboxReady(db)) return 0;
+	const row = db
+		.query("SELECT MAX(seq) AS seq FROM conversation_outbox")
+		.get() as {
+		seq: number | null;
+	};
+	return row.seq ?? 0;
+}
 /** Replaces a confirmed message's text with a correction (same transaction as its event). */
 export function correctMessage(
 	db: Database,

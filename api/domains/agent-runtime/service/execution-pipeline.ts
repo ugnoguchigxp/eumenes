@@ -1,6 +1,12 @@
 import type { Database } from "bun:sqlite";
 import { hash } from "../../capabilities";
-import { expand, expandValue, startInputs, stepFault } from "../../pipelines";
+import {
+	expand,
+	expandValue,
+	resolvePipelineMaterials,
+	startInputs,
+	stepFault,
+} from "../../pipelines";
 import type { ChildResult, ExecutionSource } from "../../tool-runtime";
 import {
 	executionRow,
@@ -88,7 +94,14 @@ export function executionPipeline(ctx: ExecutionContext, ops: ExecutionOps) {
 		const scope = { inputs: p.inputs, steps: p.values };
 		let request: string;
 		let args: Record<string, unknown> | undefined;
+		let materials: import("../../tool-runtime").ChildExecution["materials"];
 		try {
+			materials = resolvePipelineMaterials(
+				p.definition,
+				step.materials,
+				scope,
+				executionSource(row).request,
+			);
 			request = expand(step.request, scope).slice(0, 8000);
 			args = step.arguments
 				? Object.fromEntries(
@@ -98,26 +111,43 @@ export function executionPipeline(ctx: ExecutionContext, ops: ExecutionOps) {
 						]),
 					)
 				: undefined;
-		} catch {
-			return stop(db, row, state, "pipeline_reference_missing");
+		} catch (error) {
+			const code =
+				error instanceof Error &&
+				["pipeline_material_missing", "pipeline_material_capacity"].includes(
+					error.message,
+				)
+					? error.message
+					: "pipeline_reference_missing";
+			return stop(db, row, state, code);
 		}
 		const used = new Set(
 			(step.uses ?? []).map((id) => `result:${p.children[id]}`),
 		);
 		const id = crypto.randomUUID();
 		p.children[step.id] = id;
-		ops.launch(
-			db,
-			row,
-			state,
-			{
-				chainRevisionId: chain,
-				request,
-				...(args ? { arguments: args } : {}),
-				refs: state.refs.filter((r) => used.has(r.ref)),
-			},
-			id,
-		);
+		try {
+			ops.launch(
+				db,
+				row,
+				state,
+				{
+					chainRevisionId: chain,
+					request,
+					...(args ? { arguments: args } : {}),
+					...(materials?.length ? { materials } : {}),
+					refs: state.refs.filter((r) => used.has(r.ref)),
+				},
+				id,
+			);
+		} catch (error) {
+			if (
+				error instanceof Error &&
+				error.message === "execution_input_capacity"
+			)
+				return stop(db, row, state, "execution_input_capacity");
+			throw error;
+		}
 	}
 	/** A settled child: the step passes with its result, or the run stops. */
 	function advance(

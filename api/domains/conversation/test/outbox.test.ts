@@ -311,3 +311,16 @@ test("without the retraction column reads and corrections work and retraction fa
 		rmSync(dir, { recursive: true, force: true });
 	}
 });
+
+test("outboxHead is the newest seq and 0 before any event", async () => {
+	await withStore(async (store, service) => {
+		expect(store.read((db) => service.outboxHeadInTransaction(db))).toBe(0);
+		await service.append(message("m1", "a"));
+		await service.append(message("m2", "b"));
+		const last = events(service, store).at(-1)?.seq ?? -1;
+		expect(store.read((db) => service.outboxHeadInTransaction(db))).toBe(last);
+		await service.retract({ messageId: "m1" });
+		const head = events(service, store).reduce((m, e) => Math.max(m, e.seq), 0);
+		expect(store.read((db) => service.outboxHeadInTransaction(db))).toBe(head);
+	});
+});

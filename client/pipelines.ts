@@ -54,6 +54,15 @@ export const pipelineFixture = z.union([
 					id: z.string(),
 					request: z.string().optional(),
 					arguments: z.unknown().optional(),
+					materials: z
+						.array(
+							z.object({
+								kind: z.enum(["value", "image", "music"]),
+								label: z.string(),
+								value: z.unknown(),
+							}),
+						)
+						.optional(),
 					fault: z.string().optional(),
 				}),
 			),

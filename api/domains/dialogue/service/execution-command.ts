@@ -58,6 +58,7 @@ export function executionCommands(deps: DialogueDeps) {
 				userAnswers: child.source.responses,
 				snapshot,
 				references: child.referenceData ?? child.refs,
+				...(child.materials?.length ? { materials: child.materials } : {}),
 				...(child.resume
 					? {
 							previousQuestion: child.resume.previous,

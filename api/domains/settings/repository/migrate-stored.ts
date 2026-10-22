@@ -8,7 +8,7 @@ const isObject = (v: unknown): v is Json =>
 /**
  * One-time migration of a stored settings document, applied before the strict parse:
  * - Managed Agents connections (a removed kind) go with their models; routes and the dedicated
- *   World / sub-agent models that pointed at them fall back to LARM.
+ *   World / sub-agent models that pointed at them fall back to LARM; agency is switched off instead.
  * - Claude Agent SDK connections get the explicit `auth` the key used to imply
  *   (a stored key or an env ref: "api-key"; nothing: "subscription").
  * - The removed Managed Agents fields are dropped.
@@ -76,11 +76,16 @@ export function migrateStoredSettings(
 				];
 			}),
 		);
-	for (const key of ["world", "subagent"] as const) {
+	for (const key of ["world", "subagent", "agency"] as const) {
 		const section = raw[key];
 		const field = key === "world" ? "curationResourceId" : "resourceId";
 		if (isObject(section) && removedResources.has(String(section[field])))
-			out[key] = { ...section, [field]: null };
+			// Agency never falls back to LARM silently: it stops until a route is chosen again.
+			out[key] = {
+				...section,
+				[field]: null,
+				...(key === "agency" ? { enabled: false } : {}),
+			};
 	}
 	return { document: out, removedConnectionIds: [...removed] };
 }

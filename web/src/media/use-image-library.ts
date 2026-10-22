@@ -9,10 +9,12 @@ export const imageLibraryKey = (client: Pick<EumenesClient, "identity">) =>
 export function useImageLibrary(
 	client: EumenesClient,
 	refetchInterval: number | false = false,
+	enabled = true,
 ) {
 	return useQuery({
 		queryKey: imageLibraryKey(client),
 		queryFn: ({ signal }) => client.imageLibrary(signal),
+		enabled,
 		refetchInterval,
 		retry: false,
 	});

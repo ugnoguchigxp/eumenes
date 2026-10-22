@@ -109,11 +109,19 @@ export function flowOf(d: PipelineDefinition) {
 				? read(
 						[
 							s.request,
+							...(s.materials ?? [])
+								.filter((m) => m.kind === "reference")
+								.map((m) => `\${${m.reference}}`),
 							...Object.values(s.arguments ?? {}).filter(
 								(v): v is string => typeof v === "string",
 							),
 						],
-						s.uses,
+						[
+							...(s.uses ?? []),
+							...(s.materials ?? [])
+								.filter((m) => m.kind === "result")
+								.map((m) => m.stepId),
+						],
 					)
 				: read(s.from)),
 		})),

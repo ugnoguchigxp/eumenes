@@ -14,6 +14,11 @@ export type VolatileParts = {
 	 * (`actionPayload`). A failed research is answered by the host and phrases nothing.
 	 */
 	answer?: { actionPayload?: unknown };
+	/**
+	 * What the assistant said on its own since the user's last message, and its interests (`agency.recent`); null
+	 * or absent when the agency layer is off or has nothing to show.
+	 */
+	agency?: ContextBlock | null;
 	/** The World names this turn's wording mentions; null when there are none or World is unusable. */
 	worldNames(): ContextBlock | null;
 	/** The specialist records (work, viewing, handoff); [] when specialists are not offered to this run. */
@@ -26,7 +31,7 @@ export type VolatileParts = {
 
 /**
  * The assembly with its volatile part (V), in the order the prepare phase shows it: the notices and the prefetch,
- * the World names, the specialist records, the operation results, the research record. An answer that is an
+ * the agency record, the World names, the specialist records, the operation results, the research record. An answer that is an
  * action has no World names; any sub-agent answer has no specialist records. The stage is
  * `result` while an answer or an operation result is phrased.
  */
@@ -38,6 +43,7 @@ export function withVolatile(
 	const worldNames = answer?.actionPayload ? null : parts.worldNames();
 	const volatile: ContextBlock[] = [
 		...parts.memory,
+		...(parts.agency ? [parts.agency] : []),
 		...(worldNames ? [worldNames] : []),
 		...(answer ? [] : parts.specialist()),
 		...parts.operations,

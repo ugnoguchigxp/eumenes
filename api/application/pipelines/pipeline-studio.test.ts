@@ -289,3 +289,45 @@ test("trials read the work's draft: the probe ranks it among the toolchains, the
 		await h.close();
 	}
 });
+
+test("artifact source edits preserve materials and refuse a stale modal revision", async () => {
+	const { h, work, invoke, studio } = await setup();
+	try {
+		const d = structuredClone(draft);
+		const last = d.steps[1] as Extract<
+			PipelineDefinition["steps"][number],
+			{ kind: "toolchain" }
+		>;
+		last.materials = [
+			{ kind: "text", text: " 本文\n " },
+			{ kind: "prompt", stepId: "second" },
+			{ kind: "image", id: "image-1", title: "画像" },
+			{ kind: "music", id: "track-1", title: "楽曲" },
+		];
+		await invoke("pipelines.source.apply", {
+			workRef: work.workRef,
+			expectedRevision: 0,
+			text: JSON.stringify(d),
+		});
+		expect(JSON.parse(studio().work.source).steps[1].materials).toEqual(
+			last.materials,
+		);
+		await expect(
+			invoke("pipelines.source.apply", {
+				workRef: work.workRef,
+				expectedRevision: 0,
+				text: JSON.stringify(draft),
+			}),
+		).rejects.toThrow("revision_conflict");
+		expect(JSON.parse(studio().work.source).steps[1].materials).toEqual(
+			last.materials,
+		);
+		const published = await invoke("pipelines.publish", {
+			workRef: work.workRef,
+			expectedRevision: 1,
+		});
+		expect(published.receipt).toMatchObject({ state: "published" });
+	} finally {
+		await h.close();
+	}
+});

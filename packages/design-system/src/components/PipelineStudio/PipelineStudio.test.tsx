@@ -370,3 +370,47 @@ describe("PipelineStudio", () => {
 		expect(screen.getByText("ここにパイプラインを表示します")).toBeTruthy();
 	});
 });
+
+it("keeps the modal frozen if its work is replaced and restores the card focus on cancel", async () => {
+	const source = JSON.stringify({
+		inputs: {},
+		steps: [{ id: "first", kind: "toolchain", title: "手順", request: "依頼" }],
+	});
+	const current = work({
+		source,
+		flow: {
+			inputs: [],
+			steps: [
+				{
+					id: "first",
+					kind: "toolchain",
+					title: "手順",
+					toolchain: "web.search",
+					reads: [],
+					inputs: [],
+				},
+			],
+			answer: null,
+		},
+	});
+	const h = setup({ work: current });
+	await h.user.click(screen.getByRole("button", { name: "渡すものを編集" }));
+	h.rerender(
+		<PipelineStudio
+			work={{
+				...current,
+				workRef: "another",
+				source: JSON.stringify({ inputs: {}, steps: [] }),
+			}}
+			onApply={h.onApply}
+			onPublish={h.onPublish}
+			onProbe={h.onProbe}
+			onSelect={h.onSelect}
+			onFixture={h.onFixture}
+		/>,
+	);
+	expect(screen.getByRole("alert")).toHaveTextContent("ほかの更新");
+	expect(screen.getByRole("button", { name: "反映" })).toBeDisabled();
+	await h.user.click(screen.getByRole("button", { name: "キャンセル" }));
+	expect(h.onApply).not.toHaveBeenCalled();
+});

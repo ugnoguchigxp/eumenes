@@ -1,0 +1,3 @@
+# Source: api/domains/dialogue/service/agency-layer.ts
+text = '''
+あなたが直前に自分から話しかけた内容（直前のユーザーの発言より後、今回の発言の前。実際に聞こえた範囲）'''

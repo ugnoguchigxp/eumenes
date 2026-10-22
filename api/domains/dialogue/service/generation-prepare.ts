@@ -35,6 +35,7 @@ import { prepareRouting } from "./delegate-conversation";
 import { prepareRetained } from "./retained-toolchains";
 import { analysisTools } from "./initial-decision";
 import { analysisMessages, previousExchange } from "./request-analysis";
+import { renderAgencyLayer } from "./agency-layer";
 import { renderGoalsLayer } from "./goals-layer";
 import { topicTexts, worldNamesBlock } from "./topic-texts";
 import { specialistWorkBlock, viewingBlock } from "./specialist-context";
@@ -59,8 +60,16 @@ export function createPrepare(
 	GenerateInput,
 	unknown
 >["prepareInTransaction"] {
-	const { conversation, larm, clock, memory, agents, worldContext, goals } =
-		deps;
+	const {
+		conversation,
+		larm,
+		clock,
+		memory,
+		agents,
+		worldContext,
+		goals,
+		agency,
+	} = deps;
 	return (tx, claim) => {
 		const run = byId(tx, claim.payload.runId);
 		if (!run || run.status !== "queued" || run.jobId !== claim.jobId)
@@ -194,6 +203,8 @@ export function createPrepare(
 		// What holds for this call only, in the order it is shown (see `withVolatile`).
 		const assembly = withVolatile(compiled.assembly, {
 			memory: compiled.assembly.volatile,
+			// What the assistant said on its own is in no run, so the history does not hold it.
+			agency: renderAgencyLayer(agency, tx, run.conversationId),
 			...(agent ? { answer: { actionPayload: agent.actionPayload } } : {}),
 			// World is read only by the research sub-agent; the conversation gets the names of the known targets
 			// this turn's wording mentions, as one line of L4 (nothing when none is named or World is unusable).

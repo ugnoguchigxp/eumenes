@@ -158,7 +158,6 @@ export async function harness(
 		badJson?: boolean;
 		workerOutput?: string;
 		workerReportOutput?: string;
-		lookupTimeoutOnce?: boolean;
 		voiceText?: string;
 		parentAnswer?: string;
 		announcement?: string;
@@ -611,8 +610,6 @@ export async function harness(
 		execute: async (req, signal) => {
 			acquisitions++;
 			if (options.acquire) return options.acquire(req, signal);
-			if (options.lookupTimeoutOnce && acquisitions === 1)
-				throw new Error("web_timeout");
 			if (options.gate) await options.gate;
 			signal.throwIfAborted();
 			const observedAt = new Date().toISOString();

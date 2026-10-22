@@ -257,7 +257,7 @@ try {
 			answer,
 			correctAgent:
 				tasks.filter((t) => t.kind === "worker").length === 1 &&
-				child?.packageRevisionId === "package:web.recipe@3",
+				child?.packageRevisionId === "package:web.recipe@6",
 			budget: !!child && child.modelCalls <= 5,
 			sample: { ...sample, documents: sourceDocuments, report, answer },
 		};

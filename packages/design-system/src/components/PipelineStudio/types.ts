@@ -82,6 +82,11 @@ export type PipelineStudioFixtureResult =
 					id: string;
 					request?: string;
 					arguments?: unknown;
+					materials?: Array<{
+						kind: "value" | "image" | "music";
+						label: string;
+						value: unknown;
+					}>;
 					fault?: string;
 				}>;
 				answer?: string;

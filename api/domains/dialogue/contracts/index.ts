@@ -144,5 +144,28 @@ export interface GoalsLayerPort {
 	existingInTransaction(db: Database, goalIds: readonly string[]): Set<string>;
 }
 
+/**
+ * What the agency layer (the background participation of eumenes-agency, wired by the application) lets the main
+ * model see: what the assistant said on its own since the user's last message (runless messages are not in the
+ * history) and its standing interests. Reference data, never instructions. Null when the layer is off or empty.
+ */
+export type AgencyContextUtterance = {
+	messageId: string;
+	text: string;
+	/** `partial` when playback was interrupted; `text` is then only what was heard. */
+	heard: "full" | "partial";
+};
+export type AgencyContext = {
+	utterances: AgencyContextUtterance[];
+	interests: string[];
+};
+export interface AgencyLayerPort {
+	/** Read-only. Null when agency is off for this conversation or there is nothing to show. */
+	recentForContextInTransaction(
+		db: Database,
+		conversationId: string,
+	): AgencyContext | null;
+}
+
 export * from "./command-interactions";
 export * from "./specialist";

@@ -7,6 +7,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { queryRoots } from "../../queryKeys";
+import { usePipelineLibrary } from "./use-pipeline-library";
 import type { WebArtifactAdapter } from "../toolchain-artifacts/registry";
 import {
 	type BridgeResult,
@@ -120,6 +121,7 @@ export const pipelinesWebAdapter: WebArtifactAdapter = {
 		visible,
 	}) {
 		const cache = useQueryClient();
+		const library = usePipelineLibrary(client, visible);
 		const bridge = useSpecialistBridge();
 		const session = bridge?.session ?? null;
 		const root = [queryRoots.toolchainArtifacts, client.identity, "pipelines"];
@@ -180,6 +182,7 @@ export const pipelinesWebAdapter: WebArtifactAdapter = {
 					held.revision === work.revision
 						? held.trial
 						: null,
+				library: library.resource,
 			} satisfies PipelineStudioResource;
 		const refresh = () => {
 			void cache.invalidateQueries({ queryKey: root });
@@ -221,6 +224,17 @@ export const pipelinesWebAdapter: WebArtifactAdapter = {
 			targetOf: () => undefined,
 			local: async (binding, event) => {
 				switch (binding.eventAction) {
+					case "pipeline-library": {
+						const kind = event.values.kind;
+						if (kind !== "image" && kind !== "music" && kind !== "close")
+							return rejected("選択画面が見つかりません。");
+						library.open(
+							kind === "close" ? null : kind,
+							typeof event.values.query === "string" ? event.values.query : "",
+							event.values.more === "true",
+						);
+						return { status: "accepted", message: "" };
+					}
 					case "pipeline-probe": {
 						const query = event.values.query;
 						if (typeof query !== "string" || query.trim() === "")

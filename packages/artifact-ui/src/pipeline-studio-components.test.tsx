@@ -10,6 +10,10 @@ const domGlobals = {
 	window: dom.window,
 	document: dom.window.document,
 	IS_REACT_ACT_ENVIRONMENT: true,
+	requestAnimationFrame: (callback: FrameRequestCallback) =>
+		setTimeout(() => callback(performance.now()), 0),
+	cancelAnimationFrame: (id: ReturnType<typeof setTimeout>) => clearTimeout(id),
+	getComputedStyle: dom.window.getComputedStyle.bind(dom.window),
 	ResizeObserver: class {
 		observe() {}
 		unobserve() {}
@@ -295,4 +299,73 @@ test("opening, refreshing and the session operations dispatch their events", asy
 test("a studio without a draft shows the empty state", async () => {
 	const { container } = await mount(snapshotOf({ work: null, session: null }));
 	expect(container.textContent).toContain("ここにパイプラインを表示します");
+});
+
+test("handoff edits stay inside the artifact and dispatch library navigation and revision checked source apply", async () => {
+	const source = JSON.stringify({
+		inputs: {},
+		steps: [
+			{ id: "first", kind: "toolchain", title: "調べる", request: "調べる" },
+			{ id: "second", kind: "toolchain", title: "作る", request: "作る" },
+		],
+	});
+	const { container, dispatch } = await mount(
+		snapshotOf({
+			work: work({
+				source,
+				flow: {
+					inputs: [],
+					steps: [
+						{
+							id: "first",
+							kind: "toolchain",
+							title: "調べる",
+							toolchain: "web.search",
+							reads: [],
+							inputs: [],
+						},
+						{
+							id: "second",
+							kind: "toolchain",
+							title: "作る",
+							toolchain: "image.create",
+							reads: [],
+							inputs: [],
+						},
+					],
+					answer: null,
+				},
+			}),
+			library: {
+				kind: "image",
+				loading: false,
+				query: "",
+				images: [],
+				tracks: [],
+			},
+		}),
+	);
+	await press(container, "渡すものを編集");
+	expect(container.querySelector('[role="dialog"]')).not.toBeNull();
+	await press(container, "画像を選ぶ ›");
+	expect(last(dispatch)).toMatchObject({
+		source: "pipeline-studio",
+		action: "pipeline-library",
+		values: { kind: "image", query: "", more: "false" },
+	});
+	expect(container.querySelector('[role="dialog"]')).toBeNull();
+	await press(container, "戻る");
+	await typeInto(container.querySelector("select")!, "prompt");
+	await press(container, "このプロンプトを選ぶ");
+	await press(container, "反映");
+	const applied = dispatch.mock.calls
+		.map((call) => call[0])
+		.find((event) => event?.action === "pipeline-source-apply")!;
+	expect(applied.values).toMatchObject({
+		workRef: "work-1",
+		expectedRevision: "3",
+	});
+	expect(JSON.parse(String(applied.values.text)).steps[0].materials).toEqual([
+		{ kind: "request" },
+	]);
 });

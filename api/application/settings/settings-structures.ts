@@ -69,6 +69,13 @@ function releaseFallbacks(doc: Settings, resourceIds: ReadonlySet<string>) {
 		doc.world.curationResourceId = null;
 	const subagent = doc.subagent.resourceId;
 	if (subagent && resourceIds.has(subagent)) doc.subagent.resourceId = null;
+	// A released agency model is never replaced by the LARM local LLM silently: agency stops until the user
+	// chooses a route again.
+	const agency = doc.agency.resourceId;
+	if (agency && resourceIds.has(agency)) {
+		doc.agency.resourceId = null;
+		doc.agency.enabled = false;
+	}
 }
 
 export type StructuralResult = {

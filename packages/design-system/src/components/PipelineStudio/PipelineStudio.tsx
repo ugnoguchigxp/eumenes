@@ -7,7 +7,7 @@ import {
 	Square,
 	X,
 } from "lucide-react";
-import { useId } from "react";
+import { useId, useRef, useState } from "react";
 import { cn } from "../../utils/cn";
 import { Button } from "../Button";
 import { PipelineFlow } from "../PipelineFlow";
@@ -20,6 +20,12 @@ import type {
 	PipelineStudioWorkData,
 } from "./types";
 import "./PipelineStudio.css";
+import { PipelineHandoff } from "./PipelineHandoff";
+import {
+	handoffDocument,
+	materialLabel,
+	type PipelineMediaLibrary,
+} from "./handoff-types";
 
 export type PipelineStudioProps = {
 	title?: string;
@@ -53,6 +59,12 @@ export type PipelineStudioProps = {
 	onClose?: () => void;
 	onStop?: () => void;
 	className?: string;
+	library?: PipelineMediaLibrary;
+	onLibrary?: (
+		kind: "image" | "music" | null,
+		query?: string,
+		more?: boolean,
+	) => void;
 };
 
 const draftOption = "__draft__";
@@ -212,11 +224,17 @@ export function PipelineStudio({
 	onClose,
 	onStop,
 	className,
+	library,
+	onLibrary,
 }: PipelineStudioProps) {
+	const [handoff, setHandoff] = useState<string>();
+	const panel = useRef<HTMLDivElement>(null);
+	if (!work && handoff) setHandoff(undefined);
 	const heading = useId();
 	const flowHeading = useId();
 	const checkHeading = useId();
 	const busy = !!work?.busy;
+	const document = work ? handoffDocument(work.source) : null;
 	// A trial is one at a time; the draft is read by the host, so it needs a draft and no running trial.
 	const trialLocked = !work || pending || !!trial?.pending;
 	const trialOf = <K extends PipelineStudioTrialData["kind"]>(kind: K) =>
@@ -224,8 +242,31 @@ export function PipelineStudio({
 			PipelineStudioTrialData,
 			{ kind: K }
 		> | null;
+	if (handoff && work && document)
+		return (
+			<PipelineHandoff
+				key={handoff}
+				work={work}
+				stepId={handoff}
+				pending={pending}
+				library={library}
+				onLibrary={onLibrary ?? (() => {})}
+				onApply={onApply}
+				onClose={() => {
+					setHandoff(undefined);
+					requestAnimationFrame(() =>
+						panel.current
+							?.querySelector<HTMLButtonElement>(
+								`[data-handoff-step="${handoff}"]`,
+							)
+							?.focus(),
+					);
+				}}
+			/>
+		);
 	return (
 		<div
+			ref={panel}
 			className={cn("pipeline-studio", className)}
 			data-busy={busy ? "true" : undefined}
 		>
@@ -341,7 +382,24 @@ export function PipelineStudio({
 										aria-labelledby={flowHeading}
 									>
 										<h3 id={flowHeading}>流れ</h3>
-										<PipelineFlow flow={work.flow} issues={work.issues} />
+										<PipelineFlow
+											flow={work.flow}
+											issues={work.issues}
+											onHandoff={document ? setHandoff : undefined}
+											handoffDisabled={busy || pending}
+											handoffs={
+												document
+													? Object.fromEntries(
+															document.steps.map((step) => [
+																step.id,
+																(step.materials ?? []).map((item) =>
+																	materialLabel(item, document),
+																),
+															]),
+														)
+													: undefined
+											}
+										/>
 									</section>
 									<section
 										className="pipeline-studio-panel"

@@ -33,6 +33,10 @@ export {
 	type DocumentIssue,
 } from "./service/document";
 export {
+	resolvePipelineMaterials,
+	type ResolvedPipelineMaterial,
+} from "./service/materials";
+export {
 	applySourceInTransaction,
 	beginTurnInTransaction,
 	commitDocumentInTransaction,

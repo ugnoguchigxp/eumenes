@@ -67,7 +67,12 @@ for (const kind of ["image", "music", "playback", "drawing"] as const)
 			);
 			expect(plans).toHaveLength(1);
 			const plan = plans[0]!;
-			expect(plan).toHaveLength(2);
+			// The music planner also reads the provider catalog after the task.
+			expect(plan).toHaveLength(kind === "music" ? 3 : 2);
+			if (kind === "music")
+				expect(Object.keys(JSON.parse(plan[2]!.content))).toEqual([
+					"musicProviders",
+				]);
 			expect(JSON.stringify(plan)).not.toContain(history);
 			const data = JSON.parse(plan[1]!.content);
 			const task = kind === "playback" ? data.request : data;

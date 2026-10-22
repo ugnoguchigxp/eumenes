@@ -217,7 +217,7 @@ for (const [blocked, empty, uncollected] of [
 			const worker = h.toolchain.agents
 				.list(id)
 				.find((t) => t.kind === "worker")!;
-			expect(worker.packageRevisionId).toBe("package:web.service-search@3");
+			expect(worker.packageRevisionId).toBe("package:web.service-search@4");
 			const report = h.toolchain.agents.report(worker.id);
 			expect(report).not.toBeNull();
 			expect(report!.candidateResults).toHaveLength(fallback ? 1 : 3);

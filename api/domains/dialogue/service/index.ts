@@ -17,9 +17,11 @@ import type { ConversationService } from "../../conversation";
 import type { InferencePort } from "../../inference";
 import type { QueueService } from "../../queue";
 import type { MemoryService } from "../../memory";
+import { conversationHasActiveRun } from "./active-run";
 import type {
 	Run,
 	StewardPort,
+	AgencyLayerPort,
 	GoalsLayerPort,
 	WorldContextPort,
 } from "../contracts";
@@ -77,6 +79,8 @@ interface DialogueServiceOptions {
 	delegation?: import("../contracts/delegation").DelegationPort;
 	worldContext?: WorldContextPort;
 	goals?: GoalsLayerPort;
+	/** The agency layer: its own recent utterances and interests for the main context. Absent: no agency block. */
+	agency?: AgencyLayerPort;
 	toolchains?: import("../contracts/toolchains").ToolchainRoutingPort;
 	specialist?: import("../contracts").SpecialistPort;
 	/** The operational log file the error report reads (`config.logFile`); no log is read when absent. */
@@ -99,6 +103,7 @@ export function createDialogueService({
 	music,
 	worldContext,
 	goals,
+	agency,
 	toolchains,
 	specialist,
 	logFile,
@@ -120,6 +125,7 @@ export function createDialogueService({
 		music,
 		worldContext,
 		goals,
+		agency,
 		toolchains,
 		specialist,
 	};
@@ -145,6 +151,8 @@ export function createDialogueService({
 	});
 	const service = {
 		executionCommands: executionCommands(deps),
+		/** True while the conversation has a queued or running run (the agency host waits for a quiet moment). */
+		conversationHasActiveRunInTransaction: conversationHasActiveRun,
 		executionSourceInTransaction: (db: Database, runId: string) =>
 			executionSourceInTransaction(deps, db, runId),
 		notifyInTransaction: intake.notifyInTransaction,

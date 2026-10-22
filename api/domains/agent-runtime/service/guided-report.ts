@@ -22,6 +22,7 @@ export function saveGuidedReport(
 	const claims = raw.claims
 		.filter((c) => c.evidence.length > 0)
 		.map(({ text, evidence }) => ({ text, evidence }));
+	catalog.checkPlaced("claims", raw.claims);
 	const refs = raw.claims.flatMap((c) => c.evidence);
 	if (catalog.referencedSources(refs).some((s) => s.basis !== "page" || !s.url))
 		throw new Error("invalid_evidence");

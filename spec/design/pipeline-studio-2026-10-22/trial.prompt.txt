@@ -1,0 +1,21 @@
+Use case: ui-mockup. Create ONE high-fidelity Japanese UI screenshot of an Eumenes embedded ARTIFACT PANE, portrait 768x1152 pixels. This is the TEST screen of the SAME pipeline titled 「茹で時間・タイマー・曲」. It is not a standalone app, website, dashboard or phone. Crop exactly to the pane edges. No surrounding chat, no device frame, no desktop navigation, no branding, no browser toolbar, no giant heading. The chat exists outside this pane. The only text entry here is a compact sample utterance used for TESTING, not a chat composer; no microphone and no send icon.
+
+Match the real Eumenes DARK design system and the paired creation screen: background #101419, cards #181e26, dark inputs #11161c, thin borders #303a46, primary blue #2b80ed, main text #e6edf3, muted text #9aa8ba, restrained green checkmarks. All surfaces and empty areas are dark. Crisp Japanese sans-serif, legible 17-20px body type at this image scale, compact spacing, 8px corners, 12px content inset. No glossy effects, purple, neon or decorative gradients. Slim scrollbar at right. Quiet practical product UI.
+
+Top: flush 40px host workspace tab strip, a single small active tab 「パイプライン制作 ×」. Immediately below local tabs 「手順」 inactive, 「試す」 selected blue underline, ellipsis menu at right. Then the same modest name 「茹で時間・タイマー・曲」, badge 「未公開」, compact blue 「公開」 button at far right. No redundant page title.
+
+Next, a compact section 「この言い方で呼び出せる？」 with a bounded two-line sample field showing exactly 「ペンネの茹で時間を調べて、タイマーと明るい曲も作って」. A small outline button 「選択を確認」. Under it a green check and text 「この手順が選ばれました」, then parsed-input pills 「食材：ペンネ」 and 「曲の雰囲気：明るい」. Do not show a probability, similarity score or rank as reliability. This section tests selection only; it has not run a timer or generated a song.
+
+Below a divider, title 「サンプルで手順を確認」, a small muted badge 「疑似データ」 and compact outline button 「もう一度確認」 aligned right. One plain explanatory line 「実際の検索・タイマー・曲の生成は行いません。」 This is a clear visible mock-data test, never pretend it is live execution.
+
+Dominant area: ONE full-width vertical stack of four numbered compact result cards, short thin gray connectors. Use green check icons accompanied by text 「確認済み」, not green color alone. Every card contains concrete values so the data passing is easy to follow. Blue rounded source tokens carry origin numbers. Do not create columns, branches, a graph canvas or right sidebar.
+
+Result card 1, about 100px high: 「1 茹で時間を調べる」 and 「確認済み」. Source pill 「入力・食材：ペンネ」. Row labeled 「サンプル結果」 with exact quote 「茹で時間は11〜12分」. The report is a supplied sample, not an actual search result.
+
+Result card 2, about 150px high, expanded with a subtle blue outline: 「2 分数を取り出す」 and 「確認済み」. Row 「元の情報」 with blue source token 「① 調査結果」. Show a clear transformation: 「11〜12分」 a small arrow 「→」 and a prominent blue-tinted value pill 「11 分」. Under it 「幅があれば短い方」. Bottom small check 「期待値 11 ／ 結果 11」. This is the key visual focus.
+
+Result card 3, about 95px high: 「3 タイマーをかける」 and 「確認済み」. Row 「時間」 blue source pill 「② 分数：11」 followed by unit 「分」. Smaller text 「確認した依頼：11分のタイマーをかける」. No countdown dial, no running timer, no actual timer ID.
+
+Result card 4, about 95px high: 「4 曲を作る」 and 「確認済み」. Row 「雰囲気」 blue source pill 「入力・曲の雰囲気：明るい」. Smaller text 「確認した依頼：明るい曲を作る」. No player, no album art, no real generated song, no claim of playback.
+
+Bottom summary: small green check, headline 「サンプルの確認：合格」, muted line 「4手順の依頼と値の受け渡しを確認しました」. Bottom compact collapsed disclosure row 「検索の詳細」 with chevron. All four result cards and test input must fit without clipping. No JSON, no raw code, no fake logs, no runtime charts, no actual-live-run button, no new app navigation. This is only the artifact pane with its host tab, edge-to-edge. Render Japanese labels carefully and keep the visual style identical to the creation screen.

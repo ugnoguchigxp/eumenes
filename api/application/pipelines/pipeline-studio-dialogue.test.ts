@@ -13,7 +13,7 @@ import { harness } from "../toolchain/toolchain.fixture";
  * and publishes it, and the published pipeline is a candidate of the next request. Only the models are scripted.
  */
 
-const STUDIO = "artifact:pipeline.studio@1";
+const STUDIO = "artifact:pipeline.studio@2";
 const id = () => crypto.randomUUID();
 type Prompt = Array<{ role: string; content: string }>;
 

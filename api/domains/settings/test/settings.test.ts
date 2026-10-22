@@ -1005,6 +1005,13 @@ test("stored settings are migrated once: Managed Agents removed, auth filled, no
 		fallbackId: managedResource,
 	};
 	legacy.world.curationResourceId = managedResource;
+	legacy.agency = {
+		enabled: true,
+		resourceId: managedResource,
+		idleSec: 20,
+		maxUnanswered: 1,
+		interests: [],
+	};
 	await h.store.write((db) => {
 		db.query("UPDATE settings_document SET document=? WHERE id=1").run(
 			JSON.stringify(legacy),
@@ -1025,6 +1032,9 @@ test("stored settings are migrated once: Managed Agents removed, auth filled, no
 	expect(migrated.routes.llm.fallbackId).toBeNull();
 	expect(migrated.routes.llm.mode).toBe("larm-preferred");
 	expect(migrated.world.curationResourceId).toBeNull();
+	// Agency does not fall back to LARM silently: it is switched off.
+	expect(migrated.agency.resourceId).toBeNull();
+	expect(migrated.agency.enabled).toBe(false);
 	expect(migrated.subagent).toEqual({ resourceId: null });
 	expect(h.settings.credential(migrated.connections[0]!)).toBe("sk-keep");
 	// Startup persists the migration once and drops the removed connection's secret.
@@ -1081,6 +1091,7 @@ test("a connection in use never changes its billing path in place; other changes
 	const next = h.settings.get();
 	next.world.curationResourceId = idle.resource;
 	next.subagent.resourceId = idle.resource;
+	next.agency.resourceId = idle.resource;
 	await save(h, next);
 	// Switching a routed connection from API key to subscription is refused, key or not.
 	const swapped = h.settings.get();
@@ -1101,6 +1112,7 @@ test("a connection in use never changes its billing path in place; other changes
 	const free = h.settings.get();
 	free.world.curationResourceId = null;
 	free.subagent.resourceId = null;
+	free.agency.resourceId = null;
 	free.connections.find((c) => c.id === idle.connection)!.auth = "api-key";
 	await expect(save(h, structuredClone(free))).rejects.toThrow(
 		"credential_required",
@@ -1140,4 +1152,79 @@ test("subagent.resourceId must name a registered LLM resource and defaults to LA
 	).toBe(false);
 	await save(h, s);
 	expect(h.settings.get().subagent.resourceId).toBe(resource);
+});
+
+test("agency defaults to OFF on the LARM local LLM, also for saved documents without it", async () => {
+	const h = await setup();
+	const defaultAgency = {
+		enabled: false,
+		resourceId: null,
+		idleSec: 20,
+		maxUnanswered: 1,
+		interests: [],
+	};
+	expect(h.settings.get().agency).toEqual(defaultAgency);
+	// A document saved before this setting existed still loads, with agency off.
+	const legacy = JSON.parse(JSON.stringify(h.settings.get()));
+	delete legacy.agency;
+	await h.store.write((db) => {
+		db.query("UPDATE settings_document SET document=? WHERE id=1").run(
+			JSON.stringify(legacy),
+		);
+	});
+	const reopened = await createSettings(h.store, { dbPath: h.dbPath, env: {} });
+	expect(reopened.get().agency).toEqual(defaultAgency);
+	// A partial section fills the rest with the defaults.
+	const partial = JSON.parse(JSON.stringify(legacy));
+	partial.agency = { enabled: true };
+	expect(settingsSchema.parse(partial).agency).toEqual({
+		...defaultAgency,
+		enabled: true,
+	});
+});
+
+test("agency persists through apply; its resource must name a registered LLM resource", async () => {
+	const h = await setup();
+	const s = h.settings.get();
+	expect(
+		settingsSchema.safeParse({
+			...s,
+			agency: { ...s.agency, resourceId: crypto.randomUUID() },
+		}).success,
+	).toBe(false);
+	const { resource } = claude(s, "api-key", { envRef: "EUMENES_CLOUD_KEY" });
+	s.agency = {
+		enabled: true,
+		resourceId: resource,
+		idleSec: 0,
+		maxUnanswered: 10,
+		interests: ["a", "b", "c"],
+	};
+	expect(settingsSchema.safeParse(s).success).toBe(true);
+	await save(h, s);
+	const again = await createSettings(h.store, { dbPath: h.dbPath, env: {} });
+	expect(again.get().agency).toEqual(s.agency);
+});
+
+test("agency rejects out-of-range values and unknown fields", async () => {
+	const h = await setup();
+	const s = h.settings.get();
+	const withAgency = (patch: Record<string, unknown>) =>
+		settingsSchema.safeParse({ ...s, agency: { ...s.agency, ...patch } })
+			.success;
+	expect(withAgency({})).toBe(true);
+	expect(withAgency({ idleSec: 86400 })).toBe(true);
+	expect(withAgency({ idleSec: -1 })).toBe(false);
+	expect(withAgency({ idleSec: 86401 })).toBe(false);
+	expect(withAgency({ idleSec: 1.5 })).toBe(false);
+	expect(withAgency({ maxUnanswered: 0 })).toBe(false);
+	expect(withAgency({ maxUnanswered: 11 })).toBe(false);
+	expect(withAgency({ maxUnanswered: 1.5 })).toBe(false);
+	expect(withAgency({ interests: ["a", "b", "c", "d"] })).toBe(false);
+	expect(withAgency({ interests: [""] })).toBe(false);
+	expect(withAgency({ interests: ["x".repeat(200)] })).toBe(true);
+	expect(withAgency({ interests: ["x".repeat(201)] })).toBe(false);
+	expect(withAgency({ enabled: "yes" })).toBe(false);
+	expect(withAgency({ resourceId: "not-a-uuid" })).toBe(false);
+	expect(withAgency({ extra: 1 })).toBe(false);
 });

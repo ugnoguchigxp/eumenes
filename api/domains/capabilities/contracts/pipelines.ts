@@ -49,6 +49,33 @@ export const pipelineValueSchema = z.strictObject({
 });
 export type PipelineValueSchema = z.infer<typeof pipelineValueSchema>;
 
+/** Explicit data handed to a step; asset IDs are resolved by their existing authenticated domains. */
+export const pipelineMaterial = z.discriminatedUnion("kind", [
+	z.strictObject({
+		kind: z.literal("text"),
+		text: z.string().min(1).max(16000),
+	}),
+	z.strictObject({ kind: z.literal("value"), value: z.json() }),
+	z.strictObject({ kind: z.literal("request") }),
+	z.strictObject({ kind: z.literal("prompt"), stepId }),
+	z.strictObject({
+		kind: z.literal("reference"),
+		reference: z.string().min(1).max(600),
+	}),
+	z.strictObject({ kind: z.literal("result"), stepId }),
+	z.strictObject({
+		kind: z.literal("image"),
+		id: z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/),
+		title: z.string().min(1).max(200),
+	}),
+	z.strictObject({
+		kind: z.literal("music"),
+		id: z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/),
+		title: z.string().min(1).max(200),
+	}),
+]);
+export type PipelineMaterial = z.infer<typeof pipelineMaterial>;
+
 /**
  * A step handed to an existing toolchain as a child of the run. `request` is the request it gets; an instant
  * toolchain gets `arguments` (each a template or a literal). `uses` passes earlier steps' results as references.
@@ -64,6 +91,7 @@ const toolchainStep = z.strictObject({
 		.record(name, z.union([template(500), z.number(), z.boolean()]))
 		.optional(),
 	uses: z.array(stepId).max(PIPELINE_MAX_STEPS).optional(),
+	materials: z.array(pipelineMaterial).max(16).optional(),
 	require: z
 		.array(z.string().regex(/^(summary|output(\.[A-Za-z0-9_-]{1,64}){0,6})$/))
 		.max(8)

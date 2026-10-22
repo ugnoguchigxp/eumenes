@@ -77,6 +77,7 @@ export function defaults(env: Record<string, string | undefined>): Settings {
 		},
 		codingSupervision: { approveInstructions: true },
 		world: { enabled: false },
+		agency: { enabled: false },
 	});
 }
 export async function createSettings(

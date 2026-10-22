@@ -33,16 +33,8 @@ test("new Web revisions upgrade and reseed without changing archived definitions
 				),
 			),
 		);
-		const boundary = bundle.definitions.findIndex(
-			(d) => d.kind === "skill" && d.id === "web.guided" && d.revision === 2,
-		);
-		expect(boundary).toBeGreaterThan(0);
 		await store.write((db) =>
-			caps.importBundleInTransaction(
-				db,
-				{ ...bundle, definitions: bundle.definitions.slice(0, boundary) },
-				host(),
-			),
+			caps.importBundleInTransaction(db, bundle, host()),
 		);
 		const archived = () =>
 			store.read((db) =>

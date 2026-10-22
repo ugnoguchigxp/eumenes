@@ -106,8 +106,8 @@ test("C01-C03: a relative timer request is saved through the toolchain", async (
 			origin_message_id: run.inputMessageId,
 		});
 		expect(h.acquisitions).toBe(0);
-		// The request analysis, the toolchain selection, the timer sub-agent, and the answer.
-		expect(h.calls).toBe(4);
+		// The discovery, the toolchain selection, the handover, the timer sub-agent, the completion check and the answer.
+		expect(h.calls).toBe(6);
 	} finally {
 		await h.close();
 	}
@@ -563,8 +563,9 @@ test("real dialogue list and cancel select an authoritative timer snapshot", asy
 		expect(h.commandContexts[1]).toContain("revision");
 		expect(await ask("タイマーを止めて")).toContain("取り消");
 		expect(h.timers!.get(timer.id)?.timer.state).toBe("cancelled");
-		// Each of the three requests takes the analysis, the selection, the sub-agent and the answer.
-		expect(h.calls).toBe(12);
+		// The first request as above (6); each later one selects the retained timer directly, so it takes the
+		// selection, the handover, the sub-agent, the completion check and the answer (5).
+		expect(h.calls).toBe(16);
 	} finally {
 		await h.close();
 	}
@@ -638,7 +639,7 @@ test("cancellation after preparation refreshes the result before the agent phras
 		expect(changed).toBe(true);
 		expect(h.dialogue.answerText(run.id)).toContain("取り消");
 		expect(h.dialogue.answerText(run.id)).not.toContain("開始");
-		expect(h.calls).toBe(4);
+		expect(h.calls).toBe(6);
 	} finally {
 		unsubscribe();
 		await h.close();

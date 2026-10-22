@@ -28,7 +28,12 @@ const log = getLogger("dialogue");
  */
 export type AnalysisInput = {
 	persona: PersonaSpec;
-	previous: Array<{ role: "user" | "assistant"; content: string }>;
+	/** A lone user message is marked `unanswered`: its run ended (failed or cancelled) without an answer. */
+	previous: Array<{
+		role: "user" | "assistant";
+		content: string;
+		unanswered?: true;
+	}>;
 	background?: string;
 };
 
@@ -45,7 +50,8 @@ function clipMessage(content: string) {
 
 /**
  * The newest exchange of the shown history: its last answer with the user message before it, or a lone last
- * message. Each message is cut to `PREVIOUS_MESSAGE_MAX_CHARS` characters.
+ * message. Each message is cut to `PREVIOUS_MESSAGE_MAX_CHARS` characters. A lone user message is marked
+ * `unanswered`, so the first round does not take it for a request still to be carried out.
  */
 export function previousExchange(
 	turns: readonly HistoryTurn[],
@@ -53,11 +59,13 @@ export function previousExchange(
 	const last = turns.at(-1);
 	if (!last) return [];
 	const before = turns.at(-2);
-	return (
-		last.role === "assistant" && before?.role === "user"
-			? [before, last]
-			: [last]
-	).map(({ role, content }) => ({ role, content: clipMessage(content) }));
+	if (last.role === "user")
+		return [
+			{ role: "user", content: clipMessage(last.content), unanswered: true },
+		];
+	return (before?.role === "user" ? [before, last] : [last]).map(
+		({ role, content }) => ({ role, content: clipMessage(content) }),
+	);
 }
 
 /** Same host-owned framing for budget estimation and delivery. */

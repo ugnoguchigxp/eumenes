@@ -36,6 +36,14 @@ export function PipelineStudioView({ request }: { request: ArtifactRequest }) {
 				session={data.session}
 				stoppable={data.stoppable}
 				trial={data.trial}
+				library={data.library}
+				onLibrary={(kind, query, more) =>
+					void send("pipeline-library", {
+						kind: kind ?? "close",
+						query: query ?? "",
+						more: String(!!more),
+					})
+				}
 				pending={action.pending}
 				result={{ status: action.status, message: action.message }}
 				onApply={(text, revision) => {

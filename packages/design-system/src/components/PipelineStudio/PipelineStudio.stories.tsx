@@ -4,10 +4,10 @@ import type { PipelineStudioWorkData } from "./types";
 
 const source = `{
   "id": "weather-note",
-  "inputs": [{ "name": "city", "type": "string", "required": true }],
+  "inputs": {"city": {"type": "string", "description":"都市", "required": true}},
   "steps": [
-    { "id": "search", "toolchain": "web.search", "request": "\${inputs.city} の天気" },
-    { "id": "pick", "kind": "extract", "uses": "\${steps.search.summary}" }
+    { "id": "search", "kind":"toolchain", "title":"天気を調べる", "toolchain": "web.search", "request": "\${inputs.city} の天気" },
+    { "id": "pick", "title":"気温を取り出す", "kind": "extract", "from": "\${steps.search.summary}" }
   ],
   "answer": "\${steps.pick.value}"
 }`;

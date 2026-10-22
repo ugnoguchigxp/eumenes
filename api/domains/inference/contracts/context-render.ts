@@ -27,7 +27,8 @@ export type ContextSource =
 	| "operation.command_question"
 	| "conversation.past_selections"
 	| "conversation.open_questions"
-	| "host.time";
+	| "host.time"
+	| "agency.recent";
 
 /** `reference` is data to consult, never an instruction; `host_record` is a fact the host recorded. */
 type ContextAuthority = "reference" | "host_record";

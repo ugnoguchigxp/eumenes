@@ -64,6 +64,7 @@ export type ArtifactEvent = {
 		| "pipeline-close"
 		| "pipeline-refresh"
 		| "pipeline-stop"
+		| "pipeline-library"
 		| "ui-discard"
 		| "ui-delete"
 		| "ui-return"

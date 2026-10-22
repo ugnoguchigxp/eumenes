@@ -3,12 +3,16 @@ import type { InferencePort, Receipt } from "../../domains/inference";
 import { createDialogueService } from "../../domains/dialogue";
 import {
 	analysisReceipt,
+	DISCOVERY,
+	finishCall,
 	isAnalysisRound,
+	isCompletionCheck,
 } from "../../domains/dialogue/test/analysis.fixture";
 import { createDotsDialogue } from "./dots-dialogue";
 import { dotsFixture } from "./dots-fixture";
 import { createToolchainHistory } from "../../domains/toolchain-history";
 import { createToolchainRouting } from "../toolchain/toolchain-routing";
+import { fixtureDiscovery } from "../toolchain/discovery.fixture";
 import { createAdapterRegistry } from "../../domains/tool-runtime";
 import { createSchemaProvider } from "../toolchain/toolchain-adapters";
 const clean: Array<() => Promise<void>> = [];
@@ -39,11 +43,25 @@ test("conversation hands the request to the delegation toolchain, whose sub-agen
 		) => {
 			if (isAnalysisRound(tools as Parameters<typeof isAnalysisRound>[0])) {
 				analyses++;
-				return analysisReceipt("request", {
-					name: "delegate_project",
-					announcement: "プロジェクトの変更に取りかかります。",
-				});
+				// The first round searches; the found delegation toolchain is chosen in the next one.
+				return JSON.stringify(tools).includes('"delegate_project"')
+					? analysisReceipt("request", {
+							name: "delegate_project",
+							announcement: "プロジェクトの変更に取りかかります。",
+						})
+					: analysisReceipt("request", {
+							name: DISCOVERY,
+							args: { kind: "action", query: "プロジェクトの変更を実装" },
+						});
 			}
+			// The completion check of the delegated result: the handed request is achieved.
+			if (isCompletionCheck(tools as Parameters<typeof isCompletionCheck>[0]))
+				return {
+					requestId: "request",
+					attemptId: "check",
+					value: "",
+					toolCalls: [finishCall()],
+				} as Receipt;
 			messages.push(history);
 			calls++;
 			const r: Receipt = {
@@ -105,7 +123,7 @@ test("conversation hands the request to the delegation toolchain, whose sub-agen
 		toolchains: createToolchainRouting(
 			f.capabilities,
 			createToolchainHistory(f.store),
-			async () => undefined,
+			fixtureDiscovery(f.store, f.capabilities, () => "delegate_project"),
 			createAdapterRegistry([]),
 			createSchemaProvider(f.capabilities),
 		),
@@ -119,8 +137,8 @@ test("conversation hands the request to the delegation toolchain, whose sub-agen
 	f.queue.start();
 	const done = await dialogue.waitForTerminal(run.id, { timeoutMs: 3000 });
 	expect(done).toMatchObject({ status: "completed" });
-	// The request analysis, then the selection and the answer.
-	expect(analyses).toBe(1);
+	// The discovery and the analysis that chooses, then the handover and the answer.
+	expect(analyses).toBe(2);
 	expect(calls).toBe(2);
 	expect(JSON.stringify(messages[1])).toContain("delegationResult");
 	// The sub-agent loaded the toolchain's set and the catalog; the conversation did not.

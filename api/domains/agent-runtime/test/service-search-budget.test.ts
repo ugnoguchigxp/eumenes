@@ -41,7 +41,7 @@ test("revoking the frozen package revokes a research child's caller authority", 
 				input: {
 					kind: "web",
 					question: "指定サイトで検索",
-					packageRevisionId: "package:web.service-search@3",
+					packageRevisionId: "package:web.service-search@4",
 				},
 				deadline: Date.now() + 360000,
 			}),
@@ -85,7 +85,7 @@ test("native refusal continues through external lookup and host-issued candidate
 				input: {
 					kind: "web",
 					question: "YouTubeでpython3の動画を探して",
-					packageRevisionId: "package:web.service-search@3",
+					packageRevisionId: "package:web.service-search@4",
 				},
 				deadline: Date.now() + 360000,
 			}),

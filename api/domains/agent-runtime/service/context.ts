@@ -69,6 +69,19 @@ export function workerContext(
 			JSON.parse(task.input_json ?? "{}").originalRequest ??
 			(prepared.input as { question: string }).question,
 	};
+	// The earlier steps of a continued request are results, so they travel with the reference material.
+	const priorSteps = JSON.parse(task.input_json ?? "{}").priorSteps as
+		| unknown[]
+		| undefined;
+	const suppliedMaterials = {
+		...(execution?.materials?.length
+			? { pipelineMaterials: execution.materials }
+			: {}),
+		...(execution?.referenceData?.length
+			? { delegatedReferences: execution.referenceData }
+			: {}),
+		...(priorSteps?.length ? { priorSteps } : {}),
+	};
 	// Materials get what the 64 KiB step leaves after the parts that do not
 	// depend on them, so a full catalog can always be presented again. The
 	// reserve covers repair state, tools offered later and message framing.
@@ -116,7 +129,9 @@ export function workerContext(
 	// never crowd out references already frozen in the evidence catalog.
 	const observations = catalog.observe(
 		evidenceSources,
-		materialLimit - (guided ? 2 * OPERATION_BYTES + 64 : 0),
+		materialLimit -
+			(Object.keys(suppliedMaterials).length ? bytes(suppliedMaterials) : 0) -
+			(guided ? 2 * OPERATION_BYTES + 64 : 0),
 	);
 	if (catalog.full) tools = [];
 	const contracts = contractsFor(tools);
@@ -156,15 +171,8 @@ export function workerContext(
 	// recent ones are kept. Registered evidence is never trimmed.
 	while (bytes(operationList) > OPERATION_BYTES && operationList.length)
 		operationList.shift();
-	// The earlier steps of a continued request are results, so they travel with the reference material.
-	const priorSteps = JSON.parse(task.input_json ?? "{}").priorSteps as
-		| unknown[]
-		| undefined;
 	const materials = {
-		...(execution?.referenceData?.length
-			? { delegatedReferences: execution.referenceData }
-			: {}),
-		...(priorSteps?.length ? { priorSteps } : {}),
+		...suppliedMaterials,
 		evidence: data.evidence,
 		observations: visible,
 		...(guided ? { candidates, toolNotes } : {}),

@@ -301,6 +301,19 @@ function FixtureResult({ result }: { result: PipelineStudioFixtureResult }) {
 									<code>{step.request}</code>
 								</pre>
 							)}
+							{step.materials?.length ? (
+								<details>
+									<summary>渡す資料 {step.materials.length}件</summary>
+									{step.materials.map((material, i) => (
+										<div key={i}>
+											<strong>{material.label}</strong>
+											<pre className="pipeline-studio-code">
+												{show(material.value)}
+											</pre>
+										</div>
+									))}
+								</details>
+							) : null}
 							{step.arguments !== undefined && (
 								<code>{show(step.arguments)}</code>
 							)}

@@ -326,7 +326,7 @@ function childLauncher(
 		state: ParentState,
 		input: Pick<
 			import("../../tool-runtime").ChildExecution,
-			"chainRevisionId" | "request" | "arguments" | "refs"
+			"chainRevisionId" | "request" | "arguments" | "refs" | "materials"
 		>,
 		id: string,
 		started?: () => void,

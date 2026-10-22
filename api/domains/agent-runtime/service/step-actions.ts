@@ -367,6 +367,9 @@ export function createStepActions(ctx: RuntimeContext, ops: TaskOps) {
 			} else if (action.action === "finish") {
 				const draft = validateDraft(action.report, frozen!.contract);
 				const catalog = catalogs.get(t.id)!;
+				catalog.checkPlaced("claims", draft.claims);
+				catalog.checkPlaced("checks", draft.checks);
+				catalog.checkPlaced("externalRules", draft.externalRules);
 				catalog.verificationEvidence(draftReferences(draft));
 				if (
 					!tools.validateEvidenceInTransaction(

@@ -231,6 +231,8 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 			start: () => reportDelivery.start?.(),
 		},
 		{ name: "world_start", start: () => s.world?.start() },
+		// After every recovery: the feed starts at the end of the outbox, so nothing from the past is read.
+		{ name: "agency_start", start: () => s.agency.start() },
 		{ name: "web_research_start", start: () => s.webResearch.start() },
 		{ name: "excalidraw_start", start: () => drawingMaintenance.start?.() },
 		{ name: "scheduler_start", start: () => s.scheduler.start() },
@@ -254,7 +256,14 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 			name: "inference",
 			close: () => Promise.race([s.inference.close(), Bun.sleep(5_000)]),
 		},
-		{ name: "dialogue", close: () => s.dialogue.close() },
+		{
+			// Spontaneous speech stops (its in-flight cycles end) before the dialogue service closes.
+			name: "dialogue",
+			close: async () => {
+				await s.agency.close();
+				await s.dialogue.close();
+			},
+		},
 		{ name: "monitoring", close: () => s.monitoring.close() },
 		createSpecialistSessionsLifecycle(s.dialogue),
 		{ name: "web_research", close: () => s.webResearch.close() },

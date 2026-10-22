@@ -1,7 +1,10 @@
 import { expect, test } from "bun:test";
 import { harness } from "../toolchain/toolchain.fixture";
 import { musicFixture } from "./music.fixture";
-import { isAnalysisRound } from "../../domains/dialogue/test/analysis.fixture";
+import {
+	isAnalysisRound,
+	isCompletionCheck,
+} from "../../domains/dialogue/test/analysis.fixture";
 import {
 	toolchainPassages,
 	type VectorSpace,
@@ -22,7 +25,12 @@ test("the current music request reaches generation after unrelated Web and image
 	const model = {
 		...f.model,
 		answer: async (...args: Parameters<typeof f.model.answer>) => {
-			if (args[2]?.tools?.length && !isAnalysisRound(args[2].tools)) {
+			// The handover round offers the chosen function; the analysis and the completion check are not selections.
+			if (
+				args[2]?.tools?.length &&
+				!isAnalysisRound(args[2].tools) &&
+				!isCompletionCheck(args[2].tools)
+			) {
 				offered = args[2].tools.map((t) => t.function.name);
 				expect(offered).toContain("music");
 				expect(offered[0]).toBe("music");
@@ -104,7 +112,8 @@ test("the current music request reaches generation after unrelated Web and image
 			toolchainId: "music.create",
 		});
 		expect(selection.historyRefs.length).toBeGreaterThan(0);
-		expect(embeddedQueries).toEqual([question]);
+		// Only the first round's search query is embedded (the fixture's), never the earlier requests.
+		expect(embeddedQueries).toEqual(["今回の依頼を実行する担当"]);
 		expect(
 			selection.candidates.find((c) => c.toolchainId === "music.create")!.rank,
 		).toBe(1);

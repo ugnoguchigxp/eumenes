@@ -6,6 +6,8 @@ import { ImageGrid, type ImageGridItem } from "./ImageGrid";
 
 export type ImagePickerProps = {
 	images: readonly ImageGridItem[];
+	/** Only browse saved images; omit upload and external providers. */
+	savedOnly?: boolean;
 	selectedId?: string;
 	loading?: boolean;
 	error?: string;
@@ -36,6 +38,7 @@ export function ImagePicker({
 	onConfirm,
 	onCancel,
 	onUpload,
+	savedOnly = false,
 	renderGooglePhotos,
 }: ImagePickerProps) {
 	const [draftId, setDraftId] = useState(selectedId);
@@ -129,44 +132,48 @@ export function ImagePicker({
 				/>
 			) : (
 				<>
-					<div className="image-picker-toolbar">
-						<span>端末の画像</span>
-						<Button
-							type="button"
-							variant="outline"
-							disabled={pending}
-							onClick={() => fileInput.current?.click()}
-						>
-							参照…
-						</Button>
-						<input
-							ref={fileInput}
-							type="file"
-							hidden
-							aria-label="アップロードする画像"
-							accept="image/jpeg,image/png,image/webp"
-							disabled={pending}
-							onChange={(event) => {
-								const picked = event.target.files?.[0];
-								event.target.value = "";
-								if (!picked) return;
-								cancelUpload();
-								setUploadResult(undefined);
-								setFile({
-									name: picked.name,
-									url: URL.createObjectURL(picked),
-									value: picked,
-									requestId: crypto.randomUUID(),
-								});
-								setDraftId(undefined);
-							}}
-						/>
-					</div>
-					<p className="image-picker-note">
-						{onUpload
-							? "長辺2000px以内・WebP品質75に変換して保存します。選択だけでは3D生成しません。"
-							: "ファイルの選択・確認ができます。アップロードは画像取込機能の対応待ちです。"}
-					</p>
+					{!savedOnly && (
+						<>
+							<div className="image-picker-toolbar">
+								<span>端末の画像</span>
+								<Button
+									type="button"
+									variant="outline"
+									disabled={pending}
+									onClick={() => fileInput.current?.click()}
+								>
+									参照…
+								</Button>
+								<input
+									ref={fileInput}
+									type="file"
+									hidden
+									aria-label="アップロードする画像"
+									accept="image/jpeg,image/png,image/webp"
+									disabled={pending}
+									onChange={(event) => {
+										const picked = event.target.files?.[0];
+										event.target.value = "";
+										if (!picked) return;
+										cancelUpload();
+										setUploadResult(undefined);
+										setFile({
+											name: picked.name,
+											url: URL.createObjectURL(picked),
+											value: picked,
+											requestId: crypto.randomUUID(),
+										});
+										setDraftId(undefined);
+									}}
+								/>
+							</div>
+							<p className="image-picker-note">
+								{onUpload
+									? "長辺2000px以内・WebP品質75に変換して保存します。選択だけでは3D生成しません。"
+									: "ファイルの選択・確認ができます。アップロードは画像取込機能の対応待ちです。"}
+							</p>
+						</>
+					)}
 					{file && (
 						<div className="image-picker-local">
 							<ImageFrame
@@ -223,13 +230,15 @@ export function ImagePicker({
 						</div>
 					)}
 					<Tabs value={provider} onValueChange={setProvider}>
-						<TabsList
-							className="image-picker-sources"
-							aria-label="画像の提供元"
-						>
-							<TabsTrigger value="larm">LARM画像</TabsTrigger>
-							<TabsTrigger value="google">Googleフォト</TabsTrigger>
-						</TabsList>
+						{!savedOnly && (
+							<TabsList
+								className="image-picker-sources"
+								aria-label="画像の提供元"
+							>
+								<TabsTrigger value="larm">LARM画像</TabsTrigger>
+								<TabsTrigger value="google">Googleフォト</TabsTrigger>
+							</TabsList>
+						)}
 						<TabsContent value="larm">
 							<div className="image-picker-toolbar">
 								<span>保存した画像　{images.length}枚</span>

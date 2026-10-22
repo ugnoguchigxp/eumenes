@@ -1,0 +1,31 @@
+Use case: ui-mockup. One flat screenshot, 768x1152 portrait, cropped edge-to-edge to a narrow embedded Eumenes ARTIFACT PANE. This is the testing state of the same dark pipeline artifact. It must match the creation state: entirely dark navy/charcoal, with FOUR DARK CHARCOAL CARDS and LIGHT TEXT ON EVERY CARD. Each card background is #181e26, card text #e6edf3, pane background #101419, borders #303a46, blue #2b80ed. A test result card has the SAME DARK SURFACE as an ordinary editor card. The whole image, including every result card, is dark. No pale or white panels anywhere.
+
+Compact Japanese sans-serif, crisp 17-20px body text, 8px corners, 12px pane inset. Tasteful practical Eumenes design system, small blue tokens and buttons, restrained green checks with text. No phone frame, no browser toolbar, no branding, no application navigation, no dashboard, no surrounding conversation. This artifact is already embedded beside an existing chat. There is no chat composer inside it. Gray connectors show sequence; small blue source chips show value passing. Single column only. No sidebars.
+
+Structure from top to bottom:
+ROW 1: narrow flush HOST TAB BAR, height 36px, only a small left-aligned tab 「パイプライン制作 ×」. Rest of the row empty dark.
+ROW 2: separate compact LOCAL TAB BAR below it, showing BOTH tabs 「手順」 then 「試す」 side by side at the LEFT; underline 「試す」 in blue. Ellipsis menu at right. These tabs are not in the host tab bar.
+ROW 3: modest pipeline name 「茹で時間・タイマー・曲」, muted outline badge 「未公開」, small blue button 「公開」 at right.
+
+Compact selection test area:
+Heading 「この言い方で呼び出せる？」
+Dark input field containing 「ペンネの茹で時間を調べて、タイマーと明るい曲も作って」.
+Small outline button 「選択を確認」.
+Green check and 「この手順が選ばれました」.
+Two small dark-blue input chips 「食材：ペンネ」 and 「曲の雰囲気：明るい」.
+
+Thin divider. Heading 「サンプルで手順を確認」 with small dark badge 「疑似データ」 and compact outline button 「もう一度確認」 at right. Clear muted sentence 「実際の検索・タイマー・曲の生成は行いません。」
+
+Four compact DARK CHARCOAL cards with fine gray outlines, stacked vertically with short gray connectors. All text is light gray and all source chips have saturated dark-blue backgrounds with light lettering. Every card has its step number at left and small green check 「確認済み」 at right. No large white panels.
+
+Dark card 1: title 「1 茹で時間を調べる」. Small source chip 「入力・食材：ペンネ」. Body 「サンプル結果：茹で時間は11〜12分」.
+
+Dark card 2: title 「2 分数を取り出す」. Subtle blue border. Source row 「元の情報」 and blue chip 「① 調査結果」. Main value transformation 「11〜12分 → 11分」, with 「11分」 in a prominent dark-blue chip. Caption 「幅があれば短い方」. Small green check 「期待値 11 ／ 結果 11」. This is the key focus.
+
+Dark card 3: title 「3 タイマーをかける」. Row 「時間」 and blue source chip 「② 分数：11」 then 「分」. Small line 「確認した依頼：11分のタイマーをかける」. No running clock or countdown.
+
+Dark card 4: title 「4 曲を作る」. Row 「雰囲気」 and blue chip reading EXACTLY 「入力・曲の雰囲気：明るい」. This input chip MUST HAVE NO circled number, no ②, no ③; it comes from original user input and does not come from another step. Small line 「確認した依頼：明るい曲を作る」. No music player or artwork.
+
+Small bottom summary with green check 「サンプルの確認：合格」. Muted sentence 「4手順の依頼と値の受け渡しを確認しました」. Collapsed disclosure 「検索の詳細」 with chevron at the bottom.
+
+Fit all four cards, summary, and top test area fully inside the pane. Accurate concise Japanese. No percentages, invented logs, actual live execution button, JSON or code. Keep result cards DARK CHARCOAL #181e26 with LIGHT TEXT, exactly matching the dark pane and creation screen. All surfaces are dark; green checks are small accents only.

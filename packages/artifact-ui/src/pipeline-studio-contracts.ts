@@ -105,6 +105,11 @@ export type PipelineStudioFixture =
 					id: string;
 					request?: string;
 					arguments?: unknown;
+					materials?: Array<{
+						kind: "value" | "image" | "music";
+						label: string;
+						value: unknown;
+					}>;
 					fault?: string;
 				}>;
 				answer?: string;
@@ -155,4 +160,6 @@ export type PipelineStudioResource = {
 	stoppable: boolean;
 	/** The last trial (probe, selection test, fixture run); null before any. */
 	trial: PipelineStudioTrial | null;
+	/** Transient authenticated library data, never saved in the pipeline definition. */
+	library?: import("@eumenes/design-system").PipelineMediaLibrary;
 };

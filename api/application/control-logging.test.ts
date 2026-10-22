@@ -59,9 +59,14 @@ test("an unknown tool name invokes nothing and receives one bounded correction",
 	}
 });
 
-test("a search timeout is correlated across agent, web and queue and is not searched again", async () => {
+test("a search timeout is correlated across agent, web and queue and searches stop at the budget", async () => {
 	const output = capture();
-	const h = await harness({ fullResearch: true, lookupTimeoutOnce: true });
+	const h = await harness({
+		fullResearch: true,
+		acquire: async () => {
+			throw new Error("web_timeout");
+		},
+	});
 	try {
 		const r = await run(h);
 		const rows = output.entries();
@@ -83,8 +88,8 @@ test("a search timeout is correlated across agent, web and queue and is not sear
 					entry.event === "queue.settled" && entry.jobId === failed.jobId,
 			),
 		).toMatchObject({ reason: "web_timeout", status: "failed" });
-		// The search budget is one call; a failed search is reported, not repeated.
-		expect(h.acquisitions).toBe(1);
+		// Guided research has two searches; when both time out the failure is reported, not searched further.
+		expect(h.acquisitions).toBe(2);
 		expect(rows.some((entry) => entry.event === "agent.tool_completed")).toBe(
 			false,
 		);
@@ -112,7 +117,7 @@ test("a malformed report after a successful read is diagnosed once per attempt w
 		const completed = rows.find(
 			(entry) =>
 				entry.event === "agent.tool_completed" &&
-				entry.kind === "tool:web.lookup@1",
+				entry.kind === "tool:web.lookup@2",
 		);
 		expect(completed).toMatchObject({ runId: r.id, status: "succeeded" });
 		expect(
@@ -163,10 +168,12 @@ test("valid JSON with a missing report field records the field and expected type
 		workerOutput: JSON.stringify({
 			action: "finish",
 			report: {
-				outcome: "answered",
+				completion: "complete",
+				answer: "PRIVATE_ANSWER",
 				claims: [
 					{
 						text: "PRIVATE_CLAIM",
+						status: "verified",
 						evidence: ["e1"],
 					},
 				],

@@ -1,0 +1,9 @@
+# Source: api/domains/dialogue/service/agency-layer.ts
+text = '''
+（これより前の自発発言 [[count]] 件は省略）'''
+
+[variables.count]
+type = "string"
+trust = "trusted"
+placement = "inline"
+encoding = "raw"

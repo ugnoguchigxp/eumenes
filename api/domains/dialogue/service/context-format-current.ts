@@ -154,6 +154,9 @@ function blockMessage(block: ContextBlock): ChatMessage {
 		case "memory.notice":
 			if (body.kind !== "lines") throw new Error("context_block_body");
 			return reference(`${NOTICE_FRAME}\n${linesText(body, false)}`);
+		case "agency.recent":
+			if (body.kind !== "lines") throw new Error("context_block_body");
+			return reference(linesText(body, true));
 		case "memory.recall":
 			if (body.kind !== "text") throw new Error("context_block_body");
 			return reference(body.text);

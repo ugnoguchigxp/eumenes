@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import agencyPkg from "eumenes-agency/package.json";
 import pkg from "eumenes-memory/package.json";
 import worldPkg from "eumenes-world-model/package.json";
 
@@ -51,6 +52,35 @@ test("the vendored world-model package matches its manifest, package.json, the l
 	const integrity = `sha512-${createHash("sha512").update(artifact).digest("base64")}`;
 	expect(lock).toContain(
 		`${worldManifest.package}@vendor/world/${worldManifest.artifact}`,
+	);
+	expect(lock).toContain(integrity);
+});
+
+const agencyManifest = JSON.parse(
+	read("vendor/agency/manifest.json").toString(),
+);
+
+test("the vendored agency package matches its manifest, package.json, the lockfile and the installed copy", () => {
+	const artifact = read(`vendor/agency/${agencyManifest.artifact}`);
+	expect(agencyManifest.package).toBe("eumenes-agency");
+	expect(agencyManifest.dirty).toBe(false);
+	expect(createHash("sha256").update(artifact).digest("hex")).toBe(
+		agencyManifest.sha256,
+	);
+	expect(
+		read(`vendor/agency/${agencyManifest.artifact}.sha256`)
+			.toString()
+			.split(/\s+/)[0],
+	).toBe(agencyManifest.sha256);
+	const dependency = JSON.parse(read("package.json").toString()).dependencies[
+		agencyManifest.package
+	];
+	expect(dependency).toBe(`file:vendor/agency/${agencyManifest.artifact}`);
+	expect(agencyPkg.version).toBe(agencyManifest.version);
+	const lock = read("bun.lock").toString();
+	const integrity = `sha512-${createHash("sha512").update(artifact).digest("base64")}`;
+	expect(lock).toContain(
+		`${agencyManifest.package}@vendor/agency/${agencyManifest.artifact}`,
 	);
 	expect(lock).toContain(integrity);
 });

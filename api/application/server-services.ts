@@ -39,6 +39,8 @@ import { createToolchainRouting } from "./toolchain/toolchain-routing";
 import { createPipelinesService } from "./pipelines/pipelines-service";
 import { createPipelineTrials } from "./pipelines/pipelines-trials";
 import { createHostToolchain } from "./toolchain/toolchain-host";
+import { createAgencyHost } from "./agency/host";
+import { createAgencyLlmPort } from "./agency/llm-port";
 
 const log = getLogger("server");
 
@@ -182,7 +184,37 @@ export async function buildServices(
 				toolchain.worldAvailable,
 			)
 		: undefined;
+	// Spontaneous speech: runtimes per conversation, fed by the conversation outbox. ON/OFF is the saved setting.
+	const agency = createAgencyHost({
+		store,
+		conversation,
+		inference,
+		settings,
+		memory,
+		// The dialogue service is built below (it takes this host's context port).
+		conversationBusy: (db, conversationId) =>
+			dialogue.conversationHasActiveRunInTransaction(db, conversationId),
+		createLlm: (next) =>
+			createAgencyLlmPort({
+				store,
+				inference,
+				next,
+				// The receipt of a control call carries no token counts: read them from the attempt record.
+				attemptUsage: (attemptId) => {
+					const used = inference.usage().find((a) => a.id === attemptId);
+					return used
+						? {
+								model: used.model,
+								inputTokens: used.inputTokens,
+								outputTokens: used.outputTokens,
+								cacheReadTokens: null,
+							}
+						: null;
+				},
+			}),
+	});
 	const dialogue = createDialogueService({
+		agency: agency.dialoguePort,
 		logFile: () => config.logFile,
 		objectRecognition: enabled
 			? media.objectRecognition.port(CONVERSATION_DEFAULT_PRINCIPAL)
@@ -217,6 +249,8 @@ export async function buildServices(
 				}
 			: {}),
 	});
+	// A forgotten State item must not stay a topic suggestion.
+	memory.registerForgetPurge(() => agency.invalidateTopics());
 	links.attachDialogue(dialogue);
 	if (enabled && toolchains)
 		configureTaskExecution({
@@ -323,6 +357,7 @@ export async function buildServices(
 		pipelines,
 		pipelineTrials,
 		dialogue,
+		agency,
 		voice,
 		monitoring,
 	};

@@ -42,6 +42,7 @@ import {
 	queueLinkMigration,
 	worldStateMigration,
 } from "..";
+import type { AgencyLayerPort } from "../contracts";
 import { saveItem } from "./memory-seed";
 
 const MIGRATIONS = [
@@ -73,7 +74,7 @@ afterEach(async () => {
 });
 
 /** A run of the main conversation with a long-term fact and an adopted goal, optionally answering a failed research. */
-async function generate(failureCode: string | null) {
+async function generate(failureCode: string | null, agency?: AgencyLayerPort) {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-generation-prepare-"));
 	dirs.push(dir);
 	const store = openStore(join(dir, "db.sqlite3"), MIGRATIONS);
@@ -151,6 +152,7 @@ async function generate(failureCode: string | null) {
 			queue,
 			memory,
 			goals,
+			...(agency ? { agency } : {}),
 			...(failureCode ? { agents } : {}),
 		});
 		return { queue, dialogue };
@@ -214,4 +216,47 @@ test("without a research result the persona, long-term and goals layers are the 
 	).toBe(true);
 	expect(sent[1]!.content).toContain("辛いものが好き");
 	expect(sent[2]!.content).toContain("毎日少し運動する");
+});
+
+test("the agency layer: absent, null and empty give byte-identical prompts; a result adds one message before the input", async () => {
+	// Message ids are random per run; the rest must match to the byte.
+	const bytes = (sent: Sent) =>
+		JSON.stringify(sent).replace(/[0-9a-f]{8}-[0-9a-f-]{27}/g, "<id>");
+	const absent = (await generate(null)).sent;
+	const nothing = (
+		await generate(null, { recentForContextInTransaction: () => null })
+	).sent;
+	const empty = (
+		await generate(null, {
+			recentForContextInTransaction: () => ({ utterances: [], interests: [] }),
+		})
+	).sent;
+	expect(bytes(nothing)).toBe(bytes(absent));
+	expect(bytes(empty)).toBe(bytes(absent));
+	const shown = (
+		await generate(null, {
+			recentForContextInTransaction: () => ({
+				utterances: [
+					{ messageId: "m1", text: "そういえば昨日の天気は", heard: "partial" },
+				],
+				interests: ["マイメロディ"],
+			}),
+		})
+	).sent;
+	expect(shown).toHaveLength(absent.length + 1);
+	const at = shown.findIndex((m) => m.content.includes('"agency.recent"'));
+	const added = shown[at]!;
+	// Before the current request, with the other per-call records.
+	expect(at).toBeLessThan(shown.length - 2);
+	expect(added.role).toBe("system");
+	expect(JSON.parse(added.content).context).toMatchObject({
+		source: "agency.recent",
+		authority: "host_record",
+		freshness: "this_turn",
+	});
+	expect(JSON.parse(added.content).content).toContain(
+		"- そういえば昨日の天気は（途中まで）",
+	);
+	// Everything else is what it was.
+	expect(bytes(shown.filter((_, i) => i !== at))).toBe(bytes(absent));
 });

@@ -27,6 +27,7 @@ import { migrations } from "../migrations";
 import { createToolchain } from "../toolchain/toolchain";
 import { createToolchainHostLinks } from "../toolchain/toolchain-host";
 import { createToolchainRouting } from "../toolchain/toolchain-routing";
+import { fixtureDiscovery } from "../toolchain/discovery.fixture";
 import {
 	createWorldAssembly,
 	defaultWorldJournalPath,
@@ -419,7 +420,8 @@ export async function boot(steps: Step[], options: BootOptions = {}) {
 	const routing = createToolchainRouting(
 		toolchain.capabilities,
 		toolchain.history,
-		toolchain.embedQuery,
+		// The discovery finds the World query, as the fixture's embedding would.
+		fixtureDiscovery(store, toolchain.capabilities, () => "world_query"),
 		toolchain.registry,
 		toolchain.schemas,
 		toolchain.worldAvailable,

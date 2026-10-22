@@ -1,0 +1,12 @@
+{
+	"package": "eumenes-agency",
+	"version": "0.0.1",
+	"artifact": "eumenes-agency-0.0.1-5ff93a6afea5.tgz",
+	"sha256": "9fd8f682f5d75280703ded630e6677c5bb3a094729fb83cd2c76af7d011c65e8",
+	"size": 52271,
+	"INSTRUCTION_VERSION": "p0e-instructions-10",
+	"HOST_RULES_VERSION": "host-rules-3",
+	"gitSha": "5ff93a6afea5063eb0f28875a7da1482a2d41685",
+	"dirty": false,
+	"builtAt": "2026-10-22T12:04:42.378Z"
+}

@@ -10,6 +10,10 @@ import {
 	valueOf,
 	type PipelineScope,
 } from "./template";
+import {
+	resolvePipelineMaterials,
+	type ResolvedPipelineMaterial,
+} from "./materials";
 
 /** The JSON Schema of an extract step's one value, as its function takes it. */
 export function valueSchemaJson(s: PipelineValueSchema) {
@@ -89,6 +93,7 @@ export type FixtureOutcome = {
 		id: string;
 		request?: string;
 		arguments?: unknown;
+		materials?: ResolvedPipelineMaterial[];
 		fault?: string;
 	}>;
 	answer?: string;
@@ -123,6 +128,12 @@ export function runFixture(
 		const fake = test.stepResults[step.id];
 		try {
 			if (step.kind === "toolchain") {
+				const materials = resolvePipelineMaterials(
+					d,
+					step.materials,
+					scope,
+					test.utterance,
+				);
 				const request = expand(step.request, scope);
 				const args = step.arguments
 					? Object.fromEntries(
@@ -153,6 +164,7 @@ export function runFixture(
 					request,
 					arguments: args,
 					...(fault ? { fault } : {}),
+					...(materials.length ? { materials } : {}),
 				});
 				if (fault) {
 					fail(`steps.${step.id}`, fault);

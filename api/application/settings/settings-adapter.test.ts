@@ -1417,7 +1417,7 @@ test("the AI and external-work artifacts apply through the action ledger with st
 			eventCreatedAt: new Date(now).toISOString(),
 			eventExpiresAt: new Date(now + 60_000).toISOString(),
 			artifactId: "tab-ai",
-			artifactRevisionId: "artifact:settings.ai-connections@7",
+			artifactRevisionId: "artifact:settings.ai-connections@8",
 			source: "settings-ai",
 			sourceRevision: rev(h),
 			actionId: "apply",

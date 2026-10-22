@@ -737,3 +737,46 @@ test("an empty page keeps its cursor metadata visible", () => {
 		expect.objectContaining({ nextCursor: "c2", excerpts: [] }),
 	]);
 });
+
+test("pipeline materials reserve room before evidence admission and remain intact on later research steps", () => {
+	const materials = [
+		{
+			kind: "value",
+			label: "本文",
+			value: "  原文 ${inputs.topic}\n" + "資料".repeat(1200) + "\n ",
+		},
+		{ kind: "value", label: "値", value: { list: [0, false, null, ""] } },
+		{ kind: "image", label: "画像", value: { imageRef: "image-1" } },
+		{ kind: "music", label: "曲", value: { trackId: "track-1" } },
+	];
+	const input = {
+		...task,
+		input_json: JSON.stringify({
+			execution: { source: { request: "元の依頼" }, materials },
+		}),
+	};
+	const sources = Array.from({ length: 40 }, (_, i) => ({
+		...source(`資料${i}：${"取得した本文です。".repeat(80)}`),
+		sourceId: `page-${i}`,
+		sourceRef: `page-ref-${i}`,
+	}));
+	const catalog = new EvidenceCatalog();
+	const context = workerContext(input, prepared, [], sources, [], catalog, 0);
+	const packet = JSON.parse(
+		context.messages[1]!.content.slice(
+			context.messages[1]!.content.indexOf("{"),
+		),
+	);
+	expect(packet.pipelineMaterials).toEqual(materials);
+	expect(packet.evidence.length).toBeGreaterThan(0);
+	expect(catalog.full).toBe(true);
+	const again = workerContext(input, prepared, [], sources, [], catalog, 0);
+	const next = JSON.parse(
+		again.messages[1]!.content.slice(again.messages[1]!.content.indexOf("{")),
+	);
+	expect(next.pipelineMaterials).toEqual(materials);
+	expect(next.evidence).toEqual(packet.evidence);
+	expect(context.control.instructions).not.toContain(
+		materials[0]!.value as string,
+	);
+});

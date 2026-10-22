@@ -10,7 +10,7 @@ test("a candidate read resolves its observed URL and then supports body evidence
 				input: {
 					kind: "web",
 					question: "対象サイトの教材の学習時間を確認",
-					packageRevisionId: "package:web.service-search@3",
+					packageRevisionId: "package:web.service-search@4",
 				},
 				deadline: Date.now() + 360000,
 			}),

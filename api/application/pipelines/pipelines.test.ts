@@ -88,11 +88,11 @@ function timerCommand(messages: Array<{ role: string; content: string }>) {
 	});
 }
 
-async function setup(extract: () => unknown) {
+async function setup(extract: () => unknown, command = timerCommand) {
 	const h = await harness({
 		timers: true,
 		pipelines: true,
-		command: timerCommand,
+		command,
 		extract,
 		firstRound: (tools) =>
 			tools.some((t) => t.function.name === "pipeline_timer_relay")
@@ -333,6 +333,59 @@ test("a pipeline id that names another toolchain is refused; a revision publishe
 			toolchainRevisionId: "toolchain:pipeline.timer-relay@2",
 		});
 		expect(timers(h).map((t) => t.s)).toEqual([300, 30]);
+	} finally {
+		await h.close();
+	}
+});
+
+test("published materials survive storage and arrive in the actual command input as separate full data", async () => {
+	const packets: any[] = [];
+	const { h, pipelines } = await setup(
+		() => 30,
+		(messages) => {
+			packets.push(
+				JSON.parse(messages.filter((m) => m.role === "user").at(-1)!.content),
+			);
+			return timerCommand(messages);
+		},
+	);
+	try {
+		const d = structuredClone(relay);
+		const last = d.steps[2] as Extract<
+			PipelineDefinition["steps"][number],
+			{ kind: "toolchain" }
+		>;
+		const body = "  本文\n${inputs.minutes}\n ";
+		last.materials = [
+			{ kind: "text", text: body },
+			{ kind: "request" },
+			{ kind: "prompt", stepId: "second" },
+			{ kind: "reference", reference: "steps.seconds.value" },
+			{ kind: "value", value: { list: [0, false, null, ""] } },
+			{ kind: "image", id: "saved-image", title: "画像" },
+			{ kind: "music", id: "saved-track", title: "楽曲" },
+		];
+		expect((await pipelines.publish(d)).ok).toBe(true);
+		await h.dialogue.submit({
+			requestId: crypto.randomUUID(),
+			conversationId: "main",
+			text: TEXT,
+		});
+		await waitFor(() => execution(h)?.state === "completed", {
+			timeout: 15000,
+		});
+		expect(timers(h).map((t) => t.s)).toEqual([300, 30]);
+		const delivered = packets.find((p) => p.materials);
+		expect(delivered.request).toBe("30秒のタイマーを掛けてください");
+		expect(delivered.materials.map((m: any) => m.value)).toEqual([
+			body,
+			TEXT,
+			last.request,
+			30,
+			{ list: [0, false, null, ""] },
+			{ imageRef: "saved-image" },
+			{ trackId: "saved-track" },
+		]);
 	} finally {
 		await h.close();
 	}

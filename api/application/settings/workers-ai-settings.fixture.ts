@@ -79,6 +79,21 @@ export async function workersSettingsFixture(
 			"utf8",
 		),
 	);
+	// The state before the current save contracts: the first screens and the schemas they used. A screen whose
+	// first kept revision already needs a later schema did not exist yet.
+	const legacySchemas = bundle.schemas.filter(
+		(s: { id: string; revision: number }) =>
+			s.id === "settings-add-resource"
+				? s.revision === 1
+				: ["settings-apply", "settings-add-connection"].includes(s.id)
+					? s.revision <= 3
+					: true,
+	);
+	const legacyRefs = new Set(
+		legacySchemas.map(
+			(s: { id: string; revision: number }) => `schema:${s.id}@${s.revision}`,
+		),
+	);
 	const imported = await store.write((db) =>
 		caps.importBundleInTransaction(
 			db,
@@ -86,20 +101,22 @@ export async function workersSettingsFixture(
 				? {
 						...bundle,
 						artifacts: bundle.artifacts.filter(
-							(a: { id: string; revision: number }) =>
+							(a: {
+								id: string;
+								revision: number;
+								actionBindings?: Array<{ inputSchemaRef?: string }>;
+							}) =>
 								!bundle.artifacts.some(
 									(other: { id: string; revision: number }) =>
 										other.id === a.id && other.revision < a.revision,
+								) &&
+								(a.actionBindings ?? []).every(
+									(b) =>
+										!b.inputSchemaRef?.startsWith("schema:") ||
+										legacyRefs.has(b.inputSchemaRef),
 								),
 						),
-						schemas: bundle.schemas.filter(
-							(s: { id: string; revision: number }) =>
-								s.id === "settings-add-resource"
-									? s.revision === 1
-									: ["settings-apply", "settings-add-connection"].includes(s.id)
-										? s.revision <= 3
-										: true,
-						),
+						schemas: legacySchemas,
 					}
 				: maxAiRevision === undefined
 					? bundle

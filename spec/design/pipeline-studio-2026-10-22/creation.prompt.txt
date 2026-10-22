@@ -1,0 +1,19 @@
+Use case: ui-mockup. Create ONE high-fidelity Japanese UI screenshot of an Eumenes embedded ARTIFACT PANE, portrait 768x1152 pixels. This is the CREATION screen of a pipeline, not a standalone app, not a website, not a phone. Crop exactly to the pane edges. No surrounding chat, no device frame, no desktop sidebar, no logo, no browser toolbar, no giant page heading. The chat that edits this pipeline already exists OUTSIDE this pane; never duplicate a chat input, microphone or send button inside the artifact.
+
+Match the real Eumenes DARK design system: background #101419, cards #181e26, dark inputs #11161c, thin borders #303a46, primary blue #2b80ed, main text #e6edf3, muted text #9aa8ba, restrained green checkmarks. All backgrounds are dark, including empty areas. Crisp Japanese sans-serif, clear 17-20px body type at this image scale, compact UI, 8px rounded corners, 12px outer content padding, no glossy effects, no neon, no purple, no decorative gradients. Slim scrollbar at right. A practical quiet product UI, not a presentation slide.
+
+Top: a flush 40px host workspace tab strip with just one small active tab labeled exactly 「パイプライン制作 ×」. This host tab supplies the artifact title. Immediately below, a compact local row of tabs: 「手順」 selected blue underline, 「試す」 inactive; at far right an ellipsis menu. Next a modest pipeline name 「茹で時間・タイマー・曲」, smaller status badge 「未公開」, and a compact blue button 「公開」 aligned right. No extra application header.
+
+The main content is ONE FULL-WIDTH VERTICAL stack of four numbered step cards connected by short thin gray vertical lines. Do not create columns, a canvas grid, a right inspector or any branching. Make value passing visually explicit using small rounded blue-tinted source tokens with origin numbers, distinct from plain text.
+
+At the top of the stack a compact block labeled 「実行時の入力」 with two outlined pills 「食材・必須」 and 「曲の雰囲気・任意」. A subtle secondary line 「雰囲気の既定値：落ち着いた」.
+
+Card 1, about 115px high: number circle 「1」 and a small search icon, title 「茹で時間を調べる」. Body read-only sentence 「食材の標準的な茹で時間を調べる」. Next line 「使う値」 followed by a blue source token 「入力・食材」. A small output row reads 「渡すもの」 then outlined token 「調査結果」.
+
+Card 2, expanded and selected, about 210px high, fine blue outline and subtle blue-tinted dark surface: number 「2」 and small transform icon, title 「分数を取り出す」. Source row 「元の情報」 with blue token 「① 調査結果」. Expanded area after a subtle divider: caption 「取り出し方」, read-only sentence 「茹で時間を分で取り出す。幅があれば短い方。」. A quiet inline setting 「整数・1〜120分」. Bottom output row 「渡すもの」 with outlined token 「分数」. This is a visible independent transformation step; don't hide it as an invisible connector. This is a definition, so no actual numeric test result and no success state here.
+
+Card 3, about 110px high: number 「3」 and clock icon, title 「タイマーをかける」. Row 「時間」 blue source token 「② 分数」 followed by unit 「分」. Output row 「渡すもの」 outlined token 「タイマー」.
+
+Card 4, about 110px high: number 「4」 and music note icon, title 「曲を作る」. Row 「雰囲気」 blue source token 「入力・曲の雰囲気」. Output row 「渡すもの」 outlined token 「曲」. Do not suggest that the timer result feeds into the music step. The gray spine means execution order, blue tokens mean data references.
+
+After the cards a compact dashed-outline block 「完了時の回答」 with sentence 「茹で時間と、タイマー・曲を案内する」. At bottom a quiet line with green check 「定義の検査：問題なし」 and muted hint 「手順の変更はチャットから」. Keep all four cards and the final answer visible in the image without clipping. Sufficient whitespace between blocks, but no large empty margins. No JSON editor, no raw identifiers or code, no add-step button, no invented toolbar, no percentages, no simulated run states. Carefully render the short Japanese labels. This is only the artifact content and its host tab, edge-to-edge.

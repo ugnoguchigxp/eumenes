@@ -79,6 +79,12 @@ export type ChildExecution = {
 	arguments?: Record<string, unknown>;
 	refs: ExecutionReference[];
 	referenceData?: Array<{ ref: string; text: string }>;
+	/** Host-resolved data from a pipeline's frozen definition, separate from its request. */
+	materials?: Array<{
+		kind: "value" | "image" | "music";
+		label: string;
+		value: unknown;
+	}>;
 	source: ExecutionSource;
 	deadline: number;
 	modelCalls: number;

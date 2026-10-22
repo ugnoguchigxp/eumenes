@@ -328,31 +328,40 @@ export class EvidenceCatalog {
 		];
 	}
 
+	/** Every reference of these report items names a viewed source; a failure says where in the report it sits. */
+	checkPlaced(field: string, items: ReadonlyArray<{ evidence: string[] }>) {
+		items.forEach((item, i) =>
+			item.evidence.forEach((ref, j) => {
+				const e = this.entries.get(ref);
+				if (this.unavailable.has(ref)) throw new Error("evidence_invalidated");
+				if (!e || !e.source.viewId)
+					throw new ValidationFailure("invalid_evidence", [
+						{
+							validationPath: `report.${field}.${i}.evidence.${j}`,
+							validationCode: e ? "missing_view" : "unknown_evidence",
+						},
+					]);
+			}),
+		);
+	}
+
 	report(
 		raw: Omit<z.infer<typeof researchReport>, "checks" | "externalRules"> &
 			Partial<Pick<z.infer<typeof researchReport>, "checks" | "externalRules">>,
 		exploration: string[],
 	) {
+		this.checkPlaced("claims", raw.claims);
 		return {
 			...raw,
 			version: 2 as const,
 			exploration,
 			claims: raw.claims.map((c) => ({
 				...c,
-				evidence: c.evidence.map((ref, index) => {
-					const e = this.entries.get(ref);
-					if (this.unavailable.has(ref))
-						throw new Error("evidence_invalidated");
-					if (!e || !e.source.viewId)
-						throw new ValidationFailure("invalid_evidence", [
-							{
-								validationPath: `report.claims.${raw.claims.indexOf(c)}.evidence.${index}`,
-								validationCode: e ? "missing_view" : "unknown_evidence",
-							},
-						]);
+				evidence: c.evidence.map((ref) => {
+					const e = this.entries.get(ref)!;
 					return {
 						sourceId: e.source.sourceId,
-						viewId: e.source.viewId,
+						viewId: e.source.viewId!,
 						excerptId: e.excerptId,
 					};
 				}),

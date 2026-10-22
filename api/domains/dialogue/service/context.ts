@@ -10,6 +10,7 @@ import {
 } from "../../agent-runtime";
 import type {
 	Addressee,
+	AgencyLayerPort,
 	GoalsLayerPort,
 	Run,
 	SpecialistPort,
@@ -193,6 +194,8 @@ export type DialogueDeps = {
 	worldContext?: WorldContextPort;
 	/** The adopted goals, shown as a layer right after L1. Without it no goals layer exists. */
 	goals?: GoalsLayerPort;
+	/** The agency layer (its recent own utterances and interests). Without it no agency block exists. */
+	agency?: AgencyLayerPort;
 	/** Session toolchains and their domain work; without it no specialist session exists. */
 	specialist?: SpecialistPort;
 	/** Set by `createDialogueService` once intake exists (it accepts the resumed runs). */

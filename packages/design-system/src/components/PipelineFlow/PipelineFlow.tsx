@@ -1,6 +1,7 @@
 import { ArrowLeft } from "lucide-react";
 import { useMemo } from "react";
 import { cn } from "../../utils/cn";
+import { Button } from "../Button";
 import type { PipelineFlowData, PipelineFlowIssue } from "./types";
 import "./PipelineFlow.css";
 
@@ -10,6 +11,9 @@ export type PipelineFlowProps = {
 	/** The check findings; those under `/steps/<n>` and `/answer` are shown on their step. */
 	issues?: PipelineFlowIssue[];
 	className?: string;
+	onHandoff?: (stepId: string) => void;
+	handoffs?: Record<string, string[]>;
+	handoffDisabled?: boolean;
 };
 
 const stepPointer = /^\/steps\/(\d+)(?:\/|$)/;
@@ -74,6 +78,9 @@ export function PipelineFlow({
 	flow,
 	issues = [],
 	className,
+	onHandoff,
+	handoffs,
+	handoffDisabled,
 }: PipelineFlowProps) {
 	const grouped = useMemo(() => {
 		const byStep = new Map<number, PipelineFlowIssue[]>();
@@ -156,6 +163,22 @@ export function PipelineFlow({
 							knownSteps={before}
 						/>
 						<Findings issues={found} />
+						{handoffs?.[step.id]?.map((label, i) => (
+							<p className="pipeline-flow-note" key={i}>
+								{label}
+							</p>
+						))}
+						{step.kind === "toolchain" && onHandoff && (
+							<Button
+								size="sm"
+								variant="outline"
+								disabled={handoffDisabled}
+								data-handoff-step={step.id}
+								onClick={() => onHandoff(step.id)}
+							>
+								渡すものを編集
+							</Button>
+						)}
 					</li>
 				);
 			})}

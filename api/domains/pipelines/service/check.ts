@@ -135,11 +135,34 @@ function semanticIssues(d: PipelineDefinition, lookup: ToolchainLookup) {
 			if (kinds.get(id) !== "toolchain" || position.get(id)! >= i)
 				issue([...at, "uses", j], "unknown_step");
 		});
+		step.materials?.forEach((material, j) => {
+			const path = [...at, "materials", j];
+			if (material.kind === "reference") {
+				if (!parseReference(material.reference))
+					issue([...path, "reference"], "unknown_reference");
+				else
+					checkTemplate(`\${${material.reference}}`, [...path, "reference"], i);
+			} else if (material.kind === "result") {
+				if (
+					!position.has(material.stepId) ||
+					position.get(material.stepId)! >= i
+				)
+					issue([...path, "stepId"], "forward_reference");
+			} else if (material.kind === "prompt") {
+				if (
+					kinds.get(material.stepId) !== "toolchain" ||
+					position.get(material.stepId)! > i
+				)
+					issue([...path, "stepId"], "unknown_prompt");
+			}
+		});
 		const found = lookup(step.toolchain);
 		if (!found) return issue([...at, "toolchain"], "unknown_toolchain");
 		if (!STEP_EXECUTIONS.has(found.execution))
 			return issue([...at, "toolchain"], "unsupported_toolchain");
 		if (found.execution === "instant") {
+			if (step.materials?.length)
+				issue([...at, "materials"], "instant_materials_unsupported");
 			if (!step.arguments) issue([...at, "arguments"], "arguments_required");
 			for (const key of Object.keys(step.arguments ?? {}))
 				if (!found.arguments?.includes(key))
