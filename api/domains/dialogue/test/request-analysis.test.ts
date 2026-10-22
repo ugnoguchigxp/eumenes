@@ -71,7 +71,6 @@ test("live information is classified with the candidates, announced by the first
 		expect(first.map((t) => t.function.name)).toEqual([
 			"studio_create",
 			"other_create",
-			"answer",
 			"report_unavailable",
 		]);
 		expect(

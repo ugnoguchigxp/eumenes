@@ -31,6 +31,7 @@ import type { Model3dWorkspaceResource } from "./model3d-components";
 import type { BrowserWorkspaceResource } from "./browser-components";
 import type { MusicResource, GenerationResource } from "./media-contracts";
 import type { UiStudioResource } from "./ui-studio-contracts";
+import type { PipelineStudioResource } from "./pipeline-studio-contracts";
 import type {
 	SettingsSectionResource,
 	SettingsNavigationResource,
@@ -168,6 +169,15 @@ export const viewRegistry = {
 		name: "UiStudio",
 		label: "UI制作",
 		schema: z.strictObject({ view: z.literal("ui-studio"), source, title }),
+	},
+	"pipeline-studio": {
+		name: "PipelineStudio",
+		label: "パイプライン制作",
+		schema: z.strictObject({
+			view: z.literal("pipeline-studio"),
+			source,
+			title,
+		}),
 	},
 	"ocr-media": {
 		name: "OcrMedia",
@@ -785,6 +795,7 @@ export type Resource =
 	| CollectionResource
 	| FormResource
 	| UiStudioResource
+	| PipelineStudioResource
 	| MemoryResource
 	| SettingsResource
 	| { kind: "components"; revision: number; example?: string };

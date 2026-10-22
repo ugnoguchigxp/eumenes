@@ -149,6 +149,8 @@ export function retainedCandidates(
 		sessionFunctions: sessionFunctionNames(deps, offer.cards),
 	};
 }
+/** The pipelines a discovery also offers from the request's own embedding, besides the search text's candidates. */
+const PIPELINES_BY_REQUEST = 2;
 /** One LLM-requested search, excluding already offered revisions before ranking and the four-card limit. */
 export async function findCandidates(
 	deps: DialogueDeps,
@@ -163,18 +165,55 @@ export async function findCandidates(
 		deps.toolchains!.embedQuery(searchText, signal),
 	);
 	signal.throwIfAborted();
-	const route = deps.store.read((db) =>
+	const available = new Set(
+		routing.available.filter((id) => id !== routing.tasks?.card?.id),
+	);
+	let route = deps.store.read((db) =>
 		deps.toolchains!.routeInTransaction(db, {
 			runId: input.runId,
 			text: searchText,
 			query,
-			available: new Set(
-				routing.available.filter((id) => id !== routing.tasks?.card?.id),
-			),
+			available,
 			excludeRevisionIds: excluded,
 			strict: true,
 		}),
 	);
+	// A pipeline runs a whole request (spec task-pipeline-design §5): it is also found by the request itself, when the
+	// search text names only its first part. A continuation goes on step by step: it is offered no pipeline.
+	const request = currentRequestMessage(input).content;
+	if (routing.continuation)
+		route = { ...route, cards: route.cards.filter((c) => !c.pipeline) };
+	else if (
+		searchText !== request &&
+		deps.store.read((db) =>
+			(deps.toolchains!.catalogInTransaction?.(db) ?? []).some(
+				(e) => e.runtime.execution === "pipeline" && available.has(e.id),
+			),
+		)
+	) {
+		const whole = await deps.toolchains!.embedQuery(request, signal);
+		signal.throwIfAborted();
+		if (whole) {
+			const offered = new Set([
+				...excluded,
+				...route.cards.map((c) => c.revisionId),
+			]);
+			const pipelines = deps.store
+				.read((db) =>
+					deps.toolchains!.routeInTransaction(db, {
+						runId: input.runId,
+						text: request,
+						query: whole,
+						available,
+						excludeRevisionIds: offered,
+						strict: true,
+					}),
+				)
+				.cards.filter((c) => c.pipeline)
+				.slice(0, PIPELINES_BY_REQUEST);
+			route = { ...route, cards: [...route.cards, ...pipelines] };
+		}
+	}
 	log.info("dialogue.candidates_selected", {
 		candidateCount: route.cards.length,
 		retrieval: route.retrieval,

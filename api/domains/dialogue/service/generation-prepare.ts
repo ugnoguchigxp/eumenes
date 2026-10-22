@@ -7,6 +7,7 @@ import {
 import {
 	executionNoticeContext,
 	executionNoticeInTransaction,
+	finishedPipelineOrigin,
 	renderExecutionNotice,
 } from "./execution-notices";
 import {
@@ -282,11 +283,15 @@ export function createPrepare(
 				room: budgets.task - outputReserveTokens(windowTokens),
 			});
 		}
+		const origin = finishedPipelineOrigin(deps, tx, executionNotice);
 		const completionCheck = completionCheckInTransaction(deps, tx, run, {
 			routing: routing?.routing,
 			results: [...operations, ...research],
 			hostAside:
-				!!note || !!executionNotice || !!claim.payload.specialistHandoff,
+				!!note ||
+				(!!executionNotice && !origin) ||
+				!!claim.payload.specialistHandoff,
+			origin,
 		});
 		// A prefetch left out of this turn is neither sent nor checked at adoption.
 		const prepared =

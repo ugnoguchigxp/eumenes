@@ -47,12 +47,12 @@ test("cold discovery offers four new candidates once; a follow-up and changed lo
 	]);
 	expect(h.searches).toHaveLength(1);
 	expect(h.embedded).toEqual(["鎌倉の天気"]);
+	// The selection after the discovery takes its analysis (a live question) as fixed: no answer from hand.
 	expect(names(h.offered[1]!.tools)).toEqual([
 		"weather_run",
 		"stock_run",
 		"calendar_run",
 		"documents_run",
-		"answer",
 		"report_unavailable",
 	]);
 	expect(refs(h).map((r) => r.revision_id)).toEqual(["toolchain:weather@1"]);
@@ -125,7 +125,6 @@ test("a miss excludes every retained revision before the four-candidate limit an
 		"calendar_run",
 		"documents_run",
 		"travel_run",
-		"answer",
 		"report_unavailable",
 	]);
 	expect(
@@ -152,7 +151,7 @@ test("embedding failure offers no catalog fallback; another discovery after the 
 		args: { reply: "担当の検索ができませんでした。" },
 	});
 	expect((await h.ask("新しいこと")).status).toBe("completed");
-	expect(names(h.offered[1]!.tools)).toEqual(["answer", "report_unavailable"]);
+	expect(names(h.offered[1]!.tools)).toEqual(["report_unavailable"]);
 	expect(JSON.stringify(h.offered[1]!.messages)).toContain(
 		"embedding_unavailable",
 	);

@@ -149,8 +149,7 @@ export function executionAccess(
 				isExecutionActive(row) &&
 				row.request_revision === child.revision &&
 				row.deadline > now() &&
-				ctx.port().controlInTransaction(db)?.revisionId ===
-					executionState(row).bindingRevisionId &&
+				ops.controlValid(db, executionState(row)) &&
 				executionState(row).pending?.child.id === child.id &&
 				executionState(row).pending?.child.dispatchId === child.dispatchId &&
 				!!ctx.port().validSourceInTransaction(db, child.source) &&

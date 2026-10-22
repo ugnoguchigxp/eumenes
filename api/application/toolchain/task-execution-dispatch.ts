@@ -76,7 +76,8 @@ export function taskExecutionDispatch(
 						"interactive_handoff",
 					),
 				} as const;
-			if (kind === "task") throw new Error("recursive_execution_denied");
+			if (kind === "task" || kind === "pipeline")
+				throw new Error("recursive_execution_denied");
 			if (!host.media) throw new Error("capability_unavailable");
 			return {
 				kind: "media",

@@ -13,6 +13,7 @@ import { imageScreenWebAdapter } from "../domains/image/toolchain-adapter";
 import { model3dWebAdapter } from "../domains/model3d/toolchain-adapter";
 import { browserWebAdapter } from "../domains/browser/toolchain-adapter";
 import { uiCompositionsWebAdapter } from "../domains/ui-compositions/toolchain-adapter";
+import { pipelinesWebAdapter } from "../domains/pipelines/toolchain-adapter";
 import { objectRecognitionScreenWebAdapter } from "../domains/object-recognition/toolchain-adapter";
 import { serviceTestsWebAdapter } from "../domains/service-tests/toolchain-adapter";
 import { terminalsWebAdapter } from "../domains/terminals";
@@ -28,6 +29,7 @@ export const toolchainWebAdapters = createWebAdapterRegistry([
 	computeWebAdapter,
 	browserWebAdapter,
 	uiCompositionsWebAdapter,
+	pipelinesWebAdapter,
 	objectRecognitionScreenWebAdapter,
 	ocrWebAdapter,
 	settingsWebAdapter,

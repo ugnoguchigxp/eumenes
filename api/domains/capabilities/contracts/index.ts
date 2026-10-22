@@ -19,6 +19,11 @@ import {
 } from "./ui-compositions";
 import { claudeCodeRequest } from "./claude-code";
 import {
+	pipelineSourceApply,
+	pipelineTargetRef,
+	pipelineWorkStep,
+} from "./pipelines";
+import {
 	kanbanSharedAdd,
 	kanbanExecutorRef,
 	kanbanSelectExecutor,
@@ -255,6 +260,9 @@ export const validators = {
 	uiWorkSave,
 	uiCompositionDelete,
 	uiTargetRef,
+	pipelineSourceApply,
+	pipelineWorkStep,
+	pipelineTargetRef,
 	uiResponseFields,
 	uiSubmitRequest,
 	recognitionManage,
@@ -412,5 +420,6 @@ export * from "./bindings";
 export * from "./requirements";
 export * from "./runtime-meta";
 export * from "./toolchains";
+export * from "./pipelines";
 
 export { dotsPackageInput } from "./dots";

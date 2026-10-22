@@ -381,6 +381,7 @@ export async function executeRequest(
 		...(session?.toolChoice && tools?.length
 			? { toolChoice: session.toolChoice }
 			: {}),
+		...(session?.outputLimit ? { outputLimit: session.outputLimit } : {}),
 		control,
 		session: resolvedSession,
 		reason: null,

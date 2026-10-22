@@ -231,6 +231,24 @@ export function createGenerationHandler(
 									}
 								: {}),
 						};
+					// A task pipeline: the notice is the answer; the host runs its steps once the answer is adopted.
+					if (first && found && analysis?.next === "pipeline")
+						return {
+							text: analysis.announcement,
+							receipt: first.receipt,
+							pipelineDecision: analysis,
+							selection: decisionDraft(input, found.started, {
+								analysis,
+								route: found.route,
+								query: found.query,
+							})("toolchain", {
+								toolchainId: analysis.card.id,
+								toolchainRevisionId: analysis.card.revisionId,
+								functionName: analysis.card.functionName,
+								request: JSON.stringify(analysis.inputs),
+								repaired: first.repaired,
+							}),
+						};
 					let decision: Decision;
 					let generated: Awaited<ReturnType<typeof generateConversation>>;
 					let completion: CompletionDecision | undefined;

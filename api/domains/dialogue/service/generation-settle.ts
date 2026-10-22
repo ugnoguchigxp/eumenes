@@ -33,6 +33,8 @@ export type GenerationResult = {
 	selection?: SelectionDraft;
 	recallPins?: Array<{ messageId: string; digest: string }>;
 	taskDecision?: Extract<FirstRound, { next: "execute_task" | "task_control" }>;
+	/** The first round chose a task pipeline: its run starts with the adopted notice. */
+	pipelineDecision?: Extract<FirstRound, { next: "pipeline" }>;
 	/** The completion check found the request not yet achieved: the next step it names. */
 	continuation?: { achieved: string; need: string; conditions: string[] };
 };
@@ -200,6 +202,25 @@ export function createGenerationSettlement(
 						answerText = executionStatusText(view);
 				}
 			}
+			if (outcome.result.pipelineDecision) {
+				const decision = outcome.result.pipelineDecision;
+				const source = executionSourceInTransaction(deps, tx, run.id);
+				if (
+					!agents ||
+					!source ||
+					!input.routing?.offeredRevisionIds?.includes(
+						decision.card.revisionId,
+					) ||
+					!deps.toolchains?.cardInTransaction(tx, decision.card.revisionId)
+						?.pipeline
+				)
+					throw new Error("execution_source_invalid");
+				agents.executions.startPipelineInTransaction(tx, {
+					source,
+					toolchainRevisionId: decision.card.revisionId,
+					inputs: decision.inputs,
+				});
+			}
 			const messageId = id();
 			conversation.appendInTransaction(tx, {
 				id: messageId,
@@ -229,6 +250,15 @@ export function createGenerationSettlement(
 						input,
 						selectionId,
 						outcome.result.taskDecision.card.revisionId,
+					);
+				if (outcome.result.pipelineDecision)
+					retainAdopted(
+						deps,
+						tx,
+						run,
+						input,
+						selectionId,
+						outcome.result.pipelineDecision.card.revisionId,
 					);
 				traceOutcome(deps, tx, run.id, agentOutcome(input.agent));
 				const next = outcome.result.continuation;

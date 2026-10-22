@@ -1,5 +1,5 @@
 import type { Database } from "bun:sqlite";
-import type { ToolchainCard } from "../../capabilities";
+import type { PipelineDefinition, ToolchainCard } from "../../capabilities";
 import { z } from "zod";
 
 /** Source identities are issued by the host, never reconstructed from model prose. */
@@ -55,6 +55,8 @@ export type ExecutionView = {
 		inputSchema: Record<string, unknown>;
 	} | null;
 	result: ExecutionResult | null;
+	/** A task pipeline's run: its fixed steps answer for the request as one step of it. */
+	pipeline?: true;
 };
 export type ExecutionSource = {
 	conversationId: string;
@@ -183,6 +185,24 @@ export interface ToolchainExecutionPort {
 		view: ExecutionView,
 		eventId: string,
 	): boolean;
+	/**
+	 * A task pipeline revision and its binding (spec task-pipeline-design 2026-10-22 §13.4); null when its pipeline is
+	 * no longer published or not runnable on this host now. A later revision of the same pipeline keeps it valid.
+	 */
+	pipelineInTransaction?(
+		db: Database,
+		toolchainRevisionId: string,
+	): {
+		bindingRevisionId: string;
+		definition: PipelineDefinition;
+		runMs: number;
+	} | null;
+	/** The revision of the toolchain a pipeline step names that a child may run now; null when none may. */
+	stepToolchainInTransaction?(
+		db: Database,
+		toolchainId: string,
+		source: ExecutionSource,
+	): string | null;
 	/** Frozen parent instructions from the published package, without a model/provider name. */
 	controlInTransaction(db: Database): {
 		revisionId: string;

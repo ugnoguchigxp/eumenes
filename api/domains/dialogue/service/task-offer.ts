@@ -15,6 +15,7 @@ export function taskOfferProjection(tasks: TaskOffer) {
 			revision: work.revision,
 			status: work.status,
 			purpose: work.request.slice(0, 120),
+			...(work.pipeline ? { pipeline: true } : {}),
 			question: work.question
 				? {
 						id: work.question.id,

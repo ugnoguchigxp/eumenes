@@ -146,7 +146,8 @@
 			],
 			"session": {
 				"sessionRole": "auxiliary",
-				"toolChoice": "required"
+				"toolChoice": "required",
+				"outputLimit": 1536
 			},
 			"tools": [
 				"check_request"
@@ -225,7 +226,8 @@
 			],
 			"session": {
 				"sessionRole": "auxiliary",
-				"toolChoice": "required"
+				"toolChoice": "required",
+				"outputLimit": 1536
 			},
 			"tools": [
 				"check_request"

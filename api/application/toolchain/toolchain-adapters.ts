@@ -1,4 +1,8 @@
 import {
+	PIPELINES_ADAPTER_REF,
+	describePipelinesAdapter,
+} from "../pipelines/pipelines-adapter";
+import {
 	describeSharedKanbanAdapter,
 	SHARED_KANBAN_ADAPTER_REF,
 } from "../work/kanban-shared-adapter";
@@ -162,6 +166,7 @@ export function bundleHostOf(
 					structures: d.structures,
 					instant: d.instant,
 					task: d.task,
+					pipeline: d.pipeline,
 					...(d.workspaces ? { workspaces: new Set(d.workspaces.keys()) } : {}),
 				},
 			]),
@@ -184,6 +189,7 @@ export const hostAdapterDescriptions: Array<
 	Pick<DomainAdapter, "ref" | "describe">
 > = [
 	{ ref: TASK_ADAPTER_REF, describe: describeTaskAdapter },
+	{ ref: PIPELINES_ADAPTER_REF, describe: describePipelinesAdapter },
 	{ ref: TIMER_ADAPTER_REF, describe: describeTimerAdapter },
 	{ ref: OCR_ADAPTER_REF, describe: describeOcrAdapter },
 	{ ref: MODEL3D_ADAPTER_REF, describe: describeModel3dAdapter },

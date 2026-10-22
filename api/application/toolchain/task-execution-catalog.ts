@@ -8,6 +8,7 @@ export function taskChildContext(host: TaskExecutionHost) {
 		return routing.catalogInTransaction(db).filter((e) => {
 			if (
 				e.runtime.execution === "task" ||
+				e.runtime.execution === "pipeline" ||
 				(e.runtime.binding && !e.runtime.binding.available)
 			)
 				return false;

@@ -151,6 +151,7 @@ export function specialistTurnMessages(input: {
 		label: string;
 		dirty: boolean;
 		current: unknown;
+		context?: unknown;
 		savedRef: string | null;
 	};
 	viewing: { toolchainId: string; ref: string; label: string } | null;
@@ -194,6 +195,10 @@ export function specialistTurnMessages(input: {
 					},
 				}
 			: { currentWork: input.work.current }),
+		// Beside the document: what the work's domain hands the specialist (the choices its document may name).
+		...(document && input.work.context !== undefined
+			? { workContext: input.work.context }
+			: {}),
 		// A whole draft that failed its check: what was wrong, and the draft itself when it is small.
 		...(rejected
 			? {

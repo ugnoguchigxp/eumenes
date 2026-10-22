@@ -1,3 +1,4 @@
+import { registerPipelines } from "./pipelines/pipelines-controller";
 import {
 	registerGoogleAccounts,
 	type GoogleAccounts,
@@ -109,6 +110,8 @@ export type AppModule = { mount(app: Hono): void };
 export type AppServices = {
 	dotsModule?: AppModule;
 	capabilities?: Capabilities;
+	pipelines?: import("./pipelines/pipelines-service").PipelinesService;
+	pipelineTrials?: import("./pipelines/pipelines-trials").PipelineTrials;
 	agents?: AgentRuntime;
 	attitudeDataset?: AttitudeDataset;
 	conversation: ConversationService;
@@ -231,6 +234,9 @@ export function appModules(services: AppServices): AppModule[] {
 		s.music && { mount: (app) => registerMusic(app, s.music!) },
 		s.capabilities && {
 			mount: (app) => registerCapabilities(app, s.capabilities!),
+		},
+		s.pipelines && {
+			mount: (app) => registerPipelines(app, s.pipelines!, s.pipelineTrials),
 		},
 		s.agents && {
 			mount: (app) => registerAgentRuntime(app, s.agents!, s.dialogue.cancel),

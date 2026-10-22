@@ -227,6 +227,7 @@ function validateBinding(
 	if (
 		!pack.toolRevisionIds?.length &&
 		binding.document.execution !== "task" &&
+		binding.document.execution !== "pipeline" &&
 		!(
 			binding.document.execution === "session" &&
 			binding.document.agent?.workspace
@@ -236,7 +237,8 @@ function validateBinding(
 	// An instant binding has no screen; every other binding is presented by exactly one artifact.
 	if (
 		binding.document.execution === "instant" ||
-		binding.document.execution === "task"
+		binding.document.execution === "task" ||
+		binding.document.execution === "pipeline"
 	) {
 		if (d.artifactRevisionId !== undefined)
 			throw new Error("invalid_toolchain");

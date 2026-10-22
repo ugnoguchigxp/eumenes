@@ -104,6 +104,11 @@ type SessionWorkState = {
 	label: string;
 	/** The current work handed to the specialist model as input data (bounded, no secrets). */
 	current: unknown;
+	/**
+	 * With a work document (which stands for `current`): what the specialist reads beside it, such as the
+	 * choices the document may name (bounded, no secrets). Omitted: nothing.
+	 */
+	context?: unknown;
 };
 
 /** Where a work document failed its check: a position and a rule name, never the document's values. */
@@ -294,6 +299,8 @@ export interface DomainAdapter {
 		/** The adapter answers instant bindings (it has `instant`). */
 		instant?: boolean;
 		task?: boolean;
+		/** Runs task pipelines (binding execution "pipeline"). */
+		pipeline?: boolean;
 		/**
 		 * Work documents of its session (`workspace:` refs a session binding's `agent.workspace` may name):
 		 * the file name shown to the agent and the media type of the text.

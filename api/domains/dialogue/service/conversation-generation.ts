@@ -131,12 +131,13 @@ export async function generateConversation(input: {
 					input.allowDiscovery,
 					input.tasks,
 					input.settled,
+					input.requestMessage.content,
 				);
 				if (analysis.approved && input.approvalReference === false)
 					throw operationRejection("approval_reference_missing");
 				// The notice and the explanation are shown to the user: the same output and spoken-reply checks.
 				if (
-					["toolchain", "execute_task", "task_control"].includes(
+					["toolchain", "pipeline", "execute_task", "task_control"].includes(
 						analysis.next,
 					) &&
 					"announcement" in analysis

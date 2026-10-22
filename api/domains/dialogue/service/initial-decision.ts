@@ -101,7 +101,7 @@ const discoveryChoice = requestAnalysis
 			.min(1)
 			.max(2000)
 			.describe(
-				"今回の依頼に必要な担当の用途を表す検索文。対象・時点・条件を保ちます。",
+				"今回の依頼のうち、最初に行う一つの作業に必要な担当の用途を表す検索文。複数の作業を含む依頼でも、最初の作業だけを書きます。対象・時点・条件を保ちます。",
 			),
 	})
 	.strict();
@@ -132,6 +132,13 @@ export type FirstRound = RequestAnalysis &
 				announcement: string;
 				control: z.infer<typeof executionControl>;
 		  }
+		/** A task pipeline: the notice, and its inputs (checked by the card against the request's words). */
+		| {
+				next: "pipeline";
+				card: PipelineCard;
+				announcement: string;
+				inputs: Record<string, unknown>;
+		  }
 		/** An instant-answer toolchain: its arguments (checked by the card) are all the call carries. */
 		| {
 				next: "instant";
@@ -139,6 +146,10 @@ export type FirstRound = RequestAnalysis &
 				arguments: Record<string, unknown>;
 		  }
 	);
+/** A card whose toolchain is a task pipeline: its inputs are filled by the first round's call. */
+export type PipelineCard = ToolchainCard & {
+	pipeline: NonNullable<ToolchainCard["pipeline"]>;
+};
 /** A card whose toolchain answers at once from the arguments of the first round's call. */
 export type InstantCard = ToolchainCard & {
 	instant: NonNullable<ToolchainCard["instant"]>;
@@ -194,7 +205,7 @@ export function analysisTools(
 	allowDiscovery = false,
 	tasks?: TaskOffer,
 	approvalReference = true,
-	settled = false,
+	settled?: RequestAnalysis,
 ): NativeTool[] {
 	const offered = new Set(cards.map((c) => c.functionName));
 	const tools: NativeTool[] = [
@@ -235,7 +246,7 @@ export function analysisTools(
 						function: {
 							name: DISCOVERY_FUNCTION,
 							description:
-								"提示された使用済みの担当では今回の用途を満たせず、別の担当が必要なときだけ呼びます。検索は一度だけ、最大4候補です。今回の依頼と参考文脈から用途の検索文を作ります。実行は行いません。",
+								"提示された使用済みの担当では今回の用途を満たせず、別の担当が必要なときだけ呼びます。検索は一度だけ、最大4候補です。今回の依頼と参考文脈から、最初に行う一つの作業の用途を検索文にします。続きの作業は、その結果の照合の後に別に探します。実行は行いません。",
 							parameters: jsonSchema(discoveryChoice),
 						},
 					},
@@ -255,10 +266,17 @@ export function analysisTools(
 						) +
 						(card.instant
 							? "。この担当へ任せるときに呼び、依頼の分析と引数を書きます"
-							: "。この担当へ任せるときに呼び、予告(announcement)と依頼の分析だけを書きます"),
+							: card.pipeline
+								? "。この手順を使うときに呼び、予告(announcement)・依頼の分析・各入力と、その根拠として依頼の原文から写した引用(<入力名>_quote)を書きます"
+								: "。この担当へ任せるときに呼び、予告(announcement)と依頼の分析だけを書きます"),
 					parameters: card.instant
 						? instantParameters(card.instant.parameters)
-						: jsonSchema(toolchainChoice.strict()),
+						: card.pipeline
+							? instantParameters(
+									card.pipeline.parameters,
+									jsonSchema(toolchainChoice.strict()),
+								)
+							: jsonSchema(toolchainChoice.strict()),
 				},
 			})),
 		{
@@ -288,25 +306,31 @@ export function analysisTools(
 			properties.approved = { type: "boolean", const: false };
 		}
 	// After a discovery the analysis is the first round's: the functions take only their own fields.
-	if (settled)
-		for (const tool of tools) {
-			const parameters = tool.function.parameters as {
-				properties: Record<string, unknown>;
-				required?: string[];
-			};
-			for (const key of Object.keys(requestAnalysis.shape))
-				delete parameters.properties[key];
-			if (parameters.required)
-				parameters.required = parameters.required.filter(
-					(key) => !(key in requestAnalysis.shape),
-				);
-		}
-	return tools;
+	if (!settled) return tools;
+	// `answer` contradicts an analysis that hands the request on: it is not offered, as the check would reject it.
+	const offeredAfter = tools.filter(
+		(t) => t.function.name !== ANSWER_FUNCTION || !handedOn(settled),
+	);
+	for (const tool of offeredAfter) {
+		const parameters = tool.function.parameters as {
+			properties: Record<string, unknown>;
+			required?: string[];
+		};
+		for (const key of Object.keys(requestAnalysis.shape))
+			delete parameters.properties[key];
+		if (parameters.required)
+			parameters.required = parameters.required.filter(
+				(key) => !(key in requestAnalysis.shape),
+			);
+	}
+	return offeredAfter;
 }
 
 /** The analysis and an instant toolchain's own arguments, in the one flat object the call takes. */
-function instantParameters(own: Record<string, unknown>) {
-	const analysis = jsonSchema(requestAnalysis.strict());
+function instantParameters(
+	own: Record<string, unknown>,
+	analysis = jsonSchema(requestAnalysis.strict()),
+) {
 	const required = (schema: Record<string, unknown>) =>
 		Array.isArray(schema.required) ? (schema.required as string[]) : [];
 	return {
@@ -322,14 +346,18 @@ function instantParameters(own: Record<string, unknown>) {
 
 /** Structure only: what cannot be answered from hand must not be answered from hand. */
 function consistent(round: FirstRound) {
-	const handed =
-		round.kind === "live_info" ||
-		round.kind === "past_conversation" ||
-		round.kind === "action" ||
-		round.kind === "creation" ||
-		round.freshness === "live";
-	if (handed && round.next === "answer")
+	if (handedOn(round) && round.next === "answer")
 		throw operationRejection("analysis_answer_mismatch");
+}
+/** An analysis whose request needs a toolchain: current information, a saved conversation, an operation or a creation. */
+function handedOn(analysis: RequestAnalysis) {
+	return (
+		analysis.kind === "live_info" ||
+		analysis.kind === "past_conversation" ||
+		analysis.kind === "action" ||
+		analysis.kind === "creation" ||
+		analysis.freshness === "live"
+	);
 }
 
 /** The one function call of the first round, checked; anything else goes back for the structural repair. */
@@ -339,6 +367,8 @@ export function validateAnalysis(
 	allowDiscovery = false,
 	tasks?: TaskOffer,
 	settled?: RequestAnalysis,
+	/** The user's request as the call stood on it: a pipeline's input quotes are looked up in it. */
+	request = "",
 ): FirstRound {
 	if (calls.length !== 1)
 		throw operationRejection("call_count", undefined, [], calls.length);
@@ -369,6 +399,8 @@ export function validateAnalysis(
 	if (settled && args && typeof args === "object" && !Array.isArray(args))
 		args = { ...args, ...settled };
 	if (card?.instant) return validateInstant(call, card as InstantCard, args);
+	if (card?.pipeline)
+		return validatePipeline(call, card as PipelineCard, args, request);
 	if (tasks?.card?.functionName === call.name) {
 		const parsed = taskChoice.safeParse(args);
 		if (
@@ -400,7 +432,9 @@ export function validateAnalysis(
 			!work ||
 			(action === "answer" &&
 				(!work.question || work.question.id !== questionRef)) ||
-			(action === "amend" && !request)
+			(action === "amend" && !request) ||
+			// A pipeline's steps are fixed: a changed request is a new request, never an amendment of the run.
+			(action === "amend" && work.pipeline)
 		)
 			throw operationRejection("arguments_invalid", call);
 		return {
@@ -500,6 +534,70 @@ function validateInstant(
 	return round;
 }
 
+/**
+ * The call of a task pipeline: the analysis and the notice, and the inputs the card declares, whose quotes must be
+ * the user's words. Whatever the card does not accept goes back for the structural repair, with where and why.
+ */
+function validatePipeline(
+	call: NativeToolCall,
+	card: PipelineCard,
+	args: unknown,
+	request: string,
+): FirstRound {
+	const record =
+		args && typeof args === "object" && !Array.isArray(args)
+			? (args as Record<string, unknown>)
+			: undefined;
+	if (!record)
+		throw operationRejection("arguments_invalid", call, [
+			{ validationPath: "arguments", validationCode: "invalid_type" },
+		]);
+	const keys = Object.keys(toolchainChoice.shape);
+	const common = toolchainChoice
+		.strict()
+		.safeParse(
+			Object.fromEntries(
+				keys.filter((k) => k in record).map((k) => [k, record[k]]),
+			),
+		);
+	if (!common.success)
+		throw operationRejection(
+			"arguments_invalid",
+			call,
+			validationIssues(common.error, args),
+			undefined,
+			repairIssues(common.error),
+		);
+	const own = card.pipeline.parse(
+		Object.fromEntries(
+			Object.entries(record).filter(([k]) => !keys.includes(k)),
+		),
+		request,
+	);
+	if (!own.ok)
+		throw operationRejection(
+			"arguments_invalid",
+			call,
+			// Input names are the definition's own, not the user's words: kept out of logs all the same.
+			own.issues.map((i) => ({
+				validationPath: "arguments",
+				validationCode: i.code,
+			})),
+			undefined,
+			own.issues,
+		);
+	const { announcement, ...analysis } = common.data;
+	const round: FirstRound = {
+		...analysis,
+		next: "pipeline",
+		card,
+		announcement,
+		inputs: own.value,
+	};
+	consistent(round);
+	return round;
+}
+
 /** The judgment of the first round as the selection trace keeps it (never the request itself). */
 export function analysisTrace(round: FirstRound): SelectionAnalysis {
 	if (round.next === "find_toolchain")
@@ -510,7 +608,10 @@ export function analysisTrace(round: FirstRound): SelectionAnalysis {
 		kind,
 		freshness,
 		next:
-			next === "instant" || next === "execute_task" || next === "task_control"
+			next === "instant" ||
+			next === "pipeline" ||
+			next === "execute_task" ||
+			next === "task_control"
 				? "toolchain"
 				: next,
 		impact,

@@ -799,3 +799,26 @@ test("an analysis value outside its choices is corrected with the field and its 
 	expect(JSON.stringify(rejected())).not.toContain('"fields"');
 	expect(rejected()[0]).toMatchObject({ validationCode: "invalid_value" });
 });
+test("after a discovery the selection is offered no answer an analysis that hands the request on would contradict", () => {
+	const names = (settled: Parameters<typeof analysisTools>[5]) =>
+		analysisTools(CARDS, new Set(), false, undefined, true, settled).map(
+			(t) => t.function.name,
+		);
+	expect(names(delegatingArgs())).toEqual([
+		"web_search",
+		"music",
+		"report_unavailable",
+	]);
+	expect(names(analysisArgs())).toEqual([
+		"web_search",
+		"music",
+		"answer",
+		"report_unavailable",
+	]);
+	// Without a settled analysis the first round offers every function, each with the analysis fields.
+	const first = analysisTools(CARDS);
+	expect(first.map((t) => t.function.name)).toContain("answer");
+	expect(
+		Object.keys(first[0]!.function.parameters.properties as object),
+	).toContain("impact");
+});

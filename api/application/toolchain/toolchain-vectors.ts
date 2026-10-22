@@ -105,6 +105,16 @@ export function createVectorRefresh(
 				});
 			return running;
 		},
+		/** Passages embedded now, for a trial of a draft that is not in the index (undefined without a provider). */
+		async embedPassages(texts: string[]) {
+			if (!embed) return undefined;
+			try {
+				return await passages(texts);
+			} catch (error) {
+				warn("toolchain.passage_embedding_failed", error);
+				return undefined;
+			}
+		},
 		async embedQuery(
 			text: string,
 			signal: AbortSignal,

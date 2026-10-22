@@ -5,3 +5,4 @@ export type {
 	CollectionRowAction,
 } from "./collection-contracts";
 export type { UiStudioResource } from "./ui-studio-contracts";
+export type { PipelineStudioResource } from "./pipeline-studio-contracts";

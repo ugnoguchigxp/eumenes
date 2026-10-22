@@ -7,9 +7,12 @@ export const ANSWER = "answer";
 export const UNAVAILABLE = "report_unavailable";
 
 type Tools = ReadonlyArray<{ function: { name: string } }> | undefined;
-/** A fake model recognizes the first round by its `answer` function: the second round never offers it. */
+/**
+ * A fake model recognizes an analysis round by its `report_unavailable` function: every analysis round offers it
+ * (the selection after a discovery may offer no `answer`), the round that writes the request never does.
+ */
 export const isAnalysisRound = (tools: Tools) =>
-	!!tools?.some((t) => t.function.name === ANSWER);
+	!!tools?.some((t) => t.function.name === UNAVAILABLE);
 /** The completion check of a delegated result offers `check_request`; nothing else does. */
 export const COMPLETION = "check_request";
 export const isCompletionCheck = (tools: Tools) =>

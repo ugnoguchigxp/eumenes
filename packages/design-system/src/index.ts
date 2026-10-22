@@ -101,6 +101,8 @@ export * from "./components/BrowserWorkspace";
 export * from "./components/MusicWorkspace";
 export * from "./components/Playlist";
 export * from "./components/GenerationStatus";
+export * from "./components/PipelineFlow";
+export * from "./components/PipelineStudio";
 export * from "./components/LightSpiritLab";
 export * from "./components/MusicLibraryControls";
 export * from "./components/SettingsPanels";

@@ -11,3 +11,5 @@ export type ExecutionContext = {
 };
 export const PARENT_STEP = "agent.execution.step";
 export const CHILD_STEP = "agent.execution.child";
+/** A task pipeline's extract step: one inference that takes one typed value out of earlier text. */
+export const PIPELINE_EXTRACT = "agent.execution.extract";

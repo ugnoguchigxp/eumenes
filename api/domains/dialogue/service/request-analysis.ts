@@ -192,7 +192,7 @@ export async function analyzeRequest(
 				found.allowDiscovery,
 				input.routing!.tasks,
 				approvalReference,
-				!!settled,
+				settled,
 			),
 			cards: found.route.cards,
 			analysis: true,

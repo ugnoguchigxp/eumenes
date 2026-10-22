@@ -1,4 +1,5 @@
 import { computeClient } from "./compute";
+import { pipelinesClient } from "./pipelines";
 import { googleAccountsClient } from "./google-accounts";
 import { ocrClient } from "./ocr";
 import { objectRecognitionClient } from "./object-recognition";
@@ -38,6 +39,7 @@ export function createClient(baseUrl: string, token?: string) {
 	const transport = createTransport(baseUrl, token);
 	return {
 		...computeClient(transport),
+		...pipelinesClient(transport),
 		...musicClient(transport),
 		...imageClient(transport),
 		...objectRecognitionClient(transport),

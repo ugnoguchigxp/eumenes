@@ -9,6 +9,7 @@ import { createComputeAdapter } from "../compute/compute-adapter";
 import { createModel3dAdapter } from "../media/model3d-adapter";
 import { createBrowserAdapter } from "../browser/browser-adapter";
 import { createTaskAdapter } from "./task-execution-adapter";
+import { createPipelinesAdapter } from "../pipelines/pipelines-adapter";
 import type { BrowserAssembly } from "../browser/browser-composition";
 import type { SqliteStore } from "../../infrastructure/sqlite";
 import type { QueueService } from "../../domains/queue";
@@ -167,9 +168,18 @@ export async function createToolchain(
 		);
 	const weather = options.weather && createWeatherAdapter(options.weather);
 	const stock = options.stock && createStockAdapter(options.stock);
+	// The pipelines service is built on the routing, after this registry: the adapter reads it once attached.
+	let pipelines:
+		| import("../pipelines/pipelines-service").PipelinesService
+		| undefined;
 	// Typed domain adapters this host offers; bundles naming any other adapter are not registered.
 	const registry = createAdapterRegistry([
 		createTaskAdapter(() => taskRuntime),
+		createPipelinesAdapter(
+			() => taskRuntime,
+			() => pipelines,
+			{ sessionLive: options.specialistSessionLive },
+		),
 		...(shared && options.kanbanSdk
 			? [
 					shared,
@@ -433,6 +443,14 @@ export async function createToolchain(
 		history,
 		/** Embed passages that have no vector in the provider's current space. */
 		refreshVectors: vectors.refresh,
+		/** Connects the pipelines service (built on the routing) to its adapter. */
+		attachPipelines(
+			service: import("../pipelines/pipelines-service").PipelinesService,
+		) {
+			pipelines = service;
+		},
+		/** Embed passages outside the index (a draft's trial); undefined when embedding is unavailable. */
+		embedPassages: vectors.embedPassages,
 		/** Embed one request for retrieval; undefined when embedding is unavailable or slow. */
 		embedQuery: vectors.embedQuery,
 	};

@@ -8,6 +8,8 @@ import type {
 	ExecutionStatus,
 	ExecutionView,
 } from "../../tool-runtime";
+import type { PipelineDefinition } from "../../capabilities";
+import type { StepValues } from "../../pipelines";
 
 export const taskExecutionMigration = `
 CREATE TABLE agent_executions (
@@ -69,6 +71,20 @@ export type ParentState = {
 	amending?: boolean;
 	activeRequestId?: string;
 	planRequired?: boolean;
+	/**
+	 * A task pipeline's run (spec task-pipeline-design 2026-10-22 §13.4): the host takes the steps in order, so no
+	 * parent decision is asked. `values` holds each finished step's result; `children` its child's id.
+	 */
+	pipeline?: {
+		toolchainRevisionId: string;
+		definition: Omit<PipelineDefinition, "tests">;
+		inputs: Record<string, unknown>;
+		values: Record<string, StepValues>;
+		cursor: number;
+		children: Record<string, string>;
+		/** The structural repair an extract step's next attempt carries. */
+		correction?: string;
+	};
 	plan?: {
 		revision: number;
 		requestRevision: number;
@@ -184,6 +200,7 @@ export const executionView = (row: ExecutionRow): ExecutionView => ({
 	result: row.result_json
 		? (JSON.parse(row.result_json) as ExecutionResult)
 		: null,
+	...(executionState(row).pipeline ? { pipeline: true as const } : {}),
 });
 /** Erase bodies while preserving the start key as a replay tombstone. */
 export function eraseExecutionBodies(

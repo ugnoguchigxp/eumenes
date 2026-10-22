@@ -227,6 +227,7 @@ export function createSpecialistTurnHandler(
 							label: work.label,
 							dirty: work.dirty,
 							current: work.current,
+							...(work.context !== undefined ? { context: work.context } : {}),
 							savedRef: work.savedRef,
 						},
 						viewing: viewedSpecialistTarget(deps, tx, run),

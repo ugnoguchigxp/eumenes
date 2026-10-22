@@ -153,6 +153,54 @@ test("an image the host handed from an earlier step of the request may be named;
 	);
 });
 
+test("a pipeline step may name an image its own conversation made; an image of another conversation still may not", async () => {
+	const { store, adapter } = setup();
+	await store.write((db) => {
+		for (const [id, conversationId] of [
+			["img_run", "c1"],
+			["img_elsewhere", "c2"],
+		] as const)
+			db.query(
+				"INSERT INTO image_generations(id,run_id,conversation_id,record_json,request_json,bindings_json,deadline) VALUES(?,?,?,?,'{}','[]',0)",
+			).run(
+				id,
+				`run-${id}`,
+				conversationId,
+				JSON.stringify({
+					id,
+					state: "completed",
+					artifactId: id,
+					title: "猫",
+					description: "",
+					createdAt: 0,
+					updatedAt: 0,
+				}),
+			);
+	});
+	const origin = {
+		kind: "task" as const,
+		owner: conversation.owner,
+		runId: "run-1",
+		conversationId: "c1",
+		messageId: "m1",
+		execution: { deadline: Date.now() + 60_000 } as never,
+	};
+	const generate = (sourceImageRef: string) =>
+		store.write((db) =>
+			adapter.invokeInTransaction(db, {
+				operationName: "model3d.generate",
+				input: { prompt: "", title: "画像から", tags: [], sourceImageRef },
+				requestId: crypto.randomUUID(),
+				issuedAt: new Date().toISOString(),
+				origin,
+			}),
+		);
+	expect((await generate("img_run")).receiptRef.owner).toBe("model3d");
+	await expect(generate("img_elsewhere")).rejects.toThrow(
+		"model3d_image_not_found",
+	);
+});
+
 test("HTTP: the request is validated, and a missing asset is a 404 that leaves the index", async () => {
 	const { service, store } = setup();
 	const app = new Hono();

@@ -217,6 +217,8 @@ type SpecialistWorkState = {
 	revision: number;
 	label: string;
 	current: unknown;
+	/** What the specialist reads beside the work document (see SessionWorkState.context). */
+	context?: unknown;
 };
 
 /**

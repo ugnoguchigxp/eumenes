@@ -226,6 +226,34 @@ export function configureTaskExecution(host: TaskExecutionHost) {
 			});
 			return false;
 		},
+		// A run follows the revision it started from (its definition is frozen in the run): a later revision of the
+		// same pipeline does not stop it; withdrawing the pipeline or its adapter does.
+		pipelineInTransaction(db, toolchainRevisionId) {
+			const id = /^toolchain:(.+)@[1-9][0-9]*$/.exec(toolchainRevisionId)?.[1];
+			if (
+				!id ||
+				!capabilities.toolchainsInTransaction(db).some((d) => d.id === id)
+			)
+				return null;
+			const bound = capabilities.toolchainBindingInTransaction(
+				db,
+				toolchainRevisionId,
+			);
+			const binding = bound?.binding.document;
+			if (
+				binding?.execution !== "pipeline" ||
+				!registry.get(binding.adapterRef)?.availableInTransaction(db)
+			)
+				return null;
+			return {
+				bindingRevisionId: bound!.binding.revisionId,
+				definition: binding.pipeline,
+				runMs: binding.timeLimits.runMs,
+			};
+		},
+		stepToolchainInTransaction: (db, toolchainId, source) =>
+			available(db, source.runId).find((e) => e.id === toolchainId)
+				?.revisionId ?? null,
 		controlInTransaction(db) {
 			const sets = capabilities.toolchainsInTransaction(db).flatMap((d) => {
 				const bound = capabilities.toolchainBindingInTransaction(

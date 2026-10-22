@@ -144,6 +144,7 @@ test("without vectors every available toolchain is offered; with vectors the top
 			"timers.manage",
 			"web.search",
 			"web.research.codex",
+			"pipeline.studio",
 		]
 			.filter(
 				(id) =>

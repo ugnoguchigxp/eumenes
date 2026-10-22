@@ -7,6 +7,7 @@ import { migrations as excalidrawMigrations } from "../domains/excalidraw";
 import { migrations as objectRecognitionMigrations } from "../domains/object-recognition";
 import { migrations as imageMigrations } from "../domains/image";
 import { migrations as uiCompositionsMigrations } from "../domains/ui-compositions";
+import { migrations as pipelinesMigrations } from "../domains/pipelines";
 import { migrations as musicMigrations } from "../domains/music";
 import type { Migration } from "../infrastructure/sqlite";
 import { orderMigrations } from "../infrastructure/sqlite";
@@ -164,6 +165,7 @@ const catalog: readonly Migration[] = [
 	...musicMigrations,
 	...imageMigrations,
 	...uiCompositionsMigrations,
+	...pipelinesMigrations,
 	...excalidrawMigrations,
 	...objectRecognitionMigrations,
 	...ocrMigrations,

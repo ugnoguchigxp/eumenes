@@ -14,7 +14,7 @@ CPU計算は `compute.bundle.json` と `adapter:compute@1` で追加する。4�
 | --- | --- | --- |
 | bundle | `api/domains/capabilities/bundles/<名前>.bundle.json`（`CapabilityBundleV1`） | 依存revisionのpin、definitions、bindings、artifacts、schemas。コード・URLは実行しない |
 | definition | bundle の `definitions[]`（既存の `Definition`） | profile・skill（本文はJSON内のUTF-8）・tool・package・toolchain。toolchainは会話に出す関数名・説明・例・依存package一つ |
-| binding | bundle の `bindings[]`（`BindingV1` = `execution:"command"`・`"session"`・`"instant"`・`"task"`） | packageの各toolを登録adapterの操作名と入力schema参照へ結ぶ。sessionは専門担当との継続対話で、adapterに `session`（作業の開始・状態・ターン・終了）の実装が要る。instantは即時回答型で、adapterに `instant`（値の列挙 `choices` と実行 `run`）の実装が要る（[§3.2](#32-即時回答型instantを追加する)） |
+| binding | bundle の `bindings[]`（`BindingV1` = `execution:"command"`・`"session"`・`"instant"`・`"task"`・`"pipeline"`） | packageの各toolを登録adapterの操作名と入力schema参照へ結ぶ。sessionは専門担当との継続対話で、adapterに `session`（作業の開始・状態・ターン・終了）の実装が要る。instantは即時回答型で、adapterに `instant`（値の列挙 `choices` と実行 `run`）の実装が要る（[§3.2](#32-即時回答型instantを追加する)） |
 | artifact | bundle の `artifacts[]`（`ArtifactDefinitionV1`） | OpenUI定義のvariant、source（adapterの登録query）、action（既存event→操作・回答・ローカル） |
 | schema | `builtin:<キー>`（`capabilities/contracts` のvalidators）、`domain:<owner>.<名前>@n`（hostの結果schema）、`schema:<id>@n`（bundle内JSON Schemaの有限subset） | 入力・出力・質問の検査。同じ参照をhost・UI・モデル提示で共有する |
 | DomainAdapter | `api/application/<domain>-adapter.ts` | 操作・query・入力変換・projectionの実装。domainの既存公開transaction操作を呼ぶ |
@@ -37,6 +37,14 @@ CPU計算は `compute.bundle.json` と `adapter:compute@1` で追加する。4�
 制御名 `find_toolchain`、`task_control`、`read_reference`、`ask_user`、`complete_task`、`report_partial` は通常のツールチェーン名として登録しない。`execute_task` はtask binding専用で、重複登録は拒否する。session型は公開状態と未保存確認を検査して会話へ引き継ぐ。親から隠れたsessionを開かない。
 
 開始・回答・訂正・取消・期限・再起動・忘却は [日常の複数操作担当](task-execution.md) を参照。数値上限と適合性の意味判断をadapter独自の処理で変更しない。
+
+### 決まった手順を実行するpipeline型
+
+`execution:"pipeline"` のbindingは、3つ以上の担当を決まった順に使う手順（タスクパイプライン）を、定義（`pipeline`、schemaは `api/domains/capabilities/contracts/pipelines.ts`）ごと持つ。adapterは `adapter:pipelines@1`、画面とtoolは持たず、packageはtoolを持たない。設計は[タスクパイプライン設計](../spec/task-pipeline-design-2026-10-22.md)。
+
+- 手で bundle を書かない。定義を `POST /api/pipelines/publish`（`/check` で検査だけ、`/fixture` で試験の事例を担当なしで運転）か、パイプライン制作の画面（`pipeline-studio.bundle.json`、協働型 `pipeline.studio`）の「公開」で登録する。公開のたびに profile・skill・package・binding・toolchain の新revision（id `pipeline.<定義のid>`、関数名 `pipeline_<id>`）ができ、既存revisionは書き換えない。
+- 候補カードには入力のschemaとステップの一覧が付き、R1が入力と原文の引用（`<名前>_quote`）を書いて呼ぶ。実行は agent-runtime の親実行が1ステップずつ子として担当へ渡す。依頼の検索文が最初の作業だけのときも、依頼そのものの埋め込みで見つかるパイプラインを候補に足す。
+- ステップに書けるのは単発の担当（command・instant・research・画像・音楽など）だけ。session・task・pipeline は書けない。
 
 ### 1.1 Seedと初期化
 
@@ -69,6 +77,7 @@ Seedに含めるのは再利用する定義だけで、会話、実行・操作�
 | 新しい画面部品が要る | [§10 E](#10-e-designsystemopenuiartifactを追加する) | DesignSystem部品とOpenUI登録 |
 | 履歴調査の要件profile・dotsの担当 | [§9 A](#9-a-登録apiで追加する) | なし。登録API |
 | 外部の読取りAPIの結果を決まった文でそのまま答える（R2・一時回答なし） | [§3.2](#32-即時回答型instantを追加する) | adapterの `instant`、bundle |
+| 既存の担当を決まった順に使う手順（3つ以上の担当） | [pipeline型](#決まった手順を実行するpipeline型) | なし。定義を公開APIか制作画面で登録 |
 | 単純なHTTP JSON API（結果を担当が整理して返す） | 未対応 | bundleの `bindings` はcommand・session bindingだけを受け付ける。HTTP APIはadapterで実装する |
 
 まず「何を入力して何が返れば完了か」「どのadapterを再利用するか」「今回どこまで確認するか」を短く記録する。既存adapterで同じ操作ができるならadapterを増やさず§3を使う。

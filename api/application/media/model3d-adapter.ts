@@ -169,6 +169,15 @@ export function createModel3dAdapter(service: Model3dService): DomainAdapter {
 						(image) =>
 							(image as { imageRef?: unknown } | null)?.imageRef ===
 							input.sourceImageRef,
+					) &&
+					// A pipeline step names the image an earlier step of the same run made, in that conversation.
+					!(
+						request.origin.kind === "task" &&
+						imageListInTransaction(db, request.origin.conversationId).some(
+							(r) =>
+								r.state === "completed" &&
+								r.artifactId === input.sourceImageRef,
+						)
 					)
 				)
 					throw new Error("model3d_image_not_found");

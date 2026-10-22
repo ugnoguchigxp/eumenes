@@ -4,6 +4,8 @@ import { registerDots } from "./work/dots-http";
 export function appServices(s: Services) {
 	return {
 		capabilities: s.toolchain.capabilities,
+		pipelines: s.pipelines,
+		pipelineTrials: s.pipelineTrials,
 		agents: s.toolchain.agents,
 		attitudeDataset: s.attitudeDataset,
 		conversation: s.conversation,

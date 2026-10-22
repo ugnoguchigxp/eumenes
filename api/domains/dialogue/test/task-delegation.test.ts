@@ -138,3 +138,37 @@ test("work controls and their question schema stay inside the 1024 estimated-tok
 		validateAnalysis(answer(id, 1).toolCalls!, [], true, fitted),
 	).toThrow();
 });
+
+test("a pipeline's run is never amended: the call goes back for the structural repair; cancel still works", () => {
+	const tasks = offer(),
+		id = crypto.randomUUID();
+	tasks.works = [
+		{
+			id,
+			conversationId: "main",
+			request: "茹で時間を調べてタイマーと曲",
+			revision: 0,
+			status: "waiting_child",
+			deadline: Date.now() + 1000,
+			question: null,
+			result: null,
+			pipeline: true,
+		},
+	];
+	const control = (action: "amend" | "cancel") =>
+		analysisReceipt("control", {
+			name: "task_control",
+			args: {
+				workRef: id,
+				expectedRevision: 0,
+				action,
+				...(action === "amend" ? { request: "5分にして" } : {}),
+			},
+		}).toolCalls!;
+	expect(() => validateAnalysis(control("amend"), [], true, tasks)).toThrow();
+	expect(validateAnalysis(control("cancel"), [], true, tasks)).toMatchObject({
+		next: "task_control",
+		control: { action: "cancel" },
+	});
+	expect(taskOfferProjection(tasks).works[0]).toMatchObject({ pipeline: true });
+});

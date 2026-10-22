@@ -239,7 +239,8 @@ export function createToolchains(
 		if (!binding) return null;
 		if (
 			binding.document.execution === "instant" ||
-			binding.document.execution === "task"
+			binding.document.execution === "task" ||
+			binding.document.execution === "pipeline"
 		)
 			return d.artifactRevisionId ? null : { binding, artifact: null as null };
 		const artifact = d.artifactRevisionId

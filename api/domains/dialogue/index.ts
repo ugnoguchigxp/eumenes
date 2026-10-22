@@ -22,6 +22,7 @@ export type { DialogueService } from "./service";
 export { createDialogueService } from "./service";
 export { readActionOriginInTransaction } from "./service/action-origin";
 export { isAdoptedAnswerInTransaction } from "./service/adopted-answer";
+export { trialFirstRound } from "./service/trial-selection";
 export type {
 	GoalsLayerPort,
 	StewardRunEnd,

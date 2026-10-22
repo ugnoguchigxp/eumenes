@@ -22,6 +22,19 @@ export function createPublishing(
 	},
 ) {
 	return {
+		/** The highest stored revision of a definition (0 when none): the next one a publisher writes is above it. */
+		latestRevisionInTransaction(
+			db: Database,
+			kind: string,
+			id: string,
+		): number {
+			const row = db
+				.query(
+					"SELECT MAX(r.revision) AS n FROM capability_revisions r JOIN capability_items i ON i.key=r.item_key WHERE i.kind=? AND i.id=?",
+				)
+				.get(kind, id) as { n: number | null };
+			return row.n ?? 0;
+		},
 		publishToolchain: (
 			toolchainId: string,
 			revisionId: string,

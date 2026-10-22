@@ -69,7 +69,7 @@ test("a notice is visible before a full handoff, survives completion and does no
 				.messages.some((m) => m.text === "制作担当に引き継ぎます。"),
 		).toBe(false);
 		expect(h.state.analysisCalls[0]?.tools.map((t) => t.function.name)).toEqual(
-			["studio_create", "other_create", "answer", "report_unavailable"],
+			["studio_create", "other_create", "report_unavailable"],
 		);
 		expect(h.state.mainCalls[0]?.tools[0]?.function.description).toContain(
 			"会話相手",

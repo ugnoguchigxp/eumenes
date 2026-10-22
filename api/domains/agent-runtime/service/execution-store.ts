@@ -24,6 +24,10 @@ import { plannedInvocation } from "./execution-invocation";
 
 export function createExecutionStore(ctx: ExecutionContext) {
 	const { queue, now } = ctx;
+	/** A pipeline's next step after a settled child (spec task-pipeline-design §13.4); set by its module. */
+	let advance:
+		| ((db: Database, r: ExecutionRow, s: ParentState, c: ChildResult) => void)
+		| null = null;
 	function event(db: Database, row: ExecutionRow, kind: string) {
 		db.query(
 			"INSERT OR IGNORE INTO agent_execution_events(id,execution_id,kind) VALUES(?,?,?)",
@@ -34,11 +38,12 @@ export function createExecutionStore(ctx: ExecutionContext) {
 		row: ExecutionRow,
 		state: ParentState,
 		child = false,
+		kind = child ? CHILD_STEP : PARENT_STEP,
 	) {
 		state.ordinal++;
 		const { job } = queue.enqueueInTransaction(db, {
 			scope: "agent",
-			kind: child ? CHILD_STEP : PARENT_STEP,
+			kind,
 			dedupeKey: `execution:${row.id}:${row.epoch}:${state.ordinal}`,
 			payload: { id: row.id, epoch: row.epoch, ordinal: state.ordinal },
 			subjectRef: row.id,
@@ -227,7 +232,8 @@ export function createExecutionStore(ctx: ExecutionContext) {
 						? "interactive_handoff"
 						: "operation_indeterminate"),
 			);
-		enqueue(db, row, state);
+		if (state.pipeline && advance) advance(db, row, state, result);
+		else enqueue(db, row, state);
 	}
 	function startChild(
 		db: Database,
@@ -238,49 +244,11 @@ export function createExecutionStore(ctx: ExecutionContext) {
 	) {
 		const planned = plannedInvocation(db, state, chainRevisionId, args);
 		if (planned.replay) return planned.replay;
-		if (
-			state.children >= state.limits.childCalls ||
-			now() >= row.deadline - 45_000
-		)
-			return fail(db, row, state, "execution_budget_exceeded");
-		const allocation = Math.min(
-			12,
-			state.limits.modelCalls - state.consumed - 1,
-		);
-		if (allocation < 1)
-			return fail(db, row, state, "execution_budget_exceeded");
-		const id = planned.item.childId;
-		const child = {
-			...planned.input,
-			id,
-			executionId: row.id,
-			revision: row.request_revision,
-			step: state.ordinal,
-			source: executionSource(row),
-			deadline: Math.min(
-				row.deadline - 45_000,
-				ctx
-					.port()
-					.childDeadlineInTransaction?.(
-						db,
-						chainRevisionId,
-						row.deadline - 45_000,
-					) ?? row.deadline - 45_000,
-			),
-			modelCalls: allocation,
-		};
-		const body = JSON.stringify(child);
-		if (new TextEncoder().encode(body).length > 24_576)
-			throw new Error("execution_input_capacity");
-		state.children++;
-		planned.item.inputDigest = planned.digest;
-		state.pending = { child, result: null, allocation };
-		row.state = "waiting_child";
-		db.query(
-			"INSERT INTO agent_execution_steps(id,execution_id,request_revision,ordinal,input_digest,input_json,state) VALUES(?,?,?,?,?,?,'queued')",
-		).run(id, row.id, row.request_revision, state.ordinal, hash(child), body);
-		enqueue(db, row, state, true);
+		launch(db, row, state, planned.input, planned.item.childId, () => {
+			planned.item.inputDigest = planned.digest;
+		});
 	}
+	const launch = childLauncher(ctx, enqueue, fail);
 	function active(db: Database, id: string, epoch: number, ordinal: number) {
 		const row = executionRow(db, id);
 		if (!row || row.epoch !== epoch || !isExecutionActive(row)) return null;
@@ -292,8 +260,7 @@ export function createExecutionStore(ctx: ExecutionContext) {
 		}
 		const source = executionSource(row);
 		if (
-			ctx.port().controlInTransaction(db)?.revisionId !==
-				state.bindingRevisionId ||
+			!controlValid(db, state) ||
 			!ctx.port().validSourceInTransaction(db, source) ||
 			state.refs.some(
 				(ref) => !ctx.port().validReferenceInTransaction(db, source, ref),
@@ -304,6 +271,106 @@ export function createExecutionStore(ctx: ExecutionContext) {
 		}
 		return { row, state, source };
 	}
-	return { enqueue, finish, fail, question, startChild, adoptChild, active };
+	const controlValid = (db: Database, state: ParentState) =>
+		followsControl(ctx, db, state);
+	return {
+		enqueue,
+		finish,
+		fail,
+		question,
+		startChild,
+		launch,
+		adoptChild,
+		active,
+		controlValid,
+		setAdvance: (fn: NonNullable<typeof advance>) => {
+			advance = fn;
+		},
+	};
 }
 export type ExecutionOps = ReturnType<typeof createExecutionStore>;
+
+/** The run still follows what it started from: the task binding, or the pipeline's published binding. */
+function followsControl(
+	ctx: ExecutionContext,
+	db: Database,
+	state: ParentState,
+) {
+	return state.pipeline
+		? ctx.port().pipelineInTransaction?.(db, state.pipeline.toolchainRevisionId)
+				?.bindingRevisionId === state.bindingRevisionId
+		: ctx.port().controlInTransaction(db)?.revisionId ===
+				state.bindingRevisionId;
+}
+
+/** Hands one invocation to a child job, within the run's budget and time. */
+function childLauncher(
+	ctx: ExecutionContext,
+	enqueue: (
+		db: Database,
+		row: ExecutionRow,
+		state: ParentState,
+		child: boolean,
+	) => void,
+	fail: (
+		db: Database,
+		row: ExecutionRow,
+		state: ParentState,
+		code: string,
+	) => void,
+) {
+	const { now } = ctx;
+	return function launch(
+		db: Database,
+		row: ExecutionRow,
+		state: ParentState,
+		input: Pick<
+			import("../../tool-runtime").ChildExecution,
+			"chainRevisionId" | "request" | "arguments" | "refs"
+		>,
+		id: string,
+		started?: () => void,
+	) {
+		if (
+			state.children >= state.limits.childCalls ||
+			now() >= row.deadline - 45_000
+		)
+			return fail(db, row, state, "execution_budget_exceeded");
+		const allocation = Math.min(
+			12,
+			state.limits.modelCalls - state.consumed - 1,
+		);
+		if (allocation < 1)
+			return fail(db, row, state, "execution_budget_exceeded");
+		const child = {
+			...input,
+			id,
+			executionId: row.id,
+			revision: row.request_revision,
+			step: state.ordinal,
+			source: executionSource(row),
+			deadline: Math.min(
+				row.deadline - 45_000,
+				ctx
+					.port()
+					.childDeadlineInTransaction?.(
+						db,
+						input.chainRevisionId,
+						row.deadline - 45_000,
+					) ?? row.deadline - 45_000,
+			),
+			modelCalls: allocation,
+		};
+		const body = JSON.stringify(child);
+		if (new TextEncoder().encode(body).length > 24_576)
+			throw new Error("execution_input_capacity");
+		state.children++;
+		started?.();
+		state.pending = { child, result: null, allocation };
+		row.state = "waiting_child";
+		db.query(
+			"INSERT INTO agent_execution_steps(id,execution_id,request_revision,ordinal,input_digest,input_json,state) VALUES(?,?,?,?,?,?,'queued')",
+		).run(id, row.id, row.request_revision, state.ordinal, hash(child), body);
+		enqueue(db, row, state, true);
+	};
+}

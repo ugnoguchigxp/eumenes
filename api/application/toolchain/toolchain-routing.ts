@@ -18,6 +18,7 @@ import type {
 import type { AdapterRegistry } from "../../domains/tool-runtime";
 import type { SchemaProvider } from "./toolchain-adapters";
 import { createInstantRouting } from "./toolchain-instant";
+import { createPipelineRouting } from "./toolchain-pipeline";
 
 /**
  * Dialogue's view of the toolchain registry and selection history. Retrieval uses
@@ -99,6 +100,10 @@ export function createToolchainRouting(
 			return !!runtime && (!runtime.binding || runtime.binding.available);
 		},
 	});
+	const pipelines = createPipelineRouting({ capabilities, registry });
+	/** The card with what its execution adds: an instant toolchain's arguments, a pipeline's inputs. */
+	const enrich = (db: Database, card: Parameters<typeof instant.card>[1]) =>
+		instant.card(db, card).flatMap((c) => pipelines.card(db, c));
 	const bound: BoundCommandPort = {
 		snapshotInTransaction: (db, bindingRevisionId) =>
 			adapterOf(db, bindingRevisionId).snapshotInTransaction(db),
@@ -162,7 +167,7 @@ export function createToolchainRouting(
 					available: () => true,
 				})
 				.find((c) => c.revisionId === revisionId);
-			return card ? instant.card(db, card)[0] : undefined;
+			return card ? enrich(db, card)[0] : undefined;
 		},
 		routeInTransaction(db, input) {
 			const active = capabilities
@@ -191,7 +196,7 @@ export function createToolchainRouting(
 				strict: input.strict,
 				limit: input.strict ? 4 : undefined,
 			});
-			const offered = cards.flatMap((card) => instant.card(db, card));
+			const offered = cards.flatMap((card) => enrich(db, card));
 			const fts = cards.some((c) => c.score.ftsRank !== null);
 			const vector = cards.some((c) => c.score.similarity !== null);
 			return {

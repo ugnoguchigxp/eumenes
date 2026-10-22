@@ -1,3 +1,4 @@
+import { createPipelinesService } from "../pipelines/pipelines-service";
 import { dormantBundleFile } from "../../domains/capabilities";
 import { bundleHostOf } from "./toolchain-adapters";
 import { computeAnnouncements } from "../compute/compute-composition";
@@ -85,6 +86,12 @@ const stock = "AAPLの株価は250.12 USD、2026-10-08終値です。";
 export async function harness(
 	options: {
 		everyday?: boolean;
+		/** Task pipelines run on the parent execution, without the suspended task bundle. */
+		pipelines?: boolean;
+		/** A pipeline's extract step: the value the model gives for the step's text. */
+		extract?: (
+			messages: import("../../domains/inference/contracts").Messages,
+		) => unknown;
 		computePort?: ComputePort;
 		discoveryTarget?: (query: string) => string;
 		acquisition?: AcquisitionPort;
@@ -241,6 +248,7 @@ export async function harness(
 		routeContexts: string[] = [],
 		completionContexts: string[] = [],
 		completionToolChoices: Array<string | undefined> = [],
+		completionOutputLimits: Array<number | undefined> = [],
 		commandContexts: string[] = [];
 	const spoken: string[] = [];
 	let calls = 0,
@@ -366,6 +374,7 @@ export async function harness(
 			) {
 				completionContexts.push(JSON.stringify(messages));
 				completionToolChoices.push(callOptions.toolChoice);
+				completionOutputLimits.push(callOptions.maxOutputTokens);
 				const step = offeredKinds(
 					callOptions.tools,
 					options.completion?.(callOptions.tools, messages) ?? {
@@ -382,6 +391,18 @@ export async function harness(
 						id: crypto.randomUUID(),
 						name: step.name,
 						arguments: JSON.stringify(step.arguments),
+					},
+				]);
+				return "";
+			}
+			if (
+				callOptions?.tools?.some((t) => t.function.name === "extract_value")
+			) {
+				callOptions.onToolCalls!([
+					{
+						id: crypto.randomUUID(),
+						name: "extract_value",
+						arguments: JSON.stringify({ value: options.extract?.(messages) }),
 					},
 				]);
 				return "";
@@ -860,16 +881,18 @@ export async function harness(
 		}),
 	});
 	toolchainLinks.attachDialogue(dialogue);
-	if (options.everyday) {
+	if (options.everyday || options.pipelines) {
 		// The everyday task agent is suspended: its bundle is never seeded, so the fixtures of that
-		// implementation register it explicitly.
-		const registered = await store.write((db) =>
-			toolchain.capabilities.importBundleInTransaction(
-				db,
-				dormantBundleFile("task-execution"),
-				bundleHostOf(toolchain.registry),
-			),
-		);
+		// implementation register it explicitly. Pipelines need only the parent execution's port.
+		const registered = options.everyday
+			? await store.write((db) =>
+					toolchain.capabilities.importBundleInTransaction(
+						db,
+						dormantBundleFile("task-execution"),
+						bundleHostOf(toolchain.registry),
+					),
+				)
+			: { issues: [] };
 		if (registered.issues.length) throw new Error("dormant_bundle_rejected");
 		configureTaskExecution({
 			queue,
@@ -889,6 +912,14 @@ export async function harness(
 	}
 	const voice = createVoiceDialogue(store, dialogue, inference);
 	if (terminals) reportFinishedTasks(terminals, dialogue);
+	const pipelines = createPipelinesService({
+		store,
+		capabilities: toolchain.capabilities,
+		registry: toolchain.registry,
+		routing,
+		schemas: toolchain.schemas,
+	});
+	toolchain.attachPipelines(pipelines);
 	const app = createApp({
 		token: "fixture-token-for-toolchain-browser",
 		origin: process.env.EUMENES_ORIGIN ?? "http://localhost",
@@ -914,6 +945,7 @@ export async function harness(
 		toolchainHistory: toolchain.history,
 		toolchainActions: toolchain.actionRequests,
 		...toolchain,
+		pipelines,
 	});
 	toolchain.agents.start();
 	queue.start();
@@ -944,6 +976,8 @@ export async function harness(
 		dialogue,
 		conversation,
 		toolchain,
+		routing,
+		pipelines,
 		timers,
 		scheduler,
 		queue,
@@ -957,6 +991,7 @@ export async function harness(
 		routeContexts,
 		completionContexts,
 		completionToolChoices,
+		completionOutputLimits,
 		commandContexts,
 		get acquisitions() {
 			return acquisitions;

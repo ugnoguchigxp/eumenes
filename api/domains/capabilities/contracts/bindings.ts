@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { pipelineDefinitionV1 } from "./pipelines";
 
 /**
  * Versioned bindings and artifact registrations (spec: timer-data-driven-ui-acceptance-design
@@ -211,11 +212,27 @@ export const taskBindingV1 = z.strictObject({
 		modelCalls: z.number().int().min(2).max(48),
 	}),
 });
+/**
+ * A task pipeline (spec task-pipeline-design 2026-10-22 §13.1): the procedure itself is the binding's, so the
+ * pipeline's revision is the binding's. No tools and no screen; `timeLimits.runMs` bounds the whole run.
+ */
+export const pipelineBindingV1 = z.strictObject({
+	kind: z.literal("binding"),
+	id: slug,
+	revision: revisionNumber,
+	execution: z.literal("pipeline"),
+	adapterRef: hostRef("adapter"),
+	availabilityRef: hostRef("availability"),
+	tools: z.array(bindingTool).max(0),
+	timeLimits: timeLimitsV1,
+	pipeline: pipelineDefinitionV1,
+});
 export const bindingV1 = z.discriminatedUnion("execution", [
 	commandBindingV1,
 	sessionBindingV1,
 	instantBindingV1,
 	taskBindingV1,
+	pipelineBindingV1,
 ]);
 export type BindingV1 = z.infer<typeof bindingV1>;
 /** Where one OpenUI source's data comes from: a registered adapter query. */
@@ -672,6 +689,8 @@ export type BundleHost = {
 			/** The adapter answers instant bindings (see `DomainAdapter.instant`). */
 			instant?: boolean;
 			task?: boolean;
+			/** The adapter runs task pipelines (binding execution "pipeline"). */
+			pipeline?: boolean;
 			/** Work documents its session offers (`workspace:` refs, see `DomainAdapter.workspaces`). */
 			workspaces?: ReadonlySet<string>;
 		}

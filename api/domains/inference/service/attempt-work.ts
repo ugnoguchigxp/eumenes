@@ -72,7 +72,14 @@ export function callOptionsFor(r: Request, attemptId: string): LarmCallOptions {
 			? { history: r.session.context }
 			: {}),
 		...sessionCallOptions(r.session),
-		...(r.row.outputLimit ? { maxOutputTokens: r.row.outputLimit } : {}),
+		...(r.row.outputLimit || r.outputLimit
+			? {
+					maxOutputTokens: Math.min(
+						r.row.outputLimit || Infinity,
+						r.outputLimit || Infinity,
+					),
+				}
+			: {}),
 		...(r.row.attemptMs ? { attemptMs: r.row.attemptMs } : {}),
 
 		onExchange: async (exchange: LarmExchange) => {

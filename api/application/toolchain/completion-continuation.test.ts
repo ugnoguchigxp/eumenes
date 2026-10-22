@@ -3,6 +3,7 @@ import { harness } from "./toolchain.fixture";
 import { waitFor } from "../../infrastructure/wait-for";
 import {
 	chainSuperseded,
+	CHECK_OUTPUT_TOKENS,
 	MAX_CONTINUATIONS,
 	progressLine,
 	stepResultsInTransaction,
@@ -354,6 +355,10 @@ test("a check that stays outside its contract continues nothing: a condition can
 		// The check is told to call its function; a check that gives no valid decision stands for no achievement:
 		// the answer is told to claim only what the results show.
 		expect(h.completionToolChoices).toEqual(["required", "required"]);
+		// A forced call on a long context must not run on: each check carries its own output bound.
+		for (const limit of h.completionOutputLimits)
+			expect(limit).toBeLessThanOrEqual(CHECK_OUTPUT_TOKENS);
+		expect(h.completionOutputLimits).toHaveLength(2);
 		expect(h.parentContexts.at(-1)).toContain("照合できませんでした");
 		expect(h.dialogue.answerText(run.id)).toContain("180秒");
 	} finally {

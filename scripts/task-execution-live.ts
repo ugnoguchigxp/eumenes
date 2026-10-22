@@ -14,10 +14,15 @@ import { appModules } from "../api/application/app-modules";
 import { appServices } from "../api/application/server-app-services";
 import { createClient } from "../client";
 import { liveLarmSettings } from "../scripts/live-larm";
+import { livePipelines } from "./live-pipelines";
 const args = process.argv.slice(2);
 if (args[0] !== "--run") throw Error("explicit_--run_required");
 const suite = args[1] ?? "timers",
-	count = Number(args[2] ?? 3);
+	count = Number(args[2] ?? 3),
+	// Publish the hand-written task pipelines into the isolated database first (spec task-pipeline-design §9).
+	pipelined = args.includes("--pipelines"),
+	// A similar request with other words is checked like the suite it varies.
+	base = suite.replace(/2$/, "");
 if (
 	![
 		"simple",
@@ -29,6 +34,10 @@ if (
 		"amend",
 		"image3d",
 		"timermusic",
+		"pasta",
+		"pasta2",
+		"image3dmusic",
+		"image3dmusic2",
 		"video",
 	].includes(suite) ||
 	!Number.isInteger(count) ||
@@ -37,7 +46,7 @@ if (
 )
 	throw Error("invalid_suite_or_count");
 const dir = mkdtempSync(join(tmpdir(), "eumenes-composed-live-"));
-const report = `verification-reports/everyday-task-agent/composed-${suite}-${Date.now()}`;
+const report = `verification-reports/everyday-task-agent/composed-${suite}${pipelined ? "-pipelines" : ""}-${Date.now()}`;
 mkdirSync(report, { recursive: true, mode: 0o700 });
 const rows: any[] = [];
 const record = (r: any) => {
@@ -155,6 +164,14 @@ try {
 	}
 	await life.recoverAll();
 	await s.inference.connect();
+	if (pipelined) {
+		for (const definition of livePipelines)
+			record({
+				stage: "pipeline_published",
+				id: definition.id,
+				result: await s.pipelines!.publish(definition),
+			});
+	}
 	await s.toolchain.refreshVectors();
 	life.startAll();
 	const token = resolveApiToken({ EUMENES_DB: config.dbPath });
@@ -182,6 +199,14 @@ try {
 			"猫のマスコットの画像を1枚作って、できた画像をもとに3Dモデルを作ってください。作った画像と3Dモデルの結果を教えてください。",
 		timermusic:
 			"1分のタイマーをセットして、それから明るい曲を1曲作ってください。",
+		pasta:
+			"パスタの標準的な茹で時間を調べて、その時間でタイマーをセットして、待っている間に流す明るい曲を1曲作ってください。",
+		pasta2:
+			"うどんを茹でたいので、茹で時間を調べてその時間のタイマーを掛けて、待つ間に流すのんびりした曲も1曲お願い。",
+		image3dmusic:
+			"猫のマスコットの画像を1枚作って、その画像をもとに3Dモデルを作り、作業用BGMとして明るい曲も1曲作ってください。",
+		image3dmusic2:
+			"犬のキャラクターの絵を描いて、それを3Dモデルにして、作業用ににぎやかな曲も作ってください。",
 		video:
 			"Webでおすすめの動画をYouTubeから一つ探して、ブラウザーの別タブで開いて再生してください。再生できたら動画のタイトルとURLを教えてください。",
 	};
@@ -258,7 +283,7 @@ try {
 			works.some((w) =>
 				["queued", "deciding", "waiting_child"].includes(w.status),
 			) &&
-			performance.now() - start < 350000
+			performance.now() - start < (pipelined ? 1500000 : 350000)
 		) {
 			await Bun.sleep(500);
 			works = s.toolchain.agents.executions.list(conv);
@@ -272,7 +297,7 @@ try {
 					),
 			)
 		)
-			while (performance.now() - start < 500000) {
+			while (performance.now() - start < (pipelined ? 1600000 : 500000)) {
 				const runs = await c.runs(conv);
 				if (
 					runs.length > 1 &&
@@ -282,7 +307,7 @@ try {
 				await Bun.sleep(250);
 			}
 		// A request goes on as hidden continuation runs: it is settled when none is queued or running.
-		while (performance.now() - start < 500000) {
+		while (performance.now() - start < (pipelined ? 1600000 : 500000)) {
 			const runs = await c.runs(conv);
 			if (runs.every((r) => !["queued", "running"].includes(r.status))) break;
 			await Bun.sleep(250);
@@ -320,7 +345,7 @@ try {
 			});
 			await s.dialogue.waitForTerminal(answer.id, { timeoutMs: 180000 });
 			while (
-				performance.now() - start < 500000 &&
+				performance.now() - start < (pipelined ? 1600000 : 500000) &&
 				s.toolchain.agents.executions
 					.list(conv)
 					.some((w) =>
@@ -379,7 +404,7 @@ try {
 				db.close();
 			}
 		}
-		if (suite === "image3d") {
+		if (suite === "image3d" || base === "image3dmusic") {
 			// A 3D generation finishes minutes after its run answered: wait for it to end, not for a state in between.
 			const until = Date.now() + 600000;
 			for (;;) {
@@ -413,7 +438,7 @@ try {
 		}
 		// A song finishes after its run answered: wait for it to end, then read this conversation's songs.
 		let songs: Array<{ state: string }> = [];
-		if (suite === "timermusic") {
+		if (suite === "timermusic" || base === "pasta" || base === "image3dmusic") {
 			const until = Date.now() + 600000;
 			for (;;) {
 				const read = new Database(config.dbPath, { readonly: true });
@@ -433,88 +458,144 @@ try {
 				await Bun.sleep(5000);
 			}
 		}
+		const song = songs.length === 1 && songs[0]!.state === "completed";
+		// A 3D model made from an image of this conversation, not from a prompt.
+		const modelFromImage =
+			media.images.length > 0 &&
+			media.models.some((m) => {
+				const source = JSON.parse(m.source) as { type: string; id?: string };
+				return (
+					m.state === "completed" &&
+					source.type === "image-artifact" &&
+					media.images.some(
+						(image) =>
+							image.id === source.id || image.record.includes(source.id!),
+					)
+				);
+			});
+		// The timer's minutes come from the search step's report as the host handed it on.
+		let reports = "";
+		if (base === "pasta") {
+			const db = new Database(config.dbPath, { readonly: true });
+			try {
+				reports = (
+					db
+						.query(
+							"SELECT c.steps_json AS steps FROM dialogue_continuations c JOIN dialogue_runs r ON r.id=c.root_run_id WHERE r.conversation_id=?",
+						)
+						.all(conv) as Array<{ steps: string }>
+				)
+					.flatMap((row) =>
+						(
+							JSON.parse(row.steps) as Array<{
+								results: Array<{ source: string; value: unknown }>;
+							}>
+						).flatMap((step) =>
+							step.results
+								.filter((r) => r.source === "research.result")
+								.map((r) => JSON.stringify(r.value)),
+						),
+					)
+					.join("\n");
+				// A pipeline hands its search step's result on inside its own run.
+				reports += (
+					db
+						.query(
+							"SELECT s.result_json AS result FROM agent_execution_steps s JOIN agent_executions e ON e.id=s.execution_id WHERE e.conversation_id=? AND s.result_json IS NOT NULL",
+						)
+						.all(conv) as Array<{ result: string }>
+				)
+					.map((r) => "\n" + r.result)
+					.join("");
+			} finally {
+				db.close();
+			}
+		}
+		const minutes = (timers.items[0]?.durationSeconds ?? 0) / 60;
 		const pass =
-			suite === "timermusic"
+			base === "pasta"
 				? completed &&
 					timers.items.length === 1 &&
-					timers.items[0]!.durationSeconds === 60 &&
-					songs.length === 1 &&
-					songs[0]!.state === "completed"
-				: suite === "simple"
-					? run.status === "completed" &&
-						works.length === 0 &&
-						answers.some((x) =>
-							/^(?:答え(?:は|：|:)\s*)?(?:42|四十二)(?:です|になります)?[。.!！]?$/u.test(
-								x.trim(),
-							),
-						)
-					: suite === "search"
-						? run.status === "completed" &&
-							works.length === 0 &&
-							!!run.agentTaskId &&
-							answers.some((x) => x.includes("bun test"))
-						: suite === "multi"
-							? completed &&
-								active.length === 1 &&
-								active.some(
-									(t) => t.label === "確認済み" && t.durationSeconds === 5400,
-								) &&
-								chain.length >= 2 &&
-								answers.some((x) => x.includes("bun test"))
-							: suite === "image3d"
-								? completed &&
-									media.images.length > 0 &&
-									media.models.some((m) => {
-										const source = JSON.parse(m.source) as {
-											type: string;
-											id?: string;
-										};
-										return (
-											m.state === "completed" &&
-											source.type === "image-artifact" &&
-											media.images.some(
-												(image) =>
-													image.id === source.id ||
-													image.record.includes(source.id!),
-											)
-										);
-									})
-								: suite === "video"
+					Number.isInteger(minutes) &&
+					minutes >= 1 &&
+					minutes <= 30 &&
+					new RegExp(`(?<![0-9])${minutes}(?![0-9])`).test(reports) &&
+					song
+				: base === "image3dmusic"
+					? completed && modelFromImage && song
+					: suite === "timermusic"
+						? completed &&
+							timers.items.length === 1 &&
+							timers.items[0]!.durationSeconds === 60 &&
+							songs.length === 1 &&
+							songs[0]!.state === "completed"
+						: suite === "simple"
+							? run.status === "completed" &&
+								works.length === 0 &&
+								answers.some((x) =>
+									/^(?:答え(?:は|：|:)\s*)?(?:42|四十二)(?:です|になります)?[。.!！]?$/u.test(
+										x.trim(),
+									),
+								)
+							: suite === "search"
+								? run.status === "completed" &&
+									works.length === 0 &&
+									!!run.agentTaskId &&
+									answers.some((x) => x.includes("bun test"))
+								: suite === "multi"
 									? completed &&
-										browser.tasks.some((t) => t.state === "completed") &&
-										browser.operations.some(
-											(o) =>
-												o.state === "observed" &&
-												/^https:\/\/(www\.|m\.)?youtube\.com\/watch\?/.test(
-													o.url ?? "",
-												),
-										)
-									: suite === "ambiguity"
-										? ambiguitySafe &&
-											completed &&
-											active.length === 1 &&
-											a?.durationSeconds === 5400 &&
-											timers.items.some(
-												(t) => t.label === "受入B" && t.state === "cancelled",
-											) &&
-											!b
-										: suite === "amend"
-											? works.some(
-													(w) => w.revision > 0 && w.status === "completed",
-												) &&
-												active.length === 2 &&
-												a?.durationSeconds === 5400 &&
-												b?.durationSeconds === 7200
-											: completed &&
-												active.length === 2 &&
-												a?.durationSeconds === 5400 &&
-												b?.durationSeconds === 6000;
-		if (!pass) process.exitCode = 1;
+										active.length === 1 &&
+										active.some(
+											(t) =>
+												t.label === "確認済み" && t.durationSeconds === 5400,
+										) &&
+										chain.length >= 2 &&
+										answers.some((x) => x.includes("bun test"))
+									: suite === "image3d"
+										? completed && modelFromImage
+										: suite === "video"
+											? completed &&
+												browser.tasks.some((t) => t.state === "completed") &&
+												browser.operations.some(
+													(o) =>
+														o.state === "observed" &&
+														/^https:\/\/(www\.|m\.)?youtube\.com\/watch\?/.test(
+															o.url ?? "",
+														),
+												)
+											: suite === "ambiguity"
+												? ambiguitySafe &&
+													completed &&
+													active.length === 1 &&
+													a?.durationSeconds === 5400 &&
+													timers.items.some(
+														(t) =>
+															t.label === "受入B" && t.state === "cancelled",
+													) &&
+													!b
+												: suite === "amend"
+													? works.some(
+															(w) => w.revision > 0 && w.status === "completed",
+														) &&
+														active.length === 2 &&
+														a?.durationSeconds === 5400 &&
+														b?.durationSeconds === 7200
+													: completed &&
+														active.length === 2 &&
+														a?.durationSeconds === 5400 &&
+														b?.durationSeconds === 6000;
+		// With the pipelines published, the request must also have been run by one of them.
+		const byPipeline = works.some(
+			(w) => w.pipeline && w.status === "completed",
+		);
+		const passed = pipelined ? pass && byPipeline : pass;
+		if (!passed) process.exitCode = 1;
 		record({
 			stage: "case",
 			i,
 			conv,
-			pass,
+			pass: passed,
+			...(pipelined ? { byPipeline } : {}),
 			elapsedMs: Math.round(performance.now() - start),
 			run,
 			works,
@@ -526,7 +607,11 @@ try {
 			})),
 			timers,
 			...(suite === "image3d" ? { media } : {}),
-			...(suite === "timermusic" ? { songs } : {}),
+			...(suite === "timermusic" || base === "pasta" || base === "image3dmusic"
+				? { songs }
+				: {}),
+			...(base === "image3dmusic" ? { media } : {}),
+			...(base === "pasta" ? { reports } : {}),
 			...(suite === "video" ? { browser } : {}),
 			answers,
 			usage: usage.map((u) => ({

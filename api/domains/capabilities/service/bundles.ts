@@ -299,6 +299,7 @@ function checkBindingBase(c: Check, b: BindingV1, path: string) {
 	if (
 		b.execution !== "instant" &&
 		b.execution !== "task" &&
+		b.execution !== "pipeline" &&
 		!c.hasDocument(b.artifactRevisionId, "artifact")
 	)
 		issue(
@@ -472,19 +473,29 @@ function checkBindingsAndArtifacts(c: Check) {
 			? checkSessionBinding(c, b, `bindings/${i}`)
 			: b.execution === "instant"
 				? checkInstantBinding(c, b, `bindings/${i}`)
-				: b.execution === "task"
+				: b.execution === "pipeline"
 					? (() => {
 							checkBindingBase(c, b, `bindings/${i}`);
-							c.schemaRef(b.inputSchemaRef, `bindings/${i}/inputSchemaRef`);
-							c.schemaRef(b.outputSchemaRef, `bindings/${i}/outputSchemaRef`);
-							if (!c.host.adapters.get(b.adapterRef)?.task)
+							if (!c.host.adapters.get(b.adapterRef)?.pipeline)
 								c.issue(
 									"unregistered_adapter",
 									`bindings/${i}/adapterRef`,
 									b.adapterRef,
 								);
 						})()
-					: checkCommandBinding(c, b, `bindings/${i}`),
+					: b.execution === "task"
+						? (() => {
+								checkBindingBase(c, b, `bindings/${i}`);
+								c.schemaRef(b.inputSchemaRef, `bindings/${i}/inputSchemaRef`);
+								c.schemaRef(b.outputSchemaRef, `bindings/${i}/outputSchemaRef`);
+								if (!c.host.adapters.get(b.adapterRef)?.task)
+									c.issue(
+										"unregistered_adapter",
+										`bindings/${i}/adapterRef`,
+										b.adapterRef,
+									);
+							})()
+						: checkCommandBinding(c, b, `bindings/${i}`),
 	);
 	c.bundle.artifacts.forEach((a, i) => {
 		const path = `artifacts/${i}`;

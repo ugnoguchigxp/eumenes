@@ -14,6 +14,8 @@ import { executionChild } from "./execution-child";
 import { executionCommands } from "./execution-commands";
 import type { ExecutionContext } from "./execution-context";
 import { executionStep } from "./execution-step";
+import { executionExtract } from "./execution-extract";
+import { executionPipeline } from "./execution-pipeline";
 import { createExecutionStore } from "./execution-store";
 export function createTaskExecutions(deps: Omit<ExecutionContext, "port">) {
 	let port: ToolchainExecutionPort | null = null;
@@ -34,6 +36,8 @@ export function createTaskExecutions(deps: Omit<ExecutionContext, "port">) {
 	const ops = createExecutionStore(ctx);
 	queue.registerHandler(executionStep(ctx, ops));
 	queue.registerHandler(executionChild(ctx, ops));
+	const pipeline = executionPipeline(ctx, ops);
+	queue.registerHandler(executionExtract(ctx, ops, pipeline));
 	const table = (db: Database) =>
 		!!db
 			.query(
@@ -78,8 +82,7 @@ export function createTaskExecutions(deps: Omit<ExecutionContext, "port">) {
 						state.refs.every((ref) =>
 							port!.validReferenceInTransaction(db, executionSource(row), ref),
 						) &&
-						port!.controlInTransaction(db)?.revisionId ===
-							state.bindingRevisionId,
+						ops.controlValid(db, state),
 				);
 				if (
 					!valid ||
@@ -239,6 +242,15 @@ export function createTaskExecutions(deps: Omit<ExecutionContext, "port">) {
 			schedule();
 		},
 		availableInTransaction: available,
+		/** Whether this host runs task pipelines now (the task binding is not needed for them). */
+		pipelinesAvailableInTransaction: (db: Database) => !!port && table(db),
+		startPipelineInTransaction(
+			db: Database,
+			input: Parameters<typeof pipeline.startPipelineInTransaction>[1],
+		) {
+			if (!port || !table(db)) throw new Error("execution_unavailable");
+			return pipeline.startPipelineInTransaction(db, input);
+		},
 		...executionCommands(ctx, ops, available),
 		...executionAccess(ctx, ops, table, () => !!port),
 		reconcile,

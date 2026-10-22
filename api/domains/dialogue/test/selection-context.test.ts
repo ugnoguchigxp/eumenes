@@ -340,3 +340,102 @@ test("the recall of both rounds is embedded from the utterance itself", async ()
 	// One embedding of the utterance, searched for the candidates and read by the recall of whichever round follows.
 	expect(searched.embedded).toEqual(["明日はどうなる？"]);
 });
+
+test("a discovery of the first part also offers the pipelines the whole request finds; a continuation is offered none", async () => {
+	const pipeline: ToolchainCard = {
+		...card,
+		id: "pipeline.cook",
+		revisionId: "toolchain:pipeline.cook@1",
+		functionName: "pipeline_cook",
+		execution: "pipeline",
+		pipeline: {
+			parameters: {},
+			outline: "調べる→タイマー",
+			parse: () => ({ ok: true, value: {} }),
+		},
+	};
+	const timer: ToolchainCard = {
+		...card,
+		id: "timers.manage",
+		revisionId: "toolchain:timers.manage@1",
+		functionName: "timer",
+	};
+	const routed: Array<{ text: string; excluded: string[] }> = [];
+	const deps2 = {
+		...deps,
+		toolchains: {
+			catalogInTransaction: () => [
+				{
+					id: "pipeline.cook",
+					revisionId: pipeline.revisionId,
+					runtime: { execution: "pipeline" },
+				},
+			],
+			embedQuery: async (text: string) => ({
+				space: {
+					modelId: "m",
+					revision: "1",
+					artifactDigest: "d",
+					dimension: 1,
+				},
+				vector: [text.length],
+			}),
+			routeInTransaction: (
+				_db: unknown,
+				input: { text: string; excludeRevisionIds?: ReadonlySet<string> },
+			) => {
+				routed.push({
+					text: input.text,
+					excluded: [...(input.excludeRevisionIds ?? [])],
+				});
+				// The first part finds the web search; the whole request finds the pipeline (and the timer).
+				const cards =
+					input.text === "茹で時間を調べる"
+						? [card]
+						: [pipeline, timer].filter(
+								(c) => !input.excludeRevisionIds?.has(c.revisionId),
+							);
+				return { cards, past: [], retrieval: "vector" };
+			},
+		},
+	} as unknown as DialogueDeps;
+	const current = {
+		role: "user" as const,
+		content: "パスタの茹で時間を調べてタイマーをセットして",
+	};
+	const input = (continuation?: { need: string }) =>
+		({
+			runId: "run",
+			messages: [current],
+			currentRequest: { messageId: "m", messageIndex: 0 },
+			routing: {
+				...routingOf([]),
+				available: [card.id, pipeline.id, timer.id],
+				...(continuation ? { continuation } : {}),
+			},
+		}) as unknown as GenerateInput;
+	const found = await findCandidates(
+		deps2,
+		input(),
+		signal(),
+		"茹で時間を調べる",
+	);
+	// Only pipelines are added from the request's own search, after the search text's candidates.
+	expect(found.route.cards.map((c) => c.functionName)).toEqual([
+		"web_search",
+		"pipeline_cook",
+	]);
+	expect(routed[1]).toEqual({
+		text: current.content,
+		excluded: ["toolchain:web.search@1"],
+	});
+	routed.length = 0;
+	const searched = await findCandidates(
+		deps2,
+		input({ need: "タイマー" }),
+		signal(),
+		current.content,
+	);
+	expect(searched.route.cards.map((c) => c.functionName)).toEqual(["timer"]);
+	expect(routed).toHaveLength(1);
+});

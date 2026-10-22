@@ -8,7 +8,7 @@
 | Domain | Tier | Backend 入口 | Web 入口 | Components | 依存 (api) | 依存 (web) | 依存 (試験のみ) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `google-accounts` | 0 | `api/domains/google-accounts/index.ts` | `web/src/domains/google-accounts/` | `packages/design-system/src/components/GoogleAccounts/index.tsx` | なし | なし | なし |
-| `excalidraw` | 3 | `api/domains/excalidraw/index.ts` | `web/src/domains/excalidraw/` | なし | `capabilities`、`inference`、`larm`、`queue` | なし | なし |
+| `excalidraw` | 3 | `api/domains/excalidraw/index.ts` | `web/src/domains/excalidraw/` | なし | `capabilities`、`inference`、`larm`、`queue`、`tool-runtime` | なし | なし |
 | `ocr` | 3 | `api/domains/ocr/index.ts` | `web/src/domains/ocr/` | `packages/design-system/src/components/OcrWorkspace/index.ts` | `capabilities`、`inference`、`queue` | なし | なし |
 | `object-recognition` | 1 | `api/domains/object-recognition/index.ts` | `web/src/domains/object-recognition/index.ts` | なし | `capabilities`、`queue` | なし | なし |
 | `compute` | 1 | `api/domains/compute/index.ts` | `web/src/domains/compute/` | `packages/design-system/src/components/ComputeWorkspace/index.tsx` | `queue` | なし | なし |
@@ -18,9 +18,9 @@
 | `codex-tasks` | 1 | `api/domains/codex-tasks/index.ts` | `web/src/domains/codex-tasks/` | なし | `coding` | なし | なし |
 | `terminals` | 0 | `api/domains/terminals/index.ts` | `web/src/domains/terminals/index.ts` | なし | なし | なし | なし |
 | `background` | 0 | なし | `web/src/domains/background/index.ts` | なし | なし | なし | なし |
-| `image` | 3 | `api/domains/image/index.ts` | `web/src/domains/image/index.ts` | なし | `capabilities`、`inference`、`larm`、`queue` | なし | なし |
+| `image` | 3 | `api/domains/image/index.ts` | `web/src/domains/image/index.ts` | なし | `capabilities`、`inference`、`larm`、`queue`、`tool-runtime` | なし | なし |
 | `ui-compositions` | 3 | `api/domains/ui-compositions/index.ts` | `web/src/domains/ui-compositions/` | なし | なし | なし | なし |
-| `music` | 3 | `api/domains/music/index.ts` | `web/src/domains/music/index.ts` | `web/src/components/domains/music/` | `capabilities`、`inference`、`larm`、`queue` | なし | なし |
+| `music` | 3 | `api/domains/music/index.ts` | `web/src/domains/music/index.ts` | `web/src/components/domains/music/` | `capabilities`、`inference`、`larm`、`queue`、`tool-runtime` | なし | なし |
 | `dots` | 1 | `api/domains/dots/index.ts` | なし | なし | `queue` | なし | なし |
 | `task-reports` | 1 | `api/domains/task-reports/index.ts` | なし | なし | `tasks` | なし | なし |
 | `coding-supervision` | 3 | `api/domains/coding-supervision/index.ts` | なし | なし | `coding`、`inference`、`queue`、`task-reports`、`tasks` | なし | なし |
@@ -28,8 +28,9 @@
 | `artifact` | 3 | なし | `web/src/domains/artifact/index.ts` | `web/src/components/domains/artifact/` | なし | `conversation` | なし |
 | `tasks` | 0 | `api/domains/tasks/index.ts` | なし | なし | なし | なし | なし |
 | `capabilities` | 0 | `api/domains/capabilities/index.ts` | なし | なし | なし | なし | なし |
+| `pipelines` | 1 | `api/domains/pipelines/index.ts` | `web/src/domains/pipelines/` | `packages/design-system/src/components/PipelineStudio/index.ts` | `capabilities` | なし | なし |
 | `tool-runtime` | 1 | `api/domains/tool-runtime/index.ts` | なし | なし | `capabilities`、`queue` | なし | なし |
-| `agent-runtime` | 3 | `api/domains/agent-runtime/index.ts` | `web/src/domains/agent-runtime/index.ts` | なし | `capabilities`、`inference`、`queue`、`tool-runtime` | なし | なし |
+| `agent-runtime` | 3 | `api/domains/agent-runtime/index.ts` | `web/src/domains/agent-runtime/index.ts` | なし | `capabilities`、`inference`、`pipelines`、`queue`、`tool-runtime` | なし | なし |
 | `toolchain-history` | 1 | `api/domains/toolchain-history/index.ts` | なし | なし | `capabilities` | なし | なし |
 | `web-research` | 1 | `api/domains/web-research/index.ts` | なし | なし | `queue` | なし | なし |
 | `attitude-dataset` | 1 | `api/domains/attitude-dataset/index.ts` | なし | なし | `delivery` | なし | なし |
@@ -44,14 +45,14 @@
 | `continuity` | 0 | `api/domains/continuity/index.ts` | なし | なし | なし | なし | なし |
 | `goals` | 0 | `api/domains/goals/index.ts` | なし | なし | なし | なし | なし |
 | `world` | 4 | `api/domains/world/index.ts` | なし | なし | `conversation`、`goals` | なし | `memory` |
-| `memory` | 3 | `api/domains/memory/index.ts` | なし | なし | `continuity`、`conversation` | なし | なし |
+| `memory` | 3 | `api/domains/memory/index.ts` | なし | なし | `continuity`、`conversation`、`tool-runtime` | なし | なし |
 | `steward` | 5 | `api/domains/steward/index.ts` | なし | なし | `continuity`、`conversation`、`goals`、`memory`、`world` | なし | `queue` |
 | `larm` | 0 | `api/domains/larm/index.ts` | なし | なし | なし | なし | なし |
 | `audio` | 0 | なし | `web/src/domains/audio/index.ts` | なし | なし | なし | なし |
 | `queue` | 0 | `api/domains/queue/index.ts` | なし | なし | なし | なし | なし |
 | `scheduler` | 1 | `api/domains/scheduler/index.ts` | なし | なし | `queue` | なし | なし |
 | `timers` | 2 | `api/domains/timers/index.ts` | `web/src/domains/timers/` | `web/src/components/domains/timers/` | `queue`、`scheduler` | なし | なし |
-| `dialogue` | 5 | `api/domains/dialogue/index.ts` | `web/src/domains/dialogue/index.ts` | なし | `agent-runtime`、`capabilities`、`conversation`、`delivery`、`inference`、`memory`、`queue`、`scheduler`、`toolchain-history` | `conversation` | `world` |
+| `dialogue` | 5 | `api/domains/dialogue/index.ts` | `web/src/domains/dialogue/index.ts` | なし | `agent-runtime`、`capabilities`、`conversation`、`delivery`、`inference`、`memory`、`queue`、`scheduler`、`toolchain-history`、`tool-runtime` | `conversation` | `world` |
 | `voice-dialogue` | 6 | `api/domains/voice-dialogue/index.ts` | `web/src/domains/voice-dialogue/index.ts` | なし | `delivery`、`dialogue`、`inference`、`settings` | `audio`、`avatar`、`dialogue`、`settings` | なし |
 <!-- domains:end -->
 

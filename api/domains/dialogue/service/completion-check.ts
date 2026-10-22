@@ -20,6 +20,11 @@ const log = getLogger("dialogue");
 
 /** Steps after the first a request may take; the last step's check only reports what stays unmet. */
 export const MAX_CONTINUATIONS = 3;
+/**
+ * The check is a short structured call. A forced tool call on a long context can run on without end; its bound
+ * keeps a runaway from spending the answer's time (the check then stays unverified).
+ */
+export const CHECK_OUTPUT_TOKENS = 1536;
 
 const condition = z.string().trim().min(1).max(300);
 const step = z.number().int().min(1).nullable();
@@ -258,7 +263,11 @@ export async function judgeCompletion(
 				undefined,
 				offered,
 				// Its only valid output is the check: the provider is told to call it rather than answer in text.
-				{ sessionRole: "auxiliary", toolChoice: "required" },
+				{
+					sessionRole: "auxiliary",
+					toolChoice: "required",
+					outputLimit: CHECK_OUTPUT_TOKENS,
+				},
 			);
 		} catch {
 			signal.throwIfAborted();
@@ -459,6 +468,8 @@ export function completionCheckInTransaction(
 		/** The delegated step's results this answer phrases; none for anything else. */
 		results: ContextBlock[];
 		hostAside: boolean;
+		/** A finished pipeline's notice: the run whose request the pipeline was started for. */
+		origin?: string;
 	},
 ): CompletionCheck | undefined {
 	const continuation =
@@ -474,16 +485,20 @@ export function completionCheckInTransaction(
 		hop <= MAX_CONTINUATIONS &&
 		(run.sourceKind === "manual" ||
 			run.sourceKind === "voice" ||
-			!!continuation) &&
+			!!continuation ||
+			(run.sourceKind === "notice" && !!phase.origin)) &&
 		!resumedQuestion(tx, run.id);
+	const origin = phase.origin ? byId(tx, phase.origin) : null;
 	const originalRequest =
 		continuation?.originalRequest ??
-		deps.conversation.messageInTransaction(tx, run.inputMessageId)?.message
-			.text;
+		deps.conversation.messageInTransaction(
+			tx,
+			origin?.inputMessageId ?? run.inputMessageId,
+		)?.message.text;
 	return checked && originalRequest
 		? {
 				originalRequest,
-				rootRunId: continuation?.rootRunId ?? run.id,
+				rootRunId: continuation?.rootRunId ?? origin?.id ?? run.id,
 				hop,
 				achieved: continuation?.achieved ?? "",
 				...(continuation ? { conditions: continuation.conditions } : {}),

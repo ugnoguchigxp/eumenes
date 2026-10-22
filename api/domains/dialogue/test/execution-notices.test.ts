@@ -227,3 +227,30 @@ test("a partial result with confirmed facts is delivered verbatim without return
 		await h.close();
 	}
 }, 10000);
+
+test("a stopped pipeline's reply names the step it stopped at and why, in the host's words", () => {
+	const view = (code: string) => ({
+		id: crypto.randomUUID(),
+		conversationId: "main",
+		request: "茹で時間を調べてタイマーと曲",
+		revision: 0,
+		status: "partial" as const,
+		deadline: 0,
+		question: null,
+		pipeline: true as const,
+		result: {
+			status: "partial" as const,
+			summary: "茹で時間を調べる: 約9分",
+			fulfilled: ["茹で時間を調べる"],
+			missing: ["タイマー", "曲"],
+			refs: [],
+			code,
+		},
+	});
+	expect(executionStatusText(view("pipeline_step_failed"))).toBe(
+		"要求を完了できませんでした。\n茹で時間を調べる: 約9分\n「タイマー」で止まりました。その手順が完了しませんでした。",
+	);
+	expect(
+		executionStatusText(view("pipeline_extract_invalid_too_big")),
+	).toContain("前の結果から値を取り出せませんでした");
+});

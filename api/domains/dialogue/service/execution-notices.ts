@@ -33,9 +33,30 @@ export function executionStatusText(view: ExecutionView) {
 	].includes(view.result?.code ?? "")
 		? "操作を停止できたか確認できていません。"
 		: undefined;
-	return [labels[view.status], view.question?.prompt ?? uncertainty ?? summary]
+	return [
+		labels[view.status],
+		view.question?.prompt ?? uncertainty ?? summary,
+		view.pipeline ? pipelineStop(view.result) : undefined,
+	]
 		.filter(Boolean)
 		.join("\n");
+}
+
+/** Why the reasons of a stopped pipeline read as they do (spec task-pipeline-design §6.3): the host's own codes. */
+const pipelineReasons: Record<string, string> = {
+	pipeline_step_failed: "その手順が完了しませんでした",
+	pipeline_step_output_missing: "その手順の結果に必要な値がありませんでした",
+	pipeline_toolchain_unavailable: "その手順の担当を今は使えません",
+	pipeline_reference_missing: "その手順に渡す値がそろいませんでした",
+};
+/** A stopped pipeline names the step it stopped at and why; a completed one, nothing more. */
+function pipelineStop(result: ExecutionView["result"]) {
+	const step = result?.missing[0];
+	if (!result || result.status !== "partial" || !step) return undefined;
+	const reason = result.code?.startsWith("pipeline_extract_invalid")
+		? "前の結果から値を取り出せませんでした"
+		: (pipelineReasons[result.code ?? ""] ?? "続けられませんでした");
+	return `「${step}」で止まりました。${reason}。`;
 }
 
 /** An unfinished task reports its bounded execution result without another promise-generating inference. */
@@ -118,6 +139,28 @@ export function executionNoticeInTransaction(
 			...deps.agents!.executions.viewInTransaction(db, n.workRef)!,
 		},
 	};
+}
+/**
+ * A finished pipeline answers for its request as one step (spec task-pipeline-design §13.5): the run it was
+ * started for, whose request its result is checked against. Undefined for any other notice.
+ */
+export function finishedPipelineOrigin(
+	deps: Pick<DialogueDeps, "agents">,
+	db: Database,
+	notice: ReturnType<typeof executionNoticeInTransaction>,
+) {
+	if (
+		!notice ||
+		notice.stale ||
+		notice.data.kind !== "task_result" ||
+		notice.data.status !== "completed" ||
+		!notice.data.pipeline
+	)
+		return undefined;
+	return (
+		deps.agents?.executions.sourceRunInTransaction(db, notice.data.id) ??
+		undefined
+	);
 }
 export function executionNoticeContext(
 	notice: ReturnType<typeof executionNoticeInTransaction>,

@@ -172,6 +172,13 @@ export const domains = {
 		components: null,
 		depends: { api: [], web: [], test: [] },
 	},
+	pipelines: {
+		tier: 1,
+		backend: "api/domains/pipelines",
+		web: "web/src/domains/pipelines",
+		components: "packages/design-system/src/components/PipelineStudio",
+		depends: { api: ["capabilities"], web: [], test: [] },
+	},
 	"tool-runtime": {
 		tier: 1,
 		backend: "api/domains/tool-runtime",
@@ -185,7 +192,7 @@ export const domains = {
 		web: "web/src/domains/agent-runtime",
 		components: null,
 		depends: {
-			api: ["capabilities", "inference", "queue", "tool-runtime"],
+			api: ["capabilities", "inference", "pipelines", "queue", "tool-runtime"],
 			web: [],
 			test: [],
 		},
