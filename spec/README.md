@@ -9,6 +9,8 @@ archive の基準: その文書が担当した実装がコードにあり、本�
 | 文書 | 状態 |
 | --- | --- |
 | [task-pipeline-design-2026-10-22.md](task-pipeline-design-2026-10-22.md) | 合意済み。P0〜P2は実装・固定試験済み（§14）、liveは§14に記録。ブラウザE2E・実機器は未実施。3つ以上の担当を使う決まった手順をJSONの定義（入力・ステップ・変数・extract・合格条件）として `pipelines` ドメインに版で保存し、担当の検索で引き当てる。実行はアプリケーション層が1ステップずつ既存の委譲で進める。定義は協働型 `pipeline.studio` が作業文書を編集して作り、Artifactの編集画面で流れ・検索の拾われ方・選択と運転を試す。合わない依頼は一手ずつ照合する方式へ |
+| [conversation-cache-latency-design-2026-10-22.md](conversation-cache-latency-design-2026-10-22.md) | 案・合意待ち。会話の応答時間とLARMのprompt キャッシュ。計測（キャッシュ0、R1・R2の毎回の新規接続、段ごとの共通先頭、ローカルLLMの修正頻度、`tool_choice: required`の暴走）は実施済み。判断用の持続session、修正材料の末尾化、R1の並び、構造化出力、R1と返答段の先頭共有（H2見直し）、runless発言の台帳入りを提案。§4は未実装 |
+| [larm-prompt-cache-request-prompt-2026-10-22.md](larm-prompt-cache-request-prompt-2026-10-22.md) | LARM への prompt キャッシュ（KV prefix 再利用）修正依頼 Prompt。同一 Connection・同一要求でも `cache_n` 0 を確認（2026-10-22）。LARM 側の回答・修正待ち |
 | [step-and-check-multi-operation-design-2026-10-21.md](step-and-check-multi-operation-design-2026-10-21.md) | 案・合意待ち（方向性は合意済み、§9の決定事項は未合意）。最初の計画とタスク数の予測をやめ、R1が最初の一手だけを検索・委譲し、結果確定後に利用者の原文と照合して足りない要素を探し直す。完了には結果refの根拠を必須にし、`done` 後の利用者の不足の指摘を経験として次の照合に提示する。`execute_task` の別枠提示と `set_plan` を廃止し、台帳・取消・予算は再利用 |
 | [browser-service-search-design-2026-10-21.md](browser-service-search-design-2026-10-21.md) | 自己評価を反映した設計案・実装前。共通子実行を再利用し、指定サイトの検索不能時は既存外部検索で補完。候補refと本文根拠の別契約、部分採取、330秒worker内の補完150秒予約、既存入口での早期観測→最小結合→複数サイト受入を定義 |
 | [everyday-task-agent-implementation-plan-2026-10-21.md](everyday-task-agent-implementation-plan-2026-10-21.md) | 実装・固定検証済み、実モデル受入未達で無効を維持。合意済みの進行契約改訂を含む。task実行型、会話からの委譲/作業操作、必要時の能力探索、既存実行型との接続、原文とMemory等の参照、非同期完了・質問・訂正・取消、親子の予算、P0〜P6の検証・公開条件を定義。Pursuit/Harness2の取込は対象外 |

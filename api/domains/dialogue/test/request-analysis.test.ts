@@ -452,3 +452,20 @@ test("each message of the previous exchange is cut to the limit with the omissio
 		user!.content,
 	);
 });
+
+test("a lone user message (its run ended without an answer) is marked unanswered; an answered exchange is not", () => {
+	const turn = (role: "user" | "assistant", content: string) =>
+		({ role, content }) as HistoryTurn;
+	expect(
+		previousExchange([turn("assistant", "前"), turn("user", "1+1を計算して")]),
+	).toEqual([{ role: "user", content: "1+1を計算して", unanswered: true }]);
+	expect(
+		previousExchange([
+			turn("user", "1+1を計算して"),
+			turn("assistant", "2です"),
+		]),
+	).toEqual([
+		{ role: "user", content: "1+1を計算して" },
+		{ role: "assistant", content: "2です" },
+	]);
+});
