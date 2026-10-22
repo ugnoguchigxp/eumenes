@@ -112,9 +112,7 @@ test("library table keeps the selected past calculation through updates and targ
 			jobs={[{ ...job, stage: "collecting" }, past]}
 		/>,
 	);
-	expect(
-		screen.getByRole("heading", { name: "計算 job-past" }),
-	).toBeInTheDocument();
+	expect(screen.getByLabelText("計算ID job-past")).toBeInTheDocument();
 	await user.click(screen.getByRole("button", { name: "計算を取り消す" }));
 	expect(cancel).toHaveBeenCalledWith("job-past");
 	await user.click(screen.getByRole("button", { name: "ダウンロード" }));

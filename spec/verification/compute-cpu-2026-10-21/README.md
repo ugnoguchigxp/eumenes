@@ -154,3 +154,12 @@ bundle check、今回のapplication lintとサイズ検査も成功。全bundle�
 製品画面はViteのwatch/HMR無効設定のため、reloadのみでは旧表示だった。利用者の再起動許可に基づきmanagerへSIGTERMを送り、shutdown_completedを確認してから起動。2026-10-21 21:42 JST、bootId `cd56fab6-5612-427d-a8c6-c740c249f8db` で反映した。計算を再投入せず、ライブラリの保存済み2件から実グラフのjobを開き、コードclosed→結果openの順、結果を閉じるとグラフとダウンロードが非表示、コードを開くと実行済みコードが見えることを確認した。最後はコードclosed・結果openに戻している。[現行の実結果画面](../../../verification-reports/compute-cpu/accordion-result-live.jpg)、[実計算2件のライブラリ](../../../verification-reports/compute-cpu/computed-library-live.jpg)。
 
 最終差分点検: 今回のclient変更は広告された接続契約の検査と外部IO、表示変更は既存Collapsibleの組合せに限定。語句・題材に応じた意味判断や自動再投入は追加していない。同時に存在するagent-runtime/dialogue/task-execution等の担当外変更は保持し、追加修正していない。git diff --check成功。
+
+
+## 状態表示を1行へ整理（2026-10-21）
+
+利用者指定により、個別結果の「計算 ID」見出し・状態テキスト・生stageの3行を、既存Badgeと短縮IDの横1行へ変更。完全なIDはtitleとアクセシブル名に保持し、取消中・進捗・取消操作は残す。見出しを除いた分、アコーディオンの見出し階層をh3へ揃えた。設計と利用手順も更新した。
+
+表示部品4件、application/OpenUI結合9件成功。compute domain検証は14,498msで成功（Bun22・Web3・部品4、計29件、型・境界・SystemContext・サイズ・書式・lint・buildを含む）。runId `2026-10-21T13-16-47-818Z-3c2e4b42-41de-41e4-b47a-3c7f299954ef`。[部品](../../../verification-reports/compute-cpu/status-row-component.log)、[結合](../../../verification-reports/compute-cpu/status-row-integration.log)、[domain検証](../../../verification-reports/compute-cpu/status-row-verify.log)。
+
+既存の再起動許可に基づき反映。実画面の保存済みjob `1be826c0` で、状態行が高さ31px、バッジとIDが同じ行に収まり、生のcompletedと独立見出しがないことを確認。[実画面](../../../verification-reports/compute-cpu/status-row-live.jpg)。他のdomainの同時進行差分には追加編集せず、計算・意味判断の処理は変更していない。git diff --check成功。

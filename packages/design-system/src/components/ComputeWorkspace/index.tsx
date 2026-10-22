@@ -6,6 +6,7 @@ import {
 	CollapsibleContent,
 } from "../Collapsible";
 import { Button } from "../Button";
+import { Badge } from "../Badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../Tabs";
 import "./ComputeWorkspace.css";
 
@@ -97,8 +98,22 @@ export function ComputeWorkspace({
 					)}
 					{job && (
 						<article key={job.id}>
-							<h3>計算 {job.id.slice(0, 8)}</h3>
-							<p>{labels[job.state] ?? job.state}</p>
+							<div className="compute-workspace-status" aria-label="計算の状態">
+								<Badge
+									variant={
+										job.state === "completed"
+											? "success"
+											: job.state === "failed"
+												? "destructive"
+												: "secondary"
+									}
+								>
+									{labels[job.state] ?? job.state}
+								</Badge>
+								<span title={job.id} aria-label={`計算ID ${job.id}`}>
+									{job.id.slice(0, 8)}
+								</span>
+							</div>
 							{job.cancelRequested &&
 								["submitting", "queued", "running", "indeterminate"].includes(
 									job.state,
@@ -107,7 +122,6 @@ export function ComputeWorkspace({
 										取消を要求しました。停止を確認しています。
 									</p>
 								)}
-							<p>{job.stage}</p>
 							{job.progress && (
 								<div role="status">
 									<p>{job.progress.message}</p>
@@ -134,23 +148,23 @@ export function ComputeWorkspace({
 								</Button>
 							)}
 							<Collapsible className="compute-workspace-accordion">
-								<h4>
+								<h3>
 									<CollapsibleTrigger className="compute-workspace-trigger">
 										実行したPythonコード
 										<ChevronDown aria-hidden="true" />
 									</CollapsibleTrigger>
-								</h4>
+								</h3>
 								<CollapsibleContent className="compute-workspace-content">
 									<pre>{job.code}</pre>
 								</CollapsibleContent>
 							</Collapsible>
 							<Collapsible defaultOpen className="compute-workspace-accordion">
-								<h4>
+								<h3>
 									<CollapsibleTrigger className="compute-workspace-trigger">
 										結果
 										<ChevronDown aria-hidden="true" />
 									</CollapsibleTrigger>
-								</h4>
+								</h3>
 								<CollapsibleContent className="compute-workspace-content">
 									{job.error && (
 										<div role="alert">

@@ -44,6 +44,16 @@
 	gap: 0.75rem;
 	min-width: 0;
 }
+.compute-workspace-status {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	white-space: nowrap;
+}
+.compute-workspace-status > span {
+	font-size: 0.875rem;
+	color: var(--muted-foreground);
+}
 .compute-workspace pre {
 	max-height: 24rem;
 	overflow: auto;
@@ -58,7 +68,7 @@
 	border: 1px solid var(--border);
 	border-radius: var(--radius);
 }
-.compute-workspace-accordion h4 {
+.compute-workspace-accordion h3 {
 	margin: 0;
 }
 .compute-workspace-trigger {
