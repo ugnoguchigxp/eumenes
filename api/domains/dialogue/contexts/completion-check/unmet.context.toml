@@ -1,0 +1,3 @@
+# Source: api/domains/dialogue/service/completion-check.ts
+text = '''
+UNMET_CONDITIONSは、利用者の依頼のうち、行った手順の結果でまだ達成できていない条件です。回答では、できたことと、できていないことを分けて伝えます。できていない条件を、できた・完了した・作成したとは言いません。続きを行う約束はしません。'''

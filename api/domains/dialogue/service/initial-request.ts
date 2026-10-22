@@ -1,5 +1,6 @@
 import type { DialogueDeps, GenerateInput } from "./context";
 import { analyzeRequest } from "./request-analysis";
+import { settledAnalysis } from "./initial-decision";
 import {
 	findCandidates,
 	prepareRecallQuery,
@@ -39,7 +40,14 @@ export async function analyzeInitialRequest(
 			excluded,
 		);
 		found = { ...searched, started: found.started };
-		const selected = await analyzeRequest(deps, input, found, signal, repair);
+		const selected = await analyzeRequest(
+			deps,
+			input,
+			found,
+			signal,
+			repair,
+			settledAnalysis(first.analysis),
+		);
 		first = { ...selected, repaired: first.repaired || selected.repaired };
 	}
 	if (first.analysis.next === "answer" || first.analysis.next === "toolchain")

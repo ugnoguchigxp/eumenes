@@ -11,7 +11,10 @@ import {
 import type { SelectionAnalysis } from "../../toolchain-history";
 import type { ChatMessage } from "./context";
 import { LlmJsonError, parseLlmJson } from "../../../infrastructure/llm-json";
-import { validationIssues } from "../../../infrastructure/validation-log";
+import {
+	repairIssues,
+	validationIssues,
+} from "../../../infrastructure/validation-log";
 import { z } from "zod";
 import {
 	executionControl,
@@ -58,6 +61,11 @@ const requestAnalysis = z
 	})
 	.strict();
 export type RequestAnalysis = z.infer<typeof requestAnalysis>;
+/** The first round's analysis, which the second round (after a discovery) takes as fixed instead of writing again. */
+export function settledAnalysis(round: RequestAnalysis): RequestAnalysis {
+	const { kind, freshness, impact, approved } = round;
+	return { kind, freshness, impact, approved };
+}
 
 /** The function a toolchain's turn into the second round is chosen by: the analysis and the notice to the user. */
 const toolchainChoice = requestAnalysis.extend({
@@ -186,6 +194,7 @@ export function analysisTools(
 	allowDiscovery = false,
 	tasks?: TaskOffer,
 	approvalReference = true,
+	settled = false,
 ): NativeTool[] {
 	const offered = new Set(cards.map((c) => c.functionName));
 	const tools: NativeTool[] = [
@@ -278,6 +287,20 @@ export function analysisTools(
 			>;
 			properties.approved = { type: "boolean", const: false };
 		}
+	// After a discovery the analysis is the first round's: the functions take only their own fields.
+	if (settled)
+		for (const tool of tools) {
+			const parameters = tool.function.parameters as {
+				properties: Record<string, unknown>;
+				required?: string[];
+			};
+			for (const key of Object.keys(requestAnalysis.shape))
+				delete parameters.properties[key];
+			if (parameters.required)
+				parameters.required = parameters.required.filter(
+					(key) => !(key in requestAnalysis.shape),
+				);
+		}
 	return tools;
 }
 
@@ -315,6 +338,7 @@ export function validateAnalysis(
 	cards: readonly ToolchainCard[],
 	allowDiscovery = false,
 	tasks?: TaskOffer,
+	settled?: RequestAnalysis,
 ): FirstRound {
 	if (calls.length !== 1)
 		throw operationRejection("call_count", undefined, [], calls.length);
@@ -341,6 +365,9 @@ export function validateAnalysis(
 				: [],
 		);
 	}
+	// The first round's analysis stands: the host writes it, not the second round's output.
+	if (settled && args && typeof args === "object" && !Array.isArray(args))
+		args = { ...args, ...settled };
 	if (card?.instant) return validateInstant(call, card as InstantCard, args);
 	if (tasks?.card?.functionName === call.name) {
 		const parsed = taskChoice.safeParse(args);
@@ -403,6 +430,8 @@ export function validateAnalysis(
 			"arguments_invalid",
 			call,
 			validationIssues(parsed.error, args),
+			undefined,
+			repairIssues(parsed.error),
 		);
 	const data = parsed.data as RequestAnalysis & {
 		announcement?: string;
@@ -449,6 +478,8 @@ function validateInstant(
 			"arguments_invalid",
 			call,
 			validationIssues(analysis.error, args),
+			undefined,
+			repairIssues(analysis.error),
 		);
 	const own = card.instant.parse(
 		Object.fromEntries(

@@ -39,7 +39,7 @@ export function chatRequest(
 						: { type: "json_object" },
 				}
 			: {}),
-		...nativeToolOptions(options?.tools),
+		...nativeToolOptions(options?.tools, options?.toolChoice),
 		// Function-selection turns have a checked output contract, like JSON control turns.
 		...(options?.tools?.length ? { temperature: 0 } : {}),
 		stream,

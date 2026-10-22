@@ -6,7 +6,11 @@ import type { DialogueDeps, GenerateInput } from "./context";
 import { omitted } from "./context-fit";
 import type { HistoryTurn, PersonaSpec } from "./context-assembly";
 import { generateConversation } from "./conversation-generation";
-import { analysisTools, type FirstRound } from "./initial-decision";
+import {
+	analysisTools,
+	type FirstRound,
+	type RequestAnalysis,
+} from "./initial-decision";
 import { currentRequestMessage, markCurrentRequest } from "./request-context";
 import {
 	decisionDraft,
@@ -60,6 +64,7 @@ export function previousExchange(
 export function analysisMessages(
 	input: Pick<GenerateInput, "routing" | "messages" | "currentRequest">,
 	found?: Candidates,
+	settled?: RequestAnalysis,
 ) {
 	const analysis = input.routing!.analysis;
 	const current = currentRequestMessage(input);
@@ -115,6 +120,20 @@ export function analysisMessages(
 						},
 					]
 				: []),
+			...(settled
+				? [
+						{
+							role: "system" as const,
+							content:
+								systemContext(
+									"dialogue.contexts.request-analysis.settled",
+									{},
+								) +
+								"\nSETTLED_ANALYSIS=" +
+								JSON.stringify(settled),
+						},
+					]
+				: []),
 			// Right before the request: a reply the previous turn happened to give must not set the form of this call.
 			{
 				role: "system",
@@ -141,9 +160,11 @@ export async function analyzeRequest(
 	found: Candidates,
 	signal: AbortSignal,
 	repair: () => void,
+	/** The second round, after a discovery: the first round's analysis, which it does not write again. */
+	settled?: RequestAnalysis,
 ): Promise<{ analysis: FirstRound; receipt?: Receipt; repaired: boolean }> {
 	const started = Date.now();
-	const messages = analysisMessages(input, found);
+	const messages = analysisMessages(input, found, settled);
 	const approvalReference = input.routing!.analysis.previous.some(
 		(message) => message.role === "assistant",
 	);
@@ -171,9 +192,11 @@ export async function analyzeRequest(
 				found.allowDiscovery,
 				input.routing!.tasks,
 				approvalReference,
+				!!settled,
 			),
 			cards: found.route.cards,
 			analysis: true,
+			...(settled ? { settled } : {}),
 			approvalReference,
 			allowDiscovery: found.allowDiscovery,
 			tasks: input.routing!.tasks,

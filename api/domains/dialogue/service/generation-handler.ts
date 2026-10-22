@@ -1,6 +1,9 @@
 import {
+	beforeCurrentRequest,
 	judgeCompletion,
 	progressLine,
+	unmetMessage,
+	unverifiedMessage,
 	type CompletionDecision,
 } from "./completion-check";
 import {
@@ -297,7 +300,16 @@ export function createGenerationHandler(
 								generated = await generateConversation({
 									inference: larm,
 									requestId: input.requestId,
-									messages: prepared.messages,
+									messages:
+										completion?.status === "unmet"
+											? beforeCurrentRequest(prepared.messages, [
+													unmetMessage(completion.unmet),
+												])
+											: completion?.status === "unverified"
+												? beforeCurrentRequest(prepared.messages, [
+														unverifiedMessage(),
+													])
+												: prepared.messages,
 									requestMessage: currentRequestMessage(input),
 									signal,
 									delta,

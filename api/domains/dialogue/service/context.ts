@@ -168,6 +168,8 @@ export type CompletionCheck = {
 	conditions?: string[];
 	/** The chain's steps up to this one, with this step's results as the conversation received them. */
 	steps: import("../repository").PriorStep[];
+	/** The condition each continuation step was taken for (the first step served none): each is tried once. */
+	attempts: Array<{ step: number; condition: string }>;
 };
 
 /** Everything the dialogue service parts share: the injected ports. */

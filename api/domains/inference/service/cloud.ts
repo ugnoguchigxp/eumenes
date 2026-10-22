@@ -377,7 +377,7 @@ export async function cloudRequest(
 				...(options?.tools?.length
 					? {
 							tools: options.tools,
-							tool_choice: "auto",
+							tool_choice: options.toolChoice ?? "auto",
 							parallel_tool_calls: false,
 						}
 					: {}),

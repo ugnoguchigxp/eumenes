@@ -102,15 +102,9 @@ test("the first round offers the stock function with a free-text query and witho
 		expect(properties.query.type).toBe("string");
 		expect(properties.query.enum).toBeUndefined();
 		expect(properties.announcement).toBeUndefined();
-		expect(stock.parameters.required).toEqual(
-			expect.arrayContaining([
-				"kind",
-				"freshness",
-				"impact",
-				"approved",
-				"query",
-			]),
-		);
+		// After the discovery the analysis is the discovery's: the function takes its own arguments only.
+		expect(stock.parameters.required).toEqual(["query"]);
+		expect(properties.impact).toBeUndefined();
 		const web = offers[0]!.find((t) => t.name === "web_search")!;
 		expect(web.parameters.properties.announcement).toBeDefined();
 		expect(web.parameters.properties.query).toBeUndefined();

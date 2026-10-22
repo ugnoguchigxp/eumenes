@@ -191,7 +191,7 @@ test("a request a delegated step did not achieve continues as a hidden run that 
 	}
 });
 
-test("a request achieved by its first step ends there; the chain is bounded and its last step is not checked", async () => {
+test("a request achieved by its first step ends there; the chain is bounded and its last step says what stays unmet", async () => {
 	const single = await harness({ timers: true });
 	try {
 		await single.dialogue.submit({
@@ -206,24 +206,128 @@ test("a request achieved by its first step ends there; the chain is bounded and 
 	} finally {
 		await single.close();
 	}
+	// Every check finds only the first of five conditions met; each step is taken for the next untried one.
+	const many = ["一つ目", "二つ目", "三つ目", "四つ目", "五つ目"];
 	const bounded = await harness({
 		timers: true,
-		// Every check reports the second condition still unmet.
-		completion: () => check(1, null),
+		completion: () => ({
+			name: "check_request",
+			arguments: {
+				conditions: many.map((condition, i) => ({
+					condition,
+					step: i ? null : 1,
+				})),
+				achieved: "",
+				need: "",
+			},
+		}),
 	});
 	try {
 		await bounded.dialogue.submit({
 			requestId: crypto.randomUUID(),
 			conversationId: "main",
-			text: "タイマーを何個も作って",
+			text: "タイマーを五つ作って",
 		});
 		const saved = await settled(bounded, MAX_CONTINUATIONS + 1);
 		await Bun.sleep(300);
 		expect(saved.runs).toHaveLength(MAX_CONTINUATIONS + 1);
-		expect(saved.chain.map((c) => c.hop)).toEqual([1, 2, 3]);
-		expect(bounded.completionContexts).toHaveLength(MAX_CONTINUATIONS);
+		expect(saved.chain.map((c) => [c.hop, c.need])).toEqual([
+			[1, "二つ目"],
+			[2, "三つ目"],
+			[3, "四つ目"],
+		]);
+		// Each continuation step is checked once more when it is found short of its condition; the last step
+		// continues nothing, and its answer is told what it must not claim.
+		expect(bounded.completionContexts).toHaveLength(1 + 2 * MAX_CONTINUATIONS);
+		expect(bounded.dialogue.answerText(saved.runs.at(-1)!.id)).not.toBe(
+			progressLine(),
+		);
+		expect(bounded.parentContexts.at(-1)).toContain(
+			`UNMET_CONDITIONS=${JSON.stringify(many.slice(1))}`.replace(/"/g, '\\"'),
+		);
 	} finally {
 		await bounded.close();
+	}
+});
+
+test("a condition is tried once: a step taken for it and still found short is looked at again, never taken again", async () => {
+	const h = await harness({
+		timers: true,
+		completion: () => check(1, null),
+	});
+	try {
+		const run = await h.dialogue.submit({
+			requestId: crypto.randomUUID(),
+			conversationId: "main",
+			text: "3分のタイマーを作ってから、もう一つタイマーを作って",
+		});
+		const saved = await settled(h, 2);
+		await Bun.sleep(300);
+		expect(saved.runs.map((r) => r.status)).toEqual(["completed", "completed"]);
+		expect(saved.chain.map((c) => c.need)).toEqual([SECOND]);
+		expect(saved.timers).toHaveLength(2);
+		// The second step's check was asked once more about the condition it was taken for.
+		expect(h.completionContexts).toHaveLength(3);
+		expect(h.completionContexts[2]).toContain("RECONSIDER=");
+		expect(h.parentContexts.at(-1)).toContain("UNMET_CONDITIONS=");
+		expect(h.dialogue.answerText(run.id)).toBe(progressLine());
+	} finally {
+		await h.close();
+	}
+	// A second look that finds the condition met ends the request there.
+	const answers: Step[] = [check(1, null), check(1, null), check(1, 2)];
+	const looked = await harness({
+		timers: true,
+		completion: () => answers.shift()!,
+	});
+	try {
+		await looked.dialogue.submit({
+			requestId: crypto.randomUUID(),
+			conversationId: "main",
+			text: "3分のタイマーを作ってから、もう一つタイマーを作って",
+		});
+		await settled(looked, 2);
+		await Bun.sleep(300);
+		expect(looked.completionContexts).toHaveLength(3);
+		expect(looked.parentContexts.at(-1)).not.toContain("UNMET_CONDITIONS=");
+	} finally {
+		await looked.close();
+	}
+});
+
+test("a condition the answer itself meets makes no step: only the operation conditions are fixed and continued", async () => {
+	const h = await harness({
+		timers: true,
+		completion: () => ({
+			name: "check_request",
+			arguments: {
+				conditions: [
+					{ condition: FIRST, kind: "operation", step: 1 },
+					{
+						condition: "作った結果をまとめて伝える",
+						kind: "answer",
+						step: null,
+					},
+				],
+				achieved: "一つ目のタイマーを開始した",
+				need: "",
+			},
+		}),
+	});
+	try {
+		const run = await h.dialogue.submit({
+			requestId: crypto.randomUUID(),
+			conversationId: "main",
+			text: "3分のタイマーを作って、結果をまとめて教えて",
+		});
+		const saved = await settled(h, 1);
+		await Bun.sleep(300);
+		expect(saved.runs).toHaveLength(1);
+		expect(saved.chain).toEqual([]);
+		expect(h.completionContexts).toHaveLength(1);
+		expect(h.dialogue.answerText(run.id)).toContain("180秒");
+	} finally {
+		await h.close();
 	}
 });
 
@@ -247,6 +351,10 @@ test("a check that stays outside its contract continues nothing: a condition can
 		await Bun.sleep(300);
 		expect(checks).toBe(2);
 		expect(saved.runs).toHaveLength(1);
+		// The check is told to call its function; a check that gives no valid decision stands for no achievement:
+		// the answer is told to claim only what the results show.
+		expect(h.completionToolChoices).toEqual(["required", "required"]);
+		expect(h.parentContexts.at(-1)).toContain("照合できませんでした");
 		expect(h.dialogue.answerText(run.id)).toContain("180秒");
 	} finally {
 		await h.close();
@@ -334,4 +442,38 @@ test("a step's results travel as the conversation received them; an image as the
 		{ source: "operation.image", value: reference },
 	]);
 	db.close();
+});
+
+test("a step whose results failed satisfies nothing and is not tried again: the answer says what stays unmet", async () => {
+	const answers: Step[] = [check(1, null), check(null, null)];
+	const h = await harness({
+		timers: true,
+		// The operation the sub-agent chooses is refused by the domain, so the step's result is a failure record.
+		command: () =>
+			JSON.stringify({
+				action: "invoke",
+				tool: "timer.cancel",
+				arguments: { timerId: crypto.randomUUID(), expectedRevision: 0 },
+			}),
+		completion: () => answers.shift() ?? check(null, null),
+		parent: () => "タイマーを作れませんでした。",
+	});
+	try {
+		const run = await h.dialogue.submit({
+			requestId: crypto.randomUUID(),
+			conversationId: "main",
+			text: "3分のタイマーを作ってから、もう一つタイマーを作って",
+		});
+		const saved = await settled(h, 1);
+		await Bun.sleep(300);
+		// The first answer cited the failed step and was corrected; nothing continued.
+		expect(h.completionContexts).toHaveLength(2);
+		expect(h.completionContexts[1]).toContain("completion_step_failed");
+		expect(saved.runs.map((r) => r.status)).toEqual(["completed"]);
+		expect(saved.chain).toEqual([]);
+		expect(h.dialogue.answerText(run.id)).toBe("タイマーを作れませんでした。");
+		expect(h.parentContexts.at(-1)).toContain("UNMET_CONDITIONS=");
+	} finally {
+		await h.close();
+	}
 });

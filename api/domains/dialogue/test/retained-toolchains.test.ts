@@ -457,7 +457,7 @@ test("oversized structured arguments are omitted whole, and temporary execution 
 	expect(refs(h)).toHaveLength(1);
 });
 
-test("an approval without any preceding assistant confirmation is structurally repaired before instant execution", async () => {
+test("an approval the selection after a discovery writes is not its own: the discovery's analysis stands", async () => {
 	const h = await harness();
 	h.find("天気");
 	h.scripts.push({
@@ -466,13 +466,15 @@ test("an approval without any preceding assistant confirmation is structurally r
 	});
 	h.use("weather", "鎌倉", "今日");
 	expect((await h.ask("鎌倉の今日の天気は")).status).toBe("completed");
-	expect(h.offered).toHaveLength(3);
-	expect(h.executed).toHaveLength(1);
+	// The selection is not offered the analysis fields; an approval it writes anyway is replaced by the host's.
+	expect(h.offered).toHaveLength(2);
 	expect(
-		h.offered[2]!.messages.some((m) =>
-			m.content.startsWith("UNTRUSTED_REJECTED_OUTPUT="),
+		Object.keys(
+			h.offered[1]!.tools.find((t) => t.function.name === "weather_run")!
+				.function.parameters.properties as object,
 		),
-	).toBe(true);
+	).not.toContain("approved");
+	expect(h.executed).toHaveLength(1);
 	expect([...h.traces.values()][0]!.analysis?.approved).toBe(false);
 });
 

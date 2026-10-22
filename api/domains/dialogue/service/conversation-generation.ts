@@ -45,6 +45,8 @@ export async function generateConversation(input: {
 	sessions?: SessionOffers;
 	/** The first round: `tools` holds the candidates' functions, `answer` and `report_unavailable`. */
 	analysis?: boolean;
+	/** The second round: the first round's analysis, fixed by the host. */
+	settled?: import("./initial-decision").RequestAnalysis;
 	allowDiscovery?: boolean;
 	tasks?: import("./initial-decision").TaskOffer;
 	/** A true approval must at least have a preceding assistant exchange to stand on. Meaning is judged by the model. */
@@ -128,6 +130,7 @@ export async function generateConversation(input: {
 					input.cards ?? [],
 					input.allowDiscovery,
 					input.tasks,
+					input.settled,
 				);
 				if (analysis.approved && input.approvalReference === false)
 					throw operationRejection("approval_reference_missing");
@@ -184,6 +187,9 @@ export async function generateConversation(input: {
 				error instanceof ValidationFailure
 					? error.issues
 					: [{ reason: "unclassified" }];
+			// The model is told where its output broke the contract; the log keeps only the sanitized issues.
+			const fields =
+				error instanceof ValidationFailure ? error.repair : undefined;
 			for (const issue of issues)
 				log.warn("dialogue.operation_rejected", {
 					...issue,
@@ -252,6 +258,7 @@ export async function generateConversation(input: {
 							truncated: call.arguments.length > 4096,
 						})),
 						issues,
+						...(fields?.length ? { fields } : {}),
 					}),
 			});
 		}

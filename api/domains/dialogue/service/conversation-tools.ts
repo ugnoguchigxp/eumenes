@@ -16,8 +16,10 @@ import type {
 } from "../../../infrastructure/chat-stream";
 import type { LogFields } from "../../../infrastructure/logger";
 import {
+	repairIssues,
 	ValidationFailure,
 	validationIssues,
+	type RepairIssue,
 } from "../../../infrastructure/validation-log";
 import type { ChatMessage } from "./context";
 
@@ -216,6 +218,7 @@ export function operationRejection(
 	call?: NativeToolCall,
 	issues: LogFields[] = [],
 	count?: number,
+	repair?: RepairIssue[],
 ) {
 	return new ValidationFailure(
 		"invalid_conversation_operation",
@@ -231,6 +234,8 @@ export function operationRejection(
 			...(count === undefined ? {} : { count }),
 			...issue,
 		})),
+		undefined,
+		repair,
 	);
 }
 export function operation(
@@ -266,6 +271,8 @@ export function operation(
 				"arguments_invalid",
 				call,
 				validationIssues(parsed.error, args),
+				undefined,
+				repairIssues(parsed.error),
 			);
 		// Only a ref the host issued for this toolchain can be a target.
 		if (
@@ -299,6 +306,8 @@ export function operation(
 			"arguments_invalid",
 			call,
 			validationIssues(result.error, args),
+			undefined,
+			repairIssues(result.error),
 		);
 	const questionRef = answering
 		? (result.data as z.infer<typeof answeringRequest>).questionRef

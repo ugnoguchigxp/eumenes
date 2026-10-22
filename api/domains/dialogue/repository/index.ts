@@ -7,6 +7,7 @@ import {
 	continuationsMigration,
 } from "./continuations";
 export {
+	chainAttempts,
 	continuationOf,
 	deleteContinuationsOfInput,
 	insertContinuation,

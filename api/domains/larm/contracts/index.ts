@@ -57,6 +57,8 @@ export type LarmCallOptions = {
 	taskId?: string;
 	speechLanguage?: SpeechLanguage;
 	tools?: NativeTool[];
+	/** `required`: the provider must call one of `tools` (default: it may answer in text). */
+	toolChoice?: "required";
 	onToolCalls?: (calls: NativeToolCall[]) => void;
 	maxOutputTokens?: number;
 	/** Internal control calls only: JSON-object generation at temperature zero. */

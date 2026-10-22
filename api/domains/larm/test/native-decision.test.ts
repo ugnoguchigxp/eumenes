@@ -25,6 +25,15 @@ test("native decisions keep the compatible auto choice at temperature zero witho
 		temperature: 0,
 	});
 	expect(request).not.toHaveProperty("response_format");
+	// A call whose only valid output is a function call asks the provider for one.
+	expect(
+		chatRequest(
+			{ model: "fixture", contextWindow: { outputReserveTokens: 4096 } },
+			[{ role: "user", content: "fixture" }],
+			true,
+			{ tools, toolChoice: "required" },
+		),
+	).toMatchObject({ tools, tool_choice: "required" });
 	expect(
 		chatRequest(
 			{ model: "fixture", contextWindow: { outputReserveTokens: 4096 } },

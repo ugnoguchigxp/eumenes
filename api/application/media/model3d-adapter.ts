@@ -4,7 +4,11 @@ import { z } from "zod";
 import { CONVERSATION_DEFAULT_PRINCIPAL } from "../../domains/conversation/contracts";
 import { imageListInTransaction } from "../../domains/image";
 import type { Model3dService } from "../../domains/model3d";
-import type { AdapterResult, DomainAdapter } from "../../domains/tool-runtime";
+import {
+	handoffValues,
+	type AdapterResult,
+	type DomainAdapter,
+} from "../../domains/tool-runtime";
 
 export const MODEL3D_ADAPTER_REF = "adapter:model3d@1";
 const WORKSPACE = "query:model3d.workspace@1";
@@ -160,7 +164,12 @@ export function createModel3dAdapter(service: Model3dService): DomainAdapter {
 					throw new Error("model3d_generation_not_found");
 				if (
 					input.sourceImageRef &&
-					!shown.images.some((i) => i.imageRef === input.sourceImageRef)
+					!shown.images.some((i) => i.imageRef === input.sourceImageRef) &&
+					!handoffValues(request.origin, "operation.image").some(
+						(image) =>
+							(image as { imageRef?: unknown } | null)?.imageRef ===
+							input.sourceImageRef,
+					)
 				)
 					throw new Error("model3d_image_not_found");
 			}

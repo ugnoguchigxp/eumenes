@@ -7,9 +7,12 @@ export type NativeTool = {
 	};
 };
 export type NativeToolCall = { id: string; name: string; arguments: string };
-export function nativeToolOptions(tools?: NativeTool[]) {
+export function nativeToolOptions(
+	tools?: NativeTool[],
+	choice: "auto" | "required" = "auto",
+) {
 	return tools?.length
-		? { tools, tool_choice: "auto", parallel_tool_calls: false }
+		? { tools, tool_choice: choice, parallel_tool_calls: false }
 		: {};
 }
 export function forwardToolCalls(

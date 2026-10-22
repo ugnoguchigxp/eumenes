@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import type { LarmPort } from "../../domains/larm";
 import {
+	analysisArgs,
 	analysisReceipt,
 	DISCOVERY,
 	isAnalysisRound,
@@ -134,10 +135,16 @@ async function rig() {
 					options?.tools?.some((t) => t.function.name === DISCOVERY) &&
 					!options.tools.some((t) => t.function.name === "ui_create")
 				) {
+					// The discovery writes the analysis the selection after it takes as fixed: the script's decision.
 					options!.onToolCalls!(
 						analysisReceipt("fixture", {
 							name: DISCOVERY,
-							args: { query: messages.at(-1)!.content },
+							args: {
+								query: messages.at(-1)!.content,
+								...(typeof head === "object"
+									? { kind: "creation" as const }
+									: analysisArgs()),
+							},
 						}).toolCalls as never,
 					);
 					return "";

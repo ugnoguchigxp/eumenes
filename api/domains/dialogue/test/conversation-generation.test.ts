@@ -765,3 +765,37 @@ test("report_unavailable of the first round is the answer itself and obeys the s
 	expect((await control.run()).text).toBe("対応できません。");
 	expect(control.h.repairs()).toBe(1);
 });
+test("an analysis value outside its choices is corrected with the field and its choices; the log keeps only the sanitized issue", async () => {
+	const rejected = captureLog();
+	const bad = {
+		...delegatingArgs(),
+		impact: "action",
+		announcement: "調べます。",
+	};
+	const h = fixture(
+		[
+			{ toolCalls: [call("web_search", bad)] },
+			{
+				toolCalls: [call("web_search", { ...bad, impact: "none" })],
+			},
+		],
+		analysisTools(CARDS),
+	);
+	const result = await h.run("auxiliary", undefined, { analysis: true });
+	expect(result.analysis).toMatchObject({ next: "toolchain", impact: "none" });
+	const feedback = h.seen[1]!.find((m) =>
+		m.content.startsWith("UNTRUSTED_REJECTED_OUTPUT="),
+	)!;
+	const data = JSON.parse(
+		feedback.content.slice(feedback.content.indexOf("=") + 1),
+	);
+	expect(data.fields).toEqual([
+		{
+			path: "impact",
+			code: "invalid_value",
+			allowed: ["none", "create", "modify_existing", "irreversible"],
+		},
+	]);
+	expect(JSON.stringify(rejected())).not.toContain('"fields"');
+	expect(rejected()[0]).toMatchObject({ validationCode: "invalid_value" });
+});

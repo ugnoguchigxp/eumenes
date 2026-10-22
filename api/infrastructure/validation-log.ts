@@ -155,12 +155,37 @@ export function validationIssues(
 			: {}),
 	}));
 }
-/** Carries only sanitized diagnostics; preserves the existing runtime error code. */
+/**
+ * The issues as the model that wrote the value needs them to repair it: the exact path and what is allowed there.
+ * The names come from the schema and from the model's own output, never from the user's text. Not for logs.
+ */
+export function repairIssues(error: z.ZodError): RepairIssue[] {
+	return error.issues.slice(0, 8).map((issue) => ({
+		path: issue.path.map(String).join("."),
+		code: issue.code,
+		...(issue.code === "invalid_value" ? { allowed: issue.values } : {}),
+		...(issue.code === "unrecognized_keys" ? { keys: issue.keys } : {}),
+		...("expected" in issue && typeof issue.expected === "string"
+			? { expected: issue.expected }
+			: {}),
+		...(issue.code === "too_big" ? { maximum: issue.maximum } : {}),
+		...(issue.code === "too_small" ? { minimum: issue.minimum } : {}),
+	}));
+}
+export type RepairIssue = Record<string, unknown> & {
+	path: string;
+	code: string;
+};
+/**
+ * Carries only sanitized diagnostics for logs; preserves the existing runtime error code. `repair` is what the
+ * structural correction tells the model, and never reaches a log.
+ */
 export class ValidationFailure extends Error {
 	constructor(
 		code: string,
 		public readonly issues: LogFields[],
 		public readonly issueCount = issues.length,
+		public readonly repair?: RepairIssue[],
 	) {
 		super(code);
 	}

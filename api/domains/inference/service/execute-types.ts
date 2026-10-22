@@ -84,6 +84,7 @@ export type Source = "larm" | "cloud" | "codex";
 export type Request = {
 	voiceOverride?: SpeechOverride;
 	tools?: import("../../../infrastructure/chat-stream").NativeTool[];
+	toolChoice?: "required";
 	toolCalls?: import("../../../infrastructure/chat-stream").NativeToolCall[];
 	env: Env;
 	row: RequestRow;

@@ -61,12 +61,13 @@ test("live information is classified with the candidates, announced by the first
 		expect(h.state.routeTexts).toEqual(["今日の鎌倉の天気を教えて"]);
 		// The first round offers the candidates, answer and report_unavailable; none of them takes the request.
 		expect(h.state.analysisCalls).toHaveLength(1);
-		const first = h.state.analysisCalls[0]!.tools;
-		for (const tool of first)
+		// The discovery round writes the analysis; with no confirmation to stand on, an approval cannot be written.
+		for (const tool of h.state.discoveryCalls[0]!.tools)
 			expect(
 				(tool.function.parameters.properties as Record<string, unknown>)
 					.approved,
 			).toMatchObject({ const: false });
+		const first = h.state.analysisCalls[0]!.tools;
 		expect(first.map((t) => t.function.name)).toEqual([
 			"studio_create",
 			"other_create",
@@ -75,7 +76,13 @@ test("live information is classified with the candidates, announced by the first
 		]);
 		expect(
 			Object.keys(first[0]!.function.parameters.properties as object),
-		).toEqual(["kind", "freshness", "impact", "approved", "announcement"]);
+		).toEqual(["announcement"]);
+		// The selection after the discovery takes the analysis as fixed: it is told it, and does not write it.
+		expect(
+			h.state.analysisCalls[0]!.history.some((m) =>
+				m.content.includes("SETTLED_ANALYSIS="),
+			),
+		).toBe(true);
 		// The second round offers the chosen function only, with the request and no notice.
 		const second = h.state.mainCalls[0]!;
 		expect(second.tools.map((t) => t.function.name)).toEqual(["studio_create"]);
@@ -230,11 +237,12 @@ test("an old answer to the same question, the memory and the time never reach th
 		const again = await h.ask("今日の鎌倉の天気を教えて");
 		expect(again.status).toBe("completed");
 		const input = h.state.analysisCalls[2]!.history;
-		// The role, the exchange just before, the marker and the request: nothing else.
+		// The role, the exchange just before, the settled analysis, the marker and the request: nothing else.
 		expect(roles(h, 2)).toEqual([
 			"system",
 			"user",
 			"user",
+			"system",
 			"system",
 			"system",
 			"user",
@@ -279,6 +287,7 @@ test("a cold follow-up searches once using the current request anchor and the av
 			"system",
 			"user",
 			"user",
+			"system",
 			"system",
 			"system",
 			"user",

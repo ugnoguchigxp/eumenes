@@ -297,7 +297,12 @@ export function createRegistryActions(
 				origin: {
 					...(execution
 						? { kind: "task" as const, execution }
-						: { kind: "conversation" as const }),
+						: {
+								kind: "conversation" as const,
+								...("handoff" in source && source.handoff.length
+									? { handoff: source.handoff }
+									: {}),
+							}),
 					owner: request.owner,
 					runId: request.owner.rootRunId,
 					conversationId: source.conversationId,

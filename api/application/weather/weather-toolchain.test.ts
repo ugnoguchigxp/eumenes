@@ -111,17 +111,12 @@ test("the first round offers the weather function with the place, its prefecture
 		expect(properties.prefecture.type).toBe("string");
 		expect(properties.day.enum).toEqual(["today", "tomorrow", "day_after"]);
 		expect(properties.announcement).toBeUndefined();
+		// After the discovery the analysis is the discovery's: the function takes its own arguments only.
 		expect(weather.parameters.required).toEqual(
-			expect.arrayContaining([
-				"kind",
-				"freshness",
-				"impact",
-				"approved",
-				"place",
-				"prefecture",
-				"day",
-			]),
+			expect.arrayContaining(["place", "prefecture", "day"]),
 		);
+		expect(weather.parameters.required).not.toContain("impact");
+		expect(properties.impact).toBeUndefined();
 		// The other toolchains keep the notice.
 		const web = offers[0]!.find((t) => t.name === "web_search")!;
 		expect(web.parameters.properties.announcement).toBeDefined();

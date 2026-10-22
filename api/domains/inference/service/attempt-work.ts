@@ -51,6 +51,7 @@ export function callOptionsFor(r: Request, attemptId: string): LarmCallOptions {
 		...(r.tools?.length
 			? {
 					tools: r.tools,
+					...(r.toolChoice ? { toolChoice: r.toolChoice } : {}),
 					onToolCalls: (
 						calls: import("../../../infrastructure/chat-stream").NativeToolCall[],
 					) => {

@@ -19,7 +19,7 @@ export const finishCall = () => ({
 	id: crypto.randomUUID(),
 	name: COMPLETION,
 	arguments: JSON.stringify({
-		conditions: [{ condition: "依頼", step: 1 }],
+		conditions: [{ condition: "依頼", kind: "operation", step: 1 }],
 		achieved: "",
 		need: "",
 	}),

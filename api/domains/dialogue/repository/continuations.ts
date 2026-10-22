@@ -98,3 +98,14 @@ export function deleteContinuationsOfInput(db: Database, messageId: string) {
 		"DELETE FROM dialogue_continuations WHERE root_run_id IN (SELECT id FROM dialogue_runs WHERE input_message_id=?)",
 	).run(messageId);
 }
+
+/** The condition each continuation step of a chain was taken for, up to `hop`: step `hop + 1` served `need`. */
+export function chainAttempts(db: Database, rootRunId: string, hop: number) {
+	return (
+		db
+			.query(
+				"SELECT hop, need FROM dialogue_continuations WHERE root_run_id=? AND hop<=? ORDER BY hop",
+			)
+			.all(rootRunId, hop) as Array<{ hop: number; need: string }>
+	).map((r) => ({ step: r.hop + 1, condition: r.need }));
+}

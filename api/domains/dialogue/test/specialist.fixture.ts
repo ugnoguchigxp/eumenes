@@ -343,9 +343,17 @@ export async function setup(options: Options = {}) {
 					!offeredToolchains(tools).includes(wanted)
 				) {
 					state.discoveryCalls.push(call);
+					// The discovery round writes the analysis the second round then takes as fixed.
+					const { kind, freshness, impact, approved } = state.analyses[0] ?? {};
 					return analysisReceipt(requestId, {
 						name: DISCOVERY,
-						args: { query: history.at(-1)!.content },
+						args: {
+							query: history.at(-1)!.content,
+							...(kind ? { kind } : {}),
+							...(freshness ? { freshness } : {}),
+							...(impact ? { impact } : {}),
+							...(approved !== undefined ? { approved } : {}),
+						},
 					});
 				}
 				state.analysisCalls.push(call);

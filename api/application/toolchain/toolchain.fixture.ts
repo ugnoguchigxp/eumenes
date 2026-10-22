@@ -240,6 +240,7 @@ export async function harness(
 		workerContexts: string[] = [],
 		routeContexts: string[] = [],
 		completionContexts: string[] = [],
+		completionToolChoices: Array<string | undefined> = [],
 		commandContexts: string[] = [];
 	const spoken: string[] = [];
 	let calls = 0,
@@ -364,14 +365,18 @@ export async function harness(
 				callOptions?.tools?.some((t) => t.function.name === "check_request")
 			) {
 				completionContexts.push(JSON.stringify(messages));
-				const step = options.completion?.(callOptions.tools, messages) ?? {
-					name: "check_request",
-					arguments: {
-						conditions: [{ condition: question, step: 1 }],
-						achieved: "",
-						need: "",
+				completionToolChoices.push(callOptions.toolChoice);
+				const step = offeredKinds(
+					callOptions.tools,
+					options.completion?.(callOptions.tools, messages) ?? {
+						name: "check_request",
+						arguments: {
+							conditions: [{ condition: question, step: 1 }],
+							achieved: "",
+							need: "",
+						},
 					},
-				};
+				);
 				callOptions.onToolCalls!([
 					{
 						id: crypto.randomUUID(),
@@ -951,6 +956,7 @@ export async function harness(
 		workerContexts,
 		routeContexts,
 		completionContexts,
+		completionToolChoices,
 		commandContexts,
 		get acquisitions() {
 			return acquisitions;
@@ -974,6 +980,30 @@ export async function harness(
 			await excalidraw?.close();
 			await store.close();
 			rmSync(dir, { recursive: true, force: true });
+		},
+	};
+}
+
+/**
+ * Only the first check's schema has a condition's kind: an answer without one is an operation condition there,
+ * and a later check's answer carries none.
+ */
+function offeredKinds(
+	tools: import("../../infrastructure/chat-stream").NativeTool[],
+	step: { name: string; arguments: Record<string, unknown> },
+) {
+	const kinded = JSON.stringify(tools).includes('"kind"');
+	const conditions = step.arguments.conditions as
+		| Array<Record<string, unknown>>
+		| undefined;
+	if (!Array.isArray(conditions)) return step;
+	return {
+		...step,
+		arguments: {
+			...step.arguments,
+			conditions: conditions.map(({ kind, ...c }) =>
+				kinded ? { ...c, kind: kind ?? "operation" } : c,
+			),
 		},
 	};
 }

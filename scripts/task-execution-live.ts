@@ -28,6 +28,7 @@ if (
 		"memory",
 		"amend",
 		"image3d",
+		"timermusic",
 		"video",
 	].includes(suite) ||
 	!Number.isInteger(count) ||
@@ -179,6 +180,8 @@ try {
 			"Bun公式ドキュメントでテストを実行するコマンドをWebで確認し、その確認が終わったら「確認済み」という名前の90分タイマーを作成してください。確認結果と作成結果をまとめてください。",
 		image3d:
 			"猫のマスコットの画像を1枚作って、できた画像をもとに3Dモデルを作ってください。作った画像と3Dモデルの結果を教えてください。",
+		timermusic:
+			"1分のタイマーをセットして、それから明るい曲を1曲作ってください。",
 		video:
 			"Webでおすすめの動画をYouTubeから一つ探して、ブラウザーの別タブで開いて再生してください。再生できたら動画のタイトルとURLを教えてください。",
 	};
@@ -377,6 +380,19 @@ try {
 			}
 		}
 		if (suite === "image3d") {
+			// A 3D generation finishes minutes after its run answered: wait for it to end, not for a state in between.
+			const until = Date.now() + 600000;
+			for (;;) {
+				const read = new Database(config.dbPath, { readonly: true });
+				const pending = read
+					.query(
+						"SELECT COUNT(*) AS n FROM model3d_generations WHERE conversation_id=? AND deleted=0 AND state IN ('submitting','queued','running')",
+					)
+					.get(conv) as { n: number };
+				read.close();
+				if (!pending.n || Date.now() > until) break;
+				await Bun.sleep(5000);
+			}
 			const db = new Database(config.dbPath, { readonly: true });
 			try {
 				media = {
@@ -395,76 +411,104 @@ try {
 				db.close();
 			}
 		}
-		const pass =
-			suite === "simple"
-				? run.status === "completed" &&
-					works.length === 0 &&
-					answers.some((x) =>
-						/^(?:答え(?:は|：|:)\s*)?(?:42|四十二)(?:です|になります)?[。.!！]?$/u.test(
-							x.trim(),
-						),
+		// A song finishes after its run answered: wait for it to end, then read this conversation's songs.
+		let songs: Array<{ state: string }> = [];
+		if (suite === "timermusic") {
+			const until = Date.now() + 600000;
+			for (;;) {
+				const read = new Database(config.dbPath, { readonly: true });
+				songs = read
+					.query(
+						"SELECT json_extract(record_json,'$.state') AS state FROM music_generations WHERE conversation_id=?",
 					)
-				: suite === "search"
+					.all(conv) as Array<{ state: string }>;
+				read.close();
+				if (
+					!songs.some(
+						(m) => m.state === "planning" || m.state === "generating",
+					) ||
+					Date.now() > until
+				)
+					break;
+				await Bun.sleep(5000);
+			}
+		}
+		const pass =
+			suite === "timermusic"
+				? completed &&
+					timers.items.length === 1 &&
+					timers.items[0]!.durationSeconds === 60 &&
+					songs.length === 1 &&
+					songs[0]!.state === "completed"
+				: suite === "simple"
 					? run.status === "completed" &&
 						works.length === 0 &&
-						!!run.agentTaskId &&
-						answers.some((x) => x.includes("bun test"))
-					: suite === "multi"
-						? completed &&
-							active.length === 1 &&
-							active.some(
-								(t) => t.label === "確認済み" && t.durationSeconds === 5400,
-							) &&
-							chain.length >= 2 &&
+						answers.some((x) =>
+							/^(?:答え(?:は|：|:)\s*)?(?:42|四十二)(?:です|になります)?[。.!！]?$/u.test(
+								x.trim(),
+							),
+						)
+					: suite === "search"
+						? run.status === "completed" &&
+							works.length === 0 &&
+							!!run.agentTaskId &&
 							answers.some((x) => x.includes("bun test"))
-						: suite === "image3d"
+						: suite === "multi"
 							? completed &&
-								media.images.length > 0 &&
-								media.models.some((m) => {
-									const source = JSON.parse(m.source) as {
-										type: string;
-										id?: string;
-									};
-									return (
-										m.state === "completed" &&
-										source.type === "image-artifact" &&
-										media.images.some(
-											(image) =>
-												image.id === source.id ||
-												image.record.includes(source.id!),
-										)
-									);
-								})
-							: suite === "video"
+								active.length === 1 &&
+								active.some(
+									(t) => t.label === "確認済み" && t.durationSeconds === 5400,
+								) &&
+								chain.length >= 2 &&
+								answers.some((x) => x.includes("bun test"))
+							: suite === "image3d"
 								? completed &&
-									browser.tasks.some((t) => t.state === "completed") &&
-									browser.operations.some(
-										(o) =>
-											o.state === "observed" &&
-											/^https:\/\/(www\.|m\.)?youtube\.com\/watch\?/.test(
-												o.url ?? "",
-											),
-									)
-								: suite === "ambiguity"
-									? ambiguitySafe &&
-										completed &&
-										active.length === 1 &&
-										a?.durationSeconds === 5400 &&
-										timers.items.some(
-											(t) => t.label === "受入B" && t.state === "cancelled",
-										) &&
-										!b
-									: suite === "amend"
-										? works.some(
-												(w) => w.revision > 0 && w.status === "completed",
+									media.images.length > 0 &&
+									media.models.some((m) => {
+										const source = JSON.parse(m.source) as {
+											type: string;
+											id?: string;
+										};
+										return (
+											m.state === "completed" &&
+											source.type === "image-artifact" &&
+											media.images.some(
+												(image) =>
+													image.id === source.id ||
+													image.record.includes(source.id!),
+											)
+										);
+									})
+								: suite === "video"
+									? completed &&
+										browser.tasks.some((t) => t.state === "completed") &&
+										browser.operations.some(
+											(o) =>
+												o.state === "observed" &&
+												/^https:\/\/(www\.|m\.)?youtube\.com\/watch\?/.test(
+													o.url ?? "",
+												),
+										)
+									: suite === "ambiguity"
+										? ambiguitySafe &&
+											completed &&
+											active.length === 1 &&
+											a?.durationSeconds === 5400 &&
+											timers.items.some(
+												(t) => t.label === "受入B" && t.state === "cancelled",
 											) &&
-											active.length === 2 &&
-											a?.durationSeconds === 5400 &&
-											b?.durationSeconds === 7200
-										: completed &&
-											active.length === 2 &&
-											a?.durationSeconds === 5400 &&
-											b?.durationSeconds === 6000;
+											!b
+										: suite === "amend"
+											? works.some(
+													(w) => w.revision > 0 && w.status === "completed",
+												) &&
+												active.length === 2 &&
+												a?.durationSeconds === 5400 &&
+												b?.durationSeconds === 7200
+											: completed &&
+												active.length === 2 &&
+												a?.durationSeconds === 5400 &&
+												b?.durationSeconds === 6000;
 		if (!pass) process.exitCode = 1;
 		record({
 			stage: "case",
@@ -482,6 +526,7 @@ try {
 			})),
 			timers,
 			...(suite === "image3d" ? { media } : {}),
+			...(suite === "timermusic" ? { songs } : {}),
 			...(suite === "video" ? { browser } : {}),
 			answers,
 			usage: usage.map((u) => ({

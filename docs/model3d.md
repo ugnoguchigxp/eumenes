@@ -38,7 +38,7 @@ Googleフォトは基本プロフィールと別の追加同意が必要。Googl
 
 ## 会話
 
-toolchain `model3d.studio@1`（関数 `model3d_studio`、表示名「インスタント3Dモデル」）。command 担当が `open`・`generate`・`find`・`show`・`update`・`delete`・`cancel` から一つを選ぶ。対象は snapshot にあるホストの ref（`assetRef`・`generationRef`・`imageRef`）だけを受け付ける。生成の成功と、編集・印刷に向く品質は区別し、警告を伝える。編集には Blender 4.0 以降か WebP テクスチャ対応のビューアを使う。
+toolchain `model3d.studio@2`（関数 `model3d_studio`、表示名「インスタント3Dモデル」）。command 担当が `open`・`generate`・`find`・`show`・`update`・`delete`・`cancel` から一つを選ぶ。対象は snapshot にあるホストの ref（`assetRef`・`generationRef`・`imageRef`）だけを受け付ける。生成の成功と、編集・印刷に向く品質は区別し、警告を伝える。編集には Blender 4.0 以降か WebP テクスチャ対応のビューアを使う。
 
 ## 確認
 

@@ -89,6 +89,8 @@ export interface BackgroundControl {
  */
 export type CallSession = {
 	sessionRole?: "main" | "subagent" | "auxiliary";
+	/** A call whose only valid output is a call of one of its tools: the provider is told to call one. */
+	toolChoice?: "required";
 	taskId?: string;
 	/**
 	 * `main` only. Where the call's messages split, by position: the first `instructionCount` messages are the

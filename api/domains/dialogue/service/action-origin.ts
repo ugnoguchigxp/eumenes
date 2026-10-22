@@ -23,5 +23,10 @@ export function readActionOriginInTransaction(db: Database, runId: string) {
 		messageId: root.inputMessageId,
 		runId: run.id,
 		taskId: run.agentTaskId,
+		// The host's record of the request's earlier steps: what an operation of this run may refer to.
+		handoff:
+			run.sourceKind === "continuation"
+				? (continuationOf(db, run.id)?.steps ?? [])
+				: [],
 	};
 }

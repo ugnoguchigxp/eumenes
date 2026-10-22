@@ -378,6 +378,9 @@ export async function executeRequest(
 		onDelta,
 		preparation,
 		tools,
+		...(session?.toolChoice && tools?.length
+			? { toolChoice: session.toolChoice }
+			: {}),
 		control,
 		session: resolvedSession,
 		reason: null,

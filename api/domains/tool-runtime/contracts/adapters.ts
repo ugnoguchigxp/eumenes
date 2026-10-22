@@ -9,6 +9,27 @@ import type { Owner } from "../../capabilities/contracts";
  * uses an existing adapter never edits a dispatcher.
  */
 
+/** One earlier step of a continued request and its results (`source` and the data), host-recorded. */
+export type AdapterHandoff = Array<{
+	step: number;
+	results: Array<{ source: string; value: unknown }>;
+}>;
+
+/**
+ * The values of one result kind the host handed to this operation: a reference among them was recorded by the host,
+ * never written by a model, so an adapter may accept it besides what its own snapshot shows.
+ */
+export function handoffValues(
+	origin: AdapterOrigin,
+	source: string,
+): unknown[] {
+	return origin.kind === "conversation"
+		? (origin.handoff ?? []).flatMap((step) =>
+				step.results.filter((r) => r.source === source).map((r) => r.value),
+			)
+		: [];
+}
+
 /** Where an operation comes from. The adapter never trusts an owner the client declares. */
 export type AdapterOrigin =
 	| {
@@ -25,6 +46,8 @@ export type AdapterOrigin =
 			runId: string;
 			conversationId: string;
 			messageId: string;
+			/** The earlier steps' results of the request this run continues, as the host stored them. */
+			handoff?: AdapterHandoff;
 	  }
 	| { kind: "ui"; scope: string; actionRequestId: string }
 	/**
