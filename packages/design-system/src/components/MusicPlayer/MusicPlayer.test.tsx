@@ -101,6 +101,36 @@ describe("MusicPlayer", () => {
 		);
 		expect(container.querySelector("audio")?.currentTime).toBe(0);
 	});
+	it("advances on end and keeps playing the next track", async () => {
+		const ended = vi.fn();
+		const { audio, container, rerender } = setup({ onEnded: ended });
+		fireEvent.click(screen.getByRole("button", { name: "再生" }));
+		await screen.findByRole("button", { name: "一時停止" });
+		Object.defineProperty(audio, "ended", { configurable: true, value: true });
+		audio.pause();
+		fireEvent.ended(audio);
+		expect(ended).toHaveBeenCalledOnce();
+		rerender(
+			<MusicPlayer
+				track={{ ...track, id: "two", src: "blob:two" }}
+				onEnded={ended}
+			/>,
+		);
+		await waitFor(() =>
+			expect(container.querySelector("audio")?.paused).toBe(false),
+		);
+	});
+	it("repeats the current track across track changes", () => {
+		const { audio, container, rerender } = setup();
+		expect(audio.loop).toBe(false);
+		const toggle = screen.getByRole("button", { name: "1曲リピート" });
+		expect(toggle).toHaveAttribute("aria-pressed", "false");
+		fireEvent.click(toggle);
+		expect(toggle).toHaveAttribute("aria-pressed", "true");
+		expect(audio.loop).toBe(true);
+		rerender(<MusicPlayer track={{ ...track, id: "two", src: "blob:two" }} />);
+		expect(container.querySelector("audio")?.loop).toBe(true);
+	});
 	it("reports a rejected play without pretending playback started", async () => {
 		vi.mocked(HTMLMediaElement.prototype.play).mockRejectedValue(
 			new Error("blocked"),

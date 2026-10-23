@@ -7,7 +7,7 @@ import {
 	CONVERSATION_HOST_RULES,
 	type ContextAssembly,
 } from "../service/context-assembly";
-import { renderContext } from "../service/context-render";
+import { contextPartSizes, renderContext } from "../service/context-render";
 import { SCENARIOS, runScenario, TURN_TEXTS } from "./context-golden.fixture";
 
 const INPUT = "今日のニュースは？";
@@ -136,6 +136,12 @@ test("the session split, the position of the input and the cache marks come from
 		input: { role: "user", content: "今回" },
 	};
 	const rendered = renderContext(assembly, "current");
+	const sizes = contextPartSizes(assembly);
+	expect(Object.keys(sizes)).toEqual(["S", "P", "H", "W", "V", "R"]);
+	expect(
+		Object.values(sizes).every((n) => Number.isSafeInteger(n) && n > 0),
+	).toBe(true);
+	expect(JSON.stringify(sizes)).not.toContain("保持の質問");
 	const contents = rendered.messages.map((m) => m.content);
 	expect(contents.slice(1, 3).map((text) => JSON.parse(text))).toEqual([
 		{

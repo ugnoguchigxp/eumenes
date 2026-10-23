@@ -48,6 +48,7 @@ export const agentLinkMigration = `ALTER TABLE dialogue_runs ADD COLUMN agent_ta
 export const worldStateMigration = `ALTER TABLE dialogue_runs ADD COLUMN world_state TEXT CHECK (world_state IN ('used','blocked'));`;
 /** Nothing writes `world_state` any more (the conversation gets no World slice), so the column goes. */
 const worldStateDropMigration = `ALTER TABLE dialogue_runs DROP COLUMN world_state;`;
+export const pinnedToolchainMigration = `ALTER TABLE dialogue_runs ADD COLUMN pinned_toolchain_id TEXT;`;
 export const announcementMigration = `ALTER TABLE dialogue_runs ADD COLUMN announcement TEXT;`;
 type Announcement = { key: string; text: string };
 function announcements(value: unknown): Announcement[] {
@@ -128,6 +129,8 @@ function map(row: Record<string, unknown>): Run {
 		deadlineFixed:
 			row.deadline_fixed === undefined ? true : !!row.deadline_fixed,
 		sourceKind: row.source_kind as Run["sourceKind"],
+		pinnedToolchainId:
+			(row.pinned_toolchain_id as string | null | undefined) ?? null,
 		scheduleId: row.schedule_id as string | null,
 		occurrenceId: row.occurrence_id as string | null,
 		specialistSessionId:
@@ -328,7 +331,24 @@ export const migrations: readonly Migration[] = [
 		after: ["dialogue/0014-continuation-conditions"],
 		sql: continuationStepsMigration,
 	},
+	{
+		id: "dialogue/0016-pinned-toolchain",
+		after: ["dialogue/0015-continuation-steps"],
+		sql: pinnedToolchainMigration,
+	},
 ];
+
+/** A screen's form submit names its toolchain; only such a run writes the column. */
+export function savePinnedToolchain(
+	db: Database,
+	id: string,
+	toolchainId: string,
+) {
+	db.query("UPDATE dialogue_runs SET pinned_toolchain_id=? WHERE id=?").run(
+		toolchainId,
+		id,
+	);
+}
 
 /** Explicit caller deadlines stay fixed; old installations without the column keep their current policy. */
 export function saveDeadlinePolicy(db: Database, id: string, fixed: boolean) {

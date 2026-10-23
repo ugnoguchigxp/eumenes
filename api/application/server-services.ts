@@ -41,6 +41,7 @@ import { createPipelineTrials } from "./pipelines/pipelines-trials";
 import { createHostToolchain } from "./toolchain/toolchain-host";
 import { createAgencyHost } from "./agency/host";
 import { createAgencyLlmPort } from "./agency/llm-port";
+import { createAgencyWork } from "./agency/work";
 
 const log = getLogger("server");
 
@@ -272,7 +273,12 @@ export async function buildServices(
 				excalidraw: media.drawingOperations,
 			}),
 			legacy: taskLegacyPorts(dialogue),
+			// Result reports wait for the agency while it watches the conversation (one report, its moment).
+			holdResultInTransaction: (db, conversationId) =>
+				agency.holdsReportsInTransaction(db, conversationId),
 		});
+	if (enabled && toolchains)
+		agency.attachWork(createAgencyWork({ agents: toolchain.agents, dialogue }));
 	stewardAssembly.attachDialogue(dialogue);
 	memory.registerForgetPurge(
 		toolchain.agents.executions.purgeSourcesInTransaction,

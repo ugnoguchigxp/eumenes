@@ -170,4 +170,11 @@ CREATE UNIQUE INDEX agent_execution_call_once ON agent_tasks(execution_call_id) 
 CREATE TABLE agent_execution_model_reservations(id TEXT PRIMARY KEY,task_id TEXT NOT NULL,allocation INTEGER NOT NULL);`,
 		after: ["agent-runtime/0007-task-executions"],
 	},
+	{
+		// Result notices held for the agency layer (spec agency-work-reports-design-2026-10-24).
+		id: "agent-runtime/0009-execution-reports",
+		sql: `CREATE TABLE agent_execution_reports(event_id TEXT PRIMARY KEY,execution_id TEXT NOT NULL,conversation_id TEXT NOT NULL,state TEXT NOT NULL,held_at INTEGER NOT NULL,released_at INTEGER);
+CREATE INDEX agent_execution_reports_conversation ON agent_execution_reports(conversation_id,state);`,
+		after: ["agent-runtime/0008-execution-children"],
+	},
 ];

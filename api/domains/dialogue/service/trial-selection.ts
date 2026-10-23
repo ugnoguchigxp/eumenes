@@ -1,6 +1,11 @@
 import { systemContext } from "../../../infrastructure/system-context";
+import { withLogContext } from "../../../infrastructure/logger";
 import type { ToolchainCard } from "../../capabilities";
 import type { InferencePort } from "../../inference";
+import {
+	operationOutputContract,
+	operationOutputReceipt,
+} from "../../inference";
 import { analysisTools, validateAnalysis } from "./initial-decision";
 
 /**
@@ -15,6 +20,8 @@ export async function trialFirstRound(
 		text: string;
 		cards: readonly ToolchainCard[];
 		signal: AbortSignal;
+		/** Explicit comparison candidate; native output is the production default. */
+		operationOutput?: "json-schema";
 	},
 ): Promise<{
 	chosen: string | null;
@@ -24,24 +31,45 @@ export async function trialFirstRound(
 }> {
 	if (!larm.executeStream) throw new Error("inference_unavailable");
 	const tools = analysisTools(input.cards);
-	const receipt = await larm.executeStream(
-		input.requestId,
-		[
+	const contract =
+		input.operationOutput === "json-schema"
+			? operationOutputContract(tools)
+			: undefined;
+	let receipt = await withLogContext({ phase: "trial_decision" }, () =>
+		larm.executeStream!(
+			input.requestId,
+			[
+				{
+					role: "system",
+					content: systemContext(
+						"dialogue.contexts.request-analysis.instruction",
+						{},
+					),
+				},
+				{ role: "user", content: input.text },
+			],
+			input.signal,
+			() => {},
+			undefined,
+			tools,
 			{
-				role: "system",
-				content: systemContext(
-					"dialogue.contexts.request-analysis.instruction",
-					{},
-				),
+				sessionRole: "auxiliary",
+				...(!contract ? { toolChoice: "required" as const } : {}),
 			},
-			{ role: "user", content: input.text },
-		],
-		input.signal,
-		() => {},
-		undefined,
-		tools,
-		{ sessionRole: "auxiliary", toolChoice: "required", outputLimit: 1024 },
+			contract,
+		),
 	);
+	input.signal.throwIfAborted();
+	try {
+		if (contract) receipt = operationOutputReceipt(receipt, tools);
+	} catch {
+		return {
+			chosen: null,
+			next: null,
+			inputs: null,
+			code: "operation_output_invalid",
+		};
+	}
 	const calls = receipt.toolCalls ?? [];
 	const chosen = calls[0]?.name ?? null;
 	try {

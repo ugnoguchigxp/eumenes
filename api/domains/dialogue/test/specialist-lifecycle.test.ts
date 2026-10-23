@@ -169,6 +169,34 @@ test("recovery ends every session that was not ended as restarted", async () => 
 	expect(h.state.released).toHaveLength(1);
 });
 
+test("a pinned form submit is the main conversation's: an active session does not take it", async () => {
+	const h = await harness();
+	await startDirty(h);
+	const session = (await h.session())!;
+	const run = await h.dialogue.submit({
+		requestId: crypto.randomUUID(),
+		conversationId: "main",
+		text: "猫を描いて",
+		presentation: "artifact",
+		toolchainId: "image.create",
+	});
+	expect(run.specialistSessionId).toBeNull();
+	expect(run.pinnedToolchainId).toBe("image.create");
+	const job = h.rows(
+		"SELECT kind, payload_json FROM queue_jobs WHERE id = ?",
+		run.jobId!,
+	)[0];
+	expect(job.kind).not.toBe("dialogue.specialist-turn");
+	expect(JSON.parse(job.payload_json)).toEqual({ runId: run.id });
+	await h.finished(run.id);
+	// The session is untouched: no turn was begun for the pinned submit.
+	expect(await h.session()).toMatchObject({
+		id: session.id,
+		state: "active",
+		activeRunId: null,
+	});
+});
+
 test("commands: revision guard, idempotent by requestId, return suspends or ends, resume advances the epoch", async () => {
 	const h = await harness();
 	await startDirty(h);

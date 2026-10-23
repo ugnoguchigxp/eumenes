@@ -1,3 +1,3 @@
 # Source: api/domains/dialogue/service/conversation-generation.ts
 text = '''
-この応答には操作用のfunctionがありません。提示済みの結果と現在の依頼に基づいて自然な回答本文だけを返します。元の依頼を再実行しません。'''
+操作用のfunctionが提示されていない応答での修正時だけ、提示済みの結果と現在の依頼に基づいて自然な回答本文だけを返します。元の依頼を再実行しません。'''

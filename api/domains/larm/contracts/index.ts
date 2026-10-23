@@ -65,6 +65,8 @@ export type LarmCallOptions = {
 	jsonOutput?: boolean;
 	/** Optional schema constraint for internal JSON control calls; host validation remains required. */
 	jsonSchema?: Record<string, unknown>;
+	/** Logical offered functions are represented by the output schema rather than the native tools field. */
+	toolOutputFormat?: "json-schema";
 	/** Optional effort for SDK-backed control tasks; ignored by providers without this option. */
 	reasoningEffort?: "low";
 	contextPolicy?: "exact";

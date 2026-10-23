@@ -64,6 +64,8 @@ export function useMusicCreation(
 			requestId: request.requestId,
 			conversationId,
 			text: `次の制作プロンプトで音楽または効果音を1件作成してください。\n\n${prompt}`,
+			presentation: "artifact",
+			toolchainId: "music.create",
 		});
 		pending.current = undefined;
 		cache.setQueryData(

@@ -118,6 +118,66 @@ test("Codex and Claude agent connections receive the schema in the call", async 
 	expect(seen.map((c) => c.outputSchema)).toEqual([schema, schema]);
 });
 
+test("schema-constrained operation choices suppress native tools on every cloud route", async () => {
+	const tools = [
+		{
+			type: "function" as const,
+			function: { name: "choose", description: "choose", parameters: schema },
+		},
+	];
+	const operationOptions = {
+		...options,
+		tools,
+		toolOutputFormat: "json-schema" as const,
+	};
+	const seen: CloudAgentCall[] = [];
+	let body: Record<string, unknown> = {};
+	const operationRow = { ...row, mode: "answer" as const };
+	await cloudRequest(
+		env({
+			fetch: async (_url, init) => {
+				body = JSON.parse(String(init?.body));
+				return Response.json({
+					choices: [{ message: { content: '{"done":true}' } }],
+				});
+			},
+		}),
+		operationRow,
+		messages,
+		connection(),
+		resource,
+		AbortSignal.timeout(1000),
+		"operation",
+		undefined,
+		operationOptions,
+	);
+	expect(body.response_format).toMatchObject({ type: "json_schema" });
+	expect(body).not.toHaveProperty("tools");
+	expect(body).not.toHaveProperty("tool_choice");
+	for (const kind of ["codex-sdk", "claude-agent-sdk"] as const) {
+		await cloudRequest(
+			env({
+				agents: {
+					async run(call) {
+						seen.push(call);
+						return { text: '{"done":true}' };
+					},
+				},
+			}),
+			operationRow,
+			messages,
+			connection(kind),
+			resource,
+			AbortSignal.timeout(1000),
+			"operation",
+			undefined,
+			operationOptions,
+		);
+	}
+	expect(seen.map((c) => c.outputSchema)).toEqual([schema, schema]);
+	expect(seen.every((c) => c.tools === undefined)).toBe(true);
+});
+
 test("Claude Agent SDK gets outputFormat and its structured output becomes the text", async () => {
 	const seen: { options?: Record<string, unknown> } = {};
 	const claudeQuery = ((input: { options: Record<string, unknown> }) => {

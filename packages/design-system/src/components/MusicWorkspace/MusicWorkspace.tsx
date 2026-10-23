@@ -88,6 +88,8 @@ export function MusicWorkspace({
 	const currentPage = Math.min(page, pages - 1);
 	const shown = tracks.slice(currentPage * 8, (currentPage + 1) * 8);
 	const neighbor = (offset: number) => available[index + offset];
+	const next =
+		index >= 0 && neighbor(1) ? () => onSelect(neighbor(1)!.id) : undefined;
 	const image = current?.artworkUrl;
 	// Show progress from the click until the host reports the generation (or rejects it).
 	const [artworkRequest, setArtworkRequest] = useState<string>();
@@ -314,11 +316,8 @@ export function MusicWorkspace({
 				loading={!!current && !current.disabled && !track}
 				onPlaybackChange={setPlayback}
 				onPrevious={index > 0 ? () => onSelect(neighbor(-1)!.id) : undefined}
-				onNext={
-					index >= 0 && neighbor(1)
-						? () => onSelect(neighbor(1)!.id)
-						: undefined
-				}
+				onNext={next}
+				onEnded={next}
 			/>
 			<Modal
 				open={!!detail}

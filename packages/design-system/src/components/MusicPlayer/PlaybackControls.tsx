@@ -1,6 +1,7 @@
 import {
 	Pause,
 	Play,
+	Repeat1,
 	RotateCcw,
 	RotateCw,
 	SkipBack,
@@ -16,6 +17,8 @@ export function PlaybackControls({
 	onSeekForward,
 	onPrevious,
 	onNext,
+	repeat,
+	onRepeatChange,
 }: {
 	playing: boolean;
 	seekable: boolean;
@@ -24,6 +27,8 @@ export function PlaybackControls({
 	onSeekForward: () => void;
 	onPrevious?: () => void;
 	onNext?: () => void;
+	repeat: boolean;
+	onRepeatChange: (repeat: boolean) => void;
 }) {
 	return (
 		<fieldset className="music-player-controls" aria-label="再生操作">
@@ -81,6 +86,17 @@ export function PlaybackControls({
 				onClick={onNext}
 			>
 				<SkipForward aria-hidden="true" />
+			</Button>
+			<Button
+				type="button"
+				variant="ghost"
+				size="icon"
+				className="music-player-repeat"
+				aria-label="1曲リピート"
+				aria-pressed={repeat}
+				onClick={() => onRepeatChange(!repeat)}
+			>
+				<Repeat1 aria-hidden="true" />
 			</Button>
 		</fieldset>
 	);

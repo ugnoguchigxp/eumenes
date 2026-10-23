@@ -52,6 +52,7 @@ function setup(onClose?: () => void) {
 				conversationId: string;
 				text: string;
 				presentation?: "conversation" | "artifact";
+				toolchainId?: string;
 			}) => ({ id: "new-run", status: "queued", revision: 1 }),
 		),
 		run: vi.fn(async () => ({ id: "new-run", status: "queued", revision: 1 })),
@@ -121,6 +122,7 @@ test("host passes precise edited input through authenticated submission, rejects
 	});
 	const input = r.api.submit.mock.calls[0]![0];
 	expect(input.presentation).toBe("artifact");
+	expect(input.toolchainId).toBe("image.create");
 	expect(JSON.parse(input.text.slice(input.text.indexOf("\n\n") + 2))).toEqual({
 		prompt: values.prompt,
 		width: 121,

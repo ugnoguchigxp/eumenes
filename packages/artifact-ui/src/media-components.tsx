@@ -67,6 +67,7 @@ export function MusicView({ request }: { request: ArtifactRequest }) {
 				track={{ ...track, src: track.url }}
 				onPrevious={select(tracks[index - 1])}
 				onNext={select(tracks[index + 1])}
+				onEnded={select(tracks[index + 1])}
 			/>
 			<a href={track.url} download={track.downloadName ?? "music"}>
 				楽曲を保存

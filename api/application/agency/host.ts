@@ -3,6 +3,7 @@ import {
 	createAgencyRuntime,
 	createIdlePlanner,
 	createIdleScheduler,
+	reportedTodoIds,
 	ttsUtteranceStyle,
 	type ActionTicket,
 	type AgencyRuntime,
@@ -30,6 +31,7 @@ import { getLogger } from "../../infrastructure/logger";
 import type { SqliteStore } from "../../infrastructure/sqlite";
 import { type AgencyCallIdentity, AgencyRouteRefusedError } from "./llm-port";
 import { selectMemoryTopics } from "./topics";
+import type { AgencyWork } from "./work";
 
 export type AgencySettings = Settings["agency"];
 
@@ -44,6 +46,11 @@ const TOPICS_TTL_MS = 30_000;
 /** Outbox events read per pass. */
 const FEED_PAGE = 200;
 const LOG_REASON_CHARS = 120;
+/**
+ * A result report is held for the agency at most this long; then it is sent as before (a stuck or always-waiting
+ * agency must not swallow a report). Spec agency-work-reports-design-2026-10-24.
+ */
+export const REPORT_HOLD_MAX_MS = 30 * 60_000;
 
 export type AgencyHostDeps = {
 	store: Pick<SqliteStore, "read" | "write" | "onCommit">;
@@ -96,6 +103,12 @@ type Conv = {
 	calls: number;
 	/** Last time the conversation had an event or a cycle (for forgetting idle conversations). */
 	touched: number;
+	/** Held report events already offered to the agency (a new one opens a result_received opportunity). */
+	seenHeld: Set<string>;
+	/** Re-check of held reports after the agency waited (cleared by any new cycle). */
+	heldTimer: unknown;
+	/** A report was held while a cycle was in flight: offer it as soon as that cycle ends. */
+	heldPending: boolean;
 };
 
 const sanitize = (id: string) =>
@@ -139,6 +152,10 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 		topics: ReturnType<typeof selectMemoryTopics>;
 	} | null = null;
 	const stoppers: Array<() => void> = [];
+	/** Task executions and their held result reports; attached after the toolchain is configured. */
+	let work: AgencyWork | null = null;
+	let releasing = false;
+	let reportExpiryTimer: unknown = null;
 
 	const on = () => started && !closed && cfg.enabled;
 
@@ -175,6 +192,19 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 		}
 	}
 
+	function todosNow(c: Conv) {
+		if (!work) return [];
+		try {
+			return store.read((db) => work!.todosInTransaction(db, c.id));
+		} catch (error) {
+			log.warn("agency.todos_failed", {
+				subjectId: c.id,
+				reason: toErrorCode(error, "failed"),
+			});
+			return [];
+		}
+	}
+
 	function stopConversation(c: Conv, reason: string) {
 		if (c.stopped) return;
 		c.stopped = reason;
@@ -183,6 +213,7 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 		c.background = null;
 		c.runtime.invalidate("stopped", nowMs());
 		log.warn("agency.stopped", { subjectId: c.id, reason });
+		safeWatchHeld();
 	}
 
 	function wrapLlm(c: Conv, scope: string): LlmPort {
@@ -239,6 +270,7 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 			condition: "B1",
 			selectWhenEmpty: true,
 			hostTopics: true,
+			hostTodos: true,
 			utteranceStyle: ttsUtteranceStyle,
 			...(interests.length > 0 ? { standingInterests: interests } : {}),
 			tools: [],
@@ -287,6 +319,9 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 			opportunities: 0,
 			calls: 0,
 			touched: nowMs(),
+			seenHeld: new Set<string>(),
+			heldTimer: null,
+			heldPending: false,
 		} as unknown as Conv;
 		c.runtime = newRuntime(c);
 		c.scheduler = newScheduler(c);
@@ -303,6 +338,11 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 			durationMs: status.nextIntervalSec * 1000,
 		};
 	};
+
+	function clearHeldTimer(c: Conv) {
+		if (c.heldTimer !== null) clearTimer(c.heldTimer);
+		c.heldTimer = null;
+	}
 
 	function abortBackground(c: Conv) {
 		c.background?.abort();
@@ -335,6 +375,7 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 
 	/** Ends a conversation's runtime for good: in-flight work is stale and no timer is left. */
 	function dropConv(c: Conv, reason: string) {
+		clearHeldTimer(c);
 		c.generation++;
 		abortBackground(c);
 		c.runtime.invalidate(reason, nowMs());
@@ -345,6 +386,8 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 
 	/** Starts a conversation over in place: new runtime, planner and scheduler, nothing stopped or delivered. */
 	function resetConv(c: Conv, reason: string) {
+		clearHeldTimer(c);
+		c.seenHeld.clear();
 		c.generation++;
 		abortBackground(c);
 		c.runtime.invalidate(reason, nowMs());
@@ -516,6 +559,69 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 		return true;
 	}
 
+	/**
+	 * Releases the held result reports the agency chose to report now (the conversation answers them as before).
+	 * Same fences as an utterance. Returns true when a notice was sent.
+	 */
+	async function releaseReports(
+		cy: Cycle,
+		ticket: ActionTicket,
+		executionIds: readonly string[],
+	): Promise<boolean> {
+		const { c, trigger } = cy;
+		let sent = 0;
+		let stale = false;
+		try {
+			await store.write((db) => {
+				const committed = deps.settings.inTransaction(db).agency;
+				if (
+					!work ||
+					!on() ||
+					!committed.enabled ||
+					!sameSettings(committed, cfg) ||
+					c.stopped ||
+					c.generation !== cy.mine ||
+					c.runtime !== cy.runtime ||
+					convs.get(c.id) !== c ||
+					conversation.latestOrdinalInTransaction(db, c.id) !== cy.ordinal ||
+					deps.conversationBusy(db, c.id)
+				) {
+					stale = true;
+					return;
+				}
+				sent = work.releaseInTransaction(db, c.id, executionIds);
+			});
+		} catch (error) {
+			log.warn("agency.report_released", {
+				subjectId: c.id,
+				attemptId: ticket.id,
+				kind: trigger,
+				outcome: "write_failed",
+				reason: toErrorCode(error, "write_failed"),
+			});
+			receipt(cy, ticket, "failed", "");
+			return false;
+		}
+		log.info("agency.report_released", {
+			subjectId: c.id,
+			attemptId: ticket.id,
+			kind: trigger,
+			outcome: stale ? "interrupted" : sent > 0 ? "released" : "nothing_held",
+			count: sent,
+		});
+		if (stale) {
+			receipt(cy, ticket, "interrupted", "");
+			return false;
+		}
+		if (sent === 0) {
+			receipt(cy, ticket, "failed", "");
+			return false;
+		}
+		// The ledger records what happened, not the agency's draft wording (the conversation writes the report).
+		receipt(cy, ticket, "succeeded", "（完了の報告を会話の応答に渡した）");
+		return true;
+	}
+
 	/** One terminal receipt per ticket (S3), recorded on the runtime that issued it and only while it is current. */
 	function receipt(
 		cy: Cycle,
@@ -571,6 +677,7 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 			foregroundBusy: hostBusy(c),
 			playerBusy: false,
 			topics: topicsNow(),
+			todos: todosNow(c),
 		};
 		const { decision, calls } = await runtime.decide(
 			opportunity,
@@ -588,6 +695,12 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 		// A busy moment is not a silent one: it must not spend the idle backoff.
 		if (decision.source === "host_blocked") return "aborted";
 		if (!decision.ticket) return "silent";
+		// A report of finished work is said by the conversation itself: release its held notice instead.
+		const reported = reportedTodoIds(decision.evidenceRefs);
+		if (decision.ticket.action === "speak" && reported.length > 0)
+			return (await releaseReports(cy, decision.ticket, reported))
+				? "spoke"
+				: "silent";
 		return (await deliver(cy, decision.ticket)) ? "spoke" : "silent";
 	}
 
@@ -604,6 +717,7 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 			return "aborted";
 		}
 		abortBackground(c);
+		clearHeldTimer(c);
 		const controller = new AbortController();
 		c.background = controller;
 		c.touched = nowMs();
@@ -637,6 +751,10 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 		}
 		if (on() && convs.get(c.id) === c && c.planner === cy.planner)
 			c.scheduler.rearm();
+		if (c.heldPending && on() && convs.get(c.id) === c && !c.stopped) {
+			c.heldPending = false;
+			launch(c, "result_received", false);
+		} else armHeldRecheck(c);
 		return outcome;
 	}
 
@@ -780,6 +898,100 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 		prune();
 	}
 
+	/** While reports are held for this conversation, look again after one silence interval. */
+	function armHeldRecheck(c: Conv) {
+		clearHeldTimer(c);
+		if (!work || !on() || convs.get(c.id) !== c || c.stopped) return;
+		if (c.id !== activeId || cfg.idleSec <= 0) return;
+		const held = store.read((db) => work!.heldInTransaction(db, c.id));
+		if (held.length === 0) return;
+		c.heldTimer = setTimer(() => {
+			c.heldTimer = null;
+			if (convs.get(c.id) === c && c.background === null)
+				launch(c, "idle", false);
+		}, cfg.idleSec * 1000);
+	}
+
+	/**
+	 * Every commit: a report held for the active conversation that the agency has not seen opens a result_received
+	 * opportunity at once; reports nobody watches (agency off, another conversation, stopped) or held too long are
+	 * sent as before. Spec agency-work-reports-design-2026-10-24.
+	 */
+	function watchHeld() {
+		if (!work || !started || closed || releasing) return;
+		if (reportExpiryTimer !== null) clearTimer(reportExpiryTimer);
+		reportExpiryTimer = null;
+		const now = nowMs();
+		const held = store.read((db) => work!.heldInTransaction(db));
+		const ids = new Set(held.map((r) => r.eventId));
+		for (const c of convs.values())
+			for (const id of c.seenHeld) if (!ids.has(id)) c.seenHeld.delete(id);
+		if (held.length === 0) return;
+		// Expiry is independent of commits and of the idle scheduler (which may be disabled or busy).
+		const future = held
+			.map((r) => r.heldAt + REPORT_HOLD_MAX_MS)
+			.filter((at) => at > now);
+		if (future.length)
+			reportExpiryTimer = setTimer(safeWatchHeld, Math.min(...future) - now);
+		const unwatched = held.filter((r) => {
+			const c = convs.get(r.conversationId);
+			return (
+				!on() ||
+				r.conversationId !== activeId ||
+				!c ||
+				c.stopped !== null ||
+				now - r.heldAt >= REPORT_HOLD_MAX_MS
+			);
+		});
+		if (unwatched.length > 0) {
+			releasing = true;
+			let succeeded = false;
+			const task = store
+				.write((db) => {
+					let sent = 0;
+					for (const r of unwatched)
+						sent += work!.releaseInTransaction(db, r.conversationId, [
+							r.executionId,
+						]);
+					return sent;
+				})
+				.then((sent) => {
+					succeeded = true;
+					log.info("agency.report_released", {
+						outcome: "unwatched",
+						count: sent,
+					});
+				})
+				.catch((error) =>
+					log.warn("agency.report_released", {
+						outcome: "write_failed",
+						reason: toErrorCode(error, "write_failed"),
+					}),
+				)
+				.finally(() => {
+					releasing = false;
+					inflight.delete(task);
+					// Commits made while releasing were suppressed; re-read them after the writer settles.
+					if (succeeded) safeWatchHeld();
+				});
+			inflight.add(task);
+		}
+		if (!on() || !activeId) return;
+		const c = convs.get(activeId);
+		if (!c || c.stopped) return;
+		const fresh = held.filter(
+			(r) =>
+				r.conversationId === c.id &&
+				!c.seenHeld.has(r.eventId) &&
+				now - r.heldAt < REPORT_HOLD_MAX_MS,
+		);
+		if (fresh.length === 0) return;
+		for (const r of fresh) c.seenHeld.add(r.eventId);
+		// A cycle in flight saw the state before: offer the report as soon as it ends.
+		if (c.background === null) launch(c, "result_received", false);
+		else c.heldPending = true;
+	}
+
 	function safePump() {
 		try {
 			pump();
@@ -810,6 +1022,17 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 			outcome: next.enabled ? "on" : "off",
 			route: next.resourceId ? "cloud" : "larm",
 		});
+		safeWatchHeld();
+	}
+
+	function safeWatchHeld() {
+		try {
+			watchHeld();
+		} catch (error) {
+			log.warn("agency.held_watch_failed", {
+				reason: toErrorCode(error, "failed"),
+			});
+		}
 	}
 
 	// ---- public ---------------------------------------------------------------
@@ -853,15 +1076,37 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 			if (cfg.enabled) cursor = feedEnd();
 			stoppers.push(deps.settings.onChange(applySettings));
 			stoppers.push(store.onCommit(safePump));
+			stoppers.push(store.onCommit(safeWatchHeld));
+			safeWatchHeld();
 		},
 		async close() {
 			if (closed) return;
 			closed = true;
+			if (reportExpiryTimer !== null) clearTimer(reportExpiryTimer);
+			reportExpiryTimer = null;
 			for (const stop of stoppers.splice(0)) stop();
 			resetAll("closed");
 			await Promise.allSettled(inflight);
 		},
 		dialoguePort,
+		/** Task executions and their result reports (attached once the toolchain is configured). */
+		attachWork(value: AgencyWork) {
+			work = value;
+			safeWatchHeld();
+		},
+		/**
+		 * Whether a finished execution's result report is held for the agency (inside the writer transaction): only
+		 * for the conversation the agency watches, with the committed setting ON and the conversation not stopped.
+		 */
+		holdsReportsInTransaction(db: Database, conversationId: string): boolean {
+			if (!work || !on() || conversationId !== activeId) return false;
+			const c = convs.get(conversationId);
+			return (
+				!!c &&
+				c.stopped === null &&
+				deps.settings.inTransaction(db).agency.enabled
+			);
+		},
 		/** Memory forgot something: the cached topics may name it. */
 		invalidateTopics() {
 			topicsCache = null;

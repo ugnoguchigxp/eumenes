@@ -11,6 +11,7 @@ import {
 	createConversationService,
 } from "../../conversation";
 import type { LarmPort } from "../../larm";
+import { submitSchema } from "../contracts";
 import { createQueue, migration as queueMigration } from "../../queue";
 import {
 	createDialogueService,
@@ -125,6 +126,38 @@ test("the public runs API rejects utteranceId and unknown keys but accepts the s
 		};
 		expect((await post({ ...base, utteranceId: "voice-1" })).status).toBe(400);
 		expect((await post({ ...base, extra: 1 })).status).toBe(400);
+		// A pinned toolchain belongs to an artifact screen's form submit only.
+		const pinned = { ...base, toolchainId: "image.create" };
+		expect((await post(pinned)).status).toBe(400);
+		expect(
+			(await post({ ...pinned, presentation: "conversation" })).status,
+		).toBe(400);
+		expect(
+			(
+				await post({
+					...pinned,
+					presentation: "artifact",
+					toolchainId: "Bad Id",
+				})
+			).status,
+		).toBe(400);
+		// A form submit carries no attachments: the specialist would get none of them.
+		expect(
+			(
+				await post({
+					...pinned,
+					presentation: "artifact",
+					attachmentIds: [crypto.randomUUID()],
+				})
+			).status,
+		).toBe(400);
+		expect(
+			submitSchema.safeParse({
+				...pinned,
+				presentation: "artifact",
+				utteranceId: "voice-1",
+			}).success,
+		).toBe(false);
 		expect((await post(base)).status).toBe(202);
 		await queue.close(100);
 		await store.close();

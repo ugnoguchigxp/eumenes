@@ -431,6 +431,7 @@ export function createInference(
 				preparation,
 				tools,
 				session,
+				outputContract,
 			]: Parameters<NonNullable<InferencePort["executeStream"]>>
 		) =>
 			executeRequest(
@@ -443,6 +444,7 @@ export function createInference(
 				undefined,
 				undefined,
 				session,
+				outputContract,
 			),
 		liveRequest: (id: string) => store.read((db) => usable(db, id)),
 		captureSpeechChunkInTransaction(

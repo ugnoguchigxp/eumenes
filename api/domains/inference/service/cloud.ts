@@ -261,7 +261,8 @@ async function agentRequest(
 		credential,
 		auth: connection.auth,
 		messages: fitted.messages,
-		tools: options?.tools,
+		tools:
+			options?.toolOutputFormat === "json-schema" ? undefined : options?.tools,
 		outputSchema: options?.jsonOutput ? options.jsonSchema : undefined,
 		reasoningEffort: options?.reasoningEffort,
 		signal,
@@ -374,7 +375,7 @@ export async function cloudRequest(
 			body = {
 				model: resource.model,
 				messages,
-				...(options?.tools?.length
+				...(options?.tools?.length && options.toolOutputFormat !== "json-schema"
 					? {
 							tools: options.tools,
 							tool_choice: options.toolChoice ?? "auto",

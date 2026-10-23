@@ -6,11 +6,15 @@ import { resolveLarmToken } from "../api/infrastructure/auth-config";
 export function liveLarmSettings(env = process.env) {
 	return readStoredLarm(env.EUMENES_DB || "./data/eumenes.sqlite3");
 }
-export function createLiveLarm(env = process.env) {
+export function createLiveLarm(
+	env = process.env,
+	options: { fetch?: typeof fetch } = {},
+) {
 	const saved = liveLarmSettings(env);
 	if (!saved.baseUrl) throw new Error("saved_larm_connection_unconfigured");
 	if (!resolveLarmToken(env)) throw new Error("larm_credential_unconfigured");
 	return createLarm({
+		...options,
 		...saved,
 		baseUrl: saved.baseUrl,
 		voice: saved.voice || undefined,

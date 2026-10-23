@@ -16,6 +16,7 @@ import type { ExecutionContext } from "./execution-context";
 import { executionStep } from "./execution-step";
 import { executionExtract } from "./execution-extract";
 import { executionPipeline } from "./execution-pipeline";
+import { executionReports } from "./execution-reports";
 import { createExecutionStore } from "./execution-store";
 export function createTaskExecutions(deps: Omit<ExecutionContext, "port">) {
 	let port: ToolchainExecutionPort | null = null;
@@ -253,6 +254,7 @@ export function createTaskExecutions(deps: Omit<ExecutionContext, "port">) {
 		},
 		...executionCommands(ctx, ops, available),
 		...executionAccess(ctx, ops, table, () => !!port),
+		...executionReports(ctx, table),
 		reconcile,
 		async recover() {
 			if (!port || !store.read(table)) return;

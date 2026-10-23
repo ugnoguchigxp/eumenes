@@ -40,6 +40,7 @@ import {
 	type SpecialistSet,
 	type ToolchainRoutingPort,
 } from "..";
+import { pinnedToolchainMigration } from "../repository";
 import type { RejectedDraft } from "../contracts";
 import {
 	analysisReceipt,
@@ -64,6 +65,7 @@ const MIGRATIONS = [
 	queueMigration,
 	queueLinkMigration,
 	announcementMigration,
+	pinnedToolchainMigration,
 	specialistMigration,
 	specialistEventsMigration,
 	continuityMigration,

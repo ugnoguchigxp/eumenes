@@ -134,6 +134,8 @@ export interface Accept {
 	conversationId: string;
 	text: string;
 	presentation?: "conversation" | "artifact";
+	/** The toolchain a screen's form submit named: stored on the run, never offered to the main agent's selection. */
+	toolchainId?: string;
 	utteranceId?: string;
 	sourceKind: Run["sourceKind"];
 	scheduleId?: string;

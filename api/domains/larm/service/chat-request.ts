@@ -1,6 +1,7 @@
 import type { ChatContentPart } from "../contracts/chat-input";
 import type { LarmPort, LarmCallOptions } from "../contracts";
 import { nativeToolOptions } from "../../../infrastructure/chat-stream";
+import { operationSchema } from "./operation-schema";
 export function chatRequest(
 	provider: { model: string; contextWindow?: { outputReserveTokens: number } },
 	messages: Parameters<LarmPort["answer"]>[0],
@@ -33,13 +34,19 @@ export function chatRequest(
 								json_schema: {
 									name: "control",
 									strict: true,
-									schema: options.jsonSchema,
+									schema:
+										options.toolOutputFormat === "json-schema"
+											? operationSchema(options.jsonSchema)
+											: options.jsonSchema,
 								},
 							}
 						: { type: "json_object" },
 				}
 			: {}),
-		...nativeToolOptions(options?.tools, options?.toolChoice),
+		...nativeToolOptions(
+			options?.toolOutputFormat === "json-schema" ? undefined : options?.tools,
+			options?.toolChoice,
+		),
 		// Function-selection turns have a checked output contract, like JSON control turns.
 		...(options?.tools?.length ? { temperature: 0 } : {}),
 		stream,

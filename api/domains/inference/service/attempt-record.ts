@@ -49,6 +49,14 @@ export function resolveSession(
 	row: RequestRow,
 	given?: CallSession,
 ): CallSessionRole | undefined {
+	if (
+		given?.failureScope &&
+		(row.purpose !== "llm" ||
+			given.failureScope !== "call" ||
+			(given.sessionRole ?? "auxiliary") !== "auxiliary" ||
+			row.mode !== "answer")
+	)
+		throw new Error("invalid_failure_scope");
 	if (row.purpose !== "llm") {
 		if (given?.sessionRole || given?.taskId || given?.context || given?.refs)
 			throw new Error("invalid_session_role");

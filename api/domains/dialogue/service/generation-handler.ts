@@ -25,6 +25,7 @@ import {
 	type Decision,
 } from "./selection-trace";
 import { analyzeInitialRequest } from "./initial-request";
+import { isPinnedDecision, pinnedGeneration } from "./pinned-operation";
 import { announceAndSelect } from "./operation-announcement";
 import { answerInstant } from "./instant-answer";
 import { generateConversation } from "./conversation-generation";
@@ -162,6 +163,11 @@ export function createGenerationHandler(
 							text: input.executionNoticeReply,
 							hostAnswer: true as const,
 						};
+					}
+					// A screen's form submit names its toolchain: handed over as it is, with no analysis and no model call.
+					if (isPinnedDecision(run, input)) {
+						signal.throwIfAborted();
+						return pinnedGeneration(deps, input, run!);
 					}
 					const timing = generationTiming();
 					resolveAttachmentContext(deps, input, run!.conversationId);

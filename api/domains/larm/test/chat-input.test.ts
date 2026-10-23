@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import { imageLarmFixture } from "./chat-input.fixture";
 import type { ChatMessage } from "../contracts";
 import { chatRequest } from "../service/chat-request";
+import { operationSchema } from "../service/operation-schema";
 import { waitFor } from "../../../infrastructure/wait-for";
 
 const messages: ChatMessage[] = [
@@ -19,6 +20,79 @@ const messages: ChatMessage[] = [
 		],
 	},
 ];
+test("a schema operation omits native tools while existing combined requests keep them", () => {
+	const provider = {
+		model: "fixture",
+		contextWindow: { outputReserveTokens: 4096 },
+	};
+	const tools = [
+		{
+			type: "function" as const,
+			function: {
+				name: "choose",
+				description: "Choose",
+				parameters: {
+					type: "object",
+					properties: {},
+					additionalProperties: false,
+				},
+			},
+		},
+	];
+	const options = {
+		tools,
+		jsonOutput: true,
+		jsonSchema: {
+			type: "object",
+			properties: { done: { type: "boolean" } },
+			required: ["done"],
+			additionalProperties: false,
+		},
+	};
+	const body = chatRequest(provider, messages.slice(0, 1), true, {
+		...options,
+		toolOutputFormat: "json-schema",
+	});
+	expect(body).not.toHaveProperty("tools");
+	expect(body).not.toHaveProperty("tool_choice");
+	expect(body.response_format).toMatchObject({
+		type: "json_schema",
+		json_schema: { strict: true, schema: options.jsonSchema },
+	});
+	expect(
+		chatRequest(provider, messages.slice(0, 1), true, options).tools,
+	).toEqual(tools);
+});
+
+test("operation grammar projects string bounds without changing the authoritative schema or other constraints", () => {
+	const source = {
+		type: "object",
+		additionalProperties: false,
+		properties: {
+			query: {
+				type: "string",
+				minLength: 1,
+				maxLength: 2000,
+				description: "用途",
+			},
+			list: {
+				type: "array",
+				maxItems: 4,
+				items: { type: "string", enum: ["one", "two"] },
+			},
+		},
+		required: ["query", "list"],
+	};
+	const projected = operationSchema(source) as typeof source;
+	expect(projected.properties.query).not.toHaveProperty("maxLength");
+	expect(projected.properties.query).not.toHaveProperty("minLength");
+	expect(projected.properties.query.description).toContain("maxLength=2000");
+	expect(projected.properties.query.description).toContain("用途");
+	expect(projected.properties.list).toEqual(source.properties.list);
+	expect(projected.required).toEqual(source.required);
+	expect(projected.additionalProperties).toBe(false);
+	expect(source.properties.query.maxLength).toBe(2000);
+});
 test("image wire conversion preserves assistant tool_calls and ordinary string messages", () => {
 	const calls = [
 		{

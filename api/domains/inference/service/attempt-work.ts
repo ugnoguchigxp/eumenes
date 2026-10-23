@@ -59,9 +59,13 @@ export function callOptionsFor(r: Request, attemptId: string): LarmCallOptions {
 					},
 				}
 			: {}),
-		...(r.row.mode === "control" && !r.tools?.length
-			? controlJsonOptions(r.control, r.row.structuredOutput)
+		...(r.outputContract || (r.row.mode === "control" && !r.tools?.length)
+			? controlJsonOptions(
+					r.outputContract ?? r.control,
+					!!r.outputContract || r.row.structuredOutput,
+				)
 			: {}),
+		...(r.outputContract ? { toolOutputFormat: "json-schema" as const } : {}),
 		...(r.row.mode === "control" && r.control?.reasoningEffort
 			? { reasoningEffort: r.control.reasoningEffort }
 			: {}),

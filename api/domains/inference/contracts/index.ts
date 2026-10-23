@@ -93,6 +93,8 @@ export type CallSession = {
 	toolChoice?: "required";
 	/** This call's own bound on output tokens, below the request's: a call whose output is short by contract. */
 	outputLimit?: number;
+	/** Hidden auxiliary work on an answer request: publishes no deltas; provider failure ends only this call. */
+	failureScope?: "call";
 	taskId?: string;
 	/**
 	 * `main` only. Where the call's messages split, by position: the first `instructionCount` messages are the
@@ -256,6 +258,8 @@ export interface InferencePort {
 		preparation?: SpeechPreparation,
 		tools?: NativeTool[],
 		session?: CallSession,
+		/** Per-call output constraint; does not change the request's route, mode or authority. */
+		outputContract?: ControlContract,
 	): Promise<Receipt>;
 	captureSpeechChunkInTransaction?(
 		db: Database,

@@ -22,6 +22,7 @@ export type MusicPlayerProps = {
 
 export function MusicPlayer(props: MusicPlayerProps) {
 	const [resume, setResume] = useState(false);
+	const [repeat, setRepeat] = useState(false);
 	if (!props.track) {
 		if (!props.loading && resume) setResume(false);
 		return (
@@ -49,6 +50,8 @@ export function MusicPlayer(props: MusicPlayerProps) {
 			{...props}
 			track={props.track}
 			autoPlay={resume}
+			repeat={repeat}
+			onRepeatChange={setRepeat}
 			onPlayingChange={(playing) => {
 				setResume(playing);
 			}}
@@ -65,10 +68,14 @@ function Player({
 	compact,
 	onPlaybackChange,
 	autoPlay,
+	repeat,
+	onRepeatChange,
 	onPlayingChange,
 }: MusicPlayerProps & {
 	track: MusicTrack;
 	autoPlay: boolean;
+	repeat: boolean;
+	onRepeatChange: (repeat: boolean) => void;
 	onPlayingChange: (playing: boolean) => void;
 }) {
 	const { ref: audioRef, ...playback } = usePlayback(
@@ -118,6 +125,7 @@ function Player({
 				ref={audioRef}
 				src={track.src}
 				preload="metadata"
+				loop={repeat}
 				{...playback.events}
 				onPlay={() => {
 					playback.events.onPlay();
@@ -125,7 +133,8 @@ function Player({
 				}}
 				onPause={() => {
 					playback.events.onPause();
-					onPlayingChange(false);
+					// Media fires pause before ended; the end decides the playing intent.
+					if (!audioRef.current?.ended) onPlayingChange(false);
 				}}
 				onEnded={() => {
 					if (onEnded) onEnded();
@@ -159,6 +168,8 @@ function Player({
 				onSeekForward={() => playback.seek(playback.position + 10)}
 				onPrevious={onPrevious}
 				onNext={onNext}
+				repeat={repeat}
+				onRepeatChange={onRepeatChange}
 			/>
 			<label className="music-player-volume">
 				<Volume2 aria-hidden="true" />

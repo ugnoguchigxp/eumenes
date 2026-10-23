@@ -3,6 +3,155 @@ import { cleanup, messages, setup } from "./inference.fixture";
 afterEach(async () => {
 	for (const close of cleanup.splice(0)) await close();
 });
+test("a failed optional auxiliary call leaves the answer request usable, with the failed attempt recorded", async () => {
+	let calls = 0;
+	const h = await setup({
+		local: async () => {
+			if (++calls === 1) throw new Error("provider_fixture_failure");
+			return "answer";
+		},
+	});
+	const id = await h.store.write((db) =>
+		h.inference.captureInTransaction(
+			db,
+			"shared-answer",
+			"llm",
+			Date.now() + 30000,
+		),
+	);
+	const signal = new AbortController().signal;
+	await expect(
+		h.inference.executeStream(
+			id,
+			messages,
+			signal,
+			() => {},
+			undefined,
+			undefined,
+			{
+				sessionRole: "auxiliary",
+				failureScope: "call",
+			},
+		),
+	).rejects.toThrow("provider_fixture_failure");
+	const result = await h.inference.executeStream(
+		id,
+		messages,
+		signal,
+		() => {},
+		undefined,
+		undefined,
+		{ sessionRole: "main" },
+	);
+	expect(result.value).toBe("answer");
+	expect(
+		await h.store.write((db) => h.inference.acceptInTransaction(db, result)),
+	).toBe(true);
+	expect(
+		h.store.read((db) =>
+			db
+				.query(
+					"SELECT status FROM inference_attempts WHERE request_id=? ORDER BY rowid",
+				)
+				.all(id),
+		),
+	).toEqual([{ status: "failed" }, { status: "succeeded" }]);
+});
+test("optional work cannot weaken a main/control request or cancellation, and never streams hidden text", async () => {
+	const controller = new AbortController();
+	const h = await setup({
+		local: async () => {
+			controller.abort();
+			throw new Error("provider_fixture_failure");
+		},
+	});
+	const id = await h.store.write((db) =>
+		h.inference.captureInTransaction(
+			db,
+			"cancelled-helper",
+			"llm",
+			Date.now() + 30000,
+		),
+	);
+	await expect(
+		h.inference.executeStream(
+			id,
+			messages,
+			new AbortController().signal,
+			() => {},
+			undefined,
+			undefined,
+			{ sessionRole: "main", failureScope: "call" },
+		),
+	).rejects.toThrow("invalid_failure_scope");
+	const control = await h.store.write((db) =>
+		h.inference.captureMaintenanceControlInTransaction(db, {
+			subject: "control-helper",
+			deadline: Date.now() + 30000,
+			maxOutputTokens: 100,
+		}),
+	);
+	await expect(
+		h.inference.executeControl(
+			control,
+			messages,
+			new AbortController().signal,
+			undefined,
+			{ failureScope: "call" },
+		),
+	).rejects.toThrow("invalid_failure_scope");
+	await expect(
+		h.inference.executeStream(
+			id,
+			messages,
+			controller.signal,
+			() => {},
+			undefined,
+			undefined,
+			{ failureScope: "call" },
+		),
+	).rejects.toThrow("cancelled");
+	await expect(
+		h.inference.executeStream(
+			id,
+			messages,
+			new AbortController().signal,
+			() => {},
+		),
+	).rejects.toThrow("permission_revoked");
+	let streamed = false;
+	const hidden = await setup({
+		local: async () => "hidden result",
+		localStream: async (_m, _s, delta) => {
+			delta("hidden");
+			throw new Error("unexpected_stream");
+		},
+	});
+	const hiddenId = await hidden.store.write((db) =>
+		hidden.inference.captureInTransaction(
+			db,
+			"hidden-helper",
+			"llm",
+			Date.now() + 30000,
+		),
+	);
+	expect(
+		(
+			await hidden.inference.executeStream(
+				hiddenId,
+				messages,
+				new AbortController().signal,
+				() => {
+					streamed = true;
+				},
+				undefined,
+				undefined,
+				{ failureScope: "call" },
+			)
+		).value,
+	).toBe("hidden result");
+	expect(streamed).toBe(false);
+});
 test("a call without a role is auxiliary: the output mode no longer decides the session", async () => {
 	const roles: unknown[] = [];
 	const h = await setup({

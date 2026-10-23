@@ -2,6 +2,8 @@
 
 状態: **案・合意待ち。** 計測（§2）は実施済み。§4 の変更はどれも未実装。LARM の prompt キャッシュが直った後（[修正依頼](larm-prompt-cache-request-prompt-2026-10-22.md)）を前提にする。
 
+2026-10-23追記: [Eumenes側の修正計画](eumenes-response-latency-plan-2026-10-23.md)で追加調査を反映した。§2.3の「KVは接続ごとなので補助接続では再利用できない」という説明は誤りであり、撤回する。実際は共有4slotで、同一Connectionでも他要求によってKVが上書きされる。§4 P1の持続判断sessionは、それだけでは保持問題を解決しないため、第一段階の推奨から外す。以下は10月22日時点の計測と提案の記録として残す。新計画も合意待ちであり、実装の承認記録ではない。
+
 関連: [ContextWindow 設計](conversation-context-window-design-2026-10-17.md)（原則・区画 S/P/H/W/V/R・C1〜C3 実装済み）、[2段の初期判断](conversation-two-round-initial-analysis-design-2026-10-17.md)（R1/R2、H1・H2）、[Agency 統合スパイク](agency-integration-spike-design-2026-10-22.md)。
 
 ## 1. 目的

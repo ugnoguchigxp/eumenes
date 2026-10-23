@@ -32,6 +32,94 @@ const chosen = (c: ToolchainCard, request: string) => ({
 /** The functions of a second-round call: the toolchain's, with the request for the specialist. */
 const SELECTION_TOOLS = toolchainTools(CARDS);
 
+test("schema output follows the existing operation validator and never streams its JSON", async () => {
+	const h = fixture([
+		{
+			value: JSON.stringify({
+				call: { name: "web_search", arguments: { request: "鎌倉の天気" } },
+			}),
+		},
+	]);
+	const result = await h.run("main", undefined, {
+		operationOutput: "json-schema",
+	});
+	expect(result.operation).toEqual(chosen(WEB, "鎌倉の天気"));
+	expect(result.text).toBe("");
+	expect(h.deltas).toEqual([]);
+	expect(h.repairs()).toBe(0);
+});
+
+test("schema output cannot bypass the original search-text length bound", async () => {
+	const args = {
+		kind: "live_info",
+		freshness: "live",
+		impact: "none",
+		approved: false,
+	};
+	const offered = analysisTools([], new Set(), true);
+	const h = fixture(
+		[
+			{
+				value: JSON.stringify({
+					call: {
+						name: "find_toolchain",
+						arguments: { ...args, query: "あ".repeat(2001) },
+					},
+				}),
+			},
+			{
+				value: JSON.stringify({
+					call: {
+						name: "find_toolchain",
+						arguments: { ...args, query: "鎌倉の明日の天気" },
+					},
+				}),
+			},
+		],
+		offered,
+	);
+	const result = await h.run("auxiliary", undefined, {
+		operationOutput: "json-schema",
+		analysis: true,
+		allowDiscovery: true,
+		cards: [],
+	});
+	expect(result.analysis).toMatchObject({
+		next: "find_toolchain",
+		query: "鎌倉の明日の天気",
+	});
+	expect(result.repaired).toBe(true);
+	expect(h.repairs()).toBe(1);
+	expect(h.seen).toHaveLength(2);
+});
+
+test("a rejected schema choice repairs once with the identical leading instruction and the original request", async () => {
+	const h = fixture([
+		{
+			value: JSON.stringify({
+				call: { name: "not_offered", arguments: { request: "過去の依頼" } },
+			}),
+		},
+		{
+			value: JSON.stringify({
+				call: { name: "web_search", arguments: { request: "今回の依頼" } },
+			}),
+		},
+	]);
+	const result = await h.run("main", undefined, {
+		operationOutput: "json-schema",
+	});
+	expect(result.operation).toEqual(chosen(WEB, "今回の依頼"));
+	expect(result.repaired).toBe(true);
+	expect(h.seen[1]![0]).toEqual(h.seen[0]![0]);
+	expect(h.seen[1]!.at(-1)).toEqual(h.seen[0]!.at(-1));
+	expect(
+		h.seen[1]!.find((m) => m.content.startsWith("UNTRUSTED_REJECTED_OUTPUT="))
+			?.role,
+	).toBe("user");
+	expect(h.repairs()).toBe(1);
+});
+
 function fixture(outputs: Partial<Receipt>[], tools = SELECTION_TOOLS) {
 	const seen: Parameters<InferencePort["answer"]>[0][] = [];
 	const sessions: unknown[] = [];

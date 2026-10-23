@@ -1,10 +1,16 @@
 import { systemContext } from "../../../infrastructure/system-context";
 import type { CallSession, InferencePort, Receipt } from "../../inference";
+import {
+	operationOutputContract,
+	operationOutputReceipt,
+	estimateMessageTokens,
+	estimateJsonTokens,
+} from "../../inference";
 import type { SpeechPreparation } from "../../delivery";
 import { isBriefSpokenReply } from "../../delivery";
 import type { NativeTool } from "../../../infrastructure/chat-stream";
 import type { ToolchainCard } from "../../capabilities";
-import { getLogger } from "../../../infrastructure/logger";
+import { getLogger, withLogContext } from "../../../infrastructure/logger";
 import { ValidationFailure } from "../../../infrastructure/validation-log";
 import { conversationOutput } from "./conversation-output";
 import { validateAnalysis, type FirstRound } from "./initial-decision";
@@ -37,6 +43,8 @@ export async function generateConversation(input: {
 	preparation?: SpeechPreparation;
 	briefReply?: boolean;
 	tools?: NativeTool[];
+	/** Explicit comparison candidate. Native output remains the default until the live adoption criteria pass. */
+	operationOutput?: "json-schema";
 	/** The toolchains behind `tools` (the first round's candidates, the second round's chosen one). */
 	cards?: ToolchainCard[];
 	/** Open questions a call may answer by `questionRef` (offered to the model with `tools`). */
@@ -71,7 +79,34 @@ export async function generateConversation(input: {
 	repaired: boolean;
 }> {
 	const { inference, signal } = input;
-	let messages = input.messages;
+	const outputContract =
+		input.operationOutput === "json-schema" && input.tools?.length
+			? operationOutputContract(input.tools)
+			: undefined;
+	const correction = input.tools?.length
+		? systemContext(
+				"dialogue.contexts.conversation-generation.correction",
+				{},
+			) +
+			systemContext(
+				input.analysis
+					? "dialogue.contexts.conversation-generation.correction-analysis"
+					: "dialogue.contexts.conversation-generation.correction-selection",
+				{},
+			)
+		: "";
+	const [leading, ...following] = input.messages;
+	let messages = correction
+		? [
+				{
+					role: "system" as const,
+					content:
+						(leading?.role === "system" ? leading.content + "\n" : "") +
+						correction,
+				},
+				...(leading?.role === "system" ? following : input.messages),
+			]
+		: input.messages;
 	const originalMessages = messages;
 	const callSession: CallSession = {
 		sessionRole: input.sessionRole,
@@ -87,17 +122,50 @@ export async function generateConversation(input: {
 			input.tools,
 			!!input.tools?.length,
 		);
-		const receipt =
+		log.debug("dialogue.input_measured", {
+			phase: input.analysis
+				? input.settled
+					? "discovery_decision"
+					: "initial_decision"
+				: input.tools?.length
+					? "operation_decision"
+					: "answer",
+			kind: "estimated_tokens",
+			count: estimateMessageTokens(messages),
+			bytes: Buffer.byteLength(JSON.stringify(messages)),
+			messageCount: messages.length,
+			repairAttempt: attempt,
+		});
+		if (input.tools?.length)
+			log.debug("dialogue.output_contract_measured", {
+				kind: "estimated_tokens",
+				count: estimateJsonTokens(outputContract?.outputSchema ?? input.tools),
+				repairAttempt: attempt,
+			});
+		let receipt =
 			input.requestId && inference.executeRequest
 				? inference.executeStream
-					? await inference.executeStream(
-							input.requestId,
-							messages,
-							signal,
-							output.delta,
-							input.preparation,
-							input.tools,
-							callSession,
+					? await withLogContext(
+							{
+								phase: input.analysis
+									? input.settled
+										? "discovery_decision"
+										: "initial_decision"
+									: input.tools?.length
+										? "operation_decision"
+										: "answer",
+							},
+							() =>
+								inference.executeStream!(
+									input.requestId!,
+									messages,
+									signal,
+									outputContract ? () => {} : output.delta,
+									input.preparation,
+									input.tools,
+									callSession,
+									outputContract,
+								),
 						)
 					: await inference.executeRequest(
 							input.requestId,
@@ -107,13 +175,26 @@ export async function generateConversation(input: {
 							callSession,
 						)
 				: undefined;
-		const text = receipt
+		let text = receipt
 			? (receipt.value as string)
 			: inference.answerStream
 				? await inference.answerStream(messages, signal, output.delta)
 				: await inference.answer(messages, signal);
 		signal.throwIfAborted();
 		try {
+			if (
+				outputContract &&
+				receipt &&
+				input.tools?.length &&
+				!receipt.toolCalls?.length
+			) {
+				try {
+					receipt = operationOutputReceipt(receipt, input.tools);
+				} catch {
+					throw operationRejection("operation_output_invalid");
+				}
+				text = receipt.value as string;
+			}
 			if (!receipt?.toolCalls?.length) {
 				if (input.analysis) throw operationRejection("analysis_call_required");
 				if (input.tools?.length) throw operationRejection("tool_call_required");
@@ -199,38 +280,7 @@ export async function generateConversation(input: {
 				});
 			if (attempt === 1) throw new Error("invalid_conversation_operation");
 			input.repair();
-			const correction =
-				systemContext(
-					"dialogue.contexts.conversation-generation.correction",
-					{},
-				) +
-				(input.analysis
-					? systemContext(
-							"dialogue.contexts.conversation-generation.correction-analysis",
-							{},
-						)
-					: input.tools?.length
-						? systemContext(
-								"dialogue.contexts.conversation-generation.correction-selection",
-								{},
-							)
-						: systemContext(
-								"dialogue.contexts.conversation-generation.correction-3",
-								{},
-							)) +
-				systemContext(
-					"dialogue.contexts.conversation-generation.correction-4",
-					{},
-				);
-			const [first, ...rest] = originalMessages;
-			messages = [
-				{
-					role: "system",
-					content:
-						correction + (first?.role === "system" ? "\n" + first.content : ""),
-				},
-				...(first?.role === "system" ? rest : originalMessages),
-			];
+			messages = [...originalMessages];
 			const requestIndex = messages.indexOf(input.requestMessage);
 			if (
 				requestIndex !== messages.length - 1 ||

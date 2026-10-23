@@ -70,6 +70,7 @@ export function useImageCreation(
 			conversationId,
 			text,
 			presentation: "artifact",
+			toolchainId: "image.create",
 		});
 		pending.current = undefined;
 		cache.setQueryData(

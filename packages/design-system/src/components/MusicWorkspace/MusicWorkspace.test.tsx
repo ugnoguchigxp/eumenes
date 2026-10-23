@@ -190,3 +190,18 @@ it("requests artwork from the track's prompt, shows progress, and offers regener
 	show({ ...base, prompt: undefined });
 	expect(screen.getByRole("button", { name: "イメージを作成" })).toBeDisabled();
 });
+it("selects the next track when the current one ends, and stops after the last", () => {
+	const r = setup();
+	fireEvent.ended(r.container.querySelector("audio")!);
+	expect(r.select).toHaveBeenCalledWith("b");
+	r.select.mockClear();
+	r.rerender(
+		<MusicWorkspace
+			{...r.props}
+			track={{ ...tracks[1]!, src: "blob:b" }}
+			currentTrackId="b"
+		/>,
+	);
+	fireEvent.ended(r.container.querySelector("audio")!);
+	expect(r.select).not.toHaveBeenCalled();
+});

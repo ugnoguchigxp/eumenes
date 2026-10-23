@@ -98,6 +98,7 @@ export type Request = {
 	onDelta?: (text: string) => void;
 	preparation?: SpeechPreparation;
 	control?: ControlContract;
+	outputContract?: ControlContract;
 	/** The call's session lifetime (llm only); written on every attempt row and passed to the provider. */
 	session?: CallSessionRole;
 	/** Why the previous attempt was abandoned (recorded on the next attempt). */

@@ -304,11 +304,6 @@ export function createPrepare(
 				!!claim.payload.specialistHandoff,
 			origin,
 		});
-		// A prefetch left out of this turn is neither sent nor checked at adoption.
-		const prepared =
-			window && compiled.prefetchDropped
-				? { ...window, prefetch: { text: "", pins: [], tokens: 0 } }
-				: window;
 		return {
 			status: "ready",
 			input: {
@@ -333,24 +328,13 @@ export function createPrepare(
 				...(goalsLayer
 					? { goals: { goalIds: goalsLayer.shown.map((g) => g.goalId) } }
 					: {}),
-				// An empty window still travels: the exchanges recalled for this turn are checked against it.
-				...(prepared
-					? {
-							memory: {
-								window: memory!.preparedWindow(
-									prepared,
-									compiled.shownMessageIds,
-								),
-								...(windowIsEmpty(prepared) ? { quiet: true as const } : {}),
-								blockedAtPrepare: [
-									...memory!.blockedMessageIdsInTransaction(
-										tx,
-										compiled.shownMessageIds,
-									),
-								],
-							},
-						}
-					: {}),
+				...preparedMemory(
+					memory,
+					tx,
+					window,
+					compiled.prefetchDropped,
+					compiled.shownMessageIds,
+				),
 				requestId: larm.requestFor?.(tx, run.id, "llm") ?? undefined,
 				memoryRoomTokens: Math.max(
 					0,
@@ -377,7 +361,7 @@ function attachRetained(
 		room: number;
 	},
 ) {
-	if (run.sourceKind === "continuation") return;
+	if (run.sourceKind === "continuation" || run.pinnedToolchainId) return;
 	const base = {
 		routing,
 		messages: prompt.messages,
@@ -395,4 +379,31 @@ function attachRetained(
 	Object.assign(routing, {
 		retained: prepareRetained(deps, tx, run, new Set(routing.available), room),
 	});
+}
+
+/** A prefetch left out of this turn is neither sent nor checked at adoption; an empty window still travels. */
+function preparedMemory(
+	memory: DialogueDeps["memory"],
+	tx: Database,
+	window: ReturnType<
+		NonNullable<DialogueDeps["memory"]>["windowForRunInTransaction"]
+	>,
+	prefetchDropped: boolean,
+	shownMessageIds: string[],
+) {
+	const prepared =
+		window && prefetchDropped
+			? { ...window, prefetch: { text: "", pins: [], tokens: 0 } }
+			: window;
+	return prepared
+		? {
+				memory: {
+					window: memory!.preparedWindow(prepared, shownMessageIds),
+					...(windowIsEmpty(prepared) ? { quiet: true as const } : {}),
+					blockedAtPrepare: [
+						...memory!.blockedMessageIdsInTransaction(tx, shownMessageIds),
+					],
+				},
+			}
+		: {};
 }

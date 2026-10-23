@@ -1,4 +1,4 @@
-import { saveDeadlinePolicy } from "../repository";
+import { saveDeadlinePolicy, savePinnedToolchain } from "../repository";
 import { getLogger } from "../../../infrastructure/logger";
 import type { TargetDefinition } from "../../scheduler";
 import type { Tx } from "../../queue";
@@ -69,7 +69,8 @@ export function createIntake(deps: DialogueDeps) {
 					(input.presentation ?? "conversation") ||
 				JSON.stringify(original?.attachments?.map((a) => a.id) ?? []) !==
 					JSON.stringify(input.attachmentIds ?? []) ||
-				existing.utteranceId !== (input.utteranceId ?? null)
+				existing.utteranceId !== (input.utteranceId ?? null) ||
+				(existing.pinnedToolchainId ?? null) !== (input.toolchainId ?? null)
 			)
 				throw new Error("request_conflict");
 			return { run: existing, fresh: false };
@@ -78,8 +79,9 @@ export function createIntake(deps: DialogueDeps) {
 		const runId = id();
 		const messageId = id();
 		// An active specialist session takes the utterance directly: no main-agent generation at all.
+		// A screen's pinned form submit is the main conversation's: it never goes to a session.
 		const { session: addressee, cancelled } =
-			!isHostPrompt(input.sourceKind) && !input.resume
+			!isHostPrompt(input.sourceKind) && !input.resume && !input.toolchainId
 				? addressedSession(deps, db, input.conversationId, now)
 				: { session: null, cancelled: { flush: [], runs: [] } };
 		// What the screen showed when the user sent must still be who listens, or nothing is stored.
@@ -152,6 +154,7 @@ export function createIntake(deps: DialogueDeps) {
 			jobId: generated.job.id,
 			deadlineAt: new Date(deadlineAtMs).toISOString(),
 			sourceKind: input.sourceKind,
+			pinnedToolchainId: input.toolchainId ?? null,
 			scheduleId: input.scheduleId ?? null,
 			occurrenceId: input.occurrenceId ?? null,
 			specialistSessionId: addressee?.id ?? null,
@@ -171,6 +174,7 @@ export function createIntake(deps: DialogueDeps) {
 		if (runMs) larm.extendDeadlineInTransaction?.(db, runId, deadlineAtMs);
 		insert(db, run);
 		saveDeadlinePolicy(db, run.id, input.deadlineMs !== undefined);
+		if (input.toolchainId) savePinnedToolchain(db, runId, input.toolchainId);
 		if (addressee) {
 			// The utterance belongs to the session: the work is taken for its turn (refused while busy), the
 			// message is kept from memory and the main agent's context, and the idle expiry restarts.

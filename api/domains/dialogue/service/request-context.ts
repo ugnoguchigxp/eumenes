@@ -8,10 +8,12 @@ import type { ChatMessage, GenerateInput } from "./context";
 /** Host-owned identity and position, fixed before results or repair data can be added. */
 export type CurrentRequest = { messageId: string; messageIndex: number };
 
-export const currentRequestRules = systemContext(
-	"dialogue.contexts.request-context.current-request-rules",
-	{},
-);
+export const currentRequestRules =
+	systemContext("dialogue.contexts.request-context.current-request-rules", {}) +
+	"\n" +
+	systemContext("dialogue.contexts.conversation-generation.correction", {}) +
+	systemContext("dialogue.contexts.conversation-generation.correction-3", {}) +
+	systemContext("dialogue.contexts.conversation-generation.correction-4", {});
 
 export function currentRequestMessage(
 	input: Pick<GenerateInput, "messages" | "currentRequest">,

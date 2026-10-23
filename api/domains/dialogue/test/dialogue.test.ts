@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openStore } from "../../../infrastructure/sqlite";
 import {
+	migrations as conversationMigrations,
 	migration as conversationMigration,
 	avatarMotionMigration as conversationAvatarMotionMigration,
 	answerDeliveryMigration as conversationAnswerDeliveryMigration,
@@ -12,6 +13,7 @@ import {
 import type { LarmPort } from "../../larm";
 import { createQueue, migration as queueMigration } from "../../queue";
 import { createDialogueService, migration, queueLinkMigration } from "..";
+import { pinnedToolchainMigration } from "../repository";
 import { settle, waitFor } from "../../../infrastructure/wait-for";
 
 async function awaitStatus(get: () => string | undefined, status: string) {
@@ -82,6 +84,76 @@ test("request ID is idempotent and answer adoption is atomic", async () => {
 			createConversationService(reopened).get("main").messages,
 		).toHaveLength(2);
 		await reopened.close();
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+test("a pinned toolchain is stored on the run and is part of the request's identity", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "eumenes-dialogue-pinned-"));
+	const larm: LarmPort = {
+		status: () => ({ state: "ready", capabilities: ["llm"] }),
+		connect: async () => {},
+		answer: async () => "回答",
+		transcribe: async () => "",
+		speak: async () => new Uint8Array(),
+		close: async () => {},
+	};
+	try {
+		const store = openStore(join(dir, "db.sqlite3"), [
+			...conversationMigrations,
+			migration,
+			queueMigration,
+			queueLinkMigration,
+			pinnedToolchainMigration,
+		]);
+		const conversation = createConversationService(store);
+		const queue = createQueue(store);
+		const dialogue = createDialogueService({
+			store,
+			conversation,
+			larm,
+			queue,
+		});
+		const input = {
+			requestId: crypto.randomUUID(),
+			conversationId: "main",
+			text: "猫を描いて",
+			presentation: "artifact" as const,
+			toolchainId: "image.create",
+		};
+		const first = await dialogue.submit(input);
+		expect(first.pinnedToolchainId).toBe("image.create");
+		expect(dialogue.get(first.id)?.pinnedToolchainId).toBe("image.create");
+		const job = store.read(
+			(db) =>
+				db
+					.query("SELECT kind, payload_json FROM queue_jobs WHERE id = ?")
+					.get(first.jobId) as { kind: string; payload_json: string },
+		);
+		expect(job.kind).toBe("dialogue.generate");
+		expect(JSON.parse(job.payload_json)).toEqual({ runId: first.id });
+		// The same request again is the same run; a different (or missing) toolchain is a conflict.
+		expect((await dialogue.submit(input)).id).toBe(first.id);
+		await expect(
+			dialogue.submit({ ...input, toolchainId: "music.create" }),
+		).rejects.toThrow("request_conflict");
+		const { toolchainId: _unpinned, ...unpinned } = input;
+		await expect(dialogue.submit(unpinned)).rejects.toThrow("request_conflict");
+		const plain = await dialogue.submit({
+			...unpinned,
+			requestId: crypto.randomUUID(),
+		});
+		expect(plain.pinnedToolchainId).toBeNull();
+		await expect(
+			dialogue.submit({
+				...unpinned,
+				requestId: plain.requestId,
+				toolchainId: "image.create",
+			}),
+		).rejects.toThrow("request_conflict");
+		await queue.close(100);
+		await store.close();
 	} finally {
 		rmSync(dir, { recursive: true, force: true });
 	}

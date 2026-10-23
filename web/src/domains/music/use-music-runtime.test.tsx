@@ -77,6 +77,8 @@ function setup(
 				requestId: string;
 				conversationId: string;
 				text: string;
+				presentation?: "conversation" | "artifact";
+				toolchainId?: string;
 			}) => ({ ...run }),
 		),
 		run: vi.fn(async () => ({ ...run })),
@@ -153,6 +155,8 @@ test("authorized creation sends the exact editable prompt through the normal API
 	expect(r.api.submit.mock.calls[0]![0]).toMatchObject({
 		conversationId: "main",
 		text: expect.stringContaining(prompt),
+		presentation: "artifact",
+		toolchainId: "music.create",
 	});
 	await waitFor(() => expect(r.resource().creation?.canCancel).toBe(true));
 	expect(r.resource().creation?.busy).toBe(true);

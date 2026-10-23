@@ -1,4 +1,8 @@
 import { measureStage } from "../../../infrastructure/performance";
+import {
+	estimateJsonTokens,
+	estimateMessageTokens,
+} from "../../../infrastructure/context-budget";
 import { getLogger } from "../../../infrastructure/logger";
 import { speechLanguage, type SpeechLanguage } from "../../delivery";
 import type {
@@ -16,6 +20,7 @@ import { codexResearchModel } from "./codex-model";
 import { recordAttemptStart, resolveSession } from "./attempt-record";
 import { fallbackErrors, safeError } from "./errors";
 import { CodexResearchFailure } from "../adapters/codex-failure";
+import { operationOutputMessages } from "../contracts/operation-output";
 
 import type { Env, Input, Request, Running, Source } from "./execute-types";
 import {
@@ -177,6 +182,7 @@ async function attempt(r: Request, source: Source): Promise<Receipt> {
 		if (
 			row.purpose === "llm" &&
 			row.mode !== "control" &&
+			!r.outputContract &&
 			r.preparation?.deliveryScope !== "chunk" &&
 			!r.toolCalls?.length &&
 			typeof value === "string"
@@ -320,15 +326,53 @@ export async function executeRequest(
 	control?: ControlContract,
 	voiceOverride?: SpeechOverride,
 	session?: CallSession,
+	outputContract?: ControlContract,
 ): Promise<Receipt> {
 	caller.throwIfAborted();
 	if (env.isClosed()) throw new Error("inference_closed");
 	const found = env.store.read((db) => get(db, requestId));
 	if (!found) throw new Error("inference_request_missing");
 	const row: RequestRow = found;
+	if (
+		outputContract &&
+		(row.purpose !== "llm" ||
+			!outputContract.outputSchema ||
+			typeof outputContract.outputSchema !== "object" ||
+			Array.isArray(outputContract.outputSchema))
+	)
+		throw new Error("invalid_output_contract");
+	if (outputContract && Array.isArray(input)) {
+		const added = input[0]?.role === "system" ? 0 : 1;
+		input = operationOutputMessages(input, outputContract);
+		if (added && session?.context)
+			session = {
+				...session,
+				context: {
+					...session.context,
+					instructionCount: session.context.instructionCount + added,
+				},
+			};
+	}
+	if (row.purpose === "llm" && Array.isArray(input)) {
+		log.debug("inference.input_measured", {
+			requestId,
+			kind: "estimated_tokens",
+			count: estimateMessageTokens(input),
+			bytes: Buffer.byteLength(JSON.stringify(input)),
+			messageCount: input.length,
+		});
+		if (outputContract)
+			log.debug("inference.output_contract_measured", {
+				requestId,
+				kind: "estimated_tokens",
+				count: estimateJsonTokens(outputContract.outputSchema),
+			});
+	}
 	if (voiceOverride && row.purpose !== "tts")
 		throw new Error("invalid_voice_override");
 	const resolvedSession = resolveSession(row, session);
+	// Optional helpers are hidden calls: even partial provider text cannot be published as answer output.
+	if (session?.failureScope === "call") onDelta = undefined;
 	if (
 		row.purpose === "asr" &&
 		(!(input instanceof Uint8Array) ||
@@ -383,6 +427,7 @@ export async function executeRequest(
 			: {}),
 		...(session?.outputLimit ? { outputLimit: session.outputLimit } : {}),
 		control,
+		outputContract,
 		session: resolvedSession,
 		reason: null,
 		published: false,
@@ -397,13 +442,16 @@ export async function executeRequest(
 	try {
 		return await runAttempts(request, key);
 	} catch (error) {
-		await env.store.write((db) =>
-			db
-				.query(
-					"UPDATE inference_requests SET status='failed' WHERE id=? AND status='pending'",
-				)
-				.run(row.id),
-		);
+		// Optional auxiliary work shares the answer's authority, but its provider failure is not the answer's
+		// terminal state. Attempts still record the failure; cancellation/deadline and published output stay terminal.
+		if (session?.failureScope !== "call" || signal.aborted || request.published)
+			await env.store.write((db) =>
+				db
+					.query(
+						"UPDATE inference_requests SET status='failed' WHERE id=? AND status='pending'",
+					)
+					.run(row.id),
+			);
 		throw error;
 	} finally {
 		env.active.delete(row.id);

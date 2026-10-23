@@ -26,6 +26,41 @@ const check = (first: number | null, second: number | null): Step => ({
 	},
 });
 
+test("a provider failure in the completion check still answers the settled operation through the public API", async () => {
+	const h = await harness({
+		timers: true,
+		completion: () => {
+			throw new Error("chat_stream_incomplete");
+		},
+	});
+	try {
+		const response = await h.request("/api/runs", {
+			requestId: crypto.randomUUID(),
+			conversationId: "main",
+			text: "3分タイマー測って",
+		});
+		expect(response.status).toBe(202);
+		const run = await response.json();
+		expect(
+			(await h.dialogue.waitForTerminal(run.id, { timeoutMs: 8000 }))?.status,
+		).toBe("completed");
+		expect(h.completionContexts).toHaveLength(1);
+		expect(h.parentContexts.at(-1)).toContain("照合できませんでした");
+		expect(h.dialogue.answerText(run.id)).toContain("180秒");
+		expect(
+			h.store.read((db) =>
+				db
+					.query(
+						"SELECT COUNT(*) AS n FROM inference_attempts a JOIN inference_requests r ON r.id=a.request_id WHERE r.subject=? AND a.status='failed'",
+					)
+					.get(run.id),
+			),
+		).toEqual({ n: 1 });
+	} finally {
+		await h.close();
+	}
+});
+
 async function settled(h: Awaited<ReturnType<typeof harness>>, count: number) {
 	await waitFor(
 		() =>

@@ -8,9 +8,11 @@ import type {
 } from "../../domains/dialogue";
 import type { InferencePort } from "../../domains/inference";
 import type { MemoryService } from "../../domains/memory";
+import type { Database } from "bun:sqlite";
 import type {
 	AdapterRegistry,
 	ChildExecution,
+	ExecutionView,
 	ToolchainExecutionPort,
 } from "../../domains/tool-runtime";
 import type { SqliteStore } from "../../infrastructure/sqlite";
@@ -35,7 +37,54 @@ export type TaskExecutionHost = {
 	legacy?: import("./task-legacy-execution").TaskLegacyPorts;
 	browser?: import("../../domains/browser").BrowserService;
 	childOperations?: import("../../domains/tool-runtime").ChildOperationPort;
+	/**
+	 * True while the agency layer watches the conversation: a result notice is then held for the agency to
+	 * release at a moment it picks (spec agency-work-reports-design-2026-10-24). Questions are never held.
+	 */
+	holdResultInTransaction?: (db: Database, conversationId: string) => boolean;
 };
+
+/**
+ * Sends an execution's notice to its conversation (the conversation answers it as a background run). False when
+ * the execution no longer has a dialogue source (nothing to answer).
+ */
+export function sendExecutionNotice(
+	host: {
+		dialogue: Pick<
+			DialogueService,
+			"executionSourceInTransaction" | "notifyInTransaction"
+		>;
+		agents: {
+			executions: Pick<AgentRuntime["executions"], "sourceRunInTransaction">;
+		};
+	},
+	db: Database,
+	view: ExecutionView,
+	eventId: string,
+): boolean {
+	const { dialogue, agents } = host;
+	if (
+		!dialogue.executionSourceInTransaction(
+			db,
+			agents.executions.sourceRunInTransaction(db, view.id) ?? "",
+		)
+	)
+		return false;
+	dialogue.notifyInTransaction(db, {
+		requestId: eventId,
+		conversationId: view.conversationId,
+		text: JSON.stringify({
+			kind: view.question ? "task_question" : "task_result",
+			workRef: view.id,
+			revision: view.revision,
+			status: view.status,
+			request: view.request.slice(0, 500),
+			question: view.question,
+			result: executionNoticeResult(view.result),
+		}),
+	});
+	return true;
+}
 /** Composition of public operations. Only execution types dispatch here; the model chooses the purpose. */
 export function configureTaskExecution(host: TaskExecutionHost) {
 	const {
@@ -211,19 +260,19 @@ export function configureTaskExecution(host: TaskExecutionHost) {
 				)
 			)
 				return true;
-			dialogue.notifyInTransaction(db, {
-				requestId: eventId,
-				conversationId: view.conversationId,
-				text: JSON.stringify({
-					kind: view.question ? "task_question" : "task_result",
-					workRef: view.id,
-					revision: view.revision,
-					status: view.status,
-					request: view.request.slice(0, 500),
-					question: view.question,
-					result: executionNoticeResult(view.result),
-				}),
-			});
+			// Held: the event stays accepted and its delivery state "pending" (no notice run yet) until the agency
+			// releases it through sendExecutionNotice with the same request id.
+			if (
+				!view.question &&
+				host.holdResultInTransaction?.(db, view.conversationId) &&
+				agents.executions.holdReportInTransaction(db, {
+					eventId,
+					executionId: view.id,
+					conversationId: view.conversationId,
+				})
+			)
+				return false;
+			sendExecutionNotice(host, db, view, eventId);
 			return false;
 		},
 		// A run follows the revision it started from (its definition is frozen in the run): a later revision of the

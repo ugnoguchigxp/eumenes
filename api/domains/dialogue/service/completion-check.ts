@@ -2,10 +2,14 @@ import { z } from "zod";
 import { systemContext } from "../../../infrastructure/system-context";
 import type { NativeTool } from "../../../infrastructure/chat-stream";
 import { parseLlmJson } from "../../../infrastructure/llm-json";
-import { getLogger } from "../../../infrastructure/logger";
+import { getLogger, withLogContext } from "../../../infrastructure/logger";
 import type { Database } from "bun:sqlite";
 import type { ConversationService } from "../../conversation";
 import type { Receipt } from "../../inference";
+import {
+	operationOutputContract,
+	operationOutputReceipt,
+} from "../../inference";
 import type { Run } from "../contracts";
 import {
 	byId,
@@ -200,11 +204,17 @@ export async function judgeCompletion(
 	input: { requestId?: string; completionCheck: CompletionCheck },
 	messages: ChatMessage[],
 	signal: AbortSignal,
+	/** Explicit comparison candidate; adoption follows the first-round live quality gate. */
+	operationOutput?: "json-schema",
 ): Promise<CompletionDecision> {
 	const check = input.completionCheck;
 	if (!input.requestId || !deps.larm.executeStream) return { status: "done" };
 	const steps = check.hop + 1;
 	const offered = tools(steps, check.conditions);
+	const contract =
+		operationOutput === "json-schema"
+			? operationOutputContract(offered)
+			: undefined;
 	// The condition this step was taken for; the first step served none.
 	const served = check.attempts.find((a) => a.step === steps)?.condition;
 	const checkMessages = (
@@ -255,19 +265,23 @@ export async function judgeCompletion(
 		signal.throwIfAborted();
 		let receipt: Receipt;
 		try {
-			receipt = await deps.larm.executeStream(
-				input.requestId,
-				attempt,
-				signal,
-				() => {},
-				undefined,
-				offered,
-				// Its only valid output is the check: the provider is told to call it rather than answer in text.
-				{
-					sessionRole: "auxiliary",
-					toolChoice: "required",
-					outputLimit: CHECK_OUTPUT_TOKENS,
-				},
+			receipt = await withLogContext({ phase: "completion_decision" }, () =>
+				deps.larm.executeStream!(
+					input.requestId!,
+					attempt,
+					signal,
+					() => {},
+					undefined,
+					offered,
+					// Both representations go through the same evidence and condition checks.
+					{
+						sessionRole: "auxiliary",
+						failureScope: "call",
+						...(!contract ? { toolChoice: "required" as const } : {}),
+						outputLimit: CHECK_OUTPUT_TOKENS,
+					},
+					contract,
+				),
 			);
 		} catch {
 			signal.throwIfAborted();
@@ -276,6 +290,8 @@ export async function judgeCompletion(
 			return { status: "unverified" };
 		}
 		try {
+			signal.throwIfAborted();
+			if (contract) receipt = operationOutputReceipt(receipt, offered);
 			const decision = parseDecision(receipt.toolCalls, check, steps);
 			if (decision.status !== "continue") return decision;
 			const failed = failedStep(check, steps);
@@ -294,6 +310,7 @@ export async function judgeCompletion(
 				return { status: "unmet", unmet: decision.unmet };
 			return { ...decision, need: decision.need, receipt };
 		} catch (error) {
+			signal.throwIfAborted();
 			const code =
 				error instanceof Error && error.message.startsWith("completion_")
 					? error.message
@@ -455,8 +472,8 @@ export function chainSuperseded(
 
 /**
  * Whether this generation phrases a delegated step's result for a user's request, and what its check reads.
- * Not checked: a new decision, a question back, a notice, a specialist session, a system prompt, or a run that
- * resumed a toolchain's question. The chain's last step is checked only to say what stays unmet. A continuation's
+ * Not checked: a new decision, a question back, a notice, a specialist session, a system prompt, a run that
+ * resumed a toolchain's question, or a screen's form submit (its toolchain was named: there is no chain to go on). The chain's last step is checked only to say what stays unmet. A continuation's
  * new decision searches the purpose it names instead.
  */
 export function completionCheckInTransaction(
@@ -482,6 +499,7 @@ export function completionCheckInTransaction(
 		phase.results.length > 0 &&
 		!phase.hostAside &&
 		!run.specialistSessionId &&
+		!run.pinnedToolchainId &&
 		hop <= MAX_CONTINUATIONS &&
 		(run.sourceKind === "manual" ||
 			run.sourceKind === "voice" ||

@@ -14,7 +14,7 @@
         "@playwright/mcp": "0.0.83",
         "@tanstack/react-query": "5.101.0",
         "bmp-ts": "1.0.9",
-        "eumenes-agency": "file:vendor/agency/eumenes-agency-0.0.1-5ff93a6afea5.tgz",
+        "eumenes-agency": "file:vendor/agency/eumenes-agency-0.0.1-92c4a2bc4c4e.tgz",
         "eumenes-memory": "file:vendor/eumenes-memory/eumenes-memory-0.0.2-6643656f3383.tgz",
         "eumenes-world-model": "file:vendor/world/eumenes-world-model-0.0.1.tgz",
         "google-auth-library": "11.1.0",
@@ -1334,7 +1334,7 @@
 
     "etag": ["etag@1.8.1", "", {}, "sha512-aIL5Fx7mawVa300al2BnEE4iNvo1qETxLrPI/o05L7z6go7fCw1J6EQmbK4FmJ2AS7kgVF/KEZWufBfdClMcPg=="],
 
-    "eumenes-agency": ["eumenes-agency@vendor/agency/eumenes-agency-0.0.1-5ff93a6afea5.tgz", { "dependencies": { "zod": "4.4.3" } }, "sha512-TG0fFKtRJJObtegScaI7q6XGBncBvmIeqE3dbyyrUAnSlvx6De2Gpar7NRoKMLnEIOIH6mlzQIy+RIws9ru24Q=="],
+    "eumenes-agency": ["eumenes-agency@vendor/agency/eumenes-agency-0.0.1-92c4a2bc4c4e.tgz", { "dependencies": { "zod": "4.4.3" } }, "sha512-iAAXK2m4pY/idiNNL8bVqKqyFC8lsaYokcO/THyvxI363iXFFu71zsW+gD0pzdlX785kkqs5c4K/jVz8ZbQE2g=="],
 
     "eumenes-memory": ["eumenes-memory@vendor/eumenes-memory/eumenes-memory-0.0.2-6643656f3383.tgz", {}, "sha512-+MIM2niIoJ+7GaycVEnuyl6zS5ZYH0Y3MAYyU/kEf9gfYZOMdNz99Jjal/ELF/ArdPoBTqhJue98M0J7FYlZAg=="],
 

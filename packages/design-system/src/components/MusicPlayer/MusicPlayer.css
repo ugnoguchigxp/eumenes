@@ -72,6 +72,27 @@
 	width: 3.5rem;
 	height: 3.5rem;
 }
+.music-player-controls .music-player-repeat {
+	position: relative;
+	color: var(--muted-foreground);
+	opacity: 0.55;
+}
+.music-player-controls .music-player-repeat[aria-pressed="true"] {
+	color: var(--destructive);
+	background: color-mix(in srgb, var(--destructive) 18%, transparent);
+	opacity: 1;
+}
+.music-player-controls .music-player-repeat[aria-pressed="true"]::after {
+	content: "";
+	position: absolute;
+	bottom: 0.15rem;
+	left: 50%;
+	width: 0.3rem;
+	height: 0.3rem;
+	border-radius: 50%;
+	background: currentColor;
+	transform: translateX(-50%);
+}
 .music-player-skip {
 	display: grid;
 	justify-items: center;

@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import { harness } from "../toolchain/toolchain.fixture";
 import { musicFixture, musicQuestion, musicTestPlan } from "./music.fixture";
+import { imageFixture, imageQuestion } from "./image.fixture";
 import { waitFor } from "../../infrastructure/wait-for";
 import {
 	isAnalysisRound,
@@ -398,5 +399,63 @@ test("artwork is refused for an unfinished track and a provider failure is recor
 		);
 	} finally {
 		await g.close();
+	}
+});
+
+test("a music screen submit generates a track though the conversation retained only another toolchain", async () => {
+	const music = musicFixture("success");
+	const image = imageFixture("success");
+	let phase: "image" | "screen" = "image";
+	let screenAnalysis = 0;
+	const model = {
+		...music.model,
+		answer: async (...args: Parameters<typeof music.model.answer>) => {
+			if (phase === "image") return image.model.answer(...args);
+			if (isAnalysisRound(args[2]?.tools)) screenAnalysis++;
+			return music.model.answer(...args);
+		},
+	};
+	const h = await harness({
+		model,
+		musicGateway: music.gateway,
+		imageGateway: image.gateway,
+	});
+	try {
+		const earlier = await (
+			await h.request("/api/runs", {
+				requestId: crypto.randomUUID(),
+				conversationId: "main",
+				text: imageQuestion,
+			})
+		).json();
+		expect(
+			(await h.dialogue.waitForTerminal(earlier.id, { timeoutMs: 5000 }))
+				?.status,
+		).toBe("completed");
+		expect(h.image!.list("main")).toHaveLength(1);
+		phase = "screen";
+		const submitted = await (
+			await h.request("/api/runs", {
+				requestId: crypto.randomUUID(),
+				conversationId: "main",
+				text: musicQuestion,
+				presentation: "artifact",
+				toolchainId: "music.create",
+			})
+		).json();
+		expect(submitted.pinnedToolchainId).toBe("music.create");
+		expect(
+			(await h.dialogue.waitForTerminal(submitted.id, { timeoutMs: 5000 }))
+				?.status,
+		).toBe("completed");
+		expect(h.music!.list("main")).toHaveLength(1);
+		expect(h.music!.list("main")[0]!.state).toBe("completed");
+		// The screen's own toolchain took the request: no selection round, and no image was made for it.
+		expect(screenAnalysis).toBe(0);
+		expect(music.stages).toEqual(["plan", "answer"]);
+		expect(h.image!.list("main")).toHaveLength(1);
+		expect(music.requests.filter((r) => r.method === "POST")).toHaveLength(1);
+	} finally {
+		await h.close();
 	}
 });

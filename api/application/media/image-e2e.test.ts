@@ -1,6 +1,8 @@
 import { expect, test } from "bun:test";
 import { harness } from "../toolchain/toolchain.fixture";
 import { imageFixture, imageQuestion, imageTestPlan } from "./image.fixture";
+import { musicFixture, musicQuestion } from "./music.fixture";
+import { isAnalysisRound } from "../../domains/dialogue/test/analysis.fixture";
 import { waitFor } from "../../infrastructure/wait-for";
 for (const mode of [
 	"success",
@@ -208,6 +210,74 @@ test("capability revocation rejects a generated result at adoption", async () =>
 		).toHaveLength(1);
 	} finally {
 		release();
+		await h.close();
+	}
+});
+
+test("an image screen submit generates an image though the conversation retained only another toolchain", async () => {
+	const image = imageFixture("success");
+	const music = musicFixture("success");
+	let phase: "music" | "screen" = "music";
+	let screenAnalysis = 0;
+	const model = {
+		...image.model,
+		answer: async (...args: Parameters<typeof image.model.answer>) => {
+			if (phase === "music") return music.model.answer(...args);
+			if (isAnalysisRound(args[2]?.tools)) screenAnalysis++;
+			// A screen submit is not checked against its request: a check that broke would fail the run.
+			if (args[2]?.tools?.some((t) => t.function.name === "check_request"))
+				throw new Error("chat_stream_incomplete");
+			return image.model.answer(...args);
+		},
+	};
+	const h = await harness({
+		model,
+		imageGateway: image.gateway,
+		musicGateway: music.gateway,
+	});
+	try {
+		const earlier = await (
+			await h.request("/api/runs", {
+				requestId: crypto.randomUUID(),
+				conversationId: "main",
+				text: musicQuestion,
+			})
+		).json();
+		expect(
+			(await h.dialogue.waitForTerminal(earlier.id, { timeoutMs: 5000 }))
+				?.status,
+		).toBe("completed");
+		expect(h.music!.list("main")).toHaveLength(1);
+		phase = "screen";
+		const submitted = await (
+			await h.request("/api/runs", {
+				requestId: crypto.randomUUID(),
+				conversationId: "main",
+				text: imageQuestion,
+				presentation: "artifact",
+				toolchainId: "image.create",
+			})
+		).json();
+		expect(submitted.pinnedToolchainId).toBe("image.create");
+		expect(
+			(await h.dialogue.waitForTerminal(submitted.id, { timeoutMs: 5000 }))
+				?.status,
+		).toBe("completed");
+		const records = await (
+			await h.request("/api/images/generations?conversationId=main")
+		).json();
+		expect(records).toHaveLength(1);
+		expect(records[0].state).toBe("completed");
+		// The screen's own toolchain took the request: no selection round, and no track was made.
+		expect(screenAnalysis).toBe(0);
+		expect(image.stages).toEqual(["plan", "answer"]);
+		expect(h.music!.list("main")).toHaveLength(1);
+		expect(
+			image.requests.filter(
+				(r) => r.method === "POST" && r.path === "/v1/images/generations",
+			),
+		).toHaveLength(1);
+	} finally {
 		await h.close();
 	}
 });

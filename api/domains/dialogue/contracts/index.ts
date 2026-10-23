@@ -16,16 +16,35 @@ const submitFields = z.object({
 	viewing: viewingSchema.optional(),
 	/** Who the screen showed as listening; a different addressee now refuses the send (`addressee_changed`). */
 	addressee: addresseeSchema.optional(),
+	/** The screen's own toolchain: a form submit goes straight to it, never through the main agent's selection. */
+	toolchainId: z
+		.string()
+		.regex(/^[a-z0-9][a-z0-9.-]{0,63}$/)
+		.optional(),
 });
 const hasInput = (v: { text: string; attachmentIds?: string[] }) =>
 	!!(v.text || v.attachmentIds?.length);
-export const submitSchema = submitFields.refine(hasInput, "input_required");
+/** A pinned toolchain is a screen's form submit: only an artifact presentation carries one. */
+const pinnedOnScreen = (v: {
+	toolchainId?: string;
+	presentation?: string;
+	attachmentIds?: string[];
+	utteranceId?: string;
+}) =>
+	!v.toolchainId ||
+	(v.presentation === "artifact" &&
+		!v.attachmentIds?.length &&
+		v.utteranceId === undefined);
+export const submitSchema = submitFields
+	.refine(hasInput, "input_required")
+	.refine(pinnedOnScreen, "toolchain_requires_artifact");
 export type Submit = z.infer<typeof submitSchema>;
 /** Public HTTP input: voice runs are created only by voice-dialogue, never by clients. */
 export const publicSubmitSchema = submitFields
 	.omit({ utteranceId: true })
 	.strict()
-	.refine(hasInput, "input_required");
+	.refine(hasInput, "input_required")
+	.refine(pinnedOnScreen, "toolchain_requires_artifact");
 export type PublicSubmit = z.infer<typeof publicSubmitSchema>;
 export const runSchema = z.object({
 	id: z.string(),
@@ -55,6 +74,8 @@ export const runSchema = z.object({
 	occurrenceId: z.string().nullable(),
 	/** The specialist session this run is a turn of; null for the main conversation's runs. */
 	specialistSessionId: z.string().nullable(),
+	/** The toolchain a screen's form submit named; the run skips the main agent's selection. */
+	pinnedToolchainId: z.string().nullable().optional(),
 	createdAt: z.string(),
 	updatedAt: z.string(),
 });
