@@ -4,13 +4,9 @@ import { z } from "zod";
 const LANES = ["fixture", "live"] as const;
 export type Lane = (typeof LANES)[number];
 
-export const SERIALIZATIONS = ["larm-messages", "flattened"] as const;
-export type Serialization = (typeof SERIALIZATIONS)[number];
-
 const rawRowSchema = z
 	.object({
 		lane: z.enum(LANES),
-		arm: z.string().min(1),
 		caseId: z.string().min(1),
 		trial: z.number().int().min(1),
 		/**
@@ -36,7 +32,7 @@ const rawRowSchema = z
 		latencyMs: z.number().min(0),
 		messageCount: z.number().int().min(0),
 		promptBytes: z.number().int().min(0),
-		/** The product's token estimate (`estimateMessageTokens`) of the messages sent; only ratios between arms are used. */
+		/** The product's token estimate (`estimateMessageTokens`) of the messages sent; only ratios between runs are used. */
 		promptTokensEstimate: z.number().int().min(0),
 		promptSha256: z.string(),
 	})
@@ -62,16 +58,12 @@ export const runMetaSchema = z
 		format: z.literal("context-eval.run"),
 		experiment: z.string().min(1),
 		lane: z.enum(LANES),
-		/** How the arms' messages reached the model (evaluation design section 6.2). */
-		serialization: z.enum(SERIALIZATIONS),
 		split: z.enum(["dev", "holdout", "all"]),
 		startedAt: z.string(),
 		/** sha256 of manifest.json when the run was made, else null (nothing frozen yet). */
 		manifestSha256: z.string().nullable(),
 		/** Live only: sha256 of the saved LARM connection settings the run read. Null for the fixture lane. */
 		settingsSnapshot: z.string().nullable(),
-		arms: z.array(z.string().min(1)).min(1),
-		baseline: z.string().min(1),
 		trials: z.number().int().min(1),
 		concurrency: z.number().int().min(1),
 		caseIds: z.array(z.string().min(1)).min(1),
@@ -80,7 +72,7 @@ export const runMetaSchema = z
 			.object({
 				runDir: z.string(),
 				sourceRawSha256: z.string(),
-				/** `arm|caseId|trial` of every row that was replaced. */
+				/** `caseId|trial` of every row that was replaced. */
 				replaced: z.array(z.string()),
 			})
 			.strict()
@@ -89,17 +81,16 @@ export const runMetaSchema = z
 	.strict();
 export type RunMeta = z.infer<typeof runMetaSchema>;
 
-export const rowKey = (row: Pick<RawRow, "arm" | "caseId" | "trial">) =>
-	`${row.arm}|${row.caseId}|${row.trial}`;
+export const rowKey = (row: Pick<RawRow, "caseId" | "trial">) =>
+	`${row.caseId}|${row.trial}`;
 
-/** Rows must belong to the run they sit in: known arm and case, trial in range, one row per (arm, case, trial). */
+/** Rows must belong to the run they sit in: known case, trial in range, one row per (case, trial). */
 export function rawRowIssues(rows: readonly RawRow[], meta: RunMeta): string[] {
 	const issues: string[] = [];
 	const seen = new Set<string>();
 	for (const row of rows) {
 		const key = rowKey(row);
 		if (row.lane !== meta.lane) issues.push(`${key}: lane_mismatch`);
-		if (!meta.arms.includes(row.arm)) issues.push(`${key}: unknown_arm`);
 		if (!meta.caseIds.includes(row.caseId)) issues.push(`${key}: unknown_case`);
 		if (row.trial < 1 || row.trial > meta.trials)
 			issues.push(`${key}: trial_out_of_range`);

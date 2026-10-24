@@ -62,7 +62,7 @@ test("freezing twice with the same content is a no-op; changed holdout content i
 	]);
 });
 
-test("any frozen file (judge prompt, arm source) changing is refused, as are added and removed files", () => {
+test("any frozen file (judge prompt, harness source) changing is refused, as are added and removed files", () => {
 	const dir = tmp();
 	freeze(dir, manifest());
 	const changed = buildManifest({
@@ -77,10 +77,10 @@ test("any frozen file (judge prompt, arm source) changing is refused, as are add
 	const added = buildManifest({
 		experiment: "e",
 		frozenAt: "t",
-		files: [...files(), { path: "arms.ts", bytes: enc("x") }],
+		files: [...files(), { path: "extra.ts", bytes: enc("x") }],
 	});
 	expect(manifestChanges(manifest(), added)).toEqual([
-		{ path: "arms.ts", kind: "added" },
+		{ path: "extra.ts", kind: "added" },
 	]);
 	const removed = buildManifest({
 		experiment: "e",
@@ -119,29 +119,4 @@ test("a report directory is new every time and a report file is never overwritte
 	expect(() => createReportDir(root, "../escape", at)).toThrow(
 		"context_eval_experiment_name_invalid",
 	);
-});
-
-test("baseline prompt digests are part of the freeze: a changed product prompt is refused", () => {
-	const dir = tmp();
-	const withPrompts = (hash: string) =>
-		buildManifest({
-			experiment: "e",
-			frozenAt: "t",
-			files: files(),
-			baselinePrompts: { "ctx-f1-dev-01": hash },
-		});
-	freeze(dir, withPrompts("aaa"));
-	expect(freeze(dir, withPrompts("aaa")).created).toBe(false);
-	let error: unknown;
-	try {
-		freeze(dir, withPrompts("bbb"));
-	} catch (e) {
-		error = e;
-	}
-	expect(error).toBeInstanceOf(FreezeConflict);
-	expect((error as FreezeConflict).changes).toEqual([
-		{ path: "baseline-prompt:ctx-f1-dev-01", kind: "changed" },
-	]);
-	// The file check before a run leaves the prompt digests to the run itself.
-	expect(verifyFrozen(dir, manifest())).toEqual([]);
 });

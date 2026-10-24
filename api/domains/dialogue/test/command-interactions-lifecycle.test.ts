@@ -1,26 +1,26 @@
 import { afterEach, expect, test } from "bun:test";
 import { INTERACTION_POLICY } from "..";
 import { insertInteraction } from "../repository/interactions";
+import { settle } from "../../../infrastructure/wait-for";
 import {
-	REVISION,
 	BINDING,
 	PACKAGE,
-	ADAPTER,
-	operationCall,
-	lastUser,
-	until,
-	open,
-	setup,
+	REVISION,
 	answerFor,
-	resumedJobs,
+	setup,
+	until,
+	type Harness,
 } from "./command-interactions.fixture";
-import { settle } from "../../../infrastructure/wait-for";
+
+let h: Harness | undefined;
 afterEach(async () => {
-	for (const close of open.splice(0).reverse()) await close();
+	await h?.close();
+	h = undefined;
 });
+
 test("an answer whose request id already belongs to another run is a conflict, not a link", async () => {
-	const h = setup();
-	await h.clarified();
+	h = await setup();
+	await h.asked();
 	const interaction = h.interaction()!;
 	const eventId = crypto.randomUUID();
 	// A run with this very request id and the answer's own text already exists.
@@ -45,8 +45,8 @@ test("an answer whose request id already belongs to another run is a conflict, n
 	});
 });
 test("a failed operation ends the interaction without a receipt", async () => {
-	const h = setup();
-	await h.clarified();
+	h = await setup();
+	await h.asked();
 	const interaction = h.interaction()!;
 	h.state.commands.push({
 		action: "invoke",
@@ -60,15 +60,15 @@ test("a failed operation ends the interaction without a receipt", async () => {
 		expectedRevision: 0,
 		input: { durationSeconds: 5 },
 	});
-	await until(() => h.interaction()?.status === "cancelled");
+	await until(() => h!.interaction()?.status === "cancelled");
 	expect(h.interaction()!.receiptRef).toBeNull();
 	expect(h.rows("SELECT end_code FROM command_interactions")[0].end_code).toBe(
 		"revision_conflict",
 	);
 });
 test("answers are refused for a stale question or revision, an invalid value, or a changed version", async () => {
-	const h = setup();
-	await h.clarified();
+	h = await setup();
+	await h.asked();
 	const interaction = h.interaction()!;
 	const base = {
 		eventId: crypto.randomUUID(),
@@ -76,7 +76,7 @@ test("answers are refused for a stale question or revision, an invalid value, or
 		expectedRevision: 0,
 		input: { durationSeconds: 60 },
 	};
-	const runs = () => h.rows("SELECT id FROM dialogue_runs").length;
+	const runs = () => h!.rows("SELECT id FROM dialogue_runs").length;
 	const before = runs();
 	await expect(
 		h.interactions.answer(interaction.id, {
@@ -110,8 +110,8 @@ test("answers are refused for a stale question or revision, an invalid value, or
 	expect(h.interaction()!.status).toBe("cancelled");
 });
 test("an answer past the question's time is expired, not resumed", async () => {
-	const h = setup();
-	await h.clarified();
+	h = await setup();
+	await h.asked();
 	const interaction = h.interaction()!;
 	h.state.offset = INTERACTION_POLICY.answerTtlMs + 60_000;
 	// A read already shows it expired; no question is offered any more.
@@ -131,8 +131,8 @@ test("an answer past the question's time is expired, not resumed", async () => {
 	);
 });
 test("maintenance expires open questions and ends interactions whose run is gone", async () => {
-	const h = setup();
-	await h.clarified();
+	h = await setup();
+	await h.asked();
 	h.state.offset = INTERACTION_POLICY.answerTtlMs + 60_000;
 	expect(await h.interactions.maintenance()).toMatchObject({ expired: 1 });
 	expect(h.rows("SELECT status FROM command_interactions")[0].status).toBe(
@@ -140,8 +140,8 @@ test("maintenance expires open questions and ends interactions whose run is gone
 	);
 });
 test("an answer and its new run commit together: a refused job leaves the question open", async () => {
-	const h = setup();
-	await h.clarified();
+	h = await setup();
+	await h.asked();
 	const interaction = h.interaction()!;
 	const runs = h.rows("SELECT id FROM dialogue_runs").length;
 	const messages = h.conversation.get("main").messages.length;
@@ -174,8 +174,8 @@ test("an answer and its new run commit together: a refused job leaves the questi
 	expect(again.replay).toBe(false);
 });
 test("at most three questions are asked; the fourth stops the operation", async () => {
-	const h = setup();
-	await h.clarified("一つ目");
+	h = await setup();
+	await h.asked("一つ目");
 	for (const prompt of ["二つ目", "三つ目"]) {
 		const current = h.interaction()!;
 		h.state.commands.push({ action: "clarify", question: prompt });
@@ -187,8 +187,8 @@ test("at most three questions are asked; the fourth stops the operation", async 
 		});
 		await until(
 			() =>
-				h.interaction()?.question?.prompt === prompt &&
-				h.interaction()?.status === "waiting_input",
+				h!.interaction()?.question?.prompt === prompt &&
+				h!.interaction()?.status === "waiting_input",
 		);
 	}
 	expect(h.interaction()).toMatchObject({
@@ -204,7 +204,7 @@ test("at most three questions are asked; the fourth stops the operation", async 
 		expectedRevision: third.revision,
 		input: answerFor(third.question!),
 	});
-	await until(() => h.status(runId) === "failed");
+	await until(() => h!.status(runId) === "failed");
 	expect(h.dialogue.get(runId)?.error).toBe("question_limit_reached");
 	expect(h.interaction()).toMatchObject({
 		status: "cancelled",
@@ -212,8 +212,8 @@ test("at most three questions are asked; the fourth stops the operation", async 
 	});
 });
 test("cancelling closes the question, refuses a late answer and stops a resumed run still in flight", async () => {
-	const h = setup();
-	await h.clarified();
+	h = await setup();
+	await h.asked();
 	const interaction = h.interaction()!;
 	const cancelled = await h.interactions.cancel(interaction.id, {
 		eventId: crypto.randomUUID(),
@@ -245,8 +245,8 @@ test("cancelling closes the question, refuses a late answer and stops a resumed 
 	).toBe("cancelled");
 });
 test("a model result that arrives after the interaction was cancelled is not adopted", async () => {
-	const h = setup();
-	await h.clarified();
+	h = await setup();
+	await h.asked();
 	const interaction = h.interaction()!;
 	let release!: () => void;
 	h.state.gate = new Promise<void>((resolve) => (release = resolve));
@@ -261,117 +261,20 @@ test("a model result that arrives after the interaction was cancelled is not ado
 		expectedRevision: 0,
 		input: { durationSeconds: 60 },
 	});
-	await until(() => h.commandPrompts.length === 2);
+	await until(() => h!.commandPrompts.length === 2);
 	await h.interactions.cancel(interaction.id, {
 		eventId: crypto.randomUUID(),
 		expectedRevision: 1,
 	});
 	release();
-	await until(() => h.status(runId) === "cancelled");
+	await until(() => h!.status(runId) === "cancelled");
 	await settle();
 	expect(h.started).toHaveLength(0);
 	expect(h.interaction()!.status).toBe("cancelled");
 });
-test("a reply in natural language answers an open question through its questionRef, and only that", async () => {
-	let ref = "";
-	const h = setup({
-		conversation: (call) => {
-			if (!call.tools.length) return undefined;
-			const text = lastUser(call.history);
-			if (text === "3分でお願い")
-				return {
-					toolCalls: operationCall({ request: text, questionRef: ref }),
-				};
-			return undefined;
-		},
-	});
-	h.state.commands.push({ action: "clarify", question: "何秒ですか" });
-	const first = await h.run("偽の操作を開始して");
-	await until(() => h.status(first.id) === "completed");
-	// With no open question the function takes only `request`.
-	expect(
-		Object.keys(
-			(h.conversationCalls[0]!.tools[0]!.function.parameters as any).properties,
-		),
-	).toEqual(["request"]);
-	const interaction = h.interaction()!;
-	ref = interaction.question!.questionId;
-	h.state.commands.push({
-		action: "invoke",
-		tool: "fake.start",
-		arguments: { seconds: 180 },
-	});
-	h.state.outcome = {
-		state: "saved",
-		adapterRef: ADAPTER,
-		operationId: "op-nl",
-		digest: "digest-nl",
-	};
-	const second = await h.run("3分でお願い");
-	await until(() => h.interaction()?.status === "completed");
-	// The conversation saw the open question as data and could name only its ref.
-	const call = h.conversationCalls.find((c) =>
-		c.history.some((m) => m.content.includes("openQuestions")),
-	)!;
-	expect(JSON.stringify(call.history)).toContain(ref);
-	expect(
-		(call.tools[0]!.function.parameters as any).properties.questionRef.enum,
-	).toEqual([ref]);
-	// The utterance's own run resumed the interaction; no extra run was made.
-	expect(
-		h.rows("SELECT current_run_id FROM command_interactions")[0].current_run_id,
-	).toBe(second.id);
-	expect(JSON.stringify(h.commandPrompts.at(-1))).toContain("3分でお願い");
-	expect(h.started.at(-1)!.rootRunId).toBe(second.id);
-	expect(h.rows("SELECT id FROM dialogue_runs")).toHaveLength(2);
-	// Answered once: the question is no longer offered.
-	const before = h.conversationCalls.length;
-	await h.run("もう一度");
-	await until(() => h.conversationCalls.length > before);
-	expect(
-		h.conversationCalls
-			.at(-1)!
-			.history.some((m) => m.content.includes("openQuestions")),
-	).toBe(false);
-});
-test("a questionRef that is not an open question of the offered function is rejected", async () => {
-	const h = setup({
-		conversation: (call) =>
-			call.tools.length
-				? {
-						toolCalls: operationCall({
-							request: "3分でお願い",
-							questionRef: crypto.randomUUID(),
-						}),
-					}
-				: undefined,
-	});
-	const run = await h.run("3分でお願い");
-	await until(() => h.status(run.id) === "failed");
-	expect(h.dialogue.get(run.id)?.error).toBe("invalid_conversation_operation");
-	expect(resumedJobs(h)).toHaveLength(0);
-});
-test("a natural-language answer to a question whose chain has since changed stops with version_invalidated", async () => {
-	let ref = "";
-	const h = setup({
-		conversation: (call) =>
-			call.tools.length && lastUser(call.history) === "3分"
-				? { toolCalls: operationCall({ request: "3分", questionRef: ref }) }
-				: undefined,
-	});
-	await h.clarified();
-	ref = h.interaction()!.question!.questionId;
-	// The offer now names a newer revision of the same function.
-	h.state.activeRevision = "toolchain:fake.manage@2";
-	const run = await h.run("3分");
-	await until(() => h.status(run.id) === "failed");
-	expect(h.dialogue.get(run.id)?.error).toBe("version_invalidated");
-	expect(h.interaction()!.status).toBe("cancelled");
-	expect(h.started).toHaveLength(0);
-});
 test("interactions are bounded: open and total capacity refuse a new one, and ending keeps the body for 30 days", async () => {
-	const h = setup();
-	const base = await h.clarified();
+	h = await setup();
+	const base = await h.asked();
 	const template = h.rows("SELECT * FROM command_interactions")[0];
 	await h.store.write((db) => {
 		for (let i = 1; i < INTERACTION_POLICY.maxOpen; i++)
@@ -411,13 +314,13 @@ test("interactions are bounded: open and total capacity refuse a new one, and en
 			});
 	});
 	h.state.commands.push({ action: "clarify", question: "もう一件" });
-	const run = await h.run("偽の操作を開始して");
-	await until(() => h.status(run.id) === "failed");
+	h.delegate("偽の操作を開始して");
+	const run = await h.say("偽の操作を開始して", "failed");
 	expect(h.dialogue.get(run.id)?.error).toBe("interaction_capacity");
 });
 test("ended interactions lose their bodies after 30 days and their rows after 30 more", async () => {
-	const h = setup();
-	await h.clarified();
+	h = await setup();
+	await h.asked();
 	const interaction = h.interaction()!;
 	await h.interactions.cancel(interaction.id, {
 		eventId: crypto.randomUUID(),
@@ -447,8 +350,8 @@ test("ended interactions lose their bodies after 30 days and their rows after 30
 	expect(h.rows("SELECT id FROM command_interaction_events")).toHaveLength(0);
 });
 test("an interaction whose run ended without finishing it is closed", async () => {
-	const h = setup();
-	await h.clarified();
+	h = await setup();
+	await h.asked();
 	const interaction = h.interaction()!;
 	h.state.gate = new Promise<void>(() => {});
 	await h.interactions.answer(interaction.id, {
@@ -457,7 +360,7 @@ test("an interaction whose run ended without finishing it is closed", async () =
 		expectedRevision: 0,
 		input: { durationSeconds: 60 },
 	});
-	await until(() => h.commandPrompts.length === 2);
+	await until(() => h!.commandPrompts.length === 2);
 	// The process went away while the sub-agent was thinking.
 	await h.store.write((db) =>
 		db

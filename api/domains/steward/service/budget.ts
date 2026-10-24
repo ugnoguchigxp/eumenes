@@ -1,5 +1,5 @@
 import {
-	EXCHANGES_PER_UNIT,
+	EVENTS_PER_UNIT,
 	MESSAGE_HEAD_BYTES,
 	MESSAGE_MAX_BYTES,
 	MESSAGE_TAIL_BYTES,
@@ -37,15 +37,15 @@ export const clipChars = (text: string, chars: number) =>
 	[...text].slice(0, chars).join("");
 
 /**
- * The exchanges that fit one step's input: the first always, then in order while there are at most
- * `EXCHANGES_PER_UNIT` of them and their messages fit `UNIT_INPUT_BYTES`. One exchange alone is at most
- * 4 x 6 KB, so the first always fits. What is left over waits for the next unit.
+ * The items (events, messages) that fit one step's input: the first always, then in order while there are at most
+ * `EVENTS_PER_UNIT` of them and their texts fit `UNIT_INPUT_BYTES`. One item alone is at most 6 KB, so the first
+ * always fits. What is left over waits for the next unit.
  */
-export function fitExchanges<T extends { bytes: number }>(
+export function fitEvents<T extends { bytes: number }>(
 	candidates: readonly T[],
 	options: { maxCount?: number; maxBytes?: number } = {},
 ): { fit: T[]; rest: T[] } {
-	const maxCount = options.maxCount ?? EXCHANGES_PER_UNIT;
+	const maxCount = options.maxCount ?? EVENTS_PER_UNIT;
 	const maxBytes = options.maxBytes ?? UNIT_INPUT_BYTES;
 	const fit: T[] = [];
 	let bytes = 0;

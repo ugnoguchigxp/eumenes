@@ -57,6 +57,7 @@ export function createSpeechSynthesis({
 			skipped: 0,
 			chunks: new Map(),
 			finished: false,
+			played: [],
 			wake,
 			async waitForPlayback(signal) {
 				const through = chunkOrder;

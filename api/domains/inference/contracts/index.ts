@@ -110,16 +110,12 @@ export type CallSession = {
 	refs?: {
 		messageIds: readonly string[];
 		itemIds: readonly string[];
-		/** The conversation the prompt belongs to: deleting its summary revokes the call (`deletedSummaryConversationIds`). */
-		conversationId?: string;
 	};
 };
 /** What a forget purge hands inference: the attempts standing on these references are revoked. */
 export type AgentAttemptRevocation = {
 	messageIds: readonly string[];
 	itemIds: readonly string[];
-	/** Conversations whose summary was deleted (the field name is memory's `ForgetPurge`). */
-	deletedSummaryConversationIds: readonly string[];
 };
 export interface InferencePort {
 	codexResearchAvailable?(): boolean;

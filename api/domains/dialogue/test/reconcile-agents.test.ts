@@ -10,22 +10,13 @@ import { join } from "node:path";
 import { configureLogging } from "../../../infrastructure/logger";
 import { openStore, type SqliteStore } from "../../../infrastructure/sqlite";
 import type { AgentRuntime } from "../../agent-runtime";
-import {
-	migration as conversationMigration,
-	avatarMotionMigration as conversationAvatarMotionMigration,
-	answerDeliveryMigration as conversationAnswerDeliveryMigration,
-	createConversationService,
-} from "../../conversation";
+import { createConversationService } from "../../conversation";
+import { createContinuityService } from "../../continuity";
 import type { InferencePort } from "../../inference";
 import type { LarmPort } from "../../larm";
-import { createQueue, migration as queueMigration } from "../../queue";
-import {
-	createDialogueService,
-	agentLinkMigration,
-	migration,
-	queueLinkMigration,
-	worldStateMigration,
-} from "..";
+import { createQueue } from "../../queue";
+import { createDialogueService } from "..";
+import { dialogueMigrationList } from "./store.fixture";
 
 const dirs: string[] = [];
 const stores: SqliteStore[] = [];
@@ -47,16 +38,7 @@ type RootMode = (call: number) => unknown;
 async function setup(root: RootMode, failed: { ids: string[] } = { ids: [] }) {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-reconcile-"));
 	dirs.push(dir);
-	const store = openStore(join(dir, "db.sqlite3"), [
-		conversationMigration,
-		conversationAvatarMotionMigration,
-		conversationAnswerDeliveryMigration,
-		migration,
-		queueMigration,
-		queueLinkMigration,
-		agentLinkMigration,
-		worldStateMigration,
-	]);
+	const store = openStore(join(dir, "db.sqlite3"), dialogueMigrationList());
 	stores.push(store);
 	const logs: { event?: string; reason?: string }[] = [];
 	configureLogging({
@@ -94,6 +76,7 @@ async function setup(root: RootMode, failed: { ids: string[] } = { ids: [] }) {
 		conversation,
 		larm,
 		queue,
+		continuity: createContinuityService(store),
 		agents,
 	});
 	const run = await dialogue.submit({

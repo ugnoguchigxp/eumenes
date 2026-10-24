@@ -1,0 +1,61 @@
+{
+	"id": "ctx-f1-dev-05",
+	"family": "F1",
+	"split": "dev",
+	"seed": {
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "butler"
+		},
+		"longTerm": [
+			{
+				"kind": "preference",
+				"key": "food.spicy",
+				"text": "辛い料理が好き"
+			}
+		],
+		"events": [
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-20T03:00:00.000Z",
+				"text": "今日だけは胃の調子が悪いから、辛くない店がいい"
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-20T03:00:04.000Z",
+				"text": "わかりました。今日は辛くないお店を選びます。",
+				"origin": "reply"
+			},
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-20T03:30:00.000Z",
+				"text": "お昼は軽めにしたよ"
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-20T03:30:03.000Z",
+				"text": "よい判断ですね。",
+				"origin": "reply"
+			}
+		]
+	},
+	"input": "夜に行く店を探したいな。希望に合う店を考えて",
+	"expect": {
+		"checks": [
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "follows_current_request",
+				"condition": "今日だけ辛くない店がいいという同じ日の一時的な例外が、夜の店探しにも続いている。辛い料理を勧めていない。"
+			}
+		]
+	}
+}

@@ -1,0 +1,48 @@
+{
+	"id": "ctx-f11-dev-03",
+	"family": "F11",
+	"split": "dev",
+	"seed": {
+		"events": [
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-20T06:00:00.000Z",
+				"text": "週末はどこかへ出かけたいな"
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-20T06:00:04.000Z",
+				"text": "近場の植物園はいかがでしょう。",
+				"origin": "reply"
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-20T06:03:00.000Z",
+				"text": "そういえば、今週末は風が強いみたいですよ。",
+				"origin": "spontaneous"
+			}
+		],
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "butler"
+		}
+	},
+	"input": "さっきの風の話は、僕が言ったんだっけ？",
+	"expect": {
+		"checks": [
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "delivery_aware",
+				"condition": "風の話はエージェント自身が自発的に言ったことで、利用者が言ったことではないと答えている。"
+			}
+		]
+	}
+}

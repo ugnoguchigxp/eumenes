@@ -1,0 +1,68 @@
+{
+	"id": "ctx-f3-dev-05",
+	"family": "F3",
+	"split": "dev",
+	"seed": {
+		"events": [
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-20T01:00:00.000Z",
+				"text": "待ち合わせは七時にしよう",
+				"key": "old"
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-20T01:00:03.000Z",
+				"text": "七時で承知しました。",
+				"origin": "reply"
+			},
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-20T02:00:00.000Z",
+				"text": "やっぱり待ち合わせは八時に変えよう"
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-20T02:00:03.000Z",
+				"text": "八時に変更しますね。",
+				"origin": "reply"
+			},
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-20T00:30:00.000Z",
+				"text": "待ち合わせは六時にしたいんだけど、どう？"
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-20T00:30:03.000Z",
+				"text": "六時も良いですね。",
+				"origin": "reply"
+			}
+		],
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "butler"
+		}
+	},
+	"input": "待ち合わせは何時になったんだっけ",
+	"expect": {
+		"checks": [
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "uses_newest_fact",
+				"condition": "log の並びは追記した順だが、at が最も新しい発言（二時の「八時に変えよう」）に従って、待ち合わせを八時と答えている。六時や七時を現在の時刻として答えていない。"
+			}
+		]
+	}
+}

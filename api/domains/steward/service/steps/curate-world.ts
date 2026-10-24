@@ -19,7 +19,7 @@ import type {
 } from "../types";
 
 /**
- * curate-world (T5): the steward's model call over the events World received. The window is one exchange (at most
+ * curate-world (T5): the steward's model call over the events World received. The window is one run (at most
  * two events: the user's message and the adopted answer); the World package closes every claim over ALL the
  * window's messages (each becomes the claim's manifest), so a small window keeps that closure small.
  * World owns what the model may see (`prepareCurationInTransaction`) and what of its answer is accepted
@@ -64,7 +64,7 @@ function prepare(
 			claims: prepared.model.claims,
 		},
 		targets: { events: prepared.eventIds },
-		summaryRevision: null,
+		windowVersion: null,
 		context: { prepared } satisfies WorldContext,
 	};
 }

@@ -1,27 +1,30 @@
 import { taskPlan, taskItem } from "./task-plan.fixture";
 import { expect, test } from "bun:test";
-import { analysisArgs } from "../../domains/dialogue/test/analysis.fixture";
 import { waitFor } from "../../infrastructure/wait-for";
 import { harness } from "./toolchain.fixture";
+import {
+	afterUtterance,
+	candidatesOf,
+	findToolchain,
+	respond,
+	toolResults,
+	UNAVAILABLE_TEXT,
+	type Candidate,
+} from "./conversation-script.fixture";
+import { handOverTask } from "./task-delegation.fixture";
 
-const requestArgs = (request: string) => ({
-	...analysisArgs({ kind: "action", impact: "create" }),
-	request,
-	contextRefs: [],
-	announcement: "順に進めます。",
-});
-test("the public conversation entry starts a parent directly and executes two registered timer commands without merging their source run", async () => {
+test("the conversation hands a request to the task toolchain and it executes two registered timer commands without merging their source run", async () => {
 	let steps = 0,
 		translations = 0;
 	const observed: string[][] = [];
+	const request = "短いタイマーを二つ作って";
 	const h = await harness({
 		everyday: true,
 		timers: true,
-		routeTool: "timer",
-		firstRound: () => ({
-			name: "execute_task",
-			args: requestArgs("一つ目の短いタイマーを作る"),
-		}),
+		discoveryTarget: (query) =>
+			query === "タイマーの作成" ? "timer" : "execute_task",
+		firstRound: (_tools, _question, messages) =>
+			handOverTask(request, "順に進めます。")(messages),
 		command: () =>
 			JSON.stringify({
 				action: "invoke",
@@ -43,10 +46,10 @@ test("the public conversation entry starts a parent directly and executes two re
 					role: "user",
 					content:
 						"CONVERSATION_REFERENCE=" +
-						JSON.stringify({ delegationSummary: "一つ目の短いタイマーを作る" }),
+						JSON.stringify({ delegationSummary: request }),
 				});
 				expect(packet).not.toHaveProperty("delegationSummary");
-				expect(packet.originalRequest).toBe("短いタイマーを二つ作って");
+				expect(packet.originalRequest).toBe(request);
 				expect(packet).not.toHaveProperty("request");
 				return {
 					name: "find_toolchain",
@@ -101,7 +104,7 @@ test("the public conversation entry starts a parent directly and executes two re
 		const source = await h.dialogue.submit({
 			requestId: crypto.randomUUID(),
 			conversationId: "main",
-			text: "短いタイマーを二つ作って",
+			text: request,
 		});
 		await waitFor(
 			() =>
@@ -114,6 +117,8 @@ test("the public conversation entry starts a parent directly and executes two re
 			status: "completed",
 			error: null,
 		});
+		// The run that handed the work over completes with the announcement as its answer (handed: false).
+		expect(h.dialogue.answerText(source.id)).toBe("順に進めます。");
 		const list = () =>
 			h.store.read((db) =>
 				h.toolchain.agents.executions.listInTransaction(db, "main"),
@@ -139,7 +144,8 @@ test("the public conversation entry starts a parent directly and executes two re
 		expect(roots).toHaveLength(2);
 		expect(new Set(roots.map((t) => t.id)).size).toBe(2);
 		expect(roots.every((t) => t.rootRunId === source.id)).toBe(true);
-		expect(h.commandContexts).toHaveLength(2); // Only the two children translate commands; the parent uses the R1 request directly.
+		// Only the two children translate commands; the parent hands the request over without a command.
+		expect(h.commandContexts).toHaveLength(2);
 		for (const context of h.commandContexts) {
 			const messages = JSON.parse(context);
 			const packet = JSON.parse(messages.at(-1).content);
@@ -151,38 +157,54 @@ test("the public conversation entry starts a parent directly and executes two re
 						item.label === "timer 1" && item.originRunId === null,
 				),
 			).toBe(true);
-			expect(packet.originalRequest).toBe("短いタイマーを二つ作って");
+			expect(packet.originalRequest).toBe(request);
 		}
 	} finally {
 		await h.close();
 	}
 }, 15_000);
 
-test("a public question is adopted in the original conversation, ordinary chat keeps the parent alive, and the answer resumes it once", async () => {
+test("a question of a task is reported into its TODO, ordinary chat keeps it waiting, and the work answer resumes it once", async () => {
 	let steps = 0;
-	let work: import("../../domains/tool-runtime").ExecutionView;
-	const h = await harness({
+	let h!: Awaited<ReturnType<typeof harness>>;
+	const request = "候補を選んで内容を説明して";
+	/** The TODO that waits for the question (the one open TODO of the conversation). */
+	const todoOfExecution = () => ({
+		todo: h.store
+			.read((db) => h.dialogue.todosInTransaction(db, "main"))
+			.find((item) => item.status === "waiting")!,
+	});
+	h = await harness({
 		everyday: true,
-		firstRound: (_tools, question) =>
-			question === "雑談です"
-				? { name: "answer", args: analysisArgs({ kind: "chat" }) }
-				: question === "二番目で続けて"
-					? {
-							name: "task_control",
-							args: {
-								...analysisArgs({ kind: "action", impact: "none" }),
-								workRef: work.id,
-								expectedRevision: work.revision,
-								action: "answer",
-								questionRef: work.question!.id,
-								input: "二番目",
-								announcement: "二番目で続けます。",
+		discoveryTarget: () => "execute_task",
+		firstRound: (_tools, question, messages) => {
+			if (question === "雑談です")
+				return { text: "雑談ですね。", calls: [respond()] };
+			if (question === "二番目で続けて") {
+				if (toolResults(afterUtterance(messages), "work").length === 0) {
+					const { todo } = todoOfExecution();
+					return {
+						calls: [
+							{
+								name: "work",
+								args: {
+									todo: todo.id,
+									operation: "answer",
+									revision: todo.revision,
+									questionId: todo.questionId,
+									text: "二番目",
+								},
 							},
-						}
-					: {
-							name: "execute_task",
-							args: requestArgs("候補を選んで内容を説明して"),
-						},
+						],
+					};
+				}
+				return {
+					text: "二番目で続けます。",
+					calls: [respond({ kind: "action", impact: "none" })],
+				};
+			}
+			return handOverTask(request, "候補を選んで説明します。")(messages);
+		},
 		taskStep: (_tools, messages) => {
 			const current = JSON.parse(messages.at(-1)!.content);
 			if (current.plan.required) return taskPlan("候補を選んで内容を説明する");
@@ -193,7 +215,7 @@ test("a public question is adopted in the original conversation, ordinary chat k
 					arguments: { question: "一番目と二番目のどちらを選びますか。" },
 				};
 			const packet = JSON.parse(messages.at(-1)!.content);
-			expect(packet.userAnswers[0].request).toBe("二番目で続けて");
+			expect(packet.userAnswers[0].request).toContain("二番目");
 			return {
 				name: "complete_task",
 				arguments: {
@@ -213,7 +235,7 @@ test("a public question is adopted in the original conversation, ordinary chat k
 		await h.dialogue.submit({
 			requestId: crypto.randomUUID(),
 			conversationId: "main",
-			text: "候補を選んで内容を説明して",
+			text: request,
 		});
 		await waitFor(
 			() =>
@@ -221,7 +243,7 @@ test("a public question is adopted in the original conversation, ordinary chat k
 				"waiting_user",
 			{ timeout: 5000 },
 		);
-		work = h.toolchain.agents.executions.list("main")[0]!;
+		const work = h.toolchain.agents.executions.list("main")[0]!;
 		await waitFor(() => events()[0]?.state === "delivered", { timeout: 5000 });
 		const chat = await h.dialogue.submit({
 			requestId: crypto.randomUUID(),
@@ -238,6 +260,7 @@ test("a public question is adopted in the original conversation, ordinary chat k
 			text: "二番目で続けて",
 		});
 		await h.dialogue.waitForTerminal(answer.id, { timeoutMs: 5000 });
+		expect(h.dialogue.answerText(answer.id)).toBe("二番目で続けます。");
 		await waitFor(
 			() =>
 				h.toolchain.agents.executions.get(work.id)?.status === "completed" &&
@@ -267,14 +290,14 @@ test("an instant child keeps the registered arguments and follows its explicit r
 		forecast: () => new Response("unavailable", { status: 503 }),
 	});
 	let steps = 0;
+	const request = "明日の鎌倉の天気を確認して結果を整理する";
 	const h = await harness({
 		everyday: true,
 		weather: { fetch: weather.fetch },
-		routeTool: "weather_forecast",
-		firstRound: () => ({
-			name: "execute_task",
-			args: requestArgs("明日の鎌倉の天気を確認して結果を整理する"),
-		}),
+		discoveryTarget: (query) =>
+			query === "weather forecast" ? "weather_forecast" : "execute_task",
+		firstRound: (_tools, _question, messages) =>
+			handOverTask(request, "明日の天気を確認します。")(messages),
 		taskStep: (_tools, messages) => {
 			const current = JSON.parse(messages.at(-1)!.content);
 			if (current.plan.required) return taskPlan("明日の鎌倉の天気を確認する");
@@ -315,7 +338,7 @@ test("an instant child keeps the registered arguments and follows its explicit r
 		const source = await h.dialogue.submit({
 			requestId: crypto.randomUUID(),
 			conversationId: "main",
-			text: "明日の鎌倉の天気を確認して結果を整理して",
+			text: request,
 		});
 		await waitFor(
 			() =>
@@ -323,6 +346,7 @@ test("an instant child keeps the registered arguments and follows its explicit r
 			{ timeout: 5000 },
 		);
 		expect(steps).toBe(3);
+		expect(h.dialogue.answerText(source.id)).toBe("明日の天気を確認します。");
 		const rows = h.store.read((db) =>
 			db
 				.query("SELECT input_json,result_json FROM agent_execution_steps")
@@ -342,14 +366,14 @@ test("an instant child keeps the registered arguments and follows its explicit r
 
 test("a session capability returns a checked handoff and does not secretly create or operate a session", async () => {
 	let steps = 0;
+	const request = "検索した資料を元に対話形式で画面を制作する";
 	const h = await harness({
 		everyday: true,
 		uiCompositions: true,
-		routeTool: "ui_create",
-		firstRound: () => ({
-			name: "execute_task",
-			args: requestArgs("検索した資料を元に対話形式で画面を制作する"),
-		}),
+		discoveryTarget: (query) =>
+			query === "interactive screen design" ? "ui_create" : "execute_task",
+		firstRound: (_tools, _question, messages) =>
+			handOverTask(request, "画面の制作を始めます。")(messages),
 		taskStep: (_tools, messages) => {
 			const packet = JSON.parse(messages.at(-1)!.content);
 			if (packet.plan.required)
@@ -372,7 +396,7 @@ test("a session capability returns a checked handoff and does not secretly creat
 		await h.dialogue.submit({
 			requestId: crypto.randomUUID(),
 			conversationId: "main",
-			text: "資料から対話して画面を作って",
+			text: request,
 		});
 		await waitFor(
 			() => h.toolchain.agents.executions.list("main")[0]?.status === "partial",
@@ -402,30 +426,30 @@ test("a session capability returns a checked handoff and does not secretly creat
 }, 10000);
 
 test("registered command candidates disclose their one-operation execution contract at selection time", async () => {
-	const { createToolchainRouting } = await import("./toolchain-routing");
-	const { analysisTools } =
-		await import("../../domains/dialogue/service/initial-decision");
-	const h = await harness({ timers: true, everyday: true });
+	let found: Candidate[] | undefined;
+	const h = await harness({
+		timers: true,
+		everyday: true,
+		discoveryTarget: () => "timer",
+		firstRound: (_tools, _question, messages) => {
+			found = candidatesOf(messages);
+			if (!found) return { calls: [findToolchain("タイマーを作る")] };
+			return {
+				text: UNAVAILABLE_TEXT,
+				calls: [respond({ unavailable: true })],
+			};
+		},
+	});
 	try {
-		const routing = createToolchainRouting(
-			h.toolchain.capabilities,
-			h.toolchain.history,
-			async () => undefined,
-			h.toolchain.registry,
-			h.toolchain.schemas,
-		);
-		const card = h.store.read((db) =>
-			routing.cardInTransaction(
-				db,
-				h.toolchain.capabilities
-					.toolchainsInTransaction(db)
-					.find((d) => d.id === "timers.manage")!.revisionId,
-			),
-		)!;
-		expect(card.execution).toBe("command");
-		expect(analysisTools([card])[0]!.function.description).toContain(
-			"実行形式: command",
-		);
+		const run = await h.dialogue.submit({
+			requestId: crypto.randomUUID(),
+			conversationId: "main",
+			text: "タイマーを作る",
+		});
+		await h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 });
+		const timer = found?.find((candidate) => candidate.id === "timers.manage");
+		expect(timer).toBeDefined();
+		expect(timer!.execution).toBe("command");
 	} finally {
 		await h.close();
 	}

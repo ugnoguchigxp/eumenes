@@ -1,0 +1,57 @@
+{
+	"id": "ctx-f12-holdout-03",
+	"family": "F12",
+	"split": "holdout",
+	"seed": {
+		"events": [
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-21T09:00:00.000Z",
+				"text": "洗濯機が終わる四十分後に教えて"
+			},
+			{
+				"type": "acted",
+				"at": "2026-10-21T09:00:02.000Z",
+				"fields": {
+					"action": "delegate",
+					"toolchain": "timer",
+					"request": "四十分後に知らせる"
+				}
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-21T09:00:03.000Z",
+				"text": "四十分後にお知らせします。",
+				"origin": "announcement"
+			}
+		],
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "butler"
+		}
+	},
+	"input": null,
+	"trigger": {
+		"kind": "timer",
+		"text": "四十分のタイマーが鳴りました"
+	},
+	"expect": {
+		"checks": [
+			{
+				"kind": "speaks"
+			},
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "speech_judgment",
+				"condition": "利用者が頼んだ四十分のタイマーが鳴ったので、それを知らせている。"
+			}
+		]
+	}
+}

@@ -1,0 +1,48 @@
+{
+	"id": "ctx-f1-holdout-05",
+	"family": "F1",
+	"split": "holdout",
+	"seed": {
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "butler"
+		},
+		"longTerm": [
+			{
+				"kind": "preference",
+				"key": "drink.coffee",
+				"text": "コーヒーはブラックが好き"
+			}
+		],
+		"events": [
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-19T03:00:00.000Z",
+				"text": "今日だけは甘いコーヒーが飲みたい気分"
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-19T03:00:04.000Z",
+				"text": "承知しました。今日は甘めにしましょう。",
+				"origin": "reply"
+			}
+		]
+	},
+	"input": "おやすみ前に飲むものを選んでほしいんだけど、いつもの好みで",
+	"expect": {
+		"checks": [
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "follows_current_request",
+				"condition": "一時的な例外は前日のもので、今日は元の好み（ブラック）に戻っている。ブラックのコーヒーを前提に答えている。"
+			}
+		]
+	}
+}

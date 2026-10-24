@@ -1,6 +1,7 @@
 import type { Database } from "bun:sqlite";
 import type { Migration } from "../../../infrastructure/sqlite";
 import type { ContinuityItem } from "../contracts";
+import { eventsMigration } from "./events";
 export const migration = `
 CREATE TABLE continuity_items (
  id TEXT PRIMARY KEY, conversation_id TEXT NOT NULL, kind TEXT NOT NULL CHECK(kind IN ('goal','decision','open_question')),
@@ -244,5 +245,10 @@ export const migrations: readonly Migration[] = [
 		id: "continuity/0003-item-source",
 		sql: itemSourceMigration,
 		after: ["continuity/0002-short-term"],
+	},
+	{
+		id: "continuity/0004-events",
+		sql: eventsMigration,
+		after: ["continuity/0003-item-source"],
 	},
 ];

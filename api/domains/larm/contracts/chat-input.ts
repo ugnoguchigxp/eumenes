@@ -51,8 +51,12 @@ export type ChatImage = {
 	width: number;
 	height: number;
 };
+/**
+ * One message of a chat request. An assistant message may carry the tool calls it made; a `tool` message is the
+ * host's result of one of them (`tool_call_id`), sent back in the same generation.
+ */
 export type ChatMessage = {
-	role: "system" | "user" | "assistant";
+	role: "system" | "user" | "assistant" | "tool";
 	content: string;
 	images?: ChatImage[];
 	tool_calls?: Array<{
@@ -60,6 +64,7 @@ export type ChatMessage = {
 		type: "function";
 		function: { name: string; arguments: string };
 	}>;
+	tool_call_id?: string;
 };
 export type ChatContentPart =
 	| { type: "text"; text: string }

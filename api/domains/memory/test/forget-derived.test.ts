@@ -36,19 +36,8 @@ async function setup() {
 	return { h, purges };
 }
 const exchange = async (h: MemoryHarness, user: string, answer: string) => {
-	const runId = `run-${user}`;
-	const inputMessageId = await h.say("user", user, "c1", runId);
-	const answerMessageId = await h.say("assistant", answer, "c1", runId);
-	await h.store.write((db) =>
-		h.memory.recordExchangeInTransaction(db, {
-			conversationId: "c1",
-			runId,
-			inputMessageId,
-			answerMessageId,
-			outcome: "answered",
-		}),
-	);
-	return { inputMessageId, answerMessageId };
+	const said = await h.exchange(user, answer);
+	return { inputMessageId: said.userId, answerMessageId: said.answerId! };
 };
 const journalPath = (h: MemoryHarness) => join(h.dir, "journal.jsonl");
 const blockPath = (h: MemoryHarness) => blockJournalPathOf(journalPath(h));

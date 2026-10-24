@@ -1,0 +1,62 @@
+{
+	"id": "ctx-f3-holdout-02",
+	"family": "F3",
+	"split": "holdout",
+	"seed": {
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "butler"
+		},
+		"episode": [
+			{
+				"kind": "summary",
+				"text": "お気に入りの再生リストは、ジャズ中心で作ることに決めた。",
+				"events": [
+					{
+						"type": "said",
+						"by": "user",
+						"at": "2026-10-11T22:00:00.000Z",
+						"text": "作業用の再生リストを作りたい。ジャズ中心でいこう"
+					},
+					{
+						"type": "said",
+						"by": "agent",
+						"at": "2026-10-11T22:00:03.000Z",
+						"text": "承知しました。ジャズを中心に選びます。",
+						"origin": "reply"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-16T22:30:00.000Z",
+				"text": "ジャズは眠くなるから、ボサノバ中心に切り替えて"
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-16T22:30:03.000Z",
+				"text": "かしこまりました。ボサノバ中心にいたします。",
+				"origin": "reply"
+			}
+		]
+	},
+	"input": "作業用の再生リストの方向性って、今どうなってる？",
+	"expect": {
+		"checks": [
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "uses_newest_fact",
+				"condition": "再生リストの方向性を、切り替え後のボサノバ中心として答えている。要約にあるジャズ中心を現在の方向性として答えていない。"
+			}
+		]
+	}
+}

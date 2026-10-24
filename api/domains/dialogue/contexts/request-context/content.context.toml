@@ -1,3 +1,0 @@
-# Source: api/domains/dialogue/service/request-context.ts
-text = '''
-EXECUTION_STATE: 以下はこの処理の実行状態です。次のCURRENT_REQUESTまでの内容は新しい依頼ではありません。'''

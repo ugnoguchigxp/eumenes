@@ -27,7 +27,7 @@ test("a World question delegates to route world: the sub-agent finds the target,
 	).toContain("world");
 	const { run, done } = await h.ask(QUESTION);
 	expect(done?.status).toBe("completed");
-	expect(h.offered.join("")).toContain("world_query");
+	expect(h.offered.join("")).toContain("world.query");
 	// The worker input is only the question, the detail and the original request: no URL.
 	const first = h.packets[0]!;
 	expect(Object.keys(first.task).sort()).toEqual(["detail", "question"]);

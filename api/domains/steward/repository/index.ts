@@ -9,8 +9,10 @@ import type {
 	UnitSlot,
 	UnitState,
 } from "../contracts";
+import { continuityEventsMigration } from "./events";
 import { worldGoalsMigration } from "./world-goals";
 
+export * from "./events";
 export * from "./world-goals";
 
 /**
@@ -70,6 +72,11 @@ export const migrations: readonly Migration[] = [
 		sql: worldGoalsMigration,
 		after: ["steward/0001-init"],
 	},
+	{
+		id: "steward/0003-continuity-events",
+		sql: continuityEventsMigration,
+		after: ["steward/0002-world-goals"],
+	},
 ];
 
 const CHUNK = 200;
@@ -84,17 +91,24 @@ const marks = (n: number) => Array.from({ length: n }, () => "?").join(",");
 // ---- units ----
 
 export type UnitTargets = {
-	/** Input message ids of the exchanges the step reads. */
-	exchanges?: string[];
+	/** The `seq` of the continuity events the step reads (the ones it settles). */
+	seqs?: number[];
 	/** Inbox ids of the requests a curate step settles. */
 	requests?: string[];
 	/** The maintenance revision an upkeep unit was made for. */
 	revision?: number;
-	/** The exchange the recall preparation stands on. */
-	message?: string;
+	/** The last event the recall preparation stands on. */
+	recallSeq?: number;
+	/**
+	 * What an episode unit prepares (`seq` range, both ends included): `log`, the oldest logged events the next
+	 * re-construction moves; `mark`, a range of an unsummarized mark; `merge`, consecutive shown parts.
+	 */
+	range?: { fromSeq: number; toSeq: number; of: "log" | "mark" | "merge" };
+	/** The part of `range` the unit really read (what fits its input). */
+	fitted?: { fromSeq: number; toSeq: number };
 	/** An upkeep unit made for the pending limit: it does not wait for the foreground. */
 	urgent?: boolean;
-	/** The World events a `world_events` unit curates (the events of one exchange, at most two). */
+	/** The World events a `world_events` unit curates (the events of one run's messages, at most two). */
 	events?: string[];
 };
 export interface UnitRow {
@@ -106,14 +120,15 @@ export interface UnitRow {
 	targets: UnitTargets;
 	attempt: number;
 	forgetSeq: number | null;
-	summaryRevision: number | null;
+	/** The window version the unit was prepared on (episode units: a re-construction since makes the result stale). */
+	windowVersion: number | null;
 	state: UnitState;
 	jobId: string | null;
 	createdAt: string;
 	closedAt: string | null;
 }
 const unitColumns = `id, conversation_id AS conversationId, kind, step, slot, targets, attempt, forget_seq AS forgetSeq,
- summary_revision AS summaryRevision, state, job_id AS jobId, created_at AS createdAt, closed_at AS closedAt`;
+ window_version AS windowVersion, state, job_id AS jobId, created_at AS createdAt, closed_at AS closedAt`;
 function mapUnit(row: Record<string, unknown>): UnitRow {
 	return {
 		...(row as unknown as Omit<UnitRow, "targets">),
@@ -175,15 +190,15 @@ export function setUnitPrepared(
 	id: string,
 	input: {
 		forgetSeq: number;
-		summaryRevision: number | null;
+		windowVersion: number | null;
 		targets: UnitTargets;
 	},
 ) {
 	db.query(
-		"UPDATE steward_unit SET forget_seq = ?, summary_revision = ?, targets = ? WHERE id = ? AND state = 'open'",
+		"UPDATE steward_unit SET forget_seq = ?, window_version = ?, targets = ? WHERE id = ? AND state = 'open'",
 	).run(
 		input.forgetSeq,
-		input.summaryRevision,
+		input.windowVersion,
 		JSON.stringify(input.targets),
 		id,
 	);
@@ -224,6 +239,25 @@ export function failedMaintenanceUnits(
 				 AND json_extract(targets, '$.revision') = ?`,
 			)
 			.get(conversationId, step, revision) as { n: number }
+	).n;
+}
+/** Units of an episode step over one range that ended in failure (the range is given up at the limit). */
+export function failedEpisodeUnits(
+	db: Database,
+	conversationId: string,
+	step: StepId,
+	range: { fromSeq: number; toSeq: number; of: string },
+): number {
+	return (
+		db
+			.query(
+				`SELECT COUNT(*) AS n FROM steward_unit WHERE conversation_id = ? AND step = ? AND state = 'failed'
+				 AND json_extract(targets, '$.range.fromSeq') = ? AND json_extract(targets, '$.range.toSeq') = ?
+				 AND json_extract(targets, '$.range.of') = ?`,
+			)
+			.get(conversationId, step, range.fromSeq, range.toSeq, range.of) as {
+			n: number;
+		}
 	).n;
 }
 /** Every conversation the steward has ever worked for (the startup kick starts from them). */
@@ -268,6 +302,8 @@ type QuietSteps = {
 	round?: { revision: number; count: number };
 	/** The number of pending additions a pending-limit consolidation was last made for. */
 	pending?: number;
+	/** Episode ranges with nothing to prepare (`step:from-to`): they are not made into a unit again. */
+	episode?: string[];
 };
 export interface StateRow {
 	conversationId: string;
@@ -276,7 +312,8 @@ export interface StateRow {
 	quiet: QuietSteps;
 	nextMaintenanceAt: number | null;
 	deferCount: number;
-	recallPending: string | null;
+	/** The last event the recall preparation stands on (`seq`). */
+	recallPending: number | null;
 }
 export function readState(db: Database, conversationId: string): StateRow {
 	const row = db
@@ -286,10 +323,19 @@ export function readState(db: Database, conversationId: string): StateRow {
 			 recall_pending AS recallPending FROM steward_state WHERE conversation_id = ?`,
 		)
 		.get(conversationId) as
-		| (Omit<StateRow, "conversationId" | "quiet"> & { quiet: string })
+		| (Omit<StateRow, "conversationId" | "quiet" | "recallPending"> & {
+				quiet: string;
+				recallPending: string | null;
+		  })
 		| null;
 	return row
-		? { conversationId, ...row, quiet: JSON.parse(row.quiet) as QuietSteps }
+		? {
+				conversationId,
+				...row,
+				quiet: JSON.parse(row.quiet) as QuietSteps,
+				recallPending:
+					row.recallPending === null ? null : Number(row.recallPending),
+			}
 		: {
 				conversationId,
 				maintenanceRevision: 0,
@@ -315,7 +361,7 @@ export function writeState(db: Database, state: StateRow) {
 		JSON.stringify(state.quiet),
 		state.nextMaintenanceAt,
 		state.deferCount,
-		state.recallPending,
+		state.recallPending === null ? null : String(state.recallPending),
 	);
 }
 
@@ -324,8 +370,8 @@ export function writeState(db: Database, state: StateRow) {
 export interface InboxRow {
 	id: string;
 	conversationId: string;
-	runId: string;
-	messageId: string;
+	/** The user's message the request was made in (the conversation message, not an event). */
+	sourceRef: string;
 	kind: RequestKind;
 	what: string;
 	detail: string | null;
@@ -335,16 +381,16 @@ export interface InboxRow {
 	createdAt: string;
 	resolvedAt: string | null;
 }
-const inboxColumns = `id, conversation_id AS conversationId, run_id AS runId, message_id AS messageId, kind, what, detail,
+const inboxColumns = `id, conversation_id AS conversationId, source_ref AS sourceRef, kind, what, detail,
  state, result_code AS resultCode, failures, created_at AS createdAt, resolved_at AS resolvedAt`;
+/** A request waits as `pending` at once. False when the id was already queued (the first stands). */
 export function insertInbox(
 	db: Database,
 	row: Pick<
 		InboxRow,
 		| "id"
 		| "conversationId"
-		| "runId"
-		| "messageId"
+		| "sourceRef"
 		| "kind"
 		| "what"
 		| "detail"
@@ -354,14 +400,13 @@ export function insertInbox(
 	return (
 		db
 			.query(
-				`INSERT OR IGNORE INTO steward_inbox (id, conversation_id, run_id, message_id, kind, what, detail, state, created_at)
-				 VALUES (?,?,?,?,?,?,?, 'staged', ?)`,
+				`INSERT OR IGNORE INTO steward_inbox (id, conversation_id, source_ref, kind, what, detail, state, created_at)
+				 VALUES (?,?,?,?,?,?, 'pending', ?)`,
 			)
 			.run(
 				row.id,
 				row.conversationId,
-				row.runId,
-				row.messageId,
+				row.sourceRef,
 				row.kind,
 				row.what,
 				row.detail,
@@ -376,40 +421,13 @@ export function readInbox(db: Database, id: string): InboxRow | null {
 			.get(id) as InboxRow | null) ?? null
 	);
 }
-export function inboxOfRun(
-	db: Database,
-	runId: string,
-	state: InboxState,
-): InboxRow[] {
-	return db
-		.query(
-			`SELECT ${inboxColumns} FROM steward_inbox WHERE run_id = ? AND state = ? ORDER BY created_at, id`,
-		)
-		.all(runId, state) as InboxRow[];
-}
-export function stagedRuns(db: Database): string[] {
+export function countOpenInbox(db: Database, conversationId: string): number {
 	return (
 		db
 			.query(
-				"SELECT DISTINCT run_id AS id FROM steward_inbox WHERE state = 'staged'",
+				"SELECT COUNT(*) AS n FROM steward_inbox WHERE conversation_id = ? AND state = 'pending'",
 			)
-			.all() as Array<{ id: string }>
-	).map((row) => row.id);
-}
-export function countOpenInbox(
-	db: Database,
-	conversationId: string,
-	runId?: string,
-): number {
-	return (
-		db
-			.query(
-				`SELECT COUNT(*) AS n FROM steward_inbox WHERE conversation_id = ? AND state IN ('staged','pending')
-				 ${runId ? "AND run_id = ?" : ""}`,
-			)
-			.get(...(runId ? [conversationId, runId] : [conversationId])) as {
-			n: number;
-		}
+			.get(conversationId) as { n: number }
 	).n;
 }
 /** Pending requests, oldest first. `goal` requests belong to the goal reflection, the others to curate-memory. */
@@ -426,20 +444,15 @@ export function pendingInbox(
 		)
 		.all(conversationId, limit) as InboxRow[];
 }
-export function setInboxPending(db: Database, id: string) {
-	db.query(
-		"UPDATE steward_inbox SET state = 'pending' WHERE id = ? AND state = 'staged'",
-	).run(id);
-}
 /**
- * Ends a request (done, none or discarded): its words are no longer kept (section 6). `afterForget`: the request was
+ * Ends a request (done or none): its words are no longer kept (section 6). `afterForget`: the request was
  * resolved in the same transaction as a forget whose purge already ended it as `forgotten` (its own message is among
  * the blocked ones); the resolution the curation reached replaces that ending.
  */
 export function resolveInbox(
 	db: Database,
 	id: string,
-	state: Extract<InboxState, "done" | "none" | "discarded">,
+	state: Extract<InboxState, "done" | "none">,
 	code: string | null,
 	now: string,
 	afterForget = false,
@@ -448,7 +461,7 @@ export function resolveInbox(
 		db
 			.query(
 				`UPDATE steward_inbox SET state = ?, result_code = ?, what = '', detail = NULL, resolved_at = ?
-				 WHERE id = ? AND (state IN ('staged','pending') OR (? = 1 AND state = 'none' AND result_code = 'forgotten'))`,
+				 WHERE id = ? AND (state = 'pending' OR (? = 1 AND state = 'none' AND result_code = 'forgotten'))`,
 			)
 			.run(state, code, now, id, afterForget ? 1 : 0).changes === 1
 	);
@@ -475,11 +488,11 @@ export function endInboxOfMessages(
 	for (const part of chunks(messageIds))
 		db.query(
 			`UPDATE steward_inbox SET state = 'none', result_code = ?, what = '', detail = NULL, resolved_at = ?
-			 WHERE state IN ('staged','pending') AND message_id IN (${marks(part.length)})`,
+			 WHERE state = 'pending' AND source_ref IN (${marks(part.length)})`,
 		).run(code, now, ...part);
 	for (const part of chunks(messageIds))
 		db.query(
-			`UPDATE steward_inbox SET what = '', detail = NULL WHERE message_id IN (${marks(part.length)}) AND what <> ''`,
+			`UPDATE steward_inbox SET what = '', detail = NULL WHERE source_ref IN (${marks(part.length)}) AND what <> ''`,
 		).run(...part);
 }
 
@@ -594,26 +607,6 @@ export function deleteDecisionsByRefs(
 		).run(...part);
 	}
 }
-/** The summary steps whose decisions stand on a conversation's summary. */
-const SUMMARY_STEPS = [
-	"summarize",
-	"compact-history",
-	"refine-summary",
-] as const;
-/** Deletes the summary-step decisions (and their refs) of these conversations: their summary was deleted. */
-export function deleteSummaryDecisions(
-	db: Database,
-	conversationIds: readonly string[],
-) {
-	for (const part of chunks(conversationIds)) {
-		const where = `conversation_id IN (${marks(part.length)}) AND step IN (${marks(SUMMARY_STEPS.length)})`;
-		const args = [...part, ...SUMMARY_STEPS];
-		db.query(
-			`DELETE FROM steward_decision_ref WHERE decision_id IN (SELECT id FROM steward_decision WHERE ${where})`,
-		).run(...args);
-		db.query(`DELETE FROM steward_decision WHERE ${where}`).run(...args);
-	}
-}
 const decisionColumns = `id, conversation_id AS conversationId, job_id AS jobId, step, created_at AS createdAt, output, results,
  window_version_before AS windowVersionBefore, window_version_after AS windowVersionAfter, duration_ms AS durationMs,
  output_tokens AS outputTokens, error_code AS errorCode`;
@@ -640,7 +633,7 @@ export function listDecisions(
 			.all(conversationId, limit) as Record<string, unknown>[]
 	).map(mapDecision);
 }
-/** The saved-memory decisions that read one of these messages (the dispose and summarize steps show them to the model). */
+/** The saved-memory decisions that read one of these messages (the summarize step shows them to the model). */
 export function decisionsOfMessages(
 	db: Database,
 	conversationId: string,

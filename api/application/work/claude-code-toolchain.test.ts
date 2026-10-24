@@ -87,7 +87,12 @@ test("a conversation request reaches Claude Code once saved, and its finished ta
 			const latest = messages
 				.filter((m) => m.role === "user" && !m.content.startsWith("{"))
 				.at(-1);
-			return latest?.content.includes("【通知】")
+			// The finished task reaches the result phase as the TODO's result (its summary names the README change).
+			const reported =
+				latest?.content.includes("【通知】") ||
+				(latest?.content.startsWith("新しい出来事があります") &&
+					JSON.stringify(messages).includes("README の手順修正"));
+			return reported
 				? "README の手順修正が終わりました。変更をコミットしますか？"
 				: "承知しました。終わったらお知らせします。";
 		},
@@ -207,14 +212,14 @@ test("a conversation request reaches Claude Code once saved, and its finished ta
 		expect(h.dialogue.answerText(report!.id)).toBe(
 			"README の手順修正が終わりました。変更をコミットしますか？",
 		);
-		const notice = parents.at(-1)!;
+		// The notice is the result phase's context that carries the finished report (every reply is recorded).
+		const notice = [...h.parentContexts]
+			.reverse()
+			.find((c) => c.includes("テストは未実行です"))!;
 		expect(notice).toContain("README の手順修正");
 		expect(notice).toContain("テストは未実行です");
-		// The worker's answer is a JSON string inside the notice: its quotes cannot close it.
-		const noticeText = (JSON.parse(notice) as Array<{ content: string }>).find(
-			(m) => m.content.startsWith("【通知】"),
-		)!.content;
-		expect(noticeText).toContain(JSON.stringify(lastAnswer));
+		// The worker's answer is a JSON string in the notice: its quotes cannot close it, so the context parses.
+		expect(() => JSON.parse(notice)).not.toThrow();
 		expect(notice).toContain(
 			"変更をコミットする・動作を確認する・追加で直す・やり直す",
 		);

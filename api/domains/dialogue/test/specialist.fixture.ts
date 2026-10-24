@@ -1,110 +1,56 @@
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { migrations as memoryPackageMigrations } from "eumenes-memory/sqlite";
-import { openStore, type SqliteStore } from "../../../infrastructure/sqlite";
+import { rmSync } from "node:fs";
 import { waitFor } from "../../../infrastructure/wait-for";
-import type { ToolchainCard } from "../../capabilities";
-import {
-	createConversationService,
-	migrations as conversationMigrations,
-} from "../../conversation";
+import type { NativeToolCall } from "../../../infrastructure/chat-stream";
+import type { ToolchainCard, ToolchainRuntimeMeta } from "../../capabilities";
 import {
 	createContinuityService,
-	itemSourceMigration,
-	migration as continuityMigration,
-	shortTermMigration,
+	type ConversationEvent,
 } from "../../continuity";
+import { createConversationService } from "../../conversation";
 import type { InferencePort, Receipt } from "../../inference";
-import {
-	agentHardeningMigration,
-	contextWindowMigration,
-	createMemoryService,
-	forgetClosureMigration,
-	migration as memoryMigration,
-	seedImportMigration,
-	specialistBlockReasonMigration,
-	stewardLedgersMigration,
-	turnVectorsMigration,
-} from "../../memory";
-import { createQueue, migration as queueMigration } from "../../queue";
-import {
-	createDialogueService,
-	migration as dialogueMigration,
-	retainedToolchainsMigration,
-	queueLinkMigration,
-	announcementMigration,
-	specialistMigration,
-	specialistEventsMigration,
-	type SpecialistPort,
-	type SpecialistSet,
-	type ToolchainRoutingPort,
-} from "..";
-import { pinnedToolchainMigration } from "../repository";
-import type { RejectedDraft } from "../contracts";
-import {
-	analysisReceipt,
-	ANSWER,
-	DISCOVERY,
-	isAnalysisRound,
-	NOTICE,
-	offeredToolchains,
-	UNAVAILABLE,
-} from "./analysis.fixture";
-import type { RequestAnalysis } from "../service/initial-decision";
+import { createMemoryService, type MemoryService } from "../../memory";
+import { createQueue } from "../../queue";
+import { createDialogueService } from "..";
+import type {
+	RejectedDraft,
+	SpecialistPort,
+	SpecialistSet,
+	StewardPort,
+} from "../contracts";
+import type { ImagePort } from "../contracts/image";
+import type { ToolchainRoutingPort } from "../contracts/toolchains";
+import type { ChatMessage } from "../service/context";
+import { IMAGE, respond, type Call, type Step } from "./generation.fixture";
+import { openDialogueStore } from "./store.fixture";
+
+export { IMAGE, respond, type Call, type Step };
 
 export const REVISION = "toolchain:fake.studio@1";
 export const OTHER_REVISION = "toolchain:fake.other@1";
 export const ADAPTER = "adapter:fake-studio@1";
 export const OTHER_ADAPTER = "adapter:fake-other@1";
+export const STUDIO_ARTIFACT = "artifact:fake.studio@1";
 
-const MIGRATIONS = [
-	...conversationMigrations,
-	dialogueMigration,
-	retainedToolchainsMigration,
-	queueMigration,
-	queueLinkMigration,
-	announcementMigration,
-	pinnedToolchainMigration,
-	specialistMigration,
-	specialistEventsMigration,
-	continuityMigration,
-	shortTermMigration,
-	itemSourceMigration,
-	memoryMigration,
-	contextWindowMigration,
-	agentHardeningMigration,
-	turnVectorsMigration,
-	stewardLedgersMigration,
-	forgetClosureMigration,
-	seedImportMigration,
-	specialistBlockReasonMigration,
-	...memoryPackageMigrations,
-];
-
-const card = (
+/** The session toolchains the scripted conversation can hand over to. */
+const sessionCard = (
 	revisionId: string,
 	id: string,
-	functionName: string,
+	title: string,
 ): ToolchainCard => ({
 	revisionId,
 	id,
-	functionName,
-	title: id,
+	functionName: id.replace(".", "_"),
+	title,
 	summary: "共同で作る",
 	useWhen: ["作る"],
+	execution: "session",
 	redirects: [],
 	score: { rank: 1, ftsRank: null, similarity: null, fromHistory: false },
 });
+export const STUDIO = sessionCard(REVISION, "fake.studio", "制作担当");
+export const OTHER = sessionCard(OTHER_REVISION, "fake.other", "別の担当");
 
-/** The studio's time limits a test sets (and resets); the other toolchain keeps the host defaults. */
-export const studioLimits: { current: SpecialistSet["timeLimits"] } = {
-	current: null,
-};
-/** The studio's agent settings a test sets (and resets): a work document makes the host offer doc.* tools. */
-export const studioAgent: { current: SpecialistSet["agent"] | null } = {
-	current: null,
-};
 export const NO_AGENT: SpecialistSet["agent"] = {
 	document: null,
 	sharedTools: [],
@@ -117,39 +63,14 @@ export const DOCUMENT_AGENT: SpecialistSet["agent"] = {
 	},
 	sharedTools: [],
 };
-export const setFor = (revisionId: string): SpecialistSet => {
-	const other = revisionId === OTHER_REVISION;
-	return {
-		toolchainId: other ? "fake.other" : "fake.studio",
-		toolchainRevisionId: revisionId,
-		title: other ? "別の担当" : "制作担当",
-		bindingRevisionId: other ? "binding:fake.other@1" : "binding:fake.studio@1",
-		adapterRef: other ? OTHER_ADAPTER : ADAPTER,
-		artifactRevisionId: other
-			? "artifact:fake.other@1"
-			: "artifact:fake.studio@1",
-		packageRevisionId: other ? "package:fake.other@1" : "package:fake.studio@1",
-		profile: "制作の専門担当",
-		skills: ["手順"],
-		tools: [
-			{
-				id: "draft.apply",
-				toolRevisionId: "tool:draft.apply@1",
-				operationName: "fake.draft.apply",
-				inputSchemaRef: "builtin:fakeDraft",
-				summary: "下書きへ反映する",
-				schema: {
-					type: "object",
-					properties: { title: { type: "string" } },
-					required: ["title"],
-					additionalProperties: false,
-				},
-			},
-		],
-		targetSchemaRef: other ? null : "builtin:fakeTarget",
-		timeLimits: other ? null : studioLimits.current,
-		agent: other ? NO_AGENT : (studioAgent.current ?? NO_AGENT),
-	};
+
+export type Options = {
+	/** Real memory service (its journal in the test directory); default true. */
+	memory?: boolean;
+	/** The studio's time limits; the other toolchain keeps the host defaults. */
+	limits?: SpecialistSet["timeLimits"];
+	/** The studio's agent settings: a work document makes the host offer doc.* tools. */
+	agent?: SpecialistSet["agent"];
 };
 
 /** The fixture document's canonical text: the same value always gives the same text. */
@@ -170,27 +91,15 @@ type Work = {
 	rejected: RejectedDraft | null;
 };
 
-export type Call = {
-	preparation?: import("../../delivery").SpeechPreparation;
-	history: Array<{ role: string; content: string }>;
-	tools: Array<{
-		function: {
-			name: string;
-			description?: string;
-			parameters: Record<string, unknown>;
-		};
-	}>;
-};
+/** A specialist model call as the fake saw it. */
+export type SpecialistCall = Array<{ role: string; content: string }>;
 
-export type Options = { memory?: boolean };
-
-/** A real store, queue, memory and dialogue with fake models and a fake session toolchain. */
+/** A real store, queue, memory and dialogue with a scripted conversation model, a fake specialist and session toolchains. */
 export async function setup(options: Options = {}) {
-	const dir = mkdtempSync(join(tmpdir(), "eumenes-specialist-"));
-	const store: SqliteStore = openStore(join(dir, "db.sqlite3"), MIGRATIONS);
+	const { dir, store } = openDialogueStore("eumenes-specialist-");
 	const conversation = createConversationService(store);
 	const continuity = createContinuityService(store);
-	const memory =
+	const memory: MemoryService | undefined =
 		options.memory === false
 			? undefined
 			: createMemoryService(store, conversation, continuity, {
@@ -202,39 +111,13 @@ export async function setup(options: Options = {}) {
 		receiptAllowed: true,
 		/** While set, a specialist model call waits for it (a turn in flight). */
 		gate: null as Promise<void> | null,
-		/** The main conversation model's replies in order; undefined falls back to prose. */
-		main: [] as Array<
-			| { toolCalls: Array<{ id: string; name: string; arguments: string }> }
-			| string
-		>,
+		/** The conversation model's replies, in order (one per model call). */
+		steps: [] as Step[],
+		/** Every call the conversation model received. */
+		calls: [] as Call[],
 		/** The specialist's replies in order (objects are JSON-encoded). */
-		specialist: [] as Array<unknown>,
-		mainCalls: [] as Call[],
-		/** When set, the second round and the direct answer wait for it (or for their cancellation). */
-		mainHold: undefined as Promise<void> | undefined,
-		/** The first round's calls (the request analysis), apart from the main calls that follow. */
-		analysisCalls: [] as Call[],
-		/**
-		 * The first round's replies in order: the function it calls (`call`: a toolchain's, "answer" or
-		 * "report_unavailable") with the analysis. Without one, a scripted function call delegates to that function
-		 * (its `announcement` is the notice), a prose reply with no candidates is reported as unavailable, and
-		 * any other prose answers.
-		 */
-		discoveryCalls: [] as Call[],
-		analyses: [] as Array<
-			Partial<RequestAnalysis> & {
-				call?: string;
-				announcement?: string;
-				reply?: string;
-			}
-		>,
-		noCandidates: false,
-		routeCalls: 0,
-		/** The text each candidate search ran on. */
-		routeTexts: [] as string[],
-		/** What the conversation recorded as its decisions. */
-		recorded: [] as Array<Record<string, unknown>>,
-		specialistPrompts: [] as Array<Array<{ role: string; content: string }>>,
+		specialist: [] as unknown[],
+		specialistPrompts: [] as SpecialistCall[],
 		specialistSessions: [] as unknown[],
 		captures: [] as Array<Record<string, unknown>>,
 		/** Model-request deadlines the run moved later (subject and new deadline). */
@@ -248,14 +131,38 @@ export async function setup(options: Options = {}) {
 		commitError: null as string | null,
 		/** A repair hint the refusal carries (as the ui adapter's errors do). */
 		invokeDetail: null as string | null,
-		calls: [] as string[],
+		calledPort: [] as string[],
 		released: [] as string[],
-		settled: [] as Array<{ outcome: string; code?: string | null }>,
+		runEnds: [] as Array<Parameters<StewardPort["runEndedInTransaction"]>[1]>,
+		images: new Map<string, unknown>(),
 	};
+	const receipt = (requestId: string, step: Step): Receipt => ({
+		requestId,
+		attemptId: crypto.randomUUID(),
+		value: step.text ?? "",
+		toolCalls: (step.calls ?? []).map((call): NativeToolCall => ({
+			id: crypto.randomUUID(),
+			name: call.name,
+			arguments: JSON.stringify(call.args),
+		})),
+	});
+	const aborted = (signal?: AbortSignal) =>
+		new Promise<void>((_, reject) => {
+			if (signal?.aborted) reject(new Error("aborted"));
+			signal?.addEventListener("abort", () => reject(new Error("aborted")));
+		});
 	const larm = {
 		status: () => ({ state: "ready", capabilities: ["llm"] }),
 		captureInTransaction: () => {},
-		requestFor: () => "request",
+		captureControlInTransaction: (
+			_db: unknown,
+			input: Record<string, unknown>,
+		) => {
+			state.captures.push(input);
+			return "control";
+		},
+		requestFor: (_db: unknown, runId: string) => `req:${runId}`,
+		llmContextWindowInTransaction: () => undefined,
 		setContextPolicyInTransaction: () => {},
 		validateReceiptInTransaction: () => state.receiptAllowed,
 		acceptInTransaction: () => state.receiptAllowed,
@@ -270,46 +177,21 @@ export async function setup(options: Options = {}) {
 		) => {
 			state.extended.push({ subject, deadline });
 		},
-		captureControlInTransaction: (
-			_db: unknown,
-			input: Record<string, unknown>,
-		) => {
-			state.captures.push(input);
-			return "control";
+		answer: async () => {
+			throw new Error("unexpected_answer");
 		},
+		/** The specialist's call: its next scripted reply. */
 		executeControl: async (
 			requestId: string,
-			prompt: Array<{ role: string; content: string }>,
-			_signal?: AbortSignal,
-			control?: { instructions?: string },
+			prompt: SpecialistCall,
+			signal?: AbortSignal,
+			_control?: unknown,
 			session?: unknown,
 		) => {
-			if (
-				prompt[0]?.content.includes("OUTPUT_SCHEMA=") &&
-				!control?.instructions
-			)
-				return {
-					requestId,
-					attemptId: "route",
-					value: JSON.stringify({
-						decision: "answer",
-						functionName: "",
-						request: "",
-						questionRef: "",
-					}),
-				} as Receipt;
 			state.specialistPrompts.push([...prompt]);
 			state.specialistSessions.push(session);
 			// A call waiting on the gate still honours cancellation, as a provider call does.
-			await Promise.race([
-				state.gate,
-				new Promise<void>((_, reject) => {
-					if (_signal?.aborted) reject(new Error("aborted"));
-					_signal?.addEventListener("abort", () =>
-						reject(new Error("aborted")),
-					);
-				}),
-			]);
+			await Promise.race([state.gate, aborted(signal)]);
 			const next = state.specialist.shift();
 			if (next === undefined) throw new Error("fixture_specialist_missing");
 			return {
@@ -318,123 +200,25 @@ export async function setup(options: Options = {}) {
 				value: typeof next === "string" ? next : JSON.stringify(next),
 			} as Receipt;
 		},
-		executeRequest: async () => {
-			throw new Error("unexpected_request");
-		},
+		/** The conversation's call: its next scripted step. */
 		executeStream: async (
 			requestId: string,
-			history: Call["history"],
-			_signal: AbortSignal,
+			messages: ChatMessage[],
+			signal: AbortSignal,
 			delta: (text: string) => void,
-			preparation: Call["preparation"],
-			tools: Call["tools"] | undefined,
+			_preparation: unknown,
+			tools: Array<{ function: { name: string } }> | undefined,
 		) => {
-			const call = { history: [...history], tools: tools ?? [], preparation };
-			if (isAnalysisRound(tools)) {
-				const intended = state.analyses[0]?.call;
-				const headCall = state.main[0];
-				const wanted =
-					intended ??
-					(typeof headCall === "object"
-						? headCall.toolCalls[0]?.name
-						: undefined);
-				if (
-					tools?.some((tool) => tool.function.name === DISCOVERY) &&
-					wanted &&
-					routed.some((card) => card.functionName === wanted) &&
-					!offeredToolchains(tools).includes(wanted)
-				) {
-					state.discoveryCalls.push(call);
-					// The discovery round writes the analysis the second round then takes as fixed.
-					const { kind, freshness, impact, approved } = state.analyses[0] ?? {};
-					return analysisReceipt(requestId, {
-						name: DISCOVERY,
-						args: {
-							query: history.at(-1)!.content,
-							...(kind ? { kind } : {}),
-							...(freshness ? { freshness } : {}),
-							...(impact ? { impact } : {}),
-							...(approved !== undefined ? { approved } : {}),
-						},
-					});
-				}
-				state.analysisCalls.push(call);
-				const {
-					call: named,
-					announcement,
-					reply,
-					...over
-				} = state.analyses.shift() ?? {};
-				const head = state.main[0];
-				const offered = offeredToolchains(tools);
-				const scripted =
-					typeof head === "string" || head === undefined
-						? undefined
-						: head.toolCalls[0];
-				const chosen =
-					named ??
-					(scripted && offered.includes(scripted.name)
-						? scripted.name
-						: scripted
-							? offered[0]
-							: undefined);
-				if (chosen && chosen !== ANSWER && chosen !== UNAVAILABLE)
-					return analysisReceipt(requestId, {
-						name: chosen,
-						args: over,
-						announcement:
-							announcement ??
-							(scripted
-								? JSON.parse(scripted.arguments).announcement
-								: undefined) ??
-							NOTICE,
-					});
-				if (
-					chosen === UNAVAILABLE ||
-					(!chosen &&
-						state.noCandidates &&
-						!offered.length &&
-						typeof head === "string" &&
-						!named)
-				)
-					return analysisReceipt(requestId, {
-						name: UNAVAILABLE,
-						args: over,
-						reply: reply ?? (state.main.shift() as string),
-					});
-				return analysisReceipt(requestId, { name: ANSWER, args: over });
-			}
-			state.mainCalls.push(call);
-			// A held call waits like a provider call and still honours cancellation.
-			if (state.mainHold)
-				await Promise.race([
-					state.mainHold,
-					new Promise<void>((_, reject) => {
-						if (_signal.aborted) reject(new Error("aborted"));
-						_signal.addEventListener("abort", () =>
-							reject(new Error("aborted")),
-						);
-					}),
-				]);
-			const reply = state.main.shift() ?? "了解しました";
-			if (typeof reply !== "string")
-				// The notice belongs to the first round: the second round's function takes the request only.
-				return {
-					requestId,
-					attemptId: "main",
-					value: "",
-					toolCalls: reply.toolCalls.map((c) => {
-						const { announcement: _notice, ...rest } = JSON.parse(c.arguments);
-						return { ...c, arguments: JSON.stringify(rest) };
-					}),
-				} as unknown as Receipt;
-			delta(reply);
-			return { requestId, attemptId: "main", value: reply } as Receipt;
+			state.calls.push({
+				messages: messages.map((m) => ({ ...m })),
+				tools: (tools ?? []).map((t) => t.function.name),
+			});
+			const step = state.steps.shift();
+			if (!step) throw new Error("fixture_step_missing");
+			signal.throwIfAborted();
+			if (step.text) delta(step.text);
+			return receipt(requestId, step);
 		},
-		answer: async () => "了解しました",
-		transcribe: async () => "",
-		speak: async () => new Uint8Array(),
-		close: async () => {},
 	} as unknown as InferencePort;
 
 	const fail = (code: string): never => {
@@ -453,6 +237,42 @@ export async function setup(options: Options = {}) {
 		label: work.label,
 		current: work.current,
 	});
+	const setFor = (revisionId: string): SpecialistSet => {
+		const other = revisionId === OTHER_REVISION;
+		return {
+			toolchainId: other ? "fake.other" : "fake.studio",
+			toolchainRevisionId: revisionId,
+			title: other ? "別の担当" : "制作担当",
+			bindingRevisionId: other
+				? "binding:fake.other@1"
+				: "binding:fake.studio@1",
+			adapterRef: other ? OTHER_ADAPTER : ADAPTER,
+			artifactRevisionId: other ? "artifact:fake.other@1" : STUDIO_ARTIFACT,
+			packageRevisionId: other
+				? "package:fake.other@1"
+				: "package:fake.studio@1",
+			profile: "制作の専門担当",
+			skills: ["手順"],
+			tools: [
+				{
+					id: "draft.apply",
+					toolRevisionId: "tool:draft.apply@1",
+					operationName: "fake.draft.apply",
+					inputSchemaRef: "builtin:fakeDraft",
+					summary: "下書きへ反映する",
+					schema: {
+						type: "object",
+						properties: { title: { type: "string" } },
+						required: ["title"],
+						additionalProperties: false,
+					},
+				},
+			],
+			targetSchemaRef: other ? null : "builtin:fakeTarget",
+			timeLimits: other ? null : (options.limits ?? null),
+			agent: other ? NO_AGENT : (options.agent ?? NO_AGENT),
+		};
+	};
 	const specialist: SpecialistPort = {
 		setInTransaction: (_db, revision) => {
 			if (![REVISION, OTHER_REVISION].includes(revision))
@@ -490,7 +310,7 @@ export async function setup(options: Options = {}) {
 				rejected: null,
 			};
 			state.works.set(work.workRef, work);
-			state.calls.push("open");
+			state.calledPort.push("open");
 			return view(work);
 		},
 		workStateInTransaction: (_db, adapterRef, workRef) => {
@@ -514,7 +334,7 @@ export async function setup(options: Options = {}) {
 			if (work.holder) return fail("work_busy");
 			if (mode === "close" && work.dirty) return fail("work_unsaved");
 			work.ended = true;
-			state.calls.push(`end:${mode}`);
+			state.calledPort.push(`end:${mode}`);
 		},
 		parseInvocation: (set, toolId, args) => {
 			const tool = set.tools.find((t) => t.id === toolId);
@@ -619,70 +439,75 @@ export async function setup(options: Options = {}) {
 						},
 					},
 	};
-	const routed: ToolchainCard[] = [
-		card(REVISION, "fake.studio", "studio_create"),
-		card(OTHER_REVISION, "fake.other", "other_create"),
-	];
-	const toolchains: ToolchainRoutingPort = {
-		cardInTransaction: (_db, revisionId) =>
-			routed.find((card) => card.revisionId === revisionId),
+
+	const cards: ToolchainCard[] = [STUDIO, OTHER, IMAGE];
+	const cardOf = (revisionId: string) =>
+		cards.find((c) => c.revisionId === revisionId);
+	const sessionRuntime = (revisionId: string): ToolchainRuntimeMeta => {
+		const set = setFor(revisionId);
+		return {
+			execution: "session",
+			binding: {
+				bindingRevisionId: set.bindingRevisionId,
+				adapterRef: set.adapterRef,
+				artifactRevisionId: set.artifactRevisionId,
+				available: true,
+			},
+		} as ToolchainRuntimeMeta;
+	};
+	const runtimeOf = (revisionId: string): ToolchainRuntimeMeta =>
+		[REVISION, OTHER_REVISION].includes(revisionId)
+			? sessionRuntime(revisionId)
+			: ({ execution: "image", requires: "image" } as ToolchainRuntimeMeta);
+	const toolchains = {
 		embedQuery: async () => undefined,
-		routeInTransaction: (_db, input) => {
-			state.routeCalls++;
-			state.routeTexts.push(input.text);
-			return {
-				cards: state.noCandidates ? [] : routed,
-				past: [],
-				retrieval: "none",
-			};
-		},
+		routeInTransaction: (
+			_db: unknown,
+			input: { excludeRevisionIds?: ReadonlySet<string> },
+		) => ({
+			cards: cards.filter((c) => !input.excludeRevisionIds?.has(c.revisionId)),
+			past: [],
+			retrieval: "fts",
+		}),
+		cardInTransaction: (_db: unknown, revisionId: string) => cardOf(revisionId),
 		catalogInTransaction: () =>
-			[REVISION, OTHER_REVISION].map((revisionId) => {
-				const set = setFor(revisionId);
-				return {
-					id: set.toolchainId,
-					revisionId,
-					runtime: {
-						execution: "session" as const,
-						binding: {
-							bindingRevisionId: set.bindingRevisionId,
-							adapterRef: set.adapterRef,
-							artifactRevisionId: set.artifactRevisionId,
-							available: true,
-						},
-					},
-				};
-			}),
-		resolveInTransaction: (_db, revisionId) => {
-			const set = setFor(revisionId);
+			cards.map((c) => ({
+				id: c.id,
+				revisionId: c.revisionId,
+				runtime: runtimeOf(c.revisionId),
+			})),
+		resolveInTransaction: (_db: unknown, revisionId: string) => {
+			if (!cardOf(revisionId)) throw new Error("toolchain_unavailable");
 			return {
-				toolchain: { functionName: "x" } as never,
-				packageRevisionId: set.packageRevisionId,
-				runtime: {
-					execution: "session" as const,
-					binding: {
-						bindingRevisionId: set.bindingRevisionId,
-						adapterRef: set.adapterRef,
-						artifactRevisionId: set.artifactRevisionId,
-						available: true,
-					},
-				},
+				toolchain: {},
+				packageRevisionId: [REVISION, OTHER_REVISION].includes(revisionId)
+					? setFor(revisionId).packageRevisionId
+					: "package:fake.image@1",
+				runtime: runtimeOf(revisionId),
 			};
 		},
-		sessionSetInTransaction: (_db, revisionId) =>
-			specialist.setInTransaction(_db, revisionId),
+		sessionSetInTransaction: (_db: unknown, revisionId: string) =>
+			specialist.setInTransaction(_db as never, revisionId),
+		recordSelectionInTransaction: () => "selection",
+		settleSelectionInTransaction: () => {},
+		linkTaskInTransaction: () => {},
+		requestOfRunInTransaction: () => undefined,
 		commandSetInTransaction: () => {
 			throw new Error("unexpected_command");
 		},
-		recordSelectionInTransaction: (_db, input) => {
-			state.recorded.push(input as unknown as Record<string, unknown>);
-			return "selection";
+	} as unknown as ToolchainRoutingPort;
+	const image: ImagePort = {
+		startInTransaction: (_db, input) => ({
+			id: `image:${input.runId}`,
+			jobId: `image-job:${input.runId}`,
+		}),
+		resultInTransaction: (_db, runId) => state.images.get(runId) ?? null,
+	};
+	const steward: StewardPort = {
+		runEndedInTransaction: (_db, input) => {
+			state.runEnds.push(input);
 		},
-		linkTaskInTransaction: () => {},
-		settleSelectionInTransaction: (_db, _runId, result) => {
-			state.settled.push(result);
-		},
-		requestOfRunInTransaction: () => undefined,
+		requestInTransaction: () => ({ id: "request", replay: false }),
 	};
 	const queue = createQueue(store);
 	const dialogue = createDialogueService({
@@ -690,26 +515,29 @@ export async function setup(options: Options = {}) {
 		conversation,
 		larm,
 		queue,
+		continuity,
 		memory,
 		toolchains,
 		specialist,
+		image,
+		steward,
 		clock: () => new Date(Date.now() + state.offsetMs).toISOString(),
 	});
 	queue.start();
-	const closers = async () => {
-		await dialogue.close();
-		await queue.close(100).catch(() => {});
-		await store.close().catch(() => {});
-		rmSync(dir, { recursive: true, force: true });
-	};
 	const terminal = ["completed", "failed", "cancelled", "interrupted"];
 	const h = {
 		store,
 		conversation,
+		continuity,
 		memory,
 		dialogue,
 		state,
-		close: closers,
+		async close() {
+			await dialogue.close();
+			await queue.close(100).catch(() => {});
+			await store.close().catch(() => {});
+			rmSync(dir, { recursive: true, force: true });
+		},
 		/** Accept a user message (no waiting). */
 		say: (text: string, extra: Record<string, unknown> = {}) =>
 			dialogue.submit({
@@ -729,31 +557,61 @@ export async function setup(options: Options = {}) {
 				timeout: 4000,
 			}),
 		until: (check: () => boolean) => waitFor(check, { timeout: 4000 }),
-		/** The main model hands the next utterance to the session toolchain. */
-		startCall(args: Record<string, unknown>, name = "studio_create") {
-			state.main.push({
-				toolCalls: [
-					{
-						id: "call",
-						name,
-						arguments: JSON.stringify({
-							announcement: "担当に引き継ぎます。",
-							...args,
-						}),
-					},
-				],
-			});
+		/**
+		 * Script the conversation model to hand the next utterance to a session toolchain: it searches, then
+		 * delegates (execute) with the announcement that precedes the hand-over.
+		 */
+		handOver(
+			args: { request: string } & Record<string, unknown>,
+			toolchain: string = STUDIO.id,
+		) {
+			state.steps.push(
+				{ calls: [{ name: "find_toolchain", args: { query: args.request } }] },
+				{
+					calls: [
+						{
+							name: "delegate",
+							args: {
+								mode: "execute",
+								toolchain,
+								impact: "create",
+								announcement: "担当に引き継ぎます。",
+								...args,
+							},
+						},
+					],
+				},
+			);
 		},
 		session: () => dialogue.specialistSession("main"),
 		rows: (sql: string, ...params: Array<string | number>) =>
 			store.read((db) => db.query(sql).all(...params) as any[]),
 		blocked: () =>
-			memory?.blockedMessageIdsOfConversationInTransaction
+			memory
 				? store.read((db) =>
 						memory.blockedMessageIdsOfConversationInTransaction(db, "main"),
 					)
 				: [],
 		work: () => [...state.works.values()],
+		log(): ConversationEvent[] {
+			return store.read((db) => continuity.events.logInTransaction(db, "main"));
+		},
+		fields(event: ConversationEvent) {
+			return JSON.parse(event.text ?? "{}") as Record<string, unknown>;
+		},
+		/** The material document the nth conversation call received (messages: system, document, newest). */
+		material(call: number) {
+			return JSON.parse(state.calls[call]!.messages[1]!.content) as Record<
+				string,
+				any
+			>;
+		},
+		answerText(runId: string) {
+			const run = dialogue.get(runId)!;
+			return run.answerMessageId
+				? conversation.message(run.answerMessageId)!.text
+				: null;
+		},
 	};
 	return h;
 }

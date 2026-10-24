@@ -60,68 +60,46 @@ export function loadCases(experimentDir: string): ContextCase[] {
 const experimentConfigSchema = z
 	.object({
 		name: z.string().min(1),
-		/** Arm ids in the order the report lists them; the first listed `baseline` is the reference. */
-		baseline: z.string().min(1),
-		/** `builtin` arms ship with the harness; others name a module in the experiment directory that exports `arms`. */
-		arms: z
-			.array(
-				z
-					.object({
-						id: z.string().min(1),
-						module: z.string().min(1).optional(),
-					})
-					.strict(),
-			)
-			.min(1),
-		/**
-		 * Ordering variants measured for the prefix metric only (ContextWindow design 4.1, W1): the arm they reorder and
-		 * the ordering. They are never run against the model unless the preregistration lists them as arms.
-		 */
-		orderingVariants: z
-			.array(
-				z
-					.object({
-						id: z.string().min(1),
-						of: z.string().min(1),
-						ordering: z.enum(["O1", "O2"]),
-					})
-					.strict(),
-			)
-			.default([]),
 		trials: z.number().int().min(1).max(9).default(3),
 		concurrency: z.number().int().min(1).max(2).default(2),
-		/** Fixed function catalog for `tools: "conversation"` cases (live lane). */
+		/** The toolchains a search offers in the live lane (and the cards a seeded TODO names); fixture runs need none. */
 		toolsCatalog: z.string().min(1).optional(),
-		/** Adoption thresholds. Section 5.6 defaults apply to what is not written here. */
+		/** Adoption thresholds. Section 21.2 defaults apply to what is not written here. */
 		adoption: z
 			.object({
-				minNetGain: z.number().int().min(0).default(4),
-				maxTokenRatio: z.number().positive().default(1.1),
-				maxLatencyRatio: z.number().positive().default(1.15),
+				minNetGain: z.number().int().min(0).default(0),
+				maxLatencyRatio: z.number().positive().default(1),
 			})
 			.strict()
-			.default({ minNetGain: 4, maxTokenRatio: 1.1, maxLatencyRatio: 1.15 }),
+			.default({ minNetGain: 0, maxLatencyRatio: 1 }),
 	})
-	.strict()
-	.superRefine((config, ctx) => {
-		const ids = config.arms.map((a) => a.id);
-		if (new Set(ids).size !== ids.length)
-			ctx.addIssue({ code: "custom", message: "duplicate_arm_id" });
-		if (!ids.includes(config.baseline))
-			ctx.addIssue({ code: "custom", message: "baseline_not_in_arms" });
-		const variantIds = config.orderingVariants.map((v) => v.id);
-		if (
-			new Set([...ids, ...variantIds]).size !==
-			ids.length + variantIds.length
-		)
-			ctx.addIssue({ code: "custom", message: "duplicate_variant_id" });
-		for (const variant of config.orderingVariants)
-			if (!ids.includes(variant.of))
-				ctx.addIssue({ code: "custom", message: "variant_of_unknown_arm" });
-	});
+	.strict();
 export type ExperimentConfig = z.infer<typeof experimentConfigSchema>;
 
 export function loadExperimentConfig(experimentDir: string): ExperimentConfig {
 	const text = readFileSync(join(experimentDir, "experiment.json"), "utf8");
 	return experimentConfigSchema.parse(JSON.parse(text));
+}
+
+const catalogSchema = z.array(
+	z
+		.object({
+			id: z.string().min(1),
+			title: z.string().min(1),
+			summary: z.string().min(1),
+			useWhen: z.array(z.string().min(1)),
+		})
+		.strict(),
+);
+export type CatalogEntry = z.infer<typeof catalogSchema>[number];
+
+/** The toolchains of an experiment's catalog file (none when it declares no catalog). */
+export function loadCatalog(
+	experimentDir: string,
+	config: ExperimentConfig,
+): CatalogEntry[] {
+	if (!config.toolsCatalog) return [];
+	return catalogSchema.parse(
+		JSON.parse(readFileSync(join(experimentDir, config.toolsCatalog), "utf8")),
+	);
 }

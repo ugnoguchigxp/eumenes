@@ -1,9 +1,13 @@
 import { musicProviderFixture } from "../../domains/larm/test/music-generation.fixture";
-import { answerAnalysis } from "../toolchain/analysis-round.fixture";
 import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { createLarmPlayground, type LarmPort } from "../../domains/larm";
 import { png } from "./image.fixture";
+import {
+	activeSlots,
+	answerUtterance,
+	handOver,
+} from "./conversation-turn.fixture";
 export const musicQuestion = "Tetrisをテーマにした30秒の楽曲を作って";
 export const musicTestPlan = {
 	title: "落ちるブロックのリズム",
@@ -23,7 +27,6 @@ export function musicFixture(
 		| "correctable-plan" = "success",
 	fixtureOptions: {
 		plan?: Record<string, unknown>;
-		question?: string;
 		artworkFailure?: boolean;
 		jobStatuses?: string[];
 		postStatus?: number;
@@ -200,27 +203,14 @@ export function musicFixture(
 		transcribe: async () => "",
 		speak: async () => new Uint8Array(),
 		answer: async (messages, _signal, options) => {
-			if (
-				answerAnalysis(options, {
-					call: "music",
-					announcement: "準備します。",
-					kind: "creation",
-				})
-			)
-				return "";
-			if (options?.tools?.length) {
-				stages.push("route");
-				options.onToolCalls!([
-					{
-						id: "music",
-						name: "music",
-						arguments: JSON.stringify({
-							request: fixtureOptions.question ?? musicQuestion,
-						}),
-					},
-				]);
-				return "";
-			}
+			const turn = answerUtterance(
+				options?.tools,
+				messages,
+				options?.onToolCalls,
+				handOver("music.create", "準備します。"),
+				() => stages.push("route"),
+			);
+			if (turn !== undefined) return turn;
 			if (messages[0]!.content.includes("OUTPUT_SCHEMA=")) {
 				stages.push("plan");
 				if (mode === "invalid-plan") return "{}";
@@ -228,9 +218,11 @@ export function musicFixture(
 				return mode === "correctable-plan" ? plan.slice(0, -1) + ",}" : plan;
 			}
 			stages.push("answer");
-			const result = messages.find((m) => m.content.includes('"musicResult":'));
+			const result = activeSlots(messages).at(-1)?.result as
+				| { state?: string }
+				| undefined;
 			if (!result) throw new Error("music_result_missing");
-			return JSON.parse(result.content).musicResult.state === "completed"
+			return result.state === "completed"
 				? "楽曲ができました。"
 				: "楽曲を生成できませんでした。";
 		},

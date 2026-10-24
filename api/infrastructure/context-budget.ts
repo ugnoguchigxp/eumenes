@@ -23,10 +23,6 @@ export const TOKEN_ESTIMATE = {
 
 /** The window the budgets are cut for when the window of the model is not known yet (256k tokens). */
 export const REFERENCE_WINDOW_TOKENS = 262_144;
-/** The most the memory and conversation history may take (128k tokens). */
-export const MEMORY_HISTORY_MAX_TOKENS = 131_072;
-/** The most of the window kept for the model's answer. */
-const OUTPUT_RESERVE_MAX_TOKENS = 4096;
 
 // Han (with extension A and the compatibility block), kana, hangul, and the CJK symbols and full-width forms.
 const CJK = /[ᄀ-ᇿ⺀-⿟　-〿぀-ヿ㄀-ㄯ㄰-㆏ㇰ-ㇿ㐀-䶿一-鿿가-힯豈-﫿＀-￯]/u;
@@ -80,24 +76,94 @@ export function estimateMessageTokens(
 	return tokens;
 }
 
-/** The two budgets of a window: memory and conversation history, and the current task. */
-type ContextBudgets = { memoryHistory: number; task: number };
+/** The part of the model window budgets are planned for: the estimate is not the provider's tokenizer. */
+export const PLANNING_WINDOW_SHARE = 0.8;
+/**
+ * The answer and its thinking, when neither the connection nor the saved settings say how much the model needs.
+ * An initial value: measured and revised in stage A of the ContextWindow specification.
+ */
+export const OUTPUT_RESERVE_DEFAULT_TOKENS = 8192;
+/** The least of the planning window the current work (data, request, tool results) may always use. */
+export const WORK_AREA_MIN_SHARE = 0.25;
+/** The least room the memory and conversation sections need; a smaller window is not used for conversation. */
+export const MIN_SECTION_ROOM_TOKENS = 8000;
+
+/** Each section's share of the room `R` and its absolute limit (the ContextWindow specification, section 7.2). */
+export const SECTION_LIMITS = {
+	profile: { share: 0.25, max: 12_000 },
+	episode: { share: 0.08, max: 2_000 },
+	log: { share: 0.4, max: 16_000 },
+	active: { share: 0.08, max: 4_000 },
+	state: { share: 0.08, max: 2_000 },
+	now: { share: 0.11, max: 3_000 },
+} as const;
+export type SectionName = keyof typeof SECTION_LIMITS;
+
+/** The log's targets: moved out above `high`, down to `low`; `keep` stays when a conversation resumes. */
+export type LogTargets = {
+	cap: number;
+	high: number;
+	low: number;
+	keep: number;
+};
 
 /**
- * `min(128k, window / 2)` for the memory and the conversation history; the rest for the current task (the
- * persona and rules, this turn's data, the request, the tool definitions and the answer's reservation).
+ * The budget of one model window: `planned` (C) less the output reserve (O), the fixed part (F) and the least
+ * work area (W_min) is the room (R) the sections share. Every section's limit is `min(share × R, max)`, so their
+ * sum never exceeds R and the work area of a call is at least W_min. `usable` is false when R is below its least.
  */
-export function contextBudgets(windowTokens: number): ContextBudgets {
-	const memoryHistory = Math.min(
-		MEMORY_HISTORY_MAX_TOKENS,
-		Math.floor(windowTokens / 2),
-	);
-	return { memoryHistory, task: windowTokens - memoryHistory };
+export type WindowPlan = {
+	window: number;
+	planned: number;
+	output: number;
+	fixed: number;
+	workMin: number;
+	room: number;
+	sections: Record<SectionName, number>;
+	log: LogTargets;
+	usable: boolean;
+};
+
+/** Sized for spoken replies of up to 300 characters (~370 tokens an exchange): about 27 exchanges before a re-construction, the last ~10 after it. */
+const LOG_HIGH_MAX_TOKENS = 10_000;
+const LOG_KEEP_MAX_TOKENS = 4_000;
+
+/** `high = min(10000, cap)`, `low = high / 2`, `keep = min(4000, low)`: keep ≤ low < high ≤ cap for any cap ≥ 2. */
+export function logTargets(cap: number): LogTargets {
+	const high = Math.min(LOG_HIGH_MAX_TOKENS, cap);
+	const low = Math.floor(high / 2);
+	return { cap, high, low, keep: Math.min(LOG_KEEP_MAX_TOKENS, low) };
 }
 
-/** What a window keeps for the answer: part of the task budget, never the memory and history budget. */
-export function outputReserveTokens(windowTokens: number): number {
-	return Math.min(OUTPUT_RESERVE_MAX_TOKENS, Math.floor(windowTokens / 4));
+export function planWindow(input: {
+	/** The model's window in tokens. */
+	window: number;
+	/** The fixed instructions and tool definitions (F). */
+	fixed: number;
+	/** The answer and thinking reserve the connection or settings give; absent: the default. */
+	output?: number | null;
+}): WindowPlan {
+	const planned = Math.floor(input.window * PLANNING_WINDOW_SHARE);
+	const output = input.output ?? OUTPUT_RESERVE_DEFAULT_TOKENS;
+	const workMin = Math.floor(planned * WORK_AREA_MIN_SHARE);
+	const room = Math.max(0, planned - output - input.fixed - workMin);
+	const sections = Object.fromEntries(
+		Object.entries(SECTION_LIMITS).map(([name, limit]) => [
+			name,
+			Math.min(Math.floor(room * limit.share), limit.max),
+		]),
+	) as Record<SectionName, number>;
+	return {
+		window: input.window,
+		planned,
+		output,
+		fixed: input.fixed,
+		workMin,
+		room,
+		sections,
+		log: logTargets(sections.log),
+		usable: room >= MIN_SECTION_ROOM_TOKENS,
+	};
 }
 
 /**
@@ -113,4 +179,28 @@ export function exchangeEnd(
 	let next = start + 1;
 	while (next < end && roles[next] !== "user") next++;
 	return next;
+}
+
+/** One event may take at most this share of the log's cap; a longer text keeps its head (section 8.3). */
+export const EVENT_SHARE_OF_LOG = 0.1;
+
+/**
+ * The head of `text` within `maxTokens` (estimated), cut at a character boundary, and whether it was cut. The rest
+ * stays where the text came from (the conversation's message), never rewritten or summarized here.
+ */
+export function headWithin(
+	text: string,
+	maxTokens: number,
+): { text: string; cut: boolean } {
+	if (estimateTextTokens(text) <= maxTokens) return { text, cut: false };
+	const chars = [...text];
+	let low = 0;
+	let high = chars.length;
+	while (low < high) {
+		const mid = Math.ceil((low + high) / 2);
+		if (estimateTextTokens(`${chars.slice(0, mid).join("")}…`) <= maxTokens)
+			low = mid;
+		else high = mid - 1;
+	}
+	return { text: `${chars.slice(0, low).join("")}…`, cut: true };
 }

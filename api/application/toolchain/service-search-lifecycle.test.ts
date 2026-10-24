@@ -7,7 +7,7 @@ import {
 	typeInto,
 	observation,
 	invoke,
-} from "../browser/browser-task-kit";
+} from "../browser/browser-task.fixture";
 import { until } from "../../domains/browser/test/fakes";
 
 afterEach(cleanup);

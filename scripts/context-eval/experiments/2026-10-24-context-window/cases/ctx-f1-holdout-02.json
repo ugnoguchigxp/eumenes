@@ -1,0 +1,46 @@
+{
+	"id": "ctx-f1-holdout-02",
+	"family": "F1",
+	"split": "holdout",
+	"seed": {
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "strategist"
+		},
+		"longTerm": [
+			{
+				"kind": "habit",
+				"key": "commute.train",
+				"text": "通勤はいつも電車で、車は使わない"
+			},
+			{
+				"kind": "personal_fact",
+				"key": "home.area",
+				"text": "自宅は郊外の住宅地にある"
+			}
+		],
+		"events": [
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-15T09:00:00.000Z",
+				"text": "来週は取引先が遠くて"
+			}
+		]
+	},
+	"input": "来週の月曜だけ車で出勤することにしたよ。駐車場を探すとき、何を気にすればいい？",
+	"expect": {
+		"checks": [
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "follows_current_request",
+				"condition": "車で出勤する前提で、駐車場を探すときの確認点（料金、場所、空き、営業時間など）を答えている。電車での通勤を勧め直していない。"
+			}
+		]
+	}
+}

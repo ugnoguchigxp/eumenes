@@ -1,44 +1,21 @@
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { openStore, type SqliteStore } from "../../../infrastructure/sqlite";
-import type { AgentRuntime } from "../../agent-runtime";
-import type { ToolchainCard } from "../../capabilities";
-import {
-	migration as conversationMigration,
-	avatarMotionMigration,
-	answerDeliveryMigration,
-	createConversationService,
-} from "../../conversation";
-import type { InferencePort, Receipt } from "../../inference";
-import { createQueue, migration as queueMigration } from "../../queue";
-import {
-	agentLinkMigration,
-	commandInteractionsMigration,
-	continuationConditionsMigration,
-	continuationStepsMigration,
-	continuationsMigration,
-	createDialogueService,
-	migration as dialogueMigration,
-	retainedToolchainsMigration,
-	queueLinkMigration,
-	announcementMigration,
-	questionChoicesMigration,
-	worldStateMigration,
-	type BoundCommandPort,
-	type BoundCommandSet,
-	type ToolchainRoutingPort,
-} from "..";
-import { COMMAND_KIND } from "../service/context";
-import type { RequestAnalysis } from "../service/initial-decision";
+import { rmSync } from "node:fs";
+import type { NativeToolCall } from "../../../infrastructure/chat-stream";
 import { waitFor } from "../../../infrastructure/wait-for";
-import {
-	analysisReceipt,
-	DISCOVERY,
-	isAnalysisRound,
-	offeredToolchains,
-	UNAVAILABLE,
-} from "./analysis.fixture";
+import type { ToolchainCard, ToolchainRuntimeMeta } from "../../capabilities";
+import { createContinuityService } from "../../continuity";
+import { createConversationService } from "../../conversation";
+import type { InferencePort, Receipt } from "../../inference";
+import { createQueue } from "../../queue";
+import { createDialogueService } from "..";
+import type {
+	BoundCommandPort,
+	BoundCommandSet,
+	ToolchainRoutingPort,
+} from "../contracts/toolchains";
+import { COMMAND_KIND, type ChatMessage } from "../service/context";
+import { respond } from "./generation.fixture";
+import { openDialogueStore } from "./store.fixture";
+
 export const REVISION = "toolchain:fake.manage@1";
 export const BINDING = "binding:fake.command@1";
 export const PACKAGE = "package:fake.manage@1";
@@ -76,98 +53,101 @@ export const card: ToolchainCard = {
 	title: "偽の操作",
 	summary: "偽の操作を行う",
 	useWhen: ["偽の操作"],
+	execution: "command",
 	redirects: [],
 	score: { rank: 1, ftsRank: null, similarity: null, fromHistory: false },
 };
-export const operationCall = (args: Record<string, unknown>) => [
-	{
-		id: "call",
-		name: "fake_op",
-		arguments: JSON.stringify({
-			announcement: "担当に引き継ぎます。",
-			...args,
-		}),
-	},
-];
-export const lastUser = (history: Call["history"]) =>
-	[...history].reverse().find((m) => m.role === "user")?.content ?? "";
+
+/** True when the newest message is the result of a tool call that handed the work over. */
+function afterHandover(messages: ChatMessage[]): boolean {
+	const last = messages.at(-1);
+	if (last?.role !== "tool") return false;
+	const call = messages
+		.flatMap((m) => (m.role === "assistant" ? (m.tool_calls ?? []) : []))
+		.find((c) => c.id === last.tool_call_id);
+	if (!call) return false;
+	const result = JSON.parse(last.content) as Record<string, unknown>;
+	if (call.function.name === "delegate") return result.delegated === true;
+	return (
+		call.function.name === "work" &&
+		(JSON.parse(call.function.arguments) as { operation?: string })
+			.operation === "answer" &&
+		result.ok === true
+	);
+}
 export const until = (check: () => boolean, ms = 4000) =>
 	waitFor(check, { timeout: ms });
-export const open: Array<() => Promise<void>> = [];
 export type Command = Record<string, unknown>;
-export type Call = {
-	history: Array<{ role: string; content: string }>;
-	tools: Array<{
-		function: { name: string; parameters: Record<string, unknown> };
-	}>;
-	session?: unknown;
+type Step = {
+	text?: string;
+	calls?: Array<{ name: string; args: Record<string, unknown> }>;
 };
-export function setup(
+
+/**
+ * A real store, queue, continuity and dialogue with a scripted conversation model, a scripted command sub-agent
+ * and a fake bound command toolchain (one tool, its question schemas and an adapter outcome).
+ *
+ * The conversation model's calls come from `state.steps` (FIFO, as in the generation fixture); the command
+ * sub-agent's replies come from `state.commands` (FIFO). A command run is reached through a delegate call of the
+ * scripted conversation model (`asked`) or put on a run directly (`commandRun`).
+ */
+export async function setup(
 	options: {
-		/** The conversation model's i-th call; undefined falls back to calling the function. */
-		conversation?: (
-			call: Call,
-			index: number,
-		) => { toolCalls?: unknown[] } | undefined;
-		backend?: string;
-		bound?: boolean;
-		available?: boolean;
-		/** The first round of the i-th run: the function it calls and its analysis; without it a run hands over to the offered toolchain. */
-		analyses?: Array<Partial<RequestAnalysis> & { call?: string }>;
 		/** The binding's allowed question schemas (default: QUESTIONS). */
 		questions?: BoundCommandSet["questions"];
+		/** The chain has no binding; its runtime backend is this (or none). */
+		bound?: false;
+		backend?: string;
+		/** The binding's adapter is available (default true). */
+		available?: boolean;
+		/** Start the queue at once (default true); `commandRun` needs it off and starts it itself. */
+		autoStart?: boolean;
 	} = {},
 ) {
-	const analyses = [...(options.analyses ?? [])];
 	const set: BoundCommandSet = {
 		...baseSet,
 		questions: options.questions ?? QUESTIONS,
 	};
-	const dir = mkdtempSync(join(tmpdir(), "eumenes-interactions-"));
-	const store: SqliteStore = openStore(join(dir, "db.sqlite3"), [
-		conversationMigration,
-		avatarMotionMigration,
-		answerDeliveryMigration,
-		dialogueMigration,
-		retainedToolchainsMigration,
-		queueMigration,
-		queueLinkMigration,
-		announcementMigration,
-		agentLinkMigration,
-		worldStateMigration,
-		commandInteractionsMigration,
-		questionChoicesMigration,
-		continuationsMigration,
-		continuationConditionsMigration,
-		continuationStepsMigration,
-	]);
+	const { dir, store } = openDialogueStore("eumenes-interactions-");
 	const conversation = createConversationService(store);
+	const continuity = createContinuityService(store);
 	const state = {
 		activeRevision: REVISION,
+		/** Added to the dialogue's clock (ms). */
 		offset: 0,
 		queueFull: false,
+		/** What the agent runtime reports for the saved operation. */
 		outcome: null as unknown,
+		/** Holds each command sub-agent call until released. */
 		gate: null as Promise<void> | null,
-		// Host-issued choices per question schema ref.
-		choices: {} as Record<string, Array<{ ref: string; label: string }>>,
-		// The command sub-agent's replies, consumed in order.
+		/** The conversation model's scripted calls. */
+		steps: [] as Step[],
+		/** The command sub-agent's replies, consumed in order. */
 		commands: [] as Command[],
-		// The saved sub-agent resource (settings.subagent.resourceId).
+		/** Host-issued choices per question schema ref. */
+		choices: {} as Record<string, Array<{ ref: string; label: string }>>,
+		/** The saved sub-agent resource (settings.subagent.resourceId). */
 		subagentResourceId: null as string | null,
 	};
-	const conversationCalls: Call[] = [];
+	const calls: Array<{ messages: ChatMessage[]; tools: string[] }> = [];
+	/** Indexes of the model calls made after a delegation or a command answer already handed the work over. */
+	const afterHandoverCalls: number[] = [];
+	const commandPrompts: Array<Array<{ role: string; content: string }>> = [];
 	const commandSchemas: string[] = [];
 	const commandSessions: unknown[] = [];
 	const releasedSessions: string[] = [];
 	const commandCaptures: Array<Record<string, unknown>> = [];
-	const commandPrompts: Array<Array<{ role: string; content: string }>> = [];
 	const started: Array<Record<string, any>> = [];
+	const roots: Array<{ runId: string; eventId: string; reserved: boolean }> =
+		[];
 	const routed: string[][] = [];
+	const selections: Array<Record<string, any>> = [];
 	const settled: Array<{ outcome: string; code?: string | null }> = [];
+	const clock = () => new Date(Date.now() + state.offset).toISOString();
 	const larm = {
 		status: () => ({ state: "ready", capabilities: ["llm"] }),
-		captureInTransaction: () => {},
-		requestFor: () => "request",
+		requestFor: (_db: unknown, runId: string) => `req:${runId}`,
+		llmContextWindowInTransaction: () => undefined,
 		setContextPolicyInTransaction: () => {},
 		validateReceiptInTransaction: () => true,
 		acceptInTransaction: () => true,
@@ -189,17 +169,6 @@ export function setup(
 			control?: { outputSchema?: unknown },
 			session?: unknown,
 		) => {
-			if (prompt[0]?.content.includes("OUTPUT_SCHEMA="))
-				return {
-					requestId,
-					attemptId: "route",
-					value: JSON.stringify({
-						decision: "answer",
-						functionName: "",
-						request: "",
-						questionRef: "",
-					}),
-				} as Receipt;
 			commandPrompts.push(prompt);
 			commandSessions.push(session);
 			commandSchemas.push(JSON.stringify(control?.outputSchema ?? null));
@@ -212,68 +181,40 @@ export function setup(
 				value: JSON.stringify(next),
 			} as Receipt;
 		},
-		executeRequest: async () => {
-			throw new Error("unexpected_request");
+		answer: async () => {
+			throw new Error("unexpected_answer");
 		},
 		executeStream: async (
 			requestId: string,
-			history: Call["history"],
-			_signal: AbortSignal,
+			messages: ChatMessage[],
+			signal: AbortSignal,
 			delta: (text: string) => void,
-			_p: unknown,
-			tools: Call["tools"] | undefined,
-			session?: unknown,
+			_preparation: unknown,
+			tools: Array<{ function: { name: string } }> | undefined,
 		) => {
-			if (isAnalysisRound(tools)) {
-				if (
-					tools?.some((tool) => tool.function.name === DISCOVERY) &&
-					!offeredToolchains(tools).length &&
-					(!analyses[0]?.call || analyses[0]?.call === card.functionName)
-				)
-					return analysisReceipt(requestId, {
-						name: DISCOVERY,
-						args: { query: lastUser(history) },
-					});
-				const { call: named, ...over } = analyses.shift() ?? {};
-				return analysisReceipt(requestId, {
-					name: named ?? offeredToolchains(tools)[0] ?? UNAVAILABLE,
-					args: over,
-				});
-			}
-			const call = { history, tools: tools ?? [], session };
-			const index = conversationCalls.push(call) - 1;
-			// By default the conversation hands the utterance to the offered function.
-			const result =
-				options.conversation?.(call, index) ??
-				(call.tools.length
-					? { toolCalls: operationCall({ request: lastUser(call.history) }) }
-					: undefined);
-			if (result?.toolCalls)
-				return {
-					requestId,
-					attemptId: String(index),
-					value: "",
-					// The notice belongs to the first round; the second round's function takes the request only.
-					toolCalls: (result.toolCalls as Array<{ arguments: string }>).map(
-						(c) => {
-							const { announcement: _notice, ...rest } = JSON.parse(
-								c.arguments,
-							);
-							return { ...c, arguments: JSON.stringify(rest) };
-						},
-					),
-				} as unknown as Receipt;
-			delta("了解しました");
+			calls.push({
+				messages: messages.map((m) => ({ ...m })),
+				tools: (tools ?? []).map((t) => t.function.name),
+			});
+			// A call right after a handover is not part of the script: the generation should have ended there.
+			const step = afterHandover(messages)
+				? (afterHandoverCalls.push(calls.length - 1),
+					{ calls: [respond()] } as Step)
+				: state.steps.shift();
+			if (!step) throw new Error("fixture_step_missing");
+			signal.throwIfAborted();
+			if (step.text) delta(step.text);
 			return {
 				requestId,
-				attemptId: String(index),
-				value: "了解しました",
+				attemptId: crypto.randomUUID(),
+				value: step.text ?? "",
+				toolCalls: (step.calls ?? []).map((call): NativeToolCall => ({
+					id: crypto.randomUUID(),
+					name: call.name,
+					arguments: JSON.stringify(call.args),
+				})),
 			} as Receipt;
 		},
-		answer: async () => "了解しました",
-		transcribe: async () => "",
-		speak: async () => new Uint8Array(),
-		close: async () => {},
 	} as unknown as InferencePort;
 	const agents = {
 		conversationContextInTransaction: () => ({
@@ -282,16 +223,50 @@ export function setup(
 		}),
 		startInTransaction: (_db: unknown, input: Record<string, any>) => {
 			started.push(input);
+			// The saved operation is known at once: its answer is ready for the run that started it.
+			roots.push({
+				runId: input.rootRunId as string,
+				eventId: `event-${started.length}`,
+				reserved: false,
+			});
 			return {
 				taskId: `task-${started.length}`,
 				jobId: input.parentJobId as string,
 			};
 		},
 		actionOutcomeInTransaction: () => state.outcome,
-		pendingEvents: () => [],
-		byRootInTransaction: () => null,
+		// The saved operation's projection, as the answer of the run that started it.
+		prepareAnswerInTransaction: (_db: unknown, runId: string) => ({
+			taskId: `task-${started.length}`,
+			eventId: `event:${runId}`,
+			revision: 0,
+			dataEpoch: 0,
+			reportTaskId: null,
+			reportEpoch: null,
+			reportDigest: null,
+			projection: null,
+			failureCode: null,
+			actionPayload: JSON.stringify(state.outcome ?? { state: "saved" }),
+			actionFailure:
+				(state.outcome as { state?: string } | null)?.state === "failed",
+		}),
+		completeAnswerInTransaction: () => {},
+		cancelTreeInTransaction: () => {},
+		pendingEvents: () =>
+			roots
+				.filter((root) => !root.reserved)
+				.map((root) => ({ id: root.eventId, root_run_id: root.runId })),
+		byRootInTransaction: () => ({
+			state: "ready_for_answer",
+			deadline: Date.now() + 3_600_000,
+			error_code: null,
+		}),
+		reserveAnswerInTransaction: (_db: unknown, eventId: string) => {
+			const root = roots.find((r) => r.eventId === eventId);
+			if (root) root.reserved = true;
+		},
 		failAnswerInTransaction: () => {},
-	} as unknown as AgentRuntime;
+	} as never;
 	const bound: BoundCommandPort = {
 		snapshotInTransaction: () => ({ items: [] }),
 		parseInvocation(boundSet, toolId, args) {
@@ -335,37 +310,36 @@ export function setup(
 		},
 		prepareInTransaction: () => ({ package: { revisionId: PACKAGE } }),
 	};
-	const runtime = (backend?: string) => ({
-		execution: "command" as const,
-		...(options.bound === false
-			? { requires: backend as never }
-			: {
-					binding: {
-						bindingRevisionId: BINDING,
-						adapterRef: ADAPTER,
-						artifactRevisionId: set.artifactRevisionId,
-						available: options.available ?? true,
-					},
-				}),
-	});
-	const toolchains: ToolchainRoutingPort = {
-		cardInTransaction: (_db, revisionId) =>
-			revisionId === state.activeRevision ? { ...card, revisionId } : undefined,
+	const runtime = (): ToolchainRuntimeMeta =>
+		({
+			execution: "command",
+			...(options.bound === false
+				? options.backend
+					? { requires: options.backend }
+					: {}
+				: {
+						binding: {
+							bindingRevisionId: BINDING,
+							adapterRef: ADAPTER,
+							artifactRevisionId: set.artifactRevisionId,
+							available: options.available ?? true,
+						},
+					}),
+		}) as ToolchainRuntimeMeta;
+	const current = () => ({ ...card, revisionId: state.activeRevision });
+	const toolchains = {
 		embedQuery: async () => undefined,
-		routeInTransaction: (_db, input) => {
+		routeInTransaction: (
+			_db: unknown,
+			input: { available: ReadonlySet<string> },
+		) => {
 			routed.push([...input.available]);
-			return {
-				cards: [{ ...card, revisionId: state.activeRevision }],
-				past: [],
-				retrieval: "none",
-			};
+			return { cards: [current()], past: [], retrieval: "fts" };
 		},
+		cardInTransaction: (_db: unknown, revisionId: string) =>
+			revisionId === state.activeRevision ? current() : undefined,
 		catalogInTransaction: () => [
-			{
-				id: "fake.manage",
-				revisionId: state.activeRevision,
-				runtime: runtime(),
-			},
+			{ id: card.id, revisionId: state.activeRevision, runtime: runtime() },
 			{
 				id: "needs.unknown",
 				revisionId: "toolchain:needs.unknown@1",
@@ -377,13 +351,13 @@ export function setup(
 				runtime: { execution: "research", route: "web" },
 			},
 		],
-		resolveInTransaction: (_db, revisionId) => {
+		resolveInTransaction: (_db: unknown, revisionId: string) => {
 			if (revisionId !== state.activeRevision)
 				throw new Error("toolchain_unavailable");
 			return {
-				toolchain: { functionName: "fake_op" } as never,
+				toolchain: { functionName: card.functionName },
 				packageRevisionId: PACKAGE,
-				runtime: runtime(options.backend),
+				runtime: runtime(),
 			};
 		},
 		commandSetInTransaction: () => ({
@@ -394,13 +368,25 @@ export function setup(
 			...(options.bound === false ? {} : { binding: set }),
 		}),
 		...(options.bound === false ? {} : { bound }),
-		recordSelectionInTransaction: () => "selection",
-		linkTaskInTransaction: () => {},
-		settleSelectionInTransaction: (_db, _runId, result) => {
+		recordSelectionInTransaction: (
+			_db: unknown,
+			input: Record<string, unknown>,
+		) => {
+			selections.push(input);
+			return "selection";
+		},
+		settleSelectionInTransaction: (
+			_db: unknown,
+			_runId: string,
+			result: { outcome: string; code?: string | null },
+		) => {
 			settled.push(result);
 		},
-		requestOfRunInTransaction: () => "偽の操作を開始する",
-	};
+		linkTaskInTransaction: () => {},
+		requestOfRunInTransaction: (_db: unknown, runId: string) =>
+			selections.find((s) => s.runId === runId)?.request ??
+			"偽の操作を開始する",
+	} as unknown as ToolchainRoutingPort;
 	const rawQueue = createQueue(store);
 	const queue = new Proxy(rawQueue, {
 		get(target, property) {
@@ -423,23 +409,26 @@ export function setup(
 		queue,
 		agents,
 		toolchains,
-		clock: () => new Date(Date.now() + state.offset).toISOString(),
+		continuity,
+		clock,
 	});
-	rawQueue.start();
-	open.push(async () => {
-		await dialogue.close();
-		await rawQueue.close(100).catch(() => {});
-		await store.close().catch(() => {});
-		rmSync(dir, { recursive: true, force: true });
-	});
+	let running = false;
+	const start = () => {
+		if (running) return;
+		running = true;
+		rawQueue.start();
+	};
+	if (options.autoStart !== false) start();
 	const h = {
+		dir,
 		store,
 		conversation,
-		queue: rawQueue,
+		continuity,
 		dialogue,
 		interactions: dialogue.interactions,
 		state,
-		conversationCalls,
+		calls,
+		afterHandoverCalls,
 		commandPrompts,
 		commandSchemas,
 		commandSessions,
@@ -447,16 +436,83 @@ export function setup(
 		commandCaptures,
 		started,
 		routed,
+		selections,
 		settled,
-		run: (text: string) =>
-			dialogue.submit({
+		start,
+		status: (runId: string) => dialogue.get(runId)?.status,
+		interaction: () =>
+			dialogue.interactions.list({ conversationId: "main" })[0],
+		rows: (sql: string, ...params: Array<string | number>) =>
+			store.read((db) => db.query(sql).all(...params) as any[]),
+		todos: () => store.read((db) => dialogue.todosInTransaction(db, "main")),
+		/** The material JSON document the nth model call received (messages[1]). */
+		materialOf: (call: number) => calls[call]!.messages[1]!.content,
+		/** Script the conversation model's next call: speech and a closing `respond`. */
+		speak(text: string) {
+			state.steps.push({ text, calls: [respond()] });
+		},
+		/** Script the conversation model to find the command toolchain and delegate the request to it. */
+		delegate(request: string, announcement = "担当に引き継ぎます。") {
+			state.steps.push(
+				{ calls: [{ name: "find_toolchain", args: { query: request } }] },
+				{
+					calls: [
+						{
+							name: "delegate",
+							args: {
+								mode: "execute",
+								toolchain: card.id,
+								request,
+								impact: "create",
+								announcement,
+							},
+						},
+					],
+				},
+			);
+		},
+		/** Submits an utterance and waits for its run to reach `status`. */
+		async say(text: string, status = "completed") {
+			const accepted = await dialogue.submit({
 				requestId: crypto.randomUUID(),
 				conversationId: "main",
 				text,
-			}),
-		/** Put a command job on a fresh run directly, without the conversation decision. */
+			});
+			await waitFor(() => dialogue.get(accepted.id)?.status === status).catch(
+				() => {
+					throw new Error(
+						`run_not_${status}: ${JSON.stringify(dialogue.get(accepted.id))}`,
+					);
+				},
+			);
+			return dialogue.get(accepted.id)!;
+		},
+		/**
+		 * The command sub-agent asks one question for a delegated request; the conversation then speaks it. Resolves
+		 * with the delegating run once it completed.
+		 */
+		async asked(
+			prompt = "何秒ですか",
+			schema = "builtin:timerDurationAnswer",
+			request = "偽の操作を開始して",
+		) {
+			state.commands.push({
+				action: "clarify",
+				question: prompt,
+				answerSchema: schema,
+			});
+			h.delegate(request);
+			h.speak(prompt);
+			return h.say(request);
+		},
+		/** Put a command job on a fresh run directly, without the conversation's delegation (the queue starts here). */
 		async commandRun(text = "偽の操作を開始して") {
-			const run = await h.run(text);
+			if (running) throw new Error("commandRun_needs_autoStart_false");
+			const run = await dialogue.submit({
+				requestId: crypto.randomUUID(),
+				conversationId: "main",
+				text,
+			});
 			await store.write((tx) => {
 				const { job } = rawQueue.enqueueInTransaction(tx, {
 					scope: "dialogue",
@@ -472,30 +528,19 @@ export function setup(
 				});
 				dialogue.linkOperationJobInTransaction(tx, run.id, job.id);
 			});
+			start();
 			return run;
 		},
-		status: (runId: string) => dialogue.get(runId)?.status,
-		interaction: () =>
-			dialogue.interactions.list({ conversationId: "main" })[0],
-		rows: (sql: string, ...params: Array<string | number>) =>
-			store.read((db) => db.query(sql).all(...params) as any[]),
-		async clarified(
-			prompt = "何秒ですか",
-			schema = "builtin:timerDurationAnswer",
-		) {
-			state.commands.push({
-				action: "clarify",
-				question: prompt,
-				answerSchema: schema,
-			});
-			const run = await h.run("偽の操作を開始して");
-			await until(() => h.status(run.id) === "completed");
-			return run;
+		async close() {
+			await dialogue.close();
+			await rawQueue.close(100).catch(() => {});
+			await store.close().catch(() => {});
+			rmSync(dir, { recursive: true, force: true });
 		},
 	};
 	return h;
 }
-export type Harness = ReturnType<typeof setup>;
+export type Harness = Awaited<ReturnType<typeof setup>>;
 /** The answer that fits the question's registered schema. */
 export const answerFor = (question: { inputSchemaRef: string }) =>
 	question.inputSchemaRef === "builtin:answerText"

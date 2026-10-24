@@ -1,0 +1,46 @@
+{
+	"id": "ctx-f4-dev-01",
+	"family": "F4",
+	"split": "dev",
+	"seed": {
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "butler"
+		},
+		"events": [
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-16T20:00:00.000Z",
+				"text": "実家の片付けが大変でさ"
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-16T20:00:03.000Z",
+				"text": "お疲れさまです。",
+				"origin": "reply"
+			}
+		],
+		"world": [
+			{
+				"name": "祖母の古い箪笥"
+			}
+		]
+	},
+	"input": "祖母の古い箪笥について、何か覚えてることある？",
+	"expect": {
+		"checks": [
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "no_unsupported_assertion",
+				"condition": "「祖母の古い箪笥」の素材・年代・来歴・中身・状態などの具体的な内容を作って述べていない。World に記録があることを示して調べられると伝える、調査の関数を呼ぶ、または詳しい内容は分からないと述べている。"
+			}
+		]
+	}
+}

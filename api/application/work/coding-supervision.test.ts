@@ -1,3 +1,4 @@
+import { createContinuityService } from "../../domains/continuity";
 import { expect, test } from "bun:test";
 import { z } from "zod";
 import {
@@ -9,8 +10,9 @@ import {
 } from "../../domains/coding-supervision/test/fixture";
 import {
 	createScheduler,
-	migration as schedulerMigration,
+	migrations as schedulerMigrations,
 } from "../../domains/scheduler";
+import { migrations as continuityMigrations } from "../../domains/continuity";
 import { createDelegatedTasks } from "./delegated-tasks";
 import { superviseCodingExecution } from "./coding-supervision";
 import { createCodingTaskExecution } from "./coding-tasks";
@@ -23,17 +25,15 @@ import { createApp } from "../app";
 import { createClient } from "../../../client";
 import {
 	createConversationService,
-	migration as conversationMigration,
+	migrations as conversationMigrations,
 } from "../../domains/conversation";
 import {
 	createDialogueService,
-	migration as dialogueMigration,
-	retainedToolchainsMigration,
-	queueLinkMigration,
+	migrations as dialogueMigrations,
 } from "../../domains/dialogue";
 import {
 	createVoiceDialogue,
-	migration as voiceMigration,
+	migrations as voiceMigrations,
 } from "../../domains/voice-dialogue";
 import type { LarmPort } from "../../domains/larm";
 import { waitFor } from "../../infrastructure/wait-for";
@@ -43,7 +43,7 @@ test("the existing 60-second Scheduler monitor feeds supervision through the pub
 		scheduler!: ReturnType<typeof createScheduler>;
 	let reads = 0;
 	const h = await setup({
-		migrations: [schedulerMigration],
+		migrations: schedulerMigrations.map((m) => m.sql),
 		tasksFactory: (c) => {
 			scheduler = createScheduler(c.store, c.queue, { now: c.now });
 			c.workflow.observe = async () =>
@@ -158,13 +158,12 @@ test("supervision releases the shared inference slot while waiting on a CLI step
 test("HTTP/client authenticate report and supervisor reads and omit private CLI text", async () => {
 	const h = await setup({
 		migrations: [
-			schedulerMigration,
-			conversationMigration,
-			dialogueMigration,
-			retainedToolchainsMigration,
-			queueLinkMigration,
-			voiceMigration,
-		],
+			...schedulerMigrations,
+			...conversationMigrations,
+			...continuityMigrations,
+			...dialogueMigrations,
+			...voiceMigrations,
+		].map((m) => m.sql),
 	});
 	const scheduler = createScheduler(h.store, h.queue),
 		conversation = createConversationService(h.store);
@@ -178,6 +177,7 @@ test("HTTP/client authenticate report and supervisor reads and omit private CLI 
 	};
 	const dialogue = createDialogueService({
 			store: h.store,
+			continuity: createContinuityService(h.store),
 			queue: h.queue,
 			conversation,
 			larm,
@@ -286,7 +286,7 @@ test("answering an approval question prepares no coding execution and applies th
 		scheduler!: ReturnType<typeof createScheduler>;
 	const h = await setup({
 		approveInstructions: true,
-		migrations: [codingMigration, schedulerMigration],
+		migrations: [codingMigration, ...schedulerMigrations.map((m) => m.sql)],
 		tasksFactory: (c) => {
 			scheduler = createScheduler(c.store, c.queue, { now: c.now });
 			// Real coding service: only the runner (never reached by prepare) is absent.

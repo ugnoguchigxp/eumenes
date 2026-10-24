@@ -22,7 +22,9 @@ DesignSystemの `dist` は共有です。`verify` の実行中は開発サーバ
 
 `verify:live` は明示した LARM への ASR・LLM・TTS 個別疎通であり、ブラウザと実機器を使う循環受入ではありません。
 
-型チェックは Bun 1.4.3 の `bun check` を使います。root、DesignSystem、dots MVP と domain ごとの検査は、それぞれの tsconfig を使います。DesignSystem の build 前検査も `bun check -p tsconfig.build.json` です。Bun は型宣言を出力しないため、`vite-plugin-dts` による `.d.ts` 生成と、それが使う TypeScript 依存を残します。root の TypeScript 依存も境界・SQL・サイズ検査の Compiler API に必要です。`@types/bun` などの型定義も引き続き必要です。
+型チェックは Bun 1.4.3 の `bun check` を使います。root、DesignSystem、dots MVP と domain ごとの検査は、それぞれの tsconfig を使います。DesignSystem の build 前検査も `bun check -p tsconfig.build.json` です。root と DesignSystem の `typescript` は 7.0.2、Vite は 8.3.5 に揃えています。Bun は型宣言を出力しないため、`vite-plugin-dts` 5.1.2 による `.d.ts` 生成を残します。
+
+TypeScript 7.0 は従来の JavaScript Compiler API を提供しません。境界・SQL・サイズ検査と試験棚卸しの4本は、公式の `@typescript/typescript6` 互換パッケージを使います。型宣言生成も同じ互換APIを使い、API Extractor が読む標準ライブラリの場所を `getDefaultLibFilePath` から解決します。API Extractor 内部には TypeScript 5.9.3 が残ります。`@types/bun` などの型定義も引き続き必要です。Vite 8.3.5 は利用者が指定した公開後7日未満の版のため、`bunfig.toml` の待機ルールでは Vite だけを例外に追加しています。
 
 仕様と制約は [Bun 1.4.3 リリースノート](https://bun.sh/blog/bun-v1.4.3) と [型チェックの公式ドキュメント](https://bun.sh/docs/runtime/check) を参照してください。Bun の型チェックは TypeScript 7 に対応するため、TypeScript 5 と診断が異なる場合があります。CSS の副作用 import は各 workspace の `styles` export に型宣言を付け、DesignSystem の path alias は `baseUrl` を使わず相対パスで指定しています。
 

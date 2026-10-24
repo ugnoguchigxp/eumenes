@@ -5,8 +5,8 @@ const harnesses: StewardHarness[] = [];
 afterEach(async () => {
 	for (const h of harnesses.splice(0)) await h.close();
 });
-async function setup(runStates = {}) {
-	const h = await setupSteward({ runStates });
+async function setup() {
+	const h = await setupSteward();
 	harnesses.push(h);
 	return h;
 }
@@ -18,146 +18,116 @@ const requests = [
 	{ kind: "correct" as const, what: "辛いものは平気" },
 ];
 
-test("completed: the exchange and every request of the run are confirmed", async () => {
+test("completed: the run's events are in the log and every request is pending", async () => {
 	const h = await setup();
 	const run = await h.run({ user: "覚えて", end: "completed", requests });
 	expect(states(h)).toEqual(
 		Object.fromEntries(run.requestIds.map((id) => [id, "pending"])),
 	);
-	expect(h.exchangeRow(run.inputMessageId)).toMatchObject({
-		outcome: "answered",
-		state: "pending",
-	});
+	expect(h.log().map((e) => [e.by, e.messageIds, e.curated])).toEqual([
+		["user", [run.inputMessageId], false],
+		["agent", [run.answerMessageId!], false],
+	]);
 	const [unit] = h.units();
-	expect(unit).toMatchObject({ step: "curate-memory", kind: "exchange_step" });
+	expect(unit).toMatchObject({ step: "curate-memory", kind: "events" });
 });
 
-test("failed and interrupted: the user message is an exchange without an answer and requests go on", async () => {
+test("failed and interrupted: only the user's event is in the log and requests go on", async () => {
 	const h = await setup();
 	for (const end of ["failed", "interrupted"] as const) {
 		const run = await h.run({ user: "予算は3万円", end, requests });
-		expect(h.exchangeRow(run.inputMessageId)).toMatchObject({
-			outcome: "failed",
-			answerMessageId: null,
-		});
+		expect(
+			h.log().filter((e) => e.messageIds.includes(run.inputMessageId)),
+		).toHaveLength(1);
 		for (const id of run.requestIds) expect(states(h)[id]).toBe("pending");
 	}
 });
 
-test("cancelled: no exchange; only remember goes on; forget and correct are discarded with their words cleared", async () => {
+test("cancelled: no event, and every request goes on (a stopped generation does not take back what it asked)", async () => {
 	const h = await setup();
 	const run = await h.run({ user: "覚えて", end: "cancelled", requests });
-	expect(h.exchangeRow(run.inputMessageId)).toBeNull();
-	const [remember, forget, correct] = run.requestIds;
-	expect(states(h)).toEqual({
-		[remember!]: "pending",
-		[forget!]: "discarded",
-		[correct!]: "discarded",
-	});
-	const discarded = h.inbox().filter((r) => r.state === "discarded");
-	expect(discarded.every((r) => r.what === "" && r.detail === null)).toBe(true);
-	expect(discarded.map((r) => r.resultCode)).toEqual([
-		"run_cancelled",
-		"run_cancelled",
-	]);
-	// Only the request is left to do, so the unit is a request unit.
+	expect(h.log()).toEqual([]);
+	expect(states(h)).toEqual(
+		Object.fromEntries(run.requestIds.map((id) => [id, "pending"])),
+	);
+	expect(h.inbox().every((r) => r.what !== "")).toBe(true);
+	// Only the requests are left to do, so the unit is a request unit.
 	expect(h.units().map((u) => u.kind)).toEqual(["requests"]);
 });
 
-test("stale: every request is discarded and nothing is registered", async () => {
+test("stale: the requests that were committed stay too, and nothing else is registered", async () => {
 	const h = await setup();
 	const run = await h.run({ user: "覚えて", end: "stale", requests });
-	expect(h.exchangeRow(run.inputMessageId)).toBeNull();
-	expect(new Set(Object.values(states(h)))).toEqual(new Set(["discarded"]));
-	expect(h.units()).toEqual([]);
+	expect(h.log()).toEqual([]);
+	expect(new Set(Object.values(states(h)))).toEqual(new Set(["pending"]));
+	expect(h.inbox()).toHaveLength(run.requestIds.length);
 });
 
-test("requests wait as staged and the steward does not read them before the run ends", async () => {
+test("a request is pending at once, and the steward does not read it before the run ends", async () => {
 	const h = await setup();
-	const runId = "run-live";
-	const messageId = await h.say("user", "覚えて", "c1", runId);
+	const messageId = await h.say("user", "覚えて", "c1", "run-live");
 	await h.store.write((db) =>
-		h.steward.stageRequestInTransaction(db, {
+		h.steward.requestInTransaction(db, {
 			requestId: "live-1",
 			conversationId: "c1",
-			runId,
-			messageId,
+			sourceRef: messageId,
 			kind: "remember",
 			what: "誕生日",
 		}),
 	);
 	await h.kick("c1");
-	expect(h.units()).toEqual([]);
-	expect(states(h)).toEqual({ "live-1": "staged" });
+	expect(states(h)).toEqual({ "live-1": "pending" });
+	// The kick the dialogue gives at the run's end is what starts the unit.
+	await h.runEnded("run-live", "c1", "completed");
+	expect(h.units().map((u) => u.kind)).toEqual(["requests"]);
 });
 
-test("staging the same tool call again is a replay; bad input and foreign sources are refused", async () => {
+test("asking the same tool call again is a replay; bad input and foreign sources are refused", async () => {
 	const h = await setup();
-	const runId = "run-s";
-	const messageId = await h.say("user", "x", "c1", runId);
-	const stage = (over: Record<string, unknown> = {}) =>
+	const messageId = await h.say("user", "x", "c1", "run-s");
+	const ask = (over: Record<string, unknown> = {}) =>
 		h.store.write((db) =>
-			h.steward.stageRequestInTransaction(db, {
+			h.steward.requestInTransaction(db, {
 				requestId: "same",
 				conversationId: "c1",
-				runId,
-				messageId,
+				sourceRef: messageId,
 				kind: "remember",
 				what: "w",
 				...over,
 			} as never),
 		);
-	expect(await stage()).toEqual({ id: "same", replay: false });
-	expect(await stage()).toEqual({ id: "same", replay: true });
+	expect(await ask()).toEqual({ id: "same", replay: false });
+	expect(await ask()).toEqual({ id: "same", replay: true });
 	expect(h.inbox()).toHaveLength(1);
-	await expect(stage({ requestId: "b", what: "" })).rejects.toThrow();
-	await expect(stage({ requestId: "c", kind: "delete" })).rejects.toThrow();
-	await expect(stage({ requestId: "d", messageId: "nope" })).rejects.toThrow(
+	// Without an id the request still gets one.
+	const anonymous = await ask({ requestId: undefined });
+	expect(anonymous.replay).toBe(false);
+	expect(anonymous.id).not.toBe("same");
+	await expect(ask({ requestId: "b", what: "" })).rejects.toThrow();
+	await expect(ask({ requestId: "c", kind: "delete" })).rejects.toThrow();
+	await expect(ask({ requestId: "d", sourceRef: "nope" })).rejects.toThrow(
 		"invalid_request_source",
 	);
 	await expect(
-		stage({ requestId: "e", conversationId: "other" }),
+		ask({ requestId: "e", conversationId: "other" }),
 	).rejects.toThrow("invalid_request_source");
+	await expect(
+		ask({ requestId: "same", conversationId: "other" }),
+	).rejects.toThrow("request_conflict");
 });
 
-test("at startup, the staged requests of finished runs are sorted by the same table", async () => {
-	const h = await setup({
-		"run-a": "completed",
-		"run-b": "cancelled",
-		"run-c": "active",
-		"run-d": "failed",
-	});
-	const ids: Record<string, string> = {};
-	for (const run of ["run-a", "run-b", "run-c", "run-d", "run-gone"]) {
-		const messageId = await h.say("user", "x", "c1", run);
-		await h.store.write((db) => {
-			for (const kind of ["remember", "forget"] as const) {
-				const id = `${run}:${kind}`;
-				ids[id] = id;
-				h.steward.stageRequestInTransaction(db, {
-					requestId: id,
-					conversationId: "c1",
-					runId: run,
-					messageId,
-					kind,
-					what: "w",
-				});
-			}
-		});
-	}
-	await h.store.write((db) => h.steward.sweepStagedInTransaction(db));
-	expect(states(h)).toEqual({
-		"run-a:remember": "pending",
-		"run-a:forget": "pending",
-		"run-b:remember": "pending",
-		"run-b:forget": "discarded",
-		"run-c:remember": "staged",
-		"run-c:forget": "staged",
-		"run-d:remember": "pending",
-		"run-d:forget": "pending",
-		"run-gone:remember": "discarded",
-		"run-gone:forget": "discarded",
-	});
+test("a request the steward has not applied survives a restart: the startup kick makes its unit", async () => {
+	const h = await setup();
+	const messageId = await h.say("user", "x", "c1", "run-a");
+	await h.store.write((db) =>
+		h.steward.requestInTransaction(db, {
+			conversationId: "c1",
+			sourceRef: messageId,
+			kind: "forget",
+			what: "住所",
+		}),
+	);
+	expect(h.units()).toEqual([]);
 	await h.kick();
 	expect(h.units().map((u) => u.kind)).toEqual(["requests"]);
 });

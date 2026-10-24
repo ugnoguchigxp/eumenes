@@ -3,7 +3,7 @@
  * validates the reply with zod, and fails closed: anything unusable is `needs_adjudication`, never a pass or fail.
  * Modeled on scripts/search-answer-evaluation.ts (auxiliary session, exact context, JSON schema, no repair).
  * The request carries seed facts, the current input, the answer (its text and the functions it called, each with
- * its arguments) and the axes. Never the arm id nor the context text. The whole payload is escaped as reference
+ * its arguments) and the axes. Never the context text. The whole payload is escaped as reference
  * data (`referenceJson`), so nothing in an answer or in an argument can forge a delimiter.
  */
 import { z } from "zod";
@@ -14,6 +14,7 @@ import {
 	type RubricAxis,
 	type RubricAxisName,
 	type Seed,
+	type SeedEvent,
 } from "./case-schema";
 import type { Answer } from "./checks";
 
@@ -53,34 +54,47 @@ export type AxisResult =
 			reason: string;
 	  };
 
-/** The seed as the judge's source of truth, in plain labelled fields (no persona, no arm or layout detail). */
+/**
+ * The seed as the judge's source of truth, in plain labelled fields (no persona, no layout or document detail). Events
+ * are the seed's own, in the order they were appended; the judge reads `at` for what came before what.
+ */
 export function factsOf(seed: Seed) {
+	const plain = (events: readonly SeedEvent[]) =>
+		events.map((event) => {
+			const { key: _key, ...rest } = event;
+			return rest;
+		});
 	return {
-		longTermMemory: (seed.longTerm ?? []).map((i) => i.text),
+		longTermMemory: (seed.longTerm ?? []).map((i) => ({
+			text: i.text,
+			...(i.published ? {} : { notYetInProfile: true }),
+		})),
+		tendencies: (seed.tendencies ?? []).map((t) => t.text),
 		shortTermNotes: (seed.notes ?? []).map((n) => ({
 			kind: n.kind,
 			text: n.text,
 		})),
-		conversationSummary: seed.summary?.text ?? null,
-		conversationExchanges: (seed.exchanges ?? []).map((e) => ({
-			at: e.at,
-			user: e.user,
-			...(e.assistant === undefined ? {} : { assistant: e.assistant }),
+		earlierHistory: (seed.episode ?? []).map((part) => ({
+			kind: part.kind,
+			...(part.kind === "summary" ? { summary: part.text } : {}),
+			events: plain(part.events),
 		})),
+		conversationEvents: plain(seed.events ?? []),
+		pendingUtterances: seed.pending ?? [],
 		recalledExchanges: seed.recall ?? [],
+		todos: (seed.work ?? []).map(({ key: _key, ...work }) => work),
+		pendingConfirmations: seed.confirmations ?? [],
 		adoptedGoals: (seed.goals ?? []).map((g) => g.text),
 		worldTargetNamesKnown: (seed.world ?? []).map((w) => w.name),
 		notices: seed.notices ?? [],
-		operationResult: seed.operation ?? null,
-		research: seed.research ?? null,
-		specialistRecord: seed.specialist ?? null,
+		agencyInterests: seed.agencyInterests ?? [],
 	};
 }
 
 const MAX_OUTPUT_TOKENS = 1024;
 
 export function buildJudgeRequest(
-	testCase: Pick<ContextCase, "seed" | "input" | "expect">,
+	testCase: Pick<ContextCase, "seed" | "input" | "trigger" | "expect">,
 	answer: Answer,
 	rules: string,
 ): JudgeRequest {
@@ -93,6 +107,7 @@ export function buildJudgeRequest(
 				content: referenceJson({
 					facts: factsOf(testCase.seed),
 					currentInput: testCase.input,
+					...(testCase.trigger ? { trigger: testCase.trigger } : {}),
 					answer: {
 						text: answer.text,
 						toolCalls: answer.toolCalls.map((c) => ({
@@ -130,7 +145,7 @@ const unresolved = (
  * JSON, a schema violation, or an axis set that differs from the requested one makes every axis needs_adjudication.
  */
 export async function judgeAnswer(input: {
-	case: Pick<ContextCase, "seed" | "input" | "expect">;
+	case: Pick<ContextCase, "seed" | "input" | "trigger" | "expect">;
 	answer: Answer;
 	rules: string;
 	judge: JudgeFn;

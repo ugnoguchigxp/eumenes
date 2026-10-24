@@ -1,6 +1,6 @@
 import { stateKinds as stateKindsOf } from "../../../memory/contracts";
 import {
-	EXCHANGES_PER_UNIT,
+	EVENTS_PER_UNIT,
 	REQUESTS_PER_UNIT,
 	type RequestKind,
 } from "../../contracts";
@@ -29,6 +29,7 @@ const RESOLVE_ACTIONS = [
 	"stop",
 	"remember",
 	"update",
+	"withdraw",
 	"none",
 ] as const;
 /** The steward's own forget candidates per request (its prompt, not the conversation window). */
@@ -72,8 +73,8 @@ export type Resolve = {
 	key: string | null;
 	negated?: boolean;
 };
-/** The judgment of one exchange: does it need a World step, does it need a goal step (section 3.4 of the World plan). */
-export type Route = { exchange: string; world: boolean; goals: boolean };
+/** The judgment of one event: does it need a World step, does it need a goal step (section 3.4 of the World plan). */
+export type Route = { event: string; world: boolean; goals: boolean };
 export type CurateOutput = {
 	remember: Remember[];
 	update: Update[];
@@ -91,13 +92,13 @@ export type RequestEntry = {
 	detail: string | null;
 	kind: RequestKind;
 	messageId: string;
-	/** The label of the exchange the request was made in. */
-	exchange: string;
+	/** The label of the event that shows the message the request was made in ("" when it is not shown). */
+	event: string;
 };
 export type CurateContext = {
-	exchanges: LabelTable;
-	/** The exchanges this unit marks (input message ids). */
-	targetIds: string[];
+	events: LabelTable;
+	/** The events this unit marks handled (`seq`). */
+	targetSeqs: number[];
 	requests: Record<string, RequestEntry>;
 	refs: Record<string, MemoryRef>;
 	/**
@@ -107,9 +108,9 @@ export type CurateContext = {
 	shown: Record<string, string[]>;
 	/** A claim ref -> the World entities it is about: the forget of an entity already removes the claim. */
 	claimEntities: Record<string, string[]>;
-	/** The user's text of each exchange of the unit, by label. */
-	exchangeTexts: Record<string, string>;
-	/** The version of each target exchange's messages the model read (a route is bound to it). */
+	/** The text of each event of the unit, by label. */
+	eventTexts: Record<string, string>;
+	/** The version of each target event's message the model read (a route is bound to it). */
 	sources: Record<string, { revision: string; digest: string }>;
 	digests: Record<string, string>;
 	turns: Array<{ messageId: string; text: string }>;
@@ -225,17 +226,17 @@ export function parseCurate(raw: unknown): CurateOutput | null {
 			REQUESTS_PER_UNIT,
 		),
 	);
-	// A judgment the host can not read is "needed": nothing is skipped on a guess (an exchange without one counts as needed too).
+	// A judgment the host can not read is "needed": nothing is skipped on a guess (an event without one counts as needed too).
 	const route = take(
 		elements<Route>(
 			raw.route,
 			(e) => {
-				const exchange = text(e.exchange, 16);
-				return exchange
-					? { exchange, world: e.world !== false, goals: e.goals !== false }
+				const event = text(e.event, 16);
+				return event
+					? { event, world: e.world !== false, goals: e.goals !== false }
 					: null;
 			},
-			EXCHANGES_PER_UNIT,
+			EVENTS_PER_UNIT,
 		),
 	);
 	return { remember, update, stop, notes, resolve, route, dropped };

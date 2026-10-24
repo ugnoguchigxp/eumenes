@@ -10,8 +10,14 @@ export function chatRequest(
 ) {
 	return {
 		model: provider.model,
-		messages: messages.map(({ images, role, content: text, tool_calls }) => {
-			const m = { role, content: text, ...(tool_calls ? { tool_calls } : {}) };
+		messages: messages.map(
+			({ images, role, content: text, tool_calls, tool_call_id }) => {
+			const m = {
+				role,
+				content: text,
+				...(tool_calls ? { tool_calls } : {}),
+				...(tool_call_id ? { tool_call_id } : {}),
+			};
 			if (!images?.length) return m;
 			const content: ChatContentPart[] = m.content
 				? [{ type: "text", text: m.content }]
@@ -24,7 +30,8 @@ export function chatRequest(
 					},
 				});
 			return { ...m, content };
-		}),
+			},
+		),
 		...(options?.jsonOutput
 			? {
 					temperature: 0,

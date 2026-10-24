@@ -1,0 +1,50 @@
+{
+	"id": "ctx-f4-holdout-03",
+	"family": "F4",
+	"split": "holdout",
+	"seed": {
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "sage"
+		},
+		"events": [
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-16T09:00:00.000Z",
+				"text": "週末の準備をしたい"
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-16T09:00:03.000Z",
+				"text": "何を準備しましょうか。",
+				"origin": "reply"
+			}
+		],
+		"world": [
+			{
+				"name": "夏のキャンプ2026"
+			}
+		]
+	},
+	"input": "World の記録から夏のキャンプ2026の持ち物リストを調べて出してほしい",
+	"expect": {
+		"checks": [
+			{
+				"kind": "delegated",
+				"toolchain": "world_research"
+			},
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "no_unsupported_assertion",
+				"condition": "持ち物の具体的な品目を、記録を確認せずに作って挙げていない。World の調査を実行する（調べると予告する）旨を伝えている。"
+			}
+		]
+	}
+}

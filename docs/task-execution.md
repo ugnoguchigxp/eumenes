@@ -1,14 +1,14 @@
 # 日常の複数操作担当
 
-状態: 休止中（2026-10-21）。bundleは `task-execution.bundle.dormant.json` に改名して登録対象から外し、会話から `execute_task` / `task_control` は提示されない。実装・固定試験は残す。複数操作は会話担当の[結果の照合と継続](toolchain.md#会話から担当への経路)で扱う。復元の手順は[設計 §10](../spec/step-and-check-multi-operation-design-2026-10-21.md)。
+状態: 休止中（2026-10-21）。bundleは `task-execution.bundle.dormant.json` に改名して登録対象から外し、担当の検索に出ない。実装・固定試験は残す。復元するとbundleを登録し直し、会話エージェントが依頼ツールで渡す。仕事の結果はTODOで扱う（[会話エージェントのContextWindow仕様](../spec/context-window-spec-2026-10-24.md) §9）。
 
-会話担当は、一つの結果から次の能力を使う必要がある依頼を `execute_task` へ渡す。意味の判断と完了の判定はLLM、台帳・権限・予算・副作用の実行はhostが担当する。Pursuitへの自動転送や長期探索は含まない。
+会話エージェントは、一つの結果から次の能力を使う必要がある依頼をこの担当へ依頼する。意味の判断と完了の判定はLLM、台帳・権限・予算・副作用の実行はhostが担当する。Pursuitへの自動転送や長期探索は含まない。
 
 ## 入口と状態
 
-登録（休止中）は `capabilities/bundles/task-execution.bundle.dormant.json`（skill@8 / package@8 / toolchain@9）と `adapter:task-execution@1`。専用Artifactはない。質問と結果は既存の会話通知を使う。R1には既に組み立てたMemory/Worldの背景とhost発行ref、同じ会話の短い作業projectionだけを追加し、開始時の追加分類・planner・能力探索を行わない。R1の `execute_task.contextRefs` も親と同じく提示済みrefだけを列挙し、参照がなければ空配列だけを許す。
+登録（休止中）は `capabilities/bundles/task-execution.bundle.dormant.json`（skill@8 / package@8 / toolchain@9）と `adapter:task-execution@1`。専用Artifactはない。質問と結果は既存の会話通知を使う。開始時の追加分類・planner・能力探索は行わない。
 
-親実行のIDと原発言の会話runを分離する。会話が回答を終えたり画面を離れたりしても親は継続できる。作業の操作はR1の `task_control` で `workRef`、`expectedRevision`、action（status / answer / amend / cancel）を指定する。回答には質問refと所有domainのschemaに一致する入力が必要で、別会話・古い版・回答済みの質問は再開できない。進捗照会は制御適用後の状態を返す。
+親実行のIDと原発言の会話runを分離する。会話が回答を終えたり画面を離れたりしても親は継続できる。作業の操作は会話エージェントの仕事の操作（`work`の確認・回答・訂正・取消）で、hostが`workRef`、`expectedRevision`、action（status / answer / amend / cancel）に写す。回答には質問refと所有domainのschemaに一致する入力が必要で、別会話・古い版・回答済みの質問は再開できない。進捗照会は制御適用後の状態を返す。
 
 読み取りAPIは `GET /api/agent-executions?conversationId=…` と `GET /api/agent-executions/:id`。変更は既存の会話入口から行う。
 
@@ -22,7 +22,7 @@
 
 共通のcommand入力には元runと親・子IDを渡す。所有domainが示す作成元と今回の実行結果を区別し、同種・同名の過去対象だけで新規依頼を重複扱いしない。親bindingの無効化は背景の回収だけでなく、各判断と子の認可でも検査する。
 
-承認の参照元となる直前のassistant発言がないR1では、approved=falseだけを提示する。発言がある場合、その意味が今回の承認かどうかはLLMが判断する。過去の承認をhost側で自動的に再利用しない。
+承認は実行前の確認（依頼の`confirm`）への`approve`だけで、hostは確認の構造（未使用・期限内・確認文の配信）を検査する。過去の承認をhost側で自動的に再利用しない。
 
 research、bound command、instant、生成系、旧commandは既存の実行機構を使う。instantの明示fallbackも同じ論理子として追跡する。非同期処理の受付後は所有domainの終了を待つ。生成系は実呼出しIDごとに保存し、同一会話run内の二回の生成が上書きされない。
 
@@ -39,7 +39,6 @@ browserには原文と短い作業説明を別々に渡す。承認待ちで物�
 | 未終了作業 | 同じ会話4件、host全体32件 |
 | 親状態 / 開始入力 / 結果 / 参照読取り | 64KiB / 24KiB / 16KiB / 8KiB |
 | 参照 / 未回答質問 / 質問累計 | 32件 / 1件 / 3件 |
-| R1の制御定義と作業projectionの追加量 | 1,024推定token以内。背景本文は既存Memory割当内 |
 
 外部のcoding担当内部の推論数は取得できないため48回に加算せず、外部担当の予算、親の絶対期限、停止操作で制約する。取得可能なEumenesの子推論は予約してから開始し、失敗で未確定の消費は予約上限まで使用済みと扱う。
 

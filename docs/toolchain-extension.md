@@ -30,11 +30,11 @@ CPU計算は `compute.bundle.json` と `adapter:compute@1` で追加する。4�
 
 休止中（2026-10-21）。`task-execution.bundle.dormant.json` は登録されない。以下は休止中の実装の契約。
 
-`task-execution.bundle.dormant.json`（休止中）の `task.execute` は画面・通常toolを持たない担当で、登録adapterの `task` lifecycleに結ぶ。R1の `execute_task` で目的とhost発行の背景refを受け、agent-runtimeが会話runとは独立した親実行を所有する。R2のcommand翻訳を親の開始に追加しない。
+`task-execution.bundle.dormant.json`（休止中）の `task.execute` は画面・通常toolを持たない担当で、登録adapterの `task` lifecycleに結ぶ。会話エージェントの依頼（`delegate`の`execute`）で目的を受け、agent-runtimeが会話runとは独立した親実行を所有する。commandの翻訳を親の開始に追加しない。
 
 親は `find_toolchain` の上位4件からLLMが一つを選び、子の確定結果から次の能力を選ぶ。instantは登録済みの実引数schema、その他は `stepRequest` と `contextRefs` を使う。commandは既存の翻訳・snapshot・adapterを通す。非同期adapterは `execution.currentInTransaction` / `cancelInTransaction` と必要なwriter外の `stop` を実装し、受付を実行完了と扱わない。共通契約に接続できない能力は公開候補から除く。
 
-制御名 `find_toolchain`、`task_control`、`read_reference`、`ask_user`、`complete_task`、`report_partial` は通常のツールチェーン名として登録しない。`execute_task` はtask binding専用で、重複登録は拒否する。session型は公開状態と未保存確認を検査して会話へ引き継ぐ。親から隠れたsessionを開かない。
+会話エージェントの固定ツール名 `memory`・`find_toolchain`・`delegate`・`work`・`respond` と、制御名 `task_control`、`read_reference`、`ask_user`、`complete_task`、`report_partial` は通常のツールチェーン名として登録しない。`execute_task` はtask binding専用で、重複登録は拒否する。session型は公開状態と未保存確認を検査して会話へ引き継ぐ。親から隠れたsessionを開かない。
 
 開始・回答・訂正・取消・期限・再起動・忘却は [日常の複数操作担当](task-execution.md) を参照。数値上限と適合性の意味判断をadapter独自の処理で変更しない。
 
@@ -43,7 +43,7 @@ CPU計算は `compute.bundle.json` と `adapter:compute@1` で追加する。4�
 `execution:"pipeline"` のbindingは、3つ以上の担当を決まった順に使う手順（タスクパイプライン）を、定義（`pipeline`、schemaは `api/domains/capabilities/contracts/pipelines.ts`）ごと持つ。adapterは `adapter:pipelines@1`、画面とtoolは持たず、packageはtoolを持たない。設計は[タスクパイプライン設計](../spec/task-pipeline-design-2026-10-22.md)。
 
 - 手で bundle を書かない。定義を `POST /api/pipelines/publish`（`/check` で検査だけ、`/fixture` で試験の事例を担当なしで運転）か、パイプライン制作の画面（`pipeline-studio.bundle.json`、協働型 `pipeline.studio`）の「公開」で登録する。公開のたびに profile・skill・package・binding・toolchain の新revision（id `pipeline.<定義のid>`、関数名 `pipeline_<id>`）ができ、既存revisionは書き換えない。
-- 候補カードには入力のschemaとステップの一覧が付き、R1が入力と原文の引用（`<名前>_quote`）を書いて呼ぶ。実行は agent-runtime の親実行が1ステップずつ子として担当へ渡す。依頼の検索文が最初の作業だけのときも、依頼そのものの埋め込みで見つかるパイプラインを候補に足す。
+- 担当の検索の結果に入力のschemaとステップの一覧が付き、会話エージェントが依頼の`inputs`に入力と原文の引用（`<名前>_quote`）を書いて依頼する。実行は agent-runtime の親実行が1ステップずつ子として担当へ渡す。依頼の検索文が最初の作業だけのときも、依頼そのものの埋め込みで見つかるパイプラインを候補に足す。
 - ステップに書けるのは単発の担当（command・instant・research・画像・音楽など）だけ。session・task・pipeline は書けない。
 
 ### 1.1 Seedと初期化
@@ -76,7 +76,7 @@ Seedに含めるのは再利用する定義だけで、会話、実行・操作�
 | 旧形式のツールチェーンを移す | [§6](#6-旧形式のツールチェーンを移行する) | §5に加え旧経路の削除 |
 | 新しい画面部品が要る | [§10 E](#10-e-designsystemopenuiartifactを追加する) | DesignSystem部品とOpenUI登録 |
 | 履歴調査の要件profile・dotsの担当 | [§9 A](#9-a-登録apiで追加する) | なし。登録API |
-| 外部の読取りAPIの結果を決まった文でそのまま答える（R2・一時回答なし） | [§3.2](#32-即時回答型instantを追加する) | adapterの `instant`、bundle |
+| 外部の読取りAPIの結果を決まった文で返す（予告・TODOなし） | [§3.2](#32-即時回答型instantを追加する) | adapterの `instant`、bundle |
 | 既存の担当を決まった順に使う手順（3つ以上の担当） | [pipeline型](#決まった手順を実行するpipeline型) | なし。定義を公開APIか制作画面で登録 |
 | 単純なHTTP JSON API（結果を担当が整理して返す） | 未対応 | bundleの `bindings` はcommand・session bindingだけを受け付ける。HTTP APIはadapterで実装する |
 
@@ -90,7 +90,7 @@ Seedに含めるのは再利用する定義だけで、会話、実行・操作�
    ```sh
    bun run toolchain:bundle -- pins package:timers.manage@1 tool:timer.start@1
    ```
-3. **definitionsを書く**: 新しいprofile・skill・package・toolchainを書く。本文はJSON文字列で持ち、既存revisionの本文は変えない。toolchainの必須項目は `functionName`（`^[a-z][a-z0-9_]{2,40}$`、全体で一意）、`summary`、`useWhen`（1件以上）、`examples`（3件以上・各200字以内。候補検索の索引と評価に使う）、`redirects`、`dependencies` と `packageRevisionId`（同じpackage一つ）、`bindingRevisionId`、`artifactRevisionId`。表示はartifact登録が担うので、旧形式の `artifact` 項目は不要（書いても使われない。新しく書かない）。
+3. **definitionsを書く**: 新しいprofile・skill・package・toolchainを書く。本文はJSON文字列で持ち、既存revisionの本文は変えない。toolchainの必須項目は `functionName`（`^[a-z][a-z0-9_]{2,40}$`、全体で一意）、`summary`、`useWhen`（1件以上）、`examples`（3件以上・各200字以内。候補検索の索引と評価に使う）、`redirects`、`dependencies` と `packageRevisionId`（同じpackage一つ）、`bindingRevisionId`、`artifactRevisionId`。任意の `minImpact`（`none`・`create`・`modify_existing`・`irreversible`）は、その担当の仕事が既存のものに与える影響の下限で、会話エージェントの申告より大きければこちらを使う。`modify_existing`・`irreversible`の仕事は、会話エージェントが実行前の確認（依頼の`confirm`）を出してからでないと実行されない（[ContextWindow仕様](../spec/context-window-spec-2026-10-24.md) §6.7）。未宣言なら申告を使う。表示はartifact登録が担うので、旧形式の `artifact` 項目は不要（書いても使われない。新しく書かない）。
 4. **bindingを書く**:
 
    | 項目 | 内容 |
@@ -180,13 +180,13 @@ Seedに含めるのは再利用する定義だけで、会話、実行・操作�
 
 ### 3.2 即時回答型（instant）を追加する
 
-会話の最初の判断（R1）の関数呼出しだけで答えが決まる担当（例: 天気予報 `weather_forecast`）に使う。R2・一時回答・サブエージェントを使わず、adapterが返した文をそのまま確定回答にする。実在の例は [weather-forecast.bundle.json](../api/domains/capabilities/bundles/weather-forecast.bundle.json) と [weather-adapter.ts](../api/application/weather/weather-adapter.ts)。
+会話エージェントの依頼一回で答えが決まる担当（例: 天気予報 `weather_forecast`）に使う。予告・TODO・サブエージェントを使わず、adapterが返した文をツールの結果として会話エージェントへ返し、会話エージェントがそれを根拠に話す。実在の例は [weather-forecast.bundle.json](../api/domains/capabilities/bundles/weather-forecast.bundle.json) と [weather-adapter.ts](../api/application/weather/weather-adapter.ts)。
 
-1. bundleに `execution:"instant"` のbindingを書く。`tools` は一件、`fallbackToolchainId` はadapterが答えられないとき同じrunで元の発言を渡す担当のid。`artifactRevisionId` は持たず、toolchainにも書かない（画面を持たない）。
-2. toolの `schemaKey` は `capabilities/contracts` に追加したvalidator（例 `weatherPlace`）。R1の関数には、共通の分析引数に加えてこのschemaの項目が載り、`announcement` は載らない。
+1. bundleに `execution:"instant"` のbindingを書く。`tools` は一件、`fallbackToolchainId` はadapterが答えられないときにツールの結果で示す代わりの担当のid（自動では回さず、会話エージェントが予告付きで依頼するかを判断する）。`artifactRevisionId` は持たず、toolchainにも書かない（画面を持たない）。
+2. toolの `schemaKey` は `capabilities/contracts` に追加したvalidator（例 `weatherPlace`）。担当の検索の結果にこのschemaが入力として載り、会話エージェントは依頼の`inputs`に書く。予告は付けない。
 3. 引数は利用者の言った言葉（地名・会社名）で受け、値の解決（地名→区域、名前→銘柄）はadapterが自分のデータで行う。`availableInTransaction` が候補に出すかを決める。`instant.run(operation, input, signal)` が `{ok:true, answer}` か `{ok:false, code}` を返す。ネットワークを使ってよい（transaction外）。外部取得はタイムアウト・サイズ上限・リダイレクト拒否を付ける。取消はsignalで受け、失敗として扱わない。
 4. 使う場面・使わない場面・回答文の形は、toolchainの `summary`・`useWhen`・`redirects`・profile・SKILLとadapterに書く。会話の共通SystemContextとdialogueには足さない。
-5. 試験は、adapter単体（成功・欠けた値・各障害）、R1の関数定義（列挙が入るのは候補にある時だけ）、結合（R2なしで回答、障害でfallback、音声）。fixtureで外部APIを呼ばない。
+5. 試験は、adapter単体（成功・欠けた値・各障害）、候補の入力の説明、結合（ツールの結果で答える、障害で代わりの担当を示す、音声）。fixtureで外部APIを呼ばない。
 
 ## 4. 既存adapterに操作を足す
 
@@ -537,7 +537,7 @@ builtins.push(briefSkill, {
 
 | 接続 | 例で追加する内容 |
 | --- | --- |
-| `seeds/toolchains.json` | `web.brief`ツールチェーン。`useWhen`・`examples`・既存`web.search`との`redirects`を双方に書く。登録定義の依頼は共通の`{request}`。会話の初動R1で提示する関数にはhostが共通の必須`announcement`を追加し、R1の直後に予告を通知する。R2は依頼の引数だけを作り、予告の再生後に委譲する |
+| `seeds/toolchains.json` | `web.brief`ツールチェーン。`useWhen`・`examples`・既存`web.search`との`redirects`を双方に書く。登録定義の依頼は共通の`{request}`。会話エージェントは依頼の`execute`に予告を付け、hostは予告の配信後に委譲する |
 | `runtime-meta.ts` | toolchainsへ`"web.brief": { execution: "research", route: "web" }` |
 | 結合fixture | 呼出しから開始したpackageRevisionIdまで確認。会話の選択と起動先が一致することを試す |
 

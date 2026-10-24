@@ -189,7 +189,8 @@ export function createVoiceResponder({
 				turns: preparation!.context?.turns ?? [],
 			};
 			announcement = final.announcement ?? announcement;
-			append(answer, true);
+			// Work that runs on its own answers with its announcement, which was already spoken.
+			append(answer === announcement ? "" : answer, true);
 			await speech.work;
 			if (controller.signal.aborted) return;
 			if (speech.error) throw speech.error;
@@ -206,6 +207,18 @@ export function createVoiceResponder({
 			if (!speech.chunks.size) audio.delete(turn.utteranceId);
 		} catch (error) {
 			speechController.abort();
+			// An adopted answer whose speech failed reached the user only as far as it was played.
+			const played = speech?.played ?? [];
+			await store
+				.write((db) =>
+					dialogue.recordHeardInTransaction(
+						db,
+						run.id,
+						played.length ? "partial" : "none",
+						played.join(""),
+					),
+				)
+				.catch(() => undefined);
 			audio.delete(turn.utteranceId);
 			throw error;
 		} finally {

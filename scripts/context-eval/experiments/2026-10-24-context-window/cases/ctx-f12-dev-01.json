@@ -1,0 +1,86 @@
+{
+	"id": "ctx-f12-dev-01",
+	"family": "F12",
+	"split": "dev",
+	"seed": {
+		"events": [
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-20T07:00:00.000Z",
+				"text": "来週の京都の天気を調べて"
+			},
+			{
+				"type": "acted",
+				"at": "2026-10-20T07:00:02.000Z",
+				"fields": {
+					"action": "delegate",
+					"toolchain": "web_research",
+					"request": "来週の京都の天気を調べる",
+					"todo": "@w1"
+				}
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-20T07:00:03.000Z",
+				"text": "お調べしますね。",
+				"origin": "announcement"
+			}
+		],
+		"work": [
+			{
+				"key": "w1",
+				"toolchain": "web_research",
+				"request": "来週の京都の天気を調べる",
+				"at": "2026-10-20T07:00:03.000Z",
+				"updatedAt": "2026-10-20T07:02:00.000Z",
+				"status": "done",
+				"outcome": "succeeded",
+				"result": {
+					"asOf": "2026-10-20T07:01:50.000Z",
+					"claims": [
+						{
+							"text": "来週前半は晴れの日が多い見込み",
+							"sources": [
+								"src_1"
+							]
+						}
+					],
+					"limits": "予報は変わりうる"
+				}
+			}
+		],
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "butler"
+		}
+	},
+	"input": null,
+	"trigger": {
+		"kind": "todo_changed",
+		"todos": [
+			{
+				"id": "@w1",
+				"status": "done"
+			}
+		]
+	},
+	"expect": {
+		"checks": [
+			{
+				"kind": "speaks"
+			},
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "speech_judgment",
+				"condition": "利用者が待っている調べ物が終わったので、結果を話している（または結果を確認してから話している）。"
+			}
+		]
+	}
+}

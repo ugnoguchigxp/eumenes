@@ -4,7 +4,7 @@ import {
 } from "../../../conversation";
 import type { GoalOp, GoalOpResult } from "../../../goals";
 import {
-	EXCHANGES_PER_UNIT,
+	EVENTS_PER_UNIT,
 	REQUESTS_PER_UNIT,
 	type StepId,
 } from "../../contracts";
@@ -14,15 +14,16 @@ import {
 	readInbox,
 	resolveInbox,
 } from "../../repository";
-import { fitExchanges } from "../budget";
+import { fitEvents } from "../budget";
 import {
 	type LabelTable,
-	type LoadedExchange,
+	type LoadedEvent,
 	elements,
-	exchangeView,
+	eventView,
 	isRecord,
 	labels,
-	loadExchange,
+	loadEvent,
+	loadMessage,
 	localDay,
 	oneOf,
 	optionalText,
@@ -56,9 +57,9 @@ type GoalChange = {
 type CurateGoalsOutput = { goals: GoalChange[]; dropped: number };
 
 type GoalsContext = {
-	exchanges: LabelTable;
-	/** The exchanges this unit settles (input message ids): their goal reflection is done afterwards. */
-	targetIds: string[];
+	events: LabelTable;
+	/** The events this unit settles (`seq`): their goal reflection is done afterwards. */
+	targetSeqs: number[];
 	/** `r1`... -> the inbox id of a goal request. */
 	requests: Record<string, string>;
 	goals: GoalsView["refs"];
@@ -95,20 +96,24 @@ function parse(raw: unknown): CurateGoalsOutput | null {
 	return { goals: read.items, dropped: read.dropped };
 }
 
+/** One shown item: an event by its `seq`, a request's source message by its id. */
+const keyOf = (loaded: LoadedEvent) =>
+	loaded.messageId !== null ? `m:${loaded.messageId}` : `e:${loaded.seq}`;
+
 function prepare(
 	env: StepEnv,
-	unit: { targets: { exchanges?: string[]; requests?: string[] } },
+	unit: { targets: { seqs?: number[]; requests?: string[] } },
 ): PrepareResult {
-	const { db, deps } = env;
+	const { db, deps, conversationId } = env;
 	const goalsDeps = deps.goals;
 	if (!goalsDeps) return { status: "stale", reason: "goals_off" };
 	const now = deps.clock();
 	const entries: Array<{
-		loaded: LoadedExchange;
+		loaded: LoadedEvent;
 		target: boolean;
 		requestIds: string[];
 	}> = [];
-	const byInput = new Map<string, (typeof entries)[number]>();
+	const byKey = new Map<string, (typeof entries)[number]>();
 	const requests: InboxRow[] = [];
 	for (const id of unit.targets.requests ?? []) {
 		const row = readInbox(db, id);
@@ -117,15 +122,7 @@ function prepare(
 			resolveInbox(db, id, "none", "forgotten", now);
 			continue;
 		}
-		const registered = deps.memory.exchangeInTransaction(db, row.messageId);
-		const loaded = loadExchange(
-			env,
-			registered ?? {
-				inputMessageId: row.messageId,
-				answerMessageId: null,
-				outcome: "request_only",
-			},
-		);
+		const loaded = loadMessage(env, row.sourceRef);
 		if (loaded.status !== "ok") {
 			resolveInbox(
 				db,
@@ -137,45 +134,52 @@ function prepare(
 			continue;
 		}
 		requests.push(row);
-		const existing = byInput.get(row.messageId);
+		const key = keyOf(loaded.event);
+		const existing = byKey.get(key);
 		if (existing) existing.requestIds.push(id);
 		else {
-			const entry = {
-				loaded: loaded.exchange,
-				target: false,
-				requestIds: [id],
-			};
+			const entry = { loaded: loaded.event, target: false, requestIds: [id] };
 			entries.push(entry);
-			byInput.set(row.messageId, entry);
+			byKey.set(key, entry);
 		}
 	}
-	const gone: string[] = [];
-	for (const id of unit.targets.exchanges ?? []) {
-		const row = deps.memory.exchangeInTransaction(db, id);
-		const loaded = row ? loadExchange(env, row) : null;
+	const gone: number[] = [];
+	for (const seq of unit.targets.seqs ?? []) {
+		const event = deps.continuity.events.eventInTransaction(
+			db,
+			conversationId,
+			seq,
+		);
+		const loaded = event ? loadEvent(env, event) : null;
 		if (!loaded || loaded.status !== "ok") {
-			gone.push(id);
+			gone.push(seq);
 			continue;
 		}
-		const existing = byInput.get(id);
-		if (existing) existing.target = true;
-		else {
-			const entry = { loaded: loaded.exchange, target: true, requestIds: [] };
+		const key = keyOf(loaded.event);
+		const existing = byKey.get(key);
+		if (existing) {
+			existing.loaded = loaded.event;
+			existing.target = true;
+		} else {
+			const entry = { loaded: loaded.event, target: true, requestIds: [] };
 			entries.push(entry);
-			byInput.set(id, entry);
+			byKey.set(key, entry);
 		}
 	}
-	// An exchange that can not be read any more (retracted, forgotten) has no goal reflection to wait for.
-	deleteGoalTodos(db, gone);
+	// An event that can not be read any more (retracted, forgotten) has no goal reflection to wait for.
+	deleteGoalTodos(db, conversationId, gone);
+	const byTime = (a: (typeof entries)[number], b: (typeof entries)[number]) =>
+		a.loaded.at.localeCompare(b.loaded.at) ||
+		(a.loaded.seq ?? 0) - (b.loaded.seq ?? 0);
 	const ordered = entries.sort(
 		(a, b) =>
 			(b.requestIds.length > 0 ? 1 : 0) - (a.requestIds.length > 0 ? 1 : 0) ||
-			a.loaded.ordinal - b.loaded.ordinal,
+			byTime(a, b),
 	);
-	const kept = fitExchanges(
+	const kept = fitEvents(
 		ordered.map((entry) => ({ ...entry, bytes: entry.loaded.bytes })),
-		{ maxCount: EXCHANGES_PER_UNIT },
-	).fit.sort((a, b) => a.loaded.ordinal - b.loaded.ordinal);
+		{ maxCount: EVENTS_PER_UNIT },
+	).fit.sort(byTime);
 	const keptRequestIds = new Set(kept.flatMap((e) => e.requestIds));
 	const requestRows = requests
 		.filter((row) => keptRequestIds.has(row.id))
@@ -184,17 +188,17 @@ function prepare(
 	if (targets.length === 0 && requestRows.length === 0)
 		return { status: "stale", reason: "nothing_to_do" };
 
-	const exchanges: LabelTable = {};
+	const events: LabelTable = {};
 	const labelOf = new Map<string, string>();
 	const views = kept.map((entry, i) => {
 		const label = `e${i + 1}`;
-		labelOf.set(entry.loaded.inputMessageId, label);
-		exchanges[label] = {
-			inputMessageId: entry.loaded.inputMessageId,
-			answerMessageId: entry.loaded.answerMessageId,
-			outcome: entry.loaded.outcome,
+		labelOf.set(keyOf(entry.loaded), label);
+		events[label] = {
+			seq: entry.loaded.seq,
+			messageId: entry.loaded.messageId,
+			by: entry.loaded.by,
 		};
-		return exchangeView(label, entry.loaded, !entry.target);
+		return eventView(label, entry.loaded, !entry.target);
 	});
 	const requestMap: GoalsContext["requests"] = {};
 	const requestViews = requestRows.map((row, i) => {
@@ -204,20 +208,22 @@ function prepare(
 			id,
 			what: row.what,
 			...(row.detail ? { detail: row.detail } : {}),
-			exchange: labelOf.get(row.messageId) ?? "",
+			event: labelOf.get(`m:${row.sourceRef}`) ?? "",
 		};
 	});
 	const goals = describeGoals(env, ["adopted", "proposed"]);
 	const world = describeWorld(
 		env,
-		kept.map((e) => e.loaded.user.text),
+		kept.map((e) => e.loaded.text.text),
 	);
 	const entities: GoalsContext["entities"] = {};
 	for (const [ref, entry] of Object.entries(world?.refs ?? {}))
 		if (entry.kind === "entity") entities[ref] = entry.id;
 	const context: GoalsContext = {
-		exchanges,
-		targetIds: targets.map((e) => e.loaded.inputMessageId),
+		events,
+		targetSeqs: targets
+			.map((e) => e.loaded.seq)
+			.filter((seq): seq is number => seq !== null),
 		requests: requestMap,
 		goals: goals?.refs ?? {},
 		entities,
@@ -226,16 +232,16 @@ function prepare(
 		status: "ready",
 		data: {
 			today: localDay(deps.nowMs()),
-			exchanges: views,
+			events: views,
 			requests: requestViews,
 			goals: goals?.goals ?? [],
 			worldEntities: world?.entities ?? [],
 		},
 		targets: {
-			exchanges: context.targetIds,
+			seqs: context.targetSeqs,
 			requests: requestRows.map((r) => r.id),
 		},
-		summaryRevision: null,
+		windowVersion: null,
 		context,
 	};
 }
@@ -259,9 +265,11 @@ function apply(
 		results.push({ index, status: "rejected", code });
 	};
 	output.goals.forEach((change, index) => {
-		const exchange = context.exchanges[change.evidence];
-		if (!exchange) return reject(index, "unknown_evidence");
-		const messageId = exchange.inputMessageId;
+		// Only a user's own words are evidence of a goal.
+		const evidence = context.events[change.evidence];
+		if (evidence?.by !== "user" || evidence.messageId === null)
+			return reject(index, "unknown_evidence");
+		const messageId = evidence.messageId;
 		const link = {
 			source: {
 				namespace: CONVERSATION_SOURCE_NAMESPACE,
@@ -376,10 +384,10 @@ function apply(
 				: "目標の依頼で変えるものはありませんでした。",
 		);
 	}
-	deleteGoalTodos(db, context.targetIds);
-	for (const exchange of Object.values(context.exchanges))
-		for (const id of [exchange.inputMessageId, exchange.answerMessageId])
-			if (id !== null) refs.push({ type: "message", id });
+	deleteGoalTodos(db, env.conversationId, context.targetSeqs);
+	for (const event of Object.values(context.events))
+		if (event.messageId !== null)
+			refs.push({ type: "message", id: event.messageId });
 	return {
 		applied,
 		rejected,

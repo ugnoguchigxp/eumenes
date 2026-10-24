@@ -9,10 +9,9 @@ import { type ContinuityKind, createContinuityService } from "../../continuity";
 import { createMemoryService } from "..";
 import { memoryTestMigrations, saveItem } from "./memory.fixture";
 import {
-	renderLongTerm,
-	renderShortTerm,
-	type StateLine,
-} from "../service/context-render";
+	REFERENCE_WINDOW_TOKENS,
+	planWindow,
+} from "../../../infrastructure/context-budget";
 
 const cleanups: Array<() => Promise<void> | void> = [];
 afterEach(async () => {
@@ -20,7 +19,7 @@ afterEach(async () => {
 	for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
 });
 
-async function setup(historyBudgetTokens?: () => number) {
+async function setup(stateBudget?: number) {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-memory-window-"));
 	const store: SqliteStore = openStore(
 		join(dir, "db.sqlite3"),
@@ -39,7 +38,20 @@ async function setup(historyBudgetTokens?: () => number) {
 		journalPath: join(dir, "journal.jsonl"),
 		clock,
 		id: () => `id-${++counter}`,
-		...(historyBudgetTokens ? { historyBudgetTokens } : {}),
+		...(stateBudget
+			? {
+					windowPlan: () => {
+						const plan = planWindow({
+							window: REFERENCE_WINDOW_TOKENS,
+							fixed: 0,
+						});
+						return {
+							...plan,
+							sections: { ...plan.sections, state: stateBudget },
+						};
+					},
+				}
+			: {}),
 	});
 	expect((await memory.recover()).healthy).toBe(true);
 	await conversation.append({
@@ -126,95 +138,96 @@ async function setup(historyBudgetTokens?: () => number) {
 		read,
 	};
 }
+/** The texts the published profile shows, and those waiting beside it. */
+const shown = (window: { profile: { items: Array<{ text: string }> } }) =>
+	window.profile.items.map((item) => item.text);
+const waiting = (window: { newMemories: Array<{ text: string }> }) =>
+	window.newMemories.map((item) => item.text);
 function must<T>(value: T | null | undefined): T {
 	if (value == null) throw new Error("expected_value");
 	return value;
 }
 
-test("the first read builds a snapshot and an unchanged input returns the same version and strings", async () => {
+test("the first read publishes the profile and an unchanged input returns the same version and items", async () => {
 	const h = await setup();
 	await h.remember("コーヒーが好き");
 	const first = must(await h.read());
 	expect(first.version).toBe(1);
-	expect(first.longTerm.text).toContain("- 好み: コーヒーが好き");
-	expect(
-		first.longTerm.text.startsWith("以下は本人について保存された参照情報です"),
-	).toBe(true);
+	expect(first.profile.items).toEqual([
+		expect.objectContaining({
+			kind: "preference",
+			text: "コーヒーが好き",
+			source: "user_said",
+			negated: false,
+		}),
+	]);
+	expect(first.profile.tokens).toBeGreaterThan(0);
+	expect(first.newMemories).toEqual([]);
 	const second = must(await h.read());
 	expect(second.version).toBe(1);
 	expect(second.buildId).toBe(first.buildId);
-	expect(second.longTerm.text).toBe(first.longTerm.text);
-	expect(second.shortTerm.text).toBe(first.shortTerm.text);
+	expect(second.profile).toEqual(first.profile);
 });
 
-test("an empty memory renders no layers and is not treated as unavailable", async () => {
+test("an empty memory has an empty profile and is not treated as unavailable", async () => {
 	const h = await setup();
 	const window = must(await h.read());
-	expect(window.longTerm.text).toBe("");
-	expect(window.shortTerm.text).toBe("");
+	expect(window.profile.items).toEqual([]);
 	await h.memory.setEnabled(false);
 	expect(await h.read()).toBeNull();
 });
 
-test("new registrations reach the short-term layer only, however many; the long-term layer waits for the steward's republish", async () => {
+test("additions wait in newMemories; a requested republish waits for the re-construction, which keeps the order and appends", async () => {
 	const h = await setup();
 	await h.remember("コーヒーが好き");
+	await h.remember("紅茶も好き");
 	const base = must(await h.read());
+	expect(shown(base)).toEqual(["コーヒーが好き", "紅茶も好き"]);
 	await h.remember("毎朝走っている", "habit", "毎朝走って");
-	const added = must(await h.read());
-	expect(added.version).toBe(base.version + 1);
-	expect(added.longTerm.text).toBe(base.longTerm.text);
-	expect(added.shortTerm.text).toContain("最近覚えたこと");
-	expect(added.shortTerm.text).toContain("毎朝走っている");
-	expect(added.shortTerm.pendingAdditions).toBe(1);
 	for (const text of ["二", "三", "四", "五"]) await h.remember(`${text}番目`);
-	// The fifth addition used to republish L1 by itself; now it does not.
 	const five = must(await h.read());
-	expect(five.longTerm.text).toBe(base.longTerm.text);
-	expect(five.shortTerm.pendingAdditions).toBe(5);
-	expect(five.shortTerm.text).toContain("五番目");
-	const published = await h.store.write((db) =>
-		h.memory.publishWindowInTransaction(db, "c1", { republishLongTerm: true }),
+	expect(five.version).toBeGreaterThan(base.version);
+	expect(five.profile).toEqual(base.profile);
+	expect(waiting(five)).toHaveLength(5);
+	// The steward asks for a republish: it is only recorded.
+	const requested = await h.store.write((db) =>
+		h.memory.publishWindowInTransaction(db, "c1", { requestRepublish: true }),
 	);
-	expect(published.longTerm.text).not.toBe(base.longTerm.text);
-	for (const text of ["毎朝走っている", "二番目", "五番目"])
-		expect(published.longTerm.text).toContain(text);
-	expect(published.shortTerm.pendingAdditions).toBe(0);
-	expect(published.shortTerm.text).toBe("");
+	expect(requested.republishRequested).toBe(true);
+	expect(requested.profile).toEqual(base.profile);
+	// The re-construction publishes: the earlier items keep their place, the new ones follow in their kind.
+	const published = must(
+		await h.store.write((db) =>
+			h.memory.republishWindowInTransaction(db, "c1"),
+		),
+	);
+	expect(published.republishRequested).toBe(false);
+	expect(published.newMemories).toEqual([]);
+	expect(shown(published)).toEqual([
+		"コーヒーが好き",
+		"紅茶も好き",
+		"二番目",
+		"三番目",
+		"四番目",
+		"五番目",
+		"毎朝走っている",
+	]);
 });
 
-test("the long-term layer is not republished when the local date changes", async () => {
+test("the profile is not republished when the local date changes", async () => {
 	const h = await setup();
 	await h.remember("コーヒーが好き");
 	const day1 = must(await h.read());
-	h.time.now = "2026-10-13T13:00:00.000Z";
-	expect(must(await h.read()).version).toBe(day1.version);
 	h.time.now = "2026-10-15T12:00:00.000Z";
 	const day2 = must(await h.read());
 	expect(day2.version).toBe(day1.version);
 	expect(day2.buildId).toBe(day1.buildId);
-	expect(day2.longTerm.text).toBe(day1.longTerm.text);
 });
 
-test("a continuity addition appears in the short-term layer and leaves the long-term text alone", async () => {
-	const h = await setup();
-	await h.remember("コーヒーが好き");
-	const base = must(await h.read());
-	await h.note({ kind: "goal", text: "Rustへ移行する" });
-	const next = must(await h.read());
-	expect(next.longTerm.text).toBe(base.longTerm.text);
-	expect(next.shortTerm.text).toContain("目的");
-	expect(next.shortTerm.text).toContain("- Rustへ移行する");
-	// Another conversation has its own continuity.
-	expect(must(await h.read("c2")).shortTerm.text).toBe("");
-});
-
-test("stop, retract, forget, the ON/OFF setting rebuild the long-term layer; the steward closing a note changes only the short-term layer", async () => {
+test("stop, forget and the ON/OFF setting republish the profile at once", async () => {
 	const h = await setup();
 	const a = await h.remember("コーヒーが好き");
 	const b = await h.remember("毎朝走っている", "habit", "毎朝走って");
-	const c = await h.remember("三つ目の事実");
-	// The fourth stands on another message, so forgetting the others (all from m1) leaves it.
 	await h.save({
 		conversationId: "c1",
 		messageId: "m-note",
@@ -223,36 +236,25 @@ test("stop, retract, forget, the ON/OFF setting rebuild the long-term layer; the
 		semanticKey: "fourth",
 		text: "四つ目の事実",
 	});
-	const goal = await h.note({ kind: "goal", text: "目標" });
 	let window = must(await h.read());
-	expect(window.longTerm.text).toContain("コーヒーが好き");
+	expect(shown(window)).toContain("コーヒーが好き");
 	const seen = async () => {
 		const next = must(await h.read());
-		// A purge (forget) restarts the numbering: the build id is what always changes.
 		expect(next.buildId).not.toBe(window.buildId);
 		window = next;
 		return next;
 	};
 	await h.stop(a.id, a.revision);
-	expect((await seen()).longTerm.text).not.toContain("コーヒーが好き");
-	await h.stop(b.id, b.revision);
-	expect((await seen()).longTerm.text).not.toContain("毎朝走っている");
-	await h.forget(c.id);
-	expect((await seen()).longTerm.text).not.toContain("三つ目の事実");
+	expect(shown(await seen())).not.toContain("コーヒーが好き");
+	await h.forget(b.id);
+	expect(shown(await seen())).not.toContain("毎朝走っている");
 	const before = window.inputs.policyRevision;
 	await h.memory.setEnabled(false);
 	await h.memory.setEnabled(true);
 	expect((await seen()).inputs.policyRevision).not.toBe(before);
-	// Toggling to the same value is not a change.
 	await h.memory.setEnabled(true);
 	expect(must(await h.read()).version).toBe(window.version);
-	const seq = (await h.read())!.inputs.immediateSeq;
-	expect(await h.closeNote(goal.id, 1)).toBe(true);
-	const closed = must(await h.read());
-	// Closing a note is the steward's own decision: no immediate change.
-	expect(closed.inputs.immediateSeq).toBe(seq);
-	expect(closed.shortTerm.text).toBe("");
-	expect(closed.longTerm.text).toContain("四つ目の事実");
+	expect(shown(window)).toContain("四つ目の事実");
 });
 
 test("only a stop (or a forget) is immediate; additions, replacements and denials by the steward are not", async () => {
@@ -273,7 +275,6 @@ test("only a stop (or a forget) is immediate; additions, replacements and denial
 	const start = await seq();
 	await h.remember("毎朝走っている", "habit", "毎朝走って");
 	expect(await seq()).toBe(start);
-	// A replacement and a denial are the steward's own work: they reach the next run through the next window.
 	await h.remember("コーヒーが好きです", "preference", "コーヒーが好き");
 	expect(await seq()).toBe(start);
 	await h.stop(first.id, first.revision);
@@ -289,7 +290,87 @@ test("only a stop (or a forget) is immediate; additions, replacements and denial
 	});
 	expect(await seq()).toBe(start + 1);
 	const window = must(await h.read());
-	expect(window.longTerm.text).toContain("「辛い物が好き」ではない");
+	expect(
+		[...window.profile.items, ...window.newMemories].find(
+			(item) => item.text === "辛い物が好き",
+		),
+	).toMatchObject({ negated: true });
+});
+
+test("an explicit correction republishes at once and leaves no old text; an inferred one keeps nothing of the old text either", async () => {
+	const h = await setup();
+	const a = await h.remember("コーヒーが好き");
+	const b = await h.remember("毎朝走っている", "habit", "毎朝走って");
+	const base = must(await h.read());
+	expect(shown(base)).toContain("コーヒーが好き");
+	const update = async (
+		item: { id: string; revision: number },
+		text: string,
+		explicit: boolean,
+	) => {
+		const [result] = await h.store.write((db) =>
+			h.memory.applyCurationInTransaction(db, {
+				conversationId: "c1",
+				items: [
+					{
+						op: "update",
+						itemId: item.id,
+						revision: item.revision,
+						text,
+						messageId: "m1",
+						quote: "コーヒーが好き",
+						explicit,
+					},
+				],
+			}),
+		);
+		expect(result?.status).toBe("applied");
+	};
+	await update(b, "毎朝泳いでいる", false);
+	const inferred = must(await h.read());
+	for (const text of [...shown(inferred), ...waiting(inferred)])
+		expect(text).not.toBe("毎朝走っている");
+	expect(waiting(inferred)).toContain("毎朝泳いでいる");
+	await update(a, "紅茶が好き", true);
+	const corrected = must(await h.read());
+	expect(corrected.buildId).not.toBe(inferred.buildId);
+	expect(shown(corrected)).toContain("紅茶が好き");
+	expect(shown(corrected)).not.toContain("コーヒーが好き");
+	expect(waiting(corrected)).toEqual([]);
+	const kinds = h.store.read(
+		(db) =>
+			db.query("SELECT kind FROM memory_immediate_change").all() as Array<{
+				kind: string;
+			}>,
+	);
+	expect(kinds.map((row) => row.kind)).toContain("state_correct");
+});
+
+test("the memory tool's query matches a natural Japanese sentence by character pairs", async () => {
+	const h = await setup();
+	await h.remember("コーヒーが好き");
+	await h.remember("毎朝走っている", "habit", "毎朝走って");
+	const find = (query: string, itemIds: string[] = []) =>
+		must(
+			h.store.read((db) =>
+				h.memory.readItemsInTransaction(db, {
+					query,
+					itemIds,
+					shown: new Set(),
+					limit: 10,
+				}),
+			),
+		);
+	const texts = (rows: Array<Record<string, unknown>>) =>
+		rows.map((row) => row.text);
+	expect(texts(find("私はコーヒーが好きでしたっけ"))).toEqual([
+		"コーヒーが好き",
+	]);
+	expect(texts(find("毎朝走ってる？"))).toEqual(["毎朝走っている"]);
+	expect(find("全く関係のない話")).toEqual([]);
+	expect(find("")).toEqual([]);
+	const [first] = find("コーヒー");
+	expect(texts(find("", [String(first!.id)]))).toEqual(["コーヒーが好き"]);
 });
 
 test("a rolled-back rebuild is discarded: the next read uses the committed row", async () => {
@@ -299,7 +380,7 @@ test("a rolled-back rebuild is discarded: the next read uses the committed row",
 	await expect(
 		h.store.write((db) => {
 			h.memory.windows.rebuildInTransaction(db, "c1", {
-				refreshLongTerm: true,
+				republish: true,
 				addNotices: ["rolled back"],
 			});
 			throw new Error("abort");
@@ -311,23 +392,21 @@ test("a rolled-back rebuild is discarded: the next read uses the committed row",
 	expect(next.notices).toEqual([]);
 });
 
-test("the same inputs always render the same strings", async () => {
+test("the same inputs always give the same profile", async () => {
 	const h = await setup();
 	await h.remember("コーヒーが好き");
 	await h.remember("毎朝走っている", "habit", "毎朝走って");
-	await h.note({ kind: "decision", text: "週に3回走る" });
 	const one = await h.store.write((db) =>
-		h.memory.windows.rebuildInTransaction(db, "c1", { refreshLongTerm: true }),
+		h.memory.windows.rebuildInTransaction(db, "c1", { republish: true }),
 	);
 	const two = await h.store.write((db) =>
-		h.memory.windows.rebuildInTransaction(db, "c1", { refreshLongTerm: true }),
+		h.memory.windows.rebuildInTransaction(db, "c1", { republish: true }),
 	);
 	expect(two.version).toBe(one.version + 1);
-	expect(two.longTerm.text).toBe(one.longTerm.text);
-	expect(two.shortTerm.text).toBe(one.shortTerm.text);
+	expect(two.profile).toEqual(one.profile);
 });
 
-test("an expired period is not rendered; a stated period is", async () => {
+test("an expired period is left out; a stated period is shown as absolute days", async () => {
 	const h = await setup();
 	await h.save({
 		conversationId: "c1",
@@ -348,70 +427,10 @@ test("an expired period is not rendered; a stated period is", async () => {
 		validUntil: "2020",
 	});
 	const window = must(await h.read());
-	expect(window.longTerm.text).toContain(
-		"- 好み: コーヒーが好き（2026年9月から）",
-	);
-	expect(window.longTerm.text).not.toContain("昔の習慣");
-	expect(window.shortTerm.text).not.toContain("昔の習慣");
-});
-
-test("the long-term layer lists every line with constraints first and no line is left out for size", () => {
-	const line = (kind: string, i: number, order: number): StateLine => ({
-		itemId: `state:${kind}${i}`,
-		revision: 1,
-		kind,
-		text: `${kind}-${i}-` + "あ".repeat(1500),
-		negated: false,
-		period: "",
-		order,
-	});
-	const states = [
-		...Array.from({ length: 8 }, (_, i) => line("habit", i, i)),
-		...Array.from({ length: 8 }, (_, i) => line("preference", i, 100 + i)),
-		line("constraint", 0, 1),
-	];
-	const rendered = renderLongTerm(states, [
-		{ id: "t1", revision: 1, text: "傾向", order: "2026-10-01" },
+	expect(window.profile.items).toEqual([
+		expect.objectContaining({ text: "コーヒーが好き", since: "2026-09" }),
 	]);
-	expect(rendered.tokens).toBeGreaterThan(24_000);
-	expect(rendered.manifest).toHaveLength(states.length + 1);
-	expect(rendered.text).toContain("habit-0-");
-	// Constraints first, newest preferences before older ones, habits after preferences, tendencies last.
-	const at = (needle: string) => rendered.text.indexOf(needle);
-	expect(at("constraint-0-")).toBeLessThan(at("preference-7-"));
-	expect(at("preference-7-")).toBeLessThan(at("preference-0-"));
-	expect(at("preference-0-")).toBeLessThan(at("habit-7-"));
-	expect(at("habit-0-")).toBeLessThan(at("傾向"));
-});
-
-test("the short-term layer lists the recent additions and every note, with no limit of its own", () => {
-	const note = (kind: string, i: number) => ({
-		id: `${kind}${i}`,
-		kind,
-		text: `${kind}-${i}-` + "い".repeat(1000),
-		order: `2026-10-0${i + 1}`,
-	});
-	const notes = [
-		...Array.from({ length: 4 }, (_, i) => note("memo", i)),
-		...Array.from({ length: 4 }, (_, i) => note("open_question", i)),
-		...Array.from({ length: 4 }, (_, i) => note("goal", i)),
-	];
-	const recent: StateLine[] = Array.from({ length: 6 }, (_, i) => ({
-		itemId: `state:r${i}`,
-		revision: 1,
-		kind: "preference",
-		text: `recent-${i}`,
-		negated: false,
-		period: "",
-		order: i,
-	}));
-	const rendered = renderShortTerm(recent, notes);
-	expect(rendered.tokens).toBeGreaterThan(10_000);
-	expect(rendered.pendingAdditions).toBe(6);
-	for (let i = 0; i < 6; i++) expect(rendered.text).toContain(`recent-${i}`);
-	for (const kind of ["memo", "open_question", "goal"])
-		for (let i = 0; i < 4; i++)
-			expect(rendered.text).toContain(`${kind}-${i}-`);
+	expect(waiting(window)).not.toContain("昔の習慣");
 });
 
 test("window validation: additions keep a run valid; stop, own-run changes, settings and pins decide the rest", async () => {
@@ -426,7 +445,6 @@ test("window validation: additions keep a run valid; stop, own-run changes, sett
 	expect(await validate()).toEqual({ ok: true });
 	// An addition during the run does not expire it.
 	await h.remember("毎朝走っている", "habit", "毎朝走って");
-	await h.note({ kind: "goal", text: "目標" });
 	expect(await validate()).toEqual({ ok: true });
 	// A change attributed to the run itself is not a reason to expire it; anyone else's is.
 	await h.store.write((db) =>
@@ -475,7 +493,7 @@ test("usage receipts and notices: adoption records the window; the notice is sho
 	await h.remember("コーヒーが好き");
 	await h.store.write((db) => {
 		h.memory.windows.rebuildInTransaction(db, "c1", {
-			refreshLongTerm: false,
+			republish: false,
 			addNotices: ["保存できませんでした"],
 		});
 	});
@@ -492,9 +510,7 @@ test("usage receipts and notices: adoption records the window; the notice is sho
 		stateRevision: String(window.inputs.immediateSeq),
 		viewSchema: 3,
 	});
-	expect(receipt?.itemIds).toEqual(
-		window.longTerm.manifest.map((m) => m.itemId),
-	);
+	expect(receipt?.itemIds).toEqual(window.profile.items.map((item) => item.id));
 	expect(must(await h.read()).notices).toEqual([]);
 	// No notices to clear is a no-op (no new version).
 	const version = must(await h.read()).version;
@@ -502,9 +518,9 @@ test("usage receipts and notices: adoption records the window; the notice is sho
 	expect(must(await h.read()).version).toBe(version);
 });
 
-test("the continuity guard limits the short-term layer to the memory and history budget", async () => {
-	// A window of 8k tokens: half of it (4k) is the budget; each note is about 500 tokens.
-	const h = await setup(() => 4000);
+test("the continuity guard limits the short-term notes to the state section of the window plan", async () => {
+	// A state section of 4k tokens; each note is about 500 tokens.
+	const h = await setup(4000);
 	let count = 0;
 	let error: unknown;
 	try {
@@ -546,8 +562,9 @@ test("S0-3: expired items do not count toward the active-item limit", async () =
 	// Expired items stay stored (status unchanged) but are not rendered.
 	expect(h.memory.list()).toHaveLength(101);
 	const window = must(await h.read());
-	expect(window.longTerm.text).toContain("項目 over");
-	expect(window.longTerm.text).not.toContain("項目 k1\n");
+	const texts = [...shown(window), ...waiting(window)];
+	expect(texts).toContain("項目 over");
+	expect(texts).not.toContain("項目 k1");
 });
 
 const MIGRATIONS = memoryTestMigrations;
@@ -575,7 +592,7 @@ test("forgetting purges every stored window, also with memory OFF", async () => 
 		// The next read builds from State again and does not bring the value back.
 		if (off) await h.memory.setEnabled(true);
 		const next = must(await h.read());
-		expect(next.longTerm.text + next.shortTerm.text).not.toContain(
+		expect([...shown(next), ...waiting(next)].join()).not.toContain(
 			"秘密の趣味",
 		);
 		expect(windowRows(h).some((r) => r.snapshot.includes("秘密の趣味"))).toBe(
@@ -640,8 +657,8 @@ test("a validity boundary crossed by time refreshes the layers without waiting f
 	await add("ending", "終わる習慣", { validUntil: "2026-10-13" });
 	await add("starting", "始まる習慣", { validFrom: "2026-10-15" });
 	const early = must(await h.read());
-	expect(early.longTerm.text).toContain("終わる習慣");
-	expect(early.longTerm.text).not.toContain("始まる習慣");
+	expect(shown(early)).toContain("終わる習慣");
+	expect(shown(early)).not.toContain("始まる習慣");
 	expect(early.nextBoundaryMs).toBe(until);
 	// Still before the first boundary: nothing is rebuilt.
 	h.time.now = "2026-10-13T23:59:00.000Z";
@@ -649,11 +666,11 @@ test("a validity boundary crossed by time refreshes the layers without waiting f
 	h.time.now = "2026-10-14T00:00:00.000Z";
 	const ended = must(await h.read());
 	expect(ended.version).toBeGreaterThan(early.version);
-	expect(ended.longTerm.text).not.toContain("終わる習慣");
+	expect(shown(ended)).not.toContain("終わる習慣");
 	expect(ended.nextBoundaryMs).toBe(from);
 	h.time.now = "2026-10-15T00:00:00.000Z";
 	const started = must(await h.read());
-	expect(started.longTerm.text).toContain("始まる習慣");
+	expect(shown(started)).toContain("始まる習慣");
 	expect(started.nextBoundaryMs).toBeNull();
 	expect(must(await h.read()).version).toBe(started.version);
 });
@@ -663,7 +680,7 @@ test("clearing notices is a light edit: no re-render, tolerant of a missing wind
 	await h.remember("コーヒーが好き");
 	await h.store.write((db) => {
 		h.memory.windows.rebuildInTransaction(db, "c1", {
-			refreshLongTerm: true,
+			republish: true,
 			addNotices: ["あ".repeat(500), "二つ目"],
 		});
 	});
@@ -675,8 +692,7 @@ test("clearing notices is a light edit: no re-render, tolerant of a missing wind
 	const after = must(await h.read());
 	expect(after.version).toBe(window.version + 1);
 	expect(after.notices.map((n) => n.text)).toEqual(["二つ目"]);
-	expect(after.longTerm).toEqual(window.longTerm);
-	expect(after.shortTerm).toEqual(window.shortTerm);
+	expect(after.profile).toEqual(window.profile);
 	// Unknown ids and a purged window do not throw and do not bump the version.
 	await h.store.write((db) =>
 		h.memory.clearNoticesInTransaction(db, "c1", ["unknown"]),

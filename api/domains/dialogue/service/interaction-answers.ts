@@ -195,6 +195,13 @@ export function createInteractionAnswers(
 						)
 						.run(run.id, clock(), row.id, row.revision).changes;
 					if (changed !== 1) return { ok: false, code: "interaction_closed" };
+					// The TODO that asked waits with the answering run now: its result reports there.
+					for (const work of deps.work?.waitingOfRunInTransaction(
+						tx,
+						row.currentRunId,
+					) ?? [])
+						if (work.questionId === row.questionId)
+							deps.work!.relinkInTransaction(tx, work.id, run.id);
 					addEvent(tx, row.id, "answer", body.eventId, {
 						questionId: body.questionId,
 						value: parsed.value,

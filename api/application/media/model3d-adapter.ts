@@ -5,7 +5,6 @@ import { CONVERSATION_DEFAULT_PRINCIPAL } from "../../domains/conversation/contr
 import { imageListInTransaction } from "../../domains/image";
 import type { Model3dService } from "../../domains/model3d";
 import {
-	handoffValues,
 	type AdapterResult,
 	type DomainAdapter,
 } from "../../domains/tool-runtime";
@@ -165,11 +164,6 @@ export function createModel3dAdapter(service: Model3dService): DomainAdapter {
 				if (
 					input.sourceImageRef &&
 					!shown.images.some((i) => i.imageRef === input.sourceImageRef) &&
-					!handoffValues(request.origin, "operation.image").some(
-						(image) =>
-							(image as { imageRef?: unknown } | null)?.imageRef ===
-							input.sourceImageRef,
-					) &&
 					// A pipeline step names the image an earlier step of the same run made, in that conversation.
 					!(
 						request.origin.kind === "task" &&

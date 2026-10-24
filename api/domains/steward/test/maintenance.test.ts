@@ -1,14 +1,12 @@
 import { afterEach, expect, test } from "bun:test";
-import { keepAll, setupSteward, type StewardHarness } from "./steward.fixture";
+import { setupSteward, type StewardHarness } from "./steward.fixture";
 
 const harnesses: StewardHarness[] = [];
 afterEach(async () => {
 	for (const h of harnesses.splice(0)) await h.close();
 });
-async function setup(historyBudgetTokens?: number) {
-	const h = await setupSteward(
-		historyBudgetTokens ? { historyBudgetTokens } : {},
-	);
+async function setup() {
+	const h = await setupSteward();
 	harnesses.push(h);
 	return h;
 }
@@ -35,9 +33,6 @@ const stepsOf = (h: StewardHarness) => h.units().map((u) => u.step);
 test("upkeep does not run while the revision has not moved", async () => {
 	const h = await setup();
 	h.inference.script("curate-memory", empty);
-	h.inference.script("dispose-exchanges", {
-		exchanges: [{ id: "e1", action: "drop", duplicateOf: null }],
-	});
 	await h.run({ user: "やあ", end: "completed" });
 	await h.drain();
 	expect(h.state()!.maintained).toBe(h.state()!.revision);
@@ -50,7 +45,6 @@ test("a step that changed nothing stays quiet until the revision moves", async (
 		...empty,
 		remember: [item("a.one", "一つ目"), item("a.two", "二つ目")],
 	});
-	h.inference.script("dispose-exchanges", keepAll);
 	h.inference.script("consolidate-memory", unchanged);
 	await h.run({ user: "一つ目と二つ目", end: "completed" });
 	await h.drain();
@@ -65,7 +59,6 @@ test("a step that changed nothing stays quiet until the revision moves", async (
 		...empty,
 		remember: [item("a.three", "三つ目")],
 	});
-	h.inference.script("dispose-exchanges", keepAll);
 	h.inference.script("consolidate-memory", unchanged);
 	await h.run({ user: "三つ目", end: "completed" });
 	await h.drain();
@@ -73,7 +66,7 @@ test("a step that changed nothing stays quiet until the revision moves", async (
 	expect(h.state()!.maintained).toBe(h.state()!.revision);
 });
 
-test("a merge keeps the sources' evidence, stops the sources and republishes the long-term layer", async () => {
+test("a merge keeps the sources' evidence, stops the sources and asks for the profile to be published anew", async () => {
 	const h = await setup();
 	h.inference.script("curate-memory", {
 		...empty,
@@ -82,7 +75,6 @@ test("a merge keeps the sources' evidence, stops the sources and republishes the
 			item("food.hot", "辛い料理が好き"),
 		],
 	});
-	h.inference.script("dispose-exchanges", keepAll);
 	h.inference.script("consolidate-memory", (data) => {
 		const refs = (data.longTerm as Array<{ ref: string }>).map((m) => m.ref);
 		return {
@@ -106,8 +98,18 @@ test("a merge keeps the sources' evidence, stops the sources and republishes the
 	const window = h.store.read((db) =>
 		h.memory.windows.storedInTransaction(db, "c1"),
 	)!;
-	expect(window.longTerm.text).toContain("辛い料理が好き");
+	// The republish waits for the next re-construction (the stop of the sources is an immediate change of its own).
+	expect(window.republishRequested).toBe(true);
 	expect(window.version).toBeGreaterThan(before?.version ?? 0);
+	await h.store.write((db) => h.memory.republishWindowInTransaction(db, "c1"));
+	const published = h.store.read((db) =>
+		h.memory.windows.storedInTransaction(db, "c1"),
+	)!;
+	expect(published.profile.items.map((i) => i.text)).toEqual([
+		"辛い料理が好き",
+	]);
+	expect(published.republishRequested).toBe(false);
+	expect(published.version).toBeGreaterThan(window.version);
 	const consolidate = h.steward
 		.decisions("c1")
 		.find((d) => d.step === "consolidate-memory")!;
@@ -122,7 +124,6 @@ test("upkeep waits while an answer is generated: 30 s, then 2 min, then 10 min",
 		...empty,
 		remember: [item("a.one", "一つ目"), item("a.two", "二つ目")],
 	});
-	h.inference.script("dispose-exchanges", keepAll);
 	await h.run({ user: "二つ", end: "completed" });
 	h.foreground.add("c1");
 	const tick = async () => {
@@ -165,7 +166,6 @@ test("the pending limit starts a consolidation without waiting for the foregroun
 	const h = await setup();
 	// The first window is built empty; the items below then wait as "recently remembered".
 	h.inference.script("curate-memory", empty);
-	h.inference.script("dispose-exchanges", keepAll);
 	await h.run({ user: "最初", end: "completed" });
 	await h.drain();
 	h.foreground.add("c1");
@@ -173,7 +173,6 @@ test("the pending limit starts a consolidation without waiting for the foregroun
 		...empty,
 		remember: ["a", "b", "c", "d", "e"].map((k) => item(`k.${k}`, `項目${k}`)),
 	});
-	h.inference.script("dispose-exchanges", keepAll);
 	h.inference.script("consolidate-memory", unchanged, unchanged, unchanged);
 	await h.run({ user: "たくさん", end: "completed" });
 	// The foreground stays active the whole time; the reflecting steps and the urgent upkeep still run.
@@ -188,7 +187,7 @@ test("the pending limit starts a consolidation without waiting for the foregroun
 	const window = h.store.read((db) =>
 		h.memory.windows.storedInTransaction(db, "c1"),
 	)!;
-	expect(window.shortTerm.pendingAdditions).toBe(5);
+	expect(window.newMemories).toHaveLength(5);
 	const urgent = h
 		.units()
 		.filter(
@@ -207,107 +206,12 @@ test("the pending limit starts a consolidation without waiting for the foregroun
 	).toHaveLength(1);
 });
 
-test("an upkeep round runs at most three steps", async () => {
-	// The kept history (12 messages of about 3000 tokens) is over three quarters of a 30k-token budget, and
-	// stays so while the rounds fold three exchanges into the summary.
-	const h = await setup(30_000);
-	const long = "あ".repeat(3000);
-	for (let i = 0; i < 6; i++) await h.settledExchange(`${long}${i}`, long);
-	h.inference.script("curate-memory", {
-		...empty,
-		remember: [item("a.one", "一つ目")],
-	});
-	h.inference.script("dispose-exchanges", keepAll);
-	const fold = {
-		fold: ["e1"],
-		summary: "古い往復の要約",
-		changed: true,
-	};
-	h.inference.script("compact-history", fold, fold, fold, fold, fold);
-	await h.run({ user: "一つ目", end: "completed" });
-	await h.drain();
-	expect(h.inference.callsOf("compact-history")).toHaveLength(3);
-	expect(h.state()!.maintained).toBe(h.state()!.revision);
-	// Each fold moved one exchange into the summary.
-	const folded = h.memory
-		.exchanges("c1")
-		.filter((e) => e.disposition === "summarize" && e.summarized === "done");
-	expect(folded).toHaveLength(3);
-});
-
-test("compact-history waits until the memory and history take three quarters of the budget", async () => {
-	const fold = { fold: ["e1"], summary: "古い往復の要約", changed: true };
-	const round = async (h: StewardHarness) => {
-		for (let i = 0; i < 3; i++)
-			await h.settledExchange(`質問${i}${"あ".repeat(500)}`, "どうも");
-		h.inference.script("curate-memory", empty);
-		h.inference.script("dispose-exchanges", keepAll);
-		h.inference.script("compact-history", fold, fold, fold, fold, fold);
-		await h.run({ user: "いま", end: "completed" });
-		await h.drain();
-		return h.inference.callsOf("compact-history").length;
-	};
-	// About 1,600 tokens of kept history against a 128k budget: nothing to compact.
-	expect(await round(await setup())).toBe(0);
-	// The same history against a 2,000-token budget is over three quarters of it.
-	expect(await round(await setup(2000))).toBeGreaterThan(0);
-});
-
-test("compact-history folds only as many of the oldest kept exchanges as it takes to get under the trigger", async () => {
-	const h = await setup(2600);
-	for (let i = 0; i < 4; i++)
-		await h.settledExchange(`質問${i}${"あ".repeat(500)}`, "どうも");
-	h.inference.script("curate-memory", empty);
-	h.inference.script("dispose-exchanges", keepAll);
-	const fold = { fold: ["e1"], summary: "古い往復の要約", changed: true };
-	h.inference.script("compact-history", fold, fold, fold, fold, fold);
-	await h.run({ user: "いま", end: "completed" });
-	await h.drain();
-	const calls = h.inference.callsOf("compact-history");
-	// About 2,100 tokens kept against a trigger of 1,950: the oldest exchange alone brings it under.
-	expect(calls).toHaveLength(1);
-	const shown = (calls[0]!.data.exchanges as Array<{ user: string }>).map(
-		(e) => e.user,
-	);
-	expect(shown).toHaveLength(1);
-	expect(shown[0]).toContain("質問0");
-});
-
-test("a long summary is rewritten shorter, and an unchanged answer keeps it", async () => {
-	const h = await setup();
-	const seed = await h.settledExchange("やあ", "どうも", "summarize");
-	await h.store.write((db) =>
-		h.memory.writeSummaryInTransaction(db, {
-			conversationId: "c1",
-			text: "要約".repeat(550),
-			included: [seed.inputMessageId],
-			expectedRevision: 0,
-		}),
-	);
-	h.inference.script("curate-memory", {
-		...empty,
-		remember: [item("a.one", "一つ目")],
-	});
-	h.inference.script("dispose-exchanges", keepAll);
-	h.inference.script("refine-summary", { summary: "短い要約", changed: true });
-	await h.run({ user: "一つ目", end: "completed" });
-	await h.drain();
-	const summary = h.store.read((db) =>
-		h.memory.summaryInTransaction(db, "c1"),
-	)!;
-	expect(summary).toMatchObject({ text: "短い要約", revision: 2 });
-	// The rewrite kept the earlier version's sources (section 3.2).
-	expect(summary.sources).toContain(seed.inputMessageId);
-	expect(h.inference.callsOf("refine-summary")).toHaveLength(1);
-});
-
 test("an upkeep step that failed three times at a revision is given up for it", async () => {
 	const h = await setup();
 	h.inference.script("curate-memory", {
 		...empty,
 		remember: [item("a.one", "一つ目"), item("a.two", "二つ目")],
 	});
-	h.inference.script("dispose-exchanges", keepAll);
 	h.inference.script("consolidate-memory", "x", "x", "x", "x");
 	await h.run({ user: "二つ", end: "completed" });
 	await h.drain();

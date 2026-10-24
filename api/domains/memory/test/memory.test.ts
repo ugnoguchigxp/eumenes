@@ -54,7 +54,9 @@ test("save, stop and forget work without dialogue; memory is shared across conve
 		const window = await store.write((db) =>
 			memory.windowForRunInTransaction(db, "c2"),
 		);
-		expect(window?.longTerm.text).toContain("コーヒーが好き");
+		expect(window?.profile.items.map((item) => item.text)).toEqual([
+			"コーヒーが好き",
+		]);
 		if (!window) throw new Error("fixture_not_ready");
 		const prepared = memory.preparedWindow(window);
 		expect(

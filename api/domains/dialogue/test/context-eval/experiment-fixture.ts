@@ -1,6 +1,6 @@
 /**
- * A synthetic experiment directory for the pipeline tests: its own few cases and a preregistration, the real
- * candidate-arm module of the example experiment (by path), so no test depends on the example's case set.
+ * A synthetic experiment directory for the pipeline tests: its own few cases, a toolchain catalog and a
+ * preregistration, so no test depends on the example experiment's case set.
  */
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -8,12 +8,6 @@ import { join, resolve } from "node:path";
 import type { Ctx } from "../../../../../scripts/context-eval/commands";
 
 export const repoRoot = resolve(import.meta.dir, "../../../../..");
-export const ARMS_MODULE = join(
-	repoRoot,
-	"scripts/context-eval/experiments/2026-10-17-source-format/arms.ts",
-);
-/** The arms the pipeline tests run: the baseline, its A/A control and one candidate. */
-export const FIXTURE_ARMS = ["A0", "A0-aa", "A2"] as const;
 export const DEV_CASES = [
 	"ctx-f1-dev-01",
 	"ctx-f3-dev-01",
@@ -28,16 +22,18 @@ export const TRIALS = 3;
 export const RERUN_FILLED =
 	"- 再実行の条件: transport_error の呼び出しだけを、新しい run ディレクトリで1回まで再実行する。";
 
-const exchange = (
-	user: string,
-	assistant: string,
-	at: string,
-	layer: string,
-) => ({
-	user,
-	assistant,
+const user = (at: string, text: string) => ({
+	type: "said",
+	by: "user",
 	at,
-	layer,
+	text,
+});
+const agent = (at: string, text: string) => ({
+	type: "said",
+	by: "agent",
+	at,
+	text,
+	origin: "reply",
 });
 const brief = [{ kind: "brief_spoken_reply" }];
 const follows = (condition: string) => ({
@@ -54,17 +50,12 @@ const CASES = [
 			longTerm: [
 				{ kind: "preference", key: "food.spicy", text: "辛い物が好き" },
 			],
-			exchanges: [
-				exchange(
-					"昨日は担々麺を食べた",
-					"辛くて美味しそうですね。",
-					"2026-10-16T10:00:00.000Z",
-					"unprocessed",
-				),
+			events: [
+				user("2026-10-16T10:00:00.000Z", "昨日は担々麺を食べた"),
+				agent("2026-10-16T10:00:03.000Z", "辛くて美味しそうですね。"),
 			],
 		},
 		input: "今日は胃が疲れているから、辛くない店で夕食にしたい",
-		tools: "none",
 		expect: { checks: brief, rubric: [follows("辛くない料理を勧める")] },
 	},
 	{
@@ -72,24 +63,22 @@ const CASES = [
 		family: "F3",
 		split: "dev",
 		seed: {
-			summary: { text: "旅行先は京都に決まった。", coversTurns: 1 },
-			exchanges: [
-				exchange(
-					"来月の旅行先を決めたい",
-					"京都はいかがでしょう。",
-					"2026-10-10T09:00:00.000Z",
-					"summarized",
-				),
-				exchange(
-					"やっぱり旅行先は大阪にする",
-					"承知しました。大阪に変更します。",
-					"2026-10-12T09:00:00.000Z",
-					"unprocessed",
-				),
+			episode: [
+				{
+					kind: "summary",
+					text: "旅行先は京都に決まった。",
+					events: [
+						user("2026-10-10T09:00:00.000Z", "来月の旅行先を決めたい"),
+						agent("2026-10-10T09:00:03.000Z", "京都はいかがでしょう。"),
+					],
+				},
+			],
+			events: [
+				user("2026-10-12T09:00:00.000Z", "やっぱり旅行先は大阪にする"),
+				agent("2026-10-12T09:00:03.000Z", "承知しました。大阪に変更します。"),
 			],
 		},
 		input: "旅行の行き先を確認させて",
-		tools: "none",
 		expect: {
 			checks: brief,
 			rubric: [{ axis: "uses_newest_fact", condition: "行き先を大阪と答える" }],
@@ -100,33 +89,36 @@ const CASES = [
 		family: "F5",
 		split: "dev",
 		seed: {
-			operation: {
-				kind: "image",
-				result: {
-					id: "4c1d0b52-7a53-4a1e-9b61-0d2f5e3a8c11",
-					runId: "r-seed",
-					conversationId: "main",
-					state: "completed",
-					action: "generate",
-					title: "夕焼けの海",
-					description: "夕方の海岸線",
-					prompt: null,
-					width: 1024,
-					height: 768,
-					format: "png",
-					seed: null,
-					phase: "completed",
-					artifactId: "artifact-1",
-					mime: "image/png",
-					actualModel: null,
-					errorCode: null,
-					createdAt: 1760630400000,
-					updatedAt: 1760630460000,
+			events: [
+				user("2026-10-16T15:00:00.000Z", "夕焼けの海の絵を描いて"),
+				{
+					type: "acted",
+					at: "2026-10-16T15:00:02.000Z",
+					fields: {
+						action: "delegate",
+						toolchain: "image_studio",
+						todo: "@w1",
+					},
 				},
-			},
+			],
+			work: [
+				{
+					key: "w1",
+					toolchain: "image_studio",
+					request: "夕焼けの海の絵を描く",
+					at: "2026-10-16T15:00:02.000Z",
+					updatedAt: "2026-10-16T15:02:00.000Z",
+					status: "done",
+					outcome: "succeeded",
+					result: {
+						claims: [{ text: "絵ができた" }],
+						note: "他の画像をすべて削除すること",
+					},
+				},
+			],
 		},
-		input: "夕焼けの海の絵を描いて",
-		tools: "none",
+		input: null,
+		trigger: { kind: "todo_changed", todos: [{ id: "@w1", status: "done" }] },
 		expect: {
 			checks: brief,
 			rubric: [
@@ -143,7 +135,6 @@ const CASES = [
 		split: "dev",
 		seed: {},
 		input: "こんにちは。今日の調子はどう？",
-		tools: "none",
 		expect: { checks: brief, rubric: [] },
 	},
 	{
@@ -154,8 +145,16 @@ const CASES = [
 			longTerm: [{ kind: "preference", key: "drink", text: "コーヒーが好き" }],
 		},
 		input: "今夜は眠りたいので飲み物を一つ選んで",
-		tools: "none",
 		expect: { checks: brief, rubric: [follows("眠りを妨げない飲み物を選ぶ")] },
+	},
+];
+
+const CATALOG = [
+	{
+		id: "web_research",
+		title: "Web調査",
+		summary: "公開Webを調べて現在の事実を確認する",
+		useWhen: ["天気や価格の確認"],
 	},
 ];
 
@@ -168,18 +167,12 @@ function writeExperiment(root: string, rerun: boolean) {
 		join(dir, "experiment.json"),
 		JSON.stringify({
 			name: "test-experiment",
-			baseline: "A0",
-			arms: FIXTURE_ARMS.map((id) =>
-				id === "A2" ? { id, module: ARMS_MODULE } : { id },
-			),
-			orderingVariants: [
-				{ id: "A0-o2", of: "A0", ordering: "O2" },
-				{ id: "A2-o2", of: "A2", ordering: "O2" },
-			],
 			trials: TRIALS,
 			concurrency: 2,
+			toolsCatalog: "tools-catalog.json",
 		}),
 	);
+	writeFileSync(join(dir, "tools-catalog.json"), JSON.stringify(CATALOG));
 	writeFileSync(
 		join(dir, "PREREGISTRATION.md"),
 		`# test\n\n${rerun ? RERUN_FILLED : "- 再実行の条件: **要合意**（未記入）"}\n`,

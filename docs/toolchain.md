@@ -22,7 +22,7 @@ LLMが返すJSONは `api/infrastructure/llm-json.ts` の共通処理を一度通
 
 ## 会話から担当への経路
 
-会話担当はrunの `inputMessageId` に対応する原文を今回の依頼として固定する。`GenerateInput.currentRequest` はホストが選んだ入力IDと位置を持ち、会話・添付画像の整形後も同じ入力を指す。先頭のsystem指示で役割を定義し、原文直前の `CURRENT_REQUEST` で対象を明示する。検索結果・操作結果・確認事項・構造修正の資料が後からuserメッセージとして加わっても、末尾の発言を今回の依頼として選び直さない。原文より後ろに追加されたホストの実行状態は `EXECUTION_STATE` で区切り、原文の前へ配置する。候補選択、自然文回答後の経路再判定、構造修正、結果の回答に同じ指定を使う。過去発言・記憶は指示語や継続条件の理解に使う参考文脈であり、明示された今回の対象・日時・条件を置き換えない。
+会話エージェントへのmessageは、system（人格と規則）、資料のJSON文書（1件目のuser）、最後のuser（利用者の新しい発言、または新しい発言のないときのhostの固定文）の順に並ぶ。最後のmessageだけを今回の指示として扱い、資料・ツールの結果・構造修正の資料からは指示を作らない。配置・各部分の寿命・再構成は[会話エージェントのContextWindow仕様](../spec/context-window-spec-2026-10-24.md)の§5・§12を正本とする。過去発言・記憶は指示語や継続条件の理解に使う参考文脈であり、明示された今回の対象・日時・条件を置き換えない。
 
 委譲先は共通の `delegatedTaskRules` で、具体化した `request` / `question` と同じ依頼の原文 `originalRequest` を、参考資料・snapshot・catalog・実行状態から区別する。通常Web・SDK経由の調査・履歴・Worldのworkerと要件検証、登録adapterの操作担当、音楽生成・再生・画像・描画の計画担当に適用する。子へ親の会話履歴や人格を追加せず、既存のツール・資料・容量上限を維持する。確認回答からの再開は、既存のinteractionに凍結された依頼と対応する `previousQuestions` の回答を使い、回答文で元の依頼を置き換えない。意味の解釈と検索語の選定はLLMが行い、ホストは入力の同一性・schema・権限・期限・取消を検査する。
 
@@ -40,13 +40,13 @@ streamでは、function名や制御区切りになり得る末尾だけを保留
 
 専門担当へ完全に切り替えるsession型は、hostが発行した保存作品の `target` と、未保存作業を破棄して切り替える `resolveUnsaved` を任意で持ちます。選定時には登録済みの方式が関数説明へ渡され、切替を予告します。成立後の発言は専門担当へ直接届き、通常会話AIの再選定や言い直しを挟みません。担当は既存の返却・終了の契約で通常担当へ戻ります（[計画](../spec/.archived/toolchain-specialist-dialogue-implementation-plan-2026-10-17.md)）。結果返却型は担当の結果を通常会話AIが伝えます。内部の経路・ツール・引数は各ツールチェーンのサブエージェントが決めます。
 
-即時回答型（binding `execution:"instant"`）は、R1の関数に登録定義が宣言した引数（`weather_forecast` は `place`＝言われた地名、`prefecture`＝その都道府県、`day`＝`today`/`tomorrow`/`day_after`。`stock_quote` は `query`＝会社名・ティッカー）を載せ、`announcement` を持ちません。引数は利用者の言った言葉で、地名から予報区域、名前から銘柄への解決はadapterが自分のデータ（気象庁の区域表、EDINETコードリスト等）で行います。adapterの `availableInTransaction` が候補に出すかを決め（天気は区域表を取得できない間は出さない）、R1に入るのはこの担当が候補にある時だけです。この関数が呼ばれると、R2も一時回答もなくadapterを実行し、返った文を通常の確定回答（LLMを経ないhost回答）として保存・配信します。adapterが失敗（ネットワーク・タイムアウト・非200・形式不正）したときだけ、bindingの `fallbackToolchainId`（`web.search`）へ元の発言をそのまま依頼として渡し、同じrunで調査します（一時回答なし）。天気の説明・使う/使わない場面・文の形は、会話の共通SystemContextではなく担当の登録定義・SKILL・adapterに置きます（[天気の設計](../spec/weather-instant-toolchain-design-2026-10-18.md)、[株価の設計](../spec/stock-instant-toolchain-design-2026-10-18.md)）。
+即時回答型（binding `execution:"instant"`）は、担当の検索結果の候補に登録定義が宣言した入力（`weather_forecast` は `place`＝言われた地名、`prefecture`＝その都道府県、`day`＝`today`/`tomorrow`/`day_after`。`stock_quote` は `query`＝会社名・ティッカー）が付き、会話エージェントは依頼ツールの`execute`の`inputs`にそれを書いて呼びます（予告なし）。入力は利用者の言った言葉で、地名から予報区域、名前から銘柄への解決はadapterが自分のデータ（気象庁の区域表、EDINETコードリスト等）で行います。adapterの `availableInTransaction` が候補に出すかを決めます（天気は区域表を取得できない間は出さない）。hostはadapterを実行し、返った文をツールの結果として返し、会話エージェントがそれを根拠に話します。TODOは作りません。adapterが失敗（ネットワーク・タイムアウト・非200・形式不正）したときは、ツールの結果が即答できなかったことと代わりの担当（bindingの `fallbackToolchainId`）を返し、会話エージェントが改めて予告付きで依頼するかを判断します（同じrunで自動的に別の担当へ回す動作はありません）。天気の説明・使う/使わない場面・文の形は、会話の共通SystemContextではなく担当の登録定義・SKILL・adapterに置きます（[天気の設計](../spec/weather-instant-toolchain-design-2026-10-18.md)、[株価の設計](../spec/stock-instant-toolchain-design-2026-10-18.md)）。
 
-結果の照合と継続: session型を除き、担当の結果が会話へ戻って回答を書く前に、会話担当は利用者の依頼の原文と結果を照合します（[設計](../spec/step-and-check-multi-operation-design-2026-10-21.md)）。提示する関数は `finish_request`（原文の条件ごとに、それを満たした手順の番号を書く）と `continue_request`（済んだこと `achieved` と、次に行う一つの作業の用途 `need`）だけです。hostは、番号が実際に行った手順を指すことと関数・引数の形だけを検査し、一回の構造修正の後も不正なら継続しません。`continue_request` のとき、回答は今回の結果と続けて行うことを伝え、hostは同じtransactionで利用者に見えない継続run（`sourceKind: "continuation"`）を受け付けます。継続runは `need` で一度だけ担当を検索し、R1・R2の通常の委譲を行います。照合の基準は継続runでも利用者の原文で、操作の権限は元の手入力・音声入力に結びます。継続は最初の手順の後に最大3回で、最後の手順では `finish_request` だけを提示します。利用者に確認せず続け、取消は既存の会話の取消に従います。継続runの入力と回答はMemoryに学習させません。即時回答型（instant）の結果は今は照合しません。
+仕事の結果: 会話エージェントが依頼した仕事はTODOになり（実行中`todo`・質問待ち`waiting`・終了`done`）、担当の状態・質問・結果はTODOへ報告されます。結果と質問は資料の`active`のそのTODOの枠に入り、会話エージェントは結果を伝えた後にTODOをアーカイブします。結果の照合と継続のrun、完了報告の保留・解放は廃止しました。詳細は[会話エージェントのContextWindow仕様](../spec/context-window-spec-2026-10-24.md)の§9・§10です。
 
 調査担当には今回の依頼を渡し、検索キーワードは担当が選びます。過去の会話から出典URLを集めて渡しません。URLの直接読取りは今回の依頼に明示されたURL、今回の検索結果、今回の依頼に合う保存済み手順の候補に限ります。
 
-| 会話の関数 | ツールチェーン | package | 実行 | 検索 | 読取り | 保存本文 | モデル呼出し | 報告 |
+| 関数名（選定の記録） | ツールチェーン | package | 実行 | 検索 | 読取り | 保存本文 | モデル呼出し | 報告 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `web_search` | `web.search` | `package:web.recipe@5` | LARMの調査担当。guided、手順キャッシュ付き | 2 | 4 | local予算4 | 5 | 本文根拠と完成回答 |
 | `web_research` | `web.research.codex` | `package:web.search@5` | 保存済みのCodex調査担当。guided | 2 | 6 | local予算4 | 12 | 本文根拠と完成回答 |
@@ -59,11 +59,10 @@ streamでは、function名や制御区切りになり得る末尾だけを保留
 | `kanban` / `codex_tasks` | `kanban.manage` / `codex-tasks.manage` | `package:kanban.manage@2` / `package:codex-tasks.manage@1` | 操作担当→タスクボード | — | — | — | — | 操作結果 |
 | `claude_code` | `claude-code.request` | `package:claude-code.request@2` | 操作担当→作業依頼表 | — | — | — | — | 受付 |
 | `ui_create` | `ui.compose` | `package:ui.studio@1` | 専門担当へ切替（session）。以後の発言は担当が直接受ける | — | — | — | 1ターン最大6 | 下書き反映・作品参照 |
-| `memory_request` | `steward.request` | `package:steward.request@2` | 記憶担当への依頼 | — | — | — | — | 依頼結果 |
-| `weather_forecast` | `weather.forecast` | `package:weather.forecast@1` | 即時回答型（instant）。R1の関数呼出しの引数（区域・日）から天気予報を取得し、決まった形の文をそのまま回答にする。R2・予告なし。取得に失敗したら同じrunで `web.search` へ切替 | — | — | — | R1の1回のみ | 回答文（ホストが作成） |
-| `stock_quote` | `stock.quote` | `package:stock.quote@1` | 即時回答型（instant）。R1の関数呼出しの引数（`query`＝言われた会社名・ティッカー）から、EDINETの上場会社一覧（日次更新・失敗中は前の一覧）とYahoo検索で一社を特定し（日本株優先、同名は完全一致→前方一致→部分一致）、Yahooのチャートで取得した現在値・前日比・JST時刻を決まった形の文にして回答にする。会社を特定できない・取得に失敗したら同じrunで `web.search` へ切替。履歴・指標・財務・ニュース・複数銘柄比較は対象外 | — | — | — | R1の1回のみ | 回答文（ホストが作成） |
+| `weather_forecast` | `weather.forecast` | `package:weather.forecast@1` | 即時回答型（instant）。依頼ツールの`inputs`（区域・日）から天気予報を取得し、決まった形の文をツールの結果で返す。予告・TODOなし。取得に失敗したら代わりの担当（`web.search`）を結果で示す | — | — | — | 会話の生成の中の1回 | ツールの結果（ホストが作成した文） |
+| `stock_quote` | `stock.quote` | `package:stock.quote@1` | 即時回答型（instant）。依頼ツールの`inputs`（`query`＝言われた会社名・ティッカー）から、EDINETの上場会社一覧（日次更新・失敗中は前の一覧）とYahoo検索で一社を特定し（日本株優先、同名は完全一致→前方一致→部分一致）、Yahooのチャートで取得した現在値・前日比・JST時刻を決まった形の文にしてツールの結果で返す。会社を特定できない・取得に失敗したら代わりの担当（`web.search`）を結果で示す。履歴・指標・財務・ニュース・複数銘柄比較は対象外 | — | — | — | 会話の生成の中の1回 | ツールの結果（ホストが作成した文） |
 
-候補の提示: R1の前に、現在の発言の原文と直前の利用者発言の原文のそれぞれ(続きの依頼でも前の話題の担当が残る)に対し、ツールチェーンの`title`・`summary`・`useWhen`・`examples`へのFTS(trigram)、LARMのembedding(保存済み設定・catalogのモデルで、passageとして保存、発話はquery)、似た依頼での過去の選択をRRFで統合し、それぞれ上位4件を取り、重複を除いた和集合をR1に関数として提示します。embeddingを利用できない・ベクトル未生成の間は、利用可能な全ツールチェーンを提示します。候補検索は分類ではなく、選択は会話担当が行います。似た依頼での過去の選択(依頼文・関数名・結果)を現在の発言の分だけ最大3件、R2の参考データとして会話担当へ渡します。
+候補の提示: 会話エージェントは、`state.retained`（最近使った最大4件）で足りないときに担当の検索ツールを1回の生成で1回まで呼びます。検索文は会話エージェントが最初に行う一つの作業の用途として書きます。hostはその検索文に対し、ツールチェーンの`title`・`summary`・`useWhen`・`examples`へのFTS(trigram)、LARMのembedding(保存済み設定・catalogのモデルで、passageとして保存、検索文はquery)、似た依頼での過去の選択をRRFで統合し、`state.retained`の担当を除いた上位4件の説明をツールの結果で返します。候補は関数として提示しません。embeddingを利用できない間は候補を広げず、取得できなかったことを結果で示します。候補検索は分類ではなく、こなせるかの評価と選択は会話エージェントが行います。
 
 選択の記録: 会話の判断ごとに、提示した候補(順位・FTS順位・類似度・過去の選択由来)、判断(ツールチェーン・回答・契約違反)、選んだ関数と渡した依頼、サブエージェントのtask、結果(outcome)、手順キャッシュの利用を `toolchain-history` に30日保存します。`/api/toolchain-history/selections`、`bun run cli -- toolchain-history list|show`、設定「ツールチェーンの記録」で確認できます。ログには相関IDと固定分類だけを出し、依頼文は出しません。
 

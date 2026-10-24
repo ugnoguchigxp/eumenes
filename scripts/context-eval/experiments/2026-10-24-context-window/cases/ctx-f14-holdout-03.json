@@ -1,0 +1,64 @@
+{
+	"id": "ctx-f14-holdout-03",
+	"family": "F14",
+	"split": "holdout",
+	"seed": {
+		"events": [
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-21T15:00:00.000Z",
+				"text": "穏やかな夜の曲を作って"
+			},
+			{
+				"type": "acted",
+				"at": "2026-10-21T15:00:02.000Z",
+				"fields": {
+					"action": "delegate",
+					"toolchain": "music_studio",
+					"request": "穏やかな夜の曲を作る",
+					"todo": "@w1"
+				}
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-21T15:00:03.000Z",
+				"text": "作ってみますね。",
+				"origin": "announcement"
+			}
+		],
+		"work": [
+			{
+				"key": "w1",
+				"toolchain": "music_studio",
+				"request": "穏やかな夜の曲を作る",
+				"at": "2026-10-21T15:00:03.000Z",
+				"status": "todo"
+			}
+		],
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "butler"
+		}
+	},
+	"input": "曲づくりはもう不要になった。依頼を取り下げて",
+	"expect": {
+		"checks": [
+			{
+				"kind": "tool_called",
+				"name": "work"
+			},
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "work_state_aware",
+				"condition": "state.todos にある実行中の曲づくりを、仕事の操作で取り消している（work の cancel）。取り消したことを伝えている。"
+			}
+		]
+	}
+}

@@ -1,0 +1,84 @@
+{
+	"id": "ctx-f13-holdout-02",
+	"family": "F13",
+	"split": "holdout",
+	"seed": {
+		"events": [
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-21T11:00:00.000Z",
+				"text": "夕焼けの海の絵を描いて"
+			},
+			{
+				"type": "acted",
+				"at": "2026-10-21T11:00:02.000Z",
+				"fields": {
+					"action": "delegate",
+					"toolchain": "image_studio",
+					"request": "夕焼けの海の絵を描く"
+				}
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-21T11:00:03.000Z",
+				"text": "描いてみますね。",
+				"origin": "announcement"
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-21T11:02:00.000Z",
+				"text": "描けました。",
+				"origin": "report"
+			}
+		],
+		"work": [
+			{
+				"key": "w0",
+				"toolchain": "image_studio",
+				"request": "夕焼けの海の絵を描く",
+				"at": "2026-10-21T11:00:03.000Z",
+				"updatedAt": "2026-10-21T11:02:00.000Z",
+				"status": "done",
+				"outcome": "succeeded",
+				"result": {
+					"asOf": "2026-10-21T11:02:00.000Z",
+					"claims": [
+						{
+							"text": "夕焼けの海の絵を一枚描いた",
+							"sources": []
+						}
+					],
+					"limits": "一枚のみ"
+				},
+				"archived": true
+			}
+		],
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "butler"
+		}
+	},
+	"input": "続けて、朝焼けの山の絵も作ってほしいな",
+	"expect": {
+		"checks": [
+			{
+				"kind": "tool_not_called",
+				"name": "find_toolchain"
+			},
+			{
+				"kind": "delegated",
+				"toolchain": "image_studio"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "capability_judgment",
+				"condition": "state.retained に画像制作の担当が示されているので、担当を探し直さずに画像制作へ依頼している。"
+			}
+		]
+	}
+}

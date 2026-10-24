@@ -41,6 +41,11 @@ export function createLifecycle(
 			deleteReports(db, rootRunId);
 			deleteRequirementData(db, rootRunId);
 			tools.deleteDataInTransaction(db, rootRunId);
+			for (const hook of state.dataDeleted) hook(db, rootRunId);
+		},
+		/** Copies of a run's results elsewhere are dropped in the same transaction as the run's own data. */
+		registerDataDeletion(hook: (db: Database, rootRunId: string) => void) {
+			state.dataDeleted.push(hook);
 		},
 		async recover() {
 			await store.write((db) => {

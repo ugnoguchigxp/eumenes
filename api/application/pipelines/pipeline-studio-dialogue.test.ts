@@ -1,10 +1,11 @@
 import { afterEach, expect, test } from "bun:test";
 import type { LarmPort } from "../../domains/larm";
 import {
-	analysisReceipt,
-	DISCOVERY,
-	isAnalysisRound,
-} from "../../domains/dialogue/test/analysis.fixture";
+	callsOf,
+	isResultRound,
+	isUtteranceRound,
+	searchThenDelegate,
+} from "../toolchain/conversation-script.fixture";
 import { harness } from "../toolchain/toolchain.fixture";
 
 /**
@@ -92,38 +93,19 @@ async function rig() {
 				if (!step) throw new Error("script_specialist_missing");
 				return JSON.stringify(step(messages as Prompt));
 			}
-			if (isAnalysisRound(options?.tools)) {
-				const names = options!.tools!.map((t) => t.function.name);
-				// The first round searches, then hands the request to the studio.
-				options!.onToolCalls!(
-					(names.includes("pipeline_studio")
-						? analysisReceipt("fixture", {
-								name: "pipeline_studio",
-								args: { kind: "creation" },
-								announcement: "パイプライン制作の担当に引き継ぎます。",
-							})
-						: analysisReceipt("fixture", {
-								name: DISCOVERY,
-								args: {
-									kind: "creation",
-									query: messages.at(-1)!.content,
-								},
-							})
-					).toolCalls as never,
-				);
-				return "";
-			}
-			if (options?.tools?.some((t) => t.function.name === "pipeline_studio")) {
-				options!.onToolCalls!([
+			if (isUtteranceRound(options?.tools) && !isResultRound(messages)) {
+				// The conversation's round: a search for the studio, then the hand-over of the request.
+				const step = searchThenDelegate(
+					(candidate) => candidate.id === "pipeline.studio",
+					messages.at(-1)!.content,
 					{
-						id: id(),
-						name: "pipeline_studio",
-						arguments: JSON.stringify({
-							request: messages.at(-1)!.content,
-						}),
+						announcement: "パイプライン制作の担当に引き継ぎます。",
+						impact: "create",
 					},
-				]);
-				return "";
+				)(messages);
+				if (step.calls?.length)
+					options!.onToolCalls!(callsOf(step, () => id()) as never);
+				return step.text ?? "";
 			}
 			return "かしこまりました。";
 		},

@@ -17,9 +17,11 @@ import {
 import { createWebAcquisition } from "../api/domains/web-research";
 import type { LarmPort, LarmCallOptions } from "../api/domains/larm";
 import {
-	analysisReceipt,
-	isAnalysisRound,
-} from "../api/domains/dialogue/test/analysis.fixture";
+	callsOf,
+	isResultRound,
+	isUtteranceRound,
+	searchThenDelegate,
+} from "../api/application/toolchain/conversation-script.fixture";
 import { readApiToken } from "../api/infrastructure/auth-config";
 import { createLiveLarm, liveLarmSettings } from "./live-larm";
 
@@ -53,20 +55,20 @@ const { executablePath } = (await setting.json()) as { executablePath: string };
 if (!executablePath) throw new Error("saved_browser_path_missing");
 const live = createLiveLarm();
 // Only the fixture's delegation is scripted. Neither worker/browser decisions nor their result are replaced.
-function delegate(options: LarmCallOptions | undefined): boolean {
-	if (isAnalysisRound(options?.tools)) {
-		const name = options!.tools!.some(
-			(t) => t.function.name === "service_search",
-		)
-			? "service_search"
-			: "find_toolchain";
-		options!.onToolCalls!(
-			analysisReceipt("fixture", {
-				name,
-				...(name === "find_toolchain" ? { args: { query: question } } : {}),
-			}).toolCalls!,
-		);
-		return true;
+/** The conversation's round for the request: search for the service search toolchain, then hand the request over. */
+function delegate(
+	messages: Array<{ role: string; content: string }>,
+	options: LarmCallOptions | undefined,
+): string | undefined {
+	if (isUtteranceRound(options?.tools) && !isResultRound(messages)) {
+		const step = searchThenDelegate(
+			(candidate) => candidate.id === "web.service-search",
+			question!,
+			{ announcement: "お調べします。", impact: "none" },
+		)(messages);
+		if (step.calls?.length)
+			options!.onToolCalls!(callsOf(step, () => crypto.randomUUID()) as never);
+		return step.text ?? "";
 	}
 	if (
 		options?.tools?.length === 1 &&
@@ -79,9 +81,9 @@ function delegate(options: LarmCallOptions | undefined): boolean {
 				arguments: JSON.stringify({ request: question }),
 			},
 		]);
-		return true;
+		return "";
 	}
-	return false;
+	return undefined;
 }
 function decision(raw: string, durationMs: number) {
 	try {
@@ -138,7 +140,8 @@ function decision(raw: string, durationMs: number) {
 const model: LarmPort = {
 	...live,
 	answer: async (messages, signal, options) => {
-		if (delegate(options)) return "";
+		const delegated = delegate(messages, options);
+		if (delegated !== undefined) return delegated;
 		const system =
 			messages.find((message) => message.role === "system")?.content ?? "";
 		if (system.includes("TOOLS="))
@@ -167,7 +170,8 @@ const model: LarmPort = {
 		return raw;
 	},
 	answerStream: async (messages, signal, delta, options) => {
-		if (delegate(options)) return "";
+		const delegated = delegate(messages, options);
+		if (delegated !== undefined) return delegated;
 		return live.answerStream!(messages, signal, delta, options);
 	},
 };

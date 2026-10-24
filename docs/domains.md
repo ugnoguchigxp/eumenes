@@ -52,7 +52,7 @@
 | `queue` | 0 | `api/domains/queue/index.ts` | なし | なし | なし | なし | なし |
 | `scheduler` | 1 | `api/domains/scheduler/index.ts` | なし | なし | `queue` | なし | なし |
 | `timers` | 2 | `api/domains/timers/index.ts` | `web/src/domains/timers/` | `web/src/components/domains/timers/` | `queue`、`scheduler` | なし | なし |
-| `dialogue` | 5 | `api/domains/dialogue/index.ts` | `web/src/domains/dialogue/index.ts` | なし | `agent-runtime`、`capabilities`、`conversation`、`delivery`、`inference`、`memory`、`queue`、`scheduler`、`toolchain-history`、`tool-runtime` | `conversation` | `world` |
+| `dialogue` | 5 | `api/domains/dialogue/index.ts` | `web/src/domains/dialogue/index.ts` | なし | `agent-runtime`、`capabilities`、`continuity`、`conversation`、`delivery`、`inference`、`memory`、`queue`、`scheduler`、`toolchain-history`、`tool-runtime` | `conversation` | `goals` |
 | `voice-dialogue` | 6 | `api/domains/voice-dialogue/index.ts` | `web/src/domains/voice-dialogue/index.ts` | なし | `delivery`、`dialogue`、`inference`、`settings` | `audio`、`avatar`、`dialogue`、`settings` | なし |
 <!-- domains:end -->
 

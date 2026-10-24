@@ -1,5 +1,5 @@
-import { errorReportSchema } from "../api/domains/dialogue/contracts/error-report";
 import {
+	errorReportSchema,
 	runSchema,
 	specialistSessionResponseSchema,
 	type PublicSubmit,

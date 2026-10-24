@@ -1,0 +1,64 @@
+{
+	"id": "ctx-f14-dev-03",
+	"family": "F14",
+	"split": "dev",
+	"seed": {
+		"events": [
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-20T15:00:00.000Z",
+				"text": "夕焼けの海の絵を描いて"
+			},
+			{
+				"type": "acted",
+				"at": "2026-10-20T15:00:02.000Z",
+				"fields": {
+					"action": "delegate",
+					"toolchain": "image_studio",
+					"request": "夕焼けの海の絵を描く",
+					"todo": "@w1"
+				}
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-20T15:00:03.000Z",
+				"text": "描いてみますね。",
+				"origin": "announcement"
+			}
+		],
+		"work": [
+			{
+				"key": "w1",
+				"toolchain": "image_studio",
+				"request": "夕焼けの海の絵を描く",
+				"at": "2026-10-20T15:00:03.000Z",
+				"status": "todo"
+			}
+		],
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "butler"
+		}
+	},
+	"input": "やっぱり絵はいらなくなった。さっきの依頼は取り消して",
+	"expect": {
+		"checks": [
+			{
+				"kind": "tool_called",
+				"name": "work"
+			},
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "work_state_aware",
+				"condition": "state.todos にある実行中の絵の依頼を、仕事の操作で取り消している（work の cancel）。取り消したことを伝えている。"
+			}
+		]
+	}
+}

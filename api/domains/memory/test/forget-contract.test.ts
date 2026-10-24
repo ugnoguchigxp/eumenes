@@ -31,7 +31,7 @@ afterEach(async () => {
 	for (const h of open.splice(0)) await h.close();
 });
 
-/** Three exchanges in c1; the address fact (two versions) and a note come from the first; the summary covers all three. */
+/** Four exchanges in c1 (each is two events); the address fact (two versions) and a note come from the first two; the episode summary covers three of them. */
 async function scenario() {
 	const h = await setupMemory();
 	open.push(h);
@@ -39,21 +39,13 @@ async function scenario() {
 	h.memory.registerForgetPurge((_db, purge) => {
 		purges.push(purge);
 	});
-	let n = 0;
 	const exchange = async (user: string, answer: string) => {
-		const runId = `run-s${++n}`;
-		const inputMessageId = await h.say("user", user, "c1", runId);
-		const answerMessageId = await h.say("assistant", answer, "c1", runId);
-		await h.store.write((db) =>
-			h.memory.recordExchangeInTransaction(db, {
-				conversationId: "c1",
-				runId,
-				inputMessageId,
-				answerMessageId,
-				outcome: "answered",
-			}),
-		);
-		return { inputMessageId, answerMessageId };
+		const said = await h.exchange(user, answer);
+		return {
+			inputMessageId: said.userId,
+			answerMessageId: said.answerId!,
+			seqs: said.seqs,
+		};
 	};
 	const old = await exchange("住所は大阪市です", "了解しました（大阪）");
 	const address = await exchange(
@@ -128,16 +120,22 @@ async function scenario() {
 				digest: "d",
 				createdAt: h.time.now,
 			});
-		h.memory.writeSummaryInTransaction(db, {
-			conversationId: "c1",
-			text: "引っ越しと食べ物の話をした",
-			included: [
-				old.inputMessageId,
-				address.inputMessageId,
-				food.inputMessageId,
-			],
-			expectedRevision: 0,
-		});
+		h.continuity.events.writeEpisodeInTransaction(db, "c1", "shown", [
+			{
+				kind: "summary",
+				fromSeq: 0,
+				toSeq: 0,
+				fromAt: h.time.now,
+				toAt: h.time.now,
+				count: 6,
+				text: "引っ越しと食べ物の話をした",
+				messageIds: [
+					old.inputMessageId,
+					address.inputMessageId,
+					food.inputMessageId,
+				],
+			},
+		]);
 	});
 	await h.window();
 	return {
@@ -229,35 +227,37 @@ function expectForgotten(s: Scenario) {
 	expect(vectors).toEqual(
 		[s.food.inputMessageId, s.weather.inputMessageId].sort(),
 	);
-	// The summary and its sources go; exchanges it stood on that remain are to be summarized again.
+	// The active short-term memory: the events that showed a blocked message keep only that they existed, the
+	// others are untouched, and the episode summary that stood on a blocked message is an unsummarized range.
+	const events = h.store.read((db) => [
+		...h.continuity.events.logInTransaction(db, "c1"),
+	]);
+	const gone = new Set([
+		s.old.inputMessageId,
+		s.old.answerMessageId,
+		s.address.inputMessageId,
+		s.address.answerMessageId,
+	]);
+	for (const event of events) {
+		const forgotten = event.messageIds.some((id) => gone.has(id));
+		expect(event.forgotten).toBe(forgotten);
+		if (forgotten) expect(event.text).toContain('"forgotten":true');
+		else expect(event.text).toContain('"text":');
+	}
+	expect(JSON.stringify(events)).not.toContain(
+		"住所は東京都千代田区に引っ越しました",
+	);
+	expect(JSON.stringify(events)).not.toContain("了解しました（大阪）");
 	expect(
-		h.store.read((db) => h.memory.summaryInTransaction(db, "c1")),
-	).toBeNull();
-	expect(count(h, "SELECT COUNT(*) AS n FROM memory_summary_source")).toBe(0);
-	const rows = h.memory.exchanges("c1");
-	const byInput = new Map(rows.map((row) => [row.inputMessageId, row]));
-	expect(byInput.get(s.old.inputMessageId)?.disposition).toBe("drop");
-	expect(byInput.get(s.address.inputMessageId)?.disposition).toBe("drop");
-	expect(byInput.get(s.food.inputMessageId)).toMatchObject({
-		disposition: "summarize",
-		summarized: null,
-		state: "pending",
-	});
-	// No step offers a blocked exchange; the one to re-summarize is offered.
+		h.store.read((db) => h.continuity.events.episodeInTransaction(db, "c1")),
+	).toMatchObject([{ kind: "unsummarized", text: "", messageIds: [] }]);
+	// The steward is not offered the forgotten events as new work (they are marked forgotten, not removed).
 	expect(
 		h.store
-			.read((db) =>
-				h.memory.pendingExchangesInTransaction(db, "c1", "curated", 10),
-			)
-			.map((r) => r.inputMessageId),
-	).toEqual([s.food.inputMessageId, s.weather.inputMessageId]);
-	expect(
-		h.store
-			.read((db) =>
-				h.memory.pendingExchangesInTransaction(db, "c1", "summarized", 10),
-			)
-			.map((r) => r.inputMessageId),
-	).toEqual([s.food.inputMessageId]);
+			.read((db) => h.continuity.events.uncuratedInTransaction(db, "c1"))
+			.filter((event) => !event.forgotten)
+			.map((event) => event.seq),
+	).toEqual([...s.food.seqs, ...s.weather.seqs]);
 	// The rendered windows that held the text are gone.
 	expect(count(h, "SELECT COUNT(*) AS n FROM memory_context_window")).toBe(0);
 	expect(

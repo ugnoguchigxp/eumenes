@@ -1,0 +1,53 @@
+{
+	"id": "ctx-f1-holdout-04",
+	"family": "F1",
+	"split": "holdout",
+	"seed": {
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "sage"
+		},
+		"longTerm": [
+			{
+				"kind": "preference",
+				"key": "food.sweets",
+				"text": "甘いお菓子はあまり好きではない"
+			},
+			{
+				"kind": "constraint",
+				"key": "food.budget",
+				"text": "外食は一回三千円までにしている"
+			}
+		],
+		"events": [
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-15T12:00:00.000Z",
+				"text": "彼女の誕生日が来週なんだ"
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-15T12:00:03.000Z",
+				"text": "素敵ですね。",
+				"origin": "reply"
+			}
+		]
+	},
+	"input": "彼女へ渡す誕生日ケーキを探しているよ。人気のある甘いケーキの種類を三つほど教えてほしい",
+	"expect": {
+		"checks": [
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "follows_current_request",
+				"condition": "依頼どおり、人気のある甘いケーキの種類を挙げている。本人が甘いものを好まないことを理由に、答えを拒んだり甘くないものへすり替えたりしていない。"
+			}
+		]
+	}
+}

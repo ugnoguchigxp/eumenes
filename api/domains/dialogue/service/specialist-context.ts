@@ -10,72 +10,35 @@ import {
 import type { ContextBlock } from "../../inference";
 import type { DialogueDeps } from "./context";
 import { specialistBlock } from "./context-blocks";
-import type { SessionOffers } from "./conversation-tools";
 
 /**
- * The function names of the session toolchains among these cards. The first round only needs to tell them
- * apart (it never lists saved items), so no adapter is asked.
+ * The saved items a session toolchain may start from (host-issued choices: the adapter's own list), or null for
+ * a toolchain that is not a session. One that cannot be read now has no choices.
  */
-export function sessionFunctionNames(
+export function sessionTargetsInTransaction(
 	deps: DialogueDeps,
-	cards: readonly ToolchainCard[],
-): ReadonlySet<string> {
-	const toolchains = deps.toolchains;
-	if (!deps.specialist || !toolchains?.sessionSetInTransaction || !cards.length)
-		return new Set();
-	const sessions = deps.store.read(
-		(db) =>
-			new Set(
-				toolchains
-					.catalogInTransaction(db)
-					.filter((entry) => entry.runtime.execution === "session")
-					.map((entry) => entry.revisionId),
-			),
-	);
-	return new Set(
-		cards.filter((c) => sessions.has(c.revisionId)).map((c) => c.functionName),
-	);
-}
-
-/**
- * The session toolchains among these cards with the saved items each may start from. Choices are
- * host-issued (the adapter's own list); a toolchain that cannot be read now is offered without targets.
- */
-export function sessionOffers(
-	deps: DialogueDeps,
-	cards: readonly ToolchainCard[],
+	db: Database,
+	card: ToolchainCard,
 	runId: string,
-): SessionOffers {
+): Array<{ ref: string; label: string }> | null {
 	const port = deps.specialist;
 	const toolchains = deps.toolchains;
-	const offers = new Map<string, Array<{ ref: string; label: string }>>();
-	if (!port || !toolchains?.sessionSetInTransaction || !cards.length)
-		return offers;
-	deps.store.read((db) => {
-		const sessions = new Set(
-			toolchains
-				.catalogInTransaction(db)
-				.filter((entry) => entry.runtime.execution === "session")
-				.map((entry) => entry.revisionId),
+	if (
+		!port ||
+		!toolchains?.sessionSetInTransaction ||
+		card.execution !== "session"
+	)
+		return null;
+	try {
+		const set = toolchains.sessionSetInTransaction(db, card.revisionId);
+		return port.targetChoicesInTransaction(
+			db,
+			set,
+			viewingTargetOf(db, runId, set),
 		);
-		for (const card of cards) {
-			if (!sessions.has(card.revisionId)) continue;
-			try {
-				const set = toolchains.sessionSetInTransaction!(db, card.revisionId);
-				offers.set(
-					card.functionName,
-					port.targetChoicesInTransaction(
-						db,
-						set,
-						viewingTargetOf(db, runId, set),
-					),
-				);
-			} catch {
-				offers.set(card.functionName, []);
-			}
-		}
-	});
-	return offers;
+	} catch {
+		return [];
+	}
 }
 
 /**

@@ -1,0 +1,74 @@
+import type { Database } from "bun:sqlite";
+import { jstSeconds } from "../../../infrastructure/jst-time";
+import { byId } from "../repository";
+import type { DialogueDeps } from "./context";
+import { heardOf, todoRefsOf, type Heard } from "./event-fields";
+import { confirmArchives } from "./generation-settle";
+
+/**
+ * How much of a run's spoken answer reached the user (the ContextWindow specification, sections 8.1 and 9.4):
+ * a `delivered` event against the answer's `said`, once. Heard in full, it confirms the archives its TODOs were
+ * told to (`told: this`). A partial delivery keeps what was heard, without the announcement spoken before it.
+ */
+export function recordHeardInTransaction(
+	deps: DialogueDeps,
+	db: Database,
+	runId: string,
+	heard: Heard,
+	spokenText = "",
+) {
+	const run = byId(db, runId);
+	if (!run) return;
+	const events = deps.continuity.events;
+	const said = events.deliveredUtteranceInTransaction(
+		db,
+		run.conversationId,
+		`run:${runId}`,
+	);
+	if (!said) return;
+	if (heardOf(events.logInTransaction(db, run.conversationId), said.id)) return;
+	let deliveredText = spokenText;
+	for (const line of (run.announcement ?? "").split("\n"))
+		if (line && deliveredText.startsWith(line))
+			deliveredText = deliveredText.slice(line.length).trimStart();
+	events.appendInTransaction(db, {
+		conversationId: run.conversationId,
+		at: jstSeconds(Date.parse(deps.clock())),
+		type: "delivered",
+		by: "host",
+		fields: {
+			ref: said.id,
+			heard,
+			...(heard === "partial" ? { deliveredText } : {}),
+		},
+		// The heard part is the utterance's own text: forgetting its message clears this copy too.
+		messageIds: said.messageIds,
+		dedupeKey: `delivered:${said.id}`,
+	});
+	confirmArchives(deps, db, run, todoRefsOf(said), heard);
+}
+
+/**
+ * An utterance the agency spoke on its own, with no run: a `said` of the agent (origin `spontaneous`), so the
+ * conversation knows later what it said (section 16).
+ */
+export function recordSpontaneousInTransaction(
+	deps: DialogueDeps,
+	db: Database,
+	input: {
+		conversationId: string;
+		messageId: string;
+		text: string;
+		at: string;
+	},
+) {
+	deps.continuity.events.appendInTransaction(db, {
+		conversationId: input.conversationId,
+		at: jstSeconds(Date.parse(input.at)),
+		type: "said",
+		by: "agent",
+		fields: { text: input.text, origin: "spontaneous" },
+		messageIds: [input.messageId],
+		dedupeKey: `message:${input.messageId}`,
+	});
+}

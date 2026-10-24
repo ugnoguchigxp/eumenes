@@ -1,0 +1,67 @@
+{
+	"id": "ctx-f2-dev-02",
+	"family": "F2",
+	"split": "dev",
+	"seed": {
+		"persona": {
+			"agentName": "",
+			"userName": "ご主人様",
+			"persona": "maid"
+		},
+		"events": [
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-13T10:20:00.000Z",
+				"text": "ワイヤレスイヤホンのAS-300の値段を調べて"
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-13T10:20:03.000Z",
+				"text": "十月十三日に確認したところ、AS-300は税込一万二千八百円でした。",
+				"origin": "reply"
+			},
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-13T10:22:00.000Z",
+				"text": "ちょっと考えるね"
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-13T10:22:03.000Z",
+				"text": "かしこまりました。",
+				"origin": "reply"
+			},
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-17T08:00:00.000Z",
+				"text": "おはよう"
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-17T08:00:03.000Z",
+				"text": "おはようございます、ご主人様。",
+				"origin": "reply"
+			}
+		]
+	},
+	"input": "あのイヤホン、今いくらだっけ？",
+	"expect": {
+		"checks": [
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "no_unsupported_assertion",
+				"condition": "一万二千八百円を現在の価格として断定していない。その金額は数日前に確認した時点のものだと伝える、または今の価格は確認できない旨を述べている。"
+			}
+		]
+	}
+}

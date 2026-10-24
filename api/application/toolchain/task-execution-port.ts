@@ -37,11 +37,6 @@ export type TaskExecutionHost = {
 	legacy?: import("./task-legacy-execution").TaskLegacyPorts;
 	browser?: import("../../domains/browser").BrowserService;
 	childOperations?: import("../../domains/tool-runtime").ChildOperationPort;
-	/**
-	 * True while the agency layer watches the conversation: a result notice is then held for the agency to
-	 * release at a moment it picks (spec agency-work-reports-design-2026-10-24). Questions are never held.
-	 */
-	holdResultInTransaction?: (db: Database, conversationId: string) => boolean;
 };
 
 /**
@@ -260,18 +255,6 @@ export function configureTaskExecution(host: TaskExecutionHost) {
 				)
 			)
 				return true;
-			// Held: the event stays accepted and its delivery state "pending" (no notice run yet) until the agency
-			// releases it through sendExecutionNotice with the same request id.
-			if (
-				!view.question &&
-				host.holdResultInTransaction?.(db, view.conversationId) &&
-				agents.executions.holdReportInTransaction(db, {
-					eventId,
-					executionId: view.id,
-					conversationId: view.conversationId,
-				})
-			)
-				return false;
 			sendExecutionNotice(host, db, view, eventId);
 			return false;
 		},

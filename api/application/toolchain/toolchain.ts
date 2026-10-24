@@ -8,7 +8,10 @@ import { createOcrAdapter } from "../media/ocr-adapter";
 import { createComputeAdapter } from "../compute/compute-adapter";
 import { createModel3dAdapter } from "../media/model3d-adapter";
 import { createBrowserAdapter } from "../browser/browser-adapter";
-import { createTaskAdapter } from "./task-execution-adapter";
+import {
+	createTaskAdapter,
+	type TodoPageReader,
+} from "./task-execution-adapter";
 import { createPipelinesAdapter } from "../pipelines/pipelines-adapter";
 import type { BrowserAssembly } from "../browser/browser-composition";
 import type { SqliteStore } from "../../infrastructure/sqlite";
@@ -41,7 +44,6 @@ import {
 	createMemoryAdapter,
 	type MemoryAdapterPorts,
 } from "../world/memory-adapter";
-import { createStewardAdapter } from "../world/steward-adapter";
 import { createStockAdapter } from "../stock/stock-adapter";
 import { createWeatherAdapter } from "../weather/weather-adapter";
 import type { WorldResearchPorts } from "../world/world-research-ports";
@@ -77,6 +79,8 @@ import { createToolchainHistory } from "../../domains/toolchain-history";
 import { createRecipePorts } from "./toolchain-recipes";
 import { createVectorRefresh, type Embed } from "./toolchain-vectors";
 type ToolchainOptions = {
+	/** The conversation's TODO ledger the TODO screen pages (absent until dialogue is attached). */
+	todoPage?: () => TodoPageReader | undefined;
 	dots?: boolean;
 	kanbanSdk?: ReturnType<typeof createKanbanSdkHost>;
 	music?: boolean;
@@ -121,11 +125,6 @@ type ToolchainOptions = {
 	weather?: { fetch?: typeof fetch; now?: () => number };
 	/** The stock toolchain's adapter and the services it reads (absent: not offered). */
 	stock?: { fetch?: typeof fetch; now?: () => number };
-	/** The conversation agent's `memory_request` tool (absent: not offered). */
-	steward?: {
-		service: Parameters<typeof createStewardAdapter>[0];
-		memory: Parameters<typeof createStewardAdapter>[1];
-	};
 	/** The World investigation's reads (`world.find`, `world.query`), built over the agent runtime; the toolchain is offered only while World is usable. */
 	worldResearch?: (
 		runtime: () => import("../../domains/agent-runtime").AgentRuntime,
@@ -143,6 +142,42 @@ type ToolchainOptions = {
 		Parameters<typeof createTimerAdapter>[1]
 	>["interactions"];
 };
+
+/**
+ * The saved user request a research tool call stands on: the execution's source, else the run's own action origin.
+ * A forgotten or missing message refuses the call.
+ */
+function researchSourceResolver(
+	agents: () => import("../../domains/agent-runtime").AgentRuntime,
+	options: Pick<ToolchainOptions, "browser" | "blockedMessages">,
+) {
+	return (
+		db: import("bun:sqlite").Database,
+		owner: import("../../domains/capabilities").Owner,
+	) => {
+		const origin =
+			agents().executionOriginInTransaction(db, owner)?.source ??
+			readActionOriginInTransaction(db, owner.rootRunId);
+		const request =
+			origin &&
+			options.browser?.requests.userMessageInTransaction(db, origin.messageId);
+		if (
+			!origin ||
+			!request ||
+			options.blockedMessages?.blockedMessageIdsInTransaction(db, [
+				origin.messageId,
+			]).size
+		)
+			throw new Error("source_ref_invalid");
+		return {
+			conversationId: origin.conversationId,
+			messageId: origin.messageId,
+			runId: origin.runId,
+			request,
+			digest: hash(request),
+		};
+	};
+}
 
 export async function createToolchain(
 	store: SqliteStore,
@@ -174,7 +209,7 @@ export async function createToolchain(
 		| undefined;
 	// Typed domain adapters this host offers; bundles naming any other adapter are not registered.
 	const registry = createAdapterRegistry([
-		createTaskAdapter(() => taskRuntime),
+		createTaskAdapter(() => taskRuntime, options.todoPage),
 		createPipelinesAdapter(
 			() => taskRuntime,
 			() => pipelines,
@@ -255,9 +290,6 @@ export async function createToolchain(
 			? [createTtsDictionaryAdapter(options.ttsDictionary)]
 			: []),
 		...(options.memory ? [createMemoryAdapter(options.memory)] : []),
-		...(options.steward
-			? [createStewardAdapter(options.steward.service, options.steward.memory)]
-			: []),
 		...(options.world ? [createWorldAdapter(options.world)] : []),
 		...(weather ? [weather] : []),
 		...(stock ? [stock] : []),
@@ -279,7 +311,6 @@ export async function createToolchain(
 			...(options.terminals ? ["claude-code"] : []),
 			...(options.kanban && options.terminals ? ["kanban"] : []),
 			...(options.kanbanSdk ? ["codex-tasks"] : []),
-			...(options.steward ? ["steward"] : []),
 			...(options.weather ? ["weather"] : []),
 			...(options.stock ? ["stock"] : []),
 			...(options.worldResearch ? ["world-query"] : []),
@@ -310,32 +341,7 @@ export async function createToolchain(
 		if (!world) throw new Error("capability_unavailable");
 		return world;
 	};
-	const researchSource = (
-		db: import("bun:sqlite").Database,
-		owner: import("../../domains/capabilities").Owner,
-	) => {
-		const origin =
-			agents.executionOriginInTransaction(db, owner)?.source ??
-			readActionOriginInTransaction(db, owner.rootRunId);
-		const request =
-			origin &&
-			options.browser?.requests.userMessageInTransaction(db, origin.messageId);
-		if (
-			!origin ||
-			!request ||
-			options.blockedMessages?.blockedMessageIdsInTransaction(db, [
-				origin.messageId,
-			]).size
-		)
-			throw new Error("source_ref_invalid");
-		return {
-			conversationId: origin.conversationId,
-			messageId: origin.messageId,
-			runId: origin.runId,
-			request,
-			digest: hash(request),
-		};
-	};
+	const researchSource = researchSourceResolver(() => agents, options);
 	const children =
 		options.browser &&
 		createChildOperations(

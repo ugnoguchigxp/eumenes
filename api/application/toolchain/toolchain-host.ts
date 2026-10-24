@@ -1,3 +1,4 @@
+import type { TodoPageReader } from "./task-execution-adapter";
 import type { ConversationService } from "../../domains/conversation";
 import type { InferencePort } from "../../domains/inference";
 import type { QueueService } from "../../domains/queue";
@@ -50,7 +51,7 @@ export function createToolchainHostLinks(services: {
 			import("../../domains/memory").MemoryService,
 			"readyInTransaction" | "blockedMessageIdsInTransaction"
 		>;
-	/** The steward behind the `memory_request` tool (needs `memory`). */
+	/** The steward the 記憶 screen reads (needs `memory`). */
 	steward?: import("../../domains/steward").StewardService;
 	world?: WorldAssembly;
 	/** The adopted goals the World investigation may name for `gaps` (needs `world`). */
@@ -63,6 +64,7 @@ export function createToolchainHostLinks(services: {
 	const { settings, inference, world } = services;
 	let interactions: InteractionViews | undefined;
 	let sessionLive: SessionLive | undefined;
+	let todoPage: TodoPageReader | undefined;
 	const worldPorts: WorldAdapterPorts | undefined = world && {
 		claims: world.claims,
 		documents: world.documents,
@@ -89,10 +91,6 @@ export function createToolchainHostLinks(services: {
 			memory: services.memory
 				? { memory: services.memory, steward: services.steward }
 				: undefined,
-			steward:
-				services.steward && services.memory
-					? { service: services.steward, memory: services.memory }
-					: undefined,
 			blockedMessages: services.memory,
 			world: () => worldPorts,
 			worldResearch,
@@ -108,13 +106,17 @@ export function createToolchainHostLinks(services: {
 			// Until dialogue is attached no specialist session exists, so none is live.
 			specialistSessionLive: (tx: Database, sessionId: string) =>
 				sessionLive?.(tx, sessionId) ?? false,
+			// The TODO screen reads the conversation's TODO ledger once dialogue is attached.
+			todoPage: () => todoPage,
 		},
 		attachDialogue(dialogue: {
 			interactions: InteractionViews;
 			specialistSessionLiveInTransaction: SessionLive;
+			todoPageInTransaction: TodoPageReader;
 		}) {
 			interactions = dialogue.interactions;
 			sessionLive = dialogue.specialistSessionLiveInTransaction;
+			todoPage = dialogue.todoPageInTransaction;
 		},
 	};
 }

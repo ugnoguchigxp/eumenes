@@ -1,13 +1,16 @@
 import { afterEach, expect, test } from "bun:test";
 import { Hono } from "hono";
 import { INTERACTION_POLICY, registerCommandInteractions } from "..";
-import { open, setup } from "./command-interactions.fixture";
+import { setup, type Harness } from "./command-interactions.fixture";
+
+let h: Harness | undefined;
 afterEach(async () => {
-	for (const close of open.splice(0).reverse()) await close();
+	await h?.close();
+	h = undefined;
 });
 test("the HTTP routes answer, list and cancel interactions with the documented statuses", async () => {
-	const h = setup();
-	await h.clarified();
+	h = await setup();
+	await h.asked();
 	const interaction = h.interaction()!;
 	const app = new Hono();
 	registerCommandInteractions(app, h.dialogue);
@@ -91,8 +94,8 @@ test("the HTTP routes answer, list and cancel interactions with the documented s
 	);
 });
 test("the HTTP answer to an expired question is 410", async () => {
-	const h = setup();
-	await h.clarified();
+	h = await setup();
+	await h.asked();
 	const interaction = h.interaction()!;
 	const app = new Hono();
 	registerCommandInteractions(app, h.dialogue);

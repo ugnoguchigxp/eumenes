@@ -1,7 +1,11 @@
-import { answerAnalysis } from "../toolchain/analysis-round.fixture";
 import { deflateSync } from "node:zlib";
 import { createHash } from "node:crypto";
 import { createLarmPlayground, type LarmPort } from "../../domains/larm";
+import {
+	activeSlots,
+	answerUtterance,
+	handOver,
+} from "./conversation-turn.fixture";
 export const imageQuestion = "夕焼けの海のイラストを121×177のPNGで生成して";
 export const imageTestPlan = {
 	action: "generate",
@@ -206,28 +210,14 @@ export function imageFixture(
 		transcribe: async () => "",
 		speak: async () => new Uint8Array(),
 		answer: async (messages, _signal, options) => {
-			if (
-				answerAnalysis(options, {
-					call: "image",
-					announcement: "準備します。",
-					kind: "creation",
-				})
-			)
-				return "";
-			if (options?.tools?.length) {
-				stages.push("route");
-				options.onToolCalls!([
-					{
-						id: "image",
-						name: "image",
-						arguments: JSON.stringify({
-							request: messages.filter((m) => m.role === "user").at(-1)!
-								.content,
-						}),
-					},
-				]);
-				return "";
-			}
+			const turn = answerUtterance(
+				options?.tools,
+				messages,
+				options?.onToolCalls,
+				handOver("image.create", "準備します。"),
+				() => stages.push("route"),
+			);
+			if (turn !== undefined) return turn;
 			if (messages[0]!.content.includes("OUTPUT_SCHEMA=")) {
 				stages.push("plan");
 				if (mode === "invalid-plan")
@@ -248,11 +238,12 @@ export function imageFixture(
 				});
 			}
 			stages.push("answer");
-			const result = JSON.parse(
-				messages.find((m) => m.content.startsWith('{"imageResult":'))!.content,
-			).imageResult;
-			return result.state === "completed"
-				? result.action === "generate"
+			// The result round: the host's fixed text, with the TODO's result in the `active` slot (section 9.3).
+			const result = activeSlots(messages).at(-1)?.result as
+				| { state?: string; imageRef?: string | null }
+				| undefined;
+			return result?.state === "completed"
+				? result.imageRef
 					? "画像ができました。"
 					: "画像の画面を開きました。"
 				: "画像を生成できませんでした。";

@@ -158,6 +158,7 @@ export function createToolchains(
 			title: d.title,
 			summary: d.summary,
 			useWhen: d.useWhen,
+			...(d.minImpact ? { minImpact: d.minImpact } : {}),
 			redirects: (d.redirects ?? []).flatMap((r) =>
 				functionOf.has(r.toolchainId)
 					? [

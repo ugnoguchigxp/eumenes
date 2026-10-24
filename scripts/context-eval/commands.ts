@@ -4,15 +4,12 @@ import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { z } from "zod";
 import {
-	analyze,
 	type PrefixInput,
+	analyze,
 } from "../../api/domains/dialogue/eval/context/analysis";
 import {
-	type ContextArm,
-	promptHash,
-} from "../../api/domains/dialogue/eval/context/arm";
-import {
 	loadCases,
+	loadCatalog,
 	loadExperimentConfig,
 } from "../../api/domains/dialogue/eval/context/case-loader";
 import {
@@ -25,25 +22,27 @@ import {
 	buildManifest,
 	createReportDir,
 	freeze,
-	readManifest,
 	verifyFrozen,
 	writeReportFile,
 } from "../../api/domains/dialogue/eval/context/freeze";
+import type { ConversationRunner } from "../../api/domains/dialogue/eval/context/generation-runner";
 import type { JudgeFn } from "../../api/domains/dialogue/eval/context/judge";
 import {
-	materialize,
 	type SeedWiring,
+	materialize,
 } from "../../api/domains/dialogue/eval/context/materialize";
+import { assertMessageInvariants } from "../../api/domains/dialogue/eval/context/message-invariants";
 import {
+	COMPARED_TRAJECTORY,
 	type PrefixReport,
 	measurePrefix,
 	prefixReportSchema,
 } from "../../api/domains/dialogue/eval/context/prefix-measure";
+import { promptHash } from "../../api/domains/dialogue/eval/context/prefix-stability";
 import {
 	type Lane,
 	type RawRow,
 	type RunMeta,
-	type Serialization,
 	parseRawLines,
 	rawRowIssues,
 	rowKey,
@@ -53,19 +52,13 @@ import {
 	resultsJson,
 	resultsMarkdown,
 } from "../../api/domains/dialogue/eval/context/report";
-import {
-	type ConversationRunner,
-	executeRun,
-} from "../../api/domains/dialogue/eval/context/run";
+import { executeRun } from "../../api/domains/dialogue/eval/context/run";
 import {
 	adjudicationSchema,
 	noAdjudication,
 	scoreTrial,
 	trialScoreSchema,
 } from "../../api/domains/dialogue/eval/context/scoring";
-import { assertRenderInvariants } from "../../api/domains/dialogue/eval/context/render-invariants";
-import { flattenedSourceIssues } from "../../api/domains/dialogue/eval/context/serialization";
-import { loadArms, loadMeasuredArms, withOrderingVariants } from "./arms";
 
 export type Ctx = {
 	repoRoot: string;
@@ -107,9 +100,8 @@ export function validate(experimentDir: string) {
 }
 
 /**
- * Validates, proves every case materializes, every arm renders it within the render invariants (and keeps its
- * block sources readable when flattened), the baseline arm builds identically twice and the trajectory measures,
- * then freezes.
+ * Validates, proves every case materializes through the production prepare within the message invariants and builds
+ * identically twice, plays the trajectories, then freezes.
  */
 export async function prepare(
 	ctx: Ctx,
@@ -117,40 +109,27 @@ export async function prepare(
 	openWiring: () => Promise<SeedWiring>,
 ) {
 	const { config, cases, counts } = validate(experimentDir);
-	const arms = await loadArms(experimentDir, config);
-	const baseline = arms.find((a) => a.id === config.baseline)!;
-	const baselinePrompts: Record<string, string> = {};
+	const catalog = loadCatalog(experimentDir, config);
 	for (const testCase of cases) {
 		const builds: string[] = [];
 		for (let pass = 0; pass < 2; pass++) {
-			const m = await materialize(testCase, await openWiring());
+			const m = await materialize(testCase, await openWiring(), { catalog });
 			try {
-				for (const arm of arms) {
-					const out = assertRenderInvariants(arm, m.assembly, testCase.id);
-					const lost = flattenedSourceIssues(arm, m.assembly, out);
-					if (lost.length)
-						throw new Error(
-							`context_eval_render_invariant:${arm.id}:${testCase.id}:${lost.join(",")}`,
-						);
-				}
-				builds.push(promptHash(baseline.build(m.assembly).messages));
+				assertMessageInvariants(m.input, testCase.id);
+				builds.push(promptHash(m.input.messages));
 			} finally {
 				await m.close();
 			}
 		}
 		if (builds[0] !== builds[1])
-			throw new Error(`context_eval_baseline_not_deterministic:${testCase.id}`);
-		baselinePrompts[testCase.id] = builds[0]!;
+			throw new Error(`context_eval_prompt_not_deterministic:${testCase.id}`);
 	}
-	// The trajectory must render in every arm and ordering on both serializations before anything is frozen.
-	const measured = await loadMeasuredArms(experimentDir, config);
-	for (const serialization of ["larm-messages", "flattened"] as const)
-		await measurePrefix({ arms: measured, serialization, openWiring });
+	// The trajectories must prepare, within the invariants, before anything is frozen.
+	await measurePrefix({ openWiring, catalog });
 	const manifest = buildManifest({
 		experiment: config.name,
 		frozenAt: ctx.now().toISOString(),
 		files: frozenFilesOf(ctx.repoRoot, experimentDir, config),
-		baselinePrompts,
 	});
 	const result = freeze(experimentDir, manifest);
 	ctx.log(
@@ -178,41 +157,27 @@ function requireFrozen(ctx: Ctx, experimentDir: string) {
 
 type RunBase = {
 	lane: Lane;
-	/** How the arms' messages reach the model; recorded in run.json. */
-	serialization: Serialization;
 	runner: ConversationRunner;
 	openWiring: () => Promise<SeedWiring>;
 	/** Live: identifier of the saved settings the run reads (see live.ts). Null for the fixture lane. */
 	settingsSnapshot?: string | null;
 };
 
-/** What a run binds itself to: the manifest (required for holdout) and the frozen baseline prompts. */
-function freezeBinding(
+/** What a run binds itself to: the manifest (required for holdout). */
+function manifestBinding(
 	ctx: Ctx,
 	experimentDir: string,
 	caseHasHoldout: boolean,
-	baselineArm: string,
 ) {
-	const manifestSha256 = caseHasHoldout
+	return caseHasHoldout
 		? requireFrozen(ctx, experimentDir)
 		: manifestSha(experimentDir);
-	const baseline = existsSync(join(experimentDir, MANIFEST_NAME))
-		? {
-				arm: baselineArm,
-				prompts: readManifest(experimentDir).baselinePrompts ?? {},
-			}
-		: undefined;
-	return { manifestSha256, baseline };
 }
 
 export async function run(
 	ctx: Ctx,
 	experimentDir: string,
-	options: RunBase & {
-		split: SplitChoice;
-		/** Defaults to the experiment's declared arms. */
-		arms?: ContextArm[];
-	},
+	options: RunBase & { split: SplitChoice },
 ) {
 	const { config, cases: all } = validate(experimentDir);
 	const cases = all.filter(
@@ -220,51 +185,41 @@ export async function run(
 	);
 	if (cases.length === 0)
 		throw new Error(`context_eval_no_cases_for_split:${options.split}`);
-	const { manifestSha256, baseline } = freezeBinding(
+	const manifestSha256 = manifestBinding(
 		ctx,
 		experimentDir,
 		cases.some((c) => c.split === "holdout"),
-		config.baseline,
 	);
-	const arms = options.arms ?? (await loadArms(experimentDir, config));
+	const catalog = loadCatalog(experimentDir, config);
 	const dir = createReportDir(ctx.outRoot, config.name, ctx.now());
 	const meta: RunMeta = {
 		format: "context-eval.run",
 		experiment: config.name,
 		lane: options.lane,
-		serialization: options.serialization,
 		split: options.split,
 		startedAt: ctx.now().toISOString(),
 		manifestSha256,
 		settingsSnapshot: options.settingsSnapshot ?? null,
-		arms: arms.map((a) => a.id),
-		baseline: config.baseline,
 		trials: config.trials,
 		concurrency: config.concurrency,
 		caseIds: cases.map((c) => c.id),
 	};
 	writeJson(dir, "run.json", meta);
-	// Criterion 7 reads this: the arms (and the declared ordering variants) on the trajectory, as this run sends them.
+	// Criterion 6 reads this: the trajectories, prepared by the production code as this run sends them.
 	writeJson(
 		dir,
 		PREFIX_FILE,
-		await measurePrefix({
-			arms: withOrderingVariants(arms, config),
-			serialization: options.serialization,
-			openWiring: options.openWiring,
-		}),
+		await measurePrefix({ openWiring: options.openWiring, catalog }),
 	);
 	const rows: RawRow[] = [];
 	await executeRun({
 		lane: options.lane,
-		serialization: options.serialization,
 		cases,
-		arms,
 		trials: config.trials,
 		concurrency: config.concurrency,
 		openWiring: options.openWiring,
+		catalog,
 		runner: options.runner,
-		...(baseline ? { baseline } : {}),
 		onRow: (row) => {
 			rows.push(row);
 			appendReportLine(dir, "raw.jsonl", row);
@@ -325,7 +280,7 @@ export async function rerunTransport(
 	ctx: Ctx,
 	experimentDir: string,
 	sourceRunDir: string,
-	options: RunBase & { arms?: ContextArm[] },
+	options: RunBase,
 ) {
 	const { config, cases } = validate(experimentDir);
 	if (
@@ -335,8 +290,6 @@ export async function rerunTransport(
 	const { meta, rows, rawText } = readRun(sourceRunDir);
 	if (meta.lane !== options.lane)
 		throw new Error("context_eval_rerun_lane_mismatch");
-	if (meta.serialization !== options.serialization)
-		throw new Error("context_eval_rerun_serialization_mismatch");
 	if (meta.settingsSnapshot !== (options.settingsSnapshot ?? null))
 		throw new Error("context_eval_rerun_settings_changed");
 	if (manifestCheck(ctx, experimentDir, meta, cases) === "mismatch")
@@ -345,13 +298,6 @@ export async function rerunTransport(
 		rows.filter((r) => r.status === "transport_error").map(rowKey),
 	);
 	if (failed.size === 0) throw new Error("context_eval_no_transport_errors");
-	const { baseline } = freezeBinding(ctx, experimentDir, false, meta.baseline);
-	const declared = options.arms ?? (await loadArms(experimentDir, config));
-	const arms = meta.arms.map((id) => {
-		const arm = declared.find((a) => a.id === id);
-		if (!arm) throw new Error(`context_eval_rerun_arm_unknown:${id}`);
-		return arm;
-	});
 	const dir = createReportDir(ctx.outRoot, config.name, ctx.now());
 	writeJson(dir, "run.json", {
 		...meta,
@@ -362,20 +308,18 @@ export async function rerunTransport(
 			replaced: [...failed].sort(),
 		},
 	} satisfies RunMeta);
-	// The trajectory measurement belongs to the arms and the serialization, which a re-run does not change.
+	// The trajectory measurement belongs to the code, which a re-run does not change.
 	writeReportFile(dir, PREFIX_FILE, readText(join(sourceRunDir, PREFIX_FILE)));
 	const replacements = new Map<string, RawRow>();
 	await executeRun({
 		lane: options.lane,
-		serialization: meta.serialization,
 		cases: cases.filter((c) => meta.caseIds.includes(c.id)),
-		arms,
 		trials: meta.trials,
 		concurrency: meta.concurrency,
 		openWiring: options.openWiring,
+		catalog: loadCatalog(experimentDir, config),
 		runner: options.runner,
 		only: (call) => failed.has(rowKey(call)),
-		...(baseline ? { baseline } : {}),
 		onRow: (row) => replacements.set(rowKey(row), row),
 	});
 	for (const row of rows) {
@@ -398,7 +342,6 @@ const scoreMetaSchema = z
 		format: z.literal("context-eval.score"),
 		experiment: z.string(),
 		lane: z.enum(["fixture", "live"]),
-		serialization: z.enum(["larm-messages", "flattened"]),
 		runDir: z.string(),
 		rawSha256: z.string(),
 		judgeSource: z.string(),
@@ -406,9 +349,7 @@ const scoreMetaSchema = z
 		adjudicationSha256: z.string().nullable(),
 		manifestCheck: z.enum(["match", "mismatch", "unfrozen"]),
 		settingsSnapshot: z.string().nullable(),
-		baseline: z.string(),
 		trials: z.number().int().min(1),
-		arms: z.array(z.string()),
 		manifestSha256: z.string().nullable(),
 	})
 	.strict();
@@ -439,7 +380,6 @@ export async function score(
 		format: "context-eval.score",
 		experiment: config.name,
 		lane: meta.lane,
-		serialization: meta.serialization,
 		runDir: resolve(runDir),
 		rawSha256: sha(rawText),
 		judgeSource: options.judgeSource,
@@ -447,9 +387,7 @@ export async function score(
 		adjudicationSha256: adjudicationText ? sha(adjudicationText) : null,
 		manifestCheck: check,
 		settingsSnapshot: meta.settingsSnapshot,
-		baseline: meta.baseline,
 		trials: meta.trials,
-		arms: meta.arms,
 		manifestSha256: meta.manifestSha256,
 	} satisfies z.infer<typeof scoreMetaSchema>);
 	const scores = [];
@@ -461,7 +399,6 @@ export async function score(
 			try {
 				const reply = await options.judge(request);
 				appendReportLine(dir, "judge.jsonl", {
-					arm: row.arm,
 					caseId: row.caseId,
 					trial: row.trial,
 					reply,
@@ -469,7 +406,6 @@ export async function score(
 				return reply;
 			} catch (error) {
 				appendReportLine(dir, "judge.jsonl", {
-					arm: row.arm,
 					caseId: row.caseId,
 					trial: row.trial,
 					errorClass: error instanceof Error ? error.name : "unknown",
@@ -493,13 +429,11 @@ export async function score(
 	return { dir, scores };
 }
 
-export function analyzeScores(
-	ctx: Ctx,
-	experimentDir: string,
+/** A scores directory read back and checked against the raw rows it was made from. */
+function readScores(
 	scoresDir: string,
-	options: { split: "dev" | "holdout" },
+	cases: ReturnType<typeof validate>["cases"],
 ) {
-	const { config, cases } = validate(experimentDir);
 	const meta = scoreMetaSchema.parse(readJson(join(scoresDir, "score.json")));
 	// The scores must be the ones made from the raw rows they name.
 	const rawPath = join(resolve(meta.runDir), "raw.jsonl");
@@ -523,45 +457,75 @@ export function analyzeScores(
 			`context_eval_scores_count_mismatch:${scores.length}/${rawCount}`,
 		);
 	for (const s of scores)
-		if (!meta.arms.includes(s.arm) || !cases.some((c) => c.id === s.caseId))
-			throw new Error(`context_eval_score_row_unknown:${s.arm}|${s.caseId}`);
-	// Criterion 7: the trajectory measurement the run wrote (prefix.json), judged arm against baseline.
+		if (!cases.some((c) => c.id === s.caseId))
+			throw new Error(`context_eval_score_row_unknown:${s.caseId}`);
+	// Criterion 6: the trajectory measurement the run wrote (prefix.json).
 	const prefixPath = join(resolve(meta.runDir), PREFIX_FILE);
 	const prefixText = existsSync(prefixPath) ? readText(prefixPath) : null;
-	const prefixReport: PrefixReport | null = prefixText
+	const prefix: PrefixReport | null = prefixText
 		? prefixReportSchema.parse(JSON.parse(prefixText))
 		: null;
-	const prefix: PrefixInput | undefined = prefixReport
-		? Object.fromEntries(
-				Object.entries(prefixReport.arms).map(([arm, report]) => [
-					arm,
-					{ medianRatio: report.medianRatio },
-				]),
-			)
-		: undefined;
+	const compared: PrefixInput | null = prefix?.trajectories[COMPARED_TRAJECTORY]
+		? {
+				medianRatio: prefix.trajectories[COMPARED_TRAJECTORY]!.medianRatio,
+			}
+		: null;
+	return { meta, scores, prefix, prefixText, compared };
+}
+
+/**
+ * Analyzes one scores directory; with `baselineDir` (the scores of the same cases measured before the change) the two
+ * runs are compared under the adoption rules.
+ */
+export function analyzeScores(
+	ctx: Ctx,
+	experimentDir: string,
+	scoresDir: string,
+	options: { split: "dev" | "holdout"; baselineDir?: string },
+) {
+	const { config, cases } = validate(experimentDir);
+	const candidate = readScores(scoresDir, cases);
+	const baseline = options.baselineDir
+		? readScores(options.baselineDir, cases)
+		: null;
+	if (baseline && baseline.meta.lane !== candidate.meta.lane)
+		throw new Error("context_eval_baseline_lane_mismatch");
 	const analysis = analyze({
-		lane: meta.lane,
+		lane: candidate.meta.lane,
 		split: options.split,
-		baseline: meta.baseline,
-		candidates: meta.arms.filter((a) => a !== meta.baseline),
 		cases,
-		scores,
-		expectedTrials: meta.trials,
+		candidate: {
+			scores: candidate.scores,
+			expectedTrials: candidate.meta.trials,
+			prefix: candidate.compared,
+		},
+		...(baseline
+			? {
+					baseline: {
+						scores: baseline.scores,
+						expectedTrials: baseline.meta.trials,
+						prefix: baseline.compared,
+					},
+				}
+			: {}),
 		thresholds: config.adoption,
-		...(prefix ? { prefix } : {}),
 	});
 	const reportMeta = {
 		experiment: config.name,
 		generatedAt: ctx.now().toISOString(),
-		manifestSha256: meta.manifestSha256,
+		manifestSha256: candidate.meta.manifestSha256,
 		scoredFrom: resolve(scoresDir),
-		prefixSha256: prefixText ? sha(prefixText) : null,
-		prefix: prefixReport,
+		baselineFrom: options.baselineDir ? resolve(options.baselineDir) : null,
+		prefixSha256: candidate.prefixText ? sha(candidate.prefixText) : null,
+		prefix: candidate.prefix,
 	};
 	const dir = createReportDir(ctx.outRoot, config.name, ctx.now());
 	writeJson(dir, "RESULTS.json", resultsJson(analysis, reportMeta));
 	writeReportFile(dir, "RESULTS.md", resultsMarkdown(analysis, reportMeta));
-	for (const c of analysis.comparisons)
-		ctx.log(`${c.arm} vs ${c.baseline}: ${c.decision} -> ${dir}`);
+	ctx.log(
+		analysis.comparison
+			? `comparison with the baseline: ${analysis.comparison.decision} -> ${dir}`
+			: `analysis of one run (no baseline) -> ${dir}`,
+	);
 	return { dir, analysis };
 }

@@ -1,0 +1,75 @@
+{
+	"id": "ctx-f3-dev-03",
+	"family": "F3",
+	"split": "dev",
+	"seed": {
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "butler"
+		},
+		"episode": [
+			{
+				"kind": "summary",
+				"text": "歯医者の予約は十八日の十五時に取った。",
+				"events": [
+					{
+						"type": "said",
+						"by": "user",
+						"at": "2026-10-09T10:00:00.000Z",
+						"text": "歯医者を予約したいんだけど"
+					},
+					{
+						"type": "said",
+						"by": "agent",
+						"at": "2026-10-09T10:00:03.000Z",
+						"text": "十八日の十五時でお取りしました。",
+						"origin": "reply"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-15T12:30:00.000Z",
+				"text": "仕事の都合で、歯医者は二十日の午前十時に変えてもらったよ"
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-15T12:30:03.000Z",
+				"text": "承知しました。二十日の十時ですね。",
+				"origin": "reply"
+			},
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-16T08:00:00.000Z",
+				"text": "あと牛乳も買わなきゃ"
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-16T08:00:03.000Z",
+				"text": "メモしておきます。",
+				"origin": "reply"
+			}
+		]
+	},
+	"input": "歯医者の予約はいつだったっけ",
+	"expect": {
+		"checks": [
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "uses_newest_fact",
+				"condition": "予約日時を、変更後の二十日の午前十時として答えている。要約にある十八日の十五時を現在の予約として答えていない。"
+			}
+		]
+	}
+}

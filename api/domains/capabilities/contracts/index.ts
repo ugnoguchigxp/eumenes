@@ -44,7 +44,6 @@ export {
 	codexTaskRef,
 	codexTaskFollowup,
 };
-import { memoryRequest } from "./memory-request";
 import { worldDocuments, worldFind, worldQuery } from "./world-query";
 export { claudeCodeRequest };
 import {
@@ -317,7 +316,6 @@ export const validators = {
 		expectedRevision: z.number().int().nonnegative(),
 		frameIndex: z.number().int().nonnegative().max(59).optional(),
 	}),
-	memoryRequest,
 	worldDocuments,
 	worldFind,
 	worldQuery,
@@ -347,6 +345,14 @@ export const validators = {
 };
 export type SchemaKey = keyof typeof validators;
 export type Owner = { rootRunId: string; taskId: string; cancelEpoch: number };
+/** What a piece of work does to what exists, least first. */
+export const toolchainImpacts = [
+	"none",
+	"create",
+	"modify_existing",
+	"irreversible",
+] as const;
+export type ToolchainImpact = (typeof toolchainImpacts)[number];
 export type Definition = {
 	kind: "package" | "profile" | "skill" | "tool" | "requirement" | "toolchain";
 	requirementData?: import("./requirements").RequirementProfileData;
@@ -378,6 +384,11 @@ export type Definition = {
 	artifact?: ToolchainArtifact;
 	/** Toolchain only: which other toolchain to use instead, and when. */
 	redirects?: ToolchainRedirect[];
+	/**
+	 * Toolchain only: the least impact its work has on what exists (the ContextWindow specification, section 6.7).
+	 * The conversation's own estimate is raised to it; `modify_existing` and `irreversible` need a confirmation.
+	 */
+	minImpact?: ToolchainImpact;
 	/**
 	 * Toolchain only, new revisions only (absent from the JSON of earlier ones): the stored
 	 * binding that connects the package's tools to a host adapter, and the stored artifact

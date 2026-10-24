@@ -1,3 +1,4 @@
+import { createContinuityService } from "../../domains/continuity";
 import { createPipelinesService } from "../pipelines/pipelines-service";
 import { dormantBundleFile } from "../../domains/capabilities";
 import { bundleHostOf } from "./toolchain-adapters";
@@ -54,13 +55,19 @@ import { createTimerAnnouncements } from "../timers/timer-announcements";
 import { createApp } from "../app";
 import type { LarmPort } from "../../domains/larm";
 import {
-	analysisReceipt,
-	ANSWER,
-	DISCOVERY,
-	isAnalysisRound,
-	offeredToolchains,
-	UNAVAILABLE,
-} from "../../domains/dialogue/test/analysis.fixture";
+	afterUtterance,
+	callsOf,
+	delegate,
+	findToolchain,
+	handedStep,
+	instantExecute,
+	isResultRound,
+	isUtteranceRound,
+	respond,
+	toolResults,
+	type Step,
+	UNAVAILABLE_TEXT,
+} from "./conversation-script.fixture";
 /** Trusted packet merged with the separate UNTRUSTED_MATERIALS message. */
 export function workerPacket(
 	messages: import("../../domains/inference/contracts").Messages,
@@ -153,8 +160,9 @@ export async function harness(
 		};
 		gate?: Promise<void>;
 		answerGate?: Promise<void>;
-		routeGate?: Promise<void>;
-		routeGateQuestion?: string;
+		/** Holds the operation sub-agent's call (after its context is recorded) until released. */
+		commandGate?: Promise<void>;
+		commandGateQuestion?: string;
 		badJson?: boolean;
 		workerOutput?: string;
 		workerReportOutput?: string;
@@ -190,15 +198,16 @@ export async function harness(
 		/** The services the stock toolchain reads (absent: no stock toolchain). */
 		stock?: { fetch: typeof fetch };
 		/**
-		 * The first round's call, written by the test from the functions offered (name and arguments), or
-		 * undefined to leave the round to the default model.
+		 * The step a user's utterance's model call makes, written by the test from the tools offered and the
+		 * messages so far (see conversation-script.fixture.ts), or undefined to leave the call to the default model.
 		 */
 		firstRound?: (
 			tools: ReadonlyArray<{
 				function: { name: string; parameters?: Record<string, unknown> };
 			}>,
 			question: string,
-		) => { name: string; args: Record<string, unknown> } | undefined;
+			messages: import("../../domains/inference/contracts").Messages,
+		) => Step | undefined;
 	} = {},
 ) {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-toolchain-"));
@@ -253,6 +262,192 @@ export async function harness(
 	let calls = 0,
 		acquisitions = 0;
 	let quoteRejected = false;
+	/** The conversation's answer to a message: the parent agent's reply, a finished action's, or the fixed sentence. */
+	/** The toolchain ids the document's state retains (the generation's own state, sent with the utterance). */
+	const retainedIds = (
+		messages: import("../../domains/inference/contracts").Messages,
+	): string[] => {
+		const first = messages.find((m) => m.role === "user");
+		if (!first) return [];
+		const document = JSON.parse(first.content) as {
+			state?: { retained?: Array<{ id?: string }> };
+		};
+		return (document.state?.retained ?? []).flatMap((entry) =>
+			entry.id ? [entry.id] : [],
+		);
+	};
+	/**
+	 * The result phase's reply: the finished TODO's result in the active slot the host reports (a timer's action, a
+	 * task's summary). Undefined when the phase carries no result, so the reply falls back to the default answer.
+	 */
+	const resultReply = (
+		messages: import("../../domains/inference/contracts").Messages,
+	): string | undefined => {
+		if (!isResultRound(messages)) return undefined;
+		const document = JSON.parse(
+			messages.find((m) => m.role === "user")!.content,
+		) as {
+			active?: Array<{ todo?: string; result?: Record<string, any> }>;
+			now?: {
+				trigger?: Array<{ kind?: string; todos?: Array<{ id: string }> }>;
+			};
+		};
+		// The TODO the trigger names is the one this phase reports; without a trigger, the newest result.
+		const changed = new Set(
+			(document.now?.trigger ?? [])
+				.filter((event) => event.kind === "todo_changed")
+				.flatMap((event) => event.todos ?? [])
+				.map((todo) => todo.id),
+		);
+		const entry =
+			(changed.size
+				? document.active
+						?.filter(
+							(item) => !!item.todo && changed.has(item.todo) && !!item.result,
+						)
+						.at(-1)
+				: undefined) ?? document.active?.filter((item) => item.result).at(-1);
+		const result = entry?.result;
+		if (!result) return undefined;
+		if (result.kind === "task_result") return result.summary;
+		// A research report: its summary, and the sources it read as the only links.
+		if (Array.isArray(result.sources) && typeof result.summary === "string") {
+			const links = (result.sources as Array<{ url?: string }>)
+				.flatMap((source) => (source.url ? [source.url] : []))
+				.map((url) => `[${new URL(url).hostname}](${url})`);
+			return (
+				result.summary + (links.length ? `\n\nソース：${links.join("、")}` : "")
+			);
+		}
+		if (result.kind !== "timer_action") return undefined;
+		// A cancelled timer reads as cancelled even when the action that started it is the one reported.
+		if (result.items[0]?.state === "cancelled" || result.action === "cancelled")
+			return "タイマーを取り消しました";
+		if (result.action === "started")
+			return `${result.items[0].durationSeconds}秒のタイマーを開始しました`;
+		return (
+			result.items
+				.map(
+					(item: any) =>
+						`${item.label}: 残り${item.remainingSeconds}秒 (${item.state})`,
+				)
+				.join("、") || "動いているタイマーはありません"
+		);
+	};
+	const reply = async (
+		messages: import("../../domains/inference/contracts").Messages,
+	): Promise<string> => {
+		parentContexts.push(JSON.stringify(messages));
+		if (options.answerGate) await options.answerGate;
+		if (options.parentAnswer !== undefined) return options.parentAnswer;
+		// A test's own model for the conversation answers before the host's fixed reply to a result.
+		if (options.parent && isResultRound(messages))
+			return options.parent(messages);
+		const fromResult = resultReply(messages);
+		if (fromResult !== undefined) return fromResult;
+		// The analysis asked for a clarification: the answer round carries the question.
+		if (options.clarify) return "どの地域の天気を調べますか？";
+		if (options.parent) return options.parent(messages);
+		const action = messages.find((m) =>
+			m.content.startsWith('{"actionResult":'),
+		);
+		if (action) {
+			const result = JSON.parse(action.content).actionResult;
+			if (result.kind === "task_result") return result.summary;
+			if (result.items[0]?.state === "cancelled")
+				return "タイマーを取り消しました";
+			if (result.action === "started")
+				return `${result.items[0].durationSeconds}秒のタイマーを開始しました`;
+			if (result.action === "cancelled") return "タイマーを取り消しました";
+			return (
+				result.items
+					.map(
+						(item: any) =>
+							`${item.label}: 残り${item.remainingSeconds}秒 (${item.state})`,
+					)
+					.join("、") || "動いているタイマーはありません"
+			);
+		}
+		if (options.parentAnswer !== undefined) return options.parentAnswer;
+		const result = messages.find((m) => m.content.includes('"sources":'));
+		const projection = result ? JSON.parse(result.content).report : null;
+		const source = projection?.sources?.[0];
+		const citation = source?.url
+			? `\n\nソース：[${new URL(source.url).hostname}](${source.url})`
+			: "";
+		return messages.some((m) => m.content.includes("250.12"))
+			? "調べました。AAPLは250.12米ドル、2026年10月8日の終値でございます。" +
+					citation
+			: messages.some((m) => m.content.includes("26度"))
+				? "調べました。東京は晴れ、最高26度、最低17度、降水確率0％の予報でございます。" +
+					citation
+				: "かしこまりました。";
+	};
+	/**
+	 * The model's step for a user's utterance (sections 6.1 to 6.5): a search, a hand-over, an instant answer, or the
+	 * conversation's own answer. A scripted step (`firstRound`) goes first; the default follows the question.
+	 */
+	const utteranceStep = async (
+		messages: import("../../domains/inference/contracts").Messages,
+		question: string,
+		tools: ReadonlyArray<{ function: { name: string } }>,
+	): Promise<Step> => {
+		const scripted = options.firstRound?.(tools, question, messages);
+		if (scripted) return scripted;
+		// The conversation only hands the request to a toolchain; its sub-agent decides the rest.
+		const delegates =
+			!!options.routeTool ||
+			!!options.history ||
+			(!!options.timers && /タイマー/.test(question)) ||
+			/天気|株価|weather|stock|調べ|検索|https?:|確認/.test(question);
+		if (options.clarify || !delegates)
+			return { text: await reply(messages), calls: [respond()] };
+		const after = afterUtterance(messages);
+		const handed = handedStep(messages);
+		if (handed) return handed;
+		const named = options.history
+			? "conversation_history"
+			: options.routeTool
+				? options.routeTool
+				: options.timers && /タイマー/.test(question)
+					? "timer"
+					: options.fullResearch
+						? "web_research"
+						: "web_search";
+		const wanted = store.read(
+			(db) =>
+				toolchain.capabilities
+					.toolchainsInTransaction(db)
+					.find((chain) => chain.functionName === named)?.id,
+		);
+		const handOver = (toolchain: string): Step => ({
+			calls: [
+				delegate(toolchain, question, {
+					announcement: options.announcement ?? "お調べします。",
+					impact:
+						options.timers && /タイマー/.test(question) ? "create" : "none",
+				}),
+			],
+		});
+		// A toolchain the state already retains is handed the work without a search (the model's usual path).
+		if (wanted && retainedIds(messages).includes(wanted))
+			return handOver(wanted);
+		const search = toolResults(after, "find_toolchain")[0] as
+			| { candidates?: Array<{ id: string; execution?: string }> }
+			| undefined;
+		if (!search) return { calls: [findToolchain(question)] };
+		const chosen =
+			search.candidates?.find((card) => card.id === wanted) ??
+			search.candidates?.[0];
+		if (!chosen)
+			return {
+				text: UNAVAILABLE_TEXT,
+				calls: [respond({ unavailable: true })],
+			};
+		if (chosen.execution === "instant")
+			return { calls: [instantExecute(chosen.id, question, {})] };
+		return handOver(chosen.id);
+	};
 	const model: LarmPort = {
 		status: () => ({ state: "ready", capabilities: ["llm", "asr", "tts"] }),
 		connect: async () => {},
@@ -276,23 +471,9 @@ export async function harness(
 				});
 			const system = messages[0]!.content;
 			// The default fixture declines operations on the prose-only route review.
-			// Tests of recovery supply their own model to select an offered operation.
-			if (system.includes("FUNCTIONS="))
-				return JSON.stringify({
-					decision: "answer",
-					functionName: "",
-					request: "",
-					questionRef: "",
-				});
 			const question = messages
 				.filter((m) => m.role === "user")
 				.at(-1)!.content;
-			// The conversation only hands the request to a toolchain; its sub-agent decides the rest.
-			const delegates =
-				!!options.routeTool ||
-				!!options.history ||
-				(!!options.timers && /タイマー/.test(question)) ||
-				/天気|株価|weather|stock|調べ|検索|https?:|確認/.test(question);
 			if (
 				callOptions?.tools?.some((t) => t.function.name === "report_partial")
 			) {
@@ -307,66 +488,17 @@ export async function harness(
 				]);
 				return "";
 			}
-			if (isAnalysisRound(callOptions?.tools)) {
-				if (
-					delegates &&
-					!options.clarify &&
-					callOptions?.tools?.some((t) => t.function.name === DISCOVERY) &&
-					!offeredToolchains(callOptions?.tools).length
-				) {
-					callOptions!.onToolCalls!(
-						analysisReceipt("fixture", {
-							name: DISCOVERY,
-							args: { query: question },
-						}).toolCalls as never,
-					);
-					return "";
-				}
-				const scripted = options.firstRound?.(callOptions!.tools!, question);
-				if (scripted) {
-					callOptions!.onToolCalls!([
-						{
-							id: "analysis",
-							name: scripted.name,
-							arguments: JSON.stringify(scripted.args),
-						},
-					] as never);
-					return "";
-				}
-				const offered = offeredToolchains(callOptions?.tools);
-				// The first round chooses the function the second round will write the request for.
-				const named = options.history
-					? "conversation_history"
-					: options.routeTool
-						? options.routeTool
-						: options.timers && /タイマー/.test(question)
-							? "timer"
-							: options.fullResearch
-								? "web_research"
-								: "web_search";
-				const chosen = offered.includes(named) ? named : offered[0];
-				const args =
-					options.clarify || !delegates
-						? { name: ANSWER }
-						: !chosen
-							? { name: UNAVAILABLE }
-							: {
-									name: chosen,
-									announcement: options.announcement ?? "お調べします。",
-									args: options.history
-										? { kind: "past_conversation" as const }
-										: options.routeTool ||
-											  (options.timers && /タイマー/.test(question))
-											? { kind: "action" as const }
-											: {
-													kind: "live_info" as const,
-													freshness: "live" as const,
-												},
-								};
-				callOptions!.onToolCalls!(
-					analysisReceipt("fixture", args).toolCalls as never,
+			if (isUtteranceRound(callOptions?.tools) && !isResultRound(messages)) {
+				const step = await utteranceStep(
+					messages,
+					question,
+					callOptions!.tools!,
 				);
-				return "";
+				if (step.calls?.length)
+					callOptions!.onToolCalls!(
+						callsOf(step, () => crypto.randomUUID()) as never,
+					);
+				return step.text ?? "";
 			}
 			if (
 				callOptions?.tools?.some((t) => t.function.name === "check_request")
@@ -406,26 +538,14 @@ export async function harness(
 				]);
 				return "";
 			}
-			if (callOptions?.tools?.length) {
-				routeContexts.push(JSON.stringify(messages));
-				if (
-					options.routeGate &&
-					(!options.routeGateQuestion ||
-						question.includes(options.routeGateQuestion))
-				)
-					await options.routeGate;
-				// The second round offers the one function the first round chose.
-				callOptions.onToolCalls!([
-					{
-						id: crypto.randomUUID(),
-						name: callOptions.tools[0]!.function.name,
-						arguments: JSON.stringify({ request: question }),
-					},
-				]);
-				return "";
-			}
 			if (system.includes("あなたはこのツールチェーンの操作担当です")) {
 				commandContexts.push(JSON.stringify(messages));
+				if (
+					options.commandGate &&
+					(!options.commandGateQuestion ||
+						question.includes(options.commandGateQuestion))
+				)
+					await options.commandGate;
 				if (options.command) return options.command(messages);
 				const data = JSON.parse(question) as {
 					request: string;
@@ -547,45 +667,7 @@ export async function harness(
 								: { query: data.task.question.slice(0, 400) },
 				});
 			}
-			// The analysis asked for a clarification: the answer round carries the question.
-			if (options.clarify) return "どの地域の天気を調べますか？";
-			parentContexts.push(JSON.stringify(messages));
-			if (options.parent) return options.parent(messages);
-			if (options.answerGate) await options.answerGate;
-			const action = messages.find((m) =>
-				m.content.startsWith('{"actionResult":'),
-			);
-			if (action) {
-				const result = JSON.parse(action.content).actionResult;
-				if (result.kind === "task_result") return result.summary;
-				if (result.items[0]?.state === "cancelled")
-					return "タイマーを取り消しました";
-				if (result.action === "started")
-					return `${result.items[0].durationSeconds}秒のタイマーを開始しました`;
-				if (result.action === "cancelled") return "タイマーを取り消しました";
-				return (
-					result.items
-						.map(
-							(item: any) =>
-								`${item.label}: 残り${item.remainingSeconds}秒 (${item.state})`,
-						)
-						.join("、") || "動いているタイマーはありません"
-				);
-			}
-			if (options.parentAnswer !== undefined) return options.parentAnswer;
-			const result = messages.find((m) => m.content.includes('"sources":'));
-			const projection = result ? JSON.parse(result.content).report : null;
-			const source = projection?.sources?.[0];
-			const citation = source?.url
-				? `\n\nソース：[${new URL(source.url).hostname}](${source.url})`
-				: "";
-			return messages.some((m) => m.content.includes("250.12"))
-				? "調べました。AAPLは250.12米ドル、2026年10月8日の終値でございます。" +
-						citation
-				: messages.some((m) => m.content.includes("26度"))
-					? "調べました。東京は晴れ、最高26度、最低17度、降水確率0％の予報でございます。" +
-						citation
-					: "かしこまりました。";
+			return reply(messages);
 		},
 	};
 	const inference = createInference(store, settings, {
@@ -866,6 +948,7 @@ export async function harness(
 		music,
 		store,
 		conversation,
+		continuity: createContinuityService(store),
 		larm: inference,
 		queue,
 		agents: toolchain.agents,

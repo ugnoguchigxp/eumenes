@@ -2,7 +2,14 @@ import { createApp } from "../../../application/app";
 import { registerVoiceDialogue } from "..";
 import { expect, test } from "bun:test";
 import type { LarmPort } from "../../larm";
-import { setup, say, until, wav } from "./settings-voice.fixture";
+import {
+	completion,
+	respondFrame,
+	setup,
+	say,
+	until,
+	wav,
+} from "./settings-voice.fixture";
 
 test("one voice turn uses fallback in all three stages, adopts one answer, and does not repeat duplicate upload", async () => {
 	const h = await setup();
@@ -113,12 +120,12 @@ test("queued snapshots survive recovery without re-running an attempted provider
 test("revoking a cloud answer aborts downstream TTS and never publishes late audio", async () => {
 	let finish!: (r: Response) => void;
 	let synthesizing = false;
-	const h = await setup(async (input) => {
+	const h = await setup(async (input, init) => {
 		const url = String(input);
 		if (url.endsWith("audio/transcriptions"))
 			return Response.json({ text: "speech" });
 		if (url.endsWith("chat/completions"))
-			return Response.json({ choices: [{ message: { content: "answer" } }] });
+			return Response.json(completion(init, "answer"));
 		synthesizing = true;
 		return new Promise<Response>((r) => {
 			finish = r;
@@ -217,7 +224,7 @@ test("render ahead is bounded at three clauses and playback releases the next cl
 			spoken.push(JSON.parse(init?.body as string).input);
 			return new Response(wav());
 		}
-		const text = `data: ${JSON.stringify({ choices: [{ index: 0, delta: { content: source } }] })}\n\ndata: [DONE]\n\n`;
+		const text = `data: ${JSON.stringify({ choices: [{ index: 0, delta: { content: source } }] })}\n\n${respondFrame(init)}data: [DONE]\n\n`;
 		return new Response(text, {
 			headers: { "Content-Type": "text/event-stream" },
 		});
@@ -260,7 +267,7 @@ test("final recognition preempts a slow prefix and never submits a late hypothes
 	let first = true,
 		started = false,
 		release: () => void = () => {};
-	const h = await setup(async (url) => {
+	const h = await setup(async (url, init) => {
 		if (String(url).endsWith("audio/transcriptions")) {
 			if (first) {
 				first = false;
@@ -273,7 +280,7 @@ test("final recognition preempts a slow prefix and never submits a late hypothes
 			return Response.json({ text: "確定" });
 		}
 		if (String(url).endsWith("audio/speech")) return new Response(wav());
-		return Response.json({ choices: [{ message: { content: "回答" } }] });
+		return Response.json(completion(init, "回答"));
 	});
 	const session = crypto.randomUUID(),
 		id = crypto.randomUUID();
@@ -389,6 +396,7 @@ test("audio-off answers retain a whole-answer expression and replay judges each 
 	let judgments = 0;
 	const observed: Array<Record<string, string>> = [];
 	const h = await setup(undefined, {
+		transcribe: async () => "大切な猫の名前です。",
 		answer: async () => "なるほど、素敵な名前ですね。ありがとうございます。",
 		speak: async () => wav(),
 		judge: async (state) => {
@@ -414,13 +422,13 @@ test("audio-off answers retain a whole-answer expression and replay judges each 
 		settings: off,
 		keys: [],
 	});
-	const run = await h.dialogue.submit({
-		requestId: crypto.randomUUID(),
-		conversationId: "main",
-		text: "大切な猫の名前です。",
-	});
-	await until(() => h.dialogue.get(run.id)?.status === "completed");
-	const saved = h.dialogue.answerDelivery(run.id);
+	// Speech is a voice turn's concern: the whole answer is judged once, as the turn is delivered.
+	const id = crypto.randomUUID();
+	h.voice.start("audio-off", 1);
+	await say(h, "audio-off", id);
+	await until(() => h.voice.get(id)?.status === "completed");
+	const runId = h.voice.get(id)!.runId!;
+	const saved = h.dialogue.answerDelivery(runId);
 	expect(saved).toMatchObject({
 		version: 2,
 		emotion: "warmth",
@@ -431,11 +439,11 @@ test("audio-off answers retain a whole-answer expression and replay judges each 
 		"なるほど、素敵な名前ですね。ありがとうございます。",
 	);
 	expect(observed[0]?.conversation).toContain("大切な猫の名前です。");
-	for (const text of h.voice.replaySentences(h.dialogue.answerText(run.id)!)) {
+	for (const text of h.voice.replaySentences(h.dialogue.answerText(runId)!)) {
 		const speech = await h.voice.replaySpeech(
 			text,
 			new AbortController().signal,
-			run.id,
+			runId,
 		);
 		expect(speech.delivery?.id).not.toBe(saved?.id);
 		expect(speech.delivery?.emotion).toBe("warmth");
@@ -486,19 +494,19 @@ test("cancelling during final Laya classification rejects late emotion and assis
 		finish = resolve;
 	});
 	const h = await setup(undefined, {
+		transcribe: async () => "猫の名前です。",
 		answer: async () => "素敵な名前ですね。",
 		judge: async () => {
 			entered = true;
 			return pending;
 		},
 	});
-	const run = await h.dialogue.submit({
-		requestId: crypto.randomUUID(),
-		conversationId: "main",
-		text: "猫の名前です。",
-	});
+	const id = crypto.randomUUID();
+	h.voice.start("laya-cancel", 1);
+	await say(h, "laya-cancel", id);
 	await until(() => entered);
-	await h.dialogue.cancel(run.id);
+	const runId = h.voice.get(id)!.runId!;
+	await h.voice.cancel(id);
 	finish({
 		answers: {
 			emotion: {
@@ -510,11 +518,12 @@ test("cancelling during final Laya classification rejects late emotion and assis
 		},
 	});
 	await Bun.sleep(20);
-	expect(h.dialogue.get(run.id)?.status).toBe("cancelled");
-	expect(h.dialogue.answerDelivery(run.id)).toBeUndefined();
+	expect(h.voice.get(id)?.status).toBe("cancelled");
+	// The answer was already said when the turn was cancelled; the late judgment never attaches to it.
+	expect(h.dialogue.answerDelivery(runId)).toBeUndefined();
 	expect(
 		h.conversation.get("main").messages.map((message) => message.role),
-	).toEqual(["user"]);
+	).toEqual(["user", "assistant"]);
 });
 
 const ready = (): ReturnType<LarmPort["status"]> => ({

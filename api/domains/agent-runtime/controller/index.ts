@@ -1,6 +1,5 @@
 import type { Hono } from "hono";
 import type { AgentRuntime } from "../service";
-import { workQuery } from "../contracts/work-query";
 export function registerAgentRuntime(
 	app: Hono,
 	service: AgentRuntime,
@@ -11,20 +10,6 @@ export function registerAgentRuntime(
 		if (!conversationId || conversationId.length > 120)
 			throw new Error("invalid_conversation_id");
 		return c.json(service.executions.list(conversationId));
-	});
-	// The agency's TODO view (spec agency-work-reports-design-2026-10-24): before /:id so it is not taken as an id.
-	app.get("/api/agent-executions/work", (c) => {
-		const conversationId = c.req.query("conversationId");
-		if (!conversationId || conversationId.length > 120)
-			throw new Error("invalid_conversation_id");
-		if (c.req.query("state") !== undefined) {
-			const parsed = workQuery.safeParse(c.req.query());
-			if (!parsed.success) return c.json({ error: "invalid_work_query" }, 400);
-			return c.json(
-				service.executions.agencyWorkPage(conversationId, parsed.data),
-			);
-		}
-		return c.json(service.executions.agencyWork(conversationId));
 	});
 	app.get("/api/agent-executions/:id", (c) => {
 		const view = service.executions.get(c.req.param("id"));

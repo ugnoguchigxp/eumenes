@@ -1,14 +1,5 @@
-import {
-	TOKEN_ESTIMATE,
-	estimateTextTokens,
-} from "../../../../infrastructure/context-budget";
 import type { CurationItem, CurationResult } from "../../../memory";
-import {
-	COMPACT_THRESHOLD,
-	REFINE_THRESHOLD,
-	type StepId,
-} from "../../contracts";
-import { fitExchanges } from "../budget";
+import type { StepId } from "../../contracts";
 import {
 	type MemoryRef,
 	activeStateItems,
@@ -16,17 +7,13 @@ import {
 	elements,
 	isRecord,
 	labels,
-	loadExchange,
 	localDay,
 	oneOf,
 	optionalText,
 	text,
-	type LoadedExchange,
 } from "../context";
-import { instructions as compactInstructions } from "../prompts/compact-history";
 import { instructions as consolidateInstructions } from "../prompts/consolidate-memory";
-import { instructions as refineInstructions } from "../prompts/refine-summary";
-import { compactSchema, consolidateSchema, refineSchema } from "../schemas";
+import { consolidateSchema } from "../schemas";
 import type {
 	ApplyResult,
 	PreparedUnit,
@@ -34,96 +21,14 @@ import type {
 	StepEnv,
 } from "../types";
 import { goalsEligible } from "./consolidate-goals";
-import { allMessageIds, labelExchanges, withSummarySources } from "./shared";
-
-const SUMMARY_CHARS = 1200;
 
 // ---- eligibility (the kick asks before it makes a unit) ----
-
-/**
- * Estimated tokens of the layers history compaction cannot reduce: long-term memory, short-term notes and the
- * summary, as the stored window carries them. The per-turn recall (prefetch) is left out: it is rebuilt every
- * turn, so counting it would make the trigger flap with the question asked.
- */
-function fixedLayerTokens(env: StepEnv): number {
-	const window = env.deps.memory.windows.storedInTransaction(
-		env.db,
-		env.conversationId,
-	);
-	return window
-		? window.longTerm.tokens +
-				window.shortTerm.tokens +
-				estimateTextTokens(window.history.summaryText)
-		: 0;
-}
-
-/** The exchanges kept verbatim, oldest first, with the estimated tokens their (unblocked) messages take. */
-function keptExchanges<
-	Row extends { inputMessageId: string; answerMessageId: string | null },
->(env: StepEnv, rows: readonly Row[]): Array<{ row: Row; tokens: number }> {
-	const { db, deps } = env;
-	const blocked = deps.memory.blockedMessageIdsInTransaction(
-		db,
-		rows.flatMap((r) => [
-			r.inputMessageId,
-			...(r.answerMessageId ? [r.answerMessageId] : []),
-		]),
-	);
-	return rows.map((row) => {
-		let tokens = 0;
-		for (const id of [row.inputMessageId, row.answerMessageId]) {
-			if (id === null || blocked.has(id)) continue;
-			const found = deps.conversation.messageInTransaction(db, id);
-			if (found)
-				tokens +=
-					TOKEN_ESTIMATE.messageOverheadTokens +
-					estimateTextTokens(found.message.text);
-		}
-		return { row, tokens };
-	});
-}
-
-/**
- * What compact-history sees: the tokens of the layers it cannot reduce plus the kept exchanges, against the
- * trigger (`COMPACT_THRESHOLD` of the memory and history budget). `fold` is as many of the oldest kept exchanges
- * as it takes to bring the total under the trigger (none when it is already under).
- */
-function compactNeed<
-	Row extends { inputMessageId: string; answerMessageId: string | null },
->(env: StepEnv, rows: readonly Row[]): { over: boolean; fold: Row[] } {
-	const trigger = env.deps.memory.historyBudgetTokens() * COMPACT_THRESHOLD;
-	const kept = keptExchanges(env, rows);
-	const total =
-		fixedLayerTokens(env) + kept.reduce((sum, entry) => sum + entry.tokens, 0);
-	const fold: Row[] = [];
-	let remaining = total;
-	for (const entry of kept) {
-		if (remaining < trigger) break;
-		if (entry.tokens === 0) continue;
-		fold.push(entry.row);
-		remaining -= entry.tokens;
-	}
-	return { over: total >= trigger, fold };
-}
-const keepRows = (env: StepEnv) =>
-	env.deps.memory
-		.exchangesInTransaction(env.db, env.conversationId)
-		.filter((row) => row.disposition === "keep");
-const summaryChars = (env: StepEnv): number =>
-	[
-		...(env.deps.memory.summaryInTransaction(env.db, env.conversationId)
-			?.text ?? ""),
-	].length;
 
 /** Whether the step has anything to look at now (a quiet step is not asked again until the revision moves). */
 export function eligible(env: StepEnv, step: StepId): boolean {
 	switch (step) {
 		case "consolidate-memory":
 			return activeStateItems(env).length >= 2;
-		case "compact-history":
-			return compactNeed(env, keepRows(env)).over;
-		case "refine-summary":
-			return summaryChars(env) >= SUMMARY_CHARS * REFINE_THRESHOLD;
 		case "consolidate-goals":
 			return goalsEligible(env);
 		default:
@@ -226,7 +131,7 @@ function prepareConsolidate(env: StepEnv) {
 			longTermCoverage: memory.coverage,
 		},
 		targets: {},
-		summaryRevision: null,
+		windowVersion: null,
 		context: { refs: memory.refs } satisfies ConsolidateContext,
 	};
 }
@@ -328,7 +233,7 @@ function applyConsolidate(
 		notices: [],
 		changed: false,
 		quiet: !changed,
-		...(changed && output.republishLongTerm ? { republishLongTerm: true } : {}),
+		...(changed && output.republishLongTerm ? { requestRepublish: true } : {}),
 	};
 }
 
@@ -341,196 +246,4 @@ export const consolidateMemory: StepDefinition = {
 	prepare: (env) => prepareConsolidate(env),
 	parse: parseConsolidate,
 	apply: (env, prepared, output) => applyConsolidate(env, prepared, output),
-};
-
-// ---- summary upkeep (compact-history, refine-summary) ----
-
-type SummaryContext = {
-	exchanges: Record<string, string>;
-	labels: string[];
-	messageIds: string[];
-};
-type CompactOutput = { fold: string[]; summary: string; changed: boolean };
-
-function prepareCompact(env: StepEnv) {
-	const { db, deps, conversationId } = env;
-	// Only as many of the oldest kept exchanges as it takes to get under the trigger are folded.
-	const need = compactNeed(env, keepRows(env));
-	if (!need.over) return { status: "stale" as const, reason: "nothing_to_do" };
-	const loaded: LoadedExchange[] = [];
-	for (const row of need.fold) {
-		const result = loadExchange(env, row);
-		if (result.status === "ok") loaded.push(result.exchange);
-	}
-	const { fit } = fitExchanges(loaded);
-	if (fit.length === 0)
-		return { status: "stale" as const, reason: "nothing_to_do" };
-	const { table, views, labels: names } = labelExchanges(fit);
-	const summary = deps.memory.summaryInTransaction(db, conversationId);
-	const context: SummaryContext = {
-		exchanges: Object.fromEntries(
-			names.map((n) => [n, table[n]!.inputMessageId]),
-		),
-		labels: names,
-		messageIds: allMessageIds(table),
-	};
-	return {
-		status: "ready" as const,
-		data: { previousSummary: summary?.text ?? "", exchanges: views },
-		targets: { exchanges: fit.map((e) => e.inputMessageId) },
-		summaryRevision: summary?.revision ?? 0,
-		context,
-	};
-}
-
-function summaryApply(
-	env: StepEnv,
-	prepared: PreparedUnit,
-	input: {
-		summary: string;
-		changed: boolean;
-		included: string[];
-		refs: ApplyResult["refs"];
-		output: unknown;
-	},
-): ApplyResult {
-	const base = {
-		output: input.output,
-		refs: input.refs,
-		notices: [],
-		changed: false,
-	};
-	if (!input.changed)
-		return {
-			...base,
-			applied: 0,
-			rejected: 0,
-			results: [{ status: "unchanged" }],
-			quiet: true,
-		};
-	const written = env.deps.memory.writeSummaryInTransaction(env.db, {
-		conversationId: env.conversationId,
-		text: input.summary,
-		included: input.included,
-		expectedRevision: prepared.summaryRevision ?? 0,
-	});
-	if (written.ok)
-		return {
-			...base,
-			refs: withSummarySources(base.refs, written.sources),
-			applied: 1,
-			rejected: 0,
-			results: [
-				{
-					status: "applied",
-					revision: written.revision,
-					folded: written.included.length,
-				},
-			],
-		};
-	if (written.reason === "stale_revision")
-		return {
-			...base,
-			applied: 0,
-			rejected: 1,
-			results: [],
-			stale: "stale_summary",
-		};
-	return {
-		...base,
-		applied: 0,
-		rejected: 1,
-		results: [{ status: "rejected", code: written.reason }],
-		quiet: true,
-	};
-}
-
-export const compactHistory: StepDefinition = {
-	id: "compact-history" satisfies StepId,
-	slot: "maintenance",
-	longTerm: false,
-	instructions: compactInstructions,
-	outputSchema: () => compactSchema,
-	prepare: (env) => prepareCompact(env),
-	parse(raw): CompactOutput | null {
-		if (!isRecord(raw)) return null;
-		const summary = text(raw.summary, SUMMARY_CHARS);
-		return summary || raw.changed !== true
-			? {
-					fold: labels(raw.fold, 8),
-					summary: summary ?? "",
-					changed: raw.changed === true,
-				}
-			: null;
-	},
-	apply(env, prepared, raw) {
-		const output = raw as CompactOutput;
-		const context = prepared.context as SummaryContext;
-		const included = output.fold
-			.filter((label) => context.labels.includes(label))
-			.map((label) => context.exchanges[label]!);
-		const refs = context.messageIds.map((id) => ({
-			type: "message" as const,
-			id,
-		}));
-		return summaryApply(env, prepared, {
-			summary: output.summary,
-			changed: output.changed && included.length > 0,
-			included,
-			refs,
-			output,
-		});
-	},
-};
-
-function prepareRefine(env: StepEnv) {
-	if (!eligible(env, "refine-summary"))
-		return { status: "stale" as const, reason: "nothing_to_do" };
-	const summary = env.deps.memory.summaryInTransaction(
-		env.db,
-		env.conversationId,
-	)!;
-	return {
-		status: "ready" as const,
-		data: { summary: summary.text },
-		targets: {},
-		summaryRevision: summary.revision,
-		context: { sources: summary.sources },
-	};
-}
-
-export const refineSummary: StepDefinition = {
-	id: "refine-summary" satisfies StepId,
-	slot: "maintenance",
-	longTerm: false,
-	instructions: refineInstructions,
-	outputSchema: () => refineSchema,
-	prepare: (env) => prepareRefine(env),
-	parse(raw) {
-		if (!isRecord(raw)) return null;
-		const summary = text(raw.summary, SUMMARY_CHARS);
-		return summary ? { summary, changed: raw.changed === true } : null;
-	},
-	apply(env, prepared, raw) {
-		const output = raw as { summary: string; changed: boolean };
-		const current = env.deps.memory.summaryInTransaction(
-			env.db,
-			env.conversationId,
-		);
-		const shorter =
-			current !== null && [...output.summary].length < [...current.text].length;
-		const refs = (prepared.context as { sources: string[] }).sources.map(
-			(id) => ({
-				type: "message" as const,
-				id,
-			}),
-		);
-		return summaryApply(env, prepared, {
-			summary: output.summary,
-			changed: output.changed && shorter,
-			included: [],
-			refs,
-			output,
-		});
-	},
 };

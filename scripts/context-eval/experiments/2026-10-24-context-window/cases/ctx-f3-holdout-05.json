@@ -1,0 +1,67 @@
+{
+	"id": "ctx-f3-holdout-05",
+	"family": "F3",
+	"split": "holdout",
+	"seed": {
+		"events": [
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-20T01:00:00.000Z",
+				"text": "今度の会議は火曜にしよう"
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-20T01:00:03.000Z",
+				"text": "火曜で承知しました。",
+				"origin": "reply"
+			},
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-20T03:00:00.000Z",
+				"text": "会議は水曜に変更したい"
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-20T03:00:03.000Z",
+				"text": "水曜に変更しますね。",
+				"origin": "reply"
+			},
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-20T02:00:00.000Z",
+				"text": "会議は月曜でもいいかも"
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-20T02:00:03.000Z",
+				"text": "月曜も候補ですね。",
+				"origin": "reply"
+			}
+		],
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "butler"
+		}
+	},
+	"input": "結局、あの会議は何曜日だったっけ",
+	"expect": {
+		"checks": [
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "uses_newest_fact",
+				"condition": "log の並びは追記した順だが、at が最も新しい発言（三時の「水曜に変更したい」）に従って、会議を水曜と答えている。月曜や火曜を現在の曜日として答えていない。"
+			}
+		]
+	}
+}

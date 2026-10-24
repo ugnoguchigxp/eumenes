@@ -1,4 +1,10 @@
-import { answerAnalysis } from "../toolchain/analysis-round.fixture";
+import {
+	callsOf,
+	candidatesOf,
+	isResultRound,
+	isUtteranceRound,
+	searchThenDelegate,
+} from "../toolchain/conversation-script.fixture";
 import { afterEach } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -202,27 +208,23 @@ export async function boot(steps: Step[], options: BootOptions = {}) {
 					languages: ["ja"],
 					confidence: 0.99,
 				});
-			if (
-				answerAnalysis(callOptions, {
-					call: "world_query",
-					announcement: "照会します。",
-					kind: "live_info",
-				})
-			)
-				return "";
-			if (callOptions?.tools?.length) {
-				offered.push(JSON.stringify(callOptions.tools));
-				callOptions.onToolCalls!([
-					{
-						id: crypto.randomUUID(),
-						name: "world_query",
-						arguments: JSON.stringify({
-							request: messages.filter((m) => m.role === "user").at(-1)!
-								.content,
-						}),
-					},
-				]);
-				return "";
+			if (isUtteranceRound(callOptions?.tools) && !isResultRound(messages)) {
+				// The conversation's round: search for the World query toolchain, then hand the question over.
+				const question = messages
+					.filter((m) => m.role === "user")
+					.at(-1)!.content;
+				const candidates = candidatesOf(messages);
+				if (candidates) offered.push(JSON.stringify(candidates));
+				const step = searchThenDelegate(
+					(candidate) => candidate.id === "world.query",
+					question,
+					{ announcement: "照会します。", impact: "none" },
+				)(messages);
+				if (step.calls?.length)
+					callOptions!.onToolCalls!(
+						callsOf(step, () => crypto.randomUUID()) as never,
+					);
+				return step.text ?? "";
 			}
 			if (system.includes("TOOLS=")) {
 				workerMessages.push(JSON.stringify(messages));
@@ -428,6 +430,7 @@ export async function boot(steps: Step[], options: BootOptions = {}) {
 	);
 	const dialogue = createDialogueService({
 		store,
+		continuity: createContinuityService(store),
 		conversation,
 		larm: inference,
 		queue,

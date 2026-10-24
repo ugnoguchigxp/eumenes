@@ -1,0 +1,94 @@
+{
+	"id": "ctx-f12-dev-02",
+	"family": "F12",
+	"split": "dev",
+	"seed": {
+		"events": [
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-20T08:00:00.000Z",
+				"text": "部屋に飾る風景画を作って"
+			},
+			{
+				"type": "acted",
+				"at": "2026-10-20T08:00:02.000Z",
+				"fields": {
+					"action": "delegate",
+					"toolchain": "image_studio",
+					"request": "部屋に飾る風景画を作る",
+					"todo": "@w1"
+				}
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-20T08:00:03.000Z",
+				"text": "描いてみますね。",
+				"origin": "announcement"
+			},
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-20T08:02:30.000Z",
+				"text": "今、大事な電話が始まったから、しばらく話しかけないで"
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-20T08:02:33.000Z",
+				"text": "承知しました。静かにしています。",
+				"origin": "reply"
+			}
+		],
+		"work": [
+			{
+				"key": "w1",
+				"toolchain": "image_studio",
+				"request": "部屋に飾る風景画を作る",
+				"at": "2026-10-20T08:00:03.000Z",
+				"updatedAt": "2026-10-20T08:03:00.000Z",
+				"status": "done",
+				"outcome": "succeeded",
+				"result": {
+					"asOf": "2026-10-20T08:03:00.000Z",
+					"claims": [
+						{
+							"text": "風景画を一枚作った",
+							"sources": []
+						}
+					],
+					"limits": "一枚のみ"
+				}
+			}
+		],
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "butler"
+		}
+	},
+	"input": null,
+	"trigger": {
+		"kind": "todo_changed",
+		"todos": [
+			{
+				"id": "@w1",
+				"status": "done"
+			}
+		]
+	},
+	"expect": {
+		"checks": [
+			{
+				"kind": "silent"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "speech_judgment",
+				"condition": "利用者が電話中で話しかけないでほしいと言っているので、結果が出ても話しかけていない。"
+			}
+		]
+	}
+}

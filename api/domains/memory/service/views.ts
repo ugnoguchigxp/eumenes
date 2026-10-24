@@ -2,11 +2,13 @@ import type { SqliteStore } from "../../../infrastructure/sqlite";
 import type { ContinuityItem, ContinuityService } from "../../continuity";
 import type { MemoryContextDto, MemoryTendencyDto } from "../contracts";
 import { listActiveTendencies, readSettings } from "../repository";
+import { referenceJson } from "../../../infrastructure/reference-json";
 import type { ContextWindowStore, WindowSnapshot } from "./context-window";
+import { profileItemFields } from "./profile";
 
 /**
- * What the settings screen reads besides State: short-term notes, tendencies, and the ContextWindow
- * itself. Every body fails closed while memory is unhealthy (an inconsistent journal may mean a
+ * What the settings screen reads besides State: short-term notes, tendencies, and the long-term part of the
+ * ContextWindow (the published profile). Every body fails closed while memory is unhealthy (an inconsistent journal may mean a
  * forgotten value is still in this database).
  */
 export function createMemoryViews(deps: {
@@ -18,15 +20,11 @@ export function createMemoryViews(deps: {
 	const { store, continuity, windows, healthy } = deps;
 	const contextOf = (window: WindowSnapshot): MemoryContextDto => ({
 		version: window.version,
-		longTerm: {
-			text: window.longTerm.text,
-			tokens: window.longTerm.tokens,
+		profile: {
+			text: referenceJson(window.profile.items.map(profileItemFields)),
+			tokens: window.profile.tokens,
 		},
-		shortTerm: {
-			text: window.shortTerm.text,
-			tokens: window.shortTerm.tokens,
-			pendingAdditions: window.shortTerm.pendingAdditions,
-		},
+		newMemories: window.newMemories.length,
 		notices: window.notices.length,
 	});
 	return {

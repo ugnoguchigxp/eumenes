@@ -282,14 +282,10 @@ const forget = (
 	input: {
 		messageIds: string[];
 		itemIds: string[];
-		deletedSummaryConversationIds?: string[];
 	},
 ) =>
 	h.store.write((db) =>
-		h.inference.revokeAgentAttemptsInTransaction(db, {
-			deletedSummaryConversationIds: [],
-			...input,
-		}),
+		h.inference.revokeAgentAttemptsInTransaction(db, input),
 	);
 
 test("forgetting what a running agent call stood on aborts it, and its attempt is never adopted", async () => {
@@ -357,39 +353,6 @@ test("an answer that finished before the forget is revoked too: its receipt is r
 	expect(
 		await h.store.write((db) => h.inference.acceptInTransaction(db, receipt)),
 	).toBe(false);
-});
-
-test("deleting a conversation's summary revokes the running and the finished-but-unadopted calls of that conversation only", async () => {
-	const h = await setup(async () => ({ text: "answer" }));
-	const mine = await stream(
-		h,
-		await h.request(),
-		new AbortController().signal,
-		{
-			sessionRole: "main",
-			context,
-			refs: { messageIds: [], itemIds: [], conversationId: "conv-1" },
-		},
-	);
-	const other = await stream(
-		h,
-		await h.request(),
-		new AbortController().signal,
-		{
-			sessionRole: "main",
-			context,
-			refs: { messageIds: [], itemIds: [], conversationId: "conv-2" },
-		},
-	);
-	const valid = (receipt: Receipt) =>
-		h.store.read((db) => h.inference.validateReceiptInTransaction(db, receipt));
-	await forget(h, {
-		messageIds: [],
-		itemIds: [],
-		deletedSummaryConversationIds: ["conv-1"],
-	});
-	expect(valid(mine)).toBe(false);
-	expect(valid(other)).toBe(true);
 });
 
 test("the sweeper reclaims an expired task row that was written back after the release, on its timer and not only at start", async () => {

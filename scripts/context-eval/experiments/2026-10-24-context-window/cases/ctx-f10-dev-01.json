@@ -1,0 +1,60 @@
+{
+	"id": "ctx-f10-dev-01",
+	"family": "F10",
+	"split": "dev",
+	"seed": {
+		"events": [
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-20T01:00:00.000Z",
+				"text": "来週の金曜に泊まる宿の候補を調べて"
+			},
+			{
+				"type": "acted",
+				"at": "2026-10-20T01:00:02.000Z",
+				"fields": {
+					"action": "delegate",
+					"toolchain": "web_research",
+					"request": "来週の金曜に泊まる宿の候補を調べる"
+				}
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-20T01:00:03.000Z",
+				"text": "お調べしますね。",
+				"origin": "announcement"
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-20T01:03:00.000Z",
+				"text": "三件見つかりました。駅から近い順にご案内できます。",
+				"origin": "report"
+			}
+		],
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "butler"
+		}
+	},
+	"input": "ありがとう、助かりました",
+	"expect": {
+		"checks": [
+			{
+				"kind": "not_delegated"
+			},
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "follows_current_request",
+				"condition": "過去の依頼を実行し直していない。今回の発言に対してだけ応じている。"
+			}
+		]
+	}
+}

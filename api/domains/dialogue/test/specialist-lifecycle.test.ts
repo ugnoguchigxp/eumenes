@@ -1,6 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { setup, type Harness } from "./specialist.fixture";
-import { topicTexts } from "../service/topic-texts";
+import { IMAGE, respond, setup, type Harness } from "./specialist.fixture";
 
 const open: Harness[] = [];
 afterEach(async () => {
@@ -19,8 +18,16 @@ const invoke = (title: string) => ({
 	tool: "draft.apply",
 	arguments: { title },
 });
+const chat = respond();
+const main = (h: Harness, ...texts: string[]) =>
+	h.state.steps.push(...texts.map((text) => ({ text, calls: [chat] })));
+/** The records of the conversation model's latest call, by source. */
+const recordOf = (h: Harness, source: string) =>
+	(h.material(h.state.calls.length - 1).now.records ?? []).find(
+		(r: { source: string }) => r.source === source,
+	);
 async function startDirty(h: Harness) {
-	h.startCall({ request: "アンケートを作って" });
+	h.handOver({ request: "アンケートを作って" });
 	h.state.specialist.push(invoke("アンケート"), reply("作りました"));
 	return h.ask("アンケートを作って");
 }
@@ -57,34 +64,29 @@ test("expiry is the session's only one: polling never extends it, an accepted ut
 test("an expired session is not extended by a new utterance: it ends and the utterance goes the ordinary way", async () => {
 	const h = await harness();
 	await startDirty(h);
-	const mainCalls = h.state.mainCalls.length;
+	const modelCalls = h.state.calls.length;
 	h.state.offsetMs += DAY + 60_000;
-	h.state.main.push("通常の返答");
+	main(h, "通常の返答");
 	const run = await h.ask("まだ作業中？");
 	expect(run.specialistSessionId).toBeNull();
-	expect(h.state.mainCalls.length).toBeGreaterThan(mainCalls);
+	expect(run.status).toBe("completed");
+	expect(h.answerText(run.id)).toBe("通常の返答");
+	expect(h.state.calls.length).toBe(modelCalls + 1);
+	expect(h.state.calls.at(-1)!.messages.at(-1)!.content).toBe("まだ作業中？");
 	expect(await h.session()).toBeNull();
 	expect(h.work()[0]!.ended).toBe(true);
-	expect(h.state.calls).toContain("end:discard");
+	expect(h.state.calledPort).toContain("end:discard");
 	const ended = h.rows(
 		"SELECT state, end_reason FROM dialogue_specialist_sessions",
 	);
 	expect(ended).toEqual([{ state: "ended", end_reason: "expired" }]);
-	// The main agent hears of it once, with that very utterance.
-	expect(
-		h.state.mainCalls
-			.at(-1)!
-			.history.map((m) => m.content)
-			.join("\n"),
-	).toContain('"reason":"expired"');
-	h.state.main.push("はい");
+	// The conversation agent hears of it once, with that very utterance.
+	expect(recordOf(h, "specialist.work").data.ended).toMatchObject({
+		reason: "expired",
+	});
+	main(h, "はい");
 	await h.ask("次の話");
-	expect(
-		h.state.mainCalls
-			.at(-1)!
-			.history.map((m) => m.content)
-			.join("\n"),
-	).not.toContain('"ended"');
+	expect(recordOf(h, "specialist.work")).toBeUndefined();
 });
 
 test("a turn that outlives the session's expiry is not adopted", async () => {
@@ -119,7 +121,7 @@ test("the sweep ends expired sessions; a refusing domain leaves them closing and
 	// The domain keeps its work: nothing was half ended.
 	expect(h.work()[0]!.ended).toBe(false);
 	// A closing session does not address utterances.
-	h.state.main.push("通常です");
+	main(h, "通常です");
 	const run = await h.ask("こんにちは");
 	expect(run.specialistSessionId).toBeNull();
 	// Entering it any other way is refused as well.
@@ -133,7 +135,7 @@ test("the sweep ends expired sessions; a refusing domain leaves them closing and
 	).toEqual([{ state: "ended", end_reason: "expired" }]);
 	// Sweeping again repeats nothing.
 	await h.dialogue.sweepSpecialistSessions();
-	expect(h.state.calls.filter((c) => c === "end:discard")).toHaveLength(1);
+	expect(h.state.calledPort.filter((c) => c === "end:discard")).toHaveLength(1);
 });
 
 test("a suspended work that was saved meanwhile is ended by the sweep, an unsaved one is kept", async () => {
@@ -178,23 +180,30 @@ test("a pinned form submit is the main conversation's: an active session does no
 		conversationId: "main",
 		text: "猫を描いて",
 		presentation: "artifact",
-		toolchainId: "image.create",
+		toolchainId: IMAGE.id,
 	});
 	expect(run.specialistSessionId).toBeNull();
-	expect(run.pinnedToolchainId).toBe("image.create");
+	expect(run.pinnedToolchainId).toBe(IMAGE.id);
 	const job = h.rows(
 		"SELECT kind, payload_json FROM queue_jobs WHERE id = ?",
 		run.jobId!,
 	)[0];
 	expect(job.kind).not.toBe("dialogue.specialist-turn");
 	expect(JSON.parse(job.payload_json)).toEqual({ runId: run.id });
-	await h.finished(run.id);
+	// The submit is handed to the image toolchain: the run waits behind its job, with no model call for it.
+	const modelCalls = h.state.calls.length;
+	await h.until(() => {
+		const now = h.dialogue.get(run.id)!;
+		return now.status === "queued" && now.jobId !== run.jobId;
+	});
+	expect(h.state.calls).toHaveLength(modelCalls);
 	// The session is untouched: no turn was begun for the pinned submit.
 	expect(await h.session()).toMatchObject({
 		id: session.id,
 		state: "active",
 		activeRunId: null,
 	});
+	expect(h.work()[0]!.holder).toBeNull();
 });
 
 test("commands: revision guard, idempotent by requestId, return suspends or ends, resume advances the epoch", async () => {
@@ -243,13 +252,13 @@ test("commands: revision guard, idempotent by requestId, return suspends or ends
 
 test("closing a clean work ends it; returning a clean one ends it too", async () => {
 	const h = await harness();
-	h.startCall({ request: "相談" });
+	h.handOver({ request: "相談" });
 	h.state.specialist.push(reply("どうぞ"));
 	await h.ask("相談");
 	const session = (await h.session())!;
 	const closed = await command(h, "close", session);
 	expect(closed.session).toMatchObject({ state: "ended", endReason: "closed" });
-	h.startCall({ request: "もう一度" });
+	h.handOver({ request: "もう一度" });
 	h.state.specialist.push(reply("どうぞ"));
 	await h.ask("もう一度");
 	const second = (await h.session())!;
@@ -319,7 +328,7 @@ test("an utterance while a turn holds the work is queued behind it, in order, an
 	expect(h.work()[0]!.holder).toBeNull();
 });
 
-test("the work is never free between two queued turns; a return command withdraws the turn in flight and hands the queued utterances to the main agent in order", async () => {
+test("the work is never free between two queued turns; a return command withdraws the turn in flight and hands the queued utterances to the conversation agent in order", async () => {
 	const h = await harness();
 	await startDirty(h);
 	let release!: () => void;
@@ -332,27 +341,31 @@ test("the work is never free between two queued turns; a return command withdraw
 	const second = await h.say("二つ目");
 	const third = await h.say("三つ目");
 	const chain = (await h.session())!;
-	h.state.main.push("二つ目への返答", "三つ目への返答");
+	const modelCalls = h.state.calls.length;
+	main(h, "二つ目と三つ目への返答");
 	const returned = await command(h, "return", chain);
 	expect(returned.session).toMatchObject({ state: "suspended", busy: false });
 	expect(h.dialogue.get(first.id)!.status).toBe("cancelled");
 	release();
 	await h.finished(second.id);
 	await h.finished(third.id);
-	for (const [run, answer] of [
-		[second, "二つ目への返答"],
-		[third, "三つ目への返答"],
-	] as const) {
-		const done = h.dialogue.get(run.id)!;
-		expect(done.status).toBe("completed");
-		expect(done.specialistSessionId).toBeNull();
-		expect(h.conversation.message(done.answerMessageId!)!.text).toBe(answer);
-	}
+	// Both utterances are the conversation agent's unhandled ones: one generation takes them, in order.
+	expect(h.state.calls.length).toBe(modelCalls + 1);
+	const newest = h.state.calls
+		.at(-1)!
+		.messages.slice(2)
+		.map((m) => m.content);
+	expect(newest).toHaveLength(2);
+	expect(newest[0]).toContain("二つ目");
+	expect(newest[1]).toContain("三つ目");
+	const done = [second, third].map((run) => h.dialogue.get(run.id)!);
+	expect(done.every((run) => run.specialistSessionId === null)).toBe(true);
+	expect(done.filter((run) => run.status === "completed")).toHaveLength(1);
 	expect(h.work()[0]!.holder).toBeNull();
 	expect(h.state.specialistPrompts.length).toBe(3);
 });
 
-test("when the specialist leaves, utterances queued behind it go to the main agent instead of being lost", async () => {
+test("when the specialist leaves, utterances queued behind it go to the conversation agent instead of being lost", async () => {
 	const h = await harness();
 	await startDirty(h);
 	let release!: () => void;
@@ -366,7 +379,7 @@ test("when the specialist leaves, utterances queued behind it go to the main age
 	});
 	const first = await h.say("戻って");
 	await h.until(() => h.dialogue.get(first.id)?.status === "running");
-	h.state.main.push("通常の返答");
+	main(h, "通常の返答");
 	const second = await h.say("天気は？");
 	release();
 	await h.finished(first.id);
@@ -374,9 +387,7 @@ test("when the specialist leaves, utterances queued behind it go to the main age
 	const done = h.dialogue.get(second.id)!;
 	expect(done.status).toBe("completed");
 	expect(done.specialistSessionId).toBeNull();
-	expect(h.conversation.message(done.answerMessageId!)!.text).toBe(
-		"通常の返答",
-	);
+	expect(h.answerText(second.id)).toBe("通常の返答");
 	expect(h.blocked()).not.toContain(done.inputMessageId);
 	expect((await h.session())!.state).toBe("suspended");
 });
@@ -392,7 +403,7 @@ test("an expired session with a turn in flight is withdrawn when the next uttera
 	const slow = await h.say("遅い依頼");
 	await h.until(() => h.dialogue.get(slow.id)?.status === "running");
 	h.state.offsetMs += DAY + 60_000;
-	h.state.main.push("通常です");
+	main(h, "通常です");
 	const next = await h.ask("こんにちは");
 	expect(next.specialistSessionId).toBeNull();
 	await h.finished(slow.id);
@@ -428,7 +439,7 @@ test("the live check holds only for an active or suspended session that has not 
 	).toBe(false);
 });
 
-test("context: the main agent's history, topics and memory leave out the specialist dialogue (with memory)", async () => {
+test("after the specialist leaves, the conversation's own exchanges are not blocked from memory and are learned from", async () => {
 	const h = await harness();
 	await startDirty(h);
 	h.state.specialist.push({
@@ -436,54 +447,14 @@ test("context: the main agent's history, topics and memory leave out the special
 		forward: false,
 		text: "戻ります",
 	});
-	await h.ask("戻って");
-	h.state.main.push("晴れです");
+	const left = await h.ask("戻って");
+	main(h, "晴れです");
 	const run = await h.ask("天気は？");
-	const prompt = h.state.mainCalls.at(-1)!.history.map((m) => m.content);
-	for (const hidden of [
-		"アンケートを作って",
-		"作りました",
-		"戻って",
-		"戻ります",
-	])
-		expect(prompt).not.toContain(hidden);
-	// The topics World would look for are taken from the conversation only.
-	const topics = h.store.read((db) =>
-		topicTexts(
-			db,
-			h.dialogue.get(run.id)!,
-			h.conversation,
-			new Set(h.blocked()),
-			true,
-		),
-	);
-	expect(topics).toEqual(["天気は？"]);
-	expect(h.memory!.exchanges("main")).toHaveLength(1);
-});
-
-test("context: without a memory service the specialist runs still leave the fallback history first", async () => {
-	const h = await harness({ memory: false });
-	await startDirty(h);
-	for (let i = 0; i < 12; i++) {
-		h.state.specialist.push(reply(`返答${i}`));
-		await h.ask(`依頼${i}`);
-	}
-	h.state.specialist.push({
-		action: "return",
-		forward: false,
-		text: "戻ります",
-	});
-	await h.ask("戻って");
-	h.state.main.push("通常の返答");
-	await h.ask("普通の話1");
-	h.state.main.push("二つ目の返答");
-	await h.ask("普通の話2");
-	const prompt = h.state.mainCalls.at(-1)!.history.map((m) => m.content);
-	// The ordinary exchange before is still there although twelve specialist turns came between.
-	expect(prompt).toContain("普通の話1");
-	expect(prompt).toContain("通常の返答");
-	for (const text of prompt) {
-		expect(text).not.toContain("依頼3");
-		expect(text).not.toContain("返答3");
-	}
+	expect(run.status).toBe("completed");
+	const blocked = new Set(h.blocked());
+	expect(blocked.has(left.inputMessageId)).toBe(true);
+	expect(blocked.has(run.inputMessageId)).toBe(false);
+	expect(blocked.has(run.answerMessageId!)).toBe(false);
+	expect(h.state.runEnds.map((e) => e.runId)).toContain(run.id);
+	expect(h.state.runEnds.map((e) => e.runId)).not.toContain(left.id);
 });

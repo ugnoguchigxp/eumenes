@@ -90,6 +90,8 @@ export type ToolchainCard = {
 	title: string;
 	summary: string;
 	useWhen: string[];
+	/** The least impact the toolchain's work has (section 6.7); absent when its definition declares none. */
+	minImpact?: import("./index").ToolchainImpact;
 	/** Only redirects to toolchains active on this host; the caller drops ones it does not offer. */
 	redirects: Array<ToolchainRedirect & { functionName: string }>;
 	/**

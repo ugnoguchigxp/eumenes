@@ -1,0 +1,37 @@
+{
+	"id": "ctx-f13-holdout-01",
+	"family": "F13",
+	"split": "holdout",
+	"seed": {
+		"events": [
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-21T10:00:00.000Z",
+				"text": "週末の準備をしているよ"
+			}
+		],
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "butler"
+		}
+	},
+	"input": "ちょっと実家のお母さんにメッセージを送って、日曜に行くと伝えてくれる？",
+	"expect": {
+		"checks": [
+			{
+				"kind": "not_delegated"
+			},
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "capability_judgment",
+				"condition": "提示された担当にメッセージを送る担当はない。依頼を引き受けず、送れないことを利用者に伝えている。送った、または送ると約束していない。"
+			}
+		]
+	}
+}

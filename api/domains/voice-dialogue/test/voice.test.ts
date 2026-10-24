@@ -4,31 +4,40 @@ import { expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { openStore, type SqliteStore } from "../../../infrastructure/sqlite";
 import {
-	migration as conversationMigration,
-	avatarMotionMigration as conversationAvatarMotionMigration,
-	answerDeliveryMigration as conversationAnswerDeliveryMigration,
+	openStore,
+	orderMigrations,
+	type SqliteStore,
+} from "../../../infrastructure/sqlite";
+import {
 	createConversationService,
+	migrations as conversationMigrations,
 } from "../../conversation";
 import {
-	createDialogueService,
-	migration as dialogueMigration,
-	retainedToolchainsMigration,
-	queueLinkMigration,
-} from "../../dialogue";
-import { createQueue, migration as queueMigration } from "../../queue";
-import { createVoiceDialogue, migration, sequenceMigration } from "..";
+	createContinuityService,
+	migrations as continuityMigrations,
+} from "../../continuity";
 import {
-	inputMigration,
-	inputSimplificationMigration,
-	inputTextDedupMigration,
-} from "../repository/input";
+	createDialogueService,
+	migrations as dialogueMigrations,
+} from "../../dialogue";
+import { createQueue, migrations as queueMigrations } from "../../queue";
+import { createVoiceDialogue, migrations as voiceMigrations } from "..";
 import { SpeechSentences } from "../service/sentences";
 import { Hono } from "hono";
 import { registerVoiceDialogue } from "..";
 import type { InferencePort } from "../../inference";
 import { hostDelivery, type SpeechPreparation } from "../../delivery";
+
+/** The schema the dialogue and voice flow need, built from each domain's own migrations. */
+const schemaMigrations = () =>
+	orderMigrations([
+		...conversationMigrations,
+		...queueMigrations,
+		...continuityMigrations,
+		...dialogueMigrations,
+		...voiceMigrations,
+	]);
 
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 /** Sends a transcribed input, as the Web does when the speaker is idle. */
@@ -71,25 +80,13 @@ test("voice capture to ASR, dialogue, TTS; duplicate utterance is ignored", asyn
 		close: async () => {},
 	});
 	try {
-		const store = openStore(join(dir, "db.sqlite3"), [
-			conversationMigration,
-			conversationAvatarMotionMigration,
-			conversationAnswerDeliveryMigration,
-			dialogueMigration,
-			retainedToolchainsMigration,
-			migration,
-			queueMigration,
-			queueLinkMigration,
-			sequenceMigration,
-			inputMigration,
-			inputSimplificationMigration,
-			inputTextDedupMigration,
-		]);
+		const store = openStore(join(dir, "db.sqlite3"), schemaMigrations());
 		const conversation = createConversationService(store);
 		const queue = createQueue(store);
 		queue.start();
 		const dialogue = createDialogueService({
 			store,
+			continuity: createContinuityService(store),
 			conversation,
 			larm,
 			queue,
@@ -161,24 +158,12 @@ test("restart cancels the run of a stale voice turn so no old answer is spoken",
 		close: async () => {},
 	});
 	try {
-		const store = openStore(join(dir, "db.sqlite3"), [
-			conversationMigration,
-			conversationAvatarMotionMigration,
-			conversationAnswerDeliveryMigration,
-			dialogueMigration,
-			retainedToolchainsMigration,
-			migration,
-			queueMigration,
-			queueLinkMigration,
-			sequenceMigration,
-			inputMigration,
-			inputSimplificationMigration,
-			inputTextDedupMigration,
-		]);
+		const store = openStore(join(dir, "db.sqlite3"), schemaMigrations());
 		const conversation = createConversationService(store);
 		const queue = createQueue(store);
 		const dialogue = createDialogueService({
 			store,
+			continuity: createContinuityService(store),
 			conversation,
 			larm,
 			queue,
@@ -196,6 +181,7 @@ test("restart cancels the run of a stale voice turn so no old answer is spoken",
 		const queue2 = createQueue(store);
 		const dialogue2 = createDialogueService({
 			store,
+			continuity: createContinuityService(store),
 			conversation,
 			larm,
 			queue: queue2,
@@ -225,13 +211,7 @@ async function evictionHarness(
 	} = {},
 ) {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-voice-evict-"));
-	const store = openStore(join(dir, "db.sqlite3"), [
-		migration,
-		sequenceMigration,
-		inputMigration,
-		inputSimplificationMigration,
-		inputTextDedupMigration,
-	]);
+	const store = openStore(join(dir, "db.sqlite3"), schemaMigrations());
 	const dialogue = {
 		submitVoice: async (
 			_input: unknown,
@@ -251,6 +231,7 @@ async function evictionHarness(
 				answerMessageId: "answer",
 			},
 		answerText: () => "回答",
+		recordHeardInTransaction: () => {},
 		cancel: async (runId: string) => {
 			options.cancelled?.push(runId);
 			return null;
@@ -405,13 +386,7 @@ test("restarting a session aborts the previous warm-up", async () => {
 
 test("stopping a session fences acceptance waiting in the writer queue", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-voice-stop-"));
-	const store = openStore(join(dir, "db.sqlite3"), [
-		migration,
-		sequenceMigration,
-		inputMigration,
-		inputSimplificationMigration,
-		inputTextDedupMigration,
-	]);
+	const store = openStore(join(dir, "db.sqlite3"), schemaMigrations());
 	let asr = 0;
 	const larm = withVoiceAuthority({
 		status: () => ({ state: "ready", capabilities: ["asr"] }),
@@ -611,13 +586,7 @@ test("a runless message's host delivery reaches synthesis only for a clause of t
 test("a clause that keeps failing is skipped and the rest is still spoken", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-voice-skip-"));
 	try {
-		const store = openStore(join(dir, "db.sqlite3"), [
-			migration,
-			sequenceMigration,
-			inputMigration,
-			inputSimplificationMigration,
-			inputTextDedupMigration,
-		]);
+		const store = openStore(join(dir, "db.sqlite3"), schemaMigrations());
 		const dialogue = {
 			submitVoice: async (
 				_input: unknown,
@@ -686,13 +655,7 @@ test("a failed turn stores only a machine-readable error code", async () => {
 		["audio_size_invalid", "audio_size_invalid"],
 	] as const) {
 		const dir = mkdtempSync(join(tmpdir(), "eumenes-voice-error-"));
-		const store = openStore(join(dir, "db.sqlite3"), [
-			migration,
-			sequenceMigration,
-			inputMigration,
-			inputSimplificationMigration,
-			inputTextDedupMigration,
-		]);
+		const store = openStore(join(dir, "db.sqlite3"), schemaMigrations());
 		const larm = withVoiceAuthority({
 			status: () => ({ state: "ready", capabilities: ["asr"] }),
 			connect: async () => {},
@@ -734,24 +697,17 @@ async function raceFixture(prefix: string) {
 		close: async () => {},
 	});
 	const larm = base;
-	const store = openStore(join(dir, "db.sqlite3"), [
-		conversationMigration,
-		conversationAvatarMotionMigration,
-		conversationAnswerDeliveryMigration,
-		dialogueMigration,
-		retainedToolchainsMigration,
-		migration,
-		queueMigration,
-		queueLinkMigration,
-		sequenceMigration,
-		inputMigration,
-		inputSimplificationMigration,
-		inputTextDedupMigration,
-	]);
+	const store = openStore(join(dir, "db.sqlite3"), schemaMigrations());
 	const conversation = createConversationService(store);
 	const queue = createQueue(store);
 	queue.start();
-	const dialogue = createDialogueService({ store, conversation, larm, queue });
+	const dialogue = createDialogueService({
+		store,
+		conversation,
+		continuity: createContinuityService(store),
+		larm,
+		queue,
+	});
 	return {
 		dir,
 		store,

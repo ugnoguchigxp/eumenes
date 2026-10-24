@@ -1,0 +1,86 @@
+{
+	"id": "ctx-f12-holdout-01",
+	"family": "F12",
+	"split": "holdout",
+	"seed": {
+		"events": [
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-21T07:00:00.000Z",
+				"text": "週末の映画館の上映時間を調べてほしい"
+			},
+			{
+				"type": "acted",
+				"at": "2026-10-21T07:00:02.000Z",
+				"fields": {
+					"action": "delegate",
+					"toolchain": "web_research",
+					"request": "週末の映画館の上映時間を調べる",
+					"todo": "@w1"
+				}
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-21T07:00:03.000Z",
+				"text": "確認しますね。",
+				"origin": "announcement"
+			}
+		],
+		"work": [
+			{
+				"key": "w1",
+				"toolchain": "web_research",
+				"request": "週末の映画館の上映時間を調べる",
+				"at": "2026-10-21T07:00:03.000Z",
+				"updatedAt": "2026-10-21T07:02:00.000Z",
+				"status": "done",
+				"outcome": "succeeded",
+				"result": {
+					"asOf": "2026-10-21T07:02:00.000Z",
+					"claims": [
+						{
+							"text": "土曜は十時と十四時の回がある",
+							"sources": [
+								"src_1"
+							]
+						}
+					],
+					"limits": "当日の変更は未確認"
+				}
+			}
+		],
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "butler"
+		}
+	},
+	"input": null,
+	"trigger": {
+		"kind": "todo_changed",
+		"todos": [
+			{
+				"id": "@w1",
+				"status": "done"
+			}
+		]
+	},
+	"expect": {
+		"checks": [
+			{
+				"kind": "speaks"
+			},
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "speech_judgment",
+				"condition": "利用者が頼んだ調べ物の結果が出たので、それを伝えている（または確認してから伝えている）。"
+			}
+		]
+	}
+}

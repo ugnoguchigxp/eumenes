@@ -21,23 +21,24 @@ export function createStewardService(deps: StewardDeps) {
 	return {
 		/** The queue handler of `steward.step.v1`. */
 		handler,
-		/** Makes the units a conversation needs; without an id, for every conversation with work (startup). */
+		/**
+		 * Makes the units a conversation needs (and the idle re-construction when it is due); without an id, for every
+		 * conversation with work (startup).
+		 */
 		kickInTransaction: kick.kickInTransaction,
-		/** The `memory_request` tool: a request waits as `staged` until its run ends. */
-		stageRequestInTransaction: inbox.stageRequestInTransaction,
-		/** The state of a staged request by its id (the tool reads its receipt back with it). */
+		/** The conversation agent's memory tool (dialogue calls it directly): the request waits as `pending` from the moment the action is committed. */
 		requestInTransaction: inbox.requestInTransaction,
-		/** A run ended: its requests are confirmed or discarded (section 2.5) and the steward is kicked. */
+		/** A run ended: the steward looks again (its requests were queued when they were committed). */
 		runEndedInTransaction: inbox.runEndedInTransaction,
-		/** Startup: sorts the staged requests of runs that no longer exist. Call before `kickInTransaction`. */
-		sweepStagedInTransaction: inbox.sweepStagedInTransaction,
 		/** Newest first. */
 		decisions(conversationId: string, limit = 50) {
 			return deps.store.read((db) => listDecisions(db, conversationId, limit));
 		},
-		/** The exchange ledger of a conversation. */
-		exchanges(conversationId: string) {
-			return deps.memory.exchanges(conversationId);
+		/** The conversation's event log (the flow the steward reads from), in log order. */
+		events(conversationId: string) {
+			return deps.store.read((db) =>
+				deps.continuity.events.logInTransaction(db, conversationId),
+			);
 		},
 	};
 }

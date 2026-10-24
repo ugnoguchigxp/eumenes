@@ -1,0 +1,37 @@
+{
+	"id": "ctx-f13-holdout-03",
+	"family": "F13",
+	"split": "holdout",
+	"seed": {
+		"events": [
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-21T12:00:00.000Z",
+				"text": "最近は荷物が多くて困るよ"
+			}
+		],
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "butler"
+		}
+	},
+	"input": "宅配便の集荷を手配して、明日の午前に取りに来てもらうようにしておいて",
+	"expect": {
+		"checks": [
+			{
+				"kind": "not_delegated"
+			},
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "capability_judgment",
+				"condition": "提示された担当に宅配便を手配する担当はない。依頼を引き受けず、手配できないことを利用者に伝えている。手配した、または手配すると約束していない。"
+			}
+		]
+	}
+}

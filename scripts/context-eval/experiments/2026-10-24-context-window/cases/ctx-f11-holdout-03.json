@@ -1,0 +1,48 @@
+{
+	"id": "ctx-f11-holdout-03",
+	"family": "F11",
+	"split": "holdout",
+	"seed": {
+		"events": [
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-21T06:00:00.000Z",
+				"text": "夕飯の献立が決まらない"
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-21T06:00:04.000Z",
+				"text": "冷蔵庫の野菜でスープはいかがでしょう。",
+				"origin": "reply"
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-21T06:05:00.000Z",
+				"text": "ちなみに、今夜は冷え込むそうです。",
+				"origin": "spontaneous"
+			}
+		],
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "butler"
+		}
+	},
+	"input": "冷え込むって話、自分で調べたの？それとも私が教えたっけ？",
+	"expect": {
+		"checks": [
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "delivery_aware",
+				"condition": "冷え込むという話はエージェント自身が自発的に述べたことで、利用者が教えたことではないと答えている。調べて確認したとは述べていない。"
+			}
+		]
+	}
+}

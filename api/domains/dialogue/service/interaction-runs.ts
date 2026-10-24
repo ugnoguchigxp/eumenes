@@ -11,14 +11,11 @@ import {
 	interactionById,
 	interactionCounts,
 	openInteractionOfRun,
-	openQuestionRows,
+	waitingInteractionOfRun,
 } from "../repository/interactions";
-import { continuationOf, type PriorStep } from "../repository/continuations";
-import type { OpenQuestion } from "./conversation-tools";
 import type { DialogueDeps } from "./context";
 import { ownerOf, type InteractionCore } from "./interaction-core";
 
-const MAX_OPEN_QUESTIONS_OFFERED = 3;
 const MAX_CHOICES = 20;
 
 /**
@@ -196,8 +193,6 @@ export function createInteractionRuns(
 					chainRevisionId: string;
 					request: string;
 					originalRequest: string | null;
-					/** The earlier steps of the request a continuation run asked this question for. */
-					priorSteps: PriorStep[];
 					exchanges: Array<{ question: string; answer: unknown }>;
 			  }
 			| { ok: false; code: string } {
@@ -206,7 +201,6 @@ export function createInteractionRuns(
 				return { ok: false, code: "interaction_closed" };
 			if (!frozenValid(tx, row))
 				return { ok: false, code: "version_invalidated" };
-			const origin = continuationOf(tx, row.originRunId);
 			const exchanges: Array<{ question: string; answer: unknown }> = [];
 			for (const event of eventsOf(tx, row.id)) {
 				const payload = event.payloadJson
@@ -226,14 +220,10 @@ export function createInteractionRuns(
 				epoch: row.authorityEpoch,
 				chainRevisionId: row.chainRevisionId,
 				request: row.requestText ?? "",
-				// A continuation's question stands for the user's request, not the host-written input it ran on.
 				originalRequest:
-					origin?.originalRequest ??
 					deps.conversation
 						.messagesInTransaction(tx, row.conversationId)
-						.find((m) => m.id === row.originMessageId)?.text ??
-					null,
-				priorSteps: origin?.steps ?? [],
+						.find((m) => m.id === row.originMessageId)?.text ?? null,
 				exchanges,
 			};
 		},
@@ -311,27 +301,15 @@ export function createInteractionRuns(
 			const row = openInteractionOfRun(tx, runId);
 			if (row) settle(tx, row, "cancelled", code);
 		},
-		/** The open questions of a conversation, as reference data for the conversation model. */
-		openQuestionsInTransaction(
+		/** The question the run's command sub-agent asked, while it waits for the answer. */
+		questionOfRunInTransaction(
 			tx: Database,
-			conversationId: string,
-		): OpenQuestion[] {
-			return openQuestionRows(
-				tx,
-				conversationId,
-				clock(),
-				MAX_OPEN_QUESTIONS_OFFERED,
-			).flatMap((row) =>
-				row.questionId && row.questionPrompt
-					? [
-							{
-								questionRef: row.questionId,
-								functionName: row.functionName,
-								prompt: row.questionPrompt,
-							},
-						]
-					: [],
-			);
+			runId: string,
+		): { questionId: string; prompt: string } | null {
+			const row = waitingInteractionOfRun(tx, runId);
+			return row?.questionId && row.questionPrompt
+				? { questionId: row.questionId, prompt: row.questionPrompt }
+				: null;
 		},
 	};
 }

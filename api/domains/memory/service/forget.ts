@@ -16,17 +16,12 @@ import {
 import {
 	blockedAmong,
 	bumpForgetSeq,
-	conversationsSummarizing,
 	deleteProvenance,
-	deleteSummary,
 	deleteTendenciesByEvidence,
 	deleteTurnVectors,
-	dropExchangesOfMessages,
 	insertBlocks,
 	markBlockApplied,
 	mergeNeighbours,
-	readSummary,
-	resetSummarized,
 	seedFenceForItems,
 	SEED_IMPORT_FENCE,
 } from "../repository";
@@ -83,19 +78,6 @@ function deleteTurnVectorsOf(db: Database, messageIds: string[]): number {
 	deleteTurnVectors(db, present);
 	return present.length;
 }
-/** The input message ids of the exchanges these messages belong to (the ids a summary's sources are keyed by). */
-function inputsOf(db: Database, messageIds: readonly string[]): string[] {
-	const inputs = new Set(messageIds);
-	const find = db.query(
-		"SELECT input_message_id AS i FROM memory_exchange WHERE answer_message_id = ?",
-	);
-	for (const id of messageIds) {
-		const row = find.get(id) as { i: string } | null;
-		if (row) inputs.add(row.i);
-	}
-	return [...inputs];
-}
-
 export function createForget(deps: ForgetDeps) {
 	const { access, atMs, windows, conversation, continuity } = deps;
 
@@ -191,7 +173,7 @@ export function createForget(deps: ForgetDeps) {
 			);
 	}
 
-	/** The exchange partners (B3): everything the run of each message produced, and the ledger's answer/input. */
+	/** The run partners (B3): everything the run of each message produced. */
 	function withPartners(db: Database, messageIds: Iterable<string>): string[] {
 		const all = new Set<string>();
 		for (const id of messageIds) {
@@ -205,15 +187,6 @@ export function createForget(deps: ForgetDeps) {
 					found.message.runId,
 				))
 					all.add(entry.message.id);
-			const row = db
-				.query(
-					"SELECT input_message_id AS i, answer_message_id AS a FROM memory_exchange WHERE input_message_id = ?1 OR answer_message_id = ?1",
-				)
-				.get(id) as { i: string; a: string | null } | null;
-			if (row) {
-				all.add(row.i);
-				if (row.a) all.add(row.a);
-			}
 		}
 		return [...all];
 	}
@@ -224,7 +197,7 @@ export function createForget(deps: ForgetDeps) {
 	 */
 	function purgeDerivedInTransaction(
 		db: Database,
-		purge: Omit<ForgetPurge, "deletedSummaryConversationIds" | "derived"> & {
+		purge: Omit<ForgetPurge, "derived"> & {
 			forgetId: string;
 			derived?: ForgetDerived;
 		},
@@ -262,26 +235,14 @@ export function createForget(deps: ForgetDeps) {
 		if (tendencies > 0) changed = true;
 		deleteProvenance(db, purge.itemIds);
 		if (deleteTurnVectorsOf(db, existing) > 0) changed = true;
-		// Summaries that stand on them go, with their sources; the other exchanges they covered are summarized again.
-		const inputIds = inputsOf(db, existing);
-		const deletedSummaryConversationIds = conversationsSummarizing(
-			db,
-			inputIds,
-		);
-		for (const conversationId of deletedSummaryConversationIds) {
-			const summary = readSummary(db, conversationId);
-			deleteSummary(db, conversationId);
-			if (summary) {
-				const gone = new Set(inputIds);
-				resetSummarized(
-					db,
-					summary.sources.filter((id) => !gone.has(id)),
-					now,
-				);
-			}
+		// The active short-term memory (section 13): every event that showed one of them keeps only that it
+		// existed, and every episode summary that stood on one becomes an unsummarized range. This is the forget
+		// only: blocking a specialist session's messages never comes here.
+		if (
+			continuity.events.forgetMessagesInTransaction(db, purge.messageIds, now)
+				.length > 0
+		)
 			changed = true;
-		}
-		dropExchangesOfMessages(db, existing, now);
 		deps.purgeUsageFor(db, purge.itemIds);
 		for (const hook of deps.purgeHooks)
 			hook(db, {
@@ -289,7 +250,6 @@ export function createForget(deps: ForgetDeps) {
 				messageIds: existing,
 				conversationId: purge.conversationId,
 				derived: purge.derived ?? {},
-				deletedSummaryConversationIds,
 			});
 		// This line's purge is in the database now; a restored older database lacks the mark and runs it again.
 		markBlockApplied(db, purge.forgetId, now);

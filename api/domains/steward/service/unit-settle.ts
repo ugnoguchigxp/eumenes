@@ -70,14 +70,15 @@ export function createSettle(deps: StewardDeps, kick: Kick, end: UnitEnd) {
 		}
 		db.exec("RELEASE steward_apply");
 		// A World unit changes nothing the Window carries (the answer's World context is read per answer).
-		const publishes = unit.slot !== "world";
+		// An episode unit only prepares: the window changes when a re-construction applies it.
+		const publishes = unit.slot !== "world" && unit.slot !== "episode";
 		const before = publishes
 			? (memory.windows.storedInTransaction(db, conversationId)?.version ??
 				null)
 			: null;
 		const snapshot = publishes
 			? memory.publishWindowInTransaction(db, conversationId, {
-					...(applied.republishLongTerm ? { republishLongTerm: true } : {}),
+					...(applied.requestRepublish ? { requestRepublish: true } : {}),
 					...(applied.prefetch ? { prefetch: applied.prefetch } : {}),
 					...(applied.notices.length > 0
 						? { addNotices: applied.notices }
@@ -151,15 +152,18 @@ export function createSettle(deps: StewardDeps, kick: Kick, end: UnitEnd) {
 			});
 			return "applied" as const;
 		}
-		// Section 6.5: a forget or a newer summary since prepare means this answer stood on stale ground.
+		// Section 6.5: a forget or a re-construction since prepare means this answer stood on stale ground.
 		const fenced =
 			unit.forgetSeq !== null &&
 			unit.forgetSeq !== memory.forgetSeqInTransaction(db)
 				? "stale_forget"
-				: unit.summaryRevision !== null &&
-					  unit.summaryRevision !==
-							memory.summaryRevisionInTransaction(db, unit.conversationId)
-					? "stale_summary"
+				: unit.windowVersion !== null &&
+					  unit.windowVersion !==
+							deps.continuity.events.windowVersionInTransaction(
+								db,
+								unit.conversationId,
+							).version
+					? "stale_window"
 					: result.receipt.requestId !== input.requestId
 						? "receipt_mismatch"
 						: null;

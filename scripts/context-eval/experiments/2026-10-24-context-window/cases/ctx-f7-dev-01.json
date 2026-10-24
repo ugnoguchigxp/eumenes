@@ -1,0 +1,53 @@
+{
+	"id": "ctx-f7-dev-01",
+	"family": "F7",
+	"split": "dev",
+	"seed": {
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "butler"
+		},
+		"longTerm": [
+			{
+				"kind": "personal_fact",
+				"key": "pet.cats",
+				"text": "猫を二匹飼っている"
+			},
+			{
+				"kind": "preference",
+				"key": "tea.kind",
+				"text": "紅茶はアールグレイが好き"
+			}
+		],
+		"events": [
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-16T18:20:00.000Z",
+				"text": "今日は帰りが遅くなりそうで、お留守番させてる子たちが心配"
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-16T18:20:03.000Z",
+				"text": "お家の二匹の猫ちゃんも、お待ちかねでしょうね。",
+				"origin": "reply"
+			}
+		]
+	},
+	"input": "二匹の猫って、前に私が言ったことだっけ？",
+	"expect": {
+		"checks": [
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "correct_attribution",
+				"condition": "猫が二匹いるという情報は、この会話での利用者の発言ではなく、以前から保存されている記憶に由来すると答えている。利用者がこの会話で言ったとは述べていない。"
+			}
+		]
+	}
+}

@@ -19,7 +19,7 @@ import {
 import { SPECIALIST_KIND, type ChatMessage } from "./context";
 import type { DialogueDeps, SpecialistTurnPayload } from "./context";
 import { endRun } from "./run-end";
-import { traceFailure } from "./selection-trace";
+import { traceFailure } from "./selection-outcome";
 import {
 	TURN_BUDGET_MS,
 	flushDeferred,

@@ -1,0 +1,67 @@
+{
+	"id": "ctx-f14-holdout-02",
+	"family": "F14",
+	"split": "holdout",
+	"seed": {
+		"events": [
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-21T14:00:00.000Z",
+				"text": "古いスクリプトを新しい書き方に直して"
+			},
+			{
+				"type": "acted",
+				"at": "2026-10-21T14:00:02.000Z",
+				"fields": {
+					"action": "delegate",
+					"toolchain": "code_workspace",
+					"request": "古いスクリプトを新しい書き方に直す",
+					"todo": "@w1"
+				}
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-21T14:00:03.000Z",
+				"text": "進めますね。",
+				"origin": "announcement"
+			}
+		],
+		"work": [
+			{
+				"key": "w1",
+				"toolchain": "code_workspace",
+				"request": "古いスクリプトを新しい書き方に直す",
+				"at": "2026-10-21T14:00:03.000Z",
+				"updatedAt": "2026-10-21T14:02:00.000Z",
+				"status": "waiting",
+				"questionId": "q1",
+				"question": "直したあとで、元のファイルは残しますか、上書きしますか。"
+			}
+		],
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "butler"
+		}
+	},
+	"input": "元のファイルは残しておいてね",
+	"expect": {
+		"checks": [
+			{
+				"kind": "tool_called",
+				"name": "work"
+			},
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "work_state_aware",
+				"condition": "state.todos で待っている質問（元のファイルを残すか上書きするか）への答えとして受け取り、仕事の操作で質問に答えている（work の answer）。"
+			}
+		]
+	}
+}

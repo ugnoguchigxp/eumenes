@@ -3,29 +3,45 @@ import { createHash } from "node:crypto";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { openStore } from "../../../infrastructure/sqlite";
+import {
+	openStore,
+	orderMigrations,
+	type Migration,
+} from "../../../infrastructure/sqlite";
 import {
 	migration as conversationMigration,
-	avatarMotionMigration as conversationAvatarMotionMigration,
-	answerDeliveryMigration as conversationAnswerDeliveryMigration,
 	createConversationService,
+	migrations as conversationMigrations,
 } from "../../conversation";
+import {
+	createContinuityService,
+	migrations as continuityMigrations,
+} from "../../continuity";
 import {
 	createDialogueService,
 	migration as dialogueMigration,
-	queueLinkMigration,
+	migrations as dialogueMigrations,
 } from "../../dialogue";
-import { createQueue, migration as queueMigration } from "../../queue";
-import { migration as voiceMigration, sequenceMigration } from "..";
-import { migration as schedulerMigration } from "../../scheduler";
-import {
-	inputMigration,
-	inputSimplificationMigration,
-	inputTextDedupMigration,
-	readInput,
-	saveInput,
-} from "../repository/input";
+import { createQueue, migrations as queueMigrations } from "../../queue";
+import { migrations as schedulerMigrations } from "../../scheduler";
+import { migrations as voiceAllMigrations } from "..";
+import { readInput, saveInput } from "../repository/input";
 import { get, migrations as voiceMigrations } from "../repository";
+
+/** Every migration the upgraded dialogue flow needs, in the order the domains declare them. */
+const allMigrations = () =>
+	orderMigrations([
+		...conversationMigrations,
+		...queueMigrations,
+		...schedulerMigrations,
+		...continuityMigrations,
+		...dialogueMigrations,
+		...voiceAllMigrations,
+	]);
+
+/** The migrations of one domain list up to and including the named one, as an older build had them. */
+const through = (list: readonly Migration[], id: string) =>
+	list.slice(0, list.findIndex((m) => m.id === id) + 1);
 
 test("the deployed input simplification upgrades without rewriting its checksum or voice history", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-voice-deployed-"));
@@ -109,7 +125,11 @@ test("a database with only the original three migrations (plus later ones) upgra
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-mig-"));
 	try {
 		const file = join(dir, "db.sqlite3");
-		const original = [conversationMigration, dialogueMigration, voiceMigration];
+		const original = orderMigrations([
+			...through(conversationMigrations, "conversation/0001-init"),
+			...through(dialogueMigrations, "dialogue/0001-init"),
+			...through(voiceMigrations, "voice-dialogue/0001-init"),
+		]);
 		const old = openStore(file, original);
 		const now = new Date().toISOString();
 		await old.write((db) => {
@@ -126,16 +146,16 @@ test("a database with only the original three migrations (plus later ones) upgra
 			}
 		});
 		await old.close();
-		const upgraded = openStore(file, [
-			...original,
-			queueMigration,
-			schedulerMigration,
-			queueLinkMigration,
-			sequenceMigration,
-			conversationAvatarMotionMigration,
-			conversationAnswerDeliveryMigration,
-			inputMigration,
+		// The build that staged inputs before the input simplification (0004) and text dedup (0005).
+		const staged = orderMigrations([
+			...conversationMigrations,
+			...queueMigrations,
+			...schedulerMigrations,
+			...continuityMigrations,
+			...dialogueMigrations,
+			...through(voiceMigrations, "voice-dialogue/0003-input"),
 		]);
+		const upgraded = openStore(file, staged);
 		const rows = upgraded.read((db) =>
 			db
 				.query(
@@ -160,6 +180,7 @@ test("a database with only the original three migrations (plus later ones) upgra
 		const dialogue = createDialogueService({
 			store: upgraded,
 			conversation: createConversationService(upgraded),
+			continuity: createContinuityService(upgraded),
 			larm: {
 				status: () => ({ state: "ready", capabilities: [] }),
 				connect: async () => {},
@@ -189,7 +210,7 @@ test("a database with only the original three migrations (plus later ones) upgra
 			upgraded.read((db) =>
 				db.query("SELECT id FROM schema_migrations_v2").all(),
 			),
-		).toHaveLength(10);
+		).toHaveLength(staged.length);
 		await upgraded.write((db) => {
 			db.query(
 				"INSERT INTO voice_turns (utterance_id,session_id,generation,status,revision,created_at,updated_at,sequence) VALUES ('input','session',1,'awaiting_input',0,?,?,1)",
@@ -200,38 +221,16 @@ test("a database with only the original three migrations (plus later ones) upgra
 			).run();
 		});
 		await upgraded.close();
-		const simplified = openStore(file, [
-			...original,
-			queueMigration,
-			schedulerMigration,
-			queueLinkMigration,
-			sequenceMigration,
-			conversationAvatarMotionMigration,
-			conversationAnswerDeliveryMigration,
-			inputMigration,
-			inputSimplificationMigration,
-			inputTextDedupMigration,
-		]);
+		const simplified = openStore(file, allMigrations());
 		expect(simplified.read((db) => get(db, "input"))?.status).toBe(
 			"interrupted",
 		);
 		await simplified.close();
 		// second start is a no-op
-		const again = openStore(file, [
-			...original,
-			queueMigration,
-			schedulerMigration,
-			queueLinkMigration,
-			sequenceMigration,
-			conversationAvatarMotionMigration,
-			conversationAnswerDeliveryMigration,
-			inputMigration,
-			inputSimplificationMigration,
-			inputTextDedupMigration,
-		]);
+		const again = openStore(file, allMigrations());
 		expect(
 			again.read((db) => db.query("SELECT id FROM schema_migrations_v2").all()),
-		).toHaveLength(12);
+		).toHaveLength(allMigrations().length);
 		expect(again.read((db) => readInput(db, "input"))).toEqual({
 			utteranceId: "input",
 			sources: ["input"],

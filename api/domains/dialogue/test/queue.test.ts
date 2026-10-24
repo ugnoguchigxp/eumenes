@@ -1,163 +1,159 @@
 import { afterEach, expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { openStore, type SqliteStore } from "../../../infrastructure/sqlite";
-import {
-	migration as conversationMigration,
-	avatarMotionMigration as conversationAvatarMotionMigration,
-	answerDeliveryMigration as conversationAnswerDeliveryMigration,
-	createConversationService,
-} from "../../conversation";
-import type { LarmPort } from "../../larm";
-import type { InferencePort } from "../../inference";
-import { createQueue, migration as queueMigration } from "../../queue";
-import {
-	createScheduler,
-	migration as schedulerMigration,
-} from "../../scheduler";
-import { createDialogueService, migration, queueLinkMigration } from "..";
-import { waitFor as until } from "../../../infrastructure/wait-for";
+import { waitFor } from "../../../infrastructure/wait-for";
+import { createDialogueService } from "..";
+import { createQueue } from "../../queue";
+import { createScheduler } from "../../scheduler";
+import { respond, setup, type Harness } from "./generation.fixture";
 
-const dirs: string[] = [];
-const stores: SqliteStore[] = [];
+/**
+ * Ordering, isolation and recovery of the conversation's runs (the ContextWindow specification, sections 8.2 and
+ * 12.2): a generation handles the utterances pending when it is claimed, a later input waits for its own run, and
+ * a run cut short by a restart is interrupted, never resumed by the old owner.
+ */
+let h: Harness | undefined;
 afterEach(async () => {
-	for (const s of stores.splice(0)) await s.close().catch(() => {});
-	for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
+	await h?.close();
+	h = undefined;
 });
-const migrations = [
-	conversationMigration,
-	conversationAvatarMotionMigration,
-	conversationAnswerDeliveryMigration,
-	migration,
-	queueMigration,
-	schedulerMigration,
-	queueLinkMigration,
-];
-type Call = { texts: string[]; resolve: (v: string) => void };
-function setup(
-	queueOptions: Parameters<typeof createQueue>[1] = {},
-	overrides: Partial<InferencePort> = {},
-) {
-	const dir = mkdtempSync(join(tmpdir(), "eumenes-dq-"));
-	dirs.push(dir);
-	const store = openStore(join(dir, "db.sqlite3"), migrations);
-	stores.push(store);
-	const calls: Call[] = [];
-	const larm: LarmPort & InferencePort = {
-		status: () => ({ state: "ready", capabilities: ["llm"] }),
-		connect: async () => {},
-		answer: (messages, signal) =>
-			new Promise((resolve, reject) => {
-				calls.push({
-					texts: messages
-						.filter((m) => m.role !== "system")
-						.map((m) => m.content.slice(0, 20)),
-					resolve,
-				});
-				signal?.addEventListener("abort", () => reject(new Error("aborted")));
-			}),
-		transcribe: async () => "",
-		speak: async () => new Uint8Array(),
-		close: async () => {},
-		...overrides,
-	};
-	const conversation = createConversationService(store);
-	const queue = createQueue(store, queueOptions);
-	const dialogue = createDialogueService({ store, conversation, larm, queue });
-	return { store, calls, conversation, queue, dialogue, larm };
-}
-const submit = (
-	d: ReturnType<typeof setup>["dialogue"],
-	text: string,
-	conversationId = "main",
-) => d.submit({ requestId: crypto.randomUUID(), conversationId, text });
 
-test("a run only sees earlier accepted turns; later inputs never leak into it", async () => {
-	const h = setup();
-	h.queue.start();
-	const a = await submit(h.dialogue, "A");
-	const b = await submit(h.dialogue, "B");
-	const c = await submit(h.dialogue, "C");
-	expect([a, b, c].map((r) => r.jobId !== null)).toEqual([true, true, true]);
-	await until(() => h.calls.length === 1);
-	// B and C are waiting behind A (same conversation order), not running
+const chat = respond();
+
+test("a run handles the utterances pending at its claim; a later input waits for its own run", async () => {
+	h = await setup({ autoStart: false });
+	let release!: () => void;
+	h.state.gate = new Promise<void>((resolve) => (release = resolve));
+	h.state.steps.push({ text: "ansA", calls: [chat] });
+	const a = await h.dialogue.submit({
+		requestId: crypto.randomUUID(),
+		conversationId: "main",
+		text: "A",
+	});
+	h.start();
+	await waitFor(() => h!.state.calls.length === 1);
+	// B arrives while A's generation is in flight: it is not in A's messages.
+	const b = await h.dialogue.submit({
+		requestId: crypto.randomUUID(),
+		conversationId: "main",
+		text: "B",
+	});
+	expect(h.state.calls[0]!.messages.at(-1)!.content).toBe("A");
 	expect(h.dialogue.get(b.id)?.status).toBe("queued");
-	h.calls[0]?.resolve("ansA");
-	await until(() => h.calls.length === 2);
-	h.calls[1]?.resolve("ansB");
-	await until(() => h.calls.length === 3);
-	h.calls[2]?.resolve("ansC");
-	await until(() => h.dialogue.get(c.id)?.status === "completed");
-	expect(h.calls[0]?.texts).toEqual(["A"]);
-	expect(h.calls[1]?.texts).toEqual(["A", "ansA", "B"]);
-	expect(h.calls[2]?.texts).toEqual(["A", "ansA", "B", "ansB", "C"]);
-	await h.queue.close(100);
+	h.state.steps.push({ text: "ansB", calls: [chat] });
+	release();
+	await waitFor(() => h!.dialogue.get(a.id)?.status === "completed");
+	await waitFor(() => h!.dialogue.get(b.id)?.status === "completed");
+	expect(h.dialogue.answerText(b.id)).toBe("ansB");
+	// B's own call sees A's exchange as history, then B.
+	expect(h.state.calls[1]!.messages.at(-1)!.content).toBe("B");
+	expect(h.state.calls[1]!.messages[1]!.content).toContain("ansA");
 });
 
-test("a failed earlier run leaves only its input in later history", async () => {
-	const h = setup();
-	h.queue.start();
-	const a = await submit(h.dialogue, "A");
-	await submit(h.dialogue, "B");
-	await until(() => h.calls.length === 1);
-	await h.dialogue.cancel(a.id);
-	await until(() => h.calls.length === 2);
-	expect(h.calls[1]?.texts).toEqual(["A", "B"]);
-	await h.queue.close(100);
+test("utterances pending together are one generation; a run with nothing left to handle ends as handled", async () => {
+	h = await setup({ autoStart: false });
+	h.state.steps.push({ text: "まとめて。", calls: [chat] });
+	const a = await h.dialogue.submit({
+		requestId: crypto.randomUUID(),
+		conversationId: "main",
+		text: "A",
+	});
+	const b = await h.dialogue.submit({
+		requestId: crypto.randomUUID(),
+		conversationId: "main",
+		text: "B",
+	});
+	h.start();
+	await waitFor(() => h!.dialogue.get(a.id)?.status === "completed");
+	await waitFor(() => h!.dialogue.get(b.id)?.status === "cancelled");
+	// One call carried both utterances, each as its own newest message, with the time it was said.
+	expect(h.state.calls).toHaveLength(1);
+	const newest = h.state.calls[0]!.messages.slice(2).map((m) => m.content);
+	expect(newest).toHaveLength(2);
+	expect(newest[0]).toMatch(/^\[.+\] A$/);
+	expect(newest[1]).toMatch(/^\[.+\] B$/);
+	expect(h.dialogue.get(b.id)).toMatchObject({
+		status: "cancelled",
+		error: "utterance_handled",
+	});
+	expect(h.state.calls).toHaveLength(1);
 });
 
 test("full queue rejects the submit and stores neither message nor run", async () => {
-	const h = setup({ limits: { total: 1, background: 1, scope: 1 } });
-	await submit(h.dialogue, "one");
-	await expect(submit(h.dialogue, "two")).rejects.toThrow("queue_full");
+	h = await setup({
+		autoStart: false,
+		queue: { limits: { total: 1, background: 1, scope: 1 } },
+	});
+	await h.dialogue.submit({
+		requestId: crypto.randomUUID(),
+		conversationId: "main",
+		text: "one",
+	});
+	await expect(
+		h.dialogue.submit({
+			requestId: crypto.randomUUID(),
+			conversationId: "main",
+			text: "two",
+		}),
+	).rejects.toThrow("queue_full");
 	expect(h.conversation.get("main").messages.map((m) => m.text)).toEqual([
 		"one",
 	]);
 	expect(h.dialogue.list("main")).toHaveLength(1);
 });
 
-test("restart: queued runs continue, a running run is interrupted, late result from the old owner is rejected", async () => {
-	const h = setup();
-	const a = await submit(h.dialogue, "A");
-	const b = await submit(h.dialogue, "B");
-	await h.queue.tick(); // claims A only (never started as a loop)
-	await until(() => h.calls.length === 1);
+test("restart: queued runs continue, a running run is interrupted, a late result from the old owner is rejected", async () => {
+	h = await setup({ autoStart: false });
+	let release!: () => void;
+	h.state.gate = new Promise<void>((resolve) => (release = resolve));
+	h.state.steps.push({ text: "old", calls: [chat] });
+	const a = await h.dialogue.submit({
+		requestId: crypto.randomUUID(),
+		conversationId: "main",
+		text: "A",
+	});
+	const b = await h.dialogue.submit({
+		requestId: crypto.randomUUID(),
+		conversationId: "main",
+		text: "B",
+	});
+	await h.queue.tick(); // claims A only
+	await waitFor(() => h!.state.calls.length === 1);
 	expect(h.dialogue.get(a.id)?.status).toBe("running");
-	// "restart": new queue/service instances over the same database
+	// "Restart": a new queue and service over the same database.
 	const queue2 = createQueue(h.store);
 	const dialogue2 = createDialogueService({
 		store: h.store,
 		conversation: h.conversation,
 		larm: h.larm,
 		queue: queue2,
+		continuity: h.continuity,
+		clock: () => new Date().toISOString(),
 	});
 	await dialogue2.recover();
 	expect(await queue2.recover()).toBe(1);
 	expect(dialogue2.get(a.id)?.status).toBe("interrupted");
 	expect(dialogue2.get(b.id)?.status).toBe("queued");
+	h.state.steps.push({ text: "ansB", calls: [chat] });
 	queue2.start();
-	await until(() => h.calls.length === 2);
-	h.calls[0]?.resolve("old answer");
-	// let the late result be (wrongly) processed, if it were going to be
+	await waitFor(() => h!.state.calls.length === 2);
+	// The old owner's answer arrives late: it is not adopted.
+	release();
 	for (let i = 0; i < 20; i++) await new Promise((r) => setImmediate(r));
 	expect(dialogue2.get(a.id)?.status).toBe("interrupted");
-	h.calls[1]?.resolve("ansB");
-	await until(() => dialogue2.get(b.id)?.status === "completed");
-	expect(h.conversation.get("main").messages.map((m) => m.text)).toEqual([
-		"A",
-		"B",
-		"ansB",
-	]);
+	await waitFor(() => dialogue2.get(b.id)?.status === "completed");
+	expect(
+		h.conversation
+			.get("main")
+			.messages.filter((m) => m.role === "assistant")
+			.map((m) => m.text),
+	).toEqual(["ansB"]);
 	await queue2.close(100);
-	await h.queue.close(100);
 });
 
 test("runs from before the queue existed are interrupted, not given a new job", async () => {
-	const h = setup();
+	h = await setup({ autoStart: false });
 	const now = new Date().toISOString();
 	await h.store.write((db) => {
-		h.conversation.appendInTransaction(db, {
+		h!.conversation.appendInTransaction(db, {
 			id: "m",
 			conversationId: "main",
 			role: "user",
@@ -174,8 +170,8 @@ test("runs from before the queue existed are interrupted, not given a new job", 
 	expect(h.dialogue.get("legacy")?.jobId).toBeNull();
 });
 
-test("scheduled prompt creates exactly one background run per occurrence; interactive input is claimed first", async () => {
-	const h = setup();
+test("a scheduled prompt creates exactly one background run per occurrence; an interactive input is claimed first", async () => {
+	h = await setup({ autoStart: false });
 	const clock = { t: Date.parse("2026-02-01T00:00:00Z") };
 	const scheduler = createScheduler(h.store, h.queue, {
 		now: () => clock.t,
@@ -207,28 +203,40 @@ test("scheduled prompt creates exactly one background run per occurrence; intera
 	expect(h.queue.list({ kind: "dialogue.generate" }).items[0]?.lane).toBe(
 		"background",
 	);
-	// an interactive run in another conversation overtakes the waiting background run
-	const live = await submit(h.dialogue, "今すぐ", "other");
+	// An interactive run in another conversation overtakes the waiting background run.
+	const live = await h.dialogue.submit({
+		requestId: crypto.randomUUID(),
+		conversationId: "other",
+		text: "今すぐ",
+	});
+	h.state.steps.push(
+		{ text: "はい", calls: [chat] },
+		{ text: "おはようございます", calls: [chat] },
+	);
+	let release!: () => void;
+	h.state.gate = new Promise<void>((resolve) => (release = resolve));
 	await h.queue.tick();
-	await until(() => h.calls.length === 1);
-	expect(h.calls[0]?.texts).toEqual(["今すぐ"]);
+	await waitFor(() => h!.state.calls.length === 1);
+	expect(h.state.calls[0]!.messages.at(-1)!.content).toBe("今すぐ");
 	expect(h.dialogue.get(live.id)?.status).toBe("running");
-	expect(h.dialogue.get(runs[0]?.id ?? "")?.status).toBe("queued");
-	h.calls[0]?.resolve("はい");
-	await until(() => h.dialogue.get(live.id)?.status === "completed");
+	expect(h.dialogue.get(runs[0]!.id)?.status).toBe("queued");
+	release();
+	await waitFor(() => h!.dialogue.get(live.id)?.status === "completed");
 	await h.queue.tick();
-	await until(() => h.calls.length === 2);
-	h.calls[1]?.resolve("おはようございます");
-	await until(() => h.dialogue.get(runs[0]?.id ?? "")?.status === "completed");
+	await waitFor(() => h!.state.calls.length === 2);
+	await waitFor(() => h!.dialogue.get(runs[0]!.id)?.status === "completed");
 	expect(scheduler.listOccurrences(schedule.id).items[0]?.jobState).toBe(
 		"completed",
 	);
-	await h.queue.close(100);
 });
 
-test("waitForTerminal honours abort and its own deadline without cancelling the run", async () => {
-	const h = setup();
-	const run = await submit(h.dialogue, "wait");
+test("waitForTerminal honours its own timeout and an abort, and never cancels the run", async () => {
+	h = await setup({ autoStart: false });
+	const run = await h.dialogue.submit({
+		requestId: crypto.randomUUID(),
+		conversationId: "main",
+		text: "wait",
+	});
 	const started = Date.now();
 	const waited = await h.dialogue.waitForTerminal(run.id, {
 		timeoutMs: 40,
@@ -242,44 +250,43 @@ test("waitForTerminal honours abort and its own deadline without cancelling the 
 		(await h.dialogue.waitForTerminal(run.id, { signal: controller.signal }))
 			?.status,
 	).toBe("queued");
+	expect(h.dialogue.get(run.id)?.status).toBe("queued");
 });
 
-test("rejected answer adoption fails both the run and its queue job", async () => {
-	const h = setup(
-		{},
-		{
-			requestFor: () => "request",
-			executeRequest: async () => ({
-				requestId: "request",
-				attemptId: "attempt",
-				value: "revoked answer",
-			}),
-			acceptInTransaction: () => false,
-		},
+test("a rejected answer adoption fails both the run and its queue job, and adds no message", async () => {
+	h = await setup();
+	h.state.acceptAllowed = false;
+	h.state.steps.push({ text: "revoked answer", calls: [chat] });
+	const run = await h.dialogue.submit({
+		requestId: crypto.randomUUID(),
+		conversationId: "main",
+		text: "question",
+	});
+	await waitFor(
+		() =>
+			!["queued", "running"].includes(h!.dialogue.get(run.id)?.status ?? ""),
 	);
-	try {
-		const run = await submit(h.dialogue, "question");
-		await h.queue.tick();
-		await until(
-			() => !["queued", "running"].includes(h.queue.get(run.jobId!)!.state),
-		);
-		expect(h.dialogue.get(run.id)?.status).toBe("failed");
-		expect(h.dialogue.get(run.id)?.error).toBe("permission_revoked");
-		expect(h.queue.get(run.jobId!)?.state).toBe("failed");
-		expect(h.queue.get(run.jobId!)?.errorCode).toBe("permission_revoked");
-		expect(h.conversation.get("main").messages.map((m) => m.text)).toEqual([
-			"question",
-		]);
-	} finally {
-		await h.queue.close(100);
-	}
+	expect(h.dialogue.get(run.id)?.status).toBe("failed");
+	expect(h.dialogue.get(run.id)?.error).toBe("permission_revoked");
+	expect(h.queue.get(run.jobId!)?.state).toBe("failed");
+	expect(h.queue.get(run.jobId!)?.errorCode).toBe("permission_revoked");
+	expect(h.conversation.get("main").messages.map((m) => m.text)).toEqual([
+		"question",
+	]);
 });
 
-test("only adopted, confident motion labels a running or completed answer; cancelled judgments are rejected", async () => {
-	const h = setup();
-	h.queue.start();
-	const run = await submit(h.dialogue, "良い知らせ");
-	await until(() => h.calls.length === 1);
+test("only an adopted, confident motion labels an answer; a judgment of a cancelled run is rejected", async () => {
+	h = await setup({ autoStart: false });
+	let release!: () => void;
+	h.state.gate = new Promise<void>((resolve) => (release = resolve));
+	h.state.steps.push({ text: "よかったですね。", calls: [chat] });
+	const run = await h.dialogue.submit({
+		requestId: crypto.randomUUID(),
+		conversationId: "main",
+		text: "良い知らせ",
+	});
+	h.start();
+	await waitFor(() => h!.state.calls.length === 1);
 	const decision = {
 		id: crypto.randomUUID(),
 		source: "system-one" as const,
@@ -293,48 +300,62 @@ test("only adopted, confident motion labels a running or completed answer; cance
 	for (const delivery of [
 		{ ...decision, source: "fallback" as const },
 		{ ...decision, motionConfidence: 0.2 },
-	]) {
+	])
 		expect(
 			await h.store.write((db) =>
-				h.dialogue.recordAnswerDeliveryInTransaction(db, run.id, delivery),
+				h!.dialogue.recordAnswerDeliveryInTransaction(db, run.id, delivery),
 			),
 		).toBe(false);
-	}
 	expect(
 		await h.store.write((db) =>
-			h.dialogue.recordAnswerDeliveryInTransaction(db, run.id, decision),
+			h!.dialogue.recordAnswerDeliveryInTransaction(db, run.id, decision),
 		),
 	).toBe(true);
-	h.calls[0]?.resolve("よかったですね。");
-	await until(() => h.dialogue.get(run.id)?.status === "completed");
+	release();
+	await waitFor(() => h!.dialogue.get(run.id)?.status === "completed");
 	expect(h.conversation.get("main").messages.at(-1)).toMatchObject({
 		text: "よかったですね。",
 		avatarMotion: "joyful",
 	});
-	const cancelled = await submit(h.dialogue, "取消");
-	await until(() => h.calls.length === 2);
+	// A run cancelled before its answer is adopted takes no judgment.
+	h.state.gate = new Promise<void>(() => {});
+	const cancelled = await h.dialogue.submit({
+		requestId: crypto.randomUUID(),
+		conversationId: "main",
+		text: "取消",
+	});
+	await waitFor(() => h!.state.calls.length === 2);
 	await h.dialogue.cancel(cancelled.id);
 	expect(
 		await h.store.write((db) =>
-			h.dialogue.recordAnswerDeliveryInTransaction(db, cancelled.id, decision),
+			h!.dialogue.recordAnswerDeliveryInTransaction(db, cancelled.id, decision),
 		),
 	).toBe(false);
-	await h.queue.close(100);
 });
 
-test("emotion context excludes later accepted inputs and uses the complete answer", async () => {
-	const h = setup();
-	h.queue.start();
-	const a = await submit(h.dialogue, "最初の話");
-	const b = await submit(h.dialogue, "後の話");
-	await until(() => h.calls.length === 1);
-	h.calls[0]?.resolve("最初への完全な返答。");
-	await until(() => h.calls.length === 2);
+test("the emotion context holds the earlier turns and the complete answer, never a later input", async () => {
+	h = await setup({ autoStart: false });
+	let release!: () => void;
+	h.state.gate = new Promise<void>((resolve) => (release = resolve));
+	h.state.steps.push({ text: "最初への完全な返答。", calls: [chat] });
+	const a = await h.dialogue.submit({
+		requestId: crypto.randomUUID(),
+		conversationId: "main",
+		text: "最初の話",
+	});
+	h.start();
+	await waitFor(() => h!.state.calls.length === 1);
+	const b = await h.dialogue.submit({
+		requestId: crypto.randomUUID(),
+		conversationId: "main",
+		text: "後の話",
+	});
+	release();
+	await waitFor(() => h!.dialogue.get(a.id)?.status === "completed");
 	expect(h.dialogue.answerContext(a.id)).toEqual({
 		answer: "最初への完全な返答。",
 		turns: [{ role: "user", text: "最初の話" }],
 	});
 	await h.dialogue.cancel(b.id);
 	expect(h.dialogue.answerContext(b.id)).toBeNull();
-	await h.queue.close(100);
 });

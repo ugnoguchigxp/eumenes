@@ -1,0 +1,10 @@
+{
+	"name": "2026-10-24-context-window",
+	"trials": 3,
+	"concurrency": 2,
+	"toolsCatalog": "tools-catalog.json",
+	"adoption": {
+		"minNetGain": 0,
+		"maxLatencyRatio": 1
+	}
+}

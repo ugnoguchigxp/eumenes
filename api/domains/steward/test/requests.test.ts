@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { keepAll, setupSteward, type StewardHarness } from "./steward.fixture";
+import { setupSteward, type StewardHarness } from "./steward.fixture";
 
 const harnesses: StewardHarness[] = [];
 afterEach(async () => {
@@ -37,9 +37,8 @@ const windowOf = (h: StewardHarness) =>
 
 test("a request alone starts a unit, is settled by the request's state, and its words are cleared", async () => {
 	const h = await setup();
-	// The exchange is already learned; a cancelled run then leaves only a remember request.
+	// The run's events are already learned; a cancelled run then leaves only a remember request.
 	h.inference.script("curate-memory", empty);
-	h.inference.script("dispose-exchanges", keepAll);
 	await h.run({ user: "こんにちは", end: "completed" });
 	await h.drain();
 	const run = await h.run({
@@ -63,11 +62,11 @@ test("a request alone starts a unit, is settled by the request's state, and its 
 				kind: "remember",
 				what: "誕生日は5月1日",
 				detail: "毎年祝う",
-				exchange: "e1",
+				event: "e1",
 			},
 		]);
-		const view = (data.exchanges as Array<Record<string, unknown>>)[0]!;
-		expect(view).toMatchObject({ outcome: "user_only", reference: true });
+		const view = (data.events as Array<Record<string, unknown>>)[0]!;
+		expect(view).toMatchObject({ by: "user", reference: true });
 		return {
 			...empty,
 			resolve: [
@@ -90,8 +89,8 @@ test("a request alone starts a unit, is settled by the request's state, and its 
 	expect(item!.sourceMessageIds).toEqual([run.inputMessageId]);
 	const [row] = h.inbox();
 	expect(row).toMatchObject({ state: "done", what: "", detail: null });
-	// The exchange of the cancelled run was never registered, and no more units are made.
-	expect(h.exchangeRow(run.inputMessageId)).toBeNull();
+	// The cancelled run recorded no event, and no more units are made.
+	expect(h.log()).toHaveLength(2);
 	await h.kick("c1");
 	expect(h.units().filter((u) => u.state === "open")).toEqual([]);
 	expect(windowOf(h)!.notices.map((n) => n.text)).toContain(
@@ -111,7 +110,6 @@ test("several requests are settled by one call, and one the model leaves out is 
 			],
 		};
 	});
-	h.inference.script("dispose-exchanges", keepAll);
 	const run = await h.run({
 		user: "いろいろ",
 		end: "completed",
@@ -137,7 +135,6 @@ test("several requests are settled by one call, and one the model leaves out is 
 test("an explicit remember of what is already stored makes a new confirmed version", async () => {
 	const h = await setup();
 	h.inference.script("curate-memory", { ...empty, remember: [remember()] });
-	h.inference.script("dispose-exchanges", keepAll);
 	await h.run({ user: "辛いものが好きです", end: "completed" });
 	await h.drain();
 	const [before] = h.memory.list();
@@ -151,7 +148,6 @@ test("an explicit remember of what is already stored makes a new confirmed versi
 			],
 		};
 	});
-	h.inference.script("dispose-exchanges", keepAll);
 	const second = await h.run({
 		user: "辛いものが好きなこと、覚えておいて",
 		end: "completed",
@@ -174,7 +170,6 @@ test("an explicit remember of what is already stored makes a new confirmed versi
 test("a remember request the model answers with none but points at the stored item is still reconfirmed", async () => {
 	const h = await setup();
 	h.inference.script("curate-memory", { ...empty, remember: [remember()] });
-	h.inference.script("dispose-exchanges", keepAll);
 	await h.run({ user: "辛いものが好きです", end: "completed" });
 	await h.drain();
 	const [before] = h.memory.list();
@@ -192,7 +187,6 @@ test("a remember request the model answers with none but points at the stored it
 			],
 		};
 	});
-	h.inference.script("dispose-exchanges", keepAll);
 	await h.run({
 		user: "辛いものが好きなこと、ちゃんと覚えておいてね",
 		end: "completed",
@@ -209,11 +203,10 @@ test("a remember request the model answers with none but points at the stored it
 test("a remember request answered with none and a wrong ref is reconfirmed through its key", async () => {
 	const h = await setup();
 	h.inference.script("curate-memory", { ...empty, remember: [remember()] });
-	h.inference.script("dispose-exchanges", keepAll);
 	await h.run({ user: "辛いものが好きです", end: "completed" });
 	await h.drain();
 	const [before] = h.memory.list();
-	// The live model cited the exchange instead of the item, but named the item's key.
+	// The live model cited the event instead of the item, but named the item's key.
 	h.inference.script("curate-memory", {
 		...empty,
 		resolve: [
@@ -226,7 +219,6 @@ test("a remember request answered with none and a wrong ref is reconfirmed throu
 			}),
 		],
 	});
-	h.inference.script("dispose-exchanges", keepAll);
 	await h.run({
 		user: "辛いものが好きなこと、覚えておいて",
 		end: "completed",
@@ -241,7 +233,6 @@ test("a request the model never answers is given up after three tries", async ()
 	const h = await setup();
 	const answer = { ...empty };
 	h.inference.script("curate-memory", answer, answer, answer);
-	h.inference.script("dispose-exchanges", keepAll);
 	await h.run({
 		user: "x",
 		end: "completed",
@@ -262,7 +253,6 @@ test("a correct request updates an item and is shown to the user once as a notic
 		...empty,
 		remember: [remember({ key: "food.spicy", text: "辛いものは苦手" })],
 	});
-	h.inference.script("dispose-exchanges", keepAll);
 	await h.run({ user: "辛いものは苦手", end: "completed" });
 	await h.drain();
 	h.inference.script("curate-memory", (data) => {
@@ -278,7 +268,6 @@ test("a correct request updates an item and is shown to the user once as a notic
 			],
 		};
 	});
-	h.inference.script("dispose-exchanges", keepAll);
 	await h.run({
 		user: "最近は食べられるようになった",
 		end: "completed",
@@ -290,5 +279,98 @@ test("a correct request updates an item and is shown to the user once as a notic
 	]);
 	expect(windowOf(h)!.notices.map((n) => n.text)).toContain(
 		"訂正の依頼を反映しました。",
+	);
+});
+
+test("a withdraw request takes back a request that was not applied yet: the forget is not carried out", async () => {
+	const h = await setup();
+	h.inference.script("curate-memory", { ...empty, remember: [remember()] });
+	await h.run({ user: "辛いものが好きです", end: "completed" });
+	await h.drain();
+	const [item] = h.memory.list();
+	h.inference.script("curate-memory", (data) => {
+		const requests = data.requests as Array<{ id: string; kind: string }>;
+		expect(requests.map((r) => [r.id, r.kind])).toEqual([
+			["r1", "forget"],
+			["r2", "withdraw"],
+		]);
+		const ref = (data.longTerm as Array<{ ref: string }>)[0]!.ref;
+		return {
+			...empty,
+			resolve: [
+				// The model also answered the forget; a withdrawn request is not carried out whatever it wrote.
+				resolve({ request: "r1", action: "forget", refs: [ref] }),
+				resolve({ request: "r2", action: "withdraw", refs: ["r1"] }),
+			],
+		};
+	});
+	const run = await h.run({
+		user: "辛いものを忘れて。やっぱり忘れないで",
+		end: "completed",
+		requests: [
+			{ kind: "forget", what: "辛い食べ物" },
+			{ kind: "withdraw", what: "辛いものを忘れる依頼" },
+		],
+	});
+	await h.drain();
+	expect(h.memory.list().map((i) => i.id)).toEqual([item!.id]);
+	expect(h.memory.blockedMessageIds([run.inputMessageId]).size).toBe(0);
+	const byId = Object.fromEntries(h.inbox().map((r) => [r.id, r]));
+	expect(byId[run.requestIds[0]!]).toMatchObject({
+		state: "none",
+		resultCode: "withdrawn",
+		what: "",
+	});
+	expect(byId[run.requestIds[1]!]).toMatchObject({ state: "done", what: "" });
+	expect(windowOf(h)!.notices.map((n) => n.text)).toContain(
+		"まだ実行していなかった記憶の依頼を取り下げました。",
+	);
+});
+
+test("a withdraw request can not undo an applied forget: it finds nothing to take back and the forget stays", async () => {
+	const h = await setup();
+	h.inference.script("curate-memory", { ...empty, remember: [remember()] });
+	await h.run({ user: "辛いものが好きです", end: "completed" });
+	await h.drain();
+	h.inference.script("curate-memory", (data) => {
+		const ref = (data.longTerm as Array<{ ref: string }>)[0]!.ref;
+		return {
+			...empty,
+			resolve: [resolve({ action: "forget", refs: [ref] })],
+		};
+	});
+	await h.run({
+		user: "辛いものを忘れて",
+		end: "completed",
+		requests: [{ kind: "forget", what: "辛い食べ物" }],
+	});
+	await h.drain();
+	expect(
+		h.memory.list(true).filter((i) => i.semanticKey === "food.spicy"),
+	).toEqual([]);
+	h.inference.script("curate-memory", (data) => {
+		// The applied request is not offered: there is only the withdrawal to answer.
+		expect((data.requests as unknown[]).length).toBe(1);
+		return {
+			...empty,
+			resolve: [resolve({ request: "r1", action: "withdraw", refs: ["r1"] })],
+		};
+	});
+	await h.run({
+		user: "やっぱり忘れないで",
+		end: "completed",
+		requests: [{ kind: "withdraw", what: "辛いものを忘れる依頼" }],
+	});
+	await h.drain();
+	expect(
+		h.memory.list(true).filter((i) => i.semanticKey === "food.spicy"),
+	).toEqual([]);
+	expect(h.inbox().at(-1)).toMatchObject({
+		kind: "withdraw",
+		state: "none",
+		resultCode: "nothing_to_withdraw",
+	});
+	expect(windowOf(h)!.notices.map((n) => n.text)).toContain(
+		"取り下げられる記憶の依頼はありませんでした。すでに実行した依頼は元に戻せません。",
 	);
 });

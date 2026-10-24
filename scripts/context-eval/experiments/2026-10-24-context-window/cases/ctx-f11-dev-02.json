@@ -1,0 +1,55 @@
+{
+	"id": "ctx-f11-dev-02",
+	"family": "F11",
+	"split": "dev",
+	"seed": {
+		"events": [
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-20T05:00:00.000Z",
+				"text": "最近、早起きが続かなくて困っている"
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-20T05:00:04.000Z",
+				"text": "寝る前の画面を減らすと、朝が楽になるそうですよ。",
+				"origin": "reply"
+			},
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-20T05:01:00.000Z",
+				"text": "なるほど。他には？"
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-20T05:01:03.000Z",
+				"text": "朝いちばんにカーテンを開けて、光を浴びるのも効くようです。",
+				"origin": "reply",
+				"heard": "none"
+			}
+		],
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "butler"
+		}
+	},
+	"input": "最後に言ってくれたのは何だっけ？",
+	"expect": {
+		"checks": [
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "delivery_aware",
+				"condition": "直前のカーテンの話は再生に失敗して利用者に届いていないことを踏まえている。届いたことを前提に答えず、言い直すか、届いていなかったと答えている。"
+			}
+		]
+	}
+}

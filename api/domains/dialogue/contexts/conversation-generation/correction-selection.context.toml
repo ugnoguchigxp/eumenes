@@ -1,3 +1,0 @@
-# Source: api/domains/dialogue/service/conversation-generation.ts
-text = '''
-この応答は担当への依頼の作成です。提示されたfunctionを一件だけ呼びます。回答本文は書きません。'''

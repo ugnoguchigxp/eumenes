@@ -1,13 +1,13 @@
+import { createContinuityService } from "../../domains/continuity";
 import { afterEach, expect, test } from "bun:test";
 import type { InferencePort, Receipt } from "../../domains/inference";
 import { createDialogueService } from "../../domains/dialogue";
 import {
-	analysisReceipt,
-	DISCOVERY,
-	finishCall,
-	isAnalysisRound,
-	isCompletionCheck,
-} from "../../domains/dialogue/test/analysis.fixture";
+	callsOf,
+	isResultRound,
+	isUtteranceRound,
+	searchThenDelegate,
+} from "../toolchain/conversation-script.fixture";
 import { createDotsDialogue } from "./dots-dialogue";
 import { dotsFixture } from "./dots-fixture";
 import { createToolchainHistory } from "../../domains/toolchain-history";
@@ -41,27 +41,27 @@ test("conversation hands the request to the delegation toolchain, whose sub-agen
 			_p: unknown,
 			tools: unknown,
 		) => {
-			if (isAnalysisRound(tools as Parameters<typeof isAnalysisRound>[0])) {
+			if (
+				isUtteranceRound(tools as never) &&
+				!isResultRound(history as never)
+			) {
+				// The conversation's round: a search for the delegation toolchain, then the hand-over of the request.
 				analyses++;
-				// The first round searches; the found delegation toolchain is chosen in the next one.
-				return JSON.stringify(tools).includes('"delegate_project"')
-					? analysisReceipt("request", {
-							name: "delegate_project",
-							announcement: "プロジェクトの変更に取りかかります。",
-						})
-					: analysisReceipt("request", {
-							name: DISCOVERY,
-							args: { kind: "action", query: "プロジェクトの変更を実装" },
-						});
-			}
-			// The completion check of the delegated result: the handed request is achieved.
-			if (isCompletionCheck(tools as Parameters<typeof isCompletionCheck>[0]))
+				const step = searchThenDelegate(
+					(candidate) => candidate.id === "dots.delegate",
+					"プロジェクトの変更を実装。tests passで完了",
+					{
+						announcement: "プロジェクトの変更に取りかかります。",
+						impact: "create",
+					},
+				)(history as never);
 				return {
 					requestId: "request",
-					attemptId: "check",
-					value: "",
-					toolCalls: [finishCall()],
+					attemptId: `search-${analyses}`,
+					value: step.text ?? "",
+					toolCalls: callsOf(step, () => crypto.randomUUID()),
 				} as Receipt;
+			}
 			messages.push(history);
 			calls++;
 			const r: Receipt = {
@@ -69,24 +69,9 @@ test("conversation hands the request to the delegation toolchain, whose sub-agen
 				attemptId: String(calls),
 				value: "",
 			};
-			if (calls === 1) {
-				expect(JSON.stringify(tools)).toContain("delegate_project");
-				// The second round passes only the request; the notice was the first round's.
-				expect(JSON.stringify(tools)).not.toContain("projectRef");
-				r.toolCalls = [
-					{
-						id: "call",
-						name: "delegate_project",
-						arguments: JSON.stringify({
-							request: "プロジェクトの変更を実装。tests passで完了",
-						}),
-					},
-				];
-			} else {
-				expect(tools).toBeUndefined();
-				r.value = "作業を受け付けました。";
-				delta(r.value as string);
-			}
+			// The hand-over was the conversation's own call; the one call left is the result phase's reply.
+			r.value = "作業を受け付けました。";
+			delta(r.value as string);
 			return r;
 		},
 		captureControlInTransaction: () => "control",
@@ -116,6 +101,7 @@ test("conversation hands the request to the delegation toolchain, whose sub-agen
 	} as unknown as InferencePort;
 	const dialogue = createDialogueService({
 		store: f.store,
+		continuity: createContinuityService(f.store),
 		conversation: f.conversation,
 		larm,
 		queue: f.queue,
@@ -137,10 +123,11 @@ test("conversation hands the request to the delegation toolchain, whose sub-agen
 	f.queue.start();
 	const done = await dialogue.waitForTerminal(run.id, { timeoutMs: 3000 });
 	expect(done).toMatchObject({ status: "completed" });
-	// The discovery and the analysis that chooses, then the handover and the answer.
+	// The search and the hand-over (conversation), then the result phase's reply.
 	expect(analyses).toBe(2);
-	expect(calls).toBe(2);
-	expect(JSON.stringify(messages[1])).toContain("delegationResult");
+	expect(calls).toBe(1);
+	// The result phase carries the start operation's receipt as the TODO's result (registered in Eumenes).
+	expect(JSON.stringify(messages[0])).toContain("registered_in_eumenes");
 	// The sub-agent loaded the toolchain's set and the catalog; the conversation did not.
 	expect(commandMessages).toHaveLength(1);
 	expect(JSON.stringify(commandMessages[0])).toContain("dots.start");

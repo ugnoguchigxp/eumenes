@@ -1,8 +1,9 @@
 /**
- * Machine metric (spec 5.4 / 7.2): how much of the previous call's prompt the next call shares as a prefix.
+ * Machine metric (spec 12.4 / 21.2): how much of the previous call's prompt the next call shares as a prefix.
  * Prompt caches reuse a byte-identical prefix, so the shared part is found in bytes of the canonical serialization
  * and also counted in tokens (the product's estimate).
  */
+import { createHash } from "node:crypto";
 import { estimateTextTokens } from "../../../inference";
 import type { ChatMessage } from "../../service/context";
 
@@ -102,3 +103,7 @@ export function prefixStability(
 					),
 	};
 }
+
+/** sha256 of the canonical JSON of a message list: the identity of a prompt. */
+export const promptHash = (messages: readonly ChatMessage[]) =>
+	createHash("sha256").update(canonicalJson(messages)).digest("hex");

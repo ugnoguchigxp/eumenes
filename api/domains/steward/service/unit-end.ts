@@ -7,10 +7,12 @@ import {
 } from "../contracts";
 import {
 	type UnitRow,
+	bumpEventFailure,
 	bumpGoalTodoFailure,
 	bumpInboxFailure,
 	bumpWorldEvent,
 	closeUnit,
+	deleteEventFailures,
 	deleteGoalTodos,
 	deleteWorldEvents,
 	insertDecision,
@@ -23,8 +25,7 @@ import {
 } from "../repository";
 import type { Kick } from "./kick";
 import { REQUEST_FAILED_NOTICE } from "./notices";
-import { exchangeStepOf } from "./steps";
-import { skipStep } from "./steps/shared";
+import { rangeKey } from "./episode-plan";
 import type { ApplyResult, StepEnv, StewardDeps } from "./types";
 import { type Wake, retryDelay } from "./wake";
 
@@ -85,19 +86,21 @@ export function createUnitEnd(deps: StewardDeps, kick: Kick, wake: Wake) {
 	/** One more failed try over each target; at the limit a target is given up (section 2.3). */
 	function countFailures(env: StepEnv, unit: UnitRow) {
 		const { db } = env;
-		const key = exchangeStepOf[unit.step];
 		const now = deps.clock();
-		if (key)
-			for (const id of unit.targets.exchanges ?? []) {
-				if (
-					memory.recordExchangeFailureInTransaction(db, id, key) >= MAX_FAILURES
-				)
-					skipStep(env, id, key);
-			}
+		const { conversationId } = unit;
+		// An event that failed three times is given up: it is marked handled, and later events are not held back.
+		if (unit.step === "curate-memory")
+			for (const seq of unit.targets.seqs ?? [])
+				if (bumpEventFailure(db, conversationId, seq) >= MAX_FAILURES) {
+					deps.continuity.events.markCuratedInTransaction(db, conversationId, [
+						seq,
+					]);
+					deleteEventFailures(db, conversationId, [seq]);
+				}
 		if (unit.step === "curate-goals")
-			for (const id of unit.targets.exchanges ?? [])
-				if (bumpGoalTodoFailure(db, id) >= MAX_FAILURES)
-					deleteGoalTodos(db, [id]);
+			for (const seq of unit.targets.seqs ?? [])
+				if (bumpGoalTodoFailure(db, conversationId, seq) >= MAX_FAILURES)
+					deleteGoalTodos(db, conversationId, [seq]);
 		const world = deps.world;
 		if (unit.kind === "world_events" && world) {
 			// An event that failed three times is given up (`STEWARD_GAVE_UP`); later events are not held back by it.
@@ -122,10 +125,10 @@ export function createUnitEnd(deps: StewardDeps, kick: Kick, wake: Wake) {
 			});
 	}
 
-	/** The recall preparation for this exchange is over (done, given up, or unreadable). */
+	/** The recall preparation for this event is over (done, given up, or unreadable). */
 	function dropRecall(db: Database, unit: UnitRow) {
 		const state = readState(db, unit.conversationId);
-		if (state.recallPending === unit.targets.message)
+		if (state.recallPending === unit.targets.recallSeq)
 			writeState(db, { ...state, recallPending: null });
 	}
 
@@ -194,17 +197,31 @@ export function createUnitEnd(deps: StewardDeps, kick: Kick, wake: Wake) {
 		});
 	}
 
+	/** An episode range with nothing to prepare is remembered, so the kick does not make it into a unit again. */
+	function markEpisodeQuiet(db: Database, unit: UnitRow) {
+		const range = unit.targets.range;
+		if (!range) return;
+		const state = readState(db, unit.conversationId);
+		const key = rangeKey(unit.step, range);
+		const known = state.quiet.episode ?? [];
+		if (known.includes(key)) return;
+		writeState(db, {
+			...state,
+			quiet: { ...state.quiet, episode: [...known, key].slice(-100) },
+		});
+	}
+
 	/** The upkeep control after an adopted step. */
 	function settleState(env: StepEnv, unit: UnitRow, applied: ApplyResult) {
 		const { db } = env;
 		const state = readState(db, unit.conversationId);
 		if (applied.changed) state.maintenanceRevision += 1;
+		if (unit.step === "curate-memory" && (unit.targets.seqs?.length ?? 0) > 0)
+			state.recallPending = Math.max(...unit.targets.seqs!);
 		if (
-			unit.step === "curate-memory" &&
-			(unit.targets.exchanges?.length ?? 0) > 0
+			unit.slot === "recall" &&
+			state.recallPending === unit.targets.recallSeq
 		)
-			state.recallPending = unit.targets.exchanges!.at(-1)!;
-		if (unit.slot === "recall" && state.recallPending === unit.targets.message)
 			state.recallPending = null;
 		if (unit.slot === "maintenance" && applied.quiet) {
 			const revision = unit.targets.revision ?? state.maintenanceRevision;
@@ -223,6 +240,7 @@ export function createUnitEnd(deps: StewardDeps, kick: Kick, wake: Wake) {
 		failUnit,
 		staleUnit,
 		markQuiet,
+		markEpisodeQuiet,
 		settleState,
 		dropRecall,
 	};

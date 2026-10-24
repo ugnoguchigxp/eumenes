@@ -1,6 +1,10 @@
-import { answerAnalysis } from "../toolchain/analysis-round.fixture";
 import { readFileSync } from "node:fs";
 import { createLarmPlayground, type LarmPort } from "../../domains/larm";
+import {
+	activeSlots,
+	answerUtterance,
+	handOver,
+} from "./conversation-turn.fixture";
 export const playbackQuestion = "bright pianoの保存曲をタグで探して聴きたい";
 export const playbackPlan = {
 	title: "明るいピアノ",
@@ -151,29 +155,14 @@ export function musicLibraryFixture(correctablePlan = false) {
 		transcribe: async () => "",
 		speak: async () => new Uint8Array(),
 		answer: async (messages, _signal, options) => {
-			if (
-				answerAnalysis(options, {
-					call: "music_library",
-					announcement: "準備します。",
-					kind: "action",
-				})
-			)
-				return "";
-			if (options?.tools?.length) {
-				stages.push("route");
-				if (!options.tools.some((t) => t.function.name === "music_library"))
-					throw new Error("playback_not_offered");
-				options.onToolCalls!([
-					{
-						id: "playback",
-						name: "music_library",
-						arguments: JSON.stringify({
-							request: playbackQuestion,
-						}),
-					},
-				]);
-				return "";
-			}
+			const turn = answerUtterance(
+				options?.tools,
+				messages,
+				options?.onToolCalls,
+				handOver("music.library", "準備します。", "none"),
+				() => stages.push("route"),
+			);
+			if (turn !== undefined) return turn;
 			if (messages[0]!.content.includes("OUTPUT_SCHEMA=")) {
 				stages.push("plan");
 				if (!messages[1]!.content.includes("libraryTags"))
@@ -182,10 +171,10 @@ export function musicLibraryFixture(correctablePlan = false) {
 				return correctablePlan ? plan.slice(0, -1) + ",}" : plan;
 			}
 			stages.push("answer");
-			const result = JSON.parse(
-				messages.find((m) => m.content.includes('"musicResult":'))!.content,
-			).musicResult;
-			return result.state === "completed"
+			const result = activeSlots(messages).at(-1)?.result as
+				| { state?: string }
+				| undefined;
+			return result?.state === "completed"
 				? "保存曲のプレイリストを開きました。"
 				: "保存曲を取得できませんでした。";
 		},

@@ -20,7 +20,14 @@ import {
 import type { ValidityBounds } from "./curation-evidence";
 
 export type StateWrite =
-	| { ok: true; item: StateItem; changed: boolean; reconfirmed: boolean }
+	| {
+			ok: true;
+			item: StateItem;
+			changed: boolean;
+			reconfirmed: boolean;
+			/** An active version of the same fact was stopped or replaced by this write. */
+			replaced: boolean;
+	  }
 	| { ok: false; reason: CurationRejection };
 
 /** The State items and the one write of a State version (the building blocks of remember, update and merge). */
@@ -122,13 +129,14 @@ export function createStateWriter(deps: CurationDeps) {
 				: {}),
 		});
 		if (result.status === "applied" || result.status === "unchanged") {
-			// No immediate change: a replaced or negated value is not content that must stop being used (only a stop or a
-			// forget is). A run in flight stays adoptable; the next published window carries the new version.
+			// A replacement by the agent's own inference is not immediate: a run in flight stays adoptable and the next
+			// published window carries the new version. An explicit correction is recorded by `stored`.
 			return {
 				ok: true,
 				item: result.item,
 				changed: result.status === "applied",
 				reconfirmed: reconfirm,
+				replaced: reconfirm || replace,
 			};
 		}
 		if (result.status === "rejected") {
@@ -155,6 +163,9 @@ export function createStateWriter(deps: CurationDeps) {
 	): CurationResult {
 		if (!written.ok) return rejected(op, written.reason);
 		// Who asked is recorded when the item was created or actually changed, never on a no-op.
+		if (written.changed && explicit && written.replaced)
+			// What the user corrected must not stay in the published profile beside its new version (section 13).
+			deps.windows.recordImmediateInTransaction(db, "state_correct", null);
 		if (written.changed)
 			putProvenance(
 				db,

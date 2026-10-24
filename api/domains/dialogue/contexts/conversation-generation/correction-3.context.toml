@@ -1,3 +1,2 @@
-# Source: api/domains/dialogue/service/conversation-generation.ts
 text = '''
-操作用のfunctionが提示されていない応答での修正時だけ、提示済みの結果と現在の依頼に基づいて自然な回答本文だけを返します。元の依頼を再実行しません。'''
+respond_requiredなら、本文と同じ生成でrespondを呼びます。answer_without_basisなら、respondの分析に合う根拠（担当への依頼、仕事の操作の結果、activeの結果をtodoRefsで示す、logやepisodeをaboutで示す、断りをunavailableで示す）を伴う出力に直します。根拠を作らず、分析を根拠に合わせて書き換えません。'''

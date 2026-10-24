@@ -35,10 +35,17 @@ for (const [fullResearch, invalidateLatest] of [
 			fullResearch,
 			parent: async (messages) => {
 				parents++;
-				const report = messages.find((m) =>
-					m.content.includes('"delivery":"guided-web"'),
-				)!;
-				return JSON.parse(report.content).report.answer;
+				// The result phase's document carries the finished research as the TODO's result.
+				const document = JSON.parse(
+					messages.find((m) => m.role === "user" && m.content.startsWith("{"))!
+						.content,
+				) as {
+					active: Array<{ result?: { answer?: string; summary?: string } }>;
+				};
+				const result = [...document.active]
+					.reverse()
+					.find((entry) => entry.result)!.result!;
+				return result.answer ?? result.summary!;
 			},
 			control: async (messages) => {
 				const data = workerPacket(messages);

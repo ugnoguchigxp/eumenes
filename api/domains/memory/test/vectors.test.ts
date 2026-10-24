@@ -123,7 +123,7 @@ test("a prefetched exchange whose message changed makes the run's window stale",
 	const digest = sha256Hex("京都の話をしたい");
 	await h.store.write((db) =>
 		h.memory.windows.rebuildInTransaction(db, "c1", {
-			refreshLongTerm: false,
+			republish: false,
 			prefetch: {
 				text: "京都の話",
 				pins: [{ messageId: old, digest }],

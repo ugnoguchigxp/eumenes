@@ -11,6 +11,7 @@ import type { MemoryItemDto } from "../../domains/memory";
 import { settle, waitFor } from "../../infrastructure/wait-for";
 import { openStore } from "../../infrastructure/sqlite";
 import { createAgencyHost, type AgencySettings } from "./host";
+import { createAgencyWork } from "./work";
 import { AgencyRouteRefusedError } from "./llm-port";
 
 const T0 = Date.parse("2026-10-22T09:00:00Z");
@@ -125,6 +126,7 @@ function harness(
 			},
 		},
 		conversationBusy: () => options.busy?.() ?? false,
+		recordSpokeInTransaction: () => {},
 		createLlm:
 			options.llm ??
 			((next) => ({
@@ -971,160 +973,54 @@ describe("review fixes", () => {
 	});
 });
 
-describe("work reports (spec agency-work-reports-design-2026-10-24)", () => {
-	/** A fake work port: held reports per conversation; records what was released. */
-	function fakeWork(h: Harness) {
-		const held: Array<{
-			eventId: string;
-			executionId: string;
-			conversationId: string;
-			heldAt: number;
-		}> = [];
-		const released: string[] = [];
-		const take = (pick: (r: (typeof held)[number]) => boolean) => {
-			let n = 0;
-			for (const r of held.filter(pick)) {
-				held.splice(held.indexOf(r), 1);
-				released.push(r.executionId);
-				n++;
-			}
-			return n;
-		};
-		const work = {
-			todosInTransaction: (_db: unknown, conversationId: string) =>
-				held
-					.filter((r) => r.conversationId === conversationId)
-					.map((r) => ({
-						id: r.executionId,
-						title: "楽曲の生成",
-						status: "done" as const,
-						outcome: "succeeded" as const,
-						result: "3分の曲",
-						requestedAt: T0,
-						doneAt: r.heldAt,
-					})),
-			heldInTransaction: (_db: unknown, conversationId?: string) =>
-				held.filter(
-					(r) =>
-						conversationId === undefined || r.conversationId === conversationId,
-				),
-			releaseInTransaction: (
-				_db: unknown,
-				conversationId: string,
-				ids: readonly string[],
-			) =>
-				take(
-					(r) =>
-						r.conversationId === conversationId && ids.includes(r.executionId),
-				),
-			releaseAllInTransaction: (_db: unknown, conversationId?: string) =>
-				take(
-					(r) =>
-						conversationId === undefined || r.conversationId === conversationId,
-				),
-			releaseStaleInTransaction: () => 0,
-		};
-		h.host.attachWork(work as never);
-		return {
-			held,
-			released,
-			/** A result is held now and a commit announces it. */
-			async hold(executionId: string, conversationId = "c1", at?: number) {
-				held.push({
-					eventId: `ev-${executionId}`,
-					executionId,
-					conversationId,
-					heldAt: at ?? Date.now(),
-				});
-				// A real change, as the hold's INSERT is (a write without changes notifies nobody).
-				await h.store.write((db) => {
-					db.exec("CREATE TABLE IF NOT EXISTS held_probe(x INTEGER)");
-					db.query("INSERT INTO held_probe VALUES(1)").run();
-				});
-				await settle();
-			},
-		};
-	}
-
-	test("a held report opens a result_received decision; reporting it releases the notice and appends nothing", async () => {
+describe("TODOs offered to the agency", () => {
+	const todo = (id: string, status: "todo" | "waiting" | "done") => ({
+		id,
+		title: `仕事 ${id}`,
+		status,
+		revision: 1,
+		createdAt: new Date(T0).toISOString(),
+		updatedAt: new Date(T0).toISOString(),
+	});
+	test("only the open TODOs of the dialogue ledger reach the decision; finished ones never do", async () => {
 		const h = harness();
+		const asked: string[] = [];
+		h.host.attachWork(
+			createAgencyWork({
+				dialogue: {
+					todosInTransaction: (_db, conversationId) => {
+						asked.push(conversationId);
+						return [
+							todo("open1", "todo"),
+							todo("ask1", "waiting"),
+							todo("done1", "done"),
+						];
+					},
+				},
+			}),
+		);
 		await exchange(h, 1);
 		await waitFor(() => h.calls.select === 1);
-		const w = fakeWork(h);
-		h.setNow(T0 + 60_000);
-		h.setSelect(() => choice("speak", { refs: ["todo:x1"] }));
-		await w.hold("x1", "c1", T0 + 60_000);
-		await waitFor(() => w.released.length === 1);
-		expect(w.released).toEqual(["x1"]);
 		const prompt = String(h.requests.at(-1)?.prompt ?? "");
-		expect(prompt).toContain("trigger=result_received");
-		expect(prompt).toContain("[todo:x1] 完了（成功）: 楽曲の生成");
-		// The conversation answers the released notice; the agency wrote nothing itself.
-		expect(h.texts()).toEqual(["u1", "a1"]);
+		expect(asked).toContain("c1");
+		expect(prompt).toContain("仕事 open1");
+		expect(prompt).toContain("仕事 ask1");
+		expect(prompt).not.toContain("仕事 done1");
 	});
 
-	test("waiting rechecks the held report after one silence interval", async () => {
+	test("a failing ledger read offers no TODOs and does not stop the cycle", async () => {
 		const h = harness();
+		h.host.attachWork(
+			createAgencyWork({
+				dialogue: {
+					todosInTransaction: () => {
+						throw new Error("ledger_unavailable");
+					},
+				},
+			}),
+		);
 		await exchange(h, 1);
 		await waitFor(() => h.calls.select === 1);
-		const w = fakeWork(h);
-		h.setNow(T0 + 60_000);
-		await w.hold("x1", "c1", T0 + 60_000);
-		await waitFor(() => h.calls.select === 2);
-		h.setSelect(() => choice("speak", { refs: ["todo:x1"] }));
-		await h.advance(20_000);
-		await waitFor(() => w.released.length === 1);
-		expect(w.released).toEqual(["x1"]);
-	});
-
-	test("held reports nobody watches are sent at once: agency OFF, another conversation, held too long", async () => {
-		const h = harness();
-		await exchange(h, 1);
-		await waitFor(() => h.calls.select === 1);
-		const w = fakeWork(h);
-		// another conversation than the active one
-		await w.hold("x2", "c2", Date.now());
-		await waitFor(() => w.released.includes("x2"));
-		// held too long
-		h.setNow(T0 + 40 * 60_000);
-		await w.hold("x3", "c1", T0);
-		await waitFor(() => w.released.includes("x3"));
-		// agency OFF
-		h.setAgency({ enabled: false });
-		await w.hold("x4", "c1", T0 + 40 * 60_000);
-		await waitFor(() => w.released.includes("x4"));
-		expect(h.texts()).toEqual(["u1", "a1"]);
-	});
-
-	test("reports are held only for the watched conversation with the setting ON", async () => {
-		const h = harness();
-		fakeWork(h);
-		const holds = (id: string) =>
-			h.store.read((db) => h.host.holdsReportsInTransaction(db, id));
-		expect(holds("c1")).toBe(false); // nobody spoke yet
-		await exchange(h, 1);
-		await waitFor(() => h.calls.select === 1);
-		expect(holds("c1")).toBe(true);
-		expect(holds("c2")).toBe(false);
-		h.setAgency({ enabled: false });
-		expect(holds("c1")).toBe(false);
-	});
-	test("held reports expire without a later commit even when idle opportunities are disabled", async () => {
-		const h = harness({ settings: { idleSec: 0 } });
-		await exchange(h, 1);
-		await waitFor(() => h.calls.select === 1);
-		const w = fakeWork(h);
-		await w.hold("expires", "c1", T0);
-		await h.advance(30 * 60_000);
-		await waitFor(() => w.released.includes("expires"));
-	});
-	test("disabling agency releases an already held report without a later commit", async () => {
-		const h = harness();
-		await exchange(h, 1);
-		await waitFor(() => h.calls.select === 1);
-		const w = fakeWork(h);
-		await w.hold("disabled", "c1", T0);
-		h.setAgency({ enabled: false });
-		await waitFor(() => w.released.includes("disabled"));
+		expect(String(h.requests.at(-1)?.prompt ?? "")).not.toContain("[todo:");
 	});
 });

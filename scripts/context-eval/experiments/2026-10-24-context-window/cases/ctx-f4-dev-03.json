@@ -1,0 +1,50 @@
+{
+	"id": "ctx-f4-dev-03",
+	"family": "F4",
+	"split": "dev",
+	"seed": {
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "strategist"
+		},
+		"events": [
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-16T10:00:00.000Z",
+				"text": "来月の計画を見直したい"
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-16T10:00:03.000Z",
+				"text": "どの点からにしましょうか。",
+				"origin": "reply"
+			}
+		],
+		"world": [
+			{
+				"name": "プロジェクトAurora"
+			}
+		]
+	},
+	"input": "プロジェクトAuroraの担当者が誰か、World の記録で調べて教えて",
+	"expect": {
+		"checks": [
+			{
+				"kind": "delegated",
+				"toolchain": "world_research"
+			},
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "no_unsupported_assertion",
+				"condition": "担当者の氏名や役割を、記録を確認せずに作って述べていない。World の調査を実行する（調べると予告する）旨を伝えている。"
+			}
+		]
+	}
+}

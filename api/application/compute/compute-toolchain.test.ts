@@ -2,7 +2,7 @@ import { CONVERSATION_DEFAULT_PRINCIPAL } from "../../domains/conversation/contr
 import { expect, test } from "bun:test";
 import { harness } from "../toolchain/toolchain.fixture";
 import { fixture, remote } from "../../domains/compute/test/compute.fixture";
-import { analysisArgs } from "../../domains/dialogue/test/analysis.fixture";
+import { searchThenDelegate } from "../toolchain/conversation-script.fixture";
 import { taskPlan, taskItem } from "../toolchain/task-plan.fixture";
 import { waitFor } from "../../infrastructure/wait-for";
 
@@ -12,17 +12,14 @@ test("conversation selects registered Python tool, persists action receipt and r
 	const h = await harness({
 		everyday: true,
 		computePort: f.port,
-		routeTool: "compute_python",
-		discoveryTarget: () => "compute_python",
-		firstRound: () => ({
-			name: "execute_task",
-			args: {
-				...analysisArgs({ kind: "action", impact: "create" }),
-				request: "1+1をPythonで計算して",
-				contextRefs: [],
-				announcement: "計算します。",
-			},
-		}),
+		discoveryTarget: () => "execute_task",
+		// The conversation hands the request to the task execution (a search, then the hand-over).
+		firstRound: (_tools, _question, messages) =>
+			searchThenDelegate(
+				(candidate) => candidate.id === "task.execute",
+				"1+1をPythonで計算して",
+				{ announcement: "計算します。", impact: "create" },
+			)(messages),
 		command: () =>
 			JSON.stringify({
 				action: "invoke",

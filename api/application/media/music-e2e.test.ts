@@ -3,10 +3,13 @@ import { harness } from "../toolchain/toolchain.fixture";
 import { musicFixture, musicQuestion, musicTestPlan } from "./music.fixture";
 import { imageFixture, imageQuestion } from "./image.fixture";
 import { waitFor } from "../../infrastructure/wait-for";
+import { activeSlots } from "./conversation-turn.fixture";
 import {
-	isAnalysisRound,
-	isCompletionCheck,
-} from "../../domains/dialogue/test/analysis.fixture";
+	afterUtterance,
+	isResultRound,
+	isUtteranceRound,
+	toolResults,
+} from "../toolchain/conversation-script.fixture";
 
 test("a premature creation claim accompanying the selected operation is withheld until music completes", async () => {
 	const f = musicFixture("success");
@@ -19,11 +22,12 @@ test("a premature creation claim accompanying the selected operation is withheld
 		...f.model,
 		answer: async (...args: Parameters<typeof f.model.answer>) => {
 			const [messages, signal, options] = args;
-			if (
-				options?.tools?.length &&
-				!isAnalysisRound(options.tools) &&
-				!isCompletionCheck(options.tools)
-			) {
+			// The generation that hands the work over: its speech beside the delegate call is a preamble (withdrawn).
+			const handsOver =
+				isUtteranceRound(options?.tools) &&
+				!isResultRound(messages) &&
+				toolResults(afterUtterance(messages), "find_toolchain").length > 0;
+			if (handsOver) {
 				await paused;
 				reviewed++;
 				await f.model.answer(messages, signal, options);
@@ -66,7 +70,6 @@ test("completed vocal music answers and repairs without re-offering entry operat
 	const question =
 		"休日の朝に聞く目覚めのテーマ。クラシック、落ち着いたピアノ、90秒、透明感のある女性ソロ、日本語の歌詞をテーマに合わせて作成。";
 	const f = musicFixture("success", {
-		question,
 		plan: {
 			...musicTestPlan,
 			durationSeconds: 90,
@@ -80,9 +83,15 @@ test("completed vocal music answers and repairs without re-offering entry operat
 		...f.model,
 		answer: async (...args: Parameters<typeof f.model.answer>) => {
 			const [messages, , options] = args;
-			if (isCompletionCheck(options?.tools)) return f.model.answer(...args);
-			if (messages.some((m) => m.content.includes('"musicResult":'))) {
-				expect(options?.tools).toBeUndefined();
+			if (isResultRound(messages)) {
+				// The tools are the same fixed set in every generation (section 6.1): no entry operation is re-offered.
+				expect(options?.tools?.map((t) => t.function.name)).toEqual([
+					"memory",
+					"find_toolchain",
+					"delegate",
+					"work",
+					"respond",
+				]);
 				answers.push(messages);
 				return answers.length === 1
 					? 'create_music{question:<|"|>休日の朝の楽曲<|"|>}'
@@ -115,17 +124,25 @@ test("completed vocal music answers and repairs without re-offering entry operat
 						m.content.includes("最も合うfunctionを一つ呼びます"),
 				),
 			).toBe(false);
+			// The utterance is in the document's log (section 8.1), not a native message of its own.
 			expect(
-				messages.some((m) => m.role === "user" && m.content === question),
+				messages.some(
+					(m) =>
+						m.content.startsWith('{"profile":') &&
+						JSON.parse(m.content).log.some(
+							(event: { text?: string }) => event.text === question,
+						),
+				),
 			).toBe(true);
-			const result = JSON.parse(
-				messages.find((m) => m.content.startsWith('{"musicResult":'))!.content,
-			).musicResult;
+			const result = activeSlots(messages).at(-1)!.result as {
+				state: string;
+				durationSeconds: number;
+			};
 			expect(result.state).toBe("completed");
 			expect(result.durationSeconds).toBe(90);
 		}
 		expect(answers[1]![0]!.role).toBe("system");
-		expect(answers[1]![0]!.content).toContain("自然な回答本文だけ");
+		expect(answers[1]![0]!.content).toContain("読み上げる本文は合計300字以内");
 		expect(h.dialogue.answerText(submitted.id)).toBe(
 			"楽曲が完成しました。どうぞお楽しみください。",
 		);
@@ -225,7 +242,7 @@ test("vocal orchestral music forwards the worker's voice description, exact lyri
 		lyrics,
 		language: "ja",
 	};
-	const f = musicFixture("success", { plan, question });
+	const f = musicFixture("success", { plan });
 	const h = await harness({ model: f.model, musicGateway: f.gateway });
 	try {
 		const submitted = await (
@@ -411,7 +428,8 @@ test("a music screen submit generates a track though the conversation retained o
 		...music.model,
 		answer: async (...args: Parameters<typeof music.model.answer>) => {
 			if (phase === "image") return image.model.answer(...args);
-			if (isAnalysisRound(args[2]?.tools)) screenAnalysis++;
+			if (isUtteranceRound(args[2]?.tools) && !isResultRound(args[0]))
+				screenAnalysis++;
 			return music.model.answer(...args);
 		},
 	};

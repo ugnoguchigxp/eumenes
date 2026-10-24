@@ -1,7 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import type { MemoryService } from "../../memory";
 import {
-	keepAll,
 	setupSteward,
 	topicEmbed,
 	type StewardHarness,
@@ -46,8 +45,6 @@ const windowOf = (h: StewardHarness) =>
 	h.store.read((db) => h.memory.windows.storedInTransaction(db, "c1"));
 const noticeTexts = (h: StewardHarness) =>
 	windowOf(h)!.notices.map((n) => n.text);
-const decisionSteps = (h: StewardHarness) =>
-	h.steward.decisions("c1").map((d) => d.step);
 const jobOfUnit = (h: StewardHarness, unitId: string) =>
 	h.store.read(
 		(db) =>
@@ -57,76 +54,6 @@ const jobOfUnit = (h: StewardHarness, unitId: string) =>
 				)
 				.get(unitId) as { id: string; attempt: number },
 	);
-const summarizeAll = (data: Record<string, unknown>) => ({
-	exchanges: (data.exchanges as Array<{ id: string }>).map((e) => ({
-		id: e.id,
-		action: "summarize",
-		duplicateOf: null,
-	})),
-});
-
-// ---- finding 1: the summary decisions refer to everything the summary stands on ----
-
-test("a summarize decision refers to every message the summary stands on", async () => {
-	const h = await setup();
-	h.inference.script("curate-memory", empty, empty);
-	h.inference.script("dispose-exchanges", summarizeAll, summarizeAll);
-	h.inference.script(
-		"summarize",
-		{ summary: "最初の話をした。", included: ["e1"] },
-		{ summary: "最初の話と次の話をした。", included: ["e1"] },
-	);
-	const first = await h.exchange("最初の話", "了解");
-	await h.drain();
-	const second = await h.exchange("次の話", "了解");
-	await h.drain();
-	const summary = h.store.read((db) =>
-		h.memory.summaryInTransaction(db, "c1"),
-	)!;
-	expect(summary.sources).toEqual([
-		first.inputMessageId,
-		second.inputMessageId,
-	]);
-	// The second summarize read only the second exchange, but the summary it wrote stands on the first one too.
-	const latest = h.store
-		.read(
-			(db) =>
-				db
-					.query(
-						`SELECT r.ref_id AS id FROM steward_decision d JOIN steward_decision_ref r ON r.decision_id = d.id
-					 WHERE d.id = (SELECT MAX(id) FROM steward_decision WHERE step = 'summarize') AND r.ref_type = 'message'`,
-					)
-					.all() as Array<{ id: string }>,
-		)
-		.map((r) => r.id);
-	expect(latest).toContain(first.inputMessageId);
-	expect(latest).toContain(second.inputMessageId);
-});
-
-test("the purge deletes the summary decisions of a conversation whose summary was deleted, even those that never referred to the forgotten message", async () => {
-	const h = await setup();
-	h.inference.script("curate-memory", empty, empty);
-	h.inference.script("dispose-exchanges", summarizeAll, summarizeAll);
-	h.inference.script(
-		"summarize",
-		{ summary: "最初の話をした。", included: ["e1"] },
-		{ summary: "最初の話と次の話をした。", included: ["e1"] },
-	);
-	await h.exchange("最初の話", "了解");
-	await h.drain();
-	const second = await h.exchange("次の話", "了解");
-	await h.drain();
-	expect(decisionSteps(h).filter((s) => s === "summarize")).toHaveLength(2);
-	await h.memory.forget({
-		conversationId: "c1",
-		itemIds: [],
-		messageIds: [second.inputMessageId],
-	});
-	// The first decision's refs hold only the first exchange: it goes with the deleted summary, not by its refs.
-	expect(decisionSteps(h)).not.toContain("summarize");
-	expect(decisionSteps(h)).toContain("curate-memory");
-});
-
 // ---- finding 2b / 7: a forget in the unit runs first and takes what stands on it ----
 
 async function learn(h: StewardHarness, count = 1) {
@@ -136,7 +63,6 @@ async function learn(h: StewardHarness, count = 1) {
 			item(`k.${i + 1}`, `住所に関する記憶${i + 1}`),
 		),
 	});
-	h.inference.script("dispose-exchanges", keepAll);
 	const first = await h.run({
 		user: "私の住所は東京都千代田区です",
 		answer: "承知しました",
@@ -161,7 +87,6 @@ test("a forget runs first: what the same unit would save from the forgotten exch
 			resolve: [resolve({ refs: [ref], alsoIn: ["e1"] })],
 		};
 	});
-	h.inference.script("dispose-exchanges", keepAll);
 	await h.run({
 		user: "住所を忘れて",
 		end: "completed",
@@ -204,7 +129,6 @@ test("a request that shares the forgotten message with a forget is ended by the 
 		// r2 is left unanswered: the purge has already ended it.
 		return { ...empty, resolve: [resolve({ refs: [ref], alsoIn: ["e1"] })] };
 	});
-	h.inference.script("dispose-exchanges", keepAll);
 	await h.run({
 		user: "住所を忘れて、あと覚えて",
 		end: "completed",
@@ -240,7 +164,6 @@ test("a ref the model was not shown ends the whole forget, and so does a list lo
 			],
 		};
 	});
-	h.inference.script("dispose-exchanges", keepAll);
 	await h.run({
 		user: "全部忘れて",
 		end: "completed",
@@ -269,7 +192,6 @@ test("five items can be forgotten at once", async () => {
 			.slice(0, 5);
 		return { ...empty, resolve: [resolve({ refs })] };
 	});
-	h.inference.script("dispose-exchanges", keepAll);
 	await h.run({
 		user: "五つ忘れて",
 		end: "completed",
@@ -300,7 +222,6 @@ test("a forget the memory refuses as too large ends the request without forgetti
 			resolve: [resolve({ refs: [ref] })],
 		};
 	});
-	h.inference.script("dispose-exchanges", keepAll);
 	await h.run({
 		user: "忘れて",
 		end: "completed",
@@ -324,7 +245,6 @@ test("a deferred upkeep waits in the timer, and never delays a reflecting unit o
 		...empty,
 		remember: [item("a.one", "一つ目"), item("a.two", "二つ目")],
 	});
-	h.inference.script("dispose-exchanges", keepAll);
 	h.foreground.add("c1");
 	await h.run({ user: "二つ", end: "completed" });
 	// Reflecting steps run; the upkeep unit is made, prepared, and deferred.
@@ -340,16 +260,15 @@ test("a deferred upkeep waits in the timer, and never delays a reflecting unit o
 
 	// Same conversation and another one: both are curated now, without the clock moving.
 	h.inference.script("curate-memory", empty, empty);
-	h.inference.script("dispose-exchanges", keepAll, keepAll);
-	const sameConversation = await h.exchange("続き", "はい");
-	const otherConversation = await h.exchange("別", "はい", {
+	await h.exchange("続き", "はい");
+	await h.exchange("別", "はい", {
 		conversationId: "c2",
 	});
 	const before = h.time.ms;
 	await h.pump(16);
 	expect(h.time.ms).toBe(before);
-	expect(h.exchangeRow(sameConversation.inputMessageId)!.curated).toBe("done");
-	expect(h.exchangeRow(otherConversation.inputMessageId)!.curated).toBe("done");
+	expect(h.log("c1").every((e) => e.curated)).toBe(true);
+	expect(h.log("c2").every((e) => e.curated)).toBe(true);
 	expect(h.futureJobs()).toEqual([]);
 	// The upkeep has not run: it is still waiting for its time.
 	expect(
@@ -371,7 +290,6 @@ test("the startup kick makes the upkeep that is due and waits for the one that i
 		...empty,
 		remember: [item("a.one", "一つ目"), item("a.two", "二つ目")],
 	});
-	h.inference.script("dispose-exchanges", keepAll);
 	h.foreground.add("c1");
 	await h.run({ user: "二つ", end: "completed" });
 	await h.pump(12);
@@ -401,7 +319,6 @@ test("the startup kick makes the upkeep that is due and waits for the one that i
 test("every step asks for the conversation's own route and a strict output schema", async () => {
 	const h = await setup();
 	h.inference.script("curate-memory", empty);
-	h.inference.script("dispose-exchanges", keepAll);
 	await h.exchange("こんにちは", "どうも");
 	await h.drain();
 	expect(h.inference.captures.length).toBeGreaterThan(0);
@@ -416,7 +333,6 @@ test("a request given up after real failures is shown to the user as a notice", 
 	const h = await setup();
 	const failure = new Error("provider_rejected");
 	h.inference.script("curate-memory", failure, failure, failure);
-	h.inference.script("dispose-exchanges", keepAll);
 	await h.run({
 		user: "x",
 		end: "completed",
@@ -434,7 +350,6 @@ test("a request given up after real failures is shown to the user as a notice", 
 test("a request the model never answers is also announced", async () => {
 	const h = await setup();
 	h.inference.script("curate-memory", empty, empty, empty);
-	h.inference.script("dispose-exchanges", keepAll);
 	await h.run({
 		user: "x",
 		end: "completed",
@@ -451,7 +366,7 @@ test("a request the model never answers is also announced", async () => {
 
 // ---- finding 7: the notes' sources ----
 
-test("a note is based on the user messages of every exchange the unit read, and an update adds them", async () => {
+test("a note is based on the messages of every event the unit read, and an update adds them", async () => {
 	const h = await setup();
 	const say = async (user: string, answer: string, runId: string) => {
 		const inputMessageId = await h.say("user", user, "c1", runId);
@@ -461,14 +376,7 @@ test("a note is based on the user messages of every exchange the unit read, and 
 	const record = (
 		db: Parameters<Parameters<typeof h.store.write>[0]>[0],
 		e: Awaited<ReturnType<typeof say>>,
-	) =>
-		h.memory.recordExchangeInTransaction(db, {
-			conversationId: "c1",
-			runId: e.runId,
-			inputMessageId: e.inputMessageId,
-			answerMessageId: e.answerMessageId,
-			outcome: "answered",
-		});
+	) => h.recordSaid(db, "c1", e.inputMessageId, e.answerMessageId);
 	const a = await say("目標は旅行", "了解", "run-a");
 	const b = await say("行き先は沖縄", "了解", "run-b");
 	await h.store.write((db) => {
@@ -492,13 +400,17 @@ test("a note is based on the user messages of every exchange the unit read, and 
 			},
 		],
 	});
-	h.inference.script("dispose-exchanges", keepAll);
 	await h.drain();
 	const [note] = h.store.read(
 		(db) => h.continuity.snapshotInTransaction(db, "c1").items,
 	);
 	expect(note!.sourceMessageIds.sort()).toEqual(
-		[a.inputMessageId, b.inputMessageId].sort(),
+		[
+			a.inputMessageId,
+			a.answerMessageId,
+			b.inputMessageId,
+			b.answerMessageId,
+		].sort(),
 	);
 
 	h.inference.script("curate-memory", (data) => {
@@ -510,7 +422,6 @@ test("a note is based on the user messages of every exchange the unit read, and 
 			],
 		};
 	});
-	h.inference.script("dispose-exchanges", keepAll);
 	const c = await h.exchange("夏に行く", "了解");
 	await h.drain();
 	const [updated] = h.store.read(
@@ -533,12 +444,10 @@ test("a note that repeats a live note is not added twice", async () => {
 		notes: [{ op: "add", ref: null, kind: "activity", text, status: null }],
 	});
 	h.inference.script("curate-memory", note("週末に鎌倉へ自転車で出かける。"));
-	h.inference.script("dispose-exchanges", keepAll);
 	await h.exchange("週末は鎌倉へ自転車で", "いいですね");
 	await h.drain();
 	// The model writes the same note again (with other punctuation) while reading a later exchange.
 	h.inference.script("curate-memory", note("週末に、鎌倉へ自転車で出かける"));
-	h.inference.script("dispose-exchanges", keepAll);
 	await h.exchange("仕事はエンジニアです", "承知しました");
 	await h.drain();
 	const notes = h.store.read(
@@ -572,12 +481,22 @@ function settleDirect(
 		),
 	);
 }
+/** The failed tries counted against events (one entry per event). */
+const failureCounts = (h: StewardHarness) =>
+	h.store
+		.read(
+			(db) =>
+				db
+					.query("SELECT failures FROM steward_event_failure ORDER BY seq")
+					.all() as Array<{ failures: number }>,
+		)
+		.map((row) => row.failures);
 const openCurate = (h: StewardHarness) =>
 	h.units().filter((u) => u.step === "curate-memory" && u.state === "open");
 
 test("an expired or interrupted job is not counted against its targets, and a new unit follows at once", async () => {
 	const h = await setup();
-	const { inputMessageId } = await h.exchange("こんにちは", "どうも");
+	await h.exchange("こんにちは", "どうも");
 	for (const outcome of [
 		{ type: "expired" } as const,
 		{ type: "interrupted", errorCode: "interrupted_by_restart" } as const,
@@ -585,20 +504,20 @@ test("an expired or interrupted job is not counted against its targets, and a ne
 		const [unit] = openCurate(h);
 		await settleDirect(h, unit!.id, outcome);
 		expect(h.units().find((u) => u.id === unit!.id)!.state).toBe("failed");
-		expect(h.exchangeRow(inputMessageId)!.failures).toEqual({});
+		expect(failureCounts(h)).toEqual([]);
 		expect(openCurate(h)).toHaveLength(1);
 	}
 });
 
 test("a real failure is counted, and the target waits before the next try", async () => {
 	const h = await setup();
-	const { inputMessageId } = await h.exchange("こんにちは", "どうも");
+	await h.exchange("こんにちは", "どうも");
 	const [unit] = openCurate(h);
 	await settleDirect(h, unit!.id, {
 		type: "failed",
 		errorCode: "provider_rejected",
 	});
-	expect(h.exchangeRow(inputMessageId)!.failures).toEqual({ curated: 1 });
+	expect(failureCounts(h)).toEqual([1, 1]);
 	// No unit and no job for later: the timer brings the retry.
 	expect(openCurate(h)).toEqual([]);
 	expect(h.futureJobs()).toEqual([]);
@@ -610,17 +529,16 @@ test("a real failure is counted, and the target waits before the next try", asyn
 test("when the inference request cannot be taken, the step is tried again later: 30 s, then 60 s", async () => {
 	const h = await setup();
 	h.inference.state.unavailable = true;
-	const { inputMessageId } = await h.exchange("a", "b");
+	await h.exchange("a", "b");
 	await h.pump(3);
 	expect(h.timerTimes()).toEqual([h.time.ms + 30_000]);
 	await h.fireTimer();
 	await h.pump(3);
 	expect(h.timerTimes()).toEqual([h.time.ms + 60_000]);
-	expect(h.exchangeRow(inputMessageId)!.failures).toEqual({});
+	expect(failureCounts(h)).toEqual([]);
 	// The service is back: the next timer kicks the step through.
 	h.inference.state.unavailable = false;
 	h.inference.script("curate-memory", empty);
-	h.inference.script("dispose-exchanges", keepAll);
 	await h.drain();
-	expect(h.exchangeRow(inputMessageId)!.state).toBe("done");
+	expect(h.log().every((e) => e.curated)).toBe(true);
 });

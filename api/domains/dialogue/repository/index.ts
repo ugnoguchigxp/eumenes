@@ -1,20 +1,13 @@
 import type { Database } from "bun:sqlite";
+import { workMigration, workOriginsMigration } from "./work";
 import type { Migration } from "../../../infrastructure/sqlite";
-import { retainedToolchainsMigration } from "./retained-toolchains";
 import {
 	continuationConditionsMigration,
 	continuationStepsMigration,
 	continuationsMigration,
-} from "./continuations";
-export {
-	chainAttempts,
-	continuationOf,
-	deleteContinuationsOfInput,
-	insertContinuation,
-	type Continuation,
-	type PriorStep,
-} from "./continuations";
-export { retainedToolchainsMigration } from "./retained-toolchains";
+	retainedToolchainsMigration,
+	retireContinuationsMigration,
+} from "./retired";
 import type { Run } from "../contracts";
 import { specialistEventsMigration, specialistMigration } from "./specialist";
 import {
@@ -336,7 +329,55 @@ export const migrations: readonly Migration[] = [
 		after: ["dialogue/0015-continuation-steps"],
 		sql: pinnedToolchainMigration,
 	},
+	{
+		id: "dialogue/0017-work",
+		after: ["dialogue/0016-pinned-toolchain"],
+		sql: workMigration,
+	},
+	{
+		id: "dialogue/0018-prefix-digest",
+		after: ["dialogue/0017-work"],
+		sql: "ALTER TABLE dialogue_runs ADD COLUMN prefix_digest TEXT;",
+	},
+	{
+		id: "dialogue/0019-retire-continuations",
+		after: ["dialogue/0018-prefix-digest"],
+		sql: retireContinuationsMigration,
+	},
+	{
+		id: "dialogue/0020-work-origins",
+		after: ["dialogue/0019-retire-continuations"],
+		sql: workOriginsMigration,
+	},
 ];
+
+/** The digest of the fixed part (system and tool definitions) a run's generation was prepared with. */
+export function savePrefixDigest(db: Database, runId: string, digest: string) {
+	db.query("UPDATE dialogue_runs SET prefix_digest = ? WHERE id = ?").run(
+		digest,
+		runId,
+	);
+}
+
+/**
+ * The latest generation of a conversation before `runId` that reached the model (its last update and the digest of
+ * its fixed part): a cache-loss check reads how long ago it was and whether the fixed part changed since.
+ */
+export function previousGeneration(
+	db: Database,
+	conversationId: string,
+	runId: string,
+): { at: string; prefixDigest: string | null } | null {
+	const row = db
+		.query(
+			"SELECT updated_at AS at, prefix_digest AS prefixDigest FROM dialogue_runs WHERE conversation_id = ? AND id != ? AND prefix_digest IS NOT NULL ORDER BY updated_at DESC LIMIT 1",
+		)
+		.get(conversationId, runId) as {
+		at: string;
+		prefixDigest: string | null;
+	} | null;
+	return row;
+}
 
 /** A screen's form submit names its toolchain; only such a run writes the column. */
 export function savePinnedToolchain(

@@ -1,0 +1,60 @@
+{
+	"id": "ctx-f10-dev-03",
+	"family": "F10",
+	"split": "dev",
+	"seed": {
+		"events": [
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-20T03:00:00.000Z",
+				"text": "十分後に知らせるタイマーをかけて"
+			},
+			{
+				"type": "acted",
+				"at": "2026-10-20T03:00:02.000Z",
+				"fields": {
+					"action": "delegate",
+					"toolchain": "timer",
+					"request": "十分後に知らせる"
+				}
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-20T03:00:03.000Z",
+				"text": "タイマーをかけます。",
+				"origin": "announcement"
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-20T03:10:00.000Z",
+				"text": "十分たちました。",
+				"origin": "report"
+			}
+		],
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "butler"
+		}
+	},
+	"input": "うん、わかった",
+	"expect": {
+		"checks": [
+			{
+				"kind": "not_delegated"
+			},
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "follows_current_request",
+				"condition": "過去の依頼を実行し直していない。今回の発言に対してだけ応じている。"
+			}
+		]
+	}
+}

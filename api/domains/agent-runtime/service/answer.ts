@@ -250,6 +250,14 @@ export function createAnswer(ctx: RuntimeContext, ops: TaskOps) {
 		api: {
 			prepareAnswerInTransaction,
 			validAnswerInTransaction,
+			/**
+			 * The adapter's projection of the run's saved operation as it is now (a later cancel shows), or null when
+			 * the run's task ran none. The conversation reads it again right before it speaks of the result.
+			 */
+			actionPayloadInTransaction(db: Database, rootRunId: string) {
+				const root = byRoot(db, rootRunId);
+				return root ? currentActionPayload(db, root) : null;
+			},
 			byRootInTransaction: byRoot,
 			/**
 			 * Host-only: evidence of a consumed, completed answer. Unlike validAnswer this does not

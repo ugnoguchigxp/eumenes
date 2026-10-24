@@ -119,40 +119,6 @@ test("the conversation may only name assets and images its snapshot showed", asy
 	expect(snapshot.images).toEqual([]);
 });
 
-test("an image the host handed from an earlier step of the request may be named; any other still may not", async () => {
-	const { store, adapter } = setup();
-	const origin = {
-		...conversation,
-		handoff: [
-			{
-				step: 1,
-				results: [
-					{
-						source: "operation.image",
-						value: { state: "completed", imageRef: "img_handed" },
-					},
-				],
-			},
-		],
-	};
-	const generate = (sourceImageRef: string) =>
-		store.write((db) =>
-			adapter.invokeInTransaction(db, {
-				operationName: "model3d.generate",
-				input: { prompt: "", title: "画像から", tags: [], sourceImageRef },
-				requestId: crypto.randomUUID(),
-				issuedAt: new Date().toISOString(),
-				origin,
-			}),
-		);
-	// Not in this snapshot (no image of the conversation), but in the host's record of the request.
-	const accepted = await generate("img_handed");
-	expect(accepted.receiptRef.owner).toBe("model3d");
-	await expect(generate("img_other")).rejects.toThrow(
-		"model3d_image_not_found",
-	);
-});
-
 test("a pipeline step may name an image its own conversation made; an image of another conversation still may not", async () => {
 	const { store, adapter } = setup();
 	await store.write((db) => {

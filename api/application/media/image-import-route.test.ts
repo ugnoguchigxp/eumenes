@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { createApp } from "../app";
-import { registerImageImports } from "../../domains/image/controller/imports";
+import { registerImage } from "../../domains/image";
 import type { ImageImportView } from "../../domains/image/contracts";
 test("the authenticated application streams image multipart over 1 MiB through the upload route's own cap", async () => {
 	const id = crypto.randomUUID();
@@ -18,7 +18,16 @@ test("the authenticated application streams image multipart over 1 MiB through t
 		modules: [
 			{
 				mount: (app) =>
-					registerImageImports(app, {
+					registerImage(app, {
+						library() {
+							throw new Error("Unexpected library access");
+						},
+						async content() {
+							throw new Error("Unexpected content access");
+						},
+						list() {
+							throw new Error("Unexpected generation access");
+						},
 						imports: {
 							async upload(_id, file) {
 								size = file.size;

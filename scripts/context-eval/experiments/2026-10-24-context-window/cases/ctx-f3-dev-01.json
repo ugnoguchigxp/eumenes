@@ -1,0 +1,57 @@
+{
+	"id": "ctx-f3-dev-01",
+	"family": "F3",
+	"split": "dev",
+	"seed": {
+		"episode": [
+			{
+				"kind": "summary",
+				"text": "旅行先は京都に決まった。",
+				"events": [
+					{
+						"type": "said",
+						"by": "user",
+						"at": "2026-10-10T09:00:00.000Z",
+						"text": "来月の旅行先を決めたい"
+					},
+					{
+						"type": "said",
+						"by": "agent",
+						"at": "2026-10-10T09:00:03.000Z",
+						"text": "京都はいかがでしょう。",
+						"origin": "reply"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-12T09:00:00.000Z",
+				"text": "やっぱり旅行先は大阪にする"
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-12T09:00:03.000Z",
+				"text": "承知しました。大阪に変更します。",
+				"origin": "reply"
+			}
+		]
+	},
+	"input": "旅行の行き先を確認させて",
+	"expect": {
+		"checks": [
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "uses_newest_fact",
+				"condition": "行き先を、新しい発言の大阪として答える。要約にある京都を現在の行き先として答えない。"
+			}
+		]
+	}
+}

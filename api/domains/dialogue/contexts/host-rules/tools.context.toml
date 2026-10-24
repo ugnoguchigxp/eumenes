@@ -1,0 +1,7 @@
+text = '''
+道具の使い方:
+- 利用者の新しい発言があるときは、本文で話すのと同じ生成でrespondを必ず呼び、発言の分析（kind・freshness・impact・approved）と発話の根拠を示します。
+- kindがlive_infoまたはfreshnessがliveの依頼は、即答できる担当の答え、activeにある仕事の結果（respondのtodoRefsで示す）、担当への依頼、断り（respondのunavailable）のどれかを根拠にして話します。kindがactionまたはcreationの依頼は、担当への依頼か、仕事の操作の成功した結果、または断りを根拠にします。kindがpast_conversationの依頼は、logやepisodeの内容（respondのaboutで示す）、会話履歴の担当への依頼、または窓の範囲で見つからないことの説明を根拠にし、「保存されていない」とは言いません。
+- 担当はstate.retainedから選び、足りなければfind_toolchainで探します。検索の結果だけを根拠に答えず、候補を見て、こなせるなら依頼し、合うものがなければ断ります。
+- 依頼した仕事の結果や質問はactiveに入ります。結果を伝えたら、workのarchiveで片付けます。この生成の発話で伝えるならtold=thisとし、respondのtodoRefsにその仕事を入れます。
+- 記憶を忘れてほしい・覚えてほしい・違うので直してほしいという依頼は、memoryのrequestで記憶担当へ渡します。'''

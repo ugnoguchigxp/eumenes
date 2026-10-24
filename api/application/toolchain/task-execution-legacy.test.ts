@@ -8,7 +8,7 @@ import { dotsFixture } from "../work/dots-fixture";
 import { taskLegacyPorts } from "./task-legacy-execution";
 import { harness } from "./toolchain.fixture";
 import { objectRecognitionFixture } from "../media/object-recognition.fixture";
-import { analysisArgs } from "../../domains/dialogue/test/analysis.fixture";
+import { handOverTask } from "./task-delegation.fixture";
 import { waitFor } from "../../infrastructure/wait-for";
 
 test("legacy delegation waits beyond acceptance, relays an owned question and adopts only the external completion", async () => {
@@ -188,17 +188,15 @@ test("a public parent hands camera interaction to the existing screen without ta
 	const h = await harness({
 		everyday: true,
 		recognitionFetcher: f.fetcher,
-		routeTool: "object_recognition",
-		firstRound: () => ({
-			name: "execute_task",
-			args: {
-				...analysisArgs({ kind: "action", impact: "create" }),
-				request:
-					"Open the object observation workspace, then use an observation",
-				contextRefs: [],
-				announcement: "観測の画面を準備します。",
-			},
-		}),
+		discoveryTarget: (query) =>
+			query === "object observation screen"
+				? "object_recognition"
+				: "execute_task",
+		firstRound: (_tools, _question, messages) =>
+			handOverTask(
+				"Open the object observation workspace, then use an observation",
+				"観測の画面を準備します。",
+			)(messages),
 		command: () =>
 			JSON.stringify({
 				action: "invoke",

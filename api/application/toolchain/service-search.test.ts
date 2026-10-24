@@ -15,7 +15,7 @@ import {
 	finish,
 	clarify,
 	lastResult,
-} from "../browser/browser-task-kit";
+} from "../browser/browser-task.fixture";
 import { createTaskRunner } from "../browser/browser-task-runner";
 import { registerBrowserEffects } from "../browser/browser-effects";
 
@@ -188,10 +188,14 @@ for (const [blocked, empty, uncollected] of [
 				};
 			},
 			parent: async (messages) => {
-				const report = JSON.parse(
-					messages.find((m) => m.content.includes('"delivery":"guided-web"'))!
+				// The result phase's document carries the finished search as the TODO's result (the report).
+				const document = JSON.parse(
+					messages.find((m) => m.role === "user" && m.content.startsWith("{"))!
 						.content,
-				).report;
+				) as { active: Array<{ result?: Record<string, any> }> };
+				const report = [...document.active]
+					.reverse()
+					.find((entry) => entry.result)!.result!;
 				return `${fallback ? "サイト内検索が利用できず外部検索で見つけた" : "サイト内で見つけた"}本文未確認の[候補](<${report.candidateResults[0].url}>)です。`;
 			},
 		});

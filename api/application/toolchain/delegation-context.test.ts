@@ -78,21 +78,14 @@ for (const kind of ["image", "music", "playback", "drawing"] as const)
 			const task = kind === "playback" ? data.request : data;
 			expect(task.originalRequest).toBe(question);
 			expect(task.question).toBeString();
-			// The same original stays anchored when the parent receives the operation's result.
-			for (const messages of seen.filter(
+			// The same original stays in the conversation's context when the operation's result comes back: the log
+			// keeps the user's utterance as said.
+			const conversational = seen.filter(
 				(messages) => !messages[0]?.content.includes(delegatedTaskRules),
-			)) {
-				const index = messages.findIndex(
-					(m) =>
-						m.role === "system" &&
-						m.content.includes('CURRENT_REQUEST={"messageId":'),
-				);
-				expect(index).toBeGreaterThanOrEqual(0);
-				expect(messages[index + 1]).toMatchObject({
-					role: "user",
-					content: question,
-				});
-			}
+			);
+			expect(conversational.length).toBeGreaterThan(0);
+			for (const messages of conversational)
+				expect(JSON.stringify(messages)).toContain(question);
 		} finally {
 			await h.close();
 		}

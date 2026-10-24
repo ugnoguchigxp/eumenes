@@ -2,7 +2,7 @@
 
 - 日付: 2026-10-22
 - 状態: 合意済み（2026-10-22、§11 は推奨どおり）。実装の契約は §13
-- 関連: [step-and-check-multi-operation-design-2026-10-21.md](step-and-check-multi-operation-design-2026-10-21.md)（一手ずつ照合する方式。本書の受け皿）、[subagent-task-and-session-agents-design-2026-10-18.md](subagent-task-and-session-agents-design-2026-10-18.md)（単発型・協働型、作業文書と `doc.edit`/`doc.write`）、[docs/toolchain-extension.md](../docs/toolchain-extension.md)
+- 関連: [一手ずつ照合する方式（削除済み。完了の照合と継続runは廃止し、仕事の結果はTODOで扱う。正本は会話エージェントのContextWindow仕様）](context-window-spec-2026-10-24.md)、[subagent-task-and-session-agents-design-2026-10-18.md](subagent-task-and-session-agents-design-2026-10-18.md)（単発型・協働型、作業文書と `doc.edit`/`doc.write`）、[docs/toolchain-extension.md](../docs/toolchain-extension.md)
 
 ## 1 背景と目的
 

@@ -1,3 +1,4 @@
+import { jstSeconds } from "../../../infrastructure/jst-time";
 import type { Database } from "bun:sqlite";
 import type { HandlerDefinition } from "../../queue";
 import {
@@ -17,7 +18,7 @@ import {
 	type SpecialistTurnPayload,
 } from "./context";
 import { endRun, type RunEndState } from "./run-end";
-import { traceFailure, traceOutcome } from "./selection-trace";
+import { traceFailure, traceOutcome } from "./selection-outcome";
 import {
 	blockSpecialistMessages,
 	endOrMarkClosing,
@@ -54,6 +55,19 @@ function appendSpecialistAnswer(
 		runId: run.id,
 	});
 	blockSpecialistMessages(deps, tx, run.conversationId, [messageId]);
+	// The main agent knows later what the specialist said (section 6.8): an event of the conversation.
+	const session = run.specialistSessionId
+		? sessionById(tx, run.specialistSessionId)
+		: null;
+	deps.continuity.events.appendInTransaction(tx, {
+		conversationId: run.conversationId,
+		at: jstSeconds(Date.parse(deps.clock())),
+		type: "said",
+		by: "specialist",
+		fields: { text, ...(session ? { toolchain: session.toolchainId } : {}) },
+		messageIds: [messageId],
+		dedupeKey: `message:${messageId}`,
+	});
 	return messageId;
 }
 
@@ -68,6 +82,13 @@ export function forwardToMain(
 ) {
 	deps.memory?.unblockSpecialistMessagesInTransaction(tx, [run.inputMessageId]);
 	setRunSession(tx, run.id, null);
+	// The utterance is the main agent's unhandled one again (section 6.8), shown as said to it.
+	const events = deps.continuity.events;
+	const text = deps.conversation.messageInTransaction(tx, run.inputMessageId)
+		?.message.text;
+	for (const event of events.logInTransaction(tx, run.conversationId))
+		if (text !== undefined && event.messageIds.includes(run.inputMessageId))
+			events.reopenInTransaction(tx, run.conversationId, event.seq, { text });
 	const handoff = JSON.stringify({
 		specialist: record.title,
 		work: state,

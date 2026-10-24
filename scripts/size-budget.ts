@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
-import ts from "typescript";
+import ts from "@typescript/typescript6";
 
 /**
  * Ratchet for file and function size, plus a separate test file ratchet

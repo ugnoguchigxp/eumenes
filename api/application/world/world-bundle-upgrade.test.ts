@@ -66,7 +66,7 @@ test("World bundle upgrades an existing catalog without modifying old definition
 						caps.toolchainsInTransaction(db).find((t) => t.id === "world.query")
 							?.revisionId,
 				),
-			).toBe("toolchain:world.query@7");
+			).toBe("toolchain:world.query@8");
 		},
 		{},
 		{ migrations },

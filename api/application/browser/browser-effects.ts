@@ -31,7 +31,7 @@ const payload = z.object({
 		z.strictObject({ kind: z.literal("abort_task"), taskId: z.uuid() }),
 	]),
 	owner: z.string().min(1).max(120),
- strict: z.boolean().optional(),
+	strict: z.boolean().optional(),
 });
 type Payload = z.infer<typeof payload>;
 
@@ -86,7 +86,7 @@ export function registerBrowserEffects(deps: {
 						? error.message
 						: "browser_effect_failed";
 				log.warn("browser.effect_failed", { kind: effect.kind, reason: code });
- if (input.strict) throw new Error(code);
+				if (input.strict) throw new Error(code);
 			}
 			return true;
 		},
@@ -97,12 +97,26 @@ export function registerBrowserEffects(deps: {
 	deps.queue.registerHandler(handler);
 	return {
 		statusInTransaction(db: Database, operationId: string) {
- const separator = operationId.indexOf(":");
- const action = operationId.slice(0, separator), id = operationId.slice(separator + 1);
- const kind = ({ "tab.open": "tab_open", "tab.focus": "tab_focus", "tab.close": "tab_close", connect: "connect", disconnect: "disconnect" } as Record<string, string>)[action];
- if (!kind) return null;
- return deps.queue.findByDedupeInTransaction(db, "browser", KIND, `${kind}:${id}`);
- },
+			const separator = operationId.indexOf(":");
+			const action = operationId.slice(0, separator),
+				id = operationId.slice(separator + 1);
+			const kind = (
+				{
+					"tab.open": "tab_open",
+					"tab.focus": "tab_focus",
+					"tab.close": "tab_close",
+					connect: "connect",
+					disconnect: "disconnect",
+				} as Record<string, string>
+			)[action];
+			if (!kind) return null;
+			return deps.queue.findByDedupeInTransaction(
+				db,
+				"browser",
+				KIND,
+				`${kind}:${id}`,
+			);
+		},
 		enqueueInTransaction(
 			db: Database,
 			requestId: string,
@@ -110,7 +124,7 @@ export function registerBrowserEffects(deps: {
 			/** When the request was issued; the same for every replay of it. */
 			issuedAt: string,
 			effect: BrowserEffect,
- strict = false,
+			strict = false,
 		) {
 			const issued = Date.parse(issuedAt);
 			deps.queue.enqueueInTransaction(db, {

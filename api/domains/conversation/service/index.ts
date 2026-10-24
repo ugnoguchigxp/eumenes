@@ -68,15 +68,24 @@ export function createConversationService(
 		conversationId,
 		deadline: Date.parse(clock()) + 900000,
 	});
+	/** Called inside every applied correction, after the message holds its new text. */
+	const correctHooks: Array<
+		(db: Database, messageId: string, at: string) => void
+	> = [];
 	const correctInTransaction = (
 		db: Database,
 		input: { messageId: string; text: string; at?: string },
-	): ChangeResult =>
-		correctMessage(
+	): ChangeResult => {
+		const at = input.at ?? clock();
+		const result = correctMessage(
 			db,
-			{ messageId: input.messageId, text: input.text, at: input.at ?? clock() },
+			{ messageId: input.messageId, text: input.text, at },
 			outbox,
 		);
+		if (result.status === "applied")
+			for (const hook of correctHooks) hook(db, input.messageId, at);
+		return result;
+	};
 	/** Called inside every retraction, before the message is tombstoned (each higher domain drops what it derived from it). */
 	const retractHooks: Array<(db: Database, messageId: string) => void> = [];
 	const retractInTransaction = (
@@ -122,6 +131,15 @@ export function createConversationService(
 		 */
 		addRetractHook(hook: (db: Database, messageId: string) => void) {
 			retractHooks.push(hook);
+		},
+		/**
+		 * Adds a function run in the transaction of every applied correction, after the message holds its new text.
+		 * Conversation imports nothing of its users: each injects what must follow a correction.
+		 */
+		addCorrectHook(
+			hook: (db: Database, messageId: string, at: string) => void,
+		) {
+			correctHooks.push(hook);
 		},
 		/** True when the retraction tombstone column exists on this connection. */
 		retractionReadyInTransaction(db: Database): boolean {

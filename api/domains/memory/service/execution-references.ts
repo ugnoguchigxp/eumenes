@@ -31,31 +31,36 @@ export function executionReferences(deps: {
 		db.query("DELETE FROM memory_execution_refs WHERE expires_at<=?").run(
 			now(),
 		);
-		return (window.referenceItems ?? []).slice(0, 8).map((item) => {
+		// State items only (a tendency is an observation, not something the user said), the published ones first.
+		const states = [...window.profile.items, ...window.newMemories].filter(
+			(item) => item.source === "user_said",
+		);
+		return states.slice(0, 8).map((item) => {
 			const body = JSON.stringify({
 				kind: item.kind,
 				text: item.text,
 				negated: item.negated,
-				period: item.period,
+				...(item.since ? { since: item.since } : {}),
+				...(item.until ? { until: item.until } : {}),
 			});
 			const digest = sha256Hex(body);
-			const ref = `memory:${item.itemId}:${item.revision}:${digest.slice(0, 12)}:${sha256Hex(input(db).access.policyRevision).slice(0, 8)}`;
+			const ref = `memory:${item.id}:${item.revision}:${digest.slice(0, 12)}:${sha256Hex(input(db).access.policyRevision).slice(0, 8)}`;
 			db.query(
 				"INSERT OR IGNORE INTO memory_execution_refs(ref,item_id,revision,body,digest,change_seq,policy_revision,expires_at) VALUES(?,?,?,?,?,?,?,?)",
 			).run(
 				ref,
-				item.itemId,
+				item.id,
 				String(item.revision),
 				body,
 				digest,
 				sequence.seq,
 				input(db).access.policyRevision,
-				Math.min(now() + 14 * 86_400_000, item.validUntilMs ?? Infinity),
+				Math.min(now() + 14 * 86_400_000, item.untilMs ?? Infinity),
 			);
 			return {
 				ref,
 				owner: "memory",
-				id: item.itemId,
+				id: item.id,
 				revision: String(item.revision),
 				digest,
 				label: `${item.kind}: ${item.text.slice(0, 80)}`,

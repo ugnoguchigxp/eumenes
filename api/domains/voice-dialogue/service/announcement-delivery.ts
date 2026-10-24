@@ -13,9 +13,10 @@ export function connectAnnouncementDelivery(
 ) {
 	return dialogue.setAnnouncementDelivery?.(async (run, signal) => {
 		const id = run.utteranceId;
-		if (!id) return;
+		if (!id) return "full";
 		const snapshot = store.read((db) => larm.snapshotFor?.(db, id));
-		if (snapshot && !snapshot.voice.autoSpeak) return;
+		// Not spoken: the text is shown whole.
+		if (snapshot && !snapshot.voice.autoSpeak) return "full";
 		const ready = () => {
 			signal.throwIfAborted();
 			const turn = store.read((db) => get(db, id));
@@ -50,7 +51,14 @@ export function connectAnnouncementDelivery(
 				signal.addEventListener("abort", check, { once: true });
 				check();
 			}));
-		await speech.waitForPlayback(signal);
-		ready();
+		try {
+			await speech.waitForPlayback(signal);
+			ready();
+		} catch (error) {
+			// Interrupted while it was played: what was heard counts (section 6.5); nothing heard is a failure.
+			if (speech.played.length > 0 && !signal.aborted) return "partial";
+			throw error;
+		}
+		return "full";
 	});
 }

@@ -118,16 +118,31 @@ export function createPrepare(
 		if (
 			unit.slot === "maintenance" &&
 			!unit.targets.urgent &&
-			deps.foregroundActive(unit.conversationId)
+			deps.foregroundActive(db, unit.conversationId)
 		) {
 			deferForForeground(env, unit);
+			return { status: "stale", reason: "foreground_active" };
+		}
+		// The episode preparation waits for the foreground too; the kick makes the unit again after a short wait.
+		if (
+			unit.slot === "episode" &&
+			deps.foregroundActive(db, unit.conversationId)
+		) {
+			closeUnit(db, unit.id, "stale", deps.clock());
+			wake.pause(
+				unit.conversationId,
+				unit.slot,
+				deps.nowMs() + FOREGROUND_DELAYS_MS[0],
+			);
 			return { status: "stale", reason: "foreground_active" };
 		}
 		const prepared = step.prepare(env, unit);
 		if (prepared.status === "stale") {
 			closeUnit(db, unit.id, "stale", deps.clock());
 			if (unit.slot === "maintenance") end.markQuiet(db, unit);
-			// The recall preparation is not tried again for an exchange it cannot read.
+			// A range with nothing to prepare is not made into a unit again.
+			if (unit.slot === "episode") end.markEpisodeQuiet(db, unit);
+			// The recall preparation is not tried again for an event it cannot read.
 			if (unit.slot === "recall") end.dropRecall(db, unit);
 			if (prepared.retryLater) {
 				// Nothing can be done now (World can not be used, Memory refused): the timer makes the unit again.
@@ -153,7 +168,7 @@ export function createPrepare(
 		putRequest(db, claim.jobId, unit.step, requestId);
 		setUnitPrepared(db, unit.id, {
 			forgetSeq: memory.forgetSeqInTransaction(db),
-			summaryRevision: prepared.summaryRevision,
+			windowVersion: prepared.windowVersion,
 			// What the step reports replaces its own keys; an upkeep unit keeps its revision and urgency.
 			targets: { ...unit.targets, ...prepared.targets },
 		});
@@ -168,7 +183,7 @@ export function createPrepare(
 			data: prepared.data,
 			context: prepared.context,
 			targets: prepared.targets,
-			summaryRevision: prepared.summaryRevision,
+			windowVersion: prepared.windowVersion,
 		};
 		return {
 			status: "ready",

@@ -162,6 +162,15 @@ export function openInteractionOfRun(db: Database, runId: string) {
 		.get(runId) as Record<string, unknown> | null;
 	return row ? map(row) : null;
 }
+/** The question a run's command sub-agent asked and that waits for the user's answer. */
+export function waitingInteractionOfRun(db: Database, runId: string) {
+	const row = db
+		.query(
+			"SELECT * FROM command_interactions WHERE current_run_id=? AND status='waiting_input' ORDER BY created_at DESC LIMIT 1",
+		)
+		.get(runId) as Record<string, unknown> | null;
+	return row ? map(row) : null;
+}
 export function listInteractions(
 	db: Database,
 	conversationId: string,
@@ -173,20 +182,6 @@ export function listInteractions(
 				"SELECT * FROM command_interactions WHERE conversation_id=? ORDER BY created_at DESC, id LIMIT ?",
 			)
 			.all(conversationId, limit) as Record<string, unknown>[]
-	).map(map);
-}
-export function openQuestionRows(
-	db: Database,
-	conversationId: string,
-	nowIso: string,
-	limit: number,
-) {
-	return (
-		db
-			.query(
-				"SELECT * FROM command_interactions WHERE conversation_id=? AND status='waiting_input' AND question_id IS NOT NULL AND expires_at>? ORDER BY updated_at DESC, id LIMIT ?",
-			)
-			.all(conversationId, nowIso, limit) as Record<string, unknown>[]
 	).map(map);
 }
 export function interactionCounts(db: Database) {

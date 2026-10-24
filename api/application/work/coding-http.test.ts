@@ -1,3 +1,4 @@
+import { createContinuityService } from "../../domains/continuity";
 import { expect, test } from "bun:test";
 import { join } from "node:path";
 import { createApp } from "../app";
@@ -43,7 +44,13 @@ test("coding HTTP/client authenticate reads, validate cursors and hide private e
 		transcribe: async () => "",
 		speak: async () => new Uint8Array(),
 	};
-	const dialogue = createDialogueService({ store, queue, conversation, larm }),
+	const dialogue = createDialogueService({
+			store,
+			continuity: createContinuityService(store),
+			queue,
+			conversation,
+			larm,
+		}),
 		voice = createVoiceDialogue(store, dialogue, larm);
 	const app = createApp({
 		token,

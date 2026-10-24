@@ -2,7 +2,6 @@ import { afterEach, expect, test } from "bun:test";
 import { contentUnits, mentions, relatedToRequest } from "../service/relevance";
 import { NOTHING_TO_FORGET_NOTICE } from "../service/notices";
 import {
-	keepAll,
 	setupSteward,
 	topicEmbed,
 	type StewardHarness,
@@ -82,7 +81,6 @@ async function learn(h: StewardHarness) {
 			item("hobby.cycling", "週末に鎌倉へ自転車で出かけるのが趣味である"),
 		],
 	});
-	h.inference.script("dispose-exchanges", keepAll);
 	const first = await h.run({
 		user: "辛いものが苦手です。週末は鎌倉へ自転車で出かけるのが趣味です。",
 		answer: "承知しました",
@@ -106,7 +104,6 @@ test("the live case: two memories unrelated to the request are not forgotten, an
 			}),
 		],
 	}));
-	h.inference.script("dispose-exchanges", keepAll);
 	const asked = await h.run({
 		user: "Eumenes と LARM のことは全部忘れてください。",
 		end: "completed",
@@ -146,7 +143,6 @@ test("a correct forget still works, and a related and an unrelated ref in one an
 			}),
 		],
 	}));
-	h.inference.script("dispose-exchanges", keepAll);
 	await h.run({
 		user: "辛いものの話は忘れて",
 		end: "completed",
@@ -163,7 +159,6 @@ test("an earlier exchange the request has nothing to do with is not blocked by a
 	const first = await learn(h);
 	// Found by meaning through the answer, which mentions the spicy food; the user's words are about something else.
 	h.inference.script("curate-memory", empty);
-	h.inference.script("dispose-exchanges", keepAll);
 	const other = await h.run({
 		user: "好きな食べ物は何ですか",
 		answer: "辛いものがお好きなのですね",
@@ -183,7 +178,6 @@ test("an earlier exchange the request has nothing to do with is not blocked by a
 			],
 		};
 	});
-	h.inference.script("dispose-exchanges", keepAll);
 	await h.run({
 		user: "辛いものは忘れて",
 		end: "completed",
@@ -212,7 +206,6 @@ test("a request is answered only by its own label: the kind is never a fallback"
 			resolve({ request: "forget", refs: [refOf(data, "辛い")] }),
 		],
 	}));
-	h.inference.script("dispose-exchanges", keepAll);
 	await h.run({
 		user: "辛いものを忘れて",
 		end: "completed",
@@ -234,7 +227,6 @@ test("the strict schema of curate-memory allows only the request labels of the u
 	const { h } = await setup();
 	await learn(h);
 	h.inference.script("curate-memory", empty);
-	h.inference.script("dispose-exchanges", keepAll);
 	await h.run({
 		user: "辛いものを忘れて、あと鎌倉のことも",
 		end: "completed",
@@ -277,9 +269,11 @@ test("a World entity named in the request is forgotten", async () => {
 	};
 	h.inference.script("curate-memory", {
 		...empty,
-		route: [{ exchange: "e1", world: false, goals: false }],
+		route: [
+			{ event: "e1", world: false, goals: false },
+			{ event: "e2", world: false, goals: false },
+		],
 	});
-	h.inference.script("dispose-exchanges", keepAll);
 	await h.run({
 		user: "LARM を使っています",
 		answer: "はい",
@@ -293,7 +287,6 @@ test("a World entity named in the request is forgotten", async () => {
 		resolve: [resolve({ refs: ["w1", "w2", "w3"] })],
 		route: [],
 	});
-	h.inference.script("dispose-exchanges", keepAll);
 	await h.run({
 		user: "Eumenes と larm のことは全部忘れてください。",
 		end: "completed",

@@ -1,11 +1,10 @@
 import { byId } from "../repository";
 import type { RunProgress } from "../contracts";
-import { TERMINAL, type DialogueDeps } from "./context";
+import type { DialogueDeps } from "./context";
 
-/** Live partial text, progress watchers and their commit-driven refresh. */
+/** Progress watchers and their commit-driven refresh. */
 export function createProgress(deps: DialogueDeps) {
 	const { store, conversation } = deps;
-	const partials = new Map<string, string>();
 	const watchers = new Map<string, Set<(value: RunProgress) => void>>();
 	const watchedStatuses = new Map<string, string>();
 	function progress(runId: string): RunProgress | null {
@@ -20,11 +19,10 @@ export function createProgress(deps: DialogueDeps) {
 						.get(run.conversationId)
 						.messages.find((m) => m.id === run.answerMessageId)?.text
 				: null;
-		const live = run.status === "running" ? (partials.get(runId) ?? "") : "";
 		return {
 			runId,
 			status: run.status,
-			text: answer ?? live,
+			text: answer ?? "",
 			announcement: run.announcement ?? null,
 			error: run.status === "failed" ? run.error : null,
 		};
@@ -46,13 +44,8 @@ export function createProgress(deps: DialogueDeps) {
 			const status = store.read((db) => byId(db, id))?.status;
 			if (status !== watchedStatuses.get(id)) publish(id);
 		}
-		for (const id of partials.keys()) {
-			const status = store.read((db) => byId(db, id))?.status;
-			if (!status || TERMINAL.includes(status)) partials.delete(id);
-		}
 	});
 	return {
-		partials,
 		progress,
 		publish,
 		subscribeProgress(runId: string, listener: (value: RunProgress) => void) {
@@ -77,7 +70,6 @@ export function createProgress(deps: DialogueDeps) {
 		},
 		close() {
 			stopCommits();
-			partials.clear();
 			watchers.clear();
 			watchedStatuses.clear();
 		},

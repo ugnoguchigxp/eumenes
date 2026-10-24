@@ -551,6 +551,15 @@ test("binding fields belong to toolchains only and need a matching binding", asy
 		await expect(
 			store.write((db) => caps.registerBuiltinInTransaction(db, profile)),
 		).rejects.toThrow("invalid_capability");
+		await expect(
+			store.write((db) =>
+				caps.registerBuiltinInTransaction(db, {
+					...profile,
+					bindingRevisionId: undefined,
+					minImpact: "create",
+				} as Definition),
+			),
+		).rejects.toThrow("invalid_capability");
 		const lonely = {
 			...legacyToolchain,
 			revision: 3,

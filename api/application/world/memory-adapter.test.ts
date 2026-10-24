@@ -5,13 +5,14 @@ import { join } from "node:path";
 import { createCapabilities } from "../../domains/capabilities";
 import { createContinuityService } from "../../domains/continuity";
 import { createConversationService } from "../../domains/conversation";
-import { createMemoryService } from "../../domains/memory";
+import { createMemoryService, profileItemFields } from "../../domains/memory";
 import type { DecisionDto } from "../../domains/steward";
 import {
 	createActionRequests,
 	createAdapterRegistry,
 } from "../../domains/tool-runtime";
 import { openStore, type SqliteStore } from "../../infrastructure/sqlite";
+import { referenceJson } from "../../infrastructure/reference-json";
 import {
 	createMemoryAdapter,
 	describeMemoryAdapter,
@@ -137,7 +138,7 @@ test("describe offers the memory queries and the one write (the connection switc
 		"query:memory.short-term@1",
 		"query:memory.status@1",
 		"query:memory.steward-decisions@1",
-		"query:memory.steward-exchanges@1",
+		"query:memory.steward-events@1",
 		"query:memory.tendencies@1",
 	]);
 	expect([...d.operations.keys()]).toEqual(["memory.set-enabled"]);
@@ -321,25 +322,26 @@ test("tendencies, short-term notes and the context are read", async () => {
 	await run(h, "memory.set-enabled", { enabled: true });
 	const empty = read(h, "query:memory.context@1").items[0];
 	expect(empty.state).toContain("まだ組み立てていません");
-	expect(empty.state).toContain("次のターン");
-	expect(empty.longTermText).toBeUndefined();
+	expect(empty.state).toContain("次の生成");
+	expect(empty.profileText).toBeUndefined();
 	const window = await h.store.write((db) =>
 		h.memory.windowForRunInTransaction(db, "main"),
 	);
 	const built = read(h, "query:memory.context@1").items[0];
-	expect(built).toMatchObject({ version: 1, pendingAdditions: 0 });
+	expect(built).toMatchObject({ version: 1, newMemories: 0, notices: 0 });
 	expect(built.state).toContain("組み立て済み");
-	// The rendered texts are shown (bounded), an empty layer says so.
-	expect(built.longTermText).toBe(
-		window!.longTerm.text === "" ? "（空）" : window!.longTerm.text,
+	// The published profile is shown (bounded) with its size; the short-term notes are not part of it.
+	expect(built.profileText).toBe(
+		window!.profile.items.length === 0
+			? "（空）"
+			: referenceJson(window!.profile.items.map(profileItemFields)),
 	);
-	expect(built.longTermText).toContain("コーヒーが好き");
-	expect(built.longTerm).toBe(`約 ${window!.longTerm.tokens} token`);
-	expect(built.shortTerm).toBe(`約 ${window!.shortTerm.tokens} token`);
-	expect(built.shortTermText.length).toBeGreaterThan(0);
+	expect(built.profileText).toContain("コーヒーが好き");
+	expect(built.profileText).not.toContain("旅行の計画");
+	expect(built.profile).toBe(`約 ${window!.profile.tokens} token`);
 });
 
-test("the steward timeline shows decisions with their proposal, result and window change, and the exchange ledger", async () => {
+test("the steward timeline shows decisions with their proposal, result and window change, and the event log", async () => {
 	const h = await setup();
 	const decision = (
 		over: Partial<DecisionDto> & Pick<DecisionDto, "id" | "step">,
@@ -374,12 +376,12 @@ test("the steward timeline shows decisions with their proposal, result and windo
 		decision({
 			id: 1,
 			step: "summarize",
-			output: { summary: "旅行の相談", included: ["e1"] },
-			results: [{ status: "applied", revision: 1, included: 1 }],
+			output: { summary: "旅行の相談" },
+			results: [{ status: "applied", from: 1, to: 4, count: 4 }],
 			windowVersionBefore: null,
 			windowVersionAfter: 1,
 		}),
-		decision({ id: 0, step: "dispose-exchanges", errorCode: "stale_forget" }),
+		decision({ id: 0, step: "refine-summary", errorCode: "stale_window" }),
 	];
 	const seen: Array<[string, number | undefined]> = [];
 	const adapter = createMemoryAdapter({
@@ -389,7 +391,10 @@ test("the steward timeline shows decisions with their proposal, result and windo
 				seen.push([conversationId, limit]);
 				return decisions;
 			},
-			exchanges: (conversationId) => h.memory.exchanges(conversationId),
+			events: (conversationId) =>
+				h.store.read((db) =>
+					h.continuity.events.logInTransaction(db, conversationId),
+				),
 		},
 	});
 	const readWith = (query: string) =>
@@ -407,34 +412,65 @@ test("the steward timeline shows decisions with their proposal, result and windo
 		cost: "1.5秒 / 120 tokens",
 	});
 	expect(rows[1]).toMatchObject({
-		stepLabel: "要約",
-		proposal: "summary: 旅行の相談 / included 1件",
+		stepLabel: "経緯の要約の準備",
+		proposal: "summary: 旅行の相談",
 		windowDiff: "版 1",
 	});
 	expect(rows[2]).toMatchObject({
-		result: "採用せず（stale_forget）",
+		stepLabel: "経緯の要約の統合",
+		result: "採用せず（stale_window）",
 		windowDiff: "変更なし",
 	});
 
 	const input = await h.say("旅行に行きたい");
-	await h.store.write((db) =>
-		h.memory.recordExchangeInTransaction(db, {
+	await h.store.write((db) => {
+		h.continuity.events.appendInTransaction(db, {
 			conversationId: "main",
-			runId: `run-${input}`,
-			inputMessageId: input,
-			answerMessageId: null,
-			outcome: "failed",
-		}),
-	);
-	expect(readWith("query:memory.steward-exchanges@1").items).toMatchObject([
+			at: "2026-10-14T01:00:00.000Z",
+			type: "said",
+			by: "user",
+			fields: { text: "旅行に行きたい" },
+			messageIds: [input],
+		});
+		h.continuity.events.appendInTransaction(db, {
+			conversationId: "main",
+			at: "2026-10-14T01:00:05.000Z",
+			type: "delivered",
+			by: "host",
+			fields: { ref: "e1", heard: "full" },
+		});
+		h.continuity.events.markCuratedInTransaction(db, "main", [1]);
+	});
+	// Newest first: time, type, by, a short text and whether the steward has read it.
+	expect(readWith("query:memory.steward-events@1").items).toMatchObject([
 		{
-			id: input,
-			outcomeLabel: "回答なし（失敗）",
-			stateLabel: "反映待ち",
-			curated: "未",
-			dispositionLabel: "未判断",
+			id: "e2",
+			typeLabel: "配信結果",
+			byLabel: "ホスト",
+			text: "ref: e1 / heard: full",
+			curatedLabel: "反映待ち",
+		},
+		{
+			id: "e1",
+			typeLabel: "発言",
+			byLabel: "利用者",
+			text: "旅行に行きたい",
+			curatedLabel: "反映済み",
 		},
 	]);
+	// A forgotten event shows only that it existed.
+	await h.store.write((db) =>
+		h.continuity.events.forgetMessagesInTransaction(
+			db,
+			[input],
+			"2026-10-14T02:00:00.000Z",
+		),
+	);
+	expect(
+		readWith("query:memory.steward-events@1").items.map(
+			(row: { text: string }) => row.text,
+		),
+	).toEqual(["ref: e1 / heard: full", "忘却により本文を消去しました"]);
 	// Without a steward the timeline is empty, not an error.
 	expect(read(h, "query:memory.steward-decisions@1").items).toEqual([]);
 });
@@ -456,7 +492,7 @@ test("the memory bundle runs through the action ledger: only the connection swit
 		registry,
 		scope: "test-scope",
 	});
-	const revisionId = "artifact:settings.memory@4";
+	const revisionId = "artifact:settings.memory@5";
 	expect(ledger.artifacts().map((a) => a.artifactRevisionId)).toContain(
 		revisionId,
 	);

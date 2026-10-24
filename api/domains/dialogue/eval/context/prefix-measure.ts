@@ -1,57 +1,29 @@
 /**
- * Prefix stability of the arms on the trajectory (evaluation design section 5.4, ContextWindow design 7.2): the
- * trajectory's calls are rendered by each arm (and ordering variant), serialized the way the run's lane sends
- * them, and the shared prefix of every pair of consecutive calls is measured. The result is what criterion 7 of the
- * adoption rules reads; nothing is measured by hand.
+ * Prefix stability of the production messages on the trajectories (the ContextWindow specification, sections 12.4 and
+ * 21.2): each trajectory's generations are prepared by the production code, and the shared prefix of every pair of
+ * consecutive calls is measured. The result is what criterion 6 of the adoption rules reads; nothing is measured by
+ * hand. A re-construction rewrites part of the document, so its call shares less (the document keeps its keys in
+ * the order that changes least first); the median over the ordinary calls is the figure that is compared.
  */
 import { z } from "zod";
 import { estimateMessageTokens } from "../../../inference";
-import type { ChatMessage } from "../../service/context";
-import { type ContextArm, promptHash } from "./arm";
-import { type PrefixStability, prefixStability } from "./prefix-stability";
-import { SERIALIZATIONS, type Serialization } from "./raw";
-import { assertRenderInvariants } from "./render-invariants";
-import { serialize } from "./serialization";
-import { type SeedWiring, CONVERSATION_ID } from "./materialize";
 import {
-	type Trajectory,
-	type TrajectoryCallAssembly,
-	DEFAULT_TRAJECTORY,
-	materializeTrajectory,
+	type PrefixStability,
+	median,
+	prefixStability,
+	promptHash,
+} from "./prefix-stability";
+import { assertMessageInvariants } from "./message-invariants";
+import { type EvalCard, type SeedWiring, CONVERSATION_ID } from "./session";
+import {
+	TRAJECTORIES,
+	type TrajectoryName,
+	playTrajectory,
 } from "./trajectory";
 
-/**
- * The host's own addition to the selection call (the candidate toolchains are retrieved in the execute phase, after
- * the prepare-time assembly). It is the same text for every arm and stands right before the current request.
- */
-const SELECTION_NOTE =
-	"選択肢となる担当の候補が提示されています。必要なら一つ選んで呼び出します。";
-
-/** An arm's messages for one call of the trajectory, as the lane sends them. */
-function callMessages(
-	arm: ContextArm,
-	call: TrajectoryCallAssembly,
-	serialization: Serialization,
-): ChatMessage[] {
-	const out = assertRenderInvariants(arm, call.assembly, call.label);
-	if (call.kind === "selection") {
-		const messages = [...out.messages];
-		messages.splice(out.currentRequestIndex, 0, {
-			role: "system",
-			content: SELECTION_NOTE,
-		});
-		return serialize(serialization, {
-			...out,
-			messages,
-			currentRequestIndex: out.currentRequestIndex + 1,
-		}).messages;
-	}
-	return serialize(serialization, out).messages;
-}
-
-const prefixArmSchema = z
+const trajectoryReportSchema = z
 	.object({
-		/** Median of the token ratios of consecutive calls: what criterion 7 compares. */
+		/** Median of the token ratios of the ordinary calls (no re-construction before them): what criterion 6 compares. */
 		medianRatio: z.number().min(0).max(1).nullable(),
 		medianByteRatio: z.number().min(0).max(1).nullable(),
 		/** Shared tokens over earlier-prompt tokens, summed over the conversation (supplementary). */
@@ -63,6 +35,8 @@ const prefixArmSchema = z
 					promptSha256: z.string(),
 					bytes: z.number().int().min(0),
 					tokens: z.number().int().min(0),
+					/** Why the window was re-constructed before this call; null: an ordinary call. */
+					reconstruction: z.string().nullable(),
 					/** Shared with the previous call; null for the first. */
 					sharedBytes: z.number().int().min(0).nullable(),
 					sharedTokens: z.number().int().min(0).nullable(),
@@ -75,70 +49,63 @@ const prefixArmSchema = z
 export const prefixReportSchema = z
 	.object({
 		format: z.literal("context-eval.prefix"),
-		serialization: z.enum(SERIALIZATIONS),
 		conversationId: z.string(),
-		arms: z.record(z.string(), prefixArmSchema),
+		trajectories: z.record(z.string(), trajectoryReportSchema),
 	})
 	.strict();
 export type PrefixReport = z.infer<typeof prefixReportSchema>;
 
-function armReport(
-	messagesOfCalls: ChatMessage[][],
-	labels: string[],
-	stability: PrefixStability,
-): z.infer<typeof prefixArmSchema> {
-	return {
-		medianRatio: stability.medianTokenRatio,
-		medianByteRatio: stability.medianRatio,
-		aggregateRatio: stability.aggregateTokenRatio,
-		calls: messagesOfCalls.map((messages, i) => {
-			const pair = i === 0 ? undefined : stability.pairs[i - 1];
-			const bytes = Buffer.byteLength(JSON.stringify(messages));
-			return {
-				label: labels[i]!,
-				promptSha256: promptHash(messages),
-				bytes,
-				tokens: estimateMessageTokens(messages),
-				sharedBytes: pair?.sharedBytes ?? null,
-				sharedTokens: pair?.sharedTokens ?? null,
-				tokenRatio: pair?.tokenRatio ?? null,
-			};
-		}),
-	};
-}
+/** The trajectory whose ordinary generations criterion 6 compares. */
+export const COMPARED_TRAJECTORY: TrajectoryName = "default";
 
-/** Measures every arm on one trajectory played on a fresh store (closed afterwards). */
+/** Measures every trajectory, each played on a fresh store (closed afterwards). */
 export async function measurePrefix(options: {
-	arms: readonly ContextArm[];
-	serialization: Serialization;
 	openWiring: () => Promise<SeedWiring>;
-	trajectory?: Trajectory;
+	catalog?: readonly EvalCard[];
 }): Promise<PrefixReport> {
-	const wiring = await options.openWiring();
-	let calls: TrajectoryCallAssembly[];
-	try {
-		calls = await materializeTrajectory(
-			wiring,
-			options.trajectory ?? DEFAULT_TRAJECTORY,
+	const trajectories: PrefixReport["trajectories"] = {};
+	for (const [name, trajectory] of Object.entries(TRAJECTORIES)) {
+		const wiring = await options.openWiring();
+		let calls: Awaited<ReturnType<typeof playTrajectory>>;
+		try {
+			calls = await playTrajectory(
+				wiring,
+				trajectory,
+				options.catalog ? { catalog: options.catalog } : {},
+			);
+		} finally {
+			await wiring.close();
+		}
+		for (const call of calls)
+			assertMessageInvariants(call.input, `${name}:${call.label}`);
+		const lists = calls.map((call) => call.input.messages);
+		const stability: PrefixStability = prefixStability(lists);
+		// The ordinary calls are the ones no re-construction preceded.
+		const ordinary = stability.pairs.filter(
+			(pair) => calls[pair.from + 1]!.reconstruction === null,
 		);
-	} finally {
-		await wiring.close();
-	}
-	const arms: PrefixReport["arms"] = {};
-	for (const arm of options.arms) {
-		const messages = calls.map((call) =>
-			callMessages(arm, call, options.serialization),
-		);
-		arms[arm.id] = armReport(
-			messages,
-			calls.map((c) => c.label),
-			prefixStability(messages),
-		);
+		trajectories[name] = {
+			medianRatio: median(ordinary.map((pair) => pair.tokenRatio)),
+			medianByteRatio: median(ordinary.map((pair) => pair.ratio)),
+			aggregateRatio: stability.aggregateTokenRatio,
+			calls: lists.map((messages, i) => {
+				const pair = i === 0 ? undefined : stability.pairs[i - 1];
+				return {
+					label: calls[i]!.label,
+					promptSha256: promptHash(messages),
+					bytes: Buffer.byteLength(JSON.stringify(messages)),
+					tokens: estimateMessageTokens(messages),
+					reconstruction: calls[i]!.reconstruction?.reason ?? null,
+					sharedBytes: pair?.sharedBytes ?? null,
+					sharedTokens: pair?.sharedTokens ?? null,
+					tokenRatio: pair?.tokenRatio ?? null,
+				};
+			}),
+		};
 	}
 	return {
 		format: "context-eval.prefix",
-		serialization: options.serialization,
 		conversationId: CONVERSATION_ID,
-		arms,
+		trajectories,
 	};
 }

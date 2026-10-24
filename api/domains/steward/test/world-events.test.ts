@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { keepAll, setupSteward, type StewardHarness } from "./steward.fixture";
+import { setupSteward, type StewardHarness } from "./steward.fixture";
 import { createFakeWorld, type FakeWorld } from "./world.fake";
 
 const harnesses: StewardHarness[] = [];
@@ -22,7 +22,10 @@ async function setup() {
 const empty = { remember: [], update: [], stop: [], notes: [], resolve: [] };
 const judged = (world: boolean, goals = false) => ({
 	...empty,
-	route: [{ exchange: "e1", world, goals }],
+	route: [
+		{ event: "e1", world, goals },
+		{ event: "e2", world, goals },
+	],
 });
 const claim = {
 	op: "assert",
@@ -59,7 +62,6 @@ async function exchangeWithEvents(
 test("the events of one exchange become one world_events unit; settle, unit and decision are one result", async () => {
 	const { h, fake } = await setup();
 	h.inference.script("curate-memory", judged(true));
-	h.inference.script("dispose-exchanges", keepAll);
 	h.inference.script("curate-world", answerWith([claim]));
 	const ex = await exchangeWithEvents(h, fake);
 	await h.drain();
@@ -113,7 +115,6 @@ test("the events of one exchange become one world_events unit; settle, unit and 
 test("an event that arrives before curate-memory judged its exchange waits; no unit is made and no model is asked", async () => {
 	const { h, fake } = await setup();
 	h.inference.script("curate-memory", judged(true));
-	h.inference.script("dispose-exchanges", keepAll);
 	h.inference.script("curate-world", answerWith([claim]));
 	const ex = await exchangeWithEvents(h, fake);
 	// Received before the steward's curate-memory ran.
@@ -132,7 +133,6 @@ test("an event that arrives before curate-memory judged its exchange waits; no u
 test("an exchange judged world:false is settled empty without a model, and the decision says so", async () => {
 	const { h, fake } = await setup();
 	h.inference.script("curate-memory", judged(false));
-	h.inference.script("dispose-exchanges", keepAll);
 	const ex = await exchangeWithEvents(h, fake, ["今日は眠い", "お大事に"]);
 	await h.drain();
 	await ex.receive();
@@ -153,7 +153,6 @@ test("an exchange judged world:false is settled empty without a model, and the d
 test("a corrected version of a judged message is not routed by the old judgment", async () => {
 	const { h, fake } = await setup();
 	h.inference.script("curate-memory", judged(false));
-	h.inference.script("dispose-exchanges", keepAll);
 	h.inference.script("curate-world", answerWith([]));
 	const ex = await h.run({
 		user: "最初の言い方",
@@ -179,7 +178,6 @@ test("an exchange the steward never judged (cancelled run) and an exchange witho
 	expect(worldUnits(h).map((u) => u.state)).toEqual(["applied"]);
 	// The model forgot the route: needed.
 	h.inference.script("curate-memory", empty);
-	h.inference.script("dispose-exchanges", keepAll);
 	const second = await h.run({
 		user: "判定のない往復",
 		answer: "了解",
@@ -195,7 +193,6 @@ test("an exchange the steward never judged (cancelled run) and an exchange witho
 test("prepare that is not ready closes the unit and the timer tries again; events World finalized are done", async () => {
 	const { h, fake } = await setup();
 	h.inference.script("curate-memory", judged(true));
-	h.inference.script("dispose-exchanges", keepAll);
 	h.inference.script("curate-world", answerWith([]));
 	const ex = await exchangeWithEvents(h, fake);
 	await h.drain();
@@ -219,7 +216,6 @@ test("prepare that is not ready closes the unit and the timer tries again; event
 test("a window held three times is given up and the events after it go on", async () => {
 	const { h, fake } = await setup();
 	h.inference.script("curate-memory", judged(true), judged(true));
-	h.inference.script("dispose-exchanges", keepAll, keepAll);
 	h.inference.script(
 		"curate-world",
 		answerWith([]),
@@ -269,7 +265,6 @@ test("a window held three times is given up and the events after it go on", asyn
 test("a World forget since prepare voids the answer; a memory forget does too (stale, nothing applied)", async () => {
 	const { h, fake } = await setup();
 	h.inference.script("curate-memory", judged(true));
-	h.inference.script("dispose-exchanges", keepAll);
 	h.inference.script(
 		"curate-world",
 		() => {
@@ -296,7 +291,6 @@ test("a World forget since prepare voids the answer; a memory forget does too (s
 test("a settle that fails half way leaves nothing: events stay pending, the unit fails, the dependents are released", async () => {
 	const { h, fake } = await setup();
 	h.inference.script("curate-memory", judged(true));
-	h.inference.script("dispose-exchanges", keepAll);
 	h.inference.script(
 		"curate-world",
 		answerWith([claim]),
@@ -335,7 +329,6 @@ test("a settle that fails half way leaves nothing: events stay pending, the unit
 test("an unusable answer counts against the events; after a restart the startup kick makes units for pending events", async () => {
 	const { h, fake } = await setup();
 	h.inference.script("curate-memory", judged(true));
-	h.inference.script("dispose-exchanges", keepAll);
 	h.inference.script("curate-world", "not json", answerWith([]));
 	const ex = await exchangeWithEvents(h, fake);
 	await h.drain();
@@ -366,7 +359,6 @@ test("an unusable answer counts against the events; after a restart the startup 
 test("the judgment is kept per message with the version the model read, and a forget of the message removes it", async () => {
 	const { h } = await setup();
 	h.inference.script("curate-memory", judged(false, true));
-	h.inference.script("dispose-exchanges", keepAll);
 	h.inference.script("curate-goals", { goals: [] });
 	const ex = await h.run({
 		user: "今日は眠い",
@@ -417,7 +409,6 @@ const releasedIds = (fake: FakeWorld) =>
 test("a world_events unit cancelled in the queue gives back what World registered for it", async () => {
 	const { h, fake } = await setup();
 	h.inference.script("curate-memory", judged(true));
-	h.inference.script("dispose-exchanges", keepAll);
 	const ex = await exchangeWithEvents(h, fake);
 	await h.drain();
 	await ex.receive();
@@ -441,7 +432,6 @@ test("a world_events unit cancelled in the queue gives back what World registere
 test("a retried world_events unit gives back its registration before the next try", async () => {
 	const { h, fake } = await setup();
 	h.inference.script("curate-memory", judged(true));
-	h.inference.script("dispose-exchanges", keepAll);
 	h.inference.script(
 		"curate-world",
 		new Error("network_unavailable"),

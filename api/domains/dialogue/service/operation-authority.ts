@@ -3,7 +3,7 @@ import type { InferencePort, Receipt } from "../../inference";
 import type { MemoryService, PreparedWindow } from "../../memory";
 import { shownMessageForgotten } from "./memory-window";
 import type { GoalsLayerPort } from "../contracts";
-import { goalsLayerStale, type PreparedGoals } from "./goals-layer";
+import { goalsStale, type PreparedGoals } from "./goals-state";
 
 /** Control may start an operation only while every input authority is current. */
 export function operationRejection(
@@ -36,7 +36,7 @@ export function operationRejection(
 		shownMessageForgotten(input.memory, db, input.memoryWindow)
 	)
 		return "memory_stale";
-	if (goalsLayerStale(input.goals, db, input.goalsLayer)) return "memory_stale";
+	if (goalsStale(input.goals, db, input.goalsLayer)) return "memory_stale";
 	if (
 		input.memoryWindow &&
 		input.memory &&

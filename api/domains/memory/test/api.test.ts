@@ -133,23 +133,19 @@ test("tendencies are listed; there is no route to change or delete them by hand"
 	).toHaveLength(1);
 });
 
-test("the context endpoint shows both layers with their estimated size, and is off when memory is", async () => {
+test("the context endpoint shows the profile with its estimated size, and is off when memory is", async () => {
 	const { h, app } = await setup();
 	await h.seed("コーヒーが好き", "drink.coffee");
 	await h.note("c1", { kind: "goal", text: "Rust移行" });
 	const response = await app.request("/api/memory/context?conversationId=c1");
 	const context = memoryContextSchema.parse(await response.json());
 	if ("disabled" in context && context.disabled) throw new Error("off");
-	expect(context).toMatchObject({
-		shortTerm: { pendingAdditions: 0 },
-		notices: 0,
-	});
-	if (!("longTerm" in context)) throw new Error("off");
-	expect(context.longTerm.text).toContain("コーヒーが好き");
-	expect(context.longTerm.tokens).toBe(
-		estimateTextTokens(context.longTerm.text),
-	);
-	expect(context.shortTerm.text).toContain("Rust移行");
+	if (!("profile" in context)) throw new Error("off");
+	expect(context).toMatchObject({ newMemories: 0, notices: 0 });
+	expect(context.profile.text).toContain("コーヒーが好き");
+	expect(context.profile.tokens).toBe(estimateTextTokens(context.profile.text));
+	// The short-term notes are the conversation's active memory, not part of the long-term window.
+	expect(context.profile.text).not.toContain("Rust移行");
 	await h.memory.setEnabled(false);
 	expect(
 		await (await app.request("/api/memory/context?conversationId=c1")).json(),
@@ -175,18 +171,14 @@ test("while the journal is inconsistent none of the new endpoints shows a body",
 	).toEqual({ disabled: true });
 });
 
-test("a note that expires leaves the short-term layer without any other change", async () => {
+test("a note that expires does not change the long-term window", async () => {
 	const { h } = await setup();
 	await h.note("c1", { kind: "memo", text: "一週間のメモ" });
 	await h.note("c1", { kind: "goal", text: "Rust移行" });
 	const first = await h.window();
-	expect(first.shortTerm.text).toContain("一週間のメモ");
 	expect((await h.window()).version).toBe(first.version);
 	h.time.now = "2026-10-21T12:00:00.000Z";
 	const later = await h.window();
-	expect(later.version).toBeGreaterThan(first.version);
-	expect(later.shortTerm.text).not.toContain("一週間のメモ");
-	expect(later.shortTerm.text).toContain("Rust移行");
-	// Nothing left to expire: the window is stable again.
-	expect((await h.window()).version).toBe(later.version);
+	expect(later.version).toBe(first.version);
+	expect(later.profile.items).toEqual(first.profile.items);
 });

@@ -2,7 +2,7 @@ import type { Database } from "bun:sqlite";
 import { getLogger } from "../../../infrastructure/logger";
 import { PENDING_LIMIT } from "../../memory";
 import {
-	EXCHANGES_PER_UNIT,
+	EVENTS_PER_UNIT,
 	JOB_DEADLINE_MS,
 	MAINTENANCE_STEPS_PER_ROUND,
 	MAX_FAILURES,
@@ -16,6 +16,8 @@ import {
 import {
 	type UnitTargets,
 	conversationsWithWork,
+	eventFailures,
+	failedEpisodeUnits,
 	failedMaintenanceUnits,
 	insertUnit,
 	openUnitOf,
@@ -26,9 +28,12 @@ import {
 	setUnitJob,
 	writeState,
 } from "../repository";
+import { nextCandidate } from "./episode-plan";
 import { kickWorld } from "./kick-world";
-import { MAINTENANCE_ORDER, exchangeStepOf, steps } from "./steps";
+import { givenUp, pendingAdditions, reconstructIfDue } from "./kick-window";
+import { MAINTENANCE_ORDER, steps } from "./steps";
 import { eligible } from "./steps/maintenance-steps";
+import { pendingEvents } from "./steps/shared";
 import type { StepEnv, StewardDeps } from "./types";
 import type { Wake } from "./wake";
 
@@ -103,56 +108,38 @@ export function createKick(deps: StewardDeps, wake: Wake) {
 		}
 	}
 
-	/** The next reflecting unit, if a request or an exchange still waits for a step. True: reflecting work exists. */
+	/** The next reflecting unit, if a request or a handled event still waits for a step. True: reflecting work exists. */
 	function kickReflect(env: StepEnv): boolean {
-		const { db, deps: d, conversationId } = env;
+		const { db, conversationId } = env;
 		const requests = pendingInbox(db, conversationId, REQUESTS_PER_UNIT);
-		const curate = d.memory.pendingExchangesInTransaction(
-			db,
-			conversationId,
-			"curated",
-			EXCHANGES_PER_UNIT,
-		);
-		if (curate.length > 0 || requests.length > 0) {
+		const events = pendingEvents(env).slice(0, EVENTS_PER_UNIT);
+		if (events.length > 0 || requests.length > 0) {
+			const failures = eventFailures(
+				db,
+				conversationId,
+				events.map((event) => event.seq),
+			);
 			const attempt = Math.max(
 				0,
-				...curate.map((row) => row.failures.curated ?? 0),
+				...failures.values(),
 				...requests.map((row) => row.failures),
 			);
 			createUnit(db, conversationId, {
 				step: "curate-memory",
-				kind: curate.length > 0 ? "exchange_step" : "requests",
+				kind: events.length > 0 ? "events" : "requests",
 				targets: {
-					exchanges: curate.map((row) => row.inputMessageId),
+					seqs: events.map((event) => event.seq),
 					requests: requests.map((row) => row.id),
 				},
 				attempt,
 			});
 			return true;
 		}
-		if (kickGoals(env)) return true;
-		for (const step of ["dispose-exchanges", "summarize"] as const) {
-			const key = exchangeStepOf[step]!;
-			const rows = d.memory.pendingExchangesInTransaction(
-				db,
-				conversationId,
-				key,
-				EXCHANGES_PER_UNIT,
-			);
-			if (rows.length === 0) continue;
-			createUnit(db, conversationId, {
-				step,
-				kind: "exchange_step",
-				targets: { exchanges: rows.map((row) => row.inputMessageId) },
-				attempt: Math.max(0, ...rows.map((row) => row.failures[key] ?? 0)),
-			});
-			return true;
-		}
-		return false;
+		return kickGoals(env);
 	}
 
 	/**
-	 * The goal reflection after curate-memory: the exchanges judged to need it (and the goal requests). Without goals
+	 * The goal reflection after curate-memory: the events judged to need it (and the goal requests). Without goals
 	 * a goal request can not be served: it ends at once.
 	 */
 	function kickGoals(env: StepEnv): boolean {
@@ -168,13 +155,13 @@ export function createKick(deps: StewardDeps, wake: Wake) {
 				resolveInbox(db, row.id, "none", "goals_unavailable", d.clock());
 			return false;
 		}
-		const todos = pendingGoalTodos(db, conversationId, EXCHANGES_PER_UNIT);
+		const todos = pendingGoalTodos(db, conversationId, EVENTS_PER_UNIT);
 		if (todos.length === 0 && requests.length === 0) return false;
 		createUnit(db, conversationId, {
 			step: "curate-goals",
-			kind: todos.length > 0 ? "exchange_step" : "requests",
+			kind: todos.length > 0 ? "events" : "requests",
 			targets: {
-				exchanges: todos.map((row) => row.inputMessageId),
+				seqs: todos.map((row) => row.seq),
 				requests: requests.map((row) => row.id),
 			},
 			attempt: Math.max(
@@ -193,19 +180,10 @@ export function createKick(deps: StewardDeps, wake: Wake) {
 			return;
 		createUnit(db, conversationId, {
 			step: "prepare-recall",
-			kind: "exchange_step",
-			targets: { message: state.recallPending },
+			kind: "events",
+			targets: { recallSeq: state.recallPending },
 			attempt: 0,
 		});
-	}
-
-	/** Items remembered that the long-term layer does not carry yet (the Window counts them). */
-	function pendingAdditions(env: StepEnv): number {
-		const window = env.deps.memory.windows.storedInTransaction(
-			env.db,
-			env.conversationId,
-		);
-		return window?.shortTerm.pendingAdditions ?? 0;
 	}
 
 	/** Upkeep: a pending-limit consolidation at once; otherwise rounds of at most three steps per revision. */
@@ -300,23 +278,53 @@ export function createKick(deps: StewardDeps, wake: Wake) {
 			});
 	}
 
+	/**
+	 * The episode preparation (section 12.2): the next summary or merge the re-construction will take, when no
+	 * answer is being generated. True: a unit is open (also while a reflecting unit is), was made now or is held back
+	 * by a pause after a failure, so the re-construction waits for it and the timer kicks again.
+	 */
+	function kickEpisode(env: StepEnv, reflecting: boolean): boolean {
+		const { db, deps: d, conversationId } = env;
+		if (openUnitOf(db, conversationId, "episode")) return true;
+		if (reflecting || d.foregroundActive(db, conversationId)) return false;
+		const candidate = nextCandidate(env, (c) => givenUp(env, c));
+		if (!candidate) return false;
+		if (wake.paused(conversationId, steps[candidate.step].slot)) return true;
+		return createUnit(db, conversationId, {
+			step: candidate.step,
+			kind: "maintenance",
+			targets: { range: candidate.range },
+			attempt: failedEpisodeUnits(
+				db,
+				conversationId,
+				candidate.step,
+				candidate.range,
+			),
+		});
+	}
+
 	function kickOne(db: Database, conversationId: string) {
 		try {
-			if (!deps.memory.readyInTransaction(db)) return;
 			const env: StepEnv = { db, deps, conversationId };
-			const reflecting = openUnitOf(db, conversationId, "reflect")
-				? true
-				: kickReflect(env);
-			kickRecall(env);
-			kickMaintenance(env, reflecting);
-			kickWorld(env, wake, (spec) =>
-				createUnit(db, conversationId, {
-					step: "curate-world",
-					kind: "world_events",
-					targets: { events: spec.events },
-					attempt: spec.attempt,
-				}),
-			);
+			let waiting = false;
+			if (deps.memory.readyInTransaction(db)) {
+				const reflecting = openUnitOf(db, conversationId, "reflect")
+					? true
+					: kickReflect(env);
+				kickRecall(env);
+				kickMaintenance(env, reflecting);
+				kickWorld(env, wake, (spec) =>
+					createUnit(db, conversationId, {
+						step: "curate-world",
+						kind: "world_events",
+						targets: { events: spec.events },
+						attempt: spec.attempt,
+					}),
+				);
+				waiting = kickEpisode(env, reflecting);
+			}
+			// The log is kept within its limits whether or not memory is on; only the summaries need the steward.
+			reconstructIfDue(env, waiting, wake);
 		} catch (error) {
 			log.warn("steward.kick_failed", { reason: "kick_failed" }, error);
 		}
@@ -324,7 +332,7 @@ export function createKick(deps: StewardDeps, wake: Wake) {
 
 	/**
 	 * Makes the units a conversation needs (every conversation with work when none is named, at startup: the ones
-	 * the steward knows and the ones with exchanges still waiting for a step). Called
+	 * the steward knows and the ones with handled events still waiting for a step). Called
 	 * inside the transaction of a settle or a run's end; whatever fails inside leaves that transaction alone.
 	 */
 	function kickInTransaction(db: Database, conversationId?: string) {
@@ -332,7 +340,7 @@ export function createKick(deps: StewardDeps, wake: Wake) {
 		const world = deps.world;
 		const ids = new Set([
 			...conversationsWithWork(db),
-			...deps.memory.pendingConversationIdsInTransaction(db),
+			...deps.continuity.events.conversationsWithUncuratedInTransaction(db),
 			// Events World received that no step has touched yet (the notice that woke the steward is not durable).
 			...(world
 				? world.curation

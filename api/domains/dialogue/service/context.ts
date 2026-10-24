@@ -3,6 +3,7 @@ import type { ConversationService } from "../../conversation";
 import type { InferencePort } from "../../inference";
 import type { QueueService } from "../../queue";
 import type { MemoryService, PreparedWindow } from "../../memory";
+import type { ContinuityService } from "../../continuity";
 import {
 	RESEARCH_BUDGET,
 	type AgentRuntime,
@@ -19,7 +20,6 @@ import type {
 	WorldContextPort,
 } from "../contracts";
 
-import type { CurrentRequest } from "./request-context";
 import type { MusicPort } from "../contracts/music";
 import type { ImagePort } from "../contracts/image";
 import type { ObjectRecognitionPort } from "../contracts/object-recognition";
@@ -32,6 +32,8 @@ export const SPECIALIST_KIND = "dialogue.specialist_turn";
 /** The generation job; a command sub-agent's clarifying question travels as data. */
 export type GeneratePayload = {
 	runId: string;
+	/** The earlier generation of this run committed actions and was not adopted (section 13). */
+	notAdopted?: boolean;
 	commandNote?: string;
 	/**
 	 * Set when a specialist handed the user's request back (out of its scope): the host line the
@@ -50,83 +52,73 @@ export const DEFAULT_DEADLINE_MS = RESEARCH_BUDGET.rootMilliseconds;
 export const TERMINAL = ["completed", "failed", "cancelled", "interrupted"];
 
 export type ChatMessage = {
-	role: "system" | "user" | "assistant";
+	role: "system" | "user" | "assistant" | "tool";
 	content: string;
 	attachments?: import("../../conversation/contracts").Attachment[];
 	sourceMessageId?: string;
 	images?: import("../../inference").ChatImage[];
+	tool_calls?: Array<{
+		id: string;
+		type: "function";
+		function: { name: string; arguments: string };
+	}>;
+	tool_call_id?: string;
 };
+
+/** What the newest message of a generation is (the ContextWindow specification, section 5.1). */
+export type FinalMessage =
+	| {
+			kind: "utterances";
+			/** The pending user utterances it shows, in receipt order. */
+			seqs: number[];
+			messageIds: string[];
+	  }
+	| { kind: "fixed" };
+
+/** What a generation's prepare fixes, inside the claim transaction. */
 export interface GenerateInput {
-	executionNotice?: import("./execution-notices").ExecutionNoticeBinding;
-	executionNoticeReply?: string;
-	/** Conversational prose is a short spoken reply; artifact bodies keep their own contract. */
-	briefReply?: boolean;
-	currentRequest: CurrentRequest;
-	/**
-	 * A new conversation decision: the execute phase analyzes the request, then answers it or
-	 * retrieves candidate toolchains for its goal and offers them as functions. Absent while
-	 * phrasing an operation's result.
-	 */
-	routing?: {
-		/** What the first round (the request analysis) reads besides the current request. */
-		offeredRevisionIds?: string[];
-		retained?: import("./retained-toolchains").PreparedToolchains;
-		analysis: import("./request-analysis").AnalysisInput;
-		tasks?: import("./initial-decision").TaskOffer;
-		/** Toolchains whose runtime is available on this host now. */
-		available: string[];
-		conversationId: string;
-		utteranceId: string | null;
-		requestId: string | null;
-		/** Questions a toolchain's command sub-agent asked and the user has not answered yet. */
-		openQuestions: import("./conversation-tools").OpenQuestion[];
-		/** A continuation run: its discovery searches this purpose instead of offering the retained toolchains. */
-		continuation?: { need: string };
-	};
-	/**
-	 * A delegated step's result is being phrased for a user's request: before the answer, the conversation checks
-	 * it against the request's original text and either finishes or names what is still missing.
-	 */
-	completionCheck?: CompletionCheck;
-	actionResultIndex?: number;
-	/** Media result replies have no host-granted URLs; hold and check the body before showing it. */
-	mediaResult?: true;
-	/** A saved operation is being phrased; its result context must remain in the prompt. */
-	operationResult?: true;
 	runId: string;
+	/** The run's own input message (the user's request a later generation of the run still acts for). */
+	inputMessageId: string;
+	/** The newest event seq when it was prepared: what this generation appends comes after it. */
+	lastSeq: number;
+	/** The generation's queue job: the parent of an agent task it starts. */
+	jobId: string;
 	revision: number;
-	messages: ChatMessage[];
-	/**
-	 * Where `messages` splits for a provider that resumes a session (see `CallSession.context`): the leading
-	 * instruction layers (system, long-term, goals) and the adopted exchanges stored in the conversation ledger.
-	 */
-	sessionContext?: { instructionCount: number; historyCount: number };
+	conversationId: string;
 	requestId?: string;
+	/** System, the material document, then the newest message(s). Tool calls and results are added while it runs. */
+	messages: ChatMessage[];
+	final: FinalMessage;
+	/** Why this generation runs (the `now.trigger` of its document). */
+	trigger: ReadonlyArray<Record<string, unknown>>;
+	plan: import("../../inference").WindowPlan;
+	/** The rendered document and its sizes (measured, never re-rendered while it runs). */
+	document: import("./context-document").ContextDocument;
 	/**
-	 * What is left (tokens) of the memory and history budget of the model window after this prompt was assembled:
-	 * the per-turn recall fills at most this. Absent: the whole budget less the prefetch.
+	 * The sub-agent's answer this generation speaks about, consumed only when the generation is adopted: a report
+	 * whose evidence changed meanwhile (a corrected or withdrawn source) is never adopted.
 	 */
-	memoryRoomTokens?: number;
+	agent?: AnswerTicket;
+	/** What the window shows that an answer may stand on: the TODOs with a result slot, and the logged events. */
+	shown: { todos: string[]; events: string[] };
+	/** The episode version shown: an episode changed meanwhile by a forget expires the generation. */
+	windowVersion: number;
+	/** Conversational prose is a short spoken reply. */
+	briefReply: boolean;
+	/** The toolchains this generation may delegate to without a search (`state.retained`). */
+	retained: ReturnType<
+		import("./work-ledger").WorkLedger["retainedInTransaction"]
+	>;
+	sessionContext: { instructionCount: number; historyCount: number };
 	/** The memory window fixed at prepare time; re-checked in the adoption transaction. */
 	memory?: {
 		window: PreparedWindow;
-		/**
-		 * The window adds nothing to the prompt (no layer text, no notice): its body is shown as it streams and
-		 * the window is checked at adoption only when a recalled exchange stands on it.
-		 */
-		quiet?: true;
-		/**
-		 * The shown messages that were already blocked at prepare time (scheduled prompts). A shown message that
-		 * is blocked at adoption and not listed here was forgotten meanwhile: the answer is not adopted, quiet or not.
-		 */
+		/** The shown messages already blocked at prepare time; one blocked later expires the generation. */
 		blockedAtPrepare?: string[];
 	};
-	/**
-	 * The goals the layer listed, fixed at prepare time; present only when it listed goals. At adoption a
-	 * forgotten (deleted) one ends the run as `memory_stale` (see `goalsLayerStale`).
-	 */
-	goals?: import("./goals-layer").PreparedGoals;
-	agent?: AnswerTicket;
+	/** The goals the state section listed, fixed at prepare time. */
+	goals?: import("./goals-state").PreparedGoals;
 }
 export interface Accept {
 	attachmentIds?: string[];
@@ -152,29 +144,7 @@ export interface Accept {
 	viewing?: Viewing;
 	/** The addressee the sender saw; checked in the acceptance transaction. */
 	addressee?: Addressee;
-	/** A continuation run's place in its request's chain (`sourceKind: "continuation"` only). */
-	continuation?: Omit<
-		import("../repository").Continuation,
-		"runId" | "createdAt"
-	>;
 }
-/** What the completion check of one delegated step reads besides the answer's prompt. */
-export type CompletionCheck = {
-	/** The user's own text of the request; the summaries the conversation wrote are never the standard. */
-	originalRequest: string;
-	/** The human run the chain started from. */
-	rootRunId: string;
-	/** Steps of this request before this one (0 for the first) and what they achieved. */
-	hop: number;
-	achieved: string;
-	/** The request's conditions the chain's first check fixed (absent at the first step). */
-	conditions?: string[];
-	/** The chain's steps up to this one, with this step's results as the conversation received them. */
-	steps: import("../repository").PriorStep[];
-	/** The condition each continuation step was taken for (the first step served none): each is tried once. */
-	attempts: Array<{ step: number; condition: string }>;
-};
-
 /** Everything the dialogue service parts share: the injected ports. */
 export type DialogueDeps = {
 	store: SqliteStore;
@@ -183,6 +153,10 @@ export type DialogueDeps = {
 	queue: QueueService;
 	clock: () => string;
 	id: () => string;
+	/** The active short-term memory: the event log, the episode, the work results, the notes. */
+	continuity: ContinuityService;
+	/** The conversation's TODOs and confirmations; set by `createDialogueService`. */
+	work?: import("./work-ledger").WorkLedger;
 	memory?: MemoryService;
 	/** Told in the transaction in which a run ends, after its exchange is in memory's ledger. */
 	steward?: StewardPort;
@@ -202,15 +176,10 @@ export type DialogueDeps = {
 	specialist?: SpecialistPort;
 	/** Set by `createDialogueService` once intake exists (it accepts the resumed runs). */
 	interactions?: CommandInteractions;
-	/** Set by `createDialogueService` once intake exists: accepts a continuation run of a user's request. */
-	continueInTransaction?: (
-		db: import("bun:sqlite").Database,
-		input: {
-			conversationId: string;
-			text: string;
-			continuation: NonNullable<Accept["continuation"]>;
-		},
-	) => Run;
 	/** Installed by the voice delivery owner; awaited after publishing, before any operation starts. */
-	deliverAnnouncement?: (run: Run, signal: AbortSignal) => Promise<void>;
+	/** Plays the announcement; resolves with how much was heard (cut short by the user: partial), rejects when nothing was. */
+	deliverAnnouncement?: (
+		run: Run,
+		signal: AbortSignal,
+	) => Promise<"full" | "partial">;
 };

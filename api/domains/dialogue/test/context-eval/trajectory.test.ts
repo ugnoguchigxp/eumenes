@@ -1,115 +1,128 @@
 import { expect, test } from "bun:test";
-import { baselineAaArm, baselineArm } from "../../eval/context/arm";
-import { orderingVariant } from "../../eval/context/ordering";
-import {
-	measurePrefix,
-	prefixReportSchema,
-} from "../../eval/context/prefix-measure";
+import { messageIssues } from "../../eval/context/message-invariants";
+import { promptHash } from "../../eval/context/prefix-stability";
 import {
 	DEFAULT_TRAJECTORY,
-	materializeTrajectory,
+	SMALL_WINDOW_TRAJECTORY,
+	type TrajectoryCall,
+	playTrajectory,
 } from "../../eval/context/trajectory";
-import { arms as exampleArms } from "../../../../../scripts/context-eval/experiments/2026-10-17-source-format/arms";
 import { openSeedWiring } from "./store-wiring";
 
-const a2 = exampleArms.find((a) => a.id === "A2")!;
-const measured = [
-	baselineArm,
-	baselineAaArm,
-	orderingVariant(baselineArm, "A0-o2", "O2"),
-	a2,
-	orderingVariant(a2, "A2-o2", "O2"),
-];
-
-test("the trajectory is ten turns with a memory step, an operation result, research success and failure, and a selection call", async () => {
+async function play(trajectory: Parameters<typeof playTrajectory>[1]) {
 	const wiring = await openSeedWiring();
-	let calls: Awaited<ReturnType<typeof materializeTrajectory>>;
 	try {
-		calls = await materializeTrajectory(wiring);
+		return await playTrajectory(wiring, trajectory);
 	} finally {
 		await wiring.close();
 	}
-	expect(DEFAULT_TRAJECTORY.turns.length).toBeGreaterThanOrEqual(10);
-	expect(new Set(calls.map((c) => c.turn)).size).toBe(
-		DEFAULT_TRAJECTORY.turns.length,
-	);
-	expect(new Set(calls.map((c) => c.kind))).toEqual(
-		new Set(["initial", "selection", "result"]),
-	);
-	const sources = new Set(
-		calls.flatMap((c) => [
-			...c.assembly.stable.map((b) => b.source),
-			...c.assembly.working.map((b) => b.source),
-			...c.assembly.volatile.map((b) => b.source),
-		]),
-	);
-	for (const source of [
-		"goals",
-		"memory.long_term",
-		"memory.summary",
-		"memory.notice",
-		"memory.recall",
-		"world.names",
-		"operation.image",
-		"operation.recognition",
-		"research.result",
-	] as const)
-		expect(sources.has(source)).toBe(true);
-	expect(calls.some((c) => c.assembly.stage === "selection")).toBe(true);
-	// The history grows turn by turn, and the memory steps change what is verbatim.
-	const history = (turn: number) =>
-		calls.find((c) => c.turn === turn)!.assembly.history.turns;
-	expect(history(1)).toHaveLength(0);
-	expect(history(3).length).toBeGreaterThan(history(2).length);
-	expect(history(7).some((t) => t.content.includes("紅葉"))).toBe(false);
-	// Every call has the current turn's input last.
-	for (const c of calls)
-		expect(c.assembly.input.content).toBe(
-			DEFAULT_TRAJECTORY.turns[c.turn - 1]!.user,
-		);
-}, 30_000);
+}
+type Doc = Record<string, any>;
+const docOf = (call: TrajectoryCall): Doc =>
+	JSON.parse(call.input.messages[1]!.content) as Doc;
 
-test("prefix stability: deterministic, per call bytes and tokens, the A/A control equals the baseline, O2 differs from O1", async () => {
-	const first = await measurePrefix({
-		arms: measured,
-		serialization: "larm-messages",
-		openWiring: openSeedWiring,
-	});
-	const second = await measurePrefix({
-		arms: measured,
-		serialization: "larm-messages",
-		openWiring: openSeedWiring,
-	});
-	expect(second).toEqual(first);
-	expect(prefixReportSchema.parse(first)).toEqual(first);
-	const a0 = first.arms.A0!;
-	expect(a0.calls.length).toBeGreaterThanOrEqual(10);
-	expect(a0.calls[0]!.sharedBytes).toBeNull();
-	for (const call of a0.calls.slice(1)) {
-		expect(call.sharedBytes).toBeGreaterThan(0);
-		expect(call.sharedTokens).toBeGreaterThan(0);
-		expect(call.tokenRatio).toBeLessThanOrEqual(1);
+test("the default trajectory is twelve generations that keep the message invariants", async () => {
+	const calls = await play(DEFAULT_TRAJECTORY);
+	expect(calls.map((c) => c.label)).toEqual(
+		Array.from({ length: 12 }, (_, i) => `g${i + 1}`),
+	);
+	for (const call of calls) expect(messageIssues(call.input)).toEqual([]);
+	// The same code gives the same messages.
+	const again = await play(DEFAULT_TRAJECTORY);
+	expect(again.map((c) => promptHash(c.input.messages))).toEqual(
+		calls.map((c) => promptHash(c.input.messages)),
+	);
+});
+
+test("between re-constructions the system part and the start of the document do not change: each call begins with the previous one up to the end of its log", async () => {
+	const calls = await play(DEFAULT_TRAJECTORY);
+	const system = calls[0]!.input.messages[0]!.content;
+	for (const call of calls)
+		expect(call.input.messages[0]!.content).toBe(system);
+	for (let i = 1; i < calls.length; i++) {
+		if (calls[i]!.reconstruction) continue;
+		const previous = calls[i - 1]!.input.messages[1]!.content;
+		const shared = previous.slice(0, previous.indexOf('],"active"'));
+		expect(calls[i]!.input.messages[1]!.content.startsWith(shared)).toBe(true);
 	}
-	expect(a0.medianRatio).toBeGreaterThan(0.5);
-	expect(first.arms["A0-aa"]).toEqual(a0);
-	// Moving the working memory behind the history changes which later calls share it.
-	const shared = (id: string) =>
-		first.arms[id]!.calls.map((c) => c.sharedTokens);
-	expect(shared("A0-o2")).not.toEqual(shared("A0"));
-	expect(shared("A2-o2")).not.toEqual(shared("A2"));
-	// The candidate has a longer system part, so more tokens per call.
-	expect(first.arms.A2!.calls[0]!.tokens).toBeGreaterThan(a0.calls[0]!.tokens);
-}, 60_000);
+});
 
-test("the flattened lane measures the same trajectory through promptParts", async () => {
-	const flat = await measurePrefix({
-		arms: measured,
-		serialization: "flattened",
-		openWiring: openSeedWiring,
-	});
-	expect(flat.serialization).toBe("flattened");
-	// promptParts splits the history off by the session split whatever the order, so O2 changes nothing there.
-	expect(flat.arms["A0-o2"]!.calls.map((c) => c.promptSha256)).toEqual(
-		flat.arms.A0!.calls.map((c) => c.promptSha256),
+test("the window is re-constructed where the product's rules say: a long silence resumes the conversation, an idle cache is taken as lost", async () => {
+	const calls = await play(DEFAULT_TRAJECTORY);
+	expect(
+		calls.map((c, i) => [`g${i + 1}`, c.reconstruction?.reason ?? null]),
+	).toEqual([
+		["g1", null],
+		["g2", null],
+		["g3", null],
+		["g4", null],
+		["g5", null],
+		["g6", null],
+		["g7", null],
+		["g8", null],
+		["g9", "resumed"],
+		["g10", null],
+		["g11", "cache_lost"],
+		["g12", null],
+	]);
+});
+
+test("a memory saved after the profile was published waits in state.newMemories until a re-construction takes it into the profile", async () => {
+	const calls = await play(DEFAULT_TRAJECTORY);
+	const at = (n: number) => docOf(calls[n - 1]!);
+	expect(at(3).state.newMemories).toEqual([]);
+	expect(JSON.stringify(at(4).state.newMemories)).toContain("辛い物が好き");
+	expect(at(4).profile).toEqual([]);
+	expect(at(8).profile).toEqual([]);
+	expect(JSON.stringify(at(9).profile)).toContain("辛い物が好き");
+	expect(at(9).state.newMemories).toEqual([]);
+});
+
+test("the delegation opens a TODO, its finishing starts a generation with the fixed text, and the result is held in active", async () => {
+	const calls = await play(DEFAULT_TRAJECTORY);
+	const g5 = docOf(calls[4]!);
+	expect(g5.state.todos).toEqual([]);
+	const g6 = docOf(calls[5]!);
+	expect(calls[5]!.input.final).toEqual({ kind: "fixed" });
+	expect(g6.state.todos).toEqual([
+		expect.objectContaining({
+			title: "旅行先のイメージ画像を作る",
+			status: "done",
+		}),
+	]);
+	expect(g6.now.trigger).toEqual([
+		{
+			kind: "todo_changed",
+			todos: [{ id: g6.state.todos[0].id, status: "done" }],
+		},
+	]);
+	expect(JSON.stringify(g6.active)).toContain("京都の紅葉を描いた画像ができた");
+	// The delegation the agent made is in the log with the TODO it opened.
+	const acted = (docOf(calls[5]!).log as Array<Record<string, unknown>>).find(
+		(e) => e.action === "delegate",
 	);
-}, 60_000);
+	expect(acted).toMatchObject({ todo: g6.state.todos[0].id });
+	// A notice starts a generation too, and the agent said nothing after it.
+	expect(calls[7]!.input.final).toEqual({ kind: "fixed" });
+	expect(docOf(calls[7]!).now.trigger).toEqual([
+		{ kind: "timer", text: "三分のタイマーが鳴りました" },
+	]);
+});
+
+test("in a small window the log passes its limit and the oldest events are moved out to the episode", async () => {
+	const calls = await play(SMALL_WINDOW_TRAJECTORY);
+	const reasons = calls.map((c) => c.reconstruction?.reason ?? null);
+	expect(reasons).toContain("section_over_limit");
+	const last = calls.at(-1)!;
+	expect(last.input.plan.usable).toBe(true);
+	const doc = docOf(last);
+	// No summary was prepared, so what left the log is an unsummarized range.
+	expect(doc.episode.length).toBeGreaterThan(0);
+	expect(doc.episode[0]).toMatchObject({ kind: "unsummarized" });
+	expect(last.input.document.sections.log.tokens).toBeLessThanOrEqual(
+		last.input.plan.log.cap,
+	);
+	expect(JSON.stringify(doc.log)).not.toContain('"text":"1件目');
+	expect(JSON.stringify(doc.log)).toContain("19件目の相談です");
+	for (const call of calls) expect(messageIssues(call.input)).toEqual([]);
+});

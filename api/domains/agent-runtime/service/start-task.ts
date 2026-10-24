@@ -53,8 +53,6 @@ export function createStartTask(ctx: RuntimeContext, ops: TaskOps) {
 				kind?: "web" | "history" | "world" | "action";
 				question: string;
 				originalRequest?: string;
-				/** The earlier steps of the same request (a continuation run only): reference data. */
-				priorSteps?: unknown[];
 				urls?: string[];
 				command?: unknown;
 				researcher?: "codex";
@@ -148,9 +146,6 @@ export function createStartTask(ctx: RuntimeContext, ops: TaskOps) {
 							? { references: request.execution.referenceData }
 							: {}),
 						originalRequest: request.originalRequest ?? request.question,
-						...(request.priorSteps?.length
-							? { priorSteps: request.priorSteps }
-							: {}),
 						requirementProfiles: input.requirementProfiles ?? [],
 						// The history sub-agent chooses applicable profiles from this snapshot.
 						...(request.kind === "history" && !input.requirementProfiles?.length

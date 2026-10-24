@@ -40,7 +40,7 @@ const outputShape = z
 			.refine(isBriefSpokenReply)
 			.optional()
 			.describe(
-				"短い返答。replyでは必須。invokeでは操作が成功したときの返答（任意）。音声で聞かれるため通常一文、補足込みでも二文・160字以内。制作物や実装内容は読み上げない。",
+				"短い返答。replyでは必須。invokeでは操作が成功したときの返答（任意）。音声で聞かれるため通常一文、補足込みでも二文・300字以内。制作物や実装内容は読み上げない。",
 			),
 		tool: z
 			.string()

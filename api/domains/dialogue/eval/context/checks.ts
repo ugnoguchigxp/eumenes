@@ -1,5 +1,6 @@
-/** Deterministic checks (spec 5.4). No LLM, no word-list semantic judging. */
+/** Deterministic checks (spec 21.2). No LLM, no word-list semantic judging. */
 import { isBriefSpokenReply } from "../../../delivery";
+import { TOOL_NAMES } from "../../service/generation-tools";
 import type { DeterministicCheck } from "./case-schema";
 
 export type ToolCallRecord = { name: string; arguments?: string };
@@ -10,48 +11,104 @@ export type CheckResult = {
 	reason: string;
 };
 
+function argsOf(call: ToolCallRecord): Record<string, unknown> {
+	try {
+		const value = JSON.parse(call.arguments ?? "{}") as unknown;
+		return value && typeof value === "object" && !Array.isArray(value)
+			? (value as Record<string, unknown>)
+			: {};
+	} catch {
+		return {};
+	}
+}
+
+/** The calls other than the `respond` that carries the analysis. */
+const workCalls = (answer: Answer) =>
+	answer.toolCalls.filter((c) => c.name !== TOOL_NAMES.respond);
+const delegations = (answer: Answer) =>
+	answer.toolCalls.filter((c) => c.name === TOOL_NAMES.delegate);
+
 export function runCheck(
 	check: DeterministicCheck,
 	answer: Answer,
 ): CheckResult {
+	const done = (pass: boolean, ok: string, bad: string): CheckResult => ({
+		kind: check.kind,
+		pass,
+		reason: pass ? ok : bad,
+	});
+	const names = answer.toolCalls.map((c) => c.name);
 	switch (check.kind) {
 		case "tool_called": {
-			const names = answer.toolCalls.map((c) => c.name);
-			const pass = check.name ? names.includes(check.name) : names.length > 0;
-			return {
-				kind: check.kind,
+			const pass = check.name
+				? names.includes(check.name)
+				: workCalls(answer).length > 0;
+			return done(
 				pass,
-				reason: pass
-					? "tool_called"
-					: `expected ${check.name ?? "a function call"}, got [${names.join(",")}]`,
-			};
+				"tool_called",
+				`expected ${check.name ?? "a tool call"}, got [${names.join(",")}]`,
+			);
 		}
-		case "no_tool_call": {
-			const pass = answer.toolCalls.length === 0;
-			return {
-				kind: check.kind,
+		case "tool_not_called": {
+			const pass = check.name
+				? !names.includes(check.name)
+				: workCalls(answer).length === 0;
+			return done(
 				pass,
-				reason: pass
-					? "no_tool_call"
-					: `called [${answer.toolCalls.map((c) => c.name).join(",")}]`,
-			};
+				"tool_not_called",
+				`called [${(check.name ? [check.name] : workCalls(answer).map((c) => c.name)).join(",")}]`,
+			);
 		}
+		case "delegated": {
+			const pass = delegations(answer).some((call) => {
+				const args = argsOf(call);
+				return (
+					(args.mode === "execute" || args.mode === "confirm") &&
+					(check.toolchain === undefined || args.toolchain === check.toolchain)
+				);
+			});
+			return done(
+				pass,
+				"delegated",
+				`expected a delegation${check.toolchain ? ` to ${check.toolchain}` : ""}, got [${delegations(
+					answer,
+				)
+					.map((c) => String(argsOf(c).toolchain ?? argsOf(c).mode ?? ""))
+					.join(",")}]`,
+			);
+		}
+		case "not_delegated":
+			return done(
+				delegations(answer).length === 0,
+				"not_delegated",
+				"delegated",
+			);
+		case "respond_field": {
+			const respond = answer.toolCalls
+				.filter((c) => c.name === TOOL_NAMES.respond)
+				.at(-1);
+			const value = respond ? argsOf(respond)[check.field] : undefined;
+			return done(
+				value === check.equals,
+				`${check.field}=${String(check.equals)}`,
+				`${check.field} was ${respond ? JSON.stringify(value ?? null) : "not given (no respond call)"}`,
+			);
+		}
+		case "speaks":
+			return done(answer.text.trim() !== "", "speaks", "silent");
+		case "silent":
+			return done(answer.text.trim() === "", "silent", "spoke");
 		case "brief_spoken_reply": {
-			const pass = isBriefSpokenReply(answer.text);
-			return {
-				kind: check.kind,
-				pass,
-				reason: pass ? "brief" : "spoken_reply_contract_violated",
-			};
+			const pass = answer.text.trim() === "" || isBriefSpokenReply(answer.text);
+			return done(pass, "brief", "spoken_reply_contract_violated");
 		}
 		case "forbidden_identifier": {
 			const found = check.identifiers.filter((id) => answer.text.includes(id));
-			return {
-				kind: check.kind,
-				pass: found.length === 0,
-				reason:
-					found.length === 0 ? "none_present" : `present:${found.join(",")}`,
-			};
+			return done(
+				found.length === 0,
+				"none_present",
+				`present:${found.join(",")}`,
+			);
 		}
 	}
 }

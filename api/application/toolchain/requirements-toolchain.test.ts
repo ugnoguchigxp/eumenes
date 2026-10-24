@@ -1,6 +1,11 @@
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { answerAnalysis } from "./analysis-round.fixture";
+import {
+	callsOf,
+	isResultRound,
+	isUtteranceRound,
+	searchThenDelegate,
+} from "./conversation-script.fixture";
 import { workerPacket } from "./toolchain.fixture";
 import { loadEvaluationCases } from "./llm-native-evaluation.fixture";
 import { evaluateRequirements } from "./llm-native-runner.fixture";
@@ -30,29 +35,22 @@ for (const c of cases)
 				speak: async () => new Uint8Array(),
 				answer: async (messages, _signal, options) => {
 					calls++;
-					if (
-						answerAnalysis(options, {
-							call:
-								c.engine === "codex" ? "web_research" : "conversation_history",
-							announcement: "お調べします。",
-							kind: c.engine === "codex" ? "live_info" : "past_conversation",
-							freshness: c.engine === "codex" ? "live" : "not_live",
-						})
-					)
-						return "";
-					if (options?.tools?.length) {
-						options.onToolCalls!([
-							{
-								id: crypto.randomUUID(),
-								name:
-									c.engine === "codex"
-										? "web_research"
-										: "conversation_history",
-								// The conversation hands over the request only.
-								arguments: JSON.stringify({ request: c.request }),
-							},
-						]);
-						return "";
+					if (isUtteranceRound(options?.tools) && !isResultRound(messages)) {
+						// The conversation's round: search for the source's toolchain, then hand the request over.
+						const step = searchThenDelegate(
+							(candidate) =>
+								candidate.id ===
+								(c.engine === "codex"
+									? "web.research.codex"
+									: "history.research"),
+							c.request,
+							{ announcement: "お調べします。", impact: "none" },
+						)(messages);
+						if (step.calls?.length)
+							options!.onToolCalls!(
+								callsOf(step, () => crypto.randomUUID()) as never,
+							);
+						return step.text ?? "";
 					}
 					if (messages[0]!.content.includes("TOOLS=")) {
 						const data = workerPacket(messages);
@@ -158,8 +156,8 @@ for (const c of cases)
 				expect(result.counts.verify).toEqual({ n: 0 });
 			} else expect(result.structureMatched).toBe(true);
 			expect(result.counts.worker).toBe(search ? 2 : 3);
-			// ... and the completion check of the research result before the answer.
-			expect(calls).toBe(search ? 7 : 8);
+			// The analysis round and the route round are gone: a search, a hand-over and the sub-agent's calls remain.
+			expect(calls).toBe(search ? 5 : 6);
 			expect(result.semanticChecks.every((v) => v.status === "unchecked")).toBe(
 				true,
 			);

@@ -6,47 +6,67 @@ export const STEWARD_KIND = "steward.step.v1";
 export const STEWARD_SCOPE = "steward";
 export const STEWARD_RESOURCE = "inference.aux";
 
+/**
+ * `summarize` prepares the episode summary of the oldest logged events (and of unsummarized marks); `refine-summary`
+ * prepares the one summary that merges consecutive shown episode parts. Both write the prepared episode of
+ * `continuity`; a re-construction applies it.
+ */
 const stepIds = [
 	"curate-memory",
 	"curate-goals",
 	"curate-world",
-	"dispose-exchanges",
 	"summarize",
 	"prepare-recall",
 	"consolidate-memory",
 	"consolidate-goals",
-	"compact-history",
 	"refine-summary",
 ] as const;
 export type StepId = (typeof stepIds)[number];
 const unitKinds = [
-	"exchange_step",
+	"events",
 	"requests",
 	"maintenance",
 	"world_events",
 ] as const;
 export type UnitKind = (typeof unitKinds)[number];
 /**
- * Which open unit a conversation may hold at once: reflecting steps, upkeep steps, the recall preparation and
- * the World curation (the events World received, outside the exchange chain).
+ * Which open unit a conversation may hold at once: reflecting steps (they read the handled events of the
+ * continuity flow), upkeep steps, the recall preparation, the World curation (the events World received) and the
+ * episode preparation (summaries and merges that the next re-construction applies).
  */
-export type UnitSlot = "reflect" | "maintenance" | "recall" | "world";
+export type UnitSlot =
+	| "reflect"
+	| "maintenance"
+	| "recall"
+	| "world"
+	| "episode";
 export type UnitState = "open" | "applied" | "stale" | "failed";
 
-export const requestKinds = ["forget", "remember", "correct", "goal"] as const;
+/**
+ * `withdraw` takes back a request that was not applied yet (the user changed their mind); an applied forget is
+ * never undone.
+ */
+export const requestKinds = [
+	"forget",
+	"remember",
+	"correct",
+	"goal",
+	"withdraw",
+] as const;
 export type RequestKind = (typeof requestKinds)[number];
-export type InboxState = "staged" | "pending" | "done" | "none" | "discarded";
-/** How a conversation run ended (the dialogue tells the steward); a replaced run is `stale`. */
+/** A request waits as `pending` from the moment the conversation agent's action is committed. */
+export type InboxState = "pending" | "done" | "none";
+/** How a conversation run ended (the dialogue tells the steward, which only takes it as a reason to look again). */
 export type RunEnd =
 	| "completed"
 	| "failed"
 	| "interrupted"
 	| "cancelled"
 	| "stale";
-/** What the application knows of a run at startup: `active` is still running; an unknown run is `stale`. */
+/** What the application knows of a run: `active` is still running; an unknown run is `stale`. */
 export type RunLookup = "active" | RunEnd;
 
-/** The conversation agent's `memory_request` input (the tool's own schema is registered in capabilities). */
+/** The conversation agent's memory tool `request` input (dialogue validates it and calls the steward directly). */
 const WHAT_MAX_CHARS = 500;
 const DETAIL_MAX_CHARS = 1000;
 export const memoryRequestInput = z.strictObject({
@@ -61,9 +81,17 @@ export type StewardPayload = z.infer<typeof payloadSchema>;
 
 // ---- limits (section 2.3, 2.4) ----
 
-/** Exchanges one step reads, and the input bytes they and the requests' exchanges may fill together. */
-export const EXCHANGES_PER_UNIT = 4;
+/** Events one step reads, and the input bytes they and the requests' source messages may fill together. */
+export const EVENTS_PER_UNIT = 8;
 export const UNIT_INPUT_BYTES = 16 * 1024;
+/** The events one episode summary may read (the oldest logged events, or the parts of a merge). */
+export const EPISODE_INPUT_BYTES = 48 * 1024;
+/** The consecutive shown parts one merge may span. */
+export const MERGE_PARTS = 4;
+/** The quiet time before a re-construction (section 12.3): no new event for this long. */
+export const SILENCE_WAIT_MS = 10_000;
+/** A gap of at least this long between two events is a break in the talk (section 8.3). */
+export const SILENCE_BREAK_MS = 120_000;
 export const REQUESTS_PER_UNIT = 8;
 /** One message handed to the steward: longer ones keep the head and the tail. */
 export const MESSAGE_HEAD_BYTES = 4096;
@@ -91,8 +119,8 @@ export const MAX_OUTPUT_TOKENS = 1200;
 export const MAX_OUTPUT_BYTES = 32 * 1024;
 /** The queue deadline of a job: it covers waiting behind earlier jobs and the retries. */
 export const JOB_DEADLINE_MS = 5 * 60_000;
-export const COMPACT_THRESHOLD = 0.75;
-export const REFINE_THRESHOLD = 0.9;
+/** The episode is merged when it takes this share of its section limit. */
+export const MERGE_THRESHOLD = 0.9;
 
 // ---- ports the application provides (queue and inference are lower than the steward's callers) ----
 
@@ -231,6 +259,6 @@ export const decisionsQuerySchema = z.object({
 	conversationId: z.string().min(1).max(120),
 	limit: z.coerce.number().int().min(1).max(200).optional(),
 });
-export const exchangesQuerySchema = z.object({
+export const eventsQuerySchema = z.object({
 	conversationId: z.string().min(1).max(120),
 });

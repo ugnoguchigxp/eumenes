@@ -1,27 +1,21 @@
 import type { NativeTool } from "../../../infrastructure/chat-stream";
-import {
-	conversationToolNames,
-	operationRejection,
-} from "./conversation-tools";
+import { ValidationFailure } from "../../../infrastructure/validation-log";
 
 /** Check control syntax only. Never interpret or execute an operation from text. */
 export function conversationOutput(
 	publish: (text: string) => void,
-	tools: NativeTool[] = [],
-	rejectBareTools = false,
+	tools: NativeTool[],
 ) {
-	const names = [
-		...new Set([
-			...conversationToolNames,
-			...tools.map((t) => t.function.name),
-		]),
-	];
+	const names = [...new Set(tools.map((t) => t.function.name))];
 	const escaped = names.map((name) =>
 		name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
 	);
-	const callSyntax = new RegExp(`(?:${escaped.join("|")})\\s*[({]`);
-	const bareControl = new RegExp(
-		`(?:^|\\n)[ \\t]*(?:${escaped.join("|")})[ \\t]*(?:\\n|$)`,
+	// A call written as text: `name({` or `name {"key` / `name {key`. A tool name in ordinary speech is not one.
+	const callSyntax = new RegExp(
+		`(?:${escaped.join("|")})\\s*(?:\\(\\s*\\{|\\{\\s*["\\w])`,
+	);
+	const callStart = new RegExp(
+		`(?:${escaped.join("|")})\\s*(?:\\(\\s*)?\\{?\\s*$`,
 	);
 	// These are provider control delimiters, not ordinary answer text.
 	const delimiters = ["<|", "<call:"];
@@ -37,11 +31,9 @@ export function conversationOutput(
 		let held = 0;
 		for (const prefix of prefixes)
 			if (text.endsWith(prefix)) held = Math.max(held, prefix.length);
-		// Hold a complete function name even if its opening bracket arrives after whitespace.
-		const trimmed = text.trimEnd();
-		for (const name of names)
-			if (trimmed.endsWith(name))
-				held = Math.max(held, name.length + text.length - trimmed.length);
+		// Hold a complete function name, and its opening bracket, until what follows shows whether it is a call.
+		const opened = text.match(callStart);
+		if (opened) held = Math.max(held, opened[0].length);
 		return held;
 	}
 	return {
@@ -60,12 +52,10 @@ export function conversationOutput(
 			pending = pending.slice(end);
 		},
 		finish(text: string) {
-			if (
-				blocked ||
-				invalid(text) ||
-				(rejectBareTools && bareControl.test(text))
-			)
-				throw operationRejection("control_text_in_body");
+			if (blocked || invalid(text))
+				throw new ValidationFailure("control_text_in_body", [
+					{ reason: "control_text_in_body" },
+				]);
 			if (pending) publish(pending);
 			pending = "";
 		},

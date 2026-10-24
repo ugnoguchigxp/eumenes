@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
-import ts from "typescript";
+import ts from "@typescript/typescript6";
 
 /**
  * Cross-domain SQL check. A table is owned by the domain whose migration CREATEs it

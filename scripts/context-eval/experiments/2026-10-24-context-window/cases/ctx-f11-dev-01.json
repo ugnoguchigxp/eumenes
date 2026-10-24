@@ -1,0 +1,43 @@
+{
+	"id": "ctx-f11-dev-01",
+	"family": "F11",
+	"split": "dev",
+	"seed": {
+		"events": [
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-20T04:00:00.000Z",
+				"text": "今度の連休の予定を考えているところ"
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-20T04:00:05.000Z",
+				"text": "そういえば、来月の初めに京都で紅葉まつりがあるみたいですよ。夜のライトアップもあるそうです。",
+				"origin": "spontaneous",
+				"heard": "partial",
+				"deliveredText": "そういえば、来月の初めに京都で紅葉まつりがあるみたいですよ。"
+			}
+		],
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "butler"
+		}
+	},
+	"input": "今の、夜は何があるって言いかけたの？",
+	"expect": {
+		"checks": [
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "delivery_aware",
+				"condition": "夜のライトアップの話は利用者に届いていない（届いたのは紅葉まつりがあることまで）。ライトアップのことを、すでに伝えたこととして扱っていない。"
+			}
+		]
+	}
+}

@@ -2,8 +2,7 @@ import type { Database } from "bun:sqlite";
 import type { AgentAttemptRevocation } from "../contracts";
 
 /**
- * Marks the agent attempts that stood on a forgotten reference (a message, a memory item, or the summary of the
- * conversation they belong to) as `revoked`: the ones still running, and the ones
+ * Marks the agent attempts that stood on a forgotten reference (a message or a memory item) as `revoked`: the ones still running, and the ones
  * that finished but whose answer is not adopted yet. A revoked attempt never becomes `succeeded` again, so its
  * receipt is refused at adoption. Returns the requests whose running call has to be aborted after the commit.
  * Idempotent: a second call finds nothing left to revoke.
@@ -15,8 +14,7 @@ export function revokeAgentAttempts(
 ): string[] {
 	const messages = new Set(input.messageIds);
 	const items = new Set(input.itemIds);
-	const conversations = new Set(input.deletedSummaryConversationIds);
-	if (!messages.size && !items.size && !conversations.size) return [];
+	if (!messages.size && !items.size) return [];
 	const rows = db
 		.query(
 			`SELECT a.id, a.request_id AS requestId, a.refs FROM inference_attempts a
@@ -30,7 +28,6 @@ export function revokeAgentAttempts(
 		let refs: {
 			messageIds?: string[];
 			itemIds?: string[];
-			conversationId?: string;
 		};
 		try {
 			refs = JSON.parse(row.refs);
@@ -39,8 +36,7 @@ export function revokeAgentAttempts(
 		}
 		if (
 			!refs.messageIds?.some((id) => messages.has(id)) &&
-			!refs.itemIds?.some((id) => items.has(id)) &&
-			!(refs.conversationId && conversations.has(refs.conversationId))
+			!refs.itemIds?.some((id) => items.has(id))
 		)
 			continue;
 		db.query(

@@ -1,27 +1,23 @@
 import { expect, test } from "bun:test";
 import { harness } from "../toolchain/toolchain.fixture";
+import {
+	candidatesOf,
+	searchThenDelegate,
+	type Candidate,
+} from "../toolchain/conversation-script.fixture";
 import { waitFor } from "../../infrastructure/wait-for";
 import { tomorrowKamakura, weatherFetch } from "./weather.fixture";
 
 const ask = "明日の鎌倉の天気を教えて";
-const analysis = {
-	kind: "live_info",
-	freshness: "live",
-	impact: "none",
-	approved: false,
-};
-/** The first round calls the weather function, as the model would for a weather request. */
-const callsWeather = (
-	tools: ReadonlyArray<{ function: { name: string } }>,
-	args: Record<string, unknown> = {
-		place: "鎌倉",
-		prefecture: "神奈川県",
-		day: "tomorrow",
-	},
-) =>
-	tools.some((t) => t.function.name === "weather_forecast")
-		? { name: "weather_forecast", args: { ...analysis, ...args } }
-		: undefined;
+const kamakura = { place: "鎌倉", prefecture: "神奈川県", day: "tomorrow" };
+/** The weather toolchain is the instant candidate whose inputs take a place. */
+const isWeather = (candidate: Candidate) =>
+	candidate.execution === "instant" &&
+	JSON.stringify(candidate.inputs ?? {}).includes("place");
+
+/** The model's usual path: search for the weather toolchain, then answer instantly with the inputs it reads. */
+const askWeather = (args: Record<string, unknown> = kamakura) =>
+	searchThenDelegate(isWeather, ask, { inputs: args });
 
 async function weatherHarness(
 	over: Parameters<typeof weatherFetch>[0] = {},
@@ -29,26 +25,21 @@ async function weatherHarness(
 	args?: Record<string, unknown>,
 ) {
 	const service = weatherFetch(over);
-	const offers: Array<Array<{ name: string; parameters?: any }>> = [];
+	const candidates: Array<Candidate[] | undefined> = [];
 	const h = await harness({
 		weather: { fetch: service.fetch },
-		firstRound: (tools) => {
-			offers.push(
-				tools.map((t) => ({
-					name: t.function.name,
-					parameters: t.function.parameters,
-				})),
-			);
-			return callsWeather(tools, args);
+		firstRound: (_tools, _question, messages) => {
+			candidates.push(candidatesOf(messages));
+			return askWeather(args)(messages);
 		},
 		...extra,
 	});
 	await h.toolchain.weather!.maintain();
-	return { h, service, offers };
+	return { h, service, candidates };
 }
 
-test("a cold weather request is answered after one discovery and instant selection: fixed sentence, no second round, no notice", async () => {
-	const { h, service, offers } = await weatherHarness();
+test("a cold weather request is answered after one search and one instant answer: fixed sentence, no TODO, no notice", async () => {
+	const { h, service, candidates } = await weatherHarness();
 	try {
 		const run = await h.dialogue.submit({
 			requestId: crypto.randomUUID(),
@@ -59,9 +50,9 @@ test("a cold weather request is answered after one discovery and instant selecti
 			(await h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 }))?.status,
 		).toBe("completed");
 		expect(h.dialogue.answerText(run.id)).toBe(tomorrowKamakura);
-		// Cold discovery and candidate selection; nothing reached a worker, the web, or answer generation.
-		expect(offers).toHaveLength(1);
-		expect(h.calls).toBe(2);
+		// One search, then the instant answer: nothing reached a worker, the web, or a second answer round.
+		expect(candidates.filter(Boolean)).toHaveLength(2);
+		expect(h.calls).toBe(3);
 		expect(h.workerContexts).toHaveLength(0);
 		expect(h.routeContexts).toHaveLength(0);
 		expect(h.acquisitions).toBe(0);
@@ -73,7 +64,7 @@ test("a cold weather request is answered after one discovery and instant selecti
 		expect(service.urls.at(-1)).toBe(
 			"https://weather.tsukumijima.net/api/forecast/city/140010",
 		);
-		// The decision is traced as a hand-over to the weather toolchain and completed.
+		// The instant answer is traced as a selection of the weather toolchain, completed (no TODO was made for it).
 		const traced = h.store.read((db) =>
 			db
 				.query(
@@ -89,13 +80,16 @@ test("a cold weather request is answered after one discovery and instant selecti
 				outcome: "completed",
 			},
 		]);
+		expect(
+			h.store.read((db) => h.dialogue.todosInTransaction(db, "main")),
+		).toEqual([]);
 	} finally {
 		await h.close();
 	}
 });
 
-test("the first round offers the weather function with the place, its prefecture and the day, and without a notice", async () => {
-	const { h, offers } = await weatherHarness();
+test("the search lists the weather toolchain as an instant candidate with its place, prefecture and day inputs", async () => {
+	const { h, candidates } = await weatherHarness();
 	try {
 		const run = await h.dialogue.submit({
 			requestId: crypto.randomUUID(),
@@ -103,38 +97,39 @@ test("the first round offers the weather function with the place, its prefecture
 			text: ask,
 		});
 		await h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 });
-		const weather = offers[0]!.find((t) => t.name === "weather_forecast")!;
-		const properties = weather.parameters.properties;
+		const found = candidates.find(Boolean)!;
+		const weather = found.find(isWeather);
+		expect(weather).toBeDefined();
+		const inputs = weather!.inputs as {
+			properties: Record<string, { type?: string; enum?: unknown[] }>;
+			required: string[];
+		};
 		// The place is the user's own words; the host finds its area.
-		expect(properties.place.type).toBe("string");
-		expect(properties.place.enum).toBeUndefined();
-		expect(properties.prefecture.type).toBe("string");
-		expect(properties.day.enum).toEqual(["today", "tomorrow", "day_after"]);
-		expect(properties.announcement).toBeUndefined();
-		// After the discovery the analysis is the discovery's: the function takes its own arguments only.
-		expect(weather.parameters.required).toEqual(
+		expect(inputs.properties.place!.type).toBe("string");
+		expect(inputs.properties.place!.enum).toBeUndefined();
+		expect(inputs.properties.prefecture!.type).toBe("string");
+		expect(inputs.properties.day!.enum).toEqual([
+			"today",
+			"tomorrow",
+			"day_after",
+		]);
+		expect(inputs.required).toEqual(
 			expect.arrayContaining(["place", "prefecture", "day"]),
 		);
-		expect(weather.parameters.required).not.toContain("impact");
-		expect(properties.impact).toBeUndefined();
-		// The other toolchains keep the notice.
-		const web = offers[0]!.find((t) => t.name === "web_search")!;
-		expect(web.parameters.properties.announcement).toBeDefined();
-		expect(web.parameters.properties.place).toBeUndefined();
 	} finally {
 		await h.close();
 	}
 });
 
-test("without the list of areas the weather toolchain is not offered", async () => {
+test("without the list of areas the weather toolchain is not among the candidates", async () => {
 	const service = weatherFetch({
 		areas: () => new Response("", { status: 500 }),
 	});
-	const offers: string[][] = [];
+	const candidates: Array<Candidate[] | undefined> = [];
 	const h = await harness({
 		weather: { fetch: service.fetch },
-		firstRound: (tools) => {
-			offers.push(tools.map((t) => t.function.name));
+		firstRound: (_tools, _question, messages) => {
+			candidates.push(candidatesOf(messages));
 			return undefined;
 		},
 	});
@@ -146,22 +141,22 @@ test("without the list of areas the weather toolchain is not offered", async () 
 			text: ask,
 		});
 		await h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 });
-		expect(offers[0]).not.toContain("weather_forecast");
-		expect(offers[0]).toContain("web_search");
+		const found = candidates.find(Boolean)!;
+		expect(found.some(isWeather)).toBe(false);
+		expect(
+			service.urls.filter((u) => u.includes("/api/forecast/")),
+		).toHaveLength(0);
 	} finally {
 		await h.close();
 	}
 });
 
-test("arguments outside the schema go back for the one structural repair, then fail", async () => {
+test("instant inputs outside the schema go back for the one structural repair, then fail", async () => {
 	const service = weatherFetch();
-	let rounds = 0;
 	const g = await harness({
 		weather: { fetch: service.fetch },
-		firstRound: (tools) => {
-			rounds++;
-			return callsWeather(tools, { place: "鎌倉", day: "tomorrow" });
-		},
+		firstRound: (_tools, _question, messages) =>
+			askWeather({ place: "鎌倉", day: "tomorrow" })(messages),
 	});
 	try {
 		await g.toolchain.weather!.maintain();
@@ -172,7 +167,6 @@ test("arguments outside the schema go back for the one structural repair, then f
 		});
 		const done = await g.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 });
 		expect(done?.status).toBe("failed");
-		expect(rounds).toBe(2);
 		expect(
 			service.urls.filter((u) => u.includes("/api/forecast/")),
 		).toHaveLength(0);
@@ -180,58 +174,6 @@ test("arguments outside the schema go back for the one structural repair, then f
 		await g.close();
 	}
 });
-
-for (const [name, response, args, forecasts] of [
-	[
-		"a status other than 200",
-		() => new Response("down", { status: 503 }),
-		undefined,
-		1,
-	],
-	[
-		"a body that is not a forecast",
-		() => new Response("<html></html>"),
-		undefined,
-		1,
-	],
-	[
-		"a place the list does not know",
-		undefined,
-		{ place: "銀座", prefecture: "東京都", day: "tomorrow" },
-		0,
-	],
-] as const)
-	test(`${name} switches the same run to web search with the user's words and no notice`, async () => {
-		const { h, service } = await weatherHarness(
-			{ forecast: response },
-			{},
-			args,
-		);
-		try {
-			const run = await h.dialogue.submit({
-				requestId: crypto.randomUUID(),
-				conversationId: "main",
-				text: ask,
-			});
-			const done = await h.dialogue.waitForTerminal(run.id, {
-				timeoutMs: 8000,
-			});
-			expect(done?.status).toBe("completed");
-			expect(
-				service.urls.filter((u) => u.includes("/api/forecast/")),
-			).toHaveLength(forecasts);
-			// The web investigation ran for the request as the user said it.
-			expect(h.workerContexts.length).toBeGreaterThan(0);
-			expect(h.workerContexts[0]).toContain(ask);
-			const final = await (await h.request(`/api/runs/${run.id}`)).json();
-			expect(final.announcement ?? null).toBeNull();
-			// No second round was made to write the request.
-			expect(h.routeContexts).toHaveLength(0);
-			expect(h.dialogue.answerText(run.id)).not.toBe(tomorrowKamakura);
-		} finally {
-			await h.close();
-		}
-	});
 
 test("a spoken weather request is read as the answer, with no notice before it", async () => {
 	const { h } = await weatherHarness({}, { voiceText: ask });

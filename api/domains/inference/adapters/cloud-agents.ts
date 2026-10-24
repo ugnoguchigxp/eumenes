@@ -108,7 +108,20 @@ export function promptParts(messages: Messages, context?: ContextSplit) {
 							"inference.contexts.cloud-agents.conversation-context",
 							{},
 						) + "\n") +
-				JSON.stringify(turns.map(({ role, content }) => ({ role, content })));
+				JSON.stringify(
+					turns.map((turn) => {
+						const { role, content } = turn;
+						const message = turn as Partial<Messages[number]>;
+						return {
+							role,
+							content,
+							...(message.tool_calls ? { tool_calls: message.tool_calls } : {}),
+							...(message.tool_call_id
+								? { tool_call_id: message.tool_call_id }
+								: {}),
+						};
+					}),
+				);
 	if (!prompt.trim()) throw fail("empty_prompt");
 	return {
 		system:

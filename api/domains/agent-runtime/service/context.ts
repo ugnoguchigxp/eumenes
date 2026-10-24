@@ -69,10 +69,6 @@ export function workerContext(
 			JSON.parse(task.input_json ?? "{}").originalRequest ??
 			(prepared.input as { question: string }).question,
 	};
-	// The earlier steps of a continued request are results, so they travel with the reference material.
-	const priorSteps = JSON.parse(task.input_json ?? "{}").priorSteps as
-		| unknown[]
-		| undefined;
 	const suppliedMaterials = {
 		...(execution?.materials?.length
 			? { pipelineMaterials: execution.materials }
@@ -80,7 +76,6 @@ export function workerContext(
 		...(execution?.referenceData?.length
 			? { delegatedReferences: execution.referenceData }
 			: {}),
-		...(priorSteps?.length ? { priorSteps } : {}),
 	};
 	// Materials get what the 64 KiB step leaves after the parts that do not
 	// depend on them, so a full catalog can always be presented again. The

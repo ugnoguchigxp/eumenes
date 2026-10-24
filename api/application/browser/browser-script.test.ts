@@ -10,7 +10,7 @@ import {
 	ended,
 	OWNER,
 	clickGo,
-} from "./browser-task-kit";
+} from "./browser-task.fixture";
 
 afterEach(cleanup);
 const plan = {

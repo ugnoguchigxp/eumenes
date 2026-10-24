@@ -2,25 +2,24 @@
  * context-eval CLI. Usage:
  *   bun scripts/context-eval/cli.ts validate --experiment <dir>
  *   bun scripts/context-eval/cli.ts prepare  --experiment <dir>
- *   bun scripts/context-eval/cli.ts run      --experiment <dir> [--live] [--split dev|holdout|all] [--serialization larm-messages|flattened]
+ *   bun scripts/context-eval/cli.ts run      --experiment <dir> [--live] [--split dev|holdout|all]
  *   bun scripts/context-eval/cli.ts run      --experiment <dir> --rerun-transport <run dir>   (only transport_error calls, into a new run dir)
  *   bun scripts/context-eval/cli.ts score    --experiment <dir> --run <run dir> [--adjudication <file>]
- *   bun scripts/context-eval/cli.ts analyze  --experiment <dir> --scores <scores dir> [--split dev|holdout]
+ *   bun scripts/context-eval/cli.ts analyze  --experiment <dir> --scores <scores dir> [--baseline-scores <scores dir>] [--split dev|holdout]
+ * Every case is prepared by the production code (the ContextWindow's prepare) and the model is called through the
+ * production generation loop. `--baseline-scores` takes the scores of the same experiment measured before the change.
  * Reports go to verification-reports/context-eval/<experiment>/<timestamp>/ (new directories, never overwritten).
  * `--live` uses the saved LARM connection in this process; it never starts a server. Without it the fixture lane runs.
  */
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { loadCatalog } from "../../api/domains/dialogue/eval/context/case-loader";
 import {
 	createFixtureRunner,
 	fixtureJudge,
 } from "../../api/domains/dialogue/eval/context/fixture-lane";
 import { resolveJudgeRules } from "../../api/domains/dialogue/eval/context/judge-rules";
 import { openSeedWiring } from "../../api/domains/dialogue/test/context-eval/store-wiring";
-import {
-	SERIALIZATIONS,
-	type Serialization,
-} from "../../api/domains/dialogue/eval/context/raw";
 import {
 	type SplitChoice,
 	analyzeScores,
@@ -52,13 +51,6 @@ const splitOf = (fallback: SplitChoice): SplitChoice => {
 	return value;
 };
 
-const serializationOf = (): Serialization => {
-	const value = option("serialization") ?? "larm-messages";
-	const found = SERIALIZATIONS.find((s) => s === value);
-	if (!found) throw new Error("invalid --serialization");
-	return found;
-};
-
 async function main() {
 	const ctx = defaultCtx(repoRoot);
 	const experiment = required("experiment");
@@ -79,23 +71,18 @@ async function main() {
 			const sourceMeta = sourceDir
 				? (JSON.parse(readFileSync(join(sourceDir, "run.json"), "utf8")) as {
 						lane: string;
-						serialization: Serialization;
 					})
 				: null;
-			// A re-run keeps the lane and the serialization of the run it repairs.
+			// A re-run keeps the lane of the run it repairs.
 			const live = sourceMeta ? sourceMeta.lane === "live" : flag("live");
 			const { config, cases } = validate(experiment);
+			const catalog = loadCatalog(experiment, config);
 			const liveModule = live ? await import("./live") : null;
-			const lane = liveModule
-				? await liveModule.createLiveLane(experiment, config.toolsCatalog)
-				: null;
+			const lane = liveModule ? await liveModule.createLiveLane(catalog) : null;
 			try {
 				const common = {
 					lane: live ? ("live" as const) : ("fixture" as const),
-					serialization: sourceMeta
-						? sourceMeta.serialization
-						: serializationOf(),
-					runner: lane ? lane.runner : createFixtureRunner(cases),
+					runner: lane ? lane.runner : createFixtureRunner(cases, catalog),
 					openWiring: openSeedWiring,
 					settingsSnapshot: liveModule
 						? liveModule.liveSettingsSnapshot()
@@ -118,9 +105,7 @@ async function main() {
 				JSON.parse(readFileSync(join(runDir, "run.json"), "utf8")).lane ===
 				"live";
 			const lane = live
-				? await import("./live").then((m) =>
-						m.createLiveLane(experiment, undefined),
-					)
+				? await import("./live").then((m) => m.createLiveLane([]))
 				: null;
 			try {
 				const adjudicationPath = option("adjudication");
@@ -143,7 +128,11 @@ async function main() {
 			const split = splitOf("holdout");
 			if (split === "all")
 				throw new Error("analyze needs --split dev or holdout");
-			analyzeScores(ctx, experiment, required("scores"), { split });
+			const baseline = option("baseline-scores");
+			analyzeScores(ctx, experiment, required("scores"), {
+				split,
+				...(baseline ? { baselineDir: resolve(baseline) } : {}),
+			});
 			return;
 		}
 		default:

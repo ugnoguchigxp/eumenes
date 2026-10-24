@@ -10,7 +10,7 @@ import { toErrorCode } from "../../../infrastructure/error-code";
 const log = getLogger("voice-dialogue");
 import { SpeechSentences } from "./sentences";
 import { spokenText } from "./spoken-text";
-import { recordPlayed } from "./playback";
+import { cancelHeard, recordPlayed } from "./playback";
 import { connectAnnouncementDelivery } from "./announcement-delivery";
 
 import type { SqliteStore } from "../../../infrastructure/sqlite";
@@ -386,17 +386,16 @@ export function createVoiceDialogue(
 			return chunk?.wav ?? null;
 		},
 		async played(id: string, index = 0) {
-			await recordPlayed(store, audio, id, index, clock);
+			await recordPlayed(store, dialogue, audio, id, index, clock);
 			return this.get(id);
 		},
 		async cancel(id: string) {
 			previews.get(id)?.controller.abort();
-			if (!store.read((db) => get(db, id))) return null;
-			await advance(id, "cancelled", { error: "cancel_requested" });
-			// Read after the cancel commits: a run linked by an earlier queued write is visible.
-			const latest = store.read((db) => get(db, id));
+			const cancel = () =>
+				advance(id, "cancelled", { error: "cancel_requested" });
+			if (!(await cancelHeard(store, dialogue, audio, id, cancel))) return null;
+			const latest = store.read((db) => get(db, id)); // After the cancel: an earlier queued run link shows.
 			controllers.get(id)?.abort();
-			previews.get(id)?.controller.abort();
 			audio.get(id)?.wake();
 			await larm.cancelSubject?.(id);
 			audio.delete(id);

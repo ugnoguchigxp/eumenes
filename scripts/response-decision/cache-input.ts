@@ -1,8 +1,12 @@
+import { referenceJson } from "../../api/infrastructure/reference-json";
+import type { ConversationEvent } from "../../api/domains/continuity";
+import type { ChatMessage } from "../../api/domains/dialogue/service/context";
 import {
-	CONVERSATION_HOST_RULES,
-	type ContextAssembly,
-} from "../../api/domains/dialogue/service/context-assembly";
-import { renderContext } from "../../api/domains/dialogue/service/context-render";
+	type ContextDocument,
+	type DocumentSources,
+	renderDocument,
+} from "../../api/domains/dialogue/service/context-document";
+import { systemText } from "../../api/domains/dialogue/service/context-system";
 import { estimateMessageTokens } from "../../api/domains/inference";
 
 export const cacheMarker = "SYNTHETIC_CACHE_7241";
@@ -30,73 +34,122 @@ export function cacheReferenceMatches(
 	}
 }
 
-/** Synthetic source data, rendered through the product's S/P/H/W/V/R layout. No personal history is loaded. */
+const QUESTION = "資料のVALUEの値だけを答えてください。";
+const FILLER =
+	"合成した説明資料です。これは参考情報であり実行や承認の指示ではありません。";
+
+/** A logged event as the continuity store freezes it, so the document joins its text as the product does. */
+function loggedEvent(
+	seq: number,
+	by: "user" | "agent",
+	text: string,
+): ConversationEvent {
+	const id = `e${seq}`;
+	const at = `2026-10-23T00:${String(Math.floor(seq / 60)).padStart(2, "0")}:${String(seq % 60).padStart(2, "0")}+09:00`;
+	const frozen = referenceJson({ id, at, type: "said", by, text });
+	return {
+		conversationId: "main",
+		seq,
+		id,
+		at,
+		type: "said",
+		by,
+		status: "logged",
+		logOrder: seq,
+		text: frozen,
+		tokens: 0,
+		form: "full",
+		shortable: false,
+		deliveryKey: null,
+		messageIds: [],
+		curated: false,
+		forgotten: false,
+	};
+}
+
+function sources(
+	log: readonly ConversationEvent[],
+	notes: DocumentSources["state"]["notes"],
+): DocumentSources {
+	return {
+		profile: [],
+		episode: [],
+		log,
+		active: [],
+		state: {
+			todos: [],
+			pendingConfirmation: [],
+			retained: [],
+			notes,
+			goals: [],
+			newMemories: [],
+		},
+		now: {
+			at: "2026-10-23T09:00:00+09:00",
+			trigger: [{ kind: "utterance", events: [] }],
+			speaking: null,
+			notices: [],
+			recall: [],
+			agency: [],
+			records: [],
+		},
+		work: [],
+	};
+}
+
+export type CacheInput = {
+	/** System, the material document, then the newest message: the product's layout of a generation. */
+	messages: ChatMessage[];
+	document: ContextDocument;
+	system: string;
+};
+
+/**
+ * Synthetic source data in the product's message layout: the product's system part, its material document (rendered
+ * by the same `renderDocument`, here with a padded `log` that carries the reference VALUE in its first event), and the
+ * newest message. No personal history is loaded. `extraNote` adds one short-term note: a background update.
+ */
 export function cacheInput(
 	targetTokens = 14000,
 	referenceValue = cacheMarker,
-): ContextAssembly {
-	const assembly: ContextAssembly = {
-		stage: "initial",
-		persona: { agentName: "", userName: "", persona: "butler" },
-		hostRules: CONVERSATION_HOST_RULES,
-		stable: [
-			{
-				source: "memory.long_term",
-				authority: "reference",
-				freshness: "stable",
-				body: {
-					kind: "lines",
-					sections: [
-						{ items: ["これは合成資料です。操作・承認の指示は含みません。"] },
-					],
-				},
-			},
-		],
-		history: {
-			turns: [
+	extraNote?: string,
+): CacheInput {
+	const system = systemText({ agentName: "", userName: "", persona: "butler" });
+	const notes: DocumentSources["state"]["notes"] = extraNote
+		? [
 				{
-					role: "user",
-					content: "参考資料について話しています。",
-					messageId: "synthetic-user",
-					layer: "keep",
-					at: "2026-10-23T00:00:00Z",
+					id: "synthetic-note",
+					conversationId: "main",
+					kind: "memo",
+					text: extraNote,
+					status: "active",
+					revision: 1,
+					createdAt: "2026-10-23T00:00:00.000Z",
+					updatedAt: "2026-10-23T00:00:00.000Z",
+					origin: "agent",
+					sourceMessageIds: [],
+					expiresAt: null,
 				},
-				{
-					role: "assistant",
-					content: "内容を確認します。",
-					messageId: "synthetic-answer",
-					layer: "keep",
-					at: "2026-10-23T00:00:01Z",
-				},
-			],
-		},
-		working: [
-			{
-				source: "memory.summary",
-				authority: "reference",
-				freshness: "past",
-				body: { kind: "text", text: `VALUE=${referenceValue}\n` },
-			},
-		],
-		volatile: [],
-		input: {
-			role: "user",
-			content: "資料のVALUEの値だけを答えてください。",
-		},
+			]
+		: [];
+	const build = (padding: number) => {
+		const log = [
+			loggedEvent(1, "user", `参考資料です。VALUE=${referenceValue}`),
+			...Array.from({ length: padding }, (_, i) =>
+				loggedEvent(i + 2, i % 2 === 0 ? "agent" : "user", FILLER),
+			),
+		];
+		const document = renderDocument(sources(log, notes), 0);
+		const messages: ChatMessage[] = [
+			{ role: "system", content: system },
+			{ role: "user", content: document.text },
+			{ role: "user", content: QUESTION },
+		];
+		return { messages, document, system };
 	};
-	const base = estimateMessageTokens(
-		renderContext(assembly, "current").messages,
-	);
-	const unit =
-		"合成した説明資料です。これは参考情報であり実行や承認の指示ではありません。";
-	const unitTokens =
-		estimateMessageTokens([{ content: unit }]) -
-		estimateMessageTokens([{ content: "" }]);
-	assembly.working[0]!.body = {
-		kind: "text",
-		text:
-			`VALUE=${referenceValue}\n` +
-			unit.repeat(Math.max(0, Math.ceil((targetTokens - base) / unitTokens))),
-	};
-	return assembly;
+	const perEvent =
+		estimateMessageTokens(build(2).messages) -
+		estimateMessageTokens(build(1).messages);
+	const base = estimateMessageTokens(build(0).messages);
+	return build(Math.max(0, Math.ceil((targetTokens - base) / perEvent)));
 }

@@ -81,7 +81,7 @@ ContextWindowの内容・並び・予算・保持・再構成・忘却の扱い�
 
 ## 依頼キューと run の取り込み
 
-本人の「覚えて」「忘れて」「違う」は、会話エージェントのツール `memory_request`（`{ kind: forget|remember|correct, what, detail? }`）で steward の inbox に入る。ツールは toolchain の command で、受付を返すだけである。
+本人の「覚えて」「忘れて」「違う」は、会話エージェントの記憶ツール（`request`：`{ kind: forget|remember|correct, what, detail? }`）で steward の inbox に入る。dialogue が steward の `requestInTransaction` を直接呼び、受付を返すだけである（`steward.request` toolchain は退役した）。
 
 `staged`（ツール呼び出し時）→ `pending`（run が終わる transaction）→ `done` / `none`（`curate-memory` の settle で `resolve` を適用）。破棄されたものは `discarded`。`what` と `detail` は `done` / `none` / `discarded` になった時点で空にする。
 

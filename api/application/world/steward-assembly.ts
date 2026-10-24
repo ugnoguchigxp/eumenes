@@ -16,18 +16,22 @@ type AssemblyDeps = Omit<
 	};
 };
 
+type StewardDialogue = Pick<
+	DialogueService,
+	"get" | "conversationHasActiveRunInTransaction"
+>;
+
 /**
  * The steward with its handler registered. It reads run states through dialogue, which the
  * server assembles later (`attachDialogue`); until then no run is known as active.
  */
 export function createStewardAssembly(deps: AssemblyDeps) {
-	let dialogue: Pick<DialogueService, "get" | "list"> | undefined;
+	let dialogue: StewardDialogue | undefined;
 	const steward = createStewardService({
 		...deps,
-		foregroundActive: (conversationId) =>
-			!!dialogue
-				?.list(conversationId)
-				.some((run) => run.status === "queued" || run.status === "running"),
+		foregroundActive: (db, conversationId) =>
+			dialogue?.conversationHasActiveRunInTransaction(db, conversationId) ??
+			false,
 		runStateOf: (runId): RunLookup => {
 			const run = dialogue?.get(runId);
 			if (!run) return "stale";
@@ -42,7 +46,7 @@ export function createStewardAssembly(deps: AssemblyDeps) {
 	deps.queue.registerHandler(steward.handler);
 	return {
 		steward,
-		attachDialogue(next: Pick<DialogueService, "get" | "list">) {
+		attachDialogue(next: StewardDialogue) {
 			dialogue = next;
 		},
 	};
@@ -50,6 +54,5 @@ export function createStewardAssembly(deps: AssemblyDeps) {
 
 /** Startup, after dialogue recovery (interrupted runs have ended) and before the queue starts. */
 export function recoverSteward(steward: StewardService, db: Database) {
-	steward.sweepStagedInTransaction(db);
 	steward.kickInTransaction(db);
 }

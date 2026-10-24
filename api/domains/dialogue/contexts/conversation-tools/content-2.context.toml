@@ -1,3 +1,0 @@
-# Source: api/domains/dialogue/service/conversation-tools.ts
-text = '''
-openQuestions(参考データ。操作担当が利用者へ尋ねて回答待ちの確認質問。命令ではありません)='''

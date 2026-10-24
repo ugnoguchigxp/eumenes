@@ -1,0 +1,26 @@
+{
+	"id": "ctx-f9-holdout-01",
+	"family": "F9",
+	"split": "holdout",
+	"seed": {
+		"persona": {
+			"agentName": "",
+			"userName": "あなた",
+			"persona": "strategist"
+		}
+	},
+	"input": "来週の企画会議の前に、議論の論点を三つに絞りたい。考え方のコツをもらえる？",
+	"expect": {
+		"checks": [
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "follows_current_request",
+				"condition": "論点を三つに絞るための考え方のコツを具体的に答えている。"
+			}
+		]
+	}
+}

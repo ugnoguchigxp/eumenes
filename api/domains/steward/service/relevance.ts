@@ -1,7 +1,7 @@
 /**
  * Whether something a forget names has to do with what the user asked to forget. The model chooses the refs, and a
  * model can err or be steered by text it read, so the host holds every target to the words of the request: a ref
- * (memory item, World claim or entity, goal) or an exchange that shares no content with the request is not forgotten.
+ * (memory item, World claim or entity, goal) or an event that shares no content with the request is not forgotten.
  * Deterministic: Unicode NFKC, case-insensitive.
  */
 

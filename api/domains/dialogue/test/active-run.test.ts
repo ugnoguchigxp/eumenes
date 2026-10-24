@@ -1,70 +1,48 @@
-import { expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { openStore } from "../../../infrastructure/sqlite";
+import { afterEach, expect, test } from "bun:test";
 import { waitFor } from "../../../infrastructure/wait-for";
-import {
-	migration as conversationMigration,
-	avatarMotionMigration as conversationAvatarMotionMigration,
-	answerDeliveryMigration as conversationAnswerDeliveryMigration,
-	createConversationService,
-} from "../../conversation";
-import type { LarmPort } from "../../larm";
-import { createQueue, migration as queueMigration } from "../../queue";
-import { createDialogueService, migration, queueLinkMigration } from "..";
+import { setup, type Harness } from "./generation.fixture";
+
+let h: Harness | undefined;
+afterEach(async () => {
+	await h?.close();
+	h = undefined;
+});
 
 test("a conversation has an active run from acceptance until the run ends, and only that conversation", async () => {
-	const dir = mkdtempSync(join(tmpdir(), "eumenes-active-run-"));
-	let release: () => void = () => {};
-	const gate = new Promise<void>((resolve) => (release = resolve));
-	const larm: LarmPort = {
-		status: () => ({ state: "ready", capabilities: ["llm"] }),
-		connect: async () => {},
-		answer: async () => {
-			await gate;
-			return "お答えします";
-		},
-		transcribe: async () => "",
-		speak: async () => new Uint8Array(),
-		close: async () => {},
-	};
-	const store = openStore(join(dir, "db.sqlite3"), [
-		conversationMigration,
-		conversationAvatarMotionMigration,
-		conversationAnswerDeliveryMigration,
-		migration,
-		queueMigration,
-		queueLinkMigration,
-	]);
-	const queue = createQueue(store);
-	try {
-		queue.start();
-		const dialogue = createDialogueService({
-			store,
-			conversation: createConversationService(store),
-			larm,
-			queue,
-		});
-		const active = (conversationId: string) =>
-			store.read((db) =>
-				dialogue.conversationHasActiveRunInTransaction(db, conversationId),
-			);
-		expect(active("main")).toBe(false);
-		const run = await dialogue.submit({
-			requestId: crypto.randomUUID(),
-			conversationId: "main",
-			text: "こんにちは",
-		});
-		expect(active("main")).toBe(true);
-		expect(active("other")).toBe(false);
-		release();
-		await waitFor(() => dialogue.get(run.id)?.status === "completed");
-		expect(active("main")).toBe(false);
-	} finally {
-		release();
-		await queue.close(100);
-		await store.close();
-		rmSync(dir, { recursive: true, force: true });
-	}
+	h = await setup({ autoStart: false });
+	let release!: () => void;
+	h.state.gate = new Promise<void>((resolve) => (release = resolve));
+	h.state.steps.push({
+		text: "お答えします。",
+		calls: [
+			{
+				name: "respond",
+				args: {
+					kind: "chat",
+					freshness: "not_live",
+					impact: "none",
+					approved: false,
+				},
+			},
+		],
+	});
+	const active = (conversationId: string) =>
+		h!.store.read((db) =>
+			h!.dialogue.conversationHasActiveRunInTransaction(db, conversationId),
+		);
+	expect(active("main")).toBe(false);
+	const accepted = await h.dialogue.submit({
+		requestId: crypto.randomUUID(),
+		conversationId: "main",
+		text: "こんにちは",
+	});
+	expect(active("main")).toBe(true);
+	expect(active("other")).toBe(false);
+	h.start();
+	// The generation is in flight (held at the model call): the run is still active.
+	await waitFor(() => h!.dialogue.get(accepted.id)?.status === "running");
+	expect(active("main")).toBe(true);
+	release();
+	await waitFor(() => h!.dialogue.get(accepted.id)?.status === "completed");
+	expect(active("main")).toBe(false);
 });

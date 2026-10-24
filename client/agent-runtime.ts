@@ -4,8 +4,6 @@ import {
 	reportSchema,
 	reportRequirements,
 	candidateResultSchema,
-	workQuery,
-	type WorkQuery,
 } from "../api/domains/agent-runtime/contracts";
 import { publicUrl } from "../api/domains/capabilities/contracts";
 import type { Transport } from "./transport";
@@ -96,72 +94,8 @@ const catalog = z.object({
 	),
 	nextCursor: z.string().nullable(),
 });
-const workItem = z.object({
-	id: z.string(),
-	request: z.string(),
-	status: z.string(),
-	pipeline: z.boolean(),
-	resultSummary: z.string().nullable(),
-	createdAt: z.number(),
-	updatedAt: z.number(),
-	heldEventId: z.string().nullable(),
-});
-/** The agency's TODO view of one conversation: open and held items, then archived (reported) ones. */
-export const agencyWorkSchema = z.object({
-	items: z.array(workItem),
-	archived: z.array(workItem.extend({ releasedAt: z.number() })),
-});
-export type AgencyWork = z.infer<typeof agencyWorkSchema>;
-export const agencyWorkPageSchema = z.object({
-	rows: z.array(
-		workItem.extend({
-			state: z.enum(["todo", "done", "archived"]),
-			releasedAt: z.number().nullable(),
-		}),
-	),
-	counts: z.object({
-		todo: z.number().int().nonnegative(),
-		done: z.number().int().nonnegative(),
-		archived: z.number().int().nonnegative(),
-	}),
-	total: z.number().int().nonnegative(),
-	state: workQuery.shape.state,
-	pageIndex: z.number().int().nonnegative(),
-	pageSize: workQuery.shape.pageSize,
-});
-export type AgencyWorkPage = z.infer<typeof agencyWorkPageSchema>;
-
 export function agentRuntimeClient(t: Transport) {
 	return {
-		agencyWorkPage: async (
-			conversationId: string,
-			query: WorkQuery,
-			signal?: AbortSignal,
-		) => {
-			const params = new URLSearchParams({
-				conversationId,
-				...Object.fromEntries(
-					Object.entries(workQuery.parse(query)).map(([key, value]) => [
-						key,
-						String(value),
-					]),
-				),
-			});
-			return agencyWorkPageSchema.parse(
-				await (
-					await t.call(`/api/agent-executions/work?${params}`, { signal })
-				).json(),
-			);
-		},
-		agencyWork: async (conversationId: string, signal?: AbortSignal) =>
-			agencyWorkSchema.parse(
-				await (
-					await t.call(
-						`/api/agent-executions/work?conversationId=${encodeURIComponent(conversationId)}`,
-						{ signal },
-					)
-				).json(),
-			),
 		capabilities: async (signal?: AbortSignal) =>
 			catalog.parse(
 				await (await t.call("/api/capabilities", { signal })).json(),

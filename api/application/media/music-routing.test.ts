@@ -2,9 +2,9 @@ import { expect, test } from "bun:test";
 import { harness } from "../toolchain/toolchain.fixture";
 import { musicFixture } from "./music.fixture";
 import {
-	isAnalysisRound,
-	isCompletionCheck,
-} from "../../domains/dialogue/test/analysis.fixture";
+	isResultRound,
+	isUtteranceRound,
+} from "../toolchain/conversation-script.fixture";
 import {
 	toolchainPassages,
 	type VectorSpace,
@@ -19,22 +19,20 @@ const space: VectorSpace = {
 const question = "日曜日の朝にぴったりな音楽を作って";
 
 test("the current music request reaches generation after unrelated Web and image history", async () => {
-	const f = musicFixture("success", { question });
-	let offered: string[] = [];
+	const f = musicFixture("success");
 	const embeddedQueries: string[] = [];
 	const model = {
 		...f.model,
 		answer: async (...args: Parameters<typeof f.model.answer>) => {
-			// The handover round offers the chosen function; the analysis and the completion check are not selections.
-			if (
-				args[2]?.tools?.length &&
-				!isAnalysisRound(args[2].tools) &&
-				!isCompletionCheck(args[2].tools)
-			) {
-				offered = args[2].tools.map((t) => t.function.name);
-				expect(offered).toContain("music");
-				expect(offered[0]).toBe("music");
-			}
+			// The utterance's generation offers the conversation's fixed tools; the toolchain is found by search, not offered.
+			if (isUtteranceRound(args[2]?.tools) && !isResultRound(args[0]))
+				expect(args[2]!.tools!.map((t) => t.function.name)).toEqual([
+					"memory",
+					"find_toolchain",
+					"delegate",
+					"work",
+					"respond",
+				]);
 			return f.model.answer(...args);
 		},
 	};
@@ -112,8 +110,8 @@ test("the current music request reaches generation after unrelated Web and image
 			toolchainId: "music.create",
 		});
 		expect(selection.historyRefs.length).toBeGreaterThan(0);
-		// Only the first round's search query is embedded (the fixture's), never the earlier requests.
-		expect(embeddedQueries).toEqual(["今回の依頼を実行する担当"]);
+		// Only the search the generation made is embedded (its query is the request), never the earlier requests.
+		expect(embeddedQueries).toEqual([question]);
 		expect(
 			selection.candidates.find((c) => c.toolchainId === "music.create")!.rank,
 		).toBe(1);

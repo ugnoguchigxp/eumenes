@@ -1,312 +1,210 @@
+import type { Database } from "bun:sqlite";
 import type { HandlerDefinition } from "../../queue";
 import type { Receipt } from "../../inference";
-import type { SettleResult } from "../../memory";
-import type { DialogueDeps, GenerateInput, GeneratePayload } from "./context";
-import type { ConversationOperation } from "./conversation-tools";
-import type { SelectionDraft } from "./selection-trace";
+import { jstSeconds } from "../../../infrastructure/jst-time";
+import type { Run } from "../contracts";
+import type { ToolchainRoutingPort } from "../contracts/toolchains";
+import { byId, linkAnswer, transition } from "../repository";
 import {
-	agentOutcome,
-	failedAnswer,
-	traceSelection,
-	traceOutcome,
-	traceFailure,
-} from "./selection-trace";
-import { retainAdopted, validRetainedSources } from "./retained-toolchains";
-import { settleConversationOperation } from "./generation-operation";
-import { validAttachmentContext } from "./attachment-context";
-import { goalsLayerStale } from "./goals-layer";
-import { adoptMemoryWindow, clearShownNotices } from "./memory-window";
-import { byId, transition } from "../repository";
+	GENERATE_KIND,
+	type DialogueDeps,
+	type GenerateInput,
+	type GeneratePayload,
+} from "./context";
+import type { Handover } from "./executor-context";
+import { eventFields, type Heard } from "./event-fields";
+import { generationStale } from "./generation-stream";
+import type { RespondArgs } from "./generation-tools";
+import { adoptMemoryWindow } from "./memory-window";
+import { consumeAnswer } from "./result-intake";
 import { endRun, type RunEndState } from "./run-end";
-import { researchFailed } from "./research-failure-reply";
-import type { FirstRound } from "./initial-decision";
-import { executionSourceInTransaction } from "./execution-source";
-import { chainSuperseded, continuationText } from "./completion-check";
-import { executionStatusText, validExecutionNotice } from "./execution-notices";
 
 export type GenerationResult = {
+	/** The speech the generation ends with ("" for silence or a handover). */
 	text: string;
 	receipt?: Receipt;
-	operation?: ConversationOperation;
-	/** An instant toolchain's host-owned answer. */
-	hostAnswer?: true;
-	selection?: SelectionDraft;
-	recallPins?: Array<{ messageId: string; digest: string }>;
-	taskDecision?: Extract<FirstRound, { next: "execute_task" | "task_control" }>;
-	/** The first round chose a task pipeline: its run starts with the adopted notice. */
-	pipelineDecision?: Extract<FirstRound, { next: "pipeline" }>;
-	/** The completion check found the request not yet achieved: the next step it names. */
-	continuation?: { achieved: string; need: string; conditions: string[] };
+	respond?: RespondArgs;
+	/** A delegation ended the generation: the announcement was delivered and the work handed over. */
+	handover?: Handover;
+	/** The generation issued a confirmation: its speech is the confirmation statement (section 6.7). */
+	confirmation?: true;
+	/** The trace of an utterance generation that answered without handing work over. */
+	selection?: Omit<
+		Parameters<ToolchainRoutingPort["recordSelectionInTransaction"]>[1],
+		"runId"
+	>;
 };
 export type GenerationHandler = HandlerDefinition<
 	GeneratePayload,
 	GenerateInput,
 	GenerationResult
 >;
-/** Adoption and execution dispatch share the existing queue writer transaction. */
+
+/** The actions that commit a side effect (section 8.2); reads and searches are not among them. */
+const SIDE_EFFECTS = new Set([
+	"memory.request",
+	"delegate",
+	"confirm",
+	"work.answer",
+	"work.amend",
+	"work.cancel",
+	"work.archive",
+]);
+
+/**
+ * A generation that committed an action and then was not adopted (section 13): its speech is dropped and a new
+ * generation of the run starts on the trigger "not adopted", once. False when it committed nothing, or already
+ * was such a retry.
+ */
+function retryNotAdopted(
+	deps: DialogueDeps,
+	tx: Database,
+	run: Run,
+	input: GenerateInput | null | undefined,
+	payload: GeneratePayload,
+): boolean {
+	if (!input || payload.notAdopted) return false;
+	const committed = deps.continuity.events
+		.logInTransaction(tx, run.conversationId)
+		.some(
+			(event) =>
+				event.seq > input.lastSeq &&
+				event.type === "acted" &&
+				event.by === "agent" &&
+				SIDE_EFFECTS.has(String(eventFields(event).action)),
+		);
+	if (!committed) return false;
+	const { job } = deps.queue.enqueueInTransaction(tx, {
+		scope: "dialogue",
+		kind: GENERATE_KIND,
+		dedupeKey: `not-adopted:${run.id}:${run.revision}`,
+		payload: { runId: run.id, notAdopted: true },
+		subjectRef: run.id,
+		lane: "interactive",
+		resourceKey: "inference.llm",
+		maxAttempts: 1,
+		concurrencyKey: `conversation:${run.conversationId}`,
+		deadlineAtMs: Date.parse(run.deadlineAt!),
+	});
+	linkAnswer(tx, run.id, job.id);
+	return transition(tx, run.id, run.revision, "queued", deps.clock());
+}
+
+/** A failed adoption ends the run and the decision it carried. */
+function fail(deps: DialogueDeps, tx: Database, run: Run, code: string) {
+	if (run.agentTaskId) deps.agents?.failAnswerInTransaction(tx, run.id, code);
+	endRun(deps, tx, run, "failed", code);
+	deps.toolchains?.settleSelectionInTransaction(tx, run.id, {
+		outcome: "failed",
+		code,
+	});
+	return { status: "failed" as const, errorCode: code };
+}
+
+/**
+ * The adoption of a generation in the queue writer transaction (the ContextWindow specification, sections 8 and
+ * 11.3): the speech becomes the assistant message and the agent's `said` event, the handled utterances join the
+ * log, a told TODO's archive is confirmed by the delivery, and the run ends.
+ */
 export function createGenerationSettlement(
 	deps: DialogueDeps,
-	partials: Map<string, string>,
 ): GenerationHandler["settleInTransaction"] {
-	const { larm, memory, agents, clock, id, conversation } = deps;
+	const { larm, memory, clock, id, conversation, continuity } = deps;
+	const events = continuity.events;
 	return (tx, claim, input, outcome) => {
 		const run = byId(tx, claim.payload.runId);
 		if (!run) return "stale";
 		if (outcome.type === "success") {
-			let answerText = outcome.result.text;
-			if (
-				!input ||
-				run.status !== "running" ||
-				run.revision !== input.revision
-			) {
+			const result = outcome.result;
+			if (!input) return "stale";
+			// A handed-over run is queued behind its work already; nothing more is adopted here.
+			if (result.handover?.handed) return "applied";
+			if (run.status !== "running" || run.revision !== input.revision)
 				return "stale";
-			}
-			if (
-				input.executionNotice &&
-				!validExecutionNotice(
-					deps,
-					tx,
-					run.conversationId,
-					input.executionNotice,
-				)
-			) {
-				endRun(deps, tx, run, "cancelled", "execution_notice_stale");
-				return "applied";
-			}
-			if (!validAttachmentContext(deps, tx, input, run.conversationId)) {
-				endRun(deps, tx, run, "failed", "attachment_source_unavailable");
-				return failedAnswer(deps, tx, run.id, "attachment_source_unavailable");
-			}
-			if (!validRetainedSources(deps, tx, input)) {
-				endRun(deps, tx, run, "failed", "toolchain_context_stale");
-				return failedAnswer(deps, tx, run.id, "toolchain_context_stale");
-			}
-			if (
-				outcome.result.hostAnswer &&
-				outcome.result.selection?.toolchainRevisionId &&
-				!deps.toolchains?.cardInTransaction(
-					tx,
-					outcome.result.selection.toolchainRevisionId,
-				)
-			) {
-				endRun(deps, tx, run, "failed", "toolchain_unavailable");
-				return failedAnswer(deps, tx, run.id, "toolchain_unavailable");
-			}
-			const selectionId = traceSelection(
-				deps,
-				tx,
-				run.id,
-				outcome.result.selection,
-			);
-			if (outcome.result.operation) {
-				const settled = settleConversationOperation(
-					deps,
-					partials,
-					tx,
-					claim,
-					run,
-					input,
-					{ ...outcome.result, operation: outcome.result.operation },
-				);
-				if (settled === "applied")
-					retainAdopted(
-						deps,
-						tx,
-						run,
-						input,
-						selectionId,
-						outcome.result.operation.revisionId,
-					);
-				return settled;
-			}
+			const stale = generationStale(deps, tx, input);
+			if (stale)
+				return retryNotAdopted(deps, tx, run, input, claim.payload)
+					? "applied"
+					: fail(deps, tx, run, stale);
+			// The answer spoke of a report whose evidence changed since (H4/R8): it is not adopted, nor is the report.
 			if (
 				input.agent &&
-				agents &&
-				!agents.validAnswerInTransaction(tx, input.agent)
-			) {
-				endRun(deps, tx, run, "failed", "report_invalidated");
-				agents.failAnswerInTransaction(tx, run.id, "report_invalidated");
-				return failedAnswer(deps, tx, run.id, "report_invalidated");
-			}
-			// The goals layer stands apart from the memory window: a quiet window still has to see its goals change.
-			const goalsStale = goalsLayerStale(deps.goals, tx, input.goals);
-			if (goalsStale || (input.memory && memory)) {
-				const adopted: SettleResult = goalsStale
-					? { ok: false, reason: "memory_stale" }
-					: adoptMemoryWindow(
-							memory!,
-							tx,
-							run,
-							input.memory!,
-							outcome.result.recallPins,
-						);
-				if (!adopted.ok) {
-					if (run.agentTaskId)
-						agents?.failAnswerInTransaction(tx, run.id, adopted.reason);
-					endRun(deps, tx, run, "failed", adopted.reason);
-					return failedAnswer(deps, tx, run.id, adopted.reason);
-				}
-			}
-			// No model was asked: the request is accepted as the host's own answer, so the speech standing on it proceeds.
-			if (researchFailed(input.agent) || outcome.result.hostAnswer) {
-				const requestId = larm.requestFor?.(tx, run.id, "llm");
-				if (
-					requestId &&
-					larm.acceptHostAnswerInTransaction &&
-					!larm.acceptHostAnswerInTransaction(tx, requestId)
-				) {
-					if (run.agentTaskId)
-						agents?.failAnswerInTransaction(tx, run.id, "permission_revoked");
-					endRun(deps, tx, run, "failed", "permission_revoked");
-					return failedAnswer(deps, tx, run.id, "permission_revoked");
-				}
+				!result.handover &&
+				!consumeAnswer(deps, tx, run, input.agent)
+			)
+				return fail(deps, tx, run, "report_invalidated");
+			// A handover was this generation's adoption: its receipt and memory were taken there.
+			if (input.memory && memory && !result.handover) {
+				const adopted = adoptMemoryWindow(memory, tx, run, input.memory);
+				if (!adopted.ok)
+					return retryNotAdopted(deps, tx, run, input, claim.payload)
+						? "applied"
+						: fail(deps, tx, run, adopted.reason);
 			}
 			if (
-				outcome.result.receipt &&
-				!larm.acceptInTransaction?.(tx, outcome.result.receipt)
+				result.receipt &&
+				!result.handover &&
+				!larm.acceptInTransaction?.(tx, result.receipt)
 			) {
 				memory?.discardUsageInTransaction(tx, run.id);
-				if (run.agentTaskId)
-					agents?.failAnswerInTransaction(tx, run.id, "permission_revoked");
-				endRun(deps, tx, run, "failed", "permission_revoked");
-				return failedAnswer(deps, tx, run.id, "permission_revoked");
+				return retryNotAdopted(deps, tx, run, input, claim.payload)
+					? "applied"
+					: fail(deps, tx, run, "permission_revoked");
 			}
-			if (input.agent && agents)
-				agents.completeAnswerInTransaction(tx, input.agent);
-			if (outcome.result.taskDecision) {
-				if (!agents || !input.routing?.tasks)
-					throw new Error("execution_unavailable");
-				const decision = outcome.result.taskDecision;
-				if (decision.next === "execute_task") {
-					const source = executionSourceInTransaction(deps, tx, run.id);
-					if (
-						!source ||
-						input.routing.tasks.card?.revisionId !== decision.card.revisionId
-					)
-						throw new Error("execution_source_invalid");
-					agents.executions.startInTransaction(tx, {
-						source,
-						request: decision.request,
-						references: input.routing.tasks.references.filter((r) =>
-							decision.contextRefs.includes(r.ref),
-						),
-					});
-				} else {
-					const view = agents.executions.controlInTransaction(
-						tx,
-						run.conversationId,
-						decision.control,
-						run.inputMessageId,
-					);
-					if (decision.control.action === "status" || view.result)
-						answerText = executionStatusText(view);
-				}
-			}
-			if (outcome.result.pipelineDecision) {
-				const decision = outcome.result.pipelineDecision;
-				const source = executionSourceInTransaction(deps, tx, run.id);
-				if (
-					!agents ||
-					!source ||
-					!input.routing?.offeredRevisionIds?.includes(
-						decision.card.revisionId,
-					) ||
-					!deps.toolchains?.cardInTransaction(tx, decision.card.revisionId)
-						?.pipeline
-				)
-					throw new Error("execution_source_invalid");
-				agents.executions.startPipelineInTransaction(tx, {
-					source,
-					toolchainRevisionId: decision.card.revisionId,
-					inputs: decision.inputs,
+			if (input.final.kind === "utterances")
+				events.handleInTransaction(tx, run.conversationId, input.final.seqs);
+			// A task or a pipeline runs on its own: its announcement is the answer of this run.
+			const text = result.handover?.announcement ?? result.text;
+			let messageId: string | null = null;
+			if (text.trim()) {
+				messageId = id();
+				conversation.appendInTransaction(tx, {
+					id: messageId,
+					conversationId: run.conversationId,
+					role: "assistant",
+					text,
+					createdAt: clock(),
+					runId: run.id,
 				});
+				if (!result.handover) said(deps, tx, run, messageId, text, result);
+				if (result.receipt?.delivery?.version === 2)
+					conversation.recordAnswerDeliveryInTransaction(
+						tx,
+						run.id,
+						run.conversationId,
+						result.receipt.delivery,
+					);
 			}
-			const messageId = id();
-			conversation.appendInTransaction(tx, {
-				id: messageId,
-				conversationId: run.conversationId,
-				role: "assistant",
-				text: answerText,
-				createdAt: clock(),
-				runId: run.id,
-			});
 			// The notices this answer carried are shown once: only an adopted answer clears them.
-			if (input.memory && memory)
-				clearShownNotices(memory, tx, run, input.memory);
-			if (outcome.result.receipt?.delivery?.version === 2)
-				conversation.recordAnswerDeliveryInTransaction(
+			if (input.memory && memory && !result.handover)
+				memory.clearNoticesInTransaction(
 					tx,
-					run.id,
 					run.conversationId,
-					outcome.result.receipt.delivery,
+					input.memory.window.noticeIds,
 				);
+			if (result.selection)
+				deps.toolchains?.recordSelectionInTransaction(tx, {
+					runId: run.id,
+					utteranceId: run.utteranceId ?? null,
+					requestId: run.requestId ?? null,
+					...result.selection,
+				});
 			const done = endRun(deps, tx, run, "completed", null, messageId);
-			if (done) {
-				if (outcome.result.taskDecision?.next === "execute_task")
-					retainAdopted(
-						deps,
-						tx,
-						run,
-						input,
-						selectionId,
-						outcome.result.taskDecision.card.revisionId,
-					);
-				if (outcome.result.pipelineDecision)
-					retainAdopted(
-						deps,
-						tx,
-						run,
-						input,
-						selectionId,
-						outcome.result.pipelineDecision.card.revisionId,
-					);
-				traceOutcome(deps, tx, run.id, agentOutcome(input.agent));
-				const next = outcome.result.continuation;
-				const check = input.completionCheck;
-				// The answer that reports this step is adopted; the request goes on as a hidden continuation run,
-				// unless the user wrote again or withdrew the request. A continuation that cannot be accepted ends the
-				// chain without withdrawing the adopted answer.
-				if (
-					next &&
-					check &&
-					deps.continueInTransaction &&
-					!chainSuperseded(conversation, tx, check.rootRunId)
-				) {
-					tx.exec("SAVEPOINT dialogue_continuation");
-					try {
-						deps.continueInTransaction(tx, {
-							conversationId: run.conversationId,
-							text: continuationText(check, next.achieved, next.need),
-							continuation: {
-								rootRunId: check.rootRunId,
-								hop: check.hop + 1,
-								originalRequest: check.originalRequest,
-								achieved: next.achieved,
-								need: next.need,
-								conditions: next.conditions,
-								steps: check.steps,
-							},
-						});
-						tx.exec("RELEASE dialogue_continuation");
-					} catch {
-						tx.exec("ROLLBACK TO dialogue_continuation");
-						tx.exec("RELEASE dialogue_continuation");
-					}
-				}
-				if (outcome.result.hostAnswer)
-					retainAdopted(
-						deps,
-						tx,
-						run,
-						input,
-						selectionId,
-						outcome.result.selection?.toolchainRevisionId,
-					);
-			}
+			if (done && result.selection)
+				deps.toolchains?.settleSelectionInTransaction(tx, run.id, {
+					outcome: "completed",
+				});
 			return done ? "applied" : "stale";
 		}
-		// A run that is already terminal (e.g. cancelled) keeps its state.
+		// A run that is already terminal (e.g. cancelled), or handed over to another job, keeps its state.
 		if (run.status !== "queued" && run.status !== "running") return "applied";
+		if (run.jobId !== claim.jobId) return "applied";
+		// A failure after an action committed starts the "not adopted" generation instead of ending the run.
+		if (
+			outcome.type !== "retry" &&
+			retryNotAdopted(deps, tx, run, input, claim.payload)
+		)
+			return "applied";
 		const next: [RunEndState | "queued", string | null] =
 			outcome.type === "retry"
 				? ["queued", outcome.errorCode]
@@ -316,13 +214,102 @@ export function createGenerationSettlement(
 						? ["failed", "deadline_exceeded"]
 						: ["interrupted", outcome.errorCode];
 		if (run.agentTaskId)
-			agents?.failAnswerInTransaction(tx, run.id, next[1] ?? "answer_failed");
+			deps.agents?.failAnswerInTransaction(
+				tx,
+				run.id,
+				next[1] ?? "answer_failed",
+			);
 		if (next[0] !== "queued")
-			traceFailure(deps, tx, run.id, outcome.type, next[1]);
+			deps.toolchains?.settleSelectionInTransaction(tx, run.id, {
+				outcome: outcome.type === "expired" ? "expired" : "failed",
+				code: next[1],
+			});
 		const moved =
 			next[0] === "queued"
 				? transition(tx, run.id, run.revision, "queued", clock(), next[1])
 				: endRun(deps, tx, run, next[0], next[1]);
 		return moved ? "applied" : "stale";
 	};
+}
+
+/**
+ * The agent's utterance as an event (section 8.1), with what it reported (`todoRefs`) and stood on (`about`).
+ * A text-only reply is delivered in full when it is stored; a spoken one waits for its playback's `delivered`.
+ */
+function said(
+	deps: DialogueDeps,
+	tx: Database,
+	run: Run,
+	messageId: string,
+	text: string,
+	result: GenerationResult,
+) {
+	const events = deps.continuity.events;
+	const at = jstSeconds(Date.parse(deps.clock()));
+	const todoRefs = result.respond?.todoRefs ?? [];
+	const { event } = events.appendInTransaction(tx, {
+		conversationId: run.conversationId,
+		at,
+		type: "said",
+		by: "agent",
+		fields: {
+			text,
+			...(result.confirmation ? { origin: "confirmation" } : {}),
+			...(todoRefs.length ? { todoRefs } : {}),
+			...(result.respond?.about?.length ? { about: result.respond.about } : {}),
+		},
+		messageIds: [messageId],
+		deliveryKey: `run:${run.id}`,
+	});
+	const spoken =
+		!!run.utteranceId &&
+		(deps.larm.snapshotFor?.(tx, run.id)?.voice.autoSpeak ?? true);
+	if (spoken) return;
+	events.appendInTransaction(tx, {
+		conversationId: run.conversationId,
+		at,
+		type: "delivered",
+		by: "host",
+		fields: { ref: event.id, heard: "full" },
+	});
+	confirmArchives(deps, tx, run, todoRefs, "full");
+}
+
+/**
+ * The TODOs this run's utterance was told to archive (`told: this`) are archived when it was heard in full and
+ * names them in `todoRefs` (section 9.4); the others stay done, with the reason logged.
+ */
+export function confirmArchives(
+	deps: DialogueDeps,
+	tx: Database,
+	run: Run,
+	todoRefs: readonly string[],
+	heard: Heard,
+) {
+	const ledger = deps.work;
+	if (!ledger) return;
+	const at = jstSeconds(Date.parse(deps.clock()));
+	for (const row of ledger.waitingArchivesInTransaction(
+		tx,
+		run.conversationId,
+	)) {
+		if (row.archiveRequested !== `run:${run.id}`) continue;
+		const archived =
+			heard === "full" &&
+			todoRefs.includes(row.id) &&
+			ledger.archiveInTransaction(tx, row.id);
+		deps.continuity.events.appendInTransaction(tx, {
+			conversationId: run.conversationId,
+			at,
+			type: "acted",
+			by: "host",
+			fields: archived
+				? { action: "work.archived", todo: row.id }
+				: {
+						action: "work.archive_unconfirmed",
+						todo: row.id,
+						reason: heard === "full" ? "not_in_todo_refs" : `heard_${heard}`,
+					},
+		});
+	}
 }

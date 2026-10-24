@@ -1,6 +1,6 @@
 import { spokenText } from "./spoken-text";
 
-export const SPOKEN_REPLY_MAX_CHARS = 160;
+export const SPOKEN_REPLY_MAX_CHARS = 300;
 export const SPOKEN_REPLY_MAX_SENTENCES = 2;
 const sentences = new Intl.Segmenter("ja", { granularity: "sentence" });
 

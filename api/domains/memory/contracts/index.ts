@@ -151,50 +151,32 @@ export const memoryTendenciesSchema: z.ZodType<{
 		}),
 	),
 });
-/** The ContextWindow as the screen shows it: the rendered texts and their estimated sizes (tokens). */
+/** The long-term part of the ContextWindow as the screen shows it: the published profile and what waits beside it. */
 export type MemoryContextDto =
 	| { disabled: true }
 	| {
 			disabled?: undefined;
 			version: number;
-			longTerm: { text: string; tokens: number };
-			shortTerm: { text: string; tokens: number; pendingAdditions: number };
-			/** How many notices wait for the next turn. */
+			/** The published profile as the conversation reads it (JSON) and its estimated size (tokens). */
+			profile: { text: string; tokens: number };
+			/** Current items the published profile does not show yet. */
+			newMemories: number;
+			/** How many notices wait for the next generation. */
 			notices: number;
 	  };
 export const memoryContextSchema: z.ZodType<MemoryContextDto> = z.union([
 	z.object({ disabled: z.literal(true) }),
 	z.object({
 		version: z.number(),
-		longTerm: z.object({ text: z.string(), tokens: z.number() }),
-		shortTerm: z.object({
-			text: z.string(),
-			tokens: z.number(),
-			pendingAdditions: z.number(),
-		}),
+		profile: z.object({ text: z.string(), tokens: z.number() }),
+		newMemories: z.number(),
 		notices: z.number(),
 	}),
 ]);
 
-// ---- the steward's ledgers (exchanges, summary, blocked messages) ----
+// ---- the block ledger ----
 
-export type {
-	BlockReason,
-	Disposition,
-	ExchangeRow as ExchangeDto,
-	ExchangeStep,
-	StepMark,
-	SummaryRow as SummaryDto,
-} from "../repository/ledger";
-
-/** What a run left to learn from: the user's message and, when one was adopted, the answer. */
-export type RecordExchangeInput = {
-	conversationId: string;
-	runId: string;
-	inputMessageId: string;
-	answerMessageId: string | null;
-	outcome: "answered" | "failed";
-};
+export type { BlockReason } from "../repository/ledger";
 
 // ---- the save contract ----
 
@@ -327,7 +309,7 @@ export type ForgetInput = {
 export type ForgetDerived = Readonly<Record<string, readonly string[]>>;
 export type ForgetOutcome = {
 	forgetId: string;
-	/** Every message that was blocked (the item evidence, the steward's choices and their exchange partners). */
+	/** Every message that was blocked (the item evidence, the steward's choices and their run partners). */
 	blockedMessageIds: string[];
 	/** Every State item id that was forgotten (all versions). */
 	forgottenItemIds: string[];
@@ -340,6 +322,4 @@ export type ForgetPurge = {
 	conversationId: string;
 	/** The opaque `derived` of the forget that wrote this journal line (empty when it had none). */
 	derived: ForgetDerived;
-	/** The conversations whose summary this forget (or this replay of it) deleted: their summary-step decisions go too. */
-	deletedSummaryConversationIds: readonly string[];
 };

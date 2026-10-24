@@ -1,5 +1,5 @@
 /**
- * Freeze: sha256 of every input that decides a result (cases, rubric text, judge prompt, arm sources,
+ * Freeze: sha256 of every input that decides a result (cases, rubric text, judge prompt, harness sources,
  * preregistration, config), and report directories that are created once and never overwritten.
  */
 import { createHash } from "node:crypto";
@@ -26,11 +26,6 @@ export type Manifest = {
 	files: Record<string, string>;
 	/** sha256 over the sorted `path:sha256` lines of the holdout case files. */
 	holdoutDigest: string;
-	/**
-	 * caseId -> sha256 of the baseline arm's messages for that case when the experiment was frozen. A run rebuilds
-	 * them and refuses on a difference: product prompt building must not have changed since the freeze.
-	 */
-	baselinePrompts: Record<string, string>;
 };
 
 export type FrozenFile = { path: string; bytes: Uint8Array; holdout?: boolean };
@@ -39,7 +34,6 @@ export function buildManifest(input: {
 	experiment: string;
 	frozenAt: string;
 	files: readonly FrozenFile[];
-	baselinePrompts?: Record<string, string>;
 }): Manifest {
 	const files: Record<string, string> = {};
 	for (const file of [...input.files].sort((a, b) =>
@@ -57,11 +51,6 @@ export function buildManifest(input: {
 		frozenAt: input.frozenAt,
 		files,
 		holdoutDigest: sha256Hex(holdoutLines.join("\n")),
-		baselinePrompts: Object.fromEntries(
-			Object.entries(input.baselinePrompts ?? {}).sort(([a], [b]) =>
-				a.localeCompare(b),
-			),
-		),
 	};
 }
 
@@ -72,8 +61,6 @@ export type ManifestChange = {
 export function manifestChanges(
 	frozen: Manifest,
 	next: Manifest,
-	/** Compare the baseline prompt digests too (freeze does; the file check before a run does not). */
-	includePrompts = true,
 ): ManifestChange[] {
 	const changes: ManifestChange[] = [];
 	for (const [path, digest] of Object.entries(frozen.files)) {
@@ -83,17 +70,6 @@ export function manifestChanges(
 	}
 	for (const path of Object.keys(next.files))
 		if (frozen.files[path] === undefined) changes.push({ path, kind: "added" });
-	const prompts = includePrompts ? (frozen.baselinePrompts ?? {}) : {};
-	for (const [id, digest] of Object.entries(prompts)) {
-		const other = next.baselinePrompts[id];
-		if (other === undefined)
-			changes.push({ path: `baseline-prompt:${id}`, kind: "removed" });
-		else if (other !== digest)
-			changes.push({ path: `baseline-prompt:${id}`, kind: "changed" });
-	}
-	for (const id of includePrompts ? Object.keys(next.baselinePrompts) : [])
-		if (prompts[id] === undefined)
-			changes.push({ path: `baseline-prompt:${id}`, kind: "added" });
 	return changes.sort((a, b) => a.path.localeCompare(b.path));
 }
 
@@ -143,7 +119,7 @@ export function readManifest(dir: string): Manifest {
 export function verifyFrozen(dir: string, current: Manifest): ManifestChange[] {
 	const path = join(dir, MANIFEST_NAME);
 	if (!existsSync(path)) throw new Error("context_eval_not_frozen");
-	return manifestChanges(readManifest(dir), current, false);
+	return manifestChanges(readManifest(dir), current);
 }
 
 /** `20261017T093015123Z`: sortable, millisecond resolution. */

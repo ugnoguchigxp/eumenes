@@ -78,7 +78,14 @@ export const curateSchema = (requestLabels: readonly string[]) =>
 		resolve: list(
 			obj({
 				request: enumOf(requestLabels.length > 0 ? requestLabels : [""]),
-				action: enumOf(["forget", "stop", "remember", "update", "none"]),
+				action: enumOf([
+					"forget",
+					"stop",
+					"remember",
+					"update",
+					"withdraw",
+					"none",
+				]),
 				refs: strings,
 				alsoIn: strings,
 				text: nullableStr,
@@ -87,20 +94,10 @@ export const curateSchema = (requestLabels: readonly string[]) =>
 				negated: { type: ["boolean", "null"] },
 			}),
 		),
-		route: list(obj({ exchange: str, world: bool, goals: bool })),
+		route: list(obj({ event: str, world: bool, goals: bool })),
 	});
 
-export const disposeSchema = obj({
-	exchanges: list(
-		obj({
-			id: str,
-			action: enumOf(["keep", "summarize", "drop"]),
-			duplicateOf: nullableStr,
-		}),
-	),
-});
-
-export const summarizeSchema = obj({ summary: str, included: strings });
+export const summarizeSchema = obj({ summary: str });
 
 export const recallSchema = obj({ query: nullableStr });
 
@@ -123,13 +120,7 @@ export const consolidateSchema = obj({
 	changed: bool,
 });
 
-export const compactSchema = obj({
-	fold: strings,
-	summary: str,
-	changed: bool,
-});
-
-export const refineSchema = obj({ summary: str, changed: bool });
+export const refineSchema = obj({ summary: str });
 
 const priorities = ["high", "normal", "low"];
 const worldValue = obj({

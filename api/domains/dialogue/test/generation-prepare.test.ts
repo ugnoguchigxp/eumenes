@@ -1,118 +1,180 @@
-/**
- * The session split of a generation (instructionCount) must match the messages actually sent. A failed
- * research result leaves the long-term and goals layers out, so the count follows the assembled list.
- */
 import { afterEach, expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { migrations as memoryPackageMigrations } from "eumenes-memory/sqlite";
-import { openStore, type SqliteStore } from "../../../infrastructure/sqlite";
-import { RESEARCH_FAILURE_REPLY } from "../service/research-failure-reply";
-import { waitFor as until } from "../../../infrastructure/wait-for";
-import type { AgentRuntime, AnswerTicket } from "../../agent-runtime";
-import {
-	migrations as conversationMigrations,
-	createConversationService,
-} from "../../conversation";
-import {
-	createContinuityService,
-	migration as continuityMigration,
-	shortTermMigration,
-	itemSourceMigration,
-} from "../../continuity";
-import type { CallSession } from "../../inference";
-import type { LarmPort } from "../../larm";
-import {
-	createMemoryService,
-	migration as memoryMigration,
-	contextWindowMigration,
-	agentHardeningMigration,
-	turnVectorsMigration,
-	stewardLedgersMigration,
-	forgetClosureMigration,
-	seedImportMigration,
-} from "../../memory";
-import { createQueue, migration as queueMigration } from "../../queue";
-import {
-	createDialogueService,
-	agentLinkMigration,
-	migration as dialogueMigration,
-	retainedToolchainsMigration,
-	queueLinkMigration,
-	worldStateMigration,
-} from "..";
-import type { AgencyLayerPort } from "../contracts";
-import { saveItem } from "./memory-seed";
+import { waitFor } from "../../../infrastructure/wait-for";
+import { FIXED_TRIGGER_TEXT } from "../service/context-system";
+import type {
+	AgencyLayerPort,
+	GoalsLayerPort,
+	WorldContextPort,
+} from "../contracts";
+import { respond, setup, type Harness } from "./generation.fixture";
 
-const MIGRATIONS = [
-	...conversationMigrations,
-	dialogueMigration,
-	retainedToolchainsMigration,
-	queueMigration,
-	queueLinkMigration,
-	agentLinkMigration,
-	worldStateMigration,
-	continuityMigration,
-	shortTermMigration,
-	itemSourceMigration,
-	memoryMigration,
-	contextWindowMigration,
-	agentHardeningMigration,
-	turnVectorsMigration,
-	stewardLedgersMigration,
-	forgetClosureMigration,
-	seedImportMigration,
-	...memoryPackageMigrations,
-];
-type Sent = Array<{ role: string; content: string }>;
-const dirs: string[] = [];
-const stores: SqliteStore[] = [];
+/**
+ * The claim-time half of a generation (the ContextWindow specification, sections 5, 7, 8.2 and 12): the material
+ * document's fixed keys, the newest message, the trigger, the re-construction a lost cache or a resumed talk calls
+ * for, and the window too small to plan.
+ */
+let h: Harness | undefined;
 afterEach(async () => {
-	for (const s of stores.splice(0)) await s.close().catch(() => {});
-	for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
+	await h?.close();
+	h = undefined;
 });
 
-/** A run of the main conversation with a long-term fact and an adopted goal, optionally answering a failed research. */
-async function generate(failureCode: string | null, agency?: AgencyLayerPort) {
-	const dir = mkdtempSync(join(tmpdir(), "eumenes-generation-prepare-"));
-	dirs.push(dir);
-	const store = openStore(join(dir, "db.sqlite3"), MIGRATIONS);
-	stores.push(store);
-	const sessions: Array<CallSession | undefined> = [];
-	const seen: Sent[] = [];
-	const larm = {
-		status: () => ({ state: "ready", capabilities: ["llm"] }),
-		connect: async () => {},
-		requestFor: () => "request-1",
-		executeRequest: async (
-			_id: string,
-			messages: Sent,
-			_signal: AbortSignal,
-			_preparation: unknown,
-			session?: CallSession,
-		) => {
-			sessions.push(session);
-			seen.push(messages.map((m) => ({ ...m })));
-			return {
-				requestId: "request-1",
-				attemptId: "attempt",
-				value: "了解です",
-			};
-		},
-		acceptInTransaction: () => true,
-		answer: async () => "了解です",
-		transcribe: async () => "",
-		speak: async () => new Uint8Array(),
-		close: async () => {},
-	} as unknown as LarmPort;
-	const conversation = createConversationService(store);
-	const continuity = createContinuityService(store);
-	const memory = createMemoryService(store, conversation, continuity, {
-		journalPath: join(dir, "journal.jsonl"),
+const chat = respond();
+const minutes = (n: number) => n * 60 * 1000;
+/** The fixed `chat` analysis for a plain answer. */
+
+/** The material document of the nth model call (messages: system, document, newest). */
+function documentOf(call: number) {
+	return JSON.parse(h!.state.calls[call]!.messages[1]!.content) as Record<
+		string,
+		any
+	>;
+}
+
+test("the material document keeps its fixed keys; the newest message is the utterance itself", async () => {
+	h = await setup();
+	h.state.steps.push(
+		{ text: "ansA", calls: [chat] },
+		{ text: "ansB", calls: [chat] },
+	);
+	await h.say("A");
+	await h.say("B");
+	const second = h.state.calls[1]!;
+	expect(second.messages.map((m) => m.role)).toEqual([
+		"system",
+		"user",
+		"user",
+	]);
+	expect(second.messages[2]!.content).toBe("B");
+	const document = documentOf(1);
+	expect(Object.keys(document)).toEqual([
+		"profile",
+		"episode",
+		"log",
+		"active",
+		"state",
+		"now",
+		"work",
+	]);
+	// Earlier turns are in the log as events (user said, agent said, delivered); B is the newest message, not an event yet.
+	const said = document.log
+		.filter((e: { type: string }) => e.type === "said")
+		.map((e: { by: string; text: string }) => [e.by, e.text]);
+	expect(said).toEqual([
+		["user", "A"],
+		["agent", "ansA"],
+	]);
+	expect(document.log.some((e: { text?: string }) => e.text === "B")).toBe(
+		false,
+	);
+});
+
+test("a notice whose text is a JSON object is the trigger; the fixed text is the newest message when no utterance is pending", async () => {
+	h = await setup();
+	h.state.steps.push({ text: "通知を伝えます。", calls: [chat] });
+	const notice = { kind: "task_result", status: "completed", title: "猫の絵" };
+	const run = await h.dialogue.notify({
+		requestId: crypto.randomUUID(),
+		conversationId: "main",
+		text: JSON.stringify(notice),
 	});
-	await memory.recover();
-	const goals = {
+	await waitForRun(run.id);
+	const call = h.state.calls[0]!;
+	expect(call.messages.at(-1)!.content).toBe(FIXED_TRIGGER_TEXT);
+	expect(documentOf(0).now.trigger).toEqual([notice]);
+});
+
+test("a plain notice text is the trigger as its source kind and text", async () => {
+	h = await setup();
+	h.state.steps.push({ text: "お知らせです。", calls: [chat] });
+	const run = await h.dialogue.notify({
+		requestId: crypto.randomUUID(),
+		conversationId: "main",
+		text: "タイマーが終わりました",
+	});
+	await waitForRun(run.id);
+	expect(documentOf(0).now.trigger).toEqual([
+		{ kind: "notice", text: "タイマーが終わりました" },
+	]);
+});
+
+test("a TODO that changed is the trigger, with its id and status, and the fixed text stands in as the newest message", async () => {
+	h = await setup();
+	h.state.steps.push(
+		{ calls: [{ name: "find_toolchain", args: { query: "絵" } }] },
+		{
+			calls: [
+				{
+					name: "delegate",
+					args: {
+						mode: "execute",
+						toolchain: "fake.image",
+						request: "犬の絵",
+						impact: "create",
+						announcement: "描きます。",
+					},
+				},
+			],
+		},
+	);
+	const waiting = await h.say("犬の絵", "queued");
+	const [todo] = h.todos();
+	h.state.steps.push({ text: "できました。", calls: [chat] });
+	await h.finishImage(waiting.id, { state: "completed" });
+	const resumed = h.state.calls.at(-1)!;
+	expect(resumed.messages.at(-1)!.content).toBe(FIXED_TRIGGER_TEXT);
+	expect(documentOf(h.state.calls.length - 1).now.trigger).toEqual([
+		{ kind: "todo_changed", todos: [{ id: todo!.id, status: "done" }] },
+	]);
+});
+
+test("the agency layer shows its interests in now.agency; its utterances are never in the document", async () => {
+	const agency: AgencyLayerPort = {
+		recentForContextInTransaction: () => ({
+			utterances: [
+				{ messageId: "m1", text: "そういえば昨日の天気は", heard: "partial" },
+			],
+			interests: ["マイメロディ"],
+		}),
+	};
+	h = await setup({ agency });
+	h.state.steps.push({ text: "はい。", calls: [chat] });
+	await h.say("こんにちは");
+	const document = documentOf(0);
+	expect(document.now.agency).toEqual(["マイメロディ"]);
+	expect(JSON.stringify(document)).not.toContain("そういえば昨日の天気は");
+});
+
+test("an absent or empty agency layer leaves now.agency empty", async () => {
+	h = await setup({ agency: { recentForContextInTransaction: () => null } });
+	h.state.steps.push({ text: "はい。", calls: [chat] });
+	await h.say("こんにちは");
+	expect(documentOf(0).now.agency).toEqual([]);
+});
+
+test("the world names the wording mentions are a reference record in now.records", async () => {
+	const worldContext: WorldContextPort = {
+		knownNamesInTransaction: () => ["箱根"],
+	};
+	h = await setup({ worldContext });
+	h.state.steps.push({ text: "はい。", calls: [chat] });
+	await h.say("箱根のことを教えて");
+	const records = documentOf(0).now.records as Array<{
+		source: string;
+		authority: string;
+		text: string;
+	}>;
+	expect(records).toEqual([
+		expect.objectContaining({
+			source: "world.names",
+			authority: "reference",
+			text: expect.stringContaining("「箱根」"),
+		}),
+	]);
+});
+
+test("adopted goals are the state's goals, each with its id and text (the priority orders them and stays host-side)", async () => {
+	const goals: GoalsLayerPort = {
 		adoptedForContextInTransaction: () => [
 			{
 				goalId: "g1",
@@ -123,140 +185,71 @@ async function generate(failureCode: string | null, agency?: AgencyLayerPort) {
 		],
 		existingInTransaction: () => new Set(["g1"]),
 	};
-	const ticket: AnswerTicket = {
-		taskId: "t",
-		eventId: "event-1",
-		revision: 1,
-		dataEpoch: 0,
-		reportTaskId: "c",
-		reportEpoch: 3,
-		reportDigest: null,
-		projection: null,
-		failureCode,
-	};
-	const agents = {
-		startInTransaction: () => ({ taskId: "t", jobId: "unused" }),
-		prepareAnswerInTransaction: () => ticket,
-		completeAnswerInTransaction: () => {},
-		validAnswerInTransaction: () => true,
-		failAnswerInTransaction: () => {},
-		pendingEvents: () => [],
-		byRootInTransaction: () => null,
-	} as unknown as AgentRuntime;
-	const open = () => {
-		const queue = createQueue(store);
-		const dialogue = createDialogueService({
-			store,
-			conversation,
-			larm,
-			queue,
-			memory,
-			goals,
-			...(agency ? { agency } : {}),
-			...(failureCode ? { agents } : {}),
-		});
-		return { queue, dialogue };
-	};
-	// A fact the long-term layer will carry (toggling memory republishes it), then the run under test.
-	const seed = open();
-	seed.queue.start();
-	const first = await seed.dialogue.submit({
-		requestId: crypto.randomUUID(),
-		conversationId: "main",
-		text: "私は辛いものが好きです",
-	});
-	await until(() => seed.dialogue.get(first.id)?.status === "completed");
-	saveItem(store, memory, {
-		conversationId: "main",
-		messageId: first.inputMessageId,
-		quote: "辛いものが好き",
-		kind: "preference",
-		semanticKey: "food.spicy",
-		text: "辛いものが好き",
-	});
-	await memory.setEnabled(false);
-	await memory.setEnabled(true);
-	await seed.queue.close(100);
-	const { queue, dialogue } = open();
-	const callsBefore = seen.length;
-	const run = await dialogue.submit({
-		requestId: crypto.randomUUID(),
-		conversationId: "main",
-		text: "今日のニュースは？",
-	});
-	if (failureCode)
-		await store.write((db) =>
-			db
-				.query("UPDATE dialogue_runs SET agent_task_id='t' WHERE id=?")
-				.run(run.id),
-		);
-	queue.start();
-	await until(() => dialogue.get(run.id)?.status === "completed");
-	await queue.close(100);
-	return {
-		sent: seen.at(-1)!,
-		session: sessions.at(-1)!,
-		calls: seen.length - callsBefore,
-		answer: dialogue.answerText(run.id),
-	};
-}
-
-test("a failed research result is answered by the host: no model call is made for it", async () => {
-	const { calls, answer } = await generate("agent_timeout");
-	expect(calls).toBe(0);
-	expect(answer).toBe(RESEARCH_FAILURE_REPLY);
+	h = await setup({ goals });
+	h.state.steps.push({ text: "はい。", calls: [chat] });
+	await h.say("今日の予定は");
+	expect(documentOf(0).state.goals).toEqual([
+		{ id: "g1", text: "毎日少し運動する" },
+	]);
 });
 
-test("without a research result the persona, long-term and goals layers are the instructions", async () => {
-	const { sent, session } = await generate(null);
-	const { instructionCount } = session.context!;
-	expect(instructionCount).toBe(3);
-	expect(
-		sent.slice(0, instructionCount).every((m) => m.role === "system"),
-	).toBe(true);
-	expect(sent[1]!.content).toContain("辛いものが好き");
-	expect(sent[2]!.content).toContain("毎日少し運動する");
-});
-
-test("the agency layer: absent, null and empty give byte-identical prompts; a result adds one message before the input", async () => {
-	// Message ids are random per run; the rest must match to the byte.
-	const bytes = (sent: Sent) =>
-		JSON.stringify(sent).replace(/[0-9a-f]{8}-[0-9a-f-]{27}/g, "<id>");
-	const absent = (await generate(null)).sent;
-	const nothing = (
-		await generate(null, { recentForContextInTransaction: () => null })
-	).sent;
-	const empty = (
-		await generate(null, {
-			recentForContextInTransaction: () => ({ utterances: [], interests: [] }),
-		})
-	).sent;
-	expect(bytes(nothing)).toBe(bytes(absent));
-	expect(bytes(empty)).toBe(bytes(absent));
-	const shown = (
-		await generate(null, {
-			recentForContextInTransaction: () => ({
-				utterances: [
-					{ messageId: "m1", text: "そういえば昨日の天気は", heard: "partial" },
-				],
-				interests: ["マイメロディ"],
-			}),
-		})
-	).sent;
-	expect(shown).toHaveLength(absent.length + 1);
-	const at = shown.findIndex((m) => m.content.includes('"agency.recent"'));
-	const added = shown[at]!;
-	// Before the current request, with the other per-call records.
-	expect(at).toBeLessThan(shown.length - 2);
-	expect(added.role).toBe("system");
-	expect(JSON.parse(added.content).context).toMatchObject({
-		source: "agency.recent",
-		authority: "host_record",
-		freshness: "this_turn",
-	});
-	expect(JSON.parse(added.content).content).toContain(
-		"- そういえば昨日の天気は（途中まで）",
+test("a conversation idle past the provider's cache window is re-constructed; a quick follow-up is not", async () => {
+	h = await setup();
+	h.state.steps.push(
+		{ text: "一つ目。", calls: [chat] },
+		{ text: "二つ目。", calls: [chat] },
+		{ text: "三つ目。", calls: [chat] },
 	);
-	// Everything else is what it was.
-	expect(bytes(shown.filter((_, i) => i !== at))).toBe(bytes(absent));
+	await h.say("一つ目");
+	const version = () =>
+		h!.store.read(
+			(db) =>
+				h!.continuity.events.windowVersionInTransaction(db, "main").version,
+		);
+	const afterFirst = version();
+	await h.say("二つ目");
+	expect(version()).toBe(afterFirst);
+	h.state.offsetMs += minutes(7);
+	await h.say("三つ目");
+	expect(version()).toBeGreaterThan(afterFirst);
 });
+
+test("a resumed conversation (silence of half an hour) is re-constructed; the original turns stay in the log until their summary is prepared", async () => {
+	h = await setup();
+	h.state.steps.push(
+		{ text: "一つ目。", calls: [chat] },
+		{ text: "再開。", calls: [chat] },
+	);
+	await h.say("一つ目");
+	const version = () =>
+		h!.store.read(
+			(db) =>
+				h!.continuity.events.windowVersionInTransaction(db, "main").version,
+		);
+	const before = version();
+	h.state.offsetMs += minutes(31);
+	await h.say("戻りました");
+	expect(version()).toBeGreaterThan(before);
+	const document = documentOf(1);
+	// No summary is prepared yet (section 8.3): the earlier turn is not moved to the episode, its text stays.
+	expect(document.episode).toEqual([]);
+	expect(document.log.map((e: { text?: string }) => e.text)).toContain(
+		"一つ目",
+	);
+});
+
+test("a window too small for the planned sections fails the run with window_too_small, with no model call", async () => {
+	h = await setup({ window: 12_000 });
+	const run = await h.say("こんにちは", "failed");
+	expect(run.error).toBe("window_too_small");
+	expect(h.state.calls).toHaveLength(0);
+});
+
+/** Waits until the run has left the queue (completed or failed). */
+async function waitForRun(runId: string) {
+	await waitFor(() =>
+		["completed", "failed", "cancelled"].includes(
+			h!.dialogue.get(runId)?.status ?? "",
+		),
+	);
+}

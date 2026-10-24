@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import type { Database } from "bun:sqlite";
 import { createWorldView } from "../service/world-view";
-import { keepAll, setupSteward, type StewardHarness } from "./steward.fixture";
+import { setupSteward, type StewardHarness } from "./steward.fixture";
 import {
 	ACCESS,
 	NOW,
@@ -88,9 +88,11 @@ test("only the World curation runs on the resource chosen for World; every other
 	const { opened, h } = await setup({ worldResourceId: resourceId });
 	h.inference.script("curate-memory", {
 		...empty,
-		route: [{ exchange: "e1", world: true, goals: false }],
+		route: [
+			{ event: "e1", world: true, goals: false },
+			{ event: "e2", world: true, goals: false },
+		],
 	});
-	h.inference.script("dispose-exchanges", keepAll);
 	h.inference.script("curate-world", {
 		entities: [],
 		claims: [claim],
@@ -114,9 +116,11 @@ test("a statement reaches World through the steward, and a forget request remove
 	const { opened, h } = await setup();
 	h.inference.script("curate-memory", {
 		...empty,
-		route: [{ exchange: "e1", world: true, goals: false }],
+		route: [
+			{ event: "e1", world: true, goals: false },
+			{ event: "e2", world: true, goals: false },
+		],
 	});
-	h.inference.script("dispose-exchanges", keepAll);
 	h.inference.script("curate-world", {
 		entities: [],
 		claims: [claim],
@@ -173,7 +177,6 @@ test("a statement reaches World through the steward, and a forget request remove
 			route: [],
 		};
 	});
-	h.inference.script("dispose-exchanges", keepAll);
 	await h.run({
 		user: "音声サービスのことは全部忘れて",
 		end: "completed",

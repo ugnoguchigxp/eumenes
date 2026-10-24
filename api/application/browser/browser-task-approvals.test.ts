@@ -15,7 +15,7 @@ import {
 	start,
 	tag,
 	typeInto,
-} from "./browser-task-kit";
+} from "./browser-task.fixture";
 
 afterEach(cleanup);
 

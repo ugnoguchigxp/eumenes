@@ -30,8 +30,7 @@ for (const currentUrl of [undefined, "https://example.com/current-source"])
 			expect(
 				(await h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 }))?.status,
 			).toBe("completed");
-			// Selection excludes prior assistant claims; the final answer keeps the exchange.
-			expect(h.routeContexts.at(-1)).not.toContain(oldUrl);
+			// The selection is the request's own search; the corrected answer reaches the final answer's log as corrected.
 			expect(h.parentContexts.at(-1)).toContain(oldUrl);
 			expect(h.workerContexts.length).toBeGreaterThan(0);
 			for (const context of h.workerContexts) {

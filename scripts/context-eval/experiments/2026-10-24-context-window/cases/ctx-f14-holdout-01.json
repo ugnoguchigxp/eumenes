@@ -1,0 +1,87 @@
+{
+	"id": "ctx-f14-holdout-01",
+	"family": "F14",
+	"split": "holdout",
+	"seed": {
+		"events": [
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-21T13:00:00.000Z",
+				"text": "新幹線の空席状況を調べて"
+			},
+			{
+				"type": "acted",
+				"at": "2026-10-21T13:00:02.000Z",
+				"fields": {
+					"action": "delegate",
+					"toolchain": "web_research",
+					"request": "新幹線の空席状況を調べる",
+					"todo": "@w1"
+				}
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-21T13:00:03.000Z",
+				"text": "確認しますね。",
+				"origin": "announcement"
+			},
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-21T13:03:00.000Z",
+				"text": "ところで、駅弁っておいしいよね"
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-21T13:03:04.000Z",
+				"text": "旅の楽しみの一つですね。",
+				"origin": "reply"
+			}
+		],
+		"work": [
+			{
+				"key": "w1",
+				"toolchain": "web_research",
+				"request": "新幹線の空席状況を調べる",
+				"at": "2026-10-21T13:00:03.000Z",
+				"updatedAt": "2026-10-21T13:02:00.000Z",
+				"status": "done",
+				"outcome": "succeeded",
+				"result": {
+					"asOf": "2026-10-20T13:02:00.000Z",
+					"claims": [
+						{
+							"text": "午後二時の便に自由席の空きがある",
+							"sources": [
+								"src_1"
+							]
+						}
+					],
+					"limits": "指定席は未確認"
+				}
+			}
+		],
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "butler"
+		}
+	},
+	"input": "あの新幹線の件、結局どうなったの？",
+	"expect": {
+		"checks": [
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "work_state_aware",
+				"condition": "完了した調べ物の結果（午後二時の便に自由席の空きがある。指定席は未確認）を、active にある範囲で伝えている。指定席の空きを断定していない。"
+			}
+		]
+	}
+}

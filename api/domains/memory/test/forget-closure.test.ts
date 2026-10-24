@@ -18,19 +18,8 @@ async function setup() {
 	return h;
 }
 const exchange = async (h: MemoryHarness, user: string, answer: string) => {
-	const runId = `run-${h.time.now}-${user}`;
-	const inputMessageId = await h.say("user", user, "c1", runId);
-	const answerMessageId = await h.say("assistant", answer, "c1", runId);
-	await h.store.write((db) =>
-		h.memory.recordExchangeInTransaction(db, {
-			conversationId: "c1",
-			runId,
-			inputMessageId,
-			answerMessageId,
-			outcome: "answered",
-		}),
-	);
-	return { inputMessageId, answerMessageId };
+	const said = await h.exchange(user, answer);
+	return { inputMessageId: said.userId, answerMessageId: said.answerId! };
 };
 const mergeOf = async (h: MemoryHarness) => {
 	const a = await h.seed("コーヒーが好き", "drink.coffee");
@@ -227,7 +216,7 @@ test("a replacement or merge by the steward does not expire a run in flight; a s
 	expect(await validate(window)).toEqual({ ok: true });
 });
 
-test("the purge hook is told which conversations' summaries the forget deleted", async () => {
+test("a forget reaches the short-term events and the episode of the conversation, and only those that stood on the message", async () => {
 	const h = await setup();
 	const purges: ForgetPurge[] = [];
 	h.memory.registerForgetPurge((_db, purge) => {
@@ -236,20 +225,43 @@ test("the purge hook is told which conversations' summaries the forget deleted",
 	const e1 = await exchange(h, "住所は大阪です", "了解");
 	const e2 = await exchange(h, "好きな色は青です", "了解");
 	await h.store.write((db) =>
-		h.memory.writeSummaryInTransaction(db, {
-			conversationId: "c1",
-			text: "住所と色の話",
-			included: [e1.inputMessageId, e2.inputMessageId],
-			expectedRevision: 0,
-		}),
+		h.continuity.events.writeEpisodeInTransaction(db, "c1", "shown", [
+			{
+				kind: "summary",
+				fromSeq: 0,
+				toSeq: 0,
+				fromAt: h.time.now,
+				toAt: h.time.now,
+				count: 4,
+				text: "住所と色の話",
+				messageIds: [e1.inputMessageId, e2.inputMessageId],
+			},
+		]),
 	);
+	const version = () =>
+		h.store.read((db) =>
+			h.continuity.events.windowVersionInTransaction(db, "c1"),
+		);
+	const before = version().version;
 	await h.forget([], [e1.inputMessageId]);
 	expect(purges).toHaveLength(1);
-	expect(purges[0]?.deletedSummaryConversationIds).toEqual(["c1"]);
-	// Nothing stood on this message in a summary: the list is empty.
-	const e3 = await exchange(h, "晴れでした", "そうですね");
-	await h.forget([], [e3.inputMessageId]);
-	expect(purges[1]?.deletedSummaryConversationIds).toEqual([]);
+	const log = h.store.read((db) =>
+		h.continuity.events.logInTransaction(db, "c1"),
+	);
+	expect(log.map((event) => event.forgotten)).toEqual([
+		true,
+		true,
+		false,
+		false,
+	]);
+	expect(
+		h.store.read((db) => h.continuity.events.episodeInTransaction(db, "c1")),
+	).toMatchObject([{ kind: "unsummarized", text: "" }]);
+	expect(version()).toMatchObject({ version: before + 1, reason: "forget" });
+	// Forgetting a message that no event shows leaves the window alone.
+	const other = await h.say("user", "別の会話の発言", "c2");
+	await h.forget([], [other], "c2");
+	expect(version().version).toBe(before + 1);
 });
 
 test("a restart re-applies only the lines the database has not recorded", async () => {

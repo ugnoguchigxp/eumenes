@@ -1,5 +1,6 @@
 import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
+import { createEventStore } from "./events";
 import {
 	CONTINUITY_TTL_MS,
 	MAX_ACTIVE_CONTINUITY,
@@ -166,6 +167,8 @@ export function createContinuityService(
 		snapshot(conversationId: string): ContinuitySnapshot {
 			return store.read((db) => snapshotInTransaction(db, conversationId));
 		},
+		/** The event flow, episode, work results and window version (the active short-term memory). */
+		events: createEventStore(),
 	};
 }
 export type ContinuityService = ReturnType<typeof createContinuityService>;

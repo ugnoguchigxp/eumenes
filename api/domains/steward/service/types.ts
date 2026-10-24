@@ -19,21 +19,10 @@ import type {
 } from "../contracts";
 import type { UnitRow, UnitTargets } from "../repository";
 
-/** What the steward uses of memory: the ledgers, the save contract, the forget, the vectors and the Window. */
+/** What the steward uses of memory: the block ledger, the save contract, the forget, the vectors and the Window. */
 type StewardMemory = Pick<
 	MemoryService,
 	| "readyInTransaction"
-	| "pendingExchangesInTransaction"
-	| "pendingConversationIdsInTransaction"
-	| "exchangeInTransaction"
-	| "exchangesInTransaction"
-	| "exchanges"
-	| "markExchangeStepInTransaction"
-	| "recordExchangeFailureInTransaction"
-	| "setDispositionInTransaction"
-	| "summaryInTransaction"
-	| "summaryRevisionInTransaction"
-	| "writeSummaryInTransaction"
 	| "blockedMessageIdsInTransaction"
 	| "forgetSeqInTransaction"
 	| "applyCurationInTransaction"
@@ -45,7 +34,8 @@ type StewardMemory = Pick<
 	| "recallTurnsInRead"
 	| "windows"
 	| "publishWindowInTransaction"
-	| "historyBudgetTokens"
+	| "republishWindowInTransaction"
+	| "windowPlan"
 >;
 
 /** What the steward calls of World's curation (the World package owns every rule of what becomes a claim). */
@@ -93,8 +83,8 @@ export interface StewardDeps {
 	continuity: ContinuityService;
 	queue: QueuePort;
 	inference: InferencePort;
-	/** A conversation run is generating an answer now (upkeep waits for it). */
-	foregroundActive(conversationId: string): boolean;
+	/** A conversation run is generating an answer now (upkeep waits for it); read in the caller's transaction. */
+	foregroundActive(db: Database, conversationId: string): boolean;
 	/** How a run stands (startup sorts the requests of finished runs). */
 	runStateOf(runId: string): RunLookup;
 	clock(): string;
@@ -130,8 +120,8 @@ export type PrepareResult =
 			data: unknown;
 			/** The targets that fit; rewritten into the unit. */
 			targets: UnitTargets;
-			/** The summary revision the step stands on (steps that read the summary). */
-			summaryRevision: number | null;
+			/** The window version the step stands on (the episode steps: a re-construction since makes them stale). */
+			windowVersion: number | null;
 			/** What settle needs and the model never sees (refs, ids, digests). */
 			context: unknown;
 	  };
@@ -148,7 +138,8 @@ export interface ApplyResult {
 	notices: string[];
 	/** A reflecting step changed something: the upkeep revision moves on. */
 	changed: boolean;
-	republishLongTerm?: boolean;
+	/** The profile should be published anew at the next re-construction. */
+	requestRepublish?: boolean;
 	prefetch?: {
 		text: string;
 		pins: { messageId: string; digest: string }[];
@@ -170,7 +161,7 @@ export interface PreparedUnit {
 	data: unknown;
 	context: unknown;
 	targets: UnitTargets;
-	summaryRevision: number | null;
+	windowVersion: number | null;
 }
 
 export type ExecuteContext = {

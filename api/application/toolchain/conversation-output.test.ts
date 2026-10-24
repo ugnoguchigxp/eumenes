@@ -1,6 +1,11 @@
 import { afterEach, expect, test } from "bun:test";
 import { harness } from "./toolchain.fixture";
-import { isCompletionCheck } from "../../domains/dialogue/test/analysis.fixture";
+import {
+	callsOf,
+	isResultRound,
+	isUtteranceRound,
+	searchThenDelegate,
+} from "../toolchain/conversation-script.fixture";
 import { musicFixture } from "../media/music.fixture";
 import type { LarmPort } from "../../domains/larm";
 import { configureLogging } from "../../infrastructure/logger";
@@ -47,17 +52,28 @@ for (const mode of ["repair", "repeat"] as const)
 						})
 					: f.model.answer(messages, signal, options),
 			answerStream: async (messages, signal, delta, options) => {
-				if (
-					options?.tools?.length &&
-					!isCompletionCheck(options.tools) &&
-					(++routes === 1 || mode === "repeat")
-				) {
+				const utterance =
+					isUtteranceRound(options?.tools) && !isResultRound(messages);
+				if (utterance && (++routes === 1 || mode === "repeat")) {
+					// Control text beside no tool call: the host withdraws it and asks for the one repair.
 					for (const character of control) delta(character);
 					if (routes === 1) {
 						waiting = true;
 						await pause;
 					}
 					return control;
+				}
+				if (utterance) {
+					const step = searchThenDelegate(
+						(candidate) => candidate.execution === "music-create",
+						messages.at(-1)!.content,
+						{ announcement: "準備します。", impact: "create" },
+					)(messages);
+					if (step.calls?.length)
+						options!.onToolCalls!(
+							callsOf(step, () => crypto.randomUUID()) as never,
+						);
+					return step.text ?? "";
 				}
 				const answer = await f.model.answer(messages, signal, options);
 				delta(answer);
@@ -91,7 +107,8 @@ for (const mode of ["repair", "repeat"] as const)
 					}
 				return ["ready", "failed"].includes(h.voice.get(id)?.status ?? "");
 			});
-			expect(routes).toBe(mode === "repair" ? 4 : 2);
+			// Repair: the control text, the repaired search, and the hand-over. Repeat: the control text twice.
+			expect(routes).toBe(mode === "repair" ? 3 : 2);
 			expect(
 				visible.every(
 					(text) => !text.includes("create_music") && !text.includes("<|"),

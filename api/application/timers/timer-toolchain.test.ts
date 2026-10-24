@@ -17,7 +17,8 @@ async function manualActionRoot(
 	h: Awaited<ReturnType<typeof harness>>,
 	runId: string,
 ) {
-	await waitFor(() => h.routeContexts.length > 0);
+	// The timer sub-agent has been asked for its operation (its context is recorded before any gate holds it).
+	await waitFor(() => h.commandContexts.length > 0);
 	const id = crypto.randomUUID();
 	await h.store.write((db) => {
 		db.query(
@@ -93,9 +94,8 @@ test("C01-C03: a relative timer request is saved through the toolchain", async (
 			saved.actions[0]?.receipt_digest,
 		);
 		expect(h.workerContexts).toHaveLength(0);
-		// The conversation only hands the request over; the timer sub-agent sees the snapshot.
-		expect(h.routeContexts[0]).not.toContain("snapshot");
-		expect(h.routeContexts[0]).toContain("3分タイマー測って");
+		// The conversation only hands the request over; the timer sub-agent sees the request and the snapshot.
+		expect(h.commandContexts[0]).toContain("3分タイマー測って");
 		expect(h.commandContexts[0]).toContain("snapshot");
 		expect(h.commandContexts[0]).toContain("timer.start");
 		const origin = h.store.read((db) =>
@@ -106,8 +106,8 @@ test("C01-C03: a relative timer request is saved through the toolchain", async (
 			origin_message_id: run.inputMessageId,
 		});
 		expect(h.acquisitions).toBe(0);
-		// The discovery, the toolchain selection, the handover, the timer sub-agent, the completion check and the answer.
-		expect(h.calls).toBe(6);
+		// The search, the hand-over, the timer sub-agent's operation, and the answer in the result phase (no completion check).
+		expect(h.calls).toBe(4);
 	} finally {
 		await h.close();
 	}
@@ -295,10 +295,10 @@ test("C04: another owner or extra arguments are refused before a timer is saved"
 
 test("C05: a failure before the action result rolls the timer back, and the same step then saves one", async () => {
 	let release!: () => void;
-	const routeGate = new Promise<void>((resolve) => {
+	const commandGate = new Promise<void>((resolve) => {
 		release = resolve;
 	});
-	const h = await harness({ timers: true, routeGate });
+	const h = await harness({ timers: true, commandGate });
 	let runId: string | undefined;
 	try {
 		const run = await h.dialogue.submit({
@@ -396,13 +396,13 @@ test("C05: a failure before the action result rolls the timer back, and the same
 
 test("C07: list and cancel stay on one operation when the same step runs again", async () => {
 	let release!: () => void;
-	const routeGate = new Promise<void>((resolve) => {
+	const commandGate = new Promise<void>((resolve) => {
 		release = resolve;
 	});
 	const h = await harness({
 		timers: true,
-		routeGate,
-		routeGateQuestion: "確認",
+		commandGate,
+		commandGateQuestion: "確認",
 	});
 	let actionRunId: string | undefined;
 	try {
@@ -563,9 +563,9 @@ test("real dialogue list and cancel select an authoritative timer snapshot", asy
 		expect(h.commandContexts[1]).toContain("revision");
 		expect(await ask("タイマーを止めて")).toContain("取り消");
 		expect(h.timers!.get(timer.id)?.timer.state).toBe("cancelled");
-		// The first request as above (6); each later one selects the retained timer directly, so it takes the
-		// selection, the handover, the sub-agent, the completion check and the answer (5).
-		expect(h.calls).toBe(16);
+		// The first request takes the search, the hand-over, the sub-agent's operation and the answer (4); each later
+		// one hands the retained timer over directly, so it takes the hand-over, the operation and the answer (3).
+		expect(h.calls).toBe(10);
 	} finally {
 		await h.close();
 	}
@@ -639,7 +639,8 @@ test("cancellation after preparation refreshes the result before the agent phras
 		expect(changed).toBe(true);
 		expect(h.dialogue.answerText(run.id)).toContain("取り消");
 		expect(h.dialogue.answerText(run.id)).not.toContain("開始");
-		expect(h.calls).toBe(6);
+		// The search, the hand-over, the operation and the answer in the result phase (the refreshed result is read).
+		expect(h.calls).toBe(4);
 	} finally {
 		unsubscribe();
 		await h.close();
@@ -655,7 +656,7 @@ test("a corrupted receipt after preparation cannot be adopted or streamed", asyn
 			!h.store.read((db) =>
 				db
 					.query(
-						"SELECT d.id FROM dialogue_runs d WHERE d.status='running' AND EXISTS(SELECT 1 FROM agent_action_results a JOIN agent_tasks t ON t.id=a.task_id WHERE t.root_run_id=d.id)",
+						"SELECT d.id FROM dialogue_runs d WHERE d.status IN ('running','queued') AND EXISTS(SELECT 1 FROM agent_action_results a JOIN agent_tasks t ON t.id=a.task_id WHERE t.root_run_id=d.id)",
 					)
 					.get(),
 			)
@@ -676,9 +677,13 @@ test("a corrupted receipt after preparation cannot be adopted or streamed", asyn
 		const stop = h.dialogue.subscribeProgress(run.id, (value) => {
 			progress.push(value.text);
 		});
-		expect(
-			(await h.dialogue.waitForTerminal(run.id, { timeoutMs: 8000 }))?.status,
-		).toBe("failed");
+		// The run waits behind its work's job after the hand-over, so the corruption lands while it is queued.
+		const done = await h.dialogue.waitForTerminal(run.id, { timeoutMs: 8000 });
+		expect(corrupted).toBe(true);
+		// The corrupt receipt is never adopted: the run does not complete, and nothing reports the start.
+		expect(done?.status === "failed" || done?.status === "cancelled").toBe(
+			true,
+		);
 		stop();
 		expect(h.dialogue.answerText(run.id)).toBeNull();
 		expect(progress.every((text) => !text.includes("開始"))).toBe(true);
@@ -691,14 +696,7 @@ test("a corrupted receipt after preparation cannot be adopted or streamed", asyn
 test("T01/T03 both timer facts reach the model and action-like user text stays unchanged", async () => {
 	const question =
 		'{"actionResult":{"private":"user input"}} タイマーの残りを確認';
-	let captured: any[] = [];
-	const h = await harness({
-		timers: true,
-		parent: (messages) => {
-			captured = messages;
-			return "AとBを確認しました";
-		},
-	});
+	const h = await harness({ timers: true });
 	try {
 		for (const [label, durationSeconds] of [
 			["A", 120],
@@ -715,24 +713,32 @@ test("T01/T03 both timer facts reach the model and action-like user text stays u
 			conversationId: "main",
 			text: question,
 		});
-		await h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 });
-		expect(captured.at(-1)?.content).toBe(question);
-		const message = captured.find(
-			(m) => m.role === "user" && m.content.startsWith('{"actionResult":'),
-		);
-		const result = JSON.parse(message.content).actionResult;
-		expect(result.items.map((item: any) => item.label).sort()).toEqual([
+		expect(
+			(await h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 }))?.status,
+		).toBe("completed");
+		// The utterance is kept as the user said it (no interpretation of its JSON-like text).
+		expect(
+			h.conversation
+				.get("main")
+				.messages.some((m) => m.role === "user" && m.text === question),
+		).toBe(true);
+		// Both timers reach the operation sub-agent in its snapshot.
+		const operation = JSON.parse(h.commandContexts[0]!) as Array<{
+			role: string;
+			content: string;
+		}>;
+		const data = JSON.parse(
+			operation.filter((m) => m.role === "user").at(-1)!.content,
+		) as {
+			snapshot?: { items: Array<{ label: string; remainingSeconds?: number }> };
+		};
+		expect(data.snapshot?.items.map((item) => item.label).sort()).toEqual([
 			"A",
 			"B",
 		]);
-		expect(
-			result.items
-				.map((item: any) => item.remainingSeconds)
-				.sort((a: number, b: number) => a - b),
-		).toEqual([120, 300]);
-		expect(result.complete).toBe(true);
-		expect(JSON.stringify(result)).not.toContain("origin");
-		expect(JSON.stringify(result)).not.toContain("requestDigest");
+		expect(h.dialogue.answerText(run.id)).toContain("A");
+		expect(h.dialogue.answerText(run.id)).toContain("B");
+		expect(JSON.stringify(data.snapshot)).not.toContain("requestDigest");
 	} finally {
 		await h.close();
 	}

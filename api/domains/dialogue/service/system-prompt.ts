@@ -47,12 +47,3 @@ export function buildSystemPrompt(general: AgentGeneral) {
 		personaParts(general),
 	);
 }
-/** The role alone (no tone, no spoken-reply or tool rules), for the hidden analysis round that writes no reply. */
-export function buildRolePrompt(general: AgentGeneral) {
-	const { role, agent, user } = personaParts(general);
-	return systemContext("dialogue.contexts.request-analysis.role", {
-		role,
-		agent,
-		user,
-	});
-}

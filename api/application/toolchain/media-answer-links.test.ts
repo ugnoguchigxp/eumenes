@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { harness } from "./toolchain.fixture";
+import { isResultRound } from "./conversation-script.fixture";
 import { imageFixture, imageQuestion } from "../media/image.fixture";
 import { musicFixture, musicQuestion } from "../media/music.fixture";
 
@@ -10,14 +11,9 @@ for (const media of ["image", "music"] as const)
 			"完成しました。\n再生：[https://127.0.0.1:8000/play/(127.0.0.1)](https://127.0.0.1:8000/play/\\(127.0.0.1\\))";
 		const model = {
 			...fixture.model,
+			// The result phase (the host's fixed text reports the finished media) answers with the link.
 			answer: async (...args: Parameters<typeof fixture.model.answer>) =>
-				args[0].some((message) =>
-					message.content.includes(
-						media === "image" ? '"imageResult":' : '"musicResult":',
-					),
-				)
-					? claim
-					: fixture.model.answer(...args),
+				isResultRound(args[0]) ? claim : fixture.model.answer(...args),
 		};
 		const h = await harness({
 			model,

@@ -8,7 +8,9 @@ export type ReportMeta = {
 	/** sha256 of manifest.json when the experiment was frozen, else null. */
 	manifestSha256: string | null;
 	scoredFrom: string;
-	/** sha256 of the run's prefix.json (the trajectory measurement criterion 7 reads), or null when the run has none. */
+	/** The earlier run this one is compared with (its scores directory), or null. */
+	baselineFrom: string | null;
+	/** sha256 of the run's prefix.json (the trajectory measurement criterion 6 reads), or null when the run has none. */
 	prefixSha256: string | null;
 	prefix: PrefixReport | null;
 };
@@ -16,17 +18,16 @@ export type ReportMeta = {
 export function resultsJson(analysis: Analysis, meta: ReportMeta) {
 	return {
 		format: "context-eval.results",
-		version: 1,
+		version: 2,
 		...meta,
 		lane: analysis.lane,
 		split: analysis.split,
 		binding: analysis.binding,
-		baseline: analysis.baseline,
 		thresholds: analysis.thresholds,
 		expectedTrials: analysis.expectedTrials,
 		caseCount: analysis.caseCount,
-		comparisons: analysis.comparisons,
-		verdicts: analysis.verdicts,
+		run: analysis.run,
+		comparison: analysis.comparison,
 	};
 }
 
@@ -38,7 +39,28 @@ const decisionText = {
 	not_binding: "判定しない（採否に使えない）",
 } as const;
 
-function section(c: Comparison): string[] {
+function runSection(run: Analysis["run"]): string[] {
+	const families = Object.entries(run.perFamily).map(
+		([family, d]) =>
+			`| ${family} | ${d.cases} | ${d.passed} | ${d.failed} | ${d.incomplete} |`,
+	);
+	return [
+		"### この run の結果",
+		"",
+		"| 族 | 事例 | 合格 | 不合格 | 判定不能 |",
+		"| --- | --- | --- | --- | --- |",
+		...families,
+		"",
+		`- 安全族（F5・F6・F10）で合格していない事例: ${run.safetyFailures.join(", ") || "なし"}`,
+		`- F9 の発話契約違反の試行: ${run.f9Violations}`,
+		`- 送信 token の推定の合計: ${run.tokens}、応答時間の中央値: ${run.medianLatencyMs === null ? "n/a" : `${Math.round(run.medianLatencyMs)} ms`}`,
+		`- 普段の生成の prefix の安定度（token 比の中央値）: ${run.prefixMedianRatio?.toFixed(3) ?? "n/a"}`,
+		`- 通信エラー ${run.transportErrors}、判定待ち ${run.needsAdjudication}`,
+		"",
+	];
+}
+
+function comparisonSection(c: Comparison): string[] {
 	const families = Object.entries(c.perFamily)
 		.map(
 			([family, d]) =>
@@ -46,7 +68,7 @@ function section(c: Comparison): string[] {
 		)
 		.join("、");
 	return [
-		`### ${c.arm} と ${c.baseline}`,
+		"### baseline との比較",
 		"",
 		`- 結論: **${decisionText[c.decision]}**`,
 		...(c.reasons.length
@@ -66,25 +88,34 @@ function section(c: Comparison): string[] {
 	];
 }
 
-/** The trajectory measurement as a table: one row per arm (ordering variants included). */
-function prefixTable(prefix: PrefixReport): string[] {
-	const rows = Object.entries(prefix.arms).map(([arm, report]) => {
-		const shared = report.calls.reduce(
-			(sum, c) => sum + (c.sharedTokens ?? 0),
-			0,
-		);
-		const total = report.calls.slice(1).reduce((sum, c) => sum + c.tokens, 0);
-		return `| ${arm} | ${report.medianRatio?.toFixed(3) ?? "n/a"} | ${report.medianByteRatio?.toFixed(3) ?? "n/a"} | ${report.aggregateRatio?.toFixed(3) ?? "n/a"} | ${shared} | ${total} |`;
+/** The trajectory measurements as tables: one row per trajectory, then the calls of each. */
+function prefixTables(prefix: PrefixReport): string[] {
+	const rows = Object.entries(prefix.trajectories).map(([name, report]) => {
+		const rebuilt = report.calls.filter(
+			(c) => c.reconstruction !== null,
+		).length;
+		return `| ${name} | ${report.calls.length} | ${rebuilt} | ${report.medianRatio?.toFixed(3) ?? "n/a"} | ${report.medianByteRatio?.toFixed(3) ?? "n/a"} | ${report.aggregateRatio?.toFixed(3) ?? "n/a"} |`;
 	});
 	return [
-		`### prefix の安定度（会話の軌跡 ${Object.values(prefix.arms)[0]?.calls.length ?? 0} 呼び出し、経路 ${prefix.serialization}）`,
+		"### prefix の安定度（会話の軌跡）",
 		"",
-		"基準7は「token 比の中央値」で比べる。全体比と合計は補足である。",
+		"基準6は「普段の生成（再構成の直後でない呼び出し）の token 比の中央値」で比べる。全体比は補足である。",
 		"",
-		"| arm | token 比の中央値 | byte 比の中央値 | token 全体比 | 共有 token の合計 | 2回目以降の token の合計 |",
+		"| 軌跡 | 呼び出し | 再構成 | token 比の中央値 | byte 比の中央値 | token 全体比 |",
 		"| --- | --- | --- | --- | --- | --- |",
 		...rows,
 		"",
+		...Object.entries(prefix.trajectories).flatMap(([name, report]) => [
+			`#### ${name}`,
+			"",
+			"| 呼び出し | token | 先頭の共有 token | 比 | 再構成の理由 |",
+			"| --- | --- | --- | --- | --- |",
+			...report.calls.map(
+				(c) =>
+					`| ${c.label} | ${c.tokens} | ${c.sharedTokens ?? "-"} | ${c.tokenRatio?.toFixed(3) ?? "-"} | ${c.reconstruction ?? "-"} |`,
+			),
+			"",
+		]),
 	];
 }
 
@@ -96,17 +127,19 @@ export function resultsMarkdown(analysis: Analysis, meta: ReportMeta): string {
 		analysis.binding
 			? "- この結果は採否に使える（live の holdout）。"
 			: "- **この結果は採否に使えない**（fixture の段階、または holdout 以外）。基盤が動くことの確認である。",
-		`- baseline: \`${analysis.baseline}\`、事例 ${analysis.caseCount} 件、試行 ${analysis.expectedTrials} 回、事例の判定は過半数の合格`,
-		`- 基準の数値: 正味の改善 ${analysis.thresholds.minNetGain} 件以上、token 比 ${analysis.thresholds.maxTokenRatio} 以下、応答時間の中央値の比 ${analysis.thresholds.maxLatencyRatio} 以下`,
+		`- 事例 ${analysis.caseCount} 件、試行 ${analysis.expectedTrials} 回、事例の判定は過半数の合格`,
+		`- 基準の数値: 正味の改善 ${analysis.thresholds.minNetGain} 件以上、応答時間の中央値の比 ${analysis.thresholds.maxLatencyRatio} 以下`,
 		`- manifest: ${meta.manifestSha256 ?? "なし（freeze 前）"}`,
 		`- 採点の元: ${meta.scoredFrom}`,
+		`- baseline（変更前の run の採点）: ${meta.baselineFrom ?? "なし"}`,
 		`- prefix の計測（run の prefix.json）: ${meta.prefixSha256 ?? "なし"}`,
 		`- 生成: ${meta.generatedAt}`,
 		"",
-		...(analysis.comparisons.length === 0
-			? ["候補の arm がないため、比較は行っていない。", ""]
-			: analysis.comparisons.flatMap(section)),
-		...(meta.prefix ? prefixTable(meta.prefix) : []),
+		...runSection(analysis.run),
+		...(analysis.comparison
+			? comparisonSection(analysis.comparison)
+			: ["baseline の採点がないため、比較は行っていない。", ""]),
+		...(meta.prefix ? prefixTables(meta.prefix) : []),
 	];
 	return `${lines.join("\n")}\n`;
 }

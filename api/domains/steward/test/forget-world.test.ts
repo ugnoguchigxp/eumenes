@@ -2,7 +2,6 @@ import { afterEach, expect, test } from "bun:test";
 import { CONVERSATION_DEFAULT_SCOPE } from "../../conversation";
 import {
 	GOALS_ACCESS,
-	keepAll,
 	setupSteward,
 	topicEmbed,
 	type StewardHarness,
@@ -30,7 +29,10 @@ async function setup() {
 const empty = { remember: [], update: [], stop: [], notes: [], resolve: [] };
 const judged = (world: boolean, goals: boolean) => ({
 	...empty,
-	route: [{ exchange: "e1", world, goals }],
+	route: [
+		{ event: "e1", world, goals },
+		{ event: "e2", world, goals },
+	],
 });
 const resolve = (over: Record<string, unknown>) => ({
 	request: "r1",
@@ -109,7 +111,6 @@ async function learn(h: StewardHarness, fake: FakeWorld) {
 		judged(false, true),
 		judged(false, true),
 	);
-	h.inference.script("dispose-exchanges", keepAll, keepAll, keepAll);
 	h.inference.script("curate-world", claimAnswer);
 	h.inference.script(
 		"curate-goals",
@@ -171,7 +172,6 @@ test("naming a world entity and claim forgets them, their evidence, the goals ti
 		expect((data.goals as unknown[]).length).toBe(3);
 		return { ...empty, resolve: [resolve({ refs: ["w1", "k1"] })], route: [] };
 	});
-	h.inference.script("dispose-exchanges", keepAll);
 	await h.run({
 		user: "音声サービスのことは全部忘れて",
 		end: "completed",
@@ -273,7 +273,6 @@ test("claims about a chosen entity and the goals tied to it are not counted agai
 			route: [],
 		};
 	});
-	h.inference.script("dispose-exchanges", keepAll);
 	await h.run({
 		user: "音声サービスのことは全部忘れたい",
 		end: "completed",
@@ -303,7 +302,6 @@ test("a goal named in a request is forgotten with its message; the goal layer ep
 		const target = goals.find((g) => g.text === "音声サービスを速くしたい")!;
 		return { ...empty, resolve: [resolve({ refs: [target.ref] })], route: [] };
 	});
-	h.inference.script("dispose-exchanges", keepAll);
 	await h.run({
 		user: "速くしたいという目標は忘れて",
 		end: "completed",
@@ -345,7 +343,6 @@ test("one request names at most five things in all, across memory, world and goa
 			route: [],
 		};
 	});
-	h.inference.script("dispose-exchanges", keepAll);
 	await h.run({
 		user: "全部忘れて",
 		end: "completed",
@@ -375,7 +372,6 @@ test("when World can not be read the forget is refused whole, and the request sa
 		resolve: [resolve({ refs: ["w1", "k1"] })],
 		route: [],
 	});
-	h.inference.script("dispose-exchanges", keepAll);
 	await h.run({
 		user: "音声サービスは忘れて",
 		end: "completed",
@@ -400,7 +396,6 @@ test("when the evidence of the claims can be read only in part the forget is ref
 		resolve: [resolve({ refs: ["w1", "k1"] })],
 		route: [],
 	});
-	h.inference.script("dispose-exchanges", keepAll);
 	await h.run({
 		user: "音声サービスは忘れて",
 		end: "completed",
@@ -439,7 +434,6 @@ test("a memory forget also takes the blocked messages out of World as sources", 
 		remember: [address],
 		route: [],
 	});
-	h.inference.script("dispose-exchanges", keepAll);
 	const first = await h.run({
 		user: "私の住所は東京都千代田区です",
 		answer: "承知しました",
@@ -454,7 +448,6 @@ test("a memory forget also takes the blocked messages out of World as sources", 
 			route: [],
 		};
 	});
-	h.inference.script("dispose-exchanges", keepAll);
 	await h.run({
 		user: "住所を忘れて",
 		end: "completed",

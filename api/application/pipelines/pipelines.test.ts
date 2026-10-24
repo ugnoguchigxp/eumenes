@@ -2,8 +2,7 @@ import { expect, test } from "bun:test";
 import type { PipelineDefinition } from "../../domains/capabilities";
 import { waitFor } from "../../infrastructure/wait-for";
 import { harness } from "../toolchain/toolchain.fixture";
-import { analysisTools } from "../../domains/dialogue/service/initial-decision";
-import { RESERVED_INPUT_NAMES } from "../../domains/pipelines/service/check";
+import { searchThenDelegate } from "../toolchain/conversation-script.fixture";
 
 /** Two timers with a value taken out of the first one's result in between: commands and an extract only. */
 const relay: PipelineDefinition = {
@@ -94,21 +93,18 @@ async function setup(extract: () => unknown, command = timerCommand) {
 		pipelines: true,
 		command,
 		extract,
-		firstRound: (tools) =>
-			tools.some((t) => t.function.name === "pipeline_timer_relay")
-				? {
-						name: "pipeline_timer_relay",
-						args: {
-							kind: "action",
-							freshness: "not_live",
-							impact: "create",
-							approved: false,
-							announcement: "二つのタイマーを順に掛けます。",
-							minutes: 5,
-							minutes_quote: "5分のタイマー",
-						},
-					}
-				: undefined,
+		discoveryTarget: () => "pipeline_timer_relay",
+		// The conversation hands the request to the pipeline with its inputs (a search, then the hand-over).
+		firstRound: (_tools, question, messages) =>
+			searchThenDelegate(
+				(candidate) => candidate.id === "pipeline.timer-relay",
+				question,
+				{
+					announcement: "二つのタイマーを順に掛けます。",
+					impact: "create",
+					inputs: { minutes: 5, minutes_quote: "5分のタイマー" },
+				},
+			)(messages),
 	});
 	return { h, pipelines: h.pipelines };
 }
@@ -175,7 +171,7 @@ test("a published pipeline is a new revision of an ordinary toolchain; an unchan
 	}
 });
 
-test("the first round picks the pipeline with its inputs; the host runs each step as a child, and the finished run is checked against the request", async () => {
+test("the first round picks the pipeline with its inputs; the host runs each step as a child and the finished run is reported", async () => {
 	const { h, pipelines } = await setup(() => 30);
 	try {
 		expect((await pipelines.publish(relay)).ok).toBe(true);
@@ -222,9 +218,6 @@ test("the first round picks the pipeline with its inputs; the host runs each ste
 			fulfilled: ["一つ目のタイマー", "二つ目のタイマー"],
 			missing: [],
 		});
-		// The notice of the finished run is answered, and that answer is checked against the user's request.
-		await waitFor(() => h.completionContexts.length > 0, { timeout: 15000 });
-		expect(h.completionContexts[0]).toContain(TEXT.replace(/"/g, '\\"'));
 	} finally {
 		await h.close();
 	}
@@ -274,34 +267,6 @@ test("a quote that is not the user's words goes back for the structural repair",
 	} finally {
 		await h.close();
 	}
-});
-
-test("the names a pipeline may not give its inputs are exactly the first round's own fields", () => {
-	const tools = analysisTools([
-		{
-			id: "pipeline.x",
-			revisionId: "toolchain:pipeline.x@1",
-			functionName: "pipeline_x",
-			title: "x",
-			summary: "x",
-			useWhen: [],
-			redirects: [],
-			execution: "pipeline",
-			pipeline: {
-				parameters: { type: "object", properties: {}, required: [] },
-				outline: "a→b",
-				parse: () => ({ ok: true, value: {} }),
-			},
-			score: { rank: 1, ftsRank: null, similarity: null, fromHistory: false },
-		},
-	]);
-	const own = tools.find((t) => t.function.name === "pipeline_x")!;
-	expect(
-		Object.keys(
-			(own.function.parameters as { properties: Record<string, unknown> })
-				.properties,
-		).sort(),
-	).toEqual([...RESERVED_INPUT_NAMES].sort());
 });
 
 test("a pipeline id that names another toolchain is refused; a revision published during a run does not stop it", async () => {

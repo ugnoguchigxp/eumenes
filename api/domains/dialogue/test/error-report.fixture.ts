@@ -5,21 +5,12 @@ import { Hono } from "hono";
 import { jstIso } from "../../../infrastructure/jst-time";
 import { openStore } from "../../../infrastructure/sqlite";
 import type { TaskDto } from "../../agent-runtime";
-import {
-	migration as conversationMigration,
-	avatarMotionMigration as conversationAvatarMotionMigration,
-	answerDeliveryMigration as conversationAnswerDeliveryMigration,
-	createConversationService,
-} from "../../conversation";
+import { createConversationService } from "../../conversation";
+import { createContinuityService } from "../../continuity";
 import type { LarmPort } from "../../larm";
-import { createQueue, migration as queueMigration } from "../../queue";
-import {
-	agentLinkMigration,
-	createDialogueService,
-	migration,
-	queueLinkMigration,
-	registerDialogue,
-} from "..";
+import { createQueue } from "../../queue";
+import { createDialogueService, registerDialogue } from "..";
+import { dialogueMigrationList } from "./store.fixture";
 
 export const T0 = Date.parse("2026-10-17T12:18:54.000Z");
 export const BOOT = "beeb7ec6-2ef0-48b1-a9c0-bc6a16557bb6";
@@ -90,21 +81,14 @@ export async function scenario(options: {
 }) {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-error-report-"));
 	dirs.push(dir);
-	const store = openStore(join(dir, "db.sqlite3"), [
-		conversationMigration,
-		conversationAvatarMotionMigration,
-		conversationAnswerDeliveryMigration,
-		migration,
-		queueMigration,
-		queueLinkMigration,
-		agentLinkMigration,
-	]);
+	const store = openStore(join(dir, "db.sqlite3"), dialogueMigrationList());
 	const queue = createQueue(store);
 	const tasks = options.tasks ?? [];
 	const logFile = join(dir, "api.jsonl");
 	const dialogue = createDialogueService({
 		store,
 		conversation: createConversationService(store),
+		continuity: createContinuityService(store),
 		larm,
 		queue,
 		agents: { list: () => tasks } as never,
@@ -172,19 +156,6 @@ export const controlFailure = ({ run, request, job }: Ids) => {
 			"dialogue",
 			"dialogue.accepted",
 		)({ ...base, jobId: job, status: "queued" }),
-		entry(
-			"info",
-			6000,
-			"dialogue",
-			"dialogue.request_analyzed",
-		)({
-			...base,
-			jobId: job,
-			kind: "live_info",
-			freshness: "live",
-			next: "toolchain",
-			durationMs: 5900,
-		}),
 		entry(
 			"info",
 			6100,

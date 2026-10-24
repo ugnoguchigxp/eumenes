@@ -93,6 +93,16 @@ DELETE FROM capability_search WHERE key IN (SELECT key FROM capability_items WHE
 DELETE FROM capability_items WHERE kind='toolchain' AND id LIKE 'web.research.%' AND id<>'web.research.codex';`,
 		after: ["capabilities/0005-artifact-pointers"],
 	},
+	{
+		// The `steward.request` toolchain (the `memory_request` tool) is gone: the conversation agent's fixed memory
+		// tool asks the steward directly. Its items (the toolchain and its package, profile, skill and tool) keep their
+		// revisions as history but no longer hold a function name, a search entry or an embedding.
+		id: "capabilities/0007-retire-steward-request",
+		sql: `DELETE FROM capability_toolchain_vectors WHERE revision_id IN (SELECT id FROM capability_revisions WHERE item_key LIKE '%:steward.request');
+DELETE FROM capability_search WHERE key IN (SELECT key FROM capability_items WHERE id='steward.request' AND kind IN ('toolchain','package','profile','skill','tool'));
+DELETE FROM capability_items WHERE id='steward.request' AND kind IN ('toolchain','package','profile','skill','tool');`,
+		after: ["capabilities/0006-retire-model-named-web-research"],
+	},
 ];
 
 export type DocumentKind = "binding" | "artifact" | "schema";

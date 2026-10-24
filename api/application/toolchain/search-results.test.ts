@@ -82,8 +82,14 @@ for (const topic of ["公開イベントのニュース", "製品の更新情報
 				},
 			}),
 			parent: async (messages) => {
-				const result = messages.find((m) => m.content.includes('"sources":'))!;
-				const report = JSON.parse(result.content).report;
+				// The result phase's document carries the finished research as the TODO's result (the report).
+				const document = JSON.parse(
+					messages.find((m) => m.role === "user" && m.content.startsWith("{"))!
+						.content,
+				) as { active: Array<{ result?: Record<string, any> }> };
+				const report = [...document.active]
+					.reverse()
+					.find((entry) => entry.result)!.result!;
 				expect(report.claims).toHaveLength(1);
 				expect(report.requirements).toBeUndefined();
 				expect(report.coverage).toBe("partial");

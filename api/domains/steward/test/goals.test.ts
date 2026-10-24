@@ -2,7 +2,6 @@ import { afterEach, expect, test } from "bun:test";
 import { CONVERSATION_DEFAULT_SCOPE } from "../../conversation";
 import {
 	GOALS_ACCESS,
-	keepAll,
 	setupSteward,
 	type StewardHarness,
 } from "./steward.fixture";
@@ -19,7 +18,10 @@ async function setup() {
 const empty = { remember: [], update: [], stop: [], notes: [], resolve: [] };
 const judged = (goals: boolean) => ({
 	...empty,
-	route: [{ exchange: "e1", world: false, goals }],
+	route: [
+		{ event: "e1", world: false, goals },
+		{ event: "e2", world: false, goals },
+	],
 });
 const change = (over: Record<string, unknown>) => ({
 	op: "adopt",
@@ -49,7 +51,6 @@ const source = (id: string) => ({
 test("a stated goal is adopted and an inferred one is proposed, both standing on the user's message; the chain goes on", async () => {
 	const h = await setup();
 	h.inference.script("curate-memory", judged(true));
-	h.inference.script("dispose-exchanges", keepAll);
 	h.inference.script("curate-goals", {
 		goals: [
 			change({
@@ -70,19 +71,19 @@ test("a stated goal is adopted and an inferred one is proposed, both standing on
 		{ status: "adopted", text: "音声応答の遅延を減らしたい", priority: 80 },
 		{ status: "proposed", text: "キャッシュを検討する", priority: 50 },
 	]);
-	// The provenance is the user's message of the exchange (F8, F10).
+	// The provenance is the user's own message (F8, F10); the agent's words are no evidence of a goal.
 	expect(rows(h, "SELECT DISTINCT message_id AS id FROM goals_source")).toEqual(
 		[{ id: ex.inputMessageId }],
 	);
-	// The unit order: curate-memory, then the goals, then the rest of the chain.
+	// The unit order: curate-memory, then the goals.
 	expect(
 		h
 			.units()
 			.map((u) => u.step)
 			.filter((step) => step !== "prepare-recall"),
-	).toEqual(["curate-memory", "curate-goals", "dispose-exchanges"]);
-	expect(h.exchangeRow(ex.inputMessageId)).toMatchObject({ state: "done" });
-	// The decision stands on the goals and the exchange's messages.
+	).toEqual(["curate-memory", "curate-goals"]);
+	expect(h.log().every((e) => e.curated)).toBe(true);
+	// The decision stands on the goals and the events' messages.
 	const decision = h.steward
 		.decisions("c1")
 		.find((d) => d.step === "curate-goals")!;
@@ -96,7 +97,7 @@ test("a stated goal is adopted and an inferred one is proposed, both standing on
 		{ t: "goal", n: 2 },
 		{ t: "message", n: 2 },
 	]);
-	// The model was shown the exchange and no goal yet.
+	// The model was shown the events and no goal yet.
 	expect(h.inference.callsOf("curate-goals")[0]!.data).toMatchObject({
 		goals: [],
 	});
@@ -105,7 +106,6 @@ test("a stated goal is adopted and an inferred one is proposed, both standing on
 test("goals:false skips the goal step; a missing judgment counts as true; time alone never withdraws a goal", async () => {
 	const h = await setup();
 	h.inference.script("curate-memory", judged(false), empty);
-	h.inference.script("dispose-exchanges", keepAll, keepAll);
 	h.inference.script("curate-goals", {
 		goals: [change({ text: "英語を話せるようになりたい" })],
 	});
@@ -136,7 +136,6 @@ test("goals:false skips the goal step; a missing judgment counts as true; time a
 test("a goal request is answered by the goal step, not by curate-memory", async () => {
 	const h = await setup();
 	h.inference.script("curate-memory", judged(true), empty);
-	h.inference.script("dispose-exchanges", keepAll, keepAll);
 	h.inference.script(
 		"curate-goals",
 		{ goals: [change({ text: "音声応答の遅延を減らしたい" })] },
@@ -170,7 +169,6 @@ test("a goal request is ended at once when the application keeps no goals", asyn
 	const h = await setupSteward({});
 	harnesses.push(h);
 	h.inference.script("curate-memory", empty);
-	h.inference.script("dispose-exchanges", keepAll);
 	await h.run({
 		user: "目標は終わった",
 		answer: "了解",
@@ -183,12 +181,11 @@ test("a goal request is ended at once when the application keeps no goals", asyn
 	]);
 });
 
-test("a goal step that fails three times drops its exchange's reflection and the chain goes on", async () => {
+test("a goal step that fails three times drops its events' reflection and the chain goes on", async () => {
 	const h = await setup();
 	h.inference.script("curate-memory", judged(true));
-	h.inference.script("dispose-exchanges", keepAll);
 	h.inference.script("curate-goals", "bad", "bad", "bad");
-	const ex = await h.run({
+	await h.run({
 		user: "走りたい",
 		answer: "いいですね",
 		end: "completed",
@@ -205,13 +202,12 @@ test("a goal step that fails three times drops its exchange's reflection and the
 			db.query("SELECT COUNT(*) AS n FROM steward_goal_todo").get(),
 		),
 	).toEqual({ n: 0 });
-	expect(h.exchangeRow(ex.inputMessageId)).toMatchObject({ state: "done" });
+	expect(h.log().every((e) => e.curated)).toBe(true);
 });
 
 test("an op the host can not trust is dropped: unknown evidence, unknown ref, adopted goal withdrawn as a proposal", async () => {
 	const h = await setup();
 	h.inference.script("curate-memory", judged(true));
-	h.inference.script("dispose-exchanges", keepAll);
 	h.inference.script("curate-goals", {
 		goals: [
 			change({ text: "目標A", evidence: "e9" }),
@@ -277,9 +273,11 @@ test("the goal upkeep withdraws duplicate proposals and never an adopted goal", 
 				negated: false,
 			},
 		],
-		route: [{ exchange: "e1", world: false, goals: false }],
+		route: [
+			{ event: "e1", world: false, goals: false },
+			{ event: "e2", world: false, goals: false },
+		],
 	});
-	h.inference.script("dispose-exchanges", keepAll);
 	h.inference.script(
 		"consolidate-goals",
 		(data) => {
@@ -347,9 +345,11 @@ test("near the proposal cap the model is told how full it is", async () => {
 				negated: false,
 			},
 		],
-		route: [{ exchange: "e1", world: false, goals: false }],
+		route: [
+			{ event: "e1", world: false, goals: false },
+			{ event: "e2", world: false, goals: false },
+		],
 	});
-	h.inference.script("dispose-exchanges", keepAll);
 	h.inference.script(
 		"consolidate-goals",
 		(data) => {

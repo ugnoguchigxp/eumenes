@@ -1,12 +1,18 @@
 import { afterEach, expect, test } from "bun:test";
 import type { LarmPort } from "../../domains/larm";
 import {
-	analysisArgs,
-	analysisReceipt,
-	DISCOVERY,
-	isAnalysisRound,
-} from "../../domains/dialogue/test/analysis.fixture";
+	afterUtterance,
+	callsOf,
+	isResultRound,
+	isUtteranceRound,
+	respond,
+	searchThenDelegate,
+} from "./conversation-script.fixture";
 import { harness } from "./toolchain.fixture";
+
+/** The toolchain id of a scripted function name (the UI studio's function is `ui_create`). */
+const toolchainOf = (tool: string) =>
+	tool === "ui_create" ? "ui.compose" : tool;
 
 /**
  * API-level integration of the specialist dialogue (spec toolchain-specialist-dialogue-p0-contract):
@@ -107,13 +113,6 @@ async function rig() {
 					languages: ["ja"],
 					confidence: 0.99,
 				});
-			if (system.includes("FUNCTIONS="))
-				return JSON.stringify({
-					decision: "answer",
-					functionName: "",
-					request: "",
-					questionRef: "",
-				});
 			if (system.includes("あなたはUI制作の専門担当です")) {
 				specialistPrompts.push(messages.map((m) => ({ ...m })));
 				const step = script.specialist.shift();
@@ -128,53 +127,43 @@ async function rig() {
 				return typeof value === "string" ? value : JSON.stringify(value);
 			}
 			mainPrompts.push(messages.map((m) => ({ ...m })));
-			const head = script.main[0];
-			// The first round of every main-agent run: the script decides whether the request is delegated.
-			if (isAnalysisRound(options?.tools)) {
-				if (
-					options?.tools?.some((t) => t.function.name === DISCOVERY) &&
-					!options.tools.some((t) => t.function.name === "ui_create")
-				) {
-					// The discovery writes the analysis the selection after it takes as fixed: the script's decision.
-					options!.onToolCalls!(
-						analysisReceipt("fixture", {
-							name: DISCOVERY,
-							args: {
-								query: messages.at(-1)!.content,
-								...(typeof head === "object"
-									? { kind: "creation" as const }
-									: analysisArgs()),
-							},
-						}).toolCalls as never,
-					);
-					return "";
+			// The conversation's round for a user's utterance: the script decides whether the request is delegated (a
+			// search, then the hand-over) or answered by `respond` with the scripted reply.
+			if (isUtteranceRound(options?.tools) && !isResultRound(messages)) {
+				if (afterUtterance(messages).length === 0) routeCalls++;
+				const head = script.main[0];
+				if (typeof head === "object") {
+					const { announcement, ...request } = head.args as Record<
+						string,
+						unknown
+					>;
+					const text = String(request.request);
+					const step = searchThenDelegate(
+						(candidate) => candidate.id === toolchainOf(head.tool),
+						text,
+						{
+							announcement:
+								(announcement as string | undefined) ??
+								"制作担当に引き継ぎます。",
+							impact: "create",
+						},
+					)(messages);
+					if (step.calls?.[0]?.name === "delegate") script.main.shift();
+					if (step.calls?.length)
+						options!.onToolCalls!(callsOf(step, () => id()) as never);
+					return step.text ?? "";
 				}
-				routeCalls++;
-				options!.onToolCalls!(
-					(typeof head === "object"
-						? analysisReceipt("fixture", {
-								name: head.tool,
-								args: { kind: "creation" },
-								announcement:
-									(head.args as { announcement?: string }).announcement ??
-									undefined,
-							})
-						: analysisReceipt("fixture")
-					).toolCalls as never,
-				);
-				return "";
-			}
-			if (options?.tools?.length && typeof head === "object") {
-				script.main.shift();
-				// The notice belongs to the first round; the second round's function takes the request only.
-				const { announcement: _notice, ...request } = head.args as Record<
-					string,
-					unknown
-				>;
+				const reply = script.main.shift() ?? "かしこまりました。";
+				if (typeof reply !== "string")
+					throw new Error("script_tool_after_route");
 				options!.onToolCalls!([
-					{ id: id(), name: head.tool, arguments: JSON.stringify(request) },
-				]);
-				return "";
+					{
+						id: id(),
+						name: "respond",
+						arguments: JSON.stringify(respond().args),
+					},
+				] as never);
+				return reply;
 			}
 			const step = script.main.shift() ?? "かしこまりました。";
 			if (typeof step !== "string") throw new Error("script_tool_after_route");
@@ -336,7 +325,8 @@ test("ui_create opens the work and the same run continues as the specialist's tu
 	expect(first.status).toBe("completed");
 	// The main agent decided, then selected the toolchain; the specialist answered the run.
 	expect(r.mainRuns).toBe(1);
-	expect(r.mainPrompts).toHaveLength(3);
+	// The search and the hand-over (the main agent's two calls); the specialist then answers the run.
+	expect(r.mainPrompts).toHaveLength(2);
 	expect(r.h.dialogue.answerText(first.id)).toBe("初稿です。");
 	expect(r.h.dialogue.get(first.id)!.specialistSessionId).toBe(
 		(await r.session())!.id,
@@ -519,7 +509,8 @@ test("return with unsaved work suspends the session, the main agent answers, and
 	expect(r.mainRuns).toBe(mainBefore + 1);
 	expect(r.h.dialogue.answerText(next.id)).toBe("ご用件をどうぞ。");
 	const pending = text(r.mainPrompts.at(-1)!);
-	expect(pending).toContain("specialistWork=");
+	// The suspended work is a host record in the context document.
+	expect(pending).toContain('"suspended"');
 	expect(pending).toContain('"unsaved":true');
 	// Only the record's facts, never the draft's definition.
 	expect(pending).not.toContain("ご感想をお聞かせください");
@@ -746,7 +737,7 @@ test("a session idle past its expiry is ended by the sweep and its work is remov
 	expect(text(r.mainPrompts.at(-1)!)).toContain("expired");
 });
 
-test("the specialist's prompt holds no conversation, World or memory material and specialist messages stay out of the main agent's prompt", async () => {
+test("the specialist's prompt holds no conversation, World or memory material; what was said during the switch is in the main agent's log", async () => {
 	const r = await rig();
 	r.script.main.push("好きな色は青色と覚えました。");
 	const plain = await r.sayAndWait("私の好きな色はMAIN_MARKER_BLUEです");
@@ -791,14 +782,13 @@ test("the specialist's prompt holds no conversation, World or memory material an
 	const main = text(r.mainPrompts.at(-1)!);
 	expect(main).toContain("MAIN_MARKER_AFTER");
 	expect(main).toContain("MAIN_MARKER_BLUE");
+	// What was said during the switch is an event of the log (spec 6.8): the main agent reads the flow.
 	for (const marker of [
 		"SPECIALIST_REPLY_ONE",
 		"SPECIALIST_REPLY_TWO",
 		"SPECIALIST_USER_TWO",
-		"会話に戻ってください",
-		"戻ります",
 	])
-		expect(main).not.toContain(marker);
+		expect(main).toContain(marker);
 });
 
 test("a whole draft with nothing it can show is refused at once, kept for the source view, and neither the draft nor the undo history changes", async () => {

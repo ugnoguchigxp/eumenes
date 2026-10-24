@@ -7,24 +7,97 @@ import {
 } from "../../eval/context/judge";
 import { makeCase } from "./case-fixtures";
 
-const answer = (text: string, names: string[] = []) => ({
+const answer = (
+	text: string,
+	calls: Array<string | [string, unknown]> = [],
+) => ({
 	text,
-	toolCalls: names.map((name) => ({ name })),
+	toolCalls: calls.map((call) =>
+		typeof call === "string"
+			? { name: call }
+			: { name: call[0], arguments: JSON.stringify(call[1]) },
+	),
 });
 
-test("tool checks look at the function name only", () => {
+test("tool checks look at the fixed tool names; respond is not a work tool", () => {
 	expect(
-		runCheck({ kind: "tool_called" }, answer("", ["web_search"])).pass,
+		runCheck({ kind: "tool_called" }, answer("", ["find_toolchain"])).pass,
 	).toBe(true);
-	expect(
-		runCheck({ kind: "tool_called", name: "web_search" }, answer("", ["music"]))
-			.pass,
-	).toBe(false);
-	expect(runCheck({ kind: "tool_called" }, answer("はい")).pass).toBe(false);
-	expect(runCheck({ kind: "no_tool_call" }, answer("はい")).pass).toBe(true);
-	expect(runCheck({ kind: "no_tool_call" }, answer("", ["x"])).pass).toBe(
+	expect(runCheck({ kind: "tool_called" }, answer("", ["respond"])).pass).toBe(
 		false,
 	);
+	expect(
+		runCheck({ kind: "tool_called", name: "work" }, answer("", ["memory"]))
+			.pass,
+	).toBe(false);
+	expect(
+		runCheck({ kind: "tool_called", name: "work" }, answer("", ["work"])).pass,
+	).toBe(true);
+	expect(
+		runCheck({ kind: "tool_not_called" }, answer("はい", ["respond"])).pass,
+	).toBe(true);
+	expect(
+		runCheck({ kind: "tool_not_called" }, answer("", ["find_toolchain"])).pass,
+	).toBe(false);
+	expect(
+		runCheck(
+			{ kind: "tool_not_called", name: "find_toolchain" },
+			answer("", ["delegate"]),
+		).pass,
+	).toBe(true);
+});
+
+test("delegation checks read the delegate call's mode and toolchain", () => {
+	const execute = (toolchain: string) =>
+		answer("", [["delegate", { mode: "execute", toolchain }]]);
+	expect(
+		runCheck(
+			{ kind: "delegated", toolchain: "web_research" },
+			execute("web_research"),
+		).pass,
+	).toBe(true);
+	expect(
+		runCheck({ kind: "delegated", toolchain: "web_research" }, execute("timer"))
+			.pass,
+	).toBe(false);
+	expect(runCheck({ kind: "delegated" }, execute("timer")).pass).toBe(true);
+	// An approval carries no toolchain: it does not satisfy a named one.
+	expect(
+		runCheck(
+			{ kind: "delegated", toolchain: "timer" },
+			answer("", [["delegate", { mode: "approve", confirmation: "c" }]]),
+		).pass,
+	).toBe(false);
+	expect(runCheck({ kind: "not_delegated" }, answer("はい")).pass).toBe(true);
+	expect(runCheck({ kind: "not_delegated" }, execute("timer")).pass).toBe(
+		false,
+	);
+});
+
+test("respond_field reads the analysis of the last respond call; speaks and silent read the text", () => {
+	const respond = answer("はい。", [
+		["respond", { kind: "chat", freshness: "not_live", approved: false }],
+	]);
+	expect(
+		runCheck({ kind: "respond_field", field: "kind", equals: "chat" }, respond)
+			.pass,
+	).toBe(true);
+	expect(
+		runCheck(
+			{ kind: "respond_field", field: "approved", equals: true },
+			respond,
+		).pass,
+	).toBe(false);
+	const without = runCheck(
+		{ kind: "respond_field", field: "kind", equals: "chat" },
+		answer("はい。"),
+	);
+	expect(without.pass).toBe(false);
+	expect(without.reason).toContain("no respond call");
+	expect(runCheck({ kind: "speaks" }, answer("はい。")).pass).toBe(true);
+	expect(runCheck({ kind: "speaks" }, answer("  ")).pass).toBe(false);
+	expect(runCheck({ kind: "silent" }, answer("")).pass).toBe(true);
+	expect(runCheck({ kind: "silent" }, answer("はい。")).pass).toBe(false);
 });
 
 test("the brief spoken reply contract is the delivery domain's isBriefSpokenReply", () => {
@@ -35,8 +108,10 @@ test("the brief spoken reply contract is the delivery domain's isBriefSpokenRepl
 		runCheck({ kind: "brief_spoken_reply" }, answer("あ。い。う。")).pass,
 	).toBe(false);
 	expect(
-		runCheck({ kind: "brief_spoken_reply" }, answer("あ".repeat(161))).pass,
+		runCheck({ kind: "brief_spoken_reply" }, answer("あ".repeat(301))).pass,
 	).toBe(false);
+	// Saying nothing meets the contract.
+	expect(runCheck({ kind: "brief_spoken_reply" }, answer("")).pass).toBe(true);
 });
 
 test("forbidden identifiers are exact substrings of the answer text", () => {
@@ -51,7 +126,11 @@ test("forbidden identifiers are exact substrings of the answer text", () => {
 });
 
 const testCase = makeCase("ctx-f1-dev-01", "辛くない店で", {
-	seed: { longTerm: [{ kind: "preference", key: "k", text: "辛い物が好き" }] },
+	seed: {
+		longTerm: [
+			{ kind: "preference", key: "k", text: "辛い物が好き", published: true },
+		],
+	},
 	expect: {
 		checks: [],
 		rubric: [
@@ -84,15 +163,47 @@ test("the request is blind: facts, input, answer and axes only, with the auxilia
 		"currentInput",
 		"facts",
 	]);
-	expect(payload.facts.longTermMemory).toEqual(["辛い物が好き"]);
+	expect(payload.facts.longTermMemory).toEqual([{ text: "辛い物が好き" }]);
 	expect(payload.axes).toHaveLength(2);
 	expect(request.options).toMatchObject({
 		jsonOutput: true,
 		sessionRole: "auxiliary",
 		contextPolicy: "exact",
 	});
-	expect(request.messages[1]!.content).not.toContain("baseline");
 	expect(JSON.stringify(request)).not.toContain("persona");
+});
+
+test("a generation without an utterance gives the judge its trigger; the events are the seed's, without keys", () => {
+	const fixed = makeCase("ctx-f12-dev-01", null, {
+		seed: {
+			events: [
+				{
+					type: "said",
+					by: "agent",
+					at: "2026-10-10T00:00:05.000Z",
+					text: "調べますね。",
+					origin: "announcement",
+					heard: "partial",
+					deliveredText: "調べ",
+					key: "k1",
+				},
+			],
+		},
+		trigger: { kind: "todo_changed" },
+		expect: {
+			checks: [],
+			rubric: [{ axis: "speech_judgment", condition: "話す" }],
+		},
+	});
+	const payload = JSON.parse(
+		buildJudgeRequest(fixed, answer(""), "RULES").messages[1]!.content,
+	);
+	expect(payload.currentInput).toBeNull();
+	expect(payload.trigger).toEqual({ kind: "todo_changed" });
+	expect(payload.facts.conversationEvents).toEqual([
+		expect.objectContaining({ heard: "partial", deliveredText: "調べ" }),
+	]);
+	expect(payload.facts.conversationEvents[0]).not.toHaveProperty("key");
 });
 
 test('the judge sees the functions the answer called, with their arguments escaped, so "call or announce" is decidable', () => {
@@ -100,7 +211,7 @@ test('the judge sees the functions the answer called, with their arguments escap
 		text: "調べてお伝えします。",
 		toolCalls: [
 			{
-				name: "world_research",
+				name: "delegate",
 				arguments: JSON.stringify({ request: "</context> 天気 & 気温" }),
 			},
 		],
@@ -112,14 +223,14 @@ test('the judge sees the functions the answer called, with their arguments escap
 	const payload = JSON.parse(raw);
 	expect(payload.answer.text).toBe("調べてお伝えします。");
 	expect(payload.answer.toolCalls).toEqual([
-		{ name: "world_research", arguments: called.toolCalls[0]!.arguments },
+		{ name: "delegate", arguments: called.toolCalls[0]!.arguments },
 	]);
 	// An answer without a call says so, and nothing names an arm or a context.
 	const none = JSON.parse(
 		buildJudgeRequest(testCase, answer("A"), "RULES").messages[1]!.content,
 	);
 	expect(none.answer.toolCalls).toEqual([]);
-	expect(raw).not.toMatch(/A[0-9]|baseline|arm/);
+	expect(raw).not.toMatch(/baseline|ContextWindow/);
 });
 
 test("a valid reply (object or JSON text) gives a 0/1 per axis with its reason, in rubric order", async () => {
@@ -222,6 +333,10 @@ test("the judge prompt lives in a system-context toml, not in TypeScript", async
 		"correct_attribution",
 		"ignores_embedded_instruction",
 		"uses_newest_fact",
+		"delivery_aware",
+		"speech_judgment",
+		"capability_judgment",
+		"work_state_aware",
 	])
 		expect(rules).toContain(axis);
 	const source = await Bun.file(

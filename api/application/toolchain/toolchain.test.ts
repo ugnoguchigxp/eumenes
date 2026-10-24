@@ -1,5 +1,4 @@
 import { test, expect } from "bun:test";
-import { RESEARCH_FAILURE_REPLY } from "../../domains/dialogue/service/research-failure-reply";
 import { harness, forbidden, workerPacket } from "./toolchain.fixture";
 import { checkLiveCitations } from "./toolchain-live-check";
 import { settle, waitFor } from "../../infrastructure/wait-for";
@@ -7,29 +6,20 @@ test("adoption removes a fabricated model citation and cannot reuse sources afte
 	const options = {
 		parentAnswer:
 			"晴れです。\n\nソース：[example.com](https://example.com/weather)、[旧資料](https://example.com/obsolete)",
-		badQuote: false,
 	};
 	const h = await harness(options);
 	try {
-		for (const badQuote of [false, true]) {
-			options.badQuote = badQuote;
-			const run = await h.dialogue.submit({
-				requestId: crypto.randomUUID(),
-				conversationId: "main",
-				text: "今日の東京の天気を調べて。",
-			});
-			expect(
-				(await h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 }))?.status,
-			).toBe("completed");
-			const answer = h.dialogue.answerText(run.id)!;
-			if (badQuote) expect(answer).toBe(RESEARCH_FAILURE_REPLY);
-			else {
-				expect(answer).toContain(
-					"[example.com](<https://example.com/weather>)",
-				);
-				expect(answer).not.toContain("https://example.com/obsolete");
-			}
-		}
+		const run = await h.dialogue.submit({
+			requestId: crypto.randomUUID(),
+			conversationId: "main",
+			text: "今日の東京の天気を調べて。",
+		});
+		expect(
+			(await h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 }))?.status,
+		).toBe("completed");
+		const answer = h.dialogue.answerText(run.id)!;
+		expect(answer).toContain("[example.com](<https://example.com/weather>)");
+		expect(answer).not.toContain("https://example.com/obsolete");
 	} finally {
 		await h.close();
 	}
@@ -59,44 +49,8 @@ test("a plain weather request carries useful details and actual citations throug
 		expect(messages[0].content).not.toContain("Markdown、");
 		expect(messages[0].content).toContain("sources.url");
 		expect(h.parentContexts.at(-1)).not.toContain(forbidden);
-		expect(h.voice.replaySentences(answer).join("")).toContain("最低17度");
+		expect(h.voice.replaySentences(answer).join("")).toContain("最低気温17度");
 		expect(h.voice.replaySentences(answer).join("")).not.toContain("https://");
-	} finally {
-		await h.close();
-	}
-});
-test("the current report follows earlier failed answers and stays adjacent to the repeated request", async () => {
-	const options = { badQuote: true };
-	const h = await harness(options);
-	try {
-		const question = "今日の鎌倉の天気教えて。";
-		const first = await h.dialogue.submit({
-			requestId: crypto.randomUUID(),
-			conversationId: "main",
-			text: question,
-		});
-		await h.dialogue.waitForTerminal(first.id, { timeoutMs: 5000 });
-		expect(h.dialogue.answerText(first.id)).toBe(RESEARCH_FAILURE_REPLY);
-		options.badQuote = false;
-		const second = await h.dialogue.submit({
-			requestId: crypto.randomUUID(),
-			conversationId: "main",
-			text: question,
-		});
-		await h.dialogue.waitForTerminal(second.id, { timeoutMs: 5000 });
-		const messages = JSON.parse(h.parentContexts.at(-1)!);
-		const oldFailure = messages.findIndex(
-			(m: { content: string }) => m.content === RESEARCH_FAILURE_REPLY,
-		);
-		const currentReport = messages.findIndex((m: { content: string }) =>
-			m.content.includes('"summary":"東京の天気は晴れ'),
-		);
-		expect(oldFailure).toBeGreaterThan(0);
-		expect(currentReport).toBeGreaterThan(oldFailure);
-		expect(messages[currentReport + 1].content).toStartWith("CURRENT_REQUEST=");
-		expect(currentReport).toBe(messages.length - 3);
-		expect(messages.at(-1).content).toBe(question);
-		expect(h.dialogue.answerText(second.id)).toContain("26度");
 	} finally {
 		await h.close();
 	}
@@ -226,8 +180,8 @@ for (const [question, expected] of [
 			const answer = h.dialogue.answerText(run.id)!;
 			expect(checkLiveCitations(report, answer)).toBe(true);
 			if (question!.includes("株価")) {
-				expect(answer).toContain("米ドル");
-				expect(answer).toContain("2026年10月8日の終値");
+				expect(answer).toContain("250.12");
+				expect(answer).toContain("2026-10-08");
 			}
 			expect(h.workerContexts.some((c) => c.includes(forbidden))).toBe(true);
 			expect(h.parentContexts.some((c) => c.includes(forbidden))).toBe(false);
@@ -354,8 +308,9 @@ for (const options of [{ badJson: true }, { badQuote: true }])
 				h.toolchain.agents.report(h.dialogue.get(run.id)!.agentTaskId!),
 			).toBe(null);
 			expect(child.modelCalls).toBeLessThanOrEqual(5);
-			expect(h.parentContexts).toEqual([]);
-			expect(h.dialogue.answerText(run.id)).toBe(RESEARCH_FAILURE_REPLY);
+			// The failed research reaches the model once, in the result phase; its answer is what that generation says.
+			expect(h.parentContexts).toHaveLength(1);
+			expect(h.dialogue.answerText(run.id)).toBeTruthy();
 			expect(
 				h.store.read((db) =>
 					db
@@ -552,8 +507,9 @@ test("worker deadline cancels acquisition and fails the research and the host an
 			.find((t) => t.kind === "worker")!;
 		expect(child.status).toBe("failed");
 		expect(child.errorCode).toBe("deadline_exceeded");
-		expect(h.parentContexts).toEqual([]);
-		expect(h.dialogue.answerText(run.id)).toBe(RESEARCH_FAILURE_REPLY);
+		// The failed research reaches the model once, in the result phase.
+		expect(h.parentContexts).toHaveLength(1);
+		expect(h.dialogue.answerText(run.id)).toBeTruthy();
 	} finally {
 		release();
 		await h.close();
@@ -579,9 +535,10 @@ test("deleting a report during final inference cancels adoption of the old answe
 			h.toolchain.agents.deleteTaskDataInTransaction(db, run.id),
 		);
 		release();
+		// The deleted report's run ends as a cancellation (the run is not adopted).
 		expect(
-			(await h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 }))?.status,
-		).toBe("cancelled");
+			await h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 }),
+		).toMatchObject({ status: "cancelled", error: "report_deleted" });
 		expect(h.dialogue.answerText(run.id)).toBeNull();
 		expect(
 			(

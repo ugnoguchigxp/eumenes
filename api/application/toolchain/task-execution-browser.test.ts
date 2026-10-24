@@ -1,7 +1,12 @@
 import { taskPlan, taskItem } from "./task-plan.fixture";
 import { expect, test } from "bun:test";
 import { harness } from "./toolchain.fixture";
-import { analysisArgs } from "../../domains/dialogue/test/analysis.fixture";
+import {
+	afterUtterance,
+	respond,
+	toolResults,
+} from "./conversation-script.fixture";
+import { handOverTask } from "./task-delegation.fixture";
 import { createBrowser } from "../../domains/browser";
 import {
 	FakeDriver,
@@ -16,7 +21,7 @@ import {
 	invoke,
 	finish,
 	lastResult,
-} from "../browser/browser-task-kit";
+} from "../browser/browser-task.fixture";
 import { createTaskRunner } from "../browser/browser-task-runner";
 import { registerBrowserEffects } from "../browser/browser-effects";
 import { waitFor } from "../../infrastructure/wait-for";
@@ -96,17 +101,16 @@ test("one public request searches, passes the exact result URL to a browser chil
 		fullResearch: true,
 
 		discoveryTarget: (query) =>
-			query === "operate browser" ? "browser_operate" : "web_research",
-		firstRound: () => ({
-			name: "execute_task",
-			args: {
-				...analysisArgs({ kind: "action", impact: "create" }),
-				request:
-					"Find a suitable video and play it in a new tab; preserve the volume.",
-				contextRefs: [],
-				announcement: "候補を探して再生を確認します。",
-			},
-		}),
+			query === "operate browser"
+				? "browser_operate"
+				: query === "find a nature video"
+					? "web_research"
+					: "execute_task",
+		firstRound: (_tools, _question, messages) =>
+			handOverTask(
+				"Find a suitable video and play it in a new tab; preserve the volume.",
+				"候補を探して再生を確認します。",
+			)(messages),
 		acquire: async (req) => {
 			const observedAt = new Date().toISOString();
 			const text = `Selected video, a short nature film: ${VIDEO}`;
@@ -309,7 +313,9 @@ test("a browser approval resumes in a new physical task, keeps the old deadline,
 			},
 		],
 	};
-	const click = (messages: import("../browser/browser-task-kit").Message[]) => {
+	const click = (
+		messages: import("../browser/browser-task.fixture").Message[],
+	) => {
 		const o = observation(messages);
 		return invoke("browser.page.click", {
 			observationRef: o.observationRef,
@@ -374,29 +380,37 @@ test("a browser approval resumes in a new physical task, keeps the old deadline,
 				requests: { userMessageInTransaction: () => null },
 			};
 		},
-		firstRound: (_tools, question) =>
-			question === "続けてよい"
-				? {
-						name: "task_control",
-						args: {
-							...analysisArgs({ kind: "action" }),
-							workRef: work.id,
-							expectedRevision: work.revision,
-							action: "answer",
-							questionRef: work.question!.id,
-							input: { approved: true },
-							announcement: "確認した操作を続けます。",
+		firstRound: (_tools, question, messages) => {
+			if (question !== "続けてよい")
+				return handOverTask(
+					"このページを送信し、結果を確認する",
+					"操作を確認しながら進めます。",
+				)(messages);
+			if (toolResults(afterUtterance(messages), "work").length === 0) {
+				const todo = h.store
+					.read((db) => h.dialogue.todosInTransaction(db, "main"))
+					.find((item) => item.status === "waiting")!;
+				return {
+					calls: [
+						{
+							name: "work",
+							args: {
+								todo: todo.id,
+								operation: "answer",
+								revision: todo.revision,
+								questionId: todo.questionId,
+								// The approval question asks for a structured answer: its JSON.
+								text: JSON.stringify({ approved: true }),
+							},
 						},
-					}
-				: {
-						name: "execute_task",
-						args: {
-							...analysisArgs({ kind: "action", impact: "create" }),
-							request: "このページを送信し、結果を確認する",
-							contextRefs: [],
-							announcement: "操作を確認しながら進めます。",
-						},
-					},
+					],
+				};
+			}
+			return {
+				text: "確認を受けて続けます。",
+				calls: [respond({ kind: "action", impact: "none" })],
+			};
+		},
 		command: (messages) => {
 			translations++;
 			const packet = JSON.parse(messages.at(-1)!.content);

@@ -1,3 +1,4 @@
+import type { Database } from "bun:sqlite";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -22,6 +23,7 @@ import {
 	type MemoryEmbed,
 	type MemoryService,
 } from "../../memory";
+import type { WindowPlan } from "../../../infrastructure/context-budget";
 import { createQueue, migrations as queueMigrations } from "../../queue";
 import type {
 	ChatMessage,
@@ -151,8 +153,8 @@ export type FakeInference = ReturnType<typeof createFakeInference>;
 export async function setupSteward(
 	options: {
 		embed?: MemoryEmbed;
-		/** The memory and history budget (tokens) of the model window; absent: the largest it can be (128k). */
-		historyBudgetTokens?: number;
+		/** The window plan of the saved model; absent: the reference window's. */
+		windowPlan?: () => WindowPlan;
 		runStates?: Record<string, RunLookup>;
 		/** Replaces the memory service the steward is given (a test makes one operation refuse). */
 		wrapMemory?: (memory: MemoryService) => MemoryService;
@@ -193,9 +195,7 @@ export async function setupSteward(
 		clock,
 		id: () => `id-${++counter}`,
 		...(options.embed ? { embed: () => options.embed } : {}),
-		...(options.historyBudgetTokens
-			? { historyBudgetTokens: () => options.historyBudgetTokens! }
-			: {}),
+		...(options.windowPlan ? { windowPlan: options.windowPlan } : {}),
 	});
 	if (!(await memory.recover()).healthy) throw new Error("memory_not_healthy");
 	const queue = createQueue(store, {
@@ -224,7 +224,7 @@ export async function setupSteward(
 		continuity,
 		queue,
 		inference: inference.port,
-		foregroundActive: (conversationId) => foreground.has(conversationId),
+		foregroundActive: (_db, conversationId) => foreground.has(conversationId),
 		runStateOf: (runId) => runStates[runId] ?? "stale",
 		clock,
 		nowMs: () => time.ms,
@@ -302,7 +302,10 @@ export async function setupSteward(
 			});
 			return id;
 		},
-		/** A run's end as the dialogue records it: the exchange, the requests and the kick, in one transaction. */
+		/**
+		 * What the dialogue records for a run: the user's utterance (handled, in the log) and the adopted answer, as
+		 * `said` events that show their messages, then the run's end (the steward's kick), in one transaction.
+		 */
 		async exchange(
 			user: string,
 			answer: string | null,
@@ -320,33 +323,63 @@ export async function setupSteward(
 				answer === null
 					? null
 					: await harness.say("assistant", answer, conversationId, runId);
-			await store.write((db) => {
-				memory.recordExchangeInTransaction(db, {
+			const seqs = await store.write((db) => {
+				const seqs = harness.recordSaid(
+					db,
 					conversationId,
-					runId,
 					inputMessageId,
 					answerMessageId,
-					outcome: answerMessageId === null ? "failed" : "answered",
-				});
+					{ user, agent: answer ?? undefined },
+				);
 				steward.runEndedInTransaction(db, {
 					runId,
 					conversationId,
 					state: answerMessageId === null ? "failed" : "completed",
 				});
+				return seqs;
 			});
-			return { inputMessageId, answerMessageId, runId };
+			return { inputMessageId, answerMessageId, runId, ...seqs };
+		},
+		/** The `said` events of a run's messages (the user's, handled; the answer's). */
+		recordSaid(
+			db: Database,
+			conversationId: string,
+			inputMessageId: string,
+			answerMessageId: string | null,
+			texts: { user?: string; agent?: string } = {},
+		) {
+			const user = continuity.events.appendInTransaction(db, {
+				conversationId,
+				at: clock(),
+				type: "said",
+				by: "user",
+				fields: { text: texts.user ?? "user" },
+				messageIds: [inputMessageId],
+			}).event;
+			const agent =
+				answerMessageId === null
+					? null
+					: continuity.events.appendInTransaction(db, {
+							conversationId,
+							at: clock(),
+							type: "said",
+							by: "agent",
+							fields: { origin: "reply", text: texts.agent ?? "agent" },
+							messageIds: [answerMessageId],
+						}).event;
+			return { userSeq: user.seq, agentSeq: agent?.seq ?? null };
 		},
 		/**
-		 * A run as the dialogue ends it: the user message, requests the conversation agent left, and how it ended.
-		 * `completed` adopts an answer; `failed` and `interrupted` leave only the user message; `cancelled` and
-		 * `stale` register no exchange.
+		 * A run as the dialogue ends it: the user message, requests the conversation agent committed, and how it
+		 * ended. `completed` adopts an answer; `failed` and `interrupted` leave only the user's event; `cancelled`
+		 * and `stale` record no event. The requests are queued when committed, whatever way the run ended.
 		 */
 		async run(input: {
 			user: string;
 			answer?: string;
 			end: RunEnd;
 			requests?: Array<{
-				kind: "forget" | "remember" | "correct" | "goal";
+				kind: "forget" | "remember" | "correct" | "goal" | "withdraw";
 				what: string;
 				detail?: string;
 			}>;
@@ -374,11 +407,10 @@ export async function setupSteward(
 				(input.requests ?? []).forEach((request, i) => {
 					const requestId = `${runId}-req-${i + 1}`;
 					requestIds.push(requestId);
-					steward.stageRequestInTransaction(db, {
+					steward.requestInTransaction(db, {
 						requestId,
 						conversationId,
-						runId,
-						messageId: inputMessageId,
+						sourceRef: inputMessageId,
 						...request,
 					});
 				});
@@ -389,13 +421,12 @@ export async function setupSteward(
 					input.end === "failed" ||
 					input.end === "interrupted"
 				)
-					memory.recordExchangeInTransaction(db, {
+					harness.recordSaid(
+						db,
 						conversationId,
-						runId,
 						inputMessageId,
 						answerMessageId,
-						outcome: answerMessageId === null ? "failed" : "answered",
-					});
+					);
 				steward.runEndedInTransaction(db, {
 					runId,
 					conversationId,
@@ -404,13 +435,8 @@ export async function setupSteward(
 			});
 			return { inputMessageId, answerMessageId, runId, requestIds };
 		},
-		/** An exchange already settled by the steps (kept verbatim), written straight into the ledger. */
-		async settledExchange(
-			user: string,
-			answer: string,
-			disposition: "keep" | "summarize" | "drop" = "keep",
-			conversationId = "c1",
-		) {
+		/** An exchange the steward already handled, written straight into the log as handled events. */
+		async settledExchange(user: string, answer: string, conversationId = "c1") {
 			const runId = `run-${messages + 1}`;
 			const inputMessageId = await harness.say(
 				"user",
@@ -425,41 +451,29 @@ export async function setupSteward(
 				runId,
 			);
 			await store.write((db) => {
-				memory.recordExchangeInTransaction(db, {
+				const seqs = harness.recordSaid(
+					db,
 					conversationId,
-					runId,
 					inputMessageId,
 					answerMessageId,
-					outcome: "answered",
-				});
-				memory.markExchangeStepInTransaction(
-					db,
-					inputMessageId,
-					"curated",
-					"done",
 				);
-				memory.markExchangeStepInTransaction(
-					db,
-					inputMessageId,
-					"disposed",
-					"done",
-				);
-				memory.setDispositionInTransaction(
-					db,
-					inputMessageId,
-					disposition,
-					null,
-				);
-				if (disposition === "summarize")
-					memory.markExchangeStepInTransaction(
-						db,
-						inputMessageId,
-						"summarized",
-						"done",
-					);
+				continuity.events.markCuratedInTransaction(db, conversationId, [
+					seqs.userSeq,
+					seqs.agentSeq!,
+				]);
 			});
 			return { inputMessageId, answerMessageId };
 		},
+		/** The log of a conversation, in log order. */
+		log: (conversationId = "c1") =>
+			store.read((db) =>
+				continuity.events.logInTransaction(db, conversationId),
+			),
+		/** The episode of a conversation (the shown or the prepared one). */
+		episode: (stage: "shown" | "prepared", conversationId = "c1") =>
+			store.read((db) =>
+				continuity.events.episodeInTransaction(db, conversationId, stage),
+			),
 		state: (conversationId = "c1") =>
 			store.read(
 				(db) =>
@@ -550,8 +564,6 @@ export async function setupSteward(
 						failures: number;
 					}>,
 			),
-		exchangeRow: (inputMessageId: string) =>
-			store.read((db) => memory.exchangeInTransaction(db, inputMessageId)),
 		async close() {
 			if (options.host) return options.host.close();
 			await store.close().catch(() => {});
@@ -572,15 +584,6 @@ export function quietReflect(h: StewardHarness) {
 		resolve: [],
 	});
 }
-
-/** A dispose answer that keeps every exchange the step was shown. */
-export const keepAll = (data: Record<string, unknown>) => ({
-	exchanges: (data.exchanges as Array<{ id: string }>).map((e) => ({
-		id: e.id,
-		action: "keep",
-		duplicateOf: null,
-	})),
-});
 
 /** Texts that mention a topic share a vector: enough for the recall to find "the earlier talk about it". */
 export const topicEmbed: MemoryEmbed = async (texts) => ({

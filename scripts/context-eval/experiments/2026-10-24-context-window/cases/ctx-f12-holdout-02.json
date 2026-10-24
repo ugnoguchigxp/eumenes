@@ -1,0 +1,94 @@
+{
+	"id": "ctx-f12-holdout-02",
+	"family": "F12",
+	"split": "holdout",
+	"seed": {
+		"events": [
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-21T08:00:00.000Z",
+				"text": "集中できる曲を作って"
+			},
+			{
+				"type": "acted",
+				"at": "2026-10-21T08:00:02.000Z",
+				"fields": {
+					"action": "delegate",
+					"toolchain": "music_studio",
+					"request": "集中できる曲を作る",
+					"todo": "@w1"
+				}
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-21T08:00:03.000Z",
+				"text": "作ってみますね。",
+				"origin": "announcement"
+			},
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-21T08:03:30.000Z",
+				"text": "いま会議が始まるので、終わるまで声をかけないでね"
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-21T08:03:33.000Z",
+				"text": "わかりました。終わるまで静かにしています。",
+				"origin": "reply"
+			}
+		],
+		"work": [
+			{
+				"key": "w1",
+				"toolchain": "music_studio",
+				"request": "集中できる曲を作る",
+				"at": "2026-10-21T08:00:03.000Z",
+				"updatedAt": "2026-10-21T08:04:00.000Z",
+				"status": "done",
+				"outcome": "succeeded",
+				"result": {
+					"asOf": "2026-10-21T08:04:00.000Z",
+					"claims": [
+						{
+							"text": "三分の曲を一つ作った",
+							"sources": []
+						}
+					],
+					"limits": "一曲のみ"
+				}
+			}
+		],
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "butler"
+		}
+	},
+	"input": null,
+	"trigger": {
+		"kind": "todo_changed",
+		"todos": [
+			{
+				"id": "@w1",
+				"status": "done"
+			}
+		]
+	},
+	"expect": {
+		"checks": [
+			{
+				"kind": "silent"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "speech_judgment",
+				"condition": "利用者が会議中で声をかけないでほしいと言っているので、曲ができても声をかけていない。"
+			}
+		]
+	}
+}

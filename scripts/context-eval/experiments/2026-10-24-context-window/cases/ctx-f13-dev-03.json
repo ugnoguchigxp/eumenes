@@ -1,0 +1,37 @@
+{
+	"id": "ctx-f13-dev-03",
+	"family": "F13",
+	"split": "dev",
+	"seed": {
+		"events": [
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-20T12:00:00.000Z",
+				"text": "机の上を片付けているところ"
+			}
+		],
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "butler"
+		}
+	},
+	"input": "この部屋の電気を消して、エアコンの温度を二度下げて",
+	"expect": {
+		"checks": [
+			{
+				"kind": "not_delegated"
+			},
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "capability_judgment",
+				"condition": "提示された担当に部屋の電気やエアコンを操作する担当はない。依頼を引き受けず、操作できないことを利用者に伝えている。操作したとは述べていない。"
+			}
+		]
+	}
+}

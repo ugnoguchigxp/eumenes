@@ -1,11 +1,8 @@
 import type { Database } from "bun:sqlite";
 import { createHash } from "node:crypto";
 import { z } from "zod";
-import type {
-	ExchangeDto,
-	MemoryItemDto,
-	MemoryService,
-} from "../../domains/memory";
+import type { ConversationEvent } from "../../domains/continuity";
+import type { MemoryItemDto, MemoryService } from "../../domains/memory";
 import type { DecisionDto, StewardService } from "../../domains/steward";
 import type { AdapterResult, DomainAdapter } from "../../domains/tool-runtime";
 
@@ -17,7 +14,7 @@ const TENDENCIES = "query:memory.tendencies@1";
 const SHORT_TERM = "query:memory.short-term@1";
 const CONTEXT = "query:memory.context@1";
 const DECISIONS = "query:memory.steward-decisions@1";
-const EXCHANGES = "query:memory.steward-exchanges@1";
+const EVENTS = "query:memory.steward-events@1";
 /** The conversation whose short-term notes and context the screen shows (the app's one conversation). */
 const MEMORY_SCREEN_CONVERSATION = "main";
 
@@ -41,8 +38,8 @@ export type MemoryAdapterPorts = {
 		| "storedContext"
 		| "setEnabledInTransaction"
 	>;
-	/** The steward's read model (its decision records and exchange ledger); without it those views are empty. */
-	steward?: Pick<StewardService, "decisions" | "exchanges">;
+	/** The steward's read model (its decision records and the event log it reads); without it those views are empty. */
+	steward?: Pick<StewardService, "decisions" | "events">;
 	conversationId?: string;
 };
 
@@ -75,28 +72,25 @@ const noteKindLabels: Record<string, string> = {
 };
 const stepLabels: Record<DecisionDto["step"], string> = {
 	"curate-memory": "記憶の判断",
-	"dispose-exchanges": "履歴の取捨",
-	summarize: "要約",
+	summarize: "経緯の要約の準備",
 	"prepare-recall": "想起の準備",
 	"consolidate-memory": "記憶の整理",
-	"compact-history": "履歴の圧縮",
-	"refine-summary": "要約の推敲",
+	"refine-summary": "経緯の要約の統合",
 	"curate-world": "World の反映",
 	"curate-goals": "目標の反映",
 	"consolidate-goals": "目標の整理",
 };
-const outcomeLabels: Record<ExchangeDto["outcome"], string> = {
-	answered: "回答あり",
-	failed: "回答なし（失敗）",
+const eventTypeLabels: Record<ConversationEvent["type"], string> = {
+	said: "発言",
+	delivered: "配信結果",
+	acted: "行動",
+	notice: "通知",
 };
-const markLabels: Record<string, string> = {
-	done: "済",
-	skipped: "見送り",
-};
-const dispositionLabels: Record<string, string> = {
-	keep: "逐語で残す",
-	summarize: "要約へ",
-	drop: "出さない",
+const eventActorLabels: Record<ConversationEvent["by"], string> = {
+	user: "利用者",
+	agent: "エージェント",
+	specialist: "専門担当",
+	host: "ホスト",
 };
 const NO_QUOTE = "元の発言は見つかりません";
 const CURRENT = new Set(["active", "inactive"]);
@@ -178,8 +172,9 @@ function pageOf(rows: ItemRow[], query: z.infer<typeof page>) {
 	};
 }
 
-/** How many decision records (and exchanges) the timeline shows, newest first. */
+/** How many decision records the timeline shows, newest first, and how many events of the log. */
 const DECISION_ROWS = 50;
+const EVENT_ROWS = 100;
 const PROPOSAL_CHARS = 300;
 const dateTime = (iso: string) => new Date(iso).toLocaleString("ja-JP");
 const asArray = (value: unknown): unknown[] =>
@@ -248,19 +243,38 @@ function decisionRow(decision: DecisionDto) {
 	};
 }
 
-function exchangeRow(exchange: ExchangeDto) {
+/** The event's own words in a line: its text, else its other fields, bounded. */
+const EVENT_TEXT_CHARS = 80;
+function eventText(event: ConversationEvent): string {
+	if (event.forgotten) return "忘却により本文を消去しました";
+	if (event.text === null) return "";
+	let fields: Record<string, unknown>;
+	try {
+		fields = JSON.parse(event.text) as Record<string, unknown>;
+	} catch {
+		return "";
+	}
+	const { id: _id, at: _at, type: _type, by: _by, ...own } = fields;
+	const text =
+		typeof own.text === "string"
+			? own.text
+			: Object.entries(own)
+					.filter(([, value]) => typeof value !== "object")
+					.map(([key, value]) => `${key}: ${String(value)}`)
+					.join(" / ");
+	return text.length > EVENT_TEXT_CHARS
+		? `${text.slice(0, EVENT_TEXT_CHARS)}…`
+		: text;
+}
+
+function eventRow(event: ConversationEvent) {
 	return {
-		id: exchange.inputMessageId,
-		ordinal: exchange.inputOrdinal,
-		outcomeLabel: outcomeLabels[exchange.outcome],
-		stateLabel: exchange.state === "done" ? "反映済み" : "反映待ち",
-		curated: markLabels[exchange.curated ?? ""] ?? "未",
-		disposed: markLabels[exchange.disposed ?? ""] ?? "未",
-		summarized: markLabels[exchange.summarized ?? ""] ?? "未",
-		dispositionLabel: exchange.disposition
-			? (dispositionLabels[exchange.disposition] ?? exchange.disposition)
-			: "未判断",
-		createdAt: dateTime(exchange.createdAt),
+		id: event.id,
+		createdAt: dateTime(event.at),
+		typeLabel: eventTypeLabels[event.type] ?? event.type,
+		byLabel: eventActorLabels[event.by] ?? event.by,
+		text: eventText(event),
+		curatedLabel: event.curated ? "反映済み" : "反映待ち",
 	};
 }
 
@@ -295,7 +309,7 @@ export const describeMemoryAdapter = () => ({
 		SHORT_TERM,
 		CONTEXT,
 		DECISIONS,
-		EXCHANGES,
+		EVENTS,
 	]),
 	inputAdapters: new Map(),
 	projections: new Set<string>(),
@@ -434,7 +448,7 @@ export function createMemoryAdapter(ports: MemoryAdapterPorts): DomainAdapter {
 				case CONTEXT: {
 					const window = memory.storedContext(conversationId);
 					const state = !window
-						? "まだ組み立てていません。会話の次のターンの準備で組み立てられ、その後ここに表示されます"
+						? "まだ組み立てていません。会話の次の生成の準備で組み立てられ、その後ここに表示されます"
 						: window.disabled
 							? "メモリーを利用していないため、文脈は組み立てていません"
 							: "組み立て済み（直近に組み立てた版です）";
@@ -447,12 +461,10 @@ export function createMemoryAdapter(ports: MemoryAdapterPorts): DomainAdapter {
 									id: "context",
 									state,
 									version: built?.version,
-									longTerm: built ? tokens(built.longTerm.tokens) : undefined,
-									shortTerm: built ? tokens(built.shortTerm.tokens) : undefined,
-									pendingAdditions: built?.shortTerm.pendingAdditions,
+									profile: built ? tokens(built.profile.tokens) : undefined,
+									newMemories: built?.newMemories,
 									notices: built?.notices,
-									longTermText: built ? clip(built.longTerm.text) : undefined,
-									shortTermText: built ? clip(built.shortTerm.text) : undefined,
+									profileText: built ? clip(built.profile.text) : undefined,
 								},
 							],
 						},
@@ -467,13 +479,13 @@ export function createMemoryAdapter(ports: MemoryAdapterPorts): DomainAdapter {
 							).map(decisionRow),
 						},
 					};
-				case EXCHANGES:
+				case EVENTS:
 					return {
 						revision: 0,
 						data: {
-							items: (steward?.exchanges(conversationId) ?? [])
-								.slice(-DECISION_ROWS)
-								.map(exchangeRow)
+							items: (steward?.events(conversationId) ?? [])
+								.slice(-EVENT_ROWS)
+								.map(eventRow)
 								.reverse(),
 						},
 					};

@@ -3,6 +3,7 @@ import type { PipelineDefinition } from "../../domains/capabilities";
 import { canonicalText } from "../../domains/pipelines";
 import type { DomainAdapter } from "../../domains/tool-runtime";
 import { harness } from "../toolchain/toolchain.fixture";
+import { searchThenDelegate } from "../toolchain/conversation-script.fixture";
 import {
 	createPipelinesAdapter,
 	PIPELINES_ADAPTER_REF,
@@ -62,21 +63,18 @@ async function setup() {
 		timers: true,
 		pipelines: true,
 		embed,
-		firstRound: (tools) =>
-			tools.some((t) => t.function.name === "pipeline_timer_pair")
-				? {
-						name: "pipeline_timer_pair",
-						args: {
-							kind: "action",
-							freshness: "not_live",
-							impact: "create",
-							approved: false,
-							announcement: "掛けます。",
-							minutes: 5,
-							minutes_quote: "5分",
-						},
-					}
-				: undefined,
+		discoveryTarget: () => "pipeline_timer_pair",
+		// The conversation hands the request to the pipeline with its inputs (a search, then the hand-over).
+		firstRound: (_tools, question, messages) =>
+			searchThenDelegate(
+				(candidate) => candidate.id === "pipeline.timer-pair",
+				question,
+				{
+					announcement: "掛けます。",
+					impact: "create",
+					inputs: { minutes: 5, minutes_quote: "5分" },
+				},
+			)(messages),
 	});
 	// The registered adapter also checks that the dialogue session is live; these works have no dialogue session.
 	const adapter: DomainAdapter = createPipelinesAdapter(

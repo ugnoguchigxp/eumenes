@@ -3,9 +3,16 @@ import { join } from "node:path";
 import type { LarmPort } from "../api/domains/larm";
 import { harness } from "../api/application/toolchain/toolchain.fixture";
 import {
-	analysisReceipt,
-	isAnalysisRound,
-} from "../api/domains/dialogue/test/analysis.fixture";
+	callsOf,
+	candidatesOf,
+	delegate,
+	findToolchain,
+	isResultRound,
+	isUtteranceRound,
+	respond,
+	type Step,
+	UNAVAILABLE_TEXT,
+} from "../api/application/toolchain/conversation-script.fixture";
 
 /**
  * Browser-test backend for tests/browser/ui-compositions.spec.ts: the real toolchain harness with the
@@ -155,7 +162,6 @@ const turns: Record<string, Turn> = {
 };
 
 type Prompt = Parameters<LarmPort["answer"]>[0];
-type Tool = { function?: { name?: string; parameters?: any }; name?: string };
 
 /**
  * The specialist's current turn: its request (the last user message that is not a tool result), the
@@ -177,6 +183,34 @@ function specialistTurn(messages: Prompt) {
 	};
 }
 
+/**
+ * The conversation's step for a UI request: search for the studio, then hand the request over to it. Requests sent
+ * while a saved work is viewed (`requests.again`) target that work, the first target the search offers.
+ */
+const uiStep = (
+	messages: Parameters<typeof candidatesOf>[0],
+	question: string,
+	wants: string,
+): Step => {
+	const candidates = candidatesOf(messages);
+	if (!candidates) return { calls: [findToolchain(question)] };
+	const studio = candidates.find(
+		(candidate) => candidate.id === "ui.compose",
+	) as { id: string; targets?: Array<{ ref: string }> } | undefined;
+	if (!studio)
+		return { text: UNAVAILABLE_TEXT, calls: [respond({ unavailable: true })] };
+	const target =
+		wants === requests.again ? studio.targets?.[0]?.ref : undefined;
+	return {
+		calls: [
+			delegate("ui.compose", question, {
+				announcement: "制作担当に引き継ぎます。",
+				impact: "create",
+				...(target ? { target } : {}),
+			}),
+		],
+	};
+};
 const model: LarmPort = {
 	status: () => ({ state: "ready", capabilities: ["llm", "asr", "tts"] }),
 	connect: async () => {},
@@ -190,13 +224,6 @@ const model: LarmPort = {
 				status: "identified",
 				languages: ["ja"],
 				confidence: 0.99,
-			});
-		if (system.includes("FUNCTIONS="))
-			return JSON.stringify({
-				decision: "answer",
-				functionName: "",
-				request: "",
-				questionRef: "",
 			});
 		if (system.includes("TOOLS=")) {
 			const { request, doc, applied } = specialistTurn(messages);
@@ -212,7 +239,9 @@ const model: LarmPort = {
 					: { action: "reply", text: turn.reply },
 			);
 		}
-		if (options?.tools?.length) {
+		if (isUtteranceRound(options?.tools) && !isResultRound(messages)) {
+			// The conversation's own round: a UI request is searched for and handed to the studio; anything else is
+			// answered here with `respond`.
 			const question = messages
 				.filter((m) => m.role === "user")
 				.at(-1)!.content;
@@ -221,40 +250,14 @@ const model: LarmPort = {
 				requests.again,
 				...Object.keys(parts),
 			].find((text) => question.includes(text));
-			// The first round decides: a UI request goes to the studio, anything else is answered here.
-			if (isAnalysisRound(options.tools)) {
-				options.onToolCalls!(
-					(wants
-						? analysisReceipt("fixture", {
-								name: "ui_create",
-								args: { kind: "creation" },
-								announcement: "制作担当に引き継ぎます。",
-							})
-						: analysisReceipt("fixture")
-					).toolCalls as never,
+			const step: Step = wants
+				? uiStep(messages, question, wants)
+				: { text: "かしこまりました。", calls: [respond()] };
+			if (step.calls?.length)
+				options?.onToolCalls?.(
+					callsOf(step, () => crypto.randomUUID()) as never,
 				);
-				return "";
-			}
-			if (wants) {
-				const tool = (options.tools as Tool[]).find(
-					(t) => (t.function?.name ?? t.name) === "ui_create",
-				);
-				const choices: unknown[] =
-					tool?.function?.parameters?.properties?.target?.enum ?? [];
-				options.onToolCalls!([
-					{
-						id: crypto.randomUUID(),
-						name: "ui_create",
-						arguments: JSON.stringify({
-							request: question,
-							...(wants === requests.again && choices.length
-								? { target: choices[0] }
-								: {}),
-						}),
-					},
-				]);
-				return "";
-			}
+			return step.text ?? "";
 		}
 		return "かしこまりました。";
 	},

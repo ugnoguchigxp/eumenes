@@ -10,7 +10,7 @@ export type CallSessionRole = {
 	sessionRole: "main" | "subagent" | "auxiliary";
 	taskId?: string;
 	context?: NonNullable<CallSession["context"]>;
-	refs?: { messageIds: string[]; itemIds: string[]; conversationId?: string };
+	refs?: { messageIds: string[]; itemIds: string[] };
 };
 
 /** The session fields a provider call carries (LARM chooses its connection by them). */
@@ -32,11 +32,6 @@ const refList = (ids: readonly string[] | undefined) => {
 	)
 		throw new Error("invalid_session_refs");
 	return [...new Set(ids)];
-};
-const conversationRef = (id: unknown) => {
-	if (typeof id !== "string" || !id || id.length > 200)
-		throw new Error("invalid_session_refs");
-	return id;
 };
 const count = (n: unknown) =>
 	typeof n === "number" && Number.isSafeInteger(n) && n >= 0 && n <= 100_000;
@@ -93,9 +88,6 @@ export function resolveSession(
 					refs: {
 						messageIds: refList(given.refs.messageIds),
 						itemIds: refList(given.refs.itemIds),
-						...(given.refs.conversationId !== undefined
-							? { conversationId: conversationRef(given.refs.conversationId) }
-							: {}),
 					},
 				}
 			: {}),

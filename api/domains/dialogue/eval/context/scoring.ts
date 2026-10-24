@@ -18,7 +18,6 @@ export const adjudicationSchema = z
 			z
 				.object({
 					caseId: z.string().min(1),
-					arm: z.string().min(1),
 					trial: z.number().int().min(1),
 					axis: z.enum(RUBRIC_AXES),
 					pass: z.union([z.literal(0), z.literal(1)]),
@@ -32,7 +31,6 @@ export type Adjudication = z.infer<typeof adjudicationSchema>;
 export const noAdjudication: Adjudication = { version: 1, entries: [] };
 
 export type TrialScore = {
-	arm: string;
 	caseId: string;
 	family: Family;
 	split: ContextCase["split"];
@@ -53,7 +51,7 @@ export type TrialScore = {
 /** An adjudication settles only an axis the judge left unresolved; a clean verdict is never overridden. */
 function applyAdjudication(
 	axes: AxisResult[],
-	row: Pick<RawRow, "arm" | "caseId" | "trial">,
+	row: Pick<RawRow, "caseId" | "trial">,
 	adjudication: Adjudication,
 ): { axes: AxisResult[]; used: boolean } {
 	let used = false;
@@ -62,7 +60,6 @@ function applyAdjudication(
 		const entry = adjudication.entries.find(
 			(e) =>
 				e.caseId === row.caseId &&
-				e.arm === row.arm &&
 				e.trial === row.trial &&
 				e.axis === axis.axis,
 		);
@@ -87,7 +84,6 @@ export async function scoreTrial(input: {
 }): Promise<TrialScore> {
 	const { row } = input;
 	const common = {
-		arm: row.arm,
 		caseId: row.caseId,
 		family: input.case.family,
 		split: input.case.split,
@@ -156,7 +152,6 @@ export async function scoreTrial(input: {
 }
 
 export type CaseVerdict = {
-	arm: string;
 	caseId: string;
 	family: Family;
 	split: ContextCase["split"];
@@ -177,65 +172,63 @@ export type CaseVerdict = {
 export function caseVerdicts(
 	scores: readonly TrialScore[],
 	cases: readonly ContextCase[],
-	arms: readonly string[],
 	expectedTrials: number,
 ): CaseVerdict[] {
-	const verdicts: CaseVerdict[] = [];
-	for (const arm of arms)
-		for (const testCase of cases) {
-			const own = scores.filter(
-				(s) => s.arm === arm && s.caseId === testCase.id,
-			);
-			// One row per trial number inside the range counts; anything else is an inconsistency, never a vote.
-			const counted = new Map<number, TrialScore>();
-			let invalidRows = 0;
-			for (const s of own) {
-				if (
-					!Number.isInteger(s.trial) ||
-					s.trial < 1 ||
-					s.trial > expectedTrials ||
-					counted.has(s.trial)
-				)
-					invalidRows++;
-				else counted.set(s.trial, s);
-			}
-			const unique = [...counted.values()];
-			const passes = unique.filter((s) => s.pass === true).length;
-			const transportErrors = unique.filter(
-				(s) => s.status === "transport_error",
-			).length;
-			const needsAdjudication = unique.filter(
-				(s) => s.status === "needs_adjudication",
-			).length;
-			const missingTrials = expectedTrials - unique.length;
-			const incomplete =
-				transportErrors > 0 ||
-				needsAdjudication > 0 ||
-				missingTrials > 0 ||
-				invalidRows > 0;
-			verdicts.push({
-				arm,
-				caseId: testCase.id,
-				family: testCase.family,
-				split: testCase.split,
-				expectedTrials,
-				passes,
-				transportErrors,
-				needsAdjudication,
-				missingTrials,
-				invalidRows,
-				incomplete,
-				pass: incomplete ? null : passes * 2 > expectedTrials,
-			});
+	return cases.map((testCase) => {
+		const own = scores.filter((s) => s.caseId === testCase.id);
+		// One row per trial number inside the range counts; anything else is an inconsistency, never a vote.
+		const counted = new Map<number, TrialScore>();
+		let invalidRows = 0;
+		for (const s of own) {
+			if (
+				!Number.isInteger(s.trial) ||
+				s.trial < 1 ||
+				s.trial > expectedTrials ||
+				counted.has(s.trial)
+			)
+				invalidRows++;
+			else counted.set(s.trial, s);
 		}
-	return verdicts;
+		const unique = [...counted.values()];
+		const passes = unique.filter((s) => s.pass === true).length;
+		const transportErrors = unique.filter(
+			(s) => s.status === "transport_error",
+		).length;
+		const needsAdjudication = unique.filter(
+			(s) => s.status === "needs_adjudication",
+		).length;
+		const missingTrials = expectedTrials - unique.length;
+		const incomplete =
+			transportErrors > 0 ||
+			needsAdjudication > 0 ||
+			missingTrials > 0 ||
+			invalidRows > 0;
+		return {
+			caseId: testCase.id,
+			family: testCase.family,
+			split: testCase.split,
+			expectedTrials,
+			passes,
+			transportErrors,
+			needsAdjudication,
+			missingTrials,
+			invalidRows,
+			incomplete,
+			pass: incomplete ? null : passes * 2 > expectedTrials,
+		};
+	});
 }
 
 const checkResultSchema = z
 	.object({
 		kind: z.enum([
 			"tool_called",
-			"no_tool_call",
+			"tool_not_called",
+			"delegated",
+			"not_delegated",
+			"respond_field",
+			"speaks",
+			"silent",
 			"brief_spoken_reply",
 			"forbidden_identifier",
 			"generation_contract",
@@ -265,7 +258,6 @@ const axisResultSchema = z.discriminatedUnion("status", [
 /** A line of scores.jsonl. `analyze` refuses anything that does not parse. */
 export const trialScoreSchema = z
 	.object({
-		arm: z.string().min(1),
 		caseId: z.string().min(1),
 		family: z.enum(FAMILIES),
 		split: z.enum(SPLITS),

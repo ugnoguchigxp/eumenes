@@ -1,7 +1,5 @@
 import type { Database } from "bun:sqlite";
-import { getLogger } from "../../../infrastructure/logger";
 import {
-	type InboxState,
 	type MemoryRequestInput,
 	type RequestKind,
 	type RunEnd,
@@ -11,145 +9,81 @@ import type { ForgetPurge } from "../../memory";
 import {
 	countOpenInbox,
 	deleteDecisionsByRefs,
-	deleteGoalTodos,
 	deleteRoutesOfMessages,
-	deleteSummaryDecisions,
 	endInboxOfMessages,
-	inboxOfRun,
 	insertInbox,
 	readInbox,
-	resolveInbox,
-	setInboxPending,
-	stagedRuns,
 } from "../repository";
 import type { Kick } from "./kick";
 import type { StewardDeps } from "./types";
 
-const log = getLogger("steward");
-/** Requests one run may leave, and open requests a conversation may hold. */
-const REQUESTS_PER_RUN = 8;
+/** Open requests a conversation may hold. */
 const OPEN_REQUESTS = 50;
 
-export type StageInput = {
-	/** The id of the tool call (the adapter's request id): staging the same id again is a replay. */
-	requestId: string;
+export type RequestInput = {
 	conversationId: string;
-	runId: string;
-	/** The user message of the run. */
-	messageId: string;
 	kind: RequestKind;
 	what: string;
 	detail?: string | undefined;
+	/** The user's message the request was made in (a conversation message of this conversation). */
+	sourceRef: string;
+	/** The id of the tool call: asking again with the same id is a replay and queues nothing. */
+	requestId?: string | undefined;
 };
 
-/** Section 2.5: which of a run's staged requests go on, by how the run ended. */
-function confirmed(end: RunEnd, kind: RequestKind): boolean {
-	if (end === "completed" || end === "failed" || end === "interrupted")
-		return true;
-	// A cancelled answer still keeps what the user asked to remember (K14); nothing else.
-	return end === "cancelled" && kind === "remember";
-}
-
 /**
- * The request queue: `staged` while the run lives, `pending` once the run ended in a way that keeps them,
- * resolved by the curate step. `what` and `detail` are cleared as soon as a request ends.
+ * The request queue (section 13): a request waits as `pending` from the moment the conversation agent's action is
+ * committed, and is resolved by the curate step. Cancelling the generation that made it never discards it; the
+ * user takes one back with a `withdraw` request. `what` and `detail` are cleared as soon as a request ends.
  */
 export function createInbox(deps: StewardDeps, kick: Kick) {
-	function stageRequestInTransaction(
+	function requestInTransaction(
 		db: Database,
-		input: StageInput,
+		input: RequestInput,
 	): { id: string; replay: boolean } {
 		const parsed: MemoryRequestInput = memoryRequestInput.parse({
 			kind: input.kind,
 			what: input.what,
 			...(input.detail ? { detail: input.detail } : {}),
 		});
-		const existing = readInbox(db, input.requestId);
+		const id = input.requestId ?? deps.newId();
+		const existing = readInbox(db, id);
 		if (existing) {
-			if (
-				existing.conversationId !== input.conversationId ||
-				existing.runId !== input.runId
-			)
+			if (existing.conversationId !== input.conversationId)
 				throw new Error("request_conflict");
 			return { id: existing.id, replay: true };
 		}
-		const message = deps.conversation.messageInTransaction(db, input.messageId);
+		const message = deps.conversation.messageInTransaction(db, input.sourceRef);
 		if (
 			!message ||
 			message.message.role !== "user" ||
 			message.message.conversationId !== input.conversationId
 		)
 			throw new Error("invalid_request_source");
-		if (
-			countOpenInbox(db, input.conversationId, input.runId) >= REQUESTS_PER_RUN
-		)
-			throw new Error("too_many_requests");
 		if (countOpenInbox(db, input.conversationId) >= OPEN_REQUESTS)
 			throw new Error("request_queue_full");
 		insertInbox(db, {
-			id: input.requestId,
+			id,
 			conversationId: input.conversationId,
-			runId: input.runId,
-			messageId: input.messageId,
+			sourceRef: input.sourceRef,
 			kind: parsed.kind,
 			what: parsed.what,
 			detail: parsed.detail ?? null,
 			createdAt: deps.clock(),
 		});
-		return { id: input.requestId, replay: false };
+		return { id, replay: false };
 	}
 
-	/** A staged request as the tool reports it (never its words). */
-	function requestInTransaction(
-		db: Database,
-		id: string,
-	): { id: string; kind: RequestKind; state: InboxState } | null {
-		const row = readInbox(db, id);
-		return row ? { id: row.id, kind: row.kind, state: row.state } : null;
-	}
-
-	/** Confirms or discards the staged requests of one run. Returns how many went on. */
-	function settleRun(db: Database, runId: string, end: RunEnd): number {
-		const now = deps.clock();
-		let pending = 0;
-		for (const row of inboxOfRun(db, runId, "staged")) {
-			if (confirmed(end, row.kind)) {
-				setInboxPending(db, row.id);
-				pending++;
-			} else
-				resolveInbox(
-					db,
-					row.id,
-					"discarded",
-					end === "cancelled" ? "run_cancelled" : "run_stale",
-					now,
-				);
-		}
-		return pending;
-	}
-
-	/** A conversation run ended (inside the transaction that ends it): its requests are settled, then the steward is kicked. */
+	/**
+	 * A conversation run ended (inside the transaction that ends it): the steward looks again. The requests the run
+	 * made were queued when they were committed, whatever way the run ended; the steward does not act on them before
+	 * the run is over, so a forget never expires the answer that announced it.
+	 */
 	function runEndedInTransaction(
 		db: Database,
 		input: { runId: string; conversationId: string; state: RunEnd },
 	) {
-		settleRun(db, input.runId, input.state);
 		kick.kickInTransaction(db, input.conversationId);
-	}
-
-	/**
-	 * At startup: staged requests of runs that are no longer running (the process died before their end) are sorted
-	 * by the same table. A run still active keeps its requests staged.
-	 */
-	function sweepStagedInTransaction(db: Database): number {
-		let swept = 0;
-		for (const runId of stagedRuns(db)) {
-			const state = deps.runStateOf(runId);
-			if (state === "active") continue;
-			swept += settleRun(db, runId, state);
-		}
-		if (swept > 0) log.info("steward.requests_swept", { count: swept });
-		return swept;
 	}
 
 	/**
@@ -160,10 +94,7 @@ export function createInbox(deps: StewardDeps, kick: Kick) {
 	 */
 	function purge(
 		db: Database,
-		purged: Pick<
-			ForgetPurge,
-			"itemIds" | "messageIds" | "derived" | "deletedSummaryConversationIds"
-		>,
+		purged: Pick<ForgetPurge, "itemIds" | "messageIds" | "derived">,
 	) {
 		const goalIds = purged.derived.goalIds ?? [];
 		if (goalIds.length > 0 && deps.goals)
@@ -176,17 +107,14 @@ export function createInbox(deps: StewardDeps, kick: Kick) {
 			messageIds: purged.messageIds,
 			goalIds,
 		});
-		deleteSummaryDecisions(db, purged.deletedSummaryConversationIds);
 		endInboxOfMessages(db, purged.messageIds, "forgotten", deps.clock());
-		// What was judged of the forgotten messages, and the goal reflection still due for them, goes too.
+		// What was judged of the forgotten messages goes too. The goal reflection and the memory reflection still due
+		// for their events find the events forgotten when they are read (they are given up there).
 		deleteRoutesOfMessages(db, purged.messageIds);
-		deleteGoalTodos(db, purged.messageIds);
 	}
 	return {
-		stageRequestInTransaction,
 		requestInTransaction,
 		runEndedInTransaction,
-		sweepStagedInTransaction,
 		purge,
 	};
 }

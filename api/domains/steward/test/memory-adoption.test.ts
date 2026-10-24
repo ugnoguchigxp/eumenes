@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { keepAll, setupSteward, type StewardHarness } from "./steward.fixture";
+import { setupSteward, type StewardHarness } from "./steward.fixture";
 
 const open: StewardHarness[] = [];
 afterEach(async () => {
@@ -27,7 +27,6 @@ async function initial(h: StewardHarness) {
 			},
 		],
 	});
-	h.inference.script("dispose-exchanges", keepAll);
 	await h.run({ user: "辛いものが好きではありません", end: "completed" });
 	await h.drain();
 	expect(h.memory.list()[0]).toMatchObject({
@@ -63,7 +62,6 @@ test("curation receives key, origin and coverage; update output preserves both p
 				],
 			};
 		});
-		h.inference.script("dispose-exchanges", keepAll);
 		await h.run({
 			user: negated ? "今も香辛料が好きではない" : "今は香辛料が好き",
 			end: "completed",
@@ -94,7 +92,6 @@ test("explicit remember with omitted wording retains the existing negative value
 			},
 		],
 	}));
-	h.inference.script("dispose-exchanges", keepAll);
 	await h.run({
 		user: "辛いものが好きではないことを覚えて",
 		end: "completed",
@@ -129,7 +126,6 @@ test("explicit correction carries the model's negated output to State", async ()
 			},
 		],
 	}));
-	h.inference.script("dispose-exchanges", keepAll);
 	await h.run({
 		user: "唐辛子が好きではないに訂正して",
 		end: "completed",

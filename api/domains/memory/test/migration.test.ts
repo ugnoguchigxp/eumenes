@@ -15,6 +15,7 @@ import {
 	executionReferencesMigration,
 	specialistBlockReasonMigration,
 	stewardLedgersMigration,
+	retireExchangeLedgerMigration,
 } from "..";
 import {
 	createContinuityService,
@@ -39,6 +40,7 @@ test("adding the Seed migration preserves existing memory, conversation and conn
 			(m) =>
 				m.sql !== executionReferencesMigration &&
 				m.sql !== seedImportMigration &&
+				m.sql !== retireExchangeLedgerMigration &&
 				m.sql !== specialistBlockReasonMigration,
 		),
 	);
@@ -105,6 +107,7 @@ test("memory/0005-steward-ledgers moves the old exclusions to unscoped scheduled
 		const without = memoryTestMigrations.filter(
 			(migration) =>
 				migration !== stewardLedgersMigration &&
+				migration !== retireExchangeLedgerMigration &&
 				migration !== specialistBlockReasonMigration,
 		);
 		const old = openStore(path, without);
@@ -132,7 +135,11 @@ test("memory/0005-steward-ledgers moves the old exclusions to unscoped scheduled
 			);
 		});
 		await old.close();
-		const upgraded = openStore(path, [...without, stewardLedgersMigration]);
+		const upgraded = openStore(path, [
+			...without,
+			stewardLedgersMigration,
+			retireExchangeLedgerMigration,
+		]);
 		try {
 			const blocks = upgraded.read(
 				(db) =>
@@ -176,10 +183,17 @@ test("memory/0005-steward-ledgers moves the old exclusions to unscoped scheduled
 				"memory_agent_excluded_message",
 			])
 				expect(tables).not.toContain(gone);
-			for (const added of [
+			// The exchange ledger and the summary are kept under retired names until the startup backfill.
+			for (const retired of [
 				"memory_exchange",
 				"memory_conversation_summary",
 				"memory_summary_source",
+			])
+				expect(tables).not.toContain(retired);
+			for (const added of [
+				"memory_retired_exchange",
+				"memory_retired_summary",
+				"memory_retired_summary_source",
 				"memory_message_block",
 				"memory_forget_fence",
 			])

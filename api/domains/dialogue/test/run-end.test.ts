@@ -1,206 +1,109 @@
 import { afterEach, expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { configureLogging } from "../../../infrastructure/logger";
-import { openStore } from "../../../infrastructure/sqlite";
-import { createConversationService } from "../../conversation";
-import { createContinuityService } from "../../continuity";
-import type { LarmPort } from "../../larm";
-import { createMemoryService } from "../../memory";
-import { memoryMigrations } from "./memory-seed";
-import { createQueue, migration as queueMigration } from "../../queue";
-import {
-	agentLinkMigration,
-	createDialogueService,
-	migration,
-	queueLinkMigration,
-	worldStateMigration,
-	type StewardRunEnd,
-} from "..";
 import { insert } from "../repository";
-import { waitFor as until } from "../../../infrastructure/wait-for";
+import { IMAGE, setup, type Harness } from "./generation.fixture";
 
-const open: Array<() => Promise<void>> = [];
+/**
+ * The one place a run ends (the ContextWindow specification, sections 9 and 10.1): the steward is told how it ended,
+ * once; the TODO a run was still waiting for ends with it, unless the run completed.
+ */
+let h: Harness | undefined;
 afterEach(async () => {
-	configureLogging({ level: "silent" });
-	for (const close of open.splice(0)) await close();
+	await h?.close();
+	h = undefined;
 });
 
-type Answer = (text: string) => Promise<string>;
-/** Dialogue on a real store with memory, and a steward that only records what it is told (and what the ledger held then). */
-async function setup(answer: Answer = async () => "了解です") {
-	configureLogging({ level: "silent" });
-	const dir = mkdtempSync(join(tmpdir(), "eumenes-run-end-"));
-	const store = openStore(join(dir, "db.sqlite3"), [
-		...memoryMigrations,
-		migration,
-		queueMigration,
-		queueLinkMigration,
-		agentLinkMigration,
-		worldStateMigration,
-	]);
-	const conversation = createConversationService(store);
-	const continuity = createContinuityService(store);
-	const memory = createMemoryService(store, conversation, continuity, {
-		journalPath: join(dir, "journal.jsonl"),
-	});
-	await memory.recover();
-	const queue = createQueue(store);
-	queue.start();
-	const told: Array<
-		StewardRunEnd & {
-			ledgerRows: Array<{ outcome: string; answer: string | null }>;
-		}
-	> = [];
-	const larm: LarmPort = {
-		status: () => ({ state: "ready", capabilities: ["llm"] }),
-		connect: async () => {},
-		answer: async (messages) => answer(messages.at(-1)?.content ?? ""),
-		transcribe: async () => "",
-		speak: async () => new Uint8Array(),
-		close: async () => {},
-	};
-	const dialogue = createDialogueService({
-		store,
-		conversation,
-		larm,
-		queue,
-		memory,
-		steward: {
-			runEndedInTransaction(db, input) {
-				told.push({
-					...input,
-					ledgerRows: memory
-						.exchangesInTransaction(db, input.conversationId)
-						.filter((row) => row.runId === input.runId)
-						.map((row) => ({
-							outcome: row.outcome,
-							answer: row.answerMessageId,
-						})),
-				});
+test("a completed run tells the steward once, with its conversation and the completed state", async () => {
+	h = await setup();
+	h.state.steps.push({
+		text: "こんにちは。",
+		calls: [
+			{
+				name: "respond",
+				args: {
+					kind: "chat",
+					freshness: "not_live",
+					impact: "none",
+					approved: false,
+				},
 			},
-		},
+		],
 	});
-	open.push(async () => {
-		await queue.close(100).catch(() => {});
-		await store.close().catch(() => {});
-		rmSync(dir, { recursive: true, force: true });
-	});
-	return {
-		store,
-		conversation,
-		memory,
-		dialogue,
-		told,
-		submit: (text: string) =>
-			dialogue.submit({
-				requestId: crypto.randomUUID(),
-				conversationId: "main",
-				text,
-			}),
-		settled: async (runId: string) => {
-			await until(() =>
-				["completed", "failed", "cancelled", "interrupted"].includes(
-					dialogue.get(runId)?.status ?? "",
-				),
-			);
-			return dialogue.get(runId)!;
-		},
-		ledger: () => memory.exchanges("main"),
-	};
-}
-
-test("a completed run registers its exchange with the adopted answer, then the steward hears of it", async () => {
-	const h = await setup();
-	const run = await h.settled((await h.submit("こんにちは")).id);
+	const run = await h.say("やあ");
 	expect(run.status).toBe("completed");
-	const rows = h.ledger();
-	expect(rows).toHaveLength(1);
-	expect(rows[0]).toMatchObject({
-		runId: run.id,
-		inputMessageId: run.inputMessageId,
-		answerMessageId: run.answerMessageId,
-		outcome: "answered",
-	});
-	// The steward was told in the same transaction, after the ledger held the exchange.
-	expect(h.told).toEqual([
+	expect(h.state.runEnds).toEqual([
+		{ runId: run.id, conversationId: "main", state: "completed" },
+	]);
+});
+
+test("a failed run tells the steward its failure", async () => {
+	h = await setup();
+	// No scripted step: the model call fails, the run ends as failed.
+	const run = await h.say("予算は3万円以内", "failed");
+	expect(run.error).toBe("fixture_step_missing");
+	expect(h.state.runEnds).toEqual([
+		{ runId: run.id, conversationId: "main", state: "failed" },
+	]);
+});
+
+test("a cancelled run tells the steward it was cancelled, and its waiting TODO ends with it", async () => {
+	h = await setup();
+	h.state.steps.push(
+		{ calls: [{ name: "find_toolchain", args: { query: "絵を描く" } }] },
 		{
-			runId: run.id,
-			conversationId: "main",
-			state: "completed",
-			ledgerRows: [{ outcome: "answered", answer: run.answerMessageId }],
+			calls: [
+				{
+					name: "delegate",
+					args: {
+						mode: "execute",
+						toolchain: IMAGE.id,
+						request: "猫の絵",
+						impact: "create",
+						announcement: "描きますね。",
+					},
+				},
+			],
 		},
+	);
+	const waiting = await h.say("猫の絵を描いて", "queued");
+	const [todo] = h.todos();
+	expect(todo).toMatchObject({ status: "todo" });
+	await h.dialogue.cancel(waiting.id);
+	expect(h.dialogue.get(waiting.id)?.status).toBe("cancelled");
+	// A finished TODO stays listed until it is archived (section 10.1), now done as cancelled.
+	expect(h.todos()).toMatchObject([
+		{ id: todo!.id, status: "done", outcome: "cancelled" },
+	]);
+	expect(h.state.runEnds.filter((e) => e.runId === waiting.id)).toEqual([
+		{ runId: waiting.id, conversationId: "main", state: "cancelled" },
 	]);
 });
 
-test("a failed run registers the user's message alone as a failed exchange", async () => {
-	const h = await setup(async () => {
-		throw new Error("model_down");
+test("a run that already completed is not ended or told twice by a later cancel", async () => {
+	h = await setup();
+	h.state.steps.push({
+		text: "一度だけ。",
+		calls: [
+			{
+				name: "respond",
+				args: {
+					kind: "chat",
+					freshness: "not_live",
+					impact: "none",
+					approved: false,
+				},
+			},
+		],
 	});
-	const run = await h.settled((await h.submit("予算は3万円以内")).id);
-	expect(run.status).toBe("failed");
-	expect(h.ledger()).toHaveLength(1);
-	expect(h.ledger()[0]).toMatchObject({
-		inputMessageId: run.inputMessageId,
-		answerMessageId: null,
-		outcome: "failed",
-	});
-	expect(h.told).toHaveLength(1);
-	expect(h.told[0]).toMatchObject({ runId: run.id, state: "failed" });
-	expect(h.told[0]!.ledgerRows).toEqual([{ outcome: "failed", answer: null }]);
+	const run = await h.say("一度だけ");
+	await h.dialogue.cancel(run.id);
+	expect(h.dialogue.get(run.id)?.status).toBe("completed");
+	expect(h.state.runEnds.filter((e) => e.runId === run.id)).toHaveLength(1);
 });
 
-test("a cancelled run registers no exchange but the steward is told", async () => {
-	let started!: () => void;
-	const startedPromise = new Promise<void>((resolve) => (started = resolve));
-	const h = await setup(
-		(text) =>
-			new Promise<string>((_resolve, reject) => {
-				started();
-				setTimeout(() => reject(new Error(`never answered: ${text}`)), 5000);
-			}),
-	);
-	const pending = await h.submit("やっぱりやめる");
-	await startedPromise;
-	await h.dialogue.cancel(pending.id);
-	const run = await h.settled(pending.id);
-	expect(run.status).toBe("cancelled");
-	expect(h.ledger()).toEqual([]);
-	expect(h.told).toHaveLength(1);
-	expect(h.told[0]).toMatchObject({
-		runId: pending.id,
-		state: "cancelled",
-		ledgerRows: [],
-	});
-});
-
-test("the system's own prompts (a scheduled one) register no exchange, yet the steward is told", async () => {
-	const h = await setup();
-	const scheduled = await h.store.write((db) =>
-		h.dialogue.promptTarget.materializeInTransaction(db, {
-			occurrenceId: "occurrence-1",
-			scheduleId: "schedule-1",
-			payload: { conversationId: "main", text: "毎朝の定期プロンプト" },
-		} as never),
-	);
-	const notice = { id: scheduled.subjectRef as string };
-	const run = await h.settled(notice.id);
-	expect(run.status).toBe("completed");
-	expect(h.ledger()).toEqual([]);
-	expect(h.told.map((entry) => [entry.runId, entry.state])).toEqual([
-		[notice.id, "completed"],
-	]);
-	// The prompt is blocked from the memory layers; its answer is still the conversation's.
-	expect(
-		h.memory.blockedMessageIds([run.inputMessageId]).has(run.inputMessageId),
-	).toBe(true);
-});
-
-test("a run left without a job when the backend restarts is interrupted: a failed exchange and the steward's notice", async () => {
-	const h = await setup();
+test("a run left without a job when the backend restarts is interrupted and the steward is told", async () => {
+	h = await setup({ autoStart: false });
 	await h.store.write((db) => {
-		h.conversation.appendInTransaction(db, {
+		h!.conversation.appendInTransaction(db, {
 			id: "u-orphan",
 			conversationId: "main",
 			role: "user",
@@ -231,21 +134,7 @@ test("a run left without a job when the backend restarts is interrupted: a faile
 	});
 	await h.dialogue.recover();
 	expect(h.dialogue.get("r-orphan")?.status).toBe("interrupted");
-	expect(h.ledger()).toHaveLength(1);
-	expect(h.ledger()[0]).toMatchObject({
-		inputMessageId: "u-orphan",
-		answerMessageId: null,
-		outcome: "failed",
-	});
-	expect(h.told).toHaveLength(1);
-	expect(h.told[0]).toMatchObject({ runId: "r-orphan", state: "interrupted" });
-});
-
-test("a run that already ended is not recorded twice", async () => {
-	const h = await setup();
-	const run = await h.settled((await h.submit("一度だけ")).id);
-	await h.dialogue.cancel(run.id);
-	expect(h.dialogue.get(run.id)?.status).toBe("completed");
-	expect(h.told).toHaveLength(1);
-	expect(h.ledger()).toHaveLength(1);
+	expect(h.state.runEnds).toEqual([
+		{ runId: "r-orphan", conversationId: "main", state: "interrupted" },
+	]);
 });

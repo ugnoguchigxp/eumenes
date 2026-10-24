@@ -60,11 +60,6 @@ import {
 	MEMORY_ADAPTER_REF,
 } from "../world/memory-adapter";
 import {
-	describeStewardAdapter,
-	STEWARD_ADAPTER_REF,
-	stewardDomainSchemas,
-} from "../world/steward-adapter";
-import {
 	describeWorldAdapter,
 	WORLD_ADAPTER_REF,
 } from "../world/world-adapter";
@@ -142,7 +137,6 @@ const domainSchemas: Readonly<Record<string, ZodType>> = {
 	...browserDomainSchemas,
 	...terminalsDomainSchemas,
 	...kanbanDomainSchemas,
-	...stewardDomainSchemas,
 };
 
 /** What this host can execute, for checking bundles before they are registered. */
@@ -217,7 +211,6 @@ export const hostAdapterDescriptions: Array<
 		describe: () => describeSharedKanbanAdapter(describeKanbanAdapter()),
 	},
 	{ ref: CODEX_TASKS_ADAPTER_REF, describe: describeCodexTasksAdapter },
-	{ ref: STEWARD_ADAPTER_REF, describe: describeStewardAdapter },
 	{ ref: WEATHER_ADAPTER_REF, describe: describeWeatherAdapter },
 	{ ref: STOCK_ADAPTER_REF, describe: describeStockAdapter },
 ];
@@ -303,12 +296,7 @@ export function createRegistryActions(
 				origin: {
 					...(execution
 						? { kind: "task" as const, execution }
-						: {
-								kind: "conversation" as const,
-								...("handoff" in source && source.handoff.length
-									? { handoff: source.handoff }
-									: {}),
-							}),
+						: { kind: "conversation" as const }),
 					owner: request.owner,
 					runId: request.owner.rootRunId,
 					conversationId: source.conversationId,

@@ -1,0 +1,36 @@
+{
+	"id": "ctx-f8-holdout-01",
+	"family": "F8",
+	"split": "holdout",
+	"seed": {
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "butler"
+		},
+		"longTerm": [
+			{
+				"kind": "habit",
+				"key": "wake.time",
+				"text": "毎朝七時に起きる"
+			}
+		],
+		"notices": [
+			"「毎朝六時に起きる」という訂正は、既存の記憶「毎朝七時に起きる」を置き換えるかの確認待ちです。置き換え済みとは伝えないでください。"
+		]
+	},
+	"input": "朝の習慣が変わってね、最近は起きる時間が早くなったんだ",
+	"expect": {
+		"checks": [
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "no_unsupported_assertion",
+				"condition": "起床時間の記憶を六時に更新した・置き換えた、と断定していない。"
+			}
+		]
+	}
+}

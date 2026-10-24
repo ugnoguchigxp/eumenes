@@ -1,400 +1,302 @@
 /**
- * The conversation trajectory the prefix-stability metric is measured on (ContextWindow design section 7.2): ten
- * turns of one conversation, materialized on the real services, with the calls a turn makes. It includes memory
- * steps (a kept exchange, a long-term item, a summary, a notice, a recalled exchange), an operation result,
- * a research success, and a selection call. Fully deterministic: the same code gives the
- * same assemblies, so a difference between arms is the format's.
+ * The conversation trajectories the prefix-stability metric is measured on (the ContextWindow specification, sections
+ * 12.4 and 21.2): several generations of one conversation, materialized on the real services and prepared by the
+ * production prepare, with what happens between them (a TODO finishing, a memory step, a notice, a long silence).
+ * Fully deterministic: the same code gives the same messages, so a difference between two runs is the code's.
  *
- * Offline evaluation only. The calls are returned as product assemblies; an arm renders each of them.
+ * Offline evaluation only. Each generation is adopted the way the product's settle leaves the log, so the next one
+ * sees the log grow at its end, and the re-constructions the window plan calls for (a resumed conversation, a cache
+ * taken as lost, a section over its limit) happen where the product would make them.
  */
 import { estimateTextTokens } from "../../../inference";
-import { type RecalledEntry, renderRecallBlock } from "../../../memory";
-import type { Run } from "../../contracts";
-import { insert } from "../../repository";
-import { renderGoalsLayer } from "../../service/goals-layer";
-import type { ContextAssembly } from "../../service/context-assembly";
-import { compileAssembly } from "../../service/context-compiler";
-import type { Seed } from "./case-schema";
+import type { GenerateInput } from "../../service/context";
+import type { Seed, SeedEvent } from "./case-schema";
+import { applySeed, publishStep, saveLongTerm } from "./materialize";
 import {
-	CONVERSATION_ID,
+	type EvalCard,
+	type Generated,
+	type Reply,
 	type SeedWiring,
-	type VolatileSeed,
-	assembleVolatile,
-	dispose,
-	runRow,
-} from "./materialize";
-import { recallMinute } from "./recall-text";
+	createSession,
+} from "./session";
 
-/** What a call adds to the turn's volatile part. A plain `initial` call adds nothing. */
-type TrajectoryCall = {
-	kind: "initial" | "selection" | "result";
-	seed?: VolatileSeed;
-};
-
-/** The memory step after a turn's answer: what the steward and the curator publish for the next turn. */
-type MemoryStep = {
-	/** Turns (1-based) the ledger keeps verbatim from now on. */
-	keep?: number[];
-	/** A summary written over these turns, which then leave the verbatim history. */
-	summary?: { text: string; turns: number[] };
-	/** Long-term items saved by this step. */
+/** What happens before a generation: the log, a TODO, the memory step. */
+type Step = {
+	events?: SeedEvent[];
+	/** A TODO's owner reports; the TODO must be in the trajectory's seed. */
+	work?: Array<{
+		key: string;
+		report:
+			| { status: "waiting"; questionId: string; question: string }
+			| {
+					status: "done";
+					outcome:
+						| "succeeded"
+						| "partial"
+						| "failed"
+						| "cancelled"
+						| "interrupted";
+					result: unknown;
+			  };
+	}>;
+	/** State saved after the profile was published (it waits in `state.newMemories`). */
 	longTerm?: NonNullable<Seed["longTerm"]>;
-	/** A one-time notice for the next turn. */
 	notice?: string;
-	/** Earlier exchanges recalled for the next turn (the prefetch). */
-	recall?: RecalledEntry[];
+	recall?: Seed["recall"];
 };
 
 type TrajectoryTurn = {
-	user: string;
-	assistant: string;
-	calls: TrajectoryCall[];
-	after?: MemoryStep;
+	/** Minutes after the start of the conversation. */
+	minute: number;
+	/** The newest utterance; null: the host's fixed text started it, with `trigger`. */
+	utterance: string | null;
+	trigger?: Record<string, unknown>;
+	before?: Step;
+	/** TODOs the generation opened (a delegation): they exist when its actions are logged. */
+	startWork?: NonNullable<Seed["work"]>;
+	reply?: Reply;
 };
 
 export type Trajectory = {
-	/** Goals shown in P for the whole conversation. */
-	goals: string[];
+	seed: Seed;
 	turns: TrajectoryTurn[];
 };
 
-const TURN_MINUTE = 60_000;
-const START_MS = Date.parse("2026-10-13T09:00:00.000Z");
-const turnTime = (n: number) =>
-	new Date(START_MS + n * 5 * TURN_MINUTE).toISOString();
+const MINUTE = 60_000;
+export const TRAJECTORY_START = "2026-10-13T09:00:00.000Z";
+const startMs = Date.parse(TRAJECTORY_START);
+const timeOf = (minute: number) =>
+	new Date(startMs + minute * MINUTE).toISOString();
 
-const IMAGE_RESULT = {
-	id: "4c1d0b52-7a53-4a1e-9b61-0d2f5e3a8c11",
-	runId: "r5",
-	conversationId: CONVERSATION_ID,
-	state: "completed",
-	action: "generate",
-	title: "夕焼けの海",
-	description: "夕方の海岸線と、オレンジ色の空",
-	prompt: null,
-	width: 1024,
-	height: 768,
-	format: "png",
-	seed: null,
-	phase: "completed",
-	artifactId: "artifact-1",
-	mime: "image/png",
-	actualModel: null,
-	errorCode: null,
-	createdAt: 1_760_000_000_000,
-	updatedAt: 1_760_000_060_000,
-};
-
-const RECOGNITION_RESULT = {
-	action: "read",
-	id: "7d0e5f6a-2b1c-4d3e-8f9a-0b1c2d3e4f5a",
-	conversationId: CONVERSATION_ID,
-	name: "desk.png",
-	mime: "image/png",
-	state: "completed",
-	revision: 3,
-	progress: null,
-	errorCode: null,
-	result: {
-		kind: "image",
-		model: "eval-detector",
-		width: 800,
-		height: 600,
-		objects: [
-			{
-				classId: 41,
-				label: "マグカップ",
-				confidence: 0.91,
-				box: [120, 80, 260, 210],
-			},
-			{
-				classId: 63,
-				label: "ノートパソコン",
-				confidence: 0.88,
-				box: [300, 40, 760, 380],
-			},
-		],
-	},
-	createdAt: 1_760_000_100_000,
-	updatedAt: 1_760_000_160_000,
-};
-
-const RESEARCH_REPORT = {
-	summary: "来週の京都は晴れの日が多い見込みです。",
-	claims: [{ text: "来週前半は晴れ", sourceIds: ["s1"] }],
-	sources: [{ id: "s1", kind: "web", url: "https://example.test/weather" }],
-};
+const SEARCH_ACTION = (query: string, id: string, title: string) => ({
+	action: "find_toolchain",
+	query,
+	candidates: [{ id, title }],
+});
 
 /**
- * Ten turns. Turn 4 has a selection call, 5 an operation result, 6 a research success, 7 a failed research
- * (answered by the host, so it has no call of its own), 10 an operation result of another kind. The memory steps put a kept exchange and a long-term item in (after 3),
- * a summary and a notice (after 6) and a recalled exchange (after 8).
+ * Twelve generations. Generation 4 follows a memory step (a new State item); 5 hands work over and 6 is the fixed-text
+ * generation the TODO finishing starts; 8 is started by a notice and stays silent; 9 follows a silence over the resume
+ * gap (a re-construction, where the profile takes in the waiting item); 11 follows an idle over the cache lifetime.
  */
 export const DEFAULT_TRAJECTORY: Trajectory = {
-	goals: ["毎日の夕食を、野菜多めの手作りにする"],
+	seed: {
+		goals: [{ text: "毎日の夕食を、野菜多めの手作りにする", priority: 50 }],
+	},
 	turns: [
 		{
-			user: "来月の旅行先を決めたい",
-			assistant: "京都はいかがでしょう。",
-			calls: [{ kind: "initial" }],
+			minute: 0,
+			utterance: "来月の旅行先を決めたい",
+			reply: { text: "京都はいかがでしょう。" },
 		},
 		{
-			user: "京都なら、紅葉の時期は混みますか",
-			assistant: "十一月後半は特に混みます。",
-			calls: [{ kind: "initial" }],
+			minute: 1,
+			utterance: "京都なら、紅葉の時期は混みますか",
+			reply: { text: "十一月後半は特に混みます。" },
 		},
 		{
-			user: "辛い物が好きなので、食事の候補も知りたい",
-			assistant: "辛味の効いた料理を出す店を探せます。",
-			calls: [{ kind: "initial" }],
-			after: {
-				keep: [1],
+			minute: 2,
+			utterance: "辛い物が好きなので、食事の候補も知りたい",
+			reply: { text: "辛味の効いた料理を出す店を探せます。" },
+		},
+		{
+			minute: 3,
+			utterance: "宿は駅の近くがいい",
+			before: {
 				longTerm: [
-					{ kind: "preference", key: "food.spicy", text: "辛い物が好き" },
+					{
+						kind: "preference",
+						key: "food.spicy",
+						text: "辛い物が好き",
+						published: false,
+					},
 				],
 			},
+			reply: { text: "駅近の宿を前提に考えます。" },
 		},
 		{
-			user: "宿は駅の近くがいい",
-			assistant: "駅近の宿を前提に考えます。",
-			calls: [
+			minute: 4,
+			utterance: "旅行先のイメージ画像を作って",
+			startWork: [
 				{
-					kind: "initial",
-					seed: { world: [{ name: "京都駅前のホテル" }] },
-				},
-				{ kind: "selection" },
-			],
-		},
-		{
-			user: "旅行先のイメージ画像を作って",
-			assistant: "画像ができました。",
-			calls: [
-				{ kind: "initial" },
-				{
-					kind: "result",
-					seed: { operation: { kind: "image", result: IMAGE_RESULT } },
+					key: "image",
+					toolchain: "image_studio",
+					request: "旅行先のイメージ画像を作る",
+					at: timeOf(4.5),
+					status: "todo",
 				},
 			],
-		},
-		{
-			user: "来週の京都の天気を調べて",
-			assistant: "来週前半は晴れの見込みです。",
-			calls: [
-				{ kind: "initial" },
-				{
-					kind: "result",
-					seed: { research: { projection: RESEARCH_REPORT } },
-				},
-			],
-			after: {
-				summary: {
-					text: "旅行先は京都。紅葉の時期の混雑と、辛い料理の希望を話した。",
-					turns: [2, 3],
-				},
-				notice: "先ほどの旅行の希望は、長期記憶への保存が完了していません。",
+			reply: {
+				acted: [
+					{
+						fields: SEARCH_ACTION("画像を作る", "image_studio", "画像制作"),
+					},
+					{
+						fields: {
+							action: "delegate",
+							toolchain: "image_studio",
+							request: "旅行先のイメージ画像を作る",
+							todo: "@image",
+						},
+					},
+				],
+				text: "画像を作りますね。",
+				origin: "announcement",
 			},
 		},
 		{
-			user: "京都の来月の祭りの日程も調べて",
-			assistant: "失敗しました。",
-			calls: [{ kind: "initial" }],
+			minute: 6,
+			utterance: null,
+			trigger: {
+				kind: "todo_changed",
+				todos: [{ id: "@image", status: "done" }],
+			},
+			before: {
+				work: [
+					{
+						key: "image",
+						report: {
+							status: "done",
+							outcome: "succeeded",
+							result: {
+								asOf: timeOf(5.5),
+								claims: [
+									{ text: "京都の紅葉を描いた画像ができた", sources: [] },
+								],
+								limits: "画像は一枚だけ作った",
+							},
+						},
+					},
+				],
+			},
+			reply: {
+				acted: [{ fields: { action: "check", todo: "@image" } }],
+				text: "画像ができました。",
+				origin: "report",
+				todoRefs: ["@image"],
+			},
 		},
 		{
-			user: "宿の予約はまた今度にする",
-			assistant: "承知しました。",
-			calls: [{ kind: "initial" }],
-			after: {
+			minute: 8,
+			utterance: "来週の京都の天気を教えて",
+			reply: { text: "お調べしますね。", origin: "announcement" },
+		},
+		{
+			minute: 9,
+			utterance: null,
+			trigger: { kind: "timer", text: "三分のタイマーが鳴りました" },
+		},
+		{
+			minute: 45,
+			utterance: "さっき話した紅葉の時期をもう一度教えて",
+			reply: { text: "十一月後半です。" },
+		},
+		{
+			minute: 46,
+			utterance: "ありがとう、助かった",
+			reply: { text: "どういたしまして。" },
+		},
+		{
+			minute: 56,
+			utterance: "宿の予約はまた今度にする",
+			before: {
 				recall: [
 					{
-						at: recallMinute(turnTime(2)),
+						at: timeOf(1),
 						user: "京都なら、紅葉の時期は混みますか",
 						assistant: "十一月後半は特に混みます。",
 					},
 				],
 			},
+			reply: { text: "承知しました。" },
 		},
 		{
-			user: "さっき話した紅葉の時期をもう一度教えて",
-			assistant: "十一月後半です。",
-			calls: [{ kind: "initial" }],
-		},
-		{
-			user: "机の上の写真を見てもらえる？",
-			assistant: "マグカップとノートパソコンが見えます。",
-			calls: [
-				{ kind: "initial" },
-				{
-					kind: "result",
-					seed: {
-						operation: { kind: "recognition", result: RECOGNITION_RESULT },
-					},
-				},
-			],
+			minute: 57,
+			utterance: "また明日続きを考えよう",
+			reply: { text: "はい、また明日。" },
 		},
 	],
 };
 
-export type TrajectoryCallAssembly = {
-	/** `t<turn>-<kind>`: stable label of the call. */
-	label: string;
-	turn: number;
-	kind: TrajectoryCall["kind"];
-	assembly: ContextAssembly;
-};
-
-async function runMemoryStep(
-	wiring: SeedWiring,
-	step: MemoryStep,
-	inputs: Map<number, string>,
-	nextSummaryRevision: () => number,
-) {
-	const { store, memory } = wiring;
-	for (const n of step.keep ?? [])
-		await dispose(wiring, inputs.get(n)!, "keep");
-	for (const item of step.longTerm ?? [])
-		await wiring.saveItem({
-			conversationId: CONVERSATION_ID,
-			messageId: "seed-source",
-			quote: null,
-			kind: item.kind,
-			semanticKey: item.key,
-			text: item.text,
-		});
-	if (step.summary) {
-		const covered = step.summary.turns.map((n) => inputs.get(n)!);
-		const written = await store.write((db) =>
-			memory.writeSummaryInTransaction(db, {
-				conversationId: CONVERSATION_ID,
-				text: step.summary!.text,
-				included: covered,
-				expectedRevision: nextSummaryRevision(),
-			}),
-		);
-		if (!written.ok)
-			throw new Error(`trajectory_summary_rejected:${written.reason}`);
-	}
-	const recalled = (step.recall ?? []).map((entry) => ({ ...entry }));
-	const recallText = recalled.length ? renderRecallBlock(recalled) : "";
-	// A step replaces the prefetch; an empty one clears the previous.
-	await store.write((db) =>
-		memory.publishWindowInTransaction(db, CONVERSATION_ID, {
-			republishLongTerm: (step.longTerm?.length ?? 0) > 0,
-			prefetch: {
-				text: recallText,
-				pins: [],
-				tokens: estimateTextTokens(recallText),
-			},
-			...(step.notice ? { addNotices: [step.notice] } : {}),
-		}),
-	);
-}
+const FILLER =
+	"旅程の候補を一つずつ比べながら、行きたい場所と移動の順番を決めていきたいです。";
 
 /**
- * Plays the trajectory on a fresh store and returns the assembly of every call, in order. The caller closes the
- * wiring afterwards.
+ * A small model window whose log fills up: twenty long exchanges until the log passes its limit, then the window
+ * moves the oldest ones out to the episode (an unsummarized mark, as no summary was prepared).
  */
-export async function materializeTrajectory(
+export const SMALL_WINDOW_TRAJECTORY: Trajectory = {
+	seed: { modelWindow: 48_000 },
+	turns: Array.from({ length: 20 }, (_, index) => ({
+		minute: index * 2,
+		utterance: `${index + 1}件目の相談です。${FILLER.repeat(8)}`,
+		reply: { text: `${index + 1}件目を承知しました。` },
+	})),
+};
+
+export const TRAJECTORIES = {
+	default: DEFAULT_TRAJECTORY,
+	smallWindow: SMALL_WINDOW_TRAJECTORY,
+} as const;
+export type TrajectoryName = keyof typeof TRAJECTORIES;
+
+export type TrajectoryCall = {
+	/** `g<n>`: stable label of the generation. */
+	label: string;
+	input: GenerateInput;
+	/** Why the window was re-constructed before this generation, if it was. */
+	reconstruction: Generated["reconstruction"];
+};
+
+/**
+ * Plays the trajectory on a fresh store and returns every generation, in order. The caller closes the wiring
+ * afterwards.
+ */
+export async function playTrajectory(
 	wiring: SeedWiring,
-	trajectory: Trajectory = DEFAULT_TRAJECTORY,
-): Promise<TrajectoryCallAssembly[]> {
-	const { store, conversation, memory } = wiring;
-	wiring.setNow(turnTime(0));
-	await store.write((db) =>
-		conversation.appendInTransaction(db, {
-			id: "seed-source",
-			conversationId: CONVERSATION_ID,
-			role: "user",
-			text: "覚えておいてください",
-			createdAt: turnTime(0),
-			runId: null,
-		}),
-	);
-	await store.write((db) =>
-		memory.publishWindowInTransaction(db, CONVERSATION_ID, {
-			republishLongTerm: true,
-		}),
-	);
-	const goals = renderGoalsLayer(
-		trajectory.goals.map((text, index) => ({
-			goalId: `goal-${index + 1}`,
-			priority: 50,
-			desiredState: text,
-			revision: 1,
-		})),
-	)?.block;
-	const inputs = new Map<number, string>();
-	let summaryRevision = 0;
-	const calls: TrajectoryCallAssembly[] = [];
+	trajectory: Trajectory,
+	options: { catalog?: readonly EvalCard[] } = {},
+): Promise<TrajectoryCall[]> {
+	const session = createSession(wiring, options);
+	await applySeed(session, trajectory.seed, TRAJECTORY_START);
+	const calls: TrajectoryCall[] = [];
 	for (const [index, turn] of trajectory.turns.entries()) {
-		const n = index + 1;
-		const at = turnTime(n);
+		const at = timeOf(turn.minute);
 		wiring.setNow(at);
-		const run = {
-			id: `r${n}`,
-			conversationId: CONVERSATION_ID,
-			inputMessageId: `u${n}`,
-		} as Run;
-		await store.write((db) => {
-			conversation.appendInTransaction(db, {
-				id: `u${n}`,
-				conversationId: CONVERSATION_ID,
-				role: "user",
-				text: turn.user,
-				createdAt: at,
-				runId: run.id,
-			});
-			insert(db, runRow(run.id, n, at, false));
-		});
-		inputs.set(n, `u${n}`);
-		for (const call of turn.calls) {
-			const compiled = await store.write((db) =>
-				compileAssembly(
-					db,
-					run,
-					conversation,
-					{ agentName: "", userName: "", persona: "butler" },
-					memory.windowForRunInTransaction(db, CONVERSATION_ID),
-					memory,
-					goals,
-				),
+		const before = turn.before;
+		if (before?.events) await session.appendEvents(before.events);
+		for (const change of before?.work ?? [])
+			await session.reportWork(change.key, at, change.report);
+		if (before?.longTerm) await saveLongTerm(session, before.longTerm, at);
+		if (before?.notice || before?.recall || before?.longTerm)
+			await publishStep(
+				session,
+				{
+					notices: before.notice ? [before.notice] : [],
+					recall: before.recall,
+					// The memory step that saved State asks for the profile to take it in at the next re-construction.
+					requestRepublish: !!before.longTerm,
+				},
+				at,
 			);
-			const assembly = assembleVolatile(
-				compiled.assembly,
-				call.seed ?? {},
-				Date.parse(at),
-			);
-			calls.push({
-				label: `t${n}-${call.kind}`,
-				turn: n,
-				kind: call.kind,
-				assembly:
-					call.kind === "selection"
-						? { ...assembly, stage: "selection" }
-						: assembly,
-			});
-		}
-		await store.write((db) => {
-			conversation.appendInTransaction(db, {
-				id: `a${n}`,
-				conversationId: CONVERSATION_ID,
-				role: "assistant",
-				text: turn.assistant,
-				createdAt: at,
-				runId: run.id,
-			});
-			db.query(
-				"UPDATE dialogue_runs SET status='completed', answer_message_id=? WHERE id=?",
-			).run(`a${n}`, run.id);
-			memory.recordExchangeInTransaction(db, {
-				conversationId: CONVERSATION_ID,
-				runId: run.id,
-				inputMessageId: `u${n}`,
-				answerMessageId: `a${n}`,
-				outcome: "answered",
-			});
+		const generated = await session.generate({
+			at,
+			utterance: turn.utterance,
+			...(turn.trigger
+				? { trigger: session.resolve(turn.trigger) as Record<string, unknown> }
+				: {}),
 		});
-		if (turn.after)
-			await runMemoryStep(wiring, turn.after, inputs, () => summaryRevision++);
+		calls.push({
+			label: `g${index + 1}`,
+			input: generated.input,
+			reconstruction: generated.reconstruction,
+		});
+		for (const work of turn.startWork ?? []) await session.addWork(work);
+		await session.settle(generated, turn.reply);
 	}
 	return calls;
 }
+
+/** The estimated tokens of the document of a call (for reports). */
+export const documentTokens = (call: TrajectoryCall) =>
+	estimateTextTokens(call.input.document.text);

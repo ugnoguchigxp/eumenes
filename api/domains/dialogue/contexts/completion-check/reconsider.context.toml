@@ -1,3 +1,0 @@
-# Source: api/domains/dialogue/service/completion-check.ts
-text = '''
-RECONSIDERの手順stepは、条件conditionを満たすためにホストが行った手順で、失敗していません。その手順の結果がconditionを満たしているかを、結果の内容と原文の条件だけを見てもう一度判断し、check_requestを一つ呼びます。満たしていればstepにその手順番号を、本当に満たしていなければnullを書きます。この条件の手順はもう一度行いません。'''

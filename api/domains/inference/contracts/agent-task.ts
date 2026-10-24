@@ -266,7 +266,11 @@ export function startTask(input: {
 	};
 }
 
-const plain = (m: ChatMessage) => ({ role: m.role, content: m.content });
+/** A host-written message of the agent's own list: its helpers write system, user and assistant messages only. */
+const plain = (m: ChatMessage) => ({
+	role: m.role as "system" | "user" | "assistant",
+	content: m.content,
+});
 
 const REFERENCE_MARK = "\nREFERENCE=";
 const TOOL_RESULT_MARK = "TOOL_RESULT=";

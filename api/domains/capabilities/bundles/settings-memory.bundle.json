@@ -8,7 +8,7 @@
 		{
 			"kind": "artifact",
 			"id": "settings.memory",
-			"revision": 4,
+			"revision": 5,
 			"title": "記憶",
 			"variants": [
 				{
@@ -70,8 +70,8 @@
 							},
 							{
 								"view": "collection-workspace",
-								"source": "steward-exchanges",
-								"title": "往復の台帳（新しい順）"
+								"source": "steward-events",
+								"title": "出来事の流れ（新しい順）"
 							}
 						]
 					}
@@ -124,9 +124,9 @@
 					"target": "none"
 				},
 				{
-					"source": "steward-exchanges",
+					"source": "steward-events",
 					"adapterRef": "adapter:memory@1",
-					"query": "query:memory.steward-exchanges@1",
+					"query": "query:memory.steward-events@1",
 					"target": "none"
 				}
 			],
@@ -283,7 +283,7 @@
 				},
 				{
 					"source": "memory-context",
-					"title": "いまの文脈",
+					"title": "いまの文脈（長期記憶の部分）",
 					"rowKey": "id",
 					"rowsPath": "items",
 					"columns": [
@@ -298,33 +298,23 @@
 							"format": "number"
 						},
 						{
-							"key": "longTerm",
-							"label": "長期",
+							"key": "profile",
+							"label": "公開中の長期記憶の大きさ",
 							"format": "text"
 						},
 						{
-							"key": "shortTerm",
-							"label": "短期",
-							"format": "text"
-						},
-						{
-							"key": "pendingAdditions",
-							"label": "追加待ち",
+							"key": "newMemories",
+							"label": "反映待ちの新しい記憶",
 							"format": "number"
 						},
 						{
 							"key": "notices",
-							"label": "次の会話で伝える通知",
+							"label": "次の生成で伝える通知",
 							"format": "number"
 						},
 						{
-							"key": "longTermText",
-							"label": "長期の本文",
-							"format": "text"
-						},
-						{
-							"key": "shortTermText",
-							"label": "短期の本文",
+							"key": "profileText",
+							"label": "公開中の長期記憶の本文",
 							"format": "text"
 						}
 					]
@@ -402,8 +392,8 @@
 					]
 				},
 				{
-					"source": "steward-exchanges",
-					"title": "往復の台帳（新しい順）",
+					"source": "steward-events",
+					"title": "出来事の流れ（新しい順）",
 					"rowKey": "id",
 					"rowsPath": "items",
 					"columns": [
@@ -413,34 +403,24 @@
 							"format": "text"
 						},
 						{
-							"key": "outcomeLabel",
-							"label": "往復",
+							"key": "typeLabel",
+							"label": "種類",
 							"format": "badge"
 						},
 						{
-							"key": "stateLabel",
-							"label": "状態",
+							"key": "byLabel",
+							"label": "誰が",
 							"format": "badge"
 						},
 						{
-							"key": "curated",
-							"label": "記憶の判断",
+							"key": "text",
+							"label": "内容",
 							"format": "text"
 						},
 						{
-							"key": "disposed",
-							"label": "履歴の取捨",
-							"format": "text"
-						},
-						{
-							"key": "summarized",
-							"label": "要約",
-							"format": "text"
-						},
-						{
-							"key": "dispositionLabel",
-							"label": "履歴での扱い",
-							"format": "text"
+							"key": "curatedLabel",
+							"label": "記憶担当の確認",
+							"format": "badge"
 						}
 					]
 				}

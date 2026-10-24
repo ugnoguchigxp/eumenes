@@ -12,7 +12,6 @@ import {
 	type SessionRecord,
 } from "../repository";
 import { GENERATE_KIND, SPECIALIST_KIND, type DialogueDeps } from "./context";
-import type { ConversationOperation } from "./conversation-tools";
 import { viewingTargetOf } from "./specialist-context";
 import {
 	blockSpecialistMessages,
@@ -32,6 +31,16 @@ const SWITCH_NOTE = systemContext(
 
 export type StartResult = { ok: true } | { ok: false; code: string };
 const refuse = (code: string): StartResult => ({ ok: false, code });
+
+/** What the conversation hands a session toolchain: the request, and the saved item to open (spec 6.8). */
+export type SessionStart = {
+	revisionId: string;
+	request: string;
+	/** A host-issued saved item to start from. */
+	target?: string;
+	/** The user confirmed dropping the unsaved work of another target. */
+	resolveUnsaved?: "discard";
+};
 
 /** Queue the specialist's turn; a toolchain with its own run time gets it from here. */
 function enqueueTurn(
@@ -125,7 +134,7 @@ export function startSpecialistSession(
 	deps: DialogueDeps,
 	tx: Database,
 	run: Run,
-	chosen: ConversationOperation,
+	chosen: SessionStart,
 ): StartResult {
 	const port = deps.specialist;
 	const sessionSet = deps.toolchains?.sessionSetInTransaction;
@@ -166,7 +175,7 @@ function start(
 	deps: DialogueDeps,
 	tx: Database,
 	run: Run,
-	chosen: ConversationOperation,
+	chosen: SessionStart,
 	set: SpecialistSet,
 	target: string | null,
 ): StartResult {

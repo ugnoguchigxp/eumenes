@@ -1,3 +1,4 @@
+import { createContinuityService } from "../../domains/continuity";
 import { afterEach, expect, test } from "bun:test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -117,7 +118,13 @@ function setup(
 		transcribe: async () => "",
 		speak: async () => new Uint8Array(),
 	};
-	const dialogue = createDialogueService({ store, queue, conversation, larm }),
+	const dialogue = createDialogueService({
+			store,
+			continuity: createContinuityService(store),
+			queue,
+			conversation,
+			larm,
+		}),
 		voice = createVoiceDialogue(store, dialogue, larm);
 	const app = createApp({
 		token,

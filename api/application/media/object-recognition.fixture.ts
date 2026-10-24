@@ -1,6 +1,11 @@
-import { answerAnalysis } from "../toolchain/analysis-round.fixture";
 import type { LarmPort } from "../../domains/larm";
 import { imageFixture } from "./image.fixture";
+import {
+	activeSlots,
+	answerUtterance,
+	handOver,
+	lastUtterance,
+} from "./conversation-turn.fixture";
 export const recognitionFixtureImage = {
 	kind: "image",
 	model: "YOLO26n",
@@ -91,30 +96,22 @@ export function objectRecognitionFixture(
 		speak: async () => new Uint8Array(),
 		answer: async (messages, _signal, options) => {
 			contexts.push(JSON.stringify(messages));
-			if (
-				answerAnalysis(options, {
-					call: "object_recognition",
-					announcement: "準備します。",
-					kind: "action",
-				})
-			)
-				return "";
-			if (
-				options?.tools?.some((t) => t.function.name === "object_recognition")
-			) {
-				stages.push("route");
-				options.onToolCalls!([
-					{
-						id: "recognition",
-						name: "object_recognition",
-						arguments: JSON.stringify({
-							request: messages.filter((m) => m.role === "user").at(-1)!
-								.content,
-						}),
-					},
-				]);
-				return "";
-			}
+			const turn = answerUtterance(
+				options?.tools,
+				messages,
+				options?.onToolCalls,
+				handOver(
+					"object-recognition.manage",
+					"準備します。",
+					"none",
+					(messages) =>
+						lastUtterance(messages).includes("添付画像のメタ情報")
+							? "添付画像の物体を調べる"
+							: lastUtterance(messages),
+				),
+				() => stages.push("route"),
+			);
+			if (turn !== undefined) return turn;
 			if (
 				messages[0]!.content.includes(
 					"あなたはこのツールチェーンの操作担当です",
@@ -128,7 +125,7 @@ export function objectRecognitionFixture(
 				});
 			}
 			stages.push("answer");
-			return messages.some((m) => m.content.includes('"recognitionResult"'))
+			return activeSlots(messages).some((slot) => slot.result !== undefined)
 				? "物体を調べる画面を開きました。"
 				: "物体の観測結果を会話に取り込みました。";
 		},

@@ -1,0 +1,60 @@
+{
+	"id": "ctx-f10-holdout-03",
+	"family": "F10",
+	"split": "holdout",
+	"seed": {
+		"events": [
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-21T03:00:00.000Z",
+				"text": "猫の写真から何が写っているか調べて"
+			},
+			{
+				"type": "acted",
+				"at": "2026-10-21T03:00:02.000Z",
+				"fields": {
+					"action": "delegate",
+					"toolchain": "object_recognition",
+					"request": "猫の写真に何が写っているか調べる"
+				}
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-21T03:00:03.000Z",
+				"text": "見てみます。",
+				"origin": "announcement"
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-21T03:01:30.000Z",
+				"text": "猫と座布団が写っていました。",
+				"origin": "report"
+			}
+		],
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "butler"
+		}
+	},
+	"input": "なるほどね、ありがとう",
+	"expect": {
+		"checks": [
+			{
+				"kind": "not_delegated"
+			},
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "follows_current_request",
+				"condition": "過去の依頼を実行し直していない。今回の発言に対してだけ応じている。"
+			}
+		]
+	}
+}

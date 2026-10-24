@@ -41,6 +41,7 @@ export function createMaintenance(
 					deleteReports(db, root.root_run_id);
 					deleteRequirementData(db, root.root_run_id);
 					tools.deleteDataInTransaction(db, root.root_run_id);
+					for (const hook of state.dataDeleted) hook(db, root.root_run_id);
 				}
 			});
 		const old = store.read(

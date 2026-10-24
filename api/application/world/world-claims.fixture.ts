@@ -250,6 +250,7 @@ export async function worldHarness(options: WorldFixtureOptions = {}) {
 	const unsubscribe = store.onCommit(() => changes.publish());
 	const dialogue = createDialogueService({
 		store,
+		continuity: createContinuityService(store),
 		conversation,
 		larm: inference,
 		queue,

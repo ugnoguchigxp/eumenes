@@ -1,69 +1,50 @@
-import type { ExchangeDto, ExchangeStep } from "../../../memory";
+import type { ConversationEvent } from "../../../continuity";
 import { decisionsOfMessages } from "../../repository";
-import { fitExchanges } from "../budget";
 import {
 	type LabelTable,
-	type LoadedExchange,
-	exchangeView,
+	type LoadedEvent,
+	eventView,
 	isRecord,
-	loadExchange,
 } from "../context";
 import type { ApplyResult, StepEnv } from "../types";
 
 /**
- * A step that can never run on an exchange is marked skipped. A skipped dispose leaves nothing to summarize, so the
- * summarize step is closed with it (the exchange then counts as done).
+ * The handled events the memory reflection still has to read, oldest first. Events that carry nothing to learn
+ * from (a delivery, an action, a notice, a specialist session's words, a forgotten event, a message of the block
+ * ledger) are marked handled here: they are never offered. A forgotten event shows only that it existed.
  */
-export function skipStep(
-	env: StepEnv,
-	inputMessageId: string,
-	step: ExchangeStep,
-) {
-	const { db, deps } = env;
-	deps.memory.markExchangeStepInTransaction(
+export function pendingEvents(env: StepEnv): ConversationEvent[] {
+	const { db, deps, conversationId } = env;
+	const uncurated = deps.continuity.events.uncuratedInTransaction(
 		db,
-		inputMessageId,
-		step,
-		"skipped",
+		conversationId,
 	);
-	if (
-		step === "disposed" &&
-		deps.memory.exchangeInTransaction(db, inputMessageId)?.summarized === null
-	)
-		deps.memory.markExchangeStepInTransaction(
-			db,
-			inputMessageId,
-			"summarized",
-			"skipped",
-		);
-}
-
-/**
- * The exchanges a step is about, read and fitted into its input: gone ones are marked skipped on the step
- * (they can never be read), blocked ones are left out, and what does not fit waits for the next unit.
- */
-export function loadStepTargets(
-	env: StepEnv,
-	ids: readonly string[],
-	step: ExchangeStep,
-	wanted: (row: ExchangeDto) => boolean,
-): LoadedExchange[] {
-	const { db, deps } = env;
-	const loaded: LoadedExchange[] = [];
-	for (const id of ids) {
-		const row = deps.memory.exchangeInTransaction(db, id);
-		if (!row || !wanted(row)) continue;
-		const result = loadExchange(env, row);
-		if (result.status === "gone") skipStep(env, id, step);
-		else if (result.status === "ok") loaded.push(result.exchange);
+	if (uncurated.length === 0) return [];
+	const blocked = deps.memory.blockedMessageIdsInTransaction(
+		db,
+		uncurated.flatMap((event) => event.messageIds),
+	);
+	const skip: number[] = [];
+	const todo: ConversationEvent[] = [];
+	for (const event of uncurated) {
+		if (
+			event.type !== "said" ||
+			event.by === "host" ||
+			event.by === "specialist" ||
+			event.forgotten ||
+			event.messageIds.some((id) => blocked.has(id))
+		)
+			skip.push(event.seq);
+		else todo.push(event);
 	}
-	loaded.sort((a, b) => a.ordinal - b.ordinal);
-	return fitExchanges(loaded).fit;
+	if (skip.length > 0)
+		deps.continuity.events.markCuratedInTransaction(db, conversationId, skip);
+	return todo;
 }
 
-/** Labels `e1`... in chronological order; the views the model reads. */
-export function labelExchanges(
-	loaded: readonly LoadedExchange[],
+/** Labels `e1`... in the order given; the views the model reads. */
+export function labelEvents(
+	loaded: readonly LoadedEvent[],
 	start = 1,
 ): {
 	table: LabelTable;
@@ -72,20 +53,16 @@ export function labelExchanges(
 } {
 	const table: LabelTable = {};
 	const labels: string[] = [];
-	const views = loaded.map((exchange, i) => {
+	const views = loaded.map((event, i) => {
 		const label = `e${start + i}`;
 		labels.push(label);
-		table[label] = {
-			inputMessageId: exchange.inputMessageId,
-			answerMessageId: exchange.answerMessageId,
-			outcome: exchange.outcome,
-		};
-		return exchangeView(label, exchange);
+		table[label] = { seq: event.seq, messageId: event.messageId, by: event.by };
+		return eventView(label, event);
 	});
 	return { table, views, labels };
 }
 
-/** What the curate step saved from these exchanges (the steps after it read it as context). */
+/** What the curate step saved from these messages (the steps after it read it as context). */
 export function curatedOf(
 	env: StepEnv,
 	messageIds: readonly string[],
@@ -114,25 +91,14 @@ export function curatedOf(
 	return out.slice(0, 12);
 }
 
+/** The messages a label table stands on. */
 export function allMessageIds(table: LabelTable): string[] {
-	return Object.values(table).flatMap((e) =>
-		[e.inputMessageId, e.answerMessageId].filter(
-			(id): id is string => id !== null,
-		),
-	);
+	return Object.values(table)
+		.map((entry) => entry.messageId)
+		.filter((id): id is string => id !== null);
 }
 
-/**
- * The decision of a step that wrote the summary refers to every message the summary now stands on (not only the
- * unit's own exchanges), so a forget of any of them finds the decision.
- */
-export function withSummarySources(
-	refs: ApplyResult["refs"],
-	sources: readonly string[],
-): ApplyResult["refs"] {
-	const seen = new Set(refs.map((ref) => `${ref.type}:${ref.id}`));
-	const extra = sources
-		.filter((id) => !seen.has(`message:${id}`))
-		.map((id) => ({ type: "message" as const, id }));
-	return [...refs, ...extra];
+/** Decision references to messages (a forget of any of them finds the decision). */
+export function messageRefs(ids: Iterable<string>): ApplyResult["refs"] {
+	return [...new Set(ids)].map((id) => ({ type: "message" as const, id }));
 }

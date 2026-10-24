@@ -1,0 +1,67 @@
+{
+	"id": "ctx-f14-dev-02",
+	"family": "F14",
+	"split": "dev",
+	"seed": {
+		"events": [
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-20T14:00:00.000Z",
+				"text": "来月の出張の宿の候補を調べて"
+			},
+			{
+				"type": "acted",
+				"at": "2026-10-20T14:00:02.000Z",
+				"fields": {
+					"action": "delegate",
+					"toolchain": "web_research",
+					"request": "来月の出張の宿の候補を調べる",
+					"todo": "@w1"
+				}
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-20T14:00:03.000Z",
+				"text": "進めますね。",
+				"origin": "announcement"
+			}
+		],
+		"work": [
+			{
+				"key": "w1",
+				"toolchain": "web_research",
+				"request": "来月の出張の宿の候補を調べる",
+				"at": "2026-10-20T14:00:03.000Z",
+				"updatedAt": "2026-10-20T14:01:00.000Z",
+				"status": "waiting",
+				"questionId": "q1",
+				"question": "宿の予算の上限はいくらですか。"
+			}
+		],
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "butler"
+		}
+	},
+	"input": "予算は一泊一万五千円までにして",
+	"expect": {
+		"checks": [
+			{
+				"kind": "tool_called",
+				"name": "work"
+			},
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "work_state_aware",
+				"condition": "state.todos で待っている質問（宿の予算の上限）への答えとして受け取り、仕事の操作で質問に答えている（work の answer）。"
+			}
+		]
+	}
+}

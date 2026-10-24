@@ -1,4 +1,3 @@
-import { resetToolchainOperation } from "./retained-toolchains";
 import { createToolchainCommandHandler } from "./toolchain-command";
 import { createSpecialistOps } from "./specialist-commands";
 import { flushCancelled } from "./specialist-core";
@@ -17,6 +16,7 @@ import type { ConversationService } from "../../conversation";
 import type { InferencePort } from "../../inference";
 import type { QueueService } from "../../queue";
 import type { MemoryService } from "../../memory";
+import type { ContinuityService } from "../../continuity";
 import { conversationHasActiveRun } from "./active-run";
 import type {
 	Run,
@@ -25,22 +25,15 @@ import type {
 	GoalsLayerPort,
 	WorldContextPort,
 } from "../contracts";
-import {
-	byId,
-	byRequest,
-	deleteContinuationsOfInput,
-	interruptUnfinished,
-	listRuns,
-	linkAnswer,
-} from "../repository";
+import { jstSeconds } from "../../../infrastructure/jst-time";
+import { byId, interruptUnfinished, listRuns } from "../repository";
 import { createAgentSync } from "./agent-sync";
-import {
-	DEFAULT_DEADLINE_MS,
-	GENERATE_KIND,
-	TERMINAL,
-	type DialogueDeps,
-} from "./context";
+import { DEFAULT_DEADLINE_MS, TERMINAL, type DialogueDeps } from "./context";
 import { createGenerationHandler } from "./generation-handler";
+import { createWorkLedger } from "./work-ledger";
+import { withAttachmentNotes } from "./attachment-context";
+import { eventText } from "./event-text";
+import { createOperationPorts } from "./operation-ports";
 import { createIntake } from "./intake";
 import { endRun, runEndedInTransaction } from "./run-end";
 import { createProgress } from "./progress";
@@ -69,6 +62,8 @@ interface DialogueServiceOptions {
 	queue: QueueService;
 	clock?: () => string;
 	id?: () => string;
+	/** The conversation's active short-term memory: events, episode, work results and window version. */
+	continuity: ContinuityService;
 	memory?: MemoryService;
 	steward?: StewardPort;
 	agents?: AgentRuntime;
@@ -93,6 +88,7 @@ export function createDialogueService({
 	queue,
 	clock = () => new Date().toISOString(),
 	id = () => crypto.randomUUID(),
+	continuity,
 	memory,
 	steward,
 	agents,
@@ -115,6 +111,7 @@ export function createDialogueService({
 		queue,
 		clock,
 		id,
+		continuity,
 		memory,
 		steward,
 		agents,
@@ -137,10 +134,31 @@ export function createDialogueService({
 		intake.acceptInTransaction,
 	);
 	deps.interactions = interactions;
-	deps.continueInTransaction = intake.continueInTransaction;
-	conversation.addRetractHook((db, messageId) =>
-		deleteContinuationsOfInput(db, messageId),
+	deps.work = createWorkLedger(deps);
+	const work = deps.work;
+	// Forgetting and deleted reports reach the TODOs and their result slots (section 13).
+	memory?.registerForgetPurge((db, purge) =>
+		work.forgetInTransaction(db, purge.messageIds),
 	);
+	agents?.registerDataDeletion?.((db, runId) =>
+		work.dropRunResultsInTransaction(db, runId),
+	);
+	// A corrected message is shown as corrected: the log's frozen copy of it is rewritten (section 13).
+	deps.conversation.addCorrectHook?.((db, messageId, at) => {
+		const found = deps.conversation.messageInTransaction(db, messageId);
+		if (!found) return;
+		const { message } = found;
+		const text =
+			message.role === "user"
+				? withAttachmentNotes(message.text, message.attachments)
+				: message.text;
+		deps.continuity.events.correctMessageInTransaction(
+			db,
+			messageId,
+			eventText(deps, text),
+			jstSeconds(Date.parse(at)),
+		);
+	});
 	registerHandlers(deps, progress);
 	const specialistOps = createSpecialistOps(deps);
 	const agentSync = createAgentSync(deps);
@@ -158,50 +176,8 @@ export function createDialogueService({
 		notifyInTransaction: intake.notifyInTransaction,
 		revokeExecutionNoticeInTransaction: (db: Database, eventId: string) =>
 			revokeExecutionNotice(deps, db, eventId),
-		noticeDeliveryInTransaction(db: Database, requestId: string) {
-			const run = byRequest(db, requestId);
-			return !run || run.status === "queued" || run.status === "running"
-				? ("pending" as const)
-				: run.status === "completed" && run.answerMessageId
-					? ("delivered" as const)
-					: ("failed" as const);
-		},
-		/** One delivery owner; its disposer cannot remove a newer owner's registration. */
-		setAnnouncementDelivery(
-			deliver: NonNullable<DialogueDeps["deliverAnnouncement"]>,
-		) {
-			deps.deliverAnnouncement = deliver;
-			return () => {
-				if (deps.deliverAnnouncement === deliver)
-					deps.deliverAnnouncement = undefined;
-			};
-		},
-		linkOperationJobInTransaction(db: Database, runId: string, jobId: string) {
-			linkAnswer(db, runId, jobId);
-		},
-		finishOperationInTransaction(db: Database, runId: string) {
-			const run = byId(db, runId);
-			if (!run || !["queued", "running"].includes(run.status)) return;
-			if (Date.parse(run.deadlineAt!) <= Date.parse(clock())) {
-				endRun(deps, db, run, "failed", "deadline_exceeded");
-				return;
-			}
-			const { job } = queue.enqueueInTransaction(db, {
-				scope: "dialogue",
-				kind: GENERATE_KIND,
-				dedupeKey: `operation-answer:${run.id}`,
-				payload: { runId },
-				subjectRef: runId,
-				lane: "interactive",
-				resourceKey: "inference.llm",
-				maxAttempts: 1,
-				concurrencyKey: `conversation:${run.conversationId}`,
-				deadlineAtMs: Date.parse(run.deadlineAt!),
-			});
-			linkAnswer(db, runId, job.id);
-		},
+		...createOperationPorts(deps),
 		interactions,
-		resetToolchains: resetToolchainOperation(deps),
 		/** The conversation's live specialist session, or null (`GET /api/conversations/:id/specialist`). */
 		specialistSession: specialistOps.session,
 		/** True only for an active or suspended session that has not expired (the guard of the work's screen operations). */
@@ -237,7 +213,7 @@ export function createDialogueService({
 			// Runs without a queue job predate the queue and are interrupted as before.
 			await store.write((db) => {
 				for (const run of interruptUnfinished(db, clock()))
-					runEndedInTransaction(deps, db, run, "interrupted", null);
+					runEndedInTransaction(deps, db, run, "interrupted");
 			});
 			// Questions past their time and interactions whose run ended are closed after a restart.
 			if (toolchains?.bound) await interactions.maintenance();

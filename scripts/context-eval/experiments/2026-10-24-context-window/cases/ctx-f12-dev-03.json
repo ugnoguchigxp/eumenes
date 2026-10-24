@@ -1,0 +1,57 @@
+{
+	"id": "ctx-f12-dev-03",
+	"family": "F12",
+	"split": "dev",
+	"seed": {
+		"events": [
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-20T09:00:00.000Z",
+				"text": "カップ麺ができるまで三分のタイマーをかけて"
+			},
+			{
+				"type": "acted",
+				"at": "2026-10-20T09:00:02.000Z",
+				"fields": {
+					"action": "delegate",
+					"toolchain": "timer",
+					"request": "三分のタイマー"
+				}
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-20T09:00:03.000Z",
+				"text": "三分のタイマーをかけます。",
+				"origin": "announcement"
+			}
+		],
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "butler"
+		}
+	},
+	"input": null,
+	"trigger": {
+		"kind": "timer",
+		"text": "三分のタイマーが鳴りました"
+	},
+	"expect": {
+		"checks": [
+			{
+				"kind": "speaks"
+			},
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "speech_judgment",
+				"condition": "利用者が頼んだタイマーが鳴ったので、それを知らせている。"
+			}
+		]
+	}
+}

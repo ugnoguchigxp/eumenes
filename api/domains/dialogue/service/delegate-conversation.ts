@@ -2,15 +2,9 @@ import type { Database } from "bun:sqlite";
 import type { AgentRuntime } from "../../agent-runtime";
 import type { Prepared } from "../../capabilities";
 import type { ConversationService } from "../../conversation";
-import { isSystemPrompt, type Run } from "../contracts";
+import type { Run } from "../contracts";
 import { linkAgent } from "../repository";
 import type { DialogueDeps } from "./context";
-import type { AnalysisInput } from "./request-analysis";
-import {
-	originalRequestInTransaction,
-	priorStepsInTransaction,
-} from "./request-context";
-import { hash } from "../../capabilities";
 
 /**
  * Start the research sub-agent of a toolchain. The saved human origin is established in the
@@ -34,15 +28,15 @@ export function delegateConversation(
 		actionCapability?: Prepared;
 	},
 ) {
-	const original = originalRequestInTransaction(db, conversation, run);
-	const prior = priorStepsInTransaction(db, run);
+	const original =
+		conversation.messageInTransaction(db, run.inputMessageId)?.message.text ??
+		selected.request;
 	const root = agents.startInTransaction(db, {
 		rootRunId: run.id,
 		input: {
 			kind: selected.route,
 			question: selected.request,
 			originalRequest: original,
-			...(prior.length ? { priorSteps: prior } : {}),
 			...(selected.packageRevisionId
 				? { packageRevisionId: selected.packageRevisionId }
 				: {}),
@@ -61,26 +55,16 @@ export function delegateConversation(
 }
 
 /**
- * The routing input of a new conversation decision: what the first round reads and the
- * toolchains whose runtime is available now. Nothing is offered to system prompts or while
- * an agent task already belongs to the run.
+ * The toolchains whose runtime is available now: bound chains while their adapter is available, the others by
+ * host capability. A search offers only these.
  */
-export function prepareRouting(
-	db: Database,
+export function availableToolchainsInTransaction(
 	deps: DialogueDeps,
+	db: Database,
 	run: Run,
-	messages: Array<{
-		role: "system" | "user" | "assistant";
-		content: string;
-		sourceMessageId?: string;
-	}>,
-	currentRequest: (typeof messages)[number],
-	available: { dots: boolean },
-	analysis: AnalysisInput,
-) {
+): Set<string> {
 	const { agents, toolchains } = deps;
-	if (!toolchains || run.agentTaskId || isSystemPrompt(run.sourceKind))
-		return undefined;
+	if (!toolchains) return new Set();
 	const context = agents?.conversationContextInTransaction?.(db);
 	const ready = (requires: string | undefined) =>
 		requires === undefined || requires === "world"
@@ -96,84 +80,16 @@ export function prepareRouting(
 							: requires === "music"
 								? !!deps.music
 								: requires === "dots"
-									? available.dots
+									? !!deps.delegation &&
+										deps.delegation.prepareInTransaction(db, run).available !==
+											false
 									: false;
-	// Bound chains are offered while their adapter is available; the others by host capability.
-	const ids = toolchains
-		.catalogInTransaction(db)
-		.filter(({ runtime }) =>
-			runtime.binding ? runtime.binding.available : ready(runtime.requires),
-		)
-		.map((entry) => entry.id);
-	const index = messages.indexOf(currentRequest);
-	if (index < 0) throw new Error("run_input_missing");
-	const taskEntries = toolchains
-		.catalogInTransaction(db)
-		.filter(
-			(e) => e.runtime.execution === "task" && e.runtime.binding?.available,
-		);
-	const taskCard =
-		agents?.executions?.availableInTransaction(db) && taskEntries.length === 1
-			? toolchains.cardInTransaction(db, taskEntries[0]!.revisionId)
-			: undefined;
-	const works =
-		agents?.executions?.listInTransaction(db, run.conversationId) ?? [];
-	const references = messages
-		.filter(
-			(m) =>
-				m.role !== "system" &&
-				"sourceMessageId" in m &&
-				typeof m.sourceMessageId === "string",
-		)
-		.slice(-3)
-		.flatMap((m) => {
-			const message = deps.conversation.messageInTransaction(
-				db,
-				m.sourceMessageId!,
-			)?.message;
-			return message
-				? [
-						{
-							ref: `message:${message.id}`,
-							owner: "conversation",
-							id: message.id,
-							revision: "",
-							digest: hash(message.text),
-							label: "会話の発言",
-							kind: "message" as const,
-							preview: message.text.slice(0, 600),
-						},
-					]
-				: [];
-		});
-	return {
-		routing: {
-			analysis,
-			available: ids,
-			...(taskCard || works.length
-				? {
-						tasks: {
-							card: taskCard,
-							works,
-							references: [
-								...references,
-								...(agents?.executions?.contextReferencesInTransaction(
-									db,
-									run.conversationId,
-								) ?? []),
-							],
-						},
-					}
-				: {}),
-			conversationId: run.conversationId,
-			utteranceId: run.utteranceId ?? null,
-			requestId: run.requestId ?? null,
-			openQuestions: toolchains.bound
-				? (deps.interactions?.openQuestionsInTransaction(
-						db,
-						run.conversationId,
-					) ?? [])
-				: [],
-		},
-	};
+	return new Set(
+		toolchains
+			.catalogInTransaction(db)
+			.filter(({ runtime }) =>
+				runtime.binding ? runtime.binding.available : ready(runtime.requires),
+			)
+			.map((entry) => entry.id),
+	);
 }

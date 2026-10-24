@@ -140,9 +140,6 @@ test("a worker's control failure is reported in the fixed form with the first fa
 			"- 失敗した段階: サブエージェント（web.search / worker / search）",
 		);
 		expect(text).toContain("## 経過（正常系は集約）");
-		expect(text).toContain(
-			"| 6.0s | R1 依頼分析 | live_info / toolchain（5.9s） |",
-		);
 		expect(text).toContain("| 6.1s | 候補検索 | 4件（embedding） |");
 		expect(text).toContain("| 12.0s | 選定 | toolchain web.search |");
 		// The two rejections of the same reason fold into one row that shows the status change.

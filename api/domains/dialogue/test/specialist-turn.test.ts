@@ -1,15 +1,20 @@
 import { afterEach, expect, test } from "bun:test";
 import { Hono } from "hono";
 import { registerDialogue } from "../controller";
-import { setup, studioLimits, type Harness } from "./specialist.fixture";
+import {
+	STUDIO,
+	STUDIO_ARTIFACT,
+	respond,
+	setup,
+	type Harness,
+} from "./specialist.fixture";
 
 const open: Harness[] = [];
 afterEach(async () => {
-	studioLimits.current = null;
 	for (const h of open.splice(0)) await h.close();
 });
-async function harness() {
-	const h = await setup();
+async function harness(options: Parameters<typeof setup>[0] = {}) {
+	const h = await setup(options);
 	open.push(h);
 	return h;
 }
@@ -20,7 +25,7 @@ const invoke = (title: unknown) => ({
 	arguments: { title },
 });
 async function start(h: Harness) {
-	h.startCall({ request: "作って" });
+	h.handOver({ request: "作って" });
 	h.state.specialist.push(reply("はじめます"));
 	await h.ask("作って");
 }
@@ -72,7 +77,7 @@ test("a repair call says where the output broke the contract: schema path and ki
 	expect(spoken.status).toBe("completed");
 	const length = rejectedIssues(h);
 	expect(length.issues).toEqual([
-		{ path: "text", chars: 50, maxChars: 160, sentences: 5, maxSentences: 2 },
+		{ path: "text", chars: 50, maxChars: 300, sentences: 5, maxSentences: 2 },
 	]);
 	expect(length.message).not.toContain("spoken_reply");
 	// A wrong type: the path and the schema's kind only.
@@ -192,13 +197,10 @@ test("the specialist is not given memory, World, the main prompt or the conversa
 });
 
 test("a toolchain's own time limits: the run lasts its run time from the hand-over, each call gets its turn and inference time, and an utterance addressed to it gets the run time too", async () => {
-	studioLimits.current = {
-		runMs: 1_200_000,
-		turnMs: 900_000,
-		inferenceMs: 600_000,
-	};
-	const h = await harness();
-	h.startCall({ request: "作って" });
+	const h = await harness({
+		limits: { runMs: 1_200_000, turnMs: 900_000, inferenceMs: 600_000 },
+	});
+	h.handOver({ request: "作って" });
 	h.state.specialist.push(reply("はじめます"));
 	const handed = await h.ask("作って");
 	expect(handed.status).toBe("completed");
@@ -227,15 +229,15 @@ test("a toolchain's own time limits: the run lasts its run time from the hand-ov
 	expect(h.state.captures.at(-1)!.attemptMs).toBe(600_000);
 });
 
-test("the specialist turn never calls the main conversation model, and a failed turn does not either", async () => {
+test("the specialist turn never calls the conversation model, and a failed turn does not either", async () => {
 	const h = await harness();
 	await start(h);
-	const calls = h.state.mainCalls.length;
+	const calls = h.state.calls.length;
 	h.state.specialist.push("x", "y");
 	await h.ask("壊れた返答");
 	h.state.specialist.push(reply("普通"));
 	await h.ask("普通の返答");
-	expect(h.state.mainCalls).toHaveLength(calls);
+	expect(h.state.calls).toHaveLength(calls);
 });
 
 test("HTTP: the session, its commands and their errors", async () => {
@@ -332,7 +334,7 @@ test("the addressee the screen showed must still listen: otherwise nothing is st
 		});
 	const stored = () => h.rows("SELECT COUNT(*) AS n FROM dialogue_runs")[0]!.n;
 	// Main is listening: a send that saw a specialist is refused, one that saw the main agent goes through.
-	h.state.main.push("はい");
+	h.state.steps.push({ text: "はい", calls: [respond()] });
 	expect((await send({ sessionId: "x", epoch: 1 })).status).toBe(409);
 	expect(stored()).toBe(0);
 	expect(h.rows("SELECT COUNT(*) AS n FROM messages")[0]!.n).toBe(0);
@@ -363,39 +365,34 @@ test("the addressee the screen showed must still listen: otherwise nothing is st
 
 test("a saved item older than the recent choices is offered, accepted and shown when it is on screen", async () => {
 	const h = await harness();
-	h.state.main.push("見ています");
-	await h.ask("これは？", {
-		viewing: {
-			artifactRevisionId: "artifact:fake.studio@1",
-			targetRef: "item-old",
-		},
-	});
-	const prompt = h.state.mainCalls
-		.map((c) => c.history.map((m) => m.content).join("\n"))
-		.join("\n");
-	expect(prompt).toContain('"ref":"item-old"');
-	h.startCall({ request: "これを直して", target: "item-old" });
+	const viewing = {
+		artifactRevisionId: STUDIO_ARTIFACT,
+		targetRef: "item-old",
+	};
+	h.state.steps.push({ text: "見ています", calls: [respond()] });
+	await h.ask("これは？", { viewing });
+	const shown = (h.material(0).now.records ?? []).find(
+		(r: { source: string }) => r.source === "specialist.viewing",
+	);
+	expect(shown.data).toMatchObject({ ref: "item-old", label: "古い項目" });
+	h.handOver({ request: "これを直して", target: "item-old" });
 	h.state.specialist.push(reply("開きました"));
-	await h.ask("これを直して", {
-		viewing: {
-			artifactRevisionId: "artifact:fake.studio@1",
-			targetRef: "item-old",
-		},
-	});
-	const tool = h.state.mainCalls
-		.flatMap((call) => call.tools)
-		.find((t) => t.function.name === "studio_create")!;
-	expect((tool.function.parameters.properties as any).target.enum).toContain(
-		"item-old",
-	);
+	await h.ask("これを直して", { viewing });
+	// The search offers it as a target of the studio.
+	const found = JSON.parse(
+		h.state.calls[2]!.messages.filter((m) => m.role === "tool").at(-1)!.content,
+	) as { candidates: Array<{ id: string; targets: Array<{ ref: string }> }> };
+	expect(
+		found.candidates.find((c) => c.id === STUDIO.id)!.targets.map((t) => t.ref),
+	).toContain("item-old");
 	expect(h.work()[0]!.savedRef).toBe("item-old");
-	// Without the screen showing it, the same ref is not issued.
+	// Without the screen showing it, the same ref is not issued: nothing starts.
 	const other = await harness();
-	other.startCall({ request: "直して", target: "item-old" });
-	other.startCall({ request: "直して", target: "item-old" });
-	expect((await other.ask("直して")).error).toBe(
-		"invalid_conversation_operation",
-	);
+	other.handOver({ request: "直して", target: "item-old" });
+	other.state.steps.push({ text: "開けません", calls: [respond()] });
+	await other.ask("直して");
+	expect(other.work()).toHaveLength(0);
+	expect(await other.session()).toBeNull();
 });
 
 test("a refusal's short repair hint reaches the specialist, truncated", async () => {

@@ -25,3 +25,13 @@ export function parseTimeJst(text: string): number {
 		return Date.parse(`${trimmed}+09:00`);
 	return Date.parse(trimmed);
 }
+
+/** Epoch milliseconds as JST ISO 8601 to the second (`2026-10-18T05:15:00+09:00`): the time a model reads. */
+export function jstSeconds(ms: number): string {
+	return jstIso(ms).replace(/\.\d{3}\+09:00$/, "+09:00");
+}
+
+/** The Asia/Tokyo calendar day (`YYYY-MM-DD`) of epoch milliseconds. */
+export function jstDay(ms: number): string {
+	return jstIso(ms).slice(0, 10);
+}

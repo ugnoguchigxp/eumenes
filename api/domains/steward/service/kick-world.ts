@@ -17,47 +17,49 @@ const log = getLogger("steward");
 /** Events World may list at once, and the events one unit curates. */
 const PENDING_READ = 200;
 /**
- * A unit curates the events of ONE exchange: the user's message and the adopted answer, two at most. World's package
+ * A unit curates the events of ONE run: the user's message and the adopted answer, two at most. World's package
  * makes every message of the window part of the manifest of each claim made from it, so the closure a claim stands
  * on stays small (two messages) instead of growing with the number of events in the window.
  */
 const EVENTS_PER_UNIT = 2;
 
 type Verdict = "wait" | "live" | "empty";
-type Located = { key: string; input: string | null; runId: string | null };
+type Located = { key: string; runId: string | null };
 
-/** The exchange an event's message belongs to: the user's message of its run (the exchange's input message). */
+/** The run an event's message belongs to: the events of one run are curated together. */
 function locate(env: StepEnv, event: PendingCurationEvent): Located {
-	const { db, deps } = env;
-	const message = deps.conversation.messageInTransaction(
-		db,
+	const message = env.deps.conversation.messageInTransaction(
+		env.db,
 		event.messageId,
 	)?.message;
-	if (!message?.runId)
-		return { key: event.messageId, input: null, runId: null };
-	if (message.role === "user")
-		return { key: message.id, input: message.id, runId: message.runId };
-	const user = deps.conversation
-		.messagesOfRunInTransaction(db, event.conversationId, message.runId)
-		.find((m) => m.message.role === "user");
-	return {
-		key: user?.message.id ?? event.messageId,
-		input: user?.message.id ?? null,
-		runId: message.runId,
-	};
+	if (!message?.runId) return { key: event.messageId, runId: null };
+	return { key: message.runId, runId: message.runId };
+}
+
+/** The messages whose handled events the memory reflection has not read yet (it judges what World needs of them). */
+function unjudgedMessages(env: StepEnv): Set<string> {
+	const { db, deps, conversationId } = env;
+	const events = deps.continuity.events;
+	return new Set(
+		[
+			...events.uncuratedInTransaction(db, conversationId),
+			...events.pendingInTransaction(db, conversationId),
+		].flatMap((event) => event.messageIds),
+	);
 }
 
 /**
  * Section 3.4 of the World plan: may the event be curated now, and does it need the model?
- *  - wait: the exchange's curate-memory has not judged it yet (or the run is still going and may register it);
+ *  - wait: the memory reflection has not judged its message yet (or the run is still going and may record it);
  *  - empty: curate-memory judged this very version of the message to hold nothing about the world;
- *  - live: everything else, including an exchange that is never judged (skipped, not registered, blocked), a
+ *  - live: everything else, including a message that is never judged (skipped, blocked), a
  *    message of another version than the one judged (a correction) and a missing judgment.
  */
 function verdictOf(
 	env: StepEnv,
 	event: PendingCurationEvent,
 	at: Located,
+	unjudged: ReadonlySet<string>,
 ): Verdict {
 	const { db, deps } = env;
 	// A blocked source is closed by World's prepare (`SOURCE_BLOCKED`): it needs no judgment.
@@ -65,15 +67,13 @@ function verdictOf(
 		deps.memory.blockedMessageIdsInTransaction(db, [event.messageId]).size > 0
 	)
 		return "live";
-	if (at.input === null) return "live";
-	const exchange = deps.memory.exchangeInTransaction(db, at.input);
-	if (!exchange)
+	if (unjudged.has(event.messageId)) return "wait";
+	const route = readRoute(db, event.messageId, event.revision, event.digest);
+	if (route === null)
 		return at.runId !== null && deps.runStateOf(at.runId) === "active"
 			? "wait"
 			: "live";
-	if (exchange.curated === null) return "wait";
-	const route = readRoute(db, event.messageId, event.revision, event.digest);
-	return route?.world === false ? "empty" : "live";
+	return route.world === false ? "empty" : "live";
 }
 
 /**
@@ -131,8 +131,8 @@ function settleRouted(
 }
 
 /**
- * The next World unit of a conversation: the events of the oldest exchange that may be curated. Events are taken in
- * the order World received them; an exchange that must wait holds the later ones back.
+ * The next World unit of a conversation: the events of the oldest run that may be curated. Events are taken in
+ * the order World received them; a run that must wait holds the later ones back.
  */
 export function kickWorld(
 	env: StepEnv,
@@ -148,6 +148,7 @@ export function kickWorld(
 		PENDING_READ,
 		conversationId,
 	);
+	const unjudged = unjudgedMessages(env);
 	const groups = new Map<
 		string,
 		Array<{ event: PendingCurationEvent; at: Located }>
@@ -158,14 +159,16 @@ export function kickWorld(
 		group.push({ event, at });
 		groups.set(at.key, group);
 	}
-	// An exchange has two events at most; more (the corrected versions of a message) are curated in later windows.
+	// A run has two events at most; more (the corrected versions of a message) are curated in later windows.
 	const windows = [...groups.values()].flatMap((group) =>
 		Array.from({ length: Math.ceil(group.length / EVENTS_PER_UNIT) }, (_, i) =>
 			group.slice(i * EVENTS_PER_UNIT, (i + 1) * EVENTS_PER_UNIT),
 		),
 	);
 	for (const window of windows) {
-		const verdicts = window.map(({ event, at }) => verdictOf(env, event, at));
+		const verdicts = window.map(({ event, at }) =>
+			verdictOf(env, event, at, unjudged),
+		);
 		if (verdicts.includes("wait")) return;
 		const empty = window.filter((_, i) => verdicts[i] === "empty");
 		if (

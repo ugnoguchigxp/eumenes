@@ -69,7 +69,7 @@ export const runSchema = z.object({
 	jobId: z.string().nullable(),
 	deadlineAt: z.string().nullable(),
 	deadlineFixed: z.boolean().optional(),
-	sourceKind: z.enum(["manual", "voice", "schedule", "notice", "continuation"]),
+	sourceKind: z.enum(["manual", "voice", "schedule", "notice"]),
 	scheduleId: z.string().nullable(),
 	occurrenceId: z.string().nullable(),
 	/** The specialist session this run is a turn of; null for the main conversation's runs. */
@@ -86,13 +86,6 @@ export type Run = z.infer<typeof runSchema>;
  */
 export const isSystemPrompt = (kind: Run["sourceKind"]) =>
 	kind === "schedule" || kind === "notice";
-/**
- * A text the host wrote rather than the user: a system prompt, or a continuation that carries a user's request on
- * after a delegated step. Never learned from and never addressed to a specialist session. Unlike a system prompt, a
- * continuation is offered toolchains: it acts for the human request it continues.
- */
-export const isHostPrompt = (kind: Run["sourceKind"]) =>
-	isSystemPrompt(kind) || kind === "continuation";
 /** A notice the host asks the conversation to report on; its text is hidden from the chat. */
 export const noticeSchema = z.object({
 	requestId: z.string().min(1).max(200),
@@ -125,8 +118,23 @@ export type StewardRunEnd = {
 	conversationId: string;
 	state: "completed" | "failed" | "interrupted" | "cancelled";
 };
+/** A memory request the conversation agent committed (section 13): queued as pending at once. */
+export type StewardRequest = {
+	conversationId: string;
+	kind: "forget" | "remember" | "correct" | "goal" | "withdraw";
+	what: string;
+	detail?: string;
+	/** The user's message the request comes from (its context, and the evidence of a remember or a correct). */
+	sourceRef: string;
+	/** The same id twice is one request: the second returns the first. */
+	requestId?: string;
+};
 export interface StewardPort {
 	runEndedInTransaction(db: Database, input: StewardRunEnd): void;
+	requestInTransaction(
+		db: Database,
+		input: StewardRequest,
+	): { id: string; replay: boolean };
 }
 
 /**
@@ -190,3 +198,5 @@ export interface AgencyLayerPort {
 
 export * from "./command-interactions";
 export * from "./specialist";
+
+export { errorReportSchema } from "./error-report";

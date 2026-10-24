@@ -3,9 +3,11 @@ import { expect, test } from "bun:test";
 import { harness } from "./toolchain.fixture";
 import { imageFixture } from "../media/image.fixture";
 import {
-	analysisArgs,
-	isAnalysisRound,
-} from "../../domains/dialogue/test/analysis.fixture";
+	callsOf,
+	isResultRound,
+	isUtteranceRound,
+} from "./conversation-script.fixture";
+import { handOverTask } from "./task-delegation.fixture";
 import { waitFor } from "../../infrastructure/wait-for";
 
 test("two image calls from one public source keep distinct generation/artifact IDs; duplicate acceptance reuses the same parent and forgetting erases source copies without uniqueness collisions", async () => {
@@ -54,20 +56,15 @@ test("two image calls from one public source keep distinct generation/artifact I
 				]);
 				return "";
 			}
-			if (isAnalysisRound(options?.tools)) {
-				options!.onToolCalls!([
-					{
-						id: crypto.randomUUID(),
-						name: "execute_task",
-						arguments: JSON.stringify({
-							...analysisArgs({ kind: "creation", impact: "create" }),
-							request: "Create two distinct images",
-							contextRefs: [],
-							announcement: "二つの画像を生成します。",
-						}),
-					},
-				]);
-				return "";
+			if (isUtteranceRound(options?.tools) && !isResultRound(messages)) {
+				const step = handOverTask(
+					"Create two distinct images",
+					"二つの画像を生成します。",
+				)(messages);
+				options!.onToolCalls!(
+					callsOf(step, () => crypto.randomUUID()) as never,
+				);
+				return step.text ?? "";
 			}
 			return f.model.answer(...args);
 		},
@@ -76,7 +73,8 @@ test("two image calls from one public source keep distinct generation/artifact I
 		everyday: true,
 		model,
 		imageGateway: f.gateway,
-		routeTool: "image",
+		discoveryTarget: (query) =>
+			query === "create an image" ? "image" : "execute_task",
 	});
 	try {
 		const input = {
@@ -129,6 +127,11 @@ test("two image calls from one public source keep distinct generation/artifact I
 	}
 }, 15000);
 
+/** The parent's request finds the task toolchain; the child's search `use <name>` finds the media toolchain. */
+function discoveryFor(name: string) {
+	return (query: string) => (query === `use ${name}` ? name : "execute_task");
+}
+
 function repeatMediaModel(
 	base: import("../../domains/larm").LarmPort,
 	name: string,
@@ -174,20 +177,15 @@ function repeatMediaModel(
 				]);
 				return "";
 			}
-			if (isAnalysisRound(options?.tools)) {
-				options!.onToolCalls!([
-					{
-						id: crypto.randomUUID(),
-						name: "execute_task",
-						arguments: JSON.stringify({
-							...analysisArgs({ kind: "creation", impact: "create" }),
-							request: "Create two items",
-							contextRefs: [],
-							announcement: "二つの処理を進めます。",
-						}),
-					},
-				]);
-				return "";
+			if (isUtteranceRound(options?.tools) && !isResultRound(messages)) {
+				const step = handOverTask(
+					"Create two items",
+					"二つの処理を進めます。",
+				)(messages);
+				options!.onToolCalls!(
+					callsOf(step, () => crypto.randomUUID()) as never,
+				);
+				return step.text ?? "";
 			}
 			if (messages.some((m) => m.content.includes("task_result")))
 				return "処理結果を確認しました。";
@@ -203,7 +201,7 @@ test("music generation calls use independent records and both reach confirmed co
 		everyday: true,
 		model: repeatMediaModel(f.model, "music"),
 		musicGateway: f.gateway,
-		routeTool: "music",
+		discoveryTarget: discoveryFor("music"),
 	});
 	try {
 		const source = await h.dialogue.submit({
@@ -235,7 +233,7 @@ test("drawing calls keep two independent draft URLs without claiming they were s
 		model: repeatMediaModel(f.model, "drawing_editor"),
 		drawingConnection: f.connection,
 		drawingFetch: f.fetcher,
-		routeTool: "drawing_editor",
+		discoveryTarget: discoveryFor("drawing_editor"),
 	});
 	try {
 		const source = await h.dialogue.submit({

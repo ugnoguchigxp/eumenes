@@ -9,24 +9,27 @@ export {
 	seedImportMigration,
 	specialistBlockReasonMigration,
 	executionReferencesMigration,
+	retireExchangeLedgerMigration,
 } from "./repository";
 export type { MemoryService } from "./service";
-export { createMemoryService } from "./service";
+export { NOMINAL_FIXED_TOKENS, createMemoryService } from "./service";
 export type {
 	MemoryItemDto,
 	MemoryEmbed,
 	CurationItem,
 	CurationResult,
-	Disposition,
-	ExchangeDto,
-	ExchangeStep,
 	ForgetPurge,
 	PreparedWindow,
 	TurnRecall,
 	SettleResult,
 } from "./contracts";
 export { FORGET_MAX_ITEMS } from "./contracts";
-export { PENDING_LIMIT } from "./service/context-render";
+export {
+	PENDING_LIMIT,
+	type ProfileItem,
+	profileItemFields,
+	keepOrder,
+} from "./service/profile";
 export {
 	RECALL_BLOCK_CLOSE,
 	RECALL_BLOCK_OPEN,

@@ -1,126 +1,45 @@
 /**
- * The live lane: the saved LARM connection (createLiveLarm, in this process; no server is started) and the
- * production `generateConversation`. Run through `cli.ts run --live`; it is outside verify.
- * Only the arm's messages differ between calls. Nothing here names a model or a profile.
+ * The live lane: the saved LARM connection (createLiveLarm, in this process; no server is started) answers through
+ * the production generation loop (`runGeneration`), with the fixed tools of the conversation agent. Run through
+ * `cli.ts run --live`; it is outside verify. Every call is an independent session; nothing here names a model or a
+ * profile.
  */
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-import type { ToolchainCard } from "../../api/domains/capabilities";
-import { analysisTools } from "../../api/domains/dialogue/service/initial-decision";
-import { systemContext } from "../../api/infrastructure/system-context";
-import { generateConversation } from "../../api/domains/dialogue/service/conversation-generation";
-import { markCurrentRequest } from "../../api/domains/dialogue/service/request-context";
+import type { NativeToolCall } from "../../api/infrastructure/chat-stream";
+import type { InferencePort, Receipt } from "../../api/domains/inference";
+import type { EvalCard } from "../../api/domains/dialogue/eval/context/session";
+import { runConversation } from "../../api/domains/dialogue/eval/context/generation-runner";
+import type { ConversationRunner } from "../../api/domains/dialogue/eval/context/generation-runner";
 import type { JudgeFn } from "../../api/domains/dialogue/eval/context/judge";
-import type { ConversationRunner } from "../../api/domains/dialogue/eval/context/run";
-import { createLiveLarm, liveLarmSettings } from "../live-larm";
 import { canonicalJson } from "../../api/domains/dialogue/eval/context/prefix-stability";
+import { createLiveLarm, liveLarmSettings } from "../live-larm";
 
-type CatalogEntry = {
-	functionName: string;
-	title: string;
-	summary: string;
-	useWhen: string[];
-};
-
-/** The fixed function catalog of an experiment (`toolsCatalog`), as the cards the production tools are built from. */
-function cardsOf(experimentDir: string, file: string): ToolchainCard[] {
-	const entries = JSON.parse(
-		readFileSync(join(experimentDir, file), "utf8"),
-	) as CatalogEntry[];
-	return entries.map((entry, index) => ({
-		revisionId: `eval-${index + 1}`,
-		id: entry.functionName,
-		functionName: entry.functionName,
-		title: entry.title,
-		summary: entry.summary,
-		useWhen: entry.useWhen,
-		redirects: [],
-		score: {
-			rank: index + 1,
-			ftsRank: null,
-			similarity: null,
-			fromHistory: false,
-		},
-	}));
-}
-
-export async function createLiveLane(
-	experimentDir: string,
-	toolsCatalog: string | undefined,
-) {
+export async function createLiveLane(catalog: readonly EvalCard[]) {
 	const live = createLiveLarm();
 	await live.connect();
-	const cards = toolsCatalog ? cardsOf(experimentDir, toolsCatalog) : [];
-	const runner: ConversationRunner = async (call, signal) => {
-		if (call.tools === "conversation" && cards.length === 0)
-			throw new Error("context_eval_tools_catalog_missing");
-		const offered = call.tools === "conversation";
-		const messages = [...call.messages];
-		const current = messages.at(-1)!;
-		// The first round's own instruction, right before the request, as production sends it.
-		if (offered)
-			messages.splice(messages.length - 1, 0, {
-				role: "system",
-				content: systemContext(
-					"dialogue.contexts.request-analysis.instruction",
-					{},
-				),
-			});
-		const marked = markCurrentRequest(messages, current, crypto.randomUUID());
-		let repaired = false;
-		try {
-			const generated = await generateConversation({
-				inference: live,
-				messages: marked,
-				requestMessage: marked.at(-1)!,
-				signal,
-				delta: () => {},
-				briefReply: true,
-				// The first round: a candidate's function, `answer` or `report_unavailable`, always a function call.
-				...(offered
-					? { tools: analysisTools(cards), cards, analysis: true }
-					: {}),
-				repair: () => {
-					repaired = true;
+	/** The loop's model calls: tool calls come back with the text, as a LARM request returns them. */
+	const inference: Pick<InferencePort, "answer" | "executeStream"> = {
+		answer: (messages, signal) => live.answer(messages, signal),
+		executeStream: async (requestId, messages, signal, onDelta, _p, tools) => {
+			let toolCalls: NativeToolCall[] = [];
+			const value = await live.answerStream!(messages, signal, onDelta, {
+				...(tools ? { tools } : {}),
+				onToolCalls: (calls) => {
+					toolCalls = calls;
 				},
-				sessionRole: offered ? "auxiliary" : "main",
+				sessionRole: "auxiliary",
+				contextPolicy: "exact",
 			});
-			const first = generated.analysis;
 			return {
-				kind: "ok",
-				// The notice of a hand-over, or the explanation that nothing fits; an answer is written by the next round.
-				text:
-					first?.next === "toolchain"
-						? first.announcement
-						: first?.next === "report_unavailable"
-							? first.reply
-							: generated.text,
-				toolCalls:
-					first?.next === "toolchain"
-						? [
-								{
-									name: first.card.functionName,
-									arguments: JSON.stringify({}),
-								},
-							]
-						: [],
-				repaired: repaired || generated.repaired,
-			};
-		} catch (error) {
-			// The production path ends a run with this code when the one correction did not fix the output.
-			if (
-				error instanceof Error &&
-				error.message === "invalid_conversation_operation"
-			)
-				return {
-					kind: "contract_failure",
-					code: error.message,
-					repaired: true,
-				};
-			throw error;
-		}
+				requestId,
+				attemptId: "context-eval",
+				value,
+				...(toolCalls.length ? { toolCalls } : {}),
+			} satisfies Receipt;
+		},
 	};
+	const runner: ConversationRunner = (call, signal) =>
+		runConversation({ inference, input: call.input, catalog, signal });
 	const judge: JudgeFn = (request) =>
 		live.answer(request.messages, AbortSignal.timeout(45_000), request.options);
 	return { runner, judge, close: () => live.close() };

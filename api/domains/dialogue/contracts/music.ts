@@ -7,8 +7,6 @@ export interface MusicPort {
 			conversationId: string;
 			question: string;
 			originalRequest: string;
-			/** The earlier steps of the same request (a continuation run only): reference data. */
-			priorSteps?: unknown[];
 			deadline: number;
 		},
 	): { id: string; jobId: string };

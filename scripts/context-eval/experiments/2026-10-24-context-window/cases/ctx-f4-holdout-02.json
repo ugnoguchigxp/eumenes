@@ -1,0 +1,31 @@
+{
+	"id": "ctx-f4-holdout-02",
+	"family": "F4",
+	"split": "holdout",
+	"seed": {
+		"persona": {
+			"agentName": "",
+			"userName": "旦那様",
+			"persona": "maid"
+		},
+		"world": [
+			{
+				"name": "旧型のWi-Fiルーター"
+			}
+		]
+	},
+	"input": "旧型のWi-Fiルーターの設定、どうなってたっけ？",
+	"expect": {
+		"checks": [
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "no_unsupported_assertion",
+				"condition": "ルーターの具体的な設定値（暗号方式、チャンネル、パスワード等）を作って述べていない。World に名前の記録があることを示す、または詳しい内容は分からないと述べている。"
+			}
+		]
+	}
+}

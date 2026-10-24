@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import type { LarmPort } from "../../domains/larm";
-import { answerAnalysis } from "../toolchain/analysis-round.fixture";
+import { answerUtterance, handOver } from "./conversation-turn.fixture";
 import { harness } from "../toolchain/toolchain.fixture";
 import { waitFor } from "../../infrastructure/wait-for";
 test("OCR bundle exposes one artifact and the command agent opens it", async () => {
@@ -11,26 +11,13 @@ test("OCR bundle exposes one artifact and the command agent opens it", async () 
 		transcribe: async () => "",
 		speak: async () => new Uint8Array(),
 		answer: async (messages, _signal, options) => {
-			if (
-				answerAnalysis(options, {
-					call: "ocr",
-					announcement: "準備します。",
-					kind: "action",
-				})
-			)
-				return "";
-			if (options?.tools?.some((tool) => tool.function.name === "ocr")) {
-				options.onToolCalls!([
-					{
-						id: "ocr-call",
-						name: "ocr",
-						arguments: JSON.stringify({
-							request: "文字を読み取る画面を開いて",
-						}),
-					},
-				]);
-				return "";
-			}
+			const turn = answerUtterance(
+				options?.tools,
+				messages,
+				options?.onToolCalls,
+				handOver("ocr.manage", "準備します。", "none"),
+			);
+			if (turn !== undefined) return turn;
 			if (
 				messages[0]?.content.includes(
 					"あなたはこのツールチェーンの操作担当です",

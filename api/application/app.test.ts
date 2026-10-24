@@ -1,34 +1,18 @@
+import { migrations } from "./migrations";
+import { createContinuityService } from "../domains/continuity";
 import { afterEach, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openStore, type SqliteStore } from "../infrastructure/sqlite";
-import {
-	migration as conversationMigration,
-	avatarMotionMigration as conversationAvatarMotionMigration,
-	answerDeliveryMigration as conversationAnswerDeliveryMigration,
-	createConversationService,
-} from "../domains/conversation";
-import {
-	createDialogueService,
-	migration as dialogueMigration,
-	retainedToolchainsMigration,
-	queueLinkMigration,
-} from "../domains/dialogue";
+import { createConversationService } from "../domains/conversation";
+import { createDialogueService } from "../domains/dialogue";
 import type { LarmPort } from "../domains/larm";
-import { createQueue, migration as queueMigration } from "../domains/queue";
-import {
-	createScheduler,
-	migration as schedulerMigration,
-} from "../domains/scheduler";
-import {
-	createVoiceDialogue,
-	migration as voiceMigration,
-	sequenceMigration as voiceSequenceMigration,
-} from "../domains/voice-dialogue";
+import { createQueue } from "../domains/queue";
+import { createScheduler } from "../domains/scheduler";
+import { createVoiceDialogue } from "../domains/voice-dialogue";
 import {
 	createWebResearch,
-	migration as webMigration,
 	type WebResearchService,
 } from "../domains/web-research";
 import { createApp } from "./app";
@@ -55,20 +39,7 @@ const auth = {
 function setup() {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-app-"));
 	dirs.push(dir);
-	const store = openStore(join(dir, "db.sqlite3"), [
-		conversationMigration,
-		conversationAvatarMotionMigration,
-		conversationAnswerDeliveryMigration,
-		dialogueMigration,
-		retainedToolchainsMigration,
-		voiceMigration,
-		queueMigration,
-		schedulerMigration,
-		queueLinkMigration,
-		voiceSequenceMigration,
-		webMigration,
-		"SELECT 1", // retired continuity slot
-	]);
+	const store = openStore(join(dir, "db.sqlite3"), migrations);
 	stores.push(store);
 	const changes = createChanges({ debounceMs: 1 });
 	streams.push(changes);
@@ -88,7 +59,13 @@ function setup() {
 		sleep: () => new Promise(() => {}),
 	});
 	const conversation = createConversationService(store);
-	const dialogue = createDialogueService({ store, conversation, larm, queue });
+	const dialogue = createDialogueService({
+		store,
+		continuity: createContinuityService(store),
+		conversation,
+		larm,
+		queue,
+	});
 	scheduler.registerTarget(dialogue.promptTarget);
 	const voice = createVoiceDialogue(store, dialogue, larm);
 	const webResearch = createWebResearch({
@@ -352,6 +329,7 @@ test("full queue is reported as 503 for submissions", async () => {
 	});
 	const dialogue = createDialogueService({
 		store,
+		continuity: createContinuityService(store),
 		conversation: createConversationService(store),
 		larm: {
 			status: () => ({ state: "ready", capabilities: [] }),

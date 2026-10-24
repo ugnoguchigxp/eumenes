@@ -297,17 +297,9 @@ function build(entries: LogEntry[], finalCodes: ReadonlySet<string>): Built {
 			case "dialogue.accepted":
 				add(event, entry, "受付", "queued", true);
 				break;
-			case "dialogue.request_analyzed": {
-				const ms = duration(entry);
-				add(
-					event,
-					entry,
-					"R1 依頼分析",
-					`${field(entry, "kind") ?? "?"} / ${field(entry, "next") ?? "?"}${ms === undefined ? "" : `（${seconds(ms)}）`}`,
-					true,
-				);
+			case "dialogue.generation_handed_over":
+				add(event, entry, "担当へ引継ぎ", field(entry, "kind") ?? "?", true);
 				break;
-			}
 			case "dialogue.candidates_selected":
 				add(
 					event,

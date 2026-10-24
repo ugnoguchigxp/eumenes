@@ -171,7 +171,7 @@ CREATE TABLE agent_execution_model_reservations(id TEXT PRIMARY KEY,task_id TEXT
 		after: ["agent-runtime/0007-task-executions"],
 	},
 	{
-		// Result notices held for the agency layer (spec agency-work-reports-design-2026-10-24).
+		// Result notices once held for the agency layer (the relay was retired; 0011 drops the table).
 		id: "agent-runtime/0009-execution-reports",
 		sql: `CREATE TABLE agent_execution_reports(event_id TEXT PRIMARY KEY,execution_id TEXT NOT NULL,conversation_id TEXT NOT NULL,state TEXT NOT NULL,held_at INTEGER NOT NULL,released_at INTEGER);
 CREATE INDEX agent_execution_reports_conversation ON agent_execution_reports(conversation_id,state);`,
@@ -182,5 +182,13 @@ CREATE INDEX agent_execution_reports_conversation ON agent_execution_reports(con
 		id: "agent-runtime/0010-execution-reports-held",
 		sql: `CREATE INDEX agent_execution_reports_held ON agent_execution_reports(held_at) WHERE state='held';`,
 		after: ["agent-runtime/0009-execution-reports"],
+	},
+	{
+		// Result notices are no longer held for the agency (the conversation reports finished work from its TODO
+		// ledger): a notice still held is sent as an ordinary one, and the table goes.
+		id: "agent-runtime/0011-drop-execution-reports",
+		sql: `UPDATE agent_execution_events SET state='pending' WHERE state='accepted' AND id IN (SELECT event_id FROM agent_execution_reports WHERE state='held');
+DROP TABLE agent_execution_reports;`,
+		after: ["agent-runtime/0010-execution-reports-held"],
 	},
 ];

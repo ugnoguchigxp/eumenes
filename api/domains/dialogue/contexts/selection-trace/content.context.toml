@@ -1,3 +1,0 @@
-# Source: api/domains/dialogue/service/selection-trace.ts
-text = '''
-referenceContext(過去のユーザー発言。今回の依頼ではない参考データ)='''

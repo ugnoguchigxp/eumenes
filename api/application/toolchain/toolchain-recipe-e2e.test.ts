@@ -85,7 +85,7 @@ test("鎌倉の天気: the second request reads the saved page again without sea
 			decision: "toolchain",
 			functionName: "web_search",
 			toolchainId: "web.search",
-			outcome: "answered",
+			outcome: "completed",
 			recipe: "saved",
 		});
 		const acquired = h.acquisitions;
@@ -95,7 +95,7 @@ test("鎌倉の天気: the second request reads the saved page again without sea
 		expect(steps).toEqual(["recipe.find", "web.read"]);
 		expect(h.acquisitions - acquired).toBe(1);
 		expect(h.toolchain.history.getSelection(second)).toMatchObject({
-			outcome: "answered",
+			outcome: "completed",
 			recipe: "matched",
 		});
 		expect(h.toolchain.history.listRecipes("web.search")[0]!.successes).toBe(2);
@@ -167,7 +167,7 @@ test.each([false, true])(
 				return JSON.stringify({
 					action: "finish",
 					report: {
-						outcome: "answered",
+						outcome: "completed",
 						summary: "鎌倉市の予報です。",
 						claims: [
 							{

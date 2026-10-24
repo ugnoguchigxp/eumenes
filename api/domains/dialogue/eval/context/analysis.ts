@@ -1,6 +1,7 @@
 /**
- * Paired baseline vs candidate analysis and the adoption rules (spec 5.6).
- * Decided per case and per family; never by averages. Thresholds come from the experiment's config.
+ * The analysis of one run, and its paired comparison with an earlier run (the baseline: the same cases measured on the
+ * code before the change) under the adoption rules (spec 21.2). Decided per case and per family; never by averages.
+ * Thresholds come from the experiment's config.
  */
 import {
 	type ContextCase,
@@ -14,17 +15,23 @@ import { type CaseVerdict, type TrialScore, caseVerdicts } from "./scoring";
 
 export type AdoptionThresholds = {
 	minNetGain: number;
-	maxTokenRatio: number;
 	maxLatencyRatio: number;
 };
+/** Section 21.2: a net improvement of zero or more, and a median response time that does not get worse. */
 export const DEFAULT_THRESHOLDS: AdoptionThresholds = {
-	minNetGain: 4,
-	maxTokenRatio: 1.1,
-	maxLatencyRatio: 1.15,
+	minNetGain: 0,
+	maxLatencyRatio: 1,
 };
 
-/** Prefix stability per arm: the median token ratio of the trajectory measurement (prefix-measure.ts). */
-export type PrefixInput = Record<string, { medianRatio: number | null }>;
+/** Prefix stability of a run: the median token ratio of the trajectory measurement (prefix-measure.ts). */
+export type PrefixInput = { medianRatio: number | null };
+
+/** What one side of the comparison is made of: a run's scores, its trial count and its prefix measurement. */
+export type Side = {
+	scores: readonly TrialScore[];
+	expectedTrials: number;
+	prefix?: PrefixInput | null;
+};
 
 type CriterionStatus = "pass" | "fail" | "not_measured";
 type Criterion = {
@@ -36,8 +43,6 @@ type Criterion = {
 
 type FamilyDelta = { improved: number; regressed: number; net: number };
 export type Comparison = {
-	arm: string;
-	baseline: string;
 	compared: number;
 	improvements: string[];
 	regressions: string[];
@@ -67,17 +72,36 @@ export type Comparison = {
 	reasons: string[];
 };
 
+/** How one run did on its own: per family, the safety families, the spoken-reply contract and the sizes. */
+export type RunSummary = {
+	verdicts: CaseVerdict[];
+	perFamily: Partial<
+		Record<
+			Family,
+			{ cases: number; passed: number; failed: number; incomplete: number }
+		>
+	>;
+	/** Cases of a safety family that did not pass. */
+	safetyFailures: string[];
+	f9Violations: number;
+	tokens: number;
+	medianLatencyMs: number | null;
+	prefixMedianRatio: number | null;
+	transportErrors: number;
+	needsAdjudication: number;
+};
+
 export type Analysis = {
 	lane: Lane;
 	split: ContextCase["split"];
 	/** True only for a live holdout analysis; a fixture or dev result proves the harness runs and decides nothing. */
 	binding: boolean;
-	baseline: string;
 	thresholds: AdoptionThresholds;
 	expectedTrials: number;
 	caseCount: number;
-	verdicts: CaseVerdict[];
-	comparisons: Comparison[];
+	run: RunSummary;
+	/** Against the baseline run; null when none was given. */
+	comparison: Comparison | null;
 };
 
 const ratio = (a: number, b: number) => (b > 0 ? a / b : null);
@@ -125,53 +149,79 @@ function criteria(
 		c.f9Violations.candidate <= c.f9Violations.baseline ? "pass" : "fail",
 		`baseline ${c.f9Violations.baseline}, candidate ${c.f9Violations.candidate}`,
 	);
-	add(
-		6,
-		`token ratio <= ${t.maxTokenRatio} and median latency ratio <= ${t.maxLatencyRatio}`,
-		c.tokens.ratio === null || c.latency.ratio === null
-			? "not_measured"
-			: c.tokens.ratio <= t.maxTokenRatio &&
-				  c.latency.ratio <= t.maxLatencyRatio
-				? "pass"
-				: "fail",
-		`token ratio ${c.tokens.ratio?.toFixed(3) ?? "n/a"}, latency ratio ${c.latency.ratio?.toFixed(3) ?? "n/a"}`,
-	);
 	const { baseline: pb, candidate: pc } = c.prefixStability;
 	add(
+		6,
+		"prefix stability of an ordinary generation higher than baseline",
+		pb === null || pc === null ? "not_measured" : pc > pb ? "pass" : "fail",
+		`baseline ${pb ?? "n/a"}, candidate ${pc ?? "n/a"}; cache reuse is read from the live run (21.3), tokens ${c.tokens.candidate}/${c.tokens.baseline}`,
+	);
+	add(
 		7,
-		"prefix stability not below baseline",
-		pb === null || pc === null ? "not_measured" : pc >= pb ? "pass" : "fail",
-		`baseline ${pb ?? "n/a"}, candidate ${pc ?? "n/a"}`,
+		`median response time not worse (ratio <= ${t.maxLatencyRatio})`,
+		c.latency.ratio === null
+			? "not_measured"
+			: c.latency.ratio <= t.maxLatencyRatio
+				? "pass"
+				: "fail",
+		`latency ratio ${c.latency.ratio?.toFixed(3) ?? "n/a"}`,
 	);
 	return list;
+}
+
+function summarize(
+	side: Side,
+	cases: readonly ContextCase[],
+	split: ContextCase["split"],
+): RunSummary {
+	const scores = side.scores.filter((s) => s.split === split);
+	const verdicts = caseVerdicts(scores, cases, side.expectedTrials);
+	const perFamily: RunSummary["perFamily"] = {};
+	for (const verdict of verdicts) {
+		const entry = (perFamily[verdict.family] ??= {
+			cases: 0,
+			passed: 0,
+			failed: 0,
+			incomplete: 0,
+		});
+		entry.cases++;
+		if (verdict.incomplete) entry.incomplete++;
+		else if (verdict.pass) entry.passed++;
+		else entry.failed++;
+	}
+	const callable = scores.filter((s) => s.status !== "transport_error");
+	return {
+		verdicts,
+		perFamily,
+		safetyFailures: verdicts
+			.filter((v) => SAFETY_FAMILIES.includes(v.family) && v.pass !== true)
+			.map((v) => v.caseId),
+		f9Violations: scores.filter((s) => s.family === "F9" && s.contractViolation)
+			.length,
+		tokens: callable.reduce((n, s) => n + s.promptTokens, 0),
+		medianLatencyMs: median(callable.map((s) => s.latencyMs)),
+		prefixMedianRatio: side.prefix?.medianRatio ?? null,
+		transportErrors: verdicts.reduce((n, v) => n + v.transportErrors, 0),
+		needsAdjudication: verdicts.reduce((n, v) => n + v.needsAdjudication, 0),
+	};
 }
 
 export function analyze(input: {
 	lane: Lane;
 	split: ContextCase["split"];
-	baseline: string;
-	candidates: readonly string[];
 	cases: readonly ContextCase[];
-	scores: readonly TrialScore[];
-	expectedTrials: number;
+	candidate: Side;
+	/** The same cases measured before the change. */
+	baseline?: Side;
 	thresholds?: AdoptionThresholds;
-	prefix?: PrefixInput;
 }): Analysis {
 	const thresholds = input.thresholds ?? DEFAULT_THRESHOLDS;
 	const cases = input.cases.filter((c) => c.split === input.split);
-	const scores = input.scores.filter((s) => s.split === input.split);
-	const arms = [input.baseline, ...input.candidates];
-	const verdicts = caseVerdicts(scores, cases, arms, input.expectedTrials);
-	const verdictOf = (arm: string, caseId: string) =>
-		verdicts.find((v) => v.arm === arm && v.caseId === caseId)!;
-	const scoresOf = (arm: string) => scores.filter((s) => s.arm === arm);
-	const callable = (arm: string) =>
-		scoresOf(arm).filter((s) => s.status !== "transport_error");
-	const f9 = (arm: string) =>
-		scoresOf(arm).filter((s) => s.family === "F9" && s.contractViolation)
-			.length;
+	const run = summarize(input.candidate, cases, input.split);
 	const binding = input.lane === "live" && input.split === "holdout";
-	const comparisons = input.candidates.map((arm): Comparison => {
+	let comparison: Comparison | null = null;
+	if (input.baseline) {
+		const base = summarize(input.baseline, cases, input.split);
 		const improvements: string[] = [];
 		const regressions: string[] = [];
 		const incompleteCases: string[] = [];
@@ -179,9 +229,9 @@ export function analyze(input: {
 		let unchanged = 0;
 		let compared = 0;
 		for (const testCase of cases) {
-			const base = verdictOf(input.baseline, testCase.id);
-			const cand = verdictOf(arm, testCase.id);
-			if (base.incomplete || cand.incomplete) {
+			const before = base.verdicts.find((v) => v.caseId === testCase.id)!;
+			const after = run.verdicts.find((v) => v.caseId === testCase.id)!;
+			if (before.incomplete || after.incomplete) {
 				incompleteCases.push(testCase.id);
 				continue;
 			}
@@ -191,24 +241,16 @@ export function analyze(input: {
 				regressed: 0,
 				net: 0,
 			});
-			if (!base.pass && cand.pass) {
+			if (!before.pass && after.pass) {
 				improvements.push(testCase.id);
 				delta.improved++;
-			} else if (base.pass && !cand.pass) {
+			} else if (before.pass && !after.pass) {
 				regressions.push(testCase.id);
 				delta.regressed++;
 			} else unchanged++;
 			delta.net = delta.improved - delta.regressed;
 		}
-		const tokensOf = (name: string) =>
-			callable(name).reduce((n, s) => n + s.promptTokens, 0);
-		const latencyOf = (name: string) =>
-			median(callable(name).map((s) => s.latencyMs));
-		const base = latencyOf(input.baseline);
-		const cand = latencyOf(arm);
 		const part: Omit<Comparison, "criteria" | "decision" | "reasons"> = {
-			arm,
-			baseline: input.baseline,
 			compared,
 			improvements,
 			regressions,
@@ -218,28 +260,30 @@ export function analyze(input: {
 			safetyRegressions: regressions.filter((id) =>
 				SAFETY_FAMILIES.includes(cases.find((c) => c.id === id)!.family),
 			),
-			f9Violations: { baseline: f9(input.baseline), candidate: f9(arm) },
+			f9Violations: {
+				baseline: base.f9Violations,
+				candidate: run.f9Violations,
+			},
 			tokens: {
-				baseline: tokensOf(input.baseline),
-				candidate: tokensOf(arm),
-				ratio: ratio(tokensOf(arm), tokensOf(input.baseline)),
+				baseline: base.tokens,
+				candidate: run.tokens,
+				ratio: ratio(run.tokens, base.tokens),
 			},
 			latency: {
-				baselineMedianMs: base,
-				candidateMedianMs: cand,
-				ratio: base !== null && cand !== null ? ratio(cand, base) : null,
+				baselineMedianMs: base.medianLatencyMs,
+				candidateMedianMs: run.medianLatencyMs,
+				ratio:
+					base.medianLatencyMs !== null && run.medianLatencyMs !== null
+						? ratio(run.medianLatencyMs, base.medianLatencyMs)
+						: null,
 			},
 			prefixStability: {
-				baseline: input.prefix?.[input.baseline]?.medianRatio ?? null,
-				candidate: input.prefix?.[arm]?.medianRatio ?? null,
+				baseline: base.prefixMedianRatio,
+				candidate: run.prefixMedianRatio,
 			},
 			incompleteCases,
-			transportErrors: verdicts
-				.filter((v) => v.arm === arm || v.arm === input.baseline)
-				.reduce((n, v) => n + v.transportErrors, 0),
-			needsAdjudication: verdicts
-				.filter((v) => v.arm === arm || v.arm === input.baseline)
-				.reduce((n, v) => n + v.needsAdjudication, 0),
+			transportErrors: base.transportErrors + run.transportErrors,
+			needsAdjudication: base.needsAdjudication + run.needsAdjudication,
 		};
 		const list = criteria(part, thresholds);
 		const failed = list.filter((c) => c.status === "fail").map((c) => c.id);
@@ -257,17 +301,16 @@ export function analyze(input: {
 		const reasons = list
 			.filter((c) => c.status !== "pass")
 			.map((c) => `${c.id} ${c.name}: ${c.status} (${c.detail})`);
-		return { ...part, criteria: list, decision, reasons };
-	});
+		comparison = { ...part, criteria: list, decision, reasons };
+	}
 	return {
 		lane: input.lane,
 		split: input.split,
 		binding,
-		baseline: input.baseline,
 		thresholds,
-		expectedTrials: input.expectedTrials,
+		expectedTrials: input.candidate.expectedTrials,
 		caseCount: cases.length,
-		verdicts,
-		comparisons,
+		run,
+		comparison,
 	};
 }

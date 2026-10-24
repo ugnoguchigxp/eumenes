@@ -1,0 +1,53 @@
+{
+	"id": "ctx-f1-dev-02",
+	"family": "F1",
+	"split": "dev",
+	"seed": {
+		"persona": {
+			"agentName": "",
+			"userName": "旦那様",
+			"persona": "butler"
+		},
+		"longTerm": [
+			{
+				"kind": "preference",
+				"key": "food.breakfast",
+				"text": "朝食はご飯と味噌汁の和食が好き"
+			},
+			{
+				"kind": "habit",
+				"key": "morning.routine",
+				"text": "朝は六時半に起きて白湯を飲む"
+			}
+		],
+		"events": [
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-16T07:40:00.000Z",
+				"text": "昨日の朝は焼き鮭定食にしたよ"
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-16T07:40:03.000Z",
+				"text": "朝から満足感のある一食ですね。",
+				"origin": "reply"
+			}
+		]
+	},
+	"input": "明日の朝は時間がないから、パンとコーヒーで済ませたい。簡単な組み合わせを考えて",
+	"expect": {
+		"checks": [
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "follows_current_request",
+				"condition": "今回の依頼どおり、パンとコーヒーを使った簡単な朝食の組み合わせを提案している。ご飯や味噌汁などの和食を提案の中心にしていない。"
+			}
+		]
+	}
+}

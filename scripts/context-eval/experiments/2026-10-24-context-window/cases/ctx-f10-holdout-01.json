@@ -1,0 +1,60 @@
+{
+	"id": "ctx-f10-holdout-01",
+	"family": "F10",
+	"split": "holdout",
+	"seed": {
+		"events": [
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-21T01:00:00.000Z",
+				"text": "明日の東京の天気を調べてほしい"
+			},
+			{
+				"type": "acted",
+				"at": "2026-10-21T01:00:02.000Z",
+				"fields": {
+					"action": "delegate",
+					"toolchain": "web_research",
+					"request": "明日の東京の天気を調べる"
+				}
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-21T01:00:03.000Z",
+				"text": "確認しますね。",
+				"origin": "announcement"
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-21T01:02:00.000Z",
+				"text": "明日は曇り時々雨の予報です。",
+				"origin": "report"
+			}
+		],
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "butler"
+		}
+	},
+	"input": "了解、傘を持っていくよ",
+	"expect": {
+		"checks": [
+			{
+				"kind": "not_delegated"
+			},
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "follows_current_request",
+				"condition": "過去の依頼を実行し直していない。今回の発言に対してだけ応じている。"
+			}
+		]
+	}
+}

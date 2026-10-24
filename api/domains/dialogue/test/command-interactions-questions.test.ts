@@ -1,19 +1,23 @@
-import { delegatedTaskRules } from "../../inference";
 import { afterEach, expect, test } from "bun:test";
+import { delegatedTaskRules } from "../../inference";
 import {
-	REVISION,
 	ADAPTER,
-	until,
-	open,
-	setup,
+	REVISION,
 	resumedJobs,
+	setup,
+	until,
+	type Harness,
 } from "./command-interactions.fixture";
+
+let h: Harness | undefined;
 afterEach(async () => {
-	for (const close of open.splice(0).reverse()) await close();
+	await h?.close();
+	h = undefined;
 });
-test("a clarifying question is saved atomically and handed to the conversation, then answered once by the UI", async () => {
-	const h = setup();
-	const first = await h.clarified();
+
+test("a clarifying question is saved with the delegation's TODO and reaches the conversation, then is answered once by the UI", async () => {
+	h = await setup();
+	const first = await h.asked();
 	const interaction = h.interaction()!;
 	expect(interaction).toMatchObject({
 		status: "waiting_input",
@@ -26,10 +30,18 @@ test("a clarifying question is saved atomically and handed to the conversation, 
 			revision: 0,
 		},
 	});
-	// The question still reaches the user through the conversation's own words.
-	expect(JSON.stringify(h.conversationCalls.at(-1)!.history)).toContain(
-		"commandQuestion",
-	);
+	// The TODO waits with the very question the interaction holds.
+	expect(h.todos()).toMatchObject([
+		{
+			status: "waiting",
+			questionId: interaction.question!.questionId,
+			question: "何秒ですか",
+		},
+	]);
+	// The question reaches the user through the conversation: the speaking generation saw it as data.
+	const material = h.materialOf(h.calls.length - 1);
+	expect(material).toContain(interaction.question!.questionId);
+	expect(material).toContain("何秒ですか");
 	const body = {
 		eventId: crypto.randomUUID(),
 		questionId: interaction.question!.questionId,
@@ -76,9 +88,10 @@ test("a clarifying question is saved atomically and handed to the conversation, 
 	expect(h.rows("SELECT id FROM dialogue_runs")).toHaveLength(before + 1);
 	expect(first.id).not.toBe(answered.runId);
 });
+
 test("the resumed command run gets the question and the answer as data and completes the interaction with the receipt", async () => {
-	const h = setup();
-	await h.clarified();
+	h = await setup();
+	await h.asked();
 	const interaction = h.interaction()!;
 	h.state.commands.push({
 		action: "invoke",
@@ -97,7 +110,7 @@ test("the resumed command run gets the question and the answer as data and compl
 		expectedRevision: 0,
 		input: { durationSeconds: 180 },
 	});
-	await until(() => h.interaction()?.status === "completed");
+	await until(() => h!.interaction()?.status === "completed");
 	expect(h.interaction()).toMatchObject({
 		status: "completed",
 		receiptRef: { owner: "fake", operationId: "op-1", digest: "digest-1" },
@@ -125,13 +138,14 @@ test("the resumed command run gets the question and the answer as data and compl
 		issuedAt: row.issued_at,
 	});
 });
+
 test("a target question carries the host's choices and accepts only one of them", async () => {
-	const h = setup();
+	h = await setup();
 	h.state.choices["builtin:timerTargetAnswer"] = [
 		{ ref: "timer-1", label: "お茶（残り60秒・動作中）" },
 		{ ref: "timer-2", label: "麺（残り120秒・一時停止）" },
 	];
-	await h.clarified("どのタイマーですか", "builtin:timerTargetAnswer");
+	await h.asked("どのタイマーですか", "builtin:timerTargetAnswer");
 	const interaction = h.interaction()!;
 	expect(interaction.question).toMatchObject({
 		inputSchemaRef: "builtin:timerTargetAnswer",
@@ -152,42 +166,42 @@ test("a target question carries the host's choices and accepts only one of them"
 	const accepted = await h.interactions.answer(interaction.id, body("timer-2"));
 	expect(accepted.replay).toBe(false);
 });
+
 test("a binding without questions allows only free text, and the model is offered no other schema", async () => {
-	const h = setup({ questions: [] });
+	h = await setup({ questions: [], autoStart: false });
 	h.state.commands.push({
 		action: "clarify",
 		question: "何秒ですか",
 		answerSchema: "builtin:timerDurationAnswer",
 	});
 	const refused = await h.commandRun();
-	await until(() => h.status(refused.id) === "failed");
+	await until(() => h!.status(refused.id) === "failed");
 	expect(h.dialogue.get(refused.id)?.error).toBe(
 		"toolchain_command_invalid_contract",
 	);
 	expect(h.commandSchemas[0]).not.toContain("timerDurationAnswer");
 	expect(h.commandSchemas[0]).toContain("builtin:answerText");
 	expect(h.rows("SELECT id FROM command_interactions")).toHaveLength(0);
-	// Free text is always allowed.
-	h.state.commands.push({
-		action: "clarify",
-		question: "何秒ですか",
-		answerSchema: "builtin:answerText",
-	});
-	await h.commandRun();
-	await until(() => h.interaction()?.status === "waiting_input");
+});
+
+test("free text is always allowed: a binding without questions asks builtin:answerText", async () => {
+	h = await setup({ questions: [] });
+	await h.asked("何秒ですか", "builtin:answerText");
 	expect(h.interaction()!.question!.inputSchemaRef).toBe("builtin:answerText");
 });
+
 test("a binding with questions offers exactly those schemas to the model", async () => {
-	const h = setup();
+	h = await setup({ autoStart: false });
 	h.state.commands.push({ action: "clarify", question: "どれ" });
 	await h.commandRun();
-	await until(() => h.commandPrompts.length === 1);
+	await until(() => h!.commandPrompts.length === 1);
 	expect(h.commandSchemas[0]).toContain("builtin:timerDurationAnswer");
 	expect(h.commandSchemas[0]).toContain("builtin:timerTargetAnswer");
 	expect(h.commandSchemas[0]).toContain("builtin:answerText");
 });
+
 test("the choice field is the binding's: a schema with another field is validated the same way", async () => {
-	const h = setup({
+	h = await setup({
 		questions: [
 			{ inputSchemaRef: "schema:pick-item@1", choiceField: "itemId" },
 		],
@@ -196,7 +210,7 @@ test("the choice field is the binding's: a schema with another field is validate
 		{ ref: "item-a", label: "A" },
 		{ ref: "item-b", label: "B" },
 	];
-	await h.clarified("どの項目ですか", "schema:pick-item@1");
+	await h.asked("どの項目ですか", "schema:pick-item@1");
 	const interaction = h.interaction()!;
 	expect(interaction.question).toMatchObject({
 		inputSchemaRef: "schema:pick-item@1",
@@ -215,18 +229,20 @@ test("the choice field is the binding's: a schema with another field is validate
 		(await h.interactions.answer(interaction.id, body("item-b"))).replay,
 	).toBe(false);
 });
+
 test("a schema without a choice field carries no choices even if the host has some", async () => {
-	const h = setup();
+	h = await setup();
 	h.state.choices["builtin:timerDurationAnswer"] = [{ ref: "x", label: "X" }];
-	await h.clarified();
+	await h.asked();
 	expect(h.interaction()!.question).toMatchObject({
 		inputSchemaRef: "builtin:timerDurationAnswer",
 	});
 	expect(h.interaction()!.question!.choices).toBeUndefined();
 });
+
 test("a target question without host choices is asked as free text", async () => {
-	const h = setup();
-	await h.clarified("どのタイマーですか", "builtin:timerTargetAnswer");
+	h = await setup();
+	await h.asked("どのタイマーですか", "builtin:timerTargetAnswer");
 	const question = h.interaction()!.question!;
 	expect(question.inputSchemaRef).toBe("builtin:answerText");
 	expect(question.choices).toBeUndefined();

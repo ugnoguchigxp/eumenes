@@ -1,0 +1,87 @@
+{
+	"id": "ctx-f14-dev-01",
+	"family": "F14",
+	"split": "dev",
+	"seed": {
+		"events": [
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-20T13:00:00.000Z",
+				"text": "来週の京都のホテルの空室を調べて"
+			},
+			{
+				"type": "acted",
+				"at": "2026-10-20T13:00:02.000Z",
+				"fields": {
+					"action": "delegate",
+					"toolchain": "web_research",
+					"request": "来週の京都のホテルの空室を調べる",
+					"todo": "@w1"
+				}
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-20T13:00:03.000Z",
+				"text": "お調べしますね。",
+				"origin": "announcement"
+			},
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-20T13:03:00.000Z",
+				"text": "別件だけど、猫の餌ってどれくらいの頻度であげるものだっけ"
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-20T13:03:04.000Z",
+				"text": "成猫なら一日に二回が目安です。",
+				"origin": "reply"
+			}
+		],
+		"work": [
+			{
+				"key": "w1",
+				"toolchain": "web_research",
+				"request": "来週の京都のホテルの空室を調べる",
+				"at": "2026-10-20T13:00:03.000Z",
+				"updatedAt": "2026-10-20T13:02:00.000Z",
+				"status": "done",
+				"outcome": "succeeded",
+				"result": {
+					"asOf": "2026-10-20T13:02:00.000Z",
+					"claims": [
+						{
+							"text": "駅前のホテルに十二日と十三日の空室がある",
+							"sources": [
+								"src_1"
+							]
+						}
+					],
+					"limits": "料金は未確認"
+				}
+			}
+		],
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "butler"
+		}
+	},
+	"input": "さっきのホテルの調べ物、結果はどうだった？",
+	"expect": {
+		"checks": [
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "work_state_aware",
+				"condition": "完了している調べ物の結果（駅前のホテルに十二日と十三日の空室がある。料金は未確認）を、active にある範囲で伝えている。料金など確認されていないことを断定していない。"
+			}
+		]
+	}
+}

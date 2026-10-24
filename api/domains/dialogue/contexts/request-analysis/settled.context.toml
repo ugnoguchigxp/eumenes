@@ -1,3 +1,0 @@
-# Source: api/domains/dialogue/service/request-analysis.ts
-text = '''
-SETTLED_ANALYSIS は、この依頼について前の段階で確定した分析（kind・freshness・impact・approved）です。ホストが引き継ぐので、今回はこれらを書きません。提示された候補からこの分析に合うfunctionを一つ選び、そのfunctionの引数（通常の担当ならannouncement）だけを書きます。'''

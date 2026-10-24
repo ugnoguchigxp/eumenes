@@ -191,15 +191,8 @@ export function createToolchainCommandHandler(
 				fail(tx, run, loaded.code);
 				return { status: "stale", reason: loaded.code };
 			}
-			const {
-				request,
-				original,
-				priorSteps,
-				resume,
-				snapshot,
-				tools,
-				toolIds,
-			} = loaded.source;
+			const { request, original, resume, snapshot, tools, toolIds } =
+				loaded.source;
 			const deadline = Math.min(
 				Date.parse(run.deadlineAt!) - 15000,
 				Date.now() + 45000,
@@ -217,7 +210,6 @@ export function createToolchainCommandHandler(
 				{
 					request,
 					originalRequest: original,
-					...(priorSteps.length ? { priorSteps } : {}),
 					...(set.backend === "dots" ? { catalog: snapshot } : { snapshot }),
 					...(resume?.exchanges.length
 						? { previousQuestions: resume.exchanges }

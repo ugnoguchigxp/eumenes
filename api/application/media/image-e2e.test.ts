@@ -2,7 +2,10 @@ import { expect, test } from "bun:test";
 import { harness } from "../toolchain/toolchain.fixture";
 import { imageFixture, imageQuestion, imageTestPlan } from "./image.fixture";
 import { musicFixture, musicQuestion } from "./music.fixture";
-import { isAnalysisRound } from "../../domains/dialogue/test/analysis.fixture";
+import {
+	isResultRound,
+	isUtteranceRound,
+} from "../toolchain/conversation-script.fixture";
 import { waitFor } from "../../infrastructure/wait-for";
 for (const mode of [
 	"success",
@@ -125,14 +128,10 @@ test("artifact image input keeps exact generation data without showing an intern
 		...f.model,
 		answer: async (...args: Parameters<typeof f.model.answer>) => {
 			const [messages] = args;
-			if (
-				messages.some((message) =>
-					message.content.startsWith('{"imageResult":'),
-				)
-			)
+			if (isResultRound(messages))
 				resultPolicy =
 					messages[0]?.content.includes(
-						"報告本文にURLやMarkdownリンクを作りません",
+						"activeに画像担当の仕事の結果があるときは",
 					) ?? false;
 			return f.model.answer(...args);
 		},
@@ -223,10 +222,8 @@ test("an image screen submit generates an image though the conversation retained
 		...image.model,
 		answer: async (...args: Parameters<typeof image.model.answer>) => {
 			if (phase === "music") return music.model.answer(...args);
-			if (isAnalysisRound(args[2]?.tools)) screenAnalysis++;
-			// A screen submit is not checked against its request: a check that broke would fail the run.
-			if (args[2]?.tools?.some((t) => t.function.name === "check_request"))
-				throw new Error("chat_stream_incomplete");
+			if (isUtteranceRound(args[2]?.tools) && !isResultRound(args[0]))
+				screenAnalysis++;
 			return image.model.answer(...args);
 		},
 	};

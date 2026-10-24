@@ -5,6 +5,7 @@ export * from "./seeds";
 export * from "./window";
 export * from "./tendency";
 export * from "./ledger";
+export * from "./retired-ledger";
 export * from "./turn-vector";
 export const migration = `
 CREATE TABLE memory_host_settings (id INTEGER PRIMARY KEY CHECK(id = 1), enabled INTEGER NOT NULL, revision INTEGER NOT NULL);
@@ -200,6 +201,19 @@ ALTER TABLE memory_message_block_next RENAME TO memory_message_block;
 CREATE INDEX memory_message_block_conversation ON memory_message_block(conversation_id);
 `;
 
+/**
+ * The exchange ledger and the conversation summary are replaced by the continuity event flow and episode
+ * (the ContextWindow specification, sections 5.6 and 11.2). The three tables are renamed, not dropped: the
+ * one-time backfill at startup reads them to write the recent exchanges as events and the summary as an episode
+ * part, and drops them when every conversation has been handled (`service/backfill.ts`). Migrations only run SQL
+ * and run before any code, so a plain drop here would lose what the backfill needs.
+ */
+export const retireExchangeLedgerMigration = `
+ALTER TABLE memory_exchange RENAME TO memory_retired_exchange;
+ALTER TABLE memory_conversation_summary RENAME TO memory_retired_summary;
+ALTER TABLE memory_summary_source RENAME TO memory_retired_summary_source;
+`;
+
 /** Named migrations of this domain; the SQL above is frozen once deployed. */
 export const executionReferencesMigration =
 	"CREATE TABLE memory_execution_refs(ref TEXT PRIMARY KEY,item_id TEXT NOT NULL,revision TEXT NOT NULL,body TEXT NOT NULL,digest TEXT NOT NULL,change_seq INTEGER NOT NULL,policy_revision TEXT NOT NULL,expires_at INTEGER NOT NULL);";
@@ -244,5 +258,10 @@ export const migrations: readonly Migration[] = [
 		id: "memory/0009-execution-references",
 		after: ["memory/0008-specialist-block-reason"],
 		sql: executionReferencesMigration,
+	},
+	{
+		id: "memory/0010-retire-exchange-ledger",
+		after: ["memory/0009-execution-references"],
+		sql: retireExchangeLedgerMigration,
 	},
 ];

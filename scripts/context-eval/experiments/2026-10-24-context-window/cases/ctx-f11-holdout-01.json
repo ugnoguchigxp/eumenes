@@ -1,0 +1,43 @@
+{
+	"id": "ctx-f11-holdout-01",
+	"family": "F11",
+	"split": "holdout",
+	"seed": {
+		"events": [
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-21T04:00:00.000Z",
+				"text": "来週は試験があって少し緊張している"
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-21T04:00:05.000Z",
+				"text": "ところで、試験の前日は早めに休むのがよいと言われています。それから、当日の朝は軽く体を動かすと落ち着きます。",
+				"origin": "spontaneous",
+				"heard": "partial",
+				"deliveredText": "ところで、試験の前日は早めに休むのがよいと言われています。"
+			}
+		],
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "butler"
+		}
+	},
+	"input": "もう一つ、何か勧めてくれていた？",
+	"expect": {
+		"checks": [
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "delivery_aware",
+				"condition": "当日の朝に体を動かす話は利用者に届いていない。届いたのは前日に早めに休むことまで。届いていない部分を、すでに伝えたこととして扱っていない。"
+			}
+		]
+	}
+}

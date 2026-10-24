@@ -151,6 +151,19 @@ async function boot(options: BootOptions) {
 				requestId,
 				attemptId: `att-${sends}`,
 				value: answer,
+				// A user's utterance ends with the analysis: a plain answer that needs no basis.
+				toolCalls: [
+					{
+						id: `respond-${sends}`,
+						name: "respond",
+						arguments: JSON.stringify({
+							kind: "chat",
+							freshness: "not_live",
+							impact: "none",
+							approved: false,
+						}),
+					},
+				],
 			};
 			return receipt;
 		},
@@ -168,6 +181,7 @@ async function boot(options: BootOptions) {
 	const queue = createQueue(store);
 	const dialogue = createDialogueService({
 		store,
+		continuity: createContinuityService(store),
 		conversation,
 		larm,
 		queue,
@@ -478,16 +492,11 @@ test("the conversation gets only the names of the known targets the wording name
 	const run = await h.ask();
 	expect((await h.finish(run.id)).status).toBe("completed");
 	const input = h.seen.at(-1)!;
-	expect(
-		input.filter((m) => m.content.startsWith("Worldに記録がある対象")),
-	).toEqual([
-		{
-			role: "system",
-			content:
-				"Worldに記録がある対象: 「音声サービス」（引用した名前のみ。詳しい内容は World の調査で確かめられる）",
-		},
-	]);
+	// The one hint line sits in the context document; it names the target only.
 	const text = JSON.stringify(input);
+	expect(text).toContain(
+		"Worldに記録がある対象: 「音声サービス」（引用した名前のみ。詳しい内容は World の調査で確かめられる）",
+	);
 	expect(text).not.toContain("9月から");
 	expect(text).not.toContain("svc-1");
 	expect(text).not.toContain("claim-1");

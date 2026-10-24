@@ -45,11 +45,15 @@ import type { MemorySeed } from "../contracts/seeds";
 import { createSeedImport } from "./seeds";
 import { seedEvidence } from "./seed-sources";
 import { createAgentVectors } from "./agent-vectors";
-import { MEMORY_HISTORY_MAX_TOKENS } from "../../../infrastructure/context-budget";
+import {
+	REFERENCE_WINDOW_TOKENS,
+	planWindow,
+	type WindowPlan,
+} from "../../../infrastructure/context-budget";
 import { guardContinuity } from "./continuity-guard";
-import { verbatimHistory, verbatimMessageIds } from "./context-history";
 import {
 	createContextWindowStore,
+	type ReadItemsInput,
 	type WindowSnapshot,
 } from "./context-window";
 import { createCuration } from "./curation";
@@ -59,8 +63,9 @@ import {
 	blockJournalPathOf,
 	readJournal,
 } from "./journal";
+import { createBackfill } from "./backfill";
 import { createLedger } from "./ledger";
-import { recallTurns, type RecallInput } from "./turn-recall";
+import { recallBesideLog, recallTurns, type RecallInput } from "./turn-recall";
 import { dropVectorsOnRetract } from "./retract-vectors";
 import { createMemoryViews } from "./views";
 import { validityOf } from "./validity";
@@ -132,11 +137,11 @@ function itemDto(
 	};
 }
 
-/**
- * The budget (tokens) of the memory and conversation history half of the model window, looked up at each use:
- * `min(128k, window / 2)` of the saved model's window. Without one, the largest it can be (128k).
- */
-const widestBudget = () => MEMORY_HISTORY_MAX_TOKENS;
+/** The fixed instructions and tool definitions background sizing assumes; a generation measures its own. */
+export const NOMINAL_FIXED_TOKENS = 3000;
+/** The plan of the reference window, when the application does not give the saved model's. */
+const referencePlan = () =>
+	planWindow({ window: REFERENCE_WINDOW_TOKENS, fixed: NOMINAL_FIXED_TOKENS });
 
 export function createMemoryService(
 	store: SqliteStore,
@@ -149,10 +154,11 @@ export function createMemoryService(
 		id?: () => string;
 		/** Embedding for the turn vectors; looked up at each use, so the application may create it after memory. */
 		embed?: () => MemoryEmbed | undefined;
-		historyBudgetTokens?: () => number;
+		/** The saved model's window plan, looked up at each use: background work sizes its inputs from it. */
+		windowPlan?: () => WindowPlan;
 	},
 ) {
-	const historyBudgetTokens = options.historyBudgetTokens ?? widestBudget;
+	const windowPlan = options.windowPlan ?? referencePlan;
 	const clock = options.clock ?? (() => new Date().toISOString());
 	const newId = options.id ?? (() => crypto.randomUUID());
 	let healthy = false;
@@ -177,11 +183,7 @@ export function createMemoryService(
 		scopeKey: PROFILE_SCOPE,
 	});
 	const atMs = () => Date.parse(clock());
-	const windows = createContextWindowStore({
-		continuity,
-		clock,
-		id: newId,
-	});
+	const windows = createContextWindowStore({ clock, id: newId });
 
 	const toDto = (db: Database, item: StateItem) =>
 		itemDto(conversation, db, item);
@@ -228,18 +230,18 @@ export function createMemoryService(
 		return result;
 	}
 
-	guardContinuity(continuity, historyBudgetTokens);
+	guardContinuity(continuity, () => windowPlan().sections.state);
 
 	conversation.addRetractHook(dropVectorsOnRetract(conversation));
 
 	/** The block journal's message ids: hidden from the history even while the database does not know them (memory unhealthy). */
 	const journalBlocked = new Set<string>();
-	const ledger = createLedger({
-		store,
+	const ledger = createLedger({ store, continuity, clock, journalBlocked });
+	const backfill = createBackfill({
 		conversation,
-		clock,
-		active: (db) => healthy && readSettings(db).enabled,
-		journalBlocked,
+		continuity,
+		blocked: ledger.blockedMessageIdsInTransaction,
+		logCap: () => windowPlan().log.cap,
 	});
 	const curationDeps = {
 		conversation,
@@ -285,15 +287,8 @@ export function createMemoryService(
 		conversation,
 		atMs,
 		embed: options.embed,
-		// The next prompt shows these verbatim: a prefetch must not repeat them.
-		recall: (db, input) =>
-			recallTurns(db, conversation, {
-				...input,
-				excludeMessageIds: [
-					...(input.excludeMessageIds ?? []),
-					...verbatimMessageIds(db, input.conversationId),
-				],
-			}),
+		// The next prompt shows the log's messages verbatim: a prefetch must not repeat them.
+		recall: recallBesideLog(conversation, continuity),
 	});
 
 	function setEnabledInTransaction(
@@ -305,7 +300,7 @@ export function createMemoryService(
 			writeSettings(db, enabled);
 			windows.recordImmediateInTransaction(db, "settings", null);
 			// What was said while memory was off is never learned.
-			if (enabled) ledger.skipPendingExchangesInTransaction(db);
+			if (enabled) ledger.skipUncuratedEventsInTransaction(db);
 		}
 		return { enabled, healthy };
 	}
@@ -430,9 +425,10 @@ export function createMemoryService(
 				healthy = true;
 				// Coming back from an unhealthy spell: what was said meanwhile is not learned.
 				if (wasUnhealthy) {
-					ledger.skipPendingExchangesInTransaction(db);
+					ledger.skipUncuratedEventsInTransaction(db);
 					wasUnhealthy = false;
 				}
+				backfill.runInTransaction(db);
 				return {
 					healthy,
 					reapplied: result.reapplied,
@@ -572,13 +568,18 @@ export function createMemoryService(
 				})
 			)
 				return windows.rebuildInTransaction(db, conversationId, {
-					refreshLongTerm: false,
+					republish: false,
 					prefetch: { text: "", pins: [], tokens: 0 },
 				});
 			return window;
 		},
-		/** The budget (tokens) of the memory and conversation history half of the model window. */
-		historyBudgetTokens,
+		/** The window plan of the saved model: background work sizes its inputs from it. */
+		windowPlan,
+		/** The memory tool's read; null when memory is off or unhealthy (nothing is handed over then). */
+		readItemsInTransaction: (db: Database, input: ReadItemsInput) =>
+			healthy && readSettings(db).enabled
+				? windows.readItemsInTransaction(db, input)
+				: null,
 		/**
 		 * Earlier exchanges that resemble `vector`, from before the verbatim window (read-only, no tool call).
 		 * null when memory is off or unhealthy, or nothing qualifies.
@@ -611,17 +612,22 @@ export function createMemoryService(
 			return { ok: true };
 		},
 		/**
-		 * The steward's republish of the window (section 2.4): history, summary, short-term layer and notices from the
-		 * ledger and State; L1 only when asked or when an immediate change, a policy change or a validity boundary
-		 * requires it. Records no immediate change, so a run in flight is not expired.
+		 * The steward's changes to the window: notices and the prefetch now; a requested republish waits for the next
+		 * re-construction unless an immediate change requires it. Records no immediate change, so a run in flight is
+		 * not expired.
 		 */
 		publishWindowInTransaction: windows.publishInTransaction,
-		/** The verbatim history of a prompt: L3 in the window's order and what is still unprocessed (section 2.3). */
-		verbatimHistoryInTransaction: (
+		/**
+		 * A re-construction republishes the profile (the waiting additions join it, keeping the published order).
+		 * null when memory is off or unhealthy.
+		 */
+		republishWindowInTransaction(
 			db: Database,
 			conversationId: string,
-			window: WindowSnapshot,
-		) => verbatimHistory(db, conversationId, window.history),
+		): WindowSnapshot | null {
+			if (!healthy || !readSettings(db).enabled) return null;
+			return windows.republishInTransaction(db, conversationId);
+		},
 		/** What a run keeps of a window for the adoption check (the texts stay in its prompt). */
 		preparedWindow(
 			window: WindowSnapshot,
@@ -634,8 +640,8 @@ export function createMemoryService(
 				immediateSeq: window.inputs.immediateSeq,
 				policyRevision: window.inputs.policyRevision,
 				manifest: [
-					...window.longTerm.manifest.map((entry) => entry.itemId),
-					...(window.shortTerm.recentItemIds ?? []),
+					...window.profile.items.map((item) => item.id),
+					...window.newMemories.map((item) => item.id),
 				],
 				pins: window.prefetch.pins,
 				prefetchTokens: window.prefetch.tokens,

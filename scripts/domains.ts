@@ -377,6 +377,7 @@ export const domains = {
 			api: [
 				"agent-runtime",
 				"capabilities",
+				"continuity",
 				"conversation",
 				"delivery",
 				"inference",
@@ -387,7 +388,7 @@ export const domains = {
 				"tool-runtime",
 			],
 			web: ["conversation"],
-			test: ["world"],
+			test: ["goals"],
 		},
 	},
 	"voice-dialogue": {

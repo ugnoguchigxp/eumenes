@@ -1,0 +1,75 @@
+{
+	"id": "ctx-f3-holdout-01",
+	"family": "F3",
+	"split": "holdout",
+	"seed": {
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "strategist"
+		},
+		"episode": [
+			{
+				"kind": "summary",
+				"text": "週末のハイキングは高尾山に行くと決めた。",
+				"events": [
+					{
+						"type": "said",
+						"by": "user",
+						"at": "2026-10-10T09:00:00.000Z",
+						"text": "週末どこかで体を動かしたい"
+					},
+					{
+						"type": "said",
+						"by": "agent",
+						"at": "2026-10-10T09:00:03.000Z",
+						"text": "高尾山はいかがでしょう。",
+						"origin": "reply"
+					},
+					{
+						"type": "said",
+						"by": "user",
+						"at": "2026-10-10T09:03:00.000Z",
+						"text": "いいね、高尾山にしよう"
+					},
+					{
+						"type": "said",
+						"by": "agent",
+						"at": "2026-10-10T09:03:03.000Z",
+						"text": "では朝の電車を調べておきます。",
+						"origin": "reply"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-15T18:40:00.000Z",
+				"text": "天気が崩れそうだから、屋内のボルダリングジムに変えるよ"
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-15T18:40:03.000Z",
+				"text": "承知しました。ジムに変更ですね。",
+				"origin": "reply"
+			}
+		]
+	},
+	"input": "結局、今週末はどこへ行く話になってる？",
+	"expect": {
+		"checks": [
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "uses_newest_fact",
+				"condition": "週末の行き先を、変更後の屋内のボルダリングジムとして答えている。要約にある高尾山を現在の行き先として答えていない。"
+			}
+		]
+	}
+}

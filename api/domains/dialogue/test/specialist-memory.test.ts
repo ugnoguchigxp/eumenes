@@ -32,7 +32,7 @@ function lastTurn(h: Harness) {
 test("2026-10-18: a draft whose reply broke the contract, an utterance cut off by the next one, and the follow-up all reach the specialist", async () => {
 	const h = await harness();
 	// The first turn changes the work, then twice breaks the contract with its reply: the host reports the change.
-	h.startCall({ request: "ECサイトのデモUIを作る" });
+	h.handOver({ request: "ECサイトのデモUIを作る" });
 	h.state.specialist.push(
 		invoke("デモのECサイト"),
 		{ action: "reply" },
@@ -79,7 +79,7 @@ test("2026-10-18: a draft whose reply broke the contract, an utterance cut off b
 
 test("a failed turn stays in the course with its refused operations and its code", async () => {
 	const h = await harness();
-	h.startCall({ request: "作って" });
+	h.handOver({ request: "作って" });
 	h.state.specialist.push(reply("はじめます"));
 	await h.ask("作って");
 	h.state.invokeError = "ui_definition_invalid";
@@ -109,7 +109,7 @@ test("a failed turn stays in the course with its refused operations and its code
 
 test("an operation that changes nothing ends the turn with the host's question, without another call", async () => {
 	const h = await harness();
-	h.startCall({ request: "作って" });
+	h.handOver({ request: "作って" });
 	h.state.specialist.push(reply("はじめます"));
 	await h.ask("作って");
 	const before = h.state.specialistPrompts.length;

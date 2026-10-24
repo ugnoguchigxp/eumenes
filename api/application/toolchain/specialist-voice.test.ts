@@ -1,10 +1,11 @@
 import { afterEach, expect, test } from "bun:test";
 import type { LarmPort } from "../../domains/larm";
 import {
-	analysisReceipt,
-	DISCOVERY,
-	isAnalysisRound,
-} from "../../domains/dialogue/test/analysis.fixture";
+	callsOf,
+	isResultRound,
+	isUtteranceRound,
+	searchThenDelegate,
+} from "./conversation-script.fixture";
 import { waitFor } from "../../infrastructure/wait-for";
 import { harness } from "./toolchain.fixture";
 
@@ -69,38 +70,18 @@ function model(): LarmPort {
 					text: replies[spoken],
 				});
 			}
-			// The conversation's first round delegates to the studio; the second writes its request.
-			if (isAnalysisRound(options?.tools)) {
-				if (
-					options?.tools?.some((t) => t.function.name === DISCOVERY) &&
-					!options.tools.some((t) => t.function.name === "ui_create")
-				) {
+			// The conversation's round delegates the request to the studio (a search, then the hand-over).
+			if (isUtteranceRound(options?.tools) && !isResultRound(messages)) {
+				const step = searchThenDelegate(
+					(candidate) => candidate.id === "ui.compose",
+					messages.at(-1)!.content,
+					{ announcement: "制作担当に引き継ぎます。", impact: "create" },
+				)(messages);
+				if (step.calls?.length)
 					options!.onToolCalls!(
-						analysisReceipt("fixture", {
-							name: DISCOVERY,
-							args: { query: messages.at(-1)!.content },
-						}).toolCalls as never,
+						callsOf(step, () => crypto.randomUUID()) as never,
 					);
-					return "";
-				}
-				options!.onToolCalls!(
-					analysisReceipt("fixture", {
-						name: "ui_create",
-						args: { kind: "creation" },
-						announcement: "制作担当に引き継ぎます。",
-					}).toolCalls as never,
-				);
-				return "";
-			}
-			if (options?.tools?.length) {
-				options.onToolCalls!([
-					{
-						id: crypto.randomUUID(),
-						name: "ui_create",
-						arguments: JSON.stringify({ request: spoken }),
-					},
-				]);
-				return "";
+				return step.text ?? "";
 			}
 			return "かしこまりました。";
 		},

@@ -1,0 +1,67 @@
+{
+	"id": "ctx-f2-dev-01",
+	"family": "F2",
+	"split": "dev",
+	"seed": {
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "butler"
+		},
+		"events": [
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-16T21:10:00.000Z",
+				"text": "明日の東京の天気を教えて"
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-16T21:10:03.000Z",
+				"text": "明日の東京は晴れで、最高気温は二十二度の予報です。",
+				"origin": "reply"
+			},
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-16T21:12:00.000Z",
+				"text": "ありがとう。じゃあ今日はもう休むね"
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-16T21:12:03.000Z",
+				"text": "おやすみなさいませ。",
+				"origin": "reply"
+			},
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-17T07:30:00.000Z",
+				"text": "おはよう"
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-17T07:30:03.000Z",
+				"text": "おはようございます。",
+				"origin": "reply"
+			}
+		]
+	},
+	"input": "今の東京の天気はどう？今日は傘を持っていったほうがいいかな",
+	"expect": {
+		"checks": [
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "no_unsupported_assertion",
+				"condition": "前日の回答にある「晴れ・二十二度」を、現在の天気として断定していない。最新の天気を調べる（関数を呼ぶ、または調べると予告する）か、前日時点の予報だったと時点を添えている。"
+			}
+		]
+	}
+}

@@ -1,21 +1,14 @@
 import { afterEach, expect, test } from "bun:test";
-import {
-	DOCUMENT_AGENT,
-	setup,
-	studioAgent,
-	type Harness,
-} from "./specialist.fixture";
+import { DOCUMENT_AGENT, setup, type Harness } from "./specialist.fixture";
 
 const open: Harness[] = [];
 afterEach(async () => {
-	studioAgent.current = null;
 	for (const h of open.splice(0)) await h.close();
 });
 async function harness(agent = DOCUMENT_AGENT) {
-	studioAgent.current = agent;
-	const h = await setup();
+	const h = await setup({ agent });
 	open.push(h);
-	h.startCall({ request: "ページを作って" });
+	h.handOver({ request: "ページを作って" });
 	h.state.specialist.push({ action: "reply", text: "はじめます" });
 	await h.ask("ページを作って");
 	return h;

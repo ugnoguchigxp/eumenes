@@ -1,0 +1,88 @@
+{
+	"id": "ctx-f3-holdout-04",
+	"family": "F3",
+	"split": "holdout",
+	"seed": {
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "sage"
+		},
+		"episode": [
+			{
+				"kind": "summary",
+				"text": "洗濯機は、縦型の洗濯乾燥機を買うことに決めた。",
+				"events": [
+					{
+						"type": "said",
+						"by": "user",
+						"at": "2026-10-03T20:00:00.000Z",
+						"text": "洗濯機を買い替えたい"
+					},
+					{
+						"type": "said",
+						"by": "agent",
+						"at": "2026-10-03T20:00:03.000Z",
+						"text": "縦型と、ドラム式があります。",
+						"origin": "reply"
+					},
+					{
+						"type": "said",
+						"by": "user",
+						"at": "2026-10-03T20:05:00.000Z",
+						"text": "掃除が楽な縦型がいいかな"
+					},
+					{
+						"type": "said",
+						"by": "agent",
+						"at": "2026-10-03T20:05:03.000Z",
+						"text": "縦型は価格も手頃です。",
+						"origin": "reply"
+					},
+					{
+						"type": "said",
+						"by": "user",
+						"at": "2026-10-03T20:07:00.000Z",
+						"text": "じゃあ縦型に決めた"
+					},
+					{
+						"type": "said",
+						"by": "agent",
+						"at": "2026-10-03T20:07:03.000Z",
+						"text": "承知しました。",
+						"origin": "reply"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-14T19:30:00.000Z",
+				"text": "乾燥まで一台で済ませたくなってきた。ドラム式の乾燥機能付きにする"
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-14T19:30:03.000Z",
+				"text": "承知しました。ドラム式に変更ですね。",
+				"origin": "reply"
+			}
+		]
+	},
+	"input": "買うことにした洗濯機のタイプを、もう一度聞かせて",
+	"expect": {
+		"checks": [
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "uses_newest_fact",
+				"condition": "洗濯機のタイプを、後の発言で決め直したドラム式（乾燥機能付き）として答えている。要約にある縦型を現在の選択として答えていない。"
+			}
+		]
+	}
+}

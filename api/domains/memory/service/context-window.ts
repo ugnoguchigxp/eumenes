@@ -1,9 +1,9 @@
 import { estimateTextTokens } from "../../../infrastructure/context-budget";
+import { referenceJson } from "../../../infrastructure/reference-json";
 import { listAllState } from "./state-snapshot";
 import type { Database } from "bun:sqlite";
 import { classifyValidity, periodFromStateMs } from "eumenes-memory";
 import { latestMemoryChangeSeq } from "eumenes-memory/sqlite";
-import type { ContinuityService } from "../../continuity";
 import { PRINCIPAL, PROFILE_SCOPE } from "../contracts";
 import {
 	activeTendencies,
@@ -18,21 +18,17 @@ import {
 	writeWindowRow,
 } from "../repository";
 import {
-	formatPeriod,
-	longTermFromText,
-	noteLines,
-	renderLongTerm,
-	renderShortTerm,
-	shortTermFromText,
-	type LayerSection,
-	type StateLine,
-	type TendencyLine,
-} from "./context-render";
-import { buildHistory, type WindowHistory } from "./context-history";
+	lastTokyoDay,
+	profileItemFields,
+	publishedOrder,
+	tokyoDay,
+	type ProfileItem,
+} from "./profile";
 
 export type ImmediateKind =
 	| "state_import"
 	| "state_stop"
+	| "state_correct"
 	| "state_retract"
 	| "state_forget"
 	| "settings"
@@ -42,7 +38,6 @@ export type ImmediateKind =
 export type WindowInputs = {
 	immediateSeq: number;
 	stateChangeSeq: number;
-	continuityRevision: number;
 	tendencyRevision: number;
 	policyRevision: string;
 };
@@ -52,41 +47,30 @@ export type WindowPrefetch = {
 	/** Estimated tokens of `text`. */
 	tokens: number;
 };
+/**
+ * The long-term memory a conversation's window shows (`profile`), what has changed since it was published
+ * (`newMemories`), the steward's one-time notices and the prefetched recall. The profile is republished only by a
+ * re-construction (`republishInTransaction`) or an immediate change; additions wait in `newMemories` meanwhile.
+ */
 export type WindowSnapshot = {
-	referenceItems?: StateLine[];
 	conversationId: string;
 	version: number;
 	buildId: string;
 	inputs: WindowInputs;
-	longTerm: {
-		/** The whole layer as the prompt carries it: `header`, then `sections`, written by one function (layerText). */
-		text: string;
-		/** The frame sentence that is the first line of `text`; "" when the layer is empty. */
-		header: string;
-		/** The lines of `text` after the header, grouped by heading; [] when the layer is empty. */
-		sections: LayerSection[];
-		manifest: { itemId: string; revision: string }[];
-		/** Estimated tokens of `text`. */
+	profile: {
+		/** The items in their published order. */
+		items: ProfileItem[];
+		/** Estimated tokens of the items as JSON. */
 		tokens: number;
 	};
-	shortTerm: {
-		/** As `longTerm.text`: `header` and `sections` are the same layer in structure. */
-		text: string;
-		header: string;
-		sections: LayerSection[];
-		tokens: number;
-		pendingAdditions: number;
-		/** The State items behind "recently remembered": a usage receipt must name them too (forgetting purges by item). */
-		recentItemIds?: string[];
-	};
-	/** L3 (the exchanges kept verbatim) and the summary, from the exchange ledger at the time of the build. */
-	history: WindowHistory;
+	/** Current items the published profile does not show (new, or at a newer revision). */
+	newMemories: ProfileItem[];
+	/** The steward asked for a republish: the next re-construction applies it. */
+	republishRequested: boolean;
 	prefetch: WindowPrefetch;
 	notices: { id: string; text: string }[];
 	/** The earliest validFrom/validUntil of an active State item after the build time: crossing it changes what is current. */
-	nextBoundaryMs?: number | null;
-	/** The earliest expiry of a short-term note shown in `shortTerm`: after it the text is out of date. */
-	nextExpiryMs?: number | null;
+	nextBoundaryMs: number | null;
 };
 
 const EMPTY_PREFETCH: WindowPrefetch = { text: "", pins: [], tokens: 0 };
@@ -108,8 +92,22 @@ function latestStateChange(db: Database, policyRevision: string): number {
 	return changes.seq;
 }
 
-/** The current, valid State of the profile as long-term lines, and the next time validity changes. */
-function currentState(db: Database, policyRevision: string, nowMs: number) {
+interface PartialDateLike {
+	precision: "year" | "month" | "day";
+	year: number;
+	month?: number;
+	day?: number;
+}
+const two = (n: number) => String(n).padStart(2, "0");
+/** A partial date as written (2026, 2026-09, 2026-09-01): absolute, never relative to now. */
+function partialDay(date: PartialDateLike): string {
+	if (date.precision === "year") return String(date.year);
+	if (date.precision === "month") return `${date.year}-${two(date.month!)}`;
+	return `${date.year}-${two(date.month!)}-${two(date.day!)}`;
+}
+
+/** The current, valid State of the profile and the tendencies as items, and the next time validity changes. */
+function currentItems(db: Database, policyRevision: string, nowMs: number) {
 	const listed = listAllState(db, {
 		contractVersion: CONTRACT_VERSION,
 		access: {
@@ -130,7 +128,7 @@ function currentState(db: Database, policyRevision: string, nowMs: number) {
 				(nextBoundaryMs === null || at < nextBoundaryMs)
 			)
 				nextBoundaryMs = at;
-	const lines = listed.items
+	const states = listed.items
 		.filter((item) => {
 			if (item.subject !== "self") return false;
 			const validity = classifyValidity(
@@ -139,17 +137,50 @@ function currentState(db: Database, policyRevision: string, nowMs: number) {
 			);
 			return validity === "current" || validity === "unknown";
 		})
-		.map((item): StateLine => ({
-			validUntilMs: item.validUntilMs,
-			itemId: item.itemId,
-			revision: item.revision,
-			kind: item.kind,
-			text: item.value.text,
-			negated: item.value.polarity === "negated",
-			period: formatPeriod(item),
-			order: item.updatedSeq,
-		}));
-	return { lines, nextBoundaryMs };
+		.map((item): ProfileItem => {
+			const validity = (
+				item as {
+					validity?: { from?: PartialDateLike; until?: PartialDateLike };
+				}
+			).validity;
+			const since = validity?.from
+				? partialDay(validity.from)
+				: item.validFromMs === null
+					? undefined
+					: tokyoDay(item.validFromMs);
+			const until = validity?.until
+				? partialDay(validity.until)
+				: item.validUntilMs === null
+					? undefined
+					: lastTokyoDay(item.validUntilMs);
+			return {
+				id: item.itemId,
+				kind: item.kind,
+				text: item.value.text.replace(/\s+/g, " ").trim(),
+				negated: item.value.polarity === "negated",
+				source: "user_said",
+				...(since ? { since } : {}),
+				...(until ? { until } : {}),
+				revision: item.revision,
+				newness: item.updatedSeq,
+				...(item.validUntilMs === null ? {} : { untilMs: item.validUntilMs }),
+			};
+		});
+	const tendencies = activeTendencies(db).map((row): ProfileItem => ({
+		id: `tendency:${row.id}`,
+		kind: "tendency",
+		text: row.text.replace(/\s+/g, " ").trim(),
+		negated: false,
+		source: "observed",
+		revision: row.revision,
+		newness: Date.parse(row.updatedAt),
+	}));
+	return { items: [...states, ...tendencies], nextBoundaryMs };
+}
+
+/** Tokens of the profile as the conversation reads it (the items' JSON). */
+export function profileTokens(items: readonly ProfileItem[]): number {
+	return estimateTextTokens(referenceJson(items.map(profileItemFields)));
 }
 
 /** The shown notices without the cleared ones, then the added ones, oldest first. */
@@ -165,36 +196,57 @@ function nextNotices(
 	];
 }
 
-/** A window built before the layers carried their structure or their token counts: both are read back from the stored text. */
-function withLayerStructure(window: WindowSnapshot) {
-	if (!window.longTerm.sections) {
-		const { header, sections } = longTermFromText(window.longTerm.text);
-		window.longTerm = { ...window.longTerm, header, sections };
+/** What the memory tool asks to read: the ids, or the terms of a query; the items the window already shows. */
+export type ReadItemsInput = {
+	query?: string;
+	itemIds?: readonly string[];
+	shown: ReadonlySet<string>;
+	limit: number;
+};
+
+/** Share of the character pairs of the query, or of the item, the other side must hold for a match. */
+const MATCH_SHARE = 0.5;
+
+/** The characters and character bigrams of each whitespace-separated term, lowercased (a one-character term is itself). */
+function gramsOf(text: string): Set<string> {
+	const grams = new Set<string>();
+	for (const term of text.toLowerCase().split(/\s+/).filter(Boolean)) {
+		const chars = [...term];
+		if (chars.length === 1) grams.add(term);
+		for (let i = 0; i + 1 < chars.length; i++)
+			grams.add(chars[i]! + chars[i + 1]!);
 	}
-	if (!window.shortTerm.sections) {
-		const { header, sections } = shortTermFromText(window.shortTerm.text);
-		window.shortTerm = { ...window.shortTerm, header, sections };
-	}
-	window.longTerm.tokens ??= estimateTextTokens(window.longTerm.text);
-	window.shortTerm.tokens ??= estimateTextTokens(window.shortTerm.text);
-	window.prefetch.tokens ??= estimateTextTokens(window.prefetch.text);
+	return grams;
+}
+
+/**
+ * Natural Japanese has no word breaks, so a query matches an item by overlapping character pairs: at least two
+ * shared (or all of a smaller set), and half of the query's pairs (a short query inside a long item) or half of the
+ * item's (a long question around a short item).
+ */
+function matchesQuery(query: ReadonlySet<string>, text: string): boolean {
+	const item = gramsOf(text);
+	let hit = 0;
+	for (const gram of query) if (item.has(gram)) hit++;
+	return (
+		hit >= Math.min(2, query.size, item.size) &&
+		(hit / query.size >= MATCH_SHARE || hit / item.size >= MATCH_SHARE)
+	);
 }
 
 export function createContextWindowStore(deps: {
-	continuity: ContinuityService;
 	clock: () => string;
 	id: () => string;
 }) {
-	const { continuity, clock, id } = deps;
+	const { clock, id } = deps;
 	/** A performance copy only: correctness is the (version, buildId) match against the database row. */
 	const cache = new Map<string, WindowSnapshot>();
 
-	function readInputs(db: Database, conversationId: string): WindowInputs {
+	function readInputs(db: Database): WindowInputs {
 		const policyRevision = String(readSettings(db).revision);
 		return {
 			immediateSeq: maxImmediateSeq(db),
 			stateChangeSeq: latestStateChange(db, policyRevision),
-			continuityRevision: continuity.revisionInTransaction(db, conversationId),
 			tendencyRevision: tendencyRevision(db),
 			policyRevision,
 		};
@@ -217,117 +269,99 @@ export function createContextWindowStore(deps: {
 		const row = readWindowRow(db, conversationId);
 		if (!row) return null;
 		const parsed = JSON.parse(row.snapshot) as WindowSnapshot;
-		// Built before the history was part of a window: the next read builds it again.
-		if (!parsed.history) return null;
-		withLayerStructure(parsed);
+		// Built before the profile carried its items: the next read builds it again.
+		if (!parsed.profile) return null;
 		cache.set(conversationId, parsed);
 		return parsed;
 	}
 
+	function store(db: Database, snapshot: WindowSnapshot) {
+		writeWindowRow(
+			db,
+			snapshot.conversationId,
+			{
+				version: snapshot.version,
+				buildId: snapshot.buildId,
+				snapshot: JSON.stringify(snapshot),
+			},
+			clock(),
+		);
+		// A rolled-back transaction leaves the row behind this copy; the next read notices by buildId.
+		cache.set(snapshot.conversationId, snapshot);
+	}
+
+	/**
+	 * Builds the window again from State. `republish` publishes the profile anew (keeping the previous order and
+	 * appending new items); otherwise the published profile stays and the changes go to `newMemories`.
+	 */
 	function rebuildInTransaction(
 		db: Database,
 		conversationId: string,
 		opts: {
-			refreshLongTerm: boolean;
+			republish: boolean;
+			requestRepublish?: boolean;
 			prefetch?: WindowPrefetch;
 			addNotices?: string[];
 			clearNoticeIds?: string[];
 		},
 	): WindowSnapshot {
 		const previous = current(db, conversationId);
-		const refresh = opts.refreshLongTerm || !previous;
-		const inputs = readInputs(db, conversationId);
-		const now = clock();
-		const { lines: states, nextBoundaryMs } = currentState(
+		const republish = opts.republish || !previous;
+		const inputs = readInputs(db);
+		const { items, nextBoundaryMs } = currentItems(
 			db,
 			inputs.policyRevision,
-			Date.parse(now),
+			Date.parse(clock()),
 		);
-		let longTerm: WindowSnapshot["longTerm"];
-		if (refresh || !previous) {
-			const tendencies: TendencyLine[] = activeTendencies(db).map((row) => ({
-				id: row.id,
-				revision: row.revision,
-				text: row.text,
-				order: row.updatedAt,
-			}));
-			const rendered = renderLongTerm(states, tendencies);
-			longTerm = {
-				text: rendered.text,
-				header: rendered.header,
-				sections: rendered.sections,
-				manifest: rendered.manifest,
-				tokens: rendered.tokens,
-			};
-		} else longTerm = previous.longTerm;
-		const known = new Map(
-			longTerm.manifest.map((entry) => [entry.itemId, entry.revision]),
-		);
-		const recent = states.filter(
-			(line) => known.get(line.itemId) !== String(line.revision),
-		);
-		const notes = continuity.snapshotInTransaction(db, conversationId).items;
-		const shortTerm = renderShortTerm(recent, noteLines(notes));
-		let nextExpiryMs: number | null = null;
-		for (const note of notes) {
-			const at = note.expiresAt === null ? null : Date.parse(note.expiresAt);
-			if (at !== null && (nextExpiryMs === null || at < nextExpiryMs))
-				nextExpiryMs = at;
+		let shown: ProfileItem[];
+		if (republish) {
+			shown = publishedOrder(
+				items,
+				previous?.profile.items.map((item) => item.id) ?? [],
+			);
+		} else {
+			// The published items stay as they were, except those no longer current (stopped, expired, forgotten)
+			// and those at an older revision: the old text must not stand beside its new version in `newMemories`.
+			const live = new Map(items.map((item) => [item.id, item.revision]));
+			shown = previous!.profile.items.filter(
+				(item) => live.get(item.id) === item.revision,
+			);
 		}
-		const notices = nextNotices(
-			previous?.notices ?? [],
-			opts.clearNoticeIds ?? [],
-			(opts.addNotices ?? []).map((text) => ({ id: id(), text })),
+		const published = new Map(shown.map((item) => [item.id, item.revision]));
+		const newMemories = items.filter(
+			(item) => published.get(item.id) !== item.revision,
 		);
 		const snapshot: WindowSnapshot = {
-			referenceItems: states.filter(
-				(line) =>
-					longTerm.manifest.some((m) => m.itemId === line.itemId) ||
-					recent.some((m) => m.itemId === line.itemId),
-			),
 			conversationId,
 			version: (readWindowKey(db, conversationId)?.version ?? 0) + 1,
 			buildId: id(),
-			// L1 keeps the versions it was built from: a change not yet in it must stay visible to the next read.
+			// The profile keeps the versions it was published from: a change not yet in it stays visible next time.
 			inputs:
-				refresh || !previous
+				republish || !previous
 					? inputs
 					: {
 							...inputs,
 							immediateSeq: previous.inputs.immediateSeq,
 							policyRevision: previous.inputs.policyRevision,
 						},
-			longTerm,
-			history: buildHistory(db, conversationId, previous?.history),
-			shortTerm: {
-				text: shortTerm.text,
-				header: shortTerm.header,
-				sections: shortTerm.sections,
-				tokens: shortTerm.tokens,
-				pendingAdditions: shortTerm.pendingAdditions,
-				recentItemIds: recent.map((line) => line.itemId),
-			},
+			profile: { items: shown, tokens: profileTokens(shown) },
+			newMemories,
+			republishRequested: republish
+				? false
+				: (opts.requestRepublish ?? false) || previous!.republishRequested,
 			prefetch: opts.prefetch ?? previous?.prefetch ?? EMPTY_PREFETCH,
-			notices,
-			nextExpiryMs,
-			// L1 is not re-rendered here, so its boundary stays the one it was built with.
+			notices: nextNotices(
+				previous?.notices ?? [],
+				opts.clearNoticeIds ?? [],
+				(opts.addNotices ?? []).map((text) => ({ id: id(), text })),
+			),
+			// The published profile keeps the boundary it was built with.
 			nextBoundaryMs:
-				refresh || !previous
+				republish || !previous
 					? nextBoundaryMs
 					: (previous.nextBoundaryMs ?? null),
 		};
-		writeWindowRow(
-			db,
-			conversationId,
-			{
-				version: snapshot.version,
-				buildId: snapshot.buildId,
-				snapshot: JSON.stringify(snapshot),
-			},
-			now,
-		);
-		// A rolled-back transaction leaves the row behind this copy; the next read notices by buildId.
-		cache.set(conversationId, snapshot);
+		store(db, snapshot);
 		return snapshot;
 	}
 
@@ -336,81 +370,68 @@ export function createContextWindowStore(deps: {
 		return boundary !== null && Date.parse(clock()) >= boundary;
 	}
 
+	/** An immediate change, a policy change or a validity boundary must reach the profile at once. */
+	function mustRepublish(db: Database, snapshot: WindowSnapshot): boolean {
+		const inputs = readInputs(db);
+		return (
+			inputs.immediateSeq !== snapshot.inputs.immediateSeq ||
+			inputs.policyRevision !== snapshot.inputs.policyRevision ||
+			boundaryCrossed(snapshot)
+		);
+	}
+
 	return {
 		/** The window last stored for the conversation, as it was built; never rebuilds (a read connection may call it). */
 		storedInTransaction: current,
-		/** Prepare-time read (write transaction). Rebuilds and stores when an input moved. */
+		/**
+		 * Prepare-time read (write transaction). An immediate change, a policy change or a crossed validity boundary
+		 * republishes the profile now; other State changes only refresh `newMemories`.
+		 */
 		readForRunInTransaction(
 			db: Database,
 			conversationId: string,
 		): WindowSnapshot {
-			let snapshot = current(db, conversationId);
-			if (!snapshot || !snapshot.referenceItems)
-				return rebuildInTransaction(db, conversationId, {
-					refreshLongTerm: true,
-				});
-			const inputs = readInputs(db, conversationId);
-			const was = snapshot.inputs;
-			let refreshed = false;
+			const snapshot = current(db, conversationId);
+			if (!snapshot)
+				return rebuildInTransaction(db, conversationId, { republish: true });
+			if (mustRepublish(db, snapshot))
+				return rebuildInTransaction(db, conversationId, { republish: true });
+			const inputs = readInputs(db);
 			if (
-				inputs.immediateSeq !== was.immediateSeq ||
-				inputs.policyRevision !== was.policyRevision
-			) {
-				snapshot = rebuildInTransaction(db, conversationId, {
-					refreshLongTerm: true,
-				});
-				refreshed = true;
-			} else if (
-				inputs.stateChangeSeq !== was.stateChangeSeq ||
-				inputs.continuityRevision !== was.continuityRevision ||
-				inputs.tendencyRevision !== was.tendencyRevision
+				inputs.stateChangeSeq !== snapshot.inputs.stateChangeSeq ||
+				inputs.tendencyRevision !== snapshot.inputs.tendencyRevision
 			)
-				snapshot = rebuildInTransaction(db, conversationId, {
-					refreshLongTerm: false,
-				});
-			// A note that has expired since the layer was rendered must leave it.
-			const expiry = snapshot.nextExpiryMs ?? null;
-			if (!refreshed && expiry !== null && Date.parse(clock()) >= expiry)
-				snapshot = rebuildInTransaction(db, conversationId, {
-					refreshLongTerm: false,
-				});
-			// Crossing the validity boundary changes what is current; the date changing or additions piling up do not.
-			if (!refreshed && boundaryCrossed(snapshot))
-				snapshot = rebuildInTransaction(db, conversationId, {
-					refreshLongTerm: true,
-				});
+				return rebuildInTransaction(db, conversationId, { republish: false });
 			return snapshot;
 		},
 		rebuildInTransaction,
 		/**
-		 * The steward's republish (section 2.4): history, summary, short-term and notices are built again from the
-		 * ledger and State. L1 is rendered again only when `republishLongTerm` asks for it, there was no window, or
-		 * the conditions of readForRunInTransaction apply (an immediate change, a policy change, a validity
-		 * boundary crossed). It records no immediate change, so a run in flight is not expired by it.
+		 * The steward's changes to the window: notices and the prefetch are applied now; a requested republish waits
+		 * for the next re-construction (`republishInTransaction`) unless an immediate change requires it already.
 		 */
 		publishInTransaction(
 			db: Database,
 			conversationId: string,
 			opts: {
-				republishLongTerm?: boolean;
+				requestRepublish?: boolean;
 				prefetch?: WindowPrefetch;
 				addNotices?: string[];
 			},
 		): WindowSnapshot {
 			const previous = current(db, conversationId);
-			let refresh = opts.republishLongTerm === true || !previous;
-			if (previous && !refresh) {
-				const inputs = readInputs(db, conversationId);
-				refresh =
-					inputs.immediateSeq !== previous.inputs.immediateSeq ||
-					inputs.policyRevision !== previous.inputs.policyRevision ||
-					boundaryCrossed(previous);
-			}
 			return rebuildInTransaction(db, conversationId, {
-				refreshLongTerm: refresh,
+				republish: !previous || mustRepublish(db, previous),
+				...(opts.requestRepublish ? { requestRepublish: true } : {}),
 				...(opts.prefetch ? { prefetch: opts.prefetch } : {}),
 				...(opts.addNotices ? { addNotices: opts.addNotices } : {}),
 			});
+		},
+		/** A re-construction republishes the profile: the waiting additions join it, in the order rule. */
+		republishInTransaction(
+			db: Database,
+			conversationId: string,
+		): WindowSnapshot {
+			return rebuildInTransaction(db, conversationId, { republish: true });
 		},
 		/**
 		 * Drops shown notices without re-rendering anything (it runs after the answer is saved and must not fail
@@ -428,31 +449,50 @@ export function createContextWindowStore(deps: {
 				(notice) => !cleared.has(notice.id),
 			);
 			if (notices.length === previous.notices.length) return;
-			const snapshot: WindowSnapshot = {
+			store(db, {
 				...previous,
 				version: (readWindowKey(db, conversationId)?.version ?? 0) + 1,
 				buildId: id(),
 				notices,
-			};
-			writeWindowRow(
-				db,
-				conversationId,
-				{
-					version: snapshot.version,
-					buildId: snapshot.buildId,
-					snapshot: JSON.stringify(snapshot),
-				},
-				clock(),
-			);
-			cache.set(conversationId, snapshot);
+			});
 		},
 		/**
-		 * Removes every stored window (all conversations) and the in-process copies. Rendered memory text
-		 * lives in them, so forgetting must not leave it behind; the next read builds again from State.
+		 * Removes every stored window (all conversations) and the in-process copies. Memory text lives in them, so
+		 * forgetting must not leave it behind; the next read builds again from State.
 		 */
 		purgeInTransaction(db: Database) {
 			purgeWindows(db);
 			cache.clear();
+		},
+		/**
+		 * The memory tool's read (the ContextWindow specification, section 14): the current State items and
+		 * tendencies matching the asked ids or the query (character-pair overlap, deterministic), newest first. Items the window already
+		 * shows come back by id only; nothing is added, strengthened or reordered by reading.
+		 */
+		readItemsInTransaction(
+			db: Database,
+			input: ReadItemsInput,
+		): Array<Record<string, unknown>> {
+			const { items } = currentItems(
+				db,
+				String(readSettings(db).revision),
+				Date.parse(clock()),
+			);
+			const asked = new Set(input.itemIds ?? []);
+			const grams = gramsOf(input.query ?? "");
+			return items
+				.filter(
+					(item) =>
+						asked.has(item.id) ||
+						(grams.size > 0 && matchesQuery(grams, item.text)),
+				)
+				.sort((a, b) => b.newness - a.newness)
+				.slice(0, input.limit)
+				.map((item) =>
+					input.shown.has(item.id)
+						? { id: item.id, inProfile: true }
+						: { ...profileItemFields(item), revision: item.revision },
+				);
 		},
 		/** Same transaction as the change itself: a run in flight that predates it is expired. */
 		recordImmediateInTransaction(

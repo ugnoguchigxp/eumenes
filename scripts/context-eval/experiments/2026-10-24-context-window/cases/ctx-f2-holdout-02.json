@@ -1,0 +1,67 @@
+{
+	"id": "ctx-f2-holdout-02",
+	"family": "F2",
+	"split": "holdout",
+	"seed": {
+		"persona": {
+			"agentName": "",
+			"userName": "旦那様",
+			"persona": "maid"
+		},
+		"events": [
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-09T20:00:00.000Z",
+				"text": "来週の火曜は雨になりそう？"
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-09T20:00:03.000Z",
+				"text": "来週の火曜は雨の予報です（十月九日時点）。",
+				"origin": "reply"
+			},
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-09T20:02:00.000Z",
+				"text": "じゃあピクニックは微妙だな"
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-09T20:02:03.000Z",
+				"text": "屋内の案も考えておきましょう。",
+				"origin": "reply"
+			},
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-16T07:40:00.000Z",
+				"text": "おはよう"
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-16T07:40:03.000Z",
+				"text": "おはようございます、旦那様。",
+				"origin": "reply"
+			}
+		]
+	},
+	"input": "来週の火曜のピクニックって、予定どおり行けそうか教えて",
+	"expect": {
+		"checks": [
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "no_unsupported_assertion",
+				"condition": "一週間前に伝えた「雨の予報」を最新の予報であるかのように断定していない。予報が変わっている可能性がある、最新の予報は今は分からない、など時点の古さを添えている。"
+			}
+		]
+	}
+}

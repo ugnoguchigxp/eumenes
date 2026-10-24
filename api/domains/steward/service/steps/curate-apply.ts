@@ -4,11 +4,17 @@ import {
 	type CurationResult,
 } from "../../../memory";
 import { MAX_FAILURES } from "../../contracts";
-import { bumpInboxFailure, resolveInbox } from "../../repository";
+import {
+	bumpInboxFailure,
+	deleteEventFailures,
+	resolveInbox,
+} from "../../repository";
 import {
 	FORGET_LIMIT_NOTICE,
 	NOTHING_TO_FORGET_NOTICE,
+	NOTHING_TO_WITHDRAW_NOTICE,
 	REQUEST_FAILED_NOTICE,
+	WITHDRAWN_NOTICE,
 } from "../notices";
 import type { MemoryRef } from "../context";
 import { relatedToRequest } from "../relevance";
@@ -40,6 +46,7 @@ function noticeFor(
 	if (code === "forget_limit") return FORGET_LIMIT_NOTICE;
 	if (code === "nothing_to_forget" || code === "unrelated_target")
 		return NOTHING_TO_FORGET_NOTICE;
+	if (code === "nothing_to_withdraw") return NOTHING_TO_WITHDRAW_NOTICE;
 	if (code === "world_unavailable")
 		return "世界の記録に今は触れないため、忘れる依頼は実行できませんでした。";
 	if (code === "evidence_incomplete")
@@ -54,6 +61,8 @@ function noticeFor(
 			return "訂正の依頼を反映しました。";
 		case "stop":
 			return "依頼された記憶の利用を止めました。";
+		case "withdraw":
+			return WITHDRAWN_NOTICE;
 		default:
 			return "記憶の依頼は実行できませんでした。";
 	}
@@ -65,10 +74,13 @@ type GoalsTiedTo = (entityIds: readonly string[]) => ReadonlySet<string>;
 type Entry = { item: CurationItem; source: Source };
 /** A forget the curation asks for: one per request, applied before anything else of the unit. */
 type PlannedForget = ForgetSpec & { request: string; source: Source };
+/** A request that took others back: the requests it withdrew (their labels) are not carried out. */
+type Withdrawal = { request: string; source: Source; targets: string[] };
 
 class Plan {
 	entries: Entry[] = [];
 	forgets: PlannedForget[] = [];
+	withdrawals: Withdrawal[] = [];
 	rejected: Array<{ source: Source; code: string }> = [];
 	/** Targets of a forget that did not relate to the request and were left out while the rest went on. */
 	unrelated: Array<{ source: Source; count: number }> = [];
@@ -80,17 +92,56 @@ class Plan {
 	}
 }
 
+/**
+ * The requests a `withdraw` request takes back: only requests of this unit that are still waiting (it never sees
+ * an applied one) and are not themselves a withdrawal or a goal request. An applied forget is never undone.
+ */
+function withdrawalsOf(
+	context: CurateContext,
+	output: CurateOutput,
+): Map<string, string[]> {
+	const found = new Map<string, string[]>();
+	for (const e of output.resolve) {
+		const request = context.requests[e.request];
+		if (e.action !== "withdraw" || request?.kind !== "withdraw") continue;
+		if (found.has(e.request)) continue;
+		found.set(
+			e.request,
+			[...new Set(e.refs)].filter((label) => {
+				const target = context.requests[label];
+				return (
+					target !== undefined &&
+					label !== e.request &&
+					(target.kind === "forget" ||
+						target.kind === "remember" ||
+						target.kind === "correct")
+				);
+			}),
+		);
+	}
+	return found;
+}
+
 function planOutput(
 	context: CurateContext,
 	output: CurateOutput,
 	extras: Pick<CurateExtras, "candidates" | "candidateTexts">,
 	goalsTiedTo: GoalsTiedTo,
+	withdrawals: ReadonlyMap<string, string[]>,
 ) {
 	const plan = new Plan();
-	const messageOf = (label: string) => context.exchanges[label]?.inputMessageId;
-	// The notes have no evidence of their own: they stand on every exchange the unit read (conservative).
+	// Only a user's own words are evidence of what the user said.
+	const messageOf = (label: string) => {
+		const event = context.events[label];
+		return event?.by === "user" ? (event.messageId ?? undefined) : undefined;
+	};
+	// The notes have no evidence of their own: they stand on every event the unit read (conservative).
 	const noteSources = [
-		...new Set(Object.values(context.exchanges).map((e) => e.inputMessageId)),
+		...new Set(
+			Object.values(context.events)
+				.map((e) => e.messageId)
+				.filter((id): id is string => id !== null),
+		),
 	];
 	const stateRef = (ref: string) => {
 		const found = context.refs[ref];
@@ -191,7 +242,16 @@ function planOutput(
 		const source: Source = { section: "resolve", index, request: e.request };
 		if (answered.has(e.request)) return;
 		answered.add(e.request);
-		planResolve(plan, context, extras, goalsTiedTo, e, request, source);
+		planResolve(
+			plan,
+			context,
+			extras,
+			goalsTiedTo,
+			withdrawals,
+			e,
+			request,
+			source,
+		);
 	});
 	return { plan, answered };
 }
@@ -201,6 +261,7 @@ function planResolve(
 	context: CurateContext,
 	extras: Pick<CurateExtras, "candidates" | "candidateTexts">,
 	goalsTiedTo: GoalsTiedTo,
+	withdrawals: ReadonlyMap<string, string[]>,
 	e: Resolve,
 	request: RequestEntry,
 	source: Source,
@@ -266,24 +327,21 @@ function planResolve(
 					FORGET_MAX_ITEMS
 			)
 				return plan.reject(source, "forget_limit");
-			// The exchange the request was made in is the request itself: alone it is nothing to forget.
+			// The message the request was made in is the request itself: alone it is nothing to forget.
 			const own = new Set<string>();
 			const others = new Set<string>();
 			for (const label of e.alsoIn) {
-				const exchange = context.exchanges[label];
+				const event = context.events[label];
 				const candidate = extras.candidates[label];
-				if (!exchange && !candidate) continue;
-				const userText =
-					context.exchangeTexts[label] ?? extras.candidateTexts[label] ?? "";
-				if (!relatedToRequest(asked, [userText])) {
+				if (!event && !candidate) continue;
+				const shownText =
+					context.eventTexts[label] ?? extras.candidateTexts[label] ?? "";
+				if (!relatedToRequest(asked, [shownText])) {
 					unrelated++;
 					continue;
 				}
-				const into = label === request.exchange ? own : others;
-				if (exchange) {
-					into.add(exchange.inputMessageId);
-					if (exchange.answerMessageId) into.add(exchange.answerMessageId);
-				}
+				const into = label === request.event ? own : others;
+				if (event?.messageId) into.add(event.messageId);
 				for (const id of candidate ?? []) into.add(id);
 			}
 			const messageIds = new Set([...own, ...others]);
@@ -318,6 +376,19 @@ function planResolve(
 				{ op: "stop", itemId: ref.id, revision: ref.revision },
 				source,
 			);
+		}
+		case "withdraw": {
+			// Only a withdrawal request takes requests back; the others it names are not carried out.
+			if (request.kind !== "withdraw") return plan.reject(source, "no_action");
+			const targets = withdrawals.get(source.request ?? "") ?? [];
+			if (targets.length === 0)
+				return plan.reject(source, "nothing_to_withdraw");
+			plan.withdrawals.push({
+				request: source.request ?? "",
+				source,
+				targets,
+			});
+			return;
 		}
 		case "remember": {
 			const ref = states[0];
@@ -480,16 +551,28 @@ export function applyCurate(
 	const { db, deps, conversationId } = env;
 	const context = prepared.context as CurateContext;
 	const extras = rawExtras as CurateExtras;
-	const output = withKeptText(env, context, rawOutput as CurateOutput);
-	const { plan, answered } = planOutput(context, output, extras, (entityIds) =>
-		entityIds.length > 0 && deps.goals
-			? new Set(
-					deps.goals.ops.resolveForgetInTransaction(db, {
-						goalIds: [],
-						entityIds: [...entityIds],
-					}).goalIds,
-				)
-			: new Set(),
+	// The requests a withdrawal takes back are not carried out: whatever the model also wrote for them is left out.
+	const raw = rawOutput as CurateOutput;
+	const withdrawals = withdrawalsOf(context, raw);
+	const withdrawn = new Set([...withdrawals.values()].flat());
+	const output = withKeptText(env, context, {
+		...raw,
+		resolve: raw.resolve.filter((e) => !withdrawn.has(e.request)),
+	});
+	const { plan, answered } = planOutput(
+		context,
+		output,
+		extras,
+		(entityIds) =>
+			entityIds.length > 0 && deps.goals
+				? new Set(
+						deps.goals.ops.resolveForgetInTransaction(db, {
+							goalIds: [],
+							entityIds: [...entityIds],
+						}).goalIds,
+					)
+				: new Set(),
+		withdrawals,
 	);
 	const described: unknown[] = [];
 	const refs: ApplyResult["refs"] = [];
@@ -558,6 +641,23 @@ export function applyCurate(
 		record("forgotten");
 	}
 
+	// 1b. The withdrawals: the requests taken back end without being carried out (an applied one is never undone).
+	for (const withdrawal of plan.withdrawals) {
+		applied++;
+		outcomeOf.set(withdrawal.request, {
+			applied: true,
+			action: "withdraw",
+			code: null,
+		});
+		described.push({
+			section: "resolve",
+			request: withdrawal.request,
+			status: "applied",
+			code: "withdrawn",
+			count: withdrawal.targets.length,
+		});
+	}
+
 	// 2. The rest of the curation, without what the forget took.
 	const kept: Entry[] = [];
 	for (const entry of plan.entries) {
@@ -601,6 +701,11 @@ export function applyCurate(
 	const now = deps.clock();
 	for (const [label, request] of Object.entries(context.requests)) {
 		refs.push({ type: "request", id: request.id });
+		if (withdrawn.has(label)) {
+			resolveInbox(db, request.id, "none", "withdrawn", now);
+			changed = true;
+			continue;
+		}
 		const outcome = outcomeOf.get(label);
 		if (outcome) {
 			// A forget of this unit may have blocked the request's own message: the purge ended it as `forgotten`,
@@ -626,8 +731,12 @@ export function applyCurate(
 			}
 		}
 	}
-	for (const id of context.targetIds)
-		deps.memory.markExchangeStepInTransaction(db, id, "curated", "done");
+	deps.continuity.events.markCuratedInTransaction(
+		db,
+		conversationId,
+		context.targetSeqs,
+	);
+	deleteEventFailures(db, conversationId, context.targetSeqs);
 	recordRoutes(env, context, output.route);
 	deps.memory.vectors.saveTurnVectors(
 		db,
@@ -635,11 +744,9 @@ export function applyCurate(
 		extras.turnVectors as TurnVectors,
 	);
 	const messageIds = new Set(
-		Object.values(context.exchanges).flatMap((e) =>
-			[e.inputMessageId, e.answerMessageId].filter(
-				(id): id is string => id !== null,
-			),
-		),
+		Object.values(context.events)
+			.map((e) => e.messageId)
+			.filter((id): id is string => id !== null),
 	);
 	for (const id of messageIds) refs.push({ type: "message", id });
 	return {

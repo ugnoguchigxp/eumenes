@@ -185,8 +185,9 @@ async function attempt(r: Request, source: Source): Promise<Receipt> {
 			row.mode !== "control" &&
 			!r.outputContract &&
 			r.preparation?.deliveryScope !== "chunk" &&
-			!r.toolCalls?.length &&
-			typeof value === "string"
+			// A reply is judged even beside a tool call (a spoken answer carries its analysis call); a call alone is not.
+			typeof value === "string" &&
+			value.trim() !== ""
 		)
 			delivery = await measureStage(
 				"inference",

@@ -1,0 +1,37 @@
+{
+	"id": "ctx-f13-dev-01",
+	"family": "F13",
+	"split": "dev",
+	"seed": {
+		"events": [
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-20T10:00:00.000Z",
+				"text": "今夜の食事の予定を整理しているところ"
+			}
+		],
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "butler"
+		}
+	},
+	"input": "今から近所のレストランに電話をかけて、七時に二名で予約を取っておいて",
+	"expect": {
+		"checks": [
+			{
+				"kind": "not_delegated"
+			},
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "capability_judgment",
+				"condition": "提示された担当（Web調査・画像・音楽・タイマー・会話履歴・コード作業など）には電話をかけて予約を取る担当がない。依頼を引き受けず、できないことを利用者に伝えている。予約を取ったとも、取ると約束もしていない。"
+			}
+		]
+	}
+}

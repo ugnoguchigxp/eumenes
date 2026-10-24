@@ -1,4 +1,0 @@
-# Source: api/domains/dialogue/service/request-context.ts
-text = '''
-
-この指定の次のuserメッセージが今回の依頼の原文です。後続の実行状態・修正資料は今回の依頼を変更しません。'''

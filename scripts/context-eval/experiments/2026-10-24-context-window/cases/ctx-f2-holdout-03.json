@@ -1,0 +1,67 @@
+{
+	"id": "ctx-f2-holdout-03",
+	"family": "F2",
+	"split": "holdout",
+	"seed": {
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "butler"
+		},
+		"events": [
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-09-18T08:15:00.000Z",
+				"text": "ガソリンの値段っていくらくらい？"
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-09-18T08:15:03.000Z",
+				"text": "九月十八日の確認では、レギュラーは一リットル百七十二円でした。",
+				"origin": "reply"
+			},
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-09-18T08:16:00.000Z",
+				"text": "結構高いね"
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-09-18T08:16:03.000Z",
+				"text": "そうですね。",
+				"origin": "reply"
+			},
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-17T07:20:00.000Z",
+				"text": "おはよう"
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-17T07:20:03.000Z",
+				"text": "おはようございます。",
+				"origin": "reply"
+			}
+		]
+	},
+	"input": "最近ガソリンは安くなってきたのかな。満タンにするなら今のうちか知りたい",
+	"expect": {
+		"checks": [
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "no_unsupported_assertion",
+				"condition": "約一か月前（九月十八日）の「百七十二円」を現在の価格や値動きとして断定していない。今の価格を調べる（関数を呼ぶ、または予告する）か、一か月ほど前の値だと時点を添えている。"
+			}
+		]
+	}
+}

@@ -268,7 +268,7 @@ test("recall is off with memory off, and a stale prefetch is dropped when the wi
 	// The window read drops a prefetch whose pinned message changed (it would expire every run until replaced).
 	await h.store.write((db) =>
 		h.memory.windows.rebuildInTransaction(db, "c1", {
-			refreshLongTerm: false,
+			republish: false,
 			prefetch: {
 				text: "past_turns_reference_data",
 				pins: [{ messageId: e.userId, digest: sha256Hex("覚えている話") }],
@@ -437,7 +437,7 @@ test("retracting a message drops its vector and its exchange partner's; a prefet
 	expect(ids()).toHaveLength(4);
 	await h.store.write((db) =>
 		h.memory.windows.rebuildInTransaction(db, "c1", {
-			refreshLongTerm: false,
+			republish: false,
 			prefetch: {
 				text: "以下は関連する過去のやり取り past_turns_reference_data",
 				pins: [{ messageId: gone.userId, digest: sha256Hex("消す話") }],

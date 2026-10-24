@@ -1,0 +1,55 @@
+{
+	"id": "ctx-f11-holdout-02",
+	"family": "F11",
+	"split": "holdout",
+	"seed": {
+		"events": [
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-21T05:00:00.000Z",
+				"text": "新しいノートがほしい"
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-21T05:00:04.000Z",
+				"text": "罫線の細かいものが書きやすいですよ。",
+				"origin": "reply"
+			},
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-21T05:00:30.000Z",
+				"text": "色はどうしようかな"
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-21T05:00:33.000Z",
+				"text": "濃い緑は目に優しいです。",
+				"origin": "reply",
+				"heard": "none"
+			}
+		],
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "butler"
+		}
+	},
+	"input": "色については何か言ってた？",
+	"expect": {
+		"checks": [
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "delivery_aware",
+				"condition": "濃い緑の話は再生に失敗して利用者に届いていないことを踏まえている。すでに聞いたこととして扱っていない。"
+			}
+		]
+	}
+}

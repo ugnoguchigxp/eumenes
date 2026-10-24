@@ -404,7 +404,8 @@ test("a commit & push request changes nothing: there is no such tool, and the li
 		expect(count(h, "SELECT COUNT(*) AS n FROM terminal_requests")).toBe(0);
 		expect(count(h, "SELECT COUNT(*) AS n FROM kanban_runs")).toBe(0);
 		expect(h.commandContexts.at(-1)).not.toContain("commit-push");
-		expect(answers.at(-1)).toContain(
+		// The guidance is in the result phase's document; its ampersand is escaped in the captured JSON.
+		expect(answers.at(-1)!.replaceAll("\\\\u0026", "&")).toContain(
 			"タスクボードで内容を確認してから commit & push を押してください",
 		);
 		// Even a registered operation cannot make the conversation commit: the adapter refuses it.

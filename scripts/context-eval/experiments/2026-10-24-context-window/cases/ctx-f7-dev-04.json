@@ -1,0 +1,53 @@
+{
+	"id": "ctx-f7-dev-04",
+	"family": "F7",
+	"split": "dev",
+	"seed": {
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "strategist"
+		},
+		"longTerm": [
+			{
+				"kind": "personal_fact",
+				"key": "job.field",
+				"text": "仕事は設計の分野"
+			},
+			{
+				"kind": "habit",
+				"key": "walk.morning",
+				"text": "朝は近所を三十分歩く"
+			}
+		],
+		"events": [
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-16T12:00:00.000Z",
+				"text": "来月から水泳教室を始めるつもりなんだ"
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-16T12:00:03.000Z",
+				"text": "いいですね。応援します。",
+				"origin": "reply"
+			}
+		]
+	},
+	"input": "私が水泳を始めるって話、前から覚えててくれたの？",
+	"expect": {
+		"checks": [
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "correct_attribution",
+				"condition": "水泳の話は、前から保存されている記憶ではなく、この会話でさきほど聞いた話だと答えている。以前から覚えていたとは述べていない。"
+			}
+		]
+	}
+}

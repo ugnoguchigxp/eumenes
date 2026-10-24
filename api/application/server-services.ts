@@ -8,10 +8,10 @@ import { taskMediaPorts } from "./toolchain/task-media-execution";
 import { taskLegacyPorts } from "./toolchain/task-legacy-execution";
 import {
 	REFERENCE_WINDOW_TOKENS,
-	contextBudgets,
+	planWindow,
 	createConnectionModels,
 } from "../domains/inference";
-import { createMemoryService } from "../domains/memory";
+import { NOMINAL_FIXED_TOKENS, createMemoryService } from "../domains/memory";
 import { createOcr } from "../domains/ocr";
 import { createScheduler } from "../domains/scheduler";
 import { createTimers } from "../domains/timers";
@@ -39,8 +39,7 @@ import { createToolchainRouting } from "./toolchain/toolchain-routing";
 import { createPipelinesService } from "./pipelines/pipelines-service";
 import { createPipelineTrials } from "./pipelines/pipelines-trials";
 import { createHostToolchain } from "./toolchain/toolchain-host";
-import { createAgencyHost } from "./agency/host";
-import { createAgencyLlmPort } from "./agency/llm-port";
+import { assembleAgency } from "./agency/assembly";
 import { createAgencyWork } from "./agency/work";
 
 const log = getLogger("server");
@@ -93,11 +92,12 @@ export async function buildServices(
 	const memory = createMemoryService(store, conversation, continuity, {
 		journalPath: memoryJournalPath,
 		embed: () => embedder,
-		// Half of the saved model's window, at most 128k tokens (256k is assumed while the window is not known).
-		historyBudgetTokens: () =>
-			contextBudgets(
-				inference.savedLlmContextWindow?.() ?? REFERENCE_WINDOW_TOKENS,
-			).memoryHistory,
+		// The saved model's window plan (the reference window while it is not known): background work sizes from it.
+		windowPlan: () =>
+			planWindow({
+				window: inference.savedLlmContextWindow?.() ?? REFERENCE_WINDOW_TOKENS,
+				fixed: NOMINAL_FIXED_TOKENS,
+			}),
 	});
 	// Forgetting revokes agent calls still running on what was forgotten (a no-op when replayed at startup).
 	memory.registerForgetPurge(inference.revokeAgentAttemptsInTransaction);
@@ -186,34 +186,11 @@ export async function buildServices(
 			)
 		: undefined;
 	// Spontaneous speech: runtimes per conversation, fed by the conversation outbox. ON/OFF is the saved setting.
-	const agency = createAgencyHost({
-		store,
-		conversation,
-		inference,
-		settings,
-		memory,
-		// The dialogue service is built below (it takes this host's context port).
-		conversationBusy: (db, conversationId) =>
-			dialogue.conversationHasActiveRunInTransaction(db, conversationId),
-		createLlm: (next) =>
-			createAgencyLlmPort({
-				store,
-				inference,
-				next,
-				// The receipt of a control call carries no token counts: read them from the attempt record.
-				attemptUsage: (attemptId) => {
-					const used = inference.usage().find((a) => a.id === attemptId);
-					return used
-						? {
-								model: used.model,
-								inputTokens: used.inputTokens,
-								outputTokens: used.outputTokens,
-								cacheReadTokens: null,
-							}
-						: null;
-				},
-			}),
-	});
+	// The dialogue service is built below (it takes this host's context port).
+	const agency = assembleAgency(
+		{ store, conversation, inference, settings, memory },
+		() => dialogue,
+	);
 	const dialogue = createDialogueService({
 		agency: agency.dialoguePort,
 		logFile: () => config.logFile,
@@ -227,6 +204,7 @@ export async function buildServices(
 		conversation,
 		larm: inference,
 		queue,
+		continuity,
 		memory,
 		steward,
 		goals: goals.dialoguePort,
@@ -273,12 +251,9 @@ export async function buildServices(
 				excalidraw: media.drawingOperations,
 			}),
 			legacy: taskLegacyPorts(dialogue),
-			// Result reports wait for the agency while it watches the conversation (one report, its moment).
-			holdResultInTransaction: (db, conversationId) =>
-				agency.holdsReportsInTransaction(db, conversationId),
 		});
-	if (enabled && toolchains)
-		agency.attachWork(createAgencyWork({ agents: toolchain.agents, dialogue }));
+	// The agency sees the conversation's open TODOs; the conversation reports their results itself.
+	agency.attachWork(createAgencyWork({ dialogue }));
 	stewardAssembly.attachDialogue(dialogue);
 	memory.registerForgetPurge(
 		toolchain.agents.executions.purgeSourcesInTransaction,

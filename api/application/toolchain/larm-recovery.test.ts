@@ -5,7 +5,10 @@ import {
 } from "../../domains/larm/test/larm.fixture";
 import { waitFor } from "../../infrastructure/wait-for";
 import { harness } from "./toolchain.fixture";
-import { withLocalAnalysis } from "./analysis-round.fixture";
+import {
+	CONVERSATION_WINDOW_TOKENS,
+	withRespond,
+} from "./conversation-script.fixture";
 
 for (const cancel of [false, true])
 	test(`public API replaces a gone LARM connection and ${cancel ? "rejects cancelled late output" : "completes the answer"}`, async () => {
@@ -26,7 +29,12 @@ for (const cancel of [false, true])
 			}
 			return fake.fetcher(url, init);
 		});
-		const h = await harness({ model: withLocalAnalysis(port) });
+		const h = await harness({
+			model: withRespond({
+				...port,
+				llmContextWindow: () => CONVERSATION_WINDOW_TOKENS,
+			}),
+		});
 		try {
 			expect((await h.request("/api/larm/connect", {})).status).toBe(200);
 			gone = true;

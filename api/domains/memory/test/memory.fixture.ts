@@ -18,6 +18,7 @@ import {
 	migration as continuityMigration,
 	shortTermMigration,
 	itemSourceMigration,
+	eventsMigration,
 } from "../../continuity";
 import {
 	agentHardeningMigration,
@@ -27,6 +28,7 @@ import {
 	seedImportMigration,
 	specialistBlockReasonMigration,
 	executionReferencesMigration,
+	retireExchangeLedgerMigration,
 	contextWindowMigration,
 	createMemoryService,
 	migration,
@@ -49,6 +51,7 @@ export const memoryTestMigrations = [
 	continuityMigration,
 	shortTermMigration,
 	itemSourceMigration,
+	eventsMigration,
 	migration,
 	contextWindowMigration,
 	agentHardeningMigration,
@@ -59,6 +62,8 @@ export const memoryTestMigrations = [
 	specialistBlockReasonMigration,
 	executionReferencesMigration,
 	...memoryPackageMigrations,
+	// Last, so a test that opens a database without it (the earlier design's) keeps every other position.
+	retireExchangeLedgerMigration,
 ];
 
 /** What a test saves: the old manual call's fields, written through the steward's save contract as an explicit request. */
@@ -154,6 +159,38 @@ export async function setupMemory(
 				runId: runId ?? (role === "user" ? `run-${id}` : null),
 			});
 			return id;
+		},
+		/**
+		 * What the dialogue records for a run: the messages and their `said` events (handled, in the log). Returns
+		 * the message ids and the event seqs.
+		 */
+		async exchange(user: string, answer: string | null, conversationId = "c1") {
+			const runId = `run-x${messages + 1}`;
+			const userId = await harness.say("user", user, conversationId, runId);
+			const answerId =
+				answer === null
+					? null
+					: await harness.say("assistant", answer, conversationId, runId);
+			const seqs = await store.write((db) => {
+				const said = [
+					{ by: "user" as const, id: userId, text: user },
+					...(answerId === null
+						? []
+						: [{ by: "agent" as const, id: answerId, text: answer! }]),
+				];
+				return said.map(
+					(entry) =>
+						continuity.events.appendInTransaction(db, {
+							conversationId,
+							at: time.now,
+							type: "said",
+							by: entry.by,
+							fields: { text: entry.text },
+							messageIds: [entry.id],
+						}).event.seq,
+				);
+			});
+			return { userId, answerId, runId, seqs };
 		},
 		window: (conversationId = "c1") =>
 			store.write((db) => {

@@ -2,6 +2,7 @@ import { classifyValidity, periodFromStateMs } from "eumenes-memory";
 import type { StateItem } from "eumenes-memory/sqlite";
 import { sha256Hex } from "../../../infrastructure/digest";
 import { estimateJsonTokens } from "../../../infrastructure/context-budget";
+import type { ConversationEvent } from "../../continuity";
 import { byteLength, type ClippedText, clipMessage } from "./budget";
 import type { StepEnv } from "./types";
 
@@ -53,19 +54,21 @@ export function activeStateItems(env: StepEnv): StateItem[] {
 
 /**
  * The long-term list (State, then tendencies) and the live notes, each with a short ref. The list is cut where
- * it would outgrow the memory and history budget (estimated tokens), newest first.
+ * it would outgrow the profile section of the window plan (estimated tokens), newest first.
  */
 export function describeMemory(env: StepEnv): MemoryDescription {
 	const { db, deps, conversationId } = env;
 	const refs: MemoryDescription["refs"] = {};
 	const longTerm: MemoryDescription["longTerm"] = [];
+	// The items the published profile does not show yet (the window's `newMemories`).
 	const recentIds = new Set(
-		deps.memory.windows.storedInTransaction(db, conversationId)?.shortTerm
-			.recentItemIds ?? [],
+		deps.memory.windows
+			.storedInTransaction(db, conversationId)
+			?.newMemories.map((item) => item.id) ?? [],
 	);
 	const recent: string[] = [];
 	let tokens = 0;
-	const budget = deps.memory.historyBudgetTokens();
+	const budget = deps.memory.windowPlan().sections.profile;
 	const push = (entry: Record<string, unknown>) => {
 		const size = estimateJsonTokens(entry);
 		if (tokens + size > budget) return false;
@@ -135,108 +138,146 @@ export function describeMemory(env: StepEnv): MemoryDescription {
 	};
 }
 
-// ---- exchanges ----
+// ---- events ----
 
-export type LoadedExchange = {
-	inputMessageId: string;
-	answerMessageId: string | null;
-	outcome: "answered" | "failed" | "request_only";
-	ordinal: number;
+export type EventBy = "user" | "agent" | "specialist";
+export type LoadedEvent = {
+	/** The continuity event (`seq`); null for a message shown as context that no event stands for. */
+	seq: number | null;
+	/** The conversation message the event shows: the evidence of what a step saves, and what a forget blocks. */
+	messageId: string | null;
+	by: EventBy;
+	origin: string | null;
 	at: string;
-	user: ClippedText;
-	assistant: ClippedText | null;
-	/** Bytes of the texts the steward is shown. */
+	text: ClippedText;
+	/** Bytes of the text the steward is shown. */
 	bytes: number;
-	/** sha256 of each message's full text when it was read (what a stored vector stands for). */
+	/** sha256 of the message's full text when it was read (what a stored vector stands for). */
 	digests: Record<string, string>;
 };
 export type LoadResult =
-	| { status: "ok"; exchange: LoadedExchange }
+	| { status: "ok"; event: LoadedEvent }
 	| { status: "gone" | "blocked" };
 
-/** One exchange as the steward reads it. `gone`: a message was retracted; `blocked`: it is on the block ledger. */
-export function loadExchange(
-	env: StepEnv,
-	row: {
-		inputMessageId: string;
-		answerMessageId: string | null;
-		outcome: "answered" | "failed" | "request_only";
-	},
-): LoadResult {
+const roleOf = (by: EventBy) => (by === "user" ? "user" : "assistant");
+
+/** The fields of a frozen event text (id, time, type, actor, then the event's own). */
+function fieldsOf(event: ConversationEvent): Record<string, unknown> | null {
+	if (event.text === null) return null;
+	try {
+		const parsed: unknown = JSON.parse(event.text);
+		return isRecord(parsed) ? parsed : null;
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * One handled `said` event as the steward reads it: the words come from the conversation message the event shows
+ * (the frozen text keeps only a head of a long utterance), or from the frozen text when no message stands behind
+ * it (an announcement). `gone`: a forgotten event, a retracted message, an event with nothing to read; `blocked`:
+ * a message of the block ledger (a scheduled prompt, a specialist session).
+ */
+export function loadEvent(env: StepEnv, event: ConversationEvent): LoadResult {
 	const { db, deps, conversationId } = env;
-	const ids = [row.inputMessageId, row.answerMessageId].filter(
-		(id): id is string => id !== null,
-	);
-	if (deps.memory.blockedMessageIdsInTransaction(db, ids).size > 0)
+	if (event.forgotten || event.type !== "said" || event.by === "host")
+		return { status: "gone" };
+	const by: EventBy = event.by;
+	const fields = fieldsOf(event);
+	const origin = typeof fields?.origin === "string" ? fields.origin : null;
+	if (event.messageIds.length === 0) {
+		const body = typeof fields?.text === "string" ? fields.text : null;
+		if (body === null) return { status: "gone" };
+		const clipped = clipMessage(body);
+		return {
+			status: "ok",
+			event: {
+				seq: event.seq,
+				messageId: null,
+				by,
+				origin,
+				at: event.at,
+				text: clipped,
+				bytes: byteLength(clipped.text),
+				digests: {},
+			},
+		};
+	}
+	if (deps.memory.blockedMessageIdsInTransaction(db, event.messageIds).size > 0)
 		return { status: "blocked" };
-	const user = deps.conversation.messageInTransaction(db, row.inputMessageId);
+	const messageId = event.messageIds[0]!;
+	const found = deps.conversation.messageInTransaction(db, messageId);
 	if (
-		!user ||
-		user.message.role !== "user" ||
-		user.message.conversationId !== conversationId
+		!found ||
+		found.message.role !== roleOf(by) ||
+		found.message.conversationId !== conversationId
 	)
 		return { status: "gone" };
-	let assistant: ReturnType<typeof deps.conversation.messageInTransaction> =
-		null;
-	if (row.answerMessageId !== null) {
-		assistant = deps.conversation.messageInTransaction(db, row.answerMessageId);
-		if (!assistant || assistant.message.role !== "assistant")
-			return { status: "gone" };
-	}
-	const userText = clipMessage(user.message.text);
-	const assistantText = assistant ? clipMessage(assistant.message.text) : null;
+	const clipped = clipMessage(found.message.text);
 	return {
 		status: "ok",
-		exchange: {
-			inputMessageId: row.inputMessageId,
-			answerMessageId: row.answerMessageId,
-			outcome: row.outcome,
-			ordinal: user.ordinal,
-			at: user.message.createdAt,
-			user: userText,
-			assistant: assistantText,
-			bytes: byteLength(userText.text) + byteLength(assistantText?.text ?? ""),
-			digests: {
-				[row.inputMessageId]: sha256Hex(user.message.text),
-				...(assistant && row.answerMessageId
-					? { [row.answerMessageId]: sha256Hex(assistant.message.text) }
-					: {}),
-			},
+		event: {
+			seq: event.seq,
+			messageId,
+			by,
+			origin,
+			at: event.at,
+			text: clipped,
+			bytes: byteLength(clipped.text),
+			digests: { [messageId]: sha256Hex(found.message.text) },
 		},
 	};
 }
 
-/** The model-facing view of an exchange. `reference`: it is shown only as context for a request. */
-export function exchangeView(
+/** A conversation message as context for a request (the user's message it was made in), with no event behind it. */
+export function loadMessage(env: StepEnv, messageId: string): LoadResult {
+	const { db, deps, conversationId } = env;
+	if (deps.memory.blockedMessageIdsInTransaction(db, [messageId]).size > 0)
+		return { status: "blocked" };
+	const found = deps.conversation.messageInTransaction(db, messageId);
+	if (
+		!found ||
+		found.message.role !== "user" ||
+		found.message.conversationId !== conversationId
+	)
+		return { status: "gone" };
+	const clipped = clipMessage(found.message.text);
+	return {
+		status: "ok",
+		event: {
+			seq: null,
+			messageId,
+			by: "user",
+			origin: null,
+			at: found.message.createdAt,
+			text: clipped,
+			bytes: byteLength(clipped.text),
+			digests: { [messageId]: sha256Hex(found.message.text) },
+		},
+	};
+}
+
+/** The model-facing view of an event. `reference`: it is shown only as context for a request. */
+export function eventView(
 	label: string,
-	exchange: LoadedExchange,
+	event: LoadedEvent,
 	reference = false,
 ): Record<string, unknown> {
 	return {
 		id: label,
-		at: exchange.at,
-		outcome:
-			exchange.outcome === "failed"
-				? "failed"
-				: exchange.outcome === "request_only"
-					? "user_only"
-					: "answered",
+		at: event.at,
+		by: event.by,
+		...(event.origin ? { origin: event.origin } : {}),
 		...(reference ? { reference: true } : {}),
-		user: exchange.user.text,
-		...(exchange.user.truncated ? { userTruncated: true } : {}),
-		assistant: exchange.assistant?.text ?? null,
-		...(exchange.assistant?.truncated ? { assistantTruncated: true } : {}),
+		text: event.text.text,
+		...(event.text.truncated ? { truncated: true } : {}),
 	};
 }
 
-/** The exchange label table of a step: label -> the messages the exchange stands on. */
+/** The event label table of a step: label -> the event and the message it stands on. */
 export type LabelTable = Record<
 	string,
-	{
-		inputMessageId: string;
-		answerMessageId: string | null;
-		outcome: LoadedExchange["outcome"];
-	}
+	{ seq: number | null; messageId: string | null; by: EventBy }
 >;
 
 // ---- reading the model's output ----

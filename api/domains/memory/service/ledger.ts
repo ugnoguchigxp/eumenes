@@ -1,56 +1,33 @@
 import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
-import type { ConversationService } from "../../conversation";
-import type {
-	BlockReason,
-	Disposition,
-	ExchangeDto,
-	ExchangeStep,
-	RecordExchangeInput,
-	StepMark,
-	SummaryDto,
-} from "../contracts";
+import type { ContinuityService } from "../../continuity";
+import type { BlockReason } from "../contracts";
 import {
 	blockedAmong,
 	blockedInConversation,
-	bumpExchangeFailure,
 	deleteSpecialistBlocks,
 	insertBlocks,
-	insertExchange,
 	isBlocked,
-	listExchanges,
-	pendingConversationIds,
-	pendingExchanges,
-	readExchange,
 	readForgetSeq,
-	readSummary,
-	readSummaryRevision,
-	setExchangeDisposition,
-	setExchangeMark,
-	skipPendingExchanges,
-	writeSummary,
 } from "../repository";
 
-/** The summary text the steward may store (characters). */
-export const SUMMARY_MAX_CHARS = 1200;
-
 /**
- * The exchange ledger, the conversation summary and the blocked messages: what the steward and the dialogue read
- * and write. Everything here runs in the caller's writer transaction except the plain reads.
+ * The block ledger (messages that are neither learned from nor shown to the conversation) and the forget fence:
+ * what the dialogue and the steward read and write. Everything here runs in the caller's writer transaction
+ * except the plain reads. What the conversation said is the continuity event flow; memory does not keep a ledger
+ * of it.
  */
 export function createLedger(deps: {
 	store: SqliteStore;
-	conversation: ConversationService;
+	continuity: ContinuityService;
 	clock: () => string;
-	/** Memory is switched on and healthy: what is said while it is not is never learned. */
-	active: (db: Database) => boolean;
 	/**
 	 * The message ids of the block journal (held in process). While memory is unhealthy the database may lack
 	 * a block the journal has, so the answers about blocked messages include these too.
 	 */
 	journalBlocked: ReadonlySet<string>;
 }) {
-	const { store, conversation, clock, journalBlocked } = deps;
+	const { store, continuity, clock, journalBlocked } = deps;
 	const blockedWithJournal = (
 		db: Database,
 		messageIds: Iterable<string>,
@@ -61,181 +38,7 @@ export function createLedger(deps: {
 		return blocked;
 	};
 
-	function recordExchangeInTransaction(
-		db: Database,
-		input: RecordExchangeInput,
-	): { registered: boolean } {
-		const user = conversation.messageInTransaction(db, input.inputMessageId);
-		if (
-			!user ||
-			user.message.role !== "user" ||
-			user.message.conversationId !== input.conversationId
-		)
-			throw new Error("invalid_exchange");
-		let answerOrdinal: number | null = null;
-		if (input.answerMessageId !== null) {
-			const answer = conversation.messageInTransaction(
-				db,
-				input.answerMessageId,
-			);
-			if (
-				!answer ||
-				answer.message.role !== "assistant" ||
-				answer.message.conversationId !== input.conversationId
-			)
-				throw new Error("invalid_exchange");
-			answerOrdinal = answer.ordinal;
-		}
-		if ((input.answerMessageId === null) !== (input.outcome === "failed"))
-			throw new Error("invalid_exchange");
-		// A scheduled prompt is stored as a user message but is not the user's word.
-		if (isBlocked(db, input.inputMessageId)) return { registered: false };
-		const now = clock();
-		// While memory is off or unhealthy the exchange is kept for the context but never learned from.
-		const learnable = deps.active(db);
-		const mark: StepMark | null = learnable ? null : "skipped";
-		return {
-			registered: insertExchange(db, {
-				inputMessageId: input.inputMessageId,
-				conversationId: input.conversationId,
-				runId: input.runId,
-				answerMessageId: input.answerMessageId,
-				outcome: input.outcome,
-				inputOrdinal: user.ordinal,
-				answerOrdinal,
-				state: learnable ? "pending" : "done",
-				curated: mark,
-				disposed: mark,
-				summarized: mark,
-				disposition: null,
-				duplicateOf: null,
-				failures: {},
-				createdAt: now,
-				updatedAt: now,
-			}),
-		};
-	}
-
 	return {
-		recordExchangeInTransaction,
-		/** Exchanges still waiting for a step, oldest first; exchanges touching a blocked message are never offered. */
-		pendingExchangesInTransaction: (
-			db: Database,
-			conversationId: string,
-			step: ExchangeStep,
-			limit: number,
-		): ExchangeDto[] => pendingExchanges(db, conversationId, step, limit),
-		/** The conversations that have exchanges waiting for a step. */
-		pendingConversationIdsInTransaction: (db: Database): string[] =>
-			pendingConversationIds(db),
-		exchangeInTransaction: (
-			db: Database,
-			inputMessageId: string,
-		): ExchangeDto | null => readExchange(db, inputMessageId),
-		exchangesInTransaction: (
-			db: Database,
-			conversationId: string,
-		): ExchangeDto[] => listExchanges(db, conversationId),
-		/** The ledger of a conversation (read-only). */
-		exchanges: (conversationId: string): ExchangeDto[] =>
-			store.read((db) => listExchanges(db, conversationId)),
-		/** done or skipped on one step; the exchange is `done` once all three steps are marked. false: no such exchange. */
-		markExchangeStepInTransaction(
-			db: Database,
-			inputMessageId: string,
-			step: ExchangeStep,
-			mark: StepMark,
-		): boolean {
-			return setExchangeMark(db, inputMessageId, step, mark, clock());
-		},
-		/** One more failed attempt of a step on the exchange (the steward's count); returns the new count. */
-		recordExchangeFailureInTransaction: (
-			db: Database,
-			inputMessageId: string,
-			step: ExchangeStep,
-		): number => bumpExchangeFailure(db, inputMessageId, step, clock()),
-		/**
-		 * The dispose step's verdict (`duplicateOf`: the input message id of the earlier exchange this repeats).
-		 * `keep` and `drop` need no summary, so they also close the summarize step.
-		 */
-		setDispositionInTransaction(
-			db: Database,
-			inputMessageId: string,
-			disposition: Disposition,
-			duplicateOf: string | null = null,
-		): boolean {
-			return setExchangeDisposition(
-				db,
-				inputMessageId,
-				disposition,
-				duplicateOf,
-				clock(),
-			);
-		},
-		/** The conversation's summary with its sources and revision; null when it has none. */
-		summaryInTransaction: (
-			db: Database,
-			conversationId: string,
-		): SummaryDto | null => readSummary(db, conversationId),
-		/** 0: no summary yet. */
-		summaryRevisionInTransaction: (db: Database, conversationId: string) =>
-			readSummaryRevision(db, conversationId),
-		/**
-		 * Writes the next summary. Its sources are the previous revision's sources plus `included` (input message ids of
-		 * the exchanges of this conversation), minus blocked ones, written in this transaction; the included exchanges
-		 * become `summarize` and `summarized: done`. `expectedRevision` (0: none yet) guards against a rewrite based on
-		 * an older summary.
-		 */
-		writeSummaryInTransaction(
-			db: Database,
-			input: {
-				conversationId: string;
-				text: string;
-				included: readonly string[];
-				expectedRevision: number;
-			},
-		):
-			| { ok: true; revision: number; included: string[]; sources: string[] }
-			| { ok: false; reason: "stale_revision" | "invalid_summary" } {
-			const text = input.text.trim();
-			if (text === "" || [...text].length > SUMMARY_MAX_CHARS)
-				return { ok: false, reason: "invalid_summary" };
-			if (
-				readSummaryRevision(db, input.conversationId) !== input.expectedRevision
-			)
-				return { ok: false, reason: "stale_revision" };
-			const blocked = blockedAmong(db, input.included);
-			const included = [...new Set(input.included)].filter((id) => {
-				const row = readExchange(db, id);
-				return (
-					row !== null &&
-					row.conversationId === input.conversationId &&
-					!blocked.has(id) &&
-					(row.answerMessageId === null || !isBlocked(db, row.answerMessageId))
-				);
-			});
-			const previous = readSummary(db, input.conversationId)?.sources ?? [];
-			const previousBlocked = blockedAmong(db, previous);
-			const sources = [
-				...new Set([
-					...previous.filter((id) => !previousBlocked.has(id)),
-					...included,
-				]),
-			];
-			const now = clock();
-			const revision = writeSummary(
-				db,
-				input.conversationId,
-				text,
-				sources,
-				now,
-			);
-			for (const id of included) {
-				setExchangeDisposition(db, id, "summarize", null, now);
-				setExchangeMark(db, id, "summarized", "done", now);
-			}
-			return { ok: true, revision, included, sources };
-		},
 		/** The blocked ones among these messages. */
 		blockedMessageIdsInTransaction: (
 			db: Database,
@@ -258,7 +61,8 @@ export function createLedger(deps: {
 			store.read((db) => blockedWithJournal(db, messageIds)),
 		/**
 		 * A scheduled prompt (a user message the user did not write) and a specialist session's messages
-		 * are never learned from nor shown to the conversation.
+		 * are never learned from nor shown to the conversation. This is not a forget: the conversation's events
+		 * (the continuity flow) are left as they are.
 		 */
 		blockMessagesInTransaction(
 			db: Database,
@@ -294,9 +98,19 @@ export function createLedger(deps: {
 		},
 		/** The forget fence: it moves with every forget; a step that started before a move is not adopted. */
 		forgetSeqInTransaction: (db: Database): number => readForgetSeq(db),
-		/** What was said while memory was off (or unhealthy) is never learned: pending exchanges are marked skipped. */
-		skipPendingExchangesInTransaction(db: Database) {
-			skipPendingExchanges(db, clock());
+		/**
+		 * What was said while memory was off (or unhealthy) is never learned: every event the steward has not
+		 * handled yet is marked handled, so it is not offered later.
+		 */
+		skipUncuratedEventsInTransaction(db: Database) {
+			for (const conversationId of continuity.events.conversationsWithUncuratedInTransaction(
+				db,
+			)) {
+				const seqs = continuity.events
+					.uncuratedInTransaction(db, conversationId)
+					.map((event) => event.seq);
+				continuity.events.markCuratedInTransaction(db, conversationId, seqs);
+			}
 		},
 	};
 }

@@ -5,10 +5,41 @@ import {
 	useQueryClient,
 } from "@tanstack/react-query";
 import type { TodoResource } from "@eumenes/artifact-ui";
-import { workQuery } from "../../../../api/domains/agent-runtime/contracts";
-import { agencyWorkPageSchema } from "../../../../client/agent-runtime";
+import {
+	todoPageSchema,
+	todoQuery,
+	type TodoPage,
+} from "../../../../api/domains/agent-runtime/contracts";
 import { queryRoots } from "../../queryKeys";
 import type { WebArtifactAdapter } from "../toolchain-artifacts/registry";
+
+const outcomeLabels: Record<
+	NonNullable<TodoPage["rows"][number]["outcome"]>,
+	string
+> = {
+	succeeded: "完了",
+	partial: "一部のみ",
+	failed: "失敗",
+	cancelled: "取消",
+	interrupted: "中断",
+};
+/** A ledger row as the table shows it: the title, its state, and one line of outcome and summary. */
+function rowOf(
+	row: TodoPage["rows"][number],
+): TodoResource["page"]["rows"][number] {
+	const note = [
+		row.status === "waiting" ? "確認待ち" : undefined,
+		row.outcome ? outcomeLabels[row.outcome] : undefined,
+		row.summary ?? undefined,
+	].filter(Boolean);
+	return {
+		id: row.id,
+		request: row.title,
+		state: row.archived ? "archived" : row.status === "done" ? "done" : "todo",
+		pipeline: row.pipeline,
+		resultSummary: note.length ? note.join("：") : null,
+	};
+}
 
 /** Registration owns the entry, definition and permitted events; these are only source reads. */
 export const todosWebAdapter: WebArtifactAdapter = {
@@ -23,7 +54,7 @@ export const todosWebAdapter: WebArtifactAdapter = {
 		const source = artifact.sourceBindings[0]!.source;
 		const cache = useQueryClient();
 		const [query, setQuery] = useState(() =>
-			workQuery.parse({ state: "active" }),
+			todoQuery.parse({ state: "active" }),
 		);
 		const view = query.state === "archived" ? "archived" : "active";
 		const queryKey = [
@@ -47,7 +78,7 @@ export const todosWebAdapter: WebArtifactAdapter = {
 				return {
 					conversationId,
 					revision: response.revision,
-					page: agencyWorkPageSchema.parse(response.data),
+					page: todoPageSchema.parse(response.data),
 				};
 			},
 			enabled: visible,
@@ -61,7 +92,10 @@ export const todosWebAdapter: WebArtifactAdapter = {
 			revision: read.data?.revision ?? 0,
 			view,
 			page: {
-				rows: read.isPlaceholderData || read.isError ? [] : (page?.rows ?? []),
+				rows:
+					read.isPlaceholderData || read.isError
+						? []
+						: (page?.rows ?? []).map(rowOf),
 				total: page?.state === view ? page.total : 0,
 				pageIndex:
 					!read.isPlaceholderData && page ? page.pageIndex : query.pageIndex,
@@ -96,7 +130,7 @@ export const todosWebAdapter: WebArtifactAdapter = {
 					return { status: "accepted", message: "" };
 				}
 				if (event.action === "todo-page") {
-					const next = workQuery.safeParse({
+					const next = todoQuery.safeParse({
 						state: view,
 						pageIndex: event.values.pageIndex,
 						pageSize: event.values.pageSize,

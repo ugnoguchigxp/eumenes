@@ -1,0 +1,75 @@
+{
+	"id": "ctx-f3-dev-02",
+	"family": "F3",
+	"split": "dev",
+	"seed": {
+		"persona": {
+			"agentName": "",
+			"userName": "ご主人様",
+			"persona": "maid"
+		},
+		"episode": [
+			{
+				"kind": "summary",
+				"text": "ホームパーティーに持ち寄る料理は、ローストビーフにすると決めた。",
+				"events": [
+					{
+						"type": "said",
+						"by": "user",
+						"at": "2026-10-08T19:00:00.000Z",
+						"text": "土曜のパーティーに何を持っていこう"
+					},
+					{
+						"type": "said",
+						"by": "agent",
+						"at": "2026-10-08T19:00:03.000Z",
+						"text": "ローストビーフはいかがでしょう。",
+						"origin": "reply"
+					},
+					{
+						"type": "said",
+						"by": "user",
+						"at": "2026-10-08T19:05:00.000Z",
+						"text": "それにするよ"
+					},
+					{
+						"type": "said",
+						"by": "agent",
+						"at": "2026-10-08T19:05:03.000Z",
+						"text": "では材料を準備しましょう。",
+						"origin": "reply"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-14T20:00:00.000Z",
+				"text": "ローストビーフは高いから、やっぱりミートローフにする"
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-14T20:00:03.000Z",
+				"text": "承知しました。ミートローフに変更ですね。",
+				"origin": "reply"
+			}
+		]
+	},
+	"input": "パーティーに持っていく料理って、何にするんだっけ？",
+	"expect": {
+		"checks": [
+			{
+				"kind": "brief_spoken_reply"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "uses_newest_fact",
+				"condition": "持っていく料理を、後の発言で決め直したミートローフとして答えている。要約にあるローストビーフを現在の予定として答えていない。"
+			}
+		]
+	}
+}

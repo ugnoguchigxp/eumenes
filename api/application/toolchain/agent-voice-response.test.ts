@@ -1,10 +1,7 @@
-import { afterEach, expect, test } from "bun:test";
-import { configureLogging } from "../../infrastructure/logger";
-import { RESEARCH_FAILURE_REPLY } from "../../domains/dialogue/service/research-failure-reply";
+import { expect, test } from "bun:test";
 import { harness } from "./toolchain.fixture";
 import { waitFor } from "../../infrastructure/wait-for";
 
-afterEach(() => configureLogging({ level: "silent" }));
 function wav() {
 	const value = new Uint8Array(48);
 	value.set(new TextEncoder().encode("RIFF"));
@@ -59,84 +56,6 @@ test("silence completes without creating a dialogue, cancelling another run or s
 	}
 });
 
-for (const options of [
-	{ badJson: true },
-	{ badQuote: true },
-	{ workerReportOutput: '{"action":' },
-])
-	test(`failed research is answered by the host and spoken without a model call: ${JSON.stringify(options)}`, async () => {
-		const lines: string[] = [];
-		configureLogging({
-			level: "info",
-			destination: {
-				write: (line) => {
-					lines.push(line);
-				},
-			},
-		});
-		const h = await harness({
-			...options,
-			fullResearch: true,
-			voiceText: "今日の鎌倉の天気は",
-		});
-		try {
-			const id = await accept(h);
-			await until(() =>
-				["ready", "failed"].includes(h.voice.get(id)?.status ?? ""),
-			);
-			expect(h.voice.get(id)?.status).toBe("ready");
-			const runId = h.voice.get(id)!.runId!;
-			expect(h.dialogue.answerText(runId)).toBe(RESEARCH_FAILURE_REPLY);
-			expect(h.spoken).toEqual(["お調べします。", RESEARCH_FAILURE_REPLY]);
-			expect(h.voice.takeAudio(id, 1)).toEqual(wav());
-			expect(h.parentContexts).toEqual([]);
-			const request = h.store.read((db) =>
-				db
-					.query(
-						"SELECT status FROM inference_requests WHERE subject=? AND purpose='llm'",
-					)
-					.get(runId),
-			);
-			expect(request).toEqual({ status: "accepted" });
-			const rows = lines.map((line) => JSON.parse(line));
-			expect(
-				rows.find((row) => row.event === "voice.synthesis_started"),
-			).toMatchObject({ runId, utteranceId: id });
-			expect(
-				rows.find((row) => row.event === "voice.synthesis_completed"),
-			).toMatchObject({ runId, count: 1 });
-			expect(lines.join("")).not.toContain("鎌倉");
-		} finally {
-			await h.close();
-		}
-	});
-
-test("a failed research honours autoSpeak=false: the host answer is adopted and nothing is spoken", async () => {
-	const h = await harness({ badJson: true, voiceText: "東京の天気を調べて" });
-	try {
-		const settings = h.settings.get();
-		settings.voice.autoSpeak = false;
-		await h.settings.apply({
-			requestId: crypto.randomUUID(),
-			expectedRevision: settings.revision,
-			settings,
-			keys: [],
-		});
-		const id = await accept(h);
-		await until(() =>
-			["completed", "failed"].includes(h.voice.get(id)?.status ?? ""),
-		);
-		expect(h.voice.get(id)?.status).toBe("completed");
-		expect(h.dialogue.answerText(h.voice.get(id)!.runId!)).toBe(
-			RESEARCH_FAILURE_REPLY,
-		);
-		expect(h.parentContexts).toEqual([]);
-		expect(h.spoken).toEqual([]);
-	} finally {
-		await h.close();
-	}
-});
-
 test("a committed timer result follows the agent generation and speech path without executing twice", async () => {
 	const h = await harness({ timers: true, voiceText: "3分タイマー測って" });
 	try {
@@ -145,7 +64,6 @@ test("a committed timer result follows the agent generation and speech path with
 			["ready", "failed"].includes(h.voice.get(id)?.status ?? ""),
 		);
 		expect(h.voice.get(id)?.status).toBe("ready");
-		expect(h.parentContexts).toHaveLength(1);
 		expect(h.spoken).toEqual([
 			"お調べします。",
 			h.dialogue.answerText(h.voice.get(id)!.runId!)!,

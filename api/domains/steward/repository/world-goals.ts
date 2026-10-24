@@ -6,7 +6,7 @@ import type { Database } from "bun:sqlite";
  *     `steward_decision_ref` the claim, entity and goal references (SQLite can not alter a CHECK: the tables are rebuilt);
  *   - `steward_route`: what curate-memory judged of a message (section 3.4 of the World plan), bound to the message's
  *     revision and digest so a corrected message is never routed by the old judgment;
- *   - `steward_goal_todo`: the exchanges whose goal reflection is still due (a row exists while it is pending);
+ *   - `steward_goal_todo`: the exchanges whose goal reflection is still due (rebuilt per event by `steward/0003`);
  *   - `steward_world_event`: the failures and holds counted per World event (the third one gives the event up).
  */
 export const worldGoalsMigration = `
@@ -129,60 +129,6 @@ export function deleteRoutesOfMessages(
 		db.query(
 			`DELETE FROM steward_route WHERE message_id IN (${marks(part.length)})`,
 		).run(...part);
-}
-
-// ---- goal reflection due ----
-
-export function addGoalTodo(
-	db: Database,
-	conversationId: string,
-	inputMessageId: string,
-) {
-	db.query(
-		"INSERT OR IGNORE INTO steward_goal_todo (input_message_id, conversation_id) VALUES (?,?)",
-	).run(inputMessageId, conversationId);
-}
-/** The exchanges (input message ids) whose goal reflection is due, in the order they were curated. */
-export function pendingGoalTodos(
-	db: Database,
-	conversationId: string,
-	limit: number,
-): Array<{ inputMessageId: string; failures: number }> {
-	return db
-		.query(
-			`SELECT input_message_id AS inputMessageId, failures FROM steward_goal_todo WHERE conversation_id = ?
-			 ORDER BY rowid LIMIT ?`,
-		)
-		.all(conversationId, limit) as Array<{
-		inputMessageId: string;
-		failures: number;
-	}>;
-}
-export function deleteGoalTodos(
-	db: Database,
-	inputMessageIds: readonly string[],
-) {
-	for (const part of chunks(inputMessageIds))
-		db.query(
-			`DELETE FROM steward_goal_todo WHERE input_message_id IN (${marks(part.length)})`,
-		).run(...part);
-}
-export function bumpGoalTodoFailure(
-	db: Database,
-	inputMessageId: string,
-): number {
-	db.query(
-		"UPDATE steward_goal_todo SET failures = failures + 1 WHERE input_message_id = ?",
-	).run(inputMessageId);
-	return (
-		(
-			db
-				.query(
-					"SELECT failures FROM steward_goal_todo WHERE input_message_id = ?",
-				)
-				.get(inputMessageId) as { failures: number } | null
-		)?.failures ?? 0
-	);
 }
 
 // ---- World events ----

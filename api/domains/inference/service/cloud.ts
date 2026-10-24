@@ -4,7 +4,7 @@ import { readBounded } from "../../../infrastructure/bounded-read";
 import {
 	exchangeEnd,
 	estimateMessageTokens,
-	outputReserveTokens,
+	OUTPUT_RESERVE_DEFAULT_TOKENS,
 } from "../../../infrastructure/context-budget";
 import { getLogger } from "../../../infrastructure/logger";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
@@ -71,7 +71,7 @@ function fitMessages(
 	// A control request's own output limit (a long draft) within a quarter of the window; else the default.
 	const reserve = row.outputLimit
 		? Math.min(row.outputLimit, Math.floor(window / 4))
-		: outputReserveTokens(window);
+		: Math.min(OUTPUT_RESERVE_DEFAULT_TOKENS, Math.floor(window / 4));
 	const budget = window - reserve - FIT_MARGIN_TOKENS;
 	const sizes = messages.map((message) => estimateMessageTokens([message]));
 	let tokens = sizes.reduce((sum, size) => sum + size, 0);
