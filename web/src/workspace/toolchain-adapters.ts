@@ -1,3 +1,4 @@
+import { shellWebAdapter } from "../domains/shell/toolchain-adapter";
 import { computeWebAdapter } from "../domains/compute/toolchain-adapter";
 import { todosWebAdapter } from "../domains/agent-runtime/toolchain-adapter";
 import { codexTasksWebAdapter } from "../domains/codex-tasks/toolchain-adapter";
@@ -38,6 +39,7 @@ export const toolchainWebAdapters = createWebAdapterRegistry([
 	recordsWebAdapter,
 	serviceTestsWebAdapter,
 	terminalsWebAdapter,
+	shellWebAdapter,
 	kanbanWebAdapter,
 	sharedKanbanWebAdapter,
 	codexTasksWebAdapter,

@@ -1,3 +1,4 @@
+import { reportShellRuns } from "../shell/shell-reports";
 import { createContinuityService } from "../../domains/continuity";
 import { createPipelinesService } from "../pipelines/pipelines-service";
 import { dormantBundleFile } from "../../domains/capabilities";
@@ -137,6 +138,9 @@ export async function harness(
 		recognitionFetcher?: typeof fetch;
 		ocrFetcher?: typeof fetch;
 		/** PTY sessions for the Claude Code toolchain (a fake spawn in tests), over the harness store. */
+		shell?: (
+			store: import("../../infrastructure/sqlite").SqliteStore,
+		) => import("../../domains/shell").ShellService;
 		terminals?: (
 			store: import("../../infrastructure/sqlite").SqliteStore,
 		) => import("../../domains/terminals").TerminalsService;
@@ -218,6 +222,8 @@ export async function harness(
 			(entry) => !migrations.some((known) => known.id === entry.id),
 		),
 	]);
+	const shell = options.shell?.(store);
+	await shell?.recover();
 	let terminals = options.terminals?.(store);
 	let kanban =
 		options.kanban && terminals ? createKanban({ store }) : undefined;
@@ -843,6 +849,7 @@ export async function harness(
 		excalidraw: !!options.drawingConnection,
 		objectRecognition: !!options.recognitionFetcher,
 		ocr,
+		shell,
 		terminals,
 		kanban,
 		kanbanSdk,
@@ -992,6 +999,7 @@ export async function harness(
 	}
 	const voice = createVoiceDialogue(store, dialogue, inference);
 	if (terminals) reportFinishedTasks(terminals, dialogue);
+	if (shell) reportShellRuns(shell, dialogue);
 	const pipelines = createPipelinesService({
 		store,
 		capabilities: toolchain.capabilities,
@@ -1020,6 +1028,7 @@ export async function harness(
 		scheduler,
 		inference,
 		timers,
+		shell,
 		terminals,
 		kanban,
 		toolchainHistory: toolchain.history,
@@ -1041,6 +1050,7 @@ export async function harness(
 	return {
 		dir,
 		browser,
+		shell,
 		terminals,
 		kanban,
 		excalidraw,
@@ -1083,6 +1093,7 @@ export async function harness(
 			await browser?.service.disconnect();
 			await kanbanRuns?.disconnect();
 			terminals?.closeAll();
+			shell?.closeAll();
 			unsubscribeChanges();
 			changes.close();
 			await toolchain.agents.close();

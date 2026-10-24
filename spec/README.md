@@ -9,7 +9,7 @@ archive の基準: その文書が担当した実装がコードにあり、本�
 | 文書 | 状態 |
 | --- | --- |
 | [prompt-edit-design-2026-10-24.md](prompt-edit-design-2026-10-24.md) | 実装済み（fixture 検証済み、2026-10-24 合意）。直前の利用者の発言だけを、行動が確定する前に止めて編集・再送信する。メッセージの訂正（ContextWindow §13）と未処理の発言の run の作り直しで実現し、Web に「止めて編集」・吹き出しの編集・編集の状態を足す |
-| [cli-toolchain-design-2026-10-24.md](cli-toolchain-design-2026-10-24.md) | 合意済み（§13）・実装前。Claude Code 画面のPTY基盤を共通化し、新domain `shell` でログインシェルの画面「CLI」と、会話からのCLIコマンド実行（`cli_command`、一件ごとのPTY・実行台帳・完了通知、承認なし）を追加する |
+| [cli-toolchain-design-2026-10-24.md](cli-toolchain-design-2026-10-24.md) | 合意済み（§13）・P0〜P3実装・固定試験済み。ブラウザ・実LLM受入は未実施。Claude Code 画面のPTY基盤を共通化し、新domain `shell` でログインシェルの画面「CLI」と、会話からのCLIコマンド実行（`cli_command`、一件ごとのPTY・実行台帳・完了通知、承認なし）を追加する |
 | [code-review-2026-10-24.md](verification/code-review-2026-10-24.md) | 未commit差分全体のレビューと修正・隔離検証。完了確認失敗の波及、保留報告の解除、schema変換を修正。LARM live受入と全体gateの既存違反は未完了 |
 | [artifact-form-direct-toolchain-design-2026-10-23.md](artifact-form-direct-toolchain-design-2026-10-23.md) | 合意済み・実装・固定試験済み（§8）。ブラウザE2E・live・実機器は未実施。画像・楽曲の画面フォームからの送信に担当IDを付け、メインエージェントの担当選択を通さず、その担当の専門エージェントへ依頼文を直接渡す。画像の画面で曲が作られた障害（run `5b08cd43`）の対策 |
 | [task-pipeline-design-2026-10-22.md](task-pipeline-design-2026-10-22.md) | 合意済み。P0〜P2は実装・固定試験済み（§14）、liveは§14に記録。ブラウザE2E・実機器は未実施。3つ以上の担当を使う決まった手順をJSONの定義（入力・ステップ・変数・extract・合格条件）として `pipelines` ドメインに版で保存し、担当の検索で引き当てる。実行はアプリケーション層が1ステップずつ既存の委譲で進める。定義は協働型 `pipeline.studio` が作業文書を編集して作り、Artifactの編集画面で流れ・検索の拾われ方・選択と運転を試す。合わない依頼は一手ずつ照合する方式へ |

@@ -17,11 +17,15 @@ export type TerminalSessionResource = {
 	/** Advances on every (re)start; a new run gets a fresh connection and screen. */
 	run: number;
 	statusMessage?: string;
+	restartable?: boolean;
 };
 export type TerminalsResource = {
 	kind: "terminal-workspace";
 	revision: number;
 	available: boolean;
+	unavailableMessage?: string;
+	startingLabel?: string;
+	startNeeded?: boolean;
 	sessions: TerminalSessionResource[];
 };
 /** One live PTY session as the host connects it; credentials stay with the host. */
@@ -43,7 +47,9 @@ export function TerminalWorkspaceView({
 	const open = runtime.openTerminal;
 	const autoStarted = useRef(false);
 	const startNow =
-		!!open && resource.available && resource.sessions.length === 0;
+		!!open &&
+		resource.available &&
+		(resource.startNeeded ?? resource.sessions.length === 0);
 	useEffect(() => {
 		if (!startNow || autoStarted.current) return;
 		autoStarted.current = true;
@@ -59,9 +65,11 @@ export function TerminalWorkspaceView({
 		return next;
 	}, [open, action.source, keys]);
 	const message = !open
-		? "この画面では Claude Code を利用できません。"
+		? (resource.unavailableMessage ??
+			"この画面では Claude Code を利用できません。")
 		: !resource.available
-			? "Claude Code が見つかりません。サーバーの PATH に claude を用意してください。"
+			? (resource.unavailableMessage ??
+				"Claude Code が見つかりません。サーバーの PATH に claude を用意してください。")
 			: action.status === "rejected"
 				? action.message
 				: undefined;
@@ -69,7 +77,7 @@ export function TerminalWorkspaceView({
 		<TerminalWorkspace
 			title={request.title}
 			message={message}
-			emptyLabel="Claude Code を起動しています…"
+			emptyLabel={resource.startingLabel ?? "Claude Code を起動しています…"}
 			panes={resource.sessions.flatMap((session) => {
 				const connection = connections.get(`${session.id}:${session.run}`);
 				if (!connection) return [];
@@ -83,9 +91,12 @@ export function TerminalWorkspaceView({
 						output: connection.output,
 						onInput: connection.input,
 						onResize: connection.resize,
-						onRestart: () => {
-							void action.send("terminal-restart", { id: session.id });
-						},
+						onRestart:
+							session.restartable === false
+								? undefined
+								: () => {
+										void action.send("terminal-restart", { id: session.id });
+									},
 					},
 				];
 			})}

@@ -10,6 +10,8 @@ import type { Notice } from "../../domains/dialogue/contracts";
 import { createKanbanSdkHost } from "../work/kanban-sdk-host";
 import { join } from "node:path";
 
+import { createShell } from "../../domains/shell";
+import { reportShellRuns } from "../shell/shell-reports";
 import { reportFinishedTasks } from "../work/claude-code-reports";
 
 import { createToolchain } from "./toolchain";
@@ -162,6 +164,11 @@ export async function createHostToolchain(
 		},
 	});
 	const { terminals, kanban } = sdkHost;
+	const shell = createShell({
+		store: s.store,
+		cwd: process.cwd(),
+		onChange: s.terminalHooks?.publish,
+	});
 	const kanbanRuns = sdkHost.runs;
 	const toolchain = await createToolchain(
 		s.store,
@@ -182,6 +189,7 @@ export async function createHostToolchain(
 			image: true,
 			excalidraw: true,
 			objectRecognition: true,
+			shell,
 			terminals,
 			kanban,
 			kanbanSdk: sdkHost,
@@ -193,7 +201,7 @@ export async function createHostToolchain(
 	);
 	loadedCapabilities = toolchain.capabilities;
 	return {
-		toolchain: { ...toolchain, terminals, kanban, kanbanRuns },
+		toolchain: { ...toolchain, shell, terminals, kanban, kanbanRuns },
 		links: {
 			...links,
 			attachDialogue(
@@ -204,6 +212,7 @@ export async function createHostToolchain(
 				links.attachDialogue(dialogue);
 				// A finished conversation task is reported in that conversation.
 				reportFinishedTasks(terminals, dialogue, s.log);
+				reportShellRuns(shell, dialogue);
 			},
 		},
 	};

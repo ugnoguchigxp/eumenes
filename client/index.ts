@@ -1,3 +1,4 @@
+import { shellClient } from "./shell";
 import { computeClient } from "./compute";
 import { pipelinesClient } from "./pipelines";
 import { googleAccountsClient } from "./google-accounts";
@@ -69,6 +70,7 @@ export function createClient(baseUrl: string, token?: string) {
 		...toolchainHistoryClient(transport),
 		...timersClient(transport),
 		...terminalsClient(transport),
+		...shellClient(transport),
 		...kanbanClient(transport),
 		...toolchainActionsClient(transport),
 		...worldClient(transport),

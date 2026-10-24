@@ -1,0 +1,183 @@
+{
+	"formatVersion": 1,
+	"bundleId": "cli",
+	"pins": [],
+	"definitions": [
+		{
+			"kind": "profile",
+			"id": "cli.run",
+			"revision": 1,
+			"title": "CLI",
+			"summary": "シェルコマンドを実行し、終了コードと出力を受け取る",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [],
+			"avoidWhen": [],
+			"dependencies": [],
+			"body": "利用者の求めた確認・操作を一件のシェルコマンドとして実行する担当。登録されたプロジェクトで実行し、受付と実行完了を区別する。"
+		},
+		{
+			"kind": "skill",
+			"id": "cli.run",
+			"revision": 1,
+			"title": "CLI",
+			"summary": "シェルコマンドを実行し、終了コードと出力を受け取る",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [],
+			"avoidWhen": [],
+			"dependencies": [],
+			"body": "利用者の求めた確認・操作を一件のコマンドにする。秘密をコマンドに入れない。何をしたいか分からなければ一度確認する。実行は登録プロジェクトのルートで毎回始まる。cdの効果はその一件の中だけ有効。入力待ちは利用者が画面から入力できる。常駐プロセスは管理しない。timeoutSecondsは既定120秒、最大600秒。受付の答えでは実行を始めたことと終わったら知らせることだけを伝え、出力や成功を推測しない。一操作を受け付けたら終了する。"
+		},
+		{
+			"kind": "tool",
+			"id": "cli.run",
+			"revision": 1,
+			"title": "CLI",
+			"summary": "シェルコマンドを実行し、終了コードと出力を受け取る",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [],
+			"avoidWhen": [],
+			"dependencies": [],
+			"backend": "shell",
+			"schemaKey": "cliRun"
+		},
+		{
+			"kind": "package",
+			"id": "cli.run",
+			"revision": 1,
+			"title": "CLI",
+			"summary": "シェルコマンドを実行し、終了コードと出力を受け取る",
+			"aliases": [],
+			"tags": [],
+			"useWhen": ["CLIコマンドを実行して結果を知りたい"],
+			"avoidWhen": [],
+			"dependencies": [
+				"profile:cli.run@1",
+				"skill:cli.run@1",
+				"tool:cli.run@1"
+			],
+			"backend": "shell",
+			"schemaKey": "cliRun",
+			"profileRevisionId": "profile:cli.run@1",
+			"requiredSkillRevisionIds": ["skill:cli.run@1"],
+			"toolRevisionIds": ["tool:cli.run@1"]
+		},
+		{
+			"kind": "toolchain",
+			"id": "cli.run",
+			"revision": 1,
+			"title": "CLI",
+			"summary": "シェルコマンドを実行し、終了コードと出力を受け取る",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [
+				"CLIコマンドを実行して結果を知りたい",
+				"ファイル一覧やgitの状態などをコマンドで確認・操作したい"
+			],
+			"avoidWhen": [
+				"コードの実装・修正をClaude Codeに任せたい",
+				"コマンドの使い方を聞いているだけ"
+			],
+			"dependencies": ["package:cli.run@1"],
+			"examples": [
+				"git status を見て",
+				"このプロジェクトのファイル一覧を表示して",
+				"現在の作業ディレクトリを確かめて",
+				"ディスクの空き容量を確認して"
+			],
+			"packageRevisionId": "package:cli.run@1",
+			"functionName": "cli_command",
+			"redirects": [],
+			"bindingRevisionId": "binding:cli.run@1",
+			"artifactRevisionId": "artifact:cli.workspace@1"
+		}
+	],
+	"bindings": [
+		{
+			"kind": "binding",
+			"id": "cli.run",
+			"revision": 1,
+			"execution": "command",
+			"adapterRef": "adapter:shell@1",
+			"availabilityRef": "availability:shell@1",
+			"tools": [
+				{
+					"toolRevisionId": "tool:cli.run@1",
+					"operationId": "shell.run",
+					"inputSchemaRef": "builtin:cliRun"
+				}
+			],
+			"outputSchemaRef": "domain:shell.run-receipt@1",
+			"resultProjectionRef": "projection:shell.run-result@1",
+			"artifactRevisionId": "artifact:cli.workspace@1"
+		}
+	],
+	"artifacts": [
+		{
+			"kind": "artifact",
+			"id": "cli.workspace",
+			"revision": 1,
+			"title": "CLI",
+			"variants": [
+				{
+					"id": "standard",
+					"label": "標準",
+					"definition": {
+						"view": "terminal-workspace",
+						"source": "shell",
+						"title": "CLI"
+					}
+				}
+			],
+			"defaultVariant": "standard",
+			"sourceBindings": [
+				{
+					"source": "shell",
+					"adapterRef": "adapter:shell@1",
+					"query": "query:shell.sessions@1",
+					"target": "none"
+				}
+			],
+			"actionBindings": [
+				{
+					"actionId": "start",
+					"eventAction": "terminal-start",
+					"source": "shell",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "local"
+				},
+				{
+					"actionId": "restart",
+					"eventAction": "terminal-restart",
+					"source": "shell",
+					"inputSchemaRef": "schema:shell-session-id@1",
+					"effect": "local"
+				}
+			],
+			"launcher": {
+				"label": "CLI",
+				"order": 51
+			}
+		}
+	],
+	"schemas": [
+		{
+			"kind": "schema",
+			"id": "shell-session-id",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"id": {
+						"type": "string",
+						"minLength": 1
+					}
+				},
+				"required": ["id"]
+			}
+		}
+	]
+}

@@ -10,6 +10,7 @@ import { errorStatus as taskReports } from "../domains/task-reports/contracts";
 import { errorStatus as dots } from "../domains/dots/contracts";
 import { errorStatus as tasks } from "../domains/tasks/contracts";
 import { errorStatus as timers } from "../domains/timers/contracts";
+import { errorStatus as shell } from "../domains/shell/contracts";
 import { errorStatus as terminals } from "../domains/terminals/contracts";
 import { errorStatus as kanban } from "../domains/kanban/contracts";
 import { errorStatus as voiceDialogue } from "../domains/voice-dialogue/contracts";
@@ -83,6 +84,7 @@ const statusByCode = mergeErrorStatus(
 	taskReports,
 	tasks,
 	timers,
+	shell,
 	terminals,
 	kanban,
 	voiceDialogue,

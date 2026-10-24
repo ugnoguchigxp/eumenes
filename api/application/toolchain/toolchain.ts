@@ -67,6 +67,7 @@ import { createMusicScreenAdapter } from "../media/music-screen-adapter";
 import { createImageScreenAdapter } from "../media/image-screen-adapter";
 import { createUiCompositionsAdapter } from "../media/ui-compositions-adapter";
 import { createObjectRecognitionScreenAdapter } from "../media/object-recognition-screen-adapter";
+import { createShellAdapter } from "../shell/shell-adapter";
 import { createTerminalsAdapter } from "../work/terminals-adapter";
 import { createKanbanAdapter } from "../work/kanban-adapter";
 import {
@@ -98,6 +99,7 @@ type ToolchainOptions = {
 	/** Brave tabs and local captures (absent: not offered). */
 	browser?: Pick<BrowserAssembly, "service" | "effects" | "requests">;
 	/** PTY sessions for the terminal screen (absent: not offered). */
+	shell?: import("../../domains/shell").ShellService;
 	terminals?: import("../../domains/terminals").TerminalsService;
 	/** The task board (needs `terminals` for its runs). */
 	kanban?: import("../../domains/kanban").KanbanService;
@@ -258,6 +260,7 @@ export async function createToolchain(
 		...(options.objectRecognition
 			? [createObjectRecognitionScreenAdapter()]
 			: []),
+		...(options.shell ? [createShellAdapter(options.shell)] : []),
 		...(options.terminals ? [createTerminalsAdapter(options.terminals)] : []),
 		...(options.kanban && options.terminals
 			? [
@@ -308,6 +311,7 @@ export async function createToolchain(
 			...(options.image ? ["image"] : []),
 			...(options.uiCompositions ? ["ui-compositions"] : []),
 			...(options.objectRecognition ? ["object-recognition"] : []),
+			...(options.shell ? ["shell"] : []),
 			...(options.terminals ? ["claude-code"] : []),
 			...(options.kanban && options.terminals ? ["kanban"] : []),
 			...(options.kanbanSdk ? ["codex-tasks"] : []),

@@ -8,6 +8,8 @@
 
 CPU計算は `compute.bundle.json` と `adapter:compute@1` で追加する。4操作、永続ジョブ、取消、成果物表示の契約は [Python計算](compute.md) と [CPU統合設計](../spec/compute-cpu-integration-design-2026-10-21.md)。外部サービスは保存済みControlと同一originの広告から発見し、環境取得に成功したときに新規実行を公開する。
 
+CLI（`cli.run@1`、画面 `cli.workspace@1`）も登録adapterとbundleで追加した。PTYと端末接続はClaude Code画面と共通。[CLI](shell.md)を参照。
+
 ## 1. 全体像
 
 | 単位 | 置き場所 | 持つもの |

@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { Hono } from "hono";
 import { registerTerminals } from "../controller";
 import { createTerminals } from "../service";
-import { childEnv } from "../service/spawn";
+import { childEnv } from "../../../infrastructure/pty";
 import { fakePty } from "./terminals.fixture";
 import { waitFor } from "../../../infrastructure/wait-for";
 

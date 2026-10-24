@@ -1,5 +1,8 @@
 import { expect, test, vi } from "vitest";
-import { createTerminalConnection, parseEvents } from "./connection";
+import {
+	createTerminalConnection,
+	parseEvents,
+} from "../toolchain-artifacts/terminal-connection";
 
 const sse = (...frames: string[]) =>
 	new Response(

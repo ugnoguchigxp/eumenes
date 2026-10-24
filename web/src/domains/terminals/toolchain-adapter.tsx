@@ -5,7 +5,7 @@ import { terminalSessionsViewSchema } from "../../../../api/domains/terminals/co
 import { ApiError } from "../../../../client";
 import { queryRoots } from "../../queryKeys";
 import type { WebArtifactAdapter } from "../toolchain-artifacts/registry";
-import { createTerminalConnection } from "./connection";
+import { createTerminalConnection } from "../toolchain-artifacts/terminal-connection";
 
 const TERMINALS_ADAPTER_REF = "adapter:terminals@1";
 /** Size of a new session until its pane measures itself. */

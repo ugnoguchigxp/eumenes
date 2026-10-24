@@ -1,3 +1,4 @@
+import { appendBacklog } from "../../../infrastructure/pty";
 import { getLogger } from "../../../infrastructure/logger";
 import type {
 	TerminalSessionView,
@@ -6,8 +7,8 @@ import type {
 } from "../contracts";
 import { newHookToken, removeHookSettings, writeHookSettings } from "./hooks";
 import type { Ledger } from "./ledger";
-import { bunSpawnPty } from "./spawn";
-import { type Listener, outputStream } from "./stream";
+import { bunSpawnPty } from "../../../infrastructure/pty";
+import { type Listener, outputStream } from "../../../infrastructure/pty";
 import type { Inflight, Pty, Runtime, Session, TerminalSize } from "./types";
 
 const log = getLogger("terminals");
@@ -278,14 +279,7 @@ export function createSessions(
 				cwd: session.cwd,
 				onData(bytes) {
 					if (session.pty !== pty) return;
-					const copy = bytes.slice();
-					session.backlog.push(copy);
-					session.backlogSize += copy.byteLength;
-					while (
-						session.backlogSize > backlogBytes &&
-						session.backlog.length > 1
-					)
-						session.backlogSize -= session.backlog.shift()!.byteLength;
+					const copy = appendBacklog(session, bytes, backlogBytes);
 					for (const listener of session.listeners) listener.data(copy);
 				},
 			});

@@ -30,6 +30,7 @@ const BACKENDS = [
 	"model3d",
 	"compute",
 	"browser",
+	"shell",
 	"claude-code",
 	"kanban",
 	"codex-tasks",

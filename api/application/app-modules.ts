@@ -61,6 +61,7 @@ import {
 } from "../domains/continuity";
 import { registerScheduler, type SchedulerService } from "../domains/scheduler";
 import { registerTimers, type TimersService } from "../domains/timers";
+import { registerShell, type ShellService } from "../domains/shell";
 import { registerTerminals, type TerminalsService } from "../domains/terminals";
 import { registerKanban, type KanbanService } from "../domains/kanban";
 import {
@@ -149,6 +150,7 @@ export type AppServices = {
 	toolchainHistory?: ToolchainHistory;
 	timers?: TimersService;
 	/** PTY sessions of the terminal screen (absent: the routes do not exist). */
+	shell?: ShellService;
 	terminals?: TerminalsService;
 	/** The task board's notices (absent: the routes do not exist). */
 	kanban?: KanbanService;
@@ -288,6 +290,7 @@ export function appModules(services: AppServices): AppModule[] {
 		{ mount: (app) => registerScheduler(app, s.scheduler) },
 		s.timers && { mount: (app) => registerTimers(app, s.timers!) },
 		s.kanban && { mount: (app) => registerKanban(app, s.kanban!) },
+		s.shell && { mount: (app) => registerShell(app, s.shell!) },
 		s.terminals && {
 			mount: (app) => registerTerminals(app, s.terminals!),
 		},

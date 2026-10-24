@@ -23,6 +23,7 @@ import { migrations as goalsMigrations } from "../domains/goals";
 import { migrations as inferenceMigrations } from "../domains/inference";
 import { migrations as memoryMigrations } from "../domains/memory";
 import { migrations as stewardMigrations } from "../domains/steward";
+import { migrations as shellMigrations } from "../domains/shell";
 import { migrations as terminalsMigrations } from "../domains/terminals";
 import { migrations as kanbanMigrations } from "../domains/kanban";
 import { migrations as queueMigrations } from "../domains/queue";
@@ -150,6 +151,7 @@ const catalog: readonly Migration[] = [
 	...voiceMigrations,
 	...queueMigrations,
 	...terminalsMigrations,
+	...shellMigrations,
 	...kanbanMigrations,
 	...codexTasksMigrations,
 	...schedulerMigrations,

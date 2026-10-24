@@ -1,3 +1,5 @@
+import { cliRun } from "./cli";
+export { cliRun };
 import {
 	recognitionManage,
 	recognitionManageV2,
@@ -245,6 +247,7 @@ export const validators = {
 	codexTaskRef,
 	codexTaskFollowup,
 	codexTaskConfigure,
+	cliRun,
 	claudeCodeRequest,
 	kanbanAdd,
 	kanbanEdit,

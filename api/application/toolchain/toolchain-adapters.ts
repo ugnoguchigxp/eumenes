@@ -14,6 +14,11 @@ import {
 	GOOGLE_ACCOUNTS_ADAPTER_REF,
 	describeGoogleAccountsAdapter,
 } from "../settings/google-accounts-adapter";
+import {
+	SHELL_ADAPTER_REF,
+	describeShellAdapter,
+	shellDomainSchemas,
+} from "../shell/shell-adapter";
 import { z } from "zod";
 import {
 	TASK_ADAPTER_REF,
@@ -136,6 +141,7 @@ const domainSchemas: Readonly<Record<string, ZodType>> = {
 	...computeDomainSchemas,
 	...browserDomainSchemas,
 	...terminalsDomainSchemas,
+	...shellDomainSchemas,
 	...kanbanDomainSchemas,
 };
 
@@ -182,6 +188,7 @@ export function bundleHostOf(
 export const hostAdapterDescriptions: Array<
 	Pick<DomainAdapter, "ref" | "describe">
 > = [
+	{ ref: SHELL_ADAPTER_REF, describe: describeShellAdapter },
 	{ ref: TASK_ADAPTER_REF, describe: describeTaskAdapter },
 	{ ref: PIPELINES_ADAPTER_REF, describe: describePipelinesAdapter },
 	{ ref: TIMER_ADAPTER_REF, describe: describeTimerAdapter },

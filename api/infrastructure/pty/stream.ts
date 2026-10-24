@@ -1,5 +1,3 @@
-import type { TerminalStatus } from "../contracts";
-
 export type Listener = { data(bytes: Uint8Array): void; end(): void };
 
 const encoder = new TextEncoder();
@@ -13,7 +11,7 @@ const frame = (event: string, data: string) =>
  */
 export function outputStream(
 	session: {
-		status: TerminalStatus;
+		status: "running" | "exited";
 		backlog: Uint8Array[];
 		listeners: Set<Listener>;
 	},

@@ -1,11 +1,12 @@
 import type { TerminalConnection } from "@eumenes/artifact-ui";
-import { ApiError, type EumenesClient } from "../../../../client";
+import { ApiError } from "../../../../client";
 
 type Size = { cols: number; rows: number };
-type TerminalPort = Pick<
-	EumenesClient,
-	"terminalInput" | "resizeTerminal" | "terminalOutput"
->;
+export type TerminalPort = {
+	terminalInput(id: string, data: string): Promise<void>;
+	resizeTerminal(id: string, size: Size): Promise<void>;
+	terminalOutput(id: string, signal: AbortSignal): Promise<Response>;
+};
 
 /** Largest input request; a long paste is sent as several ordered requests. */
 const INPUT_CHUNK = 16_384;

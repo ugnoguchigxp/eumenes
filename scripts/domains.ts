@@ -72,6 +72,13 @@ export const domains = {
 		components: null,
 		depends: { api: ["coding"], web: [], test: [] },
 	},
+	shell: {
+		tier: 0,
+		backend: "api/domains/shell",
+		web: "web/src/domains/shell",
+		components: null,
+		depends: { api: [], web: [], test: [] },
+	},
 	terminals: {
 		tier: 0,
 		backend: "api/domains/terminals",

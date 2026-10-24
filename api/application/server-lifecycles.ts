@@ -87,6 +87,7 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 				s.queue.pruneInTransaction(db, at);
 				s.scheduler.pruneInTransaction(db, at);
 				s.toolchain.terminals.pruneInTransaction(db, new Date(at));
+				s.toolchain.shell.pruneInTransaction(db, new Date(at));
 			})
 			.catch((error) =>
 				log.warn(
@@ -159,6 +160,10 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 		{ name: "service_tests_recovery", recover: () => s.serviceTests.recover() },
 		{ name: "agents_recovery", recover: () => s.toolchain.agents.recover() },
 		{ name: "dialogue_recovery", recover: () => s.dialogue.recover() },
+		{
+			name: "shell_recovery",
+			recover: () => s.toolchain.shell.recover(),
+		},
 		{
 			name: "terminals_recovery",
 			recover: () => s.toolchain.terminals.recover(),
@@ -274,6 +279,7 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 		{ name: "capabilities", close: () => s.toolchain.capabilities.close() },
 		{ name: "agents", close: () => s.toolchain.agents.close() },
 		{ name: "kanban", close: () => s.toolchain.kanbanRuns.disconnect() },
+		{ name: "shell", close: () => s.toolchain.shell.closeAll() },
 		{ name: "terminals", close: () => s.toolchain.terminals.closeAll() },
 		{
 			name: "excalidraw",

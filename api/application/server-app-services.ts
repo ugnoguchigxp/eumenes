@@ -45,6 +45,7 @@ export function appServices(s: Services) {
 		},
 		toolchainHistory: s.toolchain.history,
 		timers: s.timers,
+		shell: s.toolchain.shell,
 		terminals: s.toolchain.terminals,
 		kanban: s.toolchain.kanban,
 		toolchainActions: s.toolchain.actionRequests,

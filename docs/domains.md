@@ -16,6 +16,7 @@
 | `browser` | 1 | `api/domains/browser/index.ts` | `web/src/domains/browser/` | `packages/design-system/src/components/BrowserWorkspace/index.ts` | `queue` | なし | なし |
 | `kanban` | 1 | `api/domains/kanban/index.ts` | `web/src/domains/kanban/index.ts` | なし | `capabilities` | なし | なし |
 | `codex-tasks` | 1 | `api/domains/codex-tasks/index.ts` | `web/src/domains/codex-tasks/` | なし | `coding` | なし | なし |
+| `shell` | 0 | `api/domains/shell/index.ts` | `web/src/domains/shell/` | なし | なし | なし | なし |
 | `terminals` | 0 | `api/domains/terminals/index.ts` | `web/src/domains/terminals/index.ts` | なし | なし | なし | なし |
 | `background` | 0 | なし | `web/src/domains/background/index.ts` | なし | なし | なし | なし |
 | `image` | 3 | `api/domains/image/index.ts` | `web/src/domains/image/index.ts` | なし | `capabilities`、`inference`、`larm`、`queue`、`tool-runtime` | なし | なし |
