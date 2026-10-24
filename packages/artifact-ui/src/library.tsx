@@ -61,6 +61,7 @@ import {
 } from "./browser-components";
 import { CollectionWorkspaceView } from "./collection-components";
 import { RecordsWorkspaceView } from "./records-components";
+import { TodoWorkspaceView } from "./todo-components";
 import { ServiceTestWorkspaceView } from "./service-test-components";
 import { TextBlockView, InfoCardView } from "./ui-composition-components";
 import { UiStudioView } from "./ui-studio-components";
@@ -155,6 +156,7 @@ const renderers = {
 	"image-preview": ImagePreviewView,
 	"image-gallery": ImageGalleryView,
 	"records-workspace": RecordsWorkspaceView,
+	"todo-workspace": TodoWorkspaceView,
 	"collection-workspace": CollectionWorkspaceView,
 	"service-test-workspace": ServiceTestWorkspaceView,
 	"avatar-motion-lab": AvatarMotionLabView,

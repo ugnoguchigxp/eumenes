@@ -1,5 +1,5 @@
 /** In-process R1 comparison, no actions, product writes or listening sockets. See README.md. */
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve, join, dirname } from "node:path";
 import type { InferencePort, Receipt } from "../../api/domains/inference";
 import { operationOutputMessages } from "../../api/domains/inference";
@@ -12,10 +12,11 @@ import { generateConversation } from "../../api/domains/dialogue/service/convers
 import { analysisMessages } from "../../api/domains/dialogue/service/request-analysis";
 import { analysisTools } from "../../api/domains/dialogue/service/initial-decision";
 import { createLiveLarm } from "../live-larm";
-import { dev, holdout, type DecisionCase } from "./cases";
+import { dev, holdout, prefixCases, type DecisionCase } from "./cases";
 import { wirePrefixObserver } from "./prefix";
 import { safeError } from "../../api/domains/inference/service/errors";
 import { stableDecisionLayout } from "./layout";
+import { readEvents, callReport, latencyStats } from "./report";
 
 const option = (name: string) => {
 	const at = process.argv.indexOf(`--${name}`);
@@ -45,14 +46,29 @@ configureLogging({
 	level: "debug",
 	destination: { write() {} },
 });
-const arms = ["native-legacy", "schema-legacy", "schema-stable"] as const;
-const cases = smoke
-	? dev.slice(0, 2)
-	: split === "all"
-		? [...dev, ...holdout]
-		: split === "holdout"
-			? holdout
-			: dev;
+const allArms = ["native-legacy", "schema-legacy", "schema-stable"] as const;
+const arm = option("arm");
+if (arm && !allArms.includes(arm as (typeof allArms)[number]))
+	throw new Error("invalid_arm");
+const arms = allArms.filter((a) => !arm || a === arm);
+const connectionMode = option("connections") ?? "one-shot";
+if (!["one-shot", "shared", "compare"].includes(connectionMode))
+	throw new Error("invalid_connections");
+const connectionModes =
+	connectionMode === "compare" ? ["shared", "one-shot"] : [connectionMode];
+const selectedCases = process.argv.includes("--prefix-variants")
+	? prefixCases
+	: smoke
+		? dev.slice(0, 2)
+		: split === "all"
+			? [...dev, ...holdout]
+			: split === "holdout"
+				? holdout
+				: dev;
+const cases = selectedCases.filter(
+	(c) => !option("case") || c.id === option("case"),
+);
+if (!cases.length) throw new Error("invalid_case");
 const observe = wirePrefixObserver();
 let wires: ReturnType<ReturnType<typeof wirePrefixObserver>>[] = [];
 const port = fake
@@ -93,6 +109,7 @@ writeFileSync(
 			at: new Date().toISOString(),
 			lane: fake ? "fixture_runner_only" : "live_r1_no_execution",
 			arms,
+			connectionModes,
 			caseIds: cases.map((c) => c.id),
 			repeat,
 			split,
@@ -149,12 +166,14 @@ async function trial(
 	c: DecisionCase,
 	arm: (typeof arms)[number],
 	repetition: number,
+	physicalConnection: string,
 ) {
 	const subjectId = crypto.randomUUID();
 	let calls = 0,
 		repairs = 0;
 	wires = [];
 	const started = performance.now();
+	const signal = AbortSignal.timeout(90_000);
 	const approvalReference = !!c.previous?.some((m) => m.role === "assistant");
 	const tools = analysisTools(
 		c.cards ?? [],
@@ -208,7 +227,8 @@ async function trial(
 				signal,
 				delta,
 				{
-					sessionRole: session?.sessionRole,
+					sessionRole:
+						physicalConnection === "shared" ? "main" : session?.sessionRole,
 					tools: offered,
 					onToolCalls: (items) => {
 						toolCalls = items;
@@ -233,7 +253,7 @@ async function trial(
 	let result: Record<string, unknown>;
 	try {
 		const output = await withLogContext(
-			{ subjectId, phase: "initial_decision" },
+			{ subjectId, phase: "initial_decision", sessionRole: "auxiliary" },
 			() =>
 				generateConversation({
 					inference: inference as InferencePort,
@@ -247,7 +267,7 @@ async function trial(
 					allowDiscovery: true,
 					approvalReference,
 					sessionRole: "auxiliary",
-					signal: AbortSignal.timeout(90_000),
+					signal,
 					delta: () => {},
 					repair: () => {
 						repairs++;
@@ -278,8 +298,8 @@ async function trial(
 		};
 	} catch (error) {
 		result = {
-			outcome: "error",
-			errorCode: safeError(error, new AbortController().signal),
+			outcome: signal.aborted ? "aborted" : "error",
+			errorCode: safeError(error, signal),
 			errorClass:
 				error instanceof SyntaxError
 					? "SyntaxError"
@@ -293,6 +313,7 @@ async function trial(
 		subjectId,
 		id: c.id,
 		arm,
+		connectionMode: physicalConnection,
 		repetition,
 		durationMs: Math.round(performance.now() - started),
 		calls,
@@ -312,53 +333,46 @@ try {
 		for (let i = 0; i < cases.length; i++) {
 			// Rotate which arm runs first; all attempts, including errors, remain in the report.
 			for (let a = 0; a < arms.length; a++)
-				await trial(cases[i]!, arms[(a + r + i) % arms.length]!, r);
-			if (samples.slice(-3).every((s) => s.outcome === "error"))
+				for (const mode of r % 2
+					? [...connectionModes].reverse()
+					: connectionModes)
+					await trial(cases[i]!, arms[(a + r + i) % arms.length]!, r, mode);
+			if (
+				samples
+					.slice(-arms.length * connectionModes.length)
+					.every((s) => s.outcome !== "ok")
+			)
 				throw new Error("all_arms_failed_review_transport_before_retry");
 		}
 } finally {
 	await port?.close();
-	const events = readFileSync(logfile, "utf8")
-		.split("\n")
-		.filter(Boolean)
-		.map((line) => JSON.parse(line));
-	const epochs = [
-		...new Set(events.flatMap((e) => (e.bootEpoch ? [e.bootEpoch] : []))),
-	];
-	const revisions = [
-		...new Set(
-			events.flatMap((e) => (e.configRevision ? [e.configRevision] : [])),
-		),
-	];
-	const metrics = events.filter(
-		(e) =>
-			e.event === "larm.llm_timing" || e.event === "larm.token_count_completed",
+	const measured = callReport(
+		readEvents(logfile),
+		samples as Array<{ subjectId: string; calls: number; outcome: unknown }>,
 	);
-	const summary = arms.map((arm) => {
-		const rows = samples.filter((s) => s.arm === arm);
-		const times = rows.map((s) => Number(s.durationMs)).sort((a, b) => a - b);
-		return {
-			arm,
-			count: rows.length,
-			failures: rows.filter((s) => s.outcome === "error").length,
-			qualityPassed: rows.filter((s) => s.qualityPassed).length,
-			repairs: rows.filter((s) => Number(s.repairs) > 0).length,
-			medianMs: times[Math.floor(times.length * 0.5)] ?? null,
-			p95Ms:
-				times[Math.min(times.length - 1, Math.ceil(times.length * 0.95) - 1)] ??
-				null,
-			maxMs: times.at(-1) ?? null,
-		};
-	});
+	if (!fake && !measured.revisionComparable) process.exitCode = 1;
+	const summary = arms.flatMap((arm) =>
+		connectionModes.map((mode) => {
+			const rows = samples.filter(
+				(s) => s.arm === arm && s.connectionMode === mode,
+			);
+			return {
+				arm,
+				connectionMode: mode,
+				count: rows.length,
+				failures: rows.filter((s) => s.outcome !== "ok").length,
+				qualityPassed: rows.filter((s) => s.qualityPassed).length,
+				repairs: rows.filter((s) => Number(s.repairs) > 0).length,
+				...latencyStats(rows.map((s) => Number(s.durationMs))),
+			};
+		}),
+	);
 	writeFileSync(
 		join(out, "summary.json"),
 		JSON.stringify(
 			{
 				summary,
-				bootEpochs: epochs,
-				configRevisions: revisions,
-				revisionComparable: epochs.length === 1 && revisions.length === 1,
-				metrics,
+				...measured,
 				adoption: "manual_review_required; fixture or smoke is not acceptance",
 			},
 			null,

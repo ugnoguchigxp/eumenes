@@ -27,6 +27,8 @@ export type { ImageWorkspaceResource } from "./image-components";
 export type { Model3dWorkspaceResource } from "./model3d-components";
 export type { BrowserWorkspaceResource } from "./browser-components";
 import type { RecordsResource } from "./records-components";
+import type { TodoResource } from "./todo-components";
+export type { TodoResource } from "./todo-components";
 import type { Model3dWorkspaceResource } from "./model3d-components";
 import type { BrowserWorkspaceResource } from "./browser-components";
 import type { MusicResource, GenerationResource } from "./media-contracts";
@@ -269,6 +271,15 @@ export const viewRegistry = {
 		label: "記録の閲覧と管理",
 		schema: z.strictObject({
 			view: z.literal("records-workspace"),
+			source,
+			title,
+		}),
+	},
+	"todo-workspace": {
+		name: "TodoWorkspace",
+		label: "会話の仕事と報告の一覧",
+		schema: z.strictObject({
+			view: z.literal("todo-workspace"),
 			source,
 			title,
 		}),
@@ -762,6 +773,7 @@ export type Resource =
 	| ComputeWorkspaceResource
 	| BrowserWorkspaceResource
 	| RecordsResource
+	| TodoResource
 	| SubtitlePreviewResource
 	| SettingsSectionResource
 	| SettingsNavigationResource

@@ -5,8 +5,36 @@ import {
 import { renderContext } from "../../api/domains/dialogue/service/context-render";
 import { estimateMessageTokens } from "../../api/domains/inference";
 
+export const cacheMarker = "SYNTHETIC_CACHE_7241";
+export const cacheUpdatedMarker = "SYNTHETIC_REVISED_3916";
+
+/** Exact synthetic result validation. Old reference values and extra JSON fields do not pass. */
+export function cacheReferenceMatches(
+	answer: string,
+	expected: string,
+	json = false,
+) {
+	if (!json) return answer.trim() === expected;
+	try {
+		const value: unknown = JSON.parse(answer);
+		return (
+			value !== null &&
+			typeof value === "object" &&
+			!Array.isArray(value) &&
+			Object.keys(value).length === 1 &&
+			"value" in value &&
+			value.value === expected
+		);
+	} catch {
+		return false;
+	}
+}
+
 /** Synthetic source data, rendered through the product's S/P/H/W/V/R layout. No personal history is loaded. */
-export function cacheInput(targetTokens = 14000): ContextAssembly {
+export function cacheInput(
+	targetTokens = 14000,
+	referenceValue = cacheMarker,
+): ContextAssembly {
 	const assembly: ContextAssembly = {
 		stage: "initial",
 		persona: { agentName: "", userName: "", persona: "butler" },
@@ -47,13 +75,13 @@ export function cacheInput(targetTokens = 14000): ContextAssembly {
 				source: "memory.summary",
 				authority: "reference",
 				freshness: "past",
-				body: { kind: "text", text: "" },
+				body: { kind: "text", text: `VALUE=${referenceValue}\n` },
 			},
 		],
 		volatile: [],
 		input: {
 			role: "user",
-			content: "資料を受け取ったことを一文で伝えてください。",
+			content: "資料のVALUEの値だけを答えてください。",
 		},
 	};
 	const base = estimateMessageTokens(
@@ -66,9 +94,9 @@ export function cacheInput(targetTokens = 14000): ContextAssembly {
 		estimateMessageTokens([{ content: "" }]);
 	assembly.working[0]!.body = {
 		kind: "text",
-		text: unit.repeat(
-			Math.max(0, Math.ceil((targetTokens - base) / unitTokens)),
-		),
+		text:
+			`VALUE=${referenceValue}\n` +
+			unit.repeat(Math.max(0, Math.ceil((targetTokens - base) / unitTokens))),
 	};
 	return assembly;
 }

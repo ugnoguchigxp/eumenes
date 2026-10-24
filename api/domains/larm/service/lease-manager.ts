@@ -20,6 +20,39 @@ import { callerAborted, untilAborted, wait } from "./guards";
 
 const log = getLogger("larm");
 
+function stopUsing(current: Lease) {
+	current.closing = true;
+	clearTimeout(current.renewTimer);
+	clearTimeout(current.idleTimer);
+}
+
+/** One terminal DELETE, even when recovery and the final borrower both clean up. */
+async function releaseConnection(current: Lease, control: Control) {
+	if (current.release) return current.release;
+	current.release = control(
+		`/v1/agent-connections/${encodeURIComponent(current.id)}`,
+		{ method: "DELETE" },
+		[204, 200, 404, 410],
+	)
+		.then((response) => {
+			// The status confirms deletion; body cleanup must not hold up reconnection.
+			void response.body?.cancel().catch(() => {});
+			try {
+				log.info("larm.connection_released", {
+					connectionId: current.id,
+					status: response.status,
+				});
+			} catch {
+				/* Observation does not invalidate a confirmed release. */
+			}
+		})
+		.catch((error: unknown) => {
+			current.release = undefined;
+			throw error;
+		});
+	return current.release;
+}
+
 /**
  * The one shared connection of a port: creation, renewal, release and the status it reports.
  * Work borrows a provider of the lease through `withProvider`, which counts the use so the
@@ -65,22 +98,12 @@ export function createLeaseManager({
 	const changes = createStatusChanges(status);
 	const notify = changes.notify;
 	async function release(current: Lease, force = false) {
-		current.closing = true;
-		if (current.renewTimer) clearTimeout(current.renewTimer);
-		clearTimeout(current.idleTimer);
+		stopUsing(current);
 		if (current.useCount > 0 && !force) return;
 		if (lease === current) lease = undefined;
 		notify();
 		try {
-			const response = await control(
-				`/v1/agent-connections/${encodeURIComponent(current.id)}`,
-				{ method: "DELETE" },
-				[204, 200, 404, 410],
-			);
-			log.info("larm.connection_released", {
-				connectionId: current.id,
-				status: response.status,
-			});
+			await releaseConnection(current, control);
 		} catch {
 			if (!lease) {
 				lastError = "larm_release_unconfirmed";
@@ -89,9 +112,7 @@ export function createLeaseManager({
 		}
 	}
 	function discard(current: Lease, error?: string) {
-		current.closing = true;
-		clearTimeout(current.renewTimer);
-		clearTimeout(current.idleTimer);
+		stopUsing(current);
 		if (lease === current) {
 			lease = undefined;
 			lastError = error;
@@ -206,6 +227,7 @@ export function createLeaseManager({
 						].includes(error.message)
 					)
 						throw error;
+					discard(current, error.message);
 				}
 				for (let attempt = 0; current.useCount > 0 && attempt < 120; attempt++)
 					await pause(1000);

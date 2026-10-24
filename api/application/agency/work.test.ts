@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import type { Database } from "bun:sqlite";
+import { Database } from "bun:sqlite";
 import type { ExecutionWorkItem } from "../../domains/agent-runtime";
 import { createAgencyWork, hostTodoOf } from "./work";
 
@@ -89,11 +89,61 @@ test("releasing sends the held notice once; a report without a dialogue source i
 			}) as never,
 		},
 	});
-	const db = {} as Database;
+	const db = new Database(":memory:");
 	expect(work.releaseInTransaction(db, "c1", ["e1", "e2"])).toBe(1);
 	expect(notices).toEqual([{ requestId: "ev1", conversationId: "c1" }]);
 	expect(settled).toEqual(["ev2"]);
 	// already released: nothing more
 	expect(work.releaseAllInTransaction(db)).toBe(0);
 	expect(notices).toHaveLength(1);
+});
+
+test("one failing notice is closed alone; the other held reports are still sent", () => {
+	const held = [
+		{ eventId: "ev1", executionId: "e1", conversationId: "c1", heldAt: 1 },
+		{ eventId: "ev2", executionId: "e2", conversationId: "c1", heldAt: 2 },
+	];
+	const released = new Set<string>();
+	const settled: string[] = [];
+	const notices: string[] = [];
+	const work = createAgencyWork({
+		agents: {
+			executions: {
+				workItemsInTransaction: () => [],
+				heldReportsInTransaction: () =>
+					held.filter((r) => !released.has(r.eventId)),
+				releaseReportInTransaction: (_db: Database, eventId: string) =>
+					released.has(eventId) ? false : (released.add(eventId), true),
+				settleEventInTransaction: (_db: Database, eventId: string) => {
+					settled.push(eventId);
+				},
+				viewInTransaction: (_db: Database, id: string) =>
+					({
+						id,
+						conversationId: "c1",
+						request: "r",
+						revision: 0,
+						status: "completed",
+						deadline: 0,
+						question: null,
+						result: null,
+					}) as never,
+				sourceRunInTransaction: () => "run-1",
+			} as never,
+		},
+		dialogue: {
+			executionSourceInTransaction: (() => ({}) as never) as never,
+			notifyInTransaction: ((_db: Database, input: { requestId: string }) => {
+				if (input.requestId === "ev1") throw new Error("notice_rejected");
+				notices.push(input.requestId);
+				return {} as never;
+			}) as never,
+		},
+	});
+	const db = new Database(":memory:");
+	expect(work.releaseAllInTransaction(db)).toBe(1);
+	expect(notices).toEqual(["ev2"]);
+	// the failed one is closed (released and settled), so it is not retried in a loop
+	expect(settled).toEqual(["ev1"]);
+	expect(work.releaseAllInTransaction(db)).toBe(0);
 });

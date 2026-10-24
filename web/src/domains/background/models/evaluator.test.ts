@@ -197,3 +197,17 @@ test("actual GLSL leaves 40/60 percent unchanged and uses six/four seed deciles"
 				);
 		}
 });
+
+test("a disconnection shows fault red at full light, even without a fresh value", () => {
+	const data = cpuColors();
+	const red = evaluateParticle(data, 0, 4, { ...healthy, health: "fault" });
+	for (const stale of [false, true]) {
+		const cut = evaluateParticle(data, 0, 4, {
+			...healthy,
+			health: "disconnected",
+			stale,
+		});
+		expect(cut.color).toEqual(red.color);
+		expect(cut.intensity).toBe(cut.baseIntensity);
+	}
+});

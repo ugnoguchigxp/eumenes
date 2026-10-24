@@ -244,8 +244,9 @@ export function evaluateParticle(
 	// Static utilization is allowed under reduced motion, without temporal changes.
 	if (s.reducedMotion && s.health === "healthy" && !s.stale)
 		uplift = 0.03 * (s.utilization ?? 0);
-	const dim =
-		s.health === "disconnected" ? 0.3 : s.health === "unknown" ? 0.65 : 1;
+	// A disconnection has no fresh value by nature; its red stays at full light (spec §12).
+	const dim = s.health === "unknown" ? 0.65 : 1;
+	const old = s.stale && s.health !== "disconnected";
 	const base =
 		(s.baseBrightness !== undefined && Number.isFinite(s.baseBrightness)
 			? Math.max(0, s.baseBrightness)
@@ -253,10 +254,7 @@ export function evaluateParticle(
 		Math.max(0, data[p + 7]!) *
 		staticFactor;
 	out.intensity =
-		base *
-		(1 + Math.min(0.1, Math.max(0, uplift))) *
-		dim *
-		(s.stale ? 0.45 : 1);
+		base * (1 + Math.min(0.1, Math.max(0, uplift))) * dim * (old ? 0.45 : 1);
 	out.baseIntensity = base;
 	out.uplift = Math.min(0.1, Math.max(0, uplift));
 	paintColor(out.color, data[p + 5]!, phase, group, t, s, !!stopped);

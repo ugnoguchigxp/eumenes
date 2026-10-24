@@ -8,7 +8,12 @@ import { countChatBody } from "../service/chat-input";
 import { chatRequest } from "../service/chat-request";
 import type { Provider } from "../service/profiles";
 import { imageLarmFixture, imagePolicy } from "./chat-input.fixture";
-import { fixture, makeLarm } from "./larm.fixture";
+import {
+	lifecycleFixture,
+	makeLarm,
+	question,
+	freshSignal,
+} from "./larm.fixture";
 
 let lines: string[];
 beforeEach(() => {
@@ -261,8 +266,8 @@ test("the real port supplies the claim identity and retains failed count behavio
 	).toMatchObject({ connectionId: "vision-session", status: 204 });
 });
 
-test("a control-plane 410 identifies the old claim without changing lifecycle recovery", async () => {
-	const fake = fixture();
+test("a control-plane GET 410 identifies and replaces the old claim before inference", async () => {
+	const fake = lifecycleFixture();
 	let gone = false;
 	const port = makeLarm(async (url, init) => {
 		if (
@@ -276,11 +281,13 @@ test("a control-plane 410 identifies the old claim without changing lifecycle re
 	try {
 		await port.connect();
 		gone = true;
-		await expect(port.connect()).rejects.toThrow("larm_control_410");
+		await Promise.all([port.connect(), port.connect(), port.connect()]);
 		expect(
 			entries().find((x) => x.event === "larm.control_rejected"),
 		).toMatchObject({ connectionId: "connection1", status: 410 });
-		expect(port.inspect?.().connectionId).toBe("connection1");
+		expect(port.inspect?.().connectionId).toBe("connection2");
+		expect(fake.generation()).toBe(2);
+		expect(await port.answer(question, freshSignal())).toBe("承知しました");
 	} finally {
 		await port.close();
 	}

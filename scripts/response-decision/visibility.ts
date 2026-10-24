@@ -6,6 +6,7 @@ import {
 } from "../../api/infrastructure/logger";
 import { writeFileSync, mkdirSync } from "node:fs";
 import { resolve, dirname } from "node:path";
+import { readEvents, callReport } from "./report";
 import { safeError } from "../../api/domains/inference/service/errors";
 if (!process.argv.includes("--run")) throw new Error("use --run");
 const at = process.argv.indexOf("--out");
@@ -120,9 +121,10 @@ const rows: any[] = [];
 try {
 	for (const [id, messages] of cases) {
 		wires.length = 0;
+		const subjectId = crypto.randomUUID();
 		const signal = AbortSignal.timeout(60000);
 		try {
-			const result = await withLogContext({ phase: id }, () =>
+			const result = await withLogContext({ subjectId, phase: id }, () =>
 				port.answer([...messages], signal, {
 					maxOutputTokens: 512,
 					contextPolicy: "exact",
@@ -131,16 +133,29 @@ try {
 			);
 			rows.push({
 				id,
+				subjectId,
+				outcome: "ok",
 				correct: result.includes("SYNTHETIC_7241"),
 				wires: [...wires],
 			});
 		} catch (e) {
-			rows.push({ id, error: safeError(e, signal), wires: [...wires] });
+			rows.push({
+				id,
+				subjectId,
+				outcome: "error",
+				error: safeError(e, signal),
+				wires: [...wires],
+			});
 		}
 		console.log(JSON.stringify(rows.at(-1)));
 	}
 } finally {
 	await port.close();
+	const report = callReport(readEvents(out + "/backend.jsonl"), rows);
+	writeFileSync(out + "/summary.json", JSON.stringify(report, null, 2), {
+		mode: 0o600,
+	});
+	if (!report.revisionComparable) process.exitCode = 1;
 	writeFileSync(out + "/result.json", JSON.stringify(rows, null, 2), {
 		mode: 0o600,
 	});

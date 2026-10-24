@@ -113,6 +113,9 @@ export type ArtifactEvent = {
 		| "browser-save-path"
 		| "browser-browse-path"
 		| "browser-cancel-capture"
-		| "browser-cancel-task";
+		| "browser-cancel-task"
+		| "todo-view"
+		| "todo-page"
+		| "todo-refresh";
 	values: Record<string, string | boolean>;
 };

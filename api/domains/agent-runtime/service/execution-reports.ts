@@ -6,6 +6,7 @@ import {
 	type ExecutionRow,
 } from "../repository/executions";
 import type { ExecutionContext } from "./execution-context";
+import { workQuery, type WorkQuery } from "../contracts/work-query";
 
 /**
  * Completion reports held for the agency layer (spec agency-work-reports-design-2026-10-24): while the agency
@@ -92,7 +93,7 @@ export function executionReports(
 			heldAt: r.held_at,
 		}));
 	}
-	return {
+	const api = {
 		/** Holds a result notice instead of sending it; idempotent per event. */
 		holdReportInTransaction(
 			db: Database,
@@ -138,11 +139,107 @@ export function executionReports(
 					)
 					.all(conversationId) as ExecutionRow[]
 			).map((row) => item(row, null));
+			// One item per execution even if two of its events were held (e.g. a result and a stop notice).
+			const seen = new Set<string>();
 			const waiting = held(db, conversationId).flatMap((r) => {
+				if (seen.has(r.executionId)) return [];
+				seen.add(r.executionId);
 				const row = executionRow(db, r.executionId);
 				return row ? [item(row, r.eventId)] : [];
 			});
 			return [...waiting, ...open];
+		},
+		/** The TODO view of one conversation (read-only display): open and held items, then archived ones. */
+		agencyWork(conversationId: string) {
+			return ctx.store.read((db) => ({
+				items: api.workItemsInTransaction(db, conversationId),
+				archived: api.archivedItemsInTransaction(db, conversationId),
+			}));
+		},
+		/** Full read-only list, paged in SQL. Reporting decisions still use workItemsInTransaction. */
+		agencyWorkPageInTransaction(
+			db: Database,
+			conversationId: string,
+			input: WorkQuery,
+		) {
+			const query = workQuery.parse(input);
+			const counts = { todo: 0, done: 0, archived: 0 };
+			if (!ready(db))
+				return { rows: [], counts, total: 0, ...query, pageIndex: 0 };
+			// Group reports before joining: several events of one execution remain one work item.
+			const work = `WITH work AS (
+					SELECT e.*, r.held_event_id, r.released_at
+					FROM agent_executions e LEFT JOIN (
+						SELECT execution_id,
+							MIN(CASE WHEN state='held' THEN event_id END) held_event_id,
+							MAX(CASE WHEN state='released' THEN released_at END) released_at
+						FROM agent_execution_reports WHERE conversation_id=? GROUP BY execution_id
+					) r ON r.execution_id=e.id WHERE e.conversation_id=?
+				)`;
+			const totals = db
+				.query(`${work} SELECT
+					COUNT(CASE WHEN state IN ${OPEN} THEN 1 END) todo,
+					COUNT(held_event_id) done, COUNT(released_at) archived,
+					COUNT(CASE WHEN state IN ${OPEN} OR held_event_id IS NOT NULL THEN 1 END) active FROM work`)
+				.get(conversationId, conversationId) as typeof counts & {
+				active: number;
+			};
+			const total = totals[query.state];
+			const pageIndex = Math.min(
+				query.pageIndex,
+				Math.max(0, Math.ceil(total / query.pageSize) - 1),
+			);
+			const conditions = {
+				active: `state IN ${OPEN} OR held_event_id IS NOT NULL`,
+				todo: `state IN ${OPEN}`,
+				done: "held_event_id IS NOT NULL",
+				archived: "released_at IS NOT NULL",
+			};
+			const order = {
+				active: "created_at",
+				todo: "created_at",
+				done: "updated_at",
+				archived: "released_at",
+			};
+			const rows = db
+				.query(`${work} SELECT * FROM work WHERE ${conditions[query.state]}
+					ORDER BY ${order[query.state]} DESC,id DESC LIMIT ? OFFSET ?`)
+				.all(
+					conversationId,
+					conversationId,
+					query.pageSize,
+					pageIndex * query.pageSize,
+				) as Array<
+				ExecutionRow & {
+					held_event_id: string | null;
+					released_at: number | null;
+				}
+			>;
+			return {
+				...query,
+				pageIndex,
+				total,
+				counts: {
+					todo: totals.todo,
+					done: totals.done,
+					archived: totals.archived,
+				},
+				rows: rows.map((row) => ({
+					...item(row, row.held_event_id),
+					state:
+						query.state === "archived"
+							? ("archived" as const)
+							: row.held_event_id !== null
+								? ("done" as const)
+								: ("todo" as const),
+					releasedAt: row.released_at,
+				})),
+			};
+		},
+		agencyWorkPage(conversationId: string, input: WorkQuery) {
+			return ctx.store.read((db) =>
+				api.agencyWorkPageInTransaction(db, conversationId, input),
+			);
 		},
 		/** Released (archived) reports of one conversation, newest first (for display). */
 		archivedItemsInTransaction(
@@ -165,4 +262,5 @@ export function executionReports(
 			});
 		},
 	};
+	return api;
 }

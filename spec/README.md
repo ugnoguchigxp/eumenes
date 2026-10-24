@@ -8,6 +8,7 @@ archive の基準: その文書が担当した実装がコードにあり、本�
 
 | 文書 | 状態 |
 | --- | --- |
+| [cli-toolchain-design-2026-10-24.md](cli-toolchain-design-2026-10-24.md) | 合意済み（§13）・実装前。Claude Code 画面のPTY基盤を共通化し、新domain `shell` でログインシェルの画面「CLI」と、会話からのCLIコマンド実行（`cli_command`、一件ごとのPTY・実行台帳・完了通知、承認なし）を追加する |
 | [code-review-2026-10-24.md](verification/code-review-2026-10-24.md) | 未commit差分全体のレビューと修正・隔離検証。完了確認失敗の波及、保留報告の解除、schema変換を修正。LARM live受入と全体gateの既存違反は未完了 |
 | [artifact-form-direct-toolchain-design-2026-10-23.md](artifact-form-direct-toolchain-design-2026-10-23.md) | 合意済み・実装・固定試験済み（§8）。ブラウザE2E・live・実機器は未実施。画像・楽曲の画面フォームからの送信に担当IDを付け、メインエージェントの担当選択を通さず、その担当の専門エージェントへ依頼文を直接渡す。画像の画面で曲が作られた障害（run `5b08cd43`）の対策 |
 | [task-pipeline-design-2026-10-22.md](task-pipeline-design-2026-10-22.md) | 合意済み。P0〜P2は実装・固定試験済み（§14）、liveは§14に記録。ブラウザE2E・実機器は未実施。3つ以上の担当を使う決まった手順をJSONの定義（入力・ステップ・変数・extract・合格条件）として `pipelines` ドメインに版で保存し、担当の検索で引き当てる。実行はアプリケーション層が1ステップずつ既存の委譲で進める。定義は協働型 `pipeline.studio` が作業文書を編集して作り、Artifactの編集画面で流れ・検索の拾われ方・選択と運転を試す。合わない依頼は一手ずつ照合する方式へ |
@@ -26,7 +27,7 @@ archive の基準: その文書が担当した実装がコードにあり、本�
 | [object-recognition-custom-training-concept-2026-10-18.md](object-recognition-custom-training-concept-2026-10-18.md) | コンセプト、着手予定なし。判別機（YOLO26）の追加学習で家の決まった物を検出する。学習はRTX 3080（Windows）が第1候補。10種類×300枚で人の作業7〜12時間の見積もり。ターンテーブル・ロボットアームによる撮影と枠付けの自動化ができたら再検討 |
 | [object-recognition-targets-and-llm-handoff-design-2026-10-18.md](object-recognition-targets-and-llm-handoff-design-2026-10-18.md) | 物体認識で探す物を名前で指定（上流をYOLOE-26へ、上流への依頼が必要）。カメラ・画面キャプチャの静止画1枚と検出結果のメタ情報JSONを、「会話に追加」でチャット欄へ添付、または音声（見せるモード案・viewing＋ask）で会話LLMへ渡す。OCR連携はしない。合意済み（Q3・Q6は上流対応後）、実装中 |
 | [spatial-model-catalog-2026-10-18.md](spatial-model-catalog-2026-10-18.md) | 案・合意待ち。Spatial監視銀河の全17体（Eumenes 13・LARM 4）の形と動きの目録。ChatGPTへのモデリング依頼仕様を兼ねる。使用率では色を変えず、溜まりと出来事で異常を出す。LARMに届かないときは星系ごと消す。将来のContextStill（5〜8体）は別の星系として見込む。要合意事項M1〜M8 |
-| [spatial-monitoring-eumenes-design-2026-10-18.md](spatial-monitoring-eumenes-design-2026-10-18.md) | 合意済み・実装・fixture済み（§10）。ブラウザE2E・liveは未実施。設定画面の背景説明文（bundle）は未更新。Spatial背景の12対象へEumenes側の実測（推論記録・画像/楽曲ジョブ・LARM状態・ホスト計測）を接続する。LARM側APIは後続 |
+| [spatial-monitoring-eumenes-design-2026-10-18.md](spatial-monitoring-eumenes-design-2026-10-18.md) | 合意済み・実装・fixture済み（§10）。ブラウザE2E・liveは未実施。設定画面の背景説明文（bundle）は未更新。Spatial背景の12対象へEumenes側の実測（推論記録・画像/楽曲ジョブ・LARM状態・ホスト計測）を接続する。LARM側APIは後続。§12（2026-10-24合意）で接続断をfaultと同じ赤・減光なしにし、LAN外でのLARM不達はunknownにする |
 | [larm-connection-retention-design-2026-10-18.md](larm-connection-retention-design-2026-10-18.md) | 画面表示中の既存Profile利用依頼POSTを実装。backend403件・Web48件成功。同じConnectionを実接続で6分保持・停止後300秒で解放。利用者の再起動後に稼働反映と実画面の接続済みを確認（§12）。認証・自動解放設定は変更なし |
 | [toolchain-time-limits-design-2026-10-18.md](toolchain-time-limits-design-2026-10-18.md) | 合意済み・実装済み（fixture試験済み、live・実機は未了）。打ち切り時間（run・専門担当の1ターン・推論1回）をsession bindingの`timeLimits`で設定する。UI自由制作は run 20分・1ターン15分・推論10分 |
 | [ui-studio-history-focus-design-2026-10-18.md](ui-studio-history-focus-design-2026-10-18.md) | 実装・固定試験済み。UI自由制作で、閲覧中は削除ボタンで保存作品を削除（§2）、専門担当のアクティブ中に履歴で選んだ作品を編集対象にする（§3、未保存は確認）。ブラウザE2E・live・実機器は未実施 |

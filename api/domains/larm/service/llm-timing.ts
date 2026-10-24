@@ -1,6 +1,6 @@
 import {
 	readChatResponse,
-	type ProviderTimings,
+	type ChatDiagnostics,
 } from "../../../infrastructure/chat-stream";
 import { getLogger } from "../../../infrastructure/logger";
 import type { LarmCallOptions, LarmPort } from "../contracts";
@@ -8,25 +8,6 @@ import { type Provider } from "./profiles";
 import { fitContext } from "./context";
 
 const log = getLogger("larm");
-
-/** Token counts reported by the provider; non-numeric fields are ignored. */
-function usageCounts(usage: Record<string, unknown> | undefined) {
-	const count = (value: unknown) =>
-		typeof value === "number" && Number.isFinite(value) ? value : undefined;
-	const details = usage?.prompt_tokens_details;
-	const fields = {
-		promptTokens: count(usage?.prompt_tokens),
-		completionTokens: count(usage?.completion_tokens),
-		cachedTokens: count(
-			details && typeof details === "object"
-				? (details as Record<string, unknown>).cached_tokens
-				: undefined,
-		),
-	};
-	return Object.fromEntries(
-		Object.entries(fields).filter(([, value]) => value !== undefined),
-	);
-}
 
 /**
  * Fits the request to the model window and times the exchange. Only durations,
@@ -56,11 +37,8 @@ export function startLlmTiming(
 	let sentAt: number | undefined;
 	let firstDeltaAt: number | undefined;
 	let logged = false;
-	function emit(
-		outcome: "ok" | "error" | "aborted",
-		usage?: Record<string, unknown>,
-		providerTimings?: ProviderTimings,
-	) {
+	let diagnostics: ChatDiagnostics | undefined;
+	function emit(outcome: "ok" | "error" | "aborted") {
 		if (logged) return;
 		logged = true;
 		try {
@@ -80,8 +58,7 @@ export function startLlmTiming(
 					: {}),
 				requestBytes,
 				droppedMessages: messages.length - selected.length,
-				...usageCounts(usage),
-				...providerTimings,
+				...diagnostics,
 			};
 			if (outcome === "error") log.warn("larm.llm_timing", fields);
 			else log.info("larm.llm_timing", fields);
@@ -114,12 +91,15 @@ export function startLlmTiming(
 								onDelta(text);
 							}
 						: undefined,
+					(value) => {
+						diagnostics = value;
+					},
 				);
 			} catch (error) {
 				emit(signal.aborted ? "aborted" : "error");
 				throw error;
 			}
-			emit("ok", result.usage, result.providerTimings);
+			emit("ok");
 			return result;
 		},
 	};

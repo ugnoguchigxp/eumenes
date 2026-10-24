@@ -260,6 +260,18 @@ export function executionAccess(
 						db.query(`DELETE FROM ${table} WHERE execution_id=?`).run(row.id);
 					db.query("DELETE FROM agent_executions WHERE id=?").run(row.id);
 				}
+				// Agency report rows (spec agency-work-reports-design-2026-10-24): released ones after 30 days, and
+				// any whose execution is gone.
+				if (
+					db
+						.query(
+							"SELECT 1 FROM sqlite_master WHERE type='table' AND name='agent_execution_reports'",
+						)
+						.get()
+				)
+					db.query(
+						"DELETE FROM agent_execution_reports WHERE (state<>'held' AND released_at<?) OR execution_id NOT IN (SELECT id FROM agent_executions)",
+					).run(now() - 30 * 86_400_000);
 			});
 		},
 	};

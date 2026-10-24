@@ -10,14 +10,31 @@ export const connectionFailure = (reason: string) =>
 	(fallbackErrors.test(reason) && reason !== "local_timeout") ||
 	unreachable.test(reason);
 
+/** Off the LAN, LARM not answering is expected: unknown, not a disconnection (spec §12). */
+export const offLan = (state: State): State =>
+	state.health === "disconnected"
+		? { ...state, health: "unknown", reason: "larm_off_lan" }
+		: state;
+
 /**
  * A service's state from its newest outcome. `reachable` false (no saved connection, LARM failed,
  * a cloud route without credential) is a disconnection whatever the outcomes say.
+ * `away` marks a route through LARM while this host is off the LAN.
  */
 export function serviceState(
 	o: ActivityObservation,
 	reachable: boolean,
 	starting = false,
+	away = false,
+): State {
+	const state = judged(o, reachable, starting);
+	return away ? offLan(state) : state;
+}
+
+function judged(
+	o: ActivityObservation,
+	reachable: boolean,
+	starting: boolean,
 ): State {
 	const activity = o.running > 0 ? "working" : starting ? "starting" : "idle";
 	if (!reachable) return { health: "disconnected", activity };

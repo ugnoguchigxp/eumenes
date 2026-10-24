@@ -31,6 +31,8 @@ export type Lease = {
 	agentProfile: string;
 	useCount: number;
 	closing: boolean;
+	/** Coalesces cleanup by the last borrower, recovery and close. Kept after a confirmed release. */
+	release?: Promise<void>;
 	renewTimer?: ReturnType<typeof setTimeout>;
 	idleTimer?: ReturnType<typeof setTimeout>;
 	idleAt: number;

@@ -68,11 +68,12 @@ export function activityStrength(state: SpatialState) {
 		return 0;
 	return bounded(state.strength ?? 0.65, 0, 1, 0);
 }
+/** A disconnection is an anomaly: fault red, told apart only by its stopped light (spec §12). */
 export const healthColors: Record<SpatialState["health"], string> = {
 	healthy: "#a8d6ff",
 	pressure: "#ffaf62",
 	fault: "#ff6177",
-	disconnected: "#756a8e",
+	disconnected: "#ff6177",
 	unknown: "#a99fd2",
 };
 

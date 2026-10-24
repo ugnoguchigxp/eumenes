@@ -135,6 +135,34 @@ test("LARM down disconnects LARM routes, while a usable cloud route keeps them r
 	expect((await byShape(m)).llm?.state.health).toBe("disconnected");
 });
 
+test("off the LAN, LARM not answering is unknown; a cloud route without credential is still disconnected", async () => {
+	const failed: LarmStatus = { state: "failed", capabilities: [] };
+	let items = await byShape(
+		monitoring({ larmStatus: () => failed, onLan: async () => false }),
+	);
+	for (const shape of ["llm", "asr", "embedding", "attitude", "image", "music"])
+		expect(items[shape]?.state).toMatchObject({
+			health: "unknown",
+			reason: "larm_off_lan",
+		});
+	items = await byShape(
+		monitoring({
+			onLan: async () => false,
+			settings: {
+				get: () => settings({ mode: "cloud-only", fallbackId: resourceId }),
+				diagnostics: () => ({
+					connections: [{ id: connectionId, credentialAvailable: false }],
+				}),
+			},
+		}),
+	);
+	expect(items.llm?.state.health).toBe("disconnected");
+	items = await byShape(
+		monitoring({ larmStatus: () => failed, onLan: async () => true }),
+	);
+	expect(items.llm?.state.health).toBe("disconnected");
+});
+
 test("recorded outcomes count only inside the ten-minute window", async () => {
 	let clock = 0;
 	const judge = createActivityRecorder(() => clock);

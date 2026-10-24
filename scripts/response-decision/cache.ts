@@ -1,5 +1,5 @@
 /** Cache observation only. A new connection does not guarantee a cold slot. No service is started or restarted. */
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve, join, dirname } from "node:path";
 import {
 	configureLogging,
@@ -11,7 +11,18 @@ import {
 	contextPartSizes,
 } from "../../api/domains/dialogue/service/context-render";
 import { createLiveLarm } from "../live-larm";
-import { cacheInput } from "./cache-input";
+import {
+	cacheInput,
+	cacheMarker,
+	cacheUpdatedMarker,
+	cacheReferenceMatches,
+} from "./cache-input";
+import {
+	readEvents,
+	callReport,
+	cacheAcceptance,
+	type MeasuredCall,
+} from "./report";
 import { markCurrentRequest } from "../../api/domains/dialogue/service/request-context";
 
 if (!process.argv.includes("--run")) throw new Error("use --run");
@@ -36,24 +47,33 @@ const original = markCurrentRequest(
 	assembly.input,
 	"synthetic-current",
 );
-const changed = structuredClone(assembly);
+const changed = cacheInput(14000, cacheUpdatedMarker);
 changed.working.push({
 	source: "memory.short_term",
 	authority: "reference",
 	freshness: "past",
 	body: { kind: "text", text: "合成資料に一行だけ追加しました。" },
 });
-const rows: unknown[] = [];
+const rows: Array<
+	MeasuredCall & {
+		role: "main" | "auxiliary";
+		correct?: boolean;
+		regime: string;
+		durationMs: number;
+		errorCode?: string;
+	}
+> = [];
 async function call(
 	regime: string,
 	messages: typeof original,
 	sessionRole: "main" | "auxiliary",
+	expected = cacheMarker,
 ) {
 	const subjectId = crypto.randomUUID();
 	const started = performance.now();
 	const signal = AbortSignal.timeout(120_000);
 	try {
-		await withLogContext({ subjectId, phase: regime }, () =>
+		const answer = await withLogContext({ subjectId, phase: regime }, () =>
 			port.answerStream!(messages, signal, () => {}, {
 				sessionRole,
 				maxOutputTokens: 128,
@@ -63,6 +83,8 @@ async function call(
 		rows.push({
 			subjectId,
 			regime,
+			role: sessionRole,
+			correct: cacheReferenceMatches(answer, expected),
 			outcome: "ok",
 			durationMs: Math.round(performance.now() - started),
 		});
@@ -70,6 +92,7 @@ async function call(
 		rows.push({
 			subjectId,
 			regime,
+			role: sessionRole,
 			outcome: "error",
 			errorCode: safeError(error, signal),
 			durationMs: Math.round(performance.now() - started),
@@ -81,6 +104,10 @@ async function call(
 try {
 	await call("first_seen", original, "main");
 	await call("immediate_repeat", original, "main");
+	const differentUser = structuredClone(original);
+	differentUser[differentUser.length - 1]!.content +=
+		" 値だけを返してください。";
+	await call("same_system_different_user", differentUser, "main");
 	await call(
 		"background_updated",
 		markCurrentRequest(
@@ -89,6 +116,7 @@ try {
 			"synthetic-current",
 		),
 		"main",
+		cacheUpdatedMarker,
 	);
 	await call("original_repeat", original, "main");
 	for (let i = 0; i < 4; i++)
@@ -101,22 +129,14 @@ try {
 				},
 			],
 			"auxiliary",
+			String(i + 1),
 		);
 	await call("after_four_auxiliary", original, "main");
 } finally {
 	await port.close();
-	const events = readFileSync(logfile, "utf8")
-		.split("\n")
-		.filter(Boolean)
-		.map((s) => JSON.parse(s));
-	const epochs = [
-		...new Set(events.flatMap((e) => (e.bootEpoch ? [e.bootEpoch] : []))),
-	];
-	const revisions = [
-		...new Set(
-			events.flatMap((e) => (e.configRevision ? [e.configRevision] : [])),
-		),
-	];
+	const measured = callReport(readEvents(logfile), rows);
+	const acceptance = cacheAcceptance(measured);
+	if (!acceptance.passed) process.exitCode = 1;
 	writeFileSync(
 		join(out, "result.json"),
 		JSON.stringify(
@@ -126,15 +146,8 @@ try {
 					"observational_only; verify role visibility before accepting a large-context cache result",
 				note: "first_seen is not guaranteed cold; compare provider counts, never infer cache from connection identity",
 				estimatedParts: contextPartSizes(assembly),
-				bootEpochs: epochs,
-				configRevisions: revisions,
-				revisionComparable: epochs.length === 1 && revisions.length === 1,
-				rows,
-				metrics: events.filter(
-					(e) =>
-						e.event === "larm.llm_timing" ||
-						e.event === "larm.token_count_completed",
-				),
+				...measured,
+				formalAcceptance: acceptance,
 			},
 			null,
 			2,

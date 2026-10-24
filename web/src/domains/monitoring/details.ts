@@ -2,6 +2,7 @@ import type { MonitoringItem } from "../../../../api/domains/monitoring/contract
 
 const labels: Record<string, string> = {
 	unconfigured: "LARM接続が未設定です",
+	larm_off_lan: "LARMのあるLANの外にいるため確認していません",
 	unreachable: "LARMへ接続できません",
 	timeout: "LARMの応答を待っています",
 	unauthorized: "LARMの認証を確認してください",

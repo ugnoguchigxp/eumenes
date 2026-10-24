@@ -1,6 +1,7 @@
 import type { MonitoringObservation } from "../../larm/contracts";
 import type { MonitoringItem } from "../contracts";
 import type { LarmView } from "../contracts/larm";
+import { offLan } from "./rules";
 
 type Observation = MonitoringObservation<unknown>;
 type State = MonitoringItem["state"];
@@ -24,6 +25,7 @@ export function larmItems(
 	view: LarmView,
 	selection: Selection,
 	now: number,
+	away = false,
 ): MonitoringItem[] {
 	const snapshot = view.snapshot;
 	// The whole read time is a conservative transit bound when host clocks differ.
@@ -206,6 +208,6 @@ export function larmItems(
 		id: shape,
 		shape,
 		label: labels[i]!,
-		state: states[i]!,
+		state: away ? offLan(states[i]!) : states[i]!,
 	}));
 }

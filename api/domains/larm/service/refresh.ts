@@ -38,15 +38,18 @@ export function createRefresh({
 				{ connectionId: current.id, leaseExpiresAt: current.expiresAt },
 				() => control(path, { ...init, signal }, accepted),
 			);
-		const state = record(
-			await readJson(
-				await scopedControl(
-					`/v1/agent-connections/${current.id}`,
-					{ method: "GET" },
-					[200],
-				),
-			),
-		);
+		const response = await scopedControl(
+			`/v1/agent-connections/${current.id}`,
+			{ method: "GET" },
+			[200],
+		).catch((error: unknown) => {
+			// Only a GET of this connection establishes that its lease is gone.
+			// A 410 from creation, retention or inference must not replay that operation.
+			if (error instanceof Error && error.message === "larm_control_410")
+				throw new Error("larm_connection_released");
+			throw error;
+		});
+		const state = record(await readJson(response));
 		signal?.throwIfAborted();
 		if (state.id !== current.id) throw new Error("larm_invalid_connection");
 		if (["failed", "expired", "released"].includes(String(state.status)))

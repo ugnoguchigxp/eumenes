@@ -77,6 +77,10 @@ export interface LogFields {
 	retrieval?: string;
 	candidateCount?: number;
 	profile?: string;
+	sessionRole?: string;
+	finishReason?: string;
+	streamDone?: number;
+	streamFailure?: string;
 	ttftMs?: number;
 	providerTtftMs?: number;
 	providerPromptMs?: number;
@@ -125,6 +129,10 @@ const keys = new Set<keyof LogFields>([
 	"apiKeySource",
 	"tokenSource",
 	"profile",
+	"sessionRole",
+	"finishReason",
+	"streamDone",
+	"streamFailure",
 	"ttftMs",
 	"providerTtftMs",
 	"providerPromptMs",
@@ -368,6 +376,11 @@ let writer = createLogWriter(
 );
 
 let fileSink: RotatingLogFile | undefined;
+
+/** Make already emitted records visible to readers without replacing the logger. */
+export function flushLogging() {
+	fileSink?.flush();
+}
 
 export function configureLogging(options: {
 	file?: string;

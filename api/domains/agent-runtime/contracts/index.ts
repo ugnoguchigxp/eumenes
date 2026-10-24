@@ -1,4 +1,5 @@
 import { z } from "zod";
+export { workQuery, workSourceQuery, type WorkQuery } from "./work-query";
 import type { SourceMetadata } from "../../tool-runtime";
 import type { ReportRequirements } from "./requirements";
 export const reportSchema = z

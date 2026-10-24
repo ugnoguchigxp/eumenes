@@ -5,7 +5,9 @@ import {
 	eventsPage,
 	NOW,
 } from "./larm.fixture";
+import { emptyLarm } from "../contracts/larm";
 import { larmItems } from "../service/larm-items";
+import { larmView } from "../service/larm-history";
 const states = (items: ReturnType<typeof larmItems>) =>
 	Object.fromEntries(items.map((i) => [i.shape, i.state]));
 
@@ -139,4 +141,21 @@ test("only targeted explicit OOM/GPU facts create ten-minute faults, not counter
 	expect(states(larmItems(view, {}, NOW))["larm-memory"]?.health).toBe(
 		"healthy",
 	);
+});
+test("LARM not answering is a disconnection on the LAN and unknown off it", () => {
+	const state = emptyLarm(NOW);
+	state.snapshotStatus = state.eventsStatus = {
+		status: "unreachable",
+		at: NOW,
+	};
+	const view = larmView(state, []);
+	for (const s of Object.values(states(larmItems(view, {}, NOW))))
+		expect(s.health).toBe("disconnected");
+	for (const s of Object.values(states(larmItems(view, {}, NOW, true))))
+		expect(s).toMatchObject({ health: "unknown", reason: "larm_off_lan" });
+	state.snapshotStatus = { status: "not_found", at: NOW, httpStatus: 404 };
+	for (const s of Object.values(
+		states(larmItems(larmView(state, []), {}, NOW)),
+	))
+		expect(s.health).toBe("unknown");
 });

@@ -177,3 +177,15 @@ workerは共通補正の拒否分類を `agent.control_rejected.validationCode` 
 再計測は `bun scripts/response-latency-live.ts --run`（adapter経路、各3回）と `bun scripts/response-latency-api-live.ts --run`（一時DBの会話API、文字3回・合成音声入力3回）です。保存済み接続はsettings domainの読み取り専用操作で取得し、API試験では一時backendの設定APIに保存します。後者はtools無効・新規会話であり、通常の個人履歴付き会話の代表値ではありません。音声API試験は最初のチャンク取得後に停止します。両方とも本文と音声ファイルをレポートに保存せず、機器の録音・再生やOpenAI/Claude比較は行いません。結果は `verification-reports/response-latency{-api}-live/`。同じ入力・prompt・出力制約ではない二経路の値を引き算してアプリの追加遅延としないでください。
 
 LARMが`timings`を返す場合、`larm.llm_timing`に`providerPromptMs`（入力処理）、`providerDecodeMs`（生成）、`providerPromptTokens`（処理した入力）、`providerCachedTokens`（再利用した入力）、`providerOutputTokens`（生成token数）を追加します。これはProvider報告値です。5項目の有限・非負の数値だけを抽出し、未知項目・文字列・生応答を記録しません。未提供は不明として省略し、0で埋めません。`promptTokens`はusageの入力全体、`providerPromptTokens`はtimingsの処理済み入力であり、同じ値とは限りません。クライアントの`totalMs`との差には計数・通信・Provider内部の待機などが含まれ得るため、その差をqueue時間と断定しません。
+
+### LLM streamの終了診断
+
+`larm.llm_timing`は読取りに失敗した場合も、届いていた許可済みのusage・Provider timingsを記録します。`finishReason`は`stop`・`tool_calls`・`function_call`・`length`・`content_filter`・`unknown`だけです。`streamDone`はstream終端の受信（JSON応答では本文の解析完了）を1/0で示します。終了理由自体が届かない場合は省略します。
+
+`streamFailure`は`output_limit`・`content_filter`・`missing_end`・`empty_output`・`invalid_tool_calls`・`aborted`・`invalid_response`・`read_error`を区別します。外向きの`chat_stream_incomplete`と、途中の本文・引数を採用しない判定は維持します。例えば`output_limit`は出力上限到達を観測したもので、LARMの中継切断を示しません。usageやtimingsが届かない場合は不明として省略し、0にはしません。これらの診断には本文・引数・Providerの自由文は含めません。
+
+補助接続の内部処理では物理的にmainへ置き換わっても、`sessionRole`へ呼出し元の`auxiliary`または`subagent`を保持します。`profile`だけで会話段を分類せず、`phase`・runId・attemptId等と対応させてください。接続を比較するrunnerは、同一接続の対照でも論理的な呼出し元を記録します。
+
+検証runnerは`flushLogging()`で既に発行された記録を排出してからファイルを集計します。この操作は生成・接続の完了を待つものではなく、呼出しと接続終了の待機を済ませてから使用します。
+
+usageが複数のフレームに分かれて届く場合も、診断ではそれまでに届いた有効な各計数を保持します。空のusageや不正値で既知の計数を消しません。上限到達・content filterを観測した理由も保持し、後続の終了フレームで別の拒否理由へ取り違えません。

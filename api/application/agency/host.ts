@@ -714,6 +714,8 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 			// Wait one more interval at the same level.
 			c.planner.enter();
 			c.planner.leave(nowMs());
+			// A held report keeps being checked even when this moment was busy.
+			armHeldRecheck(c);
 			return "aborted";
 		}
 		abortBackground(c);

@@ -177,4 +177,10 @@ CREATE TABLE agent_execution_model_reservations(id TEXT PRIMARY KEY,task_id TEXT
 CREATE INDEX agent_execution_reports_conversation ON agent_execution_reports(conversation_id,state);`,
 		after: ["agent-runtime/0008-execution-children"],
 	},
+	{
+		// The held reports are read on every commit (agency watch): a partial index keeps that lookup small.
+		id: "agent-runtime/0010-execution-reports-held",
+		sql: `CREATE INDEX agent_execution_reports_held ON agent_execution_reports(held_at) WHERE state='held';`,
+		after: ["agent-runtime/0009-execution-reports"],
+	},
 ];

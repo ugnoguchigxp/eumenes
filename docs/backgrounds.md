@@ -30,7 +30,7 @@
 
 CPU・Memory・SSD・Backendと既存5サービスの状態は既存APIを利用する。LARM4体は既存のControl認証を使う読み取り専用監視APIへ接続する。個別の計測時刻・取得品質・履歴欠落を保持し、LARM側で約10秒の期限を超えた値は参考値として扱う。外部連携は引き続き未計測で、他サービスの状態を流用しない。言語・画像・楽曲の監視はAPIに残るが新しい形へ勝手に割り当てない。LARM本番APIの公開と実画面確認は[接続設計の記録](../spec/larm-spatial-monitoring-integration-design-2026-10-18.md)を参照する。
 
-取得失敗時はBackendをdisconnected、他をstaleへ。明示的な状態プレビューだけはデモ値を優先する。デモは実測として保存・表示しない。既存の監視判定の正本は[実測接続の設計](../spec/spatial-monitoring-eumenes-design-2026-10-18.md)。
+接続断（disconnected）はfaultと同じ赤で減光せず、光の時間変化だけを止めて動くfaultと区別する。LARMのあるLANの外ではLARM経由の用途とLARM4体の不達をunknown（`larm_off_lan`）にする（[§12](../spec/spatial-monitoring-eumenes-design-2026-10-18.md)）。取得失敗時はBackendをdisconnected、他をstaleへ。明示的な状態プレビューだけはデモ値を優先する。デモは実測として保存・表示しない。既存の監視判定の正本は[実測接続の設計](../spec/spatial-monitoring-eumenes-design-2026-10-18.md)。
 
 ## 描画と資源管理
 

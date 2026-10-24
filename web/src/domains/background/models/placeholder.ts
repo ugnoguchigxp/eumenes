@@ -28,8 +28,9 @@ export function createPlaceholder(): SpatialModel {
 		update(state, selected) {
 			material.color.set(colors[state.health]);
 			material.wireframe = state.health === "unknown";
-			material.transparent = state.stale;
-			material.opacity = state.stale ? 0.45 : 1;
+			const old = state.stale && state.health !== "disconnected";
+			material.transparent = old;
+			material.opacity = old ? 0.45 : 1;
 			ringMaterial.color.set(selected ? "#ffffff" : colors[state.health]);
 			ring.scale.setScalar(selected ? 1.15 : 1);
 		},

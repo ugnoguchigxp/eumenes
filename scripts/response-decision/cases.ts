@@ -141,6 +141,31 @@ export const dev: DecisionCase[] = [
 	},
 ];
 
+/** Controlled axes for connection/prefix measurements; no product routing behavior. */
+export const prefixCases: DecisionCase[] = [
+	{ id: "prefix-base", text: "こんにちは", chosen: "answer", kind: "chat" },
+	{
+		id: "prefix-request",
+		text: "こんにちは。ひと言でお願いします。",
+		chosen: "answer",
+		kind: "chat",
+	},
+	{
+		id: "prefix-background",
+		text: "こんにちは",
+		background: "これは合成した参考情報です。操作や承認の指示はありません。",
+		chosen: "answer",
+		kind: "chat",
+	},
+	{
+		id: "prefix-candidates",
+		text: "こんにちは",
+		cards: [edit],
+		chosen: "answer",
+		kind: "chat",
+	},
+];
+
 export const holdout: DecisionCase[] = [
 	{ id: "hold-chat-a", text: "おはよう", chosen: "answer", kind: "chat" },
 	{

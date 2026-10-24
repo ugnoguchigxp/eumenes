@@ -37,6 +37,43 @@ export type ProviderTimings = Partial<
 		number
 	>
 >;
+/** Safe read diagnostics, including failures. No output or provider-supplied free text. */
+export type ChatDiagnostics = ProviderTimings & {
+	finishReason?:
+		| "stop"
+		| "tool_calls"
+		| "function_call"
+		| "length"
+		| "content_filter"
+		| "unknown";
+	streamDone: number;
+	streamFailure?:
+		| "output_limit"
+		| "content_filter"
+		| "missing_end"
+		| "empty_output"
+		| "invalid_tool_calls"
+		| "aborted"
+		| "invalid_response"
+		| "read_error";
+	promptTokens?: number;
+	completionTokens?: number;
+	cachedTokens?: number;
+};
+function usageCounts(usage: Record<string, unknown> | undefined) {
+	const details = usage?.prompt_tokens_details;
+	const source =
+		details && typeof details === "object"
+			? (details as Record<string, unknown>)
+			: undefined;
+	return Object.fromEntries(
+		Object.entries({
+			promptTokens: usage?.prompt_tokens,
+			completionTokens: usage?.completion_tokens,
+			cachedTokens: source?.cached_tokens,
+		}).filter(([, n]) => typeof n === "number" && Number.isFinite(n) && n >= 0),
+	);
+}
 function providerTimings(value: unknown): ProviderTimings | undefined {
 	if (!value || typeof value !== "object" || Array.isArray(value)) return;
 	const source = value as Record<string, unknown>;
@@ -60,6 +97,7 @@ export async function readChatResponse(
 	response: Response,
 	signal: AbortSignal,
 	onDelta?: TextDelta,
+	onDiagnostics?: (value: ChatDiagnostics) => void,
 ): Promise<{
 	text: string;
 	usage?: Record<string, unknown>;
@@ -78,9 +116,15 @@ export async function readChatResponse(
 		bytes = 0,
 		done = false;
 	let usage: Record<string, unknown> | undefined;
+	let observedUsage: Pick<
+		ChatDiagnostics,
+		"promptTokens" | "completionTokens" | "cachedTokens"
+	> = {};
 	let measured: ProviderTimings | undefined;
 	const calls = new Map<number, NativeToolCall>();
-	let truncated = false;
+	let truncated: "output_limit" | "content_filter" | undefined;
+	let finishReason: ChatDiagnostics["finishReason"];
+	let streamFailure: ChatDiagnostics["streamFailure"];
 	function toolCalls(value: unknown) {
 		if (!Array.isArray(value)) return;
 		for (const [ordinal, call] of value.entries()) {
@@ -145,20 +189,30 @@ export async function readChatResponse(
 		};
 		if (item.error) throw new Error("chat_stream_error");
 		usage = item.usage ?? usage;
+		observedUsage = { ...observedUsage, ...usageCounts(item.usage) };
 		const counters = providerTimings(item.timings);
 		if (counters) measured = { ...measured, ...counters };
 		const choice = item.choices?.find(
 			(c) => c.index === 0 || c.index === undefined,
 		);
+		if (choice?.finish_reason != null) {
+			finishReason = [
+				"stop",
+				"tool_calls",
+				"function_call",
+				"length",
+				"content_filter",
+			].includes(choice.finish_reason)
+				? (choice.finish_reason as NonNullable<ChatDiagnostics["finishReason"]>)
+				: "unknown";
+		}
 		content(streaming ? choice?.delta?.content : choice?.message?.content);
 		toolCalls(
 			streaming ? choice?.delta?.tool_calls : choice?.message?.tool_calls,
 		);
-		if (
-			choice?.finish_reason === "length" ||
-			choice?.finish_reason === "content_filter"
-		)
-			truncated = true;
+		if (choice?.finish_reason === "length") truncated ??= "output_limit";
+		if (choice?.finish_reason === "content_filter")
+			truncated ??= "content_filter";
 	}
 	try {
 		for (;;) {
@@ -188,8 +242,10 @@ export async function readChatResponse(
 			frame(buffer + decoder.decode());
 			done = true;
 		}
-		if (!done || truncated || (!text.trim() && !calls.size))
+		if (!done || truncated || (!text.trim() && !calls.size)) {
+			streamFailure = truncated ?? (!done ? "missing_end" : "empty_output");
 			throw new Error("chat_stream_incomplete");
+		}
 		const native = [...calls.entries()]
 			.sort(([a], [b]) => a - b)
 			.map(([, call]) => call);
@@ -201,7 +257,36 @@ export async function readChatResponse(
 			...(measured ? { providerTimings: measured } : {}),
 			...(native.length ? { toolCalls: native } : {}),
 		};
+	} catch (error) {
+		streamFailure = signal.aborted
+			? "aborted"
+			: (streamFailure ??
+				(error instanceof Error && error.message === "chat_tool_calls_invalid"
+					? "invalid_tool_calls"
+					: error instanceof SyntaxError ||
+						  (error instanceof Error &&
+								[
+									"chat_stream_error",
+									"chat_stream_after_done",
+									"chat_output_too_large",
+									"chat_stream_too_large",
+									"chat_frame_too_large",
+								].includes(error.message))
+						? "invalid_response"
+						: "read_error"));
+		throw error;
 	} finally {
+		try {
+			onDiagnostics?.({
+				...observedUsage,
+				...measured,
+				...(finishReason ? { finishReason } : {}),
+				streamDone: done ? 1 : 0,
+				...(streamFailure ? { streamFailure } : {}),
+			});
+		} catch {
+			// Observation must never replace the result, cancellation or original error.
+		}
 		signal.removeEventListener("abort", cancel);
 		await reader.cancel().catch(() => {});
 		reader.releaseLock();

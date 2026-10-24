@@ -5,6 +5,8 @@ import type {
 	ExecutionWorkItem,
 } from "../../domains/agent-runtime";
 import type { DialogueService } from "../../domains/dialogue";
+import { toErrorCode } from "../../infrastructure/error-code";
+import { getLogger } from "../../infrastructure/logger";
 import { sendExecutionNotice } from "../toolchain/task-execution-port";
 
 /** Characters of one TODO line (the agency prompt stays short). */
@@ -80,12 +82,32 @@ export function createAgencyWork(deps: {
 	): number {
 		let sent = 0;
 		for (const report of held) {
-			if (!agents.executions.releaseReportInTransaction(db, report.eventId))
-				continue;
-			const view = agents.executions.viewInTransaction(db, report.executionId);
-			if (view && sendExecutionNotice(deps, db, view, report.eventId)) sent++;
-			// Nothing left to answer: settle the event so the delivery loop stops polling it.
-			else agents.executions.settleEventInTransaction(db, report.eventId);
+			// One report at a time: a notice that fails must not keep the others (or itself) held for ever.
+			db.exec("SAVEPOINT agency_report_release");
+			try {
+				if (!agents.executions.releaseReportInTransaction(db, report.eventId)) {
+					db.exec("RELEASE agency_report_release");
+					continue;
+				}
+				const view = agents.executions.viewInTransaction(
+					db,
+					report.executionId,
+				);
+				if (view && sendExecutionNotice(deps, db, view, report.eventId)) sent++;
+				// Nothing left to answer: settle the event so the delivery loop stops polling it.
+				else agents.executions.settleEventInTransaction(db, report.eventId);
+				db.exec("RELEASE agency_report_release");
+			} catch (error) {
+				db.exec("ROLLBACK TO agency_report_release");
+				db.exec("RELEASE agency_report_release");
+				// The notice cannot be sent: the report is closed as failed (logged), never retried in a loop.
+				agents.executions.releaseReportInTransaction(db, report.eventId);
+				agents.executions.settleEventInTransaction(db, report.eventId);
+				getLogger("agency").warn("agency.report_release_failed", {
+					subjectId: report.executionId,
+					reason: toErrorCode(error, "notice_failed"),
+				});
+			}
 		}
 		return sent;
 	}

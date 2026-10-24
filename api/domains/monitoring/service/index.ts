@@ -12,6 +12,7 @@ import type {
 	MonitoringSnapshot,
 } from "../contracts";
 import { createHostMetrics } from "./host";
+import { createLanPresence } from "./lan";
 import { hostLimits, hostState, serviceState } from "./rules";
 import type { LarmCollector } from "./larm-collector";
 import { larmItems } from "./larm-items";
@@ -46,6 +47,8 @@ export type MonitoringDeps = {
 	host?: ReturnType<typeof createHostMetrics>;
 	now?: () => number;
 	remote?: LarmCollector;
+	/** Whether LARM is expected to answer from here; see ./lan.ts. */
+	onLan?: () => Promise<boolean>;
 };
 
 const labels: Record<MonitoringShape, string> = {
@@ -90,26 +93,35 @@ export function createMonitoring(deps: MonitoringDeps) {
 	const now = deps.now ?? Date.now;
 	const host = deps.host ?? createHostMetrics(deps.dataDir);
 	const previous = new Map<string, string>();
+	const onLan =
+		deps.onLan ??
+		createLanPresence(() => deps.settings.get().larm?.baseUrl ?? null);
 
 	function larmReachable(status: LarmStatus) {
 		return status.state !== "unconfigured" && status.state !== "failed";
 	}
 	/** A route reaches its service when LARM is up, or when its cloud resource is usable. */
 	function routeReachable(purpose: Purpose, settings: Settings, larm: boolean) {
+		const cloud = cloudUsable(purpose, settings);
+		const route = settings.routes[purpose];
+		if (route.mode === "cloud-only")
+			return { reachable: cloud, viaLarm: false };
+		if (route.mode === "larm-preferred" && route.cloudAllowed && cloud)
+			return { reachable: true, viaLarm: false };
+		return { reachable: larm, viaLarm: true };
+	}
+	function cloudUsable(purpose: Purpose, settings: Settings) {
 		const route = settings.routes[purpose];
 		const resource = settings.resources.find((r) => r.id === route.fallbackId);
 		const connection = settings.connections.find(
 			(c) => c.id === resource?.connectionId,
 		);
-		const cloud =
+		return (
 			!!connection?.enabled &&
 			!!deps.settings
 				.diagnostics()
-				.connections.find((c) => c.id === connection.id)?.credentialAvailable;
-		if (route.mode === "cloud-only") return cloud;
-		if (route.mode === "larm-preferred" && route.cloudAllowed && cloud)
-			return true;
-		return larm;
+				.connections.find((c) => c.id === connection.id)?.credentialAvailable
+		);
 	}
 
 	function item(
@@ -135,7 +147,7 @@ export function createMonitoring(deps: MonitoringDeps) {
 			await deps.remote?.close();
 		},
 		async snapshot(): Promise<MonitoringSnapshot> {
-			const remote = await deps.remote?.read();
+			const [remote, lan] = await Promise.all([deps.remote?.read(), onLan()]);
 			const observedAt = now();
 			const since = observedAt - WINDOW_MS;
 			const settings = deps.settings.get();
@@ -148,15 +160,18 @@ export function createMonitoring(deps: MonitoringDeps) {
 			const busy =
 				Object.values(queue.lanes).some((lane) => lane.running > 0) ||
 				Object.values(attempts).some((a) => a.running > 0);
-			const route = (purpose: Purpose, group: Group) =>
-				serviceState(
+			const route = (purpose: Purpose, group: Group) => {
+				const { reachable, viaLarm } = routeReachable(purpose, settings, larm);
+				return serviceState(
 					attempts[group],
-					routeReachable(purpose, settings, larm),
+					reachable,
 					// A cloud-only route does not wait for the LARM connection.
 					starting && settings.routes[purpose].mode !== "cloud-only",
+					viaLarm && !lan,
 				);
+			};
 			const recorded = (o: ActivityObservation) =>
-				serviceState({ ...o, ...recentOnly(o, since) }, larm, starting);
+				serviceState({ ...o, ...recentOnly(o, since) }, larm, starting, !lan);
 			return {
 				observedAt,
 				...(remote ? { larm: remote } : {}),
@@ -193,7 +208,7 @@ export function createMonitoring(deps: MonitoringDeps) {
 					item("language", route("llm", "language")),
 					item("image", recorded(deps.image?.(since) ?? none)),
 					item("music", recorded(deps.music?.(since) ?? none)),
-					...(remote ? larmItems(remote, settings.larm, now()) : []),
+					...(remote ? larmItems(remote, settings.larm, now(), !lan) : []),
 				],
 			};
 		},

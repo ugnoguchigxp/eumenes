@@ -89,3 +89,18 @@ test("a held report is listed as a work item until it is released (archived)", (
 		db.query("SELECT state FROM agent_execution_events WHERE id='ev1'").get(),
 	).toEqual({ state: "delivered" });
 });
+
+test("two held events of one execution make one work item", () => {
+	const { db, reports, row } = setup();
+	row("e1", "completed");
+	for (const ev of ["ev1", "ev2"])
+		reports.holdReportInTransaction(db, {
+			eventId: ev,
+			executionId: "e1",
+			conversationId: "c1",
+		});
+	expect(reports.heldReportsInTransaction(db, "c1")).toHaveLength(2);
+	expect(reports.workItemsInTransaction(db, "c1").map((i) => i.id)).toEqual([
+		"e1",
+	]);
+});

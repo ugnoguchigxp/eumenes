@@ -63,3 +63,17 @@ TODO の見え方（agency に渡す `HostTodo`）:
 - `api/application/agency/host.ts`: `hostTodos`、機会ごとの `todos`、保留の監視と再確認、報告の判断での解除、見ていない保留の解除。
 - `api/application/server-services.ts`: 配線。
 - 同梱の eumenes-agency を 92c4a2b の版に更新（`HostTodo`・`reportedTodoIds`）。
+- 仮の表示（§5）: `GET /api/agent-executions/work?conversationId=`（`/:id` より前に登録）と、Web のランチャー「TODO（暫定）」から開く markdown の artifact タブ（進行中・完了・未報告・報告済み直近20件。開き直すと更新）。
+- 独立レビュー（2026-10-24）を受けた修正:
+  - 解除は報告ごとに SAVEPOINT で切り離す。通知が失敗した1件は、報告済みにしたうえで配信済みとして片付け、ログ（`agency.report_release_failed`）に残す。ほかの報告は止めない。
+  - 保留の検索用の部分インデックス（migration 0010）。保守で、報告済みから30日を過ぎた行と、実行が消えた行を消す。
+  - 同じ実行に保留が2件（結果と停止の通知など）あっても、TODO は1件にする。
+  - 会話が混んでいて idle の判断を見送ったときも、保留の再確認を掛け直す。
+  - 表示の文字列は、切ってからエスケープする（エスケープの途中で切らない）。
+- 未対応（テストの不足）: `deliverInTransaction` の保留の分岐を通す統合テスト。ルートの順序は§8で試験した。
+
+## 8. TODOアーティファクトの表示改善（2026-10-24）
+
+利用者の依頼により、仮のmarkdown表示を、TanStack Tableを使うDesignSystemの `ServerDataTable` を主体とした読み取り専用画面へ置き換えた。todo・doneは同じテーブルの行とし、状態列だけで区別する。archivedだけを別タブにする。一覧全体で共通のページ送りを持ち、初期10件・25/50件を選べる。日付・詳細ボタン・モーダルは表示せず、依頼と結果を表内で全文表示する。
+
+`agency-todos-screen.bundle.json` の単独公開artifact `artifact:agency.todos@1` と、既存 `adapter:task-execution@1` の読み取りquery `query:agent-runtime.todos@1` で登録する。Webは登録adapterと共通ArtifactHostを通す。固定ランチャー項目と専用Reactホスト・描画分岐は撤去した。表示の状態別ページングは旧8件・20件上限に依存せず保存済みの全履歴へ到達できる。agencyへ渡す一覧や報告の判断は維持する。旧読み取りAPIも維持し、`/work` が `/:id` より先に解決されることを試験した。画像生成案・実装範囲・検証結果と共通領域の残る不整合は[表示改善の記録](design/todo-artifact-2026-10-24/implementation.md)を参照する。

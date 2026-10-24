@@ -105,6 +105,32 @@ test("invalid optional provider timings are omitted without changing the answer"
 	expect(JSON.stringify(lines)).not.toContain("private-token");
 });
 
+test("invalid usage counters cannot bypass the reader's safe diagnostics", async () => {
+	const lines = capture();
+	const timing = startLlmTiming(
+		"fixture",
+		messages,
+		window,
+		undefined,
+		undefined,
+	);
+	await timing.read(
+		Response.json({
+			choices: [{ message: { content: "ok" } }],
+			usage: {
+				prompt_tokens: -1,
+				completion_tokens: "private-count",
+				prompt_tokens_details: { cached_tokens: -2 },
+			},
+		}),
+		new AbortController().signal,
+	);
+	const [entry] = timings(lines);
+	for (const key of ["promptTokens", "completionTokens", "cachedTokens"])
+		expect(entry?.[key]).toBeUndefined();
+	expect(JSON.stringify(lines)).not.toContain("private-count");
+});
+
 test("the fit check reports the byte size of the returned messages without extra serialization", () => {
 	const stringify = spyOn(JSON, "stringify");
 	let fitted: ReturnType<typeof fitContext>;
@@ -173,6 +199,9 @@ test("a failed read logs outcome=error with known timings, usage only when prese
 		level: "warn",
 		outcome: "error",
 		profile: "main",
+		promptTokens: 9,
+		streamFailure: "missing_end",
+		streamDone: 0,
 		droppedMessages: 0,
 		requestBytes: encoded(timing.selected),
 	});

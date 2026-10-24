@@ -1,4 +1,5 @@
 import { measureStage } from "../../../infrastructure/performance";
+import { withLogContext } from "../../../infrastructure/logger";
 import { gzipFetch, plainFetch } from "./gzip-fetch";
 import type { Capability, LarmPort, LarmCallOptions } from "../contracts";
 import { ttsVoicesSchema } from "../contracts";
@@ -156,26 +157,14 @@ export function createLarm(config: {
 		) {
 			// Independent sessions (one-shot calls and task sub-agents) share the saved profile; admission and KV capacity belong to LARM.
 			return withProvider("llm", scoped, async () => {
-				const helper = createLarm({
-					...config,
-					profile,
-					client: `eumenes-helper-${crypto.randomUUID()}`,
-				});
-				auxiliarySessions.add(helper);
-				try {
-					return onDelta
-						? await helper.answerStream!(messages, scoped, onDelta, {
-								...options,
-								sessionRole: "main",
-							})
-						: await helper.answer(messages, scoped, {
-								...options,
-								sessionRole: "main",
-							});
-				} finally {
-					await helper.close();
-					auxiliarySessions.delete(helper);
-				}
+				return independentAnswer(
+					{ ...config, profile },
+					auxiliarySessions,
+					messages,
+					scoped,
+					onDelta,
+					options,
+				);
 			});
 		}
 		// One foreground conversation may infer on its connection at a time.
@@ -378,4 +367,36 @@ export function createLarm(config: {
 				).then(() => {}),
 			),
 	};
+}
+
+/** Own one helper for one call, preserving the caller role only in diagnostics. */
+async function independentAnswer(
+	config: Parameters<typeof createLarm>[0],
+	sessions: Set<LarmPort>,
+	messages: Parameters<LarmPort["answer"]>[0],
+	signal: AbortSignal,
+	onDelta: ((text: string) => void) | undefined,
+	options: LarmCallOptions,
+) {
+	return withLogContext({ sessionRole: options.sessionRole }, async () => {
+		const helper = createLarm({
+			...config,
+			client: `eumenes-helper-${crypto.randomUUID()}`,
+		});
+		sessions.add(helper);
+		try {
+			return onDelta
+				? await helper.answerStream!(messages, signal, onDelta, {
+						...options,
+						sessionRole: "main",
+					})
+				: await helper.answer(messages, signal, {
+						...options,
+						sessionRole: "main",
+					});
+		} finally {
+			await helper.close();
+			sessions.delete(helper);
+		}
+	});
 }

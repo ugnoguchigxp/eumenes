@@ -30,6 +30,7 @@ export type ServerDataTableProps<T extends { id: string }> = {
 	detail?: (row: T) => ReactNode;
 	detailMode?: "inline" | "modal";
 	emptyMessage?: string;
+	searchable?: boolean;
 };
 /** All sorting, filtering and pagination are controlled by the caller's API response. */
 export function ServerDataTable<T extends { id: string }>({
@@ -44,6 +45,7 @@ export function ServerDataTable<T extends { id: string }>({
 	detail,
 	detailMode = "inline",
 	emptyMessage = "記録はまだありません。",
+	searchable = true,
 }: ServerDataTableProps<T>) {
 	const [search, setSearch] = useState(query.q);
 	const [open, setOpen] = useState<string | null>(null);
@@ -93,38 +95,40 @@ export function ServerDataTable<T extends { id: string }>({
 	const pageCount = Math.max(1, table.getPageCount());
 	return (
 		<section className="ds-server-table" aria-label={label}>
-			<form
-				className="ds-server-table-tools"
-				onSubmit={(event) => {
-					event.preventDefault();
-					onQuery({ ...query, q: search.trim(), pageIndex: 0 });
-				}}
-			>
-				<input
-					type="search"
-					aria-label={`${label}を検索`}
-					placeholder="検索する文字を入力"
-					value={search}
-					maxLength={200}
-					onChange={(event) => setSearch(event.target.value)}
-				/>
-				<Button variant="secondary" disabled={busy} type="submit">
-					検索
-				</Button>
-				{query.q && (
-					<Button
-						variant="ghost"
-						disabled={busy}
-						type="button"
-						onClick={() => {
-							setSearch("");
-							onQuery({ ...query, q: "", pageIndex: 0 });
-						}}
-					>
-						検索を解除
+			{searchable && (
+				<form
+					className="ds-server-table-tools"
+					onSubmit={(event) => {
+						event.preventDefault();
+						onQuery({ ...query, q: search.trim(), pageIndex: 0 });
+					}}
+				>
+					<input
+						type="search"
+						aria-label={`${label}を検索`}
+						placeholder="検索する文字を入力"
+						value={search}
+						maxLength={200}
+						onChange={(event) => setSearch(event.target.value)}
+					/>
+					<Button variant="secondary" disabled={busy} type="submit">
+						検索
 					</Button>
-				)}
-			</form>
+					{query.q && (
+						<Button
+							variant="ghost"
+							disabled={busy}
+							type="button"
+							onClick={() => {
+								setSearch("");
+								onQuery({ ...query, q: "", pageIndex: 0 });
+							}}
+						>
+							検索を解除
+						</Button>
+					)}
+				</form>
+			)}
 			{error && <p role="alert">{error}</p>}
 			<div
 				className="ds-server-table-scroll"

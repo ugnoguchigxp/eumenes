@@ -1,4 +1,5 @@
 import { computeWebAdapter } from "../domains/compute/toolchain-adapter";
+import { todosWebAdapter } from "../domains/agent-runtime/toolchain-adapter";
 import { codexTasksWebAdapter } from "../domains/codex-tasks/toolchain-adapter";
 import { googleAccountsWebAdapter } from "../domains/google-accounts/toolchain-adapter";
 import { ocrWebAdapter } from "../domains/ocr/toolchain-adapter";
@@ -21,6 +22,7 @@ import { kanbanWebAdapter, sharedKanbanWebAdapter } from "../domains/kanban";
 
 /** Every domain adapter the common artifact host can render. Adding a domain adds one line. */
 export const toolchainWebAdapters = createWebAdapterRegistry([
+	todosWebAdapter,
 	googleAccountsWebAdapter,
 	timerWebAdapter,
 	musicScreenWebAdapter,
