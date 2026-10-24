@@ -4,7 +4,7 @@
 
 状態: 利用者合意済み。2026-10-17、fixture の範囲は実装済み（§5）。§4 の実機受入は未記録。`web-guided.bundle.json` と shared-execution の古い SKILL 本文は `readAhead:[{url},…]` のまま。
 
-関連: [会話の初動2ラウンド化](conversation-two-round-initial-analysis-design-2026-10-17.md)、[委譲前の一時回答 §9](conversation-pre-delegation-response-design-2026-10-17.md)。
+関連: [会話の初動2ラウンド化（削除済み。正本は会話エージェントのContextWindow仕様）](context-window-spec-2026-10-24.md)、[委譲前の一時回答 §9（削除済み。正本は会話エージェントのContextWindow仕様）](context-window-spec-2026-10-24.md)。
 
 ## 1. 実機で確認した事実
 
@@ -43,4 +43,4 @@ fixture は次のとおり。実機は未実施。
 - 音声経路: LLM を呼ばずに確定した回答でも音声配信できるよう、`InferencePort.acceptHostAnswerInTransaction`（`api/domains/inference/service/request-status.ts`）を追加。`generation-handler.ts` の settle で調査失敗時に1回呼ぶ。受理できなければ `permission_revoked` で run を失敗させる。試験は `api/domains/inference/test/inference.test.ts`、`api/application/toolchain/agent-voice-response.test.ts`。
 - 固定返答の対象は調査そのものの失敗だけで、action の失敗（kanban の `revision_conflict` など）は従来どおり会話エージェントが結果を伝える。
 - readAhead の新 revision は `skill:web.guided@4`、`package:web.recipe@5`・`web.search@5`・`web.quick@6`、`toolchain:web.search@6`・`web.research.codex@3`（`web-shared-execution.bundle.json`）。製品DB登録済み（2026-10-17 再起動）。登録後の live で天気の調査が成功（run `180ade55-9423-40fa-ba74-cb1c4e735136`）。
-- 実機で未確認: 調査失敗時の「失敗しました。」の読み上げ。2026-10-18 以降に確認する（[会話の初動 §9](conversation-two-round-initial-analysis-design-2026-10-17.md)）。
+- 実機で未確認: 調査失敗時の「失敗しました。」の読み上げ。2026-10-18 以降に確認する（[会話の初動 §9（削除済み。正本は会話エージェントのContextWindow仕様）](context-window-spec-2026-10-24.md)）。

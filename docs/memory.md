@@ -49,50 +49,9 @@ APIは `POST /api/memory/seeds/preview` と `POST /api/memory/seeds/import`（�
 
 今回のSeedは50候補（State28・手順18・案件4）。実データをリポジトリのfixtureへ複製しない。隔離環境での導入確認と既存環境への登録状況は、[導入検証記録](../spec/verification/memory-package-adoption-2026-10-16/README.md)に分けて記載する。
 
-## ContextWindow の層と並び順
+## ContextWindow
 
-prompt cache は先頭から一致する部分にしか効かない。変わりにくい層ほど前に置く。
-
-| 順 | 層 | 中身 | 変わる時 |
-| --- | --- | --- | --- |
-| 1 | L0 system | system prompt | ほぼ不変 |
-| 2 | L1 長期記憶 | プロフィール、好み、事実、傾向 | 下の「L1 を作り直す条件」だけ |
-| 3 | L3 逐語履歴 | `keep` の往復を古い順に追記 | 新しい往復の追記。畳むのは `compact-history` と重複除去のときだけ |
-| 4 | L2 作業記憶 | 「これまでの経緯（要約）」、短期メモ、「最近覚えたこと」（L1 に未反映の新しい記憶） | 往復ごと |
-| 5 | 未処理 | まだ判断されていない往復（逐語） | 往復ごと |
-| 6 | L4 | notice、想起（prefetch）、World の名前の手がかり（1行）、操作の結果 | 毎回 |
-| 7 | L5 | 今回の入力 | 毎回 |
-
-**L1 を作り直す条件**
-
-| 条件 | 作り直すか |
-| --- | --- |
-| 記憶の停止・置き換え・忘却（immediate change） | する。使ってはいけない内容を残さないため |
-| Seed候補の追加登録 | する。登録前のWindowを破棄し、次のrunで反映する |
-| policy の変更（メモリーの入り切り） | する |
-| 有効期間の境界をまたいだ | する。期限切れの内容を「現在」として出さないため |
-| `consolidate-memory` が `republishLongTerm: true` を返した | する |
-| 日付の変わり目 | しない（cache を崩すだけなので） |
-| 短期の追加が `PENDING_LIMIT`（5件）に達した | しない。代わりに `consolidate-memory` を優先して起動する。新しい記憶は L2 の「最近覚えたこと」に出し続ける |
-
-短期メモを steward が閉じても immediate change にはならない（短期の層だけが変わる）。
-
-### 予算
-
-| 項目 | 値 | 定義の場所 |
-| --- | --- | --- |
-| L1 長期記憶 | 16 KiB（`LONG_TERM_BYTES`） | memory |
-| L2 短期 | 8 KiB（`SHORT_TERM_BYTES`） | memory |
-| 想起（prefetch ＋ 毎回の想起） | 6 KiB（`PREFETCH_BYTES`） | memory |
-| 要約 | 最大1200文字（`SUMMARY_MAX_CHARS`） | memory |
-| 逐語履歴（L3 ＋ 未処理 ＋ 直近2往復）の合計 | 48 KiB（`HISTORY_MAX_BYTES`） | memory contracts |
-| 履歴の1メッセージ | 12 KiB（`HISTORY_MESSAGE_MAX_BYTES`）。超えたら先頭8 KiB と末尾4 KiB を残し「（中略：約N文字）」を入れる。UTF-8 の文字境界で切る | memory contracts |
-
-- dialogue は上の定数を memory から import して使う。memory が Window の予算を持つ。
-- 直近2往復は常に入れる。超えたら直近2往復以外を古い順に落とす（L3 と未処理は区別しない）。落とした往復も想起の検索対象には残る。今回の入力（L5）は切らず、履歴の予算にも数えない。
-- 会話の原文は切らない。切るのは文脈に入れるときだけである。
-- steward が遅れても止まっても、文脈は「直近の往復を予算内で逐語」より悪くならない。
-- World の中身は入力に入れない（予算の割り当てもない）。話題の対象の名前の手がかり（最大5件、1行）だけが L4 に入る。
+ContextWindowの内容・並び・予算・保持・再構成・忘却の扱いは、[会話エージェントのContextWindow仕様](../spec/context-window-spec-2026-10-24.md)を唯一の正本とする。本書には書かない。仕様は未実装であり、実装が済むまでの現行コードとの差分は仕様の§17にある。
 
 ## step と実行単位
 

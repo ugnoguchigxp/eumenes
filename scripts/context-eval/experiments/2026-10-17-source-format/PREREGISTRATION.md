@@ -1,6 +1,6 @@
 # 事前登録: 出所の表し方（2026-10-17-source-format）
 
-設計書: `spec/context-window-structure-and-evaluation-design-2026-10-17.md` §5.6、§6.1。
+設計書: `spec/context-window-spec-2026-10-24.md` §21.2（元の設計書は削除済み）。
 このファイルと `experiment.json`、事例、判定役の prompt、arm のソースは `prepare` で sha256 を `manifest.json` に固定する。freeze 後に変えると `prepare`・`run` が止まる。
 
 ## arm

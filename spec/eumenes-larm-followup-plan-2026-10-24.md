@@ -6,7 +6,7 @@
 
 LARM新版でキャッシュ保持の改善を確認した後に残った問題を扱う。先にEumenesだけで接続復旧と測定の不備を直し、初期判断の遅さを切り分ける。後方systemの配置変更や判断用接続の常駐化は、LARMの契約確認と追加の設計判断を経て扱う。
 
-既存の[応答時間短縮計画](eumenes-response-latency-plan-2026-10-23.md)、[接続保持設計](larm-connection-retention-design-2026-10-18.md)、[新版の再検証記録](verification/larm-revalidation-retry-2026-10-24.md)を前提とする。構造化出力候補は未採用であり、本計画で自動採用しない。
+既存の[応答時間短縮計画（削除済み。正本は会話エージェントのContextWindow仕様）](context-window-spec-2026-10-24.md)、[接続保持設計](larm-connection-retention-design-2026-10-18.md)、[新版の再検証記録](verification/larm-revalidation-retry-2026-10-24.md)を前提とする。構造化出力候補は未採用であり、本計画で自動採用しない。
 
 ## 目的と分担
 

@@ -4,7 +4,7 @@
 
 状態: 2026-10-18 利用者合意（§6 決着）。実装・fixture済み（binding `execution:"instant"`、`api/application/weather/`）。回答文は末尾に発表時刻「（5時発表）」を付ける。実機で「鎌倉の天気」が「横浜は…」と答えたため、§7 で地名の解決を host 側へ移した（利用者合意 2026-10-18、revision 2、実装・fixture済み、実APIで鎌倉・横浜・札幌・大阪の回答を確認。実LLMの引数は未確認）。§3 の `area` 列挙と `primary_area.xml` は §7 で置き換え。
 
-関連: [会話の初動 §8](conversation-two-round-initial-analysis-design-2026-10-17.md)、[ツールチェーンの登録と拡張](../docs/toolchain-extension.md)、[調査失敗時の返答](research-failure-reply-and-readahead-2026-10-17.md)。
+関連: [会話の初動 §8（削除済み。正本は会話エージェントのContextWindow仕様）](context-window-spec-2026-10-24.md)、[ツールチェーンの登録と拡張](../docs/toolchain-extension.md)、[調査失敗時の返答](research-failure-reply-and-readahead-2026-10-17.md)。
 
 ## 1. 背景
 

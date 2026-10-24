@@ -1,5 +1,5 @@
 /**
- * context-eval cases (design: spec/context-window-structure-and-evaluation-design-2026-10-17.md section 5.2).
+ * context-eval cases (spec: spec/context-window-spec-2026-10-24.md section 21.2).
  * A case is seed DATA, not a ContextWindow: materialize builds the real window from it.
  * Offline evaluation only; product code never imports this folder.
  */

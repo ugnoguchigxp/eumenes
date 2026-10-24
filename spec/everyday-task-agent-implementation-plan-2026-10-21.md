@@ -358,7 +358,7 @@ bunx playwright test tests/browser/task-execution.spec.ts tests/browser/browser-
 
 - [ツールチェーンの登録と拡張](../docs/toolchain-extension.md) と [検証手順](../docs/toolchain-extension-verification.md)
 - [単発型と協働型](subagent-task-and-session-agents-design-2026-10-18.md)。共有・非同期能力のP3は本計画の子実行接続と整合させるが、session全体への共有機能展開は別作業とする
-- [会話ContextWindow](conversation-context-window-design-2026-10-17.md)、[使用済みツールの保持](conversation-toolchain-context-retention-design-2026-10-21.md)、[時間制限](toolchain-time-limits-design-2026-10-18.md)
+- [ContextWindow仕様](context-window-spec-2026-10-24.md)、[時間制限](toolchain-time-limits-design-2026-10-18.md)
 - [ブラウザ](browser-tabs-toolchain-design-2026-10-18.md)、[実行Scriptと進捗](browser-script-progress-ui-design-2026-10-20.md)
 - [ブラウザによるサービス内検索](browser-service-search-design-2026-10-21.md)は別の設計案。子の関連付け・原文参照・完了配送が先に実装された場合はその公開契約を再利用し、別の台帳や通知機構を増やさない。本計画は同案全体の先行実装を必須にしない
 - [Pursuitの位置付け](../../eumenes_pursuit/spec/host-contract-v1.md)。別の長期リサーチ担当であり、本計画から起動しない
