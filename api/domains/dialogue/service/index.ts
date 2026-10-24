@@ -335,6 +335,20 @@ export function createDialogueService({
 			if (run?.status !== "completed" || !run.answerMessageId) return undefined;
 			return conversation.message(run.answerMessageId)?.delivery;
 		},
+		/** A runless assistant message with a host-chosen delivery (agency utterance), else null. */
+		hostMessageDelivery(
+			messageId: string,
+		): { text: string; delivery: SpeechDelivery } | null {
+			const message = conversation.message(messageId);
+			if (
+				!message ||
+				message.role !== "assistant" ||
+				message.runId !== null ||
+				message.delivery?.source !== "host"
+			)
+				return null;
+			return { text: message.text, delivery: message.delivery };
+		},
 		answerText(runId: string): string | null {
 			const run = store.read((db) => byId(db, runId));
 			return run?.answerMessageId

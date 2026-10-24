@@ -10,6 +10,7 @@ import {
 	type CallOutcome,
 	type CycleOutcome,
 	type Decision,
+	type EmotionName,
 	type IdlePlanner,
 	type LlmPort,
 	type LlmRequest,
@@ -24,6 +25,7 @@ import type {
 	AgencyContextUtterance,
 	AgencyLayerPort,
 } from "../../domains/dialogue/contracts";
+import { hostDelivery, type DeliveryEmotion } from "../../domains/delivery";
 import type { MemoryService } from "../../domains/memory";
 import type { Settings } from "../../domains/settings";
 import { toErrorCode } from "../../infrastructure/error-code";
@@ -113,6 +115,10 @@ type Conv = {
 
 const sanitize = (id: string) =>
 	id.replace(/[^a-zA-Z0-9_.:-]/g, "_").slice(0, 60);
+/** The agency's calm is the delivery's "none"; every other feeling keeps its name. */
+const deliveryEmotionOf = (emotion: EmotionName): DeliveryEmotion =>
+	emotion === "calm" ? "none" : emotion;
+
 const sameSettings = (a: AgencySettings, b: AgencySettings) =>
 	JSON.stringify(a) === JSON.stringify(b);
 
@@ -271,6 +277,7 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 			selectWhenEmpty: true,
 			hostTopics: true,
 			hostTodos: true,
+			...(cfg.emotion ? { utteranceEmotion: true } : {}),
 			utteranceStyle: ttsUtteranceStyle,
 			...(interests.length > 0 ? { standingInterests: interests } : {}),
 			tools: [],
@@ -520,6 +527,10 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 					text,
 					createdAt: new Date(at).toISOString(),
 					runId: null,
+					// The feeling chosen with the utterance sets its voice tone and motion (never judged again).
+					...(ticket.emotion
+						? { delivery: hostDelivery(deliveryEmotionOf(ticket.emotion)) }
+						: {}),
 				});
 				return "appended";
 			});
@@ -554,6 +565,7 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 			kind: trigger,
 			outcome: "appended",
 			outputCharacters: text.length,
+			...(ticket.emotion ? { emotion: ticket.emotion } : {}),
 		});
 		receipt(cy, ticket, "succeeded", text);
 		return true;

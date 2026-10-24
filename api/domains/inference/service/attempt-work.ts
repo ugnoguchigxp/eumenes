@@ -159,9 +159,11 @@ export async function chooseTtsDelivery(
 ): Promise<SpeechDelivery> {
 	const { env, preparation } = r;
 	const p = env.port(r.row.snapshot);
+	// A host delivery holds for every clause of its message; a judged one only answer-wide.
 	const delivery =
-		preparation?.deliveryScope !== "chunk" &&
-		preparation?.delivery?.version === 2
+		preparation?.delivery?.version === 2 &&
+		(preparation.deliveryScope !== "chunk" ||
+			preparation.delivery.source === "host")
 			? preparation.delivery
 			: await args.decide(
 					p.judge!.bind(p),

@@ -1,5 +1,5 @@
 import { type Sample } from "../../attitude-dataset";
-import { emotionSchema } from "../../delivery";
+import { emotionSchema, hostDelivery } from "../../delivery";
 import { afterEach, expect, spyOn, test } from "bun:test";
 import {
 	ATTITUDE_MODEL,
@@ -365,6 +365,46 @@ test("Ruri dataset captures real-turn receipt adoption once; a technical collect
 	expect(sample.adopted?.voice_application).toBe("preset");
 	expect(sample.adopted?.tone).toBe("natural");
 	expect(sample.primary_label).toBeNull();
+});
+test("a host delivery holds for a single clause without a judge call; a judged chunk still asks", async () => {
+	let calls = 0;
+	const h = await setup({
+		localSpeech: async () => wav(),
+		judge: async () => {
+			calls++;
+			return {
+				model: ATTITUDE_MODEL,
+				answers: {
+					emotion: {
+						type: "choice",
+						choice: "joy",
+						confidence: 0.9,
+						answer_confidence: 0.9,
+					},
+				},
+			};
+		},
+	});
+	const own = hostDelivery("wry");
+	const hosted = await h.inference.speakWithDelivery(
+		"また雨か。",
+		freshSignal(),
+		{
+			delivery: own,
+			deliveryScope: "chunk",
+		},
+	);
+	expect(hosted.delivery).toEqual(own);
+	expect(calls).toBe(0);
+	const judged = await h.inference.speakWithDelivery(
+		"また雨か。",
+		freshSignal(),
+		{
+			deliveryScope: "chunk",
+		},
+	);
+	expect(calls).toBe(1);
+	expect(judged.delivery?.source).not.toBe("host");
 });
 test("each clause routes by its own text; English bypasses the Japanese dictionary; disabling routing keeps the Japanese voice", async () => {
 	const spoken: Array<[string, string | undefined]> = [];

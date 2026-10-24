@@ -111,6 +111,7 @@ export function registerVoiceDialogue(
 				parsed.data.text,
 				AbortSignal.any([c.req.raw.signal, AbortSignal.timeout(60_000)]),
 				parsed.data.runId,
+				parsed.data.messageId,
 			);
 			return c.body(new Uint8Array(speech.wav), 200, {
 				"Content-Type": "audio/wav",

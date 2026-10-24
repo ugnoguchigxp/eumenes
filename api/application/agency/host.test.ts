@@ -20,6 +20,7 @@ const baseSettings: AgencySettings = {
 	idleSec: 20,
 	maxUnanswered: 1,
 	interests: [],
+	emotion: false,
 };
 
 /** What the fake background model answers for one purpose. */
@@ -431,6 +432,43 @@ describe("delivery", () => {
 		expect(snapshot?.observations.some((o) => o.id.startsWith("agency:"))).toBe(
 			false,
 		);
+	});
+
+	test("with emotion on, the utterance's feeling is stored as its host delivery; without one, none", async () => {
+		const h = harness({
+			settings: { emotion: true },
+			select: (request) => {
+				expect(request.system).toContain("【発話の気持ち】");
+				return { ...choice("speak", { refs: ["u1"] }), emotion: "🙂" };
+			},
+		});
+		await exchange(h, 1);
+		await waitFor(() => h.texts().length === 3);
+		const spoken = h.conversation.get("c1").messages[2];
+		expect(spoken?.delivery).toMatchObject({
+			source: "host",
+			emotion: "none",
+			tone: "natural",
+		});
+		const plain = harness({
+			settings: { emotion: true },
+			select: () => ({ ...choice("speak", { refs: ["u1"] }), emotion: null }),
+		});
+		await exchange(plain, 1);
+		await waitFor(() => plain.texts().length === 3);
+		expect(plain.conversation.get("c1").messages[2]?.delivery).toBeUndefined();
+	});
+
+	test("with emotion off, the select is asked without the feeling rules", async () => {
+		const h = harness({
+			select: (request) => {
+				expect(request.system).not.toContain("発話の気持ち");
+				return choice("speak", { refs: ["u1"] });
+			},
+		});
+		await exchange(h, 1);
+		await waitFor(() => h.texts().length === 3);
+		expect(h.conversation.get("c1").messages[2]?.delivery).toBeUndefined();
 	});
 
 	test("S5: a user message arriving during the decision appends nothing", async () => {

@@ -276,6 +276,8 @@ export const settingsSchema = z
 				maxUnanswered: z.number().int().min(1).max(10).default(1),
 				/** Standing interests the persona may bring up on its own. */
 				interests: z.array(z.string().min(1).max(200)).max(3).default([]),
+				/** The agency picks a light feeling for each utterance (voice tone and motion). */
+				emotion: z.boolean().default(true),
 			})
 			.strict()
 			.default({
@@ -284,6 +286,7 @@ export const settingsSchema = z
 				idleSec: 20,
 				maxUnanswered: 1,
 				interests: [],
+				emotion: true,
 			}),
 	})
 	.strict()

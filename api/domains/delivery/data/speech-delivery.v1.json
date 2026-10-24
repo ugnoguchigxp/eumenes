@@ -15,13 +15,27 @@
 		"joy": { "motion": "joyful", "tone": "excited" },
 		"empathy": { "motion": "listening", "tone": "gentle" },
 		"curiosity": { "motion": "curious", "tone": "bright" },
-		"surprise": { "motion": "surprised", "tone": "excited" }
+		"surprise": { "motion": "surprised", "tone": "excited" },
+		"enjoyment": { "motion": "joyful", "tone": "bright" },
+		"wry": { "motion": "agreeing", "tone": "wry" },
+		"admiration": { "motion": "agreeing", "tone": "bright" },
+		"relief": { "motion": "agreeing", "tone": "gentle" },
+		"shy": { "motion": "shy", "tone": "gentle" },
+		"confusion": { "motion": "thinking", "tone": "serious" },
+		"sadness": { "motion": "downcast", "tone": "soft" },
+		"apologetic": { "motion": "downcast", "tone": "gentle" },
+		"worry": { "motion": "listening", "tone": "gentle" },
+		"dislike": { "motion": "distant", "tone": "serious" },
+		"anger": { "motion": "distant", "tone": "firm" }
 	},
 	"presets": {
 		"natural": [0, 0, 0],
 		"bright": [0.05, 0.03, 0.3],
 		"gentle": [-0.08, -0.03, -0.25],
 		"serious": [-0.04, 0, 0.05],
-		"excited": [0.1, 0.05, 0.45]
+		"excited": [0.1, 0.05, 0.45],
+		"soft": [-0.1, -0.04, -0.35],
+		"wry": [-0.03, -0.02, 0.15],
+		"firm": [0.03, -0.04, 0.2]
 	}
 }

@@ -208,7 +208,12 @@ export function createVoiceDialogue(
 				throw new Error("replay_text_invalid");
 			return larm.speak(text, signal);
 		},
-		async replaySpeech(text: string, signal: AbortSignal, runId?: string) {
+		async replaySpeech(
+			text: string,
+			signal: AbortSignal,
+			runId?: string,
+			messageId?: string,
+		) {
 			if (!text.trim() || text.length > 400)
 				throw new Error("replay_text_invalid");
 			if (runId) {
@@ -224,6 +229,14 @@ export function createVoiceDialogue(
 			const context = runId ? dialogue.answerContext?.(runId) : undefined;
 
 			const replayRun = runId ? dialogue.get(runId) : undefined;
+			// A runless message's own feeling (agency utterance), only for a clause of that message.
+			const own =
+				!runId && messageId ? dialogue.hostMessageDelivery(messageId) : null;
+			const hostDelivery =
+				own &&
+				new SpeechSentences().append(spokenText(own.text), true).includes(text)
+					? own.delivery
+					: undefined;
 			const preparation: SpeechPreparation = {
 				...(replayRun
 					? {
@@ -236,6 +249,7 @@ export function createVoiceDialogue(
 						}
 					: {}),
 				...(context ? { context } : {}),
+				...(hostDelivery ? { delivery: hostDelivery } : {}),
 				deliveryScope: "chunk",
 			};
 			const speech = larm.speakWithDelivery

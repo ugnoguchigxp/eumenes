@@ -124,7 +124,12 @@ export function useReplay(
 				const fetchAt = (i: number) =>
 					sentences[i] === undefined
 						? undefined
-						: client.replaySpeech(sentences[i], signal, runId ?? undefined);
+						: client.replaySpeech(
+								sentences[i],
+								signal,
+								runId ?? undefined,
+								runId ? undefined : id,
+							);
 				let next = fetchAt(0);
 				for (let i = 0; i < sentences.length; i++) {
 					const speech = await next;

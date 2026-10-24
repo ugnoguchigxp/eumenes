@@ -28,6 +28,7 @@ import { SpeechSentences } from "../service/sentences";
 import { Hono } from "hono";
 import { registerVoiceDialogue } from "..";
 import type { InferencePort } from "../../inference";
+import { hostDelivery, type SpeechPreparation } from "../../delivery";
 
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 /** Sends a transcribed input, as the Web does when the speaker is idle. */
@@ -541,6 +542,66 @@ test("replay HTTP returns the adopted Laya motion with the same audio and suppor
 		expect(legacy.status).toBe(200);
 		expect(legacy.headers.get("X-Avatar-Motion")).toBeNull();
 		expect(synthesis).toBe(2);
+	} finally {
+		await store.close();
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+test("a runless message's host delivery reaches synthesis only for a clause of that message", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "eumenes-replay-host-"));
+	const store = openStore(join(dir, "db.sqlite3"), []);
+	const prepared: Array<SpeechPreparation | undefined> = [];
+	const port: InferencePort = {
+		status: () => ({ state: "ready", capabilities: ["tts"] }),
+		answer: async () => {
+			throw new Error("unexpected_answer");
+		},
+		transcribe: async () => {
+			throw new Error("unexpected_transcribe");
+		},
+		close: async () => {},
+		speak: async () => wav,
+		speakWithDelivery: async (_text, _signal, preparation) => {
+			prepared.push(preparation);
+			return {
+				wav,
+				...(preparation?.delivery ? { delivery: preparation.delivery } : {}),
+			};
+		},
+	};
+	const own = hostDelivery("sadness");
+	const dialogue = {
+		hostMessageDelivery: (id: string) =>
+			id === "agency:s1:t1"
+				? { text: "そっか。つらかったね。", delivery: own }
+				: null,
+	};
+	const service = createVoiceDialogue(store, dialogue as never, port);
+	try {
+		const a = await service.replaySpeech(
+			"そっか。",
+			AbortSignal.timeout(5000),
+			undefined,
+			"agency:s1:t1",
+		);
+		expect(prepared[0]?.delivery).toEqual(own);
+		expect(prepared[0]?.deliveryScope).toBe("chunk");
+		expect(a.delivery?.motion).toBe("downcast");
+		await service.replaySpeech(
+			"別の文。",
+			AbortSignal.timeout(5000),
+			undefined,
+			"agency:s1:t1",
+		);
+		await service.replaySpeech(
+			"そっか。",
+			AbortSignal.timeout(5000),
+			undefined,
+			"agency:other",
+		);
+		expect(prepared[1]?.delivery).toBeUndefined();
+		expect(prepared[2]?.delivery).toBeUndefined();
 	} finally {
 		await store.close();
 		rmSync(dir, { recursive: true, force: true });

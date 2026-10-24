@@ -2,7 +2,15 @@ import { useCallback, useEffect, useRef } from "react";
 import type { Run } from "../../../../../api/domains/dialogue/contracts";
 import type { useReplay } from "./replay";
 
-/** New adopted answers share the existing player; live voice turns own their chunks. */
+/** Proactive utterances of the agency host: runless assistant messages with this id prefix. */
+const AGENCY_MESSAGE_PREFIX = "agency:";
+const isAgencyUtterance = (message: { id: string }) =>
+	message.id.startsWith(AGENCY_MESSAGE_PREFIX);
+
+/**
+ * New adopted answers and new agency utterances share the existing player; live voice turns own
+ * their chunks.
+ */
 export function useAutomaticSpeech({
 	runs,
 	messages,
@@ -23,9 +31,10 @@ export function useAutomaticSpeech({
 	blocked?: boolean;
 }) {
 	const seen = useRef<Set<string> | null>(null);
-	const pending = useRef<Array<{ id: string; text: string; runId: string }>>(
-		[],
-	);
+	const seenUtterances = useRef<Set<string> | null>(null);
+	const pending = useRef<
+		Array<{ id: string; text: string; runId: string | null }>
+	>([]);
 	const epoch = useRef(0);
 	const busy = useRef(false);
 	const latest = useRef({ enabled, player, blocked });
@@ -44,6 +53,9 @@ export function useAutomaticSpeech({
 			// Opening a conversation never reads its existing history aloud.
 			seen.current = new Set(
 				runs.filter((run) => run.status === "completed").map((run) => run.id),
+			);
+			seenUtterances.current = new Set(
+				messages.filter(isAgencyUtterance).map((message) => message.id),
 			);
 			return;
 		}
@@ -64,6 +76,16 @@ export function useAutomaticSpeech({
 				text: message.text,
 				runId: run.id,
 			});
+		}
+		for (const message of messages) {
+			if (
+				!isAgencyUtterance(message) ||
+				seenUtterances.current!.has(message.id)
+			)
+				continue;
+			seenUtterances.current!.add(message.id);
+			if (!enabled || !message.text.trim()) continue;
+			pending.current.push({ id: message.id, text: message.text, runId: null });
 		}
 		if (!enabled) {
 			clearQueue();

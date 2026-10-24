@@ -116,8 +116,9 @@ async function attempt(r: Request, source: Source): Promise<Receipt> {
 					: r.input;
 			let delivery: SpeechDelivery | undefined =
 				row.purpose === "tts" &&
-				r.preparation?.deliveryScope !== "chunk" &&
-				r.preparation?.delivery?.version === 2
+				r.preparation?.delivery?.version === 2 &&
+				(r.preparation.deliveryScope !== "chunk" ||
+					r.preparation.delivery.source === "host")
 					? r.preparation.delivery
 					: undefined;
 			if (

@@ -7,6 +7,7 @@ import {
 	emotionSchema,
 	type DeliveryContext,
 	type ChoiceQuestions,
+	type DeliveryEmotion,
 	type SpeechDelivery,
 } from "../contracts";
 export { acceptedEmotion };
@@ -171,6 +172,22 @@ export async function chooseSpeechDelivery(
 		scoped.removeEventListener("abort", stopped);
 		abort.abort();
 	}
+}
+
+/** A feeling the host chose with the text itself: used as is, never judged again. */
+export function hostDelivery(emotion: DeliveryEmotion): SpeechDelivery {
+	return {
+		id: crypto.randomUUID(),
+		version: 2,
+		emotion,
+		emotionConfidence: 1,
+		...emotionPerformance[emotion],
+		source: "host",
+		confidence: 1,
+		motionConfidence: 1,
+		toneConfidence: 1,
+		latencyMs: 0,
+	};
 }
 
 export function acceptedAvatarMotion(delivery: SpeechDelivery) {

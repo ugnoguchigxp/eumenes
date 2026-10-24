@@ -65,6 +65,11 @@ CREATE INDEX conversation_outbox_source ON conversation_outbox(source_id, seq);
 export const retractionMigration = `
 ALTER TABLE messages ADD COLUMN retracted_at TEXT;
 `;
+/** Deliveries chosen by the host for a runless message (an agency utterance's feeling). */
+const messageDeliveryMigration = `
+CREATE TABLE message_deliveries (message_id TEXT PRIMARY KEY REFERENCES messages(id), conversation_id TEXT NOT NULL REFERENCES conversations(id), delivery TEXT NOT NULL);
+CREATE INDEX message_deliveries_conversation ON message_deliveries(conversation_id);
+`;
 const presentationMigration = `
 ALTER TABLE messages ADD COLUMN presentation TEXT NOT NULL DEFAULT 'conversation' CHECK(presentation IN ('conversation','artifact'));
 `;
@@ -88,6 +93,20 @@ export function outboxReady(db: Database): boolean {
 }
 const retractionColumn = new WeakMap<Database, boolean>();
 const presentationColumn = new WeakMap<Database, boolean>();
+const messageDeliveryTable = new WeakMap<Database, boolean>();
+function messageDeliveryReady(db: Database): boolean {
+	let ready = messageDeliveryTable.get(db);
+	if (ready === undefined) {
+		ready =
+			db
+				.query(
+					"SELECT 1 FROM sqlite_master WHERE type='table' AND name='message_deliveries'",
+				)
+				.get() !== null;
+		messageDeliveryTable.set(db, ready);
+	}
+	return ready;
+}
 /**
  * True once retractionMigration has been applied. Checked once per connection
  * (migrations only run when the store opens), so non-retraction reads keep
@@ -418,6 +437,18 @@ export function appendMessage(
 		message.runId,
 		...(ready ? [message.presentation ?? "conversation"] : []),
 	);
+	// A runless message may carry the host's delivery (run answers record theirs per run).
+	if (message.delivery && message.runId === null) {
+		if (!messageDeliveryReady(db))
+			throw new Error("message_delivery_unavailable");
+		db.query(
+			"INSERT INTO message_deliveries (message_id, conversation_id, delivery) VALUES (?, ?, ?)",
+		).run(
+			message.id,
+			message.conversationId,
+			JSON.stringify(speechDeliverySchema.parse(message.delivery)),
+		);
+	}
 	if (outbox && options)
 		insertEvent(db, options, {
 			kind: "added",
@@ -440,8 +471,10 @@ type MessageRow = {
 	motion: AvatarMotion | null;
 	delivery: string | null;
 };
-const messageSelect = (db: Database, where: string, columns = ""): string =>
-	`SELECT ${columns}m.id, m.conversation_id, m.role, m.text, m.created_at, m.run_id, ${presentationReady(db) ? "m.presentation" : "'conversation' AS presentation"}, a.motion, d.delivery FROM messages m LEFT JOIN answer_avatar_motions a ON a.run_id = m.run_id AND a.conversation_id = m.conversation_id AND m.role = 'assistant' LEFT JOIN answer_deliveries d ON d.run_id = m.run_id AND d.conversation_id = m.conversation_id AND m.role = 'assistant' WHERE ${where}${liveOnly(db, "m")}`;
+const messageSelect = (db: Database, where: string, columns = ""): string => {
+	const own = messageDeliveryReady(db);
+	return `SELECT ${columns}m.id, m.conversation_id, m.role, m.text, m.created_at, m.run_id, ${presentationReady(db) ? "m.presentation" : "'conversation' AS presentation"}, a.motion, ${own ? "COALESCE(d.delivery, md.delivery) AS delivery" : "d.delivery"} FROM messages m LEFT JOIN answer_avatar_motions a ON a.run_id = m.run_id AND a.conversation_id = m.conversation_id AND m.role = 'assistant' LEFT JOIN answer_deliveries d ON d.run_id = m.run_id AND d.conversation_id = m.conversation_id AND m.role = 'assistant'${own ? " LEFT JOIN message_deliveries md ON md.message_id = m.id AND md.conversation_id = m.conversation_id AND m.role = 'assistant'" : ""} WHERE ${where}${liveOnly(db, "m")}`;
+};
 /** A stored delivery that no longer matches the schema is dropped, not fatal. */
 function safeDelivery(row: MessageRow): SpeechDelivery | undefined {
 	if (!row.delivery) return undefined;
@@ -659,5 +692,10 @@ export const migrations: readonly Migration[] = [
 		id: "conversation/0008-neutral-delivery-source",
 		sql: neutralSourceMigration,
 		after: ["conversation/0007-presentation"],
+	},
+	{
+		id: "conversation/0009-message-delivery",
+		sql: messageDeliveryMigration,
+		after: ["conversation/0008-neutral-delivery-source"],
 	},
 ];

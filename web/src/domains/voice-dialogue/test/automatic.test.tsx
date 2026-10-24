@@ -186,3 +186,29 @@ test("an answer adopted while muted is not deferred until the delayed message or
 	});
 	expect(player.play).not.toHaveBeenCalled();
 });
+
+test("new agency utterances are spoken once, without a run; existing ones and other runless messages are not", async () => {
+	const said = { id: "agency:s1-1:t1", text: "前の一言。" };
+	const { hook, player } = fixture([], [said]);
+	const fresh = { id: "agency:s1-1:t2", text: "雨やんだね。" };
+	const timer = { id: "timer-completion:x", text: "時間です。" };
+	const props = { runs: [], messages: [said, timer, fresh], enabled: true };
+	hook.rerender(props);
+	await waitFor(() => expect(player.play).toHaveBeenCalledTimes(1));
+	expect(player.play.mock.calls[0]?.slice(0, 3)).toEqual([
+		"agency:s1-1:t2",
+		"雨やんだね。",
+		null,
+	]);
+	hook.rerender({ ...props, messages: [...props.messages] });
+	expect(player.play).toHaveBeenCalledTimes(1);
+});
+
+test("an agency utterance that arrives while automatic speech is off is never spoken later", async () => {
+	const { hook, player } = fixture([], []);
+	const fresh = { id: "agency:s1-1:t3", text: "おっ。" };
+	hook.rerender({ runs: [], messages: [fresh], enabled: false });
+	hook.rerender({ runs: [], messages: [fresh], enabled: true });
+	await act(async () => {});
+	expect(player.play).not.toHaveBeenCalled();
+});

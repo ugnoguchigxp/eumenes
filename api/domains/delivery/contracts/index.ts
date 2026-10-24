@@ -21,6 +21,9 @@ export const speechToneSchema = z.enum([
 	"gentle",
 	"serious",
 	"excited",
+	"soft",
+	"wry",
+	"firm",
 ]);
 export const emotionSchema = z.enum([
 	"none",
@@ -31,6 +34,26 @@ export const emotionSchema = z.enum([
 	"surprise",
 ]);
 export type Emotion = z.infer<typeof emotionSchema>;
+/**
+ * Every feeling a delivery can carry: the judged labels above (the attitude classifier answers
+ * only those) plus the feelings a host chooses itself (agency utterances, spec
+ * agency-emotion-design-2026-10-24).
+ */
+export const deliveryEmotionSchema = z.enum([
+	...emotionSchema.options,
+	"enjoyment",
+	"wry",
+	"admiration",
+	"relief",
+	"shy",
+	"confusion",
+	"sadness",
+	"apologetic",
+	"worry",
+	"dislike",
+	"anger",
+]);
+export type DeliveryEmotion = z.infer<typeof deliveryEmotionSchema>;
 export type DeliveryContext = {
 	answer: string;
 	turns: Array<{ role: "user" | "assistant"; text: string }>;
@@ -52,11 +75,12 @@ export type SpeechPreparation = {
 export const speechDeliverySchema = z.object({
 	id: z.uuid(),
 	version: z.literal(2).optional(),
-	emotion: emotionSchema.optional(),
+	emotion: deliveryEmotionSchema.optional(),
 	emotionConfidence: z.number().min(0).max(1).optional(),
 	motion: avatarMotionSchema,
 	tone: speechToneSchema,
-	source: z.enum(["scored", "system-one", "fallback"]),
+	/** host: chosen by the host with the text (no judge call). */
+	source: z.enum(["scored", "system-one", "fallback", "host"]),
 	reason: z
 		.enum([
 			"unavailable",

@@ -1162,6 +1162,7 @@ test("agency defaults to OFF on the LARM local LLM, also for saved documents wit
 		idleSec: 20,
 		maxUnanswered: 1,
 		interests: [],
+		emotion: true,
 	};
 	expect(h.settings.get().agency).toEqual(defaultAgency);
 	// A document saved before this setting existed still loads, with agency off.
@@ -1199,6 +1200,7 @@ test("agency persists through apply; its resource must name a registered LLM res
 		idleSec: 0,
 		maxUnanswered: 10,
 		interests: ["a", "b", "c"],
+		emotion: false,
 	};
 	expect(settingsSchema.safeParse(s).success).toBe(true);
 	await save(h, s);

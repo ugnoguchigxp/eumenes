@@ -2,6 +2,7 @@ import { z } from "zod";
 import data from "../data/speech-delivery.v1.json" with { type: "json" };
 import {
 	emotionSchema,
+	deliveryEmotionSchema,
 	avatarMotionSchema,
 	speechToneSchema,
 } from "../contracts";
@@ -11,7 +12,7 @@ export const speechDeliverySettings = z
 		instructions: z.string().min(1),
 		criteria: z.record(emotionSchema, z.string().min(1)),
 		performance: z.record(
-			emotionSchema,
+			deliveryEmotionSchema,
 			z.object({ motion: avatarMotionSchema, tone: speechToneSchema }).strict(),
 		),
 		presets: z.record(

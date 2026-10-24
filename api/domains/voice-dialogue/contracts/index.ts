@@ -20,6 +20,8 @@ export const sampleInputSchema = z
 	.strict();
 export const replayInputSchema = z.object({
 	runId: z.string().min(1).max(120).optional(),
+	/** A runless message (agency utterance): its stored host delivery is used for the clause. */
+	messageId: z.string().min(1).max(512).optional(),
 	text: z.string().trim().min(1).max(65536),
 });
 export const voiceTurnSchema = z.object({

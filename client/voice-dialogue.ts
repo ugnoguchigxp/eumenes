@@ -129,9 +129,14 @@ export function voiceDialogueClient(transport: Transport) {
 			text: string,
 			signal?: AbortSignal,
 			runId?: string,
+			messageId?: string,
 		) => {
 			const response = await transport.call("/api/voice/replay/audio", {
-				...json({ text, ...(runId ? { runId } : {}) }),
+				...json({
+					text,
+					...(runId ? { runId } : {}),
+					...(messageId ? { messageId } : {}),
+				}),
 				signal,
 			});
 			const motion = avatarMotionSchema.safeParse(

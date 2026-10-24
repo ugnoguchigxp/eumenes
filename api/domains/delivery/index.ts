@@ -3,13 +3,16 @@ export {
 	acceptedEmotion,
 	deliveryState,
 	chooseSpeechDelivery,
+	hostDelivery,
 	speechParameters,
 	speechQuestions,
 } from "./service";
 export {
 	speechDeliverySchema,
 	emotionSchema,
+	deliveryEmotionSchema,
 	type Emotion,
+	type DeliveryEmotion,
 	type DeliveryContext,
 	type SpeechPreparation,
 	avatarMotionSchema,

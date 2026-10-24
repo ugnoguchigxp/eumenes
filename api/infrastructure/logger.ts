@@ -36,6 +36,8 @@ export interface LogFields {
 	controlAction?: string;
 	outputType?: string;
 	outputCharacters?: number;
+	/** A feeling label (e.g. an agency utterance's), never text. */
+	emotion?: string;
 	repairAttempt?: number;
 	validationPath?: string;
 	validationCode?: string;
@@ -179,6 +181,7 @@ const keys = new Set<keyof LogFields>([
 	"controlAction",
 	"outputType",
 	"outputCharacters",
+	"emotion",
 	"repairAttempt",
 	"validationPath",
 	"validationCode",
