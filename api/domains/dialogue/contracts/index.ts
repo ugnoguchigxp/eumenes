@@ -46,6 +46,11 @@ export const publicSubmitSchema = submitFields
 	.refine(hasInput, "input_required")
 	.refine(pinnedOnScreen, "toolchain_requires_artifact");
 export type PublicSubmit = z.infer<typeof publicSubmitSchema>;
+/** The latest utterance's corrected text, answered again (the prompt edit design, section 4.1). */
+export const resubmitSchema = z
+	.object({ requestId: z.uuid(), text: z.string().trim().max(8000) })
+	.strict();
+export type Resubmit = z.infer<typeof resubmitSchema>;
 export const runSchema = z.object({
 	id: z.string(),
 	agentTaskId: z.string().nullable().optional(),

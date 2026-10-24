@@ -8,7 +8,7 @@ import type {
 } from "../../../../../api/domains/dialogue/contracts";
 import type { DialogueClient } from "../../../../../client/dialogue";
 import { ApiConnectionError } from "../../../../../client/transport";
-import { useSubmit } from "..";
+import { useResubmit, useSubmit } from "..";
 
 const cleanup: Array<() => void> = [];
 afterEach(() => {
@@ -16,6 +16,7 @@ afterEach(() => {
 });
 function setup() {
 	const accepted = new Map<string, Run>();
+	const resubmitted: string[] = [];
 	let loseResponse = true;
 	const api: DialogueClient = {
 		identity: "http://127.0.0.1:8787",
@@ -30,6 +31,11 @@ function setup() {
 		},
 		specialistRetarget: async () => {
 			throw new Error("not_used");
+		},
+		async resubmit(_conversationId, _messageId, input) {
+			resubmitted.push(input.requestId);
+			if (resubmitted.length === 1) throw new ApiConnectionError();
+			return [...accepted.values()][0]!;
 		},
 		async submit(input: Submit) {
 			let run = accepted.get(input.requestId);
@@ -69,12 +75,20 @@ function setup() {
 		<QueryClientProvider client={cache}>{children}</QueryClientProvider>
 	);
 	const hook = renderHook(() => useSubmit(api, "main"), { wrapper });
+	const edit = renderHook(() => useResubmit(api, "main"), { wrapper });
 	cleanup.push(() => {
 		hook.unmount();
+		edit.unmount();
 		cache.clear();
 	});
 	return {
 		accepted,
+		resubmitted,
+		resubmit: async (text: string) => {
+			await act(async () => {
+				await edit.result.current.mutateAsync({ messageId: "m1", text });
+			});
+		},
 		send: async (text: string) => {
 			let run: Run | undefined;
 			await act(async () => {
@@ -104,4 +118,14 @@ test("editing a message after an uncertain send starts a different request", asy
 	const changed = await h.send("編集したメッセージ");
 	expect(changed.inputMessageId).toBe("編集したメッセージ");
 	expect(h.accepted.size).toBe(2);
+});
+test("an edit resent after a lost acknowledgement keeps its requestId; a changed text is a new request", async () => {
+	const h = setup();
+	// One accepted run for the edit to answer with.
+	await h.send("こんにちは").catch(() => {});
+	await expect(h.resubmit("直した")).rejects.toThrow("api_connection_failed");
+	await h.resubmit("直した");
+	expect(h.resubmitted[1]).toBe(h.resubmitted[0]);
+	await h.resubmit("もう一度直した");
+	expect(h.resubmitted[2]).not.toBe(h.resubmitted[0]);
 });

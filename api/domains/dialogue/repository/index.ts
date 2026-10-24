@@ -159,6 +159,26 @@ export function listRuns(db: Database, conversationId: string): Run[] {
 			.all(conversationId) as Record<string, unknown>[]
 	).map(map);
 }
+/** The newest run made for an input message (an edited message has one per send). */
+export function latestRunOfMessage(
+	db: Database,
+	messageId: string,
+): Run | null {
+	const row = db
+		.query(
+			`SELECT ${columns} FROM dialogue_runs WHERE input_message_id = ? ORDER BY seq DESC LIMIT 1`,
+		)
+		.get(messageId);
+	return row ? map(row as Record<string, unknown>) : null;
+}
+/** True when the user said something after the run: a later typed or spoken input of the conversation. */
+export function userInputAfter(db: Database, run: Run): boolean {
+	return !!db
+		.query(
+			"SELECT 1 FROM dialogue_runs WHERE conversation_id = ? AND seq > (SELECT seq FROM dialogue_runs WHERE id = ?) AND input_message_id <> ? AND source_kind IN ('manual','voice') LIMIT 1",
+		)
+		.get(run.conversationId, run.id, run.inputMessageId);
+}
 export function insert(db: Database, run: Run) {
 	db.query(
 		"INSERT INTO dialogue_runs (id,request_id,conversation_id,utterance_id,status,revision,input_message_id,answer_message_id,error,job_id,deadline_at,source_kind,schedule_id,occurrence_id,seq,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,(SELECT COALESCE(MAX(seq),0)+1 FROM dialogue_runs),?,?)",

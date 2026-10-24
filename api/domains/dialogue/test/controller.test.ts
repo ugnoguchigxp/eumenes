@@ -93,3 +93,56 @@ test("the public runs API rejects utteranceId, unknown keys and a pinned toolcha
 	).toBe(false);
 	expect((await post(base)).status).toBe(202);
 });
+
+test("the resubmit route answers the new run, 400 for an empty text, 404 for an unknown message and 409 when refused", async () => {
+	const hono = await app();
+	const post = (messageId: string, body: unknown) =>
+		hono.request(`/api/conversations/main/messages/${messageId}/resubmit`, {
+			method: "POST",
+			headers: { "content-type": "application/json" },
+			body: JSON.stringify(body),
+		});
+	const first = await h!.dialogue.submit({
+		requestId: crypto.randomUUID(),
+		conversationId: "main",
+		text: "A",
+	});
+	await h!.dialogue.submit({
+		requestId: crypto.randomUUID(),
+		conversationId: "main",
+		text: "B",
+	});
+	const latest = h!.dialogue.list("main").at(-1)!;
+	const edited = await post(latest.inputMessageId, {
+		requestId: crypto.randomUUID(),
+		text: "C",
+	});
+	expect(edited.status).toBe(200);
+	expect(
+		((await edited.json()) as { run: { inputMessageId: string } }).run
+			.inputMessageId,
+	).toBe(latest.inputMessageId);
+	const empty = await post(latest.inputMessageId, {
+		requestId: crypto.randomUUID(),
+		text: "  ",
+	});
+	expect([empty.status, await empty.json()]).toEqual([
+		400,
+		{ error: "empty_text" },
+	]);
+	const unknown = await post(crypto.randomUUID(), {
+		requestId: crypto.randomUUID(),
+		text: "D",
+	});
+	expect(unknown.status).toBe(404);
+	const older = await post(first.inputMessageId, {
+		requestId: crypto.randomUUID(),
+		text: "D",
+	});
+	expect([older.status, await older.json()]).toEqual([
+		409,
+		{ error: "not_latest" },
+	]);
+	const invalid = await post(latest.inputMessageId, { text: "D" });
+	expect(invalid.status).toBe(400);
+});

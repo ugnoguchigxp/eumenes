@@ -99,6 +99,39 @@ export function useSubmit(client: DialogueClient, id: string) {
 		},
 	});
 }
+/** The latest utterance corrected and answered again; a retry of the same text keeps its requestId. */
+export function useResubmit(client: DialogueClient, id: string) {
+	const cache = useQueryClient();
+	const pending = useRef<{
+		messageId: string;
+		text: string;
+		requestId: string;
+	} | null>(null);
+	return useMutation({
+		mutationFn: async (input: { messageId: string; text: string }) => {
+			const previous = pending.current;
+			const request =
+				previous?.messageId === input.messageId && previous.text === input.text
+					? previous
+					: { ...input, requestId: crypto.randomUUID() };
+			// A failed acknowledgement does not prove that the server refused the edit.
+			pending.current = request;
+			const run = await client.resubmit(id, request.messageId, {
+				requestId: request.requestId,
+				text: request.text,
+			});
+			if (pending.current === request) pending.current = null;
+			return run;
+		},
+		retry: false,
+		onSettled: () => {
+			void cache.invalidateQueries({
+				queryKey: conversationKey(client.identity, id),
+			});
+			void cache.invalidateQueries({ queryKey: runsKey(client.identity, id) });
+		},
+	});
+}
 export function useCancel(client: DialogueClient, id: string) {
 	const cache = useQueryClient();
 	return useMutation({

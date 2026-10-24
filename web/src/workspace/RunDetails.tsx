@@ -17,7 +17,11 @@ export function RunDetails({
 	message: Pick<Message, "id" | "text">;
 	runs: Run[] | undefined;
 }) {
-	const run = runs?.find((r) => r.inputMessageId === message.id);
+	// An edited message has one run per send: the newest is the one that answers it.
+	const run = runs
+		?.slice()
+		.reverse()
+		.find((r) => r.inputMessageId === message.id);
 	return (
 		<>
 			{run?.announcement && (

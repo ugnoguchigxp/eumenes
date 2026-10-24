@@ -159,6 +159,11 @@ export function createEventStore() {
 			eventsWithStatus(db, conversationId, "moved"),
 		eventInTransaction: (db: Database, conversationId: string, seq: number) =>
 			eventBySeq(db, conversationId, seq),
+		/** Every event that carries the message, whatever its status. */
+		ofMessageInTransaction: (db: Database, messageId: string) =>
+			eventsOfMessages(db, [messageId]).flatMap(
+				({ conversationId, seq }) => eventBySeq(db, conversationId, seq) ?? [],
+			),
 		/** The utterance a delivery reports on (see `EventInput.deliveryKey`). */
 		deliveredUtteranceInTransaction: eventByDeliveryKey,
 		moveOutInTransaction: moveEvents,

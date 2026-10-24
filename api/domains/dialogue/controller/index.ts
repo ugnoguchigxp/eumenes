@@ -2,6 +2,7 @@ import type { Hono } from "hono";
 import type { DialogueService } from "..";
 import {
 	publicSubmitSchema,
+	resubmitSchema,
 	specialistCommandKinds,
 	specialistCommandSchema,
 	specialistRetargetSchema,
@@ -66,6 +67,33 @@ export function registerDialogue(app: Hono, service: DialogueService) {
 			return specialistError(c, error);
 		}
 	});
+	app.post(
+		"/api/conversations/:conversationId/messages/:messageId/resubmit",
+		async (c) => {
+			const parsed = await parseJsonBody(c, resubmitSchema);
+			if (!parsed.ok) return parsed.response;
+			try {
+				const result = await service.resubmit(
+					c.req.param("conversationId"),
+					c.req.param("messageId"),
+					parsed.data,
+				);
+				if (result.ok) return c.json({ run: result.run });
+				return c.json(
+					{ error: result.code },
+					result.code === "not_found"
+						? 404
+						: result.code === "empty_text"
+							? 400
+							: 409,
+				);
+			} catch (error) {
+				if (error instanceof Error && error.message === "request_conflict")
+					return c.json({ error: "request_conflict" }, 409);
+				throw error;
+			}
+		},
+	);
 	app.get("/api/conversations/:id/specialist", (c) =>
 		c.json({ session: service.specialistSession(c.req.param("id")) }),
 	);

@@ -290,3 +290,41 @@ test("a streaming answer counts as one visible bubble", () => {
 	expect(container.querySelectorAll("article")).toHaveLength(20);
 	expect(screen.queryByRole("button", { name: "さらに20件表示" })).toBeNull();
 });
+test("the latest utterance offers its edit, an edited one says so and the one being edited is faded", () => {
+	const edit = vi.fn();
+	const conversation = {
+		id: "main",
+		revision: 1,
+		messages: [
+			{ ...base, id: "old", role: "user" as const, text: "前の発言" },
+			{ ...base, id: "latest", role: "user" as const, text: "直前の発言" },
+		],
+	};
+	const view = render(
+		<MessageList
+			conversation={conversation}
+			editableId="latest"
+			editedIds={new Set(["latest"])}
+			onEdit={edit}
+		/>,
+	);
+	const buttons = screen.getAllByRole("button", { name: "編集" });
+	expect(buttons).toHaveLength(1);
+	expect(buttons[0]!.closest("article")?.textContent).toContain("直前の発言");
+	fireEvent.click(buttons[0]!);
+	expect(edit).toHaveBeenCalledOnce();
+	expect(
+		screen.getByText("編集済み").closest("article")?.textContent,
+	).toContain("直前の発言");
+	view.rerender(
+		<MessageList
+			conversation={conversation}
+			editingId="latest"
+			onEdit={edit}
+		/>,
+	);
+	expect(screen.queryByRole("button", { name: "編集" })).toBeNull();
+	expect(
+		view.container.querySelector(".message-editing")?.textContent,
+	).toContain("直前の発言");
+});

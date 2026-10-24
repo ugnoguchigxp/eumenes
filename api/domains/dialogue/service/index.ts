@@ -35,6 +35,7 @@ import { withAttachmentNotes } from "./attachment-context";
 import { eventText } from "./event-text";
 import { createOperationPorts } from "./operation-ports";
 import { createIntake } from "./intake";
+import { createResubmit } from "./resubmit";
 import { endRun, runEndedInTransaction } from "./run-end";
 import { createProgress } from "./progress";
 import { createErrorReport } from "./error-report";
@@ -208,6 +209,8 @@ export function createDialogueService({
 		subscribeProgress: progress.subscribeProgress,
 		submitVoice: intake.submitVoice,
 		submit: intake.submit,
+		/** The latest utterance stopped, corrected and answered again (`POST .../messages/:id/resubmit`). */
+		resubmit: createResubmit(deps).resubmit,
 		notify: intake.notify,
 		async recover() {
 			// Runs without a queue job predate the queue and are interrupted as before.

@@ -8,6 +8,7 @@ archive の基準: その文書が担当した実装がコードにあり、本�
 
 | 文書 | 状態 |
 | --- | --- |
+| [prompt-edit-design-2026-10-24.md](prompt-edit-design-2026-10-24.md) | 実装済み（fixture 検証済み、2026-10-24 合意）。直前の利用者の発言だけを、行動が確定する前に止めて編集・再送信する。メッセージの訂正（ContextWindow §13）と未処理の発言の run の作り直しで実現し、Web に「止めて編集」・吹き出しの編集・編集の状態を足す |
 | [cli-toolchain-design-2026-10-24.md](cli-toolchain-design-2026-10-24.md) | 合意済み（§13）・実装前。Claude Code 画面のPTY基盤を共通化し、新domain `shell` でログインシェルの画面「CLI」と、会話からのCLIコマンド実行（`cli_command`、一件ごとのPTY・実行台帳・完了通知、承認なし）を追加する |
 | [code-review-2026-10-24.md](verification/code-review-2026-10-24.md) | 未commit差分全体のレビューと修正・隔離検証。完了確認失敗の波及、保留報告の解除、schema変換を修正。LARM live受入と全体gateの既存違反は未完了 |
 | [artifact-form-direct-toolchain-design-2026-10-23.md](artifact-form-direct-toolchain-design-2026-10-23.md) | 合意済み・実装・固定試験済み（§8）。ブラウザE2E・live・実機器は未実施。画像・楽曲の画面フォームからの送信に担当IDを付け、メインエージェントの担当選択を通さず、その担当の専門エージェントへ依頼文を直接渡す。画像の画面で曲が作られた障害（run `5b08cd43`）の対策 |

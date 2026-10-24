@@ -1,8 +1,10 @@
+import { z } from "zod";
 import {
 	errorReportSchema,
 	runSchema,
 	specialistSessionResponseSchema,
 	type PublicSubmit,
+	type Resubmit,
 	type SpecialistCommand,
 	type SpecialistCommandKind,
 	type SpecialistRetarget,
@@ -85,6 +87,22 @@ export function dialogueClient(transport: Transport) {
 					)
 				).json(),
 			),
+		/** Stop the latest utterance, correct it and answer it again; refused with 409 once it was acted on. */
+		resubmit: async (
+			conversationId: string,
+			messageId: string,
+			input: Resubmit,
+		) =>
+			z
+				.object({ run: runSchema })
+				.parse(
+					await (
+						await transport.call(
+							`/api/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/resubmit`,
+							json(input),
+						)
+					).json(),
+				).run,
 		cancel: async (id: string) =>
 			runSchema.parse(
 				await (

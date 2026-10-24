@@ -38,6 +38,10 @@ export const MessageList = memo(function MessageList({
 	agentName,
 	renderInsideMessage,
 	renderFollowingMessage,
+	editableId,
+	editingId,
+	editedIds,
+	onEdit,
 }: {
 	conversation: Conversation | undefined;
 	client?: EumenesClient;
@@ -47,6 +51,13 @@ export const MessageList = memo(function MessageList({
 	agentName?: string;
 	renderInsideMessage?: (message: Message) => ReactNode;
 	renderFollowingMessage?: (message: Message) => ReactNode;
+	/** The latest utterance, while it can still be edited. */
+	editableId?: string;
+	/** The utterance the composer is editing: shown faded. */
+	editingId?: string;
+	/** Utterances sent again after an edit. */
+	editedIds?: ReadonlySet<string>;
+	onEdit?: () => void;
 }) {
 	const assistantLabel = agentName || "Eumenes";
 	// Streaming text is not announced; a settled answer is, once per message id.
@@ -103,7 +114,9 @@ export const MessageList = memo(function MessageList({
 			{all.length ? (
 				visibleMessages.map((message) => (
 					<Fragment key={message.id}>
-						<article className={`message message-${message.role}`}>
+						<article
+							className={`message message-${message.role}${message.id === editingId ? " message-editing" : ""}`}
+						>
 							<small className="message-author">
 								{message.role === "user" ? "あなた" : assistantLabel}
 								{message.role === "assistant" && (
@@ -156,10 +169,37 @@ export const MessageList = memo(function MessageList({
 									attachments={message.attachments}
 								/>
 							) : null}
+							{message.id === editableId && onEdit && (
+								<button
+									type="button"
+									className="message-edit"
+									aria-label="編集"
+									title="編集"
+									onClick={onEdit}
+								>
+									<svg
+										viewBox="0 0 24 24"
+										width="16"
+										height="16"
+										fill="none"
+										stroke="currentColor"
+										strokeWidth="2"
+										strokeLinecap="round"
+										strokeLinejoin="round"
+										aria-hidden="true"
+									>
+										<path d="M12 20h9" />
+										<path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" />
+									</svg>
+								</button>
+							)}
 							{message.role === "assistant" ? (
 								<MarkdownContent text={message.text} />
 							) : (
 								<p>{message.text}</p>
+							)}
+							{editedIds?.has(message.id) && (
+								<small className="message-edited">編集済み</small>
 							)}
 							{renderInsideMessage?.(message)}
 						</article>

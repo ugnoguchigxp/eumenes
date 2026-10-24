@@ -12,7 +12,7 @@ import {
 	type GeneratePayload,
 } from "./context";
 import type { Handover } from "./executor-context";
-import { eventFields, type Heard } from "./event-fields";
+import { eventFields, SIDE_EFFECTS, type Heard } from "./event-fields";
 import { generationStale } from "./generation-stream";
 import type { RespondArgs } from "./generation-tools";
 import { adoptMemoryWindow } from "./memory-window";
@@ -41,16 +41,6 @@ export type GenerationHandler = HandlerDefinition<
 >;
 
 /** The actions that commit a side effect (section 8.2); reads and searches are not among them. */
-const SIDE_EFFECTS = new Set([
-	"memory.request",
-	"delegate",
-	"confirm",
-	"work.answer",
-	"work.amend",
-	"work.cancel",
-	"work.archive",
-]);
-
 /**
  * A generation that committed an action and then was not adopted (section 13): its speech is dropped and a new
  * generation of the run starts on the trigger "not adopted", once. False when it committed nothing, or already

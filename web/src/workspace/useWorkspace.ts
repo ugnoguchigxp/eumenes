@@ -32,6 +32,8 @@ import { useArtifactWorkspace } from "../domains/artifact";
 import { useConversation } from "../domains/conversation";
 import { useCancel, useRuns, useSubmit } from "../domains/dialogue";
 import { useSpecialistWorkspace } from "./useSpecialistWorkspace";
+import { usePromptEdit } from "./usePromptEdit";
+import { useDocumentTheme } from "./useDocumentTheme";
 import {
 	useAutomaticSpeech,
 	useReplay,
@@ -110,17 +112,7 @@ export function useWorkspace({
 	const actualModel = usage.data?.find(
 		(u) => u.purpose === "llm" && u.accepted,
 	);
-	useEffect(() => {
-		const media = window.matchMedia("(prefers-color-scheme: dark)");
-		const apply = () => {
-			const theme = settings.data?.general.theme ?? "system";
-			document.documentElement.dataset.theme =
-				theme === "system" ? (media.matches ? "dark" : "light") : theme;
-		};
-		apply();
-		media.addEventListener("change", apply);
-		return () => media.removeEventListener("change", apply);
-	}, [settings.data?.general.theme]);
+	useDocumentTheme(settings.data?.general.theme);
 	const historyRef = useRef<HTMLDivElement>(null);
 	const followLatest = useRef(true);
 	const [showLatest, setShowLatest] = useState(false);
@@ -293,6 +285,16 @@ export function useWorkspace({
 		currentViewing,
 		specialist.addresseeNow,
 	);
+	const edit = usePromptEdit({
+		client,
+		conversationId: "main",
+		messages: conversation.data?.messages,
+		runs: runs.data,
+		recording: voice.active,
+		input,
+		setInput,
+		watchRun: watchTimerRun,
+	});
 	useEffect(() => {
 		if (voice.turn?.runId) watchTimerRun(voice.turn.runId);
 	}, [voice.turn?.runId, watchTimerRun]);
@@ -334,7 +336,8 @@ export function useWorkspace({
 		scrollLatest,
 		onHistoryScroll,
 		editInput,
-		send,
+		send: edit.editing ? edit.send : send,
+		edit,
 		submit,
 		cancel,
 		specialist,

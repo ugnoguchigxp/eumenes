@@ -39,7 +39,9 @@ export function ConversationComposer({
 		editInput,
 		latestRun,
 		audioError,
+		edit,
 	} = state;
+	const editing = edit.editing;
 	const inputPhase = useStore(store, (audio) => audio.inputPhase);
 	const starting = voice.active && inputPhase === "starting";
 	const route = [
@@ -79,8 +81,24 @@ export function ConversationComposer({
 					<small>話しかけてください</small>
 				) : null}
 			</output>
+			{editing && (
+				<div className="composer-edit">
+					<span>
+						直前の発言を編集中
+						{editing.attachments?.length ? "（添付はそのまま送ります）" : ""}
+					</span>
+					<Button type="button" variant="ghost" size="sm" onClick={edit.stop}>
+						やめる
+					</Button>
+					{edit.error && (
+						<p className="composer-edit-error" role="alert">
+							{edit.error}
+						</p>
+					)}
+				</div>
+			)}
 			<form className="chat-composer" onSubmit={send}>
-				<ChatImagePreviews state={state} />
+				{!editing && <ChatImagePreviews state={state} />}
 				<Textarea
 					aria-label="メッセージ"
 					value={draft}
@@ -88,6 +106,18 @@ export function ConversationComposer({
 					onKeyDown={(event) => {
 						if ((event.metaKey || event.ctrlKey) && event.key === "Enter")
 							event.currentTarget.form?.requestSubmit();
+						else if (editing && event.key === "Escape") {
+							event.preventDefault();
+							edit.stop();
+						} else if (
+							!editing &&
+							event.key === "ArrowUp" &&
+							!draft &&
+							edit.target
+						) {
+							event.preventDefault();
+							edit.start();
+						}
 					}}
 					placeholder={
 						state.specialist.addressee.kind === "specialist"
@@ -98,7 +128,7 @@ export function ConversationComposer({
 					rows={3}
 				/>
 				<div className="composer-actions">
-					<ChatImageInput state={state} />
+					{!editing && <ChatImageInput state={state} />}
 					<div className="voice-controls">
 						<Button
 							type="button"
@@ -108,7 +138,7 @@ export function ConversationComposer({
 									? voice.pause()
 									: (replay.stop(), voice.start()))
 							}
-							disabled={!voice.active && phase !== "idle"}
+							disabled={!voice.active && (phase !== "idle" || !!editing)}
 							aria-label={voice.active ? "マイクを停止" : "音声を開始"}
 						>
 							{voice.active ? "マイクを停止" : "音声を開始"}
@@ -149,18 +179,24 @@ export function ConversationComposer({
 						</Button>
 						<MicLevelMeter store={store} />
 					</div>
-					<Button
-						type="submit"
-						disabled={
-							(!draft.trim() && !state.attachments.items.length) ||
-							(automaticInput && !state.attachments.items.length) ||
-							submit.isPending ||
-							state.attachments.busy
-						}
-						aria-label="送信"
-					>
-						送信
-					</Button>
+					{editing ? (
+						<Button type="submit" disabled={!draft.trim() || edit.pending}>
+							更新して送信
+						</Button>
+					) : (
+						<Button
+							type="submit"
+							disabled={
+								(!draft.trim() && !state.attachments.items.length) ||
+								(automaticInput && !state.attachments.items.length) ||
+								submit.isPending ||
+								state.attachments.busy
+							}
+							aria-label="送信"
+						>
+							送信
+						</Button>
+					)}
 				</div>
 			</form>
 			{(submit.isError || voice.error || audioError) && (

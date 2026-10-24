@@ -13,6 +13,17 @@ export function eventFields(event: ConversationEvent): Record<string, unknown> {
 	}
 }
 
+/** The actions a generation commits (section 13): what the conversation can no longer take back. */
+export const SIDE_EFFECTS = new Set([
+	"memory.request",
+	"delegate",
+	"confirm",
+	"work.answer",
+	"work.amend",
+	"work.cancel",
+	"work.archive",
+]);
+
 export type Heard = "full" | "partial" | "none";
 
 /** How much of an utterance reached the user: its newest `delivered` record in the log, or null while none. */

@@ -17,6 +17,7 @@ import { useMonitoringItems } from "../domains/monitoring";
 import { ConversationComposer } from "./ConversationComposer";
 import type { WorkspaceState } from "./useWorkspace";
 import { useScreenPresence } from "./useScreenPresence";
+import { ThinkingRow } from "./ThinkingRow";
 
 export function ConversationPanel({
 	client,
@@ -45,7 +46,6 @@ export function ConversationPanel({
 		onHistoryScroll,
 		runs,
 		followLatestIfPinned,
-		cancel,
 		showLatest,
 		scrollLatest,
 	} = state;
@@ -277,6 +277,12 @@ export function ConversationPanel({
 					renderFollowingMessage={(message) => (
 						<RunDetails client={client} message={message} runs={runs.data} />
 					)}
+					editableId={
+						state.edit.editing ? undefined : state.edit.target?.message.id
+					}
+					editingId={state.edit.editing?.id}
+					editedIds={state.edit.editedIds}
+					onEdit={state.edit.start}
 					agentName={settings.data?.general.agentName}
 					replayingId={replay.playingId}
 					onReplay={(message) =>
@@ -285,26 +291,7 @@ export function ConversationPanel({
 							: void replay.play(message.id, message.text, message.runId)
 					}
 				/>
-				{activeRun && (
-					<div className="thinking">
-						<span className="thinking-dots" aria-hidden="true">
-							<i />
-							<i />
-							<i />
-						</span>
-						<output>
-							{activeRun.status === "queued" ? "応答を準備中" : "回答を作成中"}
-						</output>
-						<Button
-							variant="ghost"
-							size="sm"
-							onClick={() => cancel.mutate(activeRun.id)}
-							disabled={cancel.isPending}
-						>
-							中止
-						</Button>
-					</div>
-				)}
+				{activeRun && <ThinkingRow state={state} run={activeRun} />}
 			</div>
 			{showLatest && (
 				<button className="latest-button" type="button" onClick={scrollLatest}>

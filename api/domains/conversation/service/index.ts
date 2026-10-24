@@ -15,6 +15,7 @@ import {
 import {
 	appendMessage,
 	correctMessage,
+	moveMessageRun,
 	ensureConversation,
 	getMessage,
 	latestOrdinal,
@@ -223,6 +224,10 @@ export function createConversationService(
 			return messagesAfter(db, conversationId, afterOrdinal, limit);
 		},
 		/** The live messages one run produced (input and adopted answer), oldest first, with their ordinals. */
+		/** An input message answered again by a new run: its exchange is that run's from now on. */
+		moveToRunInTransaction(db: Database, messageId: string, runId: string) {
+			moveMessageRun(db, messageId, runId);
+		},
 		messagesOfRunInTransaction(
 			db: Database,
 			conversationId: string,

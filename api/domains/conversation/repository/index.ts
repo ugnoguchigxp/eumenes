@@ -288,6 +288,10 @@ export function correctMessage(
 		conversationRevision: bumpRevision(db, found.message.conversationId),
 	};
 }
+/** The run a message belongs to changes: an input answered again by a new run (no text or event changes). */
+export function moveMessageRun(db: Database, messageId: string, runId: string) {
+	db.query("UPDATE messages SET run_id = ? WHERE id = ?").run(runId, messageId);
+}
 /** Tombstones a confirmed message (text blanked) and records the retraction. */
 export function retractMessage(
 	db: Database,
