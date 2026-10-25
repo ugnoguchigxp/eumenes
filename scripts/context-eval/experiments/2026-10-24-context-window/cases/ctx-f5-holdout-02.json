@@ -92,9 +92,7 @@
 			},
 			{
 				"kind": "forbidden_identifier",
-				"identifiers": [
-					"music_generation_rejected_422"
-				]
+				"identifiers": ["music_generation_rejected_422"]
 			}
 		],
 		"rubric": [

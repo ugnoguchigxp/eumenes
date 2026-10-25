@@ -25,7 +25,6 @@ export function createMemoryViews(deps: {
 			tokens: window.profile.tokens,
 		},
 		newMemories: window.newMemories.length,
-		notices: window.notices.length,
 	});
 	return {
 		/** Active, unexpired short-term notes of a conversation. Empty while memory is unhealthy. */

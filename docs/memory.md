@@ -51,7 +51,7 @@ APIは `POST /api/memory/seeds/preview` と `POST /api/memory/seeds/import`（�
 
 ## ContextWindow
 
-ContextWindowの内容・並び・予算・保持・再構成・忘却の扱いは、[会話エージェントのContextWindow仕様](../spec/context-window-spec-2026-10-24.md)を唯一の正本とする。本書には書かない。仕様は未実装であり、実装が済むまでの現行コードとの差分は仕様の§17にある。
+ContextWindowの内容・並び・予算・保持・再構成・忘却の扱いは、[会話エージェントのContextWindow仕様](../spec/context-window-spec-2026-10-24.md)と、区画・書式・キャッシュを定める[ContextWindow 構成仕様](../spec/context-window-layout-spec-2026-10-25.md)を正本とする。本書には書かない。
 
 ## step と実行単位
 
@@ -59,9 +59,11 @@ ContextWindowの内容・並び・予算・保持・再構成・忘却の扱い�
 
 | 種類 | step | 役割 |
 | --- | --- | --- |
-| 反映 step（往復ごとに必ずこの順で連鎖） | `curate-memory` → `dispose-exchanges` → `summarize` | 記憶の保存・更新・停止と短期メモ、往復を逐語に残す／要約へ回す／捨てる判断、会話全体の要約の更新 |
-| 付随 step | `prepare-recall` | 次の発言の前に探しておく話題を決めて想起を先に実行する |
-| 手入れ step（反映すべき往復も依頼もないときだけ） | `consolidate-memory`、`compact-history`、`refine-summary` | 記憶の統合・停止・傾向、逐語履歴の畳み込み（L3 が予算の75%を超えたとき）、要約の書き直し（要約が上限の90%を超えたとき） |
+| 反映 step（処理済みの出来事ごと） | `curate-memory`、`curate-goals`、`curate-world` | 記憶の保存・更新・停止と短期メモ（決定・利用者への問い・目標・一時的な例外）、目標、World |
+| 経緯の step（次の再構成が適用する） | `summarize`、`refine-summary` | `log` から外れる出来事の要約、続いた要約のまとめ直し |
+| 手入れ step（会話の最後の出来事から10分後だけ） | `consolidate-memory`、`consolidate-goals` | 記憶の統合・停止・傾向、目標の整理 |
+
+会話の内容を読む step（`curate-memory`・`curate-goals`・`summarize`・`refine-summary`）は、主会話と同じ先頭（system・tool定義・資料の文書）の後に自分の指示と入力を置き、主会話の接続で推論する。主会話の呼出しや音声の文字起こしが始まると取り消され（`larm_preempted`）、失敗に数えずに15秒後に作り直される。記憶の依頼の結果は、会話の `log` に `memory.notice` の出来事として足す。
 
 **実行単位**（`steward_unit`）は 1 step ＝ 1 ジョブ。同じ対象に開いている単位は 1 つだけである。
 
@@ -152,7 +154,7 @@ State（過去の版を含む）・usage・Window・傾向、World の派生、�
 
 | 列 | 意味 |
 | --- | --- |
-| 時刻・担当した作業 | 判断した step（記憶の判断・履歴の取捨・要約・想起の準備・記憶の整理・履歴の圧縮・要約の推敲） |
+| 時刻・担当した作業 | 判断した step（記憶の判断・目標・World・要約・要約の推敲・記憶の整理・目標の整理） |
 | 提案 | モデルの出力の要約（各リストの件数と、要約・問い合わせの本文） |
 | 適用・却下と理由 | 適用の件数、却下の件数と理由コード、採用しなかった単位は理由コード |
 | 文脈の版 | Window の版の変化（例: 版 3 → 4） |

@@ -236,7 +236,7 @@ const model: LarmPort = {
 					: { action: "reply", text: turn.reply },
 			);
 		}
-		if (isUtteranceRound(options?.tools)) {
+		if (isUtteranceRound(options)) {
 			// The conversation's own round: a UI request is searched for and handed to the studio; anything else is
 			// answered here in plain text.
 			const question = messages

@@ -16,6 +16,7 @@ import {
 	specialistBlockReasonMigration,
 	stewardLedgersMigration,
 	retireExchangeLedgerMigration,
+	dropWindowPrefetchMigration,
 } from "..";
 import {
 	createContinuityService,
@@ -41,6 +42,7 @@ test("adding the Seed migration preserves existing memory, conversation and conn
 				m.sql !== executionReferencesMigration &&
 				m.sql !== seedImportMigration &&
 				m.sql !== retireExchangeLedgerMigration &&
+				m.sql !== dropWindowPrefetchMigration &&
 				m.sql !== specialistBlockReasonMigration,
 		),
 	);

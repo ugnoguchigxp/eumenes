@@ -1,4 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
+import { MAINTENANCE_QUIET_MS } from "../contracts";
 import type { MemoryService } from "../../memory";
 import {
 	setupSteward,
@@ -41,10 +42,7 @@ const resolve = (over: Record<string, unknown>) => ({
 	key: null,
 	...over,
 });
-const windowOf = (h: StewardHarness) =>
-	h.store.read((db) => h.memory.windows.storedInTransaction(db, "c1"));
-const noticeTexts = (h: StewardHarness) =>
-	windowOf(h)!.notices.map((n) => n.text);
+const noticeTexts = (h: StewardHarness) => h.notices();
 const jobOfUnit = (h: StewardHarness, unitId: string) =>
 	h.store.read(
 		(db) =>
@@ -239,6 +237,13 @@ test("a forget the memory refuses as too large ends the request without forgetti
 
 // ---- finding 3: no job is enqueued for later ----
 
+/** Upkeep runs only after a quiet spell: the clock moves past it, its timer fires and the queue runs. */
+async function quietSpell(h: StewardHarness) {
+	h.time.ms += MAINTENANCE_QUIET_MS;
+	await h.fireTimer();
+	await h.pump(12);
+}
+
 test("a deferred upkeep waits in the timer, and never delays a reflecting unit or another conversation", async () => {
 	const h = await setup();
 	h.inference.script("curate-memory", {
@@ -247,8 +252,9 @@ test("a deferred upkeep waits in the timer, and never delays a reflecting unit o
 	});
 	h.foreground.add("c1");
 	await h.run({ user: "二つ", end: "completed" });
-	// Reflecting steps run; the upkeep unit is made, prepared, and deferred.
+	// Reflecting steps run; after the quiet spell the upkeep unit is made, prepared, and deferred.
 	await h.pump(12);
+	await quietSpell(h);
 	const deferredAt = h.state()!.nextAt;
 	expect(deferredAt).not.toBeNull();
 	expect(deferredAt!).toBeGreaterThan(h.time.ms);
@@ -293,6 +299,7 @@ test("the startup kick makes the upkeep that is due and waits for the one that i
 	h.foreground.add("c1");
 	await h.run({ user: "二つ", end: "completed" });
 	await h.pump(12);
+	await quietSpell(h);
 	const dueAt = h.state()!.nextAt!;
 	// A kick before the time makes no unit; the timer already waits for it.
 	await h.kick();

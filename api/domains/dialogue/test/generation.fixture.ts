@@ -26,6 +26,19 @@ import type { ChatMessage } from "../service/context";
 import { testConversationAgent } from "./conversation-agent.fixture";
 import { openDialogueStore } from "./store.fixture";
 
+/** The lines of one tagged section (`<memory>`, `<log>`, `<state>`…) of the material document, without its tags. */
+export function sectionLines(document: string, name: string): string[] {
+	const open = `<${name}>`;
+	const start = document.indexOf(open);
+	if (start < 0) return [];
+	const end = document.indexOf(`</${name}>`, start);
+	// An empty section is its two tags alone: no lines.
+	return document
+		.slice(start + open.length, end)
+		.split("\n")
+		.filter((line) => line !== "");
+}
+
 /** One model call as the fake saw it. */
 export type Call = {
 	messages: ChatMessage[];
@@ -384,10 +397,16 @@ export async function setup(options: SetupOptions = {}) {
 		todos() {
 			return store.read((db) => dialogue.todosInTransaction(db, "main"));
 		},
-		active() {
-			return store.read((db) =>
-				continuity.events.activeInTransaction(db, "main"),
-			);
+		/** The work results the log holds (`work.result` events), in log order: what the owners reported. */
+		results(): ConversationEvent[] {
+			return store
+				.read((db) => continuity.events.logInTransaction(db, "main"))
+				.filter(
+					(e) =>
+						e.type === "acted" &&
+						(JSON.parse(e.text ?? "{}") as Record<string, unknown>).action ===
+							"work.result",
+				);
 		},
 		async close() {
 			await queue.close(100);

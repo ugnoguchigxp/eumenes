@@ -46,7 +46,7 @@ test("coding HTTP/client authenticate reads, validate cursors and hide private e
 		speak: async () => new Uint8Array(),
 	};
 	const dialogue = createDialogueService({
-		conversationAgent: testConversationAgent,
+			conversationAgent: testConversationAgent,
 			store,
 			continuity: createContinuityService(store),
 			queue,

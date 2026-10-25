@@ -42,6 +42,7 @@ import { createProgress } from "./progress";
 import { createErrorReport } from "./error-report";
 import { executionSourceInTransaction } from "./execution-source";
 import { executionCommands } from "./execution-command";
+import { conversationPrefixPort } from "./conversation-prefix";
 import { revokeExecutionNotice } from "./execution-notices";
 import type { MusicPort } from "../contracts/music";
 import type { ImagePort } from "../contracts/image";
@@ -314,6 +315,7 @@ export function createDialogueService({
 				})),
 			};
 		},
+		...conversationPrefixPort(deps, clock),
 		answerDelivery(runId: string): SpeechDelivery | undefined {
 			const run = store.read((db) => byId(db, runId));
 			if (run?.status !== "completed" || !run.answerMessageId) return undefined;

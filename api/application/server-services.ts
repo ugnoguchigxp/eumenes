@@ -40,6 +40,7 @@ import { createPipelinesService } from "./pipelines/pipelines-service";
 import { createPipelineTrials } from "./pipelines/pipelines-trials";
 import { createHostToolchain } from "./toolchain/toolchain-host";
 import { assembleAgency } from "./agency/assembly";
+import { createConversationPrewarm } from "./conversation-prewarm";
 import { createAgencyWork } from "./agency/work";
 
 const log = getLogger("server");
@@ -256,6 +257,14 @@ export async function buildServices(
 	// The agency sees the conversation's open TODOs; the conversation reports their results itself.
 	agency.attachWork(createAgencyWork({ dialogue }));
 	stewardAssembly.attachDialogue(dialogue);
+	// The latest conversation's prompt is read ahead when it would be cold (started, shown, idle while shown).
+	const prewarm = createConversationPrewarm({
+		store,
+		inference,
+		latestConversationIdInTransaction:
+			dialogue.latestConversationIdInTransaction,
+		prefix: dialogue.conversationPrefixInTransaction,
+	});
 	memory.registerForgetPurge(
 		toolchain.agents.executions.purgeSourcesInTransaction,
 	);
@@ -341,6 +350,7 @@ export async function buildServices(
 		pipelineTrials,
 		dialogue,
 		agency,
+		prewarm,
 		voice,
 		monitoring,
 	};

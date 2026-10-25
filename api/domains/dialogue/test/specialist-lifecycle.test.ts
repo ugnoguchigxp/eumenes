@@ -22,9 +22,7 @@ const main = (h: Harness, ...texts: string[]) =>
 	h.state.steps.push(...texts.map((text) => ({ text })));
 /** The records of the conversation model's latest call, by source. */
 const recordOf = (h: Harness, source: string) =>
-	(h.material(h.state.calls.length - 1).now.records ?? []).find(
-		(r: { source: string }) => r.source === source,
-	);
+	h.records(h.state.calls.length - 1).find((r) => r.source === source);
 async function startDirty(h: Harness) {
 	h.handOver({ request: "アンケートを作って" });
 	h.state.specialist.push(invoke("アンケート"), reply("作りました"));
@@ -80,7 +78,7 @@ test("an expired session is not extended by a new utterance: it ends and the utt
 	);
 	expect(ended).toEqual([{ state: "ended", end_reason: "expired" }]);
 	// The conversation agent hears of it once, with that very utterance.
-	expect(recordOf(h, "specialist.work").data.ended).toMatchObject({
+	expect(recordOf(h, "specialist.work")!.data.ended).toMatchObject({
 		reason: "expired",
 	});
 	main(h, "はい");
@@ -352,7 +350,7 @@ test("the work is never free between two queued turns; a return command withdraw
 	expect(h.state.calls.length).toBe(modelCalls + 1);
 	const newest = h.state.calls
 		.at(-1)!
-		.messages.slice(2)
+		.messages.slice(3)
 		.map((m) => m.content);
 	expect(newest).toHaveLength(2);
 	expect(newest[0]).toContain("二つ目");

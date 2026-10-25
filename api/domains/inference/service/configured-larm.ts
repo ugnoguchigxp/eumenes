@@ -39,3 +39,16 @@ export function createConfiguredLarm(
 		judgeActivity: options.judgeActivity,
 	});
 }
+
+/** Whether the port saved under `name` (its LARM settings as JSON) has the client, so the connection, of any of `others`. */
+export function sharesLarmClient(
+	key: Uint8Array | undefined,
+	name: string,
+	others: readonly Settings["larm"][],
+): boolean {
+	const own = stableLarmClient(key, JSON.parse(name) as Settings["larm"]);
+	return (
+		own !== undefined &&
+		others.some((other) => stableLarmClient(key, other) === own)
+	);
+}

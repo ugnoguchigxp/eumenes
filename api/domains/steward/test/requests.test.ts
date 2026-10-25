@@ -32,8 +32,6 @@ const remember = (over: Record<string, unknown> = {}) => ({
 	negated: false,
 	...over,
 });
-const windowOf = (h: StewardHarness) =>
-	h.store.read((db) => h.memory.windows.storedInTransaction(db, "c1"));
 
 test("a request alone starts a unit, is settled by the request's state, and its words are cleared", async () => {
 	const h = await setup();
@@ -56,17 +54,18 @@ test("a request alone starts a unit, is settled by the request's state, and its 
 	});
 	h.inference.script("curate-memory", (data) => {
 		const requests = data.requests as Array<Record<string, unknown>>;
+		const view = (data.events as Array<Record<string, unknown>>)[0]!;
+		expect(view).toMatchObject({ by: "user", reference: true });
+		// The request names the event it was made in by the id the step was shown.
 		expect(requests).toEqual([
 			{
 				id: "r1",
 				kind: "remember",
 				what: "誕生日は5月1日",
 				detail: "毎年祝う",
-				event: "e1",
+				event: view.id,
 			},
 		]);
-		const view = (data.events as Array<Record<string, unknown>>)[0]!;
-		expect(view).toMatchObject({ by: "user", reference: true });
 		return {
 			...empty,
 			resolve: [
@@ -89,13 +88,11 @@ test("a request alone starts a unit, is settled by the request's state, and its 
 	expect(item!.sourceMessageIds).toEqual([run.inputMessageId]);
 	const [row] = h.inbox();
 	expect(row).toMatchObject({ state: "done", what: "", detail: null });
-	// The cancelled run recorded no event, and no more units are made.
-	expect(h.log()).toHaveLength(2);
+	// The cancelled run recorded no event (the notice of the saved request is the only new one), and no more units are made.
+	expect(h.log()).toHaveLength(3);
 	await h.kick("c1");
 	expect(h.units().filter((u) => u.state === "open")).toEqual([]);
-	expect(windowOf(h)!.notices.map((n) => n.text)).toContain(
-		"覚える依頼を保存しました。",
-	);
+	expect(h.notices()).toContain("覚える依頼を保存しました。");
 });
 
 test("several requests are settled by one call, and one the model leaves out is counted", async () => {
@@ -277,9 +274,7 @@ test("a correct request updates an item and is shown to the user once as a notic
 	expect(h.memory.list().map((i) => i.text)).toEqual([
 		"最近は辛いものも食べられる",
 	]);
-	expect(windowOf(h)!.notices.map((n) => n.text)).toContain(
-		"訂正の依頼を反映しました。",
-	);
+	expect(h.notices()).toContain("訂正の依頼を反映しました。");
 });
 
 test("a withdraw request takes back a request that was not applied yet: the forget is not carried out", async () => {
@@ -322,7 +317,7 @@ test("a withdraw request takes back a request that was not applied yet: the forg
 		what: "",
 	});
 	expect(byId[run.requestIds[1]!]).toMatchObject({ state: "done", what: "" });
-	expect(windowOf(h)!.notices.map((n) => n.text)).toContain(
+	expect(h.notices()).toContain(
 		"まだ実行していなかった記憶の依頼を取り下げました。",
 	);
 });
@@ -370,7 +365,7 @@ test("a withdraw request can not undo an applied forget: it finds nothing to tak
 		state: "none",
 		resultCode: "nothing_to_withdraw",
 	});
-	expect(windowOf(h)!.notices.map((n) => n.text)).toContain(
+	expect(h.notices()).toContain(
 		"取り下げられる記憶の依頼はありませんでした。すでに実行した依頼は元に戻せません。",
 	);
 });

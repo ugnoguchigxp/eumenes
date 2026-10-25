@@ -65,28 +65,32 @@ export function rankCandidates(
 }
 
 type DocumentView = {
-	todos: Array<{ id: string; revision: number; status: string }>;
+	/** The TODO numbers `<state>` shows (`t<n>`) and their status words. */
+	todos: Array<{ id: string; status: string }>;
+	/** The confirmation numbers `<state>` shows (`c<n>`). */
 	confirmations: string[];
-	activeText: Map<string, string>;
+	/** Each TODO's newest result line in `<log>`. */
+	resultText: Map<string, string>;
 };
 
-/** What the tools need to know of the window the model read: the TODOs, the confirmations, the result slots. */
+/** What the tools need to know of the window the model read: the TODOs, the confirmations, the results. */
 function viewOf(input: GenerateInput): DocumentView {
-	const doc = JSON.parse(input.document.text) as {
-		state?: {
-			todos?: DocumentView["todos"];
-			pendingConfirmation?: Array<{ id: string }>;
-		};
-		active?: Array<{ todo?: string }>;
-	};
+	const state = input.document.sections.state.text.split("\n");
+	const resultText = new Map<string, string>();
+	for (const line of input.document.sections.log.text.split("\n")) {
+		const result = /^e\d+ \d\d:\d\d (?:結果|問い) (t\d+)/.exec(line);
+		if (result) resultText.set(result[1]!, line);
+	}
 	return {
-		todos: doc.state?.todos ?? [],
-		confirmations: (doc.state?.pendingConfirmation ?? []).map((c) => c.id),
-		activeText: new Map(
-			(doc.active ?? []).flatMap((slot) =>
-				slot.todo ? [[slot.todo, JSON.stringify(slot)] as const] : [],
-			),
-		),
+		todos: state.flatMap((line) => {
+			const todo = /^(t\d+) (\S+)/.exec(line);
+			return todo ? [{ id: todo[1]!, status: todo[2]! }] : [];
+		}),
+		confirmations: state.flatMap((line) => {
+			const confirmation = /^(c\d+) /.exec(line);
+			return confirmation ? [confirmation[1]!] : [];
+		}),
+		resultText,
 	};
 }
 
@@ -161,15 +165,13 @@ function createEvalExecutor(
 			case "work": {
 				const todo = view.todos.find((t) => t.id === call.args.todo);
 				if (!todo) return { result: { ok: false, code: "todo_not_found" } };
-				if (todo.revision !== call.args.revision)
-					return { result: { ok: false, code: "revision_stale", todo } };
-				const slot = view.activeText.get(todo.id);
+				const line = view.resultText.get(todo.id);
 				return {
 					result: {
 						ok: true,
 						todo,
-						...(call.args.operation === "check" && slot
-							? { result: JSON.parse(slot) }
+						...(call.args.operation === "check" && line
+							? { result: line }
 							: {}),
 					},
 				} satisfies ToolOutcome;

@@ -1,6 +1,12 @@
 import { afterEach, expect, test } from "bun:test";
 import { hostDelivery } from "../../delivery";
-import { IMAGE, INSTANT, setup, type Harness } from "./generation.fixture";
+import {
+	IMAGE,
+	INSTANT,
+	sectionLines,
+	setup,
+	type Harness,
+} from "./generation.fixture";
 
 let h: Harness | undefined;
 afterEach(async () => {
@@ -15,9 +21,16 @@ test("an utterance is answered with plain text: the said events, a full delivery
 	expect(h.dialogue.answerText(run.id)).toBe("こんにちは。");
 	expect(h.state.calls).toHaveLength(1);
 	const call = h.state.calls[0]!;
-	expect(call.messages.map((m) => m.role)).toEqual(["system", "user", "user"]);
-	expect(call.messages[2]!.content).toBe("やあ");
-	expect(JSON.parse(call.messages[1]!.content)).toHaveProperty("now");
+	// System, the material document, `<now>` of this call, then the newest message (the utterance itself).
+	expect(call.messages.map((m) => m.role)).toEqual([
+		"system",
+		"user",
+		"user",
+		"user",
+	]);
+	expect(call.messages[3]!.content).toBe("やあ");
+	expect(call.messages[2]!.content.startsWith("<now>\n")).toBe(true);
+	expect(call.messages[1]!.content).toContain("<log>\n");
 	// The fixed tools only: there is no `respond` to call, and a reply needs none.
 	expect(call.tools).toEqual(["memory", "find_toolchain", "delegate", "work"]);
 	const log = h.log();
@@ -208,7 +221,7 @@ test("a delegation is announced, opens a TODO and hands the run over; the finish
 	]);
 	expect(notified).toEqual([]);
 	const calls = h.state.calls.length;
-	// The result: the TODO is done, its slot is in active; no model call is made for it, and the agent is told.
+	// The result: the TODO is done, its result is a line of the log; no model call is made for it, and the agent is told.
 	const done = await h.finishImage(waiting.id, {
 		state: "completed",
 		title: "猫",
@@ -218,7 +231,8 @@ test("a delegation is announced, opens a TODO and hands the run over; the finish
 	expect(h.state.calls).toHaveLength(calls);
 	expect(notified).toEqual(["main"]);
 	expect(h.todos()[0]).toMatchObject({ status: "done", outcome: "succeeded" });
-	expect(JSON.stringify(h.active())).toContain("猫");
+	expect(h.results()).toHaveLength(1);
+	expect(JSON.stringify(h.results())).toContain("猫");
 	// Reporting the result is the agent's job: nothing was said or archived by the host.
 	expect(
 		h.log().filter((e) => e.by === "agent" && e.type === "said"),
@@ -328,25 +342,26 @@ test("a change needs a confirmation first; the approval executes the saved reque
 		(m) => m.role === "tool" && m.content.includes("confirmation_required"),
 	);
 	expect(JSON.parse(refused!.content)).toMatchObject({ refused: true });
-	const confirmationId = h.store.read(
-		(db) =>
-			db.query("SELECT id FROM dialogue_confirmations").get() as { id: string },
-	).id;
-	const document = JSON.parse(h.state.calls.at(-1)!.messages[1]!.content);
-	expect(document).toBeTruthy();
 	h.state.steps.push({
 		calls: [
 			{
 				name: "delegate",
 				args: {
 					mode: "approve",
-					confirmation: confirmationId,
+					confirmation: "c1",
 					announcement: "差し替えます。",
 				},
 			},
 		],
 	});
 	const approved = await h.say("お願い", "queued");
+	// The confirmation was issued in the earlier generation; the approving generation's document shows it in <state>
+	// under the number the approval names.
+	expect(
+		sectionLines(h.state.calls[4]!.messages[1]!.content, "state").some((line) =>
+			line.startsWith("c1 確認待ち "),
+		),
+	).toBe(true);
 	expect(approved.announcement).toBe("差し替えます。");
 	expect(h.todos()[0]).toMatchObject({
 		title: "壁紙を差し替える",

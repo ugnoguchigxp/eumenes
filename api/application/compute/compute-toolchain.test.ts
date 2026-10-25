@@ -6,7 +6,7 @@ import { searchThenDelegate } from "../toolchain/conversation-script.fixture";
 import { taskPlan, taskItem } from "../toolchain/task-plan.fixture";
 import { waitFor } from "../../infrastructure/wait-for";
 
-test("conversation selects registered Python tool, persists action receipt and returns result to parent", async () => {
+test("conversation selects registered Python tool, persists action receipt and reports the result through the TODO", async () => {
 	const f = await fixture();
 	let calls = 0;
 	const h = await harness({
@@ -56,12 +56,6 @@ test("conversation selects registered Python tool, persists action receipt and r
 				},
 			};
 		},
-		parent: (messages) => {
-			const text = JSON.stringify(messages);
-			return text.includes("Pythonで計算した結果は2")
-				? "Pythonで計算した結果は2です。"
-				: "計算を受け付けました。";
-		},
 	});
 	try {
 		const run = await h.dialogue.submit({
@@ -83,16 +77,12 @@ test("conversation selects registered Python tool, persists action receipt and r
 		);
 		expect(executions()[0]?.status).toBe("completed");
 		expect(calls).toBe(3);
+		// The finished task is the TODO's result, which the agency reports.
 		await waitFor(
-			() =>
-				h.conversation
-					.get("main")
-					.messages.some(
-						(m) =>
-							m.role === "assistant" &&
-							m.text === "Pythonで計算した結果は2です。",
-					),
-			{ timeout: 8000 },
+			() => h.reported().includes("Pythonで計算した結果は2です。"),
+			{
+				timeout: 8000,
+			},
 		);
 		expect(h.commandContexts[0]).toContain("python_submit");
 		expect(h.commandContexts[0]).not.toContain("fixture-secret");

@@ -33,6 +33,21 @@ export const workOriginsMigration = `
 ALTER TABLE dialogue_work ADD COLUMN message_ids_json TEXT NOT NULL DEFAULT '[]';
 ALTER TABLE dialogue_confirmations ADD COLUMN message_ids_json TEXT NOT NULL DEFAULT '[]';`;
 
+/**
+ * The short number the model reads a TODO (`t<ref>`) and a confirmation (`c<ref>`) by: per conversation, in
+ * creation order, never changed (the ContextWindow layout specification, section 6).
+ */
+export const workRefsMigration = `
+ALTER TABLE dialogue_work ADD COLUMN ref INTEGER;
+UPDATE dialogue_work SET ref = (SELECT COUNT(*) FROM dialogue_work w WHERE w.conversation_id = dialogue_work.conversation_id
+ AND (w.created_at < dialogue_work.created_at OR (w.created_at = dialogue_work.created_at AND w.rowid <= dialogue_work.rowid)));
+CREATE UNIQUE INDEX dialogue_work_ref ON dialogue_work(conversation_id, ref);
+ALTER TABLE dialogue_confirmations ADD COLUMN ref INTEGER;
+UPDATE dialogue_confirmations SET ref = (SELECT COUNT(*) FROM dialogue_confirmations c
+ WHERE c.conversation_id = dialogue_confirmations.conversation_id
+ AND (c.issued_at < dialogue_confirmations.issued_at OR (c.issued_at = dialogue_confirmations.issued_at AND c.rowid <= dialogue_confirmations.rowid)));
+CREATE UNIQUE INDEX dialogue_confirmations_ref ON dialogue_confirmations(conversation_id, ref);`;
+
 const fromMessages = (table: string, count: number) =>
 	`EXISTS (SELECT 1 FROM json_each(${table}.message_ids_json) m WHERE m.value IN (${Array.from({ length: count }, () => "?").join(",")}))`;
 
@@ -55,9 +70,10 @@ export function forgetWork(
 		db.query(
 			"UPDATE dialogue_work SET request = '', title = '', question_id = NULL, question = NULL, result_json = NULL, archived_at = COALESCE(archived_at, ?), revision = revision + 1, updated_at = ? WHERE id = ?",
 		).run(at, at, row.id);
+	// The row stays without its words, so its number (`c<ref>`) is never given to another confirmation.
 	db.query(
-		`DELETE FROM dialogue_confirmations WHERE ${fromMessages("dialogue_confirmations", messageIds.length)}`,
-	).run(...messageIds);
+		`UPDATE dialogue_confirmations SET request = '', inputs_json = NULL, superseded_at = COALESCE(superseded_at, ?) WHERE ${fromMessages("dialogue_confirmations", messageIds.length)}`,
+	).run(at, ...messageIds);
 	return rows;
 }
 
@@ -88,6 +104,8 @@ export type WorkOutcome =
 	| "interrupted";
 export type WorkRow = {
 	id: string;
+	/** The conversation's number of the TODO (`t<ref>`). */
+	ref: number;
 	conversationId: string;
 	runId: string;
 	toolchainId: string;
@@ -106,13 +124,16 @@ export type WorkRow = {
 	archivedAt: string | null;
 	createdAt: string;
 	updatedAt: string;
+	/** The user's messages the request comes from. */
+	messageIds: string[];
 };
 
 const columns =
-	"id, conversation_id, run_id, toolchain_id, toolchain_revision_id, execution, request, title, status, outcome, revision, question_id, question, result_json, source_ref, archive_requested, archived_at, created_at, updated_at";
+	"id, ref, conversation_id, run_id, toolchain_id, toolchain_revision_id, execution, request, title, status, outcome, revision, question_id, question, result_json, source_ref, archive_requested, archived_at, created_at, updated_at, message_ids_json";
 function map(row: Record<string, unknown>): WorkRow {
 	return {
 		id: row.id as string,
+		ref: row.ref as number,
 		conversationId: row.conversation_id as string,
 		runId: row.run_id as string,
 		toolchainId: row.toolchain_id as string,
@@ -132,6 +153,7 @@ function map(row: Record<string, unknown>): WorkRow {
 		archivedAt: (row.archived_at as string | null) ?? null,
 		createdAt: row.created_at as string,
 		updatedAt: row.updated_at as string,
+		messageIds: JSON.parse(row.message_ids_json as string) as string[],
 	};
 }
 
@@ -148,6 +170,8 @@ export function insertWork(
 		| "archiveRequested"
 		| "archivedAt"
 		| "updatedAt"
+		| "ref"
+		| "messageIds"
 	> & {
 		dedupeKey: string;
 		/** The user's messages the request comes from: forgetting any of them clears the TODO. */
@@ -155,9 +179,10 @@ export function insertWork(
 	},
 ): WorkRow {
 	db.query(
-		"INSERT INTO dialogue_work (id, conversation_id, run_id, toolchain_id, toolchain_revision_id, execution, request, title, status, revision, source_ref, dedupe_key, created_at, updated_at, message_ids_json) VALUES (?,?,?,?,?,?,?,?,'todo',1,?,?,?,?,?)",
+		"INSERT INTO dialogue_work (id, ref, conversation_id, run_id, toolchain_id, toolchain_revision_id, execution, request, title, status, revision, source_ref, dedupe_key, created_at, updated_at, message_ids_json) VALUES (?,(SELECT COALESCE(MAX(ref), 0) + 1 FROM dialogue_work WHERE conversation_id = ?),?,?,?,?,?,?,?,'todo',1,?,?,?,?,?)",
 	).run(
 		row.id,
+		row.conversationId,
 		row.conversationId,
 		row.runId,
 		row.toolchainId,
@@ -172,6 +197,31 @@ export function insertWork(
 		JSON.stringify(row.messageIds),
 	);
 	return workById(db, row.id)!;
+}
+
+/** The TODO the model names `t<ref>` in a conversation. */
+export function workByRef(
+	db: Database,
+	conversationId: string,
+	ref: number,
+): WorkRow | null {
+	const row = db
+		.query(
+			`SELECT ${columns} FROM dialogue_work WHERE conversation_id = ? AND ref = ?`,
+		)
+		.get(conversationId, ref) as Record<string, unknown> | null;
+	return row ? map(row) : null;
+}
+
+/** Every TODO's number in a conversation (id to `ref`), archived ones included: the log names them all. */
+export function workRefs(
+	db: Database,
+	conversationId: string,
+): Map<string, number> {
+	const rows = db
+		.query("SELECT id, ref FROM dialogue_work WHERE conversation_id = ?")
+		.all(conversationId) as Array<{ id: string; ref: number }>;
+	return new Map(rows.map((row) => [row.id, row.ref]));
 }
 
 export function workById(db: Database, id: string): WorkRow | null {
@@ -388,6 +438,8 @@ export function waitingArchives(
 
 export type ConfirmationRow = {
 	id: string;
+	/** The conversation's number of the confirmation (`c<ref>`). */
+	ref: number;
 	conversationId: string;
 	toolchainId: string;
 	toolchainRevisionId: string;
@@ -403,6 +455,7 @@ export type ConfirmationRow = {
 function mapConfirmation(row: Record<string, unknown>): ConfirmationRow {
 	return {
 		id: row.id as string,
+		ref: row.ref as number,
 		conversationId: row.conversation_id as string,
 		toolchainId: row.toolchain_id as string,
 		toolchainRevisionId: row.toolchain_revision_id as string,
@@ -423,7 +476,7 @@ function mapConfirmation(row: Record<string, unknown>): ConfirmationRow {
 /** Issues a confirmation; an open one for the same toolchain and request is superseded. */
 export function insertConfirmation(
 	db: Database,
-	row: Omit<ConfirmationRow, "usedAt" | "supersededAt">,
+	row: Omit<ConfirmationRow, "ref" | "usedAt" | "supersededAt">,
 	/** The user's messages the confirmed request comes from: forgetting any of them withdraws it. */
 	messageIds: readonly string[],
 ) {
@@ -431,9 +484,10 @@ export function insertConfirmation(
 		"UPDATE dialogue_confirmations SET superseded_at = ? WHERE conversation_id = ? AND toolchain_id = ? AND request = ? AND used_at IS NULL AND superseded_at IS NULL",
 	).run(row.issuedAt, row.conversationId, row.toolchainId, row.request);
 	db.query(
-		"INSERT INTO dialogue_confirmations (id, conversation_id, toolchain_id, toolchain_revision_id, request, inputs_json, impact, statement_delivery_key, issued_at, expires_at, message_ids_json) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+		"INSERT INTO dialogue_confirmations (id, ref, conversation_id, toolchain_id, toolchain_revision_id, request, inputs_json, impact, statement_delivery_key, issued_at, expires_at, message_ids_json) VALUES (?,(SELECT COALESCE(MAX(ref), 0) + 1 FROM dialogue_confirmations WHERE conversation_id = ?),?,?,?,?,?,?,?,?,?,?)",
 	).run(
 		row.id,
+		row.conversationId,
 		row.conversationId,
 		row.toolchainId,
 		row.toolchainRevisionId,
@@ -455,6 +509,33 @@ export function confirmationById(
 		.query("SELECT * FROM dialogue_confirmations WHERE id = ?")
 		.get(id) as Record<string, unknown> | null;
 	return row ? mapConfirmation(row) : null;
+}
+
+/** The confirmation the model names `c<ref>` in a conversation. */
+export function confirmationByRef(
+	db: Database,
+	conversationId: string,
+	ref: number,
+): ConfirmationRow | null {
+	const row = db
+		.query(
+			"SELECT * FROM dialogue_confirmations WHERE conversation_id = ? AND ref = ?",
+		)
+		.get(conversationId, ref) as Record<string, unknown> | null;
+	return row ? mapConfirmation(row) : null;
+}
+
+/** Every confirmation's number in a conversation (id to `ref`). */
+export function confirmationRefs(
+	db: Database,
+	conversationId: string,
+): Map<string, number> {
+	const rows = db
+		.query(
+			"SELECT id, ref FROM dialogue_confirmations WHERE conversation_id = ?",
+		)
+		.all(conversationId) as Array<{ id: string; ref: number }>;
+	return new Map(rows.map((row) => [row.id, row.ref]));
 }
 
 export function openConfirmations(

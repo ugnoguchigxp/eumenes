@@ -42,9 +42,7 @@
 					"claims": [
 						{
 							"text": "土曜は十時と十四時の回がある",
-							"sources": [
-								"src_1"
-							]
+							"sources": ["src_1"]
 						}
 					],
 					"limits": "当日の変更は未確認"

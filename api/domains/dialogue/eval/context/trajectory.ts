@@ -42,7 +42,6 @@ type Step = {
 	/** State saved after the profile was published (it waits in `state.newMemories`). */
 	longTerm?: NonNullable<Seed["longTerm"]>;
 	notice?: string;
-	recall?: Seed["recall"];
 };
 
 type TrajectoryTurn = {
@@ -199,15 +198,6 @@ export const DEFAULT_TRAJECTORY: Trajectory = {
 		{
 			minute: 56,
 			utterance: "宿の予約はまた今度にする",
-			before: {
-				recall: [
-					{
-						at: timeOf(1),
-						user: "京都なら、紅葉の時期は混みますか",
-						assistant: "十一月後半は特に混みます。",
-					},
-				],
-			},
 			reply: { text: "承知しました。" },
 		},
 		{
@@ -268,12 +258,11 @@ export async function playTrajectory(
 		for (const change of before?.work ?? [])
 			await session.reportWork(change.key, at, change.report);
 		if (before?.longTerm) await saveLongTerm(session, before.longTerm, at);
-		if (before?.notice || before?.recall || before?.longTerm)
+		if (before?.notice || before?.longTerm)
 			await publishStep(
 				session,
 				{
 					notices: before.notice ? [before.notice] : [],
-					recall: before.recall,
 					// The memory step that saved State asks for the profile to take it in at the next re-construction.
 					requestRepublish: !!before.longTerm,
 				},

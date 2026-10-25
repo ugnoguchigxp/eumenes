@@ -27,7 +27,7 @@ export function givenUp(env: StepEnv, candidate: EpisodeCandidate): boolean {
 }
 
 /**
- * The idle re-construction (section 12.3): when the log, the episode or the work results are over their limits,
+ * The idle re-construction (section 12.3): when the log or the episode is over its limit,
  * no answer is being generated and the last event is at least `SILENCE_WAIT_MS` old, the window is rebuilt with
  * what was prepared; it never waits for a model. `waiting`: the preparation is still being made.
  */
@@ -42,12 +42,7 @@ export function reconstructIfDue(env: StepEnv, waiting: boolean, wake: Wake) {
 	const episodeOver =
 		episodeTokens(events.episodeInTransaction(db, conversationId, "shown")) >
 		plan.sections.episode;
-	const slots = events.activeInTransaction(db, conversationId);
-	// Only a finished result can be let go: a question the user has not answered stays.
-	const activeOver =
-		slots.reduce((sum, slot) => sum + slot.tokens, 0) > plan.sections.active &&
-		slots.some((slot) => slot.status === "done");
-	if (!logOver && !episodeOver && !activeOver) return;
+	if (!logOver && !episodeOver) return;
 	if (waiting) return;
 	const now = d.nowMs();
 	if (
@@ -69,7 +64,6 @@ export function reconstructIfDue(env: StepEnv, waiting: boolean, wake: Wake) {
 		limits: {
 			log: plan.log,
 			episode: plan.sections.episode,
-			active: plan.sections.active,
 			silenceMs: SILENCE_BREAK_MS,
 		},
 	});

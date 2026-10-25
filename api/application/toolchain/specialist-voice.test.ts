@@ -70,7 +70,7 @@ function model(): LarmPort {
 				});
 			}
 			// The conversation's round delegates the request to the studio (a search, then the hand-over).
-			if (isUtteranceRound(options?.tools)) {
+			if (isUtteranceRound(options)) {
 				const step = searchThenDelegate(
 					(candidate) => candidate.id === "ui.compose",
 					messages.at(-1)!.content,

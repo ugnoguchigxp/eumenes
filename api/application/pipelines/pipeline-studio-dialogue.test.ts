@@ -92,7 +92,7 @@ async function rig() {
 				if (!step) throw new Error("script_specialist_missing");
 				return JSON.stringify(step(messages as Prompt));
 			}
-			if (isUtteranceRound(options?.tools)) {
+			if (isUtteranceRound(options)) {
 				// The conversation's round: a search for the studio, then the hand-over of the request.
 				const step = searchThenDelegate(
 					(candidate) => candidate.id === "pipeline.studio",

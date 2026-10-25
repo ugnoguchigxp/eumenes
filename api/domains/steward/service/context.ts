@@ -79,7 +79,7 @@ export function describeMemory(env: StepEnv): MemoryDescription {
 	let m = 0;
 	const stateItems = activeStateItems(env);
 	for (const item of stateItems) {
-		const ref = `m${m + 1}`;
+		const ref = `lm${m + 1}`;
 		const entry: Record<string, unknown> = {
 			ref,
 			kind: item.kind,
@@ -107,7 +107,7 @@ export function describeMemory(env: StepEnv): MemoryDescription {
 	let t = 0;
 	const tendencies = deps.memory.tendencies();
 	for (const row of tendencies) {
-		const ref = `t${t + 1}`;
+		const ref = `lt${t + 1}`;
 		if (!push({ ref, kind: "tendency", text: row.text })) break;
 		t++;
 		refs[ref] = { namespace: "tendency", id: row.id, revision: row.revision };
@@ -116,7 +116,7 @@ export function describeMemory(env: StepEnv): MemoryDescription {
 	let n = 0;
 	for (const item of deps.continuity.snapshotInTransaction(db, conversationId)
 		.items) {
-		const ref = `n${++n}`;
+		const ref = `sn${++n}`;
 		refs[ref] = {
 			namespace: "continuity",
 			id: item.id,

@@ -208,6 +208,13 @@ CREATE INDEX memory_message_block_conversation ON memory_message_block(conversat
  * part, and drops them when every conversation has been handled (`service/backfill.ts`). Migrations only run SQL
  * and run before any code, so a plain drop here would lose what the backfill needs.
  */
+/**
+ * The automatic recall and the window's notices are gone (the ContextWindow layout specification): stored windows
+ * drop the recalled text and the notices they carried.
+ */
+export const dropWindowPrefetchMigration =
+	"UPDATE memory_context_window SET snapshot = json_remove(snapshot, '$.prefetch', '$.notices');";
+
 export const retireExchangeLedgerMigration = `
 ALTER TABLE memory_exchange RENAME TO memory_retired_exchange;
 ALTER TABLE memory_conversation_summary RENAME TO memory_retired_summary;
@@ -263,5 +270,10 @@ export const migrations: readonly Migration[] = [
 		id: "memory/0010-retire-exchange-ledger",
 		after: ["memory/0009-execution-references"],
 		sql: retireExchangeLedgerMigration,
+	},
+	{
+		id: "memory/0011-drop-window-prefetch",
+		after: ["memory/0010-retire-exchange-ledger"],
+		sql: dropWindowPrefetchMigration,
 	},
 ];

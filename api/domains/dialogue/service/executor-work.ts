@@ -1,11 +1,12 @@
 import type { Database } from "bun:sqlite";
 import type { Run } from "../contracts";
 import { byId } from "../repository";
+import type { WorkRow } from "../repository/work";
 import type { DialogueDeps } from "./context";
 import type { ToolOutcome } from "./generation-loop";
 import { type ParsedCall, type WorkArgs } from "./generation-tools";
 import { endRun } from "./run-end";
-import { activeFields, todoOf } from "./work-ledger";
+import { resultFields } from "./work-ledger";
 import { dispatchInTransaction } from "./work-dispatch";
 
 import {
@@ -15,11 +16,28 @@ import {
 	type ExecutorContext,
 } from "./executor-context";
 
+/** A work call with its TODO found: the row's id, the revision the model saw, and the open question. */
+export type ResolvedWork = Omit<WorkArgs, "todo"> & {
+	todo: string;
+	revision: number;
+	questionId?: string;
+};
+
+/** A TODO as a work tool result shows it: its number, never its id. */
+function todoView(row: WorkRow): Record<string, unknown> {
+	return {
+		todo: `t${row.ref}`,
+		title: row.title,
+		status: row.status,
+		...resultFields(row),
+	};
+}
+
 /* The operations on the conversation's TODOs (section 6.1). */
 export async function work(
 	x: ExecutorContext,
 	call: ParsedCall,
-	args: WorkArgs,
+	given: WorkArgs,
 ): Promise<ToolOutcome> {
 	const { deps, current, acted, handle } = x;
 	const { store } = deps;
@@ -29,13 +47,25 @@ export async function work(
 	const operate = () =>
 		store.write((tx): ToolOutcome => {
 			const run = current(tx);
-			const row = ledger.workInTransaction(tx, args.todo);
-			if (!row || row.conversationId !== run.conversationId || row.archivedAt)
+			// The model names a TODO by its number (`t<ref>`, the layout specification's section 6).
+			const ref = /^t(\d+)$/.exec(given.todo);
+			const row = ref
+				? ledger.workByRefInTransaction(tx, run.conversationId, Number(ref[1]))
+				: null;
+			if (!row || row.archivedAt)
 				return { result: { ok: false, code: "todo_not_found" } };
-			const state = (next = row) => ({
-				todo: todoOf(next),
-				...activeFields(next),
-			});
+			const seen = x.state.todoRevisions.get(row.id) ?? row.revision;
+			const args: ResolvedWork = {
+				...given,
+				todo: row.id,
+				revision: seen,
+				...(row.questionId ? { questionId: row.questionId } : {}),
+			};
+			// What a result shows is what the model has now seen.
+			const state = (next = row) => {
+				x.state.todoRevisions.set(next.id, next.revision);
+				return todoView(next);
+			};
 			const record = (fields: Record<string, unknown>) => {
 				acted(tx, `work:${row.id}:${args.operation}:${args.revision}`, {
 					action: `work.${args.operation}`,
@@ -83,7 +113,13 @@ export async function work(
 					result: null,
 				});
 				record({});
-				return { result: { ok: true, ...state(next ?? row) } };
+				// Ending the run it waited on already finished (and archived) the TODO: its row as it is now.
+				return {
+					result: {
+						ok: true,
+						...state(next ?? ledger.workInTransaction(tx, row.id) ?? row),
+					},
+				};
 			}
 			return { result: { ok: false, code: "amend_unsupported", ...state() } };
 		});
@@ -107,7 +143,7 @@ export function controlExecution(
 	row: NonNullable<
 		ReturnType<NonNullable<DialogueDeps["work"]>["workInTransaction"]>
 	>,
-	args: WorkArgs,
+	args: ResolvedWork,
 	record: (fields: Record<string, unknown>) => unknown,
 	state: (next?: typeof row) => Record<string, unknown>,
 ): ToolOutcome {
@@ -206,7 +242,7 @@ export function answerCommand(
 	row: NonNullable<
 		ReturnType<NonNullable<DialogueDeps["work"]>["workInTransaction"]>
 	>,
-	args: WorkArgs,
+	args: ResolvedWork,
 	record: (fields: Record<string, unknown>) => unknown,
 	state: (next?: typeof row) => Record<string, unknown>,
 ): ToolOutcome {

@@ -12,7 +12,6 @@ import {
 } from "eumenes-memory/sqlite";
 import type { ForgetJournalEntry, StateItem } from "eumenes-memory/sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
-import { sha256Hex } from "../../../infrastructure/digest";
 import type { ConversationService } from "../../conversation";
 import type { ContinuityService } from "../../continuity";
 import {
@@ -65,7 +64,7 @@ import {
 } from "./journal";
 import { createBackfill } from "./backfill";
 import { createLedger } from "./ledger";
-import { recallBesideLog, recallTurns, type RecallInput } from "./turn-recall";
+import { recallTurns, type RecallInput } from "./turn-recall";
 import { dropVectorsOnRetract } from "./retract-vectors";
 import { createMemoryViews } from "./views";
 import { validityOf } from "./validity";
@@ -73,7 +72,6 @@ import pkg from "eumenes-memory/package.json";
 import { executionReferences } from "./execution-references";
 
 const PACKAGE_VERSION = pkg.version;
-const sha = (text: string) => sha256Hex(text);
 
 /** The words an item stands on, cut out of the messages by their recorded byte ranges. */
 function evidenceOf(
@@ -287,8 +285,6 @@ export function createMemoryService(
 		conversation,
 		atMs,
 		embed: options.embed,
-		// The next prompt shows the log's messages verbatim: a prefetch must not repeat them.
-		recall: recallBesideLog(conversation, continuity),
 	});
 
 	function setEnabledInTransaction(
@@ -546,7 +542,7 @@ export function createMemoryService(
 		registerForgetPurge(hook: (db: Database, purge: ForgetPurge) => void) {
 			purgeHooks.push(hook);
 		},
-		/** Embedding of the turns and the prefetch query, and the turn-vector store (the steward uses them). */
+		/** Embedding of the turns and of queries, and the turn-vector store (the steward uses them). */
 		vectors,
 		...ledger,
 		...views,
@@ -559,19 +555,18 @@ export function createMemoryService(
 			conversationId: string,
 		): WindowSnapshot | null {
 			if (!healthy || !readSettings(db).enabled) return null;
-			const window = windows.readForRunInTransaction(db, conversationId);
-			// Prefetched exchanges whose messages changed since are dropped now: they would expire every run until replaced.
-			if (
-				window.prefetch.pins.some((pin) => {
-					const found = conversation.messageInTransaction(db, pin.messageId);
-					return !found || sha(found.message.text) !== pin.digest;
-				})
-			)
-				return windows.rebuildInTransaction(db, conversationId, {
-					republish: false,
-					prefetch: { text: "", pins: [], tokens: 0 },
-				});
-			return window;
+			return windows.readForRunInTransaction(db, conversationId);
+		},
+		/**
+		 * The stored window as the conversation's last generation read it (read-only; no rebuild). null when memory is
+		 * off or unhealthy, as for a generation.
+		 */
+		storedWindowInTransaction(
+			db: Database,
+			conversationId: string,
+		): WindowSnapshot | null {
+			if (!healthy || !readSettings(db).enabled) return null;
+			return windows.storedInTransaction(db, conversationId);
 		},
 		/** The window plan of the saved model: background work sizes its inputs from it. */
 		windowPlan,
@@ -590,13 +585,12 @@ export function createMemoryService(
 		},
 		/**
 		 * Adoption-time check in the writer transaction. Additions never expire a run; immediate changes by
-		 * anyone but the run's own memory step, a settings change, or a changed pinned message do.
+		 * anyone but the run's own memory step, or a settings change, do.
 		 */
 		validateWindowInTransaction(
 			db: Database,
 			runId: string,
 			window: PreparedWindow,
-			extraPins: ReadonlyArray<{ messageId: string; digest: string }> = [],
 		): SettleResult {
 			if (!healthy || !readSettings(db).enabled)
 				return { ok: false, reason: "memory_unavailable" };
@@ -604,15 +598,10 @@ export function createMemoryService(
 				return { ok: false, reason: "memory_stale" };
 			if (windows.changedSinceInTransaction(db, window.immediateSeq, runId))
 				return { ok: false, reason: "memory_stale" };
-			for (const pin of [...window.pins, ...extraPins]) {
-				const found = conversation.messageInTransaction(db, pin.messageId);
-				if (!found || sha(found.message.text) !== pin.digest)
-					return { ok: false, reason: "memory_stale" };
-			}
 			return { ok: true };
 		},
 		/**
-		 * The steward's changes to the window: notices and the prefetch now; a requested republish waits for the next
+		 * The steward's changes to the window: a requested republish waits for the next
 		 * re-construction unless an immediate change requires it. Records no immediate change, so a run in flight is
 		 * not expired.
 		 */
@@ -643,9 +632,6 @@ export function createMemoryService(
 					...window.profile.items.map((item) => item.id),
 					...window.newMemories.map((item) => item.id),
 				],
-				pins: window.prefetch.pins,
-				prefetchTokens: window.prefetch.tokens,
-				noticeIds: window.notices.map((notice) => notice.id),
 				shownMessageIds: [...shownMessageIds],
 			};
 		},
@@ -667,15 +653,6 @@ export function createMemoryService(
 				createdAt: clock(),
 			});
 			pruneUsage(db);
-		},
-		/** Notices are shown once: dropped when the answer that carried them is stored. */
-		clearNoticesInTransaction(
-			db: Database,
-			conversationId: string,
-			noticeIds: readonly string[],
-		) {
-			if (noticeIds.length === 0) return;
-			windows.clearNoticesInTransaction(db, conversationId, noticeIds);
 		},
 		/** The adoption failed after the receipt was written: no answer exists, so no receipt may either. */
 		discardUsageInTransaction(db: Database, runId: string) {

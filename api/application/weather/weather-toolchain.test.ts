@@ -1,8 +1,10 @@
 import { expect, test } from "bun:test";
 import { harness } from "../toolchain/toolchain.fixture";
 import {
+	afterUtterance,
 	candidatesOf,
 	searchThenDelegate,
+	toolResults,
 	type Candidate,
 } from "../toolchain/conversation-script.fixture";
 import { waitFor } from "../../infrastructure/wait-for";
@@ -151,12 +153,20 @@ test("without the list of areas the weather toolchain is not among the candidate
 	}
 });
 
-test("instant inputs outside the schema go back for the one structural repair, then fail", async () => {
+test("instant inputs outside the schema are refused with the fields to repair, and nothing is fetched", async () => {
 	const service = weatherFetch();
+	const refusals: unknown[] = [];
 	const g = await harness({
 		weather: { fetch: service.fetch },
-		firstRound: (_tools, _question, messages) =>
-			askWeather({ place: "鎌倉", day: "tomorrow" })(messages),
+		firstRound: (_tools, _question, messages) => {
+			// The refusal is the tool's result; the agent goes on with it (here it gives up and says so).
+			const refused = toolResults(afterUtterance(messages), "delegate");
+			if (refused.length) {
+				refusals.push(...refused);
+				return { text: "天気を取得できませんでした。" };
+			}
+			return askWeather({ place: "鎌倉", day: "tomorrow" })(messages);
+		},
 	});
 	try {
 		await g.toolchain.weather!.maintain();
@@ -166,7 +176,9 @@ test("instant inputs outside the schema go back for the one structural repair, t
 			text: ask,
 		});
 		const done = await g.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 });
-		expect(done?.status).toBe("failed");
+		expect(done?.status).toBe("completed");
+		expect(refusals).toMatchObject([{ refused: true }]);
+		expect(g.dialogue.answerText(run.id)).toBe("天気を取得できませんでした。");
 		expect(
 			service.urls.filter((u) => u.includes("/api/forecast/")),
 		).toHaveLength(0);

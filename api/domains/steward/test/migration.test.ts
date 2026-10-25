@@ -43,6 +43,17 @@ test("steward/0003 carries the units, requests and decisions over to the event f
 				"t3",
 			);
 			unit.run(
+				"u-recall",
+				"c1",
+				"exchange_step",
+				"prepare-recall",
+				"recall",
+				"{}",
+				"applied",
+				"t4",
+				"t5",
+			);
+			unit.run(
 				"u-dispose",
 				"c1",
 				"exchange_step",
@@ -115,9 +126,12 @@ test("steward/0003 carries the units, requests and decisions over to the event f
 				{ step: "curate-memory" },
 			]);
 			expect(rows("SELECT * FROM steward_goal_todo")).toEqual([]);
-			expect(rows("SELECT recall_pending AS p FROM steward_state")).toEqual([
-				{ p: null },
-			]);
+			// The automatic recall is gone with its units and its state (steward/0004).
+			expect(
+				rows(
+					"SELECT name FROM pragma_table_info('steward_state') WHERE name = 'recall_pending'",
+				),
+			).toEqual([]);
 			// The new shapes accept what the steward writes now.
 			await upgraded.write((db) => {
 				db.query(

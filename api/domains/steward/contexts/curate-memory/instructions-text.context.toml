@@ -19,7 +19,7 @@ text = '''
 - 今の会話の作業の目標、決めたこと、未解決の問いは notes に書きます（add / update / close）。close は解決（resolved）か取り下げ（retracted）です。
 - requests は本人が会話エージェントを通して頼んだことです。1件ずつ resolve に答えます。resolve の request には、requests の id（r1 など）を書きます（forget や remember のような依頼の種類は書けません）。
   - forget: 忘れてほしい。refs には、依頼の what / detail の内容に当てはまる記憶の ref だけを書きます（関係のないものは書かない。当てはまるものがなければ refs を空にして none）。candidates にある往復の中で、その内容が残っているものは alsoIn に id を書きます（id は events か candidates のものだけ）。
-    入力に worldEntities（世界の対象、ref は w1 など）、worldClaims（世界の主張、ref は k1 など）、goals（目標、ref は g1 など）があるときは、依頼がそれらを指すなら、その ref も refs に書きます。対象（w）を指すと、その対象に結び付いた主張と目標もまとめて消えます。1件の依頼で指せるのは、記憶・主張・対象・目標を合わせて 5 件までです。
+    入力に worldEntities（世界の対象、ref は w1 など）、worldClaims（世界の主張、ref は k1 など）、goals（目標、ref は gl1 など）があるときは、依頼がそれらを指すなら、その ref も refs に書きます。対象（w）を指すと、その対象に結び付いた主張と目標もまとめて消えます。1件の依頼で指せるのは、記憶・主張・対象・目標を合わせて 5 件までです。
   - stop: 使うのをやめてほしい（消さない）。refs に記憶の ref を書きます。
   - remember: 覚えてほしい。新しい内容なら kind、key、text を書きます。既にある記憶と同じ内容でも none にはせず、action を remember にして refs にその ref を書きます（本人が確認した版として保存し直されます）。
   - update: 内容を直してほしい。refs に記憶の ref、text に直した一文を書きます。

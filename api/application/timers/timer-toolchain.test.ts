@@ -41,7 +41,8 @@ test("C01-C03: a relative timer request is saved through the toolchain", async (
 		});
 		const done = await h.dialogue.waitForTerminal(run.id, { timeoutMs: 8000 });
 		expect(done?.status).toBe("completed");
-		expect(h.dialogue.answerText(run.id)).toContain("180秒");
+		// The agency reports the finished timer from the TODO's result; the run has no reply of its own.
+		expect(h.reported()).toContain('"durationSeconds":180');
 		const saved = h.store.read((db) => ({
 			timers: db
 				.query("SELECT duration_seconds, state FROM timers")
@@ -106,8 +107,8 @@ test("C01-C03: a relative timer request is saved through the toolchain", async (
 			origin_message_id: run.inputMessageId,
 		});
 		expect(h.acquisitions).toBe(0);
-		// The search, the hand-over, the timer sub-agent's operation, and the answer in the result phase (no completion check).
-		expect(h.calls).toBe(4);
+		// The search, the hand-over and the timer sub-agent's operation (no completion check).
+		expect(h.calls).toBe(3);
 	} finally {
 		await h.close();
 	}
@@ -136,7 +137,7 @@ for (const [text, seconds] of [
 					},
 			);
 			expect(row.duration_seconds).toBe(seconds);
-			expect(h.dialogue.answerText(run.id)).toContain(`${seconds}秒`);
+			expect(h.reported()).toContain(`"durationSeconds":${seconds}`);
 		} finally {
 			await h.close();
 		}
@@ -554,18 +555,18 @@ test("real dialogue list and cancel select an authoritative timer snapshot", asy
 			expect(
 				(await h.dialogue.waitForTerminal(run.id, { timeoutMs: 8000 }))?.status,
 			).toBe("completed");
-			return h.dialogue.answerText(run.id);
+			return h.reported();
 		};
 		await ask("90秒タイマー");
-		expect(await ask("タイマーの残りを確認して")).toContain("残り");
+		expect(await ask("タイマーの残りを確認して")).toContain("remainingSeconds");
 		const timer = h.timers!.list().items[0]!;
 		expect(h.commandContexts[1]).toContain(timer.id);
 		expect(h.commandContexts[1]).toContain("revision");
-		expect(await ask("タイマーを止めて")).toContain("取り消");
+		expect(await ask("タイマーを止めて")).toContain("cancelled");
 		expect(h.timers!.get(timer.id)?.timer.state).toBe("cancelled");
-		// The first request takes the search, the hand-over, the sub-agent's operation and the answer (4); each later
-		// one hands the retained timer over directly, so it takes the hand-over, the operation and the answer (3).
-		expect(h.calls).toBe(10);
+		// The first request takes the search, the hand-over and the sub-agent's operation (3); each later one hands
+		// the retained timer over directly, so it takes the hand-over and the operation (2).
+		expect(h.calls).toBe(7);
 	} finally {
 		await h.close();
 	}
@@ -608,24 +609,8 @@ test("a made-up origin cannot authorize a timer through a valid capability refer
 	}
 });
 
-test("cancellation after preparation refreshes the result before the agent phrases it", async () => {
+test("a cancel after the report is the result the agency reads from the TODO", async () => {
 	const h = await harness({ timers: true });
-	let changed = false;
-	let cancellation: Promise<unknown> | undefined;
-	const unsubscribe = h.store.onCommit(() => {
-		if (changed) return;
-		const run = h.store.read((db) =>
-			db.query("SELECT id FROM dialogue_runs WHERE status='running'").get(),
-		);
-		const timer = h.timers!.list().items[0];
-		if (!run || !timer) return;
-		changed = true;
-		cancellation = h.timers!.cancel(timer.id, {
-			requestId: crypto.randomUUID(),
-			issuedAt: new Date().toISOString(),
-			expectedRevision: timer.revision,
-		});
-	});
 	try {
 		const run = await h.dialogue.submit({
 			requestId: crypto.randomUUID(),
@@ -635,14 +620,17 @@ test("cancellation after preparation refreshes the result before the agent phras
 		expect(
 			(await h.dialogue.waitForTerminal(run.id, { timeoutMs: 8000 }))?.status,
 		).toBe("completed");
-		await cancellation;
-		expect(changed).toBe(true);
-		expect(h.dialogue.answerText(run.id)).toContain("取り消");
-		expect(h.dialogue.answerText(run.id)).not.toContain("開始");
-		// The search, the hand-over, the operation and the answer in the result phase (the refreshed result is read).
-		expect(h.calls).toBe(4);
+		const before = h.reported();
+		const timer = h.timers!.list().items[0]!;
+		await h.timers!.cancel(timer.id, {
+			requestId: crypto.randomUUID(),
+			issuedAt: new Date().toISOString(),
+			expectedRevision: timer.revision,
+		});
+		expect(before).toContain('"state":"active"');
+		// The TODO's result is read again as it is now: the agent says the timer was cancelled.
+		expect(h.reported()).toContain('"state":"cancelled"');
 	} finally {
-		unsubscribe();
 		await h.close();
 	}
 });
@@ -736,8 +724,8 @@ test("T01/T03 both timer facts reach the model and action-like user text stays u
 			"A",
 			"B",
 		]);
-		expect(h.dialogue.answerText(run.id)).toContain("A");
-		expect(h.dialogue.answerText(run.id)).toContain("B");
+		expect(h.reported()).toContain('"label":"A"');
+		expect(h.reported()).toContain('"label":"B"');
 		expect(JSON.stringify(data.snapshot)).not.toContain("requestDigest");
 	} finally {
 		await h.close();

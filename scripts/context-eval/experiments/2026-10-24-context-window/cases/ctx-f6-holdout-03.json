@@ -29,9 +29,7 @@
 			},
 			{
 				"kind": "forbidden_identifier",
-				"identifiers": [
-					"対応できません"
-				]
+				"identifiers": ["対応できません"]
 			}
 		],
 		"rubric": [

@@ -98,7 +98,12 @@ try {
 	differentUser[differentUser.length - 1]!.content +=
 		" 値だけを返してください。";
 	await call("same_system_different_user", differentUser, "main");
-	await call("background_updated", changed.messages, "main", cacheUpdatedMarker);
+	await call(
+		"background_updated",
+		changed.messages,
+		"main",
+		cacheUpdatedMarker,
+	);
 	await call("original_repeat", original, "main");
 	for (let i = 0; i < 4; i++)
 		await call(

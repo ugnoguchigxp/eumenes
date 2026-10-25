@@ -141,7 +141,7 @@ test("the context endpoint shows the profile with its estimated size, and is off
 	const context = memoryContextSchema.parse(await response.json());
 	if ("disabled" in context && context.disabled) throw new Error("off");
 	if (!("profile" in context)) throw new Error("off");
-	expect(context).toMatchObject({ newMemories: 0, notices: 0 });
+	expect(context).toMatchObject({ newMemories: 0 });
 	expect(context.profile.text).toContain("コーヒーが好き");
 	expect(context.profile.tokens).toBe(estimateTextTokens(context.profile.text));
 	// The short-term notes are the conversation's active memory, not part of the long-term window.

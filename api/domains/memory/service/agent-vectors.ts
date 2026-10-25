@@ -2,14 +2,8 @@ import type { Database } from "bun:sqlite";
 import { getLogger } from "../../../infrastructure/logger";
 import { packVector, vectorSpaceKey } from "../../../infrastructure/vector";
 import type { ConversationService } from "../../conversation";
-import {
-	type MemoryEmbed,
-	type MemoryVectorSpace,
-	type TurnRecall,
-} from "../contracts";
+import { type MemoryEmbed, type MemoryVectorSpace } from "../contracts";
 import { isBlocked, putTurnVector } from "../repository";
-import type { WindowPrefetch } from "./context-window";
-import { RECALL_MIN_SCORE, type RecallInput } from "./turn-recall";
 
 const log = getLogger("memory");
 /** Embedding is best effort: it never holds the job longer than this. */
@@ -20,7 +14,7 @@ export type TurnVectors = {
 	space: MemoryVectorSpace;
 	items: Array<{ messageId: string; vector: number[] }>;
 };
-/** The prefetch query as a vector. */
+/** A search query as a vector. */
 export type QueryVector = { space: MemoryVectorSpace; vector: number[] };
 
 /** A vector of the space's dimension with finite values (anything else would poison the comparison). */
@@ -30,15 +24,14 @@ const validVector = (vector: number[] | undefined, space: MemoryVectorSpace) =>
 	vector.every(Number.isFinite);
 
 /**
- * The memory agent's embedding side: turn vectors saved with its settle, and the prefetch the next turn starts
- * from. Nothing here throws into the job: embedding failure costs only the vectors (and a stale prefetch).
+ * The memory agent's embedding side: turn vectors saved with its settle, and query vectors for its searches.
+ * Nothing here throws into the job: embedding failure costs only the vectors.
  */
 export function createAgentVectors(deps: {
 	conversation: ConversationService;
 	atMs(): number;
 	/** Looked up at each use: the application may create the embedder after memory. */
 	embed?: (() => MemoryEmbed | undefined) | undefined;
-	recall(db: Database, input: RecallInput): TurnRecall | null;
 }) {
 	const { conversation } = deps;
 	async function embedAll(
@@ -142,36 +135,6 @@ export function createAgentVectors(deps: {
 					{ reason: "vector_store_failed" },
 					error,
 				);
-			}
-		},
-		/**
-		 * The prefetched exchanges for the next turn: what the model's query finds among the exchanges that turn does
-		 * not show verbatim. undefined keeps the earlier prefetch.
-		 */
-		prefetchOf(
-			db: Database,
-			conversationId: string,
-			query: QueryVector | null | undefined,
-			/** The most (estimated tokens) the prefetch may take: the memory and history budget. */
-			maxTokens: number,
-		): WindowPrefetch | undefined {
-			if (!query) return undefined;
-			try {
-				const found = deps.recall(db, {
-					conversationId,
-					space: query.space,
-					vector: query.vector,
-					minScore: RECALL_MIN_SCORE,
-					maxTokens,
-				});
-				return found ?? { text: "", pins: [], tokens: 0 };
-			} catch (error) {
-				log.warn(
-					"memory.agent_embedding_failed",
-					{ reason: "prefetch_failed" },
-					error,
-				);
-				return undefined;
 			}
 		},
 	};

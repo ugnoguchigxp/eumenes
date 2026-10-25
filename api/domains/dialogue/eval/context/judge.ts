@@ -81,7 +81,6 @@ export function factsOf(seed: Seed) {
 		})),
 		conversationEvents: plain(seed.events ?? []),
 		pendingUtterances: seed.pending ?? [],
-		recalledExchanges: seed.recall ?? [],
 		todos: (seed.work ?? []).map(({ key: _key, ...work }) => work),
 		pendingConfirmations: seed.confirmations ?? [],
 		adoptedGoals: (seed.goals ?? []).map((g) => g.text),

@@ -16,13 +16,7 @@ import {
 } from "../context";
 import type { StepEnv } from "../types";
 
-const NOTE_KINDS = [
-	"goal",
-	"decision",
-	"open_question",
-	"activity",
-	"memo",
-] as const;
+const NOTE_KINDS = ["goal", "decision", "open_question", "memo"] as const;
 const STOP_WHY = ["contradicted", "outdated", "wrong", "user_asked"] as const;
 const RESOLVE_ACTIONS = [
 	"forget",

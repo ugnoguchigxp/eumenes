@@ -5,25 +5,13 @@ import {
 	findToolchain,
 	isNoticeRound,
 	isUtteranceRound,
+	retainedIds,
 	UNAVAILABLE_TEXT,
 	type ConversationMessage,
 	type Step,
 } from "../toolchain/conversation-script.fixture";
 
-type Tools = ReadonlyArray<{ function: { name: string } }> | undefined;
-
-/** The generation's JSON document (the message that starts with the profile section), parsed; {} when absent. */
-function documentOf(messages: ConversationMessage[]): Record<string, any> {
-	const document = messages.find((m) => m.content.startsWith('{"profile":'));
-	return document ? JSON.parse(document.content) : {};
-}
-
-/** The ids of the toolchains the document's `state.retained` lists. */
-export function retainedIds(messages: ConversationMessage[]): string[] {
-	return (
-		(documentOf(messages).state?.retained ?? []) as Array<{ id: string }>
-	).map((item) => item.id);
-}
+export { retainedIds };
 
 /** The text of the newest user message: the utterance a generation answers. */
 export function lastUtterance(messages: ConversationMessage[]): string {
@@ -42,7 +30,7 @@ export function handOver(
 	query: (messages: ConversationMessage[]) => string = lastUtterance,
 ) {
 	return (messages: ConversationMessage[]): Step => {
-		// A toolchain the conversation retained (state.retained, section 6.2) is delegated to without a search.
+		// A toolchain the conversation retained (a `担当` line of the document's <state>, spec section 4.4) is delegated to without a search.
 		if (retainedIds(messages).includes(toolchain))
 			return {
 				calls: [
@@ -72,13 +60,13 @@ export function handOver(
  * Answers one model call when it is the user's utterance's generation (the conversation's fixed tools are offered). Returns undefined for every other call, which the caller answers itself.
  */
 export function answerUtterance(
-	tools: Tools,
+	options: Parameters<typeof isUtteranceRound>[0],
 	messages: ConversationMessage[],
 	onToolCalls: ((calls: ReturnType<typeof callsOf>) => void) | undefined,
 	step: (messages: ConversationMessage[]) => Step,
 	onHandOver?: () => void,
 ): string | undefined {
-	if (!isUtteranceRound(tools) || isNoticeRound(messages)) return undefined;
+	if (!isUtteranceRound(options) || isNoticeRound(messages)) return undefined;
 	const chosen = step(messages);
 	if (chosen.calls?.length) {
 		if (chosen.calls.some((call) => call.name === "delegate")) onHandOver?.();

@@ -410,9 +410,7 @@ test("when the evidence of the claims can be read only in part the forget is ref
 	expect(fake.callsOf("forgetEntities")).toHaveLength(0);
 	expect(fake.callsOf("sourceForget")).toHaveLength(0);
 	expect(fake.resumed).toEqual([]);
-	const notices = h.store
-		.read((db) => h.memory.windows.storedInTransaction(db, "c1"))!
-		.notices.map((n) => n.text);
+	const notices = h.notices();
 	expect(notices.some((t) => t.includes("もう一度お願いします"))).toBe(true);
 	expect(notices.some((t) => /evidence|incomplete/.test(t))).toBe(false);
 });
@@ -444,7 +442,7 @@ test("a memory forget also takes the blocked messages out of World as sources", 
 		const ref = (data.longTerm as Array<{ ref: string }>)[0]!.ref;
 		return {
 			...empty,
-			resolve: [resolve({ refs: [ref], alsoIn: ["c1"] })],
+			resolve: [resolve({ refs: [ref], alsoIn: ["xc1"] })],
 			route: [],
 		};
 	});

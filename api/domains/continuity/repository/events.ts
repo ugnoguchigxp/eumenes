@@ -1,6 +1,5 @@
 import type { Database } from "bun:sqlite";
 import type {
-	ActiveSlot,
 	ConversationEvent,
 	EpisodeSegment,
 	EventActor,
@@ -9,7 +8,17 @@ import type {
 	WindowVersion,
 } from "../contracts/events";
 
-/** The active short-term memory: events, episode (shown and prepared), work results and the window version. */
+/** Work results are events of the log now (the ContextWindow layout specification): the result slots go. */
+export const dropActiveMigration = "DROP TABLE continuity_active;";
+
+/**
+ * The `activity` notes copied the conversation, which the log and the episode hold (the ContextWindow layout
+ * specification, section 2.2): the open ones are retracted, so they no longer count toward the notes' limit.
+ */
+export const retractActivityMigration =
+	"UPDATE continuity_items SET status = 'retracted', revision = revision + 1 WHERE kind = 'activity' AND status = 'active';";
+
+/** The active short-term memory: events, episode (shown and prepared) and the window version. */
 export const eventsMigration = `
 CREATE TABLE continuity_events (
  conversation_id TEXT NOT NULL, seq INTEGER NOT NULL, at TEXT NOT NULL,
@@ -221,6 +230,24 @@ export function eventBySeq(
 }
 
 /** Events of one status: pending ones in receipt order, logged ones in log order, moved ones in receipt order. */
+/**
+ * The time (ms) of the conversation's newest logged or pending event, or null when it has none. The times are
+ * compared as instants: they need not share one offset.
+ */
+export function latestEventMs(
+	db: Database,
+	conversationId: string,
+): number | null {
+	const rows = db
+		.query(
+			"SELECT at FROM continuity_events WHERE conversation_id = ? AND status IN ('logged','pending')",
+		)
+		.all(conversationId) as Array<{ at: string }>;
+	return rows.length
+		? Math.max(...rows.map((row) => Date.parse(row.at)))
+		: null;
+}
+
 export function eventsWithStatus(
 	db: Database,
 	conversationId: string,
@@ -476,65 +503,6 @@ export function conversationsWithEpisodeMessages(
 		)
 		.map((row) => row.id)
 		.filter((id, index, all) => all.indexOf(id) === index);
-}
-
-export function readActive(db: Database, conversationId: string): ActiveSlot[] {
-	return (
-		db
-			.query(
-				"SELECT conversation_id AS conversationId, todo_id AS todoId, position, status, at, text, tokens FROM continuity_active WHERE conversation_id = ? ORDER BY position",
-			)
-			.all(conversationId) as ActiveSlot[]
-	).map((slot) => ({ ...slot }));
-}
-
-/** Writes a TODO's slot: in place when it exists, else after the last one. */
-export function putActive(db: Database, slot: Omit<ActiveSlot, "position">) {
-	const updated = db
-		.query(
-			"UPDATE continuity_active SET status = ?, at = ?, text = ?, tokens = ? WHERE conversation_id = ? AND todo_id = ?",
-		)
-		.run(
-			slot.status,
-			slot.at,
-			slot.text,
-			slot.tokens,
-			slot.conversationId,
-			slot.todoId,
-		);
-	if (updated.changes > 0) return;
-	const next = (
-		db
-			.query(
-				"SELECT COALESCE(MAX(position), 0) + 1 AS next FROM continuity_active WHERE conversation_id = ?",
-			)
-			.get(slot.conversationId) as { next: number }
-	).next;
-	db.query(
-		"INSERT INTO continuity_active (conversation_id, todo_id, position, status, at, text, tokens) VALUES (?,?,?,?,?,?,?)",
-	).run(
-		slot.conversationId,
-		slot.todoId,
-		next,
-		slot.status,
-		slot.at,
-		slot.text,
-		slot.tokens,
-	);
-}
-
-export function removeActive(
-	db: Database,
-	conversationId: string,
-	todoId: string,
-): boolean {
-	return (
-		db
-			.query(
-				"DELETE FROM continuity_active WHERE conversation_id = ? AND todo_id = ?",
-			)
-			.run(conversationId, todoId).changes > 0
-	);
 }
 
 export function readWindowVersion(

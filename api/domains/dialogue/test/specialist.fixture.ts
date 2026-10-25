@@ -21,7 +21,12 @@ import type {
 import type { ImagePort } from "../contracts/image";
 import type { ToolchainRoutingPort } from "../contracts/toolchains";
 import type { ChatMessage } from "../service/context";
-import { IMAGE, type Call, type Step } from "./generation.fixture";
+import {
+	IMAGE,
+	sectionLines,
+	type Call,
+	type Step,
+} from "./generation.fixture";
 import { openDialogueStore } from "./store.fixture";
 import { testConversationAgent } from "./conversation-agent.fixture";
 
@@ -600,12 +605,26 @@ export async function setup(options: Options = {}) {
 		fields(event: ConversationEvent) {
 			return JSON.parse(event.text ?? "{}") as Record<string, unknown>;
 		},
-		/** The material document the nth conversation call received (messages: system, document, newest). */
-		material(call: number) {
-			return JSON.parse(state.calls[call]!.messages[1]!.content) as Record<
-				string,
-				any
-			>;
+		/** The lines of one tagged section of the material document the nth conversation call received. */
+		section(call: number, name: string): string[] {
+			return sectionLines(state.calls[call]!.messages[1]!.content, name);
+		},
+		/** The reference records of the nth conversation call: its `<now>` lines `資料 <source>: <json>`. */
+		records(call: number): Array<Record<string, any> & { source: string }> {
+			return sectionLines(
+				state.calls[call]!.messages[2]!.content,
+				"now",
+			).flatMap((line) => {
+				const match = /^資料 ([^:]+): (.*)$/.exec(line);
+				return match
+					? [
+							{
+								source: match[1]!,
+								...(JSON.parse(match[2]!) as Record<string, any>),
+							},
+						]
+					: [];
+			});
 		},
 		answerText(runId: string) {
 			const run = dialogue.get(runId)!;

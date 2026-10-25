@@ -3,10 +3,7 @@ import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { createLarmPlayground, type LarmPort } from "../../domains/larm";
 import { png } from "./image.fixture";
-import {
-	answerUtterance,
-	handOver,
-} from "./conversation-turn.fixture";
+import { answerUtterance, handOver } from "./conversation-turn.fixture";
 export const musicQuestion = "Tetrisをテーマにした30秒の楽曲を作って";
 export const musicTestPlan = {
 	title: "落ちるブロックのリズム",
@@ -203,7 +200,7 @@ export function musicFixture(
 		speak: async () => new Uint8Array(),
 		answer: async (messages, _signal, options) => {
 			const turn = answerUtterance(
-				options?.tools,
+				options,
 				messages,
 				options?.onToolCalls,
 				handOver("music.create", "準備します。"),

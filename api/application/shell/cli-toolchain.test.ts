@@ -52,7 +52,8 @@ test("CLI is published in the artifact list and source API; conversation accepta
 			"-c",
 			"git status --short",
 		]);
-		expect(parentContexts.join("\n")).toContain('\\"completed\\":false');
+		// The work's result is only the acceptance, not the completion.
+		expect(h.reported()).toContain('"completed":false');
 		const runs = h.store.read((db) => shell.recentInTransaction(db));
 		expect(runs).toHaveLength(1);
 		const run = runs[0]!;

@@ -53,12 +53,20 @@ export type LarmCallOptions = {
 	 * Helper calls on LARM use their own connections, one per instruction prefix (see `createHelperConnections`).
 	 */
 	sessionRole?: "main" | "subagent" | "auxiliary";
+	/**
+	 * `auxiliary` only: background work on the conversation's prompt. It runs on the conversation's connection (the
+	 * shared prefix is in its cache) and yields: a conversation call aborts it (`larm_preempted`).
+	 */
+	onConversation?: true;
 	/** `subagent` only: the task whose calls share one agent session. */
 	taskId?: string;
 	speechLanguage?: SpeechLanguage;
 	tools?: NativeTool[];
-	/** `required`: the provider must call one of `tools` (default: it may answer in text). */
-	toolChoice?: "required";
+	/**
+	 * `required`: the provider must call one of `tools`; `none`: it must not (the tools only keep the prompt's prefix
+	 * the same as the conversation's). Default: it may answer in text.
+	 */
+	toolChoice?: "required" | "none";
 	/** The output is spoken to the user: no fixed temperature, even with `tools`. */
 	speaks?: true;
 	onToolCalls?: (calls: NativeToolCall[]) => void;

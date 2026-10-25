@@ -29,9 +29,7 @@
 			},
 			{
 				"kind": "forbidden_identifier",
-				"identifiers": [
-					"KS-4471"
-				]
+				"identifiers": ["KS-4471"]
 			}
 		],
 		"rubric": [

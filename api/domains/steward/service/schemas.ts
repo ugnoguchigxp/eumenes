@@ -30,7 +30,8 @@ function obj(properties: Record<string, Schema>): Schema {
 const list = (items: Schema): Schema => ({ type: "array", items });
 
 const stateKinds = ["preference", "personal_fact", "constraint", "habit"];
-const noteKinds = ["goal", "decision", "open_question", "activity", "memo"];
+// `activity` is not written any more: the conversation itself is in the log and the episode.
+const noteKinds = ["goal", "decision", "open_question", "memo"];
 
 /**
  * The answer of curate-memory. `resolve.request` is one of the request labels this unit gave (`r1`...): the model can
@@ -98,8 +99,6 @@ export const curateSchema = (requestLabels: readonly string[]) =>
 	});
 
 export const summarizeSchema = obj({ summary: str });
-
-export const recallSchema = obj({ query: nullableStr });
 
 export const consolidateSchema = obj({
 	merge: list(

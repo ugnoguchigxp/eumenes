@@ -65,6 +65,9 @@ export type ModelCall = {
 	data: Record<string, unknown>;
 	/** The output schema the request was made with. */
 	schema: unknown;
+	messages: ChatMessage[];
+	/** The session of a call on the conversation's prompt. */
+	session?: unknown;
 };
 
 /** A scripted stand-in for the inference service: it answers by step id, records the calls and tracks the requests. */
@@ -82,13 +85,41 @@ export function createFakeInference() {
 	let counter = 0;
 	const state = { unavailable: false };
 	/** Steps a test does not care about answer "nothing" unless scripted. */
-	const defaults: Record<string, Scripted> = {
-		"prepare-recall": { query: null },
+	const defaults: Record<string, Scripted> = {};
+	/**
+	 * Scripts name the events a step was shown by position (`e1` is the first one), whatever the conversation's
+	 * own ids (`e<seq>`) are: a label the step was not shown is read as that position.
+	 */
+	const byPosition = (value: unknown, shown: readonly string[]): unknown => {
+		if (typeof value === "string") {
+			const n = /^e(\d+)$/.exec(value);
+			return n && !shown.includes(value)
+				? (shown[Number(n[1]) - 1] ?? value)
+				: value;
+		}
+		if (Array.isArray(value)) return value.map((v) => byPosition(v, shown));
+		if (value && typeof value === "object")
+			return Object.fromEntries(
+				Object.entries(value).map(([k, v]) => [k, byPosition(v, shown)]),
+			);
+		return value;
 	};
+	/** A step's own prompt starts with its instructions; on the conversation's prompt, its task is the last message. */
 	const stepOf = (messages: ChatMessage[]) =>
+		/^<task name="([a-z-]+)">/.exec(messages.at(-1)?.content ?? "")?.[1] ??
 		Object.values(steps).find((step) =>
 			messages[0]?.content.startsWith(step.instructions),
-		)?.id ?? "unknown";
+		)?.id ??
+		"unknown";
+	const dataOf = (messages: ChatMessage[]) => {
+		const task = /\n入力:\n([\s\S]*)\n<\/task>$/.exec(
+			messages.at(-1)?.content ?? "",
+		);
+		return JSON.parse(task ? task[1]! : messages[1]!.content) as Record<
+			string,
+			unknown
+		>;
+	};
 	const port: InferencePort = {
 		captureBackgroundControlInTransaction(_db, input) {
 			captures.push(input);
@@ -103,19 +134,33 @@ export function createFakeInference() {
 			messages,
 			_signal,
 			control,
+			session,
 		): Promise<ControlReceipt> {
 			const step = stepOf(messages);
-			const data = JSON.parse(messages[1]!.content) as Record<string, unknown>;
-			calls.push({ step, requestId, data, schema: control?.outputSchema });
+			const data = dataOf(messages);
+			calls.push({
+				step,
+				requestId,
+				data,
+				schema: control?.outputSchema,
+				messages,
+				...(session ? { session } : {}),
+			});
 			const queue = scripts.get(step);
 			let answer = queue?.shift() ?? defaults[step];
 			if (answer === undefined) throw new Error("no_script");
 			while (typeof answer === "function") answer = await answer(data);
 			if (answer instanceof Error) throw answer;
+			const shown = Array.isArray(data.events)
+				? (data.events as Array<{ id?: unknown }>).map((e) => String(e.id))
+				: [];
 			return {
 				requestId,
 				attemptId: `attempt-${calls.length}`,
-				value: typeof answer === "string" ? answer : JSON.stringify(answer),
+				value:
+					typeof answer === "string"
+						? answer
+						: JSON.stringify(byPosition(answer, shown)),
 			};
 		},
 		acceptInTransaction(_db, receipt) {
@@ -170,6 +215,12 @@ export async function setupSteward(
 			/** Kicks the steward (the World's notice that events arrived). */
 			kick(conversationId: string): Promise<void>;
 		}) => StewardWorld | Promise<StewardWorld>;
+		/** The conversation's prompt prefix the steps that read the conversation send before their task. */
+		conversationPrefix?: NonNullable<
+			StewardDeps["conversationPrefix"]
+		> extends () => infer F
+			? F
+			: never;
 		/** A database and conversation service made elsewhere (the real World's); `dir` is its folder. */
 		host?: {
 			store: SqliteStore;
@@ -239,6 +290,9 @@ export async function setupSteward(
 		...(world ? { world } : {}),
 		...(goals ? { goals: { ops: goals, access: GOALS_ACCESS } } : {}),
 		worldResourceId: () => options.worldResourceId ?? null,
+		...(options.conversationPrefix
+			? { conversationPrefix: () => options.conversationPrefix }
+			: {}),
 	} satisfies StewardDeps);
 	queue.registerHandler(steward.handler as never);
 	let messages = 0;
@@ -469,6 +523,16 @@ export async function setupSteward(
 			store.read((db) =>
 				continuity.events.logInTransaction(db, conversationId),
 			),
+		/** What the conversation was told of its memory requests: the texts of its `memory.notice` events. */
+		notices: (conversationId = "c1") =>
+			store
+				.read((db) => continuity.events.logInTransaction(db, conversationId))
+				.flatMap((event) => {
+					const fields = event.text
+						? (JSON.parse(event.text) as Record<string, unknown>)
+						: {};
+					return fields.action === "memory.notice" ? [String(fields.text)] : [];
+				}),
 		/** The episode of a conversation (the shown or the prepared one). */
 		episode: (stage: "shown" | "prepared", conversationId = "c1") =>
 			store.read((db) =>

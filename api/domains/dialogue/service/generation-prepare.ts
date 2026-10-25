@@ -11,7 +11,6 @@ import {
 	type ContextBlock,
 	type WindowPlan,
 } from "../../inference";
-import { parseRecallBlock } from "../../memory";
 import type { HandlerDefinition } from "../../queue";
 import { isSystemPrompt, type Run } from "../contracts";
 import {
@@ -29,13 +28,14 @@ import {
 	type GenerateInput,
 	type GeneratePayload,
 } from "./context";
+import { historyTokens, renderNow, type NowSources } from "./context-document";
+import { FIXED_TRIGGER_TEXT } from "./context-system";
 import {
-	renderDocument,
-	type ContextDocument,
-	type DocumentSources,
-	type NowSources,
-} from "./context-document";
-import { FIXED_TRIGGER_TEXT, systemText } from "./context-system";
+	conversationDocumentInTransaction,
+	conversationSystem,
+	profileLimitOf,
+	tokyoYear,
+} from "./conversation-prefix";
 import { generationTools } from "./generation-tools";
 import { eventFields } from "./event-fields";
 import {
@@ -43,7 +43,7 @@ import {
 	answerTicketInTransaction,
 	intakeInTransaction,
 } from "./result-intake";
-import { endRun } from "./run-end";
+import { acceptRunAnswer, endRun } from "./run-end";
 import type { WorkRow } from "../repository/work";
 import { hostTextBlock } from "./context-blocks";
 import { specialistWorkBlock, viewingBlock } from "./specialist-context";
@@ -167,53 +167,18 @@ function reconstructReason(
 	)
 		return "cache_lost";
 	const logTokens = log.reduce((sum, event) => sum + event.tokens, 0);
-	const activeTokens = events
-		.activeInTransaction(tx, run.conversationId)
-		.reduce((sum, slot) => sum + slot.tokens, 0);
 	if (
 		logTokens > plan.log.cap ||
-		activeTokens > plan.sections.active ||
-		renderEpisodeTokens(deps, tx, run.conversationId) > plan.sections.episode
+		historyTokens(
+			events.episodeInTransaction(tx, run.conversationId),
+			tokyoYear(now),
+		) > plan.sections.episode
 	)
 		return "section_over_limit";
 	return null;
 }
 
-function renderEpisodeTokens(
-	deps: DialogueDeps,
-	tx: Database,
-	conversationId: string,
-): number {
-	return renderDocument(
-		{
-			profile: [],
-			episode: deps.continuity.events.episodeInTransaction(tx, conversationId),
-			log: [],
-			active: [],
-			state: {
-				todos: [],
-				pendingConfirmation: [],
-				retained: [],
-				notes: [],
-				goals: [],
-				newMemories: [],
-			},
-			now: {
-				at: "",
-				trigger: [],
-				speaking: null,
-				notices: [],
-				recall: [],
-				agency: [],
-				records: [],
-			},
-			work: [],
-		},
-		0,
-	).sections.episode.tokens;
-}
-
-/** `now` within its section: the oldest recall entries go first, then the agency's interests, then the records. */
+/** `<now>` within its section: the agency's lines go first, then the records. */
 function fitNow(
 	now: NowSources,
 	limit: number,
@@ -221,11 +186,9 @@ function fitNow(
 ) {
 	const fitted = {
 		...now,
-		recall: [...now.recall],
 		agency: [...now.agency],
 		records: [...now.records],
 	};
-	while (render(fitted) > limit && fitted.recall.length) fitted.recall.shift();
 	while (render(fitted) > limit && fitted.agency.length) fitted.agency.shift();
 	while (render(fitted) > limit && fitted.records.length)
 		fitted.records.shift();
@@ -281,8 +244,7 @@ export function createPrepare(
 	GenerateInput,
 	unknown
 >["prepareInTransaction"] {
-	const { conversation, larm, clock, memory, goals, agency, worldContext } =
-		deps;
+	const { conversation, larm, clock, memory, agency, worldContext } = deps;
 	const events = deps.continuity.events;
 	return (tx, claim) => {
 		const run = byId(tx, claim.payload.runId);
@@ -312,6 +274,14 @@ export function createPrepare(
 		// it. The sub-agent's answer is consumed here (one whose evidence changed drops its result).
 		if (changed?.length && !hostNote && !notAdopted && pending.length === 0) {
 			if (agent) consumeAnswer(deps, tx, current, agent);
+			// The report is recorded in the TODO already: a request that can no longer be accepted (settings changed,
+			// deadline passed) only means nothing stands on it, so what waits on it (a voice turn) ends; the run does not
+			// fail, nor is its TODO overwritten.
+			if (!acceptRunAnswer(deps, tx, current))
+				log.warn("dialogue.answer_request_not_accepted", {
+					runId: run.id,
+					reason: "permission_revoked",
+				});
 			endRun(deps, tx, current, "completed", null);
 			agency?.workChangedInTransaction(tx, conversationId);
 			return { status: "stale", reason: "work_reported" };
@@ -358,12 +328,7 @@ export function createPrepare(
 		const requestId = larm.requestFor?.(tx, run.id, "llm");
 		// This run's context is fixed by the host: the server must neither trim nor reorder it.
 		if (requestId) larm.setContextPolicyInTransaction?.(tx, requestId, "exact");
-		const persona = larm.snapshotInTransaction?.(tx).general ?? {
-			agentName: "",
-			userName: "",
-			persona: "butler" as const,
-		};
-		const system = deps.conversationAgent.system() + "\n" + systemText(persona);
+		const system = conversationSystem(deps, tx);
 		const fixed = tokens(system) + estimateJsonTokens(generationTools);
 		const plan = planWindow({ window: windowOf(deps, tx, run.id), fixed });
 		if (!plan.usable) {
@@ -387,7 +352,6 @@ export function createPrepare(
 				limits: {
 					log: plan.log,
 					episode: plan.sections.episode,
-					active: plan.sections.active,
 					silenceMs: TALK_BREAK_MS,
 				},
 			});
@@ -406,7 +370,6 @@ export function createPrepare(
 			? (conversation.messageInTransaction(tx, run.inputMessageId)?.message
 					.text ?? null)
 			: null;
-		const adopted = goals?.adoptedForContextInTransaction(tx) ?? [];
 		const texts = newest.map((message) => message.content);
 		const records: ContextBlock[] = [
 			worldContext
@@ -424,33 +387,16 @@ export function createPrepare(
 				? hostTextBlock("specialist.handoff", claim.payload.specialistHandoff)
 				: null,
 		].filter((block): block is ContextBlock => !!block);
-		const logged = events.logInTransaction(tx, conversationId);
-		const sources: DocumentSources = {
-			profile: window?.profile.items ?? [],
-			episode: events.episodeInTransaction(tx, conversationId),
-			log: logged,
-			active: events.activeInTransaction(tx, conversationId),
-			state: {
-				todos: deps.work?.todosInTransaction(tx, conversationId) ?? [],
-				pendingConfirmation:
-					deps.work?.pendingConfirmationsInTransaction(tx, conversationId) ??
-					[],
-				retained: (
-					deps.work?.retainedInTransaction(tx, conversationId) ?? []
-				).map((entry) => ({
-					id: entry.card.id,
-					summary: entry.summary,
-					last: entry.last,
-				})),
-				notes: deps.continuity.snapshotInTransaction(tx, conversationId).items,
-				goals: adopted.map((goal) => ({
-					id: goal.goalId,
-					text: goal.desiredState,
-					priority: goal.priority,
-				})),
-				newMemories: window?.newMemories ?? [],
-			},
-			now: {
+		// The background calls on this conversation render the same document (conversation-prefix.ts): the profile
+		// limit is the one they use too, so their prefix is this one while nothing changes.
+		const { document, refs, todos, logged, adopted } =
+			conversationDocumentInTransaction(deps, tx, conversationId, {
+				window,
+				profileLimit: profileLimitOf(deps, system, plan.window),
+				nowMs,
+			});
+		const now = fitNow(
+			{
 				at: jstSeconds(nowMs),
 				trigger: triggerOf(
 					current,
@@ -461,34 +407,33 @@ export function createPrepare(
 					notAdopted,
 				),
 				speaking: speakingNow(logged),
-				notices: window?.notices.map((notice) => notice.text) ?? [],
-				recall: (window ? parseRecallBlock(window.prefetch.text) : null) ?? [],
 				agency: agency?.stateForContextInTransaction(tx, conversationId) ?? [],
 				records,
 			},
-			work: [],
-		};
-		const nowLimit = plan.sections.now;
-		sources.now = fitNow(
-			sources.now,
-			nowLimit,
-			(now) =>
-				renderDocument({ ...sources, now }, plan.sections.profile).sections.now
-					.tokens,
-		);
-		const document: ContextDocument = renderDocument(
-			sources,
-			plan.sections.profile,
+			plan.sections.now,
+			(fitted) => tokens(renderNow(fitted, refs)),
 		);
 		const messages: ChatMessage[] = [
 			{ role: "system", content: system },
 			{ role: "user", content: document.text },
+			{ role: "user", content: renderNow(now, refs) },
 			...newest,
 		];
 		log.debug("dialogue.context_measured", {
 			kind: "estimated_tokens",
 			count: tokens(system) + document.tokens,
 		});
+		// The TODOs whose result the log shows: what a reply may report.
+		const resulted = new Set(
+			logged.flatMap((event) => {
+				if (event.type !== "acted" || event.forgotten) return [];
+				const fields = eventFields(event);
+				return fields.action === "work.result" &&
+					typeof fields.todo === "string"
+					? [fields.todo]
+					: [];
+			}),
+		);
 		return {
 			status: "ready",
 			input: {
@@ -505,20 +450,22 @@ export function createPrepare(
 				...(requestId ? { requestId } : {}),
 				messages,
 				final,
-				trigger: sources.now.trigger,
+				trigger: now.trigger,
 				plan,
 				document,
 				...(agent ? { agent } : {}),
 				shown: {
-					todos: sources.active.map((slot) => slot.todoId),
-					events: logged.map((event) => event.id),
+					todos: todos
+						.filter((todo) => resulted.has(todo.id))
+						.map((todo) => todo.id),
 				},
+				todoRevisions: Object.fromEntries(
+					(deps.work?.todoRevisionsInTransaction(tx, conversationId) ?? []).map(
+						(row) => [row.id, row.revision],
+					),
+				),
 				windowVersion: events.windowVersionInTransaction(tx, conversationId)
 					.version,
-				// A display artifact's body is not held to the speech contract (section 6.4).
-				briefReply:
-					conversation.messageInTransaction(tx, run.inputMessageId)?.message
-						.presentation !== "artifact",
 				retained: deps.work?.retainedInTransaction(tx, conversationId) ?? [],
 				sessionContext: { instructionCount: 1, historyCount: 0 },
 				...(window && memory

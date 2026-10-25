@@ -59,12 +59,7 @@ export type PreparedWindow = {
 	policyRevision: string;
 	/** Item ids the prompt stood on: the long-term layer and the recently remembered (usage receipt). */
 	manifest: string[];
-	/** Earlier messages the prefetched text stands on: a changed digest expires the run. */
-	pins: { messageId: string; digest: string }[];
-	noticeIds: string[];
-	/** Estimated tokens of the prefetched text already in the prompt (the per-turn recall fills what is left of its budget). */
-	prefetchTokens: number;
-	/** The messages the prompt shows verbatim: the per-turn recall leaves them out. */
+	/** The messages the prompt shows verbatim: a forget of one of them expires the run. */
 	shownMessageIds: string[];
 };
 /** The vector space of an embedding (same shape as the toolchain embeddings'). */
@@ -79,11 +74,9 @@ export type MemoryEmbed = (
 	signal: AbortSignal,
 ) => Promise<{ vectors: number[][]; space: MemoryVectorSpace }>;
 /** Earlier exchanges found by meaning, as a reference block, and the messages it stands on. */
+/** The messages of the exchanges a search found (each exchange's user input and adopted answer). */
 export type TurnRecall = {
-	text: string;
 	pins: { messageId: string; digest: string }[];
-	/** Estimated tokens of `text`. */
-	tokens: number;
 };
 export type SettleResult =
 	| { ok: true }
@@ -161,8 +154,6 @@ export type MemoryContextDto =
 			profile: { text: string; tokens: number };
 			/** Current items the published profile does not show yet. */
 			newMemories: number;
-			/** How many notices wait for the next generation. */
-			notices: number;
 	  };
 export const memoryContextSchema: z.ZodType<MemoryContextDto> = z.union([
 	z.object({ disabled: z.literal(true) }),
@@ -170,7 +161,6 @@ export const memoryContextSchema: z.ZodType<MemoryContextDto> = z.union([
 		version: z.number(),
 		profile: z.object({ text: z.string(), tokens: z.number() }),
 		newMemories: z.number(),
-		notices: z.number(),
 	}),
 ]);
 

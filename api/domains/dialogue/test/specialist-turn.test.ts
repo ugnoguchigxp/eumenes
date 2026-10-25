@@ -370,10 +370,8 @@ test("a saved item older than the recent choices is offered, accepted and shown 
 	};
 	h.state.steps.push({ text: "見ています" });
 	await h.ask("これは？", { viewing });
-	const shown = (h.material(0).now.records ?? []).find(
-		(r: { source: string }) => r.source === "specialist.viewing",
-	);
-	expect(shown.data).toMatchObject({ ref: "item-old", label: "古い項目" });
+	const shown = h.records(0).find((r) => r.source === "specialist.viewing");
+	expect(shown!.data).toMatchObject({ ref: "item-old", label: "古い項目" });
 	h.handOver({ request: "これを直して", target: "item-old" });
 	h.state.specialist.push(reply("開きました"));
 	await h.ask("これを直して", { viewing });

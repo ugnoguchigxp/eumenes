@@ -6,14 +6,12 @@ import { curateMemory } from "./curate-memory";
 import { curateWorld } from "./curate-world";
 import { refineSummary, summarize } from "./episode-steps";
 import { consolidateMemory } from "./maintenance-steps";
-import { prepareRecallStep } from "./recall-step";
 
 export const steps: Record<StepId, StepDefinition> = {
 	"curate-memory": curateMemory,
 	"curate-goals": curateGoals,
 	"curate-world": curateWorld,
 	summarize,
-	"prepare-recall": prepareRecallStep,
 	"consolidate-memory": consolidateMemory,
 	"consolidate-goals": consolidateGoals,
 	"refine-summary": refineSummary,

@@ -82,8 +82,6 @@ export const workArgs = z
 	.object({
 		todo: id,
 		operation: z.enum(["check", "answer", "amend", "cancel"]),
-		revision: z.number().int().min(0),
-		questionId: id.optional(),
 		text: z.string().trim().min(1).max(8000).optional(),
 	})
 	.strict();
@@ -118,11 +116,11 @@ const tool = (
 export const generationTools: NativeTool[] = [
 	tool(
 		TOOL_NAMES.memory,
-		"本人の長期記憶を読む（read）か、記憶担当へ依頼する（request）。profileにある項目は読まない。会話の原文はlogか会話履歴の担当で読む。",
+		"本人の長期記憶を読む（read）か、記憶担当へ依頼する（request）。<memory>にある項目は読まない。会話の原文は<log>か会話履歴の担当で読む。",
 		{
 			operation: choice(["read", "request"], "readかrequest。"),
 			query: text("readで探す内容。"),
-			itemIds: ids("readで読み直す項目のid。"),
+			itemIds: ids("readで読み直す<memory>の番号（p1など）。"),
 			kind: choice(
 				["forget", "remember", "correct", "goal", "withdraw"],
 				"requestの種類。forget=忘れて、remember=覚えて、correct=直して、goal=目標の登録・変更・完了・取下げ、withdraw=未反映の依頼の取下げ。",
@@ -134,7 +132,7 @@ export const generationTools: NativeTool[] = [
 	),
 	tool(
 		TOOL_NAMES.search,
-		"state.retainedで足りないとき、依頼に合う担当の候補（最大4件）を探す。実行しない。1生成1回まで。",
+		"<state>の担当で足りないとき、依頼に合う担当の候補（最大4件）を探す。実行しない。1生成1回まで。",
 		{
 			query: text(
 				"最初の一つの作業に必要な担当の用途。対象・時点・条件を保つ。",
@@ -148,7 +146,7 @@ export const generationTools: NativeTool[] = [
 		{
 			mode: choice(["execute", "confirm", "approve"], "方式。"),
 			toolchain: text(
-				"execute・confirmの担当のid（find_toolchainの結果かstate.retained）。",
+				"execute・confirmの担当のid（find_toolchainの結果か<state>の担当）。",
 			),
 			request: text(
 				"担当への依頼。明示された対象名・識別子・地域・日時・数値・単位は原文のまま保ち、省略だけ文脈で補う。",
@@ -169,26 +167,26 @@ export const generationTools: NativeTool[] = [
 				["discard"],
 				"未保存の作業を捨ててよいと言われたとき。",
 			),
-			confirmation: text("approveで実行するstate.pendingConfirmationのid。"),
+			confirmation: text(
+				"approveで実行する<state>の確認待ちの番号（c1など）。",
+			),
 		},
 		["mode"],
 	),
 	tool(
 		TOOL_NAMES.work,
-		"依頼済みの仕事（state.todos）を確認・回答・訂正・取消する。",
+		"依頼済みの仕事（<state>のTODO）を確認・回答・訂正・取消する。",
 		{
-			todo: text("state.todosのid。"),
+			todo: text("<state>のTODOの番号（t1など）。"),
 			operation: choice(
 				["check", "answer", "amend", "cancel"],
 				"check=状態と結果を読む、answer=質問に答える、amend=依頼を訂正、cancel=取消。",
 			),
-			revision: { type: "integer", description: "state.todosかactiveの版。" },
-			questionId: text("answerで答える質問のid。"),
 			text: text(
 				"answerの答え（質問が形を求めるならそのJSON）、またはamendの新しい依頼。",
 			),
 		},
-		["todo", "operation", "revision"],
+		["todo", "operation"],
 	),
 ];
 

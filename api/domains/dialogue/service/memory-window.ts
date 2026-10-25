@@ -19,8 +19,7 @@ export function shownMessageForgotten(
 
 /**
  * Adoption check of the memory window a run was prepared with; the usage receipt is written only on success.
- * `recallPins`: messages the exchanges recalled for this turn stand on. A quiet window (it adds nothing to the
- * prompt) is validated only when a recalled exchange stands on it; the shown messages are always checked.
+ * A quiet window (it adds nothing to the prompt) is not validated; the shown messages are always checked.
  */
 export function adoptMemoryWindow(
 	memory: MemoryService,
@@ -31,16 +30,9 @@ export function adoptMemoryWindow(
 		quiet?: true;
 		blockedAtPrepare?: string[];
 	},
-	recallPins: ReadonlyArray<{ messageId: string; digest: string }> = [],
 ): SettleResult {
-	const verdict = validateMemoryWindow(
-		memory,
-		tx,
-		run.id,
-		prepared,
-		recallPins,
-	);
-	if (verdict.ok && !(prepared.quiet && recallPins.length === 0))
+	const verdict = validateMemoryWindow(memory, tx, run.id, prepared);
+	if (verdict.ok && !prepared.quiet)
 		memory.recordUsageInTransaction(
 			tx,
 			run.id,
@@ -60,29 +52,9 @@ export function validateMemoryWindow(
 		quiet?: true;
 		blockedAtPrepare?: string[];
 	},
-	recallPins: ReadonlyArray<{ messageId: string; digest: string }> = [],
 ): SettleResult {
 	if (shownMessageForgotten(memory, tx, prepared))
 		return { ok: false, reason: "memory_stale" };
-	if (prepared.quiet && recallPins.length === 0) return { ok: true };
-	return memory.validateWindowInTransaction(
-		tx,
-		runId,
-		prepared.window,
-		recallPins,
-	);
-}
-
-/** The notices this answer carried are shown once: only an adopted answer clears them. */
-export function clearShownNotices(
-	memory: MemoryService,
-	tx: Database,
-	run: Run,
-	prepared: { window: PreparedWindow },
-) {
-	memory.clearNoticesInTransaction(
-		tx,
-		run.conversationId,
-		prepared.window.noticeIds,
-	);
+	if (prepared.quiet) return { ok: true };
+	return memory.validateWindowInTransaction(tx, runId, prepared.window);
 }

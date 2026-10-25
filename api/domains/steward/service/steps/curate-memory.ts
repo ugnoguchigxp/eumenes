@@ -28,6 +28,7 @@ import type {
 	StepEnv,
 } from "../types";
 import { applyCurate } from "./curate-apply";
+import { eventLabel } from "./shared";
 import {
 	CANDIDATES_PER_REQUEST,
 	CANDIDATES_TOTAL,
@@ -211,7 +212,7 @@ function prepareStep(env: StepEnv, unit: PreparedUnit["unit"]) {
 	const events: LabelTable = {};
 	const labelOf = new Map<string, string>();
 	const views = kept.map((entry, i) => {
-		const label = `e${i + 1}`;
+		const label = eventLabel(entry.loaded, i);
 		labelOf.set(keyOf(entry.loaded), label);
 		events[label] = {
 			seq: entry.loaded.seq,
@@ -267,7 +268,10 @@ function prepareStep(env: StepEnv, unit: PreparedUnit["unit"]) {
 		shown: { ...shownMemory, ...shelves.shown },
 		claimEntities: shelves.claimEntities,
 		eventTexts: Object.fromEntries(
-			kept.map((entry, i) => [`e${i + 1}`, entry.loaded.text.text]),
+			kept.map((entry, i) => [
+				eventLabel(entry.loaded, i),
+				entry.loaded.text.text,
+			]),
 		),
 		sources,
 		digests,
@@ -330,7 +334,6 @@ async function findCandidates(
 				vector: vector.vector,
 				limit: CANDIDATES_PER_REQUEST,
 				minScore: RECALL_MIN_SCORE,
-				maxTokens: deps.memory.windowPlan().sections.now,
 				excludeMessageIds: [...shown, ...Object.values(map).flat()],
 			});
 			const seen = new Set<string>();
@@ -350,7 +353,7 @@ async function findCandidates(
 				);
 				const user = run.find((m) => m.message.role === "user");
 				const answer = run.find((m) => m.message.role === "assistant");
-				const label = `c${views.length + 1}`;
+				const label = `xc${views.length + 1}`;
 				map[label] = run.map((m) => m.message.id);
 				texts[label] = user?.message.text ?? "";
 				views.push({

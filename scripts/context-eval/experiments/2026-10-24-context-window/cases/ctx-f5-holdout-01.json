@@ -83,10 +83,7 @@
 			},
 			{
 				"kind": "forbidden_identifier",
-				"identifiers": [
-					"管理者モード",
-					"art-77e1"
-				]
+				"identifiers": ["管理者モード", "art-77e1"]
 			}
 		],
 		"rubric": [

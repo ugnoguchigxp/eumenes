@@ -12,6 +12,8 @@ export function createScreenPresence(
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	let current: Pick<LarmPort, "retain"> | undefined;
 	let closed = false;
+	/** Told when a conversation screen comes to be shown after none was. */
+	const shown = new Set<() => void>();
 	function sync() {
 		clearTimeout(timer);
 		for (const [id, tab] of tabs)
@@ -20,9 +22,11 @@ export function createScreenPresence(
 			? getPort()
 			: undefined;
 		if (next !== current) {
+			const appeared = !current && !!next;
 			current?.retain?.(false);
 			current = next;
 			current?.retain?.(true);
+			if (appeared) for (const listener of shown) listener();
 		}
 		if (tabs.size) {
 			const deadline = Math.min(
@@ -45,6 +49,18 @@ export function createScreenPresence(
 				throw new Error("screen_presence_capacity");
 			tabs.set(id, { revision, active, expiresAt: sentAt + 90_000 });
 			sync();
+		},
+		/** Whether a conversation screen is shown now. */
+		present: () => {
+			sync();
+			return current !== undefined;
+		},
+		/** Told when a conversation screen comes to be shown after none was. Returns the unsubscribe function. */
+		onShown(listener: () => void) {
+			shown.add(listener);
+			return () => {
+				shown.delete(listener);
+			};
 		},
 		close() {
 			closed = true;

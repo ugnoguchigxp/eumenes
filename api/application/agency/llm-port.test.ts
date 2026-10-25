@@ -3,9 +3,7 @@ import type { Database } from "bun:sqlite";
 import { LlmCallError, LlmOutputError, type LlmRequest } from "eumenes-agency";
 import { z } from "zod";
 import type { InferencePort, Receipt } from "../../domains/inference";
-import type { Settings } from "../../domains/settings";
 import {
-	AgencyRouteRefusedError,
 	BACKGROUND_OUTPUT_LIMIT,
 	createAgencyLlmPort,
 	type AgencyLlmPortDeps,
@@ -14,39 +12,10 @@ import {
 type BackgroundControl = Parameters<
 	NonNullable<InferencePort["captureBackgroundControlInTransaction"]>
 >[1];
-const RESOURCE = "11111111-1111-4111-8111-111111111111";
-const CONNECTION = "22222222-2222-4222-8222-222222222222";
 const schema = z.object({ pick: z.string(), score: z.number() });
-
-function settingsWith(
-	over: {
-		resourceId?: string | null;
-		resource?: boolean;
-		enabled?: boolean;
-		cloudAllowed?: boolean;
-	} = {},
-) {
-	return {
-		agency: { resourceId: over.resourceId ?? null },
-		resources:
-			over.resource === false
-				? []
-				: [
-						{
-							id: RESOURCE,
-							purpose: "llm",
-							connectionId: CONNECTION,
-							model: "saved-model",
-						},
-					],
-		connections: [{ id: CONNECTION, enabled: over.enabled ?? true }],
-		routes: { llm: { cloudAllowed: over.cloudAllowed ?? true } },
-	} as unknown as Settings;
-}
 
 function harness(
 	options: {
-		settings?: Settings;
 		value?: string;
 		execute?: (signal: AbortSignal) => Promise<Receipt>;
 		accept?: boolean;
@@ -72,7 +41,6 @@ function harness(
 	const deps: AgencyLlmPortDeps = {
 		store: { write: async (fn) => fn({} as Database) },
 		inference: {
-			snapshotInTransaction: () => options.settings ?? settingsWith(),
 			captureBackgroundControlInTransaction: (_db, input) => {
 				calls.captured.push(input);
 				return "req-1";
@@ -113,7 +81,7 @@ const request = (over: Partial<LlmRequest<unknown>> = {}) =>
 	}) as LlmRequest<z.infer<typeof schema>>;
 
 describe("agency LLM port", () => {
-	test("captures a structured background control on LARM when no resource is set and returns usage and latency", async () => {
+	test("captures a structured background control on the conversation route and returns usage and latency", async () => {
 		const h = harness();
 		const signal = new AbortController().signal;
 		const result = await h.port.complete(request(), signal);
@@ -127,12 +95,17 @@ describe("agency LLM port", () => {
 			maxOutputTokens: 800,
 			structuredOutput: true,
 		});
-		expect(captured.route).toBeUndefined();
+		// Every call uses the LLM the conversation is set to; no other is chosen here.
+		expect(captured.route).toBe("conversation");
 		expect(captured.deadline).toBe(captured.taskDeadline);
 		expect(captured.deadline).toBe(1_000 + 30_000);
 		const executed = h.calls.executed[0]!;
 		expect(executed.requestId).toBe("req-1");
-		expect(executed.messages).toEqual([{ role: "user", content: "PROMPT" }]);
+		// Without the conversation's prefix the call is its own system and prompt.
+		expect(executed.messages).toEqual([
+			{ role: "system", content: "SYSTEM" },
+			{ role: "user", content: "PROMPT" },
+		]);
 		expect(executed.control).toEqual({
 			instructions: "SYSTEM",
 			outputSchema: z.toJSONSchema(schema),
@@ -146,12 +119,6 @@ describe("agency LLM port", () => {
 			latencyMs: 250,
 		});
 		expect(h.calls.accepted).toBe(1);
-	});
-
-	test("routes to the saved resource when agency.resourceId is set", async () => {
-		const h = harness({ settings: settingsWith({ resourceId: RESOURCE }) });
-		await h.port.complete(request(), new AbortController().signal);
-		expect(h.calls.captured[0]!.route).toEqual({ resourceId: RESOURCE });
 	});
 
 	test("never asks for more than the background output limit", async () => {
@@ -280,7 +247,6 @@ describe("agency LLM port", () => {
 		const port = createAgencyLlmPort({
 			store: { write: async (fn) => fn({} as Database) },
 			inference: {
-				snapshotInTransaction: () => settingsWith(),
 				captureBackgroundControlInTransaction: () => {
 					throw new Error("background_control_conflict");
 				},
@@ -314,7 +280,6 @@ describe("agency LLM port", () => {
 		const port = createAgencyLlmPort({
 			store: { write: async (fn) => fn({} as Database) },
 			inference: {
-				snapshotInTransaction: () => settingsWith(),
 				captureBackgroundControlInTransaction: () => "x",
 				executeControl: async () => {
 					throw new Error("unreachable");
@@ -328,45 +293,69 @@ describe("agency LLM port", () => {
 		).rejects.toMatchObject({ reasonCode: "invalid_background_control" });
 		expect(h.calls.captured).toHaveLength(0);
 	});
+});
 
-	describe("a specified resource is never downgraded", () => {
-		for (const [name, over, refusal] of [
-			[
-				"the resource is not registered",
-				{ resource: false },
-				"resource_missing",
+describe("agency LLM port on the conversation's prompt", () => {
+	test("with the conversation's prefix the call sends it first, then its task, on the conversation's connection", async () => {
+		const tool = {
+			type: "function" as const,
+			function: {
+				name: "memory",
+				description: "",
+				parameters: { type: "object" },
+			},
+		};
+		const prefix = {
+			messages: [
+				{ role: "system" as const, content: "会話の指示" },
+				{ role: "user" as const, content: "<memory>\nなし\n</memory>" },
 			],
-			["its connection is disabled", { enabled: false }, "connection_disabled"],
-			[
-				"the conversation route does not allow the cloud",
-				{ cloudAllowed: false },
-				"cloud_not_allowed",
-			],
-		] as const)
-			test(`refuses when ${name}`, async () => {
-				const h = harness({
-					settings: settingsWith({ resourceId: RESOURCE, ...over }),
-				});
-				const error = await h.port
-					.complete(request(), new AbortController().signal)
-					.catch((e) => e);
-				expect(error).toBeInstanceOf(AgencyRouteRefusedError);
-				expect(error).toBeInstanceOf(LlmCallError);
-				expect(error).toMatchObject({
-					reasonCode: "agency_resource_unusable",
-					retryable: false,
-					refusal,
-				});
-				expect(h.calls.captured).toHaveLength(0);
-				expect(h.calls.executed).toHaveLength(0);
-			});
-
-		test("LARM (no resource) is unaffected by the cloud route settings", async () => {
-			const h = harness({
-				settings: settingsWith({ cloudAllowed: false, enabled: false }),
-			});
-			await h.port.complete(request(), new AbortController().signal);
-			expect(h.calls.captured).toHaveLength(1);
+			tools: [tool],
+		};
+		const executed: Array<{ messages: unknown; session: unknown }> = [];
+		const asked: string[] = [];
+		const port = createAgencyLlmPort({
+			store: { write: async (fn) => fn({} as Database) },
+			inference: {
+				captureBackgroundControlInTransaction: () => "req-1",
+				executeControl: async (_id, messages, _signal, _control, session) => {
+					executed.push({ messages, session });
+					return {
+						requestId: "req-1",
+						attemptId: "att-1",
+						value: '{"pick":"a","score":1}',
+					};
+				},
+				acceptInTransaction: () => true,
+				rejectControlInTransaction: () => {},
+			},
+			next: () => ({
+				decisionId: "conv-1.opp.3",
+				generation: 7,
+				conversationId: "conv-1",
+			}),
+			prefix: (conversationId) => {
+				asked.push(conversationId);
+				return prefix;
+			},
+		});
+		await port.complete(
+			request({ purpose: "update" }),
+			AbortSignal.timeout(1000),
+		);
+		expect(asked).toEqual(["conv-1"]);
+		expect(executed[0]!.messages).toEqual([
+			...prefix.messages,
+			{
+				role: "user",
+				content: '<task name="agency.update">\nSYSTEM\n\nPROMPT\n</task>',
+			},
+		]);
+		expect(executed[0]!.session).toEqual({
+			sessionRole: "auxiliary",
+			onConversation: true,
+			prefixTools: [tool],
+			toolChoice: "none",
 		});
 	});
 });

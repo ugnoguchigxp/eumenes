@@ -22,7 +22,12 @@ const remember = (over: Record<string, unknown> = {}) => ({
 	negated: false,
 	...over,
 });
-const curated = (h: StewardHarness) => h.log().map((e) => e.curated);
+/** Whether each event was handled by the reflection (the notices it wrote itself aside). */
+const curated = (h: StewardHarness) =>
+	h
+		.log()
+		.filter((e) => !e.text?.includes('"action":"memory.notice"'))
+		.map((e) => e.curated);
 
 test("the events of a run go through curate-memory and are handled", async () => {
 	const h = await setup();
@@ -38,13 +43,9 @@ test("the events of a run go through curate-memory and are handled", async () =>
 	]);
 	expect(h.units().map((unit) => [unit.step, unit.state])).toEqual([
 		["curate-memory", "applied"],
-		["prepare-recall", "applied"],
 	]);
 	const decisions = h.steward.decisions("c1");
-	expect(decisions.map((d) => d.step)).toEqual([
-		"prepare-recall",
-		"curate-memory",
-	]);
+	expect(decisions.map((d) => d.step)).toEqual(["curate-memory"]);
 	expect(decisions.every((d) => d.windowVersionAfter !== null)).toBe(true);
 	expect(decisions.every((d) => d.durationMs !== null)).toBe(true);
 	expect(h.inference.statuses("pending")).toBe(0);
@@ -58,7 +59,7 @@ test("the events of a run go through curate-memory and are handled", async () =>
 	]);
 	// Nothing is left to do: a kick makes no unit.
 	await h.kick();
-	expect(h.units()).toHaveLength(2);
+	expect(h.units()).toHaveLength(1);
 });
 
 test("events that carry nothing to learn from are handled without a model", async () => {
@@ -193,7 +194,7 @@ test("an event that is already handled is not offered again", async () => {
 	expect(curated(h)).toEqual([true, true]);
 });
 
-test("long-term writers share one concurrency key; the rest are per conversation", async () => {
+test("long-term writers share one concurrency key across conversations", async () => {
 	const h = await setup();
 	h.inference.script("curate-memory", empty, empty);
 	await h.exchange("a", "b", { conversationId: "c1" });
@@ -208,17 +209,9 @@ test("long-term writers share one concurrency key; the rest are per conversation
 	) as Array<{ unitId: string; key: string }>;
 	const byStep = new Map(h.units().map((u) => [u.id, u.step]));
 	const pairs = keys.map((k) => [byStep.get(k.unitId), k.key]);
-	expect(
-		pairs
-			.filter(([s]) => s === "curate-memory")
-			.every(([, k]) => k === "steward:long-term"),
-	).toBe(true);
-	expect(
-		pairs
-			.filter(([s]) => s === "prepare-recall")
-			.map(([, k]) => k)
-			.sort(),
-	).toEqual(["steward:c1", "steward:c2"]);
+	const curates = pairs.filter(([s]) => s === "curate-memory");
+	expect(curates).toHaveLength(2);
+	expect(curates.every(([, k]) => k === "steward:long-term")).toBe(true);
 });
 
 test("elements that cannot be saved are dropped one by one", async () => {
@@ -330,4 +323,46 @@ test("at most eight events and 16 KB go into one step; the rest waits", async ()
 	expect(bytes).toBeLessThanOrEqual(16 * 1024);
 	expect(sizes.reduce((a, b) => a + b, 0)).toBe(10);
 	expect(curated(h).every(Boolean)).toBe(true);
+});
+
+test("with the conversation's prefix, a step reading the conversation sends it first, then its own task, on the conversation's connection", async () => {
+	const tool = {
+		type: "function" as const,
+		function: {
+			name: "memory",
+			description: "",
+			parameters: { type: "object" },
+		},
+	};
+	const prefix = {
+		messages: [
+			{ role: "system" as const, content: "会話の指示" },
+			{ role: "user" as const, content: "<memory>\nなし\n</memory>" },
+		],
+		tools: [tool],
+	};
+	const h = await setupSteward({ conversationPrefix: () => prefix });
+	harnesses.push(h);
+	h.inference.script("curate-memory", {
+		...empty,
+		remember: [remember({ quote: "辛いものが好きです" })],
+	});
+	await h.exchange("辛いものが好きです", "覚えておきます");
+	await h.drain();
+	const [call] = h.inference.callsOf("curate-memory");
+	expect(call!.messages.slice(0, 2)).toEqual(prefix.messages);
+	expect(call!.messages[2]!.content).toStartWith(
+		'<task name="curate-memory">\n',
+	);
+	expect(call!.messages[2]!.content).toContain("OUTPUT_SCHEMA=");
+	expect(call!.session).toEqual({
+		sessionRole: "auxiliary",
+		onConversation: true,
+		prefixTools: [tool],
+		toolChoice: "none",
+	});
+	// The answer is adopted as from the step's own prompt.
+	expect(h.memory.list().map((item) => item.text)).toEqual([
+		"辛い食べ物が好き",
+	]);
 });

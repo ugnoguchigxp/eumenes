@@ -6,9 +6,7 @@ import {
 	bumpWindowVersion,
 	eventsWithStatus,
 	moveEvents,
-	readActive,
 	readEpisode,
-	removeActive,
 	setEventForm,
 	writeEpisode,
 } from "../repository/events";
@@ -37,7 +35,6 @@ export function episodeTokens(segments: readonly EpisodeSegment[]): number {
 export type ReconstructLimits = {
 	log: { cap: number; high: number; low: number; keep: number };
 	episode: number;
-	active: number;
 	/** The least time without events that counts as a break in the talk (ms). */
 	silenceMs: number;
 };
@@ -54,7 +51,6 @@ export type ReconstructResult = {
 	version: number;
 	moved: number;
 	shortened: number;
-	removedActive: string[];
 	episodeTokens: number;
 };
 
@@ -264,7 +260,7 @@ export function fitEpisode(
  * One re-construction of a conversation's window (sections 8.3, 8.4, 9.3 and 12): moves the oldest events out to
  * the target (`keep` when the conversation resumed, `low` when the log is over `high` or its cap), adds the moved
  * range to the episode (prepared summaries where they cover it, unsummarized marks elsewhere), applies prepared
- * summaries to earlier marks, keeps the episode and the work results inside their limits, switches older memory
+ * summaries to earlier marks, keeps the episode inside its limit, switches older memory
  * reads to their short form, and moves the window version. It never calls a model.
  */
 export function reconstructInTransaction(
@@ -325,23 +321,11 @@ export function reconstructInTransaction(
 			shortened++;
 		}
 	}
-	// The work results within their limit: the oldest finished ones go first (section 9.3).
-	const removedActive: string[] = [];
-	const slots = readActive(db, conversationId);
-	let activeTokens = slots.reduce((sum, slot) => sum + slot.tokens, 0);
-	for (const slot of slots) {
-		if (activeTokens <= limits.active) break;
-		if (slot.status !== "done") continue;
-		removeActive(db, conversationId, slot.todoId);
-		removedActive.push(slot.todoId);
-		activeTokens -= slot.tokens;
-	}
 	const version = bumpWindowVersion(db, conversationId, input.at, input.reason);
 	return {
 		version,
 		moved: moved.length,
 		shortened,
-		removedActive,
 		episodeTokens: episodeTokens(episode),
 	};
 }

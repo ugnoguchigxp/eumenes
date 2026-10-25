@@ -34,7 +34,6 @@ export async function replay(
 		history?: boolean;
 		urls?: string[];
 		acquire?: AcquisitionPort["execute"];
-		parent?: (messages: Messages) => string | Promise<string>;
 	} = {},
 ) {
 	let position = 0;

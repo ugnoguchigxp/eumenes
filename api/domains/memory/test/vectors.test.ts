@@ -115,34 +115,3 @@ test("saved turn vectors carry the digest of the whole message and are never kep
 	expect(stored.map((r) => r.messageId)).toEqual([user, long]);
 	expect(stored[1]!.digest).toBe(sha256Hex("あ".repeat(2500)));
 });
-
-test("a prefetched exchange whose message changed makes the run's window stale", async () => {
-	const h = await setup();
-	const old = await h.say("user", "京都の話をしたい");
-	await h.window();
-	const digest = sha256Hex("京都の話をしたい");
-	await h.store.write((db) =>
-		h.memory.windows.rebuildInTransaction(db, "c1", {
-			republish: false,
-			prefetch: {
-				text: "京都の話",
-				pins: [{ messageId: old, digest }],
-				tokens: 12,
-			},
-		}),
-	);
-	const window = await h.window();
-	expect(window.prefetch.pins).toHaveLength(1);
-	const prepared = h.memory.preparedWindow(window);
-	const verdict = () =>
-		h.store.read((db) =>
-			h.memory.validateWindowInTransaction(db, "run-x", prepared),
-		);
-	expect(verdict()).toEqual({ ok: true });
-	await h.store.write((db) =>
-		db.query("UPDATE messages SET text = ? WHERE id = ?").run("書き換え", old),
-	);
-	expect(verdict()).toEqual({ ok: false, reason: "memory_stale" });
-	// The next prepare drops the changed pin instead of expiring every later run.
-	expect((await h.window()).prefetch.pins).toEqual([]);
-});

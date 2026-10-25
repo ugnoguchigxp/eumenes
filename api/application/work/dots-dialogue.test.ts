@@ -41,7 +41,10 @@ test("conversation hands the request to the delegation toolchain, whose sub-agen
 			_p: unknown,
 			tools: unknown,
 		) => {
-			if (isUtteranceRound(tools as never) && !isNoticeRound(history as never)) {
+			if (
+				isUtteranceRound({ tools: tools as never }) &&
+				!isNoticeRound(history as never)
+			) {
 				// The conversation's round: a search for the delegation toolchain, then the hand-over of the request.
 				analyses++;
 				messages.push(history);

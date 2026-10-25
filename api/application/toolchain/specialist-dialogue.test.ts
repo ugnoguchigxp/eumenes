@@ -127,7 +127,7 @@ async function rig() {
 			mainPrompts.push(messages.map((m) => ({ ...m })));
 			// The conversation's round for a user's utterance: the script decides whether the request is delegated (a
 			// search, then the hand-over) or answered in plain text with the scripted reply.
-			if (isUtteranceRound(options?.tools)) {
+			if (isUtteranceRound(options)) {
 				if (afterUtterance(messages).length === 0) routeCalls++;
 				const head = script.main[0];
 				if (typeof head === "object") {

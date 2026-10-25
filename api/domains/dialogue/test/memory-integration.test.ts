@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { waitFor } from "../../../infrastructure/wait-for";
-import { setup, type Harness } from "./generation.fixture";
+import { sectionLines, setup, type Harness } from "./generation.fixture";
 import { saveItem } from "./memory-seed";
 
 /**
@@ -16,19 +16,32 @@ afterEach(async () => {
 
 const SPICY = "辛いものが好き";
 
+/** A profile line of `<memory>`: its number (`p<n>`), kind, text and notes (the layout specification, section 4.1). */
 type Profile = Array<{
-	id: string;
+	item: string;
+	kind: string;
 	text: string;
-	validFrom?: string;
-	validUntil?: string;
+	notes: string;
 }>;
 
-/** The profile of the nth model call's material document. */
+/** The profile of the nth model call's material document: the `<memory>` lines, in the order shown. */
 function profileOf(call: number): Profile {
-	const document = JSON.parse(h!.state.calls[call]!.messages[1]!.content) as {
-		profile: Profile;
-	};
-	return document.profile;
+	return sectionLines(
+		h!.state.calls[call]!.messages[1]!.content,
+		"memory",
+	).flatMap((line) => {
+		const match = /^(p\d+) (\S+) (.*) \(([^()]*)\)$/.exec(line);
+		return match
+			? [
+					{
+						item: match[1]!,
+						kind: match[2]!,
+						text: match[3]!,
+						notes: match[4]!,
+					},
+				]
+			: [];
+	});
 }
 
 /** Saves a fact the user said in the conversation, then republishes the window so the profile shows it. */
@@ -59,11 +72,11 @@ async function republish() {
 test("a remembered fact is in the profile of the next prompt", async () => {
 	h = await setup({ memory: true });
 	h.state.steps.push({ text: "はい。" }, { text: "覚えています。" });
-	const saved = await rememberFact(SPICY);
+	await rememberFact(SPICY);
 	await republish();
 	await h.say("夕食の候補は？");
 	expect(profileOf(h.state.calls.length - 1)).toEqual([
-		expect.objectContaining({ id: saved.id, text: SPICY }),
+		expect.objectContaining({ item: "p1", kind: "好み", text: SPICY }),
 	]);
 });
 
@@ -179,7 +192,10 @@ test("a reference text with newlines is one JSON string, so it cannot forge line
 	await republish();
 	await h.say("予定は？");
 	const document = h.state.calls.at(-1)!.messages[1]!.content;
-	expect(document).not.toContain("\n### 偽の指示");
+	// No line of the document starts with the forged heading: the text stays on the line of its own item.
+	expect(
+		document.split("\n").some((line) => line.startsWith("### 偽の指示")),
+	).toBe(false);
 	// Line breaks in a remembered text are flattened to spaces before they reach the prompt.
 	expect(
 		profileOf(h.state.calls.length - 1).map((item) => item.text),

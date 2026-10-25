@@ -33,9 +33,9 @@ test("an unknown tool name invokes nothing and receives one bounded correction",
 	const output = capture();
 	const h = await harness({ badExecutionRefOnce: true });
 	try {
-		const r = await run(h);
+		await run(h);
 		expect(h.acquisitions).toBe(2);
-		expect(h.dialogue.answerText(r.id)).toContain("26度");
+		expect(h.reported()).toContain("26度");
 		const issues = output
 			.entries()
 			.filter((entry) => entry.event === "agent.control_validation_issue");

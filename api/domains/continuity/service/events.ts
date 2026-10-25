@@ -2,7 +2,6 @@ import type { Database } from "bun:sqlite";
 import { estimateTextTokens } from "../../../infrastructure/context-budget";
 import { referenceJson } from "../../../infrastructure/reference-json";
 import type {
-	ActiveSlot,
 	ConversationEvent,
 	EpisodeSegment,
 	EventInput,
@@ -20,6 +19,7 @@ import {
 	eventTexts,
 	forgetEvent,
 	insertEvent,
+	latestEventMs,
 	logEvent,
 	reopenEvent,
 	reviseEvent,
@@ -27,11 +27,8 @@ import {
 	moveEvents,
 	nextLogOrder,
 	nextSeq,
-	putActive,
-	readActive,
 	readEpisode,
 	readWindowVersion,
-	removeActive,
 	setEventForm,
 	uncuratedEvents,
 	writeEpisode,
@@ -153,6 +150,8 @@ export function createEventStore() {
 		},
 		pendingInTransaction: (db: Database, conversationId: string) =>
 			eventsWithStatus(db, conversationId, "pending"),
+		/** The time (ms) of the newest logged or pending event; null when there is none. */
+		latestMsInTransaction: latestEventMs,
 		logInTransaction: (db: Database, conversationId: string) =>
 			eventsWithStatus(db, conversationId, "logged"),
 		movedInTransaction: (db: Database, conversationId: string) =>
@@ -298,34 +297,6 @@ export function createEventStore() {
 			stage: "shown" | "prepared" = "shown",
 		): EpisodeSegment[] => readEpisode(db, conversationId, stage),
 		writeEpisodeInTransaction: writeEpisode,
-		activeInTransaction: (db: Database, conversationId: string): ActiveSlot[] =>
-			readActive(db, conversationId),
-		/** Holds a TODO's work result (or question): its slot is overwritten in place. */
-		putActiveInTransaction(
-			db: Database,
-			input: {
-				conversationId: string;
-				todoId: string;
-				status: "waiting" | "done";
-				at: string;
-				fields: Record<string, unknown>;
-			},
-		) {
-			const text = referenceJson({
-				todo: input.todoId,
-				status: input.status,
-				...input.fields,
-			});
-			putActive(db, {
-				conversationId: input.conversationId,
-				todoId: input.todoId,
-				status: input.status,
-				at: input.at,
-				text,
-				tokens: estimateTextTokens(text),
-			});
-		},
-		removeActiveInTransaction: removeActive,
 		windowVersionInTransaction: (
 			db: Database,
 			conversationId: string,

@@ -2,6 +2,7 @@ import { getLogger } from "../../../infrastructure/logger";
 import type { StewardJobHandler, StewardPayload } from "../contracts";
 import { closeUnit, readUnit, takeRequests, type UnitRow } from "../repository";
 import type { Kick } from "./kick";
+import { noticeInTransaction } from "./notices";
 import type { UnitEnd } from "./unit-end";
 import type {
 	ApplyResult,
@@ -77,14 +78,15 @@ export function createSettle(deps: StewardDeps, kick: Kick, end: UnitEnd) {
 				null)
 			: null;
 		const snapshot = publishes
-			? memory.publishWindowInTransaction(db, conversationId, {
-					...(applied.requestRepublish ? { requestRepublish: true } : {}),
-					...(applied.prefetch ? { prefetch: applied.prefetch } : {}),
-					...(applied.notices.length > 0
-						? { addNotices: applied.notices }
-						: {}),
-				})
+			? memory.publishWindowInTransaction(
+					db,
+					conversationId,
+					applied.requestRepublish ? { requestRepublish: true } : {},
+				)
 			: null;
+		applied.notices.forEach((text, i) =>
+			noticeInTransaction(deps, db, conversationId, text, `${unit.id}:${i}`),
+		);
 		end.record(
 			env,
 			unit,
@@ -135,9 +137,15 @@ export function createSettle(deps: StewardDeps, kick: Kick, end: UnitEnd) {
 					: outcome.type === "expired"
 						? "deadline_exceeded"
 						: "no_input";
-			// Only a real inference failure counts against the targets: a missed deadline (the queue was busy) and a
-			// restart are not their fault, and a new unit follows at once.
-			end.failUnit(env, unit, claim.jobId, code, outcome.type === "failed");
+			// Only a real inference failure counts against the targets: a missed deadline (the queue was busy), a
+			// restart and the conversation taking its connection are not their fault, and a new unit follows.
+			end.failUnit(
+				env,
+				unit,
+				claim.jobId,
+				code,
+				outcome.type === "failed" && code !== "larm_preempted",
+			);
 			return "applied" as const;
 		}
 		const result = outcome.result;

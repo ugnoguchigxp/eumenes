@@ -1,289 +1,58 @@
-import { afterEach, describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { describe, expect, test } from "bun:test";
 import type { LlmPort, LlmRequest } from "eumenes-agency";
-import {
-	createConversationService,
-	migrations,
-} from "../../domains/conversation";
-import type { MemoryItemDto } from "../../domains/memory";
 import { settle, waitFor } from "../../infrastructure/wait-for";
-import { openStore } from "../../infrastructure/sqlite";
-import { createAgencyHost, type AgencySettings } from "./host";
-import { createAgencyWork } from "./work";
-import { AgencyRouteRefusedError } from "./llm-port";
+import { createAgencyHost } from "./host";
+import {
+	type Reply,
+	updated,
+	update,
+	choice,
+	wait,
+	memoryItem,
+	harness,
+	type Harness,
+	exchange,
+} from "./host.fixture";
 
-const T0 = Date.parse("2026-10-22T09:00:00Z");
-const baseSettings: AgencySettings = {
-	enabled: true,
-	resourceId: null,
-	idleSec: 20,
-	maxUnanswered: 1,
-	interests: [],
-	emotion: false,
-};
-
-/** What the fake background model answers for one purpose. */
-type Reply = (request: LlmRequest<unknown>) => unknown | Promise<unknown>;
-const update: Reply = () => ({
-	summary: "s",
-	missingInfo: null,
-	focusRefs: [],
-	ops: [],
-	reconciliations: [],
-});
-const choice = (
-	action: "speak" | "wait",
-	over: { utterance?: string; refs?: string[] } = {},
-) => ({
-	action,
-	candidateRef: null,
-	utterance:
-		action === "speak"
-			? (over.utterance ?? "ねえ、さっきの話の続きは？")
-			: null,
-	toolName: null,
-	toolInput: null,
-	evidenceRefs: over.refs ?? [],
-	valueNow: "v",
-	userBurden: "b",
-	lossIfWait: "l",
-	conflicts: null,
-	reason: "テストの理由",
-});
-const wait: Reply = () => choice("wait");
-
-const memoryItem = (over: Partial<MemoryItemDto>): MemoryItemDto => ({
-	id: "m1",
-	kind: "preference",
-	semanticKey: "k",
-	text: "コーヒーが好き",
-	polarity: "affirmed",
-	status: "active",
-	origin: "agent",
-	revision: 1,
-	sourceMessageIds: [],
-	validFromMs: null,
-	validUntilMs: null,
-	evidence: [],
-	validity: null,
-	capturedBy: "agent",
-	...over,
-});
-
-const cleanups: Array<() => Promise<void>> = [];
-afterEach(async () => {
-	for (const cleanup of cleanups.splice(0)) await cleanup();
-});
-
-function harness(
-	options: {
-		settings?: Partial<AgencySettings>;
-		select?: Reply;
-		update?: Reply;
-		memory?: MemoryItemDto[];
-		busy?: () => boolean;
-		start?: boolean;
-		llm?: (
-			next: Parameters<Parameters<typeof createAgencyHost>[0]["createLlm"]>[0],
-		) => LlmPort;
-	} = {},
-) {
-	const dir = mkdtempSync(join(tmpdir(), "eumenes-agency-host-"));
-	const store = openStore(join(dir, "test.sqlite3"), migrations);
-	const conversation = createConversationService(store, {
-		requireOutbox: true,
-	});
-	let agency: AgencySettings = { ...baseSettings, ...options.settings };
-	const listeners = new Set<() => void>();
-	let now = T0;
-	const timers = new Map<number, { at: number; fn: () => void }>();
-	let timerId = 0;
-	const calls = { update: 0, select: 0, respond: 0 };
-	const requests: LlmRequest<unknown>[] = [];
-	const identities: Array<{ decisionId: string; generation: number }> = [];
-	let select = options.select ?? wait;
-	const inference = { busy: false };
-	const memoryReads = { count: 0 };
-	const host = createAgencyHost({
-		store,
-		conversation,
-		inference: { foregroundBusy: () => inference.busy },
-		settings: {
-			get: () => ({ agency }),
-			inTransaction: () => ({ agency }),
-			onChange: (listener) => {
-				listeners.add(listener);
-				return () => listeners.delete(listener);
-			},
-		},
-		memory: {
-			status: () => ({ enabled: true, healthy: true }),
-			list: () => {
-				memoryReads.count++;
-				return options.memory ?? [];
-			},
-		},
-		conversationBusy: () => options.busy?.() ?? false,
-		recordSpokeInTransaction: () => {},
-		createLlm:
-			options.llm ??
-			((next) => ({
-				async complete<T>(request: LlmRequest<T>) {
-					identities.push(next(request as LlmRequest<unknown>));
-					calls[request.purpose]++;
-					requests.push(request as LlmRequest<unknown>);
-					const reply =
-						request.purpose === "update" ? (options.update ?? update) : select;
-					const value = request.schema.parse(
-						await reply(request as LlmRequest<unknown>),
-					);
-					return {
-						value,
-						model: "fake",
-						inputTokens: 10,
-						outputTokens: 5,
-						cacheReadTokens: 0,
-						latencyMs: 1,
-					};
-				},
-			})),
-		nowMs: () => now,
-		setTimer: (fn, ms) => {
-			timers.set(++timerId, { at: now + ms, fn });
-			return timerId;
-		},
-		clearTimer: (handle) => {
-			timers.delete(handle as number);
-		},
-	});
-	if (options.start !== false) host.start();
-	cleanups.push(async () => {
-		await host.close();
-		await store.close();
-		rmSync(dir, { recursive: true, force: true });
-	});
-	const message = (
-		conversationId: string,
-		id: string,
-		role: "user" | "assistant",
-		text: string,
-		runId: string | null = null,
-	) => ({
-		id,
-		conversationId,
-		role,
-		text,
-		createdAt: new Date(now).toISOString(),
-		runId,
-	});
-	return {
-		store,
-		conversation,
-		host,
-		calls,
-		requests,
-		identities,
-		inference,
-		memoryReads,
-		setSelect: (reply: Reply) => {
-			select = reply;
-		},
-		setAgency: (over: Partial<AgencySettings>) => {
-			agency = { ...agency, ...over };
-			for (const listener of listeners) listener();
-		},
-		/** The committed setting changes before the listeners hear of it. */
-		setAgencyUnannounced: (over: Partial<AgencySettings>) => {
-			agency = { ...agency, ...over };
-		},
-		/** Settings changed somewhere else (cloud allowed, a connection, a model). */
-		announceSettings: () => {
-			for (const listener of listeners) listener();
-		},
-		say: (
-			id: string,
-			role: "user" | "assistant",
-			text: string,
-			runId: string | null = null,
-			conversationId = "c1",
-		) => conversation.append(message(conversationId, id, role, text, runId)),
-		message,
-		texts: (conversationId = "c1") =>
-			conversation.get(conversationId).messages.map((m) => m.id),
-		/** Runs the fake timers due within `ms`, in order, letting each cycle finish. */
-		async advance(ms: number) {
-			const end = now + ms;
-			for (;;) {
-				const due = [...timers.entries()]
-					.filter(([, t]) => t.at <= end)
-					.sort((a, b) => a[1].at - b[1].at)[0];
-				if (!due) break;
-				timers.delete(due[0]);
-				now = Math.max(now, due[1].at);
-				due[1].fn();
-				await settle();
-			}
-			now = end;
-		},
-		pendingTimers: () => timers.size,
-		setNow: (value: number) => {
-			now = value;
-		},
-		advanceClock: (ms: number) => {
-			now += ms;
-		},
-	};
-}
-type Harness = ReturnType<typeof harness>;
-
-/** A user message and the run answer that ends the turn. */
-async function exchange(h: Harness, n: number, conversationId = "c1") {
-	await h.say(`u${n}`, "user", `こんにちは${n}`, null, conversationId);
-	await h.say(`a${n}`, "assistant", `はい${n}`, `run-${n}`, conversationId);
-}
-
-describe("OFF", () => {
-	test("observes nothing, calls no model, appends nothing and leaves the context port empty", async () => {
-		const h = harness({
-			settings: { enabled: false, interests: ["My Melody"] },
-			select: () => choice("speak", { refs: ["u1"] }),
-		});
+describe("start and settings", () => {
+	test("the feed starts at its end: what was said before start is never read", async () => {
+		const h = harness({ start: false });
 		await exchange(h, 1);
+		h.host.start();
 		await settle();
-		await h.advance(10 * 60_000);
-		expect(h.calls).toEqual({ update: 0, select: 0, respond: 0 });
-		expect(h.texts()).toEqual(["u1", "a1"]);
-		expect(h.host.inspect("c1")).toBeNull();
-		expect(h.pendingTimers()).toBe(0);
-		expect(
-			h.store.read((db) =>
-				h.host.dialoguePort.recentForContextInTransaction(db, "c1"),
-			),
-		).toBeNull();
-	});
-
-	test("turning ON starts at the end of the feed and OFF applies at once", async () => {
-		const h = harness({ settings: { enabled: false } });
-		await exchange(h, 1);
-		h.setAgency({ enabled: true });
-		await settle();
-		// What was said before ON is never read.
 		expect(h.host.inspect("c1")).toBeNull();
 		expect(h.calls.select).toBe(0);
 		await exchange(h, 2);
 		await waitFor(() => h.calls.select === 1);
-		const ids = h.host.inspect("c1")?.snapshot.observations.map((o) => o.id);
-		expect(ids).toEqual(["u2", "a2"]);
-		h.setAgency({ enabled: false });
-		expect(h.host.inspect("c1")).toBeNull();
-		await exchange(h, 3);
-		await settle();
-		expect(h.calls.select).toBe(1);
+		expect(
+			h.host.inspect("c1")?.snapshot.observations.map((o) => o.id),
+		).toEqual(["u2", "a2"]);
 	});
 
-	test("switching OFF while a decision is pending appends nothing", async () => {
+	test("a change of the agency settings applies at once: every conversation starts over", async () => {
+		const h = harness();
+		await exchange(h, 1);
+		await waitFor(() => h.calls.select === 1);
+		expect(h.host.inspect("c1")).not.toBeNull();
+		h.setAgency({ idleSec: 30 });
+		expect(h.host.inspect("c1")).toBeNull();
+		// What was said before the change is not read again; what follows is.
+		await exchange(h, 2);
+		await waitFor(() => h.calls.select === 2);
+		expect(
+			h.host.inspect("c1")?.snapshot.observations.map((o) => o.id),
+		).toEqual(["u2", "a2"]);
+	});
+
+	test("settings that are not the agency's change nothing", async () => {
+		const h = harness();
+		await exchange(h, 1);
+		await waitFor(() => h.calls.select === 1);
+		h.announceSettings();
+		expect(h.host.inspect("c1")).not.toBeNull();
+	});
+
+	test("switching the settings while a decision is pending appends nothing", async () => {
 		let release: () => void = () => {};
 		const gate = new Promise<void>((resolve) => (release = resolve));
 		const h = harness({
@@ -294,7 +63,7 @@ describe("OFF", () => {
 		});
 		await exchange(h, 1);
 		await waitFor(() => h.calls.select === 1);
-		h.setAgency({ enabled: false });
+		h.setAgency({ interests: ["My Melody"] });
 		release();
 		await settle();
 		expect(h.texts()).toEqual(["u1", "a1"]);
@@ -451,6 +220,17 @@ describe("delivery", () => {
 			source: "host",
 			emotion: "none",
 			tone: "natural",
+		});
+		// Every other feeling keeps its name as the delivery emotion.
+		const joy = harness({
+			settings: { emotion: true },
+			select: () => ({ ...choice("speak", { refs: ["u1"] }), emotion: "😊" }),
+		});
+		await exchange(joy, 1);
+		await waitFor(() => joy.texts().length === 3);
+		expect(joy.conversation.get("c1").messages[2]?.delivery).toMatchObject({
+			source: "host",
+			emotion: "joy",
 		});
 		const plain = harness({
 			settings: { emotion: true },
@@ -648,87 +428,86 @@ describe("idle", () => {
 	});
 });
 
-describe("route", () => {
-	test("a refused cloud route stops agency for the conversation and never falls back", async () => {
-		let attempts = 0;
-		const h = harness({
-			llm: () => ({
-				async complete() {
-					attempts++;
-					throw new AgencyRouteRefusedError("cloud_not_allowed");
-				},
-			}),
-		});
-		await exchange(h, 1);
-		await waitFor(() => h.host.inspect("c1")?.stopped !== null);
-		expect(h.host.inspect("c1")?.stopped).toBe(
-			"route_refused:cloud_not_allowed",
-		);
-		const seen = attempts;
-		await exchange(h, 2);
-		await settle();
-		await h.advance(3_600_000);
-		expect(attempts).toBe(seen);
-		expect(h.texts()).toEqual(["u1", "a1", "u2", "a2"]);
-	});
-
-	test("changing the settings clears the stop", async () => {
-		let refuse = true;
-		const h = harness({
-			llm: () => ({
-				async complete() {
-					if (refuse) throw new AgencyRouteRefusedError("resource_missing");
-					throw new Error("not reached in this test");
-				},
-			}),
-		});
-		await exchange(h, 1);
-		await waitFor(() => h.host.inspect("c1")?.stopped !== null);
-		refuse = false;
-		h.setAgency({ resourceId: "11111111-1111-4111-8111-111111111111" });
-		expect(h.host.inspect("c1")).toBeNull();
-	});
+/** An update op that writes one note (the agency's own concern) as the model's flat wire form. */
+const noteOp = (localId: string, text: string) => ({
+	op: "note.add",
+	id: null,
+	localId,
+	expectedRevision: null,
+	state: null,
+	text,
+	reason: null,
+	completionCondition: null,
+	resumeCondition: null,
+	withdrawCondition: null,
+	applyWhen: null,
+	hours: null,
+	intentRef: null,
+	desireRef: null,
+	supersedes: null,
+	kind: null,
+	confidence: null,
+	toolName: null,
+	toolInput: null,
+	evidenceRefs: ["u1"],
+	beliefRefs: [],
 });
+const notes =
+	(...texts: string[]): Reply =>
+	() =>
+		updated({ ops: texts.map((text, index) => noteOp(`n${index + 1}`, text)) });
 
 describe("context port", () => {
-	test("shows what was said on its own since the user's previous message, and the interests", async () => {
-		const h = harness({
-			settings: { interests: ["My Melody"] },
-			select: () => choice("speak", { refs: ["u1"] }),
-		});
-		const recent = () =>
-			h.store.read((db) =>
-				h.host.dialoguePort.recentForContextInTransaction(db, "c1"),
-			);
-		await exchange(h, 1);
-		await waitFor(() => h.texts().length === 3);
-		await h.say("u2", "user", "なあに");
-		expect(recent()?.interests).toEqual(["My Melody"]);
-		expect(recent()?.utterances.map((u) => [u.text, u.heard])).toEqual([
-			["ねえ、さっきの話の続きは？", "full"],
-		]);
-		// Answered in the next turn: no longer shown.
-		await h.say("a2", "assistant", "うん", "run-2");
-		await h.say("u3", "user", "ありがとう");
-		expect(recent()?.utterances).toEqual([]);
-		expect(recent()?.interests).toEqual(["My Melody"]);
-	});
+	const state = (h: Harness, id = "c1") =>
+		h.store.read((db) =>
+			h.host.dialoguePort.stateForContextInTransaction(db, id),
+		);
 
-	test("is empty without utterances and interests", async () => {
-		const h = harness();
+	test("shows the agent's own concerns as lines for the context's now.agency, and no more than the bound", async () => {
+		const h = harness({
+			update: notes("猫の話をもう一度聞く"),
+		});
 		await exchange(h, 1);
 		await waitFor(() => h.calls.select === 1);
-		expect(
-			h.store.read((db) =>
-				h.host.dialoguePort.recentForContextInTransaction(db, "c1"),
-			),
-		).toBeNull();
+		await settle();
+		expect(state(h)).toEqual(["[note] 猫の話をもう一度聞く"]);
+		// An update writes a few notes at a time; three turns make nine.
+		let written = 0;
+		const many = harness({
+			update: () =>
+				updated({
+					ops: Array.from({ length: 3 }, () => {
+						written++;
+						return noteOp(`n${written}`, `関心${written}`);
+					}),
+				}),
+		});
+		for (const n of [1, 2, 3]) {
+			await exchange(many, n);
+			await waitFor(() => many.calls.update === n);
+			await settle();
+			many.advanceClock(60_000);
+		}
+		const lines = state(many);
+		expect(lines).toHaveLength(8);
+		expect(lines.slice(0, 7).every((line) => line.startsWith("[note] "))).toBe(
+			true,
+		);
+		expect(lines[7]).toBe("(ほか 2 件)");
+	});
+
+	test("is empty when the agent has no concern yet, and for a conversation the host does not track", async () => {
+		const h = harness({ settings: { interests: ["My Melody"] } });
+		await exchange(h, 1);
+		await waitFor(() => h.calls.select === 1);
+		// The standing interests are in the system text, not in the changing state.
+		expect(state(h)).toEqual([]);
+		expect(state(h, "never-seen")).toEqual([]);
 	});
 });
 
 /** A model port that answers like the harness default and enforces inference's per-subject idempotency. */
 function strictLlm(
-	h: { refuse?: () => boolean } = {},
 	log: { ids: string[]; conflicts: number } = { ids: [], conflicts: 0 },
 ) {
 	return {
@@ -744,8 +523,6 @@ function strictLlm(
 					throw new Error("background_control_conflict");
 				}
 				log.ids.push(identity.decisionId);
-				if (h.refuse?.())
-					throw new AgencyRouteRefusedError("cloud_not_allowed");
 				const value = request.schema.parse(
 					request.purpose === "update"
 						? update(request as never)
@@ -814,28 +591,6 @@ describe("review fixes", () => {
 		expect(h.texts()).toEqual(["u1", "a1"]);
 	});
 
-	test("a stopped conversation gets a fresh start when settings change elsewhere", async () => {
-		let refuse = true;
-		const strict = strictLlm({ refuse: () => refuse });
-		const h = harness({ llm: strict.llm });
-		await exchange(h, 1);
-		await waitFor(() => h.host.inspect("c1")?.stopped !== null);
-		expect(h.host.inspect("c1")?.idle.blockedBy).toBe("stopped");
-		refuse = false;
-		h.announceSettings();
-		const fresh = h.host.inspect("c1");
-		expect(fresh?.stopped).toBeNull();
-		expect(fresh?.idle.blockedBy).toBeNull();
-		await exchange(h, 2);
-		await waitFor(
-			() => (h.host.inspect("c1")?.snapshot.observations.length ?? 0) >= 2,
-		);
-		await waitFor(
-			() => strict.log.ids.filter((id) => id.includes("select")).length >= 1,
-		);
-		expect(h.host.inspect("c1")?.stopped).toBeNull();
-	});
-
 	test("a retraction gives the conversation a new idle planner", async () => {
 		const h = harness();
 		await exchange(h, 1);
@@ -866,8 +621,8 @@ describe("review fixes", () => {
 		});
 		await exchange(h, 1);
 		await waitFor(() => h.calls.select === 1);
-		// OFF is committed but the change has not been announced yet.
-		h.setAgencyUnannounced({ enabled: false });
+		// A new setting is committed but the change has not been announced yet.
+		h.setAgencyUnannounced({ interests: ["My Melody"] });
 		release();
 		await waitFor(
 			() => h.host.inspect("c1")?.snapshot.state.attempts.length === 1,
@@ -917,26 +672,6 @@ describe("review fixes", () => {
 		expect(h.memoryReads.count).toBe(3);
 	});
 
-	test("a corrected agency utterance updates what the host remembers saying", async () => {
-		const h = harness({
-			settings: { interests: ["x"] },
-			select: () => choice("speak", { refs: ["u1"] }),
-		});
-		await exchange(h, 1);
-		await waitFor(() => h.texts().length === 3);
-		const id = h.texts()[2] as string;
-		await h.conversation.correct({ messageId: id, text: "言い直しました" });
-		await waitFor(
-			() => h.host.inspect("c1")?.delivered[0]?.text === "言い直しました",
-		);
-		await h.say("u2", "user", "なあに");
-		expect(
-			h.store.read((db) =>
-				h.host.dialoguePort.recentForContextInTransaction(db, "c1"),
-			)?.utterances[0]?.text,
-		).toBe("言い直しました");
-	});
-
 	test("idle conversations are forgotten and the tracked set is bounded", async () => {
 		const h = harness();
 		await h.say("u1", "user", "やあ", null, "old");
@@ -958,69 +693,5 @@ describe("review fixes", () => {
 		expect(tracked.length).toBeLessThanOrEqual(20);
 		// The newest (active) one stays.
 		expect(h.host.inspect("conv-24")).not.toBeNull();
-	});
-
-	test("the context layer shows only for conversations the host tracks", async () => {
-		const h = harness({ settings: { interests: ["My Melody"] } });
-		await exchange(h, 1);
-		await waitFor(() => h.calls.select === 1);
-		const recent = (id: string) =>
-			h.store.read((db) =>
-				h.host.dialoguePort.recentForContextInTransaction(db, id),
-			);
-		expect(recent("c1")?.interests).toEqual(["My Melody"]);
-		expect(recent("never-seen")).toBeNull();
-	});
-});
-
-describe("TODOs offered to the agency", () => {
-	const todo = (id: string, status: "todo" | "waiting" | "done") => ({
-		id,
-		title: `仕事 ${id}`,
-		status,
-		revision: 1,
-		createdAt: new Date(T0).toISOString(),
-		updatedAt: new Date(T0).toISOString(),
-	});
-	test("only the open TODOs of the dialogue ledger reach the decision; finished ones never do", async () => {
-		const h = harness();
-		const asked: string[] = [];
-		h.host.attachWork(
-			createAgencyWork({
-				dialogue: {
-					todosInTransaction: (_db, conversationId) => {
-						asked.push(conversationId);
-						return [
-							todo("open1", "todo"),
-							todo("ask1", "waiting"),
-							todo("done1", "done"),
-						];
-					},
-				},
-			}),
-		);
-		await exchange(h, 1);
-		await waitFor(() => h.calls.select === 1);
-		const prompt = String(h.requests.at(-1)?.prompt ?? "");
-		expect(asked).toContain("c1");
-		expect(prompt).toContain("仕事 open1");
-		expect(prompt).toContain("仕事 ask1");
-		expect(prompt).not.toContain("仕事 done1");
-	});
-
-	test("a failing ledger read offers no TODOs and does not stop the cycle", async () => {
-		const h = harness();
-		h.host.attachWork(
-			createAgencyWork({
-				dialogue: {
-					todosInTransaction: () => {
-						throw new Error("ledger_unavailable");
-					},
-				},
-			}),
-		);
-		await exchange(h, 1);
-		await waitFor(() => h.calls.select === 1);
-		expect(String(h.requests.at(-1)?.prompt ?? "")).not.toContain("[todo:");
 	});
 });

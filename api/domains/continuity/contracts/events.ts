@@ -79,18 +79,6 @@ export type EpisodeSegment = {
 	messageIds: string[];
 };
 
-/** A work result held for one TODO (overwritten in place, removed when the TODO is archived). */
-export type ActiveSlot = {
-	conversationId: string;
-	todoId: string;
-	position: number;
-	/** `waiting`: it holds the sub-agent's question; `done`: the result. */
-	status: "waiting" | "done";
-	at: string;
-	text: string;
-	tokens: number;
-};
-
 /** The window version: it changes only at a re-construction or an immediate change, never on an append. */
 export type WindowVersion = {
 	conversationId: string;

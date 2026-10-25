@@ -57,10 +57,7 @@ const refOf = (data: Record<string, unknown>, text: string) =>
 	(data.longTerm as Array<{ ref: string; text: string }>).find((e) =>
 		e.text.includes(text),
 	)!.ref;
-const noticeTexts = (h: StewardHarness) =>
-	h.store
-		.read((db) => h.memory.windows.storedInTransaction(db, "c1"))!
-		.notices.map((n) => n.text);
+const noticeTexts = (h: StewardHarness) => h.notices();
 const resultsOf = (h: StewardHarness) =>
 	h.steward
 		.decisions("c1")

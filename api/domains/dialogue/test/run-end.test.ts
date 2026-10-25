@@ -56,10 +56,8 @@ test("a cancelled run tells the steward it was cancelled, and its waiting TODO e
 	expect(todo).toMatchObject({ status: "todo" });
 	await h.dialogue.cancel(waiting.id);
 	expect(h.dialogue.get(waiting.id)?.status).toBe("cancelled");
-	// A finished TODO stays listed until it is archived (section 10.1), now done as cancelled.
-	expect(h.todos()).toMatchObject([
-		{ id: todo!.id, status: "done", outcome: "cancelled" },
-	]);
+	// The TODO ends with the run as cancelled; cancelled work is not reported back, so it is archived at once.
+	expect(h.todos()).toEqual([]);
 	expect(h.state.runEnds.filter((e) => e.runId === waiting.id)).toEqual([
 		{ runId: waiting.id, conversationId: "main", state: "cancelled" },
 	]);

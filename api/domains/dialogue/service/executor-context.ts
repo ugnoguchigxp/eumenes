@@ -6,7 +6,11 @@ import { jstSeconds } from "../../../infrastructure/jst-time";
 import type { Run } from "../contracts";
 import type { QueryVector, ToolchainRoute } from "../contracts/toolchains";
 import { byId } from "../repository";
-import type { DialogueDeps, GenerateInput } from "./context";
+import {
+	NEWEST_MESSAGES_AT,
+	type DialogueDeps,
+	type GenerateInput,
+} from "./context";
 import { operationRejection } from "./operation-authority";
 import { consumeAnswer } from "./result-intake";
 
@@ -81,11 +85,14 @@ export function createExecutorContext(
 		instant: { card: ToolchainCard; inputs: Record<string, unknown> } | null;
 		/** The newest model call's receipt: its permission is checked again before every action. */
 		receipt: Receipt | undefined;
+		/** Each TODO's revision as the model last saw it (`<state>`, then the work tool's results). */
+		todoRevisions: Map<string, number>;
 	} = {
 		search: null,
 		handover: null,
 		instant: null,
 		receipt: undefined,
+		todoRevisions: new Map(Object.entries(input.todoRevisions)),
 	};
 	/** The user's messages this generation acts on: every action, TODO and confirmation it makes comes from them. */
 	const origin = [
@@ -105,7 +112,7 @@ export function createExecutorContext(
 	const at = () => jstSeconds(Date.parse(clock()));
 	const utteranceText = () =>
 		input.messages
-			.slice(2)
+			.slice(NEWEST_MESSAGES_AT)
 			.filter((message) => message.role === "user")
 			.map((message) => message.content)
 			.join("\n");
@@ -183,7 +190,7 @@ export class HandoverRefused extends Error {
 
 /**
  * The adoption a handover stands in for (the generation ends there), before the work is dispatched: the
- * sub-agent's answer it spoke of is consumed, the memory window it read is recorded and its notices are cleared.
+ * sub-agent's answer it spoke of is consumed and the memory window it read is recorded.
  */
 export function adoptHere(x: ExecutorContext, tx: Database, run: Run) {
 	const { deps, input } = x;
@@ -192,11 +199,6 @@ export function adoptHere(x: ExecutorContext, tx: Database, run: Run) {
 	if (input.memory && deps.memory) {
 		const adopted = adoptMemoryWindow(deps.memory, tx, run, input.memory);
 		if (!adopted.ok) throw new Error(adopted.reason);
-		deps.memory.clearNoticesInTransaction(
-			tx,
-			run.conversationId,
-			input.memory.window.noticeIds,
-		);
 	}
 }
 

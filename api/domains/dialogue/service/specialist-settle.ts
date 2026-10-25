@@ -17,7 +17,7 @@ import {
 	type DialogueDeps,
 	type SpecialistTurnPayload,
 } from "./context";
-import { endRun, type RunEndState } from "./run-end";
+import { acceptRunAnswer, endRun, type RunEndState } from "./run-end";
 import { traceFailure, traceOutcome } from "./selection-outcome";
 import {
 	blockSpecialistMessages,
@@ -170,18 +170,6 @@ export function settleSpecialistTurn(
 		return done ? "applied" : "stale";
 	}
 	return settleHandback(deps, tx, run, session, action);
-}
-
-/**
- * The specialist, not the conversation's model, answers the run: after its receipts are accepted (they
- * stand on the run's answer request while it is pending), that request is accepted as the host's answer,
- * so the speech standing on it proceeds as for a model answer. Without this a spoken request addressed to
- * the specialist ended `permission_revoked` before its reply was spoken.
- */
-function acceptRunAnswer(deps: DialogueDeps, tx: Database, run: Run): boolean {
-	const requestId = deps.larm.requestFor?.(tx, run.id, "llm");
-	if (!requestId || !deps.larm.acceptHostAnswerInTransaction) return true;
-	return deps.larm.acceptHostAnswerInTransaction(tx, requestId);
 }
 
 /** return / discard: the turn gives the work back; the session is suspended or ended. */

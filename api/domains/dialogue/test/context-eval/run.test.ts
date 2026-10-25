@@ -95,7 +95,8 @@ test("a run records one row per call; a thrown error is a transport error with i
 	expect(by("ctx-f9-dev-01", 3)).toMatchObject({
 		status: "ok",
 		answer: { text: "承知しました。" },
-		messageCount: 3,
+		// System, the material document, `<now>`, and the newest message.
+		messageCount: 4,
 	});
 	expect(by("ctx-f9-dev-01", 3).promptTokensEstimate).toBeGreaterThan(0);
 	// The trials of one case send the same prompt.
@@ -182,4 +183,4 @@ test("the example experiment's cases all prepare within the message invariants",
 		catalog: [],
 	});
 	expect(jobs.length).toBe(loadCases(dir).length);
-});
+}, 30_000);

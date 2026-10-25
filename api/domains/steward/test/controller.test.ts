@@ -29,10 +29,7 @@ test("the decisions and the event log are read over HTTP", async () => {
 	);
 	expect(decisions.status).toBe(200);
 	const body = (await decisions.json()) as { items: Array<{ step: string }> };
-	expect(body.items.map((d) => d.step)).toEqual([
-		"prepare-recall",
-		"curate-memory",
-	]);
+	expect(body.items.map((d) => d.step)).toEqual(["curate-memory"]);
 
 	const events = await app.request("/api/steward/events?conversationId=c1");
 	const log = (await events.json()) as {

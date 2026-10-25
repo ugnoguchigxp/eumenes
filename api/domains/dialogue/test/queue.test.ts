@@ -65,7 +65,8 @@ test("utterances pending together are one generation; a run with nothing left to
 	await waitFor(() => h!.dialogue.get(b.id)?.status === "cancelled");
 	// One call carried both utterances, each as its own newest message, with the time it was said.
 	expect(h.state.calls).toHaveLength(1);
-	const newest = h.state.calls[0]!.messages.slice(2).map((m) => m.content);
+	// System, the material document and `<now>` come first; the newest messages follow (layout specification, section 5).
+	const newest = h.state.calls[0]!.messages.slice(3).map((m) => m.content);
 	expect(newest).toHaveLength(2);
 	expect(newest[0]).toMatch(/^\[.+\] A$/);
 	expect(newest[1]).toMatch(/^\[.+\] B$/);

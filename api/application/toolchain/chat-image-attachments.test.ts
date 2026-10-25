@@ -2,7 +2,9 @@ import { expect, test } from "bun:test";
 import { CONVERSATION_WINDOW_TOKENS } from "./conversation-script.fixture";
 
 /** The fixture connection with the conversation's context window. */
-const conversationModel = <T extends { llmContextWindow?: unknown }>(port: T) => ({
+const conversationModel = <T extends { llmContextWindow?: unknown }>(
+	port: T,
+) => ({
 	...port,
 	llmContextWindow: () => CONVERSATION_WINDOW_TOKENS,
 });

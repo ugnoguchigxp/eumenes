@@ -75,7 +75,6 @@ function sources(
 		profile: [],
 		episode: [],
 		log,
-		active: [],
 		state: {
 			todos: [],
 			pendingConfirmation: [],
@@ -84,18 +83,10 @@ function sources(
 			goals: [],
 			newMemories: [],
 		},
-		now: {
-			at: "2026-10-23T09:00:00+09:00",
-			trigger: [{ kind: "utterance", events: [] }],
-			speaking: null,
-			notices: [],
-			recall: [],
-			agency: [],
-			records: [],
-		},
-		work: [],
 	};
 }
+
+const NO_REFS = { todo: () => null, confirmation: () => null };
 
 export type CacheInput = {
 	/** System, the material document, then the newest message: the product's layout of a generation. */
@@ -139,7 +130,11 @@ export function cacheInput(
 				loggedEvent(i + 2, i % 2 === 0 ? "agent" : "user", FILLER),
 			),
 		];
-		const document = renderDocument(sources(log, notes), 0);
+		const document = renderDocument(sources(log, notes), {
+			profileLimit: 0,
+			refs: NO_REFS,
+			year: "2026",
+		});
 		const messages: ChatMessage[] = [
 			{ role: "system", content: system },
 			{ role: "user", content: document.text },
@@ -151,5 +146,9 @@ export function cacheInput(
 		estimateMessageTokens(build(2).messages) -
 		estimateMessageTokens(build(1).messages);
 	const base = estimateMessageTokens(build(0).messages);
-	return build(Math.max(0, Math.ceil((targetTokens - base) / perEvent)));
+	// The first event also brings its date line: the estimate is met by counting up from the computed padding.
+	let padding = Math.max(0, Math.ceil((targetTokens - base) / perEvent));
+	while (estimateMessageTokens(build(padding).messages) < targetTokens)
+		padding++;
+	return build(padding);
 }

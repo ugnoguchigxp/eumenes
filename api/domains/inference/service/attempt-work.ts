@@ -59,7 +59,9 @@ export function callOptionsFor(r: Request, attemptId: string): LarmCallOptions {
 					},
 				}
 			: {}),
-		...(r.outputContract || (r.row.mode === "control" && !r.tools?.length)
+		// A control call answers in JSON; tools it may not call (`none`) only keep the conversation's prefix.
+		...(r.outputContract ||
+		(r.row.mode === "control" && (!r.tools?.length || r.toolChoice === "none"))
 			? controlJsonOptions(
 					r.outputContract ?? r.control,
 					!!r.outputContract || r.row.structuredOutput,

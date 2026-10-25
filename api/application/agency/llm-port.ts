@@ -6,6 +6,7 @@ import {
 	type LlmResult,
 } from "eumenes-agency";
 import { z } from "zod";
+import type { NativeTool } from "../../infrastructure/chat-stream";
 import type { InferencePort } from "../../domains/inference";
 import { toErrorCode } from "../../infrastructure/error-code";
 import { LlmJsonError, parseLlmJson } from "../../infrastructure/llm-json";
@@ -29,6 +30,8 @@ export type AgencyCallIdentity = {
 	decisionId: string;
 	/** The host's execution generation (positive); bumped when input invalidates background work. */
 	generation: number;
+	/** The conversation the call is about: its prompt prefix is shared when `prefix` gives one. */
+	conversationId?: string;
 };
 
 export type AgencyLlmPortDeps = {
@@ -43,13 +46,22 @@ export type AgencyLlmPortDeps = {
 	> &
 		Pick<InferencePort, "rejectControlInTransaction">;
 	next(request: LlmRequest<unknown>): AgencyCallIdentity;
+	/**
+	 * The prefix the conversation's generations send (system, tool definitions, document; the ContextWindow layout
+	 * specification, section 8.2). With one, the call is that prefix and then its own task, on the conversation's
+	 * connection; absent or null, the call is its own system and prompt.
+	 */
+	prefix?(conversationId: string): {
+		messages: Array<{ role: "system" | "user"; content: string }>;
+		tools: NativeTool[];
+	} | null;
 	/** Token counts and model of the served attempt (the receipt carries none). Absent: zeros. */
 	attemptUsage?(attemptId: string): AgencyAttemptUsage | null;
 	nowMs?(): number;
 };
 
 const TRANSIENT =
-	/^(deadline_exceeded|local_timeout|network_unavailable|larm_connection_failed|larm_(control|inference)_(429|502|503|504))$/;
+	/^(deadline_exceeded|local_timeout|network_unavailable|larm_preempted|larm_connection_failed|larm_(control|inference)_(429|502|503|504))$/;
 
 /** Maps an inference failure to the core's call error; an abort of the caller's signal propagates as is. */
 function callError(error: unknown, signal: AbortSignal): never {
@@ -100,17 +112,39 @@ export function createAgencyLlmPort(deps: AgencyLlmPortDeps): LlmPort {
 				throw new LlmCallError(toErrorCode(error, "capture_failed"), false);
 			}
 
+			const conversationId = identity.conversationId;
+			const prefix =
+				conversationId && deps.prefix ? deps.prefix(conversationId) : null;
 			const started = nowMs();
 			let receipt: Awaited<ReturnType<typeof inference.executeControl>>;
 			try {
 				receipt = await inference.executeControl(
 					requestId,
-					[{ role: "user", content: request.prompt }],
+					prefix
+						? [
+								...prefix.messages,
+								{
+									role: "user",
+									content: `<task name="agency.${request.purpose}">\n${request.system}\n\n${request.prompt}\n</task>`,
+								},
+							]
+						: [
+								{ role: "system", content: request.system },
+								{ role: "user", content: request.prompt },
+							],
 					AbortSignal.any([
 						signal,
 						AbortSignal.timeout(BACKGROUND_DEADLINE_MS),
 					]),
 					{ instructions: request.system, outputSchema },
+					prefix
+						? {
+								sessionRole: "auxiliary",
+								onConversation: true,
+								prefixTools: prefix.tools,
+								toolChoice: "none",
+							}
+						: undefined,
 				);
 			} catch (error) {
 				return callError(error, signal);

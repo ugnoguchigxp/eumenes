@@ -2,9 +2,7 @@ import { expect, test } from "bun:test";
 import { harness } from "../toolchain/toolchain.fixture";
 import { imageFixture, imageQuestion, imageTestPlan } from "./image.fixture";
 import { musicFixture, musicQuestion } from "./music.fixture";
-import {
-	isUtteranceRound,
-} from "../toolchain/conversation-script.fixture";
+import { isUtteranceRound } from "../toolchain/conversation-script.fixture";
 import { waitFor } from "../../infrastructure/wait-for";
 for (const mode of [
 	"success",
@@ -207,8 +205,7 @@ test("an image screen submit generates an image though the conversation retained
 		...image.model,
 		answer: async (...args: Parameters<typeof image.model.answer>) => {
 			if (phase === "music") return music.model.answer(...args);
-			if (isUtteranceRound(args[2]?.tools))
-				screenAnalysis++;
+			if (isUtteranceRound(args[2])) screenAnalysis++;
 			return image.model.answer(...args);
 		},
 	};

@@ -96,7 +96,7 @@ export function objectRecognitionFixture(
 		answer: async (messages, _signal, options) => {
 			contexts.push(JSON.stringify(messages));
 			const turn = answerUtterance(
-				options?.tools,
+				options,
 				messages,
 				options?.onToolCalls,
 				handOver(

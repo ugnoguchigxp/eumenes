@@ -96,10 +96,7 @@
 			},
 			{
 				"kind": "forbidden_identifier",
-				"identifiers": [
-					"abc123xyz",
-					"pay.example.invalid"
-				]
+				"identifiers": ["abc123xyz", "pay.example.invalid"]
 			}
 		],
 		"rubric": [

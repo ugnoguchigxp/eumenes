@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { waitFor } from "../../../infrastructure/wait-for";
-import { IMAGE, setup, type Harness } from "./generation.fixture";
+import { IMAGE, sectionLines, setup, type Harness } from "./generation.fixture";
 import { saveItem } from "./memory-seed";
 
 /**
@@ -58,11 +58,7 @@ test("check reads a TODO's state and result into the tool result, and logs only 
 			calls: [
 				{
 					name: "work",
-					args: {
-						todo: todo!.id,
-						operation: "check",
-						revision: todo!.revision,
-					},
+					args: { todo: `t${todo!.ref}`, operation: "check" },
 				},
 			],
 		},
@@ -72,7 +68,9 @@ test("check reads a TODO's state and result into the tool result, and logs only 
 	const checked = toolResults(h.state.calls.length - 1).at(-1);
 	expect(checked).toMatchObject({
 		ok: true,
-		todo: { id: todo!.id, status: "done", outcome: "succeeded" },
+		todo: `t${todo!.ref}`,
+		status: "done",
+		outcome: "succeeded",
 	});
 	expect(checked).toHaveProperty("result");
 	expect(h.log().some((e) => h!.fields(e).action === "work.check")).toBe(true);
@@ -85,11 +83,7 @@ test("a check of an unknown TODO is refused with todo_not_found and changes noth
 			calls: [
 				{
 					name: "work",
-					args: {
-						todo: "00000000-0000-4000-8000-000000000000",
-						operation: "check",
-						revision: 0,
-					},
+					args: { todo: "t99", operation: "check" },
 				},
 			],
 		},
@@ -123,27 +117,34 @@ test("a stale revision is refused with revision_stale and the current state, not
 		},
 	);
 	const waiting = await h.say("猫の絵を描いて", "queued");
-	const [todo] = h.todos();
 	h.state.steps.push(
-		{
-			calls: [
-				{
-					name: "work",
-					args: {
-						todo: todo!.id,
-						operation: "cancel",
-						revision: todo!.revision + 5,
-					},
-				},
-			],
-		},
+		{ calls: [{ name: "work", args: { todo: "t1", operation: "cancel" } }] },
 		{ text: "確認します。" },
 	);
-	await h.say("やっぱり取り消して");
+	// The state of the call is fixed when it is made (revision 1). The model call is held, the TODO's revision moves on
+	// meanwhile (the owner's report bumps it; the job itself cannot run behind the held generation), and the cancel
+	// is then looked at against the revision the model saw.
+	let release!: () => void;
+	h.state.gate = new Promise<void>((resolve) => (release = resolve));
+	const calls = h.state.calls.length;
+	const cancelling = h.say("やっぱり取り消して");
+	await waitFor(() => h!.state.calls.length > calls);
+	await h.store.write((db) =>
+		db
+			.query("UPDATE dialogue_work SET revision = revision + 1 WHERE id = ?")
+			.run(h!.todos()[0]!.id),
+	);
+	h.state.gate = null;
+	release();
+	await cancelling;
 	expect(toolResults(h.state.calls.length - 1)[0]).toMatchObject({
 		ok: false,
 		code: "revision_stale",
+		todo: "t1",
+		status: "todo",
 	});
+	// Nothing is executed: the TODO is still open and the run it waits on still waits.
+	expect(h.todos()).toMatchObject([{ ref: 1, status: "todo" }]);
 	expect(h.dialogue.get(waiting.id)?.status).toBe("queued");
 });
 
@@ -181,14 +182,6 @@ test("an approval is refused when the confirmation statement was not heard at al
 	await h.store.write((db) =>
 		h!.dialogue.recordHeardInTransaction(db, confirmRun.id, "none"),
 	);
-	const confirmationId = h.store.read(
-		(db) =>
-			(
-				db.query("SELECT id FROM dialogue_confirmations").get() as {
-					id: string;
-				}
-			).id,
-	);
 	h.state.steps.push(
 		{
 			calls: [
@@ -196,7 +189,7 @@ test("an approval is refused when the confirmation statement was not heard at al
 					name: "delegate",
 					args: {
 						mode: "approve",
-						confirmation: confirmationId,
+						confirmation: "c1",
 						announcement: "差し替えます。",
 					},
 				},
@@ -253,14 +246,6 @@ test("an irreversible confirmation heard only in part is not enough to approve",
 			"削除して",
 		),
 	);
-	const confirmationId = h.store.read(
-		(db) =>
-			(
-				db.query("SELECT id FROM dialogue_confirmations").get() as {
-					id: string;
-				}
-			).id,
-	);
 	h.state.steps.push(
 		{
 			calls: [
@@ -268,7 +253,7 @@ test("an irreversible confirmation heard only in part is not enough to approve",
 					name: "delegate",
 					args: {
 						mode: "approve",
-						confirmation: confirmationId,
+						confirmation: "c1",
 						announcement: "消します。",
 					},
 				},
@@ -365,7 +350,8 @@ test("a reported TODO is archived at once when its reply was heard in full (a te
 		}),
 	);
 	expect(h.todos()).toEqual([]);
-	expect(h.active()).toEqual([]);
+	// The result stays in the log as its own line; archiving only takes the TODO out of the state.
+	expect(h.results()).toHaveLength(1);
 	expect(
 		h.log().filter((e) => h!.fields(e).action === "work.archived"),
 	).toHaveLength(1);
@@ -407,7 +393,8 @@ test("a reported TODO whose reply is still being played requests the archive, an
 	expect(
 		h.log().find((e) => h!.fields(e).action === "work.archive_unconfirmed"),
 	).toMatchObject({ type: "acted", by: "host" });
-	expect(h.active()).toHaveLength(1);
+	// Both reports are log lines; the partially heard one stays in the state, done and unarchived.
+	expect(h.results()).toHaveLength(2);
 });
 
 test("a TODO that is not done, or belongs to no reply of the conversation, is never archived by a report", async () => {
@@ -467,14 +454,13 @@ test("an agency utterance is recorded as a spontaneous said event, and the next 
 	expect(h.fields(spontaneous!)).toMatchObject({
 		text: "そういえば、紅葉の見頃みたいですよ。",
 	});
-	const document = JSON.parse(h.state.calls[0]!.messages[1]!.content) as {
-		log: Array<{ text?: string; origin?: string }>;
-	};
+	// The material document (its second message) shows it as a line of the log, marked as spontaneous.
+	const document = h.state.calls[0]!.messages[1]!.content;
 	expect(
-		document.log.some(
-			(e) =>
-				e.text === "そういえば、紅葉の見頃みたいですよ。" &&
-				e.origin === "spontaneous",
+		sectionLines(document, "log").some((line) =>
+			/^e\d+ \d{2}:\d{2} 自分（自分から）: そういえば、紅葉の見頃みたいですよ。$/.test(
+				line,
+			),
 		),
 	).toBe(true);
 });
@@ -535,15 +521,55 @@ test("a memory read returns the long-term items that match, and logs the read", 
 		semanticKey: "food.spicy",
 		text: "辛いものが好き",
 	});
+	// The re-construction publishes the saved item into the profile: `<memory>` shows it as p1.
+	await h.store.write((db) =>
+		h!.memory!.republishWindowInTransaction(db, "main"),
+	);
 	await h.say("私の好みは？");
 	const read = toolResults(h.state.calls.length - 1)[0] as {
-		items: Array<{ id: string; inProfile: boolean; text?: string }>;
+		items: Array<Record<string, unknown>>;
 	};
-	// The item is already in the profile the window shows, so the read names it without repeating its text (section 14).
-	expect(read.items).toEqual([{ id: saved.id, inProfile: true }]);
+	// The item is already in the profile the window shows, so the read names its number without repeating its text.
+	expect(read.items).toEqual([{ item: "p1", inProfile: true }]);
+	expect(
+		sectionLines(
+			h.state.calls[h.state.calls.length - 1]!.messages[1]!.content,
+			"memory",
+		).some((line) => line.startsWith("p1 ") && line.includes(saved.text)),
+	).toBe(true);
 	expect(
 		h.log().find((e) => h!.fields(e).action === "memory.read"),
 	).toBeDefined();
+});
+
+test("a memory still waiting in <state> (not yet in <memory>) is not read as an in-profile item without its p<n>", async () => {
+	h = await setup({ memory: true });
+	h.state.steps.push({ text: "はい。" });
+	const first = await h.say("私は辛いものが好きです", "completed");
+	h.state.steps.push(
+		{ calls: [{ name: "memory", args: { operation: "read", query: "辛い" } }] },
+		{ text: "辛いものがお好きですね。" },
+	);
+	await saveItem(h.store, h.memory!, {
+		conversationId: "main",
+		messageId: first.inputMessageId,
+		quote: "辛いものが好き",
+		kind: "preference",
+		semanticKey: "food.spicy",
+		text: "辛いものが好き",
+	});
+	// No re-construction: the item is shown in <state>, not in <memory>, so the model has no p<n> for it.
+	await h.say("私の好みは？");
+	const read = toolResults(h.state.calls.length - 1)[0] as {
+		items: Array<Record<string, unknown>>;
+	};
+	expect(read.items).toHaveLength(1);
+	// An in-profile item comes back as its p<n> (the layout specification, section 6): never inProfile without it.
+	expect(
+		read.items.every(
+			(item) => item.inProfile !== true || /^p\d+$/.test(String(item.item)),
+		),
+	).toBe(true);
 });
 
 test("cancel of a waiting TODO from a later utterance ends the run it waits on, and the TODO is done as cancelled", async () => {
@@ -572,11 +598,7 @@ test("cancel of a waiting TODO from a later utterance ends the run it waits on, 
 			calls: [
 				{
 					name: "work",
-					args: {
-						todo: todo!.id,
-						operation: "cancel",
-						revision: todo!.revision,
-					},
+					args: { todo: `t${todo!.ref}`, operation: "cancel" },
 				},
 			],
 		},
@@ -586,10 +608,11 @@ test("cancel of a waiting TODO from a later utterance ends the run it waits on, 
 	expect(h.dialogue.answerText(cancelling.id)).toBe("取り消しました。");
 	expect(toolResults(h.state.calls.length - 1)[0]).toMatchObject({
 		ok: true,
-		todo: { id: todo!.id, status: "done", outcome: "cancelled" },
+		todo: `t${todo!.ref}`,
+		status: "done",
+		outcome: "cancelled",
 	});
 	expect(h.dialogue.get(waiting.id)?.status).toBe("cancelled");
-	expect(h.todos()).toMatchObject([
-		{ id: todo!.id, status: "done", outcome: "cancelled" },
-	]);
+	// Cancelled work is not reported back: the TODO is archived at once.
+	expect(h.todos()).toEqual([]);
 });

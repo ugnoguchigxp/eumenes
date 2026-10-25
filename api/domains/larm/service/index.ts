@@ -11,6 +11,7 @@ import { answerRequest } from "./answer-request";
 import { assertAttitudeQuestions } from "./context";
 import { createControl } from "./control";
 import { createInfer } from "./infer";
+import { createConversationYield } from "./conversation-yield";
 import { createHelperConnections } from "./helper-connections";
 import { createLeaseManager } from "./lease-manager";
 import { leasePort } from "./lease-port";
@@ -104,10 +105,12 @@ export function createLarm(config: {
 	};
 	const lifetime = new AbortController();
 	const helpers = createHelperConnections(
-		(helperClient) => createLarm({ ...config, client: helperClient, keepAlive: false }),
+		(helperClient) =>
+			createLarm({ ...config, client: helperClient, keepAlive: false }),
 		client,
 	);
 	let mainAnswer = Promise.resolve();
+	const yielding = createConversationYield();
 	const voiceCatalogs = new WeakMap<Provider, TtsVoices>();
 	let judging = false;
 	const control = createControl({
@@ -156,17 +159,25 @@ export function createLarm(config: {
 		onDelta?: (text: string) => void,
 		options?: LarmCallOptions,
 	) {
-		const scoped = AbortSignal.any([signal, lifetime.signal]);
+		// Background work on the conversation's prompt yields: a conversation call takes the connection at once.
+		const yields = options?.onConversation ? yielding.enter() : null;
+		const scoped = AbortSignal.any([
+			signal,
+			lifetime.signal,
+			...(yields ? [yields.signal] : []),
+		]);
 		if (
-			options?.sessionRole === "auxiliary" ||
-			options?.sessionRole === "subagent"
+			!yields &&
+			(options?.sessionRole === "auxiliary" ||
+				options?.sessionRole === "subagent")
 		) {
 			// Independent sessions (one-shot calls and task sub-agents) share the saved profile; admission and KV capacity belong to LARM.
 			return helpers.answer(messages, scoped, onDelta, options, (run) =>
 				withProvider("llm", scoped, run),
 			);
 		}
-		// One foreground conversation may infer on its connection at a time.
+		if (!yields) yielding.preempt();
+		// One call may infer on the conversation's connection at a time.
 		const previous = mainAnswer;
 		let finish!: () => void;
 		mainAnswer = new Promise<void>((resolve) => {
@@ -178,6 +189,7 @@ export function createLarm(config: {
 			);
 			return await inferAnswer(messages, scoped, onDelta, options);
 		} finally {
+			yields?.leave();
 			// A cancelled queued call must not let a later call overtake the active one.
 			void previous.finally(finish);
 		}
@@ -324,6 +336,8 @@ export function createLarm(config: {
 		prepareVoice: (signal) =>
 			connect(["llm", "asr", "tts"], signal).then(() => {}),
 		transcribe(wav, signal, options) {
+			// The user has spoken: the conversation's answer comes next, so its connection is freed now.
+			yielding.preempt();
 			return withProvider("asr", signal, async (p, connectionId) => {
 				if (wav.length < 44 || wav.length > 4_000_000)
 					throw new Error("audio_size_invalid");

@@ -328,7 +328,7 @@ test("tendencies, short-term notes and the context are read", async () => {
 		h.memory.windowForRunInTransaction(db, "main"),
 	);
 	const built = read(h, "query:memory.context@1").items[0];
-	expect(built).toMatchObject({ version: 1, newMemories: 0, notices: 0 });
+	expect(built).toMatchObject({ version: 1, newMemories: 0 });
 	expect(built.state).toContain("組み立て済み");
 	// The published profile is shown (bounded) with its size; the short-term notes are not part of it.
 	expect(built.profileText).toBe(

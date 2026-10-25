@@ -1,9 +1,6 @@
 import type { LarmPort } from "../../domains/larm";
 import { drawingFixture } from "../../domains/excalidraw/test/connection.fixture";
-import {
-	answerUtterance,
-	handOver,
-} from "./conversation-turn.fixture";
+import { answerUtterance, handOver } from "./conversation-turn.fixture";
 export function excalidrawFixture(action: "create" | "library" = "create") {
 	const external = drawingFixture(),
 		stages: string[] = [],
@@ -17,7 +14,7 @@ export function excalidrawFixture(action: "create" | "library" = "create") {
 		answer: async (messages, _signal, options) => {
 			contexts.push(JSON.stringify(messages));
 			const turn = answerUtterance(
-				options?.tools,
+				options,
 				messages,
 				options?.onToolCalls,
 				handOver("excalidraw.edit", "準備します。"),

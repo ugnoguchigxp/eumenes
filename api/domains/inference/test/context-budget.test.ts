@@ -58,8 +58,7 @@ test("a 256k window plans 80%: the sections reach their absolute limits and the 
 	expect(plan.sections).toEqual({
 		profile: 12_000,
 		episode: 2_000,
-		log: 16_000,
-		active: 4_000,
+		log: 20_000,
 		state: 2_000,
 		now: 3_000,
 	});

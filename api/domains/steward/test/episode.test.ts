@@ -12,12 +12,12 @@ afterEach(async () => {
 	for (const h of harnesses.splice(0)) await h.close();
 });
 
-/** A window whose log, episode and work results are small enough for a few exchanges to be over them. */
+/** A window whose log and episode are small enough for a few exchanges to be over them. */
 const smallPlan = (episode = 300): WindowPlan => {
 	const base = planWindow({ window: 262_144, fixed: 3000 });
 	return {
 		...base,
-		sections: { ...base.sections, episode, active: 200 },
+		sections: { ...base.sections, episode },
 		log: { cap: 400, high: 200, low: 100, keep: 40 },
 	};
 };
@@ -410,40 +410,6 @@ test("the re-construction also publishes the profile when additions wait in newM
 	expect(waiting().profile.items.map((item) => item.text)).toEqual([
 		"待っている記憶",
 	]);
-});
-
-test("finished work results over their limit leave at the re-construction; a question stays", async () => {
-	const h = await setup();
-	await h.store.write((db) => {
-		h.continuity.events.putActiveInTransaction(db, {
-			conversationId: "c1",
-			todoId: "todo-ask",
-			status: "waiting",
-			at: "2026-10-14T10:00:00.000Z",
-			fields: { question: "q".repeat(300) },
-		});
-		h.continuity.events.putActiveInTransaction(db, {
-			conversationId: "c1",
-			todoId: "todo-done",
-			status: "done",
-			at: "2026-10-14T10:01:00.000Z",
-			fields: { result: "r".repeat(1200) },
-		});
-		h.continuity.events.appendInTransaction(db, {
-			conversationId: "c1",
-			at: new Date(h.time.ms).toISOString(),
-			type: "notice",
-			by: "host",
-			fields: { text: "x" },
-		});
-	});
-	h.time.ms += 20_000;
-	await h.kick("c1");
-	expect(
-		h.store
-			.read((db) => h.continuity.events.activeInTransaction(db, "c1"))
-			.map((slot) => slot.todoId),
-	).toEqual(["todo-ask"]);
 });
 
 test("a log that is within its target is left alone, however long the quiet", async () => {

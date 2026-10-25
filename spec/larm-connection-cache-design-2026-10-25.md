@@ -2,7 +2,7 @@
 
 - 日付: 2026-10-25
 - 状態: Q1・Q2は2026-10-25に合意・実装済み（§8）。Q3は未着手
-- 関連: [larm-connection-retention-design-2026-10-18.md](larm-connection-retention-design-2026-10-18.md)（画面表示中の保持）、[eumenes-larm-followup-plan-2026-10-24.md](eumenes-larm-followup-plan-2026-10-24.md)（「判断用接続の寿命の追加設計」を保留）、[prompt-prewarm-design-2026-10-24.md](prompt-prewarm-design-2026-10-24.md)
+- 関連: [larm-connection-retention-design-2026-10-18.md](larm-connection-retention-design-2026-10-18.md)（画面表示中の保持）、[eumenes-larm-followup-plan-2026-10-24.md](eumenes-larm-followup-plan-2026-10-24.md)（「判断用接続の寿命の追加設計」を保留）、[context-window-layout-spec-2026-10-25.md](context-window-layout-spec-2026-10-25.md)（先行キャッシュを集約）
 
 ## 1 目的
 

@@ -48,9 +48,7 @@
 					"claims": [
 						{
 							"text": "今日は晴れ",
-							"sources": [
-								"src_1"
-							]
+							"sources": ["src_1"]
 						}
 					],
 					"limits": "なし"

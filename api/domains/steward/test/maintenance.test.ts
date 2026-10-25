@@ -1,4 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
+import { MAINTENANCE_QUIET_MS } from "../contracts";
 import { setupSteward, type StewardHarness } from "./steward.fixture";
 
 const harnesses: StewardHarness[] = [];
@@ -125,6 +126,9 @@ test("upkeep waits while an answer is generated: 30 s, then 2 min, then 10 min",
 		remember: [item("a.one", "一つ目"), item("a.two", "二つ目")],
 	});
 	await h.run({ user: "二つ", end: "completed" });
+	// Upkeep never runs before a quiet spell after the last event: its timer fires once the spell is over.
+	h.time.ms += MAINTENANCE_QUIET_MS;
+	await h.fireTimer();
 	h.foreground.add("c1");
 	const tick = async () => {
 		await h.queue.tick();
@@ -162,7 +166,7 @@ test("upkeep waits while an answer is generated: 30 s, then 2 min, then 10 min",
 	expect(h.state()).toMatchObject({ deferCount: 0, nextAt: null });
 });
 
-test("the pending limit starts a consolidation without waiting for the foreground", async () => {
+test("after the quiet spell, the pending limit starts a consolidation without waiting for the foreground", async () => {
 	const h = await setup();
 	// The first window is built empty; the items below then wait as "recently remembered".
 	h.inference.script("curate-memory", empty);
@@ -175,6 +179,7 @@ test("the pending limit starts a consolidation without waiting for the foregroun
 	});
 	h.inference.script("consolidate-memory", unchanged, unchanged, unchanged);
 	await h.run({ user: "たくさん", end: "completed" });
+	h.time.ms += MAINTENANCE_QUIET_MS;
 	// The foreground stays active the whole time; the reflecting steps and the urgent upkeep still run.
 	for (
 		let i = 0;

@@ -9,7 +9,11 @@ import { captureBackgroundControl } from "./background-control";
 import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import type { LarmPort } from "../../larm";
-import { createConfiguredLarm, stableLarmClient } from "./configured-larm";
+import {
+	createConfiguredLarm,
+	sharesLarmClient,
+	stableLarmClient,
+} from "./configured-larm";
 import { createScreenPresence } from "./screen-presence";
 import type { SpeechPreparation } from "../../delivery/contracts";
 import type { SettingsService, Settings, Purpose } from "../../settings";
@@ -38,6 +42,8 @@ import { releaseTaskSessions } from "./agent-session";
 import { revokeAgentAttempts } from "./agent-revoke";
 /** Each clause gets its own short deadline; the turn's authority is still enforced through `parents`. */
 const SPEECH_CHUNK_DEADLINE_MS = 60_000;
+/** Subjects of requests that do not serve the user right now (World extraction, background controls, probes). */
+const BACKGROUND_SUBJECT = /^(world-extract|background|probe):/;
 /** The most output a control request may ask for (a long draft); the provider's own limit still applies. */
 const MAX_CONTROL_OUTPUT_TOKENS = 32_768;
 /** The longest one attempt may be given (a toolchain's own limit; its contract allows no more). */
@@ -59,7 +65,8 @@ const runControl = (env: Env, ...[id, m, s, c, session]: ControlArgs) =>
 		s,
 		undefined,
 		undefined,
-		undefined,
+		// A call on the conversation's prompt sends its tools unchanged (not to be called) to keep the prefix.
+		session?.prefixTools,
 		c,
 		undefined,
 		session,
@@ -110,20 +117,12 @@ export function createInference(
 				statusSubscriptions.get(name)?.();
 				statusSubscriptions.delete(name);
 				// Ports differing only in voice settings share one connection (one client): it stays for the others.
-				const client = (larm: Settings["larm"]) =>
-					stableLarmClient(settings.derivedKey("larm.client"), larm);
 				const shared =
 					options.keepLarmConnection &&
-					client(JSON.parse(name) as Settings["larm"]) !== undefined &&
-					[
+					sharesLarmClient(settings.derivedKey("larm.client"), name, [
 						settings.get().larm,
-						...[...ports.keys()].map(
-							(other) => JSON.parse(other) as Settings["larm"],
-						),
-					].some(
-						(other) =>
-							client(other) === client(JSON.parse(name) as Settings["larm"]),
-					);
+						...[...ports.keys()].map((o) => JSON.parse(o) as Settings["larm"]),
+					]);
 				const done = p.close(shared ? { keepConnection: true } : undefined);
 				closingPorts.add(done);
 				void done.finally(() => closingPorts.delete(done)).catch(() => {});
@@ -501,6 +500,8 @@ export function createInference(
 		},
 		connect: () => port(settings.get()).connect(),
 		screenPresence: screen.update,
+		screenPresent: screen.present,
+		onScreenShown: screen.onShown,
 		prepareVoice: (signal: AbortSignal) =>
 			port(settings.get()).prepareVoice?.(signal) ?? Promise.resolve(),
 		status: () => port(settings.get()).status(),
@@ -515,19 +516,8 @@ export function createInference(
 		 * conversation answers, ASR and TTS. Background work (World extraction,
 		 * background controls) and probes never count. Read-only, in memory.
 		 */
-		foregroundBusy(): boolean {
-			for (const a of active.values()) {
-				const subject = a.row.subject;
-				if (
-					subject.startsWith("world-extract:") ||
-					subject.startsWith("background:") ||
-					subject.startsWith("probe:")
-				)
-					continue;
-				return true;
-			}
-			return false;
-		},
+		foregroundBusy: () =>
+			[...active.values()].some((a) => !BACKGROUND_SUBJECT.test(a.row.subject)),
 		/** Told after a request started or ended running. Returns the unsubscribe function. */
 		onActivity(listener: () => void) {
 			activityListeners.add(listener);

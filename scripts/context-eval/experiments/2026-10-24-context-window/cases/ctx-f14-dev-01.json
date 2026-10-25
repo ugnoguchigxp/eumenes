@@ -55,9 +55,7 @@
 					"claims": [
 						{
 							"text": "駅前のホテルに十二日と十三日の空室がある",
-							"sources": [
-								"src_1"
-							]
+							"sources": ["src_1"]
 						}
 					],
 					"limits": "料金は未確認"

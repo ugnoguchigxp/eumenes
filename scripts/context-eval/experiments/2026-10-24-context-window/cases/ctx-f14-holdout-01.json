@@ -55,9 +55,7 @@
 					"claims": [
 						{
 							"text": "午後二時の便に自由席の空きがある",
-							"sources": [
-								"src_1"
-							]
+							"sources": ["src_1"]
 						}
 					],
 					"limits": "指定席は未確認"

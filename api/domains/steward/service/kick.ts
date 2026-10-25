@@ -4,6 +4,7 @@ import { PENDING_LIMIT } from "../../memory";
 import {
 	EVENTS_PER_UNIT,
 	JOB_DEADLINE_MS,
+	MAINTENANCE_QUIET_MS,
 	MAINTENANCE_STEPS_PER_ROUND,
 	MAX_FAILURES,
 	REQUESTS_PER_UNIT,
@@ -173,26 +174,29 @@ export function createKick(deps: StewardDeps, wake: Wake) {
 		return true;
 	}
 
-	function kickRecall(env: StepEnv) {
-		const { db, conversationId } = env;
-		const state = readState(db, conversationId);
-		if (!state.recallPending || openUnitOf(db, conversationId, "recall"))
-			return;
-		createUnit(db, conversationId, {
-			step: "prepare-recall",
-			kind: "events",
-			targets: { recallSeq: state.recallPending },
-			attempt: 0,
-		});
+	/** The time of the conversation's newest event (logged or pending); null when it has none. */
+	function lastEventMs(env: StepEnv): number | null {
+		return env.deps.continuity.events.latestMsInTransaction(
+			env.db,
+			env.conversationId,
+		);
 	}
 
-	/** Upkeep: a pending-limit consolidation at once; otherwise rounds of at most three steps per revision. */
+	/**
+	 * Upkeep, only after a quiet spell (`MAINTENANCE_QUIET_MS` without an event; the timer kicks when it is over): a
+	 * pending-limit consolidation first; otherwise rounds of at most three steps per revision.
+	 */
 	function kickMaintenance(env: StepEnv, reflecting: boolean) {
 		const { db, deps: d, conversationId } = env;
 		if (openUnitOf(db, conversationId, "maintenance")) return;
+		const now = d.nowMs();
+		const last = lastEventMs(env);
+		if (last !== null && now - last < MAINTENANCE_QUIET_MS) {
+			wake.at(last + MAINTENANCE_QUIET_MS);
+			return;
+		}
 		const state = readState(db, conversationId);
 		const revision = state.maintenanceRevision;
-		const now = d.nowMs();
 		const count = pendingAdditions(env);
 		if (count < PENDING_LIMIT) {
 			// The additions were taken into the long-term layer: the next time they pile up counts afresh.
@@ -311,7 +315,6 @@ export function createKick(deps: StewardDeps, wake: Wake) {
 				const reflecting = openUnitOf(db, conversationId, "reflect")
 					? true
 					: kickReflect(env);
-				kickRecall(env);
 				kickMaintenance(env, reflecting);
 				kickWorld(env, wake, (spec) =>
 					createUnit(db, conversationId, {

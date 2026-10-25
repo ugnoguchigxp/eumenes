@@ -2,11 +2,8 @@
  * Seeds a case into the session's services and runs the production prepare for its turn. The result is the
  * generation the product would send: the messages, the window plan, the document and the window version.
  */
-import { estimateTextTokens } from "../../../inference";
-import { renderRecallBlock } from "../../../memory";
 import type { GenerateInput } from "../../service/context";
 import { type ContextCase, type Seed, seedEventsOf } from "./case-schema";
-import { recallMinute } from "./recall-text";
 import {
 	CONVERSATION_ID,
 	DEFAULT_START,
@@ -35,7 +32,6 @@ export function generationTime(seed: Seed): string {
 		...seedEventsOf(seed).map((e) => e.at),
 		...(seed.pending ?? []).map((p) => p.at),
 		...(seed.work ?? []).flatMap((w) => [w.at, w.updatedAt ?? w.at]),
-		...(seed.recall ?? []).map((r) => r.at),
 	].map((time) => Date.parse(time));
 	const newest = times.length ? Math.max(...times) : Date.parse(DEFAULT_START);
 	return new Date(newest + 1000).toISOString();
@@ -93,16 +89,11 @@ export async function saveLongTerm(
 	return ids;
 }
 
-/**
- * Notices and the recalled exchanges travel in the window the way the memory step publishes them. The recall is
- * seeded as the prefetch text directly: there are no embeddings offline (see recall-text.ts). A step replaces the
- * prefetch.
- */
+/** Notices and republish requests, the way the memory step makes them. */
 export async function publishStep(
 	session: Session,
 	step: {
 		notices?: readonly string[] | undefined;
-		recall?: Seed["recall"];
 		/** The steward asks for the profile to be republished at the next re-construction (it took in new State). */
 		requestRepublish?: boolean;
 	},
@@ -110,26 +101,21 @@ export async function publishStep(
 ) {
 	const { wiring } = session;
 	wiring.setNow(now);
-	const recalled = (step.recall ?? []).map((entry) => ({
-		at: recallMinute(entry.at),
-		...(entry.user === undefined ? {} : { user: entry.user }),
-		...(entry.assistant === undefined ? {} : { assistant: entry.assistant }),
-	}));
-	const recallText = recalled.length ? renderRecallBlock(recalled) : "";
-	if (recallText || step.notices?.length || step.requestRepublish)
+	if (step.requestRepublish)
 		await wiring.store.write((db) =>
 			wiring.memory.publishWindowInTransaction(db, CONVERSATION_ID, {
-				...(step.requestRepublish ? { requestRepublish: true } : {}),
-				...(step.notices?.length ? { addNotices: [...step.notices] } : {}),
-				...(recallText
-					? {
-							prefetch: {
-								text: recallText,
-								pins: [],
-								tokens: estimateTextTokens(recallText),
-							},
-						}
-					: {}),
+				requestRepublish: true,
+			}),
+		);
+	// A notice joins the log the way the memory step tells it (an event read once).
+	for (const text of step.notices ?? [])
+		await wiring.store.write((db) =>
+			wiring.continuity.events.appendInTransaction(db, {
+				conversationId: CONVERSATION_ID,
+				at: now,
+				type: "acted",
+				by: "host",
+				fields: { action: "memory.notice", text },
 			}),
 		);
 }
@@ -184,11 +170,7 @@ async function applyMemorySeed(session: Session, seed: Seed, now: string) {
 			}),
 		);
 	}
-	await publishStep(
-		session,
-		{ notices: seed.notices, recall: seed.recall },
-		now,
-	);
+	await publishStep(session, { notices: seed.notices }, now);
 }
 
 /** The seed's ports and its history: work first (events refer to it), then the episode, then the log. */

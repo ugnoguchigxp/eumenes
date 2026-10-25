@@ -2,10 +2,7 @@ import { taskPlan, taskItem } from "./task-plan.fixture";
 import { expect, test } from "bun:test";
 import { harness } from "./toolchain.fixture";
 import { imageFixture } from "../media/image.fixture";
-import {
-	callsOf,
-	isUtteranceRound,
-} from "./conversation-script.fixture";
+import { callsOf, isUtteranceRound } from "./conversation-script.fixture";
 import { handOverTask } from "./task-delegation.fixture";
 import { waitFor } from "../../infrastructure/wait-for";
 
@@ -55,7 +52,7 @@ test("two image calls from one public source keep distinct generation/artifact I
 				]);
 				return "";
 			}
-			if (isUtteranceRound(options?.tools)) {
+			if (isUtteranceRound(options)) {
 				const step = handOverTask(
 					"Create two distinct images",
 					"二つの画像を生成します。",
@@ -176,7 +173,7 @@ function repeatMediaModel(
 				]);
 				return "";
 			}
-			if (isUtteranceRound(options?.tools)) {
+			if (isUtteranceRound(options)) {
 				const step = handOverTask(
 					"Create two items",
 					"二つの処理を進めます。",

@@ -1,10 +1,7 @@
 import { deflateSync } from "node:zlib";
 import { createHash } from "node:crypto";
 import { createLarmPlayground, type LarmPort } from "../../domains/larm";
-import {
-	answerUtterance,
-	handOver,
-} from "./conversation-turn.fixture";
+import { answerUtterance, handOver } from "./conversation-turn.fixture";
 export const imageQuestion = "夕焼けの海のイラストを121×177のPNGで生成して";
 export const imageTestPlan = {
 	action: "generate",
@@ -210,7 +207,7 @@ export function imageFixture(
 		speak: async () => new Uint8Array(),
 		answer: async (messages, _signal, options) => {
 			const turn = answerUtterance(
-				options?.tools,
+				options,
 				messages,
 				options?.onToolCalls,
 				handOver("image.create", "準備します。"),

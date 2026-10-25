@@ -329,7 +329,7 @@ function prepareRefine(env: StepEnv, unit: { targets: UnitTargets }) {
 		}
 		if (taken.length >= 2 && bytes + size > EPISODE_INPUT_BYTES) break;
 		taken.push(part);
-		views.push({ id: `p${taken.length}`, ...view });
+		views.push({ id: `hp${taken.length}`, ...view });
 		for (const id of partIds) ids.add(id);
 		bytes += size;
 	}

@@ -129,7 +129,9 @@ export function handedStep(messages: ConversationMessage[]): Step | undefined {
 		| undefined;
 	// A refused call (the host closes a call that was rejected with `{refused: true}`) is no result to answer from.
 	if (!handed || !("answered" in handed)) return undefined;
-	return { text: handed.answered && handed.answer ? handed.answer : UNAVAILABLE_TEXT };
+	return {
+		text: handed.answered && handed.answer ? handed.answer : UNAVAILABLE_TEXT,
+	};
 }
 
 /** The messages after the utterance: the generation's own exchanges (tool calls and their results). */
@@ -140,17 +142,52 @@ export function afterUtterance(
 	return last < 0 ? [] : messages.slice(last + 1);
 }
 
-/** Whether the request offers the conversation's fixed tools (a conversation agent's reply, not a background call). */
+/**
+ * Whether the call is a conversation agent's reply: it offers the conversation's fixed tools to be called. A
+ * background call on the conversation's prompt sends the same tools only to keep the prefix (`toolChoice: none`).
+ */
 export function isUtteranceRound(
-	tools: ReadonlyArray<{ function: { name: string } }> | undefined,
+	options:
+		| {
+				tools?: ReadonlyArray<{ function: { name: string } }>;
+				toolChoice?: string;
+		  }
+		| undefined,
 ): boolean {
-	return !!tools?.some((tool) => tool.function.name === "find_toolchain");
+	return (
+		options?.toolChoice !== "none" &&
+		!!options?.tools?.some((tool) => tool.function.name === "find_toolchain")
+	);
 }
 
 /** Whether the generation has no new utterance: the host's fixed trigger text is its newest message (a host notice). */
 export function isNoticeRound(messages: ConversationMessage[]): boolean {
 	const last = messages.filter((m) => m.role === "user").at(-1);
 	return !!last?.content.startsWith("新しい出来事があります");
+}
+
+/**
+ * The material document of a generation (ContextWindow spec, section 4): its first user message, the four tagged
+ * sections `<memory>`, `<history>`, `<log>` and `<state>`. Empty when the generation has none.
+ */
+export function documentOf(messages: ConversationMessage[]): string {
+	return (
+		messages.find((m) => m.role === "user" && m.content.startsWith("<memory>"))
+			?.content ?? ""
+	);
+}
+
+/**
+ * The ids of the toolchains the document's `<state>` retains (section 4.4): its `担当 <id> <summary>` lines. The
+ * `<log>` section's own `担当` lines are not retained toolchains, so only the `<state>` section is read.
+ */
+export function retainedIds(messages: ConversationMessage[]): string[] {
+	const document = documentOf(messages);
+	const start = document.indexOf("<state>");
+	if (start < 0) return [];
+	return [...document.slice(start).matchAll(/^担当 (\S+) /gm)].map(
+		(match) => match[1]!,
+	);
 }
 
 /** The tool results of one tool name in the generation, parsed, oldest first. */

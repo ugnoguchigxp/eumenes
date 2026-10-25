@@ -9,7 +9,12 @@ import {
 
 type AssemblyDeps = Omit<
 	StewardDeps,
-	"foregroundActive" | "runStateOf" | "clock" | "nowMs" | "newId"
+	| "foregroundActive"
+	| "runStateOf"
+	| "clock"
+	| "nowMs"
+	| "newId"
+	| "conversationPrefix"
 > & {
 	queue: StewardDeps["queue"] & {
 		registerHandler(handler: StewardService["handler"]): void;
@@ -18,12 +23,15 @@ type AssemblyDeps = Omit<
 
 type StewardDialogue = Pick<
 	DialogueService,
-	"get" | "conversationHasActiveRunInTransaction"
+	| "get"
+	| "conversationHasActiveRunInTransaction"
+	| "conversationPrefixInTransaction"
 >;
 
 /**
- * The steward with its handler registered. It reads run states through dialogue, which the
- * server assembles later (`attachDialogue`); until then no run is known as active.
+ * The steward with its handler registered. It reads run states and the conversation's prompt prefix through
+ * dialogue, which the server assembles later (`attachDialogue`); until then no run is known as active and the steps
+ * keep their own prompts.
  */
 export function createStewardAssembly(deps: AssemblyDeps) {
 	let dialogue: StewardDialogue | undefined;
@@ -32,6 +40,7 @@ export function createStewardAssembly(deps: AssemblyDeps) {
 		foregroundActive: (db, conversationId) =>
 			dialogue?.conversationHasActiveRunInTransaction(db, conversationId) ??
 			false,
+		conversationPrefix: () => dialogue?.conversationPrefixInTransaction,
 		runStateOf: (runId): RunLookup => {
 			const run = dialogue?.get(runId);
 			if (!run) return "stale";

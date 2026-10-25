@@ -141,8 +141,8 @@ test("a goal request is answered by the goal step, not by curate-memory", async 
 		{ goals: [change({ text: "音声応答の遅延を減らしたい" })] },
 		(data) => {
 			const goals = data.goals as Array<{ ref: string; text: string }>;
-			expect(goals).toMatchObject([{ ref: "g1", status: "adopted" }]);
-			return { goals: [change({ op: "complete", ref: "g1", request: "r1" })] };
+			expect(goals).toMatchObject([{ ref: "gl1", status: "adopted" }]);
+			return { goals: [change({ op: "complete", ref: "gl1", request: "r1" })] };
 		},
 	);
 	await h.run({
@@ -211,7 +211,7 @@ test("an op the host can not trust is dropped: unknown evidence, unknown ref, ad
 	h.inference.script("curate-goals", {
 		goals: [
 			change({ text: "目標A", evidence: "e9" }),
-			change({ op: "revise", ref: "g7", text: "目標B" }),
+			change({ op: "revise", ref: "gl7", text: "目標B" }),
 			change({ op: "adopt", text: null }),
 			change({ text: "目標C" }),
 		],
@@ -288,11 +288,11 @@ test("the goal upkeep withdraws duplicate proposals and never an adopted goal", 
 			});
 			const proposals = data.proposals as Array<{ ref: string; text: string }>;
 			const refs = proposals.map((p) => p.ref);
-			expect(refs).toEqual(["g1", "g2", "g3"]);
+			expect(refs).toEqual(["gl1", "gl2", "gl3"]);
 			return {
 				withdraw: [
-					{ ref: "g2", why: "duplicate" },
-					{ ref: "g9", why: "stale" },
+					{ ref: "gl2", why: "duplicate" },
+					{ ref: "gl9", why: "stale" },
 				],
 				changed: true,
 			};
@@ -320,8 +320,8 @@ test("the goal upkeep withdraws duplicate proposals and never an adopted goal", 
 		.filter((d) => d.step === "consolidate-goals")
 		.at(-1)!;
 	expect(decision.results).toMatchObject([
-		{ ref: "g9", status: "rejected", code: "unknown_ref" },
-		{ ref: "g2", status: "applied" },
+		{ ref: "gl9", status: "rejected", code: "unknown_ref" },
+		{ ref: "gl2", status: "applied" },
 	]);
 });
 
@@ -355,7 +355,7 @@ test("near the proposal cap the model is told how full it is", async () => {
 		(data) => {
 			expect(data).toMatchObject({ limit: 50, count: 46 });
 			return {
-				withdraw: [{ ref: "g46", why: "low_relevance" }],
+				withdraw: [{ ref: "gl46", why: "low_relevance" }],
 				changed: true,
 			};
 		},

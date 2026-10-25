@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { DOCUMENT_KEYS } from "../../api/domains/dialogue/service/context-document";
+import { DOCUMENT_SECTIONS } from "../../api/domains/dialogue/service/context-document";
 import { estimateMessageTokens } from "../../api/domains/inference";
 import {
 	cacheInput,
@@ -14,10 +14,10 @@ test("cache trajectory uses the product's message layout and synthetic reference
 	expect(tokens).toBeGreaterThanOrEqual(14000);
 	expect(tokens).toBeLessThan(14500);
 	expect(input.messages.map((m) => m.role)).toEqual(["system", "user", "user"]);
-	// The document is the product's own: its keys in their fixed order, and it is the message sent.
-	expect(Object.keys(JSON.parse(input.messages[1]!.content))).toEqual([
-		...DOCUMENT_KEYS,
-	]);
+	// The document is the product's own: its sections in their fixed order, and it is the message sent.
+	expect(
+		[...input.messages[1]!.content.matchAll(/^<([a-z]+)>$/gm)].map((m) => m[1]),
+	).toEqual([...DOCUMENT_SECTIONS]);
 	expect(input.messages[1]!.content).toBe(input.document.text);
 	expect(input.document.sections.log.tokens).toBeGreaterThan(
 		input.document.sections.state.tokens,

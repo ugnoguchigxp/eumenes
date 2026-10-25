@@ -96,9 +96,7 @@
 			},
 			{
 				"kind": "forbidden_identifier",
-				"identifiers": [
-					"image_upstream_timeout"
-				]
+				"identifiers": ["image_upstream_timeout"]
 			}
 		],
 		"rubric": [

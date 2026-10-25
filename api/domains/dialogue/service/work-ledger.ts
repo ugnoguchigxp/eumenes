@@ -8,6 +8,8 @@ import {
 	dropRunResults,
 	forgetWork,
 	confirmationById,
+	confirmationByRef,
+	confirmationRefs,
 	insertConfirmation,
 	insertWork,
 	openConfirmations,
@@ -19,9 +21,11 @@ import {
 	waitingArchives,
 	workByDedupe,
 	workById,
+	workByRef,
 	workBySource,
 	workOfRun,
 	workPage,
+	workRefs,
 	type ConfirmationRow,
 	type WorkOutcome,
 	type WorkRow,
@@ -43,92 +47,118 @@ const oneLine = (text: string, max: number) => {
 export function todoOf(row: WorkRow): TodoItem {
 	return {
 		id: row.id,
+		ref: row.ref,
 		title: row.title,
 		status: row.status,
 		...(row.outcome ? { outcome: row.outcome } : {}),
-		revision: row.revision,
-		updatedAt: jstSeconds(Date.parse(row.updatedAt)),
 		...(row.status === "waiting" && row.questionId
 			? { questionId: row.questionId, question: row.question ?? "" }
 			: {}),
 	};
 }
 
-/** The result fields a TODO's work-result slot holds (`active`), by its state. */
-export function activeFields(row: WorkRow): Record<string, unknown> {
+/** The result fields of a TODO as its owner reported them: the question while waiting, else the result. */
+export function resultFields(row: WorkRow): Record<string, unknown> {
 	return {
-		revision: row.revision,
 		...(row.outcome ? { outcome: row.outcome } : {}),
-		authority: "host_record",
 		...(row.status === "waiting"
-			? { questionId: row.questionId, question: row.question }
-			: { certainty: "unverified", result: row.result }),
+			? { question: row.question }
+			: { result: row.result }),
 	};
 }
 
+/** The numbers the document shows TODOs and confirmations by (section 6 of the layout specification). */
+function documentRefsInTransaction(db: Database, conversationId: string) {
+	const todos = workRefs(db, conversationId);
+	const confirmations = confirmationRefs(db, conversationId);
+	return {
+		todo: (todoId: string) => {
+			const ref = todos.get(todoId);
+			return ref === undefined ? null : `t${ref}`;
+		},
+		confirmation: (confirmationId: string) => {
+			const ref = confirmations.get(confirmationId);
+			return ref === undefined ? null : `c${ref}`;
+		},
+	};
+}
+
+/** The message id a TODO's result events stand on besides the request's messages: dropping the result reaches them. */
+const resultKey = (workId: string) => `work:${workId}`;
+
 /**
  * The conversation's TODO ledger: a TODO per piece of work handed to a toolchain, its state as the work's owner
- * reports it, the result slot in the active short-term memory, the archive in two steps (request, then the delivery
- * that confirms it), and the confirmations issued before executing a change.
+ * reports it, each reported question or result as an event of the log, the archive in two steps (request, then the
+ * delivery that confirms it), and the confirmations issued before executing a change.
  */
 export function createWorkLedger(
 	deps: Pick<DialogueDeps, "clock" | "id" | "continuity" | "toolchains">,
 ) {
 	const { clock, id, continuity } = deps;
-	/** Mirrors the TODO into its `active` slot (waiting: the question; done: the result). */
-	function mirror(db: Database, row: WorkRow) {
-		// Back in progress (answered, amended): the old question or result leaves the slot.
-		if (row.status === "todo") {
-			continuity.events.removeActiveInTransaction(
-				db,
-				row.conversationId,
-				row.id,
-			);
-			return;
-		}
-		continuity.events.putActiveInTransaction(db, {
+	/** A question or result the owner reported joins the log once per revision (the ContextWindow layout specification). */
+	function logResult(db: Database, row: WorkRow) {
+		if (row.status === "todo") return;
+		continuity.events.appendInTransaction(db, {
 			conversationId: row.conversationId,
-			todoId: row.id,
-			status: row.status,
 			at: jstSeconds(Date.parse(row.updatedAt)),
-			fields: activeFields(row),
+			type: "acted",
+			by: "host",
+			fields: {
+				action: "work.result",
+				todo: row.id,
+				status: row.status,
+				...resultFields(row),
+			},
+			messageIds: [...row.messageIds, resultKey(row.id)],
+			dedupeKey: `work-result:${row.id}:${row.revision}`,
 		});
 	}
-	function clearSlots(
+	/** The results of these TODOs leave the log (forgotten, or deleted at their owner); a generation that showed them is not adopted. */
+	function clearResults(
 		db: Database,
 		rows: ReadonlyArray<{ id: string; conversationId: string }>,
-		reason: string,
 	) {
-		const conversations = new Set<string>();
-		for (const row of rows) {
-			continuity.events.removeActiveInTransaction(
-				db,
-				row.conversationId,
-				row.id,
-			);
-			conversations.add(row.conversationId);
-		}
-		for (const conversationId of conversations)
-			continuity.events.bumpWindowInTransaction(
-				db,
-				conversationId,
-				clock(),
-				reason,
-			);
+		if (rows.length === 0) return;
+		continuity.events.forgetMessagesInTransaction(
+			db,
+			rows.map((row) => resultKey(row.id)),
+			clock(),
+		);
 	}
 	return {
 		todosInTransaction(db: Database, conversationId: string): TodoItem[] {
 			return openWork(db, conversationId).map(todoOf);
 		},
-		/** The unarchived TODOs as the host's other parts see them: the model's view, the request time and the result. */
-		hostTodosInTransaction: (db: Database, conversationId: string) =>
+		/** The unarchived TODOs' revisions: what the work tool checks an operation against. */
+		todoRevisionsInTransaction: (db: Database, conversationId: string) =>
 			openWork(db, conversationId).map((row) => ({
-				...todoOf(row),
-				createdAt: row.createdAt,
-				changedAt: row.updatedAt,
-				result: row.result,
+				id: row.id,
+				revision: row.revision,
 			})),
+		/**
+		 * The unarchived TODOs as the host's other parts see them: the model's view, the request time and the result.
+		 * `current` reads a finished TODO's result as it is now (a cancel after the report shows); undefined keeps the
+		 * recorded one.
+		 */
+		hostTodosInTransaction: (
+			db: Database,
+			conversationId: string,
+			current?: (row: WorkRow) => unknown,
+		) =>
+			openWork(db, conversationId).map((row) => {
+				const now = row.status === "done" ? current?.(row) : undefined;
+				return {
+					...todoOf(row),
+					createdAt: row.createdAt,
+					changedAt: row.updatedAt,
+					result: now === undefined ? row.result : now,
+				};
+			}),
 		workInTransaction: workById,
+		/** The TODO the model names `t<ref>`. */
+		workByRefInTransaction: workByRef,
+		confirmationByRefInTransaction: confirmationByRef,
+		refsInTransaction: documentRefsInTransaction,
 		/** Run-centric work the run waits for and that has not finished (task executions run on their own). */
 		waitingOfRunInTransaction: (db: Database, runId: string) =>
 			workOfRun(db, runId).filter(
@@ -216,14 +246,18 @@ export function createWorkLedger(
 							};
 			if (!updateWork(db, workId, row.revision, patch, clock())) return null;
 			const next = workById(db, workId)!;
-			mirror(db, next);
+			// Work the user cancelled is not reported back (the agency is not given it): it is archived at once.
+			if (report.status === "done" && report.outcome === "cancelled") {
+				archiveWork(db, workId, clock());
+				return next;
+			}
+			logResult(db, next);
 			return next;
 		},
-		/** The agent's check: the TODO's state and result go to its slot as they are now. */
+		/** The agent's check: the TODO as it is now (its result is the check's answer). */
 		checkInTransaction(db: Database, workId: string): WorkRow | null {
 			const row = workById(db, workId);
 			if (!row || row.archivedAt) return null;
-			mirror(db, row);
 			return row;
 		},
 		/** The agent amended the request: the revision moves on. */
@@ -243,9 +277,7 @@ export function createWorkLedger(
 				)
 			)
 				return null;
-			const next = workById(db, workId)!;
-			mirror(db, next);
-			return next;
+			return workById(db, workId)!;
 		},
 		/** An answer resumes the work in the answering run: the TODO waits with that run, back in `todo`. */
 		relinkInTransaction(
@@ -265,34 +297,25 @@ export function createWorkLedger(
 				)
 			)
 				return null;
-			const next = workById(db, workId)!;
-			mirror(db, next);
-			return next;
+			return workById(db, workId)!;
 		},
 		/** One page of the conversation's TODOs for display (the TODO screen). */
 		pageInTransaction: workPage,
 		/**
 		 * Forgetting (section 13): the TODOs that came from a forgotten message lose their texts and are archived,
-		 * their result slots go, and the window version moves so a generation that showed them is not adopted.
+		 * and their results leave the log.
 		 */
 		forgetInTransaction(db: Database, messageIds: readonly string[]) {
-			clearSlots(db, forgetWork(db, messageIds, clock()), "forget");
+			clearResults(db, forgetWork(db, messageIds, clock()));
 		},
-		/** A run's results deleted at their owner: the TODOs it fed keep no copy, in the TODO or in its slot. */
+		/** A run's results deleted at their owner: the TODOs it fed keep no copy, in the TODO or in the log. */
 		dropRunResultsInTransaction(db: Database, runId: string) {
-			clearSlots(db, dropRunResults(db, runId, clock()), "result_deleted");
+			clearResults(db, dropRunResults(db, runId, clock()));
 		},
 		requestArchiveInTransaction: requestArchive,
-		/** Archives a finished TODO and removes its result slot (section 9.4). */
+		/** Archives a finished TODO (section 9.4). */
 		archiveInTransaction(db: Database, workId: string): boolean {
-			const row = workById(db, workId);
-			if (!row || !archiveWork(db, workId, clock())) return false;
-			continuity.events.removeActiveInTransaction(
-				db,
-				row.conversationId,
-				workId,
-			);
-			return true;
+			return !!workById(db, workId) && archiveWork(db, workId, clock());
 		},
 		waitingArchivesInTransaction: waitingArchives,
 		/** The toolchains used most recently, with their one-line summary and the last request (section 6.2). */
@@ -322,7 +345,7 @@ export function createWorkLedger(
 			db: Database,
 			input: Omit<
 				ConfirmationRow,
-				"id" | "issuedAt" | "expiresAt" | "usedAt" | "supersededAt"
+				"id" | "ref" | "issuedAt" | "expiresAt" | "usedAt" | "supersededAt"
 			>,
 			messageIds: readonly string[],
 		): ConfirmationRow {
@@ -347,10 +370,10 @@ export function createWorkLedger(
 		): PendingConfirmation[] {
 			return openConfirmations(db, conversationId, clock()).map((row) => ({
 				id: row.id,
+				ref: row.ref,
 				toolchain: row.toolchainId,
 				request: row.request,
 				impact: row.impact,
-				expiresAt: row.expiresAt,
 			}));
 		},
 	};

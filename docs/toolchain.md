@@ -42,7 +42,7 @@ streamでは、function名や制御区切りになり得る末尾だけを保留
 
 即時回答型（binding `execution:"instant"`）は、担当の検索結果の候補に登録定義が宣言した入力（`weather_forecast` は `place`＝言われた地名、`prefecture`＝その都道府県、`day`＝`today`/`tomorrow`/`day_after`。`stock_quote` は `query`＝会社名・ティッカー）が付き、会話エージェントは依頼ツールの`execute`の`inputs`にそれを書いて呼びます（予告なし）。入力は利用者の言った言葉で、地名から予報区域、名前から銘柄への解決はadapterが自分のデータ（気象庁の区域表、EDINETコードリスト等）で行います。adapterの `availableInTransaction` が候補に出すかを決めます（天気は区域表を取得できない間は出さない）。hostはadapterを実行し、返った文をツールの結果として返し、会話エージェントがそれを根拠に話します。TODOは作りません。adapterが失敗（ネットワーク・タイムアウト・非200・形式不正）したときは、ツールの結果が即答できなかったことと代わりの担当（bindingの `fallbackToolchainId`）を返し、会話エージェントが改めて予告付きで依頼するかを判断します（同じrunで自動的に別の担当へ回す動作はありません）。天気の説明・使う/使わない場面・文の形は、会話の共通SystemContextではなく担当の登録定義・SKILL・adapterに置きます（[天気の設計](../spec/weather-instant-toolchain-design-2026-10-18.md)、[株価の設計](../spec/stock-instant-toolchain-design-2026-10-18.md)）。
 
-仕事の結果: 会話エージェントが依頼した仕事はTODOになり（実行中`todo`・質問待ち`waiting`・終了`done`）、担当の状態・質問・結果はTODOへ報告されます。結果と質問は資料の`active`のそのTODOの枠に入り、会話エージェントは結果を伝えた後にTODOをアーカイブします。結果の照合と継続のrun、完了報告の保留・解放は廃止しました。詳細は[会話エージェントのContextWindow仕様](../spec/context-window-spec-2026-10-24.md)の§9・§10です。
+仕事の結果: 会話エージェントが依頼した仕事はTODOになり（実行中`todo`・質問待ち`waiting`・終了`done`）、担当の状態・質問・結果はTODOへ報告されます。結果と質問は資料の`<log>`に「結果」「問い」の出来事として足され、`<state>`のTODOの状態も変わります。会話エージェントが結果を伝えた後にTODOはアーカイブされます。結果の照合と継続のrun、完了報告の保留・解放は廃止しました。詳細は[会話エージェントのContextWindow仕様](../spec/context-window-spec-2026-10-24.md)の§9・§10と[ContextWindow 構成仕様](../spec/context-window-layout-spec-2026-10-25.md)です。
 
 調査担当には今回の依頼を渡し、検索キーワードは担当が選びます。過去の会話から出典URLを集めて渡しません。URLの直接読取りは今回の依頼に明示されたURL、今回の検索結果、今回の依頼に合う保存済み手順の候補に限ります。
 

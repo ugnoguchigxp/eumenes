@@ -41,15 +41,9 @@ export type WindowInputs = {
 	tendencyRevision: number;
 	policyRevision: string;
 };
-export type WindowPrefetch = {
-	text: string;
-	pins: { messageId: string; digest: string }[];
-	/** Estimated tokens of `text`. */
-	tokens: number;
-};
 /**
  * The long-term memory a conversation's window shows (`profile`), what has changed since it was published
- * (`newMemories`), the steward's one-time notices and the prefetched recall. The profile is republished only by a
+ * (`newMemories`). The profile is republished only by a
  * re-construction (`republishInTransaction`) or an immediate change; additions wait in `newMemories` meanwhile.
  */
 export type WindowSnapshot = {
@@ -67,13 +61,10 @@ export type WindowSnapshot = {
 	newMemories: ProfileItem[];
 	/** The steward asked for a republish: the next re-construction applies it. */
 	republishRequested: boolean;
-	prefetch: WindowPrefetch;
-	notices: { id: string; text: string }[];
 	/** The earliest validFrom/validUntil of an active State item after the build time: crossing it changes what is current. */
 	nextBoundaryMs: number | null;
 };
 
-const EMPTY_PREFETCH: WindowPrefetch = { text: "", pins: [], tokens: 0 };
 const CONTRACT_VERSION = 1 as const;
 
 /** The package's change counter for the shared profile: it moves whenever State there changes. */
@@ -183,19 +174,6 @@ export function profileTokens(items: readonly ProfileItem[]): number {
 	return estimateTextTokens(referenceJson(items.map(profileItemFields)));
 }
 
-/** The shown notices without the cleared ones, then the added ones, oldest first. */
-function nextNotices(
-	shown: WindowSnapshot["notices"],
-	clearIds: readonly string[],
-	added: WindowSnapshot["notices"],
-): WindowSnapshot["notices"] {
-	const cleared = new Set(clearIds);
-	return [
-		...shown.filter((notice) => !cleared.has(notice.id)),
-		...added.map((notice) => ({ id: notice.id, text: notice.text })),
-	];
-}
-
 /** What the memory tool asks to read: the ids, or the terms of a query; the items the window already shows. */
 export type ReadItemsInput = {
 	query?: string;
@@ -300,9 +278,6 @@ export function createContextWindowStore(deps: {
 		opts: {
 			republish: boolean;
 			requestRepublish?: boolean;
-			prefetch?: WindowPrefetch;
-			addNotices?: string[];
-			clearNoticeIds?: string[];
 		},
 	): WindowSnapshot {
 		const previous = current(db, conversationId);
@@ -349,12 +324,6 @@ export function createContextWindowStore(deps: {
 			republishRequested: republish
 				? false
 				: (opts.requestRepublish ?? false) || previous!.republishRequested,
-			prefetch: opts.prefetch ?? previous?.prefetch ?? EMPTY_PREFETCH,
-			notices: nextNotices(
-				previous?.notices ?? [],
-				opts.clearNoticeIds ?? [],
-				(opts.addNotices ?? []).map((text) => ({ id: id(), text })),
-			),
 			// The published profile keeps the boundary it was built with.
 			nextBoundaryMs:
 				republish || !previous
@@ -406,24 +375,18 @@ export function createContextWindowStore(deps: {
 		},
 		rebuildInTransaction,
 		/**
-		 * The steward's changes to the window: notices and the prefetch are applied now; a requested republish waits
-		 * for the next re-construction (`republishInTransaction`) unless an immediate change requires it already.
+		 * The steward's changes to the window: a requested republish waits for the next re-construction
+		 * (`republishInTransaction`) unless an immediate change requires it already.
 		 */
 		publishInTransaction(
 			db: Database,
 			conversationId: string,
-			opts: {
-				requestRepublish?: boolean;
-				prefetch?: WindowPrefetch;
-				addNotices?: string[];
-			},
+			opts: { requestRepublish?: boolean },
 		): WindowSnapshot {
 			const previous = current(db, conversationId);
 			return rebuildInTransaction(db, conversationId, {
 				republish: !previous || mustRepublish(db, previous),
 				...(opts.requestRepublish ? { requestRepublish: true } : {}),
-				...(opts.prefetch ? { prefetch: opts.prefetch } : {}),
-				...(opts.addNotices ? { addNotices: opts.addNotices } : {}),
 			});
 		},
 		/** A re-construction republishes the profile: the waiting additions join it, in the order rule. */
@@ -432,29 +395,6 @@ export function createContextWindowStore(deps: {
 			conversationId: string,
 		): WindowSnapshot {
 			return rebuildInTransaction(db, conversationId, { republish: true });
-		},
-		/**
-		 * Drops shown notices without re-rendering anything (it runs after the answer is saved and must not fail
-		 * on memory state). No stored window, or none of the ids present, is a no-op.
-		 */
-		clearNoticesInTransaction(
-			db: Database,
-			conversationId: string,
-			noticeIds: readonly string[],
-		) {
-			const previous = current(db, conversationId);
-			if (!previous) return;
-			const cleared = new Set(noticeIds);
-			const notices = previous.notices.filter(
-				(notice) => !cleared.has(notice.id),
-			);
-			if (notices.length === previous.notices.length) return;
-			store(db, {
-				...previous,
-				version: (readWindowKey(db, conversationId)?.version ?? 0) + 1,
-				buildId: id(),
-				notices,
-			});
 		},
 		/**
 		 * Removes every stored window (all conversations) and the in-process copies. Memory text lives in them, so

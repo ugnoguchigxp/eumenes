@@ -12,6 +12,7 @@ import { createSession } from "../../eval/context/session";
 import { FIXED_TRIGGER_TEXT } from "../../service/context-system";
 import { makeCase } from "./case-fixtures";
 import { openSeedWiring } from "./store-wiring";
+import { sectionLines } from "../generation.fixture";
 
 const open: Materialized[] = [];
 afterEach(async () => {
@@ -22,9 +23,13 @@ const prepared = async (testCase: Parameters<typeof materialize>[0]) => {
 	open.push(m);
 	return m;
 };
-type Doc = Record<string, any>;
-const docOf = (m: Materialized): Doc =>
-	JSON.parse(m.input.messages[1]!.content) as Doc;
+/** The material document (the second message) of a materialized case. */
+const docOf = (m: Materialized): string => m.input.messages[1]!.content;
+/** The lines of one tagged section of the material document. */
+const sect = (m: Materialized, name: string) => sectionLines(docOf(m), name);
+/** The lines of the `<now>` block (the third message). */
+const nowOf = (m: Materialized) =>
+	sectionLines(m.input.messages[2]!.content, "now");
 
 const T = (minute: number) =>
 	new Date(Date.UTC(2026, 9, 12, 0, minute)).toISOString();
@@ -126,7 +131,6 @@ const fullCase = caseSchema.parse({
 		world: [{ name: "音声サービス" }],
 		notices: ["メモの保存に失敗しました"],
 		agencyInterests: ["紅葉の名所"],
-		recall: [{ at: T(5), user: "旅行は？", assistant: "京都です" }],
 	},
 	input: "最新の質問",
 	expect: {
@@ -135,124 +139,124 @@ const fullCase = caseSchema.parse({
 	},
 });
 
-test("a case becomes the production messages: system, the material document, then the newest utterances", async () => {
+test("a case becomes the production messages: system, the material document, <now>, then the newest utterances", async () => {
 	const m = await prepared(fullCase);
 	expect(messageIssues(m.input)).toEqual([]);
-	const [system, doc, ...newest] = m.input.messages;
-	expect(system!.role).toBe("system");
-	expect(doc!.role).toBe("user");
-	// The pending utterance and the input, each its own message, with times because there are several.
-	expect(newest).toHaveLength(2);
-	expect(newest[0]!.content).toMatch(/^\[.+\] もう一つ$/);
-	expect(newest[1]!.content).toMatch(/^\[.+\] 最新の質問$/);
-	expect(m.input.final.kind).toBe("utterances");
-	expect(Object.keys(docOf(m))).toEqual([
-		"profile",
-		"episode",
-		"log",
-		"active",
-		"state",
-		"now",
-		"work",
+	expect(m.input.messages.map((message) => message.role)).toEqual([
+		"system",
+		"user",
+		"user",
+		"user",
+		"user",
 	]);
+	expect(m.input.messages[2]!.content.startsWith("<now>\n")).toBe(true);
+	// The pending utterance and the input, each its own message, with times because there are several.
+	const newest = m.input.messages.slice(3).map((message) => message.content);
+	expect(newest[0]).toMatch(/^\[.+\] もう一つ$/);
+	expect(newest[1]).toMatch(/^\[.+\] 最新の質問$/);
+	expect(m.input.final.kind).toBe("utterances");
+	// The four tagged sections, in the layout's order (memory, history, log, state).
+	const order = ["<memory>", "<history>", "<log>", "<state>"].map((tag) =>
+		docOf(m).indexOf(tag),
+	);
+	expect(order.every((at) => at >= 0)).toBe(true);
+	expect([...order].sort((a, b) => a - b)).toEqual(order);
 });
 
 test("State goes through the memory service: the published profile, a waiting memory, tendencies and notes", async () => {
 	const m = await prepared(fullCase);
-	const doc = docOf(m);
-	const profile = JSON.stringify(doc.profile);
-	expect(profile).toContain("辛い物が好き");
-	expect(profile).toContain("刺激の強い食事を好む傾向");
-	expect(profile).not.toContain("夜は通知を控える");
-	expect(JSON.stringify(doc.state.newMemories)).toContain("夜は通知を控える");
-	expect(doc.state.decisions.map((d: { text: string }) => d.text)).toEqual([
-		"旅行は十一月",
-	]);
-	expect(doc.state.notes.map((d: { text: string }) => d.text)).toEqual([
-		"来週は出張",
-	]);
-	expect(doc.now.notices).toEqual(["メモの保存に失敗しました"]);
-	expect(doc.now.agency).toEqual(["紅葉の名所"]);
-	expect(JSON.stringify(doc.now.recall)).toContain("京都です");
-	expect(JSON.stringify(doc.state.goals)).toContain("来週までに資料を作る");
-	expect(JSON.stringify(doc.now.records)).toContain("音声サービス");
+	const memory = sect(m, "memory").join("\n");
+	expect(memory).toContain("辛い物が好き");
+	expect(memory).toContain("刺激の強い食事を好む傾向");
+	expect(memory).not.toContain("夜は通知を控える");
+	const state = sect(m, "state");
+	expect(
+		state.some((line) => /^n\d+ 反映待ちの記憶 .*夜は通知を控える/.test(line)),
+	).toBe(true);
+	expect(state).toContain("m1 決定 旅行は十一月");
+	expect(state.some((line) => line.startsWith("m2 メモ 来週は出張"))).toBe(
+		true,
+	);
+	expect(nowOf(m)).toContain("agency 紅葉の名所");
+	// The recall is gone: no earlier exchange is put in the prompt by the host.
+	expect(
+		m.input.messages.map((message) => message.content).join("\n"),
+	).not.toContain("京都です");
+	expect(state).toContain("g1 目標 来週までに資料を作る");
+	expect(nowOf(m).join("\n")).toContain("音声サービス");
 });
 
-test("the log carries the events as appended, a partial delivery with its delivered text, and what is being spoken", async () => {
+test("the log carries the events as lines, a partial delivery with its delivered text, and what is being spoken", async () => {
 	const m = await prepared(fullCase);
-	const doc = docOf(m);
-	const log = doc.log as Array<Record<string, any>>;
-	const spontaneous = log.find((e) => e.origin === "spontaneous")!;
-	const delivered = log.find(
-		(e) => e.type === "delivered" && e.ref === spontaneous.id,
+	const log = sect(m, "log");
+	// The spontaneous utterance is a line of its own; its partial delivery is a line that gives the heard text.
+	const spontaneous = log.find((line) =>
+		line.includes("自分（自分から）: そういえば、紅葉が見頃です。"),
+	);
+	expect(spontaneous).toBeDefined();
+	const id = spontaneous!.split(" ")[0]!;
+	// The delivery is a line of its own: it refers to the utterance by its number.
+	expect(
+		log.some((line) =>
+			line.endsWith(`届かず ${id} 途中まで「そういえば、紅葉が見頃です。」`),
+		),
+	).toBe(true);
+	// The utterance still being delivered is named in <now>; it has no delivered line yet.
+	const speaking = log.find((line) =>
+		line.endsWith("自分: いま話しているところ"),
 	)!;
-	expect(delivered).toMatchObject({
-		heard: "partial",
-		deliveredText: "そういえば、紅葉が見頃です。",
-	});
-	expect(spontaneous.about).toEqual([
-		log.find((e) => e.text === "宿を調べて")!.id,
-	]);
-	// The utterance still being delivered is named in `now`; it has no delivered event yet.
-	const speaking = log.find((e) => e.text === "いま話しているところ")!;
-	expect(doc.now.speaking).toBe(speaking.id);
-	// The announced work is the TODO the delegation names.
-	const acted = log.find((e) => e.type === "acted")!;
-	expect(acted.todo).toBe(doc.state.todos[0].id);
+	expect(nowOf(m)).toContain(`話し中 ${speaking.split(" ")[0]}`);
+	// The delegation is a line naming the TODO it opened.
+	expect(log.some((line) => /依頼 t1 web_research/.test(line))).toBe(true);
 	// Handled events precede the pending ones: those are the newest messages, not in the log.
-	expect(JSON.stringify(log)).not.toContain("もう一つ");
-	expect(doc.now.trigger).toEqual([
-		{ kind: "utterance", events: expect.any(Array) },
-	]);
+	expect(log.join("\n")).not.toContain("もう一つ");
+	expect(
+		nowOf(m).some((line) => line.startsWith("きっかけ 利用者の発言 ")),
+	).toBe(true);
+	// The memory request's outcome is a log line of its own (the steward's notice).
+	expect(
+		log.some((line) =>
+			line.endsWith("記憶の依頼の結果: メモの保存に失敗しました"),
+		),
+	).toBe(true);
 });
 
 test("earlier history is the episode: a summary and an unsummarized mark; its events are gone from the log", async () => {
 	const m = await prepared(fullCase);
-	const doc = docOf(m);
-	expect(doc.episode.map((s: { kind: string }) => s.kind)).toEqual([
-		"summary",
-		"unsummarized",
-	]);
-	expect(doc.episode[0]).toMatchObject({
-		text: "旅行先は京都に決まった",
-		count: 3,
-	});
-	expect(JSON.stringify(doc.log)).not.toContain("旅行先は？");
-	expect(JSON.stringify(doc.log)).not.toContain("どの季節がいい？");
+	const history = sect(m, "history");
+	expect(history).toHaveLength(2);
+	expect(history[0]).toMatch(/^s1 .*旅行先は京都に決まった$/);
+	expect(history[1]).toMatch(/^s2 .* 要約なし（1件/);
+	const log = sect(m, "log").join("\n");
+	expect(log).not.toContain("旅行先は？");
+	expect(log).not.toContain("どの季節がいい？");
 });
 
-test("TODOs come from the work ledger: open ones in state, results in active, the archived gone, a confirmation pending, the toolchain retained", async () => {
+test("TODOs come from the work ledger: open ones in state, results as log lines, the archived gone, a confirmation pending, the toolchain retained", async () => {
 	const m = await prepared(fullCase);
-	const doc = docOf(m);
-	expect(doc.state.todos).toHaveLength(1);
-	expect(doc.state.todos[0]).toMatchObject({
-		title: "宿の候補を調べる",
-		status: "done",
-		outcome: "succeeded",
-	});
-	expect(doc.active).toHaveLength(1);
-	expect(doc.active[0]).toMatchObject({
-		todo: doc.state.todos[0].id,
-		status: "done",
-		authority: "host_record",
-		certainty: "unverified",
-	});
-	expect(JSON.stringify(doc.active[0])).toContain("三件見つかった");
-	expect(JSON.stringify(doc.state.todos)).not.toContain("海の絵を描く");
-	expect(doc.state.pendingConfirmation).toEqual([
-		expect.objectContaining({
-			toolchain: "code_workspace",
-			impact: "modify_existing",
-		}),
-	]);
-	expect(doc.state.retained.map((r: { id: string }) => r.id).sort()).toEqual([
-		"image_studio",
-		"web_research",
-	]);
-	expect(m.input.shown.todos).toEqual([doc.state.todos[0].id]);
+	const state = sect(m, "state");
+	const todos = state.filter((line) => /^t\d+ /.test(line));
+	expect(todos).toHaveLength(1);
+	expect(todos[0]).toMatch(
+		/^t1 完了 宿の候補を調べる \(成功, 結果 e\d+, 未伝達\)$/,
+	);
+	const results = sect(m, "log").filter((line) => /結果 t1 成功: /.test(line));
+	expect(results).toHaveLength(1);
+	expect(results[0]).toContain("三件見つかった");
+	expect(state.join("\n")).not.toContain("海の絵を描く");
+	expect(state).toContain(
+		"c1 確認待ち code_workspace「設定を書き換える」(変更)",
+	);
+	expect(state.some((line) => line.startsWith("担当 web_research "))).toBe(
+		true,
+	);
+	expect(state.some((line) => line.startsWith("担当 image_studio "))).toBe(
+		true,
+	);
+	expect(m.input.shown.todos).toHaveLength(1);
 });
 
-test("a generation without an utterance shows the host's fixed text and the trigger with resolved ids", async () => {
+test("a generation without an utterance shows the host's fixed text and the trigger with the TODO's number", async () => {
 	const testCase = makeCase("ctx-f12-dev-01", null, {
 		seed: {
 			events: [user(0, "調べて", "ask")],
@@ -276,35 +280,29 @@ test("a generation without an utterance shows the host's fixed text and the trig
 	});
 	const m = await prepared(testCase);
 	expect(m.input.final).toEqual({ kind: "fixed" });
-	expect(m.input.messages.slice(2)).toEqual([
-		{ role: "user", content: FIXED_TRIGGER_TEXT },
-	]);
-	const doc = docOf(m);
-	expect(doc.now.trigger).toEqual([
-		{
-			kind: "todo_changed",
-			todos: [{ id: doc.state.todos[0].id, status: "done" }],
-		},
-	]);
-	// The user's utterance was handled: it is in the log, not a newest message.
-	expect(doc.log[0]).toMatchObject({
-		type: "said",
-		by: "user",
-		text: "調べて",
+	expect(m.input.messages.at(-1)).toEqual({
+		role: "user",
+		content: FIXED_TRIGGER_TEXT,
 	});
+	expect(nowOf(m)).toContain("きっかけ 仕事の変化 t1 完了");
+	// The user's utterance was handled: it is a line of the log, not a newest message.
+	expect(sect(m, "log").some((line) => line.endsWith("利用者: 調べて"))).toBe(
+		true,
+	);
 });
 
-test("the document is deterministic and escapes only markup characters and line separators", async () => {
+test("the document is deterministic and replaces only markup characters and line breaks of outside text", async () => {
 	const testCase = makeCase(
 		"ctx-f1-dev-01",
-		"これは <b>テスト</b> & 確認\u2028です",
+		"これは <b>テスト</b> & 確認 です",
 	);
 	const a = await prepared(testCase);
 	const b = await prepared(testCase);
 	expect(promptHash(a.input.messages)).toBe(promptHash(b.input.messages));
-	const text = a.input.messages[1]!.content;
-	expect(text).not.toMatch(/[<>&\u2028]/);
-	expect(a.input.messages[2]!.content).toContain("<b>");
+	// The utterance itself is the newest message, as the user said it.
+	expect(a.input.messages.at(-1)!.content).toContain("<b>");
+	// The document's own tags are the only angle brackets it shows.
+	expect(docOf(a)).not.toContain("<b>");
 	const withMemory = await prepared(
 		makeCase("ctx-f1-dev-02", "あ", {
 			seed: {
@@ -319,9 +317,10 @@ test("the document is deterministic and escapes only markup characters and line 
 			},
 		}),
 	);
-	const profile = withMemory.input.messages[1]!.content;
-	expect(profile).toContain("紅茶は");
-	expect(profile).toContain("\\u003c熱め\\u003e");
+	// Outside text in a line: `<` and `>` become full-width, so they can not forge a tag.
+	expect(sect(withMemory, "memory").join("\n")).toContain(
+		"紅茶は＜熱め＞が好き",
+	);
 });
 
 test("a window the plan cannot use stops the case, and the store is closed", async () => {
@@ -390,15 +389,16 @@ test("a generation after a long silence re-constructs the window first, and says
 		});
 		expect(later.reconstruction).toMatchObject({ reason: "resumed" });
 		// The handled utterance joined the log in receipt order, after the earlier events.
-		const log = JSON.parse(later.input.messages[1]!.content).log as Array<{
-			text?: string;
-		}>;
-		expect(log.map((e) => e.text).filter(Boolean)).toEqual([
-			"こんにちは",
-			"はい",
-			"一つ目",
-			"どうぞ",
-		]);
+		const log = sectionLines(later.input.messages[1]!.content, "log");
+		const at = (pattern: RegExp) => log.findIndex((line) => pattern.test(line));
+		const positions = [
+			at(/利用者: こんにちは$/),
+			at(/自分: はい$/),
+			at(/利用者: 一つ目$/),
+			at(/自分: どうぞ$/),
+		];
+		expect(positions.every((position) => position >= 0)).toBe(true);
+		expect([...positions].sort((a, b) => a - b)).toEqual(positions);
 	} finally {
 		await wiring.close();
 	}

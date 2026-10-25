@@ -25,9 +25,7 @@
 							"version": 1,
 							"title": "出張先の宿泊先の調査",
 							"request": "来月の出張の宿泊先を調べる",
-							"completionConditions": [
-								"宿泊先の候補が示されている"
-							],
+							"completionConditions": ["宿泊先の候補が示されている"],
 							"origin": {
 								"source": "conversation",
 								"conversationId": "main",
@@ -56,9 +54,7 @@
 								"projectRef": "proj-1",
 								"sessionRefs": [],
 								"maxSessions": 1,
-								"operations": [
-									"read"
-								],
+								"operations": ["read"],
 								"expiresAt": "2026-10-17T02:00:00.000Z"
 							}
 						},

@@ -92,8 +92,8 @@ export const MIN_SECTION_ROOM_TOKENS = 8000;
 export const SECTION_LIMITS = {
 	profile: { share: 0.25, max: 12_000 },
 	episode: { share: 0.08, max: 2_000 },
-	log: { share: 0.4, max: 16_000 },
-	active: { share: 0.08, max: 4_000 },
+	// Work results are events of the log (the ContextWindow layout specification): the log takes their share.
+	log: { share: 0.48, max: 20_000 },
 	state: { share: 0.08, max: 2_000 },
 	now: { share: 0.11, max: 3_000 },
 } as const;

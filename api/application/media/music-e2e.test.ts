@@ -22,7 +22,7 @@ test("a premature creation claim accompanying the selected operation is withheld
 			const [messages, signal, options] = args;
 			// The generation that hands the work over: its speech beside the delegate call is a preamble (withdrawn).
 			const handsOver =
-				isUtteranceRound(options?.tools) &&
+				isUtteranceRound(options) &&
 				toolResults(afterUtterance(messages), "find_toolchain").length > 0;
 			if (handsOver) {
 				await paused;
@@ -342,8 +342,7 @@ test("a music screen submit generates a track though the conversation retained o
 		...music.model,
 		answer: async (...args: Parameters<typeof music.model.answer>) => {
 			if (phase === "image") return image.model.answer(...args);
-			if (isUtteranceRound(args[2]?.tools))
-				screenAnalysis++;
+			if (isUtteranceRound(args[2])) screenAnalysis++;
 			return music.model.answer(...args);
 		},
 	};

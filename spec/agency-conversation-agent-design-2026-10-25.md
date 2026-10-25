@@ -135,3 +135,10 @@
 - dialogue: 生成は `ConversationAgentPort.respond`（組立て層が agency の `runRespond` でつなぐ）で行う。host は ReplyPort（`executeStream`、準備したメッセージが常に先頭）と ToolPort（固定の4種。受け付けない呼出しは理由を結果で返し、agency が続ける）を渡す。`respond` tool・分類・根拠の検査・構造の修正（`correction*.context.toml`）・`spoken_reply_too_long`・`tool_choice`・仕事の操作の `archive`/`told`・選択の記録の `analysis`/`repaired` を削除した。system は agency の `respondSystem`（設定で決まる）＋Eumenes の人格と host の規則。agency の状態は `now.agency`（`AgencyLayerPort.stateForContextInTransaction`）。
 - TODO: 仕事の結果だけで起きる run は生成せずに完了し（サブエージェントの答えはここで消費）、agency の `result_received` の機会を開く（`workChangedInTransaction`、利用者が今いる会話のとき）。agency には `todo`・`waiting`（質問）・`done`（outcome と一行の結果）を渡し、取り消した仕事は渡さない。`decide` の発話が引用した `done` は保存と同時に `archived`（agency の発話は保存で配信済みとする現行の扱い）。通常の返答が伝えたと update が照合した `done` は、その返答が最後まで聞かれたら `archived`。
 - 返答の感情は、返答の配信の感情（`hostDelivery`）として保存する。ストリーミング中の句ごとの音声は、従来どおり LARM の判定による。
+- 仕事の結果だけで完了する run の扱い（試験移行で見つかった不具合の修正）:
+  - 引き渡し後の別のコミットで生成が取消扱いにならないよう、生成の古さの判定は「この生成の引き渡しで次の版の `queued` になった run」を引き渡し済みと見なす。
+  - 通知 run は答えを持たずに完了しても、通知は届いたもの（`delivered`）とする。報告は TODO が運ぶ。
+  - 生成せずに完了する run は、答えのリクエストをホストの答えとして受理する（`acceptRunAnswer`。専門担当の返答と同じ扱い）。これで音声ターンが `permission_revoked` にならない。引き渡しの時点では受理しない。サブエージェントは pending の親リクエストの下で推論するため。
+- agency の `result_received` は、まだ機会を開いていない `done` か質問が TODO にあるときだけ開く。ロールバックした取引の知らせは何も開かない。
+- agency が読む `done` の結果は、その時点の操作の結果を読み直したもの（完了後の取消が見える）。旧来の結果ラウンド直前の読み直しに代わる、TODO の結果の検査（§9 Q6）。
+- 検証（fixture）: domain の試験（dialogue 340・voice-dialogue 68・inference と settings 211・toolchain-history 10・continuity 24・agent-runtime 145・capabilities 93・web-research 56・tool-runtime 31）は全件通過。`api/application` は 900 件中 899 件が通過し、残る 1 件は vendor の `dirty: true` による。live と実機器の受入は未実施。

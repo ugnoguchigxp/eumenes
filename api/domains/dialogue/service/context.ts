@@ -76,6 +76,9 @@ export type FinalMessage =
 	  }
 	| { kind: "fixed" };
 
+/** Where the newest message(s) start in a generation's messages: after the system, the document and `<now>`. */
+export const NEWEST_MESSAGES_AT = 3;
+
 /** What a generation's prepare fixes, inside the claim transaction. */
 export interface GenerateInput {
 	runId: string;
@@ -88,10 +91,13 @@ export interface GenerateInput {
 	revision: number;
 	conversationId: string;
 	requestId?: string;
-	/** System, the material document, then the newest message(s). Tool calls and results are added while it runs. */
+	/**
+	 * System, the material document, `<now>`, then the newest message(s) (from `NEWEST_MESSAGES_AT`). Tool calls and
+	 * results are added while it runs.
+	 */
 	messages: ChatMessage[];
 	final: FinalMessage;
-	/** Why this generation runs (the `now.trigger` of its document). */
+	/** Why this generation runs (the triggers its `<now>` shows). */
 	trigger: ReadonlyArray<Record<string, unknown>>;
 	plan: import("../../inference").WindowPlan;
 	/** The rendered document and its sizes (measured, never re-rendered while it runs). */
@@ -101,12 +107,12 @@ export interface GenerateInput {
 	 * whose evidence changed meanwhile (a corrected or withdrawn source) is never adopted.
 	 */
 	agent?: AnswerTicket;
-	/** What the window shows that an answer may stand on: the TODOs with a result slot, and the logged events. */
-	shown: { todos: string[]; events: string[] };
+	/** The TODOs whose result the log shows: what a reply may report. */
+	shown: { todos: string[] };
+	/** The TODOs' revisions as `<state>` showed them: the work tool acts on what the model saw. */
+	todoRevisions: Record<string, number>;
 	/** The episode version shown: an episode changed meanwhile by a forget expires the generation. */
 	windowVersion: number;
-	/** Conversational prose is a short spoken reply. */
-	briefReply: boolean;
 	/** The toolchains this generation may delegate to without a search (`state.retained`). */
 	retained: ReturnType<
 		import("./work-ledger").WorkLedger["retainedInTransaction"]

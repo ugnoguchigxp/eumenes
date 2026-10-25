@@ -1,9 +1,6 @@
 import { readFileSync } from "node:fs";
 import { createLarmPlayground, type LarmPort } from "../../domains/larm";
-import {
-	answerUtterance,
-	handOver,
-} from "./conversation-turn.fixture";
+import { answerUtterance, handOver } from "./conversation-turn.fixture";
 export const playbackQuestion = "bright pianoの保存曲をタグで探して聴きたい";
 export const playbackPlan = {
 	title: "明るいピアノ",
@@ -155,7 +152,7 @@ export function musicLibraryFixture(correctablePlan = false) {
 		speak: async () => new Uint8Array(),
 		answer: async (messages, _signal, options) => {
 			const turn = answerUtterance(
-				options?.tools,
+				options,
 				messages,
 				options?.onToolCalls,
 				handOver("music.library", "準備します。", "none"),

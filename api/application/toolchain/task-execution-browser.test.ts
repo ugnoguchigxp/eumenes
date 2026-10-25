@@ -1,10 +1,7 @@
 import { taskPlan, taskItem } from "./task-plan.fixture";
 import { expect, test } from "bun:test";
 import { harness } from "./toolchain.fixture";
-import {
-	afterUtterance,
-	toolResults,
-} from "./conversation-script.fixture";
+import { afterUtterance, toolResults } from "./conversation-script.fixture";
 import { handOverTask } from "./task-delegation.fixture";
 import { createBrowser } from "../../domains/browser";
 import {
@@ -393,10 +390,8 @@ test("a browser approval resumes in a new physical task, keeps the old deadline,
 						{
 							name: "work",
 							args: {
-								todo: todo.id,
+								todo: `t${todo.ref}`,
 								operation: "answer",
-								revision: todo.revision,
-								questionId: todo.questionId,
 								// The approval question asks for a structured answer: its JSON.
 								text: JSON.stringify({ approved: true }),
 							},

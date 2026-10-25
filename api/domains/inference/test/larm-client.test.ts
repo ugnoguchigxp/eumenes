@@ -34,8 +34,7 @@ test("the host keeps a connection that the port of the new settings shares, and 
 	const dbPath = join(dir, "test.db");
 	const store = openStore(dbPath, migrations);
 	const settings = await createSettings(store, { dbPath, env: {} });
-	const closes: Array<{ speed?: number; profile?: string; keep: boolean }> =
-		[];
+	const closes: Array<{ speed?: number; profile?: string; keep: boolean }> = [];
 	const inference = createInference(store, settings, {
 		keepLarmConnection: true,
 		larmFactory: (s) =>

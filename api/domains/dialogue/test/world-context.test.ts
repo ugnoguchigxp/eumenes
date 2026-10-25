@@ -5,7 +5,7 @@ import type {
 	WorldContextPort,
 } from "../contracts";
 import { waitFor } from "../../../infrastructure/wait-for";
-import { setup, type Harness } from "./generation.fixture";
+import { sectionLines, setup, type Harness } from "./generation.fixture";
 
 /**
  * What the conversation's prompt takes from World and Goals (the ContextWindow specification, sections 5.2 and
@@ -20,15 +20,22 @@ afterEach(async () => {
 
 const HINT_NAME = "音声サービス";
 
-/** The records of the nth model call's document, by source. */
-function recordsOf(call: number) {
-	const document = JSON.parse(h!.state.calls[call]!.messages[1]!.content) as {
-		now: {
-			records?: Array<{ source: string; authority: string; text: string }>;
-		};
-	};
-	// A document with no record leaves the key out (section 5.2).
-	return document.now.records ?? [];
+/**
+ * The reference records of the nth model call: the `資料 <source>: <json>` lines of its `<now>` (the last message of
+ * the layout specification, section 5.1). A call with no record has none of these lines.
+ */
+function recordsOf(
+	call: number,
+): Array<{ source: string; authority?: string; text?: string }> {
+	return sectionLines(
+		h!.state.calls[call]!.messages[2]!.content,
+		"now",
+	).flatMap((line) => {
+		const match = /^資料 ([^:]+): (.*)$/.exec(line);
+		return match
+			? [{ source: match[1]!, ...(JSON.parse(match[2]!) as object) }]
+			: [];
+	});
 }
 
 test("the names World knows for the wording are one reference record; the wording is the port's input", async () => {

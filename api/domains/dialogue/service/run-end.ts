@@ -69,3 +69,19 @@ export function endRun(
 	runEndedInTransaction(deps, tx, run, state);
 	return true;
 }
+
+/**
+ * The host, not the conversation's model, answers the run (a specialist's reply, or a TODO that reports the work it
+ * waited for): after the receipts standing on the run's answer request are taken, that request is accepted as the
+ * host's answer, so what stands on it (speech, the voice turn) proceeds as for a model answer. Without this a spoken
+ * request ended `permission_revoked`.
+ */
+export function acceptRunAnswer(
+	deps: Pick<DialogueDeps, "larm">,
+	tx: Database,
+	run: Run,
+): boolean {
+	const requestId = deps.larm.requestFor?.(tx, run.id, "llm");
+	if (!requestId || !deps.larm.acceptHostAnswerInTransaction) return true;
+	return deps.larm.acceptHostAnswerInTransaction(tx, requestId);
+}

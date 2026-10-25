@@ -27,7 +27,7 @@ import { migrations as schedulerMigrations } from "../../scheduler";
 import { migrations as voiceAllMigrations } from "..";
 import { readInput, saveInput } from "../repository/input";
 import { get, migrations as voiceMigrations } from "../repository";
-import { testConversationAgent } from "../../dialogue/test/conversation-agent.fixture";
+import { testConversationAgent } from "./conversation-agent.fixture";
 
 /** Every migration the upgraded dialogue flow needs, in the order the domains declare them. */
 const allMigrations = () =>

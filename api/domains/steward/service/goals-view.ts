@@ -50,7 +50,7 @@ export function describeGoals(
 		.slice(0, limit);
 	const refs: GoalsView["refs"] = {};
 	const shown: GoalsView["goals"] = listed.map((goal, i) => {
-		const ref = `g${i + 1}`;
+		const ref = `gl${i + 1}`;
 		refs[ref] = {
 			goalId: goal.goalId,
 			revision: goal.revision,

@@ -74,9 +74,7 @@
 			},
 			{
 				"kind": "forbidden_identifier",
-				"identifiers": [
-					"board_open_failed"
-				]
+				"identifiers": ["board_open_failed"]
 			}
 		],
 		"rubric": [

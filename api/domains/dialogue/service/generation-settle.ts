@@ -197,13 +197,6 @@ export function createGenerationSettlement(
 						delivery,
 					);
 			}
-			// The notices this answer carried are shown once: only an adopted answer clears them.
-			if (input.memory && memory && !result.handover)
-				memory.clearNoticesInTransaction(
-					tx,
-					run.conversationId,
-					input.memory.window.noticeIds,
-				);
 			if (result.selection)
 				deps.toolchains?.recordSelectionInTransaction(tx, {
 					runId: run.id,

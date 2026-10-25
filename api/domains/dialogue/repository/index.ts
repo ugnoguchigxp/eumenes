@@ -1,5 +1,5 @@
 import type { Database } from "bun:sqlite";
-import { workMigration, workOriginsMigration } from "./work";
+import { workMigration, workOriginsMigration, workRefsMigration } from "./work";
 import type { Migration } from "../../../infrastructure/sqlite";
 import {
 	continuationConditionsMigration,
@@ -137,6 +137,15 @@ export function byId(db: Database, id: string): Run | null {
 		.query(`SELECT ${columns} FROM dialogue_runs WHERE id = ?`)
 		.get(id);
 	return row ? map(row as Record<string, unknown>) : null;
+}
+/** The conversation of the newest run: the one the user talked in last. */
+export function latestConversationId(db: Database): string | null {
+	const row = db
+		.query(
+			"SELECT conversation_id AS id FROM dialogue_runs ORDER BY created_at DESC, rowid DESC LIMIT 1",
+		)
+		.get() as { id: string } | null;
+	return row?.id ?? null;
 }
 export function byRequest(db: Database, id: string): Run | null {
 	const row = db
@@ -368,6 +377,11 @@ export const migrations: readonly Migration[] = [
 		id: "dialogue/0020-work-origins",
 		after: ["dialogue/0019-retire-continuations"],
 		sql: workOriginsMigration,
+	},
+	{
+		id: "dialogue/0021-work-refs",
+		after: ["dialogue/0020-work-origins"],
+		sql: workRefsMigration,
 	},
 ];
 

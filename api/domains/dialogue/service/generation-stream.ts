@@ -17,8 +17,10 @@ export function generationStale(
 	input: GenerateInput,
 ): string | null {
 	const run = byId(db, input.runId);
-	// Handed over: the run waits behind its work's job now, and this generation has nothing left to adopt.
-	if (run?.status === "queued" && run.jobId !== input.jobId) return null;
+	// Handed over: the run waits for its work now (behind its job, or for a task's answer still on this job id), and
+	// this generation has nothing left to adopt. Only this generation's hand-over queues it at the next revision.
+	if (run?.status === "queued" && run.revision === input.revision + 1)
+		return null;
 	if (run?.status !== "running" || run.revision !== input.revision)
 		return "cancelled";
 	if (!validAttachmentContext(deps, db, input, run.conversationId))
@@ -73,9 +75,6 @@ export function createAnswerStream(
 		rethrow(error: unknown): never {
 			throw abort.signal.aborted ? abort.signal.reason : error;
 		},
-		reset() {
-			held = 0;
-		},
 	};
 }
 
@@ -87,10 +86,7 @@ export function answerSession(input: GenerateInput) {
 		...(window
 			? {
 					refs: {
-						messageIds: [
-							...window.shownMessageIds,
-							...window.pins.map((pin) => pin.messageId),
-						],
+						messageIds: [...window.shownMessageIds],
 						itemIds: window.manifest,
 					},
 				}

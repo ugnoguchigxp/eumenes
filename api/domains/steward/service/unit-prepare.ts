@@ -142,8 +142,6 @@ export function createPrepare(
 			if (unit.slot === "maintenance") end.markQuiet(db, unit);
 			// A range with nothing to prepare is not made into a unit again.
 			if (unit.slot === "episode") end.markEpisodeQuiet(db, unit);
-			// The recall preparation is not tried again for an event it cannot read.
-			if (unit.slot === "recall") end.dropRecall(db, unit);
 			if (prepared.retryLater) {
 				// Nothing can be done now (World can not be used, Memory refused): the timer makes the unit again.
 				wake.pause(

@@ -89,8 +89,16 @@ export interface BackgroundControl {
  */
 export type CallSession = {
 	sessionRole?: "main" | "subagent" | "auxiliary";
-	/** A call whose only valid output is a call of one of its tools: the provider is told to call one. */
-	toolChoice?: "required";
+	/** `required`: the only valid output is a call of one of its tools. `none`: a call of `prefixTools` is not valid. */
+	toolChoice?: "required" | "none";
+	/**
+	 * A control call on the conversation's prompt (the ContextWindow layout specification, section 8.2): it is sent
+	 * on the conversation's own connection, so the shared prefix is read from its cache, and it yields to the
+	 * conversation (a conversation call aborts it with `larm_preempted`). Auxiliary only.
+	 */
+	onConversation?: true;
+	/** With `onConversation`: the conversation's tool definitions, sent unchanged to keep the prefix (`toolChoice: none`). */
+	prefixTools?: import("../../../infrastructure/chat-stream").NativeTool[];
 	/** The call's output is spoken to the user: the provider samples as usual even with tools offered. */
 	speaks?: true;
 	/** This call's own bound on output tokens, below the request's: a call whose output is short by contract. */

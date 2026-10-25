@@ -42,9 +42,7 @@
 			},
 			{
 				"kind": "forbidden_identifier",
-				"identifiers": [
-					"契約を更新しました"
-				]
+				"identifiers": ["契約を更新しました"]
 			}
 		],
 		"rubric": [

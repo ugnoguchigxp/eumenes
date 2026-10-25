@@ -1,11 +1,6 @@
 import type { ConversationEvent } from "../../../continuity";
 import { decisionsOfMessages } from "../../repository";
-import {
-	type LabelTable,
-	type LoadedEvent,
-	eventView,
-	isRecord,
-} from "../context";
+import { type LabelTable, type LoadedEvent, isRecord } from "../context";
 import type { ApplyResult, StepEnv } from "../types";
 
 /**
@@ -42,24 +37,12 @@ export function pendingEvents(env: StepEnv): ConversationEvent[] {
 	return todo;
 }
 
-/** Labels `e1`... in the order given; the views the model reads. */
-export function labelEvents(
-	loaded: readonly LoadedEvent[],
-	start = 1,
-): {
-	table: LabelTable;
-	views: Array<Record<string, unknown>>;
-	labels: string[];
-} {
-	const table: LabelTable = {};
-	const labels: string[] = [];
-	const views = loaded.map((event, i) => {
-		const label = `e${start + i}`;
-		labels.push(label);
-		table[label] = { seq: event.seq, messageId: event.messageId, by: event.by };
-		return eventView(label, event);
-	});
-	return { table, views, labels };
+/**
+ * The label the model reads for a loaded event: the conversation's own event id (`e<seq>`, the id the
+ * conversation's log shows), or `x<n>` for a message shown as context that no event stands for.
+ */
+export function eventLabel(event: LoadedEvent, index: number): string {
+	return event.seq === null ? `x${index + 1}` : `e${event.seq}`;
 }
 
 /** What the curate step saved from these messages (the steps after it read it as context). */

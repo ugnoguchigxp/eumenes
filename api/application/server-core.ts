@@ -10,10 +10,7 @@ import {
 } from "../domains/attitude-dataset";
 import { createConversationService } from "../domains/conversation";
 import { createSettings } from "../domains/settings";
-import {
-	createInference,
-	createCloudAgents,
-} from "../domains/inference";
+import { createInference, createCloudAgents } from "../domains/inference";
 import { createQueue } from "../domains/queue";
 import { createActivityRecorder } from "../domains/larm";
 import { createTtsDictionary } from "../domains/tts-dictionary";

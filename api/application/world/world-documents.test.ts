@@ -46,12 +46,10 @@ test("collected seed reaches the existing worker and report without becoming a p
 	const { done } = await h.ask("収集資料から搬入規程の対象を調べて");
 	expect(done?.status).toBe("completed");
 	expect(h.packets[2]!.observations[0]!.origin).toBe("collected_document");
-	const parent = h.parentMessages.find((m) =>
-		m.includes('\\"kind\\":\\"world_document\\"'),
-	)!;
-	expect(parent).toBeDefined();
+	// The agency is given the finished TODO's result.
+	const parent = h.reported();
+	expect(parent).toContain('"kind":"world_document"');
 	expect(parent).toContain("搬入規程");
-	expect(parent).toContain("利用者の発言や本人についての記憶ではありません");
 	expect(parent).not.toContain("collected-1");
 	expect(parent).not.toContain("sourceRef");
 	expect(h.workerMessages.join("")).toContain("観測未提供");
@@ -78,7 +76,7 @@ test("withdrawn collected evidence cannot be adopted after it was read", async (
 	);
 	expect(rows).toHaveLength(0);
 	// The fixed host rules name the kind in prose; a source object of that kind or the document's text would be a leak.
-	const parentText = h.parentMessages.join("");
-	expect(parentText).not.toContain('\\"kind\\":\\"world_document\\"');
+	const parentText = h.reported();
+	expect(parentText).not.toContain('"kind":"world_document"');
 	expect(parentText).not.toContain("西工房");
 });

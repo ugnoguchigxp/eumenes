@@ -28,7 +28,7 @@ import { Hono } from "hono";
 import { registerVoiceDialogue } from "..";
 import type { InferencePort } from "../../inference";
 import { hostDelivery, type SpeechPreparation } from "../../delivery";
-import { testConversationAgent } from "../../dialogue/test/conversation-agent.fixture";
+import { testConversationAgent } from "./conversation-agent.fixture";
 
 /** The schema the dialogue and voice flow need, built from each domain's own migrations. */
 const schemaMigrations = () =>

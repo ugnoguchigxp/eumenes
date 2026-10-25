@@ -7,6 +7,8 @@ import {
 import type { SelectionOutcome } from "../../toolchain-history";
 import type { Run } from "../contracts";
 import { estimateTextTokens } from "../../../infrastructure/context-budget";
+import { eventLine } from "./context-document";
+import { eventFields } from "./event-fields";
 import { researchCitations } from "./research-citations";
 import type { DialogueDeps, GenerateInput, GeneratePayload } from "./context";
 import type { WorkOutcome, WorkRow } from "../repository/work";
@@ -221,8 +223,8 @@ function taskNotice(
 
 /**
  * Right before the model speaks of a result, an operation's result is read again (a cancel after the report shows
- * at once): a changed result overwrites its TODO and its `active` slot, and the document's `active` section is
- * rendered again. The rest of the prepared prompt stays as it was.
+ * at once): a changed result overwrites its TODO, joins the log as a new result event, and its line is added at the
+ * end of the document's `<log>`. The rest of the prepared prompt stays as it was.
  */
 export async function refreshActionResults(
 	deps: DialogueDeps,
@@ -248,8 +250,8 @@ export async function refreshActionResults(
 			: [],
 	);
 	if (!ledger || !agents || todoIds.length === 0) return;
-	const active = await deps.store.write((tx) => {
-		let changed = false;
+	const lines = await deps.store.write((tx) => {
+		const reported = new Set<string>();
 		for (const id of todoIds) {
 			const row = ledger.workInTransaction(tx, id);
 			if (!row || row.status !== "done" || row.archivedAt) continue;
@@ -266,22 +268,31 @@ export async function refreshActionResults(
 				outcome: row.outcome ?? "succeeded",
 				result: JSON.parse(payload) as unknown,
 			});
-			changed = true;
+			reported.add(row.id);
 		}
-		return changed
-			? deps.continuity.events.activeInTransaction(tx, input.conversationId)
-			: null;
+		if (reported.size === 0) return [];
+		const refs = ledger.refsInTransaction(tx, input.conversationId);
+		return deps.continuity.events
+			.logInTransaction(tx, input.conversationId)
+			.filter((event) => {
+				if (event.seq <= input.lastSeq || event.type !== "acted") return false;
+				const fields = eventFields(event);
+				return (
+					fields.action === "work.result" && reported.has(String(fields.todo))
+				);
+			})
+			.flatMap((event) => eventLine(event, refs) ?? []);
 	});
-	if (!active) return;
-	const before = input.document.sections.active.text;
-	const after = `[${active.map((slot) => slot.text).join(",")}]`;
+	if (lines.length === 0) return;
+	const before = input.document.sections.log.text;
+	const after = before.replace(
+		/\n<\/log>$/,
+		() => `\n${lines.join("\n")}\n</log>`,
+	);
 	const document = input.messages[1]!;
 	// A replacer function: the result text is external, and `$` patterns in a replacement string would be expanded.
-	document.content = document.content.replace(
-		`"active":${before}`,
-		() => `"active":${after}`,
-	);
-	input.document.sections.active = {
+	document.content = document.content.replace(before, () => after);
+	input.document.sections.log = {
 		text: after,
 		tokens: estimateTextTokens(after),
 	};

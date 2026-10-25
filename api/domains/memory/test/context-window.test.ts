@@ -379,17 +379,13 @@ test("a rolled-back rebuild is discarded: the next read uses the committed row",
 	const committed = must(await h.read());
 	await expect(
 		h.store.write((db) => {
-			h.memory.windows.rebuildInTransaction(db, "c1", {
-				republish: true,
-				addNotices: ["rolled back"],
-			});
+			h.memory.windows.rebuildInTransaction(db, "c1", { republish: true });
 			throw new Error("abort");
 		}),
 	).rejects.toThrow("abort");
 	const next = must(await h.read());
 	expect(next.buildId).toBe(committed.buildId);
 	expect(next.version).toBe(committed.version);
-	expect(next.notices).toEqual([]);
 });
 
 test("the same inputs always give the same profile", async () => {
@@ -455,22 +451,6 @@ test("window validation: additions keep a run valid; stop, own-run changes, sett
 		ok: false,
 		reason: "memory_stale",
 	});
-	// A pinned message whose text no longer matches expires the run.
-	const pinned = {
-		...prepared,
-		pins: [{ messageId: "m1", digest: "0".repeat(64) }],
-	};
-	expect(await validate("run-1", pinned)).toEqual({
-		ok: false,
-		reason: "memory_stale",
-	});
-	expect(
-		await h.store.read((db) =>
-			h.memory.validateWindowInTransaction(db, "run-1", prepared, [
-				{ messageId: "missing", digest: "x" },
-			]),
-		),
-	).toEqual({ ok: false, reason: "memory_stale" });
 	// A stop expires it.
 	const second = must(await h.read());
 	const preparedSecond = h.memory.preparedWindow(second);
@@ -488,22 +468,14 @@ test("window validation: additions keep a run valid; stop, own-run changes, sett
 	});
 });
 
-test("usage receipts and notices: adoption records the window; the notice is shown once", async () => {
+test("usage receipts: adoption records the window it read", async () => {
 	const h = await setup();
 	await h.remember("コーヒーが好き");
-	await h.store.write((db) => {
-		h.memory.windows.rebuildInTransaction(db, "c1", {
-			republish: false,
-			addNotices: ["保存できませんでした"],
-		});
-	});
 	const window = must(await h.read());
-	expect(window.notices.map((n) => n.text)).toEqual(["保存できませんでした"]);
 	const prepared = h.memory.preparedWindow(window);
-	await h.store.write((db) => {
-		h.memory.recordUsageInTransaction(db, "run-1", "c1", prepared);
-		h.memory.clearNoticesInTransaction(db, "c1", prepared.noticeIds);
-	});
+	await h.store.write((db) =>
+		h.memory.recordUsageInTransaction(db, "run-1", "c1", prepared),
+	);
 	const receipt = h.memory.usage("run-1");
 	expect(receipt).toMatchObject({
 		viewDigest: `window:${window.version}:${window.buildId}`,
@@ -511,11 +483,6 @@ test("usage receipts and notices: adoption records the window; the notice is sho
 		viewSchema: 3,
 	});
 	expect(receipt?.itemIds).toEqual(window.profile.items.map((item) => item.id));
-	expect(must(await h.read()).notices).toEqual([]);
-	// No notices to clear is a no-op (no new version).
-	const version = must(await h.read()).version;
-	await h.store.write((db) => h.memory.clearNoticesInTransaction(db, "c1", []));
-	expect(must(await h.read()).version).toBe(version);
 });
 
 test("the continuity guard limits the short-term notes to the state section of the window plan", async () => {
@@ -673,36 +640,6 @@ test("a validity boundary crossed by time refreshes the layers without waiting f
 	expect(shown(started)).toContain("始まる習慣");
 	expect(started.nextBoundaryMs).toBeNull();
 	expect(must(await h.read()).version).toBe(started.version);
-});
-
-test("clearing notices is a light edit: no re-render, tolerant of a missing window; a long notice is kept whole", async () => {
-	const h = await setup();
-	await h.remember("コーヒーが好き");
-	await h.store.write((db) => {
-		h.memory.windows.rebuildInTransaction(db, "c1", {
-			republish: true,
-			addNotices: ["あ".repeat(500), "二つ目"],
-		});
-	});
-	const window = must(await h.read());
-	expect([...window.notices[0]!.text]).toHaveLength(500);
-	await h.store.write((db) =>
-		h.memory.clearNoticesInTransaction(db, "c1", [window.notices[0]!.id]),
-	);
-	const after = must(await h.read());
-	expect(after.version).toBe(window.version + 1);
-	expect(after.notices.map((n) => n.text)).toEqual(["二つ目"]);
-	expect(after.profile).toEqual(window.profile);
-	// Unknown ids and a purged window do not throw and do not bump the version.
-	await h.store.write((db) =>
-		h.memory.clearNoticesInTransaction(db, "c1", ["unknown"]),
-	);
-	expect(must(await h.read()).version).toBe(after.version);
-	await h.store.write((db) => {
-		h.memory.windows.purgeInTransaction(db);
-		h.memory.clearNoticesInTransaction(db, "c1", ["x"]);
-	});
-	expect(windowRows(h)).toEqual([]);
 });
 
 test("an unhealthy memory fails validation as unavailable", async () => {

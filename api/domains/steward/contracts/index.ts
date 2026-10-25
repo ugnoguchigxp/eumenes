@@ -1,5 +1,6 @@
 import type { Database } from "bun:sqlite";
 import { z } from "zod";
+import type { NativeTool } from "../../../infrastructure/chat-stream";
 
 /** The one queue job kind of the steward: one job is one step, one inference. */
 export const STEWARD_KIND = "steward.step.v1";
@@ -16,7 +17,6 @@ const stepIds = [
 	"curate-goals",
 	"curate-world",
 	"summarize",
-	"prepare-recall",
 	"consolidate-memory",
 	"consolidate-goals",
 	"refine-summary",
@@ -31,15 +31,10 @@ const unitKinds = [
 export type UnitKind = (typeof unitKinds)[number];
 /**
  * Which open unit a conversation may hold at once: reflecting steps (they read the handled events of the
- * continuity flow), upkeep steps, the recall preparation, the World curation (the events World received) and the
+ * continuity flow), upkeep steps, the World curation (the events World received) and the
  * episode preparation (summaries and merges that the next re-construction applies).
  */
-export type UnitSlot =
-	| "reflect"
-	| "maintenance"
-	| "recall"
-	| "world"
-	| "episode";
+export type UnitSlot = "reflect" | "maintenance" | "world" | "episode";
 export type UnitState = "open" | "applied" | "stale" | "failed";
 
 /**
@@ -104,6 +99,10 @@ export const DECISIONS_PER_CONVERSATION = 1000;
 export const UNITS_PER_CONVERSATION = 300;
 /** Upkeep: most steps in one round, and the waits while a foreground run is active. */
 export const MAINTENANCE_STEPS_PER_ROUND = 3;
+/** A step the conversation took its connection from waits this long before it is made again (it is not a failure). */
+export const PREEMPTED_WAIT_MS = 15_000;
+/** Upkeep runs only after this long without a conversation event: it never competes with the conversation. */
+export const MAINTENANCE_QUIET_MS = 10 * 60 * 1000;
 export const FOREGROUND_DELAYS_MS = [30_000, 120_000, 600_000] as const;
 /** Waits before a failed target is tried again (indexed by earlier failures). */
 export const RETRY_DELAYS_MS = [0, 15_000, 60_000] as const;
@@ -127,6 +126,17 @@ export const MERGE_THRESHOLD = 0.9;
 export type ChatMessage = {
 	role: "system" | "user" | "assistant";
 	content: string;
+};
+/**
+ * A call on the conversation's prompt (the ContextWindow layout specification, section 8.2): it runs on the
+ * conversation's connection with the conversation's tools (not to be called), so the shared prefix is read from
+ * the cache, and it yields to the conversation (`larm_preempted`).
+ */
+export type ConversationSession = {
+	sessionRole: "auxiliary";
+	onConversation: true;
+	prefixTools: NativeTool[];
+	toolChoice: "none";
 };
 export interface ControlReceipt {
 	requestId: string;
@@ -158,6 +168,7 @@ export interface InferencePort {
 		messages: ChatMessage[],
 		signal: AbortSignal,
 		control?: { instructions: string; outputSchema: unknown },
+		session?: ConversationSession,
 	): Promise<ControlReceipt>;
 	acceptInTransaction(db: Database, receipt: ControlReceipt): boolean;
 	rejectControlInTransaction(

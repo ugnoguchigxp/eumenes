@@ -1,5 +1,6 @@
 import type { Database } from "bun:sqlite";
 import type { ScopeRef } from "eumenes-world-model";
+import type { NativeTool } from "../../../infrastructure/chat-stream";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import type { ContinuityService } from "../../continuity";
 import type { ConversationService } from "../../conversation";
@@ -83,6 +84,17 @@ export interface StewardDeps {
 	continuity: ContinuityService;
 	queue: QueuePort;
 	inference: InferencePort;
+	/**
+	 * The prefix the conversation's generations send (system, tool definitions, document), looked up at each use
+	 * (the application binds it after the dialogue exists). The steps that read the conversation send it before
+	 * their task, on the conversation's connection; absent or null keeps their own prompt.
+	 */
+	conversationPrefix?: () =>
+		| ((
+				db: Database,
+				conversationId: string,
+		  ) => { messages: ChatMessage[]; tools: NativeTool[] } | null)
+		| undefined;
 	/** A conversation run is generating an answer now (upkeep waits for it); read in the caller's transaction. */
 	foregroundActive(db: Database, conversationId: string): boolean;
 	/** How a run stands (startup sorts the requests of finished runs). */
@@ -140,11 +152,6 @@ export interface ApplyResult {
 	changed: boolean;
 	/** The profile should be published anew at the next re-construction. */
 	requestRepublish?: boolean;
-	prefetch?: {
-		text: string;
-		pins: { messageId: string; digest: string }[];
-		tokens: number;
-	};
 	/** An upkeep step found nothing to change. */
 	quiet?: boolean;
 	/** A forget ran: the decision keeps no body. */

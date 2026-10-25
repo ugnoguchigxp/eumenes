@@ -30,7 +30,7 @@ for (const c of cases)
 				speak: async () => new Uint8Array(),
 				answer: async (messages, _signal, options) => {
 					calls++;
-					if (isUtteranceRound(options?.tools)) {
+					if (isUtteranceRound(options)) {
 						// The conversation's round: search for the source's toolchain, then hand the request over.
 						const step = searchThenDelegate(
 							(candidate) => candidate.id === "history.research",
@@ -101,12 +101,7 @@ for (const c of cases)
 					return "人工資料の調査結果です。";
 				},
 			};
-			const result = await evaluateRequirements(
-				c,
-				profiles,
-				model,
-				true,
-			);
+			const result = await evaluateRequirements(c, profiles, model, true);
 			expect(result.structureMatched).toBe(true);
 			expect(result.counts.worker).toBe(3);
 			// A search, a hand-over and the sub-agent's three calls; the finished work is reported by the agency.

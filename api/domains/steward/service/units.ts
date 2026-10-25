@@ -11,12 +11,23 @@ import {
 } from "../contracts";
 import { readUnit, closeUnit, takeRequests } from "../repository";
 import type { Kick } from "./kick";
-import { buildMessages } from "./messages";
+import { buildMessages, taskMessage } from "./messages";
 import { createUnitEnd } from "./unit-end";
 import { createPrepare } from "./unit-prepare";
 import { createSettle } from "./unit-settle";
 import type { StewardDeps, StewardInput, StewardOutput } from "./types";
 import type { Wake } from "./wake";
+
+/**
+ * The steps that read the conversation: they run on its prompt (its prefix, then their task) and its connection.
+ * Upkeep and the World curation read other things and keep their own prompts.
+ */
+const ON_CONVERSATION: ReadonlySet<string> = new Set([
+	"curate-memory",
+	"curate-goals",
+	"summarize",
+	"refine-summary",
+]);
 
 /** A failure of the transport or a busy backend: the same job is tried again by the queue. */
 const TRANSIENT =
@@ -45,8 +56,17 @@ export function createUnitHandler(deps: StewardDeps, kick: Kick, wake: Wake) {
 			signal: context.signal,
 			deps,
 		});
-		const messages =
-			before?.data === undefined
+		const data = before?.data ?? prepared.data;
+		// The conversation's prefix as it stands now (read at the call, so it is what the next generation sends).
+		const read = ON_CONVERSATION.has(step.id)
+			? deps.conversationPrefix?.()
+			: undefined;
+		const prefix = read
+			? deps.store.read((db) => read(db, input.conversationId))
+			: null;
+		const messages = prefix
+			? [...prefix.messages, taskMessage(step, prepared, data)]
+			: before?.data === undefined
 				? input.messages
 				: buildMessages(step, prepared, before.data);
 		const receipt = await inference.executeControl(
@@ -57,6 +77,14 @@ export function createUnitHandler(deps: StewardDeps, kick: Kick, wake: Wake) {
 				instructions: step.instructions,
 				outputSchema: step.outputSchema(prepared),
 			},
+			prefix
+				? {
+						sessionRole: "auxiliary",
+						onConversation: true,
+						prefixTools: prefix.tools,
+						toolChoice: "none",
+					}
+				: undefined,
 		);
 		// A malformed answer is data, not a failure: settle counts it and moves on.
 		let output: unknown | null = null;

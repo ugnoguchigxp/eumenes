@@ -65,7 +65,7 @@ function prepare(env: StepEnv): PrepareResult {
 		.sort((a, b) => b.priority - a.priority);
 	const context: Context = { proposals: {} };
 	const shown = proposals.map((goal, i) => {
-		const ref = `g${i + 1}`;
+		const ref = `gl${i + 1}`;
 		context.proposals[ref] = {
 			goalId: goal.id,
 			revision: goal.revision,

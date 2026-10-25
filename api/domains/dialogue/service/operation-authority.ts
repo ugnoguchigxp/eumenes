@@ -17,8 +17,6 @@ export function operationRejection(
 			quiet?: true;
 			blockedAtPrepare?: string[];
 		};
-		/** Messages recalled exchanges stand on; a quiet window is checked only when there are some. */
-		recallPins?: ReadonlyArray<{ messageId: string; digest: string }>;
 		/** The goals layer the deciding prompt carried; a forgotten goal it listed makes the decision stale. */
 		goals?: GoalsLayerPort;
 		goalsLayer?: PreparedGoals;
@@ -37,16 +35,11 @@ export function operationRejection(
 	)
 		return "memory_stale";
 	if (goalsStale(input.goals, db, input.goalsLayer)) return "memory_stale";
-	if (
-		input.memoryWindow &&
-		input.memory &&
-		(!input.memoryWindow.quiet || (input.recallPins?.length ?? 0) > 0)
-	) {
+	if (input.memoryWindow && input.memory && !input.memoryWindow.quiet) {
 		const verdict = input.memory.validateWindowInTransaction(
 			db,
 			input.settle.runId,
 			input.memoryWindow.window,
-			input.recallPins,
 		);
 		if (!verdict.ok) return verdict.reason;
 	}

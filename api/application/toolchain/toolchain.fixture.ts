@@ -65,6 +65,7 @@ import {
 	instantExecute,
 	isNoticeRound,
 	isUtteranceRound,
+	retainedIds,
 	toolResults,
 	type Step,
 	UNAVAILABLE_TEXT,
@@ -155,7 +156,6 @@ export async function harness(
 		>;
 		settingsEnv?: Record<string, string | undefined>;
 		gate?: Promise<void>;
-		answerGate?: Promise<void>;
 		/** Holds the operation sub-agent's call (after its context is recorded) until released. */
 		commandGate?: Promise<void>;
 		commandGateQuestion?: string;
@@ -260,24 +260,10 @@ export async function harness(
 		acquisitions = 0;
 	let quoteRejected = false;
 	/** The conversation's answer to a message: the parent agent's reply, a finished action's, or the fixed sentence. */
-	/** The toolchain ids the document's state retains (the generation's own state, sent with the utterance). */
-	const retainedIds = (
-		messages: import("../../domains/inference/contracts").Messages,
-	): string[] => {
-		const first = messages.find((m) => m.role === "user");
-		if (!first) return [];
-		const document = JSON.parse(first.content) as {
-			state?: { retained?: Array<{ id?: string }> };
-		};
-		return (document.state?.retained ?? []).flatMap((entry) =>
-			entry.id ? [entry.id] : [],
-		);
-	};
 	const reply = async (
 		messages: import("../../domains/inference/contracts").Messages,
 	): Promise<string> => {
 		parentContexts.push(JSON.stringify(messages));
-		if (options.answerGate) await options.answerGate;
 		if (options.parentAnswer !== undefined) return options.parentAnswer;
 		// The analysis asked for a clarification: the answer round carries the question.
 		if (options.clarify) return "どの地域の天気を調べますか？";
@@ -334,8 +320,7 @@ export async function harness(
 			!!options.history ||
 			(!!options.timers && /タイマー/.test(question)) ||
 			/天気|株価|weather|stock|調べ|検索|https?:|確認/.test(question);
-		if (options.clarify || !delegates)
-			return { text: await reply(messages) };
+		if (options.clarify || !delegates) return { text: await reply(messages) };
 		const after = afterUtterance(messages);
 		const handed = handedStep(messages);
 		if (handed) return handed;
@@ -416,7 +401,7 @@ export async function harness(
 				]);
 				return "";
 			}
-			if (isUtteranceRound(callOptions?.tools) && !isNoticeRound(messages)) {
+			if (isUtteranceRound(callOptions) && !isNoticeRound(messages)) {
 				const step = await utteranceStep(
 					messages,
 					question,

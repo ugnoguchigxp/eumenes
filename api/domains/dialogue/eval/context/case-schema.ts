@@ -208,18 +208,6 @@ const seedSchema = z
 		events: z.array(seedEvent).optional(),
 		/** Earlier utterances no generation has handled yet; they are shown as newest messages with `input`. */
 		pending: z.array(seedPending).optional(),
-		/** Earlier exchanges the memory step recalled for this turn (seeded as the prefetch text; see recall-text.ts). */
-		recall: z
-			.array(
-				z
-					.object({
-						user: text.optional(),
-						assistant: text.optional(),
-						at: isoTime,
-					})
-					.strict(),
-			)
-			.optional(),
 		work: z.array(seedWork).optional(),
 		confirmations: z.array(seedConfirmation).optional(),
 		goals: z.array(seedGoal).optional(),

@@ -59,7 +59,7 @@ function delegate(
 	messages: Array<{ role: string; content: string }>,
 	options: LarmCallOptions | undefined,
 ): string | undefined {
-	if (isUtteranceRound(options?.tools)) {
+	if (isUtteranceRound(options)) {
 		const step = searchThenDelegate(
 			(candidate) => candidate.id === "web.service-search",
 			question!,

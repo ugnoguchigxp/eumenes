@@ -209,7 +209,7 @@ export function confirm(
 			impact,
 		});
 		return {
-			result: { confirmation: row.id, expiresAt: row.expiresAt },
+			result: { confirmation: `c${row.ref}` },
 			confirmation: true,
 		};
 	});
@@ -324,9 +324,16 @@ export function approval(
 	| { ok: false; code: string } {
 	const { deps, input, events } = x;
 	const { clock, toolchains } = deps;
-	const row = deps.work!.confirmationInTransaction(db, confirmationId);
-	if (!row || row.conversationId !== input.conversationId)
-		return { ok: false, code: "confirmation_not_found" };
+	// The model names the confirmation by its number (`c<ref>`, the layout specification's section 6).
+	const ref = /^c(\d+)$/.exec(confirmationId);
+	const row = ref
+		? deps.work!.confirmationByRefInTransaction(
+				db,
+				input.conversationId,
+				Number(ref[1]),
+			)
+		: null;
+	if (!row) return { ok: false, code: "confirmation_not_found" };
 	if (row.usedAt) return { ok: false, code: "confirmation_used" };
 	if (row.supersededAt) return { ok: false, code: "confirmation_superseded" };
 	if (Date.parse(row.expiresAt) <= Date.parse(clock()))

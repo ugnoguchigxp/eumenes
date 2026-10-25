@@ -177,8 +177,7 @@ test("a question of a task is reported into its TODO, ordinary chat keeps it wai
 		everyday: true,
 		discoveryTarget: () => "execute_task",
 		firstRound: (_tools, question, messages) => {
-			if (question === "雑談です")
-				return { text: "雑談ですね。" };
+			if (question === "雑談です") return { text: "雑談ですね。" };
 			if (question === "二番目で続けて") {
 				if (toolResults(afterUtterance(messages), "work").length === 0) {
 					const { todo } = todoOfExecution();
@@ -187,10 +186,8 @@ test("a question of a task is reported into its TODO, ordinary chat keeps it wai
 							{
 								name: "work",
 								args: {
-									todo: todo.id,
+									todo: `t${todo.ref}`,
 									operation: "answer",
-									revision: todo.revision,
-									questionId: todo.questionId,
 									text: "二番目",
 								},
 							},

@@ -28,7 +28,7 @@ import {
 } from "../../inference";
 import { createVoiceDialogue, migrations as voiceMigrations } from "..";
 import type { LarmPort } from "../../larm";
-import { testConversationAgent } from "../../dialogue/test/conversation-agent.fixture";
+import { testConversationAgent } from "./conversation-agent.fixture";
 const cleanup: Array<() => Promise<void>> = [];
 afterEach(async () => {
 	for (const close of cleanup.splice(0)) await close();

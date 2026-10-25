@@ -42,9 +42,7 @@
 					"claims": [
 						{
 							"text": "来週前半は晴れの日が多い見込み",
-							"sources": [
-								"src_1"
-							]
+							"sources": ["src_1"]
 						}
 					],
 					"limits": "予報は変わりうる"

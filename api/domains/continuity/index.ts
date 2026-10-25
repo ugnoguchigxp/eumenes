@@ -9,7 +9,6 @@ export type { ContinuityService } from "./service";
 export { createContinuityService } from "./service";
 export type { ContinuityItem, ContinuityKind } from "./contracts";
 export type {
-	ActiveSlot,
 	ConversationEvent,
 	EpisodeKind,
 	EpisodeSegment,

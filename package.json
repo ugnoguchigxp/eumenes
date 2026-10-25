@@ -51,7 +51,7 @@
 		"@playwright/mcp": "0.0.83",
 		"@tanstack/react-query": "5.101.0",
 		"bmp-ts": "1.0.9",
-		"eumenes-agency": "file:vendor/agency/eumenes-agency-0.0.1-2c21c165f268.tgz",
+		"eumenes-agency": "file:vendor/agency/eumenes-agency-0.0.1-d43f86982477.tgz",
 		"eumenes-memory": "file:vendor/eumenes-memory/eumenes-memory-0.0.2-6643656f3383.tgz",
 		"eumenes-world-model": "file:vendor/world/eumenes-world-model-0.0.1.tgz",
 		"google-auth-library": "11.1.0",

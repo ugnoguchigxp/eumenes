@@ -1,8 +1,10 @@
 import { expect, test } from "bun:test";
 import { harness } from "../toolchain/toolchain.fixture";
 import {
+	afterUtterance,
 	candidatesOf,
 	searchThenDelegate,
+	toolResults,
 	type Candidate,
 } from "../toolchain/conversation-script.fixture";
 import { softbankSentence, stockFetch } from "./stock.fixture";
@@ -130,12 +132,20 @@ test("without the stock services configured the stock toolchain is not among the
 	}
 });
 
-test("a query that is not text goes back for the one structural repair, then fails", async () => {
+test("a query that is not text is refused with the fields to repair, and nothing is fetched", async () => {
 	const service = stockFetch();
+	const refusals: unknown[] = [];
 	const h = await harness({
 		stock: { fetch: service.fetch },
-		firstRound: (_tools, _question, messages) =>
-			askStock({ query: 123 })(messages),
+		firstRound: (_tools, _question, messages) => {
+			// The refusal is the tool's result; the agent goes on with it (here it gives up and says so).
+			const refused = toolResults(afterUtterance(messages), "delegate");
+			if (refused.length) {
+				refusals.push(...refused);
+				return { text: "株価を取得できませんでした。" };
+			}
+			return askStock({ query: 123 })(messages);
+		},
 	});
 	try {
 		await h.toolchain.stock!.maintain();
@@ -145,7 +155,9 @@ test("a query that is not text goes back for the one structural repair, then fai
 			text: ask,
 		});
 		const done = await h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 });
-		expect(done?.status).toBe("failed");
+		expect(done?.status).toBe("completed");
+		expect(refusals).toMatchObject([{ refused: true }]);
+		expect(h.dialogue.answerText(run.id)).toBe("株価を取得できませんでした。");
 		expect(service.charts()).toHaveLength(0);
 	} finally {
 		await h.close();

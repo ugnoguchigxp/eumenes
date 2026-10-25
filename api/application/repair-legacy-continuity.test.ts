@@ -12,7 +12,12 @@ test("offline repair backs up the old ledger and allows the full startup migrati
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-legacy-repair-"));
 	const path = join(dir, "db.sqlite3");
 	// The other migrations have already committed when the collision is reached.
-	const before = migrations.filter((m) => m.id !== "continuity/0004-events");
+	const before = migrations.filter(
+		(m) =>
+			m.id !== "continuity/0004-events" &&
+			m.id !== "continuity/0005-drop-active" &&
+			m.id !== "continuity/0006-retract-activity",
+	);
 	let store = openStore(path, before);
 	try {
 		await store.write((db) => db.exec(legacyEventsSchema));

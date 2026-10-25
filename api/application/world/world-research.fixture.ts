@@ -19,6 +19,7 @@ import {
 	createConversationService,
 } from "../../domains/conversation";
 import { createDialogueService } from "../../domains/dialogue";
+import { testConversationAgent } from "../../domains/dialogue/test/conversation-agent.fixture";
 import { createGoalsService } from "../../domains/goals";
 import type { Messages } from "../../domains/inference/contracts";
 import { createInference } from "../../domains/inference";
@@ -185,7 +186,6 @@ export async function boot(steps: Step[], options: BootOptions = {}) {
 	const settings = await createSettings(store, { dbPath });
 	const packets: Packet[] = [];
 	const workerMessages: string[] = [];
-	const parentMessages: string[] = [];
 	const offered: string[] = [];
 	let position = 0;
 	let hooks!: {
@@ -208,7 +208,7 @@ export async function boot(steps: Step[], options: BootOptions = {}) {
 					languages: ["ja"],
 					confidence: 0.99,
 				});
-			if (isUtteranceRound(callOptions?.tools) && !isNoticeRound(messages)) {
+			if (isUtteranceRound(callOptions) && !isNoticeRound(messages)) {
 				// The conversation's round: search for the World query toolchain, then hand the question over.
 				const question = messages
 					.filter((m) => m.role === "user")
@@ -234,8 +234,7 @@ export async function boot(steps: Step[], options: BootOptions = {}) {
 				if (!step) throw new Error("replay_extra_model_call");
 				return JSON.stringify(await step(packet, hooks));
 			}
-			parentMessages.push(JSON.stringify(messages));
-			return "調べた結果をお伝えします。";
+			throw new Error("fixture_unexpected_model_call");
 		},
 	};
 	const inference = createInference(store, settings, {
@@ -429,6 +428,7 @@ export async function boot(steps: Step[], options: BootOptions = {}) {
 		toolchain.worldAvailable,
 	);
 	const dialogue = createDialogueService({
+		conversationAgent: testConversationAgent,
 		store,
 		continuity: createContinuityService(store),
 		conversation,
@@ -469,7 +469,13 @@ export async function boot(steps: Step[], options: BootOptions = {}) {
 		ask,
 		packets,
 		workerMessages,
-		parentMessages,
+		/** The results of the conversation's TODOs: what the agency is given to report. */
+		reported: () =>
+			JSON.stringify(
+				store
+					.read((db) => dialogue.todosInTransaction(db, "main"))
+					.map((todo) => todo.result),
+			),
 		offered,
 		hooks,
 	};

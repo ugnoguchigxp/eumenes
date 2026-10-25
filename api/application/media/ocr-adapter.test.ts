@@ -12,7 +12,7 @@ test("OCR bundle exposes one artifact and the command agent opens it", async () 
 		speak: async () => new Uint8Array(),
 		answer: async (messages, _signal, options) => {
 			const turn = answerUtterance(
-				options?.tools,
+				options,
 				messages,
 				options?.onToolCalls,
 				handOver("ocr.manage", "準備します。", "none"),

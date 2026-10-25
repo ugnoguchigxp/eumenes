@@ -120,6 +120,8 @@ export async function setup(
 		outcome: null as unknown,
 		/** Holds each command sub-agent call until released. */
 		gate: null as Promise<void> | null,
+		/** Holds the conversation model's call after it is recorded (to change what the call showed meanwhile). */
+		modelGate: null as Promise<void> | null,
 		/** The conversation model's scripted calls. */
 		steps: [] as Step[],
 		/** The command sub-agent's replies, consumed in order. */
@@ -196,6 +198,8 @@ export async function setup(
 				? (afterHandoverCalls.push(calls.length - 1), {} as Step)
 				: state.steps.shift();
 			if (!step) throw new Error("fixture_step_missing");
+			// Held after the call is recorded and its step taken: the state the call showed is fixed meanwhile.
+			if (state.modelGate) await state.modelGate;
 			signal.throwIfAborted();
 			if (step.text) delta(step.text);
 			return {
@@ -444,6 +448,9 @@ export async function setup(
 			dialogue.interactions.list({ conversationId: "main" })[0],
 		rows: (sql: string, ...params: Array<string | number>) =>
 			store.read((db) => db.query(sql).all(...params) as any[]),
+		/** A direct write to the store, for a change that happens outside the conversation (e.g. the owner's report). */
+		write: (sql: string, ...params: Array<string | number>) =>
+			store.write((db) => db.query(sql).run(...params)),
 		todos: () => store.read((db) => dialogue.todosInTransaction(db, "main")),
 		/** Script the conversation model's next call: speech. */
 		speak(text: string) {

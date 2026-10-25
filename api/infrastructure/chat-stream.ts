@@ -9,7 +9,7 @@ export type NativeTool = {
 export type NativeToolCall = { id: string; name: string; arguments: string };
 export function nativeToolOptions(
 	tools?: NativeTool[],
-	choice: "auto" | "required" = "auto",
+	choice: "auto" | "required" | "none" = "auto",
 ) {
 	return tools?.length
 		? { tools, tool_choice: choice, parallel_tool_calls: false }

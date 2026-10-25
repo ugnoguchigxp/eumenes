@@ -192,8 +192,8 @@ export async function runGeneration(
 		signal: options.signal,
 		onDelta: options.delta,
 	});
-	options.signal.throwIfAborted();
-	// The work was handed over: the run waits for it, and this generation says nothing more.
+	// The work was handed over (committed by its tool): the run waits for it, and this generation says nothing more.
+	// A later commit (the work failing at once) must not discard the hand-over, so no abort check comes first.
 	if (reply.ended)
 		return {
 			text: "",
@@ -201,6 +201,7 @@ export async function runGeneration(
 			executed,
 			ended: true,
 		};
+	options.signal.throwIfAborted();
 	return {
 		text: reply.text,
 		...(receipt ? { receipt } : {}),

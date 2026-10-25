@@ -21,7 +21,6 @@ export const SIDE_EFFECTS = new Set([
 	"work.answer",
 	"work.amend",
 	"work.cancel",
-	"work.archive",
 ]);
 
 export type Heard = "full" | "partial" | "none";

@@ -1,7 +1,11 @@
 import type { Database } from "bun:sqlite";
 import type { Migration } from "../../../infrastructure/sqlite";
 import type { ContinuityItem } from "../contracts";
-import { eventsMigration } from "./events";
+import {
+	dropActiveMigration,
+	eventsMigration,
+	retractActivityMigration,
+} from "./events";
 export const migration = `
 CREATE TABLE continuity_items (
  id TEXT PRIMARY KEY, conversation_id TEXT NOT NULL, kind TEXT NOT NULL CHECK(kind IN ('goal','decision','open_question')),
@@ -250,5 +254,15 @@ export const migrations: readonly Migration[] = [
 		id: "continuity/0004-events",
 		sql: eventsMigration,
 		after: ["continuity/0003-item-source"],
+	},
+	{
+		id: "continuity/0005-drop-active",
+		sql: dropActiveMigration,
+		after: ["continuity/0004-events"],
+	},
+	{
+		id: "continuity/0006-retract-activity",
+		sql: retractActivityMigration,
+		after: ["continuity/0005-drop-active"],
 	},
 ];

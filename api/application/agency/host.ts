@@ -118,6 +118,8 @@ type Conv = {
 	calls: number;
 	/** Last time the conversation had an event or a cycle (for forgetting idle conversations). */
 	touched: number;
+	/** The finished TODOs and questions the agent was last given an opportunity for. */
+	reportable: Set<string>;
 };
 
 const sanitize = (id: string) =>
@@ -222,6 +224,7 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 		const inner = deps.createLlm((request) => ({
 			decisionId: `${sanitize(c.id)}.${scope}.${request.purpose}.${++c.calls}`,
 			generation: c.generation,
+			conversationId: c.id,
 		}));
 		return {
 			async complete<T>(request: LlmRequest<T>, signal: AbortSignal) {
@@ -313,6 +316,7 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 			opportunities: 0,
 			calls: 0,
 			touched: nowMs(),
+			reportable: new Set<string>(),
 		} as unknown as Conv;
 		c.runtime = newRuntime(c);
 		c.scheduler = newScheduler(c);
@@ -730,6 +734,24 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 	type Pending = { turnEnd: boolean };
 	/** Conversations whose TODOs finished or ask something, told inside a transaction: opened after its commit. */
 	const workChanged = new Set<string>();
+	/**
+	 * Whether the conversation holds a finished TODO or a question the agent was not yet given an opportunity for.
+	 * A transaction that told of work and then rolled back changed no TODO, so it opens nothing.
+	 */
+	function newWork(c: Conv) {
+		const now = new Set(
+			todosNow(c).flatMap((todo) =>
+				todo.status === "done"
+					? [`${todo.id}:done:${todo.doneAt}`]
+					: todo.status === "waiting"
+						? [`${todo.id}:waiting:${todo.question}`]
+						: [],
+			),
+		);
+		const fresh = [...now].some((key) => !c.reportable.has(key));
+		c.reportable = now;
+		return fresh;
+	}
 
 	function observe(c: Conv, input: Parameters<AgencyRuntime["observe"]>[0]) {
 		try {
@@ -829,13 +851,16 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 			const c = convs.get(conversationId);
 			if (state.turnEnd && c && conversationId === activeId) {
 				workChanged.delete(conversationId);
+				newWork(c);
 				launch(c, "turn_end", true);
 			}
 		}
 		// Work that changed is reported where the user is talking; elsewhere it waits for the next turn there.
-		for (const conversationId of workChanged)
-			if (conversationId === activeId)
-				launch(convOf(conversationId), "result_received", true);
+		for (const conversationId of workChanged) {
+			if (conversationId !== activeId) continue;
+			const c = convOf(conversationId);
+			if (newWork(c)) launch(c, "result_received", true);
+		}
 		workChanged.clear();
 		prune();
 	}

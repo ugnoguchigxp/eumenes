@@ -40,6 +40,7 @@ import type {
 	StepEnv,
 } from "../types";
 import { describeWorld } from "../world-view";
+import { eventLabel } from "./shared";
 
 const PRIORITIES = { high: 80, normal: 50, low: 20 } as const;
 const GOAL_OPS_PER_UNIT = 8;
@@ -191,7 +192,7 @@ function prepare(
 	const events: LabelTable = {};
 	const labelOf = new Map<string, string>();
 	const views = kept.map((entry, i) => {
-		const label = `e${i + 1}`;
+		const label = eventLabel(entry.loaded, i);
 		labelOf.set(keyOf(entry.loaded), label);
 		events[label] = {
 			seq: entry.loaded.seq,

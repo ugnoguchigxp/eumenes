@@ -3,6 +3,7 @@ import { getLogger } from "../../../infrastructure/logger";
 import {
 	DECISIONS_PER_CONVERSATION,
 	MAX_FAILURES,
+	PREEMPTED_WAIT_MS,
 	UNITS_PER_CONVERSATION,
 } from "../contracts";
 import {
@@ -24,7 +25,7 @@ import {
 	writeState,
 } from "../repository";
 import type { Kick } from "./kick";
-import { REQUEST_FAILED_NOTICE } from "./notices";
+import { REQUEST_FAILED_NOTICE, noticeInTransaction } from "./notices";
 import { rangeKey } from "./episode-plan";
 import type { ApplyResult, StepEnv, StewardDeps } from "./types";
 import { type Wake, retryDelay } from "./wake";
@@ -33,7 +34,7 @@ const log = getLogger("steward");
 
 /** How a unit ends: released requests, failure counts, the decision record and the upkeep control. */
 export function createUnitEnd(deps: StewardDeps, kick: Kick, wake: Wake) {
-	const { store, inference, memory } = deps;
+	const { store, inference } = deps;
 	const cancelled = new Set<string>();
 	store.onCommit(() => {
 		if (cancelled.size === 0) return;
@@ -119,17 +120,14 @@ export function createUnitEnd(deps: StewardDeps, kick: Kick, wake: Wake) {
 				given++;
 			}
 		// The user asked for something and is told it could not be done.
-		if (given > 0 && memory.readyInTransaction(db))
-			memory.publishWindowInTransaction(db, unit.conversationId, {
-				addNotices: [REQUEST_FAILED_NOTICE],
-			});
-	}
-
-	/** The recall preparation for this event is over (done, given up, or unreadable). */
-	function dropRecall(db: Database, unit: UnitRow) {
-		const state = readState(db, unit.conversationId);
-		if (state.recallPending === unit.targets.recallSeq)
-			writeState(db, { ...state, recallPending: null });
+		if (given > 0)
+			noticeInTransaction(
+				deps,
+				db,
+				unit.conversationId,
+				REQUEST_FAILED_NOTICE,
+				`${unit.id}:failed`,
+			);
 	}
 
 	/** What a World unit's prepare registered with Memory is given back, whatever way the unit ended. Idempotent. */
@@ -154,6 +152,13 @@ export function createUnitEnd(deps: StewardDeps, kick: Kick, wake: Wake) {
 		const { db } = env;
 		if (!closeUnit(db, unit.id, "failed", deps.clock())) return;
 		releaseWorld(db, unit);
+		// The conversation took the connection: the step waits a little instead of meeting it again at once.
+		if (code === "larm_preempted")
+			wake.pause(
+				unit.conversationId,
+				unit.slot,
+				deps.nowMs() + PREEMPTED_WAIT_MS,
+			);
 		if (count) {
 			countFailures(env, unit);
 			// The same targets wait before the next try (the timer kicks when it is over; nothing is enqueued for later).
@@ -163,8 +168,6 @@ export function createUnitEnd(deps: StewardDeps, kick: Kick, wake: Wake) {
 				deps.nowMs() + retryDelay(unit.attempt + 1),
 			);
 		}
-		// The recall preparation is a side step: it is not tried again.
-		if (unit.slot === "recall") dropRecall(db, unit);
 		record(env, unit, { jobId, errorCode: code, ...details }, null);
 		log.warn("steward.unit_failed", { stepId: unit.step, reason: code, jobId });
 		kick.kickOne(db, unit.conversationId);
@@ -216,13 +219,6 @@ export function createUnitEnd(deps: StewardDeps, kick: Kick, wake: Wake) {
 		const { db } = env;
 		const state = readState(db, unit.conversationId);
 		if (applied.changed) state.maintenanceRevision += 1;
-		if (unit.step === "curate-memory" && (unit.targets.seqs?.length ?? 0) > 0)
-			state.recallPending = Math.max(...unit.targets.seqs!);
-		if (
-			unit.slot === "recall" &&
-			state.recallPending === unit.targets.recallSeq
-		)
-			state.recallPending = null;
 		if (unit.slot === "maintenance" && applied.quiet) {
 			const revision = unit.targets.revision ?? state.maintenanceRevision;
 			state.quiet = {
@@ -242,7 +238,6 @@ export function createUnitEnd(deps: StewardDeps, kick: Kick, wake: Wake) {
 		markQuiet,
 		markEpisodeQuiet,
 		settleState,
-		dropRecall,
 	};
 }
 export type UnitEnd = ReturnType<typeof createUnitEnd>;

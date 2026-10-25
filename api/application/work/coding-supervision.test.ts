@@ -177,7 +177,7 @@ test("HTTP/client authenticate report and supervisor reads and omit private CLI 
 		close: async () => {},
 	};
 	const dialogue = createDialogueService({
-		conversationAgent: testConversationAgent,
+			conversationAgent: testConversationAgent,
 			store: h.store,
 			continuity: createContinuityService(h.store),
 			queue: h.queue,

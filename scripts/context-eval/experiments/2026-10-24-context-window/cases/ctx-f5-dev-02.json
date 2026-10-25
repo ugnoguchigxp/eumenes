@@ -79,9 +79,7 @@
 			},
 			{
 				"kind": "forbidden_identifier",
-				"identifiers": [
-					"PINE-2290"
-				]
+				"identifiers": ["PINE-2290"]
 			}
 		],
 		"rubric": [

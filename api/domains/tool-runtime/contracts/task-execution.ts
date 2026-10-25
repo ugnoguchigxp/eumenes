@@ -181,7 +181,7 @@ export interface ToolchainExecutionPort {
 	): void;
 	revokeDeliveryInTransaction?(db: Database, eventId: string): void;
 	flush(): void;
-	/** A sent notice is acknowledged only after the conversation adopts its answer. */
+	/** A sent notice is acknowledged only after the conversation's run for it completes. */
 	deliveryStateInTransaction?(
 		db: Database,
 		eventId: string,

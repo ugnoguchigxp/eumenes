@@ -9,6 +9,8 @@ import type { RequestRow } from "../repository";
 export type CallSessionRole = {
 	sessionRole: "main" | "subagent" | "auxiliary";
 	taskId?: string;
+	/** An auxiliary call on the conversation's connection, yielding to the conversation. */
+	onConversation?: true;
 	context?: NonNullable<CallSession["context"]>;
 	refs?: { messageIds: string[]; itemIds: string[] };
 };
@@ -19,6 +21,7 @@ export const sessionCallOptions = (session?: CallSessionRole) =>
 		? {
 				sessionRole: session.sessionRole,
 				...(session.taskId ? { taskId: session.taskId } : {}),
+				...(session.onConversation ? { onConversation: true as const } : {}),
 			}
 		: {};
 
@@ -59,6 +62,8 @@ export function resolveSession(
 	}
 	const sessionRole = given?.sessionRole ?? "auxiliary";
 	if (
+		(given?.onConversation && sessionRole !== "auxiliary") ||
+		(given?.prefixTools && !given.onConversation) ||
 		(sessionRole === "main" && row.mode !== "answer") ||
 		(sessionRole === "subagent") !== !!given?.taskId ||
 		(given?.taskId !== undefined && !TASK_ID.test(given.taskId))
@@ -75,6 +80,7 @@ export function resolveSession(
 	return {
 		sessionRole,
 		...(given?.taskId ? { taskId: given.taskId } : {}),
+		...(given?.onConversation ? { onConversation: true as const } : {}),
 		...(context
 			? {
 					context: {

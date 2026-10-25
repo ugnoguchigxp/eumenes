@@ -9,6 +9,7 @@ import type {
 	UnitSlot,
 	UnitState,
 } from "../contracts";
+import { dropRecallMigration } from "./drop-recall";
 import { continuityEventsMigration } from "./events";
 import { worldGoalsMigration } from "./world-goals";
 
@@ -77,6 +78,11 @@ export const migrations: readonly Migration[] = [
 		sql: continuityEventsMigration,
 		after: ["steward/0002-world-goals"],
 	},
+	{
+		id: "steward/0004-drop-recall",
+		sql: dropRecallMigration,
+		after: ["steward/0003-continuity-events"],
+	},
 ];
 
 const CHUNK = 200;
@@ -97,8 +103,6 @@ export type UnitTargets = {
 	requests?: string[];
 	/** The maintenance revision an upkeep unit was made for. */
 	revision?: number;
-	/** The last event the recall preparation stands on. */
-	recallSeq?: number;
 	/**
 	 * What an episode unit prepares (`seq` range, both ends included): `log`, the oldest logged events the next
 	 * re-construction moves; `mark`, a range of an unsummarized mark; `merge`, consecutive shown parts.
@@ -312,29 +316,22 @@ export interface StateRow {
 	quiet: QuietSteps;
 	nextMaintenanceAt: number | null;
 	deferCount: number;
-	/** The last event the recall preparation stands on (`seq`). */
-	recallPending: number | null;
 }
 export function readState(db: Database, conversationId: string): StateRow {
 	const row = db
 		.query(
 			`SELECT maintenance_revision AS maintenanceRevision, maintained_revision AS maintainedRevision,
-			 quiet_steps AS quiet, next_maintenance_at AS nextMaintenanceAt, defer_count AS deferCount,
-			 recall_pending AS recallPending FROM steward_state WHERE conversation_id = ?`,
+			 quiet_steps AS quiet, next_maintenance_at AS nextMaintenanceAt, defer_count AS deferCount
+			 FROM steward_state WHERE conversation_id = ?`,
 		)
 		.get(conversationId) as
-		| (Omit<StateRow, "conversationId" | "quiet" | "recallPending"> & {
-				quiet: string;
-				recallPending: string | null;
-		  })
+		| (Omit<StateRow, "conversationId" | "quiet"> & { quiet: string })
 		| null;
 	return row
 		? {
 				conversationId,
 				...row,
 				quiet: JSON.parse(row.quiet) as QuietSteps,
-				recallPending:
-					row.recallPending === null ? null : Number(row.recallPending),
 			}
 		: {
 				conversationId,
@@ -343,17 +340,15 @@ export function readState(db: Database, conversationId: string): StateRow {
 				quiet: {},
 				nextMaintenanceAt: null,
 				deferCount: 0,
-				recallPending: null,
 			};
 }
 export function writeState(db: Database, state: StateRow) {
 	db.query(
 		`INSERT INTO steward_state (conversation_id, maintenance_revision, maintained_revision, quiet_steps,
-		 next_maintenance_at, defer_count, recall_pending) VALUES (?,?,?,?,?,?,?)
+		 next_maintenance_at, defer_count) VALUES (?,?,?,?,?,?)
 		 ON CONFLICT(conversation_id) DO UPDATE SET maintenance_revision = excluded.maintenance_revision,
 		 maintained_revision = excluded.maintained_revision, quiet_steps = excluded.quiet_steps,
-		 next_maintenance_at = excluded.next_maintenance_at, defer_count = excluded.defer_count,
-		 recall_pending = excluded.recall_pending`,
+		 next_maintenance_at = excluded.next_maintenance_at, defer_count = excluded.defer_count`,
 	).run(
 		state.conversationId,
 		state.maintenanceRevision,
@@ -361,7 +356,6 @@ export function writeState(db: Database, state: StateRow) {
 		JSON.stringify(state.quiet),
 		state.nextMaintenanceAt,
 		state.deferCount,
-		state.recallPending === null ? null : String(state.recallPending),
 	);
 }
 

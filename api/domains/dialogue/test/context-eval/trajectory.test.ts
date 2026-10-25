@@ -7,6 +7,7 @@ import {
 	type TrajectoryCall,
 	playTrajectory,
 } from "../../eval/context/trajectory";
+import { sectionLines } from "../generation.fixture";
 import { openSeedWiring } from "./store-wiring";
 
 async function play(trajectory: Parameters<typeof playTrajectory>[1]) {
@@ -17,9 +18,18 @@ async function play(trajectory: Parameters<typeof playTrajectory>[1]) {
 		await wiring.close();
 	}
 }
-type Doc = Record<string, any>;
-const docOf = (call: TrajectoryCall): Doc =>
-	JSON.parse(call.input.messages[1]!.content) as Doc;
+
+/** The material document (the second message) of a generation. */
+const documentOf = (call: TrajectoryCall): string =>
+	call.input.messages[1]!.content;
+/** The lines of one tagged section of a generation's document. */
+const sectionOf = (call: TrajectoryCall, name: string): string[] =>
+	sectionLines(documentOf(call), name);
+/** The lines of the `<now>` block (the third message) of a generation. */
+const nowOf = (call: TrajectoryCall): string[] =>
+	sectionLines(call.input.messages[2]!.content, "now");
+/** The `<memory>` lines a generation's document shows. */
+const memoryOf = (call: TrajectoryCall): string[] => sectionOf(call, "memory");
 
 test("the default trajectory is twelve generations that keep the message invariants", async () => {
 	const calls = await play(DEFAULT_TRAJECTORY);
@@ -34,16 +44,19 @@ test("the default trajectory is twelve generations that keep the message invaria
 	);
 });
 
-test("between re-constructions the system part and the start of the document do not change: each call begins with the previous one up to the end of its log", async () => {
+test("between re-constructions the system part and the start of the document do not change: each call begins with the previous one up to its state section", async () => {
 	const calls = await play(DEFAULT_TRAJECTORY);
 	const system = calls[0]!.input.messages[0]!.content;
 	for (const call of calls)
 		expect(call.input.messages[0]!.content).toBe(system);
 	for (let i = 1; i < calls.length; i++) {
 		if (calls[i]!.reconstruction) continue;
-		const previous = calls[i - 1]!.input.messages[1]!.content;
-		const shared = previous.slice(0, previous.indexOf('],"active"'));
-		expect(calls[i]!.input.messages[1]!.content.startsWith(shared)).toBe(true);
+		// The shared prefix is the document up to the end of its log, just before `</log>` (the layout specification,
+		// section 12): the memory, history and log of the previous call, which only grow at their end (an empty
+		// section is its two tags alone, so even the first event only appends).
+		const previous = documentOf(calls[i - 1]!);
+		const shared = previous.slice(0, previous.indexOf("</log>"));
+		expect(documentOf(calls[i]!).startsWith(shared)).toBe(true);
 	}
 });
 
@@ -67,62 +80,66 @@ test("the window is re-constructed where the product's rules say: a long silence
 	]);
 });
 
-test("a memory saved after the profile was published waits in state.newMemories until a re-construction takes it into the profile", async () => {
+test("a memory saved after the profile was published waits in <state> (n-lines) until a re-construction takes it into <memory>", async () => {
 	const calls = await play(DEFAULT_TRAJECTORY);
-	const at = (n: number) => docOf(calls[n - 1]!);
-	expect(at(3).state.newMemories).toEqual([]);
-	expect(JSON.stringify(at(4).state.newMemories)).toContain("辛い物が好き");
-	expect(at(4).profile).toEqual([]);
-	expect(at(8).profile).toEqual([]);
-	expect(JSON.stringify(at(9).profile)).toContain("辛い物が好き");
-	expect(at(9).state.newMemories).toEqual([]);
+	const waiting = (n: number) =>
+		sectionOf(calls[n - 1]!, "state").filter((line) =>
+			/^n\d+ 反映待ちの記憶 /.test(line),
+		);
+	expect(waiting(3)).toEqual([]);
+	expect(waiting(4).join("\n")).toContain("辛い物が好き");
+	expect(memoryOf(calls[3]!)).toEqual([]);
+	expect(memoryOf(calls[7]!)).toEqual([]);
+	expect(memoryOf(calls[8]!).join("\n")).toContain("辛い物が好き");
+	expect(waiting(9)).toEqual([]);
 });
 
-test("the delegation opens a TODO, its finishing starts a generation with the fixed text, and the result is held in active", async () => {
+test("the delegation opens a TODO, its finishing starts a generation with the fixed text, and the result is a line of the log", async () => {
 	const calls = await play(DEFAULT_TRAJECTORY);
-	const g5 = docOf(calls[4]!);
-	expect(g5.state.todos).toEqual([]);
-	const g6 = docOf(calls[5]!);
+	const todos = (call: TrajectoryCall) =>
+		sectionOf(call, "state").filter((line) => /^t\d+ /.test(line));
+	expect(todos(calls[4]!)).toEqual([]);
 	expect(calls[5]!.input.final).toEqual({ kind: "fixed" });
-	expect(g6.state.todos).toEqual([
-		expect.objectContaining({
-			title: "旅行先のイメージ画像を作る",
-			status: "done",
-		}),
+	expect(todos(calls[5]!)).toEqual([
+		expect.stringMatching(/^t1 完了 旅行先のイメージ画像を作る \(/),
 	]);
-	expect(g6.now.trigger).toEqual([
-		{
-			kind: "todo_changed",
-			todos: [{ id: g6.state.todos[0].id, status: "done" }],
-		},
-	]);
-	expect(JSON.stringify(g6.active)).toContain("京都の紅葉を描いた画像ができた");
+	expect(nowOf(calls[5]!)).toContain("きっかけ 仕事の変化 t1 完了");
+	// The result is a log line of its own (the layout specification, section 4.3), not a slot of the state.
+	expect(
+		sectionOf(calls[5]!, "log").some(
+			(line) =>
+				/結果 t1 成功: /.test(line) &&
+				line.includes("京都の紅葉を描いた画像ができた"),
+		),
+	).toBe(true);
 	// The delegation the agent made is in the log with the TODO it opened.
-	const acted = (docOf(calls[5]!).log as Array<Record<string, unknown>>).find(
-		(e) => e.action === "delegate",
-	);
-	expect(acted).toMatchObject({ todo: g6.state.todos[0].id });
+	expect(
+		sectionOf(calls[5]!, "log").some((line) => /依頼 t1 /.test(line)),
+	).toBe(true);
 	// A notice starts a generation too, and the agent said nothing after it.
 	expect(calls[7]!.input.final).toEqual({ kind: "fixed" });
-	expect(docOf(calls[7]!).now.trigger).toEqual([
-		{ kind: "timer", text: "三分のタイマーが鳴りました" },
-	]);
+	expect(nowOf(calls[7]!)).toContain(
+		'きっかけ timer {"text":"三分のタイマーが鳴りました"}',
+	);
 });
 
-test("in a small window the log passes its limit and the oldest events are moved out to the episode", async () => {
+test("in a small window the log passes its limit and the oldest events are moved out to the history", async () => {
 	const calls = await play(SMALL_WINDOW_TRAJECTORY);
 	const reasons = calls.map((c) => c.reconstruction?.reason ?? null);
 	expect(reasons).toContain("section_over_limit");
 	const last = calls.at(-1)!;
 	expect(last.input.plan.usable).toBe(true);
-	const doc = docOf(last);
-	// No summary was prepared, so what left the log is an unsummarized range.
-	expect(doc.episode.length).toBeGreaterThan(0);
-	expect(doc.episode[0]).toMatchObject({ kind: "unsummarized" });
+	// No summary was prepared, so what left the log is an unsummarized range (`s<n>` without a summary).
+	expect(
+		sectionOf(last, "history").some((line) =>
+			/^s\d+ \d{2}-\d{2}〜\d{2}-\d{2} 要約なし/.test(line),
+		),
+	).toBe(true);
 	expect(last.input.document.sections.log.tokens).toBeLessThanOrEqual(
 		last.input.plan.log.cap,
 	);
-	expect(JSON.stringify(doc.log)).not.toContain('"text":"1件目');
-	expect(JSON.stringify(doc.log)).toContain("19件目の相談です");
+	const log = sectionOf(last, "log");
+	expect(log.some((line) => /: 1件目/.test(line))).toBe(false);
+	expect(log.some((line) => line.includes("19件目の相談です"))).toBe(true);
 	for (const call of calls) expect(messageIssues(call.input)).toEqual([]);
 });

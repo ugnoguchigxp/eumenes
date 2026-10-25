@@ -300,51 +300,6 @@ test("a corrected message rewrites the said events that showed it, keeps the res
 	}
 });
 
-test("a TODO's work result is overwritten in place and removed on archive", async () => {
-	const { store, events, done } = setup();
-	try {
-		await store.write((db) => {
-			events.putActiveInTransaction(db, {
-				conversationId: "c1",
-				todoId: "w1",
-				status: "waiting",
-				at: at(1),
-				fields: { question: "日付は？" },
-			});
-			events.putActiveInTransaction(db, {
-				conversationId: "c1",
-				todoId: "w2",
-				status: "done",
-				at: at(2),
-				fields: {},
-			});
-			events.putActiveInTransaction(db, {
-				conversationId: "c1",
-				todoId: "w1",
-				status: "done",
-				at: at(3),
-				fields: { result: { claims: [] } },
-			});
-		});
-		const slots = store.read((db) => events.activeInTransaction(db, "c1"));
-		expect(slots.map((slot) => slot.todoId)).toEqual(["w1", "w2"]);
-		expect(slots[0]!.text).toContain('"status":"done"');
-		expect(slots[0]!.text).not.toContain("日付");
-		expect(
-			await store.write((db) =>
-				events.removeActiveInTransaction(db, "c1", "w1"),
-			),
-		).toBe(true);
-		expect(
-			store
-				.read((db) => events.activeInTransaction(db, "c1"))
-				.map((s) => s.todoId),
-		).toEqual(["w2"]);
-	} finally {
-		done();
-	}
-});
-
 test("curation reads handled events only and marks them", async () => {
 	const { store, events, done } = setup();
 	try {
@@ -385,7 +340,6 @@ test("curation reads handled events only and marks them", async () => {
 const LIMITS = {
 	log: { cap: 400, high: 300, low: 150, keep: 80 },
 	episode: 400,
-	active: 200,
 	silenceMs: 120_000,
 };
 
@@ -571,7 +525,7 @@ test("a full episode stays inside its limit without any model: summaries become 
 	}
 });
 
-test("older memory reads switch to their short form; finished work results go first when over the limit", async () => {
+test("older memory reads switch to their short form", async () => {
 	const { store, events, done } = setup();
 	try {
 		await store.write((db) => {
@@ -590,18 +544,6 @@ test("older memory reads switch to their short form; finished work results go fi
 				by: "user",
 				fields: { text: "き".repeat(90) },
 			});
-			for (const [todoId, status] of [
-				["w1", "done"],
-				["w2", "waiting"],
-				["w3", "done"],
-			] as const)
-				events.putActiveInTransaction(db, {
-					conversationId: "c1",
-					todoId,
-					status,
-					at: minute(2),
-					fields: { result: "く".repeat(80) },
-				});
 		});
 		const result = await store.write((db) =>
 			events.reconstructInTransaction(db, {
@@ -615,8 +557,6 @@ test("older memory reads switch to their short form; finished work results go fi
 		expect(store.read((db) => events.logInTransaction(db, "c1"))[0]!.form).toBe(
 			"short",
 		);
-		// Over the 200-token limit: the oldest finished one goes; the waiting one stays.
-		expect(result.removedActive).toEqual(["w1"]);
 	} finally {
 		done();
 	}

@@ -23,7 +23,9 @@ function prefixKey(
 	const content =
 		typeof first?.content === "string" ? first.content : "[non-text]";
 	return createHash("sha256")
-		.update(JSON.stringify([first?.role ?? null, content, options.tools ?? null]))
+		.update(
+			JSON.stringify([first?.role ?? null, content, options.tools ?? null]),
+		)
 		.digest("hex")
 		.slice(0, 16);
 }
@@ -64,7 +66,9 @@ export function createHelperConnections(
 			if (helpers.length < HELPER_CONNECTIONS) {
 				const used = new Set(own.map((helper) => helper.client));
 				let n = 0;
-				while (used.has(n ? `${client}-aux-${key}-${n}` : `${client}-aux-${key}`))
+				while (
+					used.has(n ? `${client}-aux-${key}-${n}` : `${client}-aux-${key}`)
+				)
 					n++;
 				const helperClient = n
 					? `${client}-aux-${key}-${n}`

@@ -22,12 +22,21 @@ export async function memory(
 	const { deps, input, current, acted, handle, actionKey } = x;
 	const { store } = deps;
 	if (args.operation === "read") {
+		// The model names the items `<memory>` shows by their numbers (`p<n>`); it never sees their ids.
+		const profileIds = input.document.profileIds;
+		const numberOf = new Map(profileIds.map((id, i) => [id, `p${i + 1}`]));
+		const itemIds = (args.itemIds ?? []).flatMap((ref) => {
+			const n = /^p(\d+)$/.exec(ref);
+			const id = n ? profileIds[Number(n[1]) - 1] : undefined;
+			return id ? [id] : [];
+		});
 		return store.write((tx) => {
 			current(tx);
 			const items = deps.memory?.readItemsInTransaction(tx, {
 				...(args.query ? { query: args.query } : {}),
-				...(args.itemIds ? { itemIds: args.itemIds } : {}),
-				shown: new Set(input.memory?.window.manifest ?? []),
+				...(itemIds.length ? { itemIds } : {}),
+				// Only what `<memory>` shows is read back by number; a memory still waiting comes back whole.
+				shown: new Set(profileIds),
 				limit: MEMORY_READ_LIMIT,
 			});
 			if (!items) return { result: { available: false } };
@@ -38,7 +47,15 @@ export async function memory(
 				{ action: "memory.read", found: items.map((item) => item.id) },
 				{ action: "memory.read" },
 			);
-			return { result: { items } };
+			return {
+				result: {
+					items: items.map(({ id, revision: _revision, ...item }) =>
+						item.inProfile
+							? { item: numberOf.get(String(id)) ?? null, inProfile: true }
+							: item,
+					),
+				},
+			};
 		});
 	}
 	// A request stands on the user's own words: a generation without a new utterance cannot make one.
