@@ -141,6 +141,7 @@ export async function harness(
 		drawingIdleMs?: number;
 		recognitionFetcher?: typeof fetch;
 		ocrFetcher?: typeof fetch;
+		visual?: () => import("../../domains/larm").PerceptionPort;
 		/** PTY sessions for the Claude Code toolchain (a fake spawn in tests), over the harness store. */
 		shell?: (
 			store: import("../../infrastructure/sqlite").SqliteStore,
@@ -725,6 +726,7 @@ export async function harness(
 				queue,
 				connection: () => settings.ocrCredentials(),
 				fetcher: options.ocrFetcher,
+				visual: options.visual,
 				inference,
 				capabilities: () => activeCapabilities,
 			})
@@ -829,6 +831,7 @@ export async function harness(
 				queue,
 				connection: () => settings.objectRecognitionCredentials(),
 				fetcher: options.recognitionFetcher,
+				visual: options.visual,
 			})
 		: undefined;
 	const routing = createToolchainRouting(

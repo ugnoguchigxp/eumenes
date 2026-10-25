@@ -1,3 +1,6 @@
+import { removeRecognition } from "./remove";
+import { createRecognitionAnalyses } from "./analyses";
+import type { PerceptionPort } from "../../larm";
 import { recognitionCommand } from "../../capabilities/contracts";
 import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
@@ -26,8 +29,12 @@ export function createObjectRecognition(deps: {
 	queue: QueueService;
 	connection: () => Connection | null;
 	fetcher?: typeof fetch;
+	visual?: () => PerceptionPort;
 }) {
 	const { store, queue } = deps;
+	const analyses = deps.visual
+		? createRecognitionAnalyses({ store, queue, visual: deps.visual })
+		: null;
 	function cancelInTransaction(db: Database, owner: string, id: string) {
 		const r = owned(db, id, owner);
 		const v = record(r);
@@ -67,6 +74,7 @@ export function createObjectRecognition(deps: {
 	}
 	registerRecognitionHandlers({ ...deps, enqueue });
 	return {
+		analyses,
 		async upload(
 			owner: string,
 			conversationId: string,
@@ -306,14 +314,8 @@ export function createObjectRecognition(deps: {
 				enqueue(db, id, "poll");
 				return updated;
 			}),
-		async remove(owner: string, id: string) {
-			await store.write((db) => {
-				const r = owned(db, id, owner);
-				if (!["completed", "failed", "cancelled"].includes(record(r).state))
-					throw new Error("recognition_not_ready");
-				db.query("DELETE FROM object_recognition_inputs WHERE id=?").run(id);
-			});
-		},
+		remove: (owner: string, id: string) =>
+			removeRecognition(store, queue, analyses, owner, id),
 		...createHandoffs(store),
 	};
 }

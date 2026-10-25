@@ -34,15 +34,15 @@ test("native decisions keep the compatible auto choice at temperature zero witho
 			{ tools, toolChoice: "required" },
 		),
 	).toMatchObject({ tools, tool_choice: "required" });
-	// A call whose output is spoken to the user keeps the provider's sampling, tools or not.
+	// A spoken reply offered tools decides on them greedily as well.
 	expect(
 		chatRequest(
 			{ model: "fixture", contextWindow: { outputReserveTokens: 4096 } },
 			[{ role: "user", content: "fixture" }],
 			true,
-			{ tools, speaks: true },
+			{ tools },
 		),
-	).not.toHaveProperty("temperature");
+	).toMatchObject({ temperature: 0 });
 	expect(
 		chatRequest(
 			{ model: "fixture", contextWindow: { outputReserveTokens: 4096 } },

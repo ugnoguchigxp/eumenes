@@ -1,0 +1,159 @@
+{
+  "at": "2026-10-25T12:23:21.504Z",
+  "phases": [
+    {
+      "at": "2026-10-25T12:23:23.282Z",
+      "phase": "connection",
+      "connectionId": "aconn_epoch-dda002ea-1ede-4504-aa8f-c4a58f14e484_a5d90388-2e7d-4b59-9332-2ec27860366c"
+    },
+    {
+      "at": "2026-10-25T12:23:39.579Z",
+      "phase": "claim",
+      "httpStatus": 200
+    },
+    {
+      "at": "2026-10-25T12:23:39.596Z",
+      "phase": "running"
+    },
+    {
+      "at": "2026-10-25T12:23:39.611Z",
+      "phase": "released"
+    },
+    {
+      "at": "2026-10-25T12:23:39.612Z",
+      "phase": "lifecycle"
+    },
+    {
+      "at": "2026-10-25T12:23:40.837Z",
+      "phase": "connection",
+      "connectionId": "aconn_epoch-dda002ea-1ede-4504-aa8f-c4a58f14e484_63885ae6-adae-4c17-9842-cf716d5cd569"
+    },
+    {
+      "at": "2026-10-25T12:23:56.780Z",
+      "phase": "claim",
+      "httpStatus": 200
+    },
+    {
+      "at": "2026-10-25T12:23:56.789Z",
+      "phase": "running"
+    },
+    {
+      "at": "2026-10-25T12:24:00.940Z",
+      "phase": "released"
+    },
+    {
+      "at": "2026-10-25T12:24:00.940Z",
+      "phase": "lifecycle"
+    },
+    {
+      "at": "2026-10-25T12:24:03.032Z",
+      "phase": "lifecycle"
+    },
+    {
+      "at": "2026-10-25T12:24:03.033Z",
+      "phase": "lifecycle"
+    },
+    {
+      "at": "2026-10-25T12:24:04.208Z",
+      "phase": "connection",
+      "connectionId": "aconn_epoch-dda002ea-1ede-4504-aa8f-c4a58f14e484_12fa3a7d-35a1-4c06-9e1c-0955d48af18b"
+    },
+    {
+      "at": "2026-10-25T12:24:32.708Z",
+      "phase": "claim",
+      "httpStatus": 200
+    },
+    {
+      "at": "2026-10-25T12:24:32.716Z",
+      "phase": "running"
+    },
+    {
+      "at": "2026-10-25T12:24:46.252Z",
+      "phase": "released"
+    },
+    {
+      "at": "2026-10-25T12:24:46.253Z",
+      "phase": "lifecycle"
+    },
+    {
+      "at": "2026-10-25T12:24:48.294Z",
+      "phase": "lifecycle"
+    }
+  ],
+  "observations": [
+    {
+      "status": "observing",
+      "connectionId": "aconn_epoch-dda002ea-1ede-4504-aa8f-c4a58f14e484_a5d90388-2e7d-4b59-9332-2ec27860366c",
+      "allocationId": "alloc_epoch-dda002ea-1ede-4504-aa8f-c4a58f14e484_0d6176a1-4b38-4aea-8425-7436088b1aa0",
+      "checkedAt": 1792931019612
+    },
+    {
+      "status": "observing",
+      "connectionId": "aconn_epoch-dda002ea-1ede-4504-aa8f-c4a58f14e484_63885ae6-adae-4c17-9842-cf716d5cd569",
+      "allocationId": "alloc_epoch-dda002ea-1ede-4504-aa8f-c4a58f14e484_e4a34a00-8cf3-4e29-a3f2-21fdf924fda3",
+      "checkedAt": 1792931040940
+    },
+    {
+      "status": "cold",
+      "connectionId": "aconn_epoch-dda002ea-1ede-4504-aa8f-c4a58f14e484_a5d90388-2e7d-4b59-9332-2ec27860366c",
+      "allocationId": "alloc_epoch-dda002ea-1ede-4504-aa8f-c4a58f14e484_0d6176a1-4b38-4aea-8425-7436088b1aa0",
+      "checkedAt": 1792931043032,
+      "releasedAt": "2026-10-25T12:23:39.624Z",
+      "runtimeId": "wevisone-vl-4b",
+      "observedAt": "2026-10-25T12:24:01.974Z"
+    },
+    {
+      "status": "cold",
+      "connectionId": "aconn_epoch-dda002ea-1ede-4504-aa8f-c4a58f14e484_63885ae6-adae-4c17-9842-cf716d5cd569",
+      "allocationId": "alloc_epoch-dda002ea-1ede-4504-aa8f-c4a58f14e484_e4a34a00-8cf3-4e29-a3f2-21fdf924fda3",
+      "checkedAt": 1792931043032,
+      "releasedAt": "2026-10-25T12:24:00.953Z",
+      "runtimeId": "wevisone-vl-4b",
+      "observedAt": "2026-10-25T12:24:01.974Z"
+    },
+    {
+      "status": "observing",
+      "connectionId": "aconn_epoch-dda002ea-1ede-4504-aa8f-c4a58f14e484_12fa3a7d-35a1-4c06-9e1c-0955d48af18b",
+      "allocationId": "alloc_epoch-dda002ea-1ede-4504-aa8f-c4a58f14e484_168ec405-3e7d-4cd0-a966-0987abeec652",
+      "checkedAt": 1792931086253
+    },
+    {
+      "status": "cold",
+      "connectionId": "aconn_epoch-dda002ea-1ede-4504-aa8f-c4a58f14e484_12fa3a7d-35a1-4c06-9e1c-0955d48af18b",
+      "allocationId": "alloc_epoch-dda002ea-1ede-4504-aa8f-c4a58f14e484_168ec405-3e7d-4cd0-a966-0987abeec652",
+      "checkedAt": 1792931088294,
+      "releasedAt": "2026-10-25T12:24:46.265Z",
+      "runtimeId": "wevisone-vl-4b",
+      "observedAt": "2026-10-25T12:24:47.993Z"
+    }
+  ],
+  "stateHttp": 200,
+  "cancel": {
+    "at": "2026-10-25T12:23:39.616Z",
+    "connectionId": "aconn_epoch-dda002ea-1ede-4504-aa8f-c4a58f14e484_a5d90388-2e7d-4b59-9332-2ec27860366c",
+    "cancelled": true,
+    "beforeInference": true
+  },
+  "reuse": {
+    "at": "2026-10-25T12:24:00.942Z",
+    "elapsedMs": 21324.837792,
+    "waitingMs": 17174.044542000003,
+    "releaseConfirmed": true,
+    "detections": 1
+  },
+  "delayedClaim": {
+    "at": "2026-10-25T12:24:32.008Z",
+    "delayMs": 11000,
+    "httpStatus": 200,
+    "status": "ready",
+    "providers": [
+      {
+        "claimable": false,
+        "readiness": "ready"
+      }
+    ],
+    "succeeded": true,
+    "elapsedMs": 43222.613917,
+    "releaseConfirmed": true
+  }
+}

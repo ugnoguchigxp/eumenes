@@ -77,7 +77,12 @@ export async function buildCore(
 	});
 	const queue = createQueue(store, {
 		resourceAliases: { "larm.llm": "inference.llm" },
-		resources: { "inference.llm": 1, "inference.aux": 2, "web.fetch": 6 },
+		resources: {
+			"vision.perception": 1,
+			"inference.llm": 1,
+			"inference.aux": 2,
+			"web.fetch": 6,
+		},
 	});
 	return {
 		store,

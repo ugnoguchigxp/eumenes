@@ -1,3 +1,4 @@
+import { registerOcrAnalyses } from "./analyses";
 import { z } from "zod";
 import type { Hono } from "hono";
 import { readBounded } from "../../../infrastructure/bounded-read";
@@ -15,6 +16,7 @@ export function registerOcr(
 	) => Promise<unknown>,
 ) {
 	const root = "/api/ocr";
+	if (service.analyses) registerOcrAnalyses(app, service.analyses, owner);
 	registerOcrQr(app, service, owner, incorporate);
 	app.get(root, (c) =>
 		c.json(service.list(owner, c.req.query("conversationId") ?? "main")),

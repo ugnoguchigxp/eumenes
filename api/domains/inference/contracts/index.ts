@@ -99,8 +99,6 @@ export type CallSession = {
 	onConversation?: true;
 	/** With `onConversation`: the conversation's tool definitions, sent unchanged to keep the prefix (`toolChoice: none`). */
 	prefixTools?: import("../../../infrastructure/chat-stream").NativeTool[];
-	/** The call's output is spoken to the user: the provider samples as usual even with tools offered. */
-	speaks?: true;
 	/** This call's own bound on output tokens, below the request's: a call whose output is short by contract. */
 	outputLimit?: number;
 	/** Hidden auxiliary work on an answer request: publishes no deltas; provider failure ends only this call. */

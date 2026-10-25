@@ -1,3 +1,5 @@
+import { createOcrAnalyses } from "./analyses";
+import type { PerceptionPort } from "../../larm";
 import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import type { QueueService } from "../../queue";
@@ -27,11 +29,15 @@ export function createOcr(deps: {
 	queue: QueueService;
 	connection: () => Connection | null;
 	fetcher?: typeof fetch;
+	visual?: () => PerceptionPort;
 	inference?: InferencePort;
 	capabilities?: () => Capabilities | null;
 	qrDecoder?: typeof import("./qr-input").decodeQr;
 }) {
 	const { store, queue } = deps;
+	const analyses = deps.visual
+		? createOcrAnalyses({ store, queue, visual: deps.visual })
+		: null;
 	const qr = createOcrQr(store, queue, deps.qrDecoder);
 	const corrections =
 		deps.inference && deps.capabilities
@@ -78,6 +84,7 @@ export function createOcr(deps: {
 	}
 	registerOcrHandlers({ ...deps, enqueue, onCompleted: qr.autoInTransaction });
 	return {
+		analyses,
 		corrections,
 		qr,
 		async upload(
@@ -234,6 +241,7 @@ export function createOcr(deps: {
 				const jobs = [
 					...(corrections?.removeInTransaction(db, id) ?? []),
 					...qr.removeInTransaction(db, id),
+					...(analyses?.removeInTransaction(db, id) ?? []),
 				];
 				db.query("DELETE FROM ocr_commands WHERE target_id=? AND owner=?").run(
 					id,

@@ -39,6 +39,7 @@ async function publicSelectors(control: Control, signal: AbortSignal) {
 
 /** Discover services by public selectors as well as the catalog's concrete profile IDs. */
 export function createPlaygroundCatalog({
+	includeProviderSelectors = false,
 	control,
 	publicUrl,
 	origin,
@@ -51,6 +52,7 @@ export function createPlaygroundCatalog({
 	origin: string;
 	profile?: string;
 	kinds: Record<string, TestKind>;
+	includeProviderSelectors?: boolean;
 	paths: Record<string, string>;
 }) {
 	return async (signal: AbortSignal) => {
@@ -159,7 +161,12 @@ export function createPlaygroundCatalog({
 				if (selector === profile?.trim()) continue;
 				try {
 					const { rev, profiles } = await fetchProfiles(selector);
-					ingest(selector, rev, profiles, ["service"]);
+					ingest(
+						selector,
+						rev,
+						profiles,
+						includeProviderSelectors ? ["provider", "service"] : ["service"],
+					);
 				} catch (e) {
 					if (code(e) === "stale_catalog") throw e;
 					errors.push(`${selector}: ${code(e)}`);

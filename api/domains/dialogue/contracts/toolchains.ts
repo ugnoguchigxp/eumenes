@@ -39,7 +39,6 @@ export interface ToolchainRoutingPort {
 			text: string;
 			query?: QueryVector;
 			available: ReadonlySet<string>;
-			excludeRevisionIds?: ReadonlySet<string>;
 			/** Discovery must not expand the catalog when embedding retrieval fails. */
 			strict?: boolean;
 		},

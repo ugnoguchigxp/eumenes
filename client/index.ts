@@ -1,3 +1,4 @@
+import { visualAnalysisClient } from "./visual-analysis";
 import { doclingClient } from "./docling";
 import { shellClient } from "./shell";
 import { computeClient } from "./compute";
@@ -47,6 +48,7 @@ export function createClient(baseUrl: string, token?: string) {
 		...imageClient(transport),
 		...objectRecognitionClient(transport),
 		...ocrClient(transport),
+		...visualAnalysisClient(transport),
 		...excalidrawClient(transport),
 		...requirementsClient(transport),
 		...dotsClient(transport),

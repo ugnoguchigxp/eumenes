@@ -1,0 +1,23 @@
+{
+  "at": "2026-10-25T11:06:16.875Z",
+  "fixture": false,
+  "serverStarted": false,
+  "created": [
+    {
+      "domain": "ocr",
+      "id": "5b08a2d7-4b7d-47f3-bb05-d3e32eec28d2"
+    },
+    {
+      "domain": "object-recognition",
+      "id": "702f3d02-0ee1-4b36-a6dc-a25b1f295c7f"
+    }
+  ],
+  "results": [
+    {
+      "domain": "ocr",
+      "task": "describe",
+      "state": "failed",
+      "error": "api_connection_failed"
+    }
+  ]
+}

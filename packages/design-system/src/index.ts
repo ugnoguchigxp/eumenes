@@ -169,3 +169,5 @@ export * from "./components/WorkListMenu";
 export * from "./components/WorkResultPanel";
 
 export * from "./components/ExternalAppLauncher";
+
+export * from "./components/VisualAnalysis";

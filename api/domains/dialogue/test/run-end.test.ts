@@ -63,6 +63,42 @@ test("a cancelled run tells the steward it was cancelled, and its waiting TODO e
 	]);
 });
 
+test("stopping the reply of a run that handed its work over keeps the run and its TODO", async () => {
+	h = await setup();
+	h.state.steps.push(
+		{ calls: [{ name: "find_toolchain", args: { query: "絵を描く" } }] },
+		{
+			calls: [
+				{
+					name: "delegate",
+					args: {
+						mode: "execute",
+						toolchain: IMAGE.id,
+						request: "猫の絵",
+						impact: "create",
+						announcement: "描きますね。",
+					},
+				},
+			],
+		},
+	);
+	const waiting = await h.say("猫の絵を描いて", "queued");
+	// A voice barge-in on the next utterance stops only the reply: the work's lifetime is not the reply's.
+	expect((await h.dialogue.stopReply(waiting.id))?.status).toBe("queued");
+	expect(h.todos()).toMatchObject([{ status: "todo" }]);
+	expect(h.state.runEnds.filter((e) => e.runId === waiting.id)).toEqual([]);
+});
+
+test("stopping the reply of a run that handed nothing over cancels it", async () => {
+	h = await setup({ autoStart: false });
+	const run = await h.dialogue.submit({
+		requestId: crypto.randomUUID(),
+		conversationId: "main",
+		text: "やあ",
+	});
+	expect((await h.dialogue.stopReply(run.id))?.status).toBe("cancelled");
+});
+
 test("a run that already completed is not ended or told twice by a later cancel", async () => {
 	h = await setup();
 	h.state.steps.push({ text: "一度だけ。" });

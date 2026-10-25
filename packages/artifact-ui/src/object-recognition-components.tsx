@@ -1,3 +1,4 @@
+import { visualAnalysisActions } from "./visual-analysis-actions";
 import {
 	ObjectRecognitionWorkspace,
 	type ObjectRecognitionWorkspaceProps,
@@ -7,10 +8,15 @@ import { useAction } from "./components";
 import { useArtifactRuntime } from "./runtime";
 export type ObjectRecognitionResource = Omit<
 	ObjectRecognitionWorkspaceProps,
+	| "onAnalysisOpen"
+	| "onAnalysisRun"
+	| "onAnalysisCancel"
+	| "onAnalysisSelect"
 	| "onFile"
 	| "onCredentialSourceChange"
 	| "onCancel"
 	| "onSelect"
+	| "onFrame"
 	| "onRefresh"
 	| "onRecheck"
 	| "onIncorporate"
@@ -29,6 +35,13 @@ export function ObjectRecognitionWorkspaceView({
 	return (
 		<ObjectRecognitionWorkspace
 			{...resource}
+			{...visualAnalysisActions(action, resource)}
+			onFrame={(index) => {
+				void action.send("recognition-frame", {
+					id: resource.selectedId ?? "",
+					index: String(index),
+				});
+			}}
 			busy={resource.busy || action.pending}
 			message={action.message}
 			onCredentialSourceChange={(source) => {

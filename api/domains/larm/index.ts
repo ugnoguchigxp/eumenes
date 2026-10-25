@@ -50,3 +50,22 @@ export {
 	createComputeClient,
 	ComputeHttpError,
 } from "./service/compute-client";
+
+export {
+	createVisualPerception,
+	visualError,
+} from "./service/visual-perception";
+export type {
+	PerceptionPort,
+	PerceptionResult,
+	PerceptionOptions,
+	AnalysisRecord,
+	AnalysisCreate,
+} from "./contracts/visual-perception";
+
+export {
+	analysisCreate,
+	analysisErrors,
+	perceptionOptions,
+	perceptionResult,
+} from "./contracts/visual-perception";

@@ -104,7 +104,7 @@ export function createVoiceDialogue(
 			})
 			.then(() => {
 				const runId = store.read((db) => get(db, victim))?.runId;
-				if (runId) return dialogue.cancel(runId);
+				if (runId) return dialogue.stopReply(runId);
 			})
 			.catch((error) =>
 				log.warn(
@@ -399,7 +399,7 @@ export function createVoiceDialogue(
 			audio.get(id)?.wake();
 			await larm.cancelSubject?.(id);
 			audio.delete(id);
-			if (latest?.runId) await dialogue.cancel(latest.runId);
+			if (latest?.runId) await dialogue.stopReply(latest.runId);
 			return this.get(id);
 		},
 		async stop(sessionId: string, generation: number) {

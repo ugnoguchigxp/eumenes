@@ -1,3 +1,4 @@
+import { withAgentConnection } from "./provider-connection";
 import { createImageLibrary } from "./image-library";
 import { createImageImports } from "./image-import";
 import { sha256Hex } from "../../../infrastructure/digest";
@@ -133,112 +134,23 @@ export function createLarmPlayground(config: {
 		kinds,
 		paths,
 	});
-	async function connection<T>(
+	function connection<T>(
 		target: LarmTestTarget,
 		signal: AbortSignal,
 		action: (id: string, binding: LarmTestTarget) => Promise<T>,
-	): Promise<T> {
-		if (!target.selector) throw new Error("invalid_profile_selector");
-		if (
-			config.audience === "same-host" &&
-			!["localhost", "127.0.0.1"].includes(larmBase().hostname)
-		)
-			throw new Error("invalid_larm_audience");
-		let id: string | undefined;
-		try {
-			// Bound POST independently so cancellation still lets us collect/release a late connection ID.
-			signal.throwIfAborted();
-			let state = await json(
-				await control(
-					"/v1/agent-connections",
-					AbortSignal.timeout(15_000),
-					{
-						...post({
-							profile: target.selector,
-							audience: config.audience,
-							// This call owns its release; a concurrent call must never share its credential.
-							client: `eumenes-service-${crypto.randomUUID()}`,
-							providers: [target.mode === "provider" ? target.name : "llm"],
-							ttlSeconds: 300,
-							allowFallback: false,
-							deploymentPolicy: "existing-only",
-							expectedCatalogRevision: target.revision,
-						}),
-						headers: {
-							"Content-Type": "application/json",
-							"Idempotency-Key": crypto.randomUUID(),
-							Prefer: "wait=1",
-						},
-					},
-					target.mode === "service" ? [201, 202, 503] : [201, 202],
-				),
-			);
-			id = str(state.id);
-			signal.throwIfAborted();
-			for (let i = 0; ; i++) {
-				if (
-					state.id !== id ||
-					state.agentProfile !== target.profile ||
-					state.catalogRevision !== target.revision
-				)
-					throw new Error("invalid_connection_contract");
-				const service = target.mode === "service";
-				const p = list(service ? state.services : state.providers).find(
-					(p) => p.name === target.name,
-				);
-				if (
-					!p ||
-					p.model !== target.model ||
-					p.protocol !== target.protocol ||
-					(service &&
-						(p.capability !== target.capability ||
-							typeof p.description !== "string" ||
-							!p.description.trim()))
-				)
-					throw new Error(
-						service ? "invalid_service_binding" : "invalid_provider_binding",
-					);
-				if (["failed", "expired", "released"].includes(String(state.status)))
-					throw new Error(service ? "service_not_ready" : "provider_not_ready");
-				// Services start on POST; connection readiness describes the Providers.
-				if (
-					service
-						? ["pending", "probing", "ready"].includes(String(state.status))
-						: state.status === "ready" &&
-							p.claimable === true &&
-							p.readiness === "ready"
-				)
-					return await action(
-						id,
-						service
-							? {
-									...target,
-									endpoint: publicUrl(str(p.url ?? p.endpoint)).pathname,
-									description: str(p.description),
-								}
-							: target,
-					);
-				if (service) throw new Error("invalid_connection_contract");
-				if (i >= 90) throw new Error("deadline_exceeded");
-				await pause(config.pollMs ?? 1000, signal);
-				state = await json(
-					await control(
-						`/v1/agent-connections/${encodeURIComponent(id)}`,
-						signal,
-					),
-				);
-			}
-		} finally {
-			if (id)
-				await control(
-					`/v1/agent-connections/${encodeURIComponent(id)}`,
-					AbortSignal.timeout(10_000),
-					{ method: "DELETE" },
-					[200, 204, 404],
-				).catch(() => {
-					throw new Error("provider_release_unconfirmed");
-				});
-		}
+	) {
+		return withAgentConnection(
+			{
+				control,
+				publicUrl,
+				audience: config.audience,
+				base: larmBase(),
+				pollMs: config.pollMs,
+			},
+			target,
+			signal,
+			action,
+		);
 	}
 	const { claimed, embed } = createProviderAccess({
 		control,

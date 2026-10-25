@@ -1,0 +1,28 @@
+{
+  "at": "2026-10-25T11:21:50.285Z",
+  "idle": {
+    "connectionId": "aconn_epoch-805996cb-4035-49ea-bc5d-c44d9fb41351_4a710f5d-2292-4c94-b7c4-7c23aa1dadc1",
+    "claimWaitingMs": 32587.103792,
+    "observationMs": 60394.18883299999,
+    "state": "released",
+    "inferenceRequests": 0
+  },
+  "cancel": {
+    "connectionId": "aconn_epoch-805996cb-4035-49ea-bc5d-c44d9fb41351_7463f8b3-5a66-4554-a322-ff49da3e79a9",
+    "aborted": true,
+    "releaseConfirmed": true
+  },
+  "immediateReuse": {
+    "state": "failed",
+    "stage": "ready_wait",
+    "reason": "ready_deadline_exceeded",
+    "inferenceStarted": false
+  },
+  "subsequentReuse": {
+    "source": "browser_button",
+    "analysisId": "525c1936-e4d2-466f-aa46-5a8768ce1fc7",
+    "state": "completed",
+    "releaseConfirmed": true,
+    "elapsedMs": 35986.16725
+  }
+}

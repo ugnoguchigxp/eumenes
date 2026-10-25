@@ -1,3 +1,4 @@
+import { VisualAnalysis } from "../VisualAnalysis";
 import { useEffect, useRef, useState } from "react";
 import { Camera, FileUp, ScanText, Video } from "lucide-react";
 import { Button } from "../Button";
@@ -189,6 +190,9 @@ export function OcrPanel(props: OcrWorkspaceProps) {
 						</Button>
 					)}
 				</div>
+			)}
+			{item && (
+				<VisualAnalysis key={`${item.id}:${props.frameIndex}`} {...props} />
 			)}
 			{item?.state === "completed" ? (
 				<OcrResult

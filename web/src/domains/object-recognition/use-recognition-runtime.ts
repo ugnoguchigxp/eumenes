@@ -1,3 +1,4 @@
+import { useVisualAnalysis } from "../../hooks/use-visual-analysis";
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
@@ -39,12 +40,22 @@ export function useRecognitionRuntime(
 	});
 	const pushChatImage = useRecognitionChatInbox((s) => s.push);
 	const [selection, setSelection] = useState<string>();
+	const [selectedFrame, setFrame] = useState<{ id: string; index: number }>();
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState("");
 	const uploadLock = useRef(false);
 	const viewEpoch = useRef(0);
 	const items = records.data ?? [];
 	const selected = items.find((i) => i.id === selection) ?? items[0];
+	const frameIndex =
+		selectedFrame?.id === selected?.id ? (selectedFrame?.index ?? 0) : 0;
+	const analyses = useVisualAnalysis(
+		client,
+		"object-recognition",
+		conversationId,
+		selected,
+		frameIndex,
+	);
 	const content = useQuery({
 		queryKey: [
 			queryRoots.objectRecognition,
@@ -86,9 +97,13 @@ export function useRecognitionRuntime(
 	const revision =
 		items.reduce((sum, r) => sum + r.revision + 1, 0) +
 		(connection.data?.revision ?? 0) +
-		(capture ? 1 : 0);
+		(capture ? 1 : 0) +
+		analyses.revision +
+		frameIndex;
 	const resource: ObjectRecognitionResource = {
 		kind: "object-recognition-workspace",
+		frameIndex,
+		...analyses.resource,
 		revision,
 		items,
 		selectedId: selected?.id,
@@ -118,6 +133,7 @@ export function useRecognitionRuntime(
 	async function refresh() {
 		await records.refetch();
 		await connection.refetch();
+		await analyses.refresh();
 	}
 	async function uploadFile(
 		source: string,
@@ -182,6 +198,19 @@ export function useRecognitionRuntime(
 		}
 	}
 	async function dispatch(event: ArtifactEvent): Promise<Receipt> {
+		if (event.action.startsWith("analysis-")) return analyses.dispatch(event);
+		if (event.action === "recognition-frame") {
+			const index = Number(event.values.index);
+			if (
+				event.values.id !== selected?.id ||
+				selected?.result?.kind !== "video" ||
+				!Number.isInteger(index) ||
+				!selected.result.frames[index]
+			)
+				return { status: "rejected", message: "時刻を選び直してください。" };
+			setFrame({ id: selected.id, index });
+			return { status: "accepted", message: "時刻を選びました。" };
+		}
 		if (event.source !== recognitionSource || event.revision !== revision)
 			return {
 				status: "conflict",

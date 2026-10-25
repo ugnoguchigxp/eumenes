@@ -1,3 +1,4 @@
+import type { VisualAnalysisProps } from "../VisualAnalysis";
 export type OcrLine = {
 	text: string;
 	confidence: number;
@@ -110,7 +111,7 @@ export type OcrQr = {
 		  }[]
 		| null;
 };
-export type OcrWorkspaceProps = {
+export type OcrWorkspaceProps = VisualAnalysisProps & {
 	items: OcrRecord[];
 	selectedId?: string;
 	mediaUrl?: string;

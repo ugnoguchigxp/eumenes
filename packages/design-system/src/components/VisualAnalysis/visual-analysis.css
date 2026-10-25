@@ -1,0 +1,81 @@
+.visual-analysis {
+	display: grid;
+	gap: 0.6rem;
+	padding: 1rem 0;
+	border-top: 1px solid var(--border-color, #d5dce3);
+	min-width: 0;
+}
+.visual-analysis > button {
+	justify-self: start;
+}
+.visual-analysis small {
+	color: var(--text-muted, #64748b);
+	font-size: 0.8rem;
+}
+.visual-analysis-panel,
+.visual-analysis-form {
+	display: grid;
+	gap: 0.75rem;
+	min-width: 0;
+}
+.visual-analysis label {
+	display: grid;
+	gap: 0.35rem;
+}
+.visual-analysis textarea,
+.visual-analysis select,
+.visual-analysis input:not([type="checkbox"]) {
+	width: 100%;
+	min-width: 0;
+	box-sizing: border-box;
+	border: 1px solid var(--border-color, #ccd4df);
+	border-radius: 0.5rem;
+	padding: 0.55rem;
+	background: var(--surface-color, transparent);
+	color: inherit;
+	font: inherit;
+}
+.visual-analysis textarea {
+	min-height: 5rem;
+	resize: vertical;
+}
+.visual-analysis-actions {
+	display: flex;
+	gap: 0.5rem;
+	flex-wrap: wrap;
+}
+.visual-analysis-image {
+	width: 100%;
+	max-height: 65vh;
+	background: #eef1f5;
+	border-radius: 0.65rem;
+}
+.visual-analysis-text {
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+	line-height: 1.7;
+}
+.visual-analysis [role="alert"] {
+	color: var(--danger-color, #bb4839);
+}
+.visual-analysis-timing {
+	font-size: 0.8rem;
+	color: var(--text-muted, #64748b);
+}
+.visual-analysis ul {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+	list-style: none;
+	padding: 0;
+}
+.visual-analysis li button {
+	border: 1px solid var(--border-color, #ccd4df);
+	border-radius: 0.4rem;
+	padding: 0.4rem;
+	background: transparent;
+	color: inherit;
+}
+.visual-analysis button[aria-pressed="true"] {
+	outline: 2px solid #f09b20;
+}

@@ -28,6 +28,7 @@ import type {
 } from "../contracts";
 import { jstSeconds } from "../../../infrastructure/jst-time";
 import { byId, interruptUnfinished, listRuns } from "../repository";
+import { workOfRun } from "../repository/work";
 import { createAgentSync } from "./agent-sync";
 import { DEFAULT_DEADLINE_MS, TERMINAL, type DialogueDeps } from "./context";
 import { createGenerationHandler } from "./generation-handler";
@@ -396,6 +397,17 @@ export function createDialogueService({
 						endRun(deps, db, row, "cancelled", "cancel_requested");
 				});
 			return store.read((db) => byId(db, runId));
+		},
+		/**
+		 * Stops a run's reply only (a voice turn cut off, muted or given up). A run that handed its work over waits
+		 * for that work, whose lifetime is not the reply's: the run and its open TODO stay. Any other run is cancelled.
+		 */
+		async stopReply(runId: string): Promise<Run | null> {
+			const handedOver = store.read((db) =>
+				workOfRun(db, runId).some((row) => row.status !== "done"),
+			);
+			if (handedOver) return store.read((db) => byId(db, runId));
+			return service.cancel(runId);
 		},
 		/** Runs are stopped by the queue's own shutdown; nothing is owned here. */
 		async close() {

@@ -416,13 +416,11 @@ test("a spoken call's session reaches the provider: speech sampling, a required 
 		tools,
 		{
 			sessionRole: "main",
-			speaks: true,
 			toolChoice: "required",
 			outputLimit: 1024,
 		},
 	);
 	expect(seen).toMatchObject({
-		speaks: true,
 		toolChoice: "required",
 		maxOutputTokens: 1024,
 	});

@@ -192,7 +192,6 @@ export function createToolchainRouting(
 					: undefined,
 				available: (id) => input.available.has(id),
 				fromHistory,
-				excludeRevisionIds: input.excludeRevisionIds,
 				strict: input.strict,
 				limit: input.strict ? 4 : undefined,
 			});

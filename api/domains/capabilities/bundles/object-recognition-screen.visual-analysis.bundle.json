@@ -1,0 +1,258 @@
+{
+	"formatVersion": 1,
+	"bundleId": "object-recognition-screen-visual-analysis",
+	"pins": [],
+	"definitions": [],
+	"bindings": [],
+	"artifacts": [
+		{
+			"kind": "artifact",
+			"id": "object-recognition.workspace",
+			"revision": 3,
+			"title": "映っている物を調べる",
+			"variants": [
+				{
+					"id": "standard",
+					"label": "標準",
+					"definition": {
+						"view": "object-recognition-workspace",
+						"source": "object-recognition",
+						"title": "映っている物を調べる"
+					}
+				}
+			],
+			"defaultVariant": "standard",
+			"sourceBindings": [
+				{
+					"source": "object-recognition",
+					"adapterRef": "adapter:object-recognition-screen@1",
+					"query": "query:object-recognition-screen.list@1",
+					"target": "none"
+				}
+			],
+			"actionBindings": [
+				{
+					"actionId": "credential-source",
+					"eventAction": "recognition-credential-source",
+					"source": "object-recognition",
+					"inputSchemaRef": "schema:object-recognition-screen-credential@1",
+					"effect": "local"
+				},
+				{
+					"actionId": "select",
+					"eventAction": "recognition-select",
+					"source": "object-recognition",
+					"inputSchemaRef": "schema:object-recognition-screen-id@1",
+					"effect": "local"
+				},
+				{
+					"actionId": "cancel",
+					"eventAction": "recognition-cancel",
+					"source": "object-recognition",
+					"inputSchemaRef": "schema:object-recognition-screen-id@1",
+					"effect": "local"
+				},
+				{
+					"actionId": "refresh",
+					"eventAction": "recognition-refresh",
+					"source": "object-recognition",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "local"
+				},
+				{
+					"actionId": "recheck",
+					"eventAction": "recognition-recheck",
+					"source": "object-recognition",
+					"inputSchemaRef": "schema:object-recognition-screen-id@1",
+					"effect": "local"
+				},
+				{
+					"actionId": "remove",
+					"eventAction": "recognition-remove",
+					"source": "object-recognition",
+					"inputSchemaRef": "schema:object-recognition-screen-id@1",
+					"effect": "local"
+				},
+				{
+					"actionId": "incorporate",
+					"eventAction": "recognition-incorporate",
+					"source": "object-recognition",
+					"inputSchemaRef": "schema:object-recognition-screen-id@1",
+					"effect": "local"
+				},
+				{
+					"actionId": "handoff-cancel",
+					"eventAction": "recognition-handoff-cancel",
+					"source": "object-recognition",
+					"inputSchemaRef": "schema:object-recognition-screen-id@1",
+					"effect": "local"
+				},
+				{
+					"actionId": "analysis-open",
+					"eventAction": "analysis-open",
+					"source": "object-recognition",
+					"inputSchemaRef": "schema:object-recognition-screen-analysis-open@1",
+					"effect": "local"
+				},
+				{
+					"actionId": "analysis-run",
+					"eventAction": "analysis-run",
+					"source": "object-recognition",
+					"inputSchemaRef": "schema:object-recognition-screen-analysis-run@1",
+					"effect": "local"
+				},
+				{
+					"actionId": "analysis-cancel",
+					"eventAction": "analysis-cancel",
+					"source": "object-recognition",
+					"inputSchemaRef": "schema:object-recognition-screen-analysis-cancel@1",
+					"effect": "local"
+				},
+				{
+					"actionId": "analysis-select",
+					"eventAction": "analysis-select",
+					"source": "object-recognition",
+					"inputSchemaRef": "schema:object-recognition-screen-analysis-select@1",
+					"effect": "local"
+				},
+				{
+					"actionId": "analysis-frame",
+					"eventAction": "recognition-frame",
+					"source": "object-recognition",
+					"inputSchemaRef": "schema:object-recognition-analysis-frame@1",
+					"effect": "local"
+				}
+			],
+			"launcher": {
+				"label": "映っている物を調べる",
+				"order": 40
+			}
+		}
+	],
+	"schemas": [
+		{
+			"kind": "schema",
+			"id": "object-recognition-screen-analysis-open",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"id": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 64
+					},
+					"scope": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 256
+					}
+				},
+				"required": ["id", "scope"]
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "object-recognition-screen-analysis-run",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"id": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 64
+					},
+					"scope": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 256
+					},
+					"options": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 8192
+					}
+				},
+				"required": ["id", "scope", "options"]
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "object-recognition-screen-analysis-cancel",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"id": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 64
+					},
+					"scope": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 256
+					},
+					"analysisId": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 64
+					}
+				},
+				"required": ["id", "scope", "analysisId"]
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "object-recognition-screen-analysis-select",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"id": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 64
+					},
+					"scope": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 256
+					},
+					"analysisId": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 64
+					}
+				},
+				"required": ["id", "scope", "analysisId"]
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "object-recognition-analysis-frame",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"id": {
+						"type": "string",
+						"minLength": 1
+					},
+					"index": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 2
+					}
+				},
+				"required": ["id", "index"]
+			}
+		}
+	]
+}

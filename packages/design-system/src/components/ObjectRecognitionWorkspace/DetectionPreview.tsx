@@ -4,6 +4,8 @@ import type { RecognitionItem } from "./types";
 
 export function DetectionPreview({
 	item,
+	frameIndex,
+	onFrame,
 	url,
 	onIncorporate,
 	cameraPreview,
@@ -15,6 +17,8 @@ export function DetectionPreview({
 	mediaSelector,
 }: {
 	item?: RecognitionItem;
+	frameIndex?: number;
+	onFrame?: (index: number) => void;
 	url?: string;
 	/** Attaches the still and its detections to the chat input; images only. */
 	onIncorporate?: () => void;
@@ -27,7 +31,12 @@ export function DetectionPreview({
 	mediaSelector?: ReactNode;
 }) {
 	const video = useRef<HTMLVideoElement>(null);
-	const [index, setIndex] = useState(0);
+	const [localIndex, setLocalIndex] = useState(0);
+	const index = frameIndex ?? localIndex;
+	const setIndex = (value: number) => {
+		setLocalIndex(value);
+		onFrame?.(value);
+	};
 	const [atFrame, setAtFrame] = useState(true);
 	const result = item?.state === "completed" ? item.result : null;
 	const width = result?.kind === "image" ? result.width : result?.video.width;
@@ -112,7 +121,7 @@ export function DetectionPreview({
 											(f) => Math.abs(f.timestampSeconds - time) < 0.12,
 										);
 										setAtFrame(found >= 0);
-										if (found >= 0) setIndex(found);
+										if (found >= 0 && found !== index) setIndex(found);
 									}}
 								/>
 							)}

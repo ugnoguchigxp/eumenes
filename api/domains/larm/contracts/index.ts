@@ -74,8 +74,6 @@ export type LarmCallOptions = {
 	 * the same as the conversation's). Default: it may answer in text.
 	 */
 	toolChoice?: "required" | "none";
-	/** The output is spoken to the user: no fixed temperature, even with `tools`. */
-	speaks?: true;
 	onToolCalls?: (calls: NativeToolCall[]) => void;
 	maxOutputTokens?: number;
 	/** Internal control calls only: JSON-object generation at temperature zero. */

@@ -414,7 +414,6 @@ export async function executeRequest(
 		...(session?.toolChoice && tools?.length
 			? { toolChoice: session.toolChoice }
 			: {}),
-		...(session?.speaks ? { speaks: true as const } : {}),
 		...(session?.outputLimit ? { outputLimit: session.outputLimit } : {}),
 		control,
 		outputContract,

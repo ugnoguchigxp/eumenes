@@ -198,6 +198,13 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 		{ name: "compute_discovery", recover: () => s.compute.refresh() },
 		{ name: "queue_recovery", recover: () => s.queue.recover() },
 		{
+			name: "visual_analysis_recovery",
+			recover: async () => {
+				await s.ocr.analyses?.recover();
+				await s.objectRecognition.analyses?.recover();
+			},
+		},
+		{
 			// A connection of the previous process ended with it; what it left running is settled here.
 			name: "browser_recovery",
 			recover: async () => {

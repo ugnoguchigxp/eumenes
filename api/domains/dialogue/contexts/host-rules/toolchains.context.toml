@@ -1,5 +1,5 @@
 text = '''
-依頼できる担当: [[titles]]。<state>の担当にないものは、find_toolchainで探してからdelegateで渡します。'''
+依頼できる担当: [[titles]]。依頼を受けたら、まずfind_toolchainで探し、その結果の担当へdelegateで渡します。'''
 
 [variables.titles]
 type = "string"

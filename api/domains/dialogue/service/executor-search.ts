@@ -21,7 +21,7 @@ export async function find(
 	query: string,
 	signal: AbortSignal,
 ): Promise<ToolOutcome> {
-	const { deps, input, offered, current, acted } = x;
+	const { deps, offered, current, acted } = x;
 	const { store, toolchains } = deps;
 	if (!toolchains) return { result: { candidates: [] } };
 	const vector = await toolchains.embedQuery(query, signal);
@@ -36,9 +36,6 @@ export async function find(
 			text: query,
 			...(vector ? { query: vector } : {}),
 			available: availableToolchainsInTransaction(deps, tx, run),
-			excludeRevisionIds: new Set(
-				input.retained.map((entry) => entry.card.revisionId),
-			),
 			strict: true,
 		});
 		x.state.search = { route, ...(vector ? { query: vector } : {}) };

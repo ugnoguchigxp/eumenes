@@ -1,6 +1,6 @@
 # Docling Deskの入口・ツールチェーン設計案
 
-2026-10-25。状態: **別タブ方式を実装し、文書操作の実接続受入済み。全体gateは未完了**。結果と制約は[受入記録](verification/docling-desk-2026-10-25/acceptance.md)、設計時の調査履歴は[準備記録](verification/docling-desk-2026-10-25/preparation.md)を参照。以下は実装前に合意した設計であり、「候補」「未受入」はその時点の状態を表す。利用者の補足に従い、Doclingの既存UIを別タブで使う。前案の起動待ち専用ページ、queue、永続launch台帳、状態ポーリングを撤回した。その後、利用者から本案の実装、必要なSSH中継、Eumenes・試験サーバーの起動/再起動の明示許可を得た。
+2026-10-25。状態: **別タブの入口とWord/PDF操作は以前の実接続確認済み。Docling側2件はコード修正・隔離fixture検証済みとの報告。配備・実接続再受入と全体gateは未完了**。結果と制約は[受入記録](verification/docling-desk-2026-10-25/acceptance.md)、設計時の調査履歴は[準備記録](verification/docling-desk-2026-10-25/preparation.md)を参照。以下は実装前に合意した設計であり、「候補」「未受入」はその時点の状態を表す。利用者の補足に従い、Doclingの既存UIを別タブで使う。前案の起動待ち専用ページ、queue、永続launch台帳、状態ポーリングを撤回した。その後、利用者から初回実装と受入に必要な操作の明示許可を得た。現在の指示ではSSH接続、配備変更、サービスの起動・再起動を行わない。今回のDocling側報告の反映は文書更新だけで、配備や追加開発の実装合意ではない。
 
 ## 1. 目的と初版の範囲
 
@@ -22,7 +22,7 @@
 | LocalServicesPort | `ensure/resolve/renew/release`契約を確認。初版はgatewayがleaseを所有するのでEumenesから呼ばない。独自leaseを足さない |
 | 外部アプリ計画 | `spec/external-apps-artifacts-implementation-plan-2026-10-09.md`はDoclingを後続とし、文書版・検索等を含む。今回その大きな基盤を実装済みと扱わず、配備済みのUI-ticket契約へ限定する |
 | 上流認証と安全性 | Docling sourceの`web/auth.py`、`web/security.py`を参照。ticketは60秒・一回限り、交換は303、CookieはSecure/HttpOnly/SameSite=None。配備用uvicornは`--no-access-log`。Origin/Host・CSP・sandboxを保持する |
-| 上流の定期通信 | `frontend/src/lib/polling.ts`と`App.tsx`では、ライブラリ表示中のidle時も5秒周期の取得がある。表示したままの自然停止は現状保証できない。Eumenesはこの定期通信を増やさない |
+| 上流の定期通信 | Docling側レビューによる現行仕様は、queued/runningあり約2秒、処理なしのlibraryモード約5秒。共有更新検知のため文書閲覧中も続き、非表示タブでは定期取得を抑制する。対象通信・処理・leaseがなくなった後に停止する。無操作だけを停止条件とせず、Eumenesは定期通信を増やさない |
 
 参照したgnosis資料:
 
@@ -158,6 +158,8 @@ API連携を後続で追加する場合、gateway起点の`/api/upload`、`/api/
 
 現行OCRはTesseract。`ocr_provider`はlocal/azure_read/disabledで、azure_readは未設定。`ocr-host`はDoclingへ未接続。翻訳・解説・Azure embedding/Blob・TeXも設定済みと表示しない。機能の利用可否は開いたDoclingの`/api/diagnostics/features`の実測を正本とし、Eumenesの入口表示のために定期取得しない。
 
+Docling側レビューで確認された解説の診断とoverviewの事前判定不整合、汎用warningsのJob型・画面表示の欠落は、後続報告でコード修正・隔離fixture検証済みとなった。backendとfrontend配信資産の同じ版への反映、実接続・実ブラウザ再受入は未実施であり、稼働版での修正完了とは扱わない。以前のTeX固有の組版失敗理由の表示も汎用warnings表示の受入成功とは扱わない。通信間隔30秒案とocr-host adapterは別の設計合意・追加開発として分離する。担当、検証範囲、未設定機能の制御、再受入条件は[受入記録](verification/docling-desk-2026-10-25/acceptance.md)のDocling側報告を正本とする。
+
 ## 9. 実装予定箇所と依存
 
 - `api/domains/docling/`: 契約・上流ticket client・HTTP処理中の重複ガード・controller・domain試験。launch保存用migrationやqueue handlerは追加しない。設定/credentialはapplicationで注入し、他domainのDBを直接読まない。
@@ -205,8 +207,8 @@ LARMは公開契約を変えなければ既存コードを修正しない。変�
 
 文書に対する受入用データは新規の非機密ファイルだけ。既存文書を変更・削除しない。partial/failedがfixtureだけならlive成功と混ぜない。関連外の失敗は証拠を記録し、他作業の差分やテスト期待値を変更して通さない。
 
-## 11. 合意が必要な操作と現在の未実施
+## 11. 初回の操作許可と現在の制約
 
-別タブの既存UIを使う方針は利用者の明示指示で確定。新しいdomain・認証入口の実装設計は本改訂を基準とする。実接続に必要なMac loopback限定SSH中継の開始、反映/受入に必要なEumenes・隔離試験サーバーの起動/再起動は、最新の利用者メッセージで明示的に許可された範囲で実施する。gnosisのsystemd、LARM daemon、配備済みgatewayの再起動は要求しない。
+別タブの既存UIを使う方針は利用者の明示指示で確定。初回実装・実接続受入では、利用者の当時の許可に基づいてMac loopback限定SSH中継とEumenes・隔離試験サーバーの操作を実施した。その後SSH禁止の指示を受けた。現在はSSH接続、配備変更、サービスの起動・再起動を行わず、今回のレビュー結果を文書へ反映するだけとする。初回の許可を現在の操作許可に読み替えない。gnosisのsystemd、LARM daemon、配備済みgatewayの再起動も行わない。
 
 実装と受入の結果は[受入記録](verification/docling-desk-2026-10-25/acceptance.md)へ記録する。初回の未実施状態と現在の結果を混同しない。

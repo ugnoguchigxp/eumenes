@@ -34,7 +34,8 @@ const recorded = (codes: readonly string[]) =>
 /**
  * Per slot, the unit that closed last in the conversation, with the error code its job recorded. Units whose job
  * recorded one of `skipCodes` (a yield the steward retries by itself) are passed over, so they never hide the
- * failure before them.
+ * failure before them. A failure is left out once the same step later succeeded without a unit (World events
+ * routed with nothing to record write only a decision).
  */
 export function lastClosedUnits(
 	db: Database,
@@ -52,7 +53,10 @@ export function lastClosedUnits(
 				AND u.id = (SELECT x.id FROM steward_unit x
 					WHERE x.conversation_id = u.conversation_id AND x.slot = u.slot
 						AND x.state <> 'open' AND x.closed_at IS NOT NULL AND NOT ${recorded(skipCodes)}
-					ORDER BY x.closed_at DESC, x.rowid DESC LIMIT 1)`,
+					ORDER BY x.closed_at DESC, x.rowid DESC LIMIT 1)
+				AND NOT (u.state = 'failed' AND EXISTS (SELECT 1 FROM steward_decision s
+					WHERE s.conversation_id = u.conversation_id AND s.step = u.step AND s.job_id IS NOT u.job_id
+						AND s.error_code IS NULL AND s.created_at > u.closed_at))`,
 		)
 		.all(conversationId, ...skipCodes) as ClosedUnitRow[];
 }

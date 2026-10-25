@@ -43,7 +43,7 @@ export const domains = {
 		web: "web/src/domains/ocr",
 		components: "packages/design-system/src/components/OcrWorkspace",
 		depends: {
-			api: ["capabilities", "inference", "queue", "resources"],
+			api: ["capabilities", "inference", "queue", "resources", "larm"],
 			web: ["resources"],
 			test: [],
 		},
@@ -53,7 +53,7 @@ export const domains = {
 		backend: "api/domains/object-recognition",
 		web: "web/src/domains/object-recognition",
 		components: null,
-		depends: { api: ["capabilities", "queue"], web: [], test: [] },
+		depends: { api: ["capabilities", "queue", "larm"], web: [], test: [] },
 	},
 	compute: {
 		tier: 1,

@@ -54,9 +54,8 @@ export function chatRequest(
 			options?.toolOutputFormat === "json-schema" ? undefined : options?.tools,
 			options?.toolChoice,
 		),
-		// Function-selection turns have a checked output contract, like JSON control turns; a call whose output
-		// is spoken to the user keeps the provider's sampling (greedy speech repeats itself).
-		...(options?.tools?.length && !options.speaks ? { temperature: 0 } : {}),
+		// A call offered tools decides on them greedily, a spoken reply too: sampled, the model talks instead of calling.
+		...(options?.tools?.length ? { temperature: 0 } : {}),
 		stream,
 		max_tokens: Math.min(
 			provider.contextWindow!.outputReserveTokens,

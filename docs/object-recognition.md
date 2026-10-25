@@ -40,6 +40,20 @@ profileは`object-recognition.manage@1`、skill・tool・package・toolchainは�
 
 80クラスの検出で、動画30秒、毎秒2枚・最大60枚。追跡ID・任意クラス指定・人物同定はない。画面共有はブラウザの共有選択で始め（macOSでは初回にブラウザへの画面収録の許可が必要）、静止画は長辺2560pxに縮小したJPEGにする。scoreは校正済み確率ではなく、各フレームの同じlabelを同一個体として数えない。カメラは明示操作で開き、終了・非表示・アンマウントでtrackを解放する。動画撮影はブラウザのMediaRecorder対応形式を使い、30秒上限を越えないよう29秒で自動終了する。上流が媒体形式・長さ・decodeの最終検査を行う。
 
+## 詳細分析
+
+保存した静止画、または完了済み動画の選択フレームで「詳細分析」を押すと、画像の説明を表示する。保存済み結果は再実行せずに開く。同じ欄で用途と自然文の指定を変え、対象検索、カテゴリ検出、箱の数え上げ、segmentation・matting、文字認識・文字位置検索を明示実行できる。
+
+通常のYOLO結果と詳細分析の結果は独立して保存・表示する。通常解析が失敗した静止画にも使え、検出枠・マスクは正規化した入力画像へ重ねる。検出座標は上流のdetectionsを使い、生テキストの特殊トークンを解析し直さない。confidenceを作らず、途中で切れた結果には注意を表示する。マスクはdetectionIndexで検出物と結び付ける。
+
+`/api/object-recognition/:id/analyses`以下に作成・履歴・取得・取消・正規化画像・マスク取得を追加した。OCRと同じLARM接続処理とキュー資源を使い、同時実行は両画面合わせて1件。保存済みControl接続とcatalog・claimでProviderを発見し、終了・失敗・取消の後に解放する。原寸で4 MiB・4,194,304画素・各辺8192pxを超える場合は理由を示す。
+
+既存画面の`object-recognition.workspace@3`を使い、新しいツールチェーンは追加しない。[設計・確認結果](../spec/visual-perception-subsystem-design-2026-10-25.md)に固定試験、実API、実画面、上流の通常解析の未確認事項を分けて記録する。
+
+解放後は、同じ通常LARM資格でConnectionのallocation bindingと`/state`を読み、停止状態を最長30秒・1秒間隔で確認する。対象runtimeの新鮮なCOLD（`releasedAt`以降、取得時点から10秒以内、未来でない観測）だけを「停止確認」と表示し、取得失敗・古い観測・対象不明・期限超過は「停止未確認」とする。停止確認はLARMの稼働状態の観測であり、プロセス終了やGPUメモリ解放の保証ではない。観測中も次の分析を受け付ける。
+
+readyになればclaimableのキャッシュ値を待たずclaimへ進む。指定された一時的なclaimエラーだけを既存の120秒枠で待ち直し、推論POSTは再送しない。[停止確認の受入記録](../spec/verification/visual-stop-observation-2026-10-25/README.md)に固定試験・実API・実画面の結果を分けて残した。
+
 ## 検証
 
 `bun run verify -- --domain object-recognition`、影響のある利用側domainのverify。登録の試験は`api/application/media/object-recognition-screen-adapter.test.ts`、API結合は`api/application/media/object-recognition-e2e.test.ts`、ブラウザfixtureは`tests/browser/object-recognition.spec.ts`。カメラfixtureはChromiumの仮想カメラで、MacBook実カメラ受入とは区別する。

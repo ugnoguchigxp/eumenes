@@ -1,3 +1,4 @@
+import { visualAnalysisActions } from "./visual-analysis-actions";
 import {
 	OcrMedia,
 	OcrPanel,
@@ -12,6 +13,10 @@ export type OcrResource = Omit<
 	| "onQrCancel"
 	| "onQrIncorporate"
 	| "onQrEvidence"
+	| "onAnalysisOpen"
+	| "onAnalysisRun"
+	| "onAnalysisCancel"
+	| "onAnalysisSelect"
 	| "onFile"
 	| "onSelect"
 	| "onFrame"
@@ -41,6 +46,7 @@ function useOcrProps(request: ArtifactRequest): OcrWorkspaceProps {
 	const resource = action.resource as OcrResource;
 	return {
 		...resource,
+		...visualAnalysisActions(action, resource),
 		busy: resource.busy || action.pending,
 		message: action.message,
 		onFile: async (file) => {

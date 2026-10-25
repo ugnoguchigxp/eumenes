@@ -218,11 +218,8 @@ export async function setup(options: SetupOptions = {}) {
 		({ execution: cardOf(revisionId)?.execution }) as ToolchainRuntimeMeta;
 	const toolchains = {
 		embedQuery: async () => undefined,
-		routeInTransaction: (
-			_db: unknown,
-			input: { excludeRevisionIds?: ReadonlySet<string> },
-		) => ({
-			cards: cards.filter((c) => !input.excludeRevisionIds?.has(c.revisionId)),
+		routeInTransaction: () => ({
+			cards,
 			past: [],
 			retrieval: "fts",
 		}),

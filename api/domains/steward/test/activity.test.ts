@@ -190,6 +190,42 @@ test("a slot fails while its last closed unit failed for a reason other than a L
 	]);
 });
 
+test("a later success without a unit (World events routed with nothing to record) clears the failure", async () => {
+	const { store, activity } = setup();
+	await unit(store, {
+		slot: "world",
+		step: "curate-world",
+		state: "failed",
+		code: "cloud_agent_billing_error",
+		at: "2026-10-25T04:51:33.982Z",
+	});
+	const routed = (at: string, errorCode: string | null) =>
+		store.write((db) =>
+			insertDecision(db, {
+				conversationId: "main",
+				jobId: `routed-${at}`,
+				step: "curate-world",
+				createdAt: at,
+				output: { routed: "empty" },
+				results: null,
+				windowVersionBefore: null,
+				windowVersionAfter: null,
+				durationMs: null,
+				outputTokens: null,
+				errorCode,
+			}),
+		);
+	// Before the failure, or failed itself: the failure still shows.
+	await routed("2026-10-25T04:50:00.000Z", null);
+	await routed("2026-10-25T04:52:00.000Z", "settle_empty_failed");
+	expect(activity.activity("main").errors).toMatchObject([
+		{ slot: "world", code: "cloud_agent_billing_error" },
+	]);
+	await routed("2026-10-25T04:53:00.000Z", null);
+	expect(activity.activity("main").errors).toEqual([]);
+	expect(await activity.errorReport("main")).toBeNull();
+});
+
 test("the error report names the failing step with IDs, codes and the job's log, and nothing else", async () => {
 	const { store, logFile, activity } = setup();
 	expect(await activity.errorReport("main")).toBeNull();

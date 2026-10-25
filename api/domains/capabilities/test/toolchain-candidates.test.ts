@@ -74,7 +74,7 @@ for (const targetId of ["music.create", "image.create", "excalidraw.edit"])
 		}
 	});
 
-test("strict discovery has no all-catalog fallback and excludes retained revisions before the top four", async () => {
+test("strict discovery has no all-catalog fallback and returns the top four", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-discovery-limit-"));
 	const store = openStore(join(dir, "db"), migrations);
 	const caps = createCapabilities(
@@ -93,18 +93,17 @@ test("strict discovery has no all-catalog fallback and excludes retained revisio
 		await caps.seed();
 		const active = store.read((db) => caps.toolchainsInTransaction(db));
 		expect(active.length).toBeGreaterThan(4);
-		const read = (excludeRevisionIds = new Set<string>(), withVector = true) =>
+		const read = (withVector = true) =>
 			store.read((db) =>
 				caps.toolchainCandidatesInTransaction(db, {
 					text: "用途",
 					available: () => true,
 					strict: true,
-					excludeRevisionIds,
 					vector: withVector ? { space, values: [1, 0] } : undefined,
 				}),
 			);
 		expect(read()).toEqual([]);
-		expect(read(new Set(), false)).toEqual([]);
+		expect(read(false)).toEqual([]);
 		await store.write((db) =>
 			caps.saveToolchainVectorsInTransaction(
 				db,
@@ -121,11 +120,6 @@ test("strict discovery has no all-catalog fallback and excludes retained revisio
 		);
 		const initial = read();
 		expect(initial).toHaveLength(4);
-		const excluded = new Set(initial.slice(0, 2).map((c) => c.revisionId));
-		const next = read(excluded);
-		expect(next).toHaveLength(Math.min(4, active.length - 2));
-		expect(next.some((c) => excluded.has(c.revisionId))).toBe(false);
-		expect(next[0]!.revisionId).toBe(initial[2]!.revisionId);
 	} finally {
 		await store.close();
 		rmSync(dir, { recursive: true, force: true });

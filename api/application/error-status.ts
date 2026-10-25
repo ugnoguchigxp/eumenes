@@ -1,3 +1,4 @@
+import { analysisErrors } from "../domains/larm/contracts/visual-perception";
 import { errorStatus as docling } from "../domains/docling/contracts";
 import { errorStatus as ocr } from "../domains/ocr/contracts";
 import { attachmentErrors } from "../domains/conversation/contracts";
@@ -72,6 +73,7 @@ export function mergeErrorStatus(
 }
 
 const statusByCode = mergeErrorStatus(
+	analysisErrors,
 	docling,
 	attachmentErrors,
 	objectRecognition,

@@ -21,6 +21,11 @@ export type ArtifactEvent = {
 		| "dots-message-cancel"
 		| "dots-message-refresh"
 		| "dots-message-more"
+		| "analysis-open"
+		| "analysis-run"
+		| "analysis-cancel"
+		| "analysis-select"
+		| "recognition-frame"
 		| OcrAction
 		| WorkspaceAction
 		| KanbanEventAction

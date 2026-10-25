@@ -1,0 +1,238 @@
+{
+  "schemaVersion": 1,
+  "runId": "2026-10-25T11-21-51-470Z-c4f1332e-5f7c-4acd-973a-2b00c36b7970",
+  "startedAt": "2026-10-25T11:21:51.470Z",
+  "scope": {
+    "all": false,
+    "selected": [
+      "larm",
+      "ocr",
+      "object-recognition"
+    ]
+  },
+  "baseCommit": "d7cc41d59d15ca18b9d101927d260e4c3036ec4d",
+  "revision": "4fcf24524fb6c31e306f3dcb7d555d583ecc1bcbe641116e5f85af551612cc1b",
+  "runtime": {
+    "bun": "1.4.3",
+    "node": "26.3.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "ci": false,
+    "runner": null
+  },
+  "result": "pass",
+  "steps": [
+    {
+      "name": "inventory",
+      "status": "pass",
+      "ms": 61
+    },
+    {
+      "name": "boundaries",
+      "status": "pass",
+      "ms": 117
+    },
+    {
+      "name": "system-context",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "context:check"
+      ],
+      "status": "pass",
+      "ms": 85,
+      "exitCode": 0
+    },
+    {
+      "name": "size-budget",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "scripts/size-budget.ts",
+        "api/domains/larm",
+        "api/domains/ocr",
+        "web/src/domains/ocr",
+        "packages/design-system/src/components/OcrWorkspace",
+        "api/domains/object-recognition",
+        "web/src/domains/object-recognition"
+      ],
+      "status": "pass",
+      "ms": 260,
+      "exitCode": 0
+    },
+    {
+      "name": "format",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "format:check",
+        "api/domains/larm",
+        "api/domains/ocr",
+        "web/src/domains/ocr",
+        "packages/design-system/src/components/OcrWorkspace",
+        "api/domains/object-recognition",
+        "web/src/domains/object-recognition"
+      ],
+      "status": "pass",
+      "ms": 117,
+      "exitCode": 0
+    },
+    {
+      "name": "lint",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "lint",
+        "api/domains/larm",
+        "api/domains/ocr",
+        "web/src/domains/ocr",
+        "packages/design-system/src/components/OcrWorkspace",
+        "api/domains/object-recognition",
+        "web/src/domains/object-recognition"
+      ],
+      "status": "pass",
+      "ms": 85,
+      "exitCode": 0
+    },
+    {
+      "name": "design-system typecheck",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "--cwd",
+        "packages/design-system",
+        "typecheck"
+      ],
+      "status": "pass",
+      "ms": 255,
+      "exitCode": 0
+    },
+    {
+      "name": "design-system build",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "--cwd",
+        "packages/design-system",
+        "build"
+      ],
+      "status": "pass",
+      "ms": 6786,
+      "exitCode": 0
+    },
+    {
+      "name": "typecheck configuration",
+      "status": "pass",
+      "ms": 1
+    },
+    {
+      "name": "typecheck",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "check",
+        "-p",
+        "/Users/y.noguchi/Code/eumenes/verification-reports/runs/2026-10-25T11-21-51-470Z-c4f1332e-5f7c-4acd-973a-2b00c36b7970/tsconfig.selected.json"
+      ],
+      "status": "pass",
+      "ms": 499,
+      "exitCode": 0
+    },
+    {
+      "name": "typecheck closure",
+      "status": "pass",
+      "ms": 289
+    },
+    {
+      "name": "bun tests",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "test",
+        "./api/domains/larm/test/activity-recorder.test.ts",
+        "./api/domains/larm/test/asr-segments.test.ts",
+        "./api/domains/larm/test/auxiliary-sessions.test.ts",
+        "./api/domains/larm/test/catalog-selectors.test.ts",
+        "./api/domains/larm/test/chat-input.test.ts",
+        "./api/domains/larm/test/compute-client.test.ts",
+        "./api/domains/larm/test/context-exact.test.ts",
+        "./api/domains/larm/test/conversation-background.test.ts",
+        "./api/domains/larm/test/foreground-serialization.test.ts",
+        "./api/domains/larm/test/gzip-fetch.test.ts",
+        "./api/domains/larm/test/image-connection.test.ts",
+        "./api/domains/larm/test/image-delete.test.ts",
+        "./api/domains/larm/test/image-import.test.ts",
+        "./api/domains/larm/test/image-library.test.ts",
+        "./api/domains/larm/test/inference-error.test.ts",
+        "./api/domains/larm/test/larm-inference.test.ts",
+        "./api/domains/larm/test/larm-lifecycle.test.ts",
+        "./api/domains/larm/test/larm-speech.test.ts",
+        "./api/domains/larm/test/larm.test.ts",
+        "./api/domains/larm/test/lease-recovery.test.ts",
+        "./api/domains/larm/test/llm-timing.test.ts",
+        "./api/domains/larm/test/mesh-library.test.ts",
+        "./api/domains/larm/test/monitoring.test.ts",
+        "./api/domains/larm/test/music-generation.test.ts",
+        "./api/domains/larm/test/music-library.test.ts",
+        "./api/domains/larm/test/native-decision.test.ts",
+        "./api/domains/larm/test/playground-concurrency.test.ts",
+        "./api/domains/larm/test/playground.test.ts",
+        "./api/domains/larm/test/profile-retention.test.ts",
+        "./api/domains/larm/test/speech-overrides.test.ts",
+        "./api/domains/larm/test/speech-voice-pair.test.ts",
+        "./api/domains/larm/test/token-count-diagnostics.test.ts",
+        "./api/domains/larm/test/visual-perception.test.ts",
+        "./api/domains/object-recognition/test/analyses.test.ts",
+        "./api/domains/object-recognition/test/object-recognition.test.ts",
+        "./api/domains/ocr/test/analyses.test.ts",
+        "./api/domains/ocr/test/correction-plan.test.ts",
+        "./api/domains/ocr/test/correction.test.ts",
+        "./api/domains/ocr/test/ocr.test.ts",
+        "./api/domains/ocr/test/qr.test.ts",
+        "./api/domains/ocr/test/resource-adapter.test.ts"
+      ],
+      "status": "pass",
+      "ms": 11928,
+      "exitCode": 0
+    },
+    {
+      "name": "web tests",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "x",
+        "--no-install",
+        "vitest",
+        "run",
+        "web/src/domains/object-recognition/use-recognition-runtime.test.tsx",
+        "web/src/domains/ocr/thumbnail.test.ts",
+        "web/src/domains/ocr/toolchain-adapter.test.tsx",
+        "web/src/domains/ocr/use-ocr-runtime.test.tsx"
+      ],
+      "status": "pass",
+      "ms": 3312,
+      "exitCode": 0
+    },
+    {
+      "name": "design-system tests",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "--cwd",
+        "packages/design-system",
+        "test",
+        "src/components/OcrWorkspace/OcrPanel.test.tsx",
+        "src/components/OcrWorkspace/region.test.tsx"
+      ],
+      "status": "pass",
+      "ms": 2695,
+      "exitCode": 0
+    }
+  ],
+  "totalMs": 27004,
+  "integrityErrors": [],
+  "build": {
+    "sharedOutput": true,
+    "inputRevision": "4fcf24524fb6c31e306f3dcb7d555d583ecc1bcbe641116e5f85af551612cc1b",
+    "distAfterBuild": "55f62c1a45a961f83bf4944a2d3d14c620896a5cc8706288166d5c3754d90727",
+    "distAfterConsumers": "55f62c1a45a961f83bf4944a2d3d14c620896a5cc8706288166d5c3754d90727"
+  },
+  "finalRevision": "4fcf24524fb6c31e306f3dcb7d555d583ecc1bcbe641116e5f85af551612cc1b",
+  "finishedAt": "2026-10-25T11:22:18.935Z"
+}

@@ -1,3 +1,4 @@
+import type { VisualAnalysisProps } from "../VisualAnalysis";
 export type ObservedObject = {
 	classId: number;
 	label: string;
@@ -33,8 +34,10 @@ export type RecognitionItem = {
 		  }
 		| null;
 };
-export type ObjectRecognitionWorkspaceProps = {
+export type ObjectRecognitionWorkspaceProps = VisualAnalysisProps & {
 	items: RecognitionItem[];
+	frameIndex?: number;
+	onFrame?: (index: number) => void;
 	selectedId?: string;
 	mediaUrl?: string;
 	busy?: boolean;

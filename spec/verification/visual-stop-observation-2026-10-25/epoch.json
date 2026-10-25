@@ -1,0 +1,6 @@
+{
+  "at": "2026-10-25T12:28:13.886Z",
+  "oldConnectionId": "aconn_epoch-805996cb-4035-49ea-bc5d-c44d9fb41351_7463f8b3-5a66-4554-a322-ff49da3e79a9",
+  "httpStatus": 410,
+  "errorCode": "connection_epoch_expired"
+}

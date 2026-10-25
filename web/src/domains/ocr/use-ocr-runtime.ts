@@ -1,3 +1,4 @@
+import { useVisualAnalysis } from "../../hooks/use-visual-analysis";
 import { useOcrSelection } from "./use-ocr-selection";
 import { useOcrQr } from "./use-ocr-qr";
 import { useEffect, useRef, useState } from "react";
@@ -103,6 +104,16 @@ function useSourceUrl(blob: Blob | undefined, id: string | undefined) {
 	}, [blob, id]);
 	return url;
 }
+function sourceError(message: string, unavailable: unknown, media: unknown) {
+	return (
+		message ||
+		(unavailable
+			? "情報を取得できません。接続を確認してください。"
+			: media
+				? "原本を取得できませんでした。"
+				: undefined)
+	);
+}
 export function useOcrRuntime(client: EumenesClient, conversationId = "main") {
 	const cache = useQueryClient();
 	const key = [queryRoots.ocr, client.identity, conversationId];
@@ -130,6 +141,13 @@ export function useOcrRuntime(client: EumenesClient, conversationId = "main") {
 	const items = records.data ?? [];
 	const selected = items.find((i) => i.id === selection) ?? items[0];
 	const selectedId = selected?.id;
+	const analyses = useVisualAnalysis(
+		client,
+		"ocr",
+		conversationId,
+		selected,
+		frameIndex,
+	);
 	const selectionRuntime = useOcrSelection(selected, frameIndex);
 	const {
 		selectedLines,
@@ -187,6 +205,7 @@ export function useOcrRuntime(client: EumenesClient, conversationId = "main") {
 		(highlightRegion?.reduce((sum, value) => sum + value, 0) ?? 0) +
 		correctionRuntime.revision +
 		qrRuntime.revision +
+		analyses.revision +
 		(selectionRegion?.reduce((sum, n) => sum + n, 0) ?? 0);
 	const resource: OcrResource = {
 		kind: "ocr-workspace",
@@ -200,6 +219,7 @@ export function useOcrRuntime(client: EumenesClient, conversationId = "main") {
 		highlightRegion,
 		selectionRegion,
 		...qrRuntime.resource,
+		...analyses.resource,
 		...correctionRuntime.resource,
 		busy,
 		recording,
@@ -207,13 +227,7 @@ export function useOcrRuntime(client: EumenesClient, conversationId = "main") {
 		sharedCredentialAvailable: connection.data?.sharedCredentialAvailable,
 		connectionRevision: connection.data?.revision ?? 0,
 		baseUrl: connection.data?.baseUrl ?? null,
-		error:
-			error ||
-			(records.error || connection.error
-				? "情報を取得できません。接続を確認してください。"
-				: content.error
-					? "原本を取得できませんでした。"
-					: undefined),
+		error: sourceError(error, records.error || connection.error, content.error),
 	};
 	async function refresh() {
 		await Promise.all([
@@ -221,6 +235,7 @@ export function useOcrRuntime(client: EumenesClient, conversationId = "main") {
 			connection.refetch(),
 			correctionRuntime.refresh(),
 			qrRuntime.refresh(),
+			analyses.refresh(),
 		]);
 	}
 	async function uploadFile(source: string, file: File): Promise<Receipt> {
@@ -272,6 +287,7 @@ export function useOcrRuntime(client: EumenesClient, conversationId = "main") {
 		correctionRuntime.reset();
 	}
 	async function dispatch(event: ArtifactEvent): Promise<Receipt> {
+		if (event.action.startsWith("analysis-")) return analyses.dispatch(event);
 		if (event.source !== ocrSource)
 			return { status: "rejected", message: "対象が見つかりません。" };
 		if (event.action === "ocr-thumbnail") {

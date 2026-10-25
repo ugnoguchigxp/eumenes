@@ -1,0 +1,27 @@
+bun test v1.4.3 (c6da4a4d3)
+
+api/domains/larm/test/visual-lifecycle.test.ts:
+(pass) ready claims immediately despite stale false claimability/readiness cache, and observes fresh bound COLD with Control auth [10.02ms]
+(pass) claim %s provider_semantic_not_ready refetches and reclaims while inference remains single [3.37ms]
+(pass) claim %s connection_not_ready refetches and reclaims while inference remains single [4.55ms]
+(pass) unrelated claim HTTP 409 is never retried and releases [2.24ms]
+(pass) unrelated claim HTTP 503 is never retried and releases [1.82ms]
+(pass) terminal failed ends a claim retry and still releases its own connection [3.19ms]
+(pass) terminal released ends a claim retry and still releases its own connection [3.00ms]
+(pass) terminal expired ends a claim retry and still releases its own connection [3.76ms]
+(pass) cancellation bounds repeated temporary claims, releases, and sends no inference [20.49ms]
+(pass) cancel after claim before POST releases and a new acquisition does not wait for the previous observation [2.53ms]
+(pass) offline, absent, active, stale or future snapshots stay unconfirmed 0 [10.12ms]
+(pass) offline, absent, active, stale or future snapshots stay unconfirmed 1 [10.15ms]
+(pass) offline, absent, active, stale or future snapshots stay unconfirmed 2 [10.36ms]
+(pass) offline, absent, active, stale or future snapshots stay unconfirmed 3 [10.13ms]
+(pass) offline, absent, active, stale or future snapshots stay unconfirmed 4 [10.26ms]
+(pass) offline, absent, active, stale or future snapshots stay unconfirmed 5 [10.14ms]
+(pass) COLD before release and old COLD after release cannot confirm stop [20.43ms]
+(pass) read failure, missing release timestamp and unknown binding explicitly stay unconfirmed [0.15ms]
+(pass) an expired epoch is not reused: the next explicit operation gets a fresh connection [3.16ms]
+
+ 19 pass
+ 0 fail
+ 156 expect() calls
+Ran 19 tests across 1 file. [375.00ms]

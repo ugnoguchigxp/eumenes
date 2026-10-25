@@ -1,3 +1,4 @@
+import { VisualAnalysis } from "../VisualAnalysis";
 import { useEffect, useRef, useState } from "react";
 import { Menu } from "lucide-react";
 import { Button } from "../Button";
@@ -282,6 +283,8 @@ export function ObjectRecognitionWorkspace(
 				</section>
 			)}
 			<DetectionPreview
+				frameIndex={props.frameIndex}
+				onFrame={props.onFrame}
 				key={item?.id ?? "empty"}
 				item={item}
 				url={props.mediaUrl}
@@ -414,6 +417,9 @@ export function ObjectRecognitionWorkspace(
 					) : null
 				}
 			/>
+			{item && (
+				<VisualAnalysis key={`${item.id}:${props.frameIndex}`} {...props} />
+			)}
 			<details className="recognition-note">
 				<summary>検出結果について</summary>
 				<p>

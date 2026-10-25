@@ -1,0 +1,15 @@
+bun test v1.4.3 (c6da4a4d3)
+
+api/application/media/object-recognition-screen-adapter.test.ts:
+(pass) recognition screen seeds once and exposes its owner-scoped source [1267.03ms]
+
+api/application/media/visual-analysis-e2e.test.ts:
+(pass) OCR and recognition detail analysis share one queue resource and the real authenticated API [855.17ms]
+
+api/application/media/visual-analysis-registration.test.ts:
+(pass) existing OCR and recognition artifacts upgrade without replacing published revisions or adding a toolchain identity [533.05ms]
+
+ 3 pass
+ 0 fail
+ 36 expect() calls
+Ran 3 tests across 3 files. [3.63s]

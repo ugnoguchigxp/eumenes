@@ -123,7 +123,7 @@ test("a refused tool call is returned as the tool's result, and the reply goes o
 	).toBe(false);
 });
 
-test("a call the host cannot read and a second search are refused with their reasons, and the reply continues", async () => {
+test("a second search runs like the first, a call the host cannot read is refused with its reason, and the reply continues", async () => {
 	h = await setup();
 	h.state.steps.push(
 		{ calls: [{ name: "find_toolchain", args: { query: "絵" } }] },
@@ -139,7 +139,7 @@ test("a call the host cannot read and a second search are refused with their rea
 		.map((m) => JSON.parse(m.content) as Record<string, unknown>);
 	expect(tool).toHaveLength(3);
 	expect(tool[0]).toHaveProperty("candidates");
-	expect(tool[1]).toMatchObject({ refused: true });
+	expect(tool[1]).toHaveProperty("candidates");
 	expect(tool[2]).toMatchObject({ refused: true });
 });
 

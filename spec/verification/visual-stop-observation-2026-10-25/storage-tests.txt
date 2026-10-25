@@ -1,0 +1,24 @@
+bun test v1.4.3 (c6da4a4d3)
+
+api/domains/object-recognition/test/analyses.test.ts:
+(pass) object-recognition detail analysis persists separately, reopens without inference, and exposes authenticated mask/image routes [37.65ms]
+(pass) object-recognition cancelling a running analysis rejects its late result and frees the connection [16.98ms]
+(pass) object-recognition deleting a source cancels analysis and never resurrects late data [16.93ms]
+(pass) object-recognition LARM settings changes invalidate an in-flight response [16.98ms]
+(pass) object-recognition restart recovery releases a known connection without replaying inference [10.77ms]
+(pass) object-recognition interrupted stop observation becomes unconfirmed without releasing again or replaying inference [12.59ms]
+(pass) object-recognition snapshot HTTP failure persists stop unconfirmed while preserving successful analysis [20.40ms]
+
+api/domains/ocr/test/analyses.test.ts:
+(pass) ocr detail analysis persists separately, reopens without inference, and exposes authenticated mask/image routes [38.37ms]
+(pass) ocr cancelling a running analysis rejects its late result and frees the connection [30.71ms]
+(pass) ocr deleting a source cancels analysis and never resurrects late data [28.86ms]
+(pass) ocr LARM settings changes invalidate an in-flight response [28.82ms]
+(pass) ocr restart recovery releases a known connection without replaying inference [13.94ms]
+(pass) ocr interrupted stop observation becomes unconfirmed without releasing again or replaying inference [13.26ms]
+(pass) ocr snapshot HTTP failure persists stop unconfirmed while preserving successful analysis [26.98ms]
+
+ 14 pass
+ 0 fail
+ 62 expect() calls
+Ran 14 tests across 2 files. [677.00ms]

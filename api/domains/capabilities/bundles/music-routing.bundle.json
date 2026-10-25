@@ -72,9 +72,9 @@
 			"dependencies": ["package:music.create@3"],
 			"kind": "toolchain",
 			"id": "music.create",
-			"revision": 2,
+			"revision": 3,
 			"title": "音楽・効果音制作",
-			"summary": "歌なし音楽・BGM、ボーカル・歌詞付き音楽、効果音を生成しプレイヤーで再生する",
+			"summary": "歌なし音楽・BGM、ボーカル・歌詞付き音楽、効果音を新しく生成する。作成済みの曲の再生には使わない",
 			"functionName": "music",
 			"examples": [
 				"30秒のオーケストラBGMを作って",

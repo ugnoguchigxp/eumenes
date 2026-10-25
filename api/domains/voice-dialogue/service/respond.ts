@@ -165,7 +165,7 @@ export function createVoiceResponder({
 			if (controller.signal.aborted) return;
 			if (streamError) throw streamError;
 			if (final && ["queued", "running"].includes(final.status)) {
-				await dialogue.cancel(run.id);
+				await dialogue.stopReply(run.id);
 				throw new Error("dialogue_wait_timeout");
 			}
 			if (final?.status !== "completed")

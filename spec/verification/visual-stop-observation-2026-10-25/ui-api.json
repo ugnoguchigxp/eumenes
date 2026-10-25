@@ -1,0 +1,53 @@
+{
+  "at": "2026-10-25T12:28:13.901Z",
+  "records": [
+    {
+      "domain": "ocr",
+      "sourceId": "5b08a2d7-4b7d-47f3-bb05-d3e32eec28d2",
+      "analyses": [
+        {
+          "id": "8dfc310c-5d0f-4378-b025-65029746a149",
+          "state": "completed",
+          "releaseConfirmed": true,
+          "stopObservation": {
+            "status": "cold",
+            "connectionId": "aconn_epoch-dda002ea-1ede-4504-aa8f-c4a58f14e484_e90b6a47-eff8-4fdb-8671-d55b3e0072f6",
+            "allocationId": "alloc_epoch-dda002ea-1ede-4504-aa8f-c4a58f14e484_6a703504-bbed-48c7-8c9e-b0622f9d7f0e",
+            "runtimeId": "wevisone-vl-4b",
+            "releasedAt": "2026-10-25T12:25:46.446Z",
+            "observedAt": "2026-10-25T12:25:48.017Z",
+            "checkedAt": 1792931149436
+          },
+          "waitingMs": 19792.738458999993,
+          "inferenceMs": 14386.34758300001,
+          "elapsedMs": 34199.901208999996,
+          "resultAdopted": true
+        }
+      ]
+    },
+    {
+      "domain": "object-recognition",
+      "sourceId": "702f3d02-0ee1-4b36-a6dc-a25b1f295c7f",
+      "analyses": [
+        {
+          "id": "0c923533-019d-4c57-b912-14f428040b86",
+          "state": "cancelled",
+          "releaseConfirmed": true,
+          "stopObservation": {
+            "status": "cold",
+            "connectionId": "aconn_epoch-dda002ea-1ede-4504-aa8f-c4a58f14e484_7457af70-da2d-4939-b012-5286c1771810",
+            "allocationId": "alloc_epoch-dda002ea-1ede-4504-aa8f-c4a58f14e484_54091619-f9bc-40e7-8b01-77819ef12eb5",
+            "runtimeId": "wevisone-vl-4b",
+            "releasedAt": "2026-10-25T12:28:00.899Z",
+            "observedAt": "2026-10-25T12:28:02.091Z",
+            "checkedAt": 1792931282252
+          },
+          "waitingMs": null,
+          "inferenceMs": null,
+          "elapsedMs": null,
+          "resultAdopted": false
+        }
+      ]
+    }
+  ]
+}

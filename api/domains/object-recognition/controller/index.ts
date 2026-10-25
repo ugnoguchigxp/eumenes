@@ -1,3 +1,4 @@
+import { registerRecognitionAnalyses } from "./analyses";
 import { z } from "zod";
 import type { Hono } from "hono";
 import { readBounded } from "../../../infrastructure/bounded-read";
@@ -25,6 +26,8 @@ export function registerObjectRecognition(
 	sharing: RecognitionSharing,
 ) {
 	const root = "/api/object-recognition";
+	if (service.analyses)
+		registerRecognitionAnalyses(app, service.analyses, owner);
 	app.get(`${root}/commands`, (c) =>
 		c.json(service.commands(owner, c.req.query("conversationId") ?? "main")),
 	);

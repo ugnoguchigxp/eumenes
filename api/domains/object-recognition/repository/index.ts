@@ -20,6 +20,13 @@ CREATE INDEX object_recognition_handoff_owner ON object_recognition_handoffs(own
 		after: ["object-recognition/0002-handoffs"],
 		sql: "CREATE TABLE object_recognition_execution_commands(call_id TEXT PRIMARY KEY,run_id TEXT NOT NULL,owner TEXT NOT NULL,conversation_id TEXT NOT NULL,result_json TEXT NOT NULL);",
 	},
+	{
+		id: "object-recognition/0004-analyses",
+		after: ["object-recognition/0003-execution-calls"],
+		sql: `CREATE TABLE object_recognition_analyses(id TEXT PRIMARY KEY,source_id TEXT NOT NULL REFERENCES object_recognition_inputs(id) ON DELETE CASCADE,owner TEXT NOT NULL,conversation_id TEXT NOT NULL,frame_key INTEGER NOT NULL,record_json TEXT NOT NULL,input_json TEXT NOT NULL,job_id TEXT,connection_id TEXT);
+CREATE INDEX object_recognition_analyses_source ON object_recognition_analyses(source_id,frame_key);
+CREATE UNIQUE INDEX object_recognition_analyses_active ON object_recognition_analyses(source_id,frame_key) WHERE json_extract(record_json,'$.state') IN ('queued','starting','running','cancelling');`,
+	},
 ];
 export type Row = {
 	id: string;

@@ -1,0 +1,223 @@
+{
+  "at": "2026-10-25T11:09:25.263Z",
+  "fixture": false,
+  "serverStarted": false,
+  "created": [
+    {
+      "domain": "ocr",
+      "id": "5b08a2d7-4b7d-47f3-bb05-d3e32eec28d2"
+    },
+    {
+      "domain": "object-recognition",
+      "id": "702f3d02-0ee1-4b36-a6dc-a25b1f295c7f"
+    }
+  ],
+  "results": [
+    {
+      "domain": "ocr",
+      "task": "describe",
+      "sourceId": "5b08a2d7-4b7d-47f3-bb05-d3e32eec28d2",
+      "record": {
+        "id": "953052aa-e50f-4e24-998a-82a264062313",
+        "sourceId": "5b08a2d7-4b7d-47f3-bb05-d3e32eec28d2",
+        "sourceRevision": 2,
+        "frameIndex": null,
+        "timestamp": null,
+        "actualTimestamp": null,
+        "sourceDigest": "f7dadb92bcfce277a66edf939ad27a9ca881810722a4f757da4405ba469c7a16",
+        "settingsVersion": "4c2e3f4103664106cdf92bbf689d4d5e83f3083ef060dc35f4013739e648f482",
+        "options": {
+          "task": "describe",
+          "query": "この画像で何が起きているか説明してください。"
+        },
+        "state": "completed",
+        "result": {
+          "contractVersion": "larm.visual-perception.v1",
+          "model": "wevisone-vl-4b",
+          "modelRevision": "4a7bed92750ac9d8b8a124cede14759036932dc2",
+          "task": "describe",
+          "image": {
+            "width": 810,
+            "height": 1080,
+            "orientation": "exif-normalized"
+          },
+          "response": "<ref>この画像は、都市の通りで電気バスの前を歩く人々と、背景にある建物を捉えたものです。左側には2人の男性が並んで歩いており、1人は茶色いコートを着て、もう1人は黒いコートを着ています。右側には、電気バスの横を歩く別の男性がいます。背景には、黄色い壁の建物があり、バルコニーと窓が見えます。建物の上部には、電気バスの屋根の一部が写っています。全体的に、日常的な街角の風景が描かれています。</ref><box><0><513><96><808></box>",
+          "detections": [],
+          "masks": [],
+          "truncated": false,
+          "timings": {
+            "imageDecodeMs": 17.36344094388187,
+            "preprocessMs": 12.998065911233425,
+            "generationMs": 14772.401726804674,
+            "maskMs": 0,
+            "postprocessMs": 0.02291891723871231,
+            "totalMs": 14803.727054968476
+          },
+          "execution": {
+            "device": "cuda:0",
+            "backend": "transformers",
+            "dtype": "bfloat16",
+            "decoderDtype": "float32",
+            "outputTokens": 144,
+            "visualTokens": 850
+          }
+        },
+        "errorCode": null,
+        "releaseConfirmed": true,
+        "waitingMs": 9216.358458999995,
+        "inferenceMs": 15229.101791000008,
+        "elapsedMs": 24467.167125000007,
+        "createdAt": 1792926445574,
+        "updatedAt": 1792926470125
+      },
+      "clientElapsedMs": 27224.780291000003
+    },
+    {
+      "domain": "object-recognition",
+      "task": "referring",
+      "sourceId": "702f3d02-0ee1-4b36-a6dc-a25b1f295c7f",
+      "record": {
+        "id": "1dafc52d-0dd2-40af-af0f-82c6c5992a68",
+        "sourceId": "702f3d02-0ee1-4b36-a6dc-a25b1f295c7f",
+        "sourceRevision": 2,
+        "frameIndex": null,
+        "timestamp": null,
+        "actualTimestamp": null,
+        "sourceDigest": "d0f619253fa590d55fd82a4d40a54b510d784a19174c493a5e0f97025a2fe1b3",
+        "settingsVersion": "4c2e3f4103664106cdf92bbf689d4d5e83f3083ef060dc35f4013739e648f482",
+        "options": {
+          "task": "referring",
+          "query": "道路に停車しているバス"
+        },
+        "state": "completed",
+        "result": {
+          "contractVersion": "larm.visual-perception.v1",
+          "model": "wevisone-vl-4b",
+          "modelRevision": "4a7bed92750ac9d8b8a124cede14759036932dc2",
+          "task": "referring",
+          "image": {
+            "width": 810,
+            "height": 1080,
+            "orientation": "exif-normalized"
+          },
+          "response": "<ref>道路に停車しているバス</ref><box><4><215><989><679></box>",
+          "detections": [
+            {
+              "label": "道路に停車しているバス",
+              "box": [
+                3.24,
+                232.2,
+                801.09,
+                733.32
+              ]
+            }
+          ],
+          "masks": [],
+          "truncated": false,
+          "timings": {
+            "imageDecodeMs": 40.526592172682285,
+            "preprocessMs": 27.95612206682563,
+            "generationMs": 7414.610911859199,
+            "maskMs": 0,
+            "postprocessMs": 0.17417408525943756,
+            "totalMs": 7484.567070147023
+          },
+          "execution": {
+            "device": "cuda:0",
+            "backend": "transformers",
+            "dtype": "bfloat16",
+            "decoderDtype": "float32",
+            "outputTokens": 15,
+            "visualTokens": 850
+          }
+        },
+        "errorCode": null,
+        "releaseConfirmed": true,
+        "waitingMs": 45934.712125000005,
+        "inferenceMs": 7575.629749999993,
+        "elapsedMs": 53523.94124999999,
+        "createdAt": 1792926472837,
+        "updatedAt": 1792926526463
+      },
+      "clientElapsedMs": 56437.86558299999
+    },
+    {
+      "domain": "object-recognition",
+      "task": "segmentation",
+      "sourceId": "702f3d02-0ee1-4b36-a6dc-a25b1f295c7f",
+      "record": {
+        "id": "5b0c10f0-97e0-4b46-99d1-7be2479ca02c",
+        "sourceId": "702f3d02-0ee1-4b36-a6dc-a25b1f295c7f",
+        "sourceRevision": 2,
+        "frameIndex": null,
+        "timestamp": null,
+        "actualTimestamp": null,
+        "sourceDigest": "d0f619253fa590d55fd82a4d40a54b510d784a19174c493a5e0f97025a2fe1b3",
+        "settingsVersion": "4c2e3f4103664106cdf92bbf689d4d5e83f3083ef060dc35f4013739e648f482",
+        "options": {
+          "task": "segmentation",
+          "query": "バス"
+        },
+        "state": "completed",
+        "result": {
+          "contractVersion": "larm.visual-perception.v1",
+          "model": "wevisone-vl-4b",
+          "modelRevision": "4a7bed92750ac9d8b8a124cede14759036932dc2",
+          "task": "segmentation",
+          "image": {
+            "width": 810,
+            "height": 1080,
+            "orientation": "exif-normalized"
+          },
+          "response": "<ref>巴士</ref><box><4><215><991><681><OBJ></box>",
+          "detections": [
+            {
+              "label": "巴士",
+              "box": [
+                3.24,
+                232.2,
+                802.71,
+                735.48
+              ]
+            }
+          ],
+          "masks": [
+            {
+              "detectionIndex": 0,
+              "encoding": "png-base64",
+              "mode": "binary",
+              "width": 810,
+              "height": 1080,
+              "data": ""
+            }
+          ],
+          "truncated": false,
+          "timings": {
+            "imageDecodeMs": 18.21721508167684,
+            "preprocessMs": 20.657559158280492,
+            "generationMs": 4160.629390971735,
+            "maskMs": 4277.409846894443,
+            "postprocessMs": 8.773966925218701,
+            "totalMs": 8486.520973965526
+          },
+          "execution": {
+            "device": "cuda:0",
+            "backend": "transformers",
+            "dtype": "bfloat16",
+            "decoderDtype": "float32",
+            "outputTokens": 11,
+            "visualTokens": 850
+          }
+        },
+        "errorCode": null,
+        "releaseConfirmed": true,
+        "waitingMs": 24461.343374999997,
+        "inferenceMs": 8729.949625000008,
+        "elapsedMs": 33209.56362499998,
+        "createdAt": 1792926529248,
+        "updatedAt": 1792926562503
+      },
+      "clientElapsedMs": 36016.069875
+    }
+  ]
+}

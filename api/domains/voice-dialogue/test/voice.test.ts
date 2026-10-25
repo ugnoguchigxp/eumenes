@@ -244,6 +244,10 @@ async function evictionHarness(
 			options.cancelled?.push(runId);
 			return null;
 		},
+		stopReply: async (runId: string) => {
+			options.cancelled?.push(runId);
+			return null;
+		},
 	} as unknown as ReturnType<typeof createDialogueService>;
 	const larm = withVoiceAuthority({
 		status: () => ({ state: "ready", capabilities: ["llm", "asr", "tts"] }),
@@ -635,6 +639,7 @@ test.each([
 				}),
 				answerText: () => "最初です。壊れます。最後です。",
 				cancel: async () => null,
+				stopReply: async () => null,
 			} as unknown as ReturnType<typeof createDialogueService>;
 			const calls: string[] = [];
 			const larm = withVoiceAuthority({

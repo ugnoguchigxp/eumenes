@@ -112,14 +112,10 @@ export function createToolchains(
 			available: (toolchainId: string) => boolean;
 			fromHistory?: string[];
 			limit?: number;
-			excludeRevisionIds?: ReadonlySet<string>;
 			strict?: boolean;
 		},
 	): ToolchainCard[] {
-		const active = activeInTransaction(db).filter(
-			(d) =>
-				input.available(d.id) && !input.excludeRevisionIds?.has(d.revisionId),
-		);
+		const active = activeInTransaction(db).filter((d) => input.available(d.id));
 		const byRevision = new Map(active.map((d) => [d.revisionId, d]));
 		const similarity = new Map<string, number>();
 		if (input.vector) {

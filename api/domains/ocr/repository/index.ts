@@ -25,6 +25,13 @@ CREATE TABLE ocr_correction_preference(source_id TEXT NOT NULL REFERENCES ocr_in
 CREATE INDEX ocr_qr_source ON ocr_qr(source_id,frame_key,source_revision);
 CREATE UNIQUE INDEX ocr_qr_active ON ocr_qr(source_id,frame_key) WHERE json_extract(record_json,'$.state') IN ('queued','running','cancelling');`,
 	},
+	{
+		id: "ocr/0004-analyses",
+		after: ["ocr/0003-qr"],
+		sql: `CREATE TABLE ocr_analyses(id TEXT PRIMARY KEY,source_id TEXT NOT NULL REFERENCES ocr_inputs(id) ON DELETE CASCADE,owner TEXT NOT NULL,conversation_id TEXT NOT NULL,frame_key INTEGER NOT NULL,record_json TEXT NOT NULL,input_json TEXT NOT NULL,job_id TEXT,connection_id TEXT);
+CREATE INDEX ocr_analyses_source ON ocr_analyses(source_id,frame_key);
+CREATE UNIQUE INDEX ocr_analyses_active ON ocr_analyses(source_id,frame_key) WHERE json_extract(record_json,'$.state') IN ('queued','starting','running','cancelling');`,
+	},
 ];
 export type Row = {
 	id: string;

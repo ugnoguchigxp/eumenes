@@ -1,3 +1,4 @@
+import { buildVisualPerception } from "./media/visual-perception";
 import type { Database } from "bun:sqlite";
 import type { Capabilities } from "../domains/capabilities";
 import type { DialogueService } from "../domains/dialogue";
@@ -84,6 +85,7 @@ export function buildMedia(
 		service: excalidraw,
 	});
 	const objectRecognition = createObjectRecognition({
+		visual: buildVisualPerception(config, settings),
 		store,
 		queue,
 		connection: () => settings.objectRecognitionCredentials(),

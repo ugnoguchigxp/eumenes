@@ -1,0 +1,57 @@
+{
+  "fixture": false,
+  "source": "browser_button",
+  "record": {
+    "id": "525c1936-e4d2-466f-aa46-5a8768ce1fc7",
+    "sourceId": "702f3d02-0ee1-4b36-a6dc-a25b1f295c7f",
+    "sourceRevision": 2,
+    "frameIndex": null,
+    "timestamp": null,
+    "actualTimestamp": null,
+    "sourceDigest": "d0f619253fa590d55fd82a4d40a54b510d784a19174c493a5e0f97025a2fe1b3",
+    "settingsVersion": "d4d2f6a81618c397723e1f6fdc032002632930bccf9174e37cb9956d7fe6bc16",
+    "options": {
+      "task": "describe",
+      "query": "バスと周囲の人について短く説明してください。"
+    },
+    "state": "completed",
+    "result": {
+      "contractVersion": "larm.visual-perception.v1",
+      "model": "wevisone-vl-4b",
+      "modelRevision": "4a7bed92750ac9d8b8a124cede14759036932dc2",
+      "task": "describe",
+      "image": {
+        "width": 810,
+        "height": 1080,
+        "orientation": "exif-normalized"
+      },
+      "response": "画像の中心には、青い電気バスが停車しており、その前には2人の男性が立っています。左側の男性は茶色のコートを着て、右側の男性は黒いコートを着ています。右端には、バスの後ろに立つ別の男性がいます。背景には建物があり、その前には植木鉢が置かれています。",
+      "detections": [],
+      "masks": [],
+      "truncated": false,
+      "timings": {
+        "imageDecodeMs": 20.16297192312777,
+        "preprocessMs": 26.999677997082472,
+        "generationMs": 10001.726444112137,
+        "maskMs": 0,
+        "postprocessMs": 0.02443883568048477,
+        "totalMs": 10049.849493894726
+      },
+      "execution": {
+        "device": "cuda:0",
+        "backend": "transformers",
+        "dtype": "bfloat16",
+        "decoderDtype": "float32",
+        "outputTokens": 89,
+        "visualTokens": 850
+      }
+    },
+    "errorCode": null,
+    "releaseConfirmed": true,
+    "waitingMs": 25786.014582999982,
+    "inferenceMs": 10183.83600000001,
+    "elapsedMs": 35986.16725,
+    "createdAt": 1792927680277,
+    "updatedAt": 1792927716331
+  }
+}

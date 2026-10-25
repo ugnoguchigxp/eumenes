@@ -13,7 +13,6 @@ import type {
 import type { ChatMessage, DialogueDeps, GenerateInput } from "./context";
 import { conversationOutput } from "./conversation-output";
 import {
-	TOOL_NAMES,
 	generationTools,
 	parseCall,
 	toolRejection,
@@ -38,7 +37,7 @@ export type ToolOutcome = {
 /** Executes one call of a fixed tool; throws a `ValidationFailure` for a call the host refuses outright. */
 export type ToolExecutor = (
 	call: ParsedCall,
-	context: { signal: AbortSignal; searched: boolean; receipt?: Receipt },
+	context: { signal: AbortSignal; receipt?: Receipt },
 ) => Promise<ToolOutcome>;
 
 export type GenerationOutcome = {
@@ -84,10 +83,8 @@ export async function runGeneration(
 	const executed: GenerationOutcome["executed"] = [];
 	const base = input.messages;
 	let receipt: Receipt | undefined;
-	let searched = false;
 	const callSession: CallSession = {
 		sessionRole: "main",
-		speaks: true,
 		// A short spoken reply and the tool arguments fit far below this; a runaway output stops here.
 		outputLimit: GENERATION_OUTPUT_LIMIT,
 		...(options.session?.context ? { context: options.session.context } : {}),
@@ -165,14 +162,10 @@ export async function runGeneration(
 				const parsed = parseCall(call);
 				if (executed.length >= MAX_TOOL_CALLS)
 					throw toolRejection("tool_call_limit");
-				if (parsed.name === TOOL_NAMES.search && searched)
-					throw toolRejection("search_limit");
 				const outcome = await options.execute(parsed, {
 					signal,
-					searched,
 					...(receipt ? { receipt } : {}),
 				});
-				if (parsed.name === TOOL_NAMES.search) searched = true;
 				executed.push({ call: parsed, outcome });
 				return {
 					content: JSON.stringify(outcome.result),
