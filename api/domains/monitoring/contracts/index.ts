@@ -12,7 +12,6 @@ export const monitoringShapes = [
 	"tts",
 	"embedding",
 	"attitude",
-	"language",
 	"image",
 	"music",
 	"larm-core",

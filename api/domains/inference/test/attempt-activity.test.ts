@@ -37,14 +37,12 @@ async function seed(
 	return createActivityReader(store);
 }
 
-test("groups attempts by purpose, keeps language checks apart and ignores probes and cancellations", async () => {
+test("groups attempts by purpose and ignores probes and cancellations", async () => {
 	const reader = await seed([
 		["conversation:1", "llm", "running", null],
-		["voice:1:language", "llm", "running", null],
 		["conversation:2", "llm", "succeeded", 500],
 		["conversation:3", "llm", "failed", 600, "inference_failed"],
 		["conversation:4", "llm", "failed", 700, "cancelled"],
-		["voice:2:language", "llm", "failed", 650, "network_unavailable"],
 		["voice:3", "asr", "succeeded", 50],
 		["probe:tts", "tts", "failed", 900, "larm_failed"],
 	]);
@@ -53,11 +51,6 @@ test("groups attempts by purpose, keeps language checks apart and ignores probes
 		running: 1,
 		lastSuccessAt: 500,
 		lastFailure: { at: 600, reason: "inference_failed" },
-	});
-	expect(activity.language).toEqual({
-		running: 1,
-		lastSuccessAt: null,
-		lastFailure: { at: 650, reason: "network_unavailable" },
 	});
 	// Outcomes before the window are not reported; probes are never service traffic.
 	expect(activity.asr).toEqual({

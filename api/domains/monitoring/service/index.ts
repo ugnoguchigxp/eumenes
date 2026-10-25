@@ -26,7 +26,7 @@ const none: ActivityObservation = {
 	lastFailure: null,
 };
 
-type Group = "llm" | "asr" | "tts" | "language";
+type Group = "llm" | "asr" | "tts";
 type Activity = (since: number) => ActivityObservation;
 export type MonitoringDeps = {
 	settings: {
@@ -61,7 +61,6 @@ const labels: Record<MonitoringShape, string> = {
 	tts: "TTS",
 	embedding: "Embedding",
 	attitude: "態度判定",
-	language: "言語判定",
 	image: "画像生成",
 	music: "楽曲生成",
 	"larm-core": "LARM Core",
@@ -79,7 +78,6 @@ const ids: Record<MonitoringShape, string> = {
 	tts: "service-tts",
 	embedding: "service-embedding",
 	attitude: "service-attitude",
-	language: "service-language",
 	image: "service-image",
 	music: "service-music",
 	"larm-core": "larm-core",
@@ -160,10 +158,10 @@ export function createMonitoring(deps: MonitoringDeps) {
 			const busy =
 				Object.values(queue.lanes).some((lane) => lane.running > 0) ||
 				Object.values(attempts).some((a) => a.running > 0);
-			const route = (purpose: Purpose, group: Group) => {
+			const route = (purpose: Group) => {
 				const { reachable, viaLarm } = routeReachable(purpose, settings, larm);
 				return serviceState(
-					attempts[group],
+					attempts[purpose],
 					reachable,
 					// A cloud-only route does not wait for the LARM connection.
 					starting && settings.routes[purpose].mode !== "cloud-only",
@@ -200,12 +198,11 @@ export function createMonitoring(deps: MonitoringDeps) {
 							? {}
 							: { utilization: sample.process }),
 					}),
-					item("llm", route("llm", "llm")),
-					item("asr", route("asr", "asr")),
-					item("tts", route("tts", "tts")),
+					item("llm", route("llm")),
+					item("asr", route("asr")),
+					item("tts", route("tts")),
 					item("embedding", recorded(deps.embedding.observe())),
 					item("attitude", recorded(deps.judge.observe())),
-					item("language", route("llm", "language")),
 					item("image", recorded(deps.image?.(since) ?? none)),
 					item("music", recorded(deps.music?.(since) ?? none)),
 					...(remote ? larmItems(remote, settings.larm, now(), !lan) : []),

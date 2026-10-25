@@ -52,22 +52,9 @@ export function wav() {
 	b.set(new TextEncoder().encode("WAVE"), 8);
 	return b;
 }
-/** Fixture language judgment: Latin text is English, anything else Japanese. */
-function judgeLanguage(
-	messages: Array<{ content: string }>,
-	judge: (text: string) => string[] = (text) => [
-		/[A-Za-z]/.test(text) ? "en" : "ja",
-	],
-) {
-	if (!messages[0]?.content.includes("音声認識（ASR）が書き起こした文の言語"))
-		return null;
-	const { text } = JSON.parse(messages.at(-1)!.content) as { text: string };
-	return JSON.stringify({ languages: judge(text) });
-}
 export async function setup(
 	fetcher?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>,
 	local: Partial<LarmPort> = {},
-	judge?: (text: string) => string[],
 	goals?: GoalsLayerPort,
 ) {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-settings-voice-"));
@@ -124,16 +111,7 @@ export async function setup(
 				: Response.json(completion("fixture answer"));
 	};
 	const inference = createInference(store, settings, {
-		fetch: async (input, init) => {
-			const judged =
-				typeof init?.body === "string" &&
-				judgeLanguage(JSON.parse(init.body).messages ?? [], judge);
-			if (judged)
-				return Response.json({
-					choices: [{ message: { content: judged } }],
-				});
-			return (fetcher ?? defaultFetch)(input, init);
-		},
+		fetch: (input, init) => (fetcher ?? defaultFetch)(input, init),
 		larmFactory: () => ({
 			status: () => ({ state: "unconfigured", capabilities: [] }),
 			connect: async () => {},
@@ -144,13 +122,10 @@ export async function setup(
 				throw new Error("larm_unconfigured");
 			},
 			close: async () => {},
-			...local,
-			answer: async (messages, signal, options) => {
-				const judged = judgeLanguage(messages, judge);
-				if (judged) return judged;
-				if (!local.answer) throw new Error("larm_unconfigured");
-				return local.answer(messages, signal, options);
+			answer: async () => {
+				throw new Error("larm_unconfigured");
 			},
+			...local,
 		}),
 	});
 	const conversation = createConversationService(store);

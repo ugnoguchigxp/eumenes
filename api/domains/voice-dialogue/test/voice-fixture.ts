@@ -22,11 +22,6 @@ export function withVoiceAuthority(port: InferencePort): InferencePort {
 		...port,
 		captureInTransaction: (_db, subject, purpose) => capture(subject, purpose),
 		snapshotFor: () => snapshot,
-		captureControlInTransaction: (_db, input) =>
-			capture(input.subject, "control"),
-		// Fixture judgment, not production classification.
-		executeControl: async (id) =>
-			receipt(id, JSON.stringify({ languages: ["ja"] })),
 		requestFor: (_db, subject, purpose) =>
 			[...requests].find(
 				([, r]) => r.subject === subject && r.purpose === purpose,

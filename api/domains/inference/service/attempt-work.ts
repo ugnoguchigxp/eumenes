@@ -94,9 +94,7 @@ export function callOptionsFor(r: Request, attemptId: string): LarmCallOptions {
 		...(r.row.attemptMs ? { attemptMs: r.row.attemptMs } : {}),
 		...(r.row.purpose === "asr"
 			? {
-					asrLanguage: asrRequestLanguage(
-						r.row.snapshot.general.asrLanguages,
-					),
+					asrLanguage: asrRequestLanguage(r.row.snapshot.general.asrLanguages),
 				}
 			: {}),
 

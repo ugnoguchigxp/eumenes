@@ -53,7 +53,7 @@ function monitoring(over: Partial<MonitoringDeps> = {}, host = probes()) {
 			}),
 		},
 		larmStatus: () => status,
-		attempts: () => ({ llm: idle, asr: idle, tts: idle, language: idle }),
+		attempts: () => ({ llm: idle, asr: idle, tts: idle }),
 		embedding: createActivityRecorder(),
 		judge: createActivityRecorder(),
 		queue: {
@@ -195,7 +195,6 @@ test("host thresholds and the backend's load and activity", async () => {
 				llm: { ...idle, running: 1 },
 				asr: idle,
 				tts: idle,
-				language: idle,
 			}),
 		},
 		probes({

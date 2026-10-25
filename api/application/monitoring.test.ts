@@ -14,7 +14,7 @@ test("the authenticated product snapshot combines the original services and LARM
 		remote: h.collector,
 		settings: { get: () => settings, diagnostics: () => ({ connections: [] }) },
 		larmStatus: () => ({ state: "ready", capabilities: [] }),
-		attempts: () => ({ llm: idle, asr: idle, tts: idle, language: idle }),
+		attempts: () => ({ llm: idle, asr: idle, tts: idle }),
 		embedding: createActivityRecorder(),
 		judge: createActivityRecorder(),
 		queue: {
@@ -44,7 +44,7 @@ test("the authenticated product snapshot combines the original services and LARM
 	expect(response.status).toBe(200);
 	expect(response.headers.get("X-Request-Id")).toBeTruthy();
 	const snapshot = monitoringSnapshotSchema.parse(await response.json());
-	expect(snapshot.items).toHaveLength(16);
+	expect(snapshot.items).toHaveLength(15);
 	expect(snapshot.items.find((i) => i.shape === "cpu")?.state.utilization).toBe(
 		0,
 	);

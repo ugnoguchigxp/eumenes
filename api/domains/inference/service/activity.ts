@@ -1,10 +1,8 @@
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import type { ActivityObservation } from "../../larm";
 
-/** ASR language checks are llm requests on a `voice:<id>:language` subject; they are observed apart. */
-export type AttemptGroup = "llm" | "asr" | "tts" | "language";
-const group =
-	"CASE WHEN r.purpose='llm' AND r.subject LIKE '%:language' THEN 'language' ELSE r.purpose END";
+export type AttemptGroup = "llm" | "asr" | "tts";
+const group = "r.purpose";
 const from =
 	"FROM inference_attempts a JOIN inference_requests r ON r.id=a.request_id WHERE r.subject NOT LIKE 'probe:%'";
 
@@ -14,7 +12,7 @@ export function createActivityReader(store: SqliteStore) {
 		attemptActivity: (since: number) =>
 			store.read((db) => {
 				const result = Object.fromEntries(
-					(["llm", "asr", "tts", "language"] as const).map((g) => [
+					(["llm", "asr", "tts"] as const).map((g) => [
 						g,
 						{ running: 0, lastSuccessAt: null, lastFailure: null },
 					]),

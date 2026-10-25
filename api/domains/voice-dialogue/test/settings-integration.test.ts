@@ -582,49 +582,18 @@ test("kana settles Japanese without a control call", async () => {
 	expect(controlRequests(h)).toEqual({ n: 0 });
 });
 
-for (const [label, settingsLanguages, heard] of [
-	[
-		"a language outside the allowed set",
-		["ja", "en"],
-		"Ellos son los primeros.",
-	],
-	["English when only Japanese is allowed", ["ja"], "Hello there"],
-	["an unjudgeable transcript", ["ja", "en"], "Mmm hmm"],
-] as const)
-	test(`${label} is dropped as noise and keeps the pending input`, async () => {
-		let count = 0;
-		const h = await setup(
-			undefined,
-			{
-				status: ready,
-				transcribe: async () => (count++ === 0 ? "天気を教えて" : heard),
-			},
-			(text) =>
-				text.startsWith("Ellos")
-					? ["es"]
-					: text.startsWith("Mmm")
-						? []
-						: ["en"],
-		);
-		const value = h.settings.get();
-		value.general.asrLanguages = [...settingsLanguages];
-		await h.settings.apply({
-			requestId: crypto.randomUUID(),
-			expectedRevision: value.revision,
-			settings: value,
-			keys: [],
-		});
-		const session = crypto.randomUUID(),
-			first = crypto.randomUUID(),
-			second = crypto.randomUUID();
-		h.voice.start(session, 1);
-		await h.voice.accept(session, 1, 1, first, wav());
-		await until(() => h.voice.get(first)?.status === "input_ready");
-		await h.voice.accept(session, 1, 2, second, wav());
-		await until(() => h.voice.get(second)?.status === "input_ready");
-		expect(h.voice.get(second)?.text).toBe("天気を教えて");
-		expect(h.dialogue.list("main")).toHaveLength(0);
+test("a short transcript without kana is adopted as heard", async () => {
+	const h = await setup(undefined, {
+		status: ready,
+		transcribe: async () => "了解",
 	});
+	const session = crypto.randomUUID(),
+		id = crypto.randomUUID();
+	h.voice.start(session, 1);
+	await h.voice.accept(session, 1, 1, id, wav());
+	await until(() => h.voice.get(id)?.status === "input_ready");
+	expect(h.voice.get(id)?.text).toBe("了解");
+});
 
 for (const [settingsLanguages, expected] of [
 	[["en", "ja"], "ja"],

@@ -12,7 +12,6 @@ import {
 	type PreparedInput,
 } from "../repository/input";
 import type { createVoiceResponder } from "./respond";
-import { createLanguageFilter } from "./language-filter";
 import { toErrorCode } from "../../../infrastructure/error-code";
 import { getLogger, withLogContext } from "../../../infrastructure/logger";
 const log = getLogger("voice-dialogue");
@@ -21,7 +20,7 @@ const MAX_TEXT = 8000;
 
 /**
  * Serializes recognition per session, while answering stays on the existing dialogue queue.
- * A transcript in an allowed language is ready as heard; one in any other language is noise.
+ * A transcript is ready as heard (ASR is fixed to the language chosen from settings).
  * A segment arriving before the previous one was committed (the speaker resumed after a
  * pause) continues that input.
  */
@@ -41,7 +40,6 @@ export function createInputCollector({
 	clock: () => string;
 }) {
 	const tails = new Map<string, Promise<void>>();
-	const allowedLanguage = createLanguageFilter({ store, larm });
 	const valid = (turn: VoiceTurn, signal: AbortSignal) => {
 		signal.throwIfAborted();
 		if (sessions.get(turn.sessionId) !== turn.generation)
@@ -90,7 +88,7 @@ export function createInputCollector({
 			larm.skipInTransaction?.(db, turn.utteranceId, "tts");
 			return "completed" as const;
 		}
-		// Noise (or another language) after a pause carries the pending input forward instead of stranding it
+		// An empty transcript after a pause carries the pending input forward instead of stranding it
 		// behind a later sequence. (A failed segment cannot: its own ASR was never accepted.)
 		const prepared: PreparedInput = {
 			utteranceId: turn.utteranceId,
@@ -128,10 +126,6 @@ export function createInputCollector({
 		try {
 			valid(turn, controller.signal);
 			const receipt = await transcribe(turn, wav, controller.signal);
-			const heard = receipt.value as string;
-			const adopted =
-				!heard.trim() ||
-				(await allowedLanguage(turn, heard, controller.signal));
 			valid(turn, controller.signal);
 			const status = await store.write((db) => {
 				valid(turn, controller.signal);
@@ -142,19 +136,21 @@ export function createInputCollector({
 				)
 					throw new Error("permission_revoked");
 				return stage(db, turn, current, {
-					text: adopted ? heard : "",
+					text: receipt.value as string,
 					requestId: receipt.requestId,
 				});
 			});
-			const reason = adopted ? "empty_transcript" : "language_not_allowed";
-			if (status === "completed") log.info("voice.input_ignored", { reason });
+			if (status === "completed")
+				log.info("voice.input_ignored", {
+					utteranceId: turn.utteranceId,
+					reason: "empty_transcript",
+				});
 			else
 				log.info("voice.input_prepared", {
 					utteranceId: turn.utteranceId,
 					sessionId: turn.sessionId,
 					generation: turn.generation,
 					status,
-					...(adopted ? {} : { reason }),
 				});
 		} catch (error) {
 			if (!controller.signal.aborted) {

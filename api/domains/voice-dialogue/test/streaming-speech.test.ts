@@ -260,7 +260,6 @@ test("forgetting a goal revokes provisional text before any speech judgment or a
 				return wav();
 			},
 		},
-		undefined,
 		{
 			adoptedForContextInTransaction: () => [
 				{
