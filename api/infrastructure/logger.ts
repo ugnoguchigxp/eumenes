@@ -91,6 +91,14 @@ export interface LogFields {
 	providerCachedTokens?: number;
 	providerOutputTokens?: number;
 	totalMs?: number;
+	/** voice.input_timing: the browser's side of speech end → transcript on screen. */
+	audioMs?: number;
+	preRollMs?: number;
+	trailMs?: number;
+	endToSegmentMs?: number;
+	encodeMs?: number;
+	uploadMs?: number;
+	uploadToShownMs?: number;
 	requestBytes?: number;
 	droppedMessages?: number;
 	promptTokens?: number;
@@ -148,6 +156,13 @@ const keys = new Set<keyof LogFields>([
 	"promptTokens",
 	"completionTokens",
 	"cachedTokens",
+	"audioMs",
+	"preRollMs",
+	"trailMs",
+	"endToSegmentMs",
+	"encodeMs",
+	"uploadMs",
+	"uploadToShownMs",
 	"omitted",
 	"messageCount",
 	"applied",

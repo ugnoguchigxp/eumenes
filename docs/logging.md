@@ -177,6 +177,20 @@ workerは共通補正の拒否分類を `agent.control_rejected.validationCode` 
 
 これらの区間は**入れ子**です。`provider` に `provider_ready`・`token_count`・`response_headers` が含まれるため、全行の `durationMs` を合計しないでください。`inference.delivery_selected.durationMs` は採用するdelivery内の値で、既存deliveryをTTSで再利用した場合は過去の判定時間です。新しい待ち時間として重複加算しません。
 
+### 音声入力：話し終えてから入力欄に表示されるまで
+
+ブラウザは、文字起こしを入力欄に表示した時点で送る確定要求（`POST /api/voice/turns/:id/commit`）に、その発話の区間の時間（ms・数値だけ）を添えます。サーバーはそれを `voice.input_timing`（`utteranceId` 付き）に記録します。本文・音声は含みません。
+
+| 項目 | 意味 |
+| --- | --- |
+| `endToSegmentMs` | 最後に声と判定した時点から、区間を切って渡すまで（無音の待ちと検出の遅れ） |
+| `encodeMs` | WAV への変換 |
+| `uploadMs` | 区間を渡してから送信が受け付けられるまで（前の送信の待ちを含む） |
+| `uploadToShownMs` | 受付から入力欄に表示されるまで（ASR・変更通知・ブラウザの再取得） |
+| `audioMs` / `preRollMs` / `trailMs` | ASR に送った音声の長さ、そのうち確定前に残した分、最後の声の後の無音 |
+
+サーバー側の内訳は同じ `utteranceId`（ASR の `subjectId`）で、`performance.stage`（`purpose=asr`）の `provider_ready`（LARM 接続の待ち）と `response_headers`（認識）、`inference.attempt_*` の `source`・失敗理由、`voice.input_prepared` で見ます。`bun scripts/voice-latency.ts [--since TIME] [--limit 20]` が発話ごとに突き合わせて一覧にし、`uploadToShownMs` から ASR の所要（受付〜`voice.input_prepared`）を引いた残りを「通知と再取得」として出します。表示されなかった発話（空の文字起こし・取消）は記録されません。
+
 ブラウザではUser Timingに次のイベントを残します。外部送信はせず、各名前につき最大64件、上限到達時にその名前の古い記録をクリアします。`detail` はrunIdまたはutteranceIdとchunkIndexだけです。
 
 - `eumenes.text_received`：SSEで最初の表示可能な本文を受け取った時点。

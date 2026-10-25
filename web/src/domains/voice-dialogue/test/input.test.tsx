@@ -92,7 +92,7 @@ for (const pause of [false, true])
 				await act(async () => hook.result.current.start());
 			}
 			await waitFor(() => expect(voiceCommit).toHaveBeenCalledTimes(1));
-			expect(voiceCommit).toHaveBeenCalledWith(ids[1], 2);
+			expect(voiceCommit).toHaveBeenCalledWith(ids[1], 2, undefined, undefined);
 		} finally {
 			hook.unmount();
 			cache.clear();

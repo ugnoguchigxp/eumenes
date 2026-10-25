@@ -17,6 +17,7 @@ import type { Settings } from "../../../../../api/domains/settings/contracts";
 import type { AvatarCue } from "../../avatar";
 import { queryRoots } from "../../../queryKeys";
 import { createVoiceMachine, isCurrent } from "./machine";
+import { createInputLedger } from "./input-timing";
 import { describeError } from "../../../errorMessages";
 export function useVoiceDialogue(
 	client: VoiceDialogueClient,
@@ -43,7 +44,7 @@ export function useVoiceDialogue(
 		finish?: () => void;
 	} | null>(null);
 	const candidate = useRef<RecognitionCandidate | null>(null);
-	const committing = useRef(new Set<string>());
+	const inputs = useRef(createInputLedger());
 	const [inputVersion, setInputVersion] = useState(0);
 	const [previewText, setPreviewText] = useState<string | null>(null);
 	const [avatarCue, setAvatarCue] = useState<AvatarCue | null>(null);
@@ -267,7 +268,7 @@ export function useVoiceDialogue(
 			inputEnabled.current,
 			candidate.current,
 			controller.current,
-			committing.current,
+			inputs.current,
 			setError,
 		);
 	}, [turn.data, recognitionId, inputVersion, turnId, client, cache, machine]);
@@ -303,7 +304,7 @@ export function useVoiceDialogue(
 		}
 		inputEnabled.current = true;
 		replacement.current = null;
-		committing.current.clear();
+		inputs.current.committing.clear();
 		setError(null);
 		setRecognitionId(null);
 		setPreviewText(null);
@@ -350,7 +351,7 @@ export function useVoiceDialogue(
 					// Energy alone cannot distinguish speech from noise. Keep the answer
 					// until the replacement has a nonempty accepted transcript.
 				},
-				(wav) => {
+				(wav, timing) => {
 					const active = machine.get().session;
 					if (!inputLive() || !active || active.failed) return;
 					const pauseAfterUpload = active.pending >= 2;
@@ -397,6 +398,7 @@ export function useVoiceDialogue(
 								);
 							}
 							if (!live()) return;
+							inputs.current.uploaded(id, timing);
 							replacement.current = { id, previous: old };
 							setTurnId(id);
 							await cache.invalidateQueries({

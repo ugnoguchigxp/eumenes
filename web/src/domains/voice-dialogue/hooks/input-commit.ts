@@ -6,6 +6,7 @@ import { describeError } from "../../../errorMessages";
 import { queryRoots } from "../../../queryKeys";
 import type { RecognitionCandidate } from "./preview";
 import { isCurrent, type VoiceMachine } from "./machine";
+import type { InputLedger } from "./input-timing";
 
 export function commitIdleInput(
 	value: VoiceTurn,
@@ -15,7 +16,7 @@ export function commitIdleInput(
 	inputEnabled: boolean,
 	candidate: RecognitionCandidate | null,
 	controller: AudioController | null,
-	committing: Set<string>,
+	inputs: InputLedger,
 	setError: (error: string) => void,
 ) {
 	const session = machine.get().session;
@@ -25,12 +26,18 @@ export function commitIdleInput(
 		session.pending ||
 		candidate ||
 		controller?.isInputBusy?.() ||
-		committing.has(value.utteranceId)
+		inputs.committing.has(value.utteranceId)
 	)
 		return;
-	committing.add(value.utteranceId);
+	inputs.committing.add(value.utteranceId);
+	// The transcript is on screen now (this runs with the render that shows it).
 	void client
-		.voiceCommit(value.utteranceId, value.revision)
+		.voiceCommit(
+			value.utteranceId,
+			value.revision,
+			undefined,
+			inputs.shown(value.utteranceId),
+		)
 		.then(() => {
 			if (isCurrent(machine.get(), session.token))
 				return cache.invalidateQueries({

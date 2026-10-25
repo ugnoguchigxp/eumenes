@@ -81,10 +81,25 @@ export const errorStatus = {
 	voice_audio_capacity: 503,
 } as const satisfies Record<string, HttpErrorStatus>;
 
+const ms = z.number().int().nonnegative().max(600_000);
+/** Where the input's time went in the browser before its transcript was shown (ms, numbers only). */
+export const inputTimingSchema = z
+	.object({
+		audioMs: ms,
+		preRollMs: ms,
+		trailMs: ms,
+		endToSegmentMs: ms,
+		encodeMs: ms,
+		uploadMs: ms,
+		uploadToShownMs: ms,
+	})
+	.strict();
+export type InputTiming = z.infer<typeof inputTimingSchema>;
 export const inputCommitSchema = z
 	.object({
 		revision: z.number().int().nonnegative(),
 		/** The saved item on screen when the user spoke; re-checked by the host like a typed message's. */
 		viewing: runViewingSchema.optional(),
+		timing: inputTimingSchema.optional(),
 	})
 	.strict();

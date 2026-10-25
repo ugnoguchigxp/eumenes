@@ -1,4 +1,5 @@
 import { createResampler } from "./resample";
+import { createSegmentClock, type SegmentTiming } from "./segment-timing";
 import {
 	createSpeechClassifier,
 	type SpeechClassifier,
@@ -91,12 +92,17 @@ const FRAME_SAMPLES = 2048;
 const MAX_RECORDING_SECONDS = 60;
 /** Audio kept before speech is confirmed: confirmation lags the onset by the voiced span needed. */
 const PRE_ROLL_SECONDS = 1;
-/** Closes a model load, whatever its outcome. */
-const release = (load: Promise<SpeechClassifier> | undefined) =>
+/**
+ * Closes a model load, whatever its outcome (stop, or a worker that failed: the next start loads a
+ * new one), and leaves nothing to reuse.
+ */
+const release = (load: Promise<SpeechClassifier> | undefined) => {
 	void load?.then(
 		(model) => model.close(),
 		() => {},
 	);
+	return undefined;
+};
 type LostReason =
 	| "mic_lost"
 	| "audio_context_lost"
@@ -188,7 +194,7 @@ const OUTPUT_TAIL_MS = 500;
 export function createAudioController(
 	onState: (state: AudioState) => void,
 	onSpeech: () => void,
-	onSegment: (wav: Uint8Array) => void,
+	onSegment: (wav: Uint8Array, timing?: SegmentTiming) => void,
 	options: {
 		inputDevice?: string;
 		outputDevice?: string;
@@ -238,6 +244,7 @@ export function createAudioController(
 	let lastFrame: Float32Array | undefined;
 	let sampleCount = 0;
 	let lastLevel = 0;
+	const clock = createSegmentClock();
 	let nextPartialAt = 0;
 	let lastEmit = 0;
 	let listenAfter = 0;
@@ -353,12 +360,12 @@ export function createAudioController(
 	function flush() {
 		const segment =
 			context && sampleCount >= context.sampleRate * 0.25
-				? encodeFrames()
+				? clock.take(sampleCount, context.sampleRate, encodeFrames)
 				: undefined;
 		resetRecording();
 		nextPartialAt = 0;
 		// A consumer may pause capture synchronously when its upload queue fills.
-		if (segment) onSegment(segment);
+		if (segment) onSegment(segment.wav, segment.timing);
 	}
 	function pauseInput() {
 		// Include samples received since the last complete detector frame.
@@ -485,9 +492,7 @@ export function createAudioController(
 						strict: !!playback || performance.now() < listenAfter,
 					});
 					if (detector?.failed) {
-						// The worker is gone; the next start loads a new one.
-						release(classifier);
-						classifier = undefined;
+						classifier = release(classifier);
 						reportLost("voice_detector_unavailable");
 						return;
 					}
@@ -505,6 +510,7 @@ export function createAudioController(
 							speaking = true;
 							resetRecording();
 							for (const candidate of candidateFrames) pushFrame(candidate);
+							clock.confirmed(sampleCount);
 							nextPartialAt = sampleCount + context.sampleRate * 1.8;
 							candidateFrames = [];
 							candidateSamples = 0;
@@ -514,6 +520,7 @@ export function createAudioController(
 					if (speaking) {
 						if (!observation?.hasSpeech || lastFrame !== frame)
 							pushFrame(frame);
+						if (detector?.hearing) clock.heard(sampleCount);
 						if (
 							options.onPartial &&
 							!observation?.shouldFinalize &&
@@ -723,8 +730,7 @@ export function createAudioController(
 			candidateFrames = [];
 			candidateSamples = 0;
 			detector = undefined;
-			release(classifier);
-			classifier = undefined;
+			classifier = release(classifier);
 			emit("idle");
 		},
 		/** Stop recording while keeping the accepted answer's output context alive. */

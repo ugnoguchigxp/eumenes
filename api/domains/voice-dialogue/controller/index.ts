@@ -87,6 +87,12 @@ export function registerVoiceDialogue(
 	app.post("/api/voice/turns/:id/commit", async (c) => {
 		const parsed = await parseJsonBody(c, inputCommitSchema);
 		if (!parsed.ok) return parsed.response;
+		// The browser's side of speech end → transcript on screen; the server's side is in the ASR logs.
+		if (parsed.data.timing)
+			log.info("voice.input_timing", {
+				utteranceId: c.req.param("id"),
+				...parsed.data.timing,
+			});
 		return c.json(
 			await service.commit(
 				c.req.param("id"),

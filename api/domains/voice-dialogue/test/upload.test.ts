@@ -105,3 +105,48 @@ test("replay failure logs and returns a code, never the raw message", async () =
 		configureLogging({ level: "silent" });
 	}
 });
+
+test("a commit's browser timing is logged as numbers, and unknown timing fields are refused", async () => {
+	const lines: string[] = [];
+	configureLogging({
+		level: "info",
+		destination: { write: (line) => void lines.push(line) },
+	});
+	try {
+		const commits: unknown[] = [];
+		const app = new Hono();
+		registerVoiceDialogue(app, {
+			commit: async (...args: unknown[]) => {
+				commits.push(args);
+				return { status: "responding" };
+			},
+		} as unknown as VoiceDialogueService);
+		const timing = {
+			audioMs: 2800,
+			preRollMs: 1000,
+			trailMs: 1500,
+			endToSegmentMs: 1520,
+			encodeMs: 4,
+			uploadMs: 21,
+			uploadToShownMs: 2900,
+		};
+		const commit = (body: unknown) =>
+			app.request(`/api/voice/turns/${utteranceId}/commit`, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify(body),
+			});
+		expect((await commit({ revision: 2, timing })).status).toBe(202);
+		const entry = lines
+			.map((line) => JSON.parse(line))
+			.find((e) => e.event === "voice.input_timing");
+		expect(entry).toMatchObject({ utteranceId, ...timing });
+		expect(
+			(await commit({ revision: 2, timing: { ...timing, text: "はい" } }))
+				.status,
+		).toBe(400);
+		expect(commits).toHaveLength(1);
+	} finally {
+		configureLogging({ level: "silent" });
+	}
+});

@@ -2,6 +2,7 @@ import {
 	previewResultSchema,
 	replaySentencesSchema,
 	voiceTurnSchema,
+	type InputTiming,
 } from "../api/domains/voice-dialogue/contracts";
 import { avatarMotionSchema } from "../api/domains/delivery/contracts";
 import { z } from "zod";
@@ -80,12 +81,17 @@ export function voiceDialogueClient(transport: Transport) {
 			viewing?:
 				| { artifactRevisionId: string; targetRef: string }
 				| { resource: string },
+			timing?: InputTiming,
 		) =>
 			voiceTurnSchema.parse(
 				await (
 					await transport.call(
 						`/api/voice/turns/${encodeURIComponent(id)}/commit`,
-						json(viewing ? { revision, viewing } : { revision }),
+						json({
+							revision,
+							...(viewing ? { viewing } : {}),
+							...(timing ? { timing } : {}),
+						}),
 					)
 				).json(),
 			),

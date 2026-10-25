@@ -132,7 +132,12 @@ test("preview keeps pending input, then only the server-adopted text is committe
 		expect(h.voiceCommit).not.toHaveBeenCalled();
 		await h.update(1, { text: expected, status: "input_ready", revision: 2 });
 		await waitFor(() =>
-			expect(h.voiceCommit).toHaveBeenCalledExactlyOnceWith(h.ids[1], 2),
+			expect(h.voiceCommit).toHaveBeenCalledExactlyOnceWith(
+				h.ids[1],
+				2,
+				undefined,
+				undefined,
+			),
 		);
 		expect(h.hook.result.current.transcription?.text).toBe(expected);
 		h.speech();
