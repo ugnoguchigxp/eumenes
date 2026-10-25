@@ -38,6 +38,7 @@ export const MessageList = memo(function MessageList({
 	agentName,
 	renderInsideMessage,
 	renderFollowingMessage,
+	renderHiddenMessage,
 	editableId,
 	editingId,
 	editedIds,
@@ -51,6 +52,8 @@ export const MessageList = memo(function MessageList({
 	agentName?: string;
 	renderInsideMessage?: (message: Message) => ReactNode;
 	renderFollowingMessage?: (message: Message) => ReactNode;
+	/** Shown in the place of an input the list does not display (`presentation: "artifact"`). */
+	renderHiddenMessage?: (message: Message) => ReactNode;
 	/** The latest utterance, while it can still be edited. */
 	editableId?: string;
 	/** The utterance the composer is editing: shown faded. */
@@ -87,12 +90,16 @@ export const MessageList = memo(function MessageList({
 		});
 	}, [conversation, lastAssistantId, lastAssistantText, streaming]);
 	const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
-	const all =
-		conversation?.messages.filter(
-			(message) => message.presentation !== "artifact",
-		) ?? [];
+	const messages = conversation?.messages ?? [];
+	const all = messages.filter((message) => message.presentation !== "artifact");
 	const hidden = Math.max(0, all.length + (streaming ? 1 : 0) - visibleCount);
-	const visibleMessages = hidden ? all.slice(hidden) : all;
+	const firstVisible = hidden ? all[hidden] : all[0];
+	// Inputs that are not displayed keep their place, so what is shown for them stays in order.
+	const rows = !hidden
+		? messages
+		: firstVisible
+			? messages.slice(messages.indexOf(firstVisible))
+			: [];
 	return (
 		<div className="messages">
 			<output
@@ -111,8 +118,10 @@ export const MessageList = memo(function MessageList({
 					さらに20件表示
 				</button>
 			)}
-			{all.length ? (
-				visibleMessages.map((message) => (
+			{rows.map((message) =>
+				message.presentation === "artifact" ? (
+					<Fragment key={message.id}>{renderHiddenMessage?.(message)}</Fragment>
+				) : (
 					<Fragment key={message.id}>
 						<article
 							className={`message message-${message.role}${message.id === editingId ? " message-editing" : ""}`}
@@ -205,12 +214,13 @@ export const MessageList = memo(function MessageList({
 						</article>
 						{renderFollowingMessage?.(message)}
 					</Fragment>
-				))
-			) : !streaming ? (
+				),
+			)}
+			{!all.length && !streaming && (
 				<p className="empty">
 					まだ会話はありません。声か文字で話しかけてください。
 				</p>
-			) : null}
+			)}
 			{streaming && (
 				<article className="message message-assistant" aria-busy="true">
 					<small>{assistantLabel}</small>

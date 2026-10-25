@@ -37,7 +37,6 @@ export function ConversationComposer({
 		automaticInput,
 		submit,
 		editInput,
-		latestRun,
 		audioError,
 		edit,
 	} = state;
@@ -207,14 +206,6 @@ export function ConversationComposer({
 							? describeError(submit.error)
 							: `送信できませんでした: ${describeError(submit.error)}`
 						: voice.error || (audioError ? describeError(audioError) : null)}
-				</p>
-			)}
-			{latestRun?.status === "failed" && (
-				<p className="chat-error" role="alert">
-					回答を取得できませんでした:{" "}
-					{latestRun.error
-						? describeError(new Error(latestRun.error))
-						: "応答に失敗しました"}
 				</p>
 			)}
 		</div>

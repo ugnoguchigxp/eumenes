@@ -390,3 +390,40 @@ test("cancelling a structured decision fences a late provider and refuses its ad
 	await expect(pending).rejects.toThrow();
 	expect(h.inference.usage().some((r) => r.accepted)).toBe(false);
 });
+
+test("a spoken call's session reaches the provider: speech sampling, a required call and its own output bound", async () => {
+	let seen: unknown;
+	const h = await setup({
+		local: async (_m, _s, options) => {
+			seen = options;
+			return "はい。";
+		},
+	});
+	const id = await h.store.write((db) =>
+		h.inference.captureInTransaction(
+			db,
+			"spoken-root",
+			"llm",
+			Date.now() + 10000,
+		),
+	);
+	await h.inference.executeStream(
+		id,
+		messages,
+		AbortSignal.timeout(1000),
+		() => {},
+		undefined,
+		tools,
+		{
+			sessionRole: "main",
+			speaks: true,
+			toolChoice: "required",
+			outputLimit: 1024,
+		},
+	);
+	expect(seen).toMatchObject({
+		speaks: true,
+		toolChoice: "required",
+		maxOutputTokens: 1024,
+	});
+});

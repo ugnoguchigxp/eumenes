@@ -15,20 +15,6 @@ export type SelectionCandidate = {
  * or a clarifying question; the two are not told apart). rejected: its output broke the contract.
  */
 export type SelectionDecision = "toolchain" | "answer" | "rejected";
-/** What the conversation's first round judged about the request (the request itself is never kept here). */
-export type SelectionAnalysis = {
-	kind:
-		| "knowledge"
-		| "live_info"
-		| "past_conversation"
-		| "action"
-		| "creation"
-		| "chat";
-	freshness: "live" | "not_live";
-	next: "answer" | "report_unavailable" | "toolchain";
-	impact: "none" | "create" | "modify_existing" | "irreversible";
-	approved: boolean;
-};
 export type SelectionOutcome =
 	| "answered"
 	| "partial"
@@ -52,9 +38,6 @@ export type Selection = {
 	toolchainRevisionId: string | null;
 	functionName: string | null;
 	request: string | null;
-	repaired: boolean;
-	/** The first round's judgment; absent for a decision made without one. */
-	analysis?: SelectionAnalysis;
 	taskId: string | null;
 	outcome: SelectionOutcome | null;
 	outcomeCode: string | null;

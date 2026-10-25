@@ -2,7 +2,6 @@ import { afterEach, expect, test } from "bun:test";
 import type { LarmPort } from "../../domains/larm";
 import {
 	callsOf,
-	isResultRound,
 	isUtteranceRound,
 	searchThenDelegate,
 } from "./conversation-script.fixture";
@@ -71,7 +70,7 @@ function model(): LarmPort {
 				});
 			}
 			// The conversation's round delegates the request to the studio (a search, then the hand-over).
-			if (isUtteranceRound(options?.tools) && !isResultRound(messages)) {
+			if (isUtteranceRound(options?.tools)) {
 				const step = searchThenDelegate(
 					(candidate) => candidate.id === "ui.compose",
 					messages.at(-1)!.content,

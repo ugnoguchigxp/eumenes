@@ -25,7 +25,7 @@ test("the final model call is reserved once on the guided quick budget", () => {
 
 test("batch read budgets and URL scopes are enforced atomically before adoption", async () => {
 	for (const foreign of [false, true]) {
-		const h = await harness(Date.now, false, undefined, true);
+		const h = await harness(Date.now, undefined, true);
 		const urls = [1, 2, 3].map((n) => `https://same.example/${n}`);
 		try {
 			await h.start("batch-scope", `確認 ${urls.join(" ")}`);
@@ -53,7 +53,7 @@ test("batch read budgets and URL scopes are enforced atomically before adoption"
 
 test("retry cooldown is owned by Queue without a web-specific timer or another model call", async () => {
 	let now = Date.now();
-	const h = await harness(() => now, false, undefined, true);
+	const h = await harness(() => now, undefined, true);
 	const url = "https://retry.example/page";
 	try {
 		await h.start("cooldown", `取得 ${url}`);

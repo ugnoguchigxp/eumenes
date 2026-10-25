@@ -2,17 +2,13 @@ import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import {
 	callsOf,
-	isResultRound,
 	isUtteranceRound,
 	searchThenDelegate,
 } from "./conversation-script.fixture";
 import { workerPacket } from "./toolchain.fixture";
 import { loadEvaluationCases } from "./llm-native-evaluation.fixture";
 import { evaluateRequirements } from "./llm-native-runner.fixture";
-import {
-	fixtureResearchOutput,
-	fixtureVerification,
-} from "../../domains/agent-runtime/test/research-fixture";
+import { fixtureVerification } from "../../domains/agent-runtime/test/research-fixture";
 import type { LarmPort } from "../../domains/larm";
 const directory = new URL("./testdata/llm-native/", import.meta.url);
 const { cases, profiles } = loadEvaluationCases(
@@ -25,7 +21,6 @@ for (const c of cases)
 	if (c.suite === "requirements")
 		test(`data-only report host fixture: ${c.id}`, async () => {
 			const canned = responses[c.id];
-			const search = c.engine === "codex";
 			let calls = 0;
 			const model: LarmPort = {
 				status: () => ({ state: "ready", capabilities: ["llm"] }),
@@ -35,14 +30,10 @@ for (const c of cases)
 				speak: async () => new Uint8Array(),
 				answer: async (messages, _signal, options) => {
 					calls++;
-					if (isUtteranceRound(options?.tools) && !isResultRound(messages)) {
+					if (isUtteranceRound(options?.tools)) {
 						// The conversation's round: search for the source's toolchain, then hand the request over.
 						const step = searchThenDelegate(
-							(candidate) =>
-								candidate.id ===
-								(c.engine === "codex"
-									? "web.research.codex"
-									: "history.research"),
+							(candidate) => candidate.id === "history.research",
 							c.request,
 							{ announcement: "お調べします。", impact: "none" },
 						)(messages);
@@ -56,27 +47,6 @@ for (const c of cases)
 						const data = workerPacket(messages);
 						if (data.draftReport)
 							return JSON.stringify(fixtureVerification(data.draftReport));
-						if (search)
-							return fixtureResearchOutput(
-								data,
-								JSON.stringify(
-									data.observations.length
-										? {
-												action: "finish",
-												report: {
-													outcome: canned.outcome,
-													summary: canned.summary,
-													claims: canned.claims,
-													limitations: canned.limitations,
-												},
-											}
-										: {
-												action: "invoke",
-												tool: "web.read",
-												arguments: { url: c.sources[0]!.url },
-											},
-								),
-							);
 						if (!data.requirementContract)
 							return JSON.stringify({
 								action: "invoke",
@@ -135,29 +105,12 @@ for (const c of cases)
 				c,
 				profiles,
 				model,
-				c.engine === "codex"
-					? {
-							execute: (messages, signal) => model.answer(messages, signal),
-						}
-					: undefined,
-				!search,
+				true,
 			);
-			if (search) {
-				expect(result.engine).toBe("codex");
-				expect(result.report).toMatchObject({
-					version: 2,
-					outcome: canned.outcome,
-					summary: canned.summary,
-				});
-				expect(result.report!.claims.map((c) => c.text)).toEqual(
-					canned.claims.map((c: { text: string }) => c.text),
-				);
-				expect("requirements" in result.report!).toBe(false);
-				expect(result.counts.verify).toEqual({ n: 0 });
-			} else expect(result.structureMatched).toBe(true);
-			expect(result.counts.worker).toBe(search ? 2 : 3);
-			// The analysis round and the route round are gone: a search, a hand-over and the sub-agent's calls remain.
-			expect(calls).toBe(search ? 5 : 6);
+			expect(result.structureMatched).toBe(true);
+			expect(result.counts.worker).toBe(3);
+			// A search, a hand-over and the sub-agent's three calls; the finished work is reported by the agency.
+			expect(calls).toBe(5);
 			expect(result.semanticChecks.every((v) => v.status === "unchecked")).toBe(
 				true,
 			);

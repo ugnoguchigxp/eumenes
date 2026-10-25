@@ -18,9 +18,8 @@ export { readActionOriginInTransaction } from "./service/action-origin";
 export { isAdoptedAnswerInTransaction } from "./service/adopted-answer";
 export { trialFirstRound } from "./service/trial-selection";
 export type {
-	AgencyContext,
-	AgencyContextUtterance,
 	AgencyLayerPort,
+	ConversationAgentPort,
 	GoalsLayerPort,
 	StewardRunEnd,
 	WorldContextNamesInput,

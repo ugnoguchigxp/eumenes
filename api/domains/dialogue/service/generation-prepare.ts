@@ -39,6 +39,7 @@ import { FIXED_TRIGGER_TEXT, systemText } from "./context-system";
 import { generationTools } from "./generation-tools";
 import { eventFields } from "./event-fields";
 import {
+	consumeAnswer,
 	answerTicketInTransaction,
 	intakeInTransaction,
 } from "./result-intake";
@@ -307,6 +308,14 @@ export function createPrepare(
 		// A host note the work did not take as its report (a specialist switch to confirm) is this run's trigger.
 		const hostNote = changed ? null : (claim.payload.commandNote ?? null);
 		const notAdopted = claim.payload.notAdopted === true;
+		// A TODO that changed is the conversation agent's to report, on its own opportunity: no generation runs for
+		// it. The sub-agent's answer is consumed here (one whose evidence changed drops its result).
+		if (changed?.length && !hostNote && !notAdopted && pending.length === 0) {
+			if (agent) consumeAnswer(deps, tx, current, agent);
+			endRun(deps, tx, current, "completed", null);
+			agency?.workChangedInTransaction(tx, conversationId);
+			return { status: "stale", reason: "work_reported" };
+		}
 		if (
 			!notice &&
 			!changed &&
@@ -354,7 +363,7 @@ export function createPrepare(
 			userName: "",
 			persona: "butler" as const,
 		};
-		const system = systemText(persona);
+		const system = deps.conversationAgent.system() + "\n" + systemText(persona);
 		const fixed = tokens(system) + estimateJsonTokens(generationTools);
 		const plan = planWindow({ window: windowOf(deps, tx, run.id), fixed });
 		if (!plan.usable) {
@@ -454,9 +463,7 @@ export function createPrepare(
 				speaking: speakingNow(logged),
 				notices: window?.notices.map((notice) => notice.text) ?? [],
 				recall: (window ? parseRecallBlock(window.prefetch.text) : null) ?? [],
-				agency:
-					agency?.recentForContextInTransaction(tx, conversationId)
-						?.interests ?? [],
+				agency: agency?.stateForContextInTransaction(tx, conversationId) ?? [],
 				records,
 			},
 			work: [],

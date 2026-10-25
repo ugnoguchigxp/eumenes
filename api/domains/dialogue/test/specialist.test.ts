@@ -4,7 +4,6 @@ import {
 	OTHER_REVISION,
 	STUDIO,
 	STUDIO_ARTIFACT,
-	respond,
 	setup,
 	type Harness,
 } from "./specialist.fixture";
@@ -35,7 +34,6 @@ const ret = (forward: boolean, text?: string) => ({
 	forward,
 	...(text ? { text } : {}),
 });
-const chat = respond();
 
 /** The main model hands "request" to the studio toolchain and the specialist drafts, then answers. */
 async function startDirty(
@@ -179,7 +177,7 @@ test("returning: unsaved work is suspended and the conversation agent takes over
 	expect(await h.session()).toMatchObject({ state: "suspended", dirty: true });
 	expect(h.work()[0]!.ended).toBe(false);
 	// The next utterance is the conversation agent's, with the record of the suspended work.
-	h.state.steps.push({ text: "天気は晴れです", calls: [chat] });
+	h.state.steps.push({ text: "天気は晴れです" });
 	const asked = await h.ask("今日の天気は？");
 	expect(asked.specialistSessionId).toBeNull();
 	expect(asked.status).toBe("completed");
@@ -211,10 +209,7 @@ test("returning a clean work ends the session once and tells the conversation ag
 	expect(await h.session()).toBeNull();
 	expect(h.state.calledPort).toContain("end:close");
 	expect(h.state.released).toHaveLength(1);
-	h.state.steps.push(
-		{ text: "はい", calls: [chat] },
-		{ text: "はい", calls: [chat] },
-	);
+	h.state.steps.push({ text: "はい" }, { text: "はい" });
 	await h.ask("こんにちは");
 	expect(
 		record(h, h.state.calls.length - 1, "specialist.work").data.ended,
@@ -232,7 +227,7 @@ test("a request outside the specialist's scope is forwarded to the conversation 
 	const h = await harness();
 	await startDirty(h);
 	h.state.specialist.push(ret(true));
-	h.state.steps.push({ text: "明日は雨です", calls: [chat] });
+	h.state.steps.push({ text: "明日は雨です" });
 	const requestId = crypto.randomUUID();
 	const run = await h.dialogue.submit({
 		requestId,
@@ -270,7 +265,7 @@ test("a label longer than the old payload limit still reaches the conversation a
 	const title = "長い題名".repeat(300);
 	await startDirty(h, "アンケートを作って", title);
 	h.state.specialist.push(ret(true));
-	h.state.steps.push({ text: "明日は雨です", calls: [chat] });
+	h.state.steps.push({ text: "明日は雨です" });
 	const forwarded = await h.ask("明日の天気を教えて");
 	expect(forwarded.status).toBe("completed");
 	expect(
@@ -299,7 +294,6 @@ test("a hand-over to another toolchain while unsaved work stands waits for the u
 	h.handOver({ request: "別のものを作って" }, OTHER.id);
 	h.state.steps.push({
 		text: "未保存の作業があります。破棄しますか？",
-		calls: [respond({ kind: "action", impact: "modify_existing" })],
 	});
 	const asked = await h.ask("別のものを作って");
 	expect(asked.status).toBe("completed");
@@ -325,7 +319,7 @@ test("a hand-over to another toolchain while unsaved work stands waits for the u
 		{ request: "別のものを作って", resolveUnsaved: "discard" },
 		OTHER.id,
 	);
-	h.state.steps.push({ text: "もう一度確認します", calls: [chat] });
+	h.state.steps.push({ text: "もう一度確認します" });
 	await h.ask("破棄していいよ");
 	expect((await h.session())!.id).toBe(suspended.id);
 	expect((await h.session())!.pendingSwitch!.workRevision).toBe(
@@ -371,7 +365,7 @@ test("the same target resumes the suspended work instead of starting another", a
 test("a target the host did not issue is refused before anything starts", async () => {
 	const h = await harness();
 	h.handOver({ request: "直して", target: "item-9" });
-	h.state.steps.push({ text: "開けませんでした", calls: [chat] });
+	h.state.steps.push({ text: "開けませんでした" });
 	const run = await h.ask("直して");
 	expect(h.work()).toHaveLength(0);
 	expect(await h.session()).toBeNull();
@@ -381,7 +375,7 @@ test("a target the host did not issue is refused before anything starts", async 
 
 test("a saved item starts the session from it; the search offers exactly the issued items, and the screen's viewing is shown only when issued", async () => {
 	const h = await harness();
-	h.state.steps.push({ text: "見ています", calls: [chat] });
+	h.state.steps.push({ text: "見ています" });
 	await h.ask("これは何？", {
 		viewing: { artifactRevisionId: STUDIO_ARTIFACT, targetRef: "item-1" },
 	});
@@ -390,7 +384,7 @@ test("a saved item starts the session from it; the search offers exactly the iss
 		ref: "item-1",
 		toolchainId: "fake.studio",
 	});
-	h.state.steps.push({ text: "見えません", calls: [chat] });
+	h.state.steps.push({ text: "見えません" });
 	await h.ask("あれは？", {
 		viewing: { artifactRevisionId: STUDIO_ARTIFACT, targetRef: "item-9" },
 	});

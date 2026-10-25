@@ -2,7 +2,6 @@ import { expect, test } from "bun:test";
 import { harness } from "../toolchain/toolchain.fixture";
 import { musicFixture } from "./music.fixture";
 import {
-	isResultRound,
 	isUtteranceRound,
 } from "../toolchain/conversation-script.fixture";
 import {
@@ -25,13 +24,12 @@ test("the current music request reaches generation after unrelated Web and image
 		...f.model,
 		answer: async (...args: Parameters<typeof f.model.answer>) => {
 			// The utterance's generation offers the conversation's fixed tools; the toolchain is found by search, not offered.
-			if (isUtteranceRound(args[2]?.tools) && !isResultRound(args[0]))
+			if (isUtteranceRound(args[2]?.tools))
 				expect(args[2]!.tools!.map((t) => t.function.name)).toEqual([
 					"memory",
 					"find_toolchain",
 					"delegate",
 					"work",
-					"respond",
 				]);
 			return f.model.answer(...args);
 		},

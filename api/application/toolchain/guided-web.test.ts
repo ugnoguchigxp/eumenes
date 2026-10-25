@@ -1,13 +1,8 @@
 import { expect, test } from "bun:test";
 import { harness, workerPacket } from "./toolchain.fixture";
 
-for (const [fullResearch, invalidateLatest] of [
-	[false, false],
-	[true, false],
-	[false, true],
-] as const)
-	test(`source-linked answers survive stock → weather through conversation rephrasing (${fullResearch ? "broad" : "quick"}${invalidateLatest ? ", superseded search" : ""})`, async () => {
-		let parents = 0;
+for (const invalidateLatest of [false, true])
+	test(`the finished TODO keeps its answer and source through stock → weather${invalidateLatest ? " (superseded search)" : ""}`, async () => {
 		const queries: string[] = [];
 		const requests: unknown[] = [];
 		const replaced = new Set<string>();
@@ -32,21 +27,6 @@ for (const [fullResearch, invalidateLatest] of [
 			text: "鎌倉市、2026年10月16日13時の予報：晴れ、25.4℃。",
 		};
 		const h = await harness({
-			fullResearch,
-			parent: async (messages) => {
-				parents++;
-				// The result phase's document carries the finished research as the TODO's result.
-				const document = JSON.parse(
-					messages.find((m) => m.role === "user" && m.content.startsWith("{"))!
-						.content,
-				) as {
-					active: Array<{ result?: { answer?: string; summary?: string } }>;
-				};
-				const result = [...document.active]
-					.reverse()
-					.find((entry) => entry.result)!.result!;
-				return result.answer ?? result.summary!;
-			},
 			control: async (messages) => {
 				const data = workerPacket(messages);
 				expect(Buffer.byteLength(JSON.stringify(messages))).toBeLessThanOrEqual(
@@ -163,18 +143,17 @@ for (const [fullResearch, invalidateLatest] of [
 				const { id } = await response.json();
 				const final = await h.dialogue.waitForTerminal(id, { timeoutMs: 5000 });
 				expect(final?.status).toBe("completed");
-				const answer = h.dialogue.answerText(id)!;
-				expect(answer).toContain(doc.text);
-				expect(answer).toContain(doc.url); // host restores a missing citation from the accepted receipt
+				// The agency reports the finished TODO from its result: the answer and the source it was read from.
+				expect(h.dialogue.answerText(id)).toBeNull();
+				const reported = h.reported("switch");
+				expect(reported).toContain(doc.text);
+				expect(reported).toContain(doc.url);
 				const child = h.toolchain.agents
 					.list(id)
 					.find((t) => t.kind === "worker")!;
-				expect(child.packageRevisionId).toBe(
-					fullResearch ? "package:web.search@6" : "package:web.recipe@6",
-				);
+				expect(child.packageRevisionId).toBe("package:web.recipe@6");
 				expect(child.modelCalls).toBe(invalidateLatest ? 4 : 3);
 			}
-			expect(parents).toBe(2);
 			expect(queries).toHaveLength(invalidateLatest ? 4 : 2);
 			const weatherQuery = queries[invalidateLatest ? 2 : 1];
 			expect(weatherQuery).toContain("鎌倉");

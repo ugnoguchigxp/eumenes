@@ -1,5 +1,4 @@
 import { harness } from "../api/application/toolchain/toolchain.fixture";
-import { createCodexResearch } from "../api/domains/inference";
 import { createWebAcquisition } from "../api/domains/web-research";
 import { createLiveLarm } from "./live-larm";
 import { researchLiveMetrics } from "./research-live-metrics";
@@ -174,9 +173,6 @@ const model = {
 			}
 		: {}),
 };
-const codex = createCodexResearch(process.env);
-if (!codex && cases.some((c) => c.expectedPackage === "package:web.search@1"))
-	throw new Error("codex_unavailable");
 const acquire = createWebAcquisition();
 let operations: Array<{
 	operation: string;
@@ -190,40 +186,6 @@ let operations: Array<{
 let caseIndex = 0;
 const h = await harness({
 	model,
-	codexResearch: codex
-		? {
-				execute: async (messages, signal, control, model) => {
-					const system = messages
-						.filter((m) => m.role === "system")
-						.map((m) => m.content)
-						.join("\n");
-					const listed = JSON.parse(
-						system.split("\nTOOLS=")[1]!.split("\n")[0]!,
-					);
-					console.log(
-						JSON.stringify({
-							offeredTools: listed.map((t: { id: string }) => t.id),
-						}),
-					);
-					observeContext(messages, "codex");
-					const raw = await codex.execute(messages, signal, control, model);
-					observeDecision(raw, "codex");
-					let action;
-					try {
-						action = JSON.parse(raw);
-					} catch {}
-					console.log(
-						JSON.stringify({
-							nextAction: action?.action,
-							nextTool: action?.tool,
-							claims: action?.report?.claims?.length,
-							outcome: action?.report?.outcome,
-						}),
-					);
-					return raw;
-				},
-			}
-		: undefined,
 	acquire: async (r, s) => {
 		operations.push(
 			r.operation === "lookup"

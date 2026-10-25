@@ -67,6 +67,7 @@ test("the freeze covers every harness source and the judge prompt, and nothing o
 		"session.ts",
 		"session-context.ts",
 		"generation-runner.ts",
+		"conversation-agent.ts",
 		"message-invariants.ts",
 		"raw.ts",
 		"prefix-stability.ts",

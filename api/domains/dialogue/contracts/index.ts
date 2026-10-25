@@ -1,5 +1,6 @@
 import type { Database } from "bun:sqlite";
 import { z } from "zod";
+import type { DeliveryEmotion } from "../../delivery";
 import { addresseeSchema, viewingSchema } from "./specialist";
 const submitFields = z.object({
 	requestId: z.uuid(),
@@ -179,26 +180,67 @@ export interface GoalsLayerPort {
 }
 
 /**
- * What the agency layer (the background participation of eumenes-agency, wired by the application) lets the main
- * model see: what the assistant said on its own since the user's last message (runless messages are not in the
- * history) and its standing interests. Reference data, never instructions. Null when the layer is off or empty.
+ * What the conversation agent (eumenes-agency, wired by the application) keeps of itself, for its context: its
+ * current interests, intents and what it means to say, as reference lines (never instructions), and its
+ * opportunity when work changes.
  */
-export type AgencyContextUtterance = {
-	messageId: string;
-	text: string;
-	/** `partial` when playback was interrupted; `text` is then only what was heard. */
-	heard: "full" | "partial";
-};
-export type AgencyContext = {
-	utterances: AgencyContextUtterance[];
-	interests: string[];
-};
 export interface AgencyLayerPort {
-	/** Read-only. Null when agency is off for this conversation or there is nothing to show. */
-	recentForContextInTransaction(
-		db: Database,
-		conversationId: string,
-	): AgencyContext | null;
+	/** Read-only. Empty when the agent holds nothing for this conversation. */
+	stateForContextInTransaction(db: Database, conversationId: string): string[];
+	/** A TODO of the conversation finished or asks the user something: the agent's opportunity to say so. */
+	workChangedInTransaction(db: Database, conversationId: string): void;
+}
+
+/** A message of a conversation agent's reply, in the chat shape the model reads. */
+export type AgentMessage = {
+	role: "system" | "user" | "assistant" | "tool";
+	content: string;
+	tool_calls?: Array<{
+		id: string;
+		type: "function";
+		function: { name: string; arguments: string };
+	}>;
+	tool_call_id?: string;
+};
+export type AgentToolDefinition = {
+	name: string;
+	description: string;
+	parameters: Record<string, unknown>;
+};
+export type AgentToolCall = { id: string; name: string; arguments: string };
+
+/**
+ * The conversation agent (eumenes-agency, wired by the application): it answers every generation, using the
+ * host's tools in its reply when the conversation calls for them. The host supplies the model call and the tools.
+ */
+export interface ConversationAgentPort {
+	/** The agent's part of the system message; fixed by the settings, so the cached prefix holds. */
+	system(): string;
+	respond(input: {
+		messages: AgentMessage[];
+		chat: {
+			complete(
+				request: { messages: AgentMessage[]; tools: AgentToolDefinition[] },
+				onDelta: (text: string) => void,
+				signal: AbortSignal,
+			): Promise<{ text: string; toolCalls: AgentToolCall[] }>;
+		};
+		tools: {
+			tools: readonly AgentToolDefinition[];
+			call(
+				call: AgentToolCall,
+				signal: AbortSignal,
+			): Promise<{ content: string; end?: boolean }>;
+		};
+		signal: AbortSignal;
+		onDelta(text: string): void;
+	}): Promise<{
+		text: string;
+		/** The feeling the reply is said with (voice tone and motion); absent when none was chosen. */
+		emotion?: DeliveryEmotion;
+		/** A tool handed the work over and ended the reply. */
+		ended: boolean;
+	}>;
 }
 
 export * from "./command-interactions";

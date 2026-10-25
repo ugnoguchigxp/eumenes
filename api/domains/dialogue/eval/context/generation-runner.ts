@@ -1,9 +1,10 @@
 /**
- * Runs one prepared generation through the production loop (`runGeneration`: the fixed tools, the respond and basis
- * checks, the one structural repair). The model is whatever `inference` is (the live LARM connection, or the scripted
- * model of the fixture lane); the host side of the tools is an offline stand-in that keeps the structural rules the
- * model must meet (a toolchain that was offered, an announcement with a delegation, a confirmation before a change)
- * and changes nothing: no TODO is made, nothing is executed.
+ * Runs one prepared generation through the production loop (`runGeneration`: the conversation agent answers, using
+ * the fixed tools when the conversation calls for them). The model is whatever `inference` is (the live LARM
+ * connection, or the scripted model of the fixture lane); the host side of the tools is an offline stand-in that
+ * keeps the rules the model must meet (a toolchain that was offered, an announcement with a delegation, a
+ * confirmation before a change) by refusing a call that breaks them, as the product does, and changes nothing: no
+ * TODO is made, nothing is executed.
  */
 import { ValidationFailure } from "../../../../infrastructure/validation-log";
 import type { InferencePort } from "../../../inference";
@@ -13,6 +14,7 @@ import {
 	type ToolOutcome,
 	runGeneration,
 } from "../../service/generation-loop";
+import { evalConversationAgent } from "./conversation-agent";
 import { TOOL_NAMES, toolRejection } from "../../service/generation-tools";
 import type { Answer, ToolCallRecord } from "./checks";
 import type { EvalCard } from "./session";
@@ -23,8 +25,8 @@ export type ConversationCall = {
 	input: GenerateInput;
 };
 export type ConversationOutcome =
-	| { kind: "ok"; text: string; toolCalls: ToolCallRecord[]; repaired: boolean }
-	| { kind: "contract_failure"; code: string; repaired: boolean };
+	| { kind: "ok"; text: string; toolCalls: ToolCallRecord[] }
+	| { kind: "contract_failure"; code: string };
 /** Performs one conversation call. A thrown error is a transport error. */
 export type ConversationRunner = (
 	call: ConversationCall,
@@ -105,10 +107,7 @@ function createEvalExecutor(
 			case "memory":
 				return call.args.operation === "read"
 					? { result: { items: [] } }
-					: {
-							result: { accepted: true, requestId: "eval-memory-request" },
-							basis: "work",
-						};
+					: { result: { accepted: true, requestId: "eval-memory-request" } };
 			case "find_toolchain": {
 				const found = rankCandidates(catalog, call.args.query);
 				for (const card of found) offered.add(card.id);
@@ -134,7 +133,6 @@ function createEvalExecutor(
 					state.announcement = args.announcement ?? "";
 					return {
 						result: { delegated: true, todo: "eval-todo" },
-						basis: "delegated",
 						end: true,
 					};
 				}
@@ -149,7 +147,7 @@ function createEvalExecutor(
 				if (args.mode === "confirm")
 					return {
 						result: { confirmation: "eval-confirmation", expiresAt: "eval" },
-						basis: "confirmation",
+						confirmation: true,
 					};
 				if (args.impact === "modify_existing" || args.impact === "irreversible")
 					throw need(TOOL_NAMES.delegate, "mode", "confirmation_required");
@@ -157,7 +155,6 @@ function createEvalExecutor(
 				state.announcement = args.announcement;
 				return {
 					result: { delegated: true, todo: "eval-todo" },
-					basis: "delegated",
 					end: true,
 				};
 			}
@@ -166,8 +163,6 @@ function createEvalExecutor(
 				if (!todo) return { result: { ok: false, code: "todo_not_found" } };
 				if (todo.revision !== call.args.revision)
 					return { result: { ok: false, code: "revision_stale", todo } };
-				if (call.args.operation === "archive" && !call.args.told)
-					throw need(TOOL_NAMES.work, "told", "told_required");
 				const slot = view.activeText.get(todo.id);
 				return {
 					result: {
@@ -177,7 +172,6 @@ function createEvalExecutor(
 							? { result: JSON.parse(slot) }
 							: {}),
 					},
-					basis: "work",
 				} satisfies ToolOutcome;
 			}
 		}
@@ -186,9 +180,9 @@ function createEvalExecutor(
 }
 
 /**
- * The generation of `input` against `inference`, as the host would carry it out. A contract the model did not meet
- * even after the one repair is a `contract_failure` (a model result, scored as a failure); any other error is the
- * caller's transport error.
+ * The generation of `input` against `inference`, as the host would carry it out. Output that breaks the generation
+ * contract (control text in the speech) is a `contract_failure` (a model result, scored as a failure); any other
+ * error is the caller's transport error.
  */
 export async function runConversation(options: {
 	inference: Pick<InferencePort, "answer" | "executeStream">;
@@ -199,46 +193,25 @@ export async function runConversation(options: {
 	const { input } = options;
 	const record: ToolCallRecord[] = [];
 	const { execute, state } = createEvalExecutor(input, options.catalog, record);
-	let repaired = false;
-	const deps = { larm: options.inference } as unknown as DialogueDeps;
+	const deps = {
+		larm: options.inference,
+		conversationAgent: evalConversationAgent,
+	} as unknown as DialogueDeps;
 	try {
 		const generated = await runGeneration(deps, input, {
 			signal: options.signal,
 			delta: () => {},
-			repair: () => {
-				repaired = true;
-			},
 			execute,
-			window: {
-				activeTodos: new Set(input.shown.todos),
-				eventIds: new Set(input.shown.events),
-			},
 		});
 		return {
 			kind: "ok",
 			// A delegation ended the generation: what the user hears is the announcement that went with it.
 			text: generated.ended ? state.announcement : generated.text,
-			toolCalls: [
-				...record,
-				...(generated.respond
-					? [
-							{
-								name: TOOL_NAMES.respond,
-								arguments: JSON.stringify(generated.respond),
-							},
-						]
-					: []),
-			],
-			repaired: repaired || generated.repaired,
+			toolCalls: record,
 		};
 	} catch (error) {
-		if (
-			error instanceof Error &&
-			error.message === "invalid_conversation_operation"
-		)
-			return { kind: "contract_failure", code: error.message, repaired: true };
 		if (error instanceof ValidationFailure)
-			return { kind: "contract_failure", code: error.message, repaired };
+			return { kind: "contract_failure", code: error.message };
 		throw error;
 	}
 }

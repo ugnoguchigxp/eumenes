@@ -168,40 +168,6 @@
 			}
 		},
 		{
-			"revision": 2,
-			"aliases": [],
-			"tags": [],
-			"kind": "toolchain",
-			"id": "web.research.codex",
-			"functionName": "web_research",
-			"title": "Web調査",
-			"summary": "ニュースや一般的なWeb検索、複数資料の整理を行い、見つかった情報と出典を返す",
-			"useWhen": [
-				"今日のニュースや話題を知りたい",
-				"ある話題について詳しく調べてほしい",
-				"複数の資料を比べて整理してほしい"
-			],
-			"avoidWhen": ["一つの事実の確認"],
-			"redirects": [
-				{
-					"when": "天気・株価・言葉の定義など一つの事実の確認",
-					"toolchainId": "web.search"
-				}
-			],
-			"examples": [
-				"今朝のニュースを教えて",
-				"DeepSeek harnessってなに？詳しく教えて",
-				"最近のAI関連のニュースをまとめて",
-				"EVの補助金制度を比較して"
-			],
-			"dependencies": ["package:web.search@4"],
-			"packageRevisionId": "package:web.search@4",
-			"artifact": {
-				"kind": "component",
-				"component": "ResearchTaskCard"
-			}
-		},
-		{
 			"aliases": [],
 			"tags": [],
 			"useWhen": [],
@@ -341,40 +307,6 @@
 			}
 		},
 		{
-			"revision": 3,
-			"aliases": [],
-			"tags": [],
-			"kind": "toolchain",
-			"id": "web.research.codex",
-			"functionName": "web_research",
-			"title": "Web調査",
-			"summary": "ニュースや一般的なWeb検索、複数資料の整理を行い、見つかった情報と出典を返す",
-			"useWhen": [
-				"今日のニュースや話題を知りたい",
-				"ある話題について詳しく調べてほしい",
-				"複数の資料を比べて整理してほしい"
-			],
-			"avoidWhen": ["一つの事実の確認"],
-			"redirects": [
-				{
-					"when": "天気・株価・言葉の定義など一つの事実の確認",
-					"toolchainId": "web.search"
-				}
-			],
-			"examples": [
-				"今朝のニュースを教えて",
-				"DeepSeek harnessってなに？詳しく教えて",
-				"最近のAI関連のニュースをまとめて",
-				"EVの補助金制度を比較して"
-			],
-			"dependencies": ["package:web.search@5"],
-			"packageRevisionId": "package:web.search@5",
-			"artifact": {
-				"kind": "component",
-				"component": "ResearchTaskCard"
-			}
-		},
-		{
 			"aliases": [],
 			"tags": [],
 			"useWhen": [],
@@ -508,40 +440,6 @@
 			],
 			"dependencies": ["package:web.recipe@6"],
 			"packageRevisionId": "package:web.recipe@6",
-			"artifact": {
-				"kind": "component",
-				"component": "ResearchTaskCard"
-			}
-		},
-		{
-			"revision": 4,
-			"aliases": [],
-			"tags": [],
-			"kind": "toolchain",
-			"id": "web.research.codex",
-			"functionName": "web_research",
-			"title": "Web調査",
-			"summary": "ニュースや一般的なWeb検索、複数資料の整理を行い、見つかった情報と出典を返す",
-			"useWhen": [
-				"今日のニュースや話題を知りたい",
-				"ある話題について詳しく調べてほしい",
-				"複数の資料を比べて整理してほしい"
-			],
-			"avoidWhen": ["一つの事実の確認"],
-			"redirects": [
-				{
-					"when": "天気・株価・言葉の定義など一つの事実の確認",
-					"toolchainId": "web.search"
-				}
-			],
-			"examples": [
-				"今朝のニュースを教えて",
-				"DeepSeek harnessってなに？詳しく教えて",
-				"最近のAI関連のニュースをまとめて",
-				"EVの補助金制度を比較して"
-			],
-			"dependencies": ["package:web.search@6"],
-			"packageRevisionId": "package:web.search@6",
 			"artifact": {
 				"kind": "component",
 				"component": "ResearchTaskCard"

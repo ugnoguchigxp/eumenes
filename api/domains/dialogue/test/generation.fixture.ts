@@ -14,6 +14,7 @@ import { createQueue } from "../../queue";
 import { createDialogueService } from "..";
 import type {
 	AgencyLayerPort,
+	ConversationAgentPort,
 	GoalsLayerPort,
 	StewardPort,
 	WorldContextPort,
@@ -22,6 +23,7 @@ import type { ImagePort } from "../contracts/image";
 import type { MusicPort } from "../contracts/music";
 import type { ToolchainRoutingPort } from "../contracts/toolchains";
 import type { ChatMessage } from "../service/context";
+import { testConversationAgent } from "./conversation-agent.fixture";
 import { openDialogueStore } from "./store.fixture";
 
 /** One model call as the fake saw it. */
@@ -30,23 +32,11 @@ export type Call = {
 	tools: string[];
 };
 
-/** What the fake model answers to one call: speech, tool calls, or both. */
+/** What the fake model answers to one call: plain speech, native tool calls, or both. */
 export type Step = {
 	text?: string;
 	calls?: Array<{ name: string; args: Record<string, unknown> }>;
 };
-
-/** The analysis of a request answered from hand. */
-export const CHAT = {
-	kind: "chat",
-	freshness: "not_live",
-	impact: "none",
-	approved: false,
-} as const;
-export const respond = (args: Record<string, unknown> = {}) => ({
-	name: "respond",
-	args: { ...CHAT, ...args },
-});
 
 export const IMAGE: ToolchainCard = {
 	revisionId: "toolchain:fake.image@1",
@@ -115,6 +105,8 @@ export type SetupOptions = {
 	memory?: boolean;
 	goals?: GoalsLayerPort;
 	agency?: AgencyLayerPort;
+	/** The conversation agent (default: the agency's own reply loop, see conversation-agent.fixture.ts). */
+	conversationAgent?: ConversationAgentPort;
 	worldContext?: WorldContextPort;
 	/** Queue limits (the queue's own options). */
 	queue?: Parameters<typeof createQueue>[1];
@@ -318,6 +310,7 @@ export async function setup(options: SetupOptions = {}) {
 		queue,
 		clock,
 		continuity,
+		conversationAgent: options.conversationAgent ?? testConversationAgent,
 		toolchains,
 		image,
 		...(music ? { music } : {}),

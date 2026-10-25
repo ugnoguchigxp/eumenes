@@ -19,13 +19,11 @@ const answer = (
 	),
 });
 
-test("tool checks look at the fixed tool names; respond is not a work tool", () => {
+test("tool checks look at the fixed tool names", () => {
 	expect(
 		runCheck({ kind: "tool_called" }, answer("", ["find_toolchain"])).pass,
 	).toBe(true);
-	expect(runCheck({ kind: "tool_called" }, answer("", ["respond"])).pass).toBe(
-		false,
-	);
+	expect(runCheck({ kind: "tool_called" }, answer("はい")).pass).toBe(false);
 	expect(
 		runCheck({ kind: "tool_called", name: "work" }, answer("", ["memory"]))
 			.pass,
@@ -33,9 +31,7 @@ test("tool checks look at the fixed tool names; respond is not a work tool", () 
 	expect(
 		runCheck({ kind: "tool_called", name: "work" }, answer("", ["work"])).pass,
 	).toBe(true);
-	expect(
-		runCheck({ kind: "tool_not_called" }, answer("はい", ["respond"])).pass,
-	).toBe(true);
+	expect(runCheck({ kind: "tool_not_called" }, answer("はい")).pass).toBe(true);
 	expect(
 		runCheck({ kind: "tool_not_called" }, answer("", ["find_toolchain"])).pass,
 	).toBe(false);
@@ -74,26 +70,7 @@ test("delegation checks read the delegate call's mode and toolchain", () => {
 	);
 });
 
-test("respond_field reads the analysis of the last respond call; speaks and silent read the text", () => {
-	const respond = answer("はい。", [
-		["respond", { kind: "chat", freshness: "not_live", approved: false }],
-	]);
-	expect(
-		runCheck({ kind: "respond_field", field: "kind", equals: "chat" }, respond)
-			.pass,
-	).toBe(true);
-	expect(
-		runCheck(
-			{ kind: "respond_field", field: "approved", equals: true },
-			respond,
-		).pass,
-	).toBe(false);
-	const without = runCheck(
-		{ kind: "respond_field", field: "kind", equals: "chat" },
-		answer("はい。"),
-	);
-	expect(without.pass).toBe(false);
-	expect(without.reason).toContain("no respond call");
+test("speaks and silent read the text", () => {
 	expect(runCheck({ kind: "speaks" }, answer("はい。")).pass).toBe(true);
 	expect(runCheck({ kind: "speaks" }, answer("  ")).pass).toBe(false);
 	expect(runCheck({ kind: "silent" }, answer("")).pass).toBe(true);

@@ -185,7 +185,6 @@ export function dispatchInTransaction(
 					route: runtime.route,
 					request,
 					packageRevisionId,
-					researcher: runtime.researcher,
 				},
 				{ parentJobId: input.jobId },
 			);

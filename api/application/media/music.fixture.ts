@@ -4,7 +4,6 @@ import { createHash } from "node:crypto";
 import { createLarmPlayground, type LarmPort } from "../../domains/larm";
 import { png } from "./image.fixture";
 import {
-	activeSlots,
 	answerUtterance,
 	handOver,
 } from "./conversation-turn.fixture";
@@ -217,14 +216,7 @@ export function musicFixture(
 				const plan = JSON.stringify(fixtureOptions.plan ?? musicTestPlan);
 				return mode === "correctable-plan" ? plan.slice(0, -1) + ",}" : plan;
 			}
-			stages.push("answer");
-			const result = activeSlots(messages).at(-1)?.result as
-				| { state?: string }
-				| undefined;
-			if (!result) throw new Error("music_result_missing");
-			return result.state === "completed"
-				? "楽曲ができました。"
-				: "楽曲を生成できませんでした。";
+			throw new Error("fixture_unexpected_model_call");
 		},
 	};
 	return { model, gateway, requests, stages, audio, artwork };

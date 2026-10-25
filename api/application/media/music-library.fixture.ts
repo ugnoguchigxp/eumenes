@@ -1,7 +1,6 @@
 import { readFileSync } from "node:fs";
 import { createLarmPlayground, type LarmPort } from "../../domains/larm";
 import {
-	activeSlots,
 	answerUtterance,
 	handOver,
 } from "./conversation-turn.fixture";
@@ -170,13 +169,7 @@ export function musicLibraryFixture(correctablePlan = false) {
 				const plan = JSON.stringify(playbackPlan);
 				return correctablePlan ? plan.slice(0, -1) + ",}" : plan;
 			}
-			stages.push("answer");
-			const result = activeSlots(messages).at(-1)?.result as
-				| { state?: string }
-				| undefined;
-			return result?.state === "completed"
-				? "保存曲のプレイリストを開きました。"
-				: "保存曲を取得できませんでした。";
+			throw new Error("fixture_unexpected_model_call");
 		},
 	};
 	return {

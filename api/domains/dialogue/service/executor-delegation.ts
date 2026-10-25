@@ -173,7 +173,6 @@ export async function handOver(
 			delegated: true,
 			...(committed.workId ? { todo: committed.workId } : {}),
 		},
-		basis: "delegated",
 		end: true,
 	};
 }
@@ -211,7 +210,7 @@ export function confirm(
 		});
 		return {
 			result: { confirmation: row.id, expiresAt: row.expiresAt },
-			basis: "confirmation",
+			confirmation: true,
 		};
 	});
 }

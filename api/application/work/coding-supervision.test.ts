@@ -1,3 +1,4 @@
+import { testConversationAgent } from "../../domains/dialogue/test/conversation-agent.fixture";
 import { createContinuityService } from "../../domains/continuity";
 import { expect, test } from "bun:test";
 import { z } from "zod";
@@ -176,6 +177,7 @@ test("HTTP/client authenticate report and supervisor reads and omit private CLI 
 		close: async () => {},
 	};
 	const dialogue = createDialogueService({
+		conversationAgent: testConversationAgent,
 			store: h.store,
 			continuity: createContinuityService(h.store),
 			queue: h.queue,

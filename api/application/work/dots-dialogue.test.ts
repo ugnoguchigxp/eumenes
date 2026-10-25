@@ -1,10 +1,11 @@
+import { testConversationAgent } from "../../domains/dialogue/test/conversation-agent.fixture";
 import { createContinuityService } from "../../domains/continuity";
 import { afterEach, expect, test } from "bun:test";
 import type { InferencePort, Receipt } from "../../domains/inference";
 import { createDialogueService } from "../../domains/dialogue";
 import {
 	callsOf,
-	isResultRound,
+	isNoticeRound,
 	isUtteranceRound,
 	searchThenDelegate,
 } from "../toolchain/conversation-script.fixture";
@@ -22,8 +23,7 @@ afterEach(async () => {
 test("conversation hands the request to the delegation toolchain, whose sub-agent builds the command", async () => {
 	const f = await dotsFixture();
 	clean.push(f.close);
-	let calls = 0,
-		analyses = 0;
+	let analyses = 0;
 	const messages: Array<Parameters<InferencePort["answer"]>[0]> = [];
 	const commandMessages: Array<Parameters<InferencePort["answer"]>[0]> = [];
 	const larm = {
@@ -41,12 +41,10 @@ test("conversation hands the request to the delegation toolchain, whose sub-agen
 			_p: unknown,
 			tools: unknown,
 		) => {
-			if (
-				isUtteranceRound(tools as never) &&
-				!isResultRound(history as never)
-			) {
+			if (isUtteranceRound(tools as never) && !isNoticeRound(history as never)) {
 				// The conversation's round: a search for the delegation toolchain, then the hand-over of the request.
 				analyses++;
+				messages.push(history);
 				const step = searchThenDelegate(
 					(candidate) => candidate.id === "dots.delegate",
 					"プロジェクトの変更を実装。tests passで完了",
@@ -62,17 +60,7 @@ test("conversation hands the request to the delegation toolchain, whose sub-agen
 					toolCalls: callsOf(step, () => crypto.randomUUID()),
 				} as Receipt;
 			}
-			messages.push(history);
-			calls++;
-			const r: Receipt = {
-				requestId: "request",
-				attemptId: String(calls),
-				value: "",
-			};
-			// The hand-over was the conversation's own call; the one call left is the result phase's reply.
-			r.value = "作業を受け付けました。";
-			delta(r.value as string);
-			return r;
+			throw new Error("unexpected_conversation_call");
 		},
 		captureControlInTransaction: () => "control",
 		executeControl: async (
@@ -100,6 +88,7 @@ test("conversation hands the request to the delegation toolchain, whose sub-agen
 		validateReceiptInTransaction: () => true,
 	} as unknown as InferencePort;
 	const dialogue = createDialogueService({
+		conversationAgent: testConversationAgent,
 		store: f.store,
 		continuity: createContinuityService(f.store),
 		conversation: f.conversation,
@@ -123,15 +112,18 @@ test("conversation hands the request to the delegation toolchain, whose sub-agen
 	f.queue.start();
 	const done = await dialogue.waitForTerminal(run.id, { timeoutMs: 3000 });
 	expect(done).toMatchObject({ status: "completed" });
-	// The search and the hand-over (conversation), then the result phase's reply.
+	// The search and the hand-over (conversation); the finished work is the agency's to report.
 	expect(analyses).toBe(2);
-	expect(calls).toBe(1);
-	// The result phase carries the start operation's receipt as the TODO's result (registered in Eumenes).
-	expect(JSON.stringify(messages[0])).toContain("registered_in_eumenes");
+	// The TODO's result is the start operation's receipt (registered in Eumenes).
+	expect(
+		JSON.stringify(
+			f.store.read((db) => dialogue.todosInTransaction(db, "conversation")),
+		),
+	).toContain("registered_in_eumenes");
 	// The sub-agent loaded the toolchain's set and the catalog; the conversation did not.
 	expect(commandMessages).toHaveLength(1);
 	expect(JSON.stringify(commandMessages[0])).toContain("dots.start");
-	expect(JSON.stringify(messages[0])).not.toContain("delegationCatalog");
+	expect(JSON.stringify(messages)).not.toContain("delegationCatalog");
 	const work = f.tasks.list({ conversationId: "conversation", limit: 50 });
 	expect(work.items).toHaveLength(1);
 	expect(work.items[0]!.state).toBe("queued");

@@ -612,6 +612,20 @@ test("a missing log still gives the overview from the run's own state", async ()
 	}
 });
 
+test("an interrupted run, which ended without an answer, is reported like a failure", async () => {
+	const s = await scenario({
+		status: "interrupted",
+		error: "worker_lost",
+		noLog: true,
+	});
+	try {
+		const text = (await s.report()) as string;
+		expect(text).toContain("- 結果: interrupted / worker_lost");
+	} finally {
+		await s.close();
+	}
+});
+
 test("only fixed fields and identifier-like values are printed; text, settings and unknown fields never are", async () => {
 	const secret = "ユーザーの依頼文とAPIキー sk-secret";
 	const s = await scenario({

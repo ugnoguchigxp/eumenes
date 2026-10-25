@@ -3,7 +3,6 @@ import { resolve, join } from "node:path";
 import { loadEvaluationCases } from "../api/application/toolchain/llm-native-evaluation.fixture";
 import { evaluateRequirements } from "../api/application/toolchain/llm-native-runner.fixture";
 import { createLiveLarm } from "./live-larm";
-import { createCodexResearch } from "../api/domains/inference";
 import { chooseSpeechDelivery } from "../api/domains/delivery";
 const args = process.argv.slice(2);
 const option = (name: string, fallback: string) => {
@@ -50,19 +49,7 @@ casesLoop: for (const c of selected) {
 			await port.connect();
 			let result: Record<string, unknown>;
 			if (c.suite === "requirements") {
-				const codex =
-					c.engine === "codex" ? createCodexResearch(process.env) : undefined;
-				if (c.engine === "codex" && !codex) {
-					results.push({
-						caseId: c.id,
-						repeat,
-						status: "skipped",
-						safeCode: "codex_research_unavailable",
-						semanticChecks: "unchecked",
-					});
-					continue;
-				}
-				const evaluated = await evaluateRequirements(c, profiles, port, codex);
+				const evaluated = await evaluateRequirements(c, profiles, port);
 				result = {
 					...evaluated,
 					status: evaluated.structureMatched

@@ -11,6 +11,7 @@ import type { ContextGoalEntry } from "../../contracts";
 import type { DialogueDeps } from "../../service/context";
 import { createPrepare } from "../../service/generation-prepare";
 import { createWorkLedger } from "../../service/work-ledger";
+import { evalConversationAgent } from "./conversation-agent";
 import type { EvalCard, Persona, SeedWiring } from "./session-types";
 
 const REF = /^@([A-Za-z0-9_-]+)$/;
@@ -95,11 +96,10 @@ export function createSessionContext(
 			adoptedForContextInTransaction: () => ports.goals,
 			existingInTransaction: () => new Set(ports.goals.map((g) => g.goalId)),
 		},
+		conversationAgent: evalConversationAgent,
 		agency: {
-			recentForContextInTransaction: () =>
-				ports.interests.length
-					? { utterances: [], interests: ports.interests }
-					: null,
+			stateForContextInTransaction: () => ports.interests,
+			workChangedInTransaction: () => {},
 		},
 		worldContext: {
 			knownNamesInTransaction: () => ports.worldNames,

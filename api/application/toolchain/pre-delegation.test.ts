@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { harness } from "./toolchain.fixture";
 import { waitFor } from "../../infrastructure/wait-for";
 
-test("research announces before the worker, retains the notice over API reads, then returns an answer", async () => {
+test("research announces before the worker, retains the notice over API reads, then finishes without a reply of its own", async () => {
 	const h = await harness();
 	let stop = () => {};
 	try {
@@ -21,8 +21,10 @@ test("research announces before the worker, retains the notice over API reads, t
 		expect(observations[0]).toBe(0);
 		const final = await (await h.request(`/api/runs/${run.id}`)).json();
 		expect(final.announcement).toBe("お調べします。");
-		expect(h.dialogue.answerText(run.id)).toContain("晴れ");
-		expect(h.conversation.get("main").messages).toHaveLength(2);
+		// The agency reports the finished research; the run has no reply.
+		expect(h.dialogue.answerText(run.id)).toBeNull();
+		expect(h.reported()).toContain("晴れ");
+		expect(h.conversation.get("main").messages).toHaveLength(1);
 		expect(h.workerContexts.length).toBeGreaterThan(0);
 	} finally {
 		stop();
@@ -34,7 +36,6 @@ for (const notice of ["お調べします。", "お調べします"])
 	test(`voice waits for notice playback: ${notice}`, async () => {
 		const h = await harness({
 			announcement: notice,
-			parentAnswer: "東京は晴れです。",
 			voiceText: "東京の天気を調べて",
 		});
 		try {
@@ -63,7 +64,9 @@ for (const notice of ["お調べします。", "お調べします"])
 			);
 			await waitFor(
 				() =>
-					["ready", "failed"].includes(h.voice.get(utterance)?.status ?? ""),
+					["played", "completed", "failed"].includes(
+						h.voice.get(utterance)?.status ?? "",
+					),
 				{ timeout: 2000 },
 			).catch(() => {
 				throw new Error(
@@ -71,11 +74,11 @@ for (const notice of ["お調べします。", "お調べします"])
 				);
 			});
 			const turn = h.voice.get(utterance)!;
-			expect(turn.status).toBe("ready");
-			expect(h.spoken[0]).toBe(notice);
-			expect(h.spoken.filter((text) => text === notice)).toHaveLength(1);
-			expect(h.spoken.join("")).toContain("晴れ");
-			expect(h.dialogue.answerText(turn.runId!)!).not.toContain(notice);
+			expect(turn.status).toBe("played");
+			// The notice is the only speech of the turn; the finished research is the agency's to report.
+			expect(h.spoken).toEqual([notice]);
+			expect(h.dialogue.answerText(turn.runId!)).toBeNull();
+			expect(h.reported()).toContain("晴れ");
 		} finally {
 			await h.close();
 		}

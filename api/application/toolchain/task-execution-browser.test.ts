@@ -3,7 +3,6 @@ import { expect, test } from "bun:test";
 import { harness } from "./toolchain.fixture";
 import {
 	afterUtterance,
-	respond,
 	toolResults,
 } from "./conversation-script.fixture";
 import { handOverTask } from "./task-delegation.fixture";
@@ -98,13 +97,12 @@ test("one public request searches, passes the exact result URL to a browser chil
 	const requestedURLs: string[] = [];
 	const h = await harness({
 		everyday: true,
-		fullResearch: true,
 
 		discoveryTarget: (query) =>
 			query === "operate browser"
 				? "browser_operate"
 				: query === "find a nature video"
-					? "web_research"
+					? "web_search"
 					: "execute_task",
 		firstRound: (_tools, _question, messages) =>
 			handOverTask(
@@ -209,7 +207,7 @@ test("one public request searches, passes the exact result URL to a browser chil
 				};
 			if (parentCalls === 2)
 				return {
-					name: "web_research",
+					name: "web_search",
 					arguments: {
 						stepRef: taskItem(packet),
 						contextRefs: [],
@@ -406,10 +404,7 @@ test("a browser approval resumes in a new physical task, keeps the old deadline,
 					],
 				};
 			}
-			return {
-				text: "確認を受けて続けます。",
-				calls: [respond({ kind: "action", impact: "none" })],
-			};
+			return { text: "確認を受けて続けます。" };
 		},
 		command: (messages) => {
 			translations++;

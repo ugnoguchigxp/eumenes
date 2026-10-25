@@ -65,6 +65,7 @@ export function createLeaseManager({
 	audience,
 	client,
 	idleTimeoutMs,
+	keepAlive = false,
 	hostsFor,
 	control,
 	lifetime,
@@ -75,6 +76,8 @@ export function createLeaseManager({
 	audience: string;
 	client: string;
 	idleTimeoutMs: number;
+	/** The connection is held while the port is open, as LARM's input cache lives on it (not only while a screen shows). */
+	keepAlive?: boolean;
 	hostsFor: () => ProviderHosts;
 	control: Control;
 	/** Aborted when the port closes. */
@@ -102,6 +105,7 @@ export function createLeaseManager({
 		if (current.useCount > 0 && !force) return;
 		if (lease === current) lease = undefined;
 		notify();
+		if (current.kept) return;
 		try {
 			await releaseConnection(current, control);
 		} catch {
@@ -320,9 +324,10 @@ export function createLeaseManager({
 			if (lease && !closed) scheduleIdle(lease);
 		},
 	);
+	if (keepAlive) retention.set(true);
 	return {
 		retain(active: boolean) {
-			if (!closed) retention.set(active);
+			if (!closed) retention.set(active || keepAlive);
 		},
 		status,
 		connect,
@@ -330,8 +335,11 @@ export function createLeaseManager({
 		/** The lease in use now, if any. */
 		current: () => lease,
 		onChange: changes.onChange,
-		/** Ends the port: `beforeRelease` stops the work that still borrows the lease. */
-		async close(beforeRelease: () => Promise<void>) {
+		/**
+		 * Ends the port: `beforeRelease` stops the work that still borrows the lease. `keepConnection` leaves the
+		 * connection to LARM's expiry, so a restarted host with the same client gets it back with its input cache.
+		 */
+		async close(beforeRelease: () => Promise<void>, keepConnection = false) {
 			closed = true;
 			retention.set(false);
 			clearTimeout(lease?.idleTimer);
@@ -340,6 +348,8 @@ export function createLeaseManager({
 			if (connecting) await connecting.catch(() => {});
 			if (lease) {
 				const current = lease;
+				// Marked first: a call still running when the drain ends must not release it either.
+				if (keepConnection) current.kept = true;
 				await drainLease(current);
 				await release(current, true);
 			}

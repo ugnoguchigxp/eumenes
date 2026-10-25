@@ -226,7 +226,7 @@ const seedSchema = z
 		/** Known World targets this turn's wording mentions (names only, as the production hint shows them). */
 		world: z.array(z.object({ name: text }).strict()).optional(),
 		notices: z.array(text).optional(),
-		/** What the agency shows besides its own utterances (those are events). */
+		/** The state lines the conversation agent shows in `now.agency`. */
 		agencyInterests: z.array(text).optional(),
 		/** The model window in tokens; absent: the reference window. A small one forces re-construction. */
 		modelWindow: z.number().int().min(1000).optional(),
@@ -234,18 +234,11 @@ const seedSchema = z
 	.strict();
 export type Seed = z.infer<typeof seedSchema>;
 
-const FIELD_NAMES = [
-	"kind",
-	"freshness",
-	"impact",
-	"approved",
-	"unavailable",
-] as const;
 /** Deterministic checks (section 21.2). No word-list semantic judging. */
 const checkSchema = z.discriminatedUnion("kind", [
 	/** The model called a fixed tool (a specific one when `name` is given). */
 	z.object({ kind: z.literal("tool_called"), name: text.optional() }).strict(),
-	/** No tool but `respond` was called (with `name`: that tool was not called). */
+	/** No tool was called (with `name`: that tool was not called). */
 	z
 		.object({ kind: z.literal("tool_not_called"), name: text.optional() })
 		.strict(),
@@ -254,14 +247,6 @@ const checkSchema = z.discriminatedUnion("kind", [
 		.object({ kind: z.literal("delegated"), toolchain: text.optional() })
 		.strict(),
 	z.object({ kind: z.literal("not_delegated") }).strict(),
-	/** A value of the `respond` analysis (section 6.3). */
-	z
-		.object({
-			kind: z.literal("respond_field"),
-			field: z.enum(FIELD_NAMES),
-			equals: z.union([z.string(), z.boolean()]),
-		})
-		.strict(),
 	/** The generation decided to say something / nothing. */
 	z.object({ kind: z.literal("speaks") }).strict(),
 	z.object({ kind: z.literal("silent") }).strict(),

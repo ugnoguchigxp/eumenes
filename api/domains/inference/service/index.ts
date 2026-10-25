@@ -5,14 +5,11 @@ import { createUsageReader } from "./usage";
 import { createVoiceAccess } from "./voice-access";
 import { createVoiceBinding } from "./voice-binding";
 import { bindControlPolicy } from "./control-policy";
-import {
-	captureBackgroundControl,
-	routeToResource,
-} from "./background-control";
+import { captureBackgroundControl } from "./background-control";
 import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import type { LarmPort } from "../../larm";
-import { createConfiguredLarm } from "./configured-larm";
+import { createConfiguredLarm, stableLarmClient } from "./configured-larm";
 import { createScreenPresence } from "./screen-presence";
 import type { SpeechPreparation } from "../../delivery/contracts";
 import type { SettingsService, Settings, Purpose } from "../../settings";
@@ -26,7 +23,7 @@ import type {
 	SpeechOverride,
 	BackgroundControl,
 } from "../contracts";
-import { get, bindControlEngine } from "../repository";
+import { get } from "../repository";
 import { snapshotPort } from "./snapshot-port";
 import { executeRequest as runRequest } from "./execute";
 import type {
@@ -112,7 +109,22 @@ export function createInference(
 				ports.delete(name);
 				statusSubscriptions.get(name)?.();
 				statusSubscriptions.delete(name);
-				const done = p.close();
+				// Ports differing only in voice settings share one connection (one client): it stays for the others.
+				const client = (larm: Settings["larm"]) =>
+					stableLarmClient(settings.derivedKey("larm.client"), larm);
+				const shared =
+					options.keepLarmConnection &&
+					client(JSON.parse(name) as Settings["larm"]) !== undefined &&
+					[
+						settings.get().larm,
+						...[...ports.keys()].map(
+							(other) => JSON.parse(other) as Settings["larm"],
+						),
+					].some(
+						(other) =>
+							client(other) === client(JSON.parse(name) as Settings["larm"]),
+					);
+				const done = p.close(shared ? { keepConnection: true } : undefined);
 				closingPorts.add(done);
 				void done.finally(() => closingPorts.delete(done)).catch(() => {});
 			}
@@ -122,7 +134,13 @@ export function createInference(
 		const key = JSON.stringify(s.larm);
 		let p = ports.get(key);
 		if (!p) {
-			p = options.larmFactory?.(s) ?? createConfiguredLarm(s, options);
+			p =
+				options.larmFactory?.(s) ??
+				createConfiguredLarm(
+					s,
+					options,
+					stableLarmClient(settings.derivedKey("larm.client"), s.larm),
+				);
 			ports.set(key, p);
 			const unsubscribeStatus = p.onChange?.(() => {
 				if (key !== JSON.stringify(settings.get().larm)) return;
@@ -292,13 +310,9 @@ export function createInference(
 				policySubject: string;
 				deadline: number;
 				maxOutputTokens: number;
-				engine?: "codex";
-				route?: "larm-only" | { resourceId: string };
 				attemptMs?: number;
 			},
 		) {
-			if (input.engine && (input.engine !== "codex" || !options.codexResearch))
-				throw new Error("codex_research_unavailable");
 			const policy = db
 				.query(
 					"SELECT id FROM inference_requests WHERE subject=? AND purpose='llm'",
@@ -307,12 +321,8 @@ export function createInference(
 			const root = policy ? get(db, policy.id) : null;
 			if (!root || !allowed(db, root)) throw new Error("permission_revoked");
 			const snapshot = structuredClone(root.snapshot);
-			if (input.route && input.route !== "larm-only")
-				routeToResource(snapshot, input.route.resourceId, input.subject);
-			else {
-				snapshot.routes.llm.mode = "larm-only";
-				snapshot.routes.llm.cloudAllowed = false;
-			}
+			snapshot.routes.llm.mode = "larm-only";
+			snapshot.routes.llm.cloudAllowed = false;
 			const requestId = capture(
 				db,
 				input.subject,
@@ -320,7 +330,6 @@ export function createInference(
 				Math.min(input.deadline, root.deadline),
 				snapshot,
 			);
-			bindControlEngine(db, requestId, input.engine);
 			bindControlPolicy(db, requestId, root.id);
 			db.query(
 				"UPDATE inference_requests SET mode='control',output_limit=?,attempt_ms=?,context_policy='exact',parents=? WHERE id=? AND status='pending'",
@@ -350,7 +359,6 @@ export function createInference(
 				throw new Error("invalid_control_request");
 			return runControl(env, id, messages, signal, control, session);
 		},
-		codexResearchAvailable: () => !!options.codexResearch,
 		setContextPolicyInTransaction(
 			db: Database,
 			requestId: string,
@@ -577,7 +585,14 @@ export function createInference(
 			probes.abortAll();
 			await Promise.all(pending.map((a) => a.done));
 			await probes.settled();
-			await Promise.all([...ports.values()].map((p) => p.close()));
+			// A restarted host gets its connections back with their input cache (see `keepLarmConnection`).
+			await Promise.all(
+				[...ports.values()].map((p) =>
+					p.close(
+						options.keepLarmConnection ? { keepConnection: true } : undefined,
+					),
+				),
+			);
 			await Promise.allSettled(closingPorts);
 		},
 	} satisfies InferencePort & Record<string, unknown>;

@@ -1,3 +1,4 @@
+import { testConversationAgent } from "../../domains/dialogue/test/conversation-agent.fixture";
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -249,6 +250,7 @@ export async function worldHarness(options: WorldFixtureOptions = {}) {
 	const changes = createChanges();
 	const unsubscribe = store.onCommit(() => changes.publish());
 	const dialogue = createDialogueService({
+		conversationAgent: testConversationAgent,
 		store,
 		continuity: createContinuityService(store),
 		conversation,

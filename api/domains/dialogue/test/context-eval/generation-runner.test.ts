@@ -83,57 +83,38 @@ const run = async (m: Materialized, steps: Step[]) => {
 	});
 	return { outcome, ...model };
 };
-const chat = {
-	kind: "chat",
-	freshness: "not_live",
-	impact: "none",
-	approved: false,
-};
-
-test("a spoken answer with its analysis ends the generation, with the respond call recorded", async () => {
+test("a spoken answer is plain text and ends the generation in one round, with no tool call recorded", async () => {
 	const { outcome, rounds } = await run(await prepared(), [
-		{ text: "こんにちは。", calls: [["respond", chat]] },
+		{ text: "こんにちは。" },
 	]);
 	expect(outcome).toEqual({
 		kind: "ok",
 		text: "こんにちは。",
-		toolCalls: [{ name: "respond", arguments: JSON.stringify(chat) }],
-		repaired: false,
+		toolCalls: [],
 	});
 	expect(rounds()).toBe(1);
 });
 
-test("an answer to an utterance without its analysis is repaired once: the diagnostics go before the newest message", async () => {
-	const { outcome, seen } = await run(await prepared(), [
-		{ text: "こんにちは。" },
-		{ text: "こんにちは。", calls: [["respond", chat]] },
-	]);
-	expect(outcome).toMatchObject({ kind: "ok", repaired: true });
-	const second = seen[1]!;
-	expect(second.at(-1)!.content).toBe("こんにちは");
-	expect(second.at(-2)!.content).toContain("UNTRUSTED_REJECTED_OUTPUT");
-	// The system part and the document are not touched by the repair.
-	expect(second[0]).toEqual(seen[0]![0]!);
-	expect(second[1]).toEqual(seen[0]![1]!);
-});
-
-test("a contract the model does not meet after the one repair is a contract failure, not a transport error", async () => {
-	const { outcome } = await run(await prepared(), [{ text: "こんにちは。" }]);
-	expect(outcome).toEqual({
-		kind: "contract_failure",
-		code: "invalid_conversation_operation",
-		repaired: true,
-	});
-});
-
-test("a generation without an utterance owes no analysis and may stay silent", async () => {
+test("a generation without an utterance may stay silent", async () => {
 	const { outcome } = await run(await prepared(null), [{ text: "" }]);
 	expect(outcome).toEqual({
 		kind: "ok",
 		text: "",
 		toolCalls: [],
-		repaired: false,
 	});
+});
+
+test("the prepared messages lead every round, and the agent's system text is the agency's own", async () => {
+	const m = await prepared("明日の天気を調べて");
+	const { seen } = await run(m, [
+		{ calls: [["find_toolchain", { query: "天気" }]] },
+		{ text: "見つかりませんでした。" },
+	]);
+	expect(seen).toHaveLength(2);
+	expect(seen[1]!.slice(0, m.input.messages.length)).toEqual(seen[0]!);
+	// The agency's reply rules (not the retired classification) are the first part of the system message.
+	expect(seen[0]![0]!.content).not.toContain("respond");
+	expect(m.input.messages[0]!.content).toBe(seen[0]![0]!.content);
 });
 
 test("a search then a delegation to what it offered hands the work over: the announcement is what is heard", async () => {
@@ -153,7 +134,7 @@ test("a search then a delegation to what it offered hands the work over: the ann
 				],
 			],
 		},
-		{ text: "ここには来ない", calls: [["respond", chat]] },
+		{ text: "ここには来ない" },
 	]);
 	expect(outcome).toMatchObject({ kind: "ok", text: "お調べします。" });
 	if (outcome.kind !== "ok") throw new Error("unreachable");
@@ -165,7 +146,7 @@ test("a search then a delegation to what it offered hands the work over: the ann
 	expect(rounds()).toBe(2);
 });
 
-test("a delegation the host refuses is repaired: a toolchain nobody offered, a missing announcement, a change without confirmation", async () => {
+test("a delegation the host refuses is answered with its reason and the reply goes on: a toolchain nobody offered, a missing announcement, a change without confirmation", async () => {
 	const delegate = (args: Record<string, unknown>): Step => ({
 		calls: [
 			[
@@ -181,69 +162,79 @@ test("a delegation the host refuses is repaired: a toolchain nobody offered, a m
 			],
 		],
 	});
-	const refusals = [
-		delegate({}),
-		delegate({ announcement: undefined }),
-		delegate({ impact: "modify_existing" }),
+	const search: Step = { calls: [["find_toolchain", { query: "調べる" }]] };
+	// Nothing was searched in the first, so the toolchain was never offered.
+	const refusals: Array<[Step[], string]> = [
+		[[delegate({})], "toolchain_not_offered"],
+		[[search, delegate({ announcement: undefined })], "announcement_required"],
+		[
+			[search, delegate({ impact: "modify_existing" })],
+			"confirmation_required",
+		],
 	];
-	for (const refused of refusals) {
+	for (const [before, code] of refusals) {
 		const m = await prepared("調べて");
 		const { outcome, seen } = await run(m, [
-			// Nothing was searched, so the toolchain was never offered (and the others are refused on their own).
-			refused,
-			{ text: "お答えします。", calls: [["respond", chat]] },
+			...before,
+			{ text: "お答えします。" },
 		]);
-		expect(outcome).toMatchObject({ kind: "ok", repaired: true });
+		expect(outcome).toMatchObject({ kind: "ok", text: "お答えします。" });
+		const tool = seen.at(-1)!.filter((message) => message.role === "tool");
+		expect(JSON.parse(tool.at(-1)!.content)).toMatchObject({ refused: true });
+		expect(tool.at(-1)!.content).toContain(code);
 		expect(
-			seen[1]!.some((m) => m.content.includes("UNTRUSTED_REJECTED_OUTPUT")),
-		).toBe(true);
+			seen
+				.at(-1)!
+				.some((message) =>
+					message.content.includes("UNTRUSTED_REJECTED_OUTPUT"),
+				),
+		).toBe(false);
 	}
 });
 
-test("a confirmation is issued without executing, and a live answer needs a basis the generation settled", async () => {
+test("a change is refused without its confirmation; the confirmation is issued without executing", async () => {
 	const m = await prepared("設定を書き換えて");
 	const search: Step = { calls: [["find_toolchain", { query: "コード" }]] };
-	const { outcome } = await run(m, [
-		search,
-		{
-			calls: [
-				[
-					"delegate",
-					{
-						mode: "confirm",
-						toolchain: "web_research",
-						request: "設定を書き換える",
-						announcement: "設定を書き換えてよいですか。",
-						impact: "modify_existing",
-					},
-				],
+	const call = (mode: string): Step => ({
+		calls: [
+			[
+				"delegate",
+				{
+					mode,
+					toolchain: "web_research",
+					request: "設定を書き換える",
+					announcement: "設定を書き換えてよいですか。",
+					impact: "modify_existing",
+				},
 			],
-		},
-		{
-			text: "設定を書き換えてよいですか。",
-			calls: [["respond", { ...chat, impact: "modify_existing" }]],
-		},
+		],
+	});
+	const { outcome, seen } = await run(m, [
+		search,
+		call("execute"),
+		call("confirm"),
+		{ text: "設定を書き換えてよいですか。" },
 	]);
-	expect(outcome).toMatchObject({ kind: "ok", repaired: false });
-	// A live answer without a delegation, an instant answer or a result in the window has no basis.
-	const live = {
-		kind: "live_info",
-		freshness: "live",
-		impact: "none",
-		approved: false,
-	};
-	const bare = await run(await prepared("今の天気は？"), [
-		{ text: "晴れです。", calls: [["respond", live]] },
-		{ text: "晴れです。", calls: [["respond", live]] },
+	expect(outcome).toMatchObject({
+		kind: "ok",
+		text: "設定を書き換えてよいですか。",
+	});
+	const results = seen
+		.at(-1)!
+		.filter((message) => message.role === "tool")
+		.map((message) => JSON.parse(message.content) as Record<string, unknown>);
+	expect(results[1]).toMatchObject({ refused: true });
+	expect(results[2]).toMatchObject({ confirmation: "eval-confirmation" });
+});
+
+test("control text in the speech is a contract failure, not a transport error", async () => {
+	const { outcome } = await run(await prepared(), [
+		{ text: 'delegate({"mode":"execute"})' },
 	]);
-	expect(bare.outcome).toMatchObject({ kind: "contract_failure" });
-	const declined = await run(await prepared("今の天気は？"), [
-		{
-			text: "お伝えできません。",
-			calls: [["respond", { ...live, unavailable: true }]],
-		},
-	]);
-	expect(declined.outcome).toMatchObject({ kind: "ok", repaired: false });
+	expect(outcome).toEqual({
+		kind: "contract_failure",
+		code: "control_text_in_body",
+	});
 });
 
 test("the offline search ranks the catalog by shared character pairs, best first, at most four", () => {

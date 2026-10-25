@@ -187,17 +187,6 @@ for (const [blocked, empty, uncollected] of [
 					},
 				};
 			},
-			parent: async (messages) => {
-				// The result phase's document carries the finished search as the TODO's result (the report).
-				const document = JSON.parse(
-					messages.find((m) => m.role === "user" && m.content.startsWith("{"))!
-						.content,
-				) as { active: Array<{ result?: Record<string, any> }> };
-				const report = [...document.active]
-					.reverse()
-					.find((entry) => entry.result)!.result!;
-				return `${fallback ? "サイト内検索が利用できず外部検索で見つけた" : "サイト内で見つけた"}本文未確認の[候補](<${report.candidateResults[0].url}>)です。`;
-			},
 		});
 		try {
 			await h.toolchain.capabilities.seed();
@@ -211,11 +200,13 @@ for (const [blocked, empty, uncollected] of [
 			const { id } = await response.json();
 			const run = (await h.dialogue.waitForTerminal(id, { timeoutMs: 5000 }))!;
 			expect(run.status).toBe("completed");
-			const answer = h.conversation.message(run.answerMessageId!)!.text;
-			expect(answer).toContain(
+			// The agency reports the finished TODO: its result names the candidates and that no page was read.
+			expect(run.answerMessageId).toBeNull();
+			const reported = h.reported("service");
+			expect(reported).toContain(
 				fallback ? "watch?v=external" : "watch?v=native",
 			);
-			expect(answer).toContain("本文未確認");
+			expect(reported).toContain("本文未確認");
 			expect(queries).toEqual(fallback ? ["python3 youtube.com"] : []);
 			expect(guarded).toBe(fallback ? 0 : 1);
 			const worker = h.toolchain.agents

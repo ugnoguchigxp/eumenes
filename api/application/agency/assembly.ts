@@ -24,7 +24,9 @@ export function assembleAgency(
 	},
 	dialogue: () => Pick<
 		DialogueService,
-		"conversationHasActiveRunInTransaction" | "recordSpontaneousInTransaction"
+		| "conversationHasActiveRunInTransaction"
+		| "recordSpontaneousInTransaction"
+		| "archiveReportedInTransaction"
 	>,
 ) {
 	const { store, inference } = deps;
@@ -34,6 +36,8 @@ export function assembleAgency(
 			dialogue().conversationHasActiveRunInTransaction(db, conversationId),
 		recordSpokeInTransaction: (db, input) =>
 			dialogue().recordSpontaneousInTransaction(db, input),
+		archiveReportedInTransaction: (db, input) =>
+			dialogue().archiveReportedInTransaction(db, input),
 		createLlm: (next) =>
 			createAgencyLlmPort({
 				store,

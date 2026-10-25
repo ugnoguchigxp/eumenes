@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { IMAGE, respond, setup, type Harness } from "./specialist.fixture";
+import { IMAGE, setup, type Harness } from "./specialist.fixture";
 
 const open: Harness[] = [];
 afterEach(async () => {
@@ -18,9 +18,8 @@ const invoke = (title: string) => ({
 	tool: "draft.apply",
 	arguments: { title },
 });
-const chat = respond();
 const main = (h: Harness, ...texts: string[]) =>
-	h.state.steps.push(...texts.map((text) => ({ text, calls: [chat] })));
+	h.state.steps.push(...texts.map((text) => ({ text })));
 /** The records of the conversation model's latest call, by source. */
 const recordOf = (h: Harness, source: string) =>
 	(h.material(h.state.calls.length - 1).now.records ?? []).find(

@@ -1,7 +1,6 @@
 import type { LarmPort } from "../../domains/larm";
 import { imageFixture } from "./image.fixture";
 import {
-	activeSlots,
 	answerUtterance,
 	handOver,
 	lastUtterance,
@@ -124,10 +123,7 @@ export function objectRecognitionFixture(
 					arguments: command,
 				});
 			}
-			stages.push("answer");
-			return activeSlots(messages).some((slot) => slot.result !== undefined)
-				? "物体を調べる画面を開きました。"
-				: "物体の観測結果を会話に取り込みました。";
+			throw new Error("fixture_unexpected_model_call");
 		},
 	};
 	const png = async () =>

@@ -10,6 +10,9 @@ import {
 } from "./connect";
 import { string } from "./guards";
 
+/** Claims of a ready connection LARM refuses (409) before the error is final, one second apart. */
+const CLAIM_ATTEMPTS = 60;
+
 /**
  * Creates a LARM connection and claims its providers: catalog, creation, readiness, claim.
  * A connection that cannot be claimed is released before the error is thrown.
@@ -72,21 +75,43 @@ export async function establishLease(
 	}
 	const { id, created } = creationResult;
 	try {
-		const ready = await awaitReady(scopedControl, pause, {
+		const readyInput = {
 			id,
-			created,
 			required,
 			profile,
 			agentProfile: catalogProfile.id,
+		};
+		let ready = await awaitReady(scopedControl, pause, {
+			...readyInput,
+			created,
 		});
-		const { expiresAt, providers } = await claimProviders(scopedControl, {
-			id,
-			created: ready,
-			required,
-			catalogProviders,
-			fullProfile,
-			hosts: hosts(),
-		});
+		let claimed: Awaited<ReturnType<typeof claimProviders>>;
+		for (let attempt = 1; ; attempt++) {
+			try {
+				claimed = await claimProviders(scopedControl, {
+					id,
+					created: ready,
+					required,
+					catalogProviders,
+					fullProfile,
+					hosts: hosts(),
+				});
+				break;
+			} catch (error) {
+				// Ready but not yet claimable (a profile switch): LARM refuses the claim; wait and look again.
+				if (
+					!(error instanceof Error && error.message === "larm_control_409") ||
+					attempt >= CLAIM_ATTEMPTS
+				)
+					throw error;
+				await pause(1000);
+				ready = await awaitReady(scopedControl, pause, {
+					...readyInput,
+					created: ready,
+				});
+			}
+		}
+		const { expiresAt, providers } = claimed;
 		signal?.throwIfAborted();
 		lifetime.throwIfAborted();
 		const current: Lease = {

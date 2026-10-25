@@ -74,7 +74,6 @@ export function createPlayback(deps: Parameters<typeof createMusic>[0]) {
 				? inference.captureUserControlInTransaction!(db, {
 						...capture,
 						subject: `music-task:${r.id}-playback`,
-						route: "subagent",
 					})
 				: inference.captureControlInTransaction(db, capture);
 			return {

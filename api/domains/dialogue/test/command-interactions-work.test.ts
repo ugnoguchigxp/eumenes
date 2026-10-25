@@ -67,10 +67,10 @@ test("the work tool's answer is accepted once and the same run resumes the inter
 			}),
 		],
 	});
-	h.speak("3分で設定しました。");
 	const second = await h.say("3分でお願い");
 	expect(second.id).not.toBe(first.id);
-	// The accepted answer handed the work back to the command sub-agent: the generation ended with no more calls.
+	// The accepted answer handed the work back to the command sub-agent: the generation ended with no more calls,
+	// and the result is the conversation agent's to report on its own opportunity.
 	expect(h.state.steps).toEqual([]);
 	await until(() => h!.interaction()?.status === "completed");
 	expect(h.interaction()).toMatchObject({
@@ -169,7 +169,6 @@ test("a second answer to the same question is refused: the TODO no longer waits"
 	h.state.steps.push({
 		calls: [answerCall(todo!, { questionId: todo!.questionId, text: "1分" })],
 	});
-	h.speak("設定しました。");
 	await h.say("1分");
 	await until(() => h!.interaction()?.status === "completed");
 	const [done] = h.todos();
@@ -268,7 +267,6 @@ test("a question asked again after a UI answer replaces the TODO's question", as
 	await h.asked("一つ目");
 	const interaction = h.interaction()!;
 	h.state.commands.push({ action: "clarify", question: "二つ目" });
-	h.speak("二つ目の質問です。");
 	await h.interactions.answer(interaction.id, {
 		eventId: crypto.randomUUID(),
 		questionId: interaction.question!.questionId,

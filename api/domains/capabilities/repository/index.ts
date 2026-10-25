@@ -103,6 +103,16 @@ DELETE FROM capability_search WHERE key IN (SELECT key FROM capability_items WHE
 DELETE FROM capability_items WHERE id='steward.request' AND kind IN ('toolchain','package','profile','skill','tool');`,
 		after: ["capabilities/0006-retire-model-named-web-research"],
 	},
+	{
+		// The `web.research.codex` toolchain (the `web_research` tool) is gone: research runs on the one LLM Eumenes is
+		// configured with. Its revisions stay as history but the item no longer holds a function name, a search entry
+		// or an embedding.
+		id: "capabilities/0008-retire-web-research-codex",
+		sql: `DELETE FROM capability_toolchain_vectors WHERE revision_id IN (SELECT id FROM capability_revisions WHERE item_key='toolchain:web.research.codex');
+DELETE FROM capability_search WHERE key='toolchain:web.research.codex';
+DELETE FROM capability_items WHERE key='toolchain:web.research.codex';`,
+		after: ["capabilities/0007-retire-steward-request"],
+	},
 ];
 
 export type DocumentKind = "binding" | "artifact" | "schema";

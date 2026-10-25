@@ -2,14 +2,7 @@ import { createApp } from "../../../application/app";
 import { registerVoiceDialogue } from "..";
 import { expect, test } from "bun:test";
 import type { LarmPort } from "../../larm";
-import {
-	completion,
-	respondFrame,
-	setup,
-	say,
-	until,
-	wav,
-} from "./settings-voice.fixture";
+import { completion, setup, say, until, wav } from "./settings-voice.fixture";
 
 test("one voice turn uses fallback in all three stages, adopts one answer, and does not repeat duplicate upload", async () => {
 	const h = await setup();
@@ -120,12 +113,12 @@ test("queued snapshots survive recovery without re-running an attempted provider
 test("revoking a cloud answer aborts downstream TTS and never publishes late audio", async () => {
 	let finish!: (r: Response) => void;
 	let synthesizing = false;
-	const h = await setup(async (input, init) => {
+	const h = await setup(async (input) => {
 		const url = String(input);
 		if (url.endsWith("audio/transcriptions"))
 			return Response.json({ text: "speech" });
 		if (url.endsWith("chat/completions"))
-			return Response.json(completion(init, "answer"));
+			return Response.json(completion("answer"));
 		synthesizing = true;
 		return new Promise<Response>((r) => {
 			finish = r;
@@ -224,7 +217,7 @@ test("render ahead is bounded at three clauses and playback releases the next cl
 			spoken.push(JSON.parse(init?.body as string).input);
 			return new Response(wav());
 		}
-		const text = `data: ${JSON.stringify({ choices: [{ index: 0, delta: { content: source } }] })}\n\n${respondFrame(init)}data: [DONE]\n\n`;
+		const text = `data: ${JSON.stringify({ choices: [{ index: 0, delta: { content: source } }] })}\n\ndata: [DONE]\n\n`;
 		return new Response(text, {
 			headers: { "Content-Type": "text/event-stream" },
 		});
@@ -267,7 +260,7 @@ test("final recognition preempts a slow prefix and never submits a late hypothes
 	let first = true,
 		started = false,
 		release: () => void = () => {};
-	const h = await setup(async (url, init) => {
+	const h = await setup(async (url) => {
 		if (String(url).endsWith("audio/transcriptions")) {
 			if (first) {
 				first = false;
@@ -280,7 +273,7 @@ test("final recognition preempts a slow prefix and never submits a late hypothes
 			return Response.json({ text: "確定" });
 		}
 		if (String(url).endsWith("audio/speech")) return new Response(wav());
-		return Response.json(completion(init, "回答"));
+		return Response.json(completion("回答"));
 	});
 	const session = crypto.randomUUID(),
 		id = crypto.randomUUID();

@@ -88,8 +88,6 @@ export function createApplyInTransaction(deps: {
 			[
 				...purposeSchema.options.map((p) => next.routes[p].fallbackId),
 				next.world.curationResourceId,
-				next.subagent.resourceId,
-				next.agency.resourceId,
 			].filter((id): id is string => !!id),
 		);
 		for (const c of next.connections) {

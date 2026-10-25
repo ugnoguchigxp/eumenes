@@ -17,6 +17,7 @@ import type { LarmPort } from "../../larm";
 import { createQueue } from "../../queue";
 import { createDialogueService } from "..";
 import { dialogueMigrationList } from "./store.fixture";
+import { testConversationAgent } from "./conversation-agent.fixture";
 
 const dirs: string[] = [];
 const stores: SqliteStore[] = [];
@@ -72,6 +73,7 @@ async function setup(root: RootMode, failed: { ids: string[] } = { ids: [] }) {
 		},
 	} as unknown as AgentRuntime;
 	const dialogue = createDialogueService({
+		conversationAgent: testConversationAgent,
 		store,
 		conversation,
 		larm,

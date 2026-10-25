@@ -288,15 +288,14 @@ export async function refreshActionResults(
 }
 
 /**
- * The links of a reply that reports TODO results (those this generation was triggered by and those it names in
- * `todoRefs`) are kept to what the results grant: a research report's own sources, written in the canonical form;
- * none for a result that has no sources. A reply that reports no result is left as it is.
+ * The links of a reply that may report TODO results (those this generation was triggered by and those whose result
+ * the window shows) are kept to what the results grant: a research report's own sources, written in the canonical
+ * form; none for a result that has no sources. A reply with no result in view is left as it is.
  */
 export function reportedLinks(
 	deps: DialogueDeps,
 	input: GenerateInput,
 	text: string,
-	todoRefs: readonly string[],
 ): string {
 	const ledger = deps.work;
 	if (!ledger || !text) return text;
@@ -307,7 +306,7 @@ export function reportedLinks(
 				)
 			: [],
 	);
-	const ids = [...new Set([...triggered, ...todoRefs])];
+	const ids = [...new Set([...triggered, ...input.shown.todos])];
 	if (ids.length === 0) return text;
 	const results = deps.store.read((db) =>
 		ids.flatMap((id) => {

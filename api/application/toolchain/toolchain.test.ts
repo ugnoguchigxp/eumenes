@@ -1,30 +1,7 @@
 import { test, expect } from "bun:test";
 import { harness, forbidden, workerPacket } from "./toolchain.fixture";
-import { checkLiveCitations } from "./toolchain-live-check";
 import { settle, waitFor } from "../../infrastructure/wait-for";
-test("adoption removes a fabricated model citation and cannot reuse sources after failed research", async () => {
-	const options = {
-		parentAnswer:
-			"晴れです。\n\nソース：[example.com](https://example.com/weather)、[旧資料](https://example.com/obsolete)",
-	};
-	const h = await harness(options);
-	try {
-		const run = await h.dialogue.submit({
-			requestId: crypto.randomUUID(),
-			conversationId: "main",
-			text: "今日の東京の天気を調べて。",
-		});
-		expect(
-			(await h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 }))?.status,
-		).toBe("completed");
-		const answer = h.dialogue.answerText(run.id)!;
-		expect(answer).toContain("[example.com](<https://example.com/weather>)");
-		expect(answer).not.toContain("https://example.com/obsolete");
-	} finally {
-		await h.close();
-	}
-});
-test("a plain weather request carries useful details and actual citations through research, answer and replay", async () => {
+test("a plain weather request carries useful details and actual sources into the finished TODO's result", async () => {
 	const h = await harness({ excerptEvidence: true });
 	try {
 		const run = await h.dialogue.submit({
@@ -38,26 +15,20 @@ test("a plain weather request carries useful details and actual citations throug
 		const report = h.toolchain.agents.report(
 			h.dialogue.get(run.id)!.agentTaskId!,
 		)!;
-		const answer = h.dialogue.answerText(run.id)!;
+		// The agency reports the finished TODO; the run itself says nothing more.
+		expect(h.dialogue.answerText(run.id)).toBeNull();
+		const reported = h.reported();
 		for (const fact of ["晴れ", "26度", "17度", "降水確率0％"])
-			expect(answer).toContain(fact);
-		expect(checkLiveCitations(report, answer)).toBe(true);
-		const messages = JSON.parse(h.parentContexts.at(-1)!);
-		// The real request packet, not just an unused prompt template, must allow
-		// a sourced answer with enough context even without an explicit detail request.
-		expect(messages[0].content).not.toContain("30文字以内");
-		expect(messages[0].content).not.toContain("Markdown、");
-		expect(messages[0].content).toContain("sources.url");
-		expect(h.parentContexts.at(-1)).not.toContain(forbidden);
-		expect(h.voice.replaySentences(answer).join("")).toContain("最低気温17度");
-		expect(h.voice.replaySentences(answer).join("")).not.toContain("https://");
+			expect(reported).toContain(fact);
+		for (const source of report.sources)
+			expect(reported).toContain(source.url!);
+		expect(h.parentContexts.join("")).not.toContain(forbidden);
 	} finally {
 		await h.close();
 	}
 });
 test("a premature unavailable forecast reads the next candidate before adopting an answer", async () => {
 	const h = await harness({
-		fullResearch: true,
 		incompleteWeatherFirstRead: true,
 		excerptEvidence: true,
 	});
@@ -71,7 +42,7 @@ test("a premature unavailable forecast reads the next candidate before adopting 
 			(await h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 }))?.status,
 		).toBe("completed");
 		expect(h.acquisitions).toBe(3);
-		expect(h.dialogue.answerText(run.id)).toContain("晴れ");
+		expect(h.reported()).toContain("晴れ");
 		const report = h.toolchain.agents.report(
 			h.dialogue.get(run.id)!.agentTaskId!,
 		)!;
@@ -107,10 +78,10 @@ test("authenticated search/read/report/answer resolves model excerpt selections 
 		expect(report.claims[0].evidence[0].quote).toContain("26度");
 		expect(report.claims[0].evidence[0].excerptId).toBeUndefined();
 		expect(report.verification).toBe("evidence_linked");
-		expect(h.dialogue.answerText(run.id)).toContain("26度");
+		expect(h.reported()).toContain("26度");
 		expect(h.acquisitions).toBe(2);
-		expect(h.parentContexts[0]).not.toContain(forbidden);
-		expect(h.parentContexts[0]).not.toContain('"quote"');
+		expect(h.parentContexts.join("")).not.toContain(forbidden);
+		expect(h.parentContexts.join("")).not.toContain('"quote"');
 	} finally {
 		await h.close();
 	}
@@ -161,7 +132,7 @@ for (const [question, expected] of [
 			});
 			expect(done?.error).toBeNull();
 			expect(done?.status).toBe("completed");
-			expect(h.dialogue.answerText(run.id)).toContain(expected!);
+			expect(h.reported()).toContain(expected!);
 			const tasks = await (
 				await h.request(`/api/agent-tasks?rootRunId=${run.id}`)
 			).json();
@@ -177,15 +148,12 @@ for (const [question, expected] of [
 			expect(report.summary).toContain(expected!);
 			expect(report.verification).toBe("evidence_linked");
 			expect(report.sources[0].basis).toBe("page");
-			const answer = h.dialogue.answerText(run.id)!;
-			expect(checkLiveCitations(report, answer)).toBe(true);
 			if (question!.includes("株価")) {
-				expect(answer).toContain("250.12");
-				expect(answer).toContain("2026-10-08");
+				expect(h.reported()).toContain("250.12");
+				expect(h.reported()).toContain("2026-10-08");
 			}
 			expect(h.workerContexts.some((c) => c.includes(forbidden))).toBe(true);
 			expect(h.parentContexts.some((c) => c.includes(forbidden))).toBe(false);
-			expect(h.parentContexts[0]).not.toContain('"quote"');
 			const context = workerPacket(JSON.parse(h.workerContexts[0]!));
 			expect(context.nextInvocation).toBeUndefined();
 			expect(h.acquisitions).toBe(2);
@@ -281,7 +249,7 @@ test("rolled-back cancellation cannot cancel another conversation's pending infe
 		expect(
 			(await h.dialogue.waitForTerminal(first.id, { timeoutMs: 5000 }))?.status,
 		).toBe("completed");
-		expect(h.dialogue.answerText(first.id)).toContain("26度");
+		expect(h.reported("first")).toContain("26度");
 		expect(h.dialogue.get(second.id)?.status).toBe("cancelled");
 	} finally {
 		release();
@@ -308,9 +276,11 @@ for (const options of [{ badJson: true }, { badQuote: true }])
 				h.toolchain.agents.report(h.dialogue.get(run.id)!.agentTaskId!),
 			).toBe(null);
 			expect(child.modelCalls).toBeLessThanOrEqual(5);
-			// The failed research reaches the model once, in the result phase; its answer is what that generation says.
-			expect(h.parentContexts).toHaveLength(1);
-			expect(h.dialogue.answerText(run.id)).toBeTruthy();
+			// The failed research is the TODO's result; the agency reports it, so the run says nothing more.
+			expect(h.todos().map((todo) => [todo.status, todo.outcome])).toEqual([
+				["done", "failed"],
+			]);
+			expect(h.dialogue.answerText(run.id)).toBeNull();
 			expect(
 				h.store.read((db) =>
 					db
@@ -326,7 +296,7 @@ for (const options of [{ badJson: true }, { badQuote: true }])
 	});
 
 test("invalid tool arguments are repaired once; no acquisition occurs until the contract is valid", async () => {
-	const h = await harness({ badToolArgs: true, fullResearch: true });
+	const h = await harness({ badToolArgs: true });
 	try {
 		const run = await h.dialogue.submit({
 			requestId: crypto.randomUUID(),
@@ -476,7 +446,7 @@ test("queue capacity failure rolls back child creation and reaches a terminal an
 		await h.close();
 	}
 });
-test("worker deadline cancels acquisition and fails the research and the host answers it", async () => {
+test("worker deadline cancels acquisition and fails the research, which the TODO reports", async () => {
 	let release!: () => void;
 	const h = await harness({
 		gate: new Promise<void>((r) => {
@@ -507,19 +477,21 @@ test("worker deadline cancels acquisition and fails the research and the host an
 			.find((t) => t.kind === "worker")!;
 		expect(child.status).toBe("failed");
 		expect(child.errorCode).toBe("deadline_exceeded");
-		// The failed research reaches the model once, in the result phase.
-		expect(h.parentContexts).toHaveLength(1);
-		expect(h.dialogue.answerText(run.id)).toBeTruthy();
+		// The failed research is the TODO's result; the agency reports it.
+		expect(h.todos().map((todo) => [todo.status, todo.outcome])).toEqual([
+			["done", "failed"],
+		]);
+		expect(h.dialogue.answerText(run.id)).toBeNull();
 	} finally {
 		release();
 		await h.close();
 	}
 });
 
-test("deleting a report during final inference cancels adoption of the old answer", async () => {
+test("deleting a report while the research runs ends the run as cancelled", async () => {
 	let release!: () => void;
 	const h = await harness({
-		answerGate: new Promise<void>((r) => {
+		gate: new Promise<void>((r) => {
 			release = r;
 		}),
 	});
@@ -529,8 +501,7 @@ test("deleting a report during final inference cancels adoption of the old answe
 			conversationId: "main",
 			text: "東京の天気を調べて",
 		});
-		await waitFor(() => h.parentContexts.length > 0);
-		expect(h.parentContexts).toHaveLength(1);
+		await waitFor(() => !!h.acquisitions);
 		await h.store.write((db) =>
 			h.toolchain.agents.deleteTaskDataInTransaction(db, run.id),
 		);
@@ -643,7 +614,7 @@ test("a mismatched quote is rejected and repaired once using the same observatio
 		expect(child.status).toBe("completed");
 		expect(child.modelCalls).toBe(4);
 		expect(h.acquisitions).toBe(2);
-		expect(h.dialogue.answerText(run.id)).toContain("26度");
+		expect(h.reported()).toContain("26度");
 		expect(
 			h.store.read((db) =>
 				db
@@ -669,7 +640,7 @@ test("a long accepted request remains intact when delegated to a research worker
 		expect(
 			(await h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 }))?.status,
 		).toBe("completed");
-		expect(h.dialogue.answerText(run.id)).toContain("26度");
+		expect(h.reported("long")).toContain("26度");
 		expect(workerPacket(JSON.parse(h.workerContexts[0]!)).task.question).toBe(
 			question,
 		);

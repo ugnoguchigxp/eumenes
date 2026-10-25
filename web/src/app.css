@@ -211,15 +211,19 @@ select:focus-visible {
 	border: 1px solid var(--border);
 	border-radius: 13px;
 	color: var(--foreground);
-	background: color-mix(in srgb, var(--card) 86%, transparent);
-	backdrop-filter: blur(12px);
+	background: color-mix(in srgb, var(--card) 68%, transparent);
+	backdrop-filter: blur(4px);
 	overflow-wrap: anywhere;
 }
 .message-user {
 	align-self: flex-end;
 	color: var(--foreground);
 	border-color: color-mix(in srgb, var(--border) 70%, var(--primary));
-	background: color-mix(in srgb, var(--card) 85%, var(--primary));
+	background: color-mix(
+		in srgb,
+		color-mix(in srgb, var(--card) 85%, var(--primary)) 68%,
+		transparent
+	);
 }
 .message small {
 	display: block;
@@ -435,8 +439,8 @@ select:focus-visible {
 	padding: 11px;
 	border: 1px solid var(--border);
 	border-radius: 17px;
-	background: color-mix(in srgb, var(--card) 88%, transparent);
-	backdrop-filter: blur(14px);
+	background: color-mix(in srgb, var(--card) 60%, transparent);
+	backdrop-filter: blur(4px);
 	box-shadow: 0 18px 52px rgb(0 0 0 / 0.22);
 }
 .chat-composer:focus-within {

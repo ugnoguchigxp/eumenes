@@ -68,7 +68,6 @@ const learnedPair = (): Definition[] => [
 ];
 export async function harness(
 	now = Date.now,
-	codex = false,
 	/** A registered domain adapter for bound operations; also seeds the package that uses one. */
 	actions?: ActionAdapter,
 	/** Opt in to the versioned Web bundle; archived-route tests keep their old contracts. */
@@ -194,22 +193,11 @@ export async function harness(
 	};
 	const tools = createToolRuntime(store, caps, queue, adapter, now, actions);
 	const captures: string[] = [];
-	const engines: Array<string | undefined> = [];
-	const routes: unknown[] = [];
 	const sessions: unknown[] = [];
 	const releasedSessions: string[] = [];
-	/** The saved sub-agent resource the fixture settings hold. */
-	const subagent = { resourceId: null as string | null };
 	const inference = {
-		codexResearchAvailable: () => codex,
-		snapshotInTransaction: () => ({ subagent }),
-		captureControlInTransaction: (
-			_db: unknown,
-			i: { subject: string; engine?: string; route?: unknown },
-		) => {
+		captureControlInTransaction: (_db: unknown, i: { subject: string }) => {
 			captures.push(i.subject);
-			engines.push(i.engine);
-			routes.push(i.route);
 			return `req-${captures.length}`;
 		},
 		executeControl: async (
@@ -243,13 +231,12 @@ export async function harness(
 	const start = (
 		runId: string,
 		question = "天気予報 鎌倉",
-		researcher?: "codex",
 		kind: "web" | "history" = "web",
 	) =>
 		store.write((db) =>
 			agents.startInTransaction(db, {
 				rootRunId: runId,
-				input: { kind, question, researcher },
+				input: { kind, question },
 				deadline: Date.now() + 120_000,
 			}),
 		);
@@ -371,15 +358,12 @@ export async function harness(
 		started,
 		results,
 		captures,
-		engines,
-		routes,
 		sessions,
 		releasedSessions,
-		subagent,
 		task,
 		start,
 		startHistory: (runId: string, question: string) =>
-			start(runId, question, undefined, "history"),
+			start(runId, question, "history"),
 		runModelStep,
 		runRawModelStep,
 		doc,

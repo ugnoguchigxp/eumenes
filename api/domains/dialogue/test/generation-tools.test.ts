@@ -9,7 +9,6 @@ test("the fixed tool definitions stay within the 2,000 estimated-token allowance
 		"find_toolchain",
 		"delegate",
 		"work",
-		"respond",
 	]);
 });
 

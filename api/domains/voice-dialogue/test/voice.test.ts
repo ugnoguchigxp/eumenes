@@ -28,6 +28,7 @@ import { Hono } from "hono";
 import { registerVoiceDialogue } from "..";
 import type { InferencePort } from "../../inference";
 import { hostDelivery, type SpeechPreparation } from "../../delivery";
+import { testConversationAgent } from "../../dialogue/test/conversation-agent.fixture";
 
 /** The schema the dialogue and voice flow need, built from each domain's own migrations. */
 const schemaMigrations = () =>
@@ -85,6 +86,7 @@ test("voice capture to ASR, dialogue, TTS; duplicate utterance is ignored", asyn
 		const queue = createQueue(store);
 		queue.start();
 		const dialogue = createDialogueService({
+			conversationAgent: testConversationAgent,
 			store,
 			continuity: createContinuityService(store),
 			conversation,
@@ -162,6 +164,7 @@ test("restart cancels the run of a stale voice turn so no old answer is spoken",
 		const conversation = createConversationService(store);
 		const queue = createQueue(store);
 		const dialogue = createDialogueService({
+			conversationAgent: testConversationAgent,
 			store,
 			continuity: createContinuityService(store),
 			conversation,
@@ -180,6 +183,7 @@ test("restart cancels the run of a stale voice turn so no old answer is spoken",
 		expect(dialogue.get(runId)?.status).toBe("queued");
 		const queue2 = createQueue(store);
 		const dialogue2 = createDialogueService({
+			conversationAgent: testConversationAgent,
 			store,
 			continuity: createContinuityService(store),
 			conversation,
@@ -206,7 +210,11 @@ async function evictionHarness(
 	options: {
 		prepared?: AbortSignal[];
 		/** What the run's waits return first (then completed), and the cancels they caused. */
-		waits?: Array<{ status: string; deadlineAt: string | null }>;
+		waits?: Array<{
+			status: string;
+			deadlineAt: string | null;
+			answerMessageId?: string | null;
+		}>;
 		cancelled?: string[];
 	} = {},
 ) {
@@ -256,7 +264,7 @@ async function evictionHarness(
 	async function turn(
 		sessionId: string,
 		sequence: number,
-		status: "ready" | "failed",
+		status: "ready" | "failed" | "played",
 	) {
 		const id = crypto.randomUUID();
 		ids.push(id);
@@ -297,6 +305,20 @@ test("a run whose deadline moved later meanwhile (a toolchain's own run time) is
 		h.voice.start(sessionId, 1);
 		await h.turn(sessionId, 1, "ready");
 		expect(cancelled).toEqual([]);
+	} finally {
+		await h.dispose();
+	}
+});
+
+test("a run that chose not to speak ends the turn quietly, not as a failure", async () => {
+	const h = await evictionHarness({
+		waits: [{ status: "completed", deadlineAt: null, answerMessageId: null }],
+	});
+	try {
+		const sessionId = crypto.randomUUID();
+		h.voice.start(sessionId, 1);
+		const id = await h.turn(sessionId, 1, "played");
+		expect(h.voice.get(id)?.error ?? null).toBeNull();
 	} finally {
 		await h.dispose();
 	}
@@ -702,6 +724,7 @@ async function raceFixture(prefix: string) {
 	const queue = createQueue(store);
 	queue.start();
 	const dialogue = createDialogueService({
+		conversationAgent: testConversationAgent,
 		store,
 		conversation,
 		continuity: createContinuityService(store),

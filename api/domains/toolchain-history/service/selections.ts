@@ -12,7 +12,6 @@ import {
 	SELECTION_RETENTION_MS,
 	type PastSelection,
 	type Selection,
-	type SelectionAnalysis,
 	type SelectionCandidate,
 	type SelectionDecision,
 	type SelectionOutcome,
@@ -37,8 +36,6 @@ export function selection(row: SelectionRow): Selection {
 		toolchainRevisionId: row.toolchain_revision_id,
 		functionName: row.function_name,
 		request: row.request_text,
-		repaired: !!row.repaired,
-		...(row.analysis_json ? { analysis: JSON.parse(row.analysis_json) } : {}),
 		taskId: row.task_id,
 		outcome: row.outcome as SelectionOutcome | null,
 		outcomeCode: row.outcome_code,
@@ -71,8 +68,6 @@ export function createSelections(store: SqliteStore, now: () => number) {
 			toolchainRevisionId?: string;
 			functionName?: string;
 			request?: string;
-			repaired?: boolean;
-			analysis?: SelectionAnalysis;
 			query?: { space: VectorSpace; vector: number[] };
 			durationMs?: number;
 		},
@@ -81,9 +76,9 @@ export function createSelections(store: SqliteStore, now: () => number) {
 		const at = now();
 		const id = crypto.randomUUID();
 		db.query(
-			`INSERT INTO toolchain_selections(id,run_id,conversation_id,utterance_id,request_id,retrieval,candidates_json,history_refs_json,decision,toolchain_id,toolchain_revision_id,function_name,request_text,repaired,analysis_json,duration_ms,query_space,query_vector,created_at,expires_at)
-			 VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-			 ON CONFLICT(run_id) DO UPDATE SET retrieval=excluded.retrieval,candidates_json=excluded.candidates_json,history_refs_json=excluded.history_refs_json,decision=excluded.decision,toolchain_id=excluded.toolchain_id,toolchain_revision_id=excluded.toolchain_revision_id,function_name=excluded.function_name,request_text=excluded.request_text,repaired=excluded.repaired,analysis_json=excluded.analysis_json,duration_ms=excluded.duration_ms,query_space=excluded.query_space,query_vector=excluded.query_vector,task_id=NULL,outcome=NULL,outcome_code=NULL,recipe=NULL,settled_at=NULL`,
+			`INSERT INTO toolchain_selections(id,run_id,conversation_id,utterance_id,request_id,retrieval,candidates_json,history_refs_json,decision,toolchain_id,toolchain_revision_id,function_name,request_text,duration_ms,query_space,query_vector,created_at,expires_at)
+			 VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+			 ON CONFLICT(run_id) DO UPDATE SET retrieval=excluded.retrieval,candidates_json=excluded.candidates_json,history_refs_json=excluded.history_refs_json,decision=excluded.decision,toolchain_id=excluded.toolchain_id,toolchain_revision_id=excluded.toolchain_revision_id,function_name=excluded.function_name,request_text=excluded.request_text,duration_ms=excluded.duration_ms,query_space=excluded.query_space,query_vector=excluded.query_vector,task_id=NULL,outcome=NULL,outcome_code=NULL,recipe=NULL,settled_at=NULL`,
 		).run(
 			id,
 			input.runId,
@@ -98,8 +93,6 @@ export function createSelections(store: SqliteStore, now: () => number) {
 			input.toolchainRevisionId ?? null,
 			input.functionName ?? null,
 			input.request ?? null,
-			input.repaired ? 1 : 0,
-			input.analysis ? JSON.stringify(input.analysis) : null,
 			input.durationMs ?? null,
 			input.query ? vectorSpaceKey(input.query.space) : null,
 			input.query ? packVector(input.query.vector) : null,

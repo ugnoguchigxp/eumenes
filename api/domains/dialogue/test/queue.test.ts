@@ -3,7 +3,8 @@ import { waitFor } from "../../../infrastructure/wait-for";
 import { createDialogueService } from "..";
 import { createQueue } from "../../queue";
 import { createScheduler } from "../../scheduler";
-import { respond, setup, type Harness } from "./generation.fixture";
+import { setup, type Harness } from "./generation.fixture";
+import { testConversationAgent } from "./conversation-agent.fixture";
 
 /**
  * Ordering, isolation and recovery of the conversation's runs (the ContextWindow specification, sections 8.2 and
@@ -16,13 +17,11 @@ afterEach(async () => {
 	h = undefined;
 });
 
-const chat = respond();
-
 test("a run handles the utterances pending at its claim; a later input waits for its own run", async () => {
 	h = await setup({ autoStart: false });
 	let release!: () => void;
 	h.state.gate = new Promise<void>((resolve) => (release = resolve));
-	h.state.steps.push({ text: "ansA", calls: [chat] });
+	h.state.steps.push({ text: "ansA" });
 	const a = await h.dialogue.submit({
 		requestId: crypto.randomUUID(),
 		conversationId: "main",
@@ -38,7 +37,7 @@ test("a run handles the utterances pending at its claim; a later input waits for
 	});
 	expect(h.state.calls[0]!.messages.at(-1)!.content).toBe("A");
 	expect(h.dialogue.get(b.id)?.status).toBe("queued");
-	h.state.steps.push({ text: "ansB", calls: [chat] });
+	h.state.steps.push({ text: "ansB" });
 	release();
 	await waitFor(() => h!.dialogue.get(a.id)?.status === "completed");
 	await waitFor(() => h!.dialogue.get(b.id)?.status === "completed");
@@ -50,7 +49,7 @@ test("a run handles the utterances pending at its claim; a later input waits for
 
 test("utterances pending together are one generation; a run with nothing left to handle ends as handled", async () => {
 	h = await setup({ autoStart: false });
-	h.state.steps.push({ text: "まとめて。", calls: [chat] });
+	h.state.steps.push({ text: "まとめて。" });
 	const a = await h.dialogue.submit({
 		requestId: crypto.randomUUID(),
 		conversationId: "main",
@@ -104,7 +103,7 @@ test("restart: queued runs continue, a running run is interrupted, a late result
 	h = await setup({ autoStart: false });
 	let release!: () => void;
 	h.state.gate = new Promise<void>((resolve) => (release = resolve));
-	h.state.steps.push({ text: "old", calls: [chat] });
+	h.state.steps.push({ text: "old" });
 	const a = await h.dialogue.submit({
 		requestId: crypto.randomUUID(),
 		conversationId: "main",
@@ -121,6 +120,7 @@ test("restart: queued runs continue, a running run is interrupted, a late result
 	// "Restart": a new queue and service over the same database.
 	const queue2 = createQueue(h.store);
 	const dialogue2 = createDialogueService({
+		conversationAgent: testConversationAgent,
 		store: h.store,
 		conversation: h.conversation,
 		larm: h.larm,
@@ -132,7 +132,7 @@ test("restart: queued runs continue, a running run is interrupted, a late result
 	expect(await queue2.recover()).toBe(1);
 	expect(dialogue2.get(a.id)?.status).toBe("interrupted");
 	expect(dialogue2.get(b.id)?.status).toBe("queued");
-	h.state.steps.push({ text: "ansB", calls: [chat] });
+	h.state.steps.push({ text: "ansB" });
 	queue2.start();
 	await waitFor(() => h!.state.calls.length === 2);
 	// The old owner's answer arrives late: it is not adopted.
@@ -209,10 +209,7 @@ test("a scheduled prompt creates exactly one background run per occurrence; an i
 		conversationId: "other",
 		text: "今すぐ",
 	});
-	h.state.steps.push(
-		{ text: "はい", calls: [chat] },
-		{ text: "おはようございます", calls: [chat] },
-	);
+	h.state.steps.push({ text: "はい" }, { text: "おはようございます" });
 	let release!: () => void;
 	h.state.gate = new Promise<void>((resolve) => (release = resolve));
 	await h.queue.tick();
@@ -256,7 +253,7 @@ test("waitForTerminal honours its own timeout and an abort, and never cancels th
 test("a rejected answer adoption fails both the run and its queue job, and adds no message", async () => {
 	h = await setup();
 	h.state.acceptAllowed = false;
-	h.state.steps.push({ text: "revoked answer", calls: [chat] });
+	h.state.steps.push({ text: "revoked answer" });
 	const run = await h.dialogue.submit({
 		requestId: crypto.randomUUID(),
 		conversationId: "main",
@@ -279,7 +276,7 @@ test("only an adopted, confident motion labels an answer; a judgment of a cancel
 	h = await setup({ autoStart: false });
 	let release!: () => void;
 	h.state.gate = new Promise<void>((resolve) => (release = resolve));
-	h.state.steps.push({ text: "よかったですね。", calls: [chat] });
+	h.state.steps.push({ text: "よかったですね。" });
 	const run = await h.dialogue.submit({
 		requestId: crypto.randomUUID(),
 		conversationId: "main",
@@ -337,7 +334,7 @@ test("the emotion context holds the earlier turns and the complete answer, never
 	h = await setup({ autoStart: false });
 	let release!: () => void;
 	h.state.gate = new Promise<void>((resolve) => (release = resolve));
-	h.state.steps.push({ text: "最初への完全な返答。", calls: [chat] });
+	h.state.steps.push({ text: "最初への完全な返答。" });
 	const a = await h.dialogue.submit({
 		requestId: crypto.randomUUID(),
 		conversationId: "main",

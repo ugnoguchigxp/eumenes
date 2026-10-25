@@ -88,27 +88,17 @@ export function createGenerationHandler(
 					);
 					try {
 						const publishNow = () => publish(input.runId);
-						const activeTodos = new Set(input.shown.todos);
 						const executor = createGenerationExecutor(deps, {
 							input,
 							jobId: input.jobId,
 							publish: publishNow,
-							activeTodos,
 						});
 						const generated = await runGeneration(deps, input, {
 							signal: body.signal,
 							delta: body.delta,
 							preparation: answerCollection(run, speaksChunks(deps, run)),
 							session: answerSession(input),
-							repair: () => {
-								body.reset();
-								publishNow();
-							},
 							execute: executor.execute,
-							window: {
-								activeTodos,
-								eventIds: new Set(input.shown.events),
-							},
 						});
 						const handover = executor.handover();
 						if (handover) {
@@ -125,26 +115,14 @@ export function createGenerationHandler(
 							throw new Error("chat_output_too_large");
 						log.info("dialogue.generation_completed");
 						return {
-							text: reportedLinks(
-								deps,
-								input,
-								generated.text,
-								generated.respond?.todoRefs ?? [],
-							),
+							text: reportedLinks(deps, input, generated.text),
 							...(generated.receipt ? { receipt: generated.receipt } : {}),
-							...(generated.respond ? { respond: generated.respond } : {}),
-							...(generated.executed.some(
-								(entry) => entry.outcome.basis === "confirmation",
-							)
+							...(generated.emotion ? { emotion: generated.emotion } : {}),
+							...(generated.executed.some((entry) => entry.outcome.confirmation)
 								? { confirmation: true as const }
 								: {}),
-							...(input.final.kind === "utterances" && generated.respond
-								? {
-										selection: executor.answered(
-											generated.respond,
-											generated.repaired,
-										),
-									}
+							...(input.final.kind === "utterances"
+								? { selection: executor.answered() }
 								: {}),
 						};
 					} catch (error) {

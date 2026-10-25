@@ -19,7 +19,7 @@ test("playback planning corrects model JSON before the library request", async (
 			state: "completed",
 			query: { tags: ["明るい", "ピアノ"] },
 		});
-		expect(f.stages).toEqual(["route", "plan", "answer"]);
+		expect(f.stages).toEqual(["route", "plan"]);
 	} finally {
 		await h.close();
 	}
@@ -48,10 +48,8 @@ test("playback package routes through planning, saved references, parent answer 
 			query: { tags: ["明るい", "ピアノ"] },
 			trackIds: ["two", "one"],
 		});
-		expect(f.stages).toEqual(["route", "plan", "answer"]);
-		expect(h.dialogue.answerText(run.id)).toBe(
-			"保存曲のプレイリストを開きました。",
-		);
+		expect(f.stages).toEqual(["route", "plan"]);
+		expect(h.dialogue.answerText(run.id)).toBeNull();
 		expect(await (await h.request("/api/music")).json()).toEqual([]);
 		expect(
 			f.requests.every(

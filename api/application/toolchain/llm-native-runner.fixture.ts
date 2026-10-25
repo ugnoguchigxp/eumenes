@@ -11,19 +11,12 @@ export async function evaluateRequirements(
 	c: RequirementsCase,
 	profiles: Map<string, RequirementProfileData>,
 	model: LarmPort,
-	codexResearch?: {
-		execute: (
-			messages: import("../../domains/inference/contracts").Messages,
-			signal: AbortSignal,
-		) => Promise<string>;
-	},
 	historyFixture = false,
 ) {
 	const started = performance.now();
 	const h = await harness({
 		model,
 		history: historyFixture,
-		codexResearch,
 		acquire: fixedAcquisition(c.sources),
 	});
 	try {
@@ -70,16 +63,6 @@ export async function evaluateRequirements(
 		});
 		const tasks = h.toolchain.agents.list(run.id);
 		const child = tasks.find((t) => t.kind === "worker");
-		const selected = child
-			? (h.store.read((db) =>
-					db
-						.query("SELECT input_json FROM agent_tasks WHERE id=?")
-						.get(child.id),
-				) as { input_json: string })
-			: null;
-		const engine = selected
-			? (JSON.parse(selected.input_json).researcher ?? "default")
-			: null;
 		let report: Report | null = null;
 		try {
 			report = h.toolchain.agents.report(final?.agentTaskId ?? run.agentTaskId);
@@ -88,9 +71,7 @@ export async function evaluateRequirements(
 		return {
 			caseId: c.id,
 			status: final?.status,
-			engine,
-			structureMatched:
-				engine === c.engine && compareRequirementResult(c, report, registered),
+			structureMatched: compareRequirementResult(c, report, registered),
 			semanticChecks: c.expected.semanticAssertions.map((assertion) => ({
 				assertion,
 				status: "unchecked",

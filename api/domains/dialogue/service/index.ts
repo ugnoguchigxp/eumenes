@@ -22,6 +22,7 @@ import type {
 	Run,
 	StewardPort,
 	AgencyLayerPort,
+	ConversationAgentPort,
 	GoalsLayerPort,
 	WorldContextPort,
 } from "../contracts";
@@ -75,8 +76,10 @@ interface DialogueServiceOptions {
 	delegation?: import("../contracts/delegation").DelegationPort;
 	worldContext?: WorldContextPort;
 	goals?: GoalsLayerPort;
-	/** The agency layer: its own recent utterances and interests for the main context. Absent: no agency block. */
+	/** The conversation agent's own state for the main context, and its opportunity when work changes. */
 	agency?: AgencyLayerPort;
+	/** The conversation agent that answers every generation. */
+	conversationAgent: ConversationAgentPort;
 	toolchains?: import("../contracts/toolchains").ToolchainRoutingPort;
 	specialist?: import("../contracts").SpecialistPort;
 	/** The operational log file the error report reads (`config.logFile`); no log is read when absent. */
@@ -101,6 +104,7 @@ export function createDialogueService({
 	worldContext,
 	goals,
 	agency,
+	conversationAgent,
 	toolchains,
 	specialist,
 	logFile,
@@ -124,6 +128,7 @@ export function createDialogueService({
 		worldContext,
 		goals,
 		agency,
+		conversationAgent,
 		toolchains,
 		specialist,
 	};

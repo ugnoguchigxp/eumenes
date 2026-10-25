@@ -22,7 +22,6 @@ const requirementsCase = z
 	.object({
 		id: z.string().min(1),
 		suite: z.literal("requirements"),
-		engine: z.enum(["default", "codex"]),
 		request: z.string().min(1).max(8000),
 		profiles: z
 			.array(z.object({ id: z.string(), file: z.string() }).strict())

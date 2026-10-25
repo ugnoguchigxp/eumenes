@@ -11,7 +11,7 @@ const leaked =
 for (const text of [
 	leaked,
 	'<call:work{todo:"x"}>',
-	'respond ({"kind":"chat"})',
+	'memory ({"operation":"request"})',
 	'work\n({"operation":"check"})',
 	"<|unknown_control|>",
 ])
@@ -62,10 +62,10 @@ test("an unfinished tool name is held until its ordinary continuation is known",
 test("a bare tool name at the end of an answer is released after completion", () => {
 	const visible: string[] = [];
 	const output = conversationOutput((s) => visible.push(s), generationTools);
-	output.delta("respond");
+	output.delta("memory");
 	expect(visible).toEqual([]);
-	output.finish("respond");
-	expect(visible).toEqual(["respond"]);
+	output.finish("memory");
+	expect(visible).toEqual(["memory"]);
 });
 
 test("the tool-search prose cannot substitute a bare tool name for a native call", () => {
@@ -99,7 +99,7 @@ test("control text in a nonstream response is rejected and never published", () 
 
 test("held whitespace and discarded output still obey the total capacity limit", () => {
 	const output = conversationOutput(() => {}, generationTools);
-	output.delta("respond" + " ".repeat(65529));
+	output.delta("memory" + " ".repeat(65530));
 	expect(() => output.delta(" ")).toThrow("chat_output_too_large");
 	const blocked = conversationOutput(() => {}, generationTools);
 	blocked.delta("<|");

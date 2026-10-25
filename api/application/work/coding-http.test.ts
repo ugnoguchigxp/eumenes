@@ -1,3 +1,4 @@
+import { testConversationAgent } from "../../domains/dialogue/test/conversation-agent.fixture";
 import { createContinuityService } from "../../domains/continuity";
 import { expect, test } from "bun:test";
 import { join } from "node:path";
@@ -45,6 +46,7 @@ test("coding HTTP/client authenticate reads, validate cursors and hide private e
 		speak: async () => new Uint8Array(),
 	};
 	const dialogue = createDialogueService({
+		conversationAgent: testConversationAgent,
 			store,
 			continuity: createContinuityService(store),
 			queue,

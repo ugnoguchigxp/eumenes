@@ -16,10 +16,8 @@ import {
 	type SpeechOverride,
 } from "../contracts";
 import { get, type RequestRow } from "../repository";
-import { codexResearchModel } from "./codex-model";
 import { recordAttemptStart, resolveSession } from "./attempt-record";
 import { fallbackErrors, safeError } from "./errors";
-import { CodexResearchFailure } from "../adapters/codex-failure";
 import { operationOutputMessages } from "../contracts/operation-output";
 
 import type { Env, Input, Request, Running, Source } from "./execute-types";
@@ -56,7 +54,6 @@ async function attempt(r: Request, source: Source): Promise<Receipt> {
 		selected: r.selected,
 		reason: r.reason,
 		session: r.session,
-		codexModel: codexResearchModel(row.snapshot),
 	});
 	const logFields = {
 		inferenceId: row.id,
@@ -256,7 +253,6 @@ async function attempt(r: Request, source: Source): Promise<Receipt> {
 			"inference.attempt_failed",
 			{
 				...logFields,
-				...(error instanceof CodexResearchFailure ? error.diagnostic : {}),
 				reason: code,
 				durationMs: Math.round(performance.now() - started),
 			},
@@ -272,15 +268,6 @@ async function attempt(r: Request, source: Source): Promise<Receipt> {
 /** Runs the request: larm first (unless cloud-only), then the cloud fallback when allowed. */
 async function runAttempts(r: Request, key: string): Promise<Receipt> {
 	const { env, row } = r;
-	if (row.controlEngine === "codex") {
-		if (
-			row.mode !== "control" ||
-			row.purpose !== "llm" ||
-			!env.options.codexResearch
-		)
-			throw new Error("codex_research_unavailable");
-		return attempt(r, "codex");
-	}
 	const mode = route(r).mode;
 	if (mode !== "cloud-only") {
 		if (
@@ -427,6 +414,7 @@ export async function executeRequest(
 		...(session?.toolChoice && tools?.length
 			? { toolChoice: session.toolChoice }
 			: {}),
+		...(session?.speaks ? { speaks: true as const } : {}),
 		...(session?.outputLimit ? { outputLimit: session.outputLimit } : {}),
 		control,
 		outputContract,

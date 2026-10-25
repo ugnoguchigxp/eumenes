@@ -10,21 +10,6 @@ export const searchAgentCases = [
 		answerPattern: /宮城/,
 	},
 	{
-		id: "codex",
-		question: "AIの最新ニュースを教えて",
-		expectedPackage: "package:web.search@1",
-		queryPattern: /(?:\bAI\b|人工知能|\bLLM\b|transformer)/i,
-		answerPattern: /AI|LLM/,
-	},
-	{
-		id: "model-detail",
-		question:
-			"LFM2.5-24B-A2B というモデルが出たそうです。どんなモデルか調査して詳細を教えて",
-		expectedPackage: "package:web.search@1",
-		queryPattern: /LFM2\.5-24B-A2B/i,
-		answerPattern: /LFM2\.5-24B-A2B/,
-	},
-	{
 		id: "stock",
 		question: "マイクロソフトの最新の株価を教えて",
 		expectedPackage: "package:web.recipe@1",
@@ -90,7 +75,6 @@ export function assessSearchAgent(
 		// This is a test-case keyword signal, not semantic grading of news content.
 		queryTargetsRequest:
 			c.queryPattern.test(queries[0]?.query ?? "") &&
-			(c.id !== "codex" || /ニュース|news/i.test(queries[0]?.query ?? "")) &&
 			(!quotePattern ||
 				/株価|stock|share|quote/i.test(queries[0]?.query ?? "")),
 		stockQuote:
@@ -103,19 +87,7 @@ export function assessSearchAgent(
 					quotePattern.test(text) &&
 					/(?:\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}月\d{1,2}日)/.test(text),
 			),
-		requestedResult:
-			c.id !== "codex"
-				? c.answerPattern.test(result.answer ?? "")
-				: (result.report?.claims.length ?? 0) >= 3 &&
-					(result.report?.claims.length ?? 0) <= 5,
-		bulletList:
-			c.id !== "codex" ||
-			(() => {
-				const n = (
-					result.answer?.match(/^\s*(?:[-*・●]|\d+[.)、])\s*\S/gm) ?? []
-				).length;
-				return n >= 3 && n <= 5;
-			})(),
+		requestedResult: c.answerPattern.test(result.answer ?? ""),
 		noGrading: result.verifierCalls?.n === 0,
 	};
 	return { ok: Object.values(checks).every(Boolean), checks };

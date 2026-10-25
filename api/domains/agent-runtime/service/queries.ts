@@ -6,7 +6,7 @@ import type { Answer } from "./answer";
 import { active, type RuntimeContext } from "./runtime-context";
 
 export function createQueries(ctx: RuntimeContext, answer: Answer) {
-	const { store, capabilities, tools, inference, now } = ctx.deps;
+	const { store, capabilities, tools, now } = ctx.deps;
 	const { prepared } = ctx.state;
 	const { reportInTransaction } = answer;
 	return {
@@ -55,12 +55,6 @@ export function createQueries(ctx: RuntimeContext, answer: Answer) {
 				task.cancel_epoch !== input.cancelEpoch
 			)
 				throw new Error("origin_invalid");
-		},
-		conversationContextInTransaction(db: Database) {
-			return {
-				codexEnabled: inference.codexResearchAvailable?.() ?? false,
-				requirementCatalog: capabilities.requirementCatalogInTransaction(db),
-			};
 		},
 		/**
 		 * What a bound operation did for this run, read in the transaction that ran it: the

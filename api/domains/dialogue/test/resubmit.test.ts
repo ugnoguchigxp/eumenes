@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { waitFor } from "../../../infrastructure/wait-for";
-import { IMAGE, respond, setup, type Harness } from "./generation.fixture";
+import { IMAGE, setup, type Harness } from "./generation.fixture";
 
 /**
  * The latest utterance stopped, corrected and answered again (the prompt edit design, sections 3 and 4): only
@@ -12,7 +12,6 @@ afterEach(async () => {
 	h = undefined;
 });
 
-const chat = respond();
 const submit = (text: string, extra: { presentation?: "artifact" } = {}) =>
 	h!.dialogue.submit({
 		requestId: crypto.randomUUID(),
@@ -33,7 +32,7 @@ test("an edit while the answer is generated stops the run, corrects the utteranc
 	h = await setup();
 	let release!: () => void;
 	h.state.gate = new Promise<void>((resolve) => (release = resolve));
-	h.state.steps.push({ text: "犬です。", calls: [chat] });
+	h.state.steps.push({ text: "犬です。" });
 	const first = await submit("犬の絵を描いて");
 	await waitFor(() => h!.state.calls.length === 1);
 	const result = await resubmit(first.inputMessageId, "猫の絵を描いて");
@@ -52,7 +51,7 @@ test("an edit while the answer is generated stops the run, corrects the utteranc
 	);
 	// The log's pending copy is the corrected one: the next generation reads what the user meant.
 	expect(pending().map((e) => h!.fields(e).text)).toEqual(["猫の絵を描いて"]);
-	h.state.steps.push({ text: "猫です。", calls: [chat] });
+	h.state.steps.push({ text: "猫です。" });
 	release();
 	await waitFor(() => h!.dialogue.get(result.run.id)?.status === "completed");
 	expect(h.dialogue.answerText(result.run.id)).toBe("猫です。");
@@ -84,7 +83,7 @@ test("the same text sends the utterance again without a correction", async () =>
 				.get(),
 		),
 	).toEqual({ n: 0 });
-	h.state.steps.push({ text: "晴れです。", calls: [chat] });
+	h.state.steps.push({ text: "晴れです。" });
 	h.start();
 	await waitFor(() => h!.dialogue.get(result.run.id)?.status === "completed");
 });
@@ -96,7 +95,7 @@ test("an utterance stopped by the user can be edited and answered", async () => 
 	const result = await resubmit(first.inputMessageId, "B");
 	if (!result.ok) throw new Error(result.code);
 	expect(h.dialogue.get(first.id)?.error).toBe("cancel_requested");
-	h.state.steps.push({ text: "Bです。", calls: [chat] });
+	h.state.steps.push({ text: "Bです。" });
 	h.start();
 	await waitFor(() => h!.dialogue.get(result.run.id)?.status === "completed");
 	expect(h.state.calls.at(-1)!.messages.at(-1)!.content).toContain("B");
@@ -104,7 +103,7 @@ test("an utterance stopped by the user can be edited and answered", async () => 
 
 test("an answered utterance is not edited, and nothing changes", async () => {
 	h = await setup();
-	h.state.steps.push({ text: "こんにちは。", calls: [chat] });
+	h.state.steps.push({ text: "こんにちは。" });
 	const done = await h.say("やあ");
 	const before = runCount();
 	expect(await resubmit(done.inputMessageId, "おはよう")).toEqual({
@@ -198,7 +197,7 @@ test("finding a toolchain commits nothing: the utterance is still edited, and it
 	h.state.gate = new Promise<void>((resolve) => (first = resolve));
 	h.state.steps.push(
 		{ calls: [{ name: "find_toolchain", args: { query: "絵" } }] },
-		{ text: "描きます。", calls: [chat] },
+		{ text: "描きます。" },
 	);
 	const run = await submit("犬の絵");
 	await waitFor(() => h!.state.calls.length === 1);
@@ -208,7 +207,7 @@ test("finding a toolchain commits nothing: the utterance is still edited, and it
 	const result = await resubmit(run.inputMessageId, "猫の絵");
 	if (!result.ok) throw new Error(result.code);
 	expect(h.conversation.message(run.inputMessageId)?.runId).toBe(result.run.id);
-	h.state.steps.push({ text: "猫です。", calls: [chat] });
+	h.state.steps.push({ text: "猫です。" });
 	second();
 	await waitFor(() => h!.dialogue.get(result.run.id)?.status === "completed");
 	expect(

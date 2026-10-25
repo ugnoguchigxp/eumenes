@@ -13,8 +13,8 @@ import type {
 	ToolchainRoutingPort,
 } from "../contracts/toolchains";
 import { COMMAND_KIND, type ChatMessage } from "../service/context";
-import { respond } from "./generation.fixture";
 import { openDialogueStore } from "./store.fixture";
+import { testConversationAgent } from "./conversation-agent.fixture";
 
 export const REVISION = "toolchain:fake.manage@1";
 export const BINDING = "binding:fake.command@1";
@@ -126,8 +126,6 @@ export async function setup(
 		commands: [] as Command[],
 		/** Host-issued choices per question schema ref. */
 		choices: {} as Record<string, Array<{ ref: string; label: string }>>,
-		/** The saved sub-agent resource (settings.subagent.resourceId). */
-		subagentResourceId: null as string | null,
 	};
 	const calls: Array<{ messages: ChatMessage[]; tools: string[] }> = [];
 	/** Indexes of the model calls made after a delegation or a command answer already handed the work over. */
@@ -154,9 +152,6 @@ export async function setup(
 		releaseTaskSession: async (taskId: string) => {
 			releasedSessions.push(taskId);
 		},
-		snapshotInTransaction: () => ({
-			subagent: { resourceId: state.subagentResourceId },
-		}),
 		captureControlInTransaction: (_db: unknown, input: { subject: string }) => {
 			if (input.subject.endsWith(":command"))
 				commandCaptures.push(input as Record<string, unknown>);
@@ -198,8 +193,7 @@ export async function setup(
 			});
 			// A call right after a handover is not part of the script: the generation should have ended there.
 			const step = afterHandover(messages)
-				? (afterHandoverCalls.push(calls.length - 1),
-					{ calls: [respond()] } as Step)
+				? (afterHandoverCalls.push(calls.length - 1), {} as Step)
 				: state.steps.shift();
 			if (!step) throw new Error("fixture_step_missing");
 			signal.throwIfAborted();
@@ -217,10 +211,6 @@ export async function setup(
 		},
 	} as unknown as InferencePort;
 	const agents = {
-		conversationContextInTransaction: () => ({
-			codexEnabled: false,
-			requirementCatalog: [],
-		}),
 		startInTransaction: (_db: unknown, input: Record<string, any>) => {
 			started.push(input);
 			// The saved operation is known at once: its answer is ready for the run that started it.
@@ -402,7 +392,16 @@ export async function setup(
 			return typeof value === "function" ? value.bind(target) : value;
 		},
 	});
+	/** The conversations the conversation agent was told a TODO changed in (its opportunity to report it). */
+	const workChanged: string[] = [];
 	const dialogue = createDialogueService({
+		conversationAgent: testConversationAgent,
+		agency: {
+			stateForContextInTransaction: () => [],
+			workChangedInTransaction: (_db, conversationId) => {
+				workChanged.push(conversationId);
+			},
+		},
 		store,
 		conversation,
 		larm,
@@ -428,6 +427,7 @@ export async function setup(
 		interactions: dialogue.interactions,
 		state,
 		calls,
+		workChanged,
 		afterHandoverCalls,
 		commandPrompts,
 		commandSchemas,
@@ -445,11 +445,9 @@ export async function setup(
 		rows: (sql: string, ...params: Array<string | number>) =>
 			store.read((db) => db.query(sql).all(...params) as any[]),
 		todos: () => store.read((db) => dialogue.todosInTransaction(db, "main")),
-		/** The material JSON document the nth model call received (messages[1]). */
-		materialOf: (call: number) => calls[call]!.messages[1]!.content,
-		/** Script the conversation model's next call: speech and a closing `respond`. */
+		/** Script the conversation model's next call: speech. */
 		speak(text: string) {
-			state.steps.push({ text, calls: [respond()] });
+			state.steps.push({ text });
 		},
 		/** Script the conversation model to find the command toolchain and delegate the request to it. */
 		delegate(request: string, announcement = "担当に引き継ぎます。") {
@@ -488,8 +486,8 @@ export async function setup(
 			return dialogue.get(accepted.id)!;
 		},
 		/**
-		 * The command sub-agent asks one question for a delegated request; the conversation then speaks it. Resolves
-		 * with the delegating run once it completed.
+		 * The command sub-agent asks one question for a delegated request. The waiting TODO carries it and the
+		 * conversation agent is told (no generation speaks it). Resolves with the delegating run once it completed.
 		 */
 		async asked(
 			prompt = "何秒ですか",
@@ -502,7 +500,6 @@ export async function setup(
 				answerSchema: schema,
 			});
 			h.delegate(request);
-			h.speak(prompt);
 			return h.say(request);
 		},
 		/** Put a command job on a fresh run directly, without the conversation's delegation (the queue starts here). */

@@ -1,7 +1,7 @@
 import {
 	callsOf,
 	candidatesOf,
-	isResultRound,
+	isNoticeRound,
 	isUtteranceRound,
 	searchThenDelegate,
 } from "../toolchain/conversation-script.fixture";
@@ -208,7 +208,7 @@ export async function boot(steps: Step[], options: BootOptions = {}) {
 					languages: ["ja"],
 					confidence: 0.99,
 				});
-			if (isUtteranceRound(callOptions?.tools) && !isResultRound(messages)) {
+			if (isUtteranceRound(callOptions?.tools) && !isNoticeRound(messages)) {
 				// The conversation's round: search for the World query toolchain, then hand the question over.
 				const question = messages
 					.filter((m) => m.role === "user")

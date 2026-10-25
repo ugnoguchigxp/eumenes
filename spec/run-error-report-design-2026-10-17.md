@@ -21,7 +21,7 @@
 
 ### 3.1 診断レポート（backend が組み立てる）
 
-dialogue が `GET /api/runs/:id/error-report` を公開し、失敗した run（`status=failed`、または調査失敗の固定返答で完了した run）について、次の固定形式のテキストを返す。各情報は所有 domain の公開操作から読む（dialogue が他 domain の DB を直接読まない）。ログは infrastructure にログ読み取りの公開操作を設け、`scripts/logs.ts` と同じ読み取りを使う。
+dialogue が `GET /api/runs/:id/error-report` を公開し、失敗した run（`status=failed`、中断した `status=interrupted`（E4）、または調査失敗の固定返答で完了した run）について、次の固定形式のテキストを返す。各情報は所有 domain の公開操作から読む（dialogue が他 domain の DB を直接読まない）。ログは infrastructure にログ読み取りの公開操作を設け、`scripts/logs.ts` と同じ読み取りを使う。
 
 ```text
 # Eumenes エラーレポート
@@ -91,3 +91,4 @@ dialogue が `GET /api/runs/:id/error-report` を公開し、失敗した run（
 | E1 | 対象 | 決定: (a) 会話の run の失敗（その run から起動したサブエージェント・操作の失敗を含む）。それ以外の画面・機能の失敗は対象外 |
 | E2 | 依頼文を含めるか | 決定: (a) 含めない（ログ規約どおり） |
 | E3 | 調査失敗の固定返答で完了した run も対象にするか | 決定: (a) 対象にする |
+| E4 | 中断（`status=interrupted`）で終わった run も対象にするか | 決定（2026-10-24）: (a) 対象にする。回答が出ないまま終わったので、失敗と同じく AI の回答の位置にエラー吹き出しを出し、レポートの結果欄は `interrupted / <理由>` |

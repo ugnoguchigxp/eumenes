@@ -152,7 +152,6 @@ export function registerDrawingOperations(deps: {
 				? inference.captureUserControlInTransaction!(db, {
 						...capture,
 						subject: `drawing-task:${r.id}-plan`,
-						route: "subagent",
 					})
 				: inference.captureControlInTransaction(db, capture);
 			return {

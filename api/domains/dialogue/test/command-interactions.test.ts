@@ -38,7 +38,6 @@ test("a delegation to a command toolchain opens a command TODO and hands the run
 	h = await setup();
 	h.state.commands.push({ action: "clarify", question: "どれ" });
 	h.delegate("偽の操作を開始して");
-	h.speak("どれですか。");
 	const run = await h.say("偽の操作を開始して");
 	expect(
 		h.rows(
@@ -57,11 +56,10 @@ test("a delegation ends the generation: the model is not called again after the 
 	h = await setup();
 	h.state.commands.push({ action: "clarify", question: "どれ" });
 	h.delegate("偽の操作を開始して");
-	h.speak("どれですか。");
 	await h.say("偽の操作を開始して");
-	// find_toolchain, delegate, and then the speaking generation the question triggers: three calls, no more.
+	// find_toolchain and delegate: the question the sub-agent asks is the agent's to say on its own opportunity.
 	expect(h.afterHandoverCalls).toEqual([]);
-	expect(h.calls).toHaveLength(3);
+	expect(h.calls).toHaveLength(2);
 });
 
 test("a command chain without a binding or with an unknown backend is refused before any execution", async () => {
@@ -84,7 +82,6 @@ test("a bound chain runs through the generic action route with the binding's ada
 		tool: "fake.start",
 		arguments: { seconds: 90 },
 	});
-	h.speak("設定しました。");
 	const run = await h.commandRun();
 	await until(() => h!.started.length === 1);
 	const start = h.started[0]!;
@@ -129,38 +126,20 @@ test("an operation without an interaction carries no frozen stamp", async () => 
 		tool: "fake.start",
 		arguments: { seconds: 5 },
 	});
-	h.speak("設定しました。");
 	await h.commandRun();
 	await until(() => h!.started.length === 1);
 	expect(h.started[0]!.input.command).not.toHaveProperty("stamp");
 });
 
-test("the command sub-agent runs as a sub-agent of its run, on LARM unless a sub-agent resource is saved", async () => {
+test("the command sub-agent runs as a sub-agent of its run, as one call", async () => {
 	h = await setup({ autoStart: false });
 	h.state.commands.push({ action: "clarify", question: "どれ" });
-	h.speak("どれですか。");
 	const first = await h.commandRun();
 	await until(() => h!.commandSessions.length === 1);
-	expect(h.commandCaptures[0]!.route).toBe("larm-only");
 	expect(h.commandSessions[0]).toEqual({
 		sessionRole: "subagent",
 		taskId: first.id,
 	});
 	// The command is one call: its session is released as the call ends.
 	await until(() => h!.releasedSessions.includes(first.id));
-});
-
-test("a saved sub-agent resource routes the command sub-agent's call to it", async () => {
-	h = await setup({ autoStart: false });
-	const resourceId = crypto.randomUUID();
-	h.state.subagentResourceId = resourceId;
-	h.state.commands.push({ action: "clarify", question: "どれ" });
-	h.speak("どれですか。");
-	const second = await h.commandRun("別の操作を開始して");
-	await until(() => h!.commandSessions.length === 1);
-	expect(h.commandCaptures[0]!.route).toEqual({ resourceId });
-	expect(h.commandSessions[0]).toEqual({
-		sessionRole: "subagent",
-		taskId: second.id,
-	});
 });

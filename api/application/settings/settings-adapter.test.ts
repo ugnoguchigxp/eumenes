@@ -191,7 +191,7 @@ test("describePath accepts leaves and stable-id array elements and rejects objec
 		"$.resources[id=$target].speed",
 		"$.connections[id=$target].name",
 		"$.connections[id=$target].auth",
-		"$.subagent.resourceId",
+		"$.world.curationResourceId",
 	])
 		expect(ok(path)).toBe(true);
 	for (const path of [
@@ -597,7 +597,7 @@ test("the registered settings bundle applies a draft through the action ledger a
 			eventCreatedAt: new Date(now).toISOString(),
 			eventExpiresAt: new Date(now + 60_000).toISOString(),
 			artifactId: "tab-1",
-			artifactRevisionId: "artifact:settings.conversation@7",
+			artifactRevisionId: "artifact:settings.conversation@8",
 			source,
 			sourceRevision: revision,
 			actionId: "apply",
@@ -1032,11 +1032,10 @@ test("connection targets name the auth method and never claim a Claude login", a
 	expect(JSON.stringify(targets)).not.toContain("setup-token");
 });
 
-test("deleting a model or connection also frees the dedicated World and sub-agent models that used it", async () => {
+test("deleting a model or connection also frees the dedicated World model that used it", async () => {
 	const h = await setup();
 	const { connectionId } = await withModels(h);
 	const worldModel = uuid();
-	const subagentModel = uuid();
 	await apply(h, {
 		expectedRevision: rev(h),
 		structural: [
@@ -1046,17 +1045,10 @@ test("deleting a model or connection also frees the dedicated World and sub-agen
 				purpose: "llm",
 				model: "world-model",
 			}),
-			structure(ADD_RESOURCE, {
-				resourceId: subagentModel,
-				connectionId,
-				purpose: "llm",
-				model: "subagent-model",
-			}),
 		],
 	});
 	const current = h.settings.get();
 	current.world.curationResourceId = worldModel;
-	current.subagent.resourceId = subagentModel;
 	await h.settings.apply({
 		requestId: uuid(),
 		expectedRevision: current.revision,
@@ -1065,15 +1057,13 @@ test("deleting a model or connection also frees the dedicated World and sub-agen
 	});
 	await apply(h, {
 		expectedRevision: rev(h),
-		structural: [structure(DELETE_RESOURCE, { resourceId: subagentModel })],
+		structural: [structure(DELETE_RESOURCE, { resourceId: worldModel })],
 	});
-	expect(h.settings.get().subagent.resourceId).toBeNull();
-	expect(h.settings.get().world.curationResourceId).toBe(worldModel);
+	expect(h.settings.get().world.curationResourceId).toBeNull();
 	await apply(h, {
 		expectedRevision: rev(h),
 		structural: [structure(DELETE_CONNECTION, { connectionId })],
 	});
-	expect(h.settings.get().world.curationResourceId).toBeNull();
 	expect(h.settings.get().resources).toEqual([]);
 });
 

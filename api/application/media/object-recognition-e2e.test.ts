@@ -20,7 +20,7 @@ test("authenticated upload → detection → stored source → chat attachment w
 		expect(
 			(await h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 }))?.status,
 		).toBe("completed");
-		expect(f.stages).toEqual(["route", "command", "answer"]);
+		expect(f.stages).toEqual(["route", "command"]);
 		expect(
 			await (
 				await h.request("/api/object-recognition/commands?conversationId=main")

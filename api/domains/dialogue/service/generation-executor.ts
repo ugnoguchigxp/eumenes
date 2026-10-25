@@ -1,11 +1,7 @@
 import { isSystemPrompt } from "../contracts";
 import type { DialogueDeps } from "./context";
 import type { ToolExecutor, ToolOutcome } from "./generation-loop";
-import {
-	type MemoryArgs,
-	type ParsedCall,
-	type RespondArgs,
-} from "./generation-tools";
+import { type MemoryArgs, type ParsedCall } from "./generation-tools";
 
 import {
 	createExecutorContext,
@@ -87,7 +83,6 @@ export async function memory(
 		handle(tx);
 		return {
 			result: { accepted: true, requestId: accepted.id },
-			basis: "work",
 		};
 	});
 }
@@ -117,7 +112,6 @@ export function createGenerationExecutor(
 	return {
 		execute,
 		handover: () => x.state.handover,
-		answered: (respond: RespondArgs, repaired: boolean) =>
-			answered(x, respond, repaired),
+		answered: () => answered(x),
 	};
 }

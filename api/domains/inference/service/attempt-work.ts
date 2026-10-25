@@ -10,7 +10,6 @@ import type {
 import type { Connection } from "../../settings";
 import { controlJsonOptions, type Messages } from "../contracts";
 import { cloudRequest } from "./cloud";
-import { codexResearchModel } from "./codex-model";
 import { sessionCallOptions } from "./attempt-record";
 
 import type { Input, Request, Source } from "./execute-types";
@@ -52,6 +51,7 @@ export function callOptionsFor(r: Request, attemptId: string): LarmCallOptions {
 			? {
 					tools: r.tools,
 					...(r.toolChoice ? { toolChoice: r.toolChoice } : {}),
+					...(r.speaks ? { speaks: true as const } : {}),
 					onToolCalls: (
 						calls: import("../../../infrastructure/chat-stream").NativeToolCall[],
 					) => {
@@ -210,13 +210,6 @@ export function startWork(
 	},
 ): Promise<string | Uint8Array> {
 	const { env, row } = r;
-	if (args.source === "codex")
-		return env.options.codexResearch!.execute(
-			r.input as Messages,
-			args.attemptSignal,
-			r.control,
-			codexResearchModel(row.snapshot),
-		);
 	if (args.source === "cloud")
 		return cloudRequest(
 			{

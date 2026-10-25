@@ -259,31 +259,15 @@ test("a dedicated resource that can not be used falls back to the conversation r
 		h.inference.captureInTransaction(db, "root", "llm", Date.now() + 60000),
 	);
 	expect(root).toBeTruthy();
-	const control = (subject: string, resourceId: string) =>
-		h.store.write((db) =>
-			h.inference.captureControlInTransaction!(db, {
-				subject,
-				policySubject: "root",
-				deadline: Date.now() + 20000,
-				maxOutputTokens: 512,
-				route: { resourceId },
-			}),
-		);
 	// Same billing path: the saved conversation route, as before.
 	const keep = ["larm-preferred", true, llm.id];
 	expect(routeOf(await background("same", samePath.resource.id))).toEqual(keep);
-	expect(routeOf(await control("agent:same", samePath.resource.id))).toEqual(
-		keep,
-	);
 	// Another billing path: the call stays on LARM, it is not moved to the conversation's cloud.
 	const larmOnly = ["larm-only", false, llm.id];
 	expect(routeOf(await background("other", otherPath.resource.id))).toEqual(
 		larmOnly,
 	);
-	expect(routeOf(await control("agent:other", otherPath.resource.id))).toEqual(
-		larmOnly,
-	);
-	// Without a route a control request stays on LARM, as before.
+	// A control request has no route of its own: it stays on LARM.
 	const plain = await h.store.write((db) =>
 		h.inference.captureControlInTransaction!(db, {
 			subject: "agent:plain",

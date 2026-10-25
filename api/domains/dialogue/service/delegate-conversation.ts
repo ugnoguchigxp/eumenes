@@ -19,7 +19,6 @@ export function delegateConversation(
 		route: "web" | "history" | "world" | "action";
 		request: string;
 		packageRevisionId?: string;
-		researcher?: "codex";
 		command?: unknown;
 	},
 	context: {
@@ -40,7 +39,6 @@ export function delegateConversation(
 			...(selected.packageRevisionId
 				? { packageRevisionId: selected.packageRevisionId }
 				: {}),
-			...(selected.researcher ? { researcher: selected.researcher } : {}),
 			...(selected.command ? { command: selected.command } : {}),
 		},
 		deadline: Date.parse(run.deadlineAt!),
@@ -65,25 +63,22 @@ export function availableToolchainsInTransaction(
 ): Set<string> {
 	const { agents, toolchains } = deps;
 	if (!toolchains) return new Set();
-	const context = agents?.conversationContextInTransaction?.(db);
 	const ready = (requires: string | undefined) =>
 		requires === undefined || requires === "world"
 			? !!agents
-			: requires === "codex"
-				? !!context?.codexEnabled
-				: requires === "excalidraw"
-					? !!deps.excalidraw
-					: requires === "object-recognition"
-						? !!deps.objectRecognition
-						: requires === "image"
-							? !!deps.image
-							: requires === "music"
-								? !!deps.music
-								: requires === "dots"
-									? !!deps.delegation &&
-										deps.delegation.prepareInTransaction(db, run).available !==
-											false
-									: false;
+			: requires === "excalidraw"
+				? !!deps.excalidraw
+				: requires === "object-recognition"
+					? !!deps.objectRecognition
+					: requires === "image"
+						? !!deps.image
+						: requires === "music"
+							? !!deps.music
+							: requires === "dots"
+								? !!deps.delegation &&
+									deps.delegation.prepareInTransaction(db, run).available !==
+										false
+								: false;
 	return new Set(
 		toolchains
 			.catalogInTransaction(db)

@@ -69,7 +69,6 @@ export function registerImageHandlers(
 				? inference.captureUserControlInTransaction!(db, {
 						...capture,
 						subject: `image-task:${r.id}-plan`,
-						route: "subagent",
 					})
 				: inference.captureControlInTransaction(db, capture);
 			return {

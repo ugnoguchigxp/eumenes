@@ -8,11 +8,7 @@ const input = {
 	segments: [{ location: "hidden", text: "External source material." }],
 	findings: [],
 } as const;
-function harness(
-	resourceId: string | null = null,
-	accepted = true,
-	abort?: AbortController,
-) {
+function harness(accepted = true, abort?: AbortController) {
 	const store = {
 		write: async (fn: (db: unknown) => unknown) => fn({}),
 	} as unknown as SqliteStore;
@@ -28,7 +24,6 @@ function harness(
 		};
 	});
 	const inference = {
-		snapshotInTransaction: () => ({ subagent: { resourceId } }),
 		captureBackgroundControlInTransaction: capture,
 		executeControl: execute,
 		acceptInTransaction: accept,
@@ -42,37 +37,33 @@ function harness(
 		execute,
 	};
 }
-test("web assessment uses the saved route in one isolated exact control task", async () => {
-	for (const resourceId of [null, "saved-resource"]) {
-		const h = harness(resourceId);
-		expect((await h.review(input)).decision).toBe("source_content");
-		const captured = h.capture.mock.calls[0] as unknown as [
-			unknown,
-			{ route: unknown; structuredOutput: boolean; maxOutputTokens: number },
-		];
-		expect(captured[1].route).toEqual(
-			resourceId ? { resourceId } : "conversation",
-		);
-		expect(captured[1].structuredOutput).toBe(true);
-		const execution = h.execute.mock.calls[0] as unknown as [
-			string,
-			{ role: string }[],
-			AbortSignal,
-			{ reasoningEffort: string },
-			unknown,
-		];
-		expect(execution[1].map((m) => m.role)).toEqual(["system", "user"]);
-		expect(execution[3].reasoningEffort).toBe("low");
-		expect(execution[4]).toEqual({ sessionRole: "auxiliary" });
-		expect(h.accept).toHaveBeenCalledTimes(1);
-		expect(h.cancel).toHaveBeenCalledTimes(1);
-	}
+test("web assessment uses the conversation route in one isolated exact control task", async () => {
+	const h = harness();
+	expect((await h.review(input)).decision).toBe("source_content");
+	const captured = h.capture.mock.calls[0] as unknown as [
+		unknown,
+		{ route: unknown; structuredOutput: boolean; maxOutputTokens: number },
+	];
+	expect(captured[1].route).toBe("conversation");
+	expect(captured[1].structuredOutput).toBe(true);
+	const execution = h.execute.mock.calls[0] as unknown as [
+		string,
+		{ role: string }[],
+		AbortSignal,
+		{ reasoningEffort: string },
+		unknown,
+	];
+	expect(execution[1].map((m) => m.role)).toEqual(["system", "user"]);
+	expect(execution[3].reasoningEffort).toBe("low");
+	expect(execution[4]).toEqual({ sessionRole: "auxiliary" });
+	expect(h.accept).toHaveBeenCalledTimes(1);
+	expect(h.cancel).toHaveBeenCalledTimes(1);
 });
 test("a rejected or cancelled inference receipt never clears the document", async () => {
-	const rejected = harness(null, false);
+	const rejected = harness(false);
 	await expect(rejected.review(input)).rejects.toThrow("web_review_stale");
 	const abort = new AbortController();
-	const cancelled = harness(null, true, abort);
+	const cancelled = harness(true, abort);
 	await expect(
 		cancelled.review({ ...input, signal: abort.signal }),
 	).rejects.toBeDefined();

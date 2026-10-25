@@ -45,32 +45,19 @@ const selection = (runId: string, extra: Record<string, unknown> = {}) => ({
 	...extra,
 });
 
-test("the judgment of the first round is kept with the selection and replaced by a retry", async () => {
+test("a selection keeps no classification of the request: a retry replaces the earlier decision as a whole", async () => {
 	const { store, history } = setup();
-	const judged = {
-		kind: "live_info" as const,
-		freshness: "live" as const,
-		next: "toolchain" as const,
-		impact: "none" as const,
-		approved: false,
-	};
 	await store.write((db) => {
+		history.recordSelectionInTransaction(db, selection("run"));
 		history.recordSelectionInTransaction(
 			db,
-			selection("run", { analysis: judged }),
+			selection("run", { request: "鎌倉市の天気" }),
 		);
-		history.recordSelectionInTransaction(db, selection("plain"));
 	});
-	expect(history.getSelection("run")?.analysis).toEqual(judged);
-	// A decision made without a first round has no judgment.
-	expect(history.getSelection("plain")).not.toHaveProperty("analysis");
-	await store.write((db) =>
-		history.recordSelectionInTransaction(
-			db,
-			selection("run", { analysis: { ...judged, impact: "create" } }),
-		),
-	);
-	expect(history.getSelection("run")?.analysis?.impact).toBe("create");
+	const saved = history.getSelection("run");
+	expect(saved).toMatchObject({ request: "鎌倉市の天気" });
+	expect(saved).not.toHaveProperty("analysis");
+	expect(saved).not.toHaveProperty("repaired");
 });
 
 test("a retried attempt replaces the decision and the first terminal outcome wins", async () => {

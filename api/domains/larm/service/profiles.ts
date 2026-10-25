@@ -31,6 +31,8 @@ export type Lease = {
 	agentProfile: string;
 	useCount: number;
 	closing: boolean;
+	/** Left to LARM's expiry at close (host shutdown): no borrower releases it afterwards. */
+	kept?: boolean;
 	/** Coalesces cleanup by the last borrower, recovery and close. Kept after a confirmed release. */
 	release?: Promise<void>;
 	renewTimer?: ReturnType<typeof setTimeout>;

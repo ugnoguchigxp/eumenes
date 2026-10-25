@@ -2,14 +2,8 @@ import type { Database } from "bun:sqlite";
 import type { Run } from "../contracts";
 import { byId } from "../repository";
 import type { DialogueDeps } from "./context";
-import { heardOf, todoRefsOf } from "./event-fields";
 import type { ToolOutcome } from "./generation-loop";
-import {
-	TOOL_NAMES,
-	toolRejection,
-	type ParsedCall,
-	type WorkArgs,
-} from "./generation-tools";
+import { type ParsedCall, type WorkArgs } from "./generation-tools";
 import { endRun } from "./run-end";
 import { activeFields, todoOf } from "./work-ledger";
 import { dispatchInTransaction } from "./work-dispatch";
@@ -21,7 +15,7 @@ import {
 	type ExecutorContext,
 } from "./executor-context";
 
-/* The operations on the conversation's TODOs (sections 6.1, 9.4). */
+/* The operations on the conversation's TODOs (section 6.1). */
 export async function work(
 	x: ExecutorContext,
 	call: ParsedCall,
@@ -53,46 +47,14 @@ export async function work(
 			};
 			if (args.operation === "check") {
 				const checked = ledger.checkInTransaction(tx, row.id)!;
-				x.state.checked.add(row.id);
 				record({});
-				return { result: { ok: true, ...state(checked) }, basis: "work" };
+				return { result: { ok: true, ...state(checked) } };
 			}
 			if (row.revision !== args.revision)
 				return { result: { ok: false, code: "revision_stale", ...state() } };
 			// Finished work is not answered, amended or cancelled: its result stays as it was reported.
-			if (row.status === "done" && args.operation !== "archive")
+			if (row.status === "done")
 				return { result: { ok: false, code: "todo_done", ...state() } };
-			if (args.operation === "archive") {
-				if (row.status !== "done")
-					return { result: { ok: false, code: "todo_not_done", ...state() } };
-				if (!args.told)
-					throw toolRejection("invalid_tool_arguments", [
-						{ tool: TOOL_NAMES.work, path: "told", reason: "told_required" },
-					]);
-				const told = args.told === "this" ? `run:${run.id}` : args.told;
-				ledger.requestArchiveInTransaction(tx, row.id, told);
-				record({ told: args.told });
-				// Told before (an earlier utterance heard in full), or the user's own utterance saying it is not needed:
-				// confirmed now. "this" waits for this utterance's delivery (section 9.4).
-				const basis =
-					args.told === "this" ? "this" : toldBy(x, tx, row.id, args.told);
-				if (basis === "heard" || basis === "dismissed") {
-					ledger.archiveInTransaction(tx, row.id);
-					acted(tx, `work:${row.id}:archived`, {
-						action: "work.archived",
-						todo: row.id,
-					});
-					return { result: { ok: true, archived: true }, basis: "work" };
-				}
-				return {
-					result: {
-						ok: true,
-						archived: false,
-						pending: basis === "this" ? "delivery" : "not_heard",
-					},
-					basis: "work",
-				};
-			}
 			if (row.execution === "task")
 				return controlExecution(x, tx, run, row, args, record, state);
 			if (args.operation === "answer")
@@ -121,7 +83,7 @@ export async function work(
 					result: null,
 				});
 				record({});
-				return { result: { ok: true, ...state(next ?? row) }, basis: "work" };
+				return { result: { ok: true, ...state(next ?? row) } };
 			}
 			return { result: { ok: false, code: "amend_unsupported", ...state() } };
 		});
@@ -135,26 +97,6 @@ export async function work(
 	}
 	if (cancelled.length) deps.queue.flushCancellations(cancelled);
 	return outcome;
-}
-
-/**
- * What a told event is (section 9.4): an earlier agent utterance that named this TODO and was heard in full, or the
- * user's own utterance (saying the result is not needed). Anything else does not confirm the archive.
- */
-export function toldBy(
-	x: ExecutorContext,
-	tx: Database,
-	todoId: string,
-	eventId: string,
-): "heard" | "dismissed" | "none" {
-	const { input, events } = x;
-	const log = events.logInTransaction(tx, input.conversationId);
-	const said = log.find((event) => event.id === eventId);
-	if (!said || said.type !== "said") return "none";
-	if (said.by === "user") return "dismissed";
-	return todoRefsOf(said).includes(todoId) && heardOf(log, said.id) === "full"
-		? "heard"
-		: "none";
 }
 
 /** Answer, amend or cancel a task execution through its own control (section 6.1). */
@@ -250,7 +192,7 @@ export function controlExecution(
 						: { status: "todo" },
 				);
 	record({});
-	return { result: { ok: true, ...state(next ?? row) }, basis: "work" };
+	return { result: { ok: true, ...state(next ?? row) } };
 }
 
 /**
@@ -315,7 +257,6 @@ export function answerCommand(
 	x.state.handover = { announcement: "", handed: true, workId: row.id };
 	return {
 		result: { ok: true, ...state(moved ?? row) },
-		basis: "work",
 		end: true,
 	};
 }

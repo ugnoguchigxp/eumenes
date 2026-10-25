@@ -2,7 +2,6 @@ import { afterEach, expect, test } from "bun:test";
 import type { LarmPort } from "../../domains/larm";
 import {
 	callsOf,
-	isResultRound,
 	isUtteranceRound,
 	searchThenDelegate,
 } from "../toolchain/conversation-script.fixture";
@@ -93,7 +92,7 @@ async function rig() {
 				if (!step) throw new Error("script_specialist_missing");
 				return JSON.stringify(step(messages as Prompt));
 			}
-			if (isUtteranceRound(options?.tools) && !isResultRound(messages)) {
+			if (isUtteranceRound(options?.tools)) {
 				// The conversation's round: a search for the studio, then the hand-over of the request.
 				const step = searchThenDelegate(
 					(candidate) => candidate.id === "pipeline.studio",

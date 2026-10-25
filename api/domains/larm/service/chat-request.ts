@@ -12,24 +12,24 @@ export function chatRequest(
 		model: provider.model,
 		messages: messages.map(
 			({ images, role, content: text, tool_calls, tool_call_id }) => {
-			const m = {
-				role,
-				content: text,
-				...(tool_calls ? { tool_calls } : {}),
-				...(tool_call_id ? { tool_call_id } : {}),
-			};
-			if (!images?.length) return m;
-			const content: ChatContentPart[] = m.content
-				? [{ type: "text", text: m.content }]
-				: [];
-			for (const image of images)
-				content.push({
-					type: "image_url",
-					image_url: {
-						url: `data:${image.mime};base64,${Buffer.from(image.bytes).toString("base64")}`,
-					},
-				});
-			return { ...m, content };
+				const m = {
+					role,
+					content: text,
+					...(tool_calls ? { tool_calls } : {}),
+					...(tool_call_id ? { tool_call_id } : {}),
+				};
+				if (!images?.length) return m;
+				const content: ChatContentPart[] = m.content
+					? [{ type: "text", text: m.content }]
+					: [];
+				for (const image of images)
+					content.push({
+						type: "image_url",
+						image_url: {
+							url: `data:${image.mime};base64,${Buffer.from(image.bytes).toString("base64")}`,
+						},
+					});
+				return { ...m, content };
 			},
 		),
 		...(options?.jsonOutput
@@ -54,8 +54,9 @@ export function chatRequest(
 			options?.toolOutputFormat === "json-schema" ? undefined : options?.tools,
 			options?.toolChoice,
 		),
-		// Function-selection turns have a checked output contract, like JSON control turns.
-		...(options?.tools?.length ? { temperature: 0 } : {}),
+		// Function-selection turns have a checked output contract, like JSON control turns; a call whose output
+		// is spoken to the user keeps the provider's sampling (greedy speech repeats itself).
+		...(options?.tools?.length && !options.speaks ? { temperature: 0 } : {}),
 		stream,
 		max_tokens: Math.min(
 			provider.contextWindow!.outputReserveTokens,

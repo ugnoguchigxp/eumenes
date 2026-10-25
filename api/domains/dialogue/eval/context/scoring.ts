@@ -40,7 +40,7 @@ export type TrialScore = {
 	axes: AxisResult[];
 	/** null when the trial is incomplete (transport error or an axis awaiting adjudication). */
 	pass: boolean | null;
-	/** The reply broke the spoken-reply contract, needed the correction, or failed generation. */
+	/** The reply broke the spoken-reply contract. */
 	contractViolation: boolean;
 	promptTokens: number;
 	latencyMs: number;
@@ -144,9 +144,9 @@ export async function scoreTrial(input: {
 		checks,
 		axes,
 		pass,
-		contractViolation:
-			row.repaired ||
-			checks.some((c) => c.kind === "brief_spoken_reply" && !c.pass),
+		contractViolation: checks.some(
+			(c) => c.kind === "brief_spoken_reply" && !c.pass,
+		),
 		adjudicated: used,
 	};
 }
@@ -226,7 +226,6 @@ const checkResultSchema = z
 			"tool_not_called",
 			"delegated",
 			"not_delegated",
-			"respond_field",
 			"speaks",
 			"silent",
 			"brief_spoken_reply",

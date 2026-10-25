@@ -50,7 +50,7 @@ export type LarmCallOptions = {
 	/**
 	 * Session lifetime of this call, set by the caller (independent of the output mode):
 	 * `main` the conversation agent's answer, `subagent` one task (requires `taskId`), `auxiliary` a one-shot call.
-	 * Helper calls on LARM use independent, short-lived 64K connections.
+	 * Helper calls on LARM use their own connections, one per instruction prefix (see `createHelperConnections`).
 	 */
 	sessionRole?: "main" | "subagent" | "auxiliary";
 	/** `subagent` only: the task whose calls share one agent session. */
@@ -59,6 +59,8 @@ export type LarmCallOptions = {
 	tools?: NativeTool[];
 	/** `required`: the provider must call one of `tools` (default: it may answer in text). */
 	toolChoice?: "required";
+	/** The output is spoken to the user: no fixed temperature, even with `tools`. */
+	speaks?: true;
 	onToolCalls?: (calls: NativeToolCall[]) => void;
 	maxOutputTokens?: number;
 	/** Internal control calls only: JSON-object generation at temperature zero. */
@@ -149,7 +151,11 @@ export interface LarmPort {
 		signal: AbortSignal,
 		options?: LarmCallOptions,
 	): Promise<Uint8Array>;
-	close(): Promise<void>;
+	/**
+	 * Ends the port. `keepConnection` (host shutdown) leaves the connections to LARM's expiry so a restarted host
+	 * gets them back with their input cache; otherwise they are released.
+	 */
+	close(options?: { keepConnection?: true }): Promise<void>;
 }
 
 const larmStatusSchema: z.ZodType<LarmStatus> = z.object({

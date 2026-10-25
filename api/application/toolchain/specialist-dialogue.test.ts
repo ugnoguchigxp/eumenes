@@ -3,9 +3,7 @@ import type { LarmPort } from "../../domains/larm";
 import {
 	afterUtterance,
 	callsOf,
-	isResultRound,
 	isUtteranceRound,
-	respond,
 	searchThenDelegate,
 } from "./conversation-script.fixture";
 import { harness } from "./toolchain.fixture";
@@ -128,8 +126,8 @@ async function rig() {
 			}
 			mainPrompts.push(messages.map((m) => ({ ...m })));
 			// The conversation's round for a user's utterance: the script decides whether the request is delegated (a
-			// search, then the hand-over) or answered by `respond` with the scripted reply.
-			if (isUtteranceRound(options?.tools) && !isResultRound(messages)) {
+			// search, then the hand-over) or answered in plain text with the scripted reply.
+			if (isUtteranceRound(options?.tools)) {
 				if (afterUtterance(messages).length === 0) routeCalls++;
 				const head = script.main[0];
 				if (typeof head === "object") {
@@ -156,13 +154,6 @@ async function rig() {
 				const reply = script.main.shift() ?? "かしこまりました。";
 				if (typeof reply !== "string")
 					throw new Error("script_tool_after_route");
-				options!.onToolCalls!([
-					{
-						id: id(),
-						name: "respond",
-						arguments: JSON.stringify(respond().args),
-					},
-				] as never);
 				return reply;
 			}
 			const step = script.main.shift() ?? "かしこまりました。";

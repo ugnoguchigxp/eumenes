@@ -76,6 +76,6 @@ test("the prompt is Japanese text as written, never escaped, and the same input 
 	};
 	const first = buildSystemPrompt(input);
 	expect(first).not.toMatch(/\\u[0-9a-fA-F]{4}/);
-	expect(first).toContain("音声で聞かれます");
+	expect(first).toContain("読み上げません");
 	expect(buildSystemPrompt(input)).toBe(first);
 });

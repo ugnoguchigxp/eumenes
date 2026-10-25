@@ -19,7 +19,6 @@ export const TOOL_NAMES = {
 	search: "find_toolchain",
 	delegate: "delegate",
 	work: "work",
-	respond: "respond",
 } as const;
 export type ToolName = (typeof TOOL_NAMES)[keyof typeof TOOL_NAMES];
 
@@ -30,32 +29,6 @@ export type ToolName = (typeof TOOL_NAMES)[keyof typeof TOOL_NAMES];
  */
 const id = z.string().trim().min(1).max(160);
 const impacts = ["none", "create", "modify_existing", "irreversible"] as const;
-
-export const analysisSchema = z
-	.object({
-		kind: z.enum([
-			"knowledge",
-			"live_info",
-			"past_conversation",
-			"action",
-			"creation",
-			"chat",
-		]),
-		freshness: z.enum(["live", "not_live"]),
-		impact: z.enum(impacts),
-		approved: z.boolean(),
-	})
-	.strict();
-export type Analysis = z.infer<typeof analysisSchema>;
-
-export const respondArgs = analysisSchema
-	.extend({
-		todoRefs: z.array(id).max(8).optional(),
-		about: z.array(id).max(8).optional(),
-		unavailable: z.boolean().optional(),
-	})
-	.strict();
-export type RespondArgs = z.infer<typeof respondArgs>;
 
 export const memoryArgs = z.discriminatedUnion("operation", [
 	z
@@ -108,11 +81,10 @@ export type DelegateArgs = z.infer<typeof delegateArgs>;
 export const workArgs = z
 	.object({
 		todo: id,
-		operation: z.enum(["check", "answer", "amend", "cancel", "archive"]),
+		operation: z.enum(["check", "answer", "amend", "cancel"]),
 		revision: z.number().int().min(0),
 		questionId: id.optional(),
 		text: z.string().trim().min(1).max(8000).optional(),
-		told: z.union([z.literal("this"), id]).optional(),
 	})
 	.strict();
 export type WorkArgs = z.infer<typeof workArgs>;
@@ -142,10 +114,7 @@ const tool = (
 	},
 });
 
-/**
- * The fixed tool definitions, in a fixed order. The analysis values keep their full descriptions (section 6.1:
- * shortening them raised classification and approval errors); `impact` is described once, in `respond`.
- */
+/** The fixed tool definitions, in a fixed order (the same set in every generation). */
 export const generationTools: NativeTool[] = [
 	tool(
 		TOOL_NAMES.memory,
@@ -165,7 +134,7 @@ export const generationTools: NativeTool[] = [
 	),
 	tool(
 		TOOL_NAMES.search,
-		"state.retainedで足りないとき、依頼に合う担当の候補（最大4件）を探す。実行しない。1生成1回まで。合う候補がなければ依頼せず断る。",
+		"state.retainedで足りないとき、依頼に合う担当の候補（最大4件）を探す。実行しない。1生成1回まで。",
 		{
 			query: text(
 				"最初の一つの作業に必要な担当の用途。対象・時点・条件を保つ。",
@@ -187,7 +156,10 @@ export const generationTools: NativeTool[] = [
 			announcement: text(
 				"予告、またはconfirmの確認文（80字以内）。これから行うことを言い、完了は断言しない。",
 			),
-			impact: choice(impacts, "respondのimpactと同じ基準。"),
+			impact: choice(
+				impacts,
+				"依頼の種類ではなく、既存のものへの影響。none=答える・調べる・参照するだけ、create=新しいものを設定・作成するだけで既存を変えない、modify_existing=既存の機能・コード・データ・設定・保存物を変える、irreversible=削除・外部送信・公開など取り消せない。",
+			),
 			inputs: {
 				type: "object",
 				description: "即答の担当の引数、またはパイプラインの入力。",
@@ -203,53 +175,20 @@ export const generationTools: NativeTool[] = [
 	),
 	tool(
 		TOOL_NAMES.work,
-		"依頼済みの仕事（state.todos）を確認・回答・訂正・取消・アーカイブする。",
+		"依頼済みの仕事（state.todos）を確認・回答・訂正・取消する。",
 		{
 			todo: text("state.todosのid。"),
 			operation: choice(
-				["check", "answer", "amend", "cancel", "archive"],
-				"check=状態と結果を読む、answer=質問に答える、amend=依頼を訂正、cancel=取消、archive=伝え終えた仕事を片付ける。",
+				["check", "answer", "amend", "cancel"],
+				"check=状態と結果を読む、answer=質問に答える、amend=依頼を訂正、cancel=取消。",
 			),
 			revision: { type: "integer", description: "state.todosかactiveの版。" },
 			questionId: text("answerで答える質問のid。"),
 			text: text(
 				"answerの答え（質問が形を求めるならそのJSON）、またはamendの新しい依頼。",
 			),
-			told: text(
-				"archiveの根拠。this=この発話（respondのtodoRefsに含める）、結果を伝えたlogの発話のid、または不要と言った利用者の発言のid。",
-			),
 		},
 		["todo", "operation", "revision"],
-	),
-	tool(
-		TOOL_NAMES.respond,
-		"利用者の新しい発言があるとき、話すのと同じ生成で必ず呼ぶ。発言の分析と発話の根拠。",
-		{
-			kind: choice(
-				analysisSchema.shape.kind.options,
-				"問い合わせの種類。knowledge=一般知識・説明、live_info=現在時点の外部情報、past_conversation=保存済み会話の確認、action=操作、creation=制作、chat=雑談・相づち。現在の日付・時刻そのものはnow.atで答えられるのでlive_infoにしない。",
-			),
-			freshness: choice(
-				analysisSchema.shape.freshness.options,
-				"答えが時間とともに変わり、現在時点の情報が必要ならlive。そうでなければnot_live。",
-			),
-			impact: choice(
-				impacts,
-				"依頼の種類ではなく、既存のものへの影響。none=答える・調べる・参照するだけ、create=新しいものを設定・作成するだけで既存を変えない、modify_existing=既存の機能・コード・データ・設定・保存物を変える、irreversible=削除・外部送信・公開など取り消せない。",
-			),
-			approved: {
-				type: "boolean",
-				description:
-					"今回の発言が、state.pendingConfirmationにある実行前の確認への承認ならtrue（そのときはdelegateのapproveで確認のidを渡す）。それ以外はfalse。過去の承認は引き継がない。",
-			},
-			todoRefs: ids("この発話で結果を伝えるTODOのid。"),
-			about: ids("根拠にしたlogの出来事のid、またはepisode。"),
-			unavailable: {
-				type: "boolean",
-				description: "担当がない・できないと伝えるならtrue。",
-			},
-		},
-		["kind", "freshness", "impact", "approved"],
 	),
 ];
 
@@ -261,18 +200,16 @@ export type ParsedCall =
 			args: z.infer<typeof searchArgs>;
 	  }
 	| { name: "delegate"; call: NativeToolCall; args: DelegateArgs }
-	| { name: "work"; call: NativeToolCall; args: WorkArgs }
-	| { name: "respond"; call: NativeToolCall; args: RespondArgs };
+	| { name: "work"; call: NativeToolCall; args: WorkArgs };
 
 const schemas: Record<ToolName, z.ZodType> = {
 	memory: memoryArgs,
 	find_toolchain: searchArgs,
 	delegate: delegateArgs,
 	work: workArgs,
-	respond: respondArgs,
 };
 
-/** A structural violation the one repair is told about (no arguments or text reach the log). */
+/** A call the host refuses; the agent reads the reason as the call's result (no arguments or text reach the log). */
 export function toolRejection(
 	code: string,
 	issues: Record<string, unknown>[] = [],

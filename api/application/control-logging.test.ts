@@ -31,7 +31,7 @@ async function run(h: Awaited<ReturnType<typeof harness>>) {
 
 test("an unknown tool name invokes nothing and receives one bounded correction", async () => {
 	const output = capture();
-	const h = await harness({ badExecutionRefOnce: true, fullResearch: true });
+	const h = await harness({ badExecutionRefOnce: true });
 	try {
 		const r = await run(h);
 		expect(h.acquisitions).toBe(2);
@@ -62,7 +62,6 @@ test("an unknown tool name invokes nothing and receives one bounded correction",
 test("a search timeout is correlated across agent, web and queue and searches stop at the budget", async () => {
 	const output = capture();
 	const h = await harness({
-		fullResearch: true,
 		acquire: async () => {
 			throw new Error("web_timeout");
 		},
@@ -108,7 +107,6 @@ test("a search timeout is correlated across agent, web and queue and searches st
 test("a malformed report after a successful read is diagnosed once per attempt without private text", async () => {
 	const output = capture();
 	const h = await harness({
-		fullResearch: true,
 		workerReportOutput: '{"action":',
 	});
 	try {

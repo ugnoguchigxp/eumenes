@@ -6,7 +6,6 @@ import {
 	afterUtterance,
 	candidatesOf,
 	findToolchain,
-	respond,
 	toolResults,
 	UNAVAILABLE_TEXT,
 	type Candidate,
@@ -179,7 +178,7 @@ test("a question of a task is reported into its TODO, ordinary chat keeps it wai
 		discoveryTarget: () => "execute_task",
 		firstRound: (_tools, question, messages) => {
 			if (question === "雑談です")
-				return { text: "雑談ですね。", calls: [respond()] };
+				return { text: "雑談ですね。" };
 			if (question === "二番目で続けて") {
 				if (toolResults(afterUtterance(messages), "work").length === 0) {
 					const { todo } = todoOfExecution();
@@ -198,10 +197,7 @@ test("a question of a task is reported into its TODO, ordinary chat keeps it wai
 						],
 					};
 				}
-				return {
-					text: "二番目で続けます。",
-					calls: [respond({ kind: "action", impact: "none" })],
-				};
+				return { text: "二番目で続けます。" };
 			}
 			return handOverTask(request, "候補を選んで説明します。")(messages);
 		},
@@ -434,10 +430,7 @@ test("registered command candidates disclose their one-operation execution contr
 		firstRound: (_tools, _question, messages) => {
 			found = candidatesOf(messages);
 			if (!found) return { calls: [findToolchain("タイマーを作る")] };
-			return {
-				text: UNAVAILABLE_TEXT,
-				calls: [respond({ unavailable: true })],
-			};
+			return { text: UNAVAILABLE_TEXT };
 		},
 	});
 	try {

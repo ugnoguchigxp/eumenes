@@ -330,7 +330,6 @@ export function useWorkspace({
 		reconnect,
 		connectionError,
 		connectionState,
-		latestRun,
 		activeRun,
 		followLatestIfPinned,
 		scrollLatest,

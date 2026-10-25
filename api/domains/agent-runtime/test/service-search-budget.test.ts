@@ -33,7 +33,7 @@ test("service budgets preserve fallback and final answer without changing existi
 	).toBe(false);
 });
 test("revoking the frozen package revokes a research child's caller authority", async () => {
-	const h = await harness(Date.now, false, undefined, true, true);
+	const h = await harness(Date.now, undefined, true, true);
 	try {
 		await h.store.write((db) =>
 			h.agents.startInTransaction(db, {
@@ -77,7 +77,7 @@ test("revoking the frozen package revokes a research child's caller authority", 
 	}
 });
 test("native refusal continues through external lookup and host-issued candidate result", async () => {
-	const h = await harness(Date.now, false, undefined, true, true);
+	const h = await harness(Date.now, undefined, true, true);
 	try {
 		await h.store.write((db) =>
 			h.agents.startInTransaction(db, {

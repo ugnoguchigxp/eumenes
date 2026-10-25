@@ -1,11 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { harness } from "./toolchain.fixture";
-import {
-	callsOf,
-	isResultRound,
-	isUtteranceRound,
-	searchThenDelegate,
-} from "../toolchain/conversation-script.fixture";
+import { isUtteranceRound } from "../toolchain/conversation-script.fixture";
 import { musicFixture } from "../media/music.fixture";
 import type { LarmPort } from "../../domains/larm";
 import { configureLogging } from "../../infrastructure/logger";
@@ -24,8 +19,7 @@ async function until(check: () => boolean) {
 	await waitFor(check);
 	expect(check()).toBe(true);
 }
-for (const mode of ["repair", "repeat"] as const)
-	test(`voice does not display, persist or speak text-only control output: ${mode}`, async () => {
+test("voice does not display, persist or speak text-only control output: the run fails without a repair", async () => {
 		const f = musicFixture();
 		const spoken: string[] = [],
 			visible: string[] = [];
@@ -53,27 +47,14 @@ for (const mode of ["repair", "repeat"] as const)
 					: f.model.answer(messages, signal, options),
 			answerStream: async (messages, signal, delta, options) => {
 				const utterance =
-					isUtteranceRound(options?.tools) && !isResultRound(messages);
-				if (utterance && (++routes === 1 || mode === "repeat")) {
-					// Control text beside no tool call: the host withdraws it and asks for the one repair.
-					for (const character of control) delta(character);
-					if (routes === 1) {
-						waiting = true;
-						await pause;
-					}
-					return control;
-				}
+					isUtteranceRound(options?.tools);
 				if (utterance) {
-					const step = searchThenDelegate(
-						(candidate) => candidate.execution === "music-create",
-						messages.at(-1)!.content,
-						{ announcement: "準備します。", impact: "create" },
-					)(messages);
-					if (step.calls?.length)
-						options!.onToolCalls!(
-							callsOf(step, () => crypto.randomUUID()) as never,
-						);
-					return step.text ?? "";
+					// Control text beside no tool call: it is withdrawn, and the generation fails (nothing asks for a repair).
+					routes++;
+					for (const character of control) delta(character);
+					waiting = true;
+					await pause;
+					return control;
 				}
 				const answer = await f.model.answer(messages, signal, options);
 				delta(answer);
@@ -97,18 +78,10 @@ for (const mode of ["repair", "repeat"] as const)
 			expect(h.dialogue.progress(runId)?.text).toBe("");
 			expect(spoken).toEqual([]);
 			release();
-			// The spoken announcement must be played before the handoff continues.
-			const played = new Set<number>();
-			await until(() => {
-				for (const chunk of h.voice.get(id)?.audioChunks ?? [])
-					if (chunk.text === "準備します。" && !played.has(chunk.index)) {
-						played.add(chunk.index);
-						void h.voice.played(id, chunk.index);
-					}
-				return ["ready", "failed"].includes(h.voice.get(id)?.status ?? "");
-			});
-			// Repair: the control text, the repaired search, and the hand-over. Repeat: the control text twice.
-			expect(routes).toBe(mode === "repair" ? 3 : 2);
+			await until(() =>
+				["ready", "failed"].includes(h.voice.get(id)?.status ?? ""),
+			);
+			expect(routes).toBe(1);
 			expect(
 				visible.every(
 					(text) => !text.includes("create_music") && !text.includes("<|"),
@@ -119,19 +92,11 @@ for (const mode of ["repair", "repeat"] as const)
 					.get("main")
 					.messages.every((m) => !m.text.includes(control)),
 			).toBe(true);
-			if (mode === "repair") {
-				expect(h.dialogue.get(runId)?.status).toBe("completed");
-				expect(h.music!.list("main")[0]?.state).toBe("completed");
-				expect(f.requests.filter((r) => r.method === "POST")).toHaveLength(1);
-				expect(spoken.length).toBeGreaterThan(0);
-				expect(spoken).toEqual(["準備します。", h.dialogue.answerText(runId)!]);
-			} else {
-				expect(h.dialogue.get(runId)?.status).toBe("failed");
-				expect(h.dialogue.answerText(runId)).toBeNull();
-				expect(h.music!.list("main")).toEqual([]);
-				expect(f.requests.filter((r) => r.method === "POST")).toHaveLength(0);
-				expect(spoken).toEqual([]);
-			}
+			expect(h.dialogue.get(runId)?.status).toBe("failed");
+			expect(h.dialogue.answerText(runId)).toBeNull();
+			expect(h.music!.list("main")).toEqual([]);
+			expect(f.requests.filter((r) => r.method === "POST")).toHaveLength(0);
+			expect(spoken).toEqual([]);
 		} finally {
 			release();
 			stop();

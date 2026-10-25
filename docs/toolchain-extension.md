@@ -648,7 +648,7 @@ export const archiveBuiltins: Definition[] = [
 
 契約の正本は[ToolAdapterとToolResult](../api/domains/tool-runtime/contracts/index.ts)。現在の`research-history-ports.ts`はWeb保存本文と履歴を扱うため、新backendの資料を無条件に渡さない。受け取る資料に応じた変換と検査をapplication層で接続する。新backend固有のデータを、架空の履歴参照や既存Webの所有者参照に置き換えない。
 
-別モデルの最小参照実装は[Codexアダプタ](../api/domains/inference/adapters/codex-research.ts)、更新操作は[timer-operation](../api/domains/agent-runtime/service/timer-operation.ts)と`api/application/toolchain/toolchain.ts`のtimerActions。サービス仕様の違う新担当に、そのまま流用して完成と扱わない。接続設定・認証・取消・receiptを満たす最小範囲を実装する。
+更新操作の参照実装は[timer-operation](../api/domains/agent-runtime/service/timer-operation.ts)と`api/application/toolchain/toolchain.ts`のtimerActions。サービス仕様の違う新担当に、そのまま流用して完成と扱わない。接続設定・認証・取消・receiptを満たす最小範囲を実装する。
 
 ### 付録R revision更新と起動時登録
 

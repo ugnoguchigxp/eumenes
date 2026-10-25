@@ -1,14 +1,15 @@
 import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import type { EumenesClient } from "../../../../client";
-import type { ConnectionModels } from "../../../../api/domains/inference/contracts";
 import { queryRoots } from "../../queryKeys";
 import { useSettings } from ".";
 
 const newModelPrefix = "new-model:";
 
 type Purpose = "asr" | "tts";
-type Model = ConnectionModels["models"][number];
+type Model = Awaited<
+	ReturnType<EumenesClient["connectionModels"]>
+>["models"][number];
 
 /** A listed model the switcher can register without asking: supported, and any required voice or language has a default. */
 function registrable(model: Model, purpose: Purpose) {

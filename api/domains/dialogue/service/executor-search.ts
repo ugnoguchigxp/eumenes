@@ -4,12 +4,7 @@ import { isSystemPrompt } from "../contracts";
 import type { ToolchainRoutingPort } from "../contracts/toolchains";
 import { availableToolchainsInTransaction } from "./delegate-conversation";
 import type { ToolOutcome } from "./generation-loop";
-import {
-	TOOL_NAMES,
-	toolRejection,
-	type ParsedCall,
-	type RespondArgs,
-} from "./generation-tools";
+import { TOOL_NAMES, toolRejection, type ParsedCall } from "./generation-tools";
 import { sessionTargetsInTransaction } from "./specialist-context";
 
 import { type ExecutorContext, candidateOf } from "./executor-context";
@@ -126,7 +121,7 @@ export async function instant(
 	});
 	if (answer) x.state.instant = { card, inputs: parsed.value };
 	return answer
-		? { result: { answered: true, answer }, basis: "instant" }
+		? { result: { answered: true, answer } }
 		: {
 				result: {
 					answered: false,
@@ -137,11 +132,9 @@ export async function instant(
 			};
 }
 
-/** The trace of an utterance generation that answered (or declined) without handing work over. */
+/** The trace of an utterance generation that answered without handing work over. */
 export function answered(
 	x: ExecutorContext,
-	respond: RespondArgs,
-	repaired: boolean,
 ): Omit<
 	Parameters<ToolchainRoutingPort["recordSelectionInTransaction"]>[1],
 	"runId"
@@ -169,18 +162,6 @@ export function answered(
 					request: JSON.stringify(instant.inputs),
 				}
 			: { decision: "answer" as const }),
-		repaired,
-		analysis: {
-			kind: respond.kind,
-			freshness: respond.freshness,
-			impact: respond.impact,
-			approved: respond.approved,
-			next: instant
-				? "toolchain"
-				: respond.unavailable
-					? "report_unavailable"
-					: "answer",
-		},
 		...(x.state.search?.query ? { query: x.state.search.query } : {}),
 	};
 }

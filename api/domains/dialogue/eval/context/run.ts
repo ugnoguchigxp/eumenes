@@ -106,14 +106,12 @@ export async function executeRun(
 							...base,
 							status: "ok",
 							answer: { text: outcome.text, toolCalls: outcome.toolCalls },
-							repaired: outcome.repaired,
 							latencyMs,
 						}
 					: {
 							...base,
 							status: "contract_failure",
 							errorCode: outcome.code,
-							repaired: outcome.repaired,
 							latencyMs,
 						},
 			);
@@ -123,7 +121,6 @@ export async function executeRun(
 				status: "transport_error",
 				// The class of the failure only: provider text may carry user content.
 				errorCode: error instanceof Error ? error.name : "unknown",
-				repaired: false,
 				latencyMs: Math.max(0, clock() - started),
 			});
 		}

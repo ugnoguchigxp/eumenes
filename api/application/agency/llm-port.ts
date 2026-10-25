@@ -7,7 +7,6 @@ import {
 } from "eumenes-agency";
 import { z } from "zod";
 import type { InferencePort } from "../../domains/inference";
-import type { Settings } from "../../domains/settings";
 import { toErrorCode } from "../../infrastructure/error-code";
 import { LlmJsonError, parseLlmJson } from "../../infrastructure/llm-json";
 import type { SqliteStore } from "../../infrastructure/sqlite";
@@ -17,23 +16,6 @@ export const BACKGROUND_OUTPUT_LIMIT = 1500;
 export const BACKGROUND_DEADLINE_MS = 30_000;
 /** A decision id is `<conversation>.<opportunity|bg>.<n>`; inference accepts `[a-zA-Z0-9_.:-]{1,160}`. */
 const DECISION_ID = /^[a-zA-Z0-9_.:-]{1,160}$/;
-
-export type AgencyRouteRefusal =
-	| "resource_missing"
-	| "connection_disabled"
-	| "cloud_not_allowed";
-
-/**
- * The saved cloud resource `agency.resourceId` names cannot be used. Inference would downgrade such a
- * request to the conversation route or LARM; agency never falls back silently, so the call is refused
- * and the host stops agency and logs the reason. Not retryable.
- */
-export class AgencyRouteRefusedError extends LlmCallError {
-	constructor(readonly refusal: AgencyRouteRefusal) {
-		super("agency_resource_unusable", false);
-		this.name = "AgencyRouteRefusedError";
-	}
-}
 
 export type AgencyAttemptUsage = {
 	model: string | null;
@@ -54,7 +36,6 @@ export type AgencyLlmPortDeps = {
 	inference: Required<
 		Pick<
 			InferencePort,
-			| "snapshotInTransaction"
 			| "captureBackgroundControlInTransaction"
 			| "executeControl"
 			| "acceptInTransaction"
@@ -66,23 +47,6 @@ export type AgencyLlmPortDeps = {
 	attemptUsage?(attemptId: string): AgencyAttemptUsage | null;
 	nowMs?(): number;
 };
-
-/** Mirrors `routeToResource`'s usable condition without changing the request. */
-function refusalFor(
-	snapshot: Settings,
-	resourceId: string,
-): AgencyRouteRefusal | null {
-	const resource = snapshot.resources.find(
-		(r) => r.id === resourceId && r.purpose === "llm",
-	);
-	if (!resource) return "resource_missing";
-	const connection = snapshot.connections.find(
-		(c) => c.id === resource.connectionId,
-	);
-	if (!connection?.enabled) return "connection_disabled";
-	if (!snapshot.routes.llm.cloudAllowed) return "cloud_not_allowed";
-	return null;
-}
 
 const TRANSIENT =
 	/^(deadline_exceeded|local_timeout|network_unavailable|larm_connection_failed|larm_(control|inference)_(429|502|503|504))$/;
@@ -97,10 +61,7 @@ function callError(error: unknown, signal: AbortSignal): never {
 	throw new LlmCallError(code, false);
 }
 
-/**
- * The agency core's LlmPort on Eumenes inference background control: `agency.resourceId` set uses that
- * saved cloud resource (and refuses instead of downgrading), null uses the LARM local LLM.
- */
+/** The agency core's LlmPort on Eumenes inference background control, on the conversation's LLM route. */
 export function createAgencyLlmPort(deps: AgencyLlmPortDeps): LlmPort {
 	const nowMs = deps.nowMs ?? Date.now;
 	const { inference } = deps;
@@ -121,16 +82,9 @@ export function createAgencyLlmPort(deps: AgencyLlmPortDeps): LlmPort {
 
 			const deadline = nowMs() + BACKGROUND_DEADLINE_MS;
 			let requestId: string;
-			let modelHint: string;
 			try {
-				({ requestId, modelHint } = await deps.store.write((db) => {
-					const snapshot = inference.snapshotInTransaction(db);
-					const resourceId = snapshot.agency.resourceId;
-					if (resourceId) {
-						const refusal = refusalFor(snapshot, resourceId);
-						if (refusal) throw new AgencyRouteRefusedError(refusal);
-					}
-					const id = inference.captureBackgroundControlInTransaction(db, {
+				requestId = await deps.store.write((db) =>
+					inference.captureBackgroundControlInTransaction(db, {
 						taskId: "agency",
 						decisionId: identity.decisionId,
 						authorityEpoch: 1,
@@ -139,15 +93,10 @@ export function createAgencyLlmPort(deps: AgencyLlmPortDeps): LlmPort {
 						taskDeadline: deadline,
 						maxOutputTokens,
 						structuredOutput: true,
-						route: resourceId ? { resourceId } : undefined,
-					});
-					const resource = resourceId
-						? snapshot.resources.find((r) => r.id === resourceId)
-						: undefined;
-					return { requestId: id, modelHint: resource?.model ?? "larm" };
-				}));
+						route: "conversation",
+					}),
+				);
 			} catch (error) {
-				if (error instanceof LlmCallError) throw error;
 				throw new LlmCallError(toErrorCode(error, "capture_failed"), false);
 			}
 
@@ -172,7 +121,7 @@ export function createAgencyLlmPort(deps: AgencyLlmPortDeps): LlmPort {
 
 			const used = deps.attemptUsage?.(receipt.attemptId) ?? null;
 			const usage = {
-				model: used?.model ?? modelHint,
+				model: used?.model ?? "conversation",
 				inputTokens: used?.inputTokens ?? 0,
 				outputTokens: used?.outputTokens ?? 0,
 				cacheReadTokens: used?.cacheReadTokens ?? 0,

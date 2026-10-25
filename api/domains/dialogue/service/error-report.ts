@@ -15,21 +15,23 @@ import { byId } from "../repository";
 export const ERROR_REPORT_LIMIT = 3000;
 
 /** What the report is about: a run that failed, or one that ended with the host's fixed reply to a failed research. */
-export type ErrorReportKind = "failed" | "research_failed";
+export type ErrorReportKind = "failed" | "interrupted" | "research_failed";
 
 /** The root task of a run is its coordinator. */
 const rootOf = (tasks: TaskDto[]) =>
 	tasks.find((t) => t.kind === "coordinator" && !t.parentTaskId);
 
 /**
- * Whether a run has an error report. A research failure keeps the root task's code and the run completes
+ * Whether a run has an error report. An interrupted run ended without an answer, so it is reported like a
+ * failed one. A research failure keeps the root task's code and the run completes
  * with the fixed reply (`researchFailed`); a clarification request is not a failure.
  */
 function errorReportKind(
 	run: Pick<Run, "status">,
 	tasks: TaskDto[],
 ): ErrorReportKind | null {
-	if (run.status === "failed") return "failed";
+	if (run.status === "failed" || run.status === "interrupted")
+		return run.status;
 	const code = rootOf(tasks)?.errorCode;
 	if (run.status === "completed" && code && code !== "clarification_required")
 		return "research_failed";
@@ -54,7 +56,6 @@ const REFERENCES: Array<{
 		],
 		prefixes: ["control_", "web_"],
 	},
-	{ section: "Codex SDKによる調査の失敗", prefixes: ["codex_research_"] },
 	{ section: "LLM生成JSONの補正と拒否", prefixes: ["llm_json_"] },
 	{
 		section: "LARM正式計数の診断",
@@ -445,7 +446,8 @@ type ErrorReportInput = {
 function formatErrorReport(input: ErrorReportInput): string {
 	const { run, kind, tasks, entries } = input;
 	const root = rootOf(tasks);
-	const code = kind === "failed" ? safe(run.error) : safe(root?.errorCode);
+	const code =
+		kind === "research_failed" ? safe(root?.errorCode) : safe(run.error);
 	const built = build(
 		entries,
 		new Set(
@@ -468,9 +470,9 @@ function formatErrorReport(input: ErrorReportInput): string {
 			? `サブエージェント（${safe(failedTask.kind) ?? "?"} / ${safe(failedTask.phase) ?? "?"}）`
 			: "不明（ログに失敗の記録がありません）";
 	const result =
-		kind === "failed"
-			? `failed / ${code ?? "不明"}`
-			: `completed / 調査失敗の固定返答 / ${code ?? "不明"}`;
+		kind === "research_failed"
+			? `completed / 調査失敗の固定返答 / ${code ?? "不明"}`
+			: `${kind} / ${code ?? "不明"}`;
 	const taskLines = tasks
 		.slice(0, 4)
 		.map(

@@ -96,6 +96,33 @@ test("artifact control input stays available to the model but is absent from cha
 	);
 	expect(screen.queryByText(/width/)).toBeNull();
 });
+test("what is shown for a hidden input keeps its place between the bubbles", () => {
+	const { container } = render(
+		<MessageList
+			conversation={{
+				id: "main",
+				revision: 1,
+				messages: [
+					{ ...base, id: "before", role: "user", text: "前の発言" },
+					{
+						...base,
+						id: "notice",
+						role: "user",
+						text: '{"kind":"task_finished"}',
+						presentation: "artifact",
+					},
+					{ ...base, id: "after", role: "user", text: "後の発言" },
+				],
+			}}
+			renderHiddenMessage={(message) => <aside>{`失敗:${message.id}`}</aside>}
+		/>,
+	);
+	const shown = screen.getByText("失敗:notice");
+	const bubbles = container.querySelectorAll("article");
+	expect(bubbles[0]?.nextElementSibling).toBe(shown);
+	expect(shown.nextElementSibling).toBe(bubbles[1]);
+	expect(screen.queryByText(/task_finished/)).toBeNull();
+});
 test("adopted emotion belongs beside the assistant name, preserves body and follows a custom name", () => {
 	const { container, rerender } = render(
 		<MessageList

@@ -91,6 +91,8 @@ export type CallSession = {
 	sessionRole?: "main" | "subagent" | "auxiliary";
 	/** A call whose only valid output is a call of one of its tools: the provider is told to call one. */
 	toolChoice?: "required";
+	/** The call's output is spoken to the user: the provider samples as usual even with tools offered. */
+	speaks?: true;
 	/** This call's own bound on output tokens, below the request's: a call whose output is short by contract. */
 	outputLimit?: number;
 	/** Hidden auxiliary work on an answer request: publishes no deltas; provider failure ends only this call. */
@@ -118,7 +120,6 @@ export type AgentAttemptRevocation = {
 	itemIds: readonly string[];
 };
 export interface InferencePort {
-	codexResearchAvailable?(): boolean;
 	captureBackgroundControlInTransaction?(
 		db: Database,
 		input: BackgroundControl,
@@ -131,9 +132,6 @@ export interface InferencePort {
 			policySubject: string;
 			deadline: number;
 			maxOutputTokens: number;
-			engine?: "codex";
-			/** `larm-only` (default) or the saved cloud LLM resource task sub-agents run on (see `BackgroundControl.route`). */
-			route?: "larm-only" | { resourceId: string };
 			/** How long one attempt may run, in place of the LARM and cloud defaults (a toolchain's own limit). */
 			attemptMs?: number;
 		},
@@ -151,7 +149,6 @@ export interface InferencePort {
 			subject: string;
 			deadline: number;
 			maxOutputTokens: number;
-			route?: "subagent";
 		},
 	): string;
 	executeControl?(

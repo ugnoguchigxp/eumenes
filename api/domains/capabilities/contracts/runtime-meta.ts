@@ -76,12 +76,6 @@ const toolchains: Readonly<
 > = {
 	"web.search": { execution: "research", route: "web" },
 	"web.service-search": { execution: "research", route: "web" },
-	"web.research.codex": {
-		execution: "research",
-		route: "web",
-		requires: "codex",
-		researcher: "codex",
-	},
 	"history.research": { execution: "research", route: "history" },
 	"world.query": { execution: "research", route: "world", requires: "world" },
 	"excalidraw.edit": { execution: "excalidraw", requires: "excalidraw" },

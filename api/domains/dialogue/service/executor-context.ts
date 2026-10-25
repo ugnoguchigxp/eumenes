@@ -66,8 +66,6 @@ export function createExecutorContext(
 		input: GenerateInput;
 		jobId: string;
 		publish: () => void;
-		/** The TODOs the window shows a result of; a check of this generation adds to it (the basis check reads it). */
-		activeTodos?: Set<string>;
 	},
 ) {
 	const { clock, continuity } = deps;
@@ -83,14 +81,11 @@ export function createExecutorContext(
 		instant: { card: ToolchainCard; inputs: Record<string, unknown> } | null;
 		/** The newest model call's receipt: its permission is checked again before every action. */
 		receipt: Receipt | undefined;
-		/** TODOs whose result slot a check of this generation put back in `active`. */
-		checked: Set<string>;
 	} = {
 		search: null,
 		handover: null,
 		instant: null,
 		receipt: undefined,
-		checked: ctx.activeTodos ?? new Set(),
 	};
 	/** The user's messages this generation acts on: every action, TODO and confirmation it makes comes from them. */
 	const origin = [

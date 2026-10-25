@@ -8,17 +8,31 @@ const isObject = (v: unknown): v is Json =>
 /**
  * One-time migration of a stored settings document, applied before the strict parse:
  * - Managed Agents connections (a removed kind) go with their models; routes and the dedicated
- *   World / sub-agent models that pointed at them fall back to LARM; agency is switched off instead.
+ *   World model that pointed at them fall back to LARM.
  * - Claude Agent SDK connections get the explicit `auth` the key used to imply
  *   (a stored key or an env ref: "api-key"; nothing: "subscription").
  * - The removed Managed Agents fields are dropped.
  * - The LARM sentence-language switch becomes `englishSpeechEnabled`; its classifier selector is dropped.
+ * - The removed dedicated LLM selections (`subagent`, `agency.resourceId`) and the agency ON/OFF (`agency.enabled`: spontaneous speech is always on) are dropped: every inference
+ *   other than World curation runs on the one LLM configured for the conversation.
  * It is idempotent: a migrated document passes through unchanged.
  */
 export function migrateStoredSettings(
 	db: Database,
 	raw: unknown,
 ): { document: unknown; removedConnectionIds: string[] } {
+	if (isObject(raw)) {
+		const { subagent: _subagent, ...rest } = raw;
+		if (isObject(rest.agency)) {
+			const {
+				resourceId: _resourceId,
+				enabled: _enabled,
+				...agency
+			} = rest.agency;
+			rest.agency = agency;
+		}
+		raw = rest;
+	}
 	if (isObject(raw) && isObject(raw.larm)) {
 		const {
 			sentenceLanguageEnabled,
@@ -76,17 +90,9 @@ export function migrateStoredSettings(
 				];
 			}),
 		);
-	for (const key of ["world", "subagent", "agency"] as const) {
-		const section = raw[key];
-		const field = key === "world" ? "curationResourceId" : "resourceId";
-		if (isObject(section) && removedResources.has(String(section[field])))
-			// Agency never falls back to LARM silently: it stops until a route is chosen again.
-			out[key] = {
-				...section,
-				[field]: null,
-				...(key === "agency" ? { enabled: false } : {}),
-			};
-	}
+	const world = raw.world;
+	if (isObject(world) && removedResources.has(String(world.curationResourceId)))
+		out.world = { ...world, curationResourceId: null };
 	return { document: out, removedConnectionIds: [...removed] };
 }
 

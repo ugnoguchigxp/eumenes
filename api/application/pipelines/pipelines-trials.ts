@@ -43,6 +43,8 @@ export function createPipelineTrials(deps: {
 	routing: ToolchainRoutingPort;
 	inference: InferencePort;
 	service: PipelinesService;
+	/** The conversation agent's part of the system message (the trial asks the same agent). */
+	agentSystem: () => string;
 	embedPassages?: (
 		texts: string[],
 	) => Promise<{ vectors: number[][]; space: VectorSpace } | undefined>;
@@ -168,7 +170,6 @@ export function createPipelineTrials(deps: {
 					subject: `pipeline-trial:${workRef}`,
 					deadline: Date.now() + 120_000,
 					maxOutputTokens: 1024,
-					route: "subagent",
 				}),
 			);
 			const cards = store.read((db) =>
@@ -190,6 +191,7 @@ export function createPipelineTrials(deps: {
 				requestId,
 				text: utterance,
 				cards,
+				agentSystem: deps.agentSystem(),
 				signal,
 			});
 			return {

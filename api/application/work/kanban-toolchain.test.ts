@@ -88,21 +88,16 @@ const dataOf = (messages: Messages) =>
 const invoke = (tool: string, args: unknown) =>
 	JSON.stringify({ action: "invoke", tool, arguments: args });
 
-/** A board over fake Claude Code; `command` plays the sub-agent model, `answers` collects the answer contexts. */
+/** A board over fake Claude Code; `command` plays the sub-agent model. */
 async function board(command: (data: CommandData) => string) {
 	const claude = fakeClaude();
-	const answers: string[] = [];
 	const h = await harness({
 		terminals: claude.terminals,
 		kanban: true,
 		routeTool: "kanban",
 		command: (messages) => command(dataOf(messages)),
-		parent: (messages) => {
-			answers.push(JSON.stringify(messages));
-			return "承知しました。";
-		},
 	});
-	return { h, claude, answers };
+	return { h, claude };
 }
 
 async function say(h: Harness, text: string) {
@@ -128,7 +123,7 @@ const count = (h: Harness, sql: string) =>
 	h.store.read((db) => (db.query(sql).get() as { n: number }).n);
 
 test("a conversation registers a card from the user's words; nothing is run and the sub-agent saw the SKILL and the board", async () => {
-	const { h, claude, answers } = await board((data) =>
+	const { h, claude } = await board((data) =>
 		invoke("kanban.add", {
 			title: "README の手順修正",
 			prompt: data.request,
@@ -167,9 +162,9 @@ test("a conversation registers a card from the user's words; nothing is run and 
 		expect(context).not.toContain("commit-push");
 		expect(context).not.toContain('\\"id\\":\\"kanban.commit');
 		expect(context).toContain('\\"cards\\":[]');
-		// The answer sees the short projection of the saved card.
-		const answer = answers.at(-1)!;
-		expect(answer).toContain('\\"action\\":\\"added\\"');
+		// The agency is given the short projection of the saved card.
+		const answer = h.reported();
+		expect(answer).toContain('"action":"added"');
 		expect(answer).toContain("README の手順修正");
 		expect(answer).not.toContain("queued");
 	} finally {
@@ -178,7 +173,7 @@ test("a conversation registers a card from the user's words; nothing is run and 
 });
 
 test("an ambiguous target is asked with the board's own cards; only one of them answers, and the run goes to the chosen card", async () => {
-	const { h, claude, answers } = await board((data) => {
+	const { h, claude } = await board((data) => {
 		const answered = data.previousQuestions?.at(-1);
 		if (!answered)
 			return JSON.stringify({
@@ -250,10 +245,10 @@ test("an ambiguous target is asked with the board's own cards; only one of them 
 			{ title: "README の手順修正", column: "todo" },
 			{ title: "ログイン画面のバグ修正", column: "running" },
 		]);
-		// The answer says the run is queued, not done.
-		const context = answers.at(-1)!;
-		expect(context).toContain('\\"queued\\":true');
-		expect(context).toContain('\\"completed\\":false');
+		// The result says the run is queued, not done.
+		const context = h.reported();
+		expect(context).toContain('"queued":true');
+		expect(context).toContain('"completed":false');
 		expect(context).toContain("通知センター");
 	} finally {
 		await h.close();
@@ -290,7 +285,7 @@ async function finishRun(
 }
 
 test("running from the conversation queues the user's words under the work-only restriction; the result goes to the notification center, not the conversation", async () => {
-	const { h, claude, answers } = await board((data) => {
+	const { h, claude } = await board((data) => {
 		const target = data.snapshot.cards[0]!;
 		return data.request.includes("登録")
 			? invoke("kanban.add", {
@@ -325,7 +320,6 @@ test("running from the conversation queues the user's words under the work-only 
 			),
 		).toMatchObject({ origin: "conversation" });
 		const runsBefore = count(h, "SELECT COUNT(*) AS n FROM dialogue_runs");
-		const answersBefore = answers.length;
 		const stopped = await finishRun(
 			h,
 			run,
@@ -351,14 +345,13 @@ test("running from the conversation queues the user's words under the work-only 
 				"SELECT COUNT(*) AS n FROM dialogue_runs WHERE source_kind='notice'",
 			),
 		).toBe(0);
-		expect(answers).toHaveLength(answersBefore);
 	} finally {
 		await h.close();
 	}
 });
 
 test("a status question reads the board: a Done card's report comes from the list, and the card bodies stay out of the snapshot", async () => {
-	const { h, claude, answers } = await board((data) => {
+	const { h, claude } = await board((data) => {
 		if (data.request.includes("報告")) return invoke("kanban.list", {});
 		const target = data.snapshot.cards[0]!;
 		return invoke("kanban.run", {
@@ -379,9 +372,9 @@ test("a status question reads the board: a Done card's report comes from the lis
 		expect(sent).toContain('\\"label\\":\\"done\\"');
 		expect(sent).not.toContain("秘密の依頼本文");
 		expect(sent).not.toContain("テストを 3 件直しました");
-		// The answer sees the list: the clipped report of the Done card and the fixed guidance.
-		const context = answers.at(-1)!;
-		expect(context).toContain('\\"kind\\":\\"kanban_list\\"');
+		// The result is the list: the clipped report of the Done card and the fixed guidance.
+		const context = h.reported();
+		expect(context).toContain('"kind":"kanban_list"');
 		expect(context).toContain("テストを 3 件直しました。");
 		expect(context).toContain("文書整理");
 		expect(context).not.toContain("秘密の依頼本文");
@@ -392,7 +385,7 @@ test("a status question reads the board: a Done card's report comes from the lis
 });
 
 test("a commit & push request changes nothing: there is no such tool, and the list result carries the board's button as the guidance", async () => {
-	const { h, claude, answers } = await board(() => invoke("kanban.list", {}));
+	const { h, claude } = await board(() => invoke("kanban.list", {}));
 	try {
 		await addCard(h, "README の修正");
 		const before = JSON.stringify(cardsOf(h));
@@ -404,8 +397,8 @@ test("a commit & push request changes nothing: there is no such tool, and the li
 		expect(count(h, "SELECT COUNT(*) AS n FROM terminal_requests")).toBe(0);
 		expect(count(h, "SELECT COUNT(*) AS n FROM kanban_runs")).toBe(0);
 		expect(h.commandContexts.at(-1)).not.toContain("commit-push");
-		// The guidance is in the result phase's document; its ampersand is escaped in the captured JSON.
-		expect(answers.at(-1)!.replaceAll("\\\\u0026", "&")).toContain(
+		// The guidance is in the result of the list.
+		expect(h.reported()).toContain(
 			"タスクボードで内容を確認してから commit & push を押してください",
 		);
 		// Even a registered operation cannot make the conversation commit: the adapter refuses it.
@@ -435,7 +428,7 @@ test("a commit & push request changes nothing: there is no such tool, and the li
 });
 
 test("edit, move and remove go through the bound tools with the board's revisions; a stale revision changes nothing", async () => {
-	const { h, answers } = await board((data) => {
+	const { h } = await board((data) => {
 		const target = data.snapshot.cards[0]!;
 		const ref = { cardId: target.id, expectedRevision: target.revision };
 		if (data.request.includes("題名"))
@@ -459,10 +452,10 @@ test("edit, move and remove go through the bound tools with the board's revision
 		expect(cardsOf(h)[0]).toMatchObject({ title: "新しい題名", revision: 2 });
 		await say(h, "終わった扱いにして");
 		expect(cardsOf(h)[0]).toMatchObject({ column: "finished", label: "done" });
-		expect(answers.at(-1)).toContain('\\"action\\":\\"moved\\"');
+		expect(h.reported()).toContain('"action":"moved"');
 		const before = JSON.stringify(cardsOf(h));
 		expect((await say(h, "古い版で消して")).status).toBe("completed");
-		expect(answers.at(-1)).toContain("revision_conflict");
+		expect(h.reported()).toContain("revision_conflict");
 		expect(JSON.stringify(cardsOf(h))).toBe(before);
 		expect((await say(h, "消して")).status).toBe("completed");
 		expect(cardsOf(h)).toEqual([]);

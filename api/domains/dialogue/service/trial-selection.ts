@@ -17,6 +17,8 @@ export async function trialFirstRound(
 		requestId: string;
 		text: string;
 		cards: readonly ToolchainCard[];
+		/** The conversation agent's part of the system message. */
+		agentSystem: string;
 		signal: AbortSignal;
 	},
 ): Promise<{
@@ -33,11 +35,10 @@ export async function trialFirstRound(
 			[
 				{
 					role: "system",
-					content: systemText({
-						agentName: "",
-						userName: "",
-						persona: "butler",
-					}),
+					content:
+						input.agentSystem +
+						"\n" +
+						systemText({ agentName: "", userName: "", persona: "butler" }),
 				},
 				{ role: "user", content: input.text },
 				{
@@ -75,18 +76,8 @@ export async function trialFirstRound(
 		const delegated = calls.find((call) => call.name === TOOL_NAMES.delegate);
 		const args =
 			delegated?.name === TOOL_NAMES.delegate ? delegated.args : null;
-		if (!args || args.mode === "approve") {
-			const respond = calls.find((call) => call.name === TOOL_NAMES.respond);
-			return {
-				chosen: null,
-				next:
-					respond?.name === TOOL_NAMES.respond && respond.args.unavailable
-						? "report_unavailable"
-						: "answer",
-				inputs: null,
-				code: null,
-			};
-		}
+		if (!args || args.mode === "approve")
+			return { chosen: null, next: "answer", inputs: null, code: null };
 		const toolchainId = args.toolchain;
 		const card = input.cards.find((c) => c.id === toolchainId);
 		if (!card)

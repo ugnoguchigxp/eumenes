@@ -8,7 +8,6 @@ import type {
 import type {
 	PastSelection,
 	Selection,
-	SelectionAnalysis,
 	SelectionCandidate,
 	SelectionDecision,
 	SelectionOutcome,
@@ -112,8 +111,6 @@ export interface ToolchainRoutingPort {
 			toolchainRevisionId?: string;
 			functionName?: string;
 			request?: string;
-			repaired?: boolean;
-			analysis?: SelectionAnalysis;
 			query?: QueryVector;
 			durationMs?: number;
 		},

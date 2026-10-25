@@ -2,7 +2,6 @@ import { deflateSync } from "node:zlib";
 import { createHash } from "node:crypto";
 import { createLarmPlayground, type LarmPort } from "../../domains/larm";
 import {
-	activeSlots,
 	answerUtterance,
 	handOver,
 } from "./conversation-turn.fixture";
@@ -237,16 +236,7 @@ export function imageFixture(
 						: {}),
 				});
 			}
-			stages.push("answer");
-			// The result round: the host's fixed text, with the TODO's result in the `active` slot (section 9.3).
-			const result = activeSlots(messages).at(-1)?.result as
-				| { state?: string; imageRef?: string | null }
-				| undefined;
-			return result?.state === "completed"
-				? result.imageRef
-					? "画像ができました。"
-					: "画像の画面を開きました。"
-				: "画像を生成できませんでした。";
+			throw new Error("fixture_unexpected_model_call");
 		},
 	};
 	return {

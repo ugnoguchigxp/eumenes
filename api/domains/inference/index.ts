@@ -22,7 +22,6 @@ export type {
 	Usage,
 } from "./contracts";
 export { migrations } from "./repository";
-export { createCodexResearch } from "./adapters/codex-research";
 export { createCloudAgents, promptParts } from "./adapters/cloud-agents";
 export {
 	createConnectionModels,

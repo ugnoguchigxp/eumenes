@@ -42,11 +42,3 @@ export function heardOf(
 	}
 	return null;
 }
-
-/** The TODOs an agent utterance said it reported (`todoRefs`). */
-export function todoRefsOf(event: ConversationEvent): string[] {
-	const refs = eventFields(event).todoRefs;
-	return Array.isArray(refs)
-		? refs.filter((ref): ref is string => typeof ref === "string")
-		: [];
-}

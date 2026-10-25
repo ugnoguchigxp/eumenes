@@ -1,13 +1,13 @@
-import { redactGoogleOAuthProxyError } from "./api/domains/google-accounts/proxy-errors";
-import { excalidrawAssets } from "./scripts/excalidraw-assets";
+import { redactGoogleOAuthProxyError } from "./api/domains/google-accounts/proxy-errors.ts";
+import { excalidrawAssets } from "./scripts/excalidraw-assets.ts";
 import react from "@vitejs/plugin-react";
 import { defineConfig, loadEnv } from "vite";
 import { resolve } from "node:path";
-import { resolveApiToken } from "./api/infrastructure/auth-config";
+import { resolveApiToken } from "./api/infrastructure/auth-config.ts";
 import {
 	canonicalLoopbackRedirect,
 	shouldAuthorize,
-} from "./api/infrastructure/dev-proxy";
+} from "./api/infrastructure/dev-proxy.ts";
 
 const first = (value: string | string[] | undefined) =>
 	Array.isArray(value) ? value[0] : value;

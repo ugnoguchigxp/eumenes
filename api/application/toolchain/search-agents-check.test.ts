@@ -4,7 +4,7 @@ import {
 	searchAgentCases,
 	type SearchAgentResult,
 } from "./search-agents.fixture";
-const c = searchAgentCases[1];
+const c = searchAgentCases[0];
 const success = (): SearchAgentResult => ({
 	status: "completed",
 	tasks: [
@@ -18,29 +18,25 @@ const success = (): SearchAgentResult => ({
 		},
 	],
 	report: {
-		claims: ["モデル公開", "推論の高速化", "AI製品の更新"].map((text) => ({
-			text,
-		})),
+		claims: [{ text: "仙台市は宮城県にあります。" }],
 		sources: [{ url: "https://example.org/news" }],
 	},
-	answer:
-		"- モデル公開\n- 推論の高速化\n- AI製品の更新\n[出典](https://example.org/news)",
-	operations: [{ operation: "lookup", query: "LLM news" }],
+	answer: "仙台市は宮城県にあります。[出典](https://example.org/news)",
+	operations: [{ operation: "lookup", query: "仙台市 県" }],
 	verifierCalls: { n: 0 },
 });
-test("accepts one search and a cited three-topic bullet report", () =>
+test("accepts one search and a cited answer", () =>
 	expect(assessSearchAgent(c, success()).ok).toBe(true));
-for (const error of ["invalid_requirement_schema", "codex_research_failed"])
-	test(`a completed failure explanation is not a successful search: ${error}`, () => {
-		const result = success();
-		result.tasks[0]!.status = "failed";
-		result.report = null;
-		result.answer = "情報を取得できませんでした。";
-		expect(assessSearchAgent(c, result)).toMatchObject({
-			ok: false,
-			checks: { completed: false, reportReturned: false },
-		});
+test("a completed failure explanation is not a successful search", () => {
+	const result = success();
+	result.tasks[0]!.status = "failed";
+	result.report = null;
+	result.answer = "情報を取得できませんでした。";
+	expect(assessSearchAgent(c, result)).toMatchObject({
+		ok: false,
+		checks: { completed: false, reportReturned: false },
 	});
+});
 for (const [name, change] of [
 	[
 		"wrong agent",
@@ -49,7 +45,7 @@ for (const [name, change] of [
 		},
 	],
 	[
-		"search without AI subject",
+		"search without the requested subject",
 		(r: SearchAgentResult) => {
 			r.operations[0]!.query = "最新ニュース";
 		},
@@ -57,20 +53,13 @@ for (const [name, change] of [
 	[
 		"repeated search",
 		(r: SearchAgentResult) => {
-			r.operations.push({ operation: "lookup", query: "AI news" });
+			r.operations.push({ operation: "lookup", query: "仙台市 宮城" });
 		},
 	],
 	[
-		"lost topics",
+		"lost answer",
 		(r: SearchAgentResult) => {
-			r.report!.claims.pop();
-		},
-	],
-	[
-		"lost bullet list",
-		(r: SearchAgentResult) => {
-			r.answer =
-				"モデル公開。推論高速化。製品更新。[出典](https://example.org/news)";
+			r.answer = "わかりませんでした。[出典](https://example.org/news)";
 		},
 	],
 	[

@@ -12,20 +12,7 @@ test("a conversation has an active run from acceptance until the run ends, and o
 	h = await setup({ autoStart: false });
 	let release!: () => void;
 	h.state.gate = new Promise<void>((resolve) => (release = resolve));
-	h.state.steps.push({
-		text: "お答えします。",
-		calls: [
-			{
-				name: "respond",
-				args: {
-					kind: "chat",
-					freshness: "not_live",
-					impact: "none",
-					approved: false,
-				},
-			},
-		],
-	});
+	h.state.steps.push({ text: "お答えします。" });
 	const active = (conversationId: string) =>
 		h!.store.read((db) =>
 			h!.dialogue.conversationHasActiveRunInTransaction(db, conversationId),

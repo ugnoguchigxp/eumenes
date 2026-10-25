@@ -168,8 +168,23 @@ export function createVoiceResponder({
 				await dialogue.cancel(run.id);
 				throw new Error("dialogue_wait_timeout");
 			}
-			if (final?.status !== "completed" || !final.answerMessageId)
+			if (final?.status !== "completed")
 				throw new Error(final?.error ?? "dialogue_incomplete");
+			// The generation chose not to speak (ContextWindow section 2): the turn ends quietly, not as a failure.
+			if (!final.answerMessageId) {
+				speechController.abort();
+				audio.delete(turn.utteranceId);
+				log.info("voice.synthesis_skipped", {
+					runId: run.id,
+					reason: "no_answer",
+				});
+				if (!speech)
+					await store.write((db) =>
+						larm.skipInTransaction?.(db, turn.utteranceId, "tts"),
+					);
+				await advance(turn.utteranceId, speech ? "played" : "completed");
+				return;
+			}
 			const answer = dialogue.answerText(run.id);
 			if (!answer) throw new Error("answer_missing");
 			if (!speech) {

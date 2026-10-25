@@ -1,16 +1,11 @@
 import { expect, test } from "bun:test";
-import {
-	CONVERSATION_WINDOW_TOKENS,
-	withRespond,
-} from "./conversation-script.fixture";
+import { CONVERSATION_WINDOW_TOKENS } from "./conversation-script.fixture";
 
-/** The fixture connection with the conversation's context window and the respond analysis of plain answers. */
-const conversationModel = <
-	T extends Parameters<typeof withRespond>[0] & { llmContextWindow?: unknown },
->(
-	port: T,
-) =>
-	withRespond({ ...port, llmContextWindow: () => CONVERSATION_WINDOW_TOKENS });
+/** The fixture connection with the conversation's context window. */
+const conversationModel = <T extends { llmContextWindow?: unknown }>(port: T) => ({
+	...port,
+	llmContextWindow: () => CONVERSATION_WINDOW_TOKENS,
+});
 import { harness } from "./toolchain.fixture";
 import { imageLarmFixture } from "../../domains/larm/test/chat-input.fixture";
 import { syntheticImages } from "../../domains/conversation/test/image.fixture";
@@ -94,13 +89,13 @@ test("Eumenes upload, atomic acceptance, image-only streaming, ordered history r
 		const generation = f.requests
 			.filter((r) => r.operation === "generate")
 			.map((r) => JSON.parse(r.body));
-		// Each turn is a single streamed generation that offers the fixed tools, and the analysis is `respond`.
+		// Each turn is a single streamed generation that offers the fixed tools.
 		expect(generation).toHaveLength(2);
 		expect(
 			generation.map((r) =>
 				(r.tools ?? []).some(
 					(t: { function?: { name?: string } }) =>
-						t.function?.name === "respond",
+						t.function?.name === "find_toolchain",
 				),
 			),
 		).toEqual([true, true]);

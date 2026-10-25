@@ -106,7 +106,6 @@ export function executionExtract(
 				subject: `execution:${row.id}-extract-${state.calls}`,
 				deadline: Math.min(row.deadline, ctx.now() + 45_000),
 				maxOutputTokens: OUTPUT_TOKENS,
-				route: "subagent",
 			});
 			state.calls++;
 			state.consumed++;

@@ -17,7 +17,6 @@ export const backgroundControlMigration = `CREATE TABLE inference_background_con
  request_id TEXT PRIMARY KEY REFERENCES inference_requests(id), binding TEXT NOT NULL
 );`;
 export interface RequestRow {
-	controlEngine: "larm" | "codex";
 	controlPolicyRequestId: string | null;
 	id: string;
 	subject: string;
@@ -44,7 +43,6 @@ export function get(db: Database, id: string): RequestRow | null {
 				output_limit?: number | null;
 				attempt_ms?: number | null;
 				context_policy?: "legacy" | "exact";
-				control_engine?: "larm" | "codex";
 				control_policy_request_id?: string | null;
 				structured_output?: number;
 		  })
@@ -58,25 +56,10 @@ export function get(db: Database, id: string): RequestRow | null {
 				outputLimit: row.output_limit ?? null,
 				attemptMs: row.attempt_ms ?? null,
 				contextPolicy: row.context_policy ?? "legacy",
-				controlEngine: row.control_engine ?? "larm",
 				controlPolicyRequestId: row.control_policy_request_id ?? null,
 				structuredOutput: row.structured_output === 1,
 			}
 		: null;
-}
-
-/** Pin the host-selected provider when the control is first captured. */
-export function bindControlEngine(db: Database, id: string, engine?: "codex") {
-	const row = get(db, id)!;
-	if (
-		(row.mode === "control" || !engine) &&
-		row.controlEngine !== (engine ?? "larm")
-	)
-		throw new Error("control_engine_conflict");
-	if (engine)
-		db.query(
-			"UPDATE inference_requests SET control_engine=? WHERE id=? AND status='pending'",
-		).run(engine, id);
 }
 
 /** Named migrations of this domain; the SQL above is frozen once deployed. */

@@ -1,6 +1,7 @@
 import type { Database } from "bun:sqlite";
 import type { HandlerDefinition } from "../../queue";
 import type { Receipt } from "../../inference";
+import { hostDelivery, type DeliveryEmotion } from "../../delivery";
 import { jstSeconds } from "../../../infrastructure/jst-time";
 import type { Run } from "../contracts";
 import type { ToolchainRoutingPort } from "../contracts/toolchains";
@@ -14,7 +15,6 @@ import {
 import type { Handover } from "./executor-context";
 import { eventFields, SIDE_EFFECTS, type Heard } from "./event-fields";
 import { generationStale } from "./generation-stream";
-import type { RespondArgs } from "./generation-tools";
 import { adoptMemoryWindow } from "./memory-window";
 import { consumeAnswer } from "./result-intake";
 import { endRun, type RunEndState } from "./run-end";
@@ -23,7 +23,8 @@ export type GenerationResult = {
 	/** The speech the generation ends with ("" for silence or a handover). */
 	text: string;
 	receipt?: Receipt;
-	respond?: RespondArgs;
+	/** The feeling the agent chose for its reply: the reply's voice tone and motion (never judged again). */
+	emotion?: DeliveryEmotion;
 	/** A delegation ended the generation: the announcement was delivered and the work handed over. */
 	handover?: Handover;
 	/** The generation issued a confirmation: its speech is the confirmation statement (section 6.7). */
@@ -81,9 +82,35 @@ function retryNotAdopted(
 }
 
 /** A failed adoption ends the run and the decision it carried. */
-function fail(deps: DialogueDeps, tx: Database, run: Run, code: string) {
+/**
+ * A failed generation's utterances join the log unanswered: the user saw the failure and says it again if it still
+ * matters. Left pending, every later generation would answer them all again, and a pile of them made the model
+ * answer each in turn without end (2026-10-24). A cancelled run keeps them pending (the user stopped it).
+ */
+function handleFailedUtterances(
+	deps: DialogueDeps,
+	tx: Database,
+	run: Run,
+	input: GenerateInput | null | undefined,
+) {
+	if (input?.final.kind === "utterances")
+		deps.continuity.events.handleInTransaction(
+			tx,
+			run.conversationId,
+			input.final.seqs,
+		);
+}
+
+function fail(
+	deps: DialogueDeps,
+	tx: Database,
+	run: Run,
+	code: string,
+	input: GenerateInput,
+) {
 	if (run.agentTaskId) deps.agents?.failAnswerInTransaction(tx, run.id, code);
-	endRun(deps, tx, run, "failed", code);
+	if (endRun(deps, tx, run, "failed", code))
+		handleFailedUtterances(deps, tx, run, input);
 	deps.toolchains?.settleSelectionInTransaction(tx, run.id, {
 		outcome: "failed",
 		code,
@@ -115,21 +142,21 @@ export function createGenerationSettlement(
 			if (stale)
 				return retryNotAdopted(deps, tx, run, input, claim.payload)
 					? "applied"
-					: fail(deps, tx, run, stale);
+					: fail(deps, tx, run, stale, input);
 			// The answer spoke of a report whose evidence changed since (H4/R8): it is not adopted, nor is the report.
 			if (
 				input.agent &&
 				!result.handover &&
 				!consumeAnswer(deps, tx, run, input.agent)
 			)
-				return fail(deps, tx, run, "report_invalidated");
+				return fail(deps, tx, run, "report_invalidated", input);
 			// A handover was this generation's adoption: its receipt and memory were taken there.
 			if (input.memory && memory && !result.handover) {
 				const adopted = adoptMemoryWindow(memory, tx, run, input.memory);
 				if (!adopted.ok)
 					return retryNotAdopted(deps, tx, run, input, claim.payload)
 						? "applied"
-						: fail(deps, tx, run, adopted.reason);
+						: fail(deps, tx, run, adopted.reason, input);
 			}
 			if (
 				result.receipt &&
@@ -139,7 +166,7 @@ export function createGenerationSettlement(
 				memory?.discardUsageInTransaction(tx, run.id);
 				return retryNotAdopted(deps, tx, run, input, claim.payload)
 					? "applied"
-					: fail(deps, tx, run, "permission_revoked");
+					: fail(deps, tx, run, "permission_revoked", input);
 			}
 			if (input.final.kind === "utterances")
 				events.handleInTransaction(tx, run.conversationId, input.final.seqs);
@@ -157,12 +184,17 @@ export function createGenerationSettlement(
 					runId: run.id,
 				});
 				if (!result.handover) said(deps, tx, run, messageId, text, result);
-				if (result.receipt?.delivery?.version === 2)
+				const delivery = result.emotion
+					? hostDelivery(result.emotion)
+					: result.receipt?.delivery?.version === 2
+						? result.receipt.delivery
+						: null;
+				if (delivery)
 					conversation.recordAnswerDeliveryInTransaction(
 						tx,
 						run.id,
 						run.conversationId,
-						result.receipt.delivery,
+						delivery,
 					);
 			}
 			// The notices this answer carried are shown once: only an adopted answer clears them.
@@ -218,13 +250,14 @@ export function createGenerationSettlement(
 			next[0] === "queued"
 				? transition(tx, run.id, run.revision, "queued", clock(), next[1])
 				: endRun(deps, tx, run, next[0], next[1]);
+		if (moved && next[0] === "failed")
+			handleFailedUtterances(deps, tx, run, input);
 		return moved ? "applied" : "stale";
 	};
 }
 
 /**
- * The agent's utterance as an event (section 8.1), with what it reported (`todoRefs`) and stood on (`about`).
- * A text-only reply is delivered in full when it is stored; a spoken one waits for its playback's `delivered`.
+ * The agent's utterance as an event (section 8.1). A text-only reply is delivered in full when it is stored; a spoken one waits for its playback's `delivered`.
  */
 function said(
 	deps: DialogueDeps,
@@ -236,7 +269,6 @@ function said(
 ) {
 	const events = deps.continuity.events;
 	const at = jstSeconds(Date.parse(deps.clock()));
-	const todoRefs = result.respond?.todoRefs ?? [];
 	const { event } = events.appendInTransaction(tx, {
 		conversationId: run.conversationId,
 		at,
@@ -245,8 +277,6 @@ function said(
 		fields: {
 			text,
 			...(result.confirmation ? { origin: "confirmation" } : {}),
-			...(todoRefs.length ? { todoRefs } : {}),
-			...(result.respond?.about?.length ? { about: result.respond.about } : {}),
 		},
 		messageIds: [messageId],
 		deliveryKey: `run:${run.id}`,
@@ -262,18 +292,17 @@ function said(
 		by: "host",
 		fields: { ref: event.id, heard: "full" },
 	});
-	confirmArchives(deps, tx, run, todoRefs, "full");
+	confirmArchives(deps, tx, run, "full");
 }
 
 /**
- * The TODOs this run's utterance was told to archive (`told: this`) are archived when it was heard in full and
- * names them in `todoRefs` (section 9.4); the others stay done, with the reason logged.
+ * The TODOs this run's reply reported (as the conversation agent's background update found) are archived once
+ * the reply was heard in full (section 9.4); the others stay done, with the reason logged.
  */
 export function confirmArchives(
 	deps: DialogueDeps,
 	tx: Database,
 	run: Run,
-	todoRefs: readonly string[],
 	heard: Heard,
 ) {
 	const ledger = deps.work;
@@ -285,9 +314,7 @@ export function confirmArchives(
 	)) {
 		if (row.archiveRequested !== `run:${run.id}`) continue;
 		const archived =
-			heard === "full" &&
-			todoRefs.includes(row.id) &&
-			ledger.archiveInTransaction(tx, row.id);
+			heard === "full" && ledger.archiveInTransaction(tx, row.id);
 		deps.continuity.events.appendInTransaction(tx, {
 			conversationId: run.conversationId,
 			at,
@@ -298,7 +325,7 @@ export function confirmArchives(
 				: {
 						action: "work.archive_unconfirmed",
 						todo: row.id,
-						reason: heard === "full" ? "not_in_todo_refs" : `heard_${heard}`,
+						reason: `heard_${heard}`,
 					},
 		});
 	}

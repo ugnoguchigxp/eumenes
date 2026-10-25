@@ -374,7 +374,7 @@ describe("DropdownMenu", () => {
 		expect(menu.style.top).toBe("272px");
 	});
 
-	it("does not flip if flipping does not help (both sides overflow)", async () => {
+	it("constrains width when neither horizontal alignment fits", async () => {
 		vi.stubGlobal("innerWidth", 200);
 
 		Element.prototype.getBoundingClientRect = vi.fn(function (this: Element) {
@@ -432,7 +432,8 @@ describe("DropdownMenu", () => {
 		await user.click(trigger);
 		const menu = await screen.findByRole("menu");
 
-		expect(menu.style.left).toBe("-108px");
+		expect(menu.style.left).toBe("8px");
+		expect(menu.style.width).toBe("184px");
 	});
 
 	it("prefers top when both sides insufficient but top is larger", async () => {
@@ -481,8 +482,9 @@ describe("DropdownMenu", () => {
 		);
 		const menu = await screen.findByRole("menu");
 
-		// When top side is chosen, maxHeight is based on triggerRect.top - margin (282px).
-		expect(menu.style.maxHeight).toBe("282px");
+		// The available height excludes both the viewport margin and the trigger gap.
+		expect(menu.style.maxHeight).toBe("274px");
+		expect(menu.style.top).toBe("8px");
 	});
 
 	it("flips back to bottom if top fits height but offset causes clip (Lines 163-164)", async () => {

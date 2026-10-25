@@ -21,10 +21,11 @@ import type {
 import type { ImagePort } from "../contracts/image";
 import type { ToolchainRoutingPort } from "../contracts/toolchains";
 import type { ChatMessage } from "../service/context";
-import { IMAGE, respond, type Call, type Step } from "./generation.fixture";
+import { IMAGE, type Call, type Step } from "./generation.fixture";
 import { openDialogueStore } from "./store.fixture";
+import { testConversationAgent } from "./conversation-agent.fixture";
 
-export { IMAGE, respond, type Call, type Step };
+export { IMAGE, type Call, type Step };
 
 export const REVISION = "toolchain:fake.studio@1";
 export const OTHER_REVISION = "toolchain:fake.other@1";
@@ -169,7 +170,6 @@ export async function setup(options: Options = {}) {
 		releaseTaskSession: async (taskId: string) => {
 			state.released.push(taskId);
 		},
-		snapshotInTransaction: () => ({ subagent: { resourceId: null } }),
 		extendDeadlineInTransaction: (
 			_db: unknown,
 			subject: string,
@@ -511,6 +511,7 @@ export async function setup(options: Options = {}) {
 	};
 	const queue = createQueue(store);
 	const dialogue = createDialogueService({
+		conversationAgent: testConversationAgent,
 		store,
 		conversation,
 		larm,

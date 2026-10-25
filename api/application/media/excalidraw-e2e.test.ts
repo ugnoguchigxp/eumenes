@@ -21,7 +21,7 @@ for (const action of ["create", "library"] as const)
 			expect(run?.status).toBe("completed");
 			const operation = h.drawingOperations!.list("main")[0]!;
 			expect(operation.state).toBe("completed");
-			expect(f.stages).toEqual(["route", "plan", "answer"]);
+			expect(f.stages).toEqual(["route", "plan"]);
 			expect(f.contexts.join("\n")).not.toContain("consumer-");
 			expect(f.contexts.join("\n")).not.toContain("business-");
 			// A new drawing is an unsaved draft link: LARM is not contacted until it is saved.

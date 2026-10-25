@@ -7,9 +7,7 @@ import {
 	candidatesOf,
 	delegate,
 	findToolchain,
-	isResultRound,
 	isUtteranceRound,
-	respond,
 	type Step,
 	UNAVAILABLE_TEXT,
 } from "../api/application/toolchain/conversation-script.fixture";
@@ -197,8 +195,7 @@ const uiStep = (
 	const studio = candidates.find(
 		(candidate) => candidate.id === "ui.compose",
 	) as { id: string; targets?: Array<{ ref: string }> } | undefined;
-	if (!studio)
-		return { text: UNAVAILABLE_TEXT, calls: [respond({ unavailable: true })] };
+	if (!studio) return { text: UNAVAILABLE_TEXT };
 	const target =
 		wants === requests.again ? studio.targets?.[0]?.ref : undefined;
 	return {
@@ -239,9 +236,9 @@ const model: LarmPort = {
 					: { action: "reply", text: turn.reply },
 			);
 		}
-		if (isUtteranceRound(options?.tools) && !isResultRound(messages)) {
+		if (isUtteranceRound(options?.tools)) {
 			// The conversation's own round: a UI request is searched for and handed to the studio; anything else is
-			// answered here with `respond`.
+			// answered here in plain text.
 			const question = messages
 				.filter((m) => m.role === "user")
 				.at(-1)!.content;
@@ -252,7 +249,7 @@ const model: LarmPort = {
 			].find((text) => question.includes(text));
 			const step: Step = wants
 				? uiStep(messages, question, wants)
-				: { text: "かしこまりました。", calls: [respond()] };
+				: { text: "かしこまりました。" };
 			if (step.calls?.length)
 				options?.onToolCalls?.(
 					callsOf(step, () => crypto.randomUUID()) as never,

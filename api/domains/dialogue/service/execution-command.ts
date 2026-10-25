@@ -75,7 +75,6 @@ export function executionCommands(deps: DialogueDeps) {
 			subject: `execution-command:${child.id}-${child.resume?.questionId ?? "initial"}`,
 			deadline: Math.min(child.deadline, Date.now() + 45_000),
 			maxOutputTokens: 2048,
-			route: "subagent",
 		});
 		return {
 			requestId,

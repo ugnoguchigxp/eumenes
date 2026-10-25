@@ -75,7 +75,7 @@ test("a run records one row per call; a thrown error is a transport error with i
 			if (call.caseId === "ctx-f9-dev-01" && call.trial === 1)
 				throw new TypeError("secret provider text");
 			if (call.caseId === "ctx-f9-dev-01" && call.trial === 2)
-				return { kind: "contract_failure", code: "x", repaired: true };
+				return { kind: "contract_failure", code: "x" };
 			return fixture(call, signal);
 		},
 		onRow: (row) => rows.push(row),
@@ -91,7 +91,6 @@ test("a run records one row per call; a thrown error is a transport error with i
 	expect(by("ctx-f9-dev-01", 2)).toMatchObject({
 		status: "contract_failure",
 		errorCode: "x",
-		repaired: true,
 	});
 	expect(by("ctx-f9-dev-01", 3)).toMatchObject({
 		status: "ok",
@@ -134,7 +133,7 @@ test("the fixture model answers through the production loop, so tools, analysis 
 		runner: createFixtureRunner([delegating], catalog),
 		onRow: (row) => rows.push(row),
 	});
-	expect(rows[0]).toMatchObject({ status: "ok", repaired: false });
+	expect(rows[0]).toMatchObject({ status: "ok" });
 	expect(rows[0]!.answer!.toolCalls.map((c) => c.name)).toEqual([
 		"find_toolchain",
 		"delegate",

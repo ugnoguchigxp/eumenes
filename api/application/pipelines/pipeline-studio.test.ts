@@ -1,3 +1,4 @@
+import { testConversationAgent } from "../../domains/dialogue/test/conversation-agent.fixture";
 import { expect, test } from "bun:test";
 import type { PipelineDefinition } from "../../domains/capabilities";
 import { canonicalText } from "../../domains/pipelines";
@@ -242,6 +243,7 @@ test("trials read the work's draft: the probe ranks it among the toolchains, the
 			inference: h.inference,
 			service: h.pipelines,
 			embedPassages: h.toolchain.embedPassages,
+			agentSystem: testConversationAgent.system,
 		});
 		const probe = await trials.probe(
 			work.workRef,

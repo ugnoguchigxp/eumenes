@@ -11,7 +11,7 @@ for (const url of [
 		expect(requestUrls(`このページ（${url}）を確認`)).toEqual([
 			new URL(url).href,
 		]);
-		const h = await harness(Date.now, false, undefined, true);
+		const h = await harness(Date.now, undefined, true);
 		try {
 			await h.start("unicode", `このページ（${url}）を確認`);
 			const id = h.agents.list("unicode").find((t) => t.kind === "worker")!.id;
@@ -35,7 +35,7 @@ test("Japanese commas and periods end a URL even without a space", () => {
 });
 
 test("a different path on the same host remains outside the request scope", async () => {
-	const h = await harness(Date.now, false, undefined, true);
+	const h = await harness(Date.now, undefined, true);
 	try {
 		await h.start("wrong-path", "確認 https://example.org/日本語");
 		const id = h.agents.list("wrong-path").find((t) => t.kind === "worker")!.id;

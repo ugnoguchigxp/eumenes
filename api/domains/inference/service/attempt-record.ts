@@ -94,12 +94,11 @@ export function resolveSession(
 	};
 }
 
-type Source = "larm" | "cloud" | "codex";
+type Source = "larm" | "cloud";
 
-/** Who bills an attempt: LARM, the Codex research engine, or the cloud connection's own path. */
+/** Who bills an attempt: LARM, or the cloud connection's own path. */
 function attemptBillingPath(source: Source, connection?: Connection) {
 	if (source === "larm") return "larm";
-	if (source === "codex") return "codex";
 	return connection ? billingPath(connection) : null;
 }
 
@@ -112,7 +111,6 @@ export async function recordAttemptStart(
 		selected: { resource: Resource; connection: Connection } | null;
 		reason: string | null;
 		session?: CallSessionRole;
-		codexModel?: string;
 	},
 ) {
 	const cloud = a.source === "cloud" ? a.selected : null;
@@ -128,11 +126,7 @@ export async function recordAttemptStart(
 				a.source,
 				cloud?.connection.id ?? null,
 				cloud?.resource.id ?? null,
-				cloud
-					? cloud.resource.model
-					: a.source === "codex"
-						? (a.codexModel ?? null)
-						: (a.row.snapshot.larm.profile ?? null),
+				cloud ? cloud.resource.model : (a.row.snapshot.larm.profile ?? null),
 				a.reason,
 				Date.now(),
 				a.session?.sessionRole ?? null,

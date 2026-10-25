@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { createTerminals, type SpawnPty } from "../../domains/terminals";
 import { harness } from "../toolchain/toolchain.fixture";
+import { isNoticeRound } from "../toolchain/conversation-script.fixture";
 import { waitFor } from "../../infrastructure/wait-for";
 
 type Store = Parameters<
@@ -63,7 +64,6 @@ async function until<T>(read: () => T | null | undefined | false): Promise<T> {
 
 test("a conversation request reaches Claude Code once saved, and its finished task is reported by name", async () => {
 	const claude = fakeClaude();
-	const parents: string[] = [];
 	const h = await harness({
 		terminals: claude.terminals,
 		routeTool: "claude_code",
@@ -82,20 +82,12 @@ test("a conversation request reaches Claude Code once saved, and its finished ta
 				},
 			});
 		},
-		parent: (messages) => {
-			parents.push(JSON.stringify(messages));
-			const latest = messages
-				.filter((m) => m.role === "user" && !m.content.startsWith("{"))
-				.at(-1);
-			// The finished task reaches the result phase as the TODO's result (its summary names the README change).
-			const reported =
-				latest?.content.includes("【通知】") ||
-				(latest?.content.startsWith("新しい出来事があります") &&
-					JSON.stringify(messages).includes("README の手順修正"));
-			return reported
+		// The terminal's finished task is a host notice: the conversation answers it by name.
+		parent: (messages) =>
+			isNoticeRound(messages) &&
+			JSON.stringify(messages).includes("README の手順修正")
 				? "README の手順修正が終わりました。変更をコミットしますか？"
-				: "承知しました。終わったらお知らせします。";
-		},
+				: "承知しました。終わったらお知らせします。",
 	});
 	try {
 		const first = await h.dialogue.submit({
@@ -114,11 +106,11 @@ test("a conversation request reaches Claude Code once saved, and its finished ta
 		expect(
 			readFileSync(command[command.indexOf("--settings") + 1]!, "utf8"),
 		).not.toContain("permissions");
-		// The answer sees only the projection: saved under a task name, not completed.
-		const handedContext = parents.at(-1)!;
-		expect(handedContext).toContain('\\"task\\":\\"README の手順修正\\"');
-		expect(handedContext).toContain('\\"delivered\\":\\"queued\\"');
-		expect(handedContext).toContain('\\"completed\\":false');
+		// The work's result is only the projection: saved under a task name, not completed.
+		const handed = h.reported();
+		expect(handed).toContain('"task":"README の手順修正"');
+		expect(handed).toContain('"delivered":"queued"');
+		expect(handed).toContain('"completed":false');
 
 		// The request is a saved row that the sender took.
 		const row = h.store.read(
@@ -212,7 +204,7 @@ test("a conversation request reaches Claude Code once saved, and its finished ta
 		expect(h.dialogue.answerText(report!.id)).toBe(
 			"README の手順修正が終わりました。変更をコミットしますか？",
 		);
-		// The notice is the result phase's context that carries the finished report (every reply is recorded).
+		// The notice carries the finished report (every reply is recorded).
 		const notice = [...h.parentContexts]
 			.reverse()
 			.find((c) => c.includes("テストは未実行です"))!;

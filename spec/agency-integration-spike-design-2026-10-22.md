@@ -1,6 +1,6 @@
 # Agency 統合スパイク設計（2026-10-22）
 
-**状態: 利用者の合意済み（2026-10-22、実装開始）。** 正本は eumenes_agency の `spec/eumenes-integration-spike.md`（同内容）。agency 側の実験の経緯は eumenes_agency の `spec/results.md` を参照。
+**状態: 利用者の合意済み（2026-10-22、実装開始）。2026-10-25 に [会話エージェントを agency に置き換える設計](agency-conversation-agent-design-2026-10-25.md) で改めた: agency は唯一の会話エージェント（返答・自発発話・TODOの報告）で常に動き、設定 `agency.enabled`・`agency.resourceId` は削除、推論は Eumenes に設定された会話のLLM。以下の route・ON/OFF・主会話への別枠の記述はその改訂より前のもの。** 正本は eumenes_agency の `spec/eumenes-integration-spike.md`（同内容）。agency 側の実験の経緯は eumenes_agency の `spec/results.md` を参照。
 
 決定済み（利用者、2026-10-22）:
 - 背景推論の route は設定 `agency.resourceId` で選べるようにする: 保存済みの cloud 資源（Claude Haiku を claude-agent-sdk 接続で）を指定すればそれを、未指定（null）なら LARM のローカル LLM を使う。利用者はローカル LLM も試す。LARM（約 60 tok/s）では select の出力（約 800 token）で自発発話が遅くなり、主会話・TTS と GPU を取り合う点は、試して log で測る。指定した cloud 資源が使えないときに黙って LARM へ落とすことはせず、agency を止めて理由を log に出す（§3 の方針どおり）。主会話の返答は従来どおり Eumenes の route。

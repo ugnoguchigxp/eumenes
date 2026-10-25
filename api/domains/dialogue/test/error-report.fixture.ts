@@ -11,6 +11,7 @@ import type { LarmPort } from "../../larm";
 import { createQueue } from "../../queue";
 import { createDialogueService, registerDialogue } from "..";
 import { dialogueMigrationList } from "./store.fixture";
+import { testConversationAgent } from "./conversation-agent.fixture";
 
 export const T0 = Date.parse("2026-10-17T12:18:54.000Z");
 export const BOOT = "beeb7ec6-2ef0-48b1-a9c0-bc6a16557bb6";
@@ -72,7 +73,7 @@ export function task(
 }
 
 export async function scenario(options: {
-	status?: "failed" | "completed" | "queued";
+	status?: "failed" | "interrupted" | "completed" | "queued";
 	error?: string | null;
 	tasks?: TaskDto[];
 	lines?: (ids: Ids) => string[];
@@ -86,6 +87,7 @@ export async function scenario(options: {
 	const tasks = options.tasks ?? [];
 	const logFile = join(dir, "api.jsonl");
 	const dialogue = createDialogueService({
+		conversationAgent: testConversationAgent,
 		store,
 		conversation: createConversationService(store),
 		continuity: createContinuityService(store),

@@ -15,7 +15,6 @@ const row = (over: Partial<RawRow> = {}): RawRow => ({
 	trial: 1,
 	status: "ok",
 	answer: { text: "はい。", toolCalls: [] },
-	repaired: false,
 	startedAt: "t",
 	latencyMs: 10,
 	messageCount: 3,
@@ -71,7 +70,7 @@ test("transport errors are counted apart; a contract failure is a failed trial; 
 		row({
 			status: "contract_failure",
 			answer: undefined,
-			errorCode: "invalid_conversation_operation",
+			errorCode: "control_text_in_body",
 		}),
 	);
 	expect(contract).toMatchObject({
@@ -79,9 +78,6 @@ test("transport errors are counted apart; a contract failure is a failed trial; 
 		pass: false,
 		contractViolation: true,
 	});
-	expect(
-		(await score(passJudge, row({ repaired: true }))).contractViolation,
-	).toBe(true);
 });
 
 test("an unusable judge reply leaves the trial needing adjudication, and adjudication.json settles exactly that axis", async () => {

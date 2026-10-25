@@ -10,7 +10,7 @@ import type { TaskOps } from "./task-ops";
 import { createActionOperation } from "./action-operation";
 
 export function createStartTask(ctx: RuntimeContext, ops: TaskOps) {
-	const { capabilities, tools, inference, now } = ctx.deps;
+	const { capabilities, tools, now } = ctx.deps;
 	const { prepared, actionPrepared, bindings } = ctx.state;
 	const { enqueue, insertTask, ready, fail } = ops;
 	const runAction = createActionOperation({
@@ -55,7 +55,6 @@ export function createStartTask(ctx: RuntimeContext, ops: TaskOps) {
 				originalRequest?: string;
 				urls?: string[];
 				command?: unknown;
-				researcher?: "codex";
 				/** The package of the toolchain the conversation chose. */
 				packageRevisionId?: string;
 			};
@@ -69,13 +68,6 @@ export function createStartTask(ctx: RuntimeContext, ops: TaskOps) {
 			// A World investigation has no default package: the toolchain names it.
 			if (request.kind === "world" && request.packageRevisionId === undefined)
 				throw new Error("capability_unavailable");
-			if (
-				request.researcher &&
-				(request.kind !== "web" ||
-					request.researcher !== "codex" ||
-					!inference.codexResearchAvailable?.())
-			)
-				throw new Error("codex_research_unavailable");
 			if (request.kind === "web" && input.requirementProfiles?.length)
 				throw new Error("invalid_requirement_contract");
 			const root = insertTask(
@@ -109,11 +101,7 @@ export function createStartTask(ctx: RuntimeContext, ops: TaskOps) {
 				request.packageRevisionId ??
 				capabilities.activePackageRevisionInTransaction(
 					db,
-					request.kind === "history"
-						? "history.research"
-						: request.researcher === "codex"
-							? "web.search"
-							: "web.quick",
+					request.kind === "history" ? "history.research" : "web.quick",
 				);
 			const workerInput = {
 				question: request.question,
@@ -154,7 +142,6 @@ export function createStartTask(ctx: RuntimeContext, ops: TaskOps) {
 										capabilities.requirementCatalogInTransaction(db),
 								}
 							: {}),
-						researcher: request.researcher,
 						execution: request.execution,
 					},
 					workerDeadline(

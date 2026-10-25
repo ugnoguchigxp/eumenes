@@ -22,9 +22,6 @@ const RULES = [
 	"dialogue.contexts.host-rules.research-result",
 	"dialogue.contexts.host-rules.research-world",
 	"dialogue.contexts.host-rules.research-document",
-	"dialogue.contexts.conversation-generation.correction",
-	"dialogue.contexts.conversation-generation.correction-3",
-	"dialogue.contexts.conversation-generation.correction-4",
 ] as const;
 
 /** The system part (A1): the persona, then every host rule. */

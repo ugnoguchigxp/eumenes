@@ -8,6 +8,10 @@ archive の基準: その文書が担当した実装がコードにあり、本�
 
 | 文書 | 状態 |
 | --- | --- |
+| [agency-conversation-agent-design-2026-10-25.md](agency-conversation-agent-design-2026-10-25.md) | 合意済み・実装中（§11.4）。現行の会話担当（dialogue の生成）を削除し、agency を唯一の会話エージェントにする。返事・自発発話・TODOの完了の報告はすべて agency が行い、会話の流れで必要なら担当（toolchain）を呼んでサブエージェントに渡す（agency 側は `ToolPort` の mock）。記憶は直接のツールのまま。伝え終えたTODOは `heard: full` で `archived`。分類と根拠の検査を廃止し、TODOの結果の検査に置き換える会話が返答なしで失敗した run `6839d520`・`5145885e` の対策 |
+| [user-condition-implementation-plan-2026-10-24.md](user-condition-implementation-plan-2026-10-24.md) | 計画のみ・保留・未実装。Memory・WorldModel・ContextWindowの大改修後に再確認。本人が明言した一時的な状態を既存の短期記憶で保持し、少量を文脈に提示する案を比較検証する |
+| [larm-connection-cache-design-2026-10-25.md](larm-connection-cache-design-2026-10-25.md) | Q1・Q2を合意・実装済み（§8）、Q3未着手。LARMの入力キャッシュは接続に結び付くため、主会話の接続を稼働中ずっと保ち、再起動をまたいで同じclientで取り戻す。補助は先頭ごとの最大2本の接続へ送る。liveで再起動後も11,628token再利用を確認 |
+| [prompt-prewarm-design-2026-10-24.md](prompt-prewarm-design-2026-10-24.md) | 案・合意待ち（§9）・実装前。LARM のキャッシュがない見込みのとき、主会話と同じ先頭を出力1tokenの要求で先に読ませ、初回・沈黙後の約19秒の読込みを待たないようにする。ContextWindow §15 の先読みを、無出力の契約なしで実現する案 |
 | [prompt-edit-design-2026-10-24.md](prompt-edit-design-2026-10-24.md) | 実装済み（fixture 検証済み、2026-10-24 合意）。直前の利用者の発言だけを、行動が確定する前に止めて編集・再送信する。メッセージの訂正（ContextWindow §13）と未処理の発言の run の作り直しで実現し、Web に「止めて編集」・吹き出しの編集・編集の状態を足す |
 | [cli-toolchain-design-2026-10-24.md](cli-toolchain-design-2026-10-24.md) | 合意済み（§13）・P0〜P3実装・固定試験済み。ブラウザ・実LLM受入は未実施。Claude Code 画面のPTY基盤を共通化し、新domain `shell` でログインシェルの画面「CLI」と、会話からのCLIコマンド実行（`cli_command`、一件ごとのPTY・実行台帳・完了通知、承認なし）を追加する |
 | [code-review-2026-10-24.md](verification/code-review-2026-10-24.md) | 未commit差分全体のレビューと修正・隔離検証。完了確認失敗の波及、保留報告の解除、schema変換を修正。LARM live受入と全体gateの既存違反は未完了 |

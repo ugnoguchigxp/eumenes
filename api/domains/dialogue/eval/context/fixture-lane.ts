@@ -1,7 +1,7 @@
 /**
  * Fake conversation model and fake judge: they prove the pipeline runs and decide nothing. The model is scripted from
- * the case's own checks and answers through the production loop, so the fixed tools, the respond and basis checks
- * and the host side of the tools are exercised without a provider.
+ * the case's own checks and answers through the production loop, so the conversation agent's reply loop, the fixed
+ * tools and the host side of the tools are exercised without a provider.
  */
 import type { NativeToolCall } from "../../../../infrastructure/chat-stream";
 import type { InferencePort, Receipt } from "../../../inference";
@@ -99,28 +99,11 @@ function scriptedInference(
 					value: "",
 					toolCalls: [call(round, step[0], step[1])],
 				} satisfies Receipt;
-			const field = (name: string) => {
-				const found = testCase.expect.checks.find(
-					(c) => c.kind === "respond_field" && c.field === name,
-				);
-				return found?.kind === "respond_field" ? found.equals : undefined;
-			};
+			// The answer is plain text, as the agent's reply is: no call closes it.
 			return {
 				requestId,
 				attemptId: "fixture",
 				value,
-				toolCalls:
-					testCase.input === null
-						? []
-						: [
-								call(round, "respond", {
-									kind: field("kind") ?? "chat",
-									freshness: field("freshness") ?? "not_live",
-									impact: field("impact") ?? "none",
-									approved: field("approved") ?? false,
-									...(field("unavailable") ? { unavailable: true } : {}),
-								}),
-							],
 			} satisfies Receipt;
 		},
 	};

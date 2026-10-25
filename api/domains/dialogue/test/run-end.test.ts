@@ -14,20 +14,7 @@ afterEach(async () => {
 
 test("a completed run tells the steward once, with its conversation and the completed state", async () => {
 	h = await setup();
-	h.state.steps.push({
-		text: "こんにちは。",
-		calls: [
-			{
-				name: "respond",
-				args: {
-					kind: "chat",
-					freshness: "not_live",
-					impact: "none",
-					approved: false,
-				},
-			},
-		],
-	});
+	h.state.steps.push({ text: "こんにちは。" });
 	const run = await h.say("やあ");
 	expect(run.status).toBe("completed");
 	expect(h.state.runEnds).toEqual([
@@ -80,20 +67,7 @@ test("a cancelled run tells the steward it was cancelled, and its waiting TODO e
 
 test("a run that already completed is not ended or told twice by a later cancel", async () => {
 	h = await setup();
-	h.state.steps.push({
-		text: "一度だけ。",
-		calls: [
-			{
-				name: "respond",
-				args: {
-					kind: "chat",
-					freshness: "not_live",
-					impact: "none",
-					approved: false,
-				},
-			},
-		],
-	});
+	h.state.steps.push({ text: "一度だけ。" });
 	const run = await h.say("一度だけ");
 	await h.dialogue.cancel(run.id);
 	expect(h.dialogue.get(run.id)?.status).toBe("completed");

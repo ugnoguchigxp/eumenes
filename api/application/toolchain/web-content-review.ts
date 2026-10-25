@@ -16,8 +16,6 @@ export function createWebReview(
 		signal.throwIfAborted();
 		const requestId = await store.write((db) => {
 			signal.throwIfAborted();
-			const resourceId =
-				inference.snapshotInTransaction(db).subagent.resourceId;
 			return inference.captureBackgroundControlInTransaction(db, {
 				taskId,
 				decisionId: "review",
@@ -26,7 +24,7 @@ export function createWebReview(
 				deadline,
 				taskDeadline: deadline,
 				maxOutputTokens: 1024,
-				route: resourceId ? { resourceId } : "conversation",
+				route: "conversation",
 				structuredOutput: true,
 			});
 		});

@@ -156,13 +156,3 @@ test("the shipped AI screen offers the auth method and the setup token of a Clau
 		],
 	});
 });
-
-test("the shipped conversation screen selects the sub-agent AI, none meaning LARM", async () => {
-	const backend = open(false, true);
-	fireEvent.click(await screen.findByRole("button", { name: "会話" }));
-	const select = (await screen.findByLabelText(
-		fieldLabel("subagent.resource"),
-	)) as HTMLSelectElement;
-	expect(select.value).toBe("");
-	expect(backend.sent).toHaveLength(0);
-});

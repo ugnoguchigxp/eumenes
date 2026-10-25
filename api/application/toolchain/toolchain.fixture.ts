@@ -43,6 +43,7 @@ import {
 	type AcquisitionPort,
 } from "../../domains/web-research";
 import { createDialogueService } from "../../domains/dialogue";
+import { testConversationAgent } from "../../domains/dialogue/test/conversation-agent.fixture";
 import { createVoiceDialogue } from "../../domains/voice-dialogue";
 import { createToolchain } from "./toolchain";
 import { createToolchainHostLinks } from "./toolchain-host";
@@ -62,9 +63,8 @@ import {
 	findToolchain,
 	handedStep,
 	instantExecute,
-	isResultRound,
+	isNoticeRound,
 	isUtteranceRound,
-	respond,
 	toolResults,
 	type Step,
 	UNAVAILABLE_TEXT,
@@ -154,14 +154,6 @@ export async function harness(
 			typeof import("../work/kanban-sdk-host").createKanbanSdkHost
 		>;
 		settingsEnv?: Record<string, string | undefined>;
-		codexResearch?: {
-			execute: (
-				messages: import("../../domains/inference/contracts").Messages,
-				signal: AbortSignal,
-				control?: import("../../domains/inference/contracts").ControlContract,
-				model?: string,
-			) => Promise<string>;
-		};
 		gate?: Promise<void>;
 		answerGate?: Promise<void>;
 		/** Holds the operation sub-agent's call (after its context is recorded) until released. */
@@ -187,7 +179,6 @@ export async function harness(
 			messages: import("../../domains/inference/contracts").Messages,
 		) => string | Promise<string>;
 		history?: boolean;
-		fullResearch?: boolean;
 		incompleteWeatherFirstRead?: boolean;
 		badToolArgs?: boolean;
 		badExecutionRefOnce?: boolean;
@@ -282,75 +273,12 @@ export async function harness(
 			entry.id ? [entry.id] : [],
 		);
 	};
-	/**
-	 * The result phase's reply: the finished TODO's result in the active slot the host reports (a timer's action, a
-	 * task's summary). Undefined when the phase carries no result, so the reply falls back to the default answer.
-	 */
-	const resultReply = (
-		messages: import("../../domains/inference/contracts").Messages,
-	): string | undefined => {
-		if (!isResultRound(messages)) return undefined;
-		const document = JSON.parse(
-			messages.find((m) => m.role === "user")!.content,
-		) as {
-			active?: Array<{ todo?: string; result?: Record<string, any> }>;
-			now?: {
-				trigger?: Array<{ kind?: string; todos?: Array<{ id: string }> }>;
-			};
-		};
-		// The TODO the trigger names is the one this phase reports; without a trigger, the newest result.
-		const changed = new Set(
-			(document.now?.trigger ?? [])
-				.filter((event) => event.kind === "todo_changed")
-				.flatMap((event) => event.todos ?? [])
-				.map((todo) => todo.id),
-		);
-		const entry =
-			(changed.size
-				? document.active
-						?.filter(
-							(item) => !!item.todo && changed.has(item.todo) && !!item.result,
-						)
-						.at(-1)
-				: undefined) ?? document.active?.filter((item) => item.result).at(-1);
-		const result = entry?.result;
-		if (!result) return undefined;
-		if (result.kind === "task_result") return result.summary;
-		// A research report: its summary, and the sources it read as the only links.
-		if (Array.isArray(result.sources) && typeof result.summary === "string") {
-			const links = (result.sources as Array<{ url?: string }>)
-				.flatMap((source) => (source.url ? [source.url] : []))
-				.map((url) => `[${new URL(url).hostname}](${url})`);
-			return (
-				result.summary + (links.length ? `\n\nソース：${links.join("、")}` : "")
-			);
-		}
-		if (result.kind !== "timer_action") return undefined;
-		// A cancelled timer reads as cancelled even when the action that started it is the one reported.
-		if (result.items[0]?.state === "cancelled" || result.action === "cancelled")
-			return "タイマーを取り消しました";
-		if (result.action === "started")
-			return `${result.items[0].durationSeconds}秒のタイマーを開始しました`;
-		return (
-			result.items
-				.map(
-					(item: any) =>
-						`${item.label}: 残り${item.remainingSeconds}秒 (${item.state})`,
-				)
-				.join("、") || "動いているタイマーはありません"
-		);
-	};
 	const reply = async (
 		messages: import("../../domains/inference/contracts").Messages,
 	): Promise<string> => {
 		parentContexts.push(JSON.stringify(messages));
 		if (options.answerGate) await options.answerGate;
 		if (options.parentAnswer !== undefined) return options.parentAnswer;
-		// A test's own model for the conversation answers before the host's fixed reply to a result.
-		if (options.parent && isResultRound(messages))
-			return options.parent(messages);
-		const fromResult = resultReply(messages);
-		if (fromResult !== undefined) return fromResult;
 		// The analysis asked for a clarification: the answer round carries the question.
 		if (options.clarify) return "どの地域の天気を調べますか？";
 		if (options.parent) return options.parent(messages);
@@ -407,7 +335,7 @@ export async function harness(
 			(!!options.timers && /タイマー/.test(question)) ||
 			/天気|株価|weather|stock|調べ|検索|https?:|確認/.test(question);
 		if (options.clarify || !delegates)
-			return { text: await reply(messages), calls: [respond()] };
+			return { text: await reply(messages) };
 		const after = afterUtterance(messages);
 		const handed = handedStep(messages);
 		if (handed) return handed;
@@ -417,9 +345,7 @@ export async function harness(
 				? options.routeTool
 				: options.timers && /タイマー/.test(question)
 					? "timer"
-					: options.fullResearch
-						? "web_research"
-						: "web_search";
+					: "web_search";
 		const wanted = store.read(
 			(db) =>
 				toolchain.capabilities
@@ -445,11 +371,7 @@ export async function harness(
 		const chosen =
 			search.candidates?.find((card) => card.id === wanted) ??
 			search.candidates?.[0];
-		if (!chosen)
-			return {
-				text: UNAVAILABLE_TEXT,
-				calls: [respond({ unavailable: true })],
-			};
+		if (!chosen) return { text: UNAVAILABLE_TEXT };
 		if (chosen.execution === "instant")
 			return { calls: [instantExecute(chosen.id, question, {})] };
 		return handOver(chosen.id);
@@ -494,7 +416,7 @@ export async function harness(
 				]);
 				return "";
 			}
-			if (isUtteranceRound(callOptions?.tools) && !isResultRound(messages)) {
+			if (isUtteranceRound(callOptions?.tools) && !isNoticeRound(messages)) {
 				const step = await utteranceStep(
 					messages,
 					question,
@@ -678,15 +600,6 @@ export async function harness(
 	};
 	const inference = createInference(store, settings, {
 		larmFactory: () => options.model ?? model,
-		...(options.codexResearch
-			? { codexResearch: options.codexResearch }
-			: options.fullResearch
-				? {
-						codexResearch: {
-							execute: (messages, signal) => model.answer(messages, signal),
-						},
-					}
-				: {}),
 	});
 	const queue = createQueue(store, {
 		resources: { "inference.llm": 1, "inference.aux": 2, "web.fetch": 6 },
@@ -941,14 +854,13 @@ export async function harness(
 											? "stock_quote"
 											: options.timers && /タイマー/.test(query)
 												? "timer"
-												: options.fullResearch
-													? "web_research"
-													: "web_search"))),
+												: "web_search"))),
 				),
 		toolchain.registry,
 		toolchain.schemas,
 	);
 	const dialogue = createDialogueService({
+		conversationAgent: testConversationAgent,
 		excalidraw: drawingOperations,
 		objectRecognition: objectRecognition?.port(CONVERSATION_DEFAULT_PRINCIPAL),
 		image,
@@ -1073,6 +985,20 @@ export async function harness(
 		queue,
 		request,
 		parentContexts,
+		/** The conversation's TODOs (the ledger the agency reports from). */
+		todos: (conversationId = "main") =>
+			store.read((db) => dialogue.todosInTransaction(db, conversationId)),
+		/**
+		 * The result of the conversation's newest finished TODO as text. A finished TODO is reported by the agency,
+		 * not by a conversation reply of the run, so the work's own result is what a test reads.
+		 */
+		reported: (conversationId = "main") => {
+			const done = store
+				.read((db) => dialogue.todosInTransaction(db, conversationId))
+				.filter((todo) => todo.status === "done")
+				.at(-1);
+			return done ? JSON.stringify(done.result ?? null) : "";
+		},
 		voice,
 		settings,
 		inference,

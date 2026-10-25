@@ -44,7 +44,6 @@ import {
 	runDocTool,
 } from "./specialist-agent";
 import { settleSpecialistTurn } from "./specialist-settle";
-import { subagentRoute } from "./toolchain-command";
 
 const log = getLogger("dialogue");
 
@@ -336,8 +335,6 @@ export function createSpecialistTurnHandler(
 					...(input.set.timeLimits
 						? { attemptMs: input.set.timeLimits.inferenceMs }
 						: {}),
-					// The saved sub-agent resource (read in this transaction); none keeps the call on LARM.
-					route: subagentRoute(larm.snapshotInTransaction?.(tx)),
 				});
 			});
 			// The provider session lives as long as the specialist session; it is released when that ends.

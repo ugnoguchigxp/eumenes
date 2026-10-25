@@ -125,15 +125,13 @@ export async function awaitReady(
 	const { id, required } = input;
 	if (terminalStatuses.includes(String(created.status)))
 		throw new Error(`larm_connection_${created.status}`);
-	// Profile switching can report connection ready before its providers are claimable.
+	// `claimable` is a short-lived probe cache: a live connection a restarted host gets back reports false while
+	// its claim succeeds, so readiness decides here and the claim itself confirms (see establishLease).
 	const providersPending = () => {
 		const providers = providersOf(created);
 		return required.some((name) => {
 			const provider = providers.find((p) => p.name === name);
-			return (
-				provider &&
-				(provider.readiness !== "ready" || provider.claimable !== true)
-			);
+			return provider && provider.readiness !== "ready";
 		});
 	};
 	// Capacity waiting is owned by LARM and the caller's cancellation/deadline.
@@ -161,7 +159,6 @@ export async function awaitReady(
 			!p ||
 			p.protocol !== protocols[name] ||
 			p.endpoint !== endpoints[name] ||
-			p.claimable !== true ||
 			p.readiness !== "ready"
 		)
 			throw new Error("larm_provider_not_ready");

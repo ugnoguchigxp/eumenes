@@ -41,96 +41,10 @@ test("worker contract failure after syntax correction retries once and then stop
 	}
 });
 
-test("Codex uses the common Web worker and retains the selected engine across steps", async () => {
-	const h = await harness(Date.now, true);
-	try {
-		await h.start("codex", "複数資料を比較して詳しく説明", "codex");
-		const child = h.agents.list("codex").find((t) => t.kind === "worker")!;
-		expect(child.packageRevisionId).toBe("package:web.search@1");
-		expect(JSON.parse(h.task(child.id).input_json!)).toMatchObject({
-			researcher: "codex",
-		});
-		await h.runModelStep(child.id, {
-			action: "invoke",
-			tool: "web.lookup",
-			arguments: { query: "model query" },
-		});
-		expect(h.started[0]).toMatchObject({
-			toolId: "web.lookup",
-			args: { query: "model query" },
-		});
-		h.results.set("op1", {
-			state: "succeeded",
-			result: {
-				observedAt: new Date().toISOString(),
-				hits: [],
-				documents: [],
-				failures: [],
-			},
-		});
-		await h.agents.reconcile();
-		await h.runModelStep(child.id, {
-			action: "finish",
-			report: {
-				outcome: "not_found",
-				summary: "取得範囲には根拠がありません。",
-				claims: [],
-				limitations: [],
-			},
-		});
-		expect(h.engines).toEqual(["codex", "codex"]);
-		expect(h.agents.report(child.id)?.version).toBe(2);
-		expect(h.task(child.id).state).toBe("completed");
-		await h.start("current", "語句を確認して");
-		const current = h.agents.list("current").find((t) => t.kind === "worker")!;
-		await h.runModelStep(current.id, {
-			action: "finish",
-			report: {
-				outcome: "not_found",
-				summary: "根拠なし",
-				claims: [],
-				limitations: [],
-			},
-		});
-		expect(h.engines.at(-1)).toBeUndefined();
-	} finally {
-		await h.close();
-	}
-});
-
-test("Codex cannot be used for history or when its provider is absent", async () => {
+test("search-only reports still reject invented evidence and return the failure to the parent", async () => {
 	const h = await harness();
 	try {
-		await expect(h.start("unavailable", "調査", "codex")).rejects.toThrow(
-			"codex_research_unavailable",
-		);
-	} finally {
-		await h.close();
-	}
-	const enabled = await harness(Date.now, true);
-	try {
-		await expect(
-			enabled.store.write((db) =>
-				enabled.agents.startInTransaction(db, {
-					rootRunId: "history",
-					input: {
-						kind: "history",
-						question: "以前の発言",
-						researcher: "codex",
-					},
-					deadline: Date.now() + 10000,
-				}),
-			),
-		).rejects.toThrow("codex_research_unavailable");
-	} finally {
-		await enabled.close();
-	}
-});
-
-test("search-only reports still reject invented evidence and return the failure to the parent", async () => {
-	const h = await harness(Date.now, true);
-	try {
-		await h.start("invalid-search-source", "公開情報を検索", "codex");
+		await h.start("invalid-search-source", "公開情報を検索");
 		const child = h.agents
 			.list("invalid-search-source")
 			.find((t) => t.kind === "worker")!;
@@ -159,9 +73,9 @@ test("search-only reports still reject invented evidence and return the failure 
 });
 
 test("search failures return without creating requirement contracts or drafts", async () => {
-	const h = await harness(Date.now, true);
+	const h = await harness();
 	try {
-		await h.start("failed-search", "検索して", "codex");
+		await h.start("failed-search", "検索して");
 		const child = h.agents
 			.list("failed-search")
 			.find((t) => t.kind === "worker")!;
@@ -201,9 +115,9 @@ test("search failures return without creating requirement contracts or drafts", 
 	}
 });
 test("a worker cannot give up before invoking an available tool: one repair, then failure", async () => {
-	const h = await harness(Date.now, true);
+	const h = await harness();
 	try {
-		await h.start("give-up", "最新のニュースを調べて", "codex");
+		await h.start("give-up", "最新のニュースを調べて");
 		const child = h.agents.list("give-up").find((t) => t.kind === "worker")!;
 		const giveUp = {
 			action: "finish",

@@ -45,7 +45,7 @@ const finish = (reference: string) => ({
 });
 
 test("staggered batch arrivals use shared receipts and reserve the final answer without wait calls", async () => {
-	const h = await harness(Date.now, false, undefined, true);
+	const h = await harness(Date.now, undefined, true);
 	try {
 		const id = await searched(h, "batch");
 		await h.runRawModelStep(id, {
@@ -101,7 +101,7 @@ test("staggered batch arrivals use shared receipts and reserve the final answer 
 });
 
 test("failed reads remain observations and a batch resumes once after its final receipt", async () => {
-	const h = await harness(Date.now, false, undefined, true);
+	const h = await harness(Date.now, undefined, true);
 	try {
 		const id = await searched(h, "failures");
 		await h.runRawModelStep(id, {
@@ -124,7 +124,7 @@ test("failed reads remain observations and a batch resumes once after its final 
 });
 
 test("batch cancellation rejects late successful results and cancels every pending call", async () => {
-	const h = await harness(Date.now, false, undefined, true);
+	const h = await harness(Date.now, undefined, true);
 	try {
 		const id = await searched(h, "cancel-batch");
 		await h.runRawModelStep(id, {
@@ -148,7 +148,7 @@ test("batch cancellation rejects late successful results and cancels every pendi
 });
 
 test("unpresented evidence still requires repair and cannot become an accepted report", async () => {
-	const h = await harness(Date.now, false, undefined, true);
+	const h = await harness(Date.now, undefined, true);
 	try {
 		const id = await searched(h, "unknown-ref");
 		await h.runRawModelStep(id, {

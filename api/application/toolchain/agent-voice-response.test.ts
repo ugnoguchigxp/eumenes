@@ -56,19 +56,17 @@ test("silence completes without creating a dialogue, cancelling another run or s
 	}
 });
 
-test("a committed timer result follows the agent generation and speech path without executing twice", async () => {
+test("a committed timer result is reported by the agency, not by the turn: the notice is the only speech and the timer runs once", async () => {
 	const h = await harness({ timers: true, voiceText: "3分タイマー測って" });
 	try {
 		const id = await accept(h);
 		await until(() =>
-			["ready", "failed"].includes(h.voice.get(id)?.status ?? ""),
+			["played", "completed", "failed"].includes(h.voice.get(id)?.status ?? ""),
 		);
-		expect(h.voice.get(id)?.status).toBe("ready");
-		expect(h.spoken).toEqual([
-			"お調べします。",
-			h.dialogue.answerText(h.voice.get(id)!.runId!)!,
-		]);
-		expect(h.spoken[1]).toContain("180秒");
+		expect(h.voice.get(id)?.status).toBe("played");
+		expect(h.dialogue.answerText(h.voice.get(id)!.runId!)).toBeNull();
+		expect(h.spoken).toEqual(["お調べします。"]);
+		expect(h.reported()).toContain("180");
 		expect(
 			h.store.read((db) =>
 				db

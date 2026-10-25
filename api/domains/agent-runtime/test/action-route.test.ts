@@ -131,7 +131,7 @@ const root = (h: Awaited<ReturnType<typeof harness>>, runId: string) =>
 
 test("an action runs the binding's adapter operation and its projection reaches the answer", async () => {
 	const { adapter, seen } = fakeAdapter();
-	const h = await withBinding(await harness(Date.now, false, adapter));
+	const h = await withBinding(await harness(Date.now, adapter));
 	open.push(h.close);
 	await startAction(h, "run-ok");
 	expect(seen).toMatchObject([
@@ -174,7 +174,7 @@ test("an action runs the binding's adapter operation and its projection reaches 
 
 test("a refused operation ends the task with the safe code and the answer reports a failure only", async () => {
 	const { adapter } = fakeAdapter({ fail: "revision_conflict" });
-	const h = await withBinding(await harness(Date.now, false, adapter));
+	const h = await withBinding(await harness(Date.now, adapter));
 	open.push(h.close);
 	await startAction(h, "run-fail");
 	expect(root(h, "run-fail")).toMatchObject({
@@ -197,7 +197,7 @@ test("a refused operation ends the task with the safe code and the answer report
 
 test("a command that is malformed, for another package, or without a frozen capability is refused before the adapter", async () => {
 	const { adapter, seen } = fakeAdapter();
-	const h = await withBinding(await harness(Date.now, false, adapter));
+	const h = await withBinding(await harness(Date.now, adapter));
 	open.push(h.close);
 	const cases: Array<[string, Record<string, unknown>, boolean, string]> = [
 		["run-a", { adapterRef: "timer" }, true, "invalid_action_input"],
@@ -246,7 +246,7 @@ test("a result that is not a bounded object is not handed to the answer", async 
 		{ blob: "x".repeat(40_000) },
 	]) {
 		const { adapter } = fakeAdapter({ answerContext });
-		const h = await withBinding(await harness(Date.now, false, adapter));
+		const h = await withBinding(await harness(Date.now, adapter));
 		open.push(h.close);
 		await startAction(h, "run-ctx");
 		await expect(
@@ -257,7 +257,7 @@ test("a result that is not a bounded object is not handed to the answer", async 
 
 test("a frozen request id and decision time reach the adapter; without them the runtime mints its own", async () => {
 	const { adapter, seen } = fakeAdapter();
-	const h = await withBinding(await harness(Date.now, false, adapter));
+	const h = await withBinding(await harness(Date.now, adapter));
 	open.push(h.close);
 	const stamp = {
 		requestId: crypto.randomUUID(),

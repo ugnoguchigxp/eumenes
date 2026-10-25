@@ -38,10 +38,9 @@ test("a clarifying question is saved with the delegation's TODO and reaches the 
 			question: "何秒ですか",
 		},
 	]);
-	// The question reaches the user through the conversation: the speaking generation saw it as data.
-	const material = h.materialOf(h.calls.length - 1);
-	expect(material).toContain(interaction.question!.questionId);
-	expect(material).toContain("何秒ですか");
+	// The question reaches the user through the conversation agent: it is told the TODO changed, and reads the
+	// waiting TODO with its question on its own opportunity (no generation is made for the change).
+	expect(h.workChanged).toContain("main");
 	const body = {
 		eventId: crypto.randomUUID(),
 		questionId: interaction.question!.questionId,

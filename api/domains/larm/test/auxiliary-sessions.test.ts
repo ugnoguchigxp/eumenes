@@ -20,6 +20,8 @@ function fixture() {
 		token: number;
 		providers: string[];
 		terminal?: boolean;
+		/** Claimed before: LARM's probe cache reports it unclaimable although a claim succeeds. */
+		claimedBefore?: boolean;
 	};
 	const connections = new Map<string, Connection>();
 	const bodies: Array<{ id: string; body: Record<string, unknown> }> = [];
@@ -68,7 +70,7 @@ function fixture() {
 			.map((p) => ({
 				...p,
 				readiness: c.ready ? "ready" : "waiting",
-				claimable: c.ready,
+				claimable: c.ready && !c.claimedBefore,
 			})),
 	});
 	const request = async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -160,12 +162,16 @@ function fixture() {
 		]);
 		return Response.json({ choices: [{ message: { content: text } }] });
 	};
-	const create = (profile = "saved-profile") =>
+	const create = (
+		profile = "saved-profile",
+		options: { client?: string; keepAlive?: boolean } = {},
+	) =>
 		createLarm({
 			baseUrl: "http://127.0.0.1:9810",
 			token: "control",
 			profile,
 			fetch: request,
+			...options,
 		});
 	return { create, connections, bodies, inference, claimed, released };
 }
@@ -175,53 +181,87 @@ const history = (key: string) => [
 	{ role: "user" as const, content: "私の識別子を答えてください。" },
 ];
 
-test("main plus three helpers infer independently; fifth waits without claim or inference then uses a released slot", async () => {
+test("a helper connection serves one prefix: the same instructions reuse it, a new prefix evicts the idle least-used one or waits", async () => {
 	const f = fixture();
 	const main = f.create();
 	const signal = AbortSignal.timeout(10000);
+	const helper = (key: string) =>
+		main.answer(history(key), signal, { sessionRole: "auxiliary" });
 	const work: Promise<string>[] = [];
 	try {
 		work.push(main.answer(history("main"), signal));
 		await until(() => f.inference.size === 1);
-		for (let i = 1; i <= 3; i++)
-			work.push(
-				main.answer(history(`helper${i}`), signal, {
-					sessionRole: "auxiliary",
-				}),
-			);
-		await until(() => f.inference.size === 4);
+		work.push(helper("a"), helper("b"));
+		await until(() => f.inference.size === 3);
 		expect(new Set([...f.connections.values()].map((c) => c.client)).size).toBe(
-			4,
+			3,
 		);
-		// Helpers always use the saved profile, whatever its name is.
+		// Helpers always use the saved profile, whatever its name is, and only the llm provider.
 		expect(f.bodies.map((x) => x.body.profile)).toEqual(
-			Array(4).fill("saved-profile"),
+			Array(3).fill("saved-profile"),
 		);
-		expect(f.bodies[0]!.body.providers).toEqual(["llm"]);
-		for (const { body } of f.bodies.slice(1))
-			expect(body.providers).toEqual(["llm"]);
-		for (let i = 0; i < 4; i++)
-			expect(f.inference.get(`session${i}`)!.messages).toEqual(
-				history(i === 0 ? "main" : `helper${i}`),
-			);
-		work.push(
-			main.answer(history("fifth"), signal, { sessionRole: "auxiliary" }),
-		);
-		await until(() => f.connections.size === 5);
-		expect(f.connections.get("session4")!.ready).toBe(false);
-		expect(f.claimed).not.toContain("session4");
-		expect(f.inference.has("session4")).toBe(false);
-		f.inference.get("session1")!.output.resolve("helper1");
-		expect(await work[1]).toBe("helper1");
+		for (const { body } of f.bodies) expect(body.providers).toEqual(["llm"]);
+		expect(f.inference.get("session1")!.messages).toEqual(history("a"));
+		expect(f.inference.get("session2")!.messages).toEqual(history("b"));
+		// Both helper slots are busy: a third prefix waits without a connection.
+		work.push(helper("c"));
+		await Bun.sleep(20);
+		expect(f.connections.size).toBe(3);
+		f.inference.get("session1")!.output.resolve("a");
+		expect(await work[1]).toBe("a");
+		await until(() => f.inference.has("session3"));
 		expect(f.released).toContain("session1");
-		await until(() => f.inference.has("session4"));
-		expect(f.inference.get("session4")!.messages).toEqual(history("fifth"));
+		expect(f.inference.get("session3")!.messages).toEqual(history("c"));
+		f.inference.get("session3")!.output.resolve("c");
+		expect(await work[3]).toBe("c");
+		// The same instructions again go to their held connection.
 		for (const [id, entry] of f.inference) entry.output.resolve(id);
 		await Promise.all(work);
-		expect(f.connections.size).toBe(1);
+		f.inference.clear();
+		const again = helper("c");
+		await until(() => f.inference.has("session3"));
+		expect(f.bodies).toHaveLength(4);
+		f.inference.get("session3")!.output.resolve("again");
+		expect(await again).toBe("again");
 	} finally {
 		await main.close();
 		await Promise.allSettled(work);
+	}
+	expect(f.connections.size).toBe(0);
+});
+
+test("a restarted host with the same client gets its kept connections back; keep-alive holds the connection without a call", async () => {
+	const f = fixture();
+	const first = f.create("saved-profile", { client: "eumenes-fixed" });
+	const signal = AbortSignal.timeout(10000);
+	const reply = first.answer(history("aux"), signal, {
+		sessionRole: "auxiliary",
+	});
+	await until(() => f.inference.size === 1);
+	f.inference.get("session1")!.output.resolve("aux");
+	expect(await reply).toBe("aux");
+	await first.close({ keepConnection: true });
+	expect(f.released).toEqual([]);
+	for (const c of f.connections.values()) c.claimedBefore = true;
+	const second = f.create("saved-profile", {
+		client: "eumenes-fixed",
+		keepAlive: true,
+	});
+	try {
+		// Held without any call, under the same main connection.
+		await until(() => f.claimed.filter((id) => id === "session0").length === 2);
+		second.retain!(false);
+		f.inference.clear();
+		const again = second.answer(history("aux"), signal, {
+			sessionRole: "auxiliary",
+		});
+		await until(() => f.inference.has("session1"));
+		f.inference.get("session1")!.output.resolve("back");
+		expect(await again).toBe("back");
+		expect(f.bodies).toHaveLength(2);
+		expect(f.released).toEqual([]);
+	} finally {
+		await second.close();
 	}
 	expect(f.connections.size).toBe(0);
 });
@@ -253,28 +293,28 @@ test("a sub-agent call infers on its own connection like a helper, not on the ma
 	}
 });
 
-test("cancellation of a waiting helper releases it and never infers; parent close releases active helpers", async () => {
+test("cancellation of a call waiting for a helper slot never connects or infers; parent close releases active helpers", async () => {
 	const f = fixture(),
 		main = f.create();
 	const work: Promise<string>[] = [];
 	try {
-		for (let i = 0; i < 3; i++)
+		for (let i = 0; i < 2; i++)
 			work.push(
 				main.answer(history(`${i}`), new AbortController().signal, {
 					sessionRole: "auxiliary",
 				}),
 			);
-		await until(() => f.inference.size === 3);
+		await until(() => f.inference.size === 2);
 		const abort = new AbortController();
 		const waiting = main.answer(history("cancelled"), abort.signal, {
 			sessionRole: "auxiliary",
 		});
 		const settled = Promise.allSettled([waiting]);
-		await until(() => f.connections.size === 5);
+		await Bun.sleep(20);
 		abort.abort();
 		expect((await settled)[0]!.status).toBe("rejected");
-		expect(f.released).toContain("session4");
-		expect(f.inference.has("session4")).toBe(false);
+		expect(f.connections.size).toBe(3);
+		expect(f.inference.size).toBe(2);
 		const done = Promise.allSettled(work);
 		await main.close();
 		await done;
@@ -304,5 +344,32 @@ test("auxiliary renew reclaims tokens and a released connection reconnects with 
 		expect(f.claimed).toEqual(["session0", "session0", "session1"]);
 	} finally {
 		await p.close();
+	}
+});
+
+test("parallel calls of one prefix take the free slot instead of queueing; a full set queues on its own prefix", async () => {
+	const f = fixture();
+	const main = f.create();
+	const signal = AbortSignal.timeout(10000);
+	const helper = () =>
+		main.answer(history("same"), signal, { sessionRole: "auxiliary" });
+	const work = [helper(), helper()];
+	try {
+		await until(() => f.inference.size === 2);
+		expect([...f.inference.keys()].sort()).toEqual(["session1", "session2"]);
+		work.push(helper());
+		await Bun.sleep(20);
+		expect(f.connections.size).toBe(3);
+		f.inference.get("session1")!.output.resolve("first");
+		expect(await work[0]).toBe("first");
+		await until(() => f.inference.get("session1")!.output !== undefined);
+		for (const [id, entry] of f.inference) entry.output.resolve(id);
+		await Bun.sleep(20);
+		for (const [id, entry] of f.inference) entry.output.resolve(id);
+		expect((await Promise.all(work)).length).toBe(3);
+		expect(f.bodies).toHaveLength(3);
+	} finally {
+		await main.close();
+		await Promise.allSettled(work);
 	}
 });

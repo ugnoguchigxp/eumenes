@@ -71,12 +71,12 @@ test("new Web revisions upgrade and reseed without changing archived definitions
 			store.read((db) =>
 				db
 					.query(
-						"SELECT id,definition_hash FROM capability_revisions WHERE id IN ('skill:web.guided@4','package:web.recipe@5','package:web.search@5','package:web.quick@6','toolchain:web.search@6','toolchain:web.research.codex@3') ORDER BY id",
+						"SELECT id,definition_hash FROM capability_revisions WHERE id IN ('skill:web.guided@4','package:web.recipe@5','package:web.search@5','package:web.quick@6','toolchain:web.search@6') ORDER BY id",
 					)
 					.all(),
 			);
 		const previous = previousShared();
-		expect(previous).toHaveLength(6);
+		expect(previous).toHaveLength(5);
 		await caps.seed();
 		expect(archived()).toEqual(before);
 		expect(previousShared()).toEqual(previous);
@@ -84,16 +84,12 @@ test("new Web revisions upgrade and reseed without changing archived definitions
 			store.read((db) =>
 				db
 					.query(
-						"SELECT key,active_revision_id FROM capability_items WHERE key IN ('toolchain:web.search','toolchain:web.research.codex','package:web.quick') ORDER BY key",
+						"SELECT key,active_revision_id FROM capability_items WHERE key IN ('toolchain:web.search','package:web.quick') ORDER BY key",
 					)
 					.all(),
 			);
 		expect(active()).toEqual([
 			{ key: "package:web.quick", active_revision_id: "package:web.quick@7" },
-			{
-				key: "toolchain:web.research.codex",
-				active_revision_id: "toolchain:web.research.codex@4",
-			},
 			{
 				key: "toolchain:web.search",
 				active_revision_id: "toolchain:web.search@7",

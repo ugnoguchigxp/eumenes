@@ -3,9 +3,9 @@ import {
 	candidatesOf,
 	delegate,
 	findToolchain,
-	isResultRound,
+	isNoticeRound,
 	isUtteranceRound,
-	respond,
+	UNAVAILABLE_TEXT,
 	type ConversationMessage,
 	type Step,
 } from "../toolchain/conversation-script.fixture";
@@ -32,7 +32,7 @@ export function lastUtterance(messages: ConversationMessage[]): string {
 
 /**
  * The model's usual path for a media utterance (sections 6.1 and 6.5): search for the toolchain by its id, then hand
- * the request over with the announcement. The hand-over ends the generation, so it carries no `respond`.
+ * the request over with the announcement. The hand-over ends the generation.
  */
 export function handOver(
 	toolchain: string,
@@ -64,26 +64,12 @@ export function handOver(
 						}),
 					],
 				}
-			: { calls: [respond({ unavailable: true })] };
+			: { text: UNAVAILABLE_TEXT };
 	};
 }
 
-/** A work result the host put into the conversation's `active` slots (section 9.3), as the document shows it. */
-export type ActiveSlot = {
-	todo: string;
-	status: "waiting" | "done";
-	outcome?: string;
-	result?: Record<string, unknown>;
-};
-
-/** The `active` slots of the generation's JSON document (the message that starts with the profile section). */
-export function activeSlots(messages: ConversationMessage[]): ActiveSlot[] {
-	return (documentOf(messages).active ?? []) as ActiveSlot[];
-}
-
 /**
- * Answers one model call when it is the user's utterance's generation (the conversation's fixed tools are offered and
- * no result round is pending). Returns undefined for every other call, which the caller answers itself.
+ * Answers one model call when it is the user's utterance's generation (the conversation's fixed tools are offered). Returns undefined for every other call, which the caller answers itself.
  */
 export function answerUtterance(
 	tools: Tools,
@@ -92,7 +78,7 @@ export function answerUtterance(
 	step: (messages: ConversationMessage[]) => Step,
 	onHandOver?: () => void,
 ): string | undefined {
-	if (!isUtteranceRound(tools) || isResultRound(messages)) return undefined;
+	if (!isUtteranceRound(tools) || isNoticeRound(messages)) return undefined;
 	const chosen = step(messages);
 	if (chosen.calls?.length) {
 		if (chosen.calls.some((call) => call.name === "delegate")) onHandOver?.();

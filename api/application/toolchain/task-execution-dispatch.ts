@@ -52,7 +52,6 @@ export function taskExecutionDispatch(
 						question: child.request,
 						originalRequest: child.source.request,
 						packageRevisionId: resolved.packageRevisionId,
-						researcher: resolved.runtime.researcher,
 					},
 				});
 				return { kind, result: research(db, child) } as const;

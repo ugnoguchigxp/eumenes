@@ -6,6 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { storybookTest } from "@storybook/addon-vitest/vitest-plugin";
 import tailwindcss from "@tailwindcss/vite";
+import ts from "@typescript/typescript6";
 import react from "@vitejs/plugin-react";
 import { playwright } from "@vitest/browser-playwright";
 import { defineConfig } from "vite";
@@ -30,6 +31,7 @@ export default defineConfig({
 		tailwindcss(),
 		react(),
 		dts({
+			tsconfigPath: "tsconfig.build.json",
 			include: ["src"],
 			exclude: [
 				"**/*.stories.*",
@@ -39,7 +41,14 @@ export default defineConfig({
 				".storybook/**",
 			],
 			outDir: "dist",
-			rollupTypes: true,
+			bundleTypes: {
+				invokeOptions: {
+					// API Extractor needs the compatibility compiler's standard libraries.
+					typescriptCompilerFolder: path.dirname(
+						path.dirname(ts.getDefaultLibFilePath({})),
+					),
+				},
+			},
 		}),
 	],
 	define: {

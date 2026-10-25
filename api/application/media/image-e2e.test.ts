@@ -3,7 +3,6 @@ import { harness } from "../toolchain/toolchain.fixture";
 import { imageFixture, imageQuestion, imageTestPlan } from "./image.fixture";
 import { musicFixture, musicQuestion } from "./music.fixture";
 import {
-	isResultRound,
 	isUtteranceRound,
 } from "../toolchain/conversation-script.fixture";
 import { waitFor } from "../../infrastructure/wait-for";
@@ -53,7 +52,7 @@ for (const mode of [
 					format: "png",
 					model: "fixture-image",
 				});
-			expect(f.stages).toEqual(["route", "plan", "answer"]);
+			expect(f.stages).toEqual(["route", "plan"]);
 			const library = await (await h.request("/api/images/library")).json();
 			expect(
 				library.images.some((a: { id: string }) => a.id === "past-image"),
@@ -123,20 +122,7 @@ test("cancelled image generation discards a late synchronous response and never 
 
 test("artifact image input keeps exact generation data without showing an internal chat utterance", async () => {
 	const f = imageFixture("success");
-	let resultPolicy = false;
-	const model = {
-		...f.model,
-		answer: async (...args: Parameters<typeof f.model.answer>) => {
-			const [messages] = args;
-			if (isResultRound(messages))
-				resultPolicy =
-					messages[0]?.content.includes(
-						"activeに画像担当の仕事の結果があるときは",
-					) ?? false;
-			return f.model.answer(...args);
-		},
-	};
-	const h = await harness({ model, imageGateway: f.gateway });
+	const h = await harness({ model: f.model, imageGateway: f.gateway });
 	try {
 		const request = {
 			requestId: crypto.randomUUID(),
@@ -159,7 +145,6 @@ test("artifact image input keeps exact generation data without showing an intern
 			presentation: "artifact",
 		});
 		expect(h.image!.list("main")[0]?.state).toBe("completed");
-		expect(resultPolicy).toBe(true);
 	} finally {
 		await h.close();
 	}
@@ -222,7 +207,7 @@ test("an image screen submit generates an image though the conversation retained
 		...image.model,
 		answer: async (...args: Parameters<typeof image.model.answer>) => {
 			if (phase === "music") return music.model.answer(...args);
-			if (isUtteranceRound(args[2]?.tools) && !isResultRound(args[0]))
+			if (isUtteranceRound(args[2]?.tools))
 				screenAnalysis++;
 			return image.model.answer(...args);
 		},
@@ -267,7 +252,7 @@ test("an image screen submit generates an image though the conversation retained
 		expect(records[0].state).toBe("completed");
 		// The screen's own toolchain took the request: no selection round, and no track was made.
 		expect(screenAnalysis).toBe(0);
-		expect(image.stages).toEqual(["plan", "answer"]);
+		expect(image.stages).toEqual(["plan"]);
 		expect(h.music!.list("main")).toHaveLength(1);
 		expect(
 			image.requests.filter(

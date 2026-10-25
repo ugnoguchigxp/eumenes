@@ -62,144 +62,6 @@
 		},
 		{
 			"kind": "artifact",
-			"id": "settings.conversation",
-			"revision": 6,
-			"title": "会話の設定",
-			"variants": [
-				{
-					"id": "standard",
-					"label": "標準",
-					"definition": {
-						"view": "settings-section",
-						"source": "settings-conversation",
-						"title": "会話"
-					}
-				}
-			],
-			"defaultVariant": "standard",
-			"sourceBindings": [
-				{
-					"source": "settings-conversation",
-					"adapterRef": "adapter:settings@1",
-					"query": "query:settings.document@1",
-					"target": "none"
-				}
-			],
-			"actionBindings": [
-				{
-					"actionId": "edit",
-					"eventAction": "settings-edit",
-					"source": "settings-conversation",
-					"inputSchemaRef": "builtin:emptyInput",
-					"effect": "draft",
-					"draftAction": "edit",
-					"draftDocument": "document:settings@1"
-				},
-				{
-					"actionId": "apply",
-					"eventAction": "settings-apply",
-					"source": "settings-conversation",
-					"inputSchemaRef": "schema:settings-apply@3",
-					"effect": "write",
-					"operationId": "settings.apply",
-					"draftDocument": "document:settings@1",
-					"confidentialFields": ["keys"]
-				},
-				{
-					"actionId": "review",
-					"eventAction": "settings-review",
-					"source": "settings-conversation",
-					"inputSchemaRef": "builtin:emptyInput",
-					"effect": "navigate",
-					"navigateTo": {
-						"artifactId": "settings.changes"
-					}
-				}
-			],
-			"launcher": {
-				"icon": "conversation",
-				"label": "会話",
-				"group": "使い方を変える",
-				"order": 10,
-				"description": "AIの名前 あなたの名前 口調 ワールドモデル"
-			},
-			"fields": [
-				{
-					"fieldId": "conversation.agent-name",
-					"document": "document:settings@1",
-					"path": "$.general.agentName",
-					"label": "AIの名前",
-					"control": "text",
-					"help": "空欄の場合は名前を設定しません。",
-					"maxLength": 40
-				},
-				{
-					"fieldId": "conversation.user-name",
-					"document": "document:settings@1",
-					"path": "$.general.userName",
-					"label": "あなたの名前",
-					"control": "text",
-					"help": "空欄の場合は名前で呼びません。",
-					"maxLength": 40
-				},
-				{
-					"fieldId": "conversation.persona",
-					"document": "document:settings@1",
-					"path": "$.general.persona",
-					"label": "口調",
-					"control": "select",
-					"help": "次の返答から反映されます。",
-					"options": [
-						{
-							"value": "butler",
-							"label": "執事"
-						},
-						{
-							"value": "maid",
-							"label": "メイド"
-						},
-						{
-							"value": "strategist",
-							"label": "参謀"
-						},
-						{
-							"value": "sage",
-							"label": "老師"
-						}
-					]
-				},
-				{
-					"fieldId": "world.enabled",
-					"document": "document:settings@1",
-					"path": "$.world.enabled",
-					"label": "ワールドモデル（世界の状態の記録）を使う",
-					"control": "toggle",
-					"help": "変更はbackendの再起動後に反映されます。オフにしても、保存済みの内容が残っている間は、忘却の反映だけが動き続けます。"
-				},
-				{
-					"fieldId": "world.curation-resource",
-					"document": "document:settings@1",
-					"path": "$.world.curationResourceId",
-					"label": "ワールドモデルの記録に使うAI",
-					"control": "select",
-					"unset": "null",
-					"optionsSource": "query:settings.llm-resources@1",
-					"help": "未設定なら会話と同じAIで記録します。クラウドのAIを選ぶと、記録のたびに会話の内容をそのAIへ送ります。次の記録から反映されます。"
-				},
-				{
-					"fieldId": "subagent.resource",
-					"document": "document:settings@1",
-					"path": "$.subagent.resourceId",
-					"label": "調査・操作の担当に使うAI",
-					"control": "select",
-					"unset": "null",
-					"optionsSource": "query:settings.llm-resources@1",
-					"help": "未設定ならLARMで実行します。クラウドのAIを選ぶと、調査・操作の各段階でタスクの内容をそのAIへ送ります。選んだAIが使えないときは、会話用と同じ課金経路の場合だけ会話用のAIで続け、異なる場合はLARMで実行します。次の段階から反映されます。"
-				}
-			]
-		},
-		{
-			"kind": "artifact",
 			"id": "settings.ai-connections",
 			"revision": 6,
 			"title": "AIと接続",
@@ -2453,7 +2315,7 @@
 		{
 			"kind": "artifact",
 			"id": "settings.conversation",
-			"revision": 7,
+			"revision": 8,
 			"title": "会話の設定",
 			"variants": [
 				{
@@ -2575,16 +2437,6 @@
 					"unset": "null",
 					"optionsSource": "query:settings.llm-resources@1",
 					"help": "未設定なら会話と同じAIで記録します。クラウドのAIを選ぶと、記録のたびに会話の内容をそのAIへ送ります。次の記録から反映されます。"
-				},
-				{
-					"fieldId": "subagent.resource",
-					"document": "document:settings@1",
-					"path": "$.subagent.resourceId",
-					"label": "調査・操作の担当に使うAI",
-					"control": "select",
-					"unset": "null",
-					"optionsSource": "query:settings.llm-resources@1",
-					"help": "未設定ならLARMで実行します。クラウドのAIを選ぶと、調査・操作の各段階でタスクの内容をそのAIへ送ります。選んだAIが使えないときは、会話用と同じ課金経路の場合だけ会話用のAIで続け、異なる場合はLARMで実行します。次の段階から反映されます。"
 				}
 			]
 		},

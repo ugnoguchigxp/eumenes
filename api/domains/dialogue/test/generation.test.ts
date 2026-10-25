@@ -1,11 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
-import {
-	IMAGE,
-	INSTANT,
-	respond,
-	setup,
-	type Harness,
-} from "./generation.fixture";
+import { hostDelivery } from "../../delivery";
+import { IMAGE, INSTANT, setup, type Harness } from "./generation.fixture";
 
 let h: Harness | undefined;
 afterEach(async () => {
@@ -13,22 +8,18 @@ afterEach(async () => {
 	h = undefined;
 });
 
-test("an utterance is answered with respond: the said events, a full delivery and the answer trace", async () => {
+test("an utterance is answered with plain text: the said events, a full delivery and the answer trace", async () => {
 	h = await setup();
-	h.state.steps.push({ text: "こんにちは。", calls: [respond()] });
+	h.state.steps.push({ text: "こんにちは。" });
 	const run = await h.say("やあ");
 	expect(h.dialogue.answerText(run.id)).toBe("こんにちは。");
+	expect(h.state.calls).toHaveLength(1);
 	const call = h.state.calls[0]!;
 	expect(call.messages.map((m) => m.role)).toEqual(["system", "user", "user"]);
 	expect(call.messages[2]!.content).toBe("やあ");
 	expect(JSON.parse(call.messages[1]!.content)).toHaveProperty("now");
-	expect(call.tools).toEqual([
-		"memory",
-		"find_toolchain",
-		"delegate",
-		"work",
-		"respond",
-	]);
+	// The fixed tools only: there is no `respond` to call, and a reply needs none.
+	expect(call.tools).toEqual(["memory", "find_toolchain", "delegate", "work"]);
 	const log = h.log();
 	expect(log.map((e) => [e.type, e.by])).toEqual([
 		["said", "user"],
@@ -36,34 +27,112 @@ test("an utterance is answered with respond: the said events, a full delivery an
 		["delivered", "host"],
 	]);
 	expect(h.fields(log[2]!)).toMatchObject({ ref: log[1]!.id, heard: "full" });
-	expect(h.state.selections.at(-1)).toMatchObject({
-		decision: "answer",
-		analysis: { kind: "chat", next: "answer" },
-	});
+	const selection = h.state.selections.at(-1)!;
+	expect(selection).toMatchObject({ decision: "answer" });
+	expect(selection).not.toHaveProperty("analysis");
+	expect(selection).not.toHaveProperty("repaired");
 });
 
-test("an utterance answered without respond is repaired once, then fails", async () => {
+test("a model call that fails fails the run; its utterance joins the log unanswered and the next generation answers only its own", async () => {
+	h = await setup();
+	// No scripted step: the model call fails.
+	await h.say("こんばんは", "failed");
+	expect(h.log().map((e) => h!.fields(e).text)).toContain("こんばんは");
+	h.state.steps.push({ text: "こんばんは。" });
+	const run = await h.say("今日は寒いね");
+	expect(h.dialogue.answerText(run.id)).toBe("こんばんは。");
+	// Only the new utterance is the newest message; the failed one is in the document.
+	const last = h.state.calls.at(-1)!.messages;
+	expect(last.at(-1)!.content).toBe("今日は寒いね");
+	expect(last.filter((m) => m.content === "こんばんは")).toHaveLength(0);
+});
+
+test("text written beside a tool call is spoken before it and kept: the answer is the whole spoken text", async () => {
 	h = await setup();
 	h.state.steps.push(
-		{ text: "はい。" },
-		{ text: "はい。", calls: [respond()] },
+		{
+			text: "調べますね。",
+			calls: [{ name: "find_toolchain", args: { query: "時刻" } }],
+		},
+		{ text: "見つかりませんでした。" },
 	);
-	const ok = await h.say("ねえ");
-	expect(h.dialogue.answerText(ok.id)).toBe("はい。");
-	const repaired = h.state.calls[1]!.messages;
-	expect(repaired.at(-2)!.content).toStartWith("UNTRUSTED_REJECTED_OUTPUT=");
-	expect(repaired.at(-1)!.content).toBe("ねえ");
-	h.state.steps.push({ text: "はい。" }, { text: "はい。" });
-	const failed = await h.say("もう一度", "failed");
-	expect(failed.error).toBe("invalid_conversation_operation");
+	const run = await h.say("東京は今何時？");
+	expect(h.dialogue.answerText(run.id)).toBe(
+		"調べますね。見つかりませんでした。",
+	);
+	expect(h.state.calls).toHaveLength(2);
 });
 
-test("a live question needs a basis: an instant toolchain's answer is one, and makes no TODO", async () => {
+test("a refused tool call is returned as the tool's result, and the reply goes on", async () => {
 	h = await setup();
-	const live = { kind: "live_info", freshness: "live" };
 	h.state.steps.push(
-		// Speaking at once on a live question has no basis: repaired once.
-		{ text: "12時です。", calls: [respond(live)] },
+		// A change without its confirmation is refused, not executed.
+		{
+			calls: [{ name: "find_toolchain", args: { query: "絵の差替え" } }],
+		},
+		{
+			calls: [
+				{
+					name: "delegate",
+					args: {
+						mode: "execute",
+						toolchain: IMAGE.id,
+						request: "壁紙を差し替える",
+						impact: "modify_existing",
+						announcement: "差し替えます。",
+					},
+				},
+			],
+		},
+		{ text: "先に確認させてください。差し替えてよいですか？" },
+	);
+	const run = await h.say("壁紙を差し替えて");
+	expect(run.status).toBe("completed");
+	expect(h.dialogue.answerText(run.id)).toBe(
+		"先に確認させてください。差し替えてよいですか？",
+	);
+	const tool = h.state.calls.at(-1)!.messages.filter((m) => m.role === "tool");
+	const refused = JSON.parse(tool.at(-1)!.content) as {
+		refused: boolean;
+		issues: Array<{ reason?: string }>;
+	};
+	expect(refused.refused).toBe(true);
+	expect(refused.issues.map((issue) => issue.reason)).toContain(
+		"confirmation_required",
+	);
+	// Nothing was handed over.
+	expect(h.todos()).toEqual([]);
+	// The refusal is not an error of the run: no repair message, no failure.
+	expect(
+		h.state.calls
+			.flatMap((call) => call.messages)
+			.some((m) => m.content.startsWith("UNTRUSTED_REJECTED_OUTPUT=")),
+	).toBe(false);
+});
+
+test("a call the host cannot read and a second search are refused with their reasons, and the reply continues", async () => {
+	h = await setup();
+	h.state.steps.push(
+		{ calls: [{ name: "find_toolchain", args: { query: "絵" } }] },
+		{ calls: [{ name: "find_toolchain", args: { query: "もう一度" } }] },
+		{ calls: [{ name: "no_such_tool", args: {} }] },
+		{ text: "お断りします。" },
+	);
+	const run = await h.say("絵を描いて");
+	expect(h.dialogue.answerText(run.id)).toBe("お断りします。");
+	const tool = h.state.calls
+		.at(-1)!
+		.messages.filter((m) => m.role === "tool")
+		.map((m) => JSON.parse(m.content) as Record<string, unknown>);
+	expect(tool).toHaveLength(3);
+	expect(tool[0]).toHaveProperty("candidates");
+	expect(tool[1]).toMatchObject({ refused: true });
+	expect(tool[2]).toMatchObject({ refused: true });
+});
+
+test("an instant toolchain's answer comes back as the tool result, and makes no TODO", async () => {
+	h = await setup();
+	h.state.steps.push(
 		{ calls: [{ name: "find_toolchain", args: { query: "時刻" } }] },
 		{
 			calls: [
@@ -79,24 +148,29 @@ test("a live question needs a basis: an instant toolchain's answer is one, and m
 				},
 			],
 		},
-		{ text: "東京は12時です。", calls: [respond(live)] },
+		{ text: "東京は12時です。" },
 	);
 	const run = await h.say("東京は今何時？");
 	expect(h.dialogue.answerText(run.id)).toBe("東京は12時です。");
-	const rejected = h.state.calls[1]!.messages.find((m) =>
-		m.content.startsWith("UNTRUSTED_REJECTED_OUTPUT="),
-	);
-	expect(rejected?.content).toContain("answer_without_basis");
 	expect(h.todos()).toEqual([]);
 	const tool = h.state.calls.at(-1)!.messages.filter((m) => m.role === "tool");
 	expect(JSON.parse(tool.at(-1)!.content)).toEqual({
 		answered: true,
 		answer: "東京は12時です。",
 	});
+	expect(h.state.selections.at(-1)).toMatchObject({ decision: "toolchain" });
 });
 
-test("a delegation is announced, opens a TODO and hands the run over; the result comes back through active", async () => {
-	h = await setup();
+test("a delegation is announced, opens a TODO and hands the run over; the finished work ends the run without a generation and opens the agent's opportunity", async () => {
+	const notified: string[] = [];
+	h = await setup({
+		agency: {
+			stateForContextInTransaction: () => [],
+			workChangedInTransaction: (_db, conversationId) => {
+				notified.push(conversationId);
+			},
+		},
+	});
 	h.state.steps.push(
 		{ calls: [{ name: "find_toolchain", args: { query: "絵を描く" } }] },
 		{
@@ -132,45 +206,29 @@ test("a delegation is announced, opens a TODO and hands the run over; the result
 		["delivered", "host", null],
 		["acted", "agent", "delegate"],
 	]);
-	// The result: the TODO is done, its slot is in active, the generation speaks on the fixed text and archives it.
-	h.state.steps.push({
-		text: "猫の絵ができました。",
-		calls: [],
-	});
-	h.state.steps.unshift({
-		calls: [
-			{
-				name: "work",
-				args: {
-					todo: todo!.id,
-					operation: "archive",
-					revision: todo!.revision + 1,
-					told: "this",
-				},
-			},
-		],
-	});
+	expect(notified).toEqual([]);
+	const calls = h.state.calls.length;
+	// The result: the TODO is done, its slot is in active; no model call is made for it, and the agent is told.
 	const done = await h.finishImage(waiting.id, {
 		state: "completed",
 		title: "猫",
 	});
-	expect(h.dialogue.answerText(done.id)).toBe("猫の絵ができました。");
-	const resumed = h.state.calls.at(-2)!;
-	expect(resumed.messages.at(-1)!.content).toContain("新しい出来事があります");
-	const document = JSON.parse(resumed.messages[1]!.content) as {
-		active: Array<Record<string, unknown>>;
-		now: { trigger: Array<Record<string, unknown>> };
-	};
-	expect(document.now.trigger[0]).toMatchObject({ kind: "todo_changed" });
-	expect(JSON.stringify(document.active)).toContain("猫");
-	// Said with todoRefs? This one named none, so the archive stays unconfirmed and the TODO stays done.
+	expect(done.status).toBe("completed");
+	expect(h.dialogue.answerText(done.id)).toBeNull();
+	expect(h.state.calls).toHaveLength(calls);
+	expect(notified).toEqual(["main"]);
 	expect(h.todos()[0]).toMatchObject({ status: "done", outcome: "succeeded" });
+	expect(JSON.stringify(h.active())).toContain("猫");
+	// Reporting the result is the agent's job: nothing was said or archived by the host.
 	expect(
-		h.log().some((e) => h!.fields(e).action === "work.archive_unconfirmed"),
-	).toBe(true);
+		h.log().filter((e) => e.by === "agent" && e.type === "said"),
+	).toHaveLength(1);
+	expect(h.log().some((e) => h!.fields(e).action === "work.archived")).toBe(
+		false,
+	);
 });
 
-test("a TODO told archived by the utterance that names it is archived once delivered, and its slot removed", async () => {
+test("a finished TODO with no agency port ends its run without a generation too", async () => {
 	h = await setup();
 	h.state.steps.push(
 		{ calls: [{ name: "find_toolchain", args: { query: "絵" } }] },
@@ -190,33 +248,46 @@ test("a TODO told archived by the utterance that names it is archived once deliv
 		},
 	);
 	const waiting = await h.say("犬の絵", "queued");
-	const [todo] = h.todos();
-	// The result's generation archives the TODO with this utterance and names it in todoRefs.
-	h.state.steps.push(
-		{
-			calls: [
-				{
-					name: "work",
-					args: {
-						todo: todo!.id,
-						operation: "archive",
-						revision: todo!.revision + 1,
-						told: "this",
-					},
-				},
-			],
+	const calls = h.state.calls.length;
+	const done = await h.finishImage(waiting.id, {
+		state: "completed",
+		title: "犬",
+	});
+	expect(done.status).toBe("completed");
+	expect(h.state.calls).toHaveLength(calls);
+	expect(h.todos()).toMatchObject([{ status: "done" }]);
+});
+
+test("an answer delivery uses the emotion of the reply, never judged again", async () => {
+	const emotion = "enjoyment" as const;
+	h = await setup({
+		conversationAgent: {
+			system: () => "",
+			async respond(input) {
+				const reply = await input.chat.complete(
+					{ messages: input.messages, tools: [] },
+					input.onDelta,
+					input.signal,
+				);
+				return { text: reply.text, emotion, ended: false };
+			},
 		},
-		{
-			text: "犬の絵ができました。",
-			calls: [respond({ todoRefs: [todo!.id] })],
+	});
+	h.state.steps.push({ text: "よかったですね。" });
+	const run = await h.say("テストに受かった");
+	expect(h.dialogue.answerText(run.id)).toBe("よかったですね。");
+	expect(h.conversation.get("main").messages.at(-1)).toMatchObject({
+		text: "よかったですね。",
+		delivery: {
+			version: 2,
+			emotion,
+			source: "host",
+			motion: hostDelivery(emotion).motion,
+			tone: hostDelivery(emotion).tone,
 		},
-	);
-	await h.finishImage(waiting.id, { state: "completed", title: "犬" });
-	expect(h.todos()).toEqual([]);
-	expect(h.active()).toEqual([]);
-	expect(h.log().some((e) => h!.fields(e).action === "work.archived")).toBe(
-		true,
-	);
+	});
+	// The feeling came with the reply: no judgment call follows the one model call.
+	expect(h.state.calls).toHaveLength(1);
 });
 
 test("a change needs a confirmation first; the approval executes the saved request", async () => {
@@ -250,16 +321,13 @@ test("a change needs a confirmation first; the approval executes the saved reque
 				},
 			],
 		},
-		{
-			text: "今の壁紙を差し替えてよいですか？",
-			calls: [respond({ kind: "action", impact: "modify_existing" })],
-		},
+		{ text: "今の壁紙を差し替えてよいですか？" },
 	);
 	await h.say("壁紙を差し替えて");
-	const repaired = h.state.calls[2]!.messages.find((m) =>
-		m.content.startsWith("UNTRUSTED_REJECTED_OUTPUT="),
+	const refused = h.state.calls[2]!.messages.find(
+		(m) => m.role === "tool" && m.content.includes("confirmation_required"),
 	);
-	expect(repaired?.content).toContain("confirmation_required");
+	expect(JSON.parse(refused!.content)).toMatchObject({ refused: true });
 	const confirmationId = h.store.read(
 		(db) =>
 			db.query("SELECT id FROM dialogue_confirmations").get() as { id: string },
@@ -310,7 +378,7 @@ test("a memory request goes to the steward with the user's message as its source
 				},
 			],
 		},
-		{ text: "覚えておきます。", calls: [respond({ kind: "action" })] },
+		{ text: "覚えておきます。" },
 	);
 	const run = await h.say("辛い物が好きって覚えて");
 	expect(h.state.stewardRequests).toEqual([
@@ -324,10 +392,7 @@ test("a memory request goes to the steward with the user's message as its source
 
 test("a spoken answer cut short records what was heard, without the announcement", async () => {
 	h = await setup();
-	h.state.steps.push({
-		text: "長い答えです。続きがあります。",
-		calls: [respond()],
-	});
+	h.state.steps.push({ text: "長い答えです。続きがあります。" });
 	const run = await h.say("教えて");
 	// A text reply is delivered in full at once; a later playback report adds nothing.
 	await h.store.write((db) =>

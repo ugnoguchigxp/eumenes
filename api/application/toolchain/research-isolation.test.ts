@@ -30,8 +30,6 @@ for (const currentUrl of [undefined, "https://example.com/current-source"])
 			expect(
 				(await h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 }))?.status,
 			).toBe("completed");
-			// The selection is the request's own search; the corrected answer reaches the final answer's log as corrected.
-			expect(h.parentContexts.at(-1)).toContain(oldUrl);
 			expect(h.workerContexts.length).toBeGreaterThan(0);
 			for (const context of h.workerContexts) {
 				expect(context).not.toContain(oldUrl);
@@ -47,7 +45,7 @@ for (const currentUrl of [undefined, "https://example.com/current-source"])
 					.split("\n")[0],
 			).map((tool: { id: string }) => tool.id);
 			expect(tools.includes("web.read")).toBe(!!currentUrl);
-			expect(h.dialogue.answerText(run.id)).toContain("26度");
+			expect(h.reported()).toContain("26度");
 		} finally {
 			await h.close();
 		}

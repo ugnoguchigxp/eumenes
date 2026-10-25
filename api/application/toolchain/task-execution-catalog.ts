@@ -3,7 +3,7 @@ import type { ChildExecution, ChildResult } from "../../domains/tool-runtime";
 import type { TaskExecutionHost } from "./task-execution-port";
 import { reference, result, total } from "./task-execution-values";
 export function taskChildContext(host: TaskExecutionHost) {
-	const { agents, routing, registry, inference, dialogue } = host;
+	const { agents, routing, registry, dialogue } = host;
 	function available(db: Database, sourceRunId?: string) {
 		return routing.catalogInTransaction(db).filter((e) => {
 			if (
@@ -18,8 +18,6 @@ export function taskChildContext(host: TaskExecutionHost) {
 			)
 				return false;
 			const requires = e.runtime.requires;
-			if (requires === "codex")
-				return inference.codexResearchAvailable?.() ?? false;
 			if (
 				requires === "image" ||
 				requires === "music" ||

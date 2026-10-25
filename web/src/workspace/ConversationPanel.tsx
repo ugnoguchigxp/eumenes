@@ -6,7 +6,7 @@ import { Button } from "../design-system";
 import { LiveMessageList } from "./LiveMessageList";
 import { ConversationBackground } from "../components/ConversationBackground";
 import { Subtitle } from "../components/domains/subtitle/Subtitle";
-import { RunDetails, RunResults } from "./RunDetails";
+import { RunDetails, RunFailure, RunResults } from "./RunDetails";
 import { useBackground, useConversationModel } from "../domains/settings";
 import { useSpeechModels } from "../domains/settings/useSpeechModels";
 import { SpeechModelSelect } from "./SpeechModelSelect";
@@ -275,7 +275,20 @@ export function ConversationPanel({
 						) : null
 					}
 					renderFollowingMessage={(message) => (
-						<RunDetails client={client} message={message} runs={runs.data} />
+						<RunDetails
+							client={client}
+							message={message}
+							runs={runs.data}
+							agentName={settings.data?.general.agentName}
+						/>
+					)}
+					renderHiddenMessage={(message) => (
+						<RunFailure
+							client={client}
+							message={message}
+							runs={runs.data}
+							agentName={settings.data?.general.agentName}
+						/>
 					)}
 					editableId={
 						state.edit.editing ? undefined : state.edit.target?.message.id

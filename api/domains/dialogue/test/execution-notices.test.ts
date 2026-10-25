@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { setup, respond, type Harness } from "./generation.fixture";
+import { setup, type Harness } from "./generation.fixture";
 
 /**
  * A forgotten execution source (its notice's request) revokes the notice run: a queued run is cancelled with its job,
@@ -33,7 +33,7 @@ test("revoking a queued notice run cancels it and its job, and the steward is to
 		{ runId: run.id, conversationId: "main", state: "cancelled" },
 	]);
 	// Started afterwards, the cancelled run calls no model and adopts nothing.
-	h.state.steps.push({ text: "遅い回答", calls: [respond()] });
+	h.state.steps.push({ text: "遅い回答" });
 	h.start();
 	await h.queue.tick();
 	expect(h.state.calls).toHaveLength(0);
@@ -45,7 +45,7 @@ test("revoking a queued notice run cancels it and its job, and the steward is to
 
 test("revoking a notice that already completed changes nothing", async () => {
 	h = await setup();
-	h.state.steps.push({ text: "お知らせです。", calls: [respond()] });
+	h.state.steps.push({ text: "お知らせです。" });
 	const requestId = crypto.randomUUID();
 	const run = await h.dialogue.notify({
 		requestId,

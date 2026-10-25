@@ -2,13 +2,7 @@ import { expect, test } from "bun:test";
 import type { LarmCallOptions, LarmPort } from "../../larm";
 import { emotionSchema, type Emotion } from "../../delivery";
 import { settle } from "../../../infrastructure/wait-for";
-import {
-	reportRespond,
-	setup,
-	say,
-	until,
-	wav,
-} from "./settings-voice.fixture";
+import { setup, say, until, wav } from "./settings-voice.fixture";
 
 function gate<T>() {
 	let resolve!: (value: T) => void;
@@ -46,16 +40,13 @@ function stream() {
 	let delta: ((text: string) => void) | undefined;
 	let text = "";
 	let signal: AbortSignal | undefined;
-	let offered: LarmCallOptions | undefined;
 	const answerStream: LarmPort["answerStream"] = async (
 		_messages,
 		abort,
 		onDelta,
-		options,
 	) => {
 		signal = abort;
 		delta = onDelta;
-		offered = options;
 		return done.promise;
 	};
 	return {
@@ -71,7 +62,6 @@ function stream() {
 			delta!(value);
 		},
 		finish() {
-			reportRespond(offered);
 			done.resolve(text);
 		},
 	};

@@ -6,6 +6,7 @@ import * as React from "react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { menuKeyDown } from "../../utils/menuKeyboard";
+import { layoutMenu, measureMenu, menuViewport } from "./menuLayout";
 
 type TriggerElementProps = {
 	onClick?: (event: React.MouseEvent) => void;
@@ -53,102 +54,6 @@ export interface IDropdownMenuProps {
 	className?: string;
 }
 
-type Placement = Required<
-	Pick<
-		IDropdownMenuProps,
-		"align" | "side" | "autoFlip" | "autoSide" | "offset" | "minWidthPx"
-	>
->;
-
-/** Fixed-position style that keeps the menu next to its trigger and inside the viewport. */
-function menuPosition(
-	triggerRect: DOMRect,
-	menuRect: DOMRect,
-	{ align, side, autoFlip, autoSide, offset, minWidthPx }: Placement,
-): React.CSSProperties {
-	const vw = window.innerWidth;
-	const vh = window.innerHeight;
-	const margin = 8;
-
-	const spaceBelow = vh - triggerRect.bottom - margin;
-	const spaceAbove = triggerRect.top - margin;
-
-	let resolvedSide: "bottom" | "top" = side;
-	if (autoSide) {
-		if (spaceBelow >= menuRect.height) {
-			resolvedSide = "bottom";
-		} else if (spaceAbove >= menuRect.height) {
-			resolvedSide = "top";
-		} else {
-			resolvedSide = spaceBelow >= spaceAbove ? "bottom" : "top";
-		}
-	}
-
-	const minWidth = Math.max(minWidthPx, triggerRect.width);
-
-	let top =
-		resolvedSide === "bottom"
-			? triggerRect.bottom + offset
-			: triggerRect.top - menuRect.height - offset;
-
-	const menuWidth = Math.max(menuRect.width, minWidth);
-	const leftAlignLeft = triggerRect.left;
-	const leftAlignRight = triggerRect.right - menuWidth;
-
-	let resolvedAlign: "left" | "right" = align;
-
-	if (autoFlip) {
-		const preferredLeft = align === "left" ? leftAlignLeft : leftAlignRight;
-		const preferredOverflowsLeft = preferredLeft < margin;
-		const preferredOverflowsRight = preferredLeft + menuWidth > vw - margin;
-
-		const flipIsUseful =
-			(align === "left" && preferredOverflowsRight) ||
-			(align === "right" && preferredOverflowsLeft);
-
-		if (flipIsUseful) {
-			resolvedAlign = align === "left" ? "right" : "left";
-		} else if (preferredOverflowsLeft || preferredOverflowsRight) {
-			// If overflow exists but flip would not help (e.g. near right edge with align=right),
-			// keep alignment and clamp to stay near the trigger.
-			resolvedAlign = align;
-		}
-	}
-
-	const leftUnclamped =
-		resolvedAlign === "left" ? leftAlignLeft : leftAlignRight;
-	const left = Math.min(
-		vw - margin - menuWidth,
-		Math.max(margin, leftUnclamped),
-	);
-
-	if (autoSide) {
-		if (resolvedSide === "bottom" && top + menuRect.height > vh - margin) {
-			const flippedTop = triggerRect.top - menuRect.height - offset;
-			if (flippedTop >= margin) top = flippedTop;
-		} else if (resolvedSide === "top" && top < margin) {
-			const flippedBottom = triggerRect.bottom + offset;
-			if (flippedBottom + menuRect.height <= vh - margin) top = flippedBottom;
-		}
-	}
-
-	const maxHeight =
-		resolvedSide === "bottom"
-			? Math.max(120, vh - top - margin)
-			: Math.max(120, triggerRect.top - margin);
-
-	return {
-		position: "fixed",
-		top,
-		left,
-		minWidth,
-		maxHeight,
-		overflowY: "auto",
-		zIndex: 50,
-		visibility: "visible",
-	};
-}
-
 /**
  * ドロップダウンメニュー
  */
@@ -167,6 +72,10 @@ export const DropdownMenu: React.FC<IDropdownMenuProps> = React.memo(
 		const [isOpen, setIsOpen] = useState(false);
 		const triggerRef = useRef<HTMLElement | null>(null);
 		const menuRef = useRef<HTMLDivElement>(null);
+		const listRef = useRef<HTMLDivElement>(null);
+		const [listStyle, setListStyle] = useState<React.CSSProperties>({});
+		const columnRows = useRef(0);
+		const previousItems = useRef(items);
 		const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({
 			position: "fixed",
 			top: -9999,
@@ -195,15 +104,27 @@ export const DropdownMenu: React.FC<IDropdownMenuProps> = React.memo(
 		const computeMenuPosition = React.useCallback(() => {
 			const triggerEl = triggerRef.current;
 			const menuEl = menuRef.current;
-			if (!triggerEl || !menuEl) return;
-
-			setMenuStyle(
-				menuPosition(
-					triggerEl.getBoundingClientRect(),
-					menuEl.getBoundingClientRect(),
-					{ align, side, autoFlip, autoSide, offset, minWidthPx },
-				),
+			const listEl = listRef.current;
+			if (!triggerEl || !menuEl || !listEl) return;
+			const triggerRect = triggerEl.getBoundingClientRect();
+			const viewport = menuViewport();
+			const measured = measureMenu(
+				menuEl,
+				listEl,
+				Math.max(minWidthPx, triggerRect.width),
+				viewport,
 			);
+			const layout = layoutMenu(triggerRect, measured, viewport, {
+				align,
+				side,
+				autoFlip,
+				autoSide,
+				offset,
+				minWidthPx,
+			});
+			columnRows.current = layout.columnRows;
+			setMenuStyle(layout.menuStyle);
+			setListStyle(layout.listStyle);
 		}, [align, autoFlip, autoSide, minWidthPx, offset, side]);
 
 		// 外側クリックで閉じる
@@ -245,6 +166,8 @@ export const DropdownMenu: React.FC<IDropdownMenuProps> = React.memo(
 			schedule();
 			window.addEventListener("resize", schedule);
 			window.addEventListener("scroll", schedule, true);
+			window.visualViewport?.addEventListener("resize", schedule);
+			window.visualViewport?.addEventListener("scroll", schedule);
 
 			const menuEl = menuRef.current;
 			const ro = menuEl
@@ -253,14 +176,24 @@ export const DropdownMenu: React.FC<IDropdownMenuProps> = React.memo(
 					})
 				: null;
 			if (menuEl && ro) ro.observe(menuEl);
+			if (listRef.current && ro) ro.observe(listRef.current);
 
 			return () => {
 				if (raf) window.cancelAnimationFrame(raf);
 				window.removeEventListener("resize", schedule);
 				window.removeEventListener("scroll", schedule, true);
+				window.visualViewport?.removeEventListener("resize", schedule);
+				window.visualViewport?.removeEventListener("scroll", schedule);
 				ro?.disconnect();
 			};
 		}, [computeMenuPosition, isOpen, prepareHiddenMenuStyle]);
+
+		// Refresh changed entries without hiding the menu or resetting the user's focus.
+		useEffect(() => {
+			const changed = previousItems.current !== items;
+			previousItems.current = items;
+			if (isOpen && changed) computeMenuPosition();
+		}, [items, isOpen, computeMenuPosition]);
 
 		// Once the menu is placed and visible, focus its first item so arrow keys work at once.
 		const menuVisible = menuStyle.visibility === "visible";
@@ -351,11 +284,38 @@ export const DropdownMenu: React.FC<IDropdownMenuProps> = React.memo(
 							ref={menuRef}
 							role="menu"
 							tabIndex={-1}
-							onKeyDown={menuKeyDown}
+							onKeyDown={(event) => {
+								if (
+									columnRows.current &&
+									(event.key === "ArrowLeft" || event.key === "ArrowRight")
+								) {
+									const buttons = Array.from(
+										event.currentTarget.querySelectorAll<HTMLElement>(
+											'[role="menuitem"]',
+										),
+									);
+									const current = buttons.indexOf(
+										document.activeElement as HTMLElement,
+									);
+									const rows = columnRows.current;
+									const next =
+										event.key === "ArrowRight" && current < rows
+											? Math.min(current + rows, buttons.length - 1)
+											: event.key === "ArrowLeft" && current >= rows
+												? current - rows
+												: current;
+									event.preventDefault();
+									buttons[next]?.focus();
+								} else menuKeyDown(event);
+							}}
 							style={menuStyle}
 							className="rounded-md border border-border bg-background shadow-lg"
 						>
-							<div className="py-[var(--ui-component-padding-y)]">
+							<div
+								ref={listRef}
+								style={listStyle}
+								className="py-[var(--ui-component-padding-y)]"
+							>
 								{items.map((item, index) => (
 									<button
 										// Labels may repeat, so the position keeps keys unique.
@@ -363,12 +323,14 @@ export const DropdownMenu: React.FC<IDropdownMenuProps> = React.memo(
 										type="button"
 										role="menuitem"
 										onClick={() => handleItemClick(item)}
-										className="flex w-full items-center gap-ui px-ui text-left text-ui text-foreground hover:bg-accent focus:bg-accent focus:outline-none min-h-[var(--ui-list-row-height)]"
+										className="flex min-w-0 w-full items-center gap-ui px-ui text-left text-ui text-foreground hover:bg-accent focus-visible:bg-accent focus:outline-none min-h-[var(--ui-list-row-height)]"
 									>
 										{item.icon && (
 											<span className="text-muted-foreground">{item.icon}</span>
 										)}
-										<span>{item.label}</span>
+										<span className="min-w-0 [overflow-wrap:anywhere]">
+											{item.label}
+										</span>
 									</button>
 								))}
 							</div>

@@ -1,3 +1,0 @@
-# Source: api/domains/dialogue/service/conversation-generation.ts
-text = '''
-本文に内部制御記号や関数呼出し表現を書きません。spoken_reply_too_longなら、今回の依頼に必要な答えと留保だけを残して二文・読み上げ300字以内に書き直します。元の依頼の条件を保持し、不明な値を補いません。一度だけ修正します。'''

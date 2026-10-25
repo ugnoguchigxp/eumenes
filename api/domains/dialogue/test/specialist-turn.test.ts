@@ -4,7 +4,6 @@ import { registerDialogue } from "../controller";
 import {
 	STUDIO,
 	STUDIO_ARTIFACT,
-	respond,
 	setup,
 	type Harness,
 } from "./specialist.fixture";
@@ -334,7 +333,7 @@ test("the addressee the screen showed must still listen: otherwise nothing is st
 		});
 	const stored = () => h.rows("SELECT COUNT(*) AS n FROM dialogue_runs")[0]!.n;
 	// Main is listening: a send that saw a specialist is refused, one that saw the main agent goes through.
-	h.state.steps.push({ text: "はい", calls: [respond()] });
+	h.state.steps.push({ text: "はい" });
 	expect((await send({ sessionId: "x", epoch: 1 })).status).toBe(409);
 	expect(stored()).toBe(0);
 	expect(h.rows("SELECT COUNT(*) AS n FROM messages")[0]!.n).toBe(0);
@@ -369,7 +368,7 @@ test("a saved item older than the recent choices is offered, accepted and shown 
 		artifactRevisionId: STUDIO_ARTIFACT,
 		targetRef: "item-old",
 	};
-	h.state.steps.push({ text: "見ています", calls: [respond()] });
+	h.state.steps.push({ text: "見ています" });
 	await h.ask("これは？", { viewing });
 	const shown = (h.material(0).now.records ?? []).find(
 		(r: { source: string }) => r.source === "specialist.viewing",
@@ -389,7 +388,7 @@ test("a saved item older than the recent choices is offered, accepted and shown 
 	// Without the screen showing it, the same ref is not issued: nothing starts.
 	const other = await harness();
 	other.handOver({ request: "直して", target: "item-old" });
-	other.state.steps.push({ text: "開けません", calls: [respond()] });
+	other.state.steps.push({ text: "開けません" });
 	await other.ask("直して");
 	expect(other.work()).toHaveLength(0);
 	expect(await other.session()).toBeNull();

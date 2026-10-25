@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { harness } from "./route-harness";
 
 test("a candidate read resolves its observed URL and then supports body evidence", async () => {
-	const h = await harness(Date.now, false, undefined, true, true);
+	const h = await harness(Date.now, undefined, true, true);
 	try {
 		await h.store.write((db) =>
 			h.agents.startInTransaction(db, {

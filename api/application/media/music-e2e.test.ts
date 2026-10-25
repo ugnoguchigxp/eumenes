@@ -3,10 +3,8 @@ import { harness } from "../toolchain/toolchain.fixture";
 import { musicFixture, musicQuestion, musicTestPlan } from "./music.fixture";
 import { imageFixture, imageQuestion } from "./image.fixture";
 import { waitFor } from "../../infrastructure/wait-for";
-import { activeSlots } from "./conversation-turn.fixture";
 import {
 	afterUtterance,
-	isResultRound,
 	isUtteranceRound,
 	toolResults,
 } from "../toolchain/conversation-script.fixture";
@@ -25,7 +23,6 @@ test("a premature creation claim accompanying the selected operation is withheld
 			// The generation that hands the work over: its speech beside the delegate call is a preamble (withdrawn).
 			const handsOver =
 				isUtteranceRound(options?.tools) &&
-				!isResultRound(messages) &&
 				toolResults(afterUtterance(messages), "find_toolchain").length > 0;
 			if (handsOver) {
 				await paused;
@@ -57,7 +54,7 @@ test("a premature creation claim accompanying the selected operation is withheld
 		expect(reviewed).toBe(1);
 		expect(h.music!.list("main")[0]?.state).toBe("completed");
 		expect(f.requests.filter((r) => r.method === "POST")).toHaveLength(1);
-		expect(h.dialogue.answerText(submitted.id)).not.toContain(claim);
+		expect(h.dialogue.answerText(submitted.id) ?? "").not.toContain(claim);
 		expect(visible.every((text) => !text.includes(claim))).toBe(true);
 	} finally {
 		release();
@@ -66,90 +63,6 @@ test("a premature creation claim accompanying the selected operation is withheld
 	}
 });
 
-test("completed vocal music answers and repairs without re-offering entry operations", async () => {
-	const question =
-		"休日の朝に聞く目覚めのテーマ。クラシック、落ち着いたピアノ、90秒、透明感のある女性ソロ、日本語の歌詞をテーマに合わせて作成。";
-	const f = musicFixture("success", {
-		plan: {
-			...musicTestPlan,
-			durationSeconds: 90,
-			instrumental: false,
-			lyrics: "[Verse]\n朝の光で目を覚ます",
-			language: "ja",
-		},
-	});
-	const answers: Parameters<typeof f.model.answer>[0][] = [];
-	const model = {
-		...f.model,
-		answer: async (...args: Parameters<typeof f.model.answer>) => {
-			const [messages, , options] = args;
-			if (isResultRound(messages)) {
-				// The tools are the same fixed set in every generation (section 6.1): no entry operation is re-offered.
-				expect(options?.tools?.map((t) => t.function.name)).toEqual([
-					"memory",
-					"find_toolchain",
-					"delegate",
-					"work",
-					"respond",
-				]);
-				answers.push(messages);
-				return answers.length === 1
-					? 'create_music{question:<|"|>休日の朝の楽曲<|"|>}'
-					: "楽曲が完成しました。どうぞお楽しみください。";
-			}
-			return f.model.answer(...args);
-		},
-	};
-	const h = await harness({ model, musicGateway: f.gateway });
-	try {
-		const submitted = await (
-			await h.request("/api/runs", {
-				requestId: crypto.randomUUID(),
-				conversationId: "main",
-				text: question,
-			})
-		).json();
-		const run = await h.dialogue.waitForTerminal(submitted.id, {
-			timeoutMs: 5000,
-		});
-		expect(run?.status).toBe("completed");
-		expect(h.music!.list("main")[0]!.state).toBe("completed");
-		expect(f.requests.filter((r) => r.method === "POST")).toHaveLength(1);
-		expect(answers).toHaveLength(2);
-		for (const messages of answers) {
-			expect(
-				messages.some(
-					(m) =>
-						m.role === "system" &&
-						m.content.includes("最も合うfunctionを一つ呼びます"),
-				),
-			).toBe(false);
-			// The utterance is in the document's log (section 8.1), not a native message of its own.
-			expect(
-				messages.some(
-					(m) =>
-						m.content.startsWith('{"profile":') &&
-						JSON.parse(m.content).log.some(
-							(event: { text?: string }) => event.text === question,
-						),
-				),
-			).toBe(true);
-			const result = activeSlots(messages).at(-1)!.result as {
-				state: string;
-				durationSeconds: number;
-			};
-			expect(result.state).toBe("completed");
-			expect(result.durationSeconds).toBe(90);
-		}
-		expect(answers[1]![0]!.role).toBe("system");
-		expect(answers[1]![0]!.content).toContain("読み上げる本文は合計300字以内");
-		expect(h.dialogue.answerText(submitted.id)).toBe(
-			"楽曲が完成しました。どうぞお楽しみください。",
-		);
-	} finally {
-		await h.close();
-	}
-});
 for (const mode of [
 	"success",
 	"failure",
@@ -180,7 +93,7 @@ for (const mode of [
 			expect(music.state).toBe(success ? "completed" : "failed");
 			const posts = f.requests.filter((r) => r.method === "POST");
 			expect(posts).toHaveLength(mode === "invalid-plan" ? 0 : 1);
-			expect(f.stages).toEqual(["route", "plan", "answer"]);
+			expect(f.stages).toEqual(["route", "plan"]);
 			const response = await h.request(`/api/music/${music.id}/audio`);
 			if (success) {
 				expect(posts[0]!.body).toMatchObject({
@@ -194,7 +107,8 @@ for (const mode of [
 				expect(response.status).toBe(200);
 				expect(response.headers.get("content-type")).toBe("audio/ogg");
 				expect(new Uint8Array(await response.arrayBuffer())).toEqual(f.audio);
-				expect(h.dialogue.answerText(submitted.id)).toBe("楽曲ができました。");
+				// The finished work is reported by the agency, not by a conversation reply of this run.
+				expect(h.dialogue.answerText(submitted.id)).toBeNull();
 			} else {
 				expect(response.status).toBe(404);
 				expect(music.errorCode).toBe(
@@ -428,7 +342,7 @@ test("a music screen submit generates a track though the conversation retained o
 		...music.model,
 		answer: async (...args: Parameters<typeof music.model.answer>) => {
 			if (phase === "image") return image.model.answer(...args);
-			if (isUtteranceRound(args[2]?.tools) && !isResultRound(args[0]))
+			if (isUtteranceRound(args[2]?.tools))
 				screenAnalysis++;
 			return music.model.answer(...args);
 		},
@@ -470,7 +384,7 @@ test("a music screen submit generates a track though the conversation retained o
 		expect(h.music!.list("main")[0]!.state).toBe("completed");
 		// The screen's own toolchain took the request: no selection round, and no image was made for it.
 		expect(screenAnalysis).toBe(0);
-		expect(music.stages).toEqual(["plan", "answer"]);
+		expect(music.stages).toEqual(["plan"]);
 		expect(h.image!.list("main")).toHaveLength(1);
 		expect(music.requests.filter((r) => r.method === "POST")).toHaveLength(1);
 	} finally {

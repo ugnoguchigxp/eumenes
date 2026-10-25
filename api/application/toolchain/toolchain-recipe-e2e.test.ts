@@ -232,7 +232,6 @@ test.each([false, true])(
 							: [],
 				},
 			}),
-			parent: () => "2026年10月16日の鎌倉市は晴れ、最高25℃・最低18℃です。",
 		});
 		try {
 			const run = await h.dialogue.submit({
@@ -256,9 +255,9 @@ test.each([false, true])(
 					? ["recipe.find", "web.lookup", "web.read"]
 					: ["recipe.find", "web.lookup", "web.read", "web.read"],
 			);
-			const answer = h.dialogue.answerText(run.id)!;
-			expect(answer).toContain(correct);
-			expect(answer).not.toContain(wrong);
+			const reported = h.reported("replacement");
+			expect(reported).toContain(correct);
+			expect(reported).not.toContain(wrong);
 		} finally {
 			await h.close();
 		}

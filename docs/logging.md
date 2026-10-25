@@ -87,6 +87,14 @@ bun run logs -- --since 2026-10-08T10:00:00+09:00 --component inference --json
 
 応答に契約に合う`bootEpoch`・`configRevision`がある場合だけ保持し、現在値で過去の情報を埋めません。既知のcredentialと同じ値は相関情報からも除外します。主会話と補助接続の対応は`larm.connection_ready`・計数イベント・`larm.connection_released`のconnectionIdで追います。状態確認の失敗にも同じIDとclaimの期限を残します。失敗した会話のエラーレポートにも接続ID・上流要求ID・固定コードを表示します。これらのログは接続先の応答を診断するもので、新しいヘッダーや接続の再確保・自動再送は追加しません。
 
+## 旧しおりテーブルによる起動失敗の復旧
+
+旧しおり機能を使っていたDBでは、残っている `continuity_events` が新しい短期記憶の同名テーブルと衝突し、`continuity/0004-events` の適用で起動に失敗する場合があります。新規DBでは発生しません。
+
+APIが停止している状態で `bun api/application/repair-legacy-continuity.ts` を実行すると、通常のDB所有ロック・適用済みmigrationのチェックサム検証・整合性検査・バックアップを経て、旧形式の表だけを `continuity_legacy_bookmark_events` へ改名します。行と索引は保持し、適用済みSQLと履歴は変更しません。新形式・表なしでは何もせず、未知の形式や退避先の衝突は拒否します。バックアップ先は実行結果の `backupPath` です。
+
+この保守処理はサーバーを起動せず、未適用migrationも実行しません。次回の通常起動で適用されます。自動復旧の分岐は起動処理へ追加していません。
+
 ## 保存と取扱い
 
 `EUMENES_LOG_FILE` で保存先を変更できます。空欄は既定の保存先、`-` は stderr のみ。ファイルは10 MiBを超える前に世代を切り替え、現在分と過去4世代を保持します（約50 MiB）。ファイルの権限は `0600`、新規ログディレクトリは `0700`。ファイル保存に失敗した場合は `logging.file_unavailable` を一度 stderr に通知し、stderr出力で継続します。ファイル出力の復旧にはbackendを再起動します。
@@ -129,7 +137,6 @@ Toolchainのlive検証も、一時DBを削除する前に運用ログを `verifi
 
 ## Codex SDKによる調査の失敗
 
-Codex調査のSDK呼出しでは `inference.attempt_failed` に `phase=sdk_start/sdk_turn/sdk_output` と安全な分類を残します。`codex_research_process_exit` はCLIランタイムの異常終了、`codex_research_http_401` などは外部応答のHTTP状態、`codex_research_invalid_json_schema` などは許可したProviderコード、`codex_research_invalid_event` はSDKイベントの不正です。最終応答のJSON・契約違反は共通workerの `agent.control_rejected` に記録し、構文違反・schema違反・不正な根拠を区別します。未分類は `codex_research_failed` とし、原因を推測しません。
 
 利用可能な場合だけ `exitCode`、許可した `processSignal`、HTTPの `status`、許可したProviderコードの `validationCode` を追加します。SDKイベントと例外の生メッセージはメモリー内で分類し、通常ログ・会話・DBへ保存しません。`inferenceId/attemptId/jobId/subjectId` からagentの `runId/taskId` を辿ります。`queue.settled.reason` とtask APIのerrorCodeにも分類を保持し、会話のcompletedを調査成功とは扱いません。
 

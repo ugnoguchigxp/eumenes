@@ -1,3 +1,4 @@
+import { testConversationAgent } from "../../domains/dialogue/test/conversation-agent.fixture";
 import { createContinuityService } from "../../domains/continuity";
 import { afterEach, expect, test } from "bun:test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -119,6 +120,7 @@ function setup(
 		speak: async () => new Uint8Array(),
 	};
 	const dialogue = createDialogueService({
+		conversationAgent: testConversationAgent,
 			store,
 			continuity: createContinuityService(store),
 			queue,

@@ -27,6 +27,7 @@ import { migrations as schedulerMigrations } from "../../scheduler";
 import { migrations as voiceAllMigrations } from "..";
 import { readInput, saveInput } from "../repository/input";
 import { get, migrations as voiceMigrations } from "../repository";
+import { testConversationAgent } from "../../dialogue/test/conversation-agent.fixture";
 
 /** Every migration the upgraded dialogue flow needs, in the order the domains declare them. */
 const allMigrations = () =>
@@ -178,6 +179,7 @@ test("a database with only the original three migrations (plus later ones) upgra
 		).toHaveLength(2);
 		const queue = createQueue(upgraded);
 		const dialogue = createDialogueService({
+			conversationAgent: testConversationAgent,
 			store: upgraded,
 			conversation: createConversationService(upgraded),
 			continuity: createContinuityService(upgraded),

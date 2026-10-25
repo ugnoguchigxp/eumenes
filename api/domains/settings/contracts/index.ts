@@ -251,25 +251,8 @@ export const settingsSchema = z
 			})
 			.strict()
 			.default({ enabled: false, curationResourceId: null }),
-		subagent: z
-			.object({
-				/**
-				 * The cloud LLM resource task sub-agents (research, operations) run on; null keeps them on LARM.
-				 * Read on each task step.
-				 */
-				resourceId: z.uuid().nullable().default(null),
-			})
-			.strict()
-			.default({ resourceId: null }),
 		agency: z
 			.object({
-				/** Agency (spontaneous speech) ON/OFF. Applied immediately on change. */
-				enabled: z.boolean().default(false),
-				/**
-				 * The saved cloud LLM resource agency background inference runs on; null uses the LARM local LLM.
-				 * A specified resource that is unusable stops agency instead of falling back to LARM.
-				 */
-				resourceId: z.uuid().nullable().default(null),
 				/** Seconds of silence before an AI-initiated turn; 0 turns the silence-triggered turns off (turn_end still runs). */
 				idleSec: z.number().int().min(0).max(86400).default(20),
 				/** AI-initiated utterances allowed in a row without a user reply. */
@@ -281,8 +264,6 @@ export const settingsSchema = z
 			})
 			.strict()
 			.default({
-				enabled: false,
-				resourceId: null,
 				idleSec: 20,
 				maxUnanswered: 1,
 				interests: [],
@@ -396,26 +377,6 @@ export const settingsSchema = z
 				code: "custom",
 				message: "Worldの記録に使うAIが会話モデルとして登録されていません",
 				path: ["world", "curationResourceId"],
-			});
-		const subagentResource = s.subagent.resourceId;
-		if (
-			subagentResource &&
-			!s.resources.some((r) => r.id === subagentResource && r.purpose === "llm")
-		)
-			ctx.addIssue({
-				code: "custom",
-				message: "サブエージェントに使うAIが会話モデルとして登録されていません",
-				path: ["subagent", "resourceId"],
-			});
-		const agencyResource = s.agency.resourceId;
-		if (
-			agencyResource &&
-			!s.resources.some((r) => r.id === agencyResource && r.purpose === "llm")
-		)
-			ctx.addIssue({
-				code: "custom",
-				message: "Agencyに使うAIが会話モデルとして登録されていません",
-				path: ["agency", "resourceId"],
 			});
 	});
 export type Settings = z.infer<typeof settingsSchema>;

@@ -76,7 +76,6 @@ const fields = new Set([
 	"index",
 	"kind",
 	"requirementProfiles",
-	"researcher",
 ]);
 const types = new Set([
 	"string",

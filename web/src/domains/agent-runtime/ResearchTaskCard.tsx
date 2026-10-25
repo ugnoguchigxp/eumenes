@@ -31,8 +31,8 @@ export function ResearchTaskCard({
 	client: EumenesClient;
 	rootRunId: string;
 	title: string;
-	/** Shown once the research has failed and its run is complete (the detail of the failure). */
-	failureAction?: ReactNode;
+	/** Shown once the research has failed and its run is complete (the detail of the failure), given its code. */
+	failureAction?: (errorCode: string) => ReactNode;
 }) {
 	const cache = useQueryClient();
 	const tasks = useQuery({
@@ -116,7 +116,10 @@ export function ResearchTaskCard({
 						? "一部未確認"
 						: (phases[phase ?? ""] ?? "調査中")}
 				</output>
-				{terminal && failed && root.status === "completed" && failureAction}
+				{terminal &&
+					failed &&
+					root.status === "completed" &&
+					failureAction?.(root.errorCode!)}
 				{!terminal && (
 					<button
 						type="button"

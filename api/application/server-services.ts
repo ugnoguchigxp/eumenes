@@ -185,14 +185,15 @@ export async function buildServices(
 				toolchain.worldAvailable,
 			)
 		: undefined;
-	// Spontaneous speech: runtimes per conversation, fed by the conversation outbox. ON/OFF is the saved setting.
-	// The dialogue service is built below (it takes this host's context port).
+	// The conversation agent: its replies, and its spontaneous speech (runtimes per conversation, fed by the
+	// conversation outbox). The dialogue service is built below (it takes this host's ports).
 	const agency = assembleAgency(
 		{ store, conversation, inference, settings, memory },
 		() => dialogue,
 	);
 	const dialogue = createDialogueService({
 		agency: agency.dialoguePort,
+		conversationAgent: agency.conversationAgent,
 		logFile: () => config.logFile,
 		objectRecognition: enabled
 			? media.objectRecognition.port(CONVERSATION_DEFAULT_PRINCIPAL)
@@ -298,6 +299,7 @@ export async function buildServices(
 					routing: toolchains,
 					inference,
 					service: pipelines,
+					agentSystem: agency.conversationAgent.system,
 					embedPassages: toolchain.embedPassages,
 				})
 			: undefined;

@@ -55,7 +55,7 @@ export type ApplyKey = { connectionId: string; value?: string; delete?: true };
 
 /**
  * Routes that would lose their cloud fallback fall back to LARM, as the legacy screen did; the
- * dedicated World and sub-agent models of a removed model go back to the conversation route / LARM.
+ * dedicated World model of a removed model goes back to the conversation route.
  */
 function releaseFallbacks(doc: Settings, resourceIds: ReadonlySet<string>) {
 	for (const purpose of purposeSchema.options) {
@@ -67,15 +67,6 @@ function releaseFallbacks(doc: Settings, resourceIds: ReadonlySet<string>) {
 	const curation = doc.world.curationResourceId;
 	if (curation && resourceIds.has(curation))
 		doc.world.curationResourceId = null;
-	const subagent = doc.subagent.resourceId;
-	if (subagent && resourceIds.has(subagent)) doc.subagent.resourceId = null;
-	// A released agency model is never replaced by the LARM local LLM silently: agency stops until the user
-	// chooses a route again.
-	const agency = doc.agency.resourceId;
-	if (agency && resourceIds.has(agency)) {
-		doc.agency.resourceId = null;
-		doc.agency.enabled = false;
-	}
 }
 
 export type StructuralResult = {

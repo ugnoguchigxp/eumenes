@@ -113,7 +113,6 @@ export function executionStep(
 				subject: `execution:${row.id}-${state.calls}`,
 				deadline: Math.min(row.deadline, ctx.now() + 45_000),
 				maxOutputTokens: 2048,
-				route: "subagent",
 			});
 			state.calls++;
 			state.consumed++;

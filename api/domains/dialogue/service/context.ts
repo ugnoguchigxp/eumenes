@@ -12,6 +12,7 @@ import {
 import type {
 	Addressee,
 	AgencyLayerPort,
+	ConversationAgentPort,
 	GoalsLayerPort,
 	Run,
 	SpecialistPort,
@@ -172,6 +173,8 @@ export type DialogueDeps = {
 	goals?: GoalsLayerPort;
 	/** The agency layer (its recent own utterances and interests). Without it no agency block exists. */
 	agency?: AgencyLayerPort;
+	/** The conversation agent that answers every generation. */
+	conversationAgent: ConversationAgentPort;
 	/** Session toolchains and their domain work; without it no specialist session exists. */
 	specialist?: SpecialistPort;
 	/** Set by `createDialogueService` once intake exists (it accepts the resumed runs). */

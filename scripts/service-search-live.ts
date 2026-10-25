@@ -18,7 +18,6 @@ import { createWebAcquisition } from "../api/domains/web-research";
 import type { LarmPort, LarmCallOptions } from "../api/domains/larm";
 import {
 	callsOf,
-	isResultRound,
 	isUtteranceRound,
 	searchThenDelegate,
 } from "../api/application/toolchain/conversation-script.fixture";
@@ -60,7 +59,7 @@ function delegate(
 	messages: Array<{ role: string; content: string }>,
 	options: LarmCallOptions | undefined,
 ): string | undefined {
-	if (isUtteranceRound(options?.tools) && !isResultRound(messages)) {
+	if (isUtteranceRound(options?.tools)) {
 		const step = searchThenDelegate(
 			(candidate) => candidate.id === "web.service-search",
 			question!,

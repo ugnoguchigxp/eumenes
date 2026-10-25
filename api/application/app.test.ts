@@ -1,3 +1,4 @@
+import { testConversationAgent } from "../domains/dialogue/test/conversation-agent.fixture";
 import { migrations } from "./migrations";
 import { createContinuityService } from "../domains/continuity";
 import { afterEach, expect, test } from "bun:test";
@@ -60,6 +61,7 @@ function setup() {
 	});
 	const conversation = createConversationService(store);
 	const dialogue = createDialogueService({
+		conversationAgent: testConversationAgent,
 		store,
 		continuity: createContinuityService(store),
 		conversation,
@@ -328,6 +330,7 @@ test("full queue is reported as 503 for submissions", async () => {
 		limits: { total: 0, background: 0, scope: 0 },
 	});
 	const dialogue = createDialogueService({
+		conversationAgent: testConversationAgent,
 		store,
 		continuity: createContinuityService(store),
 		conversation: createConversationService(store),

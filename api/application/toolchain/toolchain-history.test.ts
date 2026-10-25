@@ -63,6 +63,7 @@ test("every builtin and bundled toolchain registers as a complete set with flat 
 		"model3d",
 		"browser",
 		"compute",
+		"shell",
 	]);
 	const active = store.read((db) => capabilities.toolchainsInTransaction(db));
 	expect(active.map((d) => d.functionName).sort()).toEqual(
@@ -131,20 +132,19 @@ test("an incomplete set or a reused function name is refused at registration", a
 
 test("without vectors every available toolchain is offered; with vectors the top ones by similarity", async () => {
 	const { store, capabilities } = await setup();
-	const available = (id: string) => id !== "web.research.codex";
+	const available = (id: string) => id !== "timers.manage";
 	const all = store.read((db) =>
 		capabilities.toolchainCandidatesInTransaction(db, {
 			text: "鎌倉の天気を教えて",
 			available,
 		}),
 	);
-	expect(all.map((c) => c.id)).not.toContain("web.research.codex");
+	expect(all.map((c) => c.id)).not.toContain("timers.manage");
 	expect(all.map((c) => c.id).sort()).toEqual(
 		[
 			...toolchainBuiltins.map((d) => d.id),
 			"timers.manage",
 			"web.search",
-			"web.research.codex",
 			"pipeline.studio",
 		]
 			.filter(

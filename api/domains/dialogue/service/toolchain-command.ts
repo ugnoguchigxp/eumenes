@@ -27,14 +27,6 @@ import type {
 
 const log = getLogger("dialogue");
 
-/** The route of a task sub-agent's calls: the saved sub-agent resource, or LARM only. */
-export const subagentRoute = (settings?: {
-	subagent: { resourceId: string | null };
-}) =>
-	settings?.subagent.resourceId
-		? { resourceId: settings.subagent.resourceId }
-		: ("larm-only" as const);
-
 /**
  * The sub-agent's whole contract: one tool of the set with flat arguments, or one question
  * back to the user. No discriminated union: the model fills one object.
@@ -223,8 +215,6 @@ export function createToolchainCommandHandler(
 				policySubject: run.id,
 				deadline,
 				maxOutputTokens: 2048,
-				// The saved sub-agent resource (read in this transaction); none keeps the command on LARM.
-				route: subagentRoute(larm.snapshotInTransaction?.(tx)),
 			});
 			return {
 				status: "ready",

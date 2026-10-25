@@ -1,3 +1,4 @@
+import { testConversationAgent } from "../../domains/dialogue/test/conversation-agent.fixture";
 import { withVoiceAuthority } from "../../domains/voice-dialogue/test/voice-fixture";
 /**
  * P3-09 first product connection, accepted on the REAL assembly: a temp-file
@@ -151,19 +152,6 @@ async function boot(options: BootOptions) {
 				requestId,
 				attemptId: `att-${sends}`,
 				value: answer,
-				// A user's utterance ends with the analysis: a plain answer that needs no basis.
-				toolCalls: [
-					{
-						id: `respond-${sends}`,
-						name: "respond",
-						arguments: JSON.stringify({
-							kind: "chat",
-							freshness: "not_live",
-							impact: "none",
-							approved: false,
-						}),
-					},
-				],
 			};
 			return receipt;
 		},
@@ -180,6 +168,7 @@ async function boot(options: BootOptions) {
 	});
 	const queue = createQueue(store);
 	const dialogue = createDialogueService({
+		conversationAgent: testConversationAgent,
 		store,
 		continuity: createContinuityService(store),
 		conversation,

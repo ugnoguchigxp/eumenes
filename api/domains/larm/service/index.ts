@@ -1,5 +1,4 @@
 import { measureStage } from "../../../infrastructure/performance";
-import { withLogContext } from "../../../infrastructure/logger";
 import { gzipFetch, plainFetch } from "./gzip-fetch";
 import type { Capability, LarmPort, LarmCallOptions } from "../contracts";
 import { ttsVoicesSchema } from "../contracts";
@@ -12,6 +11,7 @@ import { answerRequest } from "./answer-request";
 import { assertAttitudeQuestions } from "./context";
 import { createControl } from "./control";
 import { createInfer } from "./infer";
+import { createHelperConnections } from "./helper-connections";
 import { createLeaseManager } from "./lease-manager";
 import { leasePort } from "./lease-port";
 import { type Fetcher, type Provider } from "./profiles";
@@ -52,6 +52,8 @@ export function createLarm(config: {
 	intonationScale?: number;
 	/** Internal timing seam; production follows LARM's 300-second foreground idle policy. */
 	idleTimeoutMs?: number;
+	/** Hold the connection while the port is open: LARM's input cache lives on the connection. */
+	keepAlive?: boolean;
 	/** Records attitude judge outcomes for monitoring; the judge has no attempt record of its own. */
 	judgeActivity?: ActivityRecorder;
 }): LarmPort {
@@ -101,7 +103,10 @@ export function createLarm(config: {
 		return { base, extra: providerHosts };
 	};
 	const lifetime = new AbortController();
-	const auxiliarySessions = new Set<LarmPort>();
+	const helpers = createHelperConnections(
+		(helperClient) => createLarm({ ...config, client: helperClient, keepAlive: false }),
+		client,
+	);
 	let mainAnswer = Promise.resolve();
 	const voiceCatalogs = new WeakMap<Provider, TtsVoices>();
 	let judging = false;
@@ -123,6 +128,7 @@ export function createLarm(config: {
 		audience,
 		client,
 		idleTimeoutMs,
+		keepAlive: config.keepAlive,
 		hostsFor,
 		control,
 		lifetime,
@@ -156,16 +162,9 @@ export function createLarm(config: {
 			options?.sessionRole === "subagent"
 		) {
 			// Independent sessions (one-shot calls and task sub-agents) share the saved profile; admission and KV capacity belong to LARM.
-			return withProvider("llm", scoped, async () => {
-				return independentAnswer(
-					{ ...config, profile },
-					auxiliarySessions,
-					messages,
-					scoped,
-					onDelta,
-					options,
-				);
-			});
+			return helpers.answer(messages, scoped, onDelta, options, (run) =>
+				withProvider("llm", scoped, run),
+			);
 		}
 		// One foreground conversation may infer on its connection at a time.
 		const previous = mainAnswer;
@@ -360,43 +359,7 @@ export function createLarm(config: {
 			config,
 			voice,
 		}),
-		close: () =>
-			leases.close(() =>
-				Promise.all(
-					[...auxiliarySessions].map((helper) => helper.close()),
-				).then(() => {}),
-			),
+		close: (options) =>
+			leases.close(() => helpers.close(options), !!options?.keepConnection),
 	};
-}
-
-/** Own one helper for one call, preserving the caller role only in diagnostics. */
-async function independentAnswer(
-	config: Parameters<typeof createLarm>[0],
-	sessions: Set<LarmPort>,
-	messages: Parameters<LarmPort["answer"]>[0],
-	signal: AbortSignal,
-	onDelta: ((text: string) => void) | undefined,
-	options: LarmCallOptions,
-) {
-	return withLogContext({ sessionRole: options.sessionRole }, async () => {
-		const helper = createLarm({
-			...config,
-			client: `eumenes-helper-${crypto.randomUUID()}`,
-		});
-		sessions.add(helper);
-		try {
-			return onDelta
-				? await helper.answerStream!(messages, signal, onDelta, {
-						...options,
-						sessionRole: "main",
-					})
-				: await helper.answer(messages, signal, {
-						...options,
-						sessionRole: "main",
-					});
-		} finally {
-			await helper.close();
-			sessions.delete(helper);
-		}
-	});
 }

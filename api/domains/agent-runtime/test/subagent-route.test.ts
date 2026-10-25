@@ -28,20 +28,11 @@ async function runStep(h: Awaited<ReturnType<typeof harness>>, runId: string) {
 	return task.id;
 }
 
-test("a research step runs as a sub-agent of its task, on LARM unless a sub-agent resource is saved", async () => {
+test("a research step runs as a sub-agent of its task", async () => {
 	const h = await harness();
 	try {
 		const taskId = await runStep(h, "larm");
-		expect(h.routes).toEqual(["larm-only"]);
 		expect(h.sessions).toEqual([{ sessionRole: "subagent", taskId }]);
-		const resourceId = crypto.randomUUID();
-		h.subagent.resourceId = resourceId;
-		const second = await runStep(h, "resource");
-		expect(h.routes.at(-1)).toEqual({ resourceId });
-		expect(h.sessions.at(-1)).toEqual({
-			sessionRole: "subagent",
-			taskId: second,
-		});
 	} finally {
 		await h.close();
 	}

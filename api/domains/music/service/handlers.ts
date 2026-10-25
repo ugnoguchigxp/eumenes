@@ -72,7 +72,6 @@ export function registerMusicHandlers(
 				? inference.captureUserControlInTransaction!(db, {
 						...capture,
 						subject: `music-task:${r.id}-plan`,
-						route: "subagent",
 					})
 				: inference.captureControlInTransaction(db, capture);
 			return {

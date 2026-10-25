@@ -5,7 +5,7 @@ import type {
 	WorldContextPort,
 } from "../contracts";
 import { waitFor } from "../../../infrastructure/wait-for";
-import { respond, setup, type Harness } from "./generation.fixture";
+import { setup, type Harness } from "./generation.fixture";
 
 /**
  * What the conversation's prompt takes from World and Goals (the ContextWindow specification, sections 5.2 and
@@ -18,7 +18,6 @@ afterEach(async () => {
 	h = undefined;
 });
 
-const chat = respond();
 const HINT_NAME = "音声サービス";
 
 /** The records of the nth model call's document, by source. */
@@ -41,7 +40,7 @@ test("the names World knows for the wording are one reference record; the wordin
 		},
 	};
 	h = await setup({ worldContext });
-	h.state.steps.push({ text: "9月から利用できます。", calls: [chat] });
+	h.state.steps.push({ text: "9月から利用できます。" });
 	await h.say("音声サービスはいつから使える？");
 	expect(asked.at(-1)!.conversationId).toBe("main");
 	expect(asked.at(-1)!.texts.join("\n")).toContain(
@@ -58,14 +57,14 @@ test("the names World knows for the wording are one reference record; the wordin
 test("no known target named: no record is shown", async () => {
 	const worldContext: WorldContextPort = { knownNamesInTransaction: () => [] };
 	h = await setup({ worldContext });
-	h.state.steps.push({ text: "はい。", calls: [chat] });
+	h.state.steps.push({ text: "はい。" });
 	await h.say("こんにちは");
 	expect(recordsOf(0)).toEqual([]);
 });
 
 test("World off (no port): no record, and the answer is produced as before", async () => {
 	h = await setup();
-	h.state.steps.push({ text: "はい。", calls: [chat] });
+	h.state.steps.push({ text: "はい。" });
 	const run = await h.say("音声サービスはいつから使える？");
 	expect(recordsOf(0)).toEqual([]);
 	expect(h.dialogue.answerText(run.id)).toBe("はい。");
@@ -91,7 +90,7 @@ test("a goal shown in the prompt and forgotten while the answer is generated mak
 	h = await setup({ goals: goalsPort(["g1"], existing) });
 	let release!: () => void;
 	h.state.gate = new Promise<void>((resolve) => (release = resolve));
-	h.state.steps.push({ text: "はい。", calls: [chat] });
+	h.state.steps.push({ text: "はい。" });
 	const run = await h.dialogue.submit({
 		requestId: crypto.randomUUID(),
 		conversationId: "main",
@@ -112,7 +111,7 @@ test("revising a goal shown in the prompt while the answer is generated does not
 	h = await setup({ goals: goalsPort(["g1"], existing) });
 	let release!: () => void;
 	h.state.gate = new Promise<void>((resolve) => (release = resolve));
-	h.state.steps.push({ text: "はい。", calls: [chat] });
+	h.state.steps.push({ text: "はい。" });
 	const run = await h.dialogue.submit({
 		requestId: crypto.randomUUID(),
 		conversationId: "main",
@@ -130,7 +129,7 @@ test("forgetting a goal that was not shown in the prompt does not stale the run"
 	h = await setup({ goals: goalsPort(["g1"], existing) });
 	let release!: () => void;
 	h.state.gate = new Promise<void>((resolve) => (release = resolve));
-	h.state.steps.push({ text: "はい。", calls: [chat] });
+	h.state.steps.push({ text: "はい。" });
 	const run = await h.dialogue.submit({
 		requestId: crypto.randomUUID(),
 		conversationId: "main",
@@ -159,7 +158,7 @@ test("with no goal shown, a goal adopted while the answer is generated does not 
 	h = await setup({ goals });
 	let release!: () => void;
 	h.state.gate = new Promise<void>((resolve) => (release = resolve));
-	h.state.steps.push({ text: "はい。", calls: [chat] });
+	h.state.steps.push({ text: "はい。" });
 	const run = await h.dialogue.submit({
 		requestId: crypto.randomUUID(),
 		conversationId: "main",

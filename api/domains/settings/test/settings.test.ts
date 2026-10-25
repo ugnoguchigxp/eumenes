@@ -979,7 +979,7 @@ test("stored settings are migrated once: Managed Agents removed, auth filled, no
 	// Rewrite the stored document into the shape before this change.
 	const legacy = JSON.parse(JSON.stringify(kept));
 	for (const c of legacy.connections) delete c.auth;
-	delete legacy.subagent;
+	legacy.subagent = { resourceId: managedResource };
 	legacy.connections.push({
 		id: managed,
 		kind: "claude-managed-agents",
@@ -1032,10 +1032,11 @@ test("stored settings are migrated once: Managed Agents removed, auth filled, no
 	expect(migrated.routes.llm.fallbackId).toBeNull();
 	expect(migrated.routes.llm.mode).toBe("larm-preferred");
 	expect(migrated.world.curationResourceId).toBeNull();
-	// Agency does not fall back to LARM silently: it is switched off.
-	expect(migrated.agency.resourceId).toBeNull();
-	expect(migrated.agency.enabled).toBe(false);
-	expect(migrated.subagent).toEqual({ resourceId: null });
+	// The removed dedicated LLM selections are dropped; agency keeps its other fields.
+	expect("enabled" in migrated.agency).toBe(false);
+	expect("resourceId" in migrated.agency).toBe(false);
+	expect(migrated.agency.idleSec).toBe(20);
+	expect("subagent" in migrated).toBe(false);
 	expect(h.settings.credential(migrated.connections[0]!)).toBe("sk-keep");
 	// Startup persists the migration once and drops the removed connection's secret.
 	const reopened = await createSettings(h.store, { dbPath: h.dbPath, env: {} });
@@ -1087,11 +1088,9 @@ test("a connection in use never changes its billing path in place; other changes
 		{ connectionId: used.connection, value: "sk-used" },
 		{ connectionId: idle.connection, value: "setup-token" },
 	]);
-	// A World and a sub-agent model on another billing path than the conversation route are stored.
+	// A World model on another billing path than the conversation route are stored.
 	const next = h.settings.get();
 	next.world.curationResourceId = idle.resource;
-	next.subagent.resourceId = idle.resource;
-	next.agency.resourceId = idle.resource;
 	await save(h, next);
 	// Switching a routed connection from API key to subscription is refused, key or not.
 	const swapped = h.settings.get();
@@ -1111,8 +1110,6 @@ test("a connection in use never changes its billing path in place; other changes
 	// Unassigned, the path may change; it takes a credential of the new method and drops the old.
 	const free = h.settings.get();
 	free.world.curationResourceId = null;
-	free.subagent.resourceId = null;
-	free.agency.resourceId = null;
 	free.connections.find((c) => c.id === idle.connection)!.auth = "api-key";
 	await expect(save(h, structuredClone(free))).rejects.toThrow(
 		"credential_required",
@@ -1133,39 +1130,39 @@ test("a connection in use never changes its billing path in place; other changes
 	).toBe("api-key");
 });
 
-test("subagent.resourceId must name a registered LLM resource and defaults to LARM", async () => {
+test("the removed dedicated LLM selections are not part of the settings document", async () => {
 	const h = await setup();
 	const s = h.settings.get();
-	expect(s.subagent).toEqual({ resourceId: null });
+	expect("subagent" in s).toBe(false);
+	expect("resourceId" in s.agency).toBe(false);
+	expect("enabled" in s.agency).toBe(false);
+	expect(
+		settingsSchema.safeParse({ ...s, subagent: { resourceId: null } }).success,
+	).toBe(false);
 	expect(
 		settingsSchema.safeParse({
 			...s,
-			subagent: { resourceId: crypto.randomUUID() },
+			agency: { ...s.agency, resourceId: null },
 		}).success,
 	).toBe(false);
-	const { resource } = claude(s, "api-key", { envRef: "EUMENES_CLOUD_KEY" });
-	s.subagent.resourceId = resource;
-	expect(settingsSchema.safeParse(s).success).toBe(true);
 	expect(
-		settingsSchema.safeParse({ ...s, subagent: { resourceId: resource, x: 1 } })
-			.success,
+		settingsSchema.safeParse({
+			...s,
+			agency: { ...s.agency, enabled: true },
+		}).success,
 	).toBe(false);
-	await save(h, s);
-	expect(h.settings.get().subagent.resourceId).toBe(resource);
 });
 
-test("agency defaults to OFF on the LARM local LLM, also for saved documents without it", async () => {
+test("agency defaults, also for saved documents without it", async () => {
 	const h = await setup();
 	const defaultAgency = {
-		enabled: false,
-		resourceId: null,
 		idleSec: 20,
 		maxUnanswered: 1,
 		interests: [],
 		emotion: true,
 	};
 	expect(h.settings.get().agency).toEqual(defaultAgency);
-	// A document saved before this setting existed still loads, with agency off.
+	// A document saved before this setting existed still loads, with the agency defaults.
 	const legacy = JSON.parse(JSON.stringify(h.settings.get()));
 	delete legacy.agency;
 	await h.store.write((db) => {
@@ -1177,26 +1174,17 @@ test("agency defaults to OFF on the LARM local LLM, also for saved documents wit
 	expect(reopened.get().agency).toEqual(defaultAgency);
 	// A partial section fills the rest with the defaults.
 	const partial = JSON.parse(JSON.stringify(legacy));
-	partial.agency = { enabled: true };
+	partial.agency = { idleSec: 5 };
 	expect(settingsSchema.parse(partial).agency).toEqual({
 		...defaultAgency,
-		enabled: true,
+		idleSec: 5,
 	});
 });
 
-test("agency persists through apply; its resource must name a registered LLM resource", async () => {
+test("agency persists through apply", async () => {
 	const h = await setup();
 	const s = h.settings.get();
-	expect(
-		settingsSchema.safeParse({
-			...s,
-			agency: { ...s.agency, resourceId: crypto.randomUUID() },
-		}).success,
-	).toBe(false);
-	const { resource } = claude(s, "api-key", { envRef: "EUMENES_CLOUD_KEY" });
 	s.agency = {
-		enabled: true,
-		resourceId: resource,
 		idleSec: 0,
 		maxUnanswered: 10,
 		interests: ["a", "b", "c"],
@@ -1226,7 +1214,5 @@ test("agency rejects out-of-range values and unknown fields", async () => {
 	expect(withAgency({ interests: [""] })).toBe(false);
 	expect(withAgency({ interests: ["x".repeat(200)] })).toBe(true);
 	expect(withAgency({ interests: ["x".repeat(201)] })).toBe(false);
-	expect(withAgency({ enabled: "yes" })).toBe(false);
-	expect(withAgency({ resourceId: "not-a-uuid" })).toBe(false);
 	expect(withAgency({ extra: 1 })).toBe(false);
 });

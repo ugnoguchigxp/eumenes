@@ -45,8 +45,6 @@ export type SelectionRow = {
 	toolchain_revision_id: string | null;
 	function_name: string | null;
 	request_text: string | null;
-	repaired: number;
-	analysis_json: string | null;
 	task_id: string | null;
 	outcome: string | null;
 	outcome_code: string | null;
@@ -93,5 +91,12 @@ UPDATE toolchain_recipes SET toolchain_id='web.research.codex' WHERE toolchain_i
 		id: "toolchain-history/0003-selection-analysis",
 		after: ["toolchain-history/0002-rename-web-research"],
 		sql: "ALTER TABLE toolchain_selections ADD COLUMN analysis_json TEXT;",
+	},
+	{
+		// The conversation agent no longer classifies a request nor repairs its output: neither is kept.
+		id: "toolchain-history/0004-drop-analysis",
+		after: ["toolchain-history/0003-selection-analysis"],
+		sql: `ALTER TABLE toolchain_selections DROP COLUMN analysis_json;
+ALTER TABLE toolchain_selections DROP COLUMN repaired;`,
 	},
 ];

@@ -10,8 +10,8 @@ const rawRowSchema = z
 		caseId: z.string().min(1),
 		trial: z.number().int().min(1),
 		/**
-		 * ok: an answer came back. contract_failure: the generation contract was not met even after the one
-		 * structural correction (a model result, scored as a failure). transport_error: no model result (counted apart).
+		 * ok: an answer came back. contract_failure: the output broke the generation contract (control text in the
+		 * speech; a model result, scored as a failure). transport_error: no model result (counted apart).
 		 */
 		status: z.enum(["ok", "transport_error", "contract_failure"]),
 		answer: z
@@ -25,8 +25,6 @@ const rawRowSchema = z
 			})
 			.strict()
 			.optional(),
-		/** The one structural correction was used. */
-		repaired: z.boolean(),
 		errorCode: z.string().optional(),
 		startedAt: z.string(),
 		latencyMs: z.number().min(0),

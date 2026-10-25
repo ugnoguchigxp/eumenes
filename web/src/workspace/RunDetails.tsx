@@ -5,23 +5,34 @@ import type { EumenesClient } from "../../../client";
 import type { Message } from "../../../api/domains/conversation/contracts";
 import type { Run } from "../../../api/domains/dialogue/contracts";
 import { ResearchTaskCard } from "../domains/agent-runtime";
-import { ErrorReportButton } from "./ErrorReportDialog";
+import { ErrorReportButton, RunFailureNotice } from "./ErrorReportDialog";
+import { describeError } from "../errorMessages";
+
+/** The run that answers this input message: an edited message has one run per send, the newest answers it. */
+const answeringRun = (message: Pick<Message, "id">, runs: Run[] | undefined) =>
+	runs
+		?.slice()
+		.reverse()
+		.find((r) => r.inputMessageId === message.id);
+
+const failureSummary = (
+	code: string | null,
+	fallback = "応答に失敗しました",
+) => (code ? describeError(new Error(code)) : fallback);
 
 /** Persisted notices and delegated work belonging to this input message. */
 export function RunDetails({
 	client,
 	message,
 	runs,
+	agentName,
 }: {
 	client: EumenesClient;
 	message: Pick<Message, "id" | "text">;
 	runs: Run[] | undefined;
+	agentName?: string;
 }) {
-	// An edited message has one run per send: the newest is the one that answers it.
-	const run = runs
-		?.slice()
-		.reverse()
-		.find((r) => r.inputMessageId === message.id);
+	const run = answeringRun(message, runs);
 	return (
 		<>
 			{run?.announcement && (
@@ -38,18 +49,56 @@ export function RunDetails({
 					title={message.text}
 					// A research that failed ends its run as completed, with the host's fixed reply.
 					failureAction={
-						run.status === "completed" ? (
-							<ErrorReportButton client={client} runId={run.id} />
-						) : undefined
+						run.status === "completed"
+							? (code) => (
+									<ErrorReportButton
+										client={client}
+										runId={run.id}
+										summary={failureSummary(code)}
+									/>
+								)
+							: undefined
 					}
 				/>
 			)}
-			{run?.status === "failed" && (
-				<div className="run-failure-actions">
-					<ErrorReportButton client={client} runId={run.id} />
-				</div>
-			)}
+			<RunFailure
+				client={client}
+				message={message}
+				runs={runs}
+				agentName={agentName}
+			/>
 		</>
+	);
+}
+
+/**
+ * The failure bubble of the run answering this input message (failed, or interrupted before it answered). It also stands alone for an input the list
+ * does not show (a system notice, a request sent from a music or image panel), so every failure is seen.
+ */
+export function RunFailure({
+	client,
+	message,
+	runs,
+	agentName,
+}: {
+	client: EumenesClient;
+	message: Pick<Message, "id">;
+	runs: Run[] | undefined;
+	agentName?: string;
+}) {
+	const run = answeringRun(message, runs);
+	if (run?.status !== "failed" && run?.status !== "interrupted") return null;
+	return (
+		<RunFailureNotice
+			client={client}
+			runId={run.id}
+			agentName={agentName}
+			summary={
+				run.status === "interrupted"
+					? failureSummary(run.error, "回答の作成が中断されました")
+					: failureSummary(run.error)
+			}
+		/>
 	);
 }
 

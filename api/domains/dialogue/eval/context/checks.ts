@@ -22,9 +22,6 @@ function argsOf(call: ToolCallRecord): Record<string, unknown> {
 	}
 }
 
-/** The calls other than the `respond` that carries the analysis. */
-const workCalls = (answer: Answer) =>
-	answer.toolCalls.filter((c) => c.name !== TOOL_NAMES.respond);
 const delegations = (answer: Answer) =>
 	answer.toolCalls.filter((c) => c.name === TOOL_NAMES.delegate);
 
@@ -42,7 +39,7 @@ export function runCheck(
 		case "tool_called": {
 			const pass = check.name
 				? names.includes(check.name)
-				: workCalls(answer).length > 0;
+				: answer.toolCalls.length > 0;
 			return done(
 				pass,
 				"tool_called",
@@ -52,11 +49,11 @@ export function runCheck(
 		case "tool_not_called": {
 			const pass = check.name
 				? !names.includes(check.name)
-				: workCalls(answer).length === 0;
+				: answer.toolCalls.length === 0;
 			return done(
 				pass,
 				"tool_not_called",
-				`called [${(check.name ? [check.name] : workCalls(answer).map((c) => c.name)).join(",")}]`,
+				`called [${(check.name ? [check.name] : answer.toolCalls.map((c) => c.name)).join(",")}]`,
 			);
 		}
 		case "delegated": {
@@ -83,17 +80,6 @@ export function runCheck(
 				"not_delegated",
 				"delegated",
 			);
-		case "respond_field": {
-			const respond = answer.toolCalls
-				.filter((c) => c.name === TOOL_NAMES.respond)
-				.at(-1);
-			const value = respond ? argsOf(respond)[check.field] : undefined;
-			return done(
-				value === check.equals,
-				`${check.field}=${String(check.equals)}`,
-				`${check.field} was ${respond ? JSON.stringify(value ?? null) : "not given (no respond call)"}`,
-			);
-		}
 		case "speaks":
 			return done(answer.text.trim() !== "", "speaks", "silent");
 		case "silent":

@@ -12,7 +12,6 @@ import { createConversationService } from "../domains/conversation";
 import { createSettings } from "../domains/settings";
 import {
 	createInference,
-	createCodexResearch,
 	createCloudAgents,
 } from "../domains/inference";
 import { createQueue } from "../domains/queue";
@@ -65,14 +64,12 @@ export async function buildCore(
 		embedding: createActivityRecorder(),
 	};
 	const inference = createInference(store, settings, {
-		codexResearch: config.webResearchToolsEnabled
-			? createCodexResearch(config.env, config.researchCodexExecutable)
-			: undefined,
 		cloudAgents: createCloudAgents(config.env, {
 			codexExecutable: config.researchCodexExecutable,
 		}),
 		token: config.larmToken,
 		providerHosts: config.larmProviderHosts,
+		keepLarmConnection: true,
 		speechText: ttsDictionary.apply,
 		attitudeDataset,
 		judgeActivity: activity.judge,

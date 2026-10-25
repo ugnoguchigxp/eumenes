@@ -32,14 +32,6 @@ import {
 	type StepOutput,
 } from "./step-actions";
 
-/** The route of a task sub-agent's calls: the saved sub-agent resource, or LARM only. */
-const subagentRoute = (settings?: {
-	subagent: { resourceId: string | null };
-}) =>
-	settings?.subagent.resourceId
-		? { resourceId: settings.subagent.resourceId }
-		: ("larm-only" as const);
-
 export function createStepHandler(ctx: RuntimeContext, ops: TaskOps) {
 	const { capabilities, tools, inference, queue, now } = ctx.deps;
 	const { prepared, catalogs, bindings } = ctx.state;
@@ -158,16 +150,12 @@ export function createStepHandler(ctx: RuntimeContext, ops: TaskOps) {
 					policySubject: t.root_run_id,
 					deadline: claim.deadlineAtMs ?? t.deadline,
 					maxOutputTokens: 4096,
-					engine: JSON.parse(t.input_json ?? "{}").researcher,
-					// The saved sub-agent resource (read in this transaction); none keeps the step on LARM.
-					route: subagentRoute(inference.snapshotInTransaction?.(db)),
 				};
 				const requestId = execution
 					? inference.captureUserControlInTransaction!(db, {
 							subject: `execution-research:${t.id}-${t.current_step}`,
 							deadline: Math.min(capture.deadline, now() + 45_000),
 							maxOutputTokens: capture.maxOutputTokens,
-							route: "subagent",
 						})
 					: inference.captureControlInTransaction(db, capture);
 				const current = update(db, t, "running", t.phase);

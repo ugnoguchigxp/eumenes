@@ -1,10 +1,10 @@
 /**
- * A scripted model for the conversation's fixed tools (the ContextWindow specification, sections 6.1 to 6.7).
+ * A scripted model for the conversation agent's fixed tools (the ContextWindow specification, sections 6.1 to 6.7).
  *
- * A user's utterance is one generation: the model calls `find_toolchain` to search, `delegate` to hand the work over,
- * and `respond` with the analysis that makes its speech legal. Each model call of that generation is one step: the
- * step index is the number of tool-call exchanges already carried out after the utterance, so a script reads the
- * results of the earlier steps from the messages, exactly as the real model would.
+ * A user's utterance is one generation: the model answers in plain text, and calls `find_toolchain` to search and
+ * `delegate` to hand the work over when the conversation calls for it. Each model call of that generation is one
+ * step: the step index is the number of tool-call exchanges already carried out after the utterance, so a script
+ * reads the results of the earlier steps from the messages, exactly as the real model would.
  */
 
 /** A message as the generation loop keeps it: assistant tool calls and their tool results. */
@@ -21,22 +21,8 @@ export type ConversationMessage = {
 /** One tool call the model makes. */
 export type Call = { name: string; args: Record<string, unknown> };
 
-/** One model call: speech and/or tool calls. Speech beside a tool call is a preamble the host withdraws. */
+/** One model call: speech and/or tool calls. Speech beside a tool call is a preamble the agent keeps. */
 export type Step = { text?: string; calls?: Call[] };
-
-/** The analysis of a request answered from hand (a plain answer that needs no basis). */
-export const CHAT = {
-	kind: "chat",
-	freshness: "not_live",
-	impact: "none",
-	approved: false,
-} as const;
-
-/** The utterance's analysis. Extra fields (todoRefs, about, unavailable) go in `args`. */
-export const respond = (args: Record<string, unknown> = {}): Call => ({
-	name: "respond",
-	args: { ...CHAT, ...args },
-});
 
 /** The search for a toolchain that fits the request. */
 export const findToolchain = (query: string): Call => ({
@@ -89,12 +75,6 @@ export const approve = (
 	args: { mode: "approve", confirmation, announcement },
 });
 
-/** The step's speech with a single tool call (the speech is a preamble unless the call is `respond`). */
-export const answerWith = (text: string, call: Call): Step => ({
-	text,
-	calls: [call],
-});
-
 /** One candidate of a `find_toolchain` result (the ids the delegation names). */
 export type Candidate = {
 	id: string;
@@ -133,15 +113,14 @@ export const searchThenDelegate =
 		const chosen = candidates.find(pick);
 		return chosen
 			? { calls: [delegate(chosen.id, request, args)] }
-			: { calls: [respond({ unavailable: true })] };
+			: { text: UNAVAILABLE_TEXT };
 	};
 
-/** What the conversation says when no toolchain can do the request (the `unavailable` analysis). */
+/** What the conversation says when no toolchain can do the request. */
 export const UNAVAILABLE_TEXT = "その依頼は、今の担当ではできません。";
 
 /**
- * The step after a delegation returned its result in this generation: an instant answer is the speech (the basis is
- * the answer itself), and an answer the toolchain could not give is said as unavailable (no automatic fallback).
+ * The step after a delegation returned its result in this generation: an instant answer is the speech, and an answer the toolchain could not give is said as unavailable (no automatic fallback).
  * Undefined before a result.
  */
 export function handedStep(messages: ConversationMessage[]): Step | undefined {
@@ -150,12 +129,7 @@ export function handedStep(messages: ConversationMessage[]): Step | undefined {
 		| undefined;
 	// A refused call (the host closes a call that was rejected with `{refused: true}`) is no result to answer from.
 	if (!handed || !("answered" in handed)) return undefined;
-	return handed.answered && handed.answer
-		? {
-				text: handed.answer,
-				calls: [respond({ kind: "live_info", freshness: "live" })],
-			}
-		: { text: UNAVAILABLE_TEXT, calls: [respond({ unavailable: true })] };
+	return { text: handed.answered && handed.answer ? handed.answer : UNAVAILABLE_TEXT };
 }
 
 /** The messages after the utterance: the generation's own exchanges (tool calls and their results). */
@@ -166,15 +140,15 @@ export function afterUtterance(
 	return last < 0 ? [] : messages.slice(last + 1);
 }
 
-/** Whether the request offers the fixed tools (a user's utterance is then analysed by `respond`). */
+/** Whether the request offers the conversation's fixed tools (a conversation agent's reply, not a background call). */
 export function isUtteranceRound(
 	tools: ReadonlyArray<{ function: { name: string } }> | undefined,
 ): boolean {
-	return !!tools?.some((tool) => tool.function.name === "respond");
+	return !!tools?.some((tool) => tool.function.name === "find_toolchain");
 }
 
-/** Whether the generation is the result phase: the host's fixed text reports a finished TODO. */
-export function isResultRound(messages: ConversationMessage[]): boolean {
+/** Whether the generation has no new utterance: the host's fixed trigger text is its newest message (a host notice). */
+export function isNoticeRound(messages: ConversationMessage[]): boolean {
 	const last = messages.filter((m) => m.role === "user").at(-1);
 	return !!last?.content.startsWith("新しい出来事があります");
 }
@@ -213,109 +187,6 @@ export function scripted(
 		const step = steps[stepIndex(messages)];
 		return typeof step === "function" ? step(messages) : step;
 	};
-}
-
-/** The shape of a LARM receipt's `executeStream` the wrapper below reads. */
-type Stream = (
-	requestId: string,
-	messages: unknown,
-	signal: AbortSignal,
-	onDelta: (text: string) => void,
-	preparation: unknown,
-	tools: ReadonlyArray<{ function: { name: string } }> | undefined,
-	session: unknown,
-) => Promise<{ toolCalls?: unknown[] } & Record<string, unknown>>;
-
-/**
- * A model whose answer ends with `respond` when it makes no tool call at all: a user's utterance must be analysed by
- * `respond` (the conversation's fixed tools), and a fake that only writes text has no tool to call. Both the receipt
- * path (`executeStream`) and the plain path (`answer`, with the tool callbacks) are covered. Every other call goes
- * through the wrapped model unchanged.
- */
-export function withRespond<
-	T extends {
-		executeStream?: unknown;
-		answer?: unknown;
-		answerStream?: unknown;
-	},
->(model: T): T {
-	const respondCall = () => ({
-		id: "respond",
-		name: "respond",
-		arguments: JSON.stringify({ ...CHAT }),
-	});
-	type Options = {
-		tools?: ReadonlyArray<{ function: { name: string } }>;
-		onToolCalls?: (calls: unknown[]) => void;
-	};
-	/** The call options with a tool callback that records whether the model made a call. */
-	const watched = (options: Options | undefined) => {
-		const state = { called: false };
-		if (!options?.tools?.some((tool) => tool.function.name === "respond"))
-			return { options, state, tracked: false };
-		return {
-			options: {
-				...options,
-				onToolCalls: (calls: unknown[]) => {
-					state.called = true;
-					options.onToolCalls?.(calls);
-				},
-			},
-			state,
-			tracked: true,
-		};
-	};
-	const stream = model.executeStream as Stream | undefined;
-	const answer = model.answer as
-		| ((
-				messages: unknown,
-				signal: AbortSignal,
-				options?: Options,
-		  ) => Promise<string>)
-		| undefined;
-	const answerStream = model.answerStream as
-		| ((
-				messages: unknown,
-				signal: AbortSignal,
-				delta: (text: string) => void,
-				options?: Options,
-		  ) => Promise<string>)
-		| undefined;
-	const wrapped: Record<string, unknown> = {};
-	if (stream)
-		wrapped.executeStream = async (...args: Parameters<Stream>) => {
-			const receipt = await stream(...args);
-			const offered = args[5]?.some((tool) => tool.function.name === "respond");
-			return offered && !receipt.toolCalls?.length
-				? { ...receipt, toolCalls: [respondCall()] }
-				: receipt;
-		};
-	if (answer)
-		wrapped.answer = async (
-			messages: unknown,
-			signal: AbortSignal,
-			options?: Options,
-		) => {
-			const watch = watched(options);
-			const text = await answer(messages, signal, watch.options);
-			if (watch.tracked && !watch.state.called)
-				options?.onToolCalls?.([respondCall()]);
-			return text;
-		};
-	if (answerStream)
-		wrapped.answerStream = async (
-			messages: unknown,
-			signal: AbortSignal,
-			delta: (text: string) => void,
-			options?: Options,
-		) => {
-			const watch = watched(options);
-			const text = await answerStream(messages, signal, delta, watch.options);
-			if (watch.tracked && !watch.state.called)
-				options?.onToolCalls?.([respondCall()]);
-			return text;
-		};
-	return { ...model, ...wrapped } as T;
 }
 
 /**

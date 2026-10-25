@@ -27,83 +27,23 @@ import {
 	migrations as inferenceMigrations,
 } from "../../inference";
 import { createVoiceDialogue, migrations as voiceMigrations } from "..";
-import type { LarmCallOptions, LarmPort } from "../../larm";
-import type { NativeToolCall } from "../../../infrastructure/chat-stream";
+import type { LarmPort } from "../../larm";
+import { testConversationAgent } from "../../dialogue/test/conversation-agent.fixture";
 const cleanup: Array<() => Promise<void>> = [];
 afterEach(async () => {
 	for (const close of cleanup.splice(0)) await close();
 });
-/** The analysis a user's new utterance ends with: a plain answer that needs no basis. */
-const RESPOND_ARGS = {
-	kind: "chat",
-	freshness: "not_live",
-	impact: "none",
-	approved: false,
-};
-
-/**
- * A chat completion that says `text`. When the request offers the `respond` tool, as every generation does,
- * the completion also calls it, as the conversation model must for a user's utterance.
- */
-function offersRespond(init: RequestInit | undefined) {
-	const body =
-		typeof init?.body === "string"
-			? (JSON.parse(init.body) as {
-					tools?: Array<{ function?: { name?: string } }>;
-				})
-			: {};
-	return (body.tools ?? []).some((tool) => tool.function?.name === "respond");
-}
-const RESPOND_CALL = {
-	id: "call-respond",
-	type: "function",
-	function: { name: "respond", arguments: JSON.stringify(RESPOND_ARGS) },
-};
-/**
- * The local model reports its `respond` call through `onToolCalls`, as the cloud one does in its completion;
- * call it once the answer is complete, when the request offers that tool.
- */
-export function reportRespond(options?: LarmCallOptions) {
-	if (!options?.tools?.some((tool) => tool.function.name === "respond")) return;
-	const call: NativeToolCall = {
-		id: "call-respond",
-		name: "respond",
-		arguments: JSON.stringify(RESPOND_ARGS),
-	};
-	options.onToolCalls?.([call]);
-}
-
-export function completion(init: RequestInit | undefined, text: string) {
-	const offered = offersRespond(init);
+/** A chat completion that says `text` (a conversation reply is plain text; no call closes it). */
+export function completion(text: string) {
 	return {
 		choices: [
 			{
 				index: 0,
-				message: {
-					content: text,
-					...(offered ? { tool_calls: [RESPOND_CALL] } : {}),
-				},
-				finish_reason: offered ? "tool_calls" : "stop",
+				message: { content: text },
+				finish_reason: "stop",
 			},
 		],
 	};
-}
-
-/** The stream frame that ends a streamed completion with the `respond` call, when the request offers it. */
-export function respondFrame(init: RequestInit | undefined) {
-	if (!offersRespond(init)) return "";
-	const frame = {
-		choices: [
-			{
-				index: 0,
-				delta: {
-					tool_calls: [{ index: 0, ...RESPOND_CALL }],
-				},
-				finish_reason: "tool_calls",
-			},
-		],
-	};
-	return `data: ${JSON.stringify(frame)}\n\n`;
 }
 
 export function wav() {
@@ -175,13 +115,13 @@ export async function setup(
 		keys: [{ connectionId: c, value: "fixture-key" }],
 	});
 	const calls: string[] = [];
-	const defaultFetch = async (url: unknown, init?: RequestInit) => {
+	const defaultFetch = async (url: unknown) => {
 		calls.push(String(url));
 		return String(url).endsWith("audio/transcriptions")
 			? Response.json({ text: "fixture speech" })
 			: String(url).endsWith("audio/speech")
 				? new Response(wav())
-				: Response.json(completion(init, "fixture answer"));
+				: Response.json(completion("fixture answer"));
 	};
 	const inference = createInference(store, settings, {
 		fetch: async (input, init) => {
@@ -209,9 +149,7 @@ export async function setup(
 				const judged = judgeLanguage(messages, judge);
 				if (judged) return judged;
 				if (!local.answer) throw new Error("larm_unconfigured");
-				const text = await local.answer(messages, signal, options);
-				reportRespond(options);
-				return text;
+				return local.answer(messages, signal, options);
 			},
 		}),
 	});
@@ -219,6 +157,7 @@ export async function setup(
 	const queue = createQueue(store, { pollMs: 5 });
 	const continuity = createContinuityService(store);
 	const dialogue = createDialogueService({
+		conversationAgent: testConversationAgent,
 		store,
 		conversation,
 		continuity,

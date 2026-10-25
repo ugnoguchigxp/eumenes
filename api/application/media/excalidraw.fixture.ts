@@ -1,7 +1,6 @@
 import type { LarmPort } from "../../domains/larm";
 import { drawingFixture } from "../../domains/excalidraw/test/connection.fixture";
 import {
-	activeSlots,
 	answerUtterance,
 	handOver,
 } from "./conversation-turn.fixture";
@@ -34,14 +33,7 @@ export function excalidrawFixture(action: "create" | "library" = "create") {
 					title: "構成図",
 				});
 			}
-			stages.push("answer");
-			const result =
-				(activeSlots(messages).at(-1)?.result as
-					| { url?: string }
-					| undefined) ?? null;
-			return result?.url
-				? `編集画面を開けます。[Excalidrawを開く](${result.url})`
-				: "図の一覧を開きました。";
+			throw new Error("fixture_unexpected_model_call");
 		},
 	};
 	return { ...external, model, stages, contexts };

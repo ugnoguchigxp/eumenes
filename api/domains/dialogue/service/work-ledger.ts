@@ -120,11 +120,13 @@ export function createWorkLedger(
 		todosInTransaction(db: Database, conversationId: string): TodoItem[] {
 			return openWork(db, conversationId).map(todoOf);
 		},
-		/** The open TODOs as the host's other parts see them: the model's view and when each was requested. */
+		/** The unarchived TODOs as the host's other parts see them: the model's view, the request time and the result. */
 		hostTodosInTransaction: (db: Database, conversationId: string) =>
 			openWork(db, conversationId).map((row) => ({
 				...todoOf(row),
 				createdAt: row.createdAt,
+				changedAt: row.updatedAt,
+				result: row.result,
 			})),
 		workInTransaction: workById,
 		/** Run-centric work the run waits for and that has not finished (task executions run on their own). */

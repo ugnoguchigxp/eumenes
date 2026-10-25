@@ -6,8 +6,9 @@ import { createConversationService } from "../../conversation";
 import { createContinuityService } from "../../continuity";
 import { createQueue } from "../../queue";
 import { createDialogueService } from "..";
-import { respond, setup, IMAGE, type Harness } from "./generation.fixture";
+import { setup, IMAGE, type Harness } from "./generation.fixture";
 import { dialogueMigrationList, removeDialogueStore } from "./store.fixture";
+import { testConversationAgent } from "./conversation-agent.fixture";
 
 let h: Harness | undefined;
 afterEach(async () => {
@@ -17,7 +18,7 @@ afterEach(async () => {
 
 test("a request ID is idempotent, a different body under it conflicts, and the answer is adopted atomically", async () => {
 	h = await setup();
-	h.state.steps.push({ text: "お答えします。", calls: [respond()] });
+	h.state.steps.push({ text: "お答えします。" });
 	const input = {
 		requestId: crypto.randomUUID(),
 		conversationId: "main",
@@ -126,6 +127,7 @@ test("a failed input persistence prevents any provider request", async () => {
 	} as never;
 	const conversation = createConversationService(store);
 	const dialogue = createDialogueService({
+		conversationAgent: testConversationAgent,
 		store,
 		conversation,
 		larm,
@@ -147,7 +149,7 @@ test("a cancelled inference cannot append its answer", async () => {
 	// The model call is held until after the cancel; its answer then arrives late.
 	let release!: () => void;
 	h.state.gate = new Promise<void>((resolve) => (release = resolve));
-	h.state.steps.push({ text: "古い回答", calls: [respond()] });
+	h.state.steps.push({ text: "古い回答" });
 	const run = await h.say("先ほどの依頼", "running");
 	expect((await h.dialogue.cancel(run.id))?.status).toBe("cancelled");
 	release();

@@ -29,3 +29,7 @@ export {
 	type ReconstructResult,
 } from "./service/reconstruct";
 export { migrations } from "./repository";
+export {
+	hasLegacyContinuityEvents,
+	archiveLegacyContinuityEventsInTransaction,
+} from "./repository/legacy-events";

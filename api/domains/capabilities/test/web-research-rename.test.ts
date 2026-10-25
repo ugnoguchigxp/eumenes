@@ -13,7 +13,7 @@ const host = (): BundleHost => ({
 	domainSchemas: new Set(),
 });
 
-test("the model-named Web research toolchain is retired and the model-neutral one registers in its place", async () => {
+test("the model-named Web research toolchain is retired and the Web research toolchain is not registered again", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "web-research-rename-"));
 	const path = join(dir, "db");
 	const retired = "toolchain:web.research.luna";
@@ -59,10 +59,6 @@ test("the model-named Web research toolchain is retired and the model-neutral on
 				"SELECT key,active_revision_id FROM capability_items WHERE key LIKE 'toolchain:web.%' ORDER BY key",
 			),
 		).toEqual([
-			{
-				key: "toolchain:web.research.codex",
-				active_revision_id: "toolchain:web.research.codex@4",
-			},
 			{
 				key: "toolchain:web.search",
 				active_revision_id: "toolchain:web.search@7",
