@@ -27,7 +27,10 @@ import { migrations as shellMigrations } from "../domains/shell";
 import { migrations as terminalsMigrations } from "../domains/terminals";
 import { migrations as kanbanMigrations } from "../domains/kanban";
 import { migrations as queueMigrations } from "../domains/queue";
-import { retiredResearchRoutesMigrations } from "./retired-migrations";
+import {
+	retiredResearchRoutesMigrations,
+	retiredScreenMigrations,
+} from "./retired-migrations";
 import { migrations as toolchainHistoryMigrations } from "../domains/toolchain-history";
 import { migrations as schedulerMigrations } from "../domains/scheduler";
 import { migrations as serviceTestsMigrations } from "../domains/service-tests";
@@ -36,7 +39,6 @@ import { migrations as monitoringMigrations } from "../domains/monitoring";
 import { migrations as taskReportsMigrations } from "../domains/task-reports";
 import { migrations as dotsMigrations } from "../domains/dots";
 import { migrations as tasksMigrations } from "../domains/tasks";
-import { migrations as screenMigrations } from "../domains/screen";
 import { migrations as timersMigrations } from "../domains/timers";
 import { migrations as toolRuntimeMigrations } from "../domains/tool-runtime";
 import { migrations as ttsDictionaryMigrations } from "../domains/tts-dictionary";
@@ -187,7 +189,7 @@ const catalog: readonly Migration[] = [
 	...packageMigrations("world-package", worldPackageSql),
 	...worldMigrations,
 	...timersMigrations,
-	...screenMigrations,
+	...retiredScreenMigrations,
 	...codingMigrations,
 	...taskReportsMigrations,
 	...supervisionMigrations,

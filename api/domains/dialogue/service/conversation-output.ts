@@ -1,7 +1,12 @@
 import type { NativeTool } from "../../../infrastructure/chat-stream";
-import { ValidationFailure } from "../../../infrastructure/validation-log";
+import { getLogger } from "../../../infrastructure/logger";
 
-/** Check control syntax only. Never interpret or execute an operation from text. */
+const log = getLogger("dialogue");
+
+/**
+ * Check control syntax only. Never interpret or execute an operation from text: control syntax written in the answer
+ * (a call written as text, a provider delimiter) is never published or kept, and the answer ends before it.
+ */
 export function conversationOutput(
 	publish: (text: string) => void,
 	tools: NativeTool[],
@@ -17,21 +22,39 @@ export function conversationOutput(
 	const callStart = new RegExp(
 		`(?:${escaped.join("|")})\\s*(?:\\(\\s*)?\\{?\\s*$`,
 	);
-	// An offered tool written as an XML tag: `<delegate>`, `<work\n` (run `a3c89c6e`).
-	const tagSyntax = new RegExp(`</?(?:${escaped.join("|")})[\\s>]`);
-	const tags = names.map((name) => `<${name}`);
+	// An offered tool written as an XML tag: `<delegate>`, `<work\n` (run `a3c89c6e`). The full-width brackets are
+	// the same tag: the log draws past text with them, and the model copies them back (run `6c08b000`).
+	const tagSyntax = new RegExp(`[<＜]/?(?:${escaped.join("|")})[\\s>＞]`);
+	const tags = names.flatMap((name) => [`<${name}`, `＜${name}`]);
 	// These are provider control delimiters, not ordinary answer text (`<tool_call>` / `<function=`: run `f4764696`).
-	const delimiters = ["<|", "<call:", "<tool_call>", "<function", "<parameter"];
+	const delimiters = [
+		"<|",
+		"<call:",
+		"<tool_call>",
+		"<function",
+		"<parameter",
+	].flatMap((token) => [token, `＜${token.slice(1).replace(">", "＞")}`]);
 	const prefixes = [...names, ...tags, ...delimiters].flatMap((word) =>
 		Array.from({ length: word.length }, (_, i) => word.slice(0, i + 1)),
 	);
 	let pending = "",
+		published = "",
 		blocked = false,
 		characters = 0;
-	const invalid = (text: string) =>
-		delimiters.some((token) => text.includes(token)) ||
-		callSyntax.test(text) ||
-		tagSyntax.test(text);
+	const send = (text: string) => {
+		if (!text) return;
+		published += text;
+		publish(text);
+	};
+	/** Where the first control syntax of `text` starts; -1 when it has none. */
+	function controlStart(text: string) {
+		const starts = [
+			...delimiters.map((token) => text.indexOf(token)),
+			text.search(callSyntax),
+			text.search(tagSyntax),
+		].filter((at) => at >= 0);
+		return starts.length ? Math.min(...starts) : -1;
+	}
 	function tail(text: string) {
 		let held = 0;
 		for (const prefix of prefixes)
@@ -41,28 +64,43 @@ export function conversationOutput(
 		if (opened) held = Math.max(held, opened[0].length);
 		return held;
 	}
+	/** Control syntax and everything after it is dropped: the text before it is the answer. */
+	function block(text: string, at: number) {
+		blocked = true;
+		pending = "";
+		send(text.slice(0, at).trimEnd());
+		log.warn("dialogue.control_text_dropped", {
+			reason: "control_text_in_body",
+		});
+	}
 	return {
 		delta(text: string) {
 			characters += text.length;
 			if (characters > 65536) throw new Error("chat_output_too_large");
 			if (blocked) return;
 			pending += text;
-			if (invalid(pending)) {
-				blocked = true;
-				pending = "";
-				return;
-			}
+			const at = controlStart(pending);
+			if (at >= 0) return block(pending, at);
 			const end = pending.length - tail(pending);
-			if (end) publish(pending.slice(0, end));
+			if (end) send(pending.slice(0, end));
 			pending = pending.slice(end);
 		},
-		finish(text: string) {
-			if (blocked || invalid(text))
-				throw new ValidationFailure("control_text_in_body", [
-					{ reason: "control_text_in_body" },
-				]);
-			if (pending) publish(pending);
+		/** Ends the output; returns the answer, which is exactly what was published. */
+		finish(text: string): string {
+			if (!blocked) {
+				// A response that did not stream (or streamed less) is checked whole.
+				const whole = published + pending;
+				const rest = text.startsWith(whole) ? text : whole;
+				const at = controlStart(rest);
+				if (at >= 0)
+					block(
+						rest.slice(published.length),
+						Math.max(0, at - published.length),
+					);
+				else send(rest.slice(published.length));
+			}
 			pending = "";
+			return published;
 		},
 	};
 }

@@ -395,22 +395,3 @@ test("<now> names the resource on screen by its number", () => {
 	);
 	expect(now).toContain("話し中 なし\nviewing a3 画像「夜のドライブ」\n</now>");
 });
-
-test("a screen's receipt reads as what the screen did with the resource", () => {
-	const line = (fields: Record<string, unknown>) =>
-		eventLine(
-			event("2026-10-25T16:05:00+09:00", "acted", "host", fields),
-			refs,
-		)!;
-	expect(
-		line({ action: "screen.done", resource: "a2", operation: "play" }),
-	).toEndWith("画面 a2 再生した");
-	expect(
-		line({ action: "screen.blocked", resource: "a2", operation: "play" }),
-	).toEndWith(
-		"画面 a2 再生できなかった（自動再生の拒否。再生ボタンを押してもらう）",
-	);
-	expect(line({ action: "screen.expired", operation: "open" })).toEndWith(
-		"画面 表示されなかった（どの画面も受け取らなかった）",
-	);
-});

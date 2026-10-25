@@ -1,7 +1,12 @@
 {
 	"formatVersion": 1,
 	"bundleId": "music-routing",
-	"pins": [],
+	"pins": [
+		{
+			"revisionId": "package:music.playback@2",
+			"digest": "c2731d372d7cb5ddb626e1a21071ac004c9802da57f04939c19f74259d7cc687"
+		}
+	],
 	"definitions": [
 		{
 			"aliases": [],
@@ -85,6 +90,41 @@
 			"artifact": {
 				"kind": "component",
 				"component": "MusicArtifact"
+			}
+		},
+		{
+			"aliases": [],
+			"tags": [],
+			"useWhen": [
+				"作った曲・さっきの曲・保存済みの曲を再生してほしい（「再生して」「流して」「聴かせて」）",
+				"完成の報告のあとで「はい、再生して」と頼んでいる",
+				"お気に入りやライブラリ、プレイリストを開きたい"
+			],
+			"avoidWhen": ["新しい曲を作る"],
+			"redirects": [
+				{
+					"when": "新しい曲を作る",
+					"toolchainId": "music.create"
+				}
+			],
+			"dependencies": ["package:music.playback@2"],
+			"kind": "toolchain",
+			"id": "music.library",
+			"revision": 2,
+			"title": "音楽の再生・プレイリスト",
+			"summary": "作った曲や保存済みの曲を再生し、プレイリストとプレイヤーを開く。<state>の曲(a1など)はrefsで渡すと、その曲を再生する",
+			"functionName": "music_library",
+			"examples": [
+				"さっき作った曲を再生して",
+				"はい、再生して",
+				"お気に入りの曲を流して",
+				"前に作った曲を聴かせて",
+				"音楽ライブラリを開いて"
+			],
+			"packageRevisionId": "package:music.playback@2",
+			"artifact": {
+				"kind": "component",
+				"component": "LibraryArtifact"
 			}
 		}
 	],

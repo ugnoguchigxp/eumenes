@@ -112,8 +112,7 @@ export async function runGeneration(
 			if (!input.requestId || !deps.larm.executeStream) {
 				const text = await deps.larm.answer(messages, signal);
 				output.delta(text);
-				output.finish(text);
-				return { text, toolCalls: [] };
+				return { text: output.finish(text), toolCalls: [] };
 			}
 			receipt = await withLogContext({ phase: "generation" }, () =>
 				deps.larm.executeStream!(
@@ -127,8 +126,8 @@ export async function runGeneration(
 				),
 			);
 			signal.throwIfAborted();
-			const text = receipt.value as string;
-			output.finish(text);
+			// The answer is what was published: control syntax written as text is not part of it.
+			const text = output.finish(receipt.value as string);
 			return {
 				text,
 				toolCalls: (receipt.toolCalls ?? []).map((call) => ({

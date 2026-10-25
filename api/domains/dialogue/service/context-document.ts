@@ -239,29 +239,6 @@ function resultLine(
 		: `結果 ${todo} ${outcome}: ${body}`;
 }
 
-/** A screen's receipt of an `open`/`play` command (resource-uri plan §8.2), with the resource's number when known. */
-const SCREEN_LINES: Record<string, Record<string, string>> = {
-	open: {
-		"screen.done": "表示した",
-		"screen.blocked": "表示できなかった（利用者の操作が必要）",
-		"screen.unavailable": "表示できなかった（その画面を開けない）",
-		"screen.expired": "表示されなかった（どの画面も受け取らなかった）",
-	},
-	play: {
-		"screen.done": "再生した",
-		"screen.blocked":
-			"再生できなかった（自動再生の拒否。再生ボタンを押してもらう）",
-		"screen.unavailable": "再生できなかった（その画面を開けない）",
-		"screen.expired": "再生されなかった（どの画面も受け取らなかった）",
-	},
-};
-
-function screenLine(fields: Record<string, unknown>): string {
-	const resource = str(fields.resource);
-	const text = SCREEN_LINES[str(fields.operation)]?.[str(fields.action)];
-	return `画面 ${resource ? `${resource} ` : ""}${text ?? str(fields.action)}`;
-}
-
 /** What an action says in the log; null for one that only read (it changed nothing). */
 function actedLine(
 	fields: Record<string, unknown>,
@@ -291,11 +268,6 @@ function actedLine(
 			return resultLine(fields, todo, refs);
 		case "work.archived":
 			return `伝達済み ${todo}`;
-		case "screen.done":
-		case "screen.blocked":
-		case "screen.unavailable":
-		case "screen.expired":
-			return screenLine(fields);
 		case "find_toolchain":
 		case "memory.read":
 		case "work.check":

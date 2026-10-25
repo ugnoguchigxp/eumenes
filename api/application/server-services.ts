@@ -1,7 +1,6 @@
 import { buildVisualPerception } from "./media/visual-perception";
 import { createLateResources } from "./resources/late";
 import { buildResources } from "./resources/wiring";
-import { RESOURCES_OPERATION } from "./resources/resources-tool";
 import { buildDocling } from "./docling/docling-composition";
 import { createDotsMessages } from "./work/dots-messages";
 import { createDotsWork } from "./work/dots-work";
@@ -209,10 +208,8 @@ export async function buildServices(
 		capabilities: toolchain.capabilities,
 		gateway: media.gateway,
 		events: continuity.events,
-		ledger: lateResources.tool.ledger,
 		webResearch,
 		shell: toolchain.shell,
-		publish: () => changes.publish(),
 	});
 	const toolchains = enabled
 		? createToolchainRouting(
@@ -235,10 +232,6 @@ export async function buildServices(
 			registry: resources.access.registry,
 			producesInTransaction: (db, toolchainId) =>
 				toolchain.capabilities.producesInTransaction(db, toolchainId),
-			operatorRevisionInTransaction: (db) =>
-				toolchain.capabilities
-					.toolchainsInTransaction(db)
-					.find((d) => d.id === RESOURCES_OPERATION)?.revisionId,
 		},
 		agency: agency.dialoguePort,
 		conversationAgent: agency.conversationAgent,
@@ -301,12 +294,7 @@ export async function buildServices(
 	agency.attachWork(
 		createAgencyWork({ dialogue, resources: resources.access.registry }),
 	);
-	if (dialogue.resourceLedger)
-		lateResources.attach({
-			registry: resources.access.registry,
-			ledger: dialogue.resourceLedger,
-			screen: resources.screen,
-		});
+	lateResources.attach(resources.access.registry);
 	stewardAssembly.attachDialogue(dialogue);
 	// The latest conversation's prompt is read ahead when it would be cold (started, shown, idle while shown).
 	const prewarm = createConversationPrewarm({

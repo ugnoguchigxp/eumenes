@@ -227,14 +227,11 @@ test("a change is refused without its confirmation; the confirmation is issued w
 	expect(results[2]).toMatchObject({ confirmation: "eval-confirmation" });
 });
 
-test("control text in the speech is a contract failure, not a transport error", async () => {
+test("control text in the speech is dropped from it, as in the product: the reply says nothing of it", async () => {
 	const { outcome } = await run(await prepared(), [
 		{ text: 'delegate({"mode":"execute"})' },
 	]);
-	expect(outcome).toEqual({
-		kind: "contract_failure",
-		code: "control_text_in_body",
-	});
+	expect(outcome).toMatchObject({ kind: "ok", text: "" });
 });
 
 test("the offline search ranks the catalog by shared character pairs, best first, at most four", () => {

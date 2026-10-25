@@ -113,6 +113,17 @@ DELETE FROM capability_search WHERE key='toolchain:web.research.codex';
 DELETE FROM capability_items WHERE key='toolchain:web.research.codex';`,
 		after: ["capabilities/0007-retire-steward-request"],
 	},
+	{
+		// The `resources.manage` toolchain (find, open, play and read a resource from the conversation) is gone: no
+		// search led to it and no call of it succeeded. Playing goes to the music library with the track handed over,
+		// and a link in a reply opens its resource. Its items (the toolchain and its package, profile, skill and tool)
+		// keep their revisions as history but no longer hold a function name, a search entry or an embedding.
+		id: "capabilities/0009-retire-resources-manage",
+		sql: `DELETE FROM capability_toolchain_vectors WHERE revision_id IN (SELECT id FROM capability_revisions WHERE item_key LIKE '%:resources.manage');
+DELETE FROM capability_search WHERE key IN (SELECT key FROM capability_items WHERE id='resources.manage' AND kind IN ('toolchain','package','profile','skill','tool'));
+DELETE FROM capability_items WHERE id='resources.manage' AND kind IN ('toolchain','package','profile','skill','tool');`,
+		after: ["capabilities/0008-retire-web-research-codex"],
+	},
 ];
 
 export type DocumentKind = "binding" | "artifact" | "schema";

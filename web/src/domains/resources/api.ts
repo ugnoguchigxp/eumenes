@@ -3,16 +3,10 @@ import type {
 	ResolveResourceResponse,
 	SearchResourcesResponse,
 } from "../../../../api/domains/resources/contracts";
-import type {
-	ScreenCommandsResponse,
-	ScreenReceipt,
-	ScreenReceiptResponse,
-} from "../../../../api/domains/resources/contracts";
 import type { EumenesClient } from "../../../../client";
 import {
 	ApiError,
 	createTransport,
-	json,
 	type Transport,
 } from "../../../../client/transport";
 
@@ -71,20 +65,6 @@ function resourcesApi(t: Transport) {
 			read<ConversationResourcesResponse>(
 				`/api/conversations/${encodeURIComponent(conversationId)}/resources`,
 				{ signal },
-			),
-		screenCommands: (
-			conversationId: string,
-			after: number,
-			signal?: AbortSignal,
-		) =>
-			read<ScreenCommandsResponse>(
-				`/api/screen/commands?conversationId=${encodeURIComponent(conversationId)}&after=${after}`,
-				{ signal },
-			),
-		screenReceipt: (seq: number, receipt: ScreenReceipt) =>
-			read<ScreenReceiptResponse>(
-				`/api/screen/commands/${seq}/receipt`,
-				json(receipt),
 			),
 	};
 }

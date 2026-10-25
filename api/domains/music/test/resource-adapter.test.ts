@@ -249,103 +249,6 @@ test("track read gives title, request and tags within the bound", async () => {
 	);
 });
 
-test("play prepares exactly one completed one-track playlist, idempotently", async () => {
-	const { store, track, playlist } = setup();
-	const done = await insertTrack(store, { createdAt: 1, jobId: "music_abc" });
-	const first = await store.write((db) =>
-		track.prepareInTransaction!(db, "music_abc", "play", {
-			conversationId: "main",
-		}),
-	);
-	const second = await store.write((db) =>
-		track.prepareInTransaction!(db, "music_abc", "play", {
-			conversationId: "main",
-		}),
-	);
-	expect(first).toEqual(second);
-	expect(first.adapterRef).toBe("adapter:music-library@1");
-	store.read((db) => {
-		const rows = db.query("SELECT record_json FROM music_playlists").all() as {
-			record_json: string;
-		}[];
-		expect(rows).toHaveLength(1);
-		const saved = JSON.parse(rows[0]!.record_json) as PlaylistRecord;
-		expect(saved).toMatchObject({
-			id: first.targetRef,
-			state: "completed",
-			title: done.title,
-			trackIds: ["music_abc"],
-			currentId: "music_abc",
-		});
-		expect(db.query("SELECT COUNT(*) AS n FROM queue_jobs").get()).toEqual({
-			n: 0,
-		});
-		expect(playlist.getInTransaction(db, first.targetRef)).toMatchObject({
-			targetRef: first.targetRef,
-		});
-	});
-	// A changed playlist is reset to the track on the next play.
-	await store.write((db) =>
-		db
-			.query(
-				"UPDATE music_playlists SET record_json=json_set(record_json,'$.trackIds',json('[]'),'$.currentId',NULL)",
-			)
-			.run(),
-	);
-	await store.write((db) =>
-		track.prepareInTransaction!(db, "music_abc", "play", {
-			conversationId: "main",
-		}),
-	);
-	store.read((db) => {
-		const row = db.query("SELECT record_json FROM music_playlists").get() as {
-			record_json: string;
-		};
-		expect(JSON.parse(row.record_json)).toMatchObject({
-			trackIds: ["music_abc"],
-			currentId: "music_abc",
-		});
-	});
-});
-
-test("open targets the generation or the library track id", async () => {
-	const { store, track } = setup();
-	const done = await insertTrack(store, { createdAt: 1, jobId: "music_abc" });
-	store.read((db) => {
-		expect(
-			track.prepareInTransaction!(db, "music_abc", "open", {
-				conversationId: "main",
-			}),
-		).toEqual({
-			adapterRef: "adapter:music-screen@1",
-			targetRef: done.id,
-		});
-		expect(
-			track.prepareInTransaction!(db, "lib_only", "open", {
-				conversationId: "main",
-			}).targetRef,
-		).toBe("lib_only");
-	});
-});
-
-test("a library-only track can be played through a one-track playlist", async () => {
-	const { store, track } = setup();
-	const prepared = await store.write((db) =>
-		track.prepareInTransaction!(db, "lib_only", "play", {
-			conversationId: "main",
-		}),
-	);
-	store.read((db) => {
-		const row = db
-			.query("SELECT record_json FROM music_playlists WHERE id=?")
-			.get(prepared.targetRef) as { record_json: string };
-		expect(JSON.parse(row.record_json)).toMatchObject({
-			trackIds: ["lib_only"],
-			state: "completed",
-		});
-	});
-});
-
 test("playlist adapter maps, resolves, searches and reads", async () => {
 	const { store, playlist } = setup([
 		libraryTrack("b", "2026-10-01T00:00:00.000Z", "別の曲"),
@@ -405,14 +308,6 @@ test("playlist adapter maps, resolves, searches and reads", async () => {
 		});
 		expect(playlist.getInTransaction(db, planning.id)).toBeNull();
 		expect(playlist.getInTransaction(db, "missing")).toBeNull();
-		expect(
-			playlist.prepareInTransaction!(db, older.id, "play", {
-				conversationId: "main",
-			}),
-		).toEqual({
-			adapterRef: "adapter:music-library@1",
-			targetRef: older.id,
-		});
 	});
 	const found = await playlist.search({ text: "雨", limit: 10 }, signal);
 	expect(found.map((r) => r.uri)).toEqual([
@@ -426,15 +321,4 @@ test("playlist adapter maps, resolves, searches and reads", async () => {
 	await expect(playlist.read("missing", signal)).rejects.toThrow(
 		"item_not_found",
 	);
-});
-
-test("play playlists made for a track stay out of the playlist search", async () => {
-	const { store, track, playlist } = setup();
-	await insertTrack(store, { createdAt: 1, jobId: "music_abc" });
-	await store.write((db) =>
-		track.prepareInTransaction!(db, "music_abc", "play", {
-			conversationId: "main",
-		}),
-	);
-	expect(await playlist.search({ text: "", limit: 10 }, signal)).toEqual([]);
 });

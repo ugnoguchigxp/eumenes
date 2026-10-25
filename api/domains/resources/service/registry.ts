@@ -146,19 +146,5 @@ export function createResourceRegistry(input: {
 			const { text } = await resolved.adapter.read(resolved.id, signal);
 			return { ok: true, text };
 		},
-		prepareInTransaction(db, uri, action: ResourceAction, context) {
-			const resolved = resolve(db, uri, action);
-			if (!resolved.ok) return resolved;
-			const prepared = resolved.adapter.prepareInTransaction?.(
-				db,
-				resolved.id,
-				action,
-				context,
-			) ?? {
-				adapterRef: resolved.resource.adapterRef,
-				targetRef: resolved.resource.targetRef,
-			};
-			return { ok: true, ...prepared };
-		},
 	};
 }

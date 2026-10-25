@@ -120,13 +120,6 @@ export interface ResourceAdapter {
 	search(query: ResourceSearch, signal: AbortSignal): Promise<ResourceRef[]>;
 	/** At most 600 estimated tokens, shortened by the owner (the host never truncates). */
 	read(id: string, signal: AbortSignal): Promise<{ text: string }>;
-	/** Preparation before an action, e.g. a one-track playlist before `play`. */
-	prepareInTransaction?(
-		db: Database,
-		id: string,
-		action: ResourceAction,
-		context: ResourceContext,
-	): { adapterRef: string; targetRef: string };
 }
 
 /** A registered resource kind (capabilities `resource-kind` item, resolved to plain data). */
@@ -176,15 +169,6 @@ export interface ResourceRegistry {
 	): Promise<
 		{ ok: true; text: string } | { ok: false; code: ResourceErrorCode }
 	>;
-	/** Checks the action against the kind and runs the owner's preparation. */
-	prepareInTransaction(
-		db: Database,
-		uri: string,
-		action: ResourceAction,
-		context: ResourceContext,
-	):
-		| { ok: true; adapterRef: string; targetRef: string }
-		| { ok: false; code: ResourceErrorCode };
 }
 
 /* HTTP shapes (§9). */
@@ -211,5 +195,3 @@ export type ConversationResourcesResponse = {
 	}>;
 	messages: Array<{ messageId: string; uris: string[] }>;
 };
-
-export * from "./screen";

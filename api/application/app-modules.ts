@@ -61,7 +61,6 @@ import {
 	type ContinuityService,
 } from "../domains/continuity";
 import { registerScheduler, type SchedulerService } from "../domains/scheduler";
-import { registerScreen } from "../domains/screen";
 import { registerTimers, type TimersService } from "../domains/timers";
 import { registerResourceRoutes } from "./resources";
 import { registerShell, type ShellService } from "../domains/shell";
@@ -153,7 +152,7 @@ export type AppServices = {
 	taskReports?: TaskReports;
 	toolchainHistory?: ToolchainHistory;
 	timers?: TimersService;
-	/** Resource URIs and the screen commands (absent: the routes do not exist). */
+	/** Resource URIs (absent: the routes do not exist). */
 	resources?: import("./resources/wiring").Resources;
 	/** PTY sessions of the terminal screen (absent: the routes do not exist). */
 	shell?: ShellService;
@@ -297,10 +296,8 @@ export function appModules(services: AppServices): AppModule[] {
 		{ mount: (app) => registerScheduler(app, s.scheduler) },
 		s.timers && { mount: (app) => registerTimers(app, s.timers!) },
 		s.resources && {
-			mount: (app) => {
-				registerResourceRoutes(app, { access: s.resources!.access });
-				registerScreen(app, s.resources!.screen);
-			},
+			mount: (app) =>
+				registerResourceRoutes(app, { access: s.resources!.access }),
 		},
 		s.kanban && { mount: (app) => registerKanban(app, s.kanban!) },
 		s.shell && { mount: (app) => registerShell(app, s.shell!) },

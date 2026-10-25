@@ -3,7 +3,6 @@ import { z } from "zod";
 import { headWithin } from "../../../infrastructure/context-budget";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import { MusicLibraryError, type LarmPlayground } from "../../larm";
-import { trackId as trackIdSchema } from "../../larm/contracts";
 import {
 	formatResourceUri,
 	RESOURCE_LABEL_MAX,
@@ -16,7 +15,6 @@ import type { MusicRecord, PlaylistRecord } from "../contracts";
 import { byTrack, record } from "../repository";
 import {
 	completedPlaylists,
-	ensureTrackPlaylist,
 	playlistRecordOf,
 	playlistRow,
 } from "../repository/playlists";
@@ -173,26 +171,6 @@ export function createMusicResourceAdapters(deps: {
 					.text,
 			};
 		},
-		prepareInTransaction(db, id, action, context) {
-			if (action !== "play") {
-				const found = localTrack(db, id);
-				return {
-					adapterRef: MUSIC_SCREEN_ADAPTER_REF,
-					targetRef: found?.id ?? id,
-				};
-			}
-			const checked = trackIdSchema.parse(id);
-			const found = localTrack(db, checked);
-			return {
-				adapterRef: MUSIC_PLAYLIST_ADAPTER_REF,
-				targetRef: ensureTrackPlaylist(
-					db,
-					context.conversationId,
-					checked,
-					found?.title ?? null,
-				),
-			};
-		},
 	};
 
 	const playlist: ResourceAdapter = {
@@ -259,10 +237,6 @@ export function createMusicResourceAdapters(deps: {
 				text: headWithin(lines.filter(Boolean).join("\n"), READ_TOKEN_LIMIT)
 					.text,
 			};
-		},
-		prepareInTransaction(db, id) {
-			if (!completedPlaylist(db, id)) throw new Error("item_not_found");
-			return { adapterRef: MUSIC_PLAYLIST_ADAPTER_REF, targetRef: id };
 		},
 	};
 	return [track, playlist];

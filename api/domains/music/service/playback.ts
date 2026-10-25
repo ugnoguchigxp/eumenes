@@ -17,7 +17,7 @@ import {
 import { musicContext } from "./context";
 import { openedTracks, playbackSchemaOf } from "./playback-tracks";
 import type { createMusic } from "./index";
-import type { ChildExecution } from "../../tool-runtime";
+import type { ChildExecution, ExecutionReference } from "../../tool-runtime";
 export function createPlayback(deps: Parameters<typeof createMusic>[0]) {
 	const { store, queue, inference, capabilities } = deps;
 	const fail = (
@@ -192,6 +192,8 @@ export function createPlayback(deps: Parameters<typeof createMusic>[0]) {
 				originalRequest: string;
 				deadline: number;
 				execution?: ChildExecution;
+				/** The resources the conversation handed over with a direct request (a sub-agent's are its refs). */
+				references?: ExecutionReference[];
 			},
 		) {
 			const existing = input.execution
@@ -238,7 +240,9 @@ export function createPlayback(deps: Parameters<typeof createMusic>[0]) {
 					originalRequest: input.originalRequest,
 					...(input.execution
 						? { execution: input.execution, references: input.execution.refs }
-						: {}),
+						: input.references?.length
+							? { references: input.references }
+							: {}),
 				}),
 				JSON.stringify(prepared),
 				input.deadline,

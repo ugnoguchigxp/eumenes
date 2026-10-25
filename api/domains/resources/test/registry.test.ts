@@ -78,17 +78,11 @@ function fixture() {
 		a: "2026-10-01T00:00:00.000Z",
 		b: "2026-10-03T00:00:00.000Z",
 	});
-	const track = owner(
-		"music.track",
-		{ t: "2026-10-02T00:00:00.000Z" },
-		["read", "play", "open"],
-		{
-			prepareInTransaction: (_db, id, action) => ({
-				adapterRef: "adapter:playlist",
-				targetRef: `playlist-of-${id}-${action}`,
-			}),
-		},
-	);
+	const track = owner("music.track", { t: "2026-10-02T00:00:00.000Z" }, [
+		"read",
+		"play",
+		"open",
+	]);
 	const report = owner("report", { r: "2026-10-04T00:00:00.000Z" }, ["open"]);
 	const registry = createResourceRegistry({
 		kinds: () => kinds,
@@ -221,59 +215,6 @@ test("read returns the owner's text unchanged and checks the action", async () =
 	});
 });
 
-test("prepare checks the action against the kind, then the owner's preparation or the view's refs", () => {
-	const { registry } = fixture();
-	expect(
-		registry.prepareInTransaction(db, "eumenes://music.track/t", "play", {
-			conversationId: "main",
-		}),
-	).toEqual({
-		ok: true,
-		adapterRef: "adapter:playlist",
-		targetRef: "playlist-of-t-play",
-	});
-	expect(
-		registry.prepareInTransaction(db, "eumenes://image/a", "open", {
-			conversationId: "main",
-		}),
-	).toEqual({ ok: true, adapterRef: "adapter:image", targetRef: "target:a" });
-	// The kind does not allow play: refused even for an item that does not exist.
-	expect(
-		registry.prepareInTransaction(db, "eumenes://image/a", "play", {
-			conversationId: "main",
-		}),
-	).toEqual({ ok: false, code: "action_not_allowed" });
-	expect(
-		registry.prepareInTransaction(db, "eumenes://image/zzz", "play", {
-			conversationId: "main",
-		}),
-	).toEqual({ ok: false, code: "action_not_allowed" });
-	expect(
-		registry.prepareInTransaction(db, "eumenes://image/zzz", "open", {
-			conversationId: "main",
-		}),
-	).toEqual({ ok: false, code: "item_not_found" });
-	// The kind allows read but the report owner does not list it.
-	expect(
-		registry.prepareInTransaction(db, "eumenes://report/r", "read", {
-			conversationId: "main",
-		}),
-	).toEqual({ ok: false, code: "action_not_allowed" });
-	expect(
-		registry.prepareInTransaction(db, "eumenes://nothing/a", "open", {
-			conversationId: "main",
-		}),
-	).toEqual({ ok: false, code: "resource_kind_unknown" });
-	expect(
-		registry.prepareInTransaction(db, "bad", "open", {
-			conversationId: "main",
-		}),
-	).toEqual({
-		ok: false,
-		code: "resource_uri_invalid",
-	});
-});
-
 test("one kind owned by several domains is routed by the id prefix", async () => {
 	const shellItems = { "shell:1": "2026-10-05T00:00:00.000Z" };
 	const kanbanItems = { "kanban:9": "2026-10-06T00:00:00.000Z" };
@@ -281,9 +222,7 @@ test("one kind owned by several domains is routed by the id prefix", async () =>
 		{ prefix: "shell", adapter: owner("image", shellItems).adapter },
 		{
 			prefix: "kanban",
-			adapter: owner("image", kanbanItems, ["open", "read"], {
-				prepareInTransaction: () => ({ adapterRef: "k", targetRef: "k" }),
-			}).adapter,
+			adapter: owner("image", kanbanItems, ["open", "read"]).adapter,
 		},
 	]);
 	const registry = createResourceRegistry({
@@ -300,17 +239,9 @@ test("one kind owned by several domains is routed by the id prefix", async () =>
 		(await registry.search({ text: "", limit: 5 }, signal)).map((r) => r.uri),
 	).toEqual(["eumenes://image/kanban%3A9", "eumenes://image/shell%3A1"]);
 	expect(
-		registry.prepareInTransaction(db, "eumenes://image/shell%3A1", "open", {
-			conversationId: "main",
-		}),
-	).toEqual({
+		registry.resolveInTransaction(db, "eumenes://image/kanban%3A9"),
+	).toMatchObject({
 		ok: true,
-		adapterRef: "adapter:image",
-		targetRef: "target:shell:1",
+		resource: { adapterRef: "adapter:image", targetRef: "target:kanban:9" },
 	});
-	expect(
-		registry.prepareInTransaction(db, "eumenes://image/kanban%3A9", "open", {
-			conversationId: "main",
-		}),
-	).toEqual({ ok: true, adapterRef: "k", targetRef: "k" });
 });

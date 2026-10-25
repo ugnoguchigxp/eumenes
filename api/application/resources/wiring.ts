@@ -29,16 +29,13 @@ import {
 	combineKindAdapters,
 	type ResourceKind,
 } from "../../domains/resources";
-import { createScreen } from "../../domains/screen";
 import type { ShellService } from "../../domains/shell";
 import { createUiCompositionResourceAdapter } from "../../domains/ui-compositions";
 import {
 	createWebResearchResourceAdapter,
 	type WebResearchService,
 } from "../../domains/web-research";
-import type { ConversationResourcePort } from "../../domains/dialogue";
 import { createResourceAccess } from "./access";
-import { screenSettledEventInTransaction } from "./screen-events";
 import { createEventResourceAdapter } from "./adapters/event";
 import {
 	createShellResourceAdapter,
@@ -49,22 +46,15 @@ import {
 const CONVERSATIONS = ["main"] as const;
 
 /**
- * The resource registry with every owner's adapter, and the screen commands (spec
- * resource-uri-implementation-plan-2026-10-25.md §3). A kind with several owners is combined by id prefix.
+ * The resource registry with every owner's adapter (spec resource-uri-implementation-plan-2026-10-25.md §3). A kind with several owners is combined by id prefix.
  */
 export function buildResources(deps: {
 	store: SqliteStore;
 	capabilities: Pick<Capabilities, "resourceKindsInTransaction">;
 	gateway: () => LarmPlayground;
-	events: Pick<
-		EventStore,
-		"eventInTransaction" | "logInTransaction" | "appendInTransaction"
-	>;
-	/** The conversation's ledger (late: the dialogue is built after the registry). */
-	ledger: Pick<ConversationResourcePort, "enterInTransaction">;
+	events: Pick<EventStore, "eventInTransaction" | "logInTransaction">;
 	webResearch: Pick<WebResearchService, "get">;
 	shell?: Pick<ShellService, "runInTransaction" | "recentInTransaction">;
-	publish: () => void;
 }) {
 	const { store } = deps;
 	const owner = CONVERSATION_DEFAULT_PRINCIPAL;
@@ -127,18 +117,6 @@ export function buildResources(deps: {
 			}),
 		],
 	});
-	const screen = createScreen({
-		store,
-		// A screen's receipt is the conversation's to know: "played", or "blocked, press play".
-		onSettled: (db, command) => {
-			screenSettledEventInTransaction(
-				{ events: deps.events, ledger: deps.ledger, registry: access.registry },
-				db,
-				command,
-			);
-			deps.publish();
-		},
-	});
-	return { access, screen };
+	return { access };
 }
 export type Resources = ReturnType<typeof buildResources>;

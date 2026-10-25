@@ -81,3 +81,29 @@ DROP TABLE IF EXISTS research_route_state;
 `,
 	},
 ];
+
+/**
+ * The screen commands (open and play a resource on the Web screens, issued by the conversation's `resources`
+ * toolchain) were retired on 2026-10-25 with that toolchain: playing goes to the music library, and a link in a
+ * reply opens its resource directly. The deployed migration is kept byte-for-byte; a later one drops its table.
+ */
+export const retiredScreenMigrations: readonly Migration[] = [
+	{
+		id: "screen/0001-commands",
+		// A command names its conversation; it runs after the conversation tables (no foreign key).
+		after: ["conversation/0001-init"],
+		sql: `
+CREATE TABLE screen_commands (
+  seq INTEGER PRIMARY KEY, conversation_id TEXT NOT NULL, uri TEXT NOT NULL,
+  action TEXT NOT NULL CHECK(action IN ('open','play')), adapter_ref TEXT NOT NULL, target_ref TEXT NOT NULL,
+  status TEXT NOT NULL CHECK(status IN ('pending','done','blocked','unavailable','expired')),
+  created_at TEXT NOT NULL, settled_at TEXT);
+CREATE INDEX screen_commands_pending ON screen_commands(conversation_id, status, seq);
+`,
+	},
+	{
+		id: "screen/0002-retired-drop",
+		after: ["screen/0001-commands"],
+		sql: `DROP TABLE IF EXISTS screen_commands;`,
+	},
+];

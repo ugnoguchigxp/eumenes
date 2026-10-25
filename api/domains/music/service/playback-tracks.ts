@@ -20,10 +20,9 @@ export const playbackSchemaOf = (prepared: Prepared) =>
 		? musicPlaybackPlanV2
 		: musicPlaybackPlan;
 
-/** The resource URIs handed to this execution (`kind: "resource"` references), in the stored form. */
+/** The resource URIs handed to this request (`kind: "resource"` references), in the stored form. */
 function handedUris(request: unknown) {
-	const refs =
-		(request as { execution?: { refs?: unknown } }).execution?.refs ?? [];
+	const refs = (request as { references?: unknown }).references ?? [];
 	const uris = new Set<string>();
 	if (Array.isArray(refs))
 		for (const ref of refs as Array<{ kind?: string; ref?: string }>) {

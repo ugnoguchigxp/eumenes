@@ -347,13 +347,6 @@ export const domains = {
 		components: null,
 		depends: { api: [], web: [], test: [] },
 	},
-	screen: {
-		tier: 1,
-		backend: "api/domains/screen",
-		web: null,
-		components: null,
-		depends: { api: ["resources"], web: [], test: [] },
-	},
 	continuity: {
 		tier: 0,
 		backend: "api/domains/continuity",

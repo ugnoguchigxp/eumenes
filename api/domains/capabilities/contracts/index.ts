@@ -102,7 +102,6 @@ import { toolchainRequest } from "./toolchains";
 import { stockQuote } from "./stock";
 import { musicPlaybackPlanV2 } from "./music-playback-v2";
 import { resourceRead } from "./resource-read";
-import { resourcesTool } from "./resources-tool";
 import { weatherPlace } from "./weather";
 import {
 	model3dFind,
@@ -130,7 +129,6 @@ import {
 	browserTaskTarget,
 } from "./browser";
 export { stockQuote } from "./stock";
-export * from "./resources-tool";
 export { musicPlaybackPlanV2, resourceRead };
 export { weatherPlace, weatherDays } from "./weather";
 export { publicUrl };
@@ -347,7 +345,6 @@ export const validators = {
 	worldFind,
 	worldQuery,
 	weatherPlace,
-	resourcesTool,
 	musicPlaybackPlanV2,
 	resourceRead,
 	stockQuote,

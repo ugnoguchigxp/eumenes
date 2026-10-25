@@ -28,11 +28,6 @@ export type ResourceAccess = {
 	registry: ResourceRegistry;
 	/** The resource kinds a toolchain's results create (capabilities `producesInTransaction`). */
 	producesInTransaction(db: Database, toolchainId: string): string[];
-	/**
-	 * The active revision of the toolchain that finds, opens, plays and reads resources: the state lists it while
-	 * the conversation has resources (spec resource-uri-implementation-plan-2026-10-25.md section 7.1).
-	 */
-	operatorRevisionInTransaction?(db: Database): string | undefined;
 };
 
 /** The number the model reads a resource by: `a<ref>`. */

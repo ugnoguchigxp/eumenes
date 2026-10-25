@@ -247,6 +247,14 @@ function setup(options: Options = {}) {
 					execution: execution(runId, uris),
 				}),
 			),
+		/** A direct request of the conversation, with the tracks it handed over (`delegate` refs). */
+		startPlaybackHanded: (uris: string[], runId = "run-h") =>
+			store.write((db) =>
+				music.startPlaybackInTransaction(db, {
+					...input(runId, "main"),
+					references: execution(runId, uris).refs,
+				}),
+			),
 		startPlayback: (runId = "run-p", conversationId = "main") =>
 			store.write((db) =>
 				music.startPlaybackInTransaction(db, input(runId, conversationId)),
@@ -695,6 +703,20 @@ test("playback V2 opens exactly the tracks the request carried without searching
 	expect(h.music.playback.get(id)).toMatchObject({
 		state: "completed",
 		trackIds: ["t7", "t9"],
+		currentId: "t7",
+	});
+	expect(h.trackQueries).toEqual([]);
+	await h.queue.close(100);
+});
+
+test("playback V2 opens the tracks a direct request of the conversation handed over", async () => {
+	const uris = [trackUri("t7")];
+	const h = setup({ v2: true, playbackValue: JSON.stringify(v2Plan(uris)) });
+	const { id } = await h.startPlaybackHanded(uris);
+	await until(playlistDone(h, id));
+	expect(h.music.playback.get(id)).toMatchObject({
+		state: "completed",
+		trackIds: ["t7"],
 		currentId: "t7",
 	});
 	expect(h.trackQueries).toEqual([]);

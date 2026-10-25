@@ -409,43 +409,28 @@ export function createWorkLedger(
 			return !!workById(db, workId) && archiveWork(db, workId, clock());
 		},
 		waitingArchivesInTransaction: waitingArchives,
-		/**
-		 * The toolchains used most recently, with their one-line summary and the last request (section 6.2), and the
-		 * resources' toolchain while the conversation has resources (resource plan section 7.1): the `a` lines of the
-		 * state are acted on through it.
-		 */
+		/** The toolchains used most recently, with their one-line summary and the last request (section 6.2). */
 		retainedInTransaction(
 			db: Database,
 			conversationId: string,
 		): Array<{ card: ToolchainCard; summary: string; last: string }> {
-			const retained = recentToolchains(
-				db,
-				conversationId,
-				RETAINED_LIMIT,
-			).flatMap((recent) => {
-				const card = deps.toolchains?.cardInTransaction(
-					db,
-					recent.toolchainRevisionId,
-				);
-				return card
-					? [
-							{
-								card,
-								summary: oneLine(card.summary, 120),
-								last: oneLine(recent.request, 120),
-							},
-						]
-					: [];
-			});
-			const operator = deps.resources?.operatorRevisionInTransaction?.(db);
-			const card =
-				operator &&
-				deps.resourceLedger?.recentInTransaction(db, conversationId, 1).length
-					? deps.toolchains?.cardInTransaction(db, operator)
-					: undefined;
-			if (card && !retained.some((entry) => entry.card.id === card.id))
-				retained.push({ card, summary: oneLine(card.summary, 120), last: "" });
-			return retained;
+			return recentToolchains(db, conversationId, RETAINED_LIMIT).flatMap(
+				(recent) => {
+					const card = deps.toolchains?.cardInTransaction(
+						db,
+						recent.toolchainRevisionId,
+					);
+					return card
+						? [
+								{
+									card,
+									summary: oneLine(card.summary, 120),
+									last: oneLine(recent.request, 120),
+								},
+							]
+						: [];
+				},
+			);
 		},
 		issueConfirmationInTransaction(
 			db: Database,

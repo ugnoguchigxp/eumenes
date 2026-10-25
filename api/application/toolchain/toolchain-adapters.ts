@@ -1,8 +1,4 @@
 import {
-	describeResourcesAdapter,
-	RESOURCES_ADAPTER_REF,
-} from "../resources/resources-tool";
-import {
 	DOCLING_ADAPTER_REF,
 	describeDoclingAdapter,
 	doclingDomainSchemas,
@@ -243,7 +239,6 @@ export const hostAdapterDescriptions: Array<
 	{ ref: CODEX_TASKS_ADAPTER_REF, describe: describeCodexTasksAdapter },
 	{ ref: WEATHER_ADAPTER_REF, describe: describeWeatherAdapter },
 	{ ref: STOCK_ADAPTER_REF, describe: describeStockAdapter },
-	{ ref: RESOURCES_ADAPTER_REF, describe: describeResourcesAdapter },
 ];
 
 /** The bundle host as if every adapter were registered (see `hostAdapterDescriptions`). */

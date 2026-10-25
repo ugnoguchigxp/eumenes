@@ -18,6 +18,9 @@ for (const text of [
 	"<function=work>\n<parameter=todo>\nt2\n</parameter>\n</function>",
 	'表示されていますよ。\n\n<delegate>\n<parameter name="mode">execute</parameter>\n</delegate>',
 	"<work>t3</work>",
+	// The full-width form the log draws, copied back by the model (run `6c08b000`).
+	'元気の出る曲、再生しますね。\n\n＜delegate＞\n＜parameter name="mode"＞execute＜/parameter＞\n＜/delegate＞',
+	"＜tool_call＞\n＜function=work＞\n＜/function＞\n＜/tool_call＞",
 ])
 	for (const chunkSize of [1, 3, text.length])
 		test(`control text is never published, including split delimiters: ${text.slice(0, 18)} / ${chunkSize}`, () => {
@@ -28,7 +31,8 @@ for (const text of [
 			);
 			for (let i = 0; i < text.length; i += chunkSize)
 				output.delta(text.slice(i, i + chunkSize));
-			expect(() => output.finish(text)).toThrow("control_text_in_body");
+			// The answer ends before the control syntax: it is what was published.
+			expect(output.finish(text)).toBe(visible.join(""));
 			expect(visible.join("")).not.toContain("<|");
 			expect(visible.join("")).not.toContain("<call:");
 			expect(visible.join("")).not.toContain("<tool_call>");
@@ -36,6 +40,10 @@ for (const text of [
 			expect(visible.join("")).not.toContain("<delegate");
 			expect(visible.join("")).not.toContain("<work");
 			expect(visible.join("")).not.toContain("<parameter");
+			expect(visible.join("")).not.toContain("＜delegate");
+			expect(visible.join("")).not.toContain("＜tool_call");
+			expect(visible.join("")).not.toContain("＜function");
+			expect(visible.join("")).not.toContain("＜parameter");
 		});
 
 test("a name that is not an offered tool is ordinary text, and is published", () => {
@@ -50,7 +58,7 @@ test("a name that is not an offered tool is ordinary text, and is published", ()
 test("angle brackets in ordinary prose are published", () => {
 	const visible: string[] = [];
 	const output = conversationOutput((s) => visible.push(s), generationTools);
-	const text = "1 <2 と <b> と <memory_note は普通の文です。";
+	const text = "1 <2 と <b> と <memory_note と ＜注＞ は普通の文です。";
 	for (const c of text) output.delta(c);
 	output.finish(text);
 	expect(visible.join("")).toBe(text);
@@ -92,9 +100,7 @@ test("the tool-search prose cannot substitute a bare tool name for a native call
 	expect(() => output.finish("find_toolchain\n準備します。")).not.toThrow();
 	const call = conversationOutput(() => {}, generationTools);
 	call.delta('find_toolchain({"query":"絵"})');
-	expect(() => call.finish('find_toolchain({"query":"絵"})')).toThrow(
-		"control_text_in_body",
-	);
+	expect(call.finish('find_toolchain({"query":"絵"})')).toBe("");
 });
 
 test("a natural prefix does not let later control syntax into the published text", () => {
@@ -102,17 +108,21 @@ test("a natural prefix does not let later control syntax into the published text
 	const output = conversationOutput((s) => visible.push(s), generationTools);
 	output.delta("確認します。");
 	for (const c of leaked) output.delta(c);
-	expect(() => output.finish("確認します。" + leaked)).toThrow(
-		"control_text_in_body",
-	);
+	expect(output.finish("確認します。" + leaked)).toBe("確認します。");
 	expect(visible.join("")).toBe("確認します。");
 });
 
-test("control text in a nonstream response is rejected and never published", () => {
+test("control text in a nonstream response is never published; the text before it is the answer", () => {
 	const output = conversationOutput(() => {
 		throw new Error("must_not_publish");
 	}, generationTools);
-	expect(() => output.finish(leaked)).toThrow("control_text_in_body");
+	expect(output.finish(leaked)).toBe("");
+	const visible: string[] = [];
+	const spoken = conversationOutput((s) => visible.push(s), generationTools);
+	const text =
+		'再生しますね。\n\n＜delegate＞\n＜parameter name="mode"＞execute＜/parameter＞';
+	expect(spoken.finish(text)).toBe("再生しますね。");
+	expect(visible.join("")).toBe("再生しますね。");
 });
 
 test("held whitespace and discarded output still obey the total capacity limit", () => {

@@ -38,13 +38,5 @@ export function combineKindAdapters(
 				.slice(0, query.limit);
 		},
 		read: (id, signal) => partOf(id).read(id, signal),
-		prepareInTransaction(db, id, action, context) {
-			const part = partOf(id);
-			if (part.prepareInTransaction)
-				return part.prepareInTransaction(db, id, action, context);
-			const view = part.getInTransaction(db, id);
-			if (!view) throw new Error("item_not_found");
-			return { adapterRef: view.adapterRef, targetRef: view.targetRef };
-		},
 	};
 }

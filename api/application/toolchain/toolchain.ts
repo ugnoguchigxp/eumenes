@@ -48,7 +48,6 @@ import {
 	type MemoryAdapterPorts,
 } from "../world/memory-adapter";
 import { createStockAdapter } from "../stock/stock-adapter";
-import { createResourcesToolAdapter } from "../resources/resources-tool";
 import { createWeatherAdapter } from "../weather/weather-adapter";
 import type { WorldResearchPorts } from "../world/world-research-ports";
 import {
@@ -135,7 +134,7 @@ type ToolchainOptions = {
 	weather?: { fetch?: typeof fetch; now?: () => number };
 	/** The stock toolchain's adapter and the services it reads (absent: not offered). */
 	stock?: { fetch?: typeof fetch; now?: () => number };
-	/** The `resources` tool and the sub-agents' `resource.read` (absent: neither is offered). */
+	/** The sub-agents' `resource.read` (absent: it is not offered). */
 	resources?: import("../resources/late").LateResources;
 	/** The World investigation's reads (`world.find`, `world.query`), built over the agent runtime; the toolchain is offered only while World is usable. */
 	worldResearch?: (
@@ -215,8 +214,6 @@ export async function createToolchain(
 		);
 	const weather = options.weather && createWeatherAdapter(options.weather);
 	const stock = options.stock && createStockAdapter(options.stock);
-	const resources =
-		options.resources && createResourcesToolAdapter(options.resources.tool);
 	// The pipelines service is built on the routing, after this registry: the adapter reads it once attached.
 	let pipelines:
 		| import("../pipelines/pipelines-service").PipelinesService
@@ -321,7 +318,6 @@ export async function createToolchain(
 		...(options.world ? [createWorldAdapter(options.world)] : []),
 		...(weather ? [weather] : []),
 		...(stock ? [stock] : []),
-		...(resources ? [resources] : []),
 		...(options.serviceTests
 			? [createServiceTestsAdapter(options.serviceTests)]
 			: []),
@@ -344,7 +340,6 @@ export async function createToolchain(
 			...(options.kanbanSdk ? ["codex-tasks"] : []),
 			...(options.weather ? ["weather"] : []),
 			...(options.stock ? ["stock"] : []),
-			...(options.resources ? ["resources"] : []),
 			...(options.worldResearch ? ["world-query"] : []),
 			...(options.ocr ? ["ocr"] : []),
 			...(options.model3d ? ["model3d"] : []),

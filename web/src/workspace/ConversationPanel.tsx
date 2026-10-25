@@ -28,7 +28,6 @@ import {
 	useConversationResources,
 	useResourceNotice,
 	useResourceOpener,
-	useScreenCommands,
 	type ResourceLauncher,
 } from "../domains/resources";
 import {
@@ -85,12 +84,6 @@ export function ConversationPanel({
 	const resourceNotice = useResourceNotice();
 	const openResource = useResourceOpener({
 		client,
-		launcher,
-		notify: resourceNotice.show,
-	});
-	useScreenCommands({
-		client,
-		conversationId: CONVERSATION_ID,
 		launcher,
 		notify: resourceNotice.show,
 	});

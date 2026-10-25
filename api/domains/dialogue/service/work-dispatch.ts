@@ -92,11 +92,13 @@ export function dispatchInTransaction(
 		case "music-create":
 		case "music-playback": {
 			if (!deps.music) return { ok: false, code: "music_unavailable" };
-			const saved = (
+			const saved =
 				runtime.execution === "music-create"
-					? deps.music.startInTransaction
-					: deps.music.startPlaybackInTransaction
-			)(tx, media);
+					? deps.music.startInTransaction(tx, media)
+					: deps.music.startPlaybackInTransaction(tx, {
+							...media,
+							references: input.references,
+						});
 			linkAnswer(tx, run.id, saved.jobId);
 			return handed(saved.jobId);
 		}
