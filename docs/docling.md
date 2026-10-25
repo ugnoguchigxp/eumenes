@@ -37,6 +37,8 @@ leaseの取得・更新・解放はgatewayが担当する。Eumenesは独自leas
 
 設計・検証条件は[連携設計](../spec/docling-desk-integration-design-2026-10-25.md)、fixture・live API・実ブラウザの結果と制約は[受入記録](../spec/verification/docling-desk-2026-10-25/acceptance.md)に分ける。
 
+後続の[コードレビューと改善](../spec/verification/docling-desk-2026-10-25/review.md)で、保存設定の変更通知、接続中の設定/client切替時の取消、Artifactの競合理由表示を修正した。このレビューはSSHを使わず、ローカルfixtureで検証した。
+
 部分試験は`bun run verify -- --domain docling`、API/会話結合は`bun test api/application/docling/docling-e2e.test.ts api/application/docling/docling-toolchain.test.ts`、ブラウザfixtureは`bunx playwright test tests/browser/docling.spec.ts`。設定・capabilities・tool-runtime・agent-runtime・dialogue・artifactの影響範囲も確認する。
 
 `bun scripts/docling-live.ts --check`は保存済み設定でControlとgateway healthだけを確認する。`--negative`は明示的な実接続受入で、独立したticketの交換・再利用・期限切れ、50 MiB超過、破損PDF、未設定TeX組版によるfailed/partialを確認する。test用の文書だけを新規作成し、POSTは自動再送しない。異なるEumenesの受入環境には`--api=<loopback URL>`と`--db=<そのbackendのDB path>`を指定する。新しいLARM接続先や資格情報は要求しない。

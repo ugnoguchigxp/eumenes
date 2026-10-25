@@ -1,0 +1,70 @@
+{
+  "findings": 3,
+  "fixedFindings": 3,
+  "unresolvedDoclingFindings": 0,
+  "sshUsed": false,
+  "liveDoclingRetested": false,
+  "doclingVerify": "pass",
+  "typecheck": "pass",
+  "apiIntegration": {
+    "pass": 11,
+    "fail": 0,
+    "assertions": 73
+  },
+  "targetedWeb": {
+    "pass": 11,
+    "fail": 0
+  },
+  "browserFixture": {
+    "pass": 3,
+    "fail": 0
+  },
+  "consumerBun": {
+    "pass": 1057,
+    "fail": 0
+  },
+  "consumerWeb": {
+    "pass": 110,
+    "fail": 2,
+    "failures": [
+      "artifact/test/composition.test.tsx:112",
+      "artifact/test/nested-layout.test.tsx:71"
+    ],
+    "reason": "Existing shared layout limits disagree with test expectations; not modified in this review."
+  },
+  "consumerAndAllVerify": "blocked_by_existing_size_budgets",
+  "files": [
+    {
+      "path": "web/src/queryKeys.ts",
+      "sha256": "bf54827dcde274b8d52a884c068d3fe91ea205fcfa68948d51a09a3224a3e421",
+      "matchesVerifiedCopy": true
+    },
+    {
+      "path": "web/src/domains/docling/toolchain-adapter.tsx",
+      "sha256": "fd45418fe9f1079112d346c4a0c3baa109163257b3d068cba8a5bf0137ed95aa",
+      "matchesVerifiedCopy": true
+    },
+    {
+      "path": "web/src/domains/docling/toolchain-adapter.test.tsx",
+      "sha256": "2e3a09db2855129831da93e2679f34219761c692da07c8b2d5054f91923e0864",
+      "matchesVerifiedCopy": true
+    },
+    {
+      "path": "packages/artifact-ui/src/external-app-components.tsx",
+      "sha256": "b841fcbdb55229592b19a6ab573b1431cdaca9d9e5053dbc5aab7fcd549dad16",
+      "matchesVerifiedCopy": true
+    },
+    {
+      "path": "packages/artifact-ui/src/external-app-components.test.tsx",
+      "sha256": "869373ee924c7cdafd9f51418df2aba631b987011694a5fd73e187af74f71c90",
+      "matchesVerifiedCopy": true
+    },
+    {
+      "path": "api/application/docling/docling-e2e.test.ts",
+      "sha256": "71ecc2d2f3220f926c5cbdf37b647ee961d84f10f4fa5914726087239ea56634",
+      "matchesVerifiedCopy": true
+    }
+  ],
+  "contextCompileTotal": 4,
+  "compileEvalTotal": 4
+}

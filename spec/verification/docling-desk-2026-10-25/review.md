@@ -27,3 +27,24 @@
 - 認証・許可origin/Host・一回だけのPOST・ticket非保存・取消/設定変更後の採用・immutableな入口receipt・共有ライブラリの表示を再点検し、追加の未解決指摘は見つからなかった。
 - 利用者からSSH禁止の追加指示を受けた。このレビューではSSH接続を実行していない。前回の中継PIDは既に終了していた。以降も再接続せず、実Doclingへは接続せず、ローカルfixtureだけで最終検証する。前回のlive受入結果は今回の再実行として数えない。
 - 最終検証は、環境ファイル・製品DB・秘密を除いた固定コピー`/tmp/eumenes-docling-review`で行う。新しいブランチは作成しない。
+
+## 最終結果
+
+3件の指摘を修正し、最終差分の再レビューでDocling連携に追加の未解決指摘はない。登録方式、モデルの判断方式、認証方式、起動・停止の責務は維持した。通信中の不変な設定の再取得では取消しないこと、二重操作でタブや上流要求を増やさないこと、正常に開いたDoclingタブはArtifactを閉じても残ることも試験した。
+
+| 検証 | 結果 |
+| --- | --- |
+| Docling正式verify | pass。入力revisionと終了revision一致、DesignSystem出力も一致 |
+| 型検査 | 全2,627ファイル成功 |
+| domain/settings/API/会話結合 | 11件成功、73 assertions。実HTTP切断とガード解放を含む |
+| Web対象 | 11件成功。open、adapter、Artifact構成、query keys |
+| 実ブラウザfixture | 3件成功。成功・認証失敗・popup拒否。ランダムportの専用localhost fixtureだけへ接続 |
+| 利用側Bun | 1,057件成功、失敗なし。新しいArtifact描画試験を含む |
+| 利用側Web | 110件成功、既存2件失敗 |
+| 利用側/全体verify | 既存サイズ超過で停止。gateの制約は変更していない |
+
+利用側Webの失敗は`artifact/test/composition.test.tsx:112`と`artifact/test/nested-layout.test.tsx:71`。前者はlayoutのchildren13件を拒否する期待、後者は深さ4・総view60の旧期待を含む。現行の共通契約はchildren48、深さ6、総view240であり、今回の3箇所の修正はその上限や解析処理に触れていない。担当外として調査と記録に留め、旧期待や現行制約を変更して通していない。
+
+サイズgateには共有Artifactの3ファイル、settingsの試験、agency・server組立て・既存画面等の超過がある。前回残っていた型エラーは今回の検査では解消していたが、全体検証成功とは扱わない。
+
+詳細は[review-checks.json](review-checks.json)、[Docling正式レポート](review-verify-docling.json)、[利用側gate](review-verify-consumers.json)、[全体gate](review-verify-all.json)。変更した製品3ファイルと試験3ファイルは検証コピーと一致することを確認した。`git diff --check`成功。context_compile/compile_evalは会話累計各4回。SSHと実Doclingの再接続は未実行。
