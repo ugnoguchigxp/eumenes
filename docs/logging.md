@@ -95,6 +95,12 @@ APIが停止している状態で `bun api/application/repair-legacy-continuity.
 
 この保守処理はサーバーを起動せず、未適用migrationも実行しません。次回の通常起動で適用されます。自動復旧の分岐は起動処理へ追加していません。
 
+## DBの手動バックアップ
+
+APIが停止している状態で `bun run db:backup` を実行すると、通常のDB所有ロック・適用済みmigrationのチェックサム検証・`PRAGMA integrity_check` を経て、`VACUUM INTO` で `eumenes.sqlite3.manual-<時刻>.bak`（権限 `0600`）をDBの隣に作ります。保存先は実行結果の `backupPath` です。APIの起動中は所有ロックで拒否され、`db_backup_failed` で終了します。
+
+起動時のmigration前バックアップ（`pre-migration-`、最新3件を保持）とは名前が分かれていて、手動バックアップは自動では削除されません。未適用migrationは実行しません。
+
 ## 保存と取扱い
 
 `EUMENES_LOG_FILE` で保存先を変更できます。空欄は既定の保存先、`-` は stderr のみ。ファイルは10 MiBを超える前に世代を切り替え、現在分と過去4世代を保持します（約50 MiB）。ファイルの権限は `0600`、新規ログディレクトリは `0700`。ファイル保存に失敗した場合は `logging.file_unavailable` を一度 stderr に通知し、stderr出力で継続します。ファイル出力の復旧にはbackendを再起動します。

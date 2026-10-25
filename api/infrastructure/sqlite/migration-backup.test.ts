@@ -12,6 +12,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openStore } from "./index";
 import {
+	backupOnRequest,
 	DatabaseIntegrityError,
 	PRE_MIGRATION_BACKUPS_KEPT,
 } from "./pre-migration-backup";
@@ -105,6 +106,32 @@ test("a database that fails the integrity check is not migrated", async () => {
 			DatabaseIntegrityError,
 		);
 		expect(backups(dir)).toEqual([]);
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+test("requested backups are private, separately named and never pruned", async () => {
+	const dir = temp();
+	const file = join(dir, "db.sqlite3");
+	try {
+		const store = openStore(file, [first]);
+		await store.write((db) => db.exec("INSERT INTO t (v) VALUES ('kept')"));
+		const paths: string[] = [];
+		for (let n = 0; n < PRE_MIGRATION_BACKUPS_KEPT + 2; n++)
+			paths.push(await store.maintenance!((db) => backupOnRequest(db, file)));
+		await store.close();
+		expect(backups(dir)).toEqual([]);
+		expect(
+			readdirSync(dir).filter((name) => name.includes(".manual-")),
+		).toHaveLength(PRE_MIGRATION_BACKUPS_KEPT + 2);
+		expect(statSync(paths[0]!).mode & 0o777).toBe(0o600);
+		const copy = new Database(paths[0]!, { readonly: true });
+		try {
+			expect(copy.query("SELECT v FROM t").all()).toEqual([{ v: "kept" }]);
+		} finally {
+			copy.close();
+		}
 	} finally {
 		rmSync(dir, { recursive: true, force: true });
 	}
