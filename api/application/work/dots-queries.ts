@@ -8,6 +8,7 @@ import type {
 } from "../../domains/dots";
 import type { WorkTask } from "../../domains/tasks";
 import { adoptDotsReport, type DotsReportPorts } from "./dots-report-adoption";
+import { purgeWorkOperations } from "../../domains/dots";
 export function createDotsQueries(
 	ports: DotsReportPorts & {
 		store: SqliteStore;
@@ -246,6 +247,7 @@ export function createDotsQueries(
 			if (t.kind !== "orchestration" || (!t.bodyExpired && !t.forgottenAt))
 				return;
 			commands.redactInTransaction(db, t.id);
+			purgeWorkOperations(db, t.id);
 			reports.purgeInTransaction(db, t.id);
 		},
 		purgeInTransaction: commands.purgeInTransaction,

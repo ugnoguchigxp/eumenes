@@ -1,5 +1,6 @@
 import type { Database } from "bun:sqlite";
 import { z } from "zod";
+import { resourceUriSchema } from "../../resources";
 
 /**
  * Specialist sessions (spec toolchain-specialist-dialogue 2026-10-17 §4). After the conversation
@@ -103,6 +104,19 @@ export const viewingSchema = z
 	})
 	.strict();
 export type Viewing = z.infer<typeof viewingSchema>;
+
+/**
+ * What the screen shows when it is a resource (spec resource-uri-implementation-plan-2026-10-25.md section 7.1):
+ * its URI, which the host enters into the conversation's ledger as `viewed` and shows the model by number.
+ */
+export const resourceViewingSchema = z
+	.object({ resource: resourceUriSchema })
+	.strict();
+export type ResourceViewing = z.infer<typeof resourceViewingSchema>;
+
+/** What a submit may carry as the screen's context: a specialist's saved item, or a resource. */
+export const runViewingSchema = z.union([viewingSchema, resourceViewingSchema]);
+export type RunViewing = z.infer<typeof runViewingSchema>;
 
 /**
  * Optional submit context: the addressee the screen showed when the user sent (spec §8). The host

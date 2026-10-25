@@ -1,0 +1,33 @@
+{
+	"revision": 1,
+	"aliases": [],
+	"tags": [],
+	"kind": "toolchain",
+	"id": "dots.delegate",
+	"functionName": "delegate_project",
+	"title": "プロジェクトへの委任",
+	"summary": "登録済みのCodexプロジェクトへ実装・レビュー・広い調査・コンテンツ作業を委任し、状況照会・質問への回答・停止を行う",
+	"useWhen": [
+		"プロジェクトの実装やレビューを任せたい",
+		"委任した作業の状況を知りたい",
+		"委任先の質問に答えたい、作業を止めたい"
+	],
+	"avoidWhen": ["その場で答えられる質問", "短いWeb検索"],
+	"redirects": [
+		{
+			"when": "短いWeb検索",
+			"toolchainId": "web.search"
+		}
+	],
+	"examples": [
+		"eumenesのログ画面を実装して",
+		"さっき頼んだ作業はどうなった？",
+		"委任した作業を止めて"
+	],
+	"dependencies": ["package:dots.orchestrate@2"],
+	"packageRevisionId": "package:dots.orchestrate@2",
+	"artifact": {
+		"kind": "component",
+		"component": "DotsPanel"
+	}
+}

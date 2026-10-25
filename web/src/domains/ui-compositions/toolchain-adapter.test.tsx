@@ -10,7 +10,11 @@ import {
 } from "../toolchain-artifacts/specialist-bridge";
 import { uiCompositionsWebAdapter } from "./toolchain-adapter";
 
-afterEach(cleanup);
+afterEach(() => {
+	cleanup();
+	vi.useRealTimers();
+	document.body.innerHTML = "";
+});
 
 type SpecialistSession = NonNullable<SpecialistBridge["session"]>;
 const work = (over: object = {}) => ({
@@ -545,4 +549,52 @@ test("while the specialist is active, choosing a saved work makes it the work it
 	expect(suspended.retarget).not.toHaveBeenCalled();
 	expect(s.setTargetRef).toHaveBeenLastCalledWith("b");
 	s.cache.clear();
+});
+
+const viewedStudio = (id: string) =>
+	studioData({
+		work: null,
+		viewing: {
+			id,
+			title: `作品${id}`,
+			definition: { view: "text-block", title: "見出し" },
+			savedRevision: 1,
+		},
+	});
+
+test("focus shows the saved work, marks the studio for two seconds and viewing names it", async () => {
+	const { hook, setTargetRef, cache } = setup({
+		studio: viewedStudio("a"),
+		targetRef: "a",
+	});
+	await waitFor(() => expect(hook.result.current.phase.kind).toBe("ready"));
+	const studio = document.createElement("div");
+	studio.className = "aui-ui-studio";
+	studio.scrollIntoView = vi.fn();
+	document.body.append(studio);
+	expect(uiCompositionsWebAdapter.viewing?.()).toBe(
+		"eumenes://ui.composition/a",
+	);
+	vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+	const done = uiCompositionsWebAdapter.focus?.("a");
+	await vi.advanceTimersByTimeAsync(200);
+	await expect(done).resolves.toBe(true);
+	// It was already the screen's target.
+	expect(setTargetRef).not.toHaveBeenCalled();
+	expect(studio.getAttribute("data-resource-focus")).toBe("true");
+	await vi.advanceTimersByTimeAsync(2_010);
+	expect(studio.hasAttribute("data-resource-focus")).toBe(false);
+	cache.clear();
+});
+
+test("focus asks the screen to show another work and says no when it never appears; viewing is null for the draft", async () => {
+	const { hook, setTargetRef, cache } = setup({ studio: studioData() });
+	await waitFor(() => expect(hook.result.current.phase.kind).toBe("ready"));
+	expect(uiCompositionsWebAdapter.viewing?.()).toBeNull();
+	vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+	const missing = uiCompositionsWebAdapter.focus?.("gone");
+	await vi.advanceTimersByTimeAsync(5_500);
+	await expect(missing).resolves.toBe(false);
+	expect(setTargetRef).toHaveBeenCalledWith("gone");
+	cache.clear();
 });

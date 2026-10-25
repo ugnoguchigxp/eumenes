@@ -1,4 +1,5 @@
 import { messagingMigration } from "./messaging-migration";
+import { workMigration, purgeWorkOperations } from "./work";
 import { storageMigration } from "./storage";
 import type { Database } from "bun:sqlite";
 import type { Migration } from "../../../infrastructure/sqlite";
@@ -55,6 +56,16 @@ CREATE INDEX dots_sessions_thread ON dots_sessions(thread_id);`,
 				storageMigration.indexOf("\nCREATE TRIGGER dots_reports_budget_insert"),
 			),
 		),
+	},
+	{
+		id: "dots/0005-work-settings",
+		after: ["dots/0004-messaging"],
+		sql: workMigration,
+	},
+	{
+		id: "dots/0006-remove-unused-work-settings",
+		after: ["dots/0005-work-settings"],
+		sql: "UPDATE dots_work_settings SET data_json=json_remove(data_json,'$.receiveOnStartup','$.requestPackageRevisionId');",
 	},
 ];
 function read<T>(db: Database, sql: string, ...args: string[]): T | null {
@@ -133,6 +144,7 @@ export function saveReport(
 	);
 }
 export function purge(db: Database, id: string) {
+	purgeWorkOperations(db, id);
 	db.query(
 		"DELETE FROM dots_reminders WHERE schedule_ref IN (SELECT ref FROM dots_schedules WHERE task_id=?)",
 	).run(id);

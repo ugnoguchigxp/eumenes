@@ -10,7 +10,14 @@ export const executionReference = z.strictObject({
 	revision: z.string().max(160),
 	digest: z.string().min(1).max(160),
 	label: z.string().max(200),
-	kind: z.enum(["message", "memory", "world", "result", "artifact"]),
+	kind: z.enum([
+		"message",
+		"memory",
+		"world",
+		"result",
+		"artifact",
+		"resource",
+	]),
 	preview: z.string().max(2000),
 });
 export type ExecutionReference = z.infer<typeof executionReference>;
@@ -40,6 +47,8 @@ export type ExecutionResult = {
 	missing: string[];
 	refs: string[];
 	code?: string;
+	/** Resource URIs the execution's children made (resource-uri plan §6.3). */
+	links?: string[];
 };
 export type ExecutionView = {
 	id: string;
@@ -114,6 +123,11 @@ export type ChildResult = {
 	code?: string;
 	modelCalls: number;
 	references: ExecutionReference[];
+	/**
+	 * Resource URIs the sub-agent reported as made by this execution (`finish.links`), already checked against the
+	 * URIs its tools returned and the ones handed to it (resource-uri plan §6.3).
+	 */
+	links?: string[];
 };
 /** Composition only: the host connects domain-owned public operations. */
 export interface ToolchainExecutionPort {

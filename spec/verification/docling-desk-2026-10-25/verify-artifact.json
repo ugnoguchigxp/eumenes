@@ -1,0 +1,185 @@
+{
+  "schemaVersion": 1,
+  "runId": "2026-10-25T08-37-29-899Z-c1b88a19-5e48-4635-bc05-e387699feedf",
+  "startedAt": "2026-10-25T08:37:29.899Z",
+  "scope": {
+    "all": false,
+    "selected": [
+      "artifact"
+    ]
+  },
+  "baseCommit": "a004aaad750e82abaa4119e93c5d22720628804e",
+  "revision": "70096e16b3adfc185e51d5758329d42b38300aa7bb27408eb9ea8263826d3d5c",
+  "runtime": {
+    "bun": "1.4.3",
+    "node": "26.3.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "ci": false,
+    "runner": null
+  },
+  "result": "fail",
+  "steps": [
+    {
+      "name": "inventory",
+      "status": "pass",
+      "ms": 112
+    },
+    {
+      "name": "boundaries",
+      "status": "pass",
+      "ms": 155
+    },
+    {
+      "name": "system-context",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "context:check"
+      ],
+      "status": "pass",
+      "ms": 180,
+      "exitCode": 0
+    },
+    {
+      "name": "size-budget",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "scripts/size-budget.ts",
+        "web/src/domains/artifact",
+        "web/src/components/domains/artifact",
+        "packages/artifact-ui/src"
+      ],
+      "status": "fail",
+      "ms": 713,
+      "exitCode": 1,
+      "error": "Error: size-budget failed (1)"
+    },
+    {
+      "name": "format",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "format:check",
+        "web/src/domains/artifact",
+        "web/src/components/domains/artifact",
+        "packages/artifact-ui/src"
+      ],
+      "status": "not_run",
+      "ms": 0
+    },
+    {
+      "name": "lint",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "lint",
+        "web/src/domains/artifact",
+        "web/src/components/domains/artifact",
+        "packages/artifact-ui/src"
+      ],
+      "status": "not_run",
+      "ms": 0
+    },
+    {
+      "name": "design-system typecheck",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "--cwd",
+        "packages/design-system",
+        "typecheck"
+      ],
+      "status": "not_run",
+      "ms": 0
+    },
+    {
+      "name": "design-system build",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "--cwd",
+        "packages/design-system",
+        "build"
+      ],
+      "status": "not_run",
+      "ms": 0
+    },
+    {
+      "name": "typecheck configuration",
+      "status": "not_run",
+      "ms": 0
+    },
+    {
+      "name": "typecheck",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "check",
+        "-p",
+        "/private/tmp/eumenes-docling-verification/verification-reports/runs/2026-10-25T08-37-29-899Z-c1b88a19-5e48-4635-bc05-e387699feedf/tsconfig.selected.json"
+      ],
+      "status": "not_run",
+      "ms": 0
+    },
+    {
+      "name": "typecheck closure",
+      "status": "not_run",
+      "ms": 0
+    },
+    {
+      "name": "bun tests",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "test",
+        "./packages/artifact-ui/src/composition-content-components.test.tsx",
+        "./packages/artifact-ui/src/composition-data-components.test.tsx",
+        "./packages/artifact-ui/src/composition-diagram-components.test.tsx",
+        "./packages/artifact-ui/src/composition-expressions.test.ts",
+        "./packages/artifact-ui/src/composition-fixer.test.ts",
+        "./packages/artifact-ui/src/composition-fixtures-render.test.tsx",
+        "./packages/artifact-ui/src/composition-format.test.ts",
+        "./packages/artifact-ui/src/composition-images.test.ts",
+        "./packages/artifact-ui/src/composition-marketing-components.test.tsx",
+        "./packages/artifact-ui/src/composition-model.test.tsx",
+        "./packages/artifact-ui/src/composition-validate.test.ts",
+        "./packages/artifact-ui/src/compute-components.test.tsx",
+        "./packages/artifact-ui/src/dots-messaging.test.ts",
+        "./packages/artifact-ui/src/pipeline-studio-components.test.tsx",
+        "./packages/artifact-ui/src/ui-studio-source.test.tsx",
+        "./packages/artifact-ui/src/work-components.test.tsx"
+      ],
+      "status": "not_run",
+      "ms": 0
+    },
+    {
+      "name": "web tests",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "x",
+        "--no-install",
+        "vitest",
+        "run",
+        "web/src/domains/artifact/test/compiler.test.tsx",
+        "web/src/domains/artifact/test/composition.test.tsx",
+        "web/src/domains/artifact/test/form-refresh.test.tsx",
+        "web/src/domains/artifact/test/image-url.test.tsx",
+        "web/src/domains/artifact/test/json-tokens.test.ts",
+        "web/src/domains/artifact/test/nested-layout.test.tsx",
+        "web/src/domains/artifact/test/panel.test.tsx",
+        "web/src/domains/artifact/test/store.test.ts",
+        "web/src/domains/artifact/test/ui-studio-menu.test.tsx",
+        "web/src/domains/artifact/test/ui-studio.test.tsx"
+      ],
+      "status": "not_run",
+      "ms": 0
+    }
+  ],
+  "totalMs": 1680,
+  "integrityErrors": [],
+  "build": {
+    "sharedOutput": true
+  },
+  "stopReason": "Error: size-budget failed (1)",
+  "finalRevision": "70096e16b3adfc185e51d5758329d42b38300aa7bb27408eb9ea8263826d3d5c",
+  "finishedAt": "2026-10-25T08:37:32.760Z"
+}

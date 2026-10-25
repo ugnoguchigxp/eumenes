@@ -113,6 +113,7 @@ export function taskChildContext(host: TaskExecutionHost) {
 				total(child, calls + current.calls),
 			),
 			output: body,
+			...(current.links.length ? { links: current.links } : {}),
 		};
 	}
 	function bound(

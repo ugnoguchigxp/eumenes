@@ -6,6 +6,15 @@ export type ArtifactEvent = {
 	source: string;
 	revision: number;
 	action:
+		| "external-app-open"
+		| "dots-project-role"
+		| "work-select"
+		| "work-more"
+		| "work-refresh"
+		| "work-settings"
+		| "work-answer"
+		| "work-pause"
+		| "work-cancel"
 		| "dots-message-select"
 		| "dots-message-toggle"
 		| "dots-message-send"

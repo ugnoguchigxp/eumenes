@@ -15,7 +15,13 @@ import type { WorkOutcome, WorkRow } from "../repository/work";
 
 type Report =
 	| { status: "waiting"; questionId: string; question: string }
-	| { status: "done"; outcome: WorkOutcome; result: unknown };
+	| {
+			status: "done";
+			outcome: WorkOutcome;
+			result: unknown;
+			/** Resource URIs the sub-agents reported as made (checked against the registry when recorded). */
+			links?: readonly string[];
+	  };
 
 const executionOutcome: Partial<Record<ExecutionStatus, WorkOutcome>> = {
 	completed: "succeeded",
@@ -160,9 +166,6 @@ function runReport(
 			outcome: recordOutcome(recognized),
 			result: recognized,
 		};
-	const receipt = deps.delegation?.prepareInTransaction(tx, run).receipt;
-	if (receipt)
-		return { status: "done", outcome: recordOutcome(receipt), result: receipt };
 	const ticket = answerTicketInTransaction(deps, tx, run);
 	return ticket ? agentReport(ticket) : null;
 }
@@ -216,7 +219,12 @@ function taskNotice(
 	return {
 		workRef: view.id,
 		report: outcome
-			? { status: "done", outcome, result: executionNoticeResult(view.result) }
+			? {
+					status: "done",
+					outcome,
+					result: executionNoticeResult(view.result),
+					...(view.result?.links?.length ? { links: view.result.links } : {}),
+				}
 			: null,
 	};
 }

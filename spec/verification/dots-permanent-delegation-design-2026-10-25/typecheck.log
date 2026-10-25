@@ -1,0 +1,19 @@
+api/application/docling/docling-e2e.test.ts(20,10): error TS2352: Conversion of type '() => Promise<Response>' to type 'typeof fetch' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Property 'preconnect' is missing in type '() => Promise<Response>' but required in type 'typeof fetch'.
+api/application/docling/docling-toolchain.test.ts(14,10): error TS2352: Conversion of type '() => Promise<never>' to type 'typeof fetch' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Property 'preconnect' is missing in type '() => Promise<never>' but required in type 'typeof fetch'.
+api/domains/docling/test/docling.test.ts(59,30): error TS2352: Conversion of type '() => Promise<Response>' to type 'typeof fetch' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Property 'preconnect' is missing in type '() => Promise<Response>' but required in type 'typeof fetch'.
+api/domains/docling/test/docling.test.ts(88,31): error TS2352: Conversion of type '() => Promise<Response>' to type 'typeof fetch' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Property 'preconnect' is missing in type '() => Promise<Response>' but required in type 'typeof fetch'.
+api/domains/docling/test/docling.test.ts(98,31): error TS2352: Conversion of type '() => Promise<Response>' to type 'typeof fetch' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Property 'preconnect' is missing in type '() => Promise<Response>' but required in type 'typeof fetch'.
+api/domains/docling/test/docling.test.ts(112,30): error TS2352: Conversion of type '() => Promise<never>' to type 'typeof fetch' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Property 'preconnect' is missing in type '() => Promise<never>' but required in type 'typeof fetch'.
+api/domains/docling/test/docling.test.ts(124,4): error TS2352: Conversion of type '() => Promise<Response>' to type 'typeof fetch' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Property 'preconnect' is missing in type '() => Promise<Response>' but required in type 'typeof fetch'.
+Found 7 errors in 3 files, checked 2,607 files [1.67s]
+
+  1  api/application/docling/docling-e2e.test.ts:20
+  1  api/application/docling/docling-toolchain.test.ts:14
+  5  api/domains/docling/test/docling.test.ts:59

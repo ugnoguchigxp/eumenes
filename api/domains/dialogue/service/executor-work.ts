@@ -6,6 +6,7 @@ import type { DialogueDeps } from "./context";
 import type { ToolOutcome } from "./generation-loop";
 import { type ParsedCall, type WorkArgs } from "./generation-tools";
 import { endRun } from "./run-end";
+import { hideUris, type DocumentRefs } from "./context-document";
 import { resultFields } from "./work-ledger";
 import { dispatchInTransaction } from "./work-dispatch";
 
@@ -23,13 +24,13 @@ export type ResolvedWork = Omit<WorkArgs, "todo"> & {
 	questionId?: string;
 };
 
-/** A TODO as a work tool result shows it: its number, never its id. */
-function todoView(row: WorkRow): Record<string, unknown> {
+/** A TODO as a work tool result shows it: its number, never its id; a resource in its result is its number too. */
+function todoView(row: WorkRow, refs: DocumentRefs): Record<string, unknown> {
 	return {
 		todo: `t${row.ref}`,
 		title: row.title,
 		status: row.status,
-		...resultFields(row),
+		...(hideUris(resultFields(row), refs) as Record<string, unknown>),
 	};
 }
 
@@ -64,7 +65,7 @@ export async function work(
 			// What a result shows is what the model has now seen.
 			const state = (next = row) => {
 				x.state.todoRevisions.set(next.id, next.revision);
-				return todoView(next);
+				return todoView(next, ledger.refsInTransaction(tx, run.conversationId));
 			};
 			const record = (fields: Record<string, unknown>) => {
 				acted(tx, `work:${row.id}:${args.operation}:${args.revision}`, {

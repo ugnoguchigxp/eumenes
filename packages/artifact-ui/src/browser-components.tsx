@@ -22,6 +22,7 @@ export type BrowserWorkspaceResource = Pick<
 	| "captures"
 	| "loading"
 	| "error"
+	| "focus"
 > & {
 	kind: "browser";
 	revision: number;
@@ -137,6 +138,7 @@ function BrowserWorkspaceBody({
 		<Content
 			title={title}
 			bridge={resource.bridge}
+			{...(settings ? {} : { focus: resource.focus })}
 			onOpenBrowser={() => send("browser-open-workspace")}
 			onOpenSettings={() => send("browser-settings")}
 			onSaveBridge={(input) =>

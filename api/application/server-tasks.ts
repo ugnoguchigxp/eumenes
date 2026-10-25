@@ -1,7 +1,11 @@
 import { dirname, join } from "node:path";
 import type { Capabilities } from "../domains/capabilities";
 import { createCodingSupervision } from "../domains/coding-supervision";
-import { createEvents, createSecretBox } from "../domains/dots";
+import {
+	createEvents,
+	createSecretBox,
+	createWorkSettings,
+} from "../domains/dots";
 import { createTaskReports } from "../domains/task-reports";
 import type { SchedulerService } from "../domains/scheduler";
 import type { Config } from "../infrastructure/config";
@@ -97,6 +101,9 @@ export async function buildTasks(
 		taskReports,
 		delegated.tasks,
 		conversation,
+		(db, t) =>
+			t.kind !== "orchestration" ||
+			createWorkSettings().inTransaction(db).settings.showInConversation,
 	);
 	const supervision = workflow
 		? createCodingSupervision({

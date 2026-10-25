@@ -77,7 +77,9 @@ export function voiceDialogueClient(transport: Transport) {
 		voiceCommit: async (
 			id: string,
 			revision: number,
-			viewing?: { artifactRevisionId: string; targetRef: string },
+			viewing?:
+				| { artifactRevisionId: string; targetRef: string }
+				| { resource: string },
 		) =>
 			voiceTurnSchema.parse(
 				await (

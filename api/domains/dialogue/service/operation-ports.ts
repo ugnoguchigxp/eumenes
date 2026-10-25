@@ -17,6 +17,15 @@ import type { WorkLedger } from "./work-ledger";
  */
 export function createOperationPorts(deps: DialogueDeps) {
 	const { clock, queue } = deps;
+	/** A finished operation's result as it is now; undefined keeps the reported one (reading again is an aid). */
+	function currentResult(db: Database, runId: string): unknown {
+		try {
+			const payload = deps.agents?.actionPayloadInTransaction(db, runId);
+			return payload ? (JSON.parse(payload) as unknown) : undefined;
+		} catch {
+			return undefined;
+		}
+	}
 	return {
 		/** A completed notice run delivered it: the TODO carries the news, said now or later by the agent. */
 		noticeDeliveryInTransaction(db: Database, requestId: string) {
@@ -32,24 +41,28 @@ export function createOperationPorts(deps: DialogueDeps) {
 		 * operation's result is read again as it is now, so a cancel after the report is what the agent says.
 		 */
 		todosInTransaction: (db: Database, conversationId: string) =>
-			deps.work!.hostTodosInTransaction(db, conversationId, (row) => {
-				// Reading again is an aid: when the operation cannot be read now, the reported result stands.
-				try {
-					const payload = deps.agents?.actionPayloadInTransaction(
-						db,
-						row.runId,
-					);
-					return payload ? (JSON.parse(payload) as unknown) : undefined;
-				} catch {
-					return undefined;
-				}
-			}),
-		/** One page of the conversation's TODOs for display (the TODO screen reads it inside its own read). */
+			deps.work!.hostTodosInTransaction(db, conversationId, (row) =>
+				currentResult(db, row.runId),
+			),
+		/**
+		 * One page of the conversation's TODOs for display (the TODO screen reads it inside its own read). A finished
+		 * TODO shows its result as it is now, the same one the agency reports.
+		 */
 		todoPageInTransaction: (
 			db: Database,
 			conversationId: string,
 			query: Parameters<WorkLedger["pageInTransaction"]>[2],
-		) => deps.work!.pageInTransaction(db, conversationId, query),
+		) => {
+			const page = deps.work!.pageInTransaction(db, conversationId, query);
+			return {
+				...page,
+				rows: page.rows.map((row) => {
+					const now =
+						row.status === "done" ? currentResult(db, row.runId) : undefined;
+					return now === undefined ? row : { ...row, result: now };
+				}),
+			};
+		},
 		/** The agency's own utterance (no run), as an event of the conversation. */
 		recordSpontaneousInTransaction: (
 			db: Database,

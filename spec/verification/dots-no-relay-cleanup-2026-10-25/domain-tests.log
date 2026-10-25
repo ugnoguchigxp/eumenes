@@ -1,0 +1,102 @@
+$ bun scripts/test-domain.ts --domain dots
+bun test v1.4.3 (c6da4a4d3)
+
+api/domains/dots/contracts/reports.test.ts:
+(pass) the report contract advertises and enforces the shared UTF-8 storage limit [2.35ms]
+
+api/domains/dots/repository/sessions.test.ts:
+(pass) session association migration preserves existing references and allows task-specific retention [2.82ms]
+
+api/domains/dots/test/commands.test.ts:
+(pass) prepare stores a command once and rejects a different task or kind under the same id [5.11ms]
+(pass) capacity leaves room for stop commands [55.99ms]
+(pass) list returns only live commands of the owner, pages by cursor and validates its bounds [8.68ms]
+(pass) get enforces ownership, availability and expiry [9.55ms]
+(pass) claim binds one lease, is repeatable for the same lease and refuses another [13.75ms]
+(pass) claim runs the caller's validation and refuses reported commands except reminders [11.53ms]
+(pass) supersede ends a task's commands, optionally keeping reminders [2.79ms]
+(pass) redaction strips snapshots, keeps stop intent and removes reports [8.77ms]
+(pass) renewing a stop extends it for a day and refuses other commands [34.15ms]
+(pass) purge removes every record of a task and nothing of others [86.12ms]
+
+api/domains/dots/test/configuration.test.ts:
+(pass) a new connection issues a local token once and authenticates by its digest [5.68ms]
+(pass) a stale or invalid connection write is rejected [8.27ms]
+(pass) an oauth owner cannot be removed or replaced, and cannot be added after commands exist [4.85ms]
+(pass) at most eight connections exist [5.27ms]
+(pass) projects need a connection, keep their owner and carry defaults [13.27ms]
+(pass) at most 64 projects exist [12.48ms]
+(pass) OAuth clientId is optional public setup metadata and does not change owner validation [8.35ms]
+
+api/domains/dots/test/events.test.ts:
+(pass) subscribe verifies the callback with a signed challenge and stores the secret sealed [36.47ms]
+(pass) a wrong, missing or failed challenge response rejects the subscription [178.08ms]
+(pass) subscription input is validated before any request is made [21.90ms]
+(pass) a disabled connection may subscribe only while a stop is pending [34.68ms]
+(pass) a live subscription cannot move to another url but can be refreshed [40.43ms]
+(pass) unsubscribe expires the subscription and refuses another url [27.37ms]
+(pass) a stored command is delivered with a verifiable signature and the delivery is recorded [36.53ms]
+(pass) a receiver rejection is recorded as a failed delivery without retrying [40.54ms]
+(pass) commands that cannot be acted on are not queued for delivery [24.57ms]
+(pass) maintenance queues commands that were stored before the subscription existed [24.48ms]
+(pass) unsubscribe accepts the original URL after canonicalization [23.61ms]
+(pass) refreshing the replacement key preserves the original rotation window [44.63ms]
+(pass) receiver rejection preserves its HTTP status and never retries 410 or 413 [121.20ms]
+(pass) unsubscribe cancels queued deliveries and aborts an active request [100.58ms]
+(pass) 429 and 5xx retry the same event and payload with a renewed signature timestamp [55.58ms]
+
+api/domains/dots/test/inbox.test.ts:
+(pass) an accepted report is adopted once, stored and receipted [6.82ms]
+(pass) a progress report keeps the command open while other kinds close it [7.36ms]
+(pass) only the owning connection may report for a command and its task [6.31ms]
+(pass) a replay with different content or another task is a conflict [6.11ms]
+(pass) stale epochs, leases and expiry are refused [25.37ms]
+(pass) report sequences must be consecutive per task [55.07ms]
+(pass) an invalid report shape is rejected before any state is read [12.56ms]
+(pass) progress reports are capped at 1000 per task but a stop is still accepted [12.86ms]
+(pass) a stopped report is stored without its details but keeps the session association [8.39ms]
+(pass) sessions are associated to the task and read back by task and thread [8.08ms]
+(pass) a failed adoption stores nothing [6.88ms]
+(pass) reminders require a live schedule bound to the same owner and command, once per occurrence [7.07ms]
+(pass) schedule binding is owned by its first task and connection and can be extended [7.42ms]
+(pass) dialogue receipts are stored per run and read back [7.00ms]
+(pass) projects are listed in ref order [7.87ms]
+
+api/domains/dots/test/messaging-contracts.test.ts:
+(pass) UTF-8 byte limits and a complete successful summary are required [1.51ms]
+
+api/domains/dots/test/messaging-migration.test.ts:
+(pass) migration preserves commands, leases, delivery FKs, budget, and deleted sequence high-water marks [2.93ms]
+
+api/domains/dots/test/secret-box.test.ts:
+(pass) a sealed value unseals for its owner and is not stored in clear text [4.41ms]
+(pass) every seal uses a fresh nonce so equal values differ [2.13ms]
+(pass) a value sealed for one owner cannot be unsealed for another [1.67ms]
+(pass) any tampering with the nonce, tag or body is rejected [2.83ms]
+(pass) the key persists in the key directory and differs between directories [3.91ms]
+
+api/domains/dots/test/storage.test.ts:
+(pass) retained bodies are counted on insert, update and delete [3.26ms]
+(pass) multi-byte text is counted in UTF-8 bytes [4.75ms]
+(pass) a body that would exceed the shared budget is refused, but a stop may use the reserve [205.79ms]
+(pass) freeing space makes room again and shrinking is never refused [892.60ms]
+(pass) re-saving an existing command does not count it twice [11.07ms]
+
+api/domains/dots/test/work-settings.test.ts:
+(pass) removing unused preparation settings preserves saved preferences and revision [7.03ms]
+(pass) disabled settings survive closing and reopening SQLite, replay and conflict preserve their revision [21.78ms]
+(pass) connection/project mismatches and unavailable grants cannot be enabled [2.98ms]
+
+ 64 pass
+ 0 fail
+ 287 expect() calls
+Ran 64 tests across 11 files. [2.65s]
+
+ RUN  v4.1.8 /Users/y.noguchi/Code/eumenes
+
+
+ Test Files  2 passed (2)
+      Tests  2 passed (2)
+   Start at  17:37:09
+   Duration  1.06s (transform 65ms, setup 0ms, import 331ms, tests 187ms, environment 1.33s)
+

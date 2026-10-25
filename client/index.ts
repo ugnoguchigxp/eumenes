@@ -1,3 +1,4 @@
+import { doclingClient } from "./docling";
 import { shellClient } from "./shell";
 import { computeClient } from "./compute";
 import { pipelinesClient } from "./pipelines";
@@ -39,6 +40,7 @@ export { ApiError, ApiConnectionError } from "./transport";
 export function createClient(baseUrl: string, token?: string) {
 	const transport = createTransport(baseUrl, token);
 	return {
+		...doclingClient(transport),
 		...computeClient(transport),
 		...pipelinesClient(transport),
 		...musicClient(transport),

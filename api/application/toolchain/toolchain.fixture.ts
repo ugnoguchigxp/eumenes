@@ -1,4 +1,5 @@
 import { reportShellRuns } from "../shell/shell-reports";
+import { createDotsHarness } from "../work/dots-harness.fixture";
 import { createContinuityService } from "../../domains/continuity";
 import { createPipelinesService } from "../pipelines/pipelines-service";
 import { dormantBundleFile } from "../../domains/capabilities";
@@ -102,6 +103,7 @@ export async function harness(
 			messages: import("../../domains/inference/contracts").Messages,
 		) => unknown;
 		computePort?: ComputePort;
+		dots?: boolean;
 		discoveryTarget?: (query: string) => string;
 		acquisition?: AcquisitionPort;
 		taskStep?: (
@@ -119,6 +121,7 @@ export async function harness(
 		imageGateway?: () => LarmPlayground;
 		uiCompositions?: boolean;
 		routeTool?: string;
+		docling?: import("../../domains/docling").DoclingService;
 		browser?: (
 			store: import("../../infrastructure/sqlite").SqliteStore,
 			queue: import("../../domains/queue").QueueService,
@@ -727,6 +730,9 @@ export async function harness(
 			})
 		: undefined;
 	let activeCapabilities: import("../../domains/capabilities").Capabilities;
+	const dotsWork = options.dots
+		? createDotsHarness(store, conversation, () => activeCapabilities)
+		: undefined;
 	const browser = options.browser?.(store, queue, () => activeCapabilities);
 	if (browser)
 		browser.requests = {
@@ -736,9 +742,13 @@ export async function harness(
 			},
 		};
 	const toolchain = await createToolchain(store, queue, inference, web, {
+		docling: options.docling,
 		compute,
 		browser,
 		...toolchainLinks.options,
+		dots: !!dotsWork,
+		dotsWork: dotsWork?.work,
+		dotsConfiguration: dotsWork?.dots.config,
 		embed: options.embed,
 		timers,
 		conversation: options.history ? conversation : undefined,
@@ -757,6 +767,7 @@ export async function harness(
 		stock: options.stock,
 	});
 	activeCapabilities = toolchain.capabilities;
+	await dotsWork?.setup();
 	const music = options.musicGateway
 		? createMusic({
 				validateExecutionInTransaction:
@@ -908,6 +919,7 @@ export async function harness(
 	});
 	toolchain.attachPipelines(pipelines);
 	const app = createApp({
+		docling: options.docling,
 		token: "fixture-token-for-toolchain-browser",
 		origin: process.env.EUMENES_ORIGIN ?? "http://localhost",
 		changes,
@@ -948,6 +960,7 @@ export async function harness(
 		});
 	return {
 		dir,
+		dotsWork,
 		browser,
 		shell,
 		terminals,

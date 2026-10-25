@@ -86,7 +86,11 @@ function sources(
 	};
 }
 
-const NO_REFS = { todo: () => null, confirmation: () => null };
+const NO_REFS = {
+	todo: () => null,
+	confirmation: () => null,
+	resource: () => null,
+};
 
 export type CacheInput = {
 	/** System, the material document, then the newest message: the product's layout of a generation. */

@@ -14,6 +14,7 @@ import {
 const refs: DocumentRefs = {
 	todo: (id) => (id === "todo-uuid" ? "t3" : null),
 	confirmation: (id) => (id === "confirm-uuid" ? "c1" : null),
+	resource: (uri) => (uri === "eumenes://image/image_1" ? "a3" : null),
 };
 
 let seq = 0;
@@ -303,4 +304,113 @@ test("external specialist replies and summaries keep their source instead of bec
 		expect(line).toContain(`担当 ${toolchain}:`);
 		expect(line).not.toContain("自分:");
 	}
+});
+
+test("a TODO that made a resource points to it, and the state lists the resources by number (resource plan section 7.1)", () => {
+	seq = 0;
+	const base = sources([]);
+	const document = renderDocument(
+		{
+			...base,
+			state: {
+				...base.state,
+				todos: [
+					{
+						id: "todo-uuid",
+						ref: 3,
+						title: "夜のドライブの絵を描く",
+						status: "done",
+						outcome: "succeeded",
+						links: [
+							{
+								uri: "eumenes://image/image_1",
+								kind: "image",
+								label: "夜のドライブ",
+							},
+						],
+					},
+				],
+				resources: [
+					{
+						ref: 3,
+						kindLabel: "画像",
+						label: "夜のドライブ",
+						origin: "t3",
+						actions: ["表示する", "内容を伝える"],
+					},
+					{
+						ref: 5,
+						kindLabel: "調査報告",
+						label: "エージェント設計の講演",
+						origin: "履歴 10-21",
+						actions: ["内容を伝える", "表示する"],
+					},
+				],
+			},
+		},
+		{ profileLimit: 10_000, refs, year: "2026" },
+	);
+	const state = document.sections.state.text.split("\n");
+	expect(state).toContain(
+		"t3 完了 夜のドライブの絵を描く (成功, 結果は work の check で読む, 未伝達) → a3",
+	);
+	expect(state).toContain("a3 画像「夜のドライブ」(t3) 表示する・内容を伝える");
+	expect(state).toContain(
+		"a5 調査報告「エージェント設計の講演」(履歴 10-21) 内容を伝える・表示する",
+	);
+	expect(document.text).not.toContain("eumenes://");
+});
+
+test("a resource in a result is its number in the log, never its URI", () => {
+	seq = 0;
+	const log = [
+		event("2026-10-25T10:05:00+09:00", "acted", "host", {
+			action: "work.result",
+			todo: "todo-uuid",
+			status: "done",
+			outcome: "succeeded",
+			result: {
+				image: "eumenes://image/image_1",
+				other: "eumenes://image/image_2",
+			},
+		}),
+	];
+	const text = eventLine(log[0]!, refs)!;
+	expect(text).toContain('"image":"a3"');
+	expect(text).toContain('"other":"リソース"');
+	expect(text).not.toContain("eumenes://");
+});
+
+test("<now> names the resource on screen by its number", () => {
+	const now = renderNow(
+		{
+			at: "2026-10-25T10:07:00+09:00",
+			trigger: [{ kind: "utterance", events: ["e12"] }],
+			speaking: null,
+			viewing: "a3 画像「夜のドライブ」",
+			agency: [],
+			records: [],
+		},
+		refs,
+	);
+	expect(now).toContain("話し中 なし\nviewing a3 画像「夜のドライブ」\n</now>");
+});
+
+test("a screen's receipt reads as what the screen did with the resource", () => {
+	const line = (fields: Record<string, unknown>) =>
+		eventLine(
+			event("2026-10-25T16:05:00+09:00", "acted", "host", fields),
+			refs,
+		)!;
+	expect(
+		line({ action: "screen.done", resource: "a2", operation: "play" }),
+	).toEndWith("画面 a2 再生した");
+	expect(
+		line({ action: "screen.blocked", resource: "a2", operation: "play" }),
+	).toEndWith(
+		"画面 a2 再生できなかった（自動再生の拒否。再生ボタンを押してもらう）",
+	);
+	expect(line({ action: "screen.expired", operation: "open" })).toEndWith(
+		"画面 表示されなかった（どの画面も受け取らなかった）",
+	);
 });

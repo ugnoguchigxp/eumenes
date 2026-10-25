@@ -59,17 +59,9 @@ export function delegateConversation(
 export function availableToolchainsInTransaction(
 	deps: DialogueDeps,
 	db: Database,
-	run: Run,
+	_run: Run,
 ): Set<string> {
-	return new Set(
-		readyCatalog(
-			deps,
-			db,
-			() =>
-				!!deps.delegation &&
-				deps.delegation.prepareInTransaction(db, run).available !== false,
-		).map((entry) => entry.id),
-	);
+	return new Set(readyCatalog(deps, db).map((entry) => entry.id));
 }
 
 /**
@@ -81,7 +73,7 @@ export function toolchainTitlesInTransaction(
 	deps: DialogueDeps,
 	db: Database,
 ): string[] {
-	const titles = readyCatalog(deps, db, () => !!deps.delegation)
+	const titles = readyCatalog(deps, db)
 		.sort((a, b) => a.id.localeCompare(b.id))
 		.flatMap(
 			(entry) =>
@@ -90,7 +82,7 @@ export function toolchainTitlesInTransaction(
 	return [...new Set(titles)];
 }
 
-function readyCatalog(deps: DialogueDeps, db: Database, dots: () => boolean) {
+function readyCatalog(deps: DialogueDeps, db: Database) {
 	const { agents, toolchains } = deps;
 	if (!toolchains) return [];
 	const ready = (requires: string | undefined) =>
@@ -104,9 +96,7 @@ function readyCatalog(deps: DialogueDeps, db: Database, dots: () => boolean) {
 						? !!deps.image
 						: requires === "music"
 							? !!deps.music
-							: requires === "dots"
-								? dots()
-								: false;
+							: false;
 	return toolchains
 		.catalogInTransaction(db)
 		.filter(({ runtime }) =>

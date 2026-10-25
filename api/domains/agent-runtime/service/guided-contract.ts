@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { Prepared } from "../../capabilities";
+import { finishLinks } from "./resource-access";
 
 export const guidedWeb = (p: Prepared | undefined) =>
 	["guidedResearch", "guidedCandidates"].includes(p?.package.schemaKey ?? "");
@@ -46,7 +47,11 @@ const invoke = z
 	.strict();
 const wait = z.object({ action: z.literal("wait") }).strict();
 const finish = z
-	.object({ action: z.literal("finish"), report: guidedReport })
+	.object({
+		action: z.literal("finish"),
+		report: guidedReport,
+		links: finishLinks,
+	})
 	.strict();
 export const guidedAction = z.discriminatedUnion("action", [
 	invoke,
@@ -103,7 +108,13 @@ export const candidateReport = guidedReport
 const candidateAction = z.discriminatedUnion("action", [
 	invoke,
 	wait,
-	z.object({ action: z.literal("finish"), report: candidateReport }).strict(),
+	z
+		.object({
+			action: z.literal("finish"),
+			report: candidateReport,
+			links: finishLinks,
+		})
+		.strict(),
 ]);
 
 // Published skill v1 asks for this field. Keep its output contract readable,

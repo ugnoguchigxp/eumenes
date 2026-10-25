@@ -1,0 +1,175 @@
+{
+  "schemaVersion": 1,
+  "runId": "2026-10-25T06-16-25-360Z-8671db3c-9aa1-455e-911e-1cb0cc106bd4",
+  "startedAt": "2026-10-25T06:16:25.360Z",
+  "scope": {
+    "all": false,
+    "selected": [
+      "dots"
+    ]
+  },
+  "baseCommit": "a004aaad750e82abaa4119e93c5d22720628804e",
+  "revision": "91335ea462e8952d115f733e07f7abf9adb35685f9b668acdc9fb67630305b18",
+  "runtime": {
+    "bun": "1.4.3",
+    "node": "26.3.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "ci": false,
+    "runner": null
+  },
+  "result": "pass",
+  "steps": [
+    {
+      "name": "inventory",
+      "status": "pass",
+      "ms": 57
+    },
+    {
+      "name": "boundaries",
+      "status": "pass",
+      "ms": 30
+    },
+    {
+      "name": "system-context",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "context:check"
+      ],
+      "status": "pass",
+      "ms": 85,
+      "exitCode": 0
+    },
+    {
+      "name": "size-budget",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "scripts/size-budget.ts",
+        "api/domains/dots",
+        "web/src/domains/dots"
+      ],
+      "status": "pass",
+      "ms": 200,
+      "exitCode": 0
+    },
+    {
+      "name": "format",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "format:check",
+        "api/domains/dots",
+        "web/src/domains/dots"
+      ],
+      "status": "pass",
+      "ms": 97,
+      "exitCode": 0
+    },
+    {
+      "name": "lint",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "lint",
+        "api/domains/dots",
+        "web/src/domains/dots"
+      ],
+      "status": "pass",
+      "ms": 47,
+      "exitCode": 0
+    },
+    {
+      "name": "design-system typecheck",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "--cwd",
+        "packages/design-system",
+        "typecheck"
+      ],
+      "status": "pass",
+      "ms": 255,
+      "exitCode": 0
+    },
+    {
+      "name": "design-system build",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "--cwd",
+        "packages/design-system",
+        "build"
+      ],
+      "status": "pass",
+      "ms": 6655,
+      "exitCode": 0
+    },
+    {
+      "name": "typecheck configuration",
+      "status": "pass",
+      "ms": 1
+    },
+    {
+      "name": "typecheck",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "check",
+        "-p",
+        "/Users/y.noguchi/Code/eumenes/verification-reports/runs/2026-10-25T06-16-25-360Z-8671db3c-9aa1-455e-911e-1cb0cc106bd4/tsconfig.selected.json"
+      ],
+      "status": "pass",
+      "ms": 273,
+      "exitCode": 0
+    },
+    {
+      "name": "typecheck closure",
+      "status": "pass",
+      "ms": 129
+    },
+    {
+      "name": "bun tests",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "test",
+        "./api/domains/dots/contracts/reports.test.ts",
+        "./api/domains/dots/repository/sessions.test.ts",
+        "./api/domains/dots/test/commands.test.ts",
+        "./api/domains/dots/test/configuration.test.ts",
+        "./api/domains/dots/test/events.test.ts",
+        "./api/domains/dots/test/inbox.test.ts",
+        "./api/domains/dots/test/messaging-contracts.test.ts",
+        "./api/domains/dots/test/messaging-migration.test.ts",
+        "./api/domains/dots/test/secret-box.test.ts",
+        "./api/domains/dots/test/storage.test.ts"
+      ],
+      "status": "pass",
+      "ms": 981,
+      "exitCode": 0
+    },
+    {
+      "name": "web tests",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "x",
+        "--no-install",
+        "vitest",
+        "run",
+        "web/src/domains/dots/toolchain-adapter.test.tsx"
+      ],
+      "status": "pass",
+      "ms": 1100,
+      "exitCode": 0
+    }
+  ],
+  "totalMs": 10310,
+  "integrityErrors": [],
+  "build": {
+    "sharedOutput": true,
+    "inputRevision": "91335ea462e8952d115f733e07f7abf9adb35685f9b668acdc9fb67630305b18",
+    "distAfterBuild": "610dee7e76716a84ec4af03db18cfbbc63f9bcee978d53fe3cde716c32d72135",
+    "distAfterConsumers": "610dee7e76716a84ec4af03db18cfbbc63f9bcee978d53fe3cde716c32d72135"
+  },
+  "finalRevision": "91335ea462e8952d115f733e07f7abf9adb35685f9b668acdc9fb67630305b18",
+  "finishedAt": "2026-10-25T06:16:36.015Z"
+}

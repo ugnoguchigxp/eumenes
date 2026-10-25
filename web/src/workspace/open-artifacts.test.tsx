@@ -28,3 +28,21 @@ test("playlist keeps one stable legacy screen", () => {
 	act(() => view.result.current.playlist());
 	expect(view.result.current.workspace.tabs).toHaveLength(1);
 });
+
+test("a playlist id opens that playlist on the same screen, a click event does not", () => {
+	const view = renderHook(() => {
+		const workspace = useArtifactWorkspace();
+		return { workspace, playlist: useOpenPlaylist(workspace.open) };
+	});
+	const sources = () =>
+		view.result.current.workspace.tabs.map(
+			(tab) => tab.kind === "openui" && JSON.parse(tab.definition).source,
+		);
+	act(() => view.result.current.playlist("p1"));
+	expect(sources()).toEqual(["library-p1"]);
+	act(() => view.result.current.playlist("p2"));
+	expect(sources()).toEqual(["library-p2"]);
+	act(() => view.result.current.playlist({ type: "click" }));
+	expect(sources()).toEqual(["library-studio"]);
+	expect(view.result.current.workspace.tabs).toHaveLength(1);
+});

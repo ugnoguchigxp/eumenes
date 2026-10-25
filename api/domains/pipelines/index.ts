@@ -61,3 +61,7 @@ export {
 	studioRevision,
 	work as workRow,
 } from "./repository";
+export {
+	createPipelinesResourceAdapter,
+	PIPELINE_RESOURCE_KIND,
+} from "./service/resource-adapter";

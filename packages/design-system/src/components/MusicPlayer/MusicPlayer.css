@@ -221,3 +221,17 @@
 		grid-row: 3;
 	}
 }
+.music-player-controls .music-player-attention {
+	animation: music-player-attention 1.2s ease-in-out infinite;
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 45%, transparent);
+}
+@keyframes music-player-attention {
+	50% {
+		transform: scale(1.12);
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	.music-player-controls .music-player-attention {
+		animation: none;
+	}
+}

@@ -27,6 +27,13 @@ export function usePlayback(autoPlay: boolean, analyse = false) {
 		ref.current.currentTime = next;
 		setPosition(next);
 	};
+	/** Starts playback from code; rejects with the media element's error (`NotAllowedError` without a gesture). */
+	const start = async () => {
+		const audio = ref.current;
+		if (!audio) throw new Error("player_unavailable");
+		setError(false);
+		await audio.play();
+	};
 	const toggle = async () => {
 		const audio = ref.current;
 		if (!audio) return;
@@ -52,6 +59,7 @@ export function usePlayback(autoPlay: boolean, analyse = false) {
 		analysisError: analysis.error,
 		seek,
 		toggle,
+		start,
 		setVolume: (value: number) => {
 			if (ref.current) ref.current.volume = value;
 			setVolume(value);

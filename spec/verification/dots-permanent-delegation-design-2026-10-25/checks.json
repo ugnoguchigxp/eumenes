@@ -1,0 +1,179 @@
+{
+  "recordedAt": "2026-10-25T08:17:27.265651+00:00",
+  "scope": "D0-D2 implementation, isolated fixtures and read-only local API confirmation; no cloud provisioning or real dot task",
+  "commands": [
+    {
+      "command": "bun run toolchain:bundle -- check api/domains/capabilities/bundles/dots-delegation.bundle.json --json",
+      "result": "pass",
+      "log": "bundle.json"
+    },
+    {
+      "command": "bun test api/domains/dots/test/work-settings.test.ts api/domains/dots/test/relay-contract.test.ts api/application/work/dots-delegation-adapter.test.ts api/application/work/dots-work-settings.test.ts api/application/work/dots-delegation-registration.test.ts api/application/work/dots-delegation-conversation.test.ts api/application/work/dots-dialogue.test.ts api/application/work/dots-tasks.test.ts api/application/toolchain/task-execution-legacy.test.ts packages/artifact-ui/src/work-components.test.tsx",
+      "result": "pass",
+      "tests": 28,
+      "assertions": 139,
+      "log": "partial.log"
+    },
+    {
+      "command": "bun run test:domain -- --domain dots --domain capabilities --domain tool-runtime --domain dialogue --domain tasks --domain task-reports --domain artifact",
+      "result": "partial_failure",
+      "backend": {
+        "pass": 936,
+        "fail": 0
+      },
+      "web": {
+        "pass": 85,
+        "fail": 2
+      },
+      "log": "domain-tests.log"
+    },
+    {
+      "command": "bun run verify -- --domain dots --domain capabilities --domain tool-runtime --domain dialogue --domain tasks --domain task-reports --domain artifact",
+      "result": "blocked_at_existing_size_limits",
+      "report": "broad-gate-report.json"
+    },
+    {
+      "command": "bun run verify -- --domain dots",
+      "result": "not_final_pass",
+      "note": "Earlier report passed, but dev/build isolation was uncertain; recheck passed individual steps but concurrent source changes invalidated it. Final registration revision is separately verified.",
+      "reports": [
+        "dots-gate-earlier-pass-report.json",
+        "dots-gate-invalidated-report.json"
+      ]
+    },
+    {
+      "command": "bun run --cwd packages/design-system typecheck; bun run build:design-system",
+      "result": "pass",
+      "logs": [
+        "design-system-typecheck.log",
+        "design-system-build.log"
+      ]
+    },
+    {
+      "command": "bunx vitest run --project unit src/components/WorkListMenu/WorkListMenu.test.tsx src/components/WorkResultPanel/WorkResultPanel.test.tsx",
+      "cwd": "packages/design-system",
+      "result": "pass",
+      "tests": 2,
+      "log": "components.log"
+    },
+    {
+      "command": "bunx vitest run web/src/domains/dots/work-adapter.test.tsx",
+      "result": "pass",
+      "tests": 1,
+      "log": "web.log"
+    },
+    {
+      "command": "bunx playwright test tests/browser/dots-delegation.spec.ts",
+      "result": "pass",
+      "tests": 1,
+      "mode": "fixture, not real dot/cloud",
+      "log": "browser.log"
+    },
+    {
+      "command": "bun check",
+      "result": "blocked_by_7_errors_in_3_unrelated_docling_test_files",
+      "log": "typecheck.log"
+    },
+    {
+      "command": "bun run lint -- <implementation-files.json>; bun run format:check -- <implementation-files.json>; checkBoundaries(<owned TS files>); git diff --check",
+      "result": "pass",
+      "logs": [
+        "lint.log",
+        "format.log",
+        "boundaries.json"
+      ]
+    },
+    {
+      "command": "Authenticated GET /api/status, /api/toolchain-artifacts, dots-settings source",
+      "result": "pass",
+      "mode": "live local read only",
+      "record": "local-api.json"
+    }
+  ],
+  "cloud": {
+    "provisioned": false,
+    "costCommitted": false,
+    "nativeSessionAcceptance": false,
+    "offlineRecoveryAcceptance": false
+  },
+  "sourceSnapshotAtRecordTime": {
+    "note": "Review snapshot, not a claim that all earlier shared-workspace gates used this input. Other chats edited the repository concurrently.",
+    "baseCommit": "a004aaad750e82abaa4119e93c5d22720628804e",
+    "sha256": {
+      "api/application/server-services.ts": "3c428ad18af09b725095f910aa8ca655ed613eedb01974be64575e9192cc2dca",
+      "api/application/server-tasks.ts": "361e33a42df0c08106b0d2e0edd18b11ed146f3f5084132fb89aadcfa6c21e37",
+      "api/application/toolchain/task-execution-legacy.test.ts": "e6dd782b4ba710bc391c40df4f13fe08889bbc7d9318a793585b68b3eda40941",
+      "api/application/toolchain/toolchain-adapters.ts": "c840383be6776bd574fcaef6e9f8336c1732545f149f552df8cebb194b9ee4b5",
+      "api/application/toolchain/toolchain-host.ts": "1e7d54b50a12e79a8fffcec79540bc56bc5d192fa477832253276fa8ff218fa1",
+      "api/application/toolchain/toolchain-routing.ts": "4b4f5d04d0d024f5664ae67d7e35e3b1d427d94f815fc31f4f86389ba4b43dd5",
+      "api/application/toolchain/toolchain.fixture.ts": "3fc16a434853682032fccd776baafaac3dabffc76a8641b57d6509a9fca9b2b0",
+      "api/application/toolchain/toolchain.ts": "b14856f52492a1ce118fd73ab4b7bd0e852669fb68ff72898892b4e15ccbf239",
+      "api/application/work/dots-delegation-adapter.test.ts": "31d93a5041ac4ca75cc199dd93438d83c2657bb85e0783e027b47530deefa50c",
+      "api/application/work/dots-delegation-adapter.ts": "c016e5d4efe813b2d276b76a622995a3f7eea10112b97c37e24387487e175e31",
+      "api/application/work/dots-delegation-conversation.test.ts": "a51ed64e71b76d14d9c4aa5996291c61707740a6f2149060c4a57405bb2d6965",
+      "api/application/work/dots-delegation-registration.test.ts": "976a658675dfb88f465a62cd882588daf662206e664e9492b17f6c497d87b0db",
+      "api/application/work/dots-delegation-v1.fixture.json": "8206c29c3c048baa2a858c1474a688b1a6509de60db231c49c50311b43b6cc6c",
+      "api/application/work/dots-delegation.fixture.ts": "86416467d1dd7b33a4a80727b2da5402e7d38e383fe017086d395a2916ba02bd",
+      "api/application/work/dots-dialogue.test.ts": "b4873bc8041468a418ef9202e84d950728168493a278e2c7bc4cafdfc9b66b8f",
+      "api/application/work/dots-dialogue.ts": "395dd499d076a5e20954d8c53e8d2c4baf4299d0b66224f00e288631a65a1bd8",
+      "api/application/work/dots-harness.fixture.ts": "74acf9e4e8ca462c430fe0bed185390dbd2d9c483c9084d55b401e7115a291af",
+      "api/application/work/dots-legacy-toolchain.fixture.json": "cf8269794f46ce7995651467f13f5ae76b37cd42f6cdb6b29c10dfd3f9a4d6b8",
+      "api/application/work/dots-project-role.ts": "553bc424c07030a7fe4768748e927f82c4e413a34285ae3d5ad431fc75ca58c5",
+      "api/application/work/dots-queries.ts": "adc24a8163cd39a6c0a6bdc1acba0e64bc6b7bb73a79ae4d78a65dec1de79263",
+      "api/application/work/dots-work-settings.test.ts": "9efc009c779fea559a19c177ac5eca4b1a229b7da3e2b90eca0ccb9e71755368",
+      "api/application/work/dots-work-settings.ts": "79925ca3c5135ae2a8bd84d3092207e19c42e94ae866bcf01e65f7c0ef6e6ef6",
+      "api/application/work/dots-work.ts": "f9e1273cfed43c408619950e42691aa2ebf1bfbb17e533940ba5eff1a1501cd5",
+      "api/application/work/task-report-delivery.ts": "5cf2ad639ed9ec8f9d52e3500faab15895891710a4abcbda47de7130e55fff4f",
+      "api/domains/capabilities/bundles/dots-delegation.bundle.json": "2f9baebb8b3b2b41adc755354f2d51cf39a943a4edd9fb77e7959ff16b5063c3",
+      "api/domains/capabilities/bundles/settings.bundle.json": "21c76780a3e673050d722afcd9ee332503e2693550d5bb768dcb20989e2ecd3c",
+      "api/domains/capabilities/contracts/dots-work.ts": "b9f4409727c62b976e886d9e5692ddb382872026e6c3d5ef81cf9fce6edb16cb",
+      "api/domains/capabilities/contracts/index.ts": "30b3ffbe2f0a030f97d98712b1a8de5b7e98d60011348fe7250135fb52649c25",
+      "api/domains/capabilities/contracts/runtime-meta.ts": "5aaf2e73a239cdb3373309cdc4b61e8f76be4ffc4ddcfb5e5affb00aa8269c71",
+      "api/domains/capabilities/seeds/toolchains.json": "7af1f1484937b0e57e84e77c9e512caf37864267ac6258e3e76764b6f45cd608",
+      "api/domains/dialogue/contracts/delegation.ts": "2928d43b98d4273832af04c29b7989158c1b754daec0067857248587f01a3554",
+      "api/domains/dialogue/contracts/toolchains.ts": "61360e63beaf2d5460fa6dc3b5227d2052e3c5b0c112045eb86cfee7f2632b3e",
+      "api/domains/dialogue/service/command-apply.ts": "a145f2058bcc463912736c9d68275d005f8d2af03f34f75d1e564c263e8f6ad4",
+      "api/domains/dialogue/service/command-source.ts": "12dfaff60c6e004710debce711cb0142de455e23a7da33e777b59853c2c43318",
+      "api/domains/dialogue/service/delegate-conversation.ts": "8b59d2d5b4b49c28df8369ba6fa8a994c59f9992e38236d5e00b90eb487568aa",
+      "api/domains/dialogue/service/execution-command.ts": "17ff90f7f2e1f8871400d65dd29834441dd851e9155d72379b16085205349780",
+      "api/domains/dialogue/service/result-intake.ts": "9ef5519783afd7f588512131bb037830e1270df0b48a5f62b9f7ae6b56fa4337",
+      "api/domains/dialogue/service/toolchain-command.ts": "1b1949725275fdd7f146c6231c4d16c335d77b86fb8db89d559244fae4b6de30",
+      "api/domains/dots/contracts/index.ts": "fea18a4c851b16ca7854440915dc30ac681e3c7f5410f9cec911b7bb136ec06e",
+      "api/domains/dots/contracts/relay-v1.ts": "cfcc2169ba811860d96e1e8fa8770db4401b892aac279ba97e9f1dd0e7e8e152",
+      "api/domains/dots/contracts/work-settings.ts": "ee1c6ceefc4dfb967cbc078493dfe390fa9992c5c481c71e19b7c9c242a258c4",
+      "api/domains/dots/contracts/work-view.ts": "d79c8c9bb68ee57e2b175879c9cbf8f2cbb0a9970b5b8e094671d9086e171001",
+      "api/domains/dots/index.ts": "bc35596c42f6b919805b5e97fef1ab2107264e269ab52029676e6bc3a2291aa9",
+      "api/domains/dots/repository/index.ts": "4bd66db85ea771843894b82fd2d7e8c44b601ce76dd7342f765defa32312f41b",
+      "api/domains/dots/repository/work.ts": "db56943bb01997c56b406296413ffa7a5120d5a9c106a867038e2599e7a48d97",
+      "api/domains/dots/service/work-settings.ts": "86c212e89e7ec1ce9f4f7a3fc9c929d100a7b65160ea10381558188765f9488f",
+      "api/domains/dots/test/relay-contract.test.ts": "ced1a00091e55fdfaf1c0b270f9b23ecdc7fedaed93eed5a4ff141c2b9e24580",
+      "api/domains/dots/test/work-settings.test.ts": "d8eb586d5ab0ed13b18b3493ff8b5443de48abcef6e6e82073b5b16a917ab0d4",
+      "api/domains/task-reports/repository/index.ts": "a4bd34e751de839787aad1b83f728671dfb326477fba96b32f987e53cb74e376",
+      "api/domains/task-reports/service/index.ts": "49bbedca1924ec3481bc1db50f3ad3d9ba76290a4b2ecb97ce4abbec7127be23",
+      "api/domains/tasks/repository/index.ts": "0460a1108dfa51ea3ab9ab04bab40ac4c16fee3634b80422bbc187c70e4af65d",
+      "api/domains/tasks/service/index.ts": "b502c17576bb310606d23bfa28acf5a5ba03328eec1d902dd42858a39844c36e",
+      "api/domains/tool-runtime/contracts/adapters.ts": "a563e76d5eb8b9dd2be81a0326795bfbee5a8b4a2b58a5ff4965e34e29cd730b",
+      "packages/artifact-ui/src/contracts.ts": "a55f38e74b4186954f532c86e4f41e9806c4409d351e1cbf990a547d8e379972",
+      "packages/artifact-ui/src/event-contracts.ts": "86038d897216c4dc71ae20c8d01182460f02df343684e8792a32b2f6c05fe051",
+      "packages/artifact-ui/src/library.tsx": "24f9579b347129862c1cef47c2ef5f4f9998e263ab95261658176766b4a93492",
+      "packages/artifact-ui/src/settings-components.tsx": "5814ef253d89d3e8199a2b9f978305371fc899c7f8d8364036c64ca27014de68",
+      "packages/artifact-ui/src/work-components.test.tsx": "6eb9ab4ee17888629b245ccf73042d42ccb628b8e370bc10fe574e8965a5c633",
+      "packages/artifact-ui/src/work-components.tsx": "1ae3bac17b326eeb65feb5b30c14a524d54855589914de13fd890a7b03a1b3ea",
+      "packages/design-system/src/components/WorkListMenu/WorkListMenu.stories.tsx": "b0e734cc738f7761269da86c653199089a89b3aaa5c3edfbf3f8321ae066003d",
+      "packages/design-system/src/components/WorkListMenu/WorkListMenu.test.tsx": "64deb4fe7e578102d29e1706b61c0d218bfe78b26d32114c9ec4de576a5053fa",
+      "packages/design-system/src/components/WorkListMenu/WorkListMenu.tsx": "615c34cfbcd64715c8679de08fafadb0fa66174544e660eaf333e2617ceae8e1",
+      "packages/design-system/src/components/WorkListMenu/index.ts": "ce1fa5d6178c4b3cee9e4d486fa6c956098c075acc3fd41e3ac78aba555abff4",
+      "packages/design-system/src/components/WorkResultPanel/WorkResultPanel.stories.tsx": "7ae7464042f626d08fe456fe51c984088678ce4c612f2b389c2e940544da09e4",
+      "packages/design-system/src/components/WorkResultPanel/WorkResultPanel.test.tsx": "3976798f13a58e37ef1f95610d2b3b4dbafa3b2094adbf1713523645c820a70e",
+      "packages/design-system/src/components/WorkResultPanel/WorkResultPanel.tsx": "71e9b5ee23dc8e9a1a7446c65a9aa00c8f329846ea45fdd79a84e9c78e14c0a5",
+      "packages/design-system/src/components/WorkResultPanel/index.ts": "2cb28a953bbd08356577230a4b99baf68fdab31e53bfb88e2b266784d369887b",
+      "packages/design-system/src/index.ts": "7f9791c13a1be52c0773cbf14695c62a51bb20bde5612a9e9e4d5555976c2bf0",
+      "scripts/dots-delegation-fixture-server.ts": "a53fdbfd53441d231bfae8e77caecff3c90a1d9b0e483c1b8a0852f4105e2045",
+      "tests/browser/dots-delegation.spec.ts": "be1d12695c2c6687cc0604b23ff0658bf99228deb441cf5a628012dbc6974c65",
+      "web/src/domains/dots/work-adapter.test.tsx": "c308879f1222ad560634b5894121986881412dfa2b05aafc5761ce54721cd699",
+      "web/src/domains/dots/work-adapter.tsx": "2e03db1f68190a34604346392adb3a4f7b41a149b00c9f7fd99b52e2f7c3c627",
+      "web/src/domains/dots/work-settings-adapter.tsx": "ba3072d59e42c222e21ad351cc1821ebcc1429dc96e277b2f01e6f33c956b2c9",
+      "web/src/workspace/toolchain-adapters.ts": "f8f3600dd2180b4b081e148587acd3310248ccb934dde05cbd804d497ba6fe5b"
+    }
+  }
+}

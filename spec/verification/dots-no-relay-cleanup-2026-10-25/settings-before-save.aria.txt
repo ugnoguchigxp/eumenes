@@ -1,0 +1,81 @@
+- main:
+  - button "アーティファクトを開く"
+  - button "通知センター"
+  - region "会話":
+    - text: 宛先
+    - strong: 通常
+    - combobox "会話エージェント"
+    - combobox "ASRモデル": "ASR: LARM"
+    - combobox "TTSモデル": "TTS: LARM"
+    - combobox "会話の背景": "背景: 光の妖精"
+    - text: LARM 接続済み
+    - status
+    - paragraph: まだ会話はありません。声か文字で話しかけてください。
+    - text: マイク 音声認識 回答 音声再生 メモリー整理
+    - status
+    - textbox "メッセージ":
+      - /placeholder: メッセージを入力、または話しかけてください
+    - button "ファイルを添付"
+    - button "音声を開始"
+    - button "ミュート"
+    - meter "マイク音量"
+    - button "送信" [disabled]
+  - separator "会話とアーティファクトのサイズを調整"
+  - complementary "アーティファクト":
+    - tablist "アーティファクトのタブ":
+      - tab "dotsの仕事"
+      - button "dotsの仕事を閉じる"
+      - tab "dotsの設定" [selected]
+      - button "dotsの設定を閉じる"
+    - tabpanel "dotsの設定":
+      - region "dotsの設定":
+        - text: 接続
+        - paragraph: 接続と作業先は登録済みの候補から選びます。設定はこのPCに保存します。PC停止中の結果はChatGPTで確認してください。
+        - text: 仕事の受付を有効にする
+        - checkbox "仕事の受付を有効にする" [checked]
+        - text: 接続先
+        - combobox "接続先":
+          - option "未選択"
+          - option "模擬の外部担当" [selected]
+        - button "仕事へ戻る"
+        - status
+        - text: 作業先と上限
+        - paragraph: 接続と作業先は登録済みの候補から選びます。設定はこのPCに保存します。PC停止中の結果はChatGPTで確認してください。
+        - text: 既定の作業先
+        - combobox "既定の作業先":
+          - option "未選択"
+          - option "模擬の作業先（このPC）" [selected]
+        - text: 作業時間の上限（秒）
+        - textbox "作業時間の上限（秒）": "7200"
+        - text: 作業Session数の上限
+        - textbox "作業Session数の上限": "3"
+        - status
+        - region "登録した作業先":
+          - heading "作業先の担当と手順" [level=3]
+          - paragraph: 担当の変更は明示的に保存します。作業中の仕事は既存の設定変更規則に従い一時停止を確認します。
+          - table "登録した作業先":
+            - rowgroup:
+              - row "作業先 担当と手順の版 操作":
+                - columnheader "作業先"
+                - columnheader "担当と手順の版"
+                - columnheader "操作"
+            - rowgroup:
+              - 'row "模擬の作業先 package:dots.orchestrate@4 担当を変更: 模擬の作業先"':
+                - cell "模擬の作業先"
+                - cell "package:dots.orchestrate@4"
+                - 'cell "担当を変更: 模擬の作業先"':
+                  - 'button "担当を変更: 模擬の作業先"': 担当を変更
+          - status
+        - text: 結果の表示
+        - paragraph: 接続と作業先は登録済みの候補から選びます。設定はこのPCに保存します。PC停止中の結果はChatGPTで確認してください。
+        - text: 結果を元の会話に表示する
+        - checkbox "結果を元の会話に表示する" [checked]
+        - status
+        - text: 未保存の変更
+        - heading "未適用の変更 0件" [level=3]
+        - paragraph: この一覧の設定変更をまとめて適用します。辞書や記憶の個別操作は含みません。
+        - paragraph: 未適用の変更はありません
+        - button "設定の変更をすべて適用" [disabled]
+        - button "未適用の設定変更をすべて破棄" [disabled]
+        - status
+        - status

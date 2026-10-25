@@ -100,6 +100,12 @@ export function useModel3dRuntime({
 	const [highlightedId, setHighlighted] = useState<string>();
 	const [appliedFocus, setAppliedFocus] =
 		useState<Model3dSourceData["focus"]>(null);
+	// What the workspace is told to surface; a request from this screen counts down so it never meets a host sequence.
+	const [shownFocus, setShownFocus] = useState<{
+		seq: number;
+		kind: "asset" | "generation" | "search";
+	}>();
+	const localFocusSeq = useRef(0);
 	const submission = useRef<{ signature: string; requestId: string } | null>(
 		null,
 	);
@@ -141,6 +147,7 @@ export function useModel3dRuntime({
 	const focus = sourceData?.focus;
 	if (focus && focus.seq > (appliedFocus?.seq ?? -1)) {
 		setAppliedFocus(focus);
+		setShownFocus({ seq: focus.seq, kind: focus.kind });
 		if (focus.kind === "asset") setSelected(focus.assetId);
 		else if (focus.kind === "generation") setHighlighted(focus.generationId);
 		else
@@ -214,9 +221,7 @@ export function useModel3dRuntime({
 		error: assets.error ? "3Dモデルの一覧を取得できませんでした。" : undefined,
 		filter: query,
 		selectedAsset: selected && toAsset(selected),
-		focus: appliedFocus
-			? { seq: appliedFocus.seq, kind: appliedFocus.kind }
-			: undefined,
+		focus: shownFocus,
 	};
 	const resource: Model3dWorkspaceResource = {
 		...content,
@@ -254,6 +259,20 @@ export function useModel3dRuntime({
 			cache.removeQueries({ queryKey: [...root, "asset", id] });
 		},
 	};
+	/** The saved model the screen shows, by the screen's own request (a resource opened from the conversation). */
+	const selection = {
+		requestedId: selectedId,
+		/** The asset the detail view has loaded. */
+		loadedId: selected?.id,
+		/** The requested asset could not be read (it does not exist). */
+		failedId: detail.isError ? selectedId : undefined,
+		select: (assetId: string | undefined) => {
+			setSelected(assetId);
+			if (!assetId) return;
+			localFocusSeq.current -= 1;
+			setShownFocus({ seq: localFocusSeq.current, kind: "asset" });
+		},
+	};
 	function dispatch(event: ArtifactEvent): Promise<Receipt> {
 		if (event.source !== model3dArtifactSource)
 			return Promise.resolve({
@@ -265,6 +284,7 @@ export function useModel3dRuntime({
 	return {
 		loading: source.isPending,
 		error: source.error,
+		selection,
 		runtime: {
 			snapshot: { [model3dArtifactSource]: resource },
 			dispatch,

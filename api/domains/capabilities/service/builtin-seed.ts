@@ -9,6 +9,8 @@ import { dotsBuiltins } from "../builtin/dots";
 import { historyBuiltins } from "../builtin/history";
 import { timerBuiltins } from "../builtin/timers";
 import { toolchainBuiltins } from "../builtin/toolchains";
+import { resourceKindBuiltins } from "../builtin/resource-kinds";
+import { resourceReadBuiltins } from "../builtin/resource-read";
 import { getLogger } from "../../../infrastructure/logger";
 function isSupersededBuiltin(d: (typeof builtins)[number]) {
 	return builtins.some(
@@ -21,6 +23,8 @@ export function seedBuiltins(
 	backends: Set<string>,
 	registerBuiltinInTransaction: (db: Database, d: Definition) => void,
 ) {
+	for (const d of resourceKindBuiltins) registerBuiltinInTransaction(db, d);
+	for (const d of resourceReadBuiltins) registerBuiltinInTransaction(db, d);
 	for (const d of builtins) {
 		if (d.backend && !backends.has(d.backend)) continue;
 		// Keep the exact archived definition from this installation. Only

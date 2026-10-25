@@ -1,7 +1,21 @@
 import {
+	describeResourcesAdapter,
+	RESOURCES_ADAPTER_REF,
+} from "../resources/resources-tool";
+import {
+	DOCLING_ADAPTER_REF,
+	describeDoclingAdapter,
+	doclingDomainSchemas,
+} from "../docling/docling-adapter";
+import {
 	DOTS_MESSAGING_ADAPTER_REF,
 	describeDotsMessagingAdapter,
 } from "../work/dots-messaging-adapter";
+import {
+	DOTS_DELEGATION_ADAPTER_REF,
+	describeDotsDelegationAdapter,
+	dotsWorkDomainSchemas,
+} from "../work/dots-delegation-adapter";
 import {
 	PIPELINES_ADAPTER_REF,
 	describePipelinesAdapter,
@@ -132,6 +146,8 @@ import {
 
 /** `domain:` result schemas registered by the host's adapters. */
 const domainSchemas: Readonly<Record<string, ZodType>> = {
+	...dotsWorkDomainSchemas,
+	...doclingDomainSchemas,
 	...timerDomainSchemas,
 	"domain:ocr.receipt@1": z.union([
 		ocrRecord,
@@ -192,6 +208,8 @@ export function bundleHostOf(
 export const hostAdapterDescriptions: Array<
 	Pick<DomainAdapter, "ref" | "describe">
 > = [
+	{ ref: DOCLING_ADAPTER_REF, describe: describeDoclingAdapter },
+	{ ref: DOTS_DELEGATION_ADAPTER_REF, describe: describeDotsDelegationAdapter },
 	{ ref: DOTS_MESSAGING_ADAPTER_REF, describe: describeDotsMessagingAdapter },
 	{ ref: SHELL_ADAPTER_REF, describe: describeShellAdapter },
 	{ ref: TASK_ADAPTER_REF, describe: describeTaskAdapter },
@@ -225,6 +243,7 @@ export const hostAdapterDescriptions: Array<
 	{ ref: CODEX_TASKS_ADAPTER_REF, describe: describeCodexTasksAdapter },
 	{ ref: WEATHER_ADAPTER_REF, describe: describeWeatherAdapter },
 	{ ref: STOCK_ADAPTER_REF, describe: describeStockAdapter },
+	{ ref: RESOURCES_ADAPTER_REF, describe: describeResourcesAdapter },
 ];
 
 /** The bundle host as if every adapter were registered (see `hostAdapterDescriptions`). */

@@ -178,7 +178,7 @@ export function registerDots(
 								{
 									name: "submit_message_reply",
 									description:
-										"Save one final reply and cumulative summary for a claimed message command. Use its messageId, commandId, leaseId and epoch; retry identical replyId and content after uncertainty. This is not task completion.",
+										"Save one final reply and cumulative summary for a claimed message command. Use its messageId, commandId, leaseId and epoch. coveredMessageIds uses snapshot.sourceMessageId and snapshot.context.coveredMessageIds, not the command's messageId. Retry identical replyId and content after uncertainty. This is not task completion.",
 									schema: messageReplyInput,
 									readOnly: false,
 									invoke: (v: unknown) => messages.reply(owner, v),

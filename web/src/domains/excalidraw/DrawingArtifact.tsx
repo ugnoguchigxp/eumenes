@@ -7,6 +7,7 @@ import { isDrawingFrameOf, isDrawingFrameState } from "@eumenes/design-system";
 import { useDrawingPreviews } from "./useDrawingPreviews";
 import { draftDrawingHash, drawingLocation } from "./location";
 import { queryRoots } from "../../queryKeys";
+import { useLiveDrawingScreen } from "./resource-screen";
 const emptyReferences: Awaited<ReturnType<EumenesClient["drawingReferences"]>> =
 	[];
 export function DrawingArtifact({
@@ -136,6 +137,28 @@ export function DrawingArtifact({
 	const busy =
 		shown?.state === "starting" ||
 		(!!latestOp && ["planning", "starting"].includes(latestOp.state));
+	/** Connects the editor to the saved drawing, replacing the one it was on. */
+	async function openReference(referenceId: string, requestId: string) {
+		if (active.current) await client.releaseDrawing(active.current);
+		const s = await client.openDrawing({ requestId, referenceId });
+		active.current = s.id;
+		setSession(s);
+	}
+	useLiveDrawingScreen({
+		referenceIds: new Set(refs.data?.map((r) => r.id)),
+		shownReferenceId: shown?.referenceId ?? undefined,
+		busy,
+		open: async (referenceId) => {
+			try {
+				setError("");
+				await openReference(referenceId, crypto.randomUUID());
+				return true;
+			} catch {
+				setError("Excalidrawに接続できませんでした。");
+				return false;
+			}
+		},
+	});
 	const runtime: ArtifactRuntime = {
 		snapshot: {
 			drawings: {
@@ -209,13 +232,7 @@ export function DrawingArtifact({
 						!refs.data?.some((r) => r.id === refId)
 					)
 						throw new Error("図を確認できませんでした。");
-					if (active.current) await client.releaseDrawing(active.current);
-					const s = await client.openDrawing({
-						requestId: e.id,
-						referenceId: refId,
-					});
-					active.current = s.id;
-					setSession(s);
+					await openReference(refId, e.id);
 				}
 				return { status: "accepted", message: "操作を受け付けました" };
 			} catch {

@@ -1,0 +1,54 @@
+bun test v1.4.3 (c6da4a4d3)
+
+api/application/work/dots-work-settings.test.ts:
+(pass) registered fields apply once from the UI, conflicts retain settings and conversations cannot edit them [663.90ms]
+(pass) a project-role change is an explicit revision-checked UI operation, not an automatic startup upgrade [806.75ms]
+(pass) disabled conversation delivery keeps the report inspectable without appending a chat message [443.87ms]
+
+api/application/work/dots-delegation-conversation.test.ts:
+(pass) conversation discovers the registered command subagent and stores the real task through the adapter [467.09ms]
+(pass) a clarification resumes the same pinned intake with the answer and original request [496.89ms]
+
+api/application/work/dots-tasks.test.ts:
+(pass) claimed session blocks, answers on the same task and completes only with condition evidence [340.64ms]
+(pass) owner, project, lease, source sequence and cancellation fences reject unauthorized reports [365.19ms]
+(pass) configuration change revokes execution and leaves only a stop command [365.77ms]
+(pass) forget removes private snapshots and report bodies but retains minimal stop reconciliation [364.24ms]
+(pass) restart reconciles existing session refs without replaying start; user schedules dedupe occurrences [381.27ms]
+(pass) report delivery saves one attributed message to its originating conversation [336.07ms]
+(pass) a bound reminder remains usable after completion and grant expiry, but cannot restart work [328.02ms]
+(pass) the retained-body limit reserves space for stop commands and stop confirmation [490.76ms]
+(pass) a connection cannot transfer its existing task history to a different OAuth principal [328.97ms]
+
+api/application/work/dots-delegation-registration.test.ts:
+(pass) stored first document revisions survive upgrade and do not block the current bundle [470.27ms]
+(pass) fresh seed registers one launcher and immutable revisions; reseed keeps disabled publication [564.84ms]
+(pass) an old seeded revision retains its hash while publication migrates to the new binding [450.61ms]
+
+api/application/work/dots-delegation-adapter.test.ts:
+(pass) long Japanese source and structured request survive the registered start path [451.16ms]
+(pass) intake stores one owned task with its own work deadline and replays the receipt [382.86ms]
+(pass) stale registration, unrelated chat, excess grant and unavailable cloud are refused [385.42ms]
+(pass) questions and stops use existing task fences and cannot accept a stale answer [408.71ms]
+
+api/application/work/dots-dialogue.test.ts:
+(pass) role and Skill revisions are immutable, CAS protected and revoke an already claimed command [326.43ms]
+
+api/application/toolchain/task-execution-legacy.test.ts:
+(pass) already saved legacy work remains inspectable across migration; new legacy starts are unavailable [323.61ms]
+(pass) a public parent hands camera interaction to the existing screen without taking a capture or declaring the request complete [445.35ms]
+
+packages/artifact-ui/src/work-components.test.tsx:
+(pass) work menu/result compose with an existing activity view and reject wrong source kinds [7.94ms]
+
+api/domains/dots/test/relay-contract.test.ts:
+(pass) wire envelope binds the original report IDs and trusted receipt times; parsing is not signature verification [0.68ms]
+
+api/domains/dots/test/work-settings.test.ts:
+(pass) disabled settings survive closing and reopening SQLite, replay and conflict preserve their revision [20.15ms]
+(pass) connection/project mismatches and unavailable grants cannot be enabled [2.57ms]
+
+ 28 pass
+ 0 fail
+ 139 expect() calls
+Ran 28 tests across 10 files. [11.41s]

@@ -201,6 +201,28 @@ export function list(
 			) as TaskRow[]
 	).map((row) => ({ seq: row.seq, task: task(row)! }));
 }
+/** Bounded page by registered task kind; conversation scope is host supplied. */
+export function kindPage(
+	db: Database,
+	kind: WorkTask["kind"],
+	conversationId: string | undefined,
+	offset: number,
+	limit: number,
+) {
+	return (
+		db
+			.query(
+				`SELECT seq,data_json FROM work_tasks WHERE json_extract(data_json,'$.kind')=? AND body_expired=0 AND json_extract(data_json,'$.forgottenAt') IS NULL AND (? IS NULL OR conversation_id=?) ORDER BY seq DESC LIMIT ? OFFSET ?`,
+			)
+			.all(
+				kind,
+				conversationId ?? null,
+				conversationId ?? null,
+				limit,
+				offset,
+			) as TaskRow[]
+	).map((row) => task(row)!);
+}
 export function events(
 	db: Database,
 	id: string,

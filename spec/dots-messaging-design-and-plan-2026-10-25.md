@@ -309,3 +309,16 @@ P0〜P4の機能実装と対象fixture・画面試験を行った。全体gate�
 
 
 P5反映時の調整: 起動時に既存 `skill:dots.messaging@1` と現在の組込み定義の不一致を検出した。旧版の保存済み定義を上書きせず、現行メッセージ手順を `skill:dots.messaging@2` / `MESSAGING.v2.md` として公開する。版1は保存台帳に残し、現在のseedでは再登録しない。既存 `dots.orchestrate` のprofile・Skill・packageは変更しない。旧版の異なる保存済み本文があっても新しいseedが成功し、旧hashが残るfixtureを追加してから再起動する。
+
+
+P5の操作引継ぎ: ブラウザプロファイルの誤りを利用者から指摘され、Braveの個人用 `ugnoguchi` に切り替えた。実画面でセバスチャンを確認し、個人用ChatGPTのカスタムMCP追加フォームを開いた。名前・MCP URLだけを入力し、作成・リスク確認・OAuth承認は未実行。OIDCが自動ON、dotsの3スコープが自動ON、callbackが既定のChatGPT URLになることを確認した。利用者の手動操作希望により、`docs/dots.md` 冒頭に入力値・OIDC OFF・ローカル承認の引継ぎ・監視開始文・3往復の確認・期限切れ時対応を記載した。接続案内の公開値は保存済み設定と一致し、承認tokenを文書へ含めていない。認証・購読・実3往復は未完了。Context StillはP5のcontext_compile 1回、compile_eval 1回。
+
+P5 OAuth確認（15:05〜15:07 JST）: 利用者が新プラグインの作成操作を行い、試験用の承認待ち画面を提示した。ローカル要求のclient・callback・resource・scope・有効期限を照合し、loginとconsentを承認した。ChatGPTへ戻った後、個人用プロファイルのインストール済み一覧と詳細に **Eumenes メッセージ試験** が表示され、操作が「チャットで試す」になったことを確認した。旧 **Eumenes Dots MVP** との取り違えがあったため、現行の名前と操作場所を説明し直した。PCに通知や別の承認ボタンが出る方式ではない旨を手順書へ追記した。セバスチャン本人の画面で、現行プラグインのEvents監視開始と連携内の本文だけによる返答・要約を依頼した。OAuth承認とプラグイン登録は確認済み、Events購読と実3往復は引き続き未完了である。
+
+P5実受入の初回: Events購読が管理APIで有効となり、1通目を送信した。通知後のget/claimが実dotから成功した。一方、submit_message_replyは `dots_permission_denied` で拒否された。dotに送信済み識別子を確認し、`coveredMessageIds` に管理用 `messageId` を入れ、許可された `snapshot.sourceMessageId` を使っていなかったことを確認した。epoch/leaseやOAuthの失敗ではない。保存なしを確認し、同じmessage・command・lease・replyIdのまま参照元IDだけを訂正して返却するよう依頼した。重複送信・代理返答・範囲検査の緩和は行わない。
+
+改善方針: 現行Skillには参照元IDの制約があるが、公開toolの各引数に説明がなく、tool単独では管理IDとの違いを読み取りにくい。進行中の実受入が終わってから、既存スキーマの公開説明に `messageId` と `coveredMessageIds` の取得元・用途を明記する。意味判断やIDの自動補正をコードへ追加しない。既存の範囲外拒否と有効な参照元の受入を結合試験で維持し、通過済みliveと説明補完後のfixtureを区別する。
+
+P5実受入結果: 15:12〜15:14 JSTに実セバスチャンから3件の返答・累積要約が保存された。最終要約は日曜の午後・公園・青いノートであり、変更を引き継いでいる。初回の参照元ID取り違えは、dot自身が訂正して同一返答を保存した。その後、公開説明と引数Schemaを補足し、管理用IDの誤指定を拒否して未保存を維持する回帰試験を追加した。意味判断の専用コードは追加していない。
+
+説明補足後の対象domain gateはBun 61件＋Web 1件が成功。稼働中devと重なった先行runは最終証拠に使わず、API/Webを停止して取り直した。applicationの結合試験14件とformat・lintも成功。再起動後のAPI・実画面で3件の永続化と外部発言の出所を確認した。購読の期限延長を管理APIで観測し、その後の追加1往復も15:20:42 JSTに成功した。dotの手動refresh操作は未提供だったため、更新はEumenes側の観測と更新後の実配信で確認した。試験用接続でのP5受入は成立した。恒久認証・安定ドメイン・長期の自動更新運用は対象外のまま。詳細とfixture/liveの区別は[実受入記録](verification/dots-messaging-2026-10-25/live-acceptance.md)に残した。

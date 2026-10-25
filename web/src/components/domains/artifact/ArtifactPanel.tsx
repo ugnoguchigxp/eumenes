@@ -81,8 +81,15 @@ export function ArtifactPanel({
 				)}
 				{active?.kind === "markdown" && (
 					<TabsContent value={active.id} className="artifact-panel-body">
+						{/* A resource link opens nothing here (no screen launcher): it never navigates the page away. */}
+						{/* oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
 						<div
 							className="markdown-content"
+							onClick={(event) => {
+								if (!(event.target instanceof Element)) return;
+								const href = event.target.closest("a")?.getAttribute("href");
+								if (href && /^eumenes:/i.test(href)) event.preventDefault();
+							}}
 							// biome-ignore lint/security/noDangerouslySetInnerHtml: sanitized by renderSafeMarkdown
 							dangerouslySetInnerHTML={{
 								__html: renderSafeMarkdown(active.content),

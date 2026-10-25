@@ -57,6 +57,9 @@ export function registerDialogue(app: Hono, service: DialogueService) {
 	app.get("/api/conversations/:id/runs", (c) =>
 		c.json(service.list(c.req.param("id"))),
 	);
+	app.get("/api/conversations/:id/resources", (c) =>
+		c.json(service.conversationResources(c.req.param("id"))),
+	);
 	app.post("/api/runs", async (c) => {
 		const parsed = await parseJsonBody(c, publicSubmitSchema);
 		if (!parsed.ok) return parsed.response;

@@ -43,6 +43,7 @@ export const MessageList = memo(function MessageList({
 	editingId,
 	editedIds,
 	onEdit,
+	onOpenResource,
 }: {
 	conversation: Conversation | undefined;
 	client?: EumenesClient;
@@ -61,6 +62,8 @@ export const MessageList = memo(function MessageList({
 	/** Utterances sent again after an edit. */
 	editedIds?: ReadonlySet<string>;
 	onEdit?: () => void;
+	/** A link to a resource (`eumenes://`) in an answer; such a link opens the resource, it never navigates. */
+	onOpenResource?: (uri: string) => void;
 }) {
 	const assistantLabel = agentName || "Eumenes";
 	// Streaming text is not announced; a settled answer is, once per message id.
@@ -204,7 +207,10 @@ export const MessageList = memo(function MessageList({
 								</button>
 							)}
 							{message.role === "assistant" ? (
-								<MarkdownContent text={message.text} />
+								<MarkdownContent
+									text={message.text}
+									onOpenResource={onOpenResource}
+								/>
 							) : (
 								<p>{message.text}</p>
 							)}
@@ -232,15 +238,28 @@ export const MessageList = memo(function MessageList({
 	);
 });
 
+const RESOURCE_LINK = /^eumenes:/i;
+
 const MarkdownContent = memo(function MarkdownContent({
 	text,
+	onOpenResource,
 }: {
 	text: string;
+	onOpenResource?: (uri: string) => void;
 }) {
 	const html = useMemo(() => renderSafeMarkdown(text), [text]);
 	return (
+		// Links are handled by delegation: the HTML is a string, so it has no handlers of its own.
+		// oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
 		<div
 			className="markdown-content"
+			onClick={(event) => {
+				if (!(event.target instanceof Element)) return;
+				const href = event.target.closest("a")?.getAttribute("href");
+				if (!href || !RESOURCE_LINK.test(href)) return;
+				event.preventDefault();
+				onOpenResource?.(href);
+			}}
 			dangerouslySetInnerHTML={{ __html: html }}
 		/>
 	);

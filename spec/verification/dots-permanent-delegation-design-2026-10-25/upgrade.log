@@ -1,0 +1,11 @@
+bun test v1.4.3 (c6da4a4d3)
+
+api/application/work/dots-delegation-registration.test.ts:
+(pass) stored first document revisions survive upgrade and do not block the current bundle [575.74ms]
+(pass) fresh seed registers one launcher and immutable revisions; reseed keeps disabled publication [594.31ms]
+(pass) an old seeded revision retains its hash while publication migrates to the new binding [503.73ms]
+
+ 3 pass
+ 0 fail
+ 12 expect() calls
+Ran 3 tests across 1 file. [2.33s]

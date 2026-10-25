@@ -79,6 +79,13 @@ export function recordSpontaneousInTransaction(
 		messageIds: [input.messageId],
 		dedupeKey: `message:${input.messageId}`,
 	});
+	// The report shows the resources of the TODOs it told as chips.
+	deps.resourceLedger?.linkMessageToWorkInTransaction(
+		db,
+		input.conversationId,
+		input.messageId,
+		todoRefs,
+	);
 	for (const todoId of todoRefs)
 		archiveDone(deps, db, input.conversationId, todoId, at);
 }
@@ -101,6 +108,13 @@ export function archiveReportedInTransaction(
 	const message = deps.conversation.messageInTransaction(db, input.messageId);
 	const runId = message?.message.runId;
 	if (!runId || message.message.conversationId !== input.conversationId) return;
+	// The reply that told these TODOs shows their resources as chips.
+	deps.resourceLedger?.linkMessageToWorkInTransaction(
+		db,
+		input.conversationId,
+		input.messageId,
+		input.todoIds,
+	);
 	const events = deps.continuity.events;
 	const said = events.deliveredUtteranceInTransaction(
 		db,

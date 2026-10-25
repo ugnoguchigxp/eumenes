@@ -25,6 +25,12 @@ import {
 	reservedExecutionCalls,
 } from "./execution-children";
 import type { ChildExecution } from "../../tool-runtime";
+import {
+	RESOURCE_READ_TOOL,
+	allowedUris,
+	type StoredRead,
+} from "./resource-access";
+import { parseResourceUri } from "../../resources";
 
 import {
 	createStepActions,
@@ -45,7 +51,41 @@ export function createStepHandler(ctx: RuntimeContext, ops: TaskOps) {
 		bindings,
 		prepared,
 		now,
+		resources: !!ctx.deps.resources,
 	});
+	/** The read a `resource.read` invocation asks for, made now because the host's port is async. */
+	async function requestedRead(
+		input: StepInput,
+		action: unknown,
+		signal: AbortSignal,
+	): Promise<StoredRead | undefined> {
+		const invoke = action as {
+			action?: string;
+			tool?: string;
+			arguments?: { uri?: unknown };
+		} | null;
+		if (
+			!ctx.deps.resources ||
+			invoke?.action !== "invoke" ||
+			invoke.tool !== RESOURCE_READ_TOOL ||
+			!input.grants.some((g) => g.id === RESOURCE_READ_TOOL && !g.replayOnly)
+		)
+			return undefined;
+		const parsed =
+			typeof invoke.arguments?.uri === "string"
+				? parseResourceUri(invoke.arguments.uri)
+				: null;
+		// An unlisted URI is never read; the action is then rejected as `unknown_resource` when it is applied.
+		if (!parsed || !input.resourceUris.has(parsed.uri)) return undefined;
+		try {
+			return {
+				uri: parsed.uri,
+				...(await ctx.deps.resources.read(parsed.uri, signal)),
+			};
+		} catch (error) {
+			return { uri: parsed.uri, ok: false, code: safeCode(error) };
+		}
+	}
 
 	const handler: HandlerDefinition<
 		{ taskId: string; stepId: string },
@@ -183,6 +223,7 @@ export function createStepHandler(ctx: RuntimeContext, ops: TaskOps) {
 						visible: context.visible ?? [],
 						manifestDigest: context.manifestDigest,
 						grants: context.grants,
+						resourceUris: allowedUris(db, tools, t.id, execution),
 					},
 				};
 			} catch (e) {
@@ -200,7 +241,11 @@ export function createStepHandler(ctx: RuntimeContext, ops: TaskOps) {
 					? executionCallSession(input.execution)
 					: { sessionRole: "subagent", taskId: input.taskId },
 			);
-			return { receipt, ...parseControlOutput(receipt.value) };
+			const output = parseControlOutput(receipt.value);
+			const resourceRead = output.invalid
+				? undefined
+				: await requestedRead(input, output.action, signal);
+			return { receipt, ...output, ...(resourceRead ? { resourceRead } : {}) };
 		},
 		classify: () => "fail",
 		settleInTransaction(db, claim, input, outcome) {

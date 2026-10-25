@@ -1,5 +1,6 @@
 import { ArtifactRenderer } from "@eumenes/artifact-ui";
 import type { EumenesClient } from "../../../../../client";
+import { useLivePlaylistScreen } from "../../../domains/music/playlist-screen";
 import { useLibraryRuntime } from "../../../domains/music/use-library-runtime";
 import "./LibraryArtifact.css";
 export function LibraryArtifact({
@@ -21,6 +22,13 @@ export function LibraryArtifact({
 		selectPlaylist,
 		busy,
 	} = useLibraryRuntime(client, conversationId, definition);
+	const music = Object.values(runtime.snapshot).find((r) => r.kind === "music");
+	useLivePlaylistScreen({
+		playlistId,
+		playableTrackId: music?.tracks.find(
+			(t) => t.id === music.currentId && t.url,
+		)?.id,
+	});
 	if (error)
 		return (
 			<div role="alert">

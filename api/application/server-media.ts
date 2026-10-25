@@ -89,6 +89,7 @@ export function buildMedia(
 		connection: () => settings.objectRecognitionCredentials(),
 	});
 	return {
+		gateway: mediaGateway,
 		music,
 		image,
 		excalidraw,

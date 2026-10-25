@@ -105,3 +105,11 @@ export const migrations: readonly Migration[] = [
 	{ id: "web-research/0001-init", sql: migration },
 	{ id: "web-research/0002-attempt-timeout", sql: attemptTimeoutMigration },
 ];
+
+/** Runs that produced something to read (`completed`, `partial`), newest first. */
+export const finishedRuns = (db: Database, limit: number) =>
+	db
+		.query<RunRow, [number]>(
+			"SELECT * FROM web_research_runs WHERE status IN ('completed','partial') ORDER BY created_at_ms DESC, rowid DESC LIMIT ?",
+		)
+		.all(limit);

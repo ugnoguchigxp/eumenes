@@ -8,6 +8,8 @@ archive の基準: その文書が担当した実装がコードにあり、本�
 
 | 文書 | 状態 |
 | --- | --- |
+| [docling-desk-integration-design-2026-10-25.md](docling-desk-integration-design-2026-10-25.md) | 別タブの入口を実装。Docling domain検証、固定結合、実モデル選択、実ブラウザのWord/PDF OCR・停止・文書とログイン保持を確認。利用側・全体gateには担当外と共有ファイルの未解決事項あり。[受入記録](verification/docling-desk-2026-10-25/acceptance.md) |
+| [resource-uri-implementation-plan-2026-10-25.md](resource-uri-implementation-plan-2026-10-25.md) | 合意済み・P0〜P6 実装・固定試験済み（§13）。live・実機器の受入（P7）とサーバー反映は未実施。Eumenes内のリソース（生成物・TODO・会話の出来事）を `eumenes://<kind>/<id>` で指し、種類の登録＋ResourceAdapter（データドリブン）で開く・再生する・読む・探す。TODOの報告にリンク（`links_json`）を付けて完了報告の吹き出しにチップを出し、agency の `HostTodo` に担当名と `nextActions` を渡す。サブエージェントに `RESOURCES` 区画と説明文、`delegate` の `refs`、結果の `links` の検査。会話エージェントは番号 `a<n>` と即答の担当 `resources`（find・open・play・read）、画面への指示 `screen_commands`。run `f4764696`・`a3c89c6e` の対策 |
 | [memory-activity-indicator-design-2026-10-25.md](memory-activity-indicator-design-2026-10-25.md) | 合意済み・実装済み（fixture 検証済み、live 未確認）。会話画面の経路表示の右端に独立チップ「メモリー整理」を置き、表示中の会話で steward の unit のジョブが実行中（running）のときだけ点灯する。失敗中（`larm_preempted` の譲りは飛ばして判定）は赤い点と小さな ⚠ アイコンボタンを出し、既存のエラーレポートModal（LLM貼り付け用）を開く。`GET /api/steward/activity`・`/error-report` と既存の change 購読で更新 |
 | [dots-messaging-design-and-plan-2026-10-25.md](dots-messaging-design-and-plan-2026-10-25.md) | 合意済み。P0〜P4の機能実装と固定試験・画面試験を実施。既存OAuth・Eventsでメッセージ送信と返答・連携後の要約を受け取る。全体gateは保留、実dots受入・サーバー反映は未実施（§15） |
 | [ocr-correction-region-qr-design-2026-10-25.md](ocr-correction-region-qr-design-2026-10-25.md) | 合意済み。拡大・既存OCR行の矩形選択・QR復号を実装し、固定試験とブラウザ確認を実施。補正指示の新版は実LLMの品質受入未達。実カメラ・稼働サーバー反映は未確認 |

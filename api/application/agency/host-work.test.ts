@@ -19,6 +19,7 @@ describe("TODOs offered to the agency", () => {
 		const asked: string[] = [];
 		h.host.attachWork(
 			createAgencyWork({
+				resources: { kind: () => null },
 				dialogue: {
 					todosInTransaction: (_db, conversationId) => {
 						asked.push(conversationId);
@@ -58,6 +59,7 @@ describe("TODOs offered to the agency", () => {
 		const h = harness();
 		h.host.attachWork(
 			createAgencyWork({
+				resources: { kind: () => null },
 				dialogue: {
 					todosInTransaction: () => {
 						throw new Error("ledger_unavailable");

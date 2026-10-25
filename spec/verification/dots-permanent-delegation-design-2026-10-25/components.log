@@ -1,0 +1,31 @@
+│ ┌────────────────────────────────────────────────────────────────────────────┐
+│ │  Info: Found a setup file with "setProjectAnnotations".                    │
+│ │  Skipping automatic provisioning of preview annotations to avoid           │
+│ │  conflicts. Since Storybook 10.3, "@storybook/addon-vitest" applies these  │
+│ │   automatically.                                                           │
+│ │  You can safely remove the "setProjectAnnotations" call from your setup    │
+│ │  file, or remove the file entirely if you don't have custom code there.    │
+│ └────────────────────────────────────────────────────────────────────────────┘
+
+ RUN  v4.0.16 /Users/y.noguchi/Code/eumenes/packages/design-system
+
+stdout | src/components/WorkResultPanel/WorkResultPanel.test.tsx
+Test setup running...
+
+stdout | src/components/WorkListMenu/WorkListMenu.test.tsx
+Test setup running...
+
+stdout | src/components/WorkListMenu/WorkListMenu.test.tsx
+Test setup running...
+
+stdout | src/components/WorkResultPanel/WorkResultPanel.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/WorkResultPanel/WorkResultPanel.test.tsx (1 test) 126ms
+ ✓ |unit| src/components/WorkListMenu/WorkListMenu.test.tsx (1 test) 154ms
+
+ Test Files  2 passed (2)
+      Tests  2 passed (2)
+   Start at  17:05:56
+   Duration  1.16s (transform 147ms, setup 304ms, import 401ms, tests 280ms, environment 1.08s)
+

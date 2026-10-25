@@ -1,0 +1,8 @@
+Use case: ui-mockup
+Asset type: Eumenes desktop artifact screen concept, 1280x960.
+Create a polished, realistic flat software UI screenshot for a Japanese personal AI assistant. This is a proposed interface, not a diagram. Dark charcoal/navy surfaces, restrained cyan accent, soft thin borders, compact rounded cards, readable sans-serif typography, practical spacing. No photography, no futuristic glow, no laptop frame, no charts, no background scenery.
+Screen: a persistent work workspace titled "dotsの仕事". Header has a green "接続済み" badge, small "セバスチャン" label, and a gear button "設定".
+A calm information strip says "PC停止中の結果を受け取りました" with a small "更新" button.
+Two columns: left 28% is the work list; right 72% is a selected job detail. The left list has filters "すべて / 作業中 / 要確認 / 結果" and three clear job rows: "比較調査レポート" with badge "完了", "会議資料の下書き" with badge "作業中", and "実装の確認" with badge "回答待ち". Select the first row.
+The right detail is titled "比較調査レポート", with a green "受取済み" badge and a small "クラウドで実行" chip. Under the title show three simple stages "依頼済み → 作業完了 → 受取済み". Show tabs "要約 / 成果 / やり取り" with 要約 selected. Below is a generous readable summary card with one short paragraph, two compact sections "決定事項" and "未解決事項", and a file row "report.md" with a download icon. Two actions: "ChatGPTで開く" and "続きを依頼". Do not show a stop button on a completed job.
+Bottom area: a clean request field labelled "セバスチャンへの依頼" and cyan button "依頼する". Above it a small note "PCを閉じた後もクラウドで続けます". Use understated, simple line icons for cloud, document, check and message. Keep all visible labels short and as accurate as possible. No credentials, no OAuth IDs, no database terminology. Prioritize layout and hierarchy over long text. All displayed job data are fictional.

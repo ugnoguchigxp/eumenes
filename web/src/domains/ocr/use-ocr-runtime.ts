@@ -263,6 +263,14 @@ export function useOcrRuntime(client: EumenesClient, conversationId = "main") {
 			setBusy(false);
 		}
 	}
+	function selectItem(id: string) {
+		viewEpoch.current++;
+		setSelection(id);
+		setFrameIndex(0);
+		setSelectedLines([]);
+		setHighlightRegion(undefined);
+		correctionRuntime.reset();
+	}
 	async function dispatch(event: ArtifactEvent): Promise<Receipt> {
 		if (event.source !== ocrSource)
 			return { status: "rejected", message: "対象が見つかりません。" };
@@ -346,14 +354,8 @@ export function useOcrRuntime(client: EumenesClient, conversationId = "main") {
 		}
 		if (!items.some((i) => i.id === id))
 			return { status: "rejected", message: "資料が見つかりません。" };
-		if (event.action === "ocr-select") {
-			viewEpoch.current++;
-			setSelection(id);
-			setFrameIndex(0);
-			setSelectedLines([]);
-			setHighlightRegion(undefined);
-			correctionRuntime.reset();
-		} else if (event.action === "ocr-cancel") {
+		if (event.action === "ocr-select") selectItem(id);
+		else if (event.action === "ocr-cancel") {
 			await client.ocrCancel(id);
 			await records.refetch();
 		} else if (event.action === "ocr-recheck") {
@@ -387,6 +389,12 @@ export function useOcrRuntime(client: EumenesClient, conversationId = "main") {
 	return {
 		loading: records.isPending || connection.isPending,
 		refresh,
+		/** The saved documents the screen holds and the one it shows, for a resource opened from the conversation. */
+		screen: {
+			ids: new Set(items.map((item) => item.id)),
+			selectedId,
+			select: selectItem,
+		},
 		runtime: { snapshot: { [ocrSource]: resource }, dispatch, uploadFile },
 	};
 }

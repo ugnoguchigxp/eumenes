@@ -7,6 +7,7 @@ import {
 	SkipBack,
 	SkipForward,
 } from "lucide-react";
+import { cn } from "../../utils/cn";
 import { Button } from "../Button";
 
 export function PlaybackControls({
@@ -19,6 +20,7 @@ export function PlaybackControls({
 	onNext,
 	repeat,
 	onRepeatChange,
+	attention,
 }: {
 	playing: boolean;
 	seekable: boolean;
@@ -29,6 +31,8 @@ export function PlaybackControls({
 	onNext?: () => void;
 	repeat: boolean;
 	onRepeatChange: (repeat: boolean) => void;
+	/** Playback was refused without a user gesture: the play button asks to be pressed. */
+	attention?: boolean;
 }) {
 	return (
 		<fieldset className="music-player-controls" aria-label="再生操作">
@@ -58,7 +62,10 @@ export function PlaybackControls({
 			<Button
 				type="button"
 				size="icon"
-				className="music-player-toggle"
+				className={cn(
+					"music-player-toggle",
+					attention && "music-player-attention",
+				)}
 				aria-label={playing ? "一時停止" : "再生"}
 				onClick={onToggle}
 			>

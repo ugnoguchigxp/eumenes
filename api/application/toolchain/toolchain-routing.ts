@@ -105,8 +105,8 @@ export function createToolchainRouting(
 	const enrich = (db: Database, card: Parameters<typeof instant.card>[1]) =>
 		instant.card(db, card).flatMap((c) => pipelines.card(db, c));
 	const bound: BoundCommandPort = {
-		snapshotInTransaction: (db, bindingRevisionId) =>
-			adapterOf(db, bindingRevisionId).snapshotInTransaction(db),
+		snapshotInTransaction: (db, bindingRevisionId, context) =>
+			adapterOf(db, bindingRevisionId).snapshotInTransaction(db, context),
 		parseInvocation(set, toolId, args) {
 			const tool = set.tools.find((t) => t.id === toolId);
 			if (!tool) return { ok: false, code: "toolchain_command_tool_unknown" };

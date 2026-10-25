@@ -11,7 +11,8 @@ import { type ExecutorContext, candidateOf } from "./executor-context";
 
 const log = getLogger("dialogue");
 /** What an instant toolchain's adapter may hand back as the answer. */
-const INSTANT_MAX_CHARS = 600;
+// An answer, or a read resource (at most 600 estimated tokens) with its JSON frame.
+const INSTANT_MAX_CHARS = 2000;
 
 /* The search for toolchains, the instant answers, and the trace of an answer (sections 6.1, 6.2, 6.5). */
 export async function find(
@@ -59,6 +60,9 @@ export async function find(
 					candidateOf(
 						card,
 						sessionTargetsInTransaction(deps, tx, card, run.id),
+						(card.produces ?? []).flatMap(
+							(kind) => deps.resources?.registry.kind(kind)?.label ?? [],
+						),
 					),
 				),
 				...(vector ? {} : { discovery: "embedding_unavailable" }),
@@ -87,15 +91,16 @@ export async function instant(
 			},
 		]);
 	// Every authority is checked before the adapter runs, not only after.
+	let conversationId = "";
 	const prepared = store.read((db) => {
-		current(db);
+		conversationId = current(db).conversationId;
 		toolchains!.resolveInTransaction(db, card.revisionId);
 		return toolchains!.instantInTransaction?.(db, card.revisionId);
 	});
 	if (!prepared)
 		return { result: { answered: false, code: "toolchain_unavailable" } };
 	const started = Date.now();
-	const answered = await prepared.run(parsed.value, signal);
+	const answered = await prepared.run(parsed.value, signal, { conversationId });
 	signal.throwIfAborted();
 	const answer =
 		answered.ok &&

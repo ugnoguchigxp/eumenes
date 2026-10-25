@@ -4,6 +4,7 @@ import {
 	draftReportBase,
 	requestRequirement,
 } from "../contracts/requirements";
+import { finishLinks } from "./resource-access";
 export const researchReport = draftReport;
 const invoke = z
 	.object({
@@ -15,7 +16,11 @@ const invoke = z
 	})
 	.strict();
 const finish = z
-	.object({ action: z.literal("finish"), report: researchReport })
+	.object({
+		action: z.literal("finish"),
+		report: researchReport,
+		links: finishLinks,
+	})
 	.strict();
 /** Minimal valid examples; `controlInstructions` renders them as OUTPUT_FORMAT. */
 const invokeExample = { action: "invoke", tool: "TOOLSのid", arguments: {} };
@@ -110,7 +115,13 @@ export const searchReport = z.discriminatedUnion("outcome", [
 export const searchAction = z
 	.discriminatedUnion("action", [
 		invoke,
-		z.object({ action: z.literal("finish"), report: searchReport }).strict(),
+		z
+			.object({
+				action: z.literal("finish"),
+				report: searchReport,
+				links: finishLinks,
+			})
+			.strict(),
 	])
 	.meta({
 		examples: [

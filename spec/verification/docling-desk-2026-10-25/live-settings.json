@@ -1,0 +1,25 @@
+{
+  "checkedAt": "2026-10-25T08:36:13.964Z",
+  "environments": [
+    {
+      "api": "http://127.0.0.1:8787",
+      "settings": {
+        "revision": 1,
+        "gatewayUrl": "http://127.0.0.1:28765",
+        "publicOrigin": "http://localhost:28765",
+        "credentialConfigured": true
+      },
+      "launcherCount": 1
+    },
+    {
+      "api": "http://127.0.0.1:8877",
+      "settings": {
+        "revision": 1,
+        "gatewayUrl": "http://127.0.0.1:28765",
+        "publicOrigin": "http://localhost:28765",
+        "credentialConfigured": true
+      },
+      "launcherCount": 1
+    }
+  ]
+}

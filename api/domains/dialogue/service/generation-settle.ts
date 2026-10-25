@@ -6,6 +6,7 @@ import { jstSeconds } from "../../../infrastructure/jst-time";
 import type { Run } from "../contracts";
 import type { ToolchainRoutingPort } from "../contracts/toolchains";
 import { byId, linkAnswer, transition } from "../repository";
+import { workOfRun } from "../repository/work";
 import {
 	GENERATE_KIND,
 	type DialogueDeps,
@@ -183,7 +184,10 @@ export function createGenerationSettlement(
 					createdAt: clock(),
 					runId: run.id,
 				});
-				if (!result.handover) said(deps, tx, run, messageId, text, result);
+				if (!result.handover) {
+					said(deps, tx, run, messageId, text, result);
+					linkAnswerResources(deps, tx, run, input, messageId);
+				}
 				const delivery = result.emotion
 					? hostDelivery(result.emotion)
 					: result.receipt?.delivery?.version === 2
@@ -247,6 +251,36 @@ export function createGenerationSettlement(
 			handleFailedUtterances(deps, tx, run, input);
 		return moved ? "applied" : "stale";
 	};
+}
+
+/**
+ * The reply shows the resources of the TODOs it answers for as chips (section 4.2 of the resource plan): the work
+ * this run handed over and the TODOs whose change triggered it.
+ */
+function linkAnswerResources(
+	deps: DialogueDeps,
+	tx: Database,
+	run: Run,
+	input: GenerateInput,
+	messageId: string,
+) {
+	const triggered = input.trigger.flatMap((trigger) =>
+		trigger.kind === "todo_changed" && Array.isArray(trigger.todos)
+			? (trigger.todos as Array<{ id?: unknown }>).flatMap((todo) =>
+					typeof todo.id === "string" ? [todo.id] : [],
+				)
+			: [],
+	);
+	const ids = new Set([
+		...triggered,
+		...workOfRun(tx, run.id).map((row) => row.id),
+	]);
+	deps.resourceLedger?.linkMessageToWorkInTransaction(
+		tx,
+		run.conversationId,
+		messageId,
+		[...ids],
+	);
 }
 
 /**

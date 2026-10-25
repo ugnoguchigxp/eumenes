@@ -1,0 +1,183 @@
+{
+  "schemaVersion": 1,
+  "runId": "2026-10-25T08-35-59-095Z-2c5dc4a6-189b-4d61-be75-825a432b9a95",
+  "startedAt": "2026-10-25T08:35:59.095Z",
+  "scope": {
+    "all": false,
+    "selected": [
+      "docling"
+    ]
+  },
+  "baseCommit": "a004aaad750e82abaa4119e93c5d22720628804e",
+  "revision": "70096e16b3adfc185e51d5758329d42b38300aa7bb27408eb9ea8263826d3d5c",
+  "runtime": {
+    "bun": "1.4.3",
+    "node": "26.3.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "ci": false,
+    "runner": null
+  },
+  "result": "pass",
+  "steps": [
+    {
+      "name": "inventory",
+      "status": "pass",
+      "ms": 153
+    },
+    {
+      "name": "boundaries",
+      "status": "pass",
+      "ms": 11
+    },
+    {
+      "name": "system-context",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "context:check"
+      ],
+      "status": "pass",
+      "ms": 99,
+      "exitCode": 0
+    },
+    {
+      "name": "size-budget",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "scripts/size-budget.ts",
+        "api/domains/docling",
+        "web/src/domains/docling",
+        "packages/design-system/src/components/ExternalAppLauncher"
+      ],
+      "status": "pass",
+      "ms": 206,
+      "exitCode": 0
+    },
+    {
+      "name": "format",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "format:check",
+        "api/domains/docling",
+        "web/src/domains/docling",
+        "packages/design-system/src/components/ExternalAppLauncher"
+      ],
+      "status": "pass",
+      "ms": 97,
+      "exitCode": 0
+    },
+    {
+      "name": "lint",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "lint",
+        "api/domains/docling",
+        "web/src/domains/docling",
+        "packages/design-system/src/components/ExternalAppLauncher"
+      ],
+      "status": "pass",
+      "ms": 47,
+      "exitCode": 0
+    },
+    {
+      "name": "design-system typecheck",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "--cwd",
+        "packages/design-system",
+        "typecheck"
+      ],
+      "status": "pass",
+      "ms": 253,
+      "exitCode": 0
+    },
+    {
+      "name": "design-system build",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "--cwd",
+        "packages/design-system",
+        "build"
+      ],
+      "status": "pass",
+      "ms": 5756,
+      "exitCode": 0
+    },
+    {
+      "name": "typecheck configuration",
+      "status": "pass",
+      "ms": 1
+    },
+    {
+      "name": "typecheck",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "check",
+        "-p",
+        "/private/tmp/eumenes-docling-verification/verification-reports/runs/2026-10-25T08-35-59-095Z-2c5dc4a6-189b-4d61-be75-825a432b9a95/tsconfig.selected.json"
+      ],
+      "status": "pass",
+      "ms": 223,
+      "exitCode": 0
+    },
+    {
+      "name": "typecheck closure",
+      "status": "pass",
+      "ms": 104
+    },
+    {
+      "name": "bun tests",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "test",
+        "./api/domains/docling/test/docling.test.ts"
+      ],
+      "status": "pass",
+      "ms": 41,
+      "exitCode": 0
+    },
+    {
+      "name": "web tests",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "x",
+        "--no-install",
+        "vitest",
+        "run",
+        "web/src/domains/docling/open.test.ts"
+      ],
+      "status": "pass",
+      "ms": 883,
+      "exitCode": 0
+    },
+    {
+      "name": "design-system tests",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "--cwd",
+        "packages/design-system",
+        "test",
+        "src/components/ExternalAppLauncher/ExternalAppLauncher.test.tsx"
+      ],
+      "status": "pass",
+      "ms": 2588,
+      "exitCode": 0
+    }
+  ],
+  "totalMs": 10834,
+  "integrityErrors": [],
+  "build": {
+    "sharedOutput": true,
+    "inputRevision": "70096e16b3adfc185e51d5758329d42b38300aa7bb27408eb9ea8263826d3d5c",
+    "distAfterBuild": "df82570f1d7b7dcfdde0e5346dc9e90125317909b7eb3857d5421c809fe93eaf",
+    "distAfterConsumers": "df82570f1d7b7dcfdde0e5346dc9e90125317909b7eb3857d5421c809fe93eaf"
+  },
+  "finalRevision": "70096e16b3adfc185e51d5758329d42b38300aa7bb27408eb9ea8263826d3d5c",
+  "finishedAt": "2026-10-25T08:36:12.746Z"
+}

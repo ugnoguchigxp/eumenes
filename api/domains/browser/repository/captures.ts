@@ -189,3 +189,24 @@ export const capturesRevision = (db: Database) =>
 			.query("SELECT COALESCE(SUM(revision+1),0) AS n FROM browser_captures")
 			.get() as { n: number }
 	).n;
+
+/** A finished capture with the title and address of the tab it was taken from (when the tab is still known). */
+export type CaptureWithTab = CaptureRow & {
+	tab_title: string | null;
+	tab_url: string | null;
+};
+const WITH_TAB =
+	"SELECT c.*, t.title AS tab_title, t.url AS tab_url FROM browser_captures c LEFT JOIN browser_tabs t ON t.tab_ref=c.tab_ref WHERE c.owner=? AND c.state='local_ready'";
+
+export const readyCaptureWithTab = (db: Database, owner: string, id: string) =>
+	db.query(`${WITH_TAB} AND c.id=?`).get(owner, id) as CaptureWithTab | null;
+
+/** The owner's finished captures, newest first, for a text search. */
+export const readyCapturesWithTab = (
+	db: Database,
+	owner: string,
+	limit: number,
+) =>
+	db
+		.query(`${WITH_TAB} ORDER BY c.created_at DESC, c.rowid DESC LIMIT ?`)
+		.all(owner, limit) as CaptureWithTab[];

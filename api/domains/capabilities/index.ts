@@ -22,6 +22,11 @@ export { imageBuiltins } from "./builtin/image";
 export { musicBuiltins } from "./builtin/music";
 
 export { toolchainBuiltins } from "./builtin/toolchains";
+export { resourceKindBuiltins } from "./builtin/resource-kinds";
+export type {
+	ResourceActionName,
+	ResourceKindData,
+} from "./contracts/resource-kinds";
 import { toolchainBuiltins as registeredToolchains } from "./builtin/toolchains";
 import { bundleToolchainFunctions } from "./service/bundle-files";
 export { dormantBundleFile } from "./service/bundle-files";

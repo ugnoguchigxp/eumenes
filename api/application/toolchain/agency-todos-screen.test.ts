@@ -20,7 +20,7 @@ test("TODO launcher and paged source resolve through the registered artifact wit
 		).toHaveLength(1);
 		const base =
 			"/api/toolchain-artifacts/" +
-			encodeURIComponent("artifact:agency.todos@1");
+			encodeURIComponent("artifact:agency.todos@2");
 		const detail = await (await h.request(base)).json();
 		expect(detail.artifact.variants[0].definition).toEqual({
 			view: "todo-workspace",
@@ -30,7 +30,7 @@ test("TODO launcher and paged source resolve through the registered artifact wit
 		expect(detail.artifact.sourceBindings[0]).toMatchObject({
 			adapterRef: "adapter:task-execution@1",
 			query: TASK_TODOS_QUERY,
-			paramsSchemaRef: "schema:todo-screen-query@1",
+			paramsSchemaRef: "schema:todo-screen-query@2",
 		});
 		const source = base + "/sources/agency-todos";
 		const read = (params: unknown, suffix = "") =>
@@ -102,9 +102,12 @@ test("a TODO source is unavailable before the runtime is attached", () => {
 	}
 });
 
+// Longer than any cut the ledger's title or a one-line summary would make: the screen shows them whole.
+const LONG_REQUEST = `${"長い依頼".repeat(20)}\n続き`;
+const LONG_SUMMARY = "結果の要約".repeat(60);
 const ledgerRow = (over: Partial<LedgerWorkRow>): LedgerWorkRow => ({
 	id: "w1",
-	title: "曲を作る",
+	request: "曲を作る",
 	status: "done",
 	outcome: "succeeded",
 	question: null,
@@ -115,7 +118,7 @@ const ledgerRow = (over: Partial<LedgerWorkRow>): LedgerWorkRow => ({
 	...over,
 });
 
-test("the TODO source pages the dialogue ledger and shows only title, state, outcome and a one-line summary", () => {
+test("the TODO source pages the dialogue ledger and shows the whole request, state, outcome and summary, never the result body", () => {
 	const db = new Database(":memory:");
 	try {
 		const asked: unknown[] = [];
@@ -128,7 +131,7 @@ test("the TODO source pages the dialogue ledger and shows only title, state, out
 						ledgerRow({}),
 						ledgerRow({
 							id: "w2",
-							title: "確認する",
+							request: "確認する",
 							status: "waiting",
 							outcome: null,
 							question: "どの曲調?\n明るい?",
@@ -137,14 +140,19 @@ test("the TODO source pages the dialogue ledger and shows only title, state, out
 						}),
 						ledgerRow({
 							id: "w3",
+							request: LONG_REQUEST,
 							execution: "pipeline",
 							archivedAt: "2026-10-24T00:00:03.000Z",
 							result: { notASummary: true },
 						}),
+						ledgerRow({
+							id: "w4",
+							result: { summary: LONG_SUMMARY, body: "RAW-RESULT-BODY" },
+						}),
 					],
-					total: 3,
+					total: 4,
 					pageIndex: 0,
-					counts: { todo: 1, done: 1, archived: 1 },
+					counts: { todo: 1, done: 2, archived: 1 },
 				};
 			},
 		);
@@ -163,7 +171,7 @@ test("the TODO source pages the dialogue ledger and shows only title, state, out
 				rows: [
 					{
 						id: "w1",
-						title: "曲を作る",
+						request: "曲を作る",
 						status: "done",
 						outcome: "succeeded",
 						summary: "3分の曲ができた",
@@ -173,7 +181,7 @@ test("the TODO source pages the dialogue ledger and shows only title, state, out
 					},
 					{
 						id: "w2",
-						title: "確認する",
+						request: "確認する",
 						status: "waiting",
 						outcome: null,
 						summary: "どの曲調? 明るい?",
@@ -183,7 +191,7 @@ test("the TODO source pages the dialogue ledger and shows only title, state, out
 					},
 					{
 						id: "w3",
-						title: "曲を作る",
+						request: LONG_REQUEST.replace(/\s+/g, " "),
 						status: "done",
 						outcome: "succeeded",
 						summary: null,
@@ -191,9 +199,19 @@ test("the TODO source pages the dialogue ledger and shows only title, state, out
 						archived: true,
 						updatedAt: "2026-10-24T00:00:01.000Z",
 					},
+					{
+						id: "w4",
+						request: "曲を作る",
+						status: "done",
+						outcome: "succeeded",
+						summary: LONG_SUMMARY,
+						pipeline: false,
+						archived: false,
+						updatedAt: "2026-10-24T00:00:01.000Z",
+					},
 				],
-				counts: { todo: 1, done: 1, archived: 1 },
-				total: 3,
+				counts: { todo: 1, done: 2, archived: 1 },
+				total: 4,
 				state: "active",
 				pageIndex: 0,
 				pageSize: 25,

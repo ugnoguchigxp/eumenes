@@ -12,7 +12,6 @@ import {
 import { recognitionCommand } from "../../capabilities";
 import type { HandlerDefinition } from "../../queue";
 import { ANSWER_TEXT_SCHEMA } from "../contracts/command-interactions";
-import { delegationCommand } from "../contracts/delegation";
 import type { Run } from "../contracts";
 import { byId, linkAnswer, transition } from "../repository";
 import { endRun } from "./run-end";
@@ -107,10 +106,9 @@ export function parseToolCommand(
 	const operation = out.tool ? input.toolIds[out.tool] : undefined;
 	if (!operation) throw new Error("toolchain_command_tool_unknown");
 	const raw = { ...out.arguments, operation };
-	const command =
-		input.backend === "object-recognition"
-			? recognitionCommand.safeParse(raw)
-			: delegationCommand.safeParse(raw);
+	if (input.backend !== "object-recognition")
+		throw new Error("adapter_unavailable");
+	const command = recognitionCommand.safeParse(raw);
 	if (!command.success) {
 		log.warn("dialogue.operation_rejected", {
 			reason: "command_arguments_invalid",
@@ -202,7 +200,7 @@ export function createToolchainCommandHandler(
 				{
 					request,
 					originalRequest: original,
-					...(set.backend === "dots" ? { catalog: snapshot } : { snapshot }),
+					snapshot,
 					...(resume?.exchanges.length
 						? { previousQuestions: resume.exchanges }
 						: {}),

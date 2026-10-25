@@ -76,7 +76,8 @@ export function createInstantRouting(deps: {
 				.toolchainsInTransaction(db)
 				.find((d) => d.id === binding.fallbackToolchainId);
 			return {
-				run: (args, signal) => adapter.instant!.run(operation, args, signal),
+				run: (args, signal, context) =>
+					adapter.instant!.run(operation, args, signal, context),
 				fallback:
 					fallback && deps.fallbackAvailable(db, fallback)
 						? {

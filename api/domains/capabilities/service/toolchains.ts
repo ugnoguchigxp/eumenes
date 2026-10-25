@@ -4,6 +4,11 @@ import { zSchema } from "./schema";
 import { createArtifacts } from "./artifacts";
 import { indexSearch, validateToolchain } from "./registry";
 import {
+	producersInTransaction,
+	producesInTransaction,
+	resourceKindsInTransaction,
+} from "./resource-kinds";
+import {
 	artifactInTransaction,
 	bindingInTransaction as storedBindingInTransaction,
 } from "./documents";
@@ -151,6 +156,7 @@ export function createToolchains(
 				? []
 				: active;
 		const functionOf = new Map(active.map((d) => [d.id, d.functionName!]));
+		const producers = producersInTransaction(db);
 		return candidates.map((d, i) => ({
 			revisionId: d.revisionId,
 			id: d.id,
@@ -159,6 +165,7 @@ export function createToolchains(
 			summary: d.summary,
 			useWhen: d.useWhen,
 			...(d.minImpact ? { minImpact: d.minImpact } : {}),
+			...(producers.has(d.id) ? { produces: producers.get(d.id)! } : {}),
 			redirects: (d.redirects ?? []).flatMap((r) =>
 				functionOf.has(r.toolchainId)
 					? [
@@ -294,5 +301,7 @@ export function createToolchains(
 		}),
 		publishToolchainRevisionInTransaction: publishRevisionInTransaction,
 		toolchainExamplesInTransaction: examplesInTransaction,
+		producesInTransaction,
+		resourceKindsInTransaction,
 	};
 }

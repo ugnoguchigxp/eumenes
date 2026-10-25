@@ -616,3 +616,25 @@ test("cancel of a waiting TODO from a later utterance ends the run it waits on, 
 	// Cancelled work is not reported back: the TODO is archived at once.
 	expect(h.todos()).toEqual([]);
 });
+
+test("the TODO screen's page shows the whole request, newest request first, and the archive apart", async () => {
+	h = await setup();
+	const long = `${"とても長い依頼の説明".repeat(8)}の絵`;
+	await doneTodo("猫の絵");
+	await doneTodo(long);
+	const page = (state: "active" | "archived") =>
+		h!.store.read((db) =>
+			h!.dialogue.todoPageInTransaction(db, "main", {
+				state,
+				pageIndex: 0,
+				pageSize: 10,
+			}),
+		);
+	const active = page("active");
+	expect(active.total).toBe(2);
+	expect(active.counts).toEqual({ todo: 0, done: 2, archived: 0 });
+	// The ledger's title is cut for the model's state; the screen reads the request itself.
+	expect(active.rows.map((row) => row.request)).toEqual([long, "猫の絵"]);
+	expect(active.rows[0]!.title.length).toBeLessThan(long.length);
+	expect(page("archived").rows).toEqual([]);
+});

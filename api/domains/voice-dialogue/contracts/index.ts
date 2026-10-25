@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { HttpErrorStatus } from "../../../infrastructure/http";
 import { speechDeliverySchema } from "../../delivery";
-import { viewingSchema } from "../../dialogue/contracts";
+import { runViewingSchema } from "../../dialogue/contracts";
 export const voiceStartSchema = z.object({
 	sessionId: z.uuid(),
 	generation: z.number().int().positive(),
@@ -85,6 +85,6 @@ export const inputCommitSchema = z
 	.object({
 		revision: z.number().int().nonnegative(),
 		/** The saved item on screen when the user spoke; re-checked by the host like a typed message's. */
-		viewing: viewingSchema.optional(),
+		viewing: runViewingSchema.optional(),
 	})
 	.strict();

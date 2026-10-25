@@ -13,6 +13,10 @@ import {
 } from "../contracts";
 import { zSchema } from "./schema";
 import { artifactInTransaction, bindingInTransaction } from "./documents";
+import {
+	resourceDefinitionKinds,
+	validateResourceDefinition,
+} from "./resource-kinds";
 export function registerRevision(
 	db: Database,
 	d: Definition,
@@ -73,6 +77,9 @@ export function registerRevision(
 		)
 			throw new Error("invalid_capability_bundle");
 	}
+	if (resourceDefinitionKinds.includes(d.kind)) validateResourceDefinition(d);
+	else if (d.resourceKindData !== undefined)
+		throw new Error("invalid_capability");
 	if (d.kind === "toolchain") validateToolchain(db, d, dependencies);
 	else if (
 		d.functionName !== undefined ||
@@ -114,7 +121,12 @@ export function registerRevision(
 			rev,
 			dependency,
 		);
-	if (origin === "learned" || d.kind === "requirement") return;
+	if (
+		origin === "learned" ||
+		d.kind === "requirement" ||
+		resourceDefinitionKinds.includes(d.kind)
+	)
+		return;
 	indexSearch(db, d);
 }
 /** Replace the full-text entry of an item with the content of this revision. */

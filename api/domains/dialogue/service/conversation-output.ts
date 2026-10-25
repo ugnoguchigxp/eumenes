@@ -17,16 +17,21 @@ export function conversationOutput(
 	const callStart = new RegExp(
 		`(?:${escaped.join("|")})\\s*(?:\\(\\s*)?\\{?\\s*$`,
 	);
-	// These are provider control delimiters, not ordinary answer text.
-	const delimiters = ["<|", "<call:"];
-	const prefixes = [...names, ...delimiters].flatMap((word) =>
+	// An offered tool written as an XML tag: `<delegate>`, `<work\n` (run `a3c89c6e`).
+	const tagSyntax = new RegExp(`</?(?:${escaped.join("|")})[\\s>]`);
+	const tags = names.map((name) => `<${name}`);
+	// These are provider control delimiters, not ordinary answer text (`<tool_call>` / `<function=`: run `f4764696`).
+	const delimiters = ["<|", "<call:", "<tool_call>", "<function", "<parameter"];
+	const prefixes = [...names, ...tags, ...delimiters].flatMap((word) =>
 		Array.from({ length: word.length }, (_, i) => word.slice(0, i + 1)),
 	);
 	let pending = "",
 		blocked = false,
 		characters = 0;
 	const invalid = (text: string) =>
-		delimiters.some((token) => text.includes(token)) || callSyntax.test(text);
+		delimiters.some((token) => text.includes(token)) ||
+		callSyntax.test(text) ||
+		tagSyntax.test(text);
 	function tail(text: string) {
 		let held = 0;
 		for (const prefix of prefixes)

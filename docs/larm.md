@@ -130,3 +130,7 @@ music domainのプレイリストは会話/run・検索条件・曲IDを保存�
 ## チャットの画像入力
 
 画像入力（JPG・PNG・BMP）は、Providerの`llm.vision`と`chatInput`を確認して使います。保存、履歴再送、正式token計数と保持説明は[チャット画像入力](chat-images.md)を参照してください。
+
+## Docling Deskの入口
+
+Docling Deskは既存LARM資格情報とgatewayのUI-ticket契約で別タブに開く。独自leaseやExcalidraw専用キーは使わない。中継・Cookie・起動待ち・受入は[Docling Desk](docling.md)を参照。

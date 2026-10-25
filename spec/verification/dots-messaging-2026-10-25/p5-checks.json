@@ -1,0 +1,47 @@
+{
+  "checkedAt": "2026-10-25T06:23:15.971Z",
+  "fixture": {
+    "domain": {
+      "result": "pass",
+      "bunTests": 61,
+      "webTests": 1,
+      "report": "p5-domain-report.json",
+      "devStopped": true
+    },
+    "application": {
+      "result": "pass",
+      "tests": 14,
+      "assertions": 81
+    },
+    "format": "pass",
+    "lint": "pass",
+    "schemaDescriptions": "confirmed"
+  },
+  "live": {
+    "result": "passed",
+    "primaryExchanges": 3,
+    "primaryRecord": "live-sebastian.json",
+    "afterSubscriptionRefresh": {
+      "result": "passed",
+      "additionalExchanges": 1,
+      "record": "live-refresh-sebastian.json"
+    },
+    "subscription": {
+      "active": true,
+      "expiresAt": 1792909965000
+    },
+    "restartPersistence": "three replies and summaries retained",
+    "visual": "confirmed; live-ui-sebastian.jpg"
+  },
+  "limitations": [
+    "Trial OAuth service expires 2026-10-25T07:40:28.557Z; not permanent hosting.",
+    "Observed one subscription extension and a subsequent real exchange; not a prolonged periodic-renewal test.",
+    "Whole-repository gates are separate from this scoped verification."
+  ],
+  "sourceHashes": {
+    "api/domains/dots/contracts/messaging.ts": "1d71371080602012a16de04b9a1fc49af0f7776804b5502acae294ca9697d59d",
+    "api/application/work/dots-http.ts": "4d522136d998843dfa58455686310ebcebce1807be554a868d1211b0a49be33c",
+    "api/application/work/dots-messages.test.ts": "287924919f033eeb2f4e2fffefc6d3523d98c20057772f8d313e8cbe4a134dc4",
+    "scripts/dots-messaging-live.ts": "532b8a22b15d6eadfc7eef197b1b2a3ebc85ce71031253e367464792e9607fbe"
+  }
+}

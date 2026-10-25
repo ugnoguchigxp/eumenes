@@ -1,0 +1,9 @@
+Use case: ui-mockup
+Asset type: Eumenes desktop artifact settings concept, 1280x960.
+Create a polished, realistic flat software UI screenshot for a Japanese personal AI assistant. Match a dark charcoal/navy desktop interface, restrained cyan accent, green connection badges, subtle thin borders, rounded cards, readable sans-serif typography. No browser chrome, no laptop frame, no photographs, no charts, no neon decoration.
+Screen title "dotsの設定", back link "仕事へ戻る". Left narrow section navigation: "接続", "作業先", "担当と手順", "受取と同期". Main area has four well-spaced compact cards.
+Card 1 "ChatGPTとの接続": avatar placeholder, name "セバスチャン", green "接続済み" badge, a secondary "接続を確認" button. Small text "再起動後も同じ接続を使います". Include a collapsed "詳細設定" row, but no raw URLs, tokens or client IDs.
+Card 2 "作業先": selected option "クラウドで続行", unselected secondary option "このPCで実行". Under the selected option, show a dropdown "登録済みの作業環境" and helpful note "このPCを閉じても作業を続けます". Below are permission chips "調査", "ファイル編集", "検証" and a muted row "公開・外部送信は確認してから".
+Card 3 "担当と手順": dropdown "dots依頼担当", one short explanatory line "依頼・質問・進捗・成果を扱います", and a small "手順を見る" link.
+Card 4 "受取と同期": two clearly labelled switches, both on: "起動時に結果を受け取る", "受け取った結果を会話に表示". Helper text "未受領の結果はクラウドで保持します" and a quiet line "設定はこのPCに保存されます".
+At the bottom, a sticky draft bar showing "未保存の変更 2件", secondary "変更を破棄", and primary cyan "変更を保存". Avoid implying changes are saved until the save action succeeds. Use concise Japanese labels; keep long body text minimal. No database jargon, no implementation details, no secret fields, no hardcoded model names. Fictional screen concept only.

@@ -70,3 +70,28 @@ export function updateImport(
 	);
 	return view;
 }
+
+type ImportedArtifact = NonNullable<ImageImportView["artifact"]>;
+const succeeded = (rows: { view_json: string }[]) =>
+	rows.flatMap((r) => {
+		const view = JSON.parse(r.view_json) as ImageImportView;
+		return view.status === "succeeded" && view.artifact ? [view.artifact] : [];
+	}) as ImportedArtifact[];
+/** The library image stored by a succeeded import. */
+export const importedArtifact = (db: Database, id: string) =>
+	succeeded(
+		db
+			.query(
+				"SELECT view_json FROM image_imports WHERE json_extract(view_json,'$.status')='succeeded' AND json_extract(view_json,'$.artifact.id')=?",
+			)
+			.all(id) as { view_json: string }[],
+	)[0] ?? null;
+/** The library images stored by succeeded imports. */
+export const importedArtifacts = (db: Database) =>
+	succeeded(
+		db
+			.query(
+				"SELECT view_json FROM image_imports WHERE json_extract(view_json,'$.status')='succeeded'",
+			)
+			.all() as { view_json: string }[],
+	);

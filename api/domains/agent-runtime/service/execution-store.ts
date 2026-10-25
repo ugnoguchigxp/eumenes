@@ -65,7 +65,16 @@ export function createExecutionStore(ctx: ExecutionContext) {
 		result: Omit<ExecutionResult, "status">,
 	) {
 		if (!isExecutionActive(row)) return;
-		const body = JSON.stringify({ ...result, status });
+		// What the children made stays the parent's result, whatever its sub-agent wrote.
+		const links = [...new Set(state.notes.flatMap((n) => n.links ?? []))].slice(
+			0,
+			8,
+		);
+		const body = JSON.stringify({
+			...result,
+			status,
+			...(links.length ? { links } : {}),
+		});
 		if (new TextEncoder().encode(body).length > 16_384)
 			throw new Error("execution_result_capacity");
 		state.question = null;
@@ -205,6 +214,7 @@ export function createExecutionStore(ctx: ExecutionContext) {
 			state: result.state,
 			summary: result.summary.slice(0, 2000),
 			refs: [reference.ref, ...result.references.map((r) => r.ref)],
+			...(result.links?.length ? { links: result.links } : {}),
 		});
 		const item = state.plan?.items.find(
 			(entry) => entry.childId === pending.child.id,

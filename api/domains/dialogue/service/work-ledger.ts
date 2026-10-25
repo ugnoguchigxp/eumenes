@@ -3,6 +3,8 @@ import type { Database } from "bun:sqlite";
 import type { ToolchainCard } from "../../capabilities";
 import type { DialogueDeps } from "./context";
 import type { PendingConfirmation, TodoItem } from "./context-document";
+import { forgetWorkResources, workLinksOf } from "../repository/resources";
+import { recordWorkLinksInTransaction } from "./work-links";
 import {
 	archiveWork,
 	dropRunResults,
@@ -48,6 +50,7 @@ export function todoOf(row: WorkRow): TodoItem {
 	return {
 		id: row.id,
 		ref: row.ref,
+		toolchainId: row.toolchainId,
 		title: row.title,
 		status: row.status,
 		...(row.outcome ? { outcome: row.outcome } : {}),
@@ -67,11 +70,37 @@ export function resultFields(row: WorkRow): Record<string, unknown> {
 	};
 }
 
-/** The numbers the document shows TODOs and confirmations by (section 6 of the layout specification). */
-function documentRefsInTransaction(db: Database, conversationId: string) {
+/** The TODOs as the conversation sees them, each with the links of the resources it made. */
+function itemsOf(db: Database, rows: readonly WorkRow[]): TodoItem[] {
+	const links = workLinksOf(
+		db,
+		rows.map((row) => row.id),
+	);
+	return rows.map((row) => {
+		const made = links.get(row.id);
+		return { ...todoOf(row), ...(made ? { links: made } : {}) };
+	});
+}
+
+/**
+ * The numbers the document shows TODOs, confirmations and resources by (section 6 of the layout specification, and
+ * `a<n>` of the resource ledger).
+ */
+function documentRefsInTransaction(
+	deps: Pick<DialogueDeps, "resourceLedger">,
+	db: Database,
+	conversationId: string,
+) {
 	const todos = workRefs(db, conversationId);
 	const confirmations = confirmationRefs(db, conversationId);
+	const resources =
+		deps.resourceLedger?.numbersInTransaction(db, conversationId) ??
+		new Map<string, number>();
 	return {
+		resource: (uri: string) => {
+			const ref = resources.get(uri);
+			return ref === undefined ? null : `a${ref}`;
+		},
 		todo: (todoId: string) => {
 			const ref = todos.get(todoId);
 			return ref === undefined ? null : `t${ref}`;
@@ -86,13 +115,71 @@ function documentRefsInTransaction(db: Database, conversationId: string) {
 /** The message id a TODO's result events stand on besides the request's messages: dropping the result reaches them. */
 const resultKey = (workId: string) => `work:${workId}`;
 
+/** The display title of the toolchain a TODO was handed to, as registered now (its revision, else the current one). */
+function toolchainTitleOf(
+	toolchains: DialogueDeps["toolchains"],
+	db: Database,
+	row: WorkRow,
+): string | undefined {
+	if (!toolchains) return undefined;
+	const own = toolchains.cardInTransaction(db, row.toolchainRevisionId);
+	if (own) return own.title;
+	const current = toolchains
+		.catalogInTransaction(db)
+		.find((entry) => entry.id === row.toolchainId);
+	return current
+		? toolchains.cardInTransaction(db, current.revisionId)?.title
+		: undefined;
+}
+
+/** What an owner reports into a TODO. */
+type WorkReport =
+	| { status: "waiting"; questionId: string; question: string }
+	| {
+			status: "done";
+			outcome: WorkOutcome;
+			result: unknown;
+			/** The resource URIs the sub-agent named as made by the work (`ChildResult.links`). */
+			links?: readonly string[];
+	  }
+	| { status: "todo" };
+
+/** What the finished work made is kept with it (resource plan section 4.1): only a successful or partial end makes any. */
+function recordReportLinks(
+	deps: Pick<DialogueDeps, "resources" | "resourceLedger">,
+	db: Database,
+	row: WorkRow,
+	report: WorkReport,
+) {
+	if (
+		report.status === "done" &&
+		(report.outcome === "succeeded" || report.outcome === "partial")
+	)
+		recordWorkLinksInTransaction(
+			deps,
+			db,
+			row,
+			report.result,
+			{ conversationId: row.conversationId, runId: row.runId, workId: row.id },
+			report.links,
+		);
+}
+
 /**
  * The conversation's TODO ledger: a TODO per piece of work handed to a toolchain, its state as the work's owner
  * reports it, each reported question or result as an event of the log, the archive in two steps (request, then the
  * delivery that confirms it), and the confirmations issued before executing a change.
  */
 export function createWorkLedger(
-	deps: Pick<DialogueDeps, "clock" | "id" | "continuity" | "toolchains">,
+	deps: Pick<
+		DialogueDeps,
+		| "clock"
+		| "id"
+		| "continuity"
+		| "toolchains"
+		| "resources"
+		| "resourceLedger"
+	>,
 ) {
 	const { clock, id, continuity } = deps;
 	/** A question or result the owner reported joins the log once per revision (the ContextWindow layout specification). */
@@ -127,7 +214,7 @@ export function createWorkLedger(
 	}
 	return {
 		todosInTransaction(db: Database, conversationId: string): TodoItem[] {
-			return openWork(db, conversationId).map(todoOf);
+			return itemsOf(db, openWork(db, conversationId));
 		},
 		/** The unarchived TODOs' revisions: what the work tool checks an operation against. */
 		todoRevisionsInTransaction: (db: Database, conversationId: string) =>
@@ -147,8 +234,10 @@ export function createWorkLedger(
 		) =>
 			openWork(db, conversationId).map((row) => {
 				const now = row.status === "done" ? current?.(row) : undefined;
+				const title = toolchainTitleOf(deps.toolchains, db, row);
 				return {
-					...todoOf(row),
+					...itemsOf(db, [row])[0]!,
+					...(title ? { toolchainTitle: title } : {}),
 					createdAt: row.createdAt,
 					changedAt: row.updatedAt,
 					result: now === undefined ? row.result : now,
@@ -158,7 +247,8 @@ export function createWorkLedger(
 		/** The TODO the model names `t<ref>`. */
 		workByRefInTransaction: workByRef,
 		confirmationByRefInTransaction: confirmationByRef,
-		refsInTransaction: documentRefsInTransaction,
+		refsInTransaction: (db: Database, conversationId: string) =>
+			documentRefsInTransaction(deps, db, conversationId),
 		/** Run-centric work the run waits for and that has not finished (task executions run on their own). */
 		waitingOfRunInTransaction: (db: Database, runId: string) =>
 			workOfRun(db, runId).filter(
@@ -217,10 +307,7 @@ export function createWorkLedger(
 		reportInTransaction(
 			db: Database,
 			workId: string,
-			report:
-				| { status: "waiting"; questionId: string; question: string }
-				| { status: "done"; outcome: WorkOutcome; result: unknown }
-				| { status: "todo" },
+			report: WorkReport,
 		): WorkRow | null {
 			const row = workById(db, workId);
 			if (!row || row.archivedAt) return null;
@@ -251,6 +338,7 @@ export function createWorkLedger(
 				archiveWork(db, workId, clock());
 				return next;
 			}
+			recordReportLinks(deps, db, next, report);
 			logResult(db, next);
 			return next;
 		},
@@ -306,7 +394,10 @@ export function createWorkLedger(
 		 * and their results leave the log.
 		 */
 		forgetInTransaction(db: Database, messageIds: readonly string[]) {
-			clearResults(db, forgetWork(db, messageIds, clock()));
+			const forgotten = forgetWork(db, messageIds, clock());
+			// The resources of a forgotten TODO are forgotten with it.
+			forgetWorkResources(db, forgotten, clock());
+			clearResults(db, forgotten);
 		},
 		/** A run's results deleted at their owner: the TODOs it fed keep no copy, in the TODO or in the log. */
 		dropRunResultsInTransaction(db: Database, runId: string) {

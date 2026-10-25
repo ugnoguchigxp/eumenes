@@ -18,6 +18,7 @@ import {
 import { systemText } from "./context-system";
 import { toolchainTitlesInTransaction } from "./delegate-conversation";
 import { generationTools } from "./generation-tools";
+import { resourceLinesInTransaction } from "./resource-context";
 
 /** The system part of every call on the conversation's prompt: the agent's system, then the host's rules. */
 export function conversationSystem(deps: DialogueDeps, tx: Database): string {
@@ -78,7 +79,7 @@ export function conversationDocumentInTransaction(
 	const refs: DocumentRefs = deps.work?.refsInTransaction(
 		tx,
 		conversationId,
-	) ?? { todo: () => null, confirmation: () => null };
+	) ?? { todo: () => null, confirmation: () => null, resource: () => null };
 	const document = renderDocument(
 		{
 			profile: input.window?.profile.items ?? [],
@@ -86,6 +87,13 @@ export function conversationDocumentInTransaction(
 			log: logged,
 			state: {
 				todos,
+				resources: resourceLinesInTransaction(
+					deps,
+					tx,
+					conversationId,
+					refs,
+					tokyoYear(input.nowMs),
+				),
 				pendingConfirmation:
 					deps.work?.pendingConfirmationsInTransaction(tx, conversationId) ??
 					[],

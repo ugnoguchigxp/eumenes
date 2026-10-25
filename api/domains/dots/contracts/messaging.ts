@@ -31,13 +31,20 @@ export const messageReplyInput = z
 	.strictObject({
 		replyId: z.uuid(),
 		commandId: ref,
-		messageId: ref,
+		messageId: ref.describe(
+			"Copy the claimed command's messageId. This identifies the exchange; it is not a source ID for coveredMessageIds.",
+		),
 		leaseId: z.uuid(),
 		epoch: z.number().int().positive(),
 		outcome: z.enum(["answered", "failed"]),
 		replyText: messageText,
 		summary: bytes(4096).nullable(),
-		coveredMessageIds: z.array(ref).max(20),
+		coveredMessageIds: z
+			.array(ref)
+			.max(20)
+			.describe(
+				"Source conversation message IDs actually covered by the summary. Copy only snapshot.sourceMessageId and IDs supplied in snapshot.context.coveredMessageIds by get_command. Do not use the command's messageId or invent IDs. A previousSummary is a summary, not evidence that its original messages were reread.",
+			),
 		limitations: z.array(bytes(1024)).max(8),
 	})
 	.refine(

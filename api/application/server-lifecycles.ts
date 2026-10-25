@@ -142,6 +142,15 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 		() => s.browser.service.sweep(),
 		{ exclusive: true },
 	);
+	// A screen command nobody received expires on time, so the conversation can say it was not shown.
+	const screenExpiry = intervalLifecycle(
+		"screen_expiry",
+		5000,
+		() =>
+			s.resources &&
+			s.store.write((db) => s.resources!.screen.expireInTransaction(db)),
+		{ exclusive: true },
+	);
 	let feedResyncRequired = false;
 	return [
 		// Recovery runs to completion before any worker starts; a failure aborts startup.
@@ -259,6 +268,7 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 			start: () => timerMaintenance.start?.(),
 		},
 		{ name: "browser_sweep_start", start: () => browserSweep.start?.() },
+		{ name: "screen_expiry_start", start: () => screenExpiry.start?.() },
 		{
 			name: "kanban_maintenance_start",
 			start: () => kanbanMaintenance.start?.(),
@@ -286,6 +296,7 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 		{ name: "queue", close: () => s.queue.close(10_000) },
 		// The MCP child stops before the queue that drives it (reverse order: closed first).
 		{ name: "browser_sweep", close: () => browserSweep.idle() },
+		{ name: "screen_expiry", close: () => screenExpiry.idle() },
 		{ name: "browser", close: () => s.browser.close() },
 		{ name: "capabilities", close: () => s.toolchain.capabilities.close() },
 		{ name: "agents", close: () => s.toolchain.agents.close() },
@@ -326,6 +337,7 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 				timerMaintenance.stop();
 				kanbanMaintenance.stop();
 				browserSweep.stop();
+				screenExpiry.stop();
 				vectorRefresh.stop();
 			},
 		},

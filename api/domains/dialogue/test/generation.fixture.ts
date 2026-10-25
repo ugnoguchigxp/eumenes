@@ -23,6 +23,7 @@ import type { ImagePort } from "../contracts/image";
 import type { MusicPort } from "../contracts/music";
 import type { ToolchainRoutingPort } from "../contracts/toolchains";
 import type { ChatMessage } from "../service/context";
+import type { ResourceAccess } from "../service/resource-ledger";
 import { testConversationAgent } from "./conversation-agent.fixture";
 import { openDialogueStore } from "./store.fixture";
 
@@ -133,6 +134,8 @@ export type SetupOptions = {
 	window?: number;
 	/** Agent runtime for task executions (notice runs); absent: no agents. */
 	agents?: unknown;
+	/** The resource registry and the kinds each toolchain makes; absent: the conversation has no resources. */
+	resources?: ResourceAccess;
 };
 
 /** A real store, queue, continuity and dialogue with a scripted model, a fake toolchain catalog and image port. */
@@ -333,6 +336,7 @@ export async function setup(options: SetupOptions = {}) {
 		...(options.agency ? { agency: options.agency } : {}),
 		...(options.worldContext ? { worldContext: options.worldContext } : {}),
 		...(options.agents ? { agents: options.agents as never } : {}),
+		...(options.resources ? { resources: options.resources } : {}),
 	});
 	if (options.autoStart !== false) queue.start();
 	const run = (id: string) => dialogue.get(id);

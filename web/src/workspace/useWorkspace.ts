@@ -3,10 +3,8 @@ import { useChatAttachments } from "./useChatAttachments";
 import { useDrawingArtifacts } from "../domains/excalidraw/useDrawingArtifacts";
 import { useOpenDrawing, useOpenPlaylist } from "./open-artifacts";
 import { useRecognitionArtifacts } from "../domains/object-recognition";
-import {
-	recognitionViewing,
-	useRecognitionChatInbox,
-} from "../domains/object-recognition/chat-inbox";
+import { useRecognitionChatInbox } from "../domains/object-recognition/chat-inbox";
+import type { RunViewing } from "../../../api/domains/dialogue/contracts";
 import { useCurrentViewing } from "./useCurrentViewing";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -20,9 +18,7 @@ import {
 import { useStore } from "zustand";
 import type { EumenesClient } from "../../../client";
 import { useImageArtifacts } from "../domains/image";
-import { IMAGE_SCREEN_ADAPTER_REF } from "../domains/image/toolchain-adapter";
 import { useMusicArtifacts, usePlaylistArtifacts } from "../domains/music";
-import { MUSIC_SCREEN_ADAPTER_REF } from "../domains/music/toolchain-adapter";
 import { activeTimersQuery } from "../domains/timers/queries";
 import { TIMER_ADAPTER_REF } from "../domains/timers/toolchain-adapter";
 import { useTimerArtifacts } from "../domains/timers/useTimerArtifacts";
@@ -80,11 +76,7 @@ export function useWorkspace({
 	const openImage = useCallback(() => {
 		void openById("image.generation");
 	}, [openById]);
-	const imageItems = useImageArtifacts(client, "main", openImage);
-	const openImageResult = useCallback(
-		(id: string) => void openByAdapter(IMAGE_SCREEN_ADAPTER_REF, id),
-		[openByAdapter],
-	);
+	useImageArtifacts(client, "main", openImage);
 	const openTimer = useCallback(
 		(ref?: { timerId: string }) =>
 			void openByAdapter(TIMER_ADAPTER_REF, ref?.timerId),
@@ -96,11 +88,7 @@ export function useWorkspace({
 		},
 		[openById],
 	);
-	const musicItems = useMusicArtifacts(client, "main", openGeneratedMusic);
-	const openMusic = useCallback(
-		(id: string) => void openByAdapter(MUSIC_SCREEN_ADAPTER_REF, id),
-		[openByAdapter],
-	);
+	useMusicArtifacts(client, "main", openGeneratedMusic);
 	usePlaylistArtifacts(client, "main", openPlaylist);
 	const activeTimers = useQuery(activeTimersQuery(client));
 	const settings = useSettings(client);
@@ -127,9 +115,7 @@ export function useWorkspace({
 	const submit = useSubmit(client, "main");
 	const cancel = useCancel(client, "main");
 	// Filled once the screens are known below; a spoken message refers to what is shown, like a typed one.
-	const viewingNow = useRef<() => ReturnType<typeof recognitionViewing>>(
-		() => undefined,
-	);
+	const viewingNow = useRef<() => RunViewing | undefined>(() => undefined);
 	const voiceClient = useMemo(
 		() => ({
 			...client,
@@ -310,10 +296,6 @@ export function useWorkspace({
 		openDrawing,
 		openRecognition,
 		openPlaylist,
-		openMusic,
-		openImageResult,
-		imageItems,
-		musicItems,
 		toolchain,
 		activeTimers,
 		settings,

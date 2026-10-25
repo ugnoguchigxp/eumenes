@@ -1,4 +1,6 @@
+import { createDoclingAdapter } from "../docling/docling-adapter";
 import { createDotsMessagingAdapter } from "../work/dots-messaging-adapter";
+import { createDotsDelegationAdapter } from "../work/dots-delegation-adapter";
 import { readActionOriginInTransaction } from "../../domains/dialogue";
 import { createChildOperations } from "./child-operations";
 import { extendKanbanAdapter } from "../work/kanban-shared-adapter";
@@ -46,6 +48,7 @@ import {
 	type MemoryAdapterPorts,
 } from "../world/memory-adapter";
 import { createStockAdapter } from "../stock/stock-adapter";
+import { createResourcesToolAdapter } from "../resources/resources-tool";
 import { createWeatherAdapter } from "../weather/weather-adapter";
 import type { WorldResearchPorts } from "../world/world-research-ports";
 import {
@@ -81,6 +84,9 @@ import { createToolchainHistory } from "../../domains/toolchain-history";
 import { createRecipePorts } from "./toolchain-recipes";
 import { createVectorRefresh, type Embed } from "./toolchain-vectors";
 type ToolchainOptions = {
+	docling?: import("../../domains/docling").DoclingService;
+	dotsWork?: import("../work/dots-work").DotsWork;
+	dotsConfiguration?: import("../work/dots-tasks").DotsTasks["config"];
 	dotsMessages?: import("../work/dots-messages").DotsMessages;
 	/** The conversation's TODO ledger the TODO screen pages (absent until dialogue is attached). */
 	todoPage?: () => TodoPageReader | undefined;
@@ -129,6 +135,8 @@ type ToolchainOptions = {
 	weather?: { fetch?: typeof fetch; now?: () => number };
 	/** The stock toolchain's adapter and the services it reads (absent: not offered). */
 	stock?: { fetch?: typeof fetch; now?: () => number };
+	/** The `resources` tool and the sub-agents' `resource.read` (absent: neither is offered). */
+	resources?: import("../resources/late").LateResources;
 	/** The World investigation's reads (`world.find`, `world.query`), built over the agent runtime; the toolchain is offered only while World is usable. */
 	worldResearch?: (
 		runtime: () => import("../../domains/agent-runtime").AgentRuntime,
@@ -207,12 +215,15 @@ export async function createToolchain(
 		);
 	const weather = options.weather && createWeatherAdapter(options.weather);
 	const stock = options.stock && createStockAdapter(options.stock);
+	const resources =
+		options.resources && createResourcesToolAdapter(options.resources.tool);
 	// The pipelines service is built on the routing, after this registry: the adapter reads it once attached.
 	let pipelines:
 		| import("../pipelines/pipelines-service").PipelinesService
 		| undefined;
 	// Typed domain adapters this host offers; bundles naming any other adapter are not registered.
 	const registry = createAdapterRegistry([
+		...(options.docling ? [createDoclingAdapter(options.docling)] : []),
 		createTaskAdapter(() => taskRuntime, options.todoPage),
 		createPipelinesAdapter(
 			() => taskRuntime,
@@ -237,6 +248,15 @@ export async function createToolchain(
 			: []),
 		...(options.dotsMessages
 			? [createDotsMessagingAdapter(options.dotsMessages)]
+			: []),
+		...(options.dotsWork && options.dotsConfiguration
+			? [
+					createDotsDelegationAdapter(
+						options.dotsWork,
+						() => capabilities,
+						options.dotsConfiguration,
+					),
+				]
 			: []),
 		...(options.googleAccounts
 			? [createGoogleAccountsAdapter(options.googleAccounts)]
@@ -301,6 +321,7 @@ export async function createToolchain(
 		...(options.world ? [createWorldAdapter(options.world)] : []),
 		...(weather ? [weather] : []),
 		...(stock ? [stock] : []),
+		...(resources ? [resources] : []),
 		...(options.serviceTests
 			? [createServiceTestsAdapter(options.serviceTests)]
 			: []),
@@ -308,6 +329,7 @@ export async function createToolchain(
 	const capabilities = createCapabilities(
 		store,
 		new Set([
+			...(options.docling ? ["docling"] : []),
 			"task-execution",
 			...(options.webResearch !== false ? ["web"] : []),
 			...(options.timers ? ["timer"] : []),
@@ -322,6 +344,7 @@ export async function createToolchain(
 			...(options.kanbanSdk ? ["codex-tasks"] : []),
 			...(options.weather ? ["weather"] : []),
 			...(options.stock ? ["stock"] : []),
+			...(options.resources ? ["resources"] : []),
 			...(options.worldResearch ? ["world-query"] : []),
 			...(options.ocr ? ["ocr"] : []),
 			...(options.model3d ? ["model3d"] : []),
@@ -421,6 +444,7 @@ export async function createToolchain(
 		inference,
 		reconcileThrottleMs: options.reconcileThrottleMs,
 		onSearchReport: recipes.onSearchReport,
+		...(options.resources ? { resources: options.resources.read } : {}),
 	});
 	taskRuntime = agents;
 	const vectors = createVectorRefresh(

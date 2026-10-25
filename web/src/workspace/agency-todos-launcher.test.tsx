@@ -5,7 +5,7 @@ import { useArtifactWorkspace } from "../domains/artifact";
 import { useToolchainArtifacts } from "../domains/toolchain-artifacts/launcher";
 import { createClient } from "../../../client";
 afterEach(cleanup);
-const revision = "artifact:agency.todos@1";
+const revision = "artifact:agency.todos@2";
 const makeClient = () => ({
 	...createClient("http://127.0.0.1:4444"),
 	toolchainArtifacts: vi.fn(async () => [

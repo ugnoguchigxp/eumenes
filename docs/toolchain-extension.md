@@ -10,6 +10,8 @@ CPU計算は `compute.bundle.json` と `adapter:compute@1` で追加する。4�
 
 CLI（`cli.run@1`、画面 `cli.workspace@1`）も登録adapterとbundleで追加した。PTYと端末接続はClaude Code画面と共通。[CLI](shell.md)を参照。
 
+Docling Deskの入口は`docling-desk.bundle.json`と`adapter:docling@1`で追加した。profile・Skill・公開toolを既存command経路へ接続し、OpenUIには別タブを開く入口だけを置く。ticket発行は専用認証APIで扱い、会話・操作outbox・DBへ保存しない。[接続と検証](docling.md)を参照。
+
 ## 1. 全体像
 
 | 単位 | 置き場所 | 持つもの |
@@ -235,7 +237,11 @@ Seedに含めるのは再利用する定義だけで、会話、実行・操作�
 | `refresh()` | revision競合時の読み直し（旧操作を自動再送しない） |
 | `describeRejection`・`answerInput`（任意） | domainの言葉での拒否理由、質問への回答文→回答schemaの入力 |
 
-### 5.3 現在の制約
+### 5.3 生成物をリソースとして登録する
+
+担当が作るもの（画像・曲・報告など）は、種類の登録（`resource-kind`）と持ち主の domain の `ResourceAdapter`、画面の Web adapter の `focus`・`viewing` で、会話から `a<n>` として開く・再生する・読めるようにする。手順は [リソースURI](resources.md)。
+
+### 5.4 現在の制約
 
 - 新しい見た目が必要なら[§10 E](#10-e-designsystemopenuiartifactを追加する)でDesignSystem部品とOpenUI viewを追加する。
 - scopeは単一（`DEFAULT_TIMER_SCOPE`）。複数利用者のscope境界は未設計。

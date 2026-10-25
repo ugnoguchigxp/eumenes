@@ -380,3 +380,46 @@ test("external attribution remains visible in the ordinary conversation after re
 	);
 	expect(screen.getByText("dots の返答")).toBeTruthy();
 });
+test("a resource link in an answer opens the resource and never navigates; other links are unchanged", () => {
+	const open = vi.fn();
+	const { container } = render(
+		<MessageList
+			conversation={convo([
+				"answer",
+				"assistant",
+				"[夜の曲](eumenes://music.track/m1) と [記事](https://example.com/a)",
+			])}
+			onOpenResource={open}
+		/>,
+	);
+	const resource = screen.getByRole("link", { name: "夜の曲" });
+	expect(resource.getAttribute("target")).toBeNull();
+	const notPrevented = fireEvent.click(resource);
+	// A cancelled click event is a click that did not navigate.
+	expect(notPrevented).toBe(false);
+	expect(open).toHaveBeenCalledExactlyOnceWith("eumenes://music.track/m1");
+
+	const web = container.querySelector<HTMLAnchorElement>(
+		'a[href="https://example.com/a"]',
+	)!;
+	expect(web.getAttribute("target")).toBe("_blank");
+	expect(web.getAttribute("rel")).toBe("noreferrer noopener");
+	const followed = fireEvent.click(web);
+	expect(followed).toBe(true);
+	expect(open).toHaveBeenCalledOnce();
+});
+
+test("a resource link does not navigate even when nothing handles it", () => {
+	render(
+		<MessageList
+			conversation={convo([
+				"answer",
+				"assistant",
+				"[画像](eumenes://image/i1)",
+			])}
+		/>,
+	);
+	expect(fireEvent.click(screen.getByRole("link", { name: "画像" }))).toBe(
+		false,
+	);
+});

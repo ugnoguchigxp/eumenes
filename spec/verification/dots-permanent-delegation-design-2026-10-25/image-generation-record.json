@@ -1,0 +1,86 @@
+{
+  "purpose": "proposed artifact screens; no implemented UI or live work evidence",
+  "failedLarmAttempt": {
+    "method": "saved LARM service via authenticated Eumenes backend",
+    "purpose": "proposed artifact screens",
+    "images": [
+      {
+        "key": "workspace",
+        "requestKey": "a5a10e0f-f917-474f-9c2d-e386a40e8df2",
+        "promptFile": "workspace-prompt.txt",
+        "output": "workspace-concept.png",
+        "runId": "585abfa8-383e-4f3b-960b-bc88eec98c72",
+        "startedAt": "2026-10-25T06:57:14.101Z",
+        "phase": "cancelled",
+        "status": "cancelled"
+      }
+    ]
+  },
+  "failedAttemptClarification": "provider_failed during preparation; no image output was produced by LARM. The original output field was only an intended filename.",
+  "builtinAuthorization": "User explicitly selected Codex standard image generation for these two screen concepts after the LARM failure; revisions follow user feedback.",
+  "method": "Codex built-in image generation and reference-image editing",
+  "attempts": [
+    {
+      "key": "workspace-initial",
+      "promptFile": "workspace-prompt.txt",
+      "promptSha256": "36433518518af7466b94d49f7bfc35856ce2560c729a2c8b6effa493c826cbb9",
+      "output": "workspace-concept.png",
+      "outputSha256": "ae0a17e58b277ff59824436e1e192c2f0d46dd2545e6a2c61e10b755b0e80807",
+      "status": "rejected: full-page app layout",
+      "defaultOutput": "/Users/y.noguchi/.codex/generated_images/01a17156-30d0-7f10-9679-bfd9bd012ace/exec-caa75833-0467-40cd-9b9d-119a8a8a5f53.png",
+      "referenceImages": []
+    },
+    {
+      "key": "settings-initial",
+      "promptFile": "settings-prompt.txt",
+      "promptSha256": "4f6ef385be1dfbd2615c920000f8b273768a3c3897f701de9d37c0999f321d38",
+      "output": "settings-draft.png",
+      "outputSha256": "a12485884c0420814db99a8633016c670ef9652133950d066558df47fa667f9f",
+      "status": "rejected: full-page app layout",
+      "defaultOutput": "/Users/y.noguchi/.codex/generated_images/01a17156-30d0-7f10-9679-bfd9bd012ace/exec-98f9821d-3161-4145-93e6-2eae9debb40d.png",
+      "referenceImages": []
+    },
+    {
+      "key": "workspace-panel-select",
+      "promptFile": "workspace-panel-prompt.txt",
+      "promptSha256": "64a2b8928f4af94c3d9f5b4e382904a01098b56983750be878eedd137a542c8f",
+      "output": "workspace-select-draft.png",
+      "outputSha256": "96dfa177004d9aa87e6be7e8b986e36118ee57d18faa0a09827f85ce9b91f6c9",
+      "status": "rejected: Select instead of icon-button list",
+      "defaultOutput": "/Users/y.noguchi/.codex/generated_images/01a17156-30d0-7f10-9679-bfd9bd012ace/exec-d136886b-fa08-49ed-a238-32026be4a600.png",
+      "referenceImages": [
+        "workspace-concept.png"
+      ]
+    },
+    {
+      "key": "workspace-panel-menu",
+      "promptFile": "workspace-menu-prompt.txt",
+      "promptSha256": "f3d5a69fc01511564e64c244cf78d4f2f6e766645f8c56fb1afd385eb783fe91",
+      "output": "workspace-panel-concept.png",
+      "outputSha256": "c45e25143e6a2b97e032042cbb0e061ad65d5a25b63ff906a9aecb892d6d2b2e",
+      "status": "final proposal: icon-button anchored floating list",
+      "defaultOutput": "/Users/y.noguchi/.codex/generated_images/01a17156-30d0-7f10-9679-bfd9bd012ace/exec-79ad237d-c211-4b6c-8af7-07d8868ca493.png",
+      "referenceImages": [
+        "workspace-select-draft.png",
+        "list-menu-reference.png"
+      ]
+    },
+    {
+      "key": "settings-panel",
+      "promptFile": "settings-panel-prompt.txt",
+      "promptSha256": "1cf4f16544be1bd5fdc4d85e49f5d03378572a1ef54edd03bfd178c987767d01",
+      "output": "settings-panel-concept.png",
+      "outputSha256": "fc656b18d29c2dbd1e55c615be02aa9ef0d7dbeface9e85b03d079921b5cfb29",
+      "status": "final proposal: existing artifact panel, single column",
+      "defaultOutput": "/Users/y.noguchi/.codex/generated_images/01a17156-30d0-7f10-9679-bfd9bd012ace/exec-085aec2f-d86d-44cc-84e2-c6946fe6b7b3.png",
+      "referenceImages": [
+        "settings-draft.png"
+      ]
+    }
+  ],
+  "referenceImage": {
+    "file": "list-menu-reference.png",
+    "source": "User attachment, screenshot 2026-10-25 16.14.14.png",
+    "purpose": "list-icon button, anchored history list, highlighted selected row; no delete action transfer"
+  }
+}

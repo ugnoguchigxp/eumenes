@@ -1,0 +1,25 @@
+{
+  "mode": "live",
+  "connectionRef": "dots-messages-20261025",
+  "threadId": "a03560ce-1008-4876-9e52-ef19d6bafffd",
+  "requestId": "8391dc27-8dcf-44ec-8219-3baafaca8f25",
+  "text": "購読更新後の接続確認です。架空の予定は変更しません。この試験会話で決まった曜日・時間帯・場所・持ち物を短く確認し、返答と累積要約をMCPへ保存してください。連携前や他の会話の履歴は含めず、外部の操作は行わないでください。",
+  "priorSubscriptionExpiresAt": 1792909274001,
+  "observedRefreshedExpiresAt": 1792909965000,
+  "result": "passed",
+  "startedAt": "2026-10-25T06:19:55.432Z",
+  "messageId": "33b326af-4a8f-4235-9743-71bc35d43b80",
+  "commandId": "535a2105-9ca3-41f2-a874-7c782592ccc2",
+  "state": "answered",
+  "delivery": {
+    "state": "delivered",
+    "httpStatus": 200
+  },
+  "reply": {
+    "id": "094d5589-85de-4caa-b7e1-21e9aed40738",
+    "replyText": "架空の予定は「日曜の午後、公園、持ち物は青いノート」で、変更ありません。",
+    "summary": "非機密の連携試験の累積要約。架空の予定は日曜の午後。場所は当初の図書館から公園に変更され、持ち物に青いノートが追加された。今回の接続確認では予定を変更せず、現在の内容「日曜の午後、公園、持ち物は青いノート」を確認する返答をした。",
+    "limitations": []
+  },
+  "finishedAt": "2026-10-25T06:20:42.723Z"
+}

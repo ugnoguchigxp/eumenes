@@ -137,6 +137,8 @@ CREATE TABLE agent_requirement_drafts(task_id TEXT PRIMARY KEY,contract_digest T
 `;
 // Repair diagnostics are step state; the task input stays as created.
 export const controlRepairMigration = `ALTER TABLE agent_tasks ADD COLUMN control_repair_json TEXT;`;
+// Resources a sub-agent read and the links it reported (resource-uri plan §6): task state, not task input.
+export const resourcesMigration = `ALTER TABLE agent_tasks ADD COLUMN resources_json TEXT;`;
 export const migrations: readonly Migration[] = [
 	{ id: "agent-runtime/0001-init", sql: migration },
 	{ id: "agent-runtime/0002-acquisition", sql: acquisitionMigration },
@@ -190,5 +192,10 @@ CREATE INDEX agent_execution_reports_conversation ON agent_execution_reports(con
 		sql: `UPDATE agent_execution_events SET state='pending' WHERE state='accepted' AND id IN (SELECT event_id FROM agent_execution_reports WHERE state='held');
 DROP TABLE agent_execution_reports;`,
 		after: ["agent-runtime/0010-execution-reports-held"],
+	},
+	{
+		id: "agent-runtime/0012-task-resources",
+		sql: resourcesMigration,
+		after: ["agent-runtime/0011-drop-execution-reports"],
 	},
 ];

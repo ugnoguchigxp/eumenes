@@ -163,3 +163,5 @@ export const errorStatus = {
 export type Command = TaskCommand | import("./messaging").MessageCommand;
 
 export * from "./messaging";
+export * from "./work-settings";
+export type { WorkDetailView } from "./work-view";

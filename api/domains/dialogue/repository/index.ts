@@ -1,5 +1,11 @@
 import type { Database } from "bun:sqlite";
 import { workMigration, workOriginsMigration, workRefsMigration } from "./work";
+import {
+	confirmationRefsMigration,
+	resourcesMigration,
+	runViewingResourceMigration,
+	workLinksMigration,
+} from "./resources";
 import type { Migration } from "../../../infrastructure/sqlite";
 import {
 	continuationConditionsMigration,
@@ -382,6 +388,26 @@ export const migrations: readonly Migration[] = [
 		id: "dialogue/0021-work-refs",
 		after: ["dialogue/0020-work-origins"],
 		sql: workRefsMigration,
+	},
+	{
+		id: "dialogue/0022-resources",
+		after: ["dialogue/0021-work-refs"],
+		sql: resourcesMigration,
+	},
+	{
+		id: "dialogue/0023-work-links",
+		after: ["dialogue/0022-resources"],
+		sql: workLinksMigration,
+	},
+	{
+		id: "dialogue/0024-confirmation-refs",
+		after: ["dialogue/0023-work-links"],
+		sql: confirmationRefsMigration,
+	},
+	{
+		id: "dialogue/0025-viewing-resource",
+		after: ["dialogue/0024-confirmation-refs"],
+		sql: runViewingResourceMigration,
 	},
 ];
 

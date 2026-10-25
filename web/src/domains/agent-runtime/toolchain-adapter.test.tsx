@@ -29,11 +29,11 @@ const bundle = JSON.parse(
 	),
 );
 const artifact = artifactDefinitionV1.parse(bundle.artifacts[0]);
-const revision = "artifact:agency.todos@1";
+const revision = "artifact:agency.todos@2";
 const adapters = createWebAdapterRegistry([todosWebAdapter]);
 const row: TodoPage["rows"][number] = {
 	id: "one",
-	title: "依頼 <script>alert(1)</script> *強調*",
+	request: "依頼 <script>alert(1)</script> *強調*",
 	status: "todo",
 	outcome: null,
 	summary: null,
@@ -51,7 +51,7 @@ function page(query: TodoQuery): TodoPage {
 		rows: states.map((state) => ({
 			...row,
 			id: `${state}-${query.pageIndex}`,
-			title: `${state} ${query.pageIndex} の仕事`,
+			request: `${state} ${query.pageIndex} の仕事`,
 			status: state === "todo" ? ("waiting" as const) : ("done" as const),
 			outcome: state === "todo" ? null : ("succeeded" as const),
 			summary: state === "todo" ? "どの曲調にしますか" : "作成できました",
@@ -170,7 +170,7 @@ test("todo and done are rows of one table with one pagination and a changing sta
 			{
 				...row,
 				id: "todo-0",
-				title: "todo 0 の仕事",
+				request: "todo 0 の仕事",
 				status: "done",
 				outcome: "succeeded",
 			},
@@ -237,7 +237,7 @@ test("the combined empty table remains visible; a failed read can recover withou
 		rows: [row],
 	});
 	fireEvent.click(screen.getByRole("button", { name: "更新" }));
-	await screen.findByText(row.title);
+	await screen.findByText(row.request);
 	expect(document.querySelector(".ds-todo-workspace script")).toBeNull();
 	expect(document.querySelector(".ds-todo-workspace time")).toBeNull();
 	expect(screen.queryByRole("dialog")).toBeNull();

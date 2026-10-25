@@ -1,0 +1,89 @@
+{
+  "mode": "control-only-after-browser-close",
+  "rows": [
+    {
+      "at": "2026-10-25T08:30:20.727Z",
+      "elapsedMs": 285,
+      "state": "ready",
+      "generation": 6
+    },
+    {
+      "at": "2026-10-25T08:30:35.780Z",
+      "elapsedMs": 15338,
+      "state": "ready",
+      "generation": 6
+    },
+    {
+      "at": "2026-10-25T08:30:50.793Z",
+      "elapsedMs": 30351,
+      "state": "ready",
+      "generation": 6
+    },
+    {
+      "at": "2026-10-25T08:31:05.889Z",
+      "elapsedMs": 45447,
+      "state": "ready",
+      "generation": 6
+    },
+    {
+      "at": "2026-10-25T08:31:20.947Z",
+      "elapsedMs": 60505,
+      "state": "ready",
+      "generation": 6
+    },
+    {
+      "at": "2026-10-25T08:31:35.994Z",
+      "elapsedMs": 75552,
+      "state": "ready",
+      "generation": 6
+    },
+    {
+      "at": "2026-10-25T08:31:51.002Z",
+      "elapsedMs": 90560,
+      "state": "ready",
+      "generation": 6
+    },
+    {
+      "at": "2026-10-25T08:32:06.010Z",
+      "elapsedMs": 105568,
+      "state": "ready",
+      "generation": 6
+    },
+    {
+      "at": "2026-10-25T08:32:21.052Z",
+      "elapsedMs": 120610,
+      "state": "ready",
+      "generation": 6
+    },
+    {
+      "at": "2026-10-25T08:32:36.058Z",
+      "elapsedMs": 135616,
+      "state": "ready",
+      "generation": 6
+    },
+    {
+      "at": "2026-10-25T08:32:51.065Z",
+      "elapsedMs": 150623,
+      "state": "ready",
+      "generation": 6
+    },
+    {
+      "at": "2026-10-25T08:33:06.072Z",
+      "elapsedMs": 165630,
+      "state": "ready",
+      "generation": 6
+    },
+    {
+      "at": "2026-10-25T08:33:21.088Z",
+      "elapsedMs": 180646,
+      "state": "stopping",
+      "generation": 6
+    },
+    {
+      "at": "2026-10-25T08:33:36.096Z",
+      "elapsedMs": 195654,
+      "state": "stopped",
+      "generation": 6
+    }
+  ]
+}

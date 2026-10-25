@@ -202,6 +202,8 @@ export interface InstantAdapter {
 		operationName: string,
 		input: unknown,
 		signal: AbortSignal,
+		/** The conversation the call answers in (adapters that keep per-conversation state use it). */
+		context?: { conversationId: string },
 	): Promise<InstantResult>;
 }
 
@@ -291,7 +293,10 @@ export interface DomainAdapter {
 	 */
 	artifactAvailableInTransaction?(tx: Database): boolean;
 	/** Targets the command sub-agent may name (host data, no model-generated ids). */
-	snapshotInTransaction(tx: Database): unknown;
+	snapshotInTransaction(
+		tx: Database,
+		context?: { conversationId: string },
+	): unknown;
 	/**
 	 * Execute one validated operation inside the caller's writer transaction, through the
 	 * domain's existing public transaction operation. Throws a safe error code on rejection.

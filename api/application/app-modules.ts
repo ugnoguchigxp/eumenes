@@ -1,3 +1,4 @@
+import { registerDocling, type DoclingService } from "../domains/docling";
 import { registerPipelines } from "./pipelines/pipelines-controller";
 import {
 	registerGoogleAccounts,
@@ -60,7 +61,9 @@ import {
 	type ContinuityService,
 } from "../domains/continuity";
 import { registerScheduler, type SchedulerService } from "../domains/scheduler";
+import { registerScreen } from "../domains/screen";
 import { registerTimers, type TimersService } from "../domains/timers";
+import { registerResourceRoutes } from "./resources";
 import { registerShell, type ShellService } from "../domains/shell";
 import { registerTerminals, type TerminalsService } from "../domains/terminals";
 import { registerKanban, type KanbanService } from "../domains/kanban";
@@ -136,6 +139,7 @@ export type AppServices = {
 	monitoring?: MonitoringService;
 	music?: MusicService;
 	image?: ImageService;
+	docling?: DoclingService;
 	excalidraw?: ExcalidrawService;
 	drawingOperations?: { list: (conversationId: string) => unknown };
 	objectRecognition?: ObjectRecognitionService;
@@ -149,6 +153,8 @@ export type AppServices = {
 	taskReports?: TaskReports;
 	toolchainHistory?: ToolchainHistory;
 	timers?: TimersService;
+	/** Resource URIs and the screen commands (absent: the routes do not exist). */
+	resources?: import("./resources/wiring").Resources;
 	/** PTY sessions of the terminal screen (absent: the routes do not exist). */
 	shell?: ShellService;
 	terminals?: TerminalsService;
@@ -172,6 +178,7 @@ export type AppServices = {
 export function appModules(services: AppServices): AppModule[] {
 	const s = services;
 	const modules: Array<AppModule | undefined> = [
+		s.docling && { mount: (app) => registerDocling(app, s.docling!) },
 		s.changes && {
 			mount: (app) =>
 				app.get("/api/events", (c) =>
@@ -289,6 +296,12 @@ export function appModules(services: AppServices): AppModule[] {
 		{ mount: (app) => registerQueue(app, s.queue) },
 		{ mount: (app) => registerScheduler(app, s.scheduler) },
 		s.timers && { mount: (app) => registerTimers(app, s.timers!) },
+		s.resources && {
+			mount: (app) => {
+				registerResourceRoutes(app, { access: s.resources!.access });
+				registerScreen(app, s.resources!.screen);
+			},
+		},
 		s.kanban && { mount: (app) => registerKanban(app, s.kanban!) },
 		s.shell && { mount: (app) => registerShell(app, s.shell!) },
 		s.terminals && {

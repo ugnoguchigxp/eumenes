@@ -1,4 +1,5 @@
 import { spatialPreferences } from "../components/SpatialPreferences";
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { EumenesClient } from "../../../client";
 import type { AudioStore } from "../domains/audio";
@@ -6,7 +7,7 @@ import { Button } from "../design-system";
 import { LiveMessageList } from "./LiveMessageList";
 import { ConversationBackground } from "../components/ConversationBackground";
 import { Subtitle } from "../components/domains/subtitle/Subtitle";
-import { RunDetails, RunFailure, RunResults } from "./RunDetails";
+import { RunDetails, RunFailure } from "./RunDetails";
 import { useBackground, useConversationModel } from "../domains/settings";
 import { useSpeechModels } from "../domains/settings/useSpeechModels";
 import { SpeechModelSelect } from "./SpeechModelSelect";
@@ -18,6 +19,26 @@ import { ConversationComposer } from "./ConversationComposer";
 import type { WorkspaceState } from "./useWorkspace";
 import { useScreenPresence } from "./useScreenPresence";
 import { ThinkingRow } from "./ThinkingRow";
+import {
+	MUSIC_PLAYLIST_ADAPTER_REF,
+	musicPlaylistScreen,
+} from "../domains/music/playlist-screen";
+import {
+	ResourceChips,
+	useConversationResources,
+	useResourceNotice,
+	useResourceOpener,
+	useScreenCommands,
+	type ResourceLauncher,
+} from "../domains/resources";
+import {
+	DRAWING_ADAPTER_REF,
+	drawingScreen,
+} from "../domains/excalidraw/resource-screen";
+import { toolchainArtifactsQuery } from "../domains/toolchain-artifacts/launcher";
+import { toolchainWebAdapters } from "./toolchain-adapters";
+
+const CONVERSATION_ID = "main";
 
 export function ConversationPanel({
 	client,
@@ -29,6 +50,51 @@ export function ConversationPanel({
 	state: WorkspaceState;
 }) {
 	useScreenPresence(client);
+	const cache = useQueryClient();
+	const { openByAdapter } = state.toolchain;
+	const { openPlaylist, openDrawing } = state;
+	// How a resource reaches a screen: the registered artifact of its adapter, or the playlist or drawing tab.
+	const launcher = useMemo<ResourceLauncher>(
+		() => ({
+			open: async (adapterRef, targetRef) => {
+				if (adapterRef === MUSIC_PLAYLIST_ADAPTER_REF) {
+					openPlaylist(targetRef);
+					return true;
+				}
+				if (adapterRef === DRAWING_ADAPTER_REF) {
+					openDrawing();
+					return true;
+				}
+				const entries = await cache
+					.fetchQuery(toolchainArtifactsQuery(client))
+					.catch(() => []);
+				if (!entries.some((entry) => entry.adapterRef === adapterRef))
+					return false;
+				await openByAdapter(adapterRef, targetRef);
+				return true;
+			},
+			screen: (adapterRef) =>
+				adapterRef === MUSIC_PLAYLIST_ADAPTER_REF
+					? musicPlaylistScreen
+					: adapterRef === DRAWING_ADAPTER_REF
+						? drawingScreen
+						: toolchainWebAdapters.get(adapterRef),
+		}),
+		[cache, client, openByAdapter, openPlaylist, openDrawing],
+	);
+	const resourceNotice = useResourceNotice();
+	const openResource = useResourceOpener({
+		client,
+		launcher,
+		notify: resourceNotice.show,
+	});
+	useScreenCommands({
+		client,
+		conversationId: CONVERSATION_ID,
+		launcher,
+		notify: resourceNotice.show,
+	});
+	const resources = useConversationResources(client, CONVERSATION_ID);
 	const {
 		replay,
 		voice,
@@ -214,6 +280,14 @@ export function ConversationPanel({
 					</Button>
 				</output>
 			)}
+			{resourceNotice.notice && (
+				<output className="conversation-notice">
+					<span>{resourceNotice.notice}</span>
+					<Button variant="ghost" size="sm" onClick={resourceNotice.dismiss}>
+						閉じる
+					</Button>
+				</output>
+			)}
 			{(model.error || speechModels.error || background.error) && (
 				<p className="chat-error" role="alert">
 					{model.error || speechModels.error || background.error}
@@ -269,9 +343,14 @@ export function ConversationPanel({
 					announcement={activeRun?.announcement}
 					followLatestIfPinned={followLatestIfPinned}
 					conversation={conversation.data}
+					onOpenResource={(uri) => void openResource(uri)}
 					renderInsideMessage={(message) =>
 						message.role === "assistant" ? (
-							<RunResults runId={message.runId} state={state} />
+							<ResourceChips
+								messageId={message.id}
+								data={resources.data}
+								onOpen={(uri, action) => void openResource(uri, action)}
+							/>
 						) : null
 					}
 					renderFollowingMessage={(message) => (

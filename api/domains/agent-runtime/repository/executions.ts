@@ -47,6 +47,8 @@ export type ParentState = {
 		state: string;
 		summary: string;
 		refs: string[];
+		/** Resource URIs the child made (`ChildResult.links`). */
+		links?: string[];
 		question?: string;
 		read?: { ref: string; start: number; limit: number };
 	}>;

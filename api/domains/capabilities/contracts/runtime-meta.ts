@@ -86,7 +86,6 @@ const toolchains: Readonly<
 	"image.create": { execution: "image", requires: "image" },
 	"music.create": { execution: "music-create", requires: "music" },
 	"music.library": { execution: "music-playback", requires: "music" },
-	"dots.delegate": { execution: "command", requires: "dots" },
 };
 /** Host metadata of a toolchain by definition id (e.g. `web.search`). */
 export function toolchainRuntimeOf(

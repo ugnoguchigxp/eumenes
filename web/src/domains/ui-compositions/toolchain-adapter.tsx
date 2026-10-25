@@ -5,9 +5,14 @@ import type {
 } from "@eumenes/artifact-ui/contracts";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
+import { formatResourceUri } from "../../../../api/domains/resources/contracts";
+import { focusWhenDrawn } from "../../components/domains/resource-focus";
 import { queryRoots } from "../../queryKeys";
-import type { WebArtifactAdapter } from "../toolchain-artifacts/registry";
+import {
+	createLiveScreen,
+	type WebArtifactAdapter,
+} from "../toolchain-artifacts/registry";
 import {
 	type BridgeResult,
 	useSpecialistBridge,
@@ -16,6 +21,16 @@ import {
 const UI_COMPOSITIONS_ADAPTER_REF = "adapter:ui-compositions@1";
 /** The studio's artifact id, as a launcher or a navigation names it. */
 export const UI_STUDIO_ARTIFACT_ID = "ui.studio";
+
+/** What the mounted studio shows, read through the latest render. */
+type StudioScreen = {
+	targetRef: string | undefined;
+	/** The saved composition the studio has loaded for display. */
+	viewingId: string | undefined;
+	visible: boolean;
+	show(compositionId: string): void;
+};
+const live = createLiveScreen<{ read(): StudioScreen }>();
 
 const workSchema = z.object({
 	workRef: z.string(),
@@ -173,6 +188,17 @@ export const uiCompositionsWebAdapter: WebArtifactAdapter = {
 		const refresh = () => {
 			void cache.invalidateQueries({ queryKey: root });
 		};
+		const screen: StudioScreen = {
+			targetRef,
+			viewingId: viewing?.id,
+			visible,
+			show: setTargetRef,
+		};
+		const latest = useRef(screen);
+		useEffect(() => {
+			latest.current = screen;
+		});
+		useEffect(() => live.attach({ read: () => latest.current }), []);
 		return {
 			phase:
 				studio.isError || (studio.data && !parsedStudio.success)
@@ -293,5 +319,26 @@ export const uiCompositionsWebAdapter: WebArtifactAdapter = {
 				return `${reason}（${code}${detail ? `・${detail}` : ""}）。`;
 			},
 		};
+	},
+	async focus(compositionId) {
+		const mounted = await live.waitFor((handle) => handle.read());
+		if (!mounted) return false;
+		// Showing a saved work is a display change only; the specialist's draft is not touched.
+		if (mounted.targetRef !== compositionId) mounted.show(compositionId);
+		const shown = await live.waitFor(
+			(handle) => handle.read().viewingId === compositionId,
+		);
+		if (!shown) return false;
+		// The composition exists; marking it is best effort while the studio draws it.
+		await focusWhenDrawn(() =>
+			document.querySelector<HTMLElement>(".aui-ui-studio"),
+		);
+		return true;
+	},
+	viewing() {
+		const screen = live.current()?.read();
+		return screen?.visible && screen.viewingId
+			? formatResourceUri("ui.composition", screen.viewingId)
+			: null;
 	},
 };

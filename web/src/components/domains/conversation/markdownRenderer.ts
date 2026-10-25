@@ -1,4 +1,6 @@
 const SAFE_PROTOCOL = /^(?:https?:|mailto:)/i;
+/** An in-app resource link: the chat opens it itself, so it carries no new-tab attributes. */
+const RESOURCE_PROTOCOL = /^eumenes:\/\//i;
 const INLINE_TOKEN =
 	/`([^`\n]+)`|\[([^\]\n]{1,1024})\]\((<[^<>\s]{1,2048}>|(?:[^()\s<>]|\([^()\s<>]*\)){1,2048})\)|\*\*([^*\n]+)\*\*|\*([^*\n]+)\*|~~([^~\n]+)~~/g;
 
@@ -52,9 +54,11 @@ function renderInline(value: string): string {
 		} else if (match[2] !== undefined && match[3] !== undefined) {
 			const href = match[3].startsWith("<") ? match[3].slice(1, -1) : match[3];
 			const host = hiddenHost(match[2], href);
-			output += SAFE_PROTOCOL.test(href)
-				? `<a href="${escapeHtml(href)}" rel="noreferrer noopener" target="_blank">${renderInline(match[2])}${host ? `<span class="link-host">(${escapeHtml(host)})</span>` : ""}</a>`
-				: escapeHtml(match[0]);
+			output += RESOURCE_PROTOCOL.test(href)
+				? `<a href="${escapeHtml(href)}">${renderInline(match[2])}</a>`
+				: SAFE_PROTOCOL.test(href)
+					? `<a href="${escapeHtml(href)}" rel="noreferrer noopener" target="_blank">${renderInline(match[2])}${host ? `<span class="link-host">(${escapeHtml(host)})</span>` : ""}</a>`
+					: escapeHtml(match[0]);
 		} else if (match[4] !== undefined) {
 			output += `<strong>${renderInline(match[4])}</strong>`;
 		} else if (match[5] !== undefined) {

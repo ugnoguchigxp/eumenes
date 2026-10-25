@@ -65,6 +65,7 @@ export function BrowserCaptureList({
 						<li
 							key={capture.captureId}
 							className="browser-workspace-item"
+							data-capture-id={capture.captureId}
 							data-selected={
 								capture.captureId === selectedCaptureId || undefined
 							}

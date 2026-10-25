@@ -1,7 +1,7 @@
 import type { Database } from "bun:sqlite";
 import { z } from "zod";
 import type { DeliveryEmotion } from "../../delivery";
-import { addresseeSchema, viewingSchema } from "./specialist";
+import { addresseeSchema, runViewingSchema } from "./specialist";
 const submitFields = z.object({
 	requestId: z.uuid(),
 	conversationId: z.string().min(1).max(120),
@@ -14,7 +14,7 @@ const submitFields = z.object({
 		.optional(),
 	utteranceId: z.string().min(1).max(120).optional(),
 	/** The saved item on screen, as a host source issued it; re-checked against the issued choices. */
-	viewing: viewingSchema.optional(),
+	viewing: runViewingSchema.optional(),
 	/** Who the screen showed as listening; a different addressee now refuses the send (`addressee_changed`). */
 	addressee: addresseeSchema.optional(),
 	/** The screen's own toolchain: a form submit goes straight to it, never through the main agent's selection. */

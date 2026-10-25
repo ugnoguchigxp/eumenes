@@ -27,8 +27,10 @@ import {
 	actionResultMigration,
 	requirementsMigration,
 	controlRepairMigration,
+	resourcesMigration,
 	createAgentRuntime,
 	migration as agentMigration,
+	type ResourceReadPort,
 	type Task,
 } from "..";
 
@@ -73,6 +75,8 @@ export async function harness(
 	/** Opt in to the versioned Web bundle; archived-route tests keep their old contracts. */
 	guided = false,
 	serviceSearch = false,
+	/** Offers the sub-agent tool `resource.read` through this port. */
+	resources?: ResourceReadPort,
 ) {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-route-"));
 	const store = openStore(join(dir, "db"), [
@@ -89,6 +93,7 @@ export async function harness(
 		actionResultMigration,
 		requirementsMigration,
 		controlRepairMigration,
+		resourcesMigration,
 	]);
 	const caps = createCapabilities(
 		store,
@@ -194,6 +199,8 @@ export async function harness(
 	const tools = createToolRuntime(store, caps, queue, adapter, now, actions);
 	const captures: string[] = [];
 	const sessions: unknown[] = [];
+	/** The text the next model step returns when it is executed (not settled with a fabricated action). */
+	const control = { value: "{}" };
 	const releasedSessions: string[] = [];
 	const inference = {
 		captureControlInTransaction: (_db: unknown, i: { subject: string }) => {
@@ -208,7 +215,7 @@ export async function harness(
 			session?: unknown,
 		) => {
 			sessions.push(session);
-			return { value: "{}" };
+			return { value: control.value };
 		},
 		releaseTaskSession: async (taskId: string) => {
 			releasedSessions.push(taskId);
@@ -223,6 +230,7 @@ export async function harness(
 		inference: inference as never,
 		queue,
 		now,
+		resources,
 	});
 	const task = (id: string) =>
 		store.read(
@@ -358,6 +366,7 @@ export async function harness(
 		started,
 		results,
 		captures,
+		control,
 		sessions,
 		releasedSessions,
 		task,

@@ -18,15 +18,21 @@ export function useOpenDrawing(
 		[open],
 	);
 }
+/**
+ * The one playlist screen: it shows the playlist `id` names, or the latest/chosen one without it.
+ * The launcher passes its click event as the first argument, which is not an id.
+ */
 export function useOpenPlaylist(
 	open: ReturnType<typeof useArtifactWorkspace>["open"],
 ) {
 	return useCallback(
-		() =>
+		(id?: unknown) =>
 			open({
 				id: "music-playlist",
 				kind: "openui",
-				definition: playlistArtifactDefinition(),
+				definition: playlistArtifactDefinition(
+					typeof id === "string" && id ? id : undefined,
+				),
 				title: "音楽プレイリスト",
 			}),
 		[open],

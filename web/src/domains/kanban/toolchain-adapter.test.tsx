@@ -1,6 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
+	act,
 	cleanup,
+	renderHook,
 	fireEvent,
 	render,
 	screen,
@@ -10,10 +12,13 @@ import {
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { ApiError } from "../../../../client/transport";
 import { changeRoots, queryRoots } from "../../queryKeys";
-import { createWebAdapterRegistry } from "../toolchain-artifacts/registry";
+import {
+	type AdapterHostContext,
+	createWebAdapterRegistry,
+} from "../toolchain-artifacts/registry";
 import { ToolchainArtifactHost } from "../toolchain-artifacts/ToolchainArtifactHost";
 import { boardFixture } from "./fixtures";
-import { kanbanWebAdapter } from "./toolchain-adapter";
+import { kanbanWebAdapter, sharedKanbanWebAdapter } from "./toolchain-adapter";
 
 const REV = "artifact:kanban.board@1";
 const adapters = createWebAdapterRegistry([kanbanWebAdapter]);
@@ -119,6 +124,8 @@ beforeEach(() => sessionStorage.clear());
 afterEach(() => {
 	cleanup();
 	vi.restoreAllMocks();
+	vi.useRealTimers();
+	for (const card of document.querySelectorAll("[data-card-id]")) card.remove();
 });
 
 test("the board is read from the kanban source and drawn by the registered view", async () => {
@@ -247,4 +254,85 @@ test("an unreadable board shows the error and no board", async () => {
 		"タスクボードを取得できません。接続を確認してください。",
 	);
 	expect(screen.queryByRole("article")).toBeNull();
+});
+
+function mountBoard(targetRef?: string) {
+	const setTargetRef = vi.fn();
+	const client = {
+		identity: crypto.randomUUID(),
+		toolchainArtifactSource: vi.fn(async () => ({
+			revision: 7,
+			data: boardFixture,
+		})),
+	};
+	const cache = new QueryClient({
+		defaultOptions: { queries: { retry: false } },
+	});
+	const hook = renderHook(
+		({ target }: { target?: string }) =>
+			sharedKanbanWebAdapter.useArtifact({
+				client,
+				artifact,
+				artifactRevisionId: REV,
+				targetRef: target,
+				setTargetRef,
+				visible: true,
+			} as unknown as AdapterHostContext),
+		{
+			initialProps: { target: targetRef },
+			wrapper: ({ children }: { children: React.ReactNode }) => (
+				<QueryClientProvider client={cache}>{children}</QueryClientProvider>
+			),
+		},
+	);
+	return { hook, setTargetRef, cache };
+}
+
+/** The card the board draws. */
+function drawCard(cardId: string) {
+	const element = document.createElement("div");
+	element.setAttribute("data-card-id", cardId);
+	element.scrollIntoView = vi.fn();
+	document.body.append(element);
+	return element;
+}
+
+test("both adapter versions name the same board resource", () => {
+	expect(kanbanWebAdapter.focus).toBe(sharedKanbanWebAdapter.focus);
+	expect(sharedKanbanWebAdapter.adapterRef).toBe("adapter:kanban@2");
+});
+
+test("focus inspects the card, marks it for two seconds and viewing names it", async () => {
+	const { hook, setTargetRef, cache } = mountBoard();
+	await waitFor(() => expect(hook.result.current.phase.kind).toBe("ready"));
+	const card = drawCard("d");
+	expect(sharedKanbanWebAdapter.viewing?.()).toBeNull();
+	vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+	let done: Promise<boolean> | undefined;
+	await act(async () => {
+		done = sharedKanbanWebAdapter.focus?.("d");
+		await vi.advanceTimersByTimeAsync(200);
+	});
+	await expect(done).resolves.toBe(true);
+	expect(setTargetRef).toHaveBeenCalledWith("d");
+	expect(card.getAttribute("data-resource-focus")).toBe("true");
+	// The host feeds the inspected card back as the screen's target.
+	hook.rerender({ target: "d" });
+	expect(sharedKanbanWebAdapter.viewing?.()).toBe(
+		"eumenes://code.task/kanban%3Ad",
+	);
+	await vi.advanceTimersByTimeAsync(2_010);
+	expect(card.hasAttribute("data-resource-focus")).toBe(false);
+	cache.clear();
+});
+
+test("focus says no to a card the board lacks", async () => {
+	const { hook, setTargetRef, cache } = mountBoard();
+	await waitFor(() => expect(hook.result.current.phase.kind).toBe("ready"));
+	vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+	const unknown = sharedKanbanWebAdapter.focus?.("missing");
+	await vi.advanceTimersByTimeAsync(5_500);
+	await expect(unknown).resolves.toBe(false);
+	expect(setTargetRef).not.toHaveBeenCalled();
+	cache.clear();
 });

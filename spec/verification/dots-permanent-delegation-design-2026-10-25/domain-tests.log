@@ -1,0 +1,1242 @@
+$ bun scripts/test-domain.ts --domain dots --domain capabilities --domain tool-runtime --domain dialogue --domain tasks --domain task-reports --domain artifact
+bun test v1.4.3 (c6da4a4d3)
+
+api/domains/capabilities/test/bundles.test.ts:
+(pass) the shipped bundle's pin is the stored digest and its toolchain is data-driven [114.45ms]
+(pass) a bundle the host cannot run is skipped whole, and without a host nothing is added [99.11ms]
+(pass) old revisions keep their JSON and hash, and publication moves back and forth [83.57ms]
+(pass) rolling the pointer back to the unbound revision removes the chain from the offer until a bound revision is published [46.40ms]
+(pass) the dry run lists every problem and writes nothing [28.26ms]
+(pass) each kind of reference problem is refused [159.91ms]
+(pass) a failing toolchain rolls back its documents and keeps the published revision [23.30ms]
+(pass) documents are immutable: the same id with other content is a conflict, the same content a no-op [27.41ms]
+(pass) binding fields belong to toolchains only and need a matching binding [11.29ms]
+(pass) a bound tool is prepared with its own schema and only from an active package [38.28ms]
+(pass) a timer start without a duration is defined as the 3 minute default, not as a question [40.60ms]
+(pass) stored schemas are served as validators; unknown and domain references are not [14.15ms]
+(pass) a bound toolchain is shown by its artifact registration: artifact is optional there, and unbound ones still need one [41.84ms]
+(pass) question schemas must be readable validators and the choice field one of their fields [67.39ms]
+(pass) an install already at revision 2 is upgraded to the latest, and revision 2 stays a valid rollback target [51.79ms]
+(pass) toolchain publication over HTTP is compare-and-set and can roll back [46.58ms]
+
+api/domains/capabilities/test/capabilities.test.ts:
+(pass) quick Web capability grants only lookup and read and preserves deep research tools [0.04ms]
+(pass) 5000 capability catalogue: bounded discovery, exact aliases, immutable revisions and owner isolation [7583.91ms]
+(pass) builtin SKILL is mandatory; disabling survives seed and dependency failure hides package [25.11ms]
+(pass) revoking a dependency permanently invalidates already issued candidates, even after re-enabling [14.49ms]
+(pass) builtin bundle upgrade preserves revision 1 fingerprints and activates a new revision for the larger input contract [13.71ms]
+(pass) deployed research skill v3 upgrades without a revision conflict and restart preserves hashes [22.15ms]
+(pass) seed still rejects a changed newest builtin revision [9.30ms]
+(pass) history and web catalogue selection can be enabled independently without editing archived revisions [23.71ms]
+
+api/domains/capabilities/test/command-agent-binding.test.ts:
+(pass) a command binding takes agent.turn as the policy of its single-shot task, and stays valid without it [5.34ms]
+(pass) the bundle check accepts the existing command binding with or without agent.turn [87.12ms]
+(pass) the bundle check refuses retries that name a tool the binding does not have [89.24ms]
+
+api/domains/capabilities/test/dots-messaging-revision.test.ts:
+(pass) messaging v2 seeds without re-registering or replacing an installation's archived v1 [20.56ms]
+
+api/domains/capabilities/test/image.test.ts:
+(pass) image seed is additive, repeatable and published with one flat request schema [24.43ms]
+
+api/domains/capabilities/test/instant-binding.test.ts:
+(pass) the shipped weather bundle is seeded: an instant toolchain with a binding and no artifact [37.93ms]
+(pass) an instant binding has no field filled from the host's values: its arguments are the model's [43.42ms]
+(pass) an adapter that does not answer instant bindings is refused [42.52ms]
+(pass) an instant toolchain that also names an artifact is refused [42.18ms]
+(pass) an instant binding takes exactly one tool [49.39ms]
+(pass) the shipped stock bundle is an instant toolchain [62.92ms]
+
+api/domains/capabilities/test/json-schema-subset.test.ts:
+(pass) the finite subset becomes a strict validator with the stated bounds [0.75ms]
+(pass) anything outside the subset is refused with its path, never dropped [0.16ms]
+
+api/domains/capabilities/test/learned.test.ts:
+(pass) C01 learned registration rejects conflicts, bad bundles and oversize; builtin hashes unchanged [19.36ms]
+(pass) C01 5000 learned definitions never enter FTS/alias/list and do not displace builtins [274.79ms]
+(pass) seed adds newer research rules and packages without touching old revisions [18.66ms]
+(pass) new research packages expose generic acquisition without topic-specific tools or skills [14.52ms]
+
+api/domains/capabilities/test/lookup-upgrade.test.ts:
+(pass) deployed search schemas survive upgrade; current packages use the new tool revision and reseed safely [76.74ms]
+
+api/domains/capabilities/test/music-versions.test.ts:
+(pass) installed V1 music definitions survive the V3 upgrade and repeated seeding [21.51ms]
+(pass) V1 keeps its schema while V2 enforces the verified integer duration and vocal fields [0.55ms]
+(pass) V3 describes music/vocals/SFX without changing historical schemas [0.61ms]
+
+api/domains/capabilities/test/ocr-upgrade.test.ts:
+(pass) OCR preserves all published revisions and upgrades an existing registry idempotently [21.30ms]
+
+api/domains/capabilities/test/prepare-learned.test.ts:
+(pass) C02 prepare by ID keeps shared checks; independent registration does not disturb A; GC spares builtins/protected [18.16ms]
+
+api/domains/capabilities/test/requirement-controller.test.ts:
+(pass) profile validity compares instants with mixed fractional-second precision [0.79ms]
+(pass) R02/R03/R06 immutable profile revisions, CAS, independent catalogs and invalidation [16.61ms]
+(pass) management API validates bodies, exposes CAS state and keeps requirement profiles out of executable catalog [8.71ms]
+
+api/domains/capabilities/test/requirement-schema.test.ts:
+(pass) enum values must also satisfy bounds and formats at every nested node [2.10ms]
+(pass) R04 unsupported keywords, incompatible keywords and resource limits reject before conversion [0.11ms]
+(pass) R05 standard schema conversion is strict and does not coerce, default or ignore fields [0.59ms]
+(pass) optional string bounds preserve explicit constraints and the overall value capacity [0.12ms]
+(pass) a rejected value schema reports where and why, never its keys or values [0.04ms]
+
+api/domains/capabilities/test/requirements.test.ts:
+
+api/domains/capabilities/test/resource-kinds.test.ts:
+(pass) the 14 builtin kinds load with their actions, default and owner [20.21ms]
+(pass) action labels fall back to the global action words and a kind can override them [19.71ms]
+(pass) produces lists the kinds a toolchain creates and the candidate card carries it [19.91ms]
+(pass) an invalid registration is rejected and stores nothing [9.63ms]
+(pass) a bundle can register a kind and refuses an invalid one [9.10ms]
+(pass) revisions are versioned: seeding again changes nothing, a changed revision conflicts, a new one supersedes [24.81ms]
+
+api/domains/capabilities/test/session-binding.test.ts:
+(pass) a session binding passes the check and registers as a toolchain with the session execution [48.67ms]
+(pass) a session binding's references are all checked [78.90ms]
+(pass) a session binding with command-only fields or an unknown execution is refused [45.51ms]
+(pass) the registry refuses a session binding whose tool schema differs from the package tool's [50.26ms]
+(pass) a session binding may carry its own time limits: each 10 s to 60 min, inference <= turn <= run [4.96ms]
+
+api/domains/capabilities/test/settings-google.test.ts:
+(pass) Google settings bundle exposes no AI definitions or bindings
+
+api/domains/capabilities/test/standalone-artifacts-forms.test.ts:
+(pass) structure actions must be registered by the document's adapter with its input schema [9.47ms]
+(pass) collection sources, paging and row actions are checked against this artifact's bindings [8.49ms]
+(pass) row input keys must be top-level properties of the action's input, on write and structure actions only [7.13ms]
+(pass) the create form must match the action input and keep secrets declared [8.30ms]
+(pass) form options come from fixed values or a registered query of the source's adapter [9.46ms]
+(pass) a row edit form adds fields to the row-built input without overlapping it [10.82ms]
+(pass) form defaults fit their control, and refresh-while keeps to an existing source [10.08ms]
+(pass) structure actions can be row actions and create actions, and ids may be generated [8.50ms]
+(pass) a clean-draft requirement names a registered document that the artifact uses [8.34ms]
+
+api/domains/capabilities/test/standalone-artifacts.test.ts:
+(pass) launcher artifacts are published without a toolchain, with the final entry shape [11.55ms]
+(pass) a newer revision switches the published pointer, an old one is a rollback, and re-import keeps the choice [10.67ms]
+(pass) fields are checked against the adapter that owns the document [10.04ms]
+(pass) a field id is unique across the whole published catalog, but a revision may keep its own [11.63ms]
+(pass) draft documents, navigation targets and apply operations must be registered [10.83ms]
+(pass) a refused bundle publishes nothing [10.04ms]
+(pass) a navigate-by-value map is checked for every target, and a default value stays display-only [9.64ms]
+(pass) a field must agree with what the document schema says about its path [11.11ms]
+(pass) confidential values travel only in declared input properties of every write that applies the document [8.85ms]
+(pass) source params schemas must resolve [7.78ms]
+(pass) revisions of one artifact id inside a bundle may carry the same fields [8.38ms]
+(pass) artifact publication over HTTP is compare-and-set [12.59ms]
+
+api/domains/capabilities/test/steward-request-retire.test.ts:
+(pass) the steward.request items lose their active entry, search and embedding; their revisions stay as history [21.43ms]
+
+api/domains/capabilities/test/task-binding.test.ts:
+(pass) task binding is bounded, has no artifact and rejects unknown execution kinds [1.22ms]
+(pass) the dormant task bundle is never seeded, registers explicitly without a dummy artifact, and survives reseeding [189.97ms]
+(pass) a host with the earlier task result schema upgrades by new revisions and preserves its old binding [14.17ms]
+
+api/domains/capabilities/test/timer-compatibility.test.ts:
+(pass) timer UI pausing keeps the deployed version 1 input schemas and accepts paused result state [1.93ms]
+(pass) the bound-command inputs accept exactly the shapes the UI and the questions send [0.43ms]
+
+api/domains/capabilities/test/toolchain-candidates.test.ts:
+(pass) the current request embedding selects music.create despite past choices and unrelated text matches [21.16ms]
+(pass) the current request embedding selects image.create despite past choices and unrelated text matches [20.96ms]
+(pass) the current request embedding selects excalidraw.edit despite past choices and unrelated text matches [18.15ms]
+(pass) strict discovery has no all-catalog fallback and excludes retained revisions before the top four [19.44ms]
+
+api/domains/capabilities/test/web-guided.test.ts:
+(pass) new Web revisions upgrade and reseed without changing archived definitions [93.12ms]
+
+api/domains/capabilities/test/web-research-codex-retire.test.ts:
+(pass) the web.research.codex item loses their active entry, search and embedding; their revisions stay as history [23.87ms]
+
+api/domains/capabilities/test/web-research-rename.test.ts:
+(pass) the model-named Web research toolchain is retired and the Web research toolchain is not registered again [58.38ms]
+
+api/domains/dialogue/test/active-run.test.ts:
+(pass) a conversation has an active run from acceptance until the run ends, and only that conversation [65.90ms]
+
+api/domains/dialogue/test/attachment-notes.test.ts:
+(pass) images without host annotations leave the text unchanged [0.04ms]
+(pass) annotations follow the text in image order as reference data, including an empty meta [0.03ms]
+
+api/domains/dialogue/test/brief-reply.test.ts:
+(pass) specialist reply length is bounded without limiting production arguments [0.63ms]
+(pass) brief speech is at most two sentences, keeping decimal values and links intact [0.05ms]
+(pass) a display artifact's body is not held to the speech contract [57.37ms]
+(pass) a long conversation answer is adopted as it is: the host neither repairs nor rejects it [56.73ms]
+
+api/domains/dialogue/test/command-interactions-http.test.ts:
+(pass) the HTTP routes answer, list and cancel interactions with the documented statuses [72.16ms]
+(pass) the HTTP answer to an expired question is 410 [63.77ms]
+
+api/domains/dialogue/test/command-interactions-lifecycle.test.ts:
+(pass) an answer whose request id already belongs to another run is a conflict, not a link [65.17ms]
+(pass) a failed operation ends the interaction without a receipt [63.23ms]
+(pass) answers are refused for a stale question or revision, an invalid value, or a changed version [80.44ms]
+(pass) an answer past the question's time is expired, not resumed [64.56ms]
+(pass) maintenance expires open questions and ends interactions whose run is gone [60.02ms]
+(pass) an answer and its new run commit together: a refused job leaves the question open [67.10ms]
+(pass) at most three questions are asked; the fourth stops the operation [72.62ms]
+(pass) cancelling closes the question, refuses a late answer and stops a resumed run still in flight [60.50ms]
+(pass) a model result that arrives after the interaction was cancelled is not adopted [66.92ms]
+(pass) interactions are bounded: open and total capacity refuse a new one, and ending keeps the body for 30 days [71.34ms]
+(pass) ended interactions lose their bodies after 30 days and their rows after 30 more [61.04ms]
+(pass) an interaction whose run ended without finishing it is closed [163.71ms]
+
+api/domains/dialogue/test/command-interactions-questions.test.ts:
+(pass) a clarifying question is saved with the delegation's TODO and reaches the conversation, then is answered once by the UI [69.45ms]
+(pass) the resumed command run gets the question and the answer as data and completes the interaction with the receipt [73.21ms]
+(pass) a target question carries the host's choices and accepts only one of them [60.76ms]
+(pass) a binding without questions allows only free text, and the model is offered no other schema [66.42ms]
+(pass) free text is always allowed: a binding without questions asks builtin:answerText [79.93ms]
+(pass) a binding with questions offers exactly those schemas to the model [71.14ms]
+(pass) the choice field is the binding's: a schema with another field is validated the same way [86.27ms]
+(pass) a schema without a choice field carries no choices even if the host has some [97.19ms]
+(pass) a target question without host choices is asked as free text [70.20ms]
+
+api/domains/dialogue/test/command-interactions-work.test.ts:
+(pass) the work tool's answer is accepted once and the same run resumes the interaction [69.29ms]
+(pass) an answer that names a question is refused as an unknown argument and changes nothing: the host takes the open question [70.32ms]
+(pass) an answer without text is refused with question_not_open [68.07ms]
+(pass) a second answer to the same question is refused: the TODO no longer waits [73.97ms]
+(pass) a stale TODO revision is refused before the answer is looked at [70.89ms]
+(pass) an answer to a question whose chain has since been replaced is refused and leaves the question open [62.74ms]
+(pass) an answer the UI gave completes the operation into the TODO that asked the question [66.11ms]
+(pass) a question asked again after a UI answer replaces the TODO's question [67.68ms]
+
+api/domains/dialogue/test/command-interactions.test.ts:
+(pass) the offer comes from the catalog: bound chains by adapter availability, the rest by host capability [121.04ms]
+(pass) a delegation to a command toolchain opens a command TODO and hands the run to the command job [70.05ms]
+(pass) a delegation ends the generation: the model is not called again after the work was handed over [69.94ms]
+(pass) a command chain without a binding or with an unknown backend is refused before any execution [183.21ms]
+(pass) a bound chain runs through the generic action route with the binding's adapter and operation [70.13ms]
+(pass) arguments that the binding's schema rejects never reach the agent runtime [69.93ms]
+(pass) an operation without an interaction carries no frozen stamp [60.17ms]
+(pass) the command sub-agent runs as a sub-agent of its run, as one call [61.24ms]
+
+api/domains/dialogue/test/context-document.test.ts:
+(pass) the document is four tagged sections, one item per line, with short numbers and no ids [0.50ms]
+(pass) text from outside cannot forge a tag or a line, and a long result points to the work tool [0.16ms]
+(pass) <now> holds the time, the triggers by number, the utterance being spoken and this call's records [0.04ms]
+(pass) external specialist replies and summaries keep their source instead of becoming self utterances [0.04ms]
+
+api/domains/dialogue/test/context-eval/analysis.test.ts:
+(pass) adoption: all seven criteria met adopts [1.18ms]
+(pass) adoption criterion 1: a transport error or an unresolved axis makes the decision incomplete [0.65ms]
+(pass) adoption criterion 2: one regression in a safety family rejects, even with a large net gain [0.71ms]
+(pass) adoption criterion 3: a net of zero adopts; a net below the configured minimum rejects [0.77ms]
+(pass) adoption criterion 4: a family with a net loss rejects even when the total gain is positive [0.19ms]
+(pass) adoption criterion 5: more F9 contract violations than baseline rejects [0.34ms]
+(pass) adoption criterion 6: prefix stability must be higher than baseline; unmeasured is incomplete, never adopted [0.47ms]
+(pass) adoption criterion 7: a median response time above the baseline's rejects [0.56ms]
+(pass) fixture and dev analyses are never binding; a safety regression rejects even when criterion 1 is also unmet [0.30ms]
+(pass) a run without a baseline is summarized per family, with its safety failures and no comparison [0.09ms]
+(pass) the report names the lane and says when a result cannot decide [0.59ms]
+
+api/domains/dialogue/test/context-eval/case-schema.test.ts:
+(pass) a valid case parses; unknown fields and bad ids are rejected [0.68ms]
+(pass) id, family and split must agree; axes are unique; families that need an axis carry it [0.93ms]
+(pass) a generation without an utterance needs a trigger, and an utterance has none [0.37ms]
+(pass) references must name a seeded key, keys are unique, delivery fields agree with how much was heard [2.11ms]
+(pass) episode parts, TODOs, tendencies and forbidden identifiers are checked against the seed [1.30ms]
+(pass) the loader reports invalid json, schema errors, file-name mismatch and duplicate ids together [0.69ms]
+(pass) skeleton normalization keeps grammar and collapses content runs [0.29ms]
+(pass) dev/holdout leakage: the same skeleton or heavy n-gram overlap is refused; a different sentence passes [0.23ms]
+(pass) the example experiment's cases validate and cover every family in both splits [32.95ms]
+
+api/domains/dialogue/test/context-eval/checks-judge.test.ts:
+(pass) tool checks look at the fixed tool names [0.11ms]
+(pass) delegation checks read the delegate call's mode and toolchain [0.08ms]
+(pass) speaks and silent read the text [0.01ms]
+(pass) the brief spoken reply contract is the delivery domain's isBriefSpokenReply [0.06ms]
+(pass) forbidden identifiers are exact substrings of the answer text [0.03ms]
+(pass) the request is blind: facts, input, answer and axes only, with the auxiliary exact JSON options [0.27ms]
+(pass) a generation without an utterance gives the judge its trigger; the events are the seed's, without keys [0.18ms]
+(pass) the judge sees the functions the answer called, with their arguments escaped, so "call or announce" is decidable [0.10ms]
+(pass) a valid reply (object or JSON text) gives a 0/1 per axis with its reason, in rubric order [0.37ms]
+(pass) the judge fails closed: call failure, bad JSON, schema violation and axis mismatch all need adjudication [0.47ms]
+(pass) without rubric axes the judge is not called [0.05ms]
+(pass) the judge prompt lives in a system-context toml, not in TypeScript [1.06ms]
+
+api/domains/dialogue/test/context-eval/freeze.test.ts:
+(pass) the manifest holds a sha256 per file and a holdout digest [0.12ms]
+(pass) freezing twice with the same content is a no-op; changed holdout content is refused [1.75ms]
+(pass) any frozen file (judge prompt, harness source) changing is refused, as are added and removed files [1.56ms]
+(pass) verifyFrozen fails closed when nothing was frozen [0.24ms]
+(pass) a report directory is new every time and a report file is never overwritten [1.87ms]
+
+api/domains/dialogue/test/context-eval/generation-runner.test.ts:
+(pass) a spoken answer is plain text and ends the generation in one round, with no tool call recorded [39.88ms]
+(pass) a generation without an utterance may stay silent [32.24ms]
+(pass) the prepared messages lead every round, and the agent's system text is the agency's own [33.77ms]
+(pass) a search then a delegation to what it offered hands the work over: the announcement is what is heard [65.03ms]
+(pass) a delegation the host refuses is answered with its reason and the reply goes on: a toolchain nobody offered, a missing announcement, a change without confirmation [162.40ms]
+(pass) a change is refused without its confirmation; the confirmation is issued without executing [32.89ms]
+(pass) control text in the speech is a contract failure, not a transport error [34.14ms]
+(pass) the offline search ranks the catalog by shared character pairs, best first, at most four [0.19ms]
+
+api/domains/dialogue/test/context-eval/integrity.test.ts:
+(pass) the freeze covers every harness source and the judge prompt, and nothing of the deleted arms [500.54ms]
+(pass) run.json records the settings snapshot and score.json the judge rules digest [301.43ms]
+(pass) the catalog text of the judge rules is byte-identical to the frozen toml source (live lane check) [0.23ms]
+(pass) score refuses raw rows that do not belong to the run: duplicates, unknown case, trial out of range, lane [326.22ms]
+(pass) score refuses a holdout run whose freeze changed; a dev run records a manifest mismatch [1252.16ms]
+(pass) analyze refuses scores whose raw rows changed, malformed score rows, an invalid prefix measurement, and a baseline of another lane [383.21ms]
+(pass) rerun condition: a line that is empty, missing or still says 要合意 is not filled in [0.13ms]
+(pass) transport re-run: refused until preregistered; then a NEW run dir holds the original rows with only the failed calls replaced, with provenance [1695.94ms]
+
+api/domains/dialogue/test/context-eval/materialize.test.ts:
+(pass) a case becomes the production messages: system, the material document, <now>, then the newest utterances [67.01ms]
+(pass) State goes through the memory service: the published profile, a waiting memory, tendencies and notes [61.01ms]
+(pass) the log carries the events as lines, a partial delivery with its delivered text, and what is being spoken [55.32ms]
+(pass) earlier history is the episode: a summary and an unsummarized mark; its events are gone from the log [53.02ms]
+(pass) TODOs come from the work ledger: open ones in state, results as log lines, the archived gone, a confirmation pending, the toolchain retained [40.63ms]
+(pass) a generation without an utterance shows the host's fixed text and the trigger with the TODO's number [43.61ms]
+(pass) the document is deterministic and replaces only markup characters and line breaks of outside text [133.95ms]
+(pass) a window the plan cannot use stops the case, and the store is closed [54.44ms]
+(pass) a seed that fails to write closes the store before the error propagates [43.80ms]
+(pass) the generation time is just after the newest thing the seed records [0.09ms]
+(pass) a generation after a long silence re-constructs the window first, and says why [39.21ms]
+
+api/domains/dialogue/test/context-eval/pipeline.test.ts:
+(pass) prepare freezes once; changing a holdout case afterwards is refused by prepare and by run [2621.74ms]
+(pass) prepare refuses a case whose messages break an invariant or cannot be prepared, before anything is frozen [461.44ms]
+(pass) holdout cases are not run before the freeze [16.39ms]
+(pass) fixture lane: run, score and analyze produce reports labelled fixture, each in a new directory [1502.99ms]
+
+api/domains/dialogue/test/context-eval/run.test.ts:
+(pass) every case is prepared once by the production code and its trials share the messages [185.04ms]
+(pass) planJobs closes every store it opens, including when a case cannot be prepared [134.43ms]
+(pass) a run records one row per call; a thrown error is a transport error with its class only, a contract failure is its own status [88.39ms]
+(pass) the fixture model answers through the production loop, so tools, analysis and delegation are exercised [41.40ms]
+(pass) the trajectory measurement is a valid report; ordinary calls share nearly all of the previous prompt, re-constructed ones less [198.53ms]
+(pass) prefix stability counts the shared bytes of consecutive calls [0.11ms]
+(pass) the example experiment's cases all prepare within the message invariants [5683.78ms]
+
+api/domains/dialogue/test/context-eval/scoring.test.ts:
+(pass) a trial passes only when every check and every axis passes [2.56ms]
+(pass) transport errors are counted apart; a contract failure is a failed trial; a repair is a violation [0.10ms]
+(pass) an unusable judge reply leaves the trial needing adjudication, and adjudication.json settles exactly that axis [0.30ms]
+(pass) a case passes on the majority of trials and is incomplete when a trial is unresolved, failed to run or missing [0.13ms]
+(pass) a failed deterministic check is a definite fail even when the judge is unresolved [0.16ms]
+(pass) duplicate or out-of-range trial rows never add votes and make the case incomplete [0.06ms]
+(pass) the scores.jsonl schema refuses malformed rows and knows the new check kinds [0.28ms]
+
+api/domains/dialogue/test/context-eval/trajectory.test.ts:
+(pass) the default trajectory is twelve generations that keep the message invariants [216.04ms]
+(pass) between re-constructions the system part and the start of the document do not change: each call begins with the previous one up to its state section [137.07ms]
+(pass) the window is re-constructed where the product's rules say: a long silence resumes the conversation, an idle cache is taken as lost [87.18ms]
+(pass) a memory saved after the profile was published waits in <state> (n-lines) until a re-construction takes it into <memory> [108.28ms]
+(pass) the delegation opens a TODO, its finishing starts a generation with the fixed text, and the result is a line of the log [117.27ms]
+(pass) in a small window the log passes its limit and the oldest events are moved out to the history [139.20ms]
+
+api/domains/dialogue/test/controller.test.ts:
+(pass) the dialogue controller validates requests and delegates one run per request ID [106.61ms]
+(pass) the public runs API rejects utteranceId, unknown keys and a pinned toolchain outside a form submit; it accepts the shape web and CLI send [93.93ms]
+(pass) the resubmit route answers the new run, 400 for an empty text, 404 for an unknown message and 409 when refused [125.81ms]
+
+api/domains/dialogue/test/conversation-output.test.ts:
+(pass) control text is never published, including split delimiters: delegate{mode:<|"| / 1 [1.25ms]
+(pass) control text is never published, including split delimiters: delegate{mode:<|"| / 3 [7.48ms]
+(pass) control text is never published, including split delimiters: delegate{mode:<|"| / 63 [0.05ms]
+(pass) control text is never published, including split delimiters: <call:work{todo:"x / 1 [0.05ms]
+(pass) control text is never published, including split delimiters: <call:work{todo:"x / 3 [0.03ms]
+(pass) control text is never published, including split delimiters: <call:work{todo:"x / 21 [0.02ms]
+(pass) control text is never published, including split delimiters: memory ({"operatio / 1 [0.07ms]
+(pass) control text is never published, including split delimiters: memory ({"operatio / 3 [0.04ms]
+(pass) control text is never published, including split delimiters: memory ({"operatio / 32 [0.02ms]
+(pass) control text is never published, including split delimiters: work
+({"operation" / 1 [0.05ms]
+(pass) control text is never published, including split delimiters: work
+({"operation" / 3 [0.03ms]
+(pass) control text is never published, including split delimiters: work
+({"operation" / 28 [0.06ms]
+(pass) control text is never published, including split delimiters: <|unknown_control| / 1 [0.04ms]
+(pass) control text is never published, including split delimiters: <|unknown_control| / 3 [0.05ms]
+(pass) control text is never published, including split delimiters: <|unknown_control| / 19 [0.02ms]
+(pass) control text is never published, including split delimiters: t2を確認します。
+
+<tool_c / 1 [0.11ms]
+(pass) control text is never published, including split delimiters: t2を確認します。
+
+<tool_c / 3 [0.03ms]
+(pass) control text is never published, including split delimiters: t2を確認します。
+
+<tool_c / 104 [0.03ms]
+(pass) control text is never published, including split delimiters: <function=work>
+<p / 1 [0.06ms]
+(pass) control text is never published, including split delimiters: <function=work>
+<p / 3 [0.04ms]
+(pass) control text is never published, including split delimiters: <function=work>
+<p / 60 [0.01ms]
+(pass) control text is never published, including split delimiters: 表示されていますよ。
+
+<deleg / 1 [0.06ms]
+(pass) control text is never published, including split delimiters: 表示されていますよ。
+
+<deleg / 3 [0.05ms]
+(pass) control text is never published, including split delimiters: 表示されていますよ。
+
+<deleg / 77 [0.04ms]
+(pass) control text is never published, including split delimiters: <work>t3</work> / 1 [0.03ms]
+(pass) control text is never published, including split delimiters: <work>t3</work> / 3 [0.17ms]
+(pass) control text is never published, including split delimiters: <work>t3</work> / 15 [0.03ms]
+(pass) a name that is not an offered tool is ordinary text, and is published [0.25ms]
+(pass) angle brackets in ordinary prose are published [0.24ms]
+(pass) ordinary prose, JSON, code and tool-name mentions retain their text and stream before completion [0.16ms]
+(pass) an unfinished tool name is held until its ordinary continuation is known [0.14ms]
+(pass) a bare tool name at the end of an answer is released after completion [0.09ms]
+(pass) the tool-search prose cannot substitute a bare tool name for a native call [0.12ms]
+(pass) a natural prefix does not let later control syntax into the published text [0.12ms]
+(pass) control text in a nonstream response is rejected and never published [0.04ms]
+(pass) held whitespace and discarded output still obey the total capacity limit [0.47ms]
+(pass) a tool name followed by a parenthesis in prose is not a call [0.20ms]
+
+api/domains/dialogue/test/dialogue.test.ts:
+(pass) a request ID is idempotent, a different body under it conflicts, and the answer is adopted atomically [117.67ms]
+(pass) a pinned toolchain is stored on the run and is part of the request's identity [86.18ms]
+(pass) a failed input persistence prevents any provider request [0.58ms]
+(pass) a cancelled inference cannot append its answer [93.39ms]
+
+api/domains/dialogue/test/error-report.test.ts:
+(pass) token counting refusal includes the connection and upstream correlation without raw provider text [80.27ms]
+(pass) records written in UTC before the JST format and JST records mix in one correct timeline [85.41ms]
+(pass) a worker's control failure is reported in the fixed form with the first failure and its reference [70.72ms]
+(pass) repeated rejections of an operation fold into one row; a contract violation names the run's reason [65.25ms]
+(pass) a research failure answered by the fixed reply is reported with the tool failure of the Web run [64.35ms]
+(pass) a cancellation and the failure it causes are reported with the cancellation first [59.44ms]
+(pass) an inference failure shows where it happened (without the checkout's path) [64.40ms]
+(pass) a repaired violation of the first round is a row of the table, not the failure the worker ended with [69.15ms]
+(pass) a warning the run went on from is not the failure; the record with the run's failure code is [70.41ms]
+(pass) records from the rotated generations and the other IDs of the run are read [76.48ms]
+(pass) a missing log still gives the overview from the run's own state [70.56ms]
+(pass) an interrupted run, which ended without an answer, is reported like a failure [67.72ms]
+(pass) only fixed fields and identifier-like values are printed; text, settings and unknown fields never are [72.96ms]
+(pass) a long run stays within the limit: the oldest normal rows go first and the omission is stated [86.32ms]
+(pass) the route returns the report, 404 for an unknown run and 409 for a run that did not fail [302.73ms]
+
+api/domains/dialogue/test/execution-notices.test.ts:
+(pass) revoking a queued notice run cancels it and its job, and the steward is told it was cancelled [73.62ms]
+(pass) revoking a notice that already completed changes nothing [76.86ms]
+(pass) revoking an unknown source is a no-op [66.62ms]
+
+api/domains/dialogue/test/generation-prepare.test.ts:
+(pass) the material document is four tagged sections in order; the newest message is the utterance itself [86.05ms]
+(pass) a notice whose text is a JSON object is the trigger; the fixed text is the newest message when no utterance is pending [76.85ms]
+(pass) a plain notice text is the trigger as its source kind and text [88.78ms]
+(pass) the conversation agent's state shows in <now> as agency lines; nothing else of it is in the document [73.76ms]
+(pass) an empty agency layer, or none, leaves no agency line in <now> [76.31ms]
+(pass) the system message leads with the conversation agent's own system text, then the host's persona and rules [69.04ms]
+(pass) the world names the wording mentions are a reference record line in <now>, not in the document [70.79ms]
+(pass) adopted goals are the state's goals, each as a numbered line with its text [70.84ms]
+(pass) a conversation idle past the provider's cache window is re-constructed; a quick follow-up is not [79.97ms]
+(pass) a resumed conversation (silence of half an hour) is re-constructed; the original turns stay in the log until their summary is prepared [79.42ms]
+(pass) a window too small for the planned sections fails the run with window_too_small, with no model call [71.97ms]
+
+api/domains/dialogue/test/generation-tools.test.ts:
+(pass) the fixed tool definitions stay within the 2,000 estimated-token allowance (section 6.1) [0.11ms]
+(pass) the compact definitions leave each mode's required fields to the host's check [0.53ms]
+
+api/domains/dialogue/test/generation-work.test.ts:
+(pass) check reads a TODO's state and result into the tool result, and logs only the check [1081.28ms]
+(pass) a check of an unknown TODO is refused with todo_not_found and changes nothing [61.39ms]
+(pass) a stale revision is refused with revision_stale and the current state, nothing is executed [72.97ms]
+(pass) an approval is refused when the confirmation statement was not heard at all [68.69ms]
+(pass) an irreversible confirmation heard only in part is not enough to approve [70.06ms]
+(pass) a partial playback records what was heard of the reply [69.29ms]
+(pass) a reported TODO is archived at once when its reply was heard in full (a text reply is delivered when stored) [1079.40ms]
+(pass) a reported TODO whose reply is still being played requests the archive, and the delivery confirms it only when heard in full [2097.47ms]
+(pass) a TODO that is not done, or belongs to no reply of the conversation, is never archived by a report [63.37ms]
+(pass) an agency utterance is recorded as a spontaneous said event, and the next document carries it [53.69ms]
+(pass) a spontaneous utterance that reports done TODOs archives them: it is delivered when stored [1060.79ms]
+(pass) a memory read returns the long-term items that match, and logs the read [83.80ms]
+(pass) a memory still waiting in <state> (not yet in <memory>) is not read as an in-profile item without its p<n> [80.69ms]
+(pass) cancel of a waiting TODO from a later utterance ends the run it waits on, and the TODO is done as cancelled [94.13ms]
+(pass) the TODO screen's page shows the whole request, newest request first, and the archive apart [2075.62ms]
+
+api/domains/dialogue/test/generation.test.ts:
+(pass) an utterance is answered with plain text: the said events, a full delivery and the answer trace [69.75ms]
+(pass) a model call that fails fails the run; its utterance joins the log unanswered and the next generation answers only its own [70.30ms]
+(pass) text written beside a tool call is spoken before it and kept: the answer is the whole spoken text [71.98ms]
+(pass) a refused tool call is returned as the tool's result, and the reply goes on [64.91ms]
+(pass) a call the host cannot read and a second search are refused with their reasons, and the reply continues [74.47ms]
+(pass) an instant toolchain's answer comes back as the tool result, and makes no TODO [83.13ms]
+(pass) a delegation is announced, opens a TODO and hands the run over; the finished work ends the run without a generation and opens the agent's opportunity [1072.81ms]
+(pass) a finished TODO with no agency port ends its run without a generation too [1066.35ms]
+(pass) an answer delivery uses the emotion of the reply, never judged again [69.65ms]
+(pass) a change needs a confirmation first; the approval executes the saved request [65.88ms]
+(pass) a memory request goes to the steward with the user's message as its source [59.51ms]
+(pass) a spoken answer cut short records what was heard, without the announcement [58.33ms]
+
+api/domains/dialogue/test/memory-integration.test.ts:
+(pass) a remembered fact is in the profile of the next prompt [65.86ms]
+(pass) memory switched off injects nothing: the profile is empty [69.70ms]
+(pass) a forgotten fact leaves the next prompt, and the messages it came from stay in the conversation [72.12ms]
+(pass) a forget of a fact shown while the answer is generated makes that answer stale: nothing is adopted [110.23ms]
+(pass) an addition or a republish during generation does not expire the answer [66.84ms]
+(pass) a fact whose period has not started yet, or has ended, is not current understanding [77.14ms]
+(pass) a reference text with newlines is one JSON string, so it cannot forge lines of the prompt [72.32ms]
+(pass) the context policy of a memory-enabled run is exact: the server neither trims nor reorders the prompt [58.64ms]
+(pass) a long multibyte conversation id keeps its runs and its messages apart from others [64.57ms]
+
+api/domains/dialogue/test/pinned-operation.test.ts:
+(pass) a run pinned to image.create hands its submit body to the toolchain: a TODO, no model call, no answer text [65.89ms]
+(pass) a run pinned to music.create hands over the same way when the music port is offered [65.19ms]
+(pass) a toolchain that is not offered on this host (no music port) fails the pinned run with toolchain_unavailable and no fallback [62.27ms]
+(pass) a toolchain with no active revision (not in the catalog) fails the pinned run with toolchain_unavailable and no fallback [72.95ms]
+(pass) a toolchain whose card cannot be rebuilt fails the pinned run with toolchain_unavailable and no fallback [74.09ms]
+(pass) a research toolchain fails the pinned run with toolchain_unavailable and no fallback [81.01ms]
+(pass) a music playback toolchain fails the pinned run with toolchain_unavailable and no fallback [69.51ms]
+
+api/domains/dialogue/test/queue.test.ts:
+(pass) a run handles the utterances pending at its claim; a later input waits for its own run [80.27ms]
+(pass) utterances pending together are one generation; a run with nothing left to handle ends as handled [62.97ms]
+(pass) full queue rejects the submit and stores neither message nor run [73.28ms]
+(pass) restart: queued runs continue, a running run is interrupted, a late result from the old owner is rejected [73.73ms]
+(pass) runs from before the queue existed are interrupted, not given a new job [69.54ms]
+(pass) a scheduled prompt creates exactly one background run per occurrence; an interactive input is claimed first [82.35ms]
+(pass) waitForTerminal honours its own timeout and an abort, and never cancels the run [111.58ms]
+(pass) a rejected answer adoption fails both the run and its queue job, and adds no message [67.12ms]
+(pass) only an adopted, confident motion labels an answer; a judgment of a cancelled run is rejected [74.36ms]
+(pass) the emotion context holds the earlier turns and the complete answer, never a later input [74.62ms]
+
+api/domains/dialogue/test/reconcile-agents.test.ts:
+(pass) a throwing event is logged, never rejected, and close() still completes [63.96ms]
+(pass) transient store errors back off but never fail the run [62.47ms]
+(pass) a poison event fails the run after five failures [65.48ms]
+(pass) a failing run synchronisation write does not reject [69.83ms]
+
+api/domains/dialogue/test/resubmit.test.ts:
+(pass) an edit while the answer is generated stops the run, corrects the utterance and answers it again [71.69ms]
+(pass) the same text sends the utterance again without a correction [72.54ms]
+(pass) an utterance stopped by the user can be edited and answered [67.94ms]
+(pass) an answered utterance is not edited, and nothing changes [71.82ms]
+(pass) an utterance whose delegation was committed is refused and its run keeps waiting [67.79ms]
+(pass) an utterance followed by another is not the latest [60.59ms]
+(pass) a screen's submit, an empty text and another conversation's message are refused [62.44ms]
+(pass) a repeated requestId is one edit and one run [66.56ms]
+(pass) finding a toolchain commits nothing: the utterance is still edited, and its exchange moves to the new run [69.58ms]
+(pass) a repeated requestId with another text is a conflict [60.52ms]
+
+api/domains/dialogue/test/run-end.test.ts:
+(pass) a completed run tells the steward once, with its conversation and the completed state [66.90ms]
+(pass) a failed run tells the steward its failure [62.09ms]
+(pass) a cancelled run tells the steward it was cancelled, and its waiting TODO ends with it [64.88ms]
+(pass) a run that already completed is not ended or told twice by a later cancel [67.20ms]
+(pass) a run left without a job when the backend restarts is interrupted and the steward is told [58.07ms]
+
+api/domains/dialogue/test/specialist-document.test.ts:
+(pass) the work document is read as its canonical text, and the host offers its document tools [66.24ms]
+(pass) a partial edit with its reply makes a revision in one call and is kept in the session's course [70.67ms]
+(pass) an edit whose text is missing or not unique applies nothing and says which edit, for one retry [67.00ms]
+(pass) an edit that changes nothing ends the turn with the host's question [70.86ms]
+(pass) an edit on an old revision is refused with the current one [74.53ms]
+(pass) a whole write that fails its check is kept as the rejected draft and ends the turn at once; the next turn reads it [81.25ms]
+(pass) a write the domain had to trim says so after the reply [78.35ms]
+(pass) a document larger than the inline budget is an outline, and doc.view reads its lines [71.89ms]
+(pass) a domain refusal of the commit is data for the next call, and a later screen change is flagged [80.02ms]
+(pass) a later change that adds nothing after one that changed the work is reported as the change [75.50ms]
+(pass) an edit not found says why and gives the document's own lines to copy on the retry [73.41ms]
+
+api/domains/dialogue/test/specialist-lifecycle.test.ts:
+(pass) expiry is the session's only one: polling never extends it, an accepted utterance does [71.83ms]
+(pass) an expired session is not extended by a new utterance: it ends and the utterance goes the ordinary way [78.52ms]
+(pass) a turn that outlives the session's expiry is not adopted [74.17ms]
+(pass) the sweep ends expired sessions; a refusing domain leaves them closing and the next sweep retries the same end [74.28ms]
+(pass) a suspended work that was saved meanwhile is ended by the sweep, an unsaved one is kept [77.70ms]
+(pass) recovery ends every session that was not ended as restarted [64.61ms]
+(pass) a pinned form submit is the main conversation's: an active session does not take it [75.67ms]
+(pass) commands: revision guard, idempotent by requestId, return suspends or ends, resume advances the epoch [75.47ms]
+(pass) closing a clean work ends it; returning a clean one ends it too [72.13ms]
+(pass) return cancels the turn in flight; the work is free and a late result is not adopted [123.49ms]
+(pass) an utterance while a turn holds the work is queued behind it, in order, and takes the work when its turn starts [69.83ms]
+(pass) the work is never free between two queued turns; a return command withdraws the turn in flight and hands the queued utterances to the conversation agent in order [75.40ms]
+(pass) when the specialist leaves, utterances queued behind it go to the conversation agent instead of being lost [72.27ms]
+(pass) an expired session with a turn in flight is withdrawn when the next utterance ends it [123.14ms]
+(pass) the live check holds only for an active or suspended session that has not expired [64.39ms]
+(pass) after the specialist leaves, the conversation's own exchanges are not blocked from memory and are learned from [68.64ms]
+
+api/domains/dialogue/test/specialist-memory.test.ts:
+(pass) 2026-10-18: a draft whose reply broke the contract, an utterance cut off by the next one, and the follow-up all reach the specialist [67.01ms]
+(pass) a failed turn stays in the course with its refused operations and its code [63.95ms]
+(pass) an operation that changes nothing ends the turn with the host's question, without another call [62.61ms]
+
+api/domains/dialogue/test/specialist-turn.test.ts:
+(pass) a malformed output is repaired once with the rejected output as data; a second one fails the run [67.11ms]
+(pass) a repair call says where the output broke the contract: schema path and kind, or the reply's measured length, never an internal code name [72.11ms]
+(pass) a turn is bounded by its model calls; the last one must carry its reply, and work changed before the limit is reported by the host [67.06ms]
+(pass) refusals beyond the tool's retries end the turn with the host's words [64.42ms]
+(pass) a refused or invalid operation is data for the next call, never a crash [73.70ms]
+(pass) the specialist is not given memory, World, the main prompt or the conversation's persona [66.14ms]
+(pass) a toolchain's own time limits: the run lasts its run time from the hand-over, each call gets its turn and inference time, and an utterance addressed to it gets the run time too [67.92ms]
+(pass) the specialist turn never calls the conversation model, and a failed turn does not either [67.18ms]
+(pass) HTTP: the session, its commands and their errors [60.14ms]
+(pass) HTTP: an utterance while a turn holds the work is accepted and queued [69.41ms]
+(pass) the addressee the screen showed must still listen: otherwise nothing is stored (409 addressee_changed) [72.79ms]
+(pass) a saved item older than the recent choices is offered, accepted and shown when it is on screen [118.20ms]
+(pass) a refusal's short repair hint reaches the specialist, truncated [75.58ms]
+
+api/domains/dialogue/test/specialist.test.ts:
+(pass) a session starts from the conversation's delegate, then talks directly: no conversation model call for the utterances after it [72.49ms]
+(pass) a hand-over to a session toolchain ends the generation: the model is called for the search and the delegation only [72.66ms]
+(pass) an utterance handed to the specialist is logged as said by the user, to the specialist, and is not pending for the conversation agent [77.62ms]
+(pass) the specialist's reply is logged as said by the specialist, with the toolchain's id (6.8) [77.23ms]
+(pass) specialist dialogue is blocked from memory, and the specialist's turns tell the steward nothing [78.25ms]
+(pass) returning: unsaved work is suspended and the conversation agent takes over with a short record of it [79.39ms]
+(pass) returning a clean work ends the session once and tells the conversation agent once [78.53ms]
+(pass) a request outside the specialist's scope is forwarded to the conversation agent once, as its own utterance [73.06ms]
+(pass) a label longer than the old payload limit still reaches the conversation agent in a handoff [69.44ms]
+(pass) a discard ends the session, drops the work and returns the conversation [67.21ms]
+(pass) a hand-over to another toolchain while unsaved work stands waits for the user's decision, and the conversation agent asks [88.19ms]
+(pass) the same target resumes the suspended work instead of starting another [71.46ms]
+(pass) a target the host did not issue is refused before anything starts [58.51ms]
+(pass) a saved item starts the session from it; the search offers exactly the issued items, and the screen's viewing is shown only when issued [68.98ms]
+
+api/domains/dialogue/test/system-prompt.test.ts:
+(pass) every persona's role and style sentences are in the prompt, as the sources write them [0.81ms]
+(pass) a persona without a source falls back to the butler [0.13ms]
+(pass) the agent's and the user's names are stated as given, and omitted when empty [0.14ms]
+(pass) names with markup-like and placeholder-like characters are carried literally, not substituted [0.14ms]
+(pass) the prompt is Japanese text as written, never escaped, and the same input gives the same bytes [0.14ms]
+
+api/domains/dialogue/test/topic-texts.test.ts:
+(pass) the hint lists quoted names in the given order on one line, and is absent without names [0.08ms]
+(pass) the hint does not name a tool
+(pass) a name cannot start a line of its own and is not cut [0.02ms]
+(pass) control characters and frame-closing characters are stripped from a name [0.03ms]
+(pass) every distinct name is shown, in the order given [0.03ms]
+
+api/domains/dialogue/test/world-context.test.ts:
+(pass) the names World knows for the wording are one reference record; the wording is the port's input [58.02ms]
+(pass) no known target named: no record is shown [55.71ms]
+(pass) World off (no port): no record, and the answer is produced as before [56.05ms]
+(pass) a goal shown in the prompt and forgotten while the answer is generated makes the run memory_stale [56.87ms]
+(pass) revising a goal shown in the prompt while the answer is generated does not stale the run [58.36ms]
+(pass) forgetting a goal that was not shown in the prompt does not stale the run [56.98ms]
+(pass) with no goal shown, a goal adopted while the answer is generated does not stale the run [54.65ms]
+
+api/domains/dots/contracts/reports.test.ts:
+(pass) the report contract advertises and enforces the shared UTF-8 storage limit [0.50ms]
+
+api/domains/dots/repository/sessions.test.ts:
+(pass) session association migration preserves existing references and allows task-specific retention [0.65ms]
+
+api/domains/dots/test/commands.test.ts:
+(pass) prepare stores a command once and rejects a different task or kind under the same id [2.64ms]
+(pass) capacity leaves room for stop commands [16.77ms]
+(pass) list returns only live commands of the owner, pages by cursor and validates its bounds [2.93ms]
+(pass) get enforces ownership, availability and expiry [2.50ms]
+(pass) claim binds one lease, is repeatable for the same lease and refuses another [2.46ms]
+(pass) claim runs the caller's validation and refuses reported commands except reminders [2.23ms]
+(pass) supersede ends a task's commands, optionally keeping reminders [2.38ms]
+(pass) redaction strips snapshots, keeps stop intent and removes reports [2.45ms]
+(pass) renewing a stop extends it for a day and refuses other commands [2.28ms]
+(pass) purge removes every record of a task and nothing of others [2.29ms]
+
+api/domains/dots/test/configuration.test.ts:
+(pass) a new connection issues a local token once and authenticates by its digest [2.24ms]
+(pass) a stale or invalid connection write is rejected [2.47ms]
+(pass) an oauth owner cannot be removed or replaced, and cannot be added after commands exist [2.26ms]
+(pass) at most eight connections exist [2.26ms]
+(pass) projects need a connection, keep their owner and carry defaults [3.16ms]
+(pass) at most 64 projects exist [2.70ms]
+(pass) OAuth clientId is optional public setup metadata and does not change owner validation [2.12ms]
+
+api/domains/dots/test/events.test.ts:
+(pass) subscribe verifies the callback with a signed challenge and stores the secret sealed [14.14ms]
+(pass) a wrong, missing or failed challenge response rejects the subscription [78.80ms]
+(pass) subscription input is validated before any request is made [11.67ms]
+(pass) a disabled connection may subscribe only while a stop is pending [13.83ms]
+(pass) a live subscription cannot move to another url but can be refreshed [14.24ms]
+(pass) unsubscribe expires the subscription and refuses another url [13.30ms]
+(pass) a stored command is delivered with a verifiable signature and the delivery is recorded [26.12ms]
+(pass) a receiver rejection is recorded as a failed delivery without retrying [31.23ms]
+(pass) commands that cannot be acted on are not queued for delivery [13.46ms]
+(pass) maintenance queues commands that were stored before the subscription existed [11.45ms]
+(pass) unsubscribe accepts the original URL after canonicalization [11.82ms]
+(pass) refreshing the replacement key preserves the original rotation window [15.84ms]
+(pass) receiver rejection preserves its HTTP status and never retries 410 or 413 [53.83ms]
+(pass) unsubscribe cancels queued deliveries and aborts an active request [34.26ms]
+(pass) 429 and 5xx retry the same event and payload with a renewed signature timestamp [37.64ms]
+
+api/domains/dots/test/inbox.test.ts:
+(pass) an accepted report is adopted once, stored and receipted [2.62ms]
+(pass) a progress report keeps the command open while other kinds close it [2.72ms]
+(pass) only the owning connection may report for a command and its task [2.35ms]
+(pass) a replay with different content or another task is a conflict [2.20ms]
+(pass) stale epochs, leases and expiry are refused [8.36ms]
+(pass) report sequences must be consecutive per task [2.17ms]
+(pass) an invalid report shape is rejected before any state is read [2.24ms]
+(pass) progress reports are capped at 1000 per task but a stop is still accepted [4.63ms]
+(pass) a stopped report is stored without its details but keeps the session association [2.52ms]
+(pass) sessions are associated to the task and read back by task and thread [2.32ms]
+(pass) a failed adoption stores nothing [2.17ms]
+(pass) reminders require a live schedule bound to the same owner and command, once per occurrence [2.61ms]
+(pass) schedule binding is owned by its first task and connection and can be extended [2.26ms]
+(pass) dialogue receipts are stored per run and read back [2.15ms]
+(pass) projects are listed in ref order [2.09ms]
+
+api/domains/dots/test/messaging-contracts.test.ts:
+(pass) UTF-8 byte limits and a complete successful summary are required [0.36ms]
+
+api/domains/dots/test/messaging-migration.test.ts:
+(pass) migration preserves commands, leases, delivery FKs, budget, and deleted sequence high-water marks [2.43ms]
+
+api/domains/dots/test/relay-contract.test.ts:
+(pass) wire envelope binds the original report IDs and trusted receipt times; parsing is not signature verification [0.55ms]
+
+api/domains/dots/test/secret-box.test.ts:
+(pass) a sealed value unseals for its owner and is not stored in clear text [1.62ms]
+(pass) every seal uses a fresh nonce so equal values differ [1.25ms]
+(pass) a value sealed for one owner cannot be unsealed for another [1.30ms]
+(pass) any tampering with the nonce, tag or body is rejected [1.27ms]
+(pass) the key persists in the key directory and differs between directories [8.45ms]
+
+api/domains/dots/test/storage.test.ts:
+(pass) retained bodies are counted on insert, update and delete [2.38ms]
+(pass) multi-byte text is counted in UTF-8 bytes [2.10ms]
+(pass) a body that would exceed the shared budget is refused, but a stop may use the reserve [84.57ms]
+(pass) freeing space makes room again and shrinking is never refused [166.94ms]
+(pass) re-saving an existing command does not count it twice [6.14ms]
+
+api/domains/dots/test/work-settings.test.ts:
+(pass) disabled settings survive closing and reopening SQLite, replay and conflict preserve their revision [17.27ms]
+(pass) connection/project mismatches and unavailable grants cannot be enabled [2.45ms]
+
+api/domains/task-reports/test/reports.test.ts:
+(pass) immutable report sequence and origin are deduplicated with a durable outbox [9.94ms]
+(pass) report and outbox roll back together, and contract size bounds are enforced [7.46ms]
+(pass) resolved blocker outbox is superseded without mutating the report [9.59ms]
+
+api/domains/tasks/test/retention.test.ts:
+(pass) finished tasks are deleted 90 days after finishing, so the lifetime task cap no longer blocks creation [13.00ms]
+(pass) work_task_storage stays equal to a full recount across every kind of write [9.97ms]
+(pass) a failing purge hook keeps only that task; the others are deleted and the failure is retried [11.32ms]
+(pass) fifty permanently failing oldest purges do not starve newer finished tasks [36.65ms]
+(pass) the kind-independent purge hook removes dependents even when no kind is registered [9.90ms]
+(pass) a task whose dependents were already purged is deleted without error, and a task with undeletable dependents stays [10.18ms]
+(pass) opening a database that only has tasks/0001-init seeds the byte total from existing rows [15.65ms]
+
+api/domains/tasks/test/tasks.test.ts:
+(pass) 100 identical registrations return one receipt, with conflict on changed input and no automatic text dedupe [12.56ms]
+(pass) start is idempotent after revisions change; unavailable execution rolls back the whole initial registration [17.60ms]
+(pass) a failed transaction hook rolls back task, grant, commands and events [9.38ms]
+(pass) authority change fences old work, requests a confirmed pause, then resume creates a new execution generation [9.70ms]
+(pass) stop receipt is stopping until confirmed, cancel cannot be downgraded to pause, late completion cannot win [14.03ms]
+(pass) an unstarted registration can be cancelled without requiring a runner [9.48ms]
+(pass) answers bind task, question, revision, epoch and generation, and only valid choices resume the task [10.10ms]
+(pass) concurrent answer and cancellation have a single winner and supersede obsolete questions [7.34ms]
+(pass) task completion requires all declared conditions and evidence, not an arbitrary queue state [9.26ms]
+(pass) reopening preserves tasks independently of conversation lifetime, and recovery does not replay work [15.94ms]
+(pass) conversation input has unique operation provenance even with different request IDs [5.68ms]
+(pass) expired grants fence execution immediately, and maintenance requests cancellation without replay [7.49ms]
+(pass) terminal bodies expire at seven days, runtime history at thirty, while minimal replay receipts stay valid [10.84ms]
+(pass) pagination uses a stable sequence and rejects unsafe cursors and excess byte limits [9.23ms]
+(pass) capacity limits reject new registrations without removing paused or reconciling tasks [7.59ms]
+(pass) asynchronous domain hooks cannot escape the single writer transaction [8.24ms]
+(pass) runtime budget is bound to the task and is not extended by pause and resume [9.22ms]
+(pass) explicit forgetting revokes live work, redacts private history and cannot be undone by replaying registration [8.81ms]
+(pass) explicit budget amendments retain the original execution start and apply shorter budgets immediately [9.05ms]
+(pass) expiry of a confirmed pause reaches cancelled without another runner acknowledgement [9.39ms]
+(pass) invalid runtime question types cannot create an unreadable waiting state [8.61ms]
+(pass) storage admission bounds new grant history while revocation and cancellation remain available [16.21ms]
+(pass) public list operations reject nondecimal cursors just like the HTTP contract [8.95ms]
+(pass) shortening a running budget below elapsed time immediately requests cancellation [8.83ms]
+(pass) oversized question material rolls back both the question and waiting state [13.25ms]
+(pass) Promise-like transaction callbacks are rejected as well as native Promises [8.94ms]
+(pass) available actions reflect a missing answer capability and an exhausted runtime [8.53ms]
+(pass) expiry while pause acknowledgement is pending cannot produce a resumable pause [15.97ms]
+
+api/domains/tool-runtime/test/action-controller.test.ts:
+(pass) POST maps outcomes to status codes and GET reads back by eventId [10.18ms]
+(pass) unsettled list, launcher list, artifact and source endpoints [7.83ms]
+(pass) source params are URL-encoded JSON of at most 4 KiB validated by the source's schema [8.61ms]
+(pass) artifact availability can remain readable independently of execution, with the default still fail closed [6.93ms]
+
+api/domains/tool-runtime/test/action-invoke.test.ts:
+(pass) agent action invocation stores the adapter and operation of its binding and reads through them [16.80ms]
+
+api/domains/tool-runtime/test/action-requests.test.ts:
+(pass) artifact reads keep availability and source queries inside a read snapshot [8.44ms]
+(pass) execution and acceptance commit together and the adapter receives eventId and host issuedAt [6.81ms]
+(pass) same eventId and digest returns the stored result even after the send window expired [7.47ms]
+(pass) same eventId with a different digest is a 409 recorded in conflicts without overwriting [5.96ms]
+(pass) time window applies to new requests only [7.70ms]
+(pass) forged source, action, artifact, scope and target are refused before anything is saved [7.98ms]
+(pass) a source revision mismatch is a recorded definitive rejection with no execution [6.97ms]
+(pass) invalid UI input returns field errors and saves nothing [6.24ms]
+(pass) domain rejection rolls back its writes but records the rejection; unknown failures abort everything [7.18ms]
+(pass) capacity: ordinary actions stop at 4096 rows and cancel operations use the reserved 64 [44.62ms]
+(pass) bodies are deleted 30 days after settlement and tombstones 30 days later [7.48ms]
+(pass) registered artifacts, definitions and sources are read through the host, not the client [6.84ms]
+(pass) the accepted and rejected log lines are written only after the transaction committed [7.03ms]
+(pass) a standalone launcher artifact is listed and readable only while every source adapter is available [6.46ms]
+(pass) navigate and draft actions never reach the backend [7.47ms]
+(pass) a draft-apply write is validated by its schema; confidential keys are redacted and never persisted [7.56ms]
+(pass) confidential replay: same secret returns the stored result, a different secret is a 409 [8.09ms]
+(pass) an action that declares confidential fields but carries none needs no host key [7.57ms]
+(pass) a confidential action without a host key is refused before anything is stored [7.46ms]
+(pass) source params are accepted only for sources with a params schema and are validated [6.67ms]
+(pass) conflict audit never stores a plain hash of confidential input [8.00ms]
+(pass) a shared artifact routes writes to its registered source independently of the conversation binding [7.37ms]
+
+api/domains/tool-runtime/test/invoke.test.ts:
+(pass) gateway refuses foreign refs and unselected URLs; idempotent invocation and rolled-back result is not exposed [18.29ms]
+(pass) superseded invocations leave observations but stay in the budget and the invocation list [17.24ms]
+
+api/domains/tool-runtime/test/read-retry.test.ts:
+(pass) failure-only partial reads retry on a new step without bypassing budget; usable partial bodies replay [22.95ms]
+
+api/domains/tool-runtime/test/vault-fairness.test.ts:
+(pass) one task filling its result-vault quota cannot make another task's settle fail [20.28ms]
+
+packages/artifact-ui/src/composition-content-components.test.tsx:
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+(pass) typing in a number input recomputes the stat [16.66ms]
+(pass) an empty or unparsable text writes nothing and blur shows the state again [3.28ms]
+(pass) a number input clamps to its own min and max, then to the state's [2.61ms]
+(pass) a number input takes min, max and step from the state when the view has none [0.98ms]
+(pass) the slider moves the state and formats its value [2.73ms]
+(pass) a slider without a range anywhere is 0 to 100 [1.06ms]
+(pass) choice sets a text state, as buttons and as cards [5.63ms]
+(pass) toggle flips a boolean state [5.28ms]
+(pass) stat shows a literal value as is and — for an expression that fails [1.95ms]
+(pass) views of other kinds render nothing [0.48ms]
+(pass) without a model the input views render disabled and the stat shows — [4.30ms]
+(pass) an input bound to a state of another type or a missing state is disabled [3.26ms]
+(pass) choice is disabled without a model and for a state that is not text [2.00ms]
+(pass) pricing-card, comparison-table, faq and timeline render their content [26.47ms]
+
+packages/artifact-ui/src/composition-data-components.test.tsx:
+(pass) a chart draws the series of the model and the static points [57.06ms]
+(pass) a chart of an unknown or non-series name has no data [0.81ms]
+(pass) a data-table evaluates each column per point of a series [3.27ms]
+(pass) a data-table shows 200 rows of a series and reports the rest [9.39ms]
+(pass) a data-table shows static rows, formatted by column [1.04ms]
+(pass) a data-table of a series without a model is empty [0.35ms]
+(pass) a formula shows its value after the typeset formula [5.21ms]
+(pass) a formula whose expression has no value shows the empty mark [1.41ms]
+(pass) the calculator's result goes to resultBind and the formula follows [6.40ms]
+(pass) the calculator evaluates with the host expression language [2.44ms]
+(pass) the calculator shows an error for what the language cannot work out [1.58ms]
+(pass) without a model the views draw and the calculator works [26.62ms]
+(pass) the calculator accepts pi after a number through the host language [3.53ms]
+(pass) float noise is trimmed from the result and from resultBind [2.77ms]
+(pass) a changed preset or mode starts the calculator over [3.81ms]
+(pass) a view of another kind renders nothing [0.44ms]
+
+packages/artifact-ui/src/composition-diagram-components.test.tsx:
+(pass) the stepper moves the shared step and the diagram shows its elements [6.74ms]
+(pass) a state set from outside moves the expression coordinates [1.35ms]
+(pass) without stepBind every element is shown and highlightAt is ignored [0.67ms]
+(pass) a stepper without bind keeps its own step [1.46ms]
+(pass) a stepper bound to an unknown state keeps its own step instead of freezing [1.02ms]
+(pass) both parts render without a model [1.56ms]
+(pass) other parts render nothing [0.27ms]
+
+packages/artifact-ui/src/composition-expressions.test.ts:
+(pass) literals and operators > numbers, strings, booleans and constants [0.08ms]
+(pass) literals and operators > precedence and associativity [0.13ms]
+(pass) literals and operators > comparison and equality across types [0.02ms]
+(pass) literals and operators > the conditional is right-associative and short-circuits [0.05ms]
+(pass) literals and operators > plus joins strings and numbers [0.04ms]
+(pass) literals and operators > names come from the scope [0.03ms]
+(pass) functions > basic math [0.19ms]
+(pass) functions > round goes half away from zero and takes digits [0.08ms]
+(pass) functions > trigonometry works in degrees [0.09ms]
+(pass) functions > pmt follows the spreadsheet sign convention [0.04ms]
+(pass) functions > fv follows the spreadsheet sign convention [0.06ms]
+(pass) functions > series functions [0.14ms]
+(pass) functions > text and format [0.20ms]
+(pass) functions > a null argument gives null [0.01ms]
+(pass) failures give null and never throw > 1 / 0
+(pass) failures give null and never throw > 5 % 0
+(pass) failures give null and never throw > sqrt(-1)
+(pass) failures give null and never throw > log(0)
+(pass) failures give null and never throw > log(-1)
+(pass) failures give null and never throw > log(8, 1)
+(pass) failures give null and never throw > pow(0, -1)
+(pass) failures give null and never throw > (-8) ^ 0.5
+(pass) failures give null and never throw > 10 ^ 400
+(pass) failures give null and never throw > clamp(1, 5, 0)
+(pass) failures give null and never throw > 1 + true
+(pass) failures give null and never throw > !1
+(pass) failures give null and never throw > -"a"
+(pass) failures give null and never throw > 1 && 2
+(pass) failures give null and never throw > unknown + 1
+(pass) failures give null and never throw > a very large intermediate value is null, not Infinity
+(pass) limits > length [0.02ms]
+(pass) limits > depth [0.17ms]
+(pass) limits > string literals stop at 120 characters [0.02ms]
+(pass) limits > min and max over a series spend the step budget too [0.31ms]
+(pass) limits > sum spends the step budget [0.15ms]
+(pass) parse results > names and functions are listed once, constants excluded [0.03ms]
+(pass) parse results > 1 + is rejected as unexpected_token [0.02ms]
+(pass) parse results > (1 is rejected as unexpected_token
+(pass) parse results > 1 2 is rejected as unexpected_token
+(pass) parse results > a = 1 is rejected as unexpected_character
+(pass) parse results > a & b is rejected as unexpected_character
+(pass) parse results > a ? 1 is rejected as unexpected_token
+(pass) parse results > 1,2 is rejected as unexpected_token
+(pass) parse results > foo(1) is rejected as unknown_function
+(pass) parse results > max() is rejected as bad_arity
+(pass) parse results > sqrt(1, 2) is rejected as bad_arity
+(pass) parse results > pmt(1, 2) is rejected as bad_arity
+(pass) parse results > a.b is rejected as unexpected_character
+(pass) parse results > a[0] is rejected as unexpected_character
+(pass) parse results > x ** 2 is rejected as unexpected_token
+(pass) parse results > 1e999 is rejected as bad_number
+(pass) parse results > 日本 is rejected as unexpected_character [0.02ms]
+(pass) parse results > `a` is rejected as unexpected_character
+(pass) prototype names > constructor is just an unknown name [0.03ms]
+(pass) prototype names > __proto__ is just an unknown name
+(pass) prototype names > toString is just an unknown name
+(pass) prototype names > hasOwnProperty is just an unknown name
+(pass) prototype names > valueOf is just an unknown name
+(pass) prototype names > prototype is just an unknown name
+(pass) prototype names > function names are only called, never read from the prototype [0.01ms]
+(pass) prototype names > object prototypes stay untouched [0.01ms]
+(pass) cyclicNames > finds names on a cycle, not those that only lead into one [0.02ms]
+
+packages/artifact-ui/src/composition-fixer.test.ts:
+(pass) identity on valid definitions > there are fixtures
+(pass) identity on valid definitions > fixture u1-landing-page.json comes back unchanged [7.32ms]
+(pass) identity on valid definitions > fixture u2-ec-cart.json comes back unchanged [2.70ms]
+(pass) identity on valid definitions > fixture u3-split-bill.json comes back unchanged [1.31ms]
+(pass) identity on valid definitions > fixture u4-retirement.json comes back unchanged [1.99ms]
+(pass) identity on valid definitions > fixture u5a-airplane-diagram.json comes back unchanged [1.42ms]
+(pass) identity on valid definitions > fixture u5b-triangulation.json comes back unchanged [1.41ms]
+(pass) identity on valid definitions > fixture u6-quiz.json comes back unchanged [2.17ms]
+(pass) identity on valid definitions > fixture u7-content-showcase.json comes back unchanged [1.86ms]
+(pass) identity on valid definitions > fixture u8-survey.json comes back unchanged [1.07ms]
+(pass) identity on valid definitions > the SKILL has examples
+(pass) identity on valid definitions > every SKILL example comes back unchanged [2.75ms]
+(pass) identity on valid definitions > a valid definition is not mutated and the result is a copy [0.31ms]
+(pass) outer shape > an array of parts is wrapped in a stack layout [0.35ms]
+(pass) outer shape > a single non-layout part is wrapped [0.15ms]
+(pass) outer shape > a double wrap is unwrapped [0.15ms]
+(pass) outer shape > an unwrapped array is wrapped too [0.15ms]
+(pass) outer shape > an aliased root layout is not wrapped [0.16ms]
+(pass) keys > source and settings-only layout keys are removed [0.17ms]
+(pass) keys > unknown keys of a part are dropped [0.31ms]
+(pass) keys > unknown keys inside nested objects are dropped [0.16ms]
+(pass) keys > an unknown key of a layout is dropped [0.22ms]
+(pass) view names > aliases are mapped [0.37ms]
+(pass) view names > img becomes image [0.19ms]
+(pass) view names > a text alias moves its text into the missing title [0.19ms]
+(pass) view names > content and label move too, but a present title stays [0.33ms]
+(pass) view names > unaliased and unknown views are dropped [0.20ms]
+(pass) generic repairs from the schema issues > a long string is cut to max - 1 characters plus an ellipsis [0.22ms]
+(pass) generic repairs from the schema issues > a cut never splits a surrogate pair [0.19ms]
+(pass) generic repairs from the schema issues > a long array is cut to its maximum [0.33ms]
+(pass) generic repairs from the schema issues > more than 48 children are cut [3.79ms]
+(pass) generic repairs from the schema issues > an invalid optional enum is dropped [0.22ms]
+(pass) generic repairs from the schema issues > a differently cased enum value is corrected [0.17ms]
+(pass) generic repairs from the schema issues > an invalid layout direction becomes stack [0.28ms]
+(pass) generic repairs from the schema issues > an invalid required enum takes the first value [0.30ms]
+(pass) generic repairs from the schema issues > a wrong step is rounded to the nearest valid one [0.14ms]
+(pass) generic repairs from the schema issues > a non-integer where an integer is needed is rounded [0.21ms]
+(pass) generic repairs from the schema issues > a number over its maximum is clamped [0.10ms]
+(pass) generic repairs from the schema issues > a missing required key drops the part [0.20ms]
+(pass) generic repairs from the schema issues > an unfixable optional value is dropped, a required one drops the part [0.35ms]
+(pass) generic repairs from the schema issues > a nested union is followed to its own issue [0.34ms]
+(pass) generic repairs from the schema issues > an element with an unknown type drops the whole part [0.19ms]
+(pass) generic repairs from the schema issues > exactly-one rules: both given keeps the first [0.13ms]
+(pass) generic repairs from the schema issues > a variant that needs an image loses the variant [0.09ms]
+(pass) generic repairs from the schema issues > a table with ragged rows is dropped [0.18ms]
+(pass) images > a URL becomes a placeholder [0.10ms]
+(pass) images > an unknown provider keeps a valid alt [0.14ms]
+(pass) images > an unknown picsum theme or a bad seed becomes a placeholder [0.40ms]
+(pass) images > a too long alt is not kept [0.13ms]
+(pass) images > a valid picture is left alone, a long alt is cut [0.24ms]
+(pass) images > an avatar is handled the same way [0.11ms]
+(pass) images > a required picture that is missing drops the part [0.18ms]
+(pass) state > a model of a nested layout moves to the outermost layout [0.99ms]
+(pass) state > nested models merge with the root's when no name collides [0.40ms]
+(pass) state > a colliding nested model is dropped [0.42ms]
+(pass) state > an unbound number input gets a state, using its min and max [0.50ms]
+(pass) state > an unbound number input without a range starts at 0 [0.20ms]
+(pass) state > an unbound choice gets a text state and a toggle a boolean [0.42ms]
+(pass) state > a bind of the wrong type or a computed value drops the part [0.28ms]
+(pass) state > a chart over an unknown series is dropped [0.27ms]
+(pass) state > an input range reaching outside its state loses the key [0.21ms]
+(pass) state > an invalid state is dropped and an input gets a default state instead [0.36ms]
+(pass) state > more than 32 states are cut [0.43ms]
+(pass) expressions > computed entries with broken or unknown expressions are dropped [0.35ms]
+(pass) expressions > a part using a dropped value goes with it [0.50ms]
+(pass) expressions > a part with a broken expression is dropped [0.22ms]
+(pass) expressions > a computed value reading another in a circle is dropped [0.28ms]
+(pass) expressions > a layout with a broken `when` keeps its children and loses the key [0.86ms]
+(pass) limits > forms after the first are dropped [0.41ms]
+(pass) limits > layouts deeper than 6 give their children to the parent [1.55ms]
+(pass) limits > a depth-6 chain of layouts is valid and left alone [0.54ms]
+(pass) limits > parts over 240 are dropped from the end [17.14ms]
+(pass) limits > over 96 KiB drops parts from the end [4.16ms]
+(pass) nothing displayable > non-objects [0.09ms]
+(pass) nothing displayable > an empty layout [0.02ms]
+(pass) nothing displayable > every part dropped [0.03ms]
+(pass) nothing displayable > only empty layouts remain [0.01ms]
+(pass) nothing displayable > a single unknown part
+(pass) determinism and robustness > the same input gives the same output [0.90ms]
+(pass) determinism and robustness > a messy definition ends valid [0.30ms]
+(pass) determinism and robustness > fixing the output again changes nothing [0.82ms]
+(pass) determinism and robustness > the input is not mutated [0.43ms]
+
+packages/artifact-ui/src/composition-fixtures-render.test.tsx:
+(pass) there are fixtures to render [0.04ms]
+(pass) u1-landing-page.json renders without an error [32.37ms]
+(pass) u2-ec-cart.json renders without an error [30.42ms]
+(pass) u3-split-bill.json renders without an error [8.74ms]
+The width(0) and height(0) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+(pass) u4-retirement.json renders without an error [15.39ms]
+(pass) u5a-airplane-diagram.json renders without an error [7.72ms]
+(pass) u5b-triangulation.json renders without an error [7.82ms]
+(pass) u6-quiz.json renders without an error [9.84ms]
+(pass) u7-content-showcase.json renders without an error [27.91ms]
+(pass) u8-survey.json renders without an error [13.29ms]
+
+packages/artifact-ui/src/composition-format.test.ts:
+(pass) numbers use ja-JP grouping and at most two decimals by default [0.16ms]
+(pass) yen carries the sign and thousands separators [0.09ms]
+(pass) percent shows the value as it is [0.03ms]
+(pass) a value that rounds to zero loses its minus sign [0.04ms]
+(pass) the unit follows the value, with a space before a Latin unit [0.04ms]
+(pass) invalid values show a dash [0.02ms]
+(pass) text and booleans are shown as they read
+
+packages/artifact-ui/src/composition-images.test.ts:
+(pass) resolveCompositionImage > the same spec always gives the same url [0.08ms]
+(pass) resolveCompositionImage > the id comes from the catalog of the theme [0.10ms]
+(pass) resolveCompositionImage > an omitted seed is the seed 1, and other seeds reach other pictures [0.11ms]
+(pass) resolveCompositionImage > filters go into the query; a blur of 0 adds nothing [0.04ms]
+(pass) resolveCompositionImage > srcSet holds the 1x and 2x pictures, filters included [0.01ms]
+(pass) resolveCompositionImage > sizes are rounded to integers and limited to 1..2400 [0.03ms]
+(pass) resolveCompositionImage > the 2x size keeps the ratio when a side reaches the limit [0.02ms]
+(pass) resolveCompositionImage > a placeholder spec resolves to its tone, neutral by default [0.01ms]
+(pass) aspectSize > gives the ratio of each aspect, landscape by default [0.01ms]
+(pass) aspectSize > rounds to integers within 1..2400 [0.01ms]
+(pass) picsum catalog > nature has at least 6 distinct positive integer ids [0.02ms]
+(pass) picsum catalog > mountain has at least 6 distinct positive integer ids
+(pass) picsum catalog > forest has at least 6 distinct positive integer ids
+(pass) picsum catalog > sea has at least 6 distinct positive integer ids
+(pass) picsum catalog > beach has at least 6 distinct positive integer ids
+(pass) picsum catalog > sky has at least 6 distinct positive integer ids
+(pass) picsum catalog > flower has at least 6 distinct positive integer ids
+(pass) picsum catalog > city has at least 6 distinct positive integer ids
+(pass) picsum catalog > architecture has at least 6 distinct positive integer ids
+(pass) picsum catalog > interior has at least 6 distinct positive integer ids
+(pass) picsum catalog > night has at least 6 distinct positive integer ids
+(pass) picsum catalog > food has at least 6 distinct positive integer ids
+(pass) picsum catalog > coffee has at least 6 distinct positive integer ids
+(pass) picsum catalog > people has at least 6 distinct positive integer ids
+(pass) picsum catalog > animal has at least 6 distinct positive integer ids
+(pass) picsum catalog > workspace has at least 6 distinct positive integer ids
+(pass) picsum catalog > tech has at least 6 distinct positive integer ids
+(pass) picsum catalog > books has at least 6 distinct positive integer ids
+(pass) picsum catalog > travel has at least 6 distinct positive integer ids
+(pass) picsum catalog > road has at least 6 distinct positive integer ids
+(pass) picsum catalog > winter has at least 6 distinct positive integer ids
+(pass) picsum catalog > autumn has at least 6 distinct positive integer ids
+(pass) picsum catalog > texture has at least 6 distinct positive integer ids
+(pass) picsum catalog > minimal has at least 6 distinct positive integer ids
+
+packages/artifact-ui/src/composition-marketing-components.test.tsx:
+(pass) hero draws the text, display-only labels and a catalog photo [1.64ms]
+(pass) hero background asks for a wider picture and keeps overlay options [0.42ms]
+(pass) hero without an image draws only the text [0.23ms]
+(pass) image view uses the aspect for the frame and the picture size [0.53ms]
+(pass) image view draws a placeholder without any network picture [0.36ms]
+(pass) media card draws its text and a catalog photo [0.35ms]
+(pass) product card shows price, badge and rating with an optional photo [1.20ms]
+(pass) product card without an image still draws [0.31ms]
+(pass) feature card draws its icon, title and body [0.37ms]
+(pass) the design system's icon names are exactly the contract's featureIcons [0.03ms]
+(pass) testimonial draws the quote, person and catalog avatar [0.53ms]
+(pass) testimonial without an avatar shows the initial [0.38ms]
+(pass) cta banner draws labels, and the image variant a catalog backdrop [0.46ms]
+(pass) cta banner accent has no picture; a placeholder image becomes a gradient frame [0.63ms]
+(pass) each view renders nothing for another view's request [0.75ms]
+
+packages/artifact-ui/src/composition-model.test.tsx:
+(pass) computed values follow the state in dependency order [0.11ms]
+(pass) a series makes {x: i, y} points from the first to the last index [0.10ms]
+(pass) series bounds are rounded and an empty range gives an empty series [0.04ms]
+(pass) circular references, bad expressions and unknown names give null [0.07ms]
+(pass) series limits: 1,200 points each and a shared step budget [0.76ms]
+(pass) a series whose point fails is null as a whole [0.02ms]
+(pass) names of Object.prototype read as nothing [0.04ms]
+(pass) the Provider starts at the initial values and recomputes on set [0.84ms]
+(pass) set rounds into min and max and ignores unknown names, computed values and wrong types [0.38ms]
+(pass) an initial value outside min and max is rounded in too [0.13ms]
+(pass) evaluate uses the current values and the locals, and never throws [0.15ms]
+(pass) state returns the definition for input defaults [0.16ms]
+(pass) without a model the hook gives null [0.09ms]
+(pass) a changed definition starts over from its initial values [0.25ms]
+
+packages/artifact-ui/src/composition-validate.test.ts:
+(pass) accepted compositions > a full composition [0.25ms]
+(pass) accepted compositions > definitions without a model or expressions [0.02ms]
+(pass) model position > a nested layout may not hold a model [0.08ms]
+(pass) layout features > {"direction":"form-preview"} [0.04ms]
+(pass) layout features > {"tabs":[{"label":"a","children":[0]}]} [0.02ms]
+(pass) layout features > {"headerChildren":[0]} [0.02ms]
+(pass) layout features > {"draftSource":"x"} [0.01ms]
+(pass) layout features > {"headerLayout":"inline"} [0.02ms]
+(pass) layout features > the allowed directions pass [0.02ms]
+(pass) expressions > syntax errors and unknown functions name the position and a rule [0.12ms]
+(pass) expressions > unknown names are refused in every expression place [0.21ms]
+(pass) expressions > locals only exist where they are defined [0.07ms]
+(pass) expressions > names of Object.prototype are unknown, not inherited [0.06ms]
+(pass) expressions > a model without those names still validates its own references
+(pass) model definition > circular computed values are refused [0.05ms]
+(pass) model definition > reserved and duplicate names are refused [0.03ms]
+(pass) binds > {"view":"number-input","bind":"plan","label":"l"} [0.03ms]
+(pass) binds > {"view":"slider","bind":"pro","label":"l"} [0.02ms]
+(pass) binds > {"view":"choice","bind":"age","options":["a","b"]} [0.01ms]
+(pass) binds > {"view":"toggle","bind":"age","label":"l"} [0.02ms]
+(pass) binds > {"view":"calculator","resultBind":"plan"} [0.02ms]
+(pass) binds > {"view":"stepper","bind":"pro","steps":[]} [0.01ms]
+(pass) binds > {"view":"diagram","stepBind":"plan","elements":[]} [0.02ms]
+(pass) binds > {"view":"number-input","bind":"ghost","label":"l"} [0.02ms]
+(pass) binds > {"view":"calculator","resultBind":"ghost"} [0.02ms]
+(pass) binds > {"view":"number-input","bind":"atRetire","label":"l"} [0.01ms]
+(pass) binds > {"view":"diagram","stepBind":"balance","elements":[]} [0.02ms]
+(pass) binds > {"view":"chart","kind":"line","series":[{"name":"n","from":"ghost"}]} [0.01ms]
+(pass) binds > {"view":"chart","kind":"line","series":[{"name":"a","points":[]},{"name":"n","from":"atRetire"}]} [0.01ms]
+(pass) binds > {"view":"data-table","columns":[],"series":"atRetire"} [0.01ms]
+(pass) binds > {"view":"data-table","columns":[],"series":"ghost"} [0.01ms]
+(pass) binds > a bind without any model is refused
+(pass) binds > paths of nested layouts are joined [0.03ms]
+(pass) binds > the result never carries a value of the definition [0.04ms]
+(pass) tex > \href{x}{y} is refused [0.03ms]
+(pass) tex > \url{x} is refused [0.03ms]
+(pass) tex > \includegraphics{x} is refused [0.03ms]
+(pass) tex > \htmlClass{a}{b} is refused [0.02ms]
+(pass) tex > \htmlStyle{a}{b} is refused [0.01ms]
+(pass) tex > \def\a{1} is refused [0.03ms]
+(pass) tex > \gdef\a{1} is refused [0.01ms]
+(pass) tex > \edef\a{1} is refused [0.01ms]
+(pass) tex > \xdef\a{1} is refused [0.01ms]
+(pass) tex > \let\a=b is refused [0.01ms]
+(pass) tex > \newcommand{\a}{1} is refused
+(pass) tex > \renewcommand{\a}{1} is refused [0.01ms]
+(pass) tex > \providecommand{\a}{1} is refused [0.01ms]
+(pass) tex > \DeclareMathOperator{\a}{a} is refused
+(pass) tex > x = \frac{a}{b} \href{u}{v} is refused
+(pass) tex > ordinary commands, similar names and line breaks pass [0.07ms]
+(pass) input ranges and choices > an input may not reach outside its state's range [0.06ms]
+(pass) input ranges and choices > a state whose min is above its max is refused
+(pass) input ranges and choices > a choice starts at an option, or at nothing [0.02ms]
+(pass) data-table columns > rows with an expr column are refused; series needs it [0.04ms]
+(pass) series budget > a literal series over 1,200 points is refused [0.03ms]
+(pass) series budget > all series together stay within 10,000 points [0.07ms]
+(pass) series budget > bounds that read states are tried at the initial value and the ends of the range [0.04ms]
+(pass) series budget > a boolean in a bound is tried both ways [0.03ms]
+(pass) series budget > a bound that reads another computed value is not estimated [0.01ms]
+
+packages/artifact-ui/src/compute-components.test.tsx:
+(pass) registered computation view composes with text and rejects a wrong resource kind [2.18ms]
+
+packages/artifact-ui/src/dots-messaging.test.ts:
+(pass) dots messaging composes with registered views and requires its own source [1.97ms]
+
+packages/artifact-ui/src/pipeline-studio-components.test.tsx:
+(pass) it renders only the pipeline studio resource [4.90ms]
+(pass) the last change is marked from the previous source [2.73ms]
+(pass) applying the edited text sends the work, the revision and the text [4.71ms]
+(pass) a refused apply stays in the editor and shows the host's wording [3.96ms]
+(pass) publish sends the revision; it is unavailable with findings or no change [5.89ms]
+(pass) the three trials dispatch their local actions [7.17ms]
+(pass) a trial result from the host is shown and the trials wait while one runs [3.50ms]
+(pass) opening, refreshing and the session operations dispatch their events [9.67ms]
+(pass) a studio without a draft shows the empty state [0.55ms]
+(pass) handoff edits stay inside the artifact and dispatch library navigation and revision checked source apply [16.14ms]
+
+packages/artifact-ui/src/ui-studio-source.test.tsx:
+(pass) the source view shows the canonical text as given, not a re-serialization [20.07ms]
+(pass) the lines changed from the previous revision are marked and removed lines are indicated [7.22ms]
+(pass) nothing is marked when there is no earlier revision or nothing changed [19.32ms]
+(pass) editing the text and applying sends the work, the revision and the text [11.31ms]
+(pass) applying is unavailable while a turn runs, for blank text, and the editor cannot open for a saved work [17.77ms]
+(pass) a work that moved after editing began cannot be overwritten by the old text [9.03ms]
+(pass) a refusal is shown beside the editor and the typed text is kept [10.78ms]
+(pass) the rejected draft is read-only with its issues, can be loaded into the editor, and never reaches the preview [9.72ms]
+(pass) a first draft that failed the check still offers its text, with no preview [3.61ms]
+(pass) the toolbar keeps its own actions with the source editor open [7.10ms]
+
+packages/artifact-ui/src/work-components.test.tsx:
+(pass) work menu/result compose with an existing activity view and reject wrong source kinds [2.86ms]
+
+ 936 pass
+ 0 fail
+ 7241 expect() calls
+Ran 936 tests across 107 files. [57.01s]
+
+ RUN  v4.1.8 /Users/y.noguchi/Code/eumenes
+
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+ ❯ web/src/domains/artifact/test/nested-layout.test.tsx (5 tests | 1 failed) 540ms
+   × depth is limited to four including the root, and one definition holds at most 60 views 5ms
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+ ❯ web/src/domains/artifact/test/composition.test.tsx (13 tests | 1 failed) 1013ms
+   × composition rejects invalid nested source, arbitrary props and unbounded layouts 59ms
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  web/src/domains/artifact/test/composition.test.tsx > composition rejects invalid nested source, arbitrary props and unbounded layouts
+AssertionError: expected [Function] to throw an error
+ ❯ web/src/domains/artifact/test/composition.test.tsx:112:5
+    110|   expect(() =>
+    111|    compileArtifact(JSON.stringify({ view: "layout", children }), snaps…
+    112|   ).toThrow();
+       |     ^
+    113|  });
+    114| test("unsafe host media URL is never rendered as audio or download", (…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  web/src/domains/artifact/test/nested-layout.test.tsx > depth is limited to four including the root, and one definition holds at most 60 views
+AssertionError: expected [Function] to throw an error
+ ❯ web/src/domains/artifact/test/nested-layout.test.tsx:71:57
+     69| test("depth is limited to four including the root, and one definition …
+     70|  expect(() => parseDefinition(JSON.stringify(nest(3)))).not.toThrow();
+     71|  expect(() => parseDefinition(JSON.stringify(nest(4)))).toThrow();
+       |                                                         ^
+     72|  // 5 layouts of 12 text blocks plus the root: 1 + 5 * 13 = 66 views.
+     73|  const wide = layout(
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  2 failed | 13 passed (15)
+      Tests  2 failed | 85 passed (87)
+   Start at  17:06:11
+   Duration  7.42s (transform 7.63s, setup 0ms, import 24.89s, tests 7.22s, environment 16.57s)
+
+error: script "test:domain" exited with code 1

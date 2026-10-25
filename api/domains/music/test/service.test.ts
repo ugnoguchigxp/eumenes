@@ -9,6 +9,7 @@ import type { InferencePort } from "../../inference";
 import type { LarmPlayground, LarmTestTarget } from "../../larm";
 import { createQueue, migrations as queueMigrations } from "../../queue";
 import { MusicLibraryError } from "../../larm";
+import type { ChildExecution } from "../../tool-runtime";
 import { migrations, registerMusic } from "..";
 import { createMusic, musicListInTransaction } from "../service";
 import { waitFor as until } from "../../../infrastructure/wait-for";
@@ -33,6 +34,25 @@ const plan = {
 	durationSeconds: 45,
 	instrumental: true,
 };
+/** Prepared with the V2 playback tool: its plan schema carries `trackUris`. */
+const preparedV2 = {
+	package: {
+		kind: "package",
+		id: "music.playback",
+		revision: 2,
+		profileRevisionId: "profile:music.fake@1",
+		requiredSkillRevisionIds: ["skill:music.fake@1"],
+	},
+	dependencies: [
+		{ revisionId: "profile:music.fake@1", kind: "profile", body: "担当" },
+		{ revisionId: "skill:music.fake@1", kind: "skill", body: "手順" },
+		{
+			revisionId: "tool:music.library@2",
+			kind: "tool",
+			schemaKey: "musicPlaybackPlanV2",
+		},
+	],
+} as unknown as Prepared;
 const playbackPlan = {
 	title: "雨の曲",
 	q: "rain",
@@ -75,7 +95,36 @@ type Options = {
 	accept?: boolean;
 	artwork?: { bytes?: Uint8Array; mime?: string };
 	trackIds?: string[];
+	v2?: boolean;
 };
+const execution = (id: string, uris: string[]) =>
+	({
+		id,
+		executionId: "exec-1",
+		revision: 1,
+		step: 0,
+		chainRevisionId: "toolchain:music.library@1",
+		request: "この曲を流して",
+		refs: uris.map((uri) => ({
+			ref: uri,
+			owner: "resources",
+			id: uri,
+			revision: "",
+			digest: "d",
+			label: "曲",
+			kind: "resource",
+			preview: "",
+		})),
+		source: {
+			conversationId: "main",
+			messageId: "m1",
+			runId: "run-d",
+			request: "この曲を流して",
+			digest: "d",
+		},
+		deadline: Date.now() + 120_000,
+		modelCalls: 6,
+	}) as unknown as ChildExecution;
 function setup(options: Options = {}) {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-music-"));
 	dirs.push(dir);
@@ -93,6 +142,7 @@ function setup(options: Options = {}) {
 	let nextValue = options.planValue;
 	const inference = {
 		captureControlInTransaction: () => "request-1",
+		captureUserControlInTransaction: () => "request-1",
 		executeControl: async (
 			_id: string,
 			messages: Array<{ content: string }>,
@@ -109,7 +159,7 @@ function setup(options: Options = {}) {
 		acceptInTransaction: () => options.accept ?? true,
 	} as unknown as InferencePort;
 	const capabilities = {
-		prepareActiveByIdInTransaction: () => prepared,
+		prepareActiveByIdInTransaction: () => (options.v2 ? preparedV2 : prepared),
 		validateInTransaction: () => options.validate?.(),
 	} as unknown as Capabilities;
 	const gateway = {
@@ -151,7 +201,8 @@ function setup(options: Options = {}) {
 				};
 			},
 			detail: async (id: string) => {
-				if (id === "unknown") throw new Error("larm_http_404");
+				if (id === "unknown")
+					throw new MusicLibraryError(404, "larm_http_404", "not found");
 				return { id };
 			},
 		},
@@ -164,6 +215,7 @@ function setup(options: Options = {}) {
 		gateway: () => gateway,
 		onJob: (_db, runId, jobId) => jobs.push([runId, jobId]),
 		onFinished: (_db, runId) => finished.push(runId),
+		validateExecutionInTransaction: () => true,
 	});
 	queue.start();
 	const input = (runId: string, conversationId: string) => ({
@@ -186,6 +238,14 @@ function setup(options: Options = {}) {
 		start: (runId = "run-1", conversationId = "main") =>
 			store.write((db) =>
 				music.startInTransaction(db, input(runId, conversationId)),
+			),
+		/** A delegated playback: the request carries `uris` as resource references. */
+		startPlaybackWith: (uris: string[], runId = "run-d") =>
+			store.write((db) =>
+				music.startPlaybackInTransaction(db, {
+					...input(runId, "main"),
+					execution: execution(runId, uris),
+				}),
 			),
 		startPlayback: (runId = "run-p", conversationId = "main") =>
 			store.write((db) =>
@@ -615,5 +675,85 @@ test("playlist routes return stored playlists and validate updates", async () =>
 	expect((await put("nope", { currentId: "t2" })).status).toBe(404);
 	const updated = await put(id, { currentId: "t2" });
 	expect(await updated.json()).toMatchObject({ currentId: "t2" });
+	await h.queue.close(100);
+});
+
+const trackUri = (id: string) => `eumenes://music.track/${id}`;
+const playlistUri = (id: string) => `eumenes://music.playlist/${id}`;
+const v2Plan = (trackUris: string[]) => ({
+	...playbackPlan,
+	q: "",
+	tags: [],
+	trackUris,
+});
+
+test("playback V2 opens exactly the tracks the request carried without searching", async () => {
+	const uris = [trackUri("t7"), trackUri("t9")];
+	const h = setup({ v2: true, playbackValue: JSON.stringify(v2Plan(uris)) });
+	const { id } = await h.startPlaybackWith(uris);
+	await until(playlistDone(h, id));
+	expect(h.music.playback.get(id)).toMatchObject({
+		state: "completed",
+		trackIds: ["t7", "t9"],
+		currentId: "t7",
+	});
+	expect(h.trackQueries).toEqual([]);
+	await h.queue.close(100);
+});
+
+test("playback V2 expands a playlist reference to its tracks", async () => {
+	const options: Options = {
+		v2: true,
+		playbackValue: JSON.stringify(v2Plan([])),
+	};
+	const h = setup(options);
+	const source = await h.startPlayback("run-src");
+	await until(playlistDone(h, source.id));
+	const uris = [playlistUri(source.id), trackUri("t9"), trackUri("t1")];
+	options.playbackValue = JSON.stringify(v2Plan(uris));
+	const { id } = await h.startPlaybackWith(uris);
+	await until(playlistDone(h, id));
+	// The playlist's tracks in order, then the single track; a track named twice appears once.
+	expect(h.music.playback.get(id)).toMatchObject({
+		state: "completed",
+		trackIds: ["t1", "t2", "t9"],
+		currentId: "t1",
+	});
+	expect(h.trackQueries).toHaveLength(1);
+	await h.queue.close(100);
+});
+
+test("playback V2 fails on a track the library does not have and on a URI the request did not carry", async () => {
+	const missing = [trackUri("unknown")];
+	const h = setup({ v2: true, playbackValue: JSON.stringify(v2Plan(missing)) });
+	const a = await h.startPlaybackWith(missing);
+	await until(playlistDone(h, a.id));
+	expect(h.music.playback.get(a.id)).toMatchObject({
+		state: "failed",
+		errorCode: "music_track_unknown",
+	});
+	const invented = setup({
+		v2: true,
+		playbackValue: JSON.stringify(v2Plan([trackUri("t1")])),
+	});
+	const b = await invented.startPlaybackWith([trackUri("t2")]);
+	await until(playlistDone(invented, b.id));
+	expect(invented.music.playback.get(b.id)).toMatchObject({
+		state: "failed",
+		errorCode: "unknown_resource",
+	});
+	await h.queue.close(100);
+	await invented.queue.close(100);
+});
+
+test("playback V2 with no track URIs is the V1 search", async () => {
+	const h = setup({ v2: true, playbackValue: JSON.stringify(v2Plan([])) });
+	const { id } = await h.startPlayback();
+	await until(playlistDone(h, id));
+	expect(h.music.playback.get(id)).toMatchObject({
+		state: "completed",
+		trackIds: ["t1", "t2"],
+	});
+	expect(h.trackQueries).toHaveLength(1);
 	await h.queue.close(100);
 });

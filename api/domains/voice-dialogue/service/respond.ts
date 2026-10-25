@@ -1,4 +1,4 @@
-import type { Viewing } from "../../dialogue/contracts";
+import type { RunViewing } from "../../dialogue/contracts";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import type { Database } from "bun:sqlite";
 import type { DialogueService } from "../../dialogue";
@@ -40,7 +40,7 @@ export function createVoiceResponder({
 		text: string,
 		transcriptionRequestIds: string[],
 		controller: AbortController,
-		viewing?: Viewing,
+		viewing?: RunViewing,
 	) => {
 		controller.signal.throwIfAborted();
 		if (!transcriptionRequestIds.every((id) => larm.validRequest?.(id)))

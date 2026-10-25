@@ -100,6 +100,9 @@ export { timerResultContext } from "./timers";
 import { publicUrl } from "./public-url";
 import { toolchainRequest } from "./toolchains";
 import { stockQuote } from "./stock";
+import { musicPlaybackPlanV2 } from "./music-playback-v2";
+import { resourceRead } from "./resource-read";
+import { resourcesTool } from "./resources-tool";
 import { weatherPlace } from "./weather";
 import {
 	model3dFind,
@@ -127,6 +130,8 @@ import {
 	browserTaskTarget,
 } from "./browser";
 export { stockQuote } from "./stock";
+export * from "./resources-tool";
+export { musicPlaybackPlanV2, resourceRead };
 export { weatherPlace, weatherDays } from "./weather";
 export { publicUrl };
 export const researchInput = z
@@ -221,7 +226,26 @@ import {
 	computeArtifactTarget,
 } from "./compute";
 
+import {
+	dotsWorkStartV1,
+	dotsWorkListV1,
+	dotsWorkInspectV1,
+	dotsWorkAnswerV1,
+	dotsWorkStopV1,
+} from "./dots-work";
+export {
+	dotsWorkStartV1,
+	dotsWorkListV1,
+	dotsWorkInspectV1,
+	dotsWorkAnswerV1,
+	dotsWorkStopV1,
+} from "./dots-work";
 export const validators = {
+	dotsWorkStartV1,
+	dotsWorkListV1,
+	dotsWorkInspectV1,
+	dotsWorkAnswerV1,
+	dotsWorkStopV1,
 	computePythonSubmit,
 	computeJobTarget,
 	computeArtifactTarget,
@@ -323,6 +347,9 @@ export const validators = {
 	worldFind,
 	worldQuery,
 	weatherPlace,
+	resourcesTool,
+	musicPlaybackPlanV2,
+	resourceRead,
 	stockQuote,
 	model3dGenerate,
 	model3dFind,
@@ -357,8 +384,17 @@ export const toolchainImpacts = [
 ] as const;
 export type ToolchainImpact = (typeof toolchainImpacts)[number];
 export type Definition = {
-	kind: "package" | "profile" | "skill" | "tool" | "requirement" | "toolchain";
+	kind:
+		| "package"
+		| "profile"
+		| "skill"
+		| "tool"
+		| "requirement"
+		| "toolchain"
+		| "resource-kind"
+		| "resource-actions";
 	requirementData?: import("./requirements").RequirementProfileData;
+	resourceKindData?: import("./resource-kinds").ResourceDefinitionData;
 	id: string;
 	revision: number;
 	title: string;
@@ -435,5 +471,6 @@ export * from "./requirements";
 export * from "./runtime-meta";
 export * from "./toolchains";
 export * from "./pipelines";
+export * from "./resource-kinds";
 
 export { dotsPackageInput } from "./dots";

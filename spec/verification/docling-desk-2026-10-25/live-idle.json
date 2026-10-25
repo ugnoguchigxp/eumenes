@@ -1,0 +1,65 @@
+{
+  "mode": "control-only-after-browser-close",
+  "rows": [
+    {
+      "at": "2026-10-25T08:25:05.645Z",
+      "elapsedMs": 269,
+      "state": "ready",
+      "generation": 5
+    },
+    {
+      "at": "2026-10-25T08:25:20.691Z",
+      "elapsedMs": 15315,
+      "state": "ready",
+      "generation": 5
+    },
+    {
+      "at": "2026-10-25T08:25:35.744Z",
+      "elapsedMs": 30368,
+      "state": "ready",
+      "generation": 5
+    },
+    {
+      "at": "2026-10-25T08:25:50.800Z",
+      "elapsedMs": 45424,
+      "state": "ready",
+      "generation": 5
+    },
+    {
+      "at": "2026-10-25T08:26:05.848Z",
+      "elapsedMs": 60472,
+      "state": "ready",
+      "generation": 5
+    },
+    {
+      "at": "2026-10-25T08:26:20.904Z",
+      "elapsedMs": 75528,
+      "state": "ready",
+      "generation": 5
+    },
+    {
+      "at": "2026-10-25T08:26:35.957Z",
+      "elapsedMs": 90581,
+      "state": "ready",
+      "generation": 5
+    },
+    {
+      "at": "2026-10-25T08:26:51.011Z",
+      "elapsedMs": 105635,
+      "state": "ready",
+      "generation": 5
+    },
+    {
+      "at": "2026-10-25T08:27:06.060Z",
+      "elapsedMs": 120684,
+      "state": "ready",
+      "generation": 5
+    },
+    {
+      "at": "2026-10-25T08:27:21.076Z",
+      "elapsedMs": 135700,
+      "state": "stopped",
+      "generation": 5
+    }
+  ]
+}

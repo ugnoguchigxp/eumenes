@@ -36,6 +36,8 @@ const kinds = [
 	"tool",
 	"requirement",
 	"toolchain",
+	"resource-kind",
+	"resource-actions",
 ];
 const text = z.string().max(20_000);
 const textList = z.array(text).max(64);
@@ -55,6 +57,7 @@ const definitionShape = z.looseObject({
 /** Errors the registry throws, as the reason a bundle is refused. */
 const registryCodes: Record<string, BundleIssue["code"]> = {
 	invalid_toolchain: "invalid_toolchain",
+	invalid_resource_kind: "invalid_format",
 	toolchain_function_conflict: "duplicate_function",
 	capability_revision_conflict: "revision_conflict",
 	capability_unavailable: "unavailable",
@@ -648,11 +651,13 @@ export function createBundles(deps: {
 		host: BundleHost | undefined,
 	) {
 		for (const { name, raw } of bundleFiles()) {
-			const log = (reason: string, count?: number) =>
+			const log = (reason: string, count?: number, issue?: BundleIssue) =>
 				getLogger("capabilities").warn("capability.bundle_skipped", {
-					subjectId: name,
+					subjectId: issue?.ref ?? name,
+					source: name,
 					reason,
 					...(count === undefined ? {} : { issueCount: count }),
+					...(issue ? { validationPath: issue.path } : {}),
 				});
 			if (!host) {
 				log("no_bundle_host");
@@ -662,7 +667,7 @@ export function createBundles(deps: {
 				dryRun: true,
 			});
 			if (result.issues.length) {
-				log(result.issues[0]!.code, result.issues.length);
+				log(result.issues[0]!.code, result.issues.length, result.issues[0]);
 				continue;
 			}
 			importBundleInTransaction(db, raw, host);

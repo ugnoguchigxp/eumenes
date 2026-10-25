@@ -10,7 +10,35 @@ import { EvidenceCatalog, MATERIAL_BYTES } from "./evidence-catalog";
 import { modelLimit, operationLimits } from "./exploration";
 import { controlRepairCodes } from "./control-output";
 import { createWorkerControl } from "./worker-control";
+import { handedResources, parseResources } from "./resource-access";
 const OPERATION_BYTES = 4096;
+const RESOURCE_LABEL_CHARS = 120;
+const RESOURCE_PREVIEW_CHARS = 160;
+/**
+ * The RESOURCES section of a sub-agent that was handed resources (resource-uri plan §6.1): one JSON line per
+ * resource (uri, kind, label, short preview), so a label can never break out of its line. Empty when none.
+ */
+export function resourcesSection(
+	execution: import("../../tool-runtime").ChildExecution | undefined,
+	hasReads: boolean,
+) {
+	const handed = handedResources(execution);
+	if (!handed.length && !hasReads) return "";
+	return [
+		systemContext("agent-runtime.contexts.resources.content", {}),
+		...handed.map((r) =>
+			JSON.stringify({
+				uri: r.uri,
+				kind: r.kind,
+				label: r.label.slice(0, RESOURCE_LABEL_CHARS),
+				preview: r.preview
+					.replace(/\s+/g, " ")
+					.slice(0, RESOURCE_PREVIEW_CHARS),
+			}),
+		),
+		systemContext("agent-runtime.contexts.resources.content-2", {}),
+	].join("\n");
+}
 const VARIABLE_RESERVE_BYTES = 8192;
 export { commonRules } from "./worker-control";
 export function workerContext(
@@ -69,7 +97,18 @@ export function workerContext(
 			JSON.parse(task.input_json ?? "{}").originalRequest ??
 			(prepared.input as { question: string }).question,
 	};
+	const reads = parseResources(task.resources_json).reads;
+	const resources = resourcesSection(execution, reads.length > 0);
 	const suppliedMaterials = {
+		...(reads.length
+			? {
+					resourceReads: reads.map((read) =>
+						read.ok
+							? { uri: read.uri, text: read.text }
+							: { uri: read.uri, errorCode: read.code },
+					),
+				}
+			: {}),
 		...(execution?.materials?.length
 			? { pipelineMaterials: execution.materials }
 			: {}),
@@ -85,6 +124,7 @@ export function workerContext(
 		65536 -
 			bytes(controlInstructions(controlFor(contractsFor(tools)))) -
 			bytes(fixed) -
+			bytes(resources) -
 			OPERATION_BYTES -
 			VARIABLE_RESERVE_BYTES,
 	);
@@ -178,6 +218,7 @@ export function workerContext(
 	const control = controlFor(contracts);
 	const messages = [
 		{ role: "system" as const, content: controlInstructions(control) },
+		...(resources ? [{ role: "user" as const, content: resources }] : []),
 		{
 			role: "user" as const,
 			content:

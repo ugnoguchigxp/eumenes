@@ -278,5 +278,6 @@ export const attachLedger = (
 	h.host.attachWork(
 		createAgencyWork({
 			dialogue: { todosInTransaction: () => todos() as never },
+			resources: { kind: () => null },
 		}),
 	);

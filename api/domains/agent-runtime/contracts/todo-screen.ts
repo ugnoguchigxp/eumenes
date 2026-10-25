@@ -14,10 +14,10 @@ export const todoSourceQuery = todoQuery.extend({
 	conversationId: z.string().min(1).max(120),
 });
 
-/** One TODO as the screen shows it: its title, state, outcome and a one-line summary, never the result body. */
+/** One TODO as the screen shows it: its whole request, state, outcome and the result's summary in full, never the result body. */
 const todoRowSchema = z.object({
 	id: z.string(),
-	title: z.string(),
+	request: z.string(),
 	status: z.enum(["todo", "waiting", "done"]),
 	outcome: z
 		.enum(["succeeded", "partial", "failed", "cancelled", "interrupted"])

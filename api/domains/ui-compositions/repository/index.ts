@@ -117,6 +117,13 @@ export const list = (db: Database, scope: string, limit: number) =>
 			"SELECT * FROM ui_compositions WHERE scope=? AND state='ready' ORDER BY updated_at DESC, id LIMIT ?",
 		)
 		.all(scope, limit) as CompositionRow[];
+/** Saved compositions by creation time, newest first (a resource search lists them by when they were made). */
+export const listByCreation = (db: Database, scope: string, limit: number) =>
+	db
+		.query(
+			"SELECT * FROM ui_compositions WHERE scope=? AND state='ready' ORDER BY created_at DESC, id LIMIT ?",
+		)
+		.all(scope, limit) as CompositionRow[];
 export function insertComposition(
 	db: Database,
 	row: Pick<

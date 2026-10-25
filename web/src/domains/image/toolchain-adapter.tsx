@@ -3,16 +3,31 @@ import {
 	definitionRequests,
 	parseDefinition,
 } from "@eumenes/artifact-ui/contracts";
-import type { WebArtifactAdapter } from "../toolchain-artifacts/registry";
+import { useEffect, useRef } from "react";
+import { formatResourceUri } from "../../../../api/domains/resources/contracts";
+import {
+	createLiveScreen,
+	type WebArtifactAdapter,
+} from "../toolchain-artifacts/registry";
 import { queryRoots } from "../../queryKeys";
-import { useImageRuntime } from "./use-image-runtime";
+import { focusImageElement } from "./focus";
+import { imageStudioSource, useImageRuntime } from "./use-image-runtime";
 
 export const IMAGE_SCREEN_ADAPTER_REF = "adapter:image-screen@1";
+
+/** What the mounted image screen shows, read through the latest render. */
+type ImageScreen = {
+	ids: ReadonlySet<string>;
+	shownId: string | undefined;
+	visible: boolean;
+	show(imageId: string): void;
+};
+const live = createLiveScreen<{ read(): ImageScreen }>();
 
 /** Registered presentation with the existing authenticated image operations. */
 export const imageScreenWebAdapter: WebArtifactAdapter = {
 	adapterRef: IMAGE_SCREEN_ADAPTER_REF,
-	useArtifact({ client, artifact, targetRef }) {
+	useArtifact({ client, artifact, targetRef, setTargetRef, visible }) {
 		const cache = useQueryClient();
 		const definition = artifact.variants.find(
 			(v) => v.id === artifact.defaultVariant,
@@ -31,6 +46,18 @@ export const imageScreenWebAdapter: WebArtifactAdapter = {
 				: undefined,
 			targetRef,
 		);
+		const resource = runtime.snapshot[imageStudioSource];
+		const screen: ImageScreen = {
+			ids: new Set(resource.images.map((image) => image.id)),
+			shownId: resource.selectedId,
+			visible,
+			show: (imageId) => setTargetRef(imageId),
+		};
+		const latest = useRef(screen);
+		useEffect(() => {
+			latest.current = screen;
+		});
+		useEffect(() => live.attach({ read: () => latest.current }), []);
 		return {
 			phase: error
 				? { kind: "error", message: "画像の情報を取得できませんでした。" }
@@ -45,5 +72,22 @@ export const imageScreenWebAdapter: WebArtifactAdapter = {
 				void cache.invalidateQueries({ queryKey: [queryRoots.image] });
 			},
 		};
+	},
+	async focus(imageId) {
+		const known = await live.waitFor((handle) =>
+			handle.read().ids.has(imageId),
+		);
+		if (!known) return false;
+		const screen = live.current()?.read();
+		if (screen && screen.shownId !== imageId) screen.show(imageId);
+		// The item exists; marking it is best effort while the screen draws it.
+		await focusImageElement(imageId);
+		return true;
+	},
+	viewing() {
+		const screen = live.current()?.read();
+		return screen?.visible && screen.shownId
+			? formatResourceUri("image", screen.shownId)
+			: null;
 	},
 };

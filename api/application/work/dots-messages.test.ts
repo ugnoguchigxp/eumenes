@@ -117,9 +117,12 @@ test("wrong owner, lease, coverage, duplicate final reply and cancelled generati
 	await expect(
 		f.messages.reply("dots", { ...r, leaseId: crypto.randomUUID() }),
 	).rejects.toThrow("dots_stale");
-	await expect(
-		f.messages.reply("dots", { ...r, coveredMessageIds: ["foreign-message"] }),
-	).rejects.toThrow("dots_permission_denied");
+	for (const id of ["foreign-message", a.id]) {
+		await expect(
+			f.messages.reply("dots", { ...r, coveredMessageIds: [id] }),
+		).rejects.toThrow("dots_permission_denied");
+		expect(f.messages.view(f.thread.id).items[0]?.reply).toBeNull();
+	}
 	await f.messages.reply("dots", r);
 	await expect(
 		f.messages.reply("dots", { ...r, replyId: crypto.randomUUID() }),

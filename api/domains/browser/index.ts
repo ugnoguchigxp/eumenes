@@ -1,5 +1,6 @@
 export { createBrowser, type BrowserService } from "./service";
 export { registerBrowser } from "./controller";
+export { createBrowserResourceAdapter } from "./service/resource-adapter";
 export { migrations } from "./repository";
 export { BrowserApprovalRequired } from "./contracts";
 export type {

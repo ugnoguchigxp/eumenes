@@ -1,7 +1,6 @@
 import { taskPlan, taskItem } from "./task-plan.fixture";
 import { expect, test } from "bun:test";
 import type { DialogueService } from "../../domains/dialogue";
-import type { Run } from "../../domains/dialogue/contracts";
 import type { ChildExecution } from "../../domains/tool-runtime";
 import { createDotsDialogue } from "../work/dots-dialogue";
 import { dotsFixture } from "../work/dots-fixture";
@@ -11,7 +10,7 @@ import { objectRecognitionFixture } from "../media/object-recognition.fixture";
 import { handOverTask } from "./task-delegation.fixture";
 import { waitFor } from "../../infrastructure/wait-for";
 
-test("legacy delegation waits beyond acceptance, relays an owned question and adopts only the external completion", async () => {
+test("already saved legacy work remains inspectable across migration; new legacy starts are unavailable", async () => {
 	const f = await dotsFixture();
 	try {
 		const source = {
@@ -29,30 +28,13 @@ test("legacy delegation waits beyond acceptance, relays an owned question and ad
 			runId: source.runId,
 			createdAt: new Date().toISOString(),
 		});
-		const run = {
-			id: source.runId,
-			inputMessageId: source.messageId,
-			conversationId: source.conversationId,
-			sourceKind: "manual",
-			revision: 0,
-		} as Run;
 		const owner = createDotsDialogue(f);
-		const snapshot = f.store.read(
-			(db) => owner.prepareInTransaction(db, run).catalog,
-		);
 		const dialogue = {
 			executionCommands: {
-				legacyAvailableInTransaction: () => true,
-				invokeLegacyInTransaction: (
-					db: any,
-					child: ChildExecution,
-					_prepared: unknown,
-					command: any,
-				) =>
-					owner.invokeInTransaction(db, run, command, snapshot, {
-						callId: child.dispatchId ?? child.id,
-						deadline: child.deadline,
-					}),
+				legacyAvailableInTransaction: () => false,
+				invokeLegacyInTransaction: () => {
+					throw new Error("adapter_unavailable");
+				},
 				legacyTaskInTransaction: owner.executionTaskInTransaction,
 				cancelLegacyTaskInTransaction: owner.cancelExecutionTaskInTransaction,
 			},
@@ -71,30 +53,27 @@ test("legacy delegation waits beyond acceptance, relays an owned question and ad
 			modelCalls: 10,
 			refs: [],
 		};
-		const prepared = { backend: "dots" } as Parameters<
-			typeof port.invokeInTransaction
-		>[2];
-		const command = {
-			operation: "start",
-			projectRef: "project",
-			title: "work",
-			request: source.request,
-			completionConditions: ["Tests pass"],
-			operations: ["read", "create_session", "edit", "check"],
-			maxSessions: 1,
-		};
-		const start = () =>
-			f.store.write((db) =>
-				port.invokeInTransaction(db, child, prepared, command),
-			);
-		const initial = await start();
-		expect(initial.state).toBe("running");
-		const taskId = (initial.ref as { taskId: string }).taskId;
-		expect(taskId).toBeString();
-		expect((await start()).ref).toEqual(initial.ref);
+		const saved = await f.tasks.create(f.input(), {
+			origin: {
+				source: "conversation",
+				conversationId: source.conversationId,
+				messageId: source.messageId,
+				runId: source.runId,
+				operationKey: "historical",
+			},
+		});
+		const taskId = saved.taskId,
+			initial = { ref: { kind: "legacy", type: "dots", taskId } };
 		expect(
-			f.tasks.list({ conversationId: "main", limit: 50 }).items,
-		).toHaveLength(1);
+			f.store.read((db) =>
+				port.availableInTransaction(
+					db,
+					"dots",
+					child.chainRevisionId,
+					source.runId,
+				),
+			),
+		).toBe(false);
 		const current = () =>
 			f.store.read((db) => port.currentInTransaction(db, child, initial.ref));
 		const external = f.command(taskId);
@@ -143,20 +122,13 @@ test("legacy delegation waits beyond acceptance, relays an owned question and ad
 				),
 			),
 		).toBe(false);
-		await f.store.write((db) =>
-			owner.invokeInTransaction(
-				db,
-				run,
-				{
-					operation: "answer",
-					taskRef: taskId,
-					questionId: "target",
-					answer: "B",
-				},
-				owner.prepareInTransaction(db, run).catalog,
-				{ callId: crypto.randomUUID(), deadline: child.deadline },
-			),
-		);
+		await f.tasks.answer(taskId, {
+			requestId: crypto.randomUUID(),
+			expectedRevision: f.tasks.get(taskId).task.revision,
+			questionId: "target",
+			answer: "B",
+		});
+
 		expect(current().state).toBe("running");
 		expect(
 			f.store.read((db) =>

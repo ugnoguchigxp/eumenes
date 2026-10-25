@@ -7,6 +7,11 @@ import {
 import type { ToolRuntime } from "../../tool-runtime";
 import type { Task } from "../contracts";
 import {
+	RESOURCE_READ_TOOL,
+	RESOURCE_READS_MAX,
+	loadResources,
+} from "./resource-access";
+import {
 	explorationBudget,
 	isPageRead,
 	isSearch,
@@ -18,11 +23,14 @@ export function createToolSelection({
 	bindings,
 	prepared,
 	now,
+	resources,
 }: {
 	tools: ToolRuntime;
 	bindings: Map<string, ReturnType<ToolRuntime["bind"]>>;
 	prepared: Map<string, Prepared>;
 	now: () => number;
+	/** The host provided a resource port: `resource.read` can be offered. */
+	resources: boolean;
 }) {
 	function toolLimit(t: Task, meta: ToolRuntimeMeta | undefined) {
 		const limits = operationLimits(prepared.get(t.id));
@@ -50,6 +58,12 @@ export function createToolSelection({
 			.some((o) => o.sources.some((s) => s.sourceRef));
 		const invocations = tools.invocationsInTransaction(db, t.id);
 		return (bindings.get(t.id) ?? []).flatMap((b) => {
+			// The host answers `resource.read` itself: it takes no tool-runtime budget and needs the port.
+			if (b.tool.id === RESOURCE_READ_TOOL)
+				return resources &&
+					loadResources(db, t.id).reads.length < RESOURCE_READS_MAX
+					? [{ ...b, replayOnly: false }]
+					: [];
 			const meta = toolRuntimeOf(b.tool.revisionId);
 			if (meta?.requiresSavedBody && !hasSavedBody) return [];
 			// Do not offer a URL read when neither the request nor acquired sources authorize a URL.

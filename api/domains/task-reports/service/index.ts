@@ -86,7 +86,9 @@ export function createTaskReports(input: {
 			});
 		},
 		pendingInTransaction: repo.pending,
+		latestInTransaction: repo.latest,
 		deliveredInTransaction: repo.delivered,
+		suppressInTransaction: repo.suppress,
 		supersedeQuestionsInTransaction: repo.supersedeQuestions,
 		purgeInTransaction: repo.purge,
 		list(taskId: string, after = 0, limit = 50) {

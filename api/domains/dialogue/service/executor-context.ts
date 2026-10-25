@@ -4,6 +4,7 @@ import type { Receipt } from "../../inference";
 import { adoptMemoryWindow } from "./memory-window";
 import { jstSeconds } from "../../../infrastructure/jst-time";
 import type { Run } from "../contracts";
+import type { ExecutionReference } from "../../tool-runtime";
 import type { QueryVector, ToolchainRoute } from "../contracts/toolchains";
 import { byId } from "../repository";
 import {
@@ -38,12 +39,17 @@ export type Request = {
 	resolveUnsaved?: "discard";
 	announcement: string;
 	confirmationId?: string;
+	/** The resources handed over with the request: the references the toolchain reads, and their URIs. */
+	references?: ExecutionReference[];
+	refUris?: string[];
 };
 
 /** The candidates' descriptions the search returns (section 6.2); the log keeps only their ids and titles. */
 export function candidateOf(
 	card: ToolchainCard,
 	targets: Array<{ ref: string; label: string }> | null,
+	/** The display names of the resource kinds the toolchain makes (the registry's labels). */
+	produces: readonly string[] = [],
 ) {
 	return {
 		id: card.id,
@@ -52,6 +58,7 @@ export function candidateOf(
 		useWhen: card.useWhen,
 		...(card.execution ? { execution: card.execution } : {}),
 		...(card.minImpact ? { minImpact: card.minImpact } : {}),
+		...(produces.length ? { produces } : {}),
 		...(card.instant ? { inputs: card.instant.parameters } : {}),
 		...(card.pipeline
 			? { inputs: card.pipeline.parameters, steps: card.pipeline.outline }

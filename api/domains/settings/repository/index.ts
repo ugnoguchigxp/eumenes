@@ -56,4 +56,9 @@ export const migrations: readonly Migration[] = [
 		after: ["settings/0006-ocr"],
 		sql: `CREATE TABLE settings_browser_bridge(id INTEGER PRIMARY KEY CHECK(id=1),revision INTEGER NOT NULL,enabled INTEGER NOT NULL,encrypted TEXT NOT NULL);`,
 	},
+	{
+		id: "settings/0008-docling",
+		after: ["settings/0007-browser-bridge"],
+		sql: `CREATE TABLE settings_docling(id INTEGER PRIMARY KEY CHECK(id=1),revision INTEGER NOT NULL,gateway_url TEXT NOT NULL,public_origin TEXT NOT NULL);`,
+	},
 ];

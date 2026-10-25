@@ -314,7 +314,13 @@ export function workPage(
 		done: "archived_at IS NULL AND status = 'done'",
 		archived: "archived_at IS NOT NULL",
 	}[query.state];
-	const order = query.state === "archived" ? "archived_at" : "updated_at";
+	// Current work keeps the order it was asked in (newest first); a state's own list follows its last change.
+	const order = {
+		active: "created_at",
+		todo: "updated_at",
+		done: "updated_at",
+		archived: "archived_at",
+	}[query.state];
 	const rows = (
 		db
 			.query(

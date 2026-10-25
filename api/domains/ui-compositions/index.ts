@@ -8,3 +8,4 @@ export {
 	limits as uiCompositionLimits,
 } from "./contracts";
 export { migrations } from "./repository";
+export { createUiCompositionResourceAdapter } from "./service/resource-adapter";

@@ -10,7 +10,11 @@ import {
 } from "../toolchain-artifacts/specialist-bridge";
 import { pipelinesWebAdapter } from "./toolchain-adapter";
 
-afterEach(cleanup);
+afterEach(() => {
+	cleanup();
+	vi.useRealTimers();
+	document.body.innerHTML = "";
+});
 
 type SpecialistSession = NonNullable<SpecialistBridge["session"]>;
 const work = (over: object = {}) => ({
@@ -542,4 +546,66 @@ test("refusals name the code and the detail; other codes keep the host's wording
 	expect(describeRejection?.("something_else", [])).toBeUndefined();
 	expect(describeRejection?.(undefined, [])).toBeUndefined();
 	h.cache.clear();
+});
+
+function drawStudio() {
+	const studio = document.createElement("section");
+	studio.className = "pipeline-studio";
+	studio.scrollIntoView = vi.fn();
+	document.body.append(studio);
+	return studio;
+}
+
+test("focus shows the published pipeline's work, marks the studio for two seconds and viewing names the work", async () => {
+	const { hook, setTargetRef, cache } = setup({ targetRef: "pipeline.a" });
+	await waitFor(() => expect(hook.result.current.phase.kind).toBe("ready"));
+	const studio = drawStudio();
+	expect(pipelinesWebAdapter.viewing?.()).toBe("eumenes://pipeline/work-1");
+	vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+	const done = pipelinesWebAdapter.focus?.("pipeline.a");
+	await vi.advanceTimersByTimeAsync(200);
+	await expect(done).resolves.toBe(true);
+	expect(setTargetRef).not.toHaveBeenCalled();
+	expect(studio.getAttribute("data-resource-focus")).toBe("true");
+	await vi.advanceTimersByTimeAsync(2_010);
+	expect(studio.hasAttribute("data-resource-focus")).toBe(false);
+	cache.clear();
+});
+
+test("focus with an empty target is the current draft; the screen is asked to leave a pipeline for it", async () => {
+	const { hook, setTargetRef, cache } = setup({ targetRef: "pipeline.a" });
+	await waitFor(() => expect(hook.result.current.phase.kind).toBe("ready"));
+	drawStudio();
+	vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+	const done = pipelinesWebAdapter.focus?.("");
+	await vi.advanceTimersByTimeAsync(5_500);
+	// The mock host does not feed the target back, so the draft never shows.
+	await expect(done).resolves.toBe(false);
+	expect(setTargetRef).toHaveBeenCalledWith(undefined);
+	cache.clear();
+});
+
+test("the draft is focused when the studio already shows it", async () => {
+	const { hook, setTargetRef, cache } = setup({});
+	await waitFor(() => expect(hook.result.current.phase.kind).toBe("ready"));
+	drawStudio();
+	vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+	const done = pipelinesWebAdapter.focus?.("");
+	await vi.advanceTimersByTimeAsync(200);
+	await expect(done).resolves.toBe(true);
+	expect(setTargetRef).not.toHaveBeenCalled();
+	cache.clear();
+});
+
+test("focus says no to a pipeline the studio does not list, and viewing is null without a work", async () => {
+	const { hook, setTargetRef, cache } = setup({
+		studio: studioData({ work: null }),
+	});
+	await waitFor(() => expect(hook.result.current.phase.kind).toBe("ready"));
+	expect(pipelinesWebAdapter.viewing?.()).toBeNull();
+	await expect(pipelinesWebAdapter.focus?.("pipeline.zzz")).resolves.toBe(
+		false,
+	);
+	expect(setTargetRef).not.toHaveBeenCalled();
+	cache.clear();
 });

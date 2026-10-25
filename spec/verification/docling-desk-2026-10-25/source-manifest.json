@@ -1,0 +1,135 @@
+{
+  "allOwnedFilesMatch": true,
+  "files": [
+    {
+      "path": "api/application/docling/docling-adapter.ts",
+      "sha256": "149c22127f1b7f3ad48d89e6274c1d48bea8e74de6b1eed41d498ea181a9f1de",
+      "matchesVerifiedCopy": true
+    },
+    {
+      "path": "api/application/docling/docling-composition.ts",
+      "sha256": "effc749e309efdc9acab66aee06c235f102551d8596b98a4c91a4a117797df4a",
+      "matchesVerifiedCopy": true
+    },
+    {
+      "path": "api/application/docling/docling-e2e.test.ts",
+      "sha256": "2b8947b9432ea05dca8a48c9a9468f36783c50680f1ef6be5e842b28b1ff07cf",
+      "matchesVerifiedCopy": true
+    },
+    {
+      "path": "api/application/docling/docling-toolchain.test.ts",
+      "sha256": "e7a8f12446348a8a7629fa00db0e17f140a1d9f2973792d42d68cbf5ecb5b266",
+      "matchesVerifiedCopy": true
+    },
+    {
+      "path": "api/domains/capabilities/bundles/docling-desk.bundle.json",
+      "sha256": "5a7cacb7119c9c77d70fd6070617a3b08bfb2ab8c057beeba55616f7c8b1dc66",
+      "matchesVerifiedCopy": true
+    },
+    {
+      "path": "api/domains/docling/contracts/index.ts",
+      "sha256": "878c6423229ba8220990c91c355a9ce855ed326efdb9bc03abcbf88c0940135d",
+      "matchesVerifiedCopy": true
+    },
+    {
+      "path": "api/domains/docling/controller/index.ts",
+      "sha256": "2fe7e5a2def37684ef59635c61a6c48785498bb120b9b9eac3d11ebc28d4c6f5",
+      "matchesVerifiedCopy": true
+    },
+    {
+      "path": "api/domains/docling/index.ts",
+      "sha256": "8c757f5e91c0b20dcfdc948d0cc59a494bf0e77f7ee048a8d90b49a9f185bdda",
+      "matchesVerifiedCopy": true
+    },
+    {
+      "path": "api/domains/docling/service/index.ts",
+      "sha256": "e4f3429da9db66b100093204583f0028aea3fa566124457329d2cf63e669816a",
+      "matchesVerifiedCopy": true
+    },
+    {
+      "path": "api/domains/docling/test/docling.test.ts",
+      "sha256": "6e3e220a598ee1359be89fa166512d25451bf1347b5f3850040eebaa7db6bb55",
+      "matchesVerifiedCopy": true
+    },
+    {
+      "path": "api/domains/settings/service/docling.ts",
+      "sha256": "ebf10e0c55eaf4661552c1bddd8632bea881af30731a62e511907b6e356ff4d6",
+      "matchesVerifiedCopy": true
+    },
+    {
+      "path": "api/domains/settings/test/docling.test.ts",
+      "sha256": "31193237334238aabb4716dec488d0c4c72f142227f7d3e184b469b4bdeb8a24",
+      "matchesVerifiedCopy": true
+    },
+    {
+      "path": "client/docling.ts",
+      "sha256": "ac9f1df811e7b4141c085eb67e0c532639ef4100223500159e6e82f0252e9a59",
+      "matchesVerifiedCopy": true
+    },
+    {
+      "path": "packages/artifact-ui/src/external-app-components.tsx",
+      "sha256": "8ccbf5d5946d691816777edaa2419e366077a4ca138099287dd652dd47a72eab",
+      "matchesVerifiedCopy": true
+    },
+    {
+      "path": "packages/design-system/src/components/ExternalAppLauncher/ExternalAppLauncher.css",
+      "sha256": "0a61a28bf1a1bcbd2976929c02dce66a88fbe9f9a62240adb75386dbe4ef6d52",
+      "matchesVerifiedCopy": true
+    },
+    {
+      "path": "packages/design-system/src/components/ExternalAppLauncher/ExternalAppLauncher.stories.tsx",
+      "sha256": "d5d67c30b63e0baf5c519b53cf6b4f161392892f1e94b9a4be4447dbb6201db8",
+      "matchesVerifiedCopy": true
+    },
+    {
+      "path": "packages/design-system/src/components/ExternalAppLauncher/ExternalAppLauncher.test.tsx",
+      "sha256": "1fd90fddcf2c79ec8e392641fec5a65c17614d0318a8df182cd2097e776050f1",
+      "matchesVerifiedCopy": true
+    },
+    {
+      "path": "packages/design-system/src/components/ExternalAppLauncher/ExternalAppLauncher.tsx",
+      "sha256": "83d460c00b638a97a654fd599c902dc67d5cf24a5222283268365bc48187bb22",
+      "matchesVerifiedCopy": true
+    },
+    {
+      "path": "packages/design-system/src/components/ExternalAppLauncher/index.ts",
+      "sha256": "8649bbec18526d8505648a5544765087a693496b84bf5b35fa89fcb519567f96",
+      "matchesVerifiedCopy": true
+    },
+    {
+      "path": "scripts/docling-live.ts",
+      "sha256": "2f355ce32f209611759251d1d5dd16b5723cdfc8506d02d5e7b169af025a54e7",
+      "matchesVerifiedCopy": true
+    },
+    {
+      "path": "tests/browser/docling.spec.ts",
+      "sha256": "ed4cba55729e8e5906214266ea15f58c7555847fc0406c32d1da9af5d846e642",
+      "matchesVerifiedCopy": true
+    },
+    {
+      "path": "tests/browser/fixtures/docling.tsx",
+      "sha256": "43000a2923a8f543a31eb2478251dac1a74040395a5dbdd910bfd348be5e51f0",
+      "matchesVerifiedCopy": true
+    },
+    {
+      "path": "web/src/domains/docling/open.test.ts",
+      "sha256": "08146b280ebdef4583dcc3573c6969b7a80347a7d04908f90660754c7622c243",
+      "matchesVerifiedCopy": true
+    },
+    {
+      "path": "web/src/domains/docling/open.ts",
+      "sha256": "646129ad409e2cd3e11c216d91d7836dd9db6984a49cb6e4b1d306f83335879b",
+      "matchesVerifiedCopy": true
+    },
+    {
+      "path": "web/src/domains/docling/toolchain-adapter.tsx",
+      "sha256": "daa144d50cc2fdaa23d0bb286a5e0ca68511dafc274ebf244c46d90cff262f39",
+      "matchesVerifiedCopy": true
+    },
+    {
+      "path": "web/src/domains/toolchain-artifacts/docling-artifact.test.tsx",
+      "sha256": "9f2d5be8f77661f80e9f07353f2c9230f61bdd10dab45c839df7d104704b2108",
+      "matchesVerifiedCopy": true
+    }
+  ]
+}

@@ -32,6 +32,11 @@ import { createAgentSync } from "./agent-sync";
 import { DEFAULT_DEADLINE_MS, TERMINAL, type DialogueDeps } from "./context";
 import { createGenerationHandler } from "./generation-handler";
 import { createWorkLedger } from "./work-ledger";
+import {
+	conversationResources,
+	createResourceLedger,
+	type ResourceAccess,
+} from "./resource-ledger";
 import { withAttachmentNotes } from "./attachment-context";
 import { eventText } from "./event-text";
 import { createOperationPorts } from "./operation-ports";
@@ -48,6 +53,25 @@ import type { MusicPort } from "../contracts/music";
 import type { ImagePort } from "../contracts/image";
 import type { ObjectRecognitionPort } from "../contracts/object-recognition";
 const log = getLogger("dialogue");
+
+/** A corrected message is shown as corrected: the log's frozen copy of it is rewritten (section 13). */
+function registerCorrectionHook(deps: DialogueDeps) {
+	deps.conversation.addCorrectHook?.((db, messageId, at) => {
+		const found = deps.conversation.messageInTransaction(db, messageId);
+		if (!found) return;
+		const { message } = found;
+		const text =
+			message.role === "user"
+				? withAttachmentNotes(message.text, message.attachments)
+				: message.text;
+		deps.continuity.events.correctMessageInTransaction(
+			db,
+			messageId,
+			eventText(deps, text),
+			jstSeconds(Date.parse(at)),
+		);
+	});
+}
 
 function registerHandlers(
 	deps: DialogueDeps,
@@ -82,6 +106,8 @@ interface DialogueServiceOptions {
 	/** The conversation agent that answers every generation. */
 	conversationAgent: ConversationAgentPort;
 	toolchains?: import("../contracts/toolchains").ToolchainRoutingPort;
+	/** The resource registry and the kinds each toolchain makes; without it the conversation has no resources. */
+	resources?: ResourceAccess;
 	specialist?: import("../contracts").SpecialistPort;
 	/** The operational log file the error report reads (`config.logFile`); no log is read when absent. */
 	logFile?: () => string | undefined;
@@ -107,6 +133,7 @@ export function createDialogueService({
 	agency,
 	conversationAgent,
 	toolchains,
+	resources,
 	specialist,
 	logFile,
 }: DialogueServiceOptions) {
@@ -131,6 +158,7 @@ export function createDialogueService({
 		agency,
 		conversationAgent,
 		toolchains,
+		resources,
 		specialist,
 	};
 	const progress = createProgress(deps);
@@ -141,6 +169,7 @@ export function createDialogueService({
 		intake.acceptInTransaction,
 	);
 	deps.interactions = interactions;
+	if (resources) deps.resourceLedger = createResourceLedger(deps);
 	deps.work = createWorkLedger(deps);
 	const work = deps.work;
 	// Forgetting and deleted reports reach the TODOs and their result slots (section 13).
@@ -150,22 +179,7 @@ export function createDialogueService({
 	agents?.registerDataDeletion?.((db, runId) =>
 		work.dropRunResultsInTransaction(db, runId),
 	);
-	// A corrected message is shown as corrected: the log's frozen copy of it is rewritten (section 13).
-	deps.conversation.addCorrectHook?.((db, messageId, at) => {
-		const found = deps.conversation.messageInTransaction(db, messageId);
-		if (!found) return;
-		const { message } = found;
-		const text =
-			message.role === "user"
-				? withAttachmentNotes(message.text, message.attachments)
-				: message.text;
-		deps.continuity.events.correctMessageInTransaction(
-			db,
-			messageId,
-			eventText(deps, text),
-			jstSeconds(Date.parse(at)),
-		);
-	});
+	registerCorrectionHook(deps);
 	registerHandlers(deps, progress);
 	const specialistOps = createSpecialistOps(deps);
 	const agentSync = createAgentSync(deps);
@@ -185,6 +199,11 @@ export function createDialogueService({
 			revokeExecutionNotice(deps, db, eventId),
 		...createOperationPorts(deps),
 		interactions,
+		/** `GET /api/conversations/:id/resources`: the resources the conversation has met and each message's chips. */
+		conversationResources: (conversationId: string) =>
+			conversationResources(deps, conversationId),
+		/** The conversation's resource ledger (`a<n>`), for the `resources` tool and the screen receipts. */
+		resourceLedger: deps.resourceLedger,
 		/** The conversation's live specialist session, or null (`GET /api/conversations/:id/specialist`). */
 		specialistSession: specialistOps.session,
 		/** True only for an active or suspended session that has not expired (the guard of the work's screen operations). */

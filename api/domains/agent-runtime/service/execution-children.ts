@@ -8,6 +8,7 @@ import {
 	isExecutionActive,
 } from "../repository/executions";
 import type { Answer } from "./answer";
+import { linksOfTree } from "./resource-access";
 import type { RuntimeContext } from "./runtime-context";
 import type { TaskOps } from "./task-ops";
 
@@ -58,17 +59,21 @@ export function executionChildren(
 			payload_json: string;
 		} | null;
 		const report = answer.reportInTransaction(db, root.id);
+		// The resources the sub-agent reported as made (`finish.links`), checked when it finished.
+		const links = linksOfTree(db, root.id);
 		if (root.state !== "ready_for_answer")
 			return {
 				root,
 				calls,
 				ticket: null,
 				action,
+				links,
 				reportDigest: report ? hash(report) : null,
 			};
 		return {
 			root,
 			calls,
+			links,
 			ticket: answer.api.prepareAnswerInTransaction(
 				db,
 				root.root_run_id,

@@ -60,25 +60,22 @@ test("TODO artifact renders and pages in desktop and narrow layouts", async ({
 							: index % 5 === 1
 								? "done"
 								: "todo";
+					// The current source contract (todoPageSchema): todo/waiting/done and the archive flag.
 					return {
 						id: `work-${index}`,
-						state: rowState,
 						request: `${requests[index % requests.length]} (${index + 1})`,
 						status:
+							rowState === "todo" ? (index === 2 ? "waiting" : "todo") : "done",
+						outcome: rowState === "todo" ? null : "succeeded",
+						summary:
 							rowState === "todo"
 								? index === 2
-									? "waiting_user"
-									: "deciding"
-								: "completed",
-						pipeline: index % 3 === 1,
-						resultSummary:
-							rowState === "todo"
-								? null
+									? "どちらの案にしますか"
+									: null
 								: "作成と確認が完了しました。結果は会話にまとめています。",
-						heldEventId: rowState === "done" ? `event-${index}` : null,
-						createdAt: baseTime - index * 60000,
-						updatedAt: baseTime + 60000,
-						releasedAt: rowState === "archived" ? baseTime + 120000 : null,
+						pipeline: index % 3 === 1,
+						archived: rowState === "archived",
+						updatedAt: new Date(baseTime + 60000).toISOString(),
 					};
 				},
 			);
@@ -94,7 +91,7 @@ test("TODO artifact renders and pages in desktop and narrow layouts", async ({
 				json: {
 					artifacts: [
 						{
-							artifactRevisionId: "artifact:agency.todos@1",
+							artifactRevisionId: "artifact:agency.todos@2",
 							title: "TODOリスト",
 							adapterRefs: ["adapter:task-execution@1"],
 							launcher: bundle.artifacts[0]!.launcher,
@@ -106,7 +103,7 @@ test("TODO artifact renders and pages in desktop and narrow layouts", async ({
 			return route.fulfill({
 				json: {
 					artifact: bundle.artifacts[0],
-					artifactRevisionId: "artifact:agency.todos@1",
+					artifactRevisionId: "artifact:agency.todos@2",
 					digest: "fixture",
 					scopeRef: "scope:fixture",
 				},

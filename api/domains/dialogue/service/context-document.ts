@@ -7,7 +7,9 @@ import type {
 } from "../../continuity";
 import type { ContextBlock } from "../../inference";
 import { keepOrder, type ProfileItem } from "../../memory";
+import type { WorkLink } from "../contracts/resources";
 import { eventFields } from "./event-fields";
+import { replaceResourceUrisIn } from "./resource-text";
 
 /**
  * The material document of a generation (the ContextWindow layout specification, sections 2 and 4): four tagged
@@ -23,6 +25,10 @@ export type TodoItem = {
 	id: string;
 	/** The conversation's number of the TODO (`t<ref>`). */
 	ref: number;
+	/** The toolchain the work was handed to. */
+	toolchainId?: string;
+	/** The resources the finished work made (section 7.1 of the resource plan); absent when none. */
+	links?: WorkLink[];
 	title: string;
 	status: "todo" | "waiting" | "done";
 	outcome?: string;
@@ -40,9 +46,23 @@ export type PendingConfirmation = {
 	impact: string;
 };
 
+/** A resource the conversation has met, as the state section lists it (`a<ref>`, section 7.1 of the resource plan). */
+export type ResourceLine = {
+	ref: number;
+	/** The kind's display name, e.g. 「画像」. */
+	kindLabel: string;
+	label: string;
+	/** The TODO that made it (`t3`), or `履歴 MM-DD` for one found in the history. */
+	origin: string;
+	/** What can be done with it in words, the kind's default first. */
+	actions: readonly string[];
+};
+
 /** What the state section is made of: the TODOs, the host's records and the short-term notes. */
 export type StateSources = {
 	todos: readonly TodoItem[];
+	/** The resources, most recently used first (at most `RESOURCE_LINES`). */
+	resources?: readonly ResourceLine[];
 	pendingConfirmation: readonly PendingConfirmation[];
 	retained: ReadonlyArray<{ id: string; summary: string }>;
 	/** The memory steward's notes of this conversation (decisions, questions to the user, goals, memos). */
@@ -56,6 +76,8 @@ export type StateSources = {
 /** What holds for this generation only (the last message, section 5.1). */
 export type NowSources = {
 	at: string;
+	/** The resource on screen, as a line (`a3 画像「…」`); absent when none. */
+	viewing?: string;
 	trigger: ReadonlyArray<Record<string, unknown>>;
 	/** The event id of the utterance being delivered, if any. */
 	speaking: string | null;
@@ -78,6 +100,8 @@ export type DocumentSources = {
 export type DocumentRefs = {
 	todo(id: string): string | null;
 	confirmation(id: string): string | null;
+	/** `a<n>` of a resource URI in the conversation's ledger; null when it is not there. */
+	resource(uri: string): string | null;
 };
 
 export type RenderedSection = { text: string; tokens: number };
@@ -147,7 +171,7 @@ export function plain(text: string): string {
 
 const str = (value: unknown) => (typeof value === "string" ? value : "");
 /** `MM-DD` of a time or day (`YYYY-MM-DD…`), with the year when it is not `year`. */
-const dayOf = (at: string, year: string) =>
+export const dayOf = (at: string, year: string) =>
 	at.slice(0, 4) === year ? at.slice(5, 10) : at.slice(0, 10);
 const minuteOf = (at: string) => at.slice(11, 16);
 
@@ -193,17 +217,49 @@ function historyLine(segment: EpisodeSegment, n: number, year: string) {
 		: `s${n} ${range} 要約なし（${segment.count}件。会話履歴の担当で読める）`;
 }
 
+/** A result as the model reads it: a resource is its number, never its URI (section 2.3 of the resource plan). */
+export function hideUris(value: unknown, refs: DocumentRefs): unknown {
+	return replaceResourceUrisIn(
+		value,
+		(uri) => refs.resource(uri) ?? "リソース",
+	);
+}
+
 function resultLine(
 	fields: Record<string, unknown>,
 	todo: string,
+	refs: DocumentRefs,
 ): string | null {
 	if (fields.status === "waiting")
 		return `問い ${todo}: ${plain(str(fields.question))}`;
 	const outcome = OUTCOMES[str(fields.outcome)] ?? str(fields.outcome);
-	const body = referenceJson(fields.result ?? null);
+	const body = referenceJson(hideUris(fields.result ?? null, refs));
 	return estimateTextTokens(body) > RESULT_LINE_MAX_TOKENS
 		? `結果 ${todo} ${outcome}: （長いので work の check で読む）`
 		: `結果 ${todo} ${outcome}: ${body}`;
+}
+
+/** A screen's receipt of an `open`/`play` command (resource-uri plan §8.2), with the resource's number when known. */
+const SCREEN_LINES: Record<string, Record<string, string>> = {
+	open: {
+		"screen.done": "表示した",
+		"screen.blocked": "表示できなかった（利用者の操作が必要）",
+		"screen.unavailable": "表示できなかった（その画面を開けない）",
+		"screen.expired": "表示されなかった（どの画面も受け取らなかった）",
+	},
+	play: {
+		"screen.done": "再生した",
+		"screen.blocked":
+			"再生できなかった（自動再生の拒否。再生ボタンを押してもらう）",
+		"screen.unavailable": "再生できなかった（その画面を開けない）",
+		"screen.expired": "再生されなかった（どの画面も受け取らなかった）",
+	},
+};
+
+function screenLine(fields: Record<string, unknown>): string {
+	const resource = str(fields.resource);
+	const text = SCREEN_LINES[str(fields.operation)]?.[str(fields.action)];
+	return `画面 ${resource ? `${resource} ` : ""}${text ?? str(fields.action)}`;
 }
 
 /** What an action says in the log; null for one that only read (it changed nothing). */
@@ -232,9 +288,14 @@ function actedLine(
 			return `仕事の操作 ${todo} ${WORK_OPERATIONS[operation]}${text ? `「${plain(text)}」` : ""}`;
 		}
 		case "work.result":
-			return resultLine(fields, todo);
+			return resultLine(fields, todo, refs);
 		case "work.archived":
 			return `伝達済み ${todo}`;
+		case "screen.done":
+		case "screen.blocked":
+		case "screen.unavailable":
+		case "screen.expired":
+			return screenLine(fields);
 		case "find_toolchain":
 		case "memory.read":
 		case "work.check":
@@ -334,6 +395,7 @@ const NOTE_LINES: Record<string, { prefix: string; label: string }> = {
 function stateLines(
 	state: StateSources,
 	log: readonly ConversationEvent[],
+	refs: DocumentRefs,
 	year: string,
 ): string[] {
 	// The newest result event of each TODO the log shows.
@@ -346,6 +408,9 @@ function stateLines(
 	}
 	const lines: string[] = [];
 	for (const todo of state.todos) {
+		const made = (todo.links ?? []).flatMap(
+			(link) => refs.resource(link.uri) ?? [],
+		);
 		const head = `t${todo.ref} ${STATUSES[todo.status]} ${plain(todo.title)}`;
 		if (todo.status === "waiting")
 			lines.push(`${head} 問い: ${plain(todo.question ?? "")}`);
@@ -356,6 +421,7 @@ function stateLines(
 				`${head} (${[OUTCOMES[todo.outcome ?? ""] ?? todo.outcome, result ? `結果 ${result}` : "結果は work の check で読む", "未伝達"].join(", ")})`,
 			);
 		} else lines.push(head);
+		if (made.length) lines[lines.length - 1] += ` → ${made.join(" ")}`;
 	}
 	for (const confirmation of state.pendingConfirmation)
 		lines.push(
@@ -383,6 +449,10 @@ function stateLines(
 			`n${i + 1} 反映待ちの記憶 ${PROFILE_KINDS[item.kind] ?? item.kind} ${plain(item.text)} (${item.source === "user_said" ? "本人の発言" : "傾向"})`,
 		),
 	);
+	for (const resource of state.resources ?? [])
+		lines.push(
+			`a${resource.ref} ${resource.kindLabel}「${plain(resource.label)}」(${resource.origin}) ${resource.actions.join("・")}`,
+		);
 	for (const toolchain of state.retained)
 		lines.push(`担当 ${toolchain.id} ${plain(toolchain.summary)}`);
 	return lines;
@@ -415,7 +485,7 @@ export function renderDocument(
 			sources.episode.map((segment, i) => historyLine(segment, i + 1, year)),
 		),
 		log: tagged("log", logLines(sources.log, refs, year)),
-		state: tagged("state", stateLines(sources.state, sources.log, year)),
+		state: tagged("state", stateLines(sources.state, sources.log, refs, year)),
 	};
 	const text = DOCUMENT_SECTIONS.map((key) => sections[key].text).join("\n");
 	return {
@@ -486,6 +556,7 @@ export function renderNow(now: NowSources, refs: DocumentRefs): string {
 		`時刻 ${now.at.slice(0, 10)} ${now.at.slice(11, 16)}`,
 		...now.trigger.map((trigger) => `きっかけ ${triggerLine(trigger, refs)}`),
 		`話し中 ${now.speaking ?? "なし"}`,
+		...(now.viewing ? [`viewing ${now.viewing}`] : []),
 		...now.agency.map((line) => `agency ${plain(line)}`),
 		...now.records.map(
 			(block) => `資料 ${block.source}: ${referenceJson(blockFields(block))}`,

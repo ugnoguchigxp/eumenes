@@ -17,7 +17,7 @@ import type {
 	Run,
 	SpecialistPort,
 	StewardPort,
-	Viewing,
+	RunViewing,
 	WorldContextPort,
 } from "../contracts";
 
@@ -25,6 +25,7 @@ import type { MusicPort } from "../contracts/music";
 import type { ImagePort } from "../contracts/image";
 import type { ObjectRecognitionPort } from "../contracts/object-recognition";
 import type { CommandInteractions } from "./command-interactions";
+import type { ResourceAccess, ResourceLedger } from "./resource-ledger";
 export const GENERATE_KIND = "dialogue.generate";
 /** A toolchain's command sub-agent: one typed operation from the conversation's request. */
 export const COMMAND_KIND = "dialogue.toolchain_command";
@@ -148,7 +149,7 @@ export interface Accept {
 	 */
 	resume?: { interactionId: string; toolchainRevisionId: string };
 	/** The saved item the screen shows; kept with the run and shown to the main agent only if issued. */
-	viewing?: Viewing;
+	viewing?: RunViewing;
 	/** The addressee the sender saw; checked in the acceptance transaction. */
 	addressee?: Addressee;
 }
@@ -164,6 +165,10 @@ export type DialogueDeps = {
 	continuity: ContinuityService;
 	/** The conversation's TODOs and confirmations; set by `createDialogueService`. */
 	work?: import("./work-ledger").WorkLedger;
+	/** The resource registry and which kinds a toolchain makes; without it the conversation has no resources. */
+	resources?: ResourceAccess;
+	/** The conversation's resource ledger (`a<n>`); set by `createDialogueService` when `resources` is given. */
+	resourceLedger?: ResourceLedger;
 	memory?: MemoryService;
 	/** Told in the transaction in which a run ends, after its exchange is in memory's ledger. */
 	steward?: StewardPort;

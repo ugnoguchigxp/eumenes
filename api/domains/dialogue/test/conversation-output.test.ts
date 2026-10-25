@@ -14,6 +14,10 @@ for (const text of [
 	'memory ({"operation":"request"})',
 	'work\n({"operation":"check"})',
 	"<|unknown_control|>",
+	"t2を確認します。\n\n<tool_call>\n<function=state>\n<parameter=operation>\nread\n</parameter>\n</function>\n</tool_call>",
+	"<function=work>\n<parameter=todo>\nt2\n</parameter>\n</function>",
+	'表示されていますよ。\n\n<delegate>\n<parameter name="mode">execute</parameter>\n</delegate>',
+	"<work>t3</work>",
 ])
 	for (const chunkSize of [1, 3, text.length])
 		test(`control text is never published, including split delimiters: ${text.slice(0, 18)} / ${chunkSize}`, () => {
@@ -27,12 +31,26 @@ for (const text of [
 			expect(() => output.finish(text)).toThrow("control_text_in_body");
 			expect(visible.join("")).not.toContain("<|");
 			expect(visible.join("")).not.toContain("<call:");
+			expect(visible.join("")).not.toContain("<tool_call>");
+			expect(visible.join("")).not.toContain("<function=");
+			expect(visible.join("")).not.toContain("<delegate");
+			expect(visible.join("")).not.toContain("<work");
+			expect(visible.join("")).not.toContain("<parameter");
 		});
 
 test("a name that is not an offered tool is ordinary text, and is published", () => {
 	const visible: string[] = [];
 	const output = conversationOutput((s) => visible.push(s), generationTools);
 	const text = 'create_music {"question":"夜の曲"}';
+	for (const c of text) output.delta(c);
+	output.finish(text);
+	expect(visible.join("")).toBe(text);
+});
+
+test("angle brackets in ordinary prose are published", () => {
+	const visible: string[] = [];
+	const output = conversationOutput((s) => visible.push(s), generationTools);
+	const text = "1 <2 と <b> と <memory_note は普通の文です。";
 	for (const c of text) output.delta(c);
 	output.finish(text);
 	expect(visible.join("")).toBe(text);

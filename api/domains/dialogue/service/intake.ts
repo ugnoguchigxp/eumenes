@@ -1,4 +1,5 @@
 import { saveDeadlinePolicy, savePinnedToolchain } from "../repository";
+import { setRunViewingResource } from "../repository/resources";
 import { jstSeconds } from "../../../infrastructure/jst-time";
 import { getLogger } from "../../../infrastructure/logger";
 import { withAttachmentNotes } from "./attachment-context";
@@ -252,7 +253,9 @@ export function createIntake(deps: DialogueDeps) {
 			}
 			patchSession(db, addressee.id, { expiresAt: expiryAfter(now) }, now);
 		}
-		if (input.viewing) setRunViewing(db, runId, input.viewing);
+		if (input.viewing && "resource" in input.viewing)
+			setRunViewingResource(db, runId, input.viewing.resource);
+		else if (input.viewing) setRunViewing(db, runId, input.viewing);
 		recordInputInTransaction(deps, db, input, messageId, now, !!addressee);
 		// A scheduled prompt is stored as a user message but is the host's: it is never learned from.
 		if (isSystemPrompt(input.sourceKind))

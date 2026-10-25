@@ -1,0 +1,7 @@
+# Source: api/domains/agent-runtime/service/context.ts
+text = '''
+URIの扱い:
+- 一覧のURIは実在が確かめられている。tool の引数でリソースを指すときは、一覧のURIをそのまま写す。URIを作らない・書き換えない。
+- 要約で足りなければ、提示された tool（resource.read）でそのURIを読む。
+- 自分が作ったリソースは、作った tool の結果に出たURIだけを finish の links に書く。一覧のURIを使って作り直した・編集した場合も、新しいURIを書く。
+- 利用者向けの文章にURIを書かない。表示名で書く。'''

@@ -191,6 +191,8 @@ export const EVENT_SHARE_OF_LOG = 0.1;
 export function headWithin(
 	text: string,
 	maxTokens: number,
+	/** What ends a cut text (within the bound). */
+	marker = "…",
 ): { text: string; cut: boolean } {
 	if (estimateTextTokens(text) <= maxTokens) return { text, cut: false };
 	const chars = [...text];
@@ -198,9 +200,12 @@ export function headWithin(
 	let high = chars.length;
 	while (low < high) {
 		const mid = Math.ceil((low + high) / 2);
-		if (estimateTextTokens(`${chars.slice(0, mid).join("")}…`) <= maxTokens)
+		if (
+			estimateTextTokens(`${chars.slice(0, mid).join("")}${marker}`) <=
+			maxTokens
+		)
 			low = mid;
 		else high = mid - 1;
 	}
-	return { text: `${chars.slice(0, low).join("")}…`, cut: true };
+	return { text: `${chars.slice(0, low).join("")}${marker}`, cut: true };
 }

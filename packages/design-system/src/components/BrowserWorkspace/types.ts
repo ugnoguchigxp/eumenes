@@ -146,6 +146,11 @@ export type BrowserWorkspaceProps = {
 	tasks: readonly BrowserTaskItem[];
 	captures: readonly BrowserCaptureItem[];
 	selectedCaptureId?: string;
+	/**
+	 * ホストからの「この撮影を見せて」。seq が変わるたびに「撮影画像」を開き、そのcaptureを選ぶ
+	 * （onSelectCapture）。同じseqでは再適用しない。
+	 */
+	focus?: { seq: number; captureId: string };
 	/** 選択中のcaptureのプレビュー画像URL。ホストが渡す。 */
 	previewSrc?: string;
 	pending?: boolean;

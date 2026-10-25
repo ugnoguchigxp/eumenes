@@ -1,0 +1,26 @@
+{
+  "checkedAt": "2026-10-25T08:44:07.605Z",
+  "mode": "live_local_read_only",
+  "artifacts": [
+    {
+      "id": "artifact:dots.workspace@3",
+      "title": "dotsの仕事"
+    },
+    {
+      "id": "artifact:settings.dots@5",
+      "title": "dotsの設定"
+    }
+  ],
+  "settingsKeys": [
+    "enabled",
+    "connectionRef",
+    "projectRef",
+    "showInConversation",
+    "maxRuntimeSeconds",
+    "maxSessions"
+  ],
+  "revision": 0,
+  "enabled": false,
+  "removedSettingsPresent": false,
+  "dotTaskSent": false
+}

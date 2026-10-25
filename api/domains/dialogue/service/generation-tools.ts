@@ -65,6 +65,11 @@ export const delegateArgs = z.discriminatedUnion("mode", [
 			impact: z.enum(impacts),
 			inputs: z.record(z.string(), z.unknown()).optional(),
 			target: id.optional(),
+			/** The resources handed over with the request (`a<n>` of the ledger). */
+			refs: z
+				.array(z.string().regex(/^a\d+$/))
+				.max(8)
+				.optional(),
 			resolveUnsaved: z.literal("discard").optional(),
 		})
 		.strict(),
@@ -163,6 +168,9 @@ export const generationTools: NativeTool[] = [
 				description: "即答の担当の引数、またはパイプラインの入力。",
 			},
 			target: text("専門担当が開く保存済みの対象。"),
+			refs: ids(
+				"依頼に添えるリソースの番号（<state>のa1など、最大8件）。例: 「a3の画像を元に描き直して」。",
+			),
 			resolveUnsaved: choice(
 				["discard"],
 				"未保存の作業を捨ててよいと言われたとき。",

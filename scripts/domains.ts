@@ -5,6 +5,13 @@
  * allow-list in `depends`; raising a dependency means raising `tier` here.
  */
 export const domains = {
+	docling: {
+		tier: 0,
+		backend: "api/domains/docling",
+		web: "web/src/domains/docling",
+		components: "packages/design-system/src/components/ExternalAppLauncher",
+		depends: { api: [], web: [], test: [] },
+	},
 	"google-accounts": {
 		tier: 0,
 		backend: "api/domains/google-accounts",
@@ -18,8 +25,15 @@ export const domains = {
 		web: "web/src/domains/excalidraw",
 		components: null,
 		depends: {
-			api: ["capabilities", "inference", "larm", "queue", "tool-runtime"],
-			web: [],
+			api: [
+				"capabilities",
+				"inference",
+				"larm",
+				"queue",
+				"resources",
+				"tool-runtime",
+			],
+			web: ["resources"],
 			test: [],
 		},
 	},
@@ -28,7 +42,11 @@ export const domains = {
 		backend: "api/domains/ocr",
 		web: "web/src/domains/ocr",
 		components: "packages/design-system/src/components/OcrWorkspace",
-		depends: { api: ["capabilities", "inference", "queue"], web: [], test: [] },
+		depends: {
+			api: ["capabilities", "inference", "queue", "resources"],
+			web: ["resources"],
+			test: [],
+		},
 	},
 	"object-recognition": {
 		tier: 1,
@@ -42,35 +60,39 @@ export const domains = {
 		backend: "api/domains/compute",
 		web: "web/src/domains/compute",
 		components: "packages/design-system/src/components/ComputeWorkspace",
-		depends: { api: ["queue"], web: [], test: [] },
+		depends: { api: ["queue", "resources"], web: ["resources"], test: [] },
 	},
 	model3d: {
 		tier: 1,
 		backend: "api/domains/model3d",
 		web: "web/src/domains/model3d",
 		components: "packages/design-system/src/components/Model3dWorkspace",
-		depends: { api: ["queue"], web: [], test: [] },
+		depends: { api: ["queue", "resources"], web: ["resources"], test: [] },
 	},
 	browser: {
 		tier: 1,
 		backend: "api/domains/browser",
 		web: "web/src/domains/browser",
 		components: "packages/design-system/src/components/BrowserWorkspace",
-		depends: { api: ["queue"], web: [], test: [] },
+		depends: { api: ["queue", "resources"], web: ["resources"], test: [] },
 	},
 	kanban: {
 		tier: 1,
 		backend: "api/domains/kanban",
 		web: "web/src/domains/kanban",
 		components: null,
-		depends: { api: ["capabilities"], web: [], test: [] },
+		depends: {
+			api: ["capabilities", "resources"],
+			web: ["resources"],
+			test: [],
+		},
 	},
 	"codex-tasks": {
 		tier: 1,
 		backend: "api/domains/codex-tasks",
 		web: "web/src/domains/codex-tasks",
 		components: null,
-		depends: { api: ["coding"], web: [], test: [] },
+		depends: { api: ["coding", "resources"], web: [], test: [] },
 	},
 	shell: {
 		tier: 0,
@@ -99,8 +121,15 @@ export const domains = {
 		web: "web/src/domains/image",
 		components: null,
 		depends: {
-			api: ["capabilities", "inference", "larm", "queue", "tool-runtime"],
-			web: [],
+			api: [
+				"capabilities",
+				"inference",
+				"larm",
+				"queue",
+				"resources",
+				"tool-runtime",
+			],
+			web: ["resources"],
 			test: [],
 		},
 	},
@@ -110,8 +139,8 @@ export const domains = {
 		web: "web/src/domains/ui-compositions",
 		components: null,
 		depends: {
-			api: [],
-			web: [],
+			api: ["resources"],
+			web: ["resources"],
 			test: [],
 		},
 	},
@@ -121,8 +150,15 @@ export const domains = {
 		web: "web/src/domains/music",
 		components: "web/src/components/domains/music",
 		depends: {
-			api: ["capabilities", "inference", "larm", "queue", "tool-runtime"],
-			web: [],
+			api: [
+				"capabilities",
+				"inference",
+				"larm",
+				"queue",
+				"resources",
+				"tool-runtime",
+			],
+			web: ["resources"],
 			test: [],
 		},
 	},
@@ -184,7 +220,11 @@ export const domains = {
 		backend: "api/domains/pipelines",
 		web: "web/src/domains/pipelines",
 		components: "packages/design-system/src/components/PipelineStudio",
-		depends: { api: ["capabilities"], web: [], test: [] },
+		depends: {
+			api: ["capabilities", "resources"],
+			web: ["resources"],
+			test: [],
+		},
 	},
 	"tool-runtime": {
 		tier: 1,
@@ -199,7 +239,14 @@ export const domains = {
 		web: "web/src/domains/agent-runtime",
 		components: null,
 		depends: {
-			api: ["capabilities", "inference", "pipelines", "queue", "tool-runtime"],
+			api: [
+				"capabilities",
+				"inference",
+				"pipelines",
+				"queue",
+				"resources",
+				"tool-runtime",
+			],
 			web: [],
 			test: [],
 		},
@@ -216,7 +263,7 @@ export const domains = {
 		backend: "api/domains/web-research",
 		web: null,
 		components: null,
-		depends: { api: ["queue"], web: [], test: [] },
+		depends: { api: ["queue", "resources"], web: [], test: [] },
 	},
 	"attitude-dataset": {
 		tier: 1,
@@ -292,6 +339,20 @@ export const domains = {
 		web: "web/src/domains/conversation",
 		components: "web/src/components/domains/conversation",
 		depends: { api: ["delivery"], web: ["avatar", "delivery"], test: [] },
+	},
+	resources: {
+		tier: 0,
+		backend: "api/domains/resources",
+		web: "web/src/domains/resources",
+		components: null,
+		depends: { api: [], web: [], test: [] },
+	},
+	screen: {
+		tier: 1,
+		backend: "api/domains/screen",
+		web: null,
+		components: null,
+		depends: { api: ["resources"], web: [], test: [] },
 	},
 	continuity: {
 		tier: 0,
@@ -390,6 +451,7 @@ export const domains = {
 				"inference",
 				"memory",
 				"queue",
+				"resources",
 				"scheduler",
 				"toolchain-history",
 				"tool-runtime",

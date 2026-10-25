@@ -1,0 +1,10 @@
+{
+  "checkedAt": "2026-10-25T08:44:29.595Z",
+  "mode": "read-only",
+  "apiOrigin": "http://127.0.0.1:8787",
+  "service": {
+    "state": "ready",
+    "generation": 7
+  },
+  "gatewayHealth": 200
+}

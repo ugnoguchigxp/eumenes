@@ -13,7 +13,6 @@ import {
 } from "./toolchain-command";
 import type { BoundInvocation } from "./command-apply";
 import { executionSourceInTransaction } from "./execution-source";
-import type { DelegationCommand } from "../contracts/delegation";
 
 /** The existing command translator, with a real source turn and a separate child-call identity. */
 export function executionCommands(deps: DialogueDeps) {
@@ -181,12 +180,9 @@ export function executionCommands(deps: DialogueDeps) {
 		legacyAvailableInTransaction(
 			db: Database,
 			kind: "object-recognition" | "dots",
-			runId: string,
+			_runId: string,
 		) {
-			const run = byId(db, runId);
-			return kind === "object-recognition"
-				? !!deps.objectRecognition
-				: !!run && !!deps.delegation?.prepareInTransaction(db, run).available;
+			return kind === "object-recognition" ? !!deps.objectRecognition : false;
 		},
 		invokeLegacyInTransaction(
 			db: Database,
@@ -213,14 +209,6 @@ export function executionCommands(deps: DialogueDeps) {
 				);
 				return deps.objectRecognition.resultForCallInTransaction?.(db, callId);
 			}
-			if (input.backend === "dots" && deps.delegation)
-				return deps.delegation.invokeInTransaction(
-					db,
-					run,
-					command as DelegationCommand,
-					input.snapshot,
-					{ callId, deadline: child.deadline },
-				);
 			throw new Error("adapter_unavailable");
 		},
 		legacyTaskInTransaction: (

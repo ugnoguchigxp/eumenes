@@ -146,6 +146,7 @@ export type InstantRun = {
 	run(
 		args: Record<string, unknown>,
 		signal: AbortSignal,
+		context?: { conversationId: string },
 	): Promise<{ ok: true; answer: string } | { ok: false; code: string }>;
 	/** The (available) toolchain the binding names for a failed answer; null when it is not available now. */
 	fallback: {
@@ -192,7 +193,11 @@ export type BoundCommandSet = {
  */
 export interface BoundCommandPort {
 	/** Host data the command sub-agent may refer to (e.g. current timers). */
-	snapshotInTransaction(db: Database, bindingRevisionId: string): unknown;
+	snapshotInTransaction(
+		db: Database,
+		bindingRevisionId: string,
+		context?: { conversationId: string },
+	): unknown;
 	/** Validate the model's arguments for one tool of the binding against its schema. */
 	parseInvocation(
 		set: BoundCommandSet,

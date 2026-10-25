@@ -4,9 +4,10 @@ import {
 	ValidationFailure,
 	validationIssues,
 } from "../../../infrastructure/validation-log";
-import { researchInput, toolRuntimeOf } from "../../capabilities";
+import { researchInput, toolRuntimeOf, zSchema } from "../../capabilities";
 import type { Receipt, ControlContract } from "../../inference";
 import type { HandlerDefinition } from "../../queue";
+import { parseResourceUri } from "../../resources";
 import type { Source } from "../../tool-runtime";
 import type { Task } from "../contracts";
 import { requirementVerification } from "../contracts/requirements";
@@ -39,6 +40,16 @@ import { owner, active, type RuntimeContext } from "./runtime-context";
 import type { TaskOps } from "./task-ops";
 import { guidedAction, guidedWeb } from "./guided-contract";
 import { applyGuidedAction } from "./guided-step";
+import {
+	RESOURCE_READ_TOOL,
+	RESOURCE_READS_MAX,
+	checkLinks,
+	checkUriArguments,
+	loadResources,
+	readText,
+	saveResources,
+	type StoredRead,
+} from "./resource-access";
 
 export type StepInput = {
 	catalog: EvidenceCatalog;
@@ -56,12 +67,16 @@ export type StepInput = {
 	visible: Source[];
 	manifestDigest: string;
 	grants: Array<{ id: string; executionRef: string; replayOnly?: boolean }>;
+	/** The resource URIs this task may name at this step (handed to the execution or returned by its tools). */
+	resourceUris: Set<string>;
 };
 export type StepOutput = {
 	receipt: Receipt;
 	action: unknown;
 	invalid: boolean;
 	diagnostic?: LogFields;
+	/** The read a `resource.read` invocation asked for, made while the step ran (the host's port is async). */
+	resourceRead?: StoredRead;
 };
 type StepHandler = HandlerDefinition<
 	{ taskId: string; stepId: string },
@@ -100,6 +115,7 @@ function invokeStepTool(
 	input: StepInput,
 	p: NonNullable<ReturnType<RuntimeContext["state"]["prepared"]["get"]>>,
 	action: Extract<ControlAction, { action: "invoke" }>,
+	resourceRead?: StoredRead,
 ) {
 	const { tools } = ctx.deps;
 	const { catalogs, bindings } = ctx.state;
@@ -113,6 +129,16 @@ function invokeStepTool(
 		throw new ValidationFailure("invalid_tool_input", [
 			{ validationPath: "tool", validationCode: "unknown_tool" },
 		]);
+	// A URI argument is the same one the host handed over or a tool returned, never one the model wrote.
+	checkUriArguments(
+		tool.tool.schemaKey ? zSchema(tool.tool.schemaKey) : null,
+		action.arguments,
+		input.resourceUris,
+	);
+	if (tool.tool.id === RESOURCE_READ_TOOL) {
+		readResource(ctx, ops, db, t, claim, action, resourceRead);
+		return;
+	}
 	if (isHistory(p) && toolRuntimeOf(tool.tool.revisionId)?.cursorPaging) {
 		const stale = tools
 			.observationsInTransaction(db, t.id)
@@ -181,6 +207,36 @@ function invokeStepTool(
 		isSearch(toolRuntimeOf(tool.tool.revisionId)) ? "search" : "read",
 	);
 	ops.waitForTools(db, get(db, t.id)!, claim.jobId);
+}
+/**
+ * `resource.read` is answered by the host: the read was made while the step ran, and its result is kept on the
+ * task so the next step shows it. The tool never reaches the tool runtime.
+ */
+function readResource(
+	ctx: RuntimeContext,
+	ops: TaskOps,
+	db: Tx,
+	t: Task,
+	claim: Claim,
+	action: Extract<ControlAction, { action: "invoke" }>,
+	read: StoredRead | undefined,
+) {
+	const given = (action.arguments as { uri?: string }).uri;
+	const uri = given === undefined ? undefined : parseResourceUri(given)?.uri;
+	if (!ctx.deps.resources || !read || read.uri !== uri)
+		throw new Error("resource_read_unavailable");
+	const stored = loadResources(db, t.id);
+	if (stored.reads.length >= RESOURCE_READS_MAX)
+		throw new ValidationFailure("invalid_tool_input", [
+			{ validationPath: "tool", validationCode: "resource_read_limit" },
+		]);
+	saveResources(db, t.id, {
+		reads: [
+			...stored.reads.filter((r) => r.uri !== read.uri),
+			read.ok ? { ...read, text: readText(read.text) } : read,
+		],
+	});
+	ops.next(db, get(db, t.id)!, claim.jobId);
 }
 export function createStepActions(ctx: RuntimeContext, ops: TaskOps) {
 	const { store, capabilities, tools, inference, now } = ctx.deps;
@@ -278,6 +334,18 @@ export function createStepActions(ctx: RuntimeContext, ops: TaskOps) {
 			root.id !== t.parent_task_id
 		)
 			throw new Error("task_cancelled");
+		// A finish may report the resources it made; only URIs this task was handed or its tools returned count.
+		if (
+			input.mode !== "verify_requirements" &&
+			"action" in action &&
+			action.action === "finish"
+		)
+			saveResources(db, t.id, {
+				links: checkLinks(
+					"links" in action ? action.links : undefined,
+					input.resourceUris,
+				),
+			});
 		if (input.mode === "verify_requirements") {
 			const verification = requirementVerification.parse(action);
 			acceptRequirementVerification(
@@ -307,7 +375,18 @@ export function createStepActions(ctx: RuntimeContext, ops: TaskOps) {
 				input,
 				p,
 				parsed.data,
-				(action) => invokeStepTool(ctx, ops, db, t, claim, input, p, action),
+				(action) =>
+					invokeStepTool(
+						ctx,
+						ops,
+						db,
+						t,
+						claim,
+						input,
+						p,
+						action,
+						outcome.result.resourceRead,
+					),
 			);
 		} else {
 			const research = (
@@ -352,7 +431,17 @@ export function createStepActions(ctx: RuntimeContext, ops: TaskOps) {
 					},
 				]);
 			if (action.action === "invoke") {
-				invokeStepTool(ctx, ops, db, t, claim, input, p, action);
+				invokeStepTool(
+					ctx,
+					ops,
+					db,
+					t,
+					claim,
+					input,
+					p,
+					action,
+					outcome.result.resourceRead,
+				);
 			} else if (input.search) {
 				saveSearchReport(db, t, action.report, input.catalog, tools, now(), {
 					hook: ctx.deps.onSearchReport,

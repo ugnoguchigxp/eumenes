@@ -76,3 +76,28 @@ export function reference(db: Database, id: string): Reference | null {
 		)
 		.get(id) as Reference | null;
 }
+
+/**
+ * A saved drawing as a resource lists it. References carry no creation time, so `at` is the earliest
+ * `lastOperation` of the sessions opened on the drawing (null when none is left).
+ */
+export type DrawingEntry = Reference & { at: number | null };
+const ENTRY =
+	"SELECT r.id,r.conversation_id AS conversationId,r.document_id AS documentId,r.revision,r.title,(SELECT MIN(json_extract(s.record_json,'$.lastOperation')) FROM excalidraw_sessions s WHERE json_extract(s.record_json,'$.referenceId')=r.id) AS at FROM excalidraw_references r WHERE r.conversation_id=?";
+export const drawingEntry = (
+	db: Database,
+	conversationId: string,
+	id: string,
+) =>
+	db
+		.query(`${ENTRY} AND r.id=?`)
+		.get(conversationId, id) as DrawingEntry | null;
+/** The conversation's drawings, newest saved first. */
+export const drawingEntries = (
+	db: Database,
+	conversationId: string,
+	limit: number,
+) =>
+	db
+		.query(`${ENTRY} ORDER BY r.rowid DESC LIMIT ?`)
+		.all(conversationId, limit) as DrawingEntry[];

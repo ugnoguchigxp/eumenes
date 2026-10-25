@@ -9,7 +9,7 @@ import { useRef } from "react";
 import type {
 	Addressee,
 	Submit,
-	Viewing,
+	RunViewing,
 } from "../../../../../api/domains/dialogue/contracts";
 import { conversationKey } from "../../conversation";
 import { invalidateSpecialistSession } from "./specialist";
@@ -44,7 +44,7 @@ export function useSubmit(client: DialogueClient, id: string) {
 				| {
 						text: string;
 						attachmentIds: string[];
-						viewing?: Viewing;
+						viewing?: RunViewing;
 						addressee?: Addressee;
 				  },
 		) => {

@@ -1,16 +1,36 @@
 import type { KanbanBoardSource, KanbanResource } from "@eumenes/artifact-ui";
 import type { ActivityResource } from "@eumenes/artifact-ui/contracts";
 import { useQuery } from "@tanstack/react-query";
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
+import { formatResourceUri } from "../../../../api/domains/resources/contracts";
+import { focusWhenDrawn } from "../../components/domains/resource-focus";
 import { queryRoots } from "../../queryKeys";
-import type {
-	AdapterHostContext,
-	AdapterState,
-	WebArtifactAdapter,
+import {
+	createLiveScreen,
+	type AdapterHostContext,
+	type AdapterState,
+	type WebArtifactAdapter,
 } from "../toolchain-artifacts/registry";
 
 const KANBAN_ADAPTER_REF = "adapter:kanban@1";
 const DEFAULT_SOURCE = "kanban";
+/** A task card's resource id: the board's owner prefix, then the card id (the kanban resource adapter's shape). */
+const CARD_RESOURCE_PREFIX = "kanban:";
+
+/** What the mounted board shows, read through the latest render. */
+type KanbanScreen = {
+	cardIds: ReadonlySet<string>;
+	/** The card whose activity the board shows. */
+	inspectedId: string | undefined;
+	visible: boolean;
+	inspect(cardId: string): void;
+};
+const live = createLiveScreen<{ read(): KanbanScreen }>();
+
+const findCard = (cardId: string) =>
+	[...document.querySelectorAll<HTMLElement>("[data-card-id]")].find(
+		(card) => card.getAttribute("data-card-id") === cardId,
+	) ?? null;
 
 const REJECTIONS: Record<string, string> = {
 	kanban_state_invalid:
@@ -111,6 +131,18 @@ function useKanbanArtifact({
 			};
 		},
 	});
+	const cardIds = new Set(board.data?.board.cards.map((card) => card.id));
+	const screen: KanbanScreen = {
+		cardIds,
+		inspectedId: targetRef && cardIds.has(targetRef) ? targetRef : undefined,
+		visible,
+		inspect: setTargetRef,
+	};
+	const latest = useRef(screen);
+	useEffect(() => {
+		latest.current = screen;
+	});
+	useEffect(() => live.attach({ read: () => latest.current }), []);
 	const { refetch } = board;
 	const reload = useCallback(() => {
 		void refetch();
@@ -165,12 +197,38 @@ function useKanbanArtifact({
 	};
 }
 
+/** The board's part of the web adapter contract (`focus`, `viewing`), the same for both adapter versions. */
+const kanbanScreen: Pick<WebArtifactAdapter, "focus" | "viewing"> = {
+	async focus(cardId) {
+		const known = await live.waitFor((handle) =>
+			handle.read().cardIds.has(cardId),
+		);
+		if (!known) return false;
+		if (live.current()?.read().inspectedId !== cardId)
+			live.current()?.read().inspect(cardId);
+		// The card exists; marking it is best effort while the board draws it.
+		await focusWhenDrawn(() => findCard(cardId));
+		return true;
+	},
+	viewing() {
+		const screen = live.current()?.read();
+		return screen?.visible && screen.inspectedId
+			? formatResourceUri(
+					"code.task",
+					`${CARD_RESOURCE_PREFIX}${screen.inspectedId}`,
+				)
+			: null;
+	},
+};
+
 export const kanbanWebAdapter: WebArtifactAdapter = {
 	adapterRef: KANBAN_ADAPTER_REF,
 	useArtifact: useKanbanArtifact,
+	...kanbanScreen,
 };
 
 export const sharedKanbanWebAdapter: WebArtifactAdapter = {
 	adapterRef: "adapter:kanban@2",
 	useArtifact: useKanbanArtifact,
+	...kanbanScreen,
 };

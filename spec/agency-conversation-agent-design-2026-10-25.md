@@ -94,7 +94,7 @@
 
 - LLM: agency のすべての呼出し（返答・背景の `update`・自発発話の `decide`）は、Eumenes に設定されている会話の LLM を使う。別の LLM を使わない。agency は Provider を選ぶ仕組みを持たず、ホストが渡す口で呼ぶ。返答には inference と LARM の接続（ストリーミング・キャッシュ・tool呼出し。Eumenes の共通部品）を渡す。agency 専用の設定 `agency.resourceId` と、その資源を確かめて agency を止める処理（`AgencyRouteRefusedError` 等）は削除する。
 - 推論の LLM は Eumenes に設定された一つに揃える。例外は次だけ。
-  - World の記憶担当（`world.curationResourceId`、Claude Agent SDK）: **暫定で維持。** 2026-10-15 の比較でローカル LLM は記録の形式を正しく書けなかった（[検証記録](verification/world-steward-2026-10-14/README.md)）。その後に検査・指示を直した版のローカル LLM は未測定。会話エージェントと普通に会話できるようになってから、ローカル LLM で再評価して見直す（できればクラウドを使わない）。
+  - World の記憶担当: **LARM の LLM に移行（2026-10-25 決定）。** Claude Agent SDK の専用資源をやめ、`world.curationResourceId` を `null`（会話と同じ経路）にした。会話の LLM 経路もクラウドへの切り替えをやめて `larm-only`（`fallbackId: null`）にした。クラウドの資源・接続と `cloudAllowed` は残し、クラウドをメインの推論（`cloud-only`）として選ぶ道は残す。きっかけは 10/21〜10/25 の `cloud_agent_billing_error` による全件失敗。2026-10-15 の比較ではローカル LLM が記録の形式を正しく書けなかった（[検証記録](verification/world-steward-2026-10-14/README.md)）。検査・指示を直した版での LARM の出力品質は未測定なので、実データで確認する。
   - kanban・codex-tasks: Codex・Claude SDK が担当しうる。
 - Web 検索の担当（`web.search`・`web.service-search`）、ほかのサブエージェント、Webページの本文の確認（`web-content-review.ts`）は Eumenes の LLM を使い、`subagent.resourceId` を削除する。
 - 発話はストリーミングで返し、現行の音声の処理（句読点単位で音声を生成して順に再生する）をそのまま使う。

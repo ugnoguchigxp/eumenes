@@ -7,6 +7,10 @@ export function createTaskReportDelivery(
 	reports: TaskReports,
 	tasks: TasksService,
 	conversation: ConversationService,
+	shouldDeliver: (
+		db: Database,
+		task: NonNullable<ReturnType<TasksService["getInTransaction"]>>,
+	) => boolean = () => true,
 ) {
 	return (db: Database) => {
 		for (const r of reports.pendingInTransaction(db, 50)) {
@@ -20,6 +24,10 @@ export function createTaskReportDelivery(
 				t.executionGeneration !== r.executionGeneration
 			) {
 				reports.deliveredInTransaction(db, r.id);
+				continue;
+			}
+			if (!shouldDeliver(db, t)) {
+				reports.suppressInTransaction(db, r.id);
 				continue;
 			}
 			conversation.appendInTransaction(db, {

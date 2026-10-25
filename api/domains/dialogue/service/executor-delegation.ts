@@ -1,6 +1,11 @@
 import type { Database } from "bun:sqlite";
 import { isSystemPrompt } from "../contracts";
 import { saveAnnouncement } from "../repository";
+import {
+	confirmationResourceUris,
+	saveConfirmationRefs,
+} from "../repository/resources";
+import { referencesOfUris, resolveDelegateRefs } from "./delegate-refs";
 import { heardOf } from "./event-fields";
 import type { ToolOutcome } from "./generation-loop";
 import {
@@ -115,11 +120,20 @@ export async function handOver(
 					? { resolveUnsaved: chosen.resolveUnsaved }
 					: {}),
 				...(chosen.inputs ? { inputs: chosen.inputs } : {}),
-				references: [],
+				references: chosen.references ?? [],
 			});
 			// A refused dispatch rolls everything of this step back; the model is told why.
 			if (!dispatched.ok) throw new HandoverRefused(dispatched.code);
 			acceptHere(x, tx, dispatched);
+			// The resources handed over were used now: they move to the top of the state's list.
+			for (const uri of chosen.refUris ?? []) {
+				const used = deps.resourceLedger?.byUriInTransaction(
+					tx,
+					run.conversationId,
+					uri,
+				);
+				if (used) deps.resourceLedger!.touchInTransaction(tx, used.id);
+			}
 			const work = dispatched.session
 				? null
 				: deps.work!.startInTransaction(tx, {
@@ -201,6 +215,9 @@ export function confirm(
 			},
 			origin,
 		);
+		// The resources named with the request are handed over as they were when it is approved.
+		if (chosen.refUris?.length)
+			saveConfirmationRefs(tx, row.id, chosen.refUris);
 		handle(tx);
 		acted(tx, `confirm:${chosen.card.id}`, {
 			action: "confirm",
@@ -240,10 +257,20 @@ export async function delegate(
 					reason: "announcement_required",
 				},
 			]);
+		// The resources named when it was issued must still be there (held in the ledger and at their owner).
+		const refs = approved.request.refUris ?? [];
+		const references = await referencesOfUris(
+			deps,
+			x.input.conversationId,
+			refs,
+			signal,
+		);
+		if (!references)
+			return { result: { delegated: false, code: "resource_unavailable" } };
 		return handOver(
 			x,
 			call,
-			{ ...approved.request, announcement: args.announcement },
+			{ ...approved.request, references, announcement: args.announcement },
 			signal,
 		);
 	}
@@ -272,9 +299,16 @@ export async function delegate(
 			);
 		inputs = parsed.value;
 	}
+	const { uris, references } = await resolveDelegateRefs(
+		deps,
+		x.input.conversationId,
+		args.refs,
+		signal,
+	);
 	const chosen = {
 		card,
 		request: args.request,
+		...(uris.length ? { references, refUris: uris } : {}),
 		...(inputs ? { inputs } : {}),
 		...(args.target ? { target: args.target } : {}),
 		...(args.resolveUnsaved ? { resolveUnsaved: args.resolveUnsaved } : {}),
@@ -374,6 +408,7 @@ export function approval(
 			request: row.request,
 			...(row.inputs ? { inputs: row.inputs } : {}),
 			confirmationId: row.id,
+			refUris: confirmationResourceUris(db, row.id),
 		},
 	};
 }

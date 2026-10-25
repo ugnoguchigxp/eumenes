@@ -47,6 +47,8 @@ export function createToolchainHostLinks(services: {
 	inference: InferenceAdapterPorts & { usagePage: RecordsPorts["usagePage"] };
 	conversation: ConversationService;
 	dotsMessages?: import("../work/dots-messages").DotsMessages;
+	dotsWork?: import("../work/dots-work").DotsWork;
+	dotsConfiguration?: import("../work/dots-tasks").DotsTasks["config"];
 	googleAccounts?: import("../../domains/google-accounts").GoogleAccounts;
 	ttsDictionary?: TtsDictionaryPorts;
 	memory?: MemoryAdapterPorts["memory"] &
@@ -91,6 +93,8 @@ export function createToolchainHostLinks(services: {
 			inference,
 			googleAccounts: services.googleAccounts,
 			dotsMessages: services.dotsMessages,
+			dotsWork: services.dotsWork,
+			dotsConfiguration: services.dotsConfiguration,
 			ttsDictionary: services.ttsDictionary,
 			memory: services.memory
 				? { memory: services.memory, steward: services.steward }
@@ -136,6 +140,7 @@ export async function createHostToolchain(
 		queue: QueueService;
 		uiCompositions?: UiCompositionsService;
 		ocr?: import("../../domains/ocr").OcrService;
+		docling?: import("../../domains/docling").DoclingService;
 		compute?: import("../../domains/compute").ComputeService;
 		model3d?: import("../../domains/model3d").Model3dService;
 		browser?: import("../browser/browser-composition").BrowserAssembly;
@@ -146,6 +151,8 @@ export async function createHostToolchain(
 		history?: boolean;
 		webResearchEnabled?: boolean;
 		embed?: Embed;
+		/** The registry, ledger and screen commands, reached once the dialogue exists. */
+		resources?: import("../resources/late").LateResources;
 		/** This server's loopback URL for Claude Code hooks, and the change publisher. */
 		terminalHooks?: { baseUrl: string; publish: () => void };
 	},
@@ -181,6 +188,7 @@ export async function createHostToolchain(
 			timers: s.timers,
 			uiCompositions: s.uiCompositions,
 			ocr: s.ocr,
+			docling: s.docling,
 			model3d: s.model3d,
 			compute: s.compute,
 			browser: s.browser,
@@ -199,6 +207,7 @@ export async function createHostToolchain(
 			weather: {},
 			stock: {},
 			embed: s.embed,
+			...(s.resources ? { resources: s.resources } : {}),
 		},
 	);
 	loadedCapabilities = toolchain.capabilities;

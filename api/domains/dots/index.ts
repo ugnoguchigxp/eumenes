@@ -1,5 +1,12 @@
 export { migrations } from "./repository";
 export { createConfiguration } from "./service/configuration";
+export { createWorkSettings } from "./service/work-settings";
+export {
+	workOperation,
+	putWorkOperation,
+	purgeWorkOperations,
+} from "./repository/work";
+export * from "./contracts/work-settings";
 export { createCommands } from "./service/commands";
 export { createInbox } from "./service/inbox";
 export { createEvents } from "./service/events";

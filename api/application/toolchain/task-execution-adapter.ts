@@ -18,11 +18,10 @@ export const describeTaskAdapter = () => ({
 	task: true,
 });
 
-const SUMMARY_CHARS = 200;
 /** A ledger TODO as the page read returns it (the dialogue ledger owns the record). */
 export type LedgerWorkRow = {
 	id: string;
-	title: string;
+	request: string;
 	status: "todo" | "waiting" | "done";
 	outcome: TodoPage["rows"][number]["outcome"];
 	question: string | null;
@@ -43,13 +42,8 @@ export type TodoPageReader = (
 	counts: TodoPage["counts"];
 };
 
-const oneLine = (text: string) => {
-	const flat = text.replace(/\s+/g, " ").trim();
-	return flat.length > SUMMARY_CHARS
-		? `${flat.slice(0, SUMMARY_CHARS - 1)}…`
-		: flat;
-};
-/** What the screen says of a TODO's result: the open question, or the result's own summary line; never its body. */
+const oneLine = (text: string) => text.replace(/\s+/g, " ").trim();
+/** What the screen says of a TODO's result: the open question, or the result's own summary, in full; never its body. */
 function summaryOf(row: LedgerWorkRow): string | null {
 	if (row.status === "waiting")
 		return row.question ? oneLine(row.question) : null;
@@ -103,7 +97,7 @@ export function createTaskAdapter(
 			const data = read(tx, conversationId, page);
 			const rows = data.rows.map((row) => ({
 				id: row.id,
-				title: row.title,
+				request: oneLine(row.request),
 				status: row.status,
 				outcome: row.outcome,
 				summary: summaryOf(row),

@@ -1,0 +1,9 @@
+Use case: ui-mockup. Edit the supplied settings concept, retaining its dark charcoal/navy palette, cyan accents, green connection indicators and Japanese typography, but FIX THE EMBEDDING AND LAYOUT.
+The settings screen is INSIDE Eumenes' EXISTING ARTIFACT PANEL, not an independent app and not a full-width settings website. Remove the internal left navigation sidebar completely and remove the 2x2 desktop card grid.
+Show one Eumenes desktop window approximately 1440x1080. Left half is the existing quiet conversation: "Eumenes" heading, a fictional short message about saving the connection settings, and the ordinary conversation composer at bottom. Right half is the artifact area, separated by a subtle draggable divider. Do not add a global app sidebar.
+The right area has one tab "dotsの設定" with close icon. The panel body is about 650 pixels wide and SINGLE COLUMN, with internal vertical scrolling. Top: back link "仕事へ戻る" and short heading "dotsの設定". Below are FOUR COMPACT VERTICALLY STACKED SECTIONS, each using the same small card style.
+Section "接続": "セバスチャン", green "接続済み", small "接続を確認" button, and helper "再起動後も同じ接続を使います". A collapsed "詳細設定" line, no raw URLs or secret fields.
+Section "作業先": a dropdown "クラウドで続行", a second dropdown "登録済みの作業環境", helper "PCを閉じても作業を続けます", and concise permission chips "調査 / 編集 / 検証". No wide two-column radio-card layout.
+Section "担当と手順": a dropdown "dots依頼担当" and a small "手順を見る" text link.
+Section "受取と同期": two on switches "起動時に結果を受け取る" and "結果を会話に表示". Helper "設定はこのPCに保存されます".
+Keep a sticky bottom draft bar INSIDE THE ARTIFACT ONLY: "未保存 2件", secondary "破棄", primary "保存". Do not add a whole-app settings footer. All settings are fictional. No database terminology, no raw IDs, no credential values, no model names. Prioritize a usable narrow artifact pane and correct visual hierarchy.

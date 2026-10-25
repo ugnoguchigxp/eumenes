@@ -23,7 +23,7 @@ const outcomeLabels: Record<
 	cancelled: "取消",
 	interrupted: "中断",
 };
-/** A ledger row as the table shows it: the title, its state, and one line of outcome and summary. */
+/** A ledger row as the table shows it: the whole request, its state, and its outcome with the result summary. */
 function rowOf(
 	row: TodoPage["rows"][number],
 ): TodoResource["page"]["rows"][number] {
@@ -34,7 +34,7 @@ function rowOf(
 	].filter(Boolean);
 	return {
 		id: row.id,
-		request: row.title,
+		request: row.request,
 		state: row.archived ? "archived" : row.status === "done" ? "done" : "todo",
 		pipeline: row.pipeline,
 		resultSummary: note.length ? note.join("：") : null,

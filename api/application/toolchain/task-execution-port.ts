@@ -37,6 +37,8 @@ export type TaskExecutionHost = {
 	legacy?: import("./task-legacy-execution").TaskLegacyPorts;
 	browser?: import("../../domains/browser").BrowserService;
 	childOperations?: import("../../domains/tool-runtime").ChildOperationPort;
+	/** Resolves the `resource` references handed to sub-agents (absent: such a reference is invalid). */
+	resources?: import("../../domains/resources").ResourceRegistry;
 };
 
 /**

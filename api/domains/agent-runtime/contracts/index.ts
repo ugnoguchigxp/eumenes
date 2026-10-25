@@ -172,6 +172,8 @@ export type Task = {
 	acquisition_binding_json?: string | null;
 	// Added by controlRepairMigration: sanitized path/code of the last rejection.
 	control_repair_json?: string | null;
+	// Added by resourcesMigration: the resources read and the links accepted (service/resource-access).
+	resources_json?: string | null;
 };
 export type TaskDto = {
 	id: string;

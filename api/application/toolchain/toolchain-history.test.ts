@@ -64,6 +64,7 @@ test("every builtin and bundled toolchain registers as a complete set with flat 
 		"browser",
 		"compute",
 		"shell",
+		"resources",
 	]);
 	const active = store.read((db) => capabilities.toolchainsInTransaction(db));
 	expect(active.map((d) => d.functionName).sort()).toEqual(

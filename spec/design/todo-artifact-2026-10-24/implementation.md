@@ -136,3 +136,30 @@ artifact全体gateの既存行数超過・レイアウト期待値不一致は�
 全試験を揃えた後、Tabsの標準Contentを使って選択タブと表の関連付けも確認した。以後のverify・ブラウザ試験・ビルドはこの最終コードを対象に成功。共有DesignSystemビルドとブラウザ・Webビルドは重ねていない。製品DBへの書込みと稼働サーバーの起動・停止・再起動は未実施で、稼働画面への反映は未確認。表示専用のため実LLM・実機器・自然言語受入は対象外。artifact全体gateの既存不整合は前節の通りで、本変更では修正していない。
 
 今回のcontext_compile/compile_evalは各1回、会話全体では各3回。評価保存済み（runId `00000000-0000-0000-18e1-4e5d1e271ce5`）。残る実装作業なし。
+
+## 稼働画面で動かない不具合の修正（2026-10-25）
+
+利用者の報告: TODOアーティファクトが全く機能しない（エージェント間のTODOは機能している）。
+
+| 原因 | 根拠 | 修正 |
+| --- | --- | --- |
+| 稼働DBに途中版の `artifact:agency.todos@1`・`schema:todo-screen-query@1` が登録済みで、現行bundleと内容が違う | 起動ログ `capability.bundle_skipped`（`agency-todos-screen.bundle.json`, `revision_conflict`）。保存済みの `state` は `todo/done/archived` のみ、操作は `todo-state` | 既存revisionを書き換えず、`artifact:agency.todos@2`・`schema:todo-screen-query@2` を公開する。`todo-screen-view@1`・`todo-screen-page@1` は据え置き |
+| 画面が `state: "active"` を送り、旧schemaで拒否される | `GET /api/toolchain-artifacts/:artifactRevisionId/sources/:source` が毎回400 | 上記の新revisionで解消 |
+| 依頼が60字、結果が200字で切られる（本書の「依頼と結果を省略しない」に反する） | ledgerの `title` と `SUMMARY_CHARS` を画面に使っていた | 画面の行は `request`（依頼の全文、空白だけ1行に整える）と結果のsummary全文。結果本体は引き続き出さない |
+| todo・doneの並びが更新日時順（本書の「依頼の作成順・降順」に反する） | `workPage` が active でも `updated_at` 順 | active は `created_at DESC, id DESC`。todo/done単独は更新順、archived は解除順のまま |
+| 完了済みの結果が、エージェントの読む「今の結果」と食い違う（報告後の取消など） | 画面は記録時の結果、`todosInTransaction` は再読込 | `todoPageInTransaction` も同じ再読込を使う（読めないときは記録済みの結果） |
+
+ブラウザ試験の固定応答が旧APIの行（`status: "deciding"`・`resultSummary` 等）のままで、現行 `todoPageSchema` では取得失敗になる形だったため、現行契約へ合わせた。
+
+| 確認 | 結果 |
+| --- | --- |
+| 稼働DBのコピーへのbundle投入 | 成功。公開ポインタが `artifact:agency.todos@2` へ進む。再投入は変更なし。稼働DBには書き込んでいない |
+| bundle dry-run | issueなし |
+| ledgerのページ（新規） | 1成功。依頼全文、新しい依頼が先、archived分離 |
+| TODO source・Web adapter・ランチャー | 3成功・4成功 |
+| dialogue・agent-runtime・capabilities・toolchain のBun試験 | 742成功・1失敗。失敗は並行作業の `dots.delegate` が候補に加わった `toolchain-history.test.ts` の期待値で、TODOとは無関係 |
+| 変更ファイルの整形・lint・型 | 成功。全体の型確認には並行作業のdots関連3ファイルのエラーが残る |
+| `verify --domain agent-runtime --domain capabilities --domain dialogue` | 並行作業のdots関連10ファイルの整形で停止。全体gateは未完了 |
+| TODOブラウザ通し | 未実施。並行作業の `work-components.tsx` が DesignSystem dist に未収録の export を参照し、fixtureのビルドで停止 |
+
+稼働画面への反映には、サーバー再起動（起動時のbundle登録）が必要。再起動は実施していない。

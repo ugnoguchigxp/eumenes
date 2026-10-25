@@ -32,3 +32,8 @@ export {
 	finishWorkspaceReleaseInTransaction,
 	markWorkspaceUnknownInTransaction,
 } from "./repository/workspace-guard";
+export {
+	CODE_TASK_RESOURCE_KIND,
+	createKanbanResourceAdapter,
+	KANBAN_RESOURCE_PREFIX,
+} from "./service/resource-adapter";

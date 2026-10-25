@@ -76,7 +76,10 @@ export function SettingsSectionView({
 				blocked={resource.blocked}
 				message={resource.message}
 				supplement={supplement}
-				hideFooter={hideFooter}
+				hideFooter={
+					hideFooter ||
+					(request.view === "settings-section" && request.footer === false)
+				}
 				onChange={inputs.change}
 				onReview={() => action.send("settings-review")}
 				onApply={() => action.send("settings-apply")}

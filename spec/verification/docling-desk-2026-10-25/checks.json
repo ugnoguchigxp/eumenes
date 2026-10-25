@@ -1,0 +1,47 @@
+{
+  "fixture": {
+    "bun": {
+      "pass": 10,
+      "fail": 0,
+      "assertions": 70
+    },
+    "web": {
+      "pass": 4,
+      "fail": 0
+    },
+    "designSystem": {
+      "pass": 1,
+      "fail": 0
+    },
+    "browser": {
+      "pass": 3,
+      "fail": 0
+    }
+  },
+  "consumers": {
+    "domains": [
+      "settings",
+      "capabilities",
+      "tool-runtime",
+      "agent-runtime",
+      "dialogue"
+    ],
+    "bun": {
+      "pass": 712,
+      "fail": 0,
+      "files": 116
+    },
+    "web": {
+      "pass": 38,
+      "fail": 0,
+      "files": 8
+    }
+  },
+  "bundleCheck": "pass",
+  "doclingDomainVerify": "pass",
+  "consumerVerify": "blocked_by_settings_test_size",
+  "artifactVerify": "blocked_by_shared_artifact_file_sizes",
+  "allVerify": "blocked_by_dots_test_boundary",
+  "contextCompileTotal": 3,
+  "compileEvalTotal": 3
+}

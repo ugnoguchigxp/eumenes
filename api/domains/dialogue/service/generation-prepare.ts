@@ -47,6 +47,7 @@ import { acceptRunAnswer, endRun } from "./run-end";
 import type { WorkRow } from "../repository/work";
 import { hostTextBlock } from "./context-blocks";
 import { specialistWorkBlock, viewingBlock } from "./specialist-context";
+import { viewingLineInTransaction } from "./resource-context";
 import { worldNamesBlock } from "./topic-texts";
 
 const log = getLogger("dialogue");
@@ -389,6 +390,8 @@ export function createPrepare(
 		].filter((block): block is ContextBlock => !!block);
 		// The background calls on this conversation render the same document (conversation-prefix.ts): the profile
 		// limit is the one they use too, so their prefix is this one while nothing changes.
+		// A resource on screen joins the ledger before the document is drawn, so its line is among the resources.
+		const viewing = viewingLineInTransaction(deps, tx, current);
 		const { document, refs, todos, logged, adopted } =
 			conversationDocumentInTransaction(deps, tx, conversationId, {
 				window,
@@ -398,6 +401,7 @@ export function createPrepare(
 		const now = fitNow(
 			{
 				at: jstSeconds(nowMs),
+				...(viewing ? { viewing } : {}),
 				trigger: triggerOf(
 					current,
 					pending,

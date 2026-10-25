@@ -1,0 +1,181 @@
+{
+  "schemaVersion": 1,
+  "runId": "2026-10-25T08-08-32-033Z-55cb9f39-2762-48d7-a2fa-0c66734cd380",
+  "startedAt": "2026-10-25T08:08:32.033Z",
+  "scope": {
+    "all": false,
+    "selected": [
+      "dots"
+    ]
+  },
+  "baseCommit": "a004aaad750e82abaa4119e93c5d22720628804e",
+  "revision": "0c9deae65ac3052f28e5614fa6068d20971c96bd1fbca7f87ec98da1ddefab9e",
+  "runtime": {
+    "bun": "1.4.3",
+    "node": "26.3.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "ci": false,
+    "runner": null
+  },
+  "result": "invalidated",
+  "steps": [
+    {
+      "name": "inventory",
+      "status": "pass",
+      "ms": 81
+    },
+    {
+      "name": "boundaries",
+      "status": "pass",
+      "ms": 68
+    },
+    {
+      "name": "system-context",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "context:check"
+      ],
+      "status": "pass",
+      "ms": 229,
+      "exitCode": 0
+    },
+    {
+      "name": "size-budget",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "scripts/size-budget.ts",
+        "api/domains/dots",
+        "web/src/domains/dots"
+      ],
+      "status": "pass",
+      "ms": 342,
+      "exitCode": 0
+    },
+    {
+      "name": "format",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "format:check",
+        "api/domains/dots",
+        "web/src/domains/dots"
+      ],
+      "status": "pass",
+      "ms": 138,
+      "exitCode": 0
+    },
+    {
+      "name": "lint",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "lint",
+        "api/domains/dots",
+        "web/src/domains/dots"
+      ],
+      "status": "pass",
+      "ms": 127,
+      "exitCode": 0
+    },
+    {
+      "name": "design-system typecheck",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "--cwd",
+        "packages/design-system",
+        "typecheck"
+      ],
+      "status": "pass",
+      "ms": 508,
+      "exitCode": 0
+    },
+    {
+      "name": "design-system build",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "--cwd",
+        "packages/design-system",
+        "build"
+      ],
+      "status": "pass",
+      "ms": 7648,
+      "exitCode": 0
+    },
+    {
+      "name": "typecheck configuration",
+      "status": "pass",
+      "ms": 1
+    },
+    {
+      "name": "typecheck",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "check",
+        "-p",
+        "/Users/y.noguchi/Code/eumenes/verification-reports/runs/2026-10-25T08-08-32-033Z-55cb9f39-2762-48d7-a2fa-0c66734cd380/tsconfig.selected.json"
+      ],
+      "status": "pass",
+      "ms": 341,
+      "exitCode": 0
+    },
+    {
+      "name": "typecheck closure",
+      "status": "pass",
+      "ms": 150
+    },
+    {
+      "name": "bun tests",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "test",
+        "./api/domains/dots/contracts/reports.test.ts",
+        "./api/domains/dots/repository/sessions.test.ts",
+        "./api/domains/dots/test/commands.test.ts",
+        "./api/domains/dots/test/configuration.test.ts",
+        "./api/domains/dots/test/events.test.ts",
+        "./api/domains/dots/test/inbox.test.ts",
+        "./api/domains/dots/test/messaging-contracts.test.ts",
+        "./api/domains/dots/test/messaging-migration.test.ts",
+        "./api/domains/dots/test/relay-contract.test.ts",
+        "./api/domains/dots/test/secret-box.test.ts",
+        "./api/domains/dots/test/storage.test.ts",
+        "./api/domains/dots/test/work-settings.test.ts"
+      ],
+      "status": "pass",
+      "ms": 1121,
+      "exitCode": 0
+    },
+    {
+      "name": "web tests",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "x",
+        "--no-install",
+        "vitest",
+        "run",
+        "web/src/domains/dots/toolchain-adapter.test.tsx",
+        "web/src/domains/dots/work-adapter.test.tsx"
+      ],
+      "status": "pass",
+      "ms": 1669,
+      "exitCode": 0
+    }
+  ],
+  "totalMs": 13028,
+  "integrityErrors": [
+    "Source changed during verification"
+  ],
+  "build": {
+    "sharedOutput": true,
+    "inputRevision": "0c9deae65ac3052f28e5614fa6068d20971c96bd1fbca7f87ec98da1ddefab9e",
+    "distAfterBuild": "6336728225f59cb1632f0a8639bfa95902453f485ae0af8b128005cd6730df5a",
+    "distAfterConsumers": "6336728225f59cb1632f0a8639bfa95902453f485ae0af8b128005cd6730df5a"
+  },
+  "finalRevision": "b4e4bf9eabe71e19326c79048cc2b9f1626e134b0246a378f89edd213b88b8b9",
+  "stopReason": "Source changed during verification",
+  "finishedAt": "2026-10-25T08:08:45.706Z"
+}

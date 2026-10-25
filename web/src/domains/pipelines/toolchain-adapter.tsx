@@ -6,9 +6,14 @@ import type {
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
+import { formatResourceUri } from "../../../../api/domains/resources/contracts";
+import { focusWhenDrawn } from "../../components/domains/resource-focus";
 import { queryRoots } from "../../queryKeys";
 import { usePipelineLibrary } from "./use-pipeline-library";
-import type { WebArtifactAdapter } from "../toolchain-artifacts/registry";
+import {
+	createLiveScreen,
+	type WebArtifactAdapter,
+} from "../toolchain-artifacts/registry";
 import {
 	type BridgeResult,
 	useSpecialistBridge,
@@ -17,6 +22,20 @@ import {
 const PIPELINES_ADAPTER_REF = "adapter:pipelines@1";
 /** The studio's artifact id, as a launcher or a navigation names it. */
 export const PIPELINE_STUDIO_ARTIFACT_ID = "pipeline.studio";
+
+/** What the mounted studio shows, read through the latest render. */
+type StudioScreen = {
+	/** The published pipeline's toolchain id the studio shows, or "" for the current draft. */
+	targetRef: string;
+	/** The studio has read the work for `targetRef`. */
+	loaded: boolean;
+	/** The work the studio shows (the resource's id), if any. */
+	workRef: string | undefined;
+	historyIds: ReadonlySet<string>;
+	visible: boolean;
+	show(targetRef: string): void;
+};
+const live = createLiveScreen<{ read(): StudioScreen }>();
 
 const issueSchema = z.object({
 	pointer: z.string(),
@@ -187,6 +206,19 @@ export const pipelinesWebAdapter: WebArtifactAdapter = {
 		const refresh = () => {
 			void cache.invalidateQueries({ queryKey: root });
 		};
+		const screen: StudioScreen = {
+			targetRef: targetRef ?? "",
+			loaded: !!studio.data && parsed.success,
+			workRef: work?.workRef,
+			historyIds: new Set(history.map((entry) => entry.toolchainId)),
+			visible,
+			show: (target) => setTargetRef(target || undefined),
+		};
+		const latest = useRef(screen);
+		useEffect(() => {
+			latest.current = screen;
+		});
+		useEffect(() => live.attach({ read: () => latest.current }), []);
 		/** Runs one trial of the current draft; the screen shows it pending, then its result. */
 		const runTrial = async (
 			start: Trial,
@@ -370,5 +402,32 @@ export const pipelinesWebAdapter: WebArtifactAdapter = {
 				return `${reason}（${code}${detail ? `・${detail}` : ""}）。`;
 			},
 		};
+	},
+	async focus(target) {
+		const mounted = await live.waitFor(
+			(handle) => handle.read().loaded && handle.read(),
+		);
+		if (!mounted) return false;
+		// A published pipeline must be one the studio lists; "" is the current draft.
+		if (target && !mounted.historyIds.has(target)) return false;
+		if (mounted.targetRef !== target) mounted.show(target);
+		const shown = await live.waitFor(
+			(handle) =>
+				handle.read().targetRef === target &&
+				handle.read().loaded &&
+				handle.read().workRef,
+		);
+		if (!shown) return false;
+		// The work exists; marking it is best effort while the studio draws it.
+		await focusWhenDrawn(() =>
+			document.querySelector<HTMLElement>(".pipeline-studio"),
+		);
+		return true;
+	},
+	viewing() {
+		const screen = live.current()?.read();
+		return screen?.visible && screen.loaded && screen.workRef
+			? formatResourceUri("pipeline", screen.workRef)
+			: null;
 	},
 };

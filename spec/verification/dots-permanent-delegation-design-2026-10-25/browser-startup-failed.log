@@ -1,0 +1,30 @@
+
+Running 1 test using 1 worker
+
+(node:11057) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  1 tests/browser/dots-delegation.spec.ts:80:1 › one registered artifact supports menu selection, saved results, answers, stop and persisted settings (0ms)
+
+
+  1) tests/browser/dots-delegation.spec.ts:80:1 › one registered artifact supports menu selection, saved results, answers, stop and persisted settings 
+
+    Error: dots_fixture_not_ready
+
+       at fixture.ts:129
+
+      127 | 			await sleep(intervalMs);
+      128 | 		}
+    > 129 | 		throw new Error(options.message);
+          | 		      ^
+      130 | 	}
+      131 |
+      132 | 	/** Waits until `url` answers with a non-5xx status. */
+        at Object.waitUntil (/Users/y.noguchi/Code/eumenes/tests/browser/fixture.ts:129:9)
+        at /Users/y.noguchi/Code/eumenes/tests/browser/dots-delegation.spec.ts:62:2
+
+    Error Context: test-results/dots-delegation-one-regist-228c0-stop-and-persisted-settings/error-context.md
+
+    Error Context: test-results/dots-delegation-one-regist-228c0-stop-and-persisted-settings/error-context.md
+
+  1 failed
+    tests/browser/dots-delegation.spec.ts:80:1 › one registered artifact supports menu selection, saved results, answers, stop and persisted settings 

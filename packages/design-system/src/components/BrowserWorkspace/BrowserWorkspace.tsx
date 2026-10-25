@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Button } from "../Button";
 import { Input } from "../Input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../Tabs";
@@ -34,6 +34,21 @@ export function BrowserWorkspace(props: BrowserWorkspaceProps) {
 	const [activeView, setActiveView] = useState("operation");
 	const [submitted, setSubmitted] = useState(false);
 	const { connection, availability, pending, tabs, tasks, captures } = props;
+	const focusSeq = props.focus?.seq;
+	const focusCaptureId = props.focus?.captureId;
+	const selectCapture = useRef(props.onSelectCapture);
+	useEffect(() => {
+		selectCapture.current = props.onSelectCapture;
+	});
+	const [shownFocus, setShownFocus] = useState<number>();
+	if (focusSeq !== shownFocus) {
+		setShownFocus(focusSeq);
+		if (focusSeq !== undefined) setActiveView("captures");
+	}
+	useEffect(() => {
+		if (focusSeq !== undefined && focusCaptureId)
+			selectCapture.current(focusCaptureId);
+	}, [focusSeq, focusCaptureId]);
 	const connected = connection.state === "connected";
 	const disabled = !availability.available || pending;
 	const problem = submitted ? urlProblem(url) : undefined;

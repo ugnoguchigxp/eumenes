@@ -1,0 +1,6 @@
+[data-resource-focus="true"] {
+	outline: 3px solid var(--primary);
+	outline-offset: 3px;
+	border-radius: var(--radius, 0.5rem);
+	transition: outline-color 0.3s ease;
+}

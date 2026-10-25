@@ -1,0 +1,5 @@
+$ bun scripts/toolchain-bundle.ts check api/domains/capabilities/bundles/dots-delegation.bundle.json --json
+{
+	"issues": [],
+	"registered": []
+}

@@ -1,3 +1,4 @@
+import { doclingSettings } from "./docling";
 import {
 	browserBridgeSettings,
 	storedBridgeCiphertext,
@@ -228,6 +229,7 @@ export async function createSettings(
 		...localServiceSettings(store, encrypt, decrypt),
 		...objectRecognitionSettings(store, encrypt, decrypt, env),
 		...ocrSettings(store, env),
+		...doclingSettings(store, env),
 		get: () => store.read(read),
 		inTransaction: read,
 		credential: (c: Connection) => store.read((db) => credential(db, c)),

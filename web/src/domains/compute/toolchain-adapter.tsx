@@ -4,12 +4,50 @@ import type {
 	Receipt,
 } from "@eumenes/artifact-ui/contracts";
 import { computeJobView } from "../../../../client/compute";
-import type { WebArtifactAdapter } from "../toolchain-artifacts/registry";
+import { formatResourceUri } from "../../../../api/domains/resources/contracts";
+import { focusWhenDrawn } from "../../components/domains/resource-focus";
+import {
+	createLiveScreen,
+	type WebArtifactAdapter,
+} from "../toolchain-artifacts/registry";
 import { z } from "zod";
+
+export const COMPUTE_ADAPTER_REF = "adapter:compute@1";
+
+/** What the mounted compute screen holds, read through the latest render. */
+type ComputeScreen = {
+	jobIds: ReadonlySet<string>;
+	visible: boolean;
+	show(jobId: string): void;
+};
+const live = createLiveScreen<{ read(): ComputeScreen }>();
+
+/** The job's result card on the open screen (the "result" tab), else its row in the library. */
+function findJobElement(jobId: string): HTMLElement | null {
+	const id = [
+		...document.querySelectorAll<HTMLElement>(
+			".compute-workspace article span",
+		),
+	].find((span) => span.getAttribute("title") === jobId);
+	if (id) return id.closest<HTMLElement>("article");
+	const name = `計算 ${jobId.slice(0, 8)}`;
+	const row = [
+		...document.querySelectorAll<HTMLElement>(".compute-workspace tbody th"),
+	].find((cell) => cell.textContent === name);
+	return row?.closest<HTMLElement>("tr") ?? null;
+}
+
+/** The job the open screen's result card shows now. */
+function shownJobId(): string | null {
+	const id = document.querySelector<HTMLElement>(
+		".compute-workspace article [aria-label^='計算ID ']",
+	);
+	return id?.getAttribute("title") ?? null;
+}
 
 /** Blob URLs are runtime resources. The bundle holds only a source name. */
 export const computeWebAdapter: WebArtifactAdapter = {
-	adapterRef: "adapter:compute@1",
+	adapterRef: COMPUTE_ADAPTER_REF,
 	useArtifact({ client, artifactRevisionId, visible }) {
 		const [data, setData] = useState<ComputeWorkspaceResource>({
 			kind: "compute",
@@ -21,6 +59,18 @@ export const computeWebAdapter: WebArtifactAdapter = {
 			[error, setError] = useState(false);
 		const urls = useRef(new Map<string, string>()),
 			epoch = useRef(0);
+		// A job the conversation asked to show; it takes the screen's selection (the view remounts on it).
+		const [focusedJobId, setFocusedJobId] = useState<string>();
+		const screen: ComputeScreen = {
+			jobIds: new Set(data.jobs.map((job) => job.id)),
+			visible,
+			show: setFocusedJobId,
+		};
+		const latest = useRef(screen);
+		useEffect(() => {
+			latest.current = screen;
+		});
+		useEffect(() => live.attach({ read: () => latest.current }), []);
 		const refreshRef = useRef<() => Promise<void>>(async () => {});
 		useEffect(() => {
 			const controller = new AbortController();
@@ -122,7 +172,9 @@ export const computeWebAdapter: WebArtifactAdapter = {
 				: loading
 					? { kind: "loading" }
 					: { kind: "ready" },
-			snapshot: { compute: data },
+			snapshot: {
+				compute: focusedJobId ? { ...data, selectedJobId: focusedJobId } : data,
+			},
 			targetOf: () => undefined,
 			async local(_binding, event): Promise<Receipt> {
 				try {
@@ -161,5 +213,20 @@ export const computeWebAdapter: WebArtifactAdapter = {
 				void refreshRef.current();
 			},
 		};
+	},
+	async focus(jobId) {
+		const known = await live.waitFor((handle) =>
+			handle.read().jobIds.has(jobId),
+		);
+		if (!known) return false;
+		live.current()?.read().show(jobId);
+		// The job exists; marking it is best effort while the screen draws it.
+		await focusWhenDrawn(() => findJobElement(jobId));
+		return true;
+	},
+	viewing() {
+		const visible = live.current()?.read().visible;
+		const jobId = visible ? shownJobId() : null;
+		return jobId ? formatResourceUri("compute.result", jobId) : null;
 	},
 };

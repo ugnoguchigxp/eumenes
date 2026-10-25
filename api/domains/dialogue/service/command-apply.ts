@@ -6,7 +6,6 @@ import type { Run } from "../contracts";
 import type { DialogueDeps } from "./context";
 import { delegateConversation } from "./delegate-conversation";
 
-import type { DelegationCommand } from "../contracts/delegation";
 export type CommandInput = {
 	runId: string;
 	revision: number;
@@ -86,15 +85,6 @@ export function applyCommand(
 					conversation.messageInTransaction(tx, run.inputMessageId)?.message
 						.attachments?.length ?? 0,
 			},
-		);
-		answerJob();
-	} else if (input.backend === "dots") {
-		if (!deps.delegation) throw new Error("dots_unavailable");
-		deps.delegation.invokeInTransaction(
-			tx,
-			run,
-			result.command as DelegationCommand,
-			input.snapshot,
 		);
 		answerJob();
 	} else if (input.boundSet) {

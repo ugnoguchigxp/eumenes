@@ -1,4 +1,4 @@
-import type { Viewing } from "../../dialogue/contracts";
+import type { RunViewing } from "../../dialogue/contracts";
 import { measureStage } from "../../../infrastructure/performance";
 import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
@@ -190,7 +190,7 @@ export function createInputCollector({
 				if (tails.get(key) === tail) tails.delete(key);
 			});
 		},
-		async commit(id: string, revision: number, viewing?: Viewing) {
+		async commit(id: string, revision: number, viewing?: RunViewing) {
 			const controller = new AbortController();
 			const { turn, prepared } = await store.write((db) => {
 				const turn = get(db, id),

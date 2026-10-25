@@ -1,0 +1,130 @@
+{
+	"formatVersion": 1,
+	"bundleId": "resources",
+	"pins": [],
+	"definitions": [
+		{
+			"kind": "profile",
+			"id": "resources.manage",
+			"revision": 1,
+			"title": "生成物と履歴の即答担当",
+			"summary": "Eumenesが作ったもの・過去の記録を探し、画面に出し、再生し、内容を読む",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [],
+			"avoidWhen": [],
+			"dependencies": [],
+			"body": "Eumenesが作った画像・曲・図・調査報告・計算結果などの生成物と、会話の出来事を探し、利用者の画面に出し、再生し、内容を読む担当。ものは番号（a1、a2…）で呼ぶ。番号は会話の<state>に載っているものと、探した結果で渡されたものだけが使える。この担当は作業をせず、呼び出した時点でその結果がそのまま回答の根拠になる。"
+		},
+		{
+			"kind": "skill",
+			"id": "resources.manage",
+			"revision": 1,
+			"title": "生成物と履歴の手順",
+			"summary": "探す・出す・再生する・読むの使い分けと、拒否の扱い",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [],
+			"avoidWhen": [],
+			"dependencies": [],
+			"body": "操作（operation）は4つ。find=探す、open=画面に表示する、play=再生する、read=内容を読む。\nfind: queryに探したいものを利用者の言葉のまま書く。種類（kind）は表示名（画像・曲・調査報告など）で、利用者が種類を言ったときだけ書く。期間はsince・untilに日本時間のYYYY-MM-DDで書く（「先週」などは日付に直す）。件数のlimitは既定5、最大10。結果は新しい順で、各件に番号（item）・種類・名前・日付がある。同じ生成の中でfindの結果の番号をそのままopen・play・readに使ってよい。\nopen・play・read: itemに番号（a3のような形）だけを書く。<state>にもfindの結果にもない番号は作らない。\nopen・play: 画面への指示を出しただけで、利用者の画面で開く・始まるのは少し後になる。再生できなかったときは会話の出来事（画面の行）で分かる。\nread: 返ってきた内容を根拠に答える。内容が途中で省略されている（truncated）ときは、省略があることを伝える。\n拒否: action_not_allowedはその種類にできない操作で、allowedにできる操作が入っている。画像は再生できない、のように伝え、allowedの中から提案する。item_not_foundはその番号が無い・忘れた・消えたもの。作り直さず、findで探し直すか、できないと伝える。kind_unknownは種類の表示名が違うので、返ってきた表示名の中から選び直す。\n使わないとき: 今作る依頼（画像や曲の作成）、一般の調べもの、会話の履歴の検索は対象外。"
+		},
+		{
+			"kind": "tool",
+			"id": "resources.manage",
+			"revision": 1,
+			"title": "生成物と履歴の操作",
+			"summary": "生成物や過去の記録を探す・画面に出す・再生する・読む",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [],
+			"avoidWhen": [],
+			"dependencies": [],
+			"backend": "resources",
+			"schemaKey": "resourcesTool"
+		},
+		{
+			"kind": "package",
+			"id": "resources.manage",
+			"revision": 1,
+			"title": "生成物と履歴",
+			"summary": "作ったものや過去の記録を探し、表示し、再生し、読んで伝える",
+			"aliases": ["生成物", "履歴"],
+			"tags": [],
+			"useWhen": [
+				"作ったものや過去の記録を探したい、表示したい、再生したい、内容を知りたい"
+			],
+			"avoidWhen": [
+				"新しく画像や曲を作りたい",
+				"Webや会話の履歴を新しく調べたい"
+			],
+			"dependencies": [
+				"profile:resources.manage@1",
+				"skill:resources.manage@1",
+				"tool:resources.manage@1"
+			],
+			"backend": "resources",
+			"schemaKey": "resourcesTool",
+			"profileRevisionId": "profile:resources.manage@1",
+			"requiredSkillRevisionIds": ["skill:resources.manage@1"],
+			"toolRevisionIds": ["tool:resources.manage@1"]
+		},
+		{
+			"kind": "toolchain",
+			"id": "resources.manage",
+			"revision": 1,
+			"title": "生成物と履歴",
+			"summary": "Eumenesが作った画像・曲・図・調査報告・計算結果など(生成物)と過去の記録を、探す・画面に表示する・再生する・内容を読んで伝える。担当への依頼文や予告は不要で、この関数の呼び出しがそのまま結果になる。<state>の番号(a1など)か探した結果の番号で呼ぶ。新しく作る依頼や一般の調べものは対象外",
+			"aliases": ["生成物", "履歴"],
+			"tags": [],
+			"useWhen": [
+				"「さっきの画像を見せて」「あの曲を流して」と、作ったものを画面に出す・再生するよう頼んでいる",
+				"「先週の調査の結論は？」「前に描いた図を探して」と、過去に作ったものや記録を探している、またはその内容を知りたがっている",
+				"報告のあとで「はい、再生して」と、<state>にある番号のものの再生や表示を頼んでいる"
+			],
+			"avoidWhen": [
+				"新しく画像や曲や図を作ってほしい",
+				"Webの情報や会話の履歴を新しく調べてほしい"
+			],
+			"dependencies": ["package:resources.manage@1"],
+			"examples": [
+				"さっきの画像を見せて",
+				"その曲を再生して",
+				"先週の調査の結論を教えて",
+				"前に作った曲を探して流して",
+				"ダース・ベーダーの画像をもう一度出して",
+				"はい、再生して"
+			],
+			"packageRevisionId": "package:resources.manage@1",
+			"redirects": [
+				{
+					"when": "新しく調べる、会話の履歴から探して答える場合",
+					"toolchainId": "history.research"
+				}
+			],
+			"minImpact": "none",
+			"bindingRevisionId": "binding:resources.manage@1",
+			"functionName": "resources"
+		}
+	],
+	"bindings": [
+		{
+			"kind": "binding",
+			"id": "resources.manage",
+			"revision": 1,
+			"execution": "instant",
+			"adapterRef": "adapter:resources@1",
+			"availabilityRef": "availability:resources@1",
+			"tools": [
+				{
+					"toolRevisionId": "tool:resources.manage@1",
+					"operationId": "resources.manage",
+					"inputSchemaRef": "builtin:resourcesTool"
+				}
+			],
+			"fallbackToolchainId": "history.research"
+		}
+	],
+	"artifacts": [],
+	"schemas": []
+}

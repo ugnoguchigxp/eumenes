@@ -15,6 +15,7 @@ export const controlRepairCodes: ReadonlySet<string> = new Set([
 	"invalid_requirement_schema",
 	"invalid_requirement_verification",
 	"tool_url_out_of_scope",
+	"unknown_resource",
 ]);
 export const safeCode = (e: unknown) =>
 	e instanceof Error && /^[a-z][a-z0-9_]{0,79}$/.test(e.message)

@@ -1,0 +1,6 @@
+$ bun scripts/toolchain-bundle.ts check api/domains/capabilities/bundles/dots-delegation.bundle.json --json
+{"level":"warn","time":"2026-10-25T17:44:11.827+09:00","service":"eumenes","pid":29012,"bootId":"32568782-845b-4728-b7f5-2f174e6702cc","schemaVersion":1,"subjectId":"package:resources.manage@1","source":"resources.bundle.json","reason":"unavailable","issueCount":2,"validationPath":"definitions/3","component":"capabilities","event":"capability.bundle_skipped"}
+{
+	"issues": [],
+	"registered": []
+}

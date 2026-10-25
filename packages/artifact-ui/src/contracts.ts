@@ -1,4 +1,6 @@
 import type { DotsMessagingResource } from "./dots-messaging-components";
+import type { WorkMenuResource, WorkResultResource } from "./work-components";
+export type { WorkMenuResource, WorkResultResource } from "./work-components";
 import { browserViews } from "./browser-contracts";
 import type { GoogleAccountsResource } from "./google-accounts-components";
 import type { OcrResource } from "./ocr-components";
@@ -145,6 +147,15 @@ import type { ComputeWorkspaceResource } from "./compute-components";
 export type { ComputeWorkspaceResource } from "./compute-components";
 
 export const viewRegistry = {
+	"external-app-launcher": {
+		name: "ExternalAppLauncher",
+		label: "外部アプリを開く",
+		schema: z.strictObject({
+			view: z.literal("external-app-launcher"),
+			source,
+			title,
+		}),
+	},
 	...computeViewRegistry,
 	...compositionViewRegistry,
 	"text-block": {
@@ -227,6 +238,16 @@ export const viewRegistry = {
 			source,
 			title,
 		}),
+	},
+	"work-menu": {
+		name: "WorkMenu",
+		label: "仕事一覧",
+		schema: z.strictObject({ view: z.literal("work-menu"), source, title }),
+	},
+	"work-result": {
+		name: "WorkResult",
+		label: "仕事の結果",
+		schema: z.strictObject({ view: z.literal("work-result"), source, title }),
 	},
 	"drawing-workspace": {
 		name: "DrawingWorkspace",
@@ -390,6 +411,7 @@ export const viewRegistry = {
 			source,
 			title,
 			presentation: z.enum(["default", "card"]).optional(),
+			footer: z.boolean().optional(),
 		}),
 	},
 	"settings-navigation": {
@@ -773,6 +795,14 @@ export type SettingsResource = {
 	volume: number;
 };
 export type Resource =
+	| {
+			kind: "external-app-launcher";
+			revision: number;
+			available: boolean;
+			busy: boolean;
+	  }
+	| WorkMenuResource
+	| WorkResultResource
 	| GoogleAccountsResource
 	| DotsMessagingResource
 	| ObjectRecognitionResource

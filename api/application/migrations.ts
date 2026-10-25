@@ -36,6 +36,7 @@ import { migrations as monitoringMigrations } from "../domains/monitoring";
 import { migrations as taskReportsMigrations } from "../domains/task-reports";
 import { migrations as dotsMigrations } from "../domains/dots";
 import { migrations as tasksMigrations } from "../domains/tasks";
+import { migrations as screenMigrations } from "../domains/screen";
 import { migrations as timersMigrations } from "../domains/timers";
 import { migrations as toolRuntimeMigrations } from "../domains/tool-runtime";
 import { migrations as ttsDictionaryMigrations } from "../domains/tts-dictionary";
@@ -186,6 +187,7 @@ const catalog: readonly Migration[] = [
 	...packageMigrations("world-package", worldPackageSql),
 	...worldMigrations,
 	...timersMigrations,
+	...screenMigrations,
 	...codingMigrations,
 	...taskReportsMigrations,
 	...supervisionMigrations,

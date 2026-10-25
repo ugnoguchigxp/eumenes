@@ -131,7 +131,56 @@ export type WebArtifactAdapter = {
 	adapterRef: string;
 	/** A hook: the host renders one component per adapter, so the call order is stable. */
 	useArtifact(context: AdapterHostContext): AdapterState;
+	/**
+	 * Brings the saved item `targetRef` into view on the open screen and marks it for about two
+	 * seconds. Resolves false when the screen has no such item. Not a hook: a screen that
+	 * supports it reaches its mounted instance through `createLiveScreen`.
+	 */
+	focus?(targetRef: string): Promise<boolean>;
+	/**
+	 * Starts playback of the saved item. Rejects with the media element's `NotAllowedError` when
+	 * the browser refuses playback without a user gesture.
+	 */
+	play?(targetRef: string): Promise<void>;
+	/** The resource URI of the item the open screen shows now, or null (none, or hidden). */
+	viewing?(): string | null;
 };
+
+/**
+ * The mounted instance of one adapter's screen. A hook attaches a handle that reads the screen's
+ * latest state; the adapter's non-hook methods (`focus`, `play`, `viewing`) read through it.
+ */
+export function createLiveScreen<Handle>() {
+	let current: Handle | null = null;
+	return {
+		/** Called from an effect of the screen; returns the detach. */
+		attach(handle: Handle): () => void {
+			current = handle;
+			return () => {
+				if (current === handle) current = null;
+			};
+		},
+		current: (): Handle | null => current,
+		/**
+		 * Waits until the mounted screen satisfies `read` (a truthy result), polling because the
+		 * screen's data arrives through its own queries; null when it does not in time.
+		 */
+		async waitFor<Result>(
+			read: (handle: Handle) => Result | null | undefined | false,
+			timeoutMs = 5_000,
+		): Promise<Result | null> {
+			const deadline = Date.now() + timeoutMs;
+			for (;;) {
+				if (current) {
+					const value = read(current);
+					if (value) return value;
+				}
+				if (Date.now() >= deadline) return null;
+				await new Promise((resolve) => setTimeout(resolve, 50));
+			}
+		},
+	};
+}
 
 export type WebAdapterRegistry = {
 	get(adapterRef: string): WebArtifactAdapter | undefined;

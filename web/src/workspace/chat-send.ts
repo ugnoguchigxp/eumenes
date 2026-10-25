@@ -2,7 +2,7 @@ import type { Dispatch, FormEvent, SetStateAction } from "react";
 import type { useChatAttachments } from "./useChatAttachments";
 import type {
 	Addressee,
-	Viewing,
+	RunViewing,
 } from "../../../api/domains/dialogue/contracts";
 import type { useSubmit } from "../domains/dialogue";
 export type ChatDraft = { text: string; dictated: boolean };
@@ -16,7 +16,7 @@ export function chatSend(
 	automaticInput: boolean,
 	watchRun: (id: string) => void,
 	/** The saved item the focused screen shows when the message is sent, if any. */
-	viewing: () => Viewing | undefined = () => undefined,
+	viewing: () => RunViewing | undefined = () => undefined,
 	/** The addressee the user saw when sending; the host refuses if it changed since. */
 	addressee: () => Addressee | undefined = () => undefined,
 ) {

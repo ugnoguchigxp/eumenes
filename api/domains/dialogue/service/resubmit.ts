@@ -1,3 +1,7 @@
+import {
+	runViewingResource,
+	setRunViewingResource,
+} from "../repository/resources";
 import { getLogger } from "../../../infrastructure/logger";
 import type { Tx } from "../../queue";
 import type { Run, Resubmit } from "../contracts";
@@ -154,6 +158,8 @@ export function createResubmit(deps: DialogueDeps) {
 		saveDeadlinePolicy(db, runId, false);
 		const viewing = runViewing(db, run.id);
 		if (viewing) setRunViewing(db, runId, viewing);
+		const resource = runViewingResource(db, run.id);
+		if (resource) setRunViewingResource(db, runId, resource);
 		return { ok: true, run: next, fresh: true, stopped };
 	}
 	return {

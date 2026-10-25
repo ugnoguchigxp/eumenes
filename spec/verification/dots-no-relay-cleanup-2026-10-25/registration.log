@@ -1,0 +1,34 @@
+bun test v1.4.3 (c6da4a4d3)
+
+api/application/work/dots-work-settings.test.ts:
+(pass) registered fields apply once from the UI, conflicts retain settings and conversations cannot edit them [776.08ms]
+(pass) a project-role change is an explicit revision-checked UI operation, not an automatic startup upgrade [659.96ms]
+(pass) disabled conversation delivery keeps the report inspectable without appending a chat message [474.67ms]
+
+api/application/work/dots-delegation-registration.test.ts:
+(pass) stored first document revisions survive upgrade and do not block the current bundle [640.73ms]
+(pass) fresh seed registers one launcher and immutable revisions; reseed keeps disabled publication [569.64ms]
+(pass) an old seeded revision retains its hash while publication migrates to the new binding [546.84ms]
+
+api/domains/capabilities/test/bundles.test.ts:
+(pass) the shipped bundle's pin is the stored digest and its toolchain is data-driven [82.71ms]
+(pass) a bundle the host cannot run is skipped whole, and without a host nothing is added [104.09ms]
+(pass) old revisions keep their JSON and hash, and publication moves back and forth [107.66ms]
+(pass) rolling the pointer back to the unbound revision removes the chain from the offer until a bound revision is published [77.62ms]
+(pass) the dry run lists every problem and writes nothing [31.95ms]
+(pass) each kind of reference problem is refused [173.32ms]
+(pass) a failing toolchain rolls back its documents and keeps the published revision [23.03ms]
+(pass) documents are immutable: the same id with other content is a conflict, the same content a no-op [29.18ms]
+(pass) binding fields belong to toolchains only and need a matching binding [15.52ms]
+(pass) a bound tool is prepared with its own schema and only from an active package [47.40ms]
+(pass) a timer start without a duration is defined as the 3 minute default, not as a question [42.64ms]
+(pass) stored schemas are served as validators; unknown and domain references are not [14.83ms]
+(pass) a bound toolchain is shown by its artifact registration: artifact is optional there, and unbound ones still need one [45.50ms]
+(pass) question schemas must be readable validators and the choice field one of their fields [79.03ms]
+(pass) an install already at revision 2 is upgraded to the latest, and revision 2 stays a valid rollback target [57.11ms]
+(pass) toolchain publication over HTTP is compare-and-set and can roll back [53.13ms]
+
+ 22 pass
+ 0 fail
+ 162 expect() calls
+Ran 22 tests across 3 files. [5.32s]

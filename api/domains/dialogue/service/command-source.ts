@@ -1,38 +1,9 @@
 import type { Database } from "bun:sqlite";
-import { z } from "zod";
-import { delegationCommand } from "../contracts/delegation";
 import type { Run } from "../contracts";
 import type { Viewing } from "../contracts/specialist";
 import { runViewing } from "../repository";
 import type { ToolchainRoutingPort } from "../contracts/toolchains";
 import type { DialogueDeps } from "./context";
-
-/** dots operations offered one tool each, so every input schema is a flat object. */
-export const dotsTools = delegationCommand.options.map((option) => {
-	const operation = option.shape.operation.value;
-	return {
-		id: `dots.${operation}`,
-		operation,
-		description:
-			operation === "start"
-				? "登録済みプロジェクトへ新しい作業を委任する。completionConditionsに完了条件を保持する"
-				: operation === "inspect"
-					? "委任済みの作業の状況を照会する"
-					: operation === "answer"
-						? "委任先からの質問に回答する"
-						: "委任済みの作業を一時停止または取消する",
-		schema: (() => {
-			// The operation is the tool itself; its literal is not an argument.
-			const json = z.toJSONSchema(option) as {
-				properties?: Record<string, unknown>;
-				required?: string[];
-			};
-			delete json.properties?.operation;
-			json.required = json.required?.filter((k) => k !== "operation");
-			return json;
-		})(),
-	};
-});
 
 /** One tool as the command sub-agent is offered it. */
 type CommandTool = {
@@ -135,7 +106,11 @@ export function commandSource(
 		const bound = toolchains.bound;
 		if (!bound) return { ok: false, code: "adapter_unavailable" };
 		try {
-			snapshot = bound.snapshotInTransaction(tx, set.binding.bindingRevisionId);
+			snapshot = bound.snapshotInTransaction(
+				tx,
+				set.binding.bindingRevisionId,
+				{ conversationId: run.conversationId },
+			);
 		} catch {
 			return { ok: false, code: "adapter_unavailable" };
 		}
@@ -153,16 +128,6 @@ export function commandSource(
 		tools = set.tools.map((t) => {
 			toolIds[t.id] = "manage";
 			return { id: t.id, description: t.summary, inputSchema: t.schema };
-		});
-	} else if (set.backend === "dots") {
-		snapshot = deps.delegation?.prepareInTransaction(tx, run).catalog ?? null;
-		tools = dotsTools.map((t) => {
-			toolIds[t.id] = t.operation;
-			return {
-				id: t.id,
-				description: t.description,
-				inputSchema: t.schema,
-			};
 		});
 	} else {
 		// Neither bound nor a known backend: nothing is run on a guess.

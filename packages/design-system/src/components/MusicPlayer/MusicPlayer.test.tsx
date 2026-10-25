@@ -1,4 +1,5 @@
 import {
+	act,
 	cleanup,
 	fireEvent,
 	render,
@@ -7,6 +8,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MusicPlayer, type MusicPlayerProps } from "./MusicPlayer";
+import { requestPlayback } from "./playbackRequest";
 
 const track = { id: "one", title: "試験曲", src: "blob:one" };
 beforeEach(() => {
@@ -189,5 +191,41 @@ describe("MusicPlayer", () => {
 		expect(audio.paused).toBe(false);
 		expect(source).not.toHaveBeenCalled();
 		expect(close).toHaveBeenCalled();
+	});
+	it("starts playback from code for the track on screen without a click", async () => {
+		const { audio } = setup();
+		await act(() => requestPlayback("one"));
+		await screen.findByRole("button", { name: "一時停止" });
+		expect(audio.paused).toBe(false);
+	});
+	it("waits for the track's player to mount, and gives up when none does", async () => {
+		const pending = requestPlayback("late", 1_000);
+		render(<MusicPlayer track={{ ...track, id: "late" }} />);
+		await act(async () => {
+			await expect(pending).resolves.toBeUndefined();
+		});
+		await expect(requestPlayback("never", 20)).rejects.toThrow(
+			"player_unavailable",
+		);
+	});
+	it("reports a browser refusal as NotAllowedError and asks for a press on the play button", async () => {
+		setup();
+		vi.mocked(HTMLMediaElement.prototype.play).mockRejectedValueOnce(
+			new DOMException("blocked", "NotAllowedError"),
+		);
+		await act(async () => {
+			await expect(requestPlayback("one")).rejects.toMatchObject({
+				name: "NotAllowedError",
+			});
+		});
+		const play = await screen.findByRole("button", { name: "再生" });
+		await waitFor(() =>
+			expect(play.className).toContain("music-player-attention"),
+		);
+		fireEvent.click(play);
+		await screen.findByRole("button", { name: "一時停止" });
+		expect(
+			screen.getByRole("button", { name: "一時停止" }).className,
+		).not.toContain("music-player-attention");
 	});
 });

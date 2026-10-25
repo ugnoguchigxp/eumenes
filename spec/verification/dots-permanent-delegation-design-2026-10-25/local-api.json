@@ -1,0 +1,23 @@
+{
+  "checkedAt": "2026-10-25T08:15:45.746Z",
+  "mode": "local_read_only_api",
+  "artifacts": [
+    {
+      "id": "artifact:dots.workspace@2",
+      "title": "dotsの仕事"
+    },
+    {
+      "id": "artifact:settings.dots@2",
+      "title": "dotsの設定"
+    }
+  ],
+  "settings": {
+    "revision": 0,
+    "enabled": false,
+    "targetConfigured": false,
+    "receiveOnStartup": true,
+    "showInConversation": true
+  },
+  "actualDotTaskSent": false,
+  "cloudProvisioned": false
+}

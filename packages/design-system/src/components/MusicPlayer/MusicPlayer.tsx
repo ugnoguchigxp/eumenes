@@ -1,8 +1,9 @@
 import { Music2, Volume2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "../../utils/cn";
 import { formatClockSeconds } from "../DigitalClock/format";
 import { PlaybackControls } from "./PlaybackControls";
+import { registerPlayer } from "./playbackRequest";
 import type { MusicTrack, MusicPlaybackState } from "./types";
 import { usePlayback } from "./usePlayback";
 import "./MusicPlayer.css";
@@ -81,6 +82,32 @@ function Player({
 	const { ref: audioRef, ...playback } = usePlayback(
 		autoPlay,
 		!!onPlaybackChange,
+	);
+	// A request from code that the browser refused: the play button asks to be pressed.
+	const [refused, setRefused] = useState(false);
+	const startRef = useRef(playback.start);
+	useEffect(() => {
+		startRef.current = playback.start;
+	});
+	useEffect(
+		() =>
+			registerPlayer({
+				trackId: track.id,
+				start: async () => {
+					try {
+						await startRef.current();
+						setRefused(false);
+					} catch (error) {
+						if (
+							error instanceof DOMException &&
+							error.name === "NotAllowedError"
+						)
+							setRefused(true);
+						throw error;
+					}
+				},
+			}),
+		[track.id],
 	);
 	useEffect(() => {
 		onPlaybackChange?.({
@@ -170,6 +197,7 @@ function Player({
 				onNext={onNext}
 				repeat={repeat}
 				onRepeatChange={onRepeatChange}
+				attention={refused && !playback.playing}
 			/>
 			<label className="music-player-volume">
 				<Volume2 aria-hidden="true" />

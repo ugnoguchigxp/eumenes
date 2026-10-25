@@ -11,6 +11,7 @@ import { createMaintenance } from "./maintenance";
 import { createQueries } from "./queries";
 import { createReconcile } from "./reconcile";
 import { createRuntimeState, type SearchReportHook } from "./runtime-context";
+import type { ResourceReadPort } from "./resource-access";
 import { createStartTask } from "./start-task";
 import { createStepHandler } from "./step-handler";
 import { createTaskOps } from "./task-ops";
@@ -27,6 +28,7 @@ export function createAgentRuntime({
 	reconcileThrottleMs = 25,
 	timers = { setTimeout, clearTimeout },
 	onSearchReport,
+	resources,
 }: {
 	store: SqliteStore;
 	capabilities: Capabilities;
@@ -42,6 +44,8 @@ export function createAgentRuntime({
 		clearTimeout: typeof clearTimeout;
 	};
 	onSearchReport?: SearchReportHook;
+	/** Reads a resource by URI for the sub-agent tool `resource.read` (the registry's `read`). */
+	resources?: ResourceReadPort;
 }) {
 	const ctx = {
 		state: createRuntimeState(),
@@ -56,6 +60,7 @@ export function createAgentRuntime({
 			timers,
 			log: getLogger("agent-runtime"),
 			onSearchReport,
+			resources,
 		},
 	};
 	const ops = createTaskOps(ctx);

@@ -1,6 +1,6 @@
 import type { BrowserWorkspaceResource } from "@eumenes/artifact-ui/contracts";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, renderHook, waitFor } from "@testing-library/react";
+import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import type { PropsWithChildren } from "react";
 import { afterEach, expect, test, vi } from "vitest";
 import { ApiError } from "../../../../client/transport";
@@ -31,6 +31,8 @@ import { BROWSER_ADAPTER_REF, browserWebAdapter } from "./toolchain-adapter";
 afterEach(() => {
 	cleanup();
 	vi.clearAllMocks();
+	vi.useRealTimers();
+	document.body.innerHTML = "";
 });
 
 const connection = (state: string, over: Record<string, unknown> = {}) => ({
@@ -341,4 +343,67 @@ test("loads current-chat history independently of the global twenty-task source 
 		(hook.result.current.snapshot.browser as BrowserWorkspaceResource).tasks,
 	).toMatchObject([own]);
 	expect(api.tasks).toHaveBeenCalledWith("main", expect.any(AbortSignal));
+});
+
+const capture = (captureId: string) => ({
+	captureId,
+	range: "full-page",
+	capturedAt: "2026-10-25T01:00:00.000Z",
+	width: 800,
+	height: 600,
+	bytes: 1000,
+	reductionPercent: 50,
+	state: "local_ready",
+});
+
+/** The capture row the workspace draws on its captures view. */
+function drawCapture(captureId: string, selected = false) {
+	const root = document.createElement("section");
+	root.className = "browser-workspace";
+	const item = document.createElement("li");
+	item.setAttribute("data-capture-id", captureId);
+	if (selected) item.setAttribute("data-selected", "true");
+	item.scrollIntoView = vi.fn();
+	root.append(item);
+	document.body.append(root);
+	return item;
+}
+
+test("focus asks the screen to show the capture, marks its row for two seconds and viewing names the selected one", async () => {
+	const { hook, cache } = setup(async () =>
+		sourceOf("connected", { captures: [capture("c1"), capture("c2")] }),
+	);
+	await waitFor(() => expect(hook.result.current.phase.kind).toBe("ready"));
+	expect(hook.result.current.snapshot.browser).not.toHaveProperty("focus");
+	const row = drawCapture("c2", true);
+	vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+	let done: Promise<boolean> | undefined;
+	await act(async () => {
+		done = browserWebAdapter.focus?.("c2");
+		await vi.advanceTimersByTimeAsync(200);
+	});
+	await expect(done).resolves.toBe(true);
+	expect(hook.result.current.snapshot.browser).toMatchObject({
+		focus: { seq: 1, captureId: "c2" },
+	});
+	expect(row.getAttribute("data-resource-focus")).toBe("true");
+	expect(browserWebAdapter.viewing?.()).toBe("eumenes://capture/c2");
+	await vi.advanceTimersByTimeAsync(2_010);
+	expect(row.hasAttribute("data-resource-focus")).toBe(false);
+	cache.clear();
+});
+
+test("focus says no to a capture the screen lacks, and viewing is null without a selected capture", async () => {
+	const { hook, cache } = setup(async () =>
+		sourceOf("connected", { captures: [capture("c1")] }),
+	);
+	await waitFor(() => expect(hook.result.current.phase.kind).toBe("ready"));
+	drawCapture("c1");
+	expect(browserWebAdapter.viewing?.()).toBeNull();
+	vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+	const unknown = browserWebAdapter.focus?.("missing");
+	await vi.advanceTimersByTimeAsync(5_500);
+	await expect(unknown).resolves.toBe(false);
+	expect(hook.result.current.snapshot.browser).not.toHaveProperty("focus");
+	cache.clear();
 });

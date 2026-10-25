@@ -13,7 +13,7 @@ export function taskExecutionSources(
 	| "validReferenceInTransaction"
 	| "readReferenceInTransaction"
 > {
-	const { agents, dialogue, conversation, memory } = host;
+	const { agents, dialogue, conversation, memory, resources } = host;
 	const { resolve, bound } = context;
 	const checkingReferences = new Set<string>();
 	const port: ReturnType<typeof taskExecutionSources> = {
@@ -51,6 +51,12 @@ export function taskExecutionSources(
 				return false;
 			checkingReferences.add(ref.ref);
 			try {
+				// A resource still resolves, and its preview is the one the conversation handed over.
+				if (ref.kind === "resource")
+					return (
+						!!resources?.resolveInTransaction(db, ref.ref).ok &&
+						hash(ref.preview) === ref.digest
+					);
 				if (ref.owner === "conversation") {
 					const message = conversation.messageInTransaction(
 						db,
@@ -118,17 +124,19 @@ export function taskExecutionSources(
 			if (!port.validReferenceInTransaction(db, source, ref))
 				throw new Error("execution_reference_invalid");
 			const body =
-				ref.owner === "conversation"
-					? conversation.messageInTransaction(db, ref.id)!.message.text
-					: ref.owner === "memory"
-						? memory!.executionReferenceInTransaction(db, ref)!
-						: JSON.stringify(
-								agents.executions.resultReferenceInTransaction(
-									db,
-									source.conversationId,
-									ref,
-								)!.result,
-							);
+				ref.kind === "resource"
+					? ref.preview
+					: ref.owner === "conversation"
+						? conversation.messageInTransaction(db, ref.id)!.message.text
+						: ref.owner === "memory"
+							? memory!.executionReferenceInTransaction(db, ref)!
+							: JSON.stringify(
+									agents.executions.resultReferenceInTransaction(
+										db,
+										source.conversationId,
+										ref,
+									)!.result,
+								);
 			return [...body].slice(start, start + Math.min(limit, 2000)).join("");
 		},
 	};

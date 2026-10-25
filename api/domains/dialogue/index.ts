@@ -26,6 +26,14 @@ export type {
 	WorldContextPort,
 } from "./contracts";
 export { migrations } from "./repository";
+export type { ResourceAccess } from "./service/resource-ledger";
+export type {
+	ConversationResource,
+	ConversationResourcePort,
+	ConversationResourceSource,
+	WorkLink,
+} from "./contracts/resources";
+export { replaceResourceUrisIn } from "./service/resource-text";
 
 export { type DelegationPort } from "./contracts/delegation";
 export { INTERACTION_POLICY } from "./contracts/command-interactions";

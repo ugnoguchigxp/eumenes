@@ -1,4 +1,6 @@
+import { ExternalAppLauncherView } from "./external-app-components";
 import { DotsMessagingView } from "./dots-messaging-components";
+import { WorkMenuView, WorkResultView } from "./work-components";
 import { GoogleAccountsView } from "./google-accounts-components";
 import { OcrMediaView, OcrPanelView } from "./ocr-components";
 import { ObjectRecognitionWorkspaceView } from "./object-recognition-components";
@@ -118,7 +120,10 @@ const CalculatorView = lazyView(() =>
 );
 
 const renderers = {
+	"external-app-launcher": ExternalAppLauncherView,
 	"dots-messaging": DotsMessagingView,
+	"work-menu": WorkMenuView,
+	"work-result": WorkResultView,
 	"google-accounts": GoogleAccountsView,
 	"ui-studio": UiStudioView,
 	"pipeline-studio": PipelineStudioView,

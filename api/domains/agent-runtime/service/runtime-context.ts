@@ -7,6 +7,7 @@ import type { QueueService } from "../../queue";
 import type { ToolRuntime } from "../../tool-runtime";
 import type { Task } from "../contracts";
 import type { EvidenceCatalog } from "./evidence-catalog";
+import type { ResourceReadPort } from "./resource-access";
 
 export const STEP_KIND = "agent.step";
 export const terminal = new Set([
@@ -46,6 +47,8 @@ type RuntimeDeps = {
 	 * procedure proposed in it. The report is already verified against the task's sources.
 	 */
 	onSearchReport?: SearchReportHook;
+	/** Reads a resource by URI for the sub-agent tool `resource.read`; without it the tool is not offered. */
+	resources?: ResourceReadPort;
 };
 export type SearchReportHook = (
 	db: import("bun:sqlite").Database,

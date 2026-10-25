@@ -8,7 +8,7 @@
 		{
 			"kind": "artifact",
 			"id": "agency.todos",
-			"revision": 1,
+			"revision": 2,
 			"title": "TODOリスト",
 			"variants": [
 				{
@@ -28,7 +28,7 @@
 					"adapterRef": "adapter:task-execution@1",
 					"query": "query:agent-runtime.todos@1",
 					"target": "none",
-					"paramsSchemaRef": "schema:todo-screen-query@1"
+					"paramsSchemaRef": "schema:todo-screen-query@2"
 				}
 			],
 			"actionBindings": [
@@ -65,7 +65,7 @@
 		{
 			"kind": "schema",
 			"id": "todo-screen-query",
-			"revision": 1,
+			"revision": 2,
 			"schema": {
 				"type": "object",
 				"additionalProperties": false,

@@ -1,0 +1,15 @@
+$ bun scripts/verify.ts --domain dots --domain capabilities --domain tool-runtime --domain dialogue --domain tasks --domain task-reports --domain artifact
+[verify] selected=dots,capabilities,tool-runtime,dialogue,tasks,task-reports,artifact dependencyClosure=queue,dots,capabilities,tool-runtime,delivery,attitude-dataset,larm,settings,inference,resources,pipelines,agent-runtime,continuity,conversation,memory,scheduler,toolchain-history,dialogue,avatar,tasks,task-reports,artifact
+[verify] Shared DesignSystem dist: do not overlap dev, browser tests or other builds; endpoint hashes cannot detect change-and-restore.
+[verify] inventory
+[verify] boundaries
+[verify] system-context: /Users/y.noguchi/.bun/bin/bun run context:check
+$ s11tnext build --check --release-profile application
+Generated outputs are current (sha256:e59be94af72e45c3f2624e15d9fa4e446bfeb7dcdf00ce58075e338470899e31).
+[verify] size-budget: /Users/y.noguchi/.bun/bin/bun scripts/size-budget.ts api/domains/dots web/src/domains/dots api/domains/capabilities api/domains/tool-runtime api/domains/dialogue web/src/domains/dialogue api/domains/tasks api/domains/task-reports web/src/domains/artifact web/src/components/domains/artifact packages/artifact-ui/src
+size-budget: new file over 800 lines: packages/artifact-ui/src/composition-fixer.ts (827)
+size-budget: new file over 800 lines: packages/artifact-ui/src/contracts.ts (859)
+size-budget: new file over 800 lines: packages/artifact-ui/src/ui-studio-components.tsx (974)
+[verify] fail: 1468 ms; /Users/y.noguchi/Code/eumenes/verification-reports/runs/2026-10-25T08-04-16-391Z-445df1b9-f535-4bad-b002-a6c29aa7453e/report.json
+Error: size-budget failed (1)
+error: script "verify" exited with code 1

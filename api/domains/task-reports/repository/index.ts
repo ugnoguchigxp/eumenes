@@ -18,6 +18,14 @@ export function find(
 		.get(taskId, key) as { data_json: string } | null;
 	return row ? JSON.parse(row.data_json) : null;
 }
+export function latest(db: Database, taskId: string): TaskReport | null {
+	const row = db
+		.query(
+			"SELECT data_json FROM task_reports WHERE task_id=? ORDER BY sequence DESC LIMIT 1",
+		)
+		.get(taskId) as { data_json: string } | null;
+	return row ? JSON.parse(row.data_json) : null;
+}
 export function append(
 	db: Database,
 	report: Omit<TaskReport, "sequence">,
@@ -93,5 +101,11 @@ export function pending(db: Database, limit = 50): TaskReport[] {
 export function delivered(db: Database, id: string) {
 	db.query(
 		"UPDATE task_report_outbox SET state='delivered' WHERE report_id=? AND state='pending'",
+	).run(id);
+}
+/** A notification the owner disabled; the saved report remains available for inspection. */
+export function suppress(db: Database, id: string) {
+	db.query(
+		"UPDATE task_report_outbox SET state='superseded' WHERE report_id=? AND state='pending'",
 	).run(id);
 }

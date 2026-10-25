@@ -90,6 +90,7 @@ export function createTasks(store: SqliteStore, options: TasksOptions = {}) {
 			store.write((tx) => forgetInTransaction(tx, taskId, input)),
 		...createTaskQueries(store, core),
 		liveInTransaction: repo.live,
+		kindPageInTransaction: repo.kindPage,
 		hasConnectionHistoryInTransaction: repo.hasConnectionHistory,
 		conversationInTransaction(
 			db: Database,

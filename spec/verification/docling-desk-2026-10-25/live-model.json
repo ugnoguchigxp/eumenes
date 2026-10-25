@@ -1,0 +1,124 @@
+{
+  "checkedAt": "2026-10-25T08:33:02.156Z",
+  "runId": "93c233b5-27b8-4285-8506-a176f8687ee7",
+  "conversationId": "docling-acceptance-4612f9cc-5b2d-4227-8f7f-897a7cf53fb8",
+  "status": "completed",
+  "run": {
+    "id": "93c233b5-27b8-4285-8506-a176f8687ee7",
+    "agentTaskId": "a4d91526-fc4c-4b44-bceb-59bdc8a20e9e",
+    "requestId": "c13811e6-9acc-413a-bf17-827faea86002",
+    "conversationId": "docling-acceptance-4612f9cc-5b2d-4227-8f7f-897a7cf53fb8",
+    "utteranceId": null,
+    "status": "completed",
+    "revision": 6,
+    "inputMessageId": "3a32f5e1-6dcf-4ad5-ae91-d818e12861f1",
+    "answerMessageId": null,
+    "announcement": "Docling Deskを開いて、文書の取り込みと閲覧の入口を出します。",
+    "error": null,
+    "jobId": "6fa0be7a-2c00-4468-97f2-6e9bfc38ca01",
+    "deadlineAt": "2026-10-25T08:35:21.063Z",
+    "deadlineFixed": false,
+    "sourceKind": "manual",
+    "pinnedToolchainId": null,
+    "scheduleId": null,
+    "occurrenceId": null,
+    "specialistSessionId": null,
+    "createdAt": "2026-10-25T08:32:21.063Z",
+    "updatedAt": "2026-10-25T08:33:00.842Z"
+  },
+  "conversation": {
+    "id": "docling-acceptance-4612f9cc-5b2d-4227-8f7f-897a7cf53fb8",
+    "revision": 1,
+    "messages": [
+      {
+        "id": "3a32f5e1-6dcf-4ad5-ae91-d818e12861f1",
+        "conversationId": "docling-acceptance-4612f9cc-5b2d-4227-8f7f-897a7cf53fb8",
+        "role": "user",
+        "text": "Docling Deskを開いて。文書の取り込みと閲覧に使う入口を出してください。",
+        "createdAt": "2026-10-25T08:32:21.063Z",
+        "runId": "93c233b5-27b8-4285-8506-a176f8687ee7"
+      }
+    ]
+  },
+  "selection": {
+    "id": "c151be0a-534c-42fb-9d9b-70bd3fca8f75",
+    "runId": "93c233b5-27b8-4285-8506-a176f8687ee7",
+    "conversationId": "docling-acceptance-4612f9cc-5b2d-4227-8f7f-897a7cf53fb8",
+    "utteranceId": null,
+    "requestId": "c13811e6-9acc-413a-bf17-827faea86002",
+    "retrieval": "embedding",
+    "candidates": [
+      {
+        "toolchainId": "docling.desk",
+        "revisionId": "toolchain:docling.desk@1",
+        "functionName": "docling_desk",
+        "rank": 1,
+        "ftsRank": null,
+        "similarity": 0.9171,
+        "fromHistory": false
+      },
+      {
+        "toolchainId": "browser.operate",
+        "revisionId": "toolchain:browser.operate@4",
+        "functionName": "browser_operate",
+        "rank": 2,
+        "ftsRank": null,
+        "similarity": 0.8654,
+        "fromHistory": true
+      },
+      {
+        "toolchainId": "claude-code.request",
+        "revisionId": "toolchain:claude-code.request@2",
+        "functionName": "claude_code",
+        "rank": 3,
+        "ftsRank": null,
+        "similarity": 0.8594,
+        "fromHistory": false
+      },
+      {
+        "toolchainId": "excalidraw.edit",
+        "revisionId": "toolchain:excalidraw.edit@1",
+        "functionName": "drawing_editor",
+        "rank": 4,
+        "ftsRank": null,
+        "similarity": 0.8585,
+        "fromHistory": false
+      }
+    ],
+    "historyRefs": [
+      "d7f5905f-23f6-40e9-8eaf-653d11d680d3",
+      "fd94d46b-578e-4e62-8312-42dce3bb82f8",
+      "3af47415-1f58-4858-9296-bb02ae4bd575"
+    ],
+    "decision": "toolchain",
+    "toolchainId": "docling.desk",
+    "toolchainRevisionId": "toolchain:docling.desk@1",
+    "functionName": "docling_desk",
+    "request": "Docling Deskを開いて、文書の取り込みと閲覧に使う入口を出してください。",
+    "taskId": "a4d91526-fc4c-4b44-bceb-59bdc8a20e9e",
+    "outcome": "completed",
+    "outcomeCode": null,
+    "recipe": null,
+    "durationMs": null,
+    "createdAt": 1792917176008,
+    "settledAt": 1792917180840
+  },
+  "task": {
+    "id": "a4d91526-fc4c-4b44-bceb-59bdc8a20e9e",
+    "kind": "coordinator",
+    "rootRunId": "93c233b5-27b8-4285-8506-a176f8687ee7",
+    "parentTaskId": null,
+    "packageRevisionId": null,
+    "status": "completed",
+    "phase": "completed",
+    "modelCalls": 0,
+    "toolCalls": 0,
+    "errorCode": null,
+    "createdAt": "2026-10-25T08:33:00.835Z",
+    "deadlineAt": "2026-10-25T08:35:21.063Z",
+    "reportState": "none",
+    "acquisitionMode": null,
+    "toolOutcomes": []
+  },
+  "executions": []
+}

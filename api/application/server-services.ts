@@ -1,4 +1,8 @@
+import { createLateResources } from "./resources/late";
+import { buildResources } from "./resources/wiring";
+import { buildDocling } from "./docling/docling-composition";
 import { createDotsMessages } from "./work/dots-messages";
+import { createDotsWork } from "./work/dots-work";
 import { dirname, resolve } from "node:path";
 import type { GoogleProvider } from "../domains/google-accounts";
 import { CONVERSATION_DEFAULT_PRINCIPAL } from "../domains/conversation/contracts";
@@ -121,6 +125,7 @@ export async function buildServices(
 		memoryJournalPath,
 		worldResourceId: () => settings.get().world.curationResourceId,
 	});
+	const docling = buildDocling(settings);
 	const uiCompositions = createUiCompositions();
 	let ocrCapabilities: Capabilities | null = null;
 	const ocr = createOcr({
@@ -145,7 +150,18 @@ export async function buildServices(
 		inference,
 		capabilities: () => browserCapabilities,
 	});
+	// The toolchain's `resources` tool and `resource.read` reach the registry and ledger once they exist.
+	const lateResources = createLateResources(store);
 	const { toolchain, links } = await createHostToolchain({
+		resources: lateResources,
+		docling,
+		dotsWork: createDotsWork({
+			tasks: delegated.tasks,
+			reports: tasks.taskReports,
+			conversation,
+			capabilities: () => toolchain.capabilities,
+		}),
+		dotsConfiguration: tasks.dots.config,
 		dotsMessages,
 		dbPath,
 		store,
@@ -185,6 +201,16 @@ export async function buildServices(
 		capabilities: toolchain.capabilities,
 		dialogue: () => dialogue,
 	});
+	const resources = buildResources({
+		store,
+		capabilities: toolchain.capabilities,
+		gateway: media.gateway,
+		events: continuity.events,
+		ledger: lateResources.tool.ledger,
+		webResearch,
+		shell: toolchain.shell,
+		publish: () => changes.publish(),
+	});
 	const toolchains = enabled
 		? createToolchainRouting(
 				toolchain.capabilities,
@@ -202,6 +228,11 @@ export async function buildServices(
 		() => dialogue,
 	);
 	const dialogue = createDialogueService({
+		resources: {
+			registry: resources.access.registry,
+			producesInTransaction: (db, toolchainId) =>
+				toolchain.capabilities.producesInTransaction(db, toolchainId),
+		},
 		agency: agency.dialoguePort,
 		conversationAgent: agency.conversationAgent,
 		logFile: () => config.logFile,
@@ -220,12 +251,7 @@ export async function buildServices(
 		steward,
 		goals: goals.dialoguePort,
 		agents: enabled ? toolchain.agents : undefined,
-		delegation: createDotsDialogue({
-			store,
-			tasks: delegated.tasks,
-			conversation,
-			capabilities: toolchain.capabilities,
-		}),
+		delegation: createDotsDialogue({ tasks: delegated.tasks }),
 		...(world ? { worldContext: world.context } : {}),
 		...(toolchains
 			? {
@@ -262,9 +288,18 @@ export async function buildServices(
 				excalidraw: media.drawingOperations,
 			}),
 			legacy: taskLegacyPorts(dialogue),
+			resources: resources.access.registry,
 		});
 	// The agency sees the conversation's open TODOs; the conversation reports their results itself.
-	agency.attachWork(createAgencyWork({ dialogue }));
+	agency.attachWork(
+		createAgencyWork({ dialogue, resources: resources.access.registry }),
+	);
+	if (dialogue.resourceLedger)
+		lateResources.attach({
+			registry: resources.access.registry,
+			ledger: dialogue.resourceLedger,
+			screen: resources.screen,
+		});
 	stewardAssembly.attachDialogue(dialogue);
 	// The latest conversation's prompt is read ahead when it would be cold (started, shown, idle while shown).
 	const prewarm = createConversationPrewarm({
@@ -334,6 +369,7 @@ export async function buildServices(
 		inference,
 		connectionModels: createConnectionModels(settings, config.env, { store }),
 		serviceTests,
+		docling,
 		excalidraw: media.excalidraw,
 		drawingOperations: media.drawingOperations,
 		image: media.image,
@@ -358,6 +394,7 @@ export async function buildServices(
 		toolchain,
 		pipelines,
 		pipelineTrials,
+		resources,
 		dialogue,
 		agency,
 		prewarm,

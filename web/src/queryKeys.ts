@@ -2,7 +2,10 @@ import type { QueryClient } from "@tanstack/react-query";
 
 /** First element of every react-query key. Keys are `[root, identity, ...]`. */
 export const queryRoots = {
+	docling: "docling",
 	music: "music",
+	resources: "resources",
+	screen: "screen",
 	image: "image",
 	model3d: "model3d",
 	browser: "browser",
@@ -40,9 +43,12 @@ export const queryRoots = {
  * `change` events do not re-run them.
  */
 export const changeRoots = [
+	queryRoots.docling,
 	queryRoots.objectRecognition,
 	queryRoots.ocr,
 	queryRoots.music,
+	queryRoots.resources,
+	queryRoots.screen,
 	queryRoots.image,
 	queryRoots.model3d,
 	queryRoots.browser,

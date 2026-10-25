@@ -30,6 +30,23 @@ export function registerSettings(app: Hono, settings: SettingsService) {
 			throw error;
 		}
 	});
+	app.get("/api/settings/docling", (c) =>
+		c.json(settings.doclingConnection(), 200, { "Cache-Control": "no-store" }),
+	);
+	app.put("/api/settings/docling", async (c) => {
+		const raw = await readBounded(c.req.raw.body, {
+			limit: 8192,
+			tooLarge: "invalid_body_size",
+			missing: "invalid_body",
+		});
+		let value: unknown;
+		try {
+			value = JSON.parse(new TextDecoder().decode(raw));
+		} catch {
+			throw new Error("invalid_docling_settings");
+		}
+		return c.json(await settings.configureDocling(value));
+	});
 	app.get("/api/settings/excalidraw", (c) =>
 		c.json(settings.excalidrawConnection()),
 	);

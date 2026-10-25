@@ -105,3 +105,24 @@ export function activity(db: Database, since: number) {
 			: null,
 	};
 }
+
+/** Completed generations that produced a library image, newest first. */
+export function imageGenerations(db: Database) {
+	return (
+		db
+			.query(
+				"SELECT record_json FROM image_generations WHERE json_extract(record_json,'$.state')='completed' AND json_extract(record_json,'$.artifactId') IS NOT NULL ORDER BY rowid DESC",
+			)
+			.all() as { record_json: string }[]
+	).map((r) => JSON.parse(r.record_json) as ImageRecord);
+}
+
+/** The completed generation that produced the library image `artifactId`. */
+export function imageByArtifact(db: Database, artifactId: string) {
+	const r = db
+		.query(
+			"SELECT record_json FROM image_generations WHERE json_extract(record_json,'$.state')='completed' AND json_extract(record_json,'$.artifactId')=? ORDER BY rowid DESC LIMIT 1",
+		)
+		.get(artifactId) as { record_json: string } | null;
+	return r ? (JSON.parse(r.record_json) as ImageRecord) : null;
+}

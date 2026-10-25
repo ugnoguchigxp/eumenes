@@ -254,6 +254,21 @@ describe("BrowserWorkspace captures", () => {
 		).toBe(preview);
 	});
 
+	it("opens the captures and selects the capture the host asks to show, once per request", () => {
+		const p = props();
+		const { rerender } = render(<BrowserWorkspace {...p} />);
+		expect(screen.queryByRole("region", { name: "撮影した画像" })).toBeNull();
+		rerender(<BrowserWorkspace {...p} focus={{ seq: 1, captureId: "c2" }} />);
+		const list = screen.getByRole("region", { name: "撮影した画像" });
+		expect(p.onSelectCapture).toHaveBeenCalledWith("c2");
+		expect(list.querySelector("li[data-capture-id='c2']")).not.toBeNull();
+		// A re-render with the same request does not select again.
+		rerender(<BrowserWorkspace {...p} focus={{ seq: 1, captureId: "c2" }} />);
+		expect(p.onSelectCapture).toHaveBeenCalledTimes(1);
+		rerender(<BrowserWorkspace {...p} focus={{ seq: 2, captureId: "c2" }} />);
+		expect(p.onSelectCapture).toHaveBeenCalledTimes(2);
+	});
+
 	it("shows no image or download until the selected capture is ready", () => {
 		render(
 			<BrowserWorkspace

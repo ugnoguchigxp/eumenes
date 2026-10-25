@@ -2,11 +2,7 @@ import { executionCallSession } from "../../tool-runtime";
 import { parseLlmJson } from "../../../infrastructure/llm-json";
 import type { Database } from "bun:sqlite";
 import { z } from "zod";
-import {
-	musicRequest,
-	musicPlaybackPlan,
-	type Prepared,
-} from "../../capabilities";
+import { musicRequest, type Prepared } from "../../capabilities";
 import type { Receipt } from "../../inference";
 import type { HandlerDefinition } from "../../queue";
 import { trackQuery, type TrackQuery } from "../../larm";
@@ -19,6 +15,7 @@ import {
 	playlists,
 } from "../repository/playlists";
 import { musicContext } from "./context";
+import { openedTracks, playbackSchemaOf } from "./playback-tracks";
 import type { createMusic } from "./index";
 import type { ChildExecution } from "../../tool-runtime";
 export function createPlayback(deps: Parameters<typeof createMusic>[0]) {
@@ -89,10 +86,11 @@ export function createPlayback(deps: Parameters<typeof createMusic>[0]) {
 		async execute(input, { signal }) {
 			const library = deps.gateway().library;
 			const tags = await library.tags(signal);
+			const schema = playbackSchemaOf(input.prepared);
 			const context = musicContext(
 				input.prepared,
 				{ request: input.request, libraryTags: tags.tags },
-				musicPlaybackPlan,
+				schema,
 			);
 			const receipt = await inference.executeControl!(
 				input.requestId,
@@ -119,9 +117,18 @@ export function createPlayback(deps: Parameters<typeof createMusic>[0]) {
 			} catch {
 				throw new Error("music_playback_invalid_json");
 			}
-			const parsed = musicPlaybackPlan.safeParse(value);
+			const parsed = schema.safeParse(value);
 			if (!parsed.success) throw new Error("music_playback_invalid_contract");
 			const plan = parsed.data;
+			// The request's own tracks are opened as they are: no search, and each is checked against the library.
+			const opened = await openedTracks(plan, input.request, deps, signal);
+			if (opened)
+				return {
+					receipt,
+					title: plan.title,
+					query: trackQuery.parse({}),
+					trackIds: opened,
+				};
 			const query = trackQuery.parse({
 				q: plan.q,
 				tags: plan.tags,
@@ -201,7 +208,7 @@ export function createPlayback(deps: Parameters<typeof createMusic>[0]) {
 			const prepared = capabilities.prepareActiveByIdInTransaction(
 				db,
 				{ rootRunId: input.runId, taskId: id, cancelEpoch: 0 },
-				"package:music.playback@1",
+				"package:music.playback@2",
 				request,
 			);
 			const now = Date.now();
