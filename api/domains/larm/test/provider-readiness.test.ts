@@ -98,9 +98,15 @@ test("credential reacquisition selects ASR alone while siblings remain unready",
 	const clock = spyOn(Date, "now").mockImplementation(() => now() + skew);
 	try {
 		await f.larm.prepareVoice!(freshSignal());
+		await f.larm.speak("確認", freshSignal());
+		f.status("failed");
+		f.readiness.tts = "probing";
 		skew = 750_000;
 		await f.larm.transcribe(new Uint8Array(44), freshSignal());
-		expect(f.claims).toEqual([["asr"], ["asr"]]);
+		expect(f.claims).toEqual([["asr"], ["tts"], ["asr"]]);
+		f.readiness.tts = "ready";
+		expect((await f.larm.speak("確認", freshSignal())).length).toBe(44);
+		expect(f.claims).toEqual([["asr"], ["tts"], ["asr"], ["tts"]]);
 		expect(f.deleted).toEqual([]);
 	} finally {
 		clock.mockRestore();

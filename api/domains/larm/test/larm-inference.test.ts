@@ -169,6 +169,7 @@ test("native decision shares the voice lease, uses its own auth, and rotates cre
 			freshSignal(),
 		);
 		await larm.speak("こんにちは", freshSignal());
+		await larm.transcribe(new Uint8Array(44), freshSignal());
 		expect(bodies).toEqual([
 			{
 				model: "model-system-one",
@@ -186,7 +187,7 @@ test("native decision shares the voice lease, uses its own auth, and rotates cre
 			"Bearer secret-system-one-2",
 		]);
 		expect(fake.requests).toHaveLength(1);
-		expect(larm.status().capabilities).toEqual(["asr", "tts"]);
+		expect(larm.status().capabilities).toEqual(["tts", "asr"]);
 		expect(fake.calls.filter((c) => c.endsWith("/renew"))).toHaveLength(1);
 	} finally {
 		await larm.close();

@@ -1,3 +1,4 @@
+import { pendingRenewal } from "./renew-lifetime";
 import { measureStage } from "../../../infrastructure/performance";
 import { withLogContext } from "../../../infrastructure/logger";
 import type { Lease, Provider, ProviderName } from "./profiles";
@@ -60,6 +61,11 @@ export function createWithProvider({
 				() => untilAborted(connect(required, signal), signal),
 				{ kind: name },
 			);
+			const renewal = pendingRenewal(current);
+			if (renewal) {
+				await untilAborted(renewal, signal);
+				continue;
+			}
 			const provider = current.providers.get(name);
 			if (name === "tts-english" && !provider)
 				throw new Error("speech_tts_target_unavailable");
@@ -87,6 +93,22 @@ export function createWithProvider({
 					error instanceof LarmInferenceError &&
 					error.status === 409 &&
 					error.code === "connection_idle_released";
+				if (unusable && name !== "llm") {
+					try {
+						unusable = await isReleased(current, signal);
+					} catch {
+						signal.throwIfAborted();
+						throw error;
+					}
+					if (!unusable) {
+						// Audio credentials belong to independent child Allocations. A child idle
+						// rejection says nothing about the public Connection or its siblings.
+						if (current.providers.get(name) === selected)
+							current.providers.delete(name);
+						if (!attempt && !signal.aborted) continue;
+						throw error;
+					}
+				}
 				// Some gateway versions return unauthorized after an idle profile switch.
 				// Confirm the old connection is terminal; a ready connection's 401 stays an error.
 				if (

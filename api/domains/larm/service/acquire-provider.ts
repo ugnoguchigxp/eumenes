@@ -1,9 +1,13 @@
+import {
+	renewLifetime,
+	pendingRenewal,
+	credentialGeneration,
+} from "./renew-lifetime";
 import type { Capability } from "../contracts";
 import { getLogger } from "../../../infrastructure/logger";
 import {
 	awaitReady,
 	claimProviders,
-	renewProviders,
 	type Control,
 	type ProviderHosts,
 } from "./connect";
@@ -60,8 +64,11 @@ export async function acquireProvider(
 		declared.endpoint !== endpoints[name]
 	)
 		throw new Error("larm_catalog_provider_missing");
-	const scoped: Control = (path, init, accepted) =>
-		control(path, { ...init, signal }, accepted);
+	let observedBinding = current.providers.get(name);
+	const scoped: Control = (path, init, accepted) => {
+		if (init.method === "GET") observedBinding = current.providers.get(name);
+		return control(path, { ...init, signal }, accepted);
+	};
 	let state = record(
 		await readJson(
 			await scoped(
@@ -81,6 +88,16 @@ export async function acquireProvider(
 			kind: name,
 			profile: current.request.profile,
 			agentProfile: current.agentProfile,
+		}).catch((error) => {
+			if (
+				!signal.aborted &&
+				error instanceof Error &&
+				error.message === "larm_provider_failed" &&
+				observedBinding &&
+				current.providers.get(name) === observedBinding
+			)
+				current.providers.delete(name);
+			throw error;
 		});
 		const announced = (state.providers as unknown[])
 			.map(record)
@@ -90,41 +107,35 @@ export async function acquireProvider(
 			announced.endpoint !== declared.endpoint
 		)
 			throw new Error("larm_provider_not_ready");
+		const previous = current.providers.get(name);
 		try {
-			const previous = current.providers.get(name);
 			if (
 				previous &&
+				!pendingRenewal(current) &&
 				(previous.expiresAt ?? current.expiresAt) > Date.now() + 180_000
 			) {
 				signal.throwIfAborted();
 				return;
 			}
-			let claimed;
-			if (
-				previous &&
-				current.expiresAt <= Date.now() + 180_000 &&
-				(previous.expiresAt ?? current.expiresAt) <= Date.now() + 180_000
-			) {
-				claimed = await renewProviders(
-					scoped,
-					{ id: current.id, providers: new Map([[name, previous]]) },
-					hosts,
-				);
-			} else {
-				claimed = await claimProviders(scoped, {
-					id: current.id,
-					created: state,
-					required:
-						name === "llm" || name === "asr" || name === "tts"
-							? [name as Capability]
-							: [],
-					catalogProviders: catalog,
-					fullProfile: current.request.fullProfile,
-					claimNames: [externalName],
-					hosts,
-				});
-			}
+			if (previous && current.expiresAt <= Date.now() + 180_000)
+				await renewLifetime(current, control, signal);
+			else if (pendingRenewal(current))
+				await renewLifetime(current, control, signal);
+			const generation = credentialGeneration(current);
+			const claimed = await claimProviders(scoped, {
+				id: current.id,
+				created: state,
+				required:
+					name === "llm" || name === "asr" || name === "tts"
+						? [name as Capability]
+						: [],
+				catalogProviders: catalog,
+				fullProfile: current.request.fullProfile,
+				claimNames: [externalName],
+				hosts,
+			});
 			signal.throwIfAborted();
+			if (generation !== credentialGeneration(current)) continue;
 			if (current.closing) throw new Error("larm_connection_released");
 			const p = claimed.providers.get(name);
 			if (!p)
@@ -147,7 +158,14 @@ export async function acquireProvider(
 			});
 			return;
 		} catch (error) {
-			if (!signal.aborted) current.providers.delete(name);
+			if (
+				!signal.aborted &&
+				previous &&
+				current.providers.get(name) === previous
+			)
+				current.providers.delete(name);
+			if (error instanceof Error && error.message === "larm_expired")
+				throw new Error("larm_credential_expired");
 			if (
 				!(error instanceof Error && error.message === "larm_control_409") ||
 				attempt >= 59

@@ -88,7 +88,7 @@ export async function createConnection(
 			headers: {
 				"content-type": "application/json",
 				"Idempotency-Key": input.idempotencyKey,
-				Prefer: "wait=1",
+				...(input.fullProfile ? {} : { Prefer: "wait=1" }),
 			},
 			body: JSON.stringify({
 				profile: input.profile,
@@ -128,6 +128,7 @@ export async function awaitReady(
 	const { id, required } = input;
 	let previous = "";
 	const check = () => {
+		if (created.id !== id) throw new Error("larm_invalid_connection");
 		if (terminalStatuses.includes(String(created.status)))
 			throw new Error(`larm_connection_${created.status}`);
 		if (
@@ -149,6 +150,8 @@ export async function awaitReady(
 				"pending",
 				"probing",
 				"warming",
+				"waiting",
+				"deploying",
 				"ready",
 				"failed",
 				"expired",
@@ -176,7 +179,7 @@ export async function awaitReady(
 				throw new Error("larm_provider_failed");
 			if (
 				p.readiness === "ready" &&
-				name in protocols &&
+				Object.hasOwn(protocols, name) &&
 				(p.protocol !== protocols[name as ProviderName] ||
 					p.endpoint !== endpoints[name as ProviderName])
 			)
@@ -227,7 +230,7 @@ export async function claimProviders(
 	);
 	if (
 		claimed.id !== id ||
-		terminalStatuses.includes(String(claimed.status)) ||
+		claimed.status !== "ready" ||
 		!Array.isArray(claimed.providers)
 	)
 		throw new Error("larm_invalid_claim");
@@ -423,7 +426,7 @@ export async function renewProviders(
 	);
 	if (
 		claimed.id !== current.id ||
-		terminalStatuses.includes(String(claimed.status)) ||
+		claimed.status !== "ready" ||
 		!Array.isArray(claimed.providers)
 	)
 		throw new Error("larm_invalid_claim");

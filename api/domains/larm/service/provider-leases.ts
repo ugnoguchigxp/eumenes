@@ -10,6 +10,7 @@ import { createLeaseManager } from "./lease-manager";
 import { createVoiceLease } from "./voice-lease";
 import { drainLease } from "./drain-lease";
 import { leaseStatus, createStatusChanges } from "./lease-status";
+import { pendingRenewal } from "./renew-lifetime";
 import { acquireProvider } from "./acquire-provider";
 import { createProfileRetention, repeatProfile } from "./profile-retention";
 import { createWithProvider } from "./with-provider";
@@ -66,43 +67,55 @@ export function createProviderLeases(options: Options) {
 	const main = createLeaseManager(options);
 	let voice: ReturnType<typeof createScope> | undefined;
 	let retained = false;
-	const listeners = new Set<() => void>();
-	const notify = () => {
-		for (const listener of listeners) listener();
+	let closed = false;
+	const status = (): LarmStatus => {
+		const m = main.status(),
+			v = voice?.status();
+		const selected =
+			m.state === "ready"
+				? m
+				: v?.state === "ready"
+					? v
+					: m.state === "idle" && v
+						? v
+						: m;
+		return {
+			...selected,
+			capabilities: [
+				...new Set([...m.capabilities, ...(v?.capabilities ?? [])]),
+			],
+		};
 	};
-	main.onChange(notify);
+	const changes = createStatusChanges(status);
+	main.onChange(changes.notify);
 	const speech = () => {
+		if (closed) throw new Error("larm_closed");
 		if (!voice) {
 			voice = createScope(options);
-			voice.onChange(notify);
+			voice.onChange(changes.notify);
 			if (retained) voice.retain(true);
 		}
 		return voice;
 	};
 	return {
 		retain(active: boolean) {
+			if (closed) return;
 			retained = active;
 			// An existing audio scope is enough to keep a visible chat warm.
-			if (main.current() || !voice) main.retain(active);
+			if (!active || main.current() || !voice) main.retain(active);
 			voice?.retain(active);
 		},
-		status(): LarmStatus {
-			const m = main.status(),
-				v = voice?.status();
-			const selected = m.state === "ready" ? m : v?.state === "ready" ? v : m;
-			return {
-				...selected,
-				capabilities: [
-					...new Set([...m.capabilities, ...(v?.capabilities ?? [])]),
-				],
-			};
-		},
-		connect(required: ProviderName[], signal?: AbortSignal, force = false) {
+		status,
+		async connect(
+			required: ProviderName[],
+			signal?: AbortSignal,
+			force = false,
+		) {
 			return required.every((n) => n === "llm")
 				? main.connect(["llm"], signal, force)
 				: speech().connect(required, signal, force);
 		},
-		withProvider<T>(
+		async withProvider<T>(
 			name: ProviderName,
 			signal: AbortSignal,
 			use: (p: Provider, id: string) => Promise<T>,
@@ -122,18 +135,14 @@ export function createProviderLeases(options: Options) {
 				...(voice?.current()?.providers ?? []),
 			]);
 		},
-		onChange(listener: () => void) {
-			listeners.add(listener);
-			return () => {
-				listeners.delete(listener);
-			};
-		},
+		onChange: changes.onChange,
 		async close(beforeRelease: () => Promise<void>, keepConnection = false) {
+			closed = true;
 			await Promise.all([
 				main.close(beforeRelease, keepConnection),
 				voice?.close(async () => {}, keepConnection),
 			]);
-			listeners.clear();
+			changes.close();
 		},
 	};
 }
@@ -163,7 +172,7 @@ function createScope({
 			baseConfigured: !!base,
 			profileSaved: !!profile,
 			connecting: !!creating || (!lease?.providers.size && pending.size > 0),
-			lastError,
+			lastError: lease?.providers.size ? undefined : lastError,
 			lease: lease?.providers.size ? lease : undefined,
 		});
 	const changes = createStatusChanges(status);
@@ -286,6 +295,7 @@ function createScope({
 						const p = current.providers.get(name);
 						if (
 							!force &&
+							!pendingRenewal(current) &&
 							p &&
 							(p.expiresAt ?? current.expiresAt) > Date.now() + 180_000
 						)

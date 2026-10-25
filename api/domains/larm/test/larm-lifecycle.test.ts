@@ -249,7 +249,7 @@ test("idle expiry during a health check cannot revive the released local lease",
 		await larm.close();
 	}
 });
-test("invalid ASR reclaim discards only its credential and preserves TTS", async () => {
+test("invalid ASR reclaim after rotation is rejected and TTS can reclaim independently", async () => {
 	const fake = lifecycleFixture(60000);
 	let claims = 0,
 		inferred = 0;
@@ -269,7 +269,7 @@ test("invalid ASR reclaim discards only its credential and preserves TTS", async
 		await larm.prepareVoice!(freshSignal());
 		await expect(
 			larm.transcribe(new Uint8Array(44), freshSignal()),
-		).rejects.toThrow("larm_renew_claim_mismatch");
+		).rejects.toThrow("larm_claim_mismatch");
 		expect(larm.inspect?.().providers).toEqual([]);
 		expect(inferred).toBe(0);
 		expect(await larm.transcribe(new Uint8Array(44), freshSignal())).toBe(

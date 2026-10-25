@@ -8,7 +8,7 @@ export function liveLarmSettings(env = process.env) {
 }
 export function createLiveLarm(
 	env = process.env,
-	options: { fetch?: typeof fetch } = {},
+	options: { fetch?: typeof fetch; keepAlive?: boolean } = {},
 ) {
 	const saved = liveLarmSettings(env);
 	if (!saved.baseUrl) throw new Error("saved_larm_connection_unconfigured");
