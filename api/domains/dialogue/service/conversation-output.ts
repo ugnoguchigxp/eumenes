@@ -2,6 +2,9 @@ import type { NativeTool } from "../../../infrastructure/chat-stream";
 import { getLogger } from "../../../infrastructure/logger";
 
 const log = getLogger("dialogue");
+/** Printable ASCII other than a space: what a call written as text is made of. */
+const ATTACHED = /[!-~]/;
+const ATTACHED_RUN = /[!-~]+$/;
 
 /**
  * Check control syntax only. Never interpret or execute an operation from text: control syntax written in the answer
@@ -56,7 +59,9 @@ export function conversationOutput(
 		return starts.length ? Math.min(...starts) : -1;
 	}
 	function tail(text: string) {
-		let held = 0;
+		// A run of ASCII without spaces may be the start of a call written as text (`create_music{question:<|`):
+		// it is held until a space or other text ends it, so control syntax found later takes it along.
+		let held = text.match(ATTACHED_RUN)?.[0].length ?? 0;
 		for (const prefix of prefixes)
 			if (text.endsWith(prefix)) held = Math.max(held, prefix.length);
 		// Hold a complete function name, and its opening bracket, until what follows shows whether it is a call.
@@ -64,11 +69,13 @@ export function conversationOutput(
 		if (opened) held = Math.max(held, opened[0].length);
 		return held;
 	}
-	/** Control syntax and everything after it is dropped: the text before it is the answer. */
+	/** Control syntax, the ASCII run it is attached to, and everything after it is dropped: the text before is the answer. */
 	function block(text: string, at: number) {
 		blocked = true;
 		pending = "";
-		send(text.slice(0, at).trimEnd());
+		let start = at;
+		while (start > 0 && ATTACHED.test(text[start - 1]!)) start--;
+		send(text.slice(0, start).trimEnd());
 		log.warn("dialogue.control_text_dropped", {
 			reason: "control_text_in_body",
 		});

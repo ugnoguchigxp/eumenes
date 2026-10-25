@@ -20,6 +20,14 @@ import { callerAborted, untilAborted, wait } from "./guards";
 
 const log = getLogger("larm");
 
+function preparationSignal(lifetime: AbortSignal, caller?: AbortSignal) {
+	return AbortSignal.any([
+		lifetime,
+		AbortSignal.timeout(60_000),
+		...(caller ? [caller] : []),
+	]);
+}
+
 function stopUsing(current: Lease) {
 	current.closing = true;
 	clearTimeout(current.renewTimer);
@@ -147,6 +155,7 @@ export function createLeaseManager({
 		requestProfile = false,
 	): Promise<Lease> {
 		signal?.throwIfAborted();
+		signal = preparationSignal(lifetime.signal, signal);
 		const scopedControl = (
 			path: string,
 			init: RequestInit,
@@ -308,7 +317,7 @@ export function createLeaseManager({
 		scheduleRenew,
 	});
 	const withProvider = createWithProvider({
-		connect,
+		connect: (_required, signal, force) => connect(["llm"], signal, force),
 		release,
 		discard,
 		scheduleIdle,

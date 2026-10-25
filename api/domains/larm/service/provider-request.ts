@@ -1,3 +1,4 @@
+import { getLogger } from "../../../infrastructure/logger";
 import { measureStage } from "../../../infrastructure/performance";
 import type { Fetcher, Provider } from "./profiles";
 
@@ -12,6 +13,14 @@ export function providerRequest(
 	/** The attempt's own time limit; the guard is kept a little longer than it. */
 	attemptMs = 0,
 ) {
+	signal.throwIfAborted();
+	if (!provider.requested && provider.startedAt !== undefined) {
+		provider.requested = true;
+		getLogger("larm").info("larm.provider_first_request", {
+			kind: provider.name,
+			durationMs: Math.round(performance.now() - provider.startedAt),
+		});
+	}
 	return measureStage(
 		"larm",
 		"response_headers",

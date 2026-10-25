@@ -1,7 +1,7 @@
 import { isNetworkError } from "../../../infrastructure/error-code";
 
 export const fallbackErrors =
-	/^(larm_unconfigured|larm_base_url_unconfigured|larm_(control|inference)_(429|502|503|504)|larm_connection_(failed|expired)|larm_expired|larm_credential_expired|larm_renew_busy|larm_connect_timeout|network_unavailable|local_timeout)$/;
+	/^(larm_unconfigured|larm_base_url_unconfigured|larm_(control|inference)_(429|502|503|504)|larm_connection_(failed|expired)|larm_provider_failed|larm_expired|larm_credential_expired|larm_renew_busy|larm_connect_timeout|network_unavailable|local_timeout)$/;
 
 /** Retry the same speech only for transport, readiness, or temporary provider failures. */
 export function isRetryableSpeechError(error: unknown): boolean {

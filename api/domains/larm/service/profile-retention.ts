@@ -34,7 +34,7 @@ export async function repeatProfile(
 	if (
 		created.profile !== current.request.profile ||
 		created.agentProfile !== current.agentProfile ||
-		created.status !== "ready" ||
+		["released", "expired"].includes(String(created.status)) ||
 		!Array.isArray(created.providers)
 	)
 		throw new Error("larm_invalid_connection");
@@ -48,8 +48,7 @@ export async function repeatProfile(
 		if (
 			!provider ||
 			provider.model !== previous.model ||
-			provider.protocol !== previous.protocol ||
-			provider.readiness !== "ready"
+			provider.protocol !== previous.protocol
 		)
 			throw new Error("larm_retention_provider_changed");
 	}

@@ -1,5 +1,5 @@
 import { useVoiceTurn } from "./turn";
-import { chunkTiming, timedVoiceAudio } from "./audio-timing";
+import { queueChunks, type ChunkQueue } from "./chunk-player";
 import { requestPreview, type RecognitionCandidate } from "./preview";
 import { commitIdleInput } from "./input-commit";
 import { useTranscription } from "./transcription";
@@ -37,12 +37,7 @@ export function useVoiceDialogue(
 	const [machine] = useState(createVoiceMachine);
 	const tokens = useRef(0);
 	const upload = useRef<{ token: number; tail: Promise<void> } | null>(null);
-	const queue = useRef<{
-		id: string;
-		epoch: number;
-		tail: Promise<void>;
-		finish?: () => void;
-	} | null>(null);
+	const queue = useRef<ChunkQueue | null>(null);
 	const candidate = useRef<RecognitionCandidate | null>(null);
 	const inputs = useRef(createInputLedger());
 	const [inputVersion, setInputVersion] = useState(0);
@@ -54,7 +49,6 @@ export function useVoiceDialogue(
 	} | null>(null);
 	const [recognitionId, setRecognitionId] = useState<string | null>(null);
 	const cancelPlayback = useCallback(() => {
-		queue.current?.finish?.();
 		queue.current = null;
 		machine.dispatch({ type: "playback_cancelled" });
 		setSubtitle(null);
@@ -139,76 +133,27 @@ export function useVoiceDialogue(
 				};
 				queue.current = playback;
 			}
-			const chunkQueue = playback;
-			const queued = () => machine.get().player?.epoch === chunkQueue.epoch;
-			for (const chunk of value.audioChunks) {
-				const key = `${value.utteranceId}:${chunk.index}`;
-				if (machine.get().delivered.has(key)) continue;
-				machine.dispatch({ type: "delivered_marked", key });
-				chunkQueue.tail = chunkQueue.tail
-					.then(async () => {
-						if (!canPlay() || !queued()) return;
-						const bytes = await timedVoiceAudio(
-							client,
-							chunkTiming(value.utteranceId, chunk.index),
-						);
-						if (!canPlay() || !queued()) return;
-						await new Promise<void>((resolve, reject) => {
-							chunkQueue.finish = resolve;
-							const ended = () => {
-								chunkQueue.finish = undefined;
-								setSubtitle((s) => (s?.key === key ? null : s));
-								setAvatarCue((cue) => (cue?.key === key ? null : cue));
-								if (!valid() || !queued()) {
-									resolve();
-									return;
-								}
-								void client
-									.voicePlayed(value.utteranceId, chunk.index)
-									.then(() =>
-										cache.invalidateQueries({
-											queryKey: [
-												queryRoots.voiceDialogue,
-												client.identity,
-												value.utteranceId,
-											],
-										}),
-									)
-									.then(() => resolve(), reject);
-							};
-							void controller.current
-								?.play(bytes, ended, {
-									waitForPrevious: true,
-									timing: chunkTiming(value.utteranceId, chunk.index),
-									volume: options.current?.outputVolume,
-									shouldPlay: () => canPlay() && queued(),
-									onStarted: () => {
-										if (!canPlay() || !queued()) return;
-										if ((options.current?.outputVolume ?? 1) > 0)
-											setAvatarCue({
-												key,
-												motion: chunk.delivery?.motion ?? "neutral",
-												speaking: true,
-											});
-									},
-								})
-								.then(() => {
-									if (!valid() || !queued()) resolve();
-									else if (chunk.text.trim())
-										setSubtitle({ key, text: chunk.text.trim() });
-								}, reject);
-						});
-					})
-					.catch((e) => {
-						if (valid()) {
-							setError(describeError(e));
-							controller.current?.stopPlayback();
-							cancelPlayback();
-							machine.dispatch({ type: "turn_released" });
-							void client.voiceCancel(value.utteranceId).catch(() => {});
-						}
-					});
-			}
+			queueChunks(value, playback, {
+				client,
+				cache,
+				controller: () => controller.current,
+				volume: () => options.current?.outputVolume,
+				delivered: (key) => machine.get().delivered.has(key),
+				markDelivered: (key) =>
+					machine.dispatch({ type: "delivered_marked", key }),
+				queued: () => machine.get().player?.epoch === playback.epoch,
+				valid: canPlay,
+				setSubtitle,
+				setAvatarCue,
+				fail: (e) => {
+					if (!valid()) return;
+					setError(describeError(e));
+					controller.current?.stopPlayback();
+					cancelPlayback();
+					machine.dispatch({ type: "turn_released" });
+					void client.voiceCancel(value.utteranceId).catch(() => {});
+				},
+			});
 			return;
 		}
 

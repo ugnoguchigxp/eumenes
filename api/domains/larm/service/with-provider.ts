@@ -1,6 +1,5 @@
 import { measureStage } from "../../../infrastructure/performance";
 import { withLogContext } from "../../../infrastructure/logger";
-import type { Capability } from "../contracts";
 import type { Lease, Provider, ProviderName } from "./profiles";
 import type { Control } from "./connect";
 import { readJson, record, untilAborted } from "./guards";
@@ -16,7 +15,7 @@ export function createWithProvider({
 	idleTimeoutMs,
 }: {
 	connect: (
-		required: Capability[],
+		required: ProviderName[],
 		signal?: AbortSignal,
 		force?: boolean,
 	) => Promise<Lease>;
@@ -26,8 +25,6 @@ export function createWithProvider({
 	control: Control;
 	idleTimeoutMs: number;
 }) {
-	/** Leases confirmed without an English voice; later English clauses skip the recheck. */
-	const withoutEnglish = new WeakSet<Lease>();
 	async function isReleased(
 		current: Lease,
 		signal: AbortSignal,
@@ -53,31 +50,24 @@ export function createWithProvider({
 		signal: AbortSignal,
 		use: (p: Provider, connectionId: string) => Promise<T>,
 	): Promise<T> {
-		const required: Capability[] =
-			name === "llm" ? ["llm"] : ["llm", "asr", "tts"];
+		const required: ProviderName[] =
+			name === "tts-english" ? ["tts", name] : [name];
 		for (let attempt = 0; ; attempt++) {
 			signal.throwIfAborted();
-			let current = await measureStage(
+			const current = await measureStage(
 				"larm",
 				"provider_ready",
 				() => untilAborted(connect(required, signal), signal),
 				{ kind: name },
 			);
-			let provider = current.providers.get(name);
-			if (name === "tts-english" && !provider && !withoutEnglish.has(current)) {
-				// A pre-deployment voice lease may lack the newly published role.
-				// Check its current control state before treating the role as absent.
-				current = await untilAborted(connect(required, signal, true), signal);
-				provider = current.providers.get(name);
-				if (!provider) withoutEnglish.add(current);
-			}
+			const provider = current.providers.get(name);
 			if (name === "tts-english" && !provider)
 				throw new Error("speech_tts_target_unavailable");
 			if (name === "system-one" && !provider)
 				throw new Error("larm_system_one_unavailable");
 			if (
 				!provider ||
-				current.expiresAt <= Date.now() + 10_000 ||
+				(provider.expiresAt ?? current.expiresAt) <= Date.now() + 10_000 ||
 				current.closing
 			)
 				throw new Error("larm_credential_expired");
@@ -86,10 +76,12 @@ export function createWithProvider({
 			const selected = provider;
 			try {
 				signal.throwIfAborted();
-				return await withLogContext(
+				const result = await withLogContext(
 					{ connectionId: current.id, leaseExpiresAt: current.expiresAt },
 					() => use(selected, current.id),
 				);
+				signal.throwIfAborted();
+				return result;
 			} catch (error) {
 				let unusable =
 					error instanceof LarmInferenceError &&

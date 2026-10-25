@@ -1,3 +1,4 @@
+import { getLogger } from "../../../infrastructure/logger";
 import type { Capability } from "../contracts";
 import type { Lease } from "./profiles";
 import {
@@ -59,6 +60,7 @@ export async function establishLease(
 		catalogRevision,
 		idempotencyKey,
 	};
+	const startedAt = performance.now();
 	let creationResult: Awaited<ReturnType<typeof createConnection>>;
 	try {
 		creationResult = await createConnection(scopedControl, creation);
@@ -76,6 +78,7 @@ export async function establishLease(
 	const { id, created } = creationResult;
 	try {
 		const readyInput = {
+			startedAt,
 			id,
 			required,
 			profile,
@@ -112,6 +115,14 @@ export async function establishLease(
 			}
 		}
 		const { expiresAt, providers } = claimed;
+		for (const [name, p] of providers) {
+			p.startedAt = startedAt;
+			getLogger("larm").info("larm.provider_claimed", {
+				connectionId: id,
+				kind: name,
+				durationMs: Math.round(performance.now() - startedAt),
+			});
+		}
 		signal?.throwIfAborted();
 		lifetime.throwIfAborted();
 		const current: Lease = {

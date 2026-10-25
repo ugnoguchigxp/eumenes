@@ -24,7 +24,7 @@ test("catalog, claim, ASR/LLM/TTS and release use public contract", async () => 
 	expect(await larm.transcribe(new Uint8Array(44), signal)).toBe("こんにちは");
 	expect((await larm.speak("承知しました", signal)).length).toBe(44);
 	await larm.close();
-	expect(fake.calls.filter((x) => x.includes("/claim"))).toHaveLength(2);
+	expect(fake.calls.filter((x) => x.includes("/claim"))).toHaveLength(3);
 	expect(fake.calls.filter((x) => x.startsWith("DELETE"))).toHaveLength(2);
 });
 test("a caller's deadline that aborts a shared connection attempt does not fail other callers", async () => {

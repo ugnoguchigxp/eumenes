@@ -150,3 +150,43 @@ test("a commit's browser timing is logged as numbers, and unknown timing fields 
 		configureLogging({ level: "silent" });
 	}
 });
+
+test("a played report's chunk gap is logged as numbers; a report without one still counts", async () => {
+	const lines: string[] = [];
+	configureLogging({
+		level: "info",
+		destination: { write: (line) => void lines.push(line) },
+	});
+	try {
+		const reported: unknown[] = [];
+		const app = new Hono();
+		registerVoiceDialogue(app, {
+			played: async (...args: unknown[]) => {
+				reported.push(args);
+				return { status: "synthesizing" };
+			},
+		} as unknown as VoiceDialogueService);
+		const report = (index: number, body: unknown) =>
+			app.request(`/api/voice/turns/${utteranceId}/played?index=${index}`, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify(body),
+			});
+		expect((await report(0, {})).status).toBe(200);
+		expect((await report(1, { gapMs: 40, fetchLateMs: 0 })).status).toBe(200);
+		expect((await report(2, { gapMs: 40, text: "続き" })).status).toBe(400);
+		const gaps = lines
+			.map((line) => JSON.parse(line))
+			.filter((e) => e.event === "voice.chunk_gap");
+		expect(gaps).toHaveLength(1);
+		expect(gaps[0]).toMatchObject({
+			utteranceId,
+			chunkIndex: 1,
+			gapMs: 40,
+			fetchLateMs: 0,
+		});
+		expect(reported).toHaveLength(2);
+	} finally {
+		configureLogging({ level: "silent" });
+	}
+});

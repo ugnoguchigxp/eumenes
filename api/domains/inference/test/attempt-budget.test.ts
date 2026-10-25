@@ -42,3 +42,14 @@ test("speech preserves explicit attempt limits and an almost exhausted overall d
 	r.deadline = Date.now() - 1;
 	expect(attemptDuration(r, "larm")).toBe(1);
 });
+
+test("ASR keeps its own 15-second local attempt and cloud reservation", () => {
+	const r = request(60_000);
+	r.row.purpose = "asr";
+	r.row.snapshot.routes.asr = {
+		mode: "larm-preferred",
+		cloudAllowed: true,
+	} as typeof r.row.snapshot.routes.asr;
+	expect(attemptDuration(r, "larm")).toBe(15_000);
+	expect(attemptDuration(r, "cloud")).toBe(30_000);
+});

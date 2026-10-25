@@ -180,7 +180,7 @@ test("manual connection check follows released state even with unexpired credent
 		await larm.close();
 	}
 });
-test("renew rotates every claimed provider while leaving the idle deadline unchanged", async () => {
+test("renew rotates the selected voice provider while leaving the idle deadline unchanged", async () => {
 	jest.useFakeTimers();
 	const fake = lifecycleFixture(60000);
 	const tokens: string[] = [];
@@ -191,21 +191,15 @@ test("renew rotates every claimed provider while leaving the idle deadline uncha
 	}, 120);
 	try {
 		await larm.prepareVoice!(freshSignal());
-		await larm.connect();
-		await larm.answer(question, freshSignal());
 		await larm.transcribe(new Uint8Array(44), freshSignal());
 		await larm.speak("確認", freshSignal());
-		expect(tokens).toEqual([
-			"Bearer secret-llm-2",
-			"Bearer secret-asr-2",
-			"Bearer secret-tts-2",
-		]);
+		expect(tokens).toEqual(["Bearer secret-asr-2", "Bearer secret-tts-2"]);
 		const before = fake.calls.length;
 		jest.advanceTimersByTime(70);
-		await larm.connect();
+		await larm.prepareVoice!(freshSignal());
 		jest.advanceTimersByTime(70);
 		expect(larm.status().state).toBe("idle");
-		expect(fake.calls.length).toBe(before + 1); // health check only; no idle keepalive
+		expect(fake.calls.length).toBe(before); // valid ASR claim needs no renewal and does not extend idle time
 	} finally {
 		jest.useRealTimers();
 		await larm.close();
@@ -255,7 +249,7 @@ test("idle expiry during a health check cannot revive the released local lease",
 		await larm.close();
 	}
 });
-test("invalid reclaim after renew discards every old credential before another request", async () => {
+test("invalid ASR reclaim discards only its credential and preserves TTS", async () => {
 	const fake = lifecycleFixture(60000);
 	let claims = 0,
 		inferred = 0;
@@ -266,20 +260,24 @@ test("invalid reclaim after renew discards every old credential before another r
 			const body = (await response.json()) as {
 				providers: Array<{ name: string; model: string }>;
 			};
-			body.providers.find((p) => p.name === "tts")!.model = "wrong-model";
+			body.providers.find((p) => p.name === "asr")!.model = "wrong-model";
 			return result(body);
 		}
 		return response;
 	});
 	try {
 		await larm.prepareVoice!(freshSignal());
-		await expect(larm.connect()).rejects.toThrow("larm_renew_claim_mismatch");
+		await expect(
+			larm.transcribe(new Uint8Array(44), freshSignal()),
+		).rejects.toThrow("larm_renew_claim_mismatch");
 		expect(larm.inspect?.().providers).toEqual([]);
 		expect(inferred).toBe(0);
 		expect(await larm.transcribe(new Uint8Array(44), freshSignal())).toBe(
 			"こんにちは",
 		);
-		expect(larm.inspect?.().connectionId).toBe("connection2");
+		expect(larm.inspect?.().connectionId).toBe("connection1");
+		expect((await larm.speak("確認", freshSignal())).length).toBe(44);
+		expect(fake.calls.some((c) => c.startsWith("DELETE"))).toBe(false);
 	} finally {
 		await larm.close();
 	}

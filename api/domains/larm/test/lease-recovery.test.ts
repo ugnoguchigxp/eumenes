@@ -126,7 +126,7 @@ test("failed replacement after GET 410 leaves no ready old lease and later recov
 });
 
 for (const end of ["cancel", "close"] as const)
-	test(`a ${end} during GET 410 replacement cleans the late claim without adoption`, async () => {
+	test(`a ${end} during voice acquisition leaves the primary scope independent`, async () => {
 		const fake = lifecycleFixture();
 		let gone = false;
 		const entered = Promise.withResolvers<void>(),
@@ -163,7 +163,11 @@ for (const end of ["cancel", "close"] as const)
 			resume.resolve();
 			expect(await rejection).toBeInstanceOf(Error);
 			await closing;
-			expect(port.inspect?.().connectionId).toBeUndefined();
+			if (end === "cancel") {
+				expect(port.inspect?.().connectionId).toBe("connection1");
+				expect(deleted).not.toContain("/v1/agent-connections/connection1");
+				await port.close();
+			} else expect(port.inspect?.().connectionId).toBeUndefined();
 			expect(deleted).toContain("/v1/agent-connections/connection2");
 		} finally {
 			resume.resolve();

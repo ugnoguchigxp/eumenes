@@ -189,7 +189,9 @@ workerは共通補正の拒否分類を `agent.control_rejected.validationCode` 
 | `uploadToShownMs` | 受付から入力欄に表示されるまで（ASR・変更通知・ブラウザの再取得） |
 | `audioMs` / `preRollMs` / `trailMs` | ASR に送った音声の長さ、そのうち確定前に残した分、最後の声の後の無音 |
 
-サーバー側の内訳は同じ `utteranceId`（ASR の `subjectId`）で、`performance.stage`（`purpose=asr`）の `provider_ready`（LARM 接続の待ち）と `response_headers`（認識）、`inference.attempt_*` の `source`・失敗理由、`voice.input_prepared` で見ます。`bun scripts/voice-latency.ts [--since TIME] [--limit 20]` が発話ごとに突き合わせて一覧にし、`uploadToShownMs` から ASR の所要（受付〜`voice.input_prepared`）を引いた残りを「通知と再取得」として出します。表示されなかった発話（空の文字起こし・取消）は記録されません。
+回答の音声は、区切りの再生が終わったときの再生報告（`POST /api/voice/turns/:id/played`）に、その区切りが前の区切りの終了から何ms後に鳴り始めたか（`gapMs`）と、音声の取得が前の区切りの終了より何ms遅れたか（`fetchLateMs`、間に合えば0）を添えます。サーバーは `voice.chunk_gap`（`utteranceId`・`chunkIndex`）に記録します。最初の区切りには付きません。
+
+サーバー側の内訳は同じ `utteranceId`（ASR の `subjectId`）で、`performance.stage`（`purpose=asr`）の `provider_ready`（LARM 接続の待ち）と `response_headers`（認識）、`inference.attempt_*` の `source`・失敗理由、`voice.input_prepared` で見ます。`bun scripts/voice-latency.ts [--since TIME] [--limit 20]` が発話ごとに突き合わせて一覧にし（回答ごとの区切りの間の無音の中央値・最大も出す）、`uploadToShownMs` から ASR の所要（受付〜`voice.input_prepared`）を引いた残りを「通知と再取得」として出します。表示されなかった発話（空の文字起こし・取消）は記録されません。
 
 ブラウザではUser Timingに次のイベントを残します。外部送信はせず、各名前につき最大64件、上限到達時にその名前の古い記録をクリアします。`detail` はrunIdまたはutteranceIdとchunkIndexだけです。
 

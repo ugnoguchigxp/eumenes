@@ -392,7 +392,7 @@ test("a missing English provider never reuses Japanese synthesis and is rechecke
 			).rejects.toThrow("speech_tts_target_unavailable");
 		expect(
 			fake.calls.filter((x) => x === "GET /v1/agent-connections/connection1"),
-		).toHaveLength(1);
+		).toHaveLength(2);
 		expect(
 			fake.calls.some(
 				(x) => x.includes("/systemone") || x.includes("/audio/speech"),

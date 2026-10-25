@@ -8,6 +8,7 @@ import {
 	replayInputSchema,
 	sampleInputSchema,
 	voiceStartSchema,
+	chunkPlayedSchema,
 	inputCommitSchema,
 } from "../contracts";
 
@@ -181,6 +182,14 @@ export function registerVoiceDialogue(
 		const index = Number(c.req.query("index") ?? 0);
 		if (!Number.isSafeInteger(index) || index < 0)
 			return c.json({ error: "invalid_audio_index" }, 400);
+		const parsed = await parseJsonBody(c, chunkPlayedSchema);
+		if (!parsed.ok) return parsed.response;
+		if (parsed.data.gapMs !== undefined)
+			log.info("voice.chunk_gap", {
+				utteranceId: c.req.param("id"),
+				chunkIndex: index,
+				...parsed.data,
+			});
 		const turn = await service.played(c.req.param("id"), index);
 		return turn ? c.json(turn) : c.json({ error: "not_found" }, 404);
 	});

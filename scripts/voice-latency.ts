@@ -7,6 +7,9 @@
  * and upload → transcript shown. Server side, matched by utteranceId: the wait for the LARM
  * connection (asr provider_ready), recognition (response_headers), the source used, and the rest of
  * upload → shown (change notification and the browser's refetch).
+ *
+ * Replies (voice.chunk_gap): per voice turn, the silence between its chunks and how late a chunk's
+ * audio arrived after the previous one ended.
  */
 import { existsSync } from "node:fs";
 import {
@@ -47,6 +50,7 @@ type Input = {
 	failures: string[];
 };
 const inputs = new Map<string, Input>();
+const gaps = new Map<string, { at: number; gap: number[]; late: number[] }>();
 const input = (id: string) => {
 	let found = inputs.get(id);
 	if (!found) {
@@ -66,7 +70,12 @@ await createLogReader(file).read((entry) => {
 	if (at === undefined || at < since) return;
 	const id = String(entry.utteranceId ?? entry.subjectId ?? "");
 	if (!/^[0-9a-f-]{36}$/.test(id)) return;
-	if (entry.event === "voice.input_timing") input(id).shown = entry;
+	if (entry.event === "voice.chunk_gap") {
+		const found = gaps.get(id) ?? { at, gap: [], late: [] };
+		found.gap.push(num(entry.gapMs));
+		found.late.push(num(entry.fetchLateMs));
+		gaps.set(id, found);
+	} else if (entry.event === "voice.input_timing") input(id).shown = entry;
 	else if (entry.event === "voice.input_prepared") input(id).prepared ??= at;
 	else if (
 		entry.purpose === "asr" &&
@@ -85,7 +94,7 @@ await createLogReader(file).read((entry) => {
 		if (entry.phase === "response_headers")
 			input(id).recognitionMs += num(entry.durationMs);
 	}
-}, /voice\.input_(timing|prepared)|"purpose":"asr"/);
+}, /voice\.input_(timing|prepared)|voice\.chunk_gap|"purpose":"asr"/);
 
 const rows = [...inputs.entries()]
 	.filter(([, i]) => i.shown)
@@ -117,13 +126,31 @@ const rows = [...inputs.entries()]
 			failed: i.failures.join(",") || "",
 		};
 	});
-if (!rows.length) {
+if (rows.length) {
+	console.log(
+		"Input, in ms. end→shown = silence + upload + (asr total + notify+fetch).",
+	);
+	console.table(rows);
+} else
 	console.log(
 		"No voice.input_timing yet: speak once with the updated web, then run again.",
 	);
-	process.exit(0);
-}
-console.log(
-	"All values in ms. end→shown = silence + upload + (asr total + notify+fetch).",
-);
-console.table(rows);
+const median = (values: number[]) =>
+	[...values].sort((a, b) => a - b)[Math.floor(values.length / 2)] ?? 0;
+const replies = [...gaps.entries()].slice(-limit).map(([id, g]) => ({
+	time: jstIso(g.at).slice(11, 19),
+	id: id.slice(0, 8),
+	chunks: g.gap.length + 1,
+	"gap median": median(g.gap),
+	"gap max": Math.max(...g.gap),
+	"late max": Math.max(...g.late),
+}));
+if (replies.length) {
+	console.log(
+		"Replies, in ms: silence between chunks; late = audio arrived after the previous chunk ended.",
+	);
+	console.table(replies);
+} else
+	console.log(
+		"No voice.chunk_gap yet: listen to a reply of two or more chunks with the updated web.",
+	);

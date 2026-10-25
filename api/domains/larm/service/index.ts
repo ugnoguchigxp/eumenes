@@ -14,7 +14,7 @@ import { createControl } from "./control";
 import { createInfer } from "./infer";
 import { createConversationYield } from "./conversation-yield";
 import { createHelperConnections } from "./helper-connections";
-import { createLeaseManager } from "./lease-manager";
+import { createProviderLeases as createLeaseManager } from "./provider-leases";
 import { leasePort } from "./lease-port";
 import { type Fetcher, type Provider } from "./profiles";
 import { localEndpoint, readJson, record, untilAborted } from "./guards";
@@ -148,7 +148,7 @@ export function createLarm(config: {
 			answerRequest(p, messages, signal, onDelta, options, {
 				profile,
 				request,
-				sameClaim: () => leases.current()?.providers.get("llm") === p,
+				sameClaim: () => leases.current("llm")?.providers.get("llm") === p,
 				send: (init) =>
 					infer(p, "chat/completions", init, signal, connectionId, options),
 			}),
@@ -306,10 +306,10 @@ export function createLarm(config: {
 			const lease = leases.current();
 			return {
 				profile,
-				decisionModel: lease?.providers.get("system-one")?.model ?? null,
+				decisionModel: leasePort(leases).decisionModel(),
 				...(lease ? { connectionId: lease.id } : {}),
 				providers: lease
-					? [...lease.providers.values()]
+					? [...leases.providers().values()]
 							.filter(
 								(p): p is Provider & { name: Capability | "tts-english" } =>
 									p.name === "llm" ||
@@ -334,8 +334,7 @@ export function createLarm(config: {
 		answer: (messages, signal, options) =>
 			answer(messages, signal, undefined, options),
 		answerStream: answer,
-		prepareVoice: (signal) =>
-			connect(["llm", "asr", "tts"], signal).then(() => {}),
+		prepareVoice: (signal) => connect(["asr"], signal).then(() => {}),
 		transcribe(wav, signal, options) {
 			// The user has spoken: the conversation's answer comes next, so its connection is freed now.
 			yielding.preempt();
@@ -346,7 +345,7 @@ export function createLarm(config: {
 		speak: createSpeechSynthesizer({
 			withProvider,
 			infer,
-			japaneseVoice: () => leases.current()?.providers.get("tts"),
+			japaneseVoice: () => leases.current("tts")?.providers.get("tts"),
 			readVoices,
 			voiceCatalogs,
 			config,

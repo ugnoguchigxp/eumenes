@@ -46,6 +46,19 @@ for (const text of [
 			expect(visible.join("")).not.toContain("＜parameter");
 		});
 
+test("an ASCII run attached to control syntax goes with it, even when it streamed first", () => {
+	for (const [text, answer] of [
+		['create_music{question:<|"|>夜の曲<|"|>}', ""],
+		['作りますね。create_music{question:<|"|>夜の曲<|"|>}', "作りますね。"],
+	] as const) {
+		const visible: string[] = [];
+		const output = conversationOutput((s) => visible.push(s), generationTools);
+		for (const c of text) output.delta(c);
+		expect(output.finish(text)).toBe(answer);
+		expect(visible.join("")).toBe(answer);
+	}
+});
+
 test("a name that is not an offered tool is ordinary text, and is published", () => {
 	const visible: string[] = [];
 	const output = conversationOutput((s) => visible.push(s), generationTools);

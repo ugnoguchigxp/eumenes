@@ -1,0 +1,113 @@
+{
+	"date": "2026-10-25",
+	"scope": "会話エージェントの冗長な予告・即時回答への付け足し・既出の結果の反復を、既存の共通指示で抑える",
+	"status": "instructions_adjusted_fixture_passed_live_unverified",
+	"evidence": [
+		{
+			"runId": "2bd3a2da-19d5-4d93-8840-1ee9ac74a521",
+			"observedAt": "2026-10-25T23:04:00+09:00",
+			"facts": [
+				"回答前の案内を三度繰り返していた。23:06にも天気と助言の自発発話があった。",
+				"実行記録APIにweather.forecast、place=東京、prefecture=東京都、day=tomorrowがある。",
+				"運用ログにdialogue.instant_answeredの成功がある。元の取得JSONと回答の数値の完全な照合は未実施。"
+			]
+		},
+		{
+			"source": "API /api/memory/items, /api/memory/context?conversationId=main, /api/conversations/main/continuity",
+			"facts": [
+				"長期記憶に簡潔さの希望があり、反復する案内の要求はなかった。途中報告の希望は長時間の調査・実装に限定されていた。",
+				"回答後に天気の確認済み内容が短期メモのgoalとして保存され、expiresAtがnullだった。これは最初の冗長な回答より後の記録であり、その回答の原因とは断定できない。",
+				"対象runへ渡した文脈そのものの過去snapshotは取得していない。記憶と指示それぞれの寄与の比較は未成立。"
+			]
+		},
+		{
+			"source": "node_modules/eumenes-agency/dist/application/respond-system.js, api/domains/dialogue/contexts/system-prompt/conversation.context.toml, api/domains/dialogue/service/executor-search.ts",
+			"facts": [
+				"agencyの汎用指示は依頼前後の案内を求め、Eumenesの指示も外部作業のすべてで予告する書き方だった。",
+				"即時回答の契約は予告なしで結果をtool結果として受け取りそのまま伝える方式である。",
+				"各tool呼出しに添えた本文は会話ループで連結される。これ自体は現行設計なので変更していない。"
+			]
+		}
+	],
+	"changes": [
+		"即時回答とTODOを作る依頼の案内規則を共通の道具の使い方へ集約した。",
+		"即時回答では予告・受付案内を付けず、answerの対象・日付・数値・条件・出典を保持して伝える。",
+		"TODOの予告は既存のannouncement欄へ一度だけ書き、本文へ重ねない。",
+		"通常の返答は答えと必要条件を先に伝え、了承・言い直し・求められていない助言を足さない。",
+		"既出の結果や助言を自発発話で言い換えて繰り返さない。自発発話そのものは維持した。",
+		"コンパイル済みSystemContextカタログを再生成した。"
+	],
+	"unchanged": [
+		"LLMによる担当選択・意味判断・回答生成",
+		"ツールのschema・実行機構・権限・結果の採用手順",
+		"保存済みの記憶・目標・設定",
+		"天気専用の分岐・正規表現・固定応答の追加なし",
+		"既存の別作業による変更には手を加えていない"
+	],
+	"validation": {
+		"contextBuild": "passed",
+		"contextCheck": "passed",
+		"formatAndDiffCheck": "passed",
+		"targetedInitialFixture": {
+			"command": "bun test api/domains/dialogue/test/system-prompt.test.ts api/domains/dialogue/test/generation.test.ts api/application/weather/weather-toolchain.test.ts",
+			"passed": 22,
+			"note": "初回指示調整後。続いて自発発話の従来の判断範囲を保つよう文面を調整し、最終版は下のdomain試験で確認。"
+		},
+		"domainFixture": {
+			"command": "bun run test:domain -- --domain dialogue --domain voice-dialogue",
+			"backendPassed": 455,
+			"webPassed": 63,
+			"failed": 0,
+			"note": "固定モデル・fixtureによる契約の試験であり、実モデルの指示遵守の証明ではない。"
+		},
+		"verify": {
+			"command": "bun run verify -- --domain dialogue --domain voice-dialogue",
+			"status": "failed_at_existing_size_budget",
+			"runId": "2026-10-25T14-19-51-773Z-1d670ba0-f40c-41cb-b193-6c8ec2829c0a",
+			"detail": "変更していないapi/domains/dialogue/service/index.ts#createDialogueServiceが304行で300行上限に抵触。上限・担当外コードを変更せず停止。後続の型検査等には到達していない。",
+			"unchangedSourceBlob": "6e081fc78ca3088d19dde51ca62426131598ca57"
+		},
+		"live": {
+			"status": "comparison_not_established",
+			"detail": "変更前の3ケースで回答を取得できなかった。4ケース目の途中で比較用プロセスのみ停止。採用可能な比較結果はなく、失敗の原因分類も未確定。稼働中サーバーの起動・停止・再起動はしていない。"
+		},
+		"acceptance": "実モデルでの短文化、稼働中backendへの反映、ブラウザからの通し受入・実機器受入は未確認。UIと音声実装は変更していない。",
+		"finalWeatherIntegration": {
+			"command": "bun test api/application/weather/weather-toolchain.test.ts",
+			"passed": 5,
+			"failed": 0
+		}
+	},
+	"behavioralRegressionCases": [
+		{
+			"input": "あしたの東京の天気を教えて。",
+			"context": "履歴なし",
+			"expected": "担当検索と即時取得を行い、予告なしで取得結果だけを伝える。"
+		},
+		{
+			"input": "あしたの東京の天気を教えて。",
+			"context": "過去のassistantが案内を三度繰り返し、古い雨の予報を話している",
+			"expected": "過去の口調と数値を模倣せず再取得し、今回の結果の日時・数値・条件を保って一度伝える。"
+		},
+		{
+			"input": "あしたの東京の天気を教えて。",
+			"context": "長い作業の途中報告を好む記憶と、古い天気回答を記したgoalがある",
+			"expected": "短い即時取得に途中報告の希望を広げず、古いgoalを最新の予報として使わない。"
+		},
+		{
+			"input": "東京は今何時？",
+			"context": "天気以外の即答できる担当が結果を返す",
+			"expected": "天気専用の処理なしに、同じ共通規則で結果だけを短く伝える。"
+		},
+		{
+			"input": "元気の出る曲を作って。",
+			"context": "TODOを作る担当へ依頼する",
+			"expected": "担当検索後、announcement欄で一度だけ予告して依頼し、本文で受付・待機の説明を重ねない。"
+		},
+		{
+			"input": "利用者の新しい発言なし",
+			"context": "天気の結果は伝達済み。新しい取得結果や訂正はない",
+			"expected": "同じ天気や傘の助言を自発発話で繰り返さない。"
+		}
+	]
+}

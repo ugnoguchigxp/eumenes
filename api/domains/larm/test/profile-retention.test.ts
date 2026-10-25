@@ -79,7 +79,7 @@ test("voice Profile subset and initial catalog revision are preserved by repeate
 		expect(fake.requests[0]!.providers).toBeUndefined();
 		expect(fake.requests[1]).toEqual(fake.requests[0]);
 		expect(fake.requests[2]).toEqual(fake.requests[0]);
-		expect(larm.status().capabilities).toEqual(["llm", "asr", "tts"]);
+		expect(larm.status().capabilities).toEqual(["asr"]);
 	} finally {
 		await larm.close();
 		jest.useRealTimers();

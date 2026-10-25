@@ -163,6 +163,11 @@ test("native decision shares the voice lease, uses its own auth, and rotates cre
 			questions,
 			freshSignal(),
 		);
+		await larm.judge!(
+			{ current_chunk: "こんにちは" },
+			questions,
+			freshSignal(),
+		);
 		await larm.speak("こんにちは", freshSignal());
 		expect(bodies).toEqual([
 			{
@@ -170,10 +175,18 @@ test("native decision shares the voice lease, uses its own auth, and rotates cre
 				state: { current_chunk: "こんにちは" },
 				questions,
 			},
+			{
+				model: "model-system-one",
+				state: { current_chunk: "こんにちは" },
+				questions,
+			},
 		]);
-		expect(tokens).toEqual(["Bearer secret-system-one-2"]);
+		expect(tokens).toEqual([
+			"Bearer secret-system-one-1",
+			"Bearer secret-system-one-2",
+		]);
 		expect(fake.requests).toHaveLength(1);
-		expect(larm.status().capabilities).toEqual(["llm", "asr", "tts"]);
+		expect(larm.status().capabilities).toEqual(["asr", "tts"]);
 		expect(fake.calls.filter((c) => c.endsWith("/renew"))).toHaveLength(1);
 	} finally {
 		await larm.close();

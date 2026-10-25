@@ -99,6 +99,10 @@ export interface LogFields {
 	encodeMs?: number;
 	uploadMs?: number;
 	uploadToShownMs?: number;
+	/** voice.chunk_gap: silence before a reply chunk, and how late its audio arrived. */
+	chunkIndex?: number;
+	gapMs?: number;
+	fetchLateMs?: number;
 	requestBytes?: number;
 	droppedMessages?: number;
 	promptTokens?: number;
@@ -163,6 +167,9 @@ const keys = new Set<keyof LogFields>([
 	"encodeMs",
 	"uploadMs",
 	"uploadToShownMs",
+	"chunkIndex",
+	"gapMs",
+	"fetchLateMs",
 	"omitted",
 	"messageCount",
 	"applied",

@@ -626,23 +626,18 @@ export function createAudioController(
 			} = {},
 		) {
 			const waitingEpoch = playbackEpoch;
+			if (!context || disposed) throw new Error("audio_not_started");
+			// Decoded while the previous one still plays, so the next starts right at its end.
+			const buffer = await timedAudioDecode(context, bytes, playOptions.timing);
 			if (playOptions.waitForPrevious && playback) await playbackDone;
 			if (
 				disposed ||
+				!context ||
 				waitingEpoch !== playbackEpoch ||
 				playOptions.shouldPlay?.() === false
 			)
 				return;
-			if (!context || disposed) throw new Error("audio_not_started");
 			this.stopPlayback();
-			const epoch = playbackEpoch;
-			const buffer = await timedAudioDecode(context, bytes, playOptions.timing);
-			if (
-				disposed ||
-				epoch !== playbackEpoch ||
-				playOptions.shouldPlay?.() === false
-			)
-				return;
 			const next = context.createBufferSource();
 			next.buffer = buffer;
 			const volume = playOptions.volume ?? 1;

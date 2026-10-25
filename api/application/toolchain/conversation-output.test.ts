@@ -19,7 +19,7 @@ async function until(check: () => boolean) {
 	await waitFor(check);
 	expect(check()).toBe(true);
 }
-test("voice does not display, persist or speak text-only control output: the run fails without a repair", async () => {
+test("voice does not display, persist or speak text-only control output: the reply is what came before it (here nothing)", async () => {
 	const f = musicFixture();
 	const spoken: string[] = [],
 		visible: string[] = [];
@@ -48,7 +48,7 @@ test("voice does not display, persist or speak text-only control output: the run
 		answerStream: async (messages, signal, delta, options) => {
 			const utterance = isUtteranceRound(options);
 			if (utterance) {
-				// Control text beside no tool call: it is withdrawn, and the generation fails (nothing asks for a repair).
+				// Control text beside no tool call: it is dropped, and the reply is the text before it (nothing here).
 				routes++;
 				for (const character of control) delta(character);
 				waiting = true;
@@ -77,9 +77,9 @@ test("voice does not display, persist or speak text-only control output: the run
 		expect(h.dialogue.progress(runId)?.text).toBe("");
 		expect(spoken).toEqual([]);
 		release();
-		await until(() =>
-			["ready", "failed"].includes(h.voice.get(id)?.status ?? ""),
-		);
+		// The reply is empty: the run completes and the turn ends without speech.
+		await until(() => h.dialogue.get(runId)?.status === "completed");
+		await until(() => h.voice.get(id)?.status === "played");
 		expect(routes).toBe(1);
 		expect(
 			visible.every(
@@ -91,7 +91,7 @@ test("voice does not display, persist or speak text-only control output: the run
 				.get("main")
 				.messages.every((m) => !m.text.includes(control)),
 		).toBe(true);
-		expect(h.dialogue.get(runId)?.status).toBe("failed");
+		expect(h.dialogue.get(runId)?.status).toBe("completed");
 		expect(h.dialogue.answerText(runId)).toBeNull();
 		expect(h.music!.list("main")).toEqual([]);
 		expect(f.requests.filter((r) => r.method === "POST")).toHaveLength(0);

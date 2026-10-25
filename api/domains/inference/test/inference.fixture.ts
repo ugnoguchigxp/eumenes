@@ -33,6 +33,7 @@ export async function setup(
 		local?: LarmPort["answer"];
 		localStream?: LarmPort["answerStream"];
 		localSpeech?: LarmPort["speak"];
+		localTranscribe?: LarmPort["transcribe"];
 		judge?: LarmPort["judge"];
 		prepareVoice?: LarmPort["prepareVoice"];
 		decisionMs?: number;
@@ -99,9 +100,11 @@ export async function setup(
 			(async () => {
 				throw new Error("larm_unconfigured");
 			}),
-		transcribe: async () => {
-			throw new Error("larm_control_503");
-		},
+		transcribe:
+			options.localTranscribe ??
+			(async () => {
+				throw new Error("larm_control_503");
+			}),
 		speak:
 			options.localSpeech ??
 			(async () => {

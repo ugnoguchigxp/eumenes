@@ -1,3 +1,4 @@
+import { getLogger } from "../../../infrastructure/logger";
 import { providerChatInput } from "./chat-input";
 import type { Capability } from "../contracts";
 import {
@@ -29,7 +30,7 @@ export type ProfileRequest = {
 	catalogRevision: string;
 };
 
-const terminalStatuses = ["failed", "expired", "released"];
+const terminalStatuses = ["expired", "released"];
 const providersOf = (value: Rec): Rec[] =>
 	Array.isArray(value.providers) ? value.providers.map(record) : [];
 
@@ -109,59 +110,87 @@ export async function createConnection(
 	return { id, created };
 }
 
-/** Stage 3: wait until the connection and every required provider are claimable. */
+/** Wait only for the selected Providers, including when another Provider failed. */
 export async function awaitReady(
 	control: Control,
 	pause: (ms: number) => Promise<void>,
 	input: {
 		id: string;
 		created: Rec;
-		required: Capability[];
+		required: string[];
 		profile: string;
 		agentProfile: unknown;
+		startedAt?: number;
+		kind?: ProviderName;
 	},
 ): Promise<Rec> {
 	let { created } = input;
 	const { id, required } = input;
-	if (terminalStatuses.includes(String(created.status)))
-		throw new Error(`larm_connection_${created.status}`);
-	// `claimable` is a short-lived probe cache: a live connection a restarted host gets back reports false while
-	// its claim succeeds, so readiness decides here and the claim itself confirms (see establishLease).
-	const providersPending = () => {
-		const providers = providersOf(created);
-		return required.some((name) => {
-			const provider = providers.find((p) => p.name === name);
-			return provider && provider.readiness !== "ready";
+	let previous = "";
+	const check = () => {
+		if (terminalStatuses.includes(String(created.status)))
+			throw new Error(`larm_connection_${created.status}`);
+		if (
+			created.id !== id ||
+			created.profile !== input.profile ||
+			created.agentProfile !== input.agentProfile ||
+			!Array.isArray(created.providers)
+		)
+			throw new Error("larm_invalid_connection");
+
+		const status = ["pending", "probing", "ready", "failed"].includes(
+			String(created.status),
+		)
+			? String(created.status)
+			: "unknown";
+		const states = required.map((name) => {
+			const p = providersOf(created).find((p) => p.name === name);
+			return [
+				"pending",
+				"probing",
+				"warming",
+				"ready",
+				"failed",
+				"expired",
+				"released",
+			].includes(String(p?.readiness))
+				? String(p?.readiness)
+				: "unknown";
+		});
+		const signature = `${status}:${states.join(",")}`;
+		if (signature !== previous && input.startedAt !== undefined) {
+			for (let i = 0; i < required.length; i++)
+				getLogger("larm").info("larm.provider_readiness", {
+					connectionId: id,
+					kind: input.kind ?? required[i],
+					status,
+					next: states[i],
+					durationMs: Math.round(performance.now() - input.startedAt),
+				});
+			previous = signature;
+		}
+		return required.every((name) => {
+			const p = providersOf(created).find((p) => p.name === name);
+			if (!p) throw new Error("larm_catalog_provider_missing");
+			if (["failed", "expired", "released"].includes(String(p.readiness)))
+				throw new Error("larm_provider_failed");
+			if (
+				p.readiness === "ready" &&
+				name in protocols &&
+				(p.protocol !== protocols[name as ProviderName] ||
+					p.endpoint !== endpoints[name as ProviderName])
+			)
+				throw new Error("larm_provider_not_ready");
+			return p.readiness === "ready";
 		});
 	};
-	// Capacity waiting is owned by LARM and the caller's cancellation/deadline.
-	// Never claim or infer before the connection and its providers are ready.
-	while (created.status !== "ready" || providersPending()) {
-		await pause(1000);
+	while (!check()) {
+		await pause(100);
 		created = record(
 			await readJson(
 				await control(`/v1/agent-connections/${id}`, { method: "GET" }, [200]),
 			),
 		);
-		if (terminalStatuses.includes(String(created.status)))
-			throw new Error(`larm_connection_${created.status}`);
-	}
-	if (
-		created.id !== id ||
-		created.profile !== input.profile ||
-		created.agentProfile !== input.agentProfile ||
-		!Array.isArray(created.providers)
-	)
-		throw new Error("larm_invalid_connection");
-	for (const name of required) {
-		const p = providersOf(created).find((p) => p.name === name);
-		if (
-			!p ||
-			p.protocol !== protocols[name] ||
-			p.endpoint !== endpoints[name] ||
-			p.readiness !== "ready"
-		)
-			throw new Error("larm_provider_not_ready");
 	}
 	return created;
 }
@@ -175,6 +204,7 @@ export async function claimProviders(
 		required: Capability[];
 		catalogProviders: Rec[];
 		fullProfile: boolean;
+		claimNames?: string[];
 		hosts: ProviderHosts;
 	},
 ): Promise<{ expiresAt: number; providers: Map<ProviderName, Provider> }> {
@@ -186,7 +216,10 @@ export async function claimProviders(
 				{
 					method: "POST",
 					headers: { "content-type": "application/json" },
-					body: JSON.stringify({ format: "openai-provider-v1" }),
+					body: JSON.stringify({
+						format: "openai-provider-v1",
+						providers: input.claimNames ?? required,
+					}),
 				},
 				[200],
 			),
@@ -194,7 +227,7 @@ export async function claimProviders(
 	);
 	if (
 		claimed.id !== id ||
-		claimed.status !== "ready" ||
+		terminalStatuses.includes(String(claimed.status)) ||
 		!Array.isArray(claimed.providers)
 	)
 		throw new Error("larm_invalid_claim");
@@ -319,8 +352,7 @@ function decisionProvider(
 		const announced = providersOf(created).find((p) => p.name === "system-one");
 		const info = providersOf(claimed).find((p) => p.name === "system-one");
 		if (
-			announced?.claimable === true &&
-			announced.readiness === "ready" &&
+			announced?.readiness === "ready" &&
 			info?.protocol === protocols["system-one"] &&
 			info.model === declared.model &&
 			info.model === announced.model
@@ -366,7 +398,10 @@ export async function renewProviders(
 			),
 		),
 	);
-	if (renewed.id !== current.id || renewed.status !== "ready")
+	if (
+		renewed.id !== current.id ||
+		terminalStatuses.includes(String(renewed.status))
+	)
 		throw new Error("larm_renew_invalid");
 	const claimed = record(
 		await readJson(
@@ -375,7 +410,12 @@ export async function renewProviders(
 				{
 					method: "POST",
 					headers: { "content-type": "application/json" },
-					body: JSON.stringify({ format: "openai-provider-v1" }),
+					body: JSON.stringify({
+						format: "openai-provider-v1",
+						providers: [...current.providers.values()].map(
+							(p) => p.claimName ?? p.name,
+						),
+					}),
 				},
 				[200],
 			),
@@ -383,7 +423,7 @@ export async function renewProviders(
 	);
 	if (
 		claimed.id !== current.id ||
-		claimed.status !== "ready" ||
+		terminalStatuses.includes(String(claimed.status)) ||
 		!Array.isArray(claimed.providers)
 	)
 		throw new Error("larm_invalid_claim");

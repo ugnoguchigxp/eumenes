@@ -397,15 +397,29 @@ for (const status of ["responding", "ready"] as const)
 		let speech = () => {},
 			segment = (_wav: Uint8Array) => {},
 			sessionId = "";
+		// Like the controller: a chunk waits for the one playing to end (or be stopped), and only
+		// what actually starts is recorded.
 		const endings: Array<() => void> = [];
 		const starts: Array<() => void> = [];
+		let finishCurrent = () => {};
+		let currentDone = Promise.resolve();
 		const play = vi.fn(
 			async (
 				_bytes: Uint8Array,
 				onEnded: () => void,
 				options?: Parameters<AudioController["play"]>[2],
 			) => {
-				endings.push(onEnded);
+				if (options?.waitForPrevious) await currentDone;
+				if (options?.shouldPlay?.() === false) return;
+				let finish = () => {};
+				currentDone = new Promise<void>((resolve) => {
+					finish = resolve;
+				});
+				finishCurrent = finish;
+				endings.push(() => {
+					finish();
+					onEnded();
+				});
 				starts.push(options?.onStarted ?? (() => {}));
 			},
 		);
@@ -415,7 +429,7 @@ for (const status of ["responding", "ready"] as const)
 			return {
 				start: async () => {},
 				stop: async () => {},
-				stopPlayback: () => {},
+				stopPlayback: () => finishCurrent(),
 				play,
 			};
 		};
@@ -467,8 +481,9 @@ for (const status of ["responding", "ready"] as const)
 		);
 		await act(async () => hook.result.current.start());
 		act(() => segment(new Uint8Array(44)));
-		await waitFor(() => expect(play).toHaveBeenCalledTimes(1));
-		expect(voiceAudio).toHaveBeenCalledTimes(1);
+		await waitFor(() => expect(starts).toHaveLength(1));
+		// Both listed chunks are fetched at once; the second waits for the first to end.
+		expect(voiceAudio).toHaveBeenCalledTimes(2);
 		expect(hook.result.current.avatarCue).toBeNull();
 		act(() => starts[0]?.());
 		expect(hook.result.current.avatarCue?.motion).toBe("greeting");
@@ -478,7 +493,7 @@ for (const status of ["responding", "ready"] as const)
 			speech();
 			segment(new Uint8Array(44));
 		});
-		await waitFor(() => expect(play).toHaveBeenCalledTimes(2));
+		await waitFor(() => expect(starts).toHaveLength(2));
 		expect(hook.result.current.avatarCue).toBeNull();
 		act(() => starts[0]?.());
 		expect(hook.result.current.avatarCue).toBeNull();
@@ -492,7 +507,7 @@ for (const status of ["responding", "ready"] as const)
 			endings[0]?.();
 			endings[1]?.();
 		});
-		await waitFor(() => expect(play).toHaveBeenCalledTimes(3));
+		await waitFor(() => expect(starts).toHaveLength(3));
 		act(() => starts[2]?.());
 		expect(hook.result.current.avatarCue).toMatchObject({
 			motion: status === "responding" ? "listening" : "neutral",
@@ -501,7 +516,7 @@ for (const status of ["responding", "ready"] as const)
 		await act(async () => endings[2]?.());
 		expect(hook.result.current.avatarCue).toBeNull();
 		expect(voicePlayed).not.toHaveBeenCalledWith(oldId, expect.anything());
-		expect(voiceAudio.mock.calls.map((call) => call[1])).toEqual([0, 0, 1]);
+		expect(voiceAudio.mock.calls.map((call) => call[1])).toEqual([0, 1, 0, 1]);
 		hook.unmount();
 		query.clear();
 	});

@@ -310,7 +310,8 @@ test("without interruption the next response waits, while superseded waiting aud
 		connect: () => void;
 		buffer: unknown;
 	}> = [];
-	let started = 0;
+	let started = 0,
+		decoded = 0;
 	vi.stubGlobal("navigator", {
 		mediaDevices: {
 			getUserMedia: async () => ({ getTracks: () => [{ stop: () => {} }] }),
@@ -328,6 +329,7 @@ test("without interruption the next response waits, while superseded waiting aud
 			return { connect: () => {}, disconnect: () => {} };
 		}
 		async decodeAudioData() {
+			decoded++;
 			return {};
 		}
 		createBufferSource() {
@@ -364,11 +366,14 @@ test("without interruption the next response waits, while superseded waiting aud
 	await waiting;
 	expect(started).toBe(1);
 	await audio.play(new Uint8Array(44), () => {});
+	const decodedBefore = decoded;
 	const next = audio.play(new Uint8Array(44), () => {}, {
 		waitForPrevious: true,
 	});
 	await Promise.resolve();
 	expect(started).toBe(2);
+	// The waiting chunk is already decoded, so it can start right at the previous one's end.
+	expect(decoded).toBe(decodedBefore + 1);
 	sources[1]!.onended?.();
 	await next;
 	expect(started).toBe(3);

@@ -28,7 +28,6 @@ export function englishSpeechProvider(
 	if (
 		!info ||
 		!announced ||
-		announced.claimable !== true ||
 		announced.readiness !== "ready" ||
 		info.model !== declared.model ||
 		info.model !== announced.model ||

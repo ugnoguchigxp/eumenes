@@ -95,6 +95,15 @@ export const inputTimingSchema = z
 	})
 	.strict();
 export type InputTiming = z.infer<typeof inputTimingSchema>;
+/**
+ * Sent with a chunk's played report: the silence before it started after the previous chunk ended,
+ * and how late its audio arrived relative to that end (ms, numbers only).
+ */
+export const chunkPlayedSchema = z
+	.object({ gapMs: ms, fetchLateMs: ms })
+	.partial()
+	.strict();
+export type ChunkGap = { gapMs: number; fetchLateMs: number };
 export const inputCommitSchema = z
 	.object({
 		revision: z.number().int().nonnegative(),

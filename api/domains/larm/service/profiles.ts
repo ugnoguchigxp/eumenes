@@ -6,6 +6,9 @@ export type ProviderName = Capability | "system-one" | "tts-english";
 export type Provider = {
 	/** External catalog name, retained across renewal when the internal role differs. */
 	claimName?: string;
+	expiresAt?: number;
+	startedAt?: number;
+	requested?: boolean;
 	chatInput?: ChatInput;
 	vision?: boolean;
 	name: ProviderName;
@@ -26,6 +29,9 @@ export type Lease = {
 	/** Exact original Profile request; periodic use preserves its session scope and revision. */
 	request: ProfileRequest;
 	id: string;
+	state?: Record<string, unknown>;
+	catalogProviders?: Record<string, unknown>[];
+	startedAt?: number;
 	expiresAt: number;
 	providers: Map<ProviderName, Provider>;
 	agentProfile: string;

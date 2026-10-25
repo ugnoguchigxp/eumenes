@@ -3,6 +3,7 @@ import {
 	replaySentencesSchema,
 	voiceTurnSchema,
 	type InputTiming,
+	type ChunkGap,
 } from "../api/domains/voice-dialogue/contracts";
 import { avatarMotionSchema } from "../api/domains/delivery/contracts";
 import { z } from "zod";
@@ -109,12 +110,12 @@ export function voiceDialogueClient(transport: Transport) {
 					)
 				).arrayBuffer(),
 			),
-		voicePlayed: async (id: string, index?: number) =>
+		voicePlayed: async (id: string, index?: number, gap?: ChunkGap) =>
 			voiceTurnSchema.parse(
 				await (
 					await transport.call(
 						`/api/voice/turns/${encodeURIComponent(id)}/played${index === undefined ? "" : `?index=${index}`}`,
-						json({}),
+						json(gap ?? {}),
 					)
 				).json(),
 			),
