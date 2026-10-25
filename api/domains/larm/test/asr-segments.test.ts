@@ -143,6 +143,29 @@ test("every bounded request carries the fixed ASR language", async () => {
 	expect(languages).toEqual(["ja", "ja", "ja"]);
 });
 
+test.each([
+	["a detected language outside the accepted ones is noise", "Spanish", ""],
+	["an accepted detected language is heard", "Japanese", "了解"],
+	["an unreported language is heard", undefined, "了解"],
+] as const)("%s", async (_label, language, expected) => {
+	const text = await transcribeWav(
+		provider,
+		pcm(1),
+		async () =>
+			Response.json({
+				text: language === "Spanish" ? "seis" : "了解",
+				language,
+			}),
+		new AbortController().signal,
+		"fixture-connection",
+		{
+			asrLanguage: "ja",
+			asrAcceptedLanguages: ["ja", "japanese", "en", "english"],
+		},
+	);
+	expect(text).toBe(expected);
+});
+
 test.each(["failure", "cancel"])(
 	"a %s after the first part yields no partial transcript or later request",
 	async (mode) => {

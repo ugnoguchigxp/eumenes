@@ -3,6 +3,34 @@ import type { Provider } from "./profiles";
 import type { createInfer } from "./infer";
 import { readJson, record } from "./guards";
 import { asrWavSegments } from "./asr-wav";
+import { getLogger } from "../../../infrastructure/logger";
+
+const log = getLogger("larm");
+
+/**
+ * A transcript the provider reports in a language outside the accepted ones is noise (ASR turns
+ * keyboard clicks into short text of arbitrary languages) and counts as nothing heard. A provider
+ * that reports no language is taken as heard.
+ */
+function heard(body: Record<string, unknown>, options?: LarmCallOptions) {
+	const text = body.text;
+	if (typeof text !== "string") throw new Error("larm_invalid_contract");
+	// Only a plain language name or code is read (and logged); anything else counts as unreported.
+	const reported =
+		typeof body.language === "string" ? body.language.trim().toLowerCase() : "";
+	const language = /^[a-z][a-z -]{0,31}$/.test(reported) ? reported : null;
+	const accepted =
+		!language ||
+		!options?.asrAcceptedLanguages ||
+		options.asrAcceptedLanguages.includes(language);
+	// kind: the language the provider detected; next: the language it was fixed to.
+	log.info("larm.asr_transcribed", {
+		...(language ? { kind: language } : {}),
+		...(options?.asrLanguage ? { next: options.asrLanguage } : {}),
+		outcome: accepted ? "heard" : "language_not_allowed",
+	});
+	return accepted ? text : "";
+}
 
 /** One adopted transcript, even when the provider needs several bounded audio requests. */
 export async function transcribeWav(
@@ -35,9 +63,7 @@ export async function transcribeWav(
 			connectionId,
 			options,
 		);
-		const text = record(await readJson(response)).text;
-		if (typeof text !== "string") throw new Error("larm_invalid_contract");
-		texts.push(text);
+		texts.push(heard(record(await readJson(response)), options));
 		if (texts.join("\n").length > 4096)
 			throw new Error("larm_invalid_contract");
 	}

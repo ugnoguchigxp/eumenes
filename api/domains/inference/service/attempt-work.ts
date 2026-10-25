@@ -8,7 +8,10 @@ import type {
 	SpeechDelivery,
 } from "../../delivery/contracts";
 import type { Connection } from "../../settings";
-import { asrRequestLanguage } from "../../settings/contracts";
+import {
+	asrAcceptedLanguages,
+	asrRequestLanguage,
+} from "../../settings/contracts";
 import { controlJsonOptions, type Messages } from "../contracts";
 import { cloudRequest } from "./cloud";
 import { sessionCallOptions } from "./attempt-record";
@@ -95,6 +98,9 @@ export function callOptionsFor(r: Request, attemptId: string): LarmCallOptions {
 		...(r.row.purpose === "asr"
 			? {
 					asrLanguage: asrRequestLanguage(r.row.snapshot.general.asrLanguages),
+					asrAcceptedLanguages: asrAcceptedLanguages(
+						r.row.snapshot.general.asrLanguages,
+					),
 				}
 			: {}),
 

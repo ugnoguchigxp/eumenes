@@ -8,6 +8,7 @@ archive の基準: その文書が担当した実装がコードにあり、本�
 
 | 文書 | 状態 |
 | --- | --- |
+| [ml-voice-activity-detection-design-2026-10-25.md](ml-voice-activity-detection-design-2026-10-25.md) | 設計案・合意待ち・未実装。音声入力の発話検出を、音量比較から学習済みモデル（Silero VAD v5 を onnxruntime-web で実行）へ置き換え、キーボード音・物音を発話として検出しないようにする。再生中のエコー対策の規則、話し始めの欠け対策（確定前の音を1.0秒保持）、読み込み失敗時はフォールバックしない案、実機での受入基準を定義 |
 | [docling-desk-integration-design-2026-10-25.md](docling-desk-integration-design-2026-10-25.md) | 別タブの入口を実装。Docling domain検証、固定結合、実モデル選択、実ブラウザのWord/PDF OCR・停止・文書とログイン保持を確認。利用側・全体gateには担当外と共有ファイルの未解決事項あり。[受入記録](verification/docling-desk-2026-10-25/acceptance.md) |
 | [resource-uri-implementation-plan-2026-10-25.md](resource-uri-implementation-plan-2026-10-25.md) | 合意済み・P0〜P6 実装・固定試験済み（§13）。live・実機器の受入（P7）とサーバー反映は未実施。Eumenes内のリソース（生成物・TODO・会話の出来事）を `eumenes://<kind>/<id>` で指し、種類の登録＋ResourceAdapter（データドリブン）で開く・再生する・読む・探す。TODOの報告にリンク（`links_json`）を付けて完了報告の吹き出しにチップを出し、agency の `HostTodo` に担当名と `nextActions` を渡す。サブエージェントに `RESOURCES` 区画と説明文、`delegate` の `refs`、結果の `links` の検査。会話エージェントは番号 `a<n>` と即答の担当 `resources`（find・open・play・read）、画面への指示 `screen_commands`。run `f4764696`・`a3c89c6e` の対策 |
 | [memory-activity-indicator-design-2026-10-25.md](memory-activity-indicator-design-2026-10-25.md) | 合意済み・実装済み（fixture 検証済み、live 未確認）。会話画面の経路表示の右端に独立チップ「メモリー整理」を置き、表示中の会話で steward の unit のジョブが実行中（running）のときだけ点灯する。失敗中（`larm_preempted` の譲りは飛ばして判定）は赤い点と小さな ⚠ アイコンボタンを出し、既存のエラーレポートModal（LLM貼り付け用）を開く。`GET /api/steward/activity`・`/error-report` と既存の change 購読で更新 |

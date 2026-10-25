@@ -601,10 +601,12 @@ for (const [settingsLanguages, expected] of [
 ] as const)
 	test(`ASR is fixed to ${expected} when ${settingsLanguages.join("+")} are allowed`, async () => {
 		const languages: (string | undefined)[] = [];
+		let accepted: string[] | undefined;
 		const h = await setup(undefined, {
 			status: ready,
 			transcribe: async (_wav, _signal, options) => {
 				languages.push(options?.asrLanguage);
+				accepted = options?.asrAcceptedLanguages;
 				return "";
 			},
 		});
@@ -622,6 +624,12 @@ for (const [settingsLanguages, expected] of [
 		await h.voice.accept(session, 1, 1, id, wav());
 		await until(() => h.voice.get(id)?.status === "completed");
 		expect(languages).toEqual([expected]);
+		expect(accepted).toEqual(
+			settingsLanguages.flatMap((code) => [
+				code,
+				{ ja: "japanese", en: "english", ko: "korean" }[code],
+			]),
+		);
 	});
 
 test("empty final ASR creates no dialogue", async () => {

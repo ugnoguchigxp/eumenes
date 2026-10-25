@@ -563,12 +563,7 @@ export function createAudioController(
 						}
 						if (observation?.shouldFinalize) {
 							speaking = false;
-							detector = new VoiceActivityDetector({
-								sampleRate: context.sampleRate,
-								silenceTimeoutMs:
-									options.silenceMs ?? DEFAULT_VOICE_SILENCE_TIMEOUT_MS,
-								speechThresholdRms: options.threshold ?? 0.008,
-							});
+							detector?.restart();
 							flush();
 						}
 					}

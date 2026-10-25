@@ -2,6 +2,10 @@ export const DEFAULT_VOICE_SILENCE_TIMEOUT_MS = 1_500;
 const DEFAULT_SPEECH_THRESHOLD_RMS = 0.008;
 const DEFAULT_REQUIRED_SPEECH_MS = 240;
 const DEFAULT_CANDIDATE_RESET_MS = 200;
+/** Speech has gaps within this span, so its quietest frame is the room, not the voice. */
+const NOISE_WINDOW_MS = 1_500;
+/** Speech must be this many times the noise floor. */
+const NOISE_MARGIN = 3;
 
 type VoiceActivityDetectorOptions = {
 	sampleRate: number;
@@ -10,16 +14,6 @@ type VoiceActivityDetectorOptions = {
 	silenceTimeoutMs?: number;
 	candidateResetMs?: number;
 };
-
-/** Exponential moving average of RMS outside speech; threshold never drops below the base. */
-export function adaptiveThreshold(
-	noiseFloor: number,
-	rms: number,
-	base: number,
-) {
-	const next = 0.95 * noiseFloor + 0.05 * rms;
-	return { noiseFloor: next, threshold: Math.max(base, next * 3) };
-}
 
 export type VoiceActivityObservation = {
 	hasSpeech: boolean;
@@ -32,7 +26,12 @@ export class VoiceActivityDetector {
 	private readonly requiredSpeechSamples: number;
 	private readonly silenceTimeoutSamples: number;
 	private readonly candidateResetSamples: number;
-	private noiseFloor = 0;
+	private readonly noiseWindowSamples: number;
+	/** Recent frame levels feeding the noise floor, oldest first. */
+	private noise: Array<{ rms: number; samples: number }> = [];
+	private noiseSamples = 0;
+	/** Moving average used until a full window is heard. */
+	private warmupFloor = 0;
 	private speechSamples = 0;
 	private candidateSilenceSamples = 0;
 	private silenceSamples = 0;
@@ -63,6 +62,41 @@ export class VoiceActivityDetector {
 			candidateResetMs,
 			sampleRate,
 		);
+		this.noiseWindowSamples = millisecondsToSamples(
+			NOISE_WINDOW_MS,
+			sampleRate,
+		);
+	}
+
+	/** Starts the next utterance; the learned noise floor is kept. */
+	restart() {
+		this.speechSamples = 0;
+		this.candidateSilenceSamples = 0;
+		this.silenceSamples = 0;
+		this.speechDetected = false;
+		this.finalized = false;
+	}
+
+	/**
+	 * The quietest recent frame. Until a full window is heard (just after the microphone opens), a
+	 * moving average of the frames heard so far stands in for it.
+	 */
+	private noiseFloor() {
+		if (this.noiseSamples < this.noiseWindowSamples) return this.warmupFloor;
+		let floor = Infinity;
+		for (const { rms } of this.noise) floor = Math.min(floor, rms);
+		return floor;
+	}
+
+	private learnNoise(rms: number, samples: number) {
+		this.warmupFloor = 0.95 * this.warmupFloor + 0.05 * rms;
+		this.noise.push({ rms, samples });
+		this.noiseSamples += samples;
+		while (
+			this.noise.length > 1 &&
+			this.noiseSamples - this.noise[0]!.samples >= this.noiseWindowSamples
+		)
+			this.noiseSamples -= this.noise.shift()!.samples;
 	}
 
 	hasDetectedSpeech(): boolean {
@@ -75,21 +109,14 @@ export class VoiceActivityDetector {
 			return { hasSpeech: this.speechDetected, shouldFinalize: false, rms };
 		}
 
-		const threshold = adaptiveThreshold(
-			this.noiseFloor,
-			rms,
+		const threshold = Math.max(
 			this.speechThresholdRms,
-		).threshold;
+			this.noiseFloor() * NOISE_MARGIN,
+		);
 		const voiced = rms >= threshold;
-		// Once speech is confirmed only non-voiced frames feed the noise floor, so speech
-		// cannot raise its own threshold. Before that, steady noise above the base must
-		// still be able to raise it (otherwise it would never be learned).
-		if (!voiced || !this.speechDetected)
-			this.noiseFloor = adaptiveThreshold(
-				this.noiseFloor,
-				rms,
-				this.speechThresholdRms,
-			).noiseFloor;
+		// The room is learned only outside speech: a voice onset cannot lift the minimum, and the
+		// quiet parts of an utterance cannot creep the threshold up until it cuts the speaker off.
+		if (!this.speechDetected) this.learnNoise(rms, frame.length);
 		if (!this.speechDetected) {
 			if (voiced) {
 				this.speechSamples += frame.length;

@@ -156,6 +156,42 @@ export const asrLanguages = [
 	["mk", "マケドニア語"],
 ] as const;
 export type AsrLanguage = (typeof asrLanguages)[number][0];
+/** The English names ASR providers report a detected language with. */
+const asrLanguageNames: Record<AsrLanguage, string> = {
+	ja: "Japanese",
+	en: "English",
+	zh: "Chinese",
+	yue: "Cantonese",
+	ko: "Korean",
+	ar: "Arabic",
+	de: "German",
+	fr: "French",
+	es: "Spanish",
+	pt: "Portuguese",
+	id: "Indonesian",
+	it: "Italian",
+	ru: "Russian",
+	th: "Thai",
+	vi: "Vietnamese",
+	tr: "Turkish",
+	hi: "Hindi",
+	ms: "Malay",
+	nl: "Dutch",
+	sv: "Swedish",
+	da: "Danish",
+	fi: "Finnish",
+	pl: "Polish",
+	cs: "Czech",
+	fil: "Filipino",
+	fa: "Persian",
+	el: "Greek",
+	ro: "Romanian",
+	hu: "Hungarian",
+	mk: "Macedonian",
+};
+/** How a detected language of an allowed one may be reported: its code or English name, lower case. */
+export const asrAcceptedLanguages = (languages: readonly AsrLanguage[]) =>
+	languages.flatMap((code) => [code, asrLanguageNames[code].toLowerCase()]);
 /** ASR takes one language: Japanese whenever it is allowed, otherwise the first allowed one. */
 export const asrRequestLanguage = (languages: readonly AsrLanguage[]) =>
 	languages.includes("ja") ? "ja" : languages[0];

@@ -63,6 +63,11 @@ export type LarmCallOptions = {
 	speechLanguage?: SpeechLanguage;
 	/** ASR only: the language code the transcription is fixed to. */
 	asrLanguage?: string;
+	/**
+	 * ASR only: a transcript the provider reports in any other language (lower-case code or English name)
+	 * is noise and comes back empty.
+	 */
+	asrAcceptedLanguages?: string[];
 	tools?: NativeTool[];
 	/**
 	 * `required`: the provider must call one of `tools`; `none`: it must not (the tools only keep the prompt's prefix

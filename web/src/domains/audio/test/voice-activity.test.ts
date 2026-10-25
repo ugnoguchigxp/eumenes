@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-	adaptiveThreshold,
-	VoiceActivityDetector,
-} from "../controller/voice-activity";
+import { VoiceActivityDetector } from "../controller/voice-activity";
 
 const quiet = new Float32Array(1600);
 const speech = Float32Array.from({ length: 1600 }, (_, i) =>
@@ -41,24 +38,41 @@ const level = (rms: number) =>
 
 describe("adaptive speech threshold", () => {
 	it("keeps the base threshold in a quiet room", () => {
-		let state = { noiseFloor: 0, threshold: 0.008 };
-		for (let i = 0; i < 200; i++)
-			state = adaptiveThreshold(state.noiseFloor, 0.001, 0.008);
-		expect(state.threshold).toBe(0.008);
-	});
-
-	it("rises to about three times steady noise", () => {
-		let state = { noiseFloor: 0, threshold: 0.008 };
-		for (let i = 0; i < 200; i++)
-			state = adaptiveThreshold(state.noiseFloor, 0.01, 0.008);
-		expect(state.threshold).toBeGreaterThan(0.029);
-		expect(state.threshold).toBeLessThan(0.031);
+		const detector = new VoiceActivityDetector({ sampleRate: 16000 });
+		for (let i = 0; i < 200; i++) detector.observe(level(0.001));
+		for (let i = 0; i < 3; i++) detector.observe(level(0.009));
+		expect(detector.hasDetectedSpeech()).toBe(true);
 	});
 
 	it("does not treat a frame below the learned threshold as speech", () => {
 		const detector = new VoiceActivityDetector({ sampleRate: 16000 });
 		for (let i = 0; i < 100; i++) detector.observe(level(0.007));
 		for (let i = 0; i < 5; i++) detector.observe(level(0.02));
+		expect(detector.hasDetectedSpeech()).toBe(false);
+	});
+
+	it("detects speech a few times above the learned noise; the onset cannot raise it", () => {
+		const detector = new VoiceActivityDetector({ sampleRate: 16000 });
+		for (let i = 0; i < 30; i++) detector.observe(level(0.004));
+		for (let i = 0; i < 3; i++) detector.observe(level(0.016));
+		expect(detector.hasDetectedSpeech()).toBe(true);
+	});
+
+	it("keeps the learned noise floor across utterances", () => {
+		const detector = new VoiceActivityDetector({
+			sampleRate: 16000,
+			silenceTimeoutMs: 500,
+		});
+		for (let i = 0; i < 30; i++) detector.observe(level(0.005));
+		for (let i = 0; i < 3; i++) detector.observe(level(0.05));
+		expect(detector.hasDetectedSpeech()).toBe(true);
+		let finalized = false;
+		for (let i = 0; i < 10 && !finalized; i++)
+			finalized = detector.observe(level(0.005)).shouldFinalize;
+		expect(finalized).toBe(true);
+		detector.restart();
+		// Above the base threshold, below three times the noise kept from before.
+		for (let i = 0; i < 5; i++) detector.observe(level(0.012));
 		expect(detector.hasDetectedSpeech()).toBe(false);
 	});
 
