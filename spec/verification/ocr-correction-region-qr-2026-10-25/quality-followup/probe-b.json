@@ -1,0 +1,54 @@
+{
+  "date": "2026-10-25T05:02:20.929Z",
+  "results": [
+    {
+      "mode": "draft-vision",
+      "durationMs": 7479,
+      "model": "ornith-1.5-strix-lean",
+      "contractError": null,
+      "text": "製品の仕様や取扱方法\nなど詳細は右記の案内を\nご確認してください。\n\n型番: OCR-172 / AB-100\n\n定格: 12 V / 1.5 A",
+      "identifiersPreserved": false,
+      "exact": false,
+      "result": {
+        "blocks": [
+          {
+            "kind": "paragraph",
+            "text": "製品の仕様や取扱方法\nなど詳細は右記の案内を\nご確認してください。",
+            "evidence": {
+              "lineIndexes": [
+                0,
+                1,
+                2
+              ]
+            },
+            "uncertain": false,
+            "uncertainty": ""
+          },
+          {
+            "kind": "paragraph",
+            "text": "型番: OCR-172 / AB-100",
+            "evidence": {
+              "lineIndexes": [
+                3
+              ]
+            },
+            "uncertain": false,
+            "uncertainty": ""
+          },
+          {
+            "kind": "paragraph",
+            "text": "定格: 12 V / 1.5 A",
+            "evidence": {
+              "lineIndexes": [
+                4
+              ]
+            },
+            "uncertain": false,
+            "uncertainty": ""
+          }
+        ],
+        "excludedLines": []
+      }
+    }
+  ]
+}

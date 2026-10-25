@@ -1,3 +1,4 @@
+import { DotsMessagingView } from "./dots-messaging-components";
 import { GoogleAccountsView } from "./google-accounts-components";
 import { OcrMediaView, OcrPanelView } from "./ocr-components";
 import { ObjectRecognitionWorkspaceView } from "./object-recognition-components";
@@ -117,6 +118,7 @@ const CalculatorView = lazyView(() =>
 );
 
 const renderers = {
+	"dots-messaging": DotsMessagingView,
 	"google-accounts": GoogleAccountsView,
 	"ui-studio": UiStudioView,
 	"pipeline-studio": PipelineStudioView,

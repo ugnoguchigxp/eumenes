@@ -1,0 +1,40 @@
+{
+	"id": "ctx-f1-dev-01",
+	"family": "F1",
+	"split": "dev",
+	"seed": {
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "butler"
+		},
+		"events": [
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-25T04:00:00.000Z",
+				"text": "文章の構成と機器の構成を両方見直しています。"
+			}
+		]
+	},
+	"input": "さっきの構成を変えてください。",
+	"expect": {
+		"checks": [
+			{
+				"kind": "speaks"
+			},
+			{
+				"kind": "brief_spoken_reply"
+			},
+			{
+				"kind": "tool_not_called"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "follows_current_request",
+				"condition": "文章と機器のどちらか決められないので、一つの短い確認を返す。対象を勝手に選んで変更や委譲を実行しない。"
+			}
+		]
+	}
+}

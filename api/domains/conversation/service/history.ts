@@ -1,3 +1,4 @@
+import { readAttribution } from "../repository/attribution";
 import { historyFingerprint } from "./history-fingerprint";
 import { scanHistory, type HistoryPosition } from "./history-scan";
 import type { Database } from "bun:sqlite";
@@ -114,6 +115,7 @@ export function createHistory(now: () => number, outbox: OutboxOptions) {
 			messageId: row.id,
 			conversationId: s.owner.conversationId,
 			speaker: row.role,
+			...readAttribution(db, row.id),
 			createdAt: row.created_at,
 			...identity,
 			viewId,

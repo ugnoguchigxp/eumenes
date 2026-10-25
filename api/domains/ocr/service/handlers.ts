@@ -7,6 +7,7 @@ import { ocrGateway } from "./gateway";
 import type { Connection } from "../contracts";
 type Stage = "analyze" | "poll" | "cancel";
 type Deps = Parameters<typeof createOcr>[0] & {
+	onCompleted?: (db: Database, sourceId: string) => void;
 	enqueue: (db: Database, id: string, stage: Stage, delay?: number) => string;
 };
 const active = (s: string) =>
@@ -182,6 +183,7 @@ function registerStage(deps: Deps, stage: Stage) {
 							}
 						: { state: "completed", result },
 				);
+				if (v.state !== "cancelling") deps.onCompleted?.(db, r.id);
 				return "applied";
 			}
 			if (v.state === "cancelling") {

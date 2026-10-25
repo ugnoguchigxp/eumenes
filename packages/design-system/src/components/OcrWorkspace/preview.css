@@ -1,0 +1,91 @@
+.ocr-preview-tools {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.4rem;
+	align-items: center;
+	padding: 0.6rem 0;
+}
+.ocr-stage-scroll {
+	width: 100%;
+	overflow: auto;
+}
+.ocr-stage-scroll.expanded {
+	height: calc(100dvh - 10rem);
+}
+.ocr-stage {
+	position: relative;
+}
+.ocr-stage img,
+.ocr-stage video {
+	display: block;
+	width: 100%;
+	height: 100%;
+	object-fit: fill;
+}
+.ocr-stage svg {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	touch-action: none;
+	pointer-events: none;
+}
+.ocr-stage .ocr-stage-interactive {
+	cursor: crosshair;
+	pointer-events: auto;
+}
+.ocr-stage polygon {
+	pointer-events: auto;
+}
+.ocr-selection-region {
+	fill: rgb(37 99 235 / 0.08);
+	stroke: #2563eb;
+	stroke-width: 2;
+	vector-effect: non-scaling-stroke;
+	pointer-events: all;
+	cursor: move;
+}
+.ocr-region-handle {
+	fill: white;
+	stroke: #2563eb;
+	stroke-width: 2;
+	vector-effect: non-scaling-stroke;
+	cursor: nwse-resize;
+}
+.ocr-region-coordinates {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.7rem;
+	padding: 0.4rem;
+}
+.ocr-region-coordinates label {
+	display: flex;
+	flex-direction: column;
+	font-size: 0.8rem;
+	gap: 0.2rem;
+}
+.ocr-region-coordinates input {
+	width: 5rem;
+	color: var(--foreground);
+	background: var(--background);
+	border: 1px solid var(--border);
+	border-radius: 0.25rem;
+	padding: 0.3rem;
+}
+.fullscreen-dialog .ocr-preview-tools {
+	padding-right: 3rem;
+}
+.ocr-qr {
+	margin-top: 1.2rem;
+	border-top: 1px solid var(--border);
+	padding-top: 1rem;
+}
+.ocr-qr pre {
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
+.ocr-qr-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.4rem;
+}

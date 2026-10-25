@@ -39,6 +39,7 @@ function fixture(
 		mimeTypes?: Array<"image/jpeg" | "image/png" | "image/bmp">;
 		maxImageBytes?: number;
 		maxRequestBytes?: number;
+		editPlan?: boolean;
 	} = {},
 ) {
 	const dir = mkdtempSync(join(tmpdir(), "ocr-correction-"));
@@ -57,8 +58,24 @@ function fixture(
 			{ revisionId: "skill:ocr.correct@1", body: "根拠を付けて返す" },
 		],
 	} as Prepared;
+	if (options.editPlan) {
+		prepared.package.profileRevisionId = "profile:ocr.correct@3";
+		prepared.package.requiredSkillRevisionIds = ["skill:ocr.correct@3"];
+		prepared.dependencies = [
+			{ revisionId: "profile:ocr.correct@3", body: "保持箇所と訂正を指定する" },
+			{ revisionId: "skill:ocr.correct@3", body: "元文へ編集を適用する" },
+		] as Prepared["dependencies"];
+	}
+	const requestedPackages: string[] = [];
 	const capabilities = {
-		prepareActiveByIdInTransaction: () => prepared,
+		prepareActiveByIdInTransaction: (
+			_db: unknown,
+			_run: unknown,
+			id: string,
+		) => {
+			requestedPackages.push(id);
+			return prepared;
+		},
 		validateInTransaction: () => {},
 	} as unknown as Capabilities;
 	let calls = 0;
@@ -161,8 +178,101 @@ function fixture(
 		systemPrompt: () => systemPrompt,
 		sentImage: () => sentImage,
 		cancelledRequests,
+		requestedPackages,
 	};
 }
+test("new edit revision completes through the queue and exports the existing public result", async () => {
+	const h = fixture({
+		editPlan: true,
+		response: {
+			protectedSpans: [],
+			edits: [{ line: 0, wholeLine: true, after: "訂正" }],
+			blocks: [{ kind: "paragraph", parts: [{ line: 0 }], uncertain: false }],
+			excludedLines: [],
+		},
+	});
+	const png = await sharp({
+		create: { width: 100, height: 100, channels: 3, background: "white" },
+	})
+		.png()
+		.toBuffer();
+	const id = crypto.randomUUID();
+	await h.service.upload(
+		"alice",
+		"main",
+		new File([new Uint8Array(png)], "note.png", { type: "image/png" }),
+		id,
+	);
+	await until(() => h.service.get("alice", id).state === "completed");
+	const source = h.service.get("alice", id),
+		candidate = crypto.randomUUID();
+	await h.service.corrections!.create("alice", id, {
+		requestId: candidate,
+		conversationId: "main",
+		expectedRevision: source.revision,
+	});
+	await until(
+		() => h.service.corrections!.get("alice", candidate).state === "completed",
+	);
+	expect(h.requestedPackages).toEqual(["package:ocr.correct@3"]);
+	expect(h.systemPrompt()).toContain('"protectedSpans"');
+	expect(h.calls()).toBe(1);
+	expect(
+		correctionPlainText(h.service.corrections!.get("alice", candidate).result!),
+	).toBe("訂正");
+	expect(
+		h.service.corrections!.conversationText("alice", candidate).text,
+	).toContain("訂正");
+	expect(h.service.get("alice", id).result).toEqual(source.result);
+	const app = new Hono();
+	registerOcr(app, h.service, "alice", async () => ({ ok: true }));
+	const read = await app.request(
+		`/api/ocr/${id}/corrections/${candidate}?conversationId=main`,
+	);
+	expect(read.status).toBe(200);
+	expect(JSON.stringify(await read.json())).toContain("訂正");
+});
+test("invalid edit plans fail atomically and never retry with the legacy contract", async () => {
+	const h = fixture({
+		editPlan: true,
+		response: {
+			protectedSpans: [{ line: 0, text: "誤字" }],
+			edits: [{ line: 0, before: "誤字", after: "型番変更" }],
+			blocks: [{ kind: "paragraph", parts: [{ line: 0 }], uncertain: false }],
+			excludedLines: [],
+		},
+	});
+	const png = await sharp({
+		create: { width: 100, height: 100, channels: 3, background: "white" },
+	})
+		.png()
+		.toBuffer();
+	const id = crypto.randomUUID();
+	await h.service.upload(
+		"alice",
+		"main",
+		new File([new Uint8Array(png)], "note.png", { type: "image/png" }),
+		id,
+	);
+	await until(() => h.service.get("alice", id).state === "completed");
+	const source = h.service.get("alice", id),
+		candidate = crypto.randomUUID();
+	await h.service.corrections!.create("alice", id, {
+		requestId: candidate,
+		conversationId: "main",
+		expectedRevision: source.revision,
+	});
+	await until(
+		() => h.service.corrections!.get("alice", candidate).state === "failed",
+	);
+	expect(h.service.corrections!.get("alice", candidate).errorCode).toBe(
+		"ocr_correction_protected_edit",
+	);
+	expect(h.service.corrections!.get("alice", candidate).result).toBeNull();
+	expect(h.calls()).toBe(1);
+	expect(h.cancelledRequests).toHaveLength(1);
+	expect(h.service.get("alice", id).result).toEqual(source.result);
+});
 test("LLM correction preserves OCR, is idempotent, adopts explicitly, and enforces owner", async () => {
 	const h = fixture();
 	const png = await sharp({
@@ -230,7 +340,16 @@ test("a second correction on the same frame reports busy", async () => {
 	const wait = new Promise<void>((resolve) => {
 		release = resolve;
 	});
-	const h = fixture({ wait });
+	const h = fixture({
+		wait,
+		editPlan: true,
+		response: {
+			protectedSpans: [],
+			edits: [],
+			blocks: [{ kind: "paragraph", parts: [{ line: 0 }], uncertain: false }],
+			excludedLines: [],
+		},
+	});
 	const png = await sharp({
 		create: { width: 100, height: 100, channels: 3, background: "white" },
 	})

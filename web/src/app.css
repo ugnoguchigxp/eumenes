@@ -435,6 +435,14 @@ select:focus-visible {
 	background: var(--primary);
 	box-shadow: 0 0 8px var(--primary);
 }
+/* The steward runs beside the answer path, not on it: set apart by space instead of an arrow. */
+.route-part.route-steward {
+	margin-left: 14px;
+}
+.route-node.failed i {
+	background: var(--destructive);
+	box-shadow: 0 0 6px var(--destructive);
+}
 .chat-composer {
 	padding: 11px;
 	border: 1px solid var(--border);

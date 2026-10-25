@@ -3,6 +3,7 @@ import type { ConversationEvent } from "../../continuity";
 import type { ProfileItem } from "../../memory";
 import {
 	DOCUMENT_SECTIONS,
+	eventLine,
 	RESULT_LINE_MAX_TOKENS,
 	renderDocument,
 	renderNow,
@@ -283,4 +284,23 @@ test("<now> holds the time, the triggers by number, the utterance being spoken a
 			"</now>",
 		].join("\n"),
 	);
+});
+
+test("external specialist replies and summaries keep their source instead of becoming self utterances", () => {
+	for (const toolchain of ["dots の返答", "dots の要約"]) {
+		const line = eventLine(
+			event("2026-10-25T09:00:00Z", "said", "specialist", {
+				toolchain,
+				text: "外部担当の内容",
+				attribution: {
+					namespace: "dots",
+					sourceId: "reply",
+					displayName: toolchain,
+				},
+			}),
+			refs,
+		);
+		expect(line).toContain(`担当 ${toolchain}:`);
+		expect(line).not.toContain("自分:");
+	}
 });

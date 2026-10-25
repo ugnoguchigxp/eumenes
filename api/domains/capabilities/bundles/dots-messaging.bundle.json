@@ -1,0 +1,137 @@
+{
+	"formatVersion": 1,
+	"bundleId": "dots-messaging",
+	"pins": [],
+	"definitions": [],
+	"bindings": [],
+	"artifacts": [
+		{
+			"kind": "artifact",
+			"id": "dots.messaging",
+			"revision": 1,
+			"title": "dots メッセージ",
+			"variants": [
+				{
+					"id": "standard",
+					"label": "標準",
+					"definition": {
+						"view": "dots-messaging",
+						"source": "dots-messaging",
+						"title": "dots メッセージ"
+					}
+				}
+			],
+			"defaultVariant": "standard",
+			"sourceBindings": [
+				{
+					"source": "dots-messaging",
+					"adapterRef": "adapter:dots-messaging@1",
+					"query": "query:dots-messaging.view@1",
+					"target": "optional"
+				}
+			],
+			"actionBindings": [
+				{
+					"actionId": "select",
+					"eventAction": "dots-message-select",
+					"source": "dots-messaging",
+					"inputSchemaRef": "schema:dots-message-select@1",
+					"effect": "local"
+				},
+				{
+					"actionId": "toggle",
+					"eventAction": "dots-message-toggle",
+					"source": "dots-messaging",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "local"
+				},
+				{
+					"actionId": "send",
+					"eventAction": "dots-message-send",
+					"source": "dots-messaging",
+					"inputSchemaRef": "schema:dots-message-send@1",
+					"effect": "local"
+				},
+				{
+					"actionId": "cancel",
+					"eventAction": "dots-message-cancel",
+					"source": "dots-messaging",
+					"inputSchemaRef": "schema:dots-message-cancel@1",
+					"effect": "local"
+				},
+				{
+					"actionId": "refresh",
+					"eventAction": "dots-message-refresh",
+					"source": "dots-messaging",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "local"
+				},
+				{
+					"actionId": "more",
+					"eventAction": "dots-message-more",
+					"source": "dots-messaging",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "local"
+				}
+			],
+			"launcher": {
+				"label": "dots メッセージ",
+				"order": 85
+			}
+		}
+	],
+	"schemas": [
+		{
+			"id": "dots-message-send",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"properties": {
+					"text": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 32768
+					}
+				},
+				"required": ["text"],
+				"additionalProperties": false
+			},
+			"kind": "schema"
+		},
+		{
+			"id": "dots-message-select",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"properties": {
+					"connectionRef": {
+						"type": "string"
+					}
+				},
+				"required": ["connectionRef"],
+				"additionalProperties": false
+			},
+			"kind": "schema"
+		},
+		{
+			"id": "dots-message-cancel",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"properties": {
+					"messageId": {
+						"type": "string"
+					},
+					"expectedRevision": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 20
+					}
+				},
+				"required": ["messageId", "expectedRevision"],
+				"additionalProperties": false
+			},
+			"kind": "schema"
+		}
+	]
+}

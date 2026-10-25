@@ -109,6 +109,11 @@ export function useWorkspace({
 		queryFn: () => client.inferenceUsage(),
 		retry: 0,
 	});
+	const stewardActivity = useQuery({
+		queryKey: [queryRoots.steward, client.identity, "main"],
+		queryFn: ({ signal }) => client.stewardActivity("main", signal),
+		retry: 0,
+	});
 	const actualModel = usage.data?.find(
 		(u) => u.purpose === "llm" && u.accepted,
 	);
@@ -340,6 +345,9 @@ export function useWorkspace({
 		submit,
 		cancel,
 		specialist,
+		stewardActivity,
+		stewardErrorReport: (signal: AbortSignal) =>
+			client.stewardErrorReport("main", signal),
 	};
 }
 

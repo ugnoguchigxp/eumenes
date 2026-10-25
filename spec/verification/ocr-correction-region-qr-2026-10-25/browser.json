@@ -1,0 +1,39 @@
+{
+  "passed": true,
+  "lane": "browser-with-in-process-api-and-fixture-ocr",
+  "pageErrors": [],
+  "requests": [
+    {
+      "path": "/api/ocr",
+      "method": "GET"
+    },
+    {
+      "path": "/api/settings/ocr",
+      "method": "GET"
+    },
+    {
+      "path": "/api/ocr",
+      "method": "POST"
+    },
+    {
+      "path": "/api/ocr",
+      "method": "GET"
+    },
+    {
+      "path": "/api/ocr/ce4ee4d2-fee0-41f1-ab59-d1fe96c827a0/qr",
+      "method": "GET"
+    },
+    {
+      "path": "/api/ocr/ce4ee4d2-fee0-41f1-ab59-d1fe96c827a0/corrections",
+      "method": "GET"
+    },
+    {
+      "path": "/api/ocr/ce4ee4d2-fee0-41f1-ab59-d1fe96c827a0/content",
+      "method": "GET"
+    },
+    {
+      "path": "/api/ocr/ce4ee4d2-fee0-41f1-ab59-d1fe96c827a0/qr",
+      "method": "GET"
+    }
+  ]
+}

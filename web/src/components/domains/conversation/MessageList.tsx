@@ -127,7 +127,8 @@ export const MessageList = memo(function MessageList({
 							className={`message message-${message.role}${message.id === editingId ? " message-editing" : ""}`}
 						>
 							<small className="message-author">
-								{message.role === "user" ? "あなた" : assistantLabel}
+								{message.attribution?.displayName ??
+									(message.role === "user" ? "あなた" : assistantLabel)}
 								{message.role === "assistant" && (
 									<EmotionIcon delivery={message.delivery} />
 								)}

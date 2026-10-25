@@ -7,7 +7,7 @@ import {
 	createCommands,
 	createConfiguration,
 	createInbox,
-	type Command,
+	type TaskCommand as Command,
 	type Project,
 } from "../../domains/dots";
 import type {

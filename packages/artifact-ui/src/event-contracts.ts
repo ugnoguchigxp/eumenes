@@ -6,6 +6,12 @@ export type ArtifactEvent = {
 	source: string;
 	revision: number;
 	action:
+		| "dots-message-select"
+		| "dots-message-toggle"
+		| "dots-message-send"
+		| "dots-message-cancel"
+		| "dots-message-refresh"
+		| "dots-message-more"
 		| OcrAction
 		| WorkspaceAction
 		| KanbanEventAction

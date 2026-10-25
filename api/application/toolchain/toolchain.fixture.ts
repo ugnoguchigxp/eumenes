@@ -722,6 +722,8 @@ export async function harness(
 				queue,
 				connection: () => settings.ocrCredentials(),
 				fetcher: options.ocrFetcher,
+				inference,
+				capabilities: () => activeCapabilities,
 			})
 		: undefined;
 	let activeCapabilities: import("../../domains/capabilities").Capabilities;

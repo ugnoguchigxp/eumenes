@@ -21,12 +21,18 @@ export function createCommands(store: SqliteStore, now: () => number) {
 			repo.putCommand(db, c);
 			return c;
 		},
-		prepareInTransaction(db: Database, c: Command) {
+		prepareInTransaction<T extends Command>(db: Database, c: T): T {
 			const old = repo.command(db, c.commandId);
 			if (old) {
-				if (old.taskId !== c.taskId || old.kind !== c.kind)
+				if (
+					old.taskId !== c.taskId ||
+					old.kind !== c.kind ||
+					(old.kind === "message" &&
+						c.kind === "message" &&
+						old.messageId !== c.messageId)
+				)
 					throw new Error("dots_conflict");
-				return old;
+				return old as T;
 			}
 			if (
 				(

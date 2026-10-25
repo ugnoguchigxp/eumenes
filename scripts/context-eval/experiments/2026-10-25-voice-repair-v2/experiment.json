@@ -1,0 +1,10 @@
+{
+	"name": "2026-10-25-voice-repair-v2",
+	"trials": 1,
+	"concurrency": 1,
+	"toolsCatalog": "tools-catalog.json",
+	"adoption": {
+		"minNetGain": 0,
+		"maxLatencyRatio": 1
+	}
+}

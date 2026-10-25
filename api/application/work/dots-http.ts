@@ -1,3 +1,5 @@
+import { registerDotsMessaging } from "./dots-messaging-http";
+import type { DotsMessages } from "./dots-messages";
 import type { Hono } from "hono";
 import { parseJsonBody } from "../../infrastructure/http";
 import { z } from "zod";
@@ -15,8 +17,9 @@ import {
 	ref,
 	connectionInput,
 	projectInput,
+	messageReplyInput,
 } from "../../domains/dots";
-import { coordinatorSkill } from "../../domains/capabilities";
+import { dotsMcpSkill as coordinatorSkill } from "../../domains/capabilities";
 import type { DotsTasks } from "./dots-tasks";
 import type { createEvents } from "../../domains/dots";
 import { readBounded } from "../../infrastructure/bounded-read";
@@ -28,7 +31,9 @@ export function registerDots(
 	events: ReturnType<typeof createEvents>,
 	tasks: TasksService,
 	verify = verifyAccess,
+	messages?: DotsMessages,
 ) {
+	if (messages) registerDotsMessaging(app, messages);
 	const json = async (req: Request) =>
 		JSON.parse(
 			Buffer.from(
@@ -43,9 +48,13 @@ export function registerDots(
 	app.get("/api/dots/configuration", (c) =>
 		c.json({
 			...dots.config.list(),
+			...(messages
+				? { messageConversations: messages.listConversations() }
+				: {}),
 			events: dots.config.list().connections.map((x) => ({
 				connectionRef: x.id,
 				...events.status(x.id),
+				...(messages ? { messaging: messages.setting(x.id) } : {}),
 			})),
 		}),
 	);
@@ -141,7 +150,7 @@ export function registerDots(
 					frontmatter: {
 						name: "eumenes-coordinator",
 						description:
-							"Coordinate authorized Eumenes tasks across Codex projects and sessions and report evidence, blockers and stop confirmation through MCP.",
+							"Answer message commands with replies and summaries, and coordinate explicitly authorized task commands through MCP.",
 					},
 					resources: [
 						{
@@ -164,6 +173,18 @@ export function registerDots(
 					}),
 				unsubscribe: (url) => events.unsubscribe(owner, url),
 				tools: [
+					...(messages
+						? [
+								{
+									name: "submit_message_reply",
+									description:
+										"Save one final reply and cumulative summary for a claimed message command. Use its messageId, commandId, leaseId and epoch; retry identical replyId and content after uncertainty. This is not task completion.",
+									schema: messageReplyInput,
+									readOnly: false,
+									invoke: (v: unknown) => messages.reply(owner, v),
+								},
+							]
+						: []),
 					{
 						name: "list_pending_commands",
 						description:
@@ -183,19 +204,24 @@ export function registerDots(
 					{
 						name: "get_command",
 						description:
-							"Read the current, authorized command, frozen profile and Skills, task grant and session references.",
+							"Read the current authorized command. Message commands contain text and summary context; task commands contain a frozen grant, profile, Skills and sessions.",
 						schema: commandRef,
 						readOnly: true,
 						invoke: (v) =>
-							dots.getCommand(owner, commandRef.parse(v).commandId),
+							messages?.handles(owner, commandRef.parse(v).commandId)
+								? messages.getCommand(owner, commandRef.parse(v).commandId)
+								: dots.getCommand(owner, commandRef.parse(v).commandId),
 					},
 					{
 						name: "claim_command",
 						description:
-							"Claim before creating a session. Reuse your stable UUID lease; conflicting claims never start duplicate work.",
+							"Claim before processing a command. Reuse a stable UUID lease; a message command does not authorize creating a session.",
 						schema: claimInput,
 						readOnly: false,
-						invoke: (v) => dots.claim(owner, v),
+						invoke: (v) =>
+							messages?.handles(owner, claimInput.parse(v).commandId)
+								? messages.claim(owner, v)
+								: dots.claim(owner, v),
 					},
 					{
 						name: "get_task_snapshot",

@@ -355,3 +355,28 @@ test("the latest utterance offers its edit, an edited one says so and the one be
 		view.container.querySelector(".message-editing")?.textContent,
 	).toContain("直前の発言");
 });
+
+test("external attribution remains visible in the ordinary conversation after reload", () => {
+	render(
+		<MessageList
+			conversation={{
+				id: "main",
+				revision: 1,
+				messages: [
+					{
+						...base,
+						id: "external",
+						role: "assistant",
+						text: "外部からの返答",
+						attribution: {
+							namespace: "dots",
+							sourceId: "reply",
+							displayName: "dots の返答",
+						},
+					},
+				],
+			}}
+		/>,
+	);
+	expect(screen.getByText("dots の返答")).toBeTruthy();
+});

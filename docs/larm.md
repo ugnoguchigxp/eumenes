@@ -95,6 +95,8 @@ LLM・TTS・ASR・画像生成・音楽生成の通信は、backendの共通入�
 
 ASRの文字起こしは会話入力になり、発話の続き判定のcontrolは呼びません。かなを含まない文字起こしだけ、許可言語かどうかの判定controlを一回呼びます。ASR receiptの受理、取消、回答/TTSへの検証parentはbackendが管理します。詳細は [toolchain](toolchain.md#タイマーと音声) を参照してください。
 
+現在の接続先ASRには1要求12秒の制限があるため、長いPCM WAVはlarm adapterで12秒以内に分割します。PCM16は上限直前に200ms以上の低振幅区間があればそこで区切り、すべての区間が成功してから一つの認識結果として採用します。音声サンプルの省略・重複、意味による語句の補正は行いません。途中の失敗・取消では部分結果を会話へ渡しません。録音側の60秒上限は維持します。認識精度・会話の短さの未受入を含む結果は[音声修正記録](../spec/voice-repair-work-record-2026-10-25.md)を参照してください。
+
 画像生成ツールチェーンと、プロンプト編集・全画面の画像一覧を接続しました。保存画像の一覧と取得はControlの `/v1/image-artifacts` を使用し、生成やProvider claimは不要です。2026-10-13の配備OpenAPIで `DELETE /v1/image-artifacts/{id}`、Bearer認証、HTTP200と`{id,deleted:true}`を確認しました。一覧から保存画像を物理削除し、Eumenesでは応答IDが対象と一致することを検査します。生成履歴は維持し、削除を自動再送しません。詳細は[画像生成](images.md)を参照してください。
 
 端末画像・Googleフォトの選択写真は、Eumenesで正規化したWebPを本番 `POST /v1/image-artifacts/imports` へ送る。Control認証とUUIDを使い、receiptを `GET /v1/image-imports/{requestId}` で照会する。取込だけではGPU・画像生成・3D生成を起動しない。[現行契約](../spec/reference/larm-image-import-v1/README.txt)と[取込処理](images.md#画像の取込)を参照。

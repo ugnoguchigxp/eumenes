@@ -1,0 +1,154 @@
+{
+  "date": "2026-10-25",
+  "scope": "P0-P4",
+  "domain": {
+    "result": "pass",
+    "bun": 583,
+    "web": 65,
+    "report": "domain-report.json"
+  },
+  "integration": {
+    "result": "pass",
+    "tests": 44,
+    "files": 10,
+    "command": "bun test packages/dots-mcp/test api/application/work/dots-http.test.ts api/application/work/dots-tasks.test.ts api/application/work/dots-review.test.ts api/application/work/dots-audit.test.ts api/application/work/dots-messages.test.ts api/application/work/dots-messaging-http.test.ts api/application/work/dots-messaging-registration.test.ts packages/artifact-ui/src/dots-messaging.test.ts"
+  },
+  "client": {
+    "result": "pass",
+    "tests": 1
+  },
+  "browser": {
+    "result": "pass",
+    "tests": 2,
+    "command": "bunx --no-install playwright test tests/browser/dots-messaging.spec.ts --workers=1",
+    "transport": "in-memory client; no HTTP listener"
+  },
+  "queue_recovery": {
+    "result": "pass",
+    "tests": 3,
+    "kind": "fixture worker processes; no HTTP listener"
+  },
+  "typecheck": {
+    "result": "fail",
+    "files": 2481,
+    "previous_result": "pass",
+    "previous_pass_files": 2481,
+    "latest_errors": {
+      "path": "web/src/workspace/ErrorReportDialog.test.tsx",
+      "lines": [
+        43,
+        68
+      ],
+      "reason": "client prop no longer matches component props; outside dots scope; not modified"
+    }
+  },
+  "web_build": {
+    "result": "pass"
+  },
+  "bundle_registration": {
+    "result": "pass",
+    "seeded_launcher": true
+  },
+  "boundaries": {
+    "result": "pass"
+  },
+  "overall_gate": {
+    "result": "not_passed",
+    "size_budget": "Existing violations including affected shared files; no threshold changes",
+    "sql_boundaries": "inference accesses settings_document owned by settings",
+    "verify_all": "Not run: known static failures and HTTP-listening test fixtures require prior reporting",
+    "typecheck": "Latest check fails in unrelated ErrorReportDialog.test.tsx after an earlier full pass; not repaired or repeatedly retried"
+  },
+  "live_dots": "not_run",
+  "production_server_operations": "not_run",
+  "production_configuration_writes": "not_run",
+  "separate_codex_messages": "not_run",
+  "owned_source_sha256": {
+    "api/application/server-app-services.ts": "4600f16c80791cf8b02fca8d4de72469ffbe4baee09ce77ccbba7b187ea45da2",
+    "api/application/server-lifecycles.ts": "e82efd12ccef32b50554e19c01bf178799cba98e29faadfbdcc7943a0aeb04ef",
+    "api/application/server-services.ts": "ce56a823fdc262a5c888f7af0458d6c5d1dc8da66e55755c85f87913cedeb3bc",
+    "api/application/toolchain/research-history-ports.ts": "b27c534bcf7c5320efb62b08e5511b0df68667c1defde274529accf70ba3ac48",
+    "api/application/toolchain/toolchain-adapters.ts": "a382ceb9069047c4618b04df11e5b9fc91c650e43cf52691d3bcacb9dab9c6ec",
+    "api/application/toolchain/toolchain-host.ts": "afbd150ef8d1c7873e06bdebc3b2149f44f7e43713792e8977f524e83399a4e2",
+    "api/application/toolchain/toolchain.ts": "39bc936652f956fed2d3a74a73572d8572c891ba43447a78c0818d15a60eae2e",
+    "api/application/work/dots-fixture.ts": "780b0827b5d6f5664a50f8a318dd7c50e09b28a26016f3b92afb53e5f73b9b88",
+    "api/application/work/dots-http.ts": "f2fd9422725847597b5418bf918f656da28ceb386efb7dc4de5b225fc0479e4a",
+    "api/application/work/dots-queries.ts": "a5a46ea469da14285d199da3964480c359e85ac8240e58a9e7bce1eb999beb74",
+    "api/application/work/dots-report-adoption.ts": "0400a87be619aa4ba265bf68b03702ff8c4e6524102cac4cb87cfa7f6cbd8b4b",
+    "api/application/work/dots-tasks.ts": "a32abe84d4b99dae5a1a3288fc3bcdc37c629c5f6f1ba2cef8596773c755b2df",
+    "api/domains/capabilities/builtin/dots.ts": "9ee2ef1c743c7446e5c41ebc0dc021c4fc8f5c978411d2dc05cc65779ca859f5",
+    "api/domains/capabilities/index.ts": "54e8cbde4bb687f426f9e2740ba062b0975337a385d2b8a753b5c5db118231fc",
+    "api/domains/conversation/contracts/history.ts": "3ce35890aa89b46597fff9a131502b068067a348d0ec88b7a0aa480ff430251e",
+    "api/domains/conversation/contracts/index.ts": "b6ff4a09966670afdf18c3601a7445658e8aca59202c119bd9e75c39d2007144",
+    "api/domains/conversation/repository/index.ts": "de8091d6441c62c9a6e2b34733caf7df670e7ead3f15b644fcd3e1e65f3686d6",
+    "api/domains/conversation/service/history.ts": "fb26389564a8b97494ce534e8d07d6db720844f116bc0b0318f635c8ef39c955",
+    "api/domains/dots/contracts/index.ts": "a55c8b399af6499240e8f9004212e4f285a2d0202052d786d2da41239568abef",
+    "api/domains/dots/index.ts": "8b74b77ce83e8feb37c448bd6f3fe40fa4ee27fd74a90e0a83b454aeabc362d0",
+    "api/domains/dots/repository/index.ts": "3a33cbcb9b85fe3ed187f5d65f0fe2c9db00da67c486bfcaa858834049cf0b93",
+    "api/domains/dots/service/commands.ts": "5dd9825de7794fb5e745f15ce3911be193787b5ce7dfeff2c767fa424d238596",
+    "api/domains/dots/service/events.ts": "39b1a3c71ed56aa9538671243c742caa317fc965e7a18fcf10a19f68d101f48c",
+    "api/domains/dots/service/inbox.ts": "45eae3fbb6deb56e583772257b92e69c3fa988eb928f336278129e8691a0d218",
+    "api/domains/dots/test/events.test.ts": "b912bcc1dcd485f757b4e7ad1cb5b9aa7aedf0825e482ac18d7021c977eb4f37",
+    "api/domains/dots/test/support.ts": "284bbf750dea4f1017d72eba79aa4df59e4b0b702d109736448295c99812f3b3",
+    "api/domains/tool-runtime/contracts/index.ts": "0ea4443fa29c886a1eb1b7c317d24f9892d3875af6dd2437cba057a83a21ba3f",
+    "client/dots.ts": "b710a3e6b1b437eea946c7ec190c3133a750a3b7f44f6631d66b2c9c907b1e48",
+    "packages/artifact-ui/src/contracts.ts": "d2c516303feede0c5e0674ad2c766bd67899f339c823ecea756129af5f30f663",
+    "packages/artifact-ui/src/event-contracts.ts": "90b6f55aacad466de642558c055ac54523a28ca687e0ecea3287b2bb2848762f",
+    "packages/artifact-ui/src/library.tsx": "61598ed64dac4ac6cd880c8a04c27bfa6e25824b22bb26c3af2fbd5f917533f5",
+    "packages/dots-mcp/src/index.ts": "c596c81378077c0716dfc2756b4a57f792e4c044f6758b0322b7e4a81a11b457",
+    "packages/dots-mcp/src/webhook.ts": "6c990970e77c6eb2132f4ff8c569aea80a60c66eb4b0037cdfd89f32237d0cfa",
+    "scripts/domains.ts": "ac2e4a62cbfb62e5033aba079cb22ac5c26f304f2bfed1e7c92c1eb39b3fc0c5",
+    "web/src/components/domains/conversation/MessageList.test.tsx": "d3ad2cf40f79504cdd4395fc7e2a596e2bb032f50ed6fa5e97d78f9f2c28e501",
+    "web/src/components/domains/conversation/MessageList.tsx": "cf74fe5470535e8a6ad689f03c711c9b78c51526383bc3fc2a44383c8456cfb5",
+    "web/src/workspace/toolchain-adapters.ts": "a69a404a162101433a0169763cbd99c48013e17cf2f9b7f3d14c8c6a478f3fe4",
+    "api/application/work/dots-message-lifecycle.ts": "4051544bd3c2a712b949907a6279ffb9d6cb2ea09016da0d6b0946138327cdb4",
+    "api/application/work/dots-messages.test.ts": "f518651d44a174a9710c7c65236083d0308ddb3149c971e0a5dceb9f37929d59",
+    "api/application/work/dots-messages.ts": "6425b4d3e493319273bad913de747f0ce12f18145bb061e341bee1863aa2dda2",
+    "api/application/work/dots-messaging-adapter.ts": "1a0a5ad06cbc6d8ec7c2db83a396b735117f59899134f7be199d491fa9e61fa4",
+    "api/application/work/dots-messaging-http.test.ts": "1a3f8b38da5eb1649233168a4750d490d8f929397176398916ee069c97207893",
+    "api/application/work/dots-messaging-http.ts": "3afef3cc3698ee21a3ec4417d107c9134360fe2daff52cc9192865c75fb22715",
+    "api/domains/capabilities/bundles/dots-messaging.bundle.json": "b82a4a2a2fe50d35e797eb3c23ceaf63c9a4becea0e2beebfbe69f4c05f98292",
+    "api/domains/conversation/contracts/attribution.ts": "1dd521f98f6274a201fb2ba2036f6934b91ba16316c04ce3e172cee35420fd63",
+    "api/domains/conversation/repository/attribution.ts": "d68d19657cbaf1a796ed767f7916233fc59a0814cd94feed71bbed53f20271c9",
+    "api/domains/dots/contracts/messaging.ts": "b1a16df6f3fa9a0d572d7b3f8bb4c7ad47ae98a7de73f221b59a3a16adff5330",
+    "api/domains/dots/repository/messaging-migration.ts": "9e321c9199f4414e66b861e01c27d7b2bb407c1321647d19567258accde5af9d",
+    "api/domains/dots/repository/messaging.ts": "c486010e40b0a0ba3180f385e3a9268a2c89246dc5db88c132f8ba85b34be7a6",
+    "api/domains/dots/service/event-delivery.ts": "909e3cb1f3dac77a255d22e775e6ba27d97b5bbbdcceb6917e15545f0c0b633d",
+    "api/domains/dots/service/messaging-maintenance.ts": "96fa93798612f322038f68cae41b7d59d5b6ccbcf86b2713613146cffc57e3b1",
+    "api/domains/dots/service/messaging-replies.ts": "4e8f9d4c476af646dd59ec81a2dbc09844a4f58d937c8ff4d25d0208ee01497f",
+    "api/domains/dots/service/messaging-state.ts": "a413b8b306f72019dec924e6c6fdef2ca14d8161b47a67d117237035fd6f9581",
+    "api/domains/dots/service/messaging.ts": "633888f0f994cfc6720a6819102d4024587d048980b2448eb1b214753167ac46",
+    "api/domains/dots/test/messaging-contracts.test.ts": "fa3a4375745cca816111b0c3d90c094233f33474e9d517a2c762a1a321138111",
+    "api/domains/dots/test/messaging-migration.test.ts": "8ca4b0864bc7736d9ef7d655fbb2360c087fa2e95c1e93d50cb55c59700e8085",
+    "client/dots-messaging.test.ts": "6b7a50543d03ef7e864efd76ddb8c2a39e96c8cd1a02f98b41ad287f844ed853",
+    "client/dots-messaging.ts": "4e1c81f33306b17e6458825531704554a3e24c9062b33e3ef409d8a1dab4c336",
+    "packages/artifact-ui/src/dots-messaging-components.tsx": "98cd29ded81b8c6bf129f74d56acc4e871621e80846a9cfb7362311e76577327",
+    "packages/artifact-ui/src/dots-messaging.test.ts": "36d145052493f2436d8253ebe556f335240d6bbe1c67c5658638e0a18ff40d2f",
+    "packages/dots-mcp/test/webhook.test.ts": "206ba9169e5ed6f392db7743cd38f4f55fc2a437f6dbbff42aa6d6b618499575",
+    "tests/browser/dots-messaging.fixture.tsx": "095e5aa988acf6c0f40e487149868490ae471e48c16175e0b70e8d54bac71a18",
+    "tests/browser/dots-messaging.spec.ts": "c6e7f99a045088ab745ec7d55866cc8f82a42d11cc0899ebcaa411a2239f3f32",
+    "web/src/domains/dots/toolchain-adapter.test.tsx": "ff7feaae1e8de05a372e131dcafc24ee0181ccdd7012044b06a7071c860737aa",
+    "web/src/domains/dots/toolchain-adapter.tsx": "61788e8b7e786665e95843d9e54e090745440298a722f250ba1405a3a19cd294",
+    "api/domains/dots/contracts/ref.ts": "3681550f6d014806679e0053df636a4fbbd3b029264de3375eb20c1edfb06d5e",
+    "packages/artifact-ui/src/resource-exports.ts": "568469475f8f4642e1bec5399b07324cf6afb1185226925c29a59966aabee59d",
+    "api/domains/dialogue/test/context-document.test.ts": "d5bdb41d27f5cd2ddbbccf64b656af9e3a1461777ee9bf04f9fc0062fdcfb1e3",
+    "api/application/work/dots-messaging-registration.test.ts": "8d6087fb1dd626e92dfe1860d256a8e6986999f0c6338400aab84f6fcb29880c"
+  },
+  "context_still": {
+    "context_compile": 1,
+    "compile_eval": 1
+  },
+  "post_verification_test_only_change": {
+    "paths": [
+      "api/application/work/dots-messaging-http.test.ts",
+      "api/application/work/dots-messaging-registration.test.ts"
+    ],
+    "reason": "Use public saved-document operations in registration test; validate cross-tool payload schemas before testing rejection",
+    "tests": {
+      "result": "pass",
+      "count": 3
+    },
+    "import_boundaries": "pass",
+    "lint": "pass"
+  }
+}

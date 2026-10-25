@@ -41,7 +41,14 @@ export function appServices(s: Services) {
 		taskReports: s.taskReports,
 		dotsModule: {
 			mount: (app: import("hono").Hono) =>
-				registerDots(app, s.dots, s.dotsEvents, s.delegated.tasks),
+				registerDots(
+					app,
+					s.dots,
+					s.dotsEvents,
+					s.delegated.tasks,
+					undefined,
+					s.dotsMessages,
+				),
 		},
 		toolchainHistory: s.toolchain.history,
 		timers: s.timers,

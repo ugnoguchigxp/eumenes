@@ -1,0 +1,33 @@
+{
+	"id": "ctx-f1-dev-02",
+	"family": "F1",
+	"split": "dev",
+	"seed": {
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "butler"
+		},
+		"events": []
+	},
+	"input": "茶カレーという、お茶を入れるカレーを作りました。",
+	"expect": {
+		"checks": [
+			{
+				"kind": "speaks"
+			},
+			{
+				"kind": "brief_spoken_reply"
+			},
+			{
+				"kind": "tool_not_called"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "follows_current_request",
+				"condition": "本人が明示した料理名と作り方を受け止める。茶カレーを音声認識の誤りと決めつけず、普通のカレーへ勝手に訂正しない。"
+			}
+		]
+	}
+}

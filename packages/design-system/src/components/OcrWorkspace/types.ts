@@ -88,6 +88,28 @@ export type OcrCorrection = {
 		excludedLines: Array<{ index: number; reason: string }>;
 	} | null;
 };
+export type OcrQr = {
+	id: string;
+	sourceId: string;
+	frameIndex: number | null;
+	sourceRevision: number;
+	state:
+		| "queued"
+		| "running"
+		| "cancelling"
+		| "cancelled"
+		| "completed"
+		| "failed";
+	errorCode: string | null;
+	updatedAt: number;
+	items:
+		| {
+				text: string | null;
+				contentType: string;
+				polygon: [number, number][];
+		  }[]
+		| null;
+};
 export type OcrWorkspaceProps = {
 	items: OcrRecord[];
 	selectedId?: string;
@@ -95,6 +117,13 @@ export type OcrWorkspaceProps = {
 	thumbnails?: Record<string, string>;
 	frameIndex: number;
 	selectedLines: number[];
+	selectionRegion?: [number, number, number, number];
+	qr?: OcrQr | null;
+	qrError?: string;
+	onRegion?: (region: [number, number, number, number] | undefined) => void;
+	onQrCancel?: (id: string, qrId: string) => void;
+	onQrIncorporate?: (id: string, qrId: string, index: number) => void;
+	onQrEvidence?: (id: string, qrId: string, index: number) => void;
 	highlightRegion?: [number, number, number, number];
 	busy?: boolean;
 	recording?: boolean;

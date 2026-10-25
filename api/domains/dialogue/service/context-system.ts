@@ -24,11 +24,28 @@ const RULES = [
 	"dialogue.contexts.host-rules.research-document",
 ] as const;
 
-/** The system part (A1): the persona, then every host rule. */
-export function systemText(persona: PersonaSpec): string {
+/**
+ * The system part (A1): the persona, then every host rule, with the titles of the toolchains it can hand work to
+ * after the rule on tools.
+ */
+export function systemText(
+	persona: PersonaSpec,
+	toolchainTitles: readonly string[] = [],
+): string {
+	const toolchains = toolchainTitles.length
+		? "\n" +
+			systemContext("dialogue.contexts.host-rules.toolchains", {
+				titles: toolchainTitles.join("、"),
+			})
+		: "";
 	return (
 		buildSystemPrompt(persona) +
-		RULES.map((key) => "\n" + systemContext(key, {})).join("")
+		RULES.map(
+			(key) =>
+				"\n" +
+				systemContext(key, {}) +
+				(key === "dialogue.contexts.host-rules.tools" ? toolchains : ""),
+		).join("")
 	);
 }
 

@@ -1,3 +1,5 @@
+import { useOcrSelection } from "./use-ocr-selection";
+import { useOcrQr } from "./use-ocr-qr";
 import { useEffect, useRef, useState } from "react";
 import {
 	useQuery,
@@ -120,9 +122,6 @@ export function useOcrRuntime(client: EumenesClient, conversationId = "main") {
 	});
 	const [selection, setSelection] = useState<string>();
 	const [frameIndex, setFrameIndex] = useState(0);
-	const [selectedLines, setSelectedLines] = useState<number[]>([]);
-	const [highlightRegion, setHighlightRegion] =
-		useState<[number, number, number, number]>();
 	const [busy, setBusy] = useState(false);
 	const [recording, setRecording] = useState(false);
 	const [error, setError] = useState("");
@@ -131,6 +130,21 @@ export function useOcrRuntime(client: EumenesClient, conversationId = "main") {
 	const items = records.data ?? [];
 	const selected = items.find((i) => i.id === selection) ?? items[0];
 	const selectedId = selected?.id;
+	const selectionRuntime = useOcrSelection(selected, frameIndex);
+	const {
+		selectedLines,
+		setSelectedLines,
+		highlightRegion,
+		setHighlightRegion,
+		selectionRegion,
+	} = selectionRuntime;
+	const qrRuntime = useOcrQr(
+		client,
+		conversationId,
+		selected,
+		frameIndex,
+		(region) => setHighlightRegion(region),
+	);
 	const correctionRuntime = useOcrCorrections(
 		client,
 		conversationId,
@@ -171,7 +185,9 @@ export function useOcrRuntime(client: EumenesClient, conversationId = "main") {
 		(recording ? 1 : 0) +
 		selectedLines.reduce((sum, i) => sum + i + 1, 0) +
 		(highlightRegion?.reduce((sum, value) => sum + value, 0) ?? 0) +
-		correctionRuntime.revision;
+		correctionRuntime.revision +
+		qrRuntime.revision +
+		(selectionRegion?.reduce((sum, n) => sum + n, 0) ?? 0);
 	const resource: OcrResource = {
 		kind: "ocr-workspace",
 		revision,
@@ -182,6 +198,8 @@ export function useOcrRuntime(client: EumenesClient, conversationId = "main") {
 		frameIndex,
 		selectedLines,
 		highlightRegion,
+		selectionRegion,
+		...qrRuntime.resource,
 		...correctionRuntime.resource,
 		busy,
 		recording,
@@ -202,6 +220,7 @@ export function useOcrRuntime(client: EumenesClient, conversationId = "main") {
 			records.refetch(),
 			connection.refetch(),
 			correctionRuntime.refresh(),
+			qrRuntime.refresh(),
 		]);
 	}
 	async function uploadFile(source: string, file: File): Promise<Receipt> {
@@ -298,6 +317,9 @@ export function useOcrRuntime(client: EumenesClient, conversationId = "main") {
 			return { status: "accepted", message: "接続先を保存しました。" };
 		}
 		const id = typeof event.values.id === "string" ? event.values.id : "";
+		if (event.action.startsWith("ocr-qr-")) return qrRuntime.dispatch(event);
+		if (event.action === "ocr-region")
+			return selectionRuntime.dispatchRegion(event);
 		if (event.action.startsWith("ocr-correction-"))
 			return correctionRuntime.dispatch(event);
 		if (["ocr-frame", "ocr-line"].includes(event.action)) {
@@ -319,22 +341,7 @@ export function useOcrRuntime(client: EumenesClient, conversationId = "main") {
 				setSelectedLines([]);
 				setHighlightRegion(undefined);
 				correctionRuntime.reset();
-			} else {
-				const lines =
-					selected.result?.kind === "image"
-						? selected.result.lines
-						: selected.result?.kind === "video"
-							? selected.result.frames[frameIndex]?.lines
-							: undefined;
-				if (!lines || index >= lines.length)
-					return { status: "rejected", message: "行を選び直してください。" };
-				setSelectedLines((previous) =>
-					previous.includes(index)
-						? previous.filter((i) => i !== index)
-						: [...previous, index].sort((a, b) => a - b),
-				);
-				setHighlightRegion(undefined);
-			}
+			} else return selectionRuntime.toggleLine(index);
 			return { status: "accepted", message: "選択しました。" };
 		}
 		if (!items.some((i) => i.id === id))

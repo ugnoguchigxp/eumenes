@@ -31,6 +31,7 @@ export const queryRoots = {
 	kanban: "kanban",
 	toolchainArtifacts: "toolchain-artifacts",
 	toolchainInteractions: "toolchain-interactions",
+	steward: "steward",
 } as const;
 
 /**
@@ -61,6 +62,7 @@ export const changeRoots = [
 	queryRoots.terminals,
 	queryRoots.kanban,
 	queryRoots.toolchainInteractions,
+	queryRoots.steward,
 ] as const;
 
 /** Roots whose queries call live providers; they are fetched on demand only. */

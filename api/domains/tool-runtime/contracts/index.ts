@@ -46,6 +46,7 @@ export type Source = {
 	messageId?: string;
 	conversationId?: string;
 	speaker?: "user" | "assistant";
+	attribution?: { namespace: string; sourceId: string; displayName: string };
 	createdAt?: string;
 	revision?: string;
 	digest?: string;

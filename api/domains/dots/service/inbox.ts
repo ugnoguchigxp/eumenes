@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import {
 	reportSchema,
 	type DotReport,
-	type Command,
+	type TaskCommand as Command,
 	type NativeSession,
 } from "../contracts";
 import * as repo from "../repository";
@@ -86,7 +86,12 @@ export function createInbox(now: () => number) {
 		) {
 			const r = reportSchema.parse(raw),
 				c = repo.command(db, r.commandId);
-			if (!c || c.connectionRef !== owner || c.taskId !== r.taskId)
+			if (
+				!c ||
+				c.kind === "message" ||
+				c.connectionRef !== owner ||
+				c.taskId !== r.taskId
+			)
 				throw new Error("dots_permission_denied");
 			const digest = createHash("sha256")
 					.update(JSON.stringify(r))

@@ -6,7 +6,11 @@ import {
 	memoryTendenciesSchema,
 	shortTermSchema,
 } from "../api/domains/memory/contracts";
-import { decisionsResponseSchema } from "../api/domains/steward/contracts";
+import {
+	decisionsResponseSchema,
+	stewardActivitySchema,
+	stewardErrorReportSchema,
+} from "../api/domains/steward/contracts";
 import {
 	memorySeedResultSchema,
 	type MemorySeed,
@@ -65,5 +69,25 @@ export function memoryClient(t: Transport) {
 					)
 				).json(),
 			).items,
+		/** What the steward runs now and what failed last in a conversation. */
+		stewardActivity: async (conversationId: string, signal?: AbortSignal) =>
+			stewardActivitySchema.parse(
+				await (
+					await t.call(
+						`/api/steward/activity?conversationId=${encodeURIComponent(conversationId)}`,
+						{ signal },
+					)
+				).json(),
+			),
+		/** The diagnostic text of the steward's failures in a conversation; 404 when none is failing. */
+		stewardErrorReport: async (conversationId: string, signal?: AbortSignal) =>
+			stewardErrorReportSchema.parse(
+				await (
+					await t.call(
+						`/api/steward/error-report?conversationId=${encodeURIComponent(conversationId)}`,
+						{ signal },
+					)
+				).json(),
+			),
 	};
 }

@@ -1,38 +1,23 @@
 import type { Database } from "bun:sqlite";
 import { randomBytes, timingSafeEqual, createHash } from "node:crypto";
 
-import { z } from "zod";
 import {
-	Webhook,
+	createDeliveryHandler,
+	subscriptionHeaders,
+	readSubscription as read,
+	type Subscription,
+} from "./event-delivery";
+import {
 	eventName,
 	subscribeSchema,
 	publicHttpsPost,
 	type WebhookPost,
 } from "../../../../packages/dots-mcp/src";
-import type { QueueService, HandlerDefinition } from "../../queue";
+import type { QueueService } from "../../queue";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import type { Command } from "../contracts";
 import * as repo from "../repository";
 
-type Subscription = {
-	id: string;
-	owner: string;
-	url: string;
-	sealed: string;
-	previous: string | null;
-	rotateUntil: number;
-	revision: number;
-	expiresAt: number;
-	verifiedKey: string;
-	verifiedUntil: number;
-};
-type Payload = { commandId: string; revision: number };
-const read = (db: Database, owner: string) => {
-	const r = db
-		.query("SELECT data_json FROM dots_subscriptions WHERE connection_ref=?")
-		.get(owner) as { data_json: string } | null;
-	return r ? (JSON.parse(r.data_json) as Subscription) : null;
-};
 export function createEvents(input: {
 	store: SqliteStore;
 	queue: QueueService;
@@ -60,7 +45,8 @@ export function createEvents(input: {
 				kind: "dots.event.v1",
 				payload: { commandId: c.commandId, revision: s.revision },
 				dedupeKey: `${c.commandId}:${s.revision}:${c.expiresAt}`,
-				subjectRef: c.taskId,
+				subjectRef:
+					c.kind === "message" ? `dots-message:${c.messageId}` : c.taskId,
 				lane: "background",
 				concurrencyKey: `dots:${s.owner}`,
 				deadlineAtMs: Math.min(c.expiresAt, s.expiresAt),
@@ -79,95 +65,13 @@ export function createEvents(input: {
 			expiresAt: s?.expiresAt ?? null,
 		};
 	}
-	const headers = (s: Subscription, id: string, body: string) => {
-		const at = new Date(now());
-		return {
-			"content-type": "application/json",
-			"webhook-id": id,
-			"webhook-timestamp": String(Math.floor(at.getTime() / 1000)),
-			"webhook-signature":
-				new Webhook(unseal(s.sealed, s.owner)).sign(id, at, body) +
-				(s.previous && s.rotateUntil > now()
-					? " " + new Webhook(unseal(s.previous, s.owner)).sign(id, at, body)
-					: ""),
-			"X-MCP-Subscription-Id": s.id,
-		};
-	};
-	const handler: HandlerDefinition<
-		Payload,
-		{ s: Subscription; c: Command; id: string; body: string },
-		number
-	> = {
-		kind: "dots.event.v1",
-		payloadVersions: [1],
-		schema: z.strictObject({
-			commandId: z.string(),
-			revision: z.number().int().positive(),
-		}),
-		recovery: "replay_safe",
-		prepareInTransaction(db, claim) {
-			const c = repo.command(db, claim.payload.commandId),
-				s = c ? read(db, c.connectionRef) : null;
-			if (
-				!c ||
-				!s ||
-				s.revision !== claim.payload.revision ||
-				s.expiresAt <= now() ||
-				c.expiresAt <= now() ||
-				["superseded", "reported"].includes(c.state) ||
-				(!repo.connection(db, s.owner)?.enabled && c.kind !== "stop")
-			)
-				return { status: "stale", reason: "dots_delivery_stale" };
-			const id = `evt_${claim.jobId}`,
-				body = JSON.stringify({
-					eventId: id,
-					name: eventName,
-					timestamp: new Date(c.createdAt).toISOString(),
-					data: { command_id: c.commandId, queue_id: "eumenes-dots" },
-					cursor: null,
-				});
-			return { status: "ready", input: { s, c, id, body } };
-		},
-		async execute(p, ctx) {
-			const r = await post(
-				p.s.url,
-				p.body,
-				headers(p.s, p.id, p.body),
-				AbortSignal.any([ctx.signal, AbortSignal.timeout(10000)]),
-			);
-			if (r.status < 200 || r.status >= 300)
-				throw new Error(
-					r.status === 408 || r.status === 429 || r.status >= 500
-						? "dots_delivery_retry"
-						: "dots_delivery_rejected",
-				);
-			return r.status;
-		},
-		classify: (e) =>
-			e instanceof Error && e.message === "dots_delivery_rejected"
-				? "fail"
-				: "retry",
-		settleInTransaction(db, _claim, p, outcome) {
-			if (!p) return "stale";
-			if (read(db, p.s.owner)?.revision !== p.s.revision) return "stale";
-			db.query(
-				"INSERT INTO dots_deliveries VALUES(?,?,?) ON CONFLICT(command_id) DO UPDATE SET data_json=excluded.data_json",
-			).run(
-				p.id,
-				p.c.commandId,
-				JSON.stringify({
-					eventId: p.id,
-					state: outcome.type === "success" ? "delivered" : outcome.type,
-					httpStatus: outcome.type === "success" ? outcome.result : null,
-				}),
-			);
-			return "applied";
-		},
-		cancelInTransaction() {},
-	};
+	const headers = (s: Subscription, id: string, body: string) =>
+		subscriptionHeaders(s, id, body, now, unseal);
+	const handler = createDeliveryHandler({ store, post, now, unseal });
 	queue.registerHandler(handler);
 	return {
 		enqueueInTransaction: enqueue,
+		wake: () => queue.wake(),
 		async maintenance() {
 			await store.write((db) => {
 				const owners = db
@@ -233,8 +137,14 @@ export function createEvents(input: {
 				verifiedUntil: cached ? old!.verifiedUntil : now() + 600000,
 				url: u.href,
 				sealed: seal(data.delivery.secret, owner),
-				previous: old?.sealed ?? null,
-				rotateUntil: now() + 60000,
+				previous:
+					old && unseal(old.sealed, owner) !== data.delivery.secret
+						? old.sealed
+						: (old?.previous ?? null),
+				rotateUntil:
+					old && unseal(old.sealed, owner) !== data.delivery.secret
+						? now() + 60000
+						: (old?.rotateUntil ?? 0),
 				revision: (old?.revision ?? 0) + 1,
 				expiresAt: now() + Math.min(data.ttlMs ?? 3600000, 86400000),
 			};
@@ -298,10 +208,23 @@ export function createEvents(input: {
 			};
 		},
 		async unsubscribe(owner: string, url: string) {
-			return store.write((db) => {
+			const jobs: string[] = [];
+			const result = await store.write((db) => {
 				const s = read(db, owner);
-				if (s && s.url !== url) throw new Error("dots_conflict");
+				if (s && s.url !== new URL(url).href) throw new Error("dots_conflict");
 				if (s) {
+					for (const { command: c } of repo.commands(db, owner, 0, 4096)) {
+						const job = queue.findByDedupeInTransaction(
+							db,
+							`dots:${owner}`,
+							"dots.event.v1",
+							`${c.commandId}:${s.revision}:${c.expiresAt}`,
+						);
+						if (job) {
+							queue.cancelInTransaction(db, job.id, "dots_unsubscribed");
+							jobs.push(job.id);
+						}
+					}
 					s.expiresAt = now();
 					s.revision++;
 					db.query(
@@ -310,6 +233,8 @@ export function createEvents(input: {
 				}
 				return {};
 			});
+			queue.flushCancellations(jobs);
+			return result;
 		},
 	};
 }

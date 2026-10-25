@@ -1,11 +1,8 @@
 import { z } from "zod";
 import type { HttpErrorStatus } from "../../../infrastructure/http";
 
-export const ref = z
-	.string()
-	.min(1)
-	.max(160)
-	.regex(/^[a-zA-Z0-9_.:-]+$/);
+import { ref } from "./ref";
+export { ref } from "./ref";
 const https = z.url().refine((v) => {
 	const u = new URL(v);
 	return (
@@ -23,6 +20,8 @@ export const connectionInput = z.strictObject({
 	enabled: z.boolean(),
 	oauth: z
 		.strictObject({
+			/** Public client registration metadata for the connection guide; never a secret. */
+			clientId: z.string().trim().min(1).max(512).optional(),
 			issuer: https,
 			jwksUrl: https,
 			resource: https,
@@ -135,7 +134,7 @@ export const reportSchema = z
 		"summary, facts, limitations and evidenceRefs together must fit 12,000 UTF-8 JSON bytes; keep reports concise.",
 	);
 export type DotReport = z.infer<typeof reportSchema>;
-export type Command = {
+export type TaskCommand = {
 	commandId: string;
 	taskId: string;
 	connectionRef: string;
@@ -157,4 +156,10 @@ export const errorStatus = {
 	dots_sequence_gap: 409,
 	dots_permission_denied: 403,
 	dots_capacity: 429,
+	dots_not_subscribed: 409,
+	dots_message_pending: 409,
 } as const satisfies Record<string, HttpErrorStatus>;
+
+export type Command = TaskCommand | import("./messaging").MessageCommand;
+
+export * from "./messaging";

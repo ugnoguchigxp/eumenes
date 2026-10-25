@@ -1,4 +1,8 @@
 export type OcrAction =
+	| "ocr-region"
+	| "ocr-qr-cancel"
+	| "ocr-qr-incorporate"
+	| "ocr-qr-evidence"
 	| "ocr-select"
 	| "ocr-frame"
 	| "ocr-line"

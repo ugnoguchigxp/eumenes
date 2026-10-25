@@ -13,6 +13,7 @@ import { dropRecallMigration } from "./drop-recall";
 import { continuityEventsMigration } from "./events";
 import { worldGoalsMigration } from "./world-goals";
 
+export * from "./activity";
 export * from "./events";
 export * from "./world-goals";
 

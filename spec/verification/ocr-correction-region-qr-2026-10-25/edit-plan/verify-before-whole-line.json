@@ -1,0 +1,221 @@
+{
+  "schemaVersion": 1,
+  "runId": "2026-10-25T05-23-20-187Z-fbf7b5d9-7ec8-453c-a530-8801b43305af",
+  "startedAt": "2026-10-25T05:23:20.187Z",
+  "scope": {
+    "all": false,
+    "selected": [
+      "ocr",
+      "inference"
+    ]
+  },
+  "baseCommit": "66acc6076eb45fcccd8615418b0b080917fc8b0b",
+  "revision": "24ee3f29846bc24b9d0171e2976f0c5a1fa997d438e51a6d747c2ef60904f321",
+  "runtime": {
+    "bun": "1.4.3",
+    "node": "26.3.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "ci": false,
+    "runner": null
+  },
+  "result": "pass",
+  "steps": [
+    {
+      "name": "inventory",
+      "status": "pass",
+      "ms": 60
+    },
+    {
+      "name": "boundaries",
+      "status": "pass",
+      "ms": 111
+    },
+    {
+      "name": "system-context",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "context:check"
+      ],
+      "status": "pass",
+      "ms": 90,
+      "exitCode": 0
+    },
+    {
+      "name": "size-budget",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "scripts/size-budget.ts",
+        "api/domains/ocr",
+        "web/src/domains/ocr",
+        "packages/design-system/src/components/OcrWorkspace",
+        "api/domains/inference"
+      ],
+      "status": "pass",
+      "ms": 249,
+      "exitCode": 0
+    },
+    {
+      "name": "format",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "format:check",
+        "api/domains/ocr",
+        "web/src/domains/ocr",
+        "packages/design-system/src/components/OcrWorkspace",
+        "api/domains/inference"
+      ],
+      "status": "pass",
+      "ms": 104,
+      "exitCode": 0
+    },
+    {
+      "name": "lint",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "lint",
+        "api/domains/ocr",
+        "web/src/domains/ocr",
+        "packages/design-system/src/components/OcrWorkspace",
+        "api/domains/inference"
+      ],
+      "status": "pass",
+      "ms": 56,
+      "exitCode": 0
+    },
+    {
+      "name": "design-system typecheck",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "--cwd",
+        "packages/design-system",
+        "typecheck"
+      ],
+      "status": "pass",
+      "ms": 286,
+      "exitCode": 0
+    },
+    {
+      "name": "design-system build",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "--cwd",
+        "packages/design-system",
+        "build"
+      ],
+      "status": "pass",
+      "ms": 7016,
+      "exitCode": 0
+    },
+    {
+      "name": "typecheck configuration",
+      "status": "pass",
+      "ms": 2
+    },
+    {
+      "name": "typecheck",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "check",
+        "-p",
+        "/Users/y.noguchi/Code/eumenes/verification-reports/runs/2026-10-25T05-23-20-187Z-fbf7b5d9-7ec8-453c-a530-8801b43305af/tsconfig.selected.json"
+      ],
+      "status": "pass",
+      "ms": 682,
+      "exitCode": 0
+    },
+    {
+      "name": "typecheck closure",
+      "status": "pass",
+      "ms": 327
+    },
+    {
+      "name": "bun tests",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "test",
+        "./api/domains/inference/test/agent-session-migration.test.ts",
+        "./api/domains/inference/test/agent-sessions.test.ts",
+        "./api/domains/inference/test/agent-task.test.ts",
+        "./api/domains/inference/test/attempt-activity.test.ts",
+        "./api/domains/inference/test/attempt-budget.test.ts",
+        "./api/domains/inference/test/claude-session.test.ts",
+        "./api/domains/inference/test/cloud-agents.test.ts",
+        "./api/domains/inference/test/connection-models.test.ts",
+        "./api/domains/inference/test/context-budget.test.ts",
+        "./api/domains/inference/test/context-fit.test.ts",
+        "./api/domains/inference/test/context-render.test.ts",
+        "./api/domains/inference/test/control-engine-migration.test.ts",
+        "./api/domains/inference/test/control-schema.test.ts",
+        "./api/domains/inference/test/inference-control.test.ts",
+        "./api/domains/inference/test/inference-probes.test.ts",
+        "./api/domains/inference/test/inference-sessions.test.ts",
+        "./api/domains/inference/test/inference-speech.test.ts",
+        "./api/domains/inference/test/inference.test.ts",
+        "./api/domains/inference/test/larm-client.test.ts",
+        "./api/domains/inference/test/maintenance-control.test.ts",
+        "./api/domains/inference/test/migration.test.ts",
+        "./api/domains/inference/test/operation-output.test.ts",
+        "./api/domains/inference/test/routing-logs.test.ts",
+        "./api/domains/inference/test/screen-presence.test.ts",
+        "./api/domains/inference/test/speech-errors.test.ts",
+        "./api/domains/inference/test/usage-normalization.test.ts",
+        "./api/domains/inference/test/usage-pages.test.ts",
+        "./api/domains/inference/test/workers-ai.test.ts",
+        "./api/domains/ocr/test/correction-plan.test.ts",
+        "./api/domains/ocr/test/correction.test.ts",
+        "./api/domains/ocr/test/ocr.test.ts",
+        "./api/domains/ocr/test/qr.test.ts"
+      ],
+      "status": "pass",
+      "ms": 6451,
+      "exitCode": 0
+    },
+    {
+      "name": "web tests",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "x",
+        "--no-install",
+        "vitest",
+        "run",
+        "web/src/domains/ocr/thumbnail.test.ts",
+        "web/src/domains/ocr/toolchain-adapter.test.tsx",
+        "web/src/domains/ocr/use-ocr-runtime.test.tsx"
+      ],
+      "status": "pass",
+      "ms": 3214,
+      "exitCode": 0
+    },
+    {
+      "name": "design-system tests",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "--cwd",
+        "packages/design-system",
+        "test",
+        "src/components/OcrWorkspace/OcrPanel.test.tsx",
+        "src/components/OcrWorkspace/region.test.tsx"
+      ],
+      "status": "pass",
+      "ms": 2321,
+      "exitCode": 0
+    }
+  ],
+  "totalMs": 21478,
+  "integrityErrors": [],
+  "build": {
+    "sharedOutput": true,
+    "inputRevision": "24ee3f29846bc24b9d0171e2976f0c5a1fa997d438e51a6d747c2ef60904f321",
+    "distAfterBuild": "610dee7e76716a84ec4af03db18cfbbc63f9bcee978d53fe3cde716c32d72135",
+    "distAfterConsumers": "610dee7e76716a84ec4af03db18cfbbc63f9bcee978d53fe3cde716c32d72135"
+  },
+  "finalRevision": "24ee3f29846bc24b9d0171e2976f0c5a1fa997d438e51a6d747c2ef60904f321",
+  "finishedAt": "2026-10-25T05:23:42.130Z"
+}

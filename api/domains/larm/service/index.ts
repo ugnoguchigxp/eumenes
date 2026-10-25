@@ -1,3 +1,4 @@
+import { transcribeWav } from "./transcription";
 import { measureStage } from "../../../infrastructure/performance";
 import { gzipFetch, plainFetch } from "./gzip-fetch";
 import type { Capability, LarmPort, LarmCallOptions } from "../contracts";
@@ -338,31 +339,9 @@ export function createLarm(config: {
 		transcribe(wav, signal, options) {
 			// The user has spoken: the conversation's answer comes next, so its connection is freed now.
 			yielding.preempt();
-			return withProvider("asr", signal, async (p, connectionId) => {
-				if (wav.length < 44 || wav.length > 4_000_000)
-					throw new Error("audio_size_invalid");
-				const form = new FormData();
-				form.append("model", p.model);
-				form.append("response_format", "json");
-				form.append(
-					"file",
-					new Blob([new Uint8Array(wav)], { type: "audio/wav" }),
-					"speech.wav",
-				);
-				const response = await infer(
-					p,
-					"audio/transcriptions",
-					{ method: "POST", body: form },
-					signal,
-					connectionId,
-					options,
-				);
-				const text = record(await readJson(response)).text;
-				// An empty transcript is a valid result for silence, not a broken contract.
-				if (typeof text !== "string" || text.length > 4096)
-					throw new Error("larm_invalid_contract");
-				return text;
-			});
+			return withProvider("asr", signal, (p, connectionId) =>
+				transcribeWav(p, wav, infer, signal, connectionId, options),
+			);
 		},
 		speak: createSpeechSynthesizer({
 			withProvider,

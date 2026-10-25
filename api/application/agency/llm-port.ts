@@ -14,7 +14,11 @@ import type { SqliteStore } from "../../infrastructure/sqlite";
 
 /** The background control limits of the inference domain (`background-control.ts`). */
 export const BACKGROUND_OUTPUT_LIMIT = 1500;
-export const BACKGROUND_DEADLINE_MS = 30_000;
+/**
+ * A structured call on the conversation route takes the structured cap: the cloud fallback reserves its own time
+ * out of the deadline, so the local attempt keeps 30 s of it.
+ */
+export const BACKGROUND_DEADLINE_MS = 90_000;
 /** A decision id is `<conversation>.<opportunity|bg>.<n>`; inference accepts `[a-zA-Z0-9_.:-]{1,160}`. */
 const DECISION_ID = /^[a-zA-Z0-9_.:-]{1,160}$/;
 

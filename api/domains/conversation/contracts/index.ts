@@ -2,7 +2,10 @@ import { z } from "zod";
 import { avatarMotionSchema, speechDeliverySchema } from "../../delivery";
 import { attachmentSchema } from "./attachments";
 export * from "./attachments";
+import { attributionSchema } from "./attribution";
+export { attributionSchema } from "./attribution";
 const messageSchema = z.object({
+	attribution: attributionSchema.optional(),
 	id: z.string(),
 	conversationId: z.string(),
 	role: z.enum(["user", "assistant"]),

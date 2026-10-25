@@ -1,3 +1,8 @@
+import {
+	attributionMigration,
+	readAttribution,
+	writeAttribution,
+} from "./attribution";
 import { messageAttachments, attachmentsMigration } from "./attachments";
 import type { Database } from "bun:sqlite";
 import type { Migration } from "../../../infrastructure/sqlite";
@@ -441,6 +446,7 @@ export function appendMessage(
 		message.runId,
 		...(ready ? [message.presentation ?? "conversation"] : []),
 	);
+	writeAttribution(db, message);
 	// A runless message may carry the host's delivery (run answers record theirs per run).
 	if (message.delivery && message.runId === null) {
 		if (!messageDeliveryReady(db))
@@ -497,6 +503,7 @@ function safeDelivery(row: MessageRow): SpeechDelivery | undefined {
 function toMessage(row: MessageRow, db: Database): Message {
 	const delivery = safeDelivery(row);
 	return {
+		...readAttribution(db, row.id),
 		id: row.id,
 		conversationId: row.conversation_id,
 		role: row.role,
@@ -656,6 +663,7 @@ export function getMessage(
 	return {
 		ordinal: row.ordinal,
 		message: {
+			...readAttribution(db, row.id),
 			id: row.id,
 			conversationId: row.conversation_id,
 			role: row.role,
@@ -702,4 +710,5 @@ export const migrations: readonly Migration[] = [
 		sql: messageDeliveryMigration,
 		after: ["conversation/0008-neutral-delivery-source"],
 	},
+	attributionMigration,
 ];

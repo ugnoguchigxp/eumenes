@@ -20,6 +20,7 @@ import {
 	row,
 } from "../repository";
 import { registerOcrHandlers } from "./handlers";
+import { createOcrQr } from "./qr";
 import { createOcrCorrections } from "./corrections";
 export function createOcr(deps: {
 	store: SqliteStore;
@@ -28,8 +29,10 @@ export function createOcr(deps: {
 	fetcher?: typeof fetch;
 	inference?: InferencePort;
 	capabilities?: () => Capabilities | null;
+	qrDecoder?: typeof import("./qr-input").decodeQr;
 }) {
 	const { store, queue } = deps;
+	const qr = createOcrQr(store, queue, deps.qrDecoder);
 	const corrections =
 		deps.inference && deps.capabilities
 			? createOcrCorrections({
@@ -73,9 +76,10 @@ export function createOcr(deps: {
 			maxAttempts: stage === "poll" ? 3 : 1,
 		}).job.id;
 	}
-	registerOcrHandlers({ ...deps, enqueue });
+	registerOcrHandlers({ ...deps, enqueue, onCompleted: qr.autoInTransaction });
 	return {
 		corrections,
+		qr,
 		async upload(
 			owner: string,
 			conversationId: string,
@@ -227,7 +231,10 @@ export function createOcr(deps: {
 				const r = owned(db, id, owner);
 				if (!["completed", "failed", "cancelled"].includes(record(r).state))
 					throw new Error("ocr_not_ready");
-				const jobs = corrections?.removeInTransaction(db, id) ?? [];
+				const jobs = [
+					...(corrections?.removeInTransaction(db, id) ?? []),
+					...qr.removeInTransaction(db, id),
+				];
 				db.query("DELETE FROM ocr_commands WHERE target_id=? AND owner=?").run(
 					id,
 					owner,

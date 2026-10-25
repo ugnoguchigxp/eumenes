@@ -8,6 +8,7 @@ export type FullscreenDialogProps = {
 	title: string;
 	closeLabel?: string;
 	onOpenChange: (open: boolean) => void;
+	onCloseAutoFocus?: (event: Event) => void;
 	children: ReactNode;
 };
 /** A reusable viewport workspace with modal focus, Escape and scroll containment. */
@@ -16,6 +17,7 @@ export function FullscreenDialog({
 	title,
 	closeLabel = "閉じる",
 	onOpenChange,
+	onCloseAutoFocus,
 	children,
 }: FullscreenDialogProps) {
 	return (
@@ -25,6 +27,7 @@ export function FullscreenDialog({
 				<Dialog.Content
 					className="fullscreen-dialog"
 					aria-describedby={undefined}
+					onCloseAutoFocus={onCloseAutoFocus}
 				>
 					<Dialog.Title className="fullscreen-dialog-title">
 						{title}

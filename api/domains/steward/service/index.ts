@@ -1,3 +1,4 @@
+import { createActivity } from "./activity";
 import { createInbox } from "./inbox";
 import { createKick } from "./kick";
 import { listDecisions } from "../repository";
@@ -17,6 +18,7 @@ export function createStewardService(deps: StewardDeps) {
 	const kick = createKick(deps, wake);
 	const inbox = createInbox(deps, kick);
 	const { handler } = createUnitHandler(deps, kick, wake);
+	const { activity, errorReport } = createActivity(deps);
 	deps.memory.registerForgetPurge((db, purged) => inbox.purge(db, purged));
 	return {
 		/** The queue handler of `steward.step.v1`. */
@@ -34,6 +36,10 @@ export function createStewardService(deps: StewardDeps) {
 		decisions(conversationId: string, limit = 50) {
 			return deps.store.read((db) => listDecisions(db, conversationId, limit));
 		},
+		/** What runs now and what failed last in a conversation (the conversation screen's indicator). */
+		activity,
+		/** The diagnostic text of the conversation's steward failures; null when none is failing. */
+		errorReport,
 		/** The conversation's event log (the flow the steward reads from), in log order. */
 		events(conversationId: string) {
 			return deps.store.read((db) =>

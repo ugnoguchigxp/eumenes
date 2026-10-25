@@ -69,3 +69,17 @@ dotsBuiltins.push({
 		id === "skill:dots.orchestrate@1" ? "skill:dots.orchestrate@2" : id,
 	),
 });
+
+export const dotsMcpSkill = readFileSync(
+	new URL("./dots/MESSAGING.v2.md", import.meta.url),
+	"utf8",
+);
+// A separate Skill identity preserves active task packages pinned to orchestration v2.
+dotsBuiltins.push({
+	...previousSkill,
+	id: "dots.messaging",
+	title: "dotsメッセージの返却手順",
+	summary: "メッセージへの返答と連携後の要約をMCPへ返す",
+	revision: 2,
+	body: dotsMcpSkill,
+});

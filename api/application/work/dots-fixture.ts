@@ -9,7 +9,7 @@ import { createQueue } from "../../domains/queue";
 import {
 	createEvents,
 	createSecretBox,
-	type Command,
+	type TaskCommand as Command,
 } from "../../domains/dots";
 import { createConversationService } from "../../domains/conversation";
 import { openStore } from "../../infrastructure/sqlite";

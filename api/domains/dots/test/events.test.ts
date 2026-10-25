@@ -18,9 +18,17 @@ const subscription = (url: string, key = secret(), ttlMs?: number) => ({
 	delivery: { mode: "webhook", url, secret: key },
 	...(ttlMs ? { ttlMs } : {}),
 });
-type Sent = { url: string; body: string; headers: Record<string, string> };
+type Sent = {
+	url: string;
+	body: string;
+	headers: Record<string, string>;
+	signal: AbortSignal;
+};
 
-function setup(respond?: (sent: Sent) => ReturnType<WebhookPost>) {
+function setup(
+	respond?: (sent: Sent) => ReturnType<WebhookPost>,
+	now?: () => number,
+) {
 	const fs: FileStore = fileStore();
 	closers.push(async () => {
 		await fs.queue.close(100).catch(() => {});
@@ -28,8 +36,8 @@ function setup(respond?: (sent: Sent) => ReturnType<WebhookPost>) {
 	});
 	const box = createSecretBox(join(fs.dir, "keys"));
 	const sent: Sent[] = [];
-	const post: WebhookPost = (url, body, headers) => {
-		const item = { url, body, headers };
+	const post: WebhookPost = (url, body, headers, signal) => {
+		const item = { url, body, headers, signal };
 		sent.push(item);
 		if (respond) return respond(item);
 		const p = JSON.parse(body);
@@ -47,6 +55,7 @@ function setup(respond?: (sent: Sent) => ReturnType<WebhookPost>) {
 		queue: fs.queue,
 		...box,
 		post,
+		now,
 	});
 	const command = (change: Parameters<typeof makeCommand>[0] = {}) =>
 		makeCommand({
@@ -302,7 +311,7 @@ test("a receiver rejection is recorded as a failed delivery without retrying", a
 	);
 	expect(JSON.parse(row.d)).toMatchObject({
 		state: "failed",
-		httpStatus: null,
+		httpStatus: 403,
 	});
 	expect(h.sent).toHaveLength(2);
 });
@@ -339,4 +348,151 @@ test("maintenance queues commands that were stored before the subscription exist
 	expect(h.jobs()).toHaveLength(1);
 	await h.events.maintenance();
 	expect(h.jobs()).toHaveLength(1);
+});
+
+test("unsubscribe accepts the original URL after canonicalization", async () => {
+	const h = setup();
+	await h.connection();
+	const url = "https://HOOKS.example:443/a";
+	await h.events.subscribe("conn", subscription(url));
+	expect(await h.events.unsubscribe("conn", url)).toEqual({});
+	expect(h.events.status("conn").subscribed).toBe(false);
+});
+
+test("refreshing the replacement key preserves the original rotation window", async () => {
+	const h = setup();
+	await h.connection();
+	const a = secret(),
+		b = secret();
+	await h.events.subscribe("conn", subscription(URL_A, a));
+	await h.events.subscribe("conn", subscription(URL_A, b));
+	await h.events.subscribe("conn", subscription(URL_A, b));
+	await h.save();
+	h.queue.start();
+	await until(() => h.sent.some((x) => JSON.parse(x.body).eventId));
+	const d = h.sent.find((x) => JSON.parse(x.body).eventId)!;
+	expect(() => new Webhook(a).verify(d.body, d.headers)).not.toThrow();
+	expect(() => new Webhook(b).verify(d.body, d.headers)).not.toThrow();
+});
+
+test("receiver rejection preserves its HTTP status and never retries 410 or 413", async () => {
+	for (const status of [403, 410, 413]) {
+		const h = setup(async (sent) => {
+			const p = JSON.parse(sent.body);
+			return p.type === "verification"
+				? {
+						status: 200,
+						body: JSON.stringify({ challenge: p.challenge }),
+						retryAfter: null,
+					}
+				: { status, body: "", retryAfter: null };
+		});
+		await h.connection();
+		await h.events.subscribe("conn", subscription(URL_A));
+		await h.save();
+		h.queue.start();
+		await until(() =>
+			h.store.read((db) => !!db.query("SELECT 1 FROM dots_deliveries").get()),
+		);
+		const r = h.store.read((db) =>
+			db.query("SELECT data_json d FROM dots_deliveries").get(),
+		) as { d: string };
+		expect(JSON.parse(r.d)).toMatchObject({
+			state: "failed",
+			httpStatus: status,
+		});
+		expect(h.sent).toHaveLength(2);
+	}
+});
+
+test("unsubscribe cancels queued deliveries and aborts an active request", async () => {
+	const h = setup(async (sent) => {
+		const p = JSON.parse(sent.body);
+		if (p.type === "verification")
+			return {
+				status: 200,
+				body: JSON.stringify({ challenge: p.challenge }),
+				retryAfter: null,
+			};
+		return new Promise((_, reject) => {
+			sent.signal.addEventListener("abort", () => reject(sent.signal.reason), {
+				once: true,
+			});
+		});
+	});
+	await h.connection();
+	await h.events.subscribe("conn", subscription(URL_A));
+	await h.save();
+	h.queue.start();
+	await until(() => h.sent.length === 2);
+	await h.events.unsubscribe("conn", URL_A);
+	expect(h.sent[1]!.signal.aborted).toBe(true);
+	await until(() => h.jobs()[0]?.state === "cancelled");
+	const queued = setup();
+	await queued.connection();
+	await queued.events.subscribe("conn", subscription(URL_A));
+	await queued.save();
+	await queued.events.unsubscribe("conn", URL_A);
+	expect(queued.jobs()[0]?.state).toBe("cancelled");
+	expect(queued.sent).toHaveLength(1);
+});
+
+test("429 and 5xx retry the same event and payload with a renewed signature timestamp", async () => {
+	for (const status of [429, 503]) {
+		let at = Date.now(),
+			attempt = 0;
+		const key = secret();
+		const h = setup(
+			async (s) => {
+				const p = JSON.parse(s.body);
+				if (p.type === "verification")
+					return {
+						status: 200,
+						body: JSON.stringify({ challenge: p.challenge }),
+						retryAfter: null,
+					};
+				return {
+					status: attempt++ === 0 ? status : 200,
+					body: "{}",
+					retryAfter: null,
+				};
+			},
+			() => at,
+		);
+		await h.connection();
+		await h.events.subscribe("conn", subscription(URL_A, key));
+		await h.save();
+		h.queue.start();
+		await until(() => h.jobs()[0]?.state === "retry_wait");
+		expect(
+			h.store.read((db) =>
+				JSON.parse(
+					(
+						db.query("SELECT data_json d FROM dots_deliveries").get() as {
+							d: string;
+						}
+					).d,
+				),
+			),
+		).toMatchObject({ state: "retry", httpStatus: status });
+		at += 1000;
+		await h.store.write((db) =>
+			db
+				.query(
+					"UPDATE queue_jobs SET available_at_ms=0 WHERE state='retry_wait'",
+				)
+				.run(),
+		);
+		h.queue.wake();
+		await until(() => h.jobs()[0]?.state === "completed");
+		const [first, second] = h.sent.filter((s) => !!JSON.parse(s.body).eventId);
+		expect(second!.body).toBe(first!.body);
+		expect(second!.headers["webhook-id"]).toBe(first!.headers["webhook-id"]);
+		expect(second!.headers["webhook-timestamp"]).not.toBe(
+			first!.headers["webhook-timestamp"],
+		);
+		expect(() =>
+			new Webhook(key).verify(second!.body, second!.headers),
+		).not.toThrow();
+	}
 });

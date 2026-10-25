@@ -8,6 +8,7 @@ import {
 	Video,
 	X,
 } from "lucide-react";
+import { OcrPreview } from "./OcrPreview";
 import { Button } from "../Button";
 import { menuKeyDown } from "../../utils/menuKeyboard";
 import { canRemove, stateLabels, type OcrWorkspaceProps } from "./types";
@@ -61,14 +62,7 @@ export function OcrMedia(props: OcrWorkspaceProps) {
 	const [pendingDelete, setPendingDelete] = useState<string>();
 	const trigger = useRef<HTMLButtonElement>(null);
 	const firstItem = useRef<HTMLButtonElement>(null);
-	const video = useRef<HTMLVideoElement>(null);
 	const item = props.items.find((i) => i.id === props.selectedId);
-	const frame =
-		item?.result?.kind === "video"
-			? item.result.frames[props.frameIndex]
-			: undefined;
-	const lines =
-		item?.result?.kind === "image" ? item.result.lines : (frame?.lines ?? []);
 	const width =
 		item?.result?.kind === "image"
 			? item.result.width
@@ -80,11 +74,6 @@ export function OcrMedia(props: OcrWorkspaceProps) {
 	useEffect(() => {
 		if (historyOpen) firstItem.current?.focus();
 	}, [historyOpen]);
-	useEffect(() => {
-		if (frame && video.current)
-			video.current.currentTime = frame.timestampSeconds;
-		// oxlint-disable-next-line react-hooks/exhaustive-deps -- runs only when the listed value changes
-	}, [frame?.timestampSeconds, props.selectedId]);
 	function closeHistory() {
 		setHistoryOpen(false);
 		setPendingDelete(undefined);
@@ -234,69 +223,36 @@ export function OcrMedia(props: OcrWorkspaceProps) {
 				</>
 			)}
 			<h3 className="ocr-source-heading">元資料</h3>
-			<div className="ocr-preview">
-				{!item && (
-					<div className="ocr-media-empty">
-						<ImageIcon size={32} aria-hidden="true" />
-						<p>画像・動画の原本をここに表示します。</p>
-					</div>
-				)}
-				{item && !props.mediaUrl && (
-					<p role="status">原本を読み込んでいます。</p>
-				)}
-				{item && props.mediaUrl && (
-					<div
-						className="ocr-media-frame"
-						style={
-							width && height
-								? { aspectRatio: `${width}/${height}` }
-								: undefined
-						}
-					>
-						{item.mime.startsWith("image/") ? (
-							<img src={props.mediaUrl} alt={`${item.name}の原本`} />
-						) : (
-							// oxlint-disable-next-line jsx-a11y/media-has-caption -- user-supplied recording or camera preview has no caption track
-							<video
-								ref={video}
-								src={props.mediaUrl}
-								controls
-								playsInline
-								aria-label={`${item.name}の元動画`}
-							/>
-						)}
-						{width && height && item.state === "completed" && (
-							<svg
-								viewBox={`0 0 ${width} ${height}`}
-								aria-label="文字の検出位置"
-								preserveAspectRatio="xMidYMid meet"
-							>
-								{lines.map((line, index) => (
-									<polygon
-										key={index}
-										points={line.polygon.map(([x, y]) => `${x},${y}`).join(" ")}
-										className={
-											props.selectedLines.includes(index)
-												? "ocr-polygon selected"
-												: "ocr-polygon"
-										}
-										onClick={() => props.onLine?.(index)}
-									/>
-								))}
-								{props.highlightRegion && (
-									<rect
-										x={props.highlightRegion[0]}
-										y={props.highlightRegion[1]}
-										width={props.highlightRegion[2]}
-										height={props.highlightRegion[3]}
-										className="ocr-correction-region"
-									/>
-								)}
-							</svg>
-						)}
-					</div>
-				)}
-			</div>
+			{!item ? (
+				<div className="ocr-media-empty">
+					<ImageIcon size={32} />
+					<p>画像・動画の原本をここに表示します。</p>
+				</div>
+			) : !props.mediaUrl ? (
+				<p role="status">原本を読み込んでいます。</p>
+			) : width && height && item.state === "completed" ? (
+				<OcrPreview
+					key={`${item.id}:${item.revision}:${props.frameIndex}`}
+					{...props}
+					item={item}
+					width={width}
+					height={height}
+				/>
+			) : (
+				<div className="ocr-preview">
+					{item.mime.startsWith("image/") ? (
+						<img src={props.mediaUrl} alt={`${item.name}の原本`} />
+					) : (
+						// oxlint-disable-next-line jsx-a11y/media-has-caption -- user-supplied source has no caption track
+						<video
+							src={props.mediaUrl}
+							controls
+							playsInline
+							aria-label={`${item.name}の元動画`}
+						/>
+					)}
+				</div>
+			)}
 			{item?.state === "completed" && (
 				<p className="ocr-source-hint">
 					行を選ぶと、元資料の位置を確認できます。

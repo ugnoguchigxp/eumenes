@@ -1,5 +1,9 @@
 import { z } from "zod";
-import { correctionRecord, ocrRecord } from "../api/domains/ocr/contracts";
+import {
+	correctionRecord,
+	ocrRecord,
+	qrRecord,
+} from "../api/domains/ocr/contracts";
 import { runSchema } from "../api/domains/dialogue/contracts";
 import { callJson, json, type Transport } from "./transport";
 
@@ -72,6 +76,66 @@ export function ocrClient(t: Transport) {
 				runSchema,
 				`${root}/${encodeURIComponent(id)}/conversation`,
 				json({ requestId, frameIndex, lineIndexes }),
+			),
+		ocrQr: async (
+			id: string,
+			conversationId: string,
+			frameIndex?: number,
+			signal?: AbortSignal,
+		) =>
+			qrRecord
+				.nullable()
+				.parse(
+					await (
+						await t.call(
+							`${root}/${encodeURIComponent(id)}/qr?${new URLSearchParams({ conversationId, ...(frameIndex === undefined ? {} : { frameIndex: String(frameIndex) }) })}`,
+							{ signal },
+						)
+					).json(),
+				),
+		ocrQrCreate: async (
+			id: string,
+			input: {
+				requestId: string;
+				conversationId: string;
+				expectedRevision: number;
+				frameIndex?: number;
+			},
+		) =>
+			qrRecord.parse(
+				await (
+					await t.call(`${root}/${encodeURIComponent(id)}/qr`, json(input))
+				).json(),
+			),
+		ocrQrGet: async (id: string, qrId: string, conversationId: string) =>
+			qrRecord.parse(
+				await (
+					await t.call(
+						`${root}/${encodeURIComponent(id)}/qr/${encodeURIComponent(qrId)}?${new URLSearchParams({ conversationId })}`,
+					)
+				).json(),
+			),
+		ocrQrCancel: async (id: string, qrId: string, conversationId: string) =>
+			qrRecord.parse(
+				await (
+					await t.call(
+						`${root}/${encodeURIComponent(id)}/qr/${encodeURIComponent(qrId)}/cancel`,
+						json({ conversationId }),
+					)
+				).json(),
+			),
+		ocrQrIncorporate: async (
+			id: string,
+			qrId: string,
+			conversationId: string,
+			index: number,
+			requestId: string,
+		) =>
+			callJson(
+				t,
+				runSchema,
+				`${root}/${encodeURIComponent(id)}/qr/${encodeURIComponent(qrId)}/conversation`,
+				json({ conversationId, index, requestId }),
 			),
 		ocrCorrectionCreate: async (
 			id: string,

@@ -1,0 +1,12 @@
+{
+  "lane": "diagnostic-live-llm-with-synthetic-ocr",
+  "productAcceptancePassed": false,
+  "productBundleChangedThisFollowup": false,
+  "bundleSha256": "e6d4cbc42049369fcde2ddb035ec4dbd124b7f0d5bc9f60f0deac44c91e62726",
+  "calls": 10,
+  "completedHypothesisRounds": 7,
+  "serverOperations": false,
+  "productSettingsChanged": false,
+  "comparison": "parsed-json equality; snapshot serialization differs",
+  "bundleContentSha256": "c90db547f53b9f020583d23b1f07f801d9faf021255451feffd1275e3e35de90"
+}

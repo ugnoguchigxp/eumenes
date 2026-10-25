@@ -16,6 +16,7 @@ import {
 	type TodoItem,
 } from "./context-document";
 import { systemText } from "./context-system";
+import { toolchainTitlesInTransaction } from "./delegate-conversation";
 import { generationTools } from "./generation-tools";
 
 /** The system part of every call on the conversation's prompt: the agent's system, then the host's rules. */
@@ -25,7 +26,7 @@ export function conversationSystem(deps: DialogueDeps, tx: Database): string {
 		userName: "",
 		persona: "butler" as const,
 	};
-	return `${deps.conversationAgent.system()}\n${systemText(persona)}`;
+	return `${deps.conversationAgent.system()}\n${systemText(persona, toolchainTitlesInTransaction(deps, tx))}`;
 }
 
 /**

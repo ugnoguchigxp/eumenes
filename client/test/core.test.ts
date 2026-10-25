@@ -220,6 +220,31 @@ contracts("memory client", [
 		result: [decision],
 	},
 	{
+		name: "stewardActivity",
+		call: (c) => c.stewardActivity("main/1"),
+		method: "GET",
+		path: "/api/steward/activity?conversationId=main%2F1",
+		response: {
+			running: true,
+			slots: ["reflect"],
+			errors: [
+				{
+					slot: "world",
+					step: "curate-world",
+					code: "cloud_agent_billing_error",
+					at: "2026-10-25T04:51:33.982Z",
+				},
+			],
+		},
+	},
+	{
+		name: "stewardErrorReport",
+		call: (c) => c.stewardErrorReport("main/1"),
+		method: "GET",
+		path: "/api/steward/error-report?conversationId=main%2F1",
+		response: { text: "# Eumenes エラーレポート（メモリー整理）" },
+	},
+	{
 		name: "memoryContext (off)",
 		call: (c) => c.memoryContext("main"),
 		method: "GET",

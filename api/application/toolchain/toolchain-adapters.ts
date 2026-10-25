@@ -1,4 +1,8 @@
 import {
+	DOTS_MESSAGING_ADAPTER_REF,
+	describeDotsMessagingAdapter,
+} from "../work/dots-messaging-adapter";
+import {
 	PIPELINES_ADAPTER_REF,
 	describePipelinesAdapter,
 } from "../pipelines/pipelines-adapter";
@@ -188,6 +192,7 @@ export function bundleHostOf(
 export const hostAdapterDescriptions: Array<
 	Pick<DomainAdapter, "ref" | "describe">
 > = [
+	{ ref: DOTS_MESSAGING_ADAPTER_REF, describe: describeDotsMessagingAdapter },
 	{ ref: SHELL_ADAPTER_REF, describe: describeShellAdapter },
 	{ ref: TASK_ADAPTER_REF, describe: describeTaskAdapter },
 	{ ref: PIPELINES_ADAPTER_REF, describe: describePipelinesAdapter },

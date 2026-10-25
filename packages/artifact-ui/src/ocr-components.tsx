@@ -8,6 +8,10 @@ import { useAction } from "./components";
 import { useArtifactRuntime } from "./runtime";
 export type OcrResource = Omit<
 	OcrWorkspaceProps,
+	| "onRegion"
+	| "onQrCancel"
+	| "onQrIncorporate"
+	| "onQrEvidence"
 	| "onFile"
 	| "onSelect"
 	| "onFrame"
@@ -43,6 +47,30 @@ function useOcrProps(request: ArtifactRequest): OcrWorkspaceProps {
 			if (!runtime.uploadFile) throw new Error("input_unavailable");
 			const receipt = await runtime.uploadFile(action.source, file);
 			if (receipt.status !== "accepted") throw new Error(receipt.message);
+		},
+		onRegion: (region) => {
+			void action.send("ocr-region", {
+				id: resource.selectedId ?? "",
+				region: region ? JSON.stringify(region) : "",
+				scope: `${resource.selectedId}:${resource.items.find((i) => i.id === resource.selectedId)?.revision}:${resource.frameIndex}`,
+			});
+		},
+		onQrCancel: (id, candidateId) => {
+			void action.send("ocr-qr-cancel", { id, candidateId });
+		},
+		onQrIncorporate: (id, candidateId, index) => {
+			void action.send("ocr-qr-incorporate", {
+				id,
+				candidateId,
+				index: String(index),
+			});
+		},
+		onQrEvidence: (id, candidateId, index) => {
+			void action.send("ocr-qr-evidence", {
+				id,
+				candidateId,
+				index: String(index),
+			});
 		},
 		onSelect: (id) => {
 			void action.send("ocr-select", { id });

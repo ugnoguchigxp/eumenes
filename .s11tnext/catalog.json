@@ -3,7 +3,7 @@
   "artifactVersion": 2,
   "compilerVersion": "0.1.2",
   "releaseProfile": "application",
-  "policyDigest": "sha256:74eab2245a47c4b3ea0203f89ba943529b817e6307efb0521e6a446c20d47a79",
+  "policyDigest": "sha256:fe26c3f17f28e0f492ea1e36f0f6de56eeff55c9a1a9d25d4a117043bea15719",
   "createdFrom": {
     "configPath": "s11tnext.config.toml",
     "sourceFiles": [
@@ -49,6 +49,7 @@
       "api/domains/dialogue/contexts/host-rules/research-document.context.toml",
       "api/domains/dialogue/contexts/host-rules/research-result.context.toml",
       "api/domains/dialogue/contexts/host-rules/research-world.context.toml",
+      "api/domains/dialogue/contexts/host-rules/toolchains.context.toml",
       "api/domains/dialogue/contexts/host-rules/tools.context.toml",
       "api/domains/dialogue/contexts/specialist-turn/correction.context.toml",
       "api/domains/dialogue/contexts/specialist-turn/reference.context.toml",
@@ -1471,6 +1472,55 @@
       "definitionHash": "sha256:7653ea37d709605b49083cd539b51917d2a3aaf70d4e045f15b2c3839e134d2b",
       "releaseDigest": "sha256:72e0f5f61f389b9fdab2392d857feaf645203d2cf767440227adfe32b516f671"
     },
+    "dialogue.contexts.host-rules.toolchains": {
+      "key": "dialogue.contexts.host-rules.toolchains",
+      "owner": "unowned",
+      "contentKind": "text",
+      "messageRole": "system",
+      "sourceLocale": "ja-JP",
+      "requiredLocales": [
+        "ja-JP"
+      ],
+      "variables": {
+        "titles": {
+          "required": true,
+          "type": "string",
+          "trust": "trusted",
+          "placement": "inline",
+          "encoding": "raw"
+        }
+      },
+      "locales": {
+        "ja-JP": {
+          "sections": [
+            {
+              "id": "context.text",
+              "kind": "instruction",
+              "severity": "must",
+              "optimizable": false,
+              "omitIfEmpty": false,
+              "segments": [
+                {
+                  "type": "literal",
+                  "value": "依頼できる担当: "
+                },
+                {
+                  "type": "variable",
+                  "name": "titles"
+                },
+                {
+                  "type": "literal",
+                  "value": "。<state>の担当にないものは、find_toolchainで探してからdelegateで渡します。"
+                }
+              ]
+            }
+          ],
+          "artifactHash": "sha256:167ad7be624c6f24257d86637dc484d8a845b41f1eb8bf78d64ac673e3f8d67b"
+        }
+      },
+      "definitionHash": "sha256:80bd9f66e863a785fa9f5389f3c202728d3b4314302f8a348c70ee2719cb4eb3",
+      "releaseDigest": "sha256:409f403767b1ceab694263cbd228c6a11738417ab29198e739c679dc897df540"
+    },
     "dialogue.contexts.host-rules.tools": {
       "key": "dialogue.contexts.host-rules.tools",
       "owner": "unowned",
@@ -1493,16 +1543,16 @@
               "segments": [
                 {
                   "type": "literal",
-                  "value": "道具の使い方:\n- 担当は<state>の担当から選び、足りなければfind_toolchainで探します。候補を見て、こなせるなら依頼し、合うものがなければ断ります。\n- 依頼した仕事の結果や質問は<log>の「結果」「問い」の行に入り、<state>のTODOの状態も変わります。仕事の操作（work）は、TODOの番号で確認・質問への回答・訂正・取消に使います。\n- 記憶を忘れてほしい・覚えてほしい・違うので直してほしいという依頼は、memoryのrequestで記憶担当へ渡します。\n- 道具が受け付けなかった呼出しは、結果のissuesとfieldsを見て直して呼び直すか、できないと伝えます。"
+                  "value": "道具の使い方:\n- 担当は<state>の担当から選び、足りなければfind_toolchainで探します。候補を見て、こなせるなら依頼し、合うものがなければ断ります。delegateを呼ばずに、依頼した・依頼するとは言いません。\n- 依頼した仕事の結果や質問は<log>の「結果」「問い」の行に入り、<state>のTODOの状態も変わります。仕事の操作（work）は、TODOの番号で確認・質問への回答・訂正・取消に使います。\n- 記憶を忘れてほしい・覚えてほしい・違うので直してほしいという依頼は、memoryのrequestで記憶担当へ渡します。\n- 道具が受け付けなかった呼出しは、結果のissuesとfieldsを見て直して呼び直すか、できないと伝えます。"
                 }
               ]
             }
           ],
-          "artifactHash": "sha256:22d65ebe78f0689b1c4ac98a0117e5ccac2cfeea6461473ac3d6dae3c644291a"
+          "artifactHash": "sha256:2cad07338eb786b238189f5f09fae2d26a6dd354b5ff81bbfd3db6ae8c650d95"
         }
       },
-      "definitionHash": "sha256:d93bb7672113cde1e714c08e86edcf31d8475e702581ce01f8960d6da04f8a5f",
-      "releaseDigest": "sha256:b69f991084cb0540ebc8b5b2be5d3107a52c0077afdb15ceaefc3e96e798c18e"
+      "definitionHash": "sha256:262a71e435e6c70396b44d7a2c9eb07f36ac159479cc84bc0a5b3d0df2f92331",
+      "releaseDigest": "sha256:4ed5ceb676411677cc3e948f723a4124408246f82dd5c1acab9542bc8aa241cd"
     },
     "dialogue.contexts.specialist-turn.correction": {
       "key": "dialogue.contexts.specialist-turn.correction",
@@ -1769,7 +1819,7 @@
               "segments": [
                 {
                   "type": "literal",
-                  "value": "今回の作業指示は最後のuserメッセージです（利用者の新しい発言。新しい発言がないときはhostの固定文）。説明や言い換えでも、依頼にある対象・日時・数値・単位をそのまま保持し、条件を足しません。\n役割: "
+                  "value": "今回の作業指示は最後のuserメッセージです（利用者の新しい発言。新しい発言がないときはhostの固定文）。説明や言い換えでも、依頼にある対象・日時・数値・単位を保持し、条件を足しません。利用者が訂正した内容は、訂正前の記録より優先します。\n役割: "
                 },
                 {
                   "type": "variable",
@@ -1797,16 +1847,16 @@
                 },
                 {
                   "type": "literal",
-                  "value": "\n- 役割と口調はこの設定に従います。<log>にあるあなたの過去の発言は当時の記録であり、今の役割・口調・回答の見本ではありません。記憶や経緯に残った以前の話し方も引き継ぎません。\n- 制作物や詳しい内容は担当へ渡す依頼・成果物に含め、読み上げません。\n- 外部確認・操作・制作が必要なら、担当へ仕事を渡します（delegate）。渡すときは実行前の短い予告を付けます。結果が返るまで完了と言いません。tool名・内部ID・制御構文は話しません。\n- 実行できる依頼は、提案して返事を待たずにそのまま実行します。既存のものを変える依頼と取り消せない依頼は、delegateのconfirmで確認してから実行します。\n- 今回の根拠にない事実・数値・出典・成功を作りません。過去の発言・結果を現在の外部状態の確認結果にしません。必要な条件と不確かさを短い返答にも残します。必須情報が欠け、作業を進められないときだけ確認を一つ返します。\n- 新しい発言がなく最後のuserメッセージがhostの固定文のときは、<now>のきっかけを見て、話すべきことがあるときだけ短く話し、なければ本文を書きません。\n- 画像は実際に提示されたときだけ見たものとして扱います。"
+                  "value": "\n- 役割と口調はこの設定に従います。<log>にあるあなたの過去の発言は当時の記録であり、今の役割・口調・回答の見本ではありません。記憶や経緯に残った以前の話し方も引き継ぎません。\n- 入力には音声認識や入力の誤りが含まれます。不自然な語は直近の文脈と本人の訂正に照らして解釈し、読み違いを根拠に新しい物事や説明を作りません。意味が一意に定まらず返答や実行内容が変わるときは、短く確認します。専門語・名前・数値を根拠なく別の語へ変えません。\n- 返答は利用者の言語で自然に話せる文にします。引用・名称・翻訳の依頼で必要な表記は保持し、通常の文中に別言語の接続語や改行を示す記号を混ぜません。段落は実際の改行で区切ります。\n- 制作物や詳しい内容は担当へ渡す依頼・成果物に含め、読み上げません。\n- 外部確認・操作・制作が必要なら、担当へ仕事を渡します（delegate）。渡すときは実行前の短い予告を付けます。結果が返るまで完了と言いません。tool名・内部ID・制御構文は話しません。\n- 実行できる依頼は、提案して返事を待たずにそのまま実行します。既存のものを変える依頼と取り消せない依頼は、delegateのconfirmで確認してから実行します。\n- 今回の根拠にない事実・数値・出典・成功を作りません。過去の発言・結果を現在の外部状態の確認結果にしません。必要な条件と不確かさを短い返答にも残します。必須情報が欠け、作業を進められないときだけ確認を一つ返します。\n- 新しい発言がなく最後のuserメッセージがhostの固定文のときは、<now>のきっかけを見て、話すべきことがあるときだけ短く話し、なければ本文を書きません。\n- 画像は実際に提示されたときだけ見たものとして扱います。"
                 }
               ]
             }
           ],
-          "artifactHash": "sha256:ed4db833bdc8facc87115aafb79a24e885b346399e8191730028506a38136a25"
+          "artifactHash": "sha256:fc19d44b33dd2947474d77742bbc4829ea53ff6ad1eb656060f952c95f2c2a2a"
         }
       },
-      "definitionHash": "sha256:e14a2d0f9eaaab9c5f14a4e7e7ce815302a583a744ecabc17230759d3c66380d",
-      "releaseDigest": "sha256:5fd76c23616bf6f8d64c91ae975ead88b9564483b0585bb502764fe118330e67"
+      "definitionHash": "sha256:11a8d2915b1883cb5006d6d6a3422443e17f4ee9a440a3421432aa8fdabb39ab",
+      "releaseDigest": "sha256:3b44a7a1eeee34d546d59f0a9b7617723496926acdd62e06e5cb11db3d6f2900"
     },
     "dialogue.contexts.system-prompt.maid-role": {
       "key": "dialogue.contexts.system-prompt.maid-role",
@@ -2650,5 +2700,5 @@
       "releaseDigest": "sha256:a5598b0dc9cde21fc18bc489c3e5be973275f0493307e41ad62feedf4d30ae6f"
     }
   },
-  "catalogDigest": "sha256:516f2b4e02ca7c490f470da37f10bf535ab5b5d3b909d128a7ed6c2ae20de7e7"
+  "catalogDigest": "sha256:e59be94af72e45c3f2624e15d9fa4e446bfeb7dcdf00ce58075e338470899e31"
 }

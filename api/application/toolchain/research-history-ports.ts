@@ -26,6 +26,7 @@ function conversationSource(m: HistoryMessage, scopeRef: string): Source {
 		messageId: m.messageId,
 		conversationId: m.conversationId,
 		speaker: m.speaker,
+		...(m.attribution ? { attribution: m.attribution } : {}),
 		createdAt: m.createdAt,
 		revision: m.revision,
 		digest: m.digest,

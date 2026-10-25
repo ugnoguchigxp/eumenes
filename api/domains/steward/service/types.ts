@@ -110,6 +110,8 @@ export interface StewardDeps {
 	worldResourceId?(): string | null;
 	/** Absent: no goal reflection, no goal upkeep, no goal in a forget. */
 	goals?: StewardGoals;
+	/** The operational log file the error report reads (`config.logFile`); absent or undefined reads no log. */
+	logFile?(): string | undefined;
 }
 
 /** The transaction a step reads and writes in. */

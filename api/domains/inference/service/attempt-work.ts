@@ -30,7 +30,11 @@ export function attemptDuration(r: Request, source: Source) {
 			? cloudMs
 			: (r.row.attemptMs ??
 				options.localMs ??
-				(r.row.purpose === "llm" ? 120_000 : 15_000));
+				(r.row.purpose === "llm"
+					? 120_000
+					: r.row.purpose === "tts"
+						? 30_000
+						: 15_000));
 	const remaining = Math.max(0, r.deadline - Date.now());
 	const reserve =
 		source === "larm" &&

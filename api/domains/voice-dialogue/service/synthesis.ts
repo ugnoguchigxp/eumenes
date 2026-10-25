@@ -1,6 +1,7 @@
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import type { DialogueService } from "../../dialogue";
 import type { InferencePort, Receipt } from "../../inference";
+import { isRetryableSpeechError } from "../../inference";
 import type { SpeechPreparation } from "../../delivery";
 import type { Speech } from "./speech-state";
 import { SpeechSentences } from "./sentences";
@@ -174,12 +175,7 @@ export function createSpeechSynthesis({
 							)
 								throw error;
 							lastError = error;
-							// A text LARM cannot analyze fails identically every time.
-							if (
-								error instanceof Error &&
-								error.message === "larm_inference_422"
-							)
-								break;
+							if (!isRetryableSpeechError(error)) break;
 							log.warn(
 								"voice.chunk_retry",
 								{ utteranceId: id, runId, count: n, attempt: attempt + 1 },

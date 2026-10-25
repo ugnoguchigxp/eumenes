@@ -1,0 +1,47 @@
+{
+	"id": "ctx-f3-dev-02",
+	"family": "F3",
+	"split": "dev",
+	"seed": {
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "butler"
+		},
+		"events": [
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-25T04:00:00.000Z",
+				"text": "ここでキャー設計もできるんです"
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-25T04:01:00.000Z",
+				"text": "エージェントの設計ですね。",
+				"origin": "reply"
+			}
+		]
+	},
+	"input": "キャー設計ではなくCADです。パーツや3Dプリンタも選定しています。",
+	"expect": {
+		"checks": [
+			{
+				"kind": "speaks"
+			},
+			{
+				"kind": "brief_spoken_reply"
+			},
+			{
+				"kind": "tool_not_called"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "uses_newest_fact",
+				"condition": "最新のCADへの訂正を採用し、機械や部品の設計の文脈で短く返す。エージェント設計と解釈し続けない。"
+			}
+		]
+	}
+}

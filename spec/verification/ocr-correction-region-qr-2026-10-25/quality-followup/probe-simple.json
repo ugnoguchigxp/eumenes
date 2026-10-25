@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-25T05:03:24.999Z",
+  "results": [
+    {
+      "mode": "draft-vision",
+      "durationMs": 6808,
+      "text": "製品の仕樣や取扱方法\nなど詳細は右記の案内を\nご確認ください。\n型番: OCR-172 / AB-100\n定格: 12 V / 1.5 A",
+      "identifiersPreserved": false,
+      "exact": false
+    },
+    {
+      "mode": "draft-text",
+      "durationMs": 3533,
+      "text": "製品の仕樣や取扱方法\nなど不明な点は右記の案内を\nご確認ください。\n型番: OCR-172 / AB-100\n定格: 12 V / 1.5 A",
+      "identifiersPreserved": false,
+      "exact": false
+    }
+  ]
+}

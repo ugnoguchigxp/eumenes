@@ -162,3 +162,16 @@ bun test api/domains/dots api/application/work/dots-tasks.test.ts api/applicatio
 実 dots の製品受入には、認証付きの公開 MCP 接続と対象プロジェクトの登録が必要。接続後に、新規 Session、ブロッカー、回答後の同一 Session の再開、成果と根拠、no_next_work、取消後の全子停止、再起動時の照合、予定からの一回のリマインドを確認する。これらを確認するまで、製品接続の完成とは記録しない。
 
 参照: [実装計画](../spec/.archived/dots-toolchain-agent-skill-implementation-plan-2026-10-10.md)、[MCP server](https://developers.openai.com/plugins/build/mcp-server)、[MCP Events](https://developers.openai.com/plugins/build/mcp-events)、[OAuth](https://developers.openai.com/plugins/build/auth)。
+
+
+## メッセージと要約の往復
+
+通常の往復用に `artifact:dots.messaging@1`（「dots メッセージ」）を追加した。接続先を選び、メッセージ連携を有効にする。OAuth接続全体の有効・無効や既存の作業許可とは別の設定で、接続本体のrevisionを変更しない。
+
+対象dotが既存Eventsで監視登録した後、本文を明示的に送る。dotは `kind: message` を取得・claimし、`submit_message_reply` に返答と累積要約を返す。通常の往復ではproject・task・Codex Sessionを作成しない。要約は渡された連携後のやり取りを対象とし、画面の全履歴取得には使わない。
+
+同じメッセージ会話の未解決送信は1件まで。通知のHTTP 2xxは「通知受付」であり、返答を保存した時点で「返答受信」に変わる。失効した購読では新規送信を受け付けず下書きを残す。通信結果が不明な間は同じ本文・同じrequestIdで照合し、別IDで自動再送しない。取消・連携解除は以後の返却採用を止める操作で、dotの推論が停止した証明ではない。
+
+本文は完了・取消・失効から7日、本文なしのreceiptと再送照合は30日保持する。元の発言の削除・訂正は派生する要約と後続snapshotにも反映する。返答は会話にも「dots の返答」、要約は「dots の要約」と出所を付けて保存する。
+
+メッセージ用手順は `skill:dots.messaging@1`。既存委任の `dots.orchestrate@1`・`@2` は自動変更しない。現在の実装・固定検証と、全体gate・実dots・サーバー反映の未完了事項は[設計書§15](../spec/dots-messaging-design-and-plan-2026-10-25.md#15-実装と検証の記録)を参照する。

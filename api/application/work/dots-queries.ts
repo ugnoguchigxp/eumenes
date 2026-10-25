@@ -2,7 +2,10 @@ import { getLogger } from "../../infrastructure/logger";
 import { createHash } from "node:crypto";
 import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../infrastructure/sqlite";
-import type { createCommands, Command } from "../../domains/dots";
+import type {
+	createCommands,
+	TaskCommand as Command,
+} from "../../domains/dots";
 import type { WorkTask } from "../../domains/tasks";
 import { adoptDotsReport, type DotsReportPorts } from "./dots-report-adoption";
 export function createDotsQueries(
@@ -25,12 +28,14 @@ export function createDotsQueries(
 		getCommand(owner: string, id: string) {
 			return store.readSnapshot((db) => {
 				const c = commands.getInTransaction(db, owner, id);
+				if (c.kind === "message") throw new Error("invalid_dots_command_kind");
 				current(db, owner, c);
 				return c;
 			});
 		},
 		claim(owner: string, raw: unknown) {
 			return commands.claim(owner, raw, (db, c) => {
+				if (c.kind === "message") throw new Error("invalid_dots_command_kind");
 				current(db, owner, c);
 			});
 		},
@@ -121,6 +126,8 @@ export function createDotsQueries(
 							t.grant.connectionRef,
 							old.command_id,
 						);
+						if (c.kind === "message")
+							throw new Error("invalid_dots_command_kind");
 						current(db, t.grant.connectionRef, c);
 						return {
 							taskId,

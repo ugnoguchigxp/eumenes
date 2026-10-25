@@ -129,7 +129,7 @@ export const domains = {
 	dots: {
 		tier: 1,
 		backend: "api/domains/dots",
-		web: null,
+		web: "web/src/domains/dots",
 		components: null,
 		depends: { api: ["queue"], web: [], test: [] },
 	},

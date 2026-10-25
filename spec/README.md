@@ -8,6 +8,9 @@ archive の基準: その文書が担当した実装がコードにあり、本�
 
 | 文書 | 状態 |
 | --- | --- |
+| [memory-activity-indicator-design-2026-10-25.md](memory-activity-indicator-design-2026-10-25.md) | 合意済み・実装済み（fixture 検証済み、live 未確認）。会話画面の経路表示の右端に独立チップ「メモリー整理」を置き、表示中の会話で steward の unit のジョブが実行中（running）のときだけ点灯する。失敗中（`larm_preempted` の譲りは飛ばして判定）は赤い点と小さな ⚠ アイコンボタンを出し、既存のエラーレポートModal（LLM貼り付け用）を開く。`GET /api/steward/activity`・`/error-report` と既存の change 購読で更新 |
+| [dots-messaging-design-and-plan-2026-10-25.md](dots-messaging-design-and-plan-2026-10-25.md) | 合意済み。P0〜P4の機能実装と固定試験・画面試験を実施。既存OAuth・Eventsでメッセージ送信と返答・連携後の要約を受け取る。全体gateは保留、実dots受入・サーバー反映は未実施（§15） |
+| [ocr-correction-region-qr-design-2026-10-25.md](ocr-correction-region-qr-design-2026-10-25.md) | 合意済み。拡大・既存OCR行の矩形選択・QR復号を実装し、固定試験とブラウザ確認を実施。補正指示の新版は実LLMの品質受入未達。実カメラ・稼働サーバー反映は未確認 |
 | [agency-conversation-agent-design-2026-10-25.md](agency-conversation-agent-design-2026-10-25.md) | 合意済み・実装中（§11.4）。現行の会話担当（dialogue の生成）を削除し、agency を唯一の会話エージェントにする。返事・自発発話・TODOの完了の報告はすべて agency が行い、会話の流れで必要なら担当（toolchain）を呼んでサブエージェントに渡す（agency 側は `ToolPort` の mock）。記憶は直接のツールのまま。伝え終えたTODOは `heard: full` で `archived`。分類と根拠の検査を廃止し、TODOの結果の検査に置き換える会話が返答なしで失敗した run `6839d520`・`5145885e` の対策 |
 | [user-condition-implementation-plan-2026-10-24.md](user-condition-implementation-plan-2026-10-24.md) | 計画のみ・保留・未実装。Memory・WorldModel・ContextWindowの大改修後に再確認。本人が明言した一時的な状態を既存の短期記憶で保持し、少量を文脈に提示する案を比較検証する |
 | [larm-connection-cache-design-2026-10-25.md](larm-connection-cache-design-2026-10-25.md) | Q1・Q2を合意・実装済み（§8）、Q3未着手。LARMの入力キャッシュは接続に結び付くため、主会話の接続を稼働中ずっと保ち、再起動をまたいで同じclientで取り戻す。補助は先頭ごとの最大2本の接続へ送る。liveで再起動後も11,628token再利用を確認 |

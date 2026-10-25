@@ -1,5 +1,9 @@
 import type { Database } from "bun:sqlite";
-import type { DotReport, Command, createInbox } from "../../domains/dots";
+import type {
+	DotReport,
+	TaskCommand as Command,
+	createInbox,
+} from "../../domains/dots";
 import type {
 	TasksService,
 	OrchestrationWorkTask,

@@ -5,7 +5,11 @@ import type { EumenesClient } from "../../../client";
 import type { Message } from "../../../api/domains/conversation/contracts";
 import type { Run } from "../../../api/domains/dialogue/contracts";
 import { ResearchTaskCard } from "../domains/agent-runtime";
-import { ErrorReportButton, RunFailureNotice } from "./ErrorReportDialog";
+import {
+	ErrorReportButton,
+	RUN_FAILURE_HEADING,
+	RunFailureNotice,
+} from "./ErrorReportDialog";
 import { describeError } from "../errorMessages";
 
 /** The run that answers this input message: an edited message has one run per send, the newest answers it. */
@@ -52,8 +56,8 @@ export function RunDetails({
 						run.status === "completed"
 							? (code) => (
 									<ErrorReportButton
-										client={client}
-										runId={run.id}
+										load={(signal) => client.runErrorReport(run.id, signal)}
+										heading={RUN_FAILURE_HEADING}
 										summary={failureSummary(code)}
 									/>
 								)

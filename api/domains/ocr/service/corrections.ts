@@ -20,7 +20,7 @@ import {
 } from "./correction-shared";
 import { correctionHandler } from "./correction-handler";
 
-const packageRevision = "package:ocr.correct@1";
+const packageRevision = "package:ocr.correct@3";
 const limit = 20;
 function own(db: Database, id: string, owner: string) {
 	const r = correctionRow(db, id);

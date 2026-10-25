@@ -61,8 +61,38 @@ export function availableToolchainsInTransaction(
 	db: Database,
 	run: Run,
 ): Set<string> {
+	return new Set(
+		readyCatalog(
+			deps,
+			db,
+			() =>
+				!!deps.delegation &&
+				deps.delegation.prepareInTransaction(db, run).available !== false,
+		).map((entry) => entry.id),
+	);
+}
+
+/**
+ * The titles of the toolchains this host can run, in a fixed order: the system part names them so the model knows
+ * what it can hand over before it searches (ContextWindow specification, section 6.1). Delegation counts while it
+ * is configured; whether one run may delegate is the search's check.
+ */
+export function toolchainTitlesInTransaction(
+	deps: DialogueDeps,
+	db: Database,
+): string[] {
+	const titles = readyCatalog(deps, db, () => !!deps.delegation)
+		.sort((a, b) => a.id.localeCompare(b.id))
+		.flatMap(
+			(entry) =>
+				deps.toolchains?.cardInTransaction(db, entry.revisionId)?.title ?? [],
+		);
+	return [...new Set(titles)];
+}
+
+function readyCatalog(deps: DialogueDeps, db: Database, dots: () => boolean) {
 	const { agents, toolchains } = deps;
-	if (!toolchains) return new Set();
+	if (!toolchains) return [];
 	const ready = (requires: string | undefined) =>
 		requires === undefined || requires === "world"
 			? !!agents
@@ -75,16 +105,11 @@ export function availableToolchainsInTransaction(
 						: requires === "music"
 							? !!deps.music
 							: requires === "dots"
-								? !!deps.delegation &&
-									deps.delegation.prepareInTransaction(db, run).available !==
-										false
+								? dots()
 								: false;
-	return new Set(
-		toolchains
-			.catalogInTransaction(db)
-			.filter(({ runtime }) =>
-				runtime.binding ? runtime.binding.available : ready(runtime.requires),
-			)
-			.map((entry) => entry.id),
-	);
+	return toolchains
+		.catalogInTransaction(db)
+		.filter(({ runtime }) =>
+			runtime.binding ? runtime.binding.available : ready(runtime.requires),
+		);
 }

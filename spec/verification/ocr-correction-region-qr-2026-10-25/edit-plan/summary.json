@@ -1,0 +1,21 @@
+{
+  "implementation": "complete",
+  "qualityAcceptance": "failed",
+  "liveCases": 9,
+  "livePassed": 5,
+  "partialTestsPassed": 22,
+  "applicationTestsPassed": 4,
+  "capabilitiesTestsPassed": 94,
+  "finalVerify": "invalidated",
+  "finalVerifyStagesPassed": 14,
+  "finalBackendTestsPassed": 321,
+  "finalWebTestsPassed": 16,
+  "finalDesignSystemTestsPassed": 10,
+  "inputStableBeforeRetry": false,
+  "serverOperations": false,
+  "productionSettingsChanged": false,
+  "contextCompileThisTurn": 1,
+  "compileEvalThisTurn": 1,
+  "contextCompileConversation": 4,
+  "compileEvalConversation": 4
+}

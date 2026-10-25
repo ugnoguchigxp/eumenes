@@ -1,0 +1,60 @@
+{
+	"id": "ctx-f3-dev-01",
+	"family": "F3",
+	"split": "dev",
+	"seed": {
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "butler"
+		},
+		"events": [
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-25T04:00:00.000Z",
+				"text": "作ったのは茶カレーです"
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-25T04:01:00.000Z",
+				"text": "お茶の香りが効いたカレーですね。",
+				"origin": "reply"
+			},
+			{
+				"type": "said",
+				"by": "user",
+				"at": "2026-10-25T04:02:00.000Z",
+				"text": "ただの加齢です"
+			},
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-25T04:03:00.000Z",
+				"text": "加齢カレーですね。",
+				"origin": "reply"
+			}
+		]
+	},
+	"input": "いいえ、カレーです。ASRの誤動作です。ある程度、誤字は配慮してほしいです。",
+	"expect": {
+		"checks": [
+			{
+				"kind": "speaks"
+			},
+			{
+				"kind": "brief_spoken_reply"
+			},
+			{
+				"kind": "tool_not_called"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "uses_newest_fact",
+				"condition": "最新の訂正を受け入れ、料理はカレーとして扱う。茶カレーや加齢カレーの新しい説明を作らない。誤字への長い免責や訂正の要求を利用者へ押し返さない。"
+			}
+		]
+	}
+}

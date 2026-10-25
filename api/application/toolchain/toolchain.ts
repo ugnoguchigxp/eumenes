@@ -1,3 +1,4 @@
+import { createDotsMessagingAdapter } from "../work/dots-messaging-adapter";
 import { readActionOriginInTransaction } from "../../domains/dialogue";
 import { createChildOperations } from "./child-operations";
 import { extendKanbanAdapter } from "../work/kanban-shared-adapter";
@@ -80,6 +81,7 @@ import { createToolchainHistory } from "../../domains/toolchain-history";
 import { createRecipePorts } from "./toolchain-recipes";
 import { createVectorRefresh, type Embed } from "./toolchain-vectors";
 type ToolchainOptions = {
+	dotsMessages?: import("../work/dots-messages").DotsMessages;
 	/** The conversation's TODO ledger the TODO screen pages (absent until dialogue is attached). */
 	todoPage?: () => TodoPageReader | undefined;
 	dots?: boolean;
@@ -232,6 +234,9 @@ export async function createToolchain(
 						}),
 					}),
 				]
+			: []),
+		...(options.dotsMessages
+			? [createDotsMessagingAdapter(options.dotsMessages)]
 			: []),
 		...(options.googleAccounts
 			? [createGoogleAccountsAdapter(options.googleAccounts)]

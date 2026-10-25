@@ -605,64 +605,76 @@ test("a runless message's host delivery reaches synthesis only for a clause of t
 	}
 });
 
-test("a clause that keeps failing is skipped and the rest is still spoken", async () => {
-	const dir = mkdtempSync(join(tmpdir(), "eumenes-voice-skip-"));
-	try {
-		const store = openStore(join(dir, "db.sqlite3"), schemaMigrations());
-		const dialogue = {
-			submitVoice: async (
-				_input: unknown,
-				_subject: unknown,
-				_validation: unknown,
-				link: (db: unknown, run: unknown) => void,
-			) => {
-				const run = { id: crypto.randomUUID(), deadlineAt: null };
-				await store.write((db) => link(db, run));
-				return run;
-			},
-			get: () => ({ status: "completed" }),
-			subscribeProgress: () => () => {},
-			waitForTerminal: async () => ({
-				status: "completed",
-				answerMessageId: "answer",
-			}),
-			answerText: () => "最初です。壊れます。最後です。",
-			cancel: async () => null,
-		} as unknown as ReturnType<typeof createDialogueService>;
-		const calls: string[] = [];
-		const larm = withVoiceAuthority({
-			status: () => ({ state: "ready", capabilities: ["llm", "asr", "tts"] }),
-			connect: async () => {},
-			answer: async () => "回答",
-			transcribe: async () => "質問",
-			speak: async (text) => {
-				calls.push(text);
-				if (text.includes("壊れ")) throw new Error("larm_inference_500");
-				return wav;
-			},
-			close: async () => {},
-		});
-		const voice = createVoiceDialogue(store, dialogue, larm);
-		const sessionId = crypto.randomUUID(),
-			utteranceId = crypto.randomUUID();
-		voice.start(sessionId, 1);
-		await voice.accept(sessionId, 1, 1, utteranceId, wav);
-		await commitWhenReady(voice, utteranceId);
-		for (let i = 0; i < 100 && voice.get(utteranceId)?.status !== "ready"; i++)
-			await pause(20);
-		expect(voice.get(utteranceId)?.status).toBe("ready");
-		expect(calls.filter((t) => t.includes("壊れ"))).toHaveLength(3);
-		expect(voice.get(utteranceId)?.audioChunks.map((c) => c.text)).toEqual([
-			"最初です。",
-			"最後です。",
-		]);
-		expect(voice.get(utteranceId)?.audioSkipped).toBe(1);
-		await voice.close();
-		await store.close();
-	} finally {
-		rmSync(dir, { recursive: true, force: true });
-	}
-});
+test.each([
+	["larm_inference_500", 3],
+	["workers_ai_http_400", 1],
+	["larm_inference_422", 1],
+	["network_unavailable", 3],
+] as const)(
+	"a failed clause (%s) is skipped after %i attempts and the rest is spoken",
+	async (code, attempts) => {
+		const dir = mkdtempSync(join(tmpdir(), "eumenes-voice-skip-"));
+		try {
+			const store = openStore(join(dir, "db.sqlite3"), schemaMigrations());
+			const dialogue = {
+				submitVoice: async (
+					_input: unknown,
+					_subject: unknown,
+					_validation: unknown,
+					link: (db: unknown, run: unknown) => void,
+				) => {
+					const run = { id: crypto.randomUUID(), deadlineAt: null };
+					await store.write((db) => link(db, run));
+					return run;
+				},
+				get: () => ({ status: "completed" }),
+				subscribeProgress: () => () => {},
+				waitForTerminal: async () => ({
+					status: "completed",
+					answerMessageId: "answer",
+				}),
+				answerText: () => "最初です。壊れます。最後です。",
+				cancel: async () => null,
+			} as unknown as ReturnType<typeof createDialogueService>;
+			const calls: string[] = [];
+			const larm = withVoiceAuthority({
+				status: () => ({ state: "ready", capabilities: ["llm", "asr", "tts"] }),
+				connect: async () => {},
+				answer: async () => "回答",
+				transcribe: async () => "質問",
+				speak: async (text) => {
+					calls.push(text);
+					if (text.includes("壊れ")) throw new Error(code);
+					return wav;
+				},
+				close: async () => {},
+			});
+			const voice = createVoiceDialogue(store, dialogue, larm);
+			const sessionId = crypto.randomUUID(),
+				utteranceId = crypto.randomUUID();
+			voice.start(sessionId, 1);
+			await voice.accept(sessionId, 1, 1, utteranceId, wav);
+			await commitWhenReady(voice, utteranceId);
+			for (
+				let i = 0;
+				i < 100 && voice.get(utteranceId)?.status !== "ready";
+				i++
+			)
+				await pause(20);
+			expect(voice.get(utteranceId)?.status).toBe("ready");
+			expect(calls.filter((t) => t.includes("壊れ"))).toHaveLength(attempts);
+			expect(voice.get(utteranceId)?.audioChunks.map((c) => c.text)).toEqual([
+				"最初です。",
+				"最後です。",
+			]);
+			expect(voice.get(utteranceId)?.audioSkipped).toBe(1);
+			await voice.close();
+			await store.close();
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	},
+);
 
 test("clauses without any phoneme are never sent to TTS", () => {
 	expect(new SpeechSentences().append("はい。…。！？ 次です。", true)).toEqual([

@@ -91,6 +91,12 @@ export function createSessionContext(
 		toolchains: {
 			cardInTransaction: (_db: Database, revisionId: string) =>
 				cardOf(catalog, revisionId),
+			catalogInTransaction: () =>
+				catalog.map((card) => ({
+					id: card.id,
+					revisionId: `rev-${card.id}`,
+					runtime: { binding: { available: true } },
+				})),
 		} as unknown as NonNullable<DialogueDeps["toolchains"]>,
 		goals: {
 			adoptedForContextInTransaction: () => ports.goals,

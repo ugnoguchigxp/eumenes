@@ -16,7 +16,7 @@ export {
 	requirementValueMatches,
 } from "./service/requirement-schema";
 
-export { coordinatorSkill } from "./builtin/dots";
+export { coordinatorSkill, dotsMcpSkill } from "./builtin/dots";
 
 export { imageBuiltins } from "./builtin/image";
 export { musicBuiltins } from "./builtin/music";

@@ -1,3 +1,4 @@
+import { createDotsMessages } from "./work/dots-messages";
 import { dirname, resolve } from "node:path";
 import type { GoogleProvider } from "../domains/google-accounts";
 import { CONVERSATION_DEFAULT_PRINCIPAL } from "../domains/conversation/contracts";
@@ -89,6 +90,13 @@ export async function buildServices(
 		core.activity.embedding,
 	);
 	const continuity = createContinuityService(store);
+	const dotsMessages = createDotsMessages({
+		store,
+		conversation,
+		continuity,
+		commands: tasks.dots.commands,
+		events: tasks.dotsEvents,
+	});
 	const memoryJournalPath = resolve(config.memoryJournalPath);
 	const memory = createMemoryService(store, conversation, continuity, {
 		journalPath: memoryJournalPath,
@@ -138,6 +146,7 @@ export async function buildServices(
 		capabilities: () => browserCapabilities,
 	});
 	const { toolchain, links } = await createHostToolchain({
+		dotsMessages,
 		dbPath,
 		store,
 		queue,
@@ -340,6 +349,7 @@ export async function buildServices(
 		scheduler,
 		timers,
 		...tasks,
+		dotsMessages,
 		continuity,
 		memory,
 		steward,

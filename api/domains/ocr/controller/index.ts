@@ -3,6 +3,7 @@ import type { Hono } from "hono";
 import { readBounded } from "../../../infrastructure/bounded-read";
 import { correctionCreate, maxInputBytes } from "../contracts";
 import type { OcrService } from "../service";
+import { registerOcrQr } from "./qr";
 export function registerOcr(
 	app: Hono,
 	service: OcrService,
@@ -14,6 +15,7 @@ export function registerOcr(
 	) => Promise<unknown>,
 ) {
 	const root = "/api/ocr";
+	registerOcrQr(app, service, owner, incorporate);
 	app.get(root, (c) =>
 		c.json(service.list(owner, c.req.query("conversationId") ?? "main")),
 	);

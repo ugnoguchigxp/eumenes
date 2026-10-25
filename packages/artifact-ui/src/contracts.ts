@@ -1,3 +1,4 @@
+import type { DotsMessagingResource } from "./dots-messaging-components";
 import { browserViews } from "./browser-contracts";
 import type { GoogleAccountsResource } from "./google-accounts-components";
 import type { OcrResource } from "./ocr-components";
@@ -359,6 +360,15 @@ export const viewRegistry = {
 		label: "字幕の見本",
 		schema: z.strictObject({
 			view: z.literal("subtitle-preview"),
+			source,
+			title,
+		}),
+	},
+	"dots-messaging": {
+		name: "DotsMessagingView",
+		label: "dots メッセージ",
+		schema: z.strictObject({
+			view: z.literal("dots-messaging"),
 			source,
 			title,
 		}),
@@ -764,6 +774,7 @@ export type SettingsResource = {
 };
 export type Resource =
 	| GoogleAccountsResource
+	| DotsMessagingResource
 	| ObjectRecognitionResource
 	| TerminalsResource
 	| KanbanResource

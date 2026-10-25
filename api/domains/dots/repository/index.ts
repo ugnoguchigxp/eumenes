@@ -1,7 +1,14 @@
+import { messagingMigration } from "./messaging-migration";
 import { storageMigration } from "./storage";
 import type { Database } from "bun:sqlite";
 import type { Migration } from "../../../infrastructure/sqlite";
-import type { Command, Connection, Project, DotReport } from "../contracts";
+import type {
+	Command,
+	TaskCommand,
+	Connection,
+	Project,
+	DotReport,
+} from "../contracts";
 
 export const migration = `
 CREATE TABLE dots_dialogue_receipts(run_id TEXT PRIMARY KEY, conversation_id TEXT NOT NULL, task_id TEXT NOT NULL, receipt_json TEXT NOT NULL);
@@ -37,6 +44,18 @@ CREATE INDEX dots_sessions_thread ON dots_sessions(thread_id);`,
 		after: ["dots/0002-session-associations"],
 		sql: "CREATE TABLE dots_execution_receipts(call_id TEXT PRIMARY KEY,run_id TEXT NOT NULL,conversation_id TEXT NOT NULL,task_id TEXT NOT NULL,receipt_json TEXT NOT NULL);",
 	},
+	{
+		id: "dots/0004-messaging",
+		after: ["dots/0003-execution-receipts"],
+		sql: messagingMigration(
+			storageMigration.slice(
+				storageMigration.indexOf(
+					"\nCREATE TRIGGER dots_commands_budget_insert",
+				),
+				storageMigration.indexOf("\nCREATE TRIGGER dots_reports_budget_insert"),
+			),
+		),
+	},
 ];
 function read<T>(db: Database, sql: string, ...args: string[]): T | null {
 	const row = db.query(sql).get(...args) as { data_json: string } | null;
@@ -64,10 +83,17 @@ export function commands(
 }
 export function putCommand(db: Database, c: Command) {
 	db.query(
-		"INSERT INTO dots_commands(id,task_id,connection_ref,state,data_json) VALUES(?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET state=excluded.state,data_json=excluded.data_json",
-	).run(c.commandId, c.taskId, c.connectionRef, c.state, JSON.stringify(c));
+		"INSERT INTO dots_commands(id,task_id,message_id,connection_ref,state,data_json) VALUES(?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET state=excluded.state,data_json=excluded.data_json",
+	).run(
+		c.commandId,
+		c.taskId ?? null,
+		c.kind === "message" ? c.messageId : null,
+		c.connectionRef,
+		c.state,
+		JSON.stringify(c),
+	);
 }
-export function taskCommands(db: Database, id: string): Command[] {
+export function taskCommands(db: Database, id: string): TaskCommand[] {
 	return (
 		db
 			.query("SELECT data_json FROM dots_commands WHERE task_id=? ORDER BY seq")

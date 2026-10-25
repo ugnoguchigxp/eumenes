@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { attributionSchema } from "./attribution";
 const ref = z.string().uuid();
 export const historySearchInput = z
 	.object({
@@ -28,6 +29,7 @@ const historyViewSchema = z.object({
 	messageId: z.string(),
 	conversationId: z.string(),
 	speaker: z.enum(["user", "assistant"]),
+	attribution: attributionSchema.optional(),
 	createdAt: z.string(),
 	revision: z.string(),
 	digest: z.string(),

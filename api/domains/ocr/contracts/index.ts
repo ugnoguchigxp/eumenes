@@ -1,5 +1,6 @@
 import { z } from "zod";
 export * from "./correction";
+export * from "./qr";
 export const maxInputBytes = 16 * 1024 * 1024;
 export const inputMime = z.enum([
 	"image/jpeg",
@@ -117,6 +118,9 @@ export type Connection = {
 	credentialVersion?: string;
 };
 export const errorStatus = {
+	ocr_qr_not_found: 404,
+	ocr_qr_not_ready: 409,
+	ocr_qr_busy: 409,
 	ocr_not_found: 404,
 	ocr_not_ready: 409,
 	ocr_not_configured: 503,

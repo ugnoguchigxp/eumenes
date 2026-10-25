@@ -57,6 +57,12 @@ function setup(options: { records?: unknown[]; failRecords?: boolean } = {}) {
 			nextCursor: null,
 			preference: { preferredId: null, revision: 0 },
 		})),
+		ocrQr: vi.fn(async () => null),
+		ocrQrCreate: vi.fn(async () => ({
+			id: "qr",
+			state: "completed",
+			items: [],
+		})),
 		ocrContent: vi.fn(async () => new Blob(["x"], { type: "image/png" })),
 		configureOcrConnection: vi.fn(async () => connection),
 		ocrIncorporate: vi.fn(async () => ({})),
@@ -88,6 +94,7 @@ const resource = (h: ReturnType<typeof setup>) =>
 		revision: number;
 		selectedId?: string;
 		selectedLines: number[];
+		selectionRegion?: [number, number, number, number];
 		frameIndex: number;
 		configured: boolean;
 		baseUrl: string | null;
@@ -317,5 +324,66 @@ test("a failed list read shows a connection error", async () => {
 	expect(resource(h).error).toBe(
 		"情報を取得できません。接続を確認してください。",
 	);
+	h.cache.clear();
+});
+
+test("region selection filters saved lines, rejects crossing lines and clears on frame/source change without re-reading", async () => {
+	const h = setup({
+		records: [
+			record("a", {
+				result: {
+					kind: "image",
+					model: "fixture",
+					width: 100,
+					height: 100,
+					text: "内\n交差",
+					lines: [
+						line("内"),
+						{
+							...line("交差"),
+							polygon: [
+								[5, 5],
+								[25, 5],
+								[25, 15],
+								[5, 15],
+							],
+						},
+					],
+				},
+			}),
+			record("b"),
+		],
+	});
+	await loaded(h);
+	await send(
+		h,
+		event(h, "ocr-region", {
+			id: "a",
+			scope: "a:1:0",
+			region: JSON.stringify([0, 0, 15, 15]),
+		}),
+	);
+	expect(resource(h).selectedLines).toEqual([0]);
+	expect(resource(h).selectionRegion).toEqual([0, 0, 15, 15]);
+	expect(
+		(await send(h, event(h, "ocr-line", { id: "a", index: "1" }))).status,
+	).toBe("rejected");
+	expect(
+		(
+			await send(
+				h,
+				event(h, "ocr-region", {
+					id: "a",
+					scope: "a:1:0",
+					region: JSON.stringify([0, 0, 200, 200]),
+				}),
+			)
+		).status,
+	).toBe("rejected");
+	expect(h.client.ocrUpload).not.toHaveBeenCalled();
+	expect(h.client.ocrRecheck).not.toHaveBeenCalled();
+	await send(h, event(h, "ocr-select", { id: "b" }));
+	expect(resource(h).selectionRegion).toBeUndefined();
+	expect(resource(h).selectedLines).toEqual([]);
 	h.cache.clear();
 });

@@ -1,0 +1,165 @@
+{
+  "date": "2026-10-25T04:58:56.467Z",
+  "results": [
+    {
+      "mode": "previous-vision",
+      "durationMs": 11213,
+      "model": "ornith-1.5-strix-lean",
+      "contractError": null,
+      "text": "製品の仕様や取扱方法\n\nなど詳細は右記の案内を\n\nご確認してください。\n\n型番: OCR-172 / AB-100\n\n定格: 12 V / 1.5 A",
+      "identifiersPreserved": false,
+      "exact": false,
+      "result": {
+        "blocks": [
+          {
+            "kind": "paragraph",
+            "text": "製品の仕様や取扱方法",
+            "evidence": {
+              "lineIndexes": [
+                0
+              ]
+            },
+            "uncertain": false
+          },
+          {
+            "kind": "paragraph",
+            "text": "など詳細は右記の案内を",
+            "evidence": {
+              "lineIndexes": [
+                1
+              ]
+            },
+            "uncertain": false
+          },
+          {
+            "kind": "paragraph",
+            "text": "ご確認してください。",
+            "evidence": {
+              "lineIndexes": [
+                2
+              ]
+            },
+            "uncertain": false
+          },
+          {
+            "kind": "paragraph",
+            "text": "型番: OCR-172 / AB-100",
+            "evidence": {
+              "lineIndexes": [
+                3
+              ]
+            },
+            "uncertain": false
+          },
+          {
+            "kind": "paragraph",
+            "text": "定格: 12 V / 1.5 A",
+            "evidence": {
+              "lineIndexes": [
+                4
+              ]
+            },
+            "uncertain": false
+          }
+        ],
+        "excludedLines": []
+      }
+    },
+    {
+      "mode": "previous-text",
+      "durationMs": 15641,
+      "model": "ornith-1.5-strix-lean",
+      "contractError": null,
+      "text": "製品の仕様や取扱方など、不明点は右記の案内をご確認ください。\n\n型番: OCR-172 / AB-100\n\n定格: 12 V / 1.5 A",
+      "identifiersPreserved": false,
+      "exact": false,
+      "result": {
+        "blocks": [
+          {
+            "kind": "paragraph",
+            "text": "製品の仕様や取扱方など、不明点は右記の案内をご確認ください。",
+            "evidence": {
+              "lineIndexes": [
+                0,
+                1,
+                2
+              ]
+            },
+            "uncertain": true,
+            "uncertainty": "「仕樣」は「仕様」、「取扱方怯」は「取扱方」、「尋部」は「不明点」、「確詔」は「確認」の誤読と判断して修正しました。"
+          },
+          {
+            "kind": "paragraph",
+            "text": "型番: OCR-172 / AB-100",
+            "evidence": {
+              "lineIndexes": [
+                3
+              ]
+            },
+            "uncertain": true,
+            "uncertainty": "「AB-10O」の末尾は0かOか判然とせず、製品コードとして0が自然なため「AB-100」と修正しました。"
+          },
+          {
+            "kind": "paragraph",
+            "text": "定格: 12 V / 1.5 A",
+            "evidence": {
+              "lineIndexes": [
+                4
+              ]
+            },
+            "uncertain": false
+          }
+        ],
+        "excludedLines": []
+      }
+    },
+    {
+      "mode": "draft-vision",
+      "durationMs": 12637,
+      "model": "ornith-1.5-strix-lean",
+      "contractError": null,
+      "text": "製品の仕樣や取扱方怯\nなど尋部は右記の案内を\nご確詔ください。\n\n型番: OCR-172 / AB-10O\n\n定格: 12 V / 1.5 A",
+      "identifiersPreserved": true,
+      "exact": false,
+      "result": {
+        "blocks": [
+          {
+            "kind": "paragraph",
+            "text": "製品の仕樣や取扱方怯\nなど尋部は右記の案内を\nご確詔ください。",
+            "evidence": {
+              "lineIndexes": [
+                0,
+                1,
+                2
+              ]
+            },
+            "uncertain": true,
+            "uncertainty": "「取扱方怯」は画像では「取扱方法」、「尋部」は「詳細」、「確詔」は「確認」に誤認識。固有名詞・数値以外をOCR表記のまま保持。"
+          },
+          {
+            "kind": "paragraph",
+            "text": "型番: OCR-172 / AB-10O",
+            "evidence": {
+              "lineIndexes": [
+                3
+              ]
+            },
+            "uncertain": true,
+            "uncertainty": "「AB-10O」の末尾は画像では「0」(ゼロ)に見えるが、OCR観測の「O」をそのまま保持。"
+          },
+          {
+            "kind": "paragraph",
+            "text": "定格: 12 V / 1.5 A",
+            "evidence": {
+              "lineIndexes": [
+                4
+              ]
+            },
+            "uncertain": false
+          }
+        ],
+        "excludedLines": []
+      }
+    }
+  ]
+}

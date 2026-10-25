@@ -39,6 +39,15 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 	);
 	const taskMaintenance = intervalLifecycle("task_maintenance", 60_000, () =>
 		Promise.allSettled([
+			s.dotsMessages
+				.maintenance()
+				.catch((error) =>
+					log.warn(
+						"dots.messages_maintenance_failed",
+						{ reason: "maintenance_failed" },
+						error,
+					),
+				),
 			s.dots
 				.maintenance()
 				.catch((error) =>

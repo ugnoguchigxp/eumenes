@@ -40,7 +40,12 @@ test("the detail button shows the report with the sharing notice and copies the 
 	vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } });
 	const runErrorReport = vi.fn(async () => ({ runId: "run-1", text: REPORT }));
 	const client = { identity: "t", runErrorReport } as unknown as EumenesClient;
-	render(<ErrorReportButton client={client} runId="run-1" />);
+	render(
+		<ErrorReportButton
+			load={(signal) => client.runErrorReport("run-1", signal)}
+			heading="回答を取得できませんでした"
+		/>,
+	);
 	expect(runErrorReport).not.toHaveBeenCalled();
 	fireEvent.click(screen.getByRole("button", { name: "エラーの詳細" }));
 	const text = await screen.findByLabelText("エラーレポート本文");
@@ -65,7 +70,12 @@ test("a report that cannot be fetched is said so and cannot be copied", async ()
 			throw new Error("offline");
 		}),
 	} as unknown as EumenesClient;
-	render(<ErrorReportButton client={client} runId="run-1" />);
+	render(
+		<ErrorReportButton
+			load={(signal) => client.runErrorReport("run-1", signal)}
+			heading="回答を取得できませんでした"
+		/>,
+	);
 	fireEvent.click(screen.getByRole("button", { name: "エラーの詳細" }));
 	expect(
 		await screen.findByText("エラーレポートを取得できませんでした。"),

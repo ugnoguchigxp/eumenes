@@ -86,6 +86,7 @@ export function assembleCuration(
 	});
 	const stewardAssembly = createStewardAssembly({
 		...deps,
+		logFile: () => config.logFile,
 		goals: { ops: goals.goals, access: GOALS_ACCESS },
 		...(world
 			? {

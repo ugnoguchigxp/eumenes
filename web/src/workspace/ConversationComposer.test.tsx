@@ -25,6 +25,7 @@ test("preparing is visible and cancellable until microphone frames arrive", () =
 		draft: "",
 		submit: { isPending: false },
 		edit: { editing: null, target: null },
+		stewardActivity: {},
 	} as unknown as WorkspaceState;
 	store.setState({ inputPhase: "starting" });
 	const view = render(<ConversationComposer state={state} store={store} />);
@@ -66,6 +67,7 @@ test("the edit state names itself, sends as an update, stops with Esc and shows 
 		submit: { isPending: false },
 		editInput: vi.fn(),
 		send,
+		stewardActivity: {},
 	};
 	const idle = {
 		...base,
@@ -106,4 +108,76 @@ test("the edit state names itself, sends as an update, stops with Esc and shows 
 	fireEvent.keyDown(screen.getByLabelText("メッセージ"), { key: "Escape" });
 	fireEvent.click(screen.getByRole("button", { name: "やめる" }));
 	expect(stop).toHaveBeenCalledTimes(2);
+});
+
+test("the memory keeper is lit while a step runs and offers the error report from a small icon while one fails", async () => {
+	const store = createAudioStore();
+	const report = vi.fn(async () => ({
+		text: "# Eumenes エラーレポート（メモリー整理）",
+	}));
+	const base = {
+		voice: { active: false },
+		phase: "idle",
+		attachments: { items: [], busy: false },
+		status: {},
+		specialist: { addressee: { kind: "normal", label: "会話" } },
+		mute: { muted: false, ready: true, busy: false },
+		draft: "",
+		submit: { isPending: false },
+		edit: { editing: null, target: null },
+		stewardErrorReport: report,
+	};
+	const idle = {
+		...base,
+		stewardActivity: { data: { running: false, slots: [], errors: [] } },
+	} as unknown as WorkspaceState;
+	const view = render(<ConversationComposer state={idle} store={store} />);
+	const node = () => screen.getByText("メモリー整理");
+	expect(node().classList.contains("active")).toBe(false);
+	expect(node().classList.contains("failed")).toBe(false);
+	expect(
+		screen.queryByRole("button", { name: "メモリー整理のエラーの詳細" }),
+	).toBeNull();
+	const failing = {
+		...base,
+		stewardActivity: {
+			data: {
+				running: true,
+				slots: ["reflect"],
+				errors: [
+					{
+						slot: "world",
+						step: "curate-world",
+						code: "cloud_agent_billing_error",
+						at: "2026-10-25T04:51:33.982Z",
+					},
+				],
+			},
+		},
+	} as unknown as WorkspaceState;
+	view.rerender(<ConversationComposer state={failing} store={store} />);
+	expect(node().classList.contains("active")).toBe(true);
+	expect(node().classList.contains("failed")).toBe(true);
+	expect(node().getAttribute("title")).toBe(
+		"記憶の反映／失敗: 世界の記録（cloud_agent_billing_error）",
+	);
+	expect(report).not.toHaveBeenCalled();
+	fireEvent.click(
+		screen.getByRole("button", { name: "メモリー整理のエラーの詳細" }),
+	);
+	const text = await screen.findByLabelText("エラーレポート本文");
+	expect(text.textContent).toBe("# Eumenes エラーレポート（メモリー整理）");
+	expect(screen.getByText("メモリー整理に失敗しています")).toBeTruthy();
+	expect(report).toHaveBeenCalledWith(expect.any(AbortSignal));
+	// The failure clears while its report is read: the dialog stays, the icon goes.
+	view.rerender(<ConversationComposer state={idle} store={store} />);
+	expect(screen.getByLabelText("エラーレポート本文")).toBeTruthy();
+	expect(node().classList.contains("failed")).toBe(false);
+	fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+	await vi.waitFor(() =>
+		expect(screen.queryByLabelText("エラーレポート本文")).toBeNull(),
+	);
+	expect(
+		screen.queryByRole("button", { name: "メモリー整理のエラーの詳細" }),
+	).toBeNull();
 });

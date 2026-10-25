@@ -1,0 +1,33 @@
+{
+	"id": "ctx-f1-dev-03",
+	"family": "F1",
+	"split": "dev",
+	"seed": {
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "butler"
+		},
+		"events": []
+	},
+	"input": "CADで作った部品の穴径は13.5ミリです。この値をそのまま確認して。",
+	"expect": {
+		"checks": [
+			{
+				"kind": "speaks"
+			},
+			{
+				"kind": "brief_spoken_reply"
+			},
+			{
+				"kind": "tool_not_called"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "follows_current_request",
+				"condition": "穴径を13.5ミリとして確認し、数値と単位を変えない。専門語CADも無関係な語へ置き換えない。"
+			}
+		]
+	}
+}

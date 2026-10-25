@@ -199,3 +199,35 @@ test("at most 64 projects exist", async () => {
 		config.configureProject(project({ ref: "p64" })),
 	).rejects.toThrow("dots_capacity");
 });
+
+test("OAuth clientId is optional public setup metadata and does not change owner validation", async () => {
+	const { db, config } = setup();
+	const oauth = {
+		issuer: "https://issuer.example",
+		jwksUrl: "https://issuer.example/jwks",
+		resource: "https://issuer.example/mcp/dots/conn",
+		subject: "owner",
+		clientId: "public-client",
+	};
+	const result = config.configureInTransaction(db, {
+		id: "oauth-guide",
+		expectedRevision: 0,
+		title: "OAuth",
+		enabled: true,
+		oauth,
+	});
+	expect(result.connection.oauth?.clientId).toBe("public-client");
+	expect(() =>
+		config.configureInTransaction(db, {
+			id: "oauth-guide",
+			expectedRevision: 1,
+			title: "OAuth",
+			enabled: true,
+			oauth: {
+				...oauth,
+				subject: "other",
+				clientId: "different-public-client",
+			},
+		}),
+	).toThrow("dots_owner_immutable");
+});

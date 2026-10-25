@@ -1,0 +1,41 @@
+{
+	"id": "ctx-f1-dev-04",
+	"family": "F1",
+	"split": "dev",
+	"seed": {
+		"persona": {
+			"agentName": "",
+			"userName": "",
+			"persona": "butler"
+		},
+		"events": [
+			{
+				"type": "said",
+				"by": "agent",
+				"at": "2026-10-25T04:00:00.000Z",
+				"text": "朝より than 夕方の方がよい或者说続けやすいですね。⏎⏎どうですか？",
+				"origin": "reply"
+			}
+		]
+	},
+	"input": "その話は終わりにしましょう。今日はカレーを作りました。日本語で短く返して。",
+	"expect": {
+		"checks": [
+			{
+				"kind": "speaks"
+			},
+			{
+				"kind": "brief_spoken_reply"
+			},
+			{
+				"kind": "tool_not_called"
+			}
+		],
+		"rubric": [
+			{
+				"axis": "follows_current_request",
+				"condition": "現在の料理の話に自然な日本語で短く返す。以前の回答のthan、或者说、改行記号を模倣しない。"
+			}
+		]
+	}
+}

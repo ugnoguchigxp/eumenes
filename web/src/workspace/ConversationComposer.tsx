@@ -1,10 +1,72 @@
+import { useRef } from "react";
 import { ChatImageInput, ChatImagePreviews } from "./ChatImageInput";
 import { useStore } from "zustand";
 import type { AudioStore } from "../domains/audio";
 import { Button, Spinner, Textarea } from "../design-system";
 import { ApiError } from "../../../client/transport";
 import { describeError } from "../errorMessages";
+import type { StewardActivity } from "../../../api/domains/steward/contracts";
+import { ErrorReportButton } from "./ErrorReportDialog";
 import type { WorkspaceState } from "./useWorkspace";
+
+const STEWARD_SLOT_LABELS: Record<StewardActivity["slots"][number], string> = {
+	reflect: "記憶の反映",
+	world: "世界の記録",
+	maintenance: "記憶の整理",
+	episode: "会話の要約",
+};
+
+/**
+ * The background memory keeper beside the answer path: lit while one of its steps runs, a red dot and a small
+ * warning icon (the error report) while one of its steps is failing.
+ */
+function StewardNode({
+	activity,
+	loadReport,
+}: {
+	activity: StewardActivity | undefined;
+	loadReport: (signal: AbortSignal) => Promise<{ text: string }>;
+}) {
+	const running = activity?.running ?? false;
+	const errors = activity?.errors ?? [];
+	// The report stays mounted once a failure was seen, so a dialog being read survives the failure clearing.
+	const lastSummary = useRef<string | null>(null);
+	if (errors.length)
+		lastSummary.current = errors
+			.map((e) => `${STEWARD_SLOT_LABELS[e.slot]}: ${e.code}`)
+			.join("、");
+	const title = [
+		running
+			? activity!.slots.map((slot) => STEWARD_SLOT_LABELS[slot]).join("・")
+			: undefined,
+		errors.length
+			? `失敗: ${errors.map((e) => `${STEWARD_SLOT_LABELS[e.slot]}（${e.code}）`).join("、")}`
+			: undefined,
+	]
+		.filter(Boolean)
+		.join("／");
+	return (
+		<div className="route-part route-steward">
+			<span
+				className={`route-node${running ? " active" : ""}${errors.length ? " failed" : ""}`}
+				title={title || undefined}
+			>
+				<i aria-hidden="true" />
+				メモリー整理
+				{lastSummary.current !== null && (
+					<ErrorReportButton
+						load={loadReport}
+						heading="メモリー整理に失敗しています"
+						summary={lastSummary.current}
+						trigger="icon"
+						label="メモリー整理のエラーの詳細"
+						hidden={errors.length === 0}
+					/>
+				)}
+			</span>
+		</div>
+	);
+}
 
 function MicLevelMeter({ store }: { store: AudioStore }) {
 	const level = useStore(store, (state) => state.level);
@@ -69,6 +131,10 @@ export function ConversationComposer({
 						</span>
 					</div>
 				))}
+				<StewardNode
+					activity={state.stewardActivity.data}
+					loadReport={state.stewardErrorReport}
+				/>
 			</div>
 			<output className="composer-status" aria-live="polite">
 				{starting ? (

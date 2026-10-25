@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openStore, type SqliteStore } from "../../../infrastructure/sqlite";
 import { createQueue, migrations as queueMigrations } from "../../queue";
-import type { Command } from "../contracts";
+import type { TaskCommand as Command } from "../contracts";
 import * as repo from "../repository";
 import { migrations } from "..";
 import { createCommands } from "../service/commands";

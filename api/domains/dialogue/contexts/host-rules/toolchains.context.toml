@@ -1,0 +1,8 @@
+text = '''
+依頼できる担当: [[titles]]。<state>の担当にないものは、find_toolchainで探してからdelegateで渡します。'''
+
+[variables.titles]
+type = "string"
+trust = "trusted"
+placement = "inline"
+encoding = "raw"

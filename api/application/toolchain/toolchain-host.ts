@@ -46,6 +46,7 @@ export function createToolchainHostLinks(services: {
 	};
 	inference: InferenceAdapterPorts & { usagePage: RecordsPorts["usagePage"] };
 	conversation: ConversationService;
+	dotsMessages?: import("../work/dots-messages").DotsMessages;
 	googleAccounts?: import("../../domains/google-accounts").GoogleAccounts;
 	ttsDictionary?: TtsDictionaryPorts;
 	memory?: MemoryAdapterPorts["memory"] &
@@ -89,6 +90,7 @@ export function createToolchainHostLinks(services: {
 			settings,
 			inference,
 			googleAccounts: services.googleAccounts,
+			dotsMessages: services.dotsMessages,
 			ttsDictionary: services.ttsDictionary,
 			memory: services.memory
 				? { memory: services.memory, steward: services.steward }

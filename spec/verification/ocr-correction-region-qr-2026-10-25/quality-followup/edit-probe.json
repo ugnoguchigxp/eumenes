@@ -1,0 +1,84 @@
+{
+  "plan": {
+    "protectedSpans": [
+      {
+        "line": 3,
+        "start": 5,
+        "end": 12
+      },
+      {
+        "line": 3,
+        "start": 15,
+        "end": 20
+      },
+      {
+        "line": 4,
+        "start": 5,
+        "end": 12
+      }
+    ],
+    "edits": [
+      {
+        "line": 0,
+        "start": 8,
+        "end": 11,
+        "original": "取扱い方",
+        "replacement": "取扱方法"
+      },
+      {
+        "line": 1,
+        "start": 2,
+        "end": 4,
+        "original": "尋部",
+        "replacement": "詳細"
+      },
+      {
+        "line": 1,
+        "start": 5,
+        "end": 7,
+        "original": "右記",
+        "replacement": "右記"
+      },
+      {
+        "line": 2,
+        "start": 2,
+        "end": 5,
+        "original": "確詔",
+        "replacement": "確認"
+      },
+      {
+        "line": 3,
+        "start": 18,
+        "end": 20,
+        "original": "10O",
+        "replacement": "100"
+      }
+    ],
+    "paragraphs": [
+      {
+        "lines": [
+          0,
+          1,
+          2
+        ],
+        "separator": ""
+      },
+      {
+        "lines": [
+          3
+        ],
+        "separator": "\n"
+      },
+      {
+        "lines": [
+          4
+        ],
+        "separator": ""
+      }
+    ]
+  },
+  "error": "Error: invalid_edit",
+  "text": "製品の仕樣や取扱方怯など尋部は右記の案内をご確詔ください。\n\n型番: OCR-172 / AB-10O\n\n定格: 12 V / 1.5 A",
+  "identifiersPreserved": true,
+  "exact": false
+}

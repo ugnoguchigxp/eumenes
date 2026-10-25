@@ -34,7 +34,13 @@ export type UnitKind = (typeof unitKinds)[number];
  * continuity flow), upkeep steps, the World curation (the events World received) and the
  * episode preparation (summaries and merges that the next re-construction applies).
  */
-export type UnitSlot = "reflect" | "maintenance" | "world" | "episode";
+export const unitSlots = [
+	"reflect",
+	"world",
+	"maintenance",
+	"episode",
+] as const;
+export type UnitSlot = (typeof unitSlots)[number];
 export type UnitState = "open" | "applied" | "stale" | "failed";
 
 /**
@@ -198,6 +204,8 @@ export interface QueuePort {
 			deadlineAtMs: number;
 		},
 	): { job: { id: string }; fresh: boolean };
+	/** The job's queue state (`running` while its step executes); null when the job is gone. */
+	getInTransaction(db: Database, id: string): { state: string } | null;
 }
 /** The queue's handler contract, restated for the one handler the steward registers. */
 type StewardJobClaim<P> = {
@@ -273,3 +281,25 @@ export const decisionsQuerySchema = z.object({
 export const eventsQuerySchema = z.object({
 	conversationId: z.string().min(1).max(120),
 });
+export const activityQuerySchema = eventsQuerySchema;
+
+/**
+ * What the steward does in a conversation now (`GET /api/steward/activity`): the slots whose job runs, and per slot
+ * the failure its last closed unit ended in (a yield of LARM to the conversation is not a failure).
+ */
+export const stewardActivitySchema = z.object({
+	running: z.boolean(),
+	slots: z.array(z.enum(unitSlots)),
+	errors: z.array(
+		z.object({
+			slot: z.enum(unitSlots),
+			step: z.enum(stepIds),
+			code: z.string(),
+			at: z.string(),
+		}),
+	),
+});
+export type StewardActivity = z.infer<typeof stewardActivitySchema>;
+
+/** The diagnostic text of the steward's failures in a conversation (`GET /api/steward/error-report`). */
+export const stewardErrorReportSchema = z.object({ text: z.string() });
