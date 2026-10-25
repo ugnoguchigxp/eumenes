@@ -626,6 +626,35 @@ for (const [label, settingsLanguages, heard] of [
 		expect(h.dialogue.list("main")).toHaveLength(0);
 	});
 
+for (const [settingsLanguages, expected] of [
+	[["en", "ja"], "ja"],
+	[["en", "ko"], "en"],
+] as const)
+	test(`ASR is fixed to ${expected} when ${settingsLanguages.join("+")} are allowed`, async () => {
+		const languages: (string | undefined)[] = [];
+		const h = await setup(undefined, {
+			status: ready,
+			transcribe: async (_wav, _signal, options) => {
+				languages.push(options?.asrLanguage);
+				return "";
+			},
+		});
+		const value = h.settings.get();
+		value.general.asrLanguages = [...settingsLanguages];
+		await h.settings.apply({
+			requestId: crypto.randomUUID(),
+			expectedRevision: value.revision,
+			settings: value,
+			keys: [],
+		});
+		const session = crypto.randomUUID(),
+			id = crypto.randomUUID();
+		h.voice.start(session, 1);
+		await h.voice.accept(session, 1, 1, id, wav());
+		await until(() => h.voice.get(id)?.status === "completed");
+		expect(languages).toEqual([expected]);
+	});
+
 test("empty final ASR creates no dialogue", async () => {
 	const h = await setup(undefined, {
 		status: ready,

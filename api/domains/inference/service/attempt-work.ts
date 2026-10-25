@@ -8,6 +8,7 @@ import type {
 	SpeechDelivery,
 } from "../../delivery/contracts";
 import type { Connection } from "../../settings";
+import { asrRequestLanguage } from "../../settings/contracts";
 import { controlJsonOptions, type Messages } from "../contracts";
 import { cloudRequest } from "./cloud";
 import { sessionCallOptions } from "./attempt-record";
@@ -91,6 +92,13 @@ export function callOptionsFor(r: Request, attemptId: string): LarmCallOptions {
 				}
 			: {}),
 		...(r.row.attemptMs ? { attemptMs: r.row.attemptMs } : {}),
+		...(r.row.purpose === "asr"
+			? {
+					asrLanguage: asrRequestLanguage(
+						r.row.snapshot.general.asrLanguages,
+					),
+				}
+			: {}),
 
 		onExchange: async (exchange: LarmExchange) => {
 			// A call can use the old lease and one replacement. Keep both for correlation.

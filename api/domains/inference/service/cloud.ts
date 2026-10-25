@@ -354,6 +354,7 @@ export async function cloudRequest(
 		);
 		form.append("model", resource.model);
 		form.append("response_format", "json");
+		if (options?.asrLanguage) form.append("language", options.asrLanguage);
 		init.body = form;
 	} else {
 		let body: unknown;

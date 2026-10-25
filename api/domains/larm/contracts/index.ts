@@ -61,6 +61,8 @@ export type LarmCallOptions = {
 	/** `subagent` only: the task whose calls share one agent session. */
 	taskId?: string;
 	speechLanguage?: SpeechLanguage;
+	/** ASR only: the language code the transcription is fixed to. */
+	asrLanguage?: string;
 	tools?: NativeTool[];
 	/**
 	 * `required`: the provider must call one of `tools`; `none`: it must not (the tools only keep the prompt's prefix

@@ -21,6 +21,7 @@ export async function transcribeWav(
 		const form = new FormData();
 		form.append("model", provider.model);
 		form.append("response_format", "json");
+		if (options?.asrLanguage) form.append("language", options.asrLanguage);
 		form.append(
 			"file",
 			new Blob([new Uint8Array(segment)], { type: "audio/wav" }),

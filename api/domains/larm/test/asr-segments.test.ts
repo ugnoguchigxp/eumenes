@@ -113,6 +113,7 @@ test("one long utterance sends bounded requests in order and returns one transcr
 			expect(operation).toBe("audio/transcriptions");
 			const form = init.body as FormData;
 			expect(form.get("model")).toBe(provider.model);
+			expect(form.get("language")).toBeNull();
 			const audio = new Uint8Array(
 				await (form.get("file") as Blob).arrayBuffer(),
 			);
@@ -124,6 +125,22 @@ test("one long utterance sends bounded requests in order and returns one transcr
 	);
 	expect(lengths).toEqual([384044, 384044, 32044]);
 	expect(text).toBe("区間1\n区間2\n区間3");
+});
+
+test("every bounded request carries the fixed ASR language", async () => {
+	const languages: unknown[] = [];
+	await transcribeWav(
+		provider,
+		pcm(25),
+		async (_p, _operation, init) => {
+			languages.push((init.body as FormData).get("language"));
+			return Response.json({ text: "区間" });
+		},
+		new AbortController().signal,
+		"fixture-connection",
+		{ asrLanguage: "ja" },
+	);
+	expect(languages).toEqual(["ja", "ja", "ja"]);
 });
 
 test.each(["failure", "cancel"])(

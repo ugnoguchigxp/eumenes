@@ -156,6 +156,9 @@ export const asrLanguages = [
 	["mk", "マケドニア語"],
 ] as const;
 export type AsrLanguage = (typeof asrLanguages)[number][0];
+/** ASR takes one language: Japanese whenever it is allowed, otherwise the first allowed one. */
+export const asrRequestLanguage = (languages: readonly AsrLanguage[]) =>
+	languages.includes("ja") ? "ja" : languages[0];
 const asrLanguageCodes = asrLanguages.map(([code]) => code) as [
 	AsrLanguage,
 	...AsrLanguage[],
