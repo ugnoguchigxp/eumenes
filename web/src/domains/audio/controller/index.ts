@@ -1,3 +1,12 @@
+import { createResampler } from "./resample";
+import {
+	createSpeechClassifier,
+	type SpeechClassifier,
+} from "./speech-classifier";
+import {
+	DEFAULT_VOICE_SILENCE_TIMEOUT_MS,
+	SpeechDetector,
+} from "./speech-detector";
 import {
 	browserTiming,
 	timedAudioDecode,
@@ -38,114 +47,39 @@ function wav(samples: Float32Array, rate: number): Uint8Array {
 		);
 	return bytes;
 }
-const TARGET_RATE = 16_000;
-/**
- * Blackman-windowed sinc low-pass at 7.2 kHz, evaluated at output sample `index`. Plain
- * averaging leaves energy above the 8 kHz Nyquist that folds back over consonants.
- */
-function lowPass(rate: number) {
-	const ratio = rate / TARGET_RATE;
-	const cutoff = (0.45 * TARGET_RATE) / rate;
-	const half = Math.ceil(16 * ratio);
-	// Output positions repeat a few fractional phases (one at 48 kHz, 160 at 44.1 kHz).
-	const kernels = new Map<number, Float64Array>();
-	const kernel = (phase: number) => {
-		const key = Math.round(phase * 1e9);
-		let weights = kernels.get(key);
-		if (weights) return weights;
-		weights = new Float64Array(2 * half + 1);
-		let total = 0;
-		for (let j = 0; j < weights.length; j++) {
-			const d = j - half - phase;
-			const x = 2 * Math.PI * cutoff * d;
-			const k =
-				Math.abs(d) >= half
-					? 0
-					: (d === 0 ? 1 : Math.sin(x) / x) *
-						(0.42 +
-							0.5 * Math.cos((Math.PI * d) / half) +
-							0.08 * Math.cos((2 * Math.PI * d) / half));
-			weights[j] = k;
-			total += k;
-		}
-		for (let j = 0; j < weights.length; j++) weights[j]! /= total;
-		kernels.set(key, weights);
-		return weights;
-	};
-	return {
-		half,
-		at(read: (n: number) => number, index: number) {
-			const center = index * ratio;
-			const first = Math.floor(center) - half;
-			const weights = kernel(center - Math.floor(center));
-			let sum = 0;
-			for (let j = 0; j < weights.length; j++)
-				sum += weights[j]! * read(first + j);
-			return sum;
-		},
-	};
-}
-/**
- * Appends frames while resampling to 16 kHz, so partial results only filter the last
- * few milliseconds whose window is still open. Output is identical however frames are split.
- */
+/** Appends frames resampled to 16 kHz; partial results only filter the window still open. */
 export function createIncrementalEncoder(rate: number) {
-	const ratio = rate / TARGET_RATE;
-	const passthrough = rate <= TARGET_RATE;
-	const filter = lowPass(rate);
+	const resampler = createResampler(rate);
 	let out = new Float32Array(16_384);
 	let outLength = 0;
-	// Input still needed by an output window; `base` is the absolute index of input[0].
-	let input = new Float32Array(16_384);
-	let inputLength = 0;
-	let base = 0;
-	let total = 0;
-	const read = (n: number) =>
-		n < base || n >= total ? 0 : (input[n - base] ?? 0);
-	const append = (value: number) => {
-		if (outLength === out.length) {
-			const grown = new Float32Array(out.length * 2);
-			grown.set(out);
-			out = grown;
-		}
-		out[outLength++] = value;
-	};
 	return {
 		push(frame: Float32Array) {
-			if (passthrough) {
-				for (const sample of frame) append(sample);
-				return;
-			}
-			const keep = Math.max(base, Math.ceil(outLength * ratio - filter.half));
-			input.copyWithin(0, keep - base, inputLength);
-			inputLength -= keep - base;
-			base = keep;
-			if (inputLength + frame.length > input.length) {
+			const next = resampler.push(frame);
+			if (outLength + next.length > out.length) {
 				const grown = new Float32Array(
-					Math.max(input.length * 2, inputLength + frame.length),
+					Math.max(out.length * 2, outLength + next.length),
 				);
-				grown.set(input.subarray(0, inputLength));
-				input = grown;
+				grown.set(out.subarray(0, outLength));
+				out = grown;
 			}
-			input.set(frame, inputLength);
-			inputLength += frame.length;
-			total += frame.length;
-			while (Math.floor(outLength * ratio + filter.half) < total)
-				append(filter.at(read, outLength));
+			out.set(next, outLength);
+			outLength += next.length;
 		},
 		wav(): Uint8Array {
-			if (passthrough) return wav(out.subarray(0, outLength), rate);
-			// The last windows run past the recording; the missing input is silence.
-			const samples = new Float32Array(Math.floor(total / ratio));
-			samples.set(out.subarray(0, Math.min(outLength, samples.length)));
-			for (let i = outLength; i < samples.length; i++)
-				samples[i] = filter.at(read, i);
-			return wav(samples, TARGET_RATE);
+			const tail = resampler.tail();
+			const samples = new Float32Array(outLength + tail.length);
+			samples.set(out.subarray(0, outLength));
+			samples.set(tail, outLength);
+			return wav(samples, resampler.rate);
 		},
 	};
 }
 type IncrementalEncoder = ReturnType<typeof createIncrementalEncoder>;
-/** Seconds between partial results grows with the utterance so total work stays near-linear. */
+/**
+ * Seconds between partial results grows with the utterance so total work stays near-linear. The first
+ * comes 1.8 s after confirmation (not counting the pre-roll), so a short reply ends before any preview,
+ * and none is sent in the trailing silence: the final upload follows and would cancel it.
+ */
 export const partialInterval = (seconds: number) =>
 	Math.min(2, 0.6 + 0.1 * seconds);
 
@@ -155,6 +89,18 @@ import recorderWorkletUrl from "../worklet/recorder.worklet.ts?worker&url";
 const FRAME_SAMPLES = 2048;
 // 16 kHz PCM stays below the API's 4 MB limit without splitting a question.
 const MAX_RECORDING_SECONDS = 60;
+/** Audio kept before speech is confirmed: confirmation lags the onset by the voiced span needed. */
+const PRE_ROLL_SECONDS = 1;
+/** Closes a model load, whatever its outcome. */
+const release = (load: Promise<SpeechClassifier> | undefined) =>
+	void load?.then(
+		(model) => model.close(),
+		() => {},
+	);
+type LostReason =
+	| "mic_lost"
+	| "audio_context_lost"
+	| "voice_detector_unavailable";
 
 /**
  * Captures microphone frames with an AudioWorklet (off the main thread), falling
@@ -261,7 +207,7 @@ export function createAudioController(
 		/** Keep the output device awake with an inaudible bed (default on). */
 		keepAlive?: boolean;
 		/** The microphone or audio output went away; the session cannot continue. */
-		onLost?: (reason: "mic_lost" | "audio_context_lost") => void;
+		onLost?: (reason: LostReason) => void;
 		onNotice?: (reason: "saved_device_missing" | "recording_limit") => void;
 	} = {},
 ) {
@@ -283,7 +229,9 @@ export function createAudioController(
 	let inputReady = false;
 	let inputEpoch = 0;
 	let speaking = false;
-	let detector: VoiceActivityDetector | undefined;
+	let detector: SpeechDetector | undefined;
+	/** Loaded once (one load shared by overlapping starts) and kept across pauses; released by stop(). */
+	let classifier: Promise<SpeechClassifier> | undefined;
 	let candidateFrames: Float32Array[] = [];
 	let candidateSamples = 0;
 	let encoder: IncrementalEncoder | undefined;
@@ -298,7 +246,7 @@ export function createAudioController(
 	let wasGated = false;
 	let releaseWatchers: () => void = () => {};
 	let lostReported = false;
-	const reportLost = (reason: "mic_lost" | "audio_context_lost") => {
+	const reportLost = (reason: LostReason) => {
 		if (disposed || lostReported) return;
 		lostReported = true;
 		options.onLost?.(reason);
@@ -483,12 +431,28 @@ export function createAudioController(
 				)
 					return;
 				if (!keepAliveSource) startKeepAlive(startedContext);
+				const loading = (classifier ??= createSpeechClassifier());
+				// A failed load is not kept: the next start tries again.
+				const model = await loading.catch((error: unknown) => {
+					if (classifier === loading) classifier = undefined;
+					throw error;
+				});
+				// stop() during the load released nothing yet; this start owns the release.
+				if (disposed) return model.close();
+				if (
+					inputPaused ||
+					recordingEpoch !== inputEpoch ||
+					context !== startedContext
+				)
+					return;
+				model.reset();
 				watchDevices(startedContext, stream);
-				detector = new VoiceActivityDetector({
+				detector = new SpeechDetector({
 					sampleRate: context.sampleRate,
+					classifier: model,
 					silenceTimeoutMs:
 						options.silenceMs ?? DEFAULT_VOICE_SILENCE_TIMEOUT_MS,
-					speechThresholdRms: options.threshold ?? 0.008,
+					minimumRms: options.threshold ?? 0.008,
 				});
 				source = context.createMediaStreamSource(stream);
 				const handleFrame = (frame: Float32Array) => {
@@ -512,31 +476,36 @@ export function createAudioController(
 							resetRecording();
 							candidateFrames = [];
 							candidateSamples = 0;
-							detector = new VoiceActivityDetector({
-								sampleRate: context.sampleRate,
-								silenceTimeoutMs:
-									options.silenceMs ?? DEFAULT_VOICE_SILENCE_TIMEOUT_MS,
-								speechThresholdRms: options.threshold ?? 0.008,
-							});
+							detector?.restart();
 						}
 					}
 					wasGated = gated;
-					const observation = detector?.observe(frame);
+					// Our own reply (and its output tail) may reach the microphone while barge-in is on.
+					const observation = detector?.observe(frame, {
+						strict: !!playback || performance.now() < listenAfter,
+					});
+					if (detector?.failed) {
+						// The worker is gone; the next start loads a new one.
+						release(classifier);
+						classifier = undefined;
+						reportLost("voice_detector_unavailable");
+						return;
+					}
 					lastLevel = observation?.rms ?? 0;
 					if (!speaking) {
 						candidateFrames.push(frame);
 						candidateSamples += frame.length;
 						while (
-							candidateSamples > context.sampleRate * 0.5 &&
+							candidateSamples > context.sampleRate * PRE_ROLL_SECONDS &&
 							candidateFrames.length > 1
 						) {
 							candidateSamples -= candidateFrames.shift()?.length ?? 0;
 						}
 						if (observation?.hasSpeech) {
 							speaking = true;
-							nextPartialAt = context.sampleRate * 1.8;
 							resetRecording();
 							for (const candidate of candidateFrames) pushFrame(candidate);
+							nextPartialAt = sampleCount + context.sampleRate * 1.8;
 							candidateFrames = [];
 							candidateSamples = 0;
 							onSpeech();
@@ -548,6 +517,7 @@ export function createAudioController(
 						if (
 							options.onPartial &&
 							!observation?.shouldFinalize &&
+							detector?.hearing &&
 							sampleCount >= nextPartialAt
 						) {
 							nextPartialAt =
@@ -753,6 +723,8 @@ export function createAudioController(
 			candidateFrames = [];
 			candidateSamples = 0;
 			detector = undefined;
+			release(classifier);
+			classifier = undefined;
 			emit("idle");
 		},
 		/** Stop recording while keeping the accepted answer's output context alive. */
@@ -773,7 +745,3 @@ export type OutputController = Pick<
 export type CreateAudio = (
 	...args: Parameters<typeof createAudioController>
 ) => AudioController;
-import {
-	DEFAULT_VOICE_SILENCE_TIMEOUT_MS,
-	VoiceActivityDetector,
-} from "./voice-activity";

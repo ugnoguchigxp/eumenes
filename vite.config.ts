@@ -20,7 +20,8 @@ function spaCsp(host: string | undefined, embedded = false): string {
 	const ws = host && /^[a-z0-9.-]+(:\d+)?$/i.test(host) ? ` ws://${host}` : "";
 	return [
 		"default-src 'self'",
-		"script-src 'self'",
+		// The voice detector runs its model in WebAssembly (compiled, never evaluated as script).
+		"script-src 'self' 'wasm-unsafe-eval'",
 		"style-src 'self' 'unsafe-inline'",
 		// Images are same-origin API content, blob: object URLs or data: URLs, Google account avatars
 		// and the studio's sample pictures from picsum.photos (it redirects to fastly.picsum.photos).
@@ -95,7 +96,13 @@ export default defineConfig(({ command, mode }) => {
 			env.EUMENES_VITE_CACHE_DIR ?? resolve("node_modules/.vite/development"),
 		// Lazy artifacts need these on first open, without a mid-session dependency rebuild.
 		optimizeDeps: {
-			include: ["three", "@openuidev/react-lang", "@excalidraw/excalidraw"],
+			include: [
+				"three",
+				"@openuidev/react-lang",
+				"@excalidraw/excalidraw",
+				// Reached only from the voice detector's worker on the first microphone start.
+				"onnxruntime-web/wasm",
+			],
 		},
 		server: {
 			host: "127.0.0.1",

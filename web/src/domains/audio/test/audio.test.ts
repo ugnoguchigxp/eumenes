@@ -235,7 +235,7 @@ test("three capture cycles release tracks and ignore late callbacks", async () =
 				inputBuffer: {
 					getChannelData: () =>
 						Float32Array.from({ length: 2048 }, (_, i) =>
-							i % 2 ? value : -value,
+							Math.floor(i / 8) % 2 ? value : -value,
 						),
 				},
 			});
@@ -429,7 +429,7 @@ test("an inaudible looping bed keeps the output awake until stop, unless disable
 		buffer?: { data: Float32Array };
 	}> = [];
 	class Context {
-		sampleRate = 8000;
+		sampleRate = 16000;
 		destination = {};
 		resume = async () => {};
 		close = async () => {};
@@ -549,12 +549,12 @@ test.each(["half-duplex", "timer-tone"])(
 				inputBuffer: {
 					getChannelData: () =>
 						Float32Array.from({ length: 2048 }, (_, i) =>
-							i % 2 ? value : -value,
+							Math.floor(i / 8) % 2 ? value : -value,
 						),
 				},
 			});
-		const utterance = () => {
-			for (let i = 0; i < 7; i++) feed(0.2);
+		const utterance = (frames = 7) => {
+			for (let i = 0; i < frames; i++) feed(0.2);
 			for (let i = 0; i < 18; i++) feed(0);
 			feed(0.2);
 		};
@@ -571,7 +571,10 @@ test.each(["half-duplex", "timer-tone"])(
 		expect([speech, segments]).toEqual([1, 1]);
 		half = false;
 		await audio.play(new Uint8Array(44), () => {});
-		utterance();
+		// Barge-in over our own reply takes clearer, longer speech (0.4 s) than a normal start.
+		utterance(7);
+		expect([speech, segments]).toEqual([1, 1]);
+		utterance(12);
 		expect([speech, segments]).toEqual([2, 2]);
 		await audio.stop();
 		vi.restoreAllMocks();
@@ -746,7 +749,7 @@ test("capture uses an AudioWorklet and batches its blocks into 2048-sample frame
 	await audio.start();
 	expect(addModule).toHaveBeenCalledOnce();
 	const loud = Float32Array.from({ length: 128 }, (_, i) =>
-		i % 2 ? 0.5 : -0.5,
+		Math.floor(i / 8) % 2 ? 0.5 : -0.5,
 	);
 	for (let i = 0; i < 15; i++) nodes[0]!.port.onmessage?.({ data: loud });
 	expect(speech).not.toHaveBeenCalled();

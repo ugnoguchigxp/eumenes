@@ -96,6 +96,8 @@ const messages: Record<string, string> = {
 	saved_device_missing:
 		"保存されたマイクが見つからないため、既定のマイクを使用します。",
 	audio_context_lost: "音声出力が停止しました。音声を再開してください。",
+	voice_detector_unavailable:
+		"音声検出を準備できませんでした。ページを再読み込みしてから音声を再開してください。",
 };
 
 const turnStatuses: Record<string, string> = {

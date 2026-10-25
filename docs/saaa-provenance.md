@@ -4,7 +4,7 @@
 
 | 採用対象 | SAAA の参照元 | SHA-256 | Eumenes での対応 |
 | --- | --- | --- | --- |
-| 音声活動検出 | `src/lib/voiceActivity.ts` | `93f77ccf8d05d422d3b1b9868814a9b18419f4c505facfaed8555f0aaf9b787d` | `web/src/domains/audio/controller/voice-activity.ts` に移植。700ms の無音確定と10秒上限、録音前置 buffer を Eumenes で設定 |
+| 音声活動検出 | `src/lib/voiceActivity.ts` | `93f77ccf8d05d422d3b1b9868814a9b18419f4c505facfaed8555f0aaf9b787d` | 2026-10-25 に学習済みモデル（Silero VAD）による `web/src/domains/audio/controller/speech-detector.ts` へ置き換え、移植した実装は削除（[設計](../spec/ml-voice-activity-detection-design-2026-10-25.md)） |
 | Agent Connection 契約 | `docs/larm-agent-connection-provide.md` | `b70f9a34d1c73828aec26e006f8e9a3691639140539b99a035a69073d154bbe2` | Profile、revision、作成、claim、lease、解放を `larm` が所有 |
 | catalog と claim | `crates/larm-session/src/catalog.rs`、`contract.rs`、`lib.rs`、`http_api.rs` | 順に `cbc916f751aff2d663137af01f1d86ea7f7baf177c23e90019ede6f5a0cc8599`、`37a59fba641ed509e9f9d5cb9c686e8fcc9256b0c62572aeb89a7e7f418bf4f3`、`74263b9af3f5c25df35292f1ce9701e0553fca152839170c73732f653b0742a1`、`e30e47d7b80f8388478f5dfb8b6e58948f836c507bf3b67c7a4777e6cc81322a` | 公開契約の重要条件を TypeScript の adapter と契約試験へ対応付け |
 | ASR multipart | `src-tauri/src/voice/cloud_asr.rs` | `c790de9d13efb94e31b7f42809aee4d4c96452148b9baae26afd519949138bd5` | `file`、`model`、`response_format=json` を送信する試験を追加 |

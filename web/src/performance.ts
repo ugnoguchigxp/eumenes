@@ -8,7 +8,8 @@ type Phase =
 	| "text_committed"
 	| "audio_fetch"
 	| "audio_decode"
-	| "playback_scheduled";
+	| "playback_scheduled"
+	| "vad_answer";
 
 /** Local, bounded User Timing entries. No network upload or user content. */
 export function browserTiming(

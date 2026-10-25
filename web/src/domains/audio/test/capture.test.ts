@@ -1,7 +1,12 @@
 import { afterEach, expect, test, vi } from "vitest";
 import { createAudioController } from "..";
+import { createSpeechClassifier } from "../controller/speech-classifier";
 
 afterEach(() => vi.unstubAllGlobals());
+
+/** A square wave well inside the speech band (resampling to 16 kHz keeps it). */
+const tone = (i: number, value: number) =>
+	Math.floor(i / 8) % 2 ? value : -value;
 
 function recorder(sampleRate = 16000, useWorklet = false) {
 	let receive:
@@ -50,16 +55,14 @@ function recorder(sampleRate = 16000, useWorklet = false) {
 		resume,
 		tail() {
 			port.onmessage?.({
-				data: Float32Array.from({ length: 128 }, (_, i) =>
-					i % 2 ? 0.02 : -0.02,
-				),
+				data: Float32Array.from({ length: 128 }, (_, i) => tone(i, 0.02)),
 			});
 		},
 		feed(voiced: boolean, count: number) {
 			for (let frame = 0; frame < count; frame++) {
 				const samples = Float32Array.from(
 					{ length: sampleRate / 10 },
-					(_, i) => (voiced ? (i % 2 ? 0.02 : -0.02) : 0),
+					(_, i) => (voiced ? tone(i, 0.02) : 0),
 				);
 				if (useWorklet) {
 					port.onmessage?.({ data: samples });
@@ -164,11 +167,11 @@ test("a continuous 12-second question stays intact until its final silence", asy
 		await audio.start();
 		mic.feed(true, 120);
 		expect(segment).not.toHaveBeenCalled();
-		mic.feed(false, 7);
+		mic.feed(false, 8);
 		expect(segment).toHaveBeenCalledTimes(1);
 		expect(speech).toHaveBeenCalledTimes(1);
 		const bytes = segment.mock.calls[0]![0] as Uint8Array;
-		expect(new DataView(bytes.buffer).getUint32(40, true)).toBe(127 * 1600 * 2);
+		expect(new DataView(bytes.buffer).getUint32(40, true)).toBe(128 * 1600 * 2);
 	} finally {
 		await audio.stop();
 	}
@@ -187,13 +190,13 @@ test("worklet capture retains a long question and downsamples its complete audio
 		await audio.start();
 		mic.feed(true, 120);
 		expect(segment).not.toHaveBeenCalled();
-		mic.feed(false, 7);
+		mic.feed(false, 8);
 		expect(segment).toHaveBeenCalledTimes(1);
 		const header = new DataView(
 			(segment.mock.calls[0]![0] as Uint8Array).buffer,
 		);
 		expect(header.getUint32(24, true)).toBe(16000);
-		expect(header.getUint32(40, true)).toBe(127 * 1600 * 2);
+		expect(header.getUint32(40, true)).toBe(128 * 1600 * 2);
 	} finally {
 		await audio.stop();
 	}
@@ -216,7 +219,7 @@ test("a failed microphone resume releases its stream so another start can recove
 		expect(mic.stop).toHaveBeenCalledTimes(2);
 		await audio.start();
 		mic.feed(true, 10);
-		mic.feed(false, 7);
+		mic.feed(false, 8);
 		expect(segment).toHaveBeenCalledTimes(1);
 	} finally {
 		await audio.stop();
@@ -281,7 +284,8 @@ test("the default silence interval keeps a one-second pause inside a single ques
 		mic.feed(false, 10);
 		expect(segment).not.toHaveBeenCalled();
 		mic.feed(true, 10);
-		mic.feed(false, 14);
+		// Silence is decided per 32 ms window, so 1.5 s completes within the 16th frame.
+		mic.feed(false, 15);
 		expect(segment).not.toHaveBeenCalled();
 		mic.feed(false, 1);
 		expect(segment).toHaveBeenCalledTimes(1);
@@ -290,7 +294,7 @@ test("the default silence interval keeps a one-second pause inside a single ques
 				40,
 				true,
 			),
-		).toBe(45 * 1600 * 2);
+		).toBe(46 * 1600 * 2);
 	} finally {
 		await audio.stop();
 	}
@@ -314,6 +318,105 @@ test("the capture limit sends the retained recording once, stops the microphone 
 		expect(notice).toHaveBeenCalledWith("recording_limit");
 		expect(mic.stop).toHaveBeenCalledTimes(1);
 		expect(state.mock.lastCall?.[0].phase).toBe("idle");
+	} finally {
+		await audio.stop();
+	}
+});
+
+test("overlapping starts share one model load, and stop during the load releases it", async () => {
+	recorder();
+	const created = vi.mocked(createSpeechClassifier);
+	created.mockClear();
+	let finish!: () => void;
+	const close = vi.fn();
+	created.mockImplementationOnce(
+		() =>
+			new Promise((resolve) => {
+				finish = () => resolve({ classify: () => 0, reset() {}, close });
+			}),
+	);
+	const audio = createAudioController(
+		() => {},
+		() => {},
+		() => {},
+	);
+	const first = audio.start();
+	await vi.waitFor(() => expect(created).toHaveBeenCalledTimes(1));
+	audio.pauseInput();
+	const second = audio.start();
+	await audio.stop();
+	finish();
+	await Promise.allSettled([first, second]);
+	expect(created).toHaveBeenCalledTimes(1);
+	expect(close).toHaveBeenCalled();
+});
+
+test("a model that fails while listening is reported and loaded again on the next start", async () => {
+	const mic = recorder();
+	const created = vi.mocked(createSpeechClassifier);
+	created.mockClear();
+	const close = vi.fn();
+	created.mockImplementationOnce(async () => ({
+		classify: () => Promise.reject(new Error("worker_gone")),
+		reset() {},
+		close,
+	}));
+	const lost = vi.fn();
+	const segment = vi.fn();
+	const audio = createAudioController(
+		() => {},
+		() => {},
+		segment,
+		{
+			silenceMs: 700,
+			onLost: lost,
+		},
+	);
+	try {
+		await audio.start();
+		mic.feed(true, 2);
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		mic.feed(true, 1);
+		expect(lost).toHaveBeenCalledWith("voice_detector_unavailable");
+		audio.pauseInput();
+		await audio.start();
+		expect(created).toHaveBeenCalledTimes(2);
+		mic.feed(true, 10);
+		mic.feed(false, 8);
+		expect(segment).toHaveBeenCalledTimes(1);
+	} finally {
+		await audio.stop();
+	}
+});
+
+test("previews start 1.8 s after confirmation, never for a short reply or in the trailing silence", async () => {
+	const mic = recorder();
+	const partial = vi.fn();
+	const segment = vi.fn();
+	const audio = createAudioController(
+		() => {},
+		() => {},
+		segment,
+		{
+			silenceMs: 1500,
+			onPartial: partial,
+		},
+	);
+	try {
+		await audio.start();
+		// A short reply after a second of room tone (the pre-roll is not counted).
+		mic.feed(false, 10);
+		mic.feed(true, 3);
+		mic.feed(false, 16);
+		expect(segment).toHaveBeenCalledTimes(1);
+		expect(partial).not.toHaveBeenCalled();
+		// A long question (confirmed 0.2 s in): one preview once 1.8 s have passed since then.
+		mic.feed(true, 22);
+		expect(partial).toHaveBeenCalledTimes(1);
+		const during = partial.mock.calls.length;
+		mic.feed(false, 16);
+		expect(partial).toHaveBeenCalledTimes(during);
+		expect(segment).toHaveBeenCalledTimes(2);
 	} finally {
 		await audio.stop();
 	}
