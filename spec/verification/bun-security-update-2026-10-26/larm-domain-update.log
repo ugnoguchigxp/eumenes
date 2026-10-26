@@ -1,0 +1,866 @@
+$ bun scripts/verify.ts --domain larm
+[verify] selected=larm dependencyClosure=larm
+[verify] Shared DesignSystem dist: do not overlap dev, browser tests or other builds; endpoint hashes cannot detect change-and-restore.
+[verify] inventory
+[verify] boundaries
+[verify] system-context: /Users/y.noguchi/.bun/bin/bun run context:check
+$ s11tnext build --check --release-profile application
+Generated outputs are current (sha256:8bd8a4d97df6eb65ea6b89f1290ab2adbb8add4ee5131f4a8e29a881f36487a8).
+[verify] size-budget: /Users/y.noguchi/.bun/bin/bun scripts/size-budget.ts api/domains/larm
+size-budget ok (70 files)
+[verify] format: /Users/y.noguchi/.bun/bin/bun run format:check api/domains/larm
+$ oxfmt --check api/domains/larm
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 6ms on 113 files using 10 threads.
+[verify] lint: /Users/y.noguchi/.bun/bin/bun run lint api/domains/larm
+$ oxlint --deny-warnings api/domains/larm
+[verify] design-system typecheck: /Users/y.noguchi/.bun/bin/bun run --cwd packages/design-system typecheck
+$ bun check
+✓ No type errors in 529 files [166.85ms]
+[verify] design-system build: /Users/y.noguchi/.bun/bin/bun run --cwd packages/design-system build
+$ bun check -p tsconfig.build.json && vite build
+✓ No type errors in 309 files [94.55ms]
+vite v8.3.5 building client environment for production...
+transforming...
+✓ 347 modules transformed.
+rendering chunks...
+
+[unplugin:dts] Start generate declaration files...
+[unplugin:dts] Start bundling declaration files...
+Analysis will use the bundled TypeScript version 5.9.3
+[unplugin:dts] Declaration files built in 4403ms.
+
+computing gzip size...
+dist/design-system.css                                                      230.27 kB │ gzip: 38.68 kB
+dist/components/Collapsible/Collapsible.mjs                                   0.26 kB │ gzip:  0.16 kB
+dist/utils/cn.mjs                                                             0.26 kB │ gzip:  0.20 kB
+dist/components/ImageViewer/ImageFrame.mjs                                    0.29 kB │ gzip:  0.22 kB
+dist/components/Model3dWorkspace/types.mjs                                    0.35 kB │ gzip:  0.30 kB
+dist/components/OcrWorkspace/types.mjs                                        0.35 kB │ gzip:  0.28 kB
+dist/components/ActionButton/SaveButton.mjs                                   0.41 kB │ gzip:  0.28 kB
+dist/components/ActionButton/EditButton.mjs                                   0.41 kB │ gzip:  0.28 kB
+dist/components/ScrollArea/ScrollArea.mjs                                     0.42 kB │ gzip:  0.28 kB
+dist/components/ActionButton/DeleteButton.mjs                                 0.42 kB │ gzip:  0.28 kB
+dist/components/ActionButton/CancelButton.mjs                                 0.42 kB │ gzip:  0.29 kB
+dist/components/Subtitle/Subtitle2.mjs                                        0.45 kB │ gzip:  0.29 kB
+dist/utils/menuKeyboard.mjs                                                   0.46 kB │ gzip:  0.31 kB
+dist/components/ActionButton/CreateButton.mjs                                 0.47 kB │ gzip:  0.31 kB
+dist/components/OcrWorkspace/region.mjs                                       0.50 kB │ gzip:  0.31 kB
+dist/components/VisualAnalysis/StopObservationStatus.mjs                      0.51 kB │ gzip:  0.40 kB
+dist/styles/themes.mjs                                                        0.51 kB │ gzip:  0.26 kB
+dist/components/Label/Label.mjs                                               0.54 kB │ gzip:  0.35 kB
+dist/components/Separator/Separator.mjs                                       0.57 kB │ gzip:  0.36 kB
+dist/hooks/useMobile.mjs                                                      0.62 kB │ gzip:  0.33 kB
+dist/components/Textarea/Textarea.mjs                                         0.67 kB │ gzip:  0.40 kB
+dist/components/DigitalClock/DigitalClock2.mjs                                0.71 kB │ gzip:  0.41 kB
+dist/components/DigitalClock/format.mjs                                       0.72 kB │ gzip:  0.43 kB
+dist/components/Tooltip/Tooltip.mjs                                           0.72 kB │ gzip:  0.43 kB
+dist/components/Skeleton/Skeleton.mjs                                         0.74 kB │ gzip:  0.41 kB
+dist/components/CopyClipButton/CopyClipButton.mjs                             0.75 kB │ gzip:  0.48 kB
+dist/components/Input/Input.mjs                                               0.75 kB │ gzip:  0.44 kB
+dist/contexts/CalendarContext.mjs                                             0.76 kB │ gzip:  0.39 kB
+dist/components/MusicPlayer/playbackRequest.mjs                               0.77 kB │ gzip:  0.47 kB
+dist/components/PipelineStudio/PipelineChecks.mjs                             0.82 kB │ gzip:  0.48 kB
+dist/components/ConfirmModal/ConfirmModal.mjs                                 0.84 kB │ gzip:  0.47 kB
+dist/components/Subtitle/SubtitlePreview.mjs                                  0.89 kB │ gzip:  0.51 kB
+dist/components/TerminalWorkspace/TerminalWorkspace2.mjs                      0.97 kB │ gzip:  0.51 kB
+dist/components/Popover/Popover.mjs                                           1.01 kB │ gzip:  0.51 kB
+dist/components/Spinner/Spinner.mjs                                           1.01 kB │ gzip:  0.57 kB
+dist/components/ActionButton/ActionButton.mjs                                 1.03 kB │ gzip:  0.54 kB
+dist/components/SelectableTextInput/SelectableTextInput.mjs                   1.04 kB │ gzip:  0.47 kB
+dist/components/ExternalAppLauncher/ExternalAppLauncher2.mjs                  1.06 kB │ gzip:  0.61 kB
+dist/components/MediaCard/MediaCard2.mjs                                      1.06 kB │ gzip:  0.47 kB
+dist/components/DrawingWorkspace/frame-protocol.mjs                           1.06 kB │ gzip:  0.51 kB
+dist/components/PipelineStudio/handoff-types.mjs                              1.07 kB │ gzip:  0.64 kB
+dist/components/RangeSlider/RangeSlider2.mjs                                  1.09 kB │ gzip:  0.56 kB
+dist/components/SimpleSearchInput/SimpleSearchInput.mjs                       1.12 kB │ gzip:  0.61 kB
+dist/components/MiniTable/MiniTable.mjs                                       1.12 kB │ gzip:  0.54 kB
+dist/components/Timeline/Timeline2.mjs                                        1.12 kB │ gzip:  0.48 kB
+dist/components/Faq/Faq2.mjs                                                  1.12 kB │ gzip:  0.52 kB
+dist/components/Switch/Switch.mjs                                             1.15 kB │ gzip:  0.56 kB
+dist/components/Avatar/Avatar.mjs                                             1.16 kB │ gzip:  0.65 kB
+dist/components/RadioButtonGroup/RadioButtonGroup2.mjs                        1.17 kB │ gzip:  0.53 kB
+dist/components/ViewSwitcher/ViewSwitcher.mjs                                 1.18 kB │ gzip:  0.58 kB
+dist/components/StatTile/StatTile2.mjs                                        1.20 kB │ gzip:  0.56 kB
+dist/components/KanbanBoard/positions.mjs                                     1.25 kB │ gzip:  0.68 kB
+dist/components/NotificationCard/NotificationCard2.mjs                        1.27 kB │ gzip:  0.46 kB
+dist/components/FullscreenDialog/FullscreenDialog2.mjs                        1.28 kB │ gzip:  0.56 kB
+dist/components/ContentImage/ContentImage2.mjs                                1.30 kB │ gzip:  0.66 kB
+dist/components/MusicWorkspace/MusicCreationPanel.mjs                         1.31 kB │ gzip:  0.63 kB
+dist/components/TimerWorkspace/TimerDurationFields.mjs                        1.31 kB │ gzip:  0.66 kB
+dist/components/Testimonial/Testimonial2.mjs                                  1.33 kB │ gzip:  0.57 kB
+dist/components/ErrorState/ErrorState.mjs                                     1.33 kB │ gzip:  0.70 kB
+dist/components/AdaptiveText/AdaptiveText.mjs                                 1.39 kB │ gzip:  0.76 kB
+dist/components/Pagination/Pagination.mjs                                     1.39 kB │ gzip:  0.69 kB
+dist/components/TextInput/TextInput.mjs                                       1.41 kB │ gzip:  0.59 kB
+dist/components/TimerWorkspace/ClockDial.mjs                                  1.43 kB │ gzip:  0.61 kB
+dist/components/CtaBanner/CtaBanner2.mjs                                      1.45 kB │ gzip:  0.59 kB
+dist/components/MusicPlayer/useAudioAnalysis.mjs                              1.47 kB │ gzip:  0.65 kB
+dist/components/ImageWorkspace/image-creation-options.mjs                     1.49 kB │ gzip:  0.88 kB
+dist/components/ObjectRecognitionWorkspace/CameraCapture.mjs                  1.51 kB │ gzip:  0.69 kB
+dist/components/MusicPlayer/usePlayback.mjs                                   1.54 kB │ gzip:  0.72 kB
+dist/components/Chart/chart-data.mjs                                          1.58 kB │ gzip:  0.84 kB
+dist/components/ChoiceGroup/ChoiceGroup2.mjs                                  1.59 kB │ gzip:  0.76 kB
+dist/components/Select/selectVariants.mjs                                     1.60 kB │ gzip:  0.74 kB
+dist/components/ContentHeader/ContentHeader.mjs                               1.64 kB │ gzip:  0.70 kB
+dist/components/MusicWorkspace/MusicCurrentTrack.mjs                          1.65 kB │ gzip:  0.79 kB
+dist/components/PricingCard/PricingCard2.mjs                                  1.67 kB │ gzip:  0.66 kB
+dist/components/RecordsWorkspace/RecordList.mjs                               1.67 kB │ gzip:  0.71 kB
+dist/components/FeatureCard/FeatureCard2.mjs                                  1.68 kB │ gzip:  0.92 kB
+dist/components/ScaleInput/ScaleInput.mjs                                     1.69 kB │ gzip:  0.82 kB
+dist/components/OptionButtonGroup/OptionButtonGroup.mjs                       1.73 kB │ gzip:  0.72 kB
+dist/components/NumberFormat/NumberFormat.mjs                                 1.78 kB │ gzip:  0.64 kB
+dist/components/TimerWorkspace/TimerWorkspace2.mjs                            1.78 kB │ gzip:  0.71 kB
+dist/components/GenerationStatus/GenerationStatus2.mjs                        1.85 kB │ gzip:  0.85 kB
+dist/components/Card/Card.mjs                                                 1.87 kB │ gzip:  0.64 kB
+dist/components/Hero/Hero2.mjs                                                1.91 kB │ gzip:  0.71 kB
+dist/components/Diagram/geometry.mjs                                          1.95 kB │ gzip:  1.01 kB
+dist/components/Formula/Formula.mjs                                           1.99 kB │ gzip:  1.00 kB
+dist/components/Tabs/Tabs.mjs                                                 2.02 kB │ gzip:  0.88 kB
+dist/components/DateDisplay/DateDisplay.mjs                                   2.02 kB │ gzip:  0.61 kB
+dist/components/Checkbox/Checkbox.mjs                                         2.05 kB │ gzip:  0.87 kB
+dist/components/Badge/Badge.mjs                                               2.07 kB │ gzip:  0.77 kB
+dist/components/MusicWorkspace/MusicVisualizer2.mjs                           2.11 kB │ gzip:  1.10 kB
+dist/components/ComparisonTable/ComparisonTable2.mjs                          2.17 kB │ gzip:  0.74 kB
+dist/components/DataTable/DataTable.mjs                                       2.20 kB │ gzip:  0.93 kB
+dist/components/KanbanBoard/KanbanColumn.mjs                                  2.21 kB │ gzip:  0.97 kB
+dist/components/KanbanBoard/ExecutorLogo.mjs                                  2.23 kB │ gzip:  1.22 kB
+dist/components/ChatDock/ChatDock.mjs                                         2.24 kB │ gzip:  0.96 kB
+dist/components/DropdownMenu/menuLayout.mjs                                   2.32 kB │ gzip:  1.05 kB
+dist/components/ImagePicker/ImageGrid.mjs                                     2.32 kB │ gzip:  0.92 kB
+dist/components/ImageViewer/ImageViewer.mjs                                   2.34 kB │ gzip:  1.10 kB
+dist/components/KanbanBoard/MoveMenu.mjs                                      2.35 kB │ gzip:  1.08 kB
+dist/components/MusicPlayer/PlaybackControls.mjs                              2.40 kB │ gzip:  0.81 kB
+dist/components/EditableSelect/EditableSelect.mjs                             2.40 kB │ gzip:  1.11 kB
+dist/components/OcrWorkspace/OcrQr.mjs                                        2.44 kB │ gzip:  0.96 kB
+dist/components/ProgressBar/ProgressBar.mjs                                   2.47 kB │ gzip:  1.18 kB
+dist/components/AsyncDataWrapper/AsyncDataWrapper.mjs                         2.53 kB │ gzip:  0.97 kB
+dist/components/TimerWorkspace/StopwatchPane.mjs                              2.54 kB │ gzip:  1.00 kB
+dist/components/Form/Form.mjs                                                 2.61 kB │ gzip:  1.02 kB
+dist/components/Slides/Slides2.mjs                                            2.64 kB │ gzip:  1.08 kB
+dist/components/Calculator/calculator-expression.mjs                          2.68 kB │ gzip:  0.99 kB
+dist/components/RecordsWorkspace/SavedProcedures.mjs                          2.76 kB │ gzip:  1.18 kB
+dist/components/Model3dWorkspace/Model3dGenerationList.mjs                    2.84 kB │ gzip:  1.11 kB
+dist/components/BrowserWorkspace/BrowserTabList.mjs                           2.85 kB │ gzip:  1.02 kB
+dist/components/DrawingWorkspace/useDrawingFrame.mjs                          2.86 kB │ gzip:  1.32 kB
+dist/components/KanbanBoard/ExecutorQueues.mjs                                2.86 kB │ gzip:  1.22 kB
+dist/components/ImageWorkspace/ImagePreview.mjs                               2.91 kB │ gzip:  1.13 kB
+dist/components/ProductCard/ProductCard2.mjs                                  2.93 kB │ gzip:  1.09 kB
+dist/components/ImageWorkspace/ImageWorkspace2.mjs                            2.94 kB │ gzip:  1.11 kB
+dist/components/Drawer/Drawer.mjs                                             2.95 kB │ gzip:  1.21 kB
+dist/components/BrowserWorkspace/labels.mjs                                   2.96 kB │ gzip:  1.41 kB
+dist/components/DateFormat/DateFormat.mjs                                     3.04 kB │ gzip:  1.29 kB
+dist/components/ActivityTimeline/ActivityTimeline2.mjs                        3.06 kB │ gzip:  1.42 kB
+dist/components/Playlist/Playlist2.mjs                                        3.10 kB │ gzip:  1.22 kB
+dist/components/NotificationToast/NotificationToast.mjs                       3.18 kB │ gzip:  1.22 kB
+dist/components/WorkListMenu/WorkListMenu.mjs                                 3.21 kB │ gzip:  1.44 kB
+dist/components/PipelineStudio/HandoffValuePicker.mjs                         3.23 kB │ gzip:  1.42 kB
+dist/components/PipelineStudio/HandoffMediaPicker.mjs                         3.30 kB │ gzip:  1.28 kB
+dist/components/SearchableSelect/SearchableSelect.mjs                         3.42 kB │ gzip:  1.45 kB
+dist/components/BrowserWorkspace/BrowserConnectionPanel.mjs                   3.46 kB │ gzip:  1.42 kB
+dist/components/TerminalWorkspace/TerminalPane.mjs                            3.47 kB │ gzip:  1.50 kB
+dist/components/TodoWorkspace/TodoWorkspace2.mjs                              3.48 kB │ gzip:  1.27 kB
+dist/components/MusicWorkspace/MusicTrackDetails.mjs                          3.53 kB │ gzip:  1.21 kB
+dist/components/Canvas2D/Canvas2D2.mjs                                        3.58 kB │ gzip:  1.54 kB
+dist/components/RecordsWorkspace/RecordsWorkspace2.mjs                        3.58 kB │ gzip:  1.35 kB
+dist/components/Select/Select.mjs                                             3.63 kB │ gzip:  1.29 kB
+dist/components/BrowserWorkspace/BrowserSettings.mjs                          3.64 kB │ gzip:  1.47 kB
+dist/components/ObjectRecognitionWorkspace/RecognitionHistory.mjs             3.64 kB │ gzip:  1.51 kB
+dist/components/Button/Button.mjs                                             3.86 kB │ gzip:  1.45 kB
+dist/components/StepGuide/StepGuide.mjs                                       3.89 kB │ gzip:  1.55 kB
+dist/components/ObjectRecognitionWorkspace/useCameraCapture.mjs               3.91 kB │ gzip:  1.73 kB
+dist/components/KanbanBoard/CommitPushDialog.mjs                              3.93 kB │ gzip:  1.55 kB
+dist/components/Model3dWorkspace/Model3dDetail.mjs                            3.97 kB │ gzip:  1.49 kB
+dist/components/KanbanBoard/KanbanBoard2.mjs                                  4.05 kB │ gzip:  1.74 kB
+dist/components/MusicLibraryControls/MusicLibraryControls2.mjs                4.08 kB │ gzip:  1.44 kB
+dist/components/MenuButtonGroup/MenuButtonGroup.mjs                           4.17 kB │ gzip:  1.69 kB
+dist/components/MusicWorkspace/music-creation-options.mjs                     4.33 kB │ gzip:  1.85 kB
+dist/components/MusicPlayer/MusicPlayer2.mjs                                  4.37 kB │ gzip:  1.69 kB
+dist/components/TimerWorkspace/TimerPane.mjs                                  4.46 kB │ gzip:  1.76 kB
+dist/components/WorkResultPanel/WorkResultPanel.mjs                           4.52 kB │ gzip:  1.49 kB
+dist/components/Calculator/Calculator.mjs                                     4.55 kB │ gzip:  1.93 kB
+dist/components/Model3dWorkspace/Model3dGenerationForm.mjs                    4.57 kB │ gzip:  1.71 kB
+dist/components/ImageWorkspace/ImageGallery.mjs                               4.66 kB │ gzip:  1.75 kB
+dist/components/Model3dWorkspace/Model3dWorkspace2.mjs                        4.83 kB │ gzip:  1.76 kB
+dist/components/BrowserWorkspace/BrowserCaptureList.mjs                       4.89 kB │ gzip:  1.65 kB
+dist/components/KanbanBoard/CardForms.mjs                                     4.93 kB │ gzip:  1.81 kB
+dist/components/BrowserWorkspace/BrowserScriptPanel.mjs                       5.07 kB │ gzip:  1.87 kB
+dist/components/DropdownMenu/DropdownMenu.mjs                                 5.13 kB │ gzip:  2.02 kB
+dist/components/PipelineFlow/PipelineFlow2.mjs                                5.19 kB │ gzip:  1.71 kB
+dist/components/Chart/Chart.mjs                                               5.21 kB │ gzip:  1.89 kB
+dist/components/Model3dWorkspace/Model3dLibrary.mjs                           5.33 kB │ gzip:  1.84 kB
+dist/components/TreeMenu/TreeMenu.mjs                                         5.39 kB │ gzip:  1.89 kB
+dist/components/Modal/Modal.mjs                                               5.42 kB │ gzip:  2.03 kB
+dist/components/BrowserWorkspace/BrowserWorkspace2.mjs                        5.51 kB │ gzip:  1.92 kB
+dist/components/LightSpiritLab/LightSpiritLab2.mjs                            5.82 kB │ gzip:  1.96 kB
+dist/components/OcrWorkspace/OcrCorrection.mjs                                5.95 kB │ gzip:  1.97 kB
+dist/components/NavigationStepper/NavigationStepper.mjs                       6.01 kB │ gzip:  1.84 kB
+dist/components/PipelineStudio/PipelineSource.mjs                             6.09 kB │ gzip:  2.12 kB
+dist/components/InfiniteListMenu/InfiniteListMenu.mjs                         6.22 kB │ gzip:  2.14 kB
+dist/components/ObjectRecognitionWorkspace/DetectionPreview.mjs               6.32 kB │ gzip:  2.43 kB
+dist/components/OcrWorkspace/OcrResult.mjs                                    6.65 kB │ gzip:  2.07 kB
+dist/components/ServerDataTable/ServerDataTable2.mjs                          6.72 kB │ gzip:  2.32 kB
+dist/components/OcrWorkspace/OcrPanel.mjs                                     6.81 kB │ gzip:  2.55 kB
+dist/components/Diagram/Diagram.mjs                                           7.07 kB │ gzip:  2.63 kB
+dist/components/OcrWorkspace/OcrMedia.mjs                                     7.25 kB │ gzip:  2.57 kB
+dist/components/ImagePicker/ImagePicker2.mjs                                  7.52 kB │ gzip:  2.69 kB
+dist/components/KeypadModal/KeypadModal.mjs                                   7.60 kB │ gzip:  2.47 kB
+dist/components/GoogleAccounts/index.mjs                                      8.28 kB │ gzip:  2.57 kB
+dist/components/ComputeWorkspace/index.mjs                                    8.29 kB │ gzip:  2.42 kB
+dist/components/MusicWorkspace/MusicWorkspace2.mjs                            8.63 kB │ gzip:  2.78 kB
+dist/components/OcrWorkspace/OcrPreview.mjs                                   8.70 kB │ gzip:  3.26 kB
+dist/components/PipelineStudio/PipelineStudio2.mjs                            9.27 kB │ gzip:  3.03 kB
+dist/components/DrawingWorkspace/index.mjs                                    9.42 kB │ gzip:  2.66 kB
+dist/components/ImageWorkspace/ImageCreationForm2.mjs                         9.59 kB │ gzip:  2.78 kB
+dist/components/PipelineStudio/PipelineHandoff2.mjs                           9.68 kB │ gzip:  3.26 kB
+dist/components/PipelineStudio/PipelineTrials.mjs                             9.96 kB │ gzip:  2.74 kB
+dist/components/KanbanBoard/KanbanCard.mjs                                   10.42 kB │ gzip:  3.44 kB
+dist/components/VisualAnalysis/VisualAnalysis.mjs                            10.78 kB │ gzip:  3.71 kB
+dist/components/SettingsPanels/index.mjs                                     11.55 kB │ gzip:  3.35 kB
+dist/components/ObjectRecognitionWorkspace/ObjectRecognitionWorkspace2.mjs   11.73 kB │ gzip:  3.96 kB
+dist/components/MusicWorkspace/MusicCreationForm2.mjs                        11.74 kB │ gzip:  3.46 kB
+dist/index.mjs                                                               15.21 kB │ gzip:  3.74 kB
+
+transforming...
+✓ 347 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/design-system.css                                                     230.27 kB │ gzip: 38.68 kB
+dist/components/ImageViewer/ImageFrame.js                                    0.16 kB │ gzip:  0.14 kB
+dist/utils/cn.js                                                             0.18 kB │ gzip:  0.16 kB
+dist/components/Collapsible/Collapsible.js                                   0.25 kB │ gzip:  0.17 kB
+dist/components/OcrWorkspace/types.js                                        0.25 kB │ gzip:  0.21 kB
+dist/components/ActionButton/SaveButton.js                                   0.27 kB │ gzip:  0.20 kB
+dist/components/ActionButton/EditButton.js                                   0.27 kB │ gzip:  0.21 kB
+dist/components/Model3dWorkspace/types.js                                    0.27 kB │ gzip:  0.25 kB
+dist/components/ActionButton/DeleteButton.js                                 0.28 kB │ gzip:  0.21 kB
+dist/components/ActionButton/CancelButton.js                                 0.28 kB │ gzip:  0.21 kB
+dist/components/Subtitle/Subtitle2.js                                        0.30 kB │ gzip:  0.22 kB
+dist/components/ActionButton/CreateButton.js                                 0.31 kB │ gzip:  0.24 kB
+dist/components/OcrWorkspace/region.js                                       0.34 kB │ gzip:  0.23 kB
+dist/components/ScrollArea/ScrollArea.js                                     0.35 kB │ gzip:  0.25 kB
+dist/utils/menuKeyboard.js                                                   0.36 kB │ gzip:  0.27 kB
+dist/components/VisualAnalysis/StopObservationStatus.js                      0.37 kB │ gzip:  0.32 kB
+dist/styles/themes.js                                                        0.39 kB │ gzip:  0.21 kB
+dist/components/Label/Label.js                                               0.50 kB │ gzip:  0.31 kB
+dist/components/Separator/Separator.js                                       0.50 kB │ gzip:  0.31 kB
+dist/components/DigitalClock/DigitalClock2.js                                0.50 kB │ gzip:  0.32 kB
+dist/_virtual/_rolldown/runtime.js                                           0.51 kB │ gzip:  0.33 kB
+dist/components/MusicPlayer/playbackRequest.js                               0.51 kB │ gzip:  0.35 kB
+dist/components/DigitalClock/format.js                                       0.53 kB │ gzip:  0.34 kB
+dist/components/CopyClipButton/CopyClipButton.js                             0.54 kB │ gzip:  0.38 kB
+dist/hooks/useMobile.js                                                      0.55 kB │ gzip:  0.31 kB
+dist/components/PipelineStudio/PipelineChecks.js                             0.57 kB │ gzip:  0.37 kB
+dist/components/ConfirmModal/ConfirmModal.js                                 0.57 kB │ gzip:  0.36 kB
+dist/components/Textarea/Textarea.js                                         0.61 kB │ gzip:  0.36 kB
+dist/components/Skeleton/Skeleton.js                                         0.61 kB │ gzip:  0.36 kB
+dist/components/Subtitle/SubtitlePreview.js                                  0.63 kB │ gzip:  0.40 kB
+dist/contexts/CalendarContext.js                                             0.66 kB │ gzip:  0.34 kB
+dist/components/Tooltip/Tooltip.js                                           0.67 kB │ gzip:  0.40 kB
+dist/components/TerminalWorkspace/TerminalWorkspace2.js                      0.70 kB │ gzip:  0.41 kB
+dist/components/Input/Input.js                                               0.70 kB │ gzip:  0.40 kB
+dist/components/MediaCard/MediaCard2.js                                      0.72 kB │ gzip:  0.34 kB
+dist/components/ExternalAppLauncher/ExternalAppLauncher2.js                  0.73 kB │ gzip:  0.49 kB
+dist/components/RangeSlider/RangeSlider2.js                                  0.76 kB │ gzip:  0.43 kB
+dist/components/Timeline/Timeline2.js                                        0.76 kB │ gzip:  0.36 kB
+dist/components/Faq/Faq2.js                                                  0.79 kB │ gzip:  0.41 kB
+dist/components/RadioButtonGroup/RadioButtonGroup2.js                        0.81 kB │ gzip:  0.40 kB
+dist/components/ActionButton/ActionButton.js                                 0.81 kB │ gzip:  0.47 kB
+dist/components/StatTile/StatTile2.js                                        0.81 kB │ gzip:  0.42 kB
+dist/components/SelectableTextInput/SelectableTextInput.js                   0.82 kB │ gzip:  0.38 kB
+dist/components/NotificationCard/NotificationCard2.js                        0.82 kB │ gzip:  0.33 kB
+dist/components/DrawingWorkspace/frame-protocol.js                           0.84 kB │ gzip:  0.41 kB
+dist/components/Spinner/Spinner.js                                           0.85 kB │ gzip:  0.50 kB
+dist/components/PipelineStudio/handoff-types.js                              0.85 kB │ gzip:  0.54 kB
+dist/components/MiniTable/MiniTable.js                                       0.87 kB │ gzip:  0.44 kB
+dist/components/TimerWorkspace/TimerDurationFields.js                        0.88 kB │ gzip:  0.51 kB
+dist/components/ContentImage/ContentImage2.js                                0.93 kB │ gzip:  0.53 kB
+dist/components/ViewSwitcher/ViewSwitcher.js                                 0.94 kB │ gzip:  0.50 kB
+dist/components/Popover/Popover.js                                           0.94 kB │ gzip:  0.46 kB
+dist/components/FullscreenDialog/FullscreenDialog2.js                        0.94 kB │ gzip:  0.47 kB
+dist/components/TimerWorkspace/ClockDial.js                                  0.95 kB │ gzip:  0.47 kB
+dist/components/MusicWorkspace/MusicCreationPanel.js                         0.95 kB │ gzip:  0.52 kB
+dist/components/Avatar/Avatar.js                                             0.96 kB │ gzip:  0.57 kB
+dist/components/Testimonial/Testimonial2.js                                  0.96 kB │ gzip:  0.45 kB
+dist/components/ErrorState/ErrorState.js                                     0.96 kB │ gzip:  0.58 kB
+dist/components/SimpleSearchInput/SimpleSearchInput.js                       0.99 kB │ gzip:  0.56 kB
+dist/components/AdaptiveText/AdaptiveText.js                                 1.01 kB │ gzip:  0.60 kB
+dist/components/KanbanBoard/positions.js                                     1.01 kB │ gzip:  0.56 kB
+dist/components/CtaBanner/CtaBanner2.js                                      1.03 kB │ gzip:  0.46 kB
+dist/components/ObjectRecognitionWorkspace/CameraCapture.js                  1.04 kB │ gzip:  0.55 kB
+dist/components/Pagination/Pagination.js                                     1.05 kB │ gzip:  0.59 kB
+dist/components/TextInput/TextInput.js                                       1.05 kB │ gzip:  0.49 kB
+dist/components/MusicPlayer/useAudioAnalysis.js                              1.09 kB │ gzip:  0.51 kB
+dist/components/Switch/Switch.js                                             1.09 kB │ gzip:  0.53 kB
+dist/components/FeatureCard/FeatureCard2.js                                  1.11 kB │ gzip:  0.63 kB
+dist/components/ChoiceGroup/ChoiceGroup2.js                                  1.14 kB │ gzip:  0.60 kB
+dist/components/MusicPlayer/usePlayback.js                                   1.15 kB │ gzip:  0.58 kB
+dist/components/PricingCard/PricingCard2.js                                  1.17 kB │ gzip:  0.53 kB
+dist/components/RecordsWorkspace/RecordList.js                               1.17 kB │ gzip:  0.55 kB
+dist/components/MusicWorkspace/MusicCurrentTrack.js                          1.19 kB │ gzip:  0.64 kB
+dist/components/ContentHeader/ContentHeader.js                               1.19 kB │ gzip:  0.56 kB
+dist/components/ImageWorkspace/image-creation-options.js                     1.21 kB │ gzip:  0.74 kB
+dist/components/OptionButtonGroup/OptionButtonGroup.js                       1.26 kB │ gzip:  0.55 kB
+dist/components/TimerWorkspace/TimerWorkspace2.js                            1.26 kB │ gzip:  0.58 kB
+dist/components/GenerationStatus/GenerationStatus2.js                        1.28 kB │ gzip:  0.68 kB
+dist/components/Chart/chart-data.js                                          1.31 kB │ gzip:  0.71 kB
+dist/components/NumberFormat/NumberFormat.js                                 1.33 kB │ gzip:  0.51 kB
+dist/components/Hero/Hero2.js                                                1.34 kB │ gzip:  0.56 kB
+dist/components/Select/selectVariants.js                                     1.36 kB │ gzip:  0.67 kB
+dist/components/ScaleInput/ScaleInput.js                                     1.38 kB │ gzip:  0.70 kB
+dist/components/Diagram/geometry.js                                          1.49 kB │ gzip:  0.84 kB
+dist/components/KanbanBoard/KanbanColumn.js                                  1.53 kB │ gzip:  0.78 kB
+dist/components/ComparisonTable/ComparisonTable2.js                          1.56 kB │ gzip:  0.60 kB
+dist/components/DateDisplay/DateDisplay.js                                   1.56 kB │ gzip:  0.53 kB
+dist/components/Formula/Formula.js                                           1.58 kB │ gzip:  0.88 kB
+dist/components/MusicWorkspace/MusicVisualizer2.js                           1.60 kB │ gzip:  0.92 kB
+dist/components/DataTable/DataTable.js                                       1.61 kB │ gzip:  0.76 kB
+dist/components/Tabs/Tabs.js                                                 1.62 kB │ gzip:  0.75 kB
+dist/components/KanbanBoard/MoveMenu.js                                      1.64 kB │ gzip:  0.88 kB
+dist/components/Card/Card.js                                                 1.66 kB │ gzip:  0.58 kB
+dist/components/ImagePicker/ImageGrid.js                                     1.66 kB │ gzip:  0.74 kB
+dist/components/Checkbox/Checkbox.js                                         1.71 kB │ gzip:  0.74 kB
+dist/components/MusicPlayer/PlaybackControls.js                              1.75 kB │ gzip:  0.65 kB
+dist/components/OcrWorkspace/OcrQr.js                                        1.75 kB │ gzip:  0.79 kB
+dist/components/TimerWorkspace/StopwatchPane.js                              1.80 kB │ gzip:  0.82 kB
+dist/components/DropdownMenu/menuLayout.js                                   1.82 kB │ gzip:  0.90 kB
+dist/components/Slides/Slides2.js                                            1.84 kB │ gzip:  0.88 kB
+dist/components/ChatDock/ChatDock.js                                         1.92 kB │ gzip:  0.85 kB
+dist/components/ImageViewer/ImageViewer.js                                   1.92 kB │ gzip:  0.97 kB
+dist/components/EditableSelect/EditableSelect.js                             1.94 kB │ gzip:  0.98 kB
+dist/components/Badge/Badge.js                                               1.94 kB │ gzip:  0.72 kB
+dist/components/Calculator/calculator-expression.js                          1.95 kB │ gzip:  0.81 kB
+dist/components/ProgressBar/ProgressBar.js                                   1.95 kB │ gzip:  1.03 kB
+dist/components/BrowserWorkspace/BrowserTabList.js                           1.98 kB │ gzip:  0.83 kB
+dist/components/RecordsWorkspace/SavedProcedures.js                          1.99 kB │ gzip:  0.97 kB
+dist/components/Model3dWorkspace/Model3dGenerationList.js                    1.99 kB │ gzip:  0.91 kB
+dist/components/AsyncDataWrapper/AsyncDataWrapper.js                         2.01 kB │ gzip:  0.82 kB
+dist/components/ImageWorkspace/ImagePreview.js                               2.03 kB │ gzip:  0.90 kB
+dist/components/KanbanBoard/ExecutorLogo.js                                  2.03 kB │ gzip:  1.12 kB
+dist/components/ProductCard/ProductCard2.js                                  2.04 kB │ gzip:  0.85 kB
+dist/components/KanbanBoard/ExecutorQueues.js                                2.08 kB │ gzip:  1.00 kB
+dist/components/Form/Form.js                                                 2.17 kB │ gzip:  0.90 kB
+dist/components/ImageWorkspace/ImageWorkspace2.js                            2.18 kB │ gzip:  0.94 kB
+dist/components/Playlist/Playlist2.js                                        2.21 kB │ gzip:  1.02 kB
+dist/components/ActivityTimeline/ActivityTimeline2.js                        2.21 kB │ gzip:  1.20 kB
+dist/components/PipelineStudio/HandoffMediaPicker.js                         2.27 kB │ gzip:  1.05 kB
+dist/components/DateFormat/DateFormat.js                                     2.32 kB │ gzip:  1.07 kB
+dist/components/WorkListMenu/WorkListMenu.js                                 2.35 kB │ gzip:  1.20 kB
+dist/components/DrawingWorkspace/useDrawingFrame.js                          2.36 kB │ gzip:  1.13 kB
+dist/components/RecordsWorkspace/RecordsWorkspace2.js                        2.40 kB │ gzip:  1.07 kB
+dist/components/PipelineStudio/HandoffValuePicker.js                         2.43 kB │ gzip:  1.17 kB
+dist/components/NotificationToast/NotificationToast.js                       2.45 kB │ gzip:  1.02 kB
+dist/components/TodoWorkspace/TodoWorkspace2.js                              2.48 kB │ gzip:  1.03 kB
+dist/components/BrowserWorkspace/BrowserConnectionPanel.js                   2.51 kB │ gzip:  1.16 kB
+dist/components/Drawer/Drawer.js                                             2.54 kB │ gzip:  1.09 kB
+dist/components/ObjectRecognitionWorkspace/RecognitionHistory.js             2.61 kB │ gzip:  1.24 kB
+dist/components/MusicWorkspace/MusicTrackDetails.js                          2.61 kB │ gzip:  1.03 kB
+dist/components/SearchableSelect/SearchableSelect.js                         2.63 kB │ gzip:  1.25 kB
+dist/components/MusicLibraryControls/MusicLibraryControls2.js                2.68 kB │ gzip:  1.18 kB
+dist/components/BrowserWorkspace/labels.js                                   2.70 kB │ gzip:  1.31 kB
+dist/components/TerminalWorkspace/TerminalPane.js                            2.70 kB │ gzip:  1.26 kB
+dist/components/BrowserWorkspace/BrowserSettings.js                          2.72 kB │ gzip:  1.27 kB
+dist/components/Model3dWorkspace/Model3dDetail.js                            2.77 kB │ gzip:  1.22 kB
+dist/components/Canvas2D/Canvas2D2.js                                        2.82 kB │ gzip:  1.31 kB
+dist/components/StepGuide/StepGuide.js                                       2.88 kB │ gzip:  1.33 kB
+dist/components/KanbanBoard/CommitPushDialog.js                              2.92 kB │ gzip:  1.32 kB
+dist/components/KanbanBoard/KanbanBoard2.js                                  3.00 kB │ gzip:  1.48 kB
+dist/components/TimerWorkspace/TimerPane.js                                  3.07 kB │ gzip:  1.44 kB
+dist/components/Select/Select.js                                             3.15 kB │ gzip:  1.14 kB
+dist/components/WorkResultPanel/WorkResultPanel.js                           3.16 kB │ gzip:  1.22 kB
+dist/components/ObjectRecognitionWorkspace/useCameraCapture.js               3.18 kB │ gzip:  1.51 kB
+dist/components/Model3dWorkspace/Model3dGenerationForm.js                    3.29 kB │ gzip:  1.42 kB
+dist/components/MenuButtonGroup/MenuButtonGroup.js                           3.31 kB │ gzip:  1.44 kB
+dist/components/MusicPlayer/MusicPlayer2.js                                  3.32 kB │ gzip:  1.41 kB
+dist/components/Calculator/Calculator.js                                     3.33 kB │ gzip:  1.65 kB
+dist/components/ImageWorkspace/ImageGallery.js                               3.33 kB │ gzip:  1.47 kB
+dist/components/Button/Button.js                                             3.35 kB │ gzip:  1.31 kB
+dist/components/BrowserWorkspace/BrowserCaptureList.js                       3.43 kB │ gzip:  1.34 kB
+dist/components/Chart/Chart.js                                               3.52 kB │ gzip:  1.47 kB
+dist/components/MusicWorkspace/music-creation-options.js                     3.53 kB │ gzip:  1.66 kB
+dist/components/Model3dWorkspace/Model3dLibrary.js                           3.57 kB │ gzip:  1.49 kB
+dist/components/KanbanBoard/CardForms.js                                     3.58 kB │ gzip:  1.49 kB
+dist/components/Model3dWorkspace/Model3dWorkspace2.js                        3.59 kB │ gzip:  1.48 kB
+dist/components/PipelineFlow/PipelineFlow2.js                                3.66 kB │ gzip:  1.40 kB
+dist/components/BrowserWorkspace/BrowserScriptPanel.js                       3.77 kB │ gzip:  1.60 kB
+dist/components/BrowserWorkspace/BrowserWorkspace2.js                        3.80 kB │ gzip:  1.60 kB
+dist/components/LightSpiritLab/LightSpiritLab2.js                            4.03 kB │ gzip:  1.64 kB
+dist/components/DropdownMenu/DropdownMenu.js                                 4.08 kB │ gzip:  1.74 kB
+dist/components/TreeMenu/TreeMenu.js                                         4.25 kB │ gzip:  1.62 kB
+dist/components/ObjectRecognitionWorkspace/DetectionPreview.js               4.42 kB │ gzip:  2.05 kB
+dist/components/NavigationStepper/NavigationStepper.js                       4.46 kB │ gzip:  1.55 kB
+dist/components/OcrWorkspace/OcrCorrection.js                                4.47 kB │ gzip:  1.68 kB
+dist/components/Modal/Modal.js                                               4.49 kB │ gzip:  1.80 kB
+dist/components/PipelineStudio/PipelineSource.js                             4.50 kB │ gzip:  1.79 kB
+dist/components/InfiniteListMenu/InfiniteListMenu.js                         4.68 kB │ gzip:  1.85 kB
+dist/components/ServerDataTable/ServerDataTable2.js                          4.73 kB │ gzip:  1.96 kB
+dist/components/OcrWorkspace/OcrResult.js                                    4.74 kB │ gzip:  1.71 kB
+dist/components/OcrWorkspace/OcrMedia.js                                     5.13 kB │ gzip:  2.11 kB
+dist/components/OcrWorkspace/OcrPanel.js                                     5.23 kB │ gzip:  2.25 kB
+dist/components/ImagePicker/ImagePicker2.js                                  5.29 kB │ gzip:  2.24 kB
+dist/components/Diagram/Diagram.js                                           5.41 kB │ gzip:  2.24 kB
+dist/components/ComputeWorkspace/index.js                                    5.55 kB │ gzip:  2.00 kB
+dist/components/GoogleAccounts/index.js                                      5.98 kB │ gzip:  2.18 kB
+dist/components/MusicWorkspace/MusicWorkspace2.js                            5.98 kB │ gzip:  2.34 kB
+dist/components/KeypadModal/KeypadModal.js                                   6.24 kB │ gzip:  2.13 kB
+dist/components/OcrWorkspace/OcrPreview.js                                   6.59 kB │ gzip:  2.79 kB
+dist/components/DrawingWorkspace/index.js                                    6.67 kB │ gzip:  2.24 kB
+dist/components/PipelineStudio/PipelineStudio2.js                            6.68 kB │ gzip:  2.52 kB
+dist/components/ImageWorkspace/ImageCreationForm2.js                         6.76 kB │ gzip:  2.32 kB
+dist/components/PipelineStudio/PipelineHandoff2.js                           6.93 kB │ gzip:  2.79 kB
+dist/components/PipelineStudio/PipelineTrials.js                             7.35 kB │ gzip:  2.35 kB
+dist/components/KanbanBoard/KanbanCard.js                                    7.63 kB │ gzip:  2.95 kB
+dist/components/VisualAnalysis/VisualAnalysis.js                             7.80 kB │ gzip:  3.27 kB
+dist/components/SettingsPanels/index.js                                      8.41 kB │ gzip:  2.77 kB
+dist/components/MusicWorkspace/MusicCreationForm2.js                         8.49 kB │ gzip:  2.90 kB
+dist/components/ObjectRecognitionWorkspace/ObjectRecognitionWorkspace2.js    8.96 kB │ gzip:  3.48 kB
+dist/index.js                                                               14.21 kB │ gzip:  3.26 kB
+
+✓ built in 5.29s
+[33m[PLUGIN_TIMINGS] [0mJavaScript callbacks ran for 5.1s of this 5.3s build (98%).
+The slowest callbacks, timed inside each callback (the wait before a callback starts is excluded, the time it awaits is included):
+  - plugin unplugin-dts buildStart (61%, 3.2s, 2 calls)
+  - plugin unplugin-dts writeBundle (26%, 1.4s, 2 calls)
+Additional callback time came from the callbacks below and from callbacks under 1s.
+1 callback is listed without a time. Its calls overlapped, so the time inside one call includes work from other calls. To find its cost, profile the build with `node --cpu-prof`:
+  - plugin @tailwindcss/vite:generate:build transform (694 calls)
+See https://rolldown.rs/reference/InputOptions.checks#bundlertimings for more details.
+
+[verify] typecheck configuration
+[verify] typecheck: /Users/y.noguchi/.bun/bin/bun check -p /Users/y.noguchi/Code/eumenes/verification-reports/runs/2026-10-26T00-10-30-430Z-21fa5b17-64bd-4daa-ad1e-7d539f06d20b/tsconfig.selected.json
+✓ No type errors in 125 files [86.80ms]
+[verify] typecheck closure
+[verify] TypeScript workspace closure: 125 files
+[verify] bun tests: /Users/y.noguchi/.bun/bin/bun test ./api/domains/larm/test/activity-recorder.test.ts ./api/domains/larm/test/asr-segments.test.ts ./api/domains/larm/test/auxiliary-sessions.test.ts ./api/domains/larm/test/catalog-selectors.test.ts ./api/domains/larm/test/chat-input.test.ts ./api/domains/larm/test/compute-client.test.ts ./api/domains/larm/test/context-exact.test.ts ./api/domains/larm/test/conversation-background.test.ts ./api/domains/larm/test/credential-generation.test.ts ./api/domains/larm/test/foreground-serialization.test.ts ./api/domains/larm/test/gzip-fetch.test.ts ./api/domains/larm/test/image-connection.test.ts ./api/domains/larm/test/image-delete.test.ts ./api/domains/larm/test/image-import.test.ts ./api/domains/larm/test/image-library.test.ts ./api/domains/larm/test/inference-error.test.ts ./api/domains/larm/test/larm-inference.test.ts ./api/domains/larm/test/larm-lifecycle.test.ts ./api/domains/larm/test/larm-speech.test.ts ./api/domains/larm/test/larm.test.ts ./api/domains/larm/test/lease-recovery.test.ts ./api/domains/larm/test/llm-timing.test.ts ./api/domains/larm/test/mesh-library.test.ts ./api/domains/larm/test/monitoring.test.ts ./api/domains/larm/test/music-generation.test.ts ./api/domains/larm/test/music-library.test.ts ./api/domains/larm/test/native-decision.test.ts ./api/domains/larm/test/playground-concurrency.test.ts ./api/domains/larm/test/playground.test.ts ./api/domains/larm/test/profile-retention.test.ts ./api/domains/larm/test/provider-cache-review.test.ts ./api/domains/larm/test/provider-readiness.test.ts ./api/domains/larm/test/provider-review.test.ts ./api/domains/larm/test/speech-overrides.test.ts ./api/domains/larm/test/speech-voice-pair.test.ts ./api/domains/larm/test/token-count-diagnostics.test.ts ./api/domains/larm/test/visual-lifecycle.test.ts ./api/domains/larm/test/visual-perception.test.ts
+bun test v1.4.4 (38afee6c8)
+
+api/domains/larm/test/activity-recorder.test.ts:
+(pass) records running calls, successes and failure codes but not cancelled calls [0.72ms]
+(pass) a call cut by its deadline is a failure, unlike a cancellation [0.06ms]
+(pass) a late result after cancellation cannot replace the last observed failure [0.07ms]
+
+api/domains/larm/test/asr-segments.test.ts:
+(pass) a quiet pause before the limit is used without dropping or repeating samples [2.57ms]
+(pass) PCM at 16000 Hz and 1 channels keeps every sample across the 12-second envelope [1.80ms]
+(pass) PCM at 44100 Hz and 2 channels keeps every sample across the 12-second envelope [8.23ms]
+(pass) a short request is unchanged and a byte-offset view is split without reading its prefix [1.63ms]
+(pass) WAV metadata before and after the data chunk survives segmentation [0.63ms]
+(pass) one long utterance sends bounded requests in order and returns one transcript [2.48ms]
+(pass) every bounded request carries the fixed ASR language [0.94ms]
+(pass) a detected language outside the accepted ones is noise [0.14ms]
+(pass) an accepted detected language is heard [0.12ms]
+(pass) an unreported language is heard [0.17ms]
+(pass) a failure after the first part yields no partial transcript or later request [1.27ms]
+(pass) a cancel after the first part yields no partial transcript or later request [0.68ms]
+(pass) the transcript capacity applies to the complete utterance, not each part [1.07ms]
+
+api/domains/larm/test/auxiliary-sessions.test.ts:
+(pass) a helper connection serves one prefix: the same instructions reuse it, a new prefix evicts the idle least-used one or waits [35.91ms]
+(pass) a restarted host with the same client gets its kept connections back; keep-alive holds the connection without a call [7.53ms]
+(pass) a sub-agent call infers on its own connection like a helper, not on the main one [5.13ms]
+(pass) cancellation of a call waiting for a helper slot never connects or infers; parent close releases active helpers [124.53ms]
+(pass) auxiliary renew reclaims tokens and a released connection reconnects with the catalog revision [4.01ms]
+(pass) parallel calls of one prefix take the free slot instead of queueing; a full set queues on its own prefix [45.16ms]
+
+api/domains/larm/test/catalog-selectors.test.ts:
+(pass) public selectors discover services absent from internal profile IDs [1.70ms]
+(pass) public selectors cannot mix catalog revisions [0.21ms]
+(pass) optional OpenAPI absence preserves profile discovery [0.13ms]
+(pass) public selector discovery errors remain visible [0.10ms]
+
+api/domains/larm/test/chat-input.test.ts:
+(pass) a schema operation omits native tools while existing combined requests keep them [0.21ms]
+(pass) operation grammar projects string bounds without changing the authoritative schema or other constraints [0.07ms]
+(pass) image wire conversion preserves assistant tool_calls and ordinary string messages [0.10ms]
+(pass) formal counting uses the complete identical request, images, tools, output and stream; bytes are not tokens [3.50ms]
+(pass) fits false prevents inference without dropping images [0.86ms]
+(pass) count unavailable prevents inference without dropping images [0.49ms]
+(pass) unsupported capability prevents inference without dropping images [0.18ms]
+(pass) final body exceeds limit prevents inference without dropping images [0.26ms]
+(pass) cancels during count and does not retry [2.44ms]
+(pass) cancels during generate and does not retry [2.25ms]
+(pass) renew reclaims the credential before counting and generation [1.57ms]
+(pass) unknown generation result is not automatically retried [1.37ms]
+(pass) claim image limits cover all history and stop before counting [0.47ms]
+
+api/domains/larm/test/compute-client.test.ts:
+(pass) discovery uses root services and authenticated environment [1.47ms]
+(pass) discovery uses profile services and authenticated environment [0.17ms]
+(pass) rejects an unsafe advertised URL before sending credentials: http://other.test/v1/compute [0.19ms]
+(pass) rejects an unsafe advertised URL before sending credentials: http://user:pass@compute.test:9810/v1/compute [0.08ms]
+(pass) rejects an unsafe advertised URL before sending credentials: http://compute.test:9810/v1/compute?token=bad [0.06ms]
+(pass) rejects an unsafe advertised URL before sending credentials: http://compute.test:9810/v1/compute#fragment [0.05ms]
+(pass) missing or wrong capability is unavailable [0.28ms]
+(pass) submit has the stable key, CPU request and no retry on HTTP refusal [0.35ms]
+(pass) cancel uses POST /cancel and 202 is still a live job; DELETE 204 has no JSON [0.52ms]
+(pass) preserves safe HTTP 401 classifications [1.04ms]
+(pass) preserves safe HTTP 409 classifications [0.10ms]
+(pass) preserves safe HTTP 410 classifications [0.03ms]
+(pass) preserves safe HTTP 503 classifications [0.03ms]
+(pass) wrong job ID and MIME/size/PNG content are rejected [0.22ms]
+(pass) DELETE rejects a response belonging to another job [0.06ms]
+(pass) uses the catalog's relative Control endpoint without sending credentials to the advertised hostname (url=%s) [0.28ms]
+(pass) uses the catalog's relative Control endpoint without sending credentials to the advertised hostname (url=%s) [0.14ms]
+(pass) rejects unsafe or contradictory advertised endpoint: //other.test/v1/compute [0.12ms]
+(pass) rejects unsafe or contradictory advertised endpoint: https://other.test/v1/compute [0.06ms]
+(pass) rejects unsafe or contradictory advertised endpoint: /v1/compute?token=bad [0.07ms]
+(pass) rejects unsafe or contradictory advertised endpoint: /v1/compute#fragment [0.07ms]
+(pass) rejects unsafe or contradictory advertised endpoint: /different/path [0.07ms]
+
+api/domains/larm/test/context-exact.test.ts:
+(pass) the fit is judged by the token estimate: Japanese counts one token per character, not three bytes [0.36ms]
+(pass) a request the server may trim fails only when nothing more can be dropped [0.25ms]
+(pass) the leading system run and the last message survive trimming; the oldest conversation is dropped first [0.23ms]
+(pass) an exact request over the window drops the oldest history, never the rest, and does not fail [0.53ms]
+(pass) an exact request that cannot be fitted is sent as it is for the provider to judge, never failed here [0.14ms]
+(pass) history goes by whole exchanges: an unanswered run does not leave an assistant message first [1.27ms]
+
+api/domains/larm/test/conversation-background.test.ts:
+(pass) background work on the conversation's prompt runs on its connection and yields to a conversation call [2.82ms]
+
+api/domains/larm/test/credential-generation.test.ts:
+(pass) a claim delivered after a concurrent renew never adopts an older credential generation [3.00ms]
+
+api/domains/larm/test/foreground-serialization.test.ts:
+(pass) foreground answers serialize without allowing a cancelled queued call to overtake an active call [2.58ms]
+
+api/domains/larm/test/gzip-fetch.test.ts:
+(pass) management APIs keep plain JSON while inference still uses gzip [1.09ms]
+(pass) disabling request compression still negotiates compressed responses [0.07ms]
+(pass) JSON requests delegate gzip to Bun without changing the counted body or request contract [0.09ms]
+(pass) ASR compresses a buffered multipart with a matching boundary and intact audio and fields [0.21ms]
+(pass) ordinary reads negotiate gzip while Range reads retain the stored representation [0.08ms]
+(pass) response streams pass through without buffering and the caller can cancel them [0.09ms]
+(pass) aborted requests never send and network failures never replay a generation [0.06ms]
+(pass) the decision classifier is sent and received without compression [0.61ms]
+
+api/domains/larm/test/image-connection.test.ts:
+(pass) image uses the acquired on-demand service while provider status is pending [0.91ms]
+(pass) image uses the acquired on-demand service while provider status is probing [0.10ms]
+(pass) image uses the acquired on-demand service while provider status is ready [0.06ms]
+(pass) image rejects revision connection without generating and releases it [0.08ms]
+(pass) image rejects profile connection without generating and releases it [0.03ms]
+(pass) image rejects model connection without generating and releases it [0.03ms]
+(pass) image rejects protocol connection without generating and releases it [0.03ms]
+(pass) image rejects capability connection without generating and releases it [0.02ms]
+(pass) image rejects description connection without generating and releases it [0.03ms]
+(pass) image rejects missing-service connection without generating and releases it [0.02ms]
+(pass) image rejects failed connection without generating and releases it [0.03ms]
+(pass) image rejects expired connection without generating and releases it [0.03ms]
+(pass) image rejects released connection without generating and releases it [0.02ms]
+(pass) image cancellation after connection creation collects and releases the late ID without generating [0.06ms]
+(pass) image generation failure releases the connection without resubmitting [0.07ms]
+
+api/domains/larm/test/image-delete.test.ts:
+(pass) image deletion uses the authenticated Control API once and requires a matching receipt [0.37ms]
+(pass) invalid or mismatched image deletion receipts are not adopted [0.06ms]
+(pass) invalid or mismatched image deletion receipts are not adopted [0.05ms]
+(pass) invalid or mismatched image deletion receipts are not adopted [0.03ms]
+(pass) image DELETE 404 is reported without automatic retry [0.04ms]
+(pass) image DELETE 503 is reported without automatic retry [0.02ms]
+
+api/domains/larm/test/image-import.test.ts:
+(pass) image import sends only one WebP part and the saved UUID using Control authentication [0.92ms]
+(pass) failed receipts and ordinary errors are different; pending honors Retry-After [1.12ms]
+(pass) deleted receipt is accepted, but a foreign UUID, path, origin or MIME is never adopted [0.32ms]
+
+api/domains/larm/test/image-library.test.ts:
+(pass) image history is an authenticated read and validates the published content path [0.36ms]
+(pass) image history refuses invalid origin, binding, MIME or ID [0.09ms]
+(pass) image history refuses invalid origin, binding, MIME or ID [0.03ms]
+(pass) image history refuses invalid origin, binding, MIME or ID [0.03ms]
+(pass) image history refuses invalid origin, binding, MIME or ID [0.08ms]
+(pass) image discovery reads the saved profile and the catalog and prefers returned service URL [0.12ms]
+
+api/domains/larm/test/inference-error.test.ts:
+(pass) provider diagnostics retain the code and meaningful message, redact credentials and bound input [0.30ms]
+(pass) cancelled error-body read cannot trigger recovery [0.05ms]
+
+api/domains/larm/test/larm-inference.test.ts:
+(pass) control JSON generation is opt-in and ordinary answers keep provider defaults [0.73ms]
+(pass) ASR accepts empty silence but rejects missing, nontext or oversized transcripts [1.06ms]
+(pass) oversized inference response is rejected while streaming [1.88ms]
+(pass) context trimming retains the current input after an unanswered prior turn [0.76ms]
+(pass) the LLM window of the lease held now is known without a claim, and unknown while none is held [0.30ms]
+(pass) native decision shares the voice lease, uses its own auth, and rotates credentials [0.89ms]
+(pass) absent or invalid optional decision never breaks ordinary voice providers [0.90ms]
+(pass) inference timing and token usage are logged without prompt or answer text [0.68ms]
+(pass) the timing log reports the sent body size on success and outcome=error when the stream is cut [0.76ms]
+(pass) caller cancellation is logged separately from a provider network failure [0.88ms]
+(pass) the system-one classifier uses claimed model/token and current chunk only; rejects unsupported questions before provider request [0.62ms]
+
+api/domains/larm/test/larm-lifecycle.test.ts:
+(pass) idle-released JSON before SSE recreates and claims once; both exchanges survive [0.94ms]
+(pass) local idle expires a still-valid lease without requests; next voice use requests the profile again [0.48ms]
+(pass) an active inference pauses the local idle timer and completion starts a new idle interval [0.25ms]
+(pass) only the explicit idle-released 409 can replay, and recovery is bounded at one replacement [0.65ms]
+(pass) cancellation after the 409 diagnostic prevents replacement and replay [0.17ms]
+(pass) manual connection check follows released state even with unexpired credentials [0.22ms]
+(pass) renew rotates the selected voice provider while leaving the idle deadline unchanged [0.47ms]
+(pass) published SSE prefix errors never reconnect or replay inference [0.19ms]
+(pass) idle expiry during a health check cannot revive the released local lease [0.19ms]
+(pass) invalid ASR reclaim after rotation is rejected and TTS can reclaim independently [0.64ms]
+(pass) a ready connection waits for requested providers to become claimable before claim [0.29ms]
+(pass) unauthorized can recover only when control confirms the old connection is released [0.45ms]
+(pass) control POSTs keep the 15 s budget while status GETs with a caller signal use 3 s [0.19ms]
+(pass) a timed-out connection POST is retried with the same Idempotency-Key [0.12ms]
+(pass) a caller abort during renewal neither fails the status nor releases the shared lease [0.20ms]
+(pass) close waits for in-use leases before sending DELETE [0.27ms]
+(pass) a valid lease serves new inference while a renewal is still waiting [1.29ms]
+
+api/domains/larm/test/larm-speech.test.ts:
+(pass) voice menu uses claimed provider auth and TTS sends selected voice and speed [1.00ms]
+(pass) catalog labels, style, inclusive numeric bounds and decoded credits reach phrase synthesis [1.42ms]
+(pass) a refused voice catalog does not block synthesis of a chosen voice [0.36ms]
+(pass) a provider without a described voice omits per-voice fields and busy responses never replay or replace the connection [0.52ms]
+(pass) missing claim voice discovers and caches the advertised default with the control credential [0.28ms]
+(pass) an unadvertised default voice is rejected before speech inference [0.27ms]
+(pass) English speech binds the catalog model, a dedicated credential and renewed claims; the sentence classifier is never claimed (model-tts-english) [0.73ms]
+(pass) English speech binds the catalog model, a dedicated credential and renewed claims; the sentence classifier is never claimed (model-tts-rich) [0.43ms]
+(pass) a missing English provider never reuses Japanese synthesis and is rechecked once per lease [0.21ms]
+(pass) invalid optional speech bindings (model) are discarded without breaking Japanese speech [0.32ms]
+(pass) invalid optional speech bindings (host) are discarded without breaking Japanese speech [0.25ms]
+(pass) invalid optional speech bindings (renew) are discarded without breaking Japanese speech [0.25ms]
+(pass) a cached pre-deployment voice lease reclaims the added English provider after epoch loss [0.43ms]
+
+api/domains/larm/test/larm.test.ts:
+(pass) catalog, claim, ASR/LLM/TTS and release use public contract [0.68ms]
+(pass) a caller's deadline that aborts a shared connection attempt does not fail other callers [0.39ms]
+(pass) mismatched claim is rejected before inference and lease is released [0.23ms]
+(pass) simultaneous capability upgrades share one replacement connection [0.39ms]
+(pass) The saved profile is requested and renews by reclaiming the rotated token [0.41ms]
+(pass) voice requests every provider in the saved profile [0.17ms]
+(pass) an expired connection stops polling and is released [0.29ms]
+(pass) an explicit baseUrl is the only control origin the token is sent to [0.16ms]
+(pass) without a baseUrl LARM stays unconfigured and never contacts any host [0.17ms]
+(pass) cancelling a caller returns promptly during allocation and close stops polling [0.18ms]
+(pass) runtime changes notify connecting and ready/failed without exposing credentials [0.65ms]
+(pass) a provider on the LARM host with another port is accepted [0.31ms]
+(pass) a provider on a different private host is rejected before any token is sent [0.38ms]
+(pass) the providerHosts config allows another host and the environment is not read [0.40ms]
+(pass) a .local provider is accepted only when the LARM base itself is .local [0.12ms]
+(pass) a failed connect exposes only a machine-readable error code [0.14ms]
+(pass) without a saved profile the port reports larm_profile_missing and never contacts LARM [0.07ms]
+(pass) conversation profiles come from the unselected catalog and keep only default, current profiles with an llm provider [0.15ms]
+(pass) conversation profiles fall back to the saved profile without a model when the catalog fails [0.04ms]
+
+api/domains/larm/test/lease-recovery.test.ts:
+(pass) a terminal lease coalesces cleanup while draining: normal [1003.17ms]
+(pass) a terminal lease coalesces cleanup while draining: retry [1003.83ms]
+(pass) a terminal lease coalesces cleanup while draining: cancel-error [1004.68ms]
+(pass) a terminal lease coalesces cleanup while draining: cancel-pending [1003.18ms]
+(pass) connection GET 401 is not a terminal lease and does not create another connection [0.66ms]
+(pass) connection GET 403 is not a terminal lease and does not create another connection [0.21ms]
+(pass) connection GET 500 is not a terminal lease and does not create another connection [0.21ms]
+(pass) failed replacement after GET 410 leaves no ready old lease and later recovers [0.72ms]
+(pass) a cancel during voice acquisition leaves the primary scope independent [0.43ms]
+(pass) a close during voice acquisition leaves the primary scope independent [0.14ms]
+(pass) a provider 410 is not replayed as a connection-state rejection [0.22ms]
+
+api/domains/larm/test/llm-timing.test.ts:
+(pass) provider timings are numeric-only diagnostics (JSON) [0.38ms]
+(pass) provider timings are numeric-only diagnostics (SSE) [0.14ms]
+(pass) invalid optional provider timings are omitted without changing the answer [0.14ms]
+(pass) invalid usage counters cannot bypass the reader's safe diagnostics [0.12ms]
+(pass) the fit check reports the byte size of the returned messages without extra serialization [0.25ms]
+(pass) the timing log reuses the fit estimate instead of serializing the messages again [0.13ms]
+(pass) a failed read logs outcome=error with known timings, usage only when present, and no text [0.19ms]
+(pass) a failure before any response is logged once; abort is distinguished from error [0.12ms]
+(pass) an abort while streaming logs outcome=aborted and rethrows the original error [0.13ms]
+(pass) a logging failure never replaces the inference result or error [0.15ms]
+(pass) monotonic TTFT separates pre-send preparation and first nonempty content [0.13ms]
+(pass) an exact request is fitted by dropping the oldest history it was told about, and the timing reports the drop [0.54ms]
+
+api/domains/larm/test/mesh-library.test.ts:
+(pass) the services are found by capability and protocol in the catalog's root list [0.58ms]
+(pass) a missing service is null and a URL on another origin is refused [0.11ms]
+(pass) a submission carries the idempotency key and no steps; 429 reports Retry-After [0.56ms]
+(pass) job status keeps stage and status apart; assets are reduced to known fields [1.00ms]
+(pass) content must be a GLB [0.20ms]
+
+api/domains/larm/test/monitoring.test.ts:
+(pass) canonical source generates the exact published JSON Schema and accepts every handoff example [8.99ms]
+(pass) availability, CPU interval and unknown fields are enforced; large counters remain strings [1.47ms]
+(pass) only monitoring GETs use the existing Control bearer and an encoded cursor, without body or redirects [0.80ms]
+(pass) HTTP status survives malformed error bodies; 410, Retry-After and cancellation are distinct [0.32ms]
+
+api/domains/larm/test/music-generation.test.ts:
+(pass) structured request for true [0.35ms]
+(pass) structured request for false [0.01ms]
+(pass) structured request for sound-effect
+(pass) catalog models are retained and omitted duration stays omitted for all three uses [0.21ms]
+(pass) duration limits come from models, preserve fractions, and never clamp [0.10ms]
+(pass) rejects contradictory lyrics, unsupported options, formats and reference audio [0.26ms]
+(pass) one POST while queued/loading/generating/encoding; resolves audio and runtime [6.04ms]
+(pass) failed never yields successful audio [0.16ms]
+(pass) cancelled never yields successful audio [0.06ms]
+(pass) HTTP400 is readable by the host and not retried; invalid length never posts [0.18ms]
+(pass) a late 202 after local cancellation sends DELETE and never fetches audio [0.12ms]
+
+api/domains/larm/test/music-library.test.ts:
+(pass) Unicode query and cursor are encoded without changing conditions [0.35ms]
+(pass) track references cannot send Control authentication to another origin [0.58ms]
+
+api/domains/larm/test/native-decision.test.ts:
+(pass) native decisions keep the compatible auto choice at temperature zero without forcing JSON output [0.05ms]
+
+api/domains/larm/test/playground-concurrency.test.ts:
+(pass) parallel embeddings keep independent credentials when the first finishes [0.79ms]
+(pass) parallel embeddings keep independent credentials when the first is cancelled [0.12ms]
+
+api/domains/larm/test/playground.test.ts:
+(pass) catalog merges selector-only cold services without starting anything [0.69ms]
+(pass) services missing from the unselected catalog are fetched again by profile id [0.14ms]
+(pass) every warm provider executes independently, validates claim and releases [0.87ms]
+(pass) semantic health is distinct from catalog presence, and cold diagnosis does not generate [0.27ms]
+(pass) image acquires and releases a connection while music remains direct [0.35ms]
+(pass) music requests Opus once and fetches Ogg Opus with Control authentication after completion [1.57ms]
+(pass) music rejects invalid Opus result: not-ogg [0.31ms]
+(pass) music rejects invalid Opus result: vorbis [0.20ms]
+(pass) music rejects invalid Opus result: truncated [0.20ms]
+(pass) music rejects invalid Opus result: mime-mismatch [0.20ms]
+(pass) music rejects invalid Opus result: unknown-format [0.19ms]
+(pass) music still accepts an existing wav result [0.16ms]
+(pass) music still accepts an existing flac result [0.11ms]
+(pass) image POST failures are not retried and late cancellation is reported unknown [0.15ms]
+(pass) artifact origin mismatch never forwards control credential [0.13ms]
+(pass) music cancellation collects a late job and confirms remote cancellation [0.14ms]
+(pass) invalid claim cannot run inference and still releases connection [0.12ms]
+(pass) direct service runtime model IDs are returned separately from catalog IDs [0.13ms]
+(pass) malformed local hostnames cannot receive credentials [0.01ms]
+(pass) playground claims on the LARM host, another port included, are accepted [0.21ms]
+(pass) playground claims on another private host are refused unless listed [0.30ms]
+(pass) a missing baseUrl leaves the playground unconfigured [0.05ms]
+(pass) image uses the discovered service URL and preserves arbitrary dimensions and seed [0.22ms]
+(pass) image defaults an omitted edge to 512, format to webp and seed to zero [0.16ms]
+(pass) services are chosen by capability and protocol in catalog order, never by name [0.12ms]
+
+api/domains/larm/test/profile-retention.test.ts:
+(pass) visible chat repeats the same Profile POST with fresh keys for six idle minutes and stops on leaving [1.19ms]
+(pass) voice Profile subset and initial catalog revision are preserved by repeated use [0.32ms]
+(pass) a claimed Connection stays ready when the semantic probe cache expires between Profile requests [0.40ms]
+(pass) fixed Control authentication and existing claimed providers keep working across the credential deadline [0.60ms]
+(pass) a different Connection returned by a repeated request is released and never adopted as retention [0.42ms]
+(pass) a failed periodic request reports failure and retries the same Profile on the next interval [0.27ms]
+(pass) leaving during initial claim releases its late Connection and schedules no more Profile requests [0.17ms]
+(pass) inference proceeds on its valid claim while a periodic Profile POST waits [0.26ms]
+(pass) closing immediately after an overdue screen leaves still releases the Connection [0.11ms]
+
+api/domains/larm/test/provider-cache-review.test.ts:
+(pass) a failed readiness check retires only the previously cached target binding [0.83ms]
+(pass) late failed readiness cannot invalidate a newer recovered target claim [0.43ms]
+
+api/domains/larm/test/provider-readiness.test.ts:
+(pass) ready ASR and TTS run while Connection is probing and LLM is pending/failed [0.74ms]
+(pass) ready ASR and TTS run while Connection is failed and LLM is pending/failed [0.23ms]
+(pass) audio acquisition neither waits for nor deletes the existing primary LLM scope [0.37ms]
+(pass) ASR failure and cancellation do not stop ready TTS or discard the buffered WAV [0.25ms]
+(pass) a stalled ASR has its own deadline while a concurrent TTS succeeds [0.20ms]
+(pass) released/expired stop only that Connection and never claim a terminal record [0.16ms]
+(pass) credential reacquisition selects ASR alone while siblings remain unready [0.39ms]
+
+api/domains/larm/test/provider-review.test.ts:
+(pass) voice-only preparation reports connecting, its own failure and recovery [0.31ms]
+(pass) a failed ASR claim leaves ready TTS reported as available [0.24ms]
+(pass) hiding after a failed main attempt stops every visible-screen retention loop [0.35ms]
+(pass) closed ports reject first voice use without acquiring a new scope [0.06ms]
+(pass) an expiring ASR credential never retires a Connection still used by TTS [0.25ms]
+(pass) a failed competing claim cannot remove a newer successful claim [0.17ms]
+(pass) a partial claim must confirm its selected set ready (probing) [0.20ms]
+(pass) a partial claim must confirm its selected set ready (failed) [2.22ms]
+(pass) a partial claim must confirm its selected set ready (%s) [0.25ms]
+(pass) a different Connection's terminal GET never retires this port's speech [0.24ms]
+(pass) an audio Provider's idle release never deletes a parent still serving its sibling [0.36ms]
+(pass) a throwing status subscriber does not block the remaining subscribers [0.14ms]
+(pass) malformed optional decision metadata never becomes a public model value [0.17ms]
+(pass) catalog-selected optional names do not inherit Object prototype bindings [0.55ms]
+
+api/domains/larm/test/speech-overrides.test.ts:
+(pass) per-request voice and style use the existing provider and leave subsequent speech unchanged [0.55ms]
+(pass) a voice whose catalog entry declares no styles or ranges receives neither [0.14ms]
+(pass) a catalog without styled voices keeps the claim's voice, even one it does not list [0.10ms]
+
+api/domains/larm/test/speech-voice-pair.test.ts:
+(pass) Japanese metadata voice-a selects the common English voice Rosie [0.17ms]
+(pass) Japanese metadata voice-b selects the common English voice Rosie [0.02ms]
+(pass) Japanese metadata voice-c selects the common English voice Rosie [0.01ms]
+(pass) Japanese metadata voice-d selects the common English voice Rosie [0.01ms]
+(pass) Japanese metadata voice-e selects the common English voice Jasper
+(pass) Japanese metadata voice-f selects the common English voice Jasper
+(pass) Japanese metadata %s selects the common English voice Rosie
+(pass) catalogs are reused across clauses and Japanese synthesis keeps its own voice [0.08ms]
+(pass) unknown presentation unknown cannot silently select a different voice [0.04ms]
+(pass) unknown presentation absent cannot silently select a different voice
+(pass) Jasper must actually be declared masculine [0.04ms]
+(pass) legacy English overrides cannot change the fixed voice or speed [0.03ms]
+(pass) cancellation during catalog discovery cannot reach speech inference [0.04ms]
+(pass) one-off voice uses the avatar gender while English speed remains fixed [0.03ms]
+
+api/domains/larm/test/token-count-diagnostics.test.ts:
+(pass) count rejection retains HTTP 400 and safe correlation without inference or new headers [0.58ms]
+(pass) count rejection retains HTTP 401 and safe correlation without inference or new headers [0.11ms]
+(pass) count rejection retains HTTP 413 and safe correlation without inference or new headers [0.07ms]
+(pass) count rejection retains HTTP 503 and safe correlation without inference or new headers [0.06ms]
+(pass) unknown code, free text and credential copied into metadata are excluded [0.10ms]
+(pass) unreadable rejection retains HTTP status with 20 bytes [0.08ms]
+(pass) unreadable rejection retains HTTP status with 16385 bytes [0.09ms]
+(pass) successful count records epoch and budget, without the digest or request content [0.17ms]
+(pass) response_json is distinct from an HTTP refusal [0.09ms]
+(pass) response_contract is distinct from an HTTP refusal [0.07ms]
+(pass) input_budget is distinct from an HTTP refusal [0.06ms]
+(pass) transport errors and cancelled diagnostic reads remain bounded and do not expose raw errors [0.16ms]
+(pass) the real port supplies the claim identity and retains failed count behavior [0.60ms]
+(pass) a control-plane GET 410 identifies and replaces the old claim before inference [0.54ms]
+
+api/domains/larm/test/visual-lifecycle.test.ts:
+(pass) ready claims immediately despite stale false claimability/readiness cache, and observes fresh bound COLD with Control auth [7.21ms]
+(pass) claim %s provider_semantic_not_ready refetches and reclaims while inference remains single [3.32ms]
+(pass) claim %s connection_not_ready refetches and reclaims while inference remains single [2.99ms]
+(pass) unrelated claim HTTP 409 is never retried and releases [1.80ms]
+(pass) unrelated claim HTTP 503 is never retried and releases [1.79ms]
+(pass) terminal failed ends a claim retry and still releases its own connection [3.07ms]
+(pass) terminal released ends a claim retry and still releases its own connection [2.83ms]
+(pass) terminal expired ends a claim retry and still releases its own connection [3.01ms]
+(pass) cancellation bounds repeated temporary claims, releases, and sends no inference [20.27ms]
+(pass) cancel after claim before POST releases and a new acquisition does not wait for the previous observation [2.66ms]
+(pass) offline, absent, active, stale or future snapshots stay unconfirmed 0 [10.34ms]
+(pass) offline, absent, active, stale or future snapshots stay unconfirmed 1 [10.18ms]
+(pass) offline, absent, active, stale or future snapshots stay unconfirmed 2 [10.13ms]
+(pass) offline, absent, active, stale or future snapshots stay unconfirmed 3 [10.11ms]
+(pass) offline, absent, active, stale or future snapshots stay unconfirmed 4 [10.16ms]
+(pass) offline, absent, active, stale or future snapshots stay unconfirmed 5 [10.14ms]
+(pass) COLD before release and old COLD after release cannot confirm stop [20.80ms]
+(pass) read failure, missing release timestamp and unknown binding explicitly stay unconfirmed [0.33ms]
+(pass) an expired epoch is not reused: the next explicit operation gets a fresh connection [2.48ms]
+
+api/domains/larm/test/visual-perception.test.ts:
+(pass) a valid large response containing all eight alpha masks is not rejected by the HTTP read bound [38.66ms]
+(pass) visual JSON contract describe discovers a selector, claims, infers once and releases [2.21ms]
+(pass) visual JSON contract referring discovers a selector, claims, infers once and releases [1.83ms]
+(pass) visual JSON contract detection discovers a selector, claims, infers once and releases [1.70ms]
+(pass) visual JSON contract count_box discovers a selector, claims, infers once and releases [1.75ms]
+(pass) visual JSON contract segmentation discovers a selector, claims, infers once and releases [2.49ms]
+(pass) visual JSON contract matting discovers a selector, claims, infers once and releases [2.44ms]
+(pass) visual JSON contract ocr discovers a selector, claims, infers once and releases [1.80ms]
+(pass) visual JSON contract ocr_grounding discovers a selector, claims, infers once and releases [1.67ms]
+(pass) visual HTTP 400 is distinguished, never retried, and releases [1.88ms]
+(pass) visual HTTP 401 is distinguished, never retried, and releases [1.64ms]
+(pass) visual HTTP 409 is distinguished, never retried, and releases [1.66ms]
+(pass) visual HTTP 413 is distinguished, never retried, and releases [1.62ms]
+(pass) visual HTTP 429 is distinguished, never retried, and releases [1.73ms]
+(pass) visual HTTP 503 is distinguished, never retried, and releases [1.65ms]
+(pass) visual HTTP 504 is distinguished, never retried, and releases [1.67ms]
+(pass) visual cancellation during inference releases using an independent signal [1.86ms]
+(pass) late connection creation is collected and released after cancellation [0.62ms]
+(pass) unconfirmed creation is recovered with the same idempotency key and client [0.55ms]
+(pass) untrusted claim endpoint is rejected before a provider credential is sent [1.75ms]
+(pass) release failure preserves the result and records an explicit warning [1.78ms]
+(pass) query, coordinates, mask references, and count are validated independently of raw tokens [2.72ms]
+
+ 347 pass
+ 0 fail
+ 5747 expect() calls
+Ran 347 tests across 38 files. [4.85s]
+[verify] pass: 12277 ms; /Users/y.noguchi/Code/eumenes/verification-reports/runs/2026-10-26T00-10-30-430Z-21fa5b17-64bd-4daa-ad1e-7d539f06d20b/report.json

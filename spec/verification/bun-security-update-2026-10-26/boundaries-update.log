@@ -1,0 +1,8 @@
+api/application/media/visual-analysis-registration.test.ts: application must use capabilities public entry (../../domains/capabilities/bundles/ocr.bundle.json)
+api/application/media/visual-analysis-registration.test.ts: application must use capabilities public entry (../../domains/capabilities/bundles/object-recognition-screen.bundle.json)
+api/application/media/visual-analysis-registration.test.ts: application must use capabilities public entry (../../domains/capabilities/bundles/ocr.visual-analysis.bundle.json)
+api/application/media/visual-analysis-registration.test.ts: application must use capabilities public entry (../../domains/capabilities/bundles/object-recognition-screen.visual-analysis.bundle.json)
+web/src/hooks/use-visual-analysis.ts: web import ../../../api/domains/larm/contracts/visual-perception must use api/domains/<domain>/contracts
+client/visual-analysis.ts: client import ../api/domains/larm/contracts/visual-perception must use api/domains/<domain>/contracts
+client/visual-analysis.ts: client import ../api/domains/larm/contracts/visual-perception must use api/domains/<domain>/contracts
+unused dependency voice-dialogue -> settings (api)

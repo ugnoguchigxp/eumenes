@@ -1,0 +1,1 @@
+sql boundary: inference accesses table settings_document owned by settings (use the owner's API, or record it in scripts/sql-boundaries.allow.json)

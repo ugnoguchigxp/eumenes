@@ -1,0 +1,29 @@
+{
+  "current": {
+    "entryGzip": 176960,
+    "initialGzip": 323799,
+    "files": {
+      "assets/index-ZEKraOFx.js": 176960,
+      "assets/rolldown-runtime-BCiCTKAo.js": 713,
+      "assets/query-BdOFaZc_.js": 25799,
+      "assets/radix-_g6Nll25.js": 44237,
+      "assets/react-9lStHr2n.js": 55755,
+      "assets/zod-BC7gIWcT.js": 20335
+    }
+  },
+  "previous": {
+    "entryGzip": 176960,
+    "initialGzip": 323799,
+    "files": {
+      "assets/index-ZEKraOFx.js": 176960,
+      "assets/rolldown-runtime-BCiCTKAo.js": 713,
+      "assets/query-BdOFaZc_.js": 25799,
+      "assets/radix-_g6Nll25.js": 44237,
+      "assets/react-9lStHr2n.js": 55755,
+      "assets/zod-BC7gIWcT.js": 20335
+    }
+  },
+  "same_metrics": true,
+  "old_build_exit_code": 0,
+  "old_build_seconds": 1.17
+}

@@ -1,0 +1,1 @@
+docs/domains.md の domain 表が scripts/domains.ts と一致しません。`bun scripts/domain-docs.ts` で更新してください。

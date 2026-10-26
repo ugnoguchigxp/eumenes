@@ -1,0 +1,97 @@
+[
+  {
+    "name": "sqlite-baseline",
+    "exit_code": 0,
+    "seconds": 0.27,
+    "log": "/Users/y.noguchi/.codex/tmp/eumenes-bun-1.4.4-20261026/sqlite-baseline.log",
+    "command": [
+      "/Users/y.noguchi/.bun/bin/bun",
+      "test",
+      "/Users/y.noguchi/Code/eumenes/api/infrastructure/sqlite/commit.test.ts",
+      "/Users/y.noguchi/Code/eumenes/api/infrastructure/sqlite/migration-backup.test.ts",
+      "/Users/y.noguchi/Code/eumenes/api/infrastructure/sqlite/owner.test.ts",
+      "/Users/y.noguchi/Code/eumenes/api/infrastructure/sqlite/snapshot.test.ts",
+      "/Users/y.noguchi/Code/eumenes/api/infrastructure/sqlite/write-guard.test.ts"
+    ],
+    "cwd": "/Users/y.noguchi/Code/eumenes"
+  },
+  {
+    "name": "sqlite-candidate",
+    "exit_code": 0,
+    "seconds": 0.3,
+    "log": "/Users/y.noguchi/.codex/tmp/eumenes-bun-1.4.4-20261026/sqlite-candidate.log",
+    "command": [
+      "/Users/y.noguchi/.codex/tmp/eumenes-bun-1.4.4-20261026/bun-darwin-aarch64/bun",
+      "test",
+      "/Users/y.noguchi/Code/eumenes/api/infrastructure/sqlite/commit.test.ts",
+      "/Users/y.noguchi/Code/eumenes/api/infrastructure/sqlite/migration-backup.test.ts",
+      "/Users/y.noguchi/Code/eumenes/api/infrastructure/sqlite/owner.test.ts",
+      "/Users/y.noguchi/Code/eumenes/api/infrastructure/sqlite/snapshot.test.ts",
+      "/Users/y.noguchi/Code/eumenes/api/infrastructure/sqlite/write-guard.test.ts"
+    ],
+    "cwd": "/Users/y.noguchi/Code/eumenes"
+  },
+  {
+    "name": "root-typecheck",
+    "exit_code": 0,
+    "seconds": 0.81,
+    "log": "/Users/y.noguchi/.codex/tmp/eumenes-bun-1.4.4-20261026/root-typecheck.log",
+    "command": [
+      "/Users/y.noguchi/.codex/tmp/eumenes-bun-1.4.4-20261026/bun-darwin-aarch64/bun",
+      "check"
+    ],
+    "cwd": "/Users/y.noguchi/Code/eumenes"
+  },
+  {
+    "name": "design-system-typecheck",
+    "exit_code": 0,
+    "seconds": 0.24,
+    "log": "/Users/y.noguchi/.codex/tmp/eumenes-bun-1.4.4-20261026/design-system-typecheck.log",
+    "command": [
+      "/Users/y.noguchi/.codex/tmp/eumenes-bun-1.4.4-20261026/bun-darwin-aarch64/bun",
+      "check",
+      "-p",
+      "packages/design-system/tsconfig.json"
+    ],
+    "cwd": "/Users/y.noguchi/Code/eumenes"
+  },
+  {
+    "name": "design-system-build-typecheck",
+    "exit_code": 0,
+    "seconds": 0.11,
+    "log": "/Users/y.noguchi/.codex/tmp/eumenes-bun-1.4.4-20261026/design-system-build-typecheck.log",
+    "command": [
+      "/Users/y.noguchi/.codex/tmp/eumenes-bun-1.4.4-20261026/bun-darwin-aarch64/bun",
+      "check",
+      "-p",
+      "packages/design-system/tsconfig.build.json"
+    ],
+    "cwd": "/Users/y.noguchi/Code/eumenes"
+  },
+  {
+    "name": "dots-mvp-typecheck",
+    "exit_code": 0,
+    "seconds": 0.08,
+    "log": "/Users/y.noguchi/.codex/tmp/eumenes-bun-1.4.4-20261026/dots-mvp-typecheck.log",
+    "command": [
+      "/Users/y.noguchi/.codex/tmp/eumenes-bun-1.4.4-20261026/bun-darwin-aarch64/bun",
+      "check",
+      "-p",
+      "scripts/dots-mvp/tsconfig.json"
+    ],
+    "cwd": "/Users/y.noguchi/Code/eumenes"
+  },
+  {
+    "name": "frozen-install",
+    "exit_code": 0,
+    "seconds": 2.41,
+    "log": "/Users/y.noguchi/.codex/tmp/eumenes-bun-1.4.4-20261026/frozen-install.log",
+    "command": [
+      "/Users/y.noguchi/.codex/tmp/eumenes-bun-1.4.4-20261026/bun-darwin-aarch64/bun",
+      "install",
+      "--frozen-lockfile",
+      "--ignore-scripts"
+    ],
+    "cwd": "/Users/y.noguchi/.codex/tmp/eumenes-bun-1.4.4-20261026/install-check"
+  }
+]

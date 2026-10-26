@@ -1,0 +1,17 @@
+{
+  "release": "https://github.com/oven-sh/bun/releases/tag/bun-v1.4.4",
+  "published_at": "2026-10-22T10:11:32Z",
+  "assets": {
+    "bun-darwin-aarch64.zip": {
+      "url": "https://github.com/oven-sh/bun/releases/download/bun-v1.4.4/bun-darwin-aarch64.zip",
+      "digest": "sha256:c240d7f0ccb90c263a849fcdb09b7ee62630d921348ed6aafda86b9d577bc510",
+      "size": 40323673
+    },
+    "SHASUMS256.txt": {
+      "url": "https://github.com/oven-sh/bun/releases/download/bun-v1.4.4/SHASUMS256.txt",
+      "digest": "sha256:86629f14fe256b487ceba5170217e13787c49d0cc0fe4bb6397ce5767d3b8f65",
+      "size": 3431
+    }
+  },
+  "sha256_file_match": true
+}

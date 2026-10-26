@@ -1,0 +1,18 @@
+{
+  "git_head": "0336e778f048c1574d4da3e44d27f1b092ed3924",
+  "files": {
+    "package.json": "553564916ed8d188e63aa482ddb2b4c55af74a3ed21bd3f019f1ee45ba5105a9",
+    "bun.lock": "b5529e5ad711afbb17c3eb7d3d19a478f43a5355b1fd480c32907dd92210a147",
+    "bunfig.toml": "d5f11cce721cc0b13d2186a194b4424360eb0dfb24b16db8e2ad1a3a34b21d1f",
+    "packages/artifact-ui/package.json": "061e252bd8688adefd99afbe66059bb9d2fd9e3f61abbe3bc9ab105edcc6d977",
+    "packages/coding-runner/package.json": "1ec587df9b37d09b57c0020e2a395a99203b6da4cdeeb08a83295a93a5ad66cc",
+    "packages/design-system/package.json": "c6dd22d4bd57f62e538c50a938fd31f7c0a05ee2ab8ab96ef7c11198687151b7",
+    "packages/dots-mcp/package.json": "307704c6565588d6d0c5fe5c70d8b0bbba9b3c22f3080b36130949eee8bbe451"
+  },
+  "worktree_status": " M spec/README.md\n?? spec/system-context-chronological-input-spec-2026-10-25.md\n",
+  "candidate_revision": "1.4.4+38afee6c8",
+  "installed_revision": "1.4.3+c6da4a4d3",
+  "installed_executable_sha256": "28c7dd0a06916aba284d570ef44a2d70e9c538eaf2ba58dfe0910525563b3f79",
+  "lockfile_unchanged_after_isolated_install": true,
+  "manifest_inputs_unchanged_after_preflight": true
+}

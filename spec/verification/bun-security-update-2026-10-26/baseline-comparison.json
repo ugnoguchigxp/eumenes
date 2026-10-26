@@ -1,0 +1,50 @@
+[
+  {
+    "name": "format",
+    "baseline_bun": "1.4.3+c6da4a4d3",
+    "exit_code": 1,
+    "same_diagnostics_as_1_4_4": true,
+    "seconds": 1.55,
+    "log": "format-old-runtime.log"
+  },
+  {
+    "name": "lint",
+    "baseline_bun": "1.4.3+c6da4a4d3",
+    "exit_code": 1,
+    "same_diagnostics_as_1_4_4": true,
+    "seconds": 0.76,
+    "log": "lint-old-runtime.log"
+  },
+  {
+    "name": "boundaries",
+    "baseline_bun": "1.4.3+c6da4a4d3",
+    "exit_code": 1,
+    "same_diagnostics_as_1_4_4": true,
+    "seconds": 8.58,
+    "log": "boundaries-old-runtime.log"
+  },
+  {
+    "name": "sql-boundaries",
+    "baseline_bun": "1.4.3+c6da4a4d3",
+    "exit_code": 1,
+    "same_diagnostics_as_1_4_4": true,
+    "seconds": 4.51,
+    "log": "sql-boundaries-old-runtime.log"
+  },
+  {
+    "name": "domain-docs",
+    "baseline_bun": "1.4.3+c6da4a4d3",
+    "exit_code": 1,
+    "same_diagnostics_as_1_4_4": true,
+    "seconds": 0.02,
+    "log": "domain-docs-old-runtime.log"
+  },
+  {
+    "name": "bundle-budget",
+    "baseline_bun": "1.4.3+c6da4a4d3",
+    "exit_code": 1,
+    "same_diagnostics_as_1_4_4": true,
+    "seconds": 0.06,
+    "log": "bundle-budget-old-runtime.log"
+  }
+]

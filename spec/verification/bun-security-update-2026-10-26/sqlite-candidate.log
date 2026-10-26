@@ -1,0 +1,29 @@
+bun test v1.4.4 (38afee6c8)
+
+api/infrastructure/sqlite/commit.test.ts:
+(pass) commit notifications see persisted state, exclude idle scans/rollback, and cannot fail writes [19.95ms]
+(pass) cache maintenance runs in writer order outside a transaction and does not notify commits [8.11ms]
+
+api/infrastructure/sqlite/migration-backup.test.ts:
+(pass) a fresh database is migrated without a snapshot [8.77ms]
+(pass) pending migrations on an existing database take a private consistent snapshot first [19.47ms]
+(pass) only a bounded number of snapshots is kept [71.63ms]
+(pass) a database that fails the integrity check is not migrated [11.78ms]
+(pass) requested backups are private, separately named and never pruned [13.74ms]
+
+api/infrastructure/sqlite/owner.test.ts:
+(pass) OS lock excludes another process and releases after crash [52.00ms]
+
+api/infrastructure/sqlite/snapshot.test.ts:
+(pass) readSnapshot shows one committed snapshot while a writer commits in between [9.14ms]
+(pass) A35 readSnapshot is read-only, synchronous and refused while closing [8.99ms]
+(pass) A35 the snapshot callback never gets a writer: nested store.write queues after it [9.46ms]
+
+api/infrastructure/sqlite/write-guard.test.ts:
+(pass) write rejects an async callback and rolls back its first statement [8.37ms]
+(pass) database, WAL and SHM files are owner-only [8.29ms]
+
+ 13 pass
+ 0 fail
+ 37 expect() calls
+Ran 13 tests across 5 files. [297.00ms]

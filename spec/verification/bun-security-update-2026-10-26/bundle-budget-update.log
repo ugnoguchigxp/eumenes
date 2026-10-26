@@ -1,0 +1,2 @@
+bundle-budget: entryGzip: 176960 B exceeds the recorded 112035 B (limit 114275 B)
+bundle-budget: initialGzip: 323799 B exceeds the recorded 259653 B (limit 264846 B)

@@ -1,0 +1,49 @@
+--- a/package.json
++++ b/package.json
+@@ -2,7 +2,7 @@
+ 	"name": "eumenes",
+ 	"private": true,
+ 	"type": "module",
+-	"packageManager": "bun@1.4.3",
++	"packageManager": "bun@1.4.4",
+ 	"workspaces": [
+ 		"packages/*"
+ 	],
+--- a/.github/workflows/verify.yml
++++ b/.github/workflows/verify.yml
+@@ -23,7 +23,7 @@
+       - uses: actions/checkout@v4
+       - uses: oven-sh/setup-bun@v2
+         with:
+-          bun-version: 1.4.3
++          bun-version: 1.4.4
+       - name: Install and measure preparation
+         run: |
+           bun -e '
+--- a/README.md
++++ b/README.md
+@@ -42,7 +42,7 @@
+ 
+ ## セットアップと起動
+ 
+-前提は`package.json`の指定に合わせた **Bun 1.4.3** と、Vite 8の要件を満たす **Node.js 20.19以降の20系、または22.12以降** です。`bun run dev`はAPIをBun、画面用ViteをNode.jsで起動します。
++前提は`package.json`の指定に合わせた **Bun 1.4.4** と、Vite 8の要件を満たす **Node.js 20.19以降の20系、または22.12以降** です。`bun run dev`はAPIをBun、画面用ViteをNode.jsで起動します。
+ 
+ 1. リポジトリのルートで`bun install`を実行します。`postinstall`でDesignSystemをビルドします。
+ 2. 必要に応じて`.env.example`を`.env`へコピーし、backendで使う`LARM_API_TOKEN`を設定します。すでにexportしている場合はその値を使えます。`EUMENES_API_TOKEN`は省略可能で、初回に`data/keys/api.token`へ自動生成し、API・Vite・CLIで共有します。明示指定する場合は24文字以上にします。
+--- a/docs/verification.md
++++ b/docs/verification.md
+@@ -22,11 +22,11 @@
+ 
+ `verify:live` は明示した LARM への ASR・LLM・TTS 個別疎通であり、ブラウザと実機器を使う循環受入ではありません。
+ 
+-型チェックは Bun 1.4.3 の `bun check` を使います。root、DesignSystem、dots MVP と domain ごとの検査は、それぞれの tsconfig を使います。DesignSystem の build 前検査も `bun check -p tsconfig.build.json` です。root と DesignSystem の `typescript` は 7.0.2、Vite は 8.3.5 に揃えています。Bun は型宣言を出力しないため、`vite-plugin-dts` 5.1.2 による `.d.ts` 生成を残します。
++型チェックは Bun 1.4.4 の `bun check` を使います。root、DesignSystem、dots MVP と domain ごとの検査は、それぞれの tsconfig を使います。DesignSystem の build 前検査も `bun check -p tsconfig.build.json` です。root と DesignSystem の `typescript` は 7.0.2、Vite は 8.3.5 に揃えています。Bun は型宣言を出力しないため、`vite-plugin-dts` 5.1.2 による `.d.ts` 生成を残します。
+ 
+ TypeScript 7.0 は従来の JavaScript Compiler API を提供しません。境界・SQL・サイズ検査と試験棚卸しの4本は、公式の `@typescript/typescript6` 互換パッケージを使います。型宣言生成も同じ互換APIを使い、API Extractor が読む標準ライブラリの場所を `getDefaultLibFilePath` から解決します。API Extractor 内部には TypeScript 5.9.3 が残ります。`@types/bun` などの型定義も引き続き必要です。Vite 8.3.5 は利用者が指定した公開後7日未満の版のため、`bunfig.toml` の待機ルールでは Vite だけを例外に追加しています。
+ 
+-仕様と制約は [Bun 1.4.3 リリースノート](https://bun.sh/blog/bun-v1.4.3) と [型チェックの公式ドキュメント](https://bun.sh/docs/runtime/check) を参照してください。Bun の型チェックは TypeScript 7 に対応するため、TypeScript 5 と診断が異なる場合があります。CSS の副作用 import は各 workspace の `styles` export に型宣言を付け、DesignSystem の path alias は `baseUrl` を使わず相対パスで指定しています。
++仕様と制約は [Bun 1.4.4 リリースノート](https://bun.sh/blog/bun-v1.4.4) と [型チェックの公式ドキュメント](https://bun.sh/docs/runtime/check) を参照してください。Bun の型チェックは TypeScript 7 に対応するため、TypeScript 5 と診断が異なる場合があります。CSS の副作用 import は各 workspace の `styles` export に型宣言を付け、DesignSystem の path alias は `baseUrl` を使わず相対パスで指定しています。
+ 
+ コマンドの一覧は README の「検証」を参照してください。fixture、live、実機器受入の結果は分けて記録します。
+ 

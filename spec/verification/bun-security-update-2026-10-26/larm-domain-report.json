@@ -1,0 +1,186 @@
+{
+  "schemaVersion": 1,
+  "runId": "2026-10-26T00-10-30-430Z-21fa5b17-64bd-4daa-ad1e-7d539f06d20b",
+  "startedAt": "2026-10-26T00:10:30.430Z",
+  "scope": {
+    "all": false,
+    "selected": [
+      "larm"
+    ]
+  },
+  "baseCommit": "0336e778f048c1574d4da3e44d27f1b092ed3924",
+  "revision": "f9879bbb00d8e36f2b4fc527866af82cc18c1f475940a6288707fd6e9a96072c",
+  "runtime": {
+    "bun": "1.4.4",
+    "node": "26.3.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "ci": false,
+    "runner": null
+  },
+  "result": "pass",
+  "steps": [
+    {
+      "name": "inventory",
+      "status": "pass",
+      "ms": 57
+    },
+    {
+      "name": "boundaries",
+      "status": "pass",
+      "ms": 79
+    },
+    {
+      "name": "system-context",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "context:check"
+      ],
+      "status": "pass",
+      "ms": 121,
+      "exitCode": 0
+    },
+    {
+      "name": "size-budget",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "scripts/size-budget.ts",
+        "api/domains/larm"
+      ],
+      "status": "pass",
+      "ms": 228,
+      "exitCode": 0
+    },
+    {
+      "name": "format",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "format:check",
+        "api/domains/larm"
+      ],
+      "status": "pass",
+      "ms": 131,
+      "exitCode": 0
+    },
+    {
+      "name": "lint",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "lint",
+        "api/domains/larm"
+      ],
+      "status": "pass",
+      "ms": 65,
+      "exitCode": 0
+    },
+    {
+      "name": "design-system typecheck",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "--cwd",
+        "packages/design-system",
+        "typecheck"
+      ],
+      "status": "pass",
+      "ms": 195,
+      "exitCode": 0
+    },
+    {
+      "name": "design-system build",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "--cwd",
+        "packages/design-system",
+        "build"
+      ],
+      "status": "pass",
+      "ms": 6013,
+      "exitCode": 0
+    },
+    {
+      "name": "typecheck configuration",
+      "status": "pass",
+      "ms": 1
+    },
+    {
+      "name": "typecheck",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "check",
+        "-p",
+        "/Users/y.noguchi/Code/eumenes/verification-reports/runs/2026-10-26T00-10-30-430Z-21fa5b17-64bd-4daa-ad1e-7d539f06d20b/tsconfig.selected.json"
+      ],
+      "status": "pass",
+      "ms": 100,
+      "exitCode": 0
+    },
+    {
+      "name": "typecheck closure",
+      "status": "pass",
+      "ms": 46
+    },
+    {
+      "name": "bun tests",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "test",
+        "./api/domains/larm/test/activity-recorder.test.ts",
+        "./api/domains/larm/test/asr-segments.test.ts",
+        "./api/domains/larm/test/auxiliary-sessions.test.ts",
+        "./api/domains/larm/test/catalog-selectors.test.ts",
+        "./api/domains/larm/test/chat-input.test.ts",
+        "./api/domains/larm/test/compute-client.test.ts",
+        "./api/domains/larm/test/context-exact.test.ts",
+        "./api/domains/larm/test/conversation-background.test.ts",
+        "./api/domains/larm/test/credential-generation.test.ts",
+        "./api/domains/larm/test/foreground-serialization.test.ts",
+        "./api/domains/larm/test/gzip-fetch.test.ts",
+        "./api/domains/larm/test/image-connection.test.ts",
+        "./api/domains/larm/test/image-delete.test.ts",
+        "./api/domains/larm/test/image-import.test.ts",
+        "./api/domains/larm/test/image-library.test.ts",
+        "./api/domains/larm/test/inference-error.test.ts",
+        "./api/domains/larm/test/larm-inference.test.ts",
+        "./api/domains/larm/test/larm-lifecycle.test.ts",
+        "./api/domains/larm/test/larm-speech.test.ts",
+        "./api/domains/larm/test/larm.test.ts",
+        "./api/domains/larm/test/lease-recovery.test.ts",
+        "./api/domains/larm/test/llm-timing.test.ts",
+        "./api/domains/larm/test/mesh-library.test.ts",
+        "./api/domains/larm/test/monitoring.test.ts",
+        "./api/domains/larm/test/music-generation.test.ts",
+        "./api/domains/larm/test/music-library.test.ts",
+        "./api/domains/larm/test/native-decision.test.ts",
+        "./api/domains/larm/test/playground-concurrency.test.ts",
+        "./api/domains/larm/test/playground.test.ts",
+        "./api/domains/larm/test/profile-retention.test.ts",
+        "./api/domains/larm/test/provider-cache-review.test.ts",
+        "./api/domains/larm/test/provider-readiness.test.ts",
+        "./api/domains/larm/test/provider-review.test.ts",
+        "./api/domains/larm/test/speech-overrides.test.ts",
+        "./api/domains/larm/test/speech-voice-pair.test.ts",
+        "./api/domains/larm/test/token-count-diagnostics.test.ts",
+        "./api/domains/larm/test/visual-lifecycle.test.ts",
+        "./api/domains/larm/test/visual-perception.test.ts"
+      ],
+      "status": "pass",
+      "ms": 4861,
+      "exitCode": 0
+    }
+  ],
+  "totalMs": 12277,
+  "integrityErrors": [],
+  "build": {
+    "sharedOutput": true,
+    "inputRevision": "f9879bbb00d8e36f2b4fc527866af82cc18c1f475940a6288707fd6e9a96072c",
+    "distAfterBuild": "61d18c1327565f8f7a3d6b500eafe87c28ea3f3e2cdfa70144835f63ce35ff74",
+    "distAfterConsumers": "61d18c1327565f8f7a3d6b500eafe87c28ea3f3e2cdfa70144835f63ce35ff74"
+  },
+  "finalRevision": "f9879bbb00d8e36f2b4fc527866af82cc18c1f475940a6288707fd6e9a96072c",
+  "finishedAt": "2026-10-26T00:10:43.175Z"
+}

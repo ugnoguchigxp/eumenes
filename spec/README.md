@@ -8,6 +8,7 @@ archive の基準: その文書が担当した実装がコードにあり、本�
 
 | 文書 | 状態 |
 | --- | --- |
+| [bun-security-update-preparation-2026-10-26.md](bun-security-update-preparation-2026-10-26.md) | Bun 本体・プロジェクト指定・CI を 1.4.4 に更新済み。postinstall・型検査・LARM 347件／推論191件／SQLite13件・Web build 成功。全体チェック6項目の失敗は旧版でも再現。サーバー操作・全体試験・CI実行は未実施 |
 | [larm-voice-connection-ready-request-prompt-2026-10-25.md](larm-voice-connection-ready-request-prompt-2026-10-25.md) | LARM への調査依頼 Prompt。LLM・ASR・TTS を含む接続が ready まで 6〜22 秒かかり、2026-10-25 21:22 には 2 分以上 ready にも失敗にもならなかった（その間 ASR は 15 秒で打ち切り、クラウドへ切替）。LARM 側の回答・修正待ち |
 | [ml-voice-activity-detection-design-2026-10-25.md](ml-voice-activity-detection-design-2026-10-25.md) | 設計案・合意待ち・未実装。音声入力の発話検出を、音量比較から学習済みモデル（Silero VAD v5 を onnxruntime-web で実行）へ置き換え、キーボード音・物音を発話として検出しないようにする。再生中のエコー対策の規則、話し始めの欠け対策（確定前の音を1.0秒保持）、読み込み失敗時はフォールバックしない案、実機での受入基準を定義 |
 | [visual-perception-subsystem-design-2026-10-25.md](visual-perception-subsystem-design-2026-10-25.md) | 合意済み・実装済み。OCR・物体認識の「詳細分析」を既存画面へ追加。対象domain検証、実LARMの説明・検索・マスク、実画面の実行・保存結果・マスク切替、無通信60秒での接続解放と取消・再取得を確認。起動待ちtimeoutの試行と、通常YOLO上流・モデル停止の未確認事項は[受入記録](verification/visual-perception-2026-10-25/README.md)に区別 |

@@ -42,7 +42,7 @@ Eumenesは、**ユーザーを継続的に理解し、任された仕事を進�
 
 ## セットアップと起動
 
-前提は`package.json`の指定に合わせた **Bun 1.4.3** と、Vite 8の要件を満たす **Node.js 20.19以降の20系、または22.12以降** です。`bun run dev`はAPIをBun、画面用ViteをNode.jsで起動します。
+前提は`package.json`の指定に合わせた **Bun 1.4.4** と、Vite 8の要件を満たす **Node.js 20.19以降の20系、または22.12以降** です。`bun run dev`はAPIをBun、画面用ViteをNode.jsで起動します。
 
 1. リポジトリのルートで`bun install`を実行します。`postinstall`でDesignSystemをビルドします。
 2. 必要に応じて`.env.example`を`.env`へコピーし、backendで使う`LARM_API_TOKEN`を設定します。すでにexportしている場合はその値を使えます。`EUMENES_API_TOKEN`は省略可能で、初回に`data/keys/api.token`へ自動生成し、API・Vite・CLIで共有します。明示指定する場合は24文字以上にします。

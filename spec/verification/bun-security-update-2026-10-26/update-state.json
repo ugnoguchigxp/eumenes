@@ -1,0 +1,28 @@
+{
+  "old_revision": "1.4.3+c6da4a4d3",
+  "new_revision": "1.4.4+38afee6c8",
+  "binary": "/Users/y.noguchi/.bun/bin/bun",
+  "backup": "/Users/y.noguchi/.codex/tmp/eumenes-bun-1.4.4-20261026/bun-1.4.3-backup",
+  "new_binary_sha256": "0a2237cdcfa0d16ef501d9acca9f0026309ef348bea7393a64e8d1e3609565cc",
+  "changed_files": [
+    "package.json",
+    ".github/workflows/verify.yml",
+    "README.md",
+    "docs/verification.md"
+  ],
+  "server_operations": false,
+  "verification_constraint": "User explicitly requested verification without servers.",
+  "install": {
+    "command": "bun install --frozen-lockfile",
+    "exit_code": 0,
+    "postinstall_design_system_build": "pass",
+    "installed_packages": 164
+  },
+  "lockfile_unchanged": true,
+  "dependency_errors_observed": false,
+  "larm_tests": 347,
+  "inference_tests": 191,
+  "sqlite_tests": 13,
+  "full_verification": "not_run: server restriction",
+  "global_checks": "six failures reproduced under 1.4.3; see baseline-comparison.json"
+}

@@ -1,0 +1,146 @@
+[
+  {
+    "name": "larm-domain",
+    "command": [
+      "bun",
+      "run",
+      "verify",
+      "--",
+      "--domain",
+      "larm"
+    ],
+    "exit_code": 0,
+    "seconds": 12.97,
+    "log": "larm-domain-update.log",
+    "report": "larm-domain-report.json"
+  },
+  {
+    "name": "inference-domain",
+    "command": [
+      "bun",
+      "run",
+      "verify",
+      "--",
+      "--domain",
+      "inference"
+    ],
+    "exit_code": 0,
+    "seconds": 13.17,
+    "log": "inference-domain-update.log",
+    "report": "inference-domain-report.json"
+  },
+  {
+    "name": "root-typecheck",
+    "command": [
+      "bun",
+      "run",
+      "typecheck"
+    ],
+    "exit_code": 0,
+    "seconds": 0.59,
+    "log": "root-typecheck-update.log"
+  },
+  {
+    "name": "dots-mvp-typecheck",
+    "command": [
+      "bun",
+      "check",
+      "-p",
+      "scripts/dots-mvp/tsconfig.json"
+    ],
+    "exit_code": 0,
+    "seconds": 0.06,
+    "log": "dots-mvp-typecheck-update.log"
+  },
+  {
+    "name": "sqlite",
+    "command": [
+      "bun",
+      "test",
+      "api/infrastructure/sqlite/commit.test.ts",
+      "api/infrastructure/sqlite/migration-backup.test.ts",
+      "api/infrastructure/sqlite/owner.test.ts",
+      "api/infrastructure/sqlite/snapshot.test.ts",
+      "api/infrastructure/sqlite/write-guard.test.ts"
+    ],
+    "exit_code": 0,
+    "seconds": 0.53,
+    "log": "sqlite-update.log"
+  },
+  {
+    "name": "format",
+    "command": [
+      "bun",
+      "run",
+      "format:check"
+    ],
+    "exit_code": 1,
+    "seconds": 0.33,
+    "log": "format-update.log"
+  },
+  {
+    "name": "lint",
+    "command": [
+      "bun",
+      "run",
+      "lint"
+    ],
+    "exit_code": 1,
+    "seconds": 0.26,
+    "log": "lint-update.log"
+  },
+  {
+    "name": "boundaries",
+    "command": [
+      "bun",
+      "scripts/boundaries.ts"
+    ],
+    "exit_code": 1,
+    "seconds": 2.2,
+    "log": "boundaries-update.log"
+  },
+  {
+    "name": "sql-boundaries",
+    "command": [
+      "bun",
+      "scripts/sql-boundaries.ts"
+    ],
+    "exit_code": 1,
+    "seconds": 1.15,
+    "log": "sql-boundaries-update.log"
+  },
+  {
+    "name": "domain-docs",
+    "command": [
+      "bun",
+      "scripts/domain-docs.ts",
+      "--check"
+    ],
+    "exit_code": 1,
+    "seconds": 0.01,
+    "log": "domain-docs-update.log"
+  },
+  {
+    "name": "web-build",
+    "command": [
+      "bun",
+      "x",
+      "--no-install",
+      "vite",
+      "build"
+    ],
+    "exit_code": 0,
+    "seconds": 2.42,
+    "log": "web-build-update.log"
+  },
+  {
+    "name": "bundle-budget",
+    "command": [
+      "bun",
+      "scripts/bundle-budget.ts"
+    ],
+    "exit_code": 1,
+    "seconds": 0.03,
+    "log": "bundle-budget-update.log"
+  }
+]

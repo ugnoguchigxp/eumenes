@@ -1,0 +1,282 @@
+vite v8.3.5 building client environment for production...
+transforming...
+[plugin rolldown:vite-resolve] Module "node:crypto" has been externalized for browser compatibility, imported by "/Users/y.noguchi/Code/eumenes/node_modules/.bun/eumenes-memory@vendor+eumenes-memory+eumenes-memory-0.0.2-6643656f3383.tgz+f8c20cda7888a09f/node_modules/eumenes-memory/dist/canonical/sha256.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+✓ 5204 modules transformed.
+rendering chunks...
+computing gzip size...
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/recorder.worklet-D4tES5Cy.js                   0.46 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/index.html                                            0.77 kB │ gzip:     0.36 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_Size3-Regular-CTq5MqoE.woff              4.42 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_Size4-Regular-Dl5lxZxV.woff2             4.92 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_Size2-Regular-Dy4dx90m.woff2             5.20 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_Size1-Regular-mCD8mA8B.woff2             5.46 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_Size4-Regular-BF-4gkZK.woff              5.98 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_Size2-Regular-oD1tc_U0.woff              6.18 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_Size1-Regular-C195tn64.woff              6.49 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_Caligraphic-Regular-Di6jR-x-.woff2       6.90 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_Caligraphic-Bold-Dq_IR9rO.woff2          6.91 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_Size3-Regular-DgpXs0kz.ttf               7.58 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_Caligraphic-Regular-CTRA-rTL.woff        7.65 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_Caligraphic-Bold-BEiXGLvX.woff           7.71 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_Script-Regular-D3wIWfF6.woff2            9.64 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_SansSerif-Regular-DDBCnlJ7.woff2        10.34 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_Size4-Regular-DWFBv043.ttf              10.36 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_Script-Regular-D5yQViql.woff            10.58 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_Fraktur-Regular-CTYiF6lA.woff2          11.31 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_Fraktur-Bold-CL6g_b3V.woff2             11.34 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_Size2-Regular-B7gKUWhC.ttf              11.50 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_SansSerif-Italic-C3H0VqGB.woff2         12.02 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_SansSerif-Bold-D1sUS0GD.woff2           12.21 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_Size1-Regular-Dbsnue_I.ttf              12.22 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_SansSerif-Regular-CS6fqUqJ.woff         12.31 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_Caligraphic-Regular-wX97UBjC.ttf        12.34 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_Caligraphic-Bold-ATXxdsX0.ttf           12.36 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_Fraktur-Regular-Dxdc4cR9.woff           13.20 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_Fraktur-Bold-BsDP51OF.woff              13.29 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_Typewriter-Regular-CO6r4hn1.woff2       13.56 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_SansSerif-Italic-DN2j7dab.woff          14.11 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_SansSerif-Bold-DbIhKOiC.woff            14.40 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_Typewriter-Regular-C0xS9mPB.woff        16.02 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_Math-BoldItalic-CZnvNsCZ.woff2          16.40 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_Math-Italic-t53AETM-.woff2              16.44 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_Script-Regular-C5JkGWo-.ttf             16.64 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_Main-BoldItalic-DxDJ3AOS.woff2          16.78 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_Main-Italic-NWA7e6Wa.woff2              16.98 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_Math-BoldItalic-iY-2wyZ7.woff           18.66 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_Math-Italic-DA0__PXp.woff               18.74 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_Main-BoldItalic-SpSLRI95.woff           19.41 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_SansSerif-Regular-BNo7hRIc.ttf          19.43 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_Fraktur-Regular-CB_wures.ttf            19.57 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_Fraktur-Bold-BdnERNNW.ttf               19.58 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_Main-Italic-BMLOBm91.woff               19.67 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/Assistant-SemiBold-SCI4bEL9.woff2             20.21 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/Assistant-Regular-DVxZuzxb.woff2              20.23 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/Assistant-Medium-DrcxCXg3.woff2               20.32 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/Assistant-Bold-gm-uSS1B.woff2                 20.38 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_SansSerif-Italic-YYjJ1zSn.ttf           22.36 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_SansSerif-Bold-CFMepnvq.ttf             24.50 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_Main-Bold-Cx986IdX.woff2                25.32 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_Main-Regular-B22Nviop.woff2             26.27 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_Typewriter-Regular-D3Ib7_Hf.ttf         27.55 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_AMS-Regular-BQhdFMY1.woff2              28.07 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_Main-Bold-Jm3AIy58.woff                 29.91 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_Main-Regular-Dr94JaBh.woff              30.77 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_Math-BoldItalic-B3XSjfu4.ttf            31.19 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_Math-Italic-flOr_0UB.ttf                31.30 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_Main-BoldItalic-DzxPMmG6.ttf            32.96 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_AMS-Regular-DMm9YOAa.woff               33.51 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_Main-Italic-3WenGoN9.ttf                33.58 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_Main-Bold-waoOVXN0.ttf                  51.33 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_Main-Regular-ypZvNtVU.ttf               53.58 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/ssd-Cu3BMpIG.bin                              61.05 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/memory-Dlh1tzua.bin                           61.34 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/KaTeX_AMS-Regular-DRggAlZN.ttf                63.63 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/embedding-BkhlmR4f.bin                        66.04 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/attitude-Us5ZvzKz.bin                         69.12 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/vad.worker-BuATRpQt.js                        72.93 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/backend-BDuxpSG5.bin                          73.60 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/external-J894ovAA.bin                         73.60 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/larm-core-Dv9Fid1Q.bin                        73.60 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/larm-cpu-CP_UGu3r.bin                         73.60 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/larm-gpu-DUTRjOqG.bin                         73.60 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/larm-memory-C8OsoOcO.bin                      73.60 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/tts-C2QZs4Od.bin                              78.72 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/asr-cqn1C5LX.bin                              78.81 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/llm-BzpZ_IDR.bin                              82.94 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/cpu-Du5QUzlV.bin                             131.07 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/silero_vad-Dt9-bTDn.onnx                   2,327.52 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/ort-wasm-simd-threaded-DcHrbrbl.wasm      14,239.89 kB │ gzip: 3,736.91 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/composition-data-components-DEcVZfaU.css      28.83 kB │ gzip:     7.92 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/WorkspaceArtifacts-DDmRq1AL.css               37.02 kB │ gzip:     7.07 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/DrawingEditor-Dk4Q2KaX.css                   142.19 kB │ gzip:    22.42 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/index-DP8dHTNa.css                           257.29 kB │ gzip:    43.71 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/percentages-BXMCSKIN-ntlCimZw.js               0.06 kB │ gzip:     0.07 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/image-GAAHSSAO-CG7MTehJ.js                     0.07 kB │ gzip:     0.08 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/pie-WAS4IAKB-BiJbTWIM.js                       0.10 kB │ gzip:     0.12 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/info-A6RAGUB7-BQ-T_jYh.js                      0.10 kB │ gzip:     0.12 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/radar-RG4KPBEZ-DBkHNeQF.js                     0.10 kB │ gzip:     0.12 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/packet-AYTQ26CC-CWS2KqmU.js                    0.11 kB │ gzip:     0.12 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/cynefin-OW5HDTMX-B5qGuNFz.js                   0.11 kB │ gzip:     0.12 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/treemap-WGGIJYW6-CAi9CJaE.js                   0.11 kB │ gzip:     0.12 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/wardley-WFR3VGLG-DVjedoX5.js                   0.11 kB │ gzip:     0.12 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/gitGraph-4MIJSDKK-C-nIqezg.js                  0.11 kB │ gzip:     0.12 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/railroad-74A4TZTK-D5aqFSyt.js                  0.11 kB │ gzip:     0.12 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/treeView-Q6P3EWNA-qOKojOMy.js                  0.11 kB │ gzip:     0.12 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/channel-0UBEYzbB.js                            0.11 kB │ gzip:     0.12 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/railroad-peg-WCYAUIDC-CbDIB05k.js              0.11 kB │ gzip:     0.12 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/architecture-7GRP2DOG-LNaLjAZ8.js              0.11 kB │ gzip:     0.12 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/railroad-abnf-HS5TGJTU-DM16W1Nc.js             0.11 kB │ gzip:     0.13 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/railroad-ebnf-LZEXJU2U-C5ey68CT.js             0.11 kB │ gzip:     0.13 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/eventmodeling-NTZA5JFV-D4ShBo4x.js             0.11 kB │ gzip:     0.13 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/subset-shared.chunk-DjXYioM2.js                0.13 kB │ gzip:     0.13 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/chunk-Y2CYZVJY-DsF7k-Jl.js                     0.15 kB │ gzip:     0.14 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/chunk-2Q5K7J3B-C1jixKkw.js                     0.19 kB │ gzip:     0.16 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/chunk-JWPE2WC7-DVXcaiue.js                     0.22 kB │ gzip:     0.17 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/chunk-XXDRQBXY-CZe5ExJi.js                     0.26 kB │ gzip:     0.22 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/subset-worker.chunk-B9sVbfa-.js                0.34 kB │ gzip:     0.27 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/init-ZlXS9mIS.js                               0.35 kB │ gzip:     0.17 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/chunk-5VM5RSS4-ZNzvKenW.js                     0.36 kB │ gzip:     0.27 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/file-open-7c801643-DZtJT5zp.js                 0.44 kB │ gzip:     0.31 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/file-open-002ab408-BHUWm0Sh.js                 0.52 kB │ gzip:     0.32 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/flowDiagram-HODETNUW-tRSURTNm.js               0.55 kB │ gzip:     0.31 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/chunk-POPQ4Y6H-FFJkSfeG.js                     0.57 kB │ gzip:     0.40 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/directory-open-01563666-D4xXyWb_.js            0.58 kB │ gzip:     0.36 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/en-B4ZKOASM-Dfk4rXVX.js                        0.60 kB │ gzip:     0.34 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/infoDiagram-27XIBGKW-BFgWkOLu.js               0.64 kB │ gzip:     0.41 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/file-save-3189631c-CO9S4HFW.js                 0.69 kB │ gzip:     0.44 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/classDiagram-ZZMXUADV-CuEc244T.js              0.77 kB │ gzip:     0.44 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/classDiagram-v2-VYDZK3BY-CuEc244T.js           0.77 kB │ gzip:     0.44 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/stateDiagram-v2-MP3YSRHH-DSqLYDIY.js           0.77 kB │ gzip:     0.45 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/swimlanesDiagram-VR7AAH4N-7WBxDRps.js          0.82 kB │ gzip:     0.48 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/file-save-745eba88-Bwdfz6OZ.js                 0.85 kB │ gzip:     0.49 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/sizeCapture-INFHLROL-3uHXrFqA.js               0.87 kB │ gzip:     0.51 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/ordinal-CPleeUAT.js                            1.18 kB │ gzip:     0.57 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/rolldown-runtime-BCiCTKAo.js                   1.30 kB │ gzip:     0.71 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/chunk-GVQU2GXP-Cow-GLD8.js                     1.41 kB │ gzip:     0.79 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/directory-open-4ed118d0-1i309Asm.js            1.51 kB │ gzip:     0.76 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/band-DZ4Jagyz.js                               1.53 kB │ gzip:     0.66 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/railroadDiagram-O6MQD6OU-CdUZmdGn.js           1.66 kB │ gzip:     0.77 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/with-selector-h2Bm6Zlm.js                      1.66 kB │ gzip:     0.74 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/abnfDiagram-VCTEODGH-Ce8iCdzQ.js               1.84 kB │ gzip:     0.89 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/dist-C264K8Kf.js                               1.87 kB │ gzip:     0.83 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/chunk-P2QGCYS3-BTJZ7Rw2.js                     1.94 kB │ gzip:     0.95 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/chunk-F27PBJKO-Rl9rE8EH.js                     1.97 kB │ gzip:     0.88 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/pegDiagram-XKGWAZYB-Cz-p9mrH.js                2.00 kB │ gzip:     0.94 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/ebnfDiagram-PWID7BFC-BEqFqRFB.js               2.06 kB │ gzip:     0.89 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/roundRect-D01gJrlt.js                          2.87 kB │ gzip:     0.99 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/arc-CG4TSyJd.js                                3.46 kB │ gzip:     1.45 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/diagram-Z3DM3KII-BLo15cwp.js                   4.26 kB │ gzip:     1.84 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/defaultLocale-BFoDCU3G.js                      4.63 kB │ gzip:     2.12 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/ci-info-CRaWB68j.js                            5.26 kB │ gzip:     1.98 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/scene-B44XJ4XU.js                              5.59 kB │ gzip:     2.71 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/linear-CK1-s_WE.js                             5.74 kB │ gzip:     2.37 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/chunk-PWAF6VOD-BYHWwqo7.js                     5.83 kB │ gzip:     2.68 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/diagram-UQ7AKVKN-b3jqXPMp.js                   6.06 kB │ gzip:     2.56 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/pieDiagram-E7YTZNPT-irlnLAjh.js                6.15 kB │ gzip:     2.56 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/diagram-S7CK7UJ4-tQeEwulM.js                   8.11 kB │ gzip:     3.64 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/si-LK-N5RQ5JYF-BsNv10D1.js                     8.57 kB │ gzip:     3.35 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/az-AZ-76LH7QW2-w5r9RpNz.js                     8.60 kB │ gzip:     3.58 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/zh-HK-E62DVLB3-MjmgJhAV.js                     9.07 kB │ gzip:     4.08 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/chunk-L3NEJ4N5-klBKLAPa.js                     9.67 kB │ gzip:     2.97 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/cynefinDiagram-5FMLGOSQ-DAg0j8PA.js            9.93 kB │ gzip:     3.51 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/kk-KZ-P5N5QNE5-DrvKCOuY.js                    10.11 kB │ gzip:     4.18 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/kaa-6HZHGXH3-D2mmSuHA.js                      10.16 kB │ gzip:     4.17 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/stateDiagram-D77RDMKH-DkjxeARQ.js             10.63 kB │ gzip:     3.73 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/diagram-VSXAHHWV-BxRQbCtx.js                  10.65 kB │ gzip:     4.10 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/dagre-GXQ25YYZ-D4-QxKV2.js                    10.96 kB │ gzip:     4.16 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/lt-LT-XHIRWOB4-BRnsa0jQ.js                    12.49 kB │ gzip:     5.36 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/DrawingEditor-BLwbXpR0.js                     12.79 kB │ gzip:     4.76 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/editor-session-YM4HNnEP.js                    13.14 kB │ gzip:     4.87 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/vi-VN-M7AON7JQ-D7wZ8A4p.js                    13.85 kB │ gzip:     5.78 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/da-DK-5WZEPLOC-Cax7OzK3.js                    14.40 kB │ gzip:     6.06 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/time-65SlyS_q.js                              14.92 kB │ gzip:     4.81 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/th-TH-HPSO5L25-CvIHT8qU.js                    15.51 kB │ gzip:     5.17 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/chunk-SVP7TREG-Dbj5xnnh.js                    15.63 kB │ gzip:     4.35 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/diagram-VX7I27RA-PlOI3Hf6.js                  15.74 kB │ gzip:     5.52 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/nn-NO-6E72VCQL-vs8YJmx-.js                    15.94 kB │ gzip:     6.71 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/mermaid-parser.core-f6sPeg0Y.js               16.57 kB │ gzip:     3.92 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/nl-NL-IS3SIHDZ-COy267na.js                    16.72 kB │ gzip:     6.91 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/ishikawaDiagram-5VMMS53U-C-pIlaNK.js          17.28 kB │ gzip:     6.52 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/my-MM-5M5IBNSE-DvMuK00a.js                    17.56 kB │ gzip:     5.28 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/hu-HU-A5ZG7DT2-FgMJIKmI.js                    18.07 kB │ gzip:     7.57 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/fi-FI-Z5N7JZ37-g3MPGTBi.js                    18.39 kB │ gzip:     7.52 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/kab-KAB-ZGHBKWFO-DIgWreqz.js                  18.77 kB │ gzip:     7.54 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/chunk-75Z2AOVW-Cc_Y4zgE.js                    18.91 kB │ gzip:     6.14 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/zh-TW-RAJ6MFWO-BOkhT8bB.js                    18.98 kB │ gzip:     8.85 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/zh-CN-LNUGB5OW-DEvN_nS6.js                    19.04 kB │ gzip:     8.86 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/lv-LV-5QDEKY6T-Z8u3IEDG.js                    19.13 kB │ gzip:     7.78 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/gl-ES-HMX3MZ6V-DhxKMJuG.js                    19.38 kB │ gzip:     7.72 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/tr-TR-DEFEU3FU-mgtW1Xak.js                    19.50 kB │ gzip:     7.95 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/cs-CZ-2BRQDIVT-B5ZJVTDZ.js                    19.51 kB │ gzip:     8.39 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/pt-PT-UZXXM6DQ-CzuUwuYD.js                    19.64 kB │ gzip:     7.78 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/id-ID-SAP4L64H-J05QVPEY.js                    19.67 kB │ gzip:     7.67 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/ca-ES-6MX7JW3Y-CCW6wh2F.js                    19.78 kB │ gzip:     7.89 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/oc-FR-POXYY2M6-Blmx4rd5.js                    19.83 kB │ gzip:     7.78 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/nb-NO-T6EIAALU-BOsWMcnT.js                    20.09 kB │ gzip:     8.18 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/kanban-definition-UXKFOSKX-CYwt7a3I.js        20.25 kB │ gzip:     7.15 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/he-IL-6SHJWFNN-BuWhqs6j.js                    20.31 kB │ gzip:     7.53 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/bg-BG-XCXSNQG7-C8HTdYbq.js                    20.75 kB │ gzip:     7.38 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/pt-BR-5N22H2LF-DjYQxh-2.js                    21.03 kB │ gzip:     8.20 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/eu-ES-A7QVB2H4-CG4E08Wo.js                    21.19 kB │ gzip:     8.21 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/es-ES-U4NZUMDT-GpUGHvQl.js                    21.34 kB │ gzip:     8.48 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/sl-SI-NN7IZMDC-D2HJEygy.js                    21.35 kB │ gzip:     8.57 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/sv-SE-XGPEYMSR-z493_GJD.js                    21.50 kB │ gzip:     8.55 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/it-IT-JPQ66NNP-CF-CqFhb.js                    22.05 kB │ gzip:     8.57 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/sk-SK-C5VTKIMK-CTyhxJ3P.js                    22.30 kB │ gzip:     9.10 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/pl-PL-T2D74RX3-DJhwttLT.js                    22.49 kB │ gzip:     9.22 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/sankeyDiagram-P5KCCOFB-CDJgZsBS.js            22.78 kB │ gzip:     8.25 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/ro-RO-JPDTUUEW-doMHFEQ-.js                    23.14 kB │ gzip:     8.93 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/journeyDiagram-3NMN7TZE-BeSlHOga.js           23.15 kB │ gzip:     8.16 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/de-DE-XR44H4JA-DTpDVyGL.js                    23.33 kB │ gzip:     8.96 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/ja-JP-DBVTYXUO-ConK-Pyr.js                    23.39 kB │ gzip:     8.78 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/mindmap-definition-YA3MSWOX-DeGG6KhM.js       23.43 kB │ gzip:     7.99 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/fr-FR-RHASNOE6-Dg9Zd8vH.js                    23.44 kB │ gzip:     8.86 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/bn-BD-2XOGV67Q-CROBKtUK.js                    23.59 kB │ gzip:     6.67 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/ko-KR-MTYHY66A-RXj0XGbY.js                    23.87 kB │ gzip:     9.17 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/graphlib-DS17s2tU.js                          23.90 kB │ gzip:     8.31 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/fa-IR-HGAKTJCU-D3pB2zIf.js                    24.23 kB │ gzip:     8.43 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/noop-C4YPjIRa.js                              24.30 kB │ gzip:     8.08 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/wardleyDiagram-VM6X3IG4-BvxROR1v.js           25.19 kB │ gzip:     6.55 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/ar-SA-G6X2FPQ2-CKs30Lpq.js                    25.66 kB │ gzip:     9.10 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/rough.esm-Dy-Kn_BL.js                         27.10 kB │ gzip:     8.85 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/pa-IN-N4M65BXN-_q4WI8Os.js                    27.97 kB │ gzip:     7.97 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/gitGraphDiagram-WWUBYQGX-DQzjg5XF.js          29.00 kB │ gzip:     8.54 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/ku-TR-6OUDTVRD-CzCkCAXj.js                    29.31 kB │ gzip:     9.26 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/el-GR-BZB4AONW-tman-F1Q.js                    29.66 kB │ gzip:     9.59 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/timeline-definition-24CTP7MA-BpycHV4y.js      30.37 kB │ gzip:     9.94 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/erDiagram-RLTQ6QDP-D_jHcHK_.js                30.68 kB │ gzip:    10.55 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/ru-RU-B4JR7IUQ-BUDnkHzt.js                    30.73 kB │ gzip:     9.85 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/requirementDiagram-BXWQKSXE-Cb3XeDY7.js       30.99 kB │ gzip:     9.76 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/uk-UA-QMV73CPH-DlQuVPdP.js                    31.63 kB │ gzip:    10.09 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/pica-C5GfE5s4.js                              31.76 kB │ gzip:    12.46 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/hi-IN-IWLTKZ5I-Bbneb-Mp.js                    32.34 kB │ gzip:     9.06 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/quadrantDiagram-AXDQQJYC-7csNnaoN.js          33.52 kB │ gzip:     9.74 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/ta-IN-2NMHFXQM-BFjcxw1L.js                    35.26 kB │ gzip:     8.49 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/chunk-OSK3NFVY-D3xNg_9i.js                    36.47 kB │ gzip:     7.92 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/km-KH-HSX4SM5Z-BDJDzRGU.js                    36.64 kB │ gzip:     9.20 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/dagre-D7JM2Yhv.js                             36.84 kB │ gzip:    13.23 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/src-O9M473rR.js                               37.16 kB │ gzip:    12.41 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/chunk-IMKFNOWR-BwjNH21S.js                    37.62 kB │ gzip:    12.25 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/vennDiagram-4TSXK5OY-CzM9J-99.js              41.14 kB │ gzip:    15.09 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/blockDiagram-I7D4REHJ-teOj1OFz.js             41.47 kB │ gzip:    13.36 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/mr-IN-CRQNXWMA-CB5Y3WRt.js                    42.24 kB │ gzip:    10.67 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/xychartDiagram-S5SC5T6Z-Bs59Lsuf.js           42.86 kB │ gzip:    11.76 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/image-blob-reduce.esm-Fj7y_Tzy.js             45.38 kB │ gzip:    16.30 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/chunk-TICWLB2K-B6LHXzme.js                    48.77 kB │ gzip:    15.72 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/chunk-GMAD6QVW-KzSiu_F-.js                    51.21 kB │ gzip:    16.68 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/model-DrSBK4pg.js                             54.36 kB │ gzip:    18.50 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/ganttDiagram-EL5Y4UJY-vmFJKLGo.js             54.66 kB │ gzip:    18.35 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/models-LJ_4Sl8q.js                            58.49 kB │ gzip:    11.77 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/chunk-SHT3W25Y-IRMTWGF_.js                    61.18 kB │ gzip:    19.83 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/c4Diagram-7LVT6UL2-DkdIUG_2.js                64.74 kB │ gzip:    18.54 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/glb-scene-CZQ_YpBO.js                         67.09 kB │ gzip:    18.60 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/zod-BC7gIWcT.js                               76.82 kB │ gzip:    20.42 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/cose-bilkent-JH36ORCC-DjitrVBD.js             81.22 kB │ gzip:    21.52 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/query-BdOFaZc_.js                             93.55 kB │ gzip:    25.97 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/chunk-4HAMMTFA-BvuyBbVy.js                   104.85 kB │ gzip:    25.28 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/swimlanes-42K2YHIH-CBYHJQoa.js               111.05 kB │ gzip:    38.00 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/sequenceDiagram-WJ2MYXX4-w5UeAlnV.js         115.73 kB │ gzip:    30.61 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/radix-_g6Nll25.js                            143.37 kB │ gzip:    44.45 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/dist-C0zokQqD.js                             147.54 kB │ gzip:    49.41 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/architectureDiagram-5GKGNRK7-C3bmtg81.js     148.88 kB │ gzip:    41.13 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/react-9lStHr2n.js                            178.23 kB │ gzip:    56.30 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/three.core-DHwsDaUn.js                       227.64 kB │ gzip:    61.19 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/chunk-DU6HZSFF-0ofp8O5T.js                   236.87 kB │ gzip:    38.76 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/katex-Dp5KzNHE.js                            258.95 kB │ gzip:    77.45 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/three.module-BLgGiSxg.js                     352.30 kB │ gzip:    84.70 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/composition-data-components-BHX3shFq.js      380.92 kB │ gzip:   105.99 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/cytoscape.esm-CHBj4VkZ.js                    434.61 kB │ gzip:   137.74 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/index-ZEKraOFx.js                            576.10 kB │ gzip:   179.44 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/chunk-FOHPRMQF-DD4dKubD.js                   662.08 kB │ gzip:   143.15 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/prod-DHG-m3ZH.js                           1,018.59 kB │ gzip:   320.37 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/WorkspaceArtifacts-9v0GN24V.js             1,030.09 kB │ gzip:   291.10 kB
+../../.codex/tmp/eumenes-bun-1.4.4-20261026/web-build-1.4.3/assets/chunk-EIO257PC-wxX2QaoI.js                 1,821.02 kB │ gzip:   744.22 kB
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+[33m[INEFFECTIVE_DYNAMIC_IMPORT] [0mweb/src/domains/background/index.ts is dynamically imported by web/src/components/ConversationBackground.tsx but also statically imported by web/src/domains/monitoring/items.ts, dynamic import will not move module into another chunk.
+
+✓ built in 800ms
