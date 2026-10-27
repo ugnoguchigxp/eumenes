@@ -72,6 +72,11 @@ function fixture() {
 			};
 			const content = body.messages.at(-1)!.content;
 			inputs.push({ content, connection: path.split("/")[1]! });
+			// A read-ahead's answer: its one token, stopped at its output bound.
+			if (content.startsWith("bounded"))
+				return Response.json({
+					choices: [{ message: { content: "{" }, finish_reason: "length" }],
+				});
 			if (!content.startsWith("quick"))
 				await new Promise<void>((_, reject) => {
 					init?.signal?.addEventListener("abort", () =>
@@ -138,6 +143,30 @@ test("background work on the conversation's prompt runs on its connection and yi
 			},
 		);
 		expect(quick).toBe("quick background:none");
+	} finally {
+		await p.close();
+	}
+});
+
+test("a read-ahead on the conversation's prompt ends normally at its output bound; another call does not", async () => {
+	const { p } = fixture();
+	const signal = AbortSignal.timeout(5000);
+	const call = {
+		sessionRole: "auxiliary" as const,
+		onConversation: true as const,
+		tools: [tool],
+		toolChoice: "none" as const,
+		jsonOutput: true as const,
+		maxOutputTokens: 1,
+	};
+	try {
+		const read = [{ role: "user" as const, content: "bounded read" }];
+		expect(await p.answer(read, signal, { ...call, readAhead: true })).toBe(
+			"{",
+		);
+		await expect(p.answer(read, signal, call)).rejects.toThrow(
+			"chat_stream_incomplete",
+		);
 	} finally {
 		await p.close();
 	}

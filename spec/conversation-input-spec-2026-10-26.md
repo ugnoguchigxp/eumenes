@@ -1,6 +1,6 @@
 # 会話の入力仕様（SystemContext・長期記憶・最近の会話・会話の状態）
 
-作成日: 2026-10-25、改訂: 2026-10-26（旧ファイル名 `system-context-chronological-input-spec-2026-10-25.md`）。状態: **実装済み（2026-10-27。fixture 検証済み。P0 の live 測定と評価の再実行、実機器の受入は未実施）。Q1〜Q14 は 2026-10-26 に決定（§15）。** 本書が、[ContextWindow仕様](context-window-spec-2026-10-24.md)の文脈の組立て（§5・§7・§12・§15）と、[ContextWindow構成仕様](context-window-layout-spec-2026-10-25.md)の全体を置き換えた。置き換える前の版はブランチ `snapshot/context-window-v1-2026-10-25`（commit `7ff711da`）に残してある。
+作成日: 2026-10-25、改訂: 2026-10-26（旧ファイル名 `system-context-chronological-input-spec-2026-10-25.md`）。状態: **実装済み（2026-10-27。fixture 検証済み。SystemContext の節の順は作る依頼の live 測定で変更（§4.1・§14.1）。P0 の live 測定と評価の再実行、実機器の受入は未実施）。Q1〜Q14 は 2026-10-26 に決定（§15）。** 本書が、[ContextWindow仕様](context-window-spec-2026-10-24.md)の文脈の組立て（§5・§7・§12・§15）と、[ContextWindow構成仕様](context-window-layout-spec-2026-10-25.md)の全体を置き換えた。置き換える前の版はブランチ `snapshot/context-window-v1-2026-10-25`（commit `7ff711da`）に残してある。
 
 会話エージェント（agency の `respond`）と、同じ会話を読む agency の背景の呼出し（`update`・`decide`）に渡す入力を定める。担当（サブエージェント、`specialist-turn`）の文脈は範囲の外で、別の仕様で扱う。各規則の研究上の根拠は §16 にまとめる（調査資料「コンテキスト内の『メモリ』構造を LLM はどう扱うか」2026-10-26、出典 [S1]〜[S42]）。
 
@@ -89,17 +89,17 @@ Codex（`~/Code/codex`、commit `2e1607ee2f`）の調べ：圧縮した後に残
 
 ### 4.1 節
 
-SystemContext を、目的ごとの節に分け、`## 見出し` を付ける。1つの規則は1つの節にだけ書く（同じことを2か所に書くと、片方だけ直したときに食い違う [S7][S36]）。順は、変わりにくく全体に効くものから。
+SystemContext を、目的ごとの節に分け、`## 見出し` を付ける。1つの規則は1つの節にだけ書く（同じことを2か所に書くと、片方だけ直したときに食い違う [S7][S36]）。順は、`## Role` の直後に担当とツールの規則（`## Toolchains`・`## Tools`）、その後は変わりにくく全体に効くものから。担当の規則を7番目に置いた初めの順では、作る依頼で `find_toolchain` を呼ばずに返事だけを返した（§14 の 2026-10-27 の測定）。
 
 | 順 | 見出し | 中身 | 出所（今） |
 | --- | --- | --- | --- |
 | 1 | `## Role` | 名前、役割、利用者の呼び方、人柄（好きなもの） | agency の `base`・`persona`、設定の `agent-name`・`user-name`・`*-role` |
-| 2 | `## Speaking` | 口調、返事の長さ（通常一文、補足しても二文）、利用者の言語、挨拶は挨拶されたときだけ、読み上げられるので見出し・箇条書き・記号・tool 名・内部の番号を話さない、音声認識の誤りの扱い、制作物や詳しい内容は読み上げない | agency の `spokenReplyStyle`、設定の `*-style`、`conversation.context.toml` の話し方の行 |
-| 3 | `## Emotion` | 気持ちの絵文字（設定で有効なときだけ） | agency の `emotionRules` |
-| 4 | `## Input` | 入力の読み方（§4.2） | 新規。`conversation.context.toml` の1行目と `context-sources` を置き換える |
-| 5 | `## Facts` | 根拠にない事実・数値・出典・成功を作らない。過去の発言や結果を今の外の状態にしない。結果が届くまで完了と言わない。画像は提示されたときだけ見たものとする | `conversation.context.toml` の行 |
-| 6 | `## Tools` | `memory`・`work` を使う条件（§4.4） | agency の `toolRules` の記憶・確認の文、`host-rules/tools` の記憶・仕事の行 |
-| 7 | `## Toolchains` | 担当を探して頼む手順と条件（§4.5）。依頼できる担当の名前の一覧 | agency の `toolRules` の担当の文、`host-rules/tools` の検索・即答・予告の行、`toolchains.context.toml` |
+| 2 | `## Toolchains` | 担当を探して頼む手順と条件（§4.5）。依頼できる担当の名前の一覧 | agency の `toolRules` の担当の文、`host-rules/tools` の検索・即答・予告の行、`toolchains.context.toml` |
+| 3 | `## Tools` | `memory`・`work` を使う条件（§4.4） | agency の `toolRules` の記憶・確認の文、`host-rules/tools` の記憶・仕事の行 |
+| 4 | `## Speaking` | 口調、返事の長さ（通常一文、補足しても二文）、利用者の言語、挨拶は挨拶されたときだけ、読み上げられるので見出し・箇条書き・記号・tool 名・内部の番号を話さない、音声認識の誤りの扱い、制作物や詳しい内容は読み上げない | agency の `spokenReplyStyle`、設定の `*-style`、`conversation.context.toml` の話し方の行 |
+| 5 | `## Emotion` | 気持ちの絵文字（設定で有効なときだけ） | agency の `emotionRules` |
+| 6 | `## Input` | 入力の読み方（§4.2） | 新規。`conversation.context.toml` の1行目と `context-sources` を置き換える |
+| 7 | `## Facts` | 根拠にない事実・数値・出典・成功を作らない。過去の発言や結果を今の外の状態にしない。結果が届くまで完了と言わない。画像は提示されたときだけ見たものとする | `conversation.context.toml` の行 |
 | 8 | `## Results` | 「## Host notice」が届いたときの伝え方。種類ごとに1文（§8.2 の表）。話しかけのきっかけの扱い | `research-*`・`operation-*` を改めたもの、`conversation.context.toml` の固定文の行 |
 
 | 規則 | 内容 |
@@ -454,6 +454,7 @@ t7「鎌倉から東京駅への移動方法」の調査が終わりました（
 | --- | --- | --- |
 | agency `update`・`decide` | 主会話と同じ並び（§3 の最後の message まで）＋最後の `user` に指示 | `tool_choice: "none"`、`response_format`（JSON schema） |
 | 文脈係（§7.3） | §7.3 | §7.3 |
+| 先読み（起動・画面表示・4分の無操作の prewarm、文脈係の区切りの後の warm） | 主会話と同じ並び＋固定の短い `## Task` | 出力1token で捨てる。`readAhead` の印を付け、出力の上限で止まる終わり方を正常として扱う（失敗・warn にしない） |
 | steward `curate-memory`・`curate-goals`・`curate-world` | 今のまま（台帳の出来事を読む）。主会話の入力の形には依らない | 今のまま |
 
 - agency の `update` が観測・TODO・配信済みの発話を自分で描き直している部分は、この並びを受け取る形へ agency リポジトリで改める。
@@ -546,6 +547,27 @@ t7「鎌倉から東京駅への移動方法」の調査が終わりました（
 - 結果の上限（§8.2・§9 の 600 token、§7.1 の State の 600 token）は初期値。B で 300・600・1,200 を比べ、E3・E4・E8 が合格する中で最も小さい値を採る。
 - B と C がともに合格するなら C を採る。B だけなら B を採る。B の中で区切りの値（上限 8件・12件、残す件数 2件・4件）を比べ、合格する中で短い方を採る。
 
+### 14.1 節の順の測定（2026-10-27）
+
+本番の画像依頼（run `1d8f4bb1`）が `find_toolchain` を呼ばずに「進めてまいります」とだけ返した（`decision:"answer"`、候補0件）。本番の組立て（`conversation-input.ts`・`context-system.ts`）で作った最初の呼出しを、LARM の main 接続・ツール付き（温度0）で送り、system の節の順だけを変えて比べた。入力は最近の会話なしの `## State`＋`## User`。
+
+| 入力 | 件数 |
+| --- | --- |
+| 作る依頼（画像2・絵1・曲2・効果音1） | 6種×3回＝18 |
+| 雑談（「こんにちは」「今日は疲れたな」「ありがとう、助かったよ」） | 3種×1回 |
+
+| 節の順 | 作る依頼でツールを呼んだ回 | 雑談でツールを呼んだ回 |
+| --- | --- | --- |
+| 初めの順（Role・Speaking・Emotion・Input・Facts・Tools・Toolchains・Results） | 10/18 | 0/3 |
+| Toolchains を最後へ | 10/18 | 0/3 |
+| Toolchains を Role の直後へ | 15/18 | 0/3 |
+| Toolchains・Tools を Role の直後へ（採用、§4.1） | 17/18 | 0/3 |
+| 採用した順の実装後（再測定） | 16/18 | 0/3 |
+
+- 同じ入力でも温度0で結果が揺れる（LARM 側の非決定性）。合否は回数で見る。
+- 実装後の再測定では、調べる（天気・行き方）とタイマーの依頼も `find_toolchain` を呼んだ。「この前作った曲を再生して」は最近の会話がないため、最初に `memory` の `read` を呼んだ。
+- E1〜E20 の評価（§14）の実施には代えない。
+
 ## 15 決めたこと（2026-10-26）
 
 | # | 事項 | 決定 |
@@ -558,7 +580,7 @@ t7「鎌倉から東京駅への移動方法」の調査が終わりました（
 | Q6 | episode | 削除する。State と役割が重なり、会話履歴の担当は `messages` を読んでいて、episode に依らない（§12） |
 | Q7 | 書式 | 最低限の markdown（`##` の見出し・`- ` の箇条書き・リンク）だけ。XML・JSON は入れない。ツールの結果とホストの知らせの結果も文に直す（§3.2・§8.2・§9） |
 | Q8 | キャッシュとアテンションの折衷 | 中盤は区切りまで後ろに足すだけ。上限・話題の変わり目・30分の間で区切って短くし直す（§6.1.1） |
-| Q9 | SystemContext の節 | `## Role`・`## Speaking`・`## Emotion`・`## Input`・`## Facts`・`## Tools`・`## Toolchains`・`## Results` の8節。いつ使うかの条件は system、ツールの働きと引数はツールの説明に分ける。例は書かない（§4.1〜§4.5） |
+| Q9 | SystemContext の節 | `## Role`・`## Toolchains`・`## Tools`・`## Speaking`・`## Emotion`・`## Input`・`## Facts`・`## Results` の8節（順は 2026-10-27 に変更、§4.1）。いつ使うかの条件は system、ツールの働きと引数はツールの説明に分ける。例は書かない（§4.1〜§4.5） |
 | Q10 | 回をまたぐツールの行 | 持ち越さない。頼んだ記録（`delegate` など）とホストの知らせも入れない。最近の会話は純粋な会話だけ（§1 の4・§6） |
 | Q11 | 即応性と State | 返事の前に背景の処理を待たない。State は残し、LLM の欄は文脈係が主会話と同じ先頭で準備し（毎ターン、Q13）、利用者が話し始めたら取り消す。直近の文脈は生データ（最近の会話）が担う（§1 の10・§7.3・§10） |
 | Q12 | 文脈係 | ContextWindow の維持を担う背景の役。State の手入れ、関係する記憶・World の注入（ホストが集めた候補から3件まで）、古い会話の整理（区切りの位置）。ツールは呼ばず、主会話と同じ先頭で動く。ホストは上限などの決まった守りを持つ（§7.3） |

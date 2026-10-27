@@ -33,6 +33,8 @@ test("the eight sections stand in order, each part in its own, and no input head
 	const at = SYSTEM_SECTIONS.map((name) => text.indexOf(`## ${name}\n`));
 	expect(at.every((i) => i >= 0)).toBe(true);
 	expect([...at].sort((a, b) => a - b)).toEqual(at);
+	// The rules on handing work over follow the role: placed lower, creation requests went without a call.
+	expect(SYSTEM_SECTIONS.slice(0, 3)).toEqual(["Role", "Toolchains", "Tools"]);
 	const sectionOf = (part: string) =>
 		SYSTEM_SECTIONS.filter((_, i) => at[i]! < text.indexOf(part)).at(-1);
 	expect(sectionOf("AGENT-BASE")).toBe("Role");

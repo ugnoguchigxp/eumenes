@@ -11,6 +11,8 @@ export type CallSessionRole = {
 	taskId?: string;
 	/** An auxiliary call on the conversation's connection, yielding to the conversation. */
 	onConversation?: true;
+	/** A read-ahead on the conversation's connection: its output ends at its bound by design. */
+	readAhead?: true;
 	context?: NonNullable<CallSession["context"]>;
 	refs?: { messageIds: string[]; itemIds: string[] };
 };
@@ -22,6 +24,7 @@ export const sessionCallOptions = (session?: CallSessionRole) =>
 				sessionRole: session.sessionRole,
 				...(session.taskId ? { taskId: session.taskId } : {}),
 				...(session.onConversation ? { onConversation: true as const } : {}),
+				...(session.readAhead ? { readAhead: true as const } : {}),
 			}
 		: {};
 
@@ -64,6 +67,7 @@ export function resolveSession(
 	if (
 		(given?.onConversation && sessionRole !== "auxiliary") ||
 		(given?.prefixTools && !given.onConversation) ||
+		(given?.readAhead && !given.onConversation) ||
 		(sessionRole === "main" && row.mode !== "answer") ||
 		(sessionRole === "subagent") !== !!given?.taskId ||
 		(given?.taskId !== undefined && !TASK_ID.test(given.taskId))
@@ -81,6 +85,7 @@ export function resolveSession(
 		sessionRole,
 		...(given?.taskId ? { taskId: given.taskId } : {}),
 		...(given?.onConversation ? { onConversation: true as const } : {}),
+		...(given?.readAhead ? { readAhead: true as const } : {}),
 		...(context
 			? {
 					context: {

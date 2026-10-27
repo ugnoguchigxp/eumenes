@@ -334,6 +334,7 @@ export async function warmConversation(
 			{
 				sessionRole: "auxiliary",
 				onConversation: true,
+				readAhead: true,
 				prefixTools: prompt.tools,
 				toolChoice: "none",
 			},
@@ -457,7 +458,8 @@ export function createContextKeeper(
 				schedule(conversationId, TALK_BREAK_MS);
 				return;
 			}
-			const prepared = store.read((db) =>
+			// One read transaction: the World names it gathers are read only inside one.
+			const prepared = store.readSnapshot((db) =>
 				prepareKeeper(deps, db, conversationId),
 			);
 			if (!prepared || !inference.executeControl) return;

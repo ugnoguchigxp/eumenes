@@ -102,6 +102,12 @@ export type CallSession = {
 	prefixTools?: import("../../../infrastructure/chat-stream").NativeTool[];
 	/** This call's own bound on output tokens, below the request's: a call whose output is short by contract. */
 	outputLimit?: number;
+	/**
+	 * With `onConversation`: a read-ahead (the ContextWindow layout specification, section 8.3). It only reads the
+	 * prompt into the connection's cache; its output stops at its bound by design and is discarded, so a stream that
+	 * ends there is its normal end.
+	 */
+	readAhead?: true;
 	/** Hidden auxiliary work on an answer request: publishes no deltas; provider failure ends only this call. */
 	failureScope?: "call";
 	taskId?: string;

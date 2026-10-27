@@ -90,6 +90,27 @@ test("after a reply the keeper reads the shared prefix with its own sections, an
 	expect(next).not.toContain("- d1 ");
 });
 
+test("the keeper offers the World names it reads inside one read transaction", async () => {
+	const k = keeperInference(['{"ops":[]}']);
+	h = await setup({
+		keeper: { inference: k.inference, quietMs: 10 },
+		// World refuses a read outside a transaction, as its host repository does.
+		worldContext: {
+			knownNamesInTransaction: (db) => {
+				if (!db.inTransaction)
+					throw new Error("world_host_transaction_required");
+				return ["七里ヶ浜駅"];
+			},
+		},
+	});
+	h.state.steps.push({ text: "七里ヶ浜駅からですね。" });
+	await h.say("七里ヶ浜駅から東京駅まで");
+	await waitFor(() => k.accepted.length === 1);
+	expect(
+		sectionLines(keeperCalls(k)[0]!.messages.at(-1)!.content, "Candidates"),
+	).toEqual(["- w1 七里ヶ浜駅: World に記録がある対象（World）"]);
+});
+
 test("an output that breaks a rule is refused whole and the state stays as it was", async () => {
 	const k = keeperInference([
 		JSON.stringify({

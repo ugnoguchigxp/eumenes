@@ -70,6 +70,7 @@ export function createConversationPrewarm(deps: {
 				{
 					sessionRole: "auxiliary",
 					onConversation: true,
+					readAhead: true,
 					prefixTools: prepared.tools,
 					toolChoice: "none",
 				},

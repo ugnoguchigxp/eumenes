@@ -92,12 +92,16 @@ function providerTimings(value: unknown): ProviderTimings | undefined {
 	return Object.keys(result).length ? result : undefined;
 }
 
-/** Consume provider bytes as they arrive; only answer content is projected. */
+/**
+ * Consume provider bytes as they arrive; only answer content is projected. A `readAhead` call only reads the prompt:
+ * its output stops at its bound by design and is discarded, so a stream that ended is its normal end.
+ */
 export async function readChatResponse(
 	response: Response,
 	signal: AbortSignal,
 	onDelta?: TextDelta,
 	onDiagnostics?: (value: ChatDiagnostics) => void,
+	options: { readAhead?: boolean } = {},
 ): Promise<{
 	text: string;
 	usage?: Record<string, unknown>;
@@ -242,7 +246,10 @@ export async function readChatResponse(
 			frame(buffer + decoder.decode());
 			done = true;
 		}
-		if (!done || truncated || (!text.trim() && !calls.size)) {
+		if (
+			!done ||
+			(!options.readAhead && (truncated || (!text.trim() && !calls.size)))
+		) {
 			streamFailure = truncated ?? (!done ? "missing_end" : "empty_output");
 			throw new Error("chat_stream_incomplete");
 		}

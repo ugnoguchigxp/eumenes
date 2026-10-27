@@ -269,6 +269,16 @@ test("the caller sets the session role per call; it is validated and recorded wi
 			},
 		),
 	).rejects.toThrow("invalid_session_role");
+	// A read-ahead is only a call on the conversation's connection.
+	await expect(
+		h.inference.executeControl(
+			await controlRequest(),
+			messages,
+			signal,
+			undefined,
+			{ sessionRole: "auxiliary", readAhead: true },
+		),
+	).rejects.toThrow("invalid_session_role");
 	await expect(
 		stream(await answerRequest(), {
 			sessionRole: "subagent",

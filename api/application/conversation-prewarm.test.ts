@@ -82,6 +82,7 @@ test("the latest conversation's prefix is read by a one-token background call on
 		expect(call!.session).toMatchObject({
 			sessionRole: "auxiliary",
 			onConversation: true,
+			readAhead: true,
 			toolChoice: "none",
 		});
 		// A background subject: it never counts as the user's foreground work.

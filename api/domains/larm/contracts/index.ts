@@ -60,6 +60,8 @@ export type LarmCallOptions = {
 	 * shared prefix is in its cache) and yields: a conversation call aborts it (`larm_preempted`).
 	 */
 	onConversation?: true;
+	/** With `onConversation`: a read-ahead whose output ends at its bound by design; that end is not a failure. */
+	readAhead?: true;
 	/** `subagent` only: the task whose calls share one agent session. */
 	taskId?: string;
 	speechLanguage?: SpeechLanguage;

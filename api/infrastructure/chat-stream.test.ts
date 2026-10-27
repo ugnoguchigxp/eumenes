@@ -145,3 +145,33 @@ test("truncated native control is rejected before any operation can be adopted",
 		readChatResponse(response, new AbortController().signal),
 	).rejects.toThrow("chat_stream_incomplete");
 });
+test("a read-ahead that stops at its output bound ends normally; a normal call does not", async () => {
+	const bounded = () =>
+		new Response(
+			`data: ${JSON.stringify({ choices: [{ index: 0, delta: { content: "{" }, finish_reason: "length" }] })}\n\ndata: [DONE]\n\n`,
+			{ headers: { "Content-Type": "text/event-stream" } },
+		);
+	const signal = new AbortController().signal;
+	await expect(readChatResponse(bounded(), signal)).rejects.toThrow(
+		"chat_stream_incomplete",
+	);
+	expect(
+		(
+			await readChatResponse(bounded(), signal, undefined, undefined, {
+				readAhead: true,
+			})
+		).text,
+	).toBe("{");
+	// It still needs the stream to end.
+	await expect(
+		readChatResponse(
+			new Response(encode(delta("{")), {
+				headers: { "Content-Type": "text/event-stream" },
+			}),
+			signal,
+			undefined,
+			undefined,
+			{ readAhead: true },
+		),
+	).rejects.toThrow("chat_stream_incomplete");
+});

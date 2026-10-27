@@ -31,18 +31,19 @@ const PERSONAS = {
 };
 
 /**
- * The section headings of the system part (the conversation input specification, section 4.1), from what changes
- * least and holds for everything. None of them is one of the input's own headings (`## Memory`, `## State`,
- * `## User`, `## Host notice`, `## Task`).
+ * The section headings of the system part (the conversation input specification, section 4.1): the role, then the
+ * rules on handing work over and on the tools (placed lower, a creation request was answered without a call), then
+ * the rest. None of them is one of the input's own headings (`## Memory`, `## State`, `## User`, `## Host notice`,
+ * `## Task`).
  */
 export const SYSTEM_SECTIONS = [
 	"Role",
+	"Toolchains",
+	"Tools",
 	"Speaking",
 	"Emotion",
 	"Input",
 	"Facts",
-	"Tools",
-	"Toolchains",
 	"Results",
 ] as const;
 type SystemSection = (typeof SYSTEM_SECTIONS)[number];

@@ -94,6 +94,7 @@ export function startLlmTiming(
 					(value) => {
 						diagnostics = value;
 					},
+					{ readAhead: options?.readAhead === true },
 				);
 			} catch (error) {
 				emit(signal.aborted ? "aborted" : "error");
