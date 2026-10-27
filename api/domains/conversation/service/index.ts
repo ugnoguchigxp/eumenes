@@ -41,6 +41,7 @@ import {
 import {
 	appendState,
 	appendUtterance,
+	attachToolCalls,
 	correctUtterances,
 	reviseUtterance,
 	dropStates,
@@ -128,6 +129,7 @@ export function createConversationService(
 		 */
 		input: {
 			appendUtteranceInTransaction: appendUtterance,
+			attachToolCallsInTransaction: attachToolCalls,
 			reviseUtteranceInTransaction: reviseUtterance,
 			utterancesAfterInTransaction: utterancesAfter,
 			latestUtterancesInTransaction: latestUtterances,

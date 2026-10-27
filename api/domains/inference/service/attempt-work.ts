@@ -289,10 +289,13 @@ export async function chooseLlmDelivery(
 ): Promise<SpeechDelivery> {
 	const { env } = r;
 	const p = env.port(r.row.snapshot);
+	// The spoken turns only: a kept tool call (an empty assistant message) and its result are not talk.
 	const turns = (r.input as Messages)
 		.filter(
 			(message): message is { role: "user" | "assistant"; content: string } =>
-				message.role !== "system",
+				(message.role === "user" || message.role === "assistant") &&
+				!message.tool_calls?.length &&
+				!!message.content,
 		)
 		.slice(-4)
 		.map(({ role, content }) => ({ role, text: content }));

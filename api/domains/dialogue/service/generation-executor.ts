@@ -99,8 +99,9 @@ export function createGenerationExecutor(
 	ctx: Parameters<typeof createExecutorContext>[1],
 ) {
 	const x = createExecutorContext(deps, ctx);
-	const execute: ToolExecutor = async (call, { signal, receipt }) => {
+	const execute: ToolExecutor = async (call, { signal, receipt, exchange }) => {
 		x.state.receipt = receipt;
+		x.state.exchange = exchange;
 		switch (call.name) {
 			case "memory":
 				return memory(x, call, call.args);

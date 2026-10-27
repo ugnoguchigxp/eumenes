@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import type { ExchangeStep } from "./tool-exchange";
 import type { ToolchainCard } from "../../capabilities";
 import type { Receipt } from "../../inference";
 import { adoptMemoryWindow } from "./memory-window";
@@ -90,12 +91,15 @@ export function createExecutorContext(
 		receipt: Receipt | undefined;
 		/** Each TODO's revision as the model last saw it (`<state>`, then the work tool's results). */
 		todoRevisions: Map<string, number>;
+		/** The searches and hand-overs made before the call that runs now (the tool-call reliability design, P1). */
+		exchange: readonly ExchangeStep[];
 	} = {
 		search: null,
 		handover: null,
 		instant: null,
 		receipt: undefined,
 		todoRevisions: new Map(Object.entries(input.todoRevisions)),
+		exchange: [],
 	};
 	/** The user's messages this generation acts on: every action, TODO and confirmation it makes comes from them. */
 	const origin = [

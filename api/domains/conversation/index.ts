@@ -15,6 +15,7 @@ export type {
 	StateItem,
 	Utterance,
 	UtteranceSpeaker,
+	UtteranceToolCall,
 } from "./contracts";
 export {
 	CONVERSATION_DEFAULT_PRINCIPAL,

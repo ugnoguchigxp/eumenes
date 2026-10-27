@@ -20,6 +20,7 @@ import { generationStale } from "./generation-stream";
 import { adoptMemoryWindow } from "./memory-window";
 import { consumeAnswer } from "./result-intake";
 import { endRun, type RunEndState } from "./run-end";
+import { carriedToolCalls, type ExchangeStep } from "./tool-exchange";
 
 export type GenerationResult = {
 	/** The speech the generation ends with ("" for silence or a handover). */
@@ -31,6 +32,8 @@ export type GenerationResult = {
 	handover?: Handover;
 	/** The generation issued a confirmation: its speech is the confirmation statement (section 6.7). */
 	confirmation?: true;
+	/** Its searches and hand-overs: kept with the agent's utterance that ends the turn. */
+	exchange?: ExchangeStep[];
 	/** The trace of an utterance generation that answered without handing work over. */
 	selection?: Omit<
 		Parameters<ToolchainRoutingPort["recordSelectionInTransaction"]>[1],
@@ -283,6 +286,24 @@ function linkAnswerResources(
 	);
 }
 
+/** What later turns see of this turn's searches and hand-overs (the tool-call reliability design, P1). */
+const toolCallsOf = (
+	deps: DialogueDeps,
+	tx: Database,
+	run: Run,
+	result: GenerationResult,
+) =>
+	result.exchange?.length
+		? carriedToolCalls(
+				result.exchange,
+				deps.work?.refsInTransaction(tx, run.conversationId) ?? {
+					todo: () => null,
+					confirmation: () => null,
+					resource: () => null,
+				},
+			)
+		: [];
+
 /**
  * The agent's utterance as an event (section 8.1). A text-only reply is delivered in full when it is stored; a spoken one waits for its playback's `delivered`.
  */
@@ -322,6 +343,7 @@ function said(
 			text,
 			messageId,
 			at: deps.clock(),
+			toolCalls: toolCallsOf(deps, tx, run, result),
 		},
 		!spoken,
 	);

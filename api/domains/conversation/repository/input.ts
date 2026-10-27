@@ -5,6 +5,7 @@ import type {
 	ConversationStateBody,
 	Utterance,
 	UtteranceSpeaker,
+	UtteranceToolCall,
 } from "../contracts/input";
 
 /**
@@ -43,6 +44,29 @@ export const inputMemoryDigestMigration = {
 	sql: `ALTER TABLE conversation_cuts ADD COLUMN memory_digest TEXT NOT NULL DEFAULT '';`,
 };
 
+/**
+ * The tool calls of the turn an agent utterance ends (the tool-call reliability design, P1). 0013 and 0014 are kept
+ * as they ran on 2026-10-27: the column was dropped while the input drew no recent conversation, and 0015 adds it
+ * again now that it does.
+ */
+export const inputToolExchangeMigration = {
+	id: "conversation/0013-utterance-tool-exchange",
+	after: ["conversation/0012-input-memory-digest"],
+	sql: `ALTER TABLE conversation_utterances ADD COLUMN tool_exchange_json TEXT;`,
+};
+
+export const dropToolExchangeMigration = {
+	id: "conversation/0014-drop-utterance-tool-exchange",
+	after: ["conversation/0013-utterance-tool-exchange"],
+	sql: `ALTER TABLE conversation_utterances DROP COLUMN tool_exchange_json;`,
+};
+
+export const restoreToolExchangeMigration = {
+	id: "conversation/0015-utterance-tool-exchange",
+	after: ["conversation/0014-drop-utterance-tool-exchange"],
+	sql: `ALTER TABLE conversation_utterances ADD COLUMN tool_exchange_json TEXT;`,
+};
+
 const ready = new WeakMap<Database, boolean>();
 /** The input's tables exist on this connection (a store opened with an older migration set has none). */
 export function inputReady(db: Database): boolean {
@@ -65,7 +89,23 @@ type UtteranceRow = {
 	text: string;
 	message_id: string | null;
 	created_at: string;
+	tool_exchange_json: string | null;
 };
+const isToolCall = (value: unknown): value is UtteranceToolCall =>
+	!!value &&
+	typeof value === "object" &&
+	["name", "arguments", "result"].every(
+		(key) => typeof (value as Record<string, unknown>)[key] === "string",
+	);
+function toolCallsOf(json: string | null): UtteranceToolCall[] {
+	if (!json) return [];
+	try {
+		const value: unknown = JSON.parse(json);
+		return Array.isArray(value) ? value.filter(isToolCall) : [];
+	} catch {
+		return [];
+	}
+}
 const utteranceOf = (row: UtteranceRow): Utterance => ({
 	conversationId: row.conversation_id,
 	seq: row.seq,
@@ -73,9 +113,12 @@ const utteranceOf = (row: UtteranceRow): Utterance => ({
 	text: row.text,
 	messageId: row.message_id,
 	at: row.created_at,
+	toolCalls: toolCallsOf(row.tool_exchange_json),
 });
 const UTTERANCE_COLUMNS =
-	"conversation_id, seq, speaker, text, message_id, created_at";
+	"conversation_id, seq, speaker, text, message_id, created_at, tool_exchange_json";
+const exchangeJson = (toolCalls: readonly UtteranceToolCall[] | undefined) =>
+	toolCalls?.length ? JSON.stringify(toolCalls) : null;
 
 /** Appends one utterance; a message already stored for the same speaker keeps its first row (null: nothing added). */
 export function appendUtterance(
@@ -86,6 +129,8 @@ export function appendUtterance(
 		text: string;
 		messageId: string | null;
 		at: string;
+		/** The tool calls of the turn an agent utterance ends. */
+		toolCalls?: readonly UtteranceToolCall[];
 	},
 ): Utterance | null {
 	if (input.messageId) {
@@ -102,7 +147,7 @@ export function appendUtterance(
 		)
 		.get(input.conversationId) as { next: number };
 	db.query(
-		`INSERT INTO conversation_utterances (${UTTERANCE_COLUMNS}) VALUES (?,?,?,?,?,?)`,
+		`INSERT INTO conversation_utterances (${UTTERANCE_COLUMNS}) VALUES (?,?,?,?,?,?,?)`,
 	).run(
 		input.conversationId,
 		next,
@@ -110,6 +155,7 @@ export function appendUtterance(
 		input.text,
 		input.messageId,
 		input.at,
+		input.speaker === "agent" ? exchangeJson(input.toolCalls) : null,
 	);
 	return {
 		conversationId: input.conversationId,
@@ -118,7 +164,32 @@ export function appendUtterance(
 		text: input.text,
 		messageId: input.messageId,
 		at: input.at,
+		toolCalls: input.speaker === "agent" ? [...(input.toolCalls ?? [])] : [],
 	};
+}
+
+/**
+ * The tool calls of the turn an agent utterance ends, for an utterance written before its turn ended (an
+ * announcement reaches the user before its work is handed over). Written once: an utterance that has them, or was
+ * retracted, keeps what it has. False when no such utterance took them.
+ */
+export function attachToolCalls(
+	db: Database,
+	input: {
+		conversationId: string;
+		messageId: string;
+		toolCalls: readonly UtteranceToolCall[];
+	},
+): boolean {
+	const json = exchangeJson(input.toolCalls);
+	if (!json) return false;
+	return (
+		db
+			.query(
+				"UPDATE conversation_utterances SET tool_exchange_json = ? WHERE conversation_id = ? AND speaker = 'agent' AND message_id = ? AND retracted_at IS NULL AND tool_exchange_json IS NULL",
+			)
+			.run(json, input.conversationId, input.messageId).changes > 0
+	);
 }
 
 /**
@@ -137,7 +208,7 @@ export function reviseUtterance(
 ): void {
 	if (input.text === null)
 		db.query(
-			"UPDATE conversation_utterances SET text = '', retracted_at = ? WHERE conversation_id = ? AND speaker = ? AND message_id = ? AND retracted_at IS NULL",
+			"UPDATE conversation_utterances SET text = '', tool_exchange_json = NULL, retracted_at = ? WHERE conversation_id = ? AND speaker = ? AND message_id = ? AND retracted_at IS NULL",
 		).run(input.at, input.conversationId, input.speaker, input.messageId);
 	else
 		db.query(
@@ -177,21 +248,28 @@ export function latestUtterances(
 		.reverse();
 }
 
-/** The conversations and seqs of the standing utterances of these messages. */
+/**
+ * The conversations and seqs of the standing utterances of these messages; with `speaker`, of that speaker only (an
+ * announcement shares the id of the words it was asked by).
+ */
 function utterancesOfMessages(
 	db: Database,
 	messageIds: readonly string[],
+	speaker?: UtteranceSpeaker,
 ): Array<{ conversation_id: string; seq: number }> {
 	if (messageIds.length === 0 || !inputReady(db)) return [];
 	return db
 		.query(
-			`SELECT conversation_id, seq FROM conversation_utterances WHERE retracted_at IS NULL AND message_id IN (${messageIds.map(() => "?").join(",")})`,
+			`SELECT conversation_id, seq FROM conversation_utterances WHERE retracted_at IS NULL AND message_id IN (${messageIds.map(() => "?").join(",")})${speaker ? " AND speaker = ?" : ""}`,
 		)
-		.all(...messageIds) as Array<{ conversation_id: string; seq: number }>;
+		.all(...messageIds, ...(speaker ? [speaker] : [])) as Array<{
+		conversation_id: string;
+		seq: number;
+	}>;
 }
 
 /**
- * Forgetting messages: their utterances keep only that they existed (no text) and leave the input. Every
+ * Forgetting messages: their utterances keep only that they existed (no text, no tool calls) and leave the input. Every
  * conversation whose input showed one moves its cut's revision, and is cut on its next input when the utterance was
  * inside the recent conversation. Returns the conversations that changed.
  */
@@ -203,7 +281,7 @@ export function retractUtterances(
 	const changed = new Set<string>();
 	for (const row of utterancesOfMessages(db, messageIds)) {
 		db.query(
-			"UPDATE conversation_utterances SET text = '', retracted_at = ? WHERE conversation_id = ? AND seq = ?",
+			"UPDATE conversation_utterances SET text = '', tool_exchange_json = NULL, retracted_at = ? WHERE conversation_id = ? AND seq = ?",
 		).run(at, row.conversation_id, row.seq);
 		const cut = readCut(db, row.conversation_id);
 		if (cut && row.seq > cut.seq)
@@ -216,14 +294,17 @@ export function retractUtterances(
 	return [...changed];
 }
 
-/** A corrected message's utterances say its new text; returns the conversations that changed. */
+/**
+ * A corrected message's utterance says its new text; returns the conversations that changed. The user's words are
+ * corrected, never the agent's announcement that shares their message id.
+ */
 export function correctUtterances(
 	db: Database,
 	messageId: string,
 	text: string,
 ): string[] {
 	const changed = new Set<string>();
-	for (const row of utterancesOfMessages(db, [messageId])) {
+	for (const row of utterancesOfMessages(db, [messageId], "user")) {
 		db.query(
 			"UPDATE conversation_utterances SET text = ? WHERE conversation_id = ? AND seq = ?",
 		).run(text, row.conversation_id, row.seq);

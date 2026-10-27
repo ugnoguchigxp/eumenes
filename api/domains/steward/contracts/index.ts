@@ -106,9 +106,16 @@ export const JOB_DEADLINE_MS = 5 * 60_000;
 
 // ---- ports the application provides (queue and inference are lower than the steward's callers) ----
 
+/** A message of a step's call; on the conversation's prompt, its prefix keeps the conversation's tool calls. */
 export type ChatMessage = {
-	role: "system" | "user" | "assistant";
+	role: "system" | "user" | "assistant" | "tool";
 	content: string;
+	tool_calls?: Array<{
+		id: string;
+		type: "function";
+		function: { name: string; arguments: string };
+	}>;
+	tool_call_id?: string;
 };
 /**
  * A call on the conversation's prompt (the ContextWindow layout specification, section 8.2): it runs on the

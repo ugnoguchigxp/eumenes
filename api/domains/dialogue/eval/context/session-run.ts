@@ -184,6 +184,7 @@ export function settleIn(
 					text: reached,
 					messageId: id,
 					at: ctx.wiring.now(),
+					...(reply.toolCalls ? { toolCalls: reply.toolCalls } : {}),
 				});
 			events.appendInTransaction(db, {
 				conversationId: CONVERSATION_ID,

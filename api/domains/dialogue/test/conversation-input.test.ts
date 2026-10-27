@@ -33,6 +33,7 @@ const said = (
 	text,
 	messageId,
 	at: "2026-10-26T10:00:00.000Z",
+	toolCalls: [],
 });
 
 test("the recent conversation starts with the agent, leaves out what waits for an answer, and joins a side's run", () => {
@@ -55,6 +56,37 @@ test("the recent conversation starts with the agent, leaves out what waits for a
 		{ role: "user", content: "はい" },
 	]);
 	expect(recentUtterances([said("user", "だけ")], new Set())).toEqual([]);
+});
+
+test("an utterance's kept tool calls come before its words, the first joining the agent's words just before", () => {
+	seq = 0;
+	const find = {
+		name: "find_toolchain",
+		arguments: '{"query":"曲"}',
+		result: "{}",
+	};
+	const messages = recentMessages([
+		said("agent", "できました"),
+		{ ...said("agent", "作りますね"), toolCalls: [find] },
+		said("agent", "もう少しです"),
+		said("user", "はい"),
+	]);
+	expect(messages).toEqual([
+		{
+			role: "assistant",
+			content: "できました",
+			tool_calls: [
+				{
+					id: "u2-1",
+					type: "function",
+					function: { name: "find_toolchain", arguments: '{"query":"曲"}' },
+				},
+			],
+		},
+		{ role: "tool", tool_call_id: "u2-1", content: "{}" },
+		{ role: "assistant", content: "作りますね\nもう少しです" },
+		{ role: "user", content: "はい" },
+	]);
 });
 
 test("an utterance is cut at its bound, and its data can not open a heading", () => {

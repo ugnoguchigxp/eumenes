@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import type { UtteranceToolCall } from "../../conversation";
 import type { DialogueDeps } from "./context";
 
 /**
@@ -15,6 +16,8 @@ export function recordUtteranceInTransaction(
 		text: string;
 		messageId: string | null;
 		at: string;
+		/** The tool calls of the turn an agent utterance ends. */
+		toolCalls?: readonly UtteranceToolCall[];
 	},
 	/** Tell the context keeper (false for a reply whose playback is still to come: its delivery tells it). */
 	notify = true,

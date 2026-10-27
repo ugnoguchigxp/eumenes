@@ -15,6 +15,7 @@ import { generationTools } from "./generation-tools";
 import { INPUT_HEADINGS, dataText, joinSections, section } from "./input-text";
 import { memoryItemLine } from "./result-text";
 import { stateLinesInTransaction, stateText } from "./state-text";
+import { exchangeMessages } from "./tool-exchange";
 
 /** Bounds of the recent conversation and its cuts (the conversation input specification, sections 6.1 and 6.1.1). */
 export const RECENT = {
@@ -87,8 +88,16 @@ export function memoryLines(items: readonly ProfileItem[]): {
 	return { lines: shown.map(line), ids: shown.map((item) => item.id) };
 }
 
+/** An utterance's size in the recent conversation: its words and the tool calls kept with it. */
+const utteranceTokens = (u: Utterance) =>
+	estimateTextTokens(u.text) +
+	u.toolCalls.reduce(
+		(sum, call) =>
+			sum + estimateTextTokens(call.name + call.arguments + call.result),
+		0,
+	);
 const tokensOf = (utterances: readonly Utterance[]) =>
-	utterances.reduce((sum, u) => sum + estimateTextTokens(u.text), 0);
+	utterances.reduce((sum, u) => sum + utteranceTokens(u), 0);
 
 /** The utterances the recent conversation shows: from the agent's first one, those not waiting for an answer. */
 export function recentUtterances(
@@ -102,7 +111,11 @@ export function recentUtterances(
 	return start < 0 ? [] : shown.slice(start);
 }
 
-/** The recent conversation as native messages: one per side's run of utterances, each utterance within its bound. */
+/**
+ * The recent conversation as native messages: one per side's run of utterances, each utterance within its bound. An
+ * agent's utterance that ended a turn with a search or a hand-over follows those calls and their results (the
+ * tool-call reliability design, P1); the first call joins an agent's words just before it.
+ */
 export function recentMessages(
 	utterances: readonly Utterance[],
 ): ChatMessage[] {
@@ -110,8 +123,16 @@ export function recentMessages(
 	for (const u of utterances) {
 		const role = u.speaker === "user" ? "user" : "assistant";
 		const text = dataText(headWithin(u.text, RECENT.utteranceTokens).text);
+		const exchange = exchangeMessages(u.seq, u.toolCalls);
 		const last = messages.at(-1);
-		if (last && last.role === role) last.content += `\n${text}`;
+		if (exchange.length) {
+			const [first, ...rest] = exchange;
+			if (last && last.role === "assistant" && !last.tool_calls)
+				last.tool_calls = first!.tool_calls!;
+			else messages.push(first!);
+			messages.push(...rest, { role, content: text });
+		} else if (last && last.role === role && !last.tool_calls)
+			last.content += `\n${text}`;
 		else messages.push({ role, content: text });
 	}
 	return messages;
@@ -365,11 +386,24 @@ export function taskMessages(
 	]);
 }
 
-/** A message of a background call: the prefix and its task are text only (no tool exchange, no image). */
-export type BackgroundMessage = {
-	role: "system" | "user" | "assistant";
-	content: string;
-};
+/** A message of a background call: the prefix's words and kept tool calls, and its task (no image, no attachment). */
+export type BackgroundMessage = Pick<
+	ChatMessage,
+	"role" | "content" | "tool_calls" | "tool_call_id"
+>;
+
+/** A message as a background call sends it: what the conversation's own call sends of it, byte for byte. */
+export const backgroundMessage = ({
+	role,
+	content,
+	tool_calls,
+	tool_call_id,
+}: ChatMessage): BackgroundMessage => ({
+	role,
+	content,
+	...(tool_calls ? { tool_calls } : {}),
+	...(tool_call_id ? { tool_call_id } : {}),
+});
 
 /**
  * A background call's whole input on the conversation's prompt (section 10): the shared prefix, then the last
@@ -409,10 +443,7 @@ export function backgroundTaskInTransaction(
 	);
 	return {
 		messages: taskMessages(prefix, [state, ...sections], task).map(
-			({ role, content }) => ({
-				role: role === "tool" ? "user" : role,
-				content,
-			}),
+			backgroundMessage,
 		),
 		tools: prefix.tools,
 	};

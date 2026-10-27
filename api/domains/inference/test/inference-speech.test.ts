@@ -510,3 +510,58 @@ test("when the LARM voices are unavailable every clause falls back to cloud spee
 		"辞書今日は晴れです。",
 	]);
 });
+
+test("the delivery judge reads the spoken turns only: a kept tool call and its result are not talk", async () => {
+	const states: Array<Record<string, string>> = [];
+	const h = await setup({
+		local: async () => "どういたしまして。",
+		judge: async (state) => {
+			states.push(state as Record<string, string>);
+			return judged;
+		},
+	});
+	const id = await h.store.write((db) =>
+		h.inference.captureInTransaction(
+			db,
+			"kept-tools",
+			"llm",
+			Date.now() + 10000,
+		),
+	);
+	await h.inference.executeStream(
+		id,
+		[
+			{ role: "system", content: "S" },
+			{ role: "user", content: "曲を作って" },
+			{
+				role: "assistant",
+				content: "",
+				tool_calls: [
+					{
+						id: "u2-1",
+						type: "function",
+						function: { name: "find_toolchain", arguments: "{}" },
+					},
+				],
+			},
+			{ role: "tool", content: '{"candidates":[]}', tool_call_id: "u2-1" },
+			{ role: "assistant", content: "作りますね。" },
+			{ role: "user", content: "ありがとう" },
+		],
+		freshSignal(),
+		() => {},
+		{
+			collection: {
+				conversationId: "conversation",
+				turnId: "kept-tools",
+				granularity: "answer" as const,
+				chunkOrder: null,
+			},
+		},
+	);
+	expect(JSON.parse(states[0]!.conversation!)).toEqual([
+		{ role: "user", text: "曲を作って" },
+		{ role: "assistant", text: "作りますね。" },
+		{ role: "user", text: "ありがとう" },
+	]);
+});

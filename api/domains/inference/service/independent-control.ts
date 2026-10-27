@@ -16,10 +16,16 @@ export function createIndependentControls(
 		 * Host-only control request that does not depend on a pending parent
 		 * (e.g. after the source answer was accepted). Uses the *current* settings
 		 * snapshot, LARM only, exact context, never inherits another deadline.
+		 * `structuredOutput` makes the output schema a strict provider schema (see `controlJsonOptions`).
 		 */
 		captureMaintenanceControlInTransaction(
 			db: Database,
-			input: { subject: string; deadline: number; maxOutputTokens: number },
+			input: {
+				subject: string;
+				deadline: number;
+				maxOutputTokens: number;
+				structuredOutput?: boolean;
+			},
 		) {
 			if (!input.subject || input.deadline <= Date.now())
 				throw new Error("invalid_maintenance_control");
@@ -36,6 +42,10 @@ export function createIndependentControls(
 			db.query(
 				"UPDATE inference_requests SET mode='control',output_limit=?,context_policy='exact',parents='[]' WHERE id=? AND status='pending'",
 			).run(Math.min(2048, Math.max(1, input.maxOutputTokens)), requestId);
+			if (input.structuredOutput)
+				db.query(
+					"UPDATE inference_requests SET structured_output=1 WHERE id=?",
+				).run(requestId);
 			return requestId;
 		},
 		captureUserControlInTransaction(

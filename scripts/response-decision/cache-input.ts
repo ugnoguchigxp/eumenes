@@ -49,6 +49,7 @@ function utterance(
 		text,
 		messageId: `m${seq}`,
 		at: `2026-10-23T00:${String(Math.floor(seq / 60)).padStart(2, "0")}:${String(seq % 60).padStart(2, "0")}.000Z`,
+		toolCalls: [],
 	};
 }
 

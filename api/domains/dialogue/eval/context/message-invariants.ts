@@ -3,8 +3,9 @@
  * checked on the output of the production prepare. A case that breaks one stops `prepare` before any model call: it
  * would measure a prompt the product must never send.
  *
- *  1. The messages are `[system, (user ## Memory), ...recent conversation, user(last)]`: no tool message, no tool
- *     call, and no two messages of one role in a row.
+ *  1. The messages are `[system, (user ## Memory), ...recent conversation, user(last)]`, with no two messages of one
+ *     role in a row. A tool message only answers a call of the assistant message just before it, and every such call
+ *     is answered: the searches and hand-overs a turn kept (the tool-call reliability design, P1).
  *  2. The last message holds `## State`, then `## Host notice` and/or `## User` (the pending utterances, or a host
  *     notice when none waits); each input heading once, and only in its own place.
  *  3. No tag, event number or time of an utterance from the earlier layout reaches the input.
@@ -36,11 +37,28 @@ export function messageIssues(input: GenerateInput): string[] {
 	if (system?.role !== "system") issues.push("first_message_not_system");
 	if (last?.role !== "user" || messages.length < 2)
 		issues.push("last_message_not_user");
-	if (messages.some((m) => m.role === "tool" || m.tool_calls?.length))
-		issues.push("tool_exchange_in_prepared_messages");
-	for (let i = 1; i < messages.length; i++)
-		if (messages[i]!.role === messages[i - 1]!.role)
+	for (let i = 1; i < messages.length; i++) {
+		const message = messages[i]!;
+		const before = messages[i - 1]!;
+		if (message.role === "tool") {
+			let at = i - 1;
+			while (at > 0 && messages[at]!.role === "tool") at--;
+			const owner = messages[at];
+			if (!owner?.tool_calls?.some((call) => call.id === message.tool_call_id))
+				issues.push(`tool_result_without_call:${i}`);
+		} else if (message.role === before.role)
 			issues.push(`same_role_in_a_row:${i}`);
+		if (message.tool_calls?.length) {
+			const answered = new Set(
+				messages
+					.slice(i + 1)
+					.filter((m) => m.role === "tool")
+					.map((m) => m.tool_call_id),
+			);
+			if (message.tool_calls.some((call) => !answered.has(call.id)))
+				issues.push(`unanswered_tool_call:${i}`);
+		}
+	}
 	const body = last?.content ?? "";
 	const state = sectionOf(body, INPUT_HEADINGS.state);
 	if (state === null) issues.push("no_state_section");

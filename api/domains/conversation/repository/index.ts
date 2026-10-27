@@ -1,4 +1,10 @@
-import { inputMigration, inputMemoryDigestMigration } from "./input";
+import {
+	dropToolExchangeMigration,
+	inputMigration,
+	inputMemoryDigestMigration,
+	inputToolExchangeMigration,
+	restoreToolExchangeMigration,
+} from "./input";
 import {
 	attributionMigration,
 	readAttribution,
@@ -714,4 +720,7 @@ export const migrations: readonly Migration[] = [
 	attributionMigration,
 	inputMigration,
 	inputMemoryDigestMigration,
+	inputToolExchangeMigration,
+	dropToolExchangeMigration,
+	restoreToolExchangeMigration,
 ];

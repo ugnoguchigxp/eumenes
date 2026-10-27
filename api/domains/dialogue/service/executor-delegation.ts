@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import { carriedToolCalls } from "./tool-exchange";
 import { recordUtteranceInTransaction } from "./utterances";
 import { isSystemPrompt } from "../contracts";
 import { saveAnnouncement } from "../repository";
@@ -183,6 +184,25 @@ export async function handOver(
 				functionName: chosen.card.functionName,
 				request: chosen.request,
 				...(x.state.search?.query ? { query: x.state.search.query } : {}),
+			});
+			// The announcement reached the user before this commit: the turn's calls join it here, with the work.
+			deps.conversation.input.attachToolCallsInTransaction(tx, {
+				conversationId: run.conversationId,
+				messageId: run.inputMessageId,
+				toolCalls: carriedToolCalls(
+					[
+						...x.state.exchange,
+						{
+							name: call.name,
+							arguments: call.call.arguments,
+							result: {
+								delegated: true,
+								...(work ? { todo: work.id } : {}),
+							},
+						},
+					],
+					deps.work!.refsInTransaction(tx, run.conversationId),
+				),
 			});
 			return { handed: dispatched.handed, workId: work?.id ?? null };
 		});

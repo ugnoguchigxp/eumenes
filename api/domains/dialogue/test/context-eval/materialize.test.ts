@@ -338,3 +338,46 @@ test("a generation after a long silence cuts the recent conversation to the newe
 		await wiring.close();
 	}
 });
+
+test("a kept search and hand-over pass the invariants only as answered pairs", async () => {
+	const m = await prepared(fullCase);
+	const [system, ...rest] = m.input.messages;
+	const last = rest.at(-1)!;
+	const call = (id: string) => ({
+		role: "assistant" as const,
+		content: "",
+		tool_calls: [
+			{
+				id,
+				type: "function" as const,
+				function: { name: "find_toolchain", arguments: "{}" },
+			},
+		],
+	});
+	const result = (id: string) => ({
+		role: "tool" as const,
+		content: "{}",
+		tool_call_id: id,
+	});
+	const kept = [
+		system!,
+		{ role: "user" as const, content: "## Memory\n- なし" },
+		call("u2-1"),
+		result("u2-1"),
+		{ role: "assistant" as const, content: "作りますね。" },
+		last,
+	];
+	expect(messageIssues({ ...m.input, messages: kept })).toEqual([]);
+	expect(
+		messageIssues({
+			...m.input,
+			messages: [kept[0]!, kept[1]!, call("u2-1"), kept[4]!, last],
+		}),
+	).toContain("unanswered_tool_call:2");
+	expect(
+		messageIssues({
+			...m.input,
+			messages: [kept[0]!, kept[1]!, result("u9-1"), kept[4]!, last],
+		}),
+	).toContain("tool_result_without_call:2");
+});

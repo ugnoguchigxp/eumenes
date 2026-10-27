@@ -13,6 +13,7 @@ import type {
 import type { ChatMessage, DialogueDeps, GenerateInput } from "./context";
 import { conversationOutput } from "./conversation-output";
 import { toolResultText } from "./result-text";
+import { carriesExchange, type ExchangeStep } from "./tool-exchange";
 import {
 	generationTools,
 	parseCall,
@@ -38,7 +39,12 @@ export type ToolOutcome = {
 /** Executes one call of a fixed tool; throws a `ValidationFailure` for a call the host refuses outright. */
 export type ToolExecutor = (
 	call: ParsedCall,
-	context: { signal: AbortSignal; receipt?: Receipt },
+	context: {
+		signal: AbortSignal;
+		receipt?: Receipt;
+		/** The searches and hand-overs this generation made before this call. */
+		exchange: readonly ExchangeStep[];
+	},
 ) => Promise<ToolOutcome>;
 
 export type GenerationOutcome = {
@@ -49,6 +55,8 @@ export type GenerationOutcome = {
 	emotion?: DeliveryEmotion;
 	/** Every executed call and its outcome, in order. */
 	executed: Array<{ call: ParsedCall; outcome: ToolOutcome }>;
+	/** The searches and hand-overs as the model made them, refused ones too: what later turns see of this one. */
+	exchange: ExchangeStep[];
 	/** A tool call handed the work over and ended the generation. */
 	ended: boolean;
 };
@@ -82,6 +90,11 @@ export async function runGeneration(
 	},
 ): Promise<GenerationOutcome> {
 	const executed: GenerationOutcome["executed"] = [];
+	const exchange: ExchangeStep[] = [];
+	const carry = (call: AgentToolCall, result: unknown) => {
+		if (carriesExchange(call.name))
+			exchange.push({ name: call.name, arguments: call.arguments, result });
+	};
 	const base = input.messages;
 	let receipt: Receipt | undefined;
 	const callSession: CallSession = {
@@ -103,7 +116,11 @@ export async function runGeneration(
 				const native = nativeTools.get(tool.name);
 				return native ? [native] : [];
 			});
-			const output = conversationOutput(onDelta, generationTools);
+			const output = conversationOutput(
+				onDelta,
+				generationTools,
+				base[0]?.role === "system" ? base[0].content : undefined,
+			);
 			log.debug("dialogue.input_measured", {
 				phase: "generation",
 				kind: "estimated_tokens",
@@ -165,14 +182,19 @@ export async function runGeneration(
 				const outcome = await options.execute(parsed, {
 					signal,
 					...(receipt ? { receipt } : {}),
+					exchange,
 				});
 				executed.push({ call: parsed, outcome });
+				carry(call, outcome.result);
 				return {
 					content: toolResultText(parsed.name, outcome.result),
 					...(outcome.end ? { end: true } : {}),
 				};
 			} catch (error) {
-				if (error instanceof ValidationFailure) return refused(error);
+				if (error instanceof ValidationFailure) {
+					carry(call, { refused: true });
+					return refused(error);
+				}
 				throw error;
 			}
 		},
@@ -192,6 +214,7 @@ export async function runGeneration(
 			text: "",
 			...(receipt ? { receipt } : {}),
 			executed,
+			exchange,
 			ended: true,
 		};
 	options.signal.throwIfAborted();
@@ -200,6 +223,7 @@ export async function runGeneration(
 		...(receipt ? { receipt } : {}),
 		...(reply.emotion ? { emotion: reply.emotion } : {}),
 		executed,
+		exchange,
 		ended: false,
 	};
 }

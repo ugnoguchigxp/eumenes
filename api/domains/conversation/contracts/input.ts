@@ -1,6 +1,16 @@
 /** Who said an utterance of the conversation's input: the user, or the agent (its replies, announcements, own talk). */
 export type UtteranceSpeaker = "user" | "agent";
 
+/**
+ * One tool call of the turn an agent utterance ends, as the later turns see it: the call as the model made it and
+ * the host's short result (JSON text). The dialogue writes and reads them; this domain only keeps them.
+ */
+export type UtteranceToolCall = {
+	name: string;
+	arguments: string;
+	result: string;
+};
+
 /** One utterance as the input shows it: what was recognised or typed, or what reached the user. */
 export type Utterance = {
 	conversationId: string;
@@ -11,6 +21,8 @@ export type Utterance = {
 	/** The message (speech bubble) it is the text of. */
 	messageId: string | null;
 	at: string;
+	/** The tool calls of the turn this agent utterance ends, in order (empty for none, and for the user's). */
+	toolCalls: UtteranceToolCall[];
 };
 
 /** Where the recent conversation starts, and what it was cut on. */

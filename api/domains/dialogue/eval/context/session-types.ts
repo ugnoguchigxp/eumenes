@@ -1,7 +1,10 @@
 import type { SqliteStore } from "../../../../infrastructure/sqlite";
 import type { ToolchainCard } from "../../../capabilities";
 import type { ContinuityService } from "../../../continuity";
-import type { ConversationService } from "../../../conversation";
+import type {
+	ConversationService,
+	UtteranceToolCall,
+} from "../../../conversation";
 import type { MemoryService } from "../../../memory";
 import type { GenerateInput } from "../../service/context";
 
@@ -54,4 +57,6 @@ export type Reply = {
 	about?: string[];
 	heard?: "full" | "partial" | "none";
 	deliveredText?: string;
+	/** The searches and hand-overs of the turn, as the product keeps them with the agent's utterance (P1). */
+	toolCalls?: UtteranceToolCall[];
 };

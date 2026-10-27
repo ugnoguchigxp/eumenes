@@ -157,3 +157,31 @@ test("a tool name followed by a parenthesis in prose is not a call", () => {
 	output.finish(text);
 	expect(visible.join("")).toBe(text);
 });
+
+test("an answer that copies a line of the system part fails as it streams, and an ordinary answer passes", () => {
+	const system = [
+		"## Results",
+		"- 曲・画像・図の生成の結果: 完成と名前を短く伝えます。再生や表示を尋ねてかまいません。",
+	].join("\n");
+	const published: string[] = [];
+	const output = conversationOutput(
+		(text) => published.push(text),
+		generationTools,
+		system,
+	);
+	output.delta("火曜の夜の音楽を生成します。");
+	output.delta(": 完成と名前を短く");
+	// Fifteen characters of a rule line as they are: the reply is not an answer.
+	expect(() => output.delta("伝えます。再生や")).toThrow("system_text_copied");
+	const ordinary = conversationOutput(() => {}, generationTools, system);
+	ordinary.delta("元気が出る曲ができあがりました。再生しますか？");
+	expect(
+		ordinary.finish("元気が出る曲ができあがりました。再生しますか？"),
+	).toBe("元気が出る曲ができあがりました。再生しますか？");
+	// A reply that did not stream is checked whole.
+	expect(() =>
+		conversationOutput(() => {}, generationTools, system).finish(
+			"はい。完成と名前を短く伝えます。再生や表示を尋ねてかまいません。",
+		),
+	).toThrow("system_text_copied");
+});

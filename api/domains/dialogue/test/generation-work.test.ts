@@ -15,11 +15,17 @@ afterEach(async () => {
 	h = undefined;
 });
 
-/** The JSON results of the tool messages the nth model call received, in order. */
+/**
+ * The JSON results of the tool messages of the nth model call's own turn (after its last user message), in order:
+ * the recent conversation before it keeps earlier turns' searches and hand-overs.
+ */
 function toolResults(call: number): Array<Record<string, unknown>> {
-	return h!.state.calls[call]!.messages.filter((m) => m.role === "tool").map(
-		(m) => toolFields(m.content),
-	);
+	const messages = h!.state.calls[call]!.messages;
+	const last = messages.map((m) => m.role).lastIndexOf("user");
+	return messages
+		.slice(last + 1)
+		.filter((m) => m.role === "tool")
+		.map((m) => toolFields(m.content));
 }
 
 /** Marks a run as a voice run (the run's utterance): its speech then waits for the playback's report. */

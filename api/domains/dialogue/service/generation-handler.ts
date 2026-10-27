@@ -109,6 +109,7 @@ export function createGenerationHandler(
 							return {
 								text: "",
 								handover,
+								exchange: generated.exchange,
 								...(generated.receipt ? { receipt: generated.receipt } : {}),
 							};
 						}
@@ -117,6 +118,7 @@ export function createGenerationHandler(
 						log.info("dialogue.generation_completed");
 						return {
 							text: reportedLinks(deps, input, generated.text),
+							exchange: generated.exchange,
 							...(generated.receipt ? { receipt: generated.receipt } : {}),
 							...(generated.emotion ? { emotion: generated.emotion } : {}),
 							...(generated.executed.some((entry) => entry.outcome.confirmation)

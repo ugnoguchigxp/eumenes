@@ -16,6 +16,7 @@ import { TALK_BREAK_MS } from "./generation-prepare";
 import type { DialogueDeps } from "./context";
 import {
 	RECENT,
+	backgroundMessage,
 	backgroundPrefixInTransaction,
 	backgroundTaskInTransaction,
 	moveCutInTransaction,
@@ -85,6 +86,27 @@ export const keeperOutput = z
 	.strict();
 type KeeperOutput = z.infer<typeof keeperOutput>;
 
+/** A JSON schema in the provider's strict form: alternatives as `anyOf`, a fixed value as `enum`, no text bounds. */
+function strictForm(value: unknown): unknown {
+	if (Array.isArray(value)) return value.map(strictForm);
+	if (!value || typeof value !== "object") return value;
+	const out: Record<string, unknown> = {};
+	for (const [key, v] of Object.entries(value)) {
+		if (["$schema", "pattern", "minLength", "maxLength"].includes(key))
+			continue;
+		if (key === "oneOf") out.anyOf = strictForm(v);
+		else if (key === "const") out.enum = [v];
+		else out[key] = strictForm(v);
+	}
+	return out;
+}
+
+/**
+ * The keeper's output schema as the provider enforces it (the tool-call reliability design, P2): each op's shape and
+ * types. The numbers' patterns and the texts' bounds stay the host's check (`keeperOutput`).
+ */
+export const KEEPER_SCHEMA = strictForm(z.toJSONSchema(keeperOutput));
+
 /** What `## State` must never hold (section 7.2): links, markup or instructions, relative days. */
 const FORBIDDEN =
 	/https?:\/\/|www\.|[<>＜＞]|#|してください|しなさい|さっき|先ほど|一昨日|昨日|明日|明後日/;
@@ -100,8 +122,6 @@ const EMPTY: ConversationStateBody = {
 type Prepared = {
 	conversationId: string;
 	state: ConversationState | null;
-	basedOnSeq: number;
-	newest: number;
 	candidates: Map<string, string>;
 	points: Map<string, number>;
 	/** The input's revision and the cut it was read on: either moving makes the output stale. */
@@ -201,6 +221,24 @@ export function applyKeeperOutput(
 	return { body, cutAfter };
 }
 
+/**
+ * The cut the keeper chose (the seq the recent conversation starts after), null for none, undefined when it named a
+ * point it was not offered.
+ */
+function cutOf(
+	output: KeeperOutput,
+	points: ReadonlyMap<string, number>,
+): number | null | undefined {
+	let cut: number | null = null;
+	for (const op of output.ops) {
+		if (op.op !== "cut_before") continue;
+		const seq = points.get(op.point);
+		if (seq === undefined) return undefined;
+		cut = seq;
+	}
+	return cut;
+}
+
 /** The first characters of an utterance, quoted: how a position in the conversation is named. */
 const quote = (u: Utterance) => `「${lineText(u.text).slice(0, 24)}」`;
 
@@ -210,7 +248,12 @@ export type KeeperInference = Pick<
 > & {
 	captureMaintenanceControlInTransaction(
 		db: Database,
-		input: { subject: string; deadline: number; maxOutputTokens: number },
+		input: {
+			subject: string;
+			deadline: number;
+			maxOutputTokens: number;
+			structuredOutput?: boolean;
+		},
 	): string;
 	acceptInTransaction(db: Database, receipt: Receipt): boolean;
 };
@@ -265,6 +308,8 @@ function prepareKeeper(
 		points.set(id, u.seq - 1);
 		pointLines.push(`- ${id}${quote(u)}の前で区切れる`);
 	}
+	// While its state is held (see `adopt`), a cut is all it can give: with no point to offer, it is not called.
+	if (!points.size) return null;
 	const stateLines = stateLinesInTransaction(deps, db, {
 		conversationId,
 		nowMs: Date.parse(deps.clock()),
@@ -289,15 +334,10 @@ function prepareKeeper(
 			]),
 		],
 		TASK,
-	).map(({ role, content }) => ({
-		role: role === "tool" ? "user" : role,
-		content,
-	}));
+	).map(backgroundMessage);
 	return {
 		conversationId,
 		state,
-		basedOnSeq,
-		newest: recent.at(-1)!.seq,
 		candidates,
 		points,
 		revision: prefix.cut?.revision ?? 0,
@@ -352,8 +392,9 @@ export async function warmConversation(
 /**
  * The context keeper (section 7.3): after the agent's utterance reached the user and the conversation is quiet, it
  * reads the conversation on the conversation's own prompt and connection (so it also reads ahead the next
- * generation's prefix), and keeps `## State` (topic, decisions, open questions, related records) and the cut of the
- * recent conversation. It never calls a tool, never runs while the conversation answers, and yields to it.
+ * generation's prefix), and keeps the cut of the recent conversation. What it writes of `## State` (topic, decisions,
+ * open questions, related records) is checked and counted but held (see `adopt`). It never calls a tool, never runs
+ * while the conversation answers, and yields to it.
  */
 export function createContextKeeper(
 	deps: DialogueDeps,
@@ -468,13 +509,14 @@ export function createContextKeeper(
 					subject: `background:context:${Date.now()}`,
 					deadline: Date.now() + KEEPER.deadlineMs,
 					maxOutputTokens: KEEPER.outputTokens,
+					structuredOutput: true,
 				}),
 			);
 			receipt = await inference.executeControl(
 				requestId,
 				prepared.messages,
 				AbortSignal.any([abort.signal, AbortSignal.timeout(KEEPER.deadlineMs)]),
-				{ instructions: TASK, outputSchema: z.toJSONSchema(keeperOutput) },
+				{ instructions: TASK, outputSchema: KEEPER_SCHEMA },
 				{
 					sessionRole: "auxiliary",
 					onConversation: true,
@@ -489,25 +531,25 @@ export function createContextKeeper(
 			} catch {
 				output = null;
 			}
-			const applied = output?.success
-				? applyKeeperOutput(
-						prepared.state?.body ?? EMPTY,
-						output.data,
-						prepared.candidates,
-						prepared.points,
-					)
-				: null;
 			// Only what the model wrote counts toward a rebuild; what moved under it is tried again later.
-			if (!applied) {
-				await refuse(
-					conversationId,
-					receipt,
-					output?.success ? "rule" : "schema",
-				);
+			if (!output?.success) {
+				await refuse(conversationId, receipt, "schema");
 				return;
 			}
+			const cutAfter = cutOf(output.data, prepared.points);
+			if (cutAfter === undefined) {
+				await refuse(conversationId, receipt, "rule");
+				return;
+			}
+			// Its state is held: whether the host would have taken it is only counted.
+			const held = applyKeeperOutput(
+				prepared.state?.body ?? EMPTY,
+				output.data,
+				prepared.candidates,
+				prepared.points,
+			);
 			const adopted = await store.write((db) =>
-				adopt(db, prepared, applied, receipt!),
+				adopt(db, prepared, cutAfter, receipt!),
 			);
 			if (!adopted) {
 				await release(receipt, "context_stale");
@@ -515,12 +557,16 @@ export function createContextKeeper(
 				return;
 			}
 			refusals.delete(conversationId);
+			const ops = output.data.ops;
 			log.info("dialogue.context_kept", {
-				count: output!.success ? output!.data.ops.length : 0,
+				count: ops.length,
+				// What it would have written of `## State` (held, see `adopt`), and whether the host would refuse it.
+				omitted: ops.filter((op) => op.op !== "cut_before").length,
+				rejected: held ? 0 : 1,
 				durationMs: Date.now() - started,
-				applied: applied.cutAfter !== null ? 1 : 0,
+				applied: cutAfter !== null ? 1 : 0,
 			});
-			if (applied.cutAfter !== null)
+			if (cutAfter !== null)
 				await warmConversation(deps, inference, conversationId);
 		} catch (error) {
 			if (receipt) await release(receipt, "context_cancelled");
@@ -536,14 +582,16 @@ export function createContextKeeper(
 	}
 
 	/**
-	 * Writes the next version and moves the cut in one transaction, unless something moved under it: an answer
-	 * running, another version, a forget or correction of what it read (the input's revision), or a cut placed since.
-	 * The receipt is taken last; refused, the whole write is rolled back.
+	 * Takes the keeper's cut, unless something moved under it: an answer running, a forget or correction of what it
+	 * read (the input's revision), or a cut placed since. What it would write of `## State` is held until it passes
+	 * its evaluation (the tool-call reliability design, P2 stage 3): it reads the agent's replies as facts, so a reply
+	 * that took a request on without handing it over became a decision. The receipt is taken last; refused, the
+	 * whole write is rolled back.
 	 */
 	function adopt(
 		db: Database,
 		prepared: Prepared,
-		applied: { body: ConversationStateBody; cutAfter: number | null },
+		cutAfter: number | null,
 		receipt: Receipt,
 	): boolean {
 		if (conversationHasActiveRun(db, prepared.conversationId)) return false;
@@ -556,21 +604,10 @@ export function createContextKeeper(
 			(cut?.seq ?? 0) !== prepared.cutSeq
 		)
 			return false;
-		const next = deps.conversation.input.appendStateInTransaction(
-			db,
-			prepared.conversationId,
-			{
-				expectedVersion: prepared.state?.version ?? 0,
-				body: applied.body,
-				basedOnSeq: prepared.newest,
-				at: deps.clock(),
-			},
-		);
-		if (!next) return false;
 		// A cut only moves on: never back over what an earlier cut dropped.
-		if (applied.cutAfter !== null && applied.cutAfter > prepared.cutSeq)
+		if (cutAfter !== null && cutAfter > prepared.cutSeq)
 			moveCutInTransaction(deps, db, prepared.conversationId, {
-				seq: applied.cutAfter,
+				seq: cutAfter,
 				window: storedWindow(
 					db,
 					prepared.conversationId,

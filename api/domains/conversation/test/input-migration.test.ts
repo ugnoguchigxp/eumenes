@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { migrations } from "..";
-import { readCut, writeCut } from "../repository/input";
+import { latestUtterances, readCut, writeCut } from "../repository/input";
 import { openStore } from "../../../infrastructure/sqlite";
 
 // Deployed 0011 SQL: independent of the current definition so editing it cannot hide an upgrade failure.
@@ -38,11 +38,18 @@ test("the deployed input migration keeps its recorded checksum", () => {
 	).toBe(deployedChecksum);
 });
 
+const LATER = [
+	"conversation/0012-input-memory-digest",
+	"conversation/0013-utterance-tool-exchange",
+	"conversation/0014-drop-utterance-tool-exchange",
+	"conversation/0015-utterance-tool-exchange",
+];
+
 test("a deployed input database upgrades without losing cuts, utterances, state or migration history", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "conversation-input-upgrade-"));
 	const path = join(dir, "db.sqlite3");
 	const oldMigrations = migrations
-		.filter((m) => m.id !== "conversation/0012-input-memory-digest")
+		.filter((m) => !LATER.includes(m.id))
 		.map((m) =>
 			m.id === "conversation/0011-input" ? { ...m, sql: deployedInputSql } : m,
 		);
@@ -71,11 +78,15 @@ test("a deployed input database upgrades without losing cuts, utterances, state 
 						"SELECT conversation_id,cut_seq,revision,system_digest,memory_version,due,cut_at FROM conversation_cuts ORDER BY conversation_id",
 					)
 					.all(),
-				utterances: db.query("SELECT * FROM conversation_utterances").all(),
+				utterances: db
+					.query(
+						"SELECT conversation_id,seq,speaker,text,message_id,created_at,retracted_at FROM conversation_utterances",
+					)
+					.all(),
 				states: db.query("SELECT * FROM conversation_states").all(),
 				history: db
 					.query(
-						"SELECT * FROM schema_migrations_v2 WHERE id != 'conversation/0012-input-memory-digest' ORDER BY id",
+						`SELECT * FROM schema_migrations_v2 WHERE id NOT IN (${LATER.map((id) => `'${id}'`).join(",")}) ORDER BY id`,
 					)
 					.all(),
 			}));
@@ -90,6 +101,10 @@ test("a deployed input database upgrades without losing cuts, utterances, state 
 				memoryDigest: "",
 				due: "forget",
 			});
+		// An utterance from before keeps no tool calls.
+		expect(
+			store.read((db) => latestUtterances(db, "c1", 1)[0]!.toolCalls),
+		).toEqual([]);
 		await store.write((db) =>
 			writeCut(db, "c1", {
 				seq: 13,
@@ -114,6 +129,44 @@ test("a deployed input database upgrades without losing cuts, utterances, state 
 				db.query("SELECT * FROM schema_migrations_v2 ORDER BY id").all(),
 			),
 		).toEqual(applied);
+	} finally {
+		await store.close();
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+test("0013 keeps the checksum it ran with, and a database that went through 0014 has the column again", async () => {
+	const hash = (sql: string) => createHash("sha256").update(sql).digest("hex");
+	expect(
+		hash(
+			migrations.find(
+				(m) => m.id === "conversation/0013-utterance-tool-exchange",
+			)!.sql,
+		),
+	).toBe("893ccee65008212672dfa5555f5ef4c637b00d1044385117f337002101a15b29");
+	const dir = mkdtempSync(join(tmpdir(), "conversation-input-exchange-"));
+	const path = join(dir, "db.sqlite3");
+	let store = openStore(
+		path,
+		migrations.filter(
+			(m) => m.id !== "conversation/0015-utterance-tool-exchange",
+		),
+	);
+	try {
+		const columns = () =>
+			store.read((db) =>
+				(
+					db
+						.query("PRAGMA table_info(conversation_utterances)")
+						.all() as Array<{
+						name: string;
+					}>
+				).map((c) => c.name),
+			);
+		expect(columns()).not.toContain("tool_exchange_json");
+		await store.close();
+		store = openStore(path, migrations);
+		expect(columns()).toContain("tool_exchange_json");
 	} finally {
 		await store.close();
 		rmSync(dir, { recursive: true, force: true });

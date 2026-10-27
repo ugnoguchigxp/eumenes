@@ -141,10 +141,11 @@ test("retracting a message reaches its utterance and drops the state made from t
 	});
 });
 
-test("a correction rewrites the utterance in place and moves the revision", async () => {
+test("a correction rewrites the user's utterance in place, never the announcement sharing its message, and moves the revision", async () => {
 	const { store, input } = setup();
 	await store.write((db) => {
 		input.appendUtteranceInTransaction(db, say("user", "鎌倉", "m1"));
+		input.appendUtteranceInTransaction(db, say("agent", "調べますね。", "m1"));
 		input.writeCutInTransaction(db, "c1", {
 			seq: 0,
 			systemDigest: "s",
@@ -156,10 +157,59 @@ test("a correction rewrites the utterance in place and moves the revision", asyn
 		]);
 	});
 	store.read((db) => {
-		expect(input.utterancesAfterInTransaction(db, "c1", 0)[0]!.text).toBe(
-			"七里ヶ浜",
-		);
+		expect(
+			input.utterancesAfterInTransaction(db, "c1", 0).map((u) => u.text),
+		).toEqual(["七里ヶ浜", "調べますね。"]);
 		expect(input.cutInTransaction(db, "c1")!.revision).toBe(2);
+	});
+});
+
+test("an agent's utterance keeps its turn's tool calls, written once, and a forget takes them out with its text", async () => {
+	const { store, input } = setup();
+	const find = { name: "find_toolchain", arguments: "{}", result: "{}" };
+	const handed = { name: "delegate", arguments: "{}", result: '{"todo":"t1"}' };
+	await store.write((db) => {
+		input.appendUtteranceInTransaction(db, {
+			...say("user", "猫の絵を描いて", "m1"),
+			toolCalls: [find],
+		});
+		// The announcement reaches the user before its work is handed over: its calls join it when the turn ends.
+		input.appendUtteranceInTransaction(db, say("agent", "描きますね。", "m1"));
+		expect(
+			input.attachToolCallsInTransaction(db, {
+				conversationId: "c1",
+				messageId: "m1",
+				toolCalls: [find, handed],
+			}),
+		).toBe(true);
+		expect(
+			input.attachToolCallsInTransaction(db, {
+				conversationId: "c1",
+				messageId: "m1",
+				toolCalls: [handed],
+			}),
+		).toBe(false);
+		input.appendUtteranceInTransaction(db, {
+			...say("agent", "どうぞ。", "m2"),
+			toolCalls: [find],
+		});
+	});
+	store.read((db) => {
+		expect(
+			input.utterancesAfterInTransaction(db, "c1", 0).map((u) => u.toolCalls),
+		).toEqual([[], [find, handed], [find]]);
+	});
+	await store.write((db) =>
+		input.retractUtterancesInTransaction(db, ["m1"], "later"),
+	);
+	store.read((db) => {
+		expect(
+			db
+				.query(
+					"SELECT tool_exchange_json FROM conversation_utterances WHERE message_id = 'm1'",
+				)
+				.all(),
+		).toEqual([{ tool_exchange_json: null }, { tool_exchange_json: null }]);
 	});
 });
 
