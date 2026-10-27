@@ -1,13 +1,12 @@
 name: verify
 
+# Runs only when started by hand (Actions > verify > Run workflow); push and PR do not trigger it.
 on:
-  push:
-    branches: [main]
-  pull_request:
+  workflow_dispatch:
 
 concurrency:
   group: verify-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: false
 
 jobs:
   verify:
