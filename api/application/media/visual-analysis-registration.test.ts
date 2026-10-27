@@ -62,7 +62,7 @@ test("existing OCR and recognition artifacts upgrade without replacing published
 		expect(
 			entries.find((e) => e.artifactId === "object-recognition.workspace")
 				?.artifactRevisionId,
-		).toBe("artifact:object-recognition.workspace@3");
+		).toBe("artifact:object-recognition.workspace@4");
 		for (const artifact of [
 			...ocrAddition.artifacts,
 			...recognitionAddition.artifacts,

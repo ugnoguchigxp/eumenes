@@ -406,6 +406,84 @@ it("a conversation's camera request opens the camera, counts down and hands one 
 		vi.useRealTimers();
 	}
 });
+it("keeps the camera preview mounted behind the saved-image picker so a capture request can still be taken", async () => {
+	const track = { stop: vi.fn(), addEventListener: vi.fn() };
+	Object.defineProperty(navigator, "mediaDevices", {
+		configurable: true,
+		value: {
+			getUserMedia: async () =>
+				({
+					getTracks: () => [track],
+					getVideoTracks: () => [track],
+				}) as unknown as MediaStream,
+		},
+	});
+	vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue();
+	vi.spyOn(HTMLVideoElement.prototype, "videoWidth", "get").mockReturnValue(
+		640,
+	);
+	vi.spyOn(HTMLVideoElement.prototype, "videoHeight", "get").mockReturnValue(
+		480,
+	);
+	vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+		drawImage: vi.fn(),
+	} as unknown as CanvasRenderingContext2D);
+	vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation(
+		(callback) => callback(new Blob(["jpg"], { type: "image/jpeg" })),
+	);
+	const onFile = vi.fn(async () => {});
+	const props = {
+		items: [],
+		configured: true,
+		libraryImages: [{ id: "saved", title: "保存画像", thumbnailUrl: "/saved" }],
+		onLibrarySelect: vi.fn(),
+		onFile,
+	};
+	const { rerender, container } = render(
+		<ObjectRecognitionWorkspace {...props} />,
+	);
+	const video = container.querySelector("video");
+	fireEvent.click(screen.getByRole("button", { name: "保存した画像を選ぶ" }));
+	expect(screen.getByRole("button", { name: "この画像を使う" })).toBeTruthy();
+	expect(container.querySelector("video")).toBe(video);
+	rerender(
+		<ObjectRecognitionWorkspace
+			{...props}
+			handoff={{ id: "h3", source: "camera", question: "" }}
+		/>,
+	);
+	await act(async () => {
+		await Promise.resolve();
+	});
+	expect(container.querySelector("video")?.srcObject).toBeTruthy();
+	expect(screen.getByRole("button", { name: "この画像を使う" })).toBeTruthy();
+});
+it("offers recording only for an open camera, never for a shared screen", async () => {
+	const track = { stop: vi.fn(), addEventListener: vi.fn() };
+	const stream = {
+		getTracks: () => [track],
+		getVideoTracks: () => [track],
+	} as unknown as MediaStream;
+	Object.defineProperty(navigator, "mediaDevices", {
+		configurable: true,
+		value: {
+			getUserMedia: async () => stream,
+			getDisplayMedia: async () => stream,
+		},
+	});
+	vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue();
+	render(<ObjectRecognitionWorkspace items={[]} configured />);
+	expect(screen.queryByRole("button", { name: "録画を開始" })).toBeNull();
+	fireEvent.click(screen.getByRole("button", { name: "画面を共有" }));
+	await screen.findByRole("button", { name: "画面共有を終了" });
+	expect(screen.queryByRole("button", { name: "録画を開始" })).toBeNull();
+	fireEvent.click(screen.getByRole("button", { name: "画面共有を終了" }));
+	expect(screen.queryByRole("button", { name: "録画を開始" })).toBeNull();
+	fireEvent.click(screen.getByRole("button", { name: "カメラを開く" }));
+	expect(
+		await screen.findByRole("button", { name: "録画を開始" }),
+	).toBeEnabled();
+});
 it("a screen request waits for the user's click and can be declined", () => {
 	const cancel = vi.fn();
 	const getDisplayMedia = vi.fn();

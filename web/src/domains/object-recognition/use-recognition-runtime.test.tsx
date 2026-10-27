@@ -47,11 +47,25 @@ test("selects a LARM image through the authenticated content and existing upload
 		),
 	});
 	try {
+		await waitFor(() => expect(client.recognitionRecords).toHaveBeenCalled());
+		// The saved images are not read until the picker opens (its refresh).
+		expect(client.imageLibrary).not.toHaveBeenCalled();
+		await act(async () => {
+			await hook.result.current.runtime.dispatch({
+				id: crypto.randomUUID(),
+				source: recognitionSource,
+				revision:
+					hook.result.current.runtime.snapshot[recognitionSource].revision,
+				action: "recognition-library-refresh",
+				values: {},
+			});
+		});
 		await waitFor(() =>
 			expect(
 				hook.result.current.runtime.snapshot[recognitionSource].libraryImages,
 			).toHaveLength(1),
 		);
+		expect(client.imageLibrary).toHaveBeenCalledOnce();
 		await act(async () => {
 			expect(
 				(

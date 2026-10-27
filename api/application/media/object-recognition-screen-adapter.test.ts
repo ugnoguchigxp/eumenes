@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createCapabilities } from "../../domains/capabilities";
+import { bundleFiles, createCapabilities } from "../../domains/capabilities";
 import { openStore } from "../../infrastructure/sqlite";
 import { migrations } from "../migrations";
 import {
@@ -26,7 +26,7 @@ test("recognition screen seeds once and exposes its owner-scoped source", async 
 			),
 		).toEqual([
 			expect.objectContaining({
-				artifactRevisionId: "artifact:object-recognition.workspace@3",
+				artifactRevisionId: "artifact:object-recognition.workspace@4",
 				adapterRefs: [OBJECT_RECOGNITION_SCREEN_ADAPTER_REF],
 				title: "映っている物を調べる",
 			}),
@@ -60,4 +60,26 @@ test("recognition screen seeds once and exposes its owner-scoped source", async 
 		await store.close();
 		rmSync(dir, { recursive: true, force: true });
 	}
+});
+
+test("the published recognition screen binds every action the screen sends", () => {
+	const { artifacts } = bundleFiles().find(
+		(f) => f.name === "object-recognition-screen.visual-analysis.bundle.json",
+	)!.raw as {
+		artifacts: {
+			revision: number;
+			actionBindings: { eventAction: string }[];
+		}[];
+	};
+	const latest = artifacts.reduce((a, b) => (b.revision > a.revision ? b : a));
+	expect(latest.revision).toBe(4);
+	// An action without a binding is refused by the host as unavailable.
+	expect(latest.actionBindings.map((b) => b.eventAction)).toEqual(
+		expect.arrayContaining([
+			"recognition-library-refresh",
+			"recognition-library-select",
+			"recognition-save-recheck",
+			"recognition-save-resume",
+		]),
+	);
 });

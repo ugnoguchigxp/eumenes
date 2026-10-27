@@ -233,7 +233,7 @@ export function ObjectRecognitionWorkspace(
 					}}
 				/>
 			)}
-			{libraryOpen ? (
+			{libraryOpen && (
 				<ImagePicker
 					savedOnly
 					images={props.libraryImages ?? []}
@@ -249,65 +249,65 @@ export function ObjectRecognitionWorkspace(
 						props.onLibrarySelect?.(id);
 					}}
 				/>
-			) : (
-				<>
-					<DetectionPreview
-						frameIndex={props.frameIndex}
-						onFrame={props.onFrame}
-						key={item?.id ?? "empty"}
-						item={item}
-						url={props.mediaUrl}
-						cameraActive={camera.opened}
-						cameraPreview={
-							<video
-								ref={preview}
-								autoPlay
-								muted
-								playsInline
-								hidden={!camera.opened}
-								aria-label="カメラプレビュー"
-							/>
-						}
-						onShowCamera={() => {
-							if (!disabled && !camera.opened) void camera.open("camera");
-						}}
-						onShowResults={camera.close}
-						onIncorporate={() => item && props.onIncorporate?.(item.id)}
-						controls={
-							<CaptureControls
-								camera={camera}
-								disabled={disabled}
-								processing={processing}
-								processingLabel={processingLabel}
-								onFile={(file) => void uploading(file, "file")}
-								onLibraryOpen={
-									props.onLibrarySelect
-										? () => {
-												camera.close();
-												setLibraryOpen(true);
-												props.onLibraryRefresh?.();
-											}
-										: undefined
-								}
-							/>
-						}
-						status={
-							item ? (
-								<RecognitionStatus
-									item={item}
-									analyzing={analyzing}
-									progress={selectedProgress}
-									onCancel={props.onCancel}
-									onRecheck={props.onRecheck}
-								/>
-							) : null
-						}
-					/>
-					{item && (
-						<VisualAnalysis key={`${item.id}:${props.frameIndex}`} {...props} />
-					)}
-				</>
 			)}
+			{/* Kept mounted behind the picker so a capture request still reaches the camera preview. */}
+			<div hidden={libraryOpen}>
+				<DetectionPreview
+					frameIndex={props.frameIndex}
+					onFrame={props.onFrame}
+					key={item?.id ?? "empty"}
+					item={item}
+					url={props.mediaUrl}
+					cameraActive={camera.opened}
+					cameraPreview={
+						<video
+							ref={preview}
+							autoPlay
+							muted
+							playsInline
+							hidden={!camera.opened}
+							aria-label="カメラプレビュー"
+						/>
+					}
+					onShowCamera={() => {
+						if (!disabled && !camera.opened) void camera.open("camera");
+					}}
+					onShowResults={camera.close}
+					onIncorporate={() => item && props.onIncorporate?.(item.id)}
+					controls={
+						<CaptureControls
+							camera={camera}
+							disabled={disabled}
+							processing={processing}
+							processingLabel={processingLabel}
+							onFile={(file) => void uploading(file, "file")}
+							onLibraryOpen={
+								props.onLibrarySelect
+									? () => {
+											camera.close();
+											setLibraryOpen(true);
+											props.onLibraryRefresh?.();
+										}
+									: undefined
+							}
+						/>
+					}
+					status={
+						item ? (
+							<RecognitionStatus
+								item={item}
+								analyzing={analyzing}
+								progress={selectedProgress}
+								onCancel={props.onCancel}
+								onRecheck={props.onRecheck}
+							/>
+						) : null
+					}
+				/>
+				{item && (
+					<VisualAnalysis key={`${item.id}:${props.frameIndex}`} {...props} />
+				)}
+			</div>
 			<details className="recognition-note">
 				<summary>検出結果について</summary>
 				<p>

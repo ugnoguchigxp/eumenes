@@ -16,12 +16,33 @@ const rejected = new Set([
 	"idempotency_conflict",
 ]);
 
+/**
+ * LARM accepted the image and is still saving it: the job reads the same receipt again. A receipt
+ * LARM never admitted, or one that could not be confirmed, is left to the user (recheck, resume).
+ */
+const unsettled = new Set(["pending"]);
+/** How long one attempt reads a receipt LARM is still saving, and the job's hard limit. */
+const pollBudgetMs = 2 * 60_000;
+const saveDeadlineMs = 10 * 60_000;
+
+const pause = (ms: number, signal: AbortSignal) =>
+	new Promise<void>((resolve) => {
+		const done = () => {
+			clearTimeout(timer);
+			signal.removeEventListener("abort", done);
+			resolve();
+		};
+		const timer = setTimeout(done, ms);
+		signal.addEventListener("abort", done, { once: true });
+	});
+
 /** The durable job links a capture to the existing image import by the same UUID. */
 export function registerCaptureLibrary(
 	queue: QueueService,
 	image: ImageService,
 	recognition: () => ObjectRecognitionService,
 	connectionIdentity: () => string,
+	now: () => number = Date.now,
 ) {
 	const schema = z.object({
 		id: z.uuid(),
@@ -43,17 +64,32 @@ export function registerCaptureLibrary(
 			const file = new File([new Uint8Array(source.bytes)], "capture", {
 				type: source.mime,
 			});
-			const result = await image.imports.upload(
+			let result = await image.imports.upload(
 				input.id,
 				file,
 				signal,
 				input.connection,
 			);
+			// LARM may still be saving: read the same receipt at the interval it asks for.
+			const until = now() + pollBudgetMs;
+			while (unsettled.has(result.status) && now() < until && !signal.aborted) {
+				await pause(
+					Math.min(15_000, Math.max(1_000, result.retryAfterMs)),
+					signal,
+				);
+				if (connectionIdentity() !== input.connection) break;
+				result = await image.imports.read(input.id, signal);
+			}
 			if (connectionIdentity() !== input.connection)
 				throw new Error("capture_save_connection_changed");
+			// Still unsettled: the queue tries again later with the same receipt.
+			if (unsettled.has(result.status)) throw new Error("capture_save_pending");
 			return result;
 		},
-		classify: () => "fail",
+		classify: (error) =>
+			error instanceof Error && error.message === "capture_save_pending"
+				? "retry"
+				: "fail",
 		settleInTransaction(db, claim, _input, outcome) {
 			if (outcome.type === "retry") return "applied";
 			const state =
@@ -105,6 +141,8 @@ export function registerCaptureLibrary(
 			subjectRef: input.id,
 			lane: "background",
 			maxAttempts: 3,
+			// A save that never answers ends as unconfirmed instead of keeping the capture undeletable.
+			deadlineAtMs: now() + saveDeadlineMs,
 		});
 	};
 	return Object.assign(enqueue, {
@@ -131,6 +169,7 @@ export function registerCaptureLibrary(
 				subjectRef: input.id,
 				lane: "background",
 				maxAttempts: 3,
+				deadlineAtMs: now() + saveDeadlineMs,
 			});
 		},
 	});

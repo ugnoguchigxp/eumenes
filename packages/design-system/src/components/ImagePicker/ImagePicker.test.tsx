@@ -60,6 +60,26 @@ it("keeps the loaded images and selection when returning from a preview", () => 
 	);
 });
 
+it("renders a preselected image beyond the first batch as selected", () => {
+	const manyImages = Array.from({ length: 45 }, (_, index) => ({
+		id: String(index),
+		title: `画像${index}`,
+		thumbnailUrl: `/image/${index}`,
+	}));
+	render(
+		<ImagePicker
+			images={manyImages}
+			selectedId="30"
+			onConfirm={vi.fn()}
+			onCancel={vi.fn()}
+		/>,
+	);
+	expect(screen.getByRole("button", { name: "画像30を選ぶ" })).toHaveAttribute(
+		"aria-pressed",
+		"true",
+	);
+});
+
 it("uses the image to preview and the circle to select; deletion requires confirmation", async () => {
 	const onDelete = vi.fn().mockResolvedValue(true);
 	const onConfirm = vi.fn();

@@ -688,3 +688,117 @@ test("a failed save-job registration is rolled back without losing recognition",
 		rmSync(dir, { recursive: true, force: true });
 	}
 });
+
+/** A recognition store whose captures save through the given image imports stub. */
+function stubbedCaptures(
+	name: string,
+	imports: Partial<ReturnType<typeof createImage>["imports"]>,
+	now?: () => number,
+) {
+	const dir = mkdtempSync(join(tmpdir(), name));
+	const store = openStore(join(dir, "db"), [
+		...queueMigrations,
+		...imageMigrations,
+		...recognitionMigrations,
+	]);
+	const queue = createQueue(store, { pollMs: 5 });
+	let recognition!: ObjectRecognitionService;
+	const captureSaveInTransaction = registerCaptureLibrary(
+		queue,
+		{ imports } as unknown as ReturnType<typeof createImage>,
+		() => recognition,
+		() => "fixture-connection",
+		now,
+	);
+	recognition = createObjectRecognition({
+		store,
+		queue,
+		captureSaveInTransaction,
+		connection: () => ({
+			revision: 1,
+			baseUrl: "http://fixture.invalid",
+			credential: "fixture",
+		}),
+		fetcher: (async () =>
+			Response.json({
+				kind: "image",
+				model: "fixture",
+				width: 2,
+				height: 2,
+				objects: [],
+			})) as unknown as typeof fetch,
+	});
+	const capture = async (id: string) =>
+		recognition.upload(
+			"owner",
+			"main",
+			new File(["jpg"], "capture.jpg", { type: "image/jpeg" }),
+			id,
+			"camera",
+		);
+	const close = async () => {
+		await queue.close(500);
+		await store.close();
+		rmSync(dir, { recursive: true, force: true });
+	};
+	return { queue, recognition: () => recognition, capture, close };
+}
+
+test("a capture LARM is still saving is read again with the same receipt until it is saved", async () => {
+	const reads: string[] = [];
+	const f = stubbedCaptures("capture-pending-", {
+		upload: async () => ({ status: "pending", retryAfterMs: 0 }) as never,
+		read: async (id: string) => {
+			reads.push(id);
+			return (
+				reads.length < 2
+					? { status: "pending", retryAfterMs: 0 }
+					: { status: "succeeded", artifact: { id: "fixture" } }
+			) as never;
+		},
+	});
+	const id = crypto.randomUUID();
+	try {
+		f.queue.start();
+		await f.capture(id);
+		await waitFor(
+			() => f.recognition().get("owner", id).captureSave === "saved",
+			{
+				timeout: 5000,
+			},
+		);
+		expect(reads).toEqual([id, id]);
+	} finally {
+		await f.close();
+	}
+});
+
+test("a save that never answers ends unconfirmed at its deadline, so the capture can be removed", async () => {
+	// The job's deadline lies 300 ms ahead; the upload only ends when the queue aborts it.
+	const f = stubbedCaptures(
+		"capture-deadline-",
+		{
+			upload: (_id: string, _file: File, signal: AbortSignal) =>
+				new Promise((_, reject) =>
+					signal.addEventListener("abort", () => reject(signal.reason)),
+				) as never,
+		},
+		() => Date.now() - 10 * 60_000 + 300,
+	);
+	const id = crypto.randomUUID();
+	try {
+		f.queue.start();
+		await f.capture(id);
+		await waitFor(() => f.recognition().get("owner", id).state === "completed");
+		await waitFor(
+			() => f.recognition().get("owner", id).captureSave === "unconfirmed",
+			{ timeout: 5000 },
+		);
+		await f.recognition().remove("owner", id);
+		expect(() => f.recognition().get("owner", id)).toThrow(
+			"recognition_not_found",
+		);
+	} finally {
+		await f.close();
+	}
+});

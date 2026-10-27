@@ -1,7 +1,9 @@
 import type { ReactNode } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "../../utils/cn";
 import "./ImagePicker.css";
+
+const pageSize = 20;
 
 export type ImageGridItem = {
 	id: string;
@@ -36,7 +38,25 @@ export function ImageGrid<T extends ImageGridItem>({
 	classNames?: Partial<Record<"grid" | "card" | "select" | "caption", string>>;
 }) {
 	const [failed, setFailed] = useState<Record<string, string>>({});
-	const [visibleCount, setVisibleCount] = useState(20);
+	// Reaches the furthest selected image so it is never hidden behind "load more".
+	const selectedEnd = selectedId
+		? images.findIndex((image) => image.id === selectedId) + 1
+		: 0;
+	const firstPage = Math.max(1, Math.ceil(selectedEnd / pageSize)) * pageSize;
+	const [paging, setPaging] = useState({
+		total: images.length,
+		count: firstPage,
+	});
+	// A list of another length starts over from its own first page.
+	const visibleCount =
+		paging.total === images.length
+			? Math.max(paging.count, firstPage)
+			: firstPage;
+	const total = images.length;
+	const showMore = useCallback(
+		() => setPaging({ total, count: visibleCount + pageSize }),
+		[total, visibleCount],
+	);
 	const moreRef = useRef<HTMLButtonElement>(null);
 	const hasMore = visibleCount < images.length;
 	useEffect(() => {
@@ -48,7 +68,7 @@ export function ImageGrid<T extends ImageGridItem>({
 			if (active && entries.some((entry) => entry.isIntersecting)) {
 				active = false;
 				observer.disconnect();
-				setVisibleCount((count) => count + 20);
+				showMore();
 			}
 		});
 		observer.observe(target);
@@ -56,7 +76,7 @@ export function ImageGrid<T extends ImageGridItem>({
 			active = false;
 			observer.disconnect();
 		};
-	}, [hasMore, visibleCount]);
+	}, [hasMore, showMore]);
 	return (
 		<>
 			<div className={cn("image-grid", classNames?.grid)}>
@@ -168,7 +188,7 @@ export function ImageGrid<T extends ImageGridItem>({
 					ref={moreRef}
 					type="button"
 					className="image-grid-more"
-					onClick={() => setVisibleCount((count) => count + 20)}
+					onClick={showMore}
 				>
 					画像をさらに表示
 				</button>

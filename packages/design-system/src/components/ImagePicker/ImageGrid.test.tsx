@@ -73,6 +73,28 @@ it("allows loading the remaining images without an intersection observer", () =>
 	expect(screen.queryByRole("button", { name: "画像をさらに表示" })).toBeNull();
 });
 
+it("shows a selected image beyond the first batch and starts over when the list changes", () => {
+	vi.stubGlobal("IntersectionObserver", undefined);
+	const make = (length: number) =>
+		Array.from({ length }, (_, index) => ({
+			id: String(index),
+			title: `画像${index}`,
+			thumbnailUrl: `/image/${index}`,
+		}));
+	const { rerender } = render(
+		<ImageGrid images={make(50)} selectedId="24" onSelect={() => {}} />,
+	);
+	expect(screen.getAllByRole("img")).toHaveLength(40);
+	expect(screen.getByRole("button", { name: "画像24を選ぶ" })).toHaveAttribute(
+		"aria-pressed",
+		"true",
+	);
+	fireEvent.click(screen.getByRole("button", { name: "画像をさらに表示" }));
+	expect(screen.getAllByRole("img")).toHaveLength(50);
+	rerender(<ImageGrid images={make(60)} onSelect={() => {}} />);
+	expect(screen.getAllByRole("img")).toHaveLength(20);
+});
+
 it("shows selection circles only in selection mode and keeps the selected state accessible", () => {
 	const images = [{ id: "a", title: "森", thumbnailUrl: "/forest" }];
 	const onSelect = vi.fn();

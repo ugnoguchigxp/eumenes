@@ -1,5 +1,5 @@
 import { useVisualAnalysis } from "../../hooks/use-visual-analysis";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
 	ArtifactEvent,
@@ -45,7 +45,13 @@ export function useRecognitionRuntime(
 		queryKey: [queryRoots.objectRecognition, client.identity, "connection"],
 		queryFn: ({ signal }) => client.recognitionConnection(signal),
 	});
-	const library = useImageLibrary(client);
+	// The saved images are read only once the picker has been opened.
+	const [libraryWanted, setLibraryWanted] = useState(false);
+	const library = useImageLibrary(client, false, libraryWanted);
+	const libraryView = useMemo(
+		() => libraryResource(library.data, library.isPending, !!library.error),
+		[library.data, library.isPending, library.error],
+	);
 	const pushChatImage = useRecognitionChatInbox((s) => s.push);
 	const [selection, setSelection] = useState<string>();
 	const [selectedFrame, setFrame] = useState<{ id: string; index: number }>();
@@ -115,7 +121,7 @@ export function useRecognitionRuntime(
 		...analyses.resource,
 		revision,
 		items,
-		...libraryResource(library),
+		...libraryView,
 		selectedId: selected?.id,
 		captureSaveStatus: captureSave.status,
 		captureSaveCanResume: captureSave.canResume,
@@ -250,6 +256,8 @@ export function useRecognitionRuntime(
 		)
 			return handleLibrary(event, {
 				library,
+				libraryWanted,
+				setLibraryWanted,
 				client,
 				uploadFile,
 				uploadLock,
@@ -328,9 +336,13 @@ function validInput(file: File) {
 	);
 }
 
-function libraryResource(library: ReturnType<typeof useImageLibrary>) {
+function libraryResource(
+	data: ReturnType<typeof useImageLibrary>["data"],
+	loading: boolean,
+	failed: boolean,
+) {
 	return {
-		libraryImages: (library.data?.images ?? [])
+		libraryImages: (data?.images ?? [])
 			.slice()
 			.sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
 			.map((image) => ({
@@ -338,8 +350,8 @@ function libraryResource(library: ReturnType<typeof useImageLibrary>) {
 				title: `画像 ${image.createdAt.slice(0, 10)}（${image.width}×${image.height}）`,
 				thumbnailUrl: imageContentUrl(image.id),
 			})),
-		libraryLoading: library.isPending,
-		libraryError: library.error
+		libraryLoading: loading,
+		libraryError: failed
 			? "保存画像を取得できませんでした。一覧を更新してください。"
 			: undefined,
 	};
@@ -349,6 +361,8 @@ async function handleLibrary(
 	event: ArtifactEvent,
 	deps: {
 		library: ReturnType<typeof useImageLibrary>;
+		libraryWanted: boolean;
+		setLibraryWanted: (value: boolean) => void;
 		client: EumenesClient;
 		uploadFile: (source: string, file: File) => Promise<Receipt>;
 		uploadLock: { current: boolean };
@@ -358,6 +372,11 @@ async function handleLibrary(
 	},
 ): Promise<Receipt> {
 	if (event.action === "recognition-library-refresh") {
+		// Opening the picker the first time enables the list, which reads it once.
+		if (!deps.libraryWanted) {
+			deps.setLibraryWanted(true);
+			return { status: "accepted", message: "画像一覧を読み込みます。" };
+		}
 		await deps.library.refetch();
 		return { status: "accepted", message: "画像一覧を更新しました。" };
 	}
