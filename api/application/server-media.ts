@@ -1,4 +1,5 @@
 import { buildVisualPerception } from "./media/visual-perception";
+import { registerCaptureLibrary } from "./media/capture-library";
 import type { Database } from "bun:sqlite";
 import type { Capabilities } from "../domains/capabilities";
 import type { DialogueService } from "../domains/dialogue";
@@ -11,7 +12,10 @@ import type { ConversationService } from "../domains/conversation";
 import { createModel3d } from "../domains/model3d";
 import { createLarmPlayground, createLocalServices } from "../domains/larm";
 import { createMusic } from "../domains/music";
-import { createObjectRecognition } from "../domains/object-recognition";
+import {
+	createObjectRecognition,
+	type ObjectRecognitionService,
+} from "../domains/object-recognition";
 import type { Config } from "../infrastructure/config";
 import type { Core } from "./server-core";
 
@@ -84,11 +88,20 @@ export function buildMedia(
 		...mediaDependencies,
 		service: excalidraw,
 	});
-	const objectRecognition = createObjectRecognition({
+	let objectRecognition!: ObjectRecognitionService;
+	const captureSaveInTransaction = registerCaptureLibrary(
+		queue,
+		image,
+		() => objectRecognition,
+		() => mediaGateway().imageImports.identity,
+	);
+	objectRecognition = createObjectRecognition({
 		visual: buildVisualPerception(config, settings),
 		store,
 		queue,
 		connection: () => settings.objectRecognitionCredentials(),
+		captureSaveInTransaction,
+		captureResumeInTransaction: captureSaveInTransaction.resumeInTransaction,
 	});
 	return {
 		gateway: mediaGateway,

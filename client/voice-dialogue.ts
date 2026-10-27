@@ -8,8 +8,7 @@ import {
 } from "../api/domains/voice-dialogue/contracts";
 import { avatarMotionSchema } from "../api/domains/delivery/contracts";
 import { z } from "zod";
-import type { Transport } from "./transport";
-import { callJson, json } from "./transport";
+import { callJson, json, withQuery, type Transport } from "./transport";
 
 const voiceSessionSchema = z.object({
 	sessionId: z.string(),
@@ -40,21 +39,17 @@ export function voiceDialogueClient(transport: Transport) {
 			utteranceId: string,
 			wav: Uint8Array,
 		) => {
-			return voiceTurnSchema.parse(
-				await (
-					await transport.call("/api/voice/turns", {
-						method: "POST",
-						headers: {
-							"Content-Type": "audio/wav",
-							"X-Session-Id": sessionId,
-							"X-Generation": String(generation),
-							"X-Sequence": String(sequence),
-							"X-Utterance-Id": utteranceId,
-						},
-						body: new Uint8Array(wav),
-					})
-				).json(),
-			);
+			return callJson(transport, voiceTurnSchema, "/api/voice/turns", {
+				method: "POST",
+				headers: {
+					"Content-Type": "audio/wav",
+					"X-Session-Id": sessionId,
+					"X-Generation": String(generation),
+					"X-Sequence": String(sequence),
+					"X-Utterance-Id": utteranceId,
+				},
+				body: new Uint8Array(wav),
+			});
 		},
 		voicePreview: async (
 			sessionId: string,
@@ -63,7 +58,7 @@ export function voiceDialogueClient(transport: Transport) {
 			wav: Uint8Array,
 			signal: AbortSignal,
 		) => {
-			const response = await transport.call("/api/voice/preview", {
+			return callJson(transport, previewResultSchema, "/api/voice/preview", {
 				method: "POST",
 				signal,
 				headers: {
@@ -75,7 +70,6 @@ export function voiceDialogueClient(transport: Transport) {
 				},
 				body: new Uint8Array(wav),
 			});
-			return previewResultSchema.parse(await response.json());
 		},
 		voiceCommit: async (
 			id: string,
@@ -85,29 +79,29 @@ export function voiceDialogueClient(transport: Transport) {
 				| { resource: string },
 			timing?: InputTiming,
 		) =>
-			voiceTurnSchema.parse(
-				await (
-					await transport.call(
-						`/api/voice/turns/${encodeURIComponent(id)}/commit`,
-						json({
-							revision,
-							...(viewing ? { viewing } : {}),
-							...(timing ? { timing } : {}),
-						}),
-					)
-				).json(),
+			callJson(
+				transport,
+				voiceTurnSchema,
+				`/api/voice/turns/${encodeURIComponent(id)}/commit`,
+				json({
+					revision,
+					...(viewing ? { viewing } : {}),
+					...(timing ? { timing } : {}),
+				}),
 			),
 		voiceTurn: async (id: string) =>
-			voiceTurnSchema.parse(
-				await (
-					await transport.call(`/api/voice/turns/${encodeURIComponent(id)}`)
-				).json(),
+			callJson(
+				transport,
+				voiceTurnSchema,
+				`/api/voice/turns/${encodeURIComponent(id)}`,
 			),
 		voiceAudio: async (id: string, index?: number) =>
 			new Uint8Array(
 				await (
 					await transport.call(
-						`/api/voice/turns/${encodeURIComponent(id)}/audio${index === undefined ? "" : `?index=${index}`}`,
+						withQuery(`/api/voice/turns/${encodeURIComponent(id)}/audio`, {
+							index,
+						}),
 					)
 				).arrayBuffer(),
 			),
@@ -116,13 +110,13 @@ export function voiceDialogueClient(transport: Transport) {
 			index?: number,
 			gap?: Partial<ChunkGap> & { audible?: boolean },
 		) =>
-			voiceTurnSchema.parse(
-				await (
-					await transport.call(
-						`/api/voice/turns/${encodeURIComponent(id)}/played${index === undefined ? "" : `?index=${index}`}`,
-						json(gap ?? {}),
-					)
-				).json(),
+			callJson(
+				transport,
+				voiceTurnSchema,
+				withQuery(`/api/voice/turns/${encodeURIComponent(id)}/played`, {
+					index,
+				}),
+				json(gap ?? {}),
 			),
 		replayPlayed: (played: ReplayPlayed) =>
 			callJson(
@@ -132,10 +126,13 @@ export function voiceDialogueClient(transport: Transport) {
 				json(played),
 			),
 		replaySentences: async (text: string): Promise<string[]> =>
-			replaySentencesSchema.parse(
-				await (
-					await transport.call("/api/voice/replay/sentences", json({ text }))
-				).json(),
+			(
+				await callJson(
+					transport,
+					replaySentencesSchema,
+					"/api/voice/replay/sentences",
+					json({ text }),
+				)
 			).sentences,
 		replayAudio: async (text: string, signal?: AbortSignal) =>
 			new Uint8Array(
@@ -187,13 +184,11 @@ export function voiceDialogueClient(transport: Transport) {
 				).arrayBuffer(),
 			),
 		voiceCancel: async (id: string) =>
-			voiceTurnSchema.parse(
-				await (
-					await transport.call(
-						`/api/voice/turns/${encodeURIComponent(id)}/cancel`,
-						json({}),
-					)
-				).json(),
+			callJson(
+				transport,
+				voiceTurnSchema,
+				`/api/voice/turns/${encodeURIComponent(id)}/cancel`,
+				json({}),
 			),
 	};
 }

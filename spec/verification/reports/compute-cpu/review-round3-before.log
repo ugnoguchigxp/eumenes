@@ -1,0 +1,31 @@
+bun test v1.4.3 (c6da4a4d3)
+
+api/domains/compute/test/review.test.ts:
+(pass) reconciliation preserves the original deadline and refuses expired unknown submissions [26.58ms]
+(pass) Retry-After cannot postpone deadline cancellation [72.14ms]
+(pass) an accepted asynchronous deletion continues to deletion after the job terminates [57.84ms]
+116 |  const downloaded:string[]=[];
+117 |  let expired=true;
+118 |  f.port.artifact=async(_url,_job,a)=>{downloaded.push(a.id);if(a.id===ids[1]&&expired)throw {code:"job_expired",status:410};return new Uint8Array([1]);};
+119 |  const a=await f.service.submit("owner","main",{code:"result=2"},crypto.randomUUID());
+120 |  await waitFor(()=>f.service.get("owner",a.jobId).state==="completed");
+121 |  expect(f.service.get("owner",a.jobId).artifacts.map(a=>a.ready)).toEqual([true,false]);
+                                                                        ^
+error: expect(received).toEqual(expected)
+
+  [
+-   true,
++   false,
+    false,
+  ]
+
+- Expected  - 1
++ Received  + 1
+
+      at <anonymous> (/Users/y.noguchi/Code/eumenes/api/domains/compute/test/review.test.ts:121:67)
+(fail) one expired artifact does not discard other downloaded artifacts or redownload them on recovery [31.04ms]
+
+ 3 pass
+ 1 fail
+ 6 expect() calls
+Ran 4 tests across 1 file. [369.00ms]

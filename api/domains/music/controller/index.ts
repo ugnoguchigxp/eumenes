@@ -32,8 +32,6 @@ export function registerMusic(app: Hono, s: MusicService) {
 		} catch (error) {
 			if (error instanceof MusicArtworkError)
 				return c.json({ error: error.code }, error.status);
-			if (error instanceof Error && error.message === "queue_full")
-				return c.json({ error: "queue_full" }, 503);
 			throw error;
 		}
 	});

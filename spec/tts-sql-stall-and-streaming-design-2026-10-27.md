@@ -31,7 +31,7 @@
 
 SQLの4件の結果とAPIの応答は変更前後で同一。索引追加後の実行計画はjob単位・slot単位の索引を使い、繰り返しの一時ソートがなくなる。
 
-測定記録は `verification-reports/tts-gap-investigation-2026-10-27/steward-index-comparison.json` と `sql-service-baseline.json`。
+測定記録は `spec/verification/reports/tts-gap-investigation-2026-10-27/steward-index-comparison.json` と `sql-service-baseline.json`。
 
 - 移行の回帰試験は、既存の履歴を残して旧schemaから開き直し、結果の同一性と実行計画を検査する。
 - `bun run test:domain -- --domain steward`：111件成功、失敗なし。
@@ -79,10 +79,10 @@ LLMから受け取った回答本文のdeltaを、生成attemptの寿命に結�
 - Web：取得済み未再生音声の破棄、音声入力・再生の既存hooks、自動読み上げ、再読み上げの5ファイル34件が成功。
 - 型：変更箇所から辿る1,201ファイルの型検査が成功。変更箇所の整形、lint、サイズ検査と差分の空白検査も成功。
 - 広いdomain試験：`bun run test:domain -- --domain dialogue --domain voice-dialogue` は435件成功、14件失敗（うち1件は読込みエラー）。会話context評価・specialistの13件と `FIXED_TRIGGER_TEXT` の読込みエラーは、今回の変更を外した比較用ソースでも同じ失敗を確認した。担当外の処理や試験期待値は修正していない。作業中に削除されたgoalのAPI・fixtureによる途中の失敗は、最終の音声76件には残っていない。
-- 総合verify：`bun run verify -- --domain dialogue --domain voice-dialogue` は、別変更中の依存関係検査が `unused dependency voice-dialogue -> settings (api)` を報告し、検証中の外部ソース変更も検出したため無効。後続工程の成功とは扱わない。記録は `verification-reports/runs/2026-10-26T23-22-57-729Z-232b55c9-d40b-465e-905f-5f6bab7aa475/report.json`。
+- 総合verify：`bun run verify -- --domain dialogue --domain voice-dialogue` は、別変更中の依存関係検査が `unused dependency voice-dialogue -> settings (api)` を報告し、検証中の外部ソース変更も検出したため無効。後続工程の成功とは扱わない。記録は `spec/verification/reports/runs/2026-10-26T23-22-57-729Z-232b55c9-d40b-465e-905f-5f6bab7aa475/report.json`。
 - 差分全体の点検では、今回触っていない `dialogue/service/event-fields.ts` の末尾空行も検出したが、修正していない。意味理解の専用分岐や固定応答は追加していない。既存の共通実行・句分割・取消・保存機構を再利用した。
 
-固定試験の記録は `verification-reports/tts-streaming-2026-10-27/`。実接続と実機器の試験は未実施。残る実環境の作業は、SQL移行と新実装の稼働環境への適用、実音声の比較、実機器3往復の受入。サーバーの停止・起動・再起動は行っていない。
+固定試験の記録は `verification-reports/tts-streaming-2026-10-27/`（ローカルの検証記録。リポジトリには含めない）。実接続と実機器の試験は未実施。残る実環境の作業は、SQL移行と新実装の稼働環境への適用、実音声の比較、実機器3往復の受入。サーバーの停止・起動・再起動は行っていない。
 
 ## コードレビューと改善（2026-10-27）
 
@@ -101,6 +101,6 @@ LLMから受け取った回答本文のdeltaを、生成attemptの寿命に結�
 
 検証は再現試験の失敗を確認してから、修正・部分試験・結合試験の順で進めた。最終結果は、通知の部分試験5件、音声domainのbackend 85件・Web 59件、引継ぎ案内の対象2件、SQL索引の移行試験1件が成功。変更箇所から辿る559ファイルの型検査、変更箇所の整形・lint・サイズ・空白差分検査も成功した。音量や配達channelなど、同時進行中の別変更は保持し、このレビューの修正として数えていない。
 
-`bun run verify -- --domain dialogue --domain voice-dialogue --domain steward` はinventory・依存境界・指示catalogを通過した後、別変更中の `createVoiceDialogue` の関数サイズ超過（406→408）と `settings-integration.test.ts` のファイルサイズ超過（1001行）で停止した。これらの担当外の実装やサイズ上限を変更していない。総合verify成功とは扱わない。記録は `verification-reports/runs/2026-10-26T23-45-21-035Z-a2a832c3-07e5-4330-b710-e87c7da2de8e/report.json`。広い引継ぎ試験のうち、今回の変更前にも再現した既存の4件は失敗が残る。前置き・案内順序と、案内未再生時に作業を始めない対象2件は成功した。
+`bun run verify -- --domain dialogue --domain voice-dialogue --domain steward` はinventory・依存境界・指示catalogを通過した後、別変更中の `createVoiceDialogue` の関数サイズ超過（406→408）と `settings-integration.test.ts` のファイルサイズ超過（1001行）で停止した。これらの担当外の実装やサイズ上限を変更していない。総合verify成功とは扱わない。記録は `spec/verification/reports/runs/2026-10-26T23-45-21-035Z-a2a832c3-07e5-4330-b710-e87c7da2de8e/report.json`。広い引継ぎ試験のうち、今回の変更前にも再現した既存の4件は失敗が残る。前置き・案内順序と、案内未再生時に作業を始めない対象2件は成功した。
 
-再レビューで今回の範囲に未解決の指摘は残っていない。総合検証の阻害要因、実接続、実機器受入は上記のとおり分けて扱う。サーバー操作は行っていない。詳細は `verification-reports/tts-streaming-review-2026-10-27/`。
+再レビューで今回の範囲に未解決の指摘は残っていない。総合検証の阻害要因、実接続、実機器受入は上記のとおり分けて扱う。サーバー操作は行っていない。詳細は `verification-reports/tts-streaming-review-2026-10-27/`（ローカルの検証記録。リポジトリには含めない）。

@@ -5,7 +5,7 @@ import {
 } from "../api/domains/object-recognition/contracts";
 import { runSchema } from "../api/domains/dialogue/contracts";
 import { attachmentSchema } from "../api/domains/conversation/contracts";
-import { callJson, json, type Transport } from "./transport";
+import { callJson, json, withQuery, type Transport } from "./transport";
 
 const recognitionConnectionSchema = z.object({
 	revision: z.number(),
@@ -17,8 +17,6 @@ const recognitionConnectionSchema = z.object({
 });
 export function objectRecognitionClient(t: Transport) {
 	const root = "/api/object-recognition";
-	const record = async (path: string, init?: RequestInit) =>
-		recognitionRecord.parse(await (await t.call(path, init)).json());
 	return {
 		recognitionConnection: (signal?: AbortSignal) =>
 			callJson(
@@ -38,34 +36,22 @@ export function objectRecognitionClient(t: Transport) {
 				t,
 				recognitionConnectionSchema,
 				"/api/settings/object-recognition",
-				{
-					...json(input),
-					method: "PUT",
-				},
+				json(input, "PUT"),
 			),
 		recognitionRecords: async (conversationId: string, signal?: AbortSignal) =>
-			recognitionRecord
-				.array()
-				.parse(
-					await (
-						await t.call(
-							`${root}?conversationId=${encodeURIComponent(conversationId)}`,
-							{ signal },
-						)
-					).json(),
-				),
+			callJson(
+				t,
+				recognitionRecord.array(),
+				withQuery(root, { conversationId }),
+				{ signal },
+			),
 		recognitionCommands: async (conversationId: string, signal?: AbortSignal) =>
-			z
-				.string()
-				.array()
-				.parse(
-					await (
-						await t.call(
-							`${root}/commands?conversationId=${encodeURIComponent(conversationId)}`,
-							{ signal },
-						)
-					).json(),
-				),
+			callJson(
+				t,
+				z.string().array(),
+				withQuery(`${root}/commands`, { conversationId }),
+				{ signal },
+			),
 		recognitionUpload: async (
 			file: File,
 			conversationId: string,
@@ -75,17 +61,43 @@ export function objectRecognitionClient(t: Transport) {
 		) => {
 			const body = new FormData();
 			body.append("file", file);
-			return record(
-				`${root}?conversationId=${encodeURIComponent(conversationId)}&requestId=${encodeURIComponent(requestId)}&origin=${origin}${handoffId ? `&handoffId=${encodeURIComponent(handoffId)}` : ""}`,
+			return callJson(
+				t,
+				recognitionRecord,
+				withQuery(root, {
+					conversationId,
+					requestId,
+					origin,
+					handoffId: handoffId || undefined,
+				}),
 				{ method: "POST", body },
 			);
 		},
 		recognitionGet: (id: string, signal?: AbortSignal) =>
-			record(`${root}/${encodeURIComponent(id)}`, { signal }),
+			callJson(t, recognitionRecord, `${root}/${encodeURIComponent(id)}`, {
+				signal,
+			}),
 		recognitionCancel: (id: string) =>
-			record(`${root}/${encodeURIComponent(id)}/cancel`, json({})),
+			callJson(
+				t,
+				recognitionRecord,
+				`${root}/${encodeURIComponent(id)}/cancel`,
+				json({}),
+			),
 		recognitionRecheck: (id: string) =>
-			record(`${root}/${encodeURIComponent(id)}/recheck`, json({})),
+			callJson(
+				t,
+				recognitionRecord,
+				`${root}/${encodeURIComponent(id)}/recheck`,
+				json({}),
+			),
+		recognitionResumeCaptureSave: (id: string) =>
+			callJson(
+				t,
+				recognitionRecord,
+				`${root}/${encodeURIComponent(id)}/capture-save-resume`,
+				json({}),
+			),
 		recognitionRemove: async (id: string) => {
 			await t.call(`${root}/${encodeURIComponent(id)}`, { method: "DELETE" });
 		},
@@ -105,7 +117,7 @@ export function objectRecognitionClient(t: Transport) {
 			callJson(
 				t,
 				handoff.array(),
-				`${root}/handoffs?conversationId=${encodeURIComponent(conversationId)}`,
+				withQuery(`${root}/handoffs`, { conversationId }),
 				{ signal },
 			),
 		recognitionHandoffSend: (id: string, recognitionId?: string) =>

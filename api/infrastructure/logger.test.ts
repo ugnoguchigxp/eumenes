@@ -19,6 +19,7 @@ import {
 	type LogFields,
 } from "./logger";
 import { createApp } from "../application/app";
+import { appModules } from "../application/app-modules";
 import { waitFor } from "./wait-for";
 
 const dirs: string[] = [];
@@ -124,13 +125,15 @@ test("HTTP response IDs correlate auth failures and errors without URL or body s
 	const app = createApp({
 		token: "SECRET",
 		origin: "http://fixture",
-		larm: { status: () => ({ state: "unconfigured", capabilities: [] }) },
-		conversation: {},
-		dialogue: {},
-		voice: {},
-		queue: {},
-		scheduler: {},
-	} as unknown as Parameters<typeof createApp>[0]);
+		modules: appModules({
+			larm: { status: () => ({ state: "unconfigured", capabilities: [] }) },
+			conversation: {},
+			dialogue: {},
+			voice: {},
+			queue: {},
+			scheduler: {},
+		} as unknown as Parameters<typeof appModules>[0]),
+	});
 	app.post("/api/fixture/:id", () => {
 		throw new Error("provider said SECRET PRIVATE");
 	});

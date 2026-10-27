@@ -1,0 +1,24 @@
+{
+  "jobId": "99a2c2b6-939e-475e-99cb-5a9fb3ac4c73",
+  "state": "completed",
+  "value": {
+    "sum_1_to_100": 5050,
+    "integral_sin_x": "-cos(x)",
+    "quadratic_minimum_x": 3
+  },
+  "correct": true,
+  "artifacts": [
+    {
+      "id": "e19e7045-4b6d-48e8-a462-67592f9d486c",
+      "mime": "image/png",
+      "bytes": 28617,
+      "ready": true
+    },
+    {
+      "id": "fc3ede79-79c7-4d38-9c33-4d03cea441c2",
+      "mime": "text/csv",
+      "bytes": 5059,
+      "ready": true
+    }
+  ]
+}

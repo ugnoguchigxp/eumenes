@@ -1,0 +1,60 @@
+
+ RUN  v4.1.8 /Users/y.noguchi/Code/eumenes
+
+ ❯ web/src/domains/agent-runtime/ResearchTaskCard.test.tsx (2 tests | 2 failed) 2044ms
+   × deleted reports disappear even when a previous response remains in the query cache 1036ms
+   × a completed failure notice is displayed as retrieval failure, not research success 1007ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  web/src/domains/agent-runtime/ResearchTaskCard.test.tsx > deleted reports disappear even when a previous response remains in the query cache
+AssertionError: expected <p></p> to be null
+
+- Expected:
+null
+
++ Received:
+<p>
+  OLD_REPORT
+</p>
+
+ ❯ web/src/domains/agent-runtime/ResearchTaskCard.test.tsx:18:65
+     16|   current={...root,reportState:"deleted"};
+     17|   await cache.invalidateQueries({queryKey:[queryRoots.agentTasks]});
+     18|   await vi.waitFor(()=>expect(screen.queryByText("OLD_REPORT")).toBeNu…
+       |                                                                 ^
+     19|   expect(screen.getByText("調査の詳細は削除されました。")).toBeTruthy();
+     20|   expect(client.agentReport).toHaveBeenCalledTimes(1);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  web/src/domains/agent-runtime/ResearchTaskCard.test.tsx > a completed failure notice is displayed as retrieval failure, not research success
+TestingLibraryElementError: Unable to find an element with the text: 取得失敗. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div />[39m
+[36m</body>[39m
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div />[39m
+[36m</body>[39m
+ ❯ waitForWrapper node_modules/.bun/@testing-library+dom@10.4.1/node_modules/@testing-library/dom/dist/wait-for.js:163:27
+ ❯ node_modules/.bun/@testing-library+dom@10.4.1/node_modules/@testing-library/dom/dist/query-helpers.js:86:33
+ ❯ web/src/domains/agent-runtime/ResearchTaskCard.test.tsx:29:16
+     27|  try {
+     28|   render(<QueryClientProvider client={cache}><ResearchTaskCard client=…
+     29|   await screen.findByText("取得失敗");
+       |                ^
+     30|   expect(screen.queryByText("完了")).toBeNull();
+     31|   expect(client.agentReport).not.toHaveBeenCalled();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed (2)
+   Start at  20:32:55
+   Duration  2.75s (transform 84ms, setup 0ms, import 292ms, tests 2.04s, environment 341ms)
+

@@ -1,0 +1,14 @@
+$ bun scripts/verify.ts --domain music --domain larm --domain capabilities --domain artifact --domain dialogue
+[verify] selected=music,larm,capabilities,artifact,dialogue dependencyClosure=capabilities,delivery,attitude-dataset,larm,settings,inference,queue,music,artifact,avatar,conversation,tool-runtime,agent-runtime,continuity,memory,scheduler,toolchain-history,dialogue
+[verify] Shared DesignSystem dist: do not overlap dev, browser tests or other builds; endpoint hashes cannot detect change-and-restore.
+[verify] inventory
+[verify] boundaries
+[verify] system-context: /Users/y.noguchi/.bun/bin/bun run context:check
+$ s11tnext build --check --release-profile application
+Generated outputs are current (sha256:d6ebca26fe130ad9df6ccc6264c3474716659230aade2c174070a709eb470ded).
+[verify] size-budget: /Users/y.noguchi/.bun/bin/bun scripts/size-budget.ts api/domains/music web/src/domains/music web/src/components/domains/music api/domains/larm api/domains/capabilities web/src/domains/artifact web/src/components/domains/artifact packages/artifact-ui/src api/domains/dialogue web/src/domains/dialogue
+size-budget: new file over 800 lines: packages/artifact-ui/src/composition-fixer.ts (827)
+size-budget: new file over 800 lines: packages/artifact-ui/src/ui-studio-components.tsx (974)
+[verify] fail: 1071 ms; /Users/y.noguchi/Code/eumenes/verification-reports/runs/2026-10-20T07-10-10-423Z-5f59e030-bc67-4bb4-a7ae-c84fc8bb88a2/report.json
+Error: size-budget failed (1)
+error: script "verify" exited with code 1

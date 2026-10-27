@@ -1,0 +1,54 @@
+{
+  "api/domains/larm/service/index.ts": {
+    "sha256": "e9ffbecb7c284b84d60effcfc37e09b9e0fd9770d54e5e19528d46d99bcc05fc",
+    "snapshotMatches": true
+  },
+  "api/domains/larm/service/asr-wav.ts": {
+    "sha256": "11035cb2387ff06b565e10d0290b11772fc6208277fb8e301546bb31680aec58",
+    "snapshotMatches": true
+  },
+  "api/domains/larm/service/transcription.ts": {
+    "sha256": "a9d6ba49392b0a85d17ec2600160fabc05b975a184406c4b2967a948f3d06bf2",
+    "snapshotMatches": true
+  },
+  "api/domains/larm/test/asr-segments.test.ts": {
+    "sha256": "af200e28866f7d42d3d7d65cc8b2c3dc9983247c19dfa15cf612ddbb27f06541",
+    "snapshotMatches": true
+  },
+  "api/domains/inference/index.ts": {
+    "sha256": "2572eb787d86cac16db69afd12d04e49da6c304b5d4ada6051140ba9c0c299ad",
+    "snapshotMatches": true
+  },
+  "api/domains/inference/service/attempt-work.ts": {
+    "sha256": "fd4ce5ca7d917f0b87612abc15193b5e273649ed71597ae7fc1fb998f009c8fc",
+    "snapshotMatches": true
+  },
+  "api/domains/inference/service/errors.ts": {
+    "sha256": "0517ad5ad1c4b106c26026ab8cd50aedace2710ed44aee7f801476a7cbe663ea",
+    "snapshotMatches": true
+  },
+  "api/domains/inference/test/attempt-budget.test.ts": {
+    "sha256": "1e1d373c94ae46ea6e18f0775f7ae8f72e4fbcf092336288478e081811239a06",
+    "snapshotMatches": true
+  },
+  "api/domains/inference/test/speech-errors.test.ts": {
+    "sha256": "3bce7edca4879619552fcf77787c27ec0045f70aa506dc9912cadc7742920125",
+    "snapshotMatches": true
+  },
+  "api/domains/voice-dialogue/service/synthesis.ts": {
+    "sha256": "c860184bac8b8974ddf055f3aed5050af0da1bb0e7996db5379f841448d9c1b1",
+    "snapshotMatches": true
+  },
+  "api/domains/voice-dialogue/test/voice.test.ts": {
+    "sha256": "c4a693ce00ad8924a8e56c72e2390ae3ff2f15d6829d0667556e5f79fa9c9a60",
+    "snapshotMatches": true
+  },
+  "api/domains/dialogue/contexts/system-prompt/conversation.context.toml": {
+    "sha256": "75dfc22b86d56274b08036bdb02b5e80597b7487e6a956bc5e2e5a2e6ee001a0",
+    "snapshotMatches": true
+  },
+  "scripts/voice-repair-live.ts": {
+    "sha256": "314e33238907a8a73d6195d2ef40c36ad759757502c4b7051ea871f7fcf86c0a",
+    "snapshotMatches": true
+  }
+}

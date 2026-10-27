@@ -33,7 +33,7 @@
 - 部分：UI 27件・Web 19件・調査／資料／子実行29件が成功した後、項目の階層境界と非表示時の取得抑止も追加した。
 - 結合：会話・API・Artifact・実行の4ファイル23件が成功。本文・原文プロンプト・選択したメディア参照が、保存・公開を経て実際の子担当入力へ届く従来の試験も維持。
 - 関連domain：`bun run verify -- --domain pipelines --domain agent-runtime --domain tool-runtime --domain capabilities` がpass。Bun 282件、Web 31件、DesignSystem 28件が成功。境界・SystemContext・サイズ・整形・lint・型・DesignSystemビルドを含む。
-- 正式レポート：`verification-reports/runs/2026-10-22T12-46-54-573Z-a163ab48-5f05-48a6-b74e-703b2fb409d8/report.json`。
+- 正式レポート：`spec/verification/reports/runs/2026-10-22T12-46-54-573Z-a163ab48-5f05-48a6-b74e-703b2fb409d8/report.json`。
 - ブラウザ：対象 `tests/browser/pipeline-handoff.spec.ts` の3件が成功。狭幅のアーティファクト、小さいモーダル、画像デコード、全文保存、取消、試聴の開始と破棄に加え、試聴中の別曲選択で再生しないことを確認。
 - 全体型：`bun check` が成功（2,366ファイル）。Webビルドも成功。既存のチャンク容量・backgroundの混在import警告のみ残る。
 - 3ラウンド後の俯瞰：新しい証拠と残作業を確認して進め方を通知。再現した不具合と契約境界に修正を限定し、その後は編集を止めて関連検証と再レビューを完了した。

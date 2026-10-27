@@ -1,0 +1,41 @@
+
+ RUN  v4.1.8 /Users/y.noguchi/Code/eumenes
+
+ ❯ web/src/domains/compute/toolchain-adapter.test.tsx (3 tests | 1 failed) 1138ms
+   × a failed PNG preview does not hide job state, results or SVG downloads 1021ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  web/src/domains/compute/toolchain-adapter.test.tsx > a failed PNG preview does not hide job state, results or SVG downloads
+AssertionError: expected 'error' to be 'ready' // Object.is equality
+
+Ignored nodes: comments, script, style
+[36m<html>[39m
+  [36m<head />[39m
+  [36m<body>[39m
+    [36m<div />[39m
+  [36m</body>[39m
+[36m</html>[39m
+
+Expected: "ready"
+Received: "error"
+
+ ❯ web/src/domains/compute/toolchain-adapter.test.tsx:80:59
+     78|  };
+     79|  const hook=renderHook(()=>computeWebAdapter.useArtifact({client,visib…
+     80|  await waitFor(()=>expect(hook.result.current.phase.kind).toBe("ready"…
+       |                                                           ^
+     81|  expect(hook.result.current.snapshot.compute).toMatchObject({jobs:[{id…
+     82|  expect(client.compute.artifact).toHaveBeenCalledTimes(1);
+ ❯ runWithExpensiveErrorDiagnosticsDisabled node_modules/.bun/@testing-library+dom@10.4.1/node_modules/@testing-library/dom/dist/config.js:47:12
+ ❯ checkCallback node_modules/.bun/@testing-library+dom@10.4.1/node_modules/@testing-library/dom/dist/wait-for.js:124:77
+ ❯ Timeout.checkRealTimersCallback node_modules/.bun/@testing-library+dom@10.4.1/node_modules/@testing-library/dom/dist/wait-for.js:118:16
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 2 passed (3)
+   Start at  19:43:34
+   Duration  1.97s (transform 24ms, setup 0ms, import 149ms, tests 1.14s, environment 588ms)
+

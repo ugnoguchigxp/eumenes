@@ -12,7 +12,7 @@
 - 同じSeedを再投入した結果は `unchanged / registered: 0`。
 - 普段のEumenesの `memoryContext("main")` で28候補すべての本文が長期文脈に含まれることを確認。既存記憶を含め13,281 / 16,384 bytes。会話で返答を生成する実LLM試験は未実施で、文脈反映の確認と区別する。
 
-本文を含まない集計は `verification-reports/memory-adoption/usual-seed.json` と `usual-context.json`。同フォルダはローカル検証用でgit管理外。Seedの正規化済みdigestは `8c28c95bde4f7bc66c95e06051e515c26e70b0472312f1a54687d326efb3d03d`。
+本文を含まない集計は `spec/verification/reports/memory-adoption/usual-seed.json` と `usual-context.json`。元のフォルダ `verification-reports/memory-adoption/` はローカル検証用でgit管理外。Seedの正規化済みdigestは `8c28c95bde4f7bc66c95e06051e515c26e70b0472312f1a54687d326efb3d03d`。
 
 ## 固定試験と契約
 
@@ -47,7 +47,7 @@
 
 最終再検証では、Memory・Steward・会話側Memory結合・Memory adapter・Capabilities・検索文脈をまとめた366件がすべて成功（52ファイル、2,688 assertions）。client coreは91件成功。
 
-4 domain（memory / steward / capabilities / dialogue）の規定ゲートは、境界・サイズ・書式・lint・DesignSystem型検査とbuildが成功し、選択範囲の型検査で担当外2ファイルの8件により停止。場所は `api/domains/agent-runtime/service/web-read-plan.ts`（nullable引数とfindLast、7件）と `api/domains/dialogue/service/generation-handler.ts`（selection出力の型、1件）。全体型検査は上記に加えapplicationとweb-researchの別変更も含む5ファイル11件。今回のMemory・Steward・lookup版管理に型エラーは報告されていない。型エラーを無視する設定や期待値の変更は行っていない。ゲート報告は `verification-reports/runs/2026-10-16T11-07-34-654Z-41604e85-73d1-4043-973e-fe157da16806/report.json`。
+4 domain（memory / steward / capabilities / dialogue）の規定ゲートは、境界・サイズ・書式・lint・DesignSystem型検査とbuildが成功し、選択範囲の型検査で担当外2ファイルの8件により停止。場所は `api/domains/agent-runtime/service/web-read-plan.ts`（nullable引数とfindLast、7件）と `api/domains/dialogue/service/generation-handler.ts`（selection出力の型、1件）。全体型検査は上記に加えapplicationとweb-researchの別変更も含む5ファイル11件。今回のMemory・Steward・lookup版管理に型エラーは報告されていない。型エラーを無視する設定や期待値の変更は行っていない。ゲート報告は `spec/verification/reports/runs/2026-10-16T11-07-34-654Z-41604e85-73d1-4043-973e-fe157da16806/report.json`。
 
 最終時点でも通常APIのMemory状態は enabled / healthy。サーバーを起動したままにしており、次の普段の会話から候補を参照できる。今回、会話でのモデル返答・訂正・忘却を実データ上で試すことはしていない。訂正・忘却の破壊的な確認は架空データの試験に限定した。
 

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { callJson, type Transport } from "./transport";
+import { callJson, json, type Transport } from "./transport";
 
 /** A finding of the pipeline check: where (a JSON Pointer) and which rule, never the value. */
 const issue = z.object({ pointer: z.string(), rule: z.string() });
@@ -7,7 +7,7 @@ const refused = z.object({ ok: z.literal(false), issues: z.array(issue) });
 const unavailable = z.object({ ok: z.literal(false), code: z.string() });
 
 /** Where the draft and the other toolchains rank for one wording (spec task-pipeline-design §8.2 検索の確認). */
-export const pipelineProbe = z.union([
+const pipelineProbe = z.union([
 	z.object({
 		ok: z.literal(true),
 		candidates: z.array(
@@ -28,7 +28,7 @@ export const pipelineProbe = z.union([
 	unavailable,
 ]);
 /** What the first round chose for one utterance, without running anything (選択の試験). */
-export const pipelineSelection = z.union([
+const pipelineSelection = z.union([
 	z.object({
 		ok: z.literal(true),
 		/** The function the round called, or null when it called none. */
@@ -44,7 +44,7 @@ export const pipelineSelection = z.union([
 	unavailable,
 ]);
 /** One fixture case run without toolchains (試験運転). */
-export const pipelineFixture = z.union([
+const pipelineFixture = z.union([
 	z.object({
 		ok: z.literal(true),
 		outcome: z.object({
@@ -79,43 +79,28 @@ export const pipelineFixture = z.union([
 	}),
 	refused,
 ]);
-export type PipelineProbe = z.infer<typeof pipelineProbe>;
-export type PipelineSelection = z.infer<typeof pipelineSelection>;
-export type PipelineFixture = z.infer<typeof pipelineFixture>;
 
 /** The studio's trials of its current draft; the draft is read by the server from the work, never sent. */
 export function pipelinesClient(t: Transport) {
 	const path = (workRef: string, action: string) =>
 		`/api/pipelines/works/${encodeURIComponent(workRef)}/${action}`;
-	const post = (body: unknown, signal?: AbortSignal) => ({
-		method: "POST",
-		headers: { "content-type": "application/json" },
-		body: JSON.stringify(body),
-		signal,
-	});
 	return {
 		pipelines: {
 			probe: (workRef: string, query: string, signal?: AbortSignal) =>
-				callJson(
-					t,
-					pipelineProbe,
-					path(workRef, "probe"),
-					post({ query }, signal),
-				),
+				callJson(t, pipelineProbe, path(workRef, "probe"), {
+					...json({ query }),
+					signal,
+				}),
 			select: (workRef: string, utterance: string, signal?: AbortSignal) =>
-				callJson(
-					t,
-					pipelineSelection,
-					path(workRef, "select"),
-					post({ utterance }, signal),
-				),
+				callJson(t, pipelineSelection, path(workRef, "select"), {
+					...json({ utterance }),
+					signal,
+				}),
 			fixture: (workRef: string, test: number, signal?: AbortSignal) =>
-				callJson(
-					t,
-					pipelineFixture,
-					path(workRef, "fixture"),
-					post({ test }, signal),
-				),
+				callJson(t, pipelineFixture, path(workRef, "fixture"), {
+					...json({ test }),
+					signal,
+				}),
 		},
 	};
 }

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { HttpErrorStatus } from "../../../infrastructure/http";
 export const submitInput = z
 	.strictObject({
 		code: z.string().min(1).max(65536),
@@ -109,3 +110,14 @@ export type JobView = {
 	revision: number;
 };
 export const activeStates = ["submitting", "queued", "running", "collecting"];
+/** HTTP status of each code the compute operations throw. */
+export const errorStatus = {
+	compute_not_found: 404,
+	compute_artifact_not_found: 404,
+	request_conflict: 409,
+	compute_capacity: 429,
+	invalid_request: 400,
+	limit_exceeded: 400,
+	compute_not_reconcilable: 409,
+	compute_connection_changed: 409,
+} as const satisfies Record<string, HttpErrorStatus>;

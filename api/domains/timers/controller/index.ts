@@ -1,6 +1,10 @@
 import type { Hono } from "hono";
 import { z } from "zod";
-import { parseJsonBody } from "../../../infrastructure/http";
+import {
+	parseJsonBody,
+	parseQuery,
+	queryInt,
+} from "../../../infrastructure/http";
 import {
 	DEFAULT_TIMER_SCOPE,
 	ackNotificationSchema,
@@ -12,11 +16,12 @@ import {
 } from "../contracts";
 import type { TimersService } from "../service";
 
-const limitOf = (value: string | undefined) => {
-	if (value === undefined) return undefined;
-	const limit = Number(value);
-	return Number.isInteger(limit) ? limit : Number.NaN;
-};
+const limit = queryInt.pipe(z.number().min(1).max(100)).optional();
+const listQuery = z.object({ ...listTimersQuerySchema.shape, limit });
+const notificationsQuery = z.object({
+	cursor: z.string().optional(),
+	limit,
+});
 
 export function registerTimers(app: Hono, service: TimersService) {
 	app.post("/api/timers", async (c) => {
@@ -28,17 +33,8 @@ export function registerTimers(app: Hono, service: TimersService) {
 		return c.json(saved.receipt, saved.replay ? 200 : 201);
 	});
 	app.get("/api/timers", (c) => {
-		const limit = limitOf(c.req.query("limit"));
-		if (Number.isNaN(limit))
-			return c.json({ error: "invalid_timer_input" }, 400);
-		const query = listTimersQuerySchema.safeParse({
-			state: c.req.query("state"),
-			conversationId: c.req.query("conversationId"),
-			timerId: c.req.query("timerId"),
-			cursor: c.req.query("cursor"),
-			limit,
-		});
-		if (!query.success) return c.json({ error: "invalid_timer_input" }, 400);
+		const query = parseQuery(c, listQuery, { code: "invalid_timer_input" });
+		if (!query.ok) return query.response;
 		return c.json(service.list(query.data));
 	});
 	app.get("/api/timers/:id", (c) => {
@@ -70,20 +66,11 @@ export function registerTimers(app: Hono, service: TimersService) {
 		});
 	}
 	app.get("/api/timer-notifications", (c) => {
-		const limit = limitOf(c.req.query("limit"));
-		if (Number.isNaN(limit))
-			return c.json({ error: "invalid_timer_input" }, 400);
-		if (
-			limit !== undefined &&
-			(!Number.isInteger(limit) || limit < 1 || limit > 100)
-		)
-			return c.json({ error: "invalid_timer_input" }, 400);
-		return c.json(
-			service.notifications({
-				cursor: c.req.query("cursor"),
-				limit,
-			}),
-		);
+		const query = parseQuery(c, notificationsQuery, {
+			code: "invalid_timer_input",
+		});
+		if (!query.ok) return query.response;
+		return c.json(service.notifications(query.data));
 	});
 	app.post("/api/timer-notifications/:id/claim", async (c) => {
 		const parsed = await parseJsonBody(c, claimNotificationSchema, {

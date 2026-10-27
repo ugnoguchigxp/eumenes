@@ -140,7 +140,7 @@ bunx playwright test tests/browser/<domain>.spec.ts
 
 したがって現段階は「固定試験と全体検証を通過した実装基準」。実LLMを含めて最良・受入完了とは宣言しない。実LLM確認が許可された段階で、保存済みLARM設定をbackendの読み取り専用操作から確認し、隔離環境の設定APIで接続先を保存する。利用者へ同じ接続先を再確認したり、製品DB・秘密をコピーしたりしない。担当選択から最終回答までを観測し、途中で失敗した場合は着手時に定めた停止条件に従う。
 
-以前の[実装・live記録](../spec/verification/web-search-repair-2026-10-11/README.md)は当時の履歴として読む。現在の全体結果は上記の入力hashと[検証結果](../verification-reports/latest.json)で区別する。`latest.json` は後続検証で上書きされるため、新しい機能の記録にはその結果と入力hashを別途保存する。
+以前の[実装・live記録](../spec/verification/web-search-repair-2026-10-11/README.md)は当時の履歴として読む。現在の全体結果は上記の入力hashと検証結果（`verification-reports/latest.json`。ローカルの検証記録でリポジトリには含めない）で区別する。`latest.json` は後続検証で上書きされるため、新しい機能の記録にはその結果と入力hashを別途保存する。
 
 ## 6. 次回も使う完了報告
 

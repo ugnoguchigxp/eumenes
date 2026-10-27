@@ -1,7 +1,12 @@
 import { readBounded } from "../../../infrastructure/bounded-read";
 import type { Hono, Context } from "hono";
 import type { VoiceDialogueService } from "..";
-import { parseJsonBody } from "../../../infrastructure/http";
+import { z } from "zod";
+import {
+	parseJsonBody,
+	parseQuery,
+	queryInt,
+} from "../../../infrastructure/http";
 import { toErrorCode } from "../../../infrastructure/error-code";
 import { getLogger } from "../../../infrastructure/logger";
 import {
@@ -15,6 +20,7 @@ import {
 
 const log = getLogger("voice");
 const MAX_AUDIO_BYTES = 4_000_000;
+const chunkQuery = z.object({ index: queryInt.default(0) });
 async function readAudio(body: ReadableStream<Uint8Array> | null) {
 	const wav = await readBounded(body, {
 		limit: MAX_AUDIO_BYTES,
@@ -174,10 +180,9 @@ export function registerVoiceDialogue(
 		return turn ? c.json(turn) : c.json({ error: "not_found" }, 404);
 	});
 	app.get("/api/voice/turns/:id/audio", (c) => {
-		const index = Number(c.req.query("index") ?? 0);
-		if (!Number.isSafeInteger(index) || index < 0)
-			return c.json({ error: "invalid_audio_index" }, 400);
-		const wav = service.takeAudio(c.req.param("id"), index);
+		const query = parseQuery(c, chunkQuery, { code: "invalid_audio_index" });
+		if (!query.ok) return query.response;
+		const wav = service.takeAudio(c.req.param("id"), query.data.index);
 		return wav
 			? c.body(new Uint8Array(wav), 200, {
 					"Content-Type": "audio/wav",
@@ -186,9 +191,9 @@ export function registerVoiceDialogue(
 			: c.json({ error: "audio_unavailable" }, 404);
 	});
 	app.post("/api/voice/turns/:id/played", async (c) => {
-		const index = Number(c.req.query("index") ?? 0);
-		if (!Number.isSafeInteger(index) || index < 0)
-			return c.json({ error: "invalid_audio_index" }, 400);
+		const query = parseQuery(c, chunkQuery, { code: "invalid_audio_index" });
+		if (!query.ok) return query.response;
+		const index = query.data.index;
 		const parsed = await parseJsonBody(c, chunkPlayedSchema);
 		if (!parsed.ok) return parsed.response;
 		if (parsed.data.gapMs !== undefined)

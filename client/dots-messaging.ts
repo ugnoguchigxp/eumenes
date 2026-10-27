@@ -4,7 +4,7 @@ import {
 	messageConversationSchema,
 	outgoingMessageSchema,
 } from "../api/domains/dots/contracts";
-import { json, type Transport } from "./transport";
+import { callJson, json, withQuery, type Transport } from "./transport";
 export function dotsMessagingClient(t: Transport) {
 	return {
 		configureDotsMessaging: async (
@@ -12,55 +12,51 @@ export function dotsMessagingClient(t: Transport) {
 			expectedRevision: number,
 			enabled: boolean,
 		) =>
-			messagingSettingSchema.parse(
-				await (
-					await t.call(
-						`/api/dots/connections/${encodeURIComponent(id)}/messaging`,
-						{ ...json({ expectedRevision, enabled }), method: "PUT" },
-					)
-				).json(),
+			callJson(
+				t,
+				messagingSettingSchema,
+				`/api/dots/connections/${encodeURIComponent(id)}/messaging`,
+				json({ expectedRevision, enabled }, "PUT"),
 			),
 		openDotsMessageConversation: async (input: {
 			requestId: string;
 			connectionRef: string;
 			conversationId: string;
 		}) =>
-			messageConversationSchema.parse(
-				await (
-					await t.call("/api/dots/message-conversations", json(input))
-				).json(),
+			callJson(
+				t,
+				messageConversationSchema,
+				"/api/dots/message-conversations",
+				json(input),
 			),
 		sendDotsMessage: async (
 			id: string,
 			input: { requestId: string; text: string },
 		) =>
-			outgoingMessageSchema.parse(
-				await (
-					await t.call(
-						`/api/dots/message-conversations/${encodeURIComponent(id)}/messages`,
-						json(input),
-					)
-				).json(),
+			callJson(
+				t,
+				outgoingMessageSchema,
+				`/api/dots/message-conversations/${encodeURIComponent(id)}/messages`,
+				json(input),
 			),
 		dotsMessageConversation: async (id: string, after = 0, limit = 50) =>
-			messagingViewSchema.parse(
-				await (
-					await t.call(
-						`/api/dots/message-conversations/${encodeURIComponent(id)}?after=${after}&limit=${limit}`,
-					)
-				).json(),
+			callJson(
+				t,
+				messagingViewSchema,
+				withQuery(`/api/dots/message-conversations/${encodeURIComponent(id)}`, {
+					after,
+					limit,
+				}),
 			),
 		cancelDotsMessage: async (
 			id: string,
 			input: { requestId: string; expectedRevision: number },
 		) =>
-			outgoingMessageSchema.parse(
-				await (
-					await t.call(
-						`/api/dots/messages/${encodeURIComponent(id)}/cancel`,
-						json(input),
-					)
-				).json(),
+			callJson(
+				t,
+				outgoingMessageSchema,
+				`/api/dots/messages/${encodeURIComponent(id)}/cancel`,
+				json(input),
 			),
 	};
 }

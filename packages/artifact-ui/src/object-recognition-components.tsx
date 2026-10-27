@@ -13,6 +13,11 @@ export type ObjectRecognitionResource = Omit<
 	| "onAnalysisCancel"
 	| "onAnalysisSelect"
 	| "onFile"
+	| "onLibraryRefresh"
+	| "onLibrarySelect"
+	| "onLibraryDelete"
+	| "onCaptureSaveRecheck"
+	| "onCaptureSaveResume"
 	| "onCredentialSourceChange"
 	| "onCancel"
 	| "onSelect"
@@ -44,6 +49,23 @@ export function ObjectRecognitionWorkspaceView({
 			}}
 			busy={resource.busy || action.pending}
 			message={action.message}
+			onLibraryDelete={runtime.deleteLibraryImage}
+			onCaptureSaveRecheck={() => {
+				void action.send("recognition-save-recheck", {
+					id: resource.selectedId ?? "",
+				});
+			}}
+			onCaptureSaveResume={() => {
+				void action.send("recognition-save-resume", {
+					id: resource.selectedId ?? "",
+				});
+			}}
+			onLibraryRefresh={() => {
+				void action.send("recognition-library-refresh", {});
+			}}
+			onLibrarySelect={(id) => {
+				void action.send("recognition-library-select", { id });
+			}}
 			onCredentialSourceChange={(source) => {
 				void action.send("recognition-credential-source", {
 					credentialSource: source,

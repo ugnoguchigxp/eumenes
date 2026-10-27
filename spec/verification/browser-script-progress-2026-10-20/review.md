@@ -36,7 +36,7 @@ phaseの保存と会話別の取得用indexは、追加migration `browser/0004-p
 - 全体型検査：2,222ファイル成功。Web build：成功。既存のchunk等の警告は残る。
 - `git diff --check`：成功。新しいモデル・profile名、発話や特定サイトによる意味判定、別planner、自動再送は追加していない。main上の着手前の変更を維持した。
 
-verify記録: `verification-reports/runs/2026-10-20T14-37-35-041Z-86cf51a8-f3f4-40c8-aa39-4057439c9626/report.json`。検証中に製品コードを編集していない。
+verify記録: `spec/verification/reports/runs/2026-10-20T14-37-35-041Z-86cf51a8-f3f4-40c8-aa39-4057439c9626/report.json`。検証中に製品コードを編集していない。
 
 [初回実装記録](README.md)にある担当外の既存検証エラー、および実Brave/Bridge・実LLM・ASR実機の未受入は別に残る。固定試験の成功や今回の再レビューを、これらの確認完了とは扱わない。
 

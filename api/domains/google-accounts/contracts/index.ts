@@ -1,3 +1,4 @@
+import type { HttpErrorStatus } from "../../../infrastructure/http";
 export type GoogleProfile = {
 	sub: string;
 	name: string;
@@ -54,3 +55,12 @@ export class GoogleAccountError extends Error {
 }
 
 export { photosView, type PhotosView } from "./photos";
+
+/** HTTP status of the Photos picker codes a Google Photos import answers with. */
+export const errorStatus = {
+	photos_session_changed: 409,
+	photos_session_expired: 410,
+	photos_authorization_required: 409,
+	photos_image_unsupported: 415,
+	photos_image_too_large: 413,
+} as const satisfies Record<string, HttpErrorStatus>;

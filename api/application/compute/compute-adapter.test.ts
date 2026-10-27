@@ -6,6 +6,7 @@ import {
 	png,
 } from "../../domains/compute/test/compute.fixture";
 import { registerCompute } from "../../domains/compute";
+import { answerError } from "../app";
 import {
 	createComputeAdapter,
 	describeComputeAdapter,
@@ -101,6 +102,7 @@ test("authenticated host integration serves stored PNG and downloads SVG without
 	);
 	await waitFor(() => f.service.get(owner, a.jobId).state === "completed");
 	const app = new Hono();
+	app.onError(answerError);
 	app.use("*", async (c, next) => {
 		if (c.req.header("Authorization") !== "Bearer fixture-api")
 			return c.json({ error: "unauthorized" }, 401);

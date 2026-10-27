@@ -1,0 +1,24 @@
+bun test v1.4.3 (c6da4a4d3)
+
+api/application/compute/compute-toolchain.test.ts:
+(pass) conversation selects registered Python tool, persists action receipt and returns result to parent [558.14ms]
+(pass) recovering an unknown acceptance sends a new completion notice without duplicating either state [506.74ms]
+
+api/application/compute/compute-review.test.ts:
+(pass) older owned jobs remain addressable outside the bounded model snapshot and replay stays stable [220.01ms]
+
+api/application/compute/compute-http.test.ts:
+(pass) real client and queue use the advertised URL and persist the request before HTTP [28.91ms]
+
+api/application/compute/compute-adapter.test.ts:
+(pass) registered adapter exposes four schemas and stable receipts, then tracks actual completion [32.09ms]
+(pass) authenticated host integration serves stored PNG and downloads SVG without inline HTML [32.02ms]
+(pass) parent cancellation confirms remote termination outside the writer and does not claim it during 202 [81.29ms]
+
+packages/artifact-ui/src/compute-components.test.tsx:
+(pass) registered computation view composes with text and rejects a wrong resource kind [9.38ms]
+
+ 8 pass
+ 0 fail
+ 48 expect() calls
+Ran 8 tests across 5 files. [4.26s]

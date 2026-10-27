@@ -1,0 +1,17 @@
+{
+  "sequential_calls": 20,
+  "wall_seconds": 1.3844,
+  "process_cpu_seconds": 21.68,
+  "avg_busy_logical_cores": 15.66,
+  "cpu_percent_one_core_basis": 1566.0,
+  "host_logical_cores": 32,
+  "backend": "torch_cpu",
+  "cold_load_time": "not_measured",
+  "first_tts_delay": "not_measured",
+  "gpu_utilization": "not_measured",
+  "Rss_kib": 659660,
+  "Pss_kib": 652641,
+  "SwapPss_kib": 1095856,
+  "previous_process_peak_rss_kib": 2347148,
+  "notes": "Isolated timing interval on the existing native service; no service restart. Memory covers process, not weight file alone."
+}

@@ -1,8 +1,5 @@
 import { expect, test, vi } from "vitest";
-import {
-	createTerminalConnection,
-	parseEvents,
-} from "../toolchain-artifacts/terminal-connection";
+import { createTerminalConnection } from "../toolchain-artifacts/terminal-connection";
 
 const sse = (...frames: string[]) =>
 	new Response(
@@ -15,17 +12,6 @@ const sse = (...frames: string[]) =>
 		}),
 	);
 const b64 = (text: string) => btoa(text);
-
-test("parses complete events and keeps the unfinished rest", () => {
-	expect(
-		parseEvents(
-			"event: output\ndata: YQ==\n\n: heartbeat\n\nevent: exit\ndata",
-		),
-	).toEqual({
-		events: [{ event: "output", data: "YQ==" }],
-		rest: "event: exit\ndata",
-	});
-});
 
 test("writes decoded output, including frames split across reads, then reports the end", async () => {
 	const ended = vi.fn();

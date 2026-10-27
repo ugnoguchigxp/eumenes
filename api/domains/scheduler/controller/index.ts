@@ -1,23 +1,30 @@
 import type { Hono } from "hono";
-import { parseJsonBody } from "../../../infrastructure/http";
+import { z } from "zod";
+import {
+	parseJsonBody,
+	parseQuery,
+	queryInt,
+} from "../../../infrastructure/http";
 import { createScheduleSchema, scheduleOperationSchema } from "../contracts";
 import type { SchedulerService } from "../service";
 
+const pageQuery = z.object({
+	state: z.string().optional(),
+	cursor: z.string().optional(),
+	limit: queryInt.pipe(z.number().min(1).max(100)).default(50),
+});
+
 export function registerScheduler(app: Hono, service: SchedulerService) {
-	const page = (value: string | undefined) => {
-		const limit = value === undefined ? 50 : Number(value);
-		return Number.isInteger(limit) && limit >= 1 && limit <= 100 ? limit : null;
-	};
 	app.post("/api/schedules", async (c) => {
 		const parsed = await parseJsonBody(c, createScheduleSchema);
 		if (!parsed.ok) return parsed.response;
 		return c.json(await service.create(parsed.data), 201);
 	});
 	app.get("/api/schedules", (c) => {
-		const limit = page(c.req.query("limit"));
-		if (limit === null) return c.json({ error: "invalid_limit" }, 400);
+		const page = parseQuery(c, pageQuery, { code: "invalid_limit" });
+		if (!page.ok) return page.response;
 		return c.json(
-			service.list(c.req.query("state"), c.req.query("cursor") ?? null, limit),
+			service.list(page.data.state, page.data.cursor ?? null, page.data.limit),
 		);
 	});
 	app.get("/api/schedules/:id", (c) => {
@@ -27,13 +34,13 @@ export function registerScheduler(app: Hono, service: SchedulerService) {
 	app.get("/api/schedules/:id/occurrences", (c) => {
 		if (!service.get(c.req.param("id")))
 			return c.json({ error: "not_found" }, 404);
-		const limit = page(c.req.query("limit"));
-		if (limit === null) return c.json({ error: "invalid_limit" }, 400);
+		const page = parseQuery(c, pageQuery, { code: "invalid_limit" });
+		if (!page.ok) return page.response;
 		return c.json(
 			service.listOccurrences(
 				c.req.param("id"),
-				c.req.query("cursor") ?? null,
-				limit,
+				page.data.cursor ?? null,
+				page.data.limit,
 			),
 		);
 	});

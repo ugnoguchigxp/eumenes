@@ -12,7 +12,7 @@ import {
 	projectInput,
 } from "../api/domains/dots/contracts";
 import { dotsPackageInput } from "../api/domains/capabilities/contracts";
-import { json, type Transport } from "./transport";
+import { callJson, json, type Transport } from "./transport";
 const packageDto = dotsPackageInput.omit({ expectedToken: true }).extend({
 	revision: z.number().int(),
 	revisionId: z.string(),
@@ -22,8 +22,9 @@ export function dotsClient(transport: Transport) {
 	return {
 		...dotsMessagingClient(transport),
 		dotsConfiguration: async () =>
-			z
-				.object({
+			callJson(
+				transport,
+				z.object({
 					connections: z.array(connectionSchema),
 					messageConversations: z.array(messageConversationSchema).optional(),
 					projects: z.array(projectSchema),
@@ -35,76 +36,59 @@ export function dotsClient(transport: Transport) {
 							expiresAt: z.number().nullable(),
 						}),
 					),
-				})
-				.parse(await (await transport.call("/api/dots/configuration")).json()),
+				}),
+				"/api/dots/configuration",
+			),
 		configureDotsConnection: async (input: z.input<typeof connectionInput>) =>
-			z
-				.object({
+			callJson(
+				transport,
+				z.object({
 					connection: connectionSchema,
 					localToken: z.string().nullable(),
-				})
-				.parse(
-					await (
-						await transport.call("/api/dots/connections", {
-							...json(input),
-							method: "PUT",
-						})
-					).json(),
-				),
+				}),
+				"/api/dots/connections",
+				json(input, "PUT"),
+			),
 		configureDotsProject: async (input: z.input<typeof projectInput>) =>
-			projectSchema.parse(
-				await (
-					await transport.call("/api/dots/projects", {
-						...json(input),
-						method: "PUT",
-					})
-				).json(),
+			callJson(
+				transport,
+				projectSchema,
+				"/api/dots/projects",
+				json(input, "PUT"),
 			),
 		dotsPackages: async () =>
-			z
-				.object({ items: z.array(packageDto) })
-				.parse(
-					await (
-						await transport.call("/api/capabilities/dots-packages")
-					).json(),
-				),
+			callJson(
+				transport,
+				z.object({ items: z.array(packageDto) }),
+				"/api/capabilities/dots-packages",
+			),
 		configureDotsPackage: async (input: z.input<typeof dotsPackageInput>) =>
-			packageDto.parse(
-				await (
-					await transport.call("/api/capabilities/dots-packages", {
-						...json(input),
-						method: "PUT",
-					})
-				).json(),
+			callJson(
+				transport,
+				packageDto,
+				"/api/capabilities/dots-packages",
+				json(input, "PUT"),
 			),
 		dotsTaskSessions: async (id: string) =>
-			z
-				.object({
+			callJson(
+				transport,
+				z.object({
 					sessions: z.array(nativeSession),
 					sourceSequence: z.number().int(),
-				})
-				.parse(
-					await (
-						await transport.call(
-							`/api/dots/tasks/${encodeURIComponent(id)}/snapshot`,
-						)
-					).json(),
-				),
+				}),
+				`/api/dots/tasks/${encodeURIComponent(id)}/snapshot`,
+			),
 		bindDotsSchedule: async (id: string, scheduleRef: string) =>
-			z
-				.object({
+			callJson(
+				transport,
+				z.object({
 					taskId: z.string(),
 					scheduleRef: z.string(),
 					commandId: z.string(),
 					expiresAt: z.number().int(),
-				})
-				.parse(
-					await (
-						await transport.call(
-							`/api/dots/tasks/${encodeURIComponent(id)}/schedules`,
-							json({ scheduleRef }),
-						)
-					).json(),
-				),
+				}),
+				`/api/dots/tasks/${encodeURIComponent(id)}/schedules`,
+				json({ scheduleRef }),
+			),
 	};
 }

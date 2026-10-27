@@ -1,5 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { Hono } from "hono";
+import { answerError } from "../../../application/app";
 import { registerDialogue } from "../controller";
 import {
 	STUDIO,
@@ -242,6 +243,7 @@ test("the specialist turn never calls the conversation model, and a failed turn 
 test("HTTP: the session, its commands and their errors", async () => {
 	const h = await harness();
 	const app = new Hono();
+	app.onError(answerError);
 	registerDialogue(app, h.dialogue);
 	expect(
 		await (await app.request("/api/conversations/main/specialist")).json(),
@@ -290,6 +292,7 @@ test("HTTP: the session, its commands and their errors", async () => {
 test("HTTP: an utterance while a turn holds the work is accepted and queued", async () => {
 	const h = await harness();
 	const app = new Hono();
+	app.onError(answerError);
 	registerDialogue(app, h.dialogue);
 	await start(h);
 	let release!: () => void;
@@ -319,6 +322,7 @@ test("HTTP: an utterance while a turn holds the work is accepted and queued", as
 test("the addressee the screen showed must still listen: otherwise nothing is stored (409 addressee_changed)", async () => {
 	const h = await harness();
 	const app = new Hono();
+	app.onError(answerError);
 	registerDialogue(app, h.dialogue);
 	const send = (addressee: unknown, text = "こんにちは") =>
 		app.request("/api/runs", {

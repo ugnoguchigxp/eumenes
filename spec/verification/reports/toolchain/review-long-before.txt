@@ -1,0 +1,42 @@
+bun test v1.4.2 (744846f84)
+
+api/application/toolchain-live-check.test.ts:
+(pass) live stock checking rejects a different generated price or date, including fabricated source claims [0.59ms]
+(pass) live weather checking uses the sourced highest-temperature claim rather than another number [0.12ms]
+
+api/application/toolchain.test.ts:
+(pass) authenticated API E2E: 東京の天気を調べて; child returns summary, never raw pages [57.23ms]
+(pass) authenticated API E2E: AAPLの株価を調べて; child returns summary, never raw pages [35.38ms]
+(pass) 1 inference slot: conversation continues while child waits; cancellation rejects late results [61.62ms]
+(pass) rolled-back cancellation cannot cancel another conversation's pending inference [42.17ms]
+(pass) bounded rejected worker output: {"badJson":true} [28.70ms]
+(pass) bounded rejected worker output: {"badQuote":true} [33.42ms]
+(pass) invalid tool arguments are repaired once; no acquisition occurs until the contract is valid [34.06ms]
+(pass) restart interrupts the whole tree; late acquisition cannot append an answer [26.85ms]
+(pass) data deletion invalidates the report and preserves accepted conversation [35.55ms]
+(pass) retention removes 14-day result data then 30-day task metadata without deleting the answer [32.95ms]
+(pass) queue capacity failure rolls back child creation and reaches a terminal answer [23.34ms]
+(pass) worker deadline cancels acquisition and returns a bounded failure to the parent [31.06ms]
+(pass) deleting a report during final inference cancels adoption of the old answer [31.97ms]
+(pass) CLI reads catalogue, task and summary through the authenticated API [199.24ms]
+(pass) ambiguous target returns a clarification question without acquiring data or treating it as a retrieval failure [24.24ms]
+(pass) a mismatched quote is rejected and repaired once using the same observations [32.34ms]
+493 | 	const h=await harness();
+494 | 	try {
+495 | 		const question="東京の天気を調べて。"+"補足の条件です。".repeat(400);
+496 | 		const run=await h.dialogue.submit({requestId:crypto.randomUUID(),conversationId:"long",text:question});
+497 | 		expect((await h.dialogue.waitForTerminal(run.id,{timeoutMs:5000}))?.status).toBe("completed");
+498 | 		expect(h.dialogue.answerText(run.id)).toContain("26度");
+                                              ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "26度"
+Received: "公開情報を取得できませんでした。"
+
+      at <anonymous> (/Users/y.noguchi/Code/eumenes/api/application/toolchain.test.ts:498:41)
+(fail) a long accepted request remains intact when delegated to a research worker [25.49ms]
+
+ 18 pass
+ 1 fail
+ 121 expect() calls
+Ran 19 tests across 2 files. [889.00ms]

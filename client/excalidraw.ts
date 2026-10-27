@@ -6,7 +6,7 @@ import {
 	type Reference,
 	type Scene,
 } from "../api/domains/excalidraw/contracts";
-import { callJson, json, type Transport } from "./transport";
+import { callJson, json, withQuery, type Transport } from "./transport";
 
 const referenceSchema: z.ZodType<Reference> = z.object({
 	id: z.string(),
@@ -38,6 +38,11 @@ const operationSchema = z.object({
 });
 const createdSchema = documentSchema.extend({ referenceId: z.string() });
 
+const idempotent = (init: ReturnType<typeof json>, key: string) => ({
+	...init,
+	headers: { ...init.headers, "Idempotency-Key": key },
+});
+
 export function excalidrawClient(t: Transport) {
 	const path = (id: string) =>
 		`/api/excalidraw/sessions/${encodeURIComponent(id)}`;
@@ -49,7 +54,7 @@ export function excalidrawClient(t: Transport) {
 			callJson(
 				t,
 				z.array(referenceSchema),
-				`/api/excalidraw/references?conversationId=${encodeURIComponent(conversationId)}`,
+				withQuery("/api/excalidraw/references", { conversationId }),
 				{ signal },
 			),
 		drawingOperations: (signal?: AbortSignal) =>
@@ -93,14 +98,12 @@ export function excalidrawClient(t: Transport) {
 			input: { title: string; scene: Scene; expectedRevision: number },
 			key: string,
 		): Promise<Drawing> =>
-			callJson(t, documentSchema, `${path(id)}/document`, {
-				method: "PUT",
-				headers: {
-					"Content-Type": "application/json",
-					"Idempotency-Key": key,
-				},
-				body: JSON.stringify(input),
-			}),
+			callJson(
+				t,
+				documentSchema,
+				`${path(id)}/document`,
+				idempotent(json(input, "PUT"), key),
+			),
 		createDrawing: async (
 			id: string,
 			input: { title: string; scene: Scene },
@@ -108,12 +111,7 @@ export function excalidrawClient(t: Transport) {
 			signal?: AbortSignal,
 		): Promise<Drawing & { referenceId: string }> =>
 			callJson(t, createdSchema, `${path(id)}/document`, {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					"Idempotency-Key": key,
-				},
-				body: JSON.stringify(input),
+				...idempotent(json(input), key),
 				signal,
 			}),
 		deleteDrawing: async (
@@ -121,7 +119,10 @@ export function excalidrawClient(t: Transport) {
 			conversationId = "main",
 		): Promise<void> => {
 			await t.call(
-				`/api/excalidraw/references/${encodeURIComponent(referenceId)}?conversationId=${encodeURIComponent(conversationId)}`,
+				withQuery(
+					`/api/excalidraw/references/${encodeURIComponent(referenceId)}`,
+					{ conversationId },
+				),
 				{ method: "DELETE" },
 			);
 		},

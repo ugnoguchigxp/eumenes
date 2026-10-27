@@ -160,6 +160,7 @@ const run = {
 	sourceKind: "manual",
 	scheduleId: null,
 	occurrenceId: null,
+	specialistSessionId: null,
 	createdAt: t0,
 	updatedAt: t0,
 };

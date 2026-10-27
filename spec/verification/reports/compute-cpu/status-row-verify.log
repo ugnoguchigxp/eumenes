@@ -1,0 +1,449 @@
+$ bun scripts/verify.ts --domain compute
+[verify] selected=compute dependencyClosure=queue,compute
+[verify] Shared DesignSystem dist: do not overlap dev, browser tests or other builds; endpoint hashes cannot detect change-and-restore.
+[verify] inventory
+[verify] boundaries
+[verify] system-context: /Users/y.noguchi/.bun/bin/bun run context:check
+$ s11tnext build --check --release-profile application
+Generated outputs are current (sha256:d0be4b10d6bbe60495e0f7820d9577246b82c1aa462fcd5c124ab1d4522f51d1).
+[verify] size-budget: /Users/y.noguchi/.bun/bin/bun scripts/size-budget.ts api/domains/compute web/src/domains/compute packages/design-system/src/components/ComputeWorkspace
+size-budget ok (10 files)
+[verify] format: /Users/y.noguchi/.bun/bin/bun run format:check api/domains/compute web/src/domains/compute packages/design-system/src/components/ComputeWorkspace
+$ oxfmt --check api/domains/compute web/src/domains/compute packages/design-system/src/components/ComputeWorkspace
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 5ms on 16 files using 10 threads.
+[verify] lint: /Users/y.noguchi/.bun/bin/bun run lint api/domains/compute web/src/domains/compute packages/design-system/src/components/ComputeWorkspace
+$ oxlint --deny-warnings api/domains/compute web/src/domains/compute packages/design-system/src/components/ComputeWorkspace
+[verify] design-system typecheck: /Users/y.noguchi/.bun/bin/bun run --cwd packages/design-system typecheck
+$ bun check
+✓ No type errors in 483 files [436.65ms]
+[verify] design-system build: /Users/y.noguchi/.bun/bin/bun run --cwd packages/design-system build
+$ bun check -p tsconfig.build.json && vite build
+✓ No type errors in 279 files [190.56ms]
+vite v7.3.6 building client environment for production...
+transforming...
+✓ 312 modules transformed.
+rendering chunks...
+
+[vite:dts] Start generate declaration files...
+computing gzip size...
+dist/design-system.css                                                     211.77 kB │ gzip: 35.86 kB
+dist/components/Collapsible/Collapsible.mjs                                  0.21 kB │ gzip:  0.14 kB
+dist/components/ImageViewer/ImageFrame.mjs                                   0.23 kB │ gzip:  0.19 kB
+dist/utils/cn.mjs                                                            0.24 kB │ gzip:  0.18 kB
+dist/components/Model3dWorkspace/types.mjs                                   0.29 kB │ gzip:  0.26 kB
+dist/components/OcrWorkspace/types.mjs                                       0.31 kB │ gzip:  0.24 kB
+dist/components/ActionButton/SaveButton.mjs                                  0.36 kB │ gzip:  0.25 kB
+dist/components/ActionButton/EditButton.mjs                                  0.36 kB │ gzip:  0.25 kB
+dist/components/ActionButton/DeleteButton.mjs                                0.37 kB │ gzip:  0.26 kB
+dist/components/ActionButton/CancelButton.mjs                                0.37 kB │ gzip:  0.26 kB
+dist/components/ScrollArea/ScrollArea.mjs                                    0.42 kB │ gzip:  0.27 kB
+dist/components/Subtitle/Subtitle.mjs                                        0.44 kB │ gzip:  0.28 kB
+dist/components/ActionButton/CreateButton.mjs                                0.44 kB │ gzip:  0.30 kB
+dist/utils/menuKeyboard.mjs                                                  0.48 kB │ gzip:  0.32 kB
+dist/styles/themes.mjs                                                       0.50 kB │ gzip:  0.24 kB
+dist/components/Label/Label.mjs                                              0.55 kB │ gzip:  0.33 kB
+dist/components/Separator/Separator.mjs                                      0.59 kB │ gzip:  0.35 kB
+dist/hooks/useMobile.mjs                                                     0.63 kB │ gzip:  0.32 kB
+dist/components/Textarea/Textarea.mjs                                        0.67 kB │ gzip:  0.39 kB
+dist/components/DigitalClock/format.mjs                                      0.67 kB │ gzip:  0.40 kB
+dist/components/DigitalClock/DigitalClock.mjs                                0.72 kB │ gzip:  0.40 kB
+dist/components/Tooltip/Tooltip.mjs                                          0.75 kB │ gzip:  0.43 kB
+dist/components/Skeleton/Skeleton.mjs                                        0.76 kB │ gzip:  0.40 kB
+dist/components/Input/Input.mjs                                              0.77 kB │ gzip:  0.43 kB
+dist/contexts/CalendarContext.mjs                                            0.82 kB │ gzip:  0.39 kB
+dist/components/CopyClipButton/CopyClipButton.mjs                            0.82 kB │ gzip:  0.49 kB
+dist/components/Subtitle/SubtitlePreview.mjs                                 0.84 kB │ gzip:  0.48 kB
+dist/components/ConfirmModal/ConfirmModal.mjs                                0.84 kB │ gzip:  0.45 kB
+dist/components/TerminalWorkspace/TerminalWorkspace.mjs                      0.94 kB │ gzip:  0.49 kB
+dist/components/Popover/Popover.mjs                                          1.00 kB │ gzip:  0.50 kB
+dist/components/SelectableTextInput/SelectableTextInput.mjs                  1.01 kB │ gzip:  0.45 kB
+dist/components/MediaCard/MediaCard.mjs                                      1.02 kB │ gzip:  0.44 kB
+dist/components/DrawingWorkspace/frame-protocol.mjs                          1.02 kB │ gzip:  0.47 kB
+dist/components/Timeline/Timeline.mjs                                        1.06 kB │ gzip:  0.45 kB
+dist/components/NotificationCard/NotificationCard.mjs                        1.12 kB │ gzip:  0.41 kB
+dist/components/RangeSlider/RangeSlider.mjs                                  1.12 kB │ gzip:  0.55 kB
+dist/components/StatTile/StatTile.mjs                                        1.13 kB │ gzip:  0.52 kB
+dist/components/Faq/Faq.mjs                                                  1.13 kB │ gzip:  0.51 kB
+dist/components/ActionButton/ActionButton.mjs                                1.14 kB │ gzip:  0.52 kB
+dist/components/Switch/Switch.mjs                                            1.18 kB │ gzip:  0.55 kB
+dist/components/RadioButtonGroup/RadioButtonGroup.mjs                        1.18 kB │ gzip:  0.51 kB
+dist/components/Spinner/Spinner.mjs                                          1.19 kB │ gzip:  0.58 kB
+dist/components/SimpleSearchInput/SimpleSearchInput.mjs                      1.19 kB │ gzip:  0.61 kB
+dist/components/KanbanBoard/positions.mjs                                    1.25 kB │ gzip:  0.64 kB
+dist/components/FullscreenDialog/FullscreenDialog.mjs                        1.28 kB │ gzip:  0.53 kB
+dist/components/MiniTable/MiniTable.mjs                                      1.33 kB │ gzip:  0.59 kB
+dist/components/Avatar/Avatar.mjs                                            1.33 kB │ gzip:  0.67 kB
+dist/components/ErrorState/ErrorState.mjs                                    1.35 kB │ gzip:  0.68 kB
+dist/components/ViewSwitcher/ViewSwitcher.mjs                                1.36 kB │ gzip:  0.59 kB
+dist/components/ContentImage/ContentImage.mjs                                1.38 kB │ gzip:  0.66 kB
+dist/components/Testimonial/Testimonial.mjs                                  1.42 kB │ gzip:  0.57 kB
+dist/components/CtaBanner/CtaBanner.mjs                                      1.49 kB │ gzip:  0.57 kB
+dist/components/ImageWorkspace/image-creation-options.mjs                    1.50 kB │ gzip:  0.82 kB
+dist/components/MusicPlayer/usePlayback.mjs                                  1.52 kB │ gzip:  0.66 kB
+dist/components/TimerWorkspace/TimerDurationFields.mjs                       1.52 kB │ gzip:  0.65 kB
+dist/components/AdaptiveText/AdaptiveText.mjs                                1.54 kB │ gzip:  0.79 kB
+dist/components/MusicPlayer/useAudioAnalysis.mjs                             1.60 kB │ gzip:  0.64 kB
+dist/components/ObjectRecognitionWorkspace/CameraCapture.mjs                 1.60 kB │ gzip:  0.68 kB
+dist/components/Pagination/Pagination.mjs                                    1.62 kB │ gzip:  0.69 kB
+dist/components/MusicWorkspace/MusicCreationPanel.mjs                        1.62 kB │ gzip:  0.65 kB
+dist/components/FeatureCard/FeatureCard.mjs                                  1.65 kB │ gzip:  0.88 kB
+dist/components/ContentHeader/ContentHeader.mjs                              1.66 kB │ gzip:  0.67 kB
+dist/components/Chart/chart-data.mjs                                         1.68 kB │ gzip:  0.85 kB
+dist/components/RecordsWorkspace/RecordList.mjs                              1.75 kB │ gzip:  0.69 kB
+dist/components/Select/selectVariants.mjs                                    1.75 kB │ gzip:  0.72 kB
+dist/components/TimerWorkspace/ClockDial.mjs                                 1.76 kB │ gzip:  0.62 kB
+dist/components/PricingCard/PricingCard.mjs                                  1.77 kB │ gzip:  0.65 kB
+dist/components/OptionButtonGroup/OptionButtonGroup.mjs                      1.80 kB │ gzip:  0.70 kB
+dist/components/MusicWorkspace/MusicCurrentTrack.mjs                         1.80 kB │ gzip:  0.78 kB
+dist/components/TextInput/TextInput.mjs                                      1.81 kB │ gzip:  0.59 kB
+dist/components/ScaleInput/ScaleInput.mjs                                    1.82 kB │ gzip:  0.81 kB
+dist/components/GenerationStatus/GenerationStatus.mjs                        1.91 kB │ gzip:  0.84 kB
+dist/components/ChoiceGroup/ChoiceGroup.mjs                                  1.91 kB │ gzip:  0.77 kB
+dist/components/NumberFormat/NumberFormat.mjs                                1.91 kB │ gzip:  0.65 kB
+dist/components/TimerWorkspace/TimerWorkspace.mjs                            1.95 kB │ gzip:  0.71 kB
+dist/components/Hero/Hero.mjs                                                2.02 kB │ gzip:  0.70 kB
+dist/components/Diagram/geometry.mjs                                         2.05 kB │ gzip:  1.02 kB
+dist/components/Formula/Formula.mjs                                          2.17 kB │ gzip:  1.04 kB
+dist/components/KanbanBoard/ExecutorLogo.mjs                                 2.22 kB │ gzip:  1.18 kB
+dist/components/Badge/Badge.mjs                                              2.25 kB │ gzip:  0.80 kB
+dist/components/MusicPlayer/PlaybackControls.mjs                             2.26 kB │ gzip:  0.66 kB
+dist/components/MusicWorkspace/MusicVisualizer.mjs                           2.28 kB │ gzip:  1.10 kB
+dist/components/Card/Card.mjs                                                2.31 kB │ gzip:  0.65 kB
+dist/components/ComparisonTable/ComparisonTable.mjs                          2.42 kB │ gzip:  0.75 kB
+dist/components/Tabs/Tabs.mjs                                                2.42 kB │ gzip:  0.91 kB
+dist/components/KanbanBoard/KanbanColumn.mjs                                 2.45 kB │ gzip:  0.99 kB
+dist/components/DateDisplay/DateDisplay.mjs                                  2.54 kB │ gzip:  0.62 kB
+dist/components/ImageViewer/ImageViewer.mjs                                  2.64 kB │ gzip:  1.12 kB
+dist/components/ImagePicker/ImageGrid.mjs                                    2.67 kB │ gzip:  0.93 kB
+dist/components/TimerWorkspace/StopwatchPane.mjs                             2.69 kB │ gzip:  0.98 kB
+dist/components/Form/Form.mjs                                                2.79 kB │ gzip:  1.02 kB
+dist/components/DataTable/DataTable.mjs                                      2.82 kB │ gzip:  0.98 kB
+dist/components/Calculator/calculator-expression.mjs                         2.88 kB │ gzip:  0.97 kB
+dist/components/KanbanBoard/MoveMenu.mjs                                     2.92 kB │ gzip:  1.18 kB
+dist/components/ProgressBar/ProgressBar.mjs                                  2.95 kB │ gzip:  1.22 kB
+dist/components/Checkbox/Checkbox.mjs                                        2.95 kB │ gzip:  0.89 kB
+dist/components/DrawingWorkspace/useDrawingFrame.mjs                         2.98 kB │ gzip:  1.30 kB
+dist/components/BrowserWorkspace/labels.mjs                                  3.00 kB │ gzip:  1.36 kB
+dist/components/AsyncDataWrapper/AsyncDataWrapper.mjs                        3.05 kB │ gzip:  1.06 kB
+dist/components/ProductCard/ProductCard.mjs                                  3.06 kB │ gzip:  1.06 kB
+dist/components/EditableSelect/EditableSelect.mjs                            3.17 kB │ gzip:  1.18 kB
+dist/components/ChatDock/ChatDock.mjs                                        3.18 kB │ gzip:  1.04 kB
+dist/components/BrowserWorkspace/BrowserTabList.mjs                          3.18 kB │ gzip:  0.95 kB
+dist/components/Model3dWorkspace/Model3dGenerationList.mjs                   3.25 kB │ gzip:  1.11 kB
+dist/components/Slides/Slides.mjs                                            3.30 kB │ gzip:  1.23 kB
+dist/components/RecordsWorkspace/SavedProcedures.mjs                         3.30 kB │ gzip:  1.19 kB
+dist/components/DateFormat/DateFormat.mjs                                    3.35 kB │ gzip:  1.32 kB
+dist/components/ImageWorkspace/ImagePreview.mjs                              3.39 kB │ gzip:  1.13 kB
+dist/components/ImageWorkspace/ImageWorkspace.mjs                            3.51 kB │ gzip:  1.14 kB
+dist/components/ActivityTimeline/ActivityTimeline.mjs                        3.64 kB │ gzip:  1.46 kB
+dist/components/MusicWorkspace/MusicTrackDetails.mjs                         3.65 kB │ gzip:  1.17 kB
+dist/components/NotificationToast/NotificationToast.mjs                      3.67 kB │ gzip:  1.23 kB
+dist/components/KanbanBoard/ExecutorQueues.mjs                               3.69 kB │ gzip:  1.27 kB
+dist/components/TerminalWorkspace/TerminalPane.mjs                           3.69 kB │ gzip:  1.50 kB
+dist/components/Playlist/Playlist.mjs                                        3.70 kB │ gzip:  1.23 kB
+dist/components/BrowserWorkspace/BrowserConnectionPanel.mjs                  3.79 kB │ gzip:  1.34 kB
+dist/components/Drawer/Drawer.mjs                                            3.84 kB │ gzip:  1.27 kB
+dist/components/Canvas2D/Canvas2D.mjs                                        4.01 kB │ gzip:  1.58 kB
+dist/components/RecordsWorkspace/RecordsWorkspace.mjs                        4.17 kB │ gzip:  1.36 kB
+dist/components/SearchableSelect/SearchableSelect.mjs                        4.17 kB │ gzip:  1.48 kB
+dist/components/BrowserWorkspace/BrowserSettings.mjs                         4.19 kB │ gzip:  1.49 kB
+dist/components/Select/Select.mjs                                            4.23 kB │ gzip:  1.33 kB
+dist/components/KanbanBoard/CommitPushDialog.mjs                             4.28 kB │ gzip:  1.54 kB
+dist/components/ObjectRecognitionWorkspace/useCameraCapture.mjs              4.31 kB │ gzip:  1.77 kB
+dist/components/Button/Button.mjs                                            4.35 kB │ gzip:  1.54 kB
+dist/components/Model3dWorkspace/Model3dDetail.mjs                           4.52 kB │ gzip:  1.50 kB
+dist/components/MusicWorkspace/music-creation-options.mjs                    4.54 kB │ gzip:  1.79 kB
+dist/components/MusicPlayer/MusicPlayer.mjs                                  4.67 kB │ gzip:  1.45 kB
+dist/components/ObjectRecognitionWorkspace/RecognitionHistory.mjs            4.72 kB │ gzip:  1.55 kB
+dist/components/Calculator/Calculator.mjs                                    4.79 kB │ gzip:  1.94 kB
+dist/components/KanbanBoard/KanbanBoard.mjs                                  4.88 kB │ gzip:  1.80 kB
+dist/components/MenuButtonGroup/MenuButtonGroup.mjs                          4.93 kB │ gzip:  1.78 kB
+dist/components/StepGuide/StepGuide.mjs                                      5.04 kB │ gzip:  1.61 kB
+dist/components/MusicLibraryControls/MusicLibraryControls.mjs                5.07 kB │ gzip:  1.47 kB
+dist/components/TimerWorkspace/TimerPane.mjs                                 5.29 kB │ gzip:  1.78 kB
+dist/components/BrowserWorkspace/BrowserScriptPanel.mjs                      5.35 kB │ gzip:  1.84 kB
+dist/components/BrowserWorkspace/BrowserCaptureList.mjs                      5.54 kB │ gzip:  1.63 kB
+dist/components/Model3dWorkspace/Model3dGenerationForm.mjs                   5.54 kB │ gzip:  1.72 kB
+dist/components/ImageWorkspace/ImageGallery.mjs                              5.64 kB │ gzip:  1.80 kB
+dist/components/Model3dWorkspace/Model3dLibrary.mjs                          5.65 kB │ gzip:  1.82 kB
+dist/components/Model3dWorkspace/Model3dWorkspace.mjs                        5.66 kB │ gzip:  1.77 kB
+dist/components/Chart/Chart.mjs                                              5.71 kB │ gzip:  1.93 kB
+dist/components/BrowserWorkspace/BrowserWorkspace.mjs                        5.79 kB │ gzip:  1.80 kB
+dist/components/DropdownMenu/DropdownMenu.mjs                                5.88 kB │ gzip:  2.08 kB
+dist/components/KanbanBoard/CardForms.mjs                                    6.26 kB │ gzip:  1.93 kB
+dist/components/OcrWorkspace/OcrResult.mjs                                   6.48 kB │ gzip:  1.83 kB
+dist/components/OcrWorkspace/OcrPanel.mjs                                    7.23 kB │ gzip:  2.53 kB
+dist/components/Modal/Modal.mjs                                              7.33 kB │ gzip:  2.16 kB
+dist/components/ObjectRecognitionWorkspace/DetectionPreview.mjs              7.46 kB │ gzip:  2.48 kB
+dist/components/OcrWorkspace/OcrCorrection.mjs                               7.64 kB │ gzip:  2.15 kB
+dist/components/ServerDataTable/ServerDataTable.mjs                          7.65 kB │ gzip:  2.39 kB
+dist/components/TreeMenu/TreeMenu.mjs                                        7.71 kB │ gzip:  2.06 kB
+dist/components/LightSpiritLab/LightSpiritLab.mjs                            7.79 kB │ gzip:  2.06 kB
+dist/components/ImagePicker/ImagePicker.mjs                                  8.16 kB │ gzip:  2.66 kB
+dist/components/NavigationStepper/NavigationStepper.mjs                      8.25 kB │ gzip:  2.02 kB
+dist/components/InfiniteListMenu/InfiniteListMenu.mjs                        8.37 kB │ gzip:  2.41 kB
+dist/components/KeypadModal/KeypadModal.mjs                                  8.72 kB │ gzip:  2.50 kB
+dist/components/ComputeWorkspace/index.mjs                                   8.73 kB │ gzip:  2.37 kB
+dist/components/Diagram/Diagram.mjs                                          9.08 kB │ gzip:  2.84 kB
+dist/components/GoogleAccounts/index.mjs                                     9.30 kB │ gzip:  2.58 kB
+dist/components/OcrWorkspace/OcrMedia.mjs                                   10.46 kB │ gzip:  3.03 kB
+dist/components/MusicWorkspace/MusicWorkspace.mjs                           11.77 kB │ gzip:  2.91 kB
+dist/components/DrawingWorkspace/index.mjs                                  12.02 kB │ gzip:  2.80 kB
+dist/components/ImageWorkspace/ImageCreationForm.mjs                        12.33 kB │ gzip:  2.96 kB
+dist/components/SettingsPanels/index.mjs                                    12.73 kB │ gzip:  3.43 kB
+dist/components/KanbanBoard/KanbanCard.mjs                                  12.82 kB │ gzip:  3.61 kB
+dist/components/MusicWorkspace/MusicCreationForm.mjs                        14.04 kB │ gzip:  3.58 kB
+dist/components/ObjectRecognitionWorkspace/ObjectRecognitionWorkspace.mjs   14.06 kB │ gzip:  4.03 kB
+dist/index.mjs                                                              14.43 kB │ gzip:  3.37 kB
+[vite:dts] Start rollup declaration files...
+Analysis will use the bundled TypeScript version 5.9.3
+[vite:dts] Declaration files built in 4162ms.
+
+dist/design-system.css                                                    211.77 kB │ gzip: 35.86 kB
+dist/components/ImageViewer/ImageFrame.js                                   0.25 kB │ gzip:  0.20 kB
+dist/utils/cn.js                                                            0.26 kB │ gzip:  0.22 kB
+dist/components/ActionButton/SaveButton.js                                  0.34 kB │ gzip:  0.25 kB
+dist/components/OcrWorkspace/types.js                                       0.34 kB │ gzip:  0.28 kB
+dist/components/ActionButton/EditButton.js                                  0.34 kB │ gzip:  0.26 kB
+dist/components/ActionButton/DeleteButton.js                                0.35 kB │ gzip:  0.26 kB
+dist/components/ActionButton/CancelButton.js                                0.35 kB │ gzip:  0.27 kB
+dist/components/Model3dWorkspace/types.js                                   0.36 kB │ gzip:  0.32 kB
+dist/components/ActionButton/CreateButton.js                                0.39 kB │ gzip:  0.29 kB
+dist/components/Subtitle/Subtitle.js                                        0.39 kB │ gzip:  0.28 kB
+dist/utils/menuKeyboard.js                                                  0.46 kB │ gzip:  0.34 kB
+dist/styles/themes.js                                                       0.48 kB │ gzip:  0.27 kB
+dist/components/Collapsible/Collapsible.js                                  0.55 kB │ gzip:  0.32 kB
+dist/components/DigitalClock/DigitalClock.js                                0.58 kB │ gzip:  0.37 kB
+dist/components/DigitalClock/format.js                                      0.62 kB │ gzip:  0.41 kB
+dist/components/CopyClipButton/CopyClipButton.js                            0.63 kB │ gzip:  0.44 kB
+dist/components/ScrollArea/ScrollArea.js                                    0.64 kB │ gzip:  0.40 kB
+dist/components/ConfirmModal/ConfirmModal.js                                0.66 kB │ gzip:  0.43 kB
+dist/contexts/CalendarContext.js                                            0.66 kB │ gzip:  0.35 kB
+dist/components/Subtitle/SubtitlePreview.js                                 0.68 kB │ gzip:  0.46 kB
+dist/components/TerminalWorkspace/TerminalWorkspace.js                      0.77 kB │ gzip:  0.47 kB
+dist/components/Label/Label.js                                              0.77 kB │ gzip:  0.47 kB
+dist/components/Separator/Separator.js                                      0.78 kB │ gzip:  0.46 kB
+dist/components/MediaCard/MediaCard.js                                      0.78 kB │ gzip:  0.40 kB
+dist/components/ActionButton/ActionButton.js                                0.81 kB │ gzip:  0.48 kB
+dist/components/Timeline/Timeline.js                                        0.81 kB │ gzip:  0.42 kB
+dist/components/RangeSlider/RangeSlider.js                                  0.82 kB │ gzip:  0.48 kB
+dist/components/Faq/Faq.js                                                  0.85 kB │ gzip:  0.46 kB
+dist/hooks/useMobile.js                                                     0.87 kB │ gzip:  0.46 kB
+dist/components/RadioButtonGroup/RadioButtonGroup.js                        0.87 kB │ gzip:  0.46 kB
+dist/components/SelectableTextInput/SelectableTextInput.js                  0.87 kB │ gzip:  0.42 kB
+dist/components/StatTile/StatTile.js                                        0.87 kB │ gzip:  0.47 kB
+dist/components/NotificationCard/NotificationCard.js                        0.87 kB │ gzip:  0.40 kB
+dist/components/Skeleton/Skeleton.js                                        0.89 kB │ gzip:  0.51 kB
+dist/components/Textarea/Textarea.js                                        0.90 kB │ gzip:  0.51 kB
+dist/components/ViewSwitcher/ViewSwitcher.js                                0.91 kB │ gzip:  0.50 kB
+dist/components/MiniTable/MiniTable.js                                      0.92 kB │ gzip:  0.53 kB
+dist/components/DrawingWorkspace/frame-protocol.js                          0.93 kB │ gzip:  0.48 kB
+dist/components/TimerWorkspace/TimerDurationFields.js                       0.94 kB │ gzip:  0.56 kB
+dist/components/Tooltip/Tooltip.js                                          0.94 kB │ gzip:  0.55 kB
+dist/components/SimpleSearchInput/SimpleSearchInput.js                      0.97 kB │ gzip:  0.57 kB
+dist/components/Input/Input.js                                              0.99 kB │ gzip:  0.55 kB
+dist/components/ContentImage/ContentImage.js                                0.99 kB │ gzip:  0.58 kB
+dist/components/MusicWorkspace/MusicCreationPanel.js                        1.01 kB │ gzip:  0.57 kB
+dist/components/Testimonial/Testimonial.js                                  1.01 kB │ gzip:  0.50 kB
+dist/components/TimerWorkspace/ClockDial.js                                 1.02 kB │ gzip:  0.53 kB
+dist/components/ErrorState/ErrorState.js                                    1.02 kB │ gzip:  0.63 kB
+dist/components/TextInput/TextInput.js                                      1.03 kB │ gzip:  0.49 kB
+dist/components/Pagination/Pagination.js                                    1.04 kB │ gzip:  0.61 kB
+dist/components/AdaptiveText/AdaptiveText.js                                1.08 kB │ gzip:  0.66 kB
+dist/components/ObjectRecognitionWorkspace/CameraCapture.js                 1.08 kB │ gzip:  0.60 kB
+dist/components/CtaBanner/CtaBanner.js                                      1.08 kB │ gzip:  0.50 kB
+dist/components/KanbanBoard/positions.js                                    1.10 kB │ gzip:  0.64 kB
+dist/components/Spinner/Spinner.js                                          1.13 kB │ gzip:  0.65 kB
+dist/components/MusicPlayer/usePlayback.js                                  1.13 kB │ gzip:  0.62 kB
+dist/components/MusicPlayer/useAudioAnalysis.js                             1.17 kB │ gzip:  0.57 kB
+dist/components/FullscreenDialog/FullscreenDialog.js                        1.18 kB │ gzip:  0.60 kB
+dist/components/FeatureCard/FeatureCard.js                                  1.18 kB │ gzip:  0.68 kB
+dist/components/RecordsWorkspace/RecordList.js                              1.19 kB │ gzip:  0.61 kB
+dist/components/ChoiceGroup/ChoiceGroup.js                                  1.21 kB │ gzip:  0.65 kB
+dist/components/Popover/Popover.js                                          1.21 kB │ gzip:  0.61 kB
+dist/components/PricingCard/PricingCard.js                                  1.21 kB │ gzip:  0.58 kB
+dist/components/ContentHeader/ContentHeader.js                              1.23 kB │ gzip:  0.62 kB
+dist/components/Avatar/Avatar.js                                            1.24 kB │ gzip:  0.72 kB
+dist/components/MusicWorkspace/MusicCurrentTrack.js                         1.24 kB │ gzip:  0.70 kB
+dist/components/ImageWorkspace/image-creation-options.js                    1.29 kB │ gzip:  0.81 kB
+dist/components/OptionButtonGroup/OptionButtonGroup.js                      1.31 kB │ gzip:  0.61 kB
+dist/components/TimerWorkspace/TimerWorkspace.js                            1.31 kB │ gzip:  0.63 kB
+dist/components/GenerationStatus/GenerationStatus.js                        1.33 kB │ gzip:  0.73 kB
+dist/components/Switch/Switch.js                                            1.35 kB │ gzip:  0.67 kB
+dist/components/Hero/Hero.js                                                1.38 kB │ gzip:  0.62 kB
+dist/components/Select/selectVariants.js                                    1.44 kB │ gzip:  0.72 kB
+dist/components/MusicPlayer/PlaybackControls.js                             1.45 kB │ gzip:  0.59 kB
+dist/components/NumberFormat/NumberFormat.js                                1.45 kB │ gzip:  0.57 kB
+dist/components/Chart/chart-data.js                                         1.46 kB │ gzip:  0.81 kB
+dist/components/Formula/Formula.js                                          1.56 kB │ gzip:  0.88 kB
+dist/components/ComparisonTable/ComparisonTable.js                          1.56 kB │ gzip:  0.65 kB
+dist/components/KanbanBoard/KanbanColumn.js                                 1.58 kB │ gzip:  0.84 kB
+dist/components/DateDisplay/DateDisplay.js                                  1.59 kB │ gzip:  0.55 kB
+dist/components/Diagram/geometry.js                                         1.63 kB │ gzip:  0.93 kB
+dist/components/ScaleInput/ScaleInput.js                                    1.65 kB │ gzip:  0.85 kB
+dist/components/DataTable/DataTable.js                                      1.65 kB │ gzip:  0.80 kB
+dist/components/KanbanBoard/MoveMenu.js                                     1.66 kB │ gzip:  0.93 kB
+dist/components/ImagePicker/ImageGrid.js                                    1.69 kB │ gzip:  0.80 kB
+dist/components/MusicWorkspace/MusicVisualizer.js                           1.71 kB │ gzip:  0.99 kB
+dist/components/TimerWorkspace/StopwatchPane.js                             1.83 kB │ gzip:  0.87 kB
+dist/components/Tabs/Tabs.js                                                1.86 kB │ gzip:  0.89 kB
+dist/components/ImageViewer/ImageViewer.js                                  1.86 kB │ gzip:  0.97 kB
+dist/components/BrowserWorkspace/BrowserTabList.js                          1.89 kB │ gzip:  0.82 kB
+dist/components/Slides/Slides.js                                            1.89 kB │ gzip:  0.94 kB
+dist/components/Card/Card.js                                                1.93 kB │ gzip:  0.73 kB
+dist/components/Checkbox/Checkbox.js                                        1.97 kB │ gzip:  0.88 kB
+dist/components/Model3dWorkspace/Model3dGenerationList.js                   2.00 kB │ gzip:  0.97 kB
+dist/components/RecordsWorkspace/SavedProcedures.js                         2.01 kB │ gzip:  1.01 kB
+dist/components/ImageWorkspace/ImagePreview.js                              2.04 kB │ gzip:  0.96 kB
+dist/components/ProductCard/ProductCard.js                                  2.05 kB │ gzip:  0.91 kB
+dist/components/AsyncDataWrapper/AsyncDataWrapper.js                        2.06 kB │ gzip:  0.89 kB
+dist/components/KanbanBoard/ExecutorQueues.js                               2.11 kB │ gzip:  1.06 kB
+dist/components/KanbanBoard/ExecutorLogo.js                                 2.11 kB │ gzip:  1.18 kB
+dist/components/Calculator/calculator-expression.js                         2.14 kB │ gzip:  0.90 kB
+dist/components/ChatDock/ChatDock.js                                        2.15 kB │ gzip:  1.00 kB
+dist/components/EditableSelect/EditableSelect.js                            2.21 kB │ gzip:  1.12 kB
+dist/components/ImageWorkspace/ImageWorkspace.js                            2.21 kB │ gzip:  0.99 kB
+dist/components/Playlist/Playlist.js                                        2.21 kB │ gzip:  1.08 kB
+dist/components/ProgressBar/ProgressBar.js                                  2.21 kB │ gzip:  1.19 kB
+dist/components/ActivityTimeline/ActivityTimeline.js                        2.21 kB │ gzip:  1.24 kB
+dist/components/Badge/Badge.js                                              2.23 kB │ gzip:  0.87 kB
+dist/components/DateFormat/DateFormat.js                                    2.39 kB │ gzip:  1.13 kB
+dist/components/RecordsWorkspace/RecordsWorkspace.js                        2.39 kB │ gzip:  1.12 kB
+dist/components/DrawingWorkspace/useDrawingFrame.js                         2.41 kB │ gzip:  1.19 kB
+dist/components/BrowserWorkspace/BrowserConnectionPanel.js                  2.43 kB │ gzip:  1.14 kB
+dist/components/Form/Form.js                                                2.45 kB │ gzip:  1.03 kB
+dist/components/MusicWorkspace/MusicTrackDetails.js                         2.54 kB │ gzip:  1.08 kB
+dist/components/ObjectRecognitionWorkspace/RecognitionHistory.js            2.60 kB │ gzip:  1.28 kB
+dist/components/MusicLibraryControls/MusicLibraryControls.js                2.65 kB │ gzip:  1.23 kB
+dist/components/NotificationToast/NotificationToast.js                      2.67 kB │ gzip:  1.17 kB
+dist/components/BrowserWorkspace/BrowserSettings.js                         2.71 kB │ gzip:  1.31 kB
+dist/components/Model3dWorkspace/Model3dDetail.js                           2.74 kB │ gzip:  1.27 kB
+dist/components/Drawer/Drawer.js                                            2.75 kB │ gzip:  1.23 kB
+dist/components/TerminalWorkspace/TerminalPane.js                           2.77 kB │ gzip:  1.33 kB
+dist/components/BrowserWorkspace/labels.js                                  2.80 kB │ gzip:  1.37 kB
+dist/components/MusicPlayer/MusicPlayer.js                                  2.85 kB │ gzip:  1.25 kB
+dist/components/Canvas2D/Canvas2D.js                                        2.90 kB │ gzip:  1.38 kB
+dist/components/KanbanBoard/CommitPushDialog.js                             2.91 kB │ gzip:  1.38 kB
+dist/components/SearchableSelect/SearchableSelect.js                        2.92 kB │ gzip:  1.39 kB
+dist/components/KanbanBoard/KanbanBoard.js                                  3.02 kB │ gzip:  1.53 kB
+dist/components/TimerWorkspace/TimerPane.js                                 3.05 kB │ gzip:  1.48 kB
+dist/components/StepGuide/StepGuide.js                                      3.13 kB │ gzip:  1.48 kB
+dist/components/Model3dWorkspace/Model3dGenerationForm.js                   3.26 kB │ gzip:  1.46 kB
+dist/components/ObjectRecognitionWorkspace/useCameraCapture.js              3.26 kB │ gzip:  1.59 kB
+dist/components/ImageWorkspace/ImageGallery.js                              3.29 kB │ gzip:  1.52 kB
+dist/components/BrowserWorkspace/BrowserCaptureList.js                      3.36 kB │ gzip:  1.37 kB
+dist/components/Select/Select.js                                            3.37 kB │ gzip:  1.29 kB
+dist/components/Calculator/Calculator.js                                    3.40 kB │ gzip:  1.71 kB
+dist/components/Model3dWorkspace/Model3dLibrary.js                          3.51 kB │ gzip:  1.54 kB
+dist/components/BrowserWorkspace/BrowserWorkspace.js                        3.52 kB │ gzip:  1.52 kB
+dist/components/Chart/Chart.js                                              3.53 kB │ gzip:  1.55 kB
+dist/components/KanbanBoard/CardForms.js                                    3.53 kB │ gzip:  1.55 kB
+dist/components/Model3dWorkspace/Model3dWorkspace.js                        3.60 kB │ gzip:  1.53 kB
+dist/components/MusicWorkspace/music-creation-options.js                    3.62 kB │ gzip:  1.74 kB
+dist/components/Button/Button.js                                            3.62 kB │ gzip:  1.46 kB
+dist/components/MenuButtonGroup/MenuButtonGroup.js                          3.63 kB │ gzip:  1.61 kB
+dist/components/BrowserWorkspace/BrowserScriptPanel.js                      3.71 kB │ gzip:  1.64 kB
+dist/components/OcrWorkspace/OcrResult.js                                   3.96 kB │ gzip:  1.56 kB
+dist/components/LightSpiritLab/LightSpiritLab.js                            3.97 kB │ gzip:  1.69 kB
+dist/components/TreeMenu/TreeMenu.js                                        4.10 kB │ gzip:  1.64 kB
+dist/components/DropdownMenu/DropdownMenu.js                                4.23 kB │ gzip:  1.89 kB
+dist/components/ObjectRecognitionWorkspace/DetectionPreview.js              4.31 kB │ gzip:  2.05 kB
+dist/components/NavigationStepper/NavigationStepper.js                      4.37 kB │ gzip:  1.61 kB
+dist/components/OcrWorkspace/OcrCorrection.js                               4.42 kB │ gzip:  1.76 kB
+dist/components/ServerDataTable/ServerDataTable.js                          4.64 kB │ gzip:  1.98 kB
+dist/components/Modal/Modal.js                                              4.68 kB │ gzip:  1.95 kB
+dist/components/InfiniteListMenu/InfiniteListMenu.js                        4.89 kB │ gzip:  2.01 kB
+dist/components/OcrWorkspace/OcrPanel.js                                    5.05 kB │ gzip:  2.26 kB
+dist/components/ImagePicker/ImagePicker.js                                  5.13 kB │ gzip:  2.25 kB
+dist/components/ComputeWorkspace/index.js                                   5.36 kB │ gzip:  2.03 kB
+dist/components/Diagram/Diagram.js                                          5.65 kB │ gzip:  2.42 kB
+dist/components/OcrWorkspace/OcrMedia.js                                    5.78 kB │ gzip:  2.43 kB
+dist/components/GoogleAccounts/index.js                                     5.80 kB │ gzip:  2.23 kB
+dist/components/MusicWorkspace/MusicWorkspace.js                            5.85 kB │ gzip:  2.37 kB
+dist/components/KeypadModal/KeypadModal.js                                  6.15 kB │ gzip:  2.15 kB
+dist/components/DrawingWorkspace/index.js                                   6.36 kB │ gzip:  2.24 kB
+dist/components/ImageWorkspace/ImageCreationForm.js                         6.59 kB │ gzip:  2.39 kB
+dist/components/KanbanBoard/KanbanCard.js                                   7.48 kB │ gzip:  2.98 kB
+dist/components/SettingsPanels/index.js                                     8.17 kB │ gzip:  2.83 kB
+dist/components/MusicWorkspace/MusicCreationForm.js                         8.25 kB │ gzip:  2.97 kB
+dist/components/ObjectRecognitionWorkspace/ObjectRecognitionWorkspace.js    8.67 kB │ gzip:  3.46 kB
+dist/index.js                                                              13.09 kB │ gzip:  2.98 kB
+✓ built in 5.10s
+[verify] typecheck configuration
+[verify] typecheck: /Users/y.noguchi/.bun/bin/bun check -p /Users/y.noguchi/Code/eumenes/verification-reports/runs/2026-10-21T13-16-47-818Z-3c2e4b42-41de-41e4-b47a-3c7f299954ef/tsconfig.selected.json
+✓ No type errors in 339 files [297.07ms]
+[verify] typecheck closure
+[verify] TypeScript workspace closure: 343 files
+[verify] bun tests: /Users/y.noguchi/.bun/bin/bun test ./api/domains/compute/test/compute.test.ts ./api/domains/compute/test/review.test.ts
+bun test v1.4.3 (c6da4a4d3)
+
+api/domains/compute/test/compute.test.ts:
+(pass) persists key and body before HTTP, adopts result and replays an identical command [38.15ms]
+(pass) ambiguous submit is never automatically retried; explicit recovery preserves key/body [37.17ms]
+(pass) HTTP success with timeout is a failed calculation [29.90ms]
+(pass) HTTP success with memory_exceeded is a failed calculation [29.39ms]
+(pass) HTTP success with syntax_error is a failed calculation [29.46ms]
+(pass) HTTP success with runtime_error is a failed calculation [30.30ms]
+(pass) HTTP success with queue_timeout is a failed calculation [29.06ms]
+(pass) HTTP success with output_exceeded is a failed calculation [28.80ms]
+(pass) cancel 202 remains running until confirmed, completion race stays completed, another job succeeds [72.97ms]
+(pass) cancelling while submit is in flight waits for the saved jobId then calls cancel [23.72ms]
+(pass) imports artifacts without deleting remote results, and separates artifact failure [53.35ms]
+(pass) submit HTTP 429 is recorded without resending the POST [18.32ms]
+(pass) submit HTTP 503 is recorded without resending the POST [16.31ms]
+(pass) token rotation refuses old jobs and capacity/UTF-8 limits reject before POST [43.88ms]
+(pass) invalidated parent cannot adopt completion and is stopped [48.07ms]
+(pass) reopening the database resumes polling by saved jobId without a new submit [47.66ms]
+(pass) defaulted and explicit CPU request fields share a normalized replay [10.93ms]
+
+api/domains/compute/test/review.test.ts:
+(pass) reconciliation preserves the original deadline and refuses expired unknown submissions [22.22ms]
+(pass) Retry-After cannot postpone deadline cancellation [74.50ms]
+(pass) an accepted asynchronous deletion continues to deletion after the job terminates [74.47ms]
+(pass) one expired artifact does not discard other downloaded artifacts or redownload them on recovery [42.91ms]
+(pass) parent invalidation during artifact IO suppresses completion adoption and notices [36.44ms]
+
+ 22 pass
+ 0 fail
+ 48 expect() calls
+Ran 22 tests across 2 files. [902.00ms]
+[verify] web tests: /Users/y.noguchi/.bun/bin/bun x --no-install vitest run web/src/domains/compute/toolchain-adapter.test.tsx
+
+ RUN  v4.1.8 /Users/y.noguchi/Code/eumenes
+
+
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+   Start at  22:16:58
+   Duration  1.15s (transform 40ms, setup 0ms, import 189ms, tests 172ms, environment 629ms)
+
+[verify] design-system tests: /Users/y.noguchi/.bun/bin/bun run --cwd packages/design-system test src/components/ComputeWorkspace/ComputeWorkspace.test.tsx
+$ vitest run --project unit src/components/ComputeWorkspace/ComputeWorkspace.test.tsx
+│ ┌────────────────────────────────────────────────────────────────────────────┐
+│ │  Info: Found a setup file with "setProjectAnnotations".                    │
+│ │  Skipping automatic provisioning of preview annotations to avoid           │
+│ │  conflicts. Since Storybook 10.3, "@storybook/addon-vitest" applies these  │
+│ │   automatically.                                                           │
+│ │  You can safely remove the "setProjectAnnotations" call from your setup    │
+│ │  file, or remove the file entirely if you don't have custom code there.    │
+│ └────────────────────────────────────────────────────────────────────────────┘
+
+ RUN  v4.0.16 /Users/y.noguchi/Code/eumenes/packages/design-system
+
+stdout | src/components/ComputeWorkspace/ComputeWorkspace.test.tsx
+Test setup running...
+
+stdout | src/components/ComputeWorkspace/ComputeWorkspace.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/ComputeWorkspace/ComputeWorkspace.test.tsx (4 tests) 272ms
+
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+   Start at  22:17:01
+   Duration  1.08s (transform 110ms, setup 102ms, import 210ms, tests 272ms, environment 402ms)
+
+[verify] pass: 14498 ms; /Users/y.noguchi/Code/eumenes/verification-reports/runs/2026-10-21T13-16-47-818Z-3c2e4b42-41de-41e4-b47a-3c7f299954ef/report.json

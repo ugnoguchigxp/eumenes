@@ -19,7 +19,8 @@ export const stateLabel = (item: RecognitionItem) =>
 		? "取消済み（処理終了・結果不採用）"
 		: labels[item.state];
 const canRemove = (item: RecognitionItem) =>
-	["completed", "failed", "cancelled"].includes(item.state);
+	["completed", "failed", "cancelled"].includes(item.state) &&
+	item.captureSave !== "queued";
 
 /** Saved-material menu with per-item delete confirmation; focuses the first item on open. */
 export function RecognitionHistory({
@@ -93,9 +94,11 @@ export function RecognitionHistory({
 								className="recognition-history-delete"
 								disabled={!canRemove(saved) || !onRemove || busy}
 								title={
-									!canRemove(saved)
-										? "解析中の資料は、先に取消してください。"
-										: undefined
+									saved.captureSave === "queued"
+										? "LARMへの保存が終わるまでお待ちください。"
+										: !canRemove(saved)
+											? "解析中の資料は、先に取消してください。"
+											: undefined
 								}
 								onClick={() => setPendingDeleteId(saved.id)}
 							>

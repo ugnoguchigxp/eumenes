@@ -8,15 +8,19 @@ import {
 	type CancelTimerInput,
 	type StartTimerInput,
 } from "../api/domains/timers/contracts";
-import type { Transport } from "./transport";
-import { json } from "./transport";
+import { callJson, json, withQuery, type Transport } from "./transport";
 
 export function timersClient(transport: Transport) {
+	const act = (id: string, action: string, input: CancelTimerInput) =>
+		callJson(
+			transport,
+			timerReceiptSchema,
+			`/api/timers/${encodeURIComponent(id)}/${action}`,
+			json(input),
+		);
 	return {
 		startTimer: async (input: StartTimerInput) =>
-			timerReceiptSchema.parse(
-				await (await transport.call("/api/timers", json(input))).json(),
-			),
+			callJson(transport, timerReceiptSchema, "/api/timers", json(input)),
 		timers: async (
 			query: {
 				state?: string;
@@ -26,73 +30,43 @@ export function timersClient(transport: Transport) {
 				limit?: number;
 			} = {},
 			signal?: AbortSignal,
-		) => {
-			const params = new URLSearchParams();
-			for (const [key, value] of Object.entries(query))
-				if (value !== undefined) params.set(key, String(value));
-			return timerListResponseSchema.parse(
-				await (
-					await transport.call(`/api/timers?${params}`, { signal })
-				).json(),
-			);
-		},
+		) =>
+			callJson(
+				transport,
+				timerListResponseSchema,
+				withQuery("/api/timers", query),
+				{ signal },
+			),
 		timer: async (id: string, signal?: AbortSignal) =>
-			timerGetResponseSchema.parse(
-				await (
-					await transport.call(`/api/timers/${encodeURIComponent(id)}`, {
-						signal,
-					})
-				).json(),
+			callJson(
+				transport,
+				timerGetResponseSchema,
+				`/api/timers/${encodeURIComponent(id)}`,
+				{ signal },
 			),
 		timerReceiptByRun: async (runId: string, signal?: AbortSignal) =>
-			timerRunReceiptSchema.parse(
-				await (
-					await transport.call(
-						`/api/timer-actions/by-run/${encodeURIComponent(runId)}`,
-						{ signal },
-					)
-				).json(),
+			callJson(
+				transport,
+				timerRunReceiptSchema,
+				`/api/timer-actions/by-run/${encodeURIComponent(runId)}`,
+				{ signal },
 			),
 		cancelTimer: async (id: string, input: CancelTimerInput) =>
-			timerReceiptSchema.parse(
-				await (
-					await transport.call(
-						`/api/timers/${encodeURIComponent(id)}/cancel`,
-						json(input),
-					)
-				).json(),
-			),
+			act(id, "cancel", input),
 		pauseTimer: async (id: string, input: CancelTimerInput) =>
-			timerReceiptSchema.parse(
-				await (
-					await transport.call(
-						`/api/timers/${encodeURIComponent(id)}/pause`,
-						json(input),
-					)
-				).json(),
-			),
+			act(id, "pause", input),
 		resumeTimer: async (id: string, input: CancelTimerInput) =>
-			timerReceiptSchema.parse(
-				await (
-					await transport.call(
-						`/api/timers/${encodeURIComponent(id)}/resume`,
-						json(input),
-					)
-				).json(),
-			),
+			act(id, "resume", input),
 		timerNotifications: async (
 			query: { cursor?: string; limit?: number } = {},
 			signal?: AbortSignal,
-		) => {
-			const params = new URLSearchParams();
-			for (const [key, value] of Object.entries(query))
-				if (value !== undefined) params.set(key, String(value));
-			return timerNotificationListSchema.parse(
-				await (
-					await transport.call(`/api/timer-notifications?${params}`, { signal })
-				).json(),
-			);
-		},
+		) =>
+			callJson(
+				transport,
+				timerNotificationListSchema,
+				withQuery("/api/timer-notifications", query),
+				{ signal },
+			),
 		claimTimerNotification: async (
 			id: string,
 			input: {
@@ -101,13 +75,11 @@ export function timersClient(transport: Transport) {
 				expectedRevision: number;
 			},
 		) =>
-			timerClaimResponseSchema.parse(
-				await (
-					await transport.call(
-						`/api/timer-notifications/${encodeURIComponent(id)}/claim`,
-						json(input),
-					)
-				).json(),
+			callJson(
+				transport,
+				timerClaimResponseSchema,
+				`/api/timer-notifications/${encodeURIComponent(id)}/claim`,
+				json(input),
 			),
 		ackTimerNotification: async (
 			id: string,
@@ -117,25 +89,21 @@ export function timersClient(transport: Transport) {
 				outcome: "played" | "muted" | "blocked";
 			},
 		) =>
-			timerClaimResponseSchema.parse(
-				await (
-					await transport.call(
-						`/api/timer-notifications/${encodeURIComponent(id)}/ack`,
-						json(input),
-					)
-				).json(),
+			callJson(
+				transport,
+				timerClaimResponseSchema,
+				`/api/timer-notifications/${encodeURIComponent(id)}/ack`,
+				json(input),
 			),
 		silenceTimerNotification: async (
 			id: string,
 			input: { expectedRevision: number; reason: "muted" | "blocked" },
 		) =>
-			timerClaimResponseSchema.parse(
-				await (
-					await transport.call(
-						`/api/timer-notifications/${encodeURIComponent(id)}/silence`,
-						json(input),
-					)
-				).json(),
+			callJson(
+				transport,
+				timerClaimResponseSchema,
+				`/api/timer-notifications/${encodeURIComponent(id)}/silence`,
+				json(input),
 			),
 	};
 }

@@ -1,0 +1,122 @@
+{
+  "scope": "voice provider lifecycle review",
+  "resolvedFindings": [
+    "voice-only status and healthy sibling availability",
+    "retention stop after main-scope failure",
+    "competing claim failure preserves newer binding",
+    "credential expiry is not Connection expiry",
+    "audio child idle release is not parent release",
+    "partial-claim ready contract and Connection ID validation",
+    "independent status subscriber exceptions",
+    "optional model metadata validation and prototype-safe role lookup",
+    "failed readiness invalidates only the binding observed by that check",
+    "live verdict and cleanup ordering",
+    "production API verification requires route and stop confirmation"
+  ],
+  "verification": {
+    "addedRegressions": 16,
+    "backend": 611,
+    "web": 111,
+    "upperIntegration": 6,
+    "domainReport": "/Users/y.noguchi/Code/eumenes/verification-reports/larm-provider-readiness-2026-10-25/review-domain-verify/2026-10-25T15-45-49-330Z-31267cea-bba0-4a2e-9ffa-cbe0e3f64933/report.json"
+  },
+  "controlledLive": {
+    "pass": true,
+    "cases": 8,
+    "noDeleteBeforeClose": true,
+    "report": "/Users/y.noguchi/Code/eumenes/verification-reports/larm-provider-readiness-2026-10-25/review-isolation/2026-10-25T15-45-48.166Z/live.json"
+  },
+  "sourceMatch": {
+    "checkedFiles": 121,
+    "mismatches": []
+  },
+  "normalLive": {
+    "status": "pass",
+    "report": "/Users/y.noguchi/Code/eumenes/verification-reports/larm-provider-readiness-2026-10-25/review/2026-10-25T15-46-55.545Z/live.json",
+    "idleMs": 600107,
+    "cleanup": {
+      "phase": "cleanup",
+      "ownedConnectionCount": 8,
+      "confirmed": 8,
+      "pass": true
+    }
+  },
+  "production": {
+    "serverOperationsPerformed": true,
+    "startupApprovalPending": false,
+    "startupExplicitlyAuthorized": true,
+    "deployedCodeCommit": "230c2af39e07194fd9b6f09574d2a32e010a2ec2",
+    "apiReady": true,
+    "webReady": true,
+    "serversLeftRunning": true,
+    "verification": {
+      "lane": "running_production_api_synthetic_no_devices",
+      "serviceAvailable": true,
+      "sessionStartMs": 2,
+      "tts": {
+        "durationMs": 563,
+        "httpRequestId": "21518a8e-4b90-4669-972b-4d50c529d41a",
+        "pass": true
+      },
+      "asr": {
+        "durationMs": 282,
+        "httpRequestId": "0d5c12fd-0799-442a-a00f-36dc3bdae8a1",
+        "pass": true
+      },
+      "pass": true,
+      "testSessionStopped": true,
+      "attempts": [
+        {
+          "event": "inference.attempt_started",
+          "purpose": "tts",
+          "source": "larm",
+          "pid": 75090,
+          "bootId": "4979811b-1aea-4cb5-83e5-4034eb82d639"
+        },
+        {
+          "event": "inference.attempt_succeeded",
+          "purpose": "tts",
+          "source": "larm",
+          "durationMs": 552,
+          "pid": 75090,
+          "bootId": "4979811b-1aea-4cb5-83e5-4034eb82d639"
+        },
+        {
+          "event": "inference.attempt_started",
+          "purpose": "asr",
+          "source": "larm",
+          "pid": 75090,
+          "bootId": "4979811b-1aea-4cb5-83e5-4034eb82d639"
+        },
+        {
+          "event": "inference.attempt_succeeded",
+          "purpose": "asr",
+          "source": "larm",
+          "durationMs": 273,
+          "pid": 75090,
+          "bootId": "4979811b-1aea-4cb5-83e5-4034eb82d639"
+        }
+      ],
+      "asrCloudFallback": false,
+      "larmRouteConfirmed": true
+    },
+    "report": "/Users/y.noguchi/Code/eumenes/verification-reports/larm-provider-readiness-2026-10-25/deployment/live.json",
+    "physicalDevicesTested": false,
+    "settingsChanged": false
+  },
+  "contextCalls": {
+    "thisReview": {
+      "context_compile": 1,
+      "compile_eval": 1
+    },
+    "conversationTotal": {
+      "context_compile": 2,
+      "compile_eval": 2
+    }
+  },
+  "liveSourceMatch": {
+    "checkedFiles": 116,
+    "mismatches": []
+  },
+  "reviewResult": "no_unresolved_actionable_findings_in_scope"
+}

@@ -1,22 +1,28 @@
 import type { Hono } from "hono";
+import { z } from "zod";
+import {
+	parseJsonBody,
+	parseQuery,
+	queryInt,
+} from "../../../infrastructure/http";
 import type { ToolchainHistory } from "../service";
-import { selectionPageQuerySchema, recipePageQuerySchema } from "../contracts";
+import {
+	selectionPageQuerySchema,
+	recipePageQuerySchema,
+	recipeStateBody,
+} from "../contracts";
 
-const code = (e: unknown) =>
-	e instanceof Error && /^[a-z_]+$/.test(e.message)
-		? e.message
-		: "internal_error";
-const int = (v: string | undefined) =>
-	v !== undefined && /^\d{1,16}$/.test(v) ? Number(v) : undefined;
 const pattern = /^[A-Za-z0-9._:-]{1,160}$/;
 const id = (v: string | undefined) =>
 	v !== undefined && pattern.test(v) ? v : undefined;
 /** Optional filters: absent is fine, malformed is a 400 (never silently "no filter"). */
-const valid = (q: URLSearchParams) =>
-	["runId", "toolchain"].every((k) => !q.has(k) || pattern.test(q.get(k)!)) &&
-	["since", "cursor", "limit"].every(
-		(k) => !q.has(k) || /^\d{1,16}$/.test(q.get(k)!),
-	);
+const listQuery = z.object({
+	runId: z.string().regex(pattern).optional(),
+	toolchain: z.string().regex(pattern).optional(),
+	since: queryInt.optional(),
+	cursor: queryInt.optional(),
+	limit: queryInt.optional(),
+});
 
 /**
  * Trace and procedure management. Authentication and Origin checks run in the application
@@ -24,27 +30,29 @@ const valid = (q: URLSearchParams) =>
  */
 export function registerToolchainHistory(app: Hono, history: ToolchainHistory) {
 	app.get("/api/toolchain-history/selections/page", (c) => {
-		const query = selectionPageQuerySchema.safeParse(c.req.query());
-		return query.success
+		const query = parseQuery(c, selectionPageQuerySchema, {
+			code: "invalid_request",
+		});
+		return query.ok
 			? c.json(history.selectionPage(query.data))
-			: c.json({ error: "invalid_request" }, 400);
+			: query.response;
 	});
 	app.get("/api/toolchain-history/recipes/page", (c) => {
-		const query = recipePageQuerySchema.safeParse(c.req.query());
-		return query.success
-			? c.json(history.recipePage(query.data))
-			: c.json({ error: "invalid_request" }, 400);
+		const query = parseQuery(c, recipePageQuerySchema, {
+			code: "invalid_request",
+		});
+		return query.ok ? c.json(history.recipePage(query.data)) : query.response;
 	});
 	app.get("/api/toolchain-history/selections", (c) => {
-		const q = new URL(c.req.url).searchParams;
-		if (!valid(q)) return c.json({ error: "invalid_request" }, 400);
+		const q = parseQuery(c, listQuery, { code: "invalid_request" });
+		if (!q.ok) return q.response;
 		return c.json(
 			history.listSelections({
-				runId: id(q.get("runId") ?? undefined),
-				toolchainId: id(q.get("toolchain") ?? undefined),
-				since: int(q.get("since") ?? undefined),
-				cursor: int(q.get("cursor") ?? undefined),
-				limit: int(q.get("limit") ?? undefined),
+				runId: q.data.runId,
+				toolchainId: q.data.toolchain,
+				since: q.data.since,
+				cursor: q.data.cursor,
+				limit: q.data.limit,
 			}),
 		);
 	});
@@ -56,40 +64,24 @@ export function registerToolchainHistory(app: Hono, history: ToolchainHistory) {
 			: c.json({ error: "selection_not_found" }, 404);
 	});
 	app.get("/api/toolchain-history/recipes", (c) => {
-		const q = new URL(c.req.url).searchParams;
-		if (!valid(q)) return c.json({ error: "invalid_request" }, 400);
-		return c.json({
-			items: history.listRecipes(id(q.get("toolchain") ?? undefined)),
-		});
+		const q = parseQuery(c, listQuery, { code: "invalid_request" });
+		if (!q.ok) return q.response;
+		return c.json({ items: history.listRecipes(q.data.toolchain) });
 	});
 	app.post("/api/toolchain-history/recipes/:id/state", async (c) => {
-		const body = (await c.req.json().catch(() => null)) as {
-			state?: unknown;
-		} | null;
+		const body = await parseJsonBody(c, recipeStateBody, {
+			code: "invalid_request",
+		});
+		if (!body.ok) return body.response;
 		const key = id(c.req.param("id"));
-		if (!key || (body?.state !== "active" && body?.state !== "disabled"))
-			return c.json({ error: "invalid_request" }, 400);
-		try {
-			await history.setRecipeState(key, body.state);
-			return c.json({ ok: true });
-		} catch (e) {
-			return c.json(
-				{ error: code(e) },
-				code(e) === "recipe_not_found" ? 404 : 500,
-			);
-		}
+		if (!key) return c.json({ error: "invalid_request" }, 400);
+		await history.setRecipeState(key, body.data.state);
+		return c.json({ ok: true });
 	});
 	app.delete("/api/toolchain-history/recipes/:id", async (c) => {
 		const key = id(c.req.param("id"));
 		if (!key) return c.json({ error: "invalid_request" }, 400);
-		try {
-			await history.deleteRecipe(key);
-			return c.json({ ok: true });
-		} catch (e) {
-			return c.json(
-				{ error: code(e) },
-				code(e) === "recipe_not_found" ? 404 : 500,
-			);
-		}
+		await history.deleteRecipe(key);
+		return c.json({ ok: true });
 	});
 }

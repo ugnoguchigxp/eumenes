@@ -1,0 +1,11 @@
+{
+  "png": {
+    "width": 800,
+    "height": 400,
+    "decodedBytes": 1280000
+  },
+  "csv": {
+    "rows": 100,
+    "correct": true
+  }
+}

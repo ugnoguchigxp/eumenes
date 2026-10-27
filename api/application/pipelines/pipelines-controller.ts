@@ -58,13 +58,7 @@ export function registerPipelines(
 		const workRef = z.uuid().safeParse(c.req.param("workRef"));
 		if (!workRef.success)
 			return c.json({ error: "invalid_pipeline_trial" }, 400);
-		try {
-			return c.json(await trial(workRef.data));
-		} catch (error) {
-			if (error instanceof Error && error.message === "work_not_found")
-				return c.json({ error: "work_not_found" }, 404);
-			throw error;
-		}
+		return c.json(await trial(workRef.data));
 	};
 	app.post("/api/pipelines/works/:workRef/probe", async (c) => {
 		const b = await parseJsonBody(c, z.strictObject({ query: text }), {

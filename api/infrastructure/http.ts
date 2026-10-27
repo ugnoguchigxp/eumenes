@@ -1,5 +1,5 @@
 import type { Context } from "hono";
-import type { z } from "zod";
+import { z } from "zod";
 
 export type ParseJsonBodyOptions = {
 	/** Error code of the 400 response. Defaults to `invalid_input`. */
@@ -8,7 +8,12 @@ export type ParseJsonBodyOptions = {
 	emptyAs?: unknown;
 };
 
-export type ParsedJsonBody<T> =
+export type ParseQueryOptions = {
+	/** Error code of the 400 response. Defaults to `invalid_input`. */
+	code?: string;
+};
+
+export type ParsedInput<T> =
 	| { ok: true; data: T }
 	| { ok: false; response: Response };
 
@@ -20,7 +25,7 @@ export async function parseJsonBody<T>(
 	c: Context,
 	schema: z.ZodType<T>,
 	options: ParseJsonBodyOptions = {},
-): Promise<ParsedJsonBody<T>> {
+): Promise<ParsedInput<T>> {
 	let raw: unknown = null;
 	try {
 		const text = await c.req.text();
@@ -41,6 +46,34 @@ export async function parseJsonBody<T>(
 	return { ok: true, data: parsed.data };
 }
 
+/**
+ * Validates the query string against a schema; a rejected query yields the ready-made 400
+ * response. An absent parameter reaches the schema as undefined, so its default applies. Unknown
+ * parameters are the schema's concern (a plain object ignores them, a strict one rejects them).
+ */
+export function parseQuery<T>(
+	c: Context,
+	schema: z.ZodType<T>,
+	options: ParseQueryOptions = {},
+): ParsedInput<T> {
+	const parsed = schema.safeParse(c.req.query());
+	if (!parsed.success)
+		return {
+			ok: false,
+			response: c.json({ error: options.code ?? "invalid_input" }, 400),
+		};
+	return { ok: true, data: parsed.data };
+}
+
+/**
+ * A non-negative decimal integer query value. Text that is empty or not a plain number is
+ * rejected, never read as 0 or NaN; bounds are added with `.pipe(z.number().min(..).max(..))`.
+ */
+export const queryInt = z
+	.string()
+	.regex(/^\d{1,15}$/)
+	.transform(Number);
+
 /** HTTP statuses a thrown error code may map to; each domain declares its own in `contracts`. */
 export type HttpErrorStatus =
 	| 400
@@ -54,5 +87,6 @@ export type HttpErrorStatus =
 	| 415
 	| 422
 	| 429
+	| 501
 	| 502
 	| 503;

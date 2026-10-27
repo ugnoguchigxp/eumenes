@@ -1,0 +1,25 @@
+$ bun scripts/verify.ts --all
+[verify] selected=delivery,avatar,settings,inference,tts-dictionary,conversation,larm,audio,queue,scheduler,dialogue,voice-dialogue dependencyClosure=delivery,avatar,tts-dictionary,settings,larm,inference,conversation,audio,queue,scheduler,dialogue,voice-dialogue
+[verify] format: /Users/y.noguchi/.bun/bin/bun run format:check .
+$ oxfmt --check .
+Checking formatting...
+
+api/domains/delivery/test/strength.test.ts (1ms)
+api/domains/inference/service/index.ts (1ms)
+api/domains/inference/service/speech-intonation.ts (0ms)
+api/domains/inference/test/speech-intonation.test.ts (1ms)
+
+Format issues found in above 4 files. Run without `--check` to fix.
+Finished in 80ms on 196 files using 10 threads.
+error: script "format:check" exited with code 1
+103 | 	steps.push({
+104 | 		name,
+105 | 		ms: Math.round(performance.now() - start),
+106 | 		result: code === 0 ? "pass" : `exit ${code}`,
+107 | 	});
+108 | 	if (code !== 0) throw new Error(`${name} failed (${code})`);
+                                 ^
+error: format failed (1)
+      at run (/Users/y.noguchi/Code/eumenes/scripts/verify.ts:108:28)
+
+error: script "verify:all" exited with code 1

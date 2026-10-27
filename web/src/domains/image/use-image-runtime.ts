@@ -9,7 +9,7 @@ import { queryRoots } from "../../queryKeys";
 import type { ImageCreationOptions } from "@eumenes/design-system";
 import {
 	imageContentUrl,
-	imageLibraryKey,
+	deleteLibraryImage,
 	useImageLibrary,
 } from "../../media/use-image-library";
 export const imageStudioSource = "image-studio";
@@ -167,34 +167,14 @@ export function useImageRuntime(
 						status: "rejected",
 						message: "画像が見つかりません。一覧を更新してください。",
 					};
-				const queryKey = imageLibraryKey(client);
-				await cache.cancelQueries({ queryKey });
-				try {
-					await client.deleteImage(image.id);
-				} catch {
-					await cache.invalidateQueries({ queryKey });
+				if (!(await deleteLibraryImage(cache, client, image.id))) {
 					return {
 						status: "rejected",
 						message: "削除結果を確認できませんでした。一覧を更新してください。",
 					};
 				}
-				await cache.cancelQueries({ queryKey });
-				cache.setQueryData<Awaited<ReturnType<EumenesClient["imageLibrary"]>>>(
-					queryKey,
-					(data) =>
-						data && {
-							...data,
-							images: data.images.filter((i) => i.id !== image.id),
-							totalBytes: Math.max(
-								0,
-								data.totalBytes -
-									(data.images.find((i) => i.id === image.id)?.bytes ?? 0),
-							),
-						},
-				);
 				if (resource.selectedId === image.id) select({ latestId: latest?.id });
 				seen.current.add(event.id);
-				await cache.invalidateQueries({ queryKey });
 				return { status: "accepted", message: "画像を削除しました。" };
 			} else {
 				const image = images.find((i) => i.id === event.values.id);

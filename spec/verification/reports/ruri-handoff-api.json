@@ -1,0 +1,20 @@
+{
+  "kind": "live-api-claim-refresh",
+  "profile": "SAAA-gemma4-26b",
+  "decision_model": "ruri-v3-30m-speaking-attitude",
+  "status": {
+    "enabled": false,
+    "target": 300,
+    "successful": 0,
+    "unreviewed": 0,
+    "reviewed": 0,
+    "held": 0,
+    "skipped": 0,
+    "skip_reasons": {},
+    "pending": 0,
+    "failed": 0,
+    "storage_errors": 0,
+    "path": "/Users/y.noguchi/Code/eumenes/data/attitude-dataset/dataset.sqlite3",
+    "score_notice": "合成データ由来の暫定校正。実会話の正解確率ではありません。"
+  }
+}

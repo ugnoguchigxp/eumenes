@@ -1,0 +1,236 @@
+{
+  "schemaVersion": 1,
+  "runId": "2026-10-16T11-07-34-654Z-41604e85-73d1-4043-973e-fe157da16806",
+  "startedAt": "2026-10-16T11:07:34.654Z",
+  "scope": {
+    "all": false,
+    "selected": [
+      "memory",
+      "steward",
+      "capabilities",
+      "dialogue"
+    ]
+  },
+  "baseCommit": "32ff7f72e74d67beed09ae8418b4555c46035628",
+  "revision": "e271406cc0fe4ffe77062a0cd5ca50dd8c538e32aa78654bdb48f84c5f2b181f",
+  "runtime": {
+    "bun": "1.4.3",
+    "node": "26.3.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "ci": false,
+    "runner": null
+  },
+  "result": "fail",
+  "steps": [
+    {
+      "name": "inventory",
+      "status": "pass",
+      "ms": 67
+    },
+    {
+      "name": "boundaries",
+      "status": "pass",
+      "ms": 406
+    },
+    {
+      "name": "size-budget",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "scripts/size-budget.ts",
+        "api/domains/memory",
+        "api/domains/steward",
+        "api/domains/capabilities",
+        "api/domains/dialogue",
+        "web/src/domains/dialogue"
+      ],
+      "status": "pass",
+      "ms": 357,
+      "exitCode": 0
+    },
+    {
+      "name": "format",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "format:check",
+        "api/domains/memory",
+        "api/domains/steward",
+        "api/domains/capabilities",
+        "api/domains/dialogue",
+        "web/src/domains/dialogue"
+      ],
+      "status": "pass",
+      "ms": 148,
+      "exitCode": 0
+    },
+    {
+      "name": "lint",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "lint",
+        "api/domains/memory",
+        "api/domains/steward",
+        "api/domains/capabilities",
+        "api/domains/dialogue",
+        "web/src/domains/dialogue"
+      ],
+      "status": "pass",
+      "ms": 90,
+      "exitCode": 0
+    },
+    {
+      "name": "design-system typecheck",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "--cwd",
+        "packages/design-system",
+        "typecheck"
+      ],
+      "status": "pass",
+      "ms": 266,
+      "exitCode": 0
+    },
+    {
+      "name": "design-system build",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "--cwd",
+        "packages/design-system",
+        "build"
+      ],
+      "status": "pass",
+      "ms": 10399,
+      "exitCode": 0
+    },
+    {
+      "name": "typecheck configuration",
+      "status": "pass",
+      "ms": 1
+    },
+    {
+      "name": "typecheck",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "check",
+        "-p",
+        "/Users/y.noguchi/Code/eumenes/verification-reports/runs/2026-10-16T11-07-34-654Z-41604e85-73d1-4043-973e-fe157da16806/tsconfig.selected.json"
+      ],
+      "status": "fail",
+      "ms": 581,
+      "exitCode": 1,
+      "error": "Error: typecheck failed (1)"
+    },
+    {
+      "name": "typecheck closure",
+      "status": "not_run",
+      "ms": 0
+    },
+    {
+      "name": "bun tests",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "test",
+        "./api/domains/capabilities/test/bundles.test.ts",
+        "./api/domains/capabilities/test/capabilities.test.ts",
+        "./api/domains/capabilities/test/image.test.ts",
+        "./api/domains/capabilities/test/json-schema-subset.test.ts",
+        "./api/domains/capabilities/test/learned.test.ts",
+        "./api/domains/capabilities/test/lookup-upgrade.test.ts",
+        "./api/domains/capabilities/test/music-versions.test.ts",
+        "./api/domains/capabilities/test/prepare-learned.test.ts",
+        "./api/domains/capabilities/test/requirement-controller.test.ts",
+        "./api/domains/capabilities/test/requirement-schema.test.ts",
+        "./api/domains/capabilities/test/requirements.test.ts",
+        "./api/domains/capabilities/test/settings-google.test.ts",
+        "./api/domains/capabilities/test/standalone-artifacts.test.ts",
+        "./api/domains/capabilities/test/timer-compatibility.test.ts",
+        "./api/domains/capabilities/test/web-guided.test.ts",
+        "./api/domains/dialogue/test/command-interactions.test.ts",
+        "./api/domains/dialogue/test/context-compiler.test.ts",
+        "./api/domains/dialogue/test/controller.test.ts",
+        "./api/domains/dialogue/test/conversation-generation.test.ts",
+        "./api/domains/dialogue/test/conversation-output.test.ts",
+        "./api/domains/dialogue/test/conversation-routing.test.ts",
+        "./api/domains/dialogue/test/dialogue.test.ts",
+        "./api/domains/dialogue/test/goals-layer.test.ts",
+        "./api/domains/dialogue/test/memory-integration.test.ts",
+        "./api/domains/dialogue/test/memory-recall.test.ts",
+        "./api/domains/dialogue/test/post-answer.test.ts",
+        "./api/domains/dialogue/test/queue.test.ts",
+        "./api/domains/dialogue/test/reconcile-agents.test.ts",
+        "./api/domains/dialogue/test/research-citations.test.ts",
+        "./api/domains/dialogue/test/research-hold.test.ts",
+        "./api/domains/dialogue/test/research-result-context.test.ts",
+        "./api/domains/dialogue/test/run-end.test.ts",
+        "./api/domains/dialogue/test/selection-context.test.ts",
+        "./api/domains/dialogue/test/toolchain-tools.test.ts",
+        "./api/domains/dialogue/test/topic-texts.test.ts",
+        "./api/domains/dialogue/test/world-context.test.ts",
+        "./api/domains/memory/test/api.test.ts",
+        "./api/domains/memory/test/context-window.test.ts",
+        "./api/domains/memory/test/curation.test.ts",
+        "./api/domains/memory/test/forget-cascade.test.ts",
+        "./api/domains/memory/test/forget-closure.test.ts",
+        "./api/domains/memory/test/forget-contract.test.ts",
+        "./api/domains/memory/test/forget-derived.test.ts",
+        "./api/domains/memory/test/forget.test.ts",
+        "./api/domains/memory/test/ledger.test.ts",
+        "./api/domains/memory/test/memory.test.ts",
+        "./api/domains/memory/test/migration.test.ts",
+        "./api/domains/memory/test/quote.test.ts",
+        "./api/domains/memory/test/seed-import.test.ts",
+        "./api/domains/memory/test/state-snapshot.test.ts",
+        "./api/domains/memory/test/turn-recall.test.ts",
+        "./api/domains/memory/test/vectors.test.ts",
+        "./api/domains/memory/test/window-history.test.ts",
+        "./api/domains/steward/test/controller.test.ts",
+        "./api/domains/steward/test/forget-relevance.test.ts",
+        "./api/domains/steward/test/forget-world.test.ts",
+        "./api/domains/steward/test/forget.test.ts",
+        "./api/domains/steward/test/goals-restore.test.ts",
+        "./api/domains/steward/test/goals.test.ts",
+        "./api/domains/steward/test/maintenance.test.ts",
+        "./api/domains/steward/test/memory-adoption.test.ts",
+        "./api/domains/steward/test/requests.test.ts",
+        "./api/domains/steward/test/review-fixes.test.ts",
+        "./api/domains/steward/test/runs.test.ts",
+        "./api/domains/steward/test/steps.test.ts",
+        "./api/domains/steward/test/units.test.ts",
+        "./api/domains/steward/test/world-events.test.ts",
+        "./api/domains/steward/test/world-integration.test.ts",
+        "./api/domains/steward/test/world-view.test.ts"
+      ],
+      "status": "not_run",
+      "ms": 0
+    },
+    {
+      "name": "web tests",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "x",
+        "--no-install",
+        "vitest",
+        "run",
+        "web/src/domains/dialogue/test/hooks.test.tsx",
+        "web/src/domains/dialogue/test/progress.test.tsx"
+      ],
+      "status": "not_run",
+      "ms": 0
+    }
+  ],
+  "totalMs": 13067,
+  "integrityErrors": [],
+  "build": {
+    "sharedOutput": true,
+    "inputRevision": "e271406cc0fe4ffe77062a0cd5ca50dd8c538e32aa78654bdb48f84c5f2b181f",
+    "distAfterBuild": "4cb27630a968cf3fd9b12d3cd9c878855205dd3ffae62ba12d4a45a5fa4c7e82",
+    "distAfterConsumers": "4cb27630a968cf3fd9b12d3cd9c878855205dd3ffae62ba12d4a45a5fa4c7e82"
+  },
+  "stopReason": "Error: typecheck failed (1)",
+  "finalRevision": "e271406cc0fe4ffe77062a0cd5ca50dd8c538e32aa78654bdb48f84c5f2b181f",
+  "finishedAt": "2026-10-16T11:07:48.353Z"
+}

@@ -1,0 +1,44 @@
+{
+  "documents": 984,
+  "events": [
+    {
+      "action": "invoke",
+      "tool": "world.documents",
+      "milliseconds": 6282
+    },
+    {
+      "action": "invoke",
+      "tool": "world.documents",
+      "milliseconds": 6228
+    },
+    {
+      "action": "finish",
+      "milliseconds": 8528
+    }
+  ],
+  "status": "completed",
+  "tasks": [
+    {
+      "state": "completed",
+      "error_code": null
+    }
+  ],
+  "reports": [
+    {
+      "version": 2,
+      "outcome": "not_found",
+      "summary": "収集資料（world.documents）内で RFC 6979 に関する原文が見つからず、サイドチャネル漏えい対策についての根拠を提示できませんでした。",
+      "claims": [],
+      "limitations": [
+        "world.documents への文字列検索（「RFC 6979 秘密键 サイドチャネル 漏えい 対策」「RFC 6979 deterministic signatures side channel secret key」）を実行した結果、該当する文書（documents）が0件でした。取り込まれた収集資料に RFC 6979 の原文またはその内容が含まれていない可能性があります。",
+        "RFC 6979 のサイドチャネル漏えい対策について、根拠つきで報告するには収集資料の取得が必要です。"
+      ],
+      "exploration": [
+        "確認した操作2件。"
+      ],
+      "sources": [],
+      "coverage": "partial",
+      "verification": "evidence_linked"
+    }
+  ]
+}

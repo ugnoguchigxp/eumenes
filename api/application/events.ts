@@ -1,3 +1,10 @@
+import {
+	sseFrame,
+	sseResponse,
+	sseStream,
+	type SseSink,
+} from "../infrastructure/sse";
+
 // State invalidations only: snapshots remain authoritative in the existing APIs.
 export function createChanges(
 	options: {
@@ -10,12 +17,9 @@ export function createChanges(
 	let revision = 0;
 	let closed = false;
 	let pending: ReturnType<typeof setTimeout> | undefined;
-	const clients = new Set<{
-		send: (frame: string) => void;
-		close: () => void;
-	}>();
+	const clients = new Set<SseSink>();
 	const frame = (event: string) =>
-		`id: ${session}:${revision}\nevent: ${event}\ndata: {}\n\n`;
+		sseFrame({ id: `${session}:${revision}`, event, data: "{}" });
 	return {
 		publish() {
 			if (closed || pending) return;
@@ -32,65 +36,28 @@ export function createChanges(
 					{ error: "event_stream_unavailable" },
 					{ status: 503 },
 				);
-			let cleanup = () => {};
-			const body = new ReadableStream<Uint8Array>(
-				{
-					start(controller) {
-						let ended = false;
-						const encoder = new TextEncoder();
-						const client = {
-							send(value: string) {
-								if (ended) return;
-								// Disconnect slow clients rather than retaining unbounded notifications.
-								if ((controller.desiredSize ?? 0) <= 0) {
-									client.close();
-									return;
-								}
-								controller.enqueue(encoder.encode(value));
-							},
-							close() {
-								if (ended) return;
-								cleanup();
-								controller.close();
-							},
-						};
-						const heartbeat = setInterval(
-							() => client.send(": heartbeat\n\n"),
-							options.heartbeatMs ?? 15_000,
-						);
-						heartbeat.unref?.();
-						cleanup = () => {
-							ended = true;
-							clearInterval(heartbeat);
-							clients.delete(client);
-							signal.removeEventListener("abort", client.close);
-						};
+			return sseResponse(
+				sseStream({
+					signal,
+					highWaterMark: 16,
+					// Disconnect slow clients rather than retaining unbounded notifications.
+					lagging: "disconnect",
+					heartbeatMs: options.heartbeatMs,
+					open(client) {
 						clients.add(client);
-						signal.addEventListener("abort", client.close, { once: true });
-						if (signal.aborted) client.close();
 						// Resnapshot unless the client proves it saw this session's latest revision.
-						else if (lastEventId === `${session}:${revision}`)
+						if (lastEventId === `${session}:${revision}`)
 							client.send(frame("resumed"));
 						else client.send(frame("reset"));
+						return () => clients.delete(client);
 					},
-					cancel() {
-						cleanup();
-					},
-				},
-				{ highWaterMark: 16 },
+				}),
 			);
-			return new Response(body, {
-				headers: {
-					"Content-Type": "text/event-stream",
-					"Cache-Control": "no-store",
-					"X-Accel-Buffering": "no",
-				},
-			});
 		},
 		close() {
 			closed = true;
 			clearTimeout(pending);
-			for (const client of clients) client.close();
+			for (const client of clients) client.end();
 		},
 	};
 }

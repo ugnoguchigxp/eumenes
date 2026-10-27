@@ -1,0 +1,32 @@
+{
+  "environment": "product_database",
+  "dbPath": "./data/eumenes.sqlite3",
+  "transport": "temporary_authenticated_world_documents_api",
+  "normalStartup": "blocked_by_tool:web.lookup@1_capability_revision_conflict",
+  "completedAt": "2026-10-16T11:02:25.256Z",
+  "seed": "grok-984-v1",
+  "manifestDigest": "7a7f8ef7da7c3460469e8e34d2bff8a0376c44a78f070452225197b44dce5eb3",
+  "collections": 11,
+  "imports": [
+    {
+      "mode": "imported",
+      "count": 984,
+      "inserted": 984,
+      "unchanged": 0
+    },
+    {
+      "mode": "imported",
+      "count": 984,
+      "inserted": 0,
+      "unchanged": 984
+    }
+  ],
+  "verified": 984,
+  "pages": 2101,
+  "unauthorizedStatus": 401,
+  "searchMatches": 1,
+  "unchangedOtherTables": 220,
+  "unchangedPreStartupMemoryConversationSettingsTables": 35,
+  "reset": false,
+  "milliseconds": 2678
+}

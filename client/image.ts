@@ -4,7 +4,7 @@ import {
 	imageArtifactDelete,
 	imageArtifactId,
 } from "../api/domains/larm/contracts";
-import type { Transport } from "./transport";
+import { callJson, withQuery, type Transport } from "./transport";
 export function imageClient(t: Transport) {
 	return {
 		importImage: async (
@@ -14,60 +14,47 @@ export function imageClient(t: Transport) {
 		) => {
 			const body = new FormData();
 			body.append("file", file);
-			return imageImportView.parse(
-				await (
-					await t.call(
-						`/api/images/imports?requestId=${encodeURIComponent(requestId)}`,
-						{ method: "POST", body, signal },
-					)
-				).json(),
+			return callJson(
+				t,
+				imageImportView,
+				withQuery("/api/images/imports", { requestId }),
+				{ method: "POST", body, signal },
 			);
 		},
 		imageImport: async (requestId: string, signal?: AbortSignal) =>
-			imageImportView.parse(
-				await (
-					await t.call(`/api/images/imports/${encodeURIComponent(requestId)}`, {
-						signal,
-					})
-				).json(),
+			callJson(
+				t,
+				imageImportView,
+				`/api/images/imports/${encodeURIComponent(requestId)}`,
+				{ signal },
 			),
 		resumeImageImport: async (requestId: string, signal?: AbortSignal) =>
-			imageImportView.parse(
-				await (
-					await t.call(
-						`/api/images/imports/${encodeURIComponent(requestId)}/resume`,
-						{ method: "POST", signal },
-					)
-				).json(),
+			callJson(
+				t,
+				imageImportView,
+				`/api/images/imports/${encodeURIComponent(requestId)}/resume`,
+				{ method: "POST", signal },
 			),
 		deleteImage: async (id: string, signal?: AbortSignal) => {
 			imageArtifactId.parse(id);
-			const result = imageArtifactDelete.parse(
-				await (
-					await t.call(`/api/images/${encodeURIComponent(id)}`, {
-						method: "DELETE",
-						signal,
-					})
-				).json(),
+			const result = await callJson(
+				t,
+				imageArtifactDelete,
+				`/api/images/${encodeURIComponent(id)}`,
+				{ method: "DELETE", signal },
 			);
 			if (result.id !== id) throw new Error("invalid_image_delete_result");
 			return result;
 		},
 		imageGenerations: async (conversationId: string, signal?: AbortSignal) =>
-			imageRecord
-				.array()
-				.parse(
-					await (
-						await t.call(
-							`/api/images/generations?conversationId=${encodeURIComponent(conversationId)}`,
-							{ signal },
-						)
-					).json(),
-				),
-		imageLibrary: async (signal?: AbortSignal) =>
-			imageLibrary.parse(
-				await (await t.call("/api/images/library", { signal })).json(),
+			callJson(
+				t,
+				imageRecord.array(),
+				withQuery("/api/images/generations", { conversationId }),
+				{ signal },
 			),
+		imageLibrary: async (signal?: AbortSignal) =>
+			callJson(t, imageLibrary, "/api/images/library", { signal }),
 		imageContent: async (id: string, signal?: AbortSignal) =>
 			(
 				await t.call(`/api/images/${encodeURIComponent(id)}/content`, {

@@ -14,8 +14,8 @@ const route = {
 const settings = {
 	revision: 1,
 	codingSupervision: { approveInstructions: true },
+	agency: { emotion: true, idleSec: 20, interests: [], maxUnanswered: 1 },
 	world: { enabled: false, curationResourceId: null },
-	subagent: { resourceId: null },
 	larm: {
 		baseUrl: "http://127.0.0.1:9000",
 		profile: "default",
@@ -39,6 +39,7 @@ const settings = {
 	},
 	general: {
 		agentName: "",
+		asrLanguages: ["ja", "en"],
 		userName: "",
 		persona: "butler",
 		theme: "system",

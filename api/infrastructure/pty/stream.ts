@@ -1,8 +1,6 @@
-export type Listener = { data(bytes: Uint8Array): void; end(): void };
+import { sseFrame, sseResponse, sseStream } from "../sse";
 
-const encoder = new TextEncoder();
-const frame = (event: string, data: string) =>
-	encoder.encode(`event: ${event}\ndata: ${data}\n\n`);
+export type Listener = { data(bytes: Uint8Array): void; end(): void };
 
 /**
  * Server-sent events of one session: `output` frames carry base64 PTY bytes (the backlog first),
@@ -18,59 +16,29 @@ export function outputStream(
 	signal: AbortSignal,
 	heartbeatMs: number,
 ): Response {
-	let cleanup = () => {};
-	const body = new ReadableStream<Uint8Array>(
-		{
-			start(controller) {
-				let ended = false;
-				const drop = () => {
-					if (ended) return;
-					cleanup();
-					controller.close();
-				};
-				const send = (chunk: Uint8Array) => {
-					if (ended) return;
-					if ((controller.desiredSize ?? 0) <= 0) drop();
-					else controller.enqueue(chunk);
-				};
+	return sseResponse(
+		sseStream({
+			signal,
+			highWaterMark: 64,
+			lagging: "disconnect",
+			heartbeatMs,
+			open(sink) {
 				const listener: Listener = {
 					data: (bytes) =>
-						send(frame("output", Buffer.from(bytes).toString("base64"))),
-					end() {
-						if (ended) return;
-						controller.enqueue(frame("exit", "{}"));
-						drop();
-					},
+						sink.send(
+							sseFrame({
+								event: "output",
+								data: Buffer.from(bytes).toString("base64"),
+							}),
+						),
+					end: () => sink.end(sseFrame({ event: "exit", data: "{}" })),
 				};
-				const heartbeat = setInterval(
-					() => send(encoder.encode(": heartbeat\n\n")),
-					heartbeatMs,
-				);
-				heartbeat.unref?.();
-				cleanup = () => {
-					ended = true;
-					clearInterval(heartbeat);
-					session.listeners.delete(listener);
-					signal.removeEventListener("abort", drop);
-				};
-				signal.addEventListener("abort", drop, { once: true });
 				if (session.backlog.length)
 					listener.data(Buffer.concat(session.backlog));
-				if (signal.aborted) drop();
-				else if (session.status !== "running") listener.end();
+				if (session.status !== "running") listener.end();
 				else session.listeners.add(listener);
+				return () => session.listeners.delete(listener);
 			},
-			cancel() {
-				cleanup();
-			},
-		},
-		{ highWaterMark: 64 },
+		}),
 	);
-	return new Response(body, {
-		headers: {
-			"Content-Type": "text/event-stream",
-			"Cache-Control": "no-store",
-			"X-Accel-Buffering": "no",
-		},
-	});
 }

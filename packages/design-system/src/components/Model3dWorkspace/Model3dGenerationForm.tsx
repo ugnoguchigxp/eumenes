@@ -21,6 +21,7 @@ export type Model3dGenerationFormProps = {
 	sourceImagesError?: string;
 	onRefreshImages?: () => void;
 	onUploadImage?: ImagePickerProps["onUpload"];
+	onDeleteImage?: ImagePickerProps["onDelete"];
 	renderGooglePhotos?: ImagePickerProps["renderGooglePhotos"];
 	pending?: boolean;
 	onGenerate: (values: Model3dGenerateValues) => Model3dSubmitResult;
@@ -59,6 +60,7 @@ export function Model3dGenerationForm({
 	sourceImagesError,
 	onRefreshImages,
 	onUploadImage,
+	onDeleteImage,
 	renderGooglePhotos,
 	pending,
 	onGenerate,
@@ -70,11 +72,16 @@ export function Model3dGenerationForm({
 	const selectedImage = sourceImages.find(
 		(image) => image.id === draft.imageId,
 	);
-	const error = submitted ? problem(draft) : undefined;
+	const invalidImage =
+		draft.mode === "image" && !!draft.imageId && !selectedImage;
+	const error = submitted
+		? (problem(draft) ??
+			(invalidImage ? "元にする画像を選び直してください。" : undefined))
+		: undefined;
 	const disabled = !available || pending;
 	async function submit() {
 		setSubmitted(true);
-		if (problem(draft)) return;
+		if (problem(draft) || invalidImage) return;
 		const accepted = await onGenerate({
 			title: draft.title.trim(),
 			tags: draft.tags.trim(),
@@ -193,6 +200,19 @@ export function Model3dGenerationForm({
 					pending={disabled}
 					onRefresh={onRefreshImages}
 					onUpload={onUploadImage}
+					onDelete={
+						onDeleteImage &&
+						(async (imageId) => {
+							const deleted = await onDeleteImage(imageId);
+							if (deleted)
+								setDraft((current) =>
+									current.imageId === imageId
+										? { ...current, imageId: "" }
+										: current,
+								);
+							return deleted;
+						})
+					}
 					renderGooglePhotos={renderGooglePhotos}
 					onCancel={() => setPicking(false)}
 					onConfirm={(imageId) => {

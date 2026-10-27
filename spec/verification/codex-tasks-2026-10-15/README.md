@@ -36,9 +36,9 @@ P0用の候補transportと検証器を`scripts/codex-tasks-p0/`に置く。製�
 | P0 部分・孤児 | `bun test scripts/codex-tasks-p0/orphan.test.ts` | **失敗**。別sessionでsleepをspawnして親を即時終了すると、子が残存し、候補が誤ってstopConfirmed=trueを返した。期待値を弱めず残す |
 | P0 live・孤児 | `bun scripts/codex-tasks-p0/orphan-live.ts <record>` | **失敗**、23625ms、SDK thread `01a13c58-7eae-7391-a354-05093516d2db`。turn.completed後もpid72306の/bin/sleepが残存、候補の停止確認は誤り。source SHA一致、SDK streamは正常。自分のfixtureの同一identityだけをcleanupした |
 
-実測のfixture出力は`verification-reports/codex-tasks-p0/`に保存。Provider生応答やstderrは保存せず、fixtureの最終schema、イベントtype/item type/id、実行時間、ホストによる実体確認を記録する。
+実測のfixture出力は`verification-reports/codex-tasks-p0/`（ローカルの検証記録。リポジトリには含めない）に保存。Provider生応答やstderrは保存せず、fixtureの最終schema、イベントtype/item type/id、実行時間、ホストによる実体確認を記録する。
 
-表中の`<record>`は`verification-reports/codex-tasks-p0/2026-10-14T21-17-30.766Z`。初回設定parse失敗だけは親ディレクトリの`work.json`。最終検証器はSDK error/例外の生メッセージを保存せず固定codeへ落とす。初回の設定parseエラーは秘密を含まないfixture起動エラーとして原因だけを本記録へ転記した。
+表中の`<record>`は`verification-reports/codex-tasks-p0/2026-10-14T21-17-30.766Z`（ローカルの検証記録。リポジトリには含めない）。初回設定parse失敗だけは親ディレクトリの`work.json`。最終検証器はSDK error/例外の生メッセージを保存せず固定codeへ落とす。初回の設定parseエラーは秘密を含まないfixture起動エラーとして原因だけを本記録へ転記した。
 
 実SDKではcommand_executionのstarted/completed中心の粒度を観測した。一文字ごとの配信を保証しない。巨大な改行無し行の拒否は4MiBを使った固定transport試験までで、実SDKの巨大出力受入は未実施。
 
@@ -95,8 +95,8 @@ macOS 26.6.2、Xcode SDK 26.2。現行`sys/event.h`はNOTE_TRACK/NOTE_TRACKERR/N
 ### 改訂5の実測・部分/結合結果
 
 - packages/coding-runner/src/sdk-*へSDK専用CLIを追加。旧exec worker契約とconsumerは維持。SDK部分試験6件、runner全体68件（1217 assertions）成功。型/lint/sizeも成功。
-- 実SDK復元: `runner-live.ts --run`。接続元のSIGTERM/SIGKILL後にそれぞれ完了、同epoch・同thread、再送時のturn.completedは各一件、HEAD不変、履歴をrunnerへ複製しないことを確認。thread `01a13c77-8765-7663-9b6a-ac9abf19c024`。source SHA開始/終了一致。結果 `verification-reports/codex-tasks-p0/2026-10-14T22-11-30.188Z/runner-recovery.json`。接続元は独立runnerを呼ぶbackend-portの検証clientであり、実Eumenes serverの通し受入ではない。
-- 実SDK境界: `runner-boundaries.ts --run <record>`。manual Abort=cancelled/managedExecutionStopped=true、runner SIGKILL=unknown/同epoch/元指示再送なし、分離sleep残存=実測再現/引渡し拒否/guard保持。全ケースworkspaceReleaseConfirmed=false。source SHA一致。結果 `verification-reports/codex-tasks-p0/2026-10-14T22-13-54.910Z/runner-boundaries.json`。fixture残存processはPID/開始/実行バイナリ一致時だけcleanup。旧孤児の全子孫停止試験は失敗のまま。
+- 実SDK復元: `runner-live.ts --run`。接続元のSIGTERM/SIGKILL後にそれぞれ完了、同epoch・同thread、再送時のturn.completedは各一件、HEAD不変、履歴をrunnerへ複製しないことを確認。thread `01a13c77-8765-7663-9b6a-ac9abf19c024`。source SHA開始/終了一致。結果 `spec/verification/reports/codex-tasks-p0/2026-10-14T22-11-30.188Z/runner-recovery.json`。接続元は独立runnerを呼ぶbackend-portの検証clientであり、実Eumenes serverの通し受入ではない。
+- 実SDK境界: `runner-boundaries.ts --run <record>`。manual Abort=cancelled/managedExecutionStopped=true、runner SIGKILL=unknown/同epoch/元指示再送なし、分離sleep残存=実測再現/引渡し拒否/guard保持。全ケースworkspaceReleaseConfirmed=false。source SHA一致。結果 `spec/verification/reports/codex-tasks-p0/2026-10-14T22-13-54.910Z/runner-boundaries.json`。fixture残存processはPID/開始/実行バイナリ一致時だけcleanup。旧孤児の全子孫停止試験は失敗のまま。
 - P1: kanban/0003-executors、共通状態/担当FIFO/汎用executor registry/旧@1投影/workspace guard/構造化状態採用を追加中。既存domain39・Web18とapplication47件成功。新共通fixture6件、移行/第三担当/rollback/unknown採用を確認。実SDKのボード接続・実PTY入力との排他・新GUI・bundle公開・git工程は未実装/未受入。
 - 共有workspaceの引渡し方式は確認中。独立CLI化を全子孫停止保証の解決として扱わず、その判断に依存しないP1のみ先行する。
 
@@ -116,7 +116,7 @@ macOS 26.6.2、Xcode SDK 26.2。現行`sys/event.h`はNOTE_TRACK/NOTE_TRACKERR/N
 - 標準検証: codex-tasks（8件、35 assertions、970ms）、kanban（45件＋Web18件、4199ms）のsize/format/lint/型/試験・検証中のsource不変確認が成功。全体の型確認には担当外object-recognition browser試験のArrayBuffer/Iterable型不整合が一件残る。全体sizeにも担当外の既存/並行変更がある。これらを修正して検証を通す作業は行わない。
 - P4部分: UIの元run/HEAD/内容指紋/登録remoteに結び付く許可を保存し、別SDK turnのcommit→pushを同一操作group内で行う。private MCPは一工程のツールだけを公開し、通常shellはread-only/network禁止を維持。ホストがバイナリ/削除/新規ファイルの内容、親HEAD、tree、branch/remote、期限、SHAを照合する。部分試験5件では再送一回性、後からの変更/混在/余分なstage/remote変更/不明intentの拒否を確認。
 - 実SDKのGit受入: git-live.ts --run。最初はMCPの既定承認要求がapprovalPolicy=neverで拒否され、Git副作用は未開始、process観測の終了判定も未確認となった。privateなUI許可に限定する一工程のtool approval設定を公式MCP仕様に従って追加。実行バイナリが変わったPIDはsignalせず、同PID/開始時刻の生存中は完了を拒否し、zombie/終了後に観測対象の終了を判定する。
-- 二回目のliveはwork/commit/pushの3SDK turnが同threadで成功。親HEAD=baseline、変更path=value.jsのみ、remote SHA=検証済みcommit、commit数2、同一受付再送で同epoch、管理対象終了、source SHA開始/終了一致。記録: verification-reports/codex-tasks-p0/2026-10-15T00-40-20.993Z/git-live.json。これは隔離したrunner/ローカルbare remoteの受入であり、Eumenes APIの通しではない。全OS子孫の停止保証へ昇格しない。
+- 二回目のliveはwork/commit/pushの3SDK turnが同threadで成功。親HEAD=baseline、変更path=value.jsのみ、remote SHA=検証済みcommit、commit数2、同一受付再送で同epoch、管理対象終了、source SHA開始/終了一致。記録: `spec/verification/reports/codex-tasks-p0/2026-10-15T00-40-20.993Z/git-live.json`。これは隔離したrunner/ローカルbare remoteの受入であり、Eumenes APIの通しではない。全OS子孫の停止保証へ昇格しない。
 - SDK履歴はnative sessionだけを正本とする。CLIのcodex-runnerは製品DBを開かず、backend API認証の前に独立runner APIへ状態取得/停止を接続する。recoverによる未知工程の照合は残作業で、現状は保存状態の再照会。
 - 運用ログに適用済みkanban/0003-executorsのchecksum不一致を確認したため、0003のSQLをGit追加前へ戻し、追加は0004-gitに分離した。製品DBの書換えやmigration checksum更新は行わない。画面/受付の新しい参照は共通artifact@4・Kanban binding/toolchain@4・Codex binding/toolchain@2。登録整合性試験は成功。保存済みの旧revisionは更新しない。
 - ブラウザGit受入は継続中。最初は画面の文字列revisionを変換後のbuiltin数値schemaで検査して拒否した。画面用schema:kanban-git@1を追加し、実行時の厳密schemaを維持。登録参照のずれも検証で修正。次は受入済みの登録から画面操作を確認する。

@@ -31,7 +31,7 @@ bun run nl-acceptance -- --rejudge <runDir>         # 保存済み証拠の再�
 
 ## 結果と証拠
 
-`verification-reports/nl-acceptance/<runId>/` に `manifest.json`（基準commit、凍結digest、browser/viewport/locale/timezone、driver版、tester・製品モデル、開始終了、token・呼出し数・action数・費用、停止理由）、`steps.jsonl`、スクリーンショットを保存する。
+`verification-reports/nl-acceptance/<runId>/`（ローカルの検証記録。リポジトリには含めない）に `manifest.json`（基準commit、凍結digest、browser/viewport/locale/timezone、driver版、tester・製品モデル、開始終了、token・呼出し数・action数・費用、停止理由）、`steps.jsonl`、スクリーンショットを保存する。
 
 - `verdict`: `success`（必須criteriaを証拠で全て満たし、禁止副作用なし）、`failure`（具体的な違反を観測）、`inconclusive`（証拠不足・tester/driver故障・予算到達・環境不安定）。
 - `failureClass`: `product`・`tester`・`environment`・`criteria`・`undetermined`。testerの見誤りや予算到達を製品故障にしない。

@@ -1,0 +1,866 @@
+{
+  "operations": [
+    {
+      "name": "agency subscribe",
+      "durationMs": 0.26204100000006747
+    },
+    {
+      "name": "agent callbacks",
+      "durationMs": 0.8609589999999798
+    },
+    {
+      "name": "world callbacks",
+      "durationMs": 0.37904100000002927
+    },
+    {
+      "name": "inference rejected sample",
+      "durationMs": 9.427374999999984,
+      "error": "Error"
+    },
+    {
+      "name": "background callbacks settle",
+      "durationMs": 2001.0655000000002
+    },
+    {
+      "name": "task report delivery",
+      "durationMs": 0.6264579999997295
+    },
+    {
+      "name": "inference activity",
+      "durationMs": 4.814958000000388
+    },
+    {
+      "name": "inference usage",
+      "durationMs": 34.7170000000001
+    },
+    {
+      "name": "queue stats",
+      "durationMs": 0.9937079999999696
+    },
+    {
+      "name": "GET /api/conversations/main",
+      "durationMs": 11.914166000000023
+    },
+    {
+      "name": "GET /api/conversations/main/runs",
+      "durationMs": 0.9932919999996557
+    },
+    {
+      "name": "GET /api/inference/status",
+      "durationMs": 0.38020800000003874
+    },
+    {
+      "name": "GET /api/inference/usage",
+      "durationMs": 13.184624999999869
+    },
+    {
+      "name": "GET /api/inference/usage/page",
+      "durationMs": 22.170374999999694
+    },
+    {
+      "name": "GET /api/settings",
+      "durationMs": 0.45695900000009715
+    },
+    {
+      "name": "GET /api/memory/status",
+      "durationMs": 0.15000000000009095
+    },
+    {
+      "name": "GET /api/memory/items",
+      "durationMs": 0.06783399999994799
+    },
+    {
+      "name": "GET /api/memory/short-term?conversationId=main",
+      "durationMs": 0.19312499999978172
+    },
+    {
+      "name": "event loop before",
+      "delayMs": 1474.2711660000004
+    },
+    {
+      "name": "GET /api/steward/activity?conversationId=main",
+      "durationMs": 1474.2785829999998
+    },
+    {
+      "name": "GET /api/tasks",
+      "durationMs": 2.157000000000153
+    },
+    {
+      "name": "GET /api/queue/status",
+      "durationMs": 0.7099589999997988
+    },
+    {
+      "name": "GET /api/monitoring/snapshot",
+      "durationMs": 10.496750000000247
+    },
+    {
+      "name": "event loop indexed",
+      "delayMs": 2.144749999999476,
+      "sameResponse": true
+    },
+    {
+      "name": "GET steward activity indexed",
+      "durationMs": 2.2124170000006416
+    }
+  ],
+  "queries": [
+    {
+      "sql": "SELECT u.slot, u.step, u.state, u.attempt, u.job_id AS jobId, u.closed_at AS closedAt,\n\t\t\t\t(SELECT d.error_code FROM steward_decision d\n\t\t\t\t\tWHERE d.conversation_id = u.conversation_id AND d.job_id = u.job_id\n\t\t\t\t\tORDER BY d.id DESC LIMIT 1) AS errorCode\n\t\t\tFROM steward_unit u\n\t\t\tWHERE u.conversation_id = ? AND u.state <> 'open' AND u.closed_at IS NOT NULL\n\t\t\t\tAND u.id = (SELECT x.id FROM steward_unit x\n\t\t\t\t\tWHERE x.conversation_id = u.conversation_id AND x.slot = u.slot\n\t\t\t\t\t\tAND x.state <> 'open' AND x.closed_at IS NOT NULL AND NOT EXISTS (SELECT 1 FROM steward_decision d WHERE d.conversation_id = x.conversation_id AND d.job_id = x.job_id\n\t\t\tAND d.error_code IN (?))\n\t\t\t\t\tORDER BY x.closed_at DESC, x.rowid DESC LIMIT 1)\n\t\t\t\tAND NOT (u.state = 'failed' AND EXISTS (SELECT 1 FROM steward_decision s\n\t\t\t\t\tWHERE s.conversation_id = u.conversation_id AND s.step = u.step AND s.job_id IS NOT u.job_id\n\t\t\t\t\t\tAND s.error_code IS NULL AND s.created_at > u.closed_at))",
+      "totalMs": 1474.0919590000008,
+      "maxMs": 1473.7840840000003,
+      "count": 2,
+      "call": [
+        "    at <anonymous> (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/steward/service/activity.ts:114:6)",
+        "    at <anonymous> (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/steward/controller/index.ts:26:25)",
+        "    at dispatch (/Users/y.noguchi/Code/eumenes/node_modules/.bun/hono@4.12.34/node_modules/hono/dist/compose.js:22:23)",
+        "    at <anonymous> (/private/tmp/eumenes-sql-source.Kwc9h5/api/application/app.ts:127:9)"
+      ],
+      "phases": {
+        "GET /api/steward/activity?conversationId=main": 1,
+        "GET steward activity indexed": 1
+      }
+    },
+    {
+      "sql": "SELECT a.id,a.request_id AS requestId,r.subject,r.purpose,a.source,a.model,a.status,a.reason,a.started,a.ended,a.accepted,a.input_tokens AS inputTokens,a.output_tokens AS outputTokens,a.billing_path AS billingPath,a.provider_details AS providerDetails FROM inference_attempts a JOIN inference_requests r ON r.id=a.request_id WHERE r.subject NOT LIKE 'probe:%' AND instr(lower(r.purpose||' '||CASE r.purpose WHEN 'llm' THEN '会話' WHEN 'asr' THEN '聞き取り' WHEN 'tts' THEN '読み上げ' ELSE '' END||' '||a.source||' '||coalesce(a.model,'不明')||' '||a.status||' '||CASE WHEN a.accepted<>0 THEN '採用済み' ELSE a.status END||' '||coalesce(a.reason,'')),lower(?))>0 ORDER BY a.started DESC,a.id DESC LIMIT ? OFFSET ?",
+      "totalMs": 29.731917000000067,
+      "maxMs": 16.724083000000064,
+      "count": 2,
+      "call": [
+        "    at <anonymous> (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/inference/service/usage.ts:66:8)",
+        "    at transaction (bun:sqlite:447:27)",
+        "    at measure (/private/tmp/eumenes-sql-service-diagnostic.ts:24:107)",
+        "    at /private/tmp/eumenes-sql-service-diagnostic.ts:34:8"
+      ],
+      "phases": {
+        "inference usage": 1,
+        "GET /api/inference/usage/page": 1
+      }
+    },
+    {
+      "sql": "SELECT count(*) AS total FROM inference_attempts a JOIN inference_requests r ON r.id=a.request_id WHERE r.subject NOT LIKE 'probe:%' AND instr(lower(r.purpose||' '||CASE r.purpose WHEN 'llm' THEN '会話' WHEN 'asr' THEN '聞き取り' WHEN 'tts' THEN '読み上げ' ELSE '' END||' '||a.source||' '||coalesce(a.model,'不明')||' '||a.status||' '||CASE WHEN a.accepted<>0 THEN '採用済み' ELSE a.status END||' '||coalesce(a.reason,'')),lower(?))>0",
+      "totalMs": 24.80025100000057,
+      "maxMs": 16.250417000000198,
+      "count": 2,
+      "call": [
+        "    at <anonymous> (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/inference/service/usage.ts:55:9)",
+        "    at transaction (bun:sqlite:447:27)",
+        "    at measure (/private/tmp/eumenes-sql-service-diagnostic.ts:24:107)",
+        "    at /private/tmp/eumenes-sql-service-diagnostic.ts:34:8"
+      ],
+      "phases": {
+        "inference usage": 1,
+        "GET /api/inference/usage/page": 1
+      }
+    },
+    {
+      "sql": "SELECT id,kind,digest,document_json FROM capability_documents WHERE id=?",
+      "totalMs": 13.181897000004028,
+      "maxMs": 0.09654199999999946,
+      "count": 3215,
+      "call": [
+        "    at getDocument (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/capabilities/repository/index.ts:144:4)",
+        "    at artifactInTransaction (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/capabilities/service/documents.ts:41:15)",
+        "    at publishedArtifacts (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/capabilities/service/artifacts.ts:53:17)",
+        "    at createCheck (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/capabilities/service/bundles.ts:184:20)"
+      ],
+      "phases": {
+        "construct": 3215
+      }
+    },
+    {
+      "sql": "SELECT a.id,a.request_id AS requestId,r.subject,r.purpose,a.source,a.model,a.status,a.reason,a.started,a.ended,a.accepted,a.input_tokens AS inputTokens,a.output_tokens AS outputTokens,a.billing_path AS billingPath,a.provider_details AS providerDetails FROM inference_attempts a JOIN inference_requests r ON r.id=a.request_id WHERE r.subject NOT LIKE 'probe:%' ORDER BY a.started DESC LIMIT 100",
+      "totalMs": 12.875290999999834,
+      "maxMs": 12.875290999999834,
+      "count": 1,
+      "call": [
+        "    at <anonymous> (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/inference/service/usage.ts:43:7)",
+        "    at <anonymous> (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/inference/controller/index.ts:56:56)",
+        "    at dispatch (/Users/y.noguchi/Code/eumenes/node_modules/.bun/hono@4.12.34/node_modules/hono/dist/compose.js:22:23)",
+        "    at <anonymous> (/private/tmp/eumenes-sql-source.Kwc9h5/api/application/app.ts:127:9)"
+      ],
+      "phases": {
+        "GET /api/inference/usage": 1
+      }
+    },
+    {
+      "sql": "SELECT json_extract(r.definition_json,'$.artifactRevisionId') a FROM capability_items i JOIN capability_revisions r ON r.id=i.active_revision_id WHERE i.kind='toolchain' AND i.enabled=1",
+      "totalMs": 3.4998719999997547,
+      "maxMs": 0.11095799999998235,
+      "count": 69,
+      "call": [
+        "    at toolchainArtifactIds (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/capabilities/service/artifacts.ts:40:5)",
+        "    at publishedArtifacts (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/capabilities/service/artifacts.ts:50:23)",
+        "    at createCheck (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/capabilities/service/bundles.ts:184:20)",
+        "    at importBundleInTransaction (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/capabilities/service/bundles.ts:622:13)"
+      ],
+      "phases": {
+        "construct": 69
+      }
+    },
+    {
+      "sql": "SELECT 1 FROM sqlite_master WHERE name='conversation_attachments'",
+      "totalMs": 3.4035979999980555,
+      "maxMs": 0.032083999999940715,
+      "count": 200,
+      "call": [
+        "    at attachmentsReady (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/conversation/repository/attachments.ts:25:4)",
+        "    at messageAttachments (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/conversation/repository/attachments.ts:28:7)",
+        "    at toMessage (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/conversation/repository/index.ts:516:7)",
+        "    at map (native:1:11)"
+      ],
+      "phases": {
+        "GET /api/conversations/main": 200
+      }
+    },
+    {
+      "sql": "SELECT r.purpose AS g,COUNT(*) AS n FROM inference_attempts a JOIN inference_requests r ON r.id=a.request_id WHERE r.subject NOT LIKE 'probe:%' AND a.status='running' GROUP BY g",
+      "totalMs": 2.7020010000001093,
+      "maxMs": 1.930166999999983,
+      "count": 2,
+      "call": [
+        "    at <anonymous> (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/inference/service/activity.ts:25:7)",
+        "    at measure (/private/tmp/eumenes-sql-service-diagnostic.ts:24:107)",
+        "    at /private/tmp/eumenes-sql-service-diagnostic.ts:33:8"
+      ],
+      "phases": {
+        "inference activity": 1,
+        "GET /api/monitoring/snapshot": 1
+      }
+    },
+    {
+      "sql": "SELECT lane,\n COALESCE(SUM(state IN ('queued','retry_wait')),0) AS queued,\n COALESCE(SUM(state IN ('running','cancel_requested')),0) AS running,\n COALESCE(SUM(state='failed'),0) AS failed,\n MIN(CASE WHEN state IN ('queued','retry_wait') AND available_at_ms <= ? THEN available_at_ms END) AS oldest\n FROM queue_jobs GROUP BY lane",
+      "totalMs": 1.8493759999996655,
+      "maxMs": 0.7204999999999018,
+      "count": 3,
+      "call": [
+        "    at stats (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/queue/service/index.ts:258:29)",
+        "    at measure (/private/tmp/eumenes-sql-service-diagnostic.ts:24:107)",
+        "    at /private/tmp/eumenes-sql-service-diagnostic.ts:35:8"
+      ],
+      "phases": {
+        "queue stats": 1,
+        "GET /api/queue/status": 1,
+        "GET /api/monitoring/snapshot": 1
+      }
+    },
+    {
+      "sql": "SELECT r.purpose AS g,MAX(a.ended) AS at FROM inference_attempts a JOIN inference_requests r ON r.id=a.request_id WHERE r.subject NOT LIKE 'probe:%' AND a.status='succeeded' AND a.ended>=? GROUP BY g",
+      "totalMs": 1.7745829999994385,
+      "maxMs": 1.452291999999943,
+      "count": 2,
+      "call": [
+        "    at <anonymous> (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/inference/service/activity.ts:31:7)",
+        "    at measure (/private/tmp/eumenes-sql-service-diagnostic.ts:24:107)",
+        "    at /private/tmp/eumenes-sql-service-diagnostic.ts:33:8"
+      ],
+      "phases": {
+        "inference activity": 1,
+        "GET /api/monitoring/snapshot": 1
+      }
+    },
+    {
+      "sql": "SELECT slot, job_id AS jobId FROM steward_unit WHERE conversation_id = ? AND state = 'open' AND job_id IS NOT NULL",
+      "totalMs": 1.6263749999998254,
+      "maxMs": 1.6152499999998327,
+      "count": 2,
+      "call": [
+        "    at <anonymous> (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/steward/service/activity.ts:107:23)",
+        "    at <anonymous> (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/steward/controller/index.ts:26:25)",
+        "    at dispatch (/Users/y.noguchi/Code/eumenes/node_modules/.bun/hono@4.12.34/node_modules/hono/dist/compose.js:22:23)",
+        "    at <anonymous> (/private/tmp/eumenes-sql-source.Kwc9h5/api/application/app.ts:127:9)"
+      ],
+      "phases": {
+        "GET /api/steward/activity?conversationId=main": 1,
+        "GET steward activity indexed": 1
+      }
+    },
+    {
+      "sql": "SELECT definition_hash FROM capability_revisions WHERE id=?",
+      "totalMs": 1.613213999999175,
+      "maxMs": 0.01704199999994671,
+      "count": 635,
+      "call": [
+        "    at registerRevision (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/capabilities/service/registry.ts:48:4)",
+        "    at registerBuiltinInTransaction (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/capabilities/service/index.ts:86:3)",
+        "    at seedBuiltins (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/capabilities/service/builtin-seed.ts:26:40)",
+        "    at <anonymous> (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/capabilities/service/index.ts:371:5)"
+      ],
+      "phases": {
+        "construct": 635
+      }
+    },
+    {
+      "sql": "SELECT 1 FROM capability_revisions WHERE id=?",
+      "totalMs": 1.514356999996835,
+      "maxMs": 0.48583399999995436,
+      "count": 798,
+      "call": [
+        "    at seedBuiltins (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/capabilities/service/builtin-seed.ts:37:6)",
+        "    at <anonymous> (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/capabilities/service/index.ts:371:5)",
+        "    at <anonymous> (/private/tmp/eumenes-sql-source.Kwc9h5/api/infrastructure/sqlite/index.ts:330:20)",
+        "    at transaction (bun:sqlite:447:27)"
+      ],
+      "phases": {
+        "construct": 798
+      }
+    },
+    {
+      "sql": "SELECT r.purpose AS g,a.reason,a.ended AS at FROM inference_attempts a JOIN inference_requests r ON r.id=a.request_id WHERE r.subject NOT LIKE 'probe:%' AND a.status='failed' AND a.ended>=? AND coalesce(a.reason,'')<>'cancelled' ORDER BY a.ended DESC",
+      "totalMs": 1.1535420000000158,
+      "maxMs": 0.9092920000002778,
+      "count": 2,
+      "call": [
+        "    at <anonymous> (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/inference/service/activity.ts:37:7)",
+        "    at measure (/private/tmp/eumenes-sql-service-diagnostic.ts:24:107)",
+        "    at /private/tmp/eumenes-sql-service-diagnostic.ts:33:8"
+      ],
+      "phases": {
+        "inference activity": 1,
+        "GET /api/monitoring/snapshot": 1
+      }
+    },
+    {
+      "sql": "SELECT m.id, m.conversation_id, m.role, m.text, m.created_at, m.run_id, m.presentation, a.motion, COALESCE(d.delivery, md.delivery) AS delivery FROM messages m LEFT JOIN answer_avatar_motions a ON a.run_id = m.run_id AND a.conversation_id = m.conversation_id AND m.role = 'assistant' LEFT JOIN answer_deliveries d ON d.run_id = m.run_id AND d.conversation_id = m.conversation_id AND m.role = 'assistant' LEFT JOIN message_deliveries md ON md.message_id = m.id AND md.conversation_id = m.conversation_id AND m.role = 'assistant' WHERE m.conversation_id = ? AND m.retracted_at IS NULL ORDER BY m.rowid DESC LIMIT ?",
+      "totalMs": 1.031582999999955,
+      "maxMs": 1.031582999999955,
+      "count": 1,
+      "call": [
+        "    at tailMessages (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/conversation/repository/index.ts:539:4)",
+        "    at <anonymous> (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/conversation/service/index.ts:188:35)",
+        "    at <anonymous> (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/conversation/controller/index.ts:50:18)",
+        "    at dispatch (/Users/y.noguchi/Code/eumenes/node_modules/.bun/hono@4.12.34/node_modules/hono/dist/compose.js:22:23)"
+      ],
+      "phases": {
+        "GET /api/conversations/main": 1
+      }
+    },
+    {
+      "sql": "SELECT data_json FROM message_attributions WHERE message_id=?",
+      "totalMs": 0.4723390000017389,
+      "maxMs": 0.007124999999632564,
+      "count": 200,
+      "call": [
+        "    at readAttribution (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/conversation/repository/attribution.ts:25:4)",
+        "    at toMessage (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/conversation/repository/index.ts:506:6)",
+        "    at map (native:1:11)",
+        "    at tailMessages (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/conversation/repository/index.ts:545:5)"
+      ],
+      "phases": {
+        "GET /api/conversations/main": 200
+      }
+    },
+    {
+      "sql": "SELECT active_revision_id r FROM capability_artifact_pointers ORDER BY artifact_id",
+      "totalMs": 0.4258340000001226,
+      "maxMs": 0.022082999999952335,
+      "count": 69,
+      "call": [
+        "    at artifactPointers (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/capabilities/repository/index.ts:208:5)",
+        "    at publishedArtifacts (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/capabilities/service/artifacts.ts:50:52)",
+        "    at createCheck (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/capabilities/service/bundles.ts:184:20)",
+        "    at importBundleInTransaction (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/capabilities/service/bundles.ts:622:13)"
+      ],
+      "phases": {
+        "construct": 69
+      }
+    },
+    {
+      "sql": "SELECT a.metadata FROM message_attachments m JOIN conversation_attachments a ON a.id=m.attachment_id WHERE m.message_id=? ORDER BY m.ordinal",
+      "totalMs": 0.39232900000388327,
+      "maxMs": 0.0152909999997064,
+      "count": 200,
+      "call": [
+        "    at messageAttachments (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/conversation/repository/attachments.ts:34:5)",
+        "    at toMessage (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/conversation/repository/index.ts:516:7)",
+        "    at map (native:1:11)",
+        "    at tailMessages (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/conversation/repository/index.ts:545:5)"
+      ],
+      "phases": {
+        "GET /api/conversations/main": 200
+      }
+    },
+    {
+      "sql": "SELECT * FROM dialogue_runs WHERE conversation_id = ? ORDER BY seq",
+      "totalMs": 0.26262499999984357,
+      "maxMs": 0.26262499999984357,
+      "count": 1,
+      "call": [
+        "    at listRuns (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/dialogue/repository/index.ts:174:5)",
+        "    at <anonymous> (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/dialogue/controller/index.ts:58:18)",
+        "    at dispatch (/Users/y.noguchi/Code/eumenes/node_modules/.bun/hono@4.12.34/node_modules/hono/dist/compose.js:22:23)",
+        "    at <anonymous> (/private/tmp/eumenes-sql-source.Kwc9h5/api/application/app.ts:127:9)"
+      ],
+      "phases": {
+        "GET /api/conversations/main/runs": 1
+      }
+    },
+    {
+      "sql": "SELECT document FROM settings_document WHERE id=1",
+      "totalMs": 0.2560030000012148,
+      "maxMs": 0.021834000000012566,
+      "count": 38,
+      "call": [
+        "    at persistStoredMigration (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/settings/repository/migrate-stored.ts:107:4)",
+        "    at <anonymous> (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/settings/service/index.ts:190:8)",
+        "    at <anonymous> (/private/tmp/eumenes-sql-source.Kwc9h5/api/infrastructure/sqlite/index.ts:330:20)",
+        "    at transaction (bun:sqlite:447:27)"
+      ],
+      "phases": {
+        "construct": 4,
+        "agency subscribe": 1,
+        "inference rejected sample": 5,
+        "GET /api/inference/status": 1,
+        "GET /api/settings": 1,
+        "GET /api/monitoring/snapshot": 26
+      }
+    },
+    {
+      "sql": "SELECT * FROM agent_tasks WHERE state NOT IN ('completed','failed','cancelled','interrupted') AND deadline<=? LIMIT 100",
+      "totalMs": 0.2103749999999991,
+      "maxMs": 0.10579199999995126,
+      "count": 2,
+      "call": [
+        "    at <anonymous> (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/agent-runtime/service/reconcile.ts:195:27)",
+        "    at reconcile (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/agent-runtime/service/reconcile.ts:242:42)",
+        "    at runScheduled (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/agent-runtime/service/reconcile.ts:34:9)"
+      ],
+      "phases": {
+        "agent callbacks": 1,
+        "background callbacks settle": 1
+      }
+    },
+    {
+      "sql": "SELECT id FROM codex_task_attempts WHERE adopted=0 ORDER BY seq",
+      "totalMs": 0.13833400000100937,
+      "maxMs": 0.053958999999849766,
+      "count": 10,
+      "call": [
+        "    at pending (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/codex-tasks/repository/index.ts:78:5)",
+        "    at <anonymous> (/private/tmp/eumenes-sql-source.Kwc9h5/api/infrastructure/sqlite/index.ts:318:19)",
+        "    at transaction (bun:sqlite:447:27)",
+        "    at <anonymous> (/private/tmp/eumenes-sql-source.Kwc9h5/api/application/work/codex-task-runner.ts:68:34)"
+      ],
+      "phases": {
+        "inference rejected sample": 7,
+        "background callbacks settle": 2,
+        "GET /api/monitoring/snapshot": 1
+      }
+    },
+    {
+      "sql": "SELECT 1 FROM sqlite_master WHERE type='table' AND name='conversation_outbox'",
+      "totalMs": 0.13370699999973112,
+      "maxMs": 0.03283299999998235,
+      "count": 8,
+      "call": [
+        "    at outboxReady (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/conversation/repository/index.ts:97:4)",
+        "    at outboxHead (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/conversation/repository/index.ts:243:7)",
+        "    at start (/private/tmp/eumenes-sql-source.Kwc9h5/api/application/agency/host.ts:939:13)",
+        "    at measure (/private/tmp/eumenes-sql-service-diagnostic.ts:24:107)"
+      ],
+      "phases": {
+        "agency subscribe": 1,
+        "inference rejected sample": 7
+      }
+    },
+    {
+      "sql": "SELECT r.data_json FROM task_report_outbox o JOIN task_reports r ON r.id=o.report_id WHERE o.state='pending' AND json_extract(r.data_json,'$.originConversationId') IS NOT NULL ORDER BY r.rowid LIMIT ?",
+      "totalMs": 0.12208400000008623,
+      "maxMs": 0.12208400000008623,
+      "count": 1,
+      "call": [
+        "    at pending (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/task-reports/repository/index.ts:98:5)",
+        "    at <anonymous> (/private/tmp/eumenes-sql-source.Kwc9h5/api/application/work/task-report-delivery.ts:16:27)",
+        "    at <anonymous> (/private/tmp/eumenes-sql-source.Kwc9h5/api/infrastructure/sqlite/index.ts:330:20)",
+        "    at transaction (bun:sqlite:447:27)"
+      ],
+      "phases": {
+        "task report delivery": 1
+      }
+    },
+    {
+      "sql": "SELECT * FROM conversation_outbox WHERE seq > ? ORDER BY seq LIMIT ?",
+      "totalMs": 0.10729099999980463,
+      "maxMs": 0.020792000000028565,
+      "count": 7,
+      "call": [
+        "    at listOutbox (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/conversation/repository/index.ts:238:5)",
+        "    at <anonymous> (/private/tmp/eumenes-sql-source.Kwc9h5/api/application/agency/host.ts:834:33)",
+        "    at pump (/private/tmp/eumenes-sql-source.Kwc9h5/api/application/agency/host.ts:833:23)",
+        "    at safePump (/private/tmp/eumenes-sql-source.Kwc9h5/api/application/agency/host.ts:870:4)"
+      ],
+      "phases": {
+        "inference rejected sample": 7
+      }
+    },
+    {
+      "sql": "SELECT 1 FROM sqlite_master WHERE type='table' AND name='message_deliveries'",
+      "totalMs": 0.10695799999984956,
+      "maxMs": 0.10695799999984956,
+      "count": 1,
+      "call": [
+        "    at messageDeliveryReady (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/conversation/repository/index.ts:110:6)",
+        "    at messageSelect (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/conversation/repository/index.ts:485:14)",
+        "    at tailMessages (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/conversation/repository/index.ts:537:7)",
+        "    at <anonymous> (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/conversation/service/index.ts:188:35)"
+      ],
+      "phases": {
+        "GET /api/conversations/main": 1
+      }
+    },
+    {
+      "sql": "SELECT * FROM tool_invocations WHERE state='pending' AND id>? ORDER BY id LIMIT ?",
+      "totalMs": 0.08929200000011406,
+      "maxMs": 0.050292000000013104,
+      "count": 2,
+      "call": [
+        "    at <anonymous> (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/agent-runtime/service/reconcile.ts:106:26)",
+        "    at reconcile (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/agent-runtime/service/reconcile.ts:242:42)",
+        "    at runScheduled (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/agent-runtime/service/reconcile.ts:34:9)"
+      ],
+      "phases": {
+        "agent callbacks": 1,
+        "background callbacks settle": 1
+      }
+    },
+    {
+      "sql": "SELECT COUNT(*) AS n FROM queue_jobs WHERE state IN ('queued','running','retry_wait','cancel_requested')",
+      "totalMs": 0.07416699999930643,
+      "maxMs": 0.02841699999953562,
+      "count": 3,
+      "call": [
+        "    at openTotal (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/queue/repository/index.ts:398:5)",
+        "    at stats (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/queue/service/index.ts:272:21)",
+        "    at measure (/private/tmp/eumenes-sql-service-diagnostic.ts:24:107)",
+        "    at /private/tmp/eumenes-sql-service-diagnostic.ts:35:8"
+      ],
+      "phases": {
+        "queue stats": 1,
+        "GET /api/queue/status": 1,
+        "GET /api/monitoring/snapshot": 1
+      }
+    },
+    {
+      "sql": "SELECT total_changes() AS count",
+      "totalMs": 0.06162600000027396,
+      "maxMs": 0.012083000000075117,
+      "count": 28,
+      "call": [
+        "    at <anonymous> (/private/tmp/eumenes-sql-source.Kwc9h5/api/infrastructure/sqlite/index.ts:328:28)"
+      ],
+      "phases": {
+        "construct": 8,
+        "world callbacks": 2,
+        "inference rejected sample": 14,
+        "task report delivery": 2,
+        "GET /api/monitoring/snapshot": 2
+      }
+    },
+    {
+      "sql": "INSERT INTO schema_migrations_v2 (id, checksum, applied_at) VALUES (?, ?, ?)",
+      "totalMs": 0.057456000000229324,
+      "maxMs": 0.011124999999992724,
+      "count": 11,
+      "call": [
+        "    at <anonymous> (/private/tmp/eumenes-sql-source.Kwc9h5/api/infrastructure/sqlite/index.ts:272:7)",
+        "    at transaction (bun:sqlite:447:27)",
+        "    at openStore (/private/tmp/eumenes-sql-source.Kwc9h5/api/infrastructure/sqlite/index.ts:273:5)",
+        "    at buildCore (/private/tmp/eumenes-sql-source.Kwc9h5/api/application/server-core.ts:55:23)"
+      ],
+      "phases": {
+        "construct": 11
+      }
+    },
+    {
+      "sql": "SELECT id, checksum FROM schema_migrations_v2",
+      "totalMs": 0.05687499999987722,
+      "maxMs": 0.051582999999936874,
+      "count": 3,
+      "call": [
+        "    at openStore (/private/tmp/eumenes-sql-source.Kwc9h5/api/infrastructure/sqlite/index.ts:250:7)",
+        "    at buildCore (/private/tmp/eumenes-sql-source.Kwc9h5/api/application/server-core.ts:39:16)",
+        "    at buildServices (/private/tmp/eumenes-sql-source.Kwc9h5/api/application/server-services.ts:63:21)",
+        "    at /private/tmp/eumenes-sql-service-diagnostic.ts:26:17"
+      ],
+      "phases": {
+        "construct": 3
+      }
+    },
+    {
+      "sql": "SELECT * FROM agent_tasks WHERE kind='coordinator' AND state IN ('completed','failed','cancelled','interrupted') AND updated_at<? AND report_state NOT IN ('deleted','expired') LIMIT 100",
+      "totalMs": 0.05525000000000091,
+      "maxMs": 0.05525000000000091,
+      "count": 1,
+      "call": [
+        "    at runMaintenance (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/agent-runtime/service/maintenance.ts:26:23)"
+      ],
+      "phases": {
+        "agent callbacks": 1
+      }
+    },
+    {
+      "sql": "SELECT MIN(deadline) AS deadline FROM agent_tasks WHERE state NOT IN ('completed','failed','cancelled','interrupted')",
+      "totalMs": 0.050666999999975815,
+      "maxMs": 0.02758399999993344,
+      "count": 2,
+      "call": [
+        "    at armRuntimeTimer (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/agent-runtime/service/reconcile-timer.ts:9:25)",
+        "    at <anonymous> (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/agent-runtime/service/reconcile.ts:249:5)"
+      ],
+      "phases": {
+        "agent callbacks": 1,
+        "background callbacks settle": 1
+      }
+    },
+    {
+      "sql": "SELECT * FROM inference_requests WHERE id=?",
+      "totalMs": 0.049167000000011285,
+      "maxMs": 0.017291999999997643,
+      "count": 4,
+      "call": [
+        "    at get (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/inference/repository/index.ts:39:4)",
+        "    at executeRequest (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/inference/service/execute.ts:322:26)",
+        "    at standaloneReceipt (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/inference/service/index.ts:257:25)",
+        "    at async standalone (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/inference/service/index.ts:278:17)"
+      ],
+      "phases": {
+        "inference rejected sample": 4
+      }
+    },
+    {
+      "sql": "SELECT 1 FROM sqlite_master WHERE type='table' AND name='message_attributions'",
+      "totalMs": 0.047708999999940715,
+      "maxMs": 0.047708999999940715,
+      "count": 1,
+      "call": [
+        "    at available (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/conversation/repository/attribution.ts:16:5)",
+        "    at readAttribution (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/conversation/repository/attribution.ts:22:7)",
+        "    at toMessage (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/conversation/repository/index.ts:506:6)",
+        "    at map (native:1:11)"
+      ],
+      "phases": {
+        "GET /api/conversations/main": 1
+      }
+    },
+    {
+      "sql": "INSERT INTO inference_attempts(id,request_id,source,connection_id,resource_id,model,status,reason,started,session_role,task_id,billing_path,refs) VALUES(?,?,?,?,?,?,'running',?,?,?,?,?,?)",
+      "totalMs": 0.046832999999878666,
+      "maxMs": 0.027124999999955435,
+      "count": 2,
+      "call": [
+        "    at <anonymous> (/private/tmp/eumenes-sql-source.Kwc9h5/api/infrastructure/sqlite/index.ts:330:20)",
+        "    at transaction (bun:sqlite:447:27)",
+        "    at <anonymous> (/private/tmp/eumenes-sql-source.Kwc9h5/api/infrastructure/sqlite/index.ts:336:6)"
+      ],
+      "phases": {
+        "inference rejected sample": 2
+      }
+    },
+    {
+      "sql": "SELECT seq,data_json FROM work_tasks WHERE\n (? IS NULL OR state=?) AND (? IS NULL OR conversation_id=?) AND (? IS NULL OR seq<?)\n ORDER BY seq DESC LIMIT ?",
+      "totalMs": 0.04537499999969441,
+      "maxMs": 0.04537499999969441,
+      "count": 1,
+      "call": [
+        "    at list (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/tasks/repository/index.ts:193:5)",
+        "    at list (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/tasks/service/queries.ts:82:23)",
+        "    at <anonymous> (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/tasks/controller/index.ts:28:23)",
+        "    at dispatch (/Users/y.noguchi/Code/eumenes/node_modules/.bun/hono@4.12.34/node_modules/hono/dist/compose.js:22:23)"
+      ],
+      "phases": {
+        "GET /api/tasks": 1
+      }
+    },
+    {
+      "sql": "SELECT root_run_id FROM agent_tasks WHERE kind='coordinator' AND state IN ('completed','failed','cancelled','interrupted') AND updated_at<? LIMIT 100",
+      "totalMs": 0.04508299999997689,
+      "maxMs": 0.04508299999997689,
+      "count": 1,
+      "call": [
+        "    at runMaintenance (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/agent-runtime/service/maintenance.ts:47:21)"
+      ],
+      "phases": {
+        "agent callbacks": 1
+      }
+    },
+    {
+      "sql": "SELECT temp_ref AS ref FROM browser_captures WHERE temp_ref IS NOT NULL UNION SELECT webp_ref FROM browser_captures WHERE webp_ref IS NOT NULL",
+      "totalMs": 0.039915999999948326,
+      "maxMs": 0.039915999999948326,
+      "count": 1,
+      "call": [
+        "    at knownCaptureRefs (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/browser/repository/captures.ts:182:6)",
+        "    at removeOrphans (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/browser/service/captures.ts:239:28)"
+      ],
+      "phases": {
+        "background callbacks settle": 1
+      }
+    },
+    {
+      "sql": "SELECT record_json FROM music_generations ORDER BY rowid DESC LIMIT 50",
+      "totalMs": 0.0384169999997539,
+      "maxMs": 0.0384169999997539,
+      "count": 1,
+      "call": [
+        "    at activity (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/music/repository/index.ts:128:5)",
+        "    at snapshot (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/monitoring/service/index.ts:207:34)",
+        "    at async <anonymous> (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/monitoring/controller/index.ts:5:66)",
+        "    at async dispatch (/Users/y.noguchi/Code/eumenes/node_modules/.bun/hono@4.12.34/node_modules/hono/dist/compose.js:22:23)"
+      ],
+      "phases": {
+        "GET /api/monitoring/snapshot": 1
+      }
+    },
+    {
+      "sql": "SELECT COUNT(*) AS n FROM schema_migrations_v2",
+      "totalMs": 0.036207999999987805,
+      "maxMs": 0.026250000000004547,
+      "count": 3,
+      "call": [
+        "    at openStore (/private/tmp/eumenes-sql-source.Kwc9h5/api/infrastructure/sqlite/index.ts:238:6)",
+        "    at buildCore (/private/tmp/eumenes-sql-source.Kwc9h5/api/application/server-core.ts:39:16)",
+        "    at buildServices (/private/tmp/eumenes-sql-source.Kwc9h5/api/application/server-services.ts:63:21)",
+        "    at /private/tmp/eumenes-sql-service-diagnostic.ts:26:17"
+      ],
+      "phases": {
+        "construct": 3
+      }
+    },
+    {
+      "sql": "SELECT 1 FROM sqlite_master WHERE name='settings_object_recognition'",
+      "totalMs": 0.032042000000046755,
+      "maxMs": 0.032042000000046755,
+      "count": 1,
+      "call": [
+        "    at <anonymous> (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/settings/service/object-recognition.ts:119:6)",
+        "    at createSettings (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/settings/service/index.ts:97:32)",
+        "    at buildCore (/private/tmp/eumenes-sql-source.Kwc9h5/api/application/server-core.ts:45:25)",
+        "    at buildServices (/private/tmp/eumenes-sql-source.Kwc9h5/api/application/server-services.ts:63:21)"
+      ],
+      "phases": {
+        "construct": 1
+      }
+    },
+    {
+      "sql": "SELECT * FROM browser_connections WHERE state IN ('connecting','connected') ORDER BY started_at DESC LIMIT 1",
+      "totalMs": 0.031207999999992353,
+      "maxMs": 0.031207999999992353,
+      "count": 1,
+      "call": [
+        "    at <anonymous> (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/browser/service/connection.ts:134:19)",
+        "    at <anonymous> (/private/tmp/eumenes-sql-source.Kwc9h5/api/infrastructure/sqlite/index.ts:330:20)",
+        "    at transaction (bun:sqlite:447:27)",
+        "    at <anonymous> (/private/tmp/eumenes-sql-source.Kwc9h5/api/infrastructure/sqlite/index.ts:336:6)"
+      ],
+      "phases": {
+        "construct": 1
+      }
+    },
+    {
+      "sql": "SELECT record_json FROM image_generations ORDER BY rowid DESC LIMIT 50",
+      "totalMs": 0.03112500000042928,
+      "maxMs": 0.03112500000042928,
+      "count": 1,
+      "call": [
+        "    at activity (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/image/repository/index.ts:91:5)",
+        "    at snapshot (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/monitoring/service/index.ts:206:34)",
+        "    at async <anonymous> (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/monitoring/controller/index.ts:5:66)",
+        "    at async dispatch (/Users/y.noguchi/Code/eumenes/node_modules/.bun/hono@4.12.34/node_modules/hono/dist/compose.js:22:23)"
+      ],
+      "phases": {
+        "GET /api/monitoring/snapshot": 1
+      }
+    },
+    {
+      "sql": "SELECT 1 FROM sqlite_master WHERE name='settings_browser_bridge'",
+      "totalMs": 0.03058299999997871,
+      "maxMs": 0.03058299999997871,
+      "count": 1,
+      "call": [
+        "    at <anonymous> (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/settings/service/browser-bridge.ts:20:6)",
+        "    at createSettings (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/settings/service/index.ts:98:27)",
+        "    at buildCore (/private/tmp/eumenes-sql-source.Kwc9h5/api/application/server-core.ts:45:25)",
+        "    at buildServices (/private/tmp/eumenes-sql-source.Kwc9h5/api/application/server-services.ts:63:21)"
+      ],
+      "phases": {
+        "construct": 1
+      }
+    },
+    {
+      "sql": "SELECT * FROM world_host_forget_intake WHERE journal_seq IS NOT NULL ORDER BY journal_seq",
+      "totalMs": 0.024290999999948326,
+      "maxMs": 0.024290999999948326,
+      "count": 1,
+      "call": [
+        "    at intakesWithJournal (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/world/repository/lifecycle.ts:286:5)",
+        "    at decide (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/world/service/lifecycle-recover.ts:126:21)",
+        "    at <anonymous> (/private/tmp/eumenes-sql-source.Kwc9h5/api/infrastructure/sqlite/index.ts:330:20)",
+        "    at transaction (bun:sqlite:447:27)"
+      ],
+      "phases": {
+        "world callbacks": 1
+      }
+    },
+    {
+      "sql": "SELECT * FROM browser_captures WHERE state IN (?,?,?)",
+      "totalMs": 0.02183399999989888,
+      "maxMs": 0.01129199999991215,
+      "count": 3,
+      "call": [
+        "    at settleLostConnection (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/browser/service/lifecycle.ts:198:18)",
+        "    at <anonymous> (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/browser/service/connection.ts:142:4)",
+        "    at <anonymous> (/private/tmp/eumenes-sql-source.Kwc9h5/api/infrastructure/sqlite/index.ts:330:20)",
+        "    at transaction (bun:sqlite:447:27)"
+      ],
+      "phases": {
+        "construct": 2,
+        "background callbacks settle": 1
+      }
+    },
+    {
+      "sql": "SELECT revision,enabled,runner_id,workspace_id,resource_id FROM codex_task_settings WHERE id=1",
+      "totalMs": 0.02079199999991488,
+      "maxMs": 0.02079199999991488,
+      "count": 1,
+      "call": [
+        "    at readSettings (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/codex-tasks/repository/index.ts:59:4)",
+        "    at <anonymous> (/private/tmp/eumenes-sql-source.Kwc9h5/api/infrastructure/sqlite/index.ts:318:19)",
+        "    at transaction (bun:sqlite:447:27)",
+        "    at codexConfiguration (/private/tmp/eumenes-sql-source.Kwc9h5/api/application/work/kanban-sdk-host.ts:351:22)"
+      ],
+      "phases": {
+        "construct": 1
+      }
+    },
+    {
+      "sql": "SELECT 1 FROM sqlite_master WHERE name='settings_excalidraw'",
+      "totalMs": 0.01999999999998181,
+      "maxMs": 0.01999999999998181,
+      "count": 1,
+      "call": [
+        "    at <anonymous> (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/settings/service/local-services.ts:111:6)",
+        "    at createSettings (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/settings/service/index.ts:99:34)",
+        "    at buildCore (/private/tmp/eumenes-sql-source.Kwc9h5/api/application/server-core.ts:45:25)",
+        "    at buildServices (/private/tmp/eumenes-sql-source.Kwc9h5/api/application/server-services.ts:63:21)"
+      ],
+      "phases": {
+        "construct": 1
+      }
+    },
+    {
+      "sql": "INSERT INTO inference_requests(id,subject,purpose,snapshot,deadline) VALUES(?,?,?,?,?)",
+      "totalMs": 0.019499999999993634,
+      "maxMs": 0.019499999999993634,
+      "count": 1,
+      "call": [
+        "    at capture (/private/tmp/eumenes-sql-source.Kwc9h5/api/domains/inference/service/index.ts:176:5)",
+        "    at <anonymous> (/private/tmp/eumenes-sql-source.Kwc9h5/api/infrastructure/sqlite/index.ts:330:20)",
+        "    at transaction (bun:sqlite:447:27)",
+        "    at <anonymous> (/private/tmp/eumenes-sql-source.Kwc9h5/api/infrastructure/sqlite/index.ts:336:6)"
+      ],
+      "phases": {
+        "inference rejected sample": 1
+      }
+    }
+  ],
+  "statementCount": 5577
+}

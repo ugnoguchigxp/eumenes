@@ -1,0 +1,31 @@
+bun test v1.4.2 (744846f84)
+
+api/domains/inference/test/speech-intonation.test.ts:
+(pass) phrase intonation follows punctuation and questions, preserves baseline and stays bounded [0.28ms]
+(pass) auto strength scales the deviation from the baseline [0.03ms]
+(pass) phrase adjustment moves speed and pitch from the baseline and respects strength [0.14ms]
+
+api/domains/inference/test/inference.test.ts:
+(pass) three purposes fall back once, adapters preserve paths and usage; no duplicate adoption [23.95ms]
+(pass) cloud TTS keeps its own voice and speed from the accepted settings snapshot [15.08ms]
+(pass) automatic intonation uses each phrase and its immutable manual baseline; disabling restores manual delivery [14.25ms]
+(pass) authentication, invalid contracts and caller cancellation never trigger cloud [62.99ms]
+(pass) local timeout fences a late adapter result; immutable snapshot and revocation at adoption [36.02ms]
+(pass) revocation aborts pending cloud; regrant does not revive old request [21.94ms]
+(pass) acceptance updates rollback together with the caller transaction [12.35ms]
+(pass) a failed stream cannot append a cloud fallback to already published local text [13.87ms]
+(pass) late provider deltas are fenced after caller cancellation [19.84ms]
+(pass) provider diagnostics preserve the rejected and recovered Connection IDs on the same attempt [16.46ms]
+(pass) a failed provider still saves the rejected Connection ID and error fields [14.42ms]
+(pass) Laya judges the spoken text and carries one decision with bounded immutable voice settings [15.52ms]
+(pass) decision timeout keeps manual voice, fences late results and cancellation prevents synthesis [33.10ms]
+(pass) speech text is rewritten for the local provider and for the cloud fallback [29.16ms]
+(pass) speak with an override synthesizes with unsaved voice settings without changing saved ones [12.38ms]
+
+api/domains/inference/test/migration.test.ts:
+(pass) append-only diagnostics migration preserves previous inference attempts [17.40ms]
+
+ 19 pass
+ 0 fail
+ 90 expect() calls
+Ran 19 tests across 3 files. [425.00ms]

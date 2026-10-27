@@ -1,0 +1,258 @@
+{
+  "schemaVersion": 1,
+  "runId": "2026-10-22T12-46-54-573Z-a163ab48-5f05-48a6-b74e-703b2fb409d8",
+  "startedAt": "2026-10-22T12:46:54.573Z",
+  "scope": {
+    "all": false,
+    "selected": [
+      "pipelines",
+      "agent-runtime",
+      "tool-runtime",
+      "capabilities"
+    ]
+  },
+  "baseCommit": "a54ef3632e36b24bb1188d9fd875b69c50afd282",
+  "revision": "1c9a50249c717e4151099e8b6abb7537aad011f222e0dfe1f6e8bd7258dbb086",
+  "runtime": {
+    "bun": "1.4.3",
+    "node": "26.3.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "ci": false,
+    "runner": null
+  },
+  "result": "pass",
+  "steps": [
+    {
+      "name": "inventory",
+      "status": "pass",
+      "ms": 59
+    },
+    {
+      "name": "boundaries",
+      "status": "pass",
+      "ms": 141
+    },
+    {
+      "name": "system-context",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "context:check"
+      ],
+      "status": "pass",
+      "ms": 100,
+      "exitCode": 0
+    },
+    {
+      "name": "size-budget",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "scripts/size-budget.ts",
+        "api/domains/pipelines",
+        "web/src/domains/pipelines",
+        "packages/design-system/src/components/PipelineStudio",
+        "api/domains/agent-runtime",
+        "web/src/domains/agent-runtime",
+        "api/domains/tool-runtime",
+        "api/domains/capabilities"
+      ],
+      "status": "pass",
+      "ms": 300,
+      "exitCode": 0
+    },
+    {
+      "name": "format",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "format:check",
+        "api/domains/pipelines",
+        "web/src/domains/pipelines",
+        "packages/design-system/src/components/PipelineStudio",
+        "api/domains/agent-runtime",
+        "web/src/domains/agent-runtime",
+        "api/domains/tool-runtime",
+        "api/domains/capabilities"
+      ],
+      "status": "pass",
+      "ms": 106,
+      "exitCode": 0
+    },
+    {
+      "name": "lint",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "lint",
+        "api/domains/pipelines",
+        "web/src/domains/pipelines",
+        "packages/design-system/src/components/PipelineStudio",
+        "api/domains/agent-runtime",
+        "web/src/domains/agent-runtime",
+        "api/domains/tool-runtime",
+        "api/domains/capabilities"
+      ],
+      "status": "pass",
+      "ms": 79,
+      "exitCode": 0
+    },
+    {
+      "name": "design-system typecheck",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "--cwd",
+        "packages/design-system",
+        "typecheck"
+      ],
+      "status": "pass",
+      "ms": 228,
+      "exitCode": 0
+    },
+    {
+      "name": "design-system build",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "--cwd",
+        "packages/design-system",
+        "build"
+      ],
+      "status": "pass",
+      "ms": 5936,
+      "exitCode": 0
+    },
+    {
+      "name": "typecheck configuration",
+      "status": "pass",
+      "ms": 1
+    },
+    {
+      "name": "typecheck",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "check",
+        "-p",
+        "/Users/y.noguchi/Code/eumenes/verification-reports/runs/2026-10-22T12-46-54-573Z-a163ab48-5f05-48a6-b74e-703b2fb409d8/tsconfig.selected.json"
+      ],
+      "status": "pass",
+      "ms": 485,
+      "exitCode": 0
+    },
+    {
+      "name": "typecheck closure",
+      "status": "pass",
+      "ms": 189
+    },
+    {
+      "name": "bun tests",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "test",
+        "./api/domains/agent-runtime/test/action-route.test.ts",
+        "./api/domains/agent-runtime/test/candidate-reading.test.ts",
+        "./api/domains/agent-runtime/test/context.test.ts",
+        "./api/domains/agent-runtime/test/control-output.test.ts",
+        "./api/domains/agent-runtime/test/deadline.test.ts",
+        "./api/domains/agent-runtime/test/guided-candidates.test.ts",
+        "./api/domains/agent-runtime/test/guided-contract.test.ts",
+        "./api/domains/agent-runtime/test/guided-limits.test.ts",
+        "./api/domains/agent-runtime/test/guided-web.test.ts",
+        "./api/domains/agent-runtime/test/pipeline-materials.test.ts",
+        "./api/domains/agent-runtime/test/read-evidence.test.ts",
+        "./api/domains/agent-runtime/test/reconcile-failure.test.ts",
+        "./api/domains/agent-runtime/test/rejection-logging.test.ts",
+        "./api/domains/agent-runtime/test/repair-diagnostics.test.ts",
+        "./api/domains/agent-runtime/test/report-projection.test.ts",
+        "./api/domains/agent-runtime/test/report.test.ts",
+        "./api/domains/agent-runtime/test/request-urls.test.ts",
+        "./api/domains/agent-runtime/test/requirement-adoption.test.ts",
+        "./api/domains/agent-runtime/test/requirement-verification.test.ts",
+        "./api/domains/agent-runtime/test/requirements.test.ts",
+        "./api/domains/agent-runtime/test/research-contract.test.ts",
+        "./api/domains/agent-runtime/test/research-engine.test.ts",
+        "./api/domains/agent-runtime/test/service-search-budget.test.ts",
+        "./api/domains/agent-runtime/test/structured-web.test.ts",
+        "./api/domains/agent-runtime/test/subagent-route.test.ts",
+        "./api/domains/agent-runtime/test/task-execution-plan.test.ts",
+        "./api/domains/agent-runtime/test/task-execution.test.ts",
+        "./api/domains/agent-runtime/test/world-evidence-dedupe.test.ts",
+        "./api/domains/capabilities/test/bundles.test.ts",
+        "./api/domains/capabilities/test/capabilities.test.ts",
+        "./api/domains/capabilities/test/command-agent-binding.test.ts",
+        "./api/domains/capabilities/test/image.test.ts",
+        "./api/domains/capabilities/test/instant-binding.test.ts",
+        "./api/domains/capabilities/test/json-schema-subset.test.ts",
+        "./api/domains/capabilities/test/learned.test.ts",
+        "./api/domains/capabilities/test/lookup-upgrade.test.ts",
+        "./api/domains/capabilities/test/music-versions.test.ts",
+        "./api/domains/capabilities/test/prepare-learned.test.ts",
+        "./api/domains/capabilities/test/requirement-controller.test.ts",
+        "./api/domains/capabilities/test/requirement-schema.test.ts",
+        "./api/domains/capabilities/test/requirements.test.ts",
+        "./api/domains/capabilities/test/session-binding.test.ts",
+        "./api/domains/capabilities/test/settings-google.test.ts",
+        "./api/domains/capabilities/test/standalone-artifacts-forms.test.ts",
+        "./api/domains/capabilities/test/standalone-artifacts.test.ts",
+        "./api/domains/capabilities/test/task-binding.test.ts",
+        "./api/domains/capabilities/test/timer-compatibility.test.ts",
+        "./api/domains/capabilities/test/toolchain-candidates.test.ts",
+        "./api/domains/capabilities/test/web-guided.test.ts",
+        "./api/domains/capabilities/test/web-research-rename.test.ts",
+        "./api/domains/pipelines/test/materials.test.ts",
+        "./api/domains/pipelines/test/pipelines.test.ts",
+        "./api/domains/tool-runtime/test/action-controller.test.ts",
+        "./api/domains/tool-runtime/test/action-invoke.test.ts",
+        "./api/domains/tool-runtime/test/action-requests.test.ts",
+        "./api/domains/tool-runtime/test/invoke.test.ts",
+        "./api/domains/tool-runtime/test/read-retry.test.ts",
+        "./api/domains/tool-runtime/test/vault-fairness.test.ts"
+      ],
+      "status": "pass",
+      "ms": 29625,
+      "exitCode": 0
+    },
+    {
+      "name": "web tests",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "x",
+        "--no-install",
+        "vitest",
+        "run",
+        "web/src/domains/agent-runtime/ResearchTaskCard.test.tsx",
+        "web/src/domains/pipelines/toolchain-adapter.test.tsx",
+        "web/src/domains/pipelines/use-pipeline-library.test.tsx"
+      ],
+      "status": "pass",
+      "ms": 3179,
+      "exitCode": 0
+    },
+    {
+      "name": "design-system tests",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "--cwd",
+        "packages/design-system",
+        "test",
+        "src/components/PipelineStudio/PipelineHandoff.test.tsx",
+        "src/components/PipelineStudio/PipelineStudio.test.tsx"
+      ],
+      "status": "pass",
+      "ms": 2832,
+      "exitCode": 0
+    }
+  ],
+  "totalMs": 43670,
+  "integrityErrors": [],
+  "build": {
+    "sharedOutput": true,
+    "inputRevision": "1c9a50249c717e4151099e8b6abb7537aad011f222e0dfe1f6e8bd7258dbb086",
+    "distAfterBuild": "e8ad0a3bbe93760f2baa767f83f41e5d468366d73a7f597e96ecf1c8e19589ee",
+    "distAfterConsumers": "e8ad0a3bbe93760f2baa767f83f41e5d468366d73a7f597e96ecf1c8e19589ee"
+  },
+  "finalRevision": "1c9a50249c717e4151099e8b6abb7537aad011f222e0dfe1f6e8bd7258dbb086",
+  "finishedAt": "2026-10-22T12:47:38.701Z"
+}

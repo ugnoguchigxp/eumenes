@@ -1,0 +1,42 @@
+bun test v1.4.3 (c6da4a4d3)
+
+api/application/compute/compute-review.test.ts:
+(pass) older owned jobs remain addressable outside the bounded model snapshot and replay stays stable [222.91ms]
+61 |  const h = await harness({ computePort: f.port });
+62 |  try {
+63 |  expect(h.store.read(db => h.compute!.availableInTransaction(db))).toBe(false);
+64 |  const listing = await h.request("/api/toolchain-artifacts");
+65 |  expect(listing.status).toBe(200);
+66 |  expect(JSON.stringify(await listing.json())).toContain("artifact:compute.workspace@1");
+                                                   ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "artifact:compute.workspace@1"
+Received: "{\"artifacts\":[{\"artifactId\":\"settings.ai-connections\",\"artifactRevisionId\":\"artifact:settings.ai-connections@8\",\"title\":\"AIと接続\",\"toolchainId\":null,\"toolchainRevisionId\":null,\"adapterRef\":null,\"adapterRefs\":[\"adapter:settings@1\",\"adapter:inference@1\"],\"launcher\":{\"label\":\"AIと接続\",\"icon\":\"connections\",\"description\":\"LARM 利用先 クラウド接続 モデル\",\"group\":\"使い方を変える\",\"order\":15}},{\"artifactId\":\"settings.changes\",\"artifactRevisionId\":\"artifact:settings.changes@4\",\"title\":\"設定の変更一覧\",\"toolchainId\":null,\"toolchainRevisionId\":null,\"adapterRef\":null,\"adapterRefs\":[\"adapter:settings@1\"],\"launcher\":{\"label\":\"変更一覧\",\"group\":\"管理と確認\",\"order\":50}},{\"artifactId\":\"settings.conversation\",\"artifactRevisionId\":\"artifact:settings.conversation@7\",\"title\":\"会話の設定\",\"toolchainId\":null,\"toolchainRevisionId\":null,\"adapterRef\":null,\"adapterRefs\":[\"adapter:settings@1\"],\"launcher\":{\"label\":\"会話\",\"icon\":\"conversation\",\"description\":\"AIの名前 あなたの名前 口調 ワールドモデル\",\"group\":\"使い方を変える\",\"order\":10}},{\"artifactId\":\"settings.dictionary\",\"artifactRevisionId\":\"artifact:settings.dictionary@2\",\"title\":\"読み方辞書\",\"toolchainId\":null,\"toolchainRevisionId\":null,\"adapterRef\":null,\"adapterRefs\":[\"adapter:tts-dictionary@1\"],\"launcher\":{\"label\":\"読み方辞書\",\"icon\":\"dictionary\",\"description\":\"読み上げ時の文字の読み方を登録 編集 削除\",\"group\":\"管理と確認\",\"order\":50}},{\"artifactId\":\"settings.display\",\"artifactRevisionId\":\"artifact:settings.display@10\",\"title\":\"表示\",\"toolchainId\":null,\"toolchainRevisionId\":null,\"adapterRef\":null,\"adapterRefs\":[\"adapter:settings@1\"],\"launcher\":{\"label\":\"表示\",\"icon\":\"display\",\"description\":\"背景 テーマ 字幕 粒子 公転 光の動作\",\"group\":\"使い方を変える\",\"order\":30}},{\"artifactId\":\"settings.external-work\",\"artifactRevisionId\":\"artifact:settings.external-work@6\",\"title\":\"外部作業\",\"toolchainId\":null,\"toolchainRevisionId\":null,\"adapterRef\":null,\"adapterRefs\":[\"adapter:settings@1\"],\"launcher\":{\"label\":\"外部作業\",\"icon\":\"external\",\"description\":\"実行前の確認\",\"group\":\"使い方を変える\",\"order\":25}},{\"artifactId\":\"settings.hub\",\"artifactRevisionId\":\"artifact:settings.hub@7\",\"title\":\"設定\",\"toolchainId\":null,\"toolchainRevisionId\":null,\"adapterRef\":null,\"adapterRefs\":[\"adapter:settings@1\"],\"launcher\":{\"label\":\"設定\",\"order\":100}},{\"artifactId\":\"settings.records\",\"artifactRevisionId\":\"artifact:settings.records@3\",\"title\":\"記録\",\"toolchainId\":null,\"toolchainRevisionId\":null,\"adapterRef\":null,\"adapterRefs\":[\"adapter:records@1\"],\"launcher\":{\"label\":\"記録\",\"icon\":\"records\",\"description\":\"AIの利用 ツールチェーン\",\"group\":\"管理と確認\",\"order\":40}},{\"artifactId\":\"settings.voice-input\",\"artifactRevisionId\":\"artifact:settings.voice-input@8\",\"title\":\"音声と入力\",\"toolchainId\":null,\"toolchainRevisionId\":null,\"adapterRef\":null,\"adapterRefs\":[\"adapter:settings@1\"],\"launcher\":{\"label\":\"音声と入力\",\"icon\":\"voice\",\"description\":\"読み上げ 聞き取り 機器\",\"group\":\"使い方を変える\",\"order\":20}}]}"
+
+      at <anonymous> (/Users/y.noguchi/Code/eumenes/api/application/compute/compute-review.test.ts:66:47)
+(fail) offline compute with no history remains listed and opens its empty artifact without enabling submissions [867.15ms]
+
+api/domains/tool-runtime/test/action-controller.test.ts:
+(pass) POST maps outcomes to status codes and GET reads back by eventId [10.97ms]
+(pass) unsettled list, launcher list, artifact and source endpoints [9.01ms]
+(pass) source params are URL-encoded JSON of at most 4 KiB validated by the source's schema [8.34ms]
+183 | test("artifact availability can remain readable independently of execution, with the default still fail closed", async () => {
+184 |  const { hono } = app();
+185 |  h.setAvailable(() => false);
+186 |  expect((await hono.request(`/api/toolchain-artifacts/${ARTIFACT_ID}`)).status).toBe(503);
+187 |  h.adapter.artifactAvailableInTransaction = () => true;
+188 |  expect((await hono.request(`/api/toolchain-artifacts/${ARTIFACT_ID}`)).status).toBe(200);
+                                                                                      ^
+error: expect(received).toBe(expected)
+
+Expected: 200
+Received: 503
+
+      at <anonymous> (/Users/y.noguchi/Code/eumenes/api/domains/tool-runtime/test/action-controller.test.ts:188:81)
+(fail) artifact availability can remain readable independently of execution, with the default still fail closed [5.78ms]
+
+ 4 pass
+ 2 fail
+ 47 expect() calls
+Ran 6 tests across 2 files. [1415.00ms]

@@ -31,7 +31,7 @@
 ## 初回の確認結果（09時台）
 
 - 固定試験: larm・image・musicの188件、Webの39件が成功。接続変更後の部分・画像/音楽のapplication結合試験55件も成功（件数は重複を含む）。format・lint・DesignSystemの型検査とbuildも成功。
-- 実LARM: `providers: ["llm"]` の接続依頼がHTTP201・readyとなり、生成POST1回で512×384 PNG、279,925 bytesを取得・デコードした。画像取得後の接続解放はHTTP204。全体約11.8秒。画像と記録は `verification-reports/image-connection-2026-10-17/`。
+- 実LARM: `providers: ["llm"]` の接続依頼がHTTP201・readyとなり、生成POST1回で512×384 PNG、279,925 bytesを取得・デコードした。画像取得後の接続解放はHTTP204。全体約11.8秒。画像と記録は `verification-reports/image-connection-2026-10-17/`（ローカルの検証記録。リポジトリには含めない）。
 - 通し確認: 既存の `scripts/image-live.ts --run` は画像POST前の会話モデル接続で120秒後に `local_timeout`、`cloud_fallback_unconfigured` となった。会話経由の実モデル通し成功は未確認。画像の実生成成功とは区別する。
 - 全体verify: 今回未変更の `api/domains/larm/service/index.ts#createLarm` のサイズ制限（346→349）で停止。残る検査を個別実行したところ、今回未変更の `api/domains/larm/test/catalog-selectors.test.ts:70` に `string` と `TestKind` の型不一致1件が残った。両ファイルは着手前commitと同一であり、この依頼では変更しない。
 - サーバーの起動・停止・再起動およびブラウザE2Eは行っていない。最終差分には意味判断・ツールの優先順位変更を含まない。
@@ -49,5 +49,5 @@
 
 - 固定試験はlarm・image・musicと画像削除・画像/音楽のapplication結合試験を合わせて213件成功。Provider待機を残したまま、画像サービスのpending・probing・readyからの生成、失敗・失効・解放の拒否、取消・解放・未再送を確認した。format・lint・SystemContext検査も成功。
 - 実モデルの担当選択→制作計画→接続依頼HTTP202→画像生成POST1回・HTTP200→画像取得→接続解放HTTP204→完了回答を通して成功。受付から約30.5秒で会話runと画像がcompleted。512×384 PNG、263,678 bytesを取得し、画像decoderで形式・寸法を確認した。LARM一覧の取得もHTTP200だった。
-- runIdは `976eadb4-8eb4-4d35-a102-60fd7de439a5`。記録と画像は `verification-reports/image-toolchain/2026-10-17T04-59-45.935Z/`。修正前の実モデル通し失敗では画像POST0回、修正後は1回で完了した。
+- runIdは `976eadb4-8eb4-4d35-a102-60fd7de439a5`。記録と画像は `verification-reports/image-toolchain/2026-10-17T04-59-45.935Z/`（ローカルの検証記録。リポジトリには含めない）。修正前の実モデル通し失敗では画像POST0回、修正後は1回で完了した。
 - 全体verifyは前記の未変更ファイルのサイズ制限で停止。選択型検査も前記の未変更試験の型不一致1件が残る。これらを検証成功とは扱わない。サーバーは起動・停止・再起動していない。

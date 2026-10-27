@@ -25,7 +25,7 @@
 | music・artifact一括 | `bun run verify -- --domain music --domain artifact` はsystem-context工程で停止。未変更の `.s11tnext/catalog.json` が `S11TNEXT_BUILD_STALE`。後続は未実行 |
 | リポジトリ型検査 | `bun check` は担当外16ファイルの21エラーで未合格。会話・agency側の型変更、生成指示のPromptKey、削除中のsystem-prompt参照など。今回変更したファイルへのエラーなし |
 
-画面の画像・結果は [verification-reports/music-prompt-retention](../verification-reports/music-prompt-retention/)、一括検証の停止記録は [report.json](../verification-reports/runs/2026-10-26T22-36-30-347Z-1ad238b2-236d-4d8a-bb44-cac9085b0c9a/report.json)。外部接続のlive生成・実機器聴取は対象外で未実施。backendは変更しておらず、一括検証を妨げる別作業の変更は修正・再生成しない。
+画面の画像・結果は `verification-reports/music-prompt-retention/`（ローカルの検証記録。リポジトリには含めない）、一括検証の停止記録は [report.json](verification/reports/runs/2026-10-26T22-36-30-347Z-1ad238b2-236d-4d8a-bb44-cac9085b0c9a/report.json)。外部接続のlive生成・実機器聴取は対象外で未実施。backendは変更しておらず、一括検証を妨げる別作業の変更は修正・再生成しない。
 
 追加した処理は既存promptの受渡しとフォーム状態の管理のみ。利用者の発話や個別語句に依存する分岐、意味判断の代替は追加していない。フォームの状態管理を同じファイル内のhookへ移し、関数行数上限を維持した。着手時から存在する会話・agencyなどの変更と、作業中に増えた担当外の差分も確認し、触れていない。
 

@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { Hono } from "hono";
+import { answerError } from "../app";
 import { registerGooglePhotoImport } from "./google-photo-import";
 import type { ImageImportView } from "../../domains/image/contracts";
 const handle = crypto.randomUUID(),
@@ -45,6 +46,7 @@ function fixture() {
 		},
 	};
 	const app = new Hono();
+	app.onError(answerError);
 	registerGooglePhotoImport(app, image, google);
 	const send = (body: unknown = { handle, itemId: "selected-photo" }) =>
 		app.request(`/api/images/imports/${id}/google-photo`, {

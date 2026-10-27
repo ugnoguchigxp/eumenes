@@ -1,5 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { Hono } from "hono";
+import { answerError } from "../../../application/app";
 import { INTERACTION_POLICY, registerCommandInteractions } from "..";
 import { setup, type Harness } from "./command-interactions.fixture";
 
@@ -13,6 +14,7 @@ test("the HTTP routes answer, list and cancel interactions with the documented s
 	await h.asked();
 	const interaction = h.interaction()!;
 	const app = new Hono();
+	app.onError(answerError);
 	registerCommandInteractions(app, h.dialogue);
 	const post = (path: string, body: unknown) =>
 		app.request(path, {
@@ -98,6 +100,7 @@ test("the HTTP answer to an expired question is 410", async () => {
 	await h.asked();
 	const interaction = h.interaction()!;
 	const app = new Hono();
+	app.onError(answerError);
 	registerCommandInteractions(app, h.dialogue);
 	h.state.offset = INTERACTION_POLICY.answerTtlMs + 60_000;
 	const response = await app.request(

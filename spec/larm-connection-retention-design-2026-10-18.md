@@ -217,7 +217,7 @@ LARM側の更新文書にも、実Providerの360秒試験は一時検証daemon�
 
 検証は、当初のサイズ検査の指摘に対して接続状態通知・終了待ち・設定からのport構築を小さな既存責務へ分離し、上限を変更せず通した。最初のdomain選択検証はbackend401件・Web48件で成功。差分点検で見つけた終了timer競合の修正と1試験追加後の最終版も、backend402件・Web48件で成功した。型・書式・lint・境界・サイズ・DesignSystemの検証を含み、入力hashの変更は検出されなかった。
 
-最終結果: `verification-reports/runs/2026-10-18T03-58-09-442Z-12e8efc3-5905-4580-805f-65997def1ef8/report.json`（pass）。
+最終結果: `spec/verification/reports/runs/2026-10-18T03-58-09-442Z-12e8efc3-5905-4580-805f-65997def1ef8/report.json`（pass）。
 
 API結合は既存app試験を含め19件成功、画面通知・共通client・App smokeは5件成功。ブラウザE2E・実LARMでの期限延長受入は未実施で、稼働サーバーの起動・停止・再起動やLARM側の変更は行っていない。
 
@@ -258,7 +258,7 @@ HTTPリスナーや一時backendサーバーは起動せず、改修済みHono�
 
 ### 固定試験・稼働反映・完了点検
 
-修正後の`bun run verify -- --domain larm --domain inference --domain voice-dialogue`はbackend403件・Web48件成功。型・書式・lint・境界・サイズ・SystemContext・DesignSystem・入力hash検査も通過した。最終結果は `verification-reports/runs/2026-10-18T05-22-13-957Z-2ea6ec93-2d52-4d0d-b67a-90296c6bc052/report.json`。§11のAPI結合19件、画面通知・client・App smoke 5件の結果も保持する。
+修正後の`bun run verify -- --domain larm --domain inference --domain voice-dialogue`はbackend403件・Web48件成功。型・書式・lint・境界・サイズ・SystemContext・DesignSystem・入力hash検査も通過した。最終結果は `spec/verification/reports/runs/2026-10-18T05-22-13-957Z-2ea6ec93-2d52-4d0d-b67a-90296c6bc052/report.json`。§11のAPI結合19件、画面通知・client・App smoke 5件の結果も保持する。
 
 初めの稼働Eumenesは画面通知APIが404で未反映だった。ユーザーが再起動を実施し、14:24:24の起動後に同APIの204、status APIの200/readyを確認した。さらに14:29:59の実ブラウザでdocument.visibilityState=visibleと「LARMの接続状態: 接続済み」、14:30:05のstatus APIでreadyを確認し、起動時のローカル無操作5分境界を超える接続保持も確認した。検証用に開いたブラウザタブは最後に閉じた。こちらから稼働サーバーの停止・起動・再起動は行っていない。
 

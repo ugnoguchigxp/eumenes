@@ -67,6 +67,7 @@ export function Model3dWorkspaceView({
 			}))}
 			sourceImagesLoading={resource.sourceImagesLoading}
 			sourceImagesError={resource.sourceImagesError}
+			onDeleteImage={runtime.deleteLibraryImage}
 			onUploadImage={
 				runtime.uploadFile
 					? async (file, requestId, signal) => {

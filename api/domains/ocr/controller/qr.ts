@@ -1,8 +1,24 @@
 import { z } from "zod";
 import type { Hono } from "hono";
+import {
+	parseJsonBody,
+	parseQuery,
+	queryInt,
+} from "../../../infrastructure/http";
 import type { OcrService } from "../service";
 import { qrCreate } from "../contracts/qr";
 
+const latestQuery = z.object({
+	frameIndex: queryInt.pipe(z.number().max(59)).optional(),
+});
+const conversationScope = z.strictObject({
+	conversationId: z.string().min(1).max(120),
+});
+const conversationBody = z.strictObject({
+	requestId: z.uuid(),
+	conversationId: z.string().min(1).max(120),
+	index: z.number().int().min(0).max(254),
+});
 export function registerOcrQr(
 	app: Hono,
 	service: OcrService,
@@ -24,28 +40,23 @@ export function registerOcrQr(
 		return id;
 	}
 	app.post(root, async (c) => {
-		const input = qrCreate.safeParse(await c.req.json());
-		if (!input.success) return c.json({ error: "invalid_ocr_input" }, 400);
+		const input = await parseJsonBody(c, qrCreate, {
+			code: "invalid_ocr_input",
+		});
+		if (!input.ok) return input.response;
 		return c.json(
 			await service.qr.create(owner, c.req.param("id"), input.data),
 			202,
 		);
 	});
 	app.get(root, (c) => {
-		const frame = c.req.query("frameIndex");
-		const input = z.coerce
-			.number()
-			.int()
-			.min(0)
-			.max(59)
-			.optional()
-			.safeParse(frame);
-		if (!input.success) return c.json({ error: "invalid_ocr_input" }, 400);
+		const input = parseQuery(c, latestQuery, { code: "invalid_ocr_input" });
+		if (!input.ok) return input.response;
 		return c.json(
 			service.qr.latest(
 				owner,
 				checked(c.req.param("id"), c.req.query("conversationId")),
-				input.data,
+				input.data.frameIndex,
 			),
 		);
 	});
@@ -59,10 +70,10 @@ export function registerOcrQr(
 		),
 	);
 	app.post(`${root}/:qrId/cancel`, async (c) => {
-		const input = z
-			.strictObject({ conversationId: z.string().min(1).max(120) })
-			.safeParse(await c.req.json());
-		if (!input.success) return c.json({ error: "invalid_ocr_input" }, 400);
+		const input = await parseJsonBody(c, conversationScope, {
+			code: "invalid_ocr_input",
+		});
+		if (!input.ok) return input.response;
 		return c.json(
 			await service.qr.cancel(
 				owner,
@@ -72,14 +83,10 @@ export function registerOcrQr(
 		);
 	});
 	app.post(`${root}/:qrId/conversation`, async (c) => {
-		const input = z
-			.strictObject({
-				requestId: z.uuid(),
-				conversationId: z.string().min(1).max(120),
-				index: z.number().int().min(0).max(254),
-			})
-			.safeParse(await c.req.json());
-		if (!input.success) return c.json({ error: "invalid_ocr_input" }, 400);
+		const input = await parseJsonBody(c, conversationBody, {
+			code: "invalid_ocr_input",
+		});
+		if (!input.ok) return input.response;
 		const value = service.qr.conversationText(
 			owner,
 			checked(c.req.param("id"), input.data.conversationId),

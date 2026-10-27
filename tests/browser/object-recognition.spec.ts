@@ -30,6 +30,58 @@ test.beforeAll(async () => {
 	await fixture.ready(origin);
 });
 test.afterAll(() => fixture.stopAll());
+test("selects a saved LARM image and analyzes it", async ({ page }) => {
+	const png = Buffer.from(
+		await page.evaluate(async () => {
+			const canvas = document.createElement("canvas");
+			canvas.width = 320;
+			canvas.height = 240;
+			const blob = await new Promise<Blob>((resolve) =>
+				canvas.toBlob((value) => resolve(value!), "image/png"),
+			);
+			return Array.from(new Uint8Array(await blob.arrayBuffer()));
+		}),
+	);
+	await page.route("**/api/images/library", (route) =>
+		route.fulfill({
+			json: {
+				images: [
+					{
+						id: "saved-image",
+						createdAt: "2026-10-27T00:00:00Z",
+						format: "png",
+						mimeType: "image/png",
+						width: 320,
+						height: 240,
+						hasAlpha: false,
+						bytes: png.length,
+						sha256: "a".repeat(64),
+						contentUrl: "/api/images/saved-image/content",
+					},
+				],
+				totalBytes: png.length,
+				maxBytes: 100000,
+				targetBytes: 90000,
+			},
+		}),
+	);
+	await page.route("**/api/images/saved-image/content", (route) =>
+		route.fulfill({ status: 200, contentType: "image/png", body: png }),
+	);
+	await page.goto(origin);
+	await page.getByRole("button", { name: "アーティファクトを開く" }).click();
+	await page
+		.getByRole("menuitem", { name: "映っている物を調べる", exact: true })
+		.click();
+	const workspace = page.locator(".recognition-workspace");
+	await workspace.getByRole("button", { name: "保存した画像を選ぶ" }).click();
+	await workspace
+		.getByRole("button", { name: "画像 2026-10-27（320×240）を選ぶ" })
+		.click();
+	await workspace.getByRole("button", { name: "この画像を使う" }).click();
+	await expect(workspace.getByRole("img", { name: "image.png" })).toBeVisible();
+	await expect(workspace.getByText("解析完了", { exact: true })).toBeVisible();
+});
 test("recognition stays inside artifact: selected image, camera capture, video seek, cancel and conversation", async ({
 	page,
 }) => {
@@ -42,6 +94,19 @@ test("recognition stays inside artifact: selected image, camera capture, video s
 	const panel = page.getByRole("complementary", { name: "アーティファクト" });
 	const workspace = panel.locator(".recognition-workspace");
 	await expect(workspace).toBeVisible();
+	await expect(workspace.locator(".recognition-media img")).toHaveCount(0);
+	await expect(
+		workspace.getByRole("button", { name: "撮影して調べる" }),
+	).toHaveCount(0);
+	await expect(
+		workspace.getByRole("button", { name: "録画を開始" }),
+	).toHaveCount(0);
+	await expect(
+		workspace.getByRole("button", { name: "会話に追加" }),
+	).toHaveCount(0);
+	await expect(
+		workspace.getByRole("button", { name: "保存した画像を選ぶ" }),
+	).toBeVisible();
 	await expect
 		.poll(async () => {
 			const main = await workspace.locator(".recognition-main").boundingBox();

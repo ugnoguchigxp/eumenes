@@ -10,6 +10,8 @@
 
 画像一覧のカード表示はDesignSystemの共通`ImageGrid`を使い、3Dの`ImagePicker`と共有する。画像スタジオではクリック拡大・ダウンロード・確認付き削除を維持する。選択用途では候補の選択と枠内プレビューを分け、「この画像を使う」で確定する。両画面の一覧取得は認証済みclient単位の共通キャッシュを使い、生成後や削除後の更新を共有する。端末画像とGoogleフォトの写真を[本番画像取込契約](../spec/reference/larm-image-import-v1/README.txt)で保存し、同じ画像一覧へ反映する。取込操作だけでは画像生成・3D生成を開始しない。
 
+共通グリッドは閲覧・選択モードを持ち、幅に応じて最大4列のコンパクトな画像を並べ、タイトルと操作を画像上に表示する。画像クリックで拡大し、選択モードでは右上の丸で画像を選ぶ。保存画像のダウンロードと確認付き削除はどちらのモードでも使える。削除は表示中の認証済み画像一覧にあるIDに限り、成功・未確認のいずれも共通一覧を再確認する。「映っている物を調べる」の保存画像選択にも同じ部品を使う。画像本体は最初に最大20枚分を表示し、スクロールに応じて20枚ずつ追加する。接続先の画像一覧APIにはページ指定がないため、一覧情報は従来どおりまとめて取得する。
+
 `toolchain:image.create@1`（会話関数`image`、引数は共通の`request`）から`package:image.create@1`を起動します。`profile:image.create@1`、`skill:image.create@1`、`tool:image.generate@1`を登録し、画像domainの計画担当が生成・編集画面・履歴の意図を解釈します。画面表示だけでは生成APIを呼びません。
 
 LARMの保存済み接続先とbackend内のControl認証を使い、catalogからcapability `media.image.generate`（protocol `larm.image-generation.v1`）を持つサービスを発見します。Profile名・モデル名は固定しません。発見したサービスの公開Profile selectorとcatalog revisionで`POST /v1/agent-connections`に接続を依頼します。画像は生成POSTで起動するため、Providerのreadyを待たずに接続応答のサービスを使います。接続応答の画像サービスを照合して`services[].url`を優先し、`url`がない場合は`endpoint`を使います。`description`を確認し、生成POSTは一度だけ送ります。画像取得後、失敗時、取消時には接続を解放します。詳細は[接続変更の設計](../spec/.archived/image-larm-connection-2026-10-17.md)を参照してください。同期APIのため取消時にはローカル受付を取り消し、遅い生成結果を採用しません。外部で処理済みの画像がLARMの履歴に残る場合はあります。結果が不明でも生成POSTを自動再送せず、一覧を更新して確認します。
@@ -27,7 +29,7 @@ WebとclientはAPIを使い、画像URLは同一originの認証proxyを通りま
 
 固定試験: `bun test api/domains/image/test api/domains/larm/test/image-library.test.ts api/domains/capabilities/test/image.test.ts api/application/media/image-e2e.test.ts`。JSON合成・ホスト操作は`web/src/domains/image/`、部品はDesignSystemのImageWorkspace、画面操作は`tests/browser/image.spec.ts`で確認します。所有domainと影響のある利用側domainをverifyし、ブラウザE2Eは対象domainの試験ファイルを指定して個別に実行します。
 
-実接続: `bun scripts/image-live.ts --run`は隔離backendの設定APIに接続先を保存し、実モデルの担当選択から画像生成までを一度だけ行います。`--library-only`では新しい画像を生成せず、実モデルの一覧表示計画とLARM一覧取得を確認します。生成した確認画像はLARMに残します。結果は`verification-reports/image-toolchain/`に保存し、通常ログには本文や秘密を入れません。
+実接続: `bun scripts/image-live.ts --run`は隔離backendの設定APIに接続先を保存し、実モデルの担当選択から画像生成までを一度だけ行います。`--library-only`では新しい画像を生成せず、実モデルの一覧表示計画とLARM一覧取得を確認します。生成した確認画像はLARMに残します。結果は`verification-reports/image-toolchain/`（ローカルの検証記録。リポジトリには含めない）に保存し、通常ログには本文や秘密を入れません。
 
 2026-10-13の実生成では512×384 PNGを取得・表示し、約14秒、258,329 bytes、指定どおりの寸法を確認しました。実モデルの一覧表示も新規生成0回で確認しました。経路ごとの確認結果は[作業記録](../spec/.archived/image-toolchain-work-record-2026-10-13.md)を参照してください。
 

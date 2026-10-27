@@ -1,0 +1,33 @@
+{
+  "case": {
+    "id": "ctx-f9-dev-01",
+    "family": "F9",
+    "split": "dev",
+    "seed": {
+      "persona": {
+        "agentName": "",
+        "userName": "",
+        "persona": "butler"
+      },
+      "events": []
+    },
+    "input": "引用「Keep calm and carry on.」を一字も変えずに、そのまま復唱してください。",
+    "expect": {
+      "checks": [
+        {
+          "kind": "speaks"
+        },
+        {
+          "kind": "tool_not_called"
+        }
+      ],
+      "rubric": []
+    }
+  },
+  "result": {
+    "kind": "ok",
+    "text": "Keep calm and carry on.",
+    "toolCalls": []
+  },
+  "pass": true
+}

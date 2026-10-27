@@ -1,0 +1,265 @@
+{
+  "schemaVersion": 1,
+  "runId": "2026-10-25T14-54-23-013Z-6a8763be-00f4-457a-a2cd-1c22b3cac9e3",
+  "startedAt": "2026-10-25T14:54:23.013Z",
+  "scope": {
+    "all": false,
+    "selected": [
+      "larm",
+      "inference",
+      "voice-dialogue",
+      "audio"
+    ]
+  },
+  "baseCommit": "7ff711da1a2dc3ebb96095bb285d5795cd1a903c",
+  "revision": "4d0ed581fa44f744415c476f3370458c9b00fd0b8c1802059eb99b8813caccaa",
+  "runtime": {
+    "bun": "1.4.3",
+    "node": "26.3.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "ci": false,
+    "runner": null
+  },
+  "result": "pass",
+  "steps": [
+    {
+      "name": "inventory",
+      "status": "pass",
+      "ms": 58
+    },
+    {
+      "name": "boundaries",
+      "status": "pass",
+      "ms": 161
+    },
+    {
+      "name": "system-context",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "context:check"
+      ],
+      "status": "pass",
+      "ms": 93,
+      "exitCode": 0
+    },
+    {
+      "name": "size-budget",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "scripts/size-budget.ts",
+        "api/domains/larm",
+        "api/domains/inference",
+        "api/domains/voice-dialogue",
+        "web/src/domains/voice-dialogue",
+        "web/src/domains/audio"
+      ],
+      "status": "pass",
+      "ms": 281,
+      "exitCode": 0
+    },
+    {
+      "name": "format",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "format:check",
+        "api/domains/larm",
+        "api/domains/inference",
+        "api/domains/voice-dialogue",
+        "web/src/domains/voice-dialogue",
+        "web/src/domains/audio"
+      ],
+      "status": "pass",
+      "ms": 120,
+      "exitCode": 0
+    },
+    {
+      "name": "lint",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "lint",
+        "api/domains/larm",
+        "api/domains/inference",
+        "api/domains/voice-dialogue",
+        "web/src/domains/voice-dialogue",
+        "web/src/domains/audio"
+      ],
+      "status": "pass",
+      "ms": 77,
+      "exitCode": 0
+    },
+    {
+      "name": "design-system typecheck",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "--cwd",
+        "packages/design-system",
+        "typecheck"
+      ],
+      "status": "pass",
+      "ms": 267,
+      "exitCode": 0
+    },
+    {
+      "name": "design-system build",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "--cwd",
+        "packages/design-system",
+        "build"
+      ],
+      "status": "pass",
+      "ms": 5761,
+      "exitCode": 0
+    },
+    {
+      "name": "typecheck configuration",
+      "status": "pass",
+      "ms": 1
+    },
+    {
+      "name": "typecheck",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "check",
+        "-p",
+        "/private/var/folders/mx/jbv8qfwd52z14q0mby_273lhlp5gd2/T/eumenes-provider-verification-i3_0ye7c/source/verification-reports/runs/2026-10-25T14-54-23-013Z-6a8763be-00f4-457a-a2cd-1c22b3cac9e3/tsconfig.selected.json"
+      ],
+      "status": "pass",
+      "ms": 395,
+      "exitCode": 0
+    },
+    {
+      "name": "typecheck closure",
+      "status": "pass",
+      "ms": 170
+    },
+    {
+      "name": "bun tests",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "test",
+        "./api/domains/inference/test/agent-session-migration.test.ts",
+        "./api/domains/inference/test/agent-sessions.test.ts",
+        "./api/domains/inference/test/agent-task.test.ts",
+        "./api/domains/inference/test/attempt-activity.test.ts",
+        "./api/domains/inference/test/attempt-budget.test.ts",
+        "./api/domains/inference/test/claude-session.test.ts",
+        "./api/domains/inference/test/cloud-agents.test.ts",
+        "./api/domains/inference/test/connection-models.test.ts",
+        "./api/domains/inference/test/context-budget.test.ts",
+        "./api/domains/inference/test/context-fit.test.ts",
+        "./api/domains/inference/test/context-render.test.ts",
+        "./api/domains/inference/test/control-engine-migration.test.ts",
+        "./api/domains/inference/test/control-schema.test.ts",
+        "./api/domains/inference/test/inference-control.test.ts",
+        "./api/domains/inference/test/inference-probes.test.ts",
+        "./api/domains/inference/test/inference-sessions.test.ts",
+        "./api/domains/inference/test/inference-speech.test.ts",
+        "./api/domains/inference/test/inference.test.ts",
+        "./api/domains/inference/test/larm-client.test.ts",
+        "./api/domains/inference/test/maintenance-control.test.ts",
+        "./api/domains/inference/test/migration.test.ts",
+        "./api/domains/inference/test/operation-output.test.ts",
+        "./api/domains/inference/test/routing-logs.test.ts",
+        "./api/domains/inference/test/screen-presence.test.ts",
+        "./api/domains/inference/test/speech-errors.test.ts",
+        "./api/domains/inference/test/usage-normalization.test.ts",
+        "./api/domains/inference/test/usage-pages.test.ts",
+        "./api/domains/inference/test/workers-ai.test.ts",
+        "./api/domains/larm/test/activity-recorder.test.ts",
+        "./api/domains/larm/test/asr-segments.test.ts",
+        "./api/domains/larm/test/auxiliary-sessions.test.ts",
+        "./api/domains/larm/test/catalog-selectors.test.ts",
+        "./api/domains/larm/test/chat-input.test.ts",
+        "./api/domains/larm/test/compute-client.test.ts",
+        "./api/domains/larm/test/context-exact.test.ts",
+        "./api/domains/larm/test/conversation-background.test.ts",
+        "./api/domains/larm/test/credential-generation.test.ts",
+        "./api/domains/larm/test/foreground-serialization.test.ts",
+        "./api/domains/larm/test/gzip-fetch.test.ts",
+        "./api/domains/larm/test/image-connection.test.ts",
+        "./api/domains/larm/test/image-delete.test.ts",
+        "./api/domains/larm/test/image-import.test.ts",
+        "./api/domains/larm/test/image-library.test.ts",
+        "./api/domains/larm/test/inference-error.test.ts",
+        "./api/domains/larm/test/larm-inference.test.ts",
+        "./api/domains/larm/test/larm-lifecycle.test.ts",
+        "./api/domains/larm/test/larm-speech.test.ts",
+        "./api/domains/larm/test/larm.test.ts",
+        "./api/domains/larm/test/lease-recovery.test.ts",
+        "./api/domains/larm/test/llm-timing.test.ts",
+        "./api/domains/larm/test/mesh-library.test.ts",
+        "./api/domains/larm/test/monitoring.test.ts",
+        "./api/domains/larm/test/music-generation.test.ts",
+        "./api/domains/larm/test/music-library.test.ts",
+        "./api/domains/larm/test/native-decision.test.ts",
+        "./api/domains/larm/test/playground-concurrency.test.ts",
+        "./api/domains/larm/test/playground.test.ts",
+        "./api/domains/larm/test/profile-retention.test.ts",
+        "./api/domains/larm/test/provider-readiness.test.ts",
+        "./api/domains/larm/test/speech-overrides.test.ts",
+        "./api/domains/larm/test/speech-voice-pair.test.ts",
+        "./api/domains/larm/test/token-count-diagnostics.test.ts",
+        "./api/domains/larm/test/visual-lifecycle.test.ts",
+        "./api/domains/larm/test/visual-perception.test.ts",
+        "./api/domains/voice-dialogue/test/migration.test.ts",
+        "./api/domains/voice-dialogue/test/playback-heard.test.ts",
+        "./api/domains/voice-dialogue/test/sentences.test.ts",
+        "./api/domains/voice-dialogue/test/settings-integration.test.ts",
+        "./api/domains/voice-dialogue/test/spoken-text.test.ts",
+        "./api/domains/voice-dialogue/test/streaming-speech.test.ts",
+        "./api/domains/voice-dialogue/test/upload.test.ts",
+        "./api/domains/voice-dialogue/test/voice.test.ts"
+      ],
+      "status": "pass",
+      "ms": 11296,
+      "exitCode": 0
+    },
+    {
+      "name": "web tests",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "x",
+        "--no-install",
+        "vitest",
+        "run",
+        "web/src/domains/audio/test/audio.test.ts",
+        "web/src/domains/audio/test/capture.test.ts",
+        "web/src/domains/audio/test/performance.test.ts",
+        "web/src/domains/audio/test/segment-timing.test.ts",
+        "web/src/domains/audio/test/speech-detector.test.ts",
+        "web/src/domains/audio/test/speech-model.test.ts",
+        "web/src/domains/audio/test/timer-output.test.tsx",
+        "web/src/domains/audio/test/tone.test.ts",
+        "web/src/domains/voice-dialogue/test/automatic.test.tsx",
+        "web/src/domains/voice-dialogue/test/capture.test.tsx",
+        "web/src/domains/voice-dialogue/test/chunk-player.test.ts",
+        "web/src/domains/voice-dialogue/test/corrections.test.tsx",
+        "web/src/domains/voice-dialogue/test/hooks.test.tsx",
+        "web/src/domains/voice-dialogue/test/input-timing.test.ts",
+        "web/src/domains/voice-dialogue/test/input.test.tsx",
+        "web/src/domains/voice-dialogue/test/machine.test.ts",
+        "web/src/domains/voice-dialogue/test/replay.test.tsx"
+      ],
+      "status": "pass",
+      "ms": 3196,
+      "exitCode": 0
+    }
+  ],
+  "totalMs": 22217,
+  "integrityErrors": [],
+  "build": {
+    "sharedOutput": true,
+    "inputRevision": "4d0ed581fa44f744415c476f3370458c9b00fd0b8c1802059eb99b8813caccaa",
+    "distAfterBuild": "61d18c1327565f8f7a3d6b500eafe87c28ea3f3e2cdfa70144835f63ce35ff74",
+    "distAfterConsumers": "61d18c1327565f8f7a3d6b500eafe87c28ea3f3e2cdfa70144835f63ce35ff74"
+  },
+  "finalRevision": "4d0ed581fa44f744415c476f3370458c9b00fd0b8c1802059eb99b8813caccaa",
+  "finishedAt": "2026-10-25T14:54:45.603Z"
+}

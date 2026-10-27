@@ -12,7 +12,7 @@ Gemmaの接続をdiscovery/claimから再取得し、稼働中のbackendでもpr
 
 ## Fixture
 
-変更前のdelivery/larmは54件成功。変更後は関連domainの検証とverify:allを実行。全体結果は`verification-reports/ruri-verify-all.log`、domain結果は`verification-reports/ruri-verify-<domain>.log`に保存した。最終のverify:allはbackend 265件・Web 65件・ブラウザ14件が成功し、型・境界・書式・lint・ビルド・最終入力hashの検査も通過した。delivery、larm、inference、attitude-dataset、conversation、dialogue、voice-dialogue、avatarのdomain検証も成功した。
+変更前のdelivery/larmは54件成功。変更後は関連domainの検証とverify:allを実行。全体結果は`spec/verification/reports/ruri-verify-all.log`、domain結果は`verification-reports/ruri-verify-<domain>.log`（ローカルの検証記録。リポジトリには含めない）に保存した。最終のverify:allはbackend 265件・Web 65件・ブラウザ14件が成功し、型・境界・書式・lint・ビルド・最終入力hashの検査も通過した。delivery、larm、inference、attitude-dataset、conversation、dialogue、voice-dialogue、avatarのdomain検証も成功した。
 
 確認した条件:
 
@@ -25,11 +25,11 @@ Gemmaの接続をdiscovery/claimから再取得し、稼働中のbackendでもpr
 - 会話・テンプレート・未レビューの連結例を分断しないグループ分割、JSON SchemaとJSONLのフィールド、API入力とno-store。
 - Ruriの名前横表示、既存の会話・音声・アバター経路、全体の型・境界・書式・lint・Web build・ブラウザfixture。
 
-一度、domain検証の実行中に空exportのschema/report JSONを作成したため、検証対象ファイルのhash変化で終了した。該当検証は再実行した。途中の失敗を最終合格として扱っていない。最終版でもアバターの初期canvasを5秒待つブラウザ試験に一度失敗したが、ソースを変えずにverify:allを再実行し、全工程が成功した。失敗時のログは`verification-reports/ruri-verify-all-avatar-timeout.log`に保存している。
+一度、domain検証の実行中に空exportのschema/report JSONを作成したため、検証対象ファイルのhash変化で終了した。該当検証は再実行した。途中の失敗を最終合格として扱っていない。最終版でもアバターの初期canvasを5秒待つブラウザ試験に一度失敗したが、ソースを変えずにverify:allを再実行し、全工程が成功した。失敗時のログは`spec/verification/reports/ruri-verify-all-avatar-timeout.log`に保存している。
 
 ## 実接続（合成テキストによる互換確認）
 
-`verification-reports/ruri-live.json`と再実行用の`verification-reports/ruri-live.ts`に記録。現行Ruriの推論意味や実会話の正解率を評価したものではない。
+`spec/verification/reports/ruri-live.json`と再実行用の`verification-reports/ruri-live.ts`（ローカルの検証記録。リポジトリには含めない）に記録。現行Ruriの推論意味や実会話の正解率を評価したものではない。
 
 | 確認 | 結果 |
 | --- | --- |
@@ -60,11 +60,11 @@ Gemmaの接続をdiscovery/claimから再取得し、稼働中のbackendでもpr
 - chunk収集契約の現在テキストにcontext内の回答全文を混ぜない。
 - レビューの修正理由・テンプレートIDに認証文字列が含まれた場合、保存を拒否する。
 
-Gemmaのclaimを再取得し、稼働APIのmodelがRuriであることを再確認した。実接続probeの再試行は成功し、6クラス、候補外のnone/confidence=0、スコア保持、Ruri由来の演出、TTS合成87,084 bytesを確認した。この3例のモデル内推論は3.03〜5.37ms、Eumenes往復13.96〜19.52ms。実会話精度やP50/P95の評価ではない。途中に1回のタイムアウトがあり、成功とは別に記録した。結果は`verification-reports/ruri-handoff-live-retry.json`、稼働APIの状態は`verification-reports/ruri-handoff-api.json`。
+Gemmaのclaimを再取得し、稼働APIのmodelがRuriであることを再確認した。実接続probeの再試行は成功し、6クラス、候補外のnone/confidence=0、スコア保持、Ruri由来の演出、TTS合成87,084 bytesを確認した。この3例のモデル内推論は3.03〜5.37ms、Eumenes往復13.96〜19.52ms。実会話精度やP50/P95の評価ではない。途中に1回のタイムアウトがあり、成功とは別に記録した。結果は`spec/verification/reports/ruri-handoff-live-retry.json`、稼働APIの状態は`spec/verification/reports/ruri-handoff-api.json`。
 
 現在の収集は停止中、成功0/300・未レビュー0・確認済み0・保留0・スキップ0。追加補強はソースの検証と新しいプロセスでの実接続を確認したものであり、既に起動しているbackendへ反映する際は再起動が必要。
 
-全体検証は初回・再実行ともbackend 280件・Web 74件が成功し、ブラウザは13件成功・1件失敗。失敗は設定へ移った後のアバターcanvas解除待機で、再実行時の表示状態は`#settings / inactive / hidden=true`だったがcanvasが残った。収集機能の試験失敗ではないが、今回のverify:allを合格とは扱わない。ログは`verification-reports/ruri-handoff-verify-all.log`と`verification-reports/ruri-handoff-verify-all-retry.log`に保存した。確認中にアバター表示・ブラウザ試験へ別の作業変更が入っており、その変更は上書きしていない。
+全体検証は初回・再実行ともbackend 280件・Web 74件が成功し、ブラウザは13件成功・1件失敗。失敗は設定へ移った後のアバターcanvas解除待機で、再実行時の表示状態は`#settings / inactive / hidden=true`だったがcanvasが残った。収集機能の試験失敗ではないが、今回のverify:allを合格とは扱わない。ログは`spec/verification/reports/ruri-handoff-verify-all.log`と`spec/verification/reports/ruri-handoff-verify-all-retry.log`に保存した。確認中にアバター表示・ブラウザ試験へ別の作業変更が入っており、その変更は上書きしていない。
 
 ## コードレビュー後の修正
 
@@ -77,8 +77,8 @@ Gemmaのclaimを再取得し、稼働APIのmodelがRuriであることを再確�
 - 専用SQLiteの本体を600にしてから開くことでWAL/SHMにも600を引き継ぐ。既存の補助ファイルも600に修正する。公開権限の親ディレクトリと既存の644ファイルから開くfixtureで本体・WAL・SHMを検査した。
 - アバターcanvasをGPU資源の解放前に画面から外す。画面遷移の解除fixtureは、同時進行で更新されたSwiftShaderの待機時間を含む試験で通過した。元の短い待機時間では失敗しており、この変更だけで解決したとは扱わない。
 
-対象fixtureは31件成功。delivery、attitude-dataset、inference、avatarのdomain検証が成功した。Ruri実接続・候補外棄却・TTS合成も成功し、`verification-reports/ruri-review-live.json`に記録した。実会話収集は実施していない。全体検証は一度全工程を通過し（`verification-reports/ruri-review-verify-all.log`）、権限補強後の最終結果を`verification-reports/ruri-review-verify-all-final.log`に保存する。
+対象fixtureは31件成功。delivery、attitude-dataset、inference、avatarのdomain検証が成功した。Ruri実接続・候補外棄却・TTS合成も成功し、`spec/verification/reports/ruri-review-live.json`に記録した。実会話収集は実施していない。全体検証は一度全工程を通過し（`spec/verification/reports/ruri-review-verify-all.log`）、権限補強後の最終結果を`spec/verification/reports/ruri-review-verify-all-final.log`に保存する。
 
-権限補強後の最初の全体実行は、同時進行で追加されたAudioWorklet fixtureの発話開始条件で失敗した。そのfixtureが更新された後の再実行ではbackend 285件・Web 76件・ブラウザ14件が成功したが、検証中のソース変更を最後のhash検査が検出して終了した（`verification-reports/ruri-review-verify-all-final-retry.log`）。途中の成功を最終合格として扱わず、現在のソースを`verification-reports/ruri-review-verify-all-stable.log`で再検証する。
+権限補強後の最初の全体実行は、同時進行で追加されたAudioWorklet fixtureの発話開始条件で失敗した。そのfixtureが更新された後の再実行ではbackend 285件・Web 76件・ブラウザ14件が成功したが、検証中のソース変更を最後のhash検査が検出して終了した（`spec/verification/reports/ruri-review-verify-all-final-retry.log`）。途中の成功を最終合格として扱わず、現在のソースを`spec/verification/reports/ruri-review-verify-all-stable.log`で再検証する。
 
-最後の全体実行（`verification-reports/ruri-review-verify-all-final-ready.log`）はbackend 292件・Web 76件・ブラウザ14件が成功し、書式・lint・型・境界・buildも通過した。ただし同時進行の変更を最終入力hash検査が検出して終了したため、verify:all全体を最終合格とは記録しない。途中の関数移動・SQLite checksum初期化の変更にも一時的な不整合があり、現在は解消している。収集・deliveryのdomain検証を最後に再実行し、各入力hash検査を含めて通過した。対象範囲の再レビューでは新たな要修正の指摘はない。収集は停止中0/300件、確認済み0件のまま。
+最後の全体実行（`spec/verification/reports/ruri-review-verify-all-final-ready.log`）はbackend 292件・Web 76件・ブラウザ14件が成功し、書式・lint・型・境界・buildも通過した。ただし同時進行の変更を最終入力hash検査が検出して終了したため、verify:all全体を最終合格とは記録しない。途中の関数移動・SQLite checksum初期化の変更にも一時的な不整合があり、現在は解消している。収集・deliveryのdomain検証を最後に再実行し、各入力hash検査を含めて通過した。対象範囲の再レビューでは新たな要修正の指摘はない。収集は停止中0/300件、確認済み0件のまま。

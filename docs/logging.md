@@ -131,9 +131,9 @@ APIが停止している状態で `bun run db:backup` を実行すると、通�
 
 ブラウザfixtureが失敗した場合は、試験結果のディレクトリに `backend.jsonl` を保存し、`backend-log` として添付します。fixture用backendは `debug` で記録するため、一時DBの削除後も失敗直前の経過を調べられます。`bun run logs -- --file <backend.jsonlのパス> --level warn` で閲覧できます。
 
-Toolchainのlive検証も、一時DBを削除する前に運用ログを `verification-reports/toolchain/live-backend.jsonl`（0600）へ保存します。通常の安全なlogger出力だけを保存し、Providerの生応答は記録しません。
+Toolchainのlive検証も、一時DBを削除する前に運用ログを `verification-reports/toolchain/live-backend.jsonl`（0600。ローカルの検証記録でリポジトリには含めない）へ保存します。通常の安全なlogger出力だけを保存し、Providerの生応答は記録しません。
 
-`EUMENES_LIVE_VOICE=1 bun scripts/voice-live.ts` は、一時DBの隔離backendで実TTSの試験入力→実ASR→検索・本文取得→実LLM回答→実TTSを確認します。最終回答と読上げ文の一致・音声の取得も合格条件です。運用ログは `verification-reports/voice-live/backend.jsonl`、試験の入力・回答・出典は `result.json`（双方0600）へ別々に保存します。試験結果は会話本文を除外した運用ログとは区別し、実マイク・スピーカーの受入試験とも区別します。
+`EUMENES_LIVE_VOICE=1 bun scripts/voice-live.ts` は、一時DBの隔離backendで実TTSの試験入力→実ASR→検索・本文取得→実LLM回答→実TTSを確認します。最終回答と読上げ文の一致・音声の取得も合格条件です。運用ログは `verification-reports/voice-live/backend.jsonl`、試験の入力・回答・出典は `result.json`（双方0600。ローカルの検証記録でリポジトリには含めない）へ別々に保存します。試験結果は会話本文を除外した運用ログとは区別し、実マイク・スピーカーの受入試験とも区別します。
 
 `api/infrastructure/logger.test.ts` はJSON形式、並行処理のID分離、秘密の除外、世代管理、書込み失敗時の継続、HTTPの相関ID、閲覧時の絞込みを確認します。`api/application/logging.test.ts` は一時DBとLARM未設定のbackendを実際に起動し、入力受付→ジョブ→推論失敗→終了のログを確認します。これらはfixture試験であり、liveのProvider疎通や実マイク・再生の受入ではありません。
 
@@ -203,7 +203,7 @@ workerは共通補正の拒否分類を `agent.control_rejected.validationCode` 
 
 ブラウザConsoleで `performance.getEntriesByType('measure').filter(x => x.name.startsWith('eumenes.'))` を確認できます。サーバーとブラウザの単調時計の値を直接引き算せず、IDで対応させ、それぞれの区間を比較します。実際の初回描画・発話終了・最初の可聴音は実機器受入で別に確認します。
 
-再計測は `bun scripts/response-latency-live.ts --run`（adapter経路、各3回）と `bun scripts/response-latency-api-live.ts --run`（一時DBの会話API、文字3回・合成音声入力3回）です。保存済み接続はsettings domainの読み取り専用操作で取得し、API試験では一時backendの設定APIに保存します。後者はtools無効・新規会話であり、通常の個人履歴付き会話の代表値ではありません。音声API試験は最初のチャンク取得後に停止します。両方とも本文と音声ファイルをレポートに保存せず、機器の録音・再生やOpenAI/Claude比較は行いません。結果は `verification-reports/response-latency{-api}-live/`。同じ入力・prompt・出力制約ではない二経路の値を引き算してアプリの追加遅延としないでください。
+再計測は `bun scripts/response-latency-live.ts --run`（adapter経路、各3回）と `bun scripts/response-latency-api-live.ts --run`（一時DBの会話API、文字3回・合成音声入力3回）です。保存済み接続はsettings domainの読み取り専用操作で取得し、API試験では一時backendの設定APIに保存します。後者はtools無効・新規会話であり、通常の個人履歴付き会話の代表値ではありません。音声API試験は最初のチャンク取得後に停止します。両方とも本文と音声ファイルをレポートに保存せず、機器の録音・再生やOpenAI/Claude比較は行いません。結果は `verification-reports/response-latency{-api}-live/`（ローカルの検証記録。リポジトリには含めない）。同じ入力・prompt・出力制約ではない二経路の値を引き算してアプリの追加遅延としないでください。
 
 LARMが`timings`を返す場合、`larm.llm_timing`に`providerPromptMs`（入力処理）、`providerDecodeMs`（生成）、`providerPromptTokens`（処理した入力）、`providerCachedTokens`（再利用した入力）、`providerOutputTokens`（生成token数）を追加します。これはProvider報告値です。5項目の有限・非負の数値だけを抽出し、未知項目・文字列・生応答を記録しません。未提供は不明として省略し、0で埋めません。`promptTokens`はusageの入力全体、`providerPromptTokens`はtimingsの処理済み入力であり、同じ値とは限りません。クライアントの`totalMs`との差には計数・通信・Provider内部の待機などが含まれ得るため、その差をqueue時間と断定しません。
 

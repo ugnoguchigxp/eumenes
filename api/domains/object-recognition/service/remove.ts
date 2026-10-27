@@ -11,7 +11,11 @@ export async function removeRecognition(
 ) {
 	const jobs = await store.write((db) => {
 		const r = owned(db, id, owner);
-		if (!["completed", "failed", "cancelled"].includes(record(r).state))
+		const current = record(r);
+		if (
+			!["completed", "failed", "cancelled"].includes(current.state) ||
+			current.captureSave === "queued"
+		)
 			throw new Error("recognition_not_ready");
 		const jobs = analyses?.removeInTransaction(db, id) ?? [];
 		db.query("DELETE FROM object_recognition_inputs WHERE id=?").run(id);

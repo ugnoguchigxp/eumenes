@@ -1,4 +1,5 @@
 import type { VisualAnalysisProps } from "../VisualAnalysis";
+import type { ImageGridItem } from "../ImagePicker/ImageGrid";
 export type ObservedObject = {
 	classId: number;
 	label: string;
@@ -18,6 +19,7 @@ export type RecognitionItem = {
 		| "failed"
 		| "cancelled";
 	canRecheck?: boolean;
+	captureSave?: "queued" | "saved" | "failed" | "unconfirmed";
 	progress: unknown;
 	errorCode: string | null;
 	result:
@@ -40,6 +42,16 @@ export type ObjectRecognitionWorkspaceProps = VisualAnalysisProps & {
 	onFrame?: (index: number) => void;
 	selectedId?: string;
 	mediaUrl?: string;
+	captureSaveStatus?: "queued" | "saved" | "failed" | "unconfirmed";
+	captureSaveCanResume?: boolean;
+	onCaptureSaveRecheck?: () => void;
+	onCaptureSaveResume?: () => void;
+	libraryImages?: readonly ImageGridItem[];
+	libraryLoading?: boolean;
+	libraryError?: string;
+	onLibraryRefresh?: () => void;
+	onLibrarySelect?: (id: string) => void;
+	onLibraryDelete?: (id: string) => Promise<boolean>;
 	busy?: boolean;
 	message?: string;
 	error?: string;

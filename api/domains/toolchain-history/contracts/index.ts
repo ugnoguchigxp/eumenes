@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { HttpErrorStatus } from "../../../infrastructure/http";
 
 /** One toolchain the conversation model was offered, and why it ranked where it did. */
 export type SelectionCandidate = {
@@ -78,6 +79,14 @@ export const recipeProposal = z
 	})
 	.strict();
 export type RecipeProposal = z.infer<typeof recipeProposal>;
+/** The state a user sets by hand; a procedure is suspended only by repeated failures. */
+export const recipeStateBody = z.object({
+	state: z.enum(["active", "disabled"]),
+});
+/** HTTP status of each code the history operations throw. */
+export const errorStatus = {
+	recipe_not_found: 404,
+} as const satisfies Record<string, HttpErrorStatus>;
 /** Consecutive failures that suspend a procedure; the next request starts from search. */
 export const RECIPE_SUSPEND_AFTER = 3;
 /** Selection traces are kept like other conversation metadata. */

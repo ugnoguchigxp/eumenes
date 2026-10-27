@@ -14,6 +14,75 @@ afterEach(() => {
 	cleanup();
 	vi.restoreAllMocks();
 });
+it("shows the LARM save outcome independently of recognition and offers recovery", () => {
+	const recheck = vi.fn();
+	const resume = vi.fn();
+	const { rerender } = render(
+		<ObjectRecognitionWorkspace
+			items={[]}
+			configured
+			captureSaveStatus="unconfirmed"
+			captureSaveCanResume
+			onCaptureSaveRecheck={recheck}
+			onCaptureSaveResume={resume}
+		/>,
+	);
+	expect(
+		screen.getByText("撮影画像のLARMへの保存を確認できません。"),
+	).toBeTruthy();
+	fireEvent.click(screen.getByRole("button", { name: "保存状態を再確認" }));
+	fireEvent.click(screen.getByRole("button", { name: "保存を再開" }));
+	expect(recheck).toHaveBeenCalledOnce();
+	expect(resume).toHaveBeenCalledOnce();
+	rerender(
+		<ObjectRecognitionWorkspace
+			items={[]}
+			configured
+			captureSaveStatus="saved"
+		/>,
+	);
+	expect(screen.getByText("撮影画像をLARMに保存しました。")).toBeTruthy();
+	expect(screen.queryByRole("button", { name: "保存を再開" })).toBeNull();
+});
+it("starts without a photo or camera actions and selects a saved image separately", () => {
+	const select = vi.fn();
+	const refresh = vi.fn();
+	const removeImage = vi.fn().mockResolvedValue(true);
+	render(
+		<ObjectRecognitionWorkspace
+			items={[]}
+			configured
+			libraryImages={[
+				{ id: "saved", title: "保存画像", thumbnailUrl: "/saved" },
+			]}
+			onLibrarySelect={select}
+			onLibraryRefresh={refresh}
+			onLibraryDelete={removeImage}
+		/>,
+	);
+	expect(screen.queryByRole("img")).toBeNull();
+	expect(screen.queryByRole("button", { name: "撮影して調べる" })).toBeNull();
+	expect(screen.queryByRole("button", { name: "録画を開始" })).toBeNull();
+	expect(screen.queryByRole("button", { name: "会話に追加" })).toBeNull();
+	expect(screen.getByRole("button", { name: "画面を共有" })).toBeTruthy();
+	fireEvent.click(screen.getByRole("button", { name: "保存した画像を選ぶ" }));
+	expect(refresh).toHaveBeenCalledOnce();
+	expect(
+		screen.getByRole("link", { name: "保存画像をダウンロード" }),
+	).toHaveAttribute("href", "/saved");
+	expect(screen.getByRole("button", { name: "保存画像を削除" })).toBeEnabled();
+	const savedImage = screen.getByRole("button", { name: "保存画像を選ぶ" });
+	expect(savedImage).toHaveAttribute("aria-pressed", "false");
+	const selectionMark =
+		savedImage.parentElement?.querySelector(".image-grid-check");
+	expect(selectionMark).toHaveAttribute("data-selected", "false");
+	fireEvent.click(savedImage);
+	expect(savedImage).toHaveAttribute("aria-pressed", "true");
+	expect(selectionMark).toHaveAttribute("data-selected", "true");
+	expect(select).not.toHaveBeenCalled();
+	fireEvent.click(screen.getByRole("button", { name: "この画像を使う" }));
+	expect(select).toHaveBeenCalledWith("saved");
+});
 const item: RecognitionItem = {
 	id: "one",
 	name: "desk.png",
@@ -71,11 +140,8 @@ it("seek controls move the actual video to the frame and don't overlay unsampled
 	fireEvent.click(screen.getByRole("button", { name: "1.5秒 · 1件" }));
 	const video = container.querySelector("video")!;
 	expect(video.currentTime).toBe(1.5);
-	// Only stills go to the conversation; a video has no "会話に追加".
-	expect(
-		(screen.getByRole("button", { name: "会話に追加" }) as HTMLButtonElement)
-			.disabled,
-	).toBe(true);
+	// Only stills go to the conversation.
+	expect(screen.queryByRole("button", { name: "会話に追加" })).toBeNull();
 	video.currentTime = 1.2;
 	fireEvent.timeUpdate(video);
 	expect(container.querySelector("svg")).toBeNull();
@@ -261,11 +327,7 @@ it("shows a labeled loading indicator while submitting and analyzing", async () 
 	fireEvent.change(screen.getByLabelText("画像・動画を選ぶ"), {
 		target: { files: [new File(["image"], "desk.png", { type: "image/png" })] },
 	});
-	const submitting = screen.getByRole("button", { name: "画像・動画を送信中" });
-	expect(submitting.getAttribute("aria-busy")).toBe("true");
-	expect(
-		container.querySelector(".recognition-submit-loading .recognition-spinner"),
-	).toBeTruthy();
+	expect(screen.getByText("画像・動画を送信中")).toBeTruthy();
 	await act(async () => finishUpload());
 	rerender(
 		<ObjectRecognitionWorkspace
@@ -274,18 +336,12 @@ it("shows a labeled loading indicator while submitting and analyzing", async () 
 			configured
 		/>,
 	);
-	expect(
-		screen.getByRole("button", { name: "解析中" }).getAttribute("aria-busy"),
-	).toBe("true");
+	expect(screen.getByText("解析中", { selector: "div" })).toBeTruthy();
 	expect(container.querySelectorAll(".recognition-spinner")).toHaveLength(2);
 	rerender(
 		<ObjectRecognitionWorkspace items={[item]} selectedId="one" configured />,
 	);
-	expect(
-		screen
-			.getByRole("button", { name: "撮影して調べる" })
-			.getAttribute("aria-busy"),
-	).toBe("false");
+	expect(screen.queryByRole("button", { name: "撮影して調べる" })).toBeNull();
 	expect(container.querySelector(".recognition-spinner")).toBeNull();
 });
 

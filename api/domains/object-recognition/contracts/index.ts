@@ -90,6 +90,7 @@ export const recognitionRecord = z.object({
 	canRecheck: z.boolean().optional(),
 	/** How the still or video was taken; absent on records saved before it was recorded. */
 	origin: z.enum(["camera", "screen", "file"]).optional(),
+	captureSave: z.enum(["queued", "saved", "failed", "unconfirmed"]).optional(),
 });
 export type RecognitionRecord = z.infer<typeof recognitionRecord>;
 const upstreamId = z
@@ -139,4 +140,6 @@ export const errorStatus = {
 	recognition_handoff_closed: 409,
 	recognition_not_configured: 503,
 	recognition_capacity: 429,
+	capture_save_connection_changed: 409,
+	capture_save_unavailable: 409,
 } as const;

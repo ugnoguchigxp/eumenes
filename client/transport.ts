@@ -62,11 +62,31 @@ export function createTransport(baseUrl: string, token?: string) {
 	};
 }
 export type Transport = ReturnType<typeof createTransport>;
-export const json = (body: unknown): RequestInit => ({
-	method: "POST",
+export const json = (body: unknown, method = "POST") => ({
+	method,
 	headers: { "Content-Type": "application/json" },
 	body: JSON.stringify(body),
 });
+type QueryValue = string | number | boolean | null | undefined;
+/**
+ * Appends a query string to `path`: `undefined`/`null` values are skipped, an array repeats its key,
+ * and `path` is returned unchanged when nothing remains.
+ */
+export function withQuery(
+	path: string,
+	params: URLSearchParams | Record<string, QueryValue | readonly QueryValue[]>,
+): string {
+	const query = new URLSearchParams();
+	const entries =
+		params instanceof URLSearchParams
+			? [...params].map(([key, value]) => [key, [value]] as const)
+			: Object.entries(params);
+	for (const [key, value] of entries)
+		for (const v of Array.isArray(value) ? value : [value])
+			if (v !== undefined && v !== null) query.append(key, String(v));
+	const text = query.toString();
+	return text ? `${path}?${text}` : path;
+}
 /** Calls the API and parses the JSON answer with its contract, so a drifted answer fails here. */
 export async function callJson<S extends z.ZodType>(
 	t: Transport,

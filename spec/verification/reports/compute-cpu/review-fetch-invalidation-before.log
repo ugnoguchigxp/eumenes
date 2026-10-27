@@ -1,0 +1,68 @@
+bun test v1.4.3 (c6da4a4d3)
+
+api/domains/compute/test/review.test.ts:
+(pass) reconciliation preserves the original deadline and refuses expired unknown submissions [52.89ms]
+(pass) Retry-After cannot postpone deadline cancellation [79.13ms]
+(pass) an accepted asynchronous deletion continues to deletion after the job terminates [56.49ms]
+(pass) one expired artifact does not discard other downloaded artifacts or redownload them on recovery [35.99ms]
+166 |  const f = await setup();
+167 |  f.state.job = remote("completed", {result:{value:2,stdout:"",stderr:"",stdoutTruncated:false,stderrTruncated:false,artifacts:[{id:crypto.randomUUID(),name:"data.csv",mime:"text/csv",bytes:1}]}});
+168 |  f.port.artifact=async()=>{f.setValid(false);return new Uint8Array([1]);};
+169 |  const a=await f.store.write(db=>f.service.commandInTransaction(db,"owner","main","conversation","python_submit",{code:"result=2"},crypto.randomUUID()));
+170 |  await waitFor(()=>f.service.get("owner",a.value.jobId).state==="completed");
+171 |  expect(f.notices).toEqual([]);
+                         ^
+error: expect(received).toEqual(expected)
+
+- []
++ [
++   {
++     "artifactError": null,
++     "artifacts": [
++       {
++         "bytes": 1,
++         "id": "4ce7c099-6318-40f9-a9f7-5d45ef541344",
++         "mime": "text/csv",
++         "name": "data.csv",
++         "ready": true,
++       },
++     ],
++     "cancelRequested": false,
++     "code": "result=2",
++     "createdAt": 1792579518232,
++     "error": null,
++     "expiresAt": null,
++     "id": "97068e32-c9db-4fff-8440-982dc6a39244",
++     "progress": null,
++     "result": {
++       "artifacts": [
++         {
++           "bytes": 1,
++           "id": "4ce7c099-6318-40f9-a9f7-5d45ef541344",
++           "mime": "text/csv",
++           "name": "data.csv",
++         },
++       ],
++       "stderr": "",
++       "stderrTruncated": false,
++       "stdout": "",
++       "stdoutTruncated": false,
++       "value": 2,
++     },
++     "revision": 8,
++     "stage": "completed",
++     "state": "completed",
++     "updatedAt": 1792579518251,
++   },
++ ]
+
+- Expected  - 1
++ Received  + 40
+
+      at <anonymous> (/Users/y.noguchi/Code/eumenes/api/domains/compute/test/review.test.ts:171:20)
+(fail) parent invalidation during artifact IO suppresses completion adoption and notices [30.53ms]
+
+ 4 pass
+ 1 fail
+ 8 expect() calls
+Ran 5 tests across 1 file. [431.00ms]

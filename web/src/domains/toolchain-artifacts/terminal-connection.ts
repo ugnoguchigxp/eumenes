@@ -1,5 +1,5 @@
 import type { TerminalConnection } from "@eumenes/artifact-ui";
-import { ApiError } from "../../../../client";
+import { ApiError, readSse } from "../../../../client";
 
 type Size = { cols: number; rows: number };
 export type TerminalPort = {
@@ -37,25 +37,6 @@ function decodeBase64(value: string): Uint8Array {
 	return bytes;
 }
 
-/** Splits server-sent events; returns the complete events and the unfinished rest. */
-export function parseEvents(buffer: string): {
-	events: Array<{ event: string; data: string }>;
-	rest: string;
-} {
-	const blocks = buffer.split("\n\n");
-	const rest = blocks.pop() ?? "";
-	const events = blocks.flatMap((block) => {
-		let event = "message";
-		const data: string[] = [];
-		for (const line of block.split("\n")) {
-			if (line.startsWith("event: ")) event = line.slice(7);
-			else if (line.startsWith("data: ")) data.push(line.slice(6));
-		}
-		return data.length ? [{ event, data: data.join("\n") }] : [];
-	});
-	return { events, rest };
-}
-
 /** Cuts text at most `size` UTF-16 units long without splitting a surrogate pair. */
 function cut(text: string, size: number) {
 	if (text.length <= size) return text.length;
@@ -65,7 +46,8 @@ function cut(text: string, size: number) {
 
 /**
  * Reads one output connection until it ends and returns whether the run exited. Any chunk (output
- * or heartbeat) proves the link alive; silence for IDLE_MS closes it, so the caller reopens it.
+ * or heartbeat) proves the link alive; silence for IDLE_MS (connecting included) closes it, so the
+ * caller reopens it.
  */
 async function readConnection(
 	client: TerminalPort,
@@ -74,41 +56,20 @@ async function readConnection(
 	reopened: boolean,
 	onOutput: (data: Uint8Array | string) => void,
 ): Promise<boolean> {
-	const attempt = new AbortController();
-	const connection = AbortSignal.any([signal, attempt.signal]);
-	let reader: ReadableStreamDefaultReader<string> | undefined;
-	let watchdog: ReturnType<typeof setTimeout> | undefined;
-	const arm = () => {
-		clearTimeout(watchdog);
-		watchdog = setTimeout(() => attempt.abort(), IDLE_MS);
-	};
-	const stop = () => {
-		void reader?.cancel().catch(() => {});
-	};
-	connection.addEventListener("abort", stop, { once: true });
 	let exited = false;
-	try {
-		arm();
-		const response = await client.terminalOutput(sessionId, connection);
-		reader = response.body?.pipeThrough(new TextDecoderStream()).getReader();
-		if (connection.aborted) stop();
-		if (reader && reopened) onOutput(RESET);
-		let buffer = "";
-		while (reader) {
-			const { value, done } = await reader.read();
-			if (done) break;
-			arm();
-			const parsed = parseEvents(buffer + value);
-			buffer = parsed.rest;
-			for (const { event, data } of parsed.events) {
-				if (event === "exit") exited = true;
-				else if (event === "output") onOutput(decodeBase64(data));
-			}
-		}
-	} finally {
-		clearTimeout(watchdog);
-		connection.removeEventListener("abort", stop);
-	}
+	await readSse((attempt) => client.terminalOutput(sessionId, attempt), {
+		signal,
+		connectMs: IDLE_MS,
+		idleMs: IDLE_MS,
+		onOpen() {
+			if (reopened) onOutput(RESET);
+		},
+		onEvent({ event, data }) {
+			if (data === undefined) return;
+			if (event === "exit") exited = true;
+			else if (event === "output") onOutput(decodeBase64(data));
+		},
+	});
 	return exited;
 }
 

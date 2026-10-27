@@ -8,6 +8,7 @@ export const PRINCIPAL = CONVERSATION_DEFAULT_PRINCIPAL;
 /** The shared profile scope. Per-conversation continuity is composed into it for the active conversation. */
 export const PROFILE_SCOPE = "profile:owner";
 import { stateKinds } from "./state-kinds";
+import type { HttpErrorStatus } from "../../../infrastructure/http";
 export { stateKinds } from "./state-kinds";
 export {
 	memorySeedInputSchema,
@@ -313,3 +314,8 @@ export type ForgetPurge = {
 	/** The opaque `derived` of the forget that wrote this journal line (empty when it had none). */
 	derived: ForgetDerived;
 };
+/** HTTP status of each code the memory operations throw. */
+export const errorStatus = {
+	memory_unavailable: 409,
+	memory_forget_incomplete: 409,
+} as const satisfies Record<string, HttpErrorStatus>;

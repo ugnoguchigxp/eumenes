@@ -35,7 +35,7 @@ clientの既存fixtureに、現行の `codingSupervision.approveInstructions` �
 | `bun run verify:all` | 0 | 全12検査stepと開始・終了のsource hash一致を通過。441.995秒 |
 | 利用側10domainの `bun run verify -- --domain <name>` | すべて0 | 下表のAPI/Web試験、整形・lint・型検査・サイズ・domain境界を通過 |
 
-全体検証のsource hashは `019c6a4f6e9c8691f2233fe7bd53ec96ac79348b26710f8b716b7afe4e0d3e24`。保存した機械可読reportは `verification-reports/research-history-final.json`。API1,169件合格・実Local Provider1件skip・0件失敗、Web253件合格、client301件合格、共通UI部品1,086件合格、ブラウザ42件合格・native仮想マイク1件skip。整形・lint・型検査・サイズ・SQL/domain境界・ビルドを含む。合計2,851件合格、2件skipで、liveと実機器の結果は含まない。
+全体検証のsource hashは `019c6a4f6e9c8691f2233fe7bd53ec96ac79348b26710f8b716b7afe4e0d3e24`。保存した機械可読reportは `spec/verification/reports/research-history-final.json`。API1,169件合格・実Local Provider1件skip・0件失敗、Web253件合格、client301件合格、共通UI部品1,086件合格、ブラウザ42件合格・native仮想マイク1件skip。整形・lint・型検査・サイズ・SQL/domain境界・ビルドを含む。合計2,851件合格、2件skipで、liveと実機器の結果は含まない。
 
 個別検証のsource hashはすべて `d3b6174a81d9498fd01330832985587d35e6ca665562792a5d1fa5911ab4e991`。依存閉包を含むため、件数はdomain間で重複する。
 
@@ -84,7 +84,7 @@ URLを含む複数資料の依頼で、modelが必要項目の引用内のURLを
 | 初回候補の不一致から別資料 | 未実施 | 未測定 |
 | 不足を反映した検索語変更 | 未実施 | 未測定 |
 
-この3ケースはfixtureの成功から合格と推定しない。保存済み接続先を用いた専用実行経路で `scenarioExercised` と到達を検査し、取得・ローカル操作・モデル回数・coverage・失敗コードを `verification-reports/toolchain/research-history-live.json` に記録する。通常ログには本文・検索語・Provider生応答・秘密を追加していない。
+この3ケースはfixtureの成功から合格と推定しない。保存済み接続先を用いた専用実行経路で `scenarioExercised` と到達を検査し、取得・ローカル操作・モデル回数・coverage・失敗コードを `spec/verification/reports/toolchain/research-history-live.json` に記録する。通常ログには本文・検索語・Provider生応答・秘密を追加していない。
 
 ## 実機器と残件
 

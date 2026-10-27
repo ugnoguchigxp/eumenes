@@ -1,0 +1,51 @@
+{
+  "lane": "running_production_api_synthetic_no_devices",
+  "serviceAvailable": true,
+  "sessionStartMs": 2,
+  "tts": {
+    "durationMs": 563,
+    "httpRequestId": "21518a8e-4b90-4669-972b-4d50c529d41a",
+    "pass": true
+  },
+  "asr": {
+    "durationMs": 282,
+    "httpRequestId": "0d5c12fd-0799-442a-a00f-36dc3bdae8a1",
+    "pass": true
+  },
+  "pass": true,
+  "testSessionStopped": true,
+  "attempts": [
+    {
+      "event": "inference.attempt_started",
+      "purpose": "tts",
+      "source": "larm",
+      "pid": 75090,
+      "bootId": "4979811b-1aea-4cb5-83e5-4034eb82d639"
+    },
+    {
+      "event": "inference.attempt_succeeded",
+      "purpose": "tts",
+      "source": "larm",
+      "durationMs": 552,
+      "pid": 75090,
+      "bootId": "4979811b-1aea-4cb5-83e5-4034eb82d639"
+    },
+    {
+      "event": "inference.attempt_started",
+      "purpose": "asr",
+      "source": "larm",
+      "pid": 75090,
+      "bootId": "4979811b-1aea-4cb5-83e5-4034eb82d639"
+    },
+    {
+      "event": "inference.attempt_succeeded",
+      "purpose": "asr",
+      "source": "larm",
+      "durationMs": 273,
+      "pid": 75090,
+      "bootId": "4979811b-1aea-4cb5-83e5-4034eb82d639"
+    }
+  ],
+  "asrCloudFallback": false,
+  "larmRouteConfirmed": true
+}

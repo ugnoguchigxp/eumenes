@@ -1,0 +1,33 @@
+{
+  "mode": "real_tts_asr_llm_web_tts_isolated_backend",
+  "at": "2026-10-09T21:43:40.931Z",
+  "ok": true,
+  "status": "ready",
+  "error": null,
+  "runStatus": "completed",
+  "transcript": "今日の鎌倉の天気を教えてください。",
+  "answer": "晴れで、気温は17℃から25℃でございます。",
+  "spoken": "晴れで、気温は17℃から25℃でございます。",
+  "audioBytes": 29228,
+  "claims": [
+    {
+      "text": "10月10日の鎌倉の天気は晴れ、気温は17℃〜25℃、降水確率は0%です。",
+      "evidence": [
+        {
+          "sourceId": "9e8af1c5-1c75-47be-9cef-bea7695f0e36",
+          "quote": "10月10日(土)\n\n晴晴\n\n25℃17℃\n\n0%"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "sourceId": "9e8af1c5-1c75-47be-9cef-bea7695f0e36",
+      "url": "https://tenki.jp/forecast/3/17/4610/14204/10days.html",
+      "title": "鎌倉市の2週間天気(旧:10日間天気) - tenki.jp",
+      "basis": "page",
+      "fetchedAt": "2026-10-09T21:43:04.174Z",
+      "truncated": true
+    }
+  ]
+}

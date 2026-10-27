@@ -28,6 +28,8 @@ export type ArtifactRuntime = {
 	 * credentials) for a preview. The host refuses any other path.
 	 */
 	fetchMedia?: (path: string) => Promise<Blob>;
+	/** Deletes only an image currently present in the host's authenticated library. */
+	deleteLibraryImage?: (id: string) => Promise<boolean>;
 	/**
 	 * Advances when the host settles an earlier unsettled operation in the background. A
 	 * pending/indeterminate message shown for an older epoch no longer applies.

@@ -177,6 +177,20 @@ test("upload persists before sending, coalesces a concurrent UUID and uses the s
 		),
 	).rejects.toThrow("idempotency_conflict");
 });
+test("an expected connection is enforced for new and previously accepted imports", async () => {
+	const h = await setup();
+	const service = h.service(),
+		id = crypto.randomUUID();
+	await expect(
+		service.upload(id, h.file, signal, "different-connection"),
+	).rejects.toThrow("image_import_connection_changed");
+	expect(h.stats().posts).toBe(0);
+	expect((await service.upload(id, h.file, signal)).status).toBe("succeeded");
+	await expect(
+		service.upload(id, h.file, signal, "different-connection"),
+	).rejects.toThrow("image_import_connection_changed");
+	expect(h.stats().posts).toBe(1);
+});
 test("lost completion is queried after restart without another POST; deleted receipt never recreates", async () => {
 	const h = await setup("lost-after"),
 		id = crypto.randomUUID();

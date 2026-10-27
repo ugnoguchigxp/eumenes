@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { json, withQuery } from "../transport";
 import { contracts, newClient, stubFetch } from "./harness";
 
 const t0 = "2026-10-10T00:00:00.000Z";
@@ -36,6 +37,7 @@ const run = {
 	sourceKind: "manual",
 	scheduleId: null,
 	occurrenceId: null,
+	specialistSessionId: null,
 	createdAt: t0,
 	updatedAt: t0,
 };
@@ -146,9 +148,8 @@ const tendency = {
 };
 const memoryContext = {
 	version: 3,
-	longTerm: { text: "以下は…", bytes: 9, limit: 16384 },
-	shortTerm: { text: "", bytes: 0, limit: 8192, pendingAdditions: 0 },
-	notices: 1,
+	profile: { text: "以下は…", tokens: 9 },
+	newMemories: 1,
 };
 const decision = {
 	id: 7,
@@ -539,5 +540,46 @@ describe("transport", () => {
 			status: 502,
 			message: "HTTP 502",
 		});
+	});
+});
+
+describe("withQuery", () => {
+	it("returns the path unchanged when no parameter remains", () => {
+		expect(withQuery("/api/x", {})).toBe("/api/x");
+		expect(withQuery("/api/x", { a: undefined, b: null })).toBe("/api/x");
+		expect(withQuery("/api/x", new URLSearchParams())).toBe("/api/x");
+	});
+	it("skips undefined and null, stringifies numbers and booleans, keeps empty strings", () => {
+		expect(
+			withQuery("/api/x", {
+				a: 1,
+				b: false,
+				c: "",
+				d: undefined,
+				e: null,
+				f: 0,
+			}),
+		).toBe("/api/x?a=1&b=false&c=&f=0");
+	});
+	it("encodes values and repeats the key of an array", () => {
+		expect(withQuery("/api/x", { q: "a b&c/ü", id: ["1", 2] })).toBe(
+			"/api/x?q=a+b%26c%2F%C3%BC&id=1&id=2",
+		);
+	});
+	it("takes ready URLSearchParams as they are", () => {
+		expect(withQuery("/api/x", new URLSearchParams({ a: "1" }))).toBe(
+			"/api/x?a=1",
+		);
+	});
+});
+
+describe("json", () => {
+	it("posts by default and takes another method", () => {
+		expect(json({ a: 1 })).toEqual({
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: '{"a":1}',
+		});
+		expect(json({}, "PUT").method).toBe("PUT");
 	});
 });

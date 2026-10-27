@@ -1,5 +1,6 @@
 import type { Hono } from "hono";
 import { z } from "zod";
+import { parseQuery } from "../../infrastructure/http";
 import { RESOURCE_SEARCH_LIMIT_MAX } from "../../domains/resources";
 import type { ResourceAccess } from "./access";
 
@@ -33,9 +34,10 @@ export function registerResourceRoutes(
 		);
 	});
 	app.get("/api/resources", async (c) => {
-		const parsed = searchQuerySchema.safeParse(c.req.query());
-		if (!parsed.success)
-			return c.json({ error: "invalid_resource_query" }, 400);
+		const parsed = parseQuery(c, searchQuerySchema, {
+			code: "invalid_resource_query",
+		});
+		if (!parsed.ok) return parsed.response;
 		const { query, ...rest } = parsed.data;
 		return c.json(
 			await deps.access.search({ text: query, ...rest }, c.req.raw.signal),

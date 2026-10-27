@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { Hono } from "hono";
+import { parseJsonBody, parseQuery } from "../../../infrastructure/http";
 import { analysisCreate, type AnalysisRecord } from "../../larm";
 import type { createRecognitionAnalyses } from "../service/analyses";
 const summary = (v: AnalysisRecord) => ({
@@ -19,16 +20,18 @@ export function registerRecognitionAnalyses(
 		frameIndex: z.coerce.number().int().min(0).max(59).optional(),
 	});
 	app.post(root, async (c) => {
-		const v = analysisCreate.safeParse(await c.req.json());
-		if (!v.success) return c.json({ error: "invalid_analysis_input" }, 400);
+		const v = await parseJsonBody(c, analysisCreate, {
+			code: "invalid_analysis_input",
+		});
+		if (!v.ok) return v.response;
 		return c.json(
 			summary(await service.create(owner, c.req.param("id"), v.data)),
 			202,
 		);
 	});
 	app.get(root, (c) => {
-		const q = scope.safeParse(c.req.query());
-		if (!q.success) return c.json({ error: "invalid_analysis_input" }, 400);
+		const q = parseQuery(c, scope, { code: "invalid_analysis_input" });
+		if (!q.ok) return q.response;
 		return c.json(
 			service
 				.list(
@@ -41,8 +44,8 @@ export function registerRecognitionAnalyses(
 		);
 	});
 	app.get(`${root}/:analysisId`, (c) => {
-		const q = scope.safeParse(c.req.query());
-		if (!q.success) return c.json({ error: "invalid_analysis_input" }, 400);
+		const q = parseQuery(c, scope, { code: "invalid_analysis_input" });
+		if (!q.ok) return q.response;
 		return c.json(
 			summary(
 				service.get(
@@ -55,8 +58,8 @@ export function registerRecognitionAnalyses(
 		);
 	});
 	app.post(`${root}/:analysisId/cancel`, async (c) => {
-		const q = scope.safeParse(await c.req.json());
-		if (!q.success) return c.json({ error: "invalid_analysis_input" }, 400);
+		const q = await parseJsonBody(c, scope, { code: "invalid_analysis_input" });
+		if (!q.ok) return q.response;
 		return c.json(
 			summary(
 				await service.cancel(
@@ -69,8 +72,8 @@ export function registerRecognitionAnalyses(
 		);
 	});
 	app.get(`${root}/:analysisId/image`, async (c) => {
-		const q = scope.safeParse(c.req.query());
-		if (!q.success) return c.json({ error: "invalid_analysis_input" }, 400);
+		const q = parseQuery(c, scope, { code: "invalid_analysis_input" });
+		if (!q.ok) return q.response;
 		const image = await service.image(
 			owner,
 			c.req.param("id"),
@@ -87,15 +90,15 @@ export function registerRecognitionAnalyses(
 		});
 	});
 	app.get(`${root}/:analysisId/masks/:index`, (c) => {
-		const q = scope.safeParse(c.req.query());
+		const q = parseQuery(c, scope, { code: "invalid_analysis_input" });
 		const index = z.coerce
 			.number()
 			.int()
 			.min(0)
 			.max(7)
 			.safeParse(c.req.param("index"));
-		if (!q.success || !index.success)
-			return c.json({ error: "invalid_analysis_input" }, 400);
+		if (!q.ok) return q.response;
+		if (!index.success) return c.json({ error: "invalid_analysis_input" }, 400);
 		const r = service.get(
 			owner,
 			c.req.param("id"),

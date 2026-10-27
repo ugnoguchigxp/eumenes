@@ -1,0 +1,13 @@
+[
+  {
+    "lane": "live_adapter_synthetic_no_devices",
+    "seconds": 19.08,
+    "requests": 2,
+    "repetitions": 5,
+    "phraseCount": 5,
+    "precisionAccepted": false,
+    "transcript": "カレーを作りました設定にはキャドー使いますカレーを作りました設定にはキャドー使いますカレーを作りました設定にはキャドー使います\nカレーを作りました設定にはキャドー使いますカレーを作りました設定にはキャドー使います",
+    "durationMs": 1571.216708,
+    "pass": true
+  }
+]

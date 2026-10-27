@@ -7,23 +7,19 @@ import {
 	taskListSchema,
 	taskEventListSchema,
 } from "../api/domains/tasks/contracts";
-import { json, type Transport } from "./transport";
+import { callJson, json, withQuery, type Transport } from "./transport";
 
 import type { OrchestrationGrant } from "../api/domains/tasks/contracts";
 export function tasksClient(transport: Transport) {
 	const path = (id: string) => `/api/tasks/${encodeURIComponent(id)}`;
-	const post = async (target: string, body: unknown): Promise<TaskReceipt> =>
-		taskReceiptSchema.parse(
-			await (await transport.call(target, json(body))).json(),
-		);
+	const post = (target: string, body: unknown): Promise<TaskReceipt> =>
+		callJson(transport, taskReceiptSchema, target, json(body));
 	return {
 		forgetTask: (id: string, requestId: string, expectedRevision: number) =>
 			post(`${path(id)}/forget`, { requestId, expectedRevision }),
 		createTask: (input: CreateTask) => post("/api/tasks", input),
 		workTask: async (id: string, signal?: AbortSignal) =>
-			taskDetailSchema.parse(
-				await (await transport.call(path(id), { signal })).json(),
-			),
+			callJson(transport, taskDetailSchema, path(id), { signal }),
 		workTasks: async (
 			query: {
 				state?: string;
@@ -32,27 +28,21 @@ export function tasksClient(transport: Transport) {
 				limit?: number;
 			} = {},
 			signal?: AbortSignal,
-		) => {
-			const params = new URLSearchParams();
-			for (const [k, v] of Object.entries(query))
-				if (v !== undefined) params.set(k, String(v));
-			return taskListSchema.parse(
-				await (await transport.call(`/api/tasks?${params}`, { signal })).json(),
-			);
-		},
+		) =>
+			callJson(transport, taskListSchema, withQuery("/api/tasks", query), {
+				signal,
+			}),
 		workTaskEvents: async (
 			id: string,
 			cursor = "0",
 			limit = 50,
 			signal?: AbortSignal,
 		) =>
-			taskEventListSchema.parse(
-				await (
-					await transport.call(
-						`${path(id)}/events?${new URLSearchParams({ cursor, limit: String(limit) })}`,
-						{ signal },
-					)
-				).json(),
+			callJson(
+				transport,
+				taskEventListSchema,
+				withQuery(`${path(id)}/events`, { cursor, limit }),
+				{ signal },
 			),
 		startTask: (id: string, requestId: string, expectedRevision: number) =>
 			post(`${path(id)}/start`, { requestId, expectedRevision }),

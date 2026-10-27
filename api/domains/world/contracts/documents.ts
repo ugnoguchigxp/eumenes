@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { HttpErrorStatus } from "../../../infrastructure/http";
 
 const id = z.string().trim().min(1).max(200);
 export const worldDocumentInput = z.strictObject({
@@ -31,3 +32,8 @@ export const worldDocumentPageInput = z.strictObject({
 	desc: z.boolean().default(false),
 });
 export type WorldDocumentPageInput = z.infer<typeof worldDocumentPageInput>;
+/** HTTP status of each code the document import throws. */
+export const errorStatus = {
+	document_revision_conflict: 409,
+	document_withdrawn: 409,
+} as const satisfies Record<string, HttpErrorStatus>;

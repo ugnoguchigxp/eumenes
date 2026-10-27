@@ -1,5 +1,6 @@
 import type { Database } from "bun:sqlite";
 import type { Owner, FixedDefinition } from "../../capabilities";
+import type { HttpErrorStatus } from "../../../infrastructure/http";
 export type ToolResult = {
 	observedAt: string;
 	readings?: Source[];
@@ -187,3 +188,8 @@ export * from "./adapters";
 export * from "./task-execution";
 
 export type { ChildCaller, ChildOperationPort } from "./child-operation";
+/** HTTP status of each code the tool invocation operations throw. */
+export const errorStatus = {
+	tool_ref_invalid: 409,
+	result_capacity: 429,
+} as const satisfies Record<string, HttpErrorStatus>;

@@ -1,8 +1,12 @@
 import type { Hono } from "hono";
+import { z } from "zod";
+import { parseQuery } from "../../../infrastructure/http";
 import type { InferenceService } from "../service";
 import type { ConnectionModelsService } from "../service/connection-models";
 import { usagePageQuerySchema } from "../contracts";
 import { registerScreenPresence } from "./screen-presence";
+const modelsQuery = z.object({ refresh: z.literal("1").optional() });
+const voicesQuery = z.object({ language: z.enum(["ja", "en"]).optional() });
 /** Credential and route failures of a model-list read; anything else is an upstream failure. */
 const modelListStatus = (code: string) =>
 	code === "cloud_credential_unavailable" ? 409 : 502;
@@ -14,14 +18,13 @@ export function registerInference(
 	registerScreenPresence(app, service);
 	if (models)
 		app.get("/api/inference/connections/:id/models", async (c) => {
-			const refresh = c.req.query("refresh");
-			if (refresh !== undefined && refresh !== "1")
-				return c.json({ error: "invalid_request" }, 400);
+			const query = parseQuery(c, modelsQuery, { code: "invalid_request" });
+			if (!query.ok) return query.response;
 			try {
 				const result = await models.list(
 					c.req.param("id"),
 					AbortSignal.any([c.req.raw.signal, AbortSignal.timeout(30_000)]),
-					refresh === "1",
+					query.data.refresh === "1",
 				);
 				return result ? c.json(result) : c.json({ error: "not_found" }, 404);
 			} catch (error) {
@@ -43,22 +46,21 @@ export function registerInference(
 		),
 	);
 	app.get("/api/inference/voices", async (c) => {
-		const language = c.req.query("language");
-		if (language !== undefined && language !== "ja" && language !== "en")
-			return c.json({ error: "invalid_language" }, 400);
+		const query = parseQuery(c, voicesQuery, { code: "invalid_language" });
+		if (!query.ok) return query.response;
 		return c.json(
 			await service.voices(
 				AbortSignal.any([c.req.raw.signal, AbortSignal.timeout(15_000)]),
-				language,
+				query.data.language,
 			),
 		);
 	});
 	app.get("/api/inference/usage", (c) => c.json(service.usage()));
 	app.get("/api/inference/usage/page", (c) => {
-		const query = usagePageQuerySchema.safeParse(c.req.query());
-		return query.success
-			? c.json(service.usagePage(query.data))
-			: c.json({ error: "invalid_request" }, 400);
+		const query = parseQuery(c, usagePageQuerySchema, {
+			code: "invalid_request",
+		});
+		return query.ok ? c.json(service.usagePage(query.data)) : query.response;
 	});
 	app.get("/api/inference/probes", (c) => c.json(service.probes()));
 	app.post("/api/inference/probes", async (c) => {

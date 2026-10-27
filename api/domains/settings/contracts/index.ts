@@ -2,6 +2,7 @@ import { z } from "zod";
 import { spatialSettingsShape } from "./spatial";
 export { spatialControls } from "./spatial";
 import { endpoint, cloudEndpoint } from "./endpoints";
+import type { HttpErrorStatus } from "../../../infrastructure/http";
 export { cloudEndpoint } from "./endpoints";
 export {
 	excalidrawConnectionInput,
@@ -582,3 +583,7 @@ export function prepareConnectionRegistration(input: unknown, hasKey: boolean) {
 		}),
 	};
 }
+/** HTTP status of each code the settings operations throw. */
+export const errorStatus = {
+	env_ref_not_allowed: 400,
+} as const satisfies Record<string, HttpErrorStatus>;

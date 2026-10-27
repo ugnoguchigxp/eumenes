@@ -45,7 +45,7 @@ LLM・音声Provider、認証・設定、ツール実行、TODOの完了条件�
 - `bun run verify -- --domain dialogue --domain voice-dialogue`: 初回は追加窓口による関数サイズ増加と、既存の `voice-dialogue/test/settings-integration.test.ts` の1,001行違反で停止。追加窓口を `replay-playback.ts` に分けて本変更によるサイズ増加を解消した。
 - `bun run verify -- --domain dialogue`: 既存のrepository/index.tsのformat違反と、実行中の別作業による入力変更で **invalidated**。その後の対象formatチェックは通過したが、まとめたverifyの合格とはしていない。音声側の既存試験ファイルのサイズ違反は未解消。必要な試験・型・変更対象静的検査を個別に通して区別した。
 
-記録: `/tmp/eumenes-todo-spoken-domains-final.log`、`/tmp/eumenes-todo-spoken-integration.log`、`/tmp/eumenes-todo-spoken-browser.log`、`/tmp/eumenes-todo-spoken-typecheck-final.log`。verifyの機械記録は `verification-reports/runs/2026-10-26T23-46-47-762Z-ac0d4d70-7f8e-443d-bfe3-138bba2babdc/report.json` と `verification-reports/runs/2026-10-26T23-47-54-651Z-75421ccd-5989-4a0e-b414-31c8262cd38f/report.json`。
+記録: `/tmp/eumenes-todo-spoken-domains-final.log`、`/tmp/eumenes-todo-spoken-integration.log`、`/tmp/eumenes-todo-spoken-browser.log`、`/tmp/eumenes-todo-spoken-typecheck-final.log`。verifyの機械記録は `spec/verification/reports/runs/2026-10-26T23-46-47-762Z-ac0d4d70-7f8e-443d-bfe3-138bba2babdc/report.json` と `spec/verification/reports/runs/2026-10-26T23-47-54-651Z-75421ccd-5989-4a0e-b414-31c8262cd38f/report.json`。
 
 差分点検では、並行修正されたlive再生処理に音量0区間の累積が必要なことを再確認し、現行のコミット成功後の更新方式を保って追加した。「途中だけ音量0→最後だけ有音」の回帰試験も通過している。個別の発話語句・特定依頼向けの製品分岐は追加していない。既存の無関係な差分は維持した。
 

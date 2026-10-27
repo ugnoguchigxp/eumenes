@@ -1,0 +1,270 @@
+{
+  "schemaVersion": 1,
+  "runId": "2026-10-26T23-33-23-541Z-f8869e29-3f44-4d83-a3fb-e451699c69b3",
+  "startedAt": "2026-10-26T23:33:23.541Z",
+  "scope": {
+    "all": false,
+    "selected": [
+      "docling",
+      "artifact",
+      "capabilities"
+    ]
+  },
+  "baseCommit": "938f9d9faf77fadcf6388eae64e9568550a5c0d7",
+  "revision": "594d7cd0caa20c9a3510fe74e06980b62372d4b219094f0e567088f46f3b9e5d",
+  "runtime": {
+    "bun": "1.4.4",
+    "node": "26.3.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "ci": false,
+    "runner": null
+  },
+  "result": "pass",
+  "steps": [
+    {
+      "name": "inventory",
+      "status": "pass",
+      "ms": 61
+    },
+    {
+      "name": "boundaries",
+      "status": "pass",
+      "ms": 2265
+    },
+    {
+      "name": "system-context",
+      "status": "pass",
+      "ms": 115
+    },
+    {
+      "name": "size-budget",
+      "status": "pass",
+      "ms": 1071,
+      "warnings": [
+        "size-budget: new file over 800 lines: api/application/agency/host.ts (973)",
+        "size-budget: new function over 300 lines: api/application/agency/host.ts#createAgencyHost (833)",
+        "size-budget: new function over 300 lines: api/application/server-services.ts#buildServices (343)",
+        "size-budget: new function over 300 lines: api/domains/dialogue/service/context-keeper.ts#createContextKeeper (337)",
+        "size-budget: new function over 300 lines: api/domains/dialogue/service/index.ts#createDialogueService (314)",
+        "size-budget: new function over 300 lines: api/domains/dialogue/service/work-ledger.ts#createWorkLedger (311)",
+        "size-budget: new test file over 1000 lines: api/domains/voice-dialogue/test/settings-integration.test.ts (1001)"
+      ]
+    },
+    {
+      "name": "sql-boundaries",
+      "status": "pass",
+      "ms": 1288
+    },
+    {
+      "name": "domain-docs",
+      "status": "pass",
+      "ms": 14,
+      "warnings": [
+        "docs/domains.md: domain 表は最新です"
+      ]
+    },
+    {
+      "name": "format",
+      "status": "pass",
+      "ms": 427,
+      "warnings": [
+        "not formatted: api/application/agency/llm-port.test.ts",
+        "not formatted: api/domains/continuity/repository/events.ts",
+        "not formatted: api/domains/conversation/repository/input.ts",
+        "not formatted: api/domains/dialogue/eval/context/generation-runner.ts",
+        "not formatted: api/domains/dialogue/eval/context/message-invariants.ts",
+        "not formatted: api/domains/dialogue/eval/context/report.ts",
+        "not formatted: api/domains/dialogue/eval/context/session-events.ts",
+        "not formatted: api/domains/dialogue/eval/context/session-run.ts",
+        "not formatted: api/domains/dialogue/repository/resources.ts",
+        "not formatted: api/domains/dialogue/service/context-keeper.ts",
+        "not formatted: api/domains/dialogue/service/context-system.ts",
+        "not formatted: api/domains/dialogue/service/conversation-input.ts",
+        "not formatted: api/domains/dialogue/service/delivery-record.ts",
+        "not formatted: api/domains/dialogue/service/event-fields.ts",
+        "not formatted: api/domains/dialogue/service/generation-prepare.ts",
+        "not formatted: api/domains/dialogue/service/input-text.ts",
+        "not formatted: api/domains/dialogue/service/result-text.ts",
+        "not formatted: api/domains/dialogue/service/state-text.ts",
+        "not formatted: api/domains/dialogue/service/work-items.ts",
+        "not formatted: api/domains/dialogue/service/work-ledger.ts",
+        "not formatted: api/domains/dialogue/test/context-eval/run.test.ts",
+        "not formatted: api/domains/dialogue/test/context-eval/trajectory.test.ts",
+        "not formatted: api/domains/dialogue/test/context-keeper.test.ts",
+        "not formatted: api/domains/dialogue/test/context-system.test.ts",
+        "not formatted: api/domains/dialogue/test/conversation-input.test.ts",
+        "not formatted: api/domains/dialogue/test/generation-work.test.ts",
+        "not formatted: api/domains/dialogue/test/generation.test.ts",
+        "not formatted: api/domains/dialogue/test/memory-integration.test.ts",
+        "not formatted: api/domains/dialogue/test/resources.test.ts",
+        "not formatted: api/domains/dialogue/test/specialist-turn.test.ts",
+        "not formatted: api/domains/dialogue/test/specialist.test.ts"
+      ]
+    },
+    {
+      "name": "lint",
+      "status": "pass",
+      "ms": 286,
+      "warnings": [
+        "api/domains/dialogue/service/index.ts:204:5: Using a spread operator here creates a new object unnecessarily. [Error/unicorn(no-useless-spread)]",
+        "api/domains/dialogue/eval/context/session.ts:49:17: Variable 'events' is declared but never used. Unused variables should start with a '_'. [Error/eslint(no-unused-vars)]",
+        "api/domains/continuity/test/events.test.ts:258:7: Variable 'LIMITS' is declared but never used. Unused variables should start with a '_'. [Error/eslint(no-unused-vars)]",
+        "api/domains/continuity/test/events.test.ts:264:16: Function 'said' is declared but never used. [Error/eslint(no-unused-vars)]",
+        "api/domains/continuity/test/events.test.ts:283:7: Variable 'minute' is declared but never used. Unused variables should start with a '_'. [Error/eslint(no-unused-vars)]",
+        "web/src/workspace/ConversationComposer.tsx:34:14: Cannot access refs during render [Error/react(refs)]",
+        "web/src/workspace/ConversationComposer.tsx:55:6: Cannot access refs during render [Error/react(refs)]",
+        "web/src/workspace/ConversationComposer.tsx:59:16: Cannot access refs during render [Error/react(refs)]",
+        "web/src/workspace/ConversationComposer.tsx:55:6: Cannot access refs during render [Error/react(refs)]"
+      ]
+    },
+    {
+      "name": "design-system typecheck",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "--cwd",
+        "packages/design-system",
+        "typecheck"
+      ],
+      "status": "pass",
+      "ms": 200,
+      "exitCode": 0
+    },
+    {
+      "name": "design-system build",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "--cwd",
+        "packages/design-system",
+        "build"
+      ],
+      "status": "pass",
+      "ms": 8373,
+      "exitCode": 0
+    },
+    {
+      "name": "typecheck",
+      "status": "pass",
+      "ms": 847,
+      "warnings": [
+        "api/domains/dialogue/eval/context/session-context.ts(10,15): error TS2305: Module '\"../../contracts\"' has no exported member 'ContextGoalEntry'.",
+        "api/domains/dialogue/eval/context/session-context.ts(101,3): error TS2353: Object literal may only specify known properties, and 'goals' does not exist in type 'DialogueDeps'.",
+        "api/domains/dialogue/test/context-eval/materialize.test.ts(12,10): error TS2305: Module '\"../../service/context-system\"' has no exported member 'FIXED_TRIGGER_TEXT'.",
+        "scripts/music-answer-live.ts(7,35): error TS2307: Cannot find module '../api/domains/dialogue/service/system-prompt' or its corresponding type declarations.",
+        "scripts/response-decision/cache-input.test.ts(2,35): error TS2307: Cannot find module '../../api/domains/dialogue/service/context-document' or its corresponding type declarations.",
+        "scripts/response-decision/cache-input.ts(8,8): error TS2307: Cannot find module '../../api/domains/dialogue/service/context-document' or its corresponding type declarations.",
+        "scripts/response-decision/cache-input.ts(112,17): error TS2554: Expected 2-3 arguments, but got 1.",
+        "scripts/response-decision/cache.ts(139,8): error TS18046: 'section' is of type 'unknown'.",
+        "scripts/short-answer-live.ts(2,35): error TS2307: Cannot find module '../api/domains/dialogue/service/system-prompt' or its corresponding type declarations.",
+        "tests/browser/dots-messaging.fixture.tsx(168,52): error TS2741: Property 'notify' is missing in type '{ client: AdapterHostContext[\"client\"]; artifact: { kind: \"artifact\"; id: string; revision: number; title: string; variants: { id: string; label: string; definition: unknown; questionDefinition?: unknown; }[]; defaultVariant: string; ... 5 more ...; collections?: { ...; }[] | undefined; }; ... 8 more ...; drafts: {}...' but required in type 'AdapterHostContext'.\n  2  api/domains/dialogue/eval/context/session-context.ts:10\n  1  api/domains/dialogue/test/context-eval/materialize.test.ts:12\n  1  scripts/music-answer-live.ts:7\n  1  scripts/response-decision/cache-input.test.ts:2\n  2  scripts/response-decision/cache-input.ts:8\n  1  scripts/response-decision/cache.ts:139\n  1  scripts/short-answer-live.ts:2\n  1  tests/browser/dots-messaging.fixture.tsx:168"
+      ]
+    },
+    {
+      "name": "bun tests",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "test",
+        "./api/domains/capabilities/test/bundles.test.ts",
+        "./api/domains/capabilities/test/capabilities.test.ts",
+        "./api/domains/capabilities/test/command-agent-binding.test.ts",
+        "./api/domains/capabilities/test/docling-bundle.test.ts",
+        "./api/domains/capabilities/test/dots-messaging-revision.test.ts",
+        "./api/domains/capabilities/test/image.test.ts",
+        "./api/domains/capabilities/test/instant-binding.test.ts",
+        "./api/domains/capabilities/test/json-schema-subset.test.ts",
+        "./api/domains/capabilities/test/learned.test.ts",
+        "./api/domains/capabilities/test/lookup-upgrade.test.ts",
+        "./api/domains/capabilities/test/music-versions.test.ts",
+        "./api/domains/capabilities/test/ocr-upgrade.test.ts",
+        "./api/domains/capabilities/test/prepare-learned.test.ts",
+        "./api/domains/capabilities/test/requirement-controller.test.ts",
+        "./api/domains/capabilities/test/requirement-schema.test.ts",
+        "./api/domains/capabilities/test/requirements.test.ts",
+        "./api/domains/capabilities/test/resource-kinds.test.ts",
+        "./api/domains/capabilities/test/session-binding.test.ts",
+        "./api/domains/capabilities/test/settings-google.test.ts",
+        "./api/domains/capabilities/test/standalone-artifacts-forms.test.ts",
+        "./api/domains/capabilities/test/standalone-artifacts.test.ts",
+        "./api/domains/capabilities/test/steward-request-retire.test.ts",
+        "./api/domains/capabilities/test/task-binding.test.ts",
+        "./api/domains/capabilities/test/timer-compatibility.test.ts",
+        "./api/domains/capabilities/test/toolchain-candidates.test.ts",
+        "./api/domains/capabilities/test/web-guided.test.ts",
+        "./api/domains/capabilities/test/web-research-codex-retire.test.ts",
+        "./api/domains/capabilities/test/web-research-rename.test.ts",
+        "./api/domains/docling/test/docling.test.ts",
+        "./packages/artifact-ui/src/composition-content-components.test.tsx",
+        "./packages/artifact-ui/src/composition-data-components.test.tsx",
+        "./packages/artifact-ui/src/composition-diagram-components.test.tsx",
+        "./packages/artifact-ui/src/composition-expressions.test.ts",
+        "./packages/artifact-ui/src/composition-fixer.test.ts",
+        "./packages/artifact-ui/src/composition-fixtures-render.test.tsx",
+        "./packages/artifact-ui/src/composition-format.test.ts",
+        "./packages/artifact-ui/src/composition-images.test.ts",
+        "./packages/artifact-ui/src/composition-marketing-components.test.tsx",
+        "./packages/artifact-ui/src/composition-model.test.tsx",
+        "./packages/artifact-ui/src/composition-validate.test.ts",
+        "./packages/artifact-ui/src/compute-components.test.tsx",
+        "./packages/artifact-ui/src/dots-messaging.test.ts",
+        "./packages/artifact-ui/src/external-app-components.test.tsx",
+        "./packages/artifact-ui/src/pipeline-studio-components.test.tsx",
+        "./packages/artifact-ui/src/ui-studio-source.test.tsx",
+        "./packages/artifact-ui/src/work-components.test.tsx"
+      ],
+      "status": "pass",
+      "ms": 11728,
+      "exitCode": 0
+    },
+    {
+      "name": "web tests",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "x",
+        "--no-install",
+        "vitest",
+        "run",
+        "web/src/domains/artifact/test/compiler.test.tsx",
+        "web/src/domains/artifact/test/composition.test.tsx",
+        "web/src/domains/artifact/test/form-refresh.test.tsx",
+        "web/src/domains/artifact/test/image-url.test.tsx",
+        "web/src/domains/artifact/test/json-tokens.test.ts",
+        "web/src/domains/artifact/test/nested-layout.test.tsx",
+        "web/src/domains/artifact/test/panel.test.tsx",
+        "web/src/domains/artifact/test/store.test.ts",
+        "web/src/domains/artifact/test/ui-studio-menu.test.tsx",
+        "web/src/domains/artifact/test/ui-studio.test.tsx",
+        "web/src/domains/docling/open.test.ts",
+        "web/src/domains/docling/toolchain-adapter.test.tsx"
+      ],
+      "status": "pass",
+      "ms": 6787,
+      "exitCode": 0
+    },
+    {
+      "name": "design-system tests",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "--cwd",
+        "packages/design-system",
+        "test",
+        "src/components/ExternalAppLauncher/ExternalAppLauncher.test.tsx"
+      ],
+      "status": "pass",
+      "ms": 2511,
+      "exitCode": 0
+    }
+  ],
+  "totalMs": 36583,
+  "integrityErrors": [],
+  "build": {
+    "sharedOutput": true,
+    "inputRevision": "594d7cd0caa20c9a3510fe74e06980b62372d4b219094f0e567088f46f3b9e5d",
+    "distAfterBuild": "b267d7b1b285801ab9fc95f185c03474a26c26fc9726e2cbfc78a8cd333f2d63",
+    "distAfterConsumers": "b267d7b1b285801ab9fc95f185c03474a26c26fc9726e2cbfc78a8cd333f2d63"
+  },
+  "finalRevision": "594d7cd0caa20c9a3510fe74e06980b62372d4b219094f0e567088f46f3b9e5d",
+  "finishedAt": "2026-10-26T23:34:00.742Z"
+}

@@ -1,0 +1,295 @@
+{
+  "schemaVersion": 1,
+  "runId": "2026-10-26T23-26-54-090Z-22e8ff62-05ec-4fd6-8808-c07545ca71d4",
+  "startedAt": "2026-10-26T23:26:54.090Z",
+  "scope": {
+    "all": false,
+    "selected": [
+      "agent-runtime",
+      "artifact",
+      "capabilities"
+    ]
+  },
+  "baseCommit": "938f9d9faf77fadcf6388eae64e9568550a5c0d7",
+  "revision": "a59d052da4c462cad1e5065b462b4ed1fabe8038048b7a5fb6981a457857e6b1",
+  "runtime": {
+    "bun": "1.4.4",
+    "node": "26.3.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "ci": false,
+    "runner": null
+  },
+  "result": "invalidated",
+  "steps": [
+    {
+      "name": "inventory",
+      "status": "pass",
+      "ms": 55
+    },
+    {
+      "name": "boundaries",
+      "status": "pass",
+      "ms": 1957
+    },
+    {
+      "name": "system-context",
+      "status": "pass",
+      "ms": 106
+    },
+    {
+      "name": "size-budget",
+      "status": "pass",
+      "ms": 876,
+      "warnings": [
+        "size-budget: new file over 800 lines: api/application/agency/host.ts (973)",
+        "size-budget: new function over 300 lines: api/application/agency/host.ts#createAgencyHost (833)",
+        "size-budget: new function over 300 lines: api/application/server-services.ts#buildServices (343)",
+        "size-budget: new function over 300 lines: api/domains/dialogue/service/context-keeper.ts#createContextKeeper (334)",
+        "size-budget: new function over 300 lines: api/domains/dialogue/service/index.ts#createDialogueService (314)",
+        "size-budget: new function over 300 lines: api/domains/dialogue/service/work-ledger.ts#createWorkLedger (311)",
+        "size-budget: new function over 300 lines: api/domains/larm/service/lease-manager.ts#createLeaseManager (301)",
+        "size-budget: new test file over 1000 lines: api/domains/voice-dialogue/test/settings-integration.test.ts (1001)"
+      ]
+    },
+    {
+      "name": "sql-boundaries",
+      "status": "pass",
+      "ms": 1158
+    },
+    {
+      "name": "domain-docs",
+      "status": "pass",
+      "ms": 14,
+      "warnings": [
+        "docs/domains.md: domain 表は最新です"
+      ]
+    },
+    {
+      "name": "format",
+      "status": "pass",
+      "ms": 322,
+      "warnings": [
+        "not formatted: api/application/agency/llm-port.test.ts",
+        "not formatted: api/domains/continuity/repository/events.ts",
+        "not formatted: api/domains/conversation/repository/input.ts",
+        "not formatted: api/domains/dialogue/eval/context/generation-runner.ts",
+        "not formatted: api/domains/dialogue/eval/context/message-invariants.ts",
+        "not formatted: api/domains/dialogue/eval/context/report.ts",
+        "not formatted: api/domains/dialogue/eval/context/session-events.ts",
+        "not formatted: api/domains/dialogue/eval/context/session-run.ts",
+        "not formatted: api/domains/dialogue/repository/resources.ts",
+        "not formatted: api/domains/dialogue/service/context-keeper.ts",
+        "not formatted: api/domains/dialogue/service/context-system.ts",
+        "not formatted: api/domains/dialogue/service/conversation-input.ts",
+        "not formatted: api/domains/dialogue/service/delivery-record.ts",
+        "not formatted: api/domains/dialogue/service/event-fields.ts",
+        "not formatted: api/domains/dialogue/service/generation-prepare.ts",
+        "not formatted: api/domains/dialogue/service/input-text.ts",
+        "not formatted: api/domains/dialogue/service/result-text.ts",
+        "not formatted: api/domains/dialogue/service/state-text.ts",
+        "not formatted: api/domains/dialogue/service/work-items.ts",
+        "not formatted: api/domains/dialogue/service/work-ledger.ts",
+        "not formatted: api/domains/dialogue/test/context-eval/trajectory.test.ts",
+        "not formatted: api/domains/dialogue/test/context-system.test.ts",
+        "not formatted: api/domains/dialogue/test/conversation-input.test.ts",
+        "not formatted: api/domains/dialogue/test/generation-work.test.ts",
+        "not formatted: api/domains/dialogue/test/generation.test.ts",
+        "not formatted: api/domains/dialogue/test/memory-integration.test.ts",
+        "not formatted: api/domains/dialogue/test/resources.test.ts"
+      ]
+    },
+    {
+      "name": "lint",
+      "status": "pass",
+      "ms": 257,
+      "warnings": [
+        "api/domains/continuity/test/events.test.ts:258:7: Variable 'LIMITS' is declared but never used. Unused variables should start with a '_'. [Error/eslint(no-unused-vars)]",
+        "api/domains/continuity/test/events.test.ts:264:16: Function 'said' is declared but never used. [Error/eslint(no-unused-vars)]",
+        "api/domains/continuity/test/events.test.ts:283:7: Variable 'minute' is declared but never used. Unused variables should start with a '_'. [Error/eslint(no-unused-vars)]",
+        "api/domains/dialogue/eval/context/session.ts:49:17: Variable 'events' is declared but never used. Unused variables should start with a '_'. [Error/eslint(no-unused-vars)]",
+        "web/src/workspace/ConversationComposer.tsx:34:14: Cannot access refs during render [Error/react(refs)]",
+        "web/src/workspace/ConversationComposer.tsx:55:6: Cannot access refs during render [Error/react(refs)]",
+        "web/src/workspace/ConversationComposer.tsx:59:16: Cannot access refs during render [Error/react(refs)]",
+        "web/src/workspace/ConversationComposer.tsx:55:6: Cannot access refs during render [Error/react(refs)]",
+        "api/domains/dialogue/service/index.ts:204:5: Using a spread operator here creates a new object unnecessarily. [Error/unicorn(no-useless-spread)]"
+      ]
+    },
+    {
+      "name": "design-system typecheck",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "--cwd",
+        "packages/design-system",
+        "typecheck"
+      ],
+      "status": "pass",
+      "ms": 209,
+      "exitCode": 0
+    },
+    {
+      "name": "design-system build",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "--cwd",
+        "packages/design-system",
+        "build"
+      ],
+      "status": "pass",
+      "ms": 6998,
+      "exitCode": 0
+    },
+    {
+      "name": "typecheck",
+      "status": "pass",
+      "ms": 661,
+      "warnings": [
+        "api/domains/dialogue/eval/context/session-context.ts(10,15): error TS2305: Module '\"../../contracts\"' has no exported member 'ContextGoalEntry'.",
+        "api/domains/dialogue/eval/context/session-context.ts(101,3): error TS2353: Object literal may only specify known properties, and 'goals' does not exist in type 'DialogueDeps'.",
+        "api/domains/dialogue/test/context-eval/materialize.test.ts(12,10): error TS2305: Module '\"../../service/context-system\"' has no exported member 'FIXED_TRIGGER_TEXT'.",
+        "api/domains/dialogue/test/context-eval/trajectory.test.ts(131,20): error TS2339: Property 'plan' does not exist on type 'GenerateInput'.",
+        "api/domains/dialogue/test/context-eval/trajectory.test.ts(138,20): error TS2339: Property 'document' does not exist on type 'GenerateInput'.",
+        "api/domains/dialogue/test/context-eval/trajectory.test.ts(139,14): error TS2339: Property 'plan' does not exist on type 'GenerateInput'.",
+        "scripts/music-answer-live.ts(7,35): error TS2307: Cannot find module '../api/domains/dialogue/service/system-prompt' or its corresponding type declarations.",
+        "scripts/response-decision/cache-input.test.ts(2,35): error TS2307: Cannot find module '../../api/domains/dialogue/service/context-document' or its corresponding type declarations.",
+        "scripts/response-decision/cache-input.ts(8,8): error TS2307: Cannot find module '../../api/domains/dialogue/service/context-document' or its corresponding type declarations.",
+        "scripts/response-decision/cache-input.ts(112,17): error TS2554: Expected 2-3 arguments, but got 1.",
+        "scripts/response-decision/cache.ts(139,8): error TS18046: 'section' is of type 'unknown'.",
+        "scripts/short-answer-live.ts(2,35): error TS2307: Cannot find module '../api/domains/dialogue/service/system-prompt' or its corresponding type declarations.",
+        "tests/browser/dots-messaging.fixture.tsx(168,52): error TS2741: Property 'notify' is missing in type '{ client: AdapterHostContext[\"client\"]; artifact: { kind: \"artifact\"; id: string; revision: number; title: string; variants: { id: string; label: string; definition: unknown; questionDefinition?: unknown; }[]; defaultVariant: string; ... 5 more ...; collections?: { ...; }[] | undefined; }; ... 8 more ...; drafts: {}...' but required in type 'AdapterHostContext'.",
+        "web/src/domains/shell/toolchain-adapter.tsx(64,6): error TS2741: Property 'onInputFailed' is missing in type '{ onEnded: () => void; onResized: (size: Size) => Map<string, { cols: number; rows: number; }>; }' but required in type '{ onEnded(): void; onResized(size: Size): void; onInputFailed(): void; }'.",
+        "web/src/domains/terminals/connection.test.ts(43,60): error TS2741: Property 'onInputFailed' is missing in type '{ onEnded: Mock<Procedure>; onResized: () => void; }' but required in type '{ onEnded(): void; onResized(size: Size): void; onInputFailed(): void; }'.",
+        "web/src/domains/terminals/connection.test.ts(75,60): error TS2741: Property 'onInputFailed' is missing in type '{ onEnded: () => void; onResized: () => void; }' but required in type '{ onEnded(): void; onResized(size: Size): void; onInputFailed(): void; }'.",
+        "web/src/domains/terminals/connection.test.ts(95,60): error TS2741: Property 'onInputFailed' is missing in type '{ onEnded: () => void; onResized: Mock<Procedure>; }' but required in type '{ onEnded(): void; onResized(size: Size): void; onInputFailed(): void; }'.",
+        "web/src/domains/terminals/connection.test.ts(125,3): error TS2741: Property 'onInputFailed' is missing in type '{ onEnded: Mock<Procedure>; onResized: () => void; }' but required in type '{ onEnded(): void; onResized(size: Size): void; onInputFailed(): void; }'.",
+        "web/src/domains/terminals/toolchain-adapter.tsx(57,49): error TS2741: Property 'onInputFailed' is missing in type '{ onEnded: () => void; onResized: (size: Size) => Map<string, { cols: number; rows: number; }>; }' but required in type '{ onEnded(): void; onResized(size: Size): void; onInputFailed(): void; }'.",
+        "web/src/workspace/shell-artifact.test.tsx(112,32): error TS2741: Property 'notify' is missing in type '{ client: { analysesList: (domain: AnalysisDomain, id: string, conversationId: string, frameIndex?: number, signal?: AbortSignal) => Promise<AnalysisRecord[]>; analysisCreate: (domain: AnalysisDomain, id: string, input: AnalysisCreate) => Promise<AnalysisRecord>; ... 266 more ...; worldForgets: (scopeKey?: string, s...' but required in type 'AdapterHostContext'.\n  2  api/domains/dialogue/eval/context/session-context.ts:10\n  1  api/domains/dialogue/test/context-eval/materialize.test.ts:12\n  3  api/domains/dialogue/test/context-eval/trajectory.test.ts:131\n  1  scripts/music-answer-live.ts:7\n  1  scripts/response-decision/cache-input.test.ts:2\n  2  scripts/response-decision/cache-input.ts:8\n  1  scripts/response-decision/cache.ts:139\n  1  scripts/short-answer-live.ts:2\n  1  tests/browser/dots-messaging.fixture.tsx:168\n  1  web/src/domains/shell/toolchain-adapter.tsx:64\n  4  web/src/domains/terminals/connection.test.ts:43\n  1  web/src/domains/terminals/toolchain-adapter.tsx:57\n  1  web/src/workspace/shell-artifact.test.tsx:112"
+      ]
+    },
+    {
+      "name": "bun tests",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "test",
+        "./api/domains/agent-runtime/test/action-route.test.ts",
+        "./api/domains/agent-runtime/test/candidate-reading.test.ts",
+        "./api/domains/agent-runtime/test/context.test.ts",
+        "./api/domains/agent-runtime/test/control-output.test.ts",
+        "./api/domains/agent-runtime/test/deadline.test.ts",
+        "./api/domains/agent-runtime/test/guided-candidates.test.ts",
+        "./api/domains/agent-runtime/test/guided-contract.test.ts",
+        "./api/domains/agent-runtime/test/guided-limits.test.ts",
+        "./api/domains/agent-runtime/test/guided-web.test.ts",
+        "./api/domains/agent-runtime/test/pipeline-materials.test.ts",
+        "./api/domains/agent-runtime/test/read-evidence.test.ts",
+        "./api/domains/agent-runtime/test/reconcile-failure.test.ts",
+        "./api/domains/agent-runtime/test/rejection-logging.test.ts",
+        "./api/domains/agent-runtime/test/repair-diagnostics.test.ts",
+        "./api/domains/agent-runtime/test/report-projection.test.ts",
+        "./api/domains/agent-runtime/test/report.test.ts",
+        "./api/domains/agent-runtime/test/reports-drop-migration.test.ts",
+        "./api/domains/agent-runtime/test/request-urls.test.ts",
+        "./api/domains/agent-runtime/test/requirement-adoption.test.ts",
+        "./api/domains/agent-runtime/test/requirement-verification.test.ts",
+        "./api/domains/agent-runtime/test/requirements.test.ts",
+        "./api/domains/agent-runtime/test/research-contract.test.ts",
+        "./api/domains/agent-runtime/test/research-engine.test.ts",
+        "./api/domains/agent-runtime/test/resource-access.test.ts",
+        "./api/domains/agent-runtime/test/resource-adapter.test.ts",
+        "./api/domains/agent-runtime/test/service-search-budget.test.ts",
+        "./api/domains/agent-runtime/test/structured-web.test.ts",
+        "./api/domains/agent-runtime/test/subagent-route.test.ts",
+        "./api/domains/agent-runtime/test/task-execution-plan.test.ts",
+        "./api/domains/agent-runtime/test/task-execution.test.ts",
+        "./api/domains/agent-runtime/test/world-evidence-dedupe.test.ts",
+        "./api/domains/capabilities/test/bundles.test.ts",
+        "./api/domains/capabilities/test/capabilities.test.ts",
+        "./api/domains/capabilities/test/command-agent-binding.test.ts",
+        "./api/domains/capabilities/test/dots-messaging-revision.test.ts",
+        "./api/domains/capabilities/test/image.test.ts",
+        "./api/domains/capabilities/test/instant-binding.test.ts",
+        "./api/domains/capabilities/test/json-schema-subset.test.ts",
+        "./api/domains/capabilities/test/learned.test.ts",
+        "./api/domains/capabilities/test/lookup-upgrade.test.ts",
+        "./api/domains/capabilities/test/music-versions.test.ts",
+        "./api/domains/capabilities/test/ocr-upgrade.test.ts",
+        "./api/domains/capabilities/test/prepare-learned.test.ts",
+        "./api/domains/capabilities/test/requirement-controller.test.ts",
+        "./api/domains/capabilities/test/requirement-schema.test.ts",
+        "./api/domains/capabilities/test/requirements.test.ts",
+        "./api/domains/capabilities/test/resource-kinds.test.ts",
+        "./api/domains/capabilities/test/session-binding.test.ts",
+        "./api/domains/capabilities/test/settings-google.test.ts",
+        "./api/domains/capabilities/test/standalone-artifacts-forms.test.ts",
+        "./api/domains/capabilities/test/standalone-artifacts.test.ts",
+        "./api/domains/capabilities/test/steward-request-retire.test.ts",
+        "./api/domains/capabilities/test/task-binding.test.ts",
+        "./api/domains/capabilities/test/timer-compatibility.test.ts",
+        "./api/domains/capabilities/test/toolchain-candidates.test.ts",
+        "./api/domains/capabilities/test/web-guided.test.ts",
+        "./api/domains/capabilities/test/web-research-codex-retire.test.ts",
+        "./api/domains/capabilities/test/web-research-rename.test.ts",
+        "./packages/artifact-ui/src/composition-content-components.test.tsx",
+        "./packages/artifact-ui/src/composition-data-components.test.tsx",
+        "./packages/artifact-ui/src/composition-diagram-components.test.tsx",
+        "./packages/artifact-ui/src/composition-expressions.test.ts",
+        "./packages/artifact-ui/src/composition-fixer.test.ts",
+        "./packages/artifact-ui/src/composition-fixtures-render.test.tsx",
+        "./packages/artifact-ui/src/composition-format.test.ts",
+        "./packages/artifact-ui/src/composition-images.test.ts",
+        "./packages/artifact-ui/src/composition-marketing-components.test.tsx",
+        "./packages/artifact-ui/src/composition-model.test.tsx",
+        "./packages/artifact-ui/src/composition-validate.test.ts",
+        "./packages/artifact-ui/src/compute-components.test.tsx",
+        "./packages/artifact-ui/src/dots-messaging.test.ts",
+        "./packages/artifact-ui/src/external-app-components.test.tsx",
+        "./packages/artifact-ui/src/pipeline-studio-components.test.tsx",
+        "./packages/artifact-ui/src/ui-studio-source.test.tsx",
+        "./packages/artifact-ui/src/work-components.test.tsx"
+      ],
+      "status": "pass",
+      "ms": 34008,
+      "exitCode": 0
+    },
+    {
+      "name": "web tests",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "x",
+        "--no-install",
+        "vitest",
+        "run",
+        "web/src/domains/agent-runtime/ResearchTaskCard.test.tsx",
+        "web/src/domains/agent-runtime/toolchain-adapter.test.tsx",
+        "web/src/domains/artifact/test/compiler.test.tsx",
+        "web/src/domains/artifact/test/composition.test.tsx",
+        "web/src/domains/artifact/test/form-refresh.test.tsx",
+        "web/src/domains/artifact/test/image-url.test.tsx",
+        "web/src/domains/artifact/test/json-tokens.test.ts",
+        "web/src/domains/artifact/test/nested-layout.test.tsx",
+        "web/src/domains/artifact/test/panel.test.tsx",
+        "web/src/domains/artifact/test/store.test.ts",
+        "web/src/domains/artifact/test/ui-studio-menu.test.tsx",
+        "web/src/domains/artifact/test/ui-studio.test.tsx"
+      ],
+      "status": "pass",
+      "ms": 5688,
+      "exitCode": 0
+    }
+  ],
+  "totalMs": 52895,
+  "integrityErrors": [
+    "Source changed during verification"
+  ],
+  "build": {
+    "sharedOutput": true,
+    "inputRevision": "a59d052da4c462cad1e5065b462b4ed1fabe8038048b7a5fb6981a457857e6b1",
+    "distAfterBuild": "f5a86e1dc6c6a479b41cec4152c0067b12e580c0d109960170413954cf58b5c4",
+    "distAfterConsumers": "f5a86e1dc6c6a479b41cec4152c0067b12e580c0d109960170413954cf58b5c4"
+  },
+  "finalRevision": "14e32c5307f211df7a05cca3314e11bf97ea9259b5d3b5c41ca603273d5bc63c",
+  "stopReason": "Source changed during verification",
+  "finishedAt": "2026-10-26T23:27:47.327Z"
+}

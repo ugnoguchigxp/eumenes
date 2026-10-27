@@ -34,7 +34,7 @@ LARMのgrammarで検索文の`maxLength: 2000`を含むschemaがHTTP 500とな�
 
 確認した範囲は「会話履歴の後ろのsystem」であり、すべての2個目以降のsystemが欠落するとは結論しない。LARM配下の入力処理と、Eumenesのrole配置の互換性問題として扱う。送信済みと、モデルが資料を読めたことを区別する必要がある。再現runnerは`bun scripts/response-decision/visibility.ts --run`。資料や回答本文は結果へ保存せず、読取り成否・role・文字数と通常の安全な運用ログだけを保存する。
 
-根拠は`verification-reports/response-latency-implementation-2026-10-24/context-visibility{,-leading}.json`と対応する`*-backend.jsonl`。再現は同じ内容を3ケースと対照2ケースに分けて実行した。モデルの意味判断をコードで代替する修正や、LARM側への変更はしていない。
+根拠は`verification-reports/response-latency-implementation-2026-10-24/context-visibility{,-leading}.json`と対応する`*-backend.jsonl`（ローカルの検証記録。リポジトリには含めない）。再現は同じ内容を3ケースと対照2ケースに分けて実行した。モデルの意味判断をコードで代替する修正や、LARM側への変更はしていない。
 
 主回答の参照・完了判定の状態全体を別roleへ一括置換すると、指示・参考情報・履歴の境界とcache位置に関わる。まずLARM側のsystem保持契約を確認し、この再現で受け入れる。Eumenesで別の直列化方式を導入する場合は追加設計が必要。
 
@@ -58,7 +58,7 @@ LARMのgrammarで検索文の`maxLength: 2000`を含むschemaがHTTP 500とな�
 
 S/P/H/W/V/Rの合成入力を約1.4万**推定**tokenで作り、同一主接続で再送・背景更新・補助4件後を観測した。ただし正式入力は2,682 tokenで、背景を変えても同じだった。後方systemの欠落を確認したため、約1.4万正式tokenのcache受入としては無効である。
 
-この2,682 tokenの範囲では、初回cache 0・prefill 10,378.815 ms、即時再送cache 2,678・prefill 28.466 ms、補助4件後もcache 2,678・prefill 28.551 msだった。以前確認した約1.47万tokenの追い出し問題が解消したとは結論しない。coldを強制するcacheクリアや設定変更もしていない。結果は`verification-reports/response-latency-implementation-2026-10-24/cache-live/`。
+この2,682 tokenの範囲では、初回cache 0・prefill 10,378.815 ms、即時再送cache 2,678・prefill 28.466 ms、補助4件後もcache 2,678・prefill 28.551 msだった。以前確認した約1.47万tokenの追い出し問題が解消したとは結論しない。coldを強制するcacheクリアや設定変更もしていない。結果は`verification-reports/response-latency-implementation-2026-10-24/cache-live/`（ローカルの検証記録。リポジトリには含めない）。
 
 ## 固定試験と静的検査
 
@@ -73,7 +73,7 @@ S/P/H/W/V/Rの合成入力を約1.4万**推定**tokenで作り、同一主接続
 
 標準検証: `bun run verify -- --domain dialogue --domain inference --domain larm --domain memory --domain delivery --domain voice-dialogue --domain agent-runtime --domain tasks --domain pipelines`。
 
-結果の保存先は`verification-reports/response-latency-implementation-2026-10-24/`。最終domainは`domains-accepted.log`、公開fixtureは`public-fixtures-accepted.log`。他の作業の差分も存在するため、所有する変更を分け、入力ファイルのhashを試験前後で点検した。検証中の他作業によるapplication組立て2ファイルの変更は、今回のdomain試験の対象外で、公開fixture開始前の変更だった。今回の実装ファイルに検証中の変更はなかった。
+結果の保存先は`verification-reports/response-latency-implementation-2026-10-24/`（ローカルの検証記録。リポジトリには含めない）。最終domainは`domains-accepted.log`、公開fixtureは`public-fixtures-accepted.log`。他の作業の差分も存在するため、所有する変更を分け、入力ファイルのhashを試験前後で点検した。検証中の他作業によるapplication組立て2ファイルの変更は、今回のdomain試験の対象外で、公開fixture開始前の変更だった。今回の実装ファイルに検証中の変更はなかった。
 
 修正は語句別の意味判断・固定回答・新しい承認方式を追加していない。専用のProvider投影は、再現した文字列長grammar失敗への最小の接続処理であり、hostの契約を弱めていない。ContextStillの本会話累計はcompile 3回・eval 5回。
 

@@ -183,7 +183,7 @@ LARM に health/metrics の API は現在ない（`docs/larm.md`）。後続で�
 検証:
 
 - 修正前に上記3点の失敗を回帰試験で確認し、修正後に成功。表示中1分取得、非表示/背景無効時の停止、復帰、応答待ちのstale、取得失敗時のBackend接続断、次回成功時の復旧を確認。
-- 標準検証 `bun run verify -- --domain monitoring --domain larm --domain background --domain inference` 成功。API側349試験、Web側26試験、型・境界・生成物・サイズ・format・lint・Design System buildの各検査が成功。稼働中の開発環境と共有するdistを変更しないため、現在のソースの検証用コピーで実行した。今回変更した4ファイルが検証用コピーと一致することを確認済み。レポート: `verification-reports/spatial-monitoring-adjustment-2026-10-18/report.json`。
+- 標準検証 `bun run verify -- --domain monitoring --domain larm --domain background --domain inference` 成功。API側349試験、Web側26試験、型・境界・生成物・サイズ・format・lint・Design System buildの各検査が成功。稼働中の開発環境と共有するdistを変更しないため、現在のソースの検証用コピーで実行した。今回変更した4ファイルが検証用コピーと一致することを確認済み。レポート: `spec/verification/reports/spatial-monitoring-adjustment-2026-10-18/report.json`。
 - live読み取り: 利用者による再起動後、保存済み設定を使う稼働APIから対象9体の状態を取得。ホスト系の実測、Embeddingの成功、直近実行がない用途のunknownを確認。実LARMへの試験推論・音声入力・出力は実施していない。
 - 実画面でSpatialの描画を確認。サーバー操作は利用者が行う方針のため、サーバー起動を伴うbrowser fixture E2Eは未実施。最終修正後、利用者の再起動に続いて配信中のhookが最終版であること、実測APIの9体・ホスト系4体の利用率、画面を読み直した後のSpatial描画とLARM接続済みを確認した。今回の調整の残作業はない。
 - 差分点検: 変更は取得hook・共通recorderと回帰試験に限定。発話や個別シナリオによる意味判断の分岐は追加していない。並行する物体認識・対話・UI制作・描画資産の変更は本作業で修正していない。

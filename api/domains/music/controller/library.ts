@@ -1,4 +1,4 @@
-import { parseJsonBody } from "../../../infrastructure/http";
+import { parseJsonBody, queryInt } from "../../../infrastructure/http";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { Hono, Context } from "hono";
 import { z } from "zod";
@@ -32,7 +32,7 @@ export function registerLibrary(app: Hono, s: MusicService) {
 			const query = trackQuery.parse({
 				...p,
 				...(p.tags ? { tags: p.tags.split(",") } : {}),
-				...(p.limit ? { limit: Number(p.limit) } : {}),
+				...(p.limit ? { limit: queryInt.parse(p.limit) } : {}),
 				...(p.favorite
 					? { favorite: z.enum(["true", "false"]).parse(p.favorite) === "true" }
 					: {}),

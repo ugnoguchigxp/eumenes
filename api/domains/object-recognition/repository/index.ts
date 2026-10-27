@@ -75,6 +75,27 @@ export function patch(
 	);
 	return v;
 }
+
+/**
+ * Records the capture's LARM save state. It is not part of the analysed source, so the record keeps
+ * its revision and its detailed analyses stay valid (`analysis-source.ts` leaves it out of the digest).
+ */
+export function setCaptureSave(
+	db: Database,
+	id: string,
+	state: NonNullable<RecognitionRecord["captureSave"]>,
+) {
+	const r = row(db, id)!;
+	const recordJson = JSON.stringify({
+		...(JSON.parse(r.record_json) as RecognitionRecord),
+		captureSave: state,
+	});
+	db.query("UPDATE object_recognition_inputs SET record_json=? WHERE id=?").run(
+		recordJson,
+		id,
+	);
+	return record({ ...r, record_json: recordJson });
+}
 /** Store only endpoint/revision binding, never decrypted credential. */
 export function binding(c: Connection) {
 	return JSON.stringify({

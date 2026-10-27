@@ -18,23 +18,12 @@ export function registerScreenPresence(
 				.catch(() => null),
 		);
 		if (!input.success) return c.json({ error: "invalid_request" }, 400);
-		try {
-			service.screenPresence(
-				c.req.param("id"),
-				input.data.revision,
-				input.data.active,
-				input.data.sentAt,
-			);
-			return c.body(null, 204);
-		} catch (error) {
-			if (
-				error instanceof Error &&
-				error.message === "screen_presence_capacity"
-			)
-				return c.json({ error: error.message }, 429);
-			if (error instanceof Error && error.message === "screen_presence_expired")
-				return c.json({ error: error.message }, 409);
-			throw error;
-		}
+		service.screenPresence(
+			c.req.param("id"),
+			input.data.revision,
+			input.data.active,
+			input.data.sentAt,
+		);
+		return c.body(null, 204);
 	});
 }

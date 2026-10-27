@@ -67,7 +67,7 @@ export function DetectionPreview({
 	return (
 		<div className="recognition-stage">
 			<div className="recognition-main">
-				{cameraPreview && (
+				{cameraPreview && cameraActive && item && (
 					<div className="recognition-view-tabs" aria-label="表示する映像">
 						<button
 							type="button"
@@ -215,13 +215,15 @@ export function DetectionPreview({
 							))}
 						</ul>
 					)}
-					<Button
-						onClick={() => onIncorporate?.()}
-						disabled={!onIncorporate || !shareable}
-						title="画像と検出結果をチャット欄に添付します。送信はしません。"
-					>
-						{cameraActive ? "直前の画像を会話に追加" : "会話に追加"}
-					</Button>
+					{shareable && (
+						<Button
+							onClick={() => onIncorporate?.()}
+							disabled={!onIncorporate || !shareable}
+							title="画像と検出結果をチャット欄に添付します。送信はしません。"
+						>
+							{cameraActive ? "直前の画像を会話に追加" : "会話に追加"}
+						</Button>
+					)}
 				</section>
 			</aside>
 		</div>

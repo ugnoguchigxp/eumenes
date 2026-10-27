@@ -1,5 +1,5 @@
 import type { Hono } from "hono";
-import { parseJsonBody } from "../../../infrastructure/http";
+import { parseJsonBody, parseQuery } from "../../../infrastructure/http";
 import type { MemoryService } from "..";
 import { conversationQuerySchema, settingsSchema } from "../contracts";
 import { memorySeedInputSchema } from "../contracts/seeds";
@@ -30,22 +30,18 @@ export function registerMemory(app: Hono, service: MemoryService) {
 		c.json({ items: service.list(c.req.query("all") === "1") }),
 	);
 	// There is no default conversation: the caller names the one it shows.
-	const conversationOf = (query: string | undefined): string => {
-		const parsed = conversationQuerySchema.safeParse({ conversationId: query });
-		if (!parsed.success) throw new Error("invalid_memory_input");
-		return parsed.data.conversationId;
-	};
-	app.get("/api/memory/short-term", (c) =>
-		c.json({
-			items: service.shortTerm(conversationOf(c.req.query("conversationId"))),
-		}),
-	);
+	const options = { code: "invalid_memory_input" };
+	app.get("/api/memory/short-term", (c) => {
+		const query = parseQuery(c, conversationQuerySchema, options);
+		if (!query.ok) return query.response;
+		return c.json({ items: service.shortTerm(query.data.conversationId) });
+	});
 	app.get("/api/memory/tendencies", (c) =>
 		c.json({ items: service.tendencies() }),
 	);
-	app.get("/api/memory/context", async (c) =>
-		c.json(
-			await service.context(conversationOf(c.req.query("conversationId"))),
-		),
-	);
+	app.get("/api/memory/context", async (c) => {
+		const query = parseQuery(c, conversationQuerySchema, options);
+		if (!query.ok) return query.response;
+		return c.json(await service.context(query.data.conversationId));
+	});
 }

@@ -5,7 +5,7 @@ import {
 	qrRecord,
 } from "../api/domains/ocr/contracts";
 import { runSchema } from "../api/domains/dialogue/contracts";
-import { callJson, json, type Transport } from "./transport";
+import { callJson, json, withQuery, type Transport } from "./transport";
 
 const ocrConnectionSchema = z.object({
 	revision: z.number(),
@@ -16,8 +16,6 @@ const ocrConnectionSchema = z.object({
 });
 export function ocrClient(t: Transport) {
 	const root = "/api/ocr";
-	const record = async (path: string, init?: RequestInit) =>
-		ocrRecord.parse(await (await t.call(path, init)).json());
 	return {
 		ocrConnection: (signal?: AbortSignal) =>
 			callJson(t, ocrConnectionSchema, "/api/settings/ocr", { signal }),
@@ -25,21 +23,11 @@ export function ocrClient(t: Transport) {
 			expectedRevision: number;
 			baseUrl: string;
 		}) =>
-			callJson(t, ocrConnectionSchema, "/api/settings/ocr", {
-				...json(input),
-				method: "PUT",
-			}),
+			callJson(t, ocrConnectionSchema, "/api/settings/ocr", json(input, "PUT")),
 		ocrRecords: async (conversationId: string, signal?: AbortSignal) =>
-			ocrRecord
-				.array()
-				.parse(
-					await (
-						await t.call(
-							`${root}?conversationId=${encodeURIComponent(conversationId)}`,
-							{ signal },
-						)
-					).json(),
-				),
+			callJson(t, ocrRecord.array(), withQuery(root, { conversationId }), {
+				signal,
+			}),
 		ocrUpload: async (
 			file: File,
 			conversationId: string,
@@ -47,17 +35,29 @@ export function ocrClient(t: Transport) {
 		) => {
 			const body = new FormData();
 			body.append("file", file);
-			return record(
-				`${root}?conversationId=${encodeURIComponent(conversationId)}&requestId=${encodeURIComponent(requestId)}`,
+			return callJson(
+				t,
+				ocrRecord,
+				withQuery(root, { conversationId, requestId }),
 				{ method: "POST", body },
 			);
 		},
 		ocrGet: (id: string, signal?: AbortSignal) =>
-			record(`${root}/${encodeURIComponent(id)}`, { signal }),
+			callJson(t, ocrRecord, `${root}/${encodeURIComponent(id)}`, { signal }),
 		ocrCancel: (id: string) =>
-			record(`${root}/${encodeURIComponent(id)}/cancel`, json({})),
+			callJson(
+				t,
+				ocrRecord,
+				`${root}/${encodeURIComponent(id)}/cancel`,
+				json({}),
+			),
 		ocrRecheck: (id: string) =>
-			record(`${root}/${encodeURIComponent(id)}/recheck`, json({})),
+			callJson(
+				t,
+				ocrRecord,
+				`${root}/${encodeURIComponent(id)}/recheck`,
+				json({}),
+			),
 		ocrRemove: async (id: string) => {
 			await t.call(`${root}/${encodeURIComponent(id)}`, { method: "DELETE" });
 		},
@@ -83,16 +83,15 @@ export function ocrClient(t: Transport) {
 			frameIndex?: number,
 			signal?: AbortSignal,
 		) =>
-			qrRecord
-				.nullable()
-				.parse(
-					await (
-						await t.call(
-							`${root}/${encodeURIComponent(id)}/qr?${new URLSearchParams({ conversationId, ...(frameIndex === undefined ? {} : { frameIndex: String(frameIndex) }) })}`,
-							{ signal },
-						)
-					).json(),
-				),
+			callJson(
+				t,
+				qrRecord.nullable(),
+				withQuery(`${root}/${encodeURIComponent(id)}/qr`, {
+					conversationId,
+					frameIndex,
+				}),
+				{ signal },
+			),
 		ocrQrCreate: async (
 			id: string,
 			input: {
@@ -102,27 +101,27 @@ export function ocrClient(t: Transport) {
 				frameIndex?: number;
 			},
 		) =>
-			qrRecord.parse(
-				await (
-					await t.call(`${root}/${encodeURIComponent(id)}/qr`, json(input))
-				).json(),
+			callJson(
+				t,
+				qrRecord,
+				`${root}/${encodeURIComponent(id)}/qr`,
+				json(input),
 			),
 		ocrQrGet: async (id: string, qrId: string, conversationId: string) =>
-			qrRecord.parse(
-				await (
-					await t.call(
-						`${root}/${encodeURIComponent(id)}/qr/${encodeURIComponent(qrId)}?${new URLSearchParams({ conversationId })}`,
-					)
-				).json(),
+			callJson(
+				t,
+				qrRecord,
+				withQuery(
+					`${root}/${encodeURIComponent(id)}/qr/${encodeURIComponent(qrId)}`,
+					{ conversationId },
+				),
 			),
 		ocrQrCancel: async (id: string, qrId: string, conversationId: string) =>
-			qrRecord.parse(
-				await (
-					await t.call(
-						`${root}/${encodeURIComponent(id)}/qr/${encodeURIComponent(qrId)}/cancel`,
-						json({ conversationId }),
-					)
-				).json(),
+			callJson(
+				t,
+				qrRecord,
+				`${root}/${encodeURIComponent(id)}/qr/${encodeURIComponent(qrId)}/cancel`,
+				json({ conversationId }),
 			),
 		ocrQrIncorporate: async (
 			id: string,
@@ -146,13 +145,11 @@ export function ocrClient(t: Transport) {
 				frameIndex?: number;
 			},
 		) =>
-			correctionRecord.parse(
-				await (
-					await t.call(
-						`${root}/${encodeURIComponent(id)}/corrections`,
-						json(input),
-					)
-				).json(),
+			callJson(
+				t,
+				correctionRecord,
+				`${root}/${encodeURIComponent(id)}/corrections`,
+				json(input),
 			),
 		ocrCorrections: async (
 			id: string,
@@ -161,47 +158,46 @@ export function ocrClient(t: Transport) {
 			before?: number,
 			signal?: AbortSignal,
 		) =>
-			z
-				.object({
+			callJson(
+				t,
+				z.object({
 					items: correctionRecord.array(),
 					nextCursor: z.number().nullable(),
 					preference: z.object({
 						preferredId: z.string().nullable(),
 						revision: z.number(),
 					}),
-				})
-				.parse(
-					await (
-						await t.call(
-							`${root}/${encodeURIComponent(id)}/corrections?${new URLSearchParams({ conversationId, ...(frameIndex === undefined ? {} : { frameIndex: String(frameIndex) }), ...(before === undefined ? {} : { before: String(before) }) })}`,
-							{ signal },
-						)
-					).json(),
-				),
+				}),
+				withQuery(`${root}/${encodeURIComponent(id)}/corrections`, {
+					conversationId,
+					frameIndex,
+					before,
+				}),
+				{ signal },
+			),
 		ocrCorrectionGet: async (
 			id: string,
 			candidateId: string,
 			conversationId: string,
 		) =>
-			correctionRecord.parse(
-				await (
-					await t.call(
-						`${root}/${encodeURIComponent(id)}/corrections/${encodeURIComponent(candidateId)}?conversationId=${encodeURIComponent(conversationId)}`,
-					)
-				).json(),
+			callJson(
+				t,
+				correctionRecord,
+				withQuery(
+					`${root}/${encodeURIComponent(id)}/corrections/${encodeURIComponent(candidateId)}`,
+					{ conversationId },
+				),
 			),
 		ocrCorrectionCancel: async (
 			id: string,
 			candidateId: string,
 			conversationId: string,
 		) =>
-			correctionRecord.parse(
-				await (
-					await t.call(
-						`${root}/${encodeURIComponent(id)}/corrections/${encodeURIComponent(candidateId)}/cancel`,
-						json({ conversationId }),
-					)
-				).json(),
+			callJson(
+				t,
+				correctionRecord,
+				`${root}/${encodeURIComponent(id)}/corrections/${encodeURIComponent(candidateId)}/cancel`,
+				json({ conversationId }),
 			),
 		ocrCorrectionPrefer: async (
 			id: string,
@@ -212,16 +208,12 @@ export function ocrClient(t: Transport) {
 				expectedRevision: number;
 			},
 		) =>
-			z
-				.object({ preferredId: z.string().nullable(), revision: z.number() })
-				.parse(
-					await (
-						await t.call(
-							`${root}/${encodeURIComponent(id)}/corrections/preference`,
-							{ ...json(input), method: "PUT" },
-						)
-					).json(),
-				),
+			callJson(
+				t,
+				z.object({ preferredId: z.string().nullable(), revision: z.number() }),
+				`${root}/${encodeURIComponent(id)}/corrections/preference`,
+				json(input, "PUT"),
+			),
 		ocrCorrectionIncorporate: async (
 			id: string,
 			candidateId: string,

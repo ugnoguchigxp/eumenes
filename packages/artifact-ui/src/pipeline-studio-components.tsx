@@ -4,6 +4,7 @@ import { Feedback, useAction } from "./components";
 import type { ArtifactEvent, ArtifactRequest, Resource } from "./contracts";
 import type { PipelineStudioResource } from "./pipeline-studio-contracts";
 import { diffLines } from "./ui-studio-diff";
+import { useArtifactRuntime } from "./runtime";
 
 /**
  * The task pipeline studio: the DesignSystem screen over the host's `pipeline-studio` source. Source
@@ -12,6 +13,7 @@ import { diffLines } from "./ui-studio-diff";
  */
 export function PipelineStudioView({ request }: { request: ArtifactRequest }) {
 	const action = useAction(request);
+	const runtime = useArtifactRuntime();
 	const data = action.resource as Resource | PipelineStudioResource | undefined;
 	const work = data?.kind === "pipeline-studio" ? data.work : null;
 	// What the last change touched; the host's text is canonical, so a plain line diff is exact.
@@ -37,6 +39,7 @@ export function PipelineStudioView({ request }: { request: ArtifactRequest }) {
 				stoppable={data.stoppable}
 				trial={data.trial}
 				library={data.library}
+				onDeleteImage={runtime.deleteLibraryImage}
 				onLibrary={(kind, query, more) =>
 					void send("pipeline-library", {
 						kind: kind ?? "close",

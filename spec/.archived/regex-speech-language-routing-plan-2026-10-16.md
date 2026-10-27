@@ -136,7 +136,7 @@ catalog に `decision.sentence-language` が載っていても claim しない�
 
 - 削除: `scripts/sentence-language-live.ts`、`scripts/sentence-language-api-live.ts`、`scripts/sentence-language-bench.ts`。
 - 更新: `scripts/speech-voice-pair-live.ts`、`scripts/settings-voice-sample-live.ts` の設定キー。`scripts/profile-live.ts` の参照を確認して除去。
-- 追加: `scripts/mixed-speech-live.ts --run`。隔離backendに保存済みLARM設定を設定APIで保存し、固定の日英混在回答を区間化→合成し、区間ごとの言語・使用Provider role・model・WAV取得を `verification-reports/mixed-speech-live/` に記録する。
+- 追加: `scripts/mixed-speech-live.ts --run`。隔離backendに保存済みLARM設定を設定APIで保存し、固定の日英混在回答を区間化→合成し、区間ごとの言語・使用Provider role・model・WAV取得を `verification-reports/mixed-speech-live/`（ローカルの検証記録。リポジトリには含めない）に記録する。
 - `docs/larm.md` の文章二分類の節（判定・共有結果・再確認手順）を本計画の内容に書き換える。
 - `spec/README.md` で旧計画を「廃案」と記し、本計画を追加する。旧計画の冒頭に廃案の注記を入れる。`spec/verification/ruri-sentence-language-2026-10-12/` は記録として残す。
 

@@ -2,9 +2,43 @@ import { registerOcrAnalyses } from "./analyses";
 import { z } from "zod";
 import type { Hono } from "hono";
 import { readBounded } from "../../../infrastructure/bounded-read";
+import {
+	parseJsonBody,
+	parseQuery,
+	queryInt,
+} from "../../../infrastructure/http";
 import { correctionCreate, maxInputBytes } from "../contracts";
 import type { OcrService } from "../service";
 import { registerOcrQr } from "./qr";
+const uploadQuery = z.object({
+	requestId: z.uuid(),
+	conversationId: z.string().min(1).max(120),
+});
+const correctionListQuery = z.object({
+	frameIndex: queryInt.pipe(z.number().max(59)).optional(),
+	before: queryInt.pipe(z.number().min(1)).optional(),
+});
+const conversationScope = z.strictObject({
+	conversationId: z.string().min(1).max(120),
+});
+const preferenceBody = z.strictObject({
+	conversationId: z.string().min(1).max(120),
+	frameIndex: z.number().int().nonnegative().max(59).optional(),
+	preferredId: z.uuid().nullable(),
+	expectedRevision: z.number().int().nonnegative(),
+});
+const correctionConversationBody = z.strictObject({
+	requestId: z.uuid(),
+	conversationId: z.string().min(1).max(120),
+});
+const conversationBody = z.strictObject({
+	requestId: z.uuid(),
+	frameIndex: z.number().int().nonnegative().max(59).optional(),
+	lineIndexes: z
+		.array(z.number().int().nonnegative().max(9999))
+		.max(10000)
+		.optional(),
+});
 export function registerOcr(
 	app: Hono,
 	service: OcrService,
@@ -22,13 +56,8 @@ export function registerOcr(
 		c.json(service.list(owner, c.req.query("conversationId") ?? "main")),
 	);
 	app.post(root, async (c) => {
-		const query = z
-			.object({
-				requestId: z.uuid(),
-				conversationId: z.string().min(1).max(120),
-			})
-			.safeParse(c.req.query());
-		if (!query.success) return c.json({ error: "invalid_ocr_input" }, 400);
+		const query = parseQuery(c, uploadQuery, { code: "invalid_ocr_input" });
+		if (!query.ok) return query.response;
 		const bytes = await readBounded(c.req.raw.body, {
 			limit: maxInputBytes + 16384,
 			missing: "invalid_ocr_input",
@@ -85,32 +114,26 @@ export function registerOcr(
 			return id;
 		};
 		app.post(`${root}/:id/corrections`, async (c) => {
-			const input = correctionCreate.safeParse(await c.req.json());
-			if (!input.success) return c.json({ error: "invalid_ocr_input" }, 400);
+			const input = await parseJsonBody(c, correctionCreate, {
+				code: "invalid_ocr_input",
+			});
+			if (!input.ok) return input.response;
 			return c.json(
 				await corrections.create(owner, c.req.param("id"), input.data),
 				202,
 			);
 		});
 		app.get(`${root}/:id/corrections`, (c) => {
-			const frame = c.req.query("frameIndex");
-			const cursor = c.req.query("before");
-			const frameIndex = frame === undefined ? undefined : Number(frame);
-			const before = cursor === undefined ? undefined : Number(cursor);
-			if (
-				(frame !== undefined &&
-					(!Number.isInteger(frameIndex) ||
-						frameIndex! < 0 ||
-						frameIndex! > 59)) ||
-				(cursor !== undefined && (!Number.isSafeInteger(before) || before! < 1))
-			)
-				return c.json({ error: "invalid_ocr_input" }, 400);
+			const query = parseQuery(c, correctionListQuery, {
+				code: "invalid_ocr_input",
+			});
+			if (!query.ok) return query.response;
 			return c.json(
 				corrections.list(
 					owner,
 					checkedSource(c.req.param("id"), c.req.query("conversationId")),
-					frameIndex,
-					before,
+					query.data.frameIndex,
+					query.data.before,
 				),
 			);
 		});
@@ -124,10 +147,10 @@ export function registerOcr(
 			),
 		);
 		app.post(`${root}/:id/corrections/:candidateId/cancel`, async (c) => {
-			const input = z
-				.strictObject({ conversationId: z.string().min(1).max(120) })
-				.safeParse(await c.req.json());
-			if (!input.success) return c.json({ error: "invalid_ocr_input" }, 400);
+			const input = await parseJsonBody(c, conversationScope, {
+				code: "invalid_ocr_input",
+			});
+			if (!input.ok) return input.response;
 			return c.json(
 				await corrections.cancel(
 					owner,
@@ -137,15 +160,10 @@ export function registerOcr(
 			);
 		});
 		app.put(`${root}/:id/corrections/preference`, async (c) => {
-			const input = z
-				.strictObject({
-					conversationId: z.string().min(1).max(120),
-					frameIndex: z.number().int().nonnegative().max(59).optional(),
-					preferredId: z.uuid().nullable(),
-					expectedRevision: z.number().int().nonnegative(),
-				})
-				.safeParse(await c.req.json());
-			if (!input.success) return c.json({ error: "invalid_ocr_input" }, 400);
+			const input = await parseJsonBody(c, preferenceBody, {
+				code: "invalid_ocr_input",
+			});
+			if (!input.ok) return input.response;
 			return c.json(
 				await corrections.prefer(
 					owner,
@@ -157,13 +175,10 @@ export function registerOcr(
 			);
 		});
 		app.post(`${root}/:id/corrections/:candidateId/conversation`, async (c) => {
-			const input = z
-				.strictObject({
-					requestId: z.uuid(),
-					conversationId: z.string().min(1).max(120),
-				})
-				.safeParse(await c.req.json());
-			if (!input.success) return c.json({ error: "invalid_ocr_input" }, 400);
+			const input = await parseJsonBody(c, correctionConversationBody, {
+				code: "invalid_ocr_input",
+			});
+			if (!input.ok) return input.response;
 			const value = corrections.conversationText(
 				owner,
 				c.req.param("candidateId"),
@@ -183,17 +198,10 @@ export function registerOcr(
 		return c.body(null, 204);
 	});
 	app.post(`${root}/:id/conversation`, async (c) => {
-		const input = z
-			.strictObject({
-				requestId: z.uuid(),
-				frameIndex: z.number().int().nonnegative().max(59).optional(),
-				lineIndexes: z
-					.array(z.number().int().nonnegative().max(9999))
-					.max(10000)
-					.optional(),
-			})
-			.safeParse(await c.req.json());
-		if (!input.success) return c.json({ error: "invalid_ocr_input" }, 400);
+		const input = await parseJsonBody(c, conversationBody, {
+			code: "invalid_ocr_input",
+		});
+		if (!input.ok) return input.response;
 		const id = c.req.param("id");
 		const v = service.get(owner, id);
 		return c.json(

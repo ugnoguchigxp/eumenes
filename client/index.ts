@@ -38,6 +38,7 @@ import { webResearchClient } from "./web-research";
 import { worldClient } from "./world";
 
 export { ApiError, ApiConnectionError } from "./transport";
+export { readSse } from "./sse";
 export function createClient(baseUrl: string, token?: string) {
 	const transport = createTransport(baseUrl, token);
 	return {

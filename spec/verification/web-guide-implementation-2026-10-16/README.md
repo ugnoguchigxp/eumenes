@@ -42,4 +42,4 @@ Worldのdomain試験172件も成功しています。Worldに共有される抜�
 次の作業は、上記1〜5の修正をひとまとめにしてから再凍結し、固定試験・WebとWorldの結合・公式domain検証を通し、その後に実モデルで株価→鎌倉の天気の順を計測することです。今回は検証結果の報告までとし、これらの修正はまだ加えていません。
 
 
-集計は同じフォルダの summary.json。詳細ログは git 管理外の verification-reports/web-guide-implementation-2026-10-16/ にあります。
+集計は同じフォルダの summary.json。詳細ログは git 管理外の `verification-reports/web-guide-implementation-2026-10-16/` にあります。

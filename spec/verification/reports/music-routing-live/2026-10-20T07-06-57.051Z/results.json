@@ -1,0 +1,110 @@
+{
+  "providers": {
+    "providers": [
+      {
+        "id": "local-audio",
+        "models": [
+          {
+            "id": "stable-audio-3-small-music",
+            "task": "music",
+            "defaultDurationSeconds": 120,
+            "maxDurationSeconds": 120
+          },
+          {
+            "id": "acestep-v15-turbo",
+            "task": "vocals",
+            "defaultDurationSeconds": 180,
+            "maxDurationSeconds": 600
+          },
+          {
+            "id": "stable-audio-3-small-sfx",
+            "task": "sound-effect",
+            "defaultDurationSeconds": 5,
+            "maxDurationSeconds": 120
+          }
+        ]
+      }
+    ]
+  },
+  "results": [
+    {
+      "use": "instrumental",
+      "status": "completed",
+      "jobId": "music_659b36d6-372d-4810-87e1-455695c91048",
+      "requestedSeconds": 5,
+      "measuredSeconds": 5.0065,
+      "model": "stable-audio-3-small-music",
+      "runtime": "stable-audio",
+      "bytes": 86359,
+      "playback": {
+        "currentTime": 5.0065,
+        "ended": true,
+        "duration": 5.0065
+      },
+      "phases": [
+        "generating",
+        "queued",
+        "loading",
+        "generating",
+        "completed",
+        "fetching-result"
+      ],
+      "elapsedMs": 12476,
+      "path": "/Users/y.noguchi/Code/eumenes/verification-reports/music-routing-live/2026-10-20T07-06-57.051Z/instrumental.opus",
+      "testTrackRemoved": true
+    },
+    {
+      "use": "vocals",
+      "status": "completed",
+      "jobId": "music_fe795531-d7d6-4118-ab29-f34e1adf0444",
+      "requestedSeconds": 5,
+      "measuredSeconds": 5.1265,
+      "model": "acestep-v15-turbo",
+      "runtime": "music",
+      "bytes": 100260,
+      "playback": {
+        "currentTime": 5.1265,
+        "ended": true,
+        "duration": 5.1265
+      },
+      "phases": [
+        "generating",
+        "queued",
+        "loading",
+        "generating",
+        "encoding",
+        "completed",
+        "fetching-result"
+      ],
+      "elapsedMs": 22193,
+      "path": "/Users/y.noguchi/Code/eumenes/verification-reports/music-routing-live/2026-10-20T07-06-57.051Z/vocals.opus",
+      "testTrackRemoved": true
+    },
+    {
+      "use": "sound-effect",
+      "status": "completed",
+      "jobId": "music_a8f707b3-b780-4a2e-ae32-11e209ebe11f",
+      "requestedSeconds": 1.5,
+      "measuredSeconds": 1.5065,
+      "model": "stable-audio-3-small-sfx",
+      "runtime": "stable-audio",
+      "bytes": 23142,
+      "playback": {
+        "currentTime": 1.5065,
+        "ended": true,
+        "duration": 1.5065
+      },
+      "phases": [
+        "generating",
+        "queued",
+        "loading",
+        "generating",
+        "completed",
+        "fetching-result"
+      ],
+      "elapsedMs": 8022,
+      "path": "/Users/y.noguchi/Code/eumenes/verification-reports/music-routing-live/2026-10-20T07-06-57.051Z/sound-effect.opus",
+      "testTrackRemoved": true
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+$ vitest run --project unit src/components/ComputeWorkspace/ComputeWorkspace.test.tsx
+│ ┌────────────────────────────────────────────────────────────────────────────┐
+│ │  Info: Found a setup file with "setProjectAnnotations".                    │
+│ │  Skipping automatic provisioning of preview annotations to avoid           │
+│ │  conflicts. Since Storybook 10.3, "@storybook/addon-vitest" applies these  │
+│ │   automatically.                                                           │
+│ │  You can safely remove the "setProjectAnnotations" call from your setup    │
+│ │  file, or remove the file entirely if you don't have custom code there.    │
+│ └────────────────────────────────────────────────────────────────────────────┘
+
+ RUN  v4.0.16 /Users/y.noguchi/Code/eumenes/packages/design-system
+
+stdout | src/components/ComputeWorkspace/ComputeWorkspace.test.tsx
+Test setup running...
+
+stdout | src/components/ComputeWorkspace/ComputeWorkspace.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/ComputeWorkspace/ComputeWorkspace.test.tsx (4 tests) 211ms
+
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+   Start at  21:39:14
+   Duration  905ms (transform 75ms, setup 78ms, import 172ms, tests 211ms, environment 375ms)
+

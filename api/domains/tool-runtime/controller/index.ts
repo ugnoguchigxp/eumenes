@@ -1,6 +1,7 @@
 import type { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { z } from "zod";
+import { parseQuery } from "../../../infrastructure/http";
 import type { ActionRequests } from "../service/action-requests";
 import { ActionRequestError } from "../service/action-types";
 
@@ -11,6 +12,8 @@ const artifactRevisionId = z
 	.regex(/^artifact:[a-z][a-z0-9._-]{0,100}@[1-9][0-9]*$/);
 const sourceName = z.string().regex(/^[a-z][a-z0-9-]{0,63}$/);
 const targetRef = z.string().regex(/^[A-Za-z0-9-]{1,64}$/);
+const unsettledQuery = z.object({ status: z.literal("unsettled") });
+const sourceQuery = z.object({ target: targetRef.optional() });
 
 /**
  * UI action ledger and registered artifact endpoints (spec §6.2). The browser can only name an
@@ -53,8 +56,10 @@ export function registerToolchainActions(app: Hono, service: ActionRequests) {
 		}
 	});
 	app.get("/api/toolchain-actions", (c) => {
-		if (c.req.query("status") !== "unsettled")
-			return c.json({ error: "invalid_action_query" }, 400);
+		const query = parseQuery(c, unsettledQuery, {
+			code: "invalid_action_query",
+		});
+		if (!query.ok) return query.response;
 		return c.json({ requests: service.unsettled() });
 	});
 	app.get("/api/toolchain-actions/:eventId", (c) => {
@@ -84,17 +89,15 @@ export function registerToolchainActions(app: Hono, service: ActionRequests) {
 				c.req.param("artifactRevisionId"),
 			);
 			const source = sourceName.safeParse(c.req.param("source"));
-			const rawTarget = c.req.query("target");
-			const target =
-				rawTarget === undefined ? undefined : targetRef.safeParse(rawTarget);
-			if (!id.success || !source.success || (target && !target.success))
+			const target = parseQuery(c, sourceQuery, { code: "invalid_artifact" });
+			if (!id.success || !source.success || !target.ok)
 				return c.json({ error: "invalid_artifact" }, 400);
 			const params = parseParams(c.req.query("params"));
 			if (params === invalidParams)
 				return c.json({ error: "invalid_params" }, 400);
 			try {
 				return c.json(
-					service.source(id.data, source.data, target?.data, params),
+					service.source(id.data, source.data, target.data.target, params),
 				);
 			} catch (error) {
 				return refusal(c, error);

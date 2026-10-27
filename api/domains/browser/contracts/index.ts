@@ -2,6 +2,7 @@ export * from "./script";
 import { isAbsolute } from "node:path";
 import { z } from "zod";
 import type { CaptureRange, DriverDisconnectReason } from "./ports";
+import type { HttpErrorStatus } from "../../../infrastructure/http";
 
 /** What the host lets the model see of one snapshot (spec §5.5); the rest is not actionable. */
 export const SNAPSHOT_MAX_BYTES = 32 * 1024;
@@ -454,3 +455,12 @@ export type TaskStepOutcome =
 			 */
 			approvals?: (ApprovalRequest | InputValueApproval)[];
 	  };
+/** HTTP status of each code the browser operations throw; `browser_browse_failed` is answered by the route itself. */
+export const errorStatus = {
+	browser_task_not_found: 404,
+	browser_capture_not_found: 404,
+	browser_capture_not_ready: 409,
+	browser_executable_invalid: 400,
+	browser_browse_busy: 409,
+	browser_browse_unsupported: 501,
+} as const satisfies Record<string, HttpErrorStatus>;

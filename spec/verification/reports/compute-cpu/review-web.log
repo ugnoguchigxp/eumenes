@@ -1,0 +1,9 @@
+
+ RUN  v4.1.8 /Users/y.noguchi/Code/eumenes
+
+
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+   Start at  19:44:00
+   Duration  1.02s (transform 27ms, setup 0ms, import 140ms, tests 170ms, environment 631ms)
+

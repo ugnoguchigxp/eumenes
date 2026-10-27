@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { HttpErrorStatus } from "../../../infrastructure/http";
 export const imageRecord = z.object({
 	id: z.string().uuid(),
 	runId: z.string(),
@@ -24,3 +25,17 @@ export type ImageRecord = z.infer<typeof imageRecord>;
 
 export { imagePlan } from "../../capabilities/contracts";
 export { imageImportView, type ImageImportView } from "./imports";
+
+/** HTTP status of the image codes, which the conversation's attachments and the imports share. */
+export const errorStatus = {
+	image_invalid: 422,
+	image_format_unsupported: 415,
+	image_mime_mismatch: 415,
+	image_too_large: 413,
+	image_dimensions_exceeded: 413,
+	invalid_import_request: 400,
+	image_import_not_found: 404,
+	idempotency_conflict: 409,
+	image_import_capacity: 429,
+	image_import_connection_changed: 409,
+} as const satisfies Record<string, HttpErrorStatus>;

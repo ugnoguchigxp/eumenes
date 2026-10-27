@@ -41,6 +41,95 @@ it("separates selection, embedded preview and confirmation; cancel emits no sele
 	expect(onCancel).toHaveBeenCalledTimes(1);
 });
 
+it("keeps the loaded images and selection when returning from a preview", () => {
+	const manyImages = Array.from({ length: 25 }, (_, index) => ({
+		id: String(index),
+		title: `画像${index}`,
+		thumbnailUrl: `/image/${index}`,
+	}));
+	render(
+		<ImagePicker images={manyImages} onConfirm={vi.fn()} onCancel={vi.fn()} />,
+	);
+	fireEvent.click(screen.getByRole("button", { name: "画像をさらに表示" }));
+	fireEvent.click(screen.getByRole("button", { name: "画像24を選ぶ" }));
+	fireEvent.click(screen.getByRole("button", { name: "画像24を拡大" }));
+	fireEvent.click(screen.getByRole("button", { name: "画像一覧に戻る" }));
+	expect(screen.getByRole("button", { name: "画像24を選ぶ" })).toHaveAttribute(
+		"aria-pressed",
+		"true",
+	);
+});
+
+it("uses the image to preview and the circle to select; deletion requires confirmation", async () => {
+	const onDelete = vi.fn().mockResolvedValue(true);
+	const onConfirm = vi.fn();
+	const view = render(
+		<ImagePicker
+			images={images}
+			onDelete={onDelete}
+			onConfirm={onConfirm}
+			onCancel={vi.fn()}
+		/>,
+	);
+	expect(
+		screen.getByRole("link", { name: "森をダウンロード" }),
+	).toHaveAttribute("href", "/forest.png");
+	fireEvent.click(screen.getByRole("button", { name: "森を選ぶ" }));
+	expect(screen.getByRole("button", { name: "森を選ぶ" })).toHaveAttribute(
+		"aria-pressed",
+		"true",
+	);
+	fireEvent.click(screen.getByRole("button", { name: "森を拡大" }));
+	expect(screen.getByRole("button", { name: "画像一覧に戻る" })).toBeTruthy();
+	fireEvent.click(screen.getByRole("button", { name: "画像一覧に戻る" }));
+	fireEvent.click(screen.getByRole("button", { name: "森を削除" }));
+	expect(onDelete).not.toHaveBeenCalled();
+	fireEvent.click(screen.getByRole("button", { name: "キャンセル" }));
+	expect(onDelete).not.toHaveBeenCalled();
+	fireEvent.click(screen.getByRole("button", { name: "森を削除" }));
+	fireEvent.click(screen.getByRole("button", { name: "削除する" }));
+	await waitFor(() => expect(onDelete).toHaveBeenCalledExactlyOnceWith("a"));
+	await waitFor(() =>
+		expect(
+			screen.getByRole("button", { name: "この画像を使う" }),
+		).toBeDisabled(),
+	);
+	view.rerender(
+		<ImagePicker
+			images={[images[1]!]}
+			onDelete={onDelete}
+			onConfirm={onConfirm}
+			onCancel={vi.fn()}
+		/>,
+	);
+	expect(screen.queryByRole("button", { name: "森を選ぶ" })).toBeNull();
+});
+
+it("keeps the selection and reports an unconfirmed deletion", async () => {
+	const onDelete = vi.fn().mockResolvedValue(false);
+	render(
+		<ImagePicker
+			images={images}
+			selectedId="a"
+			onDelete={onDelete}
+			onConfirm={vi.fn()}
+			onCancel={vi.fn()}
+		/>,
+	);
+	fireEvent.click(screen.getByRole("button", { name: "森を削除" }));
+	fireEvent.click(screen.getByRole("button", { name: "削除する" }));
+	await waitFor(() =>
+		expect(screen.getByRole("alert")).toHaveTextContent(
+			"削除結果を確認できませんでした",
+		),
+	);
+	fireEvent.click(screen.getByRole("button", { name: "キャンセル" }));
+	expect(screen.getByRole("button", { name: "森を選ぶ" })).toHaveAttribute(
+		"aria-pressed",
+		"true",
+	);
+});
+
 it("does not confirm a removed candidate or an indeterminate library", () => {
 	const onConfirm = vi.fn();
 	const props = { images, selectedId: "a", onConfirm, onCancel: vi.fn() };
@@ -108,7 +197,7 @@ it("can retry a broken thumbnail by refreshing the list", () => {
 		/>,
 	);
 	fireEvent.error(
-		screen.getByRole("button", { name: "森を選ぶ" }).querySelector("img")!,
+		screen.getByRole("button", { name: "森を拡大" }).querySelector("img")!,
 	);
 	expect(screen.getByRole("button", { name: "森を選ぶ" })).toBeDisabled();
 	fireEvent.click(screen.getByRole("button", { name: "一覧を更新" }));

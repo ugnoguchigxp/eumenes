@@ -1,0 +1,230 @@
+{
+  "schemaVersion": 1,
+  "runId": "2026-10-18T08-13-06-092Z-722bc8b0-ab53-4f54-b222-5b7df4fc9524",
+  "startedAt": "2026-10-18T08:13:06.092Z",
+  "scope": {
+    "all": false,
+    "selected": [
+      "monitoring",
+      "larm",
+      "background",
+      "inference"
+    ]
+  },
+  "baseCommit": "b3bf62e7dfbd2c9c38adb063583734b042bde7b9",
+  "revision": "1c3a35bec9c0af35462b76e4a159c882634368fe0cc9ca4993d9539ccb1a07ae",
+  "runtime": {
+    "bun": "1.4.3",
+    "node": "26.3.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "ci": false,
+    "runner": null
+  },
+  "result": "pass",
+  "steps": [
+    {
+      "name": "inventory",
+      "status": "pass",
+      "ms": 59
+    },
+    {
+      "name": "boundaries",
+      "status": "pass",
+      "ms": 116
+    },
+    {
+      "name": "system-context",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "context:check"
+      ],
+      "status": "pass",
+      "ms": 105,
+      "exitCode": 0
+    },
+    {
+      "name": "size-budget",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "scripts/size-budget.ts",
+        "api/domains/monitoring",
+        "web/src/domains/monitoring",
+        "api/domains/larm",
+        "web/src/domains/background",
+        "api/domains/inference"
+      ],
+      "status": "pass",
+      "ms": 266,
+      "exitCode": 0
+    },
+    {
+      "name": "format",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "format:check",
+        "api/domains/monitoring",
+        "web/src/domains/monitoring",
+        "api/domains/larm",
+        "web/src/domains/background",
+        "api/domains/inference"
+      ],
+      "status": "pass",
+      "ms": 122,
+      "exitCode": 0
+    },
+    {
+      "name": "lint",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "lint",
+        "api/domains/monitoring",
+        "web/src/domains/monitoring",
+        "api/domains/larm",
+        "web/src/domains/background",
+        "api/domains/inference"
+      ],
+      "status": "pass",
+      "ms": 87,
+      "exitCode": 0
+    },
+    {
+      "name": "design-system typecheck",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "--cwd",
+        "packages/design-system",
+        "typecheck"
+      ],
+      "status": "pass",
+      "ms": 289,
+      "exitCode": 0
+    },
+    {
+      "name": "design-system build",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "--cwd",
+        "packages/design-system",
+        "build"
+      ],
+      "status": "pass",
+      "ms": 6053,
+      "exitCode": 0
+    },
+    {
+      "name": "typecheck configuration",
+      "status": "pass",
+      "ms": 1
+    },
+    {
+      "name": "typecheck",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "check",
+        "-p",
+        "/private/var/folders/mx/jbv8qfwd52z14q0mby_273lhlp5gd2/T/eumenes-spatial-verification-ci1oqc9d/verification-reports/runs/2026-10-18T08-13-06-092Z-722bc8b0-ab53-4f54-b222-5b7df4fc9524/tsconfig.selected.json"
+      ],
+      "status": "pass",
+      "ms": 233,
+      "exitCode": 0
+    },
+    {
+      "name": "typecheck closure",
+      "status": "pass",
+      "ms": 113
+    },
+    {
+      "name": "bun tests",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "test",
+        "./api/domains/inference/test/agent-session-migration.test.ts",
+        "./api/domains/inference/test/agent-sessions.test.ts",
+        "./api/domains/inference/test/attempt-activity.test.ts",
+        "./api/domains/inference/test/claude-session.test.ts",
+        "./api/domains/inference/test/cloud-agents.test.ts",
+        "./api/domains/inference/test/codex-adapter.test.ts",
+        "./api/domains/inference/test/codex-control.test.ts",
+        "./api/domains/inference/test/connection-models.test.ts",
+        "./api/domains/inference/test/context-budget.test.ts",
+        "./api/domains/inference/test/context-fit.test.ts",
+        "./api/domains/inference/test/context-render.test.ts",
+        "./api/domains/inference/test/control-engine-migration.test.ts",
+        "./api/domains/inference/test/control-schema.test.ts",
+        "./api/domains/inference/test/inference-control.test.ts",
+        "./api/domains/inference/test/inference-probes.test.ts",
+        "./api/domains/inference/test/inference-sessions.test.ts",
+        "./api/domains/inference/test/inference-speech.test.ts",
+        "./api/domains/inference/test/inference.test.ts",
+        "./api/domains/inference/test/maintenance-control.test.ts",
+        "./api/domains/inference/test/migration.test.ts",
+        "./api/domains/inference/test/routing-logs.test.ts",
+        "./api/domains/inference/test/screen-presence.test.ts",
+        "./api/domains/inference/test/usage-normalization.test.ts",
+        "./api/domains/inference/test/usage-pages.test.ts",
+        "./api/domains/inference/test/workers-ai.test.ts",
+        "./api/domains/larm/test/activity-recorder.test.ts",
+        "./api/domains/larm/test/auxiliary-sessions.test.ts",
+        "./api/domains/larm/test/catalog-selectors.test.ts",
+        "./api/domains/larm/test/chat-input.test.ts",
+        "./api/domains/larm/test/context-exact.test.ts",
+        "./api/domains/larm/test/foreground-serialization.test.ts",
+        "./api/domains/larm/test/gzip-fetch.test.ts",
+        "./api/domains/larm/test/image-connection.test.ts",
+        "./api/domains/larm/test/image-delete.test.ts",
+        "./api/domains/larm/test/image-library.test.ts",
+        "./api/domains/larm/test/inference-error.test.ts",
+        "./api/domains/larm/test/larm-inference.test.ts",
+        "./api/domains/larm/test/larm-lifecycle.test.ts",
+        "./api/domains/larm/test/larm-speech.test.ts",
+        "./api/domains/larm/test/larm.test.ts",
+        "./api/domains/larm/test/llm-timing.test.ts",
+        "./api/domains/larm/test/music-library.test.ts",
+        "./api/domains/larm/test/playground.test.ts",
+        "./api/domains/larm/test/profile-retention.test.ts",
+        "./api/domains/larm/test/speech-overrides.test.ts",
+        "./api/domains/larm/test/speech-voice-pair.test.ts",
+        "./api/domains/monitoring/test/monitoring.test.ts"
+      ],
+      "status": "pass",
+      "ms": 18206,
+      "exitCode": 0
+    },
+    {
+      "name": "web tests",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "x",
+        "--no-install",
+        "vitest",
+        "run",
+        "web/src/domains/background/SpatialBackground.test.tsx",
+        "web/src/domains/background/controller/camera.test.ts",
+        "web/src/domains/background/controller/scene.test.ts",
+        "web/src/domains/background/models/evaluator.test.ts",
+        "web/src/domains/background/models/particles.test.ts",
+        "web/src/domains/monitoring/index.test.tsx",
+        "web/src/domains/monitoring/items.test.ts"
+      ],
+      "status": "pass",
+      "ms": 4032,
+      "exitCode": 0
+    }
+  ],
+  "totalMs": 30313,
+  "integrityErrors": [],
+  "build": {
+    "sharedOutput": true,
+    "inputRevision": "1c3a35bec9c0af35462b76e4a159c882634368fe0cc9ca4993d9539ccb1a07ae",
+    "distAfterBuild": "5589b709d19488424bd296b7bc6eb7d5e244d7a76609ac25a99a4c2ffd0c6f87",
+    "distAfterConsumers": "5589b709d19488424bd296b7bc6eb7d5e244d7a76609ac25a99a4c2ffd0c6f87"
+  },
+  "finalRevision": "1c3a35bec9c0af35462b76e4a159c882634368fe0cc9ca4993d9539ccb1a07ae",
+  "finishedAt": "2026-10-18T08:13:37.053Z"
+}

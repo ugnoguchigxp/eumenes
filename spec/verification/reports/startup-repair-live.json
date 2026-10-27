@@ -1,0 +1,17 @@
+{
+  "mode": "live_existing_backend_synthetic_voice",
+  "ttsBytes": 71724,
+  "asrSucceeded": true,
+  "recognizedCharacters": 10,
+  "status": {
+    "service": "eumenes",
+    "larm": {
+      "state": "ready",
+      "capabilities": [
+        "llm",
+        "asr",
+        "tts"
+      ]
+    }
+  }
+}

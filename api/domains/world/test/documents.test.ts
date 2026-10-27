@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { Hono } from "hono";
+import { answerError } from "../../../application/app";
 import { createWorldDocuments, registerWorldDocuments } from "..";
 import { sha256Hex } from "../../../infrastructure/digest";
 import { SCOPE, withHarness } from "./fixture";
@@ -69,6 +70,7 @@ test("owner API imports only host scope, paged Unicode reads reconstruct all tex
 	await withHarness(async (h) => {
 		const docs = createWorldDocuments(h.store);
 		const app = new Hono();
+		app.onError(answerError);
 		registerWorldDocuments(app, docs, () => SCOPE);
 		const post = (body: unknown) =>
 			app.request("/api/world/documents", {
@@ -168,6 +170,7 @@ test("owner browsing pages all 1000 documents, searches beyond the first page, i
 			"doc-0999",
 		);
 		const app = new Hono();
+		app.onError(answerError);
 		registerWorldDocuments(app, docs, () => SCOPE);
 		const response = await app.request(
 			"/api/world/documents/page?pageIndex=99&pageSize=10&sort=id",

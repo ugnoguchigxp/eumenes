@@ -1,9 +1,13 @@
 .image-grid {
 	display: grid;
-	grid-template-columns: repeat(auto-fill, minmax(min(100%, 10rem), 1fr));
-	gap: 0.75rem;
+	grid-template-columns: repeat(
+		auto-fill,
+		minmax(min(100%, max(8.5rem, (100% - 1.5rem) / 4)), 1fr)
+	);
+	gap: 0.5rem;
 }
 .image-grid-card {
+	position: relative;
 	min-width: 0;
 	border: 1px solid var(--border);
 	border-radius: var(--radius);
@@ -38,54 +42,103 @@
 	padding: 0.5rem;
 	font-size: 0.8rem;
 }
-.image-grid-preview {
-	position: absolute;
-	right: 0.25rem;
-	bottom: 0.25rem;
-	min-height: var(--ui-touch-target-min, 2.5rem);
-	padding: 0 0.6rem;
-	border: 1px solid var(--border);
-	border-radius: var(--radius);
-	background: var(--background);
-	color: var(--foreground);
-	cursor: zoom-in;
-}
 .image-grid-check {
 	position: absolute;
 	right: 0.4rem;
 	top: 0.4rem;
 	border-radius: 50%;
-	background: var(--primary);
-	color: var(--primary-foreground);
-	padding: 0.1rem 0.4rem;
+	width: 1.5rem;
+	height: 1.5rem;
+	display: grid;
+	place-items: center;
+	border: 2px solid white;
+	background: rgb(0 0 0 / 45%);
+	color: white;
 	pointer-events: none;
 }
-.image-grid-caption {
-	display: flex;
-	gap: 0.5rem;
-	align-items: center;
-	padding: 0.5rem;
-	overflow-wrap: anywhere;
+button.image-grid-check {
+	pointer-events: auto;
+	cursor: pointer;
+	padding: 0;
 }
-.image-grid-caption > div:first-child {
-	flex: 1;
-	min-width: 0;
+button.image-grid-check:disabled {
+	cursor: default;
+	opacity: 0.5;
+}
+.image-grid-check[data-selected="true"] {
+	background: var(--primary);
+	color: var(--primary-foreground);
+}
+.image-grid-more {
+	display: block;
+	margin: 1rem auto;
+	padding: 0.5rem 1rem;
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	background: var(--background);
+	color: var(--foreground);
+	cursor: pointer;
+}
+.image-grid-caption {
+	position: absolute;
+	inset: auto 0 0;
+	padding: 1.5rem 0.4rem 0.4rem;
+	color: white;
+	background: linear-gradient(transparent, rgb(0 0 0 / 80%));
+	pointer-events: none;
 }
 .image-grid-caption h4 {
 	margin: 0;
-	font-size: 0.9rem;
+	font-size: 0.75rem;
 	font-weight: 500;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 .image-grid-caption p {
-	margin: 0.3rem 0 0;
+	margin: 0.1rem 0 0;
 	display: flex;
-	flex-wrap: wrap;
 	gap: 0.4rem;
-	font-size: 0.8rem;
-	color: var(--muted-foreground);
+	font-size: 0.65rem;
+	color: rgb(255 255 255 / 85%);
+	overflow: hidden;
+	white-space: nowrap;
+}
+.image-grid-actions {
+	position: absolute;
+	top: 0.25rem;
+	right: 0.25rem;
+	display: flex;
+	gap: 0.2rem;
+}
+.image-grid-card[data-mode="select"] .image-grid-actions {
+	right: auto;
+	left: 0.25rem;
+}
+.image-grid-actions .image-download,
+.image-grid-actions button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 2rem;
+	height: 2rem;
+	min-width: 2rem;
+	min-height: 2rem;
+	padding: 0;
+	border: 1px solid rgb(255 255 255 / 45%);
+	background: rgb(0 0 0 / 65%);
+	color: white;
+}
+.image-grid-actions svg {
+	width: 1rem;
+	height: 1rem;
+}
+.image-grid-actions button:hover,
+.image-grid-actions .image-download:hover {
+	background: rgb(0 0 0 / 85%);
 }
 .image-grid-select:focus-visible,
-.image-grid-preview:focus-visible {
+.image-grid-check:focus-visible {
 	outline: 2px solid var(--ring);
 	outline-offset: -2px;
 }
@@ -94,6 +147,9 @@
 	flex-direction: column;
 	min-width: 0;
 	gap: 0.75rem;
+}
+.image-picker-content:not([hidden]) {
+	display: contents;
 }
 .image-picker-heading,
 .image-picker-toolbar,

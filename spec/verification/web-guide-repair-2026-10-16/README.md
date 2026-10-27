@@ -43,4 +43,4 @@ Worldの変更は維持しています。専用のWorld照会workerが必要な�
 - 残作業: 初回missionの提示・実行・修正の契約を揃える試験と実装、createToolchainのサイズ超過の解消。その後、新たに凍結して株価→鎌倉の実取得を再計測する。
 - 今回は測定結果の報告で停止。製品コードを測定結果へ合わせて直したり、同じケースを再試行して成功だけを採用したりしていない。
 
-詳細ログと0600の測定資料は、git管理外のverification-reports/web-guide-repair-2026-10-16/に保存しています。同じフォルダのsummary.jsonに集計があります。
+詳細ログと0600の測定資料は、git管理外の`verification-reports/web-guide-repair-2026-10-16/`に保存しています。同じフォルダのsummary.jsonに集計があります。

@@ -1,5 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { Hono } from "hono";
+import { answerError } from "../../../application/app";
 import { registerBrowser } from "..";
 import {
 	OWNER,
@@ -15,6 +16,7 @@ afterEach(runCleanup);
 
 function app(env: ReturnType<typeof setup>, owner = OWNER) {
 	const a = new Hono();
+	a.onError(answerError);
 	registerBrowser(a, env.service, owner);
 	return a;
 }

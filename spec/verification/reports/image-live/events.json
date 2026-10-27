@@ -1,0 +1,35 @@
+[
+  {
+    "stage": "discovery",
+    "profile": "SAAA-w-Image",
+    "model": "qwen-image-2.1-turbo",
+    "endpoint": "/v1/images/generations",
+    "description": "Qwen-Image 2.1 Turbo AD-Q4_Kによる画像生成。POSTでpromptを指定すると起動し、画像保存後に停止します。width/heightは縦横それぞれ100〜1280の整数を自由指定できます（省略時512）。内部では各辺を32の倍数へ切り上げて生成し、指定どおりの寸法へ縮小して返します。stepsは8固定、seedは任意、formatはwebpまたはpng（省略時webp）。このPCで起動から応答まで512角約16秒・768角約31秒・1024角約58秒、中間サイズの個別生成試験では1216角約87秒・1280角約97秒でした。応答のartifacts[0].contentUrlをControlのURLに解決してGETすると画像を取得できます。写真・イラスト・構図検討に対応。参照画像による編集はこのAPIでは未対応。"
+  },
+  {
+    "stage": "generation_request",
+    "input": {
+      "text": "穏やかな朝の海と白い灯台。淡い青と暖かな朝日の色彩、柔らかな水彩画。水平線と空を広く取り、静かな空気感。文字やロゴは入れない。",
+      "width": 512,
+      "height": 384,
+      "format": "png",
+      "seed": 42
+    }
+  },
+  {
+    "stage": "generating"
+  },
+  {
+    "stage": "fetching-result",
+    "artifactId": "image_cd1a01e35d7d416198d1fa54df71d26a"
+  },
+  {
+    "stage": "completed",
+    "artifactId": "image_cd1a01e35d7d416198d1fa54df71d26a",
+    "mime": "image/png",
+    "actualModel": "AtomicChat/Qwen-Image-2.1-Turbo-GGUF",
+    "bytes": 258329,
+    "elapsedMs": 13822,
+    "file": "verification-reports/image-live/lighthouse.png"
+  }
+]

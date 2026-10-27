@@ -147,20 +147,20 @@ barge-inと明示取消、許可取消、session終了、再起動、画面の�
 
 ブラウザfixtureで、表示名によるキャラクター選択、変更時のdefault_style、速度・高さ・抑揚・音量の保存と再読込、保存値からvoicevox-coreの合成bodyへの反映、合成headerのクレジット復号を確認した。これは実Layaや実VOICEVOXの音質・遅延、および実機器の受入を示す結果ではない。この節は音声調整のみを実装した時点の検証記録。後続のLaya・アバター接続の検証は末尾に追記する。
 
-settings、inference、larm、voice-dialogue、audioの個別verifyは成功。直近のverify:allではbackend154件、Web27件、browser fixture10件と型・境界・ビルドの検査が成功したが、検証中に背景アバターなど別作業のソースが変更され、最後の入力hash一致検査で失敗した。このため最終checkout全体の合格とは扱わない。実行ログは[tts-settings-all.log](../../verification-reports/tts-settings-all.log)。今回のContext Still呼出しはcontext_compile2回・compile_eval2回。
+settings、inference、larm、voice-dialogue、audioの個別verifyは成功。直近のverify:allではbackend154件、Web27件、browser fixture10件と型・境界・ビルドの検査が成功したが、検証中に背景アバターなど別作業のソースが変更され、最後の入力hash一致検査で失敗した。このため最終checkout全体の合格とは扱わない。実行ログは[tts-settings-all.log](../verification/reports/tts-settings-all.log)。今回のContext Still呼出しはcontext_compile2回・compile_eval2回。
 
 
 ## Layaと光アバター接続の検証（2026年10月8日追記）
 
 fixtureでnative Providerの専用認証・同じ音声Connectionの共有・更新時のtoken交換・optional Provider不在/形式違反でも従来の音声が継続することを確認した。deliveryではchoiceの型、候補、数値範囲、answer_confidenceとconfidenceの区別、項目ごとの低確度fallback、切詰め、timeout、取消、遅着拒否を試験した。inferenceでは辞書置換後の実際の読み上げ文、受付時の手動基準、自動抑揚オフ、遅着拒否を確認した。voice-dialogueでは採用した音声句への判断結果の添付と取消時の同時失効を確認した。Webでは実再生開始のcallback、旧句の遅い開始/終了通知、取消済みframe、有限再生、動きを減らす設定を試験した。
 
-直近のverify:allはbackend175件、Web30件、ブラウザ11件、型・境界・ビルドの各検査が通過した。ただし最後の入力hash比較で、検証中の別作業のソース変更を検出して失敗した。最終checkout全体の合格とは扱わない。ログは[avatar-agent-all.log](../../verification-reports/avatar-agent-all.log)。操作のブラウザ試験はWebGL非対応時の経路を使い、専用の描画試験は別ブラウザのSwiftShaderで透過canvas、配置、移動時の解放を確認する。
+直近のverify:allはbackend175件、Web30件、ブラウザ11件、型・境界・ビルドの各検査が通過した。ただし最後の入力hash比較で、検証中の別作業のソース変更を検出して失敗した。最終checkout全体の合格とは扱わない。ログは[avatar-agent-all.log](../verification/reports/avatar-agent-all.log)。操作のブラウザ試験はWebGL非対応時の経路を使い、専用の描画試験は別ブラウザのSwiftShaderで透過canvas、配置、移動時の解放を確認する。
 
-実LARMのProfileでsystem-one / laya-multilingualを確認し、native応答を受信した。「おめでとうございます！とても嬉しいお知らせですね。」ではmotion=joyful、answer_confidence=0.9736を採用し、voiceの0.5369は低確度としてnaturalを維持した。判断時間は195ms。これはAPIの接続と採用規則の確認であり、分類品質の保証ではない。実TTSは話者一覧取得でlarm_inference_401となり、音声合成までの受入は未完了。追加の切分け要求はConnection準備で20秒のtimeoutとなった。[live記録](../../verification-reports/avatar-agent-live-accepted.log)。マイク・ヘッドホンの3往復試聴は実施していない。
+実LARMのProfileでsystem-one / laya-multilingualを確認し、native応答を受信した。「おめでとうございます！とても嬉しいお知らせですね。」ではmotion=joyful、answer_confidence=0.9736を採用し、voiceの0.5369は低確度としてnaturalを維持した。判断時間は195ms。これはAPIの接続と採用規則の確認であり、分類品質の保証ではない。実TTSは話者一覧取得でlarm_inference_401となり、音声合成までの受入は未完了。追加の切分け要求はConnection準備で20秒のtimeoutとなった。[live記録](../verification/reports/avatar-agent-live-accepted.log)。マイク・ヘッドホンの3往復試聴は実施していない。
 
 この依頼のContext Still呼出しはcontext_compile1回・compile_eval1回。前回の静止配置の依頼を含むこのチャットの累計は2回・2回。
 
-最終確認では別のverifyが実行中だったためdomain verifyの排他ロックを取得できなかった。関連domainを直接再試験し、backend74件・Web15件が通過した。これらは最終checkout全体のverify合格を意味しない。[backend記録](../../verification-reports/avatar-agent-final-backend.log)、[Web記録](../../verification-reports/avatar-agent-final-web.log)。
+最終確認では別のverifyが実行中だったためdomain verifyの排他ロックを取得できなかった。関連domainを直接再試験し、backend74件・Web15件が通過した。これらは最終checkout全体のverify合格を意味しない。[backend記録](../verification/reports/avatar-agent-final-backend.log)、[Web記録](../verification/reports/avatar-agent-final-web.log)。
 
 ## 待機アニメーションの検証（2026年10月8日追記）
 
@@ -168,19 +168,19 @@ fixtureでnative Providerの専用認証・同じ音声Connectionの共有・更
 
 avatarの5試験で長時間の待機、句の切替、通常姿勢への復帰、取消後の古いframe拒否、破棄、静止設定、描画失敗を確認した。専用のブラウザ描画試験では、待機中のcanvas画像が時間とともに変わり、静止設定では同じ画像を維持することを確認した。avatar、conversation、voice-dialogueのdomain verifyは成功した。
 
-全体検証はbackend182件、Web34件、ブラウザ11件、型・境界・ビルドの各検査が通過した。ただし検証中に別作業のソースが変更され、最後の入力hash比較で失敗したため、最終checkout全体の合格とは扱わない。[全体記録](../../verification-reports/avatar-idle-all.log)、[描画試験](../../verification-reports/avatar-idle-browser.log)。実音声・実機器の受入を示す結果ではない。この依頼のContext Still呼出しはcontext_compile1回・compile_eval1回。
+全体検証はbackend182件、Web34件、ブラウザ11件、型・境界・ビルドの各検査が通過した。ただし検証中に別作業のソースが変更され、最後の入力hash比較で失敗したため、最終checkout全体の合格とは扱わない。[全体記録](../verification/reports/avatar-idle-all.log)、[描画試験](../verification/reports/avatar-idle-browser.log)。実音声・実機器の受入を示す結果ではない。この依頼のContext Still呼出しはcontext_compile1回・compile_eval1回。
 
 ## 表示消失の修正（2026年10月8日追記）
 
 実行中の開発サーバーで、model.jsが参照するThree.jsの依存URLが504を返し、ブラウザで動的import失敗を確認した。開発用Viteとfixture用Viteの依存キャッシュを分離し、Three.jsを起動時最適化に含めた。修正後は確認用の実ブラウザでready・canvas1枚と表示復帰を確認し、fixture試験終了後も同じ開発用依存URLが200を維持した。
 
-初期化失敗をエラー種類だけで記録し、hostの描画状態で消失原因を判別できるようにした。最初の静止frameで描画が失敗した場合も、一度だけ破棄し、失敗状態を維持する試験を追加した。avatar verify5件、conversation verifyのWeb10件とbackend1件、専用ブラウザ描画1件、全体型チェックは成功。verify:allは別作業のdelivery/inference内4ファイルの書式検査で停止したため、全体合格とは扱わない。[全体記録](../../verification-reports/avatar-display-all.log)、[描画試験](../../verification-reports/avatar-display-browser.log)。この依頼のContext Still呼出しはcontext_compile1回・compile_eval1回。
+初期化失敗をエラー種類だけで記録し、hostの描画状態で消失原因を判別できるようにした。最初の静止frameで描画が失敗した場合も、一度だけ破棄し、失敗状態を維持する試験を追加した。avatar verify5件、conversation verifyのWeb10件とbackend1件、専用ブラウザ描画1件、全体型チェックは成功。verify:allは別作業のdelivery/inference内4ファイルの書式検査で停止したため、全体合格とは扱わない。[全体記録](../verification/reports/avatar-display-all.log)、[描画試験](../verification/reports/avatar-display-browser.log)。この依頼のContext Still呼出しはcontext_compile1回・compile_eval1回。
 
 ## 視認できる待機動作の追加（2026年10月8日追記）
 
 初期の上下・揺れが小さく、neutralには瞬きがなかったため、待機専用の動きを追加した。6秒周期の上下移動、首・身体・腕の揺れと、17秒の周期内に3回の短い瞬きを行う。待機姿勢を回答動作へ加算し、表示時計を維持する。静止設定では時刻0の動きなし・目を開いた姿勢になる。
 
-avatar verify5件、conversation verifyのWeb13件とbackend1件、全体型チェック、専用ブラウザ描画試験1件が成功。振幅・長時間継続・瞬きの閉眼と復帰・静止姿勢を試験し、利用中の実ブラウザでもready/animatedと待機動作を確認した。[動作記録](../../verification-reports/avatar-idle-visible.gif)。全体verifyは別作業のdelivery/inference内4ファイルの書式検査で停止しており、全体合格とは扱わない。[全体記録](../../verification-reports/avatar-idle-visible-all.log)。この依頼のContext Still呼出しはcontext_compile1回・compile_eval1回。
+avatar verify5件、conversation verifyのWeb13件とbackend1件、全体型チェック、専用ブラウザ描画試験1件が成功。振幅・長時間継続・瞬きの閉眼と復帰・静止姿勢を試験し、利用中の実ブラウザでもready/animatedと待機動作を確認した。動作記録（`verification-reports/avatar-idle-visible.gif`。ローカルの検証記録でリポジトリには含めない）。全体verifyは別作業のdelivery/inference内4ファイルの書式検査で停止しており、全体合格とは扱わない。[全体記録](../verification/reports/avatar-idle-visible-all.log)。この依頼のContext Still呼出しはcontext_compile1回・compile_eval1回。
 
 ## 時折の体振りと発話・感情の合成（2026年10月9日追記）
 
@@ -188,9 +188,9 @@ avatar verify5件、conversation verifyのWeb13件とbackend1件、全体型チ�
 
 読み上げ直しは、inferenceの既存writer transactionで採用したreceiptから音声とdeliveryを取り出す公開操作を使う。同じ音声のmotionだけをHTTP headerへ渡し、Webで候補を検証する。HTMLAudioElementのplayingで開始し、終了・取消・古いplaying/endedと遅いplay完了を世代ごとに拒否する。分類要求や音声合成を二重に実行しない。
 
-avatar verify6件、conversation verifyのWeb17件とbackend1件、voice-dialogue verifyのWeb8件とbackend22件が成功。inference全19件とWeb全47件を直接試験し、型・変更箇所lint・Web build、既存の描画ブラウザ試験1件も成功した。時折の動作の静かな時間・両端の連続性、長い発話、感情の区別、再生イベント、取消、消音、HTTPの音声とmotionの対応を確認した。実ブラウザのモデルで発話とjoyfulを重ね、8秒を超えて動くことを確認した。[描画例](../../verification-reports/avatar-speaking.gif)。これは音声を伴わない描画確認であり、実TTSやマイク・ヘッドホンの試聴受入は未実施。
+avatar verify6件、conversation verifyのWeb17件とbackend1件、voice-dialogue verifyのWeb8件とbackend22件が成功。inference全19件とWeb全47件を直接試験し、型・変更箇所lint・Web build、既存の描画ブラウザ試験1件も成功した。時折の動作の静かな時間・両端の連続性、長い発話、感情の区別、再生イベント、取消、消音、HTTPの音声とmotionの対応を確認した。実ブラウザのモデルで発話とjoyfulを重ね、8秒を超えて動くことを確認した。描画例（`verification-reports/avatar-speaking.gif`。ローカルの検証記録でリポジトリには含めない）。これは音声を伴わない描画確認であり、実TTSやマイク・ヘッドホンの試聴受入は未実施。
 
-inferenceのdomain verifyは別作業のspeech-intonation2ファイルの書式で停止したため、試験を直接実行した。verify:allは別作業のdialogueからsettingsへの依存関係で境界検査に失敗しており、全体合格とは扱わない。[全体記録](../../verification-reports/avatar-speaking-all.log)、[inference試験](../../verification-reports/avatar-speaking-inference-tests.log)、[Web試験](../../verification-reports/avatar-speaking-web.log)。この依頼のContext Still呼出しはcontext_compile1回・compile_eval1回。
+inferenceのdomain verifyは別作業のspeech-intonation2ファイルの書式で停止したため、試験を直接実行した。verify:allは別作業のdialogueからsettingsへの依存関係で境界検査に失敗しており、全体合格とは扱わない。[全体記録](../verification/reports/avatar-speaking-all.log)、[inference試験](../verification/reports/avatar-speaking-inference-tests.log)、[Web試験](../verification/reports/avatar-speaking-web.log)。この依頼のContext Still呼出しはcontext_compile1回・compile_eval1回。
 
 
 ### 2026-10-09 回答の名前横に判断を表示
@@ -199,16 +199,16 @@ inferenceのdomain verifyは別作業のspeech-intonation2ファイルの書式�
 
 回答生成とTTSの順序に依存しないよう、conversation所有の追加migrationでrunごとの最初の採用済みmotionを保存する。voice chunkのreceipt採用と同じwriter transactionから、dialogueの公開操作を通して保存する。取消・失敗したrunには保存しない。読み上げ直しもrunと本文の句の一致を確認し、取消を確認した後に同じ公開操作を使う。保存によるconversation更新で画面を再取得し、再読込後も表示する。判断未取得の過去回答には付けず、読み上げ直しで判断が得られれば表示する。
 
-fixtureの関連backend47件、conversationのbackend2件・Web18件、voice-dialogueのbackend25件・Web9件、専用ブラウザ1件が成功した。旧schemaからの追加migration、先行する判定、最初の判断の維持、rollback、取消、fallback、独立したmotion確度、読み上げ直し、本文の保持と再読込を確認した。全体型チェックとWeb buildも成功。[表示例](../../verification-reports/avatar-emotion-emoji.png)。実Laya/TTS・実機器受入は今回未実施。
+fixtureの関連backend47件、conversationのbackend2件・Web18件、voice-dialogueのbackend25件・Web9件、専用ブラウザ1件が成功した。旧schemaからの追加migration、先行する判定、最初の判断の維持、rollback、取消、fallback、独立したmotion確度、読み上げ直し、本文の保持と再読込を確認した。全体型チェックとWeb buildも成功。表示例（`verification-reports/avatar-emotion-emoji.png`。ローカルの検証記録でリポジトリには含めない）。実Laya/TTS・実機器受入は今回未実施。
 
-verify:allは既存のdialogueからsettingsへの未宣言依存で停止しており、全体合格とは扱わない。[全体記録](../../verification-reports/avatar-emoji-all.log)。Context Stillはcontext_compile1回・compile_eval1回。
+verify:allは既存のdialogueからsettingsへの未宣言依存で停止しており、全体合格とは扱わない。[全体記録](../verification/reports/avatar-emoji-all.log)。Context Stillはcontext_compile1回・compile_eval1回。
 
 
 ### 2026-10-09 判定の実経路確認と説明の訂正
 
 前項の画面確認はfixtureによる表示確認であり、実会話の適切な感情判断を確認した結果ではない。実会話APIでは「それは素敵な由来ですね。」に採用済みmotionがなく、前の質問にはsleepyが保存されていた。処理先4つの接続だけで適切な判断ができたと説明してはいけない。
 
-同じbackendの読み上げ直しAPIをrunIdなしで実行し、会話の保存内容を変更せずにlive Laya/TTS経路を確認した。「それは素敵な由来ですね。」「それは素敵な名前ですね。」はともにsource=fallback、reason=low-confidence、motion=neutral。「やった！大成功です！本当にうれしいです！」はsource=laya、motion=joyfulだった。HTTPはいずれも200で音声を返したが、ブラウザ再生や実マイクの受入は行っていない。[判定記録](../../verification-reports/laya-judgement-live-decisions.jsonl)。別clientによる独立接続の試行は15秒でタイムアウトしたため、その試行は成功扱いしない。
+同じbackendの読み上げ直しAPIをrunIdなしで実行し、会話の保存内容を変更せずにlive Laya/TTS経路を確認した。「それは素敵な由来ですね。」「それは素敵な名前ですね。」はともにsource=fallback、reason=low-confidence、motion=neutral。「やった！大成功です！本当にうれしいです！」はsource=laya、motion=joyfulだった。HTTPはいずれも200で音声を返したが、ブラウザ再生や実マイクの受入は行っていない。[判定記録](../verification/reports/laya-judgement-live-decisions.jsonl)。別clientによる独立接続の試行は15秒でタイムアウトしたため、その試行は成功扱いしない。
 
 調査のため、inference.delivery_selectedにsource・motion(kind)・fallbackのreason・所要時間・既存の相関IDを記録するよう変更した。本文・音声・Provider生応答・認証情報はログへ渡さない。fallbackはLayaによるneutralの採用と区別できる。inference fixture19件・変更ファイルlint・全体型チェックは成功。domain verifyとverify:allは別の検証が実行中でlockにより開始できなかった。
 
@@ -233,4 +233,4 @@ LLM receiptのv2 deliveryを回答と同じwriter transactionでconversationの�
 
 実Layaの調整用16例では15/16一致、感情を付けたい11例中10例を採用し、通常5例への誤付与は0だった。別の14例を各3回評価すると当初39/42一致で、感情の用語説明に親しみを誤付与した。定義文を除外した再評価は42/42一致（感情21/21、通常への誤付与0/21）。別例を用いた修正後の再評価なので、完全な未見データの精度とは扱わない。同じ例の反復は独立した42種類を意味しない。実会話の「それは素敵な由来ですね。」はreplay APIでwarmth / source=laya / answer_confidence=0.9682を採用し、名前横の🙂、HTTPのagreeing、実音声バイトを確認した。音声は合成までで、スピーカー・マイク・ヘッドホンの3往復受入は未実施。
 
-fixtureのverify:allはbackend201件・Web55件・browser12件、型・境界・書式・lint・ビルドと最終入力hashの検査すべて成功。取消中のnative遅着拒否、3句とreplayの一回判定共有、音声なしの保存、migration再起動、通常・低確度・旧motionの非表示、再読込後の名前横表示、透過WebGLと待機動作を含む。詳細は[検証記録](../../verification-reports/context-emotion-report.md)、[全体ログ](../../verification-reports/context-emotion-all.log)、[実画面](../../verification-reports/context-emotion-real-ui.png)。開発用サーバーを再起動して追加migrationと新処理を反映した。Context Stillはcontext_compile1回・compile_eval1回。
+fixtureのverify:allはbackend201件・Web55件・browser12件、型・境界・書式・lint・ビルドと最終入力hashの検査すべて成功。取消中のnative遅着拒否、3句とreplayの一回判定共有、音声なしの保存、migration再起動、通常・低確度・旧motionの非表示、再読込後の名前横表示、透過WebGLと待機動作を含む。詳細は[検証記録](../verification/reports/context-emotion-report.md)、[全体ログ](../verification/reports/context-emotion-all.log)、実画面（`verification-reports/context-emotion-real-ui.png`。ローカルの検証記録でリポジトリには含めない）。開発用サーバーを再起動して追加migrationと新処理を反映した。Context Stillはcontext_compile1回・compile_eval1回。

@@ -1,0 +1,12 @@
+$ bun scripts/verify.ts --all
+121 | 			: tsFiles
+122 | 		)
+123 | 			.filter((file) => /\.tsx?$/.test(file))
+124 | 			.map((file) => file.slice(root.length + 1)),
+125 | 	);
+126 | 	if (errors.length) throw new Error(errors.join("\n"));
+                                    ^
+error: api/domains/dialogue/service/index.ts: forbidden dependency dialogue -> settings
+      at /Users/y.noguchi/Code/eumenes/scripts/verify.ts:126:31
+
+error: script "verify:all" exited with code 1

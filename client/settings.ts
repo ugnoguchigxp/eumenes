@@ -19,7 +19,7 @@ import {
 	type ApplySettings,
 } from "../api/domains/settings/contracts";
 import { z } from "zod";
-import { json, type Transport } from "./transport";
+import { callJson, json, withQuery, type Transport } from "./transport";
 
 const usagePageSchema = z.object({
 	items: z.array(usageSchema),
@@ -32,79 +32,61 @@ export type { Usage } from "../api/domains/inference/contracts";
 export function settingsClient(t: Transport) {
 	return {
 		excalidrawConnection: async () =>
-			excalidrawConnectionSchema.parse(
-				await (await t.call("/api/settings/excalidraw")).json(),
-			),
+			callJson(t, excalidrawConnectionSchema, "/api/settings/excalidraw"),
 		configureExcalidraw: async (input: ExcalidrawConnectionInput) =>
-			excalidrawConnectionSchema.parse(
-				await (
-					await t.call("/api/settings/excalidraw", {
-						...json(excalidrawConnectionInput.parse(input)),
-						method: "PUT",
-					})
-				).json(),
+			callJson(
+				t,
+				excalidrawConnectionSchema,
+				"/api/settings/excalidraw",
+				json(excalidrawConnectionInput.parse(input), "PUT"),
 			),
 		larmVoices: async (signal?: AbortSignal, language?: "ja" | "en") =>
-			ttsVoicesSchema.parse(
-				await (
-					await t.call(
-						`/api/inference/voices${language ? `?language=${language}` : ""}`,
-						{ signal },
-					)
-				).json(),
+			callJson(
+				t,
+				ttsVoicesSchema,
+				withQuery("/api/inference/voices", { language }),
+				{ signal },
 			),
-		settings: async () =>
-			settingsSchema.parse(await (await t.call("/api/settings")).json()),
+		settings: async () => callJson(t, settingsSchema, "/api/settings"),
 		applySettings: async (input: ApplySettings) =>
-			settingsSchema.parse(
-				await (await t.call("/api/settings/apply", json(input))).json(),
-			),
+			callJson(t, settingsSchema, "/api/settings/apply", json(input)),
 		connectionModels: async (
 			connectionId: string,
 			signal?: AbortSignal,
 			refresh = false,
 		) =>
-			connectionModelsSchema.parse(
-				await (
-					await t.call(
-						`/api/inference/connections/${encodeURIComponent(connectionId)}/models${refresh ? "?refresh=1" : ""}`,
-						{ signal },
-					)
-				).json(),
+			callJson(
+				t,
+				connectionModelsSchema,
+				withQuery(
+					`/api/inference/connections/${encodeURIComponent(connectionId)}/models`,
+					{ refresh: refresh ? 1 : undefined },
+				),
+				{ signal },
 			),
 		settingsDiagnostics: async () =>
-			diagnosticsSchema.parse(
-				await (await t.call("/api/settings/diagnostics")).json(),
-			),
+			callJson(t, diagnosticsSchema, "/api/settings/diagnostics"),
 		inferenceUsage: async () =>
-			usageSchema
-				.array()
-				.parse(await (await t.call("/api/inference/usage")).json()),
-		inferenceUsagePage: async (query: UsagePageQuery, signal?: AbortSignal) => {
-			const params = new URLSearchParams(
-				Object.entries(query).map(([key, value]) => [key, String(value)]),
-			);
-			return usagePageSchema.parse(
-				await (
-					await t.call("/api/inference/usage/page?" + params, { signal })
-				).json(),
-			);
-		},
+			callJson(t, usageSchema.array(), "/api/inference/usage"),
+		inferenceUsagePage: async (query: UsagePageQuery, signal?: AbortSignal) =>
+			callJson(
+				t,
+				usagePageSchema,
+				withQuery("/api/inference/usage/page", query),
+				{ signal },
+			),
 		larmDetails: async () =>
-			larmDetailsSchema.parse(
-				await (await t.call("/api/inference/larm")).json(),
-			),
+			callJson(t, larmDetailsSchema, "/api/inference/larm"),
 		larmProfiles: async () =>
-			larmProfilesSchema.parse(
-				await (await t.call("/api/inference/larm/profiles")).json(),
-			),
+			callJson(t, larmProfilesSchema, "/api/inference/larm/profiles"),
 		inferenceProbes: async () =>
-			probeSchema
-				.array()
-				.parse(await (await t.call("/api/inference/probes")).json()),
+			callJson(t, probeSchema.array(), "/api/inference/probes"),
 		startProbe: async (target: string) =>
-			startedProbeSchema.parse(
-				await (await t.call("/api/inference/probes", json({ target }))).json(),
+			callJson(
+				t,
+				startedProbeSchema,
+				"/api/inference/probes",
+				json({ target }),
 			),
 		cancelProbe: async (id: string) => {
 			await t.call(

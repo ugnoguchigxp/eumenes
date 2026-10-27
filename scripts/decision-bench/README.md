@@ -150,6 +150,6 @@ HTTPとローカル、device・threads・学習有無・dataset・共通入力�
 
 ## 検証範囲
 
-`self-test`は正解・未来情報の非混入、group分離、手計算F1、失敗の分母、ヒステリシスの発動、強い切替、期限fallback、raw保存、校正split制約、再集計のモデル非呼び出し、HTTP契約を確認します。HTTPはローカルfixtureを使います。実機の測定結果は`verification-reports/`へ別に記録し、fixtureと混ぜません。
+`self-test`は正解・未来情報の非混入、group分離、手計算F1、失敗の分母、ヒステリシスの発動、強い切替、期限fallback、raw保存、校正split制約、再集計のモデル非呼び出し、HTTP契約を確認します。HTTPはローカルfixtureを使います。実機の測定結果は`verification-reports/`（ローカルの検証記録。リポジトリには含めない）へ別に記録し、fixtureと混ぜません。
 
 実装時は自己検証15件と`verify:all`を通し、Ryzen実機のLaya HTTPで同梱88例×A/B/Cの264判定を確認しました。Laya SDKの直接ロードも先行する84例×A/B/Cで確認済みです。EncoderのTorch経路は小さな検証用モデルで動作を確認しましたが、実際のRuri・Verdictの重みとONNX経路は未検証です。Layaの比較データも合成・仮ラベルであり、本番での判断精度を示すものではありません。

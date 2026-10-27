@@ -1,0 +1,222 @@
+{
+  "schemaVersion": 1,
+  "runId": "2026-10-23T23-57-10-124Z-040d1e48-77b2-4509-9c9c-6d7b07f3883e",
+  "startedAt": "2026-10-23T23:57:10.124Z",
+  "scope": {
+    "all": false,
+    "selected": [
+      "agent-runtime",
+      "capabilities"
+    ]
+  },
+  "baseCommit": "0fa17b5b6cefe8718a8bde37e7d21b3f1734b974",
+  "revision": "a027e850261a71f8c3a957a2f7d92cb5346eb76acdb15716da4e05fd76dc0219",
+  "runtime": {
+    "bun": "1.4.3",
+    "node": "26.3.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "ci": false,
+    "runner": null
+  },
+  "result": "pass",
+  "steps": [
+    {
+      "name": "inventory",
+      "status": "pass",
+      "ms": 55
+    },
+    {
+      "name": "boundaries",
+      "status": "pass",
+      "ms": 115
+    },
+    {
+      "name": "system-context",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "context:check"
+      ],
+      "status": "pass",
+      "ms": 97,
+      "exitCode": 0
+    },
+    {
+      "name": "size-budget",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "scripts/size-budget.ts",
+        "api/domains/agent-runtime",
+        "web/src/domains/agent-runtime",
+        "api/domains/capabilities"
+      ],
+      "status": "pass",
+      "ms": 248,
+      "exitCode": 0
+    },
+    {
+      "name": "format",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "format:check",
+        "api/domains/agent-runtime",
+        "web/src/domains/agent-runtime",
+        "api/domains/capabilities"
+      ],
+      "status": "pass",
+      "ms": 118,
+      "exitCode": 0
+    },
+    {
+      "name": "lint",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "lint",
+        "api/domains/agent-runtime",
+        "web/src/domains/agent-runtime",
+        "api/domains/capabilities"
+      ],
+      "status": "pass",
+      "ms": 50,
+      "exitCode": 0
+    },
+    {
+      "name": "design-system typecheck",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "--cwd",
+        "packages/design-system",
+        "typecheck"
+      ],
+      "status": "pass",
+      "ms": 230,
+      "exitCode": 0
+    },
+    {
+      "name": "design-system build",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "--cwd",
+        "packages/design-system",
+        "build"
+      ],
+      "status": "pass",
+      "ms": 6087,
+      "exitCode": 0
+    },
+    {
+      "name": "typecheck configuration",
+      "status": "pass",
+      "ms": 1
+    },
+    {
+      "name": "typecheck",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "check",
+        "-p",
+        "/Users/y.noguchi/Code/eumenes/verification-reports/runs/2026-10-23T23-57-10-124Z-040d1e48-77b2-4509-9c9c-6d7b07f3883e/tsconfig.selected.json"
+      ],
+      "status": "pass",
+      "ms": 512,
+      "exitCode": 0
+    },
+    {
+      "name": "typecheck closure",
+      "status": "pass",
+      "ms": 212
+    },
+    {
+      "name": "bun tests",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "test",
+        "./api/domains/agent-runtime/test/action-route.test.ts",
+        "./api/domains/agent-runtime/test/candidate-reading.test.ts",
+        "./api/domains/agent-runtime/test/context.test.ts",
+        "./api/domains/agent-runtime/test/control-output.test.ts",
+        "./api/domains/agent-runtime/test/deadline.test.ts",
+        "./api/domains/agent-runtime/test/execution-reports.test.ts",
+        "./api/domains/agent-runtime/test/guided-candidates.test.ts",
+        "./api/domains/agent-runtime/test/guided-contract.test.ts",
+        "./api/domains/agent-runtime/test/guided-limits.test.ts",
+        "./api/domains/agent-runtime/test/guided-web.test.ts",
+        "./api/domains/agent-runtime/test/pipeline-materials.test.ts",
+        "./api/domains/agent-runtime/test/read-evidence.test.ts",
+        "./api/domains/agent-runtime/test/reconcile-failure.test.ts",
+        "./api/domains/agent-runtime/test/rejection-logging.test.ts",
+        "./api/domains/agent-runtime/test/repair-diagnostics.test.ts",
+        "./api/domains/agent-runtime/test/report-projection.test.ts",
+        "./api/domains/agent-runtime/test/report.test.ts",
+        "./api/domains/agent-runtime/test/request-urls.test.ts",
+        "./api/domains/agent-runtime/test/requirement-adoption.test.ts",
+        "./api/domains/agent-runtime/test/requirement-verification.test.ts",
+        "./api/domains/agent-runtime/test/requirements.test.ts",
+        "./api/domains/agent-runtime/test/research-contract.test.ts",
+        "./api/domains/agent-runtime/test/research-engine.test.ts",
+        "./api/domains/agent-runtime/test/service-search-budget.test.ts",
+        "./api/domains/agent-runtime/test/structured-web.test.ts",
+        "./api/domains/agent-runtime/test/subagent-route.test.ts",
+        "./api/domains/agent-runtime/test/task-execution-plan.test.ts",
+        "./api/domains/agent-runtime/test/task-execution.test.ts",
+        "./api/domains/agent-runtime/test/work-page.test.ts",
+        "./api/domains/agent-runtime/test/world-evidence-dedupe.test.ts",
+        "./api/domains/capabilities/test/bundles.test.ts",
+        "./api/domains/capabilities/test/capabilities.test.ts",
+        "./api/domains/capabilities/test/command-agent-binding.test.ts",
+        "./api/domains/capabilities/test/image.test.ts",
+        "./api/domains/capabilities/test/instant-binding.test.ts",
+        "./api/domains/capabilities/test/json-schema-subset.test.ts",
+        "./api/domains/capabilities/test/learned.test.ts",
+        "./api/domains/capabilities/test/lookup-upgrade.test.ts",
+        "./api/domains/capabilities/test/music-versions.test.ts",
+        "./api/domains/capabilities/test/prepare-learned.test.ts",
+        "./api/domains/capabilities/test/requirement-controller.test.ts",
+        "./api/domains/capabilities/test/requirement-schema.test.ts",
+        "./api/domains/capabilities/test/requirements.test.ts",
+        "./api/domains/capabilities/test/session-binding.test.ts",
+        "./api/domains/capabilities/test/settings-google.test.ts",
+        "./api/domains/capabilities/test/standalone-artifacts-forms.test.ts",
+        "./api/domains/capabilities/test/standalone-artifacts.test.ts",
+        "./api/domains/capabilities/test/task-binding.test.ts",
+        "./api/domains/capabilities/test/timer-compatibility.test.ts",
+        "./api/domains/capabilities/test/toolchain-candidates.test.ts",
+        "./api/domains/capabilities/test/web-guided.test.ts",
+        "./api/domains/capabilities/test/web-research-rename.test.ts"
+      ],
+      "status": "pass",
+      "ms": 29400,
+      "exitCode": 0
+    },
+    {
+      "name": "web tests",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "x",
+        "--no-install",
+        "vitest",
+        "run",
+        "web/src/domains/agent-runtime/ResearchTaskCard.test.tsx",
+        "web/src/domains/agent-runtime/toolchain-adapter.test.tsx"
+      ],
+      "status": "pass",
+      "ms": 3392,
+      "exitCode": 0
+    }
+  ],
+  "totalMs": 41055,
+  "integrityErrors": [],
+  "build": {
+    "sharedOutput": true,
+    "inputRevision": "a027e850261a71f8c3a957a2f7d92cb5346eb76acdb15716da4e05fd76dc0219",
+    "distAfterBuild": "0866354e54eee7d53dd523b5b67c9a0f89ce4b2e2c2f3c257b8d8ffbdb8ceb70",
+    "distAfterConsumers": "0866354e54eee7d53dd523b5b67c9a0f89ce4b2e2c2f3c257b8d8ffbdb8ceb70"
+  },
+  "finalRevision": "a027e850261a71f8c3a957a2f7d92cb5346eb76acdb15716da4e05fd76dc0219",
+  "finishedAt": "2026-10-23T23:57:51.682Z"
+}

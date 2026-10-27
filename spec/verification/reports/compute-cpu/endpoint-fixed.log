@@ -1,0 +1,46 @@
+bun test v1.4.3 (c6da4a4d3)
+
+api/application/compute/compute-toolchain.test.ts:
+(pass) conversation selects registered Python tool, persists action receipt and returns result to parent [562.81ms]
+(pass) recovering an unknown acceptance sends a new completion notice without duplicating either state [383.83ms]
+
+api/application/compute/compute-review.test.ts:
+(pass) older owned jobs remain addressable outside the bounded model snapshot and replay stays stable [212.27ms]
+(pass) offline compute with no history remains listed and opens its empty artifact without enabling submissions [326.67ms]
+
+api/application/compute/compute-http.test.ts:
+(pass) real client and queue use the advertised URL and persist the request before HTTP [28.10ms]
+
+api/application/compute/compute-adapter.test.ts:
+(pass) registered adapter exposes four schemas and stable receipts, then tracks actual completion [29.02ms]
+(pass) authenticated host integration serves stored PNG and downloads SVG without inline HTML [30.77ms]
+(pass) parent cancellation confirms remote termination outside the writer and does not claim it during 202 [100.71ms]
+
+api/domains/larm/test/compute-client.test.ts:
+(pass) discovery uses root services and authenticated environment [0.66ms]
+(pass) discovery uses profile services and authenticated environment [0.24ms]
+(pass) rejects an unsafe advertised URL before sending credentials: http://other.test/v1/compute [0.19ms]
+(pass) rejects an unsafe advertised URL before sending credentials: http://user:pass@compute.test:9810/v1/compute [0.08ms]
+(pass) rejects an unsafe advertised URL before sending credentials: http://compute.test:9810/v1/compute?token=bad [0.08ms]
+(pass) rejects an unsafe advertised URL before sending credentials: http://compute.test:9810/v1/compute#fragment [0.07ms]
+(pass) missing or wrong capability is unavailable [0.23ms]
+(pass) submit has the stable key, CPU request and no retry on HTTP refusal [0.19ms]
+(pass) cancel uses POST /cancel and 202 is still a live job; DELETE 204 has no JSON [0.27ms]
+(pass) preserves safe HTTP 401 classifications [0.08ms]
+(pass) preserves safe HTTP 409 classifications [0.04ms]
+(pass) preserves safe HTTP 410 classifications [0.03ms]
+(pass) preserves safe HTTP 503 classifications [0.02ms]
+(pass) wrong job ID and MIME/size/PNG content are rejected [0.13ms]
+(pass) DELETE rejects a response belonging to another job [0.06ms]
+(pass) uses the catalog's relative Control endpoint without sending credentials to the advertised hostname (url=%s) [0.23ms]
+(pass) uses the catalog's relative Control endpoint without sending credentials to the advertised hostname (url=%s) [0.14ms]
+(pass) rejects unsafe or contradictory advertised endpoint: //other.test/v1/compute [0.14ms]
+(pass) rejects unsafe or contradictory advertised endpoint: https://other.test/v1/compute [0.09ms]
+(pass) rejects unsafe or contradictory advertised endpoint: /v1/compute?token=bad [0.06ms]
+(pass) rejects unsafe or contradictory advertised endpoint: /v1/compute#fragment [0.05ms]
+(pass) rejects unsafe or contradictory advertised endpoint: /different/path [0.06ms]
+
+ 30 pass
+ 0 fail
+ 113 expect() calls
+Ran 30 tests across 5 files. [2.32s]

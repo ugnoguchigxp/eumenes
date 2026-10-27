@@ -1,0 +1,17 @@
+{
+  "environment": "usual Eumenes via authenticated API",
+  "initialized": false,
+  "status": "imported",
+  "registered": 28,
+  "deferred": 22,
+  "before": 6,
+  "after": 34,
+  "existingUnchanged": true,
+  "settingsUnchanged": true,
+  "added": 28,
+  "allCandidates": true,
+  "allEvidenceReadable": true,
+  "repeatStatus": "unchanged",
+  "repeatRegistered": 0,
+  "digest": "8c28c95bde4f7bc66c95e06051e515c26e70b0472312f1a54687d326efb3d03d"
+}

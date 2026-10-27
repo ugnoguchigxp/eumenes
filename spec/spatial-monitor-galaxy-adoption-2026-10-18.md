@@ -23,7 +23,7 @@
 
 検証は、粒子別の色差・連続性・非同期性・暖色割合の増加・未取得の扱い・fault即時反映・停止条件・固定形状と既存拡散を対象とする。backgroundと利用側monitoringを選択したverifyを共有distに影響しない検証用コピーで実行する。既存ローカル表示かサーバー起動不要のブラウザ描画で近景・遠景を確認し、実画面未確認の場合は明記する。サーバーを操作しない。
 
-色表現の実装・固定試験を完了。`bun run verify -- --domain background --domain monitoring`は検証用コピーで成功（API 22試験、Web 34試験、型・境界・生成物・サイズ・format・lint・Design System検査）。RGB sampleとbufferの再利用、長時間clock折返しの連続性も確認した。検証レポートは`verification-reports/spatial-colour-2026-10-18/report.json`。
+色表現の実装・固定試験を完了。`bun run verify -- --domain background --domain monitoring`は検証用コピーで成功（API 22試験、Web 34試験、型・境界・生成物・サイズ・format・lint・Design System検査）。RGB sampleとbufferの再利用、長時間clock折返しの連続性も確認した。検証レポートは`spec/verification/reports/spatial-colour-2026-10-18/report.json`。
 
 ブラウザ確認は、当初の読み取り限定を理由に自動承認レビューが一度拒否した後、実装依頼のユーザー発言を受けた同じプレビューの一度の再試行で成功した。サーバーを起動せず、現行Scene・粒子・shaderと全14資産をheadless Chromiumで描画し、近景・遠景の8秒差の画像、取得済み高負荷の暖色、faultの即時赤色を確認。33,460点中14,919点の色比率が8秒で変化し、モデルの自転なし・reduced-motionでの停止・描画エラー0件を確認した。遠景の変化は近景より控えめ。画像と結果は同じレポートフォルダの`wide-t1.png` / `wide-t9.png`、`near-t11.png` / `near-t19.png`、`near-high-load.png`、`near-fault.png`、`preview.json`。これは合成観測値の描画確認であり、稼働アプリの実測状態や実GPUの長時間性能の保証とは扱わない。
 

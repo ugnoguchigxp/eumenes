@@ -4,6 +4,19 @@ import { errorStatus as ocr } from "../domains/ocr/contracts";
 import { attachmentErrors } from "../domains/conversation/contracts";
 import { errorStatus as objectRecognition } from "../domains/object-recognition/contracts";
 import { errorStatus as capabilities } from "../domains/capabilities/contracts";
+import { errorStatus as agentRuntime } from "../domains/agent-runtime/contracts";
+import { errorStatus as browser } from "../domains/browser/contracts";
+import { errorStatus as compute } from "../domains/compute/contracts";
+import { errorStatus as dialogue } from "../domains/dialogue/contracts";
+import { errorStatus as inference } from "../domains/inference/contracts";
+import { errorStatus as memory } from "../domains/memory/contracts";
+import { errorStatus as settings } from "../domains/settings/contracts";
+import { errorStatus as toolRuntime } from "../domains/tool-runtime/contracts";
+import { errorStatus as toolchainHistory } from "../domains/toolchain-history/contracts";
+import { errorStatus as webResearch } from "../domains/web-research/contracts";
+import { errorStatus as image } from "../domains/image/contracts";
+import { errorStatus as googleAccounts } from "../domains/google-accounts/contracts";
+import { errorStatus as worldDocuments } from "../domains/world/contracts/documents";
 import type { HttpErrorStatus } from "../infrastructure/http";
 import { errorStatus as coding } from "../domains/coding/contracts";
 import { errorStatus as larm } from "../domains/larm/contracts";
@@ -28,31 +41,15 @@ const shared = {
 	revision_conflict: 409,
 	queue_full: 503,
 	payload_too_large: 413,
+	invalid_body_size: 413,
 	length_required: 411,
 	database_writer_queue_full: 503,
 	stream_capacity: 503,
-} as const satisfies Record<string, ErrorStatus>;
-
-/**
- * Codes of domains whose contracts are not yet migrated to `errorStatus` (agent-runtime,
- * capabilities, tool-runtime, memory, settings, web-research). Move each entry into its domain's
- * contracts when that domain is next edited.
- */
-const pending = {
-	report_not_ready: 409,
-	report_deleted: 410,
-	capability_ref_invalid: 409,
-	tool_ref_invalid: 409,
-	result_capacity: 429,
-	reference_capacity: 429,
 	capability_unavailable: 503,
+	capability_ref_invalid: 409,
 	control_unavailable: 503,
-	memory_unavailable: 409,
-	memory_forget_incomplete: 409,
-	env_ref_not_allowed: 400,
-	web_research_unavailable: 503,
-	web_cache_unavailable: 503,
-	web_cache_clear_blocked: 409,
+	reference_capacity: 429,
+	work_not_found: 404,
 } as const satisfies Record<string, ErrorStatus>;
 
 /**
@@ -81,7 +78,19 @@ const statusByCode = mergeErrorStatus(
 	capabilities,
 	dots,
 	shared,
-	pending,
+	agentRuntime,
+	browser,
+	compute,
+	dialogue,
+	inference,
+	memory,
+	settings,
+	toolRuntime,
+	toolchainHistory,
+	webResearch,
+	image,
+	googleAccounts,
+	worldDocuments,
 	coding,
 	larm,
 	scheduler,

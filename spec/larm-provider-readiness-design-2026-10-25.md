@@ -37,9 +37,9 @@
 
 ## 固定試験と実接続の区別
 
-- 最終の固定ソース検証: backend 595件・Web 111件成功。型・境界・整形・lint・SystemContext・サイズ・DesignSystem buildも成功。対象はlarm/inference/voice-dialogue/audio。POSTの全体待機を外し、遅延claimの認証世代も検証したreportは `verification-reports/larm-provider-readiness-2026-10-25/domain-verify/2026-10-25T14-54-23-013Z-6a8763be-00f4-457a-a2cd-1c22b3cac9e3/report.json`。
+- 最終の固定ソース検証: backend 595件・Web 111件成功。型・境界・整形・lint・SystemContext・サイズ・DesignSystem buildも成功。対象はlarm/inference/voice-dialogue/audio。POSTの全体待機を外し、遅延claimの認証世代も検証したreportは `spec/verification/reports/larm-provider-readiness-2026-10-25/domain-verify/2026-10-25T14-54-23-013Z-6a8763be-00f4-457a-a2cd-1c22b3cac9e3/report.json`。
 - 個別・結合: 全体probing/failedとready音声、LLM scope保持、Provider固有の失敗・期限、取消、部分claim、更新後の古い認証不使用を確認。ASRのlocal試行は既定15秒。LLM/TTS未準備ではcloudを選ばず、ASR自身の失敗/期限で既存fallbackを使う。
-- 制御付き実接続試験: `scripts/larm-provider-isolation-live.ts --run`。LLM失敗、ASR失敗、15秒期限、実ASR応答の取消後不採用、実renewと部分再claimの5件が成功。故障状態はconsumer通信境界への注入であり、本番Providerの障害発生を意味しない。認証試験はclaimで消費側に通知する期限だけを60秒へ短縮し、実際のrenewと新しい認証でのASR/TTSを行った。対象外Providerと本番サーバーは停止していない。結果は `verification-reports/larm-provider-readiness-2026-10-25/isolation/live.json`。
+- 制御付き実接続試験: `scripts/larm-provider-isolation-live.ts --run`。LLM失敗、ASR失敗、15秒期限、実ASR応答の取消後不採用、実renewと部分再claimの5件が成功。故障状態はconsumer通信境界への注入であり、本番Providerの障害発生を意味しない。認証試験はclaimで消費側に通知する期限だけを60秒へ短縮し、実際のrenewと新しい認証でのASR/TTSを行った。対象外Providerと本番サーバーは停止していない。結果は `spec/verification/reports/larm-provider-readiness-2026-10-25/isolation/live.json`。
 - 先行liveのASR約1.38秒の内訳から、音声用POSTのPrefer指定による約1.06秒の全体待ちを特定した。指定を外した版で正常系と10分無使用を取り直す。旧版の10分区間は他の検証で音声を使用したため、最終受入の証拠にはしない。
 - LARM稼働releaseの `release-gate.json` は `ae08a8b84a80ba0e254d8cdd0dd9bb4bffe0400d`。依頼対象の `cab4d8a6df382905e9b025e5c87a30960ca7d3eb` がその祖先であることを確認した。作業checkoutのHEADと稼働releaseは区別した。
 - 主ディレクトリでは別作業による編集・commit・検証が並行していたため、製品DB・秘密・設定をコピーせず、コードと依存ライブラリ参照だけの固定コピーで検証した。今回の対象ファイルは最後にhash照合する。別作業のサーバー終了を23:28:40のログで確認したが、本作業ではまだ起動・停止・再起動していない。
@@ -108,9 +108,9 @@
 | 受入runnerに失敗があっても終了0、保持POSTとcleanupが競合する | 失敗判定を終了値へ反映。開始済みPOSTを待ち、全所有接続へcleanupを試行。実行ごとに証拠directoryを分離 |
 | 本番確認がログ反映前・経路未確認・session停止失敗でも成功を示す | ログの遅延を上限2秒で待つ。ASR/TTSのLARM成功とsession停止を確認できなければ成功にしない |
 
-レビュー追加の14試験は成功。関連4domainの固定検証はbackend 609件・Web 111件、上位の音声結合は6件成功。型・境界・整形・lint・SystemContext・サイズ・DesignSystem buildも成功。最新reportは `verification-reports/larm-provider-readiness-2026-10-25/review-domain-verify/2026-10-25T15-29-40-118Z-63bdfa21-1437-4f21-ac5a-cae68ba7f468/report.json`。
+レビュー追加の14試験は成功。関連4domainの固定検証はbackend 609件・Web 111件、上位の音声結合は6件成功。型・境界・整形・lint・SystemContext・サイズ・DesignSystem buildも成功。最新reportは `spec/verification/reports/larm-provider-readiness-2026-10-25/review-domain-verify/2026-10-25T15-29-40-118Z-63bdfa21-1437-4f21-ac5a-cae68ba7f468/report.json`。
 
-制御付き実接続は7件成功。LLM失敗、ASR失敗、15秒期限、取消後の遅延応答、実renew、ASRだけのidle release、ASRだけのcredential期限を確認し、全件で兄弟TTSが成功・close前DELETEは0件。故障はconsumer通信境界に注入し、本番Providerの停止は行っていない。結果は `verification-reports/larm-provider-readiness-2026-10-25/review-isolation/2026-10-25T15-27-26.706Z/live.json`。
+制御付き実接続は7件成功。LLM失敗、ASR失敗、15秒期限、取消後の遅延応答、実renew、ASRだけのidle release、ASRだけのcredential期限を確認し、全件で兄弟TTSが成功・close前DELETEは0件。故障はconsumer通信境界に注入し、本番Providerの停止は行っていない。結果は `spec/verification/reports/larm-provider-readiness-2026-10-25/review-isolation/2026-10-25T15-27-26.706Z/live.json`。
 
 修正後の差分再レビューでは、対象内に具体的な未解決指摘は見つかっていない。コードを固定した通常系・10分無使用後の最終live受入を待っている。本番APIの起動と本番確認用runnerの実行は、引き続き許可待ち。レビューだけを根拠に起動していない。
 
@@ -121,16 +121,16 @@
 
 最終点検で、取得済みASRの再確認がfailedになっても旧bindingを一覧に残すことを再現した。準備確認GETの開始時点のbindingを記録し、同じbindingが残っている場合に限り失敗した対象だけを無効化する。遅れたfailed応答が、その間に成功した新claimを消さないことも確認した。`provider-cache-review.test.ts` の2件が成功した。
 
-旧版の10分試験が正常に終わるまで製品コードの編集を待ち、結果確認後に補強した。新しい試験ファイルの追加は実行中のProvider処理を変更しない。補強後の関連domainはbackend 611件・Web 111件、制御付き実接続は8件成功。ASRを一度取得してからfailedにする試験でも兄弟TTSは成功し、close前のDELETEは0件。最新の異常系結果は `verification-reports/larm-provider-readiness-2026-10-25/review-isolation/2026-10-25T15-45-48.166Z/live.json`。
+旧版の10分試験が正常に終わるまで製品コードの編集を待ち、結果確認後に補強した。新しい試験ファイルの追加は実行中のProvider処理を変更しない。補強後の関連domainはbackend 611件・Web 111件、制御付き実接続は8件成功。ASRを一度取得してからfailedにする試験でも兄弟TTSは成功し、close前のDELETEは0件。最新の異常系結果は `spec/verification/reports/larm-provider-readiness-2026-10-25/review-isolation/2026-10-25T15-45-48.166Z/live.json`。
 
-最新の固定検証reportは `verification-reports/larm-provider-readiness-2026-10-25/review-domain-verify/2026-10-25T15-45-49-330Z-31267cea-bba0-4a2e-9ffa-cbe0e3f64933/report.json`。レビュー追加の回帰は計16件。対象内の具体的な未解決指摘はなく、製品コードを固定して最後の通常系・10分無使用後の結果とcleanupを確認中。本番起動の許可待ちは維持する。
+最新の固定検証reportは `spec/verification/reports/larm-provider-readiness-2026-10-25/review-domain-verify/2026-10-25T15-45-49-330Z-31267cea-bba0-4a2e-9ffa-cbe0e3f64933/report.json`。レビュー追加の回帰は計16件。対象内の具体的な未解決指摘はなく、製品コードを固定して最後の通常系・10分無使用後の結果とcleanupを確認中。本番起動の許可待ちは維持する。
 
 
 ### レビュー完了
 
 最終版の通常系も成功した。新規ASR 349ms、同構成再依頼14ms、主・背景LLM生成中の新規ASR 485ms、枠待ち中381ms。音声要求0件の600,107ms経過後もASR 535ms・TTS 272msで成功。すべて部分claimで、正常系の直接LARM処理にcloud切替はない。試験用Connection 8件は8件ともcleanupを確認した。
 
-結果とProvider別ready/claim/初回要求の時間は `verification-reports/larm-provider-readiness-2026-10-25/review/2026-10-25T15-46-55.545Z/live.json` と同じdirectoryの `timings.json`。検証対象121ファイル、実接続採取116ファイルのhash不一致はいずれも0件。`review-summary.json` に固定試験・上位結合・制御付き実接続・通常実接続を分けて記録した。
+結果とProvider別ready/claim/初回要求の時間は `verification-reports/larm-provider-readiness-2026-10-25/review/2026-10-25T15-46-55.545Z/live.json` と同じdirectoryの `timings.json`（ローカルの検証記録。リポジトリには含めない）。検証対象121ファイル、実接続採取116ファイルのhash不一致はいずれも0件。`review-summary.json` に固定試験・上位結合・制御付き実接続・通常実接続を分けて記録した。
 
 対象内の再現できた問題は修正済みで、最終の再レビューに具体的な未解決指摘は残っていない。個別発話の分岐、辞書、固定応答、LLM判断の代替は追加していない。担当外差分を保持し、別チャットへの送信、他consumerの解放、サーバー操作は行っていない。本番起動と本番APIの確認は、利用者の明示許可待ちのままとする。今回のレビューを本番反映完了として扱わない。
 
@@ -140,6 +140,6 @@
 
 通常の本番APIを通す `scripts/larm-provider-deployment-check.ts --run` が成功した。合成音声をTTSで生成し、同じ音声をASRへ渡す処理を確認した。HTTP要求全体の所要時間はTTS 563ms、ASR 282ms。対応する成功ログのsourceは両方ともlarmで、Provider処理時間はそれぞれ552ms・273msだった。ASRのクラウド切替は発生していない。本文・音声・認証情報・Provider生応答は検証記録に保存していない。
 
-試験用の音声sessionは停止済み。API・画面サーバーは起動したまま維持する。他consumerのConnectionを解放していない。稼働APIのbootIdは `4979811b-1aea-4cb5-83e5-4034eb82d639`。確認結果は `verification-reports/larm-provider-readiness-2026-10-25/deployment/startup.json` と同directoryの `live.json`、レビュー総括は `review-summary.json` に保存した。
+試験用の音声sessionは停止済み。API・画面サーバーは起動したまま維持する。他consumerのConnectionを解放していない。稼働APIのbootIdは `4979811b-1aea-4cb5-83e5-4034eb82d639`。確認結果は `spec/verification/reports/larm-provider-readiness-2026-10-25/deployment/startup.json` と同directoryの `live.json`、レビュー総括は `spec/verification/reports/larm-provider-readiness-2026-10-25/review-summary.json` に保存した。
 
 これで仕様確認、コード変更・レビュー、固定試験と実接続受入、本番反映と通常APIの合成音声確認を完了した。ブラウザの操作を含むE2Eと実機器のマイク・スピーカーによる3往復受入は行っておらず、実機器の音声MVP完成は宣言しない。本番確認では製品コードを変更していないため、既に成功した関連domain検証の再実行は不要と判断した。

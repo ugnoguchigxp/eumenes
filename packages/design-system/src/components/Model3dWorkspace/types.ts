@@ -99,6 +99,7 @@ export type Model3dWorkspaceProps = {
 	onMore: () => void;
 	onRefresh: () => void;
 	onUploadImage?: ImagePickerProps["onUpload"];
+	onDeleteImage?: ImagePickerProps["onDelete"];
 	renderGooglePhotos?: ImagePickerProps["renderGooglePhotos"];
 };
 

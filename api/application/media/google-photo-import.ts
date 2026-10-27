@@ -1,7 +1,24 @@
 import type { Hono } from "hono";
 import { z } from "zod";
+import { parseJsonBody } from "../../infrastructure/http";
 import type { ImageService } from "../../domains/image";
 import type { GoogleAccounts } from "../../domains/google-accounts";
+
+const importInput = z.strictObject({
+	handle: z.uuid(),
+	itemId: z.string().min(1).max(2048),
+});
+
+const forwarded = new Set([
+	"photos_session_changed",
+	"photos_session_expired",
+	"photos_authorization_required",
+	"photos_image_unsupported",
+	"photos_image_too_large",
+	"image_dimensions_exceeded",
+	"image_invalid",
+	"image_too_large",
+]);
 
 /** Application composition connects public operations; each domain owns its storage and policy. */
 export function registerGooglePhotoImport(
@@ -12,11 +29,11 @@ export function registerGooglePhotoImport(
 	app.post("/api/images/imports/:id/google-photo", async (c) => {
 		c.header("Cache-Control", "no-store");
 		const id = z.uuid().safeParse(c.req.param("id"));
-		const input = z
-			.strictObject({ handle: z.uuid(), itemId: z.string().min(1).max(2048) })
-			.safeParse(await c.req.json().catch(() => null));
-		if (!id.success || !input.success)
-			return c.json({ error: "invalid_import_request" }, 400);
+		const input = await parseJsonBody(c, importInput, {
+			code: "invalid_import_request",
+		});
+		if (!input.ok) return input.response;
+		if (!id.success) return c.json({ error: "invalid_import_request" }, 400);
 		try {
 			google.photos.assertCurrent(input.data.handle);
 			try {
@@ -39,36 +56,9 @@ export function registerGooglePhotoImport(
 			google.photos.assertCurrent(handle);
 			return c.json(result);
 		} catch (error) {
-			const code =
-				error instanceof Error &&
-				[
-					"photos_session_changed",
-					"photos_session_expired",
-					"photos_authorization_required",
-					"photos_image_unsupported",
-					"photos_image_too_large",
-					"image_dimensions_exceeded",
-					"image_invalid",
-					"image_too_large",
-				].includes(error.message)
-					? error.message
-					: "photos_import_unavailable";
-			return c.json(
-				{ error: code },
-				[
-					"image_too_large",
-					"image_dimensions_exceeded",
-					"photos_image_too_large",
-				].includes(code)
-					? 413
-					: code === "photos_image_unsupported"
-						? 415
-						: code === "image_invalid"
-							? 400
-							: code === "photos_session_expired"
-								? 410
-								: 409,
-			);
+			// These codes carry their own status (the Photos and image tables); anything else is the import being unavailable.
+			if (error instanceof Error && forwarded.has(error.message)) throw error;
+			return c.json({ error: "photos_import_unavailable" }, 409);
 		}
 	});
 }

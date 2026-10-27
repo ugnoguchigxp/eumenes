@@ -5,7 +5,7 @@ import type {
 	SelectionPageQuery,
 	RecipePageQuery,
 } from "../api/domains/toolchain-history/contracts";
-import { callJson, json, type Transport } from "./transport";
+import { callJson, json, withQuery, type Transport } from "./transport";
 
 const nullableNumber = z.number().nullable();
 const selectionSchema: z.ZodType<Selection> = z.object({
@@ -97,26 +97,18 @@ export function toolchainHistoryClient(t: Transport) {
 		toolchainSelectionsPage: (
 			query: SelectionPageQuery,
 			signal?: AbortSignal,
-		) => {
-			const params = new URLSearchParams(
-				Object.entries(query).map(([key, value]) => [key, String(value)]),
-			);
-			return get(
+		) =>
+			get(
 				selectionPageSchema,
-				`/api/toolchain-history/selections/page?${params}`,
+				withQuery("/api/toolchain-history/selections/page", query),
 				signal,
-			);
-		},
-		toolchainRecipesPage: (query: RecipePageQuery, signal?: AbortSignal) => {
-			const params = new URLSearchParams(
-				Object.entries(query).map(([key, value]) => [key, String(value)]),
-			);
-			return get(
+			),
+		toolchainRecipesPage: (query: RecipePageQuery, signal?: AbortSignal) =>
+			get(
 				recipePageSchema,
-				`/api/toolchain-history/recipes/page?${params}`,
+				withQuery("/api/toolchain-history/recipes/page", query),
 				signal,
-			);
-		},
+			),
 		toolchainSelections: (
 			query: {
 				runId?: string;
@@ -126,16 +118,12 @@ export function toolchainHistoryClient(t: Transport) {
 				limit?: number;
 			} = {},
 			signal?: AbortSignal,
-		) => {
-			const params = new URLSearchParams();
-			for (const [key, value] of Object.entries(query))
-				if (value !== undefined) params.set(key, String(value));
-			return get(
+		) =>
+			get(
 				selectionListSchema,
-				`/api/toolchain-history/selections${params.size ? `?${params}` : ""}`,
+				withQuery("/api/toolchain-history/selections", query),
 				signal,
-			);
-		},
+			),
 		toolchainSelection: (id: string, signal?: AbortSignal) =>
 			get(
 				selectionSchema,
@@ -145,7 +133,9 @@ export function toolchainHistoryClient(t: Transport) {
 		toolchainRecipes: (toolchain?: string, signal?: AbortSignal) =>
 			get(
 				recipeListSchema,
-				`/api/toolchain-history/recipes${toolchain ? `?toolchain=${encodeURIComponent(toolchain)}` : ""}`,
+				withQuery("/api/toolchain-history/recipes", {
+					toolchain: toolchain || undefined,
+				}),
 				signal,
 			),
 		setToolchainRecipeState: async (

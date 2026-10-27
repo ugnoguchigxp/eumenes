@@ -33,7 +33,7 @@
 - 部分: 起動完了まで無効、失敗と明示再試行、同一設定再取得時の重複抑止、client/設定変更・閉じた後の遅着破棄を確認。React StrictModeで設定取得済みの再表示でも起動要求が一回であることを確認した。
 - API結合: `docling-ready.test.ts` と、`docling-e2e.test.ts` の `authenticated ticket API` が成功。認証・Origin・要求timeout・同時要求ガード・ticketを含まない準備応答を確認。ネットワーク待受を作る既存2件はサーバー起動禁止のため実行しなかった。
 - 画面: `bunx playwright test tests/browser/docling-startup.spec.ts` の3件が成功。準備中、準備完了、起動失敗後の明示再試行、popup拒否時の新規ticket発行抑止を確認。HTTP応答はブラウザの通信fixtureで提供し、サーバーは起動していない。画像は `spec/verification/docling-on-demand-2026-10-27/preparing.png` と `ready.png` を目視確認した。
-- 最終domain検証: `bun run verify -- --domain docling --domain artifact --domain capabilities` が成功。backend/共有UI 456件、Web 91件、DesignSystem 2件、計549件。型・build・対象内の境界/lint/formatも成功。記録は `verification-reports/runs/2026-10-26T23-33-23-541Z-f8869e29-3f44-4d83-a3fb-e451699c69b3/report.json`。
+- 最終domain検証: `bun run verify -- --domain docling --domain artifact --domain capabilities` が成功。backend/共有UI 456件、Web 91件、DesignSystem 2件、計549件。型・build・対象内の境界/lint/formatも成功。記録は `spec/verification/reports/runs/2026-10-26T23-33-23-541Z-f8869e29-3f44-4d83-a3fb-e451699c69b3/report.json`。
 - 会話結合: `docling-toolchain.test.ts` は `inference_failed` で失敗。隔離fixtureの公開toolchainを旧@1と新@2へ切り替えて比較したところ、どちらも共通fixtureの `toolchain.fixture.ts:241`（find_toolchainの結果取得）で同じ失敗となり、専門担当の実行回数は0。runIdは旧 `6417a5cf-e12d-4f15-ae14-464030c90a71`、新 `1df20096-1e54-496e-b0f8-cc7a572a6eee`。担当外の会話fixtureは修正していない。会話経由の通し成功は今回の成果に含めない。
 - liveと反映: 実サービスの起動・再起動、SSH、配備変更、実接続受入は未実施。新しいメニュー定義は通常のbackend初期化・seedで登録される。既存の凍結された旧artifactは書き換えない。
 
@@ -71,7 +71,7 @@
 検証結果:
 
 - 最終の部分・API結合: Web 24件、domain・共有view・ready API 14件、計38件成功。
-- `bun run verify -- --domain docling --domain artifact --domain capabilities`: pass。backend/共有UI 459件、Web 98件、DesignSystem 2件、計559件。型・build・対象内の境界/lint/formatも成功。記録: `verification-reports/runs/2026-10-26T23-43-30-358Z-66528d10-c32c-45c5-b568-4abcd4d56f6c/report.json`。integrityErrorsは空。
+- `bun run verify -- --domain docling --domain artifact --domain capabilities`: pass。backend/共有UI 459件、Web 98件、DesignSystem 2件、計559件。型・build・対象内の境界/lint/formatも成功。記録: `spec/verification/reports/runs/2026-10-26T23-43-30-358Z-66528d10-c32c-45c5-b568-4abcd4d56f6c/report.json`。integrityErrorsは空。
 - 最終コードで `bunx playwright test tests/browser/docling-startup.spec.ts`: 4件成功。通常、起動失敗後の再試行、設定取得失敗後の再試行、popup拒否。待受サーバーを作らない通信fixtureで確認した。
 - 差分点検: 接続設定・認証方式・bundle revision・LLM指示・意味判断方式・domain依存は今回変更していない。共通query/取消/表示機構の修正に限定し、新たな自動再送・poll・台帳・leaseはない。担当外差分は保持し、今回変更したファイルのdiff checkは成功。
 - 修正後の再レビュー: 今回の変更範囲に、根拠のある未解決の対応必須指摘は残っていない。前回記載した既存会話fixtureの失敗は修正しておらず、会話経由の受入成功とは扱わない。実接続、配備、サーバー起動・再起動は未実施。

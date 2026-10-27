@@ -78,6 +78,7 @@ export function ImageGallery({
 				<p className="image-gallery-empty">まだ保存された画像はありません。</p>
 			)}
 			<ImageGrid
+				mode="view"
 				key={gridRevision}
 				classNames={{
 					grid: "image-gallery-grid",
@@ -97,7 +98,7 @@ export function ImageGallery({
 				}}
 				renderCaption={(image) => (
 					<>
-						<h4>{image.title}</h4>
+						<h4 title={image.title}>{image.title}</h4>
 						<p>
 							<time dateTime={image.createdAt}>
 								{new Date(image.createdAt).toLocaleDateString("ja-JP")}

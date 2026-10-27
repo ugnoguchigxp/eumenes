@@ -15,6 +15,11 @@ import { recognitionSource } from "./source";
 import { useRecognitionChatInbox } from "./chat-inbox";
 import { useRecognitionHandoffs } from "./use-recognition-handoffs";
 import { queryRoots } from "../../queryKeys";
+import { useCaptureSave } from "./use-capture-save";
+import {
+	imageContentUrl,
+	useImageLibrary,
+} from "../../media/use-image-library";
 const origins = new Set(["camera", "screen", "file"]);
 export function useRecognitionRuntime(
 	client: EumenesClient,
@@ -28,8 +33,10 @@ export function useRecognitionRuntime(
 		queryKey: key,
 		queryFn: ({ signal }) => client.recognitionRecords(conversationId, signal),
 		refetchInterval: (q) =>
-			q.state.data?.some((r) =>
-				["queued", "starting", "running", "cancelling"].includes(r.state),
+			q.state.data?.some(
+				(r) =>
+					["queued", "starting", "running", "cancelling"].includes(r.state) ||
+					r.captureSave === "queued",
 			)
 				? 1000
 				: false,
@@ -38,6 +45,7 @@ export function useRecognitionRuntime(
 		queryKey: [queryRoots.objectRecognition, client.identity, "connection"],
 		queryFn: ({ signal }) => client.recognitionConnection(signal),
 	});
+	const library = useImageLibrary(client);
 	const pushChatImage = useRecognitionChatInbox((s) => s.push);
 	const [selection, setSelection] = useState<string>();
 	const [selectedFrame, setFrame] = useState<{ id: string; index: number }>();
@@ -46,7 +54,8 @@ export function useRecognitionRuntime(
 	const uploadLock = useRef(false);
 	const viewEpoch = useRef(0);
 	const items = records.data ?? [];
-	const selected = items.find((i) => i.id === selection) ?? items[0];
+	const selected = items.find((i) => i.id === selection);
+	const captureSave = useCaptureSave(client, selected, items);
 	const frameIndex =
 		selectedFrame?.id === selected?.id ? (selectedFrame?.index ?? 0) : 0;
 	const analyses = useVisualAnalysis(
@@ -106,7 +115,10 @@ export function useRecognitionRuntime(
 		...analyses.resource,
 		revision,
 		items,
+		...libraryResource(library),
 		selectedId: selected?.id,
+		captureSaveStatus: captureSave.status,
+		captureSaveCanResume: captureSave.canResume,
 		mediaUrl: url?.id === selected?.id ? url?.value : undefined,
 		configured: !!connection.data?.credentialConfigured,
 		credentialSource: connection.data?.credentialSource,
@@ -146,11 +158,7 @@ export function useRecognitionRuntime(
 		const handoffId = context?.handoffId;
 		if (source !== recognitionSource || uploadLock.current)
 			return { status: "rejected", message: "入力を受け付けられません。" };
-		if (
-			!inputMime.safeParse(file.type).success ||
-			!file.size ||
-			file.size > maxInputBytes
-		) {
+		if (!validInput(file)) {
 			setError(
 				"JPEG・PNG・WebP・MP4・MOV・WebMの16 MiB以内のファイルを選んでください。",
 			);
@@ -220,34 +228,42 @@ export function useRecognitionRuntime(
 			await refresh();
 			return { status: "accepted", message: "更新しました。" };
 		}
-		if (event.action === "recognition-credential-source") {
-			const source = event.values.credentialSource;
+		if (
+			event.action === "recognition-save-recheck" ||
+			event.action === "recognition-save-resume"
+		) {
 			if (
-				(source !== "dedicated" && source !== "larm") ||
-				!connection.data?.baseUrl
+				!selected ||
+				event.values.id !== selected.id ||
+				selected.captureSave !== "unconfirmed"
 			)
-				return {
-					status: "rejected",
-					message: "backendの接続先を設定してください。",
-				};
-			if (source === "larm" && !connection.data.sharedCredentialAvailable)
-				return {
-					status: "rejected",
-					message: "LARMの共有credentialがbackendに設定されていません。",
-				};
-			await client.configureRecognitionConnection({
-				expectedRevision: connection.data.revision,
-				credentialSource: source,
-			});
-			await connection.refetch();
-			return {
-				status: "accepted",
-				message:
-					source === "larm"
-						? "LARMの共有credentialを参照します。"
-						: "保存した専用credentialを参照します。",
-			};
+				return { status: "rejected", message: "資料を選び直してください。" };
+			if (event.action === "recognition-save-recheck")
+				return captureSave.recheck();
+			const result = await captureSave.resume();
+			if (result.status === "accepted") await records.refetch();
+			return result;
 		}
+		if (
+			event.action === "recognition-library-refresh" ||
+			event.action === "recognition-library-select"
+		)
+			return handleLibrary(event, {
+				library,
+				client,
+				uploadFile,
+				uploadLock,
+				viewEpoch,
+				setBusy,
+				setError,
+			});
+		if (event.action === "recognition-credential-source")
+			return changeCredentialSource(
+				client,
+				connection.data,
+				event.values.credentialSource,
+				connection.refetch,
+			);
 
 		const id = typeof event.values.id === "string" ? event.values.id : "";
 		if (event.action === "recognition-handoff-cancel") {
@@ -301,5 +317,106 @@ export function useRecognitionRuntime(
 			dispatch,
 			uploadFile,
 		},
+	};
+}
+
+function validInput(file: File) {
+	return (
+		inputMime.safeParse(file.type).success &&
+		file.size > 0 &&
+		file.size <= maxInputBytes
+	);
+}
+
+function libraryResource(library: ReturnType<typeof useImageLibrary>) {
+	return {
+		libraryImages: (library.data?.images ?? [])
+			.slice()
+			.sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
+			.map((image) => ({
+				id: image.id,
+				title: `画像 ${image.createdAt.slice(0, 10)}（${image.width}×${image.height}）`,
+				thumbnailUrl: imageContentUrl(image.id),
+			})),
+		libraryLoading: library.isPending,
+		libraryError: library.error
+			? "保存画像を取得できませんでした。一覧を更新してください。"
+			: undefined,
+	};
+}
+
+async function handleLibrary(
+	event: ArtifactEvent,
+	deps: {
+		library: ReturnType<typeof useImageLibrary>;
+		client: EumenesClient;
+		uploadFile: (source: string, file: File) => Promise<Receipt>;
+		uploadLock: { current: boolean };
+		viewEpoch: { current: number };
+		setBusy: (value: boolean) => void;
+		setError: (value: string) => void;
+	},
+): Promise<Receipt> {
+	if (event.action === "recognition-library-refresh") {
+		await deps.library.refetch();
+		return { status: "accepted", message: "画像一覧を更新しました。" };
+	}
+	const id = event.values.id;
+	if (
+		typeof id !== "string" ||
+		!deps.library.data?.images.some((image) => image.id === id) ||
+		deps.uploadLock.current
+	)
+		return { status: "rejected", message: "画像を選び直してください。" };
+	const epoch = ++deps.viewEpoch.current;
+	deps.setBusy(true);
+	deps.setError("");
+	try {
+		const blob = await deps.client.imageContent(id);
+		if (deps.viewEpoch.current !== epoch)
+			return { status: "rejected", message: "表示が変更されました。" };
+		return await deps.uploadFile(
+			recognitionSource,
+			new File([blob], `image.${blob.type.split("/")[1] || "image"}`, {
+				type: blob.type,
+			}),
+		);
+	} catch {
+		deps.setError("保存画像を取得できませんでした。一覧を更新してください。");
+		return { status: "rejected", message: "保存画像を取得できませんでした。" };
+	} finally {
+		deps.setBusy(false);
+	}
+}
+
+async function changeCredentialSource(
+	client: EumenesClient,
+	connection:
+		| Awaited<ReturnType<EumenesClient["recognitionConnection"]>>
+		| undefined,
+	source: unknown,
+	refetch: () => Promise<unknown>,
+): Promise<Receipt> {
+	if ((source !== "dedicated" && source !== "larm") || !connection?.baseUrl)
+		return {
+			status: "rejected",
+			message: "backendの接続先を設定してください。",
+		};
+	if (source === "larm" && !connection.sharedCredentialAvailable)
+		return {
+			status: "rejected",
+			message: "LARMの共有credentialがbackendに設定されていません。",
+		};
+	await client.configureRecognitionConnection({
+		expectedRevision: connection.revision,
+		credentialSource: source,
+	});
+	await refetch();
+	return {
+		status: "accepted",
+		message:
+			source === "larm"
+				? "LARMの共有credentialを参照します。"
+				: "保存した専用credentialを参照します。",
 	};
 }

@@ -5,39 +5,28 @@ import {
 	uploadedSchema,
 	type StartTest,
 } from "../api/domains/service-tests/contracts";
-import { json, type Transport } from "./transport";
+import { callJson, json, type Transport } from "./transport";
 export function serviceTestsClient(t: Transport) {
 	const root = "/api/service-tests";
 	return {
 		serviceCatalog: async () =>
-			serviceCatalogSchema.parse(
-				await (await t.call(`${root}/catalog`)).json(),
-			),
+			callJson(t, serviceCatalogSchema, `${root}/catalog`),
 		refreshServiceCatalog: async () =>
-			serviceCatalogSchema.parse(
-				await (await t.call(`${root}/catalog/refresh`, json({}))).json(),
-			),
-		serviceRuns: async () =>
-			serviceRunsSchema.parse(await (await t.call(`${root}/runs`)).json()),
+			callJson(t, serviceCatalogSchema, `${root}/catalog/refresh`, json({})),
+		serviceRuns: async () => callJson(t, serviceRunsSchema, `${root}/runs`),
 		startServiceTest: async (input: StartTest) =>
-			serviceRunSchema.parse(
-				await (await t.call(`${root}/runs`, json(input))).json(),
-			),
+			callJson(t, serviceRunSchema, `${root}/runs`, json(input)),
 		diagnoseServices: async () =>
-			serviceRunSchema.parse(
-				await (await t.call(`${root}/diagnose`, json({}))).json(),
-			),
+			callJson(t, serviceRunSchema, `${root}/diagnose`, json({})),
 		cancelServiceTest: async (id: string) => {
 			await t.call(`${root}/runs/${encodeURIComponent(id)}/cancel`, json({}));
 		},
 		retryServiceArtifact: async (id: string) =>
-			serviceRunSchema.parse(
-				await (
-					await t.call(
-						`${root}/runs/${encodeURIComponent(id)}/retry-artifact`,
-						json({}),
-					)
-				).json(),
+			callJson(
+				t,
+				serviceRunSchema,
+				`${root}/runs/${encodeURIComponent(id)}/retry-artifact`,
+				json({}),
 			),
 		serviceArtifact: async (id: string, signal?: AbortSignal) =>
 			await (
@@ -46,10 +35,9 @@ export function serviceTestsClient(t: Transport) {
 				})
 			).blob(),
 		uploadTestAudio: async (file: Blob) =>
-			uploadedSchema.parse(
-				await (
-					await t.call(`${root}/uploads`, { method: "POST", body: file })
-				).json(),
-			),
+			callJson(t, uploadedSchema, `${root}/uploads`, {
+				method: "POST",
+				body: file,
+			}),
 	};
 }

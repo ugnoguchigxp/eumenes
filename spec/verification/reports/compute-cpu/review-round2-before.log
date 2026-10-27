@@ -1,0 +1,51 @@
+bun test v1.4.3 (c6da4a4d3)
+
+api/domains/larm/test/compute-client.test.ts:
+(pass) discovery uses root services and authenticated environment [2.41ms]
+(pass) discovery uses profile services and authenticated environment [0.25ms]
+(pass) rejects an unsafe advertised URL before sending credentials: http://other.test/v1/compute [0.22ms]
+(pass) rejects an unsafe advertised URL before sending credentials: http://user:pass@compute.test:9810/v1/compute [0.14ms]
+(pass) rejects an unsafe advertised URL before sending credentials: http://compute.test:9810/v1/compute?token=bad [0.11ms]
+(pass) rejects an unsafe advertised URL before sending credentials: http://compute.test:9810/v1/compute#fragment [0.12ms]
+(pass) missing or wrong capability is unavailable [0.38ms]
+(pass) submit has the stable key, CPU request and no retry on HTTP refusal [0.54ms]
+(pass) cancel uses POST /cancel and 202 is still a live job; DELETE 204 has no JSON [0.74ms]
+(pass) preserves safe HTTP 401 classifications [0.09ms]
+(pass) preserves safe HTTP 409 classifications [0.04ms]
+(pass) preserves safe HTTP 410 classifications [0.04ms]
+(pass) preserves safe HTTP 503 classifications [0.02ms]
+(pass) wrong job ID and MIME/size/PNG content are rejected [0.17ms]
+212 | 	).rejects.toThrow("compute_invalid_artifact");
+213 | });
+214 | 
+215 | test("DELETE rejects a response belonging to another job", async () => {
+216 |  const client=mock(()=>Response.json({jobId:crypto.randomUUID(),status:"running",stage:"running",queuedAt:"now",startedAt:null,finishedAt:null,expiresAt:null,resolvedAccelerator:"cpu",environmentRevision:"r",cancelRequested:true},{status:202}));
+217 |  await expect(client.delete(url,crypto.randomUUID(),signal())).rejects.toThrow("compute_identity_mismatch");
+                                                                             ^
+error: expect(received).rejects.toThrow(expected)
+
+Expected promise that rejects
+Received promise that resolved: Promise { <resolved> }
+
+      at <anonymous> (/Users/y.noguchi/Code/eumenes/api/domains/larm/test/compute-client.test.ts:217:72)
+(fail) DELETE rejects a response belonging to another job [0.50ms]
+
+api/domains/compute/test/review.test.ts:
+(pass) reconciliation preserves the original deadline and refuses expired unknown submissions [28.23ms]
+(pass) Retry-After cannot postpone deadline cancellation [70.55ms]
+ 7 | 	options: { timeout?: number; interval?: number } = {},
+ 8 | ): Promise<void> {
+ 9 | 	const { timeout = 5000, interval = 2 } = options;
+10 | 	const end = performance.now() + timeout;
+11 | 	while (!(await condition())) {
+12 | 		if (performance.now() > end) throw new Error("wait_for_timeout");
+                                              ^
+error: wait_for_timeout
+      at waitFor (/Users/y.noguchi/Code/eumenes/api/infrastructure/wait-for.ts:12:42)
+      at async <anonymous> (/Users/y.noguchi/Code/eumenes/api/domains/compute/test/review.test.ts:98:8)
+(fail) an accepted asynchronous deletion continues to deletion after the job terminates [1028.89ms]
+
+ 16 pass
+ 2 fail
+ 42 expect() calls
+Ran 18 tests across 2 files. [1327.00ms]

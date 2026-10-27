@@ -1,28 +1,27 @@
-import type { Hono } from "hono";
+import type { Context, Hono } from "hono";
 import { z } from "zod";
 import { readBounded } from "../../../infrastructure/bounded-read";
+import { parseQuery } from "../../../infrastructure/http";
 import type { ImageService } from "../service";
+import { errorStatus } from "../contracts";
 
-const errors: Record<string, number> = {
-	image_invalid: 400,
-	image_format_unsupported: 415,
-	image_mime_mismatch: 415,
-	image_too_large: 413,
-	image_dimensions_exceeded: 413,
-	invalid_import_request: 400,
-	image_import_not_found: 404,
-	idempotency_conflict: 409,
-	image_import_capacity: 429,
-	image_import_connection_changed: 409,
-};
+const uploadQuery = z.object({ requestId: z.uuid() });
+/** An image code carries its own status (the application's error handler); anything else is the import being unavailable. */
+function unavailable(c: Context, error: unknown) {
+	if (error instanceof Error && Object.hasOwn(errorStatus, error.message))
+		throw error;
+	return c.json({ error: "image_import_unavailable" }, 503);
+}
 export function registerImageImports(
 	app: Hono,
 	service: Pick<ImageService, "imports">,
 ) {
 	app.post("/api/images/imports", async (c) => {
 		c.header("Cache-Control", "no-store");
-		const id = z.uuid().safeParse(c.req.query("requestId"));
-		if (!id.success) return c.json({ error: "invalid_import_request" }, 400);
+		const query = parseQuery(c, uploadQuery, {
+			code: "invalid_import_request",
+		});
+		if (!query.ok) return query.response;
 		try {
 			const bytes = await readBounded(c.req.raw.body, {
 				limit: 16 * 1024 * 1024 + 65536,
@@ -41,14 +40,14 @@ export function registerImageImports(
 			if (!(file instanceof File) || [...form.keys()].length !== 1)
 				throw new Error("invalid_import_request");
 			return c.json(
-				await service.imports.upload(id.data, file, c.req.raw.signal),
+				await service.imports.upload(
+					query.data.requestId,
+					file,
+					c.req.raw.signal,
+				),
 			);
 		} catch (error) {
-			const code =
-				error instanceof Error && error.message in errors
-					? error.message
-					: "image_import_unavailable";
-			return c.json({ error: code }, (errors[code] ?? 503) as 400);
+			return unavailable(c, error);
 		}
 	});
 	for (const method of ["read", "resume"] as const) {
@@ -60,11 +59,7 @@ export function registerImageImports(
 			try {
 				return c.json(await service.imports[method](id.data, c.req.raw.signal));
 			} catch (error) {
-				const code =
-					error instanceof Error && error.message in errors
-						? error.message
-						: "image_import_unavailable";
-				return c.json({ error: code }, (errors[code] ?? 503) as 400);
+				return unavailable(c, error);
 			}
 		});
 	}

@@ -31,12 +31,7 @@ export const attachmentLimits = {
 	annotationBytes: 16 * 1024,
 };
 export const attachmentErrors = {
-	image_invalid: 422,
-	image_format_unsupported: 415,
-	image_mime_mismatch: 415,
-	image_too_large: 413,
 	image_count_exceeded: 413,
-	image_dimensions_exceeded: 413,
 	attachment_not_found: 404,
 	attachment_source_unavailable: 409,
 	attachment_capacity: 429,

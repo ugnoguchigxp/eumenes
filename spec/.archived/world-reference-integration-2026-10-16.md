@@ -35,7 +35,7 @@
 
 実モデルの初回は試験診断SQLの列名誤りで結果保存に失敗したため、成功に含めない。次の実行では部分一致検索へ複数キーワードを連結し、資料があるのにnot_foundになった。資料や設問を変えず、連続文字列1つを渡す検索仕様を指示・ツール説明に明記した後、同じ設問で成功した。固有の資料名を製品コードへ追加していない。SHOULDの強さ、収集時資料である留保を維持し、実装が対策済みとは推測しなかった。一般的な精度改善は未測定。
 
-ローカルの実測は `verification-reports/world-reference-live/before-query-guidance.json` と `result.json`。元Seed本文や認証情報はこの文書へコピーしない。
+実測は `spec/verification/reports/world-reference-live/before-query-guidance.json` と `result.json`。元Seed本文や認証情報はこの文書へコピーしない。
 
 ## 未完了と既存の阻害要因
 
@@ -73,5 +73,5 @@ APIは既存の認証に従う。POST /api/world/documents は1資料ずつ追�
 - 対象は本体 `data/eumenes.sqlite3`。Seed `grok-984-v1`、11コレクション、**984 inserted**。同一ファイルの再投入は **984 unchanged / 0 inserted**。
 - APIで2,101ページを取得し、**984件すべての本文・SHA-256・manifestDigest・revision・title・collectionが一致**。未認証401、検索による資料発見も確認。投入・再投入・照合は約2.68秒。
 - 投入前後で資料台帳以外の220テーブルの全行ハッシュと件数が一致。起動試行前に採取した記憶・会話関連・設定35テーブルの件数も全て一致。本文や秘密を検証記録へ出力していない。
-- 実測JSON: `verification-reports/world-reference-live/product-seed.json`。今回の完了は原文資料の保存・参照であり、全件の構造化抽出・自動採用・会話回答の精度改善を示さない。通常起動の競合修復は別作業として残す。
+- 実測JSON: `spec/verification/reports/world-reference-live/product-seed.json`。今回の完了は原文資料の保存・参照であり、全件の構造化抽出・自動採用・会話回答の精度改善を示さない。通常起動の競合修復は別作業として残す。
 - 差分確認: v5・World本体srcは不変。新しい意味分類・固有例分岐なし。他作業の差分は保持し、全体verifyは前述の阻害要因があるため今回再実行せず、必要な移行回帰と本体API通し検証を行った。commit/pushは未実施。

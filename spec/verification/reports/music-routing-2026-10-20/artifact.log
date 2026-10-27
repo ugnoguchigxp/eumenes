@@ -1,0 +1,426 @@
+bun test v1.4.3 (c6da4a4d3)
+
+packages/artifact-ui/src/composition-content-components.test.tsx:
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+(pass) typing in a number input recomputes the stat [13.87ms]
+(pass) an empty or unparsable text writes nothing and blur shows the state again [2.65ms]
+(pass) a number input clamps to its own min and max, then to the state's [2.04ms]
+(pass) a number input takes min, max and step from the state when the view has none [0.82ms]
+(pass) the slider moves the state and formats its value [1.73ms]
+(pass) a slider without a range anywhere is 0 to 100 [0.66ms]
+(pass) choice sets a text state, as buttons and as cards [4.03ms]
+(pass) toggle flips a boolean state [3.27ms]
+(pass) stat shows a literal value as is and — for an expression that fails [1.09ms]
+(pass) views of other kinds render nothing [0.35ms]
+(pass) without a model the input views render disabled and the stat shows — [3.25ms]
+(pass) an input bound to a state of another type or a missing state is disabled [1.50ms]
+(pass) choice is disabled without a model and for a state that is not text [1.13ms]
+(pass) pricing-card, comparison-table, faq and timeline render their content [19.77ms]
+
+packages/artifact-ui/src/composition-data-components.test.tsx:
+(pass) a chart draws the series of the model and the static points [43.11ms]
+(pass) a chart of an unknown or non-series name has no data [0.74ms]
+(pass) a data-table evaluates each column per point of a series [1.79ms]
+(pass) a data-table shows 200 rows of a series and reports the rest [7.32ms]
+(pass) a data-table shows static rows, formatted by column [0.76ms]
+(pass) a data-table of a series without a model is empty [0.27ms]
+(pass) a formula shows its value after the typeset formula [4.06ms]
+(pass) a formula whose expression has no value shows the empty mark [0.78ms]
+(pass) the calculator's result goes to resultBind and the formula follows [4.63ms]
+(pass) the calculator evaluates with the host expression language [1.64ms]
+(pass) the calculator shows an error for what the language cannot work out [1.08ms]
+(pass) without a model the views draw and the calculator works [19.40ms]
+(pass) the calculator accepts pi after a number through the host language [2.73ms]
+(pass) float noise is trimmed from the result and from resultBind [2.18ms]
+(pass) a changed preset or mode starts the calculator over [2.57ms]
+(pass) a view of another kind renders nothing [0.19ms]
+
+packages/artifact-ui/src/composition-diagram-components.test.tsx:
+(pass) the stepper moves the shared step and the diagram shows its elements [5.78ms]
+(pass) a state set from outside moves the expression coordinates [1.04ms]
+(pass) without stepBind every element is shown and highlightAt is ignored [0.49ms]
+(pass) a stepper without bind keeps its own step [1.04ms]
+(pass) a stepper bound to an unknown state keeps its own step instead of freezing [0.73ms]
+(pass) both parts render without a model [1.04ms]
+(pass) other parts render nothing [0.20ms]
+
+packages/artifact-ui/src/composition-expressions.test.ts:
+(pass) literals and operators > numbers, strings, booleans and constants [0.07ms]
+(pass) literals and operators > precedence and associativity [0.12ms]
+(pass) literals and operators > comparison and equality across types [0.02ms]
+(pass) literals and operators > the conditional is right-associative and short-circuits [0.04ms]
+(pass) literals and operators > plus joins strings and numbers [0.04ms]
+(pass) literals and operators > names come from the scope [0.02ms]
+(pass) functions > basic math [0.18ms]
+(pass) functions > round goes half away from zero and takes digits [0.06ms]
+(pass) functions > trigonometry works in degrees [0.08ms]
+(pass) functions > pmt follows the spreadsheet sign convention [0.05ms]
+(pass) functions > fv follows the spreadsheet sign convention [0.06ms]
+(pass) functions > series functions [0.15ms]
+(pass) functions > text and format [0.18ms]
+(pass) functions > a null argument gives null [0.01ms]
+(pass) failures give null and never throw > 1 / 0 [0.02ms]
+(pass) failures give null and never throw > 5 % 0
+(pass) failures give null and never throw > sqrt(-1)
+(pass) failures give null and never throw > log(0)
+(pass) failures give null and never throw > log(-1)
+(pass) failures give null and never throw > log(8, 1)
+(pass) failures give null and never throw > pow(0, -1)
+(pass) failures give null and never throw > (-8) ^ 0.5
+(pass) failures give null and never throw > 10 ^ 400
+(pass) failures give null and never throw > clamp(1, 5, 0)
+(pass) failures give null and never throw > 1 + true
+(pass) failures give null and never throw > !1
+(pass) failures give null and never throw > -"a"
+(pass) failures give null and never throw > 1 && 2
+(pass) failures give null and never throw > unknown + 1
+(pass) failures give null and never throw > a very large intermediate value is null, not Infinity
+(pass) limits > length [0.03ms]
+(pass) limits > depth [0.16ms]
+(pass) limits > string literals stop at 120 characters [0.03ms]
+(pass) limits > min and max over a series spend the step budget too [0.27ms]
+(pass) limits > sum spends the step budget [0.13ms]
+(pass) parse results > names and functions are listed once, constants excluded [0.02ms]
+(pass) parse results > 1 + is rejected as unexpected_token [0.01ms]
+(pass) parse results > (1 is rejected as unexpected_token
+(pass) parse results > 1 2 is rejected as unexpected_token
+(pass) parse results > a = 1 is rejected as unexpected_character
+(pass) parse results > a & b is rejected as unexpected_character
+(pass) parse results > a ? 1 is rejected as unexpected_token
+(pass) parse results > 1,2 is rejected as unexpected_token
+(pass) parse results > foo(1) is rejected as unknown_function
+(pass) parse results > max() is rejected as bad_arity
+(pass) parse results > sqrt(1, 2) is rejected as bad_arity
+(pass) parse results > pmt(1, 2) is rejected as bad_arity
+(pass) parse results > a.b is rejected as unexpected_character
+(pass) parse results > a[0] is rejected as unexpected_character
+(pass) parse results > x ** 2 is rejected as unexpected_token
+(pass) parse results > 1e999 is rejected as bad_number
+(pass) parse results > 日本 is rejected as unexpected_character [0.01ms]
+(pass) parse results > `a` is rejected as unexpected_character
+(pass) prototype names > constructor is just an unknown name [0.02ms]
+(pass) prototype names > __proto__ is just an unknown name
+(pass) prototype names > toString is just an unknown name
+(pass) prototype names > hasOwnProperty is just an unknown name
+(pass) prototype names > valueOf is just an unknown name
+(pass) prototype names > prototype is just an unknown name
+(pass) prototype names > function names are only called, never read from the prototype [0.01ms]
+(pass) prototype names > object prototypes stay untouched [0.01ms]
+(pass) cyclicNames > finds names on a cycle, not those that only lead into one [0.02ms]
+
+packages/artifact-ui/src/composition-fixer.test.ts:
+(pass) identity on valid definitions > there are fixtures
+(pass) identity on valid definitions > fixture u1-landing-page.json comes back unchanged [7.19ms]
+(pass) identity on valid definitions > fixture u2-ec-cart.json comes back unchanged [2.29ms]
+(pass) identity on valid definitions > fixture u3-split-bill.json comes back unchanged [1.26ms]
+(pass) identity on valid definitions > fixture u4-retirement.json comes back unchanged [2.77ms]
+(pass) identity on valid definitions > fixture u5a-airplane-diagram.json comes back unchanged [7.07ms]
+(pass) identity on valid definitions > fixture u5b-triangulation.json comes back unchanged [1.76ms]
+(pass) identity on valid definitions > fixture u6-quiz.json comes back unchanged [1.81ms]
+(pass) identity on valid definitions > fixture u7-content-showcase.json comes back unchanged [1.56ms]
+(pass) identity on valid definitions > fixture u8-survey.json comes back unchanged [0.81ms]
+(pass) identity on valid definitions > the SKILL has examples
+(pass) identity on valid definitions > every SKILL example comes back unchanged [2.44ms]
+(pass) identity on valid definitions > a valid definition is not mutated and the result is a copy [0.26ms]
+(pass) outer shape > an array of parts is wrapped in a stack layout [0.24ms]
+(pass) outer shape > a single non-layout part is wrapped [0.15ms]
+(pass) outer shape > a double wrap is unwrapped [0.17ms]
+(pass) outer shape > an unwrapped array is wrapped too [0.13ms]
+(pass) outer shape > an aliased root layout is not wrapped [0.14ms]
+(pass) keys > source and settings-only layout keys are removed [0.17ms]
+(pass) keys > unknown keys of a part are dropped [0.44ms]
+(pass) keys > unknown keys inside nested objects are dropped [0.17ms]
+(pass) keys > an unknown key of a layout is dropped [0.22ms]
+(pass) view names > aliases are mapped [0.31ms]
+(pass) view names > img becomes image [0.17ms]
+(pass) view names > a text alias moves its text into the missing title [0.16ms]
+(pass) view names > content and label move too, but a present title stays [0.30ms]
+(pass) view names > unaliased and unknown views are dropped [0.20ms]
+(pass) generic repairs from the schema issues > a long string is cut to max - 1 characters plus an ellipsis [0.21ms]
+(pass) generic repairs from the schema issues > a cut never splits a surrogate pair [0.18ms]
+(pass) generic repairs from the schema issues > a long array is cut to its maximum [0.26ms]
+(pass) generic repairs from the schema issues > more than 48 children are cut [3.30ms]
+(pass) generic repairs from the schema issues > an invalid optional enum is dropped [0.16ms]
+(pass) generic repairs from the schema issues > a differently cased enum value is corrected [0.17ms]
+(pass) generic repairs from the schema issues > an invalid layout direction becomes stack [0.26ms]
+(pass) generic repairs from the schema issues > an invalid required enum takes the first value [0.28ms]
+(pass) generic repairs from the schema issues > a wrong step is rounded to the nearest valid one [0.15ms]
+(pass) generic repairs from the schema issues > a non-integer where an integer is needed is rounded [0.20ms]
+(pass) generic repairs from the schema issues > a number over its maximum is clamped [0.10ms]
+(pass) generic repairs from the schema issues > a missing required key drops the part [0.20ms]
+(pass) generic repairs from the schema issues > an unfixable optional value is dropped, a required one drops the part [0.34ms]
+(pass) generic repairs from the schema issues > a nested union is followed to its own issue [0.31ms]
+(pass) generic repairs from the schema issues > an element with an unknown type drops the whole part [0.18ms]
+(pass) generic repairs from the schema issues > exactly-one rules: both given keeps the first [0.12ms]
+(pass) generic repairs from the schema issues > a variant that needs an image loses the variant [0.08ms]
+(pass) generic repairs from the schema issues > a table with ragged rows is dropped [0.17ms]
+(pass) images > a URL becomes a placeholder [0.09ms]
+(pass) images > an unknown provider keeps a valid alt [0.07ms]
+(pass) images > an unknown picsum theme or a bad seed becomes a placeholder [0.20ms]
+(pass) images > a too long alt is not kept [0.09ms]
+(pass) images > a valid picture is left alone, a long alt is cut [0.19ms]
+(pass) images > an avatar is handled the same way [0.09ms]
+(pass) images > a required picture that is missing drops the part [0.15ms]
+(pass) state > a model of a nested layout moves to the outermost layout [0.48ms]
+(pass) state > nested models merge with the root's when no name collides [0.33ms]
+(pass) state > a colliding nested model is dropped [0.38ms]
+(pass) state > an unbound number input gets a state, using its min and max [0.31ms]
+(pass) state > an unbound number input without a range starts at 0 [0.17ms]
+(pass) state > an unbound choice gets a text state and a toggle a boolean [0.33ms]
+(pass) state > a bind of the wrong type or a computed value drops the part [0.23ms]
+(pass) state > a chart over an unknown series is dropped [0.23ms]
+(pass) state > an input range reaching outside its state loses the key [0.17ms]
+(pass) state > an invalid state is dropped and an input gets a default state instead [0.29ms]
+(pass) state > more than 32 states are cut [0.36ms]
+(pass) expressions > computed entries with broken or unknown expressions are dropped [0.27ms]
+(pass) expressions > a part using a dropped value goes with it [0.42ms]
+(pass) expressions > a part with a broken expression is dropped [0.21ms]
+(pass) expressions > a computed value reading another in a circle is dropped [0.23ms]
+(pass) expressions > a layout with a broken `when` keeps its children and loses the key [0.67ms]
+(pass) limits > forms after the first are dropped [0.35ms]
+(pass) limits > layouts deeper than 6 give their children to the parent [1.27ms]
+(pass) limits > a depth-6 chain of layouts is valid and left alone [0.45ms]
+(pass) limits > parts over 240 are dropped from the end [14.96ms]
+(pass) limits > over 96 KiB drops parts from the end [3.64ms]
+(pass) nothing displayable > non-objects [0.07ms]
+(pass) nothing displayable > an empty layout [0.02ms]
+(pass) nothing displayable > every part dropped [0.02ms]
+(pass) nothing displayable > only empty layouts remain
+(pass) nothing displayable > a single unknown part
+(pass) determinism and robustness > the same input gives the same output [0.76ms]
+(pass) determinism and robustness > a messy definition ends valid [0.22ms]
+(pass) determinism and robustness > fixing the output again changes nothing [0.40ms]
+(pass) determinism and robustness > the input is not mutated [0.21ms]
+
+packages/artifact-ui/src/composition-fixtures-render.test.tsx:
+(pass) there are fixtures to render
+(pass) u1-landing-page.json renders without an error [15.36ms]
+(pass) u2-ec-cart.json renders without an error [27.70ms]
+(pass) u3-split-bill.json renders without an error [6.54ms]
+The width(0) and height(0) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+(pass) u4-retirement.json renders without an error [11.54ms]
+(pass) u5a-airplane-diagram.json renders without an error [5.96ms]
+(pass) u5b-triangulation.json renders without an error [6.61ms]
+(pass) u6-quiz.json renders without an error [6.33ms]
+(pass) u7-content-showcase.json renders without an error [16.45ms]
+(pass) u8-survey.json renders without an error [13.24ms]
+
+packages/artifact-ui/src/composition-format.test.ts:
+(pass) numbers use ja-JP grouping and at most two decimals by default [0.14ms]
+(pass) yen carries the sign and thousands separators [0.07ms]
+(pass) percent shows the value as it is [0.03ms]
+(pass) a value that rounds to zero loses its minus sign [0.04ms]
+(pass) the unit follows the value, with a space before a Latin unit [0.04ms]
+(pass) invalid values show a dash [0.02ms]
+(pass) text and booleans are shown as they read
+
+packages/artifact-ui/src/composition-images.test.ts:
+(pass) resolveCompositionImage > the same spec always gives the same url [0.06ms]
+(pass) resolveCompositionImage > the id comes from the catalog of the theme [0.09ms]
+(pass) resolveCompositionImage > an omitted seed is the seed 1, and other seeds reach other pictures [0.10ms]
+(pass) resolveCompositionImage > filters go into the query; a blur of 0 adds nothing [0.03ms]
+(pass) resolveCompositionImage > srcSet holds the 1x and 2x pictures, filters included [0.01ms]
+(pass) resolveCompositionImage > sizes are rounded to integers and limited to 1..2400 [0.03ms]
+(pass) resolveCompositionImage > the 2x size keeps the ratio when a side reaches the limit [0.02ms]
+(pass) resolveCompositionImage > a placeholder spec resolves to its tone, neutral by default [0.01ms]
+(pass) aspectSize > gives the ratio of each aspect, landscape by default [0.03ms]
+(pass) aspectSize > rounds to integers within 1..2400
+(pass) picsum catalog > nature has at least 6 distinct positive integer ids [0.02ms]
+(pass) picsum catalog > mountain has at least 6 distinct positive integer ids
+(pass) picsum catalog > forest has at least 6 distinct positive integer ids
+(pass) picsum catalog > sea has at least 6 distinct positive integer ids
+(pass) picsum catalog > beach has at least 6 distinct positive integer ids
+(pass) picsum catalog > sky has at least 6 distinct positive integer ids
+(pass) picsum catalog > flower has at least 6 distinct positive integer ids
+(pass) picsum catalog > city has at least 6 distinct positive integer ids
+(pass) picsum catalog > architecture has at least 6 distinct positive integer ids
+(pass) picsum catalog > interior has at least 6 distinct positive integer ids
+(pass) picsum catalog > night has at least 6 distinct positive integer ids
+(pass) picsum catalog > food has at least 6 distinct positive integer ids
+(pass) picsum catalog > coffee has at least 6 distinct positive integer ids
+(pass) picsum catalog > people has at least 6 distinct positive integer ids
+(pass) picsum catalog > animal has at least 6 distinct positive integer ids
+(pass) picsum catalog > workspace has at least 6 distinct positive integer ids
+(pass) picsum catalog > tech has at least 6 distinct positive integer ids
+(pass) picsum catalog > books has at least 6 distinct positive integer ids
+(pass) picsum catalog > travel has at least 6 distinct positive integer ids [0.01ms]
+(pass) picsum catalog > road has at least 6 distinct positive integer ids
+(pass) picsum catalog > winter has at least 6 distinct positive integer ids
+(pass) picsum catalog > autumn has at least 6 distinct positive integer ids
+(pass) picsum catalog > texture has at least 6 distinct positive integer ids
+(pass) picsum catalog > minimal has at least 6 distinct positive integer ids
+
+packages/artifact-ui/src/composition-marketing-components.test.tsx:
+(pass) hero draws the text, display-only labels and a catalog photo [1.28ms]
+(pass) hero background asks for a wider picture and keeps overlay options [0.34ms]
+(pass) hero without an image draws only the text [0.20ms]
+(pass) image view uses the aspect for the frame and the picture size [0.50ms]
+(pass) image view draws a placeholder without any network picture [0.36ms]
+(pass) media card draws its text and a catalog photo [0.36ms]
+(pass) product card shows price, badge and rating with an optional photo [0.99ms]
+(pass) product card without an image still draws [0.23ms]
+(pass) feature card draws its icon, title and body [0.27ms]
+(pass) the design system's icon names are exactly the contract's featureIcons [0.02ms]
+(pass) testimonial draws the quote, person and catalog avatar [0.38ms]
+(pass) testimonial without an avatar shows the initial [0.33ms]
+(pass) cta banner draws labels, and the image variant a catalog backdrop [0.33ms]
+(pass) cta banner accent has no picture; a placeholder image becomes a gradient frame [0.42ms]
+(pass) each view renders nothing for another view's request [0.55ms]
+
+packages/artifact-ui/src/composition-model.test.tsx:
+(pass) computed values follow the state in dependency order [0.08ms]
+(pass) a series makes {x: i, y} points from the first to the last index [0.08ms]
+(pass) series bounds are rounded and an empty range gives an empty series [0.03ms]
+(pass) circular references, bad expressions and unknown names give null [0.06ms]
+(pass) series limits: 1,200 points each and a shared step budget [0.60ms]
+(pass) a series whose point fails is null as a whole [0.04ms]
+(pass) names of Object.prototype read as nothing [0.03ms]
+(pass) the Provider starts at the initial values and recomputes on set [4.41ms]
+(pass) set rounds into min and max and ignores unknown names, computed values and wrong types [0.58ms]
+(pass) an initial value outside min and max is rounded in too [0.16ms]
+(pass) evaluate uses the current values and the locals, and never throws [0.16ms]
+(pass) state returns the definition for input defaults [0.13ms]
+(pass) without a model the hook gives null [0.09ms]
+(pass) a changed definition starts over from its initial values [0.27ms]
+
+packages/artifact-ui/src/composition-validate.test.ts:
+(pass) accepted compositions > a full composition [0.16ms]
+(pass) accepted compositions > definitions without a model or expressions [0.02ms]
+(pass) model position > a nested layout may not hold a model [0.05ms]
+(pass) layout features > {"direction":"form-preview"} [0.04ms]
+(pass) layout features > {"tabs":[{"label":"a","children":[0]}]} [0.02ms]
+(pass) layout features > {"headerChildren":[0]} [0.02ms]
+(pass) layout features > {"draftSource":"x"} [0.02ms]
+(pass) layout features > {"headerLayout":"inline"} [0.02ms]
+(pass) layout features > the allowed directions pass [0.02ms]
+(pass) expressions > syntax errors and unknown functions name the position and a rule [0.13ms]
+(pass) expressions > unknown names are refused in every expression place [0.20ms]
+(pass) expressions > locals only exist where they are defined [0.07ms]
+(pass) expressions > names of Object.prototype are unknown, not inherited [0.06ms]
+(pass) expressions > a model without those names still validates its own references [0.01ms]
+(pass) model definition > circular computed values are refused [0.04ms]
+(pass) model definition > reserved and duplicate names are refused [0.04ms]
+(pass) binds > {"view":"number-input","bind":"plan","label":"l"} [0.03ms]
+(pass) binds > {"view":"slider","bind":"pro","label":"l"} [0.02ms]
+(pass) binds > {"view":"choice","bind":"age","options":["a","b"]} [0.01ms]
+(pass) binds > {"view":"toggle","bind":"age","label":"l"} [0.01ms]
+(pass) binds > {"view":"calculator","resultBind":"plan"} [0.02ms]
+(pass) binds > {"view":"stepper","bind":"pro","steps":[]} [0.01ms]
+(pass) binds > {"view":"diagram","stepBind":"plan","elements":[]} [0.01ms]
+(pass) binds > {"view":"number-input","bind":"ghost","label":"l"} [0.02ms]
+(pass) binds > {"view":"calculator","resultBind":"ghost"} [0.02ms]
+(pass) binds > {"view":"number-input","bind":"atRetire","label":"l"} [0.01ms]
+(pass) binds > {"view":"diagram","stepBind":"balance","elements":[]} [0.01ms]
+(pass) binds > {"view":"chart","kind":"line","series":[{"name":"n","from":"ghost"}]} [0.01ms]
+(pass) binds > {"view":"chart","kind":"line","series":[{"name":"a","points":[]},{"name":"n","from":"atRetire"}]} [0.01ms]
+(pass) binds > {"view":"data-table","columns":[],"series":"atRetire"} [0.01ms]
+(pass) binds > {"view":"data-table","columns":[],"series":"ghost"} [0.01ms]
+(pass) binds > a bind without any model is refused
+(pass) binds > paths of nested layouts are joined [0.02ms]
+(pass) binds > the result never carries a value of the definition [0.04ms]
+(pass) tex > \href{x}{y} is refused [0.03ms]
+(pass) tex > \url{x} is refused [0.01ms]
+(pass) tex > \includegraphics{x} is refused [0.03ms]
+(pass) tex > \htmlClass{a}{b} is refused [0.02ms]
+(pass) tex > \htmlStyle{a}{b} is refused [0.02ms]
+(pass) tex > \def\a{1} is refused [0.01ms]
+(pass) tex > \gdef\a{1} is refused [0.01ms]
+(pass) tex > \edef\a{1} is refused [0.01ms]
+(pass) tex > \xdef\a{1} is refused [0.02ms]
+(pass) tex > \let\a=b is refused [0.01ms]
+(pass) tex > \newcommand{\a}{1} is refused [0.02ms]
+(pass) tex > \renewcommand{\a}{1} is refused [0.01ms]
+(pass) tex > \providecommand{\a}{1} is refused [0.02ms]
+(pass) tex > \DeclareMathOperator{\a}{a} is refused [0.01ms]
+(pass) tex > x = \frac{a}{b} \href{u}{v} is refused [0.01ms]
+(pass) tex > ordinary commands, similar names and line breaks pass [0.08ms]
+(pass) input ranges and choices > an input may not reach outside its state's range [0.06ms]
+(pass) input ranges and choices > a state whose min is above its max is refused [0.01ms]
+(pass) input ranges and choices > a choice starts at an option, or at nothing [0.02ms]
+(pass) data-table columns > rows with an expr column are refused; series needs it [0.04ms]
+(pass) series budget > a literal series over 1,200 points is refused [0.04ms]
+(pass) series budget > all series together stay within 10,000 points [0.09ms]
+(pass) series budget > bounds that read states are tried at the initial value and the ends of the range [0.04ms]
+(pass) series budget > a boolean in a bound is tried both ways [0.02ms]
+(pass) series budget > a bound that reads another computed value is not estimated [0.01ms]
+
+packages/artifact-ui/src/ui-studio-source.test.tsx:
+(pass) the source view shows the canonical text as given, not a re-serialization [10.88ms]
+(pass) the lines changed from the previous revision are marked and removed lines are indicated [5.65ms]
+(pass) nothing is marked when there is no earlier revision or nothing changed [8.92ms]
+(pass) editing the text and applying sends the work, the revision and the text [6.37ms]
+(pass) applying is unavailable while a turn runs, for blank text, and the editor cannot open for a saved work [12.88ms]
+(pass) a work that moved after editing began cannot be overwritten by the old text [7.06ms]
+(pass) a refusal is shown beside the editor and the typed text is kept [5.78ms]
+(pass) the rejected draft is read-only with its issues, can be loaded into the editor, and never reaches the preview [6.51ms]
+(pass) a first draft that failed the check still offers its text, with no preview [2.69ms]
+(pass) the toolbar keeps its own actions with the source editor open [5.77ms]
+
+ 330 pass
+ 0 fail
+ 3441 expect() calls
+Ran 330 tests across 12 files. [2.72s]
+
+ RUN  v4.1.8 /Users/y.noguchi/Code/eumenes
+
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+ ❯ web/src/domains/artifact/test/nested-layout.test.tsx (5 tests | 1 failed) 192ms
+   × depth is limited to four including the root, and one definition holds at most 60 views 4ms
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+ ❯ web/src/domains/artifact/test/composition.test.tsx (13 tests | 1 failed) 308ms
+   × composition rejects invalid nested source, arbitrary props and unbounded layouts 6ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  web/src/domains/artifact/test/composition.test.tsx > composition rejects invalid nested source, arbitrary props and unbounded layouts
+AssertionError: expected [Function] to throw an error
+ ❯ web/src/domains/artifact/test/composition.test.tsx:112:5
+    110|   expect(() =>
+    111|    compileArtifact(JSON.stringify({ view: "layout", children }), snaps…
+    112|   ).toThrow();
+       |     ^
+    113|  });
+    114| test("unsafe host media URL is never rendered as audio or download", (…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  web/src/domains/artifact/test/nested-layout.test.tsx > depth is limited to four including the root, and one definition holds at most 60 views
+AssertionError: expected [Function] to throw an error
+ ❯ web/src/domains/artifact/test/nested-layout.test.tsx:71:57
+     69| test("depth is limited to four including the root, and one definition …
+     70|  expect(() => parseDefinition(JSON.stringify(nest(3)))).not.toThrow();
+     71|  expect(() => parseDefinition(JSON.stringify(nest(4)))).toThrow();
+       |                                                         ^
+     72|  // 5 layouts of 12 text blocks plus the root: 1 + 5 * 13 = 66 views.
+     73|  const wide = layout(
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  2 failed | 8 passed (10)
+      Tests  2 failed | 72 passed (74)
+   Start at  16:11:41
+   Duration  4.17s (transform 4.41s, setup 0ms, import 17.02s, tests 2.60s, environment 7.26s)
+

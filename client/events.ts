@@ -1,3 +1,4 @@
+import { readSse } from "./sse";
 import { ApiError, type Transport } from "./transport";
 
 const pause = (ms: number, signal: AbortSignal) =>
@@ -53,77 +54,42 @@ export function eventsClient(
 		let failures = 0;
 		while (!lifetime.signal.aborted) {
 			if (failures === 0) setState("connecting");
-			const attempt = new AbortController();
-			const signal = AbortSignal.any([lifetime.signal, attempt.signal]);
-			let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
-			let watchdog = setTimeout(() => attempt.abort(), 10_000);
 			try {
-				const response = await transport.call("/api/events", {
-					headers: {
-						Accept: "text/event-stream",
-						...(lastId ? { "Last-Event-ID": lastId } : {}),
+				await readSse(
+					(signal) =>
+						transport.call("/api/events", {
+							headers: {
+								Accept: "text/event-stream",
+								...(lastId ? { "Last-Event-ID": lastId } : {}),
+							},
+							signal,
+						}),
+					{
+						signal: lifetime.signal,
+						connectMs: 10_000,
+						idleMs: options.idleMs ?? 45_000,
+						maxFrame: 65_536,
+						errors: {
+							invalid: "invalid_event_stream",
+							tooLarge: "event_frame_too_large",
+						},
+						onEvent({ event, id }) {
+							if (
+								event !== "reset" &&
+								event !== "change" &&
+								event !== "resumed"
+							)
+								return;
+							if (id) lastId = id;
+							failures = 0;
+							authRefused = false;
+							setState("connected");
+							// "resumed" proves nothing was missed: no invalidation.
+							if (event !== "resumed")
+								notify(event === "reset" ? "reset" : "change");
+						},
 					},
-					signal,
-				});
-				if (
-					!response.headers
-						.get("content-type")
-						?.startsWith("text/event-stream") ||
-					!response.body
-				) {
-					await response.body?.cancel();
-					throw new Error("invalid_event_stream");
-				}
-				reader = response.body.getReader();
-				const streamReader = reader;
-				const stop = () => {
-					void streamReader.cancel().catch(() => {});
-				};
-				signal.addEventListener("abort", stop, { once: true });
-				const decoder = new TextDecoder();
-				let buffer = "",
-					event = "",
-					id = "";
-				try {
-					while (!signal.aborted) {
-						clearTimeout(watchdog);
-						watchdog = setTimeout(
-							() => attempt.abort(),
-							options.idleMs ?? 45_000,
-						);
-						const { done, value } = await reader.read();
-						if (done || signal.aborted) break;
-						buffer += decoder.decode(value, { stream: true });
-						if (buffer.length > 65_536)
-							throw new Error("event_frame_too_large");
-						let end: number;
-						while ((end = buffer.indexOf("\n")) >= 0) {
-							const line = buffer.slice(0, end).replace(/\r$/, "");
-							buffer = buffer.slice(end + 1);
-							if (!line) {
-								if (
-									event === "reset" ||
-									event === "change" ||
-									event === "resumed"
-								) {
-									if (id) lastId = id;
-									failures = 0;
-									authRefused = false;
-									setState("connected");
-									// "resumed" proves nothing was missed: no invalidation.
-									if (event !== "resumed")
-										notify(event === "reset" ? "reset" : "change");
-								}
-								event = "";
-								id = "";
-							} else if (line.startsWith("event:"))
-								event = line.slice(6).trimStart();
-							else if (line.startsWith("id:")) id = line.slice(3).trimStart();
-						}
-					}
-				} finally {
-					signal.removeEventListener("abort", stop);
-				}
+				);
 			} catch (error) {
 				if (!lifetime.signal.aborted && connection === lifetime)
 					setState("failed");
@@ -134,10 +100,6 @@ export function eventsClient(
 					break;
 				}
 				if (error instanceof ApiError && error.status === 404) break;
-			} finally {
-				clearTimeout(watchdog);
-				await reader?.cancel().catch(() => {});
-				reader?.releaseLock();
 			}
 			if (lifetime.signal.aborted) break;
 			setState("failed");

@@ -1,0 +1,67 @@
+bun test v1.4.3 (c6da4a4d3)
+
+api/application/compute/compute-toolchain.test.ts:
+(pass) conversation selects registered Python tool, persists action receipt and returns result to parent [489.80ms]
+(pass) recovering an unknown acceptance sends a new completion notice without duplicating either state [385.59ms]
+
+api/application/compute/compute-review.test.ts:
+(pass) older owned jobs remain addressable outside the bounded model snapshot and replay stays stable [213.99ms]
+
+api/application/compute/compute-http.test.ts:
+(pass) real client and queue use the advertised URL and persist the request before HTTP [32.48ms]
+
+api/application/compute/compute-adapter.test.ts:
+(pass) registered adapter exposes four schemas and stable receipts, then tracks actual completion [33.22ms]
+(pass) authenticated host integration serves stored PNG and downloads SVG without inline HTML [37.33ms]
+(pass) parent cancellation confirms remote termination outside the writer and does not claim it during 202 [85.43ms]
+
+packages/artifact-ui/src/compute-components.test.tsx:
+(pass) registered computation view composes with text and rejects a wrong resource kind [5.63ms]
+
+api/domains/larm/test/compute-client.test.ts:
+(pass) discovery uses root services and authenticated environment [0.30ms]
+(pass) discovery uses profile services and authenticated environment [0.12ms]
+(pass) rejects an unsafe advertised URL before sending credentials: http://other.test/v1/compute [0.11ms]
+(pass) rejects an unsafe advertised URL before sending credentials: http://user:pass@compute.test:9810/v1/compute [0.06ms]
+(pass) rejects an unsafe advertised URL before sending credentials: http://compute.test:9810/v1/compute?token=bad [0.05ms]
+(pass) rejects an unsafe advertised URL before sending credentials: http://compute.test:9810/v1/compute#fragment [0.05ms]
+(pass) missing or wrong capability is unavailable [0.11ms]
+(pass) submit has the stable key, CPU request and no retry on HTTP refusal [0.12ms]
+(pass) cancel uses POST /cancel and 202 is still a live job; DELETE 204 has no JSON [0.17ms]
+(pass) preserves safe HTTP 401 classifications [0.06ms]
+(pass) preserves safe HTTP 409 classifications [0.02ms]
+(pass) preserves safe HTTP 410 classifications [0.02ms]
+(pass) preserves safe HTTP 503 classifications [0.02ms]
+(pass) wrong job ID and MIME/size/PNG content are rejected [0.08ms]
+(pass) DELETE rejects a response belonging to another job [0.04ms]
+
+api/domains/compute/test/compute.test.ts:
+(pass) persists key and body before HTTP, adopts result and replays an identical command [26.35ms]
+(pass) ambiguous submit is never automatically retried; explicit recovery preserves key/body [31.89ms]
+(pass) HTTP success with timeout is a failed calculation [25.88ms]
+(pass) HTTP success with memory_exceeded is a failed calculation [28.02ms]
+(pass) HTTP success with syntax_error is a failed calculation [29.95ms]
+(pass) HTTP success with runtime_error is a failed calculation [29.73ms]
+(pass) HTTP success with queue_timeout is a failed calculation [30.87ms]
+(pass) HTTP success with output_exceeded is a failed calculation [35.56ms]
+(pass) cancel 202 remains running until confirmed, completion race stays completed, another job succeeds [84.21ms]
+(pass) cancelling while submit is in flight waits for the saved jobId then calls cancel [30.66ms]
+(pass) imports artifacts without deleting remote results, and separates artifact failure [56.99ms]
+(pass) submit HTTP 429 is recorded without resending the POST [26.23ms]
+(pass) submit HTTP 503 is recorded without resending the POST [21.23ms]
+(pass) token rotation refuses old jobs and capacity/UTF-8 limits reject before POST [46.11ms]
+(pass) invalidated parent cannot adopt completion and is stopped [47.49ms]
+(pass) reopening the database resumes polling by saved jobId without a new submit [57.19ms]
+(pass) defaulted and explicit CPU request fields share a normalized replay [16.04ms]
+
+api/domains/compute/test/review.test.ts:
+(pass) reconciliation preserves the original deadline and refuses expired unknown submissions [29.96ms]
+(pass) Retry-After cannot postpone deadline cancellation [79.20ms]
+(pass) an accepted asynchronous deletion continues to deletion after the job terminates [73.22ms]
+(pass) one expired artifact does not discard other downloaded artifacts or redownload them on recovery [60.02ms]
+(pass) parent invalidation during artifact IO suppresses completion adoption and notices [36.84ms]
+
+ 45 pass
+ 0 fail
+ 134 expect() calls
+Ran 45 tests across 8 files. [3.05s]

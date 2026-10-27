@@ -1,5 +1,5 @@
 import { statusResponseSchema } from "../api/domains/larm/contracts";
-import type { Transport } from "./transport";
+import { callJson, json, type Transport } from "./transport";
 export function larmClient(transport: Transport) {
 	return {
 		identity: transport.identity,
@@ -11,22 +11,16 @@ export function larmClient(transport: Transport) {
 			signal?: AbortSignal,
 		) {
 			await transport.call(`/api/inference/screen/${encodeURIComponent(id)}`, {
-				method: "PUT",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ revision, active, sentAt }),
+				...json({ revision, active, sentAt }, "PUT"),
 				keepalive: true,
 				signal,
 			});
 		},
 		status: async () =>
-			statusResponseSchema.parse(
-				await (await transport.call("/api/status")).json(),
-			),
+			callJson(transport, statusResponseSchema, "/api/status"),
 		connectLarm: async () =>
-			statusResponseSchema.parse(
-				await (
-					await transport.call("/api/larm/connect", { method: "POST" })
-				).json(),
-			),
+			callJson(transport, statusResponseSchema, "/api/larm/connect", {
+				method: "POST",
+			}),
 	};
 }

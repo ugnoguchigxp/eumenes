@@ -58,6 +58,7 @@ import type {
 	NativeToolCall,
 } from "../../../infrastructure/chat-stream";
 import type { ChatInput, ChatMessage } from "../../larm";
+import type { HttpErrorStatus } from "../../../infrastructure/http";
 export interface Receipt {
 	toolCalls?: NativeToolCall[];
 	requestId: string;
@@ -370,3 +371,8 @@ export const startedProbeSchema = z.object({ id: z.string() });
 export * from "./record-pages";
 export * from "./context-render";
 export * from "./context-budget";
+/** HTTP status of each code the screen presence report throws. */
+export const errorStatus = {
+	screen_presence_capacity: 429,
+	screen_presence_expired: 409,
+} as const satisfies Record<string, HttpErrorStatus>;

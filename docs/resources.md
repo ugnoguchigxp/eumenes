@@ -40,7 +40,5 @@ eumenes://<kind>/<id>[?action=open|play|read]
 | `GET /api/resources/resolve?uri=` | 解決（開く画面・対象・操作） |
 | `GET /api/resources?query=&kind=&since=&until=&limit=` | 種類をまたぐ検索（新しい順） |
 | `GET /api/conversations/:id/resources` | 会話の台帳（`a<n>`）とメッセージごとのリンク |
-| `GET /api/screen/commands?conversationId=&after=` | 画面への指示（開く・再生）の受取 |
-| `POST /api/screen/commands/:seq/receipt` | 受取の結果（`done`・`blocked`・`unavailable`） |
 
-会話エージェントからの操作は、即答の担当 `resources`（`operation`: `find`・`open`・`play`・`read`）で行う。
+画面への指示の経路（`/api/screen/commands`）と、会話エージェント向けの即答の担当 `resources` は 2026-10-25 に削除した。

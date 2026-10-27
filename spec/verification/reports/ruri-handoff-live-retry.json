@@ -1,0 +1,90 @@
+{
+  "kind": "live-compatibility-synthetic-probes",
+  "real_conversation_samples_added": 0,
+  "checks": [
+    {
+      "case": "technical",
+      "model": "ruri-v3-30m-speaking-attitude",
+      "top": "none",
+      "api_label": "none",
+      "classes": 6,
+      "encoder_revision": "24899e5de370b56d179604a007c0d727bf144504",
+      "head_revision": "synthetic-v1-c100-A-9d382201d67e",
+      "calibration_revision": "synthetic-v1-A-e768c18981af",
+      "calibration_status": "synthetic-provisional",
+      "runtime": [
+        "CPUExecutionProvider"
+      ],
+      "precision": "dynamic-int8-encoder-fp32-head",
+      "input_mode": "A",
+      "truncated": false,
+      "state_tokens_dropped": 0,
+      "inference_ms": 5.370061029680073,
+      "round_trip_ms": 19.524332999999842
+    },
+    {
+      "case": "celebration",
+      "model": "ruri-v3-30m-speaking-attitude",
+      "top": "joy",
+      "api_label": "joy",
+      "classes": 6,
+      "encoder_revision": "24899e5de370b56d179604a007c0d727bf144504",
+      "head_revision": "synthetic-v1-c100-A-9d382201d67e",
+      "calibration_revision": "synthetic-v1-A-e768c18981af",
+      "calibration_status": "synthetic-provisional",
+      "runtime": [
+        "CPUExecutionProvider"
+      ],
+      "precision": "dynamic-int8-encoder-fp32-head",
+      "input_mode": "A",
+      "truncated": false,
+      "state_tokens_dropped": 0,
+      "inference_ms": 3.5993269993923604,
+      "round_trip_ms": 13.960541000000376
+    },
+    {
+      "case": "celebration-subset",
+      "api_label": "none",
+      "answer_confidence": 0,
+      "scores_unchanged": true
+    },
+    {
+      "case": "greeting",
+      "model": "ruri-v3-30m-speaking-attitude",
+      "top": "warmth",
+      "api_label": "warmth",
+      "classes": 6,
+      "encoder_revision": "24899e5de370b56d179604a007c0d727bf144504",
+      "head_revision": "synthetic-v1-c100-A-9d382201d67e",
+      "calibration_revision": "synthetic-v1-A-e768c18981af",
+      "calibration_status": "synthetic-provisional",
+      "runtime": [
+        "CPUExecutionProvider"
+      ],
+      "precision": "dynamic-int8-encoder-fp32-head",
+      "input_mode": "A",
+      "truncated": false,
+      "state_tokens_dropped": 0,
+      "inference_ms": 3.03017400437966,
+      "round_trip_ms": 18.59820800000034
+    },
+    {
+      "case": "greeting-subset",
+      "api_label": "none",
+      "answer_confidence": 0,
+      "scores_unchanged": true
+    },
+    {
+      "case": "delivery-tts",
+      "source": "ruri",
+      "emotion": "joy",
+      "motion": "joyful",
+      "tone": "bright",
+      "reason": null,
+      "model": "ruri-v3-30m-speaking-attitude",
+      "calibration_status": "synthetic-provisional",
+      "tts_bytes": 87084,
+      "playback_verified": false
+    }
+  ]
+}

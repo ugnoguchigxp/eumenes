@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { callJson, json, type Transport } from "./transport";
+import { callJson, json, withQuery, type Transport } from "./transport";
 
 const count = z.number().int().nonnegative();
 const reviewStatus = z.enum(["unreviewed", "held", "reviewed"]);
@@ -90,7 +90,9 @@ export function attitudeDatasetClient(t: Transport) {
 			callJson(
 				t,
 				sampleSchema,
-				`${root}/samples/${encodeURIComponent(id)}${showPredictions ? "?predictions=show" : ""}`,
+				withQuery(`${root}/samples/${encodeURIComponent(id)}`, {
+					predictions: showPredictions ? "show" : undefined,
+				}),
 			),
 		attitudeReview: (id: string, review: unknown) =>
 			callJson(

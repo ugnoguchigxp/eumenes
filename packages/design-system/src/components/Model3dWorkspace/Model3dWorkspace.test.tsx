@@ -437,6 +437,34 @@ describe("Model3dWorkspace detail", () => {
 		});
 	});
 
+	it("clears a confirmed source image if it is deleted from the picker", async () => {
+		const user = userEvent.setup();
+		const onDeleteImage = vi.fn().mockResolvedValue(true);
+		const p = props({ onDeleteImage });
+		render(<Model3dWorkspace {...p} />);
+		await user.type(
+			screen.getByRole("textbox", { name: "タイトル" }),
+			"制作途中",
+		);
+		await user.click(screen.getByLabelText("保存した画像から作る"));
+		await user.click(screen.getByRole("button", { name: "画像を選ぶ" }));
+		await user.click(
+			screen.getByRole("button", { name: "ロボットの絵を選ぶ" }),
+		);
+		await user.click(screen.getByRole("button", { name: "この画像を使う" }));
+		await user.click(screen.getByRole("button", { name: "画像を変更" }));
+		await user.click(
+			screen.getByRole("button", { name: "ロボットの絵を削除" }),
+		);
+		await user.click(screen.getByRole("button", { name: "削除する" }));
+		await user.click(screen.getByRole("button", { name: "キャンセル" }));
+		await user.click(
+			screen.getByRole("button", { name: "3Dモデルを生成する" }),
+		);
+		expect(p.onGenerate).not.toHaveBeenCalled();
+		expect(screen.getByText("元にする画像を選んでください。")).toBeTruthy();
+	});
+
 	function detail(p = props({ selectedAsset: asset })) {
 		const viewer = vi.fn((id: string) => <div>viewer:{id}</div>);
 		render(<Model3dWorkspace {...p} renderViewer={viewer} />);

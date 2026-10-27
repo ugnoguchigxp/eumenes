@@ -7,7 +7,7 @@ import {
 } from "../api/domains/agent-runtime/contracts";
 import { publicUrl } from "../api/domains/capabilities/contracts";
 import type { Transport } from "./transport";
-import { json } from "./transport";
+import { callJson, json, withQuery } from "./transport";
 const legacyReport = reportSchema.extend({
 	coverage: z.enum(["complete", "partial"]),
 	verification: z.literal("evidence_linked"),
@@ -97,42 +97,31 @@ const catalog = z.object({
 export function agentRuntimeClient(t: Transport) {
 	return {
 		capabilities: async (signal?: AbortSignal) =>
-			catalog.parse(
-				await (await t.call("/api/capabilities", { signal })).json(),
-			),
+			callJson(t, catalog, "/api/capabilities", { signal }),
 		agentTasks: async (rootRunId: string, signal?: AbortSignal) =>
-			taskDtoSchema
-				.array()
-				.parse(
-					await (
-						await t.call(
-							`/api/agent-tasks?rootRunId=${encodeURIComponent(rootRunId)}`,
-							{ signal },
-						)
-					).json(),
-				),
-		agentTask: async (id: string, signal?: AbortSignal) =>
-			taskDtoSchema.parse(
-				await (
-					await t.call(`/api/agent-tasks/${encodeURIComponent(id)}`, { signal })
-				).json(),
+			callJson(
+				t,
+				taskDtoSchema.array(),
+				withQuery("/api/agent-tasks", { rootRunId }),
+				{ signal },
 			),
+		agentTask: async (id: string, signal?: AbortSignal) =>
+			callJson(t, taskDtoSchema, `/api/agent-tasks/${encodeURIComponent(id)}`, {
+				signal,
+			}),
 		agentReport: async (id: string, signal?: AbortSignal) =>
-			report.nullable().parse(
-				await (
-					await t.call(`/api/agent-tasks/${encodeURIComponent(id)}/report`, {
-						signal,
-					})
-				).json(),
+			callJson(
+				t,
+				report.nullable(),
+				`/api/agent-tasks/${encodeURIComponent(id)}/report`,
+				{ signal },
 			),
 		cancelAgentTask: async (id: string) =>
-			taskDtoSchema.parse(
-				await (
-					await t.call(
-						`/api/agent-tasks/${encodeURIComponent(id)}/cancel`,
-						json({}),
-					)
-				).json(),
+			callJson(
+				t,
+				taskDtoSchema,
+				`/api/agent-tasks/${encodeURIComponent(id)}/cancel`,
+				json({}),
 			),
 	};
 }

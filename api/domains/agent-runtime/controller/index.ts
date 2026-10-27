@@ -1,15 +1,22 @@
 import type { Hono } from "hono";
+import { z } from "zod";
+import { parseQuery } from "../../../infrastructure/http";
 import type { AgentRuntime } from "../service";
+const executionsQuery = z.object({
+	conversationId: z.string().min(1).max(120),
+});
+const tasksQuery = z.object({ rootRunId: z.string().min(1).max(120) });
 export function registerAgentRuntime(
 	app: Hono,
 	service: AgentRuntime,
 	cancelRoot: (rootRunId: string) => Promise<unknown>,
 ) {
 	app.get("/api/agent-executions", (c) => {
-		const conversationId = c.req.query("conversationId");
-		if (!conversationId || conversationId.length > 120)
-			throw new Error("invalid_conversation_id");
-		return c.json(service.executions.list(conversationId));
+		const query = parseQuery(c, executionsQuery, {
+			code: "invalid_conversation_id",
+		});
+		if (!query.ok) return query.response;
+		return c.json(service.executions.list(query.data.conversationId));
 	});
 	app.get("/api/agent-executions/:id", (c) => {
 		const view = service.executions.get(c.req.param("id"));
@@ -17,9 +24,9 @@ export function registerAgentRuntime(
 		return c.json(view);
 	});
 	app.get("/api/agent-tasks", (c) => {
-		const root = c.req.query("rootRunId");
-		if (!root || root.length > 120) throw new Error("invalid_root_run_id");
-		return c.json(service.list(root));
+		const query = parseQuery(c, tasksQuery, { code: "invalid_root_run_id" });
+		if (!query.ok) return query.response;
+		return c.json(service.list(query.data.rootRunId));
 	});
 	app.get("/api/agent-tasks/:id/report", (c) =>
 		c.json(service.report(c.req.param("id"))),

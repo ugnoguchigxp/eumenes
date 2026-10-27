@@ -1,21 +1,18 @@
 import type { Context, Hono } from "hono";
 import { z } from "zod";
-import { settingSave } from "../contracts";
+import { errorStatus, settingSave } from "../contracts";
+import { parseJsonBody, parseQuery } from "../../../infrastructure/http";
 import type { BrowserService } from "../service";
 
 const noStore = { "Cache-Control": "no-store" };
 /** Bun passes its server as the Hono env; only the per-request idle timeout is used. */
 type BunServer = { timeout?: (request: Request, seconds: number) => void };
-const notFound = new Set([
-	"browser_task_not_found",
-	"browser_capture_not_found",
-]);
-const conflict = new Set(["browser_capture_not_ready"]);
 
+const tasksQuery = z.object({ conversationId: z.string().min(1).max(512) });
+
+/** A code with a status of its own reaches the application's error handler; anything else is `browser_failed`. */
 function failure(c: Context, e: unknown) {
-	const code = e instanceof Error ? e.message : "";
-	if (notFound.has(code)) return c.json({ error: code }, 404);
-	if (conflict.has(code)) return c.json({ error: code }, 409);
+	if (e instanceof Error && Object.hasOwn(errorStatus, e.message)) throw e;
 	return c.json({ error: "browser_failed" }, 500);
 }
 
@@ -34,8 +31,10 @@ export function registerBrowser(app: Hono, s: BrowserService, owner: string) {
 		),
 	);
 	app.put("/api/browser/setting", async (c) => {
-		const body = settingSave.safeParse(await c.req.json().catch(() => null));
-		if (!body.success) return c.json({ error: "invalid_browser_setting" }, 400);
+		const body = await parseJsonBody(c, settingSave, {
+			code: "invalid_browser_setting",
+		});
+		if (!body.ok) return body.response;
 		try {
 			return c.json(
 				await s.setting.save(body.data.executablePath),
@@ -43,8 +42,6 @@ export function registerBrowser(app: Hono, s: BrowserService, owner: string) {
 				noStore,
 			);
 		} catch (e) {
-			if (e instanceof Error && e.message === "browser_executable_invalid")
-				return c.json({ error: "browser_executable_invalid" }, 400);
 			return failure(c, e);
 		}
 	});
@@ -54,13 +51,8 @@ export function registerBrowser(app: Hono, s: BrowserService, owner: string) {
 		try {
 			return c.json(await s.setting.browse(), 200, noStore);
 		} catch (e) {
-			const code = e instanceof Error ? e.message : "";
-			if (code === "browser_executable_invalid")
-				return c.json({ error: code }, 400);
-			if (code === "browser_browse_busy") return c.json({ error: code }, 409);
-			if (code === "browser_browse_unsupported")
-				return c.json({ error: code }, 501);
-			if (code === "browser_browse_failed") return c.json({ error: code }, 500);
+			if (e instanceof Error && e.message === "browser_browse_failed")
+				return c.json({ error: e.message }, 500);
 			return failure(c, e);
 		}
 	});
@@ -71,15 +63,12 @@ export function registerBrowser(app: Hono, s: BrowserService, owner: string) {
 		c.json({ tabs: await s.refreshTabs() }, 200, noStore),
 	);
 	app.get("/api/browser/tasks", (c) => {
-		const conversationId = z
-			.string()
-			.min(1)
-			.max(512)
-			.safeParse(c.req.query("conversationId"));
-		if (!conversationId.success)
-			return c.json({ error: "invalid_browser_conversation" }, 400);
+		const query = parseQuery(c, tasksQuery, {
+			code: "invalid_browser_conversation",
+		});
+		if (!query.ok) return query.response;
 		return c.json(
-			{ tasks: s.listTasks(owner, conversationId.data) },
+			{ tasks: s.listTasks(owner, query.data.conversationId) },
 			200,
 			noStore,
 		);

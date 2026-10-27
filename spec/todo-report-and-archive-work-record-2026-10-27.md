@@ -61,7 +61,7 @@
 - 部分・結合: `bun test api/domains/dialogue/test/todo-screen.test.ts api/application/toolchain/agency-todos-screen.test.ts api/application/agency/host-work.test.ts` — 20件通過。
 - 登録dry-run: `bun run toolchain:bundle -- check api/domains/capabilities/bundles/agency-todos-screen.bundle.json` — 登録可能。
 - `verify`（agent-runtime・artifact・capabilities・dialogue）— 既存のdialogueのサイズ制限違反で停止。該当箇所は編集していない。
-- `verify`（agent-runtime・artifact・capabilities）— 型・build・静的工程、Bun 605件、Web 90件は通過したが、実行中の別作業による入力変更を検知して **invalidated**。実行全体を合格とは扱わない。記録: `verification-reports/runs/2026-10-26T23-26-54-090Z-22e8ff62-05ec-4fd6-8808-c07545ca71d4/report.json`。
+- `verify`（agent-runtime・artifact・capabilities）— 型・build・静的工程、Bun 605件、Web 90件は通過したが、実行中の別作業による入力変更を検知して **invalidated**。実行全体を合格とは扱わない。記録: `spec/verification/reports/runs/2026-10-26T23-26-54-090Z-22e8ff62-05ec-4fd6-8808-c07545ca71d4/report.json`。
 - `bun run --cwd packages/design-system test src/components/ServerDataTable/ServerDataTable.test.tsx` — 2件通過。
 - `bunx vitest run web/src/domains/agent-runtime/toolchain-adapter.test.tsx` — 最終差分で個別に4件通過。まとめた検証の無効化と区別して記録した。
 - `bunx playwright test tests/browser/agency-todos.spec.ts` — 1件通過。アーカイブ未選択時の取得なし、選択後20行、ページ操作なし、activeページ操作、狭い画面、空一覧を確認。アプリ・fixtureサーバーを起動しないroute fixture方式。画像は `test-results/todo-artifact/`。

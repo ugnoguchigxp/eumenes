@@ -54,6 +54,6 @@
 
 可視性・通常配置・対照・追加診断の全記録で、正式計数とtimingの欠測・重複・未対応0、同じboot/config、`coverageComplete=true`を確認した。開始前に固定した対象492ソースファイルに、試験終了までの変更はない。並行作業の設計文書・索引には手を加えていない。
 
-記録は`verification-reports/larm-recheck-2026-10-24-1792811333228/`に保存した。`contract-before.json`・`contract-after.json`、各runnerの結果・安全な計測ログ、`diagnostic.json`、集計`summary.json`を含む。会話の本文、Providerの生応答、credential、保存済み設定は記録していない。
+記録は`verification-reports/larm-recheck-2026-10-24-1792811333228/`（ローカルの検証記録。リポジトリには含めない）に保存した。`contract-before.json`・`contract-after.json`、各runnerの結果・安全な計測ログ、`diagnostic.json`、集計`summary.json`を含む。会話の本文、Providerの生応答、credential、保存済み設定は記録していない。
 
 部分の公開契約確認から、既存LARM adapterを通す合成liveまで実施した。製品の公開会話入口・ブラウザ・音声の通し受入、新ContextWindow設計の実装、無出力先読み・取消・保持期限・KV消去の受入は未実施。今回の変更はこの検証記録だけで、製品コード・既存runner・テスト期待値は変更していない。

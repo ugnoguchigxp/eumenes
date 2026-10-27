@@ -1,5 +1,9 @@
 export type WorkspaceAction =
 	| "recognition-select"
+	| "recognition-library-select"
+	| "recognition-library-refresh"
+	| "recognition-save-recheck"
+	| "recognition-save-resume"
 	| "recognition-cancel"
 	| "recognition-refresh"
 	| "recognition-recheck"

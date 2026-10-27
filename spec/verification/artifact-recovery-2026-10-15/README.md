@@ -34,7 +34,7 @@ World有効時は `GET /api/toolchain-artifacts` が `world_host_transaction_req
 
 看板の入力schema `kanban-add` / `kanban-edit` とClaude Codeのtoolも@2。両担当のprofileとskillは@1を使用。担当の意味判断や実行動作は変更していない。
 
-実行中ジョブ0件・terminal session0件を確認して開発サーバーを正常終了し、既存の起動時Seed登録で復元した。製品DBへの直接SQL書込み・削除は行っていない。復元前カタログはローカルの `verification-reports/artifact-recovery/catalog-before.json`（0600）に退避。
+実行中ジョブ0件・terminal session0件を確認して開発サーバーを正常終了し、既存の起動時Seed登録で復元した。製品DBへの直接SQL書込み・削除は行っていない。復元前カタログはローカルの `verification-reports/artifact-recovery/catalog-before.json`（0600。リポジトリには含めない）に退避。
 
 | 確認項目 | 復元前 | 復元後 |
 | --- | --- | --- |
@@ -62,7 +62,7 @@ World有効時は `GET /api/toolchain-artifacts` が `world_host_transaction_req
 - `verify --domain terminals`: 成功（backend 57件、Web 8件）。
 - 変更した結合試験のlint・format: 成功。
 - 稼働API: 一覧21件・詳細21件成功。復旧後一覧request ID `6d02312a-2716-4a89-8112-01a924a158e4`。新boot `df2a40ab-65d2-4ac4-be18-359b2258b444` の確認時点でwarn/error 0件。
-- 実ブラウザ: メニュー11項目、タスクボード、設定Hubの表示を確認。読取りのみで、新規タスク実行や保存設定の変更は行っていない。メニュー画像は `verification-reports/artifact-recovery/restored-menu.png`。
+- 実ブラウザ: メニュー11項目、タスクボード、設定Hubの表示を確認。読取りのみで、新規タスク実行や保存設定の変更は行っていない。メニュー画像は `verification-reports/artifact-recovery/restored-menu.png`（ローカルの検証記録。リポジトリには含めない）。
 
 未完了の全体ゲート（担当外の既存問題）:
 

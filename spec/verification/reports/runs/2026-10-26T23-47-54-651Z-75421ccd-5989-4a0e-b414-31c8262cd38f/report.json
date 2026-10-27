@@ -1,0 +1,184 @@
+{
+  "schemaVersion": 1,
+  "runId": "2026-10-26T23-47-54-651Z-75421ccd-5989-4a0e-b414-31c8262cd38f",
+  "startedAt": "2026-10-26T23:47:54.651Z",
+  "scope": {
+    "all": false,
+    "selected": [
+      "dialogue"
+    ]
+  },
+  "baseCommit": "938f9d9faf77fadcf6388eae64e9568550a5c0d7",
+  "revision": "78b1abdde0a7a8aff7af84d0da0bc5693d341b5eecbe38777c8d8dd5b9d93755",
+  "runtime": {
+    "bun": "1.4.4",
+    "node": "26.3.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "ci": false,
+    "runner": null
+  },
+  "result": "invalidated",
+  "steps": [
+    {
+      "name": "inventory",
+      "status": "pass",
+      "ms": 65
+    },
+    {
+      "name": "boundaries",
+      "status": "pass",
+      "ms": 3076
+    },
+    {
+      "name": "system-context",
+      "status": "pass",
+      "ms": 239
+    },
+    {
+      "name": "size-budget",
+      "status": "pass",
+      "ms": 2418,
+      "warnings": [
+        "size-budget: new file over 800 lines: api/application/agency/host.ts (989)",
+        "size-budget: new function over 300 lines: api/application/agency/host.ts#createAgencyHost (852)",
+        "size-budget: new function over 300 lines: api/application/server-services.ts#buildServices (343)",
+        "size-budget: new test file over 1000 lines: api/domains/voice-dialogue/test/settings-integration.test.ts (1001)"
+      ]
+    },
+    {
+      "name": "sql-boundaries",
+      "status": "pass",
+      "ms": 1460
+    },
+    {
+      "name": "domain-docs",
+      "status": "pass",
+      "ms": 13,
+      "warnings": [
+        "docs/domains.md: domain 表は最新です"
+      ]
+    },
+    {
+      "name": "format",
+      "status": "fail",
+      "ms": 469,
+      "error": "Error: not formatted: api/domains/dialogue/repository/index.ts"
+    },
+    {
+      "name": "lint",
+      "status": "not_run",
+      "ms": 0
+    },
+    {
+      "name": "design-system typecheck",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "--cwd",
+        "packages/design-system",
+        "typecheck"
+      ],
+      "status": "not_run",
+      "ms": 0
+    },
+    {
+      "name": "design-system build",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "--cwd",
+        "packages/design-system",
+        "build"
+      ],
+      "status": "not_run",
+      "ms": 0
+    },
+    {
+      "name": "typecheck",
+      "status": "not_run",
+      "ms": 0
+    },
+    {
+      "name": "bun tests",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "test",
+        "./api/domains/dialogue/test/active-run.test.ts",
+        "./api/domains/dialogue/test/answer-streams.test.ts",
+        "./api/domains/dialogue/test/attachment-notes.test.ts",
+        "./api/domains/dialogue/test/brief-reply.test.ts",
+        "./api/domains/dialogue/test/command-interactions-http.test.ts",
+        "./api/domains/dialogue/test/command-interactions-lifecycle.test.ts",
+        "./api/domains/dialogue/test/command-interactions-questions.test.ts",
+        "./api/domains/dialogue/test/command-interactions-work.test.ts",
+        "./api/domains/dialogue/test/command-interactions.test.ts",
+        "./api/domains/dialogue/test/context-eval/analysis.test.ts",
+        "./api/domains/dialogue/test/context-eval/case-schema.test.ts",
+        "./api/domains/dialogue/test/context-eval/checks-judge.test.ts",
+        "./api/domains/dialogue/test/context-eval/freeze.test.ts",
+        "./api/domains/dialogue/test/context-eval/generation-runner.test.ts",
+        "./api/domains/dialogue/test/context-eval/integrity.test.ts",
+        "./api/domains/dialogue/test/context-eval/materialize.test.ts",
+        "./api/domains/dialogue/test/context-eval/pipeline.test.ts",
+        "./api/domains/dialogue/test/context-eval/run.test.ts",
+        "./api/domains/dialogue/test/context-eval/scoring.test.ts",
+        "./api/domains/dialogue/test/context-eval/trajectory.test.ts",
+        "./api/domains/dialogue/test/context-keeper.test.ts",
+        "./api/domains/dialogue/test/context-system.test.ts",
+        "./api/domains/dialogue/test/controller.test.ts",
+        "./api/domains/dialogue/test/conversation-input.test.ts",
+        "./api/domains/dialogue/test/conversation-output.test.ts",
+        "./api/domains/dialogue/test/dialogue.test.ts",
+        "./api/domains/dialogue/test/error-report.test.ts",
+        "./api/domains/dialogue/test/execution-notices.test.ts",
+        "./api/domains/dialogue/test/generation-prepare.test.ts",
+        "./api/domains/dialogue/test/generation-tools.test.ts",
+        "./api/domains/dialogue/test/generation-work.test.ts",
+        "./api/domains/dialogue/test/generation.test.ts",
+        "./api/domains/dialogue/test/media-deadline.test.ts",
+        "./api/domains/dialogue/test/memory-integration.test.ts",
+        "./api/domains/dialogue/test/pinned-operation.test.ts",
+        "./api/domains/dialogue/test/queue.test.ts",
+        "./api/domains/dialogue/test/reconcile-agents.test.ts",
+        "./api/domains/dialogue/test/resources.test.ts",
+        "./api/domains/dialogue/test/resubmit.test.ts",
+        "./api/domains/dialogue/test/run-end.test.ts",
+        "./api/domains/dialogue/test/specialist-document.test.ts",
+        "./api/domains/dialogue/test/specialist-lifecycle.test.ts",
+        "./api/domains/dialogue/test/specialist-memory.test.ts",
+        "./api/domains/dialogue/test/specialist-turn.test.ts",
+        "./api/domains/dialogue/test/specialist.test.ts",
+        "./api/domains/dialogue/test/speech-delivery.test.ts",
+        "./api/domains/dialogue/test/todo-screen.test.ts"
+      ],
+      "status": "not_run",
+      "ms": 0
+    },
+    {
+      "name": "web tests",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "x",
+        "--no-install",
+        "vitest",
+        "run",
+        "web/src/domains/dialogue/test/hooks.test.tsx",
+        "web/src/domains/dialogue/test/progress.test.tsx",
+        "web/src/domains/dialogue/test/specialist.test.tsx"
+      ],
+      "status": "not_run",
+      "ms": 0
+    }
+  ],
+  "totalMs": 8139,
+  "integrityErrors": [
+    "Source changed during verification"
+  ],
+  "build": {
+    "sharedOutput": true
+  },
+  "stopReason": "Error: not formatted: api/domains/dialogue/repository/index.ts; Source changed during verification",
+  "finalRevision": "fbf0d4a7d0ca81d2f97c4c698a06518940f4d3d523b3d76941aeb3a093d05e4c",
+  "finishedAt": "2026-10-26T23:48:03.355Z"
+}

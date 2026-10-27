@@ -1,0 +1,8 @@
+
+Running 1 test using 1 worker
+
+(node:56530) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 tests/browser/voice.spec.ts:139:2 › light avatar rendering › light avatar stays behind usable chat and releases its canvas on navigation (33.1s)
+
+  1 passed (34.4s)

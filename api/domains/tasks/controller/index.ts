@@ -1,4 +1,6 @@
 import type { Hono } from "hono";
+import { z } from "zod";
+import { parseQuery, queryInt } from "../../../infrastructure/http";
 import { readBounded } from "../../../infrastructure/bounded-read";
 import { createTaskSchema, taskListQuerySchema } from "../contracts";
 import type { TasksService } from "../service";
@@ -16,6 +18,10 @@ async function body(c: { req: { raw: Request } }) {
 		throw new Error("invalid_task_input");
 	}
 }
+const eventsQuery = z.object({
+	cursor: z.string().default("0"),
+	limit: queryInt.default(50),
+});
 export function registerTasks(app: Hono, tasks: TasksService) {
 	app.post("/api/tasks", async (c) => {
 		const parsed = createTaskSchema.safeParse(await body(c));
@@ -23,20 +29,20 @@ export function registerTasks(app: Hono, tasks: TasksService) {
 		return c.json(await tasks.create(parsed.data), 202);
 	});
 	app.get("/api/tasks", (c) => {
-		const parsed = taskListQuerySchema.safeParse(c.req.query());
-		if (!parsed.success) return c.json({ error: "invalid_task_query" }, 400);
+		const parsed = parseQuery(c, taskListQuerySchema, {
+			code: "invalid_task_query",
+		});
+		if (!parsed.ok) return parsed.response;
 		return c.json(tasks.list(parsed.data));
 	});
 	app.get("/api/tasks/:id", (c) => c.json(tasks.get(c.req.param("id"))));
-	app.get("/api/tasks/:id/events", (c) =>
-		c.json(
-			tasks.events(
-				c.req.param("id"),
-				c.req.query("cursor") ?? "0",
-				Number(c.req.query("limit") ?? 50),
-			),
-		),
-	);
+	app.get("/api/tasks/:id/events", (c) => {
+		const query = parseQuery(c, eventsQuery, { code: "invalid_cursor" });
+		if (!query.ok) return query.response;
+		return c.json(
+			tasks.events(c.req.param("id"), query.data.cursor, query.data.limit),
+		);
+	});
 	for (const op of ["start", "amend", "answers", "stop", "forget"] as const)
 		app.post(`/api/tasks/:id/${op}`, async (c) => {
 			const data = await body(c);

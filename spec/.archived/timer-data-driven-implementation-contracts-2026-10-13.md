@@ -67,7 +67,7 @@
 1. 凍結ケース `tests/acceptance/nl/cases/*.json`（設計書§10.2の主caseと別ケース群）と criteria `tests/acceptance/nl/criteria/*.json`、`tests/acceptance/nl/frozen.lock.json`（case/criteria/fixture の sha256。runner は不一致で起動拒否）。selector・クリック順を持たない。
 2. runner `scripts/nl-acceptance.ts`: 隔離DB・隔離サーバ（既存 browser fixture server の起動方法に倣う）、Playwright chromium（既存 `@playwright/test`）、各stepで screenshot と accessibility snapshot（role/name/ref）を tester へ渡し、tester は `{ action: click|fill|press|wait|done|give_up, ref?, text?, reason }` の JSON を返す。許可操作は画面操作だけ（evaluate・network改変・API直叩きなし）。tester モデルは LARM の画像入力対応モデル（ornith1.5、手順は `docs/larm.md`・`docs/chat-images.md`・既存 `scripts/*live*.ts` に倣い、接続先は保存済み設定から取得）をアダプター越しに使い、差替え可能にする。予算（wallSeconds/maxActions/maxModelCalls/maxCostUSD）で停止。
 3. 判定host `scripts/nl-acceptance/judge.ts`: readonly HTTP（`GET /api/timers` 等）と証拠から criteria C1〜C5 等を判定、`verdict: success|failure|inconclusive` と `failureClass: product|tester|environment|criteria|undetermined`。AI自己申告では成功にしない。
-4. 証拠: `verification-reports/nl-acceptance/<runId>/manifest.json`（commit、digest群、browser/viewport/locale/timezone、driver版、tester/製品モデル、開始終了、token・呼出し数・action数・費用、停止理由）、`steps.jsonl`、screenshots。群: `baseline`（現行UIのURLを外部指定）、`standard`、`variant-a`、`variant-b`。
+4. 証拠: `verification-reports/nl-acceptance/<runId>/manifest.json`（ローカルの検証記録でリポジトリには含めない。commit、digest群、browser/viewport/locale/timezone、driver版、tester/製品モデル、開始終了、token・呼出し数・action数・費用、停止理由）、`steps.jsonl`、screenshots。群: `baseline`（現行UIのURLを外部指定）、`standard`、`variant-a`、`variant-b`。
 5. 受入器自体の試験: 判定器に二重開始・180分誤変換・偽成功表示・別timer変更の合成証拠を与え検出することを `tests/acceptance/nl/judge.test.ts` で確認（製品コードに故障を混入しない）。
 
 ### 親担当（application・timers・共有ファイル・文書）
@@ -80,7 +80,7 @@
 
 - 実装: W1〜W5 と親担当の全項目。独立レビュー1回（high 0、medium 3、low 9）を受け、全件を1回の修正パスで対応した（host発行の選択肢、interactionのrequestId/issuedAtのdomainへの伝搬、binding突合、送信timeout、503の確定拒否分類、outbox満杯時の拒否 ほか）。切戻しは binding を持つrevision間で行う（§1の注記）。
 - 固定試験: `bun run verify:all` で size-budget・SQL境界・domain文書・format・lint・typecheck・backend 1953 pass・Web 442・client 360・design-system 1139・web build が通過。Playwright は 65 pass / 3 fail。失敗3件（`voice.spec.ts` のexcalidraw operations再取得回数、`settings-voice-sample.spec.ts`、`timers.spec.ts` の期限到達後TTS再生）は、いずれも本変更の外の音声・Excalidraw経路で、他作業の未commit変更と重なるため原因は未確定。`tests/browser/timers.spec.ts` の他9件は通過。
-- 自然言語受入: `bun test tests/acceptance` 67 pass（判定器・lock・driver結合）。pilot（主case v2、UI専用surface、tester = LARM ornith1.5、4群×3、費用0 USD）は **12 run 中 success 0**（failure 11、inconclusive 1）。基準（各群3/3）に未達。baseline（移行前UI）も同じく0/3で、testerが右上の入口から画面を開けない・未実施の操作を完了と申告する・3分を3秒と誤入力する、が主因（判定は全てhost状態から未達成で、AI自己申告を成功扱いしていない）。testerモデルの能力不足が支配的で、新UIと旧UIの差は測れていない。pilot実施中に受入runnerの欠陥を3件修正した（UI専用surfaceの未定義→会話欄の除外、初回観測のtimeout→読込み待ちと再試行、境界判定のfail-open→fail-closed）。無効試行の証拠は `verification-reports/nl-acceptance/aborted-harness-v1/`・`v2/` に分けて保存。
+- 自然言語受入: `bun test tests/acceptance` 67 pass（判定器・lock・driver結合）。pilot（主case v2、UI専用surface、tester = LARM ornith1.5、4群×3、費用0 USD）は **12 run 中 success 0**（failure 11、inconclusive 1）。基準（各群3/3）に未達。baseline（移行前UI）も同じく0/3で、testerが右上の入口から画面を開けない・未実施の操作を完了と申告する・3分を3秒と誤入力する、が主因（判定は全てhost状態から未達成で、AI自己申告を成功扱いしていない）。testerモデルの能力不足が支配的で、新UIと旧UIの差は測れていない。pilot実施中に受入runnerの欠陥を3件修正した（UI専用surfaceの未定義→会話欄の除外、初回観測のtimeout→読込み待ちと再試行、境界判定のfail-open→fail-closed）。無効試行の証拠は `verification-reports/nl-acceptance/aborted-harness-v1/`・`v2/`（ローカルの検証記録。リポジトリには含めない）に分けて保存。
 - 未実施: 会話LLMを使うcase（`--with-product-llm`）、別testerモデルでの群、実機器受入。
 
 ## 4. 実装後の変更（2026-10-14）

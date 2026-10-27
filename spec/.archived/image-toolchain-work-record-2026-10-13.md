@@ -15,9 +15,9 @@
 
 実施結果（全体検証前）:
 - 固定部分・結合24件成功（音楽の既存8件を含む）。生成／表示のみ／不正計画／外部失敗／取得失敗、重複受付、取消後遅着、権限失効、一覧のorigin・ID・MIMEを確認。WebのJSON合成と部品3件も成功。
-- 実API生成1回: image_cd1a01e35d7d416198d1fa54df71d26a、512×384 PNG、258329 bytes、13822ms。画像をデコードして寸法・表示を確認。verification-reports/image-live/lighthouse.png と events.json。確認画像はLARMに残す。
+- 実API生成1回: image_cd1a01e35d7d416198d1fa54df71d26a、512×384 PNG、258329 bytes、13822ms。画像をデコードして寸法・表示を確認。`verification-reports/image-live/lighthouse.png`（ローカルの検証記録。リポジトリには含めない）と `spec/verification/reports/image-live/events.json`。確認画像はLARMに残す。
 - 実LLM一覧1回目: 1f0fded3-2175-4db5-905d-3cfbbc455a91、操作なしに「開きます」と返答。新しいtoolchain summaryを「表示には関数実行が必要」と修正。個別発話を条件分岐で処理しない。
-- 修正後実LLM一覧: 334584dd-3547-4ba8-b705-a6243b706090、image関数→action=library計画→結果採用→回答、生成POST0回、LARM一覧35件。verification-reports/image-toolchain/2026-10-13T02-34-26.841Z/（実際のevents.jsonを参照）。
+- 修正後実LLM一覧: 334584dd-3547-4ba8-b705-a6243b706090、image関数→action=library計画→結果採用→回答、生成POST0回、LARM一覧35件。`verification-reports/image-toolchain/2026-10-13T02-34-26.841Z/`（実際のevents.jsonを参照。ローカルの検証記録でリポジトリには含めない）。
 - ブラウザ: プロンプト・任意寸法、タブでの草稿保持、履歴・ダウンロード、生成完了、拡大、狭幅、再読込・再表示を確認。ローカル認証URLの除外を特定し、画像専用の許可パスだけを表示可能にした。既存の一般画像URL許可範囲は拡張しない。
 - ブラウザのcold開始から再表示まで21.7秒。初回30秒枠の残りが再表示操作中に尽きたため、既存重いfixtureと同じ60秒枠に設定。期待内容や失敗条件は維持。
 - User steering: UIの実装に先行したことを指摘された後はUI作業を止め、実API画像の生成・取得・表示を先に完了し、その後でUI検証を再開した。

@@ -1,10 +1,18 @@
 import { dotsPackageInput } from "../contracts/dots";
 import { z } from "zod";
 import { bodyLimit } from "hono/body-limit";
-import { parseJsonBody } from "../../../infrastructure/http";
+import {
+	parseJsonBody,
+	parseQuery,
+	queryInt,
+} from "../../../infrastructure/http";
 import { requirementProfileData } from "../contracts";
 import type { Hono } from "hono";
 import type { Capabilities } from "../service";
+const pageQuery = z.object({
+	cursor: z.string().default(""),
+	limit: queryInt.pipe(z.number().min(1).max(50)).default(50),
+});
 export function registerCapabilities(app: Hono, service: Capabilities) {
 	app.get("/api/capabilities/dots-packages", (c) =>
 		c.json(service.listDotsPackages()),
@@ -31,14 +39,10 @@ export function registerCapabilities(app: Hono, service: Capabilities) {
 		}),
 	);
 	app.get("/api/capabilities/requirements", (c) => {
-		const limit = c.req.query("limit") ?? "50";
-		if (!/^\d+$/.test(limit) || Number(limit) < 1 || Number(limit) > 50)
-			throw new Error("invalid_capability_limit");
+		const page = parseQuery(c, pageQuery, { code: "invalid_capability_limit" });
+		if (!page.ok) return page.response;
 		return c.json(
-			service.listRequirementProfiles(
-				c.req.query("cursor") ?? "",
-				Number(limit),
-			),
+			service.listRequirementProfiles(page.data.cursor, page.data.limit),
 		);
 	});
 	app.get("/api/capabilities/requirements/:id", (c) => {
@@ -126,9 +130,8 @@ export function registerCapabilities(app: Hono, service: Capabilities) {
 		);
 	});
 	app.get("/api/capabilities", (c) => {
-		const raw = c.req.query("limit") ?? "50";
-		if (!/^\d+$/.test(raw) || Number(raw) < 1 || Number(raw) > 50)
-			throw new Error("invalid_capability_limit");
-		return c.json(service.list(c.req.query("cursor") ?? "", Number(raw)));
+		const page = parseQuery(c, pageQuery, { code: "invalid_capability_limit" });
+		if (!page.ok) return page.response;
+		return c.json(service.list(page.data.cursor, page.data.limit));
 	});
 }

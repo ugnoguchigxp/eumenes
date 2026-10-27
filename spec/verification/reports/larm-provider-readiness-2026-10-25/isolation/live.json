@@ -1,0 +1,100 @@
+[
+  {
+    "mode": "llm_failed",
+    "lane": "real_connection_with_controlled_consumer_fault",
+    "faultAt": "get_readiness",
+    "asrMs": 312,
+    "adopted": true,
+    "ttsSucceeded": true,
+    "deletesBeforeClose": 0,
+    "renews": 0,
+    "claims": [
+      [
+        "tts"
+      ],
+      [
+        "asr"
+      ]
+    ],
+    "pass": true
+  },
+  {
+    "mode": "asr_failed",
+    "lane": "real_connection_with_controlled_consumer_fault",
+    "faultAt": "get_readiness",
+    "asrMs": 14,
+    "adopted": false,
+    "code": "larm_provider_failed",
+    "ttsSucceeded": true,
+    "deletesBeforeClose": 0,
+    "renews": 0,
+    "claims": [
+      [
+        "tts"
+      ]
+    ],
+    "pass": true
+  },
+  {
+    "mode": "asr_timeout",
+    "lane": "real_connection_with_controlled_consumer_fault",
+    "faultAt": "get_readiness",
+    "asrMs": 15003,
+    "adopted": false,
+    "code": "asr_failed",
+    "ttsSucceeded": true,
+    "deletesBeforeClose": 0,
+    "renews": 0,
+    "claims": [
+      [
+        "tts"
+      ]
+    ],
+    "pass": true
+  },
+  {
+    "mode": "cancel_late_asr",
+    "lane": "real_connection_with_controlled_consumer_fault",
+    "faultAt": "response_delivery",
+    "asrMs": 373,
+    "adopted": false,
+    "code": "cancelled",
+    "ttsSucceeded": true,
+    "deletesBeforeClose": 0,
+    "renews": 0,
+    "claims": [
+      [
+        "tts"
+      ],
+      [
+        "asr"
+      ]
+    ],
+    "pass": true
+  },
+  {
+    "mode": "credential_rotation",
+    "lane": "real_connection_with_controlled_consumer_fault",
+    "faultAt": "advertised_expiry_shortened",
+    "asrMs": 280,
+    "adopted": true,
+    "ttsSucceeded": true,
+    "deletesBeforeClose": 0,
+    "renews": 1,
+    "claims": [
+      [
+        "tts"
+      ],
+      [
+        "asr"
+      ],
+      [
+        "asr"
+      ],
+      [
+        "tts"
+      ]
+    ],
+    "pass": true
+  }
+]

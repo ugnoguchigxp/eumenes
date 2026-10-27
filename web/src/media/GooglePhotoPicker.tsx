@@ -251,6 +251,7 @@ function GooglePhotoPickerAccount({
 						</p>
 					)}
 					<ImageGrid
+						mode="select"
 						images={session.items}
 						selectedId={selected}
 						disabled={busy}

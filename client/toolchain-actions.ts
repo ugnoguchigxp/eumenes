@@ -13,8 +13,7 @@ import {
 	type ActionRequestView,
 	type ToolchainActionEventV1,
 } from "../api/domains/tool-runtime/contracts";
-import type { Transport } from "./transport";
-import { json } from "./transport";
+import { callJson, json, withQuery, type Transport } from "./transport";
 
 const iso = z.iso.datetime({ offset: true });
 const receiptRef = z.strictObject({
@@ -178,42 +177,38 @@ export function toolchainActionsClient(transport: Transport) {
 		},
 		toolchainAction: async (eventId: string, signal?: AbortSignal) =>
 			asView(
-				actionRequestView.parse(
-					await (
-						await transport.call(
-							`/api/toolchain-actions/${encodeURIComponent(eventId)}`,
-							{ signal },
-						)
-					).json(),
+				await callJson(
+					transport,
+					actionRequestView,
+					`/api/toolchain-actions/${encodeURIComponent(eventId)}`,
+					{ signal },
 				),
 			),
 		unsettledToolchainActions: async (signal?: AbortSignal) =>
-			listOf("requests", actionRequestView)
-				.parse(
-					await (
-						await transport.call("/api/toolchain-actions?status=unsettled", {
-							signal,
-						})
-					).json(),
+			(
+				await callJson(
+					transport,
+					listOf("requests", actionRequestView),
+					withQuery("/api/toolchain-actions", { status: "unsettled" }),
+					{ signal },
 				)
-				.map(asView),
+			).map(asView),
 		toolchainArtifacts: async (signal?: AbortSignal) =>
-			listOf("artifacts", launcherEntry).parse(
-				await (
-					await transport.call("/api/toolchain-artifacts", { signal })
-				).json(),
+			callJson(
+				transport,
+				listOf("artifacts", launcherEntry),
+				"/api/toolchain-artifacts",
+				{ signal },
 			),
 		toolchainArtifact: async (
 			artifactRevisionId: string,
 			signal?: AbortSignal,
 		) =>
-			artifactResponse.parse(
-				await (
-					await transport.call(
-						`/api/toolchain-artifacts/${encodeURIComponent(artifactRevisionId)}`,
-						{ signal },
-					)
-				).json(),
+			callJson(
+				transport,
+				artifactResponse,
+				`/api/toolchain-artifacts/${encodeURIComponent(artifactRevisionId)}`,
+				{ signal },
 			),
 		toolchainArtifactSource: async (
 			artifactRevisionId: string,
@@ -222,71 +217,60 @@ export function toolchainActionsClient(transport: Transport) {
 			signal?: AbortSignal,
 			/** Query of a source that takes one (validated by the server); sent as JSON. */
 			params?: unknown,
-		) => {
-			const query = new URLSearchParams();
-			if (targetRef) query.set("target", targetRef);
-			if (params !== undefined) query.set("params", JSON.stringify(params));
-			return sourceResponse.parse(
-				await (
-					await transport.call(
-						`/api/toolchain-artifacts/${encodeURIComponent(artifactRevisionId)}/sources/${encodeURIComponent(source)}${
-							query.size ? `?${query}` : ""
-						}`,
-						{ signal },
-					)
-				).json(),
-			);
-		},
+		) =>
+			callJson(
+				transport,
+				sourceResponse,
+				withQuery(
+					`/api/toolchain-artifacts/${encodeURIComponent(artifactRevisionId)}/sources/${encodeURIComponent(source)}`,
+					{
+						target: targetRef || undefined,
+						params: params === undefined ? undefined : JSON.stringify(params),
+					},
+				),
+				{ signal },
+			),
 		toolchainInteractions: async (
 			query: { conversationId: string; status?: string },
 			signal?: AbortSignal,
-		) => {
-			const params = new URLSearchParams({
-				conversationId: query.conversationId,
-			});
-			if (query.status) params.set("status", query.status);
-			return z.array(interactionView).parse(
-				await (
-					await transport.call(`/api/toolchain-interactions?${params}`, {
-						signal,
-					})
-				).json(),
-			) as InteractionView[];
-		},
+		) =>
+			(await callJson(
+				transport,
+				z.array(interactionView),
+				withQuery("/api/toolchain-interactions", {
+					conversationId: query.conversationId,
+					status: query.status || undefined,
+				}),
+				{ signal },
+			)) as InteractionView[],
 		toolchainInteraction: async (id: string, signal?: AbortSignal) =>
-			interactionView.parse(
-				await (
-					await transport.call(
-						`/api/toolchain-interactions/${encodeURIComponent(id)}`,
-						{ signal },
-					)
-				).json(),
-			) as InteractionView,
+			(await callJson(
+				transport,
+				interactionView,
+				`/api/toolchain-interactions/${encodeURIComponent(id)}`,
+				{ signal },
+			)) as InteractionView,
 		answerToolchainInteraction: async (
 			id: string,
 			input: InteractionAnswer,
 			signal?: AbortSignal,
 		) =>
-			answerResult.parse(
-				await (
-					await transport.call(
-						`/api/toolchain-interactions/${encodeURIComponent(id)}/answers`,
-						{ ...json(interactionAnswer.parse(input)), signal },
-					)
-				).json(),
-			) as { interaction: InteractionView; runId: string; replay: boolean },
+			(await callJson(
+				transport,
+				answerResult,
+				`/api/toolchain-interactions/${encodeURIComponent(id)}/answers`,
+				{ ...json(interactionAnswer.parse(input)), signal },
+			)) as { interaction: InteractionView; runId: string; replay: boolean },
 		cancelToolchainInteraction: async (
 			id: string,
 			input: z.infer<typeof interactionCancel>,
 			signal?: AbortSignal,
 		) =>
-			interactionView.parse(
-				await (
-					await transport.call(
-						`/api/toolchain-interactions/${encodeURIComponent(id)}/cancel`,
-						{ ...json(interactionCancel.parse(input)), signal },
-					)
-				).json(),
-			) as InteractionView,
+			(await callJson(
+				transport,
+				interactionView,
+				`/api/toolchain-interactions/${encodeURIComponent(id)}/cancel`,
+				{ ...json(interactionCancel.parse(input)), signal },
+			)) as InteractionView,
 	};
 }

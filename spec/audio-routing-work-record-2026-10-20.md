@@ -40,7 +40,7 @@
 
 ## 固定試験・画面確認
 
-結果の詳細ログは [検証ログ](../verification-reports/music-routing-2026-10-20/) に保存。
+結果の詳細ログは `verification-reports/music-routing-2026-10-20/`（ローカルの検証記録。リポジトリには含めない）に保存。
 
 | 段階 | 入力・対象 | 結果 |
 | --- | --- | --- |
@@ -51,9 +51,9 @@
 | 会話・API結合 | `music-audio-routing` / `music-e2e` / `music-library` / `music-routing` / `music-screen-adapter` の5ファイル | 26件成功。生成・音声取得・保存・検索・タグAND・お気に入り・Range・取消・旧版表示を確認 |
 | Domain | `bun run verify -- --domain music --domain larm --domain capabilities --domain dialogue` | 成功。backend 790件、Web 39件、型・境界・format・lint・DesignSystem build成功。入力変更・dist変更の整合性エラーなし |
 | 登録 | 両bundleのcheck | issueなし |
-| Artifact画面 | 実際の登録V3 JSONをArtifactRendererで描画。PC/390px、用途・1.5秒・歌詞非混入のイベント・詳細。HTTP要求をfixtureで満たしサーバーを起動しない | 成功、pageerror 0。 [画面とイベント](../verification-reports/music-routing-ui/) |
+| Artifact画面 | 実際の登録V3 JSONをArtifactRendererで描画。PC/390px、用途・1.5秒・歌詞非混入のイベント・詳細。HTTP要求をfixtureで満たしサーバーを起動しない | 成功、pageerror 0。 画面とイベント（`verification-reports/music-routing-ui/`。ローカルの検証記録でリポジトリには含めない） |
 
-最終domain記録：[report.json](../verification-reports/runs/2026-10-20T07-13-19-823Z-d2d73325-829a-4b57-bcd2-1e73a9c84104/report.json)。
+最終domain記録：[report.json](verification/reports/runs/2026-10-20T07-13-19-823Z-d2d73325-829a-4b57-bcd2-1e73a9c84104/report.json)。
 
 ## 実LARM確認（各用途一回、再送なし）
 
@@ -65,13 +65,13 @@
 | ボーカル | 5 | 5.1265 | acestep-v15-turbo / music | 同上。歌詞をlyricsへ送信 |
 | 効果音 | 1.5 | 1.5065 | stable-audio-3-small-sfx / stable-audio | 同上。歌詞なし |
 
-実測値のわずかな差は返されたファイルの長さで、要求秒数をEumenesが変更したものではない。実モデル名はLARM応答からの記録であり、製品コード・設定・ファイル名へ固定していない。実行後、この検証が生成したLARM上の3音声だけを削除した。ローカル音声、jobId、phase列、実測、再生終了状態は [実接続結果](../verification-reports/music-routing-live/2026-10-20T07-06-57.051Z/results.json) に保存。実生成後の変更は型import・取消表示の整理・境界用re-export・音声容量上限の引上げであり、短い3要求の内容と実行手順は再試行していない。
+実測値のわずかな差は返されたファイルの長さで、要求秒数をEumenesが変更したものではない。実モデル名はLARM応答からの記録であり、製品コード・設定・ファイル名へ固定していない。実行後、この検証が生成したLARM上の3音声だけを削除した。ローカル音声、jobId、phase列、実測、再生終了状態は [実接続結果](verification/reports/music-routing-live/2026-10-20T07-06-57.051Z/results.json) に保存。実生成後の変更は型import・取消表示の整理・境界用re-export・音声容量上限の引上げであり、短い3要求の内容と実行手順は再試行していない。
 
 ## 未確認・担当外の検証不合格
 
 - 実スピーカーでの聴取、実LLMによる依頼の用途選択・引数生成、600秒や各非Opus形式の実生成は未確認。実LLMを使わない固定モデルの会話結合と、実LARM gatewayの3生成を分けて記録する。音声MVPの実機器3往復受入を完了したとは扱わない。
-- Artifactを含めたverifyは、今回未変更の `packages/artifact-ui/src/composition-fixer.ts`（827行）と `ui-studio-components.tsx`（974行）の既存行数超過で停止した。[不合格ログ](../verification-reports/music-routing-2026-10-20/artifact-gate.log)。全体gateやverify:allの合格は宣言しない。同じ停止条件があるverify:allを追加で繰り返していない。
-- Artifact所有試験は別途実行し72成功・2失敗。`composition.test.tsx` の子13件拒否、`nested-layout.test.tsx` の深さ4上限の期待が現行契約と一致しない。現行契約は深さ6で、関連するcontracts/compiler/試験/行数超過ファイルがHEADから未変更であることを確認した。期待値や製品契約は変更していない。[試験ログ](../verification-reports/music-routing-2026-10-20/artifact.log)。今回の音楽・効果音画面自体は部品・Web・結合・実ブラウザ確認が成功している。
+- Artifactを含めたverifyは、今回未変更の `packages/artifact-ui/src/composition-fixer.ts`（827行）と `ui-studio-components.tsx`（974行）の既存行数超過で停止した。[不合格ログ](verification/reports/music-routing-2026-10-20/artifact-gate.log)。全体gateやverify:allの合格は宣言しない。同じ停止条件があるverify:allを追加で繰り返していない。
+- Artifact所有試験は別途実行し72成功・2失敗。`composition.test.tsx` の子13件拒否、`nested-layout.test.tsx` の深さ4上限の期待が現行契約と一致しない。現行契約は深さ6で、関連するcontracts/compiler/試験/行数超過ファイルがHEADから未変更であることを確認した。期待値や製品契約は変更していない。[試験ログ](verification/reports/music-routing-2026-10-20/artifact.log)。今回の音楽・効果音画面自体は部品・Web・結合・実ブラウザ確認が成功している。
 - 稼働中Eumenesのサーバー停止・起動・再起動、本番反映は行っていない。bundle新版の公開は通常の起動時登録を必要とする。commit/pushも未実施。
 
 ## 俯瞰評価・最終点検

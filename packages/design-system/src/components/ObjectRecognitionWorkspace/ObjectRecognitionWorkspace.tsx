@@ -1,7 +1,8 @@
 import { VisualAnalysis } from "../VisualAnalysis";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import { Menu } from "lucide-react";
 import { Button } from "../Button";
+import { ImagePicker } from "../ImagePicker/ImagePicker";
 import { RecognitionHistory } from "./RecognitionHistory";
 import {
 	CaptureControls,
@@ -9,6 +10,7 @@ import {
 	RecognitionStatus,
 } from "./CaptureControls";
 import { DetectionPreview } from "./DetectionPreview";
+import { CaptureSaveNotice } from "./CaptureSaveNotice";
 import type { ObjectRecognitionWorkspaceProps } from "./types";
 import { useCameraCapture, type CaptureOrigin } from "./useCameraCapture";
 /** Seconds between opening the camera for a capture request and taking the still. */
@@ -32,6 +34,7 @@ export function ObjectRecognitionWorkspace(
 	const [localError, setLocalError] = useState("");
 	const [submitting, setSubmitting] = useState(false);
 	const [historyOpen, setHistoryOpen] = useState(false);
+	const [libraryOpen, setLibraryOpen] = useState(false);
 	const historyTrigger = useRef<HTMLButtonElement>(null);
 	const item = props.items.find(
 		(candidate) => candidate.id === props.selectedId,
@@ -157,36 +160,13 @@ export function ObjectRecognitionWorkspace(
 			className="recognition-workspace"
 			aria-label="映っている物を調べる"
 		>
-			<header className="recognition-heading">
-				<div className="recognition-heading-main">
-					<Button
-						ref={historyTrigger}
-						variant="outline"
-						size="sm"
-						aria-haspopup="menu"
-						aria-expanded={historyOpen}
-						disabled={camera.recording}
-						title={
-							camera.recording
-								? "録画を終了してから資料を選んでください。"
-								: undefined
-						}
-						onClick={() =>
-							historyOpen ? closeHistory() : setHistoryOpen(true)
-						}
-					>
-						<Menu size={16} />
-						資料一覧
-					</Button>
-					<div>
-						<h2>映っている物を調べる</h2>
-						<p>カメラの撮影や画像・動画から、映っている物を確認します。</p>
-					</div>
-				</div>
-				<Button variant="secondary" onClick={props.onRefresh}>
-					更新
-				</Button>
-			</header>
+			<RecognitionHeading
+				historyTrigger={historyTrigger}
+				historyOpen={historyOpen}
+				recording={camera.recording}
+				onToggle={() => (historyOpen ? closeHistory() : setHistoryOpen(true))}
+				onRefresh={props.onRefresh}
+			/>
 			{historyOpen && (
 				<RecognitionHistory
 					items={props.items}
@@ -236,6 +216,7 @@ export function ObjectRecognitionWorkspace(
 					{props.message}
 				</p>
 			)}
+			<CaptureSaveNotice {...props} />
 			{handoff && (
 				<HandoffNotice
 					handoff={handoff}
@@ -252,51 +233,80 @@ export function ObjectRecognitionWorkspace(
 					}}
 				/>
 			)}
-			<DetectionPreview
-				frameIndex={props.frameIndex}
-				onFrame={props.onFrame}
-				key={item?.id ?? "empty"}
-				item={item}
-				url={props.mediaUrl}
-				cameraActive={camera.opened}
-				cameraPreview={
-					<video
-						ref={preview}
-						autoPlay
-						muted
-						playsInline
-						hidden={!camera.opened}
-						aria-label="カメラプレビュー"
+			{libraryOpen ? (
+				<ImagePicker
+					savedOnly
+					images={props.libraryImages ?? []}
+					loading={props.libraryLoading}
+					error={props.libraryError}
+					pending={props.busy}
+					onRefresh={props.onLibraryRefresh}
+					onDelete={props.onLibraryDelete}
+					onCancel={() => setLibraryOpen(false)}
+					onConfirm={(id) => {
+						setLibraryOpen(false);
+						camera.close();
+						props.onLibrarySelect?.(id);
+					}}
+				/>
+			) : (
+				<>
+					<DetectionPreview
+						frameIndex={props.frameIndex}
+						onFrame={props.onFrame}
+						key={item?.id ?? "empty"}
+						item={item}
+						url={props.mediaUrl}
+						cameraActive={camera.opened}
+						cameraPreview={
+							<video
+								ref={preview}
+								autoPlay
+								muted
+								playsInline
+								hidden={!camera.opened}
+								aria-label="カメラプレビュー"
+							/>
+						}
+						onShowCamera={() => {
+							if (!disabled && !camera.opened) void camera.open("camera");
+						}}
+						onShowResults={camera.close}
+						onIncorporate={() => item && props.onIncorporate?.(item.id)}
+						controls={
+							<CaptureControls
+								camera={camera}
+								disabled={disabled}
+								processing={processing}
+								processingLabel={processingLabel}
+								onFile={(file) => void uploading(file, "file")}
+								onLibraryOpen={
+									props.onLibrarySelect
+										? () => {
+												camera.close();
+												setLibraryOpen(true);
+												props.onLibraryRefresh?.();
+											}
+										: undefined
+								}
+							/>
+						}
+						status={
+							item ? (
+								<RecognitionStatus
+									item={item}
+									analyzing={analyzing}
+									progress={selectedProgress}
+									onCancel={props.onCancel}
+									onRecheck={props.onRecheck}
+								/>
+							) : null
+						}
 					/>
-				}
-				onShowCamera={() => {
-					if (!disabled && !camera.opened) void camera.open("camera");
-				}}
-				onShowResults={camera.close}
-				onIncorporate={() => item && props.onIncorporate?.(item.id)}
-				controls={
-					<CaptureControls
-						camera={camera}
-						disabled={disabled}
-						processing={processing}
-						processingLabel={processingLabel}
-						onFile={(file) => void uploading(file, "file")}
-					/>
-				}
-				status={
-					item ? (
-						<RecognitionStatus
-							item={item}
-							analyzing={analyzing}
-							progress={selectedProgress}
-							onCancel={props.onCancel}
-							onRecheck={props.onRecheck}
-						/>
-					) : null
-				}
-			/>
-			{item && (
-				<VisualAnalysis key={`${item.id}:${props.frameIndex}`} {...props} />
+					{item && (
+						<VisualAnalysis key={`${item.id}:${props.frameIndex}`} {...props} />
+					)}
+				</>
 			)}
 			<details className="recognition-note">
 				<summary>検出結果について</summary>
@@ -305,5 +315,48 @@ export function ObjectRecognitionWorkspace(
 				</p>
 			</details>
 		</section>
+	);
+}
+
+function RecognitionHeading({
+	historyTrigger,
+	historyOpen,
+	recording,
+	onToggle,
+	onRefresh,
+}: {
+	historyTrigger: RefObject<HTMLButtonElement | null>;
+	historyOpen: boolean;
+	recording: boolean;
+	onToggle: () => void;
+	onRefresh?: () => void;
+}) {
+	return (
+		<header className="recognition-heading">
+			<div className="recognition-heading-main">
+				<Button
+					ref={historyTrigger}
+					variant="outline"
+					size="sm"
+					aria-haspopup="menu"
+					aria-expanded={historyOpen}
+					disabled={recording}
+					title={
+						recording ? "録画を終了してから資料を選んでください。" : undefined
+					}
+					onClick={onToggle}
+				>
+					<Menu size={16} />
+					資料一覧
+				</Button>
+				<div>
+					<h2>映っている物を調べる</h2>
+					<p>カメラの撮影や画像・動画から、映っている物を確認します。</p>
+				</div>
+			</div>
+			<Button variant="secondary" onClick={onRefresh}>
+				更新
+			</Button>
+		</header>
 	);
 }

@@ -1,0 +1,102 @@
+bun test v1.4.2 (744846f84)
+
+api/domains/larm/test/inference-error.test.ts:
+(pass) provider diagnostics retain the code and meaningful message, redact credentials and bound input [0.79ms]
+(pass) cancelled error-body read cannot trigger recovery [0.10ms]
+
+api/domains/larm/test/larm.test.ts:
+(pass) catalog, claim, ASR/LLM/TTS and release use public contract [3.66ms]
+(pass) voice menu uses claimed provider auth and TTS sends selected voice and speed [2.94ms]
+(pass) VOICEVOX catalog labels, style, inclusive numeric bounds and decoded credits reach phrase synthesis [1.25ms]
+(pass) a refused VOICEVOX catalog does not block synthesis of a chosen voice [0.51ms]
+(pass) a caller's deadline that aborts a shared connection attempt does not fail other callers [40.79ms]
+(pass) other models omit VOICEVOX fields and busy responses never replay or replace the connection [1.56ms]
+(pass) mismatched claim is rejected before inference and lease is released [0.51ms]
+(pass) oversized inference response is rejected while streaming [0.27ms]
+(pass) simultaneous capability upgrades share one replacement connection [1002.43ms]
+(pass) Gemma requests the live profile and renews by reclaiming the rotated token [0.51ms]
+(pass) voice requests every provider in the Gemma profile [0.17ms]
+(pass) an expired connection stops polling and is released [0.16ms]
+(pass) exported token alone connects to the documented default URL [0.14ms]
+(pass) missing claim voice discovers and caches the advertised default with the control credential [0.35ms]
+(pass) an unadvertised default voice is rejected before speech inference [1.12ms]
+(pass) cancelling a caller returns promptly during allocation and close stops polling [5.84ms]
+(pass) runtime changes notify connecting and ready/failed without exposing credentials [0.32ms]
+(pass) idle-released JSON before SSE recreates and claims once; both exchanges survive [0.47ms]
+(pass) local idle expires a still-valid lease without requests; next voice use requests the profile again [56.58ms]
+(pass) an active inference pauses the local idle timer and completion starts a new idle interval [128.17ms]
+(pass) only the explicit idle-released 409 can replay, and recovery is bounded at one replacement [3.87ms]
+(pass) cancellation after the 409 diagnostic prevents replacement and replay [0.62ms]
+(pass) a late concurrent rejection cannot discard the replacement lease [1.16ms]
+(pass) manual connection check follows released state even with unexpired credentials [0.52ms]
+(pass) renew rotates every claimed provider while leaving the idle deadline unchanged [143.95ms]
+(pass) published SSE prefix errors never reconnect or replay inference [1.09ms]
+(pass) idle expiry during a health check cannot revive the released local lease [67.78ms]
+(pass) invalid reclaim after renew discards every old credential before another request [2.49ms]
+(pass) a ready connection waits for requested providers to become claimable before claim [1003.45ms]
+(pass) unauthorized can recover only when control confirms the old connection is released [2.43ms]
+(pass) context trimming retains the current input after an unanswered prior turn [0.67ms]
+(pass) native decision shares the voice lease, uses its own auth, and rotates credentials [1.27ms]
+(pass) absent or invalid optional decision never breaks ordinary voice providers [3.02ms]
+
+api/domains/delivery/test/delivery.test.ts:
+(pass) native choices select bounded speech parameters without copying instructions from the answer [1.38ms]
+(pass) invalid, unknown, low-confidence and truncated decisions stay neutral [0.89ms]
+(pass) timeout returns promptly and late judgments cannot replace the fallback; caller cancellation rejects [7.26ms]
+(pass) native selected-answer probability is separate from question confidence and must exist [0.44ms]
+(pass) uncertain voice stays natural while a confident motion survives, and conversely [0.24ms]
+
+api/domains/inference/test/speech-intonation.test.ts:
+(pass) phrase intonation follows punctuation and questions, preserves baseline and stays bounded [0.28ms]
+
+api/domains/inference/test/inference.test.ts:
+(pass) three purposes fall back once, adapters preserve paths and usage; no duplicate adoption [29.64ms]
+(pass) cloud TTS keeps its own voice and speed from the accepted settings snapshot [15.14ms]
+(pass) automatic intonation uses each phrase and its immutable manual baseline; disabling restores manual delivery [16.39ms]
+(pass) authentication, invalid contracts and caller cancellation never trigger cloud [54.75ms]
+(pass) local timeout fences a late adapter result; immutable snapshot and revocation at adoption [35.07ms]
+(pass) revocation aborts pending cloud; regrant does not revive old request [18.44ms]
+(pass) acceptance updates rollback together with the caller transaction [12.32ms]
+(pass) a failed stream cannot append a cloud fallback to already published local text [11.37ms]
+(pass) late provider deltas are fenced after caller cancellation [18.13ms]
+(pass) provider diagnostics preserve the rejected and recovered Connection IDs on the same attempt [12.70ms]
+(pass) a failed provider still saves the rejected Connection ID and error fields [13.60ms]
+(pass) Laya judges the spoken text and carries one decision with bounded immutable voice settings [15.20ms]
+(pass) decision timeout keeps manual voice, fences late results and cancellation prevents synthesis [34.86ms]
+
+api/domains/inference/test/migration.test.ts:
+(pass) append-only diagnostics migration preserves previous inference attempts [18.12ms]
+
+api/domains/voice-dialogue/test/sentences.test.ts:
+(pass) punctuation clauses and decimal numbers survive every token split without repeated tails [0.46ms]
+(pass) long unpunctuated output is bounded and conflicting final text is rejected [0.13ms]
+
+api/domains/voice-dialogue/test/upload.test.ts:
+(pass) bounded audio stream rejects oversized upload before ASR [2.36ms]
+(pass) valid bounded WAV reaches voice service once [0.33ms]
+
+api/domains/voice-dialogue/test/migration.test.ts:
+(pass) a database with only the original three migrations (plus later ones) upgrades in place and keeps history [28.52ms]
+
+api/domains/voice-dialogue/test/settings-integration.test.ts:
+(pass) one voice turn uses fallback in all three stages, adopts one answer, and does not repeat duplicate upload [23.58ms]
+(pass) autoSpeak false is captured at voice acceptance and ends successfully without TTS [19.41ms]
+(pass) cancellation during cloud ASR cannot create a dialogue run even with late HTTP completion [50.50ms]
+(pass) queued snapshots survive recovery without re-running an attempted provider [15.62ms]
+(pass) revoking a cloud answer aborts downstream TTS and never publishes late audio [40.69ms]
+(pass) a provisional sentence is playable while LLM is running and cancellation clears both streams [32.39ms]
+(pass) render ahead is bounded at three clauses and playback releases the next clause [48.47ms]
+(pass) final recognition preempts a slow prefix and never submits a late hypothesis [27.57ms]
+(pass) accepted audio chunks publish Laya delivery and cancellation removes the plan with the audio [20.19ms]
+
+api/domains/voice-dialogue/test/voice.test.ts:
+(pass) voice capture to ASR, dialogue, TTS; duplicate utterance is ignored [13.83ms]
+(pass) restart cancels the run of a stale voice turn so no old answer is spoken [22.50ms]
+(pass) evicting cached audio also clears the ready state [24.08ms]
+(pass) stopping a session fences acceptance waiting in the writer queue [9.59ms]
+(pass) replay splits finished text into clauses and synthesizes on demand [8.49ms]
+
+ 74 pass
+ 0 fail
+ 590 expect() calls
+Ran 74 tests across 11 files. [3.27s]

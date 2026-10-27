@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { KanbanNoticeView } from "../api/domains/kanban/contracts";
-import type { Transport } from "./transport";
+import { callJson, withQuery, type Transport } from "./transport";
 
 const noticeSchema = z.strictObject({
 	id: z.string(),
@@ -29,10 +29,11 @@ export function kanbanClient(transport: Transport) {
 	return {
 		/** Newest first; `unread` counts all unread notices, not only the returned page. */
 		kanbanNotices: async (limit = 50, signal?: AbortSignal) =>
-			noticesSchema.parse(
-				await (
-					await transport.call(`/api/kanban/notices?limit=${limit}`, { signal })
-				).json(),
+			callJson(
+				transport,
+				noticesSchema,
+				withQuery("/api/kanban/notices", { limit }),
+				{ signal },
 			),
 		readKanbanNotice: async (id: string) => {
 			await transport.call(

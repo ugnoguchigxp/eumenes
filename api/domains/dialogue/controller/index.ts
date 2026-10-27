@@ -10,32 +10,8 @@ import {
 } from "../contracts";
 import { parseJsonBody } from "../../../infrastructure/http";
 import { snapshotStream } from "../../../infrastructure/snapshot-stream";
+import { SSE_HEADERS } from "../../../infrastructure/sse";
 export { registerCommandInteractions } from "./interactions";
-/** HTTP status of each code the specialist operations throw; unknown codes stay 500. */
-const specialistErrorStatus = {
-	specialist_session_not_found: 404,
-	revision_conflict: 409,
-	request_conflict: 409,
-	session_ended: 409,
-	session_expired: 409,
-	session_closing: 409,
-	session_not_suspended: 409,
-	session_not_active: 409,
-	target_not_found: 404,
-	capability_unavailable: 503,
-	work_unsaved: 409,
-	work_busy: 409,
-	specialist_unavailable: 503,
-	addressee_changed: 409,
-} as const;
-function specialistError(c: import("hono").Context, error: unknown) {
-	const code = error instanceof Error ? error.message : "";
-	if (!Object.hasOwn(specialistErrorStatus, code)) throw error;
-	return c.json(
-		{ error: code },
-		specialistErrorStatus[code as keyof typeof specialistErrorStatus],
-	);
-}
 export function registerDialogue(app: Hono, service: DialogueService) {
 	app.get("/api/runs/:id/stream", (c) => {
 		const id = c.req.param("id");
@@ -47,11 +23,7 @@ export function registerDialogue(app: Hono, service: DialogueService) {
 				c.req.raw.signal,
 			),
 			200,
-			{
-				"Content-Type": "text/event-stream",
-				"Cache-Control": "no-store",
-				"X-Accel-Buffering": "no",
-			},
+			SSE_HEADERS,
 		);
 	});
 	app.get("/api/conversations/:id/runs", (c) =>
@@ -63,38 +35,28 @@ export function registerDialogue(app: Hono, service: DialogueService) {
 	app.post("/api/runs", async (c) => {
 		const parsed = await parseJsonBody(c, publicSubmitSchema);
 		if (!parsed.ok) return parsed.response;
-		try {
-			return c.json(await service.submit(parsed.data), 202);
-		} catch (error) {
-			// A specialist turn still holds the work: the screen sends again when it is free.
-			return specialistError(c, error);
-		}
+		// A specialist turn still holds the work: the screen sends again when it is free.
+		return c.json(await service.submit(parsed.data), 202);
 	});
 	app.post(
 		"/api/conversations/:conversationId/messages/:messageId/resubmit",
 		async (c) => {
 			const parsed = await parseJsonBody(c, resubmitSchema);
 			if (!parsed.ok) return parsed.response;
-			try {
-				const result = await service.resubmit(
-					c.req.param("conversationId"),
-					c.req.param("messageId"),
-					parsed.data,
-				);
-				if (result.ok) return c.json({ run: result.run });
-				return c.json(
-					{ error: result.code },
-					result.code === "not_found"
-						? 404
-						: result.code === "empty_text"
-							? 400
-							: 409,
-				);
-			} catch (error) {
-				if (error instanceof Error && error.message === "request_conflict")
-					return c.json({ error: "request_conflict" }, 409);
-				throw error;
-			}
+			const result = await service.resubmit(
+				c.req.param("conversationId"),
+				c.req.param("messageId"),
+				parsed.data,
+			);
+			if (result.ok) return c.json({ run: result.run });
+			return c.json(
+				{ error: result.code },
+				result.code === "not_found"
+					? 404
+					: result.code === "empty_text"
+						? 400
+						: 409,
+			);
 		},
 	);
 	app.get("/api/conversations/:id/specialist", (c) =>
@@ -104,24 +66,16 @@ export function registerDialogue(app: Hono, service: DialogueService) {
 		app.post(`/api/specialist-sessions/:id/${kind}`, async (c) => {
 			const parsed = await parseJsonBody(c, specialistCommandSchema);
 			if (!parsed.ok) return parsed.response;
-			try {
-				return c.json(
-					await service.specialistCommand(c.req.param("id"), kind, parsed.data),
-				);
-			} catch (error) {
-				return specialistError(c, error);
-			}
+			return c.json(
+				await service.specialistCommand(c.req.param("id"), kind, parsed.data),
+			);
 		});
 	app.post("/api/specialist-sessions/:id/retarget", async (c) => {
 		const parsed = await parseJsonBody(c, specialistRetargetSchema);
 		if (!parsed.ok) return parsed.response;
-		try {
-			return c.json(
-				await service.specialistRetarget(c.req.param("id"), parsed.data),
-			);
-		} catch (error) {
-			return specialistError(c, error);
-		}
+		return c.json(
+			await service.specialistRetarget(c.req.param("id"), parsed.data),
+		);
 	});
 	app.get("/api/runs/:id", (c) => {
 		const run = service.get(c.req.param("id"));

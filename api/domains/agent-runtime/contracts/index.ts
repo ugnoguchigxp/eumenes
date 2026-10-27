@@ -8,6 +8,7 @@ export {
 } from "./todo-screen";
 import type { SourceMetadata } from "../../tool-runtime";
 import type { ReportRequirements } from "./requirements";
+import type { HttpErrorStatus } from "../../../infrastructure/http";
 export const reportSchema = z
 	.object({
 		summary: z.string().min(1).max(2000),
@@ -253,3 +254,8 @@ export type AdoptedEvidence = {
 	projectionDigest: string | null;
 	bindingToken: string | null;
 };
+/** HTTP status of each code the task report projection throws. */
+export const errorStatus = {
+	report_not_ready: 409,
+	report_deleted: 410,
+} as const satisfies Record<string, HttpErrorStatus>;

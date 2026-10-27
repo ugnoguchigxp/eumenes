@@ -6,6 +6,82 @@ import type { EumenesClient } from "../../../../client";
 import type { RecognitionRecord } from "../../../../api/domains/object-recognition/contracts";
 import { useRecognitionRuntime } from "./use-recognition-runtime";
 import { recognitionSource } from "./source";
+test("selects a LARM image through the authenticated content and existing upload path", async () => {
+	const record = {
+		id: crypto.randomUUID(),
+		conversationId: "main",
+		name: "image.png",
+		mime: "image/png",
+		state: "queued",
+		revision: 1,
+		progress: null,
+		errorCode: null,
+		result: null,
+		createdAt: 1,
+		updatedAt: 1,
+	} as RecognitionRecord;
+	let records: RecognitionRecord[] = [];
+	const client = {
+		identity: "library-fixture",
+		recognitionRecords: vi.fn(async () => records),
+		recognitionConnection: vi.fn(async () => ({ credentialConfigured: true })),
+		recognitionHandoffs: vi.fn(async () => []),
+		imageLibrary: vi.fn(async () => ({
+			images: [{ id: "saved", createdAt: "2026-10-27", width: 20, height: 20 }],
+		})),
+		imageContent: vi.fn(async () => new Blob(["png"], { type: "image/png" })),
+		recognitionContent: vi.fn(
+			async () => new Blob(["png"], { type: "image/png" }),
+		),
+		recognitionUpload: vi.fn(async () => {
+			records = [record];
+			return record;
+		}),
+	} as unknown as EumenesClient;
+	const cache = new QueryClient({
+		defaultOptions: { queries: { retry: false } },
+	});
+	const hook = renderHook(() => useRecognitionRuntime(client), {
+		wrapper: ({ children }: { children: ReactNode }) => (
+			<QueryClientProvider client={cache}>{children}</QueryClientProvider>
+		),
+	});
+	try {
+		await waitFor(() =>
+			expect(
+				hook.result.current.runtime.snapshot[recognitionSource].libraryImages,
+			).toHaveLength(1),
+		);
+		await act(async () => {
+			expect(
+				(
+					await hook.result.current.runtime.dispatch({
+						id: crypto.randomUUID(),
+						source: recognitionSource,
+						revision:
+							hook.result.current.runtime.snapshot[recognitionSource].revision,
+						action: "recognition-library-select",
+						values: { id: "saved" },
+					})
+				).status,
+			).toBe("accepted");
+		});
+		expect(client.imageContent).toHaveBeenCalledWith("saved");
+		expect(client.recognitionUpload).toHaveBeenCalledWith(
+			expect.objectContaining({ name: "image.png", type: "image/png" }),
+			"main",
+			expect.any(String),
+			"file",
+			undefined,
+		);
+		expect(
+			hook.result.current.runtime.snapshot[recognitionSource].selectedId,
+		).toBe(record.id);
+	} finally {
+		hook.unmount();
+		cache.clear();
+	}
+});
 test("credential selection works before uploading any media and sends only a reference with the saved revision", async () => {
 	let connection = {
 		revision: 4,
@@ -118,9 +194,23 @@ test("changing the viewed input while upload is pending prevents its late receip
 	try {
 		await waitFor(() =>
 			expect(
-				hook.result.current.runtime.snapshot[recognitionSource].selectedId,
-			).toBe(old.id),
+				hook.result.current.runtime.snapshot[recognitionSource].items,
+			).toHaveLength(1),
 		);
+		expect(
+			hook.result.current.runtime.snapshot[recognitionSource].selectedId,
+		).toBeUndefined();
+		expect(client.recognitionContent).not.toHaveBeenCalled();
+		await act(async () => {
+			await hook.result.current.runtime.dispatch({
+				id: crypto.randomUUID(),
+				source: recognitionSource,
+				revision:
+					hook.result.current.runtime.snapshot[recognitionSource].revision,
+				action: "recognition-select",
+				values: { id: old.id },
+			});
+		});
 		await waitFor(() =>
 			expect(client.recognitionContent).toHaveBeenCalledWith(
 				old.id,
@@ -306,6 +396,21 @@ test("会話に追加 puts the saved attachment with its detections into the cha
 		},
 	);
 	try {
+		await waitFor(() =>
+			expect(
+				hook.result.current.runtime.snapshot[recognitionSource].items,
+			).toHaveLength(1),
+		);
+		await act(async () => {
+			await hook.result.current.runtime.dispatch({
+				id: crypto.randomUUID(),
+				source: recognitionSource,
+				revision:
+					hook.result.current.runtime.snapshot[recognitionSource].revision,
+				action: "recognition-select",
+				values: { id: record.id },
+			});
+		});
 		await waitFor(() => expect(setTargetRef).toHaveBeenCalledWith(record.id));
 		const event = {
 			id: crypto.randomUUID(),
@@ -324,6 +429,95 @@ test("会話に追加 puts the saved attachment with its detections into the cha
 		const queued = useRecognitionChatInbox.getState().take();
 		expect(queued.map((q) => q.attachment)).toEqual([attachment]);
 		expect(queued[0]!.file.type).toBe("image/png");
+	} finally {
+		hook.unmount();
+		cache.clear();
+	}
+});
+
+test("a stale capture-save action cannot operate on a different selected item", async () => {
+	const { ApiError } = await import("../../../../client/transport");
+	const first = crypto.randomUUID(),
+		second = crypto.randomUUID();
+	const base = {
+		conversationId: "main",
+		name: "capture.jpg",
+		mime: "image/jpeg",
+		state: "completed",
+		revision: 1,
+		progress: null,
+		errorCode: null,
+		result: null,
+		createdAt: 1,
+		updatedAt: 1,
+		captureSave: "unconfirmed",
+	} as RecognitionRecord;
+	const client = {
+		identity: "capture-selection-fixture",
+		recognitionRecords: vi.fn(async () => [
+			{ ...base, id: first },
+			{ ...base, id: second },
+		]),
+		recognitionConnection: vi.fn(async () => ({ credentialConfigured: true })),
+		recognitionHandoffs: vi.fn(async () => []),
+		recognitionContent: vi.fn(
+			async () => new Blob(["jpg"], { type: "image/jpeg" }),
+		),
+		imageImport: vi.fn(async () => {
+			throw new ApiError(404, "image_import_not_found");
+		}),
+		recognitionResumeCaptureSave: vi.fn(async () => ({})),
+	} as unknown as EumenesClient;
+	const cache = new QueryClient({
+		defaultOptions: { queries: { retry: false } },
+	});
+	const hook = renderHook(() => useRecognitionRuntime(client), {
+		wrapper: ({ children }: { children: ReactNode }) => (
+			<QueryClientProvider client={cache}>{children}</QueryClientProvider>
+		),
+	});
+	const send = (
+		action:
+			| "recognition-select"
+			| "recognition-save-resume"
+			| "recognition-save-recheck",
+		id: string,
+	) =>
+		hook.result.current.runtime.dispatch({
+			id: crypto.randomUUID(),
+			source: recognitionSource,
+			revision:
+				hook.result.current.runtime.snapshot[recognitionSource].revision,
+			action,
+			values: { id },
+		});
+	try {
+		await waitFor(() =>
+			expect(
+				hook.result.current.runtime.snapshot[recognitionSource].items,
+			).toHaveLength(2),
+		);
+		await act(async () => {
+			await send("recognition-select", first);
+		});
+		await act(async () => {
+			await send("recognition-select", second);
+		});
+		await waitFor(() =>
+			expect(
+				hook.result.current.runtime.snapshot[recognitionSource]
+					.captureSaveCanResume,
+			).toBe(true),
+		);
+		await act(async () => {
+			expect((await send("recognition-save-resume", first)).status).toBe(
+				"rejected",
+			);
+			expect((await send("recognition-save-recheck", first)).status).toBe(
+				"rejected",
+			);
+		});
+		expect(client.recognitionResumeCaptureSave).not.toHaveBeenCalled();
 	} finally {
 		hook.unmount();
 		cache.clear();

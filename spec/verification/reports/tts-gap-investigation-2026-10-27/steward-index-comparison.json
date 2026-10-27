@@ -1,0 +1,265 @@
+{
+  "at": "2026-10-26T23:01:53.287Z",
+  "rounds": [
+    {
+      "label": "baseline",
+      "durationMs": 1419.726167,
+      "rows": 4,
+      "sameResults": true,
+      "plan": [
+        {
+          "id": 3,
+          "parent": 0,
+          "notused": 62,
+          "detail": "SEARCH u USING INDEX steward_unit_conversation (conversation_id=?)"
+        },
+        {
+          "id": 16,
+          "parent": 0,
+          "notused": 0,
+          "detail": "CORRELATED SCALAR SUBQUERY 3"
+        },
+        {
+          "id": 26,
+          "parent": 16,
+          "notused": 62,
+          "detail": "SEARCH x USING INDEX steward_unit_conversation (conversation_id=?)"
+        },
+        {
+          "id": 40,
+          "parent": 16,
+          "notused": 0,
+          "detail": "CORRELATED SCALAR SUBQUERY 2"
+        },
+        {
+          "id": 45,
+          "parent": 40,
+          "notused": 61,
+          "detail": "SEARCH d USING INDEX steward_decision_conversation (conversation_id=?)"
+        },
+        {
+          "id": 72,
+          "parent": 16,
+          "notused": 0,
+          "detail": "USE TEMP B-TREE FOR ORDER BY"
+        },
+        {
+          "id": 81,
+          "parent": 0,
+          "notused": 0,
+          "detail": "CORRELATED SCALAR SUBQUERY 4"
+        },
+        {
+          "id": 86,
+          "parent": 81,
+          "notused": 61,
+          "detail": "SEARCH s USING INDEX steward_decision_conversation (conversation_id=?)"
+        },
+        {
+          "id": 115,
+          "parent": 0,
+          "notused": 0,
+          "detail": "CORRELATED SCALAR SUBQUERY 1"
+        },
+        {
+          "id": 125,
+          "parent": 115,
+          "notused": 61,
+          "detail": "SEARCH d USING INDEX steward_decision_conversation (conversation_id=?)"
+        }
+      ]
+    },
+    {
+      "label": "decision job index",
+      "durationMs": 26.15074999999979,
+      "rows": 4,
+      "sameResults": true,
+      "plan": [
+        {
+          "id": 3,
+          "parent": 0,
+          "notused": 62,
+          "detail": "SEARCH u USING INDEX steward_unit_conversation (conversation_id=?)"
+        },
+        {
+          "id": 16,
+          "parent": 0,
+          "notused": 0,
+          "detail": "CORRELATED SCALAR SUBQUERY 3"
+        },
+        {
+          "id": 26,
+          "parent": 16,
+          "notused": 62,
+          "detail": "SEARCH x USING INDEX steward_unit_conversation (conversation_id=?)"
+        },
+        {
+          "id": 40,
+          "parent": 16,
+          "notused": 0,
+          "detail": "CORRELATED SCALAR SUBQUERY 2"
+        },
+        {
+          "id": 45,
+          "parent": 40,
+          "notused": 61,
+          "detail": "SEARCH d USING INDEX diagnostic_decision_job (conversation_id=? AND job_id=?)"
+        },
+        {
+          "id": 71,
+          "parent": 16,
+          "notused": 0,
+          "detail": "USE TEMP B-TREE FOR ORDER BY"
+        },
+        {
+          "id": 80,
+          "parent": 0,
+          "notused": 0,
+          "detail": "CORRELATED SCALAR SUBQUERY 4"
+        },
+        {
+          "id": 85,
+          "parent": 80,
+          "notused": 61,
+          "detail": "SEARCH s USING INDEX steward_decision_conversation (conversation_id=?)"
+        },
+        {
+          "id": 114,
+          "parent": 0,
+          "notused": 0,
+          "detail": "CORRELATED SCALAR SUBQUERY 1"
+        },
+        {
+          "id": 124,
+          "parent": 114,
+          "notused": 61,
+          "detail": "SEARCH d USING INDEX diagnostic_decision_job (conversation_id=? AND job_id=?)"
+        }
+      ]
+    },
+    {
+      "label": "unit closed index",
+      "durationMs": 0.30062500000008185,
+      "rows": 4,
+      "sameResults": true,
+      "plan": [
+        {
+          "id": 3,
+          "parent": 0,
+          "notused": 62,
+          "detail": "SEARCH u USING INDEX diagnostic_unit_closed (conversation_id=?)"
+        },
+        {
+          "id": 12,
+          "parent": 0,
+          "notused": 0,
+          "detail": "CORRELATED SCALAR SUBQUERY 3"
+        },
+        {
+          "id": 22,
+          "parent": 12,
+          "notused": 60,
+          "detail": "SEARCH x USING INDEX diagnostic_unit_closed (conversation_id=? AND slot=? AND closed_at>?)"
+        },
+        {
+          "id": 32,
+          "parent": 12,
+          "notused": 0,
+          "detail": "CORRELATED SCALAR SUBQUERY 2"
+        },
+        {
+          "id": 37,
+          "parent": 32,
+          "notused": 61,
+          "detail": "SEARCH d USING INDEX diagnostic_decision_job (conversation_id=? AND job_id=?)"
+        },
+        {
+          "id": 59,
+          "parent": 0,
+          "notused": 0,
+          "detail": "CORRELATED SCALAR SUBQUERY 4"
+        },
+        {
+          "id": 64,
+          "parent": 59,
+          "notused": 61,
+          "detail": "SEARCH s USING INDEX steward_decision_conversation (conversation_id=?)"
+        },
+        {
+          "id": 93,
+          "parent": 0,
+          "notused": 0,
+          "detail": "CORRELATED SCALAR SUBQUERY 1"
+        },
+        {
+          "id": 103,
+          "parent": 93,
+          "notused": 61,
+          "detail": "SEARCH d USING INDEX diagnostic_decision_job (conversation_id=? AND job_id=?)"
+        }
+      ]
+    },
+    {
+      "label": "step success index",
+      "durationMs": 0.3061250000000655,
+      "rows": 4,
+      "sameResults": true,
+      "plan": [
+        {
+          "id": 3,
+          "parent": 0,
+          "notused": 62,
+          "detail": "SEARCH u USING INDEX diagnostic_unit_closed (conversation_id=?)"
+        },
+        {
+          "id": 12,
+          "parent": 0,
+          "notused": 0,
+          "detail": "CORRELATED SCALAR SUBQUERY 3"
+        },
+        {
+          "id": 22,
+          "parent": 12,
+          "notused": 60,
+          "detail": "SEARCH x USING INDEX diagnostic_unit_closed (conversation_id=? AND slot=? AND closed_at>?)"
+        },
+        {
+          "id": 32,
+          "parent": 12,
+          "notused": 0,
+          "detail": "CORRELATED SCALAR SUBQUERY 2"
+        },
+        {
+          "id": 37,
+          "parent": 32,
+          "notused": 61,
+          "detail": "SEARCH d USING INDEX diagnostic_decision_job (conversation_id=? AND job_id=?)"
+        },
+        {
+          "id": 59,
+          "parent": 0,
+          "notused": 0,
+          "detail": "CORRELATED SCALAR SUBQUERY 4"
+        },
+        {
+          "id": 64,
+          "parent": 59,
+          "notused": 50,
+          "detail": "SEARCH s USING INDEX diagnostic_decision_success (conversation_id=? AND step=? AND created_at>?)"
+        },
+        {
+          "id": 88,
+          "parent": 0,
+          "notused": 0,
+          "detail": "CORRELATED SCALAR SUBQUERY 1"
+        },
+        {
+          "id": 98,
+          "parent": 88,
+          "notused": 61,
+          "detail": "SEARCH d USING INDEX diagnostic_decision_job (conversation_id=? AND job_id=?)"
+        }
+      ]
+    }
+  ]
+}

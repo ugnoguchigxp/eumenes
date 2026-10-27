@@ -6,19 +6,19 @@ import {
 	type HistorySearchInput,
 	type HistoryReadInput,
 } from "../api/domains/conversation/contracts";
-import { json, type Transport } from "./transport";
+import { callJson, json, withQuery, type Transport } from "./transport";
 export function conversationClient(transport: Transport) {
 	return {
 		uploadAttachment: async (id: string, requestId: string, file: File) => {
 			const body = new FormData();
 			body.set("file", file);
-			return attachmentSchema.parse(
-				await (
-					await transport.call(
-						`/api/conversations/${encodeURIComponent(id)}/attachments?requestId=${encodeURIComponent(requestId)}`,
-						{ method: "POST", body },
-					)
-				).json(),
+			return callJson(
+				transport,
+				attachmentSchema,
+				withQuery(`/api/conversations/${encodeURIComponent(id)}/attachments`, {
+					requestId,
+				}),
+				{ method: "POST", body },
 			);
 		},
 		attachmentPreview: async (
@@ -28,7 +28,10 @@ export function conversationClient(transport: Transport) {
 		) =>
 			(
 				await transport.call(
-					`/api/conversations/${encodeURIComponent(id)}/attachments/${encodeURIComponent(attachmentId)}/content?preview=true`,
+					withQuery(
+						`/api/conversations/${encodeURIComponent(id)}/attachments/${encodeURIComponent(attachmentId)}/content`,
+						{ preview: true },
+					),
 					{ signal },
 				)
 			).blob(),
@@ -37,35 +40,30 @@ export function conversationClient(transport: Transport) {
 			input: HistorySearchInput,
 			signal?: AbortSignal,
 		) =>
-			historySearchResultSchema.parse(
-				await (
-					await transport.call(
-						`/api/conversations/${encodeURIComponent(id)}/history/search`,
-						{ ...json(input), signal },
-					)
-				).json(),
+			callJson(
+				transport,
+				historySearchResultSchema,
+				`/api/conversations/${encodeURIComponent(id)}/history/search`,
+				{ ...json(input), signal },
 			),
 		historyRead: async (
 			id: string,
 			input: HistoryReadInput,
 			signal?: AbortSignal,
 		) =>
-			historyReadResultSchema.parse(
-				await (
-					await transport.call(
-						`/api/conversations/${encodeURIComponent(id)}/history/read`,
-						{ ...json(input), signal },
-					)
-				).json(),
+			callJson(
+				transport,
+				historyReadResultSchema,
+				`/api/conversations/${encodeURIComponent(id)}/history/read`,
+				{ ...json(input), signal },
 			),
 		identity: transport.identity,
 		conversation: async (id: string, signal?: AbortSignal) =>
-			conversationSchema.parse(
-				await (
-					await transport.call(`/api/conversations/${encodeURIComponent(id)}`, {
-						signal,
-					})
-				).json(),
+			callJson(
+				transport,
+				conversationSchema,
+				`/api/conversations/${encodeURIComponent(id)}`,
+				{ signal },
 			),
 	};
 }

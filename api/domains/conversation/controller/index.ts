@@ -1,17 +1,22 @@
 import { limitConcurrency } from "../../../infrastructure/concurrency";
 import { z } from "zod";
+import { parseJsonBody, parseQuery } from "../../../infrastructure/http";
 import { readBounded } from "../../../infrastructure/bounded-read";
 import { attachmentLimits } from "../contracts/attachments";
 import type { Hono } from "hono";
 import { historyReadInput, historySearchInput } from "../contracts";
 import type { ConversationService } from "..";
+const uploadQuery = z.object({ requestId: z.uuid() });
 export function registerConversation(app: Hono, service: ConversationService) {
 	app.post(
 		"/api/conversations/:id/attachments",
 		limitConcurrency(2, "attachment_capacity"),
 		async (c) => {
-			const id = z.uuid().safeParse(c.req.query("requestId"));
-			if (!id.success || !c.req.param("id") || c.req.param("id").length > 120)
+			const query = parseQuery(c, uploadQuery, {
+				code: "invalid_attachment_input",
+			});
+			if (!query.ok) return query.response;
+			if (!c.req.param("id") || c.req.param("id").length > 120)
 				return c.json({ error: "invalid_attachment_input" }, 400);
 			const bytes = await readBounded(c.req.raw.body, {
 				limit: attachmentLimits.maxBytes + 16384,
@@ -31,7 +36,11 @@ export function registerConversation(app: Hono, service: ConversationService) {
 			if (!(file instanceof File) || [...form.keys()].length !== 1)
 				return c.json({ error: "invalid_attachment_input" }, 400);
 			return c.json(
-				await service.uploadAttachment(c.req.param("id"), id.data, file),
+				await service.uploadAttachment(
+					c.req.param("id"),
+					query.data.requestId,
+					file,
+				),
 				201,
 			);
 		},
@@ -49,19 +58,18 @@ export function registerConversation(app: Hono, service: ConversationService) {
 	app.get("/api/conversations/:id", (c) =>
 		c.json(service.get(c.req.param("id"))),
 	);
-	for (const operation of ["search", "read"] as const) {
+	function historyRoute<T>(
+		operation: string,
+		schema: z.ZodType<T>,
+		run: (conversationId: string, input: T) => unknown,
+	) {
 		app.post(`/api/conversations/:id/history/${operation}`, async (c) => {
-			const input = (
-				operation === "search" ? historySearchInput : historyReadInput
-			).safeParse(await c.req.json().catch(() => null));
-			if (!input.success)
-				return c.json({ error: "invalid_history_input" }, 400);
+			const input = await parseJsonBody(c, schema, {
+				code: "invalid_history_input",
+			});
+			if (!input.ok) return input.response;
 			try {
-				return c.json(
-					operation === "search"
-						? service.searchHistory(c.req.param("id"), input.data)
-						: service.readHistory(c.req.param("id"), input.data),
-				);
+				return c.json(run(c.req.param("id"), input.data));
 			} catch (e) {
 				const code = e instanceof Error ? e.message : "history_unavailable";
 				return c.json(
@@ -82,4 +90,10 @@ export function registerConversation(app: Hono, service: ConversationService) {
 			}
 		});
 	}
+	historyRoute("search", historySearchInput, (id, input) =>
+		service.searchHistory(id, input),
+	);
+	historyRoute("read", historyReadInput, (id, input) =>
+		service.readHistory(id, input),
+	);
 }

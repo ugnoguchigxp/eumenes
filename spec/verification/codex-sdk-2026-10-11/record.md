@@ -55,7 +55,7 @@ SDK内部はCLIランタイムを使う。[公式仕様](https://developers.open
 
 通しrunIdは `0bcf2983-80b5-48da-8392-7d3417fe8ff3`、workerは `f7b219be-94be-441c-a8b5-a0843b15da66`、jobIdは `50cd30ef-9421-43c0-b814-4c26d3374404`、inferenceIdは `58be186b-4131-474a-8d51-81d3f25f7165`。21:21:10.701受付、21:21:14.656 SDK開始、21:21:59.647 deadline失敗、21:22:04.348回答完了。生のProvider応答は記録していない。
 
-live証拠は `verification-reports/search-agents/2026-10-11T12-21-06.093Z/` と `verification-reports/codex-sdk/2026-10-11/`（通常ログとは別の検証成果物、0600）。録画・実機器の音声受入はこの変更の対象外。
+live証拠は `verification-reports/search-agents/2026-10-11T12-21-06.093Z/` と `verification-reports/codex-sdk/2026-10-11/`（通常ログとは別の検証成果物、0600。いずれもローカルの検証記録でリポジトリには含めない）。録画・実機器の音声受入はこの変更の対象外。
 
 ## 残る制約
 
@@ -71,7 +71,7 @@ Context Still: この実装作業ではcontext_compile 1回、compile_eval 1回�
 
 さらに21:42の実接続で `HTTP 400 / invalid_json_schema / phase=sdk_turn` を確認した（runId `592b4f60-3fdc-4eb7-8e5c-0bae6e0fb7a3`）。元のinvoke契約のargumentsは任意JSONを示す空schemaであり、strict形式で必要な定義が欠けていた。登録済みのtool idとinputSchemaを値で渡し、invokeをツールごとの型付きの枝にする。optionalはstrict形式に必要なnullable/required表現に変換し、省略可能かつ非nullableな入力のnullだけを元の省略へ戻す。SDK非対応の制約はwire表現から除き、ホストの完全な検証を維持する。検索語やニュースの選択をコードに実装していない。
 
-最終の定義変換での部分・結合試験は33件成功。実接続はrunId `df3d0e53-9b60-4526-8c7c-8013b8b49e2b`、証拠は `verification-reports/search-agents/2026-10-11T12-46-22.792Z/`。
+最終の定義変換での部分・結合試験は33件成功。実接続はrunId `df3d0e53-9b60-4526-8c7c-8013b8b49e2b`、証拠は `verification-reports/search-agents/2026-10-11T12-46-22.792Z/`（ローカルの検証記録。リポジトリには含めない）。
 
 | 日本時間 | 結果 |
 | --- | --- |
@@ -108,7 +108,7 @@ Context Still: この実装作業ではcontext_compile 1回、compile_eval 1回�
 
 最初のlive（runId `5dc533a9-da14-4deb-99e4-1994e56cb227`）は、確認用スクリプトがTOOLSの終端を旧OUTPUT_SCHEMAに依存していたため22:11:29にSDK実行前で失敗した。errorFramesが `scripts/search-agents-live.ts:88` を示し、Lunaの出力障害ではない。TOOLSの一行だけを読むように確認用スクリプトと同じ形式のfixture読取りを修正してから再実行した。試験期待値は変えていない。
 
-最終live: runId `1c78a7a3-1551-4ca2-87db-88ab349ada68`、証拠 `verification-reports/search-agents/2026-10-11T13-12-24.593Z/`。
+最終live: runId `1c78a7a3-1551-4ca2-87db-88ab349ada68`、証拠 `verification-reports/search-agents/2026-10-11T13-12-24.593Z/`（ローカルの検証記録。リポジトリには含めない）。
 
 | 日本時間 | 状態 |
 | --- | --- |

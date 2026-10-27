@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { HttpErrorStatus } from "../../../infrastructure/http";
 
 const common = {
 	requestId: z.string().uuid(),
@@ -136,3 +137,9 @@ export interface CacheStatus {
 	generation: number;
 	lastSweepAt: string | null;
 }
+/** HTTP status of each code the web research operations throw. */
+export const errorStatus = {
+	web_research_unavailable: 503,
+	web_cache_unavailable: 503,
+	web_cache_clear_blocked: 409,
+} as const satisfies Record<string, HttpErrorStatus>;

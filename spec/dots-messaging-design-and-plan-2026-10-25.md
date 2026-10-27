@@ -270,7 +270,7 @@ fixture、live、画面での確認は別々に記録する。実試験の本文
 ### 検証の記録と制限
 
 - 部分→結合→画面の順で実施。実MCP envelopeで送信→本文取得→claim→返答と要約保存→追加送信をfixtureで3往復し、Session・task・projectが不要なことを確認した。実dotsの発話として扱わない。
-- `bun run verify -- --domain dots --domain conversation --domain capabilities --domain continuity --domain dialogue --domain tool-runtime` は582件のBun試験と65件のWeb試験が成功し、domain境界・型・format・lint・選択範囲のサイズ検査も成功した。ただし検証中の担当外ソース変更を検出し、run全体は **invalidated**。全体gate成功の証拠にはしない。記録: `verification-reports/runs/2026-10-25T05-21-30-758Z-4e79c146-49f0-47df-a5d4-ce99ca726279/report.json`。
+- `bun run verify -- --domain dots --domain conversation --domain capabilities --domain continuity --domain dialogue --domain tool-runtime` は582件のBun試験と65件のWeb試験が成功し、domain境界・型・format・lint・選択範囲のサイズ検査も成功した。ただし検証中の担当外ソース変更を検出し、run全体は **invalidated**。全体gate成功の証拠にはしない。記録: `spec/verification/reports/runs/2026-10-25T05-21-30-758Z-4e79c146-49f0-47df-a5d4-ce99ca726279/report.json`。
 - JWT・MCP・既存作業委任・新規メッセージ・画面登録を別指定で検証した。追加の429/503再試行とQueueのプロセス障害復旧もfixtureで確認した。最新の件数・実行結果はこの節末尾へ追記する。
 - `tests/browser/dots-messaging.spec.ts` の2件が成功。HTTPサーバーを立てず、実際の登録ArtifactとWeb adapter、模擬clientをブラウザへ読み込むfixtureを使用。送信、通知だけの待機、返答・折りたたみ要約、追加送信、取消、再読込、購読失効と再登録、狭い画面を確認した。再読込試験では画面再作成の完了を待つ。製品の保持条件を緩めて試験を通していない。
 - Web本番build、全体型検査、全体domain import境界は成功。稼働中サービスへ変更を反映した結果ではない。

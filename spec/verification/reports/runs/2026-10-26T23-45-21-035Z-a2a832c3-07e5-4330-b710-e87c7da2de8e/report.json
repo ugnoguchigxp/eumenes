@@ -1,0 +1,212 @@
+{
+  "schemaVersion": 1,
+  "runId": "2026-10-26T23-45-21-035Z-a2a832c3-07e5-4330-b710-e87c7da2de8e",
+  "startedAt": "2026-10-26T23:45:21.035Z",
+  "scope": {
+    "all": false,
+    "selected": [
+      "dialogue",
+      "voice-dialogue",
+      "steward"
+    ]
+  },
+  "baseCommit": "938f9d9faf77fadcf6388eae64e9568550a5c0d7",
+  "revision": "03d6a80dc46838b4148ff3906546c0c79ead59f66d5e58456c861987199ff61c",
+  "runtime": {
+    "bun": "1.4.4",
+    "node": "26.3.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "ci": false,
+    "runner": null
+  },
+  "result": "fail",
+  "steps": [
+    {
+      "name": "inventory",
+      "status": "pass",
+      "ms": 82
+    },
+    {
+      "name": "boundaries",
+      "status": "pass",
+      "ms": 3749
+    },
+    {
+      "name": "system-context",
+      "status": "pass",
+      "ms": 137
+    },
+    {
+      "name": "size-budget",
+      "status": "fail",
+      "ms": 1091,
+      "error": "Error: size-budget: api/domains/voice-dialogue/service/index.ts#createVoiceDialogue grew 406 -> 408 (limit 300)\nsize-budget: new test file over 1000 lines: api/domains/voice-dialogue/test/settings-integration.test.ts (1001)"
+    },
+    {
+      "name": "sql-boundaries",
+      "status": "not_run",
+      "ms": 0
+    },
+    {
+      "name": "domain-docs",
+      "status": "not_run",
+      "ms": 0
+    },
+    {
+      "name": "format",
+      "status": "not_run",
+      "ms": 0
+    },
+    {
+      "name": "lint",
+      "status": "not_run",
+      "ms": 0
+    },
+    {
+      "name": "design-system typecheck",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "--cwd",
+        "packages/design-system",
+        "typecheck"
+      ],
+      "status": "not_run",
+      "ms": 0
+    },
+    {
+      "name": "design-system build",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "--cwd",
+        "packages/design-system",
+        "build"
+      ],
+      "status": "not_run",
+      "ms": 0
+    },
+    {
+      "name": "typecheck",
+      "status": "not_run",
+      "ms": 0
+    },
+    {
+      "name": "bun tests",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "test",
+        "./api/domains/dialogue/test/active-run.test.ts",
+        "./api/domains/dialogue/test/answer-streams.test.ts",
+        "./api/domains/dialogue/test/attachment-notes.test.ts",
+        "./api/domains/dialogue/test/brief-reply.test.ts",
+        "./api/domains/dialogue/test/command-interactions-http.test.ts",
+        "./api/domains/dialogue/test/command-interactions-lifecycle.test.ts",
+        "./api/domains/dialogue/test/command-interactions-questions.test.ts",
+        "./api/domains/dialogue/test/command-interactions-work.test.ts",
+        "./api/domains/dialogue/test/command-interactions.test.ts",
+        "./api/domains/dialogue/test/context-eval/analysis.test.ts",
+        "./api/domains/dialogue/test/context-eval/case-schema.test.ts",
+        "./api/domains/dialogue/test/context-eval/checks-judge.test.ts",
+        "./api/domains/dialogue/test/context-eval/freeze.test.ts",
+        "./api/domains/dialogue/test/context-eval/generation-runner.test.ts",
+        "./api/domains/dialogue/test/context-eval/integrity.test.ts",
+        "./api/domains/dialogue/test/context-eval/materialize.test.ts",
+        "./api/domains/dialogue/test/context-eval/pipeline.test.ts",
+        "./api/domains/dialogue/test/context-eval/run.test.ts",
+        "./api/domains/dialogue/test/context-eval/scoring.test.ts",
+        "./api/domains/dialogue/test/context-eval/trajectory.test.ts",
+        "./api/domains/dialogue/test/context-keeper.test.ts",
+        "./api/domains/dialogue/test/context-system.test.ts",
+        "./api/domains/dialogue/test/controller.test.ts",
+        "./api/domains/dialogue/test/conversation-input.test.ts",
+        "./api/domains/dialogue/test/conversation-output.test.ts",
+        "./api/domains/dialogue/test/dialogue.test.ts",
+        "./api/domains/dialogue/test/error-report.test.ts",
+        "./api/domains/dialogue/test/execution-notices.test.ts",
+        "./api/domains/dialogue/test/generation-prepare.test.ts",
+        "./api/domains/dialogue/test/generation-tools.test.ts",
+        "./api/domains/dialogue/test/generation-work.test.ts",
+        "./api/domains/dialogue/test/generation.test.ts",
+        "./api/domains/dialogue/test/media-deadline.test.ts",
+        "./api/domains/dialogue/test/memory-integration.test.ts",
+        "./api/domains/dialogue/test/pinned-operation.test.ts",
+        "./api/domains/dialogue/test/queue.test.ts",
+        "./api/domains/dialogue/test/reconcile-agents.test.ts",
+        "./api/domains/dialogue/test/resources.test.ts",
+        "./api/domains/dialogue/test/resubmit.test.ts",
+        "./api/domains/dialogue/test/run-end.test.ts",
+        "./api/domains/dialogue/test/specialist-document.test.ts",
+        "./api/domains/dialogue/test/specialist-lifecycle.test.ts",
+        "./api/domains/dialogue/test/specialist-memory.test.ts",
+        "./api/domains/dialogue/test/specialist-turn.test.ts",
+        "./api/domains/dialogue/test/specialist.test.ts",
+        "./api/domains/dialogue/test/speech-delivery.test.ts",
+        "./api/domains/dialogue/test/todo-screen.test.ts",
+        "./api/domains/steward/test/activity-indexes.test.ts",
+        "./api/domains/steward/test/activity.test.ts",
+        "./api/domains/steward/test/controller.test.ts",
+        "./api/domains/steward/test/forget-relevance.test.ts",
+        "./api/domains/steward/test/forget-world.test.ts",
+        "./api/domains/steward/test/forget.test.ts",
+        "./api/domains/steward/test/goals-restore.test.ts",
+        "./api/domains/steward/test/goals.test.ts",
+        "./api/domains/steward/test/maintenance.test.ts",
+        "./api/domains/steward/test/memory-adoption.test.ts",
+        "./api/domains/steward/test/migration.test.ts",
+        "./api/domains/steward/test/requests.test.ts",
+        "./api/domains/steward/test/review-fixes.test.ts",
+        "./api/domains/steward/test/runs.test.ts",
+        "./api/domains/steward/test/steps.test.ts",
+        "./api/domains/steward/test/units.test.ts",
+        "./api/domains/steward/test/world-events.test.ts",
+        "./api/domains/steward/test/world-integration.test.ts",
+        "./api/domains/steward/test/world-view.test.ts",
+        "./api/domains/voice-dialogue/test/migration.test.ts",
+        "./api/domains/voice-dialogue/test/playback-heard.test.ts",
+        "./api/domains/voice-dialogue/test/replay-played.test.ts",
+        "./api/domains/voice-dialogue/test/sentences.test.ts",
+        "./api/domains/voice-dialogue/test/settings-integration.test.ts",
+        "./api/domains/voice-dialogue/test/spoken-text.test.ts",
+        "./api/domains/voice-dialogue/test/streaming-speech.test.ts",
+        "./api/domains/voice-dialogue/test/upload.test.ts",
+        "./api/domains/voice-dialogue/test/voice.test.ts"
+      ],
+      "status": "not_run",
+      "ms": 0
+    },
+    {
+      "name": "web tests",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "x",
+        "--no-install",
+        "vitest",
+        "run",
+        "web/src/domains/dialogue/test/hooks.test.tsx",
+        "web/src/domains/dialogue/test/progress.test.tsx",
+        "web/src/domains/dialogue/test/specialist.test.tsx",
+        "web/src/domains/voice-dialogue/test/automatic.test.tsx",
+        "web/src/domains/voice-dialogue/test/capture.test.tsx",
+        "web/src/domains/voice-dialogue/test/chunk-player.test.ts",
+        "web/src/domains/voice-dialogue/test/corrections.test.tsx",
+        "web/src/domains/voice-dialogue/test/hooks.test.tsx",
+        "web/src/domains/voice-dialogue/test/input-timing.test.ts",
+        "web/src/domains/voice-dialogue/test/input.test.tsx",
+        "web/src/domains/voice-dialogue/test/machine.test.ts",
+        "web/src/domains/voice-dialogue/test/replay.test.tsx"
+      ],
+      "status": "not_run",
+      "ms": 0
+    }
+  ],
+  "totalMs": 5347,
+  "integrityErrors": [],
+  "build": {
+    "sharedOutput": true
+  },
+  "stopReason": "Error: size-budget: api/domains/voice-dialogue/service/index.ts#createVoiceDialogue grew 406 -> 408 (limit 300)\nsize-budget: new test file over 1000 lines: api/domains/voice-dialogue/test/settings-integration.test.ts (1001)",
+  "finalRevision": "03d6a80dc46838b4148ff3906546c0c79ead59f66d5e58456c861987199ff61c",
+  "finishedAt": "2026-10-26T23:45:27.101Z"
+}

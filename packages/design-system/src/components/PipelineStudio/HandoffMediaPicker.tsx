@@ -12,6 +12,7 @@ export function HandoffMediaPicker({
 	query,
 	setQuery,
 	onLibrary,
+	onDeleteImage,
 	onSelect,
 	onBack,
 }: {
@@ -20,6 +21,7 @@ export function HandoffMediaPicker({
 	query: string;
 	setQuery: (query: string) => void;
 	onLibrary: PipelineHandoffProps["onLibrary"];
+	onDeleteImage: PipelineHandoffProps["onDeleteImage"];
 	onSelect: (material: PipelineMaterial) => void;
 	onBack: () => void;
 }) {
@@ -34,6 +36,7 @@ export function HandoffMediaPicker({
 						loading={library.loading}
 						error={library.error}
 						onRefresh={() => onLibrary("image")}
+						onDelete={onDeleteImage}
 						onConfirm={(id) => {
 							const image = library.images.find((item) => item.id === id);
 							if (image) {

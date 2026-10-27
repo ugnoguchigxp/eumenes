@@ -2,6 +2,7 @@ import { registerRecognitionAnalyses } from "./analyses";
 import { z } from "zod";
 import type { Hono } from "hono";
 import { readBounded } from "../../../infrastructure/bounded-read";
+import { parseJsonBody, parseQuery } from "../../../infrastructure/http";
 import { maxInputBytes } from "../contracts";
 import type { ObjectRecognitionService } from "../service";
 import type { ImageMaterial } from "../service/handoff";
@@ -19,6 +20,13 @@ export type RecognitionSharing = {
 	): Promise<unknown>;
 };
 const requestBody = z.strictObject({ requestId: z.uuid() });
+const handoffSend = z.strictObject({ recognitionId: z.uuid().optional() });
+const uploadQuery = z.object({
+	requestId: z.uuid(),
+	conversationId: z.string().min(1).max(120),
+	origin: z.enum(["camera", "screen", "file"]).optional(),
+	handoffId: z.string().min(1).max(120).optional(),
+});
 export function registerObjectRecognition(
 	app: Hono,
 	service: ObjectRecognitionService,
@@ -41,11 +49,10 @@ export function registerObjectRecognition(
 		c.json(await service.cancelHandoff(owner, c.req.param("id"))),
 	);
 	app.post(`${root}/handoffs/:id/send`, async (c) => {
-		const input = z
-			.strictObject({ recognitionId: z.uuid().optional() })
-			.safeParse(await c.req.json().catch(() => null));
-		if (!input.success)
-			return c.json({ error: "invalid_recognition_input" }, 400);
+		const input = await parseJsonBody(c, handoffSend, {
+			code: "invalid_recognition_input",
+		});
+		if (!input.ok) return input.response;
 		const id = c.req.param("id");
 		const { material, question } = await service.handoffMaterial(
 			owner,
@@ -60,16 +67,10 @@ export function registerObjectRecognition(
 		return c.json(run);
 	});
 	app.post(root, async (c) => {
-		const query = z
-			.object({
-				requestId: z.uuid(),
-				conversationId: z.string().min(1).max(120),
-				origin: z.enum(["camera", "screen", "file"]).optional(),
-				handoffId: z.string().min(1).max(120).optional(),
-			})
-			.safeParse(c.req.query());
-		if (!query.success)
-			return c.json({ error: "invalid_recognition_input" }, 400);
+		const query = parseQuery(c, uploadQuery, {
+			code: "invalid_recognition_input",
+		});
+		if (!query.ok) return query.response;
 		const bytes = await readBounded(c.req.raw.body, {
 			limit: maxInputBytes + 16384,
 			missing: "invalid_recognition_input",
@@ -116,14 +117,18 @@ export function registerObjectRecognition(
 	app.post(`${root}/:id/recheck`, async (c) =>
 		c.json(await service.recheck(owner, c.req.param("id"))),
 	);
+	app.post(`${root}/:id/capture-save-resume`, async (c) =>
+		c.json(await service.resumeCaptureSave(owner, c.req.param("id"))),
+	);
 	app.delete(`${root}/:id`, async (c) => {
 		await service.remove(owner, c.req.param("id"));
 		return c.body(null, 204);
 	});
 	app.post(`${root}/:id/attachment`, async (c) => {
-		const input = requestBody.safeParse(await c.req.json().catch(() => null));
-		if (!input.success)
-			return c.json({ error: "invalid_recognition_input" }, 400);
+		const input = await parseJsonBody(c, requestBody, {
+			code: "invalid_recognition_input",
+		});
+		if (!input.ok) return input.response;
 		const material = service.attachmentMaterial(owner, c.req.param("id"));
 		return c.json(await sharing.attach(material, input.data.requestId));
 	});

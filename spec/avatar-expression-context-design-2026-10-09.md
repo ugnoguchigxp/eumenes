@@ -132,10 +132,10 @@ P50/P95はRyzen内のHTTP往復時間。モデル準備・LAN・LARM接続・TTS
 
 測定記録：
 
-- [個別確率・混同行列・集計](/Users/y.noguchi/Code/eumenes/verification-reports/expression-design-pilot.jsonl)
-- [評価を起動したコード](/Users/y.noguchi/Code/eumenes/verification-reports/expression-design-pilot.ts)／[native評価・遷移計算](/Users/y.noguchi/Code/eumenes/verification-reports/expression-design-pilot.py)
-- [CPU・メモリの追加測定](/Users/y.noguchi/Code/eumenes/verification-reports/expression-design-resources.json)
-- [ヒステリシス訂正後の比較](/Users/y.noguchi/Code/eumenes/verification-reports/expression-design-hysteresis.json)／[再計算コード](/Users/y.noguchi/Code/eumenes/verification-reports/expression-design-hysteresis.py)
+- 個別確率・混同行列・集計（`verification-reports/expression-design-pilot.jsonl`。ローカルの検証記録でリポジトリには含めない）
+- 評価を起動したコード `verification-reports/expression-design-pilot.ts`／native評価・遷移計算 `verification-reports/expression-design-pilot.py`（いずれもローカルの検証記録。リポジトリには含めない）
+- [CPU・メモリの追加測定](verification/reports/expression-design-resources.json)
+- [ヒステリシス訂正後の比較](verification/reports/expression-design-hysteresis.json)／再計算コード（`verification-reports/expression-design-hysteresis.py`。ローカルの検証記録でリポジトリには含めない）
 
 会話本文・認証情報・音声・providerの生応答は記録していない。実会話は既存の公開API経由で読み、製品DBを直接開いていない。実機器での音声3往復受入は今回行っていない。
 

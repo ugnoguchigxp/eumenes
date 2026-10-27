@@ -14,7 +14,7 @@ fixture: LARM・Web取得・音声応答の97試験、agent・Toolchain・診断
 
 全体gateの終了結果: browser30合格/5失敗。失敗は取得先学習の停止後表示、90秒timerの受付応答待ち、24時間timerの表示、timerの狭い画面の操作、アバターcanvasの表示。音声のASR→本文→TTS、通知復旧、SSE、Toolchainの天気・株価はこの全体実行でも合格した。全体gateは失敗として記録し、これら5件の修復完了は宣言しない。
 
-live: 2026-10-10 06:43 JST、製品DBやユーザーの録音をコピーしない隔離backendで実TTS入力→実ASR→実検索→本文取得→主LLM回答→実TTSを完了した。認識文は「今日の鎌倉の天気を教えてください。」。10月10日のtenki.jp予報を引用し、回答「晴れで、気温は17℃から25℃でございます。」と音声chunkの文章が一致し、RIFF音声29,228 bytesを取得した。根拠・結果は `verification-reports/voice-live/result.json`、安全な運用ログは同ディレクトリの `backend.jsonl`（各0600）。最終の合格条件にも回答と読上げ文の一致を追加した。値は試験時点の予報であり固定値ではない。引用不一致を一度修正した後に報告を採用した経過もログで追跡できる。
+live: 2026-10-10 06:43 JST、製品DBやユーザーの録音をコピーしない隔離backendで実TTS入力→実ASR→実検索→本文取得→主LLM回答→実TTSを完了した。認識文は「今日の鎌倉の天気を教えてください。」。10月10日のtenki.jp予報を引用し、回答「晴れで、気温は17℃から25℃でございます。」と音声chunkの文章が一致し、RIFF音声29,228 bytesを取得した。根拠・結果は `spec/verification/reports/voice-live/result.json`、安全な運用ログは同ディレクトリの `backend.jsonl`（各0600）。最終の合格条件にも回答と読上げ文の一致を追加した。値は試験時点の予報であり固定値ではない。引用不一致を一度修正した後に報告を採用した経過もログで追跡できる。
 
 稼働反映: 受付済みのrunがないことを公開APIで確認し、backendを再起動した。API・WebのHTTP200とLARM readyを確認した。実マイク・ヘッドホンでの3往復受入は未実施であり、音声MVPの完成とは扱わない。
 
@@ -34,7 +34,7 @@ Context作業: この修正の `context_compile` / `compile_eval` は各1回。�
 
 5,000 toolと5,000 package、固定の2依存を登録した合成catalogで、明示alias 100/100、候補の件数/bytes、所有者違い、停止した依存の除外、選択済み3依存だけの展開を確認した。一般日本語の意味品質評価やp95性能測定を行った結果ではない。
 
-最終snapshotで関連9 domainの個別gateは全件合格。`bun run verify:all` はformat・lint・型・境界・build、backend **354/354**、Web **92/92**、browser **16/16** が合格（104.6秒）。browserの内訳はToolchain 2件と既存音声・設定等14件。全体gateはfixtureを使い、下記liveとは分けて扱う。出力はGit対象外の `verification-reports/toolchain/{domain}.txt` と `all.txt`、入力revisionと工程別結果は `verification-reports/latest.json`。`git diff --check` も合格。
+最終snapshotで関連9 domainの個別gateは全件合格。`bun run verify:all` はformat・lint・型・境界・build、backend **354/354**、Web **92/92**、browser **16/16** が合格（104.6秒）。browserの内訳はToolchain 2件と既存音声・設定等14件。全体gateはfixtureを使い、下記liveとは分けて扱う。出力はGit対象外の `verification-reports/toolchain/{domain}.txt` と `all.txt`、入力revisionと工程別結果は `verification-reports/latest.json`（ローカルの検証記録。リポジトリには含めない）。`git diff --check` も合格。
 
 ## live
 
@@ -51,9 +51,9 @@ Context作業: この修正の `context_compile` / `compile_eval` は各1回。�
 
 レビューと修正内容は[2026-10-09のレビュー記録](review-2026-10-09.md)。上記354/92/16件と20:19〜20:20のliveは実装時の過去snapshotであり、レビュー後の検証結果は別に記録する。
 
-取消rollbackの波及、vault容量漏れ、候補の再利用、必須指示の混入・欠落、tickerの境界、削除済みreportの表示、失敗表示、step台帳、liveの数値判定、長い依頼の契約を修正した。レビュー後の関連9 domainの個別gateは全件合格。全体gateはbackend **363/363**、Web **94/94**、browser **16/16** と全工程が合格（106.1秒）。revisionと工程別結果はレビュー記録と `verification-reports/latest.json` に記録した。
+取消rollbackの波及、vault容量漏れ、候補の再利用、必須指示の混入・欠落、tickerの境界、削除済みreportの表示、失敗表示、step台帳、liveの数値判定、長い依頼の契約を修正した。レビュー後の関連9 domainの個別gateは全件合格。全体gateはbackend **363/363**、Web **94/94**、browser **16/16** と全工程が合格（106.1秒）。revisionと工程別結果はレビュー記録と `verification-reports/latest.json`（ローカルの検証記録。リポジトリには含めない）に記録した。
 
-実LARM＋公開Webの再実行は20:50〜20:51 JSTに2/2成功。東京の10月10日予報は晴れ・最高26度（29.0秒、推論4/tool1）、AAPLは340.42 USD・10月8日16時 America/New_York（34.8秒、推論5/tool1）。数値が引用・子の主張・最終回答で一致し、株価の取引所日付も一致した。元データ・最終回答は `verification-reports/toolchain/live.json`、出力は `review-live-final.txt`。全て隔離backendでの試験であり、実機器の音声受入ではない。
+実LARM＋公開Webの再実行は20:50〜20:51 JSTに2/2成功。東京の10月10日予報は晴れ・最高26度（29.0秒、推論4/tool1）、AAPLは340.42 USD・10月8日16時 America/New_York（34.8秒、推論5/tool1）。数値が引用・子の主張・最終回答で一致し、株価の取引所日付も一致した。元データ・最終回答は `verification-reports/toolchain/live.json`（ローカルの検証記録。リポジトリには含めない。後続の実行で上書き済み）、出力は `spec/verification/reports/toolchain/review-live-final.txt`。全て隔離backendでの試験であり、実機器の音声受入ではない。
 
 ## 未実施・意味品質の限界
 

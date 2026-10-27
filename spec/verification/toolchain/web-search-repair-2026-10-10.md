@@ -70,7 +70,7 @@ Git対象外の `verification-reports/toolchain/` に、改修前の `search-bef
 
 - fixture: capabilities gateは10件成功。旧版を持つDBへの更新・DB再オープン・旧hash保持、新版の内容衝突拒否を含む。利用側agent-runtime gateも成功。
 - 起動確認: 既存DBを使った `bun run dev` でAPIとViteの起動、LARMのready、正常終了を確認。以降の稼働中サーバーも公開APIでreadyを確認した。
-- live: 稼働中backendで合成した試験音声71,724 bytesをASRへ送り、認識成功を確認。ユーザーの録音や会話本文は試験へコピーしていない。結果は `verification-reports/startup-repair-live.json`。
-- 全体: backendは975件成功・1件skip、Web単体は201件成功、画面ビルド成功。ブラウザfixtureの最終結果は `verification-reports/startup-repair-all.log` を参照する。
+- live: 稼働中backendで合成した試験音声71,724 bytesをASRへ送り、認識成功を確認。ユーザーの録音や会話本文は試験へコピーしていない。結果は `spec/verification/reports/startup-repair-live.json`。
+- 全体: backendは975件成功・1件skip、Web単体は201件成功、画面ビルド成功。ブラウザfixtureの最終結果は `verification-reports/startup-repair-all.log`（ローカルの検証記録。リポジトリには含めない）を参照する。
 
 音声の実マイク・スピーカー3往復受入とは区別する。直前のASR停止はLARM接続作成の409による別の障害で、その詳細原因をこの修正で確定したとは扱わない。

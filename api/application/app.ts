@@ -1,6 +1,6 @@
 import { getLogger, withLogContext } from "../infrastructure/logger";
 import { limitConcurrency } from "../infrastructure/concurrency";
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { statusForError } from "./error-status";
 import { createHash, timingSafeEqual } from "node:crypto";
 import type { AppModule } from "./app-modules";
@@ -35,9 +35,21 @@ export type AppOptions = {
 	modules: readonly AppModule[];
 };
 
+const log = getLogger("http");
+/** The one answer to a thrown error: its code with the status the error table gives it, 500 without details. */
+export function answerError(error: Error, c: Context) {
+	const message = error instanceof Error ? error.message : "internal_error";
+	const status = statusForError(message);
+	// Internal failures never leak details to the client.
+	if (status === 500) {
+		log.error("http.failed", { reason: "internal_error", status }, error);
+		return c.json({ error: "internal_error" }, 500);
+	}
+	log.warn("http.rejected", { reason: message, status });
+	return c.json({ error: message }, status);
+}
 export function createApp(options: AppOptions) {
 	const app = new Hono();
-	const log = getLogger("http");
 	app.use("*", async (c, next) => {
 		await next();
 		c.header("X-Content-Type-Options", "nosniff");
@@ -140,16 +152,6 @@ export function createApp(options: AppOptions) {
 	);
 	app.on("POST", "/api/inference/probes", limitConcurrency(1));
 	for (const module of options.modules) module.mount(app);
-	app.onError((error, c) => {
-		const message = error instanceof Error ? error.message : "internal_error";
-		const status = statusForError(message);
-		// Internal failures never leak details to the client.
-		if (status === 500) {
-			log.error("http.failed", { reason: "internal_error", status }, error);
-			return c.json({ error: "internal_error" }, 500);
-		}
-		log.warn("http.rejected", { reason: message, status });
-		return c.json({ error: message }, status);
-	});
+	app.onError(answerError);
 	return app;
 }

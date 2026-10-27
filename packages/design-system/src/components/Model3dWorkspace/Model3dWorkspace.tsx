@@ -121,6 +121,7 @@ export function Model3dWorkspace(props: Model3dWorkspaceProps) {
 						sourceImagesError={props.sourceImagesError}
 						onRefreshImages={props.onRefresh}
 						onUploadImage={props.onUploadImage}
+						onDeleteImage={props.onDeleteImage}
 						renderGooglePhotos={props.renderGooglePhotos}
 						pending={props.pending}
 						onGenerate={props.onGenerate}

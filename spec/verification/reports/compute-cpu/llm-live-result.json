@@ -1,0 +1,24 @@
+{
+  "runId": "8f071173-1a0b-47ec-9626-87659f206d3c",
+  "status": "failed",
+  "error": "invalid_conversation_operation",
+  "answerMessageId": null,
+  "jobId": "1be826c0-4e4e-435b-adde-7f2e78f48558",
+  "code": "result = 1 + 1",
+  "state": "completed",
+  "value": 2,
+  "messages": [
+    {
+      "id": "32fb21ab-b905-4128-8539-990e619a2091",
+      "role": "user",
+      "text": "計算担当を使ってPythonで1+1を実行してください。計算結果を教えてください。",
+      "runId": "8f071173-1a0b-47ec-9626-87659f206d3c"
+    },
+    {
+      "id": "compute-notice:1be826c0-4e4e-435b-adde-7f2e78f48558:completed",
+      "role": "assistant",
+      "text": "計算結果: 2",
+      "runId": null
+    }
+  ]
+}

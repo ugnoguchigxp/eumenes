@@ -1,0 +1,48 @@
+bun test v1.4.3 (c6da4a4d3)
+
+api/application/compute/compute-review.test.ts:
+124 | 				const snapshot =
+125 | 					request.origin.kind === "ui"
+126 | 						? service.snapshotInTransaction(db, owner)
+127 | 						: commandSnapshot(service, db, owner);
+128 | 				if (!snapshot.jobs.some((j) => j.id === target.jobId))
+129 | 					throw new Error("compute_not_found");
+                     ^
+error: compute_not_found
+      at invokeInTransaction (/Users/y.noguchi/Code/eumenes/api/application/compute/compute-adapter.ts:129:16)
+      at <anonymous> (/Users/y.noguchi/Code/eumenes/api/infrastructure/sqlite/index.ts:330:20)
+      at transaction (bun:sqlite:401:27)
+      at <anonymous> (/Users/y.noguchi/Code/eumenes/api/infrastructure/sqlite/index.ts:336:6)
+(fail) older owned jobs remain addressable outside the bounded model snapshot and replay stays stable [222.69ms]
+
+api/domains/compute/test/review.test.ts:
+12 |  await waitFor(() => f.service.get("owner", a.jobId).state === "indeterminate");
+13 |  const deadline = Date.now() + 60000;
+14 |  await f.store.write(db => db.query("UPDATE compute_jobs SET deadline=? WHERE id=?").run(deadline, a.jobId));
+15 |  await f.service.reconcile("owner", a.jobId);
+16 |  await waitFor(() => f.service.get("owner", a.jobId).state === "indeterminate");
+17 |  expect(f.store.read(db => (db.query("SELECT deadline FROM compute_jobs WHERE id=?").get(a.jobId) as {deadline:number}).deadline)).toBe(deadline);
+                                                                                                                                        ^
+error: expect(received).toBe(expected)
+
+Expected: 1792579406814
+Received: 1792579766814
+
+      at <anonymous> (/Users/y.noguchi/Code/eumenes/api/domains/compute/test/review.test.ts:17:132)
+(fail) reconciliation preserves the original deadline and refuses expired unknown submissions [23.51ms]
+ 7 | 	options: { timeout?: number; interval?: number } = {},
+ 8 | ): Promise<void> {
+ 9 | 	const { timeout = 5000, interval = 2 } = options;
+10 | 	const end = performance.now() + timeout;
+11 | 	while (!(await condition())) {
+12 | 		if (performance.now() > end) throw new Error("wait_for_timeout");
+                                              ^
+error: wait_for_timeout
+      at waitFor (/Users/y.noguchi/Code/eumenes/api/infrastructure/wait-for.ts:12:42)
+      at async <anonymous> (/Users/y.noguchi/Code/eumenes/api/domains/compute/test/review.test.ts:33:8)
+(fail) Retry-After cannot postpone deadline cancellation [2022.67ms]
+
+ 0 pass
+ 3 fail
+ 1 expect() calls
+Ran 3 tests across 2 files. [2.48s]

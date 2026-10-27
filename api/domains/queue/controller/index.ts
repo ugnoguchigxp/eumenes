@@ -1,26 +1,38 @@
 import type { Hono } from "hono";
-import { parseJsonBody } from "../../../infrastructure/http";
+import { z } from "zod";
+import {
+	parseJsonBody,
+	parseQuery,
+	queryInt,
+} from "../../../infrastructure/http";
 import { cancelBodySchema } from "../contracts";
 import type { QueueService } from "../service";
 import { toDto } from "../service";
 
+const listQuery = z.object({
+	scope: z.string().optional(),
+	state: z.string().optional(),
+	kind: z.string().optional(),
+	subjectRef: z.string().optional(),
+	cursor: z.string().optional(),
+	limit: queryInt.pipe(z.number().min(1).max(100)).default(50),
+});
+
 export function registerQueue(app: Hono, service: QueueService) {
 	app.get("/api/queue/status", (c) => c.json(service.stats()));
 	app.get("/api/jobs", (c) => {
-		const q = c.req.query();
-		const limit = q.limit === undefined ? 50 : Number(q.limit);
-		if (!Number.isInteger(limit) || limit < 1 || limit > 100)
-			return c.json({ error: "invalid_limit" }, 400);
+		const q = parseQuery(c, listQuery, { code: "invalid_limit" });
+		if (!q.ok) return q.response;
 		return c.json(
 			service.list(
 				{
-					scope: q.scope,
-					state: q.state,
-					kind: q.kind,
-					subjectRef: q.subjectRef,
+					scope: q.data.scope,
+					state: q.data.state,
+					kind: q.data.kind,
+					subjectRef: q.data.subjectRef,
 				},
-				q.cursor ?? null,
-				limit,
+				q.data.cursor ?? null,
+				q.data.limit,
 			),
 		);
 	});

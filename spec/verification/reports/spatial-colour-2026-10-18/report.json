@@ -1,0 +1,181 @@
+{
+  "schemaVersion": 1,
+  "runId": "2026-10-18T10-22-54-712Z-259066bf-e8ba-4327-a498-b35e5ad3ac68",
+  "startedAt": "2026-10-18T10:22:54.712Z",
+  "scope": {
+    "all": false,
+    "selected": [
+      "background",
+      "monitoring"
+    ]
+  },
+  "baseCommit": "80ecd13aeca72015d7b3d56321c8f8fb613bae2b",
+  "revision": "7136f1e8e8779e476191a21f40e181bb68fa27f0bfd32b63e5a1899a20a92b3a",
+  "runtime": {
+    "bun": "1.4.3",
+    "node": "26.3.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "ci": false,
+    "runner": null
+  },
+  "result": "pass",
+  "steps": [
+    {
+      "name": "inventory",
+      "status": "pass",
+      "ms": 47
+    },
+    {
+      "name": "boundaries",
+      "status": "pass",
+      "ms": 30
+    },
+    {
+      "name": "system-context",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "context:check"
+      ],
+      "status": "pass",
+      "ms": 97,
+      "exitCode": 0
+    },
+    {
+      "name": "size-budget",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "scripts/size-budget.ts",
+        "web/src/domains/background",
+        "api/domains/monitoring",
+        "web/src/domains/monitoring"
+      ],
+      "status": "pass",
+      "ms": 196,
+      "exitCode": 0
+    },
+    {
+      "name": "format",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "format:check",
+        "web/src/domains/background",
+        "api/domains/monitoring",
+        "web/src/domains/monitoring"
+      ],
+      "status": "pass",
+      "ms": 113,
+      "exitCode": 0
+    },
+    {
+      "name": "lint",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "lint",
+        "web/src/domains/background",
+        "api/domains/monitoring",
+        "web/src/domains/monitoring"
+      ],
+      "status": "pass",
+      "ms": 62,
+      "exitCode": 0
+    },
+    {
+      "name": "design-system typecheck",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "--cwd",
+        "packages/design-system",
+        "typecheck"
+      ],
+      "status": "pass",
+      "ms": 238,
+      "exitCode": 0
+    },
+    {
+      "name": "design-system build",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "--cwd",
+        "packages/design-system",
+        "build"
+      ],
+      "status": "pass",
+      "ms": 4963,
+      "exitCode": 0
+    },
+    {
+      "name": "typecheck configuration",
+      "status": "pass",
+      "ms": 1
+    },
+    {
+      "name": "typecheck",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "check",
+        "-p",
+        "/private/var/folders/mx/jbv8qfwd52z14q0mby_273lhlp5gd2/T/eumenes-colour-verify-7220o7qd/verification-reports/runs/2026-10-18T10-22-54-712Z-259066bf-e8ba-4327-a498-b35e5ad3ac68/tsconfig.selected.json"
+      ],
+      "status": "pass",
+      "ms": 199,
+      "exitCode": 0
+    },
+    {
+      "name": "typecheck closure",
+      "status": "pass",
+      "ms": 96
+    },
+    {
+      "name": "bun tests",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "test",
+        "./api/domains/monitoring/test/larm-collector.test.ts",
+        "./api/domains/monitoring/test/larm-history-recovery.test.ts",
+        "./api/domains/monitoring/test/larm-items.test.ts",
+        "./api/domains/monitoring/test/larm-repository.test.ts",
+        "./api/domains/monitoring/test/monitoring.test.ts"
+      ],
+      "status": "pass",
+      "ms": 630,
+      "exitCode": 0
+    },
+    {
+      "name": "web tests",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "x",
+        "--no-install",
+        "vitest",
+        "run",
+        "web/src/domains/background/SpatialBackground.test.tsx",
+        "web/src/domains/background/controller/camera.test.ts",
+        "web/src/domains/background/controller/scene.test.ts",
+        "web/src/domains/background/models/evaluator.test.ts",
+        "web/src/domains/background/models/particles.test.ts",
+        "web/src/domains/monitoring/index.test.tsx",
+        "web/src/domains/monitoring/items.test.ts",
+        "web/src/domains/monitoring/larm.test.ts"
+      ],
+      "status": "pass",
+      "ms": 4423,
+      "exitCode": 0
+    }
+  ],
+  "totalMs": 11382,
+  "integrityErrors": [],
+  "build": {
+    "sharedOutput": true,
+    "inputRevision": "7136f1e8e8779e476191a21f40e181bb68fa27f0bfd32b63e5a1899a20a92b3a",
+    "distAfterBuild": "5589b709d19488424bd296b7bc6eb7d5e244d7a76609ac25a99a4c2ffd0c6f87",
+    "distAfterConsumers": "5589b709d19488424bd296b7bc6eb7d5e244d7a76609ac25a99a4c2ffd0c6f87"
+  },
+  "finalRevision": "7136f1e8e8779e476191a21f40e181bb68fa27f0bfd32b63e5a1899a20a92b3a",
+  "finishedAt": "2026-10-18T10:23:06.314Z"
+}

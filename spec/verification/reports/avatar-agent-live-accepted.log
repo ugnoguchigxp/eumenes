@@ -1,0 +1,4 @@
+{"level":"info","time":"2026-10-08T14:22:14.482Z","service":"eumenes","pid":46994,"bootId":"0f7dd3e0-9e95-42a1-8199-9c8de8c13ef9","schemaVersion":1,"count":3,"component":"larm","event":"larm.connection_started"}
+{"level":"info","time":"2026-10-08T14:22:15.921Z","service":"eumenes","pid":46994,"bootId":"0f7dd3e0-9e95-42a1-8199-9c8de8c13ef9","schemaVersion":1,"count":4,"durationMs":1439,"component":"larm","event":"larm.connection_ready"}
+{"stage":"decision","id":"73d14896-aaa9-44ce-8f54-9ca52da7a54e","motion":"joyful","tone":"natural","source":"laya","reason":"low-confidence","confidence":0.5369,"motionConfidence":0.9736,"toneConfidence":0.5369,"latencyMs":195}
+{"stage":"tts","error":"larm_inference_401"}

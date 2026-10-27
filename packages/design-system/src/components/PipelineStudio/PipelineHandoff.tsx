@@ -23,6 +23,7 @@ export type PipelineHandoffProps = {
 		query?: string,
 		more?: boolean,
 	) => void;
+	onDeleteImage?: (id: string) => Promise<boolean>;
 	onApply: (text: string, revision: number) => Promise<boolean> | void;
 	onClose: () => void;
 };
@@ -34,6 +35,7 @@ export function PipelineHandoff({
 	pending,
 	library,
 	onLibrary,
+	onDeleteImage,
 	onApply,
 	onClose,
 }: PipelineHandoffProps) {
@@ -126,6 +128,7 @@ export function PipelineHandoff({
 				query={query}
 				setQuery={setQuery}
 				onLibrary={onLibrary}
+				onDeleteImage={onDeleteImage}
 				onSelect={add}
 				onBack={back}
 			/>

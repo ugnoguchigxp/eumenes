@@ -47,7 +47,7 @@ Script用ツールを加えた当初、受付packageの必須コンテキスト�
 | bundle check | browser.bundle.json、settings.bundle.jsonともissueなし |
 | 実LLM・実Brave・ASR実機 | 未実施。画面fixtureの成功で代替しない |
 
-選択domainのverify記録: `verification-reports/runs/2026-10-20T14-08-04-367Z-98e69af5-025e-4fee-8f6e-7d6621f665d8/report.json`。その後、接続開始のwriter内にも取消・epoch検査を追加し、browserの単体・結合227件、型、lint、buildを再確認した。製品サーバーへ接続するE2E fixtureは起動していない。
+選択domainのverify記録: `spec/verification/reports/runs/2026-10-20T14-08-04-367Z-98e69af5-025e-4fee-8f6e-7d6621f665d8/report.json`。その後、接続開始のwriter内にも取消・epoch検査を追加し、browserの単体・結合227件、型、lint、buildを再確認した。製品サーバーへ接続するE2E fixtureは起動していない。
 
 ### 既存の問題で通過していない検証
 

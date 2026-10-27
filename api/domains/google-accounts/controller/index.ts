@@ -2,6 +2,7 @@ import type { Hono } from "hono";
 import { getCookie, setCookie, deleteCookie } from "hono/cookie";
 import { z } from "zod";
 import { GoogleAccountError } from "../contracts";
+import { parseJsonBody } from "../../../infrastructure/http";
 import type { GoogleAccounts } from "../service";
 import { digest } from "../service/secrets";
 import { registerPhotos } from "./photos";
@@ -27,8 +28,8 @@ export function registerGoogleAccounts(app: Hono, service: GoogleAccounts) {
 	] as const) {
 		app.post(`/api/google-accounts/${operation}`, async (c) => {
 			c.header("Cache-Control", "no-store");
-			const body = revision.safeParse(await c.req.json().catch(() => null));
-			if (!body.success) return c.json({ error: "invalid_input" }, 400);
+			const body = await parseJsonBody(c, revision);
+			if (!body.ok) return body.response;
 			try {
 				if (operation === "connect" || operation === "connect-photos") {
 					const result = await service.begin(

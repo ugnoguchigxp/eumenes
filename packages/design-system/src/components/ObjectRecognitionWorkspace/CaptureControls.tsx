@@ -73,12 +73,14 @@ export function CaptureControls({
 	processing,
 	processingLabel,
 	onFile,
+	onLibraryOpen,
 }: {
 	camera: CameraControls;
 	disabled: boolean;
 	processing: boolean;
 	processingLabel: string;
 	onFile: (file: File) => void;
+	onLibraryOpen?: () => void;
 }) {
 	return (
 		<section className="recognition-capture-card" aria-label="撮影・録画">
@@ -101,32 +103,40 @@ export function CaptureControls({
 					</Button>
 				</div>
 			)}
-			<Button
-				className={processing ? "recognition-submit-loading" : undefined}
-				aria-busy={processing}
-				disabled={disabled || !camera.opened || camera.recording || processing}
-				onClick={() => void camera.photo()}
-			>
-				{processing && (
-					<span className="recognition-spinner" aria-hidden="true" />
-				)}
-				<span aria-live="polite">
-					{processing ? processingLabel : "撮影して調べる"}
-				</span>
-			</Button>
-			<Button
-				variant="secondary"
-				className={camera.recording ? "recognition-record-button" : undefined}
-				disabled={disabled || !camera.opened}
-				onClick={() =>
-					camera.recording ? camera.finishRecording() : camera.record()
-				}
-			>
-				{camera.recording && (
-					<span className="recognition-record-dot" aria-hidden="true" />
-				)}
-				<span>{camera.recording ? "録画を終了して調べる" : "録画を開始"}</span>
-			</Button>
+			{camera.opened && (
+				<Button
+					className={processing ? "recognition-submit-loading" : undefined}
+					aria-busy={processing}
+					disabled={
+						disabled || !camera.opened || camera.recording || processing
+					}
+					onClick={() => void camera.photo()}
+				>
+					{processing && (
+						<span className="recognition-spinner" aria-hidden="true" />
+					)}
+					<span aria-live="polite">
+						{processing ? processingLabel : "撮影して調べる"}
+					</span>
+				</Button>
+			)}
+			{camera.opened && camera.origin === "camera" && (
+				<Button
+					variant="secondary"
+					className={camera.recording ? "recognition-record-button" : undefined}
+					disabled={disabled || !camera.opened}
+					onClick={() =>
+						camera.recording ? camera.finishRecording() : camera.record()
+					}
+				>
+					{camera.recording && (
+						<span className="recognition-record-dot" aria-hidden="true" />
+					)}
+					<span>
+						{camera.recording ? "録画を終了して調べる" : "録画を開始"}
+					</span>
+				</Button>
+			)}
 			{camera.opened && (
 				<Button variant="ghost" onClick={camera.close}>
 					{camera.origin === "screen" ? "画面共有を終了" : "カメラを閉じる"}
@@ -146,6 +156,25 @@ export function CaptureControls({
 					}}
 				/>
 			</label>
+			{onLibraryOpen && (
+				<Button
+					variant="secondary"
+					disabled={disabled || processing || camera.recording}
+					onClick={onLibraryOpen}
+				>
+					保存した画像を選ぶ
+				</Button>
+			)}
+			{processing && !camera.opened && (
+				<div
+					className="recognition-submit-loading"
+					role="status"
+					aria-busy="true"
+				>
+					<span className="recognition-spinner" aria-hidden="true" />
+					{processingLabel}
+				</div>
+			)}
 			<small>動画30秒・16 MiBまで</small>
 		</section>
 	);

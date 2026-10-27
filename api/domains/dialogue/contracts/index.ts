@@ -2,6 +2,7 @@ import type { Database } from "bun:sqlite";
 import { z } from "zod";
 import type { DeliveryEmotion } from "../../delivery";
 import { addresseeSchema, runViewingSchema } from "./specialist";
+import type { HttpErrorStatus } from "../../../infrastructure/http";
 const submitFields = z.object({
 	requestId: z.uuid(),
 	conversationId: z.string().min(1).max(120),
@@ -241,3 +242,26 @@ export * from "./command-interactions";
 export * from "./specialist";
 
 export { errorReportSchema } from "./error-report";
+/** HTTP status of each code the specialist and interaction operations throw. */
+export const errorStatus = {
+	specialist_session_not_found: 404,
+	session_ended: 409,
+	session_expired: 409,
+	session_closing: 409,
+	session_not_suspended: 409,
+	session_not_active: 409,
+	target_not_found: 404,
+	work_unsaved: 409,
+	work_busy: 409,
+	specialist_unavailable: 503,
+	addressee_changed: 409,
+	interaction_not_found: 404,
+	interaction_closed: 409,
+	interaction_expired: 410,
+	question_stale: 409,
+	version_invalidated: 409,
+	invalid_answer: 422,
+	interaction_body_too_large: 413,
+	interaction_capacity: 429,
+	toolchain_unavailable: 503,
+} as const satisfies Record<string, HttpErrorStatus>;

@@ -98,6 +98,15 @@ backend の HTTP 組立ては `api/application/`、SQLite の排他・接続・m
 
 backend の domain は `contracts/`(公開型・schema)、`controller/`(HTTP 登録)、`service/`(業務判断)、`repository/`(SQL と migration)、`test/`(所有する試験)に分け、外部へは `index.ts` と `contracts` だけを公開します。各ディレクトリの入口は `index.ts`、1 ファイルが 800 行に近づいたら主題ごとにファイルを分けます。例外は、配布物が置く `google-accounts/distribution-client.json`(`service/desktop-client.ts` が読む)と、Vite 設定が直接読む `google-accounts/proxy-errors.ts` です。
 
+### HTTP の入出力
+
+| 対象 | 使うもの | 規則 |
+|---|---|---|
+| JSON の本文 | `parseJsonBody(c, schema, {code?, emptyAs?})`(`api/infrastructure/http.ts`) | 読めない本文・壊れた JSON・schema 違反はすべて 400(既定 `invalid_input`)。`c.req.json()` を直接呼ばない。長さ上限を自前で検査する経路(`readBounded` など)だけは読み取りを持つ |
+| クエリ | `parseQuery(c, schema, {code?})`、数値は `queryInt` | 変換・検証する値はすべて schema を通す。無い値は schema の既定値。空文字や数字でない値は 400 で、0 や NaN にしない |
+| 投げたエラーの status | 各 domain の `contracts` の `errorStatus`、複数 domain が投げるコードは `api/application/error-status.ts` の `shared` | `app.onError`(`answerError`)が `{error: code}` と表の status を返す。表に無いコードは 500 `internal_error`。同じコードに別の status を付けると起動時に失敗する。controller は status の変換だけの catch を持たない |
+| client の呼び出し | `callJson`、`json(body, method?)`、`withQuery(path, params)`(`client/transport.ts`) | JSON の応答は契約の schema で検証する。本文とクエリ文字列を手で組み立てない。バイナリ・SSE・本文の無い応答だけ `call` を直接使う |
+
 ### migration の追加規則
 
 - migration は名前付きです。各 domain の `repository` が `export const migrations: readonly Migration[]`(`{ id, sql, after? }`)を持ち、`api/application/migrations.ts` が全 domain 分を集めます。DB には適用済みの id と SQL の SHA-256 を `schema_migrations_v2` に記録します。

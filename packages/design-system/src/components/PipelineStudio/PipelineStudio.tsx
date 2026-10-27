@@ -65,6 +65,7 @@ export type PipelineStudioProps = {
 		query?: string,
 		more?: boolean,
 	) => void;
+	onDeleteImage?: (id: string) => Promise<boolean>;
 };
 
 const draftOption = "__draft__";
@@ -226,6 +227,7 @@ export function PipelineStudio({
 	className,
 	library,
 	onLibrary,
+	onDeleteImage,
 }: PipelineStudioProps) {
 	const [handoff, setHandoff] = useState<string>();
 	const panel = useRef<HTMLDivElement>(null);
@@ -251,6 +253,7 @@ export function PipelineStudio({
 				pending={pending}
 				library={library}
 				onLibrary={onLibrary ?? (() => {})}
+				onDeleteImage={onDeleteImage}
 				onApply={onApply}
 				onClose={() => {
 					setHandoff(undefined);

@@ -40,18 +40,18 @@
 | --- | --- |
 | 変更前の基準 | 対象3ファイル27試験成功。運用ログと公開APIで失敗を照合 |
 | 部分・結合 | PCMのサンプル保持、無音の境界、WAVメタデータ、取消、途中失敗、合計文字数、TTSの期限と再試行を検証。対象8ファイル83件と、その後の追加試験が成功 |
-| 最終domain検証 | backend **883件**、Web **61件**成功。型・境界・SystemContext・サイズ・整形・lint・DesignSystem buildも成功。入力hashの変化なし。[結果](../verification-reports/voice-repair-2026-10-25/isolated-run/report.json) |
-| ASR実接続 | 19.08秒を2要求で認識し、5回の「カレー」がすべて残る。60秒の無音は5要求で正常終了。[合成音声](../verification-reports/voice-repair-2026-10-25/synthetic-live.json)、[60秒](../verification-reports/voice-repair-2026-10-25/asr-60-fixed.json) |
-| TTS実接続 | 変更後のクラウド資源の通常probe成功。通常の読上げAPIも73,772 bytesのWAVを536.8msで取得。確認前後の設定は不変。[結果](../verification-reports/voice-repair-2026-10-25/tts-api-live.json) |
-| 会話LLM | 最終採用した最小修正で意味の評価6/6成功。ただし既存の2文以内の契約を含む総合判定は2/6成功で未達。[採点](../verification-reports/context-eval/2026-10-25-voice-repair/20261025T045928515Z/scores.jsonl) |
-| 引用保持 | 英語の引用をそのまま返す実LLM試験成功。[結果と入力事例](../verification-reports/voice-repair-2026-10-25/quote-live.json) |
+| 最終domain検証 | backend **883件**、Web **61件**成功。型・境界・SystemContext・サイズ・整形・lint・DesignSystem buildも成功。入力hashの変化なし。[結果](verification/reports/voice-repair-2026-10-25/isolated-run/report.json) |
+| ASR実接続 | 19.08秒を2要求で認識し、5回の「カレー」がすべて残る。60秒の無音は5要求で正常終了。[合成音声](verification/reports/voice-repair-2026-10-25/synthetic-live.json)、[60秒](verification/reports/voice-repair-2026-10-25/asr-60-fixed.json) |
+| TTS実接続 | 変更後のクラウド資源の通常probe成功。通常の読上げAPIも73,772 bytesのWAVを536.8msで取得。確認前後の設定は不変。[結果](verification/reports/voice-repair-2026-10-25/tts-api-live.json) |
+| 会話LLM | 最終採用した最小修正で意味の評価6/6成功。ただし既存の2文以内の契約を含む総合判定は2/6成功で未達。[採点](verification/reports/context-eval/2026-10-25-voice-repair/20261025T045928515Z/scores.jsonl) |
+| 引用保持 | 英語の引用をそのまま返す実LLM試験成功。[結果と入力事例](verification/reports/voice-repair-2026-10-25/quote-live.json) |
 | 実機器 | マイク・スピーカーは未実施。Web変更がなく、サーバー操作も許可範囲に含まれないためブラウザE2Eは実施せず、既存のWeb単体61件を確認 |
 
 ### 検証の整合性と俯瞰評価
 
 - 主作業ディレクトリのverifyは2回とも内部の検査・試験が成功したが、別作業のOCR・Dots関連ソースの同時変更で無効となった。担当外は修正していない。
 - 一時コピーの検証準備ではworkspace内の依存のコピー不足と、広すぎるdata除外によるソースJSONの欠落を検出した。コピー条件を見直し、ソース欠落0件を確認した後の実行が成功した。製品の期待値は弱めていない。
-- 最終の実装・試験・live runner 13ファイルは検証した一時コピーと一致する。[照合](../verification-reports/voice-repair-2026-10-25/final-source-match.json)。主作業ディレクトリ全体の未コミット差分の合格とは区別する。
+- 最終の実装・試験・live runner 13ファイルは検証した一時コピーと一致する。[照合](verification/reports/voice-repair-2026-10-25/final-source-match.json)。主作業ディレクトリ全体の未コミット差分の合格とは区別する。
 - ASRは40msの低振幅でも語が欠けた証拠を受け200msへ変更し、次の実接続で5回の句がすべて残った。意味判断をコードへ移していない。
 - 会話指示は3ラウンド評価した。短さを強く指示した版でも2文以内は安定せず、訂正の再誤解もあった。同じ条件の再試行で合格を選ばず、意味の評価6例が通った最初の最小修正を残した。短文契約は未達として停止し、新しい出力検証・修正方式やモデル選択は導入していない。
 

@@ -38,7 +38,7 @@
 
 元の要件検証による遮断は検索経路から除去したが、迅速な結果報告のlive受入は未達。同じ上限超過が再発したため、指示の追加とlive再実行をここで止める。次に続行するには、取得後のLunaに渡す観測データ・残り操作権限・replayの提示と終了判断を、単一stepの再現試験で切り分ける必要がある。回数上限を増やすことや、特定の質問だけ強制終了させる処理は追加しない。
 
-取得結果の保存先は `verification-reports/search-only/live*.json`、安全な実行メタデータは同ディレクトリの `live-backend.jsonl`。Providerの生応答は保存していない。
+取得結果の保存先は `verification-reports/search-only/live*.json`（ローカルの検証記録。リポジトリには含めない）、安全な実行メタデータは同ディレクトリの `live-backend.jsonl`。Providerの生応答は保存していない。
 
 ## 差分の扱い
 

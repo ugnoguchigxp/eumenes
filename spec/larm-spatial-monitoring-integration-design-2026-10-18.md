@@ -142,6 +142,6 @@ canonical Zod sourceと確定JSON Schemaの一致、6個の固定応答、巨大
 | 保存済み接続先へのlive GET | 既存認証でsnapshot/eventsともHTTP404 `not_found`。監視APIの公開を確認できず。推論・故障誘発・接続変更なし |
 | browser E2E・Spatial実画面 | 未実施。対象fixture試験は追加済みだが、試験サーバー起動の事前許可がないため実行していない |
 
-固定試験・結合試験は合計471件成功。実機接続成功や画面確認済みとは扱わない。結果ファイルとconsoleは `verification-reports/larm-monitoring-2026-10-18/` に保存した。
+固定試験・結合試験は合計471件成功。実機接続成功や画面確認済みとは扱わない。結果ファイルとconsoleは `verification-reports/larm-monitoring-2026-10-18/`（ローカルの検証記録。リポジトリには含めない）に保存した。
 
 差分点検では、専用処理を外部契約の検証・読み取り通信・取消・cursor/transaction・時刻と明示状態の変換に限定していることを確認した。新しい意味分類・語句分岐・モデル名固定・pressure閾値は追加していない。`spec/README.md` の3D計画追加と `spec/instant-3d-model-toolchain-design-2026-10-18.md` は別作業の変更として確認し、変更・削除していない。

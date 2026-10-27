@@ -147,7 +147,12 @@ export function createImageUpload(options: Options) {
 		}
 	}
 	return {
-		async upload(id: string, file: File, signal: AbortSignal) {
+		async upload(
+			id: string,
+			file: File,
+			signal: AbortSignal,
+			expectedConnection?: string,
+		) {
 			id = z.uuid().parse(id).toLowerCase();
 			if (file.size > imageUploadLimits.maxInputBytes)
 				throw new Error("image_too_large");
@@ -156,11 +161,15 @@ export function createImageUpload(options: Options) {
 			return serial(id, async () => {
 				const prior = store.read((db) => findImport(db, id, principal));
 				if (prior) {
+					if (expectedConnection && prior.connection !== expectedConnection)
+						throw new Error("image_import_connection_changed");
 					if (prior.original_digest !== digest)
 						throw new Error("idempotency_conflict");
 					return advance(id, true, signal);
 				}
 				const client = options.gateway().imageImports;
+				if (expectedConnection && client.identity !== expectedConnection)
+					throw new Error("image_import_connection_changed");
 				const encoded = await prepareImageUpload(raw, file.type, signal);
 				if (encoded.bytes.length > 16 * 1024 * 1024)
 					throw new Error("image_too_large");

@@ -7,6 +7,7 @@ import {
 	model3dTags,
 	model3dTitle,
 } from "../contracts";
+import { parseJsonBody, parseQuery } from "../../../infrastructure/http";
 import type { Model3dService } from "../service";
 
 const assetQuery = z.strictObject({
@@ -73,8 +74,10 @@ export function registerModel3d(app: Hono, s: Model3dService, owner: string) {
 		c.json({ generations: s.list(owner) }, 200, noStore),
 	);
 	app.post("/api/model3d/generations", async (c) => {
-		const body = model3dCreate.safeParse(await c.req.json().catch(() => null));
-		if (!body.success) return c.json({ error: "invalid_model3d_request" }, 400);
+		const body = await parseJsonBody(c, model3dCreate, {
+			code: "invalid_model3d_request",
+		});
+		if (!body.ok) return body.response;
 		try {
 			return c.json(await s.create(owner, "main", body.data), 202, noStore);
 		} catch (e) {
@@ -92,8 +95,8 @@ export function registerModel3d(app: Hono, s: Model3dService, owner: string) {
 			}
 		});
 	app.get("/api/model3d/assets", async (c) => {
-		const q = assetQuery.safeParse(c.req.query());
-		if (!q.success) return c.json({ error: "invalid_model3d_query" }, 400);
+		const q = parseQuery(c, assetQuery, { code: "invalid_model3d_query" });
+		if (!q.ok) return q.response;
 		const tags = q.data.tags
 			?.split(/[,、，]/)
 			.map((t) => t.trim())
@@ -135,9 +138,11 @@ export function registerModel3d(app: Hono, s: Model3dService, owner: string) {
 	});
 	app.patch("/api/model3d/assets/:id", async (c) => {
 		const a = id(c);
-		const body = assetPatch.safeParse(await c.req.json().catch(() => null));
-		if (!a.success || !body.success)
-			return c.json({ error: "invalid_model3d_request" }, 400);
+		const body = await parseJsonBody(c, assetPatch, {
+			code: "invalid_model3d_request",
+		});
+		if (!body.ok) return body.response;
+		if (!a.success) return c.json({ error: "invalid_model3d_request" }, 400);
 		try {
 			return c.json(
 				await s.update(owner, a.data, body.data, c.req.raw.signal),

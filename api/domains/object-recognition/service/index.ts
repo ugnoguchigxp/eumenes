@@ -1,4 +1,9 @@
 import { removeRecognition } from "./remove";
+import {
+	enqueueCaptureSave,
+	captureSaveOperations,
+	type CaptureSaveDependencies,
+} from "./capture-save";
 import { createRecognitionAnalyses } from "./analyses";
 import type { PerceptionPort } from "../../larm";
 import { recognitionCommand } from "../../capabilities/contracts";
@@ -24,13 +29,15 @@ import {
 import { registerRecognitionHandlers } from "./handlers";
 import { bindCapture, createHandoffs } from "./handoff";
 const workspaceArtifact = "artifact:object-recognition.workspace@";
-export function createObjectRecognition(deps: {
-	store: SqliteStore;
-	queue: QueueService;
-	connection: () => Connection | null;
-	fetcher?: typeof fetch;
-	visual?: () => PerceptionPort;
-}) {
+export function createObjectRecognition(
+	deps: {
+		store: SqliteStore;
+		queue: QueueService;
+		connection: () => Connection | null;
+		fetcher?: typeof fetch;
+		visual?: () => PerceptionPort;
+	} & CaptureSaveDependencies,
+) {
 	const { store, queue } = deps;
 	const analyses = deps.visual
 		? createRecognitionAnalyses({ store, queue, visual: deps.visual })
@@ -137,11 +144,12 @@ export function createObjectRecognition(deps: {
 					now + 600_000,
 				);
 				enqueue(db, requestId, "analyze");
-				return v;
+				return enqueueCaptureSave(db, v, owner, deps.captureSaveInTransaction);
 			});
 		},
 		get: (owner: string, id: string) =>
 			store.read((db) => record(owned(db, id, owner))),
+		...captureSaveOperations(store, deps.captureResumeInTransaction),
 		list: (owner: string, conversationId: string) =>
 			store.read((db) => list(db, owner, conversationId)),
 		content: (owner: string, id: string) =>

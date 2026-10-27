@@ -92,7 +92,7 @@ context_compile 1回、compile_eval 1回。評価保存済み（runId `00000000-
 | bundle dry-run | 登録可能、issueなし |
 | API・公開入口・seedの結合 | 7成功。入口が1件、登録source経由の読取り、ページ入力の検査、source/target偽装の拒否、モデル呼び出し0回、新規DB・再seed・公開状態の保持 |
 | Web adapter・ランチャー | 4成功。todo/done同時表示、独立ページ、件数変更、表示中の表の更新、archived切替、2取得の取消と遅延応答排除、空・失敗・復旧、HTMLを文字として表示、日付・詳細モーダルなし |
-| `verify --domain agent-runtime --domain capabilities` | 成功。Bun 241試験、Web 15試験、境界・整形・lint・型・DesignSystemビルド。`verification-reports/runs/2026-10-23T23-57-10-124Z-040d1e48-77b2-4509-9c9c-6d7b07f3883e/report.json` |
+| `verify --domain agent-runtime --domain capabilities` | 成功。Bun 241試験、Web 15試験、境界・整形・lint・型・DesignSystemビルド。`spec/verification/reports/runs/2026-10-23T23-57-10-124Z-040d1e48-77b2-4509-9c9c-6d7b07f3883e/report.json` |
 | 共通artifact-ui | 341成功 |
 | TODOブラウザ通し | 1成功。実際の共通ArtifactHost→登録Web adapter→client→HTTP固定応答。会話と並べた595px幅のアーティファクト内でtodoとdoneが同時に見えること、独立ページ、archived、空状態、明色、390pxでの折り返し、日付・詳細・dialogなし、ブラウザ実行エラー0件 |
 | 全体型確認・変更箇所lint・整形・Webビルド | 成功 |
@@ -126,7 +126,7 @@ artifact全体gateの既存行数超過・レイアウト期待値不一致は�
 | 段階 | 結果 |
 | --- | --- |
 | 部分・登録source・seed結合 | 8成功。23件の混在ページを全取得、同一IDのtodo→done、重複報告1行、会話分離・archived分離・旧上限超過、登録sourceのactive許可と不正入力拒否、モデル呼び出し0回、新規DBと再seed |
-| 所有domain・利用側verify | `bun run verify -- --domain agent-runtime --domain capabilities` 成功。Bun 242試験、Web 15試験、境界・行数・整形・lint・型・DesignSystemビルド。integrity errorなし。`verification-reports/runs/2026-10-24T00-07-38-360Z-8475ac56-650f-4a23-accb-5d213cda65af/report.json` |
+| 所有domain・利用側verify | `bun run verify -- --domain agent-runtime --domain capabilities` 成功。Bun 242試験、Web 15試験、境界・行数・整形・lint・型・DesignSystemビルド。integrity errorなし。`spec/verification/reports/runs/2026-10-24T00-07-38-360Z-8475ac56-650f-4a23-accb-5d213cda65af/report.json` |
 | workspace入口・client | 2成功。共通登録入口とAPI契約・認証・取消伝播 |
 | 共通artifact-ui | 341成功 |
 | ブラウザ通し | 1成功。実際の共通ArtifactHostと登録adapterで一表・混在行・一ページ送り・archived切替を確認。595pxの分割枠、390pxでの折り返し、明色、空状態、日付・詳細・dialogなし、ブラウザ実行エラー0件 |

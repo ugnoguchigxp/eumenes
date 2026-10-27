@@ -1,0 +1,51 @@
+{
+  "runId": "16033905-e9b0-4899-8f02-c20bc477abac",
+  "elapsedMs": 20891,
+  "status": "ready_for_answer",
+  "errorCode": null,
+  "modelCalls": 2,
+  "toolCalls": 1,
+  "tools": [
+    {
+      "toolRevisionId": "tool:web.read@1",
+      "state": "succeeded",
+      "errorCode": null,
+      "sourceCount": 1
+    }
+  ],
+  "attempts": [
+    {
+      "source": "codex",
+      "model": "gpt-6-luna",
+      "status": "succeeded",
+      "accepted": 1,
+      "reason": null
+    },
+    {
+      "source": "codex",
+      "model": "gpt-6-luna",
+      "status": "succeeded",
+      "accepted": 1,
+      "reason": null
+    }
+  ],
+  "report": {
+    "outcome": "answered",
+    "summary": "Example Domain は、許可を得ずに使えるドキュメント用の例示ドメインで、テストや監視には依存しないよう案内するページです。出典: https://example.com/",
+    "claims": [
+      {
+        "text": "ページは、許可を得ずにドキュメントの例で使用できるドメインを示し、テストや監視目的で依存しないよう案内しています。",
+        "sourceIds": [
+          "37df2f79-e22d-46ee-b0a1-8f27f1969f33"
+        ]
+      }
+    ],
+    "sources": [
+      {
+        "sourceId": "37df2f79-e22d-46ee-b0a1-8f27f1969f33",
+        "url": "https://example.com/"
+      }
+    ],
+    "limitations": []
+  }
+}

@@ -1,3 +1,5 @@
+import { sseFrame, sseStream } from "./sse";
+
 let clients = 0;
 /** Bounded latest snapshots recover bursts and reconnects without a second ledger. */
 export function snapshotStream<T>(
@@ -6,77 +8,34 @@ export function snapshotStream<T>(
 	signal: AbortSignal,
 ) {
 	if (clients >= 32) throw new Error("stream_capacity");
-	clients++;
-	const encoder = new TextEncoder();
-	let stop: () => void = () => {},
-		heartbeat: ReturnType<typeof setInterval> | undefined,
-		closed = false,
-		pending: Uint8Array | undefined,
-		final = false;
-	let controller: ReadableStreamDefaultController<Uint8Array>;
-	const cleanup = () => {
-		if (closed) return;
-		closed = true;
+	// An aborted request never subscribes (the stream closes at once), so it is not counted.
+	let counted = !signal.aborted;
+	if (counted) clients++;
+	const release = () => {
+		if (!counted) return;
+		counted = false;
 		clients--;
-		stop();
-		clearInterval(heartbeat);
-		signal.removeEventListener("abort", abort);
 	};
-	const end = () => {
-		try {
-			controller.close();
-		} catch {
-			/* already closed */
-		}
-	};
-	const abort = () => {
-		cleanup();
-		end();
-	};
-	const flush = () => {
-		if (closed || !pending || (controller.desiredSize ?? 0) <= 0) return;
-		const next = pending;
-		pending = undefined;
-		controller.enqueue(next);
-		if (final) {
-			cleanup();
-			end();
-		}
-	};
-	return new ReadableStream<Uint8Array>(
-		{
-			start(next) {
-				controller = next;
-				try {
-					signal.addEventListener("abort", abort, { once: true });
-					stop = subscribe((value) => {
-						if (closed) return;
-						pending = encoder.encode(`data: ${JSON.stringify(value)}\n\n`);
-						final = terminal(value);
-						flush();
-					});
-					if (closed) {
-						stop();
-						return;
-					}
-					heartbeat = setInterval(() => {
-						if (!closed && !pending && (controller.desiredSize ?? 0) > 0)
-							controller.enqueue(encoder.encode(": heartbeat\n\n"));
-					}, 15000);
-					(heartbeat as { unref?: () => void }).unref?.();
-					if (signal.aborted) abort();
-				} catch (error) {
-					cleanup();
-					try {
-						controller.error(error);
-					} catch {
-						/* already closed */
-					}
-				}
-			},
-			pull: flush,
-			cancel: cleanup,
+	return sseStream({
+		signal,
+		highWaterMark: 4,
+		lagging: "latest",
+		open(sink) {
+			let stop: () => void;
+			try {
+				stop = subscribe((value) => {
+					const frame = sseFrame({ data: JSON.stringify(value) });
+					if (terminal(value)) sink.end(frame);
+					else sink.send(frame);
+				});
+			} catch (error) {
+				release();
+				throw error;
+			}
+			return () => {
+				stop();
+				release();
+			};
 		},
-		{ highWaterMark: 4 },
-	);
+	});
 }

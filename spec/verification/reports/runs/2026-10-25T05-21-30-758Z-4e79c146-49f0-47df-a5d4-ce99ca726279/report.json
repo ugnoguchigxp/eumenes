@@ -1,0 +1,302 @@
+{
+  "schemaVersion": 1,
+  "runId": "2026-10-25T05-21-30-758Z-4e79c146-49f0-47df-a5d4-ce99ca726279",
+  "startedAt": "2026-10-25T05:21:30.758Z",
+  "scope": {
+    "all": false,
+    "selected": [
+      "dots",
+      "conversation",
+      "capabilities",
+      "continuity",
+      "dialogue",
+      "tool-runtime"
+    ]
+  },
+  "baseCommit": "66acc6076eb45fcccd8615418b0b080917fc8b0b",
+  "revision": "14139418f558ef292fcdac74aa1f3954f7d9ee7afafa191744c02345bc0d170f",
+  "runtime": {
+    "bun": "1.4.3",
+    "node": "26.3.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "ci": false,
+    "runner": null
+  },
+  "result": "invalidated",
+  "steps": [
+    {
+      "name": "inventory",
+      "status": "pass",
+      "ms": 80
+    },
+    {
+      "name": "boundaries",
+      "status": "pass",
+      "ms": 319
+    },
+    {
+      "name": "system-context",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "context:check"
+      ],
+      "status": "pass",
+      "ms": 108,
+      "exitCode": 0
+    },
+    {
+      "name": "size-budget",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "scripts/size-budget.ts",
+        "api/domains/dots",
+        "web/src/domains/dots",
+        "api/domains/conversation",
+        "web/src/domains/conversation",
+        "web/src/components/domains/conversation",
+        "api/domains/capabilities",
+        "api/domains/continuity",
+        "api/domains/dialogue",
+        "web/src/domains/dialogue",
+        "api/domains/tool-runtime"
+      ],
+      "status": "pass",
+      "ms": 402,
+      "exitCode": 0
+    },
+    {
+      "name": "format",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "format:check",
+        "api/domains/dots",
+        "web/src/domains/dots",
+        "api/domains/conversation",
+        "web/src/domains/conversation",
+        "web/src/components/domains/conversation",
+        "api/domains/capabilities",
+        "api/domains/continuity",
+        "api/domains/dialogue",
+        "web/src/domains/dialogue",
+        "api/domains/tool-runtime"
+      ],
+      "status": "pass",
+      "ms": 122,
+      "exitCode": 0
+    },
+    {
+      "name": "lint",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "lint",
+        "api/domains/dots",
+        "web/src/domains/dots",
+        "api/domains/conversation",
+        "web/src/domains/conversation",
+        "web/src/components/domains/conversation",
+        "api/domains/capabilities",
+        "api/domains/continuity",
+        "api/domains/dialogue",
+        "web/src/domains/dialogue",
+        "api/domains/tool-runtime"
+      ],
+      "status": "pass",
+      "ms": 68,
+      "exitCode": 0
+    },
+    {
+      "name": "design-system typecheck",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "--cwd",
+        "packages/design-system",
+        "typecheck"
+      ],
+      "status": "pass",
+      "ms": 303,
+      "exitCode": 0
+    },
+    {
+      "name": "design-system build",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "--cwd",
+        "packages/design-system",
+        "build"
+      ],
+      "status": "pass",
+      "ms": 6284,
+      "exitCode": 0
+    },
+    {
+      "name": "typecheck configuration",
+      "status": "pass",
+      "ms": 1
+    },
+    {
+      "name": "typecheck",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "check",
+        "-p",
+        "/Users/y.noguchi/Code/eumenes/verification-reports/runs/2026-10-25T05-21-30-758Z-4e79c146-49f0-47df-a5d4-ce99ca726279/tsconfig.selected.json"
+      ],
+      "status": "pass",
+      "ms": 528,
+      "exitCode": 0
+    },
+    {
+      "name": "typecheck closure",
+      "status": "pass",
+      "ms": 232
+    },
+    {
+      "name": "bun tests",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "test",
+        "./api/domains/capabilities/test/bundles.test.ts",
+        "./api/domains/capabilities/test/capabilities.test.ts",
+        "./api/domains/capabilities/test/command-agent-binding.test.ts",
+        "./api/domains/capabilities/test/image.test.ts",
+        "./api/domains/capabilities/test/instant-binding.test.ts",
+        "./api/domains/capabilities/test/json-schema-subset.test.ts",
+        "./api/domains/capabilities/test/learned.test.ts",
+        "./api/domains/capabilities/test/lookup-upgrade.test.ts",
+        "./api/domains/capabilities/test/music-versions.test.ts",
+        "./api/domains/capabilities/test/ocr-upgrade.test.ts",
+        "./api/domains/capabilities/test/prepare-learned.test.ts",
+        "./api/domains/capabilities/test/requirement-controller.test.ts",
+        "./api/domains/capabilities/test/requirement-schema.test.ts",
+        "./api/domains/capabilities/test/requirements.test.ts",
+        "./api/domains/capabilities/test/session-binding.test.ts",
+        "./api/domains/capabilities/test/settings-google.test.ts",
+        "./api/domains/capabilities/test/standalone-artifacts-forms.test.ts",
+        "./api/domains/capabilities/test/standalone-artifacts.test.ts",
+        "./api/domains/capabilities/test/steward-request-retire.test.ts",
+        "./api/domains/capabilities/test/task-binding.test.ts",
+        "./api/domains/capabilities/test/timer-compatibility.test.ts",
+        "./api/domains/capabilities/test/toolchain-candidates.test.ts",
+        "./api/domains/capabilities/test/web-guided.test.ts",
+        "./api/domains/capabilities/test/web-research-codex-retire.test.ts",
+        "./api/domains/capabilities/test/web-research-rename.test.ts",
+        "./api/domains/continuity/test/continuity.test.ts",
+        "./api/domains/continuity/test/events.test.ts",
+        "./api/domains/continuity/test/legacy-events.test.ts",
+        "./api/domains/continuity/test/retract-activity.test.ts",
+        "./api/domains/conversation/test/attachments.test.ts",
+        "./api/domains/conversation/test/bounded-read.test.ts",
+        "./api/domains/conversation/test/conversation.test.ts",
+        "./api/domains/conversation/test/history.test.ts",
+        "./api/domains/conversation/test/message-delivery.test.ts",
+        "./api/domains/conversation/test/outbox.test.ts",
+        "./api/domains/dialogue/test/active-run.test.ts",
+        "./api/domains/dialogue/test/attachment-notes.test.ts",
+        "./api/domains/dialogue/test/brief-reply.test.ts",
+        "./api/domains/dialogue/test/command-interactions-http.test.ts",
+        "./api/domains/dialogue/test/command-interactions-lifecycle.test.ts",
+        "./api/domains/dialogue/test/command-interactions-questions.test.ts",
+        "./api/domains/dialogue/test/command-interactions-work.test.ts",
+        "./api/domains/dialogue/test/command-interactions.test.ts",
+        "./api/domains/dialogue/test/context-document.test.ts",
+        "./api/domains/dialogue/test/context-eval/analysis.test.ts",
+        "./api/domains/dialogue/test/context-eval/case-schema.test.ts",
+        "./api/domains/dialogue/test/context-eval/checks-judge.test.ts",
+        "./api/domains/dialogue/test/context-eval/freeze.test.ts",
+        "./api/domains/dialogue/test/context-eval/generation-runner.test.ts",
+        "./api/domains/dialogue/test/context-eval/integrity.test.ts",
+        "./api/domains/dialogue/test/context-eval/materialize.test.ts",
+        "./api/domains/dialogue/test/context-eval/pipeline.test.ts",
+        "./api/domains/dialogue/test/context-eval/run.test.ts",
+        "./api/domains/dialogue/test/context-eval/scoring.test.ts",
+        "./api/domains/dialogue/test/context-eval/trajectory.test.ts",
+        "./api/domains/dialogue/test/controller.test.ts",
+        "./api/domains/dialogue/test/conversation-output.test.ts",
+        "./api/domains/dialogue/test/dialogue.test.ts",
+        "./api/domains/dialogue/test/error-report.test.ts",
+        "./api/domains/dialogue/test/execution-notices.test.ts",
+        "./api/domains/dialogue/test/generation-prepare.test.ts",
+        "./api/domains/dialogue/test/generation-tools.test.ts",
+        "./api/domains/dialogue/test/generation-work.test.ts",
+        "./api/domains/dialogue/test/generation.test.ts",
+        "./api/domains/dialogue/test/memory-integration.test.ts",
+        "./api/domains/dialogue/test/pinned-operation.test.ts",
+        "./api/domains/dialogue/test/queue.test.ts",
+        "./api/domains/dialogue/test/reconcile-agents.test.ts",
+        "./api/domains/dialogue/test/resubmit.test.ts",
+        "./api/domains/dialogue/test/run-end.test.ts",
+        "./api/domains/dialogue/test/specialist-document.test.ts",
+        "./api/domains/dialogue/test/specialist-lifecycle.test.ts",
+        "./api/domains/dialogue/test/specialist-memory.test.ts",
+        "./api/domains/dialogue/test/specialist-turn.test.ts",
+        "./api/domains/dialogue/test/specialist.test.ts",
+        "./api/domains/dialogue/test/system-prompt.test.ts",
+        "./api/domains/dialogue/test/topic-texts.test.ts",
+        "./api/domains/dialogue/test/world-context.test.ts",
+        "./api/domains/dots/contracts/reports.test.ts",
+        "./api/domains/dots/repository/sessions.test.ts",
+        "./api/domains/dots/test/commands.test.ts",
+        "./api/domains/dots/test/configuration.test.ts",
+        "./api/domains/dots/test/events.test.ts",
+        "./api/domains/dots/test/inbox.test.ts",
+        "./api/domains/dots/test/messaging-contracts.test.ts",
+        "./api/domains/dots/test/messaging-migration.test.ts",
+        "./api/domains/dots/test/secret-box.test.ts",
+        "./api/domains/dots/test/storage.test.ts",
+        "./api/domains/tool-runtime/test/action-controller.test.ts",
+        "./api/domains/tool-runtime/test/action-invoke.test.ts",
+        "./api/domains/tool-runtime/test/action-requests.test.ts",
+        "./api/domains/tool-runtime/test/invoke.test.ts",
+        "./api/domains/tool-runtime/test/read-retry.test.ts",
+        "./api/domains/tool-runtime/test/vault-fairness.test.ts"
+      ],
+      "status": "pass",
+      "ms": 43735,
+      "exitCode": 0
+    },
+    {
+      "name": "web tests",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "x",
+        "--no-install",
+        "vitest",
+        "run",
+        "web/src/components/domains/conversation/LightAvatarBackground.test.tsx",
+        "web/src/components/domains/conversation/LightAvatarMotionLab.test.tsx",
+        "web/src/components/domains/conversation/MessageList.test.tsx",
+        "web/src/components/domains/conversation/light-avatar/clips.test.ts",
+        "web/src/components/domains/conversation/light-avatar/idle.test.ts",
+        "web/src/components/domains/conversation/light-avatar/performer.test.ts",
+        "web/src/components/domains/conversation/markdownRenderer.test.ts",
+        "web/src/domains/conversation/test/hooks.test.tsx",
+        "web/src/domains/dialogue/test/hooks.test.tsx",
+        "web/src/domains/dialogue/test/progress.test.tsx",
+        "web/src/domains/dialogue/test/specialist.test.tsx",
+        "web/src/domains/dots/toolchain-adapter.test.tsx"
+      ],
+      "status": "pass",
+      "ms": 3080,
+      "exitCode": 0
+    }
+  ],
+  "totalMs": 55896,
+  "integrityErrors": [
+    "Source changed during verification"
+  ],
+  "build": {
+    "sharedOutput": true,
+    "inputRevision": "14139418f558ef292fcdac74aa1f3954f7d9ee7afafa191744c02345bc0d170f",
+    "distAfterBuild": "610dee7e76716a84ec4af03db18cfbbc63f9bcee978d53fe3cde716c32d72135",
+    "distAfterConsumers": "610dee7e76716a84ec4af03db18cfbbc63f9bcee978d53fe3cde716c32d72135"
+  },
+  "finalRevision": "861494dd308e24aec67ed08cc158f2f2fe5a515a1737e5e10fae06f2863e8586",
+  "stopReason": "Source changed during verification",
+  "finishedAt": "2026-10-25T05:22:27.054Z"
+}

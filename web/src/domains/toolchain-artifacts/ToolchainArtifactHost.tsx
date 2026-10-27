@@ -7,7 +7,8 @@ import { LightAvatarMotionLab } from "../../components/domains/conversation/Ligh
 import { model3dApiFor } from "../model3d/api";
 import { Model3dViewer } from "../model3d/Model3dViewer";
 import { Model3dThumbnail } from "../model3d/Model3dThumbnail";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { deleteLibraryImage } from "../../media/use-image-library";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { ArtifactDefinitionV1 } from "../../../../api/domains/capabilities/contracts";
 import type { EumenesClient } from "../../../../client";
@@ -140,6 +141,11 @@ function AdapterScreen({
 	artifact: ArtifactDefinitionV1;
 	scopeRef: string;
 }) {
+	const cache = useQueryClient();
+	const deleteImage = useCallback(
+		(id: string) => deleteLibraryImage(cache, client, id),
+		[cache, client],
+	);
 	const { question, questionSource } = useOpenQuestion(
 		client,
 		artifact,
@@ -326,6 +332,7 @@ function AdapterScreen({
 			refresh: state.refresh,
 			settledEpoch,
 			fetchMedia: (path: string) => client.toolchainMedia(path),
+			deleteLibraryImage: deleteImage,
 			hostViews,
 			...(state.uploadFile ? { uploadFile: state.uploadFile } : {}),
 			...(state.openTerminal ? { openTerminal: state.openTerminal } : {}),
@@ -337,6 +344,7 @@ function AdapterScreen({
 			dispatch,
 			settledEpoch,
 			client,
+			deleteImage,
 			hostViews,
 			state.uploadFile,
 			state.openTerminal,

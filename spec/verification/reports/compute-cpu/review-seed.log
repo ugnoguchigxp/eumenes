@@ -1,0 +1,33 @@
+bun test v1.4.3 (c6da4a4d3)
+
+api/application/toolchain/capability-seed.test.ts:
+102 | 			const result = await store.write((db) =>
+103 | 				caps.importBundleInTransaction(db, bundle, offlineBundleHost(), {
+104 | 					dryRun: true,
+105 | 				}),
+106 | 			);
+107 | 			expect(result.issues).toEqual([]);
+                               ^
+error: expect(received).toEqual(expected)
+
+- []
++ [
++   {
++     "code": "unavailable",
++     "path": "definitions/3",
++     "ref": "toolchain:task.execute@9",
++   },
++ ]
+
+- Expected  - 1
++ Received  + 7
+
+      at <anonymous> (/Users/y.noguchi/Code/eumenes/api/application/toolchain/capability-seed.test.ts:107:26)
+(fail) fresh initialization installs every repository seed and bundle without runtime or personal data [483.23ms]
+(pass) reopening and seeding preserves disabled toolchains and explicitly published revisions [470.08ms]
+(pass) normal server assembly seeds toolchains and launchers without a separate import [600.88ms]
+
+ 2 pass
+ 1 fail
+ 196 expect() calls
+Ran 3 tests across 1 file. [2.26s]
