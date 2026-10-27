@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useState } from "react";
 import { ChatImageInput, ChatImagePreviews } from "./ChatImageInput";
 import { useStore } from "zustand";
 import type { AudioStore } from "../domains/audio";
@@ -28,18 +28,20 @@ function StewardNode({
 }) {
 	const running = activity?.running ?? false;
 	const errors = activity?.errors ?? [];
+	const summary = errors.length
+		? errors
+				.map((e) => `${STEWARD_SLOT_LABELS[e.slot]}: ${describeError(e.code)}`)
+				.join("、")
+		: null;
 	// The report stays mounted once a failure was seen, so a dialog being read survives the failure clearing.
-	const lastSummary = useRef<string | null>(null);
-	if (errors.length)
-		lastSummary.current = errors
-			.map((e) => `${STEWARD_SLOT_LABELS[e.slot]}: ${e.code}`)
-			.join("、");
+	const [lastSummary, setLastSummary] = useState<string | null>(null);
+	if (summary !== null && summary !== lastSummary) setLastSummary(summary);
 	const title = [
 		running
 			? activity!.slots.map((slot) => STEWARD_SLOT_LABELS[slot]).join("・")
 			: undefined,
 		errors.length
-			? `失敗: ${errors.map((e) => `${STEWARD_SLOT_LABELS[e.slot]}（${e.code}）`).join("、")}`
+			? `失敗: ${errors.map((e) => STEWARD_SLOT_LABELS[e.slot]).join("、")}`
 			: undefined,
 	]
 		.filter(Boolean)
@@ -52,11 +54,11 @@ function StewardNode({
 			>
 				<i aria-hidden="true" />
 				メモリー整理
-				{lastSummary.current !== null && (
+				{lastSummary !== null && (
 					<ErrorReportButton
 						load={loadReport}
 						heading="メモリー整理に失敗しています"
-						summary={lastSummary.current}
+						summary={lastSummary}
 						trigger="icon"
 						label="メモリー整理のエラーの詳細"
 						hidden={errors.length === 0}

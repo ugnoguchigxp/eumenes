@@ -198,16 +198,7 @@ export function useReplay(
 			} catch (e) {
 				if (!signal.aborted) setError(describeError(e));
 			} finally {
-				try {
-					await client.replayPlayed({
-						messageId: id,
-						text,
-						playbackId: playbackKey,
-						heard: completed ? "full" : heardClauses > 0 ? "partial" : "none",
-					});
-				} catch (e) {
-					if (valid()) setError(describeError(e));
-				}
+				const current = valid();
 				// A microphone interruption may leave the next clause's synthesis in flight.
 				mine.abort.abort();
 				if (run.current === mine) {
@@ -216,6 +207,17 @@ export function useReplay(
 					setSubtitle(null);
 					setAvatarCue(null);
 				}
+				// The screen is restored first; a slow or failed record must not keep the stop button or subtitle.
+				client
+					.replayPlayed({
+						messageId: id,
+						text,
+						playbackId: playbackKey,
+						heard: completed ? "full" : heardClauses > 0 ? "partial" : "none",
+					})
+					.catch((e) => {
+						if (current && run.current === null) setError(describeError(e));
+					});
 			}
 		},
 		[client, stop, prepare],

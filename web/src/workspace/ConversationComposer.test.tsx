@@ -158,8 +158,10 @@ test("the memory keeper is lit while a step runs and offers the error report fro
 	view.rerender(<ConversationComposer state={failing} store={store} />);
 	expect(node().classList.contains("active")).toBe(true);
 	expect(node().classList.contains("failed")).toBe(true);
-	expect(node().getAttribute("title")).toBe(
-		"記憶の反映／失敗: 世界の記録（cloud_agent_billing_error）",
+	// Which part failed, in Japanese: the machine code stays in the error report.
+	expect(node().getAttribute("title")).toBe("記憶の反映／失敗: 世界の記録");
+	expect(node().getAttribute("title")).not.toContain(
+		"cloud_agent_billing_error",
 	);
 	expect(report).not.toHaveBeenCalled();
 	fireEvent.click(

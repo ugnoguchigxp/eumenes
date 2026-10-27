@@ -281,3 +281,24 @@ test("muted, failed and discarded playback cannot acknowledge full delivery", as
 		hook.unmount();
 	}
 });
+
+test("the screen is restored at the end even while the played record is still pending", async () => {
+	const { hook, client, played } = fixture();
+	client.replayPlayed = vi.fn(() => new Promise<never>(() => {}));
+	let done!: Promise<void>;
+	act(() => {
+		done = hook.result.current.play("message", "句。");
+	});
+	await waitFor(() => expect(played).toHaveLength(1));
+	expect(hook.result.current.playingId).toBe("message");
+	await act(async () => {
+		played[0]!.onEnded();
+		await done;
+	});
+	expect(client.replayPlayed).toHaveBeenCalledWith(
+		expect.objectContaining({ heard: "full" }),
+	);
+	expect(hook.result.current.playingId).toBeNull();
+	expect(hook.result.current.subtitle).toBeNull();
+	expect(hook.result.current.avatarCue).toBeNull();
+});
