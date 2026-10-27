@@ -16,7 +16,7 @@ function harness(latest: string | null) {
 	const prefix = {
 		messages: [
 			{ role: "system" as const, content: "会話の指示" },
-			{ role: "user" as const, content: "<memory>\nなし\n</memory>" },
+			{ role: "user" as const, content: "## Memory\n- なし" },
 		],
 		tools: [],
 	};

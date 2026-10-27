@@ -196,7 +196,7 @@ test("capability revocation rejects a generated result at adoption", async () =>
 	}
 });
 
-test("an image screen submit generates an image though the conversation retained only another toolchain", async () => {
+test("an image screen submit generates an image though the conversation earlier used only another toolchain", async () => {
 	const image = imageFixture("success");
 	const music = musicFixture("success");
 	let phase: "music" | "screen" = "music";

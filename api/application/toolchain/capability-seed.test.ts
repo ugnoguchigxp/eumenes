@@ -17,6 +17,7 @@ import { buildServices } from "../server-services";
 import { offlineBundleHost } from "./toolchain-adapters";
 
 const backends = new Set([
+	"docling",
 	"web",
 	"history",
 	"timer",

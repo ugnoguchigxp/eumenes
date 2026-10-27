@@ -1,11 +1,13 @@
 /**
- * A scripted model for the conversation agent's fixed tools (the ContextWindow specification, sections 6.1 to 6.7).
+ * A scripted model for the conversation agent's fixed tools (the conversation input specification, sections 3 and 9).
  *
  * A user's utterance is one generation: the model answers in plain text, and calls `find_toolchain` to search and
  * `delegate` to hand the work over when the conversation calls for it. Each model call of that generation is one
  * step: the step index is the number of tool-call exchanges already carried out after the utterance, so a script
  * reads the results of the earlier steps from the messages, exactly as the real model would.
  */
+
+import { INPUT_HEADINGS } from "../../domains/dialogue";
 
 /** A message as the generation loop keeps it: assistant tool calls and their tool results. */
 export type ConversationMessage = {
@@ -75,24 +77,43 @@ export const approve = (
 	args: { mode: "approve", confirmation, announcement },
 });
 
-/** One candidate of a `find_toolchain` result (the ids the delegation names). */
+/**
+ * One candidate of a `find_toolchain` result (the ids the delegation names). The result is text (section 9): a
+ * candidate is one `- <id>: <description>` line, and `text` is the description with its `execution: <kind>` and
+ * `inputs: <parameters>` parts as the host wrote them.
+ */
 export type Candidate = {
 	id: string;
-	title: string;
-	summary: string;
-	useWhen: string[];
+	text: string;
 	execution?: string;
-	inputs?: unknown;
 };
+
+/** The result's own fields, which are lines of the same form but no candidates. */
+const SEARCH_FIELDS = new Set(["discovery", "code"]);
 
 /** The candidates of the generation's search, if the model has searched (its result is the candidate list). */
 export function candidatesOf(
 	messages: ConversationMessage[],
 ): Candidate[] | undefined {
-	const search = toolResults(afterUtterance(messages), "find_toolchain")[0] as
-		| { candidates?: Candidate[] }
-		| undefined;
-	return search?.candidates;
+	const search = toolResults(afterUtterance(messages), "find_toolchain")[0];
+	if (search === undefined) return undefined;
+	return search.split("\n").flatMap((line) => {
+		const match = /^- (\S+): (.*)$/.exec(line);
+		if (!match || SEARCH_FIELDS.has(match[1]!)) return [];
+		const execution = /execution: (\S+?)(?:。|$)/.exec(match[2]!)?.[1];
+		return [
+			{
+				id: match[1]!,
+				text: match[2]!,
+				...(execution ? { execution } : {}),
+			},
+		];
+	});
+}
+
+/** The value of a `- <key>: <value>` line of a tool result (section 9); undefined when it has none. */
+export function resultField(result: string, key: string): string | undefined {
+	return new RegExp(`^- ${key}: (.*)$`, "m").exec(result)?.[1];
 }
 
 /**
@@ -124,13 +145,16 @@ export const UNAVAILABLE_TEXT = "その依頼は、今の担当ではできま�
  * Undefined before a result.
  */
 export function handedStep(messages: ConversationMessage[]): Step | undefined {
-	const handed = toolResults(afterUtterance(messages), "delegate")[0] as
-		| { answered?: boolean; answer?: string }
-		| undefined;
-	// A refused call (the host closes a call that was rejected with `{refused: true}`) is no result to answer from.
-	if (!handed || !("answered" in handed)) return undefined;
+	const handed = toolResults(afterUtterance(messages), "delegate")[0];
+	// A refused call (the host closes a call that was rejected with `- refused: true`) is no result to answer from.
+	if (handed === undefined || resultField(handed, "answered") === undefined)
+		return undefined;
+	const answer = resultField(handed, "answer");
 	return {
-		text: handed.answered && handed.answer ? handed.answer : UNAVAILABLE_TEXT,
+		text:
+			resultField(handed, "answered") === "true" && answer
+				? answer
+				: UNAVAILABLE_TEXT,
 	};
 }
 
@@ -160,41 +184,40 @@ export function isUtteranceRound(
 	);
 }
 
-/** Whether the generation has no new utterance: the host's fixed trigger text is its newest message (a host notice). */
+/** The newest user message: the generation's last input (its headings are the dialogue domain's `INPUT_HEADINGS`). */
+const lastUserMessage = (messages: ConversationMessage[]) =>
+	messages.filter((m) => m.role === "user").at(-1)?.content ?? "";
+
+/** The lines of one section of a user message (its heading line to the next heading); undefined when it has none. */
+function sectionOf(content: string, heading: string): string | undefined {
+	const lines = content.split("\n");
+	const start = lines.indexOf(heading);
+	if (start < 0) return undefined;
+	const length = lines
+		.slice(start + 1)
+		.findIndex((line) => line.startsWith("## "));
+	return lines
+		.slice(start + 1, length < 0 ? undefined : start + 1 + length)
+		.join("\n");
+}
+
+/** Whether the generation has no new utterance: its newest message carries a host notice instead of `## User`. */
 export function isNoticeRound(messages: ConversationMessage[]): boolean {
-	const last = messages.filter((m) => m.role === "user").at(-1);
-	return !!last?.content.startsWith("新しい出来事があります");
-}
-
-/**
- * The material document of a generation (ContextWindow spec, section 4): its first user message, the four tagged
- * sections `<memory>`, `<history>`, `<log>` and `<state>`. Empty when the generation has none.
- */
-export function documentOf(messages: ConversationMessage[]): string {
 	return (
-		messages.find((m) => m.role === "user" && m.content.startsWith("<memory>"))
-			?.content ?? ""
+		sectionOf(lastUserMessage(messages), INPUT_HEADINGS.notice) !== undefined
 	);
 }
 
-/**
- * The ids of the toolchains the document's `<state>` retains (section 4.4): its `担当 <id> <summary>` lines. The
- * `<log>` section's own `担当` lines are not retained toolchains, so only the `<state>` section is read.
- */
-export function retainedIds(messages: ConversationMessage[]): string[] {
-	const document = documentOf(messages);
-	const start = document.indexOf("<state>");
-	if (start < 0) return [];
-	return [...document.slice(start).matchAll(/^担当 (\S+) /gm)].map(
-		(match) => match[1]!,
-	);
+/** The words the generation answers: the body of the newest message's `## User` (empty for a host notice). */
+export function utteranceOf(messages: ConversationMessage[]): string {
+	return sectionOf(lastUserMessage(messages), INPUT_HEADINGS.user) ?? "";
 }
 
-/** The tool results of one tool name in the generation, parsed, oldest first. */
+/** The tool results of one tool name in the generation, as the model read them (text), oldest first. */
 export function toolResults(
 	messages: ConversationMessage[],
 	name: string,
-): unknown[] {
+): string[] {
 	const names = new Map<string, string>();
 	for (const message of messages)
 		for (const call of message.tool_calls ?? [])
@@ -203,7 +226,7 @@ export function toolResults(
 		.filter(
 			(m) => m.role === "tool" && names.get(m.tool_call_id ?? "") === name,
 		)
-		.map((m) => JSON.parse(m.content) as unknown);
+		.map((m) => m.content);
 }
 
 /** The number of model calls already made in this generation (each made tool calls). */

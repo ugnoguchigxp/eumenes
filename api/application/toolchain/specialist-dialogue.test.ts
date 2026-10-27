@@ -500,9 +500,9 @@ test("return with unsaved work suspends the session, the main agent answers, and
 	expect(r.mainRuns).toBe(mainBefore + 1);
 	expect(r.h.dialogue.answerText(next.id)).toBe("ご用件をどうぞ。");
 	const pending = text(r.mainPrompts.at(-1)!);
-	// The suspended work is a host record in the context document.
-	expect(pending).toContain('"suspended"');
-	expect(pending).toContain('"unsaved":true');
+	// The suspended work is a line of the work in `## State` (section 7.1).
+	expect(pending).toContain("## State");
+	expect(pending).toContain("UI自由制作「来場者アンケート」保留中（未保存");
 	// Only the record's facts, never the draft's definition.
 	expect(pending).not.toContain("ご感想をお聞かせください");
 	// Starting the same toolchain again resumes the suspended work; no second work or session.
@@ -728,10 +728,11 @@ test("a session idle past its expiry is ended by the sweep and its work is remov
 	expect(text(r.mainPrompts.at(-1)!)).toContain("expired");
 });
 
-test("the specialist's prompt holds no conversation, World or memory material; what was said during the switch is in the main agent's log", async () => {
+test("the specialist's prompt holds no conversation, World or memory material; what was said during the switch is not in the main agent's input", async () => {
 	const r = await rig();
-	r.script.main.push("好きな色は青色と覚えました。");
-	const plain = await r.sayAndWait("私の好きな色はMAIN_MARKER_BLUEです");
+	// The recent conversation opens with the agent's words (section 6.1): the first utterance of the user is not in it.
+	r.script.main.push("好きな色はMAIN_MARKER_BLUEと覚えました。");
+	const plain = await r.sayAndWait("私の好きな色は青です");
 	expect(plain.status).toBe("completed");
 	await r.start(
 		[apply("来場者アンケート"), reply("SPECIALIST_REPLY_ONE")],
@@ -773,13 +774,13 @@ test("the specialist's prompt holds no conversation, World or memory material; w
 	const main = text(r.mainPrompts.at(-1)!);
 	expect(main).toContain("MAIN_MARKER_AFTER");
 	expect(main).toContain("MAIN_MARKER_BLUE");
-	// What was said during the switch is an event of the log (spec 6.8): the main agent reads the flow.
+	// The specialist's history is not the main agent's (the conversation input specification, section 3): what was said during the switch stays out.
 	for (const marker of [
 		"SPECIALIST_REPLY_ONE",
 		"SPECIALIST_REPLY_TWO",
 		"SPECIALIST_USER_TWO",
 	])
-		expect(main).toContain(marker);
+		expect(main).not.toContain(marker);
 });
 
 test("a whole draft with nothing it can show is refused at once, kept for the source view, and neither the draft nor the undo history changes", async () => {

@@ -3,6 +3,7 @@ import { harness } from "../toolchain/toolchain.fixture";
 import {
 	afterUtterance,
 	candidatesOf,
+	resultField,
 	searchThenDelegate,
 	toolResults,
 	type Candidate,
@@ -14,8 +15,7 @@ const ask = "明日の鎌倉の天気を教えて";
 const kamakura = { place: "鎌倉", prefecture: "神奈川県", day: "tomorrow" };
 /** The weather toolchain is the instant candidate whose inputs take a place. */
 const isWeather = (candidate: Candidate) =>
-	candidate.execution === "instant" &&
-	JSON.stringify(candidate.inputs ?? {}).includes("place");
+	candidate.execution === "instant" && candidate.text.includes("place（");
 
 /** The model's usual path: search for the weather toolchain, then answer instantly with the inputs it reads. */
 const askWeather = (args: Record<string, unknown> = kamakura) =>
@@ -102,21 +102,11 @@ test("the search lists the weather toolchain as an instant candidate with its pl
 		const found = candidates.find(Boolean)!;
 		const weather = found.find(isWeather);
 		expect(weather).toBeDefined();
-		const inputs = weather!.inputs as {
-			properties: Record<string, { type?: string; enum?: unknown[] }>;
-			required: string[];
-		};
-		// The place is the user's own words; the host finds its area.
-		expect(inputs.properties.place!.type).toBe("string");
-		expect(inputs.properties.place!.enum).toBeUndefined();
-		expect(inputs.properties.prefecture!.type).toBe("string");
-		expect(inputs.properties.day!.enum).toEqual([
-			"today",
-			"tomorrow",
-			"day_after",
-		]);
-		expect(inputs.required).toEqual(
-			expect.arrayContaining(["place", "prefecture", "day"]),
+		// The inputs read as `name（type、required）description` (section 9). The place is the user's own words; the host finds its area.
+		expect(weather!.text).toContain("place（string、必須）");
+		expect(weather!.text).toContain("prefecture（string、必須）");
+		expect(weather!.text).toContain(
+			"day（string、必須、値は today・tomorrow・day_after）",
 		);
 	} finally {
 		await h.close();
@@ -155,7 +145,7 @@ test("without the list of areas the weather toolchain is not among the candidate
 
 test("instant inputs outside the schema are refused with the fields to repair, and nothing is fetched", async () => {
 	const service = weatherFetch();
-	const refusals: unknown[] = [];
+	const refusals: string[] = [];
 	const g = await harness({
 		weather: { fetch: service.fetch },
 		firstRound: (_tools, _question, messages) => {
@@ -177,7 +167,8 @@ test("instant inputs outside the schema are refused with the fields to repair, a
 		});
 		const done = await g.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 });
 		expect(done?.status).toBe("completed");
-		expect(refusals).toMatchObject([{ refused: true }]);
+		expect(refusals).toHaveLength(1);
+		expect(resultField(refusals[0]!, "refused")).toBe("true");
 		expect(g.dialogue.answerText(run.id)).toBe("天気を取得できませんでした。");
 		expect(
 			service.urls.filter((u) => u.includes("/api/forecast/")),

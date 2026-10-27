@@ -3,6 +3,7 @@ import { harness } from "../toolchain/toolchain.fixture";
 import {
 	afterUtterance,
 	candidatesOf,
+	resultField,
 	searchThenDelegate,
 	toolResults,
 	type Candidate,
@@ -12,8 +13,7 @@ import { softbankSentence, stockFetch } from "./stock.fixture";
 const ask = "ソフトバンクの株価を教えて";
 /** The stock toolchain is the instant candidate whose inputs take a query. */
 const isStock = (candidate: Candidate) =>
-	candidate.execution === "instant" &&
-	JSON.stringify(candidate.inputs ?? {}).includes("query");
+	candidate.execution === "instant" && candidate.text.includes("query（");
 
 /** The model's usual path: search for the stock toolchain, then answer instantly with the query it reads. */
 const askStock = (args: Record<string, unknown> = { query: "ソフトバンク" }) =>
@@ -98,13 +98,9 @@ test("the search lists the stock toolchain as an instant candidate with a free-t
 		await h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 });
 		const stock = candidates.find(Boolean)!.find(isStock);
 		expect(stock).toBeDefined();
-		const inputs = stock!.inputs as {
-			properties: Record<string, { type?: string; enum?: unknown[] }>;
-			required: string[];
-		};
-		expect(inputs.properties.query!.type).toBe("string");
-		expect(inputs.properties.query!.enum).toBeUndefined();
-		expect(inputs.required).toEqual(["query"]);
+		// The inputs read as `name（type、required）description` (section 9): free text, no choices.
+		expect(stock!.text).toContain("query（string、必須）");
+		expect(stock!.text).not.toContain("値は");
 	} finally {
 		await h.close();
 	}
@@ -134,7 +130,7 @@ test("without the stock services configured the stock toolchain is not among the
 
 test("a query that is not text is refused with the fields to repair, and nothing is fetched", async () => {
 	const service = stockFetch();
-	const refusals: unknown[] = [];
+	const refusals: string[] = [];
 	const h = await harness({
 		stock: { fetch: service.fetch },
 		firstRound: (_tools, _question, messages) => {
@@ -156,7 +152,8 @@ test("a query that is not text is refused with the fields to repair, and nothing
 		});
 		const done = await h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 });
 		expect(done?.status).toBe("completed");
-		expect(refusals).toMatchObject([{ refused: true }]);
+		expect(refusals).toHaveLength(1);
+		expect(resultField(refusals[0]!, "refused")).toBe("true");
 		expect(h.dialogue.answerText(run.id)).toBe("株価を取得できませんでした。");
 		expect(service.charts()).toHaveLength(0);
 	} finally {

@@ -472,7 +472,7 @@ function worldText(h: Booted): string {
 
 // ---------------------------------------------------------------------------
 
-test("the conversation gets only the names of the known targets the wording names: no claim text, no ids; nothing otherwise", async () => {
+test("the conversation input carries no World material: no target hint, no claim text, no ids", async () => {
 	const dir = tempDir();
 	const h = await boot({ dir, mode: "on" });
 	await h.say("m1", "音声サービスは9月から利用できる。");
@@ -480,26 +480,12 @@ test("the conversation gets only the names of the known targets the wording name
 	await h.registerClaim("claim-1", "m1", "9月から");
 	const run = await h.ask();
 	expect((await h.finish(run.id)).status).toBe("completed");
-	const input = h.seen.at(-1)!;
-	// The one hint line sits in the context document; it names the target only.
-	const text = JSON.stringify(input);
-	expect(text).toContain(
-		"Worldに記録がある対象: 「音声サービス」（引用した名前のみ。詳しい内容は World の調査で確かめられる）",
-	);
+	// World is read by its toolchain, never put in every turn's input (the conversation input specification, section 5.2).
+	const text = JSON.stringify(h.seen.at(-1)!);
+	expect(text).not.toContain("Worldに記録がある対象");
 	expect(text).not.toContain("9月から");
 	expect(text).not.toContain("svc-1");
 	expect(text).not.toContain("claim-1");
-
-	// A turn that names no known target gets no hint.
-	const other = await h.dialogue.submit({
-		requestId: crypto.randomUUID(),
-		conversationId: "other",
-		text: "今日の天気は？",
-	});
-	expect((await h.finish(other.id)).status).toBe("completed");
-	expect(JSON.stringify(h.seen.at(-1)).includes("Worldに記録がある対象")).toBe(
-		false,
-	);
 });
 
 test("A34 (host side) the host consumes only the vendored World tgz: package.json points at it", () => {

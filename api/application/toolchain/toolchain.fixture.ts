@@ -58,16 +58,15 @@ import { createApp } from "../app";
 import { appModules } from "../app-modules";
 import type { LarmPort } from "../../domains/larm";
 import {
-	afterUtterance,
 	callsOf,
+	candidatesOf,
 	delegate,
 	findToolchain,
 	handedStep,
 	instantExecute,
 	isNoticeRound,
 	isUtteranceRound,
-	retainedIds,
-	toolResults,
+	utteranceOf,
 	type Step,
 	UNAVAILABLE_TEXT,
 } from "./conversation-script.fixture";
@@ -210,7 +209,6 @@ export async function harness(options: HarnessOptions = {}) {
 			(!!options.timers && /タイマー/.test(question)) ||
 			/天気|株価|weather|stock|調べ|検索|https?:|確認/.test(question);
 		if (options.clarify || !delegates) return { text: await reply(messages) };
-		const after = afterUtterance(messages);
 		const handed = handedStep(messages);
 		if (handed) return handed;
 		const named = options.history
@@ -235,16 +233,10 @@ export async function harness(options: HarnessOptions = {}) {
 				}),
 			],
 		});
-		// A toolchain the state already retains is handed the work without a search (the model's usual path).
-		if (wanted && retainedIds(messages).includes(wanted))
-			return handOver(wanted);
-		const search = toolResults(after, "find_toolchain")[0] as
-			| { candidates?: Array<{ id: string; execution?: string }> }
-			| undefined;
-		if (!search) return { calls: [findToolchain(question)] };
+		const candidates = candidatesOf(messages);
+		if (!candidates) return { calls: [findToolchain(question)] };
 		const chosen =
-			search.candidates?.find((card) => card.id === wanted) ??
-			search.candidates?.[0];
+			candidates.find((card) => card.id === wanted) ?? candidates[0];
 		if (!chosen) return { text: UNAVAILABLE_TEXT };
 		if (chosen.execution === "instant")
 			return { calls: [instantExecute(chosen.id, question, {})] };
@@ -293,7 +285,7 @@ export async function harness(options: HarnessOptions = {}) {
 			if (isUtteranceRound(callOptions) && !isNoticeRound(messages)) {
 				const step = await utteranceStep(
 					messages,
-					question,
+					utteranceOf(messages),
 					callOptions!.tools!,
 				);
 				if (step.calls?.length)

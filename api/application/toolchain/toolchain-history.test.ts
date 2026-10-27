@@ -65,6 +65,7 @@ test("every builtin and bundled toolchain registers as a complete set with flat 
 		"compute",
 		"shell",
 		"resources",
+		"docling",
 	]);
 	const active = store.read((db) => capabilities.toolchainsInTransaction(db));
 	expect(active.map((d) => d.functionName).sort()).toEqual(
@@ -147,6 +148,8 @@ test("without vectors every available toolchain is offered; with vectors the top
 			"timers.manage",
 			"web.search",
 			"pipeline.studio",
+			// The dots delegation bundle (backend `dots`, offered by this setup).
+			"dots.delegate",
 		]
 			.filter(
 				(id) =>

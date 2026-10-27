@@ -16,7 +16,8 @@ test("offline repair backs up the old ledger and allows the full startup migrati
 		(m) =>
 			m.id !== "continuity/0004-events" &&
 			m.id !== "continuity/0005-drop-active" &&
-			m.id !== "continuity/0006-retract-activity",
+			m.id !== "continuity/0006-retract-activity" &&
+			m.id !== "continuity/0007-drop-window",
 	);
 	let store = openStore(path, before);
 	try {

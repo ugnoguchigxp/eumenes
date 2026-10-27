@@ -564,9 +564,9 @@ test("real dialogue list and cancel select an authoritative timer snapshot", asy
 		expect(h.commandContexts[1]).toContain("revision");
 		expect(await ask("タイマーを止めて")).toContain("cancelled");
 		expect(h.timers!.get(timer.id)?.timer.state).toBe("cancelled");
-		// The first request takes the search, the hand-over and the sub-agent's operation (3); each later one hands
-		// the retained timer over directly, so it takes the hand-over and the operation (2).
-		expect(h.calls).toBe(7);
+		// Every request searches again (the conversation input specification, section 4.5: no toolchain is carried over),
+		// so each takes the search, the hand-over and the sub-agent's operation (3).
+		expect(h.calls).toBe(9);
 	} finally {
 		await h.close();
 	}

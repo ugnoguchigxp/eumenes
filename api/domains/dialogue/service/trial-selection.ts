@@ -5,11 +5,20 @@ import type { ConversationAgentSystem } from "../contracts";
 import { systemText } from "./context-system";
 import { candidateOf } from "./executor-context";
 import { generationTools, parseCall, TOOL_NAMES } from "./generation-tools";
+import {
+	INPUT_HEADINGS,
+	dataText,
+	joinSections,
+	jstNowLine,
+} from "./input-text";
+import { toolResultText } from "./result-text";
+import { stateText } from "./state-text";
 
 /**
  * The conversation's choice on one utterance as a trial (spec task-pipeline-design 2026-10-22 §8.2 選択の試験):
  * the same system and fixed tools, an empty window, and the candidates given as the result of a search the host
- * made. Nothing is run. Says which toolchain's function the model chose and, for a pipeline or an instant
+ * made. The utterance and the result read as in the conversation (conversation input specification, sections 8.1
+ * and 9): `## State` and `## User`, and the search's result as text. Nothing is run. Says which toolchain's function the model chose and, for a pipeline or an instant
  * toolchain, with which inputs.
  */
 export async function trialFirstRound(
@@ -41,7 +50,13 @@ export async function trialFirstRound(
 						input.agentSystem,
 					),
 				},
-				{ role: "user", content: input.text },
+				{
+					role: "user",
+					content: joinSections([
+						stateText([`今: ${jstNowLine(Date.now())}`]),
+						`${INPUT_HEADINGS.user}\n${dataText(input.text)}`,
+					]),
+				},
 				{
 					role: "assistant",
 					content: "",
@@ -59,7 +74,7 @@ export async function trialFirstRound(
 				{
 					role: "tool",
 					tool_call_id: searchId,
-					content: JSON.stringify({
+					content: toolResultText(TOOL_NAMES.search, {
 						candidates: input.cards.map((card) => candidateOf(card, null)),
 					}),
 				},

@@ -333,7 +333,7 @@ test("artwork is refused for an unfinished track and a provider failure is recor
 	}
 });
 
-test("a music screen submit generates a track though the conversation retained only another toolchain", async () => {
+test("a music screen submit generates a track though the conversation earlier used only another toolchain", async () => {
 	const music = musicFixture("success");
 	const image = imageFixture("success");
 	let phase: "image" | "screen" = "image";

@@ -1,10 +1,7 @@
 import type { LarmPort } from "../../domains/larm";
 import { imageFixture } from "./image.fixture";
-import {
-	answerUtterance,
-	handOver,
-	lastUtterance,
-} from "./conversation-turn.fixture";
+import { answerUtterance, handOver } from "./conversation-turn.fixture";
+import { utteranceOf } from "../toolchain/conversation-script.fixture";
 export const recognitionFixtureImage = {
 	kind: "image",
 	model: "YOLO26n",
@@ -104,9 +101,9 @@ export function objectRecognitionFixture(
 					"準備します。",
 					"none",
 					(messages) =>
-						lastUtterance(messages).includes("添付画像のメタ情報")
+						utteranceOf(messages).includes("添付画像のメタ情報")
 							? "添付画像の物体を調べる"
-							: lastUtterance(messages),
+							: utteranceOf(messages),
 				),
 				() => stages.push("route"),
 			);
