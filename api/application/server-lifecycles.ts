@@ -7,19 +7,8 @@ import { toolchainMaintenance } from "./toolchain/toolchain-adapters";
 
 const log = getLogger("server");
 
-/**
- * Process lifecycle of the services. The three groups are separate because the
- * three orders differ: recovery order (a journal before the world that reads
- * it, queue before the tasks it carries), start order (runners after every
- * recovery), and bring-up order for resources, which `closeAll` walks in
- * reverse so the shutdown order is exactly: commit/status subscriptions,
- * change stream, HTTP, timers, coding, in-flight maintenance (tasks, store retention,
- * timers), world,
- * supervision, delegated, scheduler, service tests, voice, excalidraw, Claude Code sessions,
- * agents, the browser (its MCP child), queue,
- * web research, dialogue, inference, datasets, store.
- */
-export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
+/** The interval workers of the process; `createLifecycles` starts, stops and drains them in its own order. */
+function createIntervalWorkers(s: Services) {
 	// Toolchain and procedure passages are embedded in the background; retrieval falls back
 	// to full-text search while a vector is missing.
 	const googleMaintenance = intervalLifecycle(
@@ -142,6 +131,45 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 		() => s.browser.service.sweep(),
 		{ exclusive: true },
 	);
+	return {
+		googleMaintenance,
+		vectorRefresh,
+		reportDelivery,
+		taskMaintenance,
+		storeRetention,
+		codingHeartbeat,
+		kanbanMaintenance,
+		timerMaintenance,
+		drawingMaintenance,
+		browserSweep,
+	};
+}
+
+/**
+ * Process lifecycle of the services. The three groups are separate because the
+ * three orders differ: recovery order (a journal before the world that reads
+ * it, queue before the tasks it carries), start order (runners after every
+ * recovery), and bring-up order for resources, which `closeAll` walks in
+ * reverse so the shutdown order is exactly: commit/status subscriptions,
+ * change stream, HTTP, timers, coding, in-flight maintenance (tasks, store retention,
+ * timers), world,
+ * supervision, delegated, scheduler, service tests, voice, excalidraw, Claude Code sessions,
+ * agents, the browser (its MCP child), queue,
+ * web research, dialogue, inference, datasets, store.
+ */
+export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
+	const {
+		googleMaintenance,
+		vectorRefresh,
+		reportDelivery,
+		taskMaintenance,
+		storeRetention,
+		codingHeartbeat,
+		kanbanMaintenance,
+		timerMaintenance,
+		drawingMaintenance,
+		browserSweep,
+	} = createIntervalWorkers(s);
 	let feedResyncRequired = false;
 	return [
 		// Recovery runs to completion before any worker starts; a failure aborts startup.

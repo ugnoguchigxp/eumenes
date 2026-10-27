@@ -27,7 +27,14 @@ export const Dark: Story = {
 	args: { ...base, highlighted: true },
 	decorators: [
 		(Story) => (
-			<div className="ds-theme-dark" style={{ background: "var(--background)", color: "var(--foreground)", padding: "1.5rem" }}>
+			<div
+				className="ds-theme-dark"
+				style={{
+					background: "var(--background)",
+					color: "var(--foreground)",
+					padding: "1.5rem",
+				}}
+			>
 				<Story />
 			</div>
 		),
@@ -35,10 +42,22 @@ export const Dark: Story = {
 };
 export const Row: Story = {
 	render: () => (
-		<div style={{ display: "grid", gap: "1.5rem", gridTemplateColumns: "repeat(auto-fit, minmax(14rem, 1fr))", paddingTop: "1rem" }}>
+		<div
+			style={{
+				display: "grid",
+				gap: "1.5rem",
+				gridTemplateColumns: "repeat(auto-fit, minmax(14rem, 1fr))",
+				paddingTop: "1rem",
+			}}
+		>
 			<PricingCard {...base} plan="フリー" price="¥0" ctaLabel="はじめる" />
 			<PricingCard {...base} highlighted />
-			<PricingCard {...base} plan="プロ" price="¥4,800" features={[...base.features, "優先サポート"]} />
+			<PricingCard
+				{...base}
+				plan="プロ"
+				price="¥4,800"
+				features={[...base.features, "優先サポート"]}
+			/>
 		</div>
 	),
 };

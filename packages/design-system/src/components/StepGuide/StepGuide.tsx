@@ -59,7 +59,7 @@ const StepGuide = React.forwardRef<HTMLElement, StepGuideProps>(
 		const atStart = current === 0;
 		const atEnd = current === count - 1;
 
-		const handleKeyDown = (event: React.KeyboardEvent<HTMLOListElement>) => {
+		const handleKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
 			switch (event.key) {
 				case "ArrowRight":
 				case "ArrowDown":
@@ -98,7 +98,6 @@ const StepGuide = React.forwardRef<HTMLElement, StepGuideProps>(
 				<ol
 					aria-label="ステップ一覧"
 					className="m-0 flex list-none flex-wrap gap-1.5 p-0"
-					onKeyDown={handleKeyDown}
 				>
 					{steps.map((item, index) => {
 						const isCurrent = index === current;
@@ -114,6 +113,7 @@ const StepGuide = React.forwardRef<HTMLElement, StepGuideProps>(
 									aria-label={`ステップ${index + 1}: ${item.title}`}
 									title={item.title}
 									onClick={() => goTo(index)}
+									onKeyDown={handleKeyDown}
 									className={cn(
 										"flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border-2 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
 										isCurrent

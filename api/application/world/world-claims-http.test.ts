@@ -22,6 +22,7 @@ import {
 } from "../../domains/world/test/fixture";
 import { openStore } from "../../infrastructure/sqlite";
 import { createApp } from "../app";
+import { appModules } from "../app-modules";
 import { migrations } from "../migrations";
 import {
 	createWorldAssembly,
@@ -81,23 +82,25 @@ async function assemble(mode: "on" | "protect" | "off") {
 	const app = createApp({
 		token,
 		origin,
-		conversation,
-		dialogue: {} as never,
-		voice: {} as never,
-		larm: {
-			status: () => ({ state: "ready" }),
-			connect: async () => {},
-		} as never,
-		queue: {} as never,
-		scheduler: {} as never,
-		...(world
-			? {
-					worldClaims: {
-						claims: world.claims,
-						context: world.claimsContext,
-					},
-				}
-			: {}),
+		modules: appModules({
+			conversation,
+			dialogue: {} as never,
+			voice: {} as never,
+			larm: {
+				status: () => ({ state: "ready" }),
+				connect: async () => {},
+			} as never,
+			queue: {} as never,
+			scheduler: {} as never,
+			...(world
+				? {
+						worldClaims: {
+							claims: world.claims,
+							context: world.claimsContext,
+						},
+					}
+				: {}),
+		}),
 	});
 	return { store, conversation, world, app };
 }

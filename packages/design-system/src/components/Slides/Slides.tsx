@@ -22,7 +22,12 @@ export function Slides({ title, slides, className }: SlidesProps) {
 		setRequested(Math.min(Math.max(next, 0), Math.max(count - 1, 0)));
 
 	const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
-		if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey)
+		if (
+			event.defaultPrevented ||
+			event.altKey ||
+			event.ctrlKey ||
+			event.metaKey
+		)
 			return;
 		if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
 		// 場面の中の入力欄・スライダーは自分で矢印キーを使う。

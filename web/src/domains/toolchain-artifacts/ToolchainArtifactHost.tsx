@@ -1,10 +1,6 @@
 import { ArtifactRenderer, type ArtifactRuntime } from "@eumenes/artifact-ui";
 import "@eumenes/artifact-ui/styles";
-import type {
-	ArtifactEvent,
-	Receipt,
-	Snapshot,
-} from "@eumenes/artifact-ui/contracts";
+import type { Snapshot } from "@eumenes/artifact-ui/contracts";
 import { Button } from "@eumenes/design-system";
 import { GooglePhotoPicker } from "../../media/GooglePhotoPicker";
 import { LightAvatarMotionLab } from "../../components/domains/conversation/LightAvatarMotionLab";
@@ -13,17 +9,13 @@ import { Model3dViewer } from "../model3d/Model3dViewer";
 import { Model3dThumbnail } from "../model3d/Model3dThumbnail";
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import type {
-	ActionBindingV1,
-	ArtifactDefinitionV1,
-} from "../../../../api/domains/capabilities/contracts";
+import type { ArtifactDefinitionV1 } from "../../../../api/domains/capabilities/contracts";
 import type { EumenesClient } from "../../../../client";
 import { queryRoots } from "../../queryKeys";
 import { useActionWiring } from "./action-wiring";
 import { useCollectionActions } from "./collection-actions";
 import { useInputBridge, withEditingState } from "./input-bridge";
 import { useCollections } from "./use-collections";
-import type { ActionOutcome } from "./dispatcher";
 import { useDraftActions } from "./draft-actions";
 import {
 	documentsOf,
@@ -31,17 +23,17 @@ import {
 	useDraftViews,
 } from "./document-hooks";
 import { dirtyEntries } from "./documents";
-import { draftStoreFor } from "./drafts";
 import { toolchainArtifactsQuery } from "./launcher";
-import { receiptOf } from "./messages";
-import { navigationDestination } from "./navigation";
 import { useAnswer, useOpenQuestion } from "./questions";
+import { useScreenDispatch } from "./screen-dispatch";
 import { SecretNotice, useSecretNotice } from "./secret-notice";
 import type {
 	AdapterState,
 	WebAdapterRegistry,
 	WebArtifactAdapter,
 } from "./registry";
+
+export { findActionBinding } from "./screen-dispatch";
 
 import "./ToolchainArtifactHost.css";
 
@@ -79,23 +71,6 @@ function hostViewsFor(client: EumenesClient): ArtifactRuntime["hostViews"] {
 		),
 	};
 }
-/**
- * The event's binding: the one registered for this event and source (a registration holds at
- * most one), else the only binding of that event. Panels with several actions register one
- * binding and name the action in the event's `id` value.
- */
-export function findActionBinding(
-	bindings: readonly ActionBindingV1[],
-	event: Pick<ArtifactEvent, "action" | "source">,
-): ActionBindingV1 | undefined {
-	const exact = bindings.find(
-		(b) => b.eventAction === event.action && b.source === event.source,
-	);
-	if (exact) return exact;
-	const same = bindings.filter((b) => b.eventAction === event.action);
-	return same.length === 1 ? same[0] : undefined;
-}
-
 function Message({ children, alert }: { children: string; alert?: boolean }) {
 	return alert ? (
 		<p role="alert" className="toolchain-artifact-message">
@@ -185,6 +160,12 @@ function AdapterScreen({
 		ready: documentFieldsReady,
 	} = useDocumentFields(client, artifact, artifactRevisionId, catalog);
 	const drafts = useDraftViews(client.identity, documents);
+	// The notice bar belongs to the action wiring, which is built after the adapter.
+	const noticeRef = useRef<(message: string) => void>(noop);
+	const notify = useCallback(
+		(message: string) => noticeRef.current(message),
+		[],
+	);
 	const own: AdapterState = adapter.useArtifact({
 		conversationId,
 		client,
@@ -197,6 +178,7 @@ function AdapterScreen({
 		documentFields,
 		documentFieldsReady,
 		drafts,
+		notify,
 	});
 	// Documents whose shared draft has unapplied changes: row actions that need a clean one wait.
 	const dirtyDocuments = new Set(
@@ -283,6 +265,9 @@ function AdapterScreen({
 			scopeRef,
 			getLatest,
 		});
+	useEffect(() => {
+		noticeRef.current = setNotice;
+	}, [setNotice]);
 	const answer = useAnswer(client, getLatest);
 	const { token: secretToken, reveal, close: closeSecret } = useSecretNotice();
 	const collectionEvent = useCollectionActions({
@@ -302,80 +287,20 @@ function AdapterScreen({
 		describe,
 	});
 
-	const dispatch = useCallback(
-		async (event: ArtifactEvent): Promise<Receipt> => {
-			const { state: s, snapshot: shown } = latest.current;
-			const collection = collectionEvent(event);
-			if (collection) return collection;
-			const binding = findActionBinding(artifact.actionBindings, event);
-			if (!binding)
-				return (
-					s.sourceRead?.(event) ?? {
-						status: "rejected",
-						message: "この操作は利用できません",
-					}
-				);
-			const current = shown[event.source];
-			if (current && current.revision !== event.revision)
-				return {
-					status: "conflict",
-					message: "状態が変わりました。もう一度お試しください。",
-				};
-			if (binding.effect === "local") return s.local(binding, event);
-			if (binding.effect === "draft") return draftAction(binding, event);
-			if (binding.effect === "navigate") {
-				if (event.action === "settings-review") {
-					const editors = documents.flatMap(
-						(doc) =>
-							draftStoreFor(client.identity, doc).getView().editors ?? [],
-					);
-					if (editors.length)
-						return {
-							status: "rejected",
-							message: editors.map((e) => e.message).join("\n"),
-						};
-				}
-				const destination = navigationDestination(binding, event.values);
-				const opened = destination ? await onNavigate?.(destination) : false;
-				return opened
-					? { status: "accepted", message: "" }
-					: { status: "rejected", message: "この画面は現在利用できません" };
-			}
-			if (binding.answer) return answer(event);
-			if (binding.draftDocument) return applyDraft(binding, event);
-			const timing = { sent: performance.now(), sentAt: Date.now() };
-			const dispatcher = dispatcherRef.current;
-			if (!dispatcher)
-				return { status: "rejected", message: "画面を準備しています。" };
-			const outcome: ActionOutcome = await dispatcher.send({
-				actionId: binding.actionId,
-				source: binding.source,
-				sourceRevision: shown[binding.source]?.revision ?? event.revision,
-				targetRef: s.targetOf(binding.source),
-				input: event.values,
-			});
-			if (outcome.kind === "accepted" && outcome.result) {
-				// A one-time value is shown before anything else can fail.
-				reveal(outcome.result.receipt);
-				s.settled(binding, outcome.result, timing, event.values);
-			}
-			if (outcome.kind === "rejected" && outcome.conflict) s.refresh();
-			return receiptOf(outcome, describe);
-		},
-		[
-			artifact,
-			documents,
-			client.identity,
-			answer,
-			describe,
-			draftAction,
-			applyDraft,
-			onNavigate,
-			dispatcherRef,
-			collectionEvent,
-			reveal,
-		],
-	);
+	const dispatch = useScreenDispatch({
+		client,
+		artifact,
+		documents,
+		getLatest,
+		collectionEvent,
+		draftAction,
+		applyDraft,
+		answer,
+		describe,
+		dispatcherRef,
+		reveal,
+		onNavigate,
+	});
 
 	const variant = artifact.variants.find(
 		(v) => v.id === (variantId ?? artifact.defaultVariant),

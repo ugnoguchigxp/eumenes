@@ -115,6 +115,7 @@ test("registered shell adapter reads sources, keeps reconnect state and calls sh
 				artifactRevisionId: "artifact:cli.workspace@1",
 				targetRef: undefined,
 				setTargetRef: () => {},
+				notify: () => {},
 				visible: true,
 				catalog: [],
 				documentFields: {},

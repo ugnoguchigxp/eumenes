@@ -3,7 +3,7 @@ import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { createClient } from "../../../client";
-import type { AnalysisRecord } from "../../../api/domains/larm/contracts/visual-perception";
+import type { AnalysisRecord } from "../../../api/domains/larm/contracts";
 import { useVisualAnalysis } from "./use-visual-analysis";
 afterEach(cleanup);
 const source = {

@@ -36,7 +36,14 @@ export const Dark: Story = {
 	args: { ...args, highlightColumn: 1 },
 	decorators: [
 		(Story) => (
-			<div className="ds-theme-dark" style={{ background: "var(--background)", color: "var(--foreground)", padding: "1.5rem" }}>
+			<div
+				className="ds-theme-dark"
+				style={{
+					background: "var(--background)",
+					color: "var(--foreground)",
+					padding: "1.5rem",
+				}}
+			>
 				<Story />
 			</div>
 		),

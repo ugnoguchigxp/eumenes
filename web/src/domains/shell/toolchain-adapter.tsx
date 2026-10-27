@@ -31,7 +31,7 @@ const accepted: Receipt = { status: "accepted", message: "" };
  */
 export const shellWebAdapter: WebArtifactAdapter = {
 	adapterRef: SHELL_ADAPTER_REF,
-	useArtifact({ client, artifact, artifactRevisionId }) {
+	useArtifact({ client, artifact, artifactRevisionId, notify }) {
 		const source = artifact.sourceBindings[0]?.source ?? "shell";
 		const sizes = useRef(new Map<string, { cols: number; rows: number }>());
 		const list = useQuery({
@@ -64,9 +64,11 @@ export const shellWebAdapter: WebArtifactAdapter = {
 					{
 						onEnded: reload,
 						onResized: (size) => sizes.current.set(sessionId, size),
+						onInputFailed: () =>
+							notify("入力を送信できませんでした。接続を確認してください。"),
 					},
 				),
-			[client, reload],
+			[client, reload, notify],
 		);
 		const data = list.data;
 		const resource: TerminalsResource | undefined = data && {

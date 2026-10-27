@@ -1,5 +1,6 @@
 import { afterEach, expect, test, vi } from "vitest";
 import { createAudioController, createAudioStore } from "..";
+import { post, stubWorkletNode, workletModule } from "./worklet-fake";
 
 afterEach(() => vi.unstubAllGlobals());
 test("pausing the microphone retains current output, resumes capture, and rejects callbacks from the old recorder", async () => {
@@ -8,15 +9,7 @@ test("pausing the microphone retains current output, resumes capture, and reject
 		outputStop = vi.fn();
 	let opened = 0,
 		contexts = 0;
-	const processors: Array<{
-		onaudioprocess:
-			| ((event: {
-					inputBuffer: { getChannelData: () => Float32Array };
-			  }) => void)
-			| null;
-		connect: () => void;
-		disconnect: () => void;
-	}> = [];
+	const nodes = stubWorkletNode();
 	vi.stubGlobal("navigator", {
 		mediaDevices: {
 			getUserMedia: async () => {
@@ -28,6 +21,7 @@ test("pausing the microphone retains current output, resumes capture, and reject
 	class Context {
 		sampleRate = 48000;
 		destination = {};
+		audioWorklet = workletModule;
 		constructor() {
 			contexts++;
 		}
@@ -35,11 +29,6 @@ test("pausing the microphone retains current output, resumes capture, and reject
 		close = close;
 		createMediaStreamSource() {
 			return { connect() {}, disconnect() {} };
-		}
-		createScriptProcessor() {
-			const processor = { onaudioprocess: null, connect() {}, disconnect() {} };
-			processors.push(processor);
-			return processor;
 		}
 		async decodeAudioData() {
 			return {};
@@ -66,7 +55,7 @@ test("pausing the microphone retains current output, resumes capture, and reject
 	);
 	await audio.start();
 	await audio.play(new Uint8Array(44), () => {});
-	const stale = processors[0]!.onaudioprocess;
+	const stale = nodes[0]!;
 	audio.pauseInput();
 	expect(tracks[0]).toHaveBeenCalledTimes(1);
 	expect(close).not.toHaveBeenCalled();
@@ -75,9 +64,7 @@ test("pausing the microphone retains current output, resumes capture, and reject
 	expect(contexts).toBe(1);
 	expect(opened).toBe(2);
 	for (let index = 0; index < 30; index++)
-		stale?.({
-			inputBuffer: { getChannelData: () => new Float32Array(2048).fill(0.1) },
-		});
+		post(stale, new Float32Array(2048).fill(0.1));
 	audio.pauseInput();
 	expect(segments).not.toHaveBeenCalled();
 	expect(tracks[1]).toHaveBeenCalledTimes(1);
@@ -98,6 +85,7 @@ test("playback volume includes mute and releases gain on completion and cancella
 		start: ReturnType<typeof vi.fn>;
 		stop: ReturnType<typeof vi.fn>;
 	}> = [];
+	stubWorkletNode();
 	vi.stubGlobal("navigator", {
 		mediaDevices: {
 			getUserMedia: async () => ({ getTracks: () => [{ stop() {} }] }),
@@ -106,12 +94,10 @@ test("playback volume includes mute and releases gain on completion and cancella
 	class Context {
 		sampleRate = 48000;
 		destination = {};
+		audioWorklet = workletModule;
 		async resume() {}
 		async close() {}
 		createMediaStreamSource() {
-			return { connect() {}, disconnect() {} };
-		}
-		createScriptProcessor() {
 			return { connect() {}, disconnect() {} };
 		}
 		async decodeAudioData() {
@@ -175,13 +161,7 @@ test("audio store instances do not leak state", () => {
 });
 test("three capture cycles release tracks and ignore late callbacks", async () => {
 	let stopped = 0;
-	const processors: Array<{
-		onaudioprocess:
-			| ((event: {
-					inputBuffer: { getChannelData: () => Float32Array };
-			  }) => void)
-			| null;
-	}> = [];
+	const nodes = stubWorkletNode();
 	const stream = {
 		getTracks: () => [
 			{
@@ -197,19 +177,11 @@ test("three capture cycles release tracks and ignore late callbacks", async () =
 	class FakeContext {
 		sampleRate = 48000;
 		destination = {};
+		audioWorklet = workletModule;
 		async resume() {}
 		async close() {}
 		createMediaStreamSource() {
 			return { connect: () => {}, disconnect: () => {} };
-		}
-		createScriptProcessor() {
-			const processor = {
-				onaudioprocess: null as (typeof processors)[number]["onaudioprocess"],
-				connect: () => {},
-				disconnect: () => {},
-			};
-			processors.push(processor);
-			return processor;
 		}
 	}
 	vi.stubGlobal("AudioContext", FakeContext);
@@ -228,17 +200,15 @@ test("three capture cycles release tracks and ignore late callbacks", async () =
 			{ silenceMs: 700 },
 		);
 		await audio.start();
-		const processor = processors[cycle];
-		if (!processor) throw new Error("processor_missing");
+		const node = nodes[cycle];
+		if (!node) throw new Error("worklet_missing");
 		const feed = (value: number) =>
-			processor.onaudioprocess?.({
-				inputBuffer: {
-					getChannelData: () =>
-						Float32Array.from({ length: 2048 }, (_, i) =>
-							Math.floor(i / 8) % 2 ? value : -value,
-						),
-				},
-			});
+			post(
+				node,
+				Float32Array.from({ length: 2048 }, (_, i) =>
+					Math.floor(i / 8) % 2 ? value : -value,
+				),
+			);
 		for (let i = 0; i < 7; i++) feed(0.2);
 		for (let i = 0; i < 18; i++) feed(0);
 		feed(0.2);
@@ -253,6 +223,7 @@ test("three capture cycles release tracks and ignore late callbacks", async () =
 test("stopping playback while WAV decoding prevents a late start", async () => {
 	let resolveDecode: ((buffer: AudioBuffer) => void) | undefined;
 	let started = 0;
+	stubWorkletNode();
 	vi.stubGlobal("navigator", {
 		mediaDevices: {
 			getUserMedia: async () => ({ getTracks: () => [{ stop: () => {} }] }),
@@ -261,12 +232,10 @@ test("stopping playback while WAV decoding prevents a late start", async () => {
 	class FakeContext {
 		sampleRate = 48000;
 		destination = {};
+		audioWorklet = workletModule;
 		async resume() {}
 		async close() {}
 		createMediaStreamSource() {
-			return { connect: () => {}, disconnect: () => {} };
-		}
-		createScriptProcessor() {
 			return { connect: () => {}, disconnect: () => {} };
 		}
 		decodeAudioData() {
@@ -312,6 +281,7 @@ test("without interruption the next response waits, while superseded waiting aud
 	}> = [];
 	let started = 0,
 		decoded = 0;
+	stubWorkletNode();
 	vi.stubGlobal("navigator", {
 		mediaDevices: {
 			getUserMedia: async () => ({ getTracks: () => [{ stop: () => {} }] }),
@@ -320,12 +290,10 @@ test("without interruption the next response waits, while superseded waiting aud
 	class Context {
 		sampleRate = 48000;
 		destination = {};
+		audioWorklet = workletModule;
 		async resume() {}
 		async close() {}
 		createMediaStreamSource() {
-			return { connect: () => {}, disconnect: () => {} };
-		}
-		createScriptProcessor() {
 			return { connect: () => {}, disconnect: () => {} };
 		}
 		async decodeAudioData() {
@@ -385,6 +353,7 @@ test("stopping while audio resume is pending never installs capture or reports a
 	let stopped = 0,
 		installed = 0;
 	const states: string[] = [];
+	stubWorkletNode();
 	vi.stubGlobal("navigator", {
 		mediaDevices: {
 			getUserMedia: async () => ({
@@ -395,6 +364,7 @@ test("stopping while audio resume is pending never installs capture or reports a
 	class Context {
 		sampleRate = 48000;
 		destination = {};
+		audioWorklet = workletModule;
 		resume() {
 			return new Promise<void>((resolve) => {
 				resume = resolve;
@@ -403,9 +373,6 @@ test("stopping while audio resume is pending never installs capture or reports a
 		async close() {}
 		createMediaStreamSource() {
 			installed++;
-			return { connect() {}, disconnect() {} };
-		}
-		createScriptProcessor() {
 			return { connect() {}, disconnect() {} };
 		}
 	}
@@ -433,9 +400,11 @@ test("an inaudible looping bed keeps the output awake until stop, unless disable
 		stop: ReturnType<typeof vi.fn>;
 		buffer?: { data: Float32Array };
 	}> = [];
+	stubWorkletNode();
 	class Context {
 		sampleRate = 16000;
 		destination = {};
+		audioWorklet = workletModule;
 		resume = async () => {};
 		close = async () => {};
 		createBuffer(_channels: number, length: number) {
@@ -455,9 +424,6 @@ test("an inaudible looping bed keeps the output awake until stop, unless disable
 			return bed;
 		}
 		createMediaStreamSource() {
-			return { connect() {}, disconnect() {} };
-		}
-		createScriptProcessor() {
 			return { connect() {}, disconnect() {} };
 		}
 	}
@@ -495,10 +461,7 @@ test("an inaudible looping bed keeps the output awake until stop, unless disable
 test.each(["half-duplex", "timer-tone"])(
 	"%s ignores the microphone during playback and its output tail",
 	async (mode) => {
-		type Process = (event: {
-			inputBuffer: { getChannelData: () => Float32Array };
-		}) => void;
-		let process: Process | null = null;
+		const nodes = stubWorkletNode();
 		const sources: Array<{ onended: (() => void) | null }> = [];
 		vi.stubGlobal("navigator", {
 			mediaDevices: {
@@ -508,20 +471,11 @@ test.each(["half-duplex", "timer-tone"])(
 		class Context {
 			sampleRate = 48000;
 			destination = {};
+			audioWorklet = workletModule;
 			async resume() {}
 			async close() {}
 			createMediaStreamSource() {
 				return { connect() {}, disconnect() {} };
-			}
-			createScriptProcessor() {
-				const processor = {
-					set onaudioprocess(value: Process | null) {
-						process = value;
-					},
-					connect() {},
-					disconnect() {},
-				};
-				return processor;
 			}
 			async decodeAudioData() {
 				return {};
@@ -550,14 +504,12 @@ test.each(["half-duplex", "timer-tone"])(
 		);
 		await audio.start();
 		const feed = (value: number) =>
-			(process as Process | null)?.({
-				inputBuffer: {
-					getChannelData: () =>
-						Float32Array.from({ length: 2048 }, (_, i) =>
-							Math.floor(i / 8) % 2 ? value : -value,
-						),
-				},
-			});
+			post(
+				nodes[0],
+				Float32Array.from({ length: 2048 }, (_, i) =>
+					Math.floor(i / 8) % 2 ? value : -value,
+				),
+			);
 		const utterance = (frames = 7) => {
 			for (let i = 0; i < frames; i++) feed(0.2);
 			for (let i = 0; i < 18; i++) feed(0);
@@ -586,17 +538,20 @@ test.each(["half-duplex", "timer-tone"])(
 	},
 );
 
-function fakeAudioEnvironment(getUserMedia: (c: unknown) => Promise<unknown>) {
+function fakeAudioEnvironment(
+	getUserMedia: (c: unknown) => Promise<unknown>,
+	listDevices: () => Promise<Array<Partial<MediaDeviceInfo>>> = async () => [],
+) {
+	stubWorkletNode();
 	class FakeContext extends EventTarget {
 		sampleRate = 48000;
 		state = "running";
 		destination = {};
+		audioWorklet = workletModule;
+		async setSinkId() {}
 		async resume() {}
 		async close() {}
 		createMediaStreamSource() {
-			return { connect: () => {}, disconnect: () => {} };
-		}
-		createScriptProcessor() {
 			return { connect: () => {}, disconnect: () => {} };
 		}
 	}
@@ -612,7 +567,7 @@ function fakeAudioEnvironment(getUserMedia: (c: unknown) => Promise<unknown>) {
 	);
 	const devices = Object.assign(new EventTarget(), {
 		getUserMedia,
-		enumerateDevices: async () => [] as MediaDeviceInfo[],
+		enumerateDevices: listDevices,
 	});
 	vi.stubGlobal("navigator", { mediaDevices: devices });
 	return { contexts, devices };
@@ -764,10 +719,9 @@ test("capture uses an AudioWorklet and batches its blocks into 2048-sample frame
 	expect(nodes[0]!.port.onmessage).toBeNull();
 });
 
-test("capture falls back to ScriptProcessorNode when the worklet cannot load", async () => {
+test("a worklet that cannot load fails the start through the error state", async () => {
 	const { stream } = fakeStream();
 	fakeAudioEnvironment(async () => stream);
-	const processors: unknown[] = [];
 	vi.stubGlobal(
 		"AudioContext",
 		class extends EventTarget {
@@ -784,20 +738,158 @@ test("capture falls back to ScriptProcessorNode when the worklet cannot load", a
 			createMediaStreamSource() {
 				return { connect: () => {}, disconnect: () => {} };
 			}
-			createScriptProcessor() {
-				const node = { connect() {}, disconnect() {}, onaudioprocess: null };
-				processors.push(node);
-				return node;
+		},
+	);
+	const states = vi.fn();
+	const audio = createAudioController(
+		states,
+		() => {},
+		() => {},
+	);
+	await expect(audio.start()).rejects.toThrow("blocked");
+	expect(states.mock.lastCall?.[0]).toMatchObject({
+		phase: "error",
+		error: "blocked",
+		inputPhase: "idle",
+	});
+	await audio.stop();
+});
+
+test("a context without an AudioWorklet fails the start instead of falling back", async () => {
+	const { stream } = fakeStream();
+	fakeAudioEnvironment(async () => stream);
+	vi.stubGlobal(
+		"AudioContext",
+		class extends EventTarget {
+			sampleRate = 48000;
+			state = "running";
+			destination = {};
+			async resume() {}
+			async close() {}
+			createMediaStreamSource() {
+				return { connect: () => {}, disconnect: () => {} };
 			}
 		},
 	);
+	const states = vi.fn();
+	const audio = createAudioController(
+		states,
+		() => {},
+		() => {},
+	);
+	await expect(audio.start()).rejects.toThrow("audio_worklet_unavailable");
+	expect(states.mock.lastCall?.[0].phase).toBe("error");
+	await audio.stop();
+});
+
+type Device = Partial<MediaDeviceInfo>;
+const microphone: Device = { kind: "audioinput", deviceId: "mic-1" };
+
+test("the selected output device leaving the device list reports audio_output_lost once", async () => {
+	const { stream } = fakeStream();
+	let outputs: Device[] = [{ kind: "audiooutput", deviceId: "spk-1" }];
+	const env = fakeAudioEnvironment(
+		async () => stream,
+		async () => [...outputs, microphone],
+	);
+	const lost = vi.fn();
 	const audio = createAudioController(
 		() => {},
 		() => {},
 		() => {},
+		{ outputDevice: "spk-1", onLost: lost },
 	);
 	await audio.start();
-	expect(processors).toHaveLength(1);
+	env.devices.dispatchEvent(new Event("devicechange"));
+	await Promise.resolve();
+	await Promise.resolve();
+	expect(lost).not.toHaveBeenCalled();
+	// A pause keeps the output, and with it the watch.
+	audio.pauseInput();
+	outputs = [{ kind: "audiooutput", deviceId: "other" }];
+	env.devices.dispatchEvent(new Event("devicechange"));
+	await vi.waitFor(() =>
+		expect(lost).toHaveBeenCalledWith("audio_output_lost"),
+	);
+	env.devices.dispatchEvent(new Event("devicechange"));
+	await Promise.resolve();
+	expect(lost).toHaveBeenCalledOnce();
+	await audio.stop();
+});
+
+test("a device list without any output ids is not read as the output being lost", async () => {
+	const { stream } = fakeStream();
+	const env = fakeAudioEnvironment(
+		async () => stream,
+		async () => [{ kind: "audiooutput", deviceId: "" }, microphone],
+	);
+	const lost = vi.fn();
+	const audio = createAudioController(
+		() => {},
+		() => {},
+		() => {},
+		{ outputDevice: "spk-1", onLost: lost },
+	);
+	await audio.start();
+	env.devices.dispatchEvent(new Event("devicechange"));
+	await Promise.resolve();
+	await Promise.resolve();
+	expect(lost).not.toHaveBeenCalled();
+	await audio.stop();
+});
+
+test("a sinkchange of the AudioContext reports audio_output_lost, and stop releases the listeners", async () => {
+	const { stream } = fakeStream();
+	const env = fakeAudioEnvironment(async () => stream);
+	const lost = vi.fn();
+	const audio = createAudioController(
+		() => {},
+		() => {},
+		() => {},
+		{ outputDevice: "spk-1", onLost: lost },
+	);
+	await audio.start();
+	const context = env.contexts[0]!;
+	context.dispatchEvent(new Event("sinkchange"));
+	expect(lost).toHaveBeenCalledOnce();
+	expect(lost).toHaveBeenCalledWith("audio_output_lost");
+	await audio.stop();
+	lost.mockClear();
+	context.dispatchEvent(new Event("sinkchange"));
+	env.devices.dispatchEvent(new Event("devicechange"));
+	await Promise.resolve();
+	expect(lost).not.toHaveBeenCalled();
+});
+
+test("output-only playback watches the selected output device too", async () => {
+	const { stream } = fakeStream();
+	const env = fakeAudioEnvironment(async () => stream);
+	const lost = vi.fn();
+	const audio = createAudioController(
+		() => {},
+		() => {},
+		() => {},
+		{ outputDevice: "spk-1", onLost: lost },
+	);
+	await audio.startOutput();
+	env.contexts[0]!.dispatchEvent(new Event("sinkchange"));
+	expect(lost).toHaveBeenCalledWith("audio_output_lost");
+	await audio.stop();
+});
+
+test("without a selected output device a sinkchange is not reported", async () => {
+	const { stream } = fakeStream();
+	const env = fakeAudioEnvironment(async () => stream);
+	const lost = vi.fn();
+	const audio = createAudioController(
+		() => {},
+		() => {},
+		() => {},
+		{ onLost: lost },
+	);
+	await audio.start();
+	env.contexts[0]!.dispatchEvent(new Event("sinkchange"));
+	expect(lost).not.toHaveBeenCalled();
 	await audio.stop();
 });
 

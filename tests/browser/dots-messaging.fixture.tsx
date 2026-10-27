@@ -171,6 +171,7 @@ function Screen() {
 		artifactRevisionId: "fixture",
 		targetRef,
 		setTargetRef,
+		notify: () => {},
 		visible: true,
 		conversationId: "fixture-chat",
 		catalog: [],

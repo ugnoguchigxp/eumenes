@@ -3,7 +3,7 @@ import { limitConcurrency } from "../infrastructure/concurrency";
 import { Hono } from "hono";
 import { statusForError } from "./error-status";
 import { createHash, timingSafeEqual } from "node:crypto";
-import { appModules, type AppModule, type AppServices } from "./app-modules";
+import type { AppModule } from "./app-modules";
 const digest = (value: string) => createHash("sha256").update(value).digest();
 const safeEqual = (a: string, b: string) =>
 	timingSafeEqual(digest(a), digest(b));
@@ -34,14 +34,8 @@ export type AppOptions = {
 	/** Route groups, mounted in order after the shared middleware. */
 	modules: readonly AppModule[];
 };
-/**
- * @deprecated Older compositions pass the services directly; they are turned
- * into modules with `appModules`. New code passes `modules`.
- */
-type LegacyAppOptions = Omit<AppOptions, "modules"> & AppServices;
 
-export function createApp(options: AppOptions | LegacyAppOptions) {
-	const modules = "modules" in options ? options.modules : appModules(options);
+export function createApp(options: AppOptions) {
 	const app = new Hono();
 	const log = getLogger("http");
 	app.use("*", async (c, next) => {
@@ -145,7 +139,7 @@ export function createApp(options: AppOptions | LegacyAppOptions) {
 		limitConcurrency(2),
 	);
 	app.on("POST", "/api/inference/probes", limitConcurrency(1));
-	for (const module of modules) module.mount(app);
+	for (const module of options.modules) module.mount(app);
 	app.onError((error, c) => {
 		const message = error instanceof Error ? error.message : "internal_error";
 		const status = statusForError(message);

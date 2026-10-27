@@ -193,7 +193,12 @@ test("bounded plain output preserves head and tail and child environment exclude
 	expect(r.output.startsWith("HEAD")).toBe(true);
 	expect(r.output.endsWith("TAIL")).toBe(true);
 	expect(
-		childEnv({ EUMENES_TOKEN: "secret", CLAUDECODE: "parent", PATH: "/bin" }),
+		childEnv({
+			EUMENES_TOKEN: "secret",
+			LARM_API_TOKEN: "larm-secret",
+			CLAUDECODE: "parent",
+			PATH: "/bin",
+		}),
 	).toEqual({ PATH: "/bin", TERM: "xterm-256color", COLORTERM: "truecolor" });
 });
 

@@ -1,1 +1,7 @@
-[]
+[
+	{
+		"domain": "inference",
+		"table": "settings_document",
+		"reason": "Frozen data migration inference/0012-total-input-tokens reads the saved connections' kind once; an applied migration cannot be edited (checksum)."
+	}
+]

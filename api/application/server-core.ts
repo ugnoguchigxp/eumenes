@@ -109,8 +109,9 @@ export function buildWebResearch(
 	core: Pick<Core, "store" | "queue" | "inference">,
 ) {
 	const { store, queue, inference } = core;
+	// v2: named migrations. The earlier file named them by position and is not read.
 	const cachePath = resolve(
-		join(dirname(config.dbPath), "cache/web-research.sqlite3"),
+		join(dirname(config.dbPath), "cache/web-research-v2.sqlite3"),
 	);
 	let webCache: ReturnType<typeof createWebCache> | undefined;
 	try {

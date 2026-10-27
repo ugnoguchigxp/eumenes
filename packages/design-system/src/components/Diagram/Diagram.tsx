@@ -447,7 +447,10 @@ const Diagram = React.forwardRef<HTMLElement, DiagramProps>(
 			(el) => el.visible !== false && isDrawable(el),
 		);
 
-		const arrowKeys = new Map<string, { color: string; highlighted: boolean }>();
+		const arrowKeys = new Map<
+			string,
+			{ color: string; highlighted: boolean }
+		>();
 		for (const el of drawable) {
 			if (el.type !== "arrow") continue;
 			const highlighted = el.highlighted === true;

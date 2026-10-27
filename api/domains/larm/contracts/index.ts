@@ -11,6 +11,8 @@ import {
 	type ChatMessage,
 } from "./chat-input";
 export * from "./chat-input";
+export { analysisRecordSchema, perceptionOptions } from "./visual-perception";
+export type { AnalysisCreate, AnalysisRecord } from "./visual-perception";
 export {
 	imageArtifactId,
 	imageArtifact,

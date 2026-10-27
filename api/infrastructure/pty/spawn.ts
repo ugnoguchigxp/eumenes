@@ -1,32 +1,28 @@
 import type { SpawnPty } from "./types";
 
-/** Color settings of the server's own (non-terminal) output; the child gets a full-color xterm. */
-const SERVER_ONLY = new Set(["NO_COLOR", "FORCE_COLOR"]);
 /**
- * Markers of a Claude Code session that started this server (e.g. `bun run dev` run by an agent).
- * A screen session is the person's own top-level session, so it must not look like its child.
+ * The person's login session: identity, paths, locale and the SSH agent. A login shell cannot
+ * rebuild these itself (macOS sets `TMPDIR` and `SSH_AUTH_SOCK` per session).
  */
-const PARENT_SESSION = new Set([
-	"CLAUDECODE",
-	"CLAUDE_PID",
-	"CLAUDE_EFFORT",
-	"CLAUDE_CODE_CHILD_SESSION",
-	"CLAUDE_CODE_ENTRYPOINT",
-	"CLAUDE_CODE_EXECPATH",
+const SESSION = new Set([
+	"HOME",
+	"USER",
+	"LOGNAME",
+	"SHELL",
+	"PATH",
+	"TMPDIR",
+	"TZ",
+	"LANG",
+	"SSH_AUTH_SOCK",
+	"__CF_USER_TEXT_ENCODING",
 ]);
-const PARENT_SESSION_PREFIXES = [
-	"EUMENES_",
-	"CLAUDE_CODE_MESSAGING_",
-	"CLAUDE_CODE_SESSION_",
-];
-const inherited = (key: string) =>
-	!SERVER_ONLY.has(key) &&
-	!PARENT_SESSION.has(key) &&
-	!PARENT_SESSION_PREFIXES.some((prefix) => key.startsWith(prefix));
+const inherited = (key: string) => SESSION.has(key) || key.startsWith("LC_");
 
 /**
- * The server's environment without Eumenes' own secrets (API token, keys, database), the
- * server's color settings, and the markers of a Claude Code session that launched the server.
+ * Only the login session passes from the server's environment. Everything else stays in the
+ * server: LARM tokens, cloud keys and `EUMENES_*` settings (including what Bun loaded from
+ * `.env`), color settings, and the markers of a Claude Code session that launched the server.
+ * A tool started in the PTY reads its own configuration (e.g. `~/.claude/settings.json`).
  */
 export function childEnv(
 	env: Record<string, string | undefined>,
@@ -40,15 +36,18 @@ export function childEnv(
 	};
 }
 
-/** Spawns through Bun's PTY support (POSIX only). The child sees a real xterm-256color terminal. */
+/**
+ * Spawns through Bun's PTY support (POSIX only). The child sees a real xterm-256color terminal.
+ * `overrides` are set on top of the login session (e.g. a pager for captured output).
+ */
 export function bunSpawnPty(
 	cwd: string | undefined,
-	env: Record<string, string | undefined> = process.env,
+	overrides: Readonly<Record<string, string>> = {},
 ): SpawnPty {
 	return ({ command, size, cwd: requested, onData }) => {
 		const proc = Bun.spawn([...command], {
 			cwd: requested ?? cwd,
-			env: childEnv(env),
+			env: { ...childEnv(process.env), ...overrides },
 			terminal: {
 				cols: size.cols,
 				rows: size.rows,

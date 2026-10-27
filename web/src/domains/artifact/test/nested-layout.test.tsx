@@ -66,19 +66,19 @@ test("a titled nested layout shows its title as the section heading", () => {
 	expect(screen.getByRole("heading", { name: "特徴" })).toBeTruthy();
 });
 
-test("depth is limited to four including the root, and one definition holds at most 60 views", () => {
-	expect(() => parseDefinition(JSON.stringify(nest(3)))).not.toThrow();
-	expect(() => parseDefinition(JSON.stringify(nest(4)))).toThrow();
-	// 5 layouts of 12 text blocks plus the root: 1 + 5 * 13 = 66 views.
+test("depth is limited to six including the root, and one definition holds at most 240 views", () => {
+	expect(() => parseDefinition(JSON.stringify(nest(5)))).not.toThrow();
+	expect(() => parseDefinition(JSON.stringify(nest(6)))).toThrow();
+	// 5 layouts of 48 text blocks plus the root: 1 + 5 * 49 = 246 views.
 	const wide = layout(
 		Array.from({ length: 5 }, () =>
-			layout(Array.from({ length: 12 }, (_, i) => text(`t${i}`))),
+			layout(Array.from({ length: 48 }, (_, i) => text(`t${i}`))),
 		),
 	);
 	expect(() => parseDefinition(JSON.stringify(wide))).toThrow();
 	const ok = layout(
 		Array.from({ length: 4 }, () =>
-			layout(Array.from({ length: 12 }, (_, i) => text(`t${i}`))),
+			layout(Array.from({ length: 48 }, (_, i) => text(`t${i}`))),
 		),
 	);
 	expect(() => parseDefinition(JSON.stringify(ok))).not.toThrow();

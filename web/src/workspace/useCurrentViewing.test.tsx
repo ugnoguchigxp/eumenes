@@ -84,15 +84,23 @@ test("an OpenUI tab that is not a screen of resources names nothing", () => {
 test("the specialist's saved work still wins the message's viewing, then the recognition still", () => {
 	const saved = { artifactRevisionId: "artifact:timer@1", targetRef: "t1" };
 	const specialist = vi.fn(() => saved);
-	const view = renderHook(() =>
-		useCurrentViewing(specialist, toolchainTab("artifact:other@1")),
+	const wrapper = ({ children }: PropsWithChildren) => (
+		<QueryClientProvider client={new QueryClient()}>
+			{children}
+		</QueryClientProvider>
+	);
+	const view = renderHook(
+		() => useCurrentViewing(specialist, toolchainTab("artifact:other@1")),
+		{ wrapper },
 	);
 	expect(view.result.current()).toEqual(saved);
-	const none = renderHook(() =>
-		useCurrentViewing(() => undefined, {
-			...toolchainTab("artifact:object-recognition.workspace@1"),
-			targetRef: "still-1",
-		}),
+	const none = renderHook(
+		() =>
+			useCurrentViewing(() => undefined, {
+				...toolchainTab("artifact:object-recognition.workspace@1"),
+				targetRef: "still-1",
+			}),
+		{ wrapper },
 	);
 	expect(none.result.current()).toEqual({
 		artifactRevisionId: "artifact:object-recognition.workspace@1",

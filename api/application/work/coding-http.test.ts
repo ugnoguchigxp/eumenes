@@ -3,6 +3,7 @@ import { createContinuityService } from "../../domains/continuity";
 import { expect, test } from "bun:test";
 import { join } from "node:path";
 import { createApp } from "../app";
+import { appModules } from "../app-modules";
 import { createClient } from "../../../client";
 import { createCoding } from "../../domains/coding";
 import { migrations } from "../migrations";
@@ -57,13 +58,15 @@ test("coding HTTP/client authenticate reads, validate cursors and hide private e
 	const app = createApp({
 		token,
 		origin: "http://127.0.0.1:5173",
-		coding,
-		queue,
-		scheduler,
-		conversation,
-		dialogue,
-		voice,
-		larm,
+		modules: appModules({
+			coding,
+			queue,
+			scheduler,
+			conversation,
+			dialogue,
+			voice,
+			larm,
+		}),
 	});
 	const server = Bun.serve({
 		hostname: "127.0.0.1",

@@ -104,7 +104,7 @@ for (const children of [
 		},
 	],
 	[{ view: "layout", children: [] }],
-	Array.from({ length: 13 }, () => ({ view: "playlist", source: "m" })),
+	Array.from({ length: 49 }, () => ({ view: "playlist", source: "m" })),
 ])
 	test("composition rejects invalid nested source, arbitrary props and unbounded layouts", () => {
 		expect(() =>

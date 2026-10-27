@@ -5,7 +5,10 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { LlmFetchError } from "llm-fetch";
-import { registerExternalDependents } from "eumenes-memory/sqlite";
+import {
+	checkHostMigrations,
+	registerExternalDependents,
+} from "eumenes-memory/sqlite";
 import { openStore } from "../../../infrastructure/sqlite";
 import { configureLogging } from "../../../infrastructure/logger";
 import { createQueue, migration as queueMigration } from "../../queue";
@@ -18,6 +21,7 @@ import {
 	type AcquisitionPort,
 } from "..";
 import { createWebAcquisition, freshnessDeadline } from "../adapters/llm-fetch";
+import { cacheMigrations } from "../service/cache";
 import {
 	submitResearchSchema,
 	type ResearchRequest,
@@ -121,6 +125,27 @@ async function until(
 		return condition();
 	});
 }
+
+test("the cache database names its migrations and appends the memory package after its own", async () => {
+	expect(checkHostMigrations(cacheMigrations.map((m) => m.sql))).toEqual([]);
+	expect(cacheMigrations[0]!.id).toBe("web-research-cache/0001-entries");
+	const dir = mkdtempSync(join(tmpdir(), "web-cache-"));
+	const store = openWebCache(join(dir, "cache.db"));
+	cleanup.push(async () => {
+		await store.close();
+		rmSync(dir, { recursive: true, force: true });
+	});
+	const applied = store.read((db) =>
+		db
+			.query<{ id: string }, []>(
+				"SELECT id FROM schema_migrations_v2 ORDER BY rowid",
+			)
+			.all()
+			.map((row) => row.id),
+	);
+	expect(applied).toEqual(cacheMigrations.map((m) => m.id));
+	expect(applied.some((id) => id.startsWith("adhoc/"))).toBe(false);
+});
 
 test("API idempotency, validation, run polling and cancellation are backed by Queue", async () => {
 	const { service, queue } = setup();

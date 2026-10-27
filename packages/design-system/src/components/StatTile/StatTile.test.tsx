@@ -20,10 +20,7 @@ it.each([
 		<StatTile label="前月比" value="1" trend={trend} />,
 	);
 	expect(screen.getByText(text)).toBeInTheDocument();
-	expect(container.querySelector("svg")).toHaveAttribute(
-		"aria-hidden",
-		"true",
-	);
+	expect(container.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
 });
 
 it("renders the dash as is and no trend mark without a trend", () => {

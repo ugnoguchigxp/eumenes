@@ -459,7 +459,7 @@ export const domains = {
 		web: "web/src/domains/voice-dialogue",
 		components: null,
 		depends: {
-			api: ["delivery", "dialogue", "inference", "settings"],
+			api: ["delivery", "dialogue", "inference"],
 			web: ["audio", "avatar", "dialogue", "settings"],
 			test: [],
 		},

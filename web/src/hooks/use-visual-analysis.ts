@@ -5,7 +5,7 @@ import type { AnalysisDomain } from "../../../client/visual-analysis";
 import {
 	perceptionOptions,
 	type AnalysisRecord,
-} from "../../../api/domains/larm/contracts/visual-perception";
+} from "../../../api/domains/larm/contracts";
 import type { ArtifactEvent, Receipt } from "@eumenes/artifact-ui/contracts";
 
 export function useVisualAnalysis(

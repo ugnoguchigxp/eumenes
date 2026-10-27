@@ -423,3 +423,32 @@ test("a resource link does not navigate even when nothing handles it", () => {
 		false,
 	);
 });
+test("a streamed token does not redraw the settled rows", () => {
+	const conversation = convo(
+		["user", "user", "質問"],
+		["answer", "assistant", "回答"],
+	);
+	const inside = vi.fn(() => null);
+	const following = vi.fn(() => null);
+	const view = render(
+		<MessageList
+			conversation={conversation}
+			streaming="あ"
+			renderInsideMessage={inside}
+			renderFollowingMessage={following}
+		/>,
+	);
+	expect(inside).toHaveBeenCalledTimes(2);
+	expect(following).toHaveBeenCalledTimes(2);
+	view.rerender(
+		<MessageList
+			conversation={conversation}
+			streaming="あい"
+			renderInsideMessage={inside}
+			renderFollowingMessage={following}
+		/>,
+	);
+	expect(screen.getByText("あい")).toBeTruthy();
+	expect(inside).toHaveBeenCalledTimes(2);
+	expect(following).toHaveBeenCalledTimes(2);
+});

@@ -19,6 +19,7 @@ import { createSettings } from "../../domains/settings";
 import { createVoiceDialogue } from "../../domains/voice-dialogue";
 import { openStore } from "../../infrastructure/sqlite";
 import { createApp } from "../app";
+import { appModules } from "../app-modules";
 import { createChanges } from "../events";
 import { migrations } from "../migrations";
 import {
@@ -262,17 +263,19 @@ export async function worldHarness(options: WorldFixtureOptions = {}) {
 	const app = createApp({
 		token: WORLD_FIXTURE_TOKEN,
 		origin: process.env.EUMENES_ORIGIN ?? "http://localhost",
-		changes,
-		settings,
-		conversation,
-		dialogue,
-		voice: createVoiceDialogue(store, dialogue, inference),
-		larm: inference,
-		queue,
-		scheduler: createScheduler(store, queue),
-		inference,
-		memory,
-		worldClaims: { claims: world.claims, context: world.claimsContext },
+		modules: appModules({
+			changes,
+			settings,
+			conversation,
+			dialogue,
+			voice: createVoiceDialogue(store, dialogue, inference),
+			larm: inference,
+			queue,
+			scheduler: createScheduler(store, queue),
+			inference,
+			memory,
+			worldClaims: { claims: world.claims, context: world.claimsContext },
+		}),
 	});
 	queue.start();
 	world.start();

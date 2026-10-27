@@ -23,8 +23,24 @@ describe("Diagram", () => {
 
 	it("shape の rect と ellipse を描き、ラベルを中央に置く", () => {
 		const { container } = renderDiagram([
-			{ type: "shape", shape: "rect", x: 10, y: 10, w: 20, h: 10, label: "機体" },
-			{ type: "shape", shape: "ellipse", x: 40, y: 10, w: 20, h: 10, filled: true },
+			{
+				type: "shape",
+				shape: "rect",
+				x: 10,
+				y: 10,
+				w: 20,
+				h: 10,
+				label: "機体",
+			},
+			{
+				type: "shape",
+				shape: "ellipse",
+				x: 40,
+				y: 10,
+				w: 20,
+				h: 10,
+				filled: true,
+			},
 		]);
 		const rect = container.querySelector("rect");
 		expect(rect?.getAttribute("width")).toBe("20");
@@ -51,9 +67,9 @@ describe("Diagram", () => {
 				origin: [5, 5],
 			},
 		]);
-		expect(container.querySelector("g[transform]")?.getAttribute("transform")).toBe(
-			"rotate(-30 10 5)",
-		);
+		expect(
+			container.querySelector("g[transform]")?.getAttribute("transform"),
+		).toBe("rotate(-30 10 5)");
 		expect(container.querySelector("polygon")?.getAttribute("transform")).toBe(
 			"rotate(-45 5 5)",
 		);
@@ -115,7 +131,13 @@ describe("Diagram", () => {
 	});
 
 	it("矢じりの id は図ごとに衝突しない", () => {
-		const arrow: DiagramElement = { type: "arrow", x1: 0, y1: 0, x2: 10, y2: 0 };
+		const arrow: DiagramElement = {
+			type: "arrow",
+			x1: 0,
+			y1: 0,
+			x2: 10,
+			y2: 0,
+		};
 		const { container } = render(
 			<>
 				<Diagram elements={[arrow]} />
@@ -197,7 +219,14 @@ describe("Diagram", () => {
 	it("非有限の数値を持つ要素は描かず、ほかの要素は描く", () => {
 		const { container } = renderDiagram([
 			{ type: "arrow", x1: 0, y1: 0, x2: Number.NaN, y2: 0 },
-			{ type: "shape", shape: "rect", x: 0, y: 0, w: Number.POSITIVE_INFINITY, h: 5 },
+			{
+				type: "shape",
+				shape: "rect",
+				x: 0,
+				y: 0,
+				w: Number.POSITIVE_INFINITY,
+				h: 5,
+			},
 			{
 				type: "polygon",
 				points: [
@@ -210,7 +239,9 @@ describe("Diagram", () => {
 			{ type: "label", x: Number.NaN, y: 1, text: "ずれ" },
 			{ type: "label", x: 1, y: 1, text: "残る" },
 		]);
-		expect(container.querySelectorAll("[data-diagram-element]")).toHaveLength(1);
+		expect(container.querySelectorAll("[data-diagram-element]")).toHaveLength(
+			1,
+		);
 		expect(screen.getByText("残る")).toBeInTheDocument();
 		expect(screen.queryByText("ずれ")).not.toBeInTheDocument();
 		expect(container.querySelector("marker")).toBeNull();

@@ -1,6 +1,7 @@
 import { afterEach, expect, test, vi } from "vitest";
 import { createAudioController } from "..";
 import { createSpeechClassifier } from "../controller/speech-classifier";
+import { post, stubWorkletNode, workletModule } from "./worklet-fake";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -8,12 +9,10 @@ afterEach(() => vi.unstubAllGlobals());
 const tone = (i: number, value: number) =>
 	Math.floor(i / 8) % 2 ? value : -value;
 
-function recorder(sampleRate = 16000, useWorklet = false) {
-	let receive:
-		| ((event: { inputBuffer: { getChannelData: () => Float32Array } }) => void)
-		| null = null;
-	const stop = vi.fn();
+function recorder(sampleRate = 16000) {
 	const resume = vi.fn(async () => {});
+	const stop = vi.fn();
+	const nodes = stubWorkletNode();
 	vi.stubGlobal("navigator", {
 		mediaDevices: {
 			getUserMedia: async () => ({ getTracks: () => [{ stop }] }),
@@ -21,59 +20,33 @@ function recorder(sampleRate = 16000, useWorklet = false) {
 	});
 	class Context {
 		sampleRate = sampleRate;
-		audioWorklet = useWorklet ? { addModule: async () => {} } : undefined;
+		audioWorklet = workletModule;
 		destination = {};
 		resume = resume;
 		async close() {}
 		createMediaStreamSource() {
 			return { connect() {}, disconnect() {} };
 		}
-		createScriptProcessor() {
-			return {
-				set onaudioprocess(value: typeof receive) {
-					receive = value;
-				},
-				connect() {},
-				disconnect() {},
-			};
-		}
-	}
-	let port: { onmessage: ((event: { data: Float32Array }) => void) | null };
-	if (useWorklet) {
-		vi.stubGlobal(
-			"AudioWorkletNode",
-			class {
-				port = (port = { onmessage: null });
-				connect() {}
-				disconnect() {}
-			},
-		);
 	}
 	vi.stubGlobal("AudioContext", Context);
 	return {
 		stop,
 		resume,
 		tail() {
-			port.onmessage?.({
-				data: Float32Array.from({ length: 128 }, (_, i) => tone(i, 0.02)),
-			});
+			post(
+				nodes.at(-1),
+				Float32Array.from({ length: 128 }, (_, i) => tone(i, 0.02)),
+			);
 		},
+		/** `count` tenths of a second, delivered in the worklet's 128-sample blocks. */
 		feed(voiced: boolean, count: number) {
-			for (let frame = 0; frame < count; frame++) {
-				const samples = Float32Array.from(
-					{ length: sampleRate / 10 },
-					(_, i) => (voiced ? tone(i, 0.02) : 0),
+			for (let block = 0; block < (count * sampleRate) / 1280; block++)
+				post(
+					nodes.at(-1),
+					Float32Array.from({ length: 128 }, (_, i) =>
+						voiced ? tone(i, 0.02) : 0,
+					),
 				);
-				if (useWorklet) {
-					port.onmessage?.({ data: samples });
-					continue;
-				}
-				receive?.({
-					inputBuffer: {
-						getChannelData: () => samples,
-					},
-				});
-			}
 		},
 	};
 }
@@ -91,13 +64,13 @@ test("capture stays preparing until its first frame, including after resume", as
 		expect(state.mock.lastCall?.[0].inputPhase).toBe("starting");
 		await starting;
 		expect(state.mock.lastCall?.[0].inputPhase).toBe("starting");
-		mic.feed(false, 1);
+		mic.feed(false, 2);
 		expect(state.mock.lastCall?.[0].inputPhase).toBe("ready");
 		audio.pauseInput();
 		expect(state.mock.lastCall?.[0].inputPhase).toBe("idle");
 		await audio.start();
 		expect(state.mock.lastCall?.[0].inputPhase).toBe("starting");
-		mic.feed(false, 1);
+		mic.feed(false, 2);
 		expect(state.mock.lastCall?.[0].inputPhase).toBe("ready");
 	} finally {
 		await audio.stop();
@@ -178,7 +151,7 @@ test("a continuous 12-second question stays intact until its final silence", asy
 });
 
 test("worklet capture retains a long question and downsamples its complete audio", async () => {
-	const mic = recorder(48000, true),
+	const mic = recorder(48000),
 		segment = vi.fn();
 	const audio = createAudioController(
 		() => {},
@@ -196,7 +169,8 @@ test("worklet capture retains a long question and downsamples its complete audio
 			(segment.mock.calls[0]![0] as Uint8Array).buffer,
 		);
 		expect(header.getUint32(24, true)).toBe(16000);
-		expect(header.getUint32(40, true)).toBe(128 * 1600 * 2);
+		// 12 s of speech plus the silence up to the 2048-sample frame that ends the question.
+		expect(header.getUint32(40, true)).toBe(406868);
 	} finally {
 		await audio.stop();
 	}
@@ -246,7 +220,7 @@ test("pausing from the final segment callback cannot resend the same recording",
 });
 
 test("manual microphone pause retains the worklet's incomplete final frame", async () => {
-	const mic = recorder(48000, true),
+	const mic = recorder(48000),
 		segment = vi.fn();
 	const audio = createAudioController(
 		() => {},
@@ -284,7 +258,8 @@ test("the default silence interval keeps a one-second pause inside a single ques
 		mic.feed(false, 10);
 		expect(segment).not.toHaveBeenCalled();
 		mic.feed(true, 10);
-		// Silence is decided per 32 ms window, so 1.5 s completes within the 16th frame.
+		// Silence is decided per 32 ms window inside 2048-sample frames, so 1.5 s completes after
+		// 1.5 s plus at most one frame.
 		mic.feed(false, 15);
 		expect(segment).not.toHaveBeenCalled();
 		mic.feed(false, 1);
@@ -294,7 +269,7 @@ test("the default silence interval keeps a one-second pause inside a single ques
 				40,
 				true,
 			),
-		).toBe(46 * 1600 * 2);
+		).toBe(147456);
 	} finally {
 		await audio.stop();
 	}
@@ -411,10 +386,10 @@ test("previews start 1.8 s after confirmation, never for a short reply or in the
 		expect(segment).toHaveBeenCalledTimes(1);
 		expect(partial).not.toHaveBeenCalled();
 		// A long question (confirmed 0.2 s in): one preview once 1.8 s have passed since then.
-		mic.feed(true, 22);
+		mic.feed(true, 24);
 		expect(partial).toHaveBeenCalledTimes(1);
 		const during = partial.mock.calls.length;
-		mic.feed(false, 16);
+		mic.feed(false, 18);
 		expect(partial).toHaveBeenCalledTimes(during);
 		expect(segment).toHaveBeenCalledTimes(2);
 	} finally {

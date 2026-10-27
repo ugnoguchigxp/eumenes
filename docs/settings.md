@@ -30,7 +30,7 @@ World画面は最初に「資料」を開き、取り込んだ原資料を総件
 
 「表示」の「会話の背景」では、光の妖精とSpatialを選び、「設定の変更をすべて保存」で保存できます。Spatialは表示中、1分ごとに `GET /api/monitoring/snapshot` を読み、Eumenes側の実測（CPU・Memory・SSD、Eumenes Backend、LLM・ASR・TTS・Embedding・態度判定・画像生成・楽曲生成）を表示します（[設計](../spec/spatial-monitoring-eumenes-design-2026-10-18.md)）。LARMホストの計測は後続です。モデルの組込みは [背景とSpatial](backgrounds.md) を参照してください。
 
-設定アーティファクトの「AIと接続」で、用途ごとの接続先とクラウド代替先を変更できます。LARMを優先し、接続不能・混雑・時間切れの場合は用途ごとに登録したクラウドへ自動で切り替えます。クラウドの送信許可と自動切替は初期値で有効ですが、代替先が未登録ならクラウドには送信しません。認証エラーや契約不一致、取消では自動切替しません。
+設定アーティファクトの「AIと接続」で、用途ごとの接続先とクラウド代替先を変更できます。LARMを優先し、接続不能・混雑・時間切れの場合は用途ごとに登録したクラウドへ自動で切り替えます。クラウドの送信許可と自動切替は初期値で有効ですが、代替先が未登録ならクラウドには送信しません。認証エラーや契約不一致、取消では自動切替しません。会話の返答を作るLLMの推論は、この切替先の設定にかかわらずLARMだけを使い、クラウドへ切り替えません（2026-10-25の決定。`api/domains/dialogue/service/generation-prepare.ts`）。
 
 クラウドはOpenAI互換のChat Completions、multipart音声認識、WAV音声合成に対応します。ベースURLは、ループバック・プライベートLAN（10/172.16-31/192.168）・`.local`・リンクローカル以外では `https` が必要です。環境変数名で指定できるのは `EUMENES_CLOUD_` で始まる名前、主要プロバイダの標準キー名（`OPENAI_API_KEY`、`ANTHROPIC_API_KEY`、`GEMINI_API_KEY`、`GOOGLE_API_KEY`、`AZURE_OPENAI_API_KEY`、`GROQ_API_KEY`、`MISTRAL_API_KEY`、`DEEPSEEK_API_KEY`）、およびbackendの `EUMENES_ENV_REF_ALLOWLIST`（カンマ区切り）に載せた名前だけです。それ以外を指す既存設定は保存したままですが、利用時に `env_ref_not_allowed` で失敗します。接続名、ベースURL、モデルとAPIキーまたは環境変数名を登録し、用途に割り当てて「設定の変更をすべて保存」を押します。一つの接続に複数の用途のモデルを追加できます。接続確認と少量の生成テストは保存済み設定を使い、サービスの利用が発生します。
 

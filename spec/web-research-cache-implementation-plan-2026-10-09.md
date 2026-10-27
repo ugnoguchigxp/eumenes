@@ -403,3 +403,11 @@ P1の天気・株価専用API、ニュース/RSS・記事再検証、会話の�
 第15・16章の未実装欄は当時の記録として残す。今回、会話からの能力選択、プロフィールとSKILLを持つ調査担当の起動、Web取得、根拠付き要約、会話への回答採用、出典cardを接続した。子はメインへ本文を転送しない。専用の公開JSON読取りを天気・明示tickerの株価に追加し、既存Web domainのguard・Queue・結果契約を通す。
 
 Luna専用Providerを新規接続したものではなく、既存のLARM LLMを制御modeで使う。通常会話の最終回答には従来のinference経路を使う。取得結果の原文は短期メモリー、検査済み要約はagent-runtimeに14日保持する。M1/M2の調査メモ、派生資料選択、RecordsのRecall自動提供は今回も未実装。詳細と試験結果は[Toolchain実装記録](verification/toolchain/README.md)を参照する。
+
+## 18 cache DB の migration 命名（2026-10-27）
+
+利用者の依頼で修正した。cache DB の migration は文字列の位置（`adhoc/0001`〜`adhoc/0009`）で識別され、Web キャッシュの表をメモリーパッケージの5本目と6本目の間に差し込んでいた。パッケージの契約（ホストの migration の後ろへ本体の migration を順に追記する）と、本番コードは名前付き migration だけを渡すという `openStore` の規則に合っていなかった。
+
+- `web-research-cache/0001-entries` を先頭に置き、その後ろへ `memory-package/0001`〜を `after` 付きで順に追記する（`cacheMigrations`）。パッケージに migration が増えても末尾に足すだけになる。
+- 識別子が変わるため、既存の `cache/web-research.sqlite3` は開けない。第8章の扱い（cache DB を失っても主DBの会話・正式保存資料を失わない）に従い、新しい `cache/web-research-v2.sqlite3` を作り直す。旧ファイルは読まない。削除は利用者が行う。
+- 本文をメモリーパッケージの Records（retention v1）に保存する方式は変えない。

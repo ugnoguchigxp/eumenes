@@ -88,13 +88,18 @@ export function ErrorReportButton({
 	const [report, setReport] = useState<Report>({ state: "loading" });
 	const [copied, setCopied] = useState<"done" | "failed" | null>(null);
 	const loader = useRef(load);
-	loader.current = load;
+	useEffect(() => {
+		loader.current = load;
+	});
 	useEffect(() => {
 		if (!open) return;
 		const controller = new AbortController();
 		loader
 			.current(controller.signal)
-			.then((value) => setReport({ state: "ready", text: value.text }))
+			.then((value) => {
+				if (!controller.signal.aborted)
+					setReport({ state: "ready", text: value.text });
+			})
 			.catch(() => {
 				if (!controller.signal.aborted) setReport({ state: "error" });
 			});

@@ -149,13 +149,11 @@ try {
 		});
 	});
 	await page.goto("http://127.0.0.1:19400/");
-	await page
-		.locator('input[type="file"]')
-		.setInputFiles({
-			name: "notice.png",
-			mimeType: "image/png",
-			buffer: image,
-		});
+	await page.locator('input[type="file"]').setInputFiles({
+		name: "notice.png",
+		mimeType: "image/png",
+		buffer: image,
+	});
 	await expect(
 		page
 			.getByRole("region", { name: "QRコード" })

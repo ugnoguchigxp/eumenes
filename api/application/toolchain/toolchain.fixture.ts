@@ -5,20 +5,18 @@ import { createPipelinesService } from "../pipelines/pipelines-service";
 import { dormantBundleFile } from "../../domains/capabilities";
 import { bundleHostOf } from "./toolchain-adapters";
 import { computeAnnouncements } from "../compute/compute-composition";
-import { createCompute, type ComputePort } from "../../domains/compute";
+import { createCompute } from "../../domains/compute";
 import { fixtureDiscovery } from "./discovery.fixture";
 import { createOcr } from "../../domains/ocr";
 import {
 	createExcalidraw,
 	registerDrawingOperations,
 } from "../../domains/excalidraw";
-import type { DrawingConnection } from "../../domains/excalidraw";
 import { createObjectRecognition } from "../../domains/object-recognition";
 import { CONVERSATION_DEFAULT_PRINCIPAL } from "../../domains/conversation/contracts";
 import { createImage } from "../../domains/image";
 import { createUiCompositions } from "../../domains/ui-compositions";
 import { createMusic } from "../../domains/music";
-import type { LarmPlayground } from "../../domains/larm";
 import {
 	fixtureResearchOutput,
 	fixtureVerification,
@@ -46,6 +44,7 @@ import {
 import { createDialogueService } from "../../domains/dialogue";
 import { testConversationAgent } from "../../domains/dialogue/test/conversation-agent.fixture";
 import { createVoiceDialogue } from "../../domains/voice-dialogue";
+import type { HarnessOptions } from "./toolchain-harness-options.fixture";
 import { createToolchain } from "./toolchain";
 import { createToolchainHostLinks } from "./toolchain-host";
 import { createTimers } from "../../domains/timers";
@@ -56,6 +55,7 @@ import { taskMediaPorts } from "./task-media-execution";
 import { taskLegacyPorts } from "./task-legacy-execution";
 import { createTimerAnnouncements } from "../timers/timer-announcements";
 import { createApp } from "../app";
+import { appModules } from "../app-modules";
 import type { LarmPort } from "../../domains/larm";
 import {
 	afterUtterance,
@@ -93,122 +93,7 @@ export const forbidden =
 const weather =
 	"東京の天気は晴れ、最高気温26度、最低気温17度、降水確率0％の予報です。";
 const stock = "AAPLの株価は250.12 USD、2026-10-08終値です。";
-export async function harness(
-	options: {
-		everyday?: boolean;
-		/** Task pipelines run on the parent execution, without the suspended task bundle. */
-		pipelines?: boolean;
-		/** A pipeline's extract step: the value the model gives for the step's text. */
-		extract?: (
-			messages: import("../../domains/inference/contracts").Messages,
-		) => unknown;
-		computePort?: ComputePort;
-		dots?: boolean;
-		discoveryTarget?: (query: string) => string;
-		acquisition?: AcquisitionPort;
-		taskStep?: (
-			tools: import("../../infrastructure/chat-stream").NativeTool[],
-			messages: import("../../domains/inference/contracts").Messages,
-		) => { name: string; arguments: Record<string, unknown> };
-		/** The completion check of a delegated result; without it every request is achieved by its first step. */
-		completion?: (
-			tools: import("../../infrastructure/chat-stream").NativeTool[],
-			messages: import("../../domains/inference/contracts").Messages,
-		) => { name: string; arguments: Record<string, unknown> };
-		model?: LarmPort;
-		embed?: import("./toolchain-vectors").Embed;
-		musicGateway?: () => LarmPlayground;
-		imageGateway?: () => LarmPlayground;
-		uiCompositions?: boolean;
-		routeTool?: string;
-		docling?: import("../../domains/docling").DoclingService;
-		browser?: (
-			store: import("../../infrastructure/sqlite").SqliteStore,
-			queue: import("../../domains/queue").QueueService,
-			capabilities: () => import("../../domains/capabilities").Capabilities,
-		) => Pick<
-			import("../browser/browser-composition").BrowserAssembly,
-			"service" | "effects" | "requests"
-		>;
-		review?: (
-			input: import("llm-fetch").GuardReviewInput,
-		) => Promise<import("llm-fetch").GuardReviewDecision>;
-		command?: (
-			messages: import("../../domains/inference/contracts").Messages,
-		) => string;
-		drawingConnection?: () => DrawingConnection;
-		drawingFetch?: typeof fetch;
-		drawingIdleMs?: number;
-		recognitionFetcher?: typeof fetch;
-		ocrFetcher?: typeof fetch;
-		visual?: () => import("../../domains/larm").PerceptionPort;
-		/** PTY sessions for the Claude Code toolchain (a fake spawn in tests), over the harness store. */
-		shell?: (
-			store: import("../../infrastructure/sqlite").SqliteStore,
-		) => import("../../domains/shell").ShellService;
-		terminals?: (
-			store: import("../../infrastructure/sqlite").SqliteStore,
-		) => import("../../domains/terminals").TerminalsService;
-		/** The task board over `terminals` (its runs are handed to those PTYs). */
-		kanban?: boolean;
-		kanbanComposition?: (
-			store: import("../../infrastructure/sqlite").SqliteStore,
-			settings: Awaited<ReturnType<typeof createSettings>>,
-			capabilities: () => import("../../domains/capabilities").Capabilities,
-		) => ReturnType<
-			typeof import("../work/kanban-sdk-host").createKanbanSdkHost
-		>;
-		settingsEnv?: Record<string, string | undefined>;
-		gate?: Promise<void>;
-		/** Holds the operation sub-agent's call (after its context is recorded) until released. */
-		commandGate?: Promise<void>;
-		commandGateQuestion?: string;
-		badJson?: boolean;
-		workerOutput?: string;
-		workerReportOutput?: string;
-		voiceText?: string;
-		parentAnswer?: string;
-		announcement?: string;
-		speechFailure?: boolean;
-		badQuote?: boolean;
-		badQuoteOnce?: boolean;
-		excerptEvidence?: boolean;
-		/** Synthetic replay overrides only; never records live provider content. */
-		control?: (
-			messages: import("../../domains/inference/contracts").Messages,
-		) => string | Promise<string> | undefined;
-		acquire?: AcquisitionPort["execute"];
-		acquisitionTimeoutMs?: number;
-		parent?: (
-			messages: import("../../domains/inference/contracts").Messages,
-		) => string | Promise<string>;
-		history?: boolean;
-		incompleteWeatherFirstRead?: boolean;
-		badToolArgs?: boolean;
-		badExecutionRefOnce?: boolean;
-		clarify?: boolean;
-		timers?: boolean;
-		timerNow?: () => number;
-		/** Model returns a timer command with a forbidden extra field. */
-		timerExtra?: boolean;
-		queueLimits?: { total: number; background: number; scope: number };
-		/** The forecast service the weather toolchain reads (absent: no weather toolchain). */
-		weather?: { fetch: typeof fetch };
-		/** The services the stock toolchain reads (absent: no stock toolchain). */
-		stock?: { fetch: typeof fetch };
-		/**
-		 * The step a user's utterance's model call makes, written by the test from the tools offered and the
-		 * messages so far (see conversation-script.fixture.ts), or undefined to leave the call to the default model.
-		 */
-		firstRound?: (
-			tools: ReadonlyArray<{
-				function: { name: string; parameters?: Record<string, unknown> };
-			}>,
-			question: string,
-			messages: import("../../domains/inference/contracts").Messages,
-		) => Step | undefined;
-	} = {},
-) {
+export async function harness(options: HarnessOptions = {}) {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-toolchain-"));
 	// The terminals request table is registered by the host; added here until it is.
 	const store = openStore(join(dir, "db"), [
@@ -922,33 +807,35 @@ export async function harness(
 	});
 	toolchain.attachPipelines(pipelines);
 	const app = createApp({
-		docling: options.docling,
 		token: "fixture-token-for-toolchain-browser",
 		origin: process.env.EUMENES_ORIGIN ?? "http://localhost",
-		changes,
-		excalidraw,
-		drawingOperations,
-		image,
-		objectRecognition,
-		ocr,
-		compute,
-		music,
-		settings,
-		conversation,
-		dialogue,
-		voice,
-		larm: inference,
-		queue,
-		scheduler,
-		inference,
-		timers,
-		shell,
-		terminals,
-		kanban,
-		toolchainHistory: toolchain.history,
-		toolchainActions: toolchain.actionRequests,
-		...toolchain,
-		pipelines,
+		modules: appModules({
+			docling: options.docling,
+			changes,
+			excalidraw,
+			drawingOperations,
+			image,
+			objectRecognition,
+			ocr,
+			compute,
+			music,
+			settings,
+			conversation,
+			dialogue,
+			voice,
+			larm: inference,
+			queue,
+			scheduler,
+			inference,
+			timers,
+			shell,
+			terminals,
+			kanban,
+			toolchainHistory: toolchain.history,
+			toolchainActions: toolchain.actionRequests,
+			...toolchain,
+			pipelines,
+		}),
 	});
 	toolchain.agents.start();
 	queue.start();

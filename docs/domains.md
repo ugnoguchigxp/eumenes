@@ -10,8 +10,8 @@
 | `docling` | 0 | `api/domains/docling/index.ts` | `web/src/domains/docling/` | `packages/design-system/src/components/ExternalAppLauncher/index.ts` | なし | なし | なし |
 | `google-accounts` | 0 | `api/domains/google-accounts/index.ts` | `web/src/domains/google-accounts/` | `packages/design-system/src/components/GoogleAccounts/index.tsx` | なし | なし | なし |
 | `excalidraw` | 3 | `api/domains/excalidraw/index.ts` | `web/src/domains/excalidraw/` | なし | `capabilities`、`inference`、`larm`、`queue`、`resources`、`tool-runtime` | `resources` | なし |
-| `ocr` | 3 | `api/domains/ocr/index.ts` | `web/src/domains/ocr/` | `packages/design-system/src/components/OcrWorkspace/index.ts` | `capabilities`、`inference`、`queue`、`resources` | `resources` | なし |
-| `object-recognition` | 1 | `api/domains/object-recognition/index.ts` | `web/src/domains/object-recognition/index.ts` | なし | `capabilities`、`queue` | なし | なし |
+| `ocr` | 3 | `api/domains/ocr/index.ts` | `web/src/domains/ocr/` | `packages/design-system/src/components/OcrWorkspace/index.ts` | `capabilities`、`inference`、`queue`、`resources`、`larm` | `resources` | なし |
+| `object-recognition` | 1 | `api/domains/object-recognition/index.ts` | `web/src/domains/object-recognition/index.ts` | なし | `capabilities`、`queue`、`larm` | なし | なし |
 | `compute` | 1 | `api/domains/compute/index.ts` | `web/src/domains/compute/` | `packages/design-system/src/components/ComputeWorkspace/index.tsx` | `queue`、`resources` | `resources` | なし |
 | `model3d` | 1 | `api/domains/model3d/index.ts` | `web/src/domains/model3d/` | `packages/design-system/src/components/Model3dWorkspace/index.ts` | `queue`、`resources` | `resources` | なし |
 | `browser` | 1 | `api/domains/browser/index.ts` | `web/src/domains/browser/` | `packages/design-system/src/components/BrowserWorkspace/index.ts` | `queue`、`resources` | `resources` | なし |
@@ -45,7 +45,6 @@
 | `tts-dictionary` | 0 | `api/domains/tts-dictionary/index.ts` | なし | なし | なし | なし | なし |
 | `conversation` | 2 | `api/domains/conversation/index.ts` | `web/src/domains/conversation/index.ts` | `web/src/components/domains/conversation/index.ts` | `delivery` | `avatar`、`delivery` | なし |
 | `resources` | 0 | `api/domains/resources/index.ts` | `web/src/domains/resources/index.ts` | なし | なし | なし | なし |
-| `screen` | 1 | `api/domains/screen/index.ts` | なし | なし | `resources` | なし | なし |
 | `continuity` | 0 | `api/domains/continuity/index.ts` | なし | なし | なし | なし | なし |
 | `goals` | 0 | `api/domains/goals/index.ts` | なし | なし | なし | なし | なし |
 | `world` | 4 | `api/domains/world/index.ts` | なし | なし | `conversation`、`goals` | なし | `memory` |
@@ -57,7 +56,7 @@
 | `scheduler` | 1 | `api/domains/scheduler/index.ts` | なし | なし | `queue` | なし | なし |
 | `timers` | 2 | `api/domains/timers/index.ts` | `web/src/domains/timers/` | `web/src/components/domains/timers/` | `queue`、`scheduler` | なし | なし |
 | `dialogue` | 5 | `api/domains/dialogue/index.ts` | `web/src/domains/dialogue/index.ts` | なし | `agent-runtime`、`capabilities`、`continuity`、`conversation`、`delivery`、`inference`、`memory`、`queue`、`resources`、`scheduler`、`toolchain-history`、`tool-runtime` | `conversation` | `goals` |
-| `voice-dialogue` | 6 | `api/domains/voice-dialogue/index.ts` | `web/src/domains/voice-dialogue/index.ts` | なし | `delivery`、`dialogue`、`inference`、`settings` | `audio`、`avatar`、`dialogue`、`settings` | なし |
+| `voice-dialogue` | 6 | `api/domains/voice-dialogue/index.ts` | `web/src/domains/voice-dialogue/index.ts` | なし | `delivery`、`dialogue`、`inference` | `audio`、`avatar`、`dialogue`、`settings` | なし |
 <!-- domains:end -->
 
 ## 試験と関連文書

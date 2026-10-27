@@ -16,11 +16,14 @@ export type StepStatus =
 	| "pass"
 	| "fail"
 	| "interrupted";
+/** Findings outside the selection: they do not fail the step but are shown and recorded. */
+export type StepOutcome = { warnings: string[] };
 export type VerificationStep = {
 	name: string;
 	command?: string[];
-	action?: () => void | Promise<void>;
+	action?: () => void | StepOutcome | Promise<void | StepOutcome>;
 };
+const SHOWN_WARNINGS = 10;
 export type VerificationReport = {
 	schemaVersion: 1;
 	runId: string;
@@ -46,6 +49,7 @@ export type VerificationReport = {
 		ms: number;
 		exitCode?: number;
 		error?: string;
+		warnings?: string[];
 	}[];
 	totalMs: number;
 	stopReason?: string;
@@ -200,7 +204,15 @@ export async function executeVerification(
 					if (result.exitCode !== 0)
 						throw new Error(`${step.name} failed (${result.exitCode})`);
 				}
-				if (step.action) await step.action();
+				const outcome = step.action ? await step.action() : undefined;
+				if (outcome?.warnings.length) {
+					result.warnings = outcome.warnings;
+					console.warn(
+						`[verify] ${step.name}: ${outcome.warnings.length} finding(s) outside the selection (not failing; all in report.json)`,
+					);
+					for (const warning of outcome.warnings.slice(0, SHOWN_WARNINGS))
+						console.warn(`  ${warning.split("\n")[0]}`);
+				}
 				if (interrupted) throw new Error(`Interrupted by ${interrupted}`);
 				result.status = "pass";
 			} catch (error) {

@@ -101,7 +101,6 @@ test("the shutdown order is fixed, and a freshly built set of services closes cl
 		"agents",
 		"capabilities",
 		"browser",
-		"screen_expiry",
 		"browser_sweep",
 		"queue",
 		"web_research",

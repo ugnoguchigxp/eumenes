@@ -43,6 +43,7 @@ test("writes decoded output, including frames split across reads, then reports t
 	const connection = createTerminalConnection(client, "s1", {
 		onEnded: ended,
 		onResized: () => {},
+		onInputFailed: () => {},
 	});
 	const chunks: string[] = [];
 	connection.output.subscribe((chunk) =>
@@ -75,6 +76,7 @@ test("sends input in order, one request at a time, coalescing keys typed meanwhi
 	const connection = createTerminalConnection(client, "s1", {
 		onEnded: () => {},
 		onResized: () => {},
+		onInputFailed: () => {},
 	});
 	connection.input("a");
 	connection.input("b");
@@ -95,6 +97,7 @@ test("debounces resizes and remembers the latest size", async () => {
 	const connection = createTerminalConnection(client, "s1", {
 		onEnded: () => {},
 		onResized: resized,
+		onInputFailed: () => {},
 	});
 	connection.resize({ cols: 80, rows: 24 });
 	connection.resize({ cols: 100, rows: 30 });
@@ -122,7 +125,7 @@ test("reopens a dropped stream with a reset while the run lasts", async () => {
 	const connection = createTerminalConnection(
 		{ terminalInput: vi.fn(), resizeTerminal: vi.fn(), terminalOutput },
 		"s1",
-		{ onEnded: ended, onResized: () => {} },
+		{ onEnded: ended, onResized: () => {}, onInputFailed: () => {} },
 	);
 	const chunks: string[] = [];
 	connection.output.subscribe((chunk) =>

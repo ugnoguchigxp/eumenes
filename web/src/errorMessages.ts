@@ -96,6 +96,8 @@ const messages: Record<string, string> = {
 	saved_device_missing:
 		"保存されたマイクが見つからないため、既定のマイクを使用します。",
 	audio_context_lost: "音声出力が停止しました。音声を再開してください。",
+	audio_output_lost: "音声出力の機器が見つかりません。音声を再開してください。",
+	audio_worklet_unavailable: "このブラウザでは録音を開始できません。",
 	voice_detector_unavailable:
 		"音声検出を準備できませんでした。ページを再読み込みしてから音声を再開してください。",
 };
@@ -164,7 +166,7 @@ export function describeError(e: unknown): string {
 }
 
 export const describeTurnStatus = (status: string) =>
-	turnStatuses[status] ?? status;
+	turnStatuses[status] ?? "状態を確認中";
 
 export const describeConnectionState = (state: string) =>
-	connectionStates[state] ?? state;
+	connectionStates[state] ?? "状態を確認中";

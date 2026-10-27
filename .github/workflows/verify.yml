@@ -44,6 +44,5 @@ jobs:
             verification-reports/runs/**/report.json
             verification-reports/runs/**/inventory.json
             verification-reports/runs/**/selection.json
-            verification-reports/runs/**/typecheck-files.json
           retention-days: 7
           if-no-files-found: ignore

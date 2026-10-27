@@ -72,7 +72,7 @@ export const pointsAttribute = (points: readonly Point[]): string =>
 
 /** from から to へ反時計回りに進む角度（0 以上 360 未満）。 */
 export const counterClockwiseSweep = (from: number, to: number): number =>
-	((((to - from) % 360) + 360) % 360);
+	(((to - from) % 360) + 360) % 360;
 
 export type AngleGeometry =
 	| {

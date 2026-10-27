@@ -1,8 +1,8 @@
-import { analysisRecordSchema } from "../api/domains/larm/contracts/visual-perception";
+import { analysisRecordSchema } from "../api/domains/larm/contracts";
 import type {
 	AnalysisCreate,
 	AnalysisRecord,
-} from "../api/domains/larm/contracts/visual-perception";
+} from "../api/domains/larm/contracts";
 import { json, callJson, type Transport } from "./transport";
 export type AnalysisDomain = "ocr" | "object-recognition";
 export function visualAnalysisClient(t: Transport) {

@@ -37,7 +37,10 @@ export function ChoiceGroup({
 		onChange(option);
 		refs.current[next]?.focus();
 	};
-	const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+	const onKeyDown = (
+		event: KeyboardEvent<HTMLButtonElement>,
+		index: number,
+	) => {
 		if (event.key === "ArrowRight" || event.key === "ArrowDown") {
 			event.preventDefault();
 			move(index, 1);

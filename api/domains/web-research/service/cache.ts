@@ -2,14 +2,18 @@ import type { Database } from "bun:sqlite";
 import { createHash } from "node:crypto";
 import { statSync } from "node:fs";
 import {
-	migrations as memoryMigrations,
+	migrations as memoryPackageSql,
 	retainRecord,
 	readRetainedRecord,
 	useRetainedRecord,
 	retainedRecordStats,
 	evictRetainedRecords,
 } from "eumenes-memory/sqlite";
-import { openStore, type SqliteStore } from "../../../infrastructure/sqlite";
+import {
+	openStore,
+	type Migration,
+	type SqliteStore,
+} from "../../../infrastructure/sqlite";
 import {
 	resultSchema,
 	type CacheStatus,
@@ -17,20 +21,28 @@ import {
 	type ResearchResult,
 } from "../contracts";
 
-const migration = `
+const entriesMigration = `
 CREATE TABLE web_cache_state(id INTEGER PRIMARY KEY CHECK(id=1), generation INTEGER NOT NULL);
 INSERT INTO web_cache_state VALUES (1,0);
 CREATE TABLE web_cache_entries(cache_key TEXT PRIMARY KEY, record_id TEXT NOT NULL);
 `;
+const entriesId = "web-research-cache/0001-entries";
+const packageId = (n: number) => `memory-package/${String(n).padStart(4, "0")}`;
+/**
+ * The cache database's migrations: this domain's tables first, then the memory package's
+ * migrations appended in the package's order (its host contract). Every migration is named,
+ * so a later package migration only appends.
+ */
+export const cacheMigrations: readonly Migration[] = [
+	{ id: entriesId, sql: entriesMigration },
+	...memoryPackageSql.map((sql, i) => ({
+		id: packageId(i + 1),
+		sql,
+		after: [i === 0 ? entriesId : packageId(i)],
+	})),
+];
 export function openWebCache(path: string) {
-	// The first five package migrations precede the host block; future ones append.
-	return openStore(
-		path,
-		[...memoryMigrations.slice(0, 5), migration, ...memoryMigrations.slice(5)],
-		{
-			incrementalVacuum: true,
-		},
-	);
+	return openStore(path, cacheMigrations, { incrementalVacuum: true });
 }
 const scope = "web:owner";
 const access = {

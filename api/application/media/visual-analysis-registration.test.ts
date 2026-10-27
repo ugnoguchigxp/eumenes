@@ -4,12 +4,20 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openStore } from "../../infrastructure/sqlite";
 import { migrations } from "../migrations";
-import { createCapabilities } from "../../domains/capabilities";
+import { bundleFiles, createCapabilities } from "../../domains/capabilities";
 import { offlineBundleHost } from "../toolchain/toolchain-adapters";
-import ocrOriginal from "../../domains/capabilities/bundles/ocr.bundle.json";
-import recognitionOriginal from "../../domains/capabilities/bundles/object-recognition-screen.bundle.json";
-import ocrAddition from "../../domains/capabilities/bundles/ocr.visual-analysis.bundle.json";
-import recognitionAddition from "../../domains/capabilities/bundles/object-recognition-screen.visual-analysis.bundle.json";
+type Addition = {
+	artifacts: { actionBindings: { eventAction: string }[] }[];
+	definitions: { id: string }[];
+};
+const bundleRaw = (name: string) =>
+	bundleFiles().find((f) => f.name === `${name}.bundle.json`)!.raw;
+const ocrOriginal = bundleRaw("ocr");
+const recognitionOriginal = bundleRaw("object-recognition-screen");
+const ocrAddition = bundleRaw("ocr.visual-analysis") as Addition;
+const recognitionAddition = bundleRaw(
+	"object-recognition-screen.visual-analysis",
+) as Addition;
 test("existing OCR and recognition artifacts upgrade without replacing published revisions or adding a toolchain identity", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "visual-screen-"));
 	const store = openStore(join(dir, "db"), migrations);

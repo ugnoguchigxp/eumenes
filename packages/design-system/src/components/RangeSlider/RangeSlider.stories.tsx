@@ -10,7 +10,9 @@ const meta: Meta<typeof RangeSlider> = {
 export default meta;
 type Story = StoryObj<typeof RangeSlider>;
 
-function Controlled(args: Omit<RangeSliderProps, "value" | "onChange"> & { initial: number }) {
+function Controlled(
+	args: Omit<RangeSliderProps, "value" | "onChange"> & { initial: number },
+) {
 	const { initial, ...rest } = args;
 	const [value, setValue] = useState(initial);
 	return <RangeSlider {...rest} value={value} onChange={setValue} />;
@@ -32,14 +34,32 @@ export const Formatted: Story = {
 	),
 };
 export const AtMinimum: Story = {
-	render: () => <Controlled label="利回り" initial={0} min={0} max={15} step={0.5} formatValue={(n) => `${n}%`} />,
+	render: () => (
+		<Controlled
+			label="利回り"
+			initial={0}
+			min={0}
+			max={15}
+			step={0.5}
+			formatValue={(n) => `${n}%`}
+		/>
+	),
 };
 export const Disabled: Story = {
-	render: () => <Controlled label="年齢" initial={40} min={20} max={70} disabled />,
+	render: () => (
+		<Controlled label="年齢" initial={40} min={20} max={70} disabled />
+	),
 };
 export const Dark: Story = {
 	render: () => (
-		<div className="ds-theme-dark" style={{ background: "var(--background)", color: "var(--foreground)", padding: "1.5rem" }}>
+		<div
+			className="ds-theme-dark"
+			style={{
+				background: "var(--background)",
+				color: "var(--foreground)",
+				padding: "1.5rem",
+			}}
+		>
 			<Controlled label="年齢" initial={40} min={20} max={70} />
 		</div>
 	),

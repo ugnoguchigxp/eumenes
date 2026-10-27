@@ -25,7 +25,10 @@ export function Faq({ title, items, className }: FaqProps) {
 			{title && <h3 className="ds-faq-title">{title}</h3>}
 			<div className="ds-faq-list">
 				{items.map((item, index) => (
-					<Collapsible key={`${index}-${item.question}`} className="ds-faq-item">
+					<Collapsible
+						key={`${index}-${item.question}`}
+						className="ds-faq-item"
+					>
 						<CollapsibleTrigger className="ds-faq-trigger">
 							<span>{item.question}</span>
 							<ChevronDown className="ds-faq-chevron" aria-hidden="true" />

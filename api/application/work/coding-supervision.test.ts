@@ -23,6 +23,7 @@ import {
 } from "../../domains/coding";
 import { approvalChoices } from "../../domains/coding-supervision/contracts";
 import { createApp } from "../app";
+import { appModules } from "../app-modules";
 import { createClient } from "../../../client";
 import {
 	createConversationService,
@@ -189,15 +190,17 @@ test("HTTP/client authenticate report and supervisor reads and omit private CLI 
 	const app = createApp({
 		token,
 		origin: "http://127.0.0.1:5173",
-		tasks: h.tasks,
-		codingSupervision: h.supervision,
-		taskReports: h.reports,
-		queue: h.queue,
-		scheduler,
-		conversation,
-		dialogue,
-		voice,
-		larm,
+		modules: appModules({
+			tasks: h.tasks,
+			codingSupervision: h.supervision,
+			taskReports: h.reports,
+			queue: h.queue,
+			scheduler,
+			conversation,
+			dialogue,
+			voice,
+			larm,
+		}),
 	});
 	const server = Bun.serve({
 		hostname: "127.0.0.1",

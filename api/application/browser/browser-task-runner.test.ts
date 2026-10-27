@@ -397,6 +397,8 @@ test("readable link URLs keep the exact observed target and never double-decode 
 		"https://example.org/%25E6%2597%25A5",
 		"https://example.org/%E0%A4",
 		"https://example.org/a%20b",
+		"https://example.org/a%01b",
+		"https://example.org/a%7Fb",
 	];
 	const view = observationView({
 		observationRef: crypto.randomUUID(),

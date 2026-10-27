@@ -3,7 +3,6 @@ import {
 	constants,
 	mkdirSync,
 	openSync,
-	rmSync,
 	writeFileSync,
 } from "node:fs";
 import { join, resolve } from "node:path";
@@ -31,6 +30,18 @@ import {
 	testPattern,
 	type TestRunner,
 } from "./verification-selection";
+import {
+	boundaryFindings,
+	contextFindings,
+	formatFindings,
+	lintFindings,
+	partition,
+	sizeBudgetFindings,
+	sqlBoundaryFindings,
+	typecheckFindings,
+	type Finding,
+	type StaticScope,
+} from "./verification-static";
 
 export function verificationPlan(
 	root: string,
@@ -42,13 +53,37 @@ export function verificationPlan(
 		all ? ["--all"] : selected.flatMap((domain) => ["--domain", domain]),
 	);
 	const paths = selectionPaths(selection.selected);
-	const tsFiles = [
-		...new Set(paths.flatMap((path) => sourceFiles(root, path))),
-	].filter((path) => /\.tsx?$/.test(path));
-	const checkPaths = all ? ["."] : paths;
+	const scope: StaticScope = { all, domains: selection.selected, paths };
 	const plan: VerificationStep[] = [];
 	const command = (name: string, args: string[]) =>
 		plan.push({ name, command: [process.execPath, ...args] });
+	/**
+	 * A static check always covers the whole repository. Findings of the selection fail the step;
+	 * the rest are warnings, so parallel work elsewhere does not block this run but stays visible.
+	 */
+	const check = (name: string, run: () => Finding[]) =>
+		plan.push({
+			name,
+			action() {
+				const { failing, outside } = partition(run(), scope);
+				if (failing.length)
+					throw new Error(failing.map((finding) => finding.text).join("\n"));
+				return { warnings: outside.map((finding) => finding.text) };
+			},
+		});
+	/** Runs a tool over the repository; a failure with no recognized finding fails as a whole. */
+	const tool =
+		(args: string[], parse: (output: string, exitCode: number) => Finding[]) =>
+		(): Finding[] => {
+			const result = Bun.spawnSync([process.execPath, ...args], { cwd: root });
+			const output = `${result.stdout.toString()}${result.stderr.toString()}`;
+			const findings = parse(output, result.exitCode);
+			if (result.exitCode === 0 || findings.length) return findings;
+			const tail = output.trim().split("\n").slice(-20).join("\n");
+			return [
+				{ text: `${args.join(" ")} failed (${result.exitCode})\n${tail}` },
+			];
+		};
 	plan.push({
 		name: "inventory",
 		action() {
@@ -59,38 +94,41 @@ export function verificationPlan(
 			);
 		},
 	});
-	plan.push({
-		name: "boundaries",
-		action() {
-			const files = all
-				? [
-						"api",
-						"web/src",
-						"client",
-						"cli",
-						"packages/artifact-ui/src",
-						"packages/coding-runner/src",
-						"packages/coding-runner/test",
-					].flatMap((path) => sourceFiles(root, path))
-				: tsFiles;
-			const errors = checkBoundaries(
-				files.filter((path) => /\.tsx?$/.test(path)),
-			);
-			if (all) errors.push(...unusedDependencies(allSourceFiles()));
-			if (errors.length) throw new Error(errors.join("\n"));
-		},
+	check("boundaries", () => {
+		const files = [
+			"api",
+			"web/src",
+			"client",
+			"cli",
+			"packages/artifact-ui/src",
+			"packages/coding-runner/src",
+			"packages/coding-runner/test",
+		]
+			.flatMap((path) => sourceFiles(root, path))
+			.filter((path) => /\.tsx?$/.test(path));
+		return boundaryFindings([
+			...checkBoundaries(files),
+			...unusedDependencies(allSourceFiles()),
+		]);
 	});
-	command("system-context", ["run", "context:check"]);
-	command("size-budget", [
-		"scripts/size-budget.ts",
-		...(all ? [] : checkPaths),
-	]);
-	if (all) {
-		command("sql-boundaries", ["scripts/sql-boundaries.ts"]);
-		command("domain-docs", ["scripts/domain-docs.ts", "--check"]);
-	}
-	command("format", ["run", "format:check", ...checkPaths]);
-	command("lint", ["run", "lint", ...checkPaths]);
+	check(
+		"system-context",
+		tool(["run", "context:check"], (output) => contextFindings(output, root)),
+	);
+	check("size-budget", tool(["scripts/size-budget.ts"], sizeBudgetFindings));
+	check(
+		"sql-boundaries",
+		tool(["scripts/sql-boundaries.ts"], sqlBoundaryFindings),
+	);
+	// The domain table is generated for the whole repository; it belongs to no domain.
+	check(
+		"domain-docs",
+		tool(["scripts/domain-docs.ts", "--check"], (output, exitCode) =>
+			exitCode === 0 ? [] : [{ text: output.trim(), path: "docs/domains.md" }],
+		),
+	);
+	check("format", tool(["run", "format:check"], formatFindings));
+	check("lint", tool(["run", "lint", "--format", "unix"], lintFindings));
 	// Regular check includes stories/tests; build's tsconfig deliberately excludes them.
 	command("design-system typecheck", [
 		"run",
@@ -114,55 +152,10 @@ export function verificationPlan(
 			);
 		},
 	});
-	if (all) command("typecheck", ["run", "typecheck"]);
-	else {
-		const config = join(directory, "tsconfig.selected.json");
-		plan.push({
-			name: "typecheck configuration",
-			action() {
-				writeFileSync(
-					config,
-					JSON.stringify(
-						{
-							extends: join(root, "tsconfig.json"),
-							include: tsFiles
-								.filter((path) => !path.startsWith("packages/design-system/"))
-								.map((path) => join(root, path)),
-							compilerOptions: { noEmit: true },
-						},
-						null,
-						2,
-					),
-				);
-			},
-		});
-		command("typecheck", ["check", "-p", config]);
-		plan.push({
-			name: "typecheck closure",
-			action() {
-				const list = Bun.spawnSync(
-					[process.execPath, "check", "-p", config, "--listFilesOnly"],
-					{ cwd: root },
-				);
-				if (list.exitCode !== 0)
-					throw new Error(`typecheck file listing failed (${list.exitCode})`);
-				const used = list.stdout
-					.toString()
-					.split("\n")
-					.filter(
-						(file) => file.startsWith(root) && !file.includes("node_modules/"),
-					)
-					.map((file) => file.slice(root.length + 1));
-				writeFileSync(
-					join(directory, "typecheck-files.json"),
-					JSON.stringify(used, null, 2),
-				);
-				console.log(
-					`[verify] TypeScript workspace closure: ${used.length} files`,
-				);
-			},
-		});
-	}
+	check(
+		"typecheck",
+		tool(["check", "--no-pretty", "--all"], typecheckFindings),
+	);
 	const tests = all
 		? sourceFiles(root, "").filter(
 				(path) =>
@@ -271,8 +264,6 @@ if (import.meta.main) {
 		console.error(error);
 		process.exitCode = 1;
 	} finally {
-		if (directory)
-			rmSync(join(directory, "tsconfig.selected.json"), { force: true });
 		flock(fd, 8);
 		closeSync(fd);
 	}

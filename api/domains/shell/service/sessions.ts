@@ -17,11 +17,7 @@ export function createSessions(
 	const spawn = options.spawn ?? bunSpawnPty(options.cwd);
 	const runSpawn =
 		options.spawn ??
-		bunSpawnPty(options.cwd, {
-			...process.env,
-			PAGER: "cat",
-			GIT_PAGER: "cat",
-		});
+		bunSpawnPty(options.cwd, { PAGER: "cat", GIT_PAGER: "cat" });
 	const now = () => (options.now?.() ?? new Date()).toISOString();
 	const find = (id: string) => {
 		const s = entries.get(id);

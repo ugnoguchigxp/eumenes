@@ -162,34 +162,52 @@ describe("verification selection and runner coverage", () => {
 		expect(
 			commands.some(
 				(arg) =>
-					arg.includes("driver.test.ts") || arg.includes("tests/browser/"),
+					arg === "./tests/acceptance/nl/driver.test.ts" ||
+					arg.includes("tests/browser/"),
 			),
 		).toBe(false);
 	});
 });
-test("selected root check consumes DS exports while DS sources use their own check", async () => {
-	const directory = fixture();
-	const report = createReport(root, {
-		all: false,
-		selected: ["ocr", "google-accounts"],
-	});
-	const plan = verificationPlan(root, directory, report);
-	await plan.find((step) => step.name === "typecheck configuration")!.action!();
-	const config = JSON.parse(
-		readFileSync(join(directory, "tsconfig.selected.json"), "utf8"),
-	);
-	expect(config.include.length).toBeGreaterThan(0);
-	expect(
-		config.include.some((path: string) =>
-			path.includes("packages/design-system/"),
-		),
-	).toBe(false);
-	expect(plan.some((step) => step.name === "design-system typecheck")).toBe(
-		true,
-	);
+test("a domain run performs every static check of a full run, over the whole repository", () => {
+	const statics = [
+		"boundaries",
+		"system-context",
+		"size-budget",
+		"sql-boundaries",
+		"domain-docs",
+		"format",
+		"lint",
+		"design-system typecheck",
+		"typecheck",
+	];
+	const names = (all: boolean) =>
+		verificationPlan(
+			root,
+			fixture(),
+			createReport(root, { all, selected: all ? [] : ["ocr"] }),
+		)
+			.map((step) => step.name)
+			.filter((name) => statics.includes(name));
+	expect(names(false)).toEqual(statics);
+	expect(names(false)).toEqual(names(true));
 });
 
 describe("verification evidence and integrity", () => {
+	test("warnings outside the selection pass the step and are recorded", async () => {
+		const dir = fixture();
+		const report = reportFor(dir);
+		const result = await executeVerification(
+			dir,
+			join(dir, "verification-reports"),
+			report,
+			[{ name: "static", action: () => ({ warnings: ["other: finding"] }) }],
+		);
+		expect(result).toBe(0);
+		expect(report.steps[0]).toMatchObject({
+			status: "pass",
+			warnings: ["other: finding"],
+		});
+	});
 	test("failed preparation blocks consumers and preserves earlier reports", async () => {
 		const dir = fixture();
 		const reports = join(dir, "verification-reports");

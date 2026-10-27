@@ -1,3 +1,4 @@
+import { createOutputWatch } from "./output-watch";
 import { createResampler } from "./resample";
 import { createSegmentClock, type SegmentTiming } from "./segment-timing";
 import {
@@ -86,7 +87,7 @@ export const partialInterval = (seconds: number) =>
 
 import recorderWorkletUrl from "../worklet/recorder.worklet.ts?worker&url";
 
-/** Samples per frame handed to the voice detector (same as the old ScriptProcessor size). */
+/** Samples per frame handed to the voice detector. */
 const FRAME_SAMPLES = 2048;
 // 16 kHz PCM stays below the API's 4 MB limit without splitting a question.
 const MAX_RECORDING_SECONDS = 60;
@@ -106,57 +107,44 @@ const release = (load: Promise<SpeechClassifier> | undefined) => {
 type LostReason =
 	| "mic_lost"
 	| "audio_context_lost"
+	| "audio_output_lost"
 	| "voice_detector_unavailable";
 
-/**
- * Captures microphone frames with an AudioWorklet (off the main thread), falling
- * back to the deprecated ScriptProcessorNode where the worklet cannot load.
- */
+/** Captures microphone frames with an AudioWorklet (off the main thread). */
 async function openRecorderNode(
 	ctx: AudioContext,
 	onFrame: (frame: Float32Array) => void,
 	onFailure: () => void,
-): Promise<
-	| { kind: "worklet"; node: AudioWorkletNode; drain: () => void }
-	| { kind: "script"; node: ScriptProcessorNode; drain: () => void }
-> {
-	if (typeof ctx.audioWorklet?.addModule === "function") {
-		try {
-			await ctx.audioWorklet.addModule(recorderWorkletUrl);
-			const node = new AudioWorkletNode(ctx, "eumenes-recorder", {
-				numberOfInputs: 1,
-				numberOfOutputs: 1,
-				channelCount: 1,
-			});
-			let pending: Float32Array[] = [];
-			let pendingSamples = 0;
-			const drain = () => {
-				if (!pendingSamples) return;
-				const frame = new Float32Array(pendingSamples);
-				let offset = 0;
-				for (const part of pending) {
-					frame.set(part, offset);
-					offset += part.length;
-				}
-				pending = [];
-				pendingSamples = 0;
-				onFrame(frame);
-			};
-			node.port.onmessage = (event: MessageEvent<Float32Array>) => {
-				pending.push(event.data);
-				pendingSamples += event.data.length;
-				if (pendingSamples >= FRAME_SAMPLES) drain();
-			};
-			node.onprocessorerror = () => onFailure();
-			return { kind: "worklet", node, drain };
-		} catch {
-			// Fall through to the main-thread processor.
+): Promise<{ node: AudioWorkletNode; drain: () => void }> {
+	if (typeof ctx.audioWorklet?.addModule !== "function")
+		throw new Error("audio_worklet_unavailable");
+	await ctx.audioWorklet.addModule(recorderWorkletUrl);
+	const node = new AudioWorkletNode(ctx, "eumenes-recorder", {
+		numberOfInputs: 1,
+		numberOfOutputs: 1,
+		channelCount: 1,
+	});
+	let pending: Float32Array[] = [];
+	let pendingSamples = 0;
+	const drain = () => {
+		if (!pendingSamples) return;
+		const frame = new Float32Array(pendingSamples);
+		let offset = 0;
+		for (const part of pending) {
+			frame.set(part, offset);
+			offset += part.length;
 		}
-	}
-	const node = ctx.createScriptProcessor(FRAME_SAMPLES, 1, 1);
-	node.onaudioprocess = (event) =>
-		onFrame(new Float32Array(event.inputBuffer.getChannelData(0)));
-	return { kind: "script", node, drain: () => {} };
+		pending = [];
+		pendingSamples = 0;
+		onFrame(frame);
+	};
+	node.port.onmessage = (event: MessageEvent<Float32Array>) => {
+		pending.push(event.data);
+		pendingSamples += event.data.length;
+		if (pendingSamples >= FRAME_SAMPLES) drain();
+	};
+	node.onprocessorerror = () => onFailure();
+	return { node, drain };
 }
 async function openMicrophone(
 	options: NonNullable<Parameters<typeof createAudioController>[3]>,
@@ -219,7 +207,6 @@ export function createAudioController(
 ) {
 	let context: AudioContext | undefined;
 	let stream: MediaStream | undefined;
-	let processor: ScriptProcessorNode | undefined;
 	let worklet: AudioWorkletNode | undefined;
 	let drainRecorder: (() => void) | undefined;
 	let source: MediaStreamAudioSourceNode | undefined;
@@ -258,6 +245,11 @@ export function createAudioController(
 		lostReported = true;
 		options.onLost?.(reason);
 	};
+	const outputWatch = createOutputWatch({
+		outputDevice: options.outputDevice,
+		isCurrent: (ctx) => !disposed && context === ctx,
+		onLost: () => reportLost("audio_output_lost"),
+	});
 	/** Watches for the microphone, device list or AudioContext disappearing. */
 	function watchDevices(ctx: AudioContext, input: MediaStream) {
 		const cleanups: Array<() => void> = [];
@@ -378,14 +370,11 @@ export function createAudioController(
 		inputReady = false;
 		inputEpoch++;
 		releaseWatchers();
-		processor?.disconnect();
-		if (processor) processor.onaudioprocess = null;
 		if (worklet) worklet.port.onmessage = null;
 		worklet?.disconnect();
 		source?.disconnect();
 		stream?.getTracks().forEach((track) => track.stop());
 		stream = undefined;
-		processor = undefined;
 		worklet = undefined;
 		source = undefined;
 		detector = undefined;
@@ -437,6 +426,7 @@ export function createAudioController(
 					context !== startedContext
 				)
 					return;
+				outputWatch.watch(startedContext);
 				if (!keepAliveSource) startKeepAlive(startedContext);
 				const loading = (classifier ??= createSpeechClassifier());
 				// A failed load is not kept: the next start tries again.
@@ -560,17 +550,13 @@ export function createAudioController(
 					context !== startedContext
 				) {
 					recorder.node.disconnect();
-					if (recorder.kind === "worklet") recorder.node.port.onmessage = null;
-					else recorder.node.onaudioprocess = null;
+					recorder.node.port.onmessage = null;
 					return;
 				}
-				if (recorder.kind === "worklet") worklet = recorder.node;
-				else processor = recorder.node;
+				worklet = recorder.node;
 				drainRecorder = recorder.drain;
-				const input = worklet ?? processor;
-				if (!input) return;
-				source.connect(input);
-				input.connect(context.destination);
+				source.connect(worklet);
+				worklet.connect(context.destination);
 				emit("listening");
 			} catch (error) {
 				if (disposed || recordingEpoch !== inputEpoch) return;
@@ -603,6 +589,8 @@ export function createAudioController(
 					).setSinkId(options.outputDevice);
 				if (disposed || context !== startedContext) return;
 				await startedContext.resume();
+				if (disposed || context !== startedContext) return;
+				outputWatch.watch(startedContext);
 			} catch (error) {
 				// A half-started output must not stay cached as if it worked.
 				context = undefined;
@@ -700,6 +688,7 @@ export function createAudioController(
 			drainRecorder = undefined;
 			lastLevel = 0;
 			releaseWatchers();
+			outputWatch.release();
 			this.stopPlayback();
 			try {
 				keepAliveSource?.stop();
@@ -708,7 +697,6 @@ export function createAudioController(
 			}
 			keepAliveSource?.disconnect();
 			keepAliveSource = undefined;
-			processor?.disconnect();
 			if (worklet) worklet.port.onmessage = null;
 			worklet?.disconnect();
 			worklet = undefined;
@@ -717,7 +705,6 @@ export function createAudioController(
 				t.stop();
 			});
 			await context?.close();
-			processor = undefined;
 			source = undefined;
 			stream = undefined;
 			context = undefined;

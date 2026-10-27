@@ -27,7 +27,13 @@ it("exposes a labelled range input with its bounds and value text", () => {
 
 it("shows the raw number without formatValue", () => {
 	render(
-		<RangeSlider label="年齢" value={40} min={20} max={70} onChange={() => {}} />,
+		<RangeSlider
+			label="年齢"
+			value={40}
+			min={20}
+			max={70}
+			onChange={() => {}}
+		/>,
 	);
 	expect(screen.getByText("40")).toBeInTheDocument();
 });
@@ -35,7 +41,13 @@ it("shows the raw number without formatValue", () => {
 it("reports a number through onChange", () => {
 	const onChange = vi.fn();
 	render(
-		<RangeSlider label="年齢" value={40} min={20} max={70} onChange={onChange} />,
+		<RangeSlider
+			label="年齢"
+			value={40}
+			min={20}
+			max={70}
+			onChange={onChange}
+		/>,
 	);
 	fireEvent.change(screen.getByRole("slider"), { target: { value: "55" } });
 	expect(onChange).toHaveBeenCalledWith(55);

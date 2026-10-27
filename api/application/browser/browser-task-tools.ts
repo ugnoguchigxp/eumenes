@@ -150,7 +150,7 @@ function visibleUrl(url: string) {
 	try {
 		const readable = decodeURI(url);
 		if (
-			!/[\u0000-\u0020\u007f]/.test(readable) &&
+			![...readable].some((ch) => ch <= " " || ch === "\u007f") &&
 			new URL(readable).href === url
 		)
 			return readable;

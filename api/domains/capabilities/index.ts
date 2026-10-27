@@ -29,7 +29,7 @@ export type {
 } from "./contracts/resource-kinds";
 import { toolchainBuiltins as registeredToolchains } from "./builtin/toolchains";
 import { bundleToolchainFunctions } from "./service/bundle-files";
-export { dormantBundleFile } from "./service/bundle-files";
+export { bundleFiles, dormantBundleFile } from "./service/bundle-files";
 /**
  * Function names of the builtin toolchains and of those shipped in bundles (for detecting
  * call syntax written as text).

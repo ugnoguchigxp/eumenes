@@ -47,6 +47,8 @@ export type AdapterHostContext = {
 	documentFieldsReady: boolean;
 	/** The shared draft of each document this screen reads or applies, keyed by document ref. */
 	drafts: Readonly<Record<string, DraftView>>;
+	/** Shows a message in the screen's notice bar (e.g. a live link failure the adapter observed). */
+	notify(message: string): void;
 };
 
 type AdapterPhase =

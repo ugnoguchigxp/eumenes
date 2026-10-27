@@ -94,9 +94,10 @@ PTY の入出力・会話本文・依頼本文はログに出さない。ログ�
 ## 制約
 
 - セッション（PTY）は backend プロセスのメモリにだけある。backend を再起動すると全て終了し、画面は空になる。保存済みの依頼は起動時に `recover()` で終端にする（Claude の会話はディスクに残るので `--resume` で続けられる）。
-- 子プロセスは backend の環境変数を引き継ぐ（Claude Code の認証・設定に必要なため）。ただし `EUMENES_*`（API token・鍵・DB の場所）、サーバー自身の出力向けの `NO_COLOR`・`FORCE_COLOR`、サーバーを起動した Claude Code セッションの印（`CLAUDECODE`、`CLAUDE_CODE_CHILD_SESSION`、`CLAUDE_CODE_SESSION_*`、`CLAUDE_CODE_MESSAGING_*` など）は渡さない。画面のセッションは利用者自身の独立したセッションとして起動する。
+- 子プロセス（この画面、CLI画面、会話からのCLI実行）が backend の環境変数から引き継ぐのは、ログインセッションの `HOME`・`USER`・`LOGNAME`・`SHELL`・`PATH`・`TMPDIR`・`TZ`・`LANG`・`LC_*`・`SSH_AUTH_SOCK`・`__CF_USER_TEXT_ENCODING` だけ（2026-10-27）。LARM の token、クラウドのキー、`EUMENES_*`（`.env` から読んだ値を含む）、`NO_COLOR`・`FORCE_COLOR`、サーバーを起動した Claude Code セッションの印は渡さない。Claude Code を環境変数で設定する場合（Bedrock・API キー・proxy など）は、`~/.claude/settings.json` の `env` に書く。画面のセッションは利用者自身の独立したセッションとして起動する。
 - 開き直した画面は保持済みの出力（直近 512 KiB）を再生するだけなので、古い部分が切り捨てられていると Claude Code の次の再描画まで表示が崩れることがある。
 - 入力は HTTP の POST、出力は SSE。WebSocket は使わない（ブラウザの WebSocket は Authorization ヘッダーを送れないため）。
+- 画面の出力の接続は、サーバーの15秒ごとの heartbeat を含めて45秒間なにも届かなければ切断して再接続する（スリープ復帰などの半開きの接続）。入力の送信に失敗したときは、その入力を捨てて画面の「お知らせ」に表示する（CLI画面も同じ）。
 - Windows は Bun の PTY が未対応のため使えない。
 
 ## 検証

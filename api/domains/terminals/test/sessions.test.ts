@@ -228,12 +228,22 @@ test.skipIf(process.platform === "win32")(
 	},
 );
 
-test("the child does not inherit Eumenes secrets, server colors or a parent Claude Code session", () => {
+test("the child inherits only the login session, never server secrets, colors or a parent Claude Code session", () => {
 	expect(
 		childEnv({
 			HOME: "/home/a",
+			USER: "a",
+			PATH: "/bin",
+			TMPDIR: "/tmp/a",
+			LANG: "ja_JP.UTF-8",
+			LC_ALL: "ja_JP.UTF-8",
+			SSH_AUTH_SOCK: "/tmp/agent",
 			EUMENES_API_TOKEN: "secret",
 			EUMENES_KEY_DIR: "/keys",
+			LARM_API_TOKEN: "larm-secret",
+			LARM_CONTROL_TOKEN: "larm-control",
+			OPENAI_API_KEY: "cloud-secret",
+			ANTHROPIC_API_KEY: "cloud-secret",
 			NO_COLOR: "1",
 			CLAUDECODE: "1",
 			CLAUDE_CODE_CHILD_SESSION: "1",
@@ -244,7 +254,12 @@ test("the child does not inherit Eumenes secrets, server colors or a parent Clau
 		}),
 	).toEqual({
 		HOME: "/home/a",
-		CLAUDE_CODE_USE_BEDROCK: "1",
+		USER: "a",
+		PATH: "/bin",
+		TMPDIR: "/tmp/a",
+		LANG: "ja_JP.UTF-8",
+		LC_ALL: "ja_JP.UTF-8",
+		SSH_AUTH_SOCK: "/tmp/agent",
 		TERM: "xterm-256color",
 		COLORTERM: "truecolor",
 	});

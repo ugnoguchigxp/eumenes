@@ -12,6 +12,8 @@ export type TerminalPort = {
 const INPUT_CHUNK = 16_384;
 const RESIZE_DELAY_MS = 80;
 const RECONNECT_MS = { first: 500, max: 10_000 };
+/** The server sends a heartbeat every 15 s; a connection silent for three of them is half-open. */
+const IDLE_MS = 45_000;
 /** Full terminal reset (RIS): the server replays the backlog on every connection. */
 const RESET = "\x1bc";
 
@@ -62,6 +64,55 @@ function cut(text: string, size: number) {
 }
 
 /**
+ * Reads one output connection until it ends and returns whether the run exited. Any chunk (output
+ * or heartbeat) proves the link alive; silence for IDLE_MS closes it, so the caller reopens it.
+ */
+async function readConnection(
+	client: TerminalPort,
+	sessionId: string,
+	signal: AbortSignal,
+	reopened: boolean,
+	onOutput: (data: Uint8Array | string) => void,
+): Promise<boolean> {
+	const attempt = new AbortController();
+	const connection = AbortSignal.any([signal, attempt.signal]);
+	let reader: ReadableStreamDefaultReader<string> | undefined;
+	let watchdog: ReturnType<typeof setTimeout> | undefined;
+	const arm = () => {
+		clearTimeout(watchdog);
+		watchdog = setTimeout(() => attempt.abort(), IDLE_MS);
+	};
+	const stop = () => {
+		void reader?.cancel().catch(() => {});
+	};
+	connection.addEventListener("abort", stop, { once: true });
+	let exited = false;
+	try {
+		arm();
+		const response = await client.terminalOutput(sessionId, connection);
+		reader = response.body?.pipeThrough(new TextDecoderStream()).getReader();
+		if (connection.aborted) stop();
+		if (reader && reopened) onOutput(RESET);
+		let buffer = "";
+		while (reader) {
+			const { value, done } = await reader.read();
+			if (done) break;
+			arm();
+			const parsed = parseEvents(buffer + value);
+			buffer = parsed.rest;
+			for (const { event, data } of parsed.events) {
+				if (event === "exit") exited = true;
+				else if (event === "output") onOutput(decodeBase64(data));
+			}
+		}
+	} finally {
+		clearTimeout(watchdog);
+		connection.removeEventListener("abort", stop);
+	}
+	return exited;
+}
+
+/**
  * The live link of one session run: the output stream opens on subscribe, input is sent in
  * order (one request at a time, coalescing keystrokes typed meanwhile), and resizes are
  * debounced. `onEnded` fires whenever the stream stops (the run exited, or it dropped and is
@@ -70,7 +121,12 @@ function cut(text: string, size: number) {
 export function createTerminalConnection(
 	client: TerminalPort,
 	sessionId: string,
-	hooks: { onEnded(): void; onResized(size: Size): void },
+	hooks: {
+		onEnded(): void;
+		onResized(size: Size): void;
+		/** Typed input could not be sent; it is dropped, not replayed later. */
+		onInputFailed(): void;
+	},
 ): TerminalConnection {
 	let pending = "";
 	let sending = false;
@@ -86,6 +142,7 @@ export function createTerminalConnection(
 			} catch {
 				// The run ended or the link dropped; typed input is not replayed later.
 				pending = "";
+				hooks.onInputFailed();
 			}
 		}
 		sending = false;
@@ -96,31 +153,23 @@ export function createTerminalConnection(
 				const abort = new AbortController();
 				const { signal } = abort;
 				// One connection at a time. A stream that stops without `exit` (dropped as slow, a
-				// network break, the per-session stream limit) is opened again while the run lasts.
+				// network break, silence past the heartbeat, the per-session stream limit) is opened
+				// again while the run lasts.
 				void (async () => {
 					let delay = RECONNECT_MS.first;
 					for (let attempt = 0; !signal.aborted; attempt++) {
 						let exited = false;
 						try {
-							const response = await client.terminalOutput(sessionId, signal);
-							const reader = response.body
-								?.pipeThrough(new TextDecoderStream())
-								.getReader();
-							if (reader && attempt > 0) listener(RESET);
-							let buffer = "";
-							while (reader) {
-								const { value, done } = await reader.read();
-								if (done) break;
-								const parsed = parseEvents(buffer + value);
-								buffer = parsed.rest;
-								for (const { event, data } of parsed.events) {
-									if (event === "exit") exited = true;
-									else if (event === "output") {
-										listener(decodeBase64(data));
-										delay = RECONNECT_MS.first;
-									}
-								}
-							}
+							exited = await readConnection(
+								client,
+								sessionId,
+								signal,
+								attempt > 0,
+								(data) => {
+									listener(data);
+									if (typeof data !== "string") delay = RECONNECT_MS.first;
+								},
+							);
 						} catch (error) {
 							if (signal.aborted) return;
 							if (error instanceof ApiError && error.status === 404)

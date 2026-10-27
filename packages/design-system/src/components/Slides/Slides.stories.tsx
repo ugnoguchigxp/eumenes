@@ -10,9 +10,20 @@ export default meta;
 type Story = StoryObj<typeof Slides>;
 
 const slides = [
-	{ label: "むかしむかし", content: <p>あるところに、おじいさんとおばあさんが住んでいました。</p> },
-	{ label: "川で", content: <p>おばあさんが川で洗濯をしていると、大きな桃が流れてきました。</p> },
-	{ label: "桃から", content: <p>桃を割ると、中から元気な男の子が生まれました。</p> },
+	{
+		label: "むかしむかし",
+		content: <p>あるところに、おじいさんとおばあさんが住んでいました。</p>,
+	},
+	{
+		label: "川で",
+		content: (
+			<p>おばあさんが川で洗濯をしていると、大きな桃が流れてきました。</p>
+		),
+	},
+	{
+		label: "桃から",
+		content: <p>桃を割ると、中から元気な男の子が生まれました。</p>,
+	},
 	{ label: "おしまい", content: <p>めでたし、めでたし。</p> },
 ];
 
@@ -23,7 +34,14 @@ export const Dark: Story = {
 	args: { title: "桃太郎", slides },
 	decorators: [
 		(Story) => (
-			<div className="ds-theme-dark" style={{ background: "var(--background)", color: "var(--foreground)", padding: "1.5rem" }}>
+			<div
+				className="ds-theme-dark"
+				style={{
+					background: "var(--background)",
+					color: "var(--foreground)",
+					padding: "1.5rem",
+				}}
+			>
 				<Story />
 			</div>
 		),
