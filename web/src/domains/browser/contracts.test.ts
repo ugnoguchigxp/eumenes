@@ -1,6 +1,7 @@
 import { expect, it } from "vitest";
 import {
 	browserHistoryList,
+	browserSourceData,
 	browserHistoryResult,
 	browserTaskList,
 } from "./contracts";
@@ -98,6 +99,93 @@ it("keeps the optional Script title, history and variables and the task's histor
 	expect(() =>
 		browserTaskList.parse({
 			tasks: [{ ...task, history: { historyId: 1, title: "x" } }],
+		}),
+	).toThrow();
+});
+
+const replay = {
+	replayId: "r1",
+	historyId: "h1",
+	state: "failed",
+	errorCode: "replay_timeout",
+	errorLabel:
+		"時間内に終わりませんでした（要素が見つからない可能性があります）",
+	startedAt: 1792454400000,
+	endedAt: 1792454460000,
+};
+const sourceBase = {
+	connection: {
+		state: "connected",
+		endReason: null,
+		configured: true,
+		availability: { available: true },
+	},
+	tabs: [],
+	tasks: [],
+	captures: [],
+};
+
+it("reads the source's replays and defaults to none when absent", () => {
+	expect(
+		browserSourceData.parse({ ...sourceBase, replays: [replay] }).replays,
+	).toEqual([replay]);
+	expect(
+		browserSourceData.parse({
+			...sourceBase,
+			replays: [
+				{
+					...replay,
+					state: "running",
+					errorCode: null,
+					errorLabel: null,
+					endedAt: null,
+				},
+			],
+		}).replays[0]?.endedAt,
+	).toBeNull();
+	expect(browserSourceData.parse(sourceBase).replays).toEqual([]);
+});
+
+it("refuses a replay of the wrong shape", () => {
+	expect(() =>
+		browserSourceData.parse({
+			...sourceBase,
+			replays: [{ ...replay, state: "queued" }],
+		}),
+	).toThrow();
+	expect(() =>
+		browserSourceData.parse({
+			...sourceBase,
+			replays: [{ ...replay, replayId: undefined }],
+		}),
+	).toThrow();
+});
+
+it("reads the replay plan of a history detail, and treats it as optional", () => {
+	const plan = {
+		code: "async (page) => {}",
+		blocked: null,
+		blockedLabel: null,
+	};
+	expect(
+		browserHistoryResult.parse({ history: { ...detail, replay: plan } }).history
+			.replay,
+	).toEqual(plan);
+	const blocked = {
+		code: "",
+		blocked: "replay_incomplete",
+		blockedLabel: "記録されていない操作や値があるため実行できません",
+	};
+	expect(
+		browserHistoryResult.parse({ history: { ...detail, replay: blocked } })
+			.history.replay,
+	).toEqual(blocked);
+	expect(
+		browserHistoryResult.parse({ history: detail }).history.replay,
+	).toBeUndefined();
+	expect(() =>
+		browserHistoryResult.parse({
+			history: { ...detail, replay: { code: 1, blocked: null } },
 		}),
 	).toThrow();
 });

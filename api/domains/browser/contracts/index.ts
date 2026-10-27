@@ -1,5 +1,6 @@
 export * from "./script";
 export * from "./history";
+export * from "./replay";
 import { isAbsolute } from "node:path";
 import { z } from "zod";
 import { variableNamePattern } from "./history";
@@ -384,6 +385,17 @@ const errorLabels: Record<string, string> = {
 	script_variable_unknown: "Scriptに宣言されていない変数です",
 	browser_history_not_found: "履歴が見つかりません",
 	browser_history_conflict: "履歴が更新されました。読み直してください",
+	browser_replay_not_found: "リプレイが見つかりません",
+	replay_busy: "別のリプレイまたはブラウザ操作を実行中です",
+	replay_not_running: "リプレイはすでに終わっています",
+	replay_values_invalid: "変数の値を確かめてください",
+	replay_incomplete: "記録されていない操作や値があるため実行できません",
+	replay_code_rejected: "このコードは安全のため実行できません",
+	replay_destination_blocked: "開けない移動先が含まれています",
+	replay_timeout:
+		"時間内に終わりませんでした（要素が見つからない可能性があります）",
+	replay_failed: "実行中にエラーが起きました",
+	replay_interrupted: "サーバーの再起動で中断しました",
 	browser_manual_connection_required:
 		"設定または接続画面でブラウザへの接続を確認してください",
 	...unavailableReasons,
@@ -477,6 +489,13 @@ export const errorStatus = {
 	browser_capture_not_ready: 409,
 	browser_history_not_found: 404,
 	browser_history_conflict: 409,
+	browser_replay_not_found: 404,
+	replay_busy: 409,
+	replay_not_running: 409,
+	replay_values_invalid: 400,
+	replay_incomplete: 422,
+	replay_code_rejected: 422,
+	replay_destination_blocked: 422,
 	browser_executable_invalid: 400,
 	browser_browse_busy: 409,
 	browser_browse_unsupported: 501,

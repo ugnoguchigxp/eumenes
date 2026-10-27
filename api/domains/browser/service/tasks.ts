@@ -11,6 +11,7 @@ import {
 	type TaskView,
 } from "../contracts";
 import {
+	assertNoReplay,
 	activeTaskCount,
 	endTaskApprovals,
 	dueTasks,
@@ -71,6 +72,13 @@ export type StartTaskInput = {
 	continueFrom?: string;
 	approvePending?: boolean;
 };
+
+/** A new task needs the browser free of a replay and a place among the owner's active tasks. */
+function assertTaskCapacity(db: Database, owner: string) {
+	assertNoReplay(db, owner);
+	if (activeTaskCount(db, owner) >= ACTIVE_TASK_LIMIT)
+		throw new Error("browser_capacity");
+}
 
 /** A started task and the approvals it holds from the start. */
 export type StartedTask = TaskView & {
@@ -293,8 +301,7 @@ export function createTasks(
 			const v = checkNavigationTarget(input.url, ctx.webOrigins);
 			if (!v.ok) throw new Error(v.code);
 		}
-		if (activeTaskCount(db, input.owner) >= ACTIVE_TASK_LIMIT)
-			throw new Error("browser_capacity");
+		assertTaskCapacity(db, input.owner);
 		const id = crypto.randomUUID();
 		insertTask(
 			db,

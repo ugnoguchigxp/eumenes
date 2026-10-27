@@ -241,11 +241,46 @@ const guid = z.guid();
 export const browserHistoryTarget = z.strictObject({
 	historyId: guid.describe("REFERENCE.historyのhistoryId"),
 });
-/** The screen's delete of one history, at the revision it showed (spec browser-run-history §8.2). */
+/**
+ * The screen's delete event as it arrives (strings only, spec browser-run-history §8.2); the action's input
+ * adapter `input:browser.history-delete@1` turns it into `browserHistoryDeleteInput`.
+ */
 export const browserHistoryDelete = z.strictObject({
+	historyId: z.string().max(64),
+	expectedRevision: z.string().max(10),
+});
+/** The delete operation's input: one history at the revision the screen showed. */
+export const browserHistoryDeleteInput = z.strictObject({
 	historyId: z.uuid(),
 	expectedRevision: z.number().int().min(0),
 });
+const replayField = /^var\.[a-z][a-zA-Z0-9]{0,30}$/;
+/**
+ * The screen's replay event as it arrives (strings, one `var.<name>` per variable, spec browser-history-replay
+ * §5.2); the input adapter `input:browser.history-replay@1` turns it into `browserHistoryReplayInput`.
+ */
+export const browserHistoryReplay = z
+	.object({
+		historyId: z.string().max(64),
+		expectedRevision: z.string().max(10),
+	})
+	.catchall(z.string().max(200))
+	.refine((v) => {
+		const fields = Object.keys(v).filter(
+			(k) => k !== "historyId" && k !== "expectedRevision",
+		);
+		return fields.length <= 5 && fields.every((k) => replayField.test(k));
+	});
+/** The replay operation's input: one history at the shown revision with this run's variable values. */
+export const browserHistoryReplayInput = z.strictObject({
+	historyId: z.uuid(),
+	expectedRevision: z.number().int().min(0),
+	values: z
+		.record(z.string().regex(/^[a-z][a-zA-Z0-9]{0,30}$/), z.string().max(200))
+		.refine((v) => Object.keys(v).length <= 5),
+});
+/** One replay the screen shows (spec browser-history-replay §5). */
+export const browserReplayTarget = z.strictObject({ replayId: z.uuid() });
 const variableName = z.string().regex(/^[a-z][a-zA-Z0-9]{0,30}$/);
 /** `browserScriptPublish` with the procedure's name, the history it follows and the values that change per run. */
 export const browserScriptPublish2 = z

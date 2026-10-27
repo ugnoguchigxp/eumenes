@@ -573,3 +573,74 @@ test("history refusals are worded and re-read the list and the open detail witho
 		"その履歴は見つかりません。削除された可能性があります。一覧を読み直しました。",
 	);
 });
+
+const replayOf = (state: string, over: Record<string, unknown> = {}) => ({
+	replayId: "r1",
+	historyId: "h1",
+	state,
+	errorCode: null,
+	errorLabel: null,
+	startedAt: 1,
+	endedAt: state === "running" ? null : 2,
+	...over,
+});
+
+test("a replay that ends reads the history list again; a running one does not", async () => {
+	let replays = [replayOf("running")];
+	api.histories.mockResolvedValue([summary("h1")]);
+	const { hook, cache } = setup(async () =>
+		sourceOf("disconnected", { replays }),
+	);
+	await waitFor(() =>
+		expect(shown(hook).replays.map((r) => r.state)).toEqual(["running"]),
+	);
+	await waitFor(() => expect(api.histories).toHaveBeenCalledTimes(1));
+	await cache.invalidateQueries({
+		predicate: (q) => q.queryKey.includes("source"),
+	});
+	await new Promise((resolve) => setTimeout(resolve, 30));
+	expect(api.histories).toHaveBeenCalledTimes(1);
+	replays = [replayOf("completed")];
+	await cache.invalidateQueries({
+		predicate: (q) => q.queryKey.includes("source"),
+	});
+	await waitFor(() => expect(api.histories).toHaveBeenCalledTimes(2));
+	expect(shown(hook).replays.map((r) => r.state)).toEqual(["completed"]);
+	// Reading an already ended replay again is not a new end.
+	await cache.invalidateQueries({
+		predicate: (q) => q.queryKey.includes("source"),
+	});
+	await new Promise((resolve) => setTimeout(resolve, 30));
+	expect(api.histories).toHaveBeenCalledTimes(2);
+});
+
+test("replay refusals are worded and re-read the screen without resending", async () => {
+	api.histories.mockResolvedValue([summary("h1")]);
+	const { hook, client } = setup(async () => sourceOf("disconnected"));
+	await waitFor(() => expect(hook.result.current.phase.kind).toBe("ready"));
+	const words: Record<string, string> = {
+		replay_busy: "別のリプレイまたはブラウザ操作を実行中です。",
+		replay_values_invalid: "変数の値を確かめてください。",
+		replay_incomplete: "記録されていない操作や値があるため実行できません。",
+		replay_code_rejected: "このコードは安全のため実行できません。",
+		replay_destination_blocked: "開けない移動先が含まれています。",
+	};
+	for (const [code, text] of Object.entries(words)) {
+		const reads = client.toolchainArtifactSource.mock.calls.length;
+		expect(hook.result.current.describeRejection?.(code, [])).toBe(text);
+		await waitFor(() =>
+			expect(client.toolchainArtifactSource.mock.calls.length).toBeGreaterThan(
+				reads,
+			),
+		);
+	}
+	for (const code of ["browser_replay_not_found", "replay_not_running"]) {
+		const reads = client.toolchainArtifactSource.mock.calls.length;
+		expect(hook.result.current.describeRejection?.(code, [])).toBeTruthy();
+		await waitFor(() =>
+			expect(client.toolchainArtifactSource.mock.calls.length).toBeGreaterThan(
+				reads,
+			),
+		);
+	}
+});

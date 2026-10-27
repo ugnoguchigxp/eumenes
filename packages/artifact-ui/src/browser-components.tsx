@@ -21,6 +21,7 @@ export type BrowserWorkspaceResource = Pick<
 	| "tasks"
 	| "captures"
 	| "histories"
+	| "replays"
 	| "selectedHistoryId"
 	| "historyDetail"
 	| "historyDetailError"
@@ -164,6 +165,7 @@ function BrowserWorkspaceBody({
 			tasks={resource.tasks}
 			captures={resource.captures}
 			histories={resource.histories}
+			replays={resource.replays}
 			selectedHistoryId={resource.selectedHistoryId}
 			historyDetail={resource.historyDetail}
 			historyDetailError={resource.historyDetailError}
@@ -189,6 +191,19 @@ function BrowserWorkspaceBody({
 					expectedRevision: String(expectedRevision),
 				})
 			}
+			onReplayHistory={(historyId, expectedRevision, values) =>
+				send("browser-replay-history", {
+					historyId,
+					expectedRevision: String(expectedRevision),
+					...Object.fromEntries(
+						Object.entries(values).map(([name, value]) => [
+							`var.${name}`,
+							value,
+						]),
+					),
+				})
+			}
+			onCancelReplay={(replayId) => send("browser-cancel-replay", { replayId })}
 			onDownloadCapture={download}
 			onCancelTask={(taskId) => send("browser-cancel-task", { taskId })}
 			onCancelCapture={(captureId) =>

@@ -18,7 +18,8 @@ export type BrowserEffect =
 	| { kind: "tab_focus"; tabRef: string }
 	| { kind: "tab_close"; tabRef: string }
 	| { kind: "abort_capture"; captureId: string }
-	| { kind: "abort_task"; taskId: string };
+	| { kind: "abort_task"; taskId: string }
+	| { kind: "abort_replay"; replayId: string };
 
 const payload = z.object({
 	effect: z.discriminatedUnion("kind", [
@@ -29,6 +30,7 @@ const payload = z.object({
 		z.strictObject({ kind: z.literal("tab_close"), tabRef: z.uuid() }),
 		z.strictObject({ kind: z.literal("abort_capture"), captureId: z.uuid() }),
 		z.strictObject({ kind: z.literal("abort_task"), taskId: z.uuid() }),
+		z.strictObject({ kind: z.literal("abort_replay"), replayId: z.uuid() }),
 	]),
 	owner: z.string().min(1).max(120),
 	strict: z.boolean().optional(),
@@ -77,6 +79,9 @@ export function registerBrowserEffects(deps: {
 						break;
 					case "abort_task":
 						deps.service.abortTask(effect.taskId);
+						break;
+					case "abort_replay":
+						deps.service.abortReplay(effect.replayId);
 						break;
 				}
 			} catch (error) {

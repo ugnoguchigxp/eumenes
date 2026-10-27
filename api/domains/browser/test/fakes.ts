@@ -80,6 +80,13 @@ export class FakeDriver implements BrowserDriver {
 	/** What the fixed inspection reports; a test sets the element a click or key press would act on. */
 	targetInfo: TargetInfo = { tag: "button", inForm: false, submits: false };
 	inspectError: BrowserDriverError | null = null;
+	/** The code of every replay run, in order (never written anywhere else). */
+	replayCodes: string[] = [];
+	/** Holds `runReplay` until the test resolves it; an abort ends the wait as a cancelled call. */
+	replayGate: Promise<void> | null = null;
+	replayError: Error | null = null;
+	/** Held after an abort until the test resolves it: the code takes this long to really stop. */
+	replayStopGate: Promise<void> | null = null;
 	onScreenshot: (() => void) | null = null;
 	screenshotGate: Promise<void> | null = null;
 	active = 0;
@@ -181,6 +188,30 @@ export class FakeDriver implements BrowserDriver {
 			return next ?? { ok: true as const, url: cur.url, title: cur.title };
 		});
 	}
+	runReplay(code: string, signal: AbortSignal) {
+		return this.track("runReplay", async () => {
+			this.replayCodes.push(code);
+			const cancelled = async () => {
+				if (this.replayStopGate) await this.replayStopGate;
+				return new BrowserDriverError("cancelled", true);
+			};
+			if (signal.aborted) throw await cancelled();
+			if (this.replayGate)
+				await Promise.race([
+					this.replayGate,
+					new Promise<never>((_, reject) =>
+						signal.addEventListener(
+							"abort",
+							() => void cancelled().then(reject),
+							{
+								once: true,
+							},
+						),
+					),
+				]);
+			if (this.replayError) throw this.replayError;
+		});
+	}
 	inspectTarget(ref: string) {
 		return this.track(`inspectTarget:${ref}`, () => this.inspected());
 	}
@@ -274,6 +305,7 @@ export function setup(
 		renewMs?: number;
 		taskMs?: number;
 		captureMs?: number;
+		replayMs?: number;
 		now?: () => number;
 		dir?: string;
 		resolveHost?: HostResolver;

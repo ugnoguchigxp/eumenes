@@ -35,6 +35,9 @@ function fakeDriver(path: string | undefined) {
 		closeTab: async () => [],
 		snapshot: async () => ({ url: "", title: "", snapshot: "" }),
 		act: async () => ({ ok: true, url: "", title: "" }),
+		runReplay: async () => {
+			calls.push("runReplay");
+		},
 		inspectTarget: async () => ({
 			tag: "button",
 			inForm: false,
@@ -114,6 +117,16 @@ test("calls go to the live driver and fail as disconnected before any connect", 
 	await driver.listTabs();
 	expect(made[0]!.calls).toContain("listTabs");
 	expect(driver.state().state).toBe("connected");
+});
+
+test("runReplay goes to the live driver and fails as disconnected before any connect", async () => {
+	const { driver, made } = setup();
+	await expect(
+		driver.runReplay("async (page) => {}", signal),
+	).rejects.toMatchObject({ code: "browser_disconnected" });
+	await driver.connect(signal);
+	await driver.runReplay("async (page) => {}", signal);
+	expect(made[0]!.calls).toContain("runReplay");
 });
 
 test("state changes of the current driver are passed on; a replaced one is silent", async () => {

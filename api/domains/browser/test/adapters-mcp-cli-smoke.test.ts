@@ -23,6 +23,7 @@ const SENT_ARGUMENTS: Record<string, string[]> = {
 	browser_wait_for: ["time", "text", "textGone"],
 	browser_take_screenshot: ["type", "scale", "fullPage", "target", "element"],
 	browser_evaluate: ["function", "target", "element"],
+	browser_run_code_unsafe: ["code"],
 };
 
 test("the pinned CLI starts under this runtime and lists the tools the driver uses", async () => {

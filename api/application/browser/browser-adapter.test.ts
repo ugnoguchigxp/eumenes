@@ -111,7 +111,9 @@ test("the adapter registers the operations of the capture toolchain and the scre
 		"browser.task.scripted": "write builtin:browserTaskBegin",
 		"browser.task.status": "read builtin:browserTaskTarget",
 		"browser.task.cancel": "write builtin:browserTaskTarget",
-		"browser.history.delete": "write builtin:browserHistoryDelete",
+		"browser.history.delete": "write builtin:browserHistoryDeleteInput",
+		"browser.history.replay": "write builtin:browserHistoryReplayInput",
+		"browser.history.replay.cancel": "write builtin:browserReplayTarget",
 	});
 	expect([...description.projections]).toEqual([
 		"projection:browser.capture-result@1",
@@ -344,6 +346,7 @@ test("the workspace source reads the domain's data and nothing else", () => {
 		"availability",
 		"captures",
 		"connection",
+		"replays",
 		"tabs",
 		"tasks",
 	]);
@@ -627,6 +630,8 @@ test("each binding of the bundle names only operations, schemas and queries this
 		"browser.capture@4",
 		"browser.operate@5",
 		"browser.capture@5",
+		"browser.operate@6",
+		"browser.capture@6",
 	]);
 	const binding = (id: string, revision: number) =>
 		bundle.bindings.find((b) => b.id === id && b.revision === revision)!;
@@ -681,13 +686,17 @@ test("each binding of the bundle names only operations, schemas and queries this
 		["browser.operate", 3],
 		["browser.operate", 5],
 		["browser.capture", 5],
+		["browser.operate", 6],
+		["browser.capture", 6],
 	] as const) {
 		expect(operationsOf(id, revision)).toEqual(operationsOf(id, revision - 1));
 		expect(binding(id, revision).artifactRevisionId).toBe(
 			`artifact:browser.workspace@${revision}`,
 		);
 	}
-	expect(bundle.artifacts.map((a) => a.revision)).toEqual([1, 2, 3, 4, 5, 1]);
+	expect(bundle.artifacts.map((a) => a.revision)).toEqual([
+		1, 2, 3, 4, 5, 6, 1,
+	]);
 	for (const artifact of bundle.artifacts) {
 		for (const source of artifact.sourceBindings) {
 			expect(source.adapterRef).toBe(BROWSER_ADAPTER_REF);
@@ -695,7 +704,10 @@ test("each binding of the bundle names only operations, schemas and queries this
 		}
 		for (const action of artifact.actionBindings.filter((a) => a.operationId)) {
 			const operation = operations.get(action.operationId!);
-			expect(operation?.inputSchemaRef).toBe(action.inputSchemaRef);
+			// An input adapter turns the screen's shape into the operation's own schema; otherwise they are one.
+			if (action.inputAdapterRef)
+				expect(operation?.inputSchemaRef).not.toBe(action.inputSchemaRef);
+			else expect(operation?.inputSchemaRef).toBe(action.inputSchemaRef);
 			expect(operation?.effect as string).toBe(action.effect);
 		}
 	}
@@ -747,6 +759,99 @@ test("each binding of the bundle names only operations, schemas and queries this
 		inputAdapterRef: "input:browser.history-delete@1",
 		effect: "write",
 	});
+	// Revision 6 adds the replay start and cancel, which the conversation has no tool for.
+	const sixth = bundle.artifacts[5];
+	expect(
+		ids(sixth).filter((id) => !ids(bundle.artifacts[4]).includes(id)),
+	).toEqual(["replay-history", "cancel-replay"]);
+	expect(
+		sixth!.actionBindings.find((a) => a.actionId === "replay-history"),
+	).toEqual({
+		actionId: "replay-history",
+		eventAction: "browser-replay-history",
+		source: "browser",
+		operationId: "browser.history.replay",
+		inputSchemaRef: "builtin:browserHistoryReplay",
+		inputAdapterRef: "input:browser.history-replay@1",
+		effect: "write",
+	});
+	for (const binding of bundle.bindings)
+		expect(
+			binding.tools.some((t) => t.operationId.startsWith("browser.history.")),
+		).toBe(false);
+});
+
+test("the screen's history events pass the action path as sent: action schema, input adapter, operation schema", () => {
+	// The same three steps the action request runs (tool-runtime action-requests), with the payloads the screen posts.
+	const bundle = JSON.parse(
+		readFileSync(
+			new URL(
+				"../../domains/capabilities/bundles/browser.bundle.json",
+				import.meta.url,
+			),
+			"utf8",
+		),
+	) as {
+		artifacts: {
+			id: string;
+			revision: number;
+			actionBindings: {
+				actionId: string;
+				operationId?: string;
+				inputSchemaRef?: string;
+				inputAdapterRef?: string;
+			}[];
+		}[];
+	};
+	const latest = bundle.artifacts
+		.filter((a) => a.id === "browser.workspace")
+		.at(-1)!;
+	const description = describeBrowserAdapter();
+	const schema = (ref: string) =>
+		validators[ref.replace("builtin:", "") as keyof typeof validators];
+	const historyId = crypto.randomUUID();
+	const sent: Record<string, Record<string, string>> = {
+		"delete-history": { historyId, expectedRevision: "3" },
+		"replay-history": {
+			historyId,
+			expectedRevision: "1",
+			"var.keyword": "AI関連",
+		},
+	};
+	const converted: Record<string, unknown> = {
+		"delete-history": { historyId, expectedRevision: 3 },
+		"replay-history": {
+			historyId,
+			expectedRevision: 1,
+			values: { keyword: "AI関連" },
+		},
+	};
+	for (const [actionId, input] of Object.entries(sent)) {
+		const action = latest.actionBindings.find((a) => a.actionId === actionId)!;
+		const raw = schema(action.inputSchemaRef!).safeParse(input);
+		expect(raw.success).toBe(true);
+		const result = description.inputAdapters.get(action.inputAdapterRef!)!(
+			raw.data as Record<string, unknown>,
+		);
+		expect(result).toEqual({ ok: true, value: converted[actionId] });
+		const operation = description.operations.get(action.operationId!)!;
+		expect(
+			schema(operation.inputSchemaRef).safeParse(
+				(result as { value: unknown }).value,
+			).success,
+		).toBe(true);
+	}
+	// A key that is not a variable field is refused before the adapter runs.
+	const replay = latest.actionBindings.find(
+		(a) => a.actionId === "replay-history",
+	)!;
+	expect(
+		schema(replay.inputSchemaRef!).safeParse({
+			historyId,
+			expectedRevision: "1",
+			values: "x",
+		}).success,
+	).toBe(false);
 });
 
 test("the tool schemas the model sees are flat objects", () => {

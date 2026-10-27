@@ -282,3 +282,60 @@ it("passes the histories, the open detail and each task's history and script var
 		resourceOf(data()).revision,
 	);
 });
+
+it("passes the replays to the screen, leaving out the absent label and end time", () => {
+	const resource = resourceOf(
+		data({
+			replays: [
+				{
+					replayId: "r2",
+					historyId: "h1",
+					state: "running",
+					errorCode: null,
+					errorLabel: null,
+					startedAt: 20,
+					endedAt: null,
+				},
+				{
+					replayId: "r1",
+					historyId: "h1",
+					state: "failed",
+					errorCode: "replay_failed",
+					errorLabel: "実行中にエラーが起きました",
+					startedAt: 10,
+					endedAt: 15,
+				},
+			],
+		}),
+	);
+	expect(resource.replays).toEqual([
+		{ replayId: "r2", historyId: "h1", state: "running", startedAt: 20 },
+		{
+			replayId: "r1",
+			historyId: "h1",
+			state: "failed",
+			errorLabel: "実行中にエラーが起きました",
+			startedAt: 10,
+			endedAt: 15,
+		},
+	]);
+	expect(resourceOf(data()).replays).toEqual([]);
+	expect(resourceOf(undefined).replays).toEqual([]);
+});
+
+it("changes its revision when a replay changes state", () => {
+	const running = {
+		replayId: "r1",
+		historyId: "h1",
+		state: "running",
+		errorCode: null,
+		errorLabel: null,
+		startedAt: 1,
+		endedAt: null,
+	};
+	const a = resourceOf(data({ replays: [running] }));
+	const b = resourceOf(
+		data({ replays: [{ ...running, state: "completed", endedAt: 2 }] }),
+	);
+	expect(a.revision).not.toBe(b.revision);
+});

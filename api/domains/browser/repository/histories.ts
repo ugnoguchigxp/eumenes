@@ -124,5 +124,13 @@ export const markHistoryFailed = (db: Database, id: string, now: number) =>
 		)
 		.run(now, now, id);
 
+/** A completed replay counts as a run; the content and so the revision stay as they were. */
+export const markHistoryReplayed = (db: Database, id: string, now: number) =>
+	db
+		.query(
+			"UPDATE browser_histories SET run_count=run_count+1,last_outcome='completed',last_used_at=?,updated_at=? WHERE id=?",
+		)
+		.run(now, now, id);
+
 export const deleteHistory = (db: Database, id: string) =>
 	db.query("DELETE FROM browser_histories WHERE id=?").run(id);

@@ -114,7 +114,11 @@ import {
 	browserCaptureStart,
 	browserCaptureTarget,
 	browserHistoryDelete,
+	browserHistoryDeleteInput,
+	browserHistoryReplay,
+	browserHistoryReplayInput,
 	browserHistoryTarget,
+	browserReplayTarget,
 	browserScriptPublish,
 	browserScriptPublish2,
 	browserPageCapture,
@@ -378,6 +382,10 @@ export const validators = {
 	browserScriptPublish2,
 	browserHistoryTarget,
 	browserHistoryDelete,
+	browserHistoryDeleteInput,
+	browserHistoryReplay,
+	browserHistoryReplayInput,
+	browserReplayTarget,
 	browserPageCapture,
 };
 export type SchemaKey = keyof typeof validators;

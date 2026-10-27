@@ -25,6 +25,7 @@ const initial: BrowserWorkspaceResource = {
 	tasks: sampleTasks,
 	captures: sampleCaptures,
 	histories: [],
+	replays: [],
 	bridge: { revision: 1, enabled: true, configured: true, available: true },
 };
 declare global {

@@ -179,6 +179,12 @@ export type BrowserHistorySummary = {
 	lastUsedAt: number;
 	createdAt: number;
 	updatedAt: number;
+	/** 一覧の再生ボタンで実行できるか。無ければ（読み込めていない）再生しない。 */
+	replay?: {
+		/** 値によらずリプレイできない理由のコード。できるなら null。 */
+		blocked: string | null;
+		blockedLabel: string | null;
+	};
 };
 
 export type BrowserHistoryDetail = BrowserHistorySummary & {
@@ -186,6 +192,31 @@ export type BrowserHistoryDetail = BrowserHistorySummary & {
 	actions: BrowserHistoryAction[];
 	/** 組み立て済みのPlaywrightソース。実行せず、テキストとして表示する。 */
 	source: string;
+	/** リプレイで実際に実行するコード。無ければ（読み込めていない）リプレイできない。 */
+	replay?: {
+		/** 実行するコードそのもの（省略しない）。 */
+		code: string;
+		/** 値によらずリプレイできない理由のコード。できるなら null。 */
+		blocked: string | null;
+		blockedLabel: string | null;
+	};
+};
+
+export type BrowserReplayState =
+	| "running"
+	| "completed"
+	| "failed"
+	| "cancelled";
+
+/** 履歴のコードを新しいタブで実行した1回。時刻はepoch ms。 */
+export type BrowserReplayItem = {
+	replayId: string;
+	historyId: string;
+	state: BrowserReplayState;
+	/** 失敗したときの理由（日本語、ホストが決めた文）。 */
+	errorLabel?: string;
+	startedAt: number;
+	endedAt?: number;
 };
 
 export type BrowserPickedPath = { path: string; pickId: number };
@@ -208,6 +239,8 @@ export type BrowserWorkspaceProps = {
 	captures: readonly BrowserCaptureItem[];
 	/** 保存済みの履歴（`lastUsedAt` の新しい順）。 */
 	histories: readonly BrowserHistorySummary[];
+	/** 履歴のリプレイ（新しい順）。履歴ごとの最新の1件が一覧とモーダルの状態になる。 */
+	replays: readonly BrowserReplayItem[];
 	/** 詳細モーダルを開いている履歴。無ければ閉じている。 */
 	selectedHistoryId?: string;
 	/** `selectedHistoryId` の詳細。読み込み中は無い。 */
@@ -243,6 +276,13 @@ export type BrowserWorkspaceProps = {
 	onSelectHistory: (historyId: string | undefined) => void;
 	/** 履歴を削除する。確認はこの部品が済ませる。 */
 	onDeleteHistory: (historyId: string, expectedRevision: number) => void;
+	/** 履歴のコードを新しいタブで実行する。確認はこの部品が済ませる。values は変数名ごとの値。 */
+	onReplayHistory: (
+		historyId: string,
+		expectedRevision: number,
+		values: Record<string, string>,
+	) => void;
+	onCancelReplay: (replayId: string) => void;
 	onDownloadCapture: (captureId: string) => void;
 	onCancelTask: (taskId: string) => void;
 	onCancelCapture: (captureId: string) => void;

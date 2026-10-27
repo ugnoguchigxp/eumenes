@@ -127,6 +127,26 @@ export const historyEmptyNote =
 export const historyDeleteNote =
 	"この履歴を削除します。ブラウザ担当は以後この手順を使いません。";
 
+export const replayLabels = {
+	button: "リプレイ",
+	running: "実行中…",
+	runningBadge: "実行中",
+	cancel: "中止",
+	completed: "完了しました",
+	cancelled: "中止しました",
+	failed: "失敗しました",
+	confirmTitle: "リプレイの確認",
+	confirmNote: "新しいタブでこのコードを実行します。",
+	commitNote: "送信・購入などの確定操作を含みます。",
+	codeHeading: "実行するコード",
+	unavailable: "このリプレイの情報を読み込めませんでした",
+	blockedFallback: "このリプレイは実行できません",
+	run: "実行する",
+	abort: "やめる",
+	play: "再生",
+	commitInDetail: "送信などを含むため、詳細から確認して実行します",
+} as const;
+
 const dayFormat = new Intl.DateTimeFormat("sv-SE", {
 	timeZone: "Asia/Tokyo",
 	year: "numeric",

@@ -1,4 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
+import { waitFor } from "../../../infrastructure/wait-for";
 import type { ToolchainCard } from "../../capabilities";
 import {
 	IMAGE,
@@ -64,6 +65,36 @@ test("a run pinned to music.create hands over the same way when the music port i
 	});
 	expect(h.state.calls).toHaveLength(0);
 	expect(h.todos()).toMatchObject([{ status: "todo" }]);
+});
+
+const command: ToolchainCard = {
+	...RESEARCH,
+	revisionId: "toolchain:fake.operate@1",
+	id: "fake.operate",
+	functionName: "fake_operate",
+	execution: "command",
+};
+
+test("a run pinned to a command toolchain (the CLI's --toolchain) hands its body to the command sub-agent", async () => {
+	h = await setup({ cards: [command] });
+	await h.dialogue.submit({
+		requestId: crypto.randomUUID(),
+		conversationId: "main",
+		text: "このタブで商品名を検索して",
+		toolchainId: command.id,
+		presentation: "artifact",
+	});
+	// The command job runs next; this fixture has no command set, so only the hand-over is checked.
+	await waitFor(() => h!.state.selections.length > 0);
+	expect(h.state.calls).toHaveLength(0);
+	expect(h.todos()).toMatchObject([
+		{ title: "このタブで商品名を検索して", toolchainId: command.id },
+	]);
+	expect(h.state.selections.at(-1)).toMatchObject({
+		decision: "toolchain",
+		toolchainId: command.id,
+		request: "このタブで商品名を検索して",
+	});
 });
 
 const unavailable: Array<

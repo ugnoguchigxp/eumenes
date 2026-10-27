@@ -83,7 +83,8 @@ export function useBrowserRuntime({
 				data?.captures.some((c) =>
 					["queued", "capturing", "encoding"].includes(c.state),
 				) ||
-				data?.tasks.some((t) => ["queued", "running"].includes(t.state));
+				data?.tasks.some((t) => ["queued", "running"].includes(t.state)) ||
+				data?.replays.some((r) => r.state === "running");
 			return working ? BUSY_POLL_MS : visible ? SOURCE_POLL_MS : false;
 		},
 	});
@@ -138,6 +139,21 @@ export function useBrowserRuntime({
 		)
 			void cache.invalidateQueries({ queryKey: [...root, "histories"] });
 	}, [tasks, cache, root]);
+	// A replay that ended changed its history's run counts, so the list is read again.
+	const replayStates = useRef<ReadonlyMap<string, string> | null>(null);
+	const replays = source.data?.replays;
+	useEffect(() => {
+		if (!replays) return;
+		const before = replayStates.current;
+		replayStates.current = new Map(replays.map((r) => [r.replayId, r.state]));
+		if (
+			before &&
+			replays.some(
+				(r) => r.state !== "running" && before.get(r.replayId) === "running",
+			)
+		)
+			void cache.invalidateQueries({ queryKey: [...root, "histories"] });
+	}, [replays, cache, root]);
 	const resource = useMemo(
 		() =>
 			browserResource({

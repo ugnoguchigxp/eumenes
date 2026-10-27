@@ -411,6 +411,9 @@ export function purgeEnded(db: Database, before: number) {
 	db.query(
 		"DELETE FROM browser_tasks WHERE state NOT IN ('queued','running') AND updated_at<?",
 	).run(before);
+	db.query(
+		"DELETE FROM browser_replays WHERE state!='running' AND ended_at<?",
+	).run(before);
 }
 
 export const tasksRevision = (db: Database) =>

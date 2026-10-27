@@ -6,6 +6,7 @@ import {
 	sampleCaptures,
 	sampleHistories,
 	sampleHistoryDetail,
+	sampleReplays,
 	sampleTabs,
 	sampleTasks,
 } from "./fixtures";
@@ -19,6 +20,7 @@ function props(patch: Partial<BrowserWorkspaceProps> = {}) {
 		tasks: sampleTasks,
 		captures: sampleCaptures,
 		histories: sampleHistories,
+		replays: [],
 		onConnect: vi.fn(),
 		onDisconnect: vi.fn(),
 		onSaveExecutablePath: vi.fn(),
@@ -28,6 +30,8 @@ function props(patch: Partial<BrowserWorkspaceProps> = {}) {
 		onSelectCapture: vi.fn(),
 		onSelectHistory: vi.fn(),
 		onDeleteHistory: vi.fn(),
+		onReplayHistory: vi.fn(),
+		onCancelReplay: vi.fn(),
 		onDownloadCapture: vi.fn(),
 		onCancelTask: vi.fn(),
 		onCancelCapture: vi.fn(),
@@ -61,9 +65,7 @@ describe("BrowserWorkspace history tab", () => {
 		const first = rows.find((r) => r.getAttribute("data-history-id") === "h1")!;
 		expect(within(first).getByText(sampleHistories[0]!.title)).toBeTruthy();
 		expect(
-			within(first).getByText(
-				"www.youtube.com ・ 変数: 検索語 ・ 実行3回 ・ 最終 2026-10-20",
-			),
+			within(first).getByText("www.youtube.com ・ 実行3回 ・ 最終 2026-10-20"),
 		).toBeTruthy();
 		expect(
 			within(first).getByText("「おすすめの動画を再生して」"),
@@ -80,6 +82,102 @@ describe("BrowserWorkspace history tab", () => {
 		).toBeTruthy();
 		await userEvent.click(within(first).getByRole("button", { name: /詳細/ }));
 		expect(p.onSelectHistory).toHaveBeenCalledWith("h1");
+	});
+
+	it("plays a row from the list with its variable values, without opening the detail", async () => {
+		const p = props();
+		render(<BrowserWorkspace {...p} />);
+		await openHistoryTab();
+		const first = screen
+			.getAllByRole("listitem")
+			.find((r) => r.getAttribute("data-history-id") === "h1")!;
+		const play = within(first).getByRole("button", {
+			name: `${sampleHistories[0]!.title}を再生`,
+		});
+		expect(play.textContent).toBe("");
+		expect(play.hasAttribute("disabled")).toBe(true);
+		await userEvent.type(within(first).getByLabelText("検索語"), "猫 癒し");
+		expect(play.hasAttribute("disabled")).toBe(false);
+		await userEvent.click(play);
+		expect(p.onReplayHistory).toHaveBeenCalledWith("h1", 3, {
+			keyword: "猫 癒し",
+		});
+		expect(p.onSelectHistory).not.toHaveBeenCalled();
+		expect(screen.queryByRole("dialog")).toBeNull();
+	});
+
+	it("keeps a row with committing operations to the detail, and says why", async () => {
+		render(<BrowserWorkspace {...props()} />);
+		await openHistoryTab();
+		const second = screen
+			.getAllByRole("listitem")
+			.find((r) => r.getAttribute("data-history-id") === "h2")!;
+		expect(
+			within(second)
+				.getByRole("button", { name: `${sampleHistories[1]!.title}を再生` })
+				.hasAttribute("disabled"),
+		).toBe(true);
+		expect(
+			within(second).getByText(
+				"送信などを含むため、詳細から確認して実行します",
+			),
+		).toBeTruthy();
+	});
+
+	it("disables a row's play and says why when the history cannot be replayed", async () => {
+		const blocked = {
+			...sampleHistories[0]!,
+			replay: {
+				blocked: "replay_incomplete",
+				blockedLabel: "記録されていない操作や値があるため実行できません",
+			},
+		};
+		render(<BrowserWorkspace {...props({ histories: [blocked] })} />);
+		await openHistoryTab();
+		expect(
+			screen
+				.getByRole("button", { name: `${blocked.title}を再生` })
+				.hasAttribute("disabled"),
+		).toBe(true);
+		expect(
+			screen.getByText("記録されていない操作や値があるため実行できません"),
+		).toBeTruthy();
+		expect(screen.getByLabelText("検索語").hasAttribute("disabled")).toBe(true);
+	});
+
+	it("turns a running row's play into a stop that cancels that replay", async () => {
+		const p = props({ replays: [sampleReplays.running] });
+		render(<BrowserWorkspace {...p} />);
+		await openHistoryTab();
+		const first = screen
+			.getAllByRole("listitem")
+			.find((r) => r.getAttribute("data-history-id") === "h1")!;
+		expect(
+			within(first).queryByRole("button", {
+				name: `${sampleHistories[0]!.title}を再生`,
+			}),
+		).toBeNull();
+		await userEvent.click(
+			within(first).getByRole("button", {
+				name: `${sampleHistories[0]!.title}の再生を中止`,
+			}),
+		);
+		expect(p.onCancelReplay).toHaveBeenCalledWith("r1");
+	});
+
+	it("shows how a row's latest replay ended", async () => {
+		render(
+			<BrowserWorkspace {...props({ replays: [sampleReplays.failed] })} />,
+		);
+		await openHistoryTab();
+		const first = screen
+			.getAllByRole("listitem")
+			.find((r) => r.getAttribute("data-history-id") === "h1")!;
+		expect(
+			within(first).getByText(
+				"時間内に終わりませんでした（要素が見つからない可能性があります）",
+			),
+		).toBeTruthy();
 	});
 
 	it("shows the empty note", async () => {
@@ -116,6 +214,7 @@ describe("BrowserWorkspace history detail", () => {
 		expect(headings).toEqual([
 			"依頼",
 			"変数",
+			"リプレイ",
 			"手順",
 			"操作",
 			"Playwrightのソース",
@@ -215,6 +314,213 @@ describe("BrowserWorkspace history detail", () => {
 				"履歴が更新されていました。",
 			),
 		).toBeTruthy();
+	});
+});
+
+describe("BrowserWorkspace history replay", () => {
+	const noVariables = {
+		...sampleHistoryDetail,
+		historyId: "h2",
+		revision: 1,
+		variables: [],
+		hasCommit: true,
+	};
+	function detailProps(patch: Partial<BrowserWorkspaceProps> = {}) {
+		return props({
+			selectedHistoryId: "h1",
+			historyDetail: sampleHistoryDetail,
+			...patch,
+		});
+	}
+	const replayButton = () =>
+		within(screen.getByRole("dialog")).getByRole("button", {
+			name: "リプレイ",
+		}) as HTMLButtonElement;
+
+	it("keeps the button disabled until every variable has a value", async () => {
+		render(<BrowserWorkspace {...detailProps()} />);
+		const input = screen.getByLabelText("検索語") as HTMLInputElement;
+		expect(input.required).toBe(true);
+		expect(input.maxLength).toBe(200);
+		expect(replayButton().disabled).toBe(true);
+		await userEvent.type(input, "   ");
+		expect(replayButton().disabled).toBe(true);
+		await userEvent.type(input, "猫");
+		expect(replayButton().disabled).toBe(false);
+	});
+
+	it("shows no input and an enabled button for a history without variables", () => {
+		const p = props({
+			selectedHistoryId: "h2",
+			historyDetail: noVariables,
+		});
+		render(<BrowserWorkspace {...p} />);
+		expect(screen.queryByLabelText("検索語")).toBeNull();
+		expect(replayButton().disabled).toBe(false);
+	});
+
+	it("confirms with the code first, and runs with the revision and values", async () => {
+		const p = detailProps();
+		render(<BrowserWorkspace {...p} />);
+		await userEvent.type(screen.getByLabelText("検索語"), "猫 癒し");
+		await userEvent.click(replayButton());
+		expect(p.onReplayHistory).not.toHaveBeenCalled();
+		const confirm = screen.getByRole("dialog", { name: "リプレイの確認" });
+		expect(
+			within(confirm).getByText("新しいタブでこのコードを実行します。"),
+		).toBeTruthy();
+		expect(within(confirm).getByText("実行するコード")).toBeTruthy();
+		expect(confirm.querySelector("pre code")?.textContent).toBe(
+			sampleHistoryDetail.replay?.code,
+		);
+		expect(confirm.textContent).not.toContain("import { test }");
+		expect(within(confirm).getByText("変数: 検索語 = 猫 癒し")).toBeTruthy();
+		expect(
+			within(confirm).queryByText("送信・購入などの確定操作を含みます。"),
+		).toBeNull();
+		await userEvent.click(
+			within(confirm).getByRole("button", { name: "実行する" }),
+		);
+		expect(p.onReplayHistory).toHaveBeenCalledWith("h1", 3, {
+			keyword: "猫 癒し",
+		});
+		expect(screen.queryByRole("dialog", { name: "リプレイの確認" })).toBeNull();
+	});
+
+	it("warns about committing operations and sends no values without variables", async () => {
+		const p = props({ selectedHistoryId: "h2", historyDetail: noVariables });
+		render(<BrowserWorkspace {...p} />);
+		await userEvent.click(replayButton());
+		const confirm = screen.getByRole("dialog", { name: "リプレイの確認" });
+		expect(
+			within(confirm).getByText("送信・購入などの確定操作を含みます。"),
+		).toBeTruthy();
+		await userEvent.click(
+			within(confirm).getByRole("button", { name: "実行する" }),
+		);
+		expect(p.onReplayHistory).toHaveBeenCalledWith("h2", 1, {});
+	});
+
+	it("disables the button and the inputs and says why when the history cannot be replayed", async () => {
+		const label = "記録されていない操作や値があるため実行できません";
+		render(
+			<BrowserWorkspace
+				{...detailProps({
+					historyDetail: {
+						...sampleHistoryDetail,
+						replay: {
+							code: "",
+							blocked: "replay_incomplete",
+							blockedLabel: label,
+						},
+					},
+				})}
+			/>,
+		);
+		const dialog = screen.getByRole("dialog");
+		expect(within(dialog).getByText(label)).toBeTruthy();
+		expect((screen.getByLabelText("検索語") as HTMLInputElement).disabled).toBe(
+			true,
+		);
+		expect(replayButton().disabled).toBe(true);
+		await userEvent.click(replayButton());
+		expect(screen.queryByRole("dialog", { name: "リプレイの確認" })).toBeNull();
+	});
+
+	it("disables the button when the replay information is missing", () => {
+		render(
+			<BrowserWorkspace
+				{...detailProps({
+					historyDetail: { ...sampleHistoryDetail, replay: undefined },
+				})}
+			/>,
+		);
+		expect(
+			within(screen.getByRole("dialog")).getByText(
+				"このリプレイの情報を読み込めませんでした",
+			),
+		).toBeTruthy();
+		expect(replayButton().disabled).toBe(true);
+	});
+
+	it("does not run when the confirmation is dismissed", async () => {
+		const p = detailProps();
+		render(<BrowserWorkspace {...p} />);
+		await userEvent.type(screen.getByLabelText("検索語"), "猫");
+		await userEvent.click(replayButton());
+		await userEvent.click(screen.getByRole("button", { name: "やめる" }));
+		expect(p.onReplayHistory).not.toHaveBeenCalled();
+		expect(screen.queryByRole("dialog", { name: "リプレイの確認" })).toBeNull();
+	});
+
+	it("shows a running replay with a cancel button and disables the replay button", async () => {
+		const p = detailProps({ replays: [sampleReplays.running] });
+		render(<BrowserWorkspace {...p} />);
+		const dialog = screen.getByRole("dialog");
+		expect(within(dialog).getByText("実行中…")).toBeTruthy();
+		expect(replayButton().disabled).toBe(true);
+		await userEvent.click(within(dialog).getByRole("button", { name: "中止" }));
+		expect(p.onCancelReplay).toHaveBeenCalledWith("r1");
+	});
+
+	it.each([
+		["completed", "完了しました"],
+		["cancelled", "中止しました"],
+		[
+			"failed",
+			"時間内に終わりませんでした（要素が見つからない可能性があります）",
+		],
+	] as const)("shows the ended %s replay", (state, text) => {
+		render(
+			<BrowserWorkspace
+				{...detailProps({ replays: [sampleReplays[state]] })}
+			/>,
+		);
+		const dialog = screen.getByRole("dialog");
+		expect(within(dialog).getByText(text)).toBeTruthy();
+		expect(within(dialog).queryByRole("button", { name: "中止" })).toBeNull();
+	});
+
+	it("uses the newest replay of the open history only", () => {
+		render(
+			<BrowserWorkspace
+				{...detailProps({
+					replays: [
+						{ ...sampleReplays.running, replayId: "other", historyId: "h2" },
+						sampleReplays.completed,
+						sampleReplays.failed,
+					],
+				})}
+			/>,
+		);
+		const dialog = screen.getByRole("dialog");
+		expect(within(dialog).getByText("完了しました")).toBeTruthy();
+		expect(within(dialog).queryByText("実行中…")).toBeNull();
+	});
+
+	it("marks the list row of a history whose replay is running", async () => {
+		render(
+			<BrowserWorkspace {...props({ replays: [sampleReplays.running] })} />,
+		);
+		await openHistoryTab();
+		const rows = screen.getAllByRole("listitem");
+		const first = rows.find((r) => r.getAttribute("data-history-id") === "h1")!;
+		const second = rows.find(
+			(r) => r.getAttribute("data-history-id") === "h2",
+		)!;
+		expect(within(first).getByText("実行中")).toBeTruthy();
+		expect(within(second).queryByText("実行中")).toBeNull();
+	});
+
+	it("does not mark a row for an ended replay", async () => {
+		render(
+			<BrowserWorkspace {...props({ replays: [sampleReplays.completed] })} />,
+		);
+		await openHistoryTab();
+		for (const row of screen.getAllByRole("listitem")) {
+			if (row.hasAttribute("data-history-id"))
+				expect(within(row).queryByText("実行中")).toBeNull();
+		}
 	});
 });
 

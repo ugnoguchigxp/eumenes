@@ -12,6 +12,7 @@ import {
 	connectionRow,
 	executablePath,
 	insertConnection,
+	interruptReplays,
 	lastConnection,
 	loseTabs,
 	patchConnection,
@@ -140,6 +141,7 @@ export function createConnection(ctx: Ctx) {
 				.all() as { id: string }[];
 			for (const s of stale) loseTabs(db, s.id, ctx.now());
 			settleLostConnection(ctx, db);
+			interruptReplays(db, ctx.now());
 			pruneTabs(db, ctx.now() - RETENTION_MS);
 			purgeEnded(db, ctx.now() - RETENTION_MS);
 		})

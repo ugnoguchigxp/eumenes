@@ -8,6 +8,7 @@ import {
 } from "../contracts";
 import {
 	activeCaptureCount,
+	assertNoReplay,
 	activeCaptures,
 	captureByRequest,
 	captureRow,
@@ -171,6 +172,7 @@ export function createCaptures(ctx: Ctx) {
 				input.observationRef!,
 				input.elementRef!,
 			);
+		assertNoReplay(db, input.owner);
 		if (activeCaptureCount(db, input.owner) >= ACTIVE_CAPTURE_LIMIT)
 			throw new Error("browser_capacity");
 		const id = crypto.randomUUID();

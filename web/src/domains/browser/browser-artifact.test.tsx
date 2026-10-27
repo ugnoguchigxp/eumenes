@@ -50,6 +50,7 @@ const resource: BrowserWorkspaceResource = {
 	],
 	tasks: [],
 	histories: [],
+	replays: [],
 	captures: [
 		capture,
 		{
@@ -365,4 +366,59 @@ it("deletes the shown history at its revision after the confirmation", async () 
 			values: { historyId: "" },
 		}),
 	);
+});
+
+const historyDetail = {
+	...summary,
+	steps: [{ label: "検索する", expectation: "結果が表示される" }],
+	actions: [{ seq: 1, kind: "navigate" as const, place: "www.youtube.com/" }],
+	source: "await page.goto('https://www.youtube.com/');",
+	replay: {
+		code: "async (page) => { await page.goto('https://www.youtube.com/'); }",
+		blocked: null,
+		blockedLabel: null,
+	},
+};
+
+it("replays the shown history with one var.<name> value per variable after the confirmation", async () => {
+	const dispatch = setup({
+		...resource,
+		histories: [summary],
+		selectedHistoryId: historyId,
+		historyDetail,
+	});
+	const button = screen.getByRole("button", { name: "リプレイ" });
+	expect((button as HTMLButtonElement).disabled).toBe(true);
+	fireEvent.change(screen.getByLabelText("検索語"), {
+		target: { value: "猫 癒し" },
+	});
+	fireEvent.click(button);
+	expect(dispatch).not.toHaveBeenCalled();
+	fireEvent.click(screen.getByRole("button", { name: "実行する" }));
+	await waitFor(() =>
+		expect(last(dispatch)?.action).toBe("browser-replay-history"),
+	);
+	expect(last(dispatch)?.values).toEqual({
+		historyId,
+		expectedRevision: "4",
+		"var.keyword": "猫 癒し",
+	});
+});
+
+it("cancels the running replay by its id", async () => {
+	const replayId = "44444444-4444-4444-8444-444444444444";
+	const dispatch = setup({
+		...resource,
+		histories: [summary],
+		selectedHistoryId: historyId,
+		historyDetail,
+		replays: [
+			{ replayId, historyId, state: "running", startedAt: 1792454400000 },
+		],
+	});
+	fireEvent.click(screen.getByRole("button", { name: "中止" }));
+	await waitFor(() =>
+		expect(last(dispatch)?.action).toBe("browser-cancel-replay"),
+	);
+	expect(last(dispatch)?.values).toEqual({ replayId });
 });

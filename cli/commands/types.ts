@@ -21,6 +21,8 @@ export type CliArgs = {
 	errorReport: boolean;
 	explicitRequestId: string | undefined;
 	conversationId: string;
+	/** `send --toolchain <id>`: hand the text straight to that toolchain, without the main agent's selection. */
+	toolchainId: string | undefined;
 	listCursor: string | undefined;
 	listLimit: number | undefined;
 };
@@ -37,4 +39,4 @@ export type CliIo = {
 export type CommandRun = (args: CliArgs, io: CliIo) => Promise<number>;
 
 export const USAGE =
-	"usage: bun cli/index.ts status|requirements list|requirements show <id>|requirements import <id> <file.json> <state-token-or-new>|requirements disable <id> <token>|requirements enable <id> <token>|web search|web read|web run|web cancel|web cache|web clear|toolchain-history ...|memory ...|send [text] [--wait] [--json] [--request-id UUID]|history [id]|history-search [query] [--from ISO --until ISO --speaker user|assistant --cursor UUID --limit N]|history-read <messageRef> [--before N --after N --cursor UUID]|run <id> [--error-report]|cancel <id>";
+	"usage: bun cli/index.ts status|requirements list|requirements show <id>|requirements import <id> <file.json> <state-token-or-new>|requirements disable <id> <token>|requirements enable <id> <token>|web search|web read|web run|web cancel|web cache|web clear|toolchain-history ...|memory ...|send [text] [--wait] [--json] [--request-id UUID] [--toolchain ID]|history [id]|history-search [query] [--from ISO --until ISO --speaker user|assistant --cursor UUID --limit N]|history-read <messageRef> [--before N --after N --cursor UUID]|run <id> [--error-report]|cancel <id>";

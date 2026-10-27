@@ -194,6 +194,7 @@ test("REST: the list is newest first, at most 100, never cached; a detail has th
 			"lastOutcome",
 			"lastUsedAt",
 			"place",
+			"replay",
 			"request",
 			"revision",
 			"runCount",
@@ -203,6 +204,11 @@ test("REST: the list is newest first, at most 100, never cached; a detail has th
 			"variables",
 		].sort(),
 	);
+	// The list says whether 再生 can run a history, without the code the detail carries.
+	expect(Object.keys(rows[0]!.replay as object).sort()).toEqual([
+		"blocked",
+		"blockedLabel",
+	]);
 	expect(rows[0]!.variables).toHaveLength(7);
 	expect(rows[0]!.variables).toEqual(
 		expect.arrayContaining([{ name: "v0", label: "説明0" }]),

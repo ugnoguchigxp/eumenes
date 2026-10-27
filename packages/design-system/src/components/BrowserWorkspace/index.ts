@@ -8,6 +8,8 @@ export type {
 	BrowserHistoryActionKind,
 	BrowserHistoryDetail,
 	BrowserHistorySummary,
+	BrowserReplayItem,
+	BrowserReplayState,
 	BrowserCaptureItem,
 	BrowserCaptureRange,
 	BrowserCaptureState,

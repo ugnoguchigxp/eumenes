@@ -127,6 +127,10 @@ APIが停止している状態で `bun run db:backup` を実行すると、通�
 
 含めるのは許可した運用項目のID・固定コード・型・数値・errorFramesだけです。会話本文・依頼文・認識結果・設定・認証情報・Providerの生応答・モデル出力の値・未知の項目名は出しません。IDやエラー発生箇所が含まれるため、外部へ共有する前に確認してください。ログが保持期間外・無効のときは、runの状態とtaskの失敗コードだけの概要になります。
 
+## ブラウザ履歴のリプレイのログ
+
+画面の「リプレイ」が走らせた実行は2件だけ残します。開始は `browser.replay_started`（info。`subjectId`=リプレイID）、終了は `browser.replay_finished`（info。`subjectId`=リプレイID・`outcome`=completed/failed/cancelled・失敗のとき `reason`=分類コード: `replay_timeout`・`replay_failed`・`browser_disconnected`・`replay_interrupted`・`replay_destination_blocked`）です。履歴との対応は `browser_replays.history_id` で引きます。変数の値、実行したコード、URL、ページの文、MCPの応答本文はログにも台帳にも出しません。再起動で中断した実行は起動時に `replay_interrupted` で失敗として閉じます。中止と時間切れは、実行中のタブを閉じてコードが実際に止まってから（止まらなければMCPの子プロセスを終了してから）`cancelled` / `replay_timeout` として閉じます。それまでは実行中として扱います。
+
 ## 検証
 
 ブラウザfixtureが失敗した場合は、試験結果のディレクトリに `backend.jsonl` を保存し、`backend-log` として添付します。fixture用backendは `debug` で記録するため、一時DBの削除後も失敗直前の経過を調べられます。`bun run logs -- --file <backend.jsonlのパス> --level warn` で閲覧できます。

@@ -136,6 +136,8 @@ export type ArtifactEvent = {
 		| "browser-cancel-task"
 		| "browser-select-history"
 		| "browser-delete-history"
+		| "browser-replay-history"
+		| "browser-cancel-replay"
 		| "todo-view"
 		| "todo-page"
 		| "todo-refresh";

@@ -12,6 +12,7 @@ import type {
 	TargetInfo,
 } from "../contracts/ports";
 import { BrowserDriverError } from "../contracts/ports";
+import { runUntilStopped } from "./mcp-replay";
 import {
 	classifyToolError,
 	parseTabList,
@@ -30,7 +31,10 @@ import {
  * BrowserDriver over a child `@playwright/mcp --extension` (spec/browser-tabs-toolchain-design-
  * 2026-10-18.md §4, §5.2, §6.2). The only way to reach the child is `callTool`, whose names are
  * the closed list below; `browser_evaluate` is reachable only through the fixed measuring and
- * inspection functions. MCP output files hold page text, so every call ends by emptying the output dir.
+ * inspection functions, and `browser_run_code_unsafe` (arbitrary code in the server process, RCE-equivalent)
+ * only through `runReplay`, which the domain calls with code its own check has passed (spec browser-history-
+ * replay §3). The response of that call is never read, kept or logged. The tool ignores cancellation, so an
+ * aborted replay closes its tab and, failing that, ends the child (see `runReplay`). MCP output files hold page text, so every call ends by emptying the output dir.
  *
  * Child flags: `--extension` (the user's Brave through Playwright MCP Bridge), `--output-dir`
  * (managed temp dir), `--no-webmcp` (page-registered tools are neither collected nor exposed).
@@ -53,6 +57,7 @@ export const ALLOWED_MCP_TOOLS = [
 	"browser_wait_for",
 	"browser_take_screenshot",
 	"browser_evaluate",
+	"browser_run_code_unsafe",
 ] as const;
 type ToolName = (typeof ALLOWED_MCP_TOOLS)[number];
 const ALLOWED_TOOLS: ReadonlySet<string> = new Set(ALLOWED_MCP_TOOLS);
@@ -103,6 +108,8 @@ export type McpBrowserDriverOptions = {
 	connectTimeoutMs?: number;
 	/** Deadline for one tool call. Default 90 s (MCP's own navigation timeout is 60 s). */
 	callTimeoutMs?: number;
+	/** How long a cancelled replay may take to stop after its tab is closed before the child is ended. Default 10 s. */
+	stopGraceMs?: number;
 	/** Override of the child command; tests only. Defaults to this runtime + the pinned CLI. */
 	launch?: { command: string; args: string[] };
 	now?: () => Date;
@@ -110,6 +117,7 @@ export type McpBrowserDriverOptions = {
 
 const DEFAULT_CONNECT_TIMEOUT_MS = 120_000;
 const DEFAULT_CALL_TIMEOUT_MS = 90_000;
+const DEFAULT_STOP_GRACE_MS = 10_000;
 
 /** This runtime + the pinned CLI inside node_modules; never `npx`. */
 export function pinnedCliLaunch() {
@@ -127,6 +135,7 @@ export function createMcpBrowserDriver(
 	const connectTimeoutMs =
 		options.connectTimeoutMs ?? DEFAULT_CONNECT_TIMEOUT_MS;
 	const callTimeoutMs = options.callTimeoutMs ?? DEFAULT_CALL_TIMEOUT_MS;
+	const stopGraceMs = options.stopGraceMs ?? DEFAULT_STOP_GRACE_MS;
 	const now = options.now ?? (() => new Date());
 	const listeners = new Set<(state: DriverConnectionState) => void>();
 	let current: DriverConnectionState = { state: "disconnected" };
@@ -277,14 +286,20 @@ export function createMcpBrowserDriver(
 		return next;
 	};
 
-	/** The single door to the child. Tool names outside the closed list cannot be called. */
-	const callTool = (
+	/**
+	 * The single door to the child. Tool names outside the closed list cannot be called. Callers hold the
+	 * serial section (`callTool`), except `runReplay`, which holds it for its whole run and sends its stop
+	 * requests from inside it.
+	 */
+	const callToolNow = (
 		name: ToolName,
 		args: Record<string, unknown>,
 		signal?: AbortSignal,
 		readSnapshotFile = false,
+		/** True while the caller itself closes the page the call works on: the closed-page error is then its doing. */
+		closing: () => boolean = () => false,
 	): Promise<ParsedToolResult & { snapshotText?: string }> =>
-		serial(signal, async () => {
+		(async () => {
 			if (!ALLOWED_TOOLS.has(name))
 				throw new BrowserDriverError("tool_not_allowed", false);
 			const child = session;
@@ -304,7 +319,7 @@ export function createMcpBrowserDriver(
 				const parsed = parseToolResult(raw);
 				if (parsed.isError) {
 					const failure = classifyToolError(parsed.error, name);
-					if (failure.code === "browser_closed")
+					if (failure.code === "browser_closed" && !closing())
 						void end(child, "browser_closed");
 					throw new BrowserDriverError(failure.code, failure.dispatched);
 				}
@@ -323,14 +338,24 @@ export function createMcpBrowserDriver(
 			} finally {
 				await clearOutput();
 			}
-		});
+		})();
+	const callTool = (
+		name: ToolName,
+		args: Record<string, unknown>,
+		signal?: AbortSignal,
+		readSnapshotFile = false,
+	) => serial(signal, () => callToolNow(name, args, signal, readSnapshotFile));
 
-	const tabsCall = async (args: Record<string, unknown>) => {
-		const parsed = await callTool("browser_tabs", args);
-		const tabs = parseTabList(parsed.result);
-		if (!tabs) throw new BrowserDriverError("mcp_response_unrecognized", true);
-		return tabs.filter((tab) => !tab.url.startsWith("chrome-extension:"));
-	};
+	const tabsCall = (args: Record<string, unknown>) => tabsVia(callTool, args);
+
+	const runReplay = createReplayRunner({
+		serial,
+		call: callToolNow,
+		connectedSession: () =>
+			current.state === "connected" ? session : undefined,
+		end,
+		stopGraceMs,
+	});
 
 	const pageOf = async (parsed: ParsedToolResult) => {
 		if (parsed.page) return parsed.page;
@@ -396,8 +421,63 @@ export function createMcpBrowserDriver(
 				};
 			}
 		},
+		runReplay,
 		...createReaders(callTool),
 	};
+}
+
+/** The tabs the child lists (its own extension pages left out), through the given way of calling it. */
+async function tabsVia(call: CallTool, args: Record<string, unknown>) {
+	const parsed = await call("browser_tabs", args);
+	const tabs = parseTabList(parsed.result);
+	if (!tabs) throw new BrowserDriverError("mcp_response_unrecognized", true);
+	return tabs.filter((tab) => !tab.url.startsWith("chrome-extension:"));
+}
+
+/**
+ * `runReplay`: the code tool through `runUntilStopped`, which holds the serial section for the whole run, so the
+ * calls it makes itself (the tab list, the tab close) go around the serial queue.
+ */
+function createReplayRunner(deps: {
+	serial: <T>(
+		signal: AbortSignal | undefined,
+		run: () => Promise<T>,
+	) => Promise<T>;
+	call: (
+		name: ToolName,
+		args: Record<string, unknown>,
+		signal?: AbortSignal,
+		readSnapshotFile?: boolean,
+		closing?: () => boolean,
+	) => Promise<ParsedToolResult>;
+	connectedSession: () => McpSession | undefined;
+	end: (child: McpSession, reason: DriverDisconnectReason) => Promise<void>;
+	stopGraceMs: number;
+}): BrowserDriver["runReplay"] {
+	return (code, signal) =>
+		deps.serial(signal, async () => {
+			const child = deps.connectedSession();
+			if (!child) throw new BrowserDriverError("not_connected", false);
+			await runUntilStopped({
+				currentTab: () =>
+					tabsVia(deps.call, { action: "list" })
+						.then((tabs) => tabs.find((t) => t.current)?.index)
+						.catch(() => undefined),
+				run: (closing) =>
+					deps.call(
+						"browser_run_code_unsafe",
+						{ code },
+						undefined,
+						false,
+						closing,
+					),
+				closeTab: (index) =>
+					tabsVia(deps.call, { action: "close", index: tabIndex(index) }),
+				endSession: () => deps.end(child, "process_exited"),
+				graceMs: deps.stopGraceMs,
+				signal,
+			});
+		});
 }
 
 type CallTool = (

@@ -8,6 +8,7 @@ import {
 	CAPTURE_MS,
 	LEASE_MS,
 	LEASE_RENEW_MS,
+	REPLAY_MS,
 	RETENTION_MS,
 	TASK_MS,
 } from "../contracts";
@@ -20,14 +21,10 @@ import type {
 } from "../contracts/ports";
 import {
 	activeConnection,
-	capturesRevision,
-	connectionCount,
 	listCaptures,
 	expireApprovals,
 	listTasks,
 	purgeEnded,
-	tabsRevision,
-	tasksRevision,
 	taskRow,
 	taskByRequest,
 	type TaskRow,
@@ -48,6 +45,8 @@ import {
 import { createGrants } from "./grants";
 import { createHistoryApi } from "./histories";
 import { createOperations } from "./operations";
+import { createReplays } from "./replay";
+import { workspaceSource } from "./workspace-source";
 import { reconcileChecked, tabViews } from "./tabs";
 import { createTasks, type StartTaskInput } from "./tasks";
 
@@ -74,6 +73,7 @@ export function createBrowser(deps: {
 	renewMs?: number;
 	taskMs?: number;
 	captureMs?: number;
+	replayMs?: number;
 	/** Where Brave is installed by default; the first executable one is offered while no path is saved. */
 	standardPaths?: readonly string[];
 	/** The OS file dialog for choosing Brave; without it the path is only typed in. */
@@ -102,6 +102,8 @@ export function createBrowser(deps: {
 		renewMs: deps.renewMs ?? LEASE_RENEW_MS,
 		taskMs: deps.taskMs ?? TASK_MS,
 		captureMs: deps.captureMs ?? CAPTURE_MS,
+		replayMs: deps.replayMs ?? REPLAY_MS,
+		pendingReplays: new Map(),
 		inflight: new Map(),
 		serialOf(connectionId) {
 			let s = serials.get(connectionId);
@@ -119,6 +121,7 @@ export function createBrowser(deps: {
 	const operations = createOperations(ctx, grants, approvals);
 	const captures = createCaptures(ctx);
 	const tasks = createTasks(ctx, apiFor, approvals);
+	const replays = createReplays(ctx, { connection, operations });
 	void connection.ready
 		.then(() => captures.removeOrphans())
 		.catch(() => undefined);
@@ -303,6 +306,10 @@ export function createBrowser(deps: {
 		listCaptures: (owner: string) =>
 			store.read((db) => listCaptures(db, owner)),
 		...createHistoryApi(store),
+		startReplayInTransaction: replays.startInTransaction,
+		cancelReplayInTransaction: replays.cancelInTransaction,
+		/** For callers that cancel inside their own transaction: stop the running code after it commits. */
+		abortReplay: replays.abortRunning,
 		captureContent: captures.content,
 		/**
 		 * Ends tasks and captures past their deadline, expires old approvals, deletes what ended more than 7 days
@@ -323,30 +330,8 @@ export function createBrowser(deps: {
 			await captures.removeOrphans();
 			return result;
 		},
-		sourceInTransaction(db: Database, owner: string) {
-			const view = connectionView(ctx, db);
-			const settings = db
-				.query(
-					"SELECT COUNT(*) AS n, COALESCE(MAX(updated_at),0) AS t FROM browser_settings",
-				)
-				.get() as { n: number; t: number };
-			return {
-				revision:
-					connectionCount(db) +
-					tabsRevision(db) +
-					tasksRevision(db) +
-					capturesRevision(db) +
-					settings.n +
-					settings.t,
-				data: {
-					availability: view.availability,
-					connection: view,
-					tabs: tabViews(ctx, db),
-					tasks: listTasks(db, owner),
-					captures: listCaptures(db, owner),
-				},
-			};
-		},
+		sourceInTransaction: (db: Database, owner: string) =>
+			workspaceSource(ctx, db, owner),
 	};
 	return service;
 }

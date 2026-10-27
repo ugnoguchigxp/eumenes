@@ -118,6 +118,15 @@ ALTER TABLE browser_operations ADD COLUMN detail_json TEXT;
 ALTER TABLE browser_input_grants ADD COLUMN variable TEXT;
 ALTER TABLE browser_approvals ADD COLUMN variable TEXT;`,
 	},
+	{
+		id: "browser/0006-replays",
+		after: ["browser/0005-histories"],
+		sql: `CREATE TABLE browser_replays (
+ id TEXT PRIMARY KEY, owner TEXT NOT NULL, history_id TEXT NOT NULL, state TEXT NOT NULL, error_code TEXT,
+ tab_ref TEXT, started_at INTEGER NOT NULL, ended_at INTEGER
+);
+CREATE INDEX browser_replays_owner ON browser_replays(owner,started_at);`,
+	},
 ];
 
 export * from "./settings";
@@ -127,3 +136,4 @@ export * from "./tasks";
 export * from "./captures";
 export * from "./approvals";
 export * from "./histories";
+export * from "./replays";

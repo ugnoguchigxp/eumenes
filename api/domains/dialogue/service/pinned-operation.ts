@@ -9,10 +9,14 @@ import { dispatchInTransaction } from "./work-dispatch";
 
 const log = getLogger("dialogue");
 
-/** The screens' own toolchains: the only executions a pinned form submit may start. */
+/**
+ * The executions a pinned submit may start: the screens' own toolchains, and a command toolchain named on
+ * the command line (its sub-agent still turns the request into one typed operation).
+ */
 const PINNED_EXECUTIONS: ReadonlySet<string> = new Set([
 	"image",
 	"music-create",
+	"command",
 ]);
 
 /** The first decision of a run that carries its toolchain (a screen's form submit), not a TODO's report. */
@@ -27,7 +31,7 @@ export function isPinnedDecision(run: Run | null, input: GenerateInput) {
 /**
  * The hand-over of a screen's form submit to the screen's own toolchain: no model call and no other candidate.
  * The request text is the submit body; the work gets its TODO like any delegation. A toolchain that is not
- * available now, has no active revision or is not an image / music-create toolchain fails the run.
+ * available now, has no active revision or is not an image / music-create / command toolchain fails the run.
  */
 export async function pinnedGeneration(
 	deps: DialogueDeps,

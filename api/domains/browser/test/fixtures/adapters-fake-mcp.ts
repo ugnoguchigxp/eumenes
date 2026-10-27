@@ -21,6 +21,8 @@ type Config = {
 	connectError?: string;
 	exitOnCall?: string;
 	hangOn?: string;
+	/** `browser_run_code_unsafe` is not answered until its tab is closed ("until-close") or ever ("forever"); it ignores cancellation. */
+	holdRun?: "until-close" | "forever";
 	snapshotMode?: "inline" | "file";
 	errors?: Record<string, string>;
 	images?: boolean;
@@ -56,6 +58,7 @@ let tabs = [
 ];
 let selected = 0;
 let calls = 0;
+let heldRun: unknown = null;
 const stamp = () => new Date().toISOString().replace(/[:.]/g, "-");
 
 const tabList = () =>
@@ -120,8 +123,21 @@ async function call(id: unknown, name: string, args: Record<string, unknown>) {
 	const failure = cfg.errors?.[name];
 	if (failure)
 		return respond(id, text(`### Error\n${failure}`, { isError: true }));
+	if (name === "browser_run_code_unsafe" && cfg.holdRun) {
+		heldRun = cfg.holdRun === "until-close" ? id : null;
+		return;
+	}
 	switch (name) {
 		case "browser_tabs": {
+			if (args.action === "close" && heldRun !== null) {
+				respond(
+					heldRun,
+					text("### Error\nTarget page, context or browser has been closed", {
+						isError: true,
+					}),
+				);
+				heldRun = null;
+			}
 			if (args.action === "new") {
 				tabs.push({ title: "Example Domain", url: String(args.url) });
 				selected = tabs.length - 1;

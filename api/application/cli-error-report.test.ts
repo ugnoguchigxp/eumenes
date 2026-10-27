@@ -13,6 +13,7 @@ const args = (patch: Partial<CliArgs>): CliArgs => ({
 	errorReport: false,
 	explicitRequestId: undefined,
 	conversationId: "main",
+	toolchainId: undefined,
 	listCursor: undefined,
 	listLimit: undefined,
 	...patch,

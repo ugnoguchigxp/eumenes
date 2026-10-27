@@ -155,6 +155,13 @@ const browserHistorySummary = z.looseObject({
 	lastUsedAt: z.number(),
 	createdAt: z.number(),
 	updatedAt: z.number(),
+	/** Whether the list's 再生 can run it; absent when the host did not send it. */
+	replay: z
+		.object({
+			blocked: z.string().nullable(),
+			blockedLabel: z.string().nullable(),
+		})
+		.optional(),
 });
 export type BrowserHistorySummaryData = z.infer<typeof browserHistorySummary>;
 const browserHistoryAction = z.looseObject({
@@ -174,6 +181,14 @@ const browserHistoryDetail = browserHistorySummary.extend({
 	steps: z.array(z.object({ label: z.string(), expectation: z.string() })),
 	actions: z.array(browserHistoryAction),
 	source: z.string(),
+	/** What a replay really runs; absent when the host did not send it. */
+	replay: z
+		.object({
+			code: z.string(),
+			blocked: z.string().nullable(),
+			blockedLabel: z.string().nullable(),
+		})
+		.optional(),
 });
 export type BrowserHistoryDetailData = z.infer<typeof browserHistoryDetail>;
 export const browserHistoryList = z.object({
@@ -181,11 +196,24 @@ export const browserHistoryList = z.object({
 });
 export const browserHistoryResult = z.object({ history: browserHistoryDetail });
 
+const browserReplay = z.looseObject({
+	replayId: z.string(),
+	historyId: z.string(),
+	state: z.enum(["running", "completed", "failed", "cancelled"]),
+	errorCode: z.string().nullable(),
+	errorLabel: z.string().nullable(),
+	startedAt: z.number(),
+	endedAt: z.number().nullable(),
+});
+export type BrowserReplayData = z.infer<typeof browserReplay>;
+
 export const browserSourceData = z.looseObject({
 	connection: browserConnection,
 	tabs: z.array(browserTab),
 	tasks: z.array(browserTask),
 	captures: z.array(browserCapture),
+	/** The owner's latest replays, newest first. */
+	replays: z.array(browserReplay).default([]),
 });
 export type BrowserSourceData = z.infer<typeof browserSourceData>;
 

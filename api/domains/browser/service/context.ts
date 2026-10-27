@@ -100,6 +100,18 @@ export type TaskStepRunner = (
 	context: { signal: AbortSignal; api: TaskApi },
 ) => Promise<TaskStepOutcome>;
 
+export type PendingReplay = {
+	/** The function MCP runs. */
+	code: string;
+	/** Where the new tab opens. */
+	tabUrl: string;
+	/** The addresses the code sends the page to, with the run's values in them. */
+	gotoUrls: string[];
+	at: number;
+	/** The user cancelled before the job began. */
+	cancelled?: boolean;
+};
+
 export type Ctx = {
 	research: import("./research-collection").ResearchCollection;
 	reviewResearch?: (
@@ -128,6 +140,13 @@ export type Ctx = {
 	renewMs: number;
 	taskMs: number;
 	captureMs: number;
+	/** How long the code of a replay may run. */
+	replayMs: number;
+	/**
+	 * What a started replay will run, handed from the accepting transaction to its queue job. It stays in memory:
+	 * the code carries the user's values and neither the queue payload nor the ledger may keep them.
+	 */
+	pendingReplays: Map<string, PendingReplay>;
 	/** The serial section of a connection; dropped when it ends. */
 	serialOf: (connectionId: string) => Serial;
 	/** Aborts running work: `task:<id>`, `capture:<id>`, `op:<id>`. */

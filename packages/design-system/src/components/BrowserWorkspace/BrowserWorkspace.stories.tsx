@@ -5,6 +5,7 @@ import {
 	sampleCaptures,
 	sampleHistories,
 	sampleHistoryDetail,
+	sampleReplays,
 	sampleTabs,
 	sampleTasks,
 } from "./fixtures";
@@ -24,6 +25,7 @@ const args: BrowserWorkspaceProps = {
 	tasks: sampleTasks,
 	captures: sampleCaptures,
 	histories: sampleHistories,
+	replays: [],
 	selectedCaptureId: "c1",
 	previewSrc: preview,
 	onConnect: () => {},
@@ -35,6 +37,8 @@ const args: BrowserWorkspaceProps = {
 	onSelectCapture: () => {},
 	onSelectHistory: () => {},
 	onDeleteHistory: () => {},
+	onReplayHistory: () => {},
+	onCancelReplay: () => {},
 	onDownloadCapture: () => {},
 	onCancelTask: () => {},
 	onCancelCapture: () => {},
@@ -61,6 +65,33 @@ export const HistoryDetail: Story = {
 	args: {
 		selectedHistoryId: sampleHistoryDetail.historyId,
 		historyDetail: sampleHistoryDetail,
+	},
+};
+export const HistoryReplayRunning: Story = {
+	args: {
+		selectedHistoryId: sampleHistoryDetail.historyId,
+		historyDetail: sampleHistoryDetail,
+		replays: [sampleReplays.running],
+	},
+};
+export const HistoryReplayFailed: Story = {
+	args: {
+		selectedHistoryId: sampleHistoryDetail.historyId,
+		historyDetail: sampleHistoryDetail,
+		replays: [sampleReplays.failed],
+	},
+};
+export const HistoryReplayBlocked: Story = {
+	args: {
+		selectedHistoryId: sampleHistoryDetail.historyId,
+		historyDetail: {
+			...sampleHistoryDetail,
+			replay: {
+				code: "",
+				blocked: "replay_incomplete",
+				blockedLabel: "記録されていない操作や値があるため実行できません",
+			},
+		},
 	},
 };
 export const NotConfigured: Story = {

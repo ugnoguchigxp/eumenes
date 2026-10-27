@@ -3,19 +3,32 @@ import { Button } from "../Button";
 import { ConfirmModal } from "../ConfirmModal";
 import { CopyClipButton } from "../CopyClipButton";
 import { Modal } from "../Modal";
+import { BrowserHistoryReplay } from "./BrowserHistoryReplay";
 import { formatDateTime, historyDeleteNote, historyKindLabels } from "./labels";
-import type { BrowserHistoryAction, BrowserHistoryDetail } from "./types";
+import type {
+	BrowserHistoryAction,
+	BrowserHistoryDetail,
+	BrowserReplayItem,
+} from "./types";
 
 export type BrowserHistoryDetailProps = {
 	/** 一覧にある名称。詳細を読むまでの見出しに使う。 */
 	fallbackTitle: string;
 	detail?: BrowserHistoryDetail;
+	/** この履歴の最新のリプレイ。 */
+	replay?: BrowserReplayItem;
 	error?: string;
 	pending?: boolean;
 	/** 削除などの結果の説明。モーダルの上では背面の表示が見えないため、ここにも出す。 */
 	message?: string;
 	onClose: () => void;
 	onDelete: (historyId: string, expectedRevision: number) => void;
+	onReplay: (
+		historyId: string,
+		expectedRevision: number,
+		values: Record<string, string>,
+	) => void;
+	onCancelReplay: (replayId: string) => void;
 };
 
 function actionLine(action: BrowserHistoryAction) {
@@ -29,7 +42,18 @@ function actionLine(action: BrowserHistoryAction) {
 		.join(" ・ ");
 }
 
-function Body({ detail }: { detail: BrowserHistoryDetail }) {
+type BodyProps = Pick<
+	BrowserHistoryDetailProps,
+	"replay" | "pending" | "onReplay" | "onCancelReplay"
+> & { detail: BrowserHistoryDetail };
+
+function Body({
+	detail,
+	replay,
+	pending,
+	onReplay,
+	onCancelReplay,
+}: BodyProps) {
 	const [copied, setCopied] = useState(false);
 	return (
 		<div className="browser-history-detail">
@@ -56,6 +80,13 @@ function Body({ detail }: { detail: BrowserHistoryDetail }) {
 					</>
 				)}
 			</section>
+			<BrowserHistoryReplay
+				detail={detail}
+				replay={replay}
+				pending={pending}
+				onReplay={onReplay}
+				onCancel={onCancelReplay}
+			/>
 			<section aria-label="手順">
 				<h4>手順</h4>
 				<ol>
@@ -112,11 +143,14 @@ function Body({ detail }: { detail: BrowserHistoryDetail }) {
 export function BrowserHistoryDetailModal({
 	fallbackTitle,
 	detail,
+	replay,
 	error,
 	pending,
 	message,
 	onClose,
 	onDelete,
+	onReplay,
+	onCancelReplay,
 }: BrowserHistoryDetailProps) {
 	const [confirming, setConfirming] = useState(false);
 	return (
@@ -145,7 +179,13 @@ export function BrowserHistoryDetailModal({
 				}
 			>
 				{detail ? (
-					<Body detail={detail} />
+					<Body
+						detail={detail}
+						replay={replay}
+						pending={pending}
+						onReplay={onReplay}
+						onCancelReplay={onCancelReplay}
+					/>
 				) : error ? (
 					<p role="alert">{error}</p>
 				) : (

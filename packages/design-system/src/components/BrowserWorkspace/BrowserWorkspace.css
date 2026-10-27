@@ -299,3 +299,40 @@
 .browser-history-info dd {
 	margin: 0;
 }
+.browser-history-row-actions {
+	display: flex;
+	gap: 0.4rem;
+	align-items: center;
+}
+.browser-history-row-fields {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+	margin-top: 0.35rem;
+}
+.browser-history-row-field {
+	display: flex;
+	flex-direction: column;
+	gap: 0.2rem;
+	min-width: 12rem;
+	font-size: 0.8rem;
+}
+.browser-history-replay-field {
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+	margin-bottom: 0.5rem;
+}
+.browser-history-replay-field label {
+	font-size: 0.9rem;
+}
+.browser-history-replay-status[data-state="failed"] {
+	color: var(--destructive);
+}
+.browser-history-replay-commit {
+	font-weight: 600;
+	color: var(--warning-foreground);
+	background: var(--warning);
+	border-radius: var(--radius);
+	padding: 0.3rem 0.6rem;
+}

@@ -12,6 +12,10 @@ export const run: CommandRun = async (args, io) => {
 			requestId,
 			conversationId: args.conversationId,
 			text: content.trim(),
+			// A named toolchain is a pinned submit, which the API takes only as an artifact presentation.
+			...(args.toolchainId
+				? { toolchainId: args.toolchainId, presentation: "artifact" as const }
+				: {}),
 		});
 	} catch (error) {
 		io.error(`Request ID: ${requestId}. Check status before retrying.`);

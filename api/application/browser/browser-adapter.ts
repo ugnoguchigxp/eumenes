@@ -23,6 +23,7 @@ import {
 
 export const BROWSER_ADAPTER_REF = "adapter:browser@1";
 export const HISTORY_DELETE_INPUT = "input:browser.history-delete@1";
+export const HISTORY_REPLAY_INPUT = "input:browser.history-replay@1";
 const WORKSPACE = "query:browser.workspace@1";
 const OWNER = CONVERSATION_DEFAULT_PRINCIPAL;
 const SNAPSHOT_TABS = 20;
@@ -49,7 +50,9 @@ const operations = [
 	["browser.task.scripted", "builtin:browserTaskBegin", "write"],
 	["browser.task.status", "builtin:browserTaskTarget", "read"],
 	["browser.task.cancel", "builtin:browserTaskTarget", "write"],
-	["browser.history.delete", "builtin:browserHistoryDelete", "write"],
+	["browser.history.delete", "builtin:browserHistoryDeleteInput", "write"],
+	["browser.history.replay", "builtin:browserHistoryReplayInput", "write"],
+	["browser.history.replay.cancel", "builtin:browserReplayTarget", "write"],
 ] as const;
 
 /** The screen's delete event carries strings only; the revision it showed becomes a number here. */
@@ -77,6 +80,42 @@ const historyDeleteInput: InputAdapter = (raw) => {
 			};
 };
 
+const VARIABLE_FIELD = /^var\.([a-z][a-zA-Z0-9]{0,30})$/;
+
+/** The replay event carries strings only: the revision becomes a number and each `var.<name>` joins `values`. */
+const historyReplayInput: InputAdapter = (raw) => {
+	const errors: FieldError[] = [];
+	const { historyId, expectedRevision } = raw;
+	if (typeof historyId !== "string" || !historyId)
+		errors.push({ field: "historyId", message: "履歴を指定してください" });
+	if (
+		typeof expectedRevision !== "string" ||
+		!/^\d{1,10}$/.test(expectedRevision)
+	)
+		errors.push({
+			field: "expectedRevision",
+			message: "revision を確認してください",
+		});
+	const values: Record<string, string> = {};
+	for (const [field, value] of Object.entries(raw)) {
+		const name = VARIABLE_FIELD.exec(field)?.[1];
+		if (!name) continue;
+		if (typeof value !== "string")
+			errors.push({ field, message: "変数の値を確かめてください" });
+		else values[name] = value;
+	}
+	return errors.length
+		? { ok: false, errors }
+		: {
+				ok: true,
+				value: {
+					historyId,
+					expectedRevision: Number(expectedRevision),
+					values,
+				},
+			};
+};
+
 export const describeBrowserAdapter = () => ({
 	owner: "browser",
 	operations: new Map<
@@ -91,6 +130,7 @@ export const describeBrowserAdapter = () => ({
 	queries: new Set([WORKSPACE]),
 	inputAdapters: new Map<string, InputAdapter>([
 		[HISTORY_DELETE_INPUT, historyDeleteInput],
+		[HISTORY_REPLAY_INPUT, historyReplayInput],
 	]),
 	projections: new Set([
 		"projection:browser.capture-result@1",
@@ -210,6 +250,11 @@ function readOperation(
 			return z.uuid().safeParse(id).success
 				? done(operationId, { action, historyId: id }, { deleted: true })
 				: null;
+		case "history.replay":
+		case "history.replay.cancel":
+			return z.uuid().safeParse(id).success
+				? done(operationId, { action, replayId: id }, { accepted: true })
+				: null;
 		case "tab.focus":
 		case "tab.close":
 			return z.uuid().safeParse(id).success
@@ -246,6 +291,63 @@ function deleteHistory(
 	);
 }
 
+/** Replays are the user's: the screen starts and stops them, and the conversation has no way to. */
+function replayHistory(
+	service: BrowserService,
+	db: Database,
+	fromUser: boolean,
+	input: {
+		historyId?: string;
+		expectedRevision?: number;
+		values?: Record<string, string>;
+	},
+) {
+	if (!fromUser) throw new Error("origin_invalid");
+	const started = service.startReplayInTransaction(db, OWNER, {
+		historyId: input.historyId!,
+		expectedRevision: input.expectedRevision!,
+		values: input.values ?? {},
+	});
+	return done(
+		`history.replay:${started.replayId}`,
+		{ action: "history.replay", replayId: started.replayId },
+		{ accepted: true },
+	);
+}
+
+function cancelReplay(
+	service: BrowserService,
+	db: Database,
+	fromUser: boolean,
+	id: string,
+	abortAfterCommit: (replayId: string) => void,
+) {
+	if (!fromUser) throw new Error("origin_invalid");
+	const { replayId } = service.cancelReplayInTransaction(db, OWNER, id);
+	abortAfterCommit(replayId);
+	return done(
+		`history.replay.cancel:${replayId}`,
+		{ action: "history.replay.cancel", replayId },
+		{ accepted: true },
+	);
+}
+
+/** What an operation's schema leaves in `request.input`; each operation reads its own fields. */
+type AdapterInput = {
+	tabRef?: string;
+	captureId?: string;
+	taskId?: string;
+	request?: string;
+	range?: "viewport" | "full-page";
+	url?: string;
+	continueFrom?: string;
+	approvePending?: boolean;
+	historyId?: string;
+	expectedRevision?: number;
+	values?: Record<string, string>;
+	replayId?: string;
+};
+
 export function createBrowserAdapter(
 	service: BrowserService,
 	effects: BrowserEffects,
@@ -266,18 +368,7 @@ export function createBrowserAdapter(
 			const fromUser = request.origin.kind === "ui";
 			const conversationId =
 				request.origin.kind === "ui" ? "main" : request.origin.conversationId;
-			const input = request.input as {
-				tabRef?: string;
-				captureId?: string;
-				taskId?: string;
-				request?: string;
-				range?: "viewport" | "full-page";
-				url?: string;
-				continueFrom?: string;
-				approvePending?: boolean;
-				historyId?: string;
-				expectedRevision?: number;
-			};
+			const input = request.input as AdapterInput;
 			const { data } = read(db);
 			const queue = (
 				effect: Parameters<BrowserEffects["enqueueInTransaction"]>[4],
@@ -506,6 +597,16 @@ export function createBrowserAdapter(
 				}
 				case "browser.history.delete":
 					return deleteHistory(service, db, fromUser, input);
+				case "browser.history.replay":
+					return replayHistory(service, db, fromUser, input);
+				case "browser.history.replay.cancel":
+					return cancelReplay(
+						service,
+						db,
+						fromUser,
+						input.replayId!,
+						(replayId) => queue({ kind: "abort_replay", replayId }),
+					);
 				case "browser.tab.open": {
 					if (!data.connection.availability.available)
 						throw new Error("browser_disconnected");

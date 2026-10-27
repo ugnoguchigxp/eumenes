@@ -41,6 +41,7 @@ export type {
 	HistoryDelete,
 	HistoryDetail,
 	HistoryForOperator,
+	HistoryReplay,
 	HistorySummary,
 } from "./contracts/history";
 export { historyDelete } from "./contracts/history";

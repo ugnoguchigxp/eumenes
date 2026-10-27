@@ -113,6 +113,11 @@ export interface BrowserDriver {
 	/** Snapshot of the current tab. */
 	snapshot(signal: AbortSignal): Promise<DriverSnapshot>;
 	act(action: DriverAction, signal: AbortSignal): Promise<DriverActionResult>;
+	/**
+	 * Runs the code of a replay on the current tab (MCP's `browser_run_code_unsafe`). The host has checked the code;
+	 * nothing of the response is returned or kept. Failure is thrown; a failure may have reached the page.
+	 */
+	runReplay(code: string, signal: AbortSignal): Promise<void>;
 	/** Inspects the element of an observed ref on the current tab. Read-only: a failure never reached the page. */
 	inspectTarget(ref: string): Promise<TargetInfo>;
 	/** Inspects the focused element of the current tab (what a key press would act on). Read-only. */

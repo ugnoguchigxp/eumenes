@@ -71,6 +71,7 @@ export function createSavedPathDriver(options: {
 		closeTab: async (index) => current().closeTab(index),
 		snapshot: async (signal) => current().snapshot(signal),
 		act: async (action, signal) => current().act(action, signal),
+		runReplay: async (code, signal) => current().runReplay(code, signal),
 		inspectTarget: async (ref) => current().inspectTarget(ref),
 		inspectFocused: async () => current().inspectFocused(),
 		measure: async (range, elementRef) => current().measure(range, elementRef),

@@ -81,11 +81,23 @@ export type HistorySummary = {
 	lastUsedAt: number;
 	createdAt: number;
 	updatedAt: number;
+	/** Whether the list's 再生 can run it; the detail adds the code. */
+	replay: Pick<HistoryReplay, "blocked" | "blockedLabel">;
+};
+/**
+ * What a replay of the history would run: `code` is exactly the lines placed in the wrapper, in order and
+ * whole. `blocked` is the code a start would be refused with for reasons that do not depend on the values.
+ */
+export type HistoryReplay = {
+	code: string;
+	blocked: "replay_incomplete" | "replay_code_rejected" | null;
+	blockedLabel: string | null;
 };
 export type HistoryDetail = HistorySummary & {
 	steps: HistoryStep[];
 	actions: HistoryAction[];
 	source: string;
+	replay: HistoryReplay;
 };
 
 /** What the page operator sees of the histories in REFERENCE (bounded). */

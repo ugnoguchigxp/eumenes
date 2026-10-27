@@ -15,6 +15,7 @@ import type {
 	DriverConnectionState,
 } from "../contracts/ports";
 import { BrowserDriverError } from "../contracts/ports";
+import { waitFor as until } from "../../../infrastructure/wait-for";
 import {
 	ALLOWED_MCP_TOOLS,
 	createMcpBrowserDriver,
@@ -45,6 +46,7 @@ function setup(
 		extensionToken?: string;
 		connectTimeoutMs?: number;
 		callTimeoutMs?: number;
+		stopGraceMs?: number;
 		executablePath?: string;
 	} = {},
 ) {
@@ -60,6 +62,9 @@ function setup(
 		outputDir,
 		connectTimeoutMs: options.connectTimeoutMs ?? 10_000,
 		callTimeoutMs: options.callTimeoutMs ?? 10_000,
+		...(options.stopGraceMs !== undefined
+			? { stopGraceMs: options.stopGraceMs }
+			: {}),
 		launch: { command: process.execPath, args: [FAKE] },
 	});
 	drivers.push(driver);
@@ -604,9 +609,12 @@ test("only allowlisted tools are ever sent, and the driver exposes no generic ca
 	await ctx.driver.measure("element", "e1");
 	await ctx.driver.screenshot("viewport", undefined, NEVER);
 	const names = new Set(ctx.calls().map((c) => c.name));
-	expect([...names].sort()).toEqual([...ALLOWED_MCP_TOOLS].sort());
+	// `browser_run_code_unsafe` is sent by `runReplay` alone: nothing above it reaches the tool.
+	expect(names.has("browser_run_code_unsafe")).toBe(false);
+	await ctx.driver.runReplay("async (page) => {}", NEVER);
+	const sent = new Set(ctx.calls().map((c) => c.name));
+	expect([...sent].sort()).toEqual([...ALLOWED_MCP_TOOLS].sort());
 	for (const forbidden of [
-		"browser_run_code_unsafe",
 		"browser_file_upload",
 		"browser_network_requests",
 		"browser_console_messages",
@@ -627,6 +635,7 @@ test("only allowlisted tools are ever sent, and the driver exposes no generic ca
 			"measure",
 			"newTab",
 			"onStateChange",
+			"runReplay",
 			"screenshot",
 			"selectTab",
 			"snapshot",
@@ -667,4 +676,81 @@ test("Bridge token is only passed as child env and extension tabs never leave th
 	);
 	expect(await ctx.driver.listTabs()).toEqual([]);
 	expect(JSON.stringify(ctx.log())).not.toContain(token);
+});
+
+test("runReplay sends the code as the only argument, keeps no response and clears the output dir", async () => {
+	const ctx = await connected();
+	const code = "async (page) => { await page.reload(); }";
+	await expect(ctx.driver.runReplay(code, NEVER)).resolves.toBeUndefined();
+	const call = ctx.calls().find((c) => c.name === "browser_run_code_unsafe");
+	expect(call?.args).toEqual({ code });
+	expect(readdirSync(ctx.outputDir)).toEqual([]);
+});
+
+test("a failing replay throws a classified driver error without the response text", async () => {
+	const ctx = await connected();
+	ctx.setConfig({
+		errors: {
+			browser_run_code_unsafe:
+				"page.waitForURL: Timeout 30000ms exceeded.\nCall log:\n  - secret page text",
+		},
+	});
+	const timeout = await ctx.driver
+		.runReplay("async (page) => {}", NEVER)
+		.catch((e) => e);
+	expect(timeout).toBeInstanceOf(BrowserDriverError);
+	expect(timeout).toMatchObject({ code: "action_timeout", dispatched: true });
+	expect(JSON.stringify(timeout)).not.toContain("secret");
+	expect((timeout as Error).message).not.toContain("secret");
+	ctx.setConfig({ errors: { browser_run_code_unsafe: "boom" } });
+	await expect(
+		ctx.driver.runReplay("async (page) => {}", NEVER),
+	).rejects.toMatchObject({ code: "mcp_error" });
+});
+
+test("an aborted replay closes its tab, which stops the code; the call returns only then, and the session stays", async () => {
+	const ctx = setup({ holdRun: "until-close" }, { stopGraceMs: 5_000 });
+	expect((await ctx.driver.connect(NEVER)).state).toBe("connected");
+	await ctx.driver.newTab("https://example.com/");
+	const abort = new AbortController();
+	const running = ctx.driver
+		.runReplay("async (page) => { await page.reload(); }", abort.signal)
+		.catch((e) => e);
+	await until(() =>
+		ctx.calls().some((c) => c.name === "browser_run_code_unsafe"),
+	);
+	abort.abort();
+	const error = await running;
+	expect(error).toBeInstanceOf(BrowserDriverError);
+	expect(error).toMatchObject({ code: "cancelled", dispatched: true });
+	// The tab it ran on (index 1: the one just opened) was closed to end the call.
+	const close = ctx
+		.calls()
+		.find((c) => c.name === "browser_tabs" && c.args?.action === "close");
+	expect(close?.args).toEqual({ action: "close", index: 1 });
+	expect(ctx.driver.state().state).toBe("connected");
+	expect(readdirSync(ctx.outputDir)).toEqual([]);
+	// No other call was sent while it was stopping, and the driver works again.
+	expect((await ctx.driver.listTabs()).length).toBe(1);
+});
+
+test("an aborted replay whose code does not stop ends the child after the grace period", async () => {
+	const ctx = setup({ holdRun: "forever" }, { stopGraceMs: 100 });
+	expect((await ctx.driver.connect(NEVER)).state).toBe("connected");
+	const abort = new AbortController();
+	const running = ctx.driver
+		.runReplay("async (page) => {}", abort.signal)
+		.catch((e) => e);
+	await until(() =>
+		ctx.calls().some((c) => c.name === "browser_run_code_unsafe"),
+	);
+	abort.abort();
+	expect(await running).toMatchObject({ code: "cancelled", dispatched: true });
+	expect(ctx.driver.state()).toMatchObject({
+		state: "disconnected",
+		reason: "process_exited",
+	});
+	await expect(ctx.driver.listTabs()).rejects.toMatchObject({
+		code: "not_connected",
+	});
 });

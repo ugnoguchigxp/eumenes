@@ -23,28 +23,36 @@ import {
 	type HistoryRow,
 } from "../repository";
 import { buildSource } from "./history-source";
+import { replayPreview } from "./replay-code";
 
 /** Reads and the delete of histories; the writes of a finished task are in `history-record.ts`. */
 
 const variablesOf = (r: HistoryRow) =>
 	historyVariables(r).map(({ name, label }) => ({ name, label }));
 
-export const historySummary = (r: HistoryRow): HistorySummary => ({
-	historyId: r.id,
-	revision: r.revision,
-	title: r.title,
-	request: r.request,
-	place: r.place,
-	variables: variablesOf(r),
-	stepCount: historySteps(r).length,
-	runCount: r.run_count,
-	failureCount: r.failure_count,
-	lastOutcome: r.last_outcome,
-	hasCommit: r.has_commit === 1,
-	lastUsedAt: r.last_used_at,
-	createdAt: r.created_at,
-	updatedAt: r.updated_at,
-});
+export function historySummary(r: HistoryRow): HistorySummary {
+	const { blocked, blockedLabel } = replayPreview(
+		historyActions(r),
+		variablesOf(r).map((v) => v.name),
+	);
+	return {
+		historyId: r.id,
+		revision: r.revision,
+		title: r.title,
+		request: r.request,
+		place: r.place,
+		variables: variablesOf(r),
+		stepCount: historySteps(r).length,
+		runCount: r.run_count,
+		failureCount: r.failure_count,
+		lastOutcome: r.last_outcome,
+		hasCommit: r.has_commit === 1,
+		lastUsedAt: r.last_used_at,
+		createdAt: r.created_at,
+		updatedAt: r.updated_at,
+		replay: { blocked, blockedLabel },
+	};
+}
 
 export const listHistories = (db: Database, owner: string): HistorySummary[] =>
 	listHistoryRows(db, owner).map(historySummary);
@@ -70,6 +78,10 @@ export function historyDetail(
 			updatedAt: r.updated_at,
 			runCount: r.run_count,
 		}),
+		replay: replayPreview(
+			actions,
+			variablesOf(r).map((v) => v.name),
+		),
 	};
 }
 

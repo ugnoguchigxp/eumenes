@@ -2,6 +2,7 @@ import type {
 	BrowserCaptureItem,
 	BrowserHistoryDetail,
 	BrowserHistorySummary,
+	BrowserReplayItem,
 	BrowserTabItem,
 	BrowserTaskItem,
 } from "./types";
@@ -141,6 +142,7 @@ const youtubeHistory: BrowserHistorySummary = {
 	lastUsedAt: 1792454400000,
 	createdAt: 1792368000000,
 	updatedAt: 1792454400000,
+	replay: { blocked: null, blockedLabel: null },
 };
 
 const formHistory: BrowserHistorySummary = {
@@ -158,12 +160,48 @@ const formHistory: BrowserHistorySummary = {
 	lastUsedAt: 1792368000000,
 	createdAt: 1792368000000,
 	updatedAt: 1792368000000,
+	replay: { blocked: null, blockedLabel: null },
 };
 
 export const sampleHistories: BrowserHistorySummary[] = [
 	youtubeHistory,
 	formHistory,
 ];
+
+export const sampleReplays: Record<
+	"running" | "completed" | "failed" | "cancelled",
+	BrowserReplayItem
+> = {
+	running: {
+		replayId: "r1",
+		historyId: "h1",
+		state: "running",
+		startedAt: 1792454400000,
+	},
+	completed: {
+		replayId: "r2",
+		historyId: "h1",
+		state: "completed",
+		startedAt: 1792454400000,
+		endedAt: 1792454410000,
+	},
+	failed: {
+		replayId: "r3",
+		historyId: "h1",
+		state: "failed",
+		errorLabel:
+			"時間内に終わりませんでした（要素が見つからない可能性があります）",
+		startedAt: 1792454400000,
+		endedAt: 1792454460000,
+	},
+	cancelled: {
+		replayId: "r4",
+		historyId: "h1",
+		state: "cancelled",
+		startedAt: 1792454400000,
+		endedAt: 1792454405000,
+	},
+};
 
 export const sampleHistoryDetail: BrowserHistoryDetail = {
 	...youtubeHistory,
@@ -202,6 +240,14 @@ export const sampleHistoryDetail: BrowserHistoryDetail = {
 			place: "www.youtube.com/watch",
 		},
 	],
+	replay: {
+		code: `async (page) => {
+  await page.goto('https://www.youtube.com/');
+  await page.getByRole('combobox', { name: '検索' }).fill(vars.keyword);
+}`,
+		blocked: null,
+		blockedLabel: null,
+	},
 	source: `import { test } from '@playwright/test';
 
 test('YouTubeで検索し、結果からランダムに再生する', async ({ page }) => {

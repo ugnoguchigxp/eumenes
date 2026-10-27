@@ -43,6 +43,7 @@ export function BrowserWorkspace(props: BrowserWorkspaceProps) {
 		tasks,
 		captures,
 		histories,
+		replays,
 	} = props;
 	const openHistory = histories.find(
 		(h) => h.historyId === props.selectedHistoryId,
@@ -109,7 +110,11 @@ export function BrowserWorkspace(props: BrowserWorkspaceProps) {
 				<TabsContent value="history">
 					<BrowserHistoryList
 						histories={histories}
+						replays={replays}
+						pending={pending}
 						onOpen={props.onSelectHistory}
+						onReplay={props.onReplayHistory}
+						onCancelReplay={props.onCancelReplay}
 					/>
 				</TabsContent>
 				<TabsContent value="connection">
@@ -178,11 +183,14 @@ export function BrowserWorkspace(props: BrowserWorkspaceProps) {
 					key={props.selectedHistoryId}
 					fallbackTitle={openHistory?.title ?? "履歴"}
 					detail={historyDetail}
+					replay={replays.find((r) => r.historyId === props.selectedHistoryId)}
 					error={props.historyDetailError}
 					pending={pending}
 					message={props.message}
 					onClose={() => props.onSelectHistory(undefined)}
 					onDelete={props.onDeleteHistory}
+					onReplay={props.onReplayHistory}
+					onCancelReplay={props.onCancelReplay}
 				/>
 			)}
 			{props.loading && (

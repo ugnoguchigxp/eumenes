@@ -43,11 +43,32 @@ const rejections: Record<string, string> = {
 		"その履歴は見つかりません。削除された可能性があります。一覧を読み直しました。",
 	browser_history_conflict:
 		"履歴が更新されていました。最新の内容を読み直しました。確認してからもう一度削除してください。",
+	replay_busy: "別のリプレイまたはブラウザ操作を実行中です。",
+	replay_values_invalid: "変数の値を確かめてください。",
+	replay_incomplete: "記録されていない操作や値があるため実行できません。",
+	replay_code_rejected: "このコードは安全のため実行できません。",
+	replay_destination_blocked: "開けない移動先が含まれています。",
+	browser_replay_not_found:
+		"そのリプレイは見つかりません。一覧を読み直しました。",
+	replay_not_running: "そのリプレイはすでに終わっています。",
 	tab_lost: "対象のタブが見つかりません。タブ一覧を取り直してください。",
 	tab_busy: "このタブは別の作業が使っています。",
 	tab_blocked: "このタブは開けないページを表示しているため使えません。",
 	browser_capacity: "同時に実行できる件数に達しています。",
 };
+
+/** Refusals that mean the screen shows stale data: it is read again, and the write never resent. */
+const refreshedRejections: ReadonlySet<string> = new Set([
+	"browser_history_conflict",
+	"browser_history_not_found",
+	"replay_busy",
+	"replay_values_invalid",
+	"replay_incomplete",
+	"replay_code_rejected",
+	"replay_destination_blocked",
+	"browser_replay_not_found",
+	"replay_not_running",
+]);
 
 /**
  * The browser screen: connect, disconnect, tab and capture actions are writes through the common
@@ -127,12 +148,8 @@ export const browserWebAdapter: WebArtifactAdapter = {
 				void refresh();
 			},
 			describeRejection: (code) => {
-				// The list and the open detail are stale; read them again and never resend the delete.
-				if (
-					code === "browser_history_conflict" ||
-					code === "browser_history_not_found"
-				)
-					void refresh();
+				// The list, the open detail and the replays are stale; read them again and never resend.
+				if (code && refreshedRejections.has(code)) void refresh();
 				return code ? rejections[code] : undefined;
 			},
 		};

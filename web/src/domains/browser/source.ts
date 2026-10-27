@@ -4,6 +4,7 @@ import type {
 	BrowserConnectionData,
 	BrowserHistoryDetailData,
 	BrowserHistorySummaryData,
+	BrowserReplayData,
 	BrowserSourceData,
 	BrowserTabData,
 } from "./contracts";
@@ -65,6 +66,15 @@ const captureOf = (c: BrowserCaptureData) => ({
 	...(c.errorLabel ? { errorLabel: c.errorLabel } : {}),
 });
 
+const replayOf = (r: BrowserReplayData) => ({
+	replayId: r.replayId,
+	historyId: r.historyId,
+	state: r.state,
+	...(r.errorLabel ? { errorLabel: r.errorLabel } : {}),
+	startedAt: r.startedAt,
+	...(r.endedAt !== null ? { endedAt: r.endedAt } : {}),
+});
+
 /** The `browser` resource: closed tabs are history, not choices, so they are not listed. */
 export function browserResource(input: {
 	data: BrowserSourceData | undefined;
@@ -121,6 +131,7 @@ export function browserResource(input: {
 			})),
 		captures: (data?.captures ?? []).map(captureOf),
 		histories: input.histories ?? [],
+		replays: (data?.replays ?? []).map(replayOf),
 		selectedHistoryId: input.selectedHistoryId,
 		historyDetail: input.historyDetail,
 		historyDetailError: input.historyDetailError,

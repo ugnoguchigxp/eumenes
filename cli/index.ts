@@ -25,6 +25,7 @@ const readPages = args.includes("--read-pages");
 const errorReport = args.includes("--error-report");
 let explicitRequestId: string | undefined;
 let conversationId = "main";
+let toolchainId: string | undefined;
 let listCursor: string | undefined;
 let listLimit: number | undefined;
 const historyOptions: NonNullable<CliArgs["historyOptions"]> = {};
@@ -113,6 +114,17 @@ for (let i = 0; i < args.length; i++) {
 		}
 		continue;
 	}
+	if (value === "--toolchain") {
+		toolchainId = args[++i];
+		if (
+			!toolchainId ||
+			!submitSchema.shape.toolchainId.safeParse(toolchainId).success
+		) {
+			console.error("--toolchain requires a toolchain ID");
+			process.exit(2);
+		}
+		continue;
+	}
 	if (!value || value.startsWith("--")) {
 		console.error(`Unknown option: ${value}`);
 		process.exit(2);
@@ -171,6 +183,7 @@ async function main(): Promise<number> {
 		errorReport,
 		explicitRequestId,
 		conversationId,
+		toolchainId,
 		listCursor,
 		listLimit,
 		historyOptions,
