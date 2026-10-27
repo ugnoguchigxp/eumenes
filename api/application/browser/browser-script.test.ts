@@ -15,6 +15,7 @@ import {
 afterEach(cleanup);
 const plan = {
 	expectedRevision: 0,
+	title: "項目を開いて確認する",
 	summary: "表示中の項目を開いて確認します。",
 	steps: [
 		{

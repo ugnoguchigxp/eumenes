@@ -1,4 +1,17 @@
 import type { Database } from "bun:sqlite";
+import type { TaskRow } from "../repository";
+
+/** A delegated execution's view of its task: the status plus the calls made, the result text and the deadline. */
+export function taskExecutionResult<V extends object>(view: V, row: TaskRow) {
+	const core = JSON.parse(row.core_state_json ?? "{}");
+	return {
+		...view,
+		callsMade: core.callsMade ?? core.core?.callsMade ?? 0,
+		result: row.result_text,
+		deadline: row.deadline,
+	};
+}
+
 /** Remove delegated source copies after the owning execution is forgotten. */
 export function purgeTaskExecution(
 	db: Database,

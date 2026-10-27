@@ -15,6 +15,7 @@ import {
 } from "../repository";
 import type { Ctx } from "./context";
 import { connectedConnection } from "./connection";
+import { redactedLiteral, replaceTypedArgument } from "./history-values";
 import { finishTask } from "./lifecycle";
 import type { CommitGuard } from "./operation-plan";
 import type { TaskRef } from "./operation-checks";
@@ -24,6 +25,28 @@ import {
 	type BlockedEntries,
 	type Holder,
 } from "./tabs";
+
+/** MCP's code of one action is short; this bounds what a page-derived locator can make it. */
+const CODE_STORED_CHARS = 4000;
+
+/**
+ * What MCP ran, stored for the history. A typed argument is the one place a value of this run sits in it, so
+ * it is rewritten here: the variable's name, or the redaction unless the value is the user's own words.
+ */
+function storedCode(db: Database, p: Prepared, code: string) {
+	if (p.kind !== "type") return code.slice(0, CODE_STORED_CHARS);
+	const detail = JSON.parse(operationRow(db, p.opId)?.detail_json ?? "{}") as {
+		variable?: string;
+		provenance?: string;
+	};
+	// Rewritten before it is cut: a cut literal would leave its value in the text.
+	const rewritten = detail.variable
+		? replaceTypedArgument(code, `vars.${detail.variable}`)
+		: detail.provenance !== "request"
+			? replaceTypedArgument(code, redactedLiteral)
+			: code;
+	return rewritten.slice(0, CODE_STORED_CHARS);
+}
 
 export type Prepared = {
 	opId: string;
@@ -121,7 +144,11 @@ export function settleOperation(
 		["dispatched"],
 		state,
 		result.ok
-			? { url: result.url, title: result.title }
+			? {
+					url: result.url,
+					title: result.title,
+					...(result.code ? { code: storedCode(db, p, result.code) } : {}),
+				}
 			: { errorCode: result.code },
 		now,
 	);

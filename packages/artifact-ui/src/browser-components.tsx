@@ -20,6 +20,10 @@ export type BrowserWorkspaceResource = Pick<
 	| "tabs"
 	| "tasks"
 	| "captures"
+	| "histories"
+	| "selectedHistoryId"
+	| "historyDetail"
+	| "historyDetailError"
 	| "loading"
 	| "error"
 	| "focus"
@@ -159,6 +163,10 @@ function BrowserWorkspaceBody({
 			tabs={resource.tabs}
 			tasks={resource.tasks}
 			captures={resource.captures}
+			histories={resource.histories}
+			selectedHistoryId={resource.selectedHistoryId}
+			historyDetail={resource.historyDetail}
+			historyDetailError={resource.historyDetailError}
 			selectedCaptureId={ready?.captureId}
 			previewSrc={image.url}
 			pending={action.pending}
@@ -172,6 +180,15 @@ function BrowserWorkspaceBody({
 			onFocusTab={(tabRef) => send("browser-focus-tab", { tabRef })}
 			onCloseTab={(tabRef) => send("browser-close-tab", { tabRef })}
 			onSelectCapture={setSelected}
+			onSelectHistory={(historyId) =>
+				send("browser-select-history", { historyId: historyId ?? "" })
+			}
+			onDeleteHistory={(historyId, expectedRevision) =>
+				send("browser-delete-history", {
+					historyId,
+					expectedRevision: String(expectedRevision),
+				})
+			}
 			onDownloadCapture={download}
 			onCancelTask={(taskId) => send("browser-cancel-task", { taskId })}
 			onCancelCapture={(captureId) =>

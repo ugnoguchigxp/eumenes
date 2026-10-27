@@ -82,6 +82,18 @@ export function registerBrowser(app: Hono, s: BrowserService, owner: string) {
 			return failure(c, e);
 		}
 	});
+	app.get("/api/browser/histories", (c) =>
+		c.json({ histories: s.listHistories(owner) }, 200, noStore),
+	);
+	app.get("/api/browser/histories/:id", (c) => {
+		const h = id(c);
+		if (!h.success) return c.json({ error: "invalid_browser_id" }, 400);
+		try {
+			return c.json({ history: s.historyDetail(owner, h.data) }, 200, noStore);
+		} catch (e) {
+			return failure(c, e);
+		}
+	});
 	app.get("/api/browser/captures", (c) =>
 		c.json({ captures: s.listCaptures(owner) }, 200, noStore),
 	);

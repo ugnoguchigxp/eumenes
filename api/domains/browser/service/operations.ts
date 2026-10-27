@@ -14,6 +14,7 @@ import {
 import {
 	bumpGeneration,
 	insertOperation,
+	markOperationCommit,
 	taskRow,
 	operationRow,
 	tabRow,
@@ -104,6 +105,7 @@ export function createOperations(
 					inputDigest: digestOf(planned.digest),
 					observationRef: planned.observation?.ref ?? null,
 					generation: b.tab?.generation ?? 0,
+					detail: planned.detail,
 				},
 				ctx.now(),
 			);
@@ -214,8 +216,10 @@ export function createOperations(
 				const t = tabRow(db, p.tab.tab_ref)!;
 				checkRef(db, t, p.task, p.observation.ref, p.observation.element);
 			}
-			if (p.commit && needsApprovalNow)
+			if (p.commit && needsApprovalNow) {
 				approvals.useInTransaction(db, p.task?.id ?? null, p.commit.request);
+				markOperationCommit(db, p.opId);
+			}
 			if (
 				!transitionOperation(
 					db,

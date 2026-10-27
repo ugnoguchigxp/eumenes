@@ -4,8 +4,14 @@ import {
 	type ScriptBinding,
 	type ScriptView,
 } from "../contracts/script";
-import { ownedTask, patchTask, type TaskRow } from "../repository";
+import {
+	ownedHistory,
+	ownedTask,
+	patchTask,
+	type TaskRow,
+} from "../repository";
 import type { Ctx } from "./context";
+import { containsValue } from "./history-values";
 
 export const scriptOf = (row: TaskRow): ScriptView | null =>
 	row.script_json ? (JSON.parse(row.script_json) as ScriptView) : null;
@@ -32,6 +38,12 @@ export function checkScript(task: TaskRow, binding?: ScriptBinding) {
 	// The transaction calling this check also records the operation, before any external dispatch.
 }
 
+/** Every variable any revision of the Script declared, whichever the latest one still has. */
+export const declaredBefore = (script: ScriptView | null | undefined) =>
+	script
+		? [script, ...(script.history ?? [])].flatMap((r) => r.variables ?? [])
+		: [];
+
 export function publishScript(
 	ctx: Ctx,
 	db: Database,
@@ -54,6 +66,14 @@ export function publishScript(
 	if ((prior?.revision ?? 0) >= 12) throw new Error("script_revision_limit");
 	if (input.steps.filter((s) => s.state === "running").length > 1)
 		throw new Error("script_multiple_active");
+	// A republish without `variables` keeps the declaration; an array replaces it.
+	const variables = input.variables ?? prior?.variables;
+	// A history's name describes the procedure; a value of this run in it would be remembered as the procedure.
+	if (
+		containsValue(input.title, [...(variables ?? []), ...declaredBefore(prior)])
+	)
+		throw new Error("script_title_has_value");
+	if (input.historyId) ownedHistory(db, input.historyId, owner);
 	const ids = new Set<string>();
 	const steps = input.steps.map((step) => {
 		const old = prior?.steps.find((s) => s.stepId === step.stepId);
@@ -79,7 +99,10 @@ export function publishScript(
 	// Removed steps remain in the immutable earlier revision, never rewritten as completed.
 	const revision = {
 		revision: (prior?.revision ?? 0) + 1,
+		title: input.title,
 		summary: input.summary,
+		...(input.historyId ? { historyId: input.historyId } : {}),
+		...(variables?.length ? { variables } : {}),
 		steps,
 		...(input.change ? { change: input.change } : {}),
 		updatedAt: ctx.now(),

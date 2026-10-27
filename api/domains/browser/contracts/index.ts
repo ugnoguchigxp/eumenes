@@ -1,6 +1,8 @@
 export * from "./script";
+export * from "./history";
 import { isAbsolute } from "node:path";
 import { z } from "zod";
+import { variableNamePattern } from "./history";
 import type { CaptureRange, DriverDisconnectReason } from "./ports";
 import type { HttpErrorStatus } from "../../../infrastructure/http";
 
@@ -114,10 +116,12 @@ export type ToolKind = PageOperation["kind"];
 
 const operationText = (max: number) => z.string().min(1).max(max);
 /**
- * The model's own statement that an operation finalises something (sends, buys, deletes, saves). The host
- * also judges forms itself (spec §5.3); this declaration covers what only scripts can submit.
+ * The model's own statement of what an operation does: navigate, input or commit (sends, buys, deletes,
+ * saves). The host also judges forms itself (spec §5.3); `commit` covers what only scripts can submit.
  */
-const commitEffect = { effect: z.literal("commit").optional() };
+export const effects = ["navigate", "input", "commit"] as const;
+export type Effect = (typeof effects)[number];
+const commitEffect = { effect: z.enum(effects).optional() };
 const elementTarget = {
 	observationRef: observationRefSchema,
 	ref: elementRefSchema,
@@ -195,7 +199,8 @@ export type Observation = {
 	refCount: number;
 };
 
-export type GrantProvenance = "request" | "user_approved";
+/** `history_variable`: a Script variable of a history this task follows, typed without asking (spec browser-run-history §5.1). */
+export type GrantProvenance = "request" | "user_approved" | "history_variable";
 
 export const approvalKinds = ["operation", "input_value"] as const;
 export type ApprovalKind = (typeof approvalKinds)[number];
@@ -228,6 +233,8 @@ export type InputValueApproval = {
 	value: string;
 	origin: string;
 	purpose: string;
+	/** The Script variable the value is for; kept so the approved input stays a variable of the history. */
+	variable?: string;
 };
 export const approvalRequestSchema = z.strictObject({
 	kind: z.literal("operation"),
@@ -243,6 +250,7 @@ export const inputValueApprovalSchema = z.strictObject({
 	value: z.string().min(1).max(2000),
 	origin: z.string().min(1).max(2048),
 	purpose: z.string().min(1).max(60),
+	variable: z.string().regex(variableNamePattern).optional(),
 });
 /** What an approved, unused approval lets the task do now; `inputValueRef` is the grant a value approval became. */
 export type ApprovedItem =
@@ -318,6 +326,8 @@ export type TaskView = {
 	conversationId: string;
 	continuedFrom: string | null;
 	script: import("./script").ScriptView | null;
+	/** The history the last Script follows, while it exists. */
+	history?: { historyId: string; title: string };
 	requestSummary: string;
 	state: TaskState;
 	resultSummary?: string;
@@ -369,6 +379,11 @@ const errorLabels: Record<string, string> = {
 		"Scriptが更新されたため、現在の予定を確認してください",
 	script_revision_limit: "Scriptの更新回数の上限に達しました",
 	script_evidence_invalid: "手順の完了を確認できる最新の観測がありません",
+	script_title_has_value:
+		"Scriptの名称に変数の値が含まれています。手続きを表す名称にしてください",
+	script_variable_unknown: "Scriptに宣言されていない変数です",
+	browser_history_not_found: "履歴が見つかりません",
+	browser_history_conflict: "履歴が更新されました。読み直してください",
 	browser_manual_connection_required:
 		"設定または接続画面でブラウザへの接続を確認してください",
 	...unavailableReasons,
@@ -460,6 +475,8 @@ export const errorStatus = {
 	browser_task_not_found: 404,
 	browser_capture_not_found: 404,
 	browser_capture_not_ready: 409,
+	browser_history_not_found: 404,
+	browser_history_conflict: 409,
 	browser_executable_invalid: 400,
 	browser_browse_busy: 409,
 	browser_browse_unsupported: 501,

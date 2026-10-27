@@ -55,7 +55,13 @@ export type DriverAction =
 	| { kind: "wait"; text?: string; textGone?: string; seconds?: number };
 
 export type DriverActionResult =
-	| { ok: true; url: string; title: string }
+	| {
+			ok: true;
+			url: string;
+			title: string;
+			/** The Playwright code MCP reported running (`### Ran Playwright code`), when it did. */
+			code?: string;
+	  }
 	/** `dispatched: true` means the action may have reached the page (→ indeterminate). */
 	| { ok: false; code: string; dispatched: boolean };
 

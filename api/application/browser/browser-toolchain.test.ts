@@ -41,8 +41,8 @@ afterEach(async () => {
 });
 
 const noRequests = { userMessageInTransaction: () => null };
-const REVISION = "toolchain:browser.capture@4";
-const BINDING = "binding:browser.capture@4";
+const REVISION = "toolchain:browser.capture@5";
+const BINDING = "binding:browser.capture@5";
 const conversation: AdapterOrigin = {
 	kind: "conversation",
 	owner: { rootRunId: "run-1", taskId: "task-1", cancelEpoch: 0 },
@@ -124,7 +124,7 @@ test("the capture toolchain is a command toolchain whose adapter is available be
 			binding: {
 				bindingRevisionId: BINDING,
 				adapterRef: "adapter:browser@1",
-				artifactRevisionId: "artifact:browser.workspace@4",
+				artifactRevisionId: "artifact:browser.workspace@5",
 				available: true,
 			},
 		},
@@ -139,7 +139,7 @@ test("capture and operate share one browser screen, so the launcher shows it onc
 			.filter((a) => a.artifactId === "browser.workspace"),
 	);
 	expect(entries.map((a) => a.artifactRevisionId)).toEqual([
-		"artifact:browser.workspace@4",
+		"artifact:browser.workspace@5",
 	]);
 });
 
@@ -201,8 +201,8 @@ test("a validated invocation reaches the adapter and starts a capture of that ta
 	await until(() => s.driver.calls.includes("measure"));
 });
 
-const OPERATE = "toolchain:browser.operate@4";
-const OPERATE_BINDING = "binding:browser.operate@4";
+const OPERATE = "toolchain:browser.operate@5";
+const OPERATE_BINDING = "binding:browser.operate@5";
 
 test("the operate toolchain is a command toolchain that starts a single-shot task with the binding's policy", async () => {
 	const s = await setup();
@@ -216,7 +216,7 @@ test("the operate toolchain is a command toolchain that starts a single-shot tas
 			binding: {
 				bindingRevisionId: OPERATE_BINDING,
 				adapterRef: "adapter:browser@1",
-				artifactRevisionId: "artifact:browser.workspace@4",
+				artifactRevisionId: "artifact:browser.workspace@5",
 				available: true,
 			},
 		},
@@ -275,24 +275,24 @@ test("the acceptance package, with the operator package it runs, still fits the 
 		s.capabilities.prepareBoundInTransaction(
 			db,
 			owner,
-			"package:browser.operate@3",
+			"package:browser.operate@4",
 			"tool:browser.task.start@3",
 			{ request: "このタブで商品名を検索して" },
 		),
 	);
 	expect(prepared.dependencies.map((d) => d.revisionId)).toContain(
-		"package:browser.page-operator@3",
+		"package:browser.page-operator@4",
 	);
 	// The operator is fixed on its own too: the exact revision the runner prepares.
 	const operator = s.store.read((db) =>
 		s.capabilities.prepareActiveByIdInTransaction(
 			db,
 			owner,
-			"package:browser.page-operator@3",
+			"package:browser.page-operator@4",
 			{ request: "x" },
 		),
 	);
-	expect(operator.package.toolRevisionIds).toHaveLength(16);
+	expect(operator.package.toolRevisionIds).toHaveLength(17);
 });
 
 test("every tool the operator package offers has a flat schema the host also checks", async () => {
@@ -302,7 +302,7 @@ test("every tool the operator package offers has a flat schema the host also che
 		s.capabilities.prepareActiveByIdInTransaction(
 			db,
 			owner,
-			"package:browser.page-operator@3",
+			"package:browser.page-operator@4",
 			{ request: "x" },
 		),
 	);

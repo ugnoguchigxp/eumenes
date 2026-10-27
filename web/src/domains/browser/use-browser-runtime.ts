@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
 	ArtifactEvent,
 	BrowserWorkspaceResource,
@@ -11,6 +11,15 @@ import { queryRoots } from "../../queryKeys";
 import type { BrowserApi } from "./api";
 import { BROWSER_SOURCE, browserSourceData } from "./contracts";
 import { browserResource } from "./source";
+
+const ENDED_TASK_STATES: ReadonlySet<string> = new Set([
+	"completed",
+	"needs_input",
+	"failed",
+	"cancelled",
+	"expired",
+	"indeterminate",
+]);
 
 const SOURCE_POLL_MS = 5_000;
 const BUSY_POLL_MS = 2_000;
@@ -99,6 +108,36 @@ export function useBrowserRuntime({
 		queryKey: [...root, "bridge"],
 		queryFn: ({ signal }) => api.bridge(signal),
 	});
+	// The list is read while the screen is shown; a finished task or a settled delete reads it again.
+	const histories = useQuery({
+		queryKey: [...root, "histories"],
+		enabled: visible,
+		queryFn: ({ signal }) => api.histories(signal),
+	});
+	const [selectedHistoryId, setSelectedHistoryId] = useState<string>();
+	const detail = useQuery({
+		queryKey: [...root, "history", selectedHistoryId],
+		enabled: selectedHistoryId !== undefined,
+		retry: (count, error) =>
+			!(error instanceof ApiError && error.status === 404) && count < 2,
+		queryFn: ({ signal }) => api.history(selectedHistoryId as string, signal),
+	});
+	const taskStates = useRef<ReadonlyMap<string, string> | null>(null);
+	const tasks = source.data?.tasks;
+	useEffect(() => {
+		if (!tasks) return;
+		const before = taskStates.current;
+		taskStates.current = new Map(tasks.map((t) => [t.taskId, t.state]));
+		if (
+			before &&
+			tasks.some(
+				(t) =>
+					ENDED_TASK_STATES.has(t.state) &&
+					!ENDED_TASK_STATES.has(before.get(t.taskId) ?? ""),
+			)
+		)
+			void cache.invalidateQueries({ queryKey: [...root, "histories"] });
+	}, [tasks, cache, root]);
 	const resource = useMemo(
 		() =>
 			browserResource({
@@ -109,6 +148,14 @@ export function useBrowserRuntime({
 				executablePath: path.data?.executablePath,
 				suggestedExecutablePath: path.data?.suggestedPath,
 				pickedExecutable: picked,
+				histories: histories.data,
+				selectedHistoryId,
+				historyDetail: detail.data,
+				historyDetailError: detail.error
+					? detail.error instanceof ApiError && detail.error.status === 404
+						? "この履歴は見つかりません。削除された可能性があります。"
+						: "履歴を読み込めませんでした。"
+					: undefined,
 				canBrowseExecutable: path.data?.canBrowse ?? false,
 				loading: source.isPending,
 				error: source.error
@@ -125,6 +172,10 @@ export function useBrowserRuntime({
 			connected,
 			path.data,
 			picked,
+			histories.data,
+			selectedHistoryId,
+			detail.data,
+			detail.error,
 		],
 	);
 
@@ -132,6 +183,18 @@ export function useBrowserRuntime({
 		() => cache.invalidateQueries({ queryKey: root }),
 		[cache, root],
 	);
+
+	/** Opens a history's detail modal (a read), or closes it with undefined. */
+	function selectHistory(historyId: string | undefined) {
+		setSelectedHistoryId(historyId);
+	}
+
+	/** The history is gone: close its modal and drop its cached detail; the list is read again. */
+	function historyDeleted(historyId: string) {
+		setSelectedHistoryId(undefined);
+		cache.removeQueries({ queryKey: [...root, "history", historyId] });
+		void cache.invalidateQueries({ queryKey: [...root, "histories"] });
+	}
 
 	async function browse(): Promise<Receipt> {
 		try {
@@ -226,5 +289,7 @@ export function useBrowserRuntime({
 		error: source.error,
 		local,
 		refresh,
+		selectHistory,
+		historyDeleted,
 	};
 }

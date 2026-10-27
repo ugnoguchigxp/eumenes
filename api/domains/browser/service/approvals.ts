@@ -103,6 +103,7 @@ export function createApprovals(ctx: Ctx, grants: Grants) {
 							element: r.data.element,
 							value_digest: r.data.valueDigest ?? null,
 							value: null,
+							variable: null,
 							summary: r.data.summary,
 						},
 						now,
@@ -124,6 +125,7 @@ export function createApprovals(ctx: Ctx, grants: Grants) {
 						element: r.data.purpose,
 						value_digest: null,
 						value: r.data.value,
+						variable: r.data.variable ?? null,
 						summary: `${r.data.purpose}（${origin}）`.slice(0, 160),
 					},
 					now,
@@ -156,6 +158,7 @@ export function createApprovals(ctx: Ctx, grants: Grants) {
 						value: a.value,
 						origin: a.url,
 						purpose: a.element,
+						...(a.variable ? { variable: a.variable } : {}),
 					});
 					approveInto(db, a.id, p.to, grant.inputValueRef, now);
 				} else approveInto(db, a.id, p.to, null, now);

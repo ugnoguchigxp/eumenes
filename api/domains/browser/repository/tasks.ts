@@ -12,6 +12,8 @@ import {
 	type ToolKind,
 } from "../contracts";
 import { originPath } from "../contracts/url";
+import type { ScriptView } from "../contracts/script";
+import { historyRow } from "./histories";
 import { patchRow } from "./sql";
 
 export type TaskRow = {
@@ -72,6 +74,27 @@ export function taskView(r: TaskRow): TaskView {
 		createdAt: r.created_at,
 		updatedAt: r.updated_at,
 		revision: r.revision,
+	};
+}
+
+/** The history the task's last Script follows, when it still exists for the task's owner. */
+export function taskHistory(db: Database, r: TaskRow) {
+	const id = r.script_json
+		? (JSON.parse(r.script_json) as ScriptView).historyId
+		: undefined;
+	const h = id ? historyRow(db, id) : null;
+	return h && h.owner === r.owner
+		? { historyId: h.id, title: h.title }
+		: undefined;
+}
+
+/** The task as the screen reads it: its view, operations and followed history. */
+export function taskDetail(db: Database, r: TaskRow) {
+	const history = taskHistory(db, r);
+	return {
+		...taskView(r),
+		...(history ? { history } : {}),
+		operations: taskOperations(db, r.id),
 	};
 }
 
@@ -154,7 +177,7 @@ export const listTasks = (
 				...(conversationId === undefined ? [] : [conversationId]),
 				limit,
 			) as TaskRow[]
-	).map((r) => ({ ...taskView(r), operations: taskOperations(db, r.id) }));
+	).map((r) => taskDetail(db, r));
 
 export const activeTaskCount = (db: Database, owner: string) =>
 	(
@@ -191,6 +214,10 @@ export type OperationRow = {
 	error_code: string | null;
 	result_url: string | null;
 	result_title: string | null;
+	/** The Playwright code MCP reported for the operation (kept with the task, 7 days). */
+	code: string | null;
+	/** What the operation was given, as the history reads it (see `service/operation-detail.ts`). */
+	detail_json: string | null;
 	created_at: number;
 	updated_at: number;
 };
@@ -210,12 +237,13 @@ export function insertOperation(
 		inputDigest: string;
 		observationRef: string | null;
 		generation: number;
+		detail?: Record<string, unknown>;
 	},
 	now: number,
 ) {
 	db.query(
-		`INSERT INTO browser_operations(id,task_id,tab_ref,tool_kind,input_digest,observation_ref,generation,state,created_at,updated_at)
-		 VALUES(?,?,?,?,?,?,?,'prepared',?,?)`,
+		`INSERT INTO browser_operations(id,task_id,tab_ref,tool_kind,input_digest,observation_ref,generation,state,detail_json,created_at,updated_at)
+		 VALUES(?,?,?,?,?,?,?,'prepared',?,?,?)`,
 	).run(
 		o.id,
 		o.taskId,
@@ -224,10 +252,19 @@ export function insertOperation(
 		o.inputDigest,
 		o.observationRef,
 		o.generation,
+		o.detail ? JSON.stringify(o.detail) : null,
 		now,
 		now,
 	);
 }
+
+/** The operation needed the user's approval (declared or judged by the host): the history keeps that. */
+export const markOperationCommit = (db: Database, id: string) =>
+	db
+		.query(
+			"UPDATE browser_operations SET detail_json=json_set(COALESCE(detail_json,'{}'),'$.commit',json('true')) WHERE id=?",
+		)
+		.run(id);
 
 /** Moves an operation forward only from the states in `from`; false when someone else already settled it. */
 export function transitionOperation(
@@ -235,13 +272,18 @@ export function transitionOperation(
 	id: string,
 	from: readonly OperationState[],
 	to: OperationState,
-	extra: { errorCode?: string | null; url?: string; title?: string },
+	extra: {
+		errorCode?: string | null;
+		url?: string;
+		title?: string;
+		code?: string;
+	},
 	now: number,
 ) {
 	const r = db
 		.query(
 			`UPDATE browser_operations SET state=?, error_code=?, result_url=COALESCE(?,result_url),
-			 result_title=COALESCE(?,result_title), updated_at=?
+			 result_title=COALESCE(?,result_title), code=COALESCE(?,code), updated_at=?
 			 WHERE id=? AND state IN (${from.map(() => "?").join(",")})`,
 		)
 		.run(
@@ -249,6 +291,7 @@ export function transitionOperation(
 			extra.errorCode ?? null,
 			extra.url === undefined ? null : originPath(extra.url),
 			extra.title ?? null,
+			extra.code ?? null,
 			now,
 			id,
 			...from,
@@ -299,6 +342,8 @@ export type GrantRow = {
 	provenance: GrantProvenance;
 	/** Null once the task has ended: a finished task keeps no typed value. */
 	value: string | null;
+	/** The Script variable the value was granted for. */
+	variable: string | null;
 	expires_at: number;
 	used_count: number;
 	revoked_at: number | null;
@@ -318,8 +363,8 @@ export function insertGrant(
 	now: number,
 ) {
 	db.query(
-		`INSERT INTO browser_input_grants(id,task_id,origin,purpose,provenance,value,expires_at,created_at)
-		 VALUES(?,?,?,?,?,?,?,?)`,
+		`INSERT INTO browser_input_grants(id,task_id,origin,purpose,provenance,value,variable,expires_at,created_at)
+		 VALUES(?,?,?,?,?,?,?,?,?)`,
 	).run(
 		g.id,
 		g.task_id,
@@ -327,6 +372,7 @@ export function insertGrant(
 		g.purpose,
 		g.provenance,
 		g.value,
+		g.variable,
 		g.expires_at,
 		now,
 	);

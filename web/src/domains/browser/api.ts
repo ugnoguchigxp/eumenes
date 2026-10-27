@@ -3,6 +3,8 @@ import type { EumenesClient } from "../../../../client";
 import { createTransport, json } from "../../../../client/transport";
 import {
 	browserBrowseResult,
+	browserHistoryList,
+	browserHistoryResult,
 	browserSetting,
 	browserTabList,
 	browserTaskList,
@@ -27,6 +29,20 @@ function browserApi(client: EumenesClient) {
 					)
 				).json(),
 			).tasks,
+		/** Saved histories, newest use first (at most 100). */
+		histories: async (signal?: AbortSignal) =>
+			browserHistoryList.parse(
+				await (await t.call("/api/browser/histories", { signal })).json(),
+			).histories,
+		history: async (historyId: string, signal?: AbortSignal) =>
+			browserHistoryResult.parse(
+				await (
+					await t.call(
+						`/api/browser/histories/${encodeURIComponent(historyId)}`,
+						{ signal },
+					)
+				).json(),
+			).history,
 		bridge: async (signal?: AbortSignal) =>
 			z
 				.object({

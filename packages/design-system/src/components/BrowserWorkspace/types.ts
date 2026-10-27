@@ -57,6 +57,12 @@ export type BrowserTaskState =
 
 export type BrowserScriptRevision = {
 	revision: number;
+	/** 手続きを表す名称。履歴の名称になり、変数の値を含まない。 */
+	title?: string;
+	/** このScriptが使う履歴。 */
+	historyId?: string;
+	/** 今回の変数の値。履歴には残らない。 */
+	variables?: { name: string; label: string; value: string }[];
 	summary: string;
 	change?: string;
 	updatedAt: number;
@@ -95,6 +101,8 @@ export type BrowserTaskItem = {
 		| (BrowserScriptRevision & { history: BrowserScriptRevision[] })
 		| null;
 	taskId: string;
+	/** 最後のScriptが使う履歴が今あるときだけ付く。 */
+	history?: { historyId: string; title: string };
 	/** 元の依頼の要約。 */
 	requestSummary: string;
 	state: BrowserTaskState;
@@ -127,6 +135,59 @@ export type BrowserCaptureItem = {
 	errorLabel?: string;
 };
 
+export type BrowserHistoryActionKind =
+	| "navigate"
+	| "back"
+	| "tab_new"
+	| "tab_select"
+	| "tab_close"
+	| "click"
+	| "hover"
+	| "type"
+	| "select"
+	| "press"
+	| "wait"
+	| "capture";
+
+export type BrowserHistoryAction = {
+	seq: number;
+	kind: BrowserHistoryActionKind;
+	stepLabel?: string;
+	element?: string;
+	url?: string;
+	variable?: string;
+	value?: string;
+	purpose?: string;
+	effect?: "navigate" | "input" | "commit";
+	place?: string;
+	code?: string;
+};
+
+/** 履歴の一覧の1件。時刻はepoch ms。 */
+export type BrowserHistorySummary = {
+	historyId: string;
+	revision: number;
+	title: string;
+	request: string;
+	place: string;
+	variables: { name: string; label: string }[];
+	stepCount: number;
+	runCount: number;
+	failureCount: number;
+	lastOutcome: "completed" | "failed";
+	hasCommit: boolean;
+	lastUsedAt: number;
+	createdAt: number;
+	updatedAt: number;
+};
+
+export type BrowserHistoryDetail = BrowserHistorySummary & {
+	steps: { label: string; expectation: string }[];
+	actions: BrowserHistoryAction[];
+	/** 組み立て済みのPlaywrightソース。実行せず、テキストとして表示する。 */
+	source: string;
+};
+
 export type BrowserPickedPath = { path: string; pickId: number };
 
 export type BrowserWorkspaceProps = {
@@ -145,6 +206,14 @@ export type BrowserWorkspaceProps = {
 	tabs: readonly BrowserTabItem[];
 	tasks: readonly BrowserTaskItem[];
 	captures: readonly BrowserCaptureItem[];
+	/** 保存済みの履歴（`lastUsedAt` の新しい順）。 */
+	histories: readonly BrowserHistorySummary[];
+	/** 詳細モーダルを開いている履歴。無ければ閉じている。 */
+	selectedHistoryId?: string;
+	/** `selectedHistoryId` の詳細。読み込み中は無い。 */
+	historyDetail?: BrowserHistoryDetail;
+	/** 詳細を読めなかったときの説明。 */
+	historyDetailError?: string;
 	selectedCaptureId?: string;
 	/**
 	 * ホストからの「この撮影を見せて」。seq が変わるたびに「撮影画像」を開き、そのcaptureを選ぶ
@@ -170,6 +239,10 @@ export type BrowserWorkspaceProps = {
 	onFocusTab: (tabRef: string) => void;
 	onCloseTab: (tabRef: string) => void;
 	onSelectCapture: (captureId: string) => void;
+	/** 詳細モーダルを開く（id）／閉じる（undefined）。 */
+	onSelectHistory: (historyId: string | undefined) => void;
+	/** 履歴を削除する。確認はこの部品が済ませる。 */
+	onDeleteHistory: (historyId: string, expectedRevision: number) => void;
 	onDownloadCapture: (captureId: string) => void;
 	onCancelTask: (taskId: string) => void;
 	onCancelCapture: (captureId: string) => void;

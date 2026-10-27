@@ -10,6 +10,7 @@ export type {
 	CaptureStart,
 	CaptureView,
 	ConnectionView,
+	Effect,
 	InputValueApproval,
 	Observation,
 	OperationOutcome,
@@ -34,6 +35,15 @@ export { createCaptureFiles } from "./adapters/capture-files";
 export { createHostResolver } from "./adapters/host-resolver";
 export { createExecutablePicker } from "./adapters/executable-picker";
 
+export type {
+	HistoryAction,
+	HistoryCatalogEntry,
+	HistoryDelete,
+	HistoryDetail,
+	HistoryForOperator,
+	HistorySummary,
+} from "./contracts/history";
+export { historyDelete } from "./contracts/history";
 export type {
 	ScriptView,
 	ScriptPublish,

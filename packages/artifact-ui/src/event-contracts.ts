@@ -134,6 +134,8 @@ export type ArtifactEvent = {
 		| "browser-browse-path"
 		| "browser-cancel-capture"
 		| "browser-cancel-task"
+		| "browser-select-history"
+		| "browser-delete-history"
 		| "todo-view"
 		| "todo-page"
 		| "todo-refresh";

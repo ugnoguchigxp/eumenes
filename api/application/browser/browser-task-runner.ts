@@ -119,6 +119,8 @@ type Operator = {
 	skills: string[];
 	tools: AgentTool[];
 	toolIds: string[];
+	/** The schema key each offered tool was registered with. */
+	schemaKeys: ReadonlyMap<string, string>;
 	turn: Parameters<typeof resolveTaskPolicy>[0];
 };
 
@@ -190,7 +192,12 @@ function operatorOf(
 		const tool = byId.get(id);
 		const host = tool ? PAGE_TOOLS[tool.id] : undefined;
 		// The package may only offer tools the host executes, with the schema the host checks.
-		if (!tool?.schemaKey || !host || host.schemaKey !== tool.schemaKey)
+		if (
+			!tool?.schemaKey ||
+			!host ||
+			(host.schemaKey !== tool.schemaKey &&
+				!host.compatible?.includes(tool.schemaKey as SchemaKey))
+		)
 			throw new Error("capability_unavailable");
 		return {
 			id: tool.id,
@@ -205,6 +212,12 @@ function operatorOf(
 		skills: skills as string[],
 		tools,
 		toolIds: tools.map((t: AgentTool) => t.id),
+		schemaKeys: new Map(
+			(pack.toolRevisionIds ?? []).flatMap((id: string) => {
+				const tool = byId.get(id);
+				return tool?.schemaKey ? [[tool.id, tool.schemaKey] as const] : [];
+			}),
+		),
 		turn: binding?.execution === "command" ? binding.agent?.turn : undefined,
 	};
 }
@@ -245,13 +258,21 @@ export function createTaskRunner(ports: TaskRunnerPorts): TaskStepRunner {
 			? await api.observe(safeTarget.tabRef)
 			: null;
 		const approved = api.approvals();
+		const history = api.histories();
 		// With no issued input reference, the only available input source is a request quotation.
 		// Present that existing contract with its required pair, rather than two optional sources.
 		const tools = approved.some((item) => item.kind === "input_value")
 			? operator.tools
 			: operator.tools.map((tool) =>
 					tool.id === "browser.page.type"
-						? { ...tool, inputSchema: zSchema("browserPageType") }
+						? {
+								...tool,
+								inputSchema: zSchema(
+									operator.schemaKeys.get(tool.id) === "browserPageTypeValue"
+										? "browserPageType"
+										: "browserPageType2",
+								),
+							}
 						: tool,
 				);
 		const work: Work = {
@@ -296,6 +317,7 @@ export function createTaskRunner(ports: TaskRunnerPorts): TaskStepRunner {
 				})),
 				observation: observation ? observationView(observation) : null,
 				...(approved.length ? { approved: approvedView(approved) } : {}),
+				...(history.length ? { history } : {}),
 			},
 			referenceIntro: REFERENCE_INTRO,
 			correction: CORRECTION,
@@ -335,9 +357,9 @@ export function createTaskRunner(ports: TaskRunnerPorts): TaskStepRunner {
 			const detail = argumentHints(parsed.error.issues);
 			// Diagnose the supplied source branch without changing the authoritative validation above.
 			const paired =
-				host.schemaKey === "browserPageTypeValue" &&
+				host.schemaKey === "browserPageTypeValue2" &&
 				!Object.hasOwn(args, "inputValueRef")
-					? validators.browserPageType.safeParse(args)
+					? validators.browserPageType2.safeParse(args)
 					: null;
 			const issues =
 				paired && !paired.success ? paired.error.issues : parsed.error.issues;

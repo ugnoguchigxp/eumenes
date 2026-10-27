@@ -23,6 +23,8 @@ const api = vi.hoisted(() => ({
 	saveSetting: vi.fn(async (path: string) => path),
 	browse: vi.fn(async (): Promise<string | null> => null),
 	tabs: vi.fn(async () => [] as unknown[]),
+	histories: vi.fn(async () => [] as unknown[]),
+	history: vi.fn(async (_id: string, _signal?: AbortSignal) => ({}) as unknown),
 }));
 vi.mock("./api", () => ({ browserApiFor: () => api }));
 
@@ -64,7 +66,7 @@ const sourceOf = (state: string, over: Record<string, unknown> = {}) => ({
 	},
 });
 
-function setup(read: () => Promise<unknown>) {
+function setup(read: () => Promise<unknown>, visible = true) {
 	const client = {
 		identity: crypto.randomUUID(),
 		toolchainArtifactSource: vi.fn(read),
@@ -75,7 +77,7 @@ function setup(read: () => Promise<unknown>) {
 	const context = {
 		client,
 		artifactRevisionId: "artifact:browser.workspace@1",
-		visible: true,
+		visible,
 	} as unknown as AdapterHostContext;
 	const hook = renderHook(() => browserWebAdapter.useArtifact(context), {
 		wrapper: ({ children }: PropsWithChildren) => (
@@ -406,4 +408,168 @@ test("focus says no to a capture the screen lacks, and viewing is null without a
 	await expect(unknown).resolves.toBe(false);
 	expect(hook.result.current.snapshot.browser).not.toHaveProperty("focus");
 	cache.clear();
+});
+
+const summary = (historyId: string, over: Record<string, unknown> = {}) => ({
+	historyId,
+	revision: 2,
+	title: `手続き ${historyId}`,
+	request: "依頼",
+	place: "example.com",
+	variables: [],
+	stepCount: 1,
+	runCount: 1,
+	failureCount: 0,
+	lastOutcome: "completed",
+	hasCommit: false,
+	lastUsedAt: 2,
+	createdAt: 1,
+	updatedAt: 2,
+	...over,
+});
+const detailOf = (historyId: string) => ({
+	...summary(historyId),
+	steps: [],
+	actions: [],
+	source: "test('x', async () => {});",
+});
+const shown = (hook: ReturnType<typeof setup>["hook"]) =>
+	hook.result.current.snapshot.browser as BrowserWorkspaceResource;
+
+test("the history list is read only while the screen is shown", async () => {
+	api.histories.mockResolvedValue([summary("h1")]);
+	const hidden = setup(async () => sourceOf("disconnected"), false);
+	await waitFor(() =>
+		expect(hidden.hook.result.current.phase.kind).toBe("ready"),
+	);
+	await new Promise((resolve) => setTimeout(resolve, 30));
+	expect(api.histories).not.toHaveBeenCalled();
+	cleanup();
+	const live = setup(async () => sourceOf("disconnected"));
+	await waitFor(() =>
+		expect(shown(live.hook).histories.map((h) => h.historyId)).toEqual(["h1"]),
+	);
+});
+
+test("opening a history reads its detail, closing drops the selection and a delete closes it and reads the list again", async () => {
+	api.histories.mockResolvedValue([summary("h1")]);
+	api.history.mockResolvedValue(detailOf("h1"));
+	const { hook } = setup(async () => sourceOf("disconnected"));
+	await waitFor(() => expect(shown(hook).histories).toHaveLength(1));
+	expect(api.history).not.toHaveBeenCalled();
+	const open = hook.result.current.sourceRead?.(
+		event("browser-select-history", { historyId: "h1" }),
+	);
+	await act(async () => {
+		await open;
+	});
+	await waitFor(() => expect(shown(hook).historyDetail?.source).toBeTruthy());
+	expect(shown(hook).selectedHistoryId).toBe("h1");
+	expect(api.history).toHaveBeenCalledWith("h1", expect.any(AbortSignal));
+	const listReads = api.histories.mock.calls.length;
+	api.histories.mockResolvedValue([]);
+	await act(async () => {
+		hook.result.current.settled(
+			{ eventAction: "browser-delete-history" } as never,
+			{ receipt: {} } as never,
+			{ sent: 0, sentAt: 0 },
+			{ historyId: "h1", expectedRevision: 2 },
+		);
+	});
+	await waitFor(() => expect(shown(hook).selectedHistoryId).toBeUndefined());
+	await waitFor(() => expect(shown(hook).histories).toEqual([]));
+	expect(api.histories.mock.calls.length).toBeGreaterThan(listReads);
+	expect(shown(hook).historyDetail).toBeUndefined();
+	// Closing is a read too.
+	await act(async () => {
+		await hook.result.current.sourceRead?.(
+			event("browser-select-history", { historyId: "h1" }),
+		);
+	});
+	await act(async () => {
+		await hook.result.current.sourceRead?.(
+			event("browser-select-history", { historyId: "" }),
+		);
+	});
+	await waitFor(() => expect(shown(hook).selectedHistoryId).toBeUndefined());
+});
+
+test("only the select-history read is answered by the source; a bad id is refused", async () => {
+	const { hook } = setup(async () => sourceOf("disconnected"));
+	await waitFor(() => expect(hook.result.current.phase.kind).toBe("ready"));
+	expect(hook.result.current.sourceRead?.(event("browser-connect"))).toBeNull();
+	await expect(
+		hook.result.current.sourceRead?.(
+			event("browser-select-history", { historyId: "../x" }),
+		),
+	).resolves.toMatchObject({ status: "rejected" });
+	expect(shown(hook).selectedHistoryId).toBeUndefined();
+});
+
+test("a detail that is gone or unreadable is explained in the modal", async () => {
+	api.histories.mockResolvedValue([summary("h1")]);
+	api.history.mockRejectedValue(new ApiError(404, "browser_history_not_found"));
+	const { hook } = setup(async () => sourceOf("disconnected"));
+	await act(async () => {
+		await hook.result.current.sourceRead?.(
+			event("browser-select-history", { historyId: "h1" }),
+		);
+	});
+	await waitFor(() =>
+		expect(shown(hook).historyDetailError).toBe(
+			"この履歴は見つかりません。削除された可能性があります。",
+		),
+	);
+	expect(api.history).toHaveBeenCalledTimes(1);
+});
+
+test("the list is read again when a task reaches an ended state, not on the first read", async () => {
+	api.histories.mockResolvedValue([]);
+	const task = (state: string) => ({
+		taskId: "k1",
+		requestSummary: "依頼",
+		state,
+	});
+	let state = "running";
+	const { hook, cache } = setup(async () =>
+		sourceOf("disconnected", { tasks: [task(state)] }),
+	);
+	await waitFor(() => expect(hook.result.current.phase.kind).toBe("ready"));
+	await waitFor(() => expect(api.histories).toHaveBeenCalledTimes(1));
+	await new Promise((resolve) => setTimeout(resolve, 30));
+	expect(api.histories).toHaveBeenCalledTimes(1);
+	state = "completed";
+	api.tasks.mockResolvedValue([task("completed")]);
+	await cache.invalidateQueries({
+		predicate: (q) => q.queryKey.includes("source"),
+	});
+	await waitFor(() => expect(api.histories).toHaveBeenCalledTimes(2));
+});
+
+test("history refusals are worded and re-read the list and the open detail without resending", async () => {
+	api.histories.mockResolvedValue([summary("h1")]);
+	api.history.mockResolvedValue(detailOf("h1"));
+	const { hook } = setup(async () => sourceOf("disconnected"));
+	await act(async () => {
+		await hook.result.current.sourceRead?.(
+			event("browser-select-history", { historyId: "h1" }),
+		);
+	});
+	await waitFor(() => expect(shown(hook).historyDetail).toBeDefined());
+	const lists = api.histories.mock.calls.length;
+	const details = api.history.mock.calls.length;
+	expect(
+		hook.result.current.describeRejection?.("browser_history_conflict", []),
+	).toBe(
+		"履歴が更新されていました。最新の内容を読み直しました。確認してからもう一度削除してください。",
+	);
+	await waitFor(() => {
+		expect(api.histories.mock.calls.length).toBeGreaterThan(lists);
+		expect(api.history.mock.calls.length).toBeGreaterThan(details);
+	});
+	expect(
+		hook.result.current.describeRejection?.("browser_history_not_found", []),
+	).toBe(
+		"その履歴は見つかりません。削除された可能性があります。一覧を読み直しました。",
+	);
 });

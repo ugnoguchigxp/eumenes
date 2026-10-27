@@ -26,6 +26,7 @@ test("a cancelled task cannot publish a late Script or initiate a connection", a
 	await expect(
 		api!.publishScript({
 			expectedRevision: 0,
+			title: "表示を確認する",
 			summary: "表示を確認",
 			steps: [{ label: "確認", expectation: "表示される", state: "running" }],
 		}),
@@ -44,6 +45,7 @@ test("a new Script revision prevents adoption of a capture that is still encodin
 			if (input.step === 1) {
 				initial = await ctx.api.publishScript({
 					expectedRevision: 0,
+					title: "表示を保存する",
 					summary: "表示を保存",
 					steps: [
 						{
@@ -83,6 +85,7 @@ test("a new Script revision prevents adoption of a capture that is still encodin
 	);
 	await api!.publishScript({
 		expectedRevision: 1,
+		title: "表示を保存する",
 		summary: "別の確認方法に変更",
 		steps: initial!.steps,
 		change: "計画の変更",

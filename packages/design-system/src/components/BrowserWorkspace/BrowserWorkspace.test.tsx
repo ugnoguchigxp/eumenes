@@ -2,7 +2,12 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { BrowserWorkspace } from "./BrowserWorkspace";
-import { sampleCaptures, sampleTabs, sampleTasks } from "./fixtures";
+import {
+	sampleCaptures,
+	sampleHistories,
+	sampleTabs,
+	sampleTasks,
+} from "./fixtures";
 import type { BrowserWorkspaceProps } from "./types";
 
 const preview =
@@ -17,6 +22,7 @@ function props(patch: Partial<BrowserWorkspaceProps> = {}) {
 		tabs: sampleTabs,
 		tasks: sampleTasks,
 		captures: sampleCaptures,
+		histories: sampleHistories,
 		onConnect: vi.fn(),
 		onDisconnect: vi.fn(),
 		onSaveExecutablePath: vi.fn(),
@@ -24,6 +30,8 @@ function props(patch: Partial<BrowserWorkspaceProps> = {}) {
 		onFocusTab: vi.fn(),
 		onCloseTab: vi.fn(),
 		onSelectCapture: vi.fn(),
+		onSelectHistory: vi.fn(),
+		onDeleteHistory: vi.fn(),
 		onDownloadCapture: vi.fn(),
 		onCancelTask: vi.fn(),
 		onCancelCapture: vi.fn(),

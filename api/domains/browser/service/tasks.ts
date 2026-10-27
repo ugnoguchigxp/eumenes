@@ -17,7 +17,7 @@ import {
 	ownedTask,
 	patchTask,
 	taskByRequest,
-	taskOperations,
+	taskDetail,
 	taskRow,
 	taskView,
 	insertTask,
@@ -373,7 +373,7 @@ export function createTasks(
 		},
 		status(db: Database, owner: string, id: string) {
 			const r = ownedTask(db, id, owner);
-			return { ...taskView(r), operations: taskOperations(db, id) };
+			return taskDetail(db, r);
 		},
 		log,
 		codeOf,

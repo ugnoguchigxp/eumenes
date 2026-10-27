@@ -102,6 +102,22 @@ ALTER TABLE browser_captures ADD COLUMN script_step_id TEXT;`,
 		sql: `ALTER TABLE browser_tasks ADD COLUMN phase TEXT NOT NULL DEFAULT 'preparing';
  CREATE INDEX browser_tasks_conversation ON browser_tasks(owner,conversation_id,created_at);`,
 	},
+	{
+		id: "browser/0005-histories",
+		after: ["browser/0004-progress"],
+		sql: `CREATE TABLE browser_histories (
+ id TEXT PRIMARY KEY, owner TEXT NOT NULL, title TEXT NOT NULL, request TEXT NOT NULL, place TEXT NOT NULL,
+ variables_json TEXT NOT NULL, steps_json TEXT NOT NULL, actions_json TEXT NOT NULL, source_task_id TEXT,
+ revision INTEGER NOT NULL DEFAULT 1, run_count INTEGER NOT NULL DEFAULT 1, failure_count INTEGER NOT NULL DEFAULT 0,
+ last_outcome TEXT NOT NULL, has_commit INTEGER NOT NULL DEFAULT 0, last_used_at INTEGER NOT NULL,
+ created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+);
+CREATE INDEX browser_histories_owner ON browser_histories(owner,last_used_at);
+ALTER TABLE browser_operations ADD COLUMN code TEXT;
+ALTER TABLE browser_operations ADD COLUMN detail_json TEXT;
+ALTER TABLE browser_input_grants ADD COLUMN variable TEXT;
+ALTER TABLE browser_approvals ADD COLUMN variable TEXT;`,
+	},
 ];
 
 export * from "./settings";
@@ -110,3 +126,4 @@ export * from "./tabs";
 export * from "./tasks";
 export * from "./captures";
 export * from "./approvals";
+export * from "./histories";

@@ -1,7 +1,13 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { BrowserSettings } from "./BrowserSettings";
 import { BrowserWorkspace } from "./BrowserWorkspace";
-import { sampleCaptures, sampleTabs, sampleTasks } from "./fixtures";
+import {
+	sampleCaptures,
+	sampleHistories,
+	sampleHistoryDetail,
+	sampleTabs,
+	sampleTasks,
+} from "./fixtures";
 import type { BrowserWorkspaceProps } from "./types";
 
 const preview =
@@ -17,6 +23,7 @@ const args: BrowserWorkspaceProps = {
 	tabs: sampleTabs,
 	tasks: sampleTasks,
 	captures: sampleCaptures,
+	histories: sampleHistories,
 	selectedCaptureId: "c1",
 	previewSrc: preview,
 	onConnect: () => {},
@@ -26,6 +33,8 @@ const args: BrowserWorkspaceProps = {
 	onFocusTab: () => {},
 	onCloseTab: () => {},
 	onSelectCapture: () => {},
+	onSelectHistory: () => {},
+	onDeleteHistory: () => {},
 	onDownloadCapture: () => {},
 	onCancelTask: () => {},
 	onCancelCapture: () => {},
@@ -43,8 +52,15 @@ export const Empty: Story = {
 		tabs: [],
 		tasks: [],
 		captures: [],
+		histories: [],
 		selectedCaptureId: undefined,
 		previewSrc: undefined,
+	},
+};
+export const HistoryDetail: Story = {
+	args: {
+		selectedHistoryId: sampleHistoryDetail.historyId,
+		historyDetail: sampleHistoryDetail,
 	},
 };
 export const NotConfigured: Story = {

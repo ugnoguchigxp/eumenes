@@ -1,4 +1,4 @@
-import { purgeTaskExecution } from "./execution-data";
+import { purgeTaskExecution, taskExecutionResult } from "./execution-data";
 import type { Database } from "bun:sqlite";
 import { createHostResolver } from "../adapters/host-resolver";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
@@ -46,6 +46,7 @@ import {
 	type TaskStepRunner,
 } from "./context";
 import { createGrants } from "./grants";
+import { createHistoryApi } from "./histories";
 import { createOperations } from "./operations";
 import { reconcileChecked, tabViews } from "./tabs";
 import { createTasks, type StartTaskInput } from "./tasks";
@@ -169,17 +170,11 @@ export function createBrowser(deps: {
 		},
 		taskExecutionSourceInTransaction: (db: Database, frozen: unknown) =>
 			ctx.taskExecutionSource?.(db, frozen) ?? null,
-		taskExecutionResultInTransaction(db: Database, owner: string, id: string) {
-			const view = tasks.status(db, owner, id),
-				row = taskRow(db, id)!;
-			const core = JSON.parse(row.core_state_json ?? "{}");
-			return {
-				...view,
-				callsMade: core.callsMade ?? core.core?.callsMade ?? 0,
-				result: row.result_text,
-				deadline: row.deadline,
-			};
-		},
+		taskExecutionResultInTransaction: (
+			db: Database,
+			owner: string,
+			id: string,
+		) => taskExecutionResult(tasks.status(db, owner, id), taskRow(db, id)!),
 		taskStatusInTransaction: (db: Database, owner: string, id: string) =>
 			tasks.status(db, owner, id),
 		taskByRequestInTransaction: (db: Database, requestId: string) =>
@@ -307,10 +302,11 @@ export function createBrowser(deps: {
 			store.read((db) => captures.status(db, owner, id)),
 		listCaptures: (owner: string) =>
 			store.read((db) => listCaptures(db, owner)),
+		...createHistoryApi(store),
 		captureContent: captures.content,
 		/**
 		 * Ends tasks and captures past their deadline, expires old approvals, deletes what ended more than 7 days
-		 * ago (tasks, operations, grants, approvals) and removes orphan capture files.
+		 * ago (tasks, operations, grants, approvals; never the histories) and removes orphan capture files.
 		 */
 		async sweep() {
 			await connection.ready;

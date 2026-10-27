@@ -345,6 +345,7 @@ test("actions map to the allowlisted tools with `target` refs and report the res
 		ok: true,
 		url: "https://example.org/x",
 		title: "Example Domain",
+		code: "await page.goto('https://example.org/x');",
 	});
 	expect(readdirSync(ctx.outputDir)).toEqual([]);
 });

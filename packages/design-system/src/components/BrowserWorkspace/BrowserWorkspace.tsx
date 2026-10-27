@@ -4,6 +4,8 @@ import { Input } from "../Input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../Tabs";
 import { BrowserCaptureList } from "./BrowserCaptureList";
 import { BrowserConnectionPanel } from "./BrowserConnectionPanel";
+import { BrowserHistoryDetailModal } from "./BrowserHistoryDetail";
+import { BrowserHistoryList } from "./BrowserHistoryList";
 import { BrowserTabList } from "./BrowserTabList";
 import { BrowserScriptPanel } from "./BrowserScriptPanel";
 import {
@@ -33,7 +35,22 @@ export function BrowserWorkspace(props: BrowserWorkspaceProps) {
 	const [url, setUrl] = useState("");
 	const [activeView, setActiveView] = useState("operation");
 	const [submitted, setSubmitted] = useState(false);
-	const { connection, availability, pending, tabs, tasks, captures } = props;
+	const {
+		connection,
+		availability,
+		pending,
+		tabs,
+		tasks,
+		captures,
+		histories,
+	} = props;
+	const openHistory = histories.find(
+		(h) => h.historyId === props.selectedHistoryId,
+	);
+	const historyDetail =
+		props.historyDetail?.historyId === props.selectedHistoryId
+			? props.historyDetail
+			: undefined;
 	const focusSeq = props.focus?.seq;
 	const focusCaptureId = props.focus?.captureId;
 	const selectCapture = useRef(props.onSelectCapture);
@@ -74,6 +91,7 @@ export function BrowserWorkspace(props: BrowserWorkspaceProps) {
 			<Tabs value={activeView} onValueChange={setActiveView}>
 				<TabsList aria-label="ブラウザの表示">
 					<TabsTrigger value="operation">操作</TabsTrigger>
+					<TabsTrigger value="history">履歴</TabsTrigger>
 					<TabsTrigger value="connection">接続・タブ</TabsTrigger>
 					<TabsTrigger value="captures">撮影画像</TabsTrigger>
 				</TabsList>
@@ -86,6 +104,12 @@ export function BrowserWorkspace(props: BrowserWorkspaceProps) {
 						tasks={tasks}
 						pending={pending}
 						onCancelTask={props.onCancelTask}
+					/>
+				</TabsContent>
+				<TabsContent value="history">
+					<BrowserHistoryList
+						histories={histories}
+						onOpen={props.onSelectHistory}
 					/>
 				</TabsContent>
 				<TabsContent value="connection">
@@ -149,6 +173,18 @@ export function BrowserWorkspace(props: BrowserWorkspaceProps) {
 					/>
 				</TabsContent>
 			</Tabs>
+			{props.selectedHistoryId && (
+				<BrowserHistoryDetailModal
+					key={props.selectedHistoryId}
+					fallbackTitle={openHistory?.title ?? "履歴"}
+					detail={historyDetail}
+					error={props.historyDetailError}
+					pending={pending}
+					message={props.message}
+					onClose={() => props.onSelectHistory(undefined)}
+					onDelete={props.onDeleteHistory}
+				/>
+			)}
 			{props.loading && (
 				<output className="browser-workspace-feedback">読み込み中です。</output>
 			)}
@@ -157,7 +193,7 @@ export function BrowserWorkspace(props: BrowserWorkspaceProps) {
 					{props.error}
 				</p>
 			)}
-			{props.message && (
+			{props.message && !props.selectedHistoryId && (
 				<output aria-live="polite" className="browser-workspace-feedback">
 					{props.message}
 				</output>

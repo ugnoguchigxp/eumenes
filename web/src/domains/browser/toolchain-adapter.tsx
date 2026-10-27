@@ -28,6 +28,8 @@ const findCapture = (captureId: string) =>
 		(item) => item.getAttribute("data-capture-id") === captureId,
 	) ?? null;
 
+const HISTORY_ID = /^[A-Za-z0-9-]{1,64}$/;
+
 /** Domain refusals in the words of the screen; other codes fall back to the host's wording. */
 const rejections: Record<string, string> = {
 	browser_not_configured:
@@ -37,6 +39,10 @@ const rejections: Record<string, string> = {
 		"そのタブは見つかりません。タブ一覧を確認してください。",
 	browser_capture_not_found: "その撮影は見つかりません。",
 	browser_task_not_found: "その操作は見つかりません。",
+	browser_history_not_found:
+		"その履歴は見つかりません。削除された可能性があります。一覧を読み直しました。",
+	browser_history_conflict:
+		"履歴が更新されていました。最新の内容を読み直しました。確認してからもう一度削除してください。",
 	tab_lost: "対象のタブが見つかりません。タブ一覧を取り直してください。",
 	tab_busy: "このタブは別の作業が使っています。",
 	tab_blocked: "このタブは開けないページを表示しているため使えません。",
@@ -50,7 +56,15 @@ const rejections: Record<string, string> = {
 export const browserWebAdapter: WebArtifactAdapter = {
 	adapterRef: BROWSER_ADAPTER_REF,
 	useArtifact({ client, artifactRevisionId, visible, conversationId }) {
-		const { resource, loading, error, local, refresh } = useBrowserRuntime({
+		const {
+			resource,
+			loading,
+			error,
+			local,
+			refresh,
+			selectHistory,
+			historyDeleted,
+		} = useBrowserRuntime({
 			client,
 			api: browserApiFor(client),
 			artifactRevisionId,
@@ -86,14 +100,41 @@ export const browserWebAdapter: WebArtifactAdapter = {
 			},
 			targetOf: () => undefined,
 			local: (_binding, event) => local(event),
-			// A connection or tab write changed what the source reports.
-			settled: () => {
+			// Opening or closing a history's detail is a read of the screen's own source.
+			sourceRead: (event) => {
+				if (event.action !== "browser-select-history") return null;
+				const id = event.values.historyId;
+				if (typeof id !== "string" || (id !== "" && !HISTORY_ID.test(id)))
+					return Promise.resolve({
+						status: "rejected",
+						message: "この操作は受け付けられません。",
+					});
+				selectHistory(id || undefined);
+				return Promise.resolve({ status: "accepted", message: "" });
+			},
+			// A connection, tab or history write changed what the source reports.
+			settled: (binding, _result, _timing, input) => {
+				const deleted = (input as { historyId?: unknown } | undefined)
+					?.historyId;
+				if (
+					binding.eventAction === "browser-delete-history" &&
+					typeof deleted === "string"
+				)
+					historyDeleted(deleted);
 				void refresh();
 			},
 			refresh: () => {
 				void refresh();
 			},
-			describeRejection: (code) => (code ? rejections[code] : undefined),
+			describeRejection: (code) => {
+				// The list and the open detail are stale; read them again and never resend the delete.
+				if (
+					code === "browser_history_conflict" ||
+					code === "browser_history_not_found"
+				)
+					void refresh();
+				return code ? rejections[code] : undefined;
+			},
 		};
 	},
 	async focus(captureId) {

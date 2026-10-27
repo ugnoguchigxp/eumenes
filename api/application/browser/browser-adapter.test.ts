@@ -111,6 +111,7 @@ test("the adapter registers the operations of the capture toolchain and the scre
 		"browser.task.scripted": "write builtin:browserTaskBegin",
 		"browser.task.status": "read builtin:browserTaskTarget",
 		"browser.task.cancel": "write builtin:browserTaskTarget",
+		"browser.history.delete": "write builtin:browserHistoryDelete",
 	});
 	expect([...description.projections]).toEqual([
 		"projection:browser.capture-result@1",
@@ -607,6 +608,7 @@ const bundle = JSON.parse(
 			source: string;
 			operationId?: string;
 			inputSchemaRef: string;
+			inputAdapterRef?: string;
 			effect: string;
 		}>;
 	}>;
@@ -623,6 +625,8 @@ test("each binding of the bundle names only operations, schemas and queries this
 		"browser.operate@3",
 		"browser.operate@4",
 		"browser.capture@4",
+		"browser.operate@5",
+		"browser.capture@5",
 	]);
 	const binding = (id: string, revision: number) =>
 		bundle.bindings.find((b) => b.id === id && b.revision === revision)!;
@@ -675,13 +679,15 @@ test("each binding of the bundle names only operations, schemas and queries this
 		["browser.capture", 2],
 		["browser.capture", 3],
 		["browser.operate", 3],
+		["browser.operate", 5],
+		["browser.capture", 5],
 	] as const) {
 		expect(operationsOf(id, revision)).toEqual(operationsOf(id, revision - 1));
 		expect(binding(id, revision).artifactRevisionId).toBe(
 			`artifact:browser.workspace@${revision}`,
 		);
 	}
-	expect(bundle.artifacts.map((a) => a.revision)).toEqual([1, 2, 3, 4, 1]);
+	expect(bundle.artifacts.map((a) => a.revision)).toEqual([1, 2, 3, 4, 5, 1]);
 	for (const artifact of bundle.artifacts) {
 		for (const source of artifact.sourceBindings) {
 			expect(source.adapterRef).toBe(BROWSER_ADAPTER_REF);
@@ -724,6 +730,22 @@ test("each binding of the bundle names only operations, schemas and queries this
 		source: "browser",
 		inputSchemaRef: "builtin:emptyInput",
 		effect: "local",
+	});
+	// Revision 5 adds the history delete, whose string event values the input adapter converts.
+	const fifth = bundle.artifacts[4];
+	expect(
+		ids(fifth).filter((id) => !ids(bundle.artifacts[3]).includes(id)),
+	).toEqual(["delete-history"]);
+	expect(
+		fifth!.actionBindings.find((a) => a.actionId === "delete-history"),
+	).toEqual({
+		actionId: "delete-history",
+		eventAction: "browser-delete-history",
+		source: "browser",
+		operationId: "browser.history.delete",
+		inputSchemaRef: "builtin:browserHistoryDelete",
+		inputAdapterRef: "input:browser.history-delete@1",
+		effect: "write",
 	});
 });
 
@@ -771,4 +793,93 @@ test("the scripted task entry accepts a new disconnected request only with saved
 	await expect(
 		manual.invoke("browser.task.scripted", { request: "ページを確認して" }),
 	).rejects.toThrow("browser_disconnected");
+});
+
+const HISTORY_ID = "7c0e3b1a-5d2f-4a6b-9c81-0e4f6a2b3c4d";
+const seedHistory = (s: Setup, owner = CONVERSATION_DEFAULT_PRINCIPAL) =>
+	s.env.store.write((db) =>
+		db
+			.query(
+				`INSERT INTO browser_histories(id,owner,title,request,place,variables_json,steps_json,actions_json,
+				 revision,run_count,failure_count,last_outcome,has_commit,last_used_at,created_at,updated_at)
+				 VALUES(?,?,'手順','依頼','example.com','[]','[]','[]',3,1,0,'completed',0,1,1,1)`,
+			)
+			.run(HISTORY_ID, owner),
+	);
+const historyCount = (s: Setup) =>
+	s.env.store.read(
+		(db) =>
+			(
+				db.query("SELECT COUNT(*) AS n FROM browser_histories").get() as {
+					n: number;
+				}
+			).n,
+	);
+
+test("deleting a history is the screen's: it needs the revision the screen showed, and the conversation cannot do it", async () => {
+	const s = setup();
+	await seedHistory(s);
+	const input = { historyId: HISTORY_ID, expectedRevision: 3 };
+	await expect(s.invoke("browser.history.delete", input)).rejects.toThrow(
+		"origin_invalid",
+	);
+	await expect(
+		s.invoke("browser.history.delete", { ...input, expectedRevision: 2 }, ui),
+	).rejects.toThrow("browser_history_conflict");
+	await expect(
+		s.invoke(
+			"browser.history.delete",
+			{ ...input, historyId: crypto.randomUUID() },
+			ui,
+		),
+	).rejects.toThrow("browser_history_not_found");
+	expect(historyCount(s)).toBe(1);
+	const out = await s.invoke("browser.history.delete", input, ui);
+	expect(out.receipt).toEqual({
+		action: "history.delete",
+		historyId: HISTORY_ID,
+	});
+	expect(historyCount(s)).toBe(0);
+	// The receipt reads back by its operation id.
+	const back = s.env.store.read((db) =>
+		s.adapter.readInTransaction(db, `history.delete:${HISTORY_ID}`),
+	);
+	expect(back?.receipt).toEqual({
+		action: "history.delete",
+		historyId: HISTORY_ID,
+	});
+});
+
+test("the delete event's string revision becomes a number; anything else reports every field", () => {
+	const convert = describeBrowserAdapter().inputAdapters.get(
+		"input:browser.history-delete@1",
+	)!;
+	expect(convert({ historyId: HISTORY_ID, expectedRevision: "12" })).toEqual({
+		ok: true,
+		value: { historyId: HISTORY_ID, expectedRevision: 12 },
+	});
+	expect(convert({ historyId: HISTORY_ID, expectedRevision: "0" })).toEqual({
+		ok: true,
+		value: { historyId: HISTORY_ID, expectedRevision: 0 },
+	});
+	for (const bad of ["abc", "-1", "1.5", "", "12345678901"])
+		expect(convert({ historyId: HISTORY_ID, expectedRevision: bad })).toEqual({
+			ok: false,
+			errors: [
+				{ field: "expectedRevision", message: "revision を確認してください" },
+			],
+		});
+	expect(convert({ historyId: HISTORY_ID, expectedRevision: 3 })).toMatchObject(
+		{
+			ok: false,
+		},
+	);
+	expect(convert({ expectedRevision: "3" })).toEqual({
+		ok: false,
+		errors: [{ field: "historyId", message: "履歴を指定してください" }],
+	});
+	expect(convert({})).toMatchObject({
+		ok: false,
+		errors: [{ field: "historyId" }, { field: "expectedRevision" }],
+	});
 });

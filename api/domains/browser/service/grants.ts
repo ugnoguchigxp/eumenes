@@ -3,11 +3,14 @@ import { GRANT_MS, activeTaskStates, type GrantProvenance } from "../contracts";
 import {
 	type GrantRow,
 	grantRow,
+	historyRow,
+	historyVariables,
 	insertGrant,
 	ownedTask,
 	useGrantRow,
 } from "../repository";
 import type { Ctx } from "./context";
+import { scriptOf } from "./script";
 
 /** Width, case, spacing and the separators people add to numbers do not change what was asked. */
 const squash = (s: string) =>
@@ -30,7 +33,13 @@ const QUOTE_MIN = 2;
 const QUOTE_VALUE_FACTOR = 4;
 const QUOTE_VALUE_SLACK = 32;
 
-type GrantInput = { value: string; origin: string; purpose: string };
+type GrantInput = {
+	value: string;
+	origin: string;
+	purpose: string;
+	/** The Script variable the value is for. */
+	variable?: string;
+};
 
 /**
  * Input values a task may type (spec §5.3, user decision 2026-10-18). A value gets a ref only from the current
@@ -63,6 +72,7 @@ export function createGrants(ctx: Ctx) {
 				purpose: input.purpose.slice(0, 60),
 				provenance,
 				value: input.value,
+				variable: input.variable ?? null,
 				expires_at: Math.min(ctx.now() + GRANT_MS, task.deadline),
 			},
 			ctx.now(),
@@ -95,6 +105,42 @@ export function createGrants(ctx: Ctx) {
 				throw new Error("grant_source_mismatch");
 			return create(db, owner, taskId, "request", input);
 		},
+		/**
+		 * A Script variable of a history the task follows, typed without asking (spec browser-run-history §5.1):
+		 * the history exists for the owner, has this variable, typed it at this origin for this purpose, and
+		 * contains no operation that needed approval. Null when any of that is not so; the caller then falls back
+		 * to the request quotation.
+		 */
+		fromHistoryVariableInTransaction(
+			db: Database,
+			owner: string,
+			taskId: string,
+			input: { variable: string; origin: string; purpose: string },
+		): { inputValueRef: string } | null {
+			const task = ownedTask(db, taskId, owner);
+			const script = scriptOf(task);
+			const declared = script?.variables?.find(
+				(v) => v.name === input.variable,
+			);
+			if (!declared) throw new Error("script_variable_unknown");
+			const history = script?.historyId
+				? historyRow(db, script.historyId)
+				: null;
+			const origin = originOf(input.origin);
+			if (!history || history.owner !== owner || history.has_commit || !origin)
+				return null;
+			const purpose = input.purpose.slice(0, 60);
+			const slot = historyVariables(history)
+				.find((v) => v.name === input.variable)
+				?.slots.some((s) => s.origin === origin && s.purpose === purpose);
+			if (!slot) return null;
+			return create(db, owner, taskId, "history_variable", {
+				value: declared.value,
+				origin,
+				purpose,
+				variable: input.variable,
+			});
+		},
 		/** Only the user's own approval path (the screen) calls this. */
 		userApprovedInTransaction: (
 			db: Database,
@@ -109,7 +155,7 @@ export function createGrants(ctx: Ctx) {
 			ref: string,
 			origin: string,
 			purpose: string,
-		): string {
+		): { value: string; provenance: GrantProvenance; variable: string | null } {
 			const g: GrantRow | null = grantRow(db, ref);
 			if (
 				!g ||
@@ -122,7 +168,11 @@ export function createGrants(ctx: Ctx) {
 			if (g.origin !== origin || g.purpose !== purpose.slice(0, 60))
 				throw new Error("grant_mismatch");
 			useGrantRow(db, ref);
-			return g.value;
+			return {
+				value: g.value,
+				provenance: g.provenance,
+				variable: g.variable,
+			};
 		},
 	};
 }

@@ -138,9 +138,10 @@ test("the first call has the D7 context: system layer, enclosed reference with t
 			.find((line) => line.startsWith("TOOLS="))!
 			.slice(6),
 	).find((tool: { id: string }) => tool.id === "browser.page.type");
-	expect(typeTool.inputSchema.required).toEqual(
-		expect.arrayContaining(["value", "quote"]),
-	);
+	// Without an approved input value the schema offers the quotation or a Script variable, never a ref.
+	expect(typeTool.inputSchema.properties).toHaveProperty("value");
+	expect(typeTool.inputSchema.properties).toHaveProperty("quote");
+	expect(typeTool.inputSchema.properties).toHaveProperty("variable");
 	expect(typeTool.inputSchema.properties).not.toHaveProperty("inputValueRef");
 	expect(s.model.state.calls[0]).toHaveLength(3);
 	expect(system!.role).toBe("system");
@@ -368,10 +369,7 @@ test("a missing source quotation receives the existing repair hint before any in
 				detail: expect.stringContaining("valueとquote"),
 			});
 			expect(JSON.stringify(refused)).not.toContain("ワイヤレスイヤホン");
-			expect(refused.issues).toContainEqual({
-				path: "quote",
-				code: "invalid_type",
-			});
+			expect(refused.issues).toContainEqual({ path: "", code: "custom" });
 			expect(s.typed).toEqual([]);
 			return typeInto("ワイヤレスイヤホン", "ワイヤレスイヤホン", {
 				submit: true,

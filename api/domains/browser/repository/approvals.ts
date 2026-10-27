@@ -18,6 +18,8 @@ export type ApprovalRow = {
 	summary: string;
 	/** The grant an approved `input_value` became. */
 	grant_ref: string | null;
+	/** The Script variable an `input_value` approval is for. */
+	variable: string | null;
 	status: ApprovalState;
 	expires_at: number;
 	created_at: number;
@@ -31,7 +33,7 @@ export function insertApproval(
 ) {
 	db.query(
 		`INSERT INTO browser_approvals(id,owner,conversation_id,task_id,kind,tab_ref,url,action,element,value_digest,value,
-		 summary,status,expires_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,'pending',?,?,?)`,
+		 summary,variable,status,expires_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,'pending',?,?,?)`,
 	).run(
 		a.id,
 		a.owner,
@@ -45,6 +47,7 @@ export function insertApproval(
 		a.value_digest,
 		a.value,
 		a.summary,
+		a.variable,
 		a.expires_at,
 		now,
 		now,

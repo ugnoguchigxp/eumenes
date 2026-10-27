@@ -4,6 +4,7 @@ import {
 	type ApprovalRequest,
 	type ApprovedItem,
 	type CaptureView,
+	type Effect,
 	type InputValueApproval,
 	type Observation,
 	type OperationOutcome,
@@ -89,7 +90,13 @@ const HINTS: Record<string, string> = {
 		"操作するタブがありません。tabsで一覧を見て、tab_selectで選んでください。",
 	effect_required: "submitがtrueのときはeffectを宣言してください。",
 	value_source:
-		"inputValueRefを使うならvalueとquoteは書かず、使わないならvalueとquoteを書いてください。",
+		"inputValueRefかvariableを使うならvalueとquoteは書かず（二つは同時に使えません）、どちらも使わないならvalueとquoteを書いてください。",
+	script_variable_unknown:
+		"その名前の変数は今回のScriptに宣言されていません。browser.page.scriptのvariablesに名前・説明・今回の値を宣言してから使ってください。",
+	script_title_has_value:
+		"titleに変数の値が入っています。手続きを表す名称に直して再公開してください。",
+	browser_history_not_found:
+		"その履歴はありません。REFERENCE.historyのhistoryIdを使ってください。",
 	navigation_scheme_blocked: "httpとhttps以外は開けません。",
 	navigation_private_blocked: "ローカルや社内のアドレスは開けません。",
 	navigation_api_blocked: "EumenesのAPIのアドレスは開けません。",
@@ -356,6 +363,8 @@ const captureResult = (v: CaptureView): TaskToolResult =>
 
 type Spec<K extends SchemaKey> = {
 	schemaKey: K;
+	/** Schema keys of earlier tool revisions that packages still offer and this tool's validator accepts as well. */
+	compatible?: readonly SchemaKey[];
 	run: (
 		args: z.infer<(typeof validators)[K]>,
 		env: ToolEnv,
@@ -368,9 +377,8 @@ const result = (r: TaskToolResult): ToolOutcome => ({
 	result: r,
 });
 
-/** The model's own declaration that an operation finalises something; the host also judges it itself. */
-const declared = (effect: string | undefined) =>
-	effect === "commit" ? { effect: "commit" as const } : {};
+/** The model's own declaration of what an operation does; the host also judges commits itself. */
+const declared = (effect: Effect | undefined) => (effect ? { effect } : {});
 
 export const PAGE_TOOLS: Readonly<Record<string, Spec<SchemaKey>>> = {
 	"browser.page.collect": spec({
@@ -384,11 +392,18 @@ export const PAGE_TOOLS: Readonly<Record<string, Spec<SchemaKey>>> = {
 		},
 	}),
 	"browser.page.script": spec({
-		schemaKey: "browserScriptPublish",
+		schemaKey: "browserScriptPublish2",
 		async run(args, env) {
 			const { history: _history, ...script } =
 				await env.api.publishScript(args);
 			return result({ ok: true, script });
+		},
+	}),
+	"browser.page.history": spec({
+		schemaKey: "browserHistoryTarget",
+		// The record of an earlier run is data for the operator to read; reading it needs no connection.
+		async run(args, env) {
+			return result({ ok: true, history: env.api.history(args.historyId) });
 		},
 	}),
 	"browser.page.connect": spec({
@@ -505,17 +520,36 @@ export const PAGE_TOOLS: Readonly<Record<string, Spec<SchemaKey>>> = {
 			}),
 	}),
 	"browser.page.type": spec({
-		schemaKey: "browserPageTypeValue",
+		schemaKey: "browserPageTypeValue2",
+		// The service-search package (web-service-search bundle) still offers the revision without `variable`.
+		compatible: ["browserPageTypeValue"],
 		async run(a, env) {
 			if (a.submit && !a.effect) throw new Error("effect_required");
 			const tabRef = needTab(env.work);
 			const origin = env.work.origin;
 			if (!origin) throw new Error("no_page_origin");
 			let inputValueRef = a.inputValueRef;
+			// A Script variable's value is the one the Script declared; the host reads it, the model does not repeat it.
+			const value = a.variable ? env.api.variableValue(a.variable) : a.value;
 			// The value typed when the host holds the operation back: shown to the user, who may then allow it.
-			const typed: InputValueApproval | undefined = a.value
-				? { kind: "input_value", value: a.value, origin, purpose: a.purpose }
+			const typed: InputValueApproval | undefined = value
+				? {
+						kind: "input_value",
+						value,
+						origin,
+						purpose: a.purpose,
+						...(a.variable ? { variable: a.variable } : {}),
+					}
 				: undefined;
+			if (!inputValueRef && a.variable)
+				// The followed history lets this variable be typed here without asking (spec §5.1).
+				inputValueRef = (
+					await env.api.grantFromHistoryVariable({
+						variable: a.variable,
+						origin,
+						purpose: a.purpose,
+					})
+				)?.inputValueRef;
 			if (!inputValueRef) {
 				// A value read from a page is not the user's own; the user is shown it before it is typed.
 				if (typed && fromPage(typed.value, env.request, env.work.seen))
@@ -524,10 +558,11 @@ export const PAGE_TOOLS: Readonly<Record<string, Spec<SchemaKey>>> = {
 					// The value becomes a grant only with a quote from the request; the host types it by reference.
 					inputValueRef = (
 						await env.api.grantFromRequest({
-							value: a.value!,
-							quote: a.quote!,
+							value: value!,
+							quote: a.quote ?? value!,
 							origin,
 							purpose: a.purpose,
+							...(a.variable ? { variable: a.variable } : {}),
 						})
 					).inputValueRef;
 				} catch (e) {

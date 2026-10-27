@@ -3,6 +3,7 @@ import type { Database } from "bun:sqlite";
 import {
 	SUMMARY_CHARS,
 	type ApprovalRequest,
+	type Effect,
 	type PageOperation,
 } from "../contracts";
 import type { DriverAction } from "../contracts/ports";
@@ -34,6 +35,8 @@ export type Planned = {
 	observation: { ref: string; element: string } | null;
 	digest: unknown;
 	commit: CommitGuard | null;
+	/** What the operation was given, kept for the history (spec browser-run-history §3.1). */
+	detail: Record<string, unknown>;
 };
 
 const clip = (text: string) => text.slice(0, SUMMARY_CHARS);
@@ -53,6 +56,8 @@ export function planOperation(
 		at: tab?.url ?? null,
 	};
 	const none = { newTabUrl: null, observation: null, commit: null };
+	const declaredEffect = (effect: Effect | undefined) =>
+		effect ? { effect } : {};
 	const request = (
 		kind: "click" | "press" | "type",
 		element: string,
@@ -86,6 +91,7 @@ export function planOperation(
 				...none,
 				driver: { kind: "navigate", url: v.url },
 				digest: { ...base, url: v.url },
+				detail: { url: v.url },
 			};
 		}
 		case "tab_new": {
@@ -96,13 +102,14 @@ export function planOperation(
 				driver: null,
 				newTabUrl: v.url,
 				digest: { ...base, url: v.url },
+				detail: { url: v.url },
 			};
 		}
 		case "back":
-			return { ...none, driver: { kind: "back" }, digest: base };
+			return { ...none, driver: { kind: "back" }, digest: base, detail: {} };
 		case "tab_close":
 		case "tab_select":
-			return { ...none, driver: null, digest: base };
+			return { ...none, driver: null, digest: base, detail: {} };
 		case "click": {
 			const o = observed(action.observationRef, action.ref);
 			return {
@@ -110,6 +117,10 @@ export function planOperation(
 				newTabUrl: null,
 				observation: o.observation,
 				digest: { ...base, ...o.at },
+				detail: {
+					element: action.element,
+					...declaredEffect(action.effect),
+				},
 				commit: {
 					declared: action.effect === "commit",
 					probe: { ref: action.ref },
@@ -128,6 +139,7 @@ export function planOperation(
 				driver: { kind: "hover", ref: action.ref, element: action.element },
 				observation: o.observation,
 				digest: { ...base, ...o.at },
+				detail: { element: action.element },
 			};
 		}
 		case "type": {
@@ -135,13 +147,14 @@ export function planOperation(
 			if (!task) throw new Error("grant_not_found");
 			const origin = originOf(tab!.url);
 			if (!origin) throw new Error("grant_mismatch");
-			const text = grants.useInTransaction(
+			const used = grants.useInTransaction(
 				db,
 				task.id,
 				action.inputValueRef,
 				origin,
 				action.purpose,
 			);
+			const text = used.value;
 			const value = digestOf(text);
 			const commits = action.submit || action.effect === "commit";
 			return {
@@ -155,6 +168,19 @@ export function planOperation(
 				newTabUrl: null,
 				observation: o.observation,
 				digest: { ...base, ...o.at, value, submit: action.submit },
+				// The typed value is kept only when it is the user's own words and no Script variable.
+				detail: {
+					element: action.element,
+					purpose: action.purpose,
+					origin,
+					provenance: used.provenance,
+					...declaredEffect(action.effect),
+					...(used.variable
+						? { variable: used.variable }
+						: used.provenance === "request"
+							? { value: text }
+							: {}),
+				},
 				commit: commits
 					? {
 							declared: action.effect === "commit",
@@ -181,6 +207,7 @@ export function planOperation(
 				},
 				observation: o.observation,
 				digest: { ...base, ...o.at, values: digestOf(action.values) },
+				detail: { element: action.element, values: action.values },
 			};
 		}
 		case "press": {
@@ -190,6 +217,7 @@ export function planOperation(
 				newTabUrl: null,
 				observation: null,
 				digest: { ...base, key: action.key },
+				detail: { key: action.key, ...declaredEffect(action.effect) },
 				commit:
 					declared || keyCommits(action.key)
 						? {
@@ -214,6 +242,11 @@ export function planOperation(
 					...(action.seconds ? { seconds: action.seconds } : {}),
 				},
 				digest: { ...base, wait: digestOf(action) },
+				detail: {
+					...(action.text ? { text: action.text } : {}),
+					...(action.textGone ? { textGone: action.textGone } : {}),
+					...(action.seconds ? { seconds: action.seconds } : {}),
+				},
 			};
 	}
 }

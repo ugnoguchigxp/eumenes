@@ -2,6 +2,8 @@ import type { BrowserWorkspaceResource } from "@eumenes/artifact-ui/contracts";
 import type {
 	BrowserCaptureData,
 	BrowserConnectionData,
+	BrowserHistoryDetailData,
+	BrowserHistorySummaryData,
 	BrowserSourceData,
 	BrowserTabData,
 } from "./contracts";
@@ -72,6 +74,11 @@ export function browserResource(input: {
 	pickedExecutable?: BrowserWorkspaceResource["pickedExecutable"];
 	canBrowseExecutable?: boolean;
 	bridge?: BrowserWorkspaceResource["bridge"];
+	histories?: readonly BrowserHistorySummaryData[];
+	/** The history whose detail modal is open, with its detail once read. */
+	selectedHistoryId?: string;
+	historyDetail?: BrowserHistoryDetailData;
+	historyDetailError?: string;
 	conversationId?: string;
 	loading: boolean;
 	error: string | undefined;
@@ -104,6 +111,7 @@ export function browserResource(input: {
 				phase: t.phase,
 				conversationId: t.conversationId,
 				continuedFrom: t.continuedFrom,
+				...(t.history ? { history: t.history } : {}),
 				script: t.script,
 				operations: t.operations,
 				...(t.errorLabel ? { errorLabel: t.errorLabel } : {}),
@@ -112,6 +120,10 @@ export function browserResource(input: {
 				...(t.resultSummary ? { resultSummary: t.resultSummary } : {}),
 			})),
 		captures: (data?.captures ?? []).map(captureOf),
+		histories: input.histories ?? [],
+		selectedHistoryId: input.selectedHistoryId,
+		historyDetail: input.historyDetail,
+		historyDetailError: input.historyDetailError,
 		loading: input.loading,
 		error: input.error,
 	};

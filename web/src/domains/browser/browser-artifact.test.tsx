@@ -49,6 +49,7 @@ const resource: BrowserWorkspaceResource = {
 		},
 	],
 	tasks: [],
+	histories: [],
 	captures: [
 		capture,
 		{
@@ -302,4 +303,66 @@ it("renders browser settings as an artifact and clears the write-only token afte
 			expectedRevision: "4",
 		},
 	});
+});
+
+const historyId = "33333333-3333-4333-8333-333333333333";
+const summary = {
+	historyId,
+	revision: 4,
+	title: "YouTubeで検索し、結果からランダムに再生する",
+	request: "おすすめの動画を再生して",
+	place: "www.youtube.com",
+	variables: [{ name: "keyword", label: "検索語" }],
+	stepCount: 1,
+	runCount: 2,
+	failureCount: 0,
+	lastOutcome: "completed" as const,
+	hasCommit: false,
+	lastUsedAt: 1792454400000,
+	createdAt: 1792368000000,
+	updatedAt: 1792454400000,
+};
+
+it("opens a history's detail as a read event and closes it with an empty id", async () => {
+	const dispatch = setup({ ...resource, histories: [summary] });
+	fireEvent.mouseDown(screen.getByRole("tab", { name: "履歴" }), {
+		button: 0,
+		ctrlKey: false,
+	});
+	fireEvent.click(screen.getByRole("button", { name: /詳細/ }));
+	await waitFor(() =>
+		expect(last(dispatch)?.action).toBe("browser-select-history"),
+	);
+	expect(last(dispatch)?.values).toEqual({ historyId });
+});
+
+it("deletes the shown history at its revision after the confirmation", async () => {
+	const dispatch = setup({
+		...resource,
+		histories: [summary],
+		selectedHistoryId: historyId,
+		historyDetail: {
+			...summary,
+			steps: [{ label: "検索する", expectation: "結果が表示される" }],
+			actions: [{ seq: 1, kind: "navigate", place: "www.youtube.com/" }],
+			source: "await page.goto('https://www.youtube.com/');",
+		},
+	});
+	fireEvent.click(screen.getByRole("button", { name: "削除" }));
+	expect(dispatch).not.toHaveBeenCalled();
+	fireEvent.click(screen.getByRole("button", { name: "削除する" }));
+	await waitFor(() =>
+		expect(last(dispatch)?.action).toBe("browser-delete-history"),
+	);
+	expect(last(dispatch)?.values).toEqual({
+		historyId,
+		expectedRevision: "4",
+	});
+	fireEvent.click(screen.getByRole("button", { name: "閉じる" }));
+	await waitFor(() =>
+		expect(last(dispatch)).toMatchObject({
+			action: "browser-select-history",
+			values: { historyId: "" },
+		}),
+	);
 });

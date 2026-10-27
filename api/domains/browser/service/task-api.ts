@@ -1,6 +1,7 @@
 import { captureStart, type TabView, type TaskPhase } from "../contracts";
 import { tabRow, taskRow, patchTask, type TaskRow } from "../repository";
-import { bindingOf, checkScript, publishScript } from "./script";
+import { bindingOf, checkScript, publishScript, scriptOf } from "./script";
+import { historyCatalog, historyForOperator } from "./histories";
 import { connectionView, type createConnection } from "./connection";
 import type { createOperations } from "./operations";
 import type { createGrants } from "./grants";
@@ -135,6 +136,22 @@ export function taskApi(
 			store.write((db) =>
 				grants.fromRequestInTransaction(db, owner, task.id, input),
 			),
+		variableValue: (name) => {
+			const declared = store.read((db) =>
+				scriptOf(taskRow(db, task.id)!)?.variables?.find(
+					(v) => v.name === name,
+				),
+			);
+			if (!declared) throw new Error("script_variable_unknown");
+			return declared.value;
+		},
+		grantFromHistoryVariable: (input) =>
+			store.write((db) =>
+				grants.fromHistoryVariableInTransaction(db, owner, task.id, input),
+			),
+		histories: () => store.read((db) => historyCatalog(db, owner)),
+		history: (historyId) =>
+			store.read((db) => historyForOperator(db, owner, historyId)),
 		approvals: () => store.read((db) => approvals.approved(db, task.id)),
 		capture: async (input): Promise<CaptureView> => {
 			await progress("capturing");

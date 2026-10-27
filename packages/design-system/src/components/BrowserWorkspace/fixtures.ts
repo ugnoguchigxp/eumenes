@@ -1,5 +1,7 @@
 import type {
 	BrowserCaptureItem,
+	BrowserHistoryDetail,
+	BrowserHistorySummary,
 	BrowserTabItem,
 	BrowserTaskItem,
 } from "./types";
@@ -48,8 +50,15 @@ export const sampleTasks: BrowserTaskItem[] = [
 		taskId: "k1",
 		requestSummary: "明日の天気を調べる",
 		state: "running",
+		history: {
+			historyId: "h1",
+			title: "YouTubeで検索し、結果からランダムに再生する",
+		},
 		script: {
 			revision: 1,
+			title: "YouTubeで検索し、結果からランダムに再生する",
+			historyId: "h1",
+			variables: [{ name: "keyword", label: "検索語", value: "猫 癒し" }],
 			summary: "対象地域の予報を開き、明日の天気を確認します。",
 			updatedAt: 1792454400000,
 			history: [],
@@ -116,3 +125,89 @@ export const sampleCaptures: BrowserCaptureItem[] = [
 		state: "failed",
 	},
 ];
+
+const youtubeHistory: BrowserHistorySummary = {
+	historyId: "h1",
+	revision: 3,
+	title: "YouTubeで検索し、結果からランダムに再生する",
+	request: "おすすめの動画を再生して",
+	place: "www.youtube.com",
+	variables: [{ name: "keyword", label: "検索語" }],
+	stepCount: 2,
+	runCount: 3,
+	failureCount: 0,
+	lastOutcome: "completed",
+	hasCommit: false,
+	lastUsedAt: 1792454400000,
+	createdAt: 1792368000000,
+	updatedAt: 1792454400000,
+};
+
+const formHistory: BrowserHistorySummary = {
+	historyId: "h2",
+	revision: 1,
+	title: "予約フォームに入力して送信する",
+	request: "{{date}}の予約を入れて",
+	place: "example.com",
+	variables: [],
+	stepCount: 3,
+	runCount: 1,
+	failureCount: 1,
+	lastOutcome: "failed",
+	hasCommit: true,
+	lastUsedAt: 1792368000000,
+	createdAt: 1792368000000,
+	updatedAt: 1792368000000,
+};
+
+export const sampleHistories: BrowserHistorySummary[] = [
+	youtubeHistory,
+	formHistory,
+];
+
+export const sampleHistoryDetail: BrowserHistoryDetail = {
+	...youtubeHistory,
+	steps: [
+		{
+			label: "YouTubeで検索する",
+			expectation: "検索結果の一覧が表示される",
+		},
+		{ label: "動画を再生する", expectation: "再生画面が表示される" },
+	],
+	actions: [
+		{
+			seq: 1,
+			kind: "navigate",
+			stepLabel: "YouTubeで検索する",
+			url: "https://www.youtube.com/",
+			place: "www.youtube.com/",
+			code: "await page.goto('https://www.youtube.com/');",
+		},
+		{
+			seq: 2,
+			kind: "type",
+			stepLabel: "YouTubeで検索する",
+			element: "検索ボックス",
+			variable: "keyword",
+			purpose: "検索語",
+			effect: "input",
+			place: "www.youtube.com/",
+			code: "await page.getByRole('combobox', { name: '検索' }).fill(keyword);",
+		},
+		{
+			seq: 3,
+			kind: "click",
+			stepLabel: "動画を再生する",
+			element: "<script>alert(1)</script>の動画",
+			place: "www.youtube.com/watch",
+		},
+	],
+	source: `import { test } from '@playwright/test';
+
+test('YouTubeで検索し、結果からランダムに再生する', async ({ page }) => {
+  const keyword = '';
+  await page.goto('https://www.youtube.com/');
+  await page.getByRole('combobox', { name: '検索' }).fill(keyword);
+});
+`,
+};

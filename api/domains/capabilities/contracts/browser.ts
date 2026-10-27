@@ -231,3 +231,105 @@ export const browserScriptPublish = z.strictObject({
 		.max(12),
 	change: z.string().trim().max(200).optional(),
 });
+
+/**
+ * The history schemas count against the package's required-context budget, so their host-checked refs
+ * use the shorter `z.guid()` pattern and keep descriptions short (spec browser-run-history §6).
+ */
+const guid = z.guid();
+/** A saved history of the REFERENCE's list (spec browser-run-history §6.2). */
+export const browserHistoryTarget = z.strictObject({
+	historyId: guid.describe("REFERENCE.historyのhistoryId"),
+});
+/** The screen's delete of one history, at the revision it showed (spec browser-run-history §8.2). */
+export const browserHistoryDelete = z.strictObject({
+	historyId: z.uuid(),
+	expectedRevision: z.number().int().min(0),
+});
+const variableName = z.string().regex(/^[a-z][a-zA-Z0-9]{0,30}$/);
+/** `browserScriptPublish` with the procedure's name, the history it follows and the values that change per run. */
+export const browserScriptPublish2 = z
+	.strictObject({
+		expectedRevision: z.number().int().min(0),
+		title: z
+			.string()
+			.trim()
+			.min(1)
+			.max(60)
+			.describe("手続きの名称。変数の値を入れない"),
+		summary: z.string().trim().min(1).max(300),
+		historyId: guid.optional().describe("沿う履歴"),
+		variables: z
+			.array(
+				z.strictObject({
+					name: variableName,
+					label: z.string().trim().min(1).max(40),
+					value: z.string().trim().min(1).max(200).describe("今回の値"),
+				}),
+			)
+			.max(5)
+			.optional()
+			.describe("依頼や趣向で変わる値"),
+		steps: z
+			.array(
+				z.strictObject({
+					stepId: guid.optional(),
+					label: z.string().trim().min(1).max(160),
+					expectation: z.string().trim().min(1).max(200),
+					state: z.enum(["pending", "running", "completed", "skipped"]),
+					evidenceRef: guid.optional(),
+				}),
+			)
+			.min(1)
+			.max(12),
+		change: z.string().trim().max(200).optional(),
+	})
+	.refine(
+		(s) =>
+			new Set(s.variables?.map((v) => v.name)).size ===
+			(s.variables?.length ?? 0),
+		"variable_name_duplicate",
+	);
+const typeTarget = {
+	observationRef: guid.describe("直近の観測のobservationRef"),
+	ref: elementRef,
+	element: elementName,
+	variable: variableName
+		.optional()
+		.describe("Scriptの変数名。使うときvalue・quoteは書かない"),
+	value: z.string().min(1).max(2000).optional().describe("入力する値"),
+	quote: z
+		.string()
+		.trim()
+		.min(1)
+		.max(500)
+		.optional()
+		.describe("valueの元にした、利用者の原文にある一節（原文のまま）"),
+	purpose: z.string().trim().min(1).max(60).describe("入力の用途の短い語"),
+	submit: z.boolean().describe("入力後にEnterを押すか"),
+	effect: effect.optional().describe("submitがtrueのときは必須"),
+};
+/** `browserPageType` that can also type a Script variable (spec browser-run-history §5.1). */
+export const browserPageType2 = z
+	.object(typeTarget)
+	.strict()
+	.refine(
+		(t) => (t.variable ? !t.value && !t.quote : !!t.value && !!t.quote),
+		"value_source",
+	);
+/** `browserPageTypeValue` that can also type a Script variable: exactly one of the three sources. */
+export const browserPageTypeValue2 = z
+	.object({
+		...typeTarget,
+		inputValueRef: guid
+			.optional()
+			.describe("approvedの入力値。使うときvalue・quote・variableは書かない"),
+	})
+	.strict()
+	.refine(
+		(t) =>
+			t.inputValueRef || t.variable
+				? !t.value && !t.quote && !(t.inputValueRef && t.variable)
+				: !!t.value && !!t.quote,
+		"value_source",
+	);

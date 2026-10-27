@@ -24,6 +24,8 @@ export type ParsedToolResult = {
 	/** `### Result` section text (tab lists, evaluate output). */
 	result?: string;
 	page?: { url: string; title: string };
+	/** `### Ran Playwright code` body without its fence. */
+	code?: string;
 	snapshot?: McpSnapshotBody;
 	images: { mimeType: string; data: string }[];
 };
@@ -89,6 +91,14 @@ function parsePage(section: string | undefined) {
 	return { url, title: /^- Page Title: (.*)$/m.exec(section)?.[1] ?? "" };
 }
 
+/** The code of the `### Ran Playwright code` section: a fenced block, or the bare text. */
+function parseCode(section: string | undefined) {
+	if (!section) return undefined;
+	const fenced = /^```[a-z]*\n([\s\S]*?)\n?```$/.exec(section.trim());
+	const code = (fenced ? fenced[1]! : section).trim();
+	return code || undefined;
+}
+
 export function parseToolResult(raw: McpToolResult): ParsedToolResult {
 	const content = raw.content ?? [];
 	const first = content[0];
@@ -100,6 +110,7 @@ export function parseToolResult(raw: McpToolResult): ParsedToolResult {
 		error: sections.get("Error"),
 		result: sections.get("Result"),
 		page: parsePage(sections.get("Page")),
+		code: parseCode(sections.get("Ran Playwright code")),
 		snapshot,
 		images: content.flatMap((item) =>
 			item.type === "image"

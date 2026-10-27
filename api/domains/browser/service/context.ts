@@ -62,13 +62,26 @@ export type TaskApi = {
 		tabRef: string | undefined,
 		action: unknown,
 	): Promise<OperationOutcome>;
-	/** `quote` is the passage of the request the value was taken from. */
+	/** `quote` is the passage of the request the value was taken from; `variable` names the Script variable it is for. */
 	grantFromRequest(input: {
 		value: string;
 		quote: string;
 		origin: string;
 		purpose: string;
+		variable?: string;
 	}): Promise<{ inputValueRef: string }>;
+	/** The value of a variable of the task's current Script (`script_variable_unknown` when not declared). */
+	variableValue(name: string): string;
+	/** Types a Script variable without asking when the followed history allows it; null when it does not. */
+	grantFromHistoryVariable(input: {
+		variable: string;
+		origin: string;
+		purpose: string;
+	}): Promise<{ inputValueRef: string } | null>;
+	/** REFERENCE.history: the owner's newest histories. */
+	histories(): import("../contracts/history").HistoryCatalogEntry[];
+	/** One history of the owner, for `browser.page.history`. */
+	history(historyId: string): import("../contracts/history").HistoryForOperator;
 	/** Approvals the user gave this task (through `continueFrom`/`approvePending`) that are not used yet. */
 	approvals(): ApprovedItem[];
 	capture(

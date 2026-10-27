@@ -82,6 +82,23 @@ export function BrowserScriptPanel({
 			)}
 			{script ? (
 				<>
+					{task.history && (
+						<p className="browser-script-history-use">
+							履歴『{task.history.title}』の手順を使っています
+						</p>
+					)}
+					{script.variables && script.variables.length > 0 && (
+						<ul
+							className="browser-script-variables"
+							aria-label="今回の変数の値"
+						>
+							{script.variables.map((v) => (
+								<li key={v.name}>
+									{v.label}: {v.value}
+								</li>
+							))}
+						</ul>
+					)}
 					<p className="browser-script-summary">{script.summary}</p>
 					<ol className="browser-script-steps">
 						{script.steps.map((step) => {

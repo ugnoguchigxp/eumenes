@@ -47,6 +47,7 @@ test("one public request searches, passes the exact result URL to a browser chil
 	let published: { revision: number; steps: Array<Record<string, unknown>> };
 	const plan = {
 		expectedRevision: 0,
+		title: "Open and play a video",
 		summary: "Open the selected video and verify playback",
 		steps: [
 			{
@@ -299,6 +300,7 @@ test("a browser approval resumes in a new physical task, keeps the old deadline,
 	};
 	const plan = {
 		expectedRevision: 0,
+		title: "Submit a form",
 		summary: "Submit after approval",
 		steps: [
 			{

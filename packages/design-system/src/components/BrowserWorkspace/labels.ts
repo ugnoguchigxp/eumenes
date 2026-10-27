@@ -1,5 +1,6 @@
 import type {
 	BrowserConnectionEndReason,
+	BrowserHistoryActionKind,
 	BrowserConnectionState,
 	BrowserCaptureRange,
 	BrowserCaptureState,
@@ -105,3 +106,43 @@ export function formatCapturedAt(iso: string) {
 		minute: "2-digit",
 	}).format(time);
 }
+
+export const historyKindLabels: Record<BrowserHistoryActionKind, string> = {
+	navigate: "ページを開く",
+	back: "前のページへ戻る",
+	tab_new: "タブを開く",
+	tab_select: "タブを選ぶ",
+	tab_close: "タブを閉じる",
+	click: "クリック",
+	hover: "ポインターを合わせる",
+	type: "入力",
+	select: "選択肢を選ぶ",
+	press: "キー操作",
+	wait: "表示を待つ",
+	capture: "撮影",
+};
+
+export const historyEmptyNote =
+	"まだ履歴はありません。ブラウザでの作業が完了すると、ここに手順が残ります。";
+export const historyDeleteNote =
+	"この履歴を削除します。ブラウザ担当は以後この手順を使いません。";
+
+const dayFormat = new Intl.DateTimeFormat("sv-SE", {
+	timeZone: "Asia/Tokyo",
+	year: "numeric",
+	month: "2-digit",
+	day: "2-digit",
+});
+const dateTimeFormat = new Intl.DateTimeFormat("ja-JP", {
+	timeZone: "Asia/Tokyo",
+	year: "numeric",
+	month: "numeric",
+	day: "numeric",
+	hour: "2-digit",
+	minute: "2-digit",
+});
+
+/** YYYY-MM-DD（日本時間）。 */
+export const formatDay = (epochMs: number) => dayFormat.format(epochMs);
+export const formatDateTime = (epochMs: number) =>
+	dateTimeFormat.format(epochMs);

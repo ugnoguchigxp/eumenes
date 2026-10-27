@@ -29,6 +29,11 @@ export type BrowserTabData = z.infer<typeof browserTab>;
 
 const scriptRevision = z.object({
 	revision: z.number().int(),
+	title: z.string().optional(),
+	historyId: z.string().optional(),
+	variables: z
+		.array(z.object({ name: z.string(), label: z.string(), value: z.string() }))
+		.optional(),
 	summary: z.string(),
 	change: z.string().optional(),
 	updatedAt: z.number(),
@@ -76,6 +81,7 @@ const browserTask = z.looseObject({
 		)
 		.optional(),
 	taskId: z.string(),
+	history: z.object({ historyId: z.string(), title: z.string() }).optional(),
 	conversationId: z.string().optional(),
 	continuedFrom: z.string().nullable().optional(),
 	errorLabel: z.string().nullable().optional(),
@@ -119,6 +125,61 @@ const browserCapture = z.looseObject({
 	]),
 });
 export type BrowserCaptureData = z.infer<typeof browserCapture>;
+
+const historyKinds = [
+	"navigate",
+	"back",
+	"tab_new",
+	"tab_select",
+	"tab_close",
+	"click",
+	"hover",
+	"type",
+	"select",
+	"press",
+	"wait",
+	"capture",
+] as const;
+const browserHistorySummary = z.looseObject({
+	historyId: z.string(),
+	revision: z.number().int(),
+	title: z.string(),
+	request: z.string(),
+	place: z.string(),
+	variables: z.array(z.object({ name: z.string(), label: z.string() })),
+	stepCount: z.number().int(),
+	runCount: z.number().int(),
+	failureCount: z.number().int(),
+	lastOutcome: z.enum(["completed", "failed"]),
+	hasCommit: z.boolean(),
+	lastUsedAt: z.number(),
+	createdAt: z.number(),
+	updatedAt: z.number(),
+});
+export type BrowserHistorySummaryData = z.infer<typeof browserHistorySummary>;
+const browserHistoryAction = z.looseObject({
+	seq: z.number().int(),
+	kind: z.enum(historyKinds),
+	stepLabel: z.string().optional(),
+	element: z.string().optional(),
+	url: z.string().optional(),
+	variable: z.string().optional(),
+	value: z.string().optional(),
+	purpose: z.string().optional(),
+	effect: z.enum(["navigate", "input", "commit"]).optional(),
+	place: z.string().optional(),
+	code: z.string().optional(),
+});
+const browserHistoryDetail = browserHistorySummary.extend({
+	steps: z.array(z.object({ label: z.string(), expectation: z.string() })),
+	actions: z.array(browserHistoryAction),
+	source: z.string(),
+});
+export type BrowserHistoryDetailData = z.infer<typeof browserHistoryDetail>;
+export const browserHistoryList = z.object({
+	histories: z.array(browserHistorySummary),
+});
+export const browserHistoryResult = z.object({ history: browserHistoryDetail });
 
 export const browserSourceData = z.looseObject({
 	connection: browserConnection,

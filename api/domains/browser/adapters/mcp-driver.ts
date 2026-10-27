@@ -382,7 +382,11 @@ export function createMcpBrowserDriver(
 			try {
 				const [name, args] = actionCall(action);
 				const parsed = await callTool(name, args, signal);
-				return { ok: true, ...(await pageOf(parsed)) };
+				return {
+					ok: true,
+					...(await pageOf(parsed)),
+					...(parsed.code ? { code: parsed.code } : {}),
+				};
 			} catch (error) {
 				const failure = toDriverError(error);
 				return {

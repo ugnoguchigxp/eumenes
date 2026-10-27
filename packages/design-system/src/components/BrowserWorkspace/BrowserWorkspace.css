@@ -241,3 +241,61 @@
 .browser-workspace input {
 	max-width: 100%;
 }
+.browser-workspace-request {
+	color: var(--muted-foreground);
+}
+.browser-script-history-use {
+	margin: 0;
+	font-weight: 600;
+}
+.browser-script-variables {
+	margin: 0;
+	padding: 0 0 0 1.25rem;
+	overflow-wrap: anywhere;
+}
+.browser-history-detail {
+	display: flex;
+	flex-direction: column;
+	gap: 0.9rem;
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+.browser-history-detail h4 {
+	margin: 0 0 0.3rem;
+	font-size: 0.95rem;
+	font-weight: 600;
+}
+.browser-history-detail p,
+.browser-history-detail ol,
+.browser-history-detail ul {
+	margin: 0;
+}
+.browser-history-detail ol,
+.browser-history-detail ul {
+	padding-left: 1.5rem;
+}
+.browser-history-request {
+	white-space: pre-wrap;
+}
+.browser-history-source {
+	margin: 0;
+	max-height: 20rem;
+	overflow: auto;
+	padding: 0.6rem;
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	background: var(--muted);
+	font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+	font-size: 0.8rem;
+	white-space: pre;
+	overflow-wrap: normal;
+}
+.browser-history-info {
+	display: grid;
+	grid-template-columns: auto 1fr;
+	gap: 0.2rem 0.75rem;
+	margin: 0;
+}
+.browser-history-info dd {
+	margin: 0;
+}

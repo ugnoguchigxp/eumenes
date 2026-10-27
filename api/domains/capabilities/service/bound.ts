@@ -29,7 +29,7 @@ export function finishPrepare(
 	);
 	if (
 		dependencies.filter((d) => d.kind === "skill").length > 4 ||
-		bytes(required) > 16384
+		bytes(required) > 18432
 	)
 		throw new Error("required_context_overflow");
 	return { package: pack, dependencies, input: parsed.data };

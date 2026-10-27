@@ -8,7 +8,12 @@ import type {
 	TaskView,
 } from "../../domains/browser";
 import { CONVERSATION_DEFAULT_PRINCIPAL } from "../../domains/conversation/contracts";
-import type { AdapterResult, DomainAdapter } from "../../domains/tool-runtime";
+import type {
+	AdapterResult,
+	DomainAdapter,
+	FieldError,
+	InputAdapter,
+} from "../../domains/tool-runtime";
 import type { BrowserEffects } from "./browser-effects";
 import { clip, placeOf } from "./browser-text";
 import {
@@ -17,6 +22,7 @@ import {
 } from "./browser-execution";
 
 export const BROWSER_ADAPTER_REF = "adapter:browser@1";
+export const HISTORY_DELETE_INPUT = "input:browser.history-delete@1";
 const WORKSPACE = "query:browser.workspace@1";
 const OWNER = CONVERSATION_DEFAULT_PRINCIPAL;
 const SNAPSHOT_TABS = 20;
@@ -43,7 +49,33 @@ const operations = [
 	["browser.task.scripted", "builtin:browserTaskBegin", "write"],
 	["browser.task.status", "builtin:browserTaskTarget", "read"],
 	["browser.task.cancel", "builtin:browserTaskTarget", "write"],
+	["browser.history.delete", "builtin:browserHistoryDelete", "write"],
 ] as const;
+
+/** The screen's delete event carries strings only; the revision it showed becomes a number here. */
+const historyDeleteInput: InputAdapter = (raw) => {
+	const errors: FieldError[] = [];
+	const { historyId, expectedRevision } = raw;
+	if (typeof historyId !== "string" || !historyId)
+		errors.push({ field: "historyId", message: "履歴を指定してください" });
+	if (
+		typeof expectedRevision !== "string" ||
+		!/^\d{1,10}$/.test(expectedRevision)
+	)
+		errors.push({
+			field: "expectedRevision",
+			message: "revision を確認してください",
+		});
+	return errors.length
+		? { ok: false, errors }
+		: {
+				ok: true,
+				value: {
+					historyId,
+					expectedRevision: Number(expectedRevision),
+				},
+			};
+};
 
 export const describeBrowserAdapter = () => ({
 	owner: "browser",
@@ -57,7 +89,9 @@ export const describeBrowserAdapter = () => ({
 		]),
 	),
 	queries: new Set([WORKSPACE]),
-	inputAdapters: new Map(),
+	inputAdapters: new Map<string, InputAdapter>([
+		[HISTORY_DELETE_INPUT, historyDeleteInput],
+	]),
 	projections: new Set([
 		"projection:browser.capture-result@1",
 		"projection:browser.task-result@1",
@@ -172,6 +206,10 @@ function readOperation(
 				? done(operationId, { action, taskId: found.taskId }, taskAnswer(found))
 				: null;
 		}
+		case "history.delete":
+			return z.uuid().safeParse(id).success
+				? done(operationId, { action, historyId: id }, { deleted: true })
+				: null;
 		case "tab.focus":
 		case "tab.close":
 			return z.uuid().safeParse(id).success
@@ -187,6 +225,25 @@ function readOperation(
 		default:
 			return null;
 	}
+}
+
+/** Histories are the user's to delete; the conversation has no way to list or remove them. */
+function deleteHistory(
+	service: BrowserService,
+	db: Database,
+	fromUser: boolean,
+	input: { historyId?: string; expectedRevision?: number },
+) {
+	if (!fromUser) throw new Error("origin_invalid");
+	const removed = service.deleteHistoryInTransaction(db, OWNER, {
+		historyId: input.historyId!,
+		expectedRevision: input.expectedRevision!,
+	});
+	return done(
+		`history.delete:${removed.historyId}`,
+		{ action: "history.delete", historyId: removed.historyId },
+		{ deleted: true },
+	);
 }
 
 export function createBrowserAdapter(
@@ -218,6 +275,8 @@ export function createBrowserAdapter(
 				url?: string;
 				continueFrom?: string;
 				approvePending?: boolean;
+				historyId?: string;
+				expectedRevision?: number;
 			};
 			const { data } = read(db);
 			const queue = (
@@ -445,6 +504,8 @@ export function createBrowserAdapter(
 						taskAnswer(view),
 					);
 				}
+				case "browser.history.delete":
+					return deleteHistory(service, db, fromUser, input);
 				case "browser.tab.open": {
 					if (!data.connection.availability.available)
 						throw new Error("browser_disconnected");

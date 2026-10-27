@@ -226,3 +226,59 @@ it("keeps Script progress and errors for the current conversation only", () => {
 		errorLabel: "中断されました",
 	});
 });
+
+it("passes the histories, the open detail and each task's history and script variables to the screen", () => {
+	const summary = {
+		historyId: "h1",
+		revision: 2,
+		title: "YouTubeで検索する",
+		request: "{{keyword}}を見て",
+		place: "www.youtube.com",
+		variables: [{ name: "keyword", label: "検索語" }],
+		stepCount: 1,
+		runCount: 1,
+		failureCount: 0,
+		lastOutcome: "completed" as const,
+		hasCommit: false,
+		lastUsedAt: 2,
+		createdAt: 1,
+		updatedAt: 2,
+	};
+	const script = {
+		revision: 1,
+		title: "YouTubeで検索する",
+		historyId: "h1",
+		variables: [{ name: "keyword", label: "検索語", value: "猫 癒し" }],
+		summary: "検索します",
+		updatedAt: 1,
+		steps: [],
+		history: [],
+	};
+	const resource = resourceOf(
+		data({
+			tasks: [
+				{
+					taskId: "k1",
+					requestSummary: "動画",
+					state: "running",
+					history: { historyId: "h1", title: "YouTubeで検索する" },
+					script,
+				},
+			],
+		}),
+		{ histories: [summary], selectedHistoryId: "h1", historyDetailError: "x" },
+	);
+	expect(resource.histories).toEqual([summary]);
+	expect(resource.selectedHistoryId).toBe("h1");
+	expect(resource.historyDetailError).toBe("x");
+	expect(resource.tasks[0]?.history).toEqual({
+		historyId: "h1",
+		title: "YouTubeで検索する",
+	});
+	expect(resource.tasks[0]?.script?.variables).toEqual(script.variables);
+	expect(resourceOf(data()).histories).toEqual([]);
+	// The revision follows what the screen shows, so an opened modal changes it.
+	expect(resourceOf(data(), { selectedHistoryId: "h1" }).revision).not.toBe(
+		resourceOf(data()).revision,
+	);
+});
