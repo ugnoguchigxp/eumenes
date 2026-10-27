@@ -13,12 +13,6 @@ export interface RetiredExchange {
 	state: "pending" | "done";
 	disposition: "keep" | "summarize" | "drop" | null;
 }
-export interface RetiredSummary {
-	text: string;
-	updatedAt: string;
-	/** Input message ids of the exchanges the text stands on. */
-	sources: string[];
-}
 
 const TABLES = [
 	"memory_retired_exchange",
@@ -60,29 +54,6 @@ export function retiredExchanges(
 			 FROM memory_retired_exchange WHERE conversation_id = ? ORDER BY input_ordinal`,
 		)
 		.all(conversationId) as RetiredExchange[];
-}
-export function retiredSummary(
-	db: Database,
-	conversationId: string,
-): RetiredSummary | null {
-	const row = db
-		.query(
-			"SELECT text, revision, updated_at AS updatedAt FROM memory_retired_summary WHERE conversation_id = ?",
-		)
-		.get(conversationId) as {
-		text: string;
-		revision: number;
-		updatedAt: string;
-	} | null;
-	if (!row) return null;
-	const sources = (
-		db
-			.query(
-				"SELECT input_message_id AS id FROM memory_retired_summary_source WHERE conversation_id = ? AND revision = ? ORDER BY input_message_id",
-			)
-			.all(conversationId, row.revision) as Array<{ id: string }>
-	).map((source) => source.id);
-	return { text: row.text, updatedAt: row.updatedAt, sources };
 }
 /** Removes a handled conversation's retired rows. */
 export function deleteRetiredConversation(

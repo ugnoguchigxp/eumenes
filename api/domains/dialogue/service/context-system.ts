@@ -1,54 +1,101 @@
 import { systemContext } from "../../../infrastructure/system-context";
-import { buildSystemPrompt } from "./system-prompt";
+import type { InferencePort } from "../../inference";
+import type { ConversationAgentSystem } from "../contracts";
 
 /** The persona the system part is written for: the agent's name, the user's name and the tone. */
-export type PersonaSpec = Parameters<typeof buildSystemPrompt>[0];
+export type PersonaSpec = Pick<
+	ReturnType<NonNullable<InferencePort["snapshotInTransaction"]>>["general"],
+	"agentName" | "userName" | "persona"
+>;
+
+const PERSONAS = {
+	butler: {
+		role: systemContext("dialogue.contexts.system-prompt.butler-role", {}),
+		style: systemContext("dialogue.contexts.system-prompt.butler-style", {}),
+	},
+	maid: {
+		role: systemContext("dialogue.contexts.system-prompt.maid-role", {}),
+		style: systemContext("dialogue.contexts.system-prompt.maid-style", {}),
+	},
+	strategist: {
+		role: systemContext("dialogue.contexts.system-prompt.strategist-role", {}),
+		style: systemContext(
+			"dialogue.contexts.system-prompt.strategist-style",
+			{},
+		),
+	},
+	sage: {
+		role: systemContext("dialogue.contexts.system-prompt.sage-role", {}),
+		style: systemContext("dialogue.contexts.system-prompt.sage-style", {}),
+	},
+};
 
 /**
- * The host's rules of the system part, in the order it writes them. Each says when it applies, so the list is the
- * same in every generation: the system part changes only with the settings (the ContextWindow specification,
- * section 12.1).
+ * The section headings of the system part (the conversation input specification, section 4.1), from what changes
+ * least and holds for everything. None of them is one of the input's own headings (`## Memory`, `## State`,
+ * `## User`, `## Host notice`, `## Task`).
  */
-const RULES = [
-	"dialogue.contexts.host-rules.context-sources",
-	"dialogue.contexts.host-rules.tools",
-	"dialogue.contexts.host-rules.operation-action",
-	"dialogue.contexts.host-rules.operation-command-question",
-	"dialogue.contexts.host-rules.operation-recognition",
-	"dialogue.contexts.host-rules.operation-delegation",
-	"dialogue.contexts.host-rules.operation-drawing",
-	"dialogue.contexts.host-rules.operation-image",
-	"dialogue.contexts.host-rules.operation-music",
-	"dialogue.contexts.host-rules.research-result",
-	"dialogue.contexts.host-rules.research-world",
-	"dialogue.contexts.host-rules.research-document",
+export const SYSTEM_SECTIONS = [
+	"Role",
+	"Speaking",
+	"Emotion",
+	"Input",
+	"Facts",
+	"Tools",
+	"Toolchains",
+	"Results",
 ] as const;
+type SystemSection = (typeof SYSTEM_SECTIONS)[number];
 
 /**
- * The system part (A1): the persona, then every host rule, with the titles of the toolchains it can hand work to
- * after the rule on tools.
+ * The system part: the agent's parts and the host's rules under their section headings. Each rule says when it
+ * applies and stands in one section only, so the text is the same in every call and changes only with the
+ * settings and the toolchains it can hand work to.
  */
 export function systemText(
 	persona: PersonaSpec,
+	agent: ConversationAgentSystem,
 	toolchainTitles: readonly string[] = [],
 ): string {
-	const toolchains = toolchainTitles.length
-		? "\n" +
-			systemContext("dialogue.contexts.host-rules.toolchains", {
-				titles: toolchainTitles.join("、"),
-			})
-		: "";
-	return (
-		buildSystemPrompt(persona) +
-		RULES.map(
-			(key) =>
-				"\n" +
-				systemContext(key, {}) +
-				(key === "dialogue.contexts.host-rules.tools" ? toolchains : ""),
-		).join("")
-	);
+	const own = PERSONAS[persona.persona] ?? PERSONAS.butler;
+	const sections: Record<SystemSection, Array<string | undefined>> = {
+		Role: [
+			agent.base,
+			systemContext("dialogue.contexts.system.role", {
+				role: own.role,
+				agent: persona.agentName
+					? systemContext("dialogue.contexts.system-prompt.agent-name", {
+							name: persona.agentName,
+						})
+					: "",
+				user: persona.userName
+					? systemContext("dialogue.contexts.system-prompt.user-name", {
+							name: persona.userName,
+						})
+					: "",
+			}),
+			agent.persona,
+		],
+		Speaking: [
+			agent.spokenReplyStyle,
+			systemContext("dialogue.contexts.system.speaking", { style: own.style }),
+		],
+		Emotion: [agent.emotionRules],
+		Input: [systemContext("dialogue.contexts.system.input", {})],
+		Facts: [systemContext("dialogue.contexts.system.facts", {})],
+		Tools: [
+			agent.toolRules,
+			systemContext("dialogue.contexts.system.tools", {}),
+		],
+		Toolchains: [
+			systemContext("dialogue.contexts.system.toolchains", {
+				titles: toolchainTitles.length ? toolchainTitles.join("、") : "なし",
+			}),
+		],
+		Results: [systemContext("dialogue.contexts.system.results", {})],
+	};
+	return SYSTEM_SECTIONS.flatMap((name) => {
+		const parts = sections[name].filter((part): part is string => !!part);
+		return parts.length ? [`## ${name}\n${parts.join("\n")}`] : [];
+	}).join("\n\n");
 }
-
-/** The host's fixed newest message of a generation without a new utterance (section 5.1). */
-export const FIXED_TRIGGER_TEXT =
-	"新しい出来事があります。話すかどうか、何を話すかを判断してください。";

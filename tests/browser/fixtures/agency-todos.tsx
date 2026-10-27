@@ -21,7 +21,7 @@ createRoot(document.getElementById("root")!).render(
 							id: "agency-todos",
 							kind: "toolchain",
 							title: "TODOリスト",
-							artifactRevisionId: "artifact:agency.todos@2",
+							artifactRevisionId: "artifact:agency.todos@3",
 						},
 					]}
 					activeTabId="agency-todos"

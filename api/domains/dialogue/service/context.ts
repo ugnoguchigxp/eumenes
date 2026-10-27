@@ -13,7 +13,6 @@ import type {
 	Addressee,
 	AgencyLayerPort,
 	ConversationAgentPort,
-	GoalsLayerPort,
 	Run,
 	SpecialistPort,
 	StewardPort,
@@ -67,7 +66,7 @@ export type ChatMessage = {
 	tool_call_id?: string;
 };
 
-/** What the newest message of a generation is (the ContextWindow specification, section 5.1). */
+/** What the last message of a generation answers: the pending utterances, or a host notice. */
 export type FinalMessage =
 	| {
 			kind: "utterances";
@@ -76,9 +75,6 @@ export type FinalMessage =
 			messageIds: string[];
 	  }
 	| { kind: "fixed" };
-
-/** Where the newest message(s) start in a generation's messages: after the system, the document and `<now>`. */
-export const NEWEST_MESSAGES_AT = 3;
 
 /** What a generation's prepare fixes, inside the claim transaction. */
 export interface GenerateInput {
@@ -93,27 +89,30 @@ export interface GenerateInput {
 	conversationId: string;
 	requestId?: string;
 	/**
-	 * System, the material document, `<now>`, then the newest message(s) (from `NEWEST_MESSAGES_AT`). Tool calls and
-	 * results are added while it runs.
+	 * The system part, `## Memory`, the recent conversation, then the last message (`## State`, `## Host notice`,
+	 * `## User`). Tool calls and results are added while it runs.
 	 */
 	messages: ChatMessage[];
+	/** The texts of the pending utterances `## User` shows, in receipt order. */
+	utterances: string[];
 	final: FinalMessage;
-	/** Why this generation runs (the triggers its `<now>` shows). */
+	/** Why this generation runs (the TODOs that changed, the utterances, a host note). */
 	trigger: ReadonlyArray<Record<string, unknown>>;
-	plan: import("../../inference").WindowPlan;
-	/** The rendered document and its sizes (measured, never re-rendered while it runs). */
-	document: import("./context-document").ContextDocument;
 	/**
 	 * The sub-agent's answer this generation speaks about, consumed only when the generation is adopted: a report
 	 * whose evidence changed meanwhile (a corrected or withdrawn source) is never adopted.
 	 */
 	agent?: AnswerTicket;
-	/** The TODOs whose result the log shows: what a reply may report. */
+	/** The TODOs whose result this generation shows (the host notice, and what the work tool read): what a reply may report. */
 	shown: { todos: string[] };
-	/** The TODOs' revisions as `<state>` showed them: the work tool acts on what the model saw. */
+	/** The memory items `## Memory` shows: a memory read names them as shown. */
+	memoryItemIds: string[];
+	/** Why the recent conversation was cut before this generation (section 6.1.1); null when it was not. */
+	cut: string | null;
+	/** The input's revision as drawn: a forget or a correction of what it shows meanwhile expires the generation. */
+	inputRevision: number;
+	/** The TODOs' revisions as `## State` showed them: the work tool acts on what the model saw. */
 	todoRevisions: Record<string, number>;
-	/** The episode version shown: an episode changed meanwhile by a forget expires the generation. */
-	windowVersion: number;
 	/** The toolchains this generation may delegate to without a search (`state.retained`). */
 	retained: ReturnType<
 		import("./work-ledger").WorkLedger["retainedInTransaction"]
@@ -125,8 +124,6 @@ export interface GenerateInput {
 		/** The shown messages already blocked at prepare time; one blocked later expires the generation. */
 		blockedAtPrepare?: string[];
 	};
-	/** The goals the state section listed, fixed at prepare time. */
-	goals?: import("./goals-state").PreparedGoals;
 }
 export interface Accept {
 	attachmentIds?: string[];
@@ -161,7 +158,7 @@ export type DialogueDeps = {
 	queue: QueueService;
 	clock: () => string;
 	id: () => string;
-	/** The active short-term memory: the event log, the episode, the work results, the notes. */
+	/** The active short-term memory: the event log (the work results among it) and the notes. */
 	continuity: ContinuityService;
 	/** The conversation's TODOs and confirmations; set by `createDialogueService`. */
 	work?: import("./work-ledger").WorkLedger;
@@ -180,9 +177,7 @@ export type DialogueDeps = {
 	delegation?: import("../contracts/delegation").DelegationPort;
 	toolchains?: import("../contracts/toolchains").ToolchainRoutingPort;
 	worldContext?: WorldContextPort;
-	/** The adopted goals, shown as a layer right after L1. Without it no goals layer exists. */
-	goals?: GoalsLayerPort;
-	/** The agency layer (its recent own utterances and interests). Without it no agency block exists. */
+	/** The agency layer: told when a TODO changed (its opportunity to report). */
 	agency?: AgencyLayerPort;
 	/** The conversation agent that answers every generation. */
 	conversationAgent: ConversationAgentPort;
@@ -190,6 +185,10 @@ export type DialogueDeps = {
 	specialist?: SpecialistPort;
 	/** Set by `createDialogueService` once intake exists (it accepts the resumed runs). */
 	interactions?: CommandInteractions;
+	/** The context keeper: told of every utterance written to the input (section 7.3). Absent: no keeper runs. */
+	contextKeeper?: {
+		noteUtterance(conversationId: string, speaker: "user" | "agent"): void;
+	};
 	/** Installed by the voice delivery owner; awaited after publishing, before any operation starts. */
 	/** Plays the announcement; resolves with how much was heard (cut short by the user: partial), rejects when nothing was. */
 	deliverAnnouncement?: (

@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import { recordUtteranceInTransaction } from "./utterances";
 import { isSystemPrompt } from "../contracts";
 import { saveAnnouncement } from "../repository";
 import {
@@ -6,7 +7,6 @@ import {
 	saveConfirmationRefs,
 } from "../repository/resources";
 import { referencesOfUris, resolveDelegateRefs } from "./delegate-refs";
-import { heardOf } from "./event-fields";
 import type { ToolOutcome } from "./generation-loop";
 import {
 	TOOL_NAMES,
@@ -76,16 +76,26 @@ export async function handOver(
 	});
 	x.publish();
 	const delivered = (heard: "full" | "partial" | "none") =>
-		store.write((tx) =>
-			events.appendInTransaction(tx, {
+		store.write((tx) => {
+			const { created } = events.appendInTransaction(tx, {
 				conversationId: run.conversationId,
 				at: at(),
 				type: "delivered",
 				by: "host",
 				fields: { ref: said.id, heard },
 				dedupeKey: `delivered:${said.id}`,
-			}),
-		);
+			});
+			// The announcement reached the user: it is the agent's utterance of the conversation's input.
+			if (created && heard !== "none")
+				recordUtteranceInTransaction(deps, tx, {
+					conversationId: run.conversationId,
+					speaker: "agent",
+					text: chosen.announcement,
+					// The words it was asked by: forgetting them takes the announcement out too.
+					messageId: run.inputMessageId,
+					at: deps.clock(),
+				});
+		});
 	// A spoken announcement is delivered before the work is handed over; one that failed hands nothing over.
 	let heard: "full" | "partial" = "full";
 	if (run.utteranceId) {
@@ -390,8 +400,9 @@ export function approval(
 		)
 	)
 		return { ok: false, code: "approval_before_statement" };
-	const heard = heardOf(
-		events.logInTransaction(db, input.conversationId),
+	const heard = events.heardInTransaction(
+		db,
+		input.conversationId,
 		statement.id,
 	);
 	const enough =

@@ -95,8 +95,8 @@ test("a run records one row per call; a thrown error is a transport error with i
 	expect(by("ctx-f9-dev-01", 3)).toMatchObject({
 		status: "ok",
 		answer: { text: "承知しました。" },
-		// System, the material document, `<now>`, and the newest message.
-		messageCount: 4,
+		// The system part and the last message (a first input has no recent conversation).
+		messageCount: 2,
 	});
 	expect(by("ctx-f9-dev-01", 3).promptTokensEstimate).toBeGreaterThan(0);
 	// The trials of one case send the same prompt.
@@ -141,7 +141,7 @@ test("the fixture model answers through the production loop, so tools, analysis 
 	]);
 });
 
-test("the trajectory measurement is a valid report; ordinary calls share nearly all of the previous prompt, re-constructed ones less", async () => {
+test("the trajectory measurement is a valid report; ordinary calls share nearly all of the previous prompt, cut ones less", async () => {
 	const report = await measurePrefix({ openWiring: openSeedWiring });
 	expect(prefixReportSchema.safeParse(report).success).toBe(true);
 	expect(Object.keys(report.trajectories).sort()).toEqual([
@@ -151,14 +151,12 @@ test("the trajectory measurement is a valid report; ordinary calls share nearly 
 	const compared = report.trajectories[COMPARED_TRAJECTORY]!;
 	expect(compared.calls).toHaveLength(12);
 	expect(compared.medianRatio).toBeGreaterThan(0.9);
-	const rebuilt = compared.calls.filter((c) => c.reconstruction !== null);
-	expect(rebuilt.map((c) => c.label)).toEqual(["g9", "g11"]);
-	// A re-construction rewrites part of the document (here the profile takes in the waiting memory).
+	const rebuilt = compared.calls.filter((c) => c.cut !== null);
+	expect(rebuilt.map((c) => c.label)).toEqual(["g9"]);
+	// A cut rewrites the start of the input (here `## Memory` takes in the waiting memory).
 	for (const call of rebuilt) expect(call.tokenRatio!).toBeLessThan(1);
 	expect(
-		report.trajectories.smallWindow!.calls.some(
-			(c) => c.reconstruction === "section_over_limit",
-		),
+		report.trajectories.smallWindow!.calls.some((c) => c.cut === "over_limit"),
 	).toBe(true);
 });
 

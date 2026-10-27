@@ -370,18 +370,18 @@ test("a saved item older than the recent choices is offered, accepted and shown 
 	};
 	h.state.steps.push({ text: "見ています" });
 	await h.ask("これは？", { viewing });
-	const shown = h.records(0).find((r) => r.source === "specialist.viewing");
-	expect(shown!.data).toMatchObject({ ref: "item-old", label: "古い項目" });
+	expect(h.stateOf(0)).toContain(
+		"- 制作担当「古い項目」（画面に表示中、target item-old）",
+	);
 	h.handOver({ request: "これを直して", target: "item-old" });
 	h.state.specialist.push(reply("開きました"));
 	await h.ask("これを直して", { viewing });
 	// The search offers it as a target of the studio.
-	const found = JSON.parse(
-		h.state.calls[2]!.messages.filter((m) => m.role === "tool").at(-1)!.content,
-	) as { candidates: Array<{ id: string; targets: Array<{ ref: string }> }> };
-	expect(
-		found.candidates.find((c) => c.id === STUDIO.id)!.targets.map((t) => t.ref),
-	).toContain("item-old");
+	const found = h.state.calls[2]!.messages.filter((m) => m.role === "tool")
+		.at(-1)!
+		.content.split("\n")
+		.find((line) => line.startsWith(`- ${STUDIO.id}: `))!;
+	expect(found).toContain("item-old「");
 	expect(h.work()[0]!.savedRef).toBe("item-old");
 	// Without the screen showing it, the same ref is not issued: nothing starts.
 	const other = await harness();

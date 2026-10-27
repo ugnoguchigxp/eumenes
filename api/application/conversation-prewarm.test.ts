@@ -58,8 +58,13 @@ function harness(latest: string | null) {
 			typeof createConversationPrewarm
 		>[0]["inference"],
 		latestConversationIdInTransaction: () => latest,
-		prefix: (_db, conversationId) =>
-			conversationId === "main" ? prefix : null,
+		task: (_db, conversationId, task) =>
+			conversationId === "main"
+				? {
+						messages: [...prefix.messages, { role: "user", content: task }],
+						tools: prefix.tools,
+					}
+				: null,
 	});
 	return { prewarm, calls, rejected, shown, prefix };
 }

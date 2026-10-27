@@ -51,3 +51,141 @@ test("an answer stopped after its first clause is recorded as heard in part, wit
 		expect.objectContaining({ heard: "partial", deliveredText: "一、" }),
 	]);
 });
+
+test("a playback report queued before cancellation is included in the heard part", async () => {
+	const h = await setup(undefined, {
+		transcribe: async () => "数えてください",
+		answer: async () => "一、二、三。",
+		speak: async () => wav(),
+	});
+	const id = crypto.randomUUID();
+	h.voice.start("heard-concurrent", 1);
+	await say(h, "heard-concurrent", id);
+	await until(() => h.voice.get(id)?.status === "ready");
+	await Promise.all([h.voice.played(id, 0), h.voice.cancel(id)]);
+	expect(h.voice.get(id)?.status).toBe("cancelled");
+	expect(h.voice.get(id)?.audioChunks).toEqual([]);
+	expect(deliveredFields(h)).toEqual([
+		expect.objectContaining({ heard: "partial", deliveredText: "一、" }),
+	]);
+});
+
+test("out-of-order playback reports keep the heard words in playback order", async () => {
+	const h = await setup(undefined, {
+		transcribe: async () => "数えてください",
+		answer: async () => "一、二、三。",
+		speak: async () => wav(),
+	});
+	const id = crypto.randomUUID();
+	h.voice.start("heard-reordered", 1);
+	await say(h, "heard-reordered", id);
+	await until(() => h.voice.get(id)?.status === "ready");
+	await h.voice.played(id, 1);
+	await h.voice.played(id, 0);
+	await h.voice.cancel(id);
+	expect(deliveredFields(h)).toEqual([
+		expect.objectContaining({ heard: "partial", deliveredText: "一、二、" }),
+	]);
+});
+
+test.each(["played", "cancelled"] as const)(
+	"the %s writer wins when the last playback report races cancellation",
+	async (winner) => {
+		const h = await setup(undefined, {
+			transcribe: async () => "話してください",
+			answer: async () => "一。",
+			speak: async () => wav(),
+		});
+		const id = crypto.randomUUID();
+		h.voice.start("heard-final-race", 1);
+		await say(h, "heard-final-race", id);
+		await until(() => h.voice.get(id)?.status === "ready");
+		await Promise.all(
+			winner === "played"
+				? [h.voice.played(id, 0), h.voice.cancel(id)]
+				: [h.voice.cancel(id), h.voice.played(id, 0)],
+		);
+		expect(h.voice.get(id)?.status).toBe(winner);
+		expect(deliveredFields(h)).toEqual([
+			expect.objectContaining({ heard: winner === "played" ? "full" : "none" }),
+		]);
+	},
+);
+
+test.each(["statement", "commit"] as const)(
+	"a failed playback receipt %s preserves the chunk so acknowledgement can be retried",
+	async (stage) => {
+		const h = await setup(undefined, {
+			transcribe: async () => "数えてください",
+			answer: async () => "一。",
+			speak: async () => wav(),
+		});
+		const id = crypto.randomUUID();
+		h.voice.start("heard-retry", 1);
+		await say(h, "heard-retry", id);
+		await until(() => h.voice.get(id)?.status === "ready");
+		if (stage === "commit")
+			await h.store.write((db) =>
+				db.exec(`
+		CREATE TABLE playback_write_parent(id INTEGER PRIMARY KEY);
+		CREATE TABLE playback_write_child(parent INTEGER REFERENCES playback_write_parent(id) DEFERRABLE INITIALLY DEFERRED);
+	`),
+			);
+		const record = h.dialogue.recordHeardInTransaction;
+		h.dialogue.recordHeardInTransaction = (...args) => {
+			if (stage === "statement") throw new Error("receipt_write_failed");
+			args[0].exec("INSERT INTO playback_write_child(parent) VALUES (42)");
+			return record(...args);
+		};
+		await expect(h.voice.played(id, 0)).rejects.toThrow(
+			stage === "statement"
+				? "receipt_write_failed"
+				: "FOREIGN KEY constraint failed",
+		);
+		expect(h.voice.get(id)?.audioChunks).toEqual([
+			expect.objectContaining({ index: 0, text: "一。" }),
+		]);
+		expect(deliveredFields(h)).toEqual([]);
+		h.dialogue.recordHeardInTransaction = record;
+		await h.voice.played(id, 0);
+		expect(h.voice.get(id)?.status).toBe("played");
+		expect(deliveredFields(h)).toEqual([
+			expect.objectContaining({ heard: "full" }),
+		]);
+	},
+);
+
+test("a muted chunk acknowledgement releases the voice queue without claiming it was heard", async () => {
+	const h = await setup(undefined, {
+		transcribe: async () => "数えてください",
+		answer: async () => "一。",
+		speak: async () => wav(),
+	});
+	const id = crypto.randomUUID();
+	h.voice.start("muted", 1);
+	await say(h, "muted", id);
+	await until(() => h.voice.get(id)?.status === "ready");
+	await h.voice.played(id, 0, false);
+	expect(h.voice.get(id)?.status).toBe("played");
+	expect(deliveredFields(h)).toEqual([
+		expect.objectContaining({ heard: "none", channel: "speech" }),
+	]);
+});
+
+test("an earlier muted clause prevents a later audible last clause from confirming the whole answer", async () => {
+	const h = await setup(undefined, {
+		transcribe: async () => "数えてください",
+		answer: async () => "一、二。",
+		speak: async () => wav(),
+	});
+	const id = crypto.randomUUID();
+	h.voice.start("mixed-volume", 1);
+	await say(h, "mixed-volume", id);
+	await until(() => h.voice.get(id)?.status === "ready");
+	expect(h.voice.get(id)?.audioChunks).toHaveLength(2);
+	await h.voice.played(id, 0, false);
+	await h.voice.played(id, 1, true);
+	expect(deliveredFields(h)).toEqual([
+		expect.objectContaining({ heard: "partial", deliveredText: "二。" }),
+	]);
+});

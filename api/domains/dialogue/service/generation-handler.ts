@@ -47,7 +47,7 @@ function answerCollection(run: Run | null, chunkSpeech: boolean) {
 /** The queue handler of one generation: prepare, run the generation with its tools, settle (adopt) and cancel. */
 export function createGenerationHandler(
 	deps: DialogueDeps,
-	{ publish }: Pick<Progress, "publish">,
+	{ publish, openAnswerStream }: Pick<Progress, "publish" | "openAnswerStream">,
 ) {
 	const { store } = deps;
 
@@ -85,6 +85,7 @@ export function createGenerationHandler(
 						input,
 						caller,
 						generationTiming(),
+						openAnswerStream,
 					);
 					try {
 						const publishNow = () => publish(input.runId);

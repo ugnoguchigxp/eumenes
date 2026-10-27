@@ -261,32 +261,6 @@ export function interruptUnfinished(db: Database, now: string): Run[] {
 	).run(now);
 	return runs;
 }
-/**
- * The newest `limit` runs accepted before `run`, oldest first (the verbatim part of the model-visible history),
- * after skipping the `offset` newest ones (a negative `limit` is every run: SQLite has no limit then).
- * `withoutSpecialist` leaves the specialist sessions' runs out before the limit applies (they are not the
- * conversation's history); it needs the specialist migration, so only a host that wires sessions sets it.
- */
-export function recentPriorRuns(
-	db: Database,
-	run: Run,
-	limit: number,
-	withoutSpecialist = false,
-	offset = 0,
-): Run[] {
-	return (
-		db
-			.query(
-				`SELECT ${columns} FROM dialogue_runs WHERE conversation_id = ? AND seq < (SELECT seq FROM dialogue_runs WHERE id = ?)${withoutSpecialist ? " AND specialist_session_id IS NULL" : ""} ORDER BY seq DESC LIMIT ? OFFSET ?`,
-			)
-			.all(run.conversationId, run.id, limit, offset) as Record<
-			string,
-			unknown
-		>[]
-	)
-		.map(map)
-		.reverse();
-}
 
 export function unfinishedAgentRuns(db: Database): Run[] {
 	return (
@@ -410,34 +384,6 @@ export const migrations: readonly Migration[] = [
 		sql: runViewingResourceMigration,
 	},
 ];
-
-/** The digest of the fixed part (system and tool definitions) a run's generation was prepared with. */
-export function savePrefixDigest(db: Database, runId: string, digest: string) {
-	db.query("UPDATE dialogue_runs SET prefix_digest = ? WHERE id = ?").run(
-		digest,
-		runId,
-	);
-}
-
-/**
- * The latest generation of a conversation before `runId` that reached the model (its last update and the digest of
- * its fixed part): a cache-loss check reads how long ago it was and whether the fixed part changed since.
- */
-export function previousGeneration(
-	db: Database,
-	conversationId: string,
-	runId: string,
-): { at: string; prefixDigest: string | null } | null {
-	const row = db
-		.query(
-			"SELECT updated_at AS at, prefix_digest AS prefixDigest FROM dialogue_runs WHERE conversation_id = ? AND id != ? AND prefix_digest IS NOT NULL ORDER BY updated_at DESC LIMIT 1",
-		)
-		.get(conversationId, runId) as {
-		at: string;
-		prefixDigest: string | null;
-	} | null;
-	return row;
-}
 
 /** A screen's form submit names its toolchain; only such a run writes the column. */
 export function savePinnedToolchain(

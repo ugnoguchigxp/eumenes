@@ -18,7 +18,7 @@ export type Speech = {
 	/** Wait for the clauses already enqueued to be acknowledged by the player. */
 	waitForPlayback: (signal: AbortSignal) => Promise<void>;
 	markPlayed: (index: number) => void;
-	/** The texts of the clauses the player acknowledged, in the order it played them. */
-	played: string[];
+	/** Acknowledged clauses in playback order, independent of report arrival order. */
+	played: Array<{ index: number; text: string }>;
 	error?: Error;
 };

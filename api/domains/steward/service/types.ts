@@ -35,7 +35,6 @@ type StewardMemory = Pick<
 	| "recallTurnsInRead"
 	| "windows"
 	| "publishWindowInTransaction"
-	| "republishWindowInTransaction"
 	| "windowPlan"
 >;
 
@@ -85,14 +84,15 @@ export interface StewardDeps {
 	queue: QueuePort;
 	inference: InferencePort;
 	/**
-	 * The prefix the conversation's generations send (system, tool definitions, document), looked up at each use
-	 * (the application binds it after the dialogue exists). The steps that read the conversation send it before
-	 * their task, on the conversation's connection; absent or null keeps their own prompt.
+	 * The conversation's prompt with a step's `## Task` last (the prefix its generations share, then `## State` and
+	 * the task), looked up at each use (the application binds it after the dialogue exists). The steps that read the
+	 * conversation run on it and on the conversation's connection; absent or null keeps their own prompt.
 	 */
-	conversationPrefix?: () =>
+	conversationTask?: () =>
 		| ((
 				db: Database,
 				conversationId: string,
+				task: string,
 		  ) => { messages: ChatMessage[]; tools: NativeTool[] } | null)
 		| undefined;
 	/** A conversation run is generating an answer now (upkeep waits for it); read in the caller's transaction. */
@@ -134,8 +134,6 @@ export type PrepareResult =
 			data: unknown;
 			/** The targets that fit; rewritten into the unit. */
 			targets: UnitTargets;
-			/** The window version the step stands on (the episode steps: a re-construction since makes them stale). */
-			windowVersion: number | null;
 			/** What settle needs and the model never sees (refs, ids, digests). */
 			context: unknown;
 	  };
@@ -152,7 +150,7 @@ export interface ApplyResult {
 	notices: string[];
 	/** A reflecting step changed something: the upkeep revision moves on. */
 	changed: boolean;
-	/** The profile should be published anew at the next re-construction. */
+	/** The profile should be published anew. */
 	requestRepublish?: boolean;
 	/** An upkeep step found nothing to change. */
 	quiet?: boolean;
@@ -170,7 +168,6 @@ export interface PreparedUnit {
 	data: unknown;
 	context: unknown;
 	targets: UnitTargets;
-	windowVersion: number | null;
 }
 
 export type ExecuteContext = {

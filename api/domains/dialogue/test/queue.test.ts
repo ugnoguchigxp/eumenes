@@ -3,7 +3,7 @@ import { waitFor } from "../../../infrastructure/wait-for";
 import { createDialogueService } from "..";
 import { createQueue } from "../../queue";
 import { createScheduler } from "../../scheduler";
-import { setup, type Harness } from "./generation.fixture";
+import { setup, type Harness, userOf } from "./generation.fixture";
 import { testConversationAgent } from "./conversation-agent.fixture";
 
 /**
@@ -35,7 +35,7 @@ test("a run handles the utterances pending at its claim; a later input waits for
 		conversationId: "main",
 		text: "B",
 	});
-	expect(h.state.calls[0]!.messages.at(-1)!.content).toBe("A");
+	expect(userOf(h.state.calls[0]!)).toBe("A");
 	expect(h.dialogue.get(b.id)?.status).toBe("queued");
 	h.state.steps.push({ text: "ansB" });
 	release();
@@ -43,8 +43,8 @@ test("a run handles the utterances pending at its claim; a later input waits for
 	await waitFor(() => h!.dialogue.get(b.id)?.status === "completed");
 	expect(h.dialogue.answerText(b.id)).toBe("ansB");
 	// B's own call sees A's exchange as history, then B.
-	expect(h.state.calls[1]!.messages.at(-1)!.content).toBe("B");
-	expect(h.state.calls[1]!.messages[1]!.content).toContain("ansA");
+	expect(userOf(h.state.calls[1]!)).toBe("B");
+	expect(h.state.calls[1]!.messages[2]!.content).toContain("ansA");
 });
 
 test("utterances pending together are one generation; a run with nothing left to handle ends as handled", async () => {
@@ -63,13 +63,9 @@ test("utterances pending together are one generation; a run with nothing left to
 	h.start();
 	await waitFor(() => h!.dialogue.get(a.id)?.status === "completed");
 	await waitFor(() => h!.dialogue.get(b.id)?.status === "cancelled");
-	// One call carried both utterances, each as its own newest message, with the time it was said.
+	// One call carried both utterances, one line each in its `## User`, in the order they were said.
 	expect(h.state.calls).toHaveLength(1);
-	// System, the material document and `<now>` come first; the newest messages follow (layout specification, section 5).
-	const newest = h.state.calls[0]!.messages.slice(3).map((m) => m.content);
-	expect(newest).toHaveLength(2);
-	expect(newest[0]).toMatch(/^\[.+\] A$/);
-	expect(newest[1]).toMatch(/^\[.+\] B$/);
+	expect(userOf(h.state.calls[0]!)).toBe("A\nB");
 	expect(h.dialogue.get(b.id)).toMatchObject({
 		status: "cancelled",
 		error: "utterance_handled",
@@ -215,7 +211,7 @@ test("a scheduled prompt creates exactly one background run per occurrence; an i
 	h.state.gate = new Promise<void>((resolve) => (release = resolve));
 	await h.queue.tick();
 	await waitFor(() => h!.state.calls.length === 1);
-	expect(h.state.calls[0]!.messages.at(-1)!.content).toBe("今すぐ");
+	expect(userOf(h.state.calls[0]!)).toBe("今すぐ");
 	expect(h.dialogue.get(live.id)?.status).toBe("running");
 	expect(h.dialogue.get(runs[0]!.id)?.status).toBe("queued");
 	release();

@@ -1,12 +1,17 @@
 import type { Database } from "bun:sqlite";
 import type {
 	ConversationEvent,
-	EpisodeSegment,
 	EventActor,
 	EventStatus,
 	EventType,
-	WindowVersion,
 } from "../contracts/events";
+
+/**
+ * The conversation's input is its own utterances and state now (the conversation input specification, section 12):
+ * the episode and the window version of the re-constructed window go.
+ */
+export const dropWindowMigration =
+	"DROP TABLE continuity_episode; DROP TABLE continuity_window;";
 
 /** Work results are events of the log now (the ContextWindow layout specification): the result slots go. */
 export const dropActiveMigration = "DROP TABLE continuity_active;";
@@ -18,7 +23,7 @@ export const dropActiveMigration = "DROP TABLE continuity_active;";
 export const retractActivityMigration =
 	"UPDATE continuity_items SET status = 'retracted', revision = revision + 1 WHERE kind = 'activity' AND status = 'active';";
 
-/** The active short-term memory: events, episode (shown and prepared) and the window version. */
+/** The active short-term memory: the events (the episode and the window version are dropped since). */
 export const eventsMigration = `
 CREATE TABLE continuity_events (
  conversation_id TEXT NOT NULL, seq INTEGER NOT NULL, at TEXT NOT NULL,
@@ -297,29 +302,6 @@ export function reopenEvent(
 	);
 }
 
-/** Moves logged events out of the window: their frozen text goes, their message links stay for forgetting. */
-export function moveEvents(
-	db: Database,
-	conversationId: string,
-	seqs: readonly number[],
-) {
-	const update = db.query(
-		"UPDATE continuity_events SET status = 'moved', full_text = NULL, short_text = NULL WHERE conversation_id = ? AND seq = ? AND status = 'logged'",
-	);
-	for (const seq of seqs) update.run(conversationId, seq);
-}
-
-export function setEventForm(
-	db: Database,
-	conversationId: string,
-	seq: number,
-	form: "full" | "short",
-) {
-	db.query(
-		"UPDATE continuity_events SET form = ? WHERE conversation_id = ? AND seq = ? AND (? = 'full' OR short_text IS NOT NULL)",
-	).run(form, conversationId, seq, form);
-}
-
 /** An event's frozen texts in both forms, as stored (null once moved out or when it has no short form). */
 export function eventTexts(
 	db: Database,
@@ -422,109 +404,27 @@ export function markCurated(
 	for (const seq of seqs) update.run(conversationId, seq);
 }
 
-type EpisodeRow = {
-	kind: EpisodeSegment["kind"];
-	from_seq: number;
-	to_seq: number;
-	from_at: string;
-	to_at: string;
-	count: number;
-	text: string;
-	message_ids: string;
-};
-
-export function readEpisode(
-	db: Database,
-	conversationId: string,
-	stage: "shown" | "prepared",
-): EpisodeSegment[] {
+/** The newest seq of the conversation's events (0 when none). */
+export function latestSeq(db: Database, conversationId: string): number {
 	return (
 		db
 			.query(
-				"SELECT kind, from_seq, to_seq, from_at, to_at, count, text, message_ids FROM continuity_episode WHERE conversation_id = ? AND stage = ? ORDER BY position",
+				"SELECT COALESCE(MAX(seq), 0) AS seq FROM continuity_events WHERE conversation_id = ?",
 			)
-			.all(conversationId, stage) as EpisodeRow[]
-	).map((row) => ({
-		kind: row.kind,
-		fromSeq: row.from_seq,
-		toSeq: row.to_seq,
-		fromAt: row.from_at,
-		toAt: row.to_at,
-		count: row.count,
-		text: row.text,
-		messageIds: JSON.parse(row.message_ids) as string[],
-	}));
+			.get(conversationId) as { seq: number }
+	).seq;
 }
 
-export function writeEpisode(
+/** The logged events after `seq`, in log order. */
+export function loggedAfter(
 	db: Database,
 	conversationId: string,
-	stage: "shown" | "prepared",
-	segments: readonly EpisodeSegment[],
-) {
-	db.query(
-		"DELETE FROM continuity_episode WHERE conversation_id = ? AND stage = ?",
-	).run(conversationId, stage);
-	const insert = db.query(
-		"INSERT INTO continuity_episode (conversation_id, stage, position, kind, from_seq, to_seq, from_at, to_at, count, text, message_ids) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-	);
-	segments.forEach((segment, position) =>
-		insert.run(
-			conversationId,
-			stage,
-			position,
-			segment.kind,
-			segment.fromSeq,
-			segment.toSeq,
-			segment.fromAt,
-			segment.toAt,
-			segment.count,
-			segment.text,
-			JSON.stringify(segment.messageIds),
-		),
-	);
-}
-
-export function conversationsWithEpisodeMessages(
-	db: Database,
-	messageIds: readonly string[],
-): string[] {
-	if (messageIds.length === 0) return [];
-	const wanted = new Set(messageIds);
-	return (
-		db
-			.query(
-				"SELECT DISTINCT conversation_id AS id, message_ids AS ids FROM continuity_episode",
-			)
-			.all() as Array<{ id: string; ids: string }>
-	)
-		.filter((row) =>
-			(JSON.parse(row.ids) as string[]).some((id) => wanted.has(id)),
-		)
-		.map((row) => row.id)
-		.filter((id, index, all) => all.indexOf(id) === index);
-}
-
-export function readWindowVersion(
-	db: Database,
-	conversationId: string,
-): WindowVersion {
-	const row = db
+	seq: number,
+): ConversationEvent[] {
+	const rows = db
 		.query(
-			"SELECT conversation_id AS conversationId, version, rebuilt_at AS rebuiltAt, reason FROM continuity_window WHERE conversation_id = ?",
+			`SELECT ${eventColumns} FROM continuity_events WHERE conversation_id = ? AND status = 'logged' AND seq > ? ORDER BY log_order`,
 		)
-		.get(conversationId) as WindowVersion | null;
-	return row ?? { conversationId, version: 0, rebuiltAt: null, reason: null };
-}
-
-export function bumpWindowVersion(
-	db: Database,
-	conversationId: string,
-	at: string,
-	reason: string,
-): number {
-	db.query(
-		"INSERT INTO continuity_window (conversation_id, version, rebuilt_at, reason) VALUES (?, 1, ?, ?) ON CONFLICT(conversation_id) DO UPDATE SET version = version + 1, rebuilt_at = excluded.rebuilt_at, reason = excluded.reason",
-	).run(conversationId, at, reason);
-	return readWindowVersion(db, conversationId).version;
+		.all(conversationId, seq) as EventRow[];
+	return toEvents(db, rows);
 }

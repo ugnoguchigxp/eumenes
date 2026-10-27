@@ -163,16 +163,15 @@ test("image cancellation after connection creation collects and releases the lat
 		"DELETE /v1/agent-connections/image-connection",
 	]);
 });
-test("image generation failure releases the connection without resubmitting", async () => {
-	const h = fixture((path) =>
-		path === "/acquired-image"
-			? new Response(null, { status: 503 })
-			: undefined,
-	);
-	await expect(h.execute()).rejects.toThrow("larm_http_503");
-	expect(h.calls).toEqual([
-		"POST /v1/agent-connections",
-		"POST /acquired-image",
-		"DELETE /v1/agent-connections/image-connection",
-	]);
-});
+for (const status of [500, 503])
+	test(`image HTTP${status} releases the connection without waiting or resubmitting`, async () => {
+		const h = fixture((path) =>
+			path === "/acquired-image" ? new Response(null, { status }) : undefined,
+		);
+		await expect(h.execute()).rejects.toThrow(`larm_http_${status}`);
+		expect(h.calls).toEqual([
+			"POST /v1/agent-connections",
+			"POST /acquired-image",
+			"DELETE /v1/agent-connections/image-connection",
+		]);
+	});

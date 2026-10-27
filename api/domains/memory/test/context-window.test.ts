@@ -350,13 +350,12 @@ test("the memory tool's query matches a natural Japanese sentence by character p
 	const h = await setup();
 	await h.remember("コーヒーが好き");
 	await h.remember("毎朝走っている", "habit", "毎朝走って");
-	const find = (query: string, itemIds: string[] = []) =>
+	const find = (query: string, shown: string[] = []) =>
 		must(
 			h.store.read((db) =>
 				h.memory.readItemsInTransaction(db, {
 					query,
-					itemIds,
-					shown: new Set(),
+					shown: new Set(shown),
 					limit: 10,
 				}),
 			),
@@ -370,7 +369,10 @@ test("the memory tool's query matches a natural Japanese sentence by character p
 	expect(find("全く関係のない話")).toEqual([]);
 	expect(find("")).toEqual([]);
 	const [first] = find("コーヒー");
-	expect(texts(find("", [String(first!.id)]))).toEqual(["コーヒーが好き"]);
+	// An item the input already shows comes back marked, not left out.
+	expect(find("コーヒー", [String(first!.id)])).toEqual([
+		{ ...first, inProfile: true },
+	]);
 });
 
 test("a rolled-back rebuild is discarded: the next read uses the committed row", async () => {

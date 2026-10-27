@@ -2,11 +2,7 @@ import { getLogger } from "../../../infrastructure/logger";
 import { jstSeconds } from "../../../infrastructure/jst-time";
 import type { Run } from "../contracts";
 import { byId } from "../repository";
-import {
-	NEWEST_MESSAGES_AT,
-	type DialogueDeps,
-	type GenerateInput,
-} from "./context";
+import type { DialogueDeps, GenerateInput } from "./context";
 import { availableToolchainsInTransaction } from "./delegate-conversation";
 import type { GenerationResult } from "./generation-settle";
 import { dispatchInTransaction } from "./work-dispatch";
@@ -41,10 +37,7 @@ export async function pinnedGeneration(
 	const pinned = run.pinnedToolchainId!;
 	const final = input.final;
 	if (final.kind !== "utterances") throw new Error("run_input_missing");
-	const request = input.messages
-		.slice(NEWEST_MESSAGES_AT)
-		.map((message) => message.content)
-		.join("\n");
+	const request = input.utterances.join("\n");
 	const handover = await deps.store.write((tx) => {
 		const current = byId(tx, run.id);
 		if (

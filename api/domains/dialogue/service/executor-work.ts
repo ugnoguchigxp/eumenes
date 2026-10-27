@@ -6,7 +6,10 @@ import type { DialogueDeps } from "./context";
 import type { ToolOutcome } from "./generation-loop";
 import { type ParsedCall, type WorkArgs } from "./generation-tools";
 import { endRun } from "./run-end";
-import { hideUris, type DocumentRefs } from "./context-document";
+import { hideUris, type DocumentRefs } from "./work-items";
+import { CHECK_MAX_TOKENS } from "./input-text";
+import { resultText } from "./result-text";
+import { madeOf } from "./state-text";
 import { resultFields } from "./work-ledger";
 import { dispatchInTransaction } from "./work-dispatch";
 
@@ -53,7 +56,8 @@ export async function work(
 			const row = ref
 				? ledger.workByRefInTransaction(tx, run.conversationId, Number(ref[1]))
 				: null;
-			if (!row || row.archivedAt)
+			// A reported (archived) TODO can still be read; nothing else is done to it.
+			if (!row || (row.archivedAt && given.operation !== "check"))
 				return { result: { ok: false, code: "todo_not_found" } };
 			const seen = x.state.todoRevisions.get(row.id) ?? row.revision;
 			const args: ResolvedWork = {
@@ -79,7 +83,32 @@ export async function work(
 			if (args.operation === "check") {
 				const checked = ledger.checkInTransaction(tx, row.id)!;
 				record({});
-				return { result: { ok: true, ...state(checked) } };
+				x.state.todoRevisions.set(checked.id, checked.revision);
+				// What the check read is what a reply may report now (its sources may be linked).
+				if (!x.input.shown.todos.includes(checked.id))
+					x.input.shown.todos.push(checked.id);
+				const refs = ledger.refsInTransaction(tx, run.conversationId);
+				// The result as the host notice shows one: the same text, so the model reads it the same way.
+				return {
+					result: `- ok: true\n${
+						resultText(
+							{
+								ref: `t${checked.ref}`,
+								title: checked.title,
+								status: checked.status,
+								...(checked.outcome ? { outcome: checked.outcome } : {}),
+								...(checked.question ? { question: checked.question } : {}),
+								result: checked.result,
+								made: ledger
+									.todosInTransaction(tx, run.conversationId)
+									.filter((todo) => todo.id === checked.id)
+									.flatMap((todo) => madeOf(todo, refs)),
+								resource: refs.resource,
+							},
+							CHECK_MAX_TOKENS,
+						).text
+					}`,
+				};
 			}
 			if (row.revision !== args.revision)
 				return { result: { ok: false, code: "revision_stale", ...state() } };

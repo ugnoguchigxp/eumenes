@@ -18,9 +18,14 @@ test("TODO launcher and paged source resolve through the registered artifact wit
 				(entry: { artifactId: string }) => entry.artifactId === "agency.todos",
 			),
 		).toHaveLength(1);
+		expect(
+			entries.find(
+				(entry: { artifactId: string }) => entry.artifactId === "agency.todos",
+			).artifactRevisionId,
+		).toBe("artifact:agency.todos@3");
 		const base =
 			"/api/toolchain-artifacts/" +
-			encodeURIComponent("artifact:agency.todos@2");
+			encodeURIComponent("artifact:agency.todos@3");
 		const detail = await (await h.request(base)).json();
 		expect(detail.artifact.variants[0].definition).toEqual({
 			view: "todo-workspace",
@@ -30,7 +35,7 @@ test("TODO launcher and paged source resolve through the registered artifact wit
 		expect(detail.artifact.sourceBindings[0]).toMatchObject({
 			adapterRef: "adapter:task-execution@1",
 			query: TASK_TODOS_QUERY,
-			paramsSchemaRef: "schema:todo-screen-query@2",
+			paramsSchemaRef: "schema:todo-screen-query@3",
 		});
 		const source = base + "/sources/agency-todos";
 		const read = (params: unknown, suffix = "") =>
@@ -43,8 +48,8 @@ test("TODO launcher and paged source resolve through the registered artifact wit
 		const input = {
 			conversationId: "main",
 			state: "archived",
-			pageIndex: 5,
-			pageSize: 10,
+			pageIndex: 0,
+			pageSize: 20,
 		};
 		expect((await read({ ...input, state: "active" })).status).toBe(200);
 		const response = await read(input);

@@ -2,19 +2,18 @@ import type { Database } from "bun:sqlite";
 import type { NativeTool } from "../infrastructure/chat-stream";
 import { getLogger } from "../infrastructure/logger";
 import type { SqliteStore } from "../infrastructure/sqlite";
-import type { InferenceService } from "../domains/inference";
+import type { InferenceService, Messages } from "../domains/inference";
 
 const log = getLogger("dialogue");
 
 /** In front of LARM's prompt keeping (5 minutes idle by default): a shown conversation is read again before it lapses. */
 export const PREWARM_IDLE_MS = 4 * 60 * 1000;
 const PREWARM_DEADLINE_MS = 120_000;
-/** The fixed last message of a prewarm: it reads the prefix and asks for nothing. */
-const PREWARM_TAIL =
-	'<task name="prewarm">\n資料を読むだけです。何も出力しません。\n</task>';
+/** The fixed task of a prewarm: it reads the prefix and asks for nothing. */
+const PREWARM_TASK = "読むだけです。何も出力しません。";
 
-type Prefix = {
-	messages: Array<{ role: "system" | "user"; content: string }>;
+type Prompt = {
+	messages: Messages;
 	tools: NativeTool[];
 };
 
@@ -37,7 +36,7 @@ export function createConversationPrewarm(deps: {
 		| "onActivity"
 	>;
 	latestConversationIdInTransaction(db: Database): string | null;
-	prefix(db: Database, conversationId: string): Prefix | null;
+	task(db: Database, conversationId: string, task: string): Prompt | null;
 }) {
 	const { store, inference } = deps;
 	let running = false;
@@ -50,7 +49,9 @@ export function createConversationPrewarm(deps: {
 		try {
 			const prepared = store.read((db) => {
 				const conversationId = deps.latestConversationIdInTransaction(db);
-				return conversationId ? deps.prefix(db, conversationId) : null;
+				return conversationId
+					? deps.task(db, conversationId, PREWARM_TASK)
+					: null;
 			});
 			if (!prepared) return;
 			const requestId = await store.write((db) =>
@@ -63,7 +64,7 @@ export function createConversationPrewarm(deps: {
 			const started = Date.now();
 			const receipt = await inference.executeControl(
 				requestId,
-				[...prepared.messages, { role: "user", content: PREWARM_TAIL }],
+				prepared.messages,
 				AbortSignal.timeout(PREWARM_DEADLINE_MS),
 				{ instructions: "", outputSchema: { type: "object" } },
 				{

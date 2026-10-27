@@ -9,6 +9,8 @@ import type {
 	UnitSlot,
 	UnitState,
 } from "../contracts";
+import { dropEpisodeMigration } from "./drop-episode";
+import { activityIndexesMigration } from "./activity-indexes";
 import { dropRecallMigration } from "./drop-recall";
 import { continuityEventsMigration } from "./events";
 import { worldGoalsMigration } from "./world-goals";
@@ -84,6 +86,12 @@ export const migrations: readonly Migration[] = [
 		sql: dropRecallMigration,
 		after: ["steward/0003-continuity-events"],
 	},
+	{
+		id: "steward/0005-drop-episode",
+		sql: dropEpisodeMigration,
+		after: ["steward/0004-drop-recall"],
+	},
+	activityIndexesMigration,
 ];
 
 const CHUNK = 200;
@@ -104,13 +112,6 @@ export type UnitTargets = {
 	requests?: string[];
 	/** The maintenance revision an upkeep unit was made for. */
 	revision?: number;
-	/**
-	 * What an episode unit prepares (`seq` range, both ends included): `log`, the oldest logged events the next
-	 * re-construction moves; `mark`, a range of an unsummarized mark; `merge`, consecutive shown parts.
-	 */
-	range?: { fromSeq: number; toSeq: number; of: "log" | "mark" | "merge" };
-	/** The part of `range` the unit really read (what fits its input). */
-	fitted?: { fromSeq: number; toSeq: number };
 	/** An upkeep unit made for the pending limit: it does not wait for the foreground. */
 	urgent?: boolean;
 	/** The World events a `world_events` unit curates (the events of one run's messages, at most two). */
@@ -125,15 +126,13 @@ export interface UnitRow {
 	targets: UnitTargets;
 	attempt: number;
 	forgetSeq: number | null;
-	/** The window version the unit was prepared on (episode units: a re-construction since makes the result stale). */
-	windowVersion: number | null;
 	state: UnitState;
 	jobId: string | null;
 	createdAt: string;
 	closedAt: string | null;
 }
 const unitColumns = `id, conversation_id AS conversationId, kind, step, slot, targets, attempt, forget_seq AS forgetSeq,
- window_version AS windowVersion, state, job_id AS jobId, created_at AS createdAt, closed_at AS closedAt`;
+ state, job_id AS jobId, created_at AS createdAt, closed_at AS closedAt`;
 function mapUnit(row: Record<string, unknown>): UnitRow {
 	return {
 		...(row as unknown as Omit<UnitRow, "targets">),
@@ -195,18 +194,12 @@ export function setUnitPrepared(
 	id: string,
 	input: {
 		forgetSeq: number;
-		windowVersion: number | null;
 		targets: UnitTargets;
 	},
 ) {
 	db.query(
-		"UPDATE steward_unit SET forget_seq = ?, window_version = ?, targets = ? WHERE id = ? AND state = 'open'",
-	).run(
-		input.forgetSeq,
-		input.windowVersion,
-		JSON.stringify(input.targets),
-		id,
-	);
+		"UPDATE steward_unit SET forget_seq = ?, targets = ? WHERE id = ? AND state = 'open'",
+	).run(input.forgetSeq, JSON.stringify(input.targets), id);
 }
 /** Closes an open unit; false when it was not open (settled already). */
 export function closeUnit(
@@ -244,25 +237,6 @@ export function failedMaintenanceUnits(
 				 AND json_extract(targets, '$.revision') = ?`,
 			)
 			.get(conversationId, step, revision) as { n: number }
-	).n;
-}
-/** Units of an episode step over one range that ended in failure (the range is given up at the limit). */
-export function failedEpisodeUnits(
-	db: Database,
-	conversationId: string,
-	step: StepId,
-	range: { fromSeq: number; toSeq: number; of: string },
-): number {
-	return (
-		db
-			.query(
-				`SELECT COUNT(*) AS n FROM steward_unit WHERE conversation_id = ? AND step = ? AND state = 'failed'
-				 AND json_extract(targets, '$.range.fromSeq') = ? AND json_extract(targets, '$.range.toSeq') = ?
-				 AND json_extract(targets, '$.range.of') = ?`,
-			)
-			.get(conversationId, step, range.fromSeq, range.toSeq, range.of) as {
-			n: number;
-		}
 	).n;
 }
 /** Every conversation the steward has ever worked for (the startup kick starts from them). */
@@ -307,8 +281,6 @@ type QuietSteps = {
 	round?: { revision: number; count: number };
 	/** The number of pending additions a pending-limit consolidation was last made for. */
 	pending?: number;
-	/** Episode ranges with nothing to prepare (`step:from-to`): they are not made into a unit again. */
-	episode?: string[];
 };
 export interface StateRow {
 	conversationId: string;
@@ -628,7 +600,7 @@ export function listDecisions(
 			.all(conversationId, limit) as Record<string, unknown>[]
 	).map(mapDecision);
 }
-/** The saved-memory decisions that read one of these messages (the summarize step shows them to the model). */
+/** The saved-memory decisions that read one of these messages (the steps after it read them as context). */
 export function decisionsOfMessages(
 	db: Database,
 	conversationId: string,

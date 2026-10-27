@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+/** Host budget for on-demand media startup, generation and retrieval; explicit caller limits take precedence. */
+export const MEDIA_GENERATION_TIMEOUT_MS = 300 * 1000;
+
 /** The function name the conversation model calls for one toolchain. */
 export const toolchainFunctionPattern = /^[a-z][a-z0-9_]{2,40}$/;
 

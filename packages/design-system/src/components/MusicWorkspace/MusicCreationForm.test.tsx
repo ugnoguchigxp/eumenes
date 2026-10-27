@@ -93,6 +93,72 @@ it("does not submit a blank or busy draft", () => {
 	fireEvent.submit(prompt().closest("form")!);
 	expect(generate).not.toHaveBeenCalled();
 });
+it("receives a generation prompt without overwriting subsequent edits or a reset", () => {
+	const generate = vi.fn();
+	const r = render(<MusicCreationForm onGenerate={generate} />);
+	r.rerender(
+		<MusicCreationForm
+			onGenerate={generate}
+			generatedPrompt="Piano at dawn"
+			busy
+		/>,
+	);
+	expect(prompt().value).toBe("Piano at dawn");
+	r.rerender(
+		<MusicCreationForm onGenerate={generate} generatedPrompt="Piano at dawn" />,
+	);
+	expect(prompt().value).toBe("Piano at dawn");
+	fireEvent.change(prompt(), { target: { value: "次の曲の希望" } });
+	r.rerender(
+		<MusicCreationForm
+			onGenerate={generate}
+			generatedPrompt="Updated source"
+		/>,
+	);
+	expect(prompt().value).toBe("次の曲の希望");
+	fireEvent.click(screen.getByRole("button", { name: "プロンプトをリセット" }));
+	expect(prompt().value).toBe("");
+	expect(screen.getByRole("button", { name: "楽曲を生成" })).toBeDisabled();
+	r.rerender(
+		<MusicCreationForm
+			onGenerate={generate}
+			generatedPrompt="Another source"
+		/>,
+	);
+	expect(prompt().value).toBe("");
+	fireEvent.click(screen.getByRole("button", { name: "編集内容に戻す" }));
+	expect(prompt().value).toBe("次の曲の希望");
+	fireEvent.click(screen.getByRole("button", { name: "楽曲を生成" }));
+	expect(generate).toHaveBeenCalledWith("次の曲の希望", {
+		task: "music",
+		instrumental: true,
+	});
+});
+it("resets only the prompt, retaining structured choices and lyrics while clearing pending changes", () => {
+	const generate = vi.fn();
+	render(<MusicCreationForm onGenerate={generate} />);
+	fireEvent.change(screen.getByRole("combobox", { name: "用途" }), {
+		target: { value: "vocals" },
+	});
+	fireEvent.change(screen.getByRole("textbox", { name: "歌詞（任意）" }), {
+		target: { value: "[Verse]\n朝の歌" },
+	});
+	fireEvent.change(prompt(), { target: { value: "朝の合唱" } });
+	fireEvent.click(screen.getByRole("checkbox", { name: "オーケストラ" }));
+	expect(screen.getByRole("button", { name: "楽曲を生成" })).toBeDisabled();
+	fireEvent.click(screen.getByRole("button", { name: "プロンプトをリセット" }));
+	expect(prompt().value).toBe("");
+	expect(screen.getByRole("checkbox", { name: "オーケストラ" })).toBeChecked();
+	expect(screen.getByRole("textbox", { name: "歌詞（任意）" })).toHaveValue(
+		"[Verse]\n朝の歌",
+	);
+	fireEvent.change(prompt(), { target: { value: "新しい合唱の希望" } });
+	fireEvent.click(screen.getByRole("button", { name: "楽曲を生成" }));
+	expect(generate).toHaveBeenCalledWith(
+		"新しい合唱の希望",
+		expect.objectContaining({ instrumental: false, lyrics: "[Verse]\n朝の歌" }),
+	);
+});
 it("uses registered choices and defaults when a screen supplies them", () => {
 	const options = {
 		...defaultMusicCreationOptions,

@@ -38,6 +38,20 @@ import {
 	type OutboxOptions,
 } from "../repository";
 
+import {
+	appendState,
+	appendUtterance,
+	correctUtterances,
+	reviseUtterance,
+	dropStates,
+	latestState,
+	latestUtterances,
+	markCutDue,
+	readCut,
+	retractUtterances,
+	utterancesAfter,
+	writeCut,
+} from "../repository/input";
 import { createHistory } from "./history";
 import type { HistoryOwner } from "../contracts/history";
 
@@ -94,6 +108,12 @@ export function createConversationService(
 		input: { messageId: string; at?: string },
 	): ChangeResult => {
 		for (const hook of retractHooks) hook(db, input.messageId);
+		for (const conversationId of retractUtterances(
+			db,
+			[input.messageId],
+			input.at ?? clock(),
+		))
+			dropStates(db, conversationId);
 		return retractMessage(
 			db,
 			{ messageId: input.messageId, at: input.at ?? clock() },
@@ -102,6 +122,24 @@ export function createConversationService(
 	};
 	return {
 		...createAttachments(store, outbox.principal),
+		/**
+		 * What the conversation's input is built from (the conversation input specification, sections 6.3, 6.1.1 and
+		 * 7.4). Every function runs inside the caller's transaction.
+		 */
+		input: {
+			appendUtteranceInTransaction: appendUtterance,
+			reviseUtteranceInTransaction: reviseUtterance,
+			utterancesAfterInTransaction: utterancesAfter,
+			latestUtterancesInTransaction: latestUtterances,
+			retractUtterancesInTransaction: retractUtterances,
+			correctUtterancesInTransaction: correctUtterances,
+			cutInTransaction: readCut,
+			writeCutInTransaction: writeCut,
+			markCutDueInTransaction: markCutDue,
+			latestStateInTransaction: latestState,
+			appendStateInTransaction: appendState,
+			dropStatesInTransaction: dropStates,
+		},
 		historyFingerprintInTransaction: history.fingerprint,
 		historySearchInTransaction: history.search,
 		historyReadInTransaction: history.read,

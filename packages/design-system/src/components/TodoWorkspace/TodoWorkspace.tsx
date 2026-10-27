@@ -108,6 +108,7 @@ export function TodoWorkspace({
 					</TabsTrigger>
 				</TabsList>
 				<TabsContent value={view} className="ds-todo-content">
+					{view === "archived" && <p>直近20件の報告済みの仕事</p>}
 					<ServerDataTable
 						label={view === "active" ? "todo・done" : "報告済み"}
 						{...page}
@@ -120,6 +121,7 @@ export function TodoWorkspace({
 							q: "",
 						}}
 						searchable={false}
+						paginated={view !== "archived"}
 						onQuery={(query) => onPage(query.pageIndex, query.pageSize)}
 						emptyMessage={
 							view === "active"

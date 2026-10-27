@@ -88,7 +88,6 @@ function prepare(env: StepEnv): PrepareResult {
 			adopted: adopted.map((goal) => clipChars(goal.desiredState, TEXT_CHARS)),
 		},
 		targets: {},
-		windowVersion: null,
 		context,
 	};
 }

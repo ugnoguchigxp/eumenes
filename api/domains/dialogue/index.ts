@@ -20,7 +20,7 @@ export { trialFirstRound } from "./service/trial-selection";
 export type {
 	AgencyLayerPort,
 	ConversationAgentPort,
-	GoalsLayerPort,
+	ConversationAgentSystem,
 	StewardRunEnd,
 	WorldContextNamesInput,
 	WorldContextPort,

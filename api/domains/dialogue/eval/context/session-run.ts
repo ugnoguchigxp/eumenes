@@ -55,6 +55,13 @@ export async function generateIn(
 					createdAt: utterance.at,
 					runId,
 				});
+				conversation.input.appendUtteranceInTransaction(db, {
+					conversationId: CONVERSATION_ID,
+					speaker: "user",
+					text: utterance.text,
+					messageId: inputMessageId,
+					at: utterance.at,
+				});
 				events.appendInTransaction(db, {
 					conversationId: CONVERSATION_ID,
 					at: ctx.jst(utterance.at),
@@ -86,7 +93,6 @@ export async function generateIn(
 			createdAt: input.at,
 			updatedAt: input.at,
 		} as Run);
-		const before = events.windowVersionInTransaction(db, CONVERSATION_ID);
 		const prepared = ctx.prepare(db, {
 			payload: { runId } satisfies GeneratePayload,
 			jobId,
@@ -95,13 +101,17 @@ export async function generateIn(
 			throw new Error(
 				`context_eval_prepare_${prepared.status}:${"reason" in prepared ? prepared.reason : ""}`,
 			);
-		const after = events.windowVersionInTransaction(db, CONVERSATION_ID);
+		const cut = ctx.deps.conversation.input.cutInTransaction(
+			db,
+			CONVERSATION_ID,
+		);
 		return {
 			runId,
 			input: prepared.input,
-			reconstruction:
-				after.version !== before.version
-					? { version: after.version, reason: after.reason }
+			// The first input places the cut at the start: only a later one moves it.
+			cut:
+				prepared.input.cut && prepared.input.cut !== "started" && cut
+					? { seq: cut.seq, reason: prepared.input.cut }
 					: null,
 		};
 	});
@@ -161,6 +171,20 @@ export function settleIn(
 				deliveryKey: `run:${generated.runId}`,
 			});
 			const heard = reply.heard ?? "full";
+			const reached =
+				heard === "full"
+					? reply.text
+					: heard === "partial"
+						? (reply.deliveredText ?? "")
+						: "";
+			if (reached)
+				conversation.input.appendUtteranceInTransaction(db, {
+					conversationId: CONVERSATION_ID,
+					speaker: "agent",
+					text: reached,
+					messageId: id,
+					at: ctx.wiring.now(),
+				});
 			events.appendInTransaction(db, {
 				conversationId: CONVERSATION_ID,
 				at,

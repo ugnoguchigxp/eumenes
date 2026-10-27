@@ -179,14 +179,14 @@ test("a slot fails while its last closed unit failed for a reason other than a L
 	expect(activity.activity("main").errors).toEqual([]);
 	// A failure whose decision was pruned still shows.
 	await unit(store, {
-		slot: "episode",
-		step: "summarize",
+		slot: "reflect",
+		step: "curate-memory",
 		state: "failed",
 		decision: false,
 		at: "2026-10-25T04:53:00.000Z",
 	});
 	expect(activity.activity("main").errors).toMatchObject([
-		{ slot: "episode", code: "unknown" },
+		{ slot: "reflect", code: "unknown" },
 	]);
 });
 

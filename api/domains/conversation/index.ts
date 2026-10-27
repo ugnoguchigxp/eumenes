@@ -6,7 +6,16 @@ export {
 	outboxMigration,
 	retractionMigration,
 } from "./repository";
-export type { OutboxEvent } from "./contracts";
+export { inputMigration } from "./repository/input";
+export type {
+	ConversationCut,
+	ConversationState,
+	ConversationStateBody,
+	OutboxEvent,
+	StateItem,
+	Utterance,
+	UtteranceSpeaker,
+} from "./contracts";
 export {
 	CONVERSATION_DEFAULT_PRINCIPAL,
 	CONVERSATION_DEFAULT_SCOPE,

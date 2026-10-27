@@ -124,6 +124,14 @@ export function createSpeechSynthesis({
 			},
 		};
 		audio.set(id, state);
+		const discard = () => {
+			pending.length = 0;
+			state.chunks.clear();
+			publishedOrders.clear();
+			wake();
+		};
+		controller.signal.addEventListener("abort", discard, { once: true });
+		if (controller.signal.aborted) discard();
 		state.work = (async () => {
 			while (!controller.signal.aborted) {
 				if (pending.length && state.chunks.size < 3) {
@@ -259,12 +267,12 @@ export function createSpeechSynthesis({
 					if (controller.signal.aborted) finish();
 				});
 			}
-		})().catch((error) => {
-			state.error = error instanceof Error ? error : new Error("tts_failed");
-			pending.length = 0;
-			state.chunks.clear();
-			wake();
-		});
+		})()
+			.catch((error) => {
+				state.error = error instanceof Error ? error : new Error("tts_failed");
+				discard();
+			})
+			.finally(() => controller.signal.removeEventListener("abort", discard));
 		return state;
 	};
 }

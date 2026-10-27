@@ -31,6 +31,7 @@ export type ServerDataTableProps<T extends { id: string }> = {
 	detailMode?: "inline" | "modal";
 	emptyMessage?: string;
 	searchable?: boolean;
+	paginated?: boolean;
 };
 /** All sorting, filtering and pagination are controlled by the caller's API response. */
 export function ServerDataTable<T extends { id: string }>({
@@ -46,6 +47,7 @@ export function ServerDataTable<T extends { id: string }>({
 	detailMode = "inline",
 	emptyMessage = "記録はまだありません。",
 	searchable = true,
+	paginated = true,
 }: ServerDataTableProps<T>) {
 	const [search, setSearch] = useState(query.q);
 	const [open, setOpen] = useState<string | null>(null);
@@ -223,44 +225,48 @@ export function ServerDataTable<T extends { id: string }>({
 			{!busy && !error && !total && (
 				<p>{query.q ? "検索条件に一致する記録はありません。" : emptyMessage}</p>
 			)}
-			<div className="ds-server-table-tools">
-				<label>
-					表示件数{" "}
-					<select
-						aria-label={`${label}の表示件数`}
-						value={query.pageSize}
-						disabled={busy}
-						onChange={(event) => table.setPageSize(Number(event.target.value))}
+			{paginated && (
+				<div className="ds-server-table-tools">
+					<label>
+						表示件数{" "}
+						<select
+							aria-label={`${label}の表示件数`}
+							value={query.pageSize}
+							disabled={busy}
+							onChange={(event) =>
+								table.setPageSize(Number(event.target.value))
+							}
+						>
+							{[10, 25, 50].map((size) => (
+								<option key={size} value={size}>
+									{size}件
+								</option>
+							))}
+						</select>
+					</label>
+					<span aria-live="polite">
+						{busy
+							? "取得中…"
+							: `${total}件 · ${query.pageIndex + 1} / ${pageCount}ページ`}
+					</span>
+					<Button
+						variant="secondary"
+						disabled={busy || !table.getCanPreviousPage()}
+						aria-label={`${label}の前のページ`}
+						onClick={() => table.previousPage()}
 					>
-						{[10, 25, 50].map((size) => (
-							<option key={size} value={size}>
-								{size}件
-							</option>
-						))}
-					</select>
-				</label>
-				<span aria-live="polite">
-					{busy
-						? "取得中…"
-						: `${total}件 · ${query.pageIndex + 1} / ${pageCount}ページ`}
-				</span>
-				<Button
-					variant="secondary"
-					disabled={busy || !table.getCanPreviousPage()}
-					aria-label={`${label}の前のページ`}
-					onClick={() => table.previousPage()}
-				>
-					前へ
-				</Button>
-				<Button
-					variant="secondary"
-					disabled={busy || !table.getCanNextPage()}
-					aria-label={`${label}の次のページ`}
-					onClick={() => table.nextPage()}
-				>
-					次へ
-				</Button>
-			</div>
+						前へ
+					</Button>
+					<Button
+						variant="secondary"
+						disabled={busy || !table.getCanNextPage()}
+						aria-label={`${label}の次のページ`}
+						onClick={() => table.nextPage()}
+					>
+						次へ
+					</Button>
+				</div>
+			)}
 			{detail && visibleDetail && detailMode === "inline" && (
 				<div className="ds-server-table-detail">
 					<div className="ds-server-table-tools">

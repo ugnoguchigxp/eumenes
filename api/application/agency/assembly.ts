@@ -27,7 +27,7 @@ export function assembleAgency(
 		| "conversationHasActiveRunInTransaction"
 		| "recordSpontaneousInTransaction"
 		| "archiveReportedInTransaction"
-		| "conversationPrefixInTransaction"
+		| "conversationTaskInTransaction"
 	>,
 ) {
 	const { store, inference } = deps;
@@ -45,9 +45,9 @@ export function assembleAgency(
 				inference,
 				next,
 				// The update and the decisions read the conversation's prompt and run on its connection.
-				prefix: (conversationId) =>
+				task: (conversationId, task) =>
 					store.read((db) =>
-						dialogue().conversationPrefixInTransaction(db, conversationId),
+						dialogue().conversationTaskInTransaction(db, conversationId, task),
 					),
 				// The receipt of a control call carries no token counts: read them from the attempt record.
 				attemptUsage: (attemptId) => {

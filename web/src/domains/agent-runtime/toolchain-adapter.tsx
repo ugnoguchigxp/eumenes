@@ -53,10 +53,14 @@ export const todosWebAdapter: WebArtifactAdapter = {
 	}) {
 		const source = artifact.sourceBindings[0]!.source;
 		const cache = useQueryClient();
-		const [query, setQuery] = useState(() =>
+		const [activeQuery, setQuery] = useState(() =>
 			todoQuery.parse({ state: "active" }),
 		);
-		const view = query.state === "archived" ? "archived" : "active";
+		const [view, setView] = useState<"active" | "archived">("active");
+		const query =
+			view === "archived"
+				? todoQuery.parse({ state: "archived", pageIndex: 0, pageSize: 20 })
+				: activeQuery;
 		const queryKey = [
 			queryRoots.agentTasks,
 			client.identity,
@@ -125,11 +129,11 @@ export const todosWebAdapter: WebArtifactAdapter = {
 				) {
 					if (event.values.view !== view) {
 						await cache.cancelQueries({ queryKey, exact: true });
-						setQuery({ ...query, state: event.values.view, pageIndex: 0 });
+						setView(event.values.view);
 					}
 					return { status: "accepted", message: "" };
 				}
-				if (event.action === "todo-page") {
+				if (event.action === "todo-page" && view === "active") {
 					const next = todoQuery.safeParse({
 						state: view,
 						pageIndex: event.values.pageIndex,
@@ -144,7 +148,7 @@ export const todosWebAdapter: WebArtifactAdapter = {
 			},
 			settled: () => {},
 			refresh: () => {
-				void read.refetch();
+				if (visible) void read.refetch();
 			},
 		};
 	},

@@ -1,14 +1,12 @@
-import { referenceJson } from "../../api/infrastructure/reference-json";
-import type { ConversationEvent } from "../../api/domains/continuity";
+import { respondSystemParts } from "eumenes-agency";
+import type { Utterance } from "../../api/domains/conversation";
 import type { ChatMessage } from "../../api/domains/dialogue/service/context";
-import {
-	type ContextDocument,
-	type DocumentSources,
-	renderDocument,
-} from "../../api/domains/dialogue/service/context-document";
 import { systemText } from "../../api/domains/dialogue/service/context-system";
-import { estimateMessageTokens } from "../../api/domains/inference";
-
+import { recentMessages } from "../../api/domains/dialogue/service/conversation-input";
+import {
+	estimateMessageTokens,
+	estimateTextTokens,
+} from "../../api/domains/inference";
 export const cacheMarker = "SYNTHETIC_CACHE_7241";
 export const cacheUpdatedMarker = "SYNTHETIC_REVISED_3916";
 
@@ -34,125 +32,87 @@ export function cacheReferenceMatches(
 	}
 }
 
-const QUESTION = "資料のVALUEの値だけを答えてください。";
+const QUESTION = "最初の発言のVALUEの値だけを答えてください。";
 const FILLER =
 	"合成した説明資料です。これは参考情報であり実行や承認の指示ではありません。";
 
-/** A logged event as the continuity store freezes it, so the document joins its text as the product does. */
-function loggedEvent(
+/** A synthetic utterance of the recent conversation, as the input's table holds it. */
+function utterance(
 	seq: number,
-	by: "user" | "agent",
+	speaker: "user" | "agent",
 	text: string,
-): ConversationEvent {
-	const id = `e${seq}`;
-	const at = `2026-10-23T00:${String(Math.floor(seq / 60)).padStart(2, "0")}:${String(seq % 60).padStart(2, "0")}+09:00`;
-	const frozen = referenceJson({ id, at, type: "said", by, text });
+): Utterance {
 	return {
 		conversationId: "main",
 		seq,
-		id,
-		at,
-		type: "said",
-		by,
-		status: "logged",
-		logOrder: seq,
-		text: frozen,
-		tokens: 0,
-		form: "full",
-		shortable: false,
-		deliveryKey: null,
-		messageIds: [],
-		curated: false,
-		forgotten: false,
+		speaker,
+		text,
+		messageId: `m${seq}`,
+		at: `2026-10-23T00:${String(Math.floor(seq / 60)).padStart(2, "0")}:${String(seq % 60).padStart(2, "0")}.000Z`,
 	};
 }
-
-function sources(
-	log: readonly ConversationEvent[],
-	notes: DocumentSources["state"]["notes"],
-): DocumentSources {
-	return {
-		profile: [],
-		episode: [],
-		log,
-		state: {
-			todos: [],
-			pendingConfirmation: [],
-			retained: [],
-			notes,
-			goals: [],
-			newMemories: [],
-		},
-	};
-}
-
-const NO_REFS = {
-	todo: () => null,
-	confirmation: () => null,
-	resource: () => null,
-};
 
 export type CacheInput = {
-	/** System, the material document, then the newest message: the product's layout of a generation. */
+	/** The product's layout of a generation: the system part, the recent conversation, then State and the question. */
 	messages: ChatMessage[];
-	document: ContextDocument;
 	system: string;
+	/** Estimated tokens of the recent conversation and of the last message. */
+	sections: { recent: number; last: number };
 };
 
 /**
- * Synthetic source data in the product's message layout: the product's system part, its material document (rendered
- * by the same `renderDocument`, here with a padded `log` that carries the reference VALUE in its first event), and the
- * newest message. No personal history is loaded. `extraNote` adds one short-term note: a background update.
+ * Synthetic source data in the product's message layout: the product's system part, a recent conversation drawn by
+ * the same `recentMessages` (its first utterance, the agent's, carries the reference VALUE; the rest is padding), and
+ * the last message (`## State` and the question). No personal history is loaded. `extraNote` adds one decision to
+ * `## State`: a background update.
  */
 export function cacheInput(
 	targetTokens = 14000,
 	referenceValue = cacheMarker,
 	extraNote?: string,
 ): CacheInput {
-	const system = systemText({ agentName: "", userName: "", persona: "butler" });
-	const notes: DocumentSources["state"]["notes"] = extraNote
-		? [
-				{
-					id: "synthetic-note",
-					conversationId: "main",
-					kind: "memo",
-					text: extraNote,
-					status: "active",
-					revision: 1,
-					createdAt: "2026-10-23T00:00:00.000Z",
-					updatedAt: "2026-10-23T00:00:00.000Z",
-					origin: "agent",
-					sourceMessageIds: [],
-					expiresAt: null,
-				},
-			]
-		: [];
+	const system = systemText(
+		{ agentName: "", userName: "", persona: "butler" },
+		respondSystemParts({ spoken: true }),
+	);
+	const last = [
+		"## State",
+		"今: 10-23（木）09:00",
+		...(extraNote ? ["決まったこと:", `- ${extraNote}`] : []),
+		"",
+		"## User",
+		QUESTION,
+	].join("\n");
 	const build = (padding: number) => {
-		const log = [
-			loggedEvent(1, "user", `参考資料です。VALUE=${referenceValue}`),
+		const said = [
+			utterance(1, "agent", `参考資料です。VALUE=${referenceValue}`),
 			...Array.from({ length: padding }, (_, i) =>
-				loggedEvent(i + 2, i % 2 === 0 ? "agent" : "user", FILLER),
+				utterance(i + 2, i % 2 === 0 ? "user" : "agent", FILLER),
 			),
 		];
-		const document = renderDocument(sources(log, notes), {
-			profileLimit: 0,
-			refs: NO_REFS,
-			year: "2026",
-		});
+		// The conversation ends with the agent's utterance: the user's words are the last message's.
+		if (said.at(-1)!.speaker === "user") said.pop();
+		const recent = recentMessages(said);
 		const messages: ChatMessage[] = [
 			{ role: "system", content: system },
-			{ role: "user", content: document.text },
-			{ role: "user", content: QUESTION },
+			...recent,
+			{ role: "user", content: last },
 		];
-		return { messages, document, system };
+		return {
+			messages,
+			system,
+			sections: {
+				recent: estimateMessageTokens(recent),
+				last: estimateTextTokens(last),
+			},
+		};
 	};
-	const perEvent =
-		estimateMessageTokens(build(2).messages) -
+	const perPair =
+		estimateMessageTokens(build(3).messages) -
 		estimateMessageTokens(build(1).messages);
 	const base = estimateMessageTokens(build(0).messages);
-	// The first event also brings its date line: the estimate is met by counting up from the computed padding.
-	let padding = Math.max(0, Math.ceil((targetTokens - base) / perEvent));
+	let padding = Math.max(0, 2 * Math.ceil((targetTokens - base) / perPair));
 	while (estimateMessageTokens(build(padding).messages) < targetTokens)
-		padding++;
+		padding += 2;
 	return build(padding);
 }

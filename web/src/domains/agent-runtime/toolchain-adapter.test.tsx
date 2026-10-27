@@ -28,8 +28,8 @@ const bundle = JSON.parse(
 		"utf8",
 	),
 );
-const artifact = artifactDefinitionV1.parse(bundle.artifacts[0]);
-const revision = "artifact:agency.todos@2";
+const artifact = artifactDefinitionV1.parse(bundle.artifacts.at(-1));
+const revision = "artifact:agency.todos@3";
 const adapters = createWebAdapterRegistry([todosWebAdapter]);
 const row: TodoPage["rows"][number] = {
 	id: "one",
@@ -63,6 +63,7 @@ function page(query: TodoQuery): TodoPage {
 }
 function setup(
 	readWork: (query: TodoQuery, signal?: AbortSignal) => Promise<TodoPage>,
+	visible = true,
 ) {
 	const cache = new QueryClient({
 		defaultOptions: { queries: { retry: false, gcTime: 0 } },
@@ -106,7 +107,7 @@ function setup(
 			},
 		),
 	};
-	render(
+	const content = (shown: boolean) => (
 		<QueryClientProvider client={cache}>
 			<ToolchainArtifactHost
 				client={client}
@@ -114,10 +115,12 @@ function setup(
 				artifactRevisionId={revision}
 				artifactId="todos"
 				conversationId="main"
+				visible={shown}
 			/>
-		</QueryClientProvider>,
+		</QueryClientProvider>
 	);
-	return client;
+	const view = render(content(visible));
+	return { client, show: (shown: boolean) => view.rerender(content(shown)) };
 }
 
 test("todo and done are rows of one table with one pagination and a changing state", async () => {
@@ -139,6 +142,9 @@ test("todo and done are rows of one table with one pagination and a changing sta
 	expect(screen.getByText("完了：作成できました")).toBeTruthy();
 	expect(screen.getByText("確認待ち：どの曲調にしますか")).toBeTruthy();
 	expect(screen.queryByText("archived 0 の仕事")).toBeNull();
+	expect(read.mock.calls.every(([query]) => query.state === "active")).toBe(
+		true,
+	);
 	expect(screen.queryByRole("button", { name: /詳細/ })).toBeNull();
 	expect(document.querySelector(".ds-todo-workspace time")).toBeNull();
 	fireEvent.click(
@@ -190,8 +196,20 @@ test("todo and done are rows of one table with one pagination and a changing sta
 	await screen.findByText("archived 0 の仕事");
 	expect(screen.getAllByRole("table")).toHaveLength(1);
 	expect(screen.queryByText("todo 0 の仕事")).toBeNull();
-	fireEvent.click(screen.getByRole("button", { name: "報告済みの次のページ" }));
-	await screen.findByText("archived 1 の仕事");
+	expect(read).toHaveBeenLastCalledWith(
+		{ state: "archived", pageIndex: 0, pageSize: 20 },
+		expect.any(AbortSignal),
+	);
+	expect(
+		screen.queryByRole("button", { name: "報告済みの次のページ" }),
+	).toBeNull();
+	expect(screen.queryByRole("combobox")).toBeNull();
+	fireEvent.mouseDown(screen.getByRole("tab", { name: "todo・done" }));
+	await screen.findByText("todo 0 の仕事");
+	expect(read).toHaveBeenLastCalledWith(
+		{ state: "active", pageIndex: 0, pageSize: 25 },
+		expect.any(AbortSignal),
+	);
 });
 
 test("switching to archived cancels the pending combined read and ignores its late response", async () => {
@@ -241,4 +259,22 @@ test("the combined empty table remains visible; a failed read can recover withou
 	expect(document.querySelector(".ds-todo-workspace script")).toBeNull();
 	expect(document.querySelector(".ds-todo-workspace time")).toBeNull();
 	expect(screen.queryByRole("dialog")).toBeNull();
+});
+
+test("a hidden artifact reads no TODOs and reads only active work when shown", async () => {
+	const read = vi.fn(async (query: TodoQuery) => page(query));
+	const view = setup(read, false);
+	await screen.findByRole("tab", { name: "todo・done" });
+	expect(read).not.toHaveBeenCalled();
+	view.show(true);
+	await screen.findByText("todo 0 の仕事");
+	expect(read.mock.calls.every(([query]) => query.state === "active")).toBe(
+		true,
+	);
+	fireEvent.mouseDown(screen.getByRole("tab", { name: "archived" }));
+	await screen.findByText("archived 0 の仕事");
+	expect(read).toHaveBeenLastCalledWith(
+		{ state: "archived", pageIndex: 0, pageSize: 20 },
+		expect.any(AbortSignal),
+	);
 });

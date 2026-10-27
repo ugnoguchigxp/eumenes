@@ -24,8 +24,8 @@ export function createStewardService(deps: StewardDeps) {
 		/** The queue handler of `steward.step.v1`. */
 		handler,
 		/**
-		 * Makes the units a conversation needs (and the idle re-construction when it is due); without an id, for every
-		 * conversation with work (startup).
+		 * Makes the units a conversation needs; without an id, for every conversation with work
+		 * (startup).
 		 */
 		kickInTransaction: kick.kickInTransaction,
 		/** The conversation agent's memory tool (dialogue calls it directly): the request waits as `pending` from the moment the action is committed. */

@@ -1,11 +1,10 @@
 import type { Database } from "bun:sqlite";
 import {
 	createAgencyRuntime,
-	createIdlePlanner,
 	createIdleScheduler,
 	emotionName,
 	reportedTodoIds,
-	respondSystem,
+	respondSystemParts,
 	runRespond,
 	ttsUtteranceStyle,
 	type ActionTicket,
@@ -14,7 +13,6 @@ import {
 	type CycleOutcome,
 	type Decision,
 	type EmotionName,
-	type IdlePlanner,
 	type LlmPort,
 	type LlmRequest,
 	type Opportunity,
@@ -36,11 +34,10 @@ import type { SqliteStore } from "../../infrastructure/sqlite";
 import type { AgencyCallIdentity } from "./llm-port";
 import { selectMemoryTopics } from "./topics";
 import type { AgencyWork } from "./work";
+import { createReportIdlePlanner, type ReportIdlePlanner } from "./report-idle";
 
 export type AgencySettings = Settings["agency"];
 
-/** Items of the agent's own state shown in the main context. */
-const PROJECTION_ITEMS = 7;
 /** A conversation the user has not touched for this long, and is not the active one, is forgotten. */
 const IDLE_DROP_MS = 30 * 60_000;
 /** Tracked conversations at most; the least recently touched inactive ones go first. */
@@ -87,7 +84,7 @@ export type AgencyHostDeps = {
 			messageId: string;
 			text: string;
 			at: string;
-			/** The finished TODOs it reported: archived with it. */
+			/** The finished TODOs it reported: archived after playback completes. */
 			todoRefs?: readonly string[];
 		},
 	): void;
@@ -110,7 +107,7 @@ type Conv = {
 	/** Unique per runtime instance: ticket ids restart per runtime, message ids must not repeat. */
 	scope: string;
 	runtime: AgencyRuntime;
-	planner: IdlePlanner;
+	planner: ReportIdlePlanner;
 	scheduler: ReturnType<typeof createIdleScheduler>;
 	generation: number;
 	background: AbortController | null;
@@ -277,10 +274,14 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 		});
 	}
 
-	function newPlanner(id: string): IdlePlanner {
-		const planner = createIdlePlanner(
+	function newPlanner(id: string): ReportIdlePlanner {
+		const planner = createReportIdlePlanner(
 			{ idleSec: cfg.idleSec, maxUnanswered: cfg.maxUnanswered },
 			nowMs(),
+			() => {
+				const c = convs.get(id);
+				return !!c && todosNow(c).some((todo) => todo.status === "done");
+			},
 		);
 		// Only the conversation the user spoke in last gets idle cycles.
 		planner.setPaused(id !== activeId, nowMs());
@@ -294,7 +295,12 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 			now: nowMs,
 			setTimer,
 			clearTimer,
-			run: () => runCycle(c, "idle", false),
+			run: () =>
+				runCycle(
+					c,
+					c.planner.reportsOnly() ? "result_received" : "idle",
+					false,
+				),
 			onCycle: (outcome) =>
 				log.info("agency.idle_cycle", {
 					subjectId: c.id,
@@ -324,7 +330,7 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 		return c;
 	}
 
-	const idleFields = (planner: IdlePlanner) => {
+	const idleFields = (planner: ReportIdlePlanner) => {
 		const status = planner.status();
 		return {
 			phase: status.blockedBy ?? "armed",
@@ -456,11 +462,12 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 	type Cycle = {
 		c: Conv;
 		runtime: AgencyRuntime;
-		planner: IdlePlanner;
+		planner: ReportIdlePlanner;
 		trigger: Opportunity["trigger"];
 		controller: AbortController;
 		mine: number;
 		ordinal: number;
+		reportsOnly: boolean;
 	};
 
 	/** Returns true when the utterance was appended. */
@@ -483,6 +490,7 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 		const text = ticket.utterance ?? "";
 		const messageId = `agency:${c.scope}:${ticket.id}`;
 		const at = nowMs();
+		let reported = false;
 		let outcome: "appended" | "stale";
 		try {
 			outcome = await store.write((db) => {
@@ -513,6 +521,9 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 						: {}),
 				});
 				const todoRefs = reportedTodoIds(evidenceRefs);
+				reported = todoRefs.some((id) =>
+					todosNow(c).some((todo) => todo.id === id && todo.status === "done"),
+				);
 				deps.recordSpokeInTransaction(db, {
 					conversationId: c.id,
 					messageId,
@@ -543,7 +554,8 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 			receipt(cy, ticket, "interrupted", "");
 			return false;
 		}
-		cy.planner.proactiveSpoke(nowMs());
+		if (reported) cy.planner.reportSpoke(nowMs());
+		else cy.planner.proactiveSpoke(nowMs());
 		log.info("agency.delivered", {
 			subjectId: c.id,
 			attemptId: ticket.id,
@@ -635,8 +647,10 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 			presence: "quiet",
 			foregroundBusy: hostBusy(c),
 			playerBusy: false,
-			topics: topicsNow(),
-			todos: todosNow(c),
+			topics: cy.reportsOnly ? [] : topicsNow(),
+			todos: todosNow(c).filter(
+				(todo) => !cy.reportsOnly || todo.status === "done",
+			),
 		};
 		const { decision, calls } = await runtime.decide(
 			opportunity,
@@ -654,6 +668,15 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 		// A busy moment is not a silent one: it must not spend the idle backoff.
 		if (decision.source === "host_blocked") return "aborted";
 		if (!decision.ticket) return "silent";
+		if (
+			cy.reportsOnly &&
+			!reportedTodoIds(decision.evidenceRefs).some((id) =>
+				todosNow(c).some((todo) => todo.id === id && todo.status === "done"),
+			)
+		) {
+			receipt(cy, decision.ticket, "failed", "completed_todo_required");
+			return "silent";
+		}
 		return (await deliver(cy, decision.ticket, decision.evidenceRefs))
 			? "spoke"
 			: "silent";
@@ -682,6 +705,7 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 			trigger,
 			controller,
 			mine: ++c.generation,
+			reportsOnly: c.planner.reportsOnly(),
 			ordinal: store.read((db) =>
 				conversation.latestOrdinalInTransaction(db, c.id),
 			),
@@ -860,6 +884,7 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 			if (conversationId !== activeId) continue;
 			const c = convOf(conversationId);
 			if (newWork(c)) launch(c, "result_received", true);
+			c.scheduler.rearm();
 		}
 		workChanged.clear();
 		prune();
@@ -890,15 +915,6 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 	// ---- public ---------------------------------------------------------------
 
 	const dialoguePort: AgencyLayerPort = {
-		stateForContextInTransaction(_db, conversationId): string[] {
-			const c = convs.get(conversationId);
-			if (!on() || !c) return [];
-			const projection = c.runtime.projection(PROJECTION_ITEMS);
-			return [
-				...projection.items.map((item) => `[${item.kind}] ${item.text}`),
-				...(projection.hidden > 0 ? [`(ほか ${projection.hidden} 件)`] : []),
-			];
-		},
 		workChangedInTransaction(_db, conversationId) {
 			workChanged.add(conversationId);
 		},
@@ -910,7 +926,7 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 	 */
 	const conversationAgent: ConversationAgentPort = {
 		system: () =>
-			respondSystem({
+			respondSystemParts({
 				interests: cfg.interests.map((text, index) => ({
 					id: `i${index + 1}`,
 					text,

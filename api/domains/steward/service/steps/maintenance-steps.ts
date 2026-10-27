@@ -131,7 +131,6 @@ function prepareConsolidate(env: StepEnv) {
 			longTermCoverage: memory.coverage,
 		},
 		targets: {},
-		windowVersion: null,
 		context: { refs: memory.refs } satisfies ConsolidateContext,
 	};
 }

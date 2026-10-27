@@ -34,13 +34,14 @@ export type Persona = {
 	persona: "butler" | "maid" | "strategist" | "sage";
 };
 
-export type Reconstruction = { version: number; reason: string | null };
+/** The cut a generation's prepare placed: the recent conversation starts after `seq`. */
+export type Cut = { seq: number; reason: string | null };
 
 export type Generated = {
 	runId: string;
 	input: GenerateInput;
-	/** The window version before this generation's prepare and the one it left (a re-construction moved it). */
-	reconstruction: Reconstruction | null;
+	/** The cut this generation's prepare moved, or null when it stayed. */
+	cut: Cut | null;
 };
 
 /** What a generation left in the log once it was adopted (the settle step of the product, in outline). */

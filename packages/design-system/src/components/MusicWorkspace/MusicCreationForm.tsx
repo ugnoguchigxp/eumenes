@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Search, Sparkles, X } from "lucide-react";
 import { Button } from "../Button";
 import {
@@ -188,48 +188,113 @@ function DurationChoice({
 export type MusicCreationFormProps = {
 	busy?: boolean;
 	initialPrompt?: string;
+	generatedPrompt?: string;
 	options?: MusicCreationOptions;
 	models?: readonly MusicDurationModel[];
 	onGenerate: (prompt: string, input?: MusicCreationInput) => void;
 };
-export function MusicCreationForm({
-	busy,
+function useMusicCreationDraft({
 	initialPrompt,
+	generatedPrompt,
 	options = defaultMusicCreationOptions,
-	onGenerate,
-	models,
-}: MusicCreationFormProps) {
-	const id = useId();
-
+}: Pick<
+	MusicCreationFormProps,
+	"initialPrompt" | "generatedPrompt" | "options"
+>) {
 	const [selection, setSelection] = useState(() =>
 		emptyMusicSelection(options),
 	);
 	const [prompt, setPrompt] = useState(
-		() => initialPrompt ?? musicSelectionText(emptyMusicSelection(options)),
+		() =>
+			initialPrompt ??
+			generatedPrompt ??
+			musicSelectionText(emptyMusicSelection(options)),
 	);
 	const [edited, setEdited] = useState(!!initialPrompt);
 	const [pending, setPending] = useState(false);
 	const [previous, setPrevious] = useState<string>();
-	const [search, setSearch] = useState("");
+	const touched = useRef(!!initialPrompt);
+	useEffect(() => {
+		if (!generatedPrompt || touched.current) return;
+		setPrompt(generatedPrompt);
+		setEdited(true);
+	}, [generatedPrompt]);
 	const update = (next: MusicSelection) => {
+		touched.current = true;
 		setSelection(next);
 		if (edited) setPending(true);
 		else setPrompt(musicSelectionText(next));
 	};
 	const reflect = () => {
+		touched.current = true;
 		setPrevious(prompt);
 		setPrompt(musicSelectionText(selection));
 		setEdited(false);
 		setPending(false);
 	};
 	const reset = () => {
+		touched.current = true;
 		setPrevious(prompt);
 		setSelection(emptyMusicSelection(options));
 		setPrompt(musicSelectionText(emptyMusicSelection(options)));
 		setEdited(false);
 		setPending(false);
-		setSearch("");
 	};
+	const edit = (value: string) => {
+		touched.current = true;
+		setPrompt(value);
+		setEdited(true);
+	};
+	const resetPrompt = () => {
+		setPrevious(prompt);
+		edit("");
+		setPending(false);
+	};
+	const restorePrompt = () => {
+		if (previous === undefined) return;
+		edit(previous);
+		setPrevious(undefined);
+		setPending(false);
+	};
+	return {
+		selection,
+		prompt,
+		edited,
+		pending,
+		previous,
+		setPending,
+		edit,
+		resetPrompt,
+		restorePrompt,
+		update,
+		reflect,
+		reset,
+	};
+}
+export function MusicCreationForm({
+	busy,
+	initialPrompt,
+	generatedPrompt,
+	options = defaultMusicCreationOptions,
+	onGenerate,
+	models,
+}: MusicCreationFormProps) {
+	const id = useId();
+	const [search, setSearch] = useState("");
+	const {
+		selection,
+		prompt,
+		edited,
+		pending,
+		previous,
+		setPending,
+		edit,
+		resetPrompt,
+		restorePrompt,
+		update,
+		reflect,
+		reset,
+	} = useMusicCreationDraft({ initialPrompt, generatedPrompt, options });
 	const kind = selection.soundEffect
 		? "sound-effect"
 		: selection.vocals
@@ -275,7 +340,15 @@ export function MusicCreationForm({
 							? "どんな効果音にしますか？"
 							: "どんな楽曲にしますか？"}
 					</h3>
-					<Button type="button" variant="ghost" size="sm" onClick={reset}>
+					<Button
+						type="button"
+						variant="ghost"
+						size="sm"
+						onClick={() => {
+							reset();
+							setSearch("");
+						}}
+					>
 						リセット
 					</Button>
 				</header>
@@ -437,10 +510,7 @@ export function MusicCreationForm({
 					rows={5}
 					maxLength={7600}
 					placeholder="作りたい音楽のイメージを自由に書いてください"
-					onChange={(event) => {
-						setPrompt(event.target.value);
-						setEdited(true);
-					}}
+					onChange={(event) => edit(event.target.value)}
 				/>
 				{!lengthValid && (
 					<p role="alert">
@@ -449,17 +519,15 @@ export function MusicCreationForm({
 				)}
 				<div className="music-creation-actions">
 					<span className="music-creation-hint">自由に編集できます</span>
+					<Button type="button" size="sm" variant="ghost" onClick={resetPrompt}>
+						プロンプトをリセット
+					</Button>
 					{previous !== undefined && (
 						<Button
 							type="button"
 							size="sm"
 							variant="ghost"
-							onClick={() => {
-								setPrompt(previous);
-								setPrevious(undefined);
-								setEdited(true);
-								setPending(false);
-							}}
+							onClick={restorePrompt}
 						>
 							編集内容に戻す
 						</Button>

@@ -72,9 +72,7 @@ const noteKindLabels: Record<string, string> = {
 };
 const stepLabels: Record<DecisionDto["step"], string> = {
 	"curate-memory": "記憶の判断",
-	summarize: "経緯の要約の準備",
 	"consolidate-memory": "記憶の整理",
-	"refine-summary": "経緯の要約の統合",
 	"curate-world": "World の反映",
 	"curate-goals": "目標の反映",
 	"consolidate-goals": "目標の整理",

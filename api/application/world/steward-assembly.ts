@@ -14,7 +14,7 @@ type AssemblyDeps = Omit<
 	| "clock"
 	| "nowMs"
 	| "newId"
-	| "conversationPrefix"
+	| "conversationTask"
 > & {
 	queue: StewardDeps["queue"] & {
 		registerHandler(handler: StewardService["handler"]): void;
@@ -25,7 +25,7 @@ type StewardDialogue = Pick<
 	DialogueService,
 	| "get"
 	| "conversationHasActiveRunInTransaction"
-	| "conversationPrefixInTransaction"
+	| "conversationTaskInTransaction"
 >;
 
 /**
@@ -40,7 +40,7 @@ export function createStewardAssembly(deps: AssemblyDeps) {
 		foregroundActive: (db, conversationId) =>
 			dialogue?.conversationHasActiveRunInTransaction(db, conversationId) ??
 			false,
-		conversationPrefix: () => dialogue?.conversationPrefixInTransaction,
+		conversationTask: () => dialogue?.conversationTaskInTransaction,
 		runStateOf: (runId): RunLookup => {
 			const run = dialogue?.get(runId);
 			if (!run) return "stale";

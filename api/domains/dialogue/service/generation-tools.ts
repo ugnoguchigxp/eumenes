@@ -10,9 +10,10 @@ import {
 } from "../../../infrastructure/validation-log";
 
 /**
- * The fixed tools of the conversation agent (the ContextWindow specification, section 6.1): the same set in every
- * generation, so a template that puts tool definitions before the prompt never breaks the cached prefix. No
- * toolchain is named here; candidates come back as the result of the search tool.
+ * The fixed tools of the conversation agent: the same set in every generation, so a template that puts tool
+ * definitions before the prompt never breaks the cached prefix. No toolchain is named here; candidates come back as
+ * the result of the search tool. A description says what the tool does and what its arguments mean; when to use it
+ * is the system part's (the conversation input specification, section 4.3).
  */
 export const TOOL_NAMES = {
 	memory: "memory",
@@ -34,8 +35,7 @@ export const memoryArgs = z.discriminatedUnion("operation", [
 	z
 		.object({
 			operation: z.literal("read"),
-			query: z.string().trim().min(1).max(500).optional(),
-			itemIds: z.array(id).max(16).optional(),
+			query: z.string().trim().min(1).max(500),
 		})
 		.strict(),
 	z
@@ -121,11 +121,10 @@ const tool = (
 export const generationTools: NativeTool[] = [
 	tool(
 		TOOL_NAMES.memory,
-		"本人の長期記憶を読む（read）か、記憶担当へ依頼する（request）。<memory>にある項目は読まない。会話の原文は<log>か会話履歴の担当で読む。",
+		"本人の長期記憶を読む（read）か、記憶担当へ依頼する（request）。readは query に合う記憶を、出所と日付とともに返す。",
 		{
 			operation: choice(["read", "request"], "readかrequest。"),
 			query: text("readで探す内容。"),
-			itemIds: ids("readで読み直す<memory>の番号（p1など）。"),
 			kind: choice(
 				["forget", "remember", "correct", "goal", "withdraw"],
 				"requestの種類。forget=忘れて、remember=覚えて、correct=直して、goal=目標の登録・変更・完了・取下げ、withdraw=未反映の依頼の取下げ。",
@@ -137,10 +136,10 @@ export const generationTools: NativeTool[] = [
 	),
 	tool(
 		TOOL_NAMES.search,
-		"利用者の依頼（会話だけでは済まないこと）を受けたら最初に呼び、依頼に合う担当の候補（最大4件）と使い方を得る。<state>の担当にあっても呼ぶ。実行しない。",
+		"依頼に合う担当の候補（最大4件）と、その使い方（execution・inputs・target など）を返す。実行はしない。",
 		{
 			query: text(
-				"最初の一つの作業に必要な担当の用途。対象・時点・条件を保つ。",
+				"最初の一つの作業に必要な担当の用途と対象。対象・時点・条件を保つ。",
 			),
 		},
 		["query"],
@@ -151,7 +150,7 @@ export const generationTools: NativeTool[] = [
 		{
 			mode: choice(["execute", "confirm", "approve"], "方式。"),
 			toolchain: text(
-				"execute・confirmの担当のid（find_toolchainの結果か<state>の担当）。",
+				"execute・confirmの担当のid（find_toolchainの結果の候補）。",
 			),
 			request: text(
 				"担当への依頼。明示された対象名・識別子・地域・日時・数値・単位は原文のまま保ち、省略だけ文脈で補う。",
@@ -169,23 +168,23 @@ export const generationTools: NativeTool[] = [
 			},
 			target: text("専門担当が開く保存済みの対象。"),
 			refs: ids(
-				"依頼に添えるリソースの番号（<state>のa1など、最大8件）。例: 「a3の画像を元に描き直して」。",
+				"依頼に添えるリソースの番号（「## State」の a1 など、最大8件）。",
 			),
 			resolveUnsaved: choice(
 				["discard"],
 				"未保存の作業を捨ててよいと言われたとき。",
 			),
 			confirmation: text(
-				"approveで実行する<state>の確認待ちの番号（c1など）。",
+				"approveで実行する確認待ちの番号（「## State」の仕事の c1 など）。",
 			),
 		},
 		["mode"],
 	),
 	tool(
 		TOOL_NAMES.work,
-		"依頼済みの仕事（<state>のTODO）を確認・回答・訂正・取消する。",
+		"依頼済みの仕事を確認・回答・訂正・取消する。",
 		{
-			todo: text("<state>のTODOの番号（t1など）。"),
+			todo: text("仕事の番号（「## State」の仕事の t1 など）。"),
 			operation: choice(
 				["check", "answer", "amend", "cancel"],
 				"check=状態と結果を読む、answer=質問に答える、amend=依頼を訂正、cancel=取消。",

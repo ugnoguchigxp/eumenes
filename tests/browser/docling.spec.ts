@@ -78,6 +78,10 @@ for (const scenario of ["success", "auth-failed", "popup-blocked"] as const) {
 						publicOrigin,
 					},
 				});
+			if (path === "/api/docling/ready")
+				return route.fulfill({
+					json: { revision: 1, configured: true, publicOrigin },
+				});
 			if (path === "/api/docling/ui-tickets") {
 				posts++;
 				await gate;
@@ -96,8 +100,8 @@ for (const scenario of ["success", "auth-failed", "popup-blocked"] as const) {
 			if (path.startsWith("/api/toolchain-artifacts/"))
 				return route.fulfill({
 					json: {
-						artifact: bundle.artifacts[0],
-						artifactRevisionId: "artifact:docling.workspace@1",
+						artifact: bundle.artifacts.at(-1),
+						artifactRevisionId: "artifact:docling.workspace@2",
 						digest: "fixture",
 						scopeRef: "scope:fixture",
 					},
@@ -124,7 +128,9 @@ for (const scenario of ["success", "auth-failed", "popup-blocked"] as const) {
 				"body{background:var(--background);color:var(--foreground);font-family:system-ui}main{max-width:600px;padding:32px}h1{font-size:20px}.aui-stack,.aui-layout{display:grid;gap:24px}",
 		});
 		await page.addScriptTag({ path: join(build, "docling.js") });
-		const button = page.getByRole("button", { name: "Docling Deskを開く" });
+		const button = page.getByRole("button", {
+			name: "文章ナレッジベース管理を開く",
+		});
 		await expect(button).toBeVisible();
 		await expect(
 			page.getByText("共通ライブラリ", { exact: true }),

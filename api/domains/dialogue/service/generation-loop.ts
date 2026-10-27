@@ -12,6 +12,7 @@ import type {
 } from "../contracts";
 import type { ChatMessage, DialogueDeps, GenerateInput } from "./context";
 import { conversationOutput } from "./conversation-output";
+import { toolResultText } from "./result-text";
 import {
 	generationTools,
 	parseCall,
@@ -26,7 +27,7 @@ export const MAX_TOOL_CALLS = 4;
 
 /** What one executed tool call gave the generation. */
 export type ToolOutcome = {
-	/** The JSON the agent reads as the tool's result. */
+	/** The tool's result; the agent reads it as text (`toolResultText`). */
 	result: unknown;
 	/** A confirmation was issued (section 6.7): the reply is its question. */
 	confirmation?: true;
@@ -146,7 +147,7 @@ export async function runGeneration(
 				issueCount: error.issues.length,
 			});
 		return {
-			content: JSON.stringify({
+			content: toolResultText("refused", {
 				refused: true,
 				issues: error.issues,
 				...(error.repair?.length ? { fields: error.repair } : {}),
@@ -167,7 +168,7 @@ export async function runGeneration(
 				});
 				executed.push({ call: parsed, outcome });
 				return {
-					content: JSON.stringify(outcome.result),
+					content: toolResultText(parsed.name, outcome.result),
 					...(outcome.end ? { end: true } : {}),
 				};
 			} catch (error) {

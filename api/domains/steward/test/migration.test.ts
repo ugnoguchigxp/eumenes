@@ -110,7 +110,6 @@ test("steward/0003 carries the units, requests and decisions over to the event f
 			expect(
 				rows("SELECT id, kind, step, state FROM steward_unit ORDER BY id"),
 			).toEqual([
-				{ id: "u-done", kind: "events", step: "summarize", state: "applied" },
 				{ id: "u-open", kind: "events", step: "curate-memory", state: "stale" },
 			]);
 			expect(
@@ -135,12 +134,103 @@ test("steward/0003 carries the units, requests and decisions over to the event f
 			// The new shapes accept what the steward writes now.
 			await upgraded.write((db) => {
 				db.query(
-					"INSERT INTO steward_unit (id, conversation_id, kind, step, slot, targets, state, created_at) VALUES ('u-new','c1','maintenance','summarize','episode','{}','open','t')",
+					"INSERT INTO steward_unit (id, conversation_id, kind, step, slot, targets, state, created_at) VALUES ('u-new','c1','maintenance','consolidate-memory','maintenance','{}','open','t')",
 				).run();
 				db.query(
 					"INSERT INTO steward_inbox (id, conversation_id, source_ref, kind, what, state, created_at) VALUES ('r-new','c1','m4','withdraw','x','pending','t')",
 				).run();
 			});
+		} finally {
+			await upgraded.close();
+		}
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+test("steward/0005 drops the episode units, decisions and quiet ranges and the window version of the units", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "steward-0005-"));
+	const path = join(dir, "db.sqlite3");
+	try {
+		const old = openStore(path, [
+			...conversationMigrations,
+			...stewardMigrations.slice(0, 4),
+		]);
+		await old.write((db) => {
+			const unit = db.query(
+				`INSERT INTO steward_unit (id, conversation_id, kind, step, slot, targets, window_version, state, created_at)
+				 VALUES (?,?,?,?,?,?,?,?,?)`,
+			);
+			unit.run(
+				"u-memory",
+				"c1",
+				"events",
+				"curate-memory",
+				"reflect",
+				"{}",
+				3,
+				"applied",
+				"t1",
+			);
+			unit.run(
+				"u-summary",
+				"c1",
+				"maintenance",
+				"summarize",
+				"episode",
+				"{}",
+				3,
+				"open",
+				"t2",
+			);
+			unit.run(
+				"u-merge",
+				"c1",
+				"maintenance",
+				"refine-summary",
+				"episode",
+				"{}",
+				3,
+				"failed",
+				"t3",
+			);
+			db.query(
+				"INSERT INTO steward_decision (id, conversation_id, job_id, step, created_at) VALUES (1,'c1','j1','summarize','t'), (2,'c1','j2','curate-memory','t'), (3,'c1','j3','refine-summary','t')",
+			).run();
+			db.query(
+				"INSERT INTO steward_decision_ref (decision_id, ref_type, ref_id) VALUES (1,'message','m1'), (2,'message','m2')",
+			).run();
+			db.query(
+				'INSERT INTO steward_state (conversation_id, quiet_steps) VALUES (\'c1\', \'{"quiet":{"consolidate-memory":2},"episode":["summarize:1-4"]}\')',
+			).run();
+		});
+		await old.close();
+		const upgraded = openStore(path, [
+			...conversationMigrations,
+			...stewardMigrations,
+		]);
+		try {
+			const rows = <T>(sql: string) =>
+				upgraded.read((db) => db.query(sql).all() as T[]);
+			expect(rows("SELECT id, slot FROM steward_unit")).toEqual([
+				{ id: "u-memory", slot: "reflect" },
+			]);
+			expect(rows("SELECT id FROM steward_decision")).toEqual([{ id: 2 }]);
+			expect(rows("SELECT ref_id FROM steward_decision_ref")).toEqual([
+				{ ref_id: "m2" },
+			]);
+			expect(
+				rows(
+					"SELECT name FROM pragma_table_info('steward_unit') WHERE name = 'window_version'",
+				),
+			).toEqual([]);
+			expect(
+				JSON.parse(
+					rows<{ quiet_steps: string }>(
+						"SELECT quiet_steps FROM steward_state",
+					)[0]!.quiet_steps,
+				),
+			).toEqual({ quiet: { "consolidate-memory": 2 } });
 		} finally {
 			await upgraded.close();
 		}

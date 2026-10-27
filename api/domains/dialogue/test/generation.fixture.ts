@@ -15,7 +15,6 @@ import { createDialogueService } from "..";
 import type {
 	AgencyLayerPort,
 	ConversationAgentPort,
-	GoalsLayerPort,
 	StewardPort,
 	WorldContextPort,
 } from "../contracts";
@@ -27,18 +26,25 @@ import type { ResourceAccess } from "../service/resource-ledger";
 import { testConversationAgent } from "./conversation-agent.fixture";
 import { openDialogueStore } from "./store.fixture";
 
-/** The lines of one tagged section (`<memory>`, `<log>`, `<state>`…) of the material document, without its tags. */
-export function sectionLines(document: string, name: string): string[] {
-	const open = `<${name}>`;
-	const start = document.indexOf(open);
-	if (start < 0) return [];
-	const end = document.indexOf(`</${name}>`, start);
-	// An empty section is its two tags alone: no lines.
-	return document
-		.slice(start + open.length, end)
+/**
+ * The lines of one `## ` section of a message (`## State`, `## User`, `## Memory`…), without its heading; empty when
+ * the message has none.
+ */
+export function sectionLines(content: string, heading: string): string[] {
+	const open = `## ${heading}\n`;
+	const at = content.startsWith(open) ? 0 : content.indexOf(`\n${open}`);
+	if (at < 0) return [];
+	const start = content.indexOf(open, at) + open.length;
+	const next = content.indexOf("\n\n## ", start);
+	return content
+		.slice(start, next < 0 ? undefined : next)
 		.split("\n")
 		.filter((line) => line !== "");
 }
+
+/** The user's words the last message of a call answers (its `## User` section). */
+export const userOf = (call: Call) =>
+	sectionLines(call.messages.at(-1)!.content, "User").join("\n");
 
 /** One model call as the fake saw it. */
 export type Call = {
@@ -117,7 +123,6 @@ export type SetupOptions = {
 	music?: boolean;
 	/** Real memory service (its journal in the test directory). */
 	memory?: boolean;
-	goals?: GoalsLayerPort;
 	agency?: AgencyLayerPort;
 	/** The conversation agent (default: the agency's own reply loop, see conversation-agent.fixture.ts). */
 	conversationAgent?: ConversationAgentPort;
@@ -136,6 +141,8 @@ export type SetupOptions = {
 	agents?: unknown;
 	/** The resource registry and the kinds each toolchain makes; absent: the conversation has no resources. */
 	resources?: ResourceAccess;
+	/** The context keeper's inference and quiet wait; absent: no keeper runs. */
+	keeper?: NonNullable<Parameters<typeof createDialogueService>[0]["keeper"]>;
 };
 
 /** A real store, queue, continuity and dialogue with a scripted model, a fake toolchain catalog and image port. */
@@ -329,11 +336,11 @@ export async function setup(options: SetupOptions = {}) {
 		...(music ? { music } : {}),
 		...(steward ? { steward } : {}),
 		...(memory ? { memory } : {}),
-		...(options.goals ? { goals: options.goals } : {}),
 		...(options.agency ? { agency: options.agency } : {}),
 		...(options.worldContext ? { worldContext: options.worldContext } : {}),
 		...(options.agents ? { agents: options.agents as never } : {}),
 		...(options.resources ? { resources: options.resources } : {}),
+		...(options.keeper ? { keeper: options.keeper } : {}),
 	});
 	if (options.autoStart !== false) queue.start();
 	const run = (id: string) => dialogue.get(id);
@@ -410,6 +417,7 @@ export async function setup(options: SetupOptions = {}) {
 				);
 		},
 		async close() {
+			await dialogue.close();
 			await queue.close(100);
 			await store.close();
 			rmSync(dir, { recursive: true, force: true });

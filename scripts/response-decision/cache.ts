@@ -1,4 +1,4 @@
-/** Cache observation only, on the product's message layout (system, material document, newest message). A new connection does not guarantee a cold slot. No service is started or restarted. */
+/** Cache observation only, on the product's message layout (system, recent conversation, State and the question). A new connection does not guarantee a cold slot. No service is started or restarted. */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve, join, dirname } from "node:path";
 import {
@@ -133,12 +133,7 @@ try {
 				note: "first_seen is not guaranteed cold; compare provider counts, never infer cache from connection identity",
 				estimatedParts: {
 					system: estimateTextTokens(input.system),
-					...Object.fromEntries(
-						Object.entries(input.document.sections).map(([key, section]) => [
-							key,
-							section.tokens,
-						]),
-					),
+					...input.sections,
 				},
 				...measured,
 				formalAcceptance: acceptance,

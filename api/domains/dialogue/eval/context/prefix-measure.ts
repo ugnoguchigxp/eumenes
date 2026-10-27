@@ -36,7 +36,7 @@ const trajectoryReportSchema = z
 					bytes: z.number().int().min(0),
 					tokens: z.number().int().min(0),
 					/** Why the window was re-constructed before this call; null: an ordinary call. */
-					reconstruction: z.string().nullable(),
+					cut: z.string().nullable(),
 					/** Shared with the previous call; null for the first. */
 					sharedBytes: z.number().int().min(0).nullable(),
 					sharedTokens: z.number().int().min(0).nullable(),
@@ -82,7 +82,7 @@ export async function measurePrefix(options: {
 		const stability: PrefixStability = prefixStability(lists);
 		// The ordinary calls are the ones no re-construction preceded.
 		const ordinary = stability.pairs.filter(
-			(pair) => calls[pair.from + 1]!.reconstruction === null,
+			(pair) => calls[pair.from + 1]!.cut === null,
 		);
 		trajectories[name] = {
 			medianRatio: median(ordinary.map((pair) => pair.tokenRatio)),
@@ -95,7 +95,7 @@ export async function measurePrefix(options: {
 					promptSha256: promptHash(messages),
 					bytes: Buffer.byteLength(JSON.stringify(messages)),
 					tokens: estimateMessageTokens(messages),
-					reconstruction: calls[i]!.reconstruction?.reason ?? null,
+					cut: calls[i]!.cut?.reason ?? null,
 					sharedBytes: pair?.sharedBytes ?? null,
 					sharedTokens: pair?.sharedTokens ?? null,
 					tokenRatio: pair?.tokenRatio ?? null,

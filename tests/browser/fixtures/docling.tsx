@@ -9,12 +9,12 @@ createRoot(document.getElementById("root")!).render(
 	<QueryClientProvider
 		client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
 	>
-		<main aria-label="Docling Deskアーティファクト">
-			<h1>Docling Desk</h1>
+		<main aria-label="文章ナレッジベース管理アーティファクト">
+			<h1>文章ナレッジベース管理</h1>
 			<ToolchainArtifactHost
 				client={createClient(window.location.origin)}
 				adapters={createWebAdapterRegistry([doclingWebAdapter])}
-				artifactRevisionId="artifact:docling.workspace@1"
+				artifactRevisionId="artifact:docling.workspace@2"
 				artifactId="docling.workspace"
 				visible
 			/>

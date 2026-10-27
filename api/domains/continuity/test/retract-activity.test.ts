@@ -10,7 +10,9 @@ test("continuity/0006 retracts the open activity notes and leaves the other note
 	const path = join(dir, "db.sqlite3");
 	try {
 		const before = migrations.filter(
-			(m) => m.id !== "continuity/0006-retract-activity",
+			(m) =>
+				m.id !== "continuity/0006-retract-activity" &&
+				m.id !== "continuity/0007-drop-window",
 		);
 		const old = openStore(path, before);
 		await old.write((db) => {

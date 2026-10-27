@@ -242,7 +242,6 @@ function prepare(
 			seqs: context.targetSeqs,
 			requests: requestRows.map((r) => r.id),
 		},
-		windowVersion: null,
 		context,
 	};
 }

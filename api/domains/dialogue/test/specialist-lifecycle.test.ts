@@ -20,9 +20,11 @@ const invoke = (title: string) => ({
 });
 const main = (h: Harness, ...texts: string[]) =>
 	h.state.steps.push(...texts.map((text) => ({ text })));
-/** The records of the conversation model's latest call, by source. */
-const recordOf = (h: Harness, source: string) =>
-	h.records(h.state.calls.length - 1).find((r) => r.source === source);
+/** The `## State` line of the conversation model's latest call about the specialist's work. */
+const workLine = (h: Harness) =>
+	h
+		.stateOf(h.state.calls.length - 1)
+		.find((line) => line.startsWith("- 担当との作業"));
 async function startDirty(h: Harness) {
 	h.handOver({ request: "アンケートを作って" });
 	h.state.specialist.push(invoke("アンケート"), reply("作りました"));
@@ -69,7 +71,7 @@ test("an expired session is not extended by a new utterance: it ends and the utt
 	expect(run.status).toBe("completed");
 	expect(h.answerText(run.id)).toBe("通常の返答");
 	expect(h.state.calls.length).toBe(modelCalls + 1);
-	expect(h.state.calls.at(-1)!.messages.at(-1)!.content).toBe("まだ作業中？");
+	expect(h.userOf(h.state.calls.length - 1)).toBe("まだ作業中？");
 	expect(await h.session()).toBeNull();
 	expect(h.work()[0]!.ended).toBe(true);
 	expect(h.state.calledPort).toContain("end:discard");
@@ -78,12 +80,10 @@ test("an expired session is not extended by a new utterance: it ends and the utt
 	);
 	expect(ended).toEqual([{ state: "ended", end_reason: "expired" }]);
 	// The conversation agent hears of it once, with that very utterance.
-	expect(recordOf(h, "specialist.work")!.data.ended).toMatchObject({
-		reason: "expired",
-	});
+	expect(workLine(h)).toMatch(/終了（expired）$/);
 	main(h, "はい");
 	await h.ask("次の話");
-	expect(recordOf(h, "specialist.work")).toBeUndefined();
+	expect(workLine(h)).toBeUndefined();
 });
 
 test("a turn that outlives the session's expiry is not adopted", async () => {
@@ -348,10 +348,7 @@ test("the work is never free between two queued turns; a return command withdraw
 	await h.finished(third.id);
 	// Both utterances are the conversation agent's unhandled ones: one generation takes them, in order.
 	expect(h.state.calls.length).toBe(modelCalls + 1);
-	const newest = h.state.calls
-		.at(-1)!
-		.messages.slice(3)
-		.map((m) => m.content);
+	const newest = h.userOf(h.state.calls.length - 1).split("\n");
 	expect(newest).toHaveLength(2);
 	expect(newest[0]).toContain("二つ目");
 	expect(newest[1]).toContain("三つ目");

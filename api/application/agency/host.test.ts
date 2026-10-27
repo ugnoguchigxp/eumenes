@@ -3,14 +3,11 @@ import type { LlmPort, LlmRequest } from "eumenes-agency";
 import { settle, waitFor } from "../../infrastructure/wait-for";
 import { createAgencyHost } from "./host";
 import {
-	type Reply,
-	updated,
 	update,
 	choice,
 	wait,
 	memoryItem,
 	harness,
-	type Harness,
 	exchange,
 } from "./host.fixture";
 
@@ -425,84 +422,6 @@ describe("idle", () => {
 		expect(h.calls.select).toBe(1);
 		await h.advance(10_000);
 		expect(h.calls.select).toBe(2);
-	});
-});
-
-/** An update op that writes one note (the agency's own concern) as the model's flat wire form. */
-const noteOp = (localId: string, text: string) => ({
-	op: "note.add",
-	id: null,
-	localId,
-	expectedRevision: null,
-	state: null,
-	text,
-	reason: null,
-	completionCondition: null,
-	resumeCondition: null,
-	withdrawCondition: null,
-	applyWhen: null,
-	hours: null,
-	intentRef: null,
-	desireRef: null,
-	supersedes: null,
-	kind: null,
-	confidence: null,
-	toolName: null,
-	toolInput: null,
-	evidenceRefs: ["u1"],
-	beliefRefs: [],
-});
-const notes =
-	(...texts: string[]): Reply =>
-	() =>
-		updated({ ops: texts.map((text, index) => noteOp(`n${index + 1}`, text)) });
-
-describe("context port", () => {
-	const state = (h: Harness, id = "c1") =>
-		h.store.read((db) =>
-			h.host.dialoguePort.stateForContextInTransaction(db, id),
-		);
-
-	test("shows the agent's own concerns as lines for the context's now.agency, and no more than the bound", async () => {
-		const h = harness({
-			update: notes("猫の話をもう一度聞く"),
-		});
-		await exchange(h, 1);
-		await waitFor(() => h.calls.select === 1);
-		await settle();
-		expect(state(h)).toEqual(["[note] 猫の話をもう一度聞く"]);
-		// An update writes a few notes at a time; three turns make nine.
-		let written = 0;
-		const many = harness({
-			update: () =>
-				updated({
-					ops: Array.from({ length: 3 }, () => {
-						written++;
-						return noteOp(`n${written}`, `関心${written}`);
-					}),
-				}),
-		});
-		for (const n of [1, 2, 3]) {
-			await exchange(many, n);
-			await waitFor(() => many.calls.update === n);
-			await settle();
-			many.advanceClock(60_000);
-		}
-		const lines = state(many);
-		expect(lines).toHaveLength(8);
-		expect(lines.slice(0, 7).every((line) => line.startsWith("[note] "))).toBe(
-			true,
-		);
-		expect(lines[7]).toBe("(ほか 2 件)");
-	});
-
-	test("is empty when the agent has no concern yet, and for a conversation the host does not track", async () => {
-		const h = harness({ settings: { interests: ["My Melody"] } });
-		await exchange(h, 1);
-		await waitFor(() => h.calls.select === 1);
-		// The standing interests are in the system text, not in the changing state.
-		expect(state(h)).toEqual([]);
-		expect(state(h, "never-seen")).toEqual([]);
 	});
 });
 

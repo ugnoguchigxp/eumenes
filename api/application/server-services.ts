@@ -236,6 +236,8 @@ export async function buildServices(
 		agency: agency.dialoguePort,
 		conversationAgent: agency.conversationAgent,
 		logFile: () => config.logFile,
+		// The context keeper reads the conversation on its own prompt and connection, and yields to it.
+		keeper: { inference },
 		objectRecognition: enabled
 			? media.objectRecognition.port(CONVERSATION_DEFAULT_PRINCIPAL)
 			: undefined,
@@ -249,7 +251,6 @@ export async function buildServices(
 		continuity,
 		memory,
 		steward,
-		goals: goals.dialoguePort,
 		agents: enabled ? toolchain.agents : undefined,
 		delegation: createDotsDialogue({ tasks: delegated.tasks }),
 		...(world ? { worldContext: world.context } : {}),
@@ -302,7 +303,7 @@ export async function buildServices(
 		inference,
 		latestConversationIdInTransaction:
 			dialogue.latestConversationIdInTransaction,
-		prefix: dialogue.conversationPrefixInTransaction,
+		task: dialogue.conversationTaskInTransaction,
 	});
 	memory.registerForgetPurge(
 		toolchain.agents.executions.purgeSourcesInTransaction,

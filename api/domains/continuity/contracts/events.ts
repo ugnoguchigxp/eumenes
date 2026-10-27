@@ -1,7 +1,6 @@
 /**
- * The active short-term memory of a conversation (the ContextWindow specification, sections 5.6, 8, 9.3, 11):
- * the flow of events, the episode that replaced the events moved out of the window, the work results of the
- * conversation's TODOs, and the window's version. Long-term memory lives in `memory`, never here.
+ * The active short-term memory of a conversation: the flow of events (what was said, delivered, done and noticed,
+ * the work results of the conversation's TODOs among them). Long-term memory lives in `memory`, never here.
  */
 export const eventTypes = ["said", "delivered", "acted", "notice"] as const;
 export type EventType = (typeof eventTypes)[number];
@@ -9,7 +8,7 @@ export const eventActors = ["user", "agent", "specialist", "host"] as const;
 export type EventActor = (typeof eventActors)[number];
 /**
  * `pending`: a user utterance no generation has handled yet (shown as the newest message, not in the log).
- * `logged`: in the log, in `logOrder`. `moved`: moved out of the window (its frozen text is gone).
+ * `logged`: in the log, in `logOrder`. `moved`: moved out of the window by the earlier design (its text is gone).
  */
 export type EventStatus = "pending" | "logged" | "moved";
 
@@ -21,8 +20,6 @@ export type EventInput = {
 	by: EventActor;
 	/** The event's own fields as the model reads them, in the order they are written. */
 	fields: Record<string, unknown>;
-	/** A shorter copy re-construction may switch to (a memory read without its results). */
-	shortFields?: Record<string, unknown>;
 	/** The conversation messages it shows: forgetting any of them purges its text. */
 	messageIds?: readonly string[];
 	/**
@@ -60,29 +57,4 @@ export type ConversationEvent = {
 	messageIds: string[];
 	curated: boolean;
 	forgotten: boolean;
-};
-
-export const episodeKinds = ["summary", "unsummarized"] as const;
-export type EpisodeKind = (typeof episodeKinds)[number];
-/** One part of the episode: a summary of a range of moved events, or the mark of a range without one. */
-export type EpisodeSegment = {
-	kind: EpisodeKind;
-	/** The receipt range (`seq`) of the events it stands for. */
-	fromSeq: number;
-	toSeq: number;
-	fromAt: string;
-	toAt: string;
-	count: number;
-	/** The summary text; empty for an unsummarized range. */
-	text: string;
-	/** The messages the summary stands on: forgetting any of them turns it into an unsummarized range. */
-	messageIds: string[];
-};
-
-/** The window version: it changes only at a re-construction or an immediate change, never on an append. */
-export type WindowVersion = {
-	conversationId: string;
-	version: number;
-	rebuiltAt: string | null;
-	reason: string | null;
 };

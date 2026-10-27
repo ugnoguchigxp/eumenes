@@ -602,26 +602,20 @@ export async function setup(options: Options = {}) {
 		fields(event: ConversationEvent) {
 			return JSON.parse(event.text ?? "{}") as Record<string, unknown>;
 		},
-		/** The lines of one tagged section of the material document the nth conversation call received. */
-		section(call: number, name: string): string[] {
-			return sectionLines(state.calls[call]!.messages[1]!.content, name);
+		/** The `## State` lines of the last message the nth conversation call received. */
+		stateOf(call: number): string[] {
+			return sectionLines(state.calls[call]!.messages.at(-1)!.content, "State");
 		},
-		/** The reference records of the nth conversation call: its `<now>` lines `資料 <source>: <json>`. */
-		records(call: number): Array<Record<string, any> & { source: string }> {
+		/** The words the nth conversation call answers (its `## User` section). */
+		userOf(call: number): string {
 			return sectionLines(
-				state.calls[call]!.messages[2]!.content,
-				"now",
-			).flatMap((line) => {
-				const match = /^資料 ([^:]+): (.*)$/.exec(line);
-				return match
-					? [
-							{
-								source: match[1]!,
-								...(JSON.parse(match[2]!) as Record<string, any>),
-							},
-						]
-					: [];
-			});
+				state.calls[call]!.messages.at(-1)!.content,
+				"User",
+			).join("\n");
+		},
+		/** Every message the nth conversation call received, as text. */
+		inputOf(call: number): string {
+			return state.calls[call]!.messages.map((m) => m.content).join("\n");
 		},
 		answerText(runId: string) {
 			const run = dialogue.get(runId)!;

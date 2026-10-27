@@ -375,13 +375,13 @@ test("the steward timeline shows decisions with their proposal, result and windo
 		}),
 		decision({
 			id: 1,
-			step: "summarize",
-			output: { summary: "旅行の相談" },
-			results: [{ status: "applied", from: 1, to: 4, count: 4 }],
+			step: "curate-goals",
+			output: { goals: [{}] },
+			results: [{ status: "applied" }],
 			windowVersionBefore: null,
 			windowVersionAfter: 1,
 		}),
-		decision({ id: 0, step: "refine-summary", errorCode: "stale_window" }),
+		decision({ id: 0, step: "curate-world", errorCode: "stale_input" }),
 	];
 	const seen: Array<[string, number | undefined]> = [];
 	const adapter = createMemoryAdapter({
@@ -412,13 +412,13 @@ test("the steward timeline shows decisions with their proposal, result and windo
 		cost: "1.5秒 / 120 tokens",
 	});
 	expect(rows[1]).toMatchObject({
-		stepLabel: "経緯の要約の準備",
-		proposal: "summary: 旅行の相談",
+		stepLabel: "目標の反映",
+		proposal: "goals 1件",
 		windowDiff: "版 1",
 	});
 	expect(rows[2]).toMatchObject({
-		stepLabel: "経緯の要約の統合",
-		result: "採用せず（stale_window）",
+		stepLabel: "World の反映",
+		result: "採用せず（stale_input）",
 		windowDiff: "変更なし",
 	});
 

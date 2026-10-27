@@ -3,6 +3,7 @@ import type { Migration } from "../../../infrastructure/sqlite";
 import type { ContinuityItem } from "../contracts";
 import {
 	dropActiveMigration,
+	dropWindowMigration,
 	eventsMigration,
 	retractActivityMigration,
 } from "./events";
@@ -264,5 +265,10 @@ export const migrations: readonly Migration[] = [
 		id: "continuity/0006-retract-activity",
 		sql: retractActivityMigration,
 		after: ["continuity/0005-drop-active"],
+	},
+	{
+		id: "continuity/0007-drop-window",
+		sql: dropWindowMigration,
+		after: ["continuity/0006-retract-activity"],
 	},
 ];

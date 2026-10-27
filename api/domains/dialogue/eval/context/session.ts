@@ -8,9 +8,13 @@
  * Only what the case decides stands in for a port: the model window, the persona, the adopted goals, the known World
  * names and the agency's interests. Offline evaluation only.
  */
-import type { EpisodeSegment } from "../../../continuity";
 import type { WorkOutcome } from "../../repository/work";
 import type { Seed, SeedEvent } from "./case-schema";
+import {
+	conversationSystem,
+	memoryDigestOf,
+	systemDigestOf,
+} from "../../service/conversation-input";
 import { createSessionContext } from "./session-context";
 import { writeEvent } from "./session-events";
 import { type GenerateRequest, generateIn, settleIn } from "./session-run";
@@ -29,7 +33,7 @@ export {
 	type EvalCard,
 	type Generated,
 	type Persona,
-	type Reconstruction,
+	type Cut,
 	type Reply,
 	type SeedWiring,
 } from "./session-types";
@@ -46,7 +50,7 @@ export function createSession(
 	options: { catalog?: readonly EvalCard[] } = {},
 ) {
 	const ctx = createSessionContext(wiring, options);
-	const { store, events, work, refs } = ctx;
+	const { store, work, refs } = ctx;
 	return {
 		deps: ctx.deps,
 		ports: ctx.ports,
@@ -60,42 +64,27 @@ export function createSession(
 			}),
 
 		/**
-		 * Earlier history that left the log: its events are written, moved out, and the episode part that stands
-		 * for them is shown (what a re-construction leaves behind).
+		 * Earlier history the recent conversation no longer shows: its events are written, and the cut is placed
+		 * after them (what a cut leaves behind; the rest is read by the history toolchain).
 		 */
 		appendEpisode: (parts: readonly EpisodePart[]) =>
 			store.write((db) => {
-				const segments: EpisodeSegment[] = [];
-				for (const part of parts) {
-					const written = part.events.flatMap((seed) =>
-						writeEvent(ctx, db, seed),
-					);
-					events.moveOutInTransaction(
-						db,
-						CONVERSATION_ID,
-						written.map((event) => event.seq),
-					);
-					segments.push({
-						kind: part.kind,
-						fromSeq: written[0]!.seq,
-						toSeq: written[written.length - 1]!.seq,
-						fromAt: written[0]!.at,
-						toAt: written[written.length - 1]!.at,
-						count: written.length,
-						text: part.kind === "summary" ? (part.text ?? "") : "",
-						messageIds:
-							part.kind === "summary"
-								? [...new Set(written.flatMap((event) => event.messageIds))]
-								: [],
+				for (const part of parts)
+					for (const seed of part.events) writeEvent(ctx, db, seed);
+				const newest = ctx.conversation.input
+					.latestUtterancesInTransaction(db, CONVERSATION_ID, 1)
+					.at(-1);
+				// The cut stands on the profile the first generation reads, so that one does not cut again.
+				if (parts.length && newest)
+					ctx.conversation.input.writeCutInTransaction(db, CONVERSATION_ID, {
+						seq: newest.seq,
+						systemDigest: systemDigestOf(conversationSystem(ctx.deps, db)),
+						memoryDigest: memoryDigestOf(
+							ctx.deps.memory?.windowForRunInTransaction(db, CONVERSATION_ID) ??
+								null,
+						),
+						at: newest.at,
 					});
-				}
-				if (segments.length)
-					events.writeEpisodeInTransaction(
-						db,
-						CONVERSATION_ID,
-						"shown",
-						segments,
-					);
 			}),
 
 		/** A TODO as the ledger holds it, with the state its owner reported. */

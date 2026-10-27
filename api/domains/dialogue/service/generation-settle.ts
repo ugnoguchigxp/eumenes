@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import { recordUtteranceInTransaction } from "./utterances";
 import type { HandlerDefinition } from "../../queue";
 import type { Receipt } from "../../inference";
 import { hostDelivery, type DeliveryEmotion } from "../../delivery";
@@ -14,7 +15,7 @@ import {
 	type GeneratePayload,
 } from "./context";
 import type { Handover } from "./executor-context";
-import { eventFields, SIDE_EFFECTS, type Heard } from "./event-fields";
+import { eventFields, SIDE_EFFECTS } from "./event-fields";
 import { generationStale } from "./generation-stream";
 import { adoptMemoryWindow } from "./memory-window";
 import { consumeAnswer } from "./result-intake";
@@ -57,10 +58,9 @@ function retryNotAdopted(
 ): boolean {
 	if (!input || payload.notAdopted) return false;
 	const committed = deps.continuity.events
-		.logInTransaction(tx, run.conversationId)
+		.loggedAfterInTransaction(tx, run.conversationId, input.lastSeq)
 		.some(
 			(event) =>
-				event.seq > input.lastSeq &&
 				event.type === "acted" &&
 				event.by === "agent" &&
 				SIDE_EFFECTS.has(String(eventFields(event).action)),
@@ -311,6 +311,20 @@ function said(
 	const spoken =
 		!!run.utteranceId &&
 		(deps.larm.snapshotFor?.(tx, run.id)?.voice.autoSpeak ?? true);
+	// The reply takes its place in the input's order now (a user who cuts in speaks after it); a spoken one is
+	// revised to what was heard when its playback reports (`recordHeardInTransaction`).
+	recordUtteranceInTransaction(
+		deps,
+		tx,
+		{
+			conversationId: run.conversationId,
+			speaker: "agent",
+			text,
+			messageId,
+			at: deps.clock(),
+		},
+		!spoken,
+	);
 	if (spoken) return;
 	events.appendInTransaction(tx, {
 		conversationId: run.conversationId,
@@ -318,42 +332,6 @@ function said(
 		type: "delivered",
 		by: "host",
 		fields: { ref: event.id, heard: "full" },
+		dedupeKey: `delivered:${event.id}`,
 	});
-	confirmArchives(deps, tx, run, "full");
-}
-
-/**
- * The TODOs this run's reply reported (as the conversation agent's background update found) are archived once
- * the reply was heard in full (section 9.4); the others stay done, with the reason logged.
- */
-export function confirmArchives(
-	deps: DialogueDeps,
-	tx: Database,
-	run: Run,
-	heard: Heard,
-) {
-	const ledger = deps.work;
-	if (!ledger) return;
-	const at = jstSeconds(Date.parse(deps.clock()));
-	for (const row of ledger.waitingArchivesInTransaction(
-		tx,
-		run.conversationId,
-	)) {
-		if (row.archiveRequested !== `run:${run.id}`) continue;
-		const archived =
-			heard === "full" && ledger.archiveInTransaction(tx, row.id);
-		deps.continuity.events.appendInTransaction(tx, {
-			conversationId: run.conversationId,
-			at,
-			type: "acted",
-			by: "host",
-			fields: archived
-				? { action: "work.archived", todo: row.id }
-				: {
-						action: "work.archive_unconfirmed",
-						todo: row.id,
-						reason: `heard_${heard}`,
-					},
-		});
-	}
 }

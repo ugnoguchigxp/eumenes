@@ -4,7 +4,8 @@ import { harness } from "../api/application/toolchain/toolchain.fixture";
 import { musicLibraryFixture } from "../api/application/media/music-library.fixture";
 import { createLiveLarm } from "./live-larm";
 import type { Messages } from "../api/domains/inference/contracts";
-import { buildSystemPrompt } from "../api/domains/dialogue/service/system-prompt";
+import { respondSystemParts } from "eumenes-agency";
+import { systemText } from "../api/domains/dialogue/service/context-system";
 
 if (!process.argv.includes("--run"))
 	throw new Error(
@@ -117,12 +118,18 @@ try {
 		const messages = structuredClone(source);
 		if (scenario.persona)
 			messages[0]!.content = messages[0]!.content.replace(
-				buildSystemPrompt({ agentName: "", userName: "", persona: "butler" }),
-				buildSystemPrompt({
-					agentName: "あみ",
-					userName: "",
-					persona: scenario.persona,
-				}),
+				systemText(
+					{ agentName: "", userName: "", persona: "butler" },
+					respondSystemParts({ spoken: true }),
+				),
+				systemText(
+					{
+						agentName: "あみ",
+						userName: "",
+						persona: scenario.persona,
+					},
+					respondSystemParts({ spoken: true }),
+				),
 			);
 		messages[resultIndex]!.content = JSON.stringify({
 			musicResult: scenario.result,

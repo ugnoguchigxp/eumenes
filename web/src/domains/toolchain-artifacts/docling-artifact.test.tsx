@@ -11,7 +11,7 @@ test("launcher composes with text and information, while URL props and wrong sou
 			busy: false,
 		},
 	};
-	const definition = bundle.artifacts[0]!.variants[0]!.definition;
+	const definition = bundle.artifacts.at(-1)!.variants[0]!.definition;
 	expect(() =>
 		compileArtifact(JSON.stringify(definition), snapshot),
 	).not.toThrow();

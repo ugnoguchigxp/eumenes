@@ -120,7 +120,7 @@ const tables = (store: SqliteStore) =>
 		)
 		.map((row) => row.name);
 
-test("the recent exchanges become handled said events, oldest first, and the summary one episode part; the retired tables are dropped", async () => {
+test("the recent exchanges become handled said events, oldest first; the old summary is not carried over and the retired tables are dropped", async () => {
 	const { path, ids } = await legacy(
 		[
 			{
@@ -183,26 +183,6 @@ test("the recent exchanges become handled said events, oldest first, and the sum
 	expect(JSON.parse(log[1]!.text!).origin).toBe("reply");
 	expect(log.map((e) => e.seq)).toEqual([1, 2, 3, 4, 5, 6, 7]);
 	expect(log[0]!.at).toBe("2026-10-01T19:03:00+09:00");
-	const episode = store.read((db) =>
-		continuity.events.episodeInTransaction(db, "c1"),
-	);
-	expect(episode).toEqual([
-		{
-			kind: "summary",
-			fromSeq: 0,
-			toSeq: 0,
-			fromAt: "2026-10-01T19:00:00+09:00",
-			toAt: "2026-10-01T19:01:00+09:00",
-			count: 4,
-			text: "古い話をした",
-			messageIds: [
-				ids[0]!.input,
-				ids[0]!.answer!,
-				ids[1]!.input,
-				ids[1]!.answer!,
-			],
-		},
-	]);
 	// Only the unfinished exchange is left for the new steward.
 	expect(
 		store
@@ -274,54 +254,6 @@ test("a conversation that already has events is left alone, and blocked messages
 			second.continuity.events.logInTransaction(db, "c1"),
 		),
 	).toHaveLength(1);
-});
-
-test("a summary that stands on a blocked message is not written", async () => {
-	const { path, ids } = await legacy(
-		[
-			{
-				user: "古い話1",
-				answer: "回答1",
-				disposition: "summarize",
-				state: "done",
-			},
-			{
-				user: "古い話2",
-				answer: "回答2",
-				disposition: "summarize",
-				state: "done",
-			},
-			{
-				user: "残した話",
-				answer: "残した回答",
-				disposition: "keep",
-				state: "done",
-			},
-			{
-				user: "最新の前",
-				answer: "回答A",
-				disposition: "summarize",
-				state: "done",
-			},
-			{
-				user: "最新",
-				answer: "回答B",
-				disposition: "summarize",
-				state: "done",
-			},
-		],
-		{ text: "古い話をした", sources: [0, 1] },
-	);
-	const { store, continuity, memory } = await upgrade(path);
-	await store.write((db) => {
-		db.query(
-			"INSERT INTO memory_message_block (message_id, conversation_id, reason, forget_id, created_at) VALUES (?, 'c1', 'forgotten', 'f', 't')",
-		).run(ids[1]!.input);
-	});
-	await memory.recover();
-	expect(
-		store.read((db) => continuity.events.episodeInTransaction(db, "c1")),
-	).toEqual([]);
 });
 
 test("a long utterance keeps its head and a reference to the message", async () => {

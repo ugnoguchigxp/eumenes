@@ -2,14 +2,17 @@ import { expect, test } from "bun:test";
 import type { LarmCallOptions, LarmPort } from "../../larm";
 import { emotionSchema, type Emotion } from "../../delivery";
 import { settle } from "../../../infrastructure/wait-for";
+import { createContinuityService } from "../../continuity";
 import { setup, say, until, wav } from "./settings-voice.fixture";
 
 function gate<T>() {
 	let resolve!: (value: T) => void;
-	const promise = new Promise<T>((done) => {
+	let reject!: (reason: Error) => void;
+	const promise = new Promise<T>((done, fail) => {
 		resolve = done;
+		reject = fail;
 	});
-	return { promise, resolve };
+	return { promise, resolve, reject };
 }
 function ruri(emotion: Emotion, confidence = 0.9) {
 	return {
@@ -64,6 +67,9 @@ function stream() {
 		finish() {
 			done.resolve(text);
 		},
+		fail(reason: Error) {
+			done.reject(reason);
+		},
 	};
 }
 async function start(
@@ -78,7 +84,7 @@ async function start(
 	return id;
 }
 
-test("validated short answers keep clause-specific tone without speaking provisional text", async () => {
+test("clauses are synthesized during generation, keep their own tone and are not repeated at adoption", async () => {
 	const source = stream();
 	const events: string[] = [];
 	const states: Array<Record<string, string>> = [];
@@ -108,9 +114,12 @@ test("validated short answers keep clause-specific tone without speaking provisi
 	const id = await start(h, source);
 	const runId = h.voice.get(id)!.runId!;
 	source.push("よかった、大変でしたね。");
-	await settle();
-	expect(states).toHaveLength(0);
-	expect(h.voice.get(id)?.audioChunks).toEqual([]);
+	await until(() => h.voice.get(id)?.audioChunks.length === 2);
+	expect(states).toHaveLength(2);
+	expect(h.dialogue.get(runId)?.status).toBe("running");
+	expect(h.dialogue.answerText(runId)).toBeNull();
+	expect(h.dialogue.progress(runId)?.text).toBe("");
+	expect(h.voice.takeAudio(id, 0)).toEqual(wav());
 	source.push("続けましょう");
 	source.finish();
 	await until(() => h.voice.get(id)?.status === "ready");
@@ -121,7 +130,7 @@ test("validated short answers keep clause-specific tone without speaking provisi
 		"大変でしたね。",
 		"続けましょう",
 	]);
-	expect(states[1]?.response).toBe("よかった、大変でしたね。続けましょう");
+	expect(states[1]?.response).toBe("よかった、大変でしたね。");
 	expect(states[0]?.conversation).toContain("話してください。");
 	expect(h.voice.get(id)?.audioChunks.map((chunk) => chunk.delivery)).toEqual([
 		expect.objectContaining({
@@ -184,11 +193,13 @@ for (const stage of ["judge", "tts"] as const)
 		});
 		const id = await start(h, source);
 		source.push("先の句。後ろの句。");
-		source.finish();
 		await until(() => !!active);
+		expect(h.dialogue.get(h.voice.get(id)!.runId!)?.status).toBe("running");
 		await h.voice.cancel(id);
 		expect(active?.aborted).toBe(true);
+		expect(source.signal?.aborted).toBe(true);
 		late.resolve();
+		expect(() => source.push("取消後の本文。")).toThrow();
 		source.finish();
 		await until(() =>
 			h.inference.usage().every((attempt) => attempt.status !== "running"),
@@ -202,7 +213,7 @@ for (const stage of ["judge", "tts"] as const)
 				.get("main")
 				.messages.filter((message) => message.role === "assistant")
 				.map((message) => message.text),
-		).toEqual(["先の句。後ろの句。"]);
+		).toEqual([]);
 		expect(judging).toBe(1);
 		expect(speaking).toBe(stage === "judge" ? 0 : 1);
 		expect(
@@ -211,6 +222,136 @@ for (const stage of ["judge", "tts"] as const)
 				.filter((attempt) => attempt.purpose === "tts" && attempt.accepted),
 		).toEqual([]);
 	});
+
+test("cancelling after playback during generation discards ready and queued clauses", async () => {
+	const source = stream();
+	const spoken: string[] = [];
+	const h = await setup(undefined, {
+		transcribe: async () => "数えてください。",
+		answerStream: source.answerStream,
+		speak: async (text) => {
+			spoken.push(text);
+			return wav();
+		},
+	});
+	const id = await start(h, source);
+	source.push("一。二。三。四。");
+	await until(() => h.voice.get(id)?.audioChunks.length === 3);
+	expect(h.dialogue.get(h.voice.get(id)!.runId!)?.status).toBe("running");
+	await h.voice.played(id, 0);
+	await until(() => spoken.length === 4);
+	await h.voice.cancel(id);
+	expect(h.voice.get(id)?.status).toBe("cancelled");
+	expect(h.voice.get(id)?.audioChunks).toEqual([]);
+	for (const index of [0, 1, 2, 3])
+		expect(h.voice.takeAudio(id, index)).toBeNull();
+	source.finish();
+	await settle();
+	expect(spoken).toEqual(["一。", "二。", "三。", "四。"]);
+	expect(h.voice.get(id)?.audioChunks).toEqual([]);
+});
+
+test("clauses played before generation ends are recorded as heard once the answer is adopted", async () => {
+	const source = stream();
+	const h = await setup(undefined, {
+		transcribe: async () => "数えてください。",
+		answerStream: source.answerStream,
+		speak: async () => wav(),
+	});
+	const id = await start(h, source);
+	source.push("一。二。");
+	await until(() => h.voice.get(id)?.audioChunks.length === 2);
+	await h.voice.played(id, 0);
+	await h.voice.played(id, 1);
+	expect(h.voice.get(id)?.status).toBe("responding");
+	expect(h.dialogue.answerText(h.voice.get(id)!.runId!)).toBeNull();
+	source.finish();
+	await until(() => h.voice.get(id)?.status === "played");
+	const delivered = h.store.read((db) =>
+		createContinuityService(h.store)
+			.events.logInTransaction(db, "main")
+			.filter((event) => event.type === "delivered")
+			.map((event) => JSON.parse(event.text ?? "{}")),
+	);
+	expect(delivered).toEqual([expect.objectContaining({ heard: "full" })]);
+});
+
+test("correcting the source while generating aborts queued speech and discards a late TTS result", async () => {
+	const source = stream(),
+		late = gate<void>();
+	let speaking: AbortSignal | undefined;
+	const h = await setup(undefined, {
+		transcribe: async () => "最初の依頼。",
+		answerStream: source.answerStream,
+		speak: async (_text, signal) => {
+			speaking = signal;
+			await late.promise;
+			return wav();
+		},
+	});
+	const id = await start(h, source);
+	source.push("最初の句。後続の句。");
+	await until(() => !!speaking);
+	const user = h.conversation
+		.get("main")
+		.messages.find((m) => m.role === "user")!;
+	await h.conversation.correct({ messageId: user.id, text: "訂正した依頼。" });
+	await until(() => h.voice.get(id)?.status === "failed");
+	expect(speaking?.aborted).toBe(true);
+	expect(source.signal?.aborted).toBe(true);
+	late.resolve();
+	source.finish();
+	await settle();
+	expect(h.voice.get(id)?.audioChunks).toEqual([]);
+	expect(h.voice.takeAudio(id, 0)).toBeNull();
+	expect(h.dialogue.answerText(h.voice.get(id)!.runId!)).toBeNull();
+});
+
+test("a failed generation discards ready audio without mixing a fallback answer into it", async () => {
+	const source = stream();
+	const h = await setup(undefined, {
+		transcribe: async () => "話してください。",
+		answerStream: source.answerStream,
+		speak: async () => wav(),
+	});
+	const id = await start(h, source);
+	source.push("先に届いた句。");
+	await until(() => h.voice.get(id)?.audioChunks.length === 1);
+	source.fail(new Error("network_unavailable"));
+	await until(() => h.voice.get(id)?.status === "failed");
+	expect(h.voice.get(id)?.audioChunks).toEqual([]);
+	expect(h.voice.takeAudio(id, 0)).toBeNull();
+	expect(h.dialogue.answerText(h.voice.get(id)!.runId!)).toBeNull();
+	expect(h.calls).toEqual([]);
+});
+
+test("a failure to read the generation's speech context fails speech instead of being swallowed", async () => {
+	const source = stream();
+	let spoken = 0,
+		contexts = 0;
+	const h = await setup(undefined, {
+		transcribe: async () => "話してください。",
+		answerStream: source.answerStream,
+		speak: async () => {
+			spoken++;
+			return wav();
+		},
+	});
+	const readContext = h.dialogue.answerContext;
+	h.dialogue.answerContext = (runId) => {
+		if (++contexts === 2) throw new Error("speech_context_unavailable");
+		return readContext(runId);
+	};
+	const id = await start(h, source);
+	try {
+		await until(() => h.voice.get(id)?.status === "failed");
+		expect(h.voice.get(id)?.error).toBe("speech_context_unavailable");
+		expect(h.voice.get(id)?.audioChunks).toEqual([]);
+		expect(spoken).toBe(0);
+	} finally {
+		source.finish();
+	}
+});
 
 test("a rejected clause decision does not prevent the next clause from being judged and expressed", async () => {
 	const source = stream();
@@ -238,64 +379,6 @@ test("a rejected clause decision does not prevent the next clause from being jud
 		}),
 	]);
 	expect(judgments).toBe(2);
-});
-
-test("forgetting a goal revokes provisional text before any speech judgment or audio", async () => {
-	const source = stream(),
-		late = gate<void>();
-	let judging: AbortSignal | undefined,
-		spoken = 0;
-	const h = await setup(
-		undefined,
-		{
-			transcribe: async () => "話してください。",
-			answerStream: source.answerStream,
-			judge: async (_state, _questions, signal) => {
-				judging = signal;
-				await late.promise;
-				return ruri("joy");
-			},
-			speak: async () => {
-				spoken++;
-				return wav();
-			},
-		},
-		{
-			adoptedForContextInTransaction: () => [
-				{
-					goalId: "goal",
-					priority: 1,
-					desiredState: "会話を続ける",
-					revision: 1,
-				},
-			],
-			existingInTransaction: (db) =>
-				new Set(
-					db
-						.query("SELECT id FROM streaming_goals")
-						.all()
-						.map((row) => (row as { id: string }).id),
-				),
-		},
-	);
-	await h.store.write((db) => {
-		db.exec("CREATE TABLE streaming_goals (id TEXT PRIMARY KEY)");
-		db.query("INSERT INTO streaming_goals (id) VALUES (?)").run("goal");
-	});
-	const id = await start(h, source);
-	source.push("最初の句。");
-	await settle();
-	expect(judging).toBeUndefined();
-	expect(h.dialogue.get(h.voice.get(id)!.runId!)?.status).toBe("running");
-	await h.store.write((db) => db.query("DELETE FROM streaming_goals").run());
-	await until(() => h.voice.get(id)?.status === "failed");
-	expect(source.signal?.aborted).toBe(true);
-	expect(judging).toBeUndefined();
-	late.resolve();
-	source.finish();
-	await settle();
-	expect(spoken).toBe(0);
-	expect(h.voice.get(id)?.audioChunks).toEqual([]);
 });
 
 test("URLs and source lines remain on screen but never reach the speech judge or TTS, including split URL tokens", async () => {

@@ -1,6 +1,7 @@
 import { withLogContext } from "../../../infrastructure/logger";
 import type { ToolchainCard } from "../../capabilities";
 import type { InferencePort } from "../../inference";
+import type { ConversationAgentSystem } from "../contracts";
 import { systemText } from "./context-system";
 import { candidateOf } from "./executor-context";
 import { generationTools, parseCall, TOOL_NAMES } from "./generation-tools";
@@ -18,7 +19,7 @@ export async function trialFirstRound(
 		text: string;
 		cards: readonly ToolchainCard[];
 		/** The conversation agent's part of the system message. */
-		agentSystem: string;
+		agentSystem: ConversationAgentSystem;
 		signal: AbortSignal;
 	},
 ): Promise<{
@@ -35,10 +36,10 @@ export async function trialFirstRound(
 			[
 				{
 					role: "system",
-					content:
-						input.agentSystem +
-						"\n" +
-						systemText({ agentName: "", userName: "", persona: "butler" }),
+					content: systemText(
+						{ agentName: "", userName: "", persona: "butler" },
+						input.agentSystem,
+					),
 				},
 				{ role: "user", content: input.text },
 				{

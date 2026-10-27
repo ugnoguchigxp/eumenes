@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
+import { toolFields } from "./tool-text.fixture";
 import { waitFor } from "../../../infrastructure/wait-for";
-import { IMAGE, sectionLines, setup, type Harness } from "./generation.fixture";
+import { IMAGE, setup, type Harness } from "./generation.fixture";
 import { saveItem } from "./memory-seed";
 
 /**
@@ -17,7 +18,7 @@ afterEach(async () => {
 /** The JSON results of the tool messages the nth model call received, in order. */
 function toolResults(call: number): Array<Record<string, unknown>> {
 	return h!.state.calls[call]!.messages.filter((m) => m.role === "tool").map(
-		(m) => JSON.parse(m.content) as Record<string, unknown>,
+		(m) => toolFields(m.content),
 	);
 }
 
@@ -65,14 +66,15 @@ test("check reads a TODO's state and result into the tool result, and logs only 
 		{ text: "猫の絵ができました。" },
 	);
 	await h.say("さっきの絵はどうなった？");
-	const checked = toolResults(h.state.calls.length - 1).at(-1);
-	expect(checked).toMatchObject({
-		ok: true,
-		todo: `t${todo!.ref}`,
-		status: "done",
-		outcome: "succeeded",
-	});
-	expect(checked).toHaveProperty("result");
+	const checked = h.state.calls
+		.at(-1)!
+		.messages.filter((m) => m.role === "tool")
+		.at(-1)!.content;
+	// The check reads like the host notice: which work, how it ended, and its result as items.
+	expect(checked).toStartWith(
+		`- ok: true\nt${todo!.ref}「猫の絵」が終わりました（成功）。`,
+	);
+	expect(checked).toContain("- title: 猫");
 	expect(h.log().some((e) => h!.fields(e).action === "work.check")).toBe(true);
 });
 
@@ -337,7 +339,7 @@ test("a partial playback records what was heard of the reply", async () => {
 	});
 });
 
-test("a reported TODO is archived at once when its reply was heard in full (a text reply is delivered when stored)", async () => {
+test("a text report waits for actual speech completion before archiving its TODO", async () => {
 	h = await setup();
 	const todo = await doneTodo("猫の絵");
 	h.state.steps.push({ text: "猫の絵ができました。" });
@@ -347,6 +349,15 @@ test("a reported TODO is archived at once when its reply was heard in full (a te
 			conversationId: "main",
 			messageId: reply.answerMessageId!,
 			todoIds: [todo.id],
+		}),
+	);
+	expect(h.todos()).toMatchObject([{ id: todo.id, status: "done" }]);
+	await h.store.write((db) =>
+		h!.dialogue.recordMessageHeardInTransaction(db, {
+			messageId: reply.answerMessageId!,
+			playbackId: "replay-full",
+			heard: "full",
+			text: "猫の絵ができました。",
 		}),
 	);
 	expect(h.todos()).toEqual([]);
@@ -435,7 +446,7 @@ test("a TODO that is not done, or belongs to no reply of the conversation, is ne
 	expect(h.todos()).toMatchObject([{ id: open!.id, status: "todo" }]);
 });
 
-test("an agency utterance is recorded as a spontaneous said event, and the next document carries it", async () => {
+test("an agency utterance is recorded as a spontaneous said event, and the next input carries it as the agent's", async () => {
 	h = await setup();
 	h.state.steps.push({ text: "はい。" });
 	await h.store.write((db) =>
@@ -454,18 +465,14 @@ test("an agency utterance is recorded as a spontaneous said event, and the next 
 	expect(h.fields(spontaneous!)).toMatchObject({
 		text: "そういえば、紅葉の見頃みたいですよ。",
 	});
-	// The material document (its second message) shows it as a line of the log, marked as spontaneous.
-	const document = h.state.calls[0]!.messages[1]!.content;
-	expect(
-		sectionLines(document, "log").some((line) =>
-			/^e\d+ \d{2}:\d{2} 自分（自分から）: そういえば、紅葉の見頃みたいですよ。$/.test(
-				line,
-			),
-		),
-	).toBe(true);
+	// The next input shows it as the agent's own message of the recent conversation.
+	expect(h.state.calls[0]!.messages[2]).toEqual({
+		role: "assistant",
+		content: "そういえば、紅葉の見頃みたいですよ。",
+	});
 });
 
-test("a spontaneous utterance that reports done TODOs archives them: it is delivered when stored", async () => {
+test("a spontaneous report keeps its completed TODO until its speech is heard in full", async () => {
 	h = await setup();
 	const done = await doneTodo("猫の絵");
 	h.state.steps.push(
@@ -487,13 +494,30 @@ test("a spontaneous utterance that reports done TODOs archives them: it is deliv
 	);
 	await h.say("鳥の絵を描いて", "queued");
 	const open = h.todos().find((todo) => todo.title === "鳥の絵")!;
-	await h.store.write((db) =>
+	await h.store.write((db) => {
+		h!.conversation.appendInTransaction(db, {
+			id: "spontaneous-todo",
+			conversationId: "main",
+			role: "assistant",
+			text: "猫の絵ができましたよ。",
+			createdAt: new Date().toISOString(),
+			runId: null,
+		});
 		h!.dialogue.recordSpontaneousInTransaction(db, {
 			conversationId: "main",
 			messageId: "spontaneous-todo",
 			text: "猫の絵ができましたよ。",
 			at: new Date().toISOString(),
 			todoRefs: [done.id, open.id],
+		});
+	});
+	expect(h.todos()).toHaveLength(2);
+	await h.store.write((db) =>
+		h!.dialogue.recordMessageHeardInTransaction(db, {
+			messageId: "spontaneous-todo",
+			playbackId: "spontaneous-full",
+			heard: "full",
+			text: "猫の絵ができましたよ。",
 		}),
 	);
 	// The reported one is archived; the one still being worked on stays.
@@ -521,28 +545,29 @@ test("a memory read returns the long-term items that match, and logs the read", 
 		semanticKey: "food.spicy",
 		text: "辛いものが好き",
 	});
-	// The re-construction publishes the saved item into the profile: `<memory>` shows it as p1.
+	// Publishing the profile puts the saved item in `## Memory` (the next input is cut and draws it again).
 	await h.store.write((db) =>
 		h!.memory!.republishWindowInTransaction(db, "main"),
 	);
 	await h.say("私の好みは？");
-	const read = toolResults(h.state.calls.length - 1)[0] as {
-		items: Array<Record<string, unknown>>;
-	};
-	// The item is already in the profile the window shows, so the read names its number without repeating its text.
-	expect(read.items).toEqual([{ item: "p1", inProfile: true }]);
+	const last = h.state.calls.at(-1)!;
+	const read = last.messages.filter((m) => m.role === "tool")[0]!.content;
+	// The item is already in `## Memory`: the read says so beside its text.
+	expect(read).toStartWith(`- ${saved.text}（本人の発言`);
+	expect(read).toContain("「## Memory」にある");
 	expect(
-		sectionLines(
-			h.state.calls[h.state.calls.length - 1]!.messages[1]!.content,
-			"memory",
-		).some((line) => line.startsWith("p1 ") && line.includes(saved.text)),
+		last.messages.some(
+			(m) =>
+				m.content.includes("## Memory\n") &&
+				m.content.includes(`- ${saved.text}`),
+		),
 	).toBe(true);
 	expect(
 		h.log().find((e) => h!.fields(e).action === "memory.read"),
 	).toBeDefined();
 });
 
-test("a memory still waiting in <state> (not yet in <memory>) is not read as an in-profile item without its p<n>", async () => {
+test("a memory not yet published is read with its text and not marked as shown", async () => {
 	h = await setup({ memory: true });
 	h.state.steps.push({ text: "はい。" });
 	const first = await h.say("私は辛いものが好きです", "completed");
@@ -558,18 +583,13 @@ test("a memory still waiting in <state> (not yet in <memory>) is not read as an 
 		semanticKey: "food.spicy",
 		text: "辛いものが好き",
 	});
-	// No re-construction: the item is shown in <state>, not in <memory>, so the model has no p<n> for it.
+	// Not published yet: `## Memory` does not show it, so the read gives it whole and unmarked.
 	await h.say("私の好みは？");
-	const read = toolResults(h.state.calls.length - 1)[0] as {
-		items: Array<Record<string, unknown>>;
-	};
-	expect(read.items).toHaveLength(1);
-	// An in-profile item comes back as its p<n> (the layout specification, section 6): never inProfile without it.
-	expect(
-		read.items.every(
-			(item) => item.inProfile !== true || /^p\d+$/.test(String(item.item)),
-		),
-	).toBe(true);
+	const read = h.state.calls
+		.at(-1)!
+		.messages.filter((m) => m.role === "tool")[0]!.content;
+	expect(read).toStartWith("- 辛いものが好き（本人の発言");
+	expect(read).not.toContain("「## Memory」にある");
 });
 
 test("cancel of a waiting TODO from a later utterance ends the run it waits on, and the TODO is done as cancelled", async () => {
@@ -637,4 +657,58 @@ test("the TODO screen's page shows the whole request, newest request first, and 
 	expect(active.rows.map((row) => row.request)).toEqual([long, "猫の絵"]);
 	expect(active.rows[0]!.title.length).toBeLessThan(long.length);
 	expect(page("archived").rows).toEqual([]);
+});
+
+test("a reported TODO can still be checked: its report is read again, with room for what the notice left out", async () => {
+	h = await setup();
+	const todo = await doneTodo("猫の絵");
+	// Reported and heard: the TODO is archived.
+	await h.store.write((db) =>
+		db
+			.query("UPDATE dialogue_work SET archived_at = ? WHERE id = ?")
+			.run(new Date().toISOString(), todo.id),
+	);
+	expect(h.todos()).toEqual([]);
+	h.state.steps.push(
+		{
+			calls: [
+				{ name: "work", args: { todo: `t${todo.ref}`, operation: "check" } },
+			],
+		},
+		{ text: "猫の絵でした。" },
+	);
+	await h.say("さっきの絵、もう一度教えて");
+	const checked = h.state.calls
+		.at(-1)!
+		.messages.filter((m) => m.role === "tool")
+		.at(-1)!.content;
+	expect(checked).toStartWith(
+		`- ok: true\nt${todo.ref}「猫の絵」が終わりました`,
+	);
+	// The state names it as reported, so the model knows the number to read.
+	const last = h.state.calls
+		.at(-1)!
+		.messages.filter((m) => m.role === "user")
+		.at(-1)!.content;
+	expect(last).toContain(`- t${todo.ref} 猫の絵 報告済み`);
+});
+
+test("a spoken reply takes its place when adopted and keeps only what was heard; one not heard at all leaves the input", async () => {
+	h = await setup();
+	h.state.steps.push({ text: "猫の絵ができました。" });
+	const cut = await speakVoice("絵はできた？", "voice-cut");
+	await h.store.write((db) =>
+		h!.dialogue.recordHeardInTransaction(db, cut.id, "partial", "猫の絵ができ"),
+	);
+	h.state.steps.push({ text: "はい。" });
+	const lost = await speakVoice("本当？", "voice-lost");
+	await h.store.write((db) =>
+		h!.dialogue.recordHeardInTransaction(db, lost.id, "none"),
+	);
+	h.state.steps.push({ text: "どうぞ。" });
+	await h.say("次は？");
+	const messages = h.state.calls.at(-1)!.messages;
+	// The reply cut short is what was heard; the one not heard is gone, so the user's words before it join the last.
+	expect(messages.slice(2, -1).map((m) => m.content)).toEqual(["猫の絵ができ"]);
+	expect(messages.at(-1)!.content).toStartWith("本当？\n\n## State\n");
 });

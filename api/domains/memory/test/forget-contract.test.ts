@@ -120,22 +120,6 @@ async function scenario() {
 				digest: "d",
 				createdAt: h.time.now,
 			});
-		h.continuity.events.writeEpisodeInTransaction(db, "c1", "shown", [
-			{
-				kind: "summary",
-				fromSeq: 0,
-				toSeq: 0,
-				fromAt: h.time.now,
-				toAt: h.time.now,
-				count: 6,
-				text: "引っ越しと食べ物の話をした",
-				messageIds: [
-					old.inputMessageId,
-					address.inputMessageId,
-					food.inputMessageId,
-				],
-			},
-		]);
 	});
 	await h.window();
 	return {
@@ -248,9 +232,6 @@ function expectForgotten(s: Scenario) {
 		"住所は東京都千代田区に引っ越しました",
 	);
 	expect(JSON.stringify(events)).not.toContain("了解しました（大阪）");
-	expect(
-		h.store.read((db) => h.continuity.events.episodeInTransaction(db, "c1")),
-	).toMatchObject([{ kind: "unsummarized", text: "", messageIds: [] }]);
 	// The steward is not offered the forgotten events as new work (they are marked forgotten, not removed).
 	expect(
 		h.store

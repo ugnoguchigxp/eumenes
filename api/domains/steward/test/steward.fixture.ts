@@ -23,7 +23,6 @@ import {
 	type MemoryEmbed,
 	type MemoryService,
 } from "../../memory";
-import type { WindowPlan } from "../../../infrastructure/context-budget";
 import { createQueue, migrations as queueMigrations } from "../../queue";
 import type {
 	ChatMessage,
@@ -106,15 +105,13 @@ export function createFakeInference() {
 	};
 	/** A step's own prompt starts with its instructions; on the conversation's prompt, its task is the last message. */
 	const stepOf = (messages: ChatMessage[]) =>
-		/^<task name="([a-z-]+)">/.exec(messages.at(-1)?.content ?? "")?.[1] ??
-		Object.values(steps).find((step) =>
-			messages[0]?.content.startsWith(step.instructions),
-		)?.id ??
-		"unknown";
+		Object.values(steps).find(
+			(step) =>
+				messages[0]?.content.startsWith(step.instructions) ||
+				messages.at(-1)?.content.includes(step.instructions),
+		)?.id ?? "unknown";
 	const dataOf = (messages: ChatMessage[]) => {
-		const task = /\n入力:\n([\s\S]*)\n<\/task>$/.exec(
-			messages.at(-1)?.content ?? "",
-		);
+		const task = /\n入力:\n([\s\S]*)$/.exec(messages.at(-1)?.content ?? "");
 		return JSON.parse(task ? task[1]! : messages[1]!.content) as Record<
 			string,
 			unknown
@@ -198,8 +195,6 @@ export type FakeInference = ReturnType<typeof createFakeInference>;
 export async function setupSteward(
 	options: {
 		embed?: MemoryEmbed;
-		/** The window plan of the saved model; absent: the reference window's. */
-		windowPlan?: () => WindowPlan;
 		runStates?: Record<string, RunLookup>;
 		/** Replaces the memory service the steward is given (a test makes one operation refuse). */
 		wrapMemory?: (memory: MemoryService) => MemoryService;
@@ -215,9 +210,9 @@ export async function setupSteward(
 			/** Kicks the steward (the World's notice that events arrived). */
 			kick(conversationId: string): Promise<void>;
 		}) => StewardWorld | Promise<StewardWorld>;
-		/** The conversation's prompt prefix the steps that read the conversation send before their task. */
-		conversationPrefix?: NonNullable<
-			StewardDeps["conversationPrefix"]
+		/** The conversation's prompt with a step's task last, which the steps that read the conversation run on. */
+		conversationTask?: NonNullable<
+			StewardDeps["conversationTask"]
 		> extends () => infer F
 			? F
 			: never;
@@ -246,7 +241,6 @@ export async function setupSteward(
 		clock,
 		id: () => `id-${++counter}`,
 		...(options.embed ? { embed: () => options.embed } : {}),
-		...(options.windowPlan ? { windowPlan: options.windowPlan } : {}),
 	});
 	if (!(await memory.recover()).healthy) throw new Error("memory_not_healthy");
 	const queue = createQueue(store, {
@@ -290,8 +284,8 @@ export async function setupSteward(
 		...(world ? { world } : {}),
 		...(goals ? { goals: { ops: goals, access: GOALS_ACCESS } } : {}),
 		worldResourceId: () => options.worldResourceId ?? null,
-		...(options.conversationPrefix
-			? { conversationPrefix: () => options.conversationPrefix }
+		...(options.conversationTask
+			? { conversationTask: () => options.conversationTask }
 			: {}),
 	} satisfies StewardDeps);
 	queue.registerHandler(steward.handler as never);
@@ -533,11 +527,6 @@ export async function setupSteward(
 						: {};
 					return fields.action === "memory.notice" ? [String(fields.text)] : [];
 				}),
-		/** The episode of a conversation (the shown or the prepared one). */
-		episode: (stage: "shown" | "prepared", conversationId = "c1") =>
-			store.read((db) =>
-				continuity.events.episodeInTransaction(db, conversationId, stage),
-			),
 		state: (conversationId = "c1") =>
 			store.read(
 				(db) =>

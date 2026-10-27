@@ -149,7 +149,7 @@ test("revoking a cloud answer aborts downstream TTS and never publishes late aud
 	).toHaveLength(0);
 });
 
-test("provisional text stays silent and cancellation prevents its adoption and speech", async () => {
+test("streamed cloud text starts speech before adoption and cancellation discards its unplayed audio", async () => {
 	let sink!: ReadableStreamDefaultController<Uint8Array>;
 	const spoken: string[] = [];
 	const h = await setup(async (url, init) => {
@@ -184,15 +184,17 @@ test("provisional text stays silent and cancellation prevents its adoption and s
 	await say(h, session, id);
 	await until(() => !!sink && !!h.voice.get(id)?.runId);
 	const runId = h.voice.get(id)!.runId!;
+	await until(() => !!h.voice.get(id)?.audioChunks.length);
 	expect(h.dialogue.get(runId)?.status).toBe("running");
 	expect(h.dialogue.progress(runId)?.text).toBe("");
 	expect(h.conversation.get("main").messages.map((m) => m.text)).toEqual([
 		"質問",
 	]);
-	expect(h.voice.get(id)?.audioChunks).toEqual([]);
-	expect(h.voice.takeAudio(id, 0)).toBeNull();
-	expect(spoken).toEqual([]);
+	expect(h.voice.get(id)?.audioChunks).toHaveLength(1);
+	expect(h.voice.takeAudio(id, 0)).toEqual(wav());
+	expect(spoken).toEqual(["先にお届けします。"]);
 	await h.voice.cancel(id);
+	expect(h.voice.get(id)?.audioChunks).toEqual([]);
 	expect(h.voice.takeAudio(id, 0)).toBeNull();
 	expect(h.dialogue.progress(runId)?.text).toBe("");
 	try {

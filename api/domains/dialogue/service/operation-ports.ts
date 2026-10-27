@@ -9,6 +9,10 @@ import {
 import type { Heard } from "./event-fields";
 import { endRun } from "./run-end";
 import type { WorkLedger } from "./work-ledger";
+import {
+	recordMessageHeardInTransaction,
+	reportPending,
+} from "./speech-delivery";
 
 /**
  * What the rest of the application tells the conversation and reads of it: notice delivery, the TODOs, the
@@ -41,9 +45,19 @@ export function createOperationPorts(deps: DialogueDeps) {
 		 * operation's result is read again as it is now, so a cancel after the report is what the agent says.
 		 */
 		todosInTransaction: (db: Database, conversationId: string) =>
-			deps.work!.hostTodosInTransaction(db, conversationId, (row) =>
-				currentResult(db, row.runId),
-			),
+			deps
+				.work!.hostTodosInTransaction(db, conversationId, (row) =>
+					currentResult(db, row.runId),
+				)
+				.map((todo) => {
+					const row = deps.work!.workInTransaction(db, todo.id)!;
+					return {
+						...todo,
+						...(reportPending(deps, db, row)
+							? { reportPending: true as const }
+							: {}),
+					};
+				}),
 		/**
 		 * One page of the conversation's TODOs for display (the TODO screen reads it inside its own read). A finished
 		 * TODO shows its result as it is now, the same one the agency reports.
@@ -73,6 +87,10 @@ export function createOperationPorts(deps: DialogueDeps) {
 			db: Database,
 			input: Parameters<typeof archiveReportedInTransaction>[2],
 		) => archiveReportedInTransaction(deps, db, input),
+		recordMessageHeardInTransaction: (
+			db: Database,
+			input: Parameters<typeof recordMessageHeardInTransaction>[2],
+		) => recordMessageHeardInTransaction(deps, db, input),
 		/** How much of a run's spoken answer reached the user (the voice playback's report). */
 		recordHeardInTransaction: (
 			db: Database,

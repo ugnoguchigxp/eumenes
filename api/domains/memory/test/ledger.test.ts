@@ -84,9 +84,6 @@ test("blocking a specialist session's messages is not a forget: the events keep 
 	const before = h.store.read((db) =>
 		h.continuity.events.logInTransaction(db, "c1"),
 	);
-	const version = h.store.read((db) =>
-		h.continuity.events.windowVersionInTransaction(db, "c1"),
-	).version;
 	await block(h, [said.userId, said.answerId!], "specialist_dialogue");
 	const after = h.store.read((db) =>
 		h.continuity.events.logInTransaction(db, "c1"),
@@ -94,11 +91,6 @@ test("blocking a specialist session's messages is not a forget: the events keep 
 	expect(after.map((e) => [e.text, e.forgotten])).toEqual(
 		before.map((e) => [e.text, false]),
 	);
-	expect(
-		h.store.read((db) =>
-			h.continuity.events.windowVersionInTransaction(db, "c1"),
-		).version,
-	).toBe(version);
 });
 
 test("what is said while memory is off is skipped when memory is switched on; what is said after is offered", async () => {

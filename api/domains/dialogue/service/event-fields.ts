@@ -24,20 +24,3 @@ export const SIDE_EFFECTS = new Set([
 ]);
 
 export type Heard = "full" | "partial" | "none";
-
-/** How much of an utterance reached the user: its newest `delivered` record in the log, or null while none. */
-export function heardOf(
-	log: readonly ConversationEvent[],
-	saidId: string,
-): Heard | null {
-	for (let i = log.length - 1; i >= 0; i--) {
-		const event = log[i]!;
-		if (event.type !== "delivered") continue;
-		const fields = eventFields(event);
-		if (fields.ref !== saidId) continue;
-		return fields.heard === "full" || fields.heard === "partial"
-			? fields.heard
-			: "none";
-	}
-	return null;
-}

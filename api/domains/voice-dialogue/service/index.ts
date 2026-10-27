@@ -11,6 +11,7 @@ const log = getLogger("voice-dialogue");
 import { SpeechSentences } from "./sentences";
 import { spokenText } from "./spoken-text";
 import { cancelHeard, recordPlayed } from "./playback";
+import { createReplayPlayback } from "./replay-playback";
 import { connectAnnouncementDelivery } from "./announcement-delivery";
 
 import type { SqliteStore } from "../../../infrastructure/sqlite";
@@ -198,10 +199,7 @@ export function createVoiceDialogue(
 	});
 	return {
 		commit: input.commit,
-		/** Splits finished answer text into speakable clauses for replay. */
-		replaySentences(text: string) {
-			return new SpeechSentences().append(spokenText(text), true);
-		},
+		...createReplayPlayback(store, dialogue),
 		/** Synthesizes one clause on demand; it is not tied to any voice turn. */
 		async replayAudio(text: string, signal: AbortSignal) {
 			if (!text.trim() || text.length > 400)
@@ -385,8 +383,8 @@ export function createVoiceDialogue(
 				return null;
 			return chunk?.wav ?? null;
 		},
-		async played(id: string, index = 0) {
-			await recordPlayed(store, dialogue, audio, id, index, clock);
+		async played(id: string, index = 0, audible = true) {
+			await recordPlayed(store, dialogue, audio, id, index, clock, audible);
 			return this.get(id);
 		},
 		async cancel(id: string) {

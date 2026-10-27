@@ -174,10 +174,9 @@ export function profileTokens(items: readonly ProfileItem[]): number {
 	return estimateTextTokens(referenceJson(items.map(profileItemFields)));
 }
 
-/** What the memory tool asks to read: the ids, or the terms of a query; the items the window already shows. */
+/** What the memory tool asks to read: the terms of a query; the items the conversation's input already shows. */
 export type ReadItemsInput = {
 	query?: string;
-	itemIds?: readonly string[];
 	shown: ReadonlySet<string>;
 	limit: number;
 };
@@ -405,9 +404,9 @@ export function createContextWindowStore(deps: {
 			cache.clear();
 		},
 		/**
-		 * The memory tool's read (the ContextWindow specification, section 14): the current State items and
-		 * tendencies matching the asked ids or the query (character-pair overlap, deterministic), newest first. Items the window already
-		 * shows come back by id only; nothing is added, strengthened or reordered by reading.
+		 * The memory tool's read: the current State items and tendencies matching the query (character-pair overlap,
+		 * deterministic), newest first. Items the input already shows are marked `inProfile`; nothing is added,
+		 * strengthened or reordered by reading.
 		 */
 		readItemsInTransaction(
 			db: Database,
@@ -418,21 +417,17 @@ export function createContextWindowStore(deps: {
 				String(readSettings(db).revision),
 				Date.parse(clock()),
 			);
-			const asked = new Set(input.itemIds ?? []);
 			const grams = gramsOf(input.query ?? "");
+			if (grams.size === 0) return [];
 			return items
-				.filter(
-					(item) =>
-						asked.has(item.id) ||
-						(grams.size > 0 && matchesQuery(grams, item.text)),
-				)
+				.filter((item) => matchesQuery(grams, item.text))
 				.sort((a, b) => b.newness - a.newness)
 				.slice(0, input.limit)
-				.map((item) =>
-					input.shown.has(item.id)
-						? { id: item.id, inProfile: true }
-						: { ...profileItemFields(item), revision: item.revision },
-				);
+				.map((item) => ({
+					...profileItemFields(item),
+					revision: item.revision,
+					...(input.shown.has(item.id) ? { inProfile: true } : {}),
+				}));
 		},
 		/** Same transaction as the change itself: a run in flight that predates it is expired. */
 		recordImmediateInTransaction(

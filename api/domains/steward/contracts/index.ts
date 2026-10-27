@@ -7,19 +7,12 @@ export const STEWARD_KIND = "steward.step.v1";
 export const STEWARD_SCOPE = "steward";
 export const STEWARD_RESOURCE = "inference.aux";
 
-/**
- * `summarize` prepares the episode summary of the oldest logged events (and of unsummarized marks); `refine-summary`
- * prepares the one summary that merges consecutive shown episode parts. Both write the prepared episode of
- * `continuity`; a re-construction applies it.
- */
 const stepIds = [
 	"curate-memory",
 	"curate-goals",
 	"curate-world",
-	"summarize",
 	"consolidate-memory",
 	"consolidate-goals",
-	"refine-summary",
 ] as const;
 export type StepId = (typeof stepIds)[number];
 const unitKinds = [
@@ -31,15 +24,9 @@ const unitKinds = [
 export type UnitKind = (typeof unitKinds)[number];
 /**
  * Which open unit a conversation may hold at once: reflecting steps (they read the handled events of the
- * continuity flow), upkeep steps, the World curation (the events World received) and the
- * episode preparation (summaries and merges that the next re-construction applies).
+ * continuity flow), upkeep steps and the World curation (the events World received).
  */
-export const unitSlots = [
-	"reflect",
-	"world",
-	"maintenance",
-	"episode",
-] as const;
+export const unitSlots = ["reflect", "world", "maintenance"] as const;
 export type UnitSlot = (typeof unitSlots)[number];
 export type UnitState = "open" | "applied" | "stale" | "failed";
 
@@ -85,14 +72,6 @@ export type StewardPayload = z.infer<typeof payloadSchema>;
 /** Events one step reads, and the input bytes they and the requests' source messages may fill together. */
 export const EVENTS_PER_UNIT = 8;
 export const UNIT_INPUT_BYTES = 16 * 1024;
-/** The events one episode summary may read (the oldest logged events, or the parts of a merge). */
-export const EPISODE_INPUT_BYTES = 48 * 1024;
-/** The consecutive shown parts one merge may span. */
-export const MERGE_PARTS = 4;
-/** The quiet time before a re-construction (section 12.3): no new event for this long. */
-export const SILENCE_WAIT_MS = 10_000;
-/** A gap of at least this long between two events is a break in the talk (section 8.3). */
-export const SILENCE_BREAK_MS = 120_000;
 export const REQUESTS_PER_UNIT = 8;
 /** One message handed to the steward: longer ones keep the head and the tail. */
 export const MESSAGE_HEAD_BYTES = 4096;
@@ -124,8 +103,6 @@ export const MAX_OUTPUT_TOKENS = 1200;
 export const MAX_OUTPUT_BYTES = 32 * 1024;
 /** The queue deadline of a job: it covers waiting behind earlier jobs and the retries. */
 export const JOB_DEADLINE_MS = 5 * 60_000;
-/** The episode is merged when it takes this share of its section limit. */
-export const MERGE_THRESHOLD = 0.9;
 
 // ---- ports the application provides (queue and inference are lower than the steward's callers) ----
 

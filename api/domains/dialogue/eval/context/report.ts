@@ -91,9 +91,7 @@ function comparisonSection(c: Comparison): string[] {
 /** The trajectory measurements as tables: one row per trajectory, then the calls of each. */
 function prefixTables(prefix: PrefixReport): string[] {
 	const rows = Object.entries(prefix.trajectories).map(([name, report]) => {
-		const rebuilt = report.calls.filter(
-			(c) => c.reconstruction !== null,
-		).length;
+		const rebuilt = report.calls.filter((c) => c.cut !== null).length;
 		return `| ${name} | ${report.calls.length} | ${rebuilt} | ${report.medianRatio?.toFixed(3) ?? "n/a"} | ${report.medianByteRatio?.toFixed(3) ?? "n/a"} | ${report.aggregateRatio?.toFixed(3) ?? "n/a"} |`;
 	});
 	return [
@@ -112,7 +110,7 @@ function prefixTables(prefix: PrefixReport): string[] {
 			"| --- | --- | --- | --- | --- |",
 			...report.calls.map(
 				(c) =>
-					`| ${c.label} | ${c.tokens} | ${c.sharedTokens ?? "-"} | ${c.tokenRatio?.toFixed(3) ?? "-"} | ${c.reconstruction ?? "-"} |`,
+					`| ${c.label} | ${c.tokens} | ${c.sharedTokens ?? "-"} | ${c.tokenRatio?.toFixed(3) ?? "-"} | ${c.cut ?? "-"} |`,
 			),
 			"",
 		]),

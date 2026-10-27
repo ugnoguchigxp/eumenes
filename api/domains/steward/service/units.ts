@@ -11,7 +11,7 @@ import {
 } from "../contracts";
 import { readUnit, closeUnit, takeRequests } from "../repository";
 import type { Kick } from "./kick";
-import { buildMessages, taskMessage } from "./messages";
+import { buildMessages, taskText } from "./messages";
 import { createUnitEnd } from "./unit-end";
 import { createPrepare } from "./unit-prepare";
 import { createSettle } from "./unit-settle";
@@ -25,8 +25,6 @@ import type { Wake } from "./wake";
 const ON_CONVERSATION: ReadonlySet<string> = new Set([
 	"curate-memory",
 	"curate-goals",
-	"summarize",
-	"refine-summary",
 ]);
 
 /** A failure of the transport or a busy backend: the same job is tried again by the queue. */
@@ -57,15 +55,17 @@ export function createUnitHandler(deps: StewardDeps, kick: Kick, wake: Wake) {
 			deps,
 		});
 		const data = before?.data ?? prepared.data;
-		// The conversation's prefix as it stands now (read at the call, so it is what the next generation sends).
+		// The conversation's prompt as it stands now (read at the call, so its prefix is what the next generation sends).
 		const read = ON_CONVERSATION.has(step.id)
-			? deps.conversationPrefix?.()
+			? deps.conversationTask?.()
 			: undefined;
 		const prefix = read
-			? deps.store.read((db) => read(db, input.conversationId))
+			? deps.store.read((db) =>
+					read(db, input.conversationId, taskText(step, prepared, data)),
+				)
 			: null;
 		const messages = prefix
-			? [...prefix.messages, taskMessage(step, prepared, data)]
+			? prefix.messages
 			: before?.data === undefined
 				? input.messages
 				: buildMessages(step, prepared, before.data);

@@ -6,7 +6,7 @@ export const todoQuery = z.object({
 	pageIndex: z.coerce.number().int().min(0).max(1_000_000).default(0),
 	pageSize: z.coerce
 		.number()
-		.pipe(z.union([z.literal(10), z.literal(25), z.literal(50)]))
+		.pipe(z.union([z.literal(10), z.literal(20), z.literal(25), z.literal(50)]))
 		.default(10),
 });
 export type TodoQuery = z.infer<typeof todoQuery>;

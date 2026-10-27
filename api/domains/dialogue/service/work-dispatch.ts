@@ -7,6 +7,7 @@ import { COMMAND_KIND, type DialogueDeps } from "./context";
 import { startSpecialistSession, type SessionStart } from "./specialist-start";
 import { delegateConversation } from "./delegate-conversation";
 import { executionSourceInTransaction } from "./execution-source";
+import { extendMediaDeadline } from "./media-deadline";
 
 /** What a dispatch did with the run. */
 export type Dispatched =
@@ -63,6 +64,7 @@ export function dispatchInTransaction(
 	const original =
 		conversation.messageInTransaction(tx, run.inputMessageId)?.message.text ??
 		request;
+	run = extendMediaDeadline(deps, tx, run, runtime.execution, card.id);
 	const deadline = Date.parse(run.deadlineAt!);
 	const handed = (sourceRef: string | null): Dispatched => {
 		transition(tx, run.id, run.revision, "queued", clock());

@@ -18,7 +18,6 @@ import {
 	type UnitTargets,
 	conversationsWithWork,
 	eventFailures,
-	failedEpisodeUnits,
 	failedMaintenanceUnits,
 	insertUnit,
 	openUnitOf,
@@ -29,9 +28,7 @@ import {
 	setUnitJob,
 	writeState,
 } from "../repository";
-import { nextCandidate } from "./episode-plan";
 import { kickWorld } from "./kick-world";
-import { givenUp, pendingAdditions, reconstructIfDue } from "./kick-window";
 import { MAINTENANCE_ORDER, steps } from "./steps";
 import { eligible } from "./steps/maintenance-steps";
 import { pendingEvents } from "./steps/shared";
@@ -44,6 +41,15 @@ const log = getLogger("steward");
 const LONG_TERM_KEY = "steward:long-term";
 
 const isGoalUpkeep = (step: StepId) => step === "consolidate-goals";
+
+/** Items remembered that the published profile does not show yet (the window's `newMemories`). */
+function pendingAdditions(env: StepEnv): number {
+	const window = env.deps.memory.windows.storedInTransaction(
+		env.db,
+		env.conversationId,
+	);
+	return window?.newMemories.length ?? 0;
+}
 
 type UnitSpec = {
 	step: StepId;
@@ -282,35 +288,9 @@ export function createKick(deps: StewardDeps, wake: Wake) {
 			});
 	}
 
-	/**
-	 * The episode preparation (section 12.2): the next summary or merge the re-construction will take, when no
-	 * answer is being generated. True: a unit is open (also while a reflecting unit is), was made now or is held back
-	 * by a pause after a failure, so the re-construction waits for it and the timer kicks again.
-	 */
-	function kickEpisode(env: StepEnv, reflecting: boolean): boolean {
-		const { db, deps: d, conversationId } = env;
-		if (openUnitOf(db, conversationId, "episode")) return true;
-		if (reflecting || d.foregroundActive(db, conversationId)) return false;
-		const candidate = nextCandidate(env, (c) => givenUp(env, c));
-		if (!candidate) return false;
-		if (wake.paused(conversationId, steps[candidate.step].slot)) return true;
-		return createUnit(db, conversationId, {
-			step: candidate.step,
-			kind: "maintenance",
-			targets: { range: candidate.range },
-			attempt: failedEpisodeUnits(
-				db,
-				conversationId,
-				candidate.step,
-				candidate.range,
-			),
-		});
-	}
-
 	function kickOne(db: Database, conversationId: string) {
 		try {
 			const env: StepEnv = { db, deps, conversationId };
-			let waiting = false;
 			if (deps.memory.readyInTransaction(db)) {
 				const reflecting = openUnitOf(db, conversationId, "reflect")
 					? true
@@ -324,10 +304,7 @@ export function createKick(deps: StewardDeps, wake: Wake) {
 						attempt: spec.attempt,
 					}),
 				);
-				waiting = kickEpisode(env, reflecting);
 			}
-			// The log is kept within its limits whether or not memory is on; only the summaries need the steward.
-			reconstructIfDue(env, waiting, wake);
 		} catch (error) {
 			log.warn("steward.kick_failed", { reason: "kick_failed" }, error);
 		}

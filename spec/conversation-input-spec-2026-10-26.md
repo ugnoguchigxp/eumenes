@@ -1,6 +1,6 @@
 # 会話の入力仕様（SystemContext・長期記憶・最近の会話・会話の状態）
 
-作成日: 2026-10-25、改訂: 2026-10-26（旧ファイル名 `system-context-chronological-input-spec-2026-10-25.md`）。状態: **案・未実装（Q1〜Q14 は 2026-10-26 に決定、§15）。** 合意後、[ContextWindow仕様](context-window-spec-2026-10-24.md)の文脈の組立て（§5・§7・§12・§15）と、[ContextWindow構成仕様](context-window-layout-spec-2026-10-25.md)の全体を置き換える。置き換える前の版はブランチ `snapshot/context-window-v1-2026-10-25`（commit `7ff711da`）に残してある。
+作成日: 2026-10-25、改訂: 2026-10-26（旧ファイル名 `system-context-chronological-input-spec-2026-10-25.md`）。状態: **実装済み（2026-10-27。fixture 検証済み。P0 の live 測定と評価の再実行、実機器の受入は未実施）。Q1〜Q14 は 2026-10-26 に決定（§15）。** 本書が、[ContextWindow仕様](context-window-spec-2026-10-24.md)の文脈の組立て（§5・§7・§12・§15）と、[ContextWindow構成仕様](context-window-layout-spec-2026-10-25.md)の全体を置き換えた。置き換える前の版はブランチ `snapshot/context-window-v1-2026-10-25`（commit `7ff711da`）に残してある。
 
 会話エージェント（agency の `respond`）と、同じ会話を読む agency の背景の呼出し（`update`・`decide`）に渡す入力を定める。担当（サブエージェント、`specialist-turn`）の文脈は範囲の外で、別の仕様で扱う。各規則の研究上の根拠は §16 にまとめる（調査資料「コンテキスト内の『メモリ』構造を LLM はどう扱うか」2026-10-26、出典 [S1]〜[S42]）。
 

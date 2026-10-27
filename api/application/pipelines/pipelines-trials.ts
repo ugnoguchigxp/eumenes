@@ -10,6 +10,7 @@ import {
 import type { Capabilities } from "../../domains/capabilities";
 import {
 	trialFirstRound,
+	type ConversationAgentSystem,
 	type ToolchainRoutingPort,
 } from "../../domains/dialogue";
 import type { InferencePort } from "../../domains/inference";
@@ -44,7 +45,7 @@ export function createPipelineTrials(deps: {
 	inference: InferencePort;
 	service: PipelinesService;
 	/** The conversation agent's part of the system message (the trial asks the same agent). */
-	agentSystem: () => string;
+	agentSystem: () => ConversationAgentSystem;
 	embedPassages?: (
 		texts: string[],
 	) => Promise<{ vectors: number[][]; space: VectorSpace } | undefined>;

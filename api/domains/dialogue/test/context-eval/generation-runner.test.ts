@@ -1,4 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
+import { toolFields } from "../tool-text.fixture";
 import type { NativeToolCall } from "../../../../infrastructure/chat-stream";
 import type { InferencePort, Receipt } from "../../../inference";
 import {
@@ -180,7 +181,7 @@ test("a delegation the host refuses is answered with its reason and the reply go
 		]);
 		expect(outcome).toMatchObject({ kind: "ok", text: "お答えします。" });
 		const tool = seen.at(-1)!.filter((message) => message.role === "tool");
-		expect(JSON.parse(tool.at(-1)!.content)).toMatchObject({ refused: true });
+		expect(toolFields(tool.at(-1)!.content)).toMatchObject({ refused: true });
 		expect(tool.at(-1)!.content).toContain(code);
 		expect(
 			seen
@@ -222,7 +223,7 @@ test("a change is refused without its confirmation; the confirmation is issued w
 	const results = seen
 		.at(-1)!
 		.filter((message) => message.role === "tool")
-		.map((message) => JSON.parse(message.content) as Record<string, unknown>);
+		.map((message) => toolFields(message.content));
 	expect(results[1]).toMatchObject({ refused: true });
 	expect(results[2]).toMatchObject({ confirmation: "eval-confirmation" });
 });

@@ -7,11 +7,7 @@ import type { Run } from "../contracts";
 import type { ExecutionReference } from "../../tool-runtime";
 import type { QueryVector, ToolchainRoute } from "../contracts/toolchains";
 import { byId } from "../repository";
-import {
-	NEWEST_MESSAGES_AT,
-	type DialogueDeps,
-	type GenerateInput,
-} from "./context";
+import type { DialogueDeps, GenerateInput } from "./context";
 import { operationRejection } from "./operation-authority";
 import { consumeAnswer } from "./result-intake";
 
@@ -117,12 +113,7 @@ export function createExecutorContext(
 			? `u:${input.final.seqs.join(",")}:${target}`
 			: `r:${input.runId}:${input.revision}:${target}`;
 	const at = () => jstSeconds(Date.parse(clock()));
-	const utteranceText = () =>
-		input.messages
-			.slice(NEWEST_MESSAGES_AT)
-			.filter((message) => message.role === "user")
-			.map((message) => message.content)
-			.join("\n");
+	const utteranceText = () => input.utterances.join("\n");
 	/** The run must still be this generation's, and every authority the prompt stood on current. */
 	function current(tx: Database): Run {
 		const run = byId(tx, input.runId);
@@ -132,8 +123,6 @@ export function createExecutorContext(
 			inference: deps.larm,
 			memory: deps.memory,
 			memoryWindow: input.memory,
-			goals: deps.goals,
-			goalsLayer: input.goals,
 			...(state.receipt ? { receipt: state.receipt } : {}),
 			settle: { runId: run.id },
 		});

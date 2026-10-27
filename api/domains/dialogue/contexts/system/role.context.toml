@@ -1,0 +1,21 @@
+text = '''
+役割: [[role]]。[[agent]][[user]]
+- 役割と口調はこの設定に従います。記録にあるあなたの以前の発言や話し方は、今の役割・口調の見本ではありません。'''
+
+[variables.role]
+type = "string"
+trust = "trusted"
+placement = "inline"
+encoding = "raw"
+
+[variables.agent]
+type = "string"
+trust = "trusted"
+placement = "inline"
+encoding = "raw"
+
+[variables.user]
+type = "string"
+trust = "trusted"
+placement = "inline"
+encoding = "raw"

@@ -23,7 +23,6 @@ import type {
 	StewardPort,
 	AgencyLayerPort,
 	ConversationAgentPort,
-	GoalsLayerPort,
 	WorldContextPort,
 } from "../contracts";
 import { jstSeconds } from "../../../infrastructure/jst-time";
@@ -48,7 +47,8 @@ import { createProgress } from "./progress";
 import { createErrorReport } from "./error-report";
 import { executionSourceInTransaction } from "./execution-source";
 import { executionCommands } from "./execution-command";
-import { conversationPrefixPort } from "./conversation-prefix";
+import { conversationTaskPort } from "./conversation-input";
+import { createContextKeeper, type KeeperInference } from "./context-keeper";
 import { revokeExecutionNotice } from "./execution-notices";
 import type { MusicPort } from "../contracts/music";
 import type { ImagePort } from "../contracts/image";
@@ -71,6 +71,64 @@ function registerCorrectionHook(deps: DialogueDeps) {
 			eventText(deps, text),
 			jstSeconds(Date.parse(at)),
 		);
+		// The input's copy says the corrected words; the state made from the old ones is made again.
+		for (const conversationId of deps.conversation.input.correctUtterancesInTransaction(
+			db,
+			messageId,
+			text,
+		))
+			deps.conversation.input.dropStatesInTransaction(db, conversationId);
+	});
+}
+
+/** The context keeper, told of every utterance through `deps.contextKeeper`; none without its inference. */
+function startKeeper(
+	deps: DialogueDeps,
+	options: DialogueServiceOptions["keeper"],
+) {
+	const keeper = options
+		? createContextKeeper(deps, options.inference, options)
+		: undefined;
+	deps.contextKeeper = keeper;
+	return keeper;
+}
+
+/**
+ * What follows a change elsewhere: forgetting and deleted reports reach the TODOs and their result slots (section
+ * 13); a correction and a forget reach the conversation's input.
+ */
+function registerChangeHooks(
+	deps: DialogueDeps,
+	work: NonNullable<DialogueDeps["work"]>,
+) {
+	deps.memory?.registerForgetPurge((db, purge) =>
+		work.forgetInTransaction(db, purge.messageIds),
+	);
+	deps.agents?.registerDataDeletion?.((db, runId) =>
+		work.dropRunResultsInTransaction(db, runId),
+	);
+	registerCorrectionHook(deps);
+	registerForgetHook(deps);
+}
+
+/**
+ * A forget reaches the conversation's input (the conversation input specification, section 11): the forgotten
+ * utterances leave it (the recent conversation is cut at the next input when one was inside it), and the state that
+ * may have been made from them is made again.
+ */
+function registerForgetHook(deps: DialogueDeps) {
+	deps.memory?.registerForgetPurge?.((db, purge) => {
+		const changed = new Set(
+			deps.conversation.input.retractUtterancesInTransaction(
+				db,
+				purge.messageIds,
+				deps.clock(),
+			),
+		);
+		// A forgotten memory item may stand in the state's records, copied as it was.
+		if (purge.itemIds.length) changed.add(purge.conversationId);
+		for (const conversationId of changed)
+			deps.conversation.input.dropStatesInTransaction(db, conversationId);
 	});
 }
 
@@ -90,7 +148,7 @@ interface DialogueServiceOptions {
 	queue: QueueService;
 	clock?: () => string;
 	id?: () => string;
-	/** The conversation's active short-term memory: events, episode, work results and window version. */
+	/** The conversation's active short-term memory: its events, work results among them. */
 	continuity: ContinuityService;
 	memory?: MemoryService;
 	steward?: StewardPort;
@@ -101,8 +159,7 @@ interface DialogueServiceOptions {
 	objectRecognition?: ObjectRecognitionPort;
 	delegation?: import("../contracts/delegation").DelegationPort;
 	worldContext?: WorldContextPort;
-	goals?: GoalsLayerPort;
-	/** The conversation agent's own state for the main context, and its opportunity when work changes. */
+	/** The conversation agent's opportunity when work changes. */
 	agency?: AgencyLayerPort;
 	/** The conversation agent that answers every generation. */
 	conversationAgent: ConversationAgentPort;
@@ -112,6 +169,11 @@ interface DialogueServiceOptions {
 	specialist?: import("../contracts").SpecialistPort;
 	/** The operational log file the error report reads (`config.logFile`); no log is read when absent. */
 	logFile?: () => string | undefined;
+	/**
+	 * The context keeper (section 7.3): the inference it calls on, and its quiet wait (default `KEEPER.quietMs`).
+	 * Without it `## State` keeps the host's fields only.
+	 */
+	keeper?: { inference: KeeperInference; quietMs?: number };
 }
 export function createDialogueService({
 	store,
@@ -130,13 +192,13 @@ export function createDialogueService({
 	image,
 	music,
 	worldContext,
-	goals,
 	agency,
 	conversationAgent,
 	toolchains,
 	resources,
 	specialist,
 	logFile,
+	keeper: keeperOptions,
 }: DialogueServiceOptions) {
 	const deps: DialogueDeps = {
 		store,
@@ -155,7 +217,6 @@ export function createDialogueService({
 		image,
 		music,
 		worldContext,
-		goals,
 		agency,
 		conversationAgent,
 		toolchains,
@@ -172,15 +233,8 @@ export function createDialogueService({
 	deps.interactions = interactions;
 	if (resources) deps.resourceLedger = createResourceLedger(deps);
 	deps.work = createWorkLedger(deps);
-	const work = deps.work;
-	// Forgetting and deleted reports reach the TODOs and their result slots (section 13).
-	memory?.registerForgetPurge((db, purge) =>
-		work.forgetInTransaction(db, purge.messageIds),
-	);
-	agents?.registerDataDeletion?.((db, runId) =>
-		work.dropRunResultsInTransaction(db, runId),
-	);
-	registerCorrectionHook(deps);
+	const keeper = startKeeper(deps, keeperOptions);
+	registerChangeHooks(deps, deps.work);
 	registerHandlers(deps, progress);
 	const specialistOps = createSpecialistOps(deps);
 	const agentSync = createAgentSync(deps);
@@ -233,6 +287,7 @@ export function createDialogueService({
 		promptTarget: intake.promptTarget,
 		progress: progress.progress,
 		subscribeProgress: progress.subscribeProgress,
+		subscribeAnswerStream: progress.subscribeAnswerStream,
 		submitVoice: intake.submitVoice,
 		submit: intake.submit,
 		/** The latest utterance stopped, corrected and answered again (`POST .../messages/:id/resubmit`). */
@@ -335,7 +390,7 @@ export function createDialogueService({
 				})),
 			};
 		},
-		...conversationPrefixPort(deps, clock),
+		...conversationTaskPort(deps),
 		answerDelivery(runId: string): SpeechDelivery | undefined {
 			const run = store.read((db) => byId(db, runId));
 			if (run?.status !== "completed" || !run.answerMessageId) return undefined;
@@ -411,6 +466,7 @@ export function createDialogueService({
 		},
 		/** Runs are stopped by the queue's own shutdown; nothing is owned here. */
 		async close() {
+			keeper?.close();
 			await agentSync.close();
 			progress.close();
 		},

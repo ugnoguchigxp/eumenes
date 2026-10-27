@@ -40,6 +40,9 @@ export function queueChunks(
 ) {
 	const { client, queued, valid } = deps;
 	const playable = () => valid() && queued();
+	const fail = (error: unknown) => {
+		if (playable()) deps.fail(error);
+	};
 	for (const chunk of turn.audioChunks ?? []) {
 		const key = `${turn.utteranceId}:${chunk.index}`;
 		if (deps.delivered(key)) continue;
@@ -56,6 +59,7 @@ export function queueChunks(
 				if (!playable()) return;
 				const { bytes, at } = await audio;
 				if (!playable()) return;
+				const volume = deps.volume();
 				let gap: { gapMs: number; fetchLateMs: number } | undefined;
 				const ended = () => {
 					chunkQueue.lastEndedAt = performance.now();
@@ -63,7 +67,11 @@ export function queueChunks(
 					deps.setAvatarCue((cue) => (cue?.key === key ? null : cue));
 					if (!playable()) return;
 					void client
-						.voicePlayed(turn.utteranceId, chunk.index, gap)
+						.voicePlayed(
+							turn.utteranceId,
+							chunk.index,
+							(volume ?? 1) > 0 ? gap : { ...gap, audible: false },
+						)
 						.then(() =>
 							deps.cache.invalidateQueries({
 								queryKey: [
@@ -73,12 +81,12 @@ export function queueChunks(
 								],
 							}),
 						)
-						.catch(deps.fail);
+						.catch(fail);
 				};
 				await deps.controller()?.play(bytes, ended, {
 					waitForPrevious: true,
 					timing: identity,
-					volume: deps.volume(),
+					volume,
 					shouldPlay: playable,
 					onStarted: () => {
 						const previous = chunkQueue.lastEndedAt;
@@ -99,6 +107,6 @@ export function queueChunks(
 				if (playable() && chunk.text.trim())
 					deps.setSubtitle(() => ({ key, text: chunk.text.trim() }));
 			})
-			.catch(deps.fail);
+			.catch(fail);
 	}
 }

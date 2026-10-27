@@ -13,7 +13,6 @@ import {
 } from "../../continuity";
 import {
 	createDialogueService,
-	type GoalsLayerPort,
 	migrations as dialogueMigrations,
 } from "../../dialogue";
 import { createQueue, migrations as queueMigrations } from "../../queue";
@@ -55,7 +54,6 @@ export function wav() {
 export async function setup(
 	fetcher?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>,
 	local: Partial<LarmPort> = {},
-	goals?: GoalsLayerPort,
 ) {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-settings-voice-"));
 	const dbPath = join(dir, "test.db");
@@ -138,7 +136,6 @@ export async function setup(
 		continuity,
 		larm: inference,
 		queue,
-		goals,
 	});
 	const voice = createVoiceDialogue(store, dialogue, inference);
 	queue.start();

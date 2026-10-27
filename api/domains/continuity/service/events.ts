@@ -1,15 +1,8 @@
 import type { Database } from "bun:sqlite";
 import { estimateTextTokens } from "../../../infrastructure/context-budget";
 import { referenceJson } from "../../../infrastructure/reference-json";
-import type {
-	ConversationEvent,
-	EpisodeSegment,
-	EventInput,
-	WindowVersion,
-} from "../contracts/events";
+import type { ConversationEvent, EventInput } from "../contracts/events";
 import {
-	bumpWindowVersion,
-	conversationsWithEpisodeMessages,
 	conversationsWithUncurated,
 	eventByDedupe,
 	eventByDeliveryKey,
@@ -20,20 +13,16 @@ import {
 	forgetEvent,
 	insertEvent,
 	latestEventMs,
+	latestSeq,
 	logEvent,
+	loggedAfter,
 	reopenEvent,
 	reviseEvent,
 	markCurated,
-	moveEvents,
 	nextLogOrder,
 	nextSeq,
-	readEpisode,
-	readWindowVersion,
-	setEventForm,
 	uncuratedEvents,
-	writeEpisode,
 } from "../repository/events";
-import { reconstructInTransaction } from "./reconstruct";
 
 /** The text of an event as the model reads it: id, time, type and actor first, then its own fields. */
 function render(
@@ -62,7 +51,7 @@ function forgottenText(event: ConversationEvent): string {
 }
 
 /**
- * The event flow, episode, work results and window version of the active short-term memory. Every function runs
+ * The event flow of the active short-term memory: what was said, delivered, done and noticed. Every function runs
  * inside the caller's write (or read) transaction; the store never opens one of its own.
  */
 export function createEventStore() {
@@ -87,9 +76,6 @@ export function createEventStore() {
 				throw new Error("invalid_pending_event");
 			const seq = nextSeq(db, input.conversationId);
 			const fullText = render(seq, input, input.fields);
-			const shortText = input.shortFields
-				? render(seq, input, input.shortFields)
-				: null;
 			insertEvent(db, {
 				conversationId: input.conversationId,
 				seq,
@@ -100,8 +86,8 @@ export function createEventStore() {
 				logOrder: input.pending ? null : nextLogOrder(db, input.conversationId),
 				fullText,
 				fullTokens: estimateTextTokens(fullText),
-				shortText,
-				shortTokens: shortText === null ? null : estimateTextTokens(shortText),
+				shortText: null,
+				shortTokens: null,
 				dedupeKey: input.dedupeKey ?? null,
 				deliveryKey: input.deliveryKey ?? null,
 				messageIds: input.messageIds ?? [],
@@ -154,8 +140,21 @@ export function createEventStore() {
 		latestMsInTransaction: latestEventMs,
 		logInTransaction: (db: Database, conversationId: string) =>
 			eventsWithStatus(db, conversationId, "logged"),
-		movedInTransaction: (db: Database, conversationId: string) =>
-			eventsWithStatus(db, conversationId, "moved"),
+		/** The logged events after `seq`: what a generation added since it was prepared. */
+		loggedAfterInTransaction: loggedAfter,
+		/** The newest event seq of the conversation (0 when none). */
+		latestSeqInTransaction: latestSeq,
+		/** How much of an utterance reached the user (its `delivered` event); null while none was recorded. */
+		heardInTransaction(
+			db: Database,
+			conversationId: string,
+			saidId: string,
+		): "full" | "partial" | "none" | null {
+			const event = eventByDedupe(db, conversationId, `delivered:${saidId}`);
+			if (!event?.text) return null;
+			const heard = (JSON.parse(event.text) as { heard?: unknown }).heard;
+			return heard === "full" || heard === "partial" ? heard : "none";
+		},
 		eventInTransaction: (db: Database, conversationId: string, seq: number) =>
 			eventBySeq(db, conversationId, seq),
 		/** Every event that carries the message, whatever its status. */
@@ -165,24 +164,14 @@ export function createEventStore() {
 			),
 		/** The utterance a delivery reports on (see `EventInput.deliveryKey`). */
 		deliveredUtteranceInTransaction: eventByDeliveryKey,
-		moveOutInTransaction: moveEvents,
-		/** Switches events to their short form (those without one keep theirs). */
-		shortenInTransaction(
-			db: Database,
-			conversationId: string,
-			seqs: readonly number[],
-		) {
-			for (const seq of seqs) setEventForm(db, conversationId, seq, "short");
-		},
 		/**
-		 * Forgetting messages reaches the short-term memory: every event that showed one keeps only that it existed,
-		 * and every episode summary that stood on one becomes an unsummarized range. Returns the conversations whose
-		 * window changed (their version moved).
+		 * Forgetting messages reaches the short-term memory: every event that showed one keeps only that it existed.
+		 * Returns the conversations that changed.
 		 */
 		forgetMessagesInTransaction(
 			db: Database,
 			messageIds: readonly string[],
-			at: string,
+			_at: string,
 		): string[] {
 			const changed = new Set<string>();
 			for (const { conversationId, seq } of eventsOfMessages(db, messageIds)) {
@@ -192,45 +181,17 @@ export function createEventStore() {
 				forgetEvent(db, conversationId, seq, text, estimateTextTokens(text));
 				changed.add(conversationId);
 			}
-			const wanted = new Set(messageIds);
-			for (const conversationId of conversationsWithEpisodeMessages(
-				db,
-				messageIds,
-			)) {
-				for (const stage of ["shown", "prepared"] as const) {
-					const segments = readEpisode(db, conversationId, stage);
-					writeEpisode(
-						db,
-						conversationId,
-						stage,
-						segments.map((segment) =>
-							segment.messageIds.some((id) => wanted.has(id))
-								? {
-										...segment,
-										kind: "unsummarized" as const,
-										text: "",
-										messageIds: [],
-									}
-								: segment,
-						),
-					);
-				}
-				changed.add(conversationId);
-			}
-			for (const conversationId of changed)
-				bumpWindowVersion(db, conversationId, at, "forget");
 			return [...changed];
 		},
 		/**
-		 * A corrected message reaches the short-term memory (section 13): every `said` event that showed it now says
-		 * `text` (moved events keep no text to correct), and every episode summary that stood on it becomes an
-		 * unsummarized range. Returns the conversations whose window changed (their version moved).
+		 * A corrected message reaches the short-term memory: every `said` event that showed it now says `text`.
+		 * Returns the conversations that changed.
 		 */
 		correctMessageInTransaction(
 			db: Database,
 			messageId: string,
 			text: string,
-			at: string,
+			_at: string,
 		): string[] {
 			const changed = new Set<string>();
 			const revised = (stored: string | null) => {
@@ -263,47 +224,11 @@ export function createEventStore() {
 				reviseEvent(db, conversationId, seq, full, short);
 				changed.add(conversationId);
 			}
-			for (const conversationId of conversationsWithEpisodeMessages(db, [
-				messageId,
-			])) {
-				for (const stage of ["shown", "prepared"] as const)
-					writeEpisode(
-						db,
-						conversationId,
-						stage,
-						readEpisode(db, conversationId, stage).map((segment) =>
-							segment.messageIds.includes(messageId)
-								? {
-										...segment,
-										kind: "unsummarized" as const,
-										text: "",
-										messageIds: [],
-									}
-								: segment,
-						),
-					);
-				changed.add(conversationId);
-			}
-			for (const conversationId of changed)
-				bumpWindowVersion(db, conversationId, at, "correct");
 			return [...changed];
 		},
 		uncuratedInTransaction: uncuratedEvents,
 		conversationsWithUncuratedInTransaction: conversationsWithUncurated,
 		markCuratedInTransaction: markCurated,
-		episodeInTransaction: (
-			db: Database,
-			conversationId: string,
-			stage: "shown" | "prepared" = "shown",
-		): EpisodeSegment[] => readEpisode(db, conversationId, stage),
-		writeEpisodeInTransaction: writeEpisode,
-		windowVersionInTransaction: (
-			db: Database,
-			conversationId: string,
-		): WindowVersion => readWindowVersion(db, conversationId),
-		bumpWindowInTransaction: bumpWindowVersion,
-		/** One re-construction of the window (see `reconstructInTransaction`). */
-		reconstructInTransaction,
 	};
 }
 export type EventStore = ReturnType<typeof createEventStore>;

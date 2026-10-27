@@ -1,9 +1,13 @@
 import type { Database } from "bun:sqlite";
+import { recordUtteranceInTransaction } from "./utterances";
 import { jstSeconds } from "../../../infrastructure/jst-time";
 import { byId } from "../repository";
 import type { DialogueDeps } from "./context";
-import { heardOf, type Heard } from "./event-fields";
-import { confirmArchives } from "./generation-settle";
+import type { Heard } from "./event-fields";
+import {
+	recordMessageHeardInTransaction,
+	speechHeard,
+} from "./speech-delivery";
 
 /**
  * How much of a run's spoken answer reached the user (the ContextWindow specification, sections 8.1 and 9.4):
@@ -26,7 +30,29 @@ export function recordHeardInTransaction(
 		`run:${runId}`,
 	);
 	if (!said) return;
-	if (heardOf(events.logInTransaction(db, run.conversationId), said.id)) return;
+	const acknowledge = (recordEvent: boolean) => {
+		if (!run.answerMessageId) return;
+		const message = deps.conversation.messageInTransaction(
+			db,
+			run.answerMessageId,
+		)?.message;
+		if (message)
+			recordMessageHeardInTransaction(
+				deps,
+				db,
+				{
+					messageId: message.id,
+					playbackId: `live:${runId}`,
+					heard,
+					text: message.text,
+				},
+				recordEvent,
+			);
+	};
+	if (events.heardInTransaction(db, run.conversationId, said.id) !== null) {
+		acknowledge(true);
+		return;
+	}
 	let deliveredText = spokenText;
 	for (const line of (run.announcement ?? "").split("\n"))
 		if (line && deliveredText.startsWith(line))
@@ -39,19 +65,34 @@ export function recordHeardInTransaction(
 		fields: {
 			ref: said.id,
 			heard,
+			channel: "speech",
 			...(heard === "partial" ? { deliveredText } : {}),
 		},
 		// The heard part is the utterance's own text: forgetting its message clears this copy too.
 		messageIds: said.messageIds,
 		dedupeKey: `delivered:${said.id}`,
 	});
-	confirmArchives(deps, db, run, heard);
+	// The reply took its place at adoption: what reached the user of it, all, the part heard, or nothing.
+	const messageId = said.messageIds[0];
+	if (messageId) {
+		if (heard !== "full")
+			deps.conversation.input.reviseUtteranceInTransaction(db, {
+				conversationId: run.conversationId,
+				speaker: "agent",
+				messageId,
+				text:
+					heard === "partial" && deliveredText.trim() ? deliveredText : null,
+				at: deps.clock(),
+			});
+		if (heard !== "none")
+			deps.contextKeeper?.noteUtterance(run.conversationId, "agent");
+	}
+	acknowledge(false);
 }
 
 /**
  * An utterance the agency spoke on its own, with no run: a `said` of the agent (origin `spontaneous`), so the
- * conversation knows later what it said (section 16). The finished TODOs it reported (`todoRefs`) are archived: it
- * was delivered when it was stored.
+ * conversation knows later what it said (section 16). The finished TODOs it reported (`todoRefs`) await playback; storage alone is not speech delivery.
  */
 export function recordSpontaneousInTransaction(
 	deps: DialogueDeps,
@@ -78,6 +119,14 @@ export function recordSpontaneousInTransaction(
 		},
 		messageIds: [input.messageId],
 		dedupeKey: `message:${input.messageId}`,
+		deliveryKey: `message:${input.messageId}`,
+	});
+	recordUtteranceInTransaction(deps, db, {
+		conversationId: input.conversationId,
+		speaker: "agent",
+		text: input.text,
+		messageId: input.messageId,
+		at: input.at,
 	});
 	// The report shows the resources of the TODOs it told as chips.
 	deps.resourceLedger?.linkMessageToWorkInTransaction(
@@ -86,8 +135,19 @@ export function recordSpontaneousInTransaction(
 		input.messageId,
 		todoRefs,
 	);
-	for (const todoId of todoRefs)
-		archiveDone(deps, db, input.conversationId, todoId, at);
+	for (const todoId of todoRefs) {
+		const row = deps.work?.workInTransaction(db, todoId);
+		if (
+			row?.conversationId === input.conversationId &&
+			row.status === "done" &&
+			!row.archivedAt
+		)
+			deps.work!.requestArchiveInTransaction(
+				db,
+				todoId,
+				`message:${input.messageId}`,
+			);
+	}
 }
 
 /**
@@ -122,19 +182,36 @@ export function archiveReportedInTransaction(
 		`run:${runId}`,
 	);
 	if (!said) return;
-	const heard = heardOf(
-		events.logInTransaction(db, input.conversationId),
-		said.id,
-	);
+	const heard = speechHeard(deps, db, input.messageId);
 	const at = jstSeconds(Date.parse(deps.clock()));
 	for (const todoId of input.todoIds) {
+		const current = ledger.workInTransaction(db, todoId);
+		if (
+			current?.conversationId !== input.conversationId ||
+			current.status !== "done" ||
+			Date.parse(current.updatedAt) > Date.parse(message.message.createdAt)
+		)
+			continue;
+		// An older reconciliation cannot supersede a newer pending report.
+		if (
+			current.archiveRequested &&
+			current.archiveRequested !== `run:${runId}`
+		) {
+			const pending = events.deliveredUtteranceInTransaction(
+				db,
+				input.conversationId,
+				current.archiveRequested,
+			);
+			if (pending && pending.seq > said.seq) continue;
+		}
 		if (heard === "full")
 			archiveDone(deps, db, input.conversationId, todoId, at);
-		else if (!heard) {
+		else {
 			const row = ledger.workInTransaction(db, todoId);
 			if (
 				row?.conversationId === input.conversationId &&
 				row.status === "done" &&
+				Date.parse(row.updatedAt) <= Date.parse(message.message.createdAt) &&
 				!row.archivedAt
 			)
 				ledger.requestArchiveInTransaction(db, todoId, `run:${runId}`);

@@ -8,7 +8,7 @@
  * sees the log grow at its end, and the re-constructions the window plan calls for (a resumed conversation, a cache
  * taken as lost, a section over its limit) happen where the product would make them.
  */
-import { estimateTextTokens } from "../../../inference";
+import { estimateMessageTokens } from "../../../inference";
 import type { GenerateInput } from "../../service/context";
 import type { Seed, SeedEvent } from "./case-schema";
 import { applySeed, publishStep, saveLongTerm } from "./materialize";
@@ -212,8 +212,8 @@ const FILLER =
 	"旅程の候補を一つずつ比べながら、行きたい場所と移動の順番を決めていきたいです。";
 
 /**
- * A small model window whose log fills up: twenty long exchanges until the log passes its limit, then the window
- * moves the oldest ones out to the episode (an unsummarized mark, as no summary was prepared).
+ * A long run of long exchanges: past the recent conversation's hard limit, the host cuts it to the newest few by its
+ * fixed rule.
  */
 export const SMALL_WINDOW_TRAJECTORY: Trajectory = {
 	seed: { modelWindow: 48_000 },
@@ -234,8 +234,8 @@ export type TrajectoryCall = {
 	/** `g<n>`: stable label of the generation. */
 	label: string;
 	input: GenerateInput;
-	/** Why the window was re-constructed before this generation, if it was. */
-	reconstruction: Generated["reconstruction"];
+	/** The cut this generation's prepare moved, if it did. */
+	cut: Generated["cut"];
 };
 
 /**
@@ -278,7 +278,7 @@ export async function playTrajectory(
 		calls.push({
 			label: `g${index + 1}`,
 			input: generated.input,
-			reconstruction: generated.reconstruction,
+			cut: generated.cut,
 		});
 		for (const work of turn.startWork ?? []) await session.addWork(work);
 		await session.settle(generated, turn.reply);
@@ -286,6 +286,6 @@ export async function playTrajectory(
 	return calls;
 }
 
-/** The estimated tokens of the document of a call (for reports). */
+/** The estimated tokens of a call's input (for reports). */
 export const documentTokens = (call: TrajectoryCall) =>
-	estimateTextTokens(call.input.document.text);
+	estimateMessageTokens(call.input.messages);

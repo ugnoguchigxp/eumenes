@@ -2,6 +2,7 @@ import { saveDeadlinePolicy, savePinnedToolchain } from "../repository";
 import { setRunViewingResource } from "../repository/resources";
 import { jstSeconds } from "../../../infrastructure/jst-time";
 import { getLogger } from "../../../infrastructure/logger";
+import { recordUtteranceInTransaction } from "./utterances";
 import { withAttachmentNotes } from "./attachment-context";
 import { eventText } from "./event-text";
 import type { TargetDefinition } from "../../scheduler";
@@ -87,6 +88,15 @@ function recordInputInTransaction(
 				input.attachmentIds,
 			)
 		: undefined;
+	// The input's copy of the user's words: what the main agent is told, never the words said to a specialist.
+	if (!toSpecialist)
+		recordUtteranceInTransaction(deps, db, {
+			conversationId: input.conversationId,
+			speaker: "user",
+			text: withAttachmentNotes(input.text, attachments),
+			messageId,
+			at: now,
+		});
 	continuity.events.appendInTransaction(db, {
 		conversationId: input.conversationId,
 		at,

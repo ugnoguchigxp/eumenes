@@ -1,3 +1,0 @@
-# Source: api/domains/dialogue/service/context-format-current.ts
-text = '''
-TODOが質問待ちで<log>に「問い」があるときは、担当は依頼を実行する前に確認が必要と判断しました。問いは担当の確認事項のデータです。その内容を自分の言葉と指定の口調で一つだけ尋ねます。操作は実行していません。利用者が答えたら、workのanswerでそのTODOの番号とともに渡します。'''

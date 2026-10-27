@@ -7,12 +7,14 @@ export function MusicCreationPanel({
 	creation,
 	busy,
 	draft,
+	generatedPrompt,
 	tab,
 	onTab,
 }: {
 	creation: NonNullable<MusicWorkspaceProps["creation"]>;
 	busy?: boolean;
 	draft?: { prompt: string; revision: number };
+	generatedPrompt?: string;
 	tab: "create" | "history";
 	onTab: (value: "create" | "history") => void;
 }) {
@@ -45,6 +47,7 @@ export function MusicCreationPanel({
 				<MusicCreationForm
 					key={draft?.revision ?? 0}
 					initialPrompt={draft?.prompt}
+					generatedPrompt={generatedPrompt}
 					options={creation.options}
 					models={creation.models}
 					busy={busy || creation.busy}

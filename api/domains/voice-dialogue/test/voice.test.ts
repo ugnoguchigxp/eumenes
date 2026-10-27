@@ -233,6 +233,7 @@ async function evictionHarness(
 		},
 		get: () => ({ status: "completed" }),
 		subscribeProgress: () => () => {},
+		subscribeAnswerStream: () => () => {},
 		waitForTerminal: async () =>
 			options.waits?.shift() ?? {
 				status: "completed",
@@ -633,6 +634,7 @@ test.each([
 				},
 				get: () => ({ status: "completed" }),
 				subscribeProgress: () => () => {},
+				subscribeAnswerStream: () => () => {},
 				waitForTerminal: async () => ({
 					status: "completed",
 					answerMessageId: "answer",

@@ -71,8 +71,7 @@ export function createSettle(deps: StewardDeps, kick: Kick, end: UnitEnd) {
 		}
 		db.exec("RELEASE steward_apply");
 		// A World unit changes nothing the Window carries (the answer's World context is read per answer).
-		// An episode unit only prepares: the window changes when a re-construction applies it.
-		const publishes = unit.slot !== "world" && unit.slot !== "episode";
+		const publishes = unit.slot !== "world";
 		const before = publishes
 			? (memory.windows.storedInTransaction(db, conversationId)?.version ??
 				null)
@@ -160,21 +159,14 @@ export function createSettle(deps: StewardDeps, kick: Kick, end: UnitEnd) {
 			});
 			return "applied" as const;
 		}
-		// Section 6.5: a forget or a re-construction since prepare means this answer stood on stale ground.
+		// Section 6.5: a forget since prepare means this answer stood on stale ground.
 		const fenced =
 			unit.forgetSeq !== null &&
 			unit.forgetSeq !== memory.forgetSeqInTransaction(db)
 				? "stale_forget"
-				: unit.windowVersion !== null &&
-					  unit.windowVersion !==
-							deps.continuity.events.windowVersionInTransaction(
-								db,
-								unit.conversationId,
-							).version
-					? "stale_window"
-					: result.receipt.requestId !== input.requestId
-						? "receipt_mismatch"
-						: null;
+				: result.receipt.requestId !== input.requestId
+					? "receipt_mismatch"
+					: null;
 		if (fenced) {
 			end.release(db, held);
 			end.staleUnit(env, unit, claim.jobId, fenced);

@@ -274,6 +274,35 @@ export function openWork(db: Database, conversationId: string): WorkRow[] {
 	).map(map);
 }
 
+/** The TODOs archived since `since` (an ISO time), newest last, at most `limit`. */
+export function recentlyArchivedWork(
+	db: Database,
+	conversationId: string,
+	since: string,
+	limit: number,
+): WorkRow[] {
+	return (
+		db
+			.query(
+				`SELECT ${columns} FROM dialogue_work WHERE conversation_id = ? AND archived_at IS NOT NULL AND archived_at >= ? ORDER BY archived_at DESC, id DESC LIMIT ?`,
+			)
+			.all(conversationId, since, limit) as Record<string, unknown>[]
+	)
+		.map(map)
+		.reverse();
+}
+
+/** The TODOs a reply was asked to archive (`archive_requested`), archived or not. */
+export function workReportedBy(db: Database, told: string): WorkRow[] {
+	return (
+		db
+			.query(
+				`SELECT ${columns} FROM dialogue_work WHERE archive_requested = ? ORDER BY created_at, id`,
+			)
+			.all(told) as Record<string, unknown>[]
+	).map(map);
+}
+
 /** Which TODOs a page lists: the unarchived ones, the open ones, the finished unarchived ones, or the archived. */
 export type WorkPageState = "active" | "todo" | "done" | "archived";
 
@@ -392,7 +421,7 @@ export function updateWork(
 	return (
 		db
 			.query(
-				"UPDATE dialogue_work SET status = ?, outcome = ?, question_id = ?, question = ?, result_json = ?, request = ?, source_ref = ?, run_id = ?, revision = revision + 1, updated_at = ? WHERE id = ? AND revision = ?",
+				"UPDATE dialogue_work SET archive_requested = NULL, status = ?, outcome = ?, question_id = ?, question = ?, result_json = ?, request = ?, source_ref = ?, run_id = ?, revision = revision + 1, updated_at = ? WHERE id = ? AND revision = ?",
 			)
 			.run(
 				next.status,

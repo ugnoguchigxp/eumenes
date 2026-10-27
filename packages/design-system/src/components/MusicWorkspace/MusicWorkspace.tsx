@@ -242,6 +242,7 @@ export function MusicWorkspace({
 							creation={creation}
 							busy={busy}
 							draft={draft}
+							generatedPrompt={current?.prompt}
 							tab={tab}
 							onTab={setTab}
 						/>

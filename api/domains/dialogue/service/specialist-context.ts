@@ -1,15 +1,8 @@
 import type { Database } from "bun:sqlite";
 import type { ToolchainCard } from "../../capabilities";
 import type { Run, SpecialistSet, Viewing } from "../contracts";
-import {
-	liveSession,
-	markReported,
-	runViewing,
-	unreportedEnded,
-} from "../repository";
-import type { ContextBlock } from "../../inference";
+import { runViewing } from "../repository";
 import type { DialogueDeps } from "./context";
-import { specialistBlock } from "./context-blocks";
 
 /**
  * The saved items a session toolchain may start from (host-issued choices: the adapter's own list), or null for
@@ -57,45 +50,6 @@ export function viewingTargetOf(
 }
 
 /**
- * What the main agent should know about specialist work, as short host facts (never the work's content):
- * a suspended unsaved work (title, label, unsaved, expiry, a switch waiting for the user), and, once, the
- * reason and label of the session that ended last.
- */
-export function specialistWorkBlock(
-	deps: DialogueDeps,
-	tx: Database,
-	run: Run,
-): ContextBlock | null {
-	const port = deps.specialist;
-	if (!port) return null;
-	const record: Record<string, unknown> = {};
-	const live = liveSession(tx, run.conversationId);
-	if (live?.state === "suspended") {
-		const work = port.workStateInTransaction(tx, live.adapterRef, live.workRef);
-		record.suspended = {
-			specialist: live.title,
-			toolchainId: live.toolchainId,
-			label: work?.label ?? live.label,
-			unsaved: work?.dirty ?? false,
-			savedRef: work?.savedRef ?? null,
-			expiresAt: live.expiresAt,
-			...(live.pendingSwitch ? { pendingSwitch: live.pendingSwitch } : {}),
-		};
-	}
-	const ended = unreportedEnded(tx, run.conversationId);
-	if (ended) {
-		record.ended = {
-			specialist: ended.title,
-			reason: ended.endReason,
-			label: ended.label,
-		};
-		markReported(tx, run.conversationId);
-	}
-	if (!Object.keys(record).length) return null;
-	return specialistBlock("specialist.work", record);
-}
-
-/**
  * The saved item on screen, only when the host issued it: the ref must be among the choices of a session
  * toolchain of that artifact. Anything else is dropped without trace (it is never an access grant).
  */
@@ -132,14 +86,4 @@ export function viewedSpecialistTarget(
 		}
 	}
 	return null;
-}
-
-/** The validated saved item as context for the main agent. */
-export function viewingBlock(
-	deps: DialogueDeps,
-	tx: Database,
-	run: Run,
-): ContextBlock | null {
-	const viewing = viewedSpecialistTarget(deps, tx, run);
-	return viewing ? specialistBlock("specialist.viewing", viewing) : null;
 }

@@ -13,17 +13,10 @@ import {
 } from "../repository/resources";
 import { resolveDelegateRefs } from "../service/delegate-refs";
 import { createResourceLedger } from "../service/resource-ledger";
-import { resourceLinesInTransaction } from "../service/resource-context";
-import { renderDocument } from "../service/context-document";
+import { madeOf } from "../service/state-text";
 import { createWorkLedger } from "../service/work-ledger";
 import { recordWorkLinksInTransaction } from "../service/work-links";
-import {
-	IMAGE,
-	MUSIC,
-	sectionLines,
-	setup,
-	type Harness,
-} from "./generation.fixture";
+import { IMAGE, MUSIC, setup, type Harness } from "./generation.fixture";
 import { fakeResources } from "./resource.fixture";
 import { openDialogueStore, removeDialogueStore } from "./store.fixture";
 
@@ -159,7 +152,7 @@ test("a message links resources in order, once each", async () => {
 	}
 });
 
-test("an image result becomes the TODO's link; the state points to it and lists it with its origin and actions", async () => {
+test("an image result becomes the TODO's link, which the state names by its number", async () => {
 	const { dir, store, deps, ledger } = ledgerStore();
 	const resources = fakeResources();
 	try {
@@ -220,69 +213,9 @@ test("an image result becomes the TODO's link; the state points to it and lists 
 			).toEqual([{ uri: track, kind: "music.track", label: "日曜日の午後" }]);
 			const refs = work.refsInTransaction(db, "main");
 			expect(refs.resource(uri)).toBe("a1");
-			const todos = work.todosInTransaction(db, "main");
-			const lines = resourceLinesInTransaction(full, db, "main", refs, "2026");
-			const document = renderDocument(
-				{
-					profile: [],
-					episode: [],
-					log: [],
-					state: {
-						todos: [{ ...todos[0]!, status: "done", outcome: "succeeded" }],
-						resources: lines,
-						pendingConfirmation: [],
-						retained: [],
-						notes: [],
-						goals: [],
-						newMemories: [],
-					},
-				},
-				{ profileLimit: 100, refs, year: "2026" },
-			);
-			const state = sectionLines(document.text, "state");
-			expect(state).toContain(
-				"t1 完了 夜のドライブの絵 (成功, 結果は work の check で読む, 未伝達) → a1",
-			);
-			// The newest used first; the TODO's image names its TODO, the track found in the history its day.
-			expect(state.filter((line) => line.startsWith("a"))).toEqual([
-				"a2 曲「日曜日の午後」(履歴 10-25) 再生する・表示する・内容を伝える",
-				"a1 画像「夜のドライブ」(t1) 表示する・内容を伝える",
-			]);
-			expect(document.text).not.toContain("eumenes://");
-		});
-	} finally {
-		removeDialogueStore(dir);
-	}
-});
-
-test("a resource its owner deleted is left out of the state; only eight are listed", async () => {
-	const { dir, store, deps, ledger } = ledgerStore();
-	const resources = fakeResources();
-	try {
-		await store.write((db) => {
-			const full = {
-				...deps,
-				resources: resources.access,
-				resourceLedger: ledger,
-			};
-			for (let i = 1; i <= 10; i++) {
-				const uri = resources.make("image", `img_${i}`, `絵${i}`);
-				ledger.enterInTransaction(db, {
-					conversationId: "main",
-					uri,
-					kind: "image",
-					label: `絵${i}`,
-					source: "found",
-				});
-			}
-			resources.remove("img_10");
-			const refs = {
-				todo: () => null,
-				confirmation: () => null,
-				resource: () => null,
-			};
-			const lines = resourceLinesInTransaction(full, db, "main", refs, "2026");
-			expect(lines.map((line) => line.ref)).toEqual([9, 8, 7, 6, 5, 4, 3, 2]);
+			const [todo] = work.todosInTransaction(db, "main");
+			// The TODO's line names what it made by number and name, never the URI.
+			expect(madeOf(todo!, refs)).toEqual(["a1「夜のドライブ」"]);
 		});
 	} finally {
 		removeDialogueStore(dir);
@@ -388,8 +321,13 @@ async function doneImage(resources: ReturnType<typeof fakeResources>) {
 	return { uri, done };
 }
 
-const stateOfLastCall = () =>
-	sectionLines(h!.state.calls.at(-1)!.messages[1]!.content, "state");
+/** The lines of `## State` in the last message of the newest model call. */
+const stateOfLastCall = () => {
+	const last = h!.state.calls.at(-1)!.messages.at(-1)!.content;
+	const start = last.indexOf("## State\n") + "## State\n".length;
+	const end = last.indexOf("\n\n", start);
+	return last.slice(start, end < 0 ? undefined : end).split("\n");
+};
 
 test("a finished image TODO links its image, the reply shows it as a chip, and the next prompt shows its number", async () => {
 	const resources = fakeResources({ [IMAGE.id]: ["image"], [MUSIC.id]: [] });
@@ -420,8 +358,9 @@ test("a finished image TODO links its image, the reply shows it as a chip, and t
 	h.state.steps.push({ text: "はい。" });
 	await h.say("さっきの絵は？");
 	const lines = stateOfLastCall();
-	expect(lines.some((line) => line.endsWith("→ a1"))).toBe(true);
-	expect(lines).toContain("a1 画像「夜のドライブ」(t1) 表示する・内容を伝える");
+	expect(lines).toContain(
+		"- t1 夜のドライブの絵 完了 未報告 a1「夜のドライブ」",
+	);
 	expect(
 		h.state.calls
 			.at(-1)!
@@ -457,7 +396,7 @@ test("a finished image TODO links its image, the reply shows it as a chip, and t
 	});
 });
 
-test("the resource on screen is shown in <now> by its number and joins the ledger as viewed", async () => {
+test("the resource on screen is shown in the state by its number and joins the ledger as viewed", async () => {
 	const resources = fakeResources();
 	h = await setup({ resources: resources.access });
 	const uri = resources.make("music.track", "music_9", "日曜日の午後");
@@ -469,14 +408,9 @@ test("the resource on screen is shown in <now> by its number and joins the ledge
 		viewing: { resource: uri },
 	});
 	await waitFor(() => h!.state.calls.length > 0);
-	const now = h.state.calls[0]!.messages[2]!.content;
-	expect(now).toContain("viewing a1 曲「日曜日の午後」");
-	expect(now).not.toContain("eumenes://");
-	expect(
-		sectionLines(h.state.calls[0]!.messages[1]!.content, "state"),
-	).toContain(
-		"a1 曲「日曜日の午後」(履歴 10-25) 再生する・表示する・内容を伝える",
-	);
+	const last = h.state.calls[0]!.messages.at(-1)!.content;
+	expect(last).toContain("提示中:\n- a1 曲「日曜日の午後」（画面に表示中）");
+	expect(last).not.toContain("eumenes://");
 });
 
 test("find_toolchain tells what a toolchain makes, in the kinds' display names", async () => {
@@ -490,13 +424,11 @@ test("find_toolchain tells what a toolchain makes, in the kinds' display names",
 		{ text: "探しました。" },
 	);
 	await h.say("絵を描ける？");
-	const result = JSON.parse(
-		h.state.calls.at(-1)!.messages.filter((m) => m.role === "tool")[0]!.content,
-	) as { candidates: Array<{ id: string; produces?: string[] }> };
-	expect(result.candidates[0]).toMatchObject({
-		id: IMAGE.id,
-		produces: ["画像"],
-	});
+	const result = h.state.calls
+		.at(-1)!
+		.messages.filter((m) => m.role === "tool")[0]!.content;
+	expect(result).toStartWith(`- ${IMAGE.id}: `);
+	expect(result).toContain("作るもの: 画像");
 });
 
 test("delegate refs are refused for a number the conversation never saw, and handed over for one it did", async () => {

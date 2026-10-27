@@ -178,6 +178,24 @@ export function linkMessageResources(
 		).run(messageId, resourceId, messageId);
 }
 
+/** The resources one message links, in link order (forgotten ones included; the caller skips them). */
+export function resourcesOfMessage(
+	db: Database,
+	messageId: string,
+): ConversationResource[] {
+	return (
+		db
+			.query(
+				`SELECT ${columns
+					.split(", ")
+					.map((c) => `r.${c}`)
+					.join(", ")} FROM dialogue_message_resources mr
+ JOIN dialogue_resources r ON r.id = mr.resource_id WHERE mr.message_id = ? ORDER BY mr.ordinal`,
+			)
+			.all(messageId) as Record<string, unknown>[]
+	).map(map);
+}
+
 /** The URIs each message of the conversation links, in link order. */
 export function messageResourceUris(
 	db: Database,

@@ -1,6 +1,6 @@
 import { ExternalAppLauncher } from "@eumenes/design-system";
 import { useState } from "react";
-import type { ArtifactRequest } from "./contracts";
+import type { ArtifactRequest, Resource } from "./contracts";
 import { useArtifactRuntime } from "./runtime";
 
 export function ExternalAppLauncherView({
@@ -11,14 +11,37 @@ export function ExternalAppLauncherView({
 	const runtime = useArtifactRuntime(),
 		source = request.source!;
 	const data = runtime.snapshot[source];
-	const [error, setError] = useState("");
 	if (data?.kind !== "external-app-launcher") return null;
+	return (
+		<Launcher
+			key={`${source}:${data.revision}:${data.available}`}
+			request={request}
+			source={source}
+			data={data}
+		/>
+	);
+}
+
+/** Errors belong to one displayed connection, including an unavailable interval during a switch. */
+function Launcher({
+	request,
+	source,
+	data,
+}: {
+	request: ArtifactRequest;
+	source: string;
+	data: Extract<Resource, { kind: "external-app-launcher" }>;
+}) {
+	const runtime = useArtifactRuntime();
+	const [error, setError] = useState("");
 	return (
 		<ExternalAppLauncher
 			label={request.title ?? "別タブで開く"}
 			available={data.available}
 			busy={data.busy}
-			error={error}
+			preparing={data.preparing}
+			error={data.error || error}
+			onRetry={data.error ? runtime.refresh : undefined}
 			onOpen={() => {
 				setError("");
 				void runtime

@@ -1,4 +1,7 @@
-/** One seeded event as the product appends it: the conversation message, then the continuity event(s). */
+/**
+ * One seeded event as the product appends it: the conversation message, the continuity event(s), and the input's
+ * utterance (the user's words to the main agent; the agent's as far as they were heard).
+ */
 import type { Database } from "bun:sqlite";
 import type { ConversationEvent } from "../../../continuity";
 import type { SeedEvent } from "./case-schema";
@@ -34,8 +37,21 @@ export function writeEvent(
 		});
 		return id;
 	};
+	const utterance = (
+		speaker: "user" | "agent",
+		text: string,
+		messageId: string,
+	) =>
+		ctx.conversation.input.appendUtteranceInTransaction(db, {
+			conversationId: CONVERSATION_ID,
+			speaker,
+			text,
+			messageId,
+			at: seed.at,
+		});
 	if (seed.type === "said" && seed.by === "user") {
 		const id = message("user", seed.text);
+		utterance("user", seed.text, id);
 		remember(
 			seed.key,
 			add({
@@ -75,6 +91,13 @@ export function writeEvent(
 				: {}),
 		});
 		remember(seed.key, said);
+		const heard =
+			seed.heard === "partial"
+				? seed.deliveredText
+				: seed.heard === "none"
+					? ""
+					: seed.text;
+		if (heard && !seed.speaking) utterance("agent", heard, id);
 		if (seed.heard !== null)
 			add({
 				conversationId: CONVERSATION_ID,

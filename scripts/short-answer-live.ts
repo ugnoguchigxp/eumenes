@@ -1,5 +1,6 @@
 import { mkdirSync, writeFileSync } from "node:fs";
-import { buildSystemPrompt } from "../api/domains/dialogue/service/system-prompt";
+import { respondSystemParts } from "eumenes-agency";
+import { systemText } from "../api/domains/dialogue/service/context-system";
 import { createLiveLarm } from "./live-larm";
 import type { Messages } from "../api/domains/inference/contracts";
 
@@ -42,11 +43,14 @@ try {
 		const messages: Messages = [
 			{
 				role: "system",
-				content: buildSystemPrompt({
-					agentName: "",
-					userName: "",
-					persona: "butler",
-				}),
+				content: systemText(
+					{
+						agentName: "",
+						userName: "",
+						persona: "butler",
+					},
+					respondSystemParts({ spoken: true }),
+				),
 			},
 			...history,
 			...(scenario.report

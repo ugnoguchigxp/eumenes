@@ -35,11 +35,13 @@ export async function openDocling(
 	const closed = window.setInterval(() => {
 		if (tab.closed) controller.abort();
 	}, 250);
+	const signal = AbortSignal.any([
+		controller.signal,
+		AbortSignal.timeout(200_000),
+	]);
 	try {
-		const value = await client.doclingTicket(
-			AbortSignal.any([controller.signal, AbortSignal.timeout(200_000)]),
-		);
-		controller.signal.throwIfAborted();
+		const value = await client.doclingTicket(signal);
+		signal.throwIfAborted();
 		const url = new URL(value.url);
 		if (
 			url.origin !== publicOrigin ||
@@ -52,11 +54,16 @@ export async function openDocling(
 		return { status: "accepted" as const, message: "別タブを開きました。" };
 	} catch (error) {
 		abort();
+		const code = signal.aborted
+			? "docling_timeout"
+			: error instanceof Error
+				? error.message
+				: "";
 		return {
 			status: "rejected" as const,
 			message: controller.signal.aborted
 				? "画面を開く操作を取り消しました。"
-				: (doclingMessages[error instanceof Error ? error.message : ""] ??
+				: (doclingMessages[code] ??
 					"Docling Deskに接続できませんでした。接続を確認して、もう一度開いてください。"),
 		};
 	} finally {

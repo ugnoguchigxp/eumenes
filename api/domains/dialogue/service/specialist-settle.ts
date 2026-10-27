@@ -1,4 +1,5 @@
 import { jstSeconds } from "../../../infrastructure/jst-time";
+import { recordUtteranceInTransaction } from "./utterances";
 import type { Database } from "bun:sqlite";
 import type { HandlerDefinition } from "../../queue";
 import {
@@ -86,9 +87,18 @@ export function forwardToMain(
 	const events = deps.continuity.events;
 	const text = deps.conversation.messageInTransaction(tx, run.inputMessageId)
 		?.message.text;
-	for (const event of events.logInTransaction(tx, run.conversationId))
-		if (text !== undefined && event.messageIds.includes(run.inputMessageId))
+	for (const event of events.ofMessageInTransaction(tx, run.inputMessageId))
+		if (text !== undefined && event.conversationId === run.conversationId)
 			events.reopenInTransaction(tx, run.conversationId, event.seq, { text });
+	// The words said to the specialist are the main agent's now: they join the conversation's input.
+	if (text !== undefined)
+		recordUtteranceInTransaction(deps, tx, {
+			conversationId: run.conversationId,
+			speaker: "user",
+			text,
+			messageId: run.inputMessageId,
+			at: deps.clock(),
+		});
 	const handoff = JSON.stringify({
 		specialist: record.title,
 		work: state,

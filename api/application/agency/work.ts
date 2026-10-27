@@ -89,6 +89,7 @@ export function hostTodoOf(
 	item: LedgerTodo,
 	kinds: KindLookup,
 ): HostTodo | null {
+	if (item.status === "done" && item.reportPending) return null;
 	const base = {
 		id: item.id,
 		title: oneLine(

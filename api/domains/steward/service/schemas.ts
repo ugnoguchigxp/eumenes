@@ -30,7 +30,7 @@ function obj(properties: Record<string, Schema>): Schema {
 const list = (items: Schema): Schema => ({ type: "array", items });
 
 const stateKinds = ["preference", "personal_fact", "constraint", "habit"];
-// `activity` is not written any more: the conversation itself is in the log and the episode.
+// `activity` is not written any more: the conversation itself is in the log.
 const noteKinds = ["goal", "decision", "open_question", "memo"];
 
 /**
@@ -98,8 +98,6 @@ export const curateSchema = (requestLabels: readonly string[]) =>
 		route: list(obj({ event: str, world: bool, goals: bool })),
 	});
 
-export const summarizeSchema = obj({ summary: str });
-
 export const consolidateSchema = obj({
 	merge: list(
 		obj({ refs: strings, key: nullableStr, text: str, negated: bool }),
@@ -118,8 +116,6 @@ export const consolidateSchema = obj({
 	republishLongTerm: bool,
 	changed: bool,
 });
-
-export const refineSchema = obj({ summary: str });
 
 const priorities = ["high", "normal", "low"];
 const worldValue = obj({

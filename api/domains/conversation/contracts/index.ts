@@ -4,6 +4,7 @@ import { attachmentSchema } from "./attachments";
 export * from "./attachments";
 import { attributionSchema } from "./attribution";
 export { attributionSchema } from "./attribution";
+export type * from "./input";
 const messageSchema = z.object({
 	attribution: attributionSchema.optional(),
 	id: z.string(),

@@ -179,17 +179,6 @@ export function goalEpochOf(
 	return scopeEpoch(db, principal, scopeKey);
 }
 
-/**
- * Which of the given goals still exist, whatever their status (completed and withdrawn goals are rows too);
- * a goal that is absent was deleted by a forget. Read-only, no access check: it answers existence only.
- */
-export function existingGoalIdsInTransaction(
-	db: Database,
-	goalIds: readonly string[],
-): Set<string> {
-	return new Set(goalIds.filter((id) => getGoal(db, id) !== null));
-}
-
 const operationDigest = (
 	status: string,
 	value: {

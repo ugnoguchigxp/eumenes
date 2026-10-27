@@ -335,9 +335,15 @@ describe("agency LLM port on the conversation's prompt", () => {
 				generation: 7,
 				conversationId: "conv-1",
 			}),
-			prefix: (conversationId) => {
+			task: (conversationId, task) => {
 				asked.push(conversationId);
-				return prefix;
+				return {
+					messages: [
+						...prefix.messages,
+						{ role: "user", content: `## Task\n${task}` },
+					],
+					tools: prefix.tools,
+				};
 			},
 		});
 		await port.complete(
@@ -347,10 +353,7 @@ describe("agency LLM port on the conversation's prompt", () => {
 		expect(asked).toEqual(["conv-1"]);
 		expect(executed[0]!.messages).toEqual([
 			...prefix.messages,
-			{
-				role: "user",
-				content: '<task name="agency.update">\nSYSTEM\n\nPROMPT\n</task>',
-			},
+			{ role: "user", content: "## Task\nSYSTEM\n\nPROMPT" },
 		]);
 		expect(executed[0]!.session).toEqual({
 			sessionRole: "auxiliary",

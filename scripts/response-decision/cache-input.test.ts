@@ -1,5 +1,4 @@
 import { expect, test } from "bun:test";
-import { DOCUMENT_SECTIONS } from "../../api/domains/dialogue/service/context-document";
 import { estimateMessageTokens } from "../../api/domains/inference";
 import {
 	cacheInput,
@@ -13,16 +12,14 @@ test("cache trajectory uses the product's message layout and synthetic reference
 	const tokens = estimateMessageTokens(input.messages);
 	expect(tokens).toBeGreaterThanOrEqual(14000);
 	expect(tokens).toBeLessThan(14500);
-	expect(input.messages.map((m) => m.role)).toEqual(["system", "user", "user"]);
-	// The document is the product's own: its sections in their fixed order, and it is the message sent.
-	expect(
-		[...input.messages[1]!.content.matchAll(/^<([a-z]+)>$/gm)].map((m) => m[1]),
-	).toEqual([...DOCUMENT_SECTIONS]);
-	expect(input.messages[1]!.content).toBe(input.document.text);
-	expect(input.document.sections.log.tokens).toBeGreaterThan(
-		input.document.sections.state.tokens,
-	);
+	expect(input.messages[0]!.role).toBe("system");
+	// The recent conversation alternates from the agent's first utterance; the last message is State and the question.
+	expect(input.messages[1]).toMatchObject({ role: "assistant" });
 	expect(input.messages[1]!.content).toContain(`VALUE=${cacheMarker}`);
+	expect(input.messages.at(-2)!.role).toBe("assistant");
+	expect(input.messages.at(-1)!.content).toStartWith("## State\n");
+	expect(input.messages.at(-1)!.content).toContain("\n\n## User\n");
+	expect(input.sections.recent).toBeGreaterThan(input.sections.last);
 });
 
 test("reference validation rejects stale values and invalid JSON shapes", () => {
@@ -54,11 +51,12 @@ test("reference validation rejects stale values and invalid JSON shapes", () => 
 
 test("a background update must change the reference answer, so stale input cannot pass", () => {
 	const updated = cacheInput(14000, cacheUpdatedMarker, "追加の一行");
-	const text = updated.messages[1]!.content;
-	expect(text).toContain(`VALUE=${cacheUpdatedMarker}`);
-	expect(text).not.toContain(`VALUE=${cacheMarker}`);
-	expect(text).toContain("追加の一行");
-	// The system part and the end of the log are the same; the change starts at the log's first event.
+	expect(updated.messages[1]!.content).toContain(`VALUE=${cacheUpdatedMarker}`);
+	expect(JSON.stringify(updated.messages)).not.toContain(
+		`VALUE=${cacheMarker}`,
+	);
+	expect(updated.messages.at(-1)!.content).toContain("- 追加の一行");
+	// The system part is the same; the change starts at the recent conversation's first utterance.
 	const original = cacheInput();
 	expect(updated.messages[0]).toEqual(original.messages[0]!);
 	expect(updated.messages[1]!.content.indexOf("VALUE=")).toBe(

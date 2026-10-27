@@ -2,7 +2,7 @@ import { jstSeconds } from "../../../infrastructure/jst-time";
 import type { Database } from "bun:sqlite";
 import type { ToolchainCard } from "../../capabilities";
 import type { DialogueDeps } from "./context";
-import type { PendingConfirmation, TodoItem } from "./context-document";
+import type { PendingConfirmation, TodoItem } from "./work-items";
 import { forgetWorkResources, workLinksOf } from "../repository/resources";
 import { recordWorkLinksInTransaction } from "./work-links";
 import {
@@ -17,6 +17,7 @@ import {
 	openConfirmations,
 	openWork,
 	recentToolchains,
+	recentlyArchivedWork,
 	requestArchive,
 	updateWork,
 	useConfirmation,
@@ -27,6 +28,7 @@ import {
 	workBySource,
 	workOfRun,
 	workPage,
+	workReportedBy,
 	workRefs,
 	type ConfirmationRow,
 	type WorkOutcome,
@@ -165,6 +167,22 @@ function recordReportLinks(
 		);
 }
 
+/** What `## State` reads of the TODOs already reported (the conversation input specification, section 7.1). */
+const reportedViews = {
+	/** The TODOs archived since `since` (an ISO time), with their links: what `## State` names as reported. */
+	recentlyArchivedInTransaction(
+		db: Database,
+		conversationId: string,
+		since: string,
+		limit: number,
+	): TodoItem[] {
+		return itemsOf(db, recentlyArchivedWork(db, conversationId, since, limit));
+	},
+	/** The TODOs a run's reply reported (its archive was asked as `run:<id>`). */
+	reportedByRunInTransaction: (db: Database, runId: string) =>
+		workReportedBy(db, `run:${runId}`),
+};
+
 /**
  * The conversation's TODO ledger: a TODO per piece of work handed to a toolchain, its state as the work's owner
  * reports it, each reported question or result as an event of the log, the archive in two steps (request, then the
@@ -216,6 +234,7 @@ export function createWorkLedger(
 		todosInTransaction(db: Database, conversationId: string): TodoItem[] {
 			return itemsOf(db, openWork(db, conversationId));
 		},
+		...reportedViews,
 		/** The unarchived TODOs' revisions: what the work tool checks an operation against. */
 		todoRevisionsInTransaction: (db: Database, conversationId: string) =>
 			openWork(db, conversationId).map((row) => ({
@@ -343,10 +362,9 @@ export function createWorkLedger(
 			return next;
 		},
 		/** The agent's check: the TODO as it is now (its result is the check's answer). */
+		/** A TODO read again: an archived one too, whose report `## State` still points to. */
 		checkInTransaction(db: Database, workId: string): WorkRow | null {
-			const row = workById(db, workId);
-			if (!row || row.archivedAt) return null;
-			return row;
+			return workById(db, workId);
 		},
 		/** The agent amended the request: the revision moves on. */
 		amendInTransaction(

@@ -256,6 +256,18 @@ test("HTTP400 is readable by the host and not retried; invalid length never post
 	).rejects.toThrow("music_duration_exceeded");
 	expect(invalid.calls.some((c) => c.method === "POST")).toBe(false);
 });
+for (const status of [500, 503])
+	test(`music HTTP${status} fails without polling or resubmitting`, async () => {
+		const { g, calls } = gateway([], { postStatus: status });
+		await expect(
+			g.execute(target, cases[0]!, AbortSignal.timeout(1000), async () => {}),
+		).rejects.toThrow("generation_unknown");
+		expect(calls.filter((c) => c.method === "POST")).toHaveLength(1);
+		expect(calls.map((c) => c.path)).toEqual([
+			"/v1/music/providers",
+			target.endpoint,
+		]);
+	});
 test("a late 202 after local cancellation sends DELETE and never fetches audio", async () => {
 	const c = new AbortController();
 	const { g, calls } = gateway(["completed"], { cancelLate: c });

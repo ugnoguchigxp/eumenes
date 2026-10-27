@@ -73,8 +73,62 @@ test("a stale source conflict is displayed and the user can explicitly try again
 		);
 		expect(dispatch).toHaveBeenCalledTimes(1);
 		await act(async () => button.click());
-		expect(container.querySelector('[role="alert"]')).toBeNull();
+		expect(
+			container.querySelector('[role="alert"]')?.textContent ?? null,
+		).toBeNull();
 		expect(dispatch).toHaveBeenCalledTimes(2);
+	} finally {
+		await act(async () => root.unmount());
+		container.remove();
+	}
+});
+
+test("a late open rejection does not leak into the launcher after its connection changes", async () => {
+	const pending = Promise.withResolvers<{
+		status: "rejected";
+		message: string;
+	}>();
+	const container = document.createElement("div");
+	const root = createRoot(container);
+	document.body.append(container);
+	const show = async (revision: number, available: boolean) =>
+		act(async () =>
+			root.render(
+				<ArtifactRuntimeContext.Provider
+					value={{
+						snapshot: {
+							launcher: {
+								kind: "external-app-launcher",
+								revision,
+								available,
+								busy: false,
+								preparing: !available,
+							},
+						},
+						dispatch: () => pending.promise,
+					}}
+				>
+					<ExternalAppLauncherView
+						request={{
+							view: "external-app-launcher",
+							source: "launcher",
+							title: "開く",
+						}}
+					/>
+				</ArtifactRuntimeContext.Provider>,
+			),
+		);
+	try {
+		await show(1, true);
+		await act(async () => container.querySelector("button")!.click());
+		await show(2, false);
+		await act(async () => {
+			pending.resolve({ status: "rejected", message: "古い接続の取消" });
+		});
+		await show(2, true);
+		expect(
+			container.querySelector('[role="alert"]')?.textContent ?? null,
+		).toBeNull();
 	} finally {
 		await act(async () => root.unmount());
 		container.remove();

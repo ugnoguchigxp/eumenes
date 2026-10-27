@@ -20,7 +20,7 @@ eumenes://<kind>/<id>[?action=open|play|read]
 
 | 読み手 | 見せ方 |
 | --- | --- |
-| 会話エージェント | 番号 `a<n>` だけ（`<state>` の `a` 行、`<now>` の `viewing`）。URI と ID は見せない |
+| 会話エージェント | 番号 `a<n>` だけ（`## State` の仕事の行と提示中の行）。URI と ID は見せない |
 | agency | 見せない。`HostTodo` の `title`（`[担当名] 依頼文`）と `nextActions`（種類の操作の言葉）で種類を伝える |
 | サブエージェント | `RESOURCES` 区画に URI・種類・表示名・要約。`resource.read` で読み、作ったものを `finish.links` に書く |
 | Web | URI（吹き出しのチップ、Markdown の `eumenes://` リンク、画面への指示） |

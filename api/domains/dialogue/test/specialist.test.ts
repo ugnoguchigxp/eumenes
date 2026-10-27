@@ -46,8 +46,9 @@ async function startDirty(
 	return h.ask(request);
 }
 /** The reference record of the main model's nth call's `<now>`, by source. */
-const record = (h: Harness, call: number, source: string) =>
-	h.records(call).find((r) => r.source === source);
+/** The `## State` line of the nth conversation call that starts with `head`. */
+const stateLine = (h: Harness, call: number, head: string) =>
+	h.stateOf(call).find((line) => line.startsWith(head));
 
 test("a session starts from the conversation's delegate, then talks directly: no conversation model call for the utterances after it", async () => {
 	const h = await harness();
@@ -179,20 +180,13 @@ test("returning: unsaved work is suspended and the conversation agent takes over
 	const asked = await h.ask("今日の天気は？");
 	expect(asked.specialistSessionId).toBeNull();
 	expect(asked.status).toBe("completed");
-	const work = record(h, h.state.calls.length - 1, "specialist.work");
-	expect(work!.data.suspended).toMatchObject({
-		specialist: "制作担当",
-		toolchainId: "fake.studio",
-		label: "アンケート",
-		unsaved: true,
-	});
-	// The conversation agent knows the course of the specialist dialogue from the log (6.8).
-	// A user line of the log: `利用者: <text>` or `利用者（担当へ）: <text>` (the layout specification, section 4.3).
-	const log = h.section(h.state.calls.length - 1, "log");
-	for (const text of ["アンケートを作って", "会話に戻って"])
-		expect(
-			log.some((line) => new RegExp(`利用者[^:]*: ${text}$`).test(line)),
-		).toBe(true);
+	const call = h.state.calls.length - 1;
+	expect(stateLine(h, call, "- 担当との作業 制作担当")).toMatch(
+		/^- 担当との作業 制作担当「アンケート」保留中（未保存、/,
+	);
+	// The conversation shows its own hand-over; the words said to the specialist are the specialist's, not its.
+	expect(h.inputOf(call)).toContain("担当に引き継ぎます。");
+	expect(h.inputOf(call)).not.toContain("会話に戻って");
 });
 
 test("returning a clean work ends the session once and tells the conversation agent once", async () => {
@@ -208,14 +202,11 @@ test("returning a clean work ends the session once and tells the conversation ag
 	h.state.steps.push({ text: "はい" }, { text: "はい" });
 	await h.ask("こんにちは");
 	expect(
-		record(h, h.state.calls.length - 1, "specialist.work")!.data.ended,
-	).toMatchObject({
-		specialist: "制作担当",
-		reason: "returned",
-	});
+		stateLine(h, h.state.calls.length - 1, "- 担当との作業 制作担当"),
+	).toMatch(/終了（returned）$/);
 	await h.ask("もう一度");
 	expect(
-		record(h, h.state.calls.length - 1, "specialist.work"),
+		stateLine(h, h.state.calls.length - 1, "- 担当との作業"),
 	).toBeUndefined();
 });
 
@@ -238,12 +229,11 @@ test("a request outside the specialist's scope is forwarded to the conversation 
 	expect(done.specialistSessionId).toBeNull();
 	expect(h.blocked()).not.toContain(done.inputMessageId);
 	const call = h.state.calls.length - 1;
-	expect(h.state.calls[call]!.messages.at(-1)!.content).toBe(
-		"明日の天気を教えて",
-	);
-	expect(record(h, call, "specialist.handoff")!.text).toContain(
-		'"work":"suspended"',
-	);
+	expect(h.userOf(call)).toBe("明日の天気を教えて");
+	expect(
+		stateLine(h, call, "- 担当 制作担当 が今回の発言を担当の外として戻した"),
+	).toBeDefined();
+	expect(stateLine(h, call, "- 担当との作業 制作担当")).toContain("保留中");
 	expect((await h.session())!.state).toBe("suspended");
 	// Sending the same request again returns the same run and does not deliver it twice.
 	const calls = h.state.calls.length;
@@ -265,7 +255,7 @@ test("a label longer than the old payload limit still reaches the conversation a
 	const forwarded = await h.ask("明日の天気を教えて");
 	expect(forwarded.status).toBe("completed");
 	expect(
-		record(h, h.state.calls.length - 1, "specialist.handoff")!.text,
+		stateLine(h, h.state.calls.length - 1, "- 担当 制作担当 が今回の発言"),
 	).toContain(title);
 });
 
@@ -375,31 +365,26 @@ test("a saved item starts the session from it; the search offers exactly the iss
 	await h.ask("これは何？", {
 		viewing: { artifactRevisionId: STUDIO_ARTIFACT, targetRef: "item-1" },
 	});
-	const shown = record(h, 0, "specialist.viewing");
-	expect(shown!.data).toMatchObject({
-		ref: "item-1",
-		toolchainId: "fake.studio",
-	});
+	expect(stateLine(h, 0, "- 制作担当「")).toMatch(
+		/（画面に表示中、target item-1）$/,
+	);
 	h.state.steps.push({ text: "見えません" });
 	await h.ask("あれは？", {
 		viewing: { artifactRevisionId: STUDIO_ARTIFACT, targetRef: "item-9" },
 	});
-	expect(record(h, 1, "specialist.viewing")).toBeUndefined();
+	expect(stateLine(h, 1, "- 制作担当「")).toBeUndefined();
 	h.handOver({ request: "これを直して", target: "item-1" });
 	h.state.specialist.push(reply("開きました"));
 	await h.ask("これを直して");
 	// The search result lists the studio's issued items as its targets.
-	const found = JSON.parse(
-		h.state.calls[3]!.messages.filter((m) => m.role === "tool").at(-1)!.content,
-	) as {
-		candidates: Array<{ id: string; targets?: Array<{ ref: string }> }>;
-	};
+	const found = h.state.calls[3]!.messages.filter((m) => m.role === "tool")
+		.at(-1)!
+		.content.split("\n");
+	const line = (id: string) => found.find((l) => l.startsWith(`- ${id}: `))!;
 	expect(
-		found.candidates
-			.find((c) => c.id === STUDIO.id)!
-			.targets!.map((t) => t.ref),
+		[...line(STUDIO.id).matchAll(/(item-\d)「/g)].map((m) => m[1]),
 	).toEqual(["item-1", "item-2"]);
-	expect(found.candidates.find((c) => c.id === OTHER.id)!.targets).toEqual([]);
+	expect(line(OTHER.id)).not.toContain("target:");
 	expect(await h.session()).toMatchObject({ label: "保存済み item-1" });
 	expect(h.work()[0]!.savedRef).toBe("item-1");
 });

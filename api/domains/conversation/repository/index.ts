@@ -1,3 +1,4 @@
+import { inputMigration, inputMemoryDigestMigration } from "./input";
 import {
 	attributionMigration,
 	readAttribution,
@@ -711,4 +712,6 @@ export const migrations: readonly Migration[] = [
 		after: ["conversation/0008-neutral-delivery-source"],
 	},
 	attributionMigration,
+	inputMigration,
+	inputMemoryDigestMigration,
 ];

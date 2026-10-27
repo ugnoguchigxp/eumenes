@@ -1,7 +1,6 @@
 import type { ConversationEvent } from "../../../continuity";
-import { decisionsOfMessages } from "../../repository";
-import { type LabelTable, type LoadedEvent, isRecord } from "../context";
-import type { ApplyResult, StepEnv } from "../types";
+import type { LabelTable, LoadedEvent } from "../context";
+import type { StepEnv } from "../types";
 
 /**
  * The handled events the memory reflection still has to read, oldest first. Events that carry nothing to learn
@@ -45,43 +44,9 @@ export function eventLabel(event: LoadedEvent, index: number): string {
 	return event.seq === null ? `x${index + 1}` : `e${event.seq}`;
 }
 
-/** What the curate step saved from these messages (the steps after it read it as context). */
-export function curatedOf(
-	env: StepEnv,
-	messageIds: readonly string[],
-): Array<Record<string, unknown>> {
-	const out: Array<Record<string, unknown>> = [];
-	for (const decision of decisionsOfMessages(
-		env.db,
-		env.conversationId,
-		"curate-memory",
-		messageIds,
-		3,
-	)) {
-		const output = decision.output;
-		if (!isRecord(output)) continue;
-		for (const section of ["remember", "update"] as const) {
-			const list = output[section];
-			if (!Array.isArray(list)) continue;
-			for (const entry of list)
-				if (isRecord(entry) && typeof entry.text === "string")
-					out.push({
-						kind: typeof entry.kind === "string" ? entry.kind : "update",
-						text: entry.text,
-					});
-		}
-	}
-	return out.slice(0, 12);
-}
-
 /** The messages a label table stands on. */
 export function allMessageIds(table: LabelTable): string[] {
 	return Object.values(table)
 		.map((entry) => entry.messageId)
 		.filter((id): id is string => id !== null);
-}
-
-/** Decision references to messages (a forget of any of them finds the decision). */
-export function messageRefs(ids: Iterable<string>): ApplyResult["refs"] {
-	return [...new Set(ids)].map((id) => ({ type: "message" as const, id }));
 }

@@ -17,6 +17,7 @@ export { registerInference } from "./controller";
 export type {
 	CallSession,
 	InferencePort,
+	Messages,
 	Receipt,
 	SpeechOverride,
 	Usage,

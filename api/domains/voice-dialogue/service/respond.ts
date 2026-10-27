@@ -77,15 +77,19 @@ export function createVoiceResponder({
 		let speech: Speech | undefined;
 		let preparation: SpeechPreparation | undefined;
 		let unsubscribe = () => {};
+		let unsubscribeBody = () => {};
+		let detachBody = () => {};
+		let generationId: string | undefined;
 		let streamError: unknown;
 		let sourcePrefix = "";
+		let bodyPrefix = "";
 		let announcement = "";
-		const append = (body: string, final = false, flush = false) => {
-			const text = announcement ? `${announcement}\n${body}` : body;
-			if (!text.startsWith(sourcePrefix))
+		const append = (body: string, final = false) => {
+			if (!body.startsWith(bodyPrefix))
 				throw new Error("speech_stream_diverged");
-			sourcePrefix = text;
-			speech!.append(spokenPrefix(text, final || flush), final, flush);
+			sourcePrefix += body.slice(bodyPrefix.length);
+			bodyPrefix = body;
+			speech!.append(spokenPrefix(sourcePrefix, final), final);
 		};
 		try {
 			if (autoSpeak) {
@@ -113,6 +117,38 @@ export function createVoiceResponder({
 					preparation,
 				);
 				log.info("voice.synthesis_started", { runId: run.id });
+				unsubscribeBody = dialogue.subscribeAnswerStream(run.id, (body) => {
+					if (controller.signal.aborted || speechController.signal.aborted)
+						return;
+					try {
+						if (generationId !== body.generationId) {
+							detachBody();
+							generationId = body.generationId;
+							// Freeze the prepared input's conversation once for this generation.
+							preparation!.context =
+								dialogue.answerContext(run.id) ?? preparation!.context;
+							const revoke = () => {
+								streamError =
+									body.signal.reason ?? new Error("generation_cancelled");
+								speechController.abort(streamError);
+								audio.delete(turn.utteranceId);
+							};
+							body.signal.addEventListener("abort", revoke, { once: true });
+							detachBody = () =>
+								body.signal.removeEventListener("abort", revoke);
+							if (body.signal.aborted) return revoke();
+						}
+						preparation!.context = {
+							...preparation!.context!,
+							answer: spokenText(body.text),
+						};
+						append(body.text);
+					} catch (error) {
+						streamError = error;
+						speechController.abort(error);
+						audio.delete(turn.utteranceId);
+					}
+				});
 				unsubscribe =
 					dialogue.subscribeProgress?.(run.id, (progress) => {
 						if (controller.signal.aborted || speechController.signal.aborted)
@@ -126,16 +162,18 @@ export function createVoiceResponder({
 						}
 						const newNotice =
 							!!progress.announcement && progress.announcement !== announcement;
-						if (progress.announcement) announcement = progress.announcement;
 						if (progress.status !== "running" && progress.status !== "queued")
 							return;
-						if (!progress.text && !announcement) return;
+						if (!newNotice) return;
+						announcement = progress.announcement!;
 						try {
+							// A tool notice may follow a preamble that was already streamed.
+							sourcePrefix += `${sourcePrefix ? "\n" : ""}${announcement}\n`;
 							preparation!.context = {
 								...(dialogue.answerContext?.(run.id) ?? preparation!.context!),
-								answer: spokenText(progress.text),
+								answer: spokenText(sourcePrefix),
 							};
-							append(progress.text, false, newNotice);
+							speech!.append(spokenPrefix(sourcePrefix, true), false, true);
 						} catch (error) {
 							streamError = error;
 							speechController.abort();
@@ -147,19 +185,20 @@ export function createVoiceResponder({
 					? Math.max(0, Date.parse(deadlineAt) - Date.now()) + 10_000
 					: undefined;
 			let final = await dialogue.waitForTerminal(run.id, {
-				signal: controller.signal,
+				signal: AbortSignal.any([controller.signal, speechController.signal]),
 				timeoutMs: waitFor(run.deadlineAt),
 			});
 			// A toolchain with its own run time moved the deadline later meanwhile: keep waiting until that one.
 			while (
 				!controller.signal.aborted &&
+				!speechController.signal.aborted &&
 				final &&
 				["queued", "running"].includes(final.status) &&
 				final.deadlineAt &&
 				Date.parse(final.deadlineAt) + 10_000 > Date.now()
 			)
 				final = await dialogue.waitForTerminal(run.id, {
-					signal: controller.signal,
+					signal: AbortSignal.any([controller.signal, speechController.signal]),
 					timeoutMs: waitFor(final.deadlineAt),
 				});
 			if (controller.signal.aborted) return;
@@ -205,7 +244,7 @@ export function createVoiceResponder({
 			};
 			announcement = final.announcement ?? announcement;
 			// Work that runs on its own answers with its announcement, which was already spoken.
-			append(answer === announcement ? "" : answer, true);
+			append(answer === announcement ? bodyPrefix : answer, true);
 			await speech.work;
 			if (controller.signal.aborted) return;
 			if (speech.error) throw speech.error;
@@ -218,6 +257,16 @@ export function createVoiceResponder({
 					runId: run.id,
 					count: speech.skipped,
 				});
+			// All streamed clauses may have played before adoption created the answer's receipt.
+			if (!speech.chunks.size && speech.played.length)
+				await store.write((db) =>
+					dialogue.recordHeardInTransaction(
+						db,
+						run.id,
+						speech!.skipped > 0 ? "partial" : "full",
+						speech!.played.map((part) => part.text).join(""),
+					),
+				);
 			await advance(turn.utteranceId, speech.chunks.size ? "ready" : "played");
 			if (!speech.chunks.size) audio.delete(turn.utteranceId);
 		} catch (error) {
@@ -230,7 +279,7 @@ export function createVoiceResponder({
 						db,
 						run.id,
 						played.length ? "partial" : "none",
-						played.join(""),
+						played.map((part) => part.text).join(""),
 					),
 				)
 				.catch(() => undefined);
@@ -238,6 +287,8 @@ export function createVoiceResponder({
 			throw error;
 		} finally {
 			unsubscribe();
+			unsubscribeBody();
+			detachBody();
 			controller.signal.removeEventListener("abort", stopSpeech);
 			if (controller.signal.aborted) {
 				speechController.abort();

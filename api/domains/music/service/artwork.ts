@@ -2,6 +2,7 @@ import type { Database } from "bun:sqlite";
 import { z } from "zod";
 import type { HandlerDefinition } from "../../queue";
 import { findServiceTarget, type TestOutput } from "../../larm";
+import { MEDIA_GENERATION_TIMEOUT_MS } from "../../capabilities";
 import type { MusicRecord } from "../contracts";
 import { row, record, patch, media } from "../repository";
 import type { createMusic } from "./index";
@@ -153,7 +154,7 @@ export function createArtwork(deps: Parameters<typeof createMusic>[0]) {
 					lane: "interactive",
 					resourceKey: "image.generate",
 					maxAttempts: 1,
-					deadlineAtMs: Date.now() + 180000,
+					deadlineAtMs: Date.now() + MEDIA_GENERATION_TIMEOUT_MS,
 				});
 				return patch(db, id, {
 					artwork: { state: "generating", revision, errorCode: null },

@@ -6,10 +6,9 @@ import {
 } from "../../tool-runtime";
 import type { SelectionOutcome } from "../../toolchain-history";
 import type { Run } from "../contracts";
-import { estimateTextTokens } from "../../../infrastructure/context-budget";
-import { eventLine } from "./context-document";
-import { eventFields } from "./event-fields";
 import { researchCitations } from "./research-citations";
+import { resultText } from "./result-text";
+import { madeOf } from "./state-text";
 import type { DialogueDeps, GenerateInput, GeneratePayload } from "./context";
 import type { WorkOutcome, WorkRow } from "../repository/work";
 
@@ -231,8 +230,8 @@ function taskNotice(
 
 /**
  * Right before the model speaks of a result, an operation's result is read again (a cancel after the report shows
- * at once): a changed result overwrites its TODO, joins the log as a new result event, and its line is added at the
- * end of the document's `<log>`. The rest of the prepared prompt stays as it was.
+ * at once): a changed result overwrites its TODO, and its text in the host notice of the last message is drawn
+ * again. The rest of the prepared prompt stays as it was.
  */
 export async function refreshActionResults(
 	deps: DialogueDeps,
@@ -250,16 +249,25 @@ export async function refreshActionResults(
 				return input.agent!;
 			}
 		});
-	const todoIds = input.trigger.flatMap((trigger) =>
-		trigger.kind === "todo_changed" && Array.isArray(trigger.todos)
-			? (trigger.todos as Array<{ id?: unknown }>).flatMap((todo) =>
-					typeof todo.id === "string" ? [todo.id] : [],
-				)
-			: [],
-	);
+	const todoIds = input.shown.todos;
 	if (!ledger || !agents || todoIds.length === 0) return;
-	const lines = await deps.store.write((tx) => {
-		const reported = new Set<string>();
+	const redrawn = await deps.store.write((tx) => {
+		const refs = ledger.refsInTransaction(tx, input.conversationId);
+		const text = (row: WorkRow) =>
+			resultText({
+				ref: refs.todo(row.id) ?? "t?",
+				title: row.title,
+				status: row.status,
+				...(row.outcome ? { outcome: row.outcome } : {}),
+				...(row.question ? { question: row.question } : {}),
+				result: row.result,
+				made: ledger
+					.todosInTransaction(tx, input.conversationId)
+					.filter((todo) => todo.id === row.id)
+					.flatMap((todo) => madeOf(todo, refs)),
+				resource: refs.resource,
+			}).text;
+		const changes: Array<{ before: string; after: string }> = [];
 		for (const id of todoIds) {
 			const row = ledger.workInTransaction(tx, id);
 			if (!row || row.status !== "done" || row.archivedAt) continue;
@@ -271,39 +279,21 @@ export async function refreshActionResults(
 				continue;
 			}
 			if (!payload || payload === JSON.stringify(row.result)) continue;
+			const before = text(row);
 			ledger.reportInTransaction(tx, row.id, {
 				status: "done",
 				outcome: row.outcome ?? "succeeded",
 				result: JSON.parse(payload) as unknown,
 			});
-			reported.add(row.id);
+			changes.push({ before, after: text(ledger.workInTransaction(tx, id)!) });
 		}
-		if (reported.size === 0) return [];
-		const refs = ledger.refsInTransaction(tx, input.conversationId);
-		return deps.continuity.events
-			.logInTransaction(tx, input.conversationId)
-			.filter((event) => {
-				if (event.seq <= input.lastSeq || event.type !== "acted") return false;
-				const fields = eventFields(event);
-				return (
-					fields.action === "work.result" && reported.has(String(fields.todo))
-				);
-			})
-			.flatMap((event) => eventLine(event, refs) ?? []);
+		return changes;
 	});
-	if (lines.length === 0) return;
-	const before = input.document.sections.log.text;
-	const after = before.replace(
-		/\n<\/log>$/,
-		() => `\n${lines.join("\n")}\n</log>`,
-	);
-	const document = input.messages[1]!;
+	const last = [...input.messages].reverse().find((m) => m.role === "user");
+	if (!last) return;
 	// A replacer function: the result text is external, and `$` patterns in a replacement string would be expanded.
-	document.content = document.content.replace(before, () => after);
-	input.document.sections.log = {
-		text: after,
-		tokens: estimateTextTokens(after),
-	};
+	for (const { before, after } of redrawn)
+		last.content = last.content.replace(before, () => after);
 }
 
 /**

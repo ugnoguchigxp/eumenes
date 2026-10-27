@@ -170,7 +170,7 @@ workerは共通補正の拒否分類を `agent.control_rejected.validationCode` 
 | `voice-dialogue / input_control` | ASR後の言語・継続関係・入力完了判定。ASR自体と区別する |
 | `inference.prepared` | 推論試行開始からProvider呼出し直前まで。TTSでは言語分類・態度準備等を含む |
 | `dialogue.body_policy` | 今回の生成が `held`（採用待ち）か `streamed` か。内容や保持理由の詳細は出さない |
-| `dialogue.first_delta` | 生成処理開始から最初の非空本文を受け取るまで。`held` は公開していない。修正を挟む場合もその生成処理の最初の一回 |
+| `dialogue.first_delta` | 生成処理開始から最初の非空本文を受け取るまで。`streamed` は生成中の本文通知、旧記録の `held` は公開前の保持を示す。生成処理ごとの最初の一回で、合成・再生完了や回答採用の時刻ではない |
 | `voice.first_chunk_ready` | 合成処理作成から、最初の音声チャンクを採用・公開するまで。最初の試行が失敗しても最初に成功したチャンクで一回 |
 
 `larm.llm_timing.ttftMs` は従来どおり、接続確保後の計数等を含む最初の非空本文までの時間です。追加した `providerTtftMs` は計数完了後、生成要求の送信直前から最初の非空本文まで。通信、Provider内部待ち、応答ヘッダー後のexchange記録待ちを含むため、純粋なprefill時間ではありません。非streamのcontrol要求には本文TTFTを付けません。`totalMs` も単調増加時計に変更しています。

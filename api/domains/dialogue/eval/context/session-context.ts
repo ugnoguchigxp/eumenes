@@ -7,7 +7,6 @@ import { jstSeconds } from "../../../../infrastructure/jst-time";
 import type { ToolchainCard } from "../../../capabilities";
 import type { InferencePort } from "../../../inference";
 import type { QueueService } from "../../../queue";
-import type { ContextGoalEntry } from "../../contracts";
 import type { DialogueDeps } from "../../service/context";
 import { createPrepare } from "../../service/generation-prepare";
 import { createWorkLedger } from "../../service/work-ledger";
@@ -47,9 +46,7 @@ export function createSessionContext(
 			userName: "",
 			persona: "butler",
 		} as Persona,
-		goals: [] as ContextGoalEntry[],
 		worldNames: [] as string[],
-		interests: [] as string[],
 	};
 	let ids = 0;
 	let messages = 0;
@@ -98,15 +95,8 @@ export function createSessionContext(
 					runtime: { binding: { available: true } },
 				})),
 		} as unknown as NonNullable<DialogueDeps["toolchains"]>,
-		goals: {
-			adoptedForContextInTransaction: () => ports.goals,
-			existingInTransaction: () => new Set(ports.goals.map((g) => g.goalId)),
-		},
 		conversationAgent: evalConversationAgent,
-		agency: {
-			stateForContextInTransaction: () => ports.interests,
-			workChangedInTransaction: () => {},
-		},
+		agency: { workChangedInTransaction: () => {} },
 		worldContext: {
 			knownNamesInTransaction: () => ports.worldNames,
 		},

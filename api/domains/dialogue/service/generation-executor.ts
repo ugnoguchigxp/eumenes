@@ -22,21 +22,11 @@ export async function memory(
 	const { deps, input, current, acted, handle, actionKey } = x;
 	const { store } = deps;
 	if (args.operation === "read") {
-		// The model names the items `<memory>` shows by their numbers (`p<n>`); it never sees their ids.
-		const profileIds = input.document.profileIds;
-		const numberOf = new Map(profileIds.map((id, i) => [id, `p${i + 1}`]));
-		const itemIds = (args.itemIds ?? []).flatMap((ref) => {
-			const n = /^p(\d+)$/.exec(ref);
-			const id = n ? profileIds[Number(n[1]) - 1] : undefined;
-			return id ? [id] : [];
-		});
 		return store.write((tx) => {
 			current(tx);
 			const items = deps.memory?.readItemsInTransaction(tx, {
-				...(args.query ? { query: args.query } : {}),
-				...(itemIds.length ? { itemIds } : {}),
-				// Only what `<memory>` shows is read back by number; a memory still waiting comes back whole.
-				shown: new Set(profileIds),
+				query: args.query,
+				shown: new Set(input.memoryItemIds),
 				limit: MEMORY_READ_LIMIT,
 			});
 			if (!items) return { result: { available: false } };
@@ -49,11 +39,7 @@ export async function memory(
 			);
 			return {
 				result: {
-					items: items.map(({ id, revision: _revision, ...item }) =>
-						item.inProfile
-							? { item: numberOf.get(String(id)) ?? null, inProfile: true }
-							: item,
-					),
+					items: items.map(({ id: _id, revision: _revision, ...item }) => item),
 				},
 			};
 		});

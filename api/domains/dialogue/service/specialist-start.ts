@@ -84,13 +84,7 @@ function askToResolve(
 	label: string,
 	incoming: { title: string; targetRef: string | null },
 ) {
-	const note = `${SWITCH_NOTE} 現在の作業=${JSON.stringify({
-		specialist: live.title,
-		label,
-	})} 切替先=${JSON.stringify({
-		specialist: incoming.title,
-		targetRef: incoming.targetRef,
-	})}`;
+	const note = `${SWITCH_NOTE}\n今の作業: ${live.title}「${label}」\n切替先: ${incoming.title}${incoming.targetRef ? `（target ${incoming.targetRef}）` : ""}`;
 	const { job } = deps.queue.enqueueInTransaction(tx, {
 		scope: "dialogue",
 		kind: GENERATE_KIND,

@@ -3,14 +3,13 @@ import { getLogger } from "../../../infrastructure/logger";
 import { jstSeconds } from "../../../infrastructure/jst-time";
 import { estimateTextTokens } from "../../../infrastructure/context-budget";
 import type { ConversationService } from "../../conversation";
-import type { ContinuityService, EpisodeSegment } from "../../continuity";
+import type { ContinuityService } from "../../continuity";
 import {
 	deleteRetiredConversation,
 	dropRetiredLedger,
 	hasRetiredLedger,
 	retiredConversationIds,
 	retiredExchanges,
-	retiredSummary,
 	type RetiredExchange,
 } from "../repository";
 
@@ -42,12 +41,11 @@ function at(iso: string): string {
 const log = getLogger("memory");
 
 /**
- * The one-time move from the exchange ledger and the conversation summary of the earlier design to the continuity
- * event flow (the ContextWindow specification, sections 5.6 and 11.2). For each conversation that has retired
- * exchanges and no event yet: the recent exchanges (the kept ones, the ones the steward had not finished and the
- * newest two), oldest first, become logged `said` events; those the steward had finished count as handled, the
- * unfinished ones stay for the new steward to learn from. The summary becomes one shown episode part for the earlier
- * range unless a message it stands on is blocked. A handled conversation's retired rows are removed, and the retired
+ * The one-time move from the exchange ledger of the earlier design to the continuity event flow. For each
+ * conversation that has retired exchanges and no event yet: the recent exchanges (the kept ones, the ones the steward
+ * had not finished and the newest two), oldest first, become logged `said` events; those the steward had finished
+ * count as handled, the unfinished ones stay for the new steward to learn from. The old summary is not carried over
+ * (the conversation's input has no summaries). A handled conversation's retired rows are removed, and the retired
  * tables are dropped once none is left; a conversation that already has events is left alone with its rows (one
  * warning, no text), so its history is never lost.
  */
@@ -65,21 +63,19 @@ export function createBackfill(deps: {
 	function hasEvents(db: Database, conversationId: string): boolean {
 		return (
 			events.logInTransaction(db, conversationId).length > 0 ||
-			events.pendingInTransaction(db, conversationId).length > 0 ||
-			events.movedInTransaction(db, conversationId).length > 0
+			events.pendingInTransaction(db, conversationId).length > 0
 		);
 	}
 
 	function backfillConversation(db: Database, conversationId: string): number {
 		const all = retiredExchanges(db, conversationId);
-		const summary = retiredSummary(db, conversationId);
-		const blocked = deps.blocked(db, [
-			...all.flatMap((row) => [
+		const blocked = deps.blocked(
+			db,
+			all.flatMap((row) => [
 				row.inputMessageId,
 				...(row.answerMessageId ? [row.answerMessageId] : []),
 			]),
-			...(summary?.sources ?? []),
-		]);
+		);
 		const usable = all.filter(
 			(row) =>
 				!blocked.has(row.inputMessageId) &&
@@ -93,7 +89,6 @@ export function createBackfill(deps: {
 			row.state === "pending" ||
 			newest.has(row.inputMessageId);
 		const recent = usable.filter(isRecent);
-		const earlier = usable.filter((row) => !isRecent(row));
 		const limit = Math.max(1, Math.floor(deps.logCap() * EVENT_SHARE));
 		let appended = 0;
 		const seqs: number[] = [];
@@ -130,35 +125,6 @@ export function createBackfill(deps: {
 		}
 		if (seqs.length > 0)
 			events.markCuratedInTransaction(db, conversationId, seqs);
-		// A summary that stands on a blocked message would keep its content in the episode.
-		if (summary && !summary.sources.some((id) => blocked.has(id))) {
-			const sources = new Set(summary.sources);
-			const covered = earlier.filter((row) => sources.has(row.inputMessageId));
-			const messageIds = covered.flatMap((row) => [
-				row.inputMessageId,
-				...(row.answerMessageId ? [row.answerMessageId] : []),
-			]);
-			const times = messageIds
-				.map(
-					(id) => conversation.messageInTransaction(db, id)?.message.createdAt,
-				)
-				.filter((at): at is string => at !== undefined)
-				.sort();
-			if (summary.text.trim() !== "" && messageIds.length > 0) {
-				// There are no events for the range the summary covers; it sits before the first one (`seq` 0).
-				const part: EpisodeSegment = {
-					kind: "summary",
-					fromSeq: 0,
-					toSeq: 0,
-					fromAt: at(times[0] ?? summary.updatedAt),
-					toAt: at(times[times.length - 1] ?? summary.updatedAt),
-					count: messageIds.length,
-					text: summary.text,
-					messageIds,
-				};
-				events.writeEpisodeInTransaction(db, conversationId, "shown", [part]);
-			}
-		}
 		return appended;
 	}
 

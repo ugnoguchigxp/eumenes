@@ -333,19 +333,18 @@ describe("the conversation agent", () => {
 			.then((result) => ({ result, spoken, script }));
 	};
 
-	test("the system text is fixed by the settings: the interests and the spoken style, and the feeling rule only when the feeling is on", () => {
+	test("the system parts are fixed by the settings: the interests and the spoken style, and the feeling rule only when the feeling is on", () => {
 		const plain = harness({ settings: { interests: ["My Melody"] } });
 		const system = plain.host.conversationAgent.system();
-		expect(system).toContain("My Melody");
-		expect(system).not.toContain("【気持ちの絵文字】");
-		// The same settings give the same text, so the cached prefix holds.
-		expect(plain.host.conversationAgent.system()).toBe(system);
+		expect(system.persona).toContain("My Melody");
+		expect(system.spokenReplyStyle).toBeDefined();
+		expect(system.emotionRules).toBeUndefined();
+		// The same settings give the same parts, so the cached prefix holds.
+		expect(plain.host.conversationAgent.system()).toEqual(system);
 		const feeling = harness({
 			settings: { interests: ["My Melody"], emotion: true },
 		});
-		expect(feeling.host.conversationAgent.system()).toContain(
-			"【気持ちの絵文字】",
-		);
+		expect(feeling.host.conversationAgent.system().emotionRules).toBeDefined();
 	});
 
 	test("a reply is one model call that answers in plain text", async () => {

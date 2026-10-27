@@ -5,6 +5,7 @@ import {
 	until,
 	type Harness,
 } from "./command-interactions.fixture";
+import { toolFields } from "./tool-text.fixture";
 
 /**
  * A command toolchain's question is answered by the conversation's `work` tool (operation `answer`) or by the
@@ -21,7 +22,7 @@ function lastToolResult(): Record<string, unknown> {
 	const call = [...h!.calls]
 		.reverse()
 		.find((c) => c.messages.at(-1)?.role === "tool")!;
-	return JSON.parse(call.messages.at(-1)!.content) as Record<string, unknown>;
+	return toolFields(call.messages.at(-1)!.content);
 }
 
 /** The work call that answers a TODO by its number (`t<ref>`); the host takes the open question and its revision itself. */

@@ -325,7 +325,7 @@ test("at most eight events and 16 KB go into one step; the rest waits", async ()
 	expect(curated(h).every(Boolean)).toBe(true);
 });
 
-test("with the conversation's prefix, a step reading the conversation sends it first, then its own task, on the conversation's connection", async () => {
+test("a step reading the conversation runs on the conversation's prompt with its own task last, on the conversation's connection", async () => {
 	const tool = {
 		type: "function" as const,
 		function: {
@@ -341,7 +341,15 @@ test("with the conversation's prefix, a step reading the conversation sends it f
 		],
 		tools: [tool],
 	};
-	const h = await setupSteward({ conversationPrefix: () => prefix });
+	const h = await setupSteward({
+		conversationTask: (_db, _conversationId, task) => ({
+			messages: [
+				...prefix.messages,
+				{ role: "user" as const, content: `## Task\n${task}` },
+			],
+			tools: prefix.tools,
+		}),
+	});
 	harnesses.push(h);
 	h.inference.script("curate-memory", {
 		...empty,
@@ -351,9 +359,7 @@ test("with the conversation's prefix, a step reading the conversation sends it f
 	await h.drain();
 	const [call] = h.inference.callsOf("curate-memory");
 	expect(call!.messages.slice(0, 2)).toEqual(prefix.messages);
-	expect(call!.messages[2]!.content).toStartWith(
-		'<task name="curate-memory">\n',
-	);
+	expect(call!.messages[2]!.content).toStartWith("## Task\n");
 	expect(call!.messages[2]!.content).toContain("OUTPUT_SCHEMA=");
 	expect(call!.session).toEqual({
 		sessionRole: "auxiliary",

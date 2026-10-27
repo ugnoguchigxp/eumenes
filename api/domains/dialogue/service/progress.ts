@@ -1,18 +1,19 @@
 import { byId } from "../repository";
 import type { RunProgress } from "../contracts";
 import type { DialogueDeps } from "./context";
+import { createAnswerStreams } from "./answer-streams";
 
 /** Progress watchers and their commit-driven refresh. */
 export function createProgress(deps: DialogueDeps) {
 	const { store, conversation } = deps;
+	const streams = createAnswerStreams();
 	const watchers = new Map<string, Set<(value: RunProgress) => void>>();
 	const watchedStatuses = new Map<string, string>();
 	function progress(runId: string): RunProgress | null {
 		const run = store.read((db) => byId(db, runId));
 		if (!run) return null;
-		// The one place body text leaves this domain (SSE, subscribers, voice).
-		// The adoption receipt is the completed run with its answer message,
-		// written in the settle transaction; nothing else releases a body.
+		// Persisted progress (including SSE) exposes only the adopted answer. Backend speech consumers
+		// receive provisional text through the separate, generation-scoped in-memory stream.
 		const answer =
 			run.status === "completed" && run.answerMessageId
 				? conversation
@@ -40,12 +41,24 @@ export function createProgress(deps: DialogueDeps) {
 		}
 	}
 	const stopCommits = store.onCommit(() => {
+		for (const id of streams.runIds()) {
+			const run = store.read((db) => byId(db, id));
+			if (run?.status === "running" || run?.status === "queued") continue;
+			streams.retire(
+				id,
+				run?.status === "completed"
+					? undefined
+					: new Error(run?.error ?? "generation_cancelled"),
+			);
+		}
 		for (const id of watchers.keys()) {
 			const status = store.read((db) => byId(db, id))?.status;
 			if (status !== watchedStatuses.get(id)) publish(id);
 		}
 	});
 	return {
+		openAnswerStream: streams.open,
+		subscribeAnswerStream: streams.subscribe,
 		progress,
 		publish,
 		subscribeProgress(runId: string, listener: (value: RunProgress) => void) {
@@ -70,6 +83,7 @@ export function createProgress(deps: DialogueDeps) {
 		},
 		close() {
 			stopCommits();
+			streams.close();
 			watchers.clear();
 			watchedStatuses.clear();
 		},

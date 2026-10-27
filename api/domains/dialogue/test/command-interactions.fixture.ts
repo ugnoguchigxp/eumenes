@@ -1,4 +1,5 @@
 import { rmSync } from "node:fs";
+import { toolFields } from "./tool-text.fixture";
 import type { NativeToolCall } from "../../../infrastructure/chat-stream";
 import { waitFor } from "../../../infrastructure/wait-for";
 import type { ToolchainCard, ToolchainRuntimeMeta } from "../../capabilities";
@@ -66,7 +67,7 @@ function afterHandover(messages: ChatMessage[]): boolean {
 		.flatMap((m) => (m.role === "assistant" ? (m.tool_calls ?? []) : []))
 		.find((c) => c.id === last.tool_call_id);
 	if (!call) return false;
-	const result = JSON.parse(last.content) as Record<string, unknown>;
+	const result = toolFields(last.content);
 	if (call.function.name === "delegate") return result.delegated === true;
 	return (
 		call.function.name === "work" &&
@@ -401,7 +402,6 @@ export async function setup(
 	const dialogue = createDialogueService({
 		conversationAgent: testConversationAgent,
 		agency: {
-			stateForContextInTransaction: () => [],
 			workChangedInTransaction: (_db, conversationId) => {
 				workChanged.push(conversationId);
 			},

@@ -162,31 +162,11 @@ export interface WorldContextPort {
 }
 
 /**
- * The adopted goals as dialogue sees them (wired by the application, bound to the conversation's principal and
- * scopes). Dialogue knows no goals types: it renders what the port lists, in the order given.
- */
-export type ContextGoalEntry = {
-	goalId: string;
-	/** Higher is more important. */
-	priority: number;
-	desiredState: string;
-	revision: number;
-};
-export interface GoalsLayerPort {
-	/** Adopted goals, priority high first, then most recently revised. Read-only. */
-	adoptedForContextInTransaction(db: Database): ContextGoalEntry[];
-	/** Which of the given goals still exist (any status); an absent one was forgotten. Read-only. */
-	existingInTransaction(db: Database, goalIds: readonly string[]): Set<string>;
-}
-
-/**
  * What the conversation agent (eumenes-agency, wired by the application) keeps of itself, for its context: its
  * current interests, intents and what it means to say, as reference lines (never instructions), and its
  * opportunity when work changes.
  */
 export interface AgencyLayerPort {
-	/** Read-only. Empty when the agent holds nothing for this conversation. */
-	stateForContextInTransaction(db: Database, conversationId: string): string[];
 	/** A TODO of the conversation finished or asks the user something: the agent's opportunity to say so. */
 	workChangedInTransaction(db: Database, conversationId: string): void;
 }
@@ -213,9 +193,23 @@ export type AgentToolCall = { id: string; name: string; arguments: string };
  * The conversation agent (eumenes-agency, wired by the application): it answers every generation, using the
  * host's tools in its reply when the conversation calls for them. The host supplies the model call and the tools.
  */
+/** The agent's parts of the system message, by name and without headings; the host lays them out in its sections. */
+export interface ConversationAgentSystem {
+	/** The natural-conversation base (section Role). */
+	base: string;
+	/** The persona's interests as character traits (section Role); absent without interests. */
+	persona?: string;
+	/** The spoken reply style (section Speaking); absent for a reply that is not read aloud. */
+	spokenReplyStyle?: string;
+	/** The leading emoji rule (section Emotion); absent when the setting is off. */
+	emotionRules?: string;
+	/** The tool-use rules every host shares (section Tools). */
+	toolRules: string;
+}
+
 export interface ConversationAgentPort {
-	/** The agent's part of the system message; fixed by the settings, so the cached prefix holds. */
-	system(): string;
+	/** The agent's parts of the system message; fixed by the settings, so the cached prefix holds. */
+	system(): ConversationAgentSystem;
 	respond(input: {
 		messages: AgentMessage[];
 		chat: {

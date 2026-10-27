@@ -24,12 +24,15 @@ test("registered Docling chain runs its profile/Skill/tool and returns one launc
 	});
 	try {
 		const entries = (await (await h.request("/api/toolchain-artifacts")).json())
-			.artifacts as Array<{ artifactId: string }>;
+			.artifacts as Array<{ artifactId: string; title: string }>;
 		expect(
 			entries.filter((entry) => entry.artifactId === "docling.workspace"),
 		).toHaveLength(1);
+		expect(
+			entries.find((entry) => entry.artifactId === "docling.workspace")?.title,
+		).toBe("文章ナレッジベース管理");
 		const source = await h.request(
-			`/api/toolchain-artifacts/${encodeURIComponent("artifact:docling.workspace@1")}/sources/docling-launcher`,
+			`/api/toolchain-artifacts/${encodeURIComponent("artifact:docling.workspace@2")}/sources/docling-launcher`,
 		);
 		expect(source.status).toBe(200);
 		expect((await source.json()).data.configured).toBe(true);

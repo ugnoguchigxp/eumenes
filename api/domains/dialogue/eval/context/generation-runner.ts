@@ -65,29 +65,32 @@ export function rankCandidates(
 }
 
 type DocumentView = {
-	/** The TODO numbers `<state>` shows (`t<n>`) and their status words. */
+	/** The TODO numbers `## State` shows (`t<n>`) and their status words. */
 	todos: Array<{ id: string; status: string }>;
-	/** The confirmation numbers `<state>` shows (`c<n>`). */
+	/** The confirmation numbers `## State` shows (`c<n>`). */
 	confirmations: string[];
-	/** Each TODO's newest result line in `<log>`. */
+	/** Each TODO's result as the host notice shows it. */
 	resultText: Map<string, string>;
 };
 
-/** What the tools need to know of the window the model read: the TODOs, the confirmations, the results. */
+/** What the tools need to know of the input the model read: the TODOs, the confirmations, the results. */
 function viewOf(input: GenerateInput): DocumentView {
-	const state = input.document.sections.state.text.split("\n");
+	const last = input.messages.at(-1)?.content ?? "";
 	const resultText = new Map<string, string>();
-	for (const line of input.document.sections.log.text.split("\n")) {
-		const result = /^e\d+ \d\d:\d\d (?:結果|問い) (t\d+)/.exec(line);
+	for (const line of last.split("\n")) {
+		const result = /^(t\d+)「/.exec(line);
 		if (result) resultText.set(result[1]!, line);
 	}
+	const lines = last.split("\n");
 	return {
-		todos: state.flatMap((line) => {
-			const todo = /^(t\d+) (\S+)/.exec(line);
+		todos: lines.flatMap((line) => {
+			const todo = /^- (t\d+) .* (実行中|質問待ち|完了 未報告|報告済み)/.exec(
+				line,
+			);
 			return todo ? [{ id: todo[1]!, status: todo[2]! }] : [];
 		}),
-		confirmations: state.flatMap((line) => {
-			const confirmation = /^(c\d+) /.exec(line);
+		confirmations: lines.flatMap((line) => {
+			const confirmation = /^- (c\d+) 確認待ち/.exec(line);
 			return confirmation ? [confirmation[1]!] : [];
 		}),
 		resultText,

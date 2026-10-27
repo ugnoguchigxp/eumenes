@@ -109,6 +109,41 @@ test("same JSON transitions from generating to playable when authorized data upd
 	);
 	expect(screen.queryByText("楽曲を生成しています")).toBeNull();
 });
+test("a conversation-generated song populates the prompt and retains it through completion and reset", async () => {
+	const r = setup([], musicArtifactDefinition());
+	const prompt = await screen.findByRole("textbox", {
+		name: "音楽作成プロンプト",
+	});
+	const item = {
+		...record("a", "generating"),
+		prompt: "Gentle orchestral piano at dawn",
+	};
+	r.cache.setQueryData(["music", "list", "main"], [item]);
+	await waitFor(() =>
+		expect((prompt as HTMLTextAreaElement).value).toBe(item.prompt),
+	);
+	expect(screen.getByRole("textbox", { name: "音楽作成プロンプト" })).toBe(
+		prompt,
+	);
+	expect(r.api.musicAudio).not.toHaveBeenCalled();
+	r.cache.setQueryData(
+		["music", "list", "main"],
+		[{ ...item, state: "completed", updatedAt: 2 }],
+	);
+	await waitFor(() => expect(r.api.musicAudio).toHaveBeenCalled());
+	expect((prompt as HTMLTextAreaElement).value).toBe(item.prompt);
+	fireEvent.click(screen.getByRole("button", { name: "プロンプトをリセット" }));
+	r.cache.setQueryData(
+		["music", "list", "main"],
+		[{ ...item, state: "completed", updatedAt: 3 }],
+	);
+	expect((prompt as HTMLTextAreaElement).value).toBe("");
+	expect(
+		screen.getByRole("button", { name: "楽曲を生成" }).hasAttribute("disabled"),
+	).toBe(true);
+	fireEvent.click(screen.getByRole("button", { name: "編集内容に戻す" }));
+	expect((prompt as HTMLTextAreaElement).value).toBe(item.prompt);
+});
 test("failed generation does not request audio", async () => {
 	const result = setup([record("a", "failed")]);
 	await screen.findByRole("alert");

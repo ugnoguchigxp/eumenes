@@ -29,6 +29,8 @@ test("TODO artifact renders and pages in desktop and narrow layouts", async ({
 }) => {
 	const errors: string[] = [];
 	let empty = false;
+	const reads: Array<{ state: string; pageIndex: number; pageSize: number }> =
+		[];
 	page.on("pageerror", (error) => errors.push(error.message));
 	const baseTime = Date.UTC(2026, 9, 23, 22, 10);
 	const requests = [
@@ -45,6 +47,7 @@ test("TODO artifact renders and pages in desktop and narrow layouts", async ({
 			const { state, pageIndex, pageSize } = JSON.parse(
 				url.searchParams.get("params")!,
 			);
+			reads.push({ state, pageIndex, pageSize });
 			const counts = empty
 				? { todo: 0, done: 0, archived: 0 }
 				: { todo: 12, done: 3, archived: 28 };
@@ -91,10 +94,10 @@ test("TODO artifact renders and pages in desktop and narrow layouts", async ({
 				json: {
 					artifacts: [
 						{
-							artifactRevisionId: "artifact:agency.todos@2",
+							artifactRevisionId: "artifact:agency.todos@3",
 							title: "TODOリスト",
 							adapterRefs: ["adapter:task-execution@1"],
-							launcher: bundle.artifacts[0]!.launcher,
+							launcher: bundle.artifacts.at(-1)!.launcher,
 						},
 					],
 				},
@@ -102,8 +105,8 @@ test("TODO artifact renders and pages in desktop and narrow layouts", async ({
 		if (url.pathname.startsWith("/api/toolchain-artifacts/"))
 			return route.fulfill({
 				json: {
-					artifact: bundle.artifacts[0],
-					artifactRevisionId: "artifact:agency.todos@2",
+					artifact: bundle.artifacts.at(-1),
+					artifactRevisionId: "artifact:agency.todos@3",
 					digest: "fixture",
 					scopeRef: "scope:fixture",
 				},
@@ -151,7 +154,7 @@ test("TODO artifact renders and pages in desktop and narrow layouts", async ({
 		.evaluate((el) => el.getBoundingClientRect().width);
 	expect(panelWidth).toBeLessThan(650);
 	expect(panelWidth).toBeGreaterThan(500);
-	const out = resolve("spec/design/todo-artifact-2026-10-24");
+	const out = resolve("test-results/todo-artifact");
 	mkdirSync(out, { recursive: true });
 	await page.screenshot({
 		path: join(out, "implemented-desktop-v4.png"),
@@ -164,16 +167,21 @@ test("TODO artifact renders and pages in desktop and narrow layouts", async ({
 		page.getByRole("button", { name: "todo・doneの次のページ" }),
 	).toBeDisabled();
 	await expect(page.getByRole("table")).toHaveCount(1);
+	expect(reads.every((query) => query.state === "active")).toBe(true);
 	await page.getByRole("tab", { name: "archived", exact: true }).click();
+	await expect(page.getByRole("table").getByRole("row")).toHaveCount(21);
+	expect(reads.at(-1)).toEqual({
+		state: "archived",
+		pageIndex: 0,
+		pageSize: 20,
+	});
 	await expect(page.getByRole("columnheader")).toHaveText(["依頼内容", "状態"]);
 	await expect(page.getByRole("button", { name: /詳細/ })).toHaveCount(0);
 	await expect(page.locator("time")).toHaveCount(0);
-	await page.getByRole("button", { name: "報告済みの次のページ" }).click();
-	await expect(page.getByText("28件 · 2 / 3ページ")).toBeVisible();
-	await page
-		.getByRole("combobox", { name: "報告済みの表示件数" })
-		.selectOption("25");
-	await expect(page.getByText("28件 · 1 / 2ページ")).toBeVisible();
+	await expect(
+		page.getByRole("button", { name: "報告済みの次のページ" }),
+	).toHaveCount(0);
+	await expect(page.getByRole("combobox")).toHaveCount(0);
 	await page.setViewportSize({ width: 390, height: 844 });
 	await page.screenshot({
 		path: join(out, "implemented-narrow-v4.png"),
@@ -195,7 +203,7 @@ test("TODO artifact renders and pages in desktop and narrow layouts", async ({
 	await expect(page.getByText("報告済みの仕事はありません。")).toBeVisible();
 	await expect(
 		page.getByRole("button", { name: "報告済みの次のページ" }),
-	).toBeDisabled();
+	).toHaveCount(0);
 	await page.screenshot({
 		path: join(out, "implemented-empty-v4.png"),
 		fullPage: true,

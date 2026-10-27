@@ -90,3 +90,21 @@ test("a foreign origin or failed API never navigates or retries", async () => {
 		expect(client.doclingTicket).toHaveBeenCalledOnce();
 	}
 });
+
+test("a ticket arriving after the deadline is discarded and closes its reserved tab", async () => {
+	const deadline = new AbortController();
+	vi.spyOn(AbortSignal, "timeout").mockReturnValue(deadline.signal);
+	const response = Promise.withResolvers<{ url: string; expiresIn: number }>();
+	const window = tab();
+	const pending = openDocling(
+		{ doclingTicket: () => response.promise },
+		"http://localhost:28765",
+		new AbortController(),
+		() => window as unknown as Window,
+	);
+	deadline.abort(new DOMException("fixture deadline", "TimeoutError"));
+	response.resolve({ url, expiresIn: 60 });
+	expect((await pending).status).toBe("rejected");
+	expect(window.location.replace).not.toHaveBeenCalled();
+	expect(window.close).toHaveBeenCalled();
+});

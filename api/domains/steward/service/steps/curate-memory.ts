@@ -293,7 +293,6 @@ function prepareStep(env: StepEnv, unit: PreparedUnit["unit"]) {
 			seqs: context.targetSeqs,
 			requests: requestRows.map((r) => r.id),
 		},
-		windowVersion: null,
 		context,
 	};
 }

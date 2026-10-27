@@ -30,6 +30,46 @@ function fixture(fetcher: DoclingFetch, timeoutMs?: number) {
 }
 const json = (value: unknown) => Response.json(value);
 
+test("startup waits for gateway readiness, discards the ticket, and shares the open guard", async () => {
+	const response = Promise.withResolvers<Response>();
+	let calls = 0;
+	const { service } = fixture(async () => {
+		calls++;
+		return response.promise;
+	});
+	let ready = false;
+	const pending = service.ready(new AbortController().signal).then((value) => {
+		ready = true;
+		return value;
+	});
+	expect(ready).toBe(false);
+	await expect(service.ticket(new AbortController().signal)).rejects.toThrow(
+		"docling_open_in_progress",
+	);
+	response.resolve(json({ url: relative, expires_in: 60 }));
+	const value = await pending;
+	expect(value).toEqual(service.status());
+	expect(JSON.stringify(value)).not.toContain("ticket");
+	expect(JSON.stringify(value)).not.toContain(token);
+	expect(calls).toBe(1);
+});
+
+test.each(["cancel", "change"] as const)(
+	"startup rejects late readiness after %s",
+	async (action) => {
+		const response = Promise.withResolvers<Response>();
+		const h = fixture(async () => response.promise);
+		const controller = new AbortController();
+		const pending = h.service.ready(controller.signal);
+		if (action === "cancel") controller.abort();
+		else h.change(null);
+		response.resolve(json({ url: relative, expires_in: 60 }));
+		await expect(pending).rejects.toThrow(
+			action === "cancel" ? "docling_cancelled" : "docling_connection_changed",
+		);
+	},
+);
+
 test("one gateway POST wakes the app and returns only a browser URL; status and prepare never connect", async () => {
 	let calls = 0;
 	const { service } = fixture((async (url, init) => {
@@ -156,3 +196,21 @@ test("deadline aborts one request; next explicit attempt is possible", async () 
 		"docling_timeout",
 	);
 });
+
+test.each(["cancel", "change"] as const)(
+	"startup rechecks %s after ticket completion",
+	async (action) => {
+		const h = fixture(async () => json({ url: relative, expires_in: 60 }));
+		const controller = new AbortController();
+		const ticket = h.service.ticket;
+		h.service.ticket = async (signal) => {
+			const value = await ticket(signal);
+			if (action === "cancel") controller.abort();
+			else h.change(null);
+			return value;
+		};
+		await expect(h.service.ready(controller.signal)).rejects.toThrow(
+			action === "cancel" ? "docling_cancelled" : "docling_connection_changed",
+		);
+	},
+);

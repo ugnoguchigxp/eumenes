@@ -64,7 +64,6 @@ function prepare(
 			claims: prepared.model.claims,
 		},
 		targets: { events: prepared.eventIds },
-		windowVersion: null,
 		context: { prepared } satisfies WorldContext,
 	};
 }

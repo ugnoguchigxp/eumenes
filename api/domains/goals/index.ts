@@ -2,7 +2,6 @@ export { migrations } from "./repository";
 export type { GoalsService } from "./service";
 export {
 	createGoalsService,
-	existingGoalIdsInTransaction,
 	goalEpochOf,
 	goalRevisionOf,
 	goalSnapshot,

@@ -15,11 +15,25 @@ export function createDocling(deps: {
 }) {
 	let opening = false;
 	const fetcher = deps.fetch ?? fetch;
-	return {
+	const service = {
 		status: deps.status,
-		/** An immutable read result: opening the artifact performs no upstream operation. */
+		/** The conversation tool only returns the artifact; its Web adapter requests startup. */
 		prepare: () =>
 			doclingPrepared.parse({ action: "open", state: "ready_for_open" }),
+		async ready(signal: AbortSignal): Promise<ReturnType<typeof deps.status>> {
+			const connection = deps.connection();
+			if (!connection) throw new Error("docling_unconfigured");
+			// Reuse the gateway's startup wait, discarding its one-time ticket here.
+			await service.ticket(signal);
+			if (signal.aborted) throw new Error("docling_cancelled");
+			if (deps.connection()?.version !== connection.version)
+				throw new Error("docling_connection_changed");
+			return {
+				revision: connection.revision,
+				configured: true,
+				publicOrigin: connection.publicOrigin,
+			};
+		},
 		async ticket(callerSignal: AbortSignal) {
 			if (opening) throw new Error("docling_open_in_progress");
 			const connection = deps.connection();
@@ -118,5 +132,6 @@ export function createDocling(deps: {
 			}
 		},
 	};
+	return service;
 }
 export type DoclingService = ReturnType<typeof createDocling>;

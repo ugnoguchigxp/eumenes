@@ -1,24 +1,16 @@
 import type { Database } from "bun:sqlite";
-import { sha256Hex } from "../../../infrastructure/digest";
-import { jstDay, jstSeconds } from "../../../infrastructure/jst-time";
 import { getLogger } from "../../../infrastructure/logger";
-import type { ConversationEvent, ReconstructReason } from "../../continuity";
+import type { ConversationEvent } from "../../continuity";
 import {
 	REFERENCE_WINDOW_TOKENS,
 	estimateJsonTokens,
+	estimateMessageTokens,
 	estimateTextTokens,
 	planWindow,
-	type ContextBlock,
-	type WindowPlan,
 } from "../../inference";
 import type { HandlerDefinition } from "../../queue";
-import { isSystemPrompt, type Run } from "../contracts";
-import {
-	byId,
-	previousGeneration,
-	savePrefixDigest,
-	transition,
-} from "../repository";
+import type { Run } from "../contracts";
+import { byId, transition } from "../repository";
 import { withAttachmentNotes } from "./attachment-context";
 import {
 	DEFAULT_DEADLINE_MS,
@@ -28,35 +20,28 @@ import {
 	type GenerateInput,
 	type GeneratePayload,
 } from "./context";
-import { historyTokens, renderNow, type NowSources } from "./context-document";
-import { FIXED_TRIGGER_TEXT } from "./context-system";
+import type { DocumentRefs } from "./work-items";
 import {
-	conversationDocumentInTransaction,
+	conversationPrefixFrom,
 	conversationSystem,
-	profileLimitOf,
-	tokyoYear,
-} from "./conversation-prefix";
+	placeCutInTransaction,
+	withLastMessage,
+} from "./conversation-input";
 import { generationTools } from "./generation-tools";
-import { eventFields } from "./event-fields";
+import { INPUT_HEADINGS, dataText, lineText, section } from "./input-text";
 import {
 	consumeAnswer,
 	answerTicketInTransaction,
 	intakeInTransaction,
 } from "./result-intake";
+import { resultText } from "./result-text";
 import { acceptRunAnswer, endRun } from "./run-end";
 import type { WorkRow } from "../repository/work";
-import { hostTextBlock } from "./context-blocks";
-import { specialistWorkBlock, viewingBlock } from "./specialist-context";
-import { viewingLineInTransaction } from "./resource-context";
-import { worldNamesBlock } from "./topic-texts";
+import { madeOf, stateLinesInTransaction, stateText } from "./state-text";
 
 const log = getLogger("dialogue");
 
-/** Without any request this long, the provider's KV for the conversation is taken as gone (section 12.3). */
-export const CACHE_IDLE_MS = 6 * 60 * 1000;
-/** A silence this long before the newest event is a resumed conversation (section 8.3). */
-export const RESUME_GAP_MS = 30 * 60 * 1000;
-/** A gap this long between events is a break in the talk, where a re-construction may cut (section 8.3). */
+/** A gap this long since the last delivery is a break in the talk: the context keeper's fallback runs (section 7.3). */
 export const TALK_BREAK_MS = 2 * 60 * 1000;
 
 const tokens = (text: string) => estimateTextTokens(text);
@@ -70,130 +55,76 @@ function windowOf(deps: DialogueDeps, tx: Database, runId: string): number {
 	);
 }
 
-/** The newest message(s): each pending utterance as its own user message, or the host's fixed text. */
-function finalMessages(
+/** The pending utterances: their texts (with the notes of their attachments) and the newest one's images. */
+function pendingInput(
 	deps: DialogueDeps,
 	tx: Database,
 	pending: readonly ConversationEvent[],
-): { messages: ChatMessage[]; final: FinalMessage } {
+): {
+	texts: string[];
+	final: FinalMessage;
+	attachments: Pick<ChatMessage, "attachments" | "sourceMessageId">;
+} {
 	if (pending.length === 0)
-		return {
-			messages: [{ role: "user", content: FIXED_TRIGGER_TEXT }],
-			final: { kind: "fixed" },
-		};
-	const messages: ChatMessage[] = [];
+		return { texts: [], final: { kind: "fixed" }, attachments: {} };
+	const texts: string[] = [];
+	let attachments: Pick<ChatMessage, "attachments" | "sourceMessageId"> = {};
 	for (const event of pending) {
 		const messageId = event.messageIds[0];
 		const found = messageId
 			? deps.conversation.messageInTransaction(tx, messageId)
 			: null;
 		if (!found) continue;
-		const text = withAttachmentNotes(
-			found.message.text,
-			found.message.attachments,
+		texts.push(
+			withAttachmentNotes(found.message.text, found.message.attachments),
 		);
-		messages.push({
-			role: "user",
-			content: pending.length > 1 ? `[${event.at}] ${text}` : text,
-			...(found.message.attachments?.length
-				? {
-						attachments: found.message.attachments,
-						sourceMessageId: found.message.id,
-					}
-				: {}),
-		});
+		// One message's images go with the input (the newest that has any).
+		if (found.message.attachments?.length)
+			attachments = {
+				attachments: found.message.attachments,
+				sourceMessageId: found.message.id,
+			};
 	}
-	if (messages.length === 0) throw new Error("run_input_missing");
+	if (texts.length === 0) throw new Error("run_input_missing");
 	return {
-		messages,
+		texts,
 		final: {
 			kind: "utterances",
 			seqs: pending.map((event) => event.seq),
 			messageIds: pending.flatMap((event) => event.messageIds),
 		},
+		attachments,
 	};
 }
 
-/**
- * The utterance being delivered: the newest agent answer or announcement (the utterances whose playback reports
- * `delivered`) with no `delivered` record yet, while the user has not spoken since.
- */
-function speakingNow(log: readonly ConversationEvent[]): string | null {
-	const delivered = new Set<string>();
-	for (const event of log)
-		if (event.type === "delivered") {
-			const ref = eventFields(event).ref;
-			if (typeof ref === "string") delivered.add(ref);
-		}
-	for (let i = log.length - 1; i >= 0; i--) {
-		const event = log[i]!;
-		if (event.type !== "said") continue;
-		if (event.by === "user") return null;
-		const key = event.deliveryKey ?? "";
-		if (!key.startsWith("run:") && !key.startsWith("announcement:")) continue;
-		return delivered.has(event.id) ? null : event.id;
+/** A host notice's text: a notice's own fields as items, or its plain text. */
+function noticeLines(text: string): string[] {
+	try {
+		const parsed = JSON.parse(text) as unknown;
+		if (parsed && typeof parsed === "object" && !Array.isArray(parsed))
+			return Object.entries(parsed as Record<string, unknown>).flatMap(
+				([key, value]) =>
+					value === null || value === undefined || typeof value === "object"
+						? []
+						: [`- ${key}: ${lineText(String(value))}`],
+			);
+	} catch {
+		// A plain notice text.
 	}
-	return null;
+	return [dataText(text)];
 }
 
-/**
- * Why the window is re-constructed before this generation, if at all (section 12.3): a resumed conversation, a
- * provider cache taken as lost (idle too long, the fixed part changed), or a section over its limit.
- */
-function reconstructReason(
-	deps: DialogueDeps,
-	tx: Database,
-	run: Run,
-	plan: WindowPlan,
-	prefixDigest: string,
-	now: number,
-): ReconstructReason | null {
-	const events = deps.continuity.events;
-	const log = events.logInTransaction(tx, run.conversationId);
-	// The newest event by its time (the log is in appending order, which a late append can reverse).
-	const lastAt = Math.max(
-		-Infinity,
-		...log.map((event) => Date.parse(event.at)),
-	);
-	if (
-		Number.isFinite(lastAt) &&
-		(now - lastAt >= RESUME_GAP_MS || jstDay(lastAt) !== jstDay(now))
-	)
-		return "resumed";
-	const previous = previousGeneration(tx, run.conversationId, run.id);
-	if (
-		previous &&
-		(now - Date.parse(previous.at) >= CACHE_IDLE_MS ||
-			previous.prefixDigest !== prefixDigest)
-	)
-		return "cache_lost";
-	const logTokens = log.reduce((sum, event) => sum + event.tokens, 0);
-	if (
-		logTokens > plan.log.cap ||
-		historyTokens(
-			events.episodeInTransaction(tx, run.conversationId),
-			tokyoYear(now),
-		) > plan.sections.episode
-	)
-		return "section_over_limit";
-	return null;
-}
-
-/** `<now>` within its section: the agency's lines go first, then the records. */
-function fitNow(
-	now: NowSources,
-	limit: number,
-	render: (now: NowSources) => number,
-) {
-	const fitted = {
-		...now,
-		agency: [...now.agency],
-		records: [...now.records],
-	};
-	while (render(fitted) > limit && fitted.agency.length) fitted.agency.shift();
-	while (render(fitted) > limit && fitted.records.length)
-		fitted.records.shift();
-	return fitted;
+/** The specialist's hand-back as a line of the work (`## State`): who gave the words back, and on what. */
+function handoffLine(handoff: string): string {
+	try {
+		const parsed = JSON.parse(handoff) as {
+			specialist?: unknown;
+			label?: unknown;
+		};
+		return `担当 ${String(parsed.specialist ?? "")} が今回の発言を担当の外として戻した${parsed.label ? `（作業「${String(parsed.label)}」）` : ""}`;
+	} catch {
+		return handoff;
+	}
 }
 
 /** The trigger of a generation: the TODOs that changed, the utterances it handles, or what a host notice says. */
@@ -234,9 +165,9 @@ function triggerOf(
 }
 
 /**
- * The claim-time half of a generation (the ContextWindow specification, sections 5, 7 and 12): the pending
- * utterances it handles, the re-construction a lost cache or a full section calls for, the material document and
- * the three messages, all fixed inside the claim transaction.
+ * The claim-time half of a generation (the conversation input specification, sections 3 to 8): the pending
+ * utterances it handles, the cut of the recent conversation, and the messages (the system part, `## Memory`, the
+ * recent conversation, then `## State` with `## Host notice` and `## User`), all fixed inside the claim transaction.
  */
 export function createPrepare(
 	deps: DialogueDeps,
@@ -245,7 +176,7 @@ export function createPrepare(
 	GenerateInput,
 	unknown
 >["prepareInTransaction"] {
-	const { conversation, larm, clock, memory, agency, worldContext } = deps;
+	const { conversation, larm, clock, memory, agency } = deps;
 	const events = deps.continuity.events;
 	return (tx, claim) => {
 		const run = byId(tx, claim.payload.runId);
@@ -336,72 +267,113 @@ export function createPrepare(
 			endRun(deps, tx, current, "failed", "window_too_small");
 			return { status: "stale", reason: "window_too_small" };
 		}
-		const prefixDigest = sha256Hex(system + JSON.stringify(generationTools));
-		const reason = reconstructReason(
-			deps,
-			tx,
-			current,
-			plan,
-			prefixDigest,
+		const pendingIds = new Set(pending.flatMap((event) => event.messageIds));
+		// The recent conversation is cut by the host's fixed rules before it is drawn (section 6.1.1).
+		const placed = placeCutInTransaction(deps, tx, conversationId, {
+			system,
+			window,
 			nowMs,
-		);
-		if (reason) {
-			const rebuilt = events.reconstructInTransaction(tx, {
-				conversationId,
-				at: jstSeconds(nowMs),
-				reason,
-				limits: {
-					log: plan.log,
-					episode: plan.sections.episode,
-					silenceMs: TALK_BREAK_MS,
-				},
-			});
-			// A re-construction republishes the profile: the waiting additions join it (sections 5.4 and 12.3).
-			if (window?.republishRequested || window?.newMemories.length)
-				window =
-					memory?.republishWindowInTransaction(tx, conversationId) ?? window;
-			log.info("dialogue.window_reconstructed", {
-				reason,
-				count: rebuilt.moved,
-			});
-		}
-		savePrefixDigest(tx, run.id, prefixDigest);
-		const { messages: newest, final } = finalMessages(deps, tx, pending);
+			pending: pendingIds,
+		});
+		window = placed.window;
+		if (placed.reason)
+			log.info("dialogue.input_cut", { reason: placed.reason, runId: run.id });
+		const prefix = conversationPrefixFrom(deps, tx, conversationId, {
+			system,
+			window,
+			pending: pendingIds,
+		});
+		const { texts, final, attachments } = pendingInput(deps, tx, pending);
 		const noticeText = notice
 			? (conversation.messageInTransaction(tx, run.inputMessageId)?.message
 					.text ?? null)
 			: null;
-		const texts = newest.map((message) => message.content);
-		const records: ContextBlock[] = [
-			worldContext
-				? worldNamesBlock(
-						worldContext.knownNamesInTransaction(tx, { conversationId, texts }),
-					)
-				: null,
-			deps.specialist && !isSystemPrompt(run.sourceKind)
-				? specialistWorkBlock(deps, tx, current)
-				: null,
-			deps.specialist && !isSystemPrompt(run.sourceKind)
-				? viewingBlock(deps, tx, current)
-				: null,
-			claim.payload.specialistHandoff
-				? hostTextBlock("specialist.handoff", claim.payload.specialistHandoff)
-				: null,
-		].filter((block): block is ContextBlock => !!block);
-		// The background calls on this conversation render the same document (conversation-prefix.ts): the profile
-		// limit is the one they use too, so their prefix is this one while nothing changes.
-		// A resource on screen joins the ledger before the document is drawn, so its line is among the resources.
-		const viewing = viewingLineInTransaction(deps, tx, current);
-		const { document, refs, todos, logged, adopted } =
-			conversationDocumentInTransaction(deps, tx, conversationId, {
-				window,
-				profileLimit: profileLimitOf(deps, system, plan.window),
+		const refs: DocumentRefs = deps.work?.refsInTransaction(
+			tx,
+			conversationId,
+		) ?? { todo: () => null, confirmation: () => null, resource: () => null };
+		// The results this generation was triggered by: the host notice shows them, this call only.
+		const reported = (changed ?? []).filter(
+			(row) => row.status !== "todo" && !row.archivedAt,
+		);
+		const results = reported.map(
+			(row) =>
+				resultText({
+					ref: refs.todo(row.id) ?? "t?",
+					title: row.title,
+					status: row.status,
+					...(row.outcome ? { outcome: row.outcome } : {}),
+					...(row.question ? { question: row.question } : {}),
+					result: row.result,
+					made: deps.work
+						? deps.work
+								.todosInTransaction(tx, conversationId)
+								.filter((todo) => todo.id === row.id)
+								.flatMap((todo) => madeOf(todo, refs))
+						: [],
+					resource: refs.resource,
+				}).text,
+		);
+		const noticeBody = [
+			...(notAdopted
+				? [
+						"前の返事は届けられませんでした。すでに頼んだ仕事は「## State」の仕事にあります。",
+					]
+				: []),
+			...(hostNote ? [dataText(hostNote)] : []),
+			...results,
+			...(noticeText !== null ? noticeLines(noticeText) : []),
+		];
+		const lastAgent =
+			[...prefix.recent].reverse().find((u) => u.speaker === "agent") ?? null;
+		const lastAt = prefix.recent.at(-1)
+			? Date.parse(prefix.recent.at(-1)!.at)
+			: null;
+		const state = stateText(
+			stateLinesInTransaction(deps, tx, {
+				conversationId,
+				run: current,
 				nowMs,
-			});
-		const now = fitNow(
-			{
-				at: jstSeconds(nowMs),
-				...(viewing ? { viewing } : {}),
+				lastAt,
+				lastAgent,
+				state: deps.conversation.input.latestStateInTransaction(
+					tx,
+					conversationId,
+				),
+				...(claim.payload.specialistHandoff
+					? { handoff: handoffLine(claim.payload.specialistHandoff) }
+					: {}),
+				refs,
+			}),
+		);
+		const messages = withLastMessage(
+			prefix,
+			[
+				state,
+				section(INPUT_HEADINGS.notice, noticeBody),
+				texts.length
+					? `${INPUT_HEADINGS.user}\n${texts.map(dataText).join("\n")}`
+					: null,
+			],
+			attachments,
+		);
+		log.debug("dialogue.context_measured", {
+			kind: "estimated_tokens",
+			count: estimateMessageTokens(messages),
+		});
+		return {
+			status: "ready",
+			input: {
+				runId: run.id,
+				inputMessageId: run.inputMessageId,
+				lastSeq: events.latestSeqInTransaction(tx, conversationId),
+				jobId: claim.jobId,
+				revision: current.revision,
+				conversationId,
+				...(requestId ? { requestId } : {}),
+				messages,
+				utterances: texts,
+				final,
 				trigger: triggerOf(
 					current,
 					pending,
@@ -410,66 +382,16 @@ export function createPrepare(
 					hostNote,
 					notAdopted,
 				),
-				speaking: speakingNow(logged),
-				agency: agency?.stateForContextInTransaction(tx, conversationId) ?? [],
-				records,
-			},
-			plan.sections.now,
-			(fitted) => tokens(renderNow(fitted, refs)),
-		);
-		const messages: ChatMessage[] = [
-			{ role: "system", content: system },
-			{ role: "user", content: document.text },
-			{ role: "user", content: renderNow(now, refs) },
-			...newest,
-		];
-		log.debug("dialogue.context_measured", {
-			kind: "estimated_tokens",
-			count: tokens(system) + document.tokens,
-		});
-		// The TODOs whose result the log shows: what a reply may report.
-		const resulted = new Set(
-			logged.flatMap((event) => {
-				if (event.type !== "acted" || event.forgotten) return [];
-				const fields = eventFields(event);
-				return fields.action === "work.result" &&
-					typeof fields.todo === "string"
-					? [fields.todo]
-					: [];
-			}),
-		);
-		return {
-			status: "ready",
-			input: {
-				runId: run.id,
-				inputMessageId: run.inputMessageId,
-				lastSeq: Math.max(
-					0,
-					...logged.map((event) => event.seq),
-					...pending.map((event) => event.seq),
-				),
-				jobId: claim.jobId,
-				revision: current.revision,
-				conversationId,
-				...(requestId ? { requestId } : {}),
-				messages,
-				final,
-				trigger: now.trigger,
-				plan,
-				document,
 				...(agent ? { agent } : {}),
-				shown: {
-					todos: todos
-						.filter((todo) => resulted.has(todo.id))
-						.map((todo) => todo.id),
-				},
+				shown: { todos: reported.map((row) => row.id) },
+				memoryItemIds: prefix.memoryItemIds,
+				cut: placed.reason,
+				inputRevision: prefix.cut?.revision ?? 0,
 				todoRevisions: Object.fromEntries(
 					(deps.work?.todoRevisionsInTransaction(tx, conversationId) ?? []).map(
 						(row) => [row.id, row.revision],
 					),
 				),
-				windowVersion: events.windowVersionInTransaction(tx, conversationId)
-					.version,
 				retained: deps.work?.retainedInTransaction(tx, conversationId) ?? [],
 				sessionContext: { instructionCount: 1, historyCount: 0 },
 				...(window && memory
@@ -487,9 +409,6 @@ export function createPrepare(
 								],
 							},
 						}
-					: {}),
-				...(adopted.length
-					? { goals: { goalIds: adopted.map((goal) => goal.goalId) } }
 					: {}),
 			},
 		};

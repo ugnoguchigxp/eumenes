@@ -24,7 +24,6 @@ const SLOT_LABELS: Record<UnitSlot, string> = {
 	reflect: "記憶の反映",
 	world: "世界の記録",
 	maintenance: "記憶の整理",
-	episode: "会話の要約",
 };
 
 const bySlot = (a: UnitSlot, b: UnitSlot) =>

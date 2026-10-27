@@ -26,7 +26,6 @@ import {
 } from "../repository";
 import type { Kick } from "./kick";
 import { REQUEST_FAILED_NOTICE, noticeInTransaction } from "./notices";
-import { rangeKey } from "./episode-plan";
 import type { ApplyResult, StepEnv, StewardDeps } from "./types";
 import { type Wake, retryDelay } from "./wake";
 
@@ -200,20 +199,6 @@ export function createUnitEnd(deps: StewardDeps, kick: Kick, wake: Wake) {
 		});
 	}
 
-	/** An episode range with nothing to prepare is remembered, so the kick does not make it into a unit again. */
-	function markEpisodeQuiet(db: Database, unit: UnitRow) {
-		const range = unit.targets.range;
-		if (!range) return;
-		const state = readState(db, unit.conversationId);
-		const key = rangeKey(unit.step, range);
-		const known = state.quiet.episode ?? [];
-		if (known.includes(key)) return;
-		writeState(db, {
-			...state,
-			quiet: { ...state.quiet, episode: [...known, key].slice(-100) },
-		});
-	}
-
 	/** The upkeep control after an adopted step. */
 	function settleState(env: StepEnv, unit: UnitRow, applied: ApplyResult) {
 		const { db } = env;
@@ -236,7 +221,6 @@ export function createUnitEnd(deps: StewardDeps, kick: Kick, wake: Wake) {
 		failUnit,
 		staleUnit,
 		markQuiet,
-		markEpisodeQuiet,
 		settleState,
 	};
 }

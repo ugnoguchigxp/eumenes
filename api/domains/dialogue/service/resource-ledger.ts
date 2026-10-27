@@ -17,6 +17,7 @@ import {
 	resourceById,
 	resourceByRef,
 	resourceByUri,
+	resourcesOfMessage,
 	touchResource,
 	usedResources,
 	workLinksOf,
@@ -82,6 +83,9 @@ export function createResourceLedger(deps: Pick<DialogueDeps, "clock" | "id">) {
 		...port,
 		/** The resource of this URI in the conversation, forgotten or not. */
 		byUriInTransaction: resourceByUri,
+		/** The resources a message shows as chips, in their order, forgotten ones left out. */
+		ofMessageInTransaction: (db: Database, messageId: string) =>
+			resourcesOfMessage(db, messageId).filter((row) => !row.forgottenAt),
 		/** The resources not forgotten, most recently used first. */
 		recentInTransaction: usedResources,
 		/** The number each resource URI of the conversation has (forgotten ones have none). */

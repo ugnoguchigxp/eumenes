@@ -6,6 +6,7 @@ import {
 	type OutputController,
 } from "../../audio";
 import type { AvatarCue } from "../../avatar";
+import { describeError } from "../../../errorMessages";
 
 type Run = { abort: AbortController; automatic: boolean };
 export type ReplayAudioSettings = {
@@ -113,6 +114,8 @@ export function useReplay(
 			const { signal } = mine.abort;
 			const valid = () => !signal.aborted && run.current === mine;
 			const playbackKey = crypto.randomUUID();
+			let heardClauses = 0;
+			let completed = false;
 			try {
 				const { deps: live } = latest.current;
 				// A new playback interrupts the live reply, like barge-in does.
@@ -142,8 +145,9 @@ export function useReplay(
 						Math.max(0, latest.current.settings.outputVolume ?? 1),
 					);
 					let cut = false;
+					let ended = false;
+					let started = false;
 					await new Promise<void>((resolve, reject) => {
-						let started = false;
 						const finish = () => {
 							signal.removeEventListener("abort", finish);
 							if (started && valid()) {
@@ -154,40 +158,56 @@ export function useReplay(
 						};
 						signal.addEventListener("abort", finish, { once: true });
 						target
-							.play(speech.wav, finish, {
-								timing: { runId: runId ?? undefined, chunkIndex: i },
-								volume,
-								shouldPlay: valid,
-								onInterrupted: () => {
-									cut = true;
+							.play(
+								speech.wav,
+								() => {
+									ended = true;
 									finish();
 								},
-								onStarted: () => {
-									if (!valid()) return;
-									started = true;
-									setSubtitle(sentences[i] ?? null);
-									if (volume > 0)
-										setAvatarCue({
-											key,
-											motion: speech.motion,
-											speaking: true,
-										});
+								{
+									timing: { runId: runId ?? undefined, chunkIndex: i },
+									volume,
+									shouldPlay: valid,
+									onInterrupted: () => {
+										cut = true;
+										finish();
+									},
+									onStarted: () => {
+										if (!valid()) return;
+										started = true;
+										setSubtitle(sentences[i] ?? null);
+										if (volume > 0)
+											setAvatarCue({
+												key,
+												motion: speech.motion,
+												speaking: true,
+											});
+									},
 								},
-							})
+							)
 							.then(() => {
 								// Discarded before it began (superseded): nothing will end it.
 								if (!started) finish();
 							}, reject);
 					});
 					// Interrupted by something else: stop reading the rest.
-					if (!valid() || cut) return;
+					if (!valid() || cut || !started || !ended || volume === 0) return;
+					heardClauses++;
 				}
+				completed = sentences.length > 0;
 			} catch (e) {
-				if (!signal.aborted)
-					setError(
-						`読み上げに失敗しました（${e instanceof Error ? e.message : "不明なエラー"}）`,
-					);
+				if (!signal.aborted) setError(describeError(e));
 			} finally {
+				try {
+					await client.replayPlayed({
+						messageId: id,
+						text,
+						playbackId: playbackKey,
+						heard: completed ? "full" : heardClauses > 0 ? "partial" : "none",
+					});
+				} catch (e) {
+					if (valid()) setError(describeError(e));
+				}
 				// A microphone interruption may leave the next clause's synthesis in flight.
 				mine.abort.abort();
 				if (run.current === mine) {
