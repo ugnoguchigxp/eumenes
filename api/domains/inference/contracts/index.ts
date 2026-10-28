@@ -5,6 +5,8 @@ import type { Settings, Purpose } from "../../settings/contracts";
 import type { SpeechDelivery, SpeechPreparation } from "../../delivery";
 export type { ChatImage } from "../../larm";
 export type Messages = ChatMessage[];
+/** How much a model thinks before it answers (`off`: not at all). */
+export type ReasoningLevel = "off" | "low" | "medium" | "high";
 /** Instruction body excludes the output schema, which is rendered from its value. */
 export type ControlContract = {
 	instructions: string;
@@ -108,6 +110,14 @@ export type CallSession = {
 	 * ends there is its normal end.
 	 */
 	readAhead?: true;
+	/**
+	 * `main` only: how much the model thinks before it answers, one level per target (the conversation harness's
+	 * setting; a call may fall back from LARM to the cloud, and the harness follows). An attempt on LARM uses `larm`
+	 * (the chat template's thinking switch and the reasoning effort), one on the cloud uses `cloud` (Codex SDK: the
+	 * turn's effort). `off` turns thinking off on LARM and sends no effort to the cloud. Its thinking spends the
+	 * output bound, so the call's `outputLimit` must leave room for it.
+	 */
+	reasoning?: { larm: ReasoningLevel; cloud: ReasoningLevel };
 	/** Hidden auxiliary work on an answer request: publishes no deltas; provider failure ends only this call. */
 	failureScope?: "call";
 	taskId?: string;

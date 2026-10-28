@@ -4,6 +4,7 @@ import {
 	inputMemoryDigestMigration,
 	inputToolExchangeMigration,
 	restoreToolExchangeMigration,
+	utteranceNoticeMigration,
 } from "./input";
 import {
 	attributionMigration,
@@ -723,4 +724,5 @@ export const migrations: readonly Migration[] = [
 	inputToolExchangeMigration,
 	dropToolExchangeMigration,
 	restoreToolExchangeMigration,
+	utteranceNoticeMigration,
 ];

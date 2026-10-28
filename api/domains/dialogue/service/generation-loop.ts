@@ -12,6 +12,7 @@ import type {
 } from "../contracts";
 import type { ChatMessage, DialogueDeps, GenerateInput } from "./context";
 import { conversationOutput } from "./conversation-output";
+import { cloudHarness, localHarness } from "./harness";
 import { toolResultText } from "./result-text";
 import { carriesExchange, type ExchangeStep } from "./tool-exchange";
 import {
@@ -61,9 +62,6 @@ export type GenerationOutcome = {
 	ended: boolean;
 };
 
-/** The output bound of one model call, in tokens. */
-const GENERATION_OUTPUT_LIMIT = 1024;
-
 const agentTools: AgentToolDefinition[] = generationTools.map((tool) => ({
 	name: tool.function.name,
 	description: tool.function.description,
@@ -99,8 +97,14 @@ export async function runGeneration(
 	let receipt: Receipt | undefined;
 	const callSession: CallSession = {
 		sessionRole: "main",
-		// A short spoken reply and the tool arguments fit far below this; a runaway output stops here.
-		outputLimit: GENERATION_OUTPUT_LIMIT,
+		// The harness's bound stops a runaway output; the reasoning counts in it.
+		outputLimit: input.harness.call.outputLimit,
+		// Each side answers with its own harness's reasoning: a call that falls back from LARM to the cloud moves to
+		// the cloud harness's (the input stays the one this run built).
+		reasoning: {
+			larm: localHarness.call.reasoning,
+			cloud: cloudHarness.call.reasoning,
+		},
 		...(options.session?.context ? { context: options.session.context } : {}),
 		...(options.session?.refs ? { refs: options.session.refs } : {}),
 	};
@@ -119,7 +123,9 @@ export async function runGeneration(
 			const output = conversationOutput(
 				onDelta,
 				generationTools,
-				base[0]?.role === "system" ? base[0].content : undefined,
+				input.harness.gates.systemCopy && base[0]?.role === "system"
+					? base[0].content
+					: undefined,
 			);
 			log.debug("dialogue.input_measured", {
 				phase: "generation",

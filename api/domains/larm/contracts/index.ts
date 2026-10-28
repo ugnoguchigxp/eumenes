@@ -62,6 +62,8 @@ export type LarmCallOptions = {
 	onConversation?: true;
 	/** With `onConversation`: a read-ahead whose output ends at its bound by design; that end is not a failure. */
 	readAhead?: true;
+	/** `main` only: how much the model thinks first (off turns the chat template's thinking off). */
+	reasoning?: "off" | "low" | "medium" | "high";
 	/** `subagent` only: the task whose calls share one agent session. */
 	taskId?: string;
 	speechLanguage?: SpeechLanguage;

@@ -67,6 +67,13 @@ export const restoreToolExchangeMigration = {
 	sql: `ALTER TABLE conversation_utterances ADD COLUMN tool_exchange_json TEXT;`,
 };
 
+/** The host notice an agent utterance reported (the tool-call reliability design, section 5.5 #4). */
+export const utteranceNoticeMigration = {
+	id: "conversation/0016-utterance-notice",
+	after: ["conversation/0015-utterance-tool-exchange"],
+	sql: `ALTER TABLE conversation_utterances ADD COLUMN notice_text TEXT;`,
+};
+
 const ready = new WeakMap<Database, boolean>();
 /** The input's tables exist on this connection (a store opened with an older migration set has none). */
 export function inputReady(db: Database): boolean {
@@ -90,6 +97,7 @@ type UtteranceRow = {
 	message_id: string | null;
 	created_at: string;
 	tool_exchange_json: string | null;
+	notice_text: string | null;
 };
 const isToolCall = (value: unknown): value is UtteranceToolCall =>
 	!!value &&
@@ -114,9 +122,10 @@ const utteranceOf = (row: UtteranceRow): Utterance => ({
 	messageId: row.message_id,
 	at: row.created_at,
 	toolCalls: toolCallsOf(row.tool_exchange_json),
+	notice: row.notice_text,
 });
 const UTTERANCE_COLUMNS =
-	"conversation_id, seq, speaker, text, message_id, created_at, tool_exchange_json";
+	"conversation_id, seq, speaker, text, message_id, created_at, tool_exchange_json, notice_text";
 const exchangeJson = (toolCalls: readonly UtteranceToolCall[] | undefined) =>
 	toolCalls?.length ? JSON.stringify(toolCalls) : null;
 
@@ -131,6 +140,8 @@ export function appendUtterance(
 		at: string;
 		/** The tool calls of the turn an agent utterance ends. */
 		toolCalls?: readonly UtteranceToolCall[];
+		/** The host notice an agent utterance reports. */
+		notice?: string;
 	},
 ): Utterance | null {
 	if (input.messageId) {
@@ -147,7 +158,7 @@ export function appendUtterance(
 		)
 		.get(input.conversationId) as { next: number };
 	db.query(
-		`INSERT INTO conversation_utterances (${UTTERANCE_COLUMNS}) VALUES (?,?,?,?,?,?,?)`,
+		`INSERT INTO conversation_utterances (${UTTERANCE_COLUMNS}) VALUES (?,?,?,?,?,?,?,?)`,
 	).run(
 		input.conversationId,
 		next,
@@ -156,6 +167,7 @@ export function appendUtterance(
 		input.messageId,
 		input.at,
 		input.speaker === "agent" ? exchangeJson(input.toolCalls) : null,
+		input.speaker === "agent" ? (input.notice ?? null) : null,
 	);
 	return {
 		conversationId: input.conversationId,
@@ -165,6 +177,7 @@ export function appendUtterance(
 		messageId: input.messageId,
 		at: input.at,
 		toolCalls: input.speaker === "agent" ? [...(input.toolCalls ?? [])] : [],
+		notice: input.speaker === "agent" ? (input.notice ?? null) : null,
 	};
 }
 
@@ -208,7 +221,7 @@ export function reviseUtterance(
 ): void {
 	if (input.text === null)
 		db.query(
-			"UPDATE conversation_utterances SET text = '', tool_exchange_json = NULL, retracted_at = ? WHERE conversation_id = ? AND speaker = ? AND message_id = ? AND retracted_at IS NULL",
+			"UPDATE conversation_utterances SET text = '', tool_exchange_json = NULL, notice_text = NULL, retracted_at = ? WHERE conversation_id = ? AND speaker = ? AND message_id = ? AND retracted_at IS NULL",
 		).run(input.at, input.conversationId, input.speaker, input.messageId);
 	else
 		db.query(
@@ -281,7 +294,7 @@ export function retractUtterances(
 	const changed = new Set<string>();
 	for (const row of utterancesOfMessages(db, messageIds)) {
 		db.query(
-			"UPDATE conversation_utterances SET text = '', tool_exchange_json = NULL, retracted_at = ? WHERE conversation_id = ? AND seq = ?",
+			"UPDATE conversation_utterances SET text = '', tool_exchange_json = NULL, notice_text = NULL, retracted_at = ? WHERE conversation_id = ? AND seq = ?",
 		).run(at, row.conversation_id, row.seq);
 		const cut = readCut(db, row.conversation_id);
 		if (cut && row.seq > cut.seq)

@@ -24,6 +24,7 @@ import type { MusicPort } from "../contracts/music";
 import type { ImagePort } from "../contracts/image";
 import type { ObjectRecognitionPort } from "../contracts/object-recognition";
 import type { CommandInteractions } from "./command-interactions";
+import type { ConversationHarness } from "./harness";
 import type { ResourceAccess, ResourceLedger } from "./resource-ledger";
 export const GENERATE_KIND = "dialogue.generate";
 /** A toolchain's command sub-agent: one typed operation from the conversation's request. */
@@ -88,6 +89,8 @@ export interface GenerateInput {
 	revision: number;
 	conversationId: string;
 	requestId?: string;
+	/** The harness this run is composed and called with, chosen when it was prepared and kept to its end. */
+	harness: ConversationHarness;
 	/**
 	 * The system part, `## Memory`, the recent conversation, then the last message (`## State`, `## Host notice`,
 	 * `## User`). Tool calls and results are added while it runs.
@@ -107,6 +110,8 @@ export interface GenerateInput {
 	shown: { todos: string[] };
 	/** The memory items `## Memory` shows: a memory read names them as shown. */
 	memoryItemIds: string[];
+	/** The host notice of the works this generation reports, in one line: kept with its reply (section 5.5 #4). */
+	notice?: string;
 	/** Why the recent conversation was cut before this generation (section 6.1.1); null when it was not. */
 	cut: string | null;
 	/** The input's revision as drawn: a forget or a correction of what it shows meanwhile expires the generation. */

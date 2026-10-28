@@ -188,7 +188,7 @@ export function createGenerationSettlement(
 					runId: run.id,
 				});
 				if (!result.handover) {
-					said(deps, tx, run, messageId, text, result);
+					said(deps, tx, run, messageId, text, result, input.notice);
 					linkAnswerResources(deps, tx, run, input, messageId);
 				}
 				const delivery = result.emotion
@@ -314,6 +314,8 @@ function said(
 	messageId: string,
 	text: string,
 	result: GenerationResult,
+	/** The host notice this reply reports. */
+	notice?: string,
 ) {
 	const events = deps.continuity.events;
 	const at = jstSeconds(Date.parse(deps.clock()));
@@ -344,6 +346,7 @@ function said(
 			messageId,
 			at: deps.clock(),
 			toolCalls: toolCallsOf(deps, tx, run, result),
+			...(notice ? { notice } : {}),
 		},
 		!spoken,
 	);

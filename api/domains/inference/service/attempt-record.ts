@@ -13,6 +13,8 @@ export type CallSessionRole = {
 	onConversation?: true;
 	/** A read-ahead on the conversation's connection: its output ends at its bound by design. */
 	readAhead?: true;
+	/** `main` only: how much the model thinks before it answers, per target (see `CallSession`). */
+	reasoning?: NonNullable<CallSession["reasoning"]>;
 	context?: NonNullable<CallSession["context"]>;
 	refs?: { messageIds: string[]; itemIds: string[] };
 };
@@ -68,6 +70,7 @@ export function resolveSession(
 		(given?.onConversation && sessionRole !== "auxiliary") ||
 		(given?.prefixTools && !given.onConversation) ||
 		(given?.readAhead && !given.onConversation) ||
+		(given?.reasoning !== undefined && sessionRole !== "main") ||
 		(sessionRole === "main" && row.mode !== "answer") ||
 		(sessionRole === "subagent") !== !!given?.taskId ||
 		(given?.taskId !== undefined && !TASK_ID.test(given.taskId))
@@ -86,6 +89,14 @@ export function resolveSession(
 		...(given?.taskId ? { taskId: given.taskId } : {}),
 		...(given?.onConversation ? { onConversation: true as const } : {}),
 		...(given?.readAhead ? { readAhead: true as const } : {}),
+		...(given?.reasoning
+			? {
+					reasoning: {
+						larm: given.reasoning.larm,
+						cloud: given.reasoning.cloud,
+					},
+				}
+			: {}),
 		...(context
 			? {
 					context: {

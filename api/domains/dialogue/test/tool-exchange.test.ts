@@ -208,3 +208,50 @@ test("a replayed call's arguments are always a JSON object, each text within its
 	expect(long.request).toBe(`${"あ".repeat(300)}…`);
 	expect(long.inputs.prompt).toBe(`${"い".repeat(300)}…`);
 });
+
+test("a report follows the notice of the work it told, in the next turn's recent conversation", async () => {
+	h = await setup();
+	h.state.steps.push(
+		{ calls: [{ name: "find_toolchain", args: { query: "猫の絵を描く" } }] },
+		{
+			calls: [
+				{
+					name: "delegate",
+					args: {
+						mode: "execute",
+						toolchain: IMAGE.id,
+						request: "猫の絵",
+						impact: "create",
+						announcement: "描きますね。",
+					},
+				},
+			],
+		},
+	);
+	const waiting = await h.say("猫の絵を描いて", "queued");
+	await h.finishImage(waiting.id, { state: "completed", title: "猫" });
+	const [todo] = h.todos();
+	await h.store.write((db) =>
+		h!.dialogue.recordSpontaneousInTransaction(db, {
+			conversationId: "main",
+			messageId: "report-1",
+			text: "猫の絵ができあがりました。",
+			at: new Date().toISOString(),
+			todoRefs: [todo!.id],
+		}),
+	);
+	h.state.steps.push({ text: "どういたしまして。" });
+	await h.say("ありがとう");
+	const messages = recent();
+	const at = messages.findIndex(
+		(m) => m.content === "猫の絵ができあがりました。",
+	);
+	expect(messages[at - 1]).toEqual({
+		role: "user",
+		content: `[ホストの知らせ] t${todo!.ref}「猫の絵」が終わりました（成功）。`,
+	});
+	expect(messages[at - 2]).toEqual({
+		role: "assistant",
+		content: "描きますね。",
+	});
+});

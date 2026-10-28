@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import { reportNoticeInTransaction } from "./report-notice";
 import { getLogger } from "../../../infrastructure/logger";
 import type { ConversationEvent } from "../../continuity";
 import {
@@ -28,6 +29,7 @@ import {
 	withLastMessage,
 } from "./conversation-input";
 import { generationTools } from "./generation-tools";
+import { harnessOf, routeConversation } from "./harness";
 import { INPUT_HEADINGS, dataText, lineText, section } from "./input-text";
 import {
 	consumeAnswer,
@@ -244,7 +246,8 @@ export function createPrepare(
 		if (larm.captureInTransaction && !larm.requestFor?.(tx, run.id, "llm")) {
 			const snapshot = larm.snapshotInTransaction?.(tx);
 			if (snapshot) {
-				for (const p of ["llm", "asr", "tts"] as const) {
+				routeConversation(snapshot);
+				for (const p of ["asr", "tts"] as const) {
 					snapshot.routes[p].mode = "larm-only";
 					snapshot.routes[p].cloudAllowed = false;
 				}
@@ -258,9 +261,12 @@ export function createPrepare(
 			}
 		}
 		const requestId = larm.requestFor?.(tx, run.id, "llm");
+		// The harness follows the route the run captured and builds its input. A `larm-preferred` call that falls back
+		// to the cloud mid-run takes the cloud harness's call settings (the generation passes both).
+		const harness = harnessOf(larm.snapshotFor?.(tx, run.id) ?? null);
 		// This run's context is fixed by the host: the server must neither trim nor reorder it.
 		if (requestId) larm.setContextPolicyInTransaction?.(tx, requestId, "exact");
-		const system = conversationSystem(deps, tx);
+		const system = conversationSystem(deps, tx, harness);
 		const fixed = tokens(system) + estimateJsonTokens(generationTools);
 		const plan = planWindow({ window: windowOf(deps, tx, run.id), fixed });
 		if (!plan.usable) {
@@ -279,6 +285,7 @@ export function createPrepare(
 		if (placed.reason)
 			log.info("dialogue.input_cut", { reason: placed.reason, runId: run.id });
 		const prefix = conversationPrefixFrom(deps, tx, conversationId, {
+			harness,
 			system,
 			window,
 			pending: pendingIds,
@@ -295,6 +302,13 @@ export function createPrepare(
 		// The results this generation was triggered by: the host notice shows them, this call only.
 		const reported = (changed ?? []).filter(
 			(row) => row.status !== "todo" && !row.archivedAt,
+		);
+		// The reply to them follows their notice in the recent conversation (section 5.5 #4).
+		const reportNotice = reportNoticeInTransaction(
+			deps,
+			tx,
+			conversationId,
+			reported.map((row) => row.id),
 		);
 		const results = reported.map(
 			(row) =>
@@ -371,6 +385,7 @@ export function createPrepare(
 				revision: current.revision,
 				conversationId,
 				...(requestId ? { requestId } : {}),
+				harness,
 				messages,
 				utterances: texts,
 				final,
@@ -384,6 +399,7 @@ export function createPrepare(
 				),
 				...(agent ? { agent } : {}),
 				shown: { todos: reported.map((row) => row.id) },
+				...(reportNotice ? { notice: reportNotice } : {}),
 				memoryItemIds: prefix.memoryItemIds,
 				cut: placed.reason,
 				inputRevision: prefix.cut?.revision ?? 0,

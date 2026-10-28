@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import { systemCopyCheck } from "./conversation-output";
 import type { NativeTool } from "../../../infrastructure/chat-stream";
 import {
 	estimateTextTokens,
@@ -12,6 +13,7 @@ import type { ChatMessage, DialogueDeps } from "./context";
 import { systemText } from "./context-system";
 import { toolchainTitlesInTransaction } from "./delegate-conversation";
 import { generationTools } from "./generation-tools";
+import { localHarness, type ConversationHarness } from "./harness";
 import { INPUT_HEADINGS, dataText, joinSections, section } from "./input-text";
 import { memoryItemLine } from "./result-text";
 import { stateLinesInTransaction, stateText } from "./state-text";
@@ -37,8 +39,12 @@ export const RECENT = {
 export const MEMORY_TOKENS = 300;
 const MEMORY_KINDS = new Set(["preference", "habit", "tendency", "constraint"]);
 
-/** The system part of every call on the conversation's prompt (section 4). */
-export function conversationSystem(deps: DialogueDeps, tx: Database): string {
+/** The system part of every call on the conversation's prompt (section 4), in the harness's sections. */
+export function conversationSystem(
+	deps: DialogueDeps,
+	tx: Database,
+	harness: ConversationHarness,
+): string {
 	const persona = deps.larm.snapshotInTransaction?.(tx).general ?? {
 		agentName: "",
 		userName: "",
@@ -48,6 +54,7 @@ export function conversationSystem(deps: DialogueDeps, tx: Database): string {
 		persona,
 		deps.conversationAgent.system(),
 		toolchainTitlesInTransaction(deps, tx),
+		harness.system,
 	);
 }
 
@@ -88,9 +95,10 @@ export function memoryLines(items: readonly ProfileItem[]): {
 	return { lines: shown.map(line), ids: shown.map((item) => item.id) };
 }
 
-/** An utterance's size in the recent conversation: its words and the tool calls kept with it. */
+/** An utterance's size in the recent conversation: its words, and the notice and tool calls kept with it. */
 const utteranceTokens = (u: Utterance) =>
 	estimateTextTokens(u.text) +
+	(u.notice ? estimateTextTokens(u.notice) : 0) +
 	u.toolCalls.reduce(
 		(sum, call) =>
 			sum + estimateTextTokens(call.name + call.arguments + call.result),
@@ -114,16 +122,27 @@ export function recentUtterances(
 /**
  * The recent conversation as native messages: one per side's run of utterances, each utterance within its bound. An
  * agent's utterance that ended a turn with a search or a hand-over follows those calls and their results (the
- * tool-call reliability design, P1); the first call joins an agent's words just before it.
+ * tool-call reliability design, P1); the first call joins an agent's words just before it. The harness's history
+ * flags leave out the exchanges and the notices.
  */
 export function recentMessages(
 	utterances: readonly Utterance[],
+	history: ConversationHarness["history"] = localHarness.history,
 ): ChatMessage[] {
 	const messages: ChatMessage[] = [];
 	for (const u of utterances) {
 		const role = u.speaker === "user" ? "user" : "assistant";
 		const text = dataText(headWithin(u.text, RECENT.utteranceTokens).text);
-		const exchange = exchangeMessages(u.seq, u.toolCalls);
+		const exchange = history.toolExchanges
+			? exchangeMessages(u.seq, u.toolCalls)
+			: [];
+		// A report follows the notice it answered (section 5.5 #4); at the very start it has nothing to follow.
+		if (history.notices && u.notice && messages.length) {
+			const notice = dataText(u.notice);
+			const before = messages.at(-1)!;
+			if (before.role === "user") before.content += `\n${notice}`;
+			else messages.push({ role: "user", content: notice });
+		}
 		const last = messages.at(-1);
 		if (exchange.length) {
 			const [first, ...rest] = exchange;
@@ -253,7 +272,7 @@ export function moveCutInTransaction(
 		{
 			seq: input.seq,
 			systemDigest: systemDigestOf(
-				input.system ?? conversationSystem(deps, tx),
+				input.system ?? conversationSystem(deps, tx, localHarness),
 			),
 			memoryDigest: memoryDigestOf(window),
 			at: new Date(input.nowMs).toISOString(),
@@ -285,6 +304,7 @@ export function conversationPrefixFrom(
 	tx: Database,
 	conversationId: string,
 	input: {
+		harness: ConversationHarness;
 		system: string;
 		window: WindowSnapshot | null;
 		pending: ReadonlySet<string>;
@@ -292,8 +312,15 @@ export function conversationPrefixFrom(
 ): ConversationPrefix {
 	const store = deps.conversation.input;
 	const cut = store.cutInTransaction(tx, conversationId);
+	const { history } = input.harness;
+	// An utterance of the agent that copies the system part is not drawn: it was copied again turn after turn
+	// (section 5.5 #1). The generation's gate keeps new ones out; this keeps out those kept before it, and the
+	// agency's, which no generation gate checks.
+	const copies = history.copyFilter ? systemCopyCheck(input.system) : null;
 	const recent = recentUtterances(
-		store.utterancesAfterInTransaction(tx, conversationId, cut?.seq ?? 0),
+		store
+			.utterancesAfterInTransaction(tx, conversationId, cut?.seq ?? 0)
+			.filter((u) => !(copies && u.speaker === "agent" && copies(u.text))),
 		input.pending,
 	);
 	const { lines, ids } = memoryLines(input.window?.profile.items ?? []);
@@ -302,7 +329,7 @@ export function conversationPrefixFrom(
 		INPUT_HEADINGS.memory,
 		lines.length ? lines : ["- なし"],
 	);
-	const conversation = recentMessages(recent);
+	const conversation = recentMessages(recent, history);
 	const messages: ChatMessage[] = [{ role: "system", content: input.system }];
 	if (memory && conversation.length)
 		messages.push({ role: "user", content: memory });
@@ -353,8 +380,8 @@ export function pendingMessageIdsInTransaction(
 
 /**
  * The prefix a background call on the conversation reads (section 10): the conversation's prefix as its next
- * generation would draw it, with the memory window it last read. null when memory is unavailable (the conversation
- * itself would not run then).
+ * generation would draw it, with the memory window it last read. It stays on LARM, so it is drawn with the local
+ * harness. null when memory is unavailable (the conversation itself would not run then).
  */
 export function backgroundPrefixInTransaction(
 	deps: DialogueDeps,
@@ -368,7 +395,8 @@ export function backgroundPrefixInTransaction(
 		return null;
 	}
 	return conversationPrefixFrom(deps, tx, conversationId, {
-		system: conversationSystem(deps, tx),
+		harness: localHarness,
+		system: conversationSystem(deps, tx, localHarness),
 		window,
 		pending: pendingMessageIdsInTransaction(deps, tx, conversationId),
 	});

@@ -56,6 +56,15 @@ export function chatRequest(
 		),
 		// A call offered tools decides on them greedily, a spoken reply too: sampled, the model talks instead of calling.
 		...(options?.tools?.length ? { temperature: 0 } : {}),
+		// Absent: nothing is sent and the served model's own default applies.
+		...(options?.reasoning === "off"
+			? { chat_template_kwargs: { enable_thinking: false } }
+			: options?.reasoning
+				? {
+						chat_template_kwargs: { enable_thinking: true },
+						reasoning_effort: options.reasoning,
+					}
+				: {}),
 		stream,
 		max_tokens: Math.min(
 			provider.contextWindow!.outputReserveTokens,

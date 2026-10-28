@@ -34,6 +34,7 @@ const said = (
 	messageId,
 	at: "2026-10-26T10:00:00.000Z",
 	toolCalls: [],
+	notice: null,
 });
 
 test("the recent conversation starts with the agent, leaves out what waits for an answer, and joins a side's run", () => {
@@ -86,6 +87,44 @@ test("an utterance's kept tool calls come before its words, the first joining th
 		{ role: "tool", tool_call_id: "u2-1", content: "{}" },
 		{ role: "assistant", content: "作りますね\nもう少しです" },
 		{ role: "user", content: "はい" },
+	]);
+});
+
+test("a report follows its notice as the host's line: joined to the user's words before it, left out at the start", () => {
+	seq = 0;
+	const report = (text: string, notice: string) => ({
+		...said("agent", text),
+		notice,
+	});
+	expect(
+		recentMessages([
+			report(
+				"できあがりました。",
+				"[ホストの知らせ] t1「曲」が終わりました（成功）。",
+			),
+			said("user", "ありがとう"),
+			report(
+				"絵もできました。",
+				"[ホストの知らせ] t2「絵」が終わりました（成功）。",
+			),
+			said("agent", "表示しますか？"),
+			report(
+				"効果音もできました。",
+				"[ホストの知らせ] t3「音」が終わりました（成功）。",
+			),
+		]),
+	).toEqual([
+		{ role: "assistant", content: "できあがりました。" },
+		{
+			role: "user",
+			content: "ありがとう\n[ホストの知らせ] t2「絵」が終わりました（成功）。",
+		},
+		{ role: "assistant", content: "絵もできました。\n表示しますか？" },
+		{
+			role: "user",
+			content: "[ホストの知らせ] t3「音」が終わりました（成功）。",
+		},
+		{ role: "assistant", content: "効果音もできました。" },
 	]);
 });
 

@@ -66,7 +66,7 @@ async function attempt(r: Request, source: Source): Promise<Receipt> {
 		...logFields,
 		reason: r.reason ?? undefined,
 	});
-	const callOptions = callOptionsFor(r, attemptId);
+	const callOptions = callOptionsFor(r, attemptId, source);
 	const abort = new AbortController();
 	const timer = setTimeout(
 		() => abort.abort(new DOMException("deadline", "TimeoutError")),

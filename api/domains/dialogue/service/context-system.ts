@@ -46,17 +46,18 @@ export const SYSTEM_SECTIONS = [
 	"Facts",
 	"Results",
 ] as const;
-type SystemSection = (typeof SYSTEM_SECTIONS)[number];
+export type SystemSection = (typeof SYSTEM_SECTIONS)[number];
 
 /**
  * The system part: the agent's parts and the host's rules under their section headings. Each rule says when it
  * applies and stands in one section only, so the text is the same in every call and changes only with the
- * settings and the toolchains it can hand work to.
+ * settings and the toolchains it can hand work to. The harness names the sections and their order.
  */
 export function systemText(
 	persona: PersonaSpec,
 	agent: ConversationAgentSystem,
 	toolchainTitles: readonly string[] = [],
+	order: readonly SystemSection[] = SYSTEM_SECTIONS,
 ): string {
 	const own = PERSONAS[persona.persona] ?? PERSONAS.butler;
 	const sections: Record<SystemSection, Array<string | undefined>> = {
@@ -95,8 +96,10 @@ export function systemText(
 		],
 		Results: [systemContext("dialogue.contexts.system.results", {})],
 	};
-	return SYSTEM_SECTIONS.flatMap((name) => {
-		const parts = sections[name].filter((part): part is string => !!part);
-		return parts.length ? [`## ${name}\n${parts.join("\n")}`] : [];
-	}).join("\n\n");
+	return order
+		.flatMap((name) => {
+			const parts = sections[name].filter((part): part is string => !!part);
+			return parts.length ? [`## ${name}\n${parts.join("\n")}`] : [];
+		})
+		.join("\n\n");
 }

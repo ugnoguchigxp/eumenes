@@ -8,7 +8,7 @@ import {
 	type ConversationEvent,
 } from "../../continuity";
 import { createConversationService } from "../../conversation";
-import type { InferencePort, Receipt } from "../../inference";
+import type { CallSession, InferencePort, Receipt } from "../../inference";
 import { createMemoryService, type MemoryService } from "../../memory";
 import { createQueue } from "../../queue";
 import { createDialogueService } from "..";
@@ -50,6 +50,8 @@ export const userOf = (call: Call) =>
 export type Call = {
 	messages: ChatMessage[];
 	tools: string[];
+	/** The session the call carried (its output limit and reasoning). */
+	session?: CallSession;
 };
 
 /** What the fake model answers to one call: plain speech, native tool calls, or both. */
@@ -141,6 +143,13 @@ export type SetupOptions = {
 	agents?: unknown;
 	/** The resource registry and the kinds each toolchain makes; absent: the conversation has no resources. */
 	resources?: ResourceAccess;
+	/**
+	 * The saved settings the run captures its routes from (the snapshot a LARM lease would be taken on). Absent: the
+	 * run has a LARM request from the start and no settings.
+	 */
+	settings?: unknown;
+	/** With `settings`: the run is not captured when it is accepted, so its prepare takes the request. */
+	lateCapture?: boolean;
 	/** The context keeper's inference and quiet wait; absent: no keeper runs. */
 	keeper?: NonNullable<Parameters<typeof createDialogueService>[0]["keeper"]>;
 };
@@ -170,7 +179,15 @@ export async function setup(options: SetupOptions = {}) {
 		/** The context policies set on the run's requests, as `requestId:policy`. */
 		policies: [] as string[],
 		settled: [] as Array<{ runId: string; outcome: string }>,
+		/** The settings each run captured, by purpose, as the run took them. */
+		captures: [] as Array<{
+			subject: string;
+			purpose: string;
+			snapshot: unknown;
+		}>,
 	};
+	const captured = new Map<string, unknown>();
+	const accepted = new Set<string>();
 	const clock = () => new Date(Date.now() + state.offsetMs).toISOString();
 	const receipt = (requestId: string, step: Step): Receipt => ({
 		requestId,
@@ -184,7 +201,33 @@ export async function setup(options: SetupOptions = {}) {
 	});
 	const larm = {
 		status: () => ({ state: "ready", capabilities: ["llm"] }),
-		requestFor: (_db: unknown, runId: string) => `req:${runId}`,
+		requestFor: (_db: unknown, runId: string) =>
+			options.settings && !captured.has(runId) ? null : `req:${runId}`,
+		...(options.settings
+			? {
+					snapshotInTransaction: () => structuredClone(options.settings),
+					captureInTransaction: (
+						_db: unknown,
+						subject: string,
+						purpose: string,
+						_deadline: number,
+						snapshot: unknown,
+					) => {
+						// A late capture leaves the accept-time one out: the run's request is then taken at prepare.
+						if (options.lateCapture && !accepted.has(subject)) {
+							accepted.add(subject);
+							return `req:${subject}`;
+						}
+						// A capture without a snapshot takes the saved settings as they are.
+						const taken = snapshot ?? structuredClone(options.settings);
+						captured.set(subject, taken);
+						state.captures.push({ subject, purpose, snapshot: taken });
+						return `req:${subject}`;
+					},
+					snapshotFor: (_db: unknown, subject: string) =>
+						captured.get(subject) ?? null,
+				}
+			: {}),
 		llmContextWindowInTransaction: () => options.window,
 		setContextPolicyInTransaction: (
 			_db: unknown,
@@ -205,10 +248,12 @@ export async function setup(options: SetupOptions = {}) {
 			delta: (text: string) => void,
 			_preparation: unknown,
 			tools: Array<{ function: { name: string } }> | undefined,
+			session?: CallSession,
 		) => {
 			state.calls.push({
 				messages: messages.map((m) => ({ ...m })),
 				tools: (tools ?? []).map((t) => t.function.name),
+				...(session ? { session } : {}),
 			});
 			// The model's answer is fixed when the call is made; the gate only holds its delivery.
 			const step = state.steps.shift();

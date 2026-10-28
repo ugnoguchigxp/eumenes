@@ -62,7 +62,7 @@ export type CloudAgentCall = {
 	tools?: NativeTool[];
 	/** JSON Schema the final text must satisfy (control requests). */
 	outputSchema?: Record<string, unknown>;
-	reasoningEffort?: "low";
+	reasoningEffort?: "low" | "medium" | "high";
 	signal: AbortSignal;
 	onDelta?: (text: string) => void;
 };

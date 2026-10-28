@@ -340,3 +340,60 @@ test("a cloud fallback attempt records the role and the connection's billing pat
 			.map((u) => u.billingPath),
 	).toEqual(["openai-compatible"]);
 });
+test("a main call's reasoning reaches the LARM stream call, and any other role is rejected", async () => {
+	const seen: Array<unknown> = [];
+	const h = await setup({
+		localStream: async (_messages, _signal, onDelta, options) => {
+			seen.push(options?.reasoning);
+			onDelta("answer");
+			return "answer";
+		},
+	});
+	const capture = (subject: string) =>
+		h.store.write((db) =>
+			h.inference.captureInTransaction(db, subject, "llm", Date.now() + 30000),
+		);
+	const signal = new AbortController().signal;
+	await h.inference.executeStream(
+		await capture("with-reasoning"),
+		messages,
+		signal,
+		() => {},
+		undefined,
+		undefined,
+		{ sessionRole: "main", reasoning: { larm: "off", cloud: "high" } },
+	);
+	await h.inference.executeStream(
+		await capture("without-reasoning"),
+		messages,
+		signal,
+		() => {},
+		undefined,
+		undefined,
+		{ sessionRole: "main" },
+	);
+	expect(seen).toEqual(["off", undefined]);
+	for (const session of [
+		{ reasoning: { larm: "low", cloud: "low" } as const },
+		{
+			sessionRole: "auxiliary" as const,
+			reasoning: { larm: "low", cloud: "low" } as const,
+		},
+		{
+			sessionRole: "subagent" as const,
+			taskId: "t",
+			reasoning: { larm: "low", cloud: "low" } as const,
+		},
+	])
+		await expect(
+			h.inference.executeStream(
+				await capture(`rejected-${session.sessionRole ?? "default"}`),
+				messages,
+				signal,
+				() => {},
+				undefined,
+				undefined,
+				session,
+			),
+		).rejects.toThrow("invalid_session_role");
+});

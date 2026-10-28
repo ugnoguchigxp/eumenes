@@ -264,7 +264,13 @@ async function agentRequest(
 		tools:
 			options?.toolOutputFormat === "json-schema" ? undefined : options?.tools,
 		outputSchema: options?.jsonOutput ? options.jsonSchema : undefined,
-		reasoningEffort: options?.reasoningEffort,
+		// The conversation's level for the cloud (`off` sends none) takes the place of a control call's effort.
+		reasoningEffort:
+			options?.reasoning !== undefined
+				? options.reasoning === "off"
+					? undefined
+					: options.reasoning
+				: options?.reasoningEffort,
 		signal,
 		onDelta,
 	});

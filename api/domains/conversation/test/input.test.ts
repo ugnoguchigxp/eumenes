@@ -192,12 +192,20 @@ test("an agent's utterance keeps its turn's tool calls, written once, and a forg
 		input.appendUtteranceInTransaction(db, {
 			...say("agent", "どうぞ。", "m2"),
 			toolCalls: [find],
+			notice: "[ホストの知らせ] t1「絵」が終わりました（成功）。",
 		});
 	});
 	store.read((db) => {
 		expect(
 			input.utterancesAfterInTransaction(db, "c1", 0).map((u) => u.toolCalls),
 		).toEqual([[], [find, handed], [find]]);
+		expect(
+			input.utterancesAfterInTransaction(db, "c1", 0).map((u) => u.notice),
+		).toEqual([
+			null,
+			null,
+			"[ホストの知らせ] t1「絵」が終わりました（成功）。",
+		]);
 	});
 	await store.write((db) =>
 		input.retractUtterancesInTransaction(db, ["m1"], "later"),

@@ -51,7 +51,11 @@ export function attemptDuration(r: Request, source: Source) {
 }
 
 /** Provider options and bounded exchange correlation across language, delivery and synthesis. */
-export function callOptionsFor(r: Request, attemptId: string): LarmCallOptions {
+export function callOptionsFor(
+	r: Request,
+	attemptId: string,
+	source: Source,
+): LarmCallOptions {
 	const exchanges: LarmExchange[] = [];
 	return {
 		...(r.voiceOverride ? { speechOverride: r.voiceOverride } : {}),
@@ -85,6 +89,8 @@ export function callOptionsFor(r: Request, attemptId: string): LarmCallOptions {
 			? { history: r.session.context }
 			: {}),
 		...sessionCallOptions(r.session),
+		// The level of the side that answers: a fallback attempt on the cloud takes the cloud's.
+		...(r.session?.reasoning ? { reasoning: r.session.reasoning[source] } : {}),
 		...(r.row.outputLimit || r.outputLimit
 			? {
 					maxOutputTokens: Math.min(

@@ -28,3 +28,25 @@ test("a reply copying the rules fails its run and is not kept: the next turn doe
 		.join("\n");
 	expect(all).not.toContain("曲を生成します");
 });
+
+test("a copying utterance kept before the gate (or the agency's) is not drawn into the recent conversation", async () => {
+	h = await setup();
+	h.state.steps.push({ text: "おはようございます。" }, { text: "どうぞ。" });
+	await h.say("こんにちは");
+	await h.store.write((db) =>
+		h!.conversation.input.appendUtteranceInTransaction(db, {
+			conversationId: "main",
+			speaker: "agent",
+			text: "曲を生成します。: 完成と名前を短く伝えます。再生や表示を尋ねてかまいません。",
+			messageId: "kept-before",
+			at: new Date().toISOString(),
+		}),
+	);
+	await h.say("おはよう");
+	const all = h.state.calls
+		.at(-1)!
+		.messages.map((m) => m.content)
+		.join("\n");
+	expect(all).toContain("おはようございます。");
+	expect(all).not.toContain("曲を生成します");
+});

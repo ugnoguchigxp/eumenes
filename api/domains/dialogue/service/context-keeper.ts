@@ -25,6 +25,7 @@ import {
 	conversationSystem,
 	taskMessages,
 } from "./conversation-input";
+import { localHarness } from "./harness";
 import { INPUT_HEADINGS, lineText, section } from "./input-text";
 import { memoryItemLine } from "./result-text";
 import { stateLinesInTransaction, stateText } from "./state-text";
@@ -459,7 +460,7 @@ export function createContextKeeper(
 				if (conversationHasActiveRun(db, conversationId)) return false;
 				const window = storedWindow(db, conversationId);
 				return !!placeCutInTransaction(deps, db, conversationId, {
-					system: conversationSystem(deps, db),
+					system: conversationSystem(deps, db, localHarness),
 					window,
 					nowMs: Date.parse(deps.clock()),
 					pending: pendingMessageIdsInTransaction(deps, db, conversationId),

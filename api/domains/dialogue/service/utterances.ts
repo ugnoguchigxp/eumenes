@@ -18,6 +18,8 @@ export function recordUtteranceInTransaction(
 		at: string;
 		/** The tool calls of the turn an agent utterance ends. */
 		toolCalls?: readonly UtteranceToolCall[];
+		/** The host notice an agent utterance reports (`reportNoticeInTransaction`). */
+		notice?: string;
 	},
 	/** Tell the context keeper (false for a reply whose playback is still to come: its delivery tells it). */
 	notify = true,

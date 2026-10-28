@@ -10,7 +10,7 @@ export type CodexTurn = {
 	instructions: string;
 	prompt: string;
 	outputSchema?: unknown;
-	reasoningEffort?: "low";
+	reasoningEffort?: "low" | "medium" | "high";
 	signal: AbortSignal;
 	/** The current agent message so far (cumulative), on every delta. */
 	onMessage?: (text: string) => void;

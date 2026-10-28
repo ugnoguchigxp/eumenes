@@ -23,6 +23,8 @@ export type Utterance = {
 	at: string;
 	/** The tool calls of the turn this agent utterance ends, in order (empty for none, and for the user's). */
 	toolCalls: UtteranceToolCall[];
+	/** The host notice this agent utterance reported (a work's end, in one line); null for none. */
+	notice: string | null;
 };
 
 /** Where the recent conversation starts, and what it was cut on. */

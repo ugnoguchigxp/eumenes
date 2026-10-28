@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import { reportNoticeInTransaction } from "./report-notice";
 import { recordUtteranceInTransaction } from "./utterances";
 import { jstSeconds } from "../../../infrastructure/jst-time";
 import { byId } from "../repository";
@@ -121,12 +122,20 @@ export function recordSpontaneousInTransaction(
 		dedupeKey: `message:${input.messageId}`,
 		deliveryKey: `message:${input.messageId}`,
 	});
+	// A report follows, in the recent conversation, the notice of the works it told.
+	const notice = reportNoticeInTransaction(
+		deps,
+		db,
+		input.conversationId,
+		todoRefs,
+	);
 	recordUtteranceInTransaction(deps, db, {
 		conversationId: input.conversationId,
 		speaker: "agent",
 		text: input.text,
 		messageId: input.messageId,
 		at: input.at,
+		...(notice ? { notice } : {}),
 	});
 	// The report shows the resources of the TODOs it told as chips.
 	deps.resourceLedger?.linkMessageToWorkInTransaction(
