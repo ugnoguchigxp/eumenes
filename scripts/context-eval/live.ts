@@ -22,14 +22,19 @@ export async function createLiveLane(catalog: readonly EvalCard[]) {
 		answer: (messages, signal) => live.answer(messages, signal),
 		executeStream: async (requestId, messages, signal, onDelta, _p, tools) => {
 			let toolCalls: NativeToolCall[] = [];
-			const value = await live.answerStream!(messages, signal, onDelta, {
-				...(tools ? { tools } : {}),
-				onToolCalls: (calls) => {
-					toolCalls = calls;
+			const value = await live.answerStream!(
+				messages,
+				signal,
+				onDelta ?? (() => {}),
+				{
+					...(tools ? { tools } : {}),
+					onToolCalls: (calls) => {
+						toolCalls = calls;
+					},
+					sessionRole: "auxiliary",
+					contextPolicy: "exact",
 				},
-				sessionRole: "auxiliary",
-				contextPolicy: "exact",
-			});
+			);
 			return {
 				requestId,
 				attemptId: "context-eval",

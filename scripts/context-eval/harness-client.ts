@@ -41,15 +41,31 @@ export type CallMetrics = {
 	tokensPerSecond: number | null;
 };
 
+/** Which call of a turn a timed call was: the one call of a single turn, or a part of a decide-then-reply turn. */
+export type CallKind = "single" | "decision" | "reply" | "cloud";
+export type TaggedCall = { kind: CallKind; metrics: CallMetrics };
+
 export type ModelClient = {
 	connect(): Promise<void>;
 	close(): Promise<void>;
+	/** One streamed call with the fixed tools; `toolChoice: "none"` offers them without letting the model call. */
 	stream(
 		messages: ChatMessage[],
 		settings: CallSettings,
 		signal: AbortSignal,
 		onDelta: (text: string) => void,
+		extra?: { toolChoice?: "none" },
 	): Promise<{ text: string; toolCalls: NativeToolCall[] }>;
+	/**
+	 * The silent decision call: strict JSON by `schema` and no native tools field (the offered tools are the
+	 * schema's choices), as the app calls LARM for a schema. Absent on a path that cannot.
+	 */
+	decide?(
+		messages: ChatMessage[],
+		settings: CallSettings,
+		signal: AbortSignal,
+		schema: Record<string, unknown>,
+	): Promise<string>;
 	/** The calls timed since the last take (waits for their streams to end). */
 	take(): Promise<CallMetrics[]>;
 };
@@ -158,27 +174,49 @@ export function createMetricsFetch() {
 			finishReason: null,
 			tokensPerSecond: null,
 		};
+		const state = { chunks: 0, usageOut: null as number | null };
+		const metricsReader = forMetrics.getReader();
+		const callerReader = forCaller.getReader();
+		let stopped = false;
 		pending.push(
 			(async () => {
-				const state = { chunks: 0, usageOut: null as number | null };
-				const reader = forMetrics.getReader();
 				const decoder = new TextDecoder();
 				let rest = "";
-				for (;;) {
-					const { value, done: end } = await reader.read();
-					if (end) break;
-					const now = performance.now() - started;
-					rest += decoder.decode(value, { stream: true });
-					const lines = rest.split("\n");
-					rest = lines.pop() ?? "";
-					for (const line of lines) readStreamLine(m, line, now, state);
+				try {
+					while (!stopped) {
+						const { value, done: end } = await metricsReader.read();
+						if (end) break;
+						const now = performance.now() - started;
+						rest += decoder.decode(value, { stream: true });
+						const lines = rest.split("\n");
+						rest = lines.pop() ?? "";
+						for (const line of lines) readStreamLine(m, line, now, state);
+					}
+				} catch {
+					// A stream that broke ends the call where it broke.
 				}
-				m.totalMs = performance.now() - started;
+				m.totalMs ||= performance.now() - started;
+				// A call the reader stopped before the server finished (a failed check) has no finish reason.
+				if (stopped) m.finishReason ??= "stopped";
 				finishMetrics(m, state);
 				done.push(m);
 			})(),
 		);
-		return new Response(forCaller, {
+		// The reader of the answer may stop the call; the timing then ends there too, not when the server stops.
+		const answer = new ReadableStream<Uint8Array>({
+			async pull(controller) {
+				const { value, done: end } = await callerReader.read();
+				if (end) controller.close();
+				else controller.enqueue(value);
+			},
+			cancel(reason) {
+				stopped = true;
+				m.totalMs = performance.now() - started;
+				void metricsReader.cancel(reason).catch(() => {});
+				return callerReader.cancel(reason);
+			},
+		});
+		return new Response(answer, {
 			status: res.status,
 			statusText: res.statusText,
 			headers: res.headers,
@@ -198,24 +236,37 @@ export async function createLarmClient(): Promise<ModelClient> {
 	const { createLiveLarm } = await import("../live-larm");
 	const timed = createMetricsFetch();
 	const live = createLiveLarm(process.env, { fetch: timed.fetch });
+	/** The options every call of the conversation carries: the harness's reasoning and output limit. */
+	const base = (settings: CallSettings) => ({
+		sessionRole: "main" as const,
+		maxOutputTokens: settings.outputLimit,
+		contextPolicy: "exact" as const,
+		reasoning: settings.reasoning,
+	});
 	return {
 		connect: () => live.connect(),
 		close: () => live.close(),
 		take: timed.take,
-		async stream(messages, settings, signal, onDelta) {
+		async stream(messages, settings, signal, onDelta, extra) {
 			let toolCalls: NativeToolCall[] = [];
 			const text = await live.answerStream!(messages, signal, onDelta, {
+				...base(settings),
 				tools: generationTools,
+				...(extra?.toolChoice ? { toolChoice: extra.toolChoice } : {}),
 				onToolCalls: (calls) => {
 					toolCalls = calls;
 				},
-				sessionRole: "main",
-				maxOutputTokens: settings.outputLimit,
-				contextPolicy: "exact",
-				reasoning: settings.reasoning,
 			});
 			return { text, toolCalls };
 		},
+		// Streamed like every call, but nothing flows to a speaker and the tools field is left out.
+		decide: (messages, settings, signal, schema) =>
+			live.answerStream!(messages, signal, () => {}, {
+				...base(settings),
+				jsonOutput: true,
+				jsonSchema: schema,
+				toolOutputFormat: "json-schema",
+			}),
 	};
 }
 

@@ -272,6 +272,9 @@ type Candidate = {
 	targets?: unknown;
 };
 
+/** The first line of a search result that found no candidate. */
+export const NO_CANDIDATES = "- 候補なし";
+
 function candidateLine(candidate: Candidate): string {
 	const text = (value: unknown) =>
 		typeof value === "string" ? lineText(value) : null;
@@ -322,7 +325,7 @@ export function toolResultText(name: string, result: unknown): string {
 		const lines = (record.candidates as Candidate[]).map(candidateLine);
 		const rest = fieldLines({ ...record, candidates: undefined });
 		return fitLines(
-			lines.length ? [...lines, ...rest] : ["- 候補なし", ...rest],
+			lines.length ? [...lines, ...rest] : [NO_CANDIDATES, ...rest],
 			RESULT_MAX_TOKENS,
 		).join("\n");
 	}

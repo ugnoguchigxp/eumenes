@@ -91,7 +91,8 @@ export type Request = {
 	deadline: number;
 	selected: Selected;
 	running: Running;
-	onDelta?: (text: string) => void;
+	/** Returning `false` means the caller holds the piece unpublished (a later refusal can still retain the request). */
+	onDelta?: (text: string) => void | false;
 	preparation?: SpeechPreparation;
 	control?: ControlContract;
 	outputContract?: ControlContract;
@@ -101,4 +102,6 @@ export type Request = {
 	reason: string | null;
 	/** True once any answer text reached the caller: no silent fallback after that. */
 	published: boolean;
+	/** True once the caller's delta function threw: its refusal is not a provider failure, so no fallback follows. */
+	deltaRefused: boolean;
 };

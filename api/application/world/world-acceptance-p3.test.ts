@@ -147,7 +147,7 @@ async function boot(options: BootOptions) {
 			sends += 1;
 			seen.push(messages.map((m) => ({ ...m })));
 			const answer = UNKNOWN;
-			onDelta(answer);
+			onDelta?.(answer);
 			const receipt: Receipt = {
 				requestId,
 				attemptId: `att-${sends}`,

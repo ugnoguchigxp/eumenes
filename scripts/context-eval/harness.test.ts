@@ -11,7 +11,7 @@ import {
 	type Card,
 	type Step,
 } from "./harness-chains";
-import type { CallMetrics } from "./harness-client";
+import type { CallKind, CallMetrics, TaggedCall } from "./harness-client";
 import { readStreamLine, finishMetrics } from "./harness-client";
 import {
 	buildSystem,
@@ -466,11 +466,18 @@ describe("timing and aggregation", () => {
 		tokensPerSecond: 40,
 		...over,
 	});
+	const one = (
+		over: Partial<CallMetrics>,
+		kind: CallKind = "single",
+	): TaggedCall => ({
+		kind,
+		metrics: call(over),
+	});
 	test("the user first hears the reply's text, or the hand-over call's end", () => {
 		const spoken = timingOf(
 			[
-				call({ firstContentMs: 400 }),
-				call({ startedAt: 3000, firstContentMs: 100 }),
+				one({ firstContentMs: 400 }),
+				one({ startedAt: 3000, firstContentMs: 100 }),
 			],
 			1000,
 			4000,
@@ -478,7 +485,7 @@ describe("timing and aggregation", () => {
 		);
 		expect(spoken.heardMs).toBe(400);
 		const handed = timingOf(
-			[call({}), call({ startedAt: 2000, totalMs: 700 })],
+			[one({}), one({ startedAt: 2000, totalMs: 700 })],
 			1000,
 			2000,
 			true,
@@ -493,12 +500,12 @@ describe("timing and aggregation", () => {
 			truncated: false,
 		});
 		expect(
-			timingOf([call({ finishReason: "length" })], 1000, 1000, false).truncated,
+			timingOf([one({ finishReason: "length" })], 1000, 1000, false).truncated,
 		).toBe(true);
 		expect(timingOf([], 0, 5, false).heardMs).toBeNull();
 	});
 	const record = (over: Partial<StepRecord>): StepRecord => ({
-		...timingOf([call({ firstContentMs: 500 })], 1000, 2000, false),
+		...timingOf([one({ firstContentMs: 500 })], 1000, 2000, false),
 		chain: "続けて頼む",
 		form: "current",
 		rep: 0,
@@ -508,6 +515,13 @@ describe("timing and aggregation", () => {
 		pass: true,
 		why: "",
 		said: "",
+		turnMode: "single",
+		failedCheck: null,
+		failedChecks: [],
+		cloudAnswered: false,
+		copyRun: null,
+		stop: "answer",
+		callDetails: [],
 		...over,
 	});
 	test("free steps are not counted; the cell sums passes, means timings, and shares cache", () => {
@@ -537,6 +551,8 @@ describe("timing and aggregation", () => {
 			outputLimit: 4096,
 			reps: 1,
 			probe: false,
+			turn: "single" as const,
+			fallback: "-",
 			chains: ["続けて頼む", "話の続き"],
 			forms: ["current", "empty"],
 			settings: null,

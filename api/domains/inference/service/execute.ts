@@ -86,8 +86,15 @@ async function attempt(r: Request, source: Source): Promise<Receipt> {
 					checkedAt = generation;
 				}
 				if (text) {
-					r.published = true;
-					r.onDelta!(text);
+					let held: void | false;
+					try {
+						held = r.onDelta!(text);
+					} catch (error) {
+						r.deltaRefused = true;
+						throw error;
+					}
+					// A piece the caller refused by throwing, or holds unpublished (`false`), has not gone out.
+					if (held !== false) r.published = true;
 				}
 			}
 		: undefined;
@@ -181,6 +188,7 @@ async function attempt(r: Request, source: Source): Promise<Receipt> {
 			row.purpose === "llm" &&
 			row.mode !== "control" &&
 			!r.outputContract &&
+			!r.session?.outputSchema &&
 			r.preparation?.deliveryScope !== "chunk" &&
 			// A reply is judged even beside a tool call (a spoken answer carries its analysis call); a call alone is not.
 			typeof value === "string" &&
@@ -265,11 +273,27 @@ async function attempt(r: Request, source: Source): Promise<Receipt> {
 	}
 }
 
+/** Whether this request's route lets a call be answered on the cloud: cloud-only, or a usable fallback beside LARM. */
+function cloudAnswerAllowed(
+	row: RequestRow,
+	selected: ReturnType<Env["resolve"]>,
+) {
+	const routeConfig = row.snapshot.routes[row.purpose];
+	return (
+		routeConfig.mode === "cloud-only" ||
+		(routeConfig.mode === "larm-preferred" &&
+			routeConfig.cloudAllowed &&
+			!!selected?.connection.enabled)
+	);
+}
+
 /** Runs the request: larm first (unless cloud-only), then the cloud fallback when allowed. */
 async function runAttempts(r: Request, key: string): Promise<Receipt> {
 	const { env, row } = r;
 	const mode = route(r).mode;
-	if (mode !== "cloud-only") {
+	const cloudTarget = r.session?.target === "cloud";
+	if (cloudTarget && mode !== "cloud-only") r.reason = "cloud_requested";
+	if (mode !== "cloud-only" && !cloudTarget) {
 		if (
 			(env.cooldown.get(key) ?? 0) > Date.now() &&
 			mode === "larm-preferred" &&
@@ -288,6 +312,7 @@ async function runAttempts(r: Request, key: string): Promise<Receipt> {
 				if (
 					r.signal.aborted ||
 					r.published ||
+					r.deltaRefused ||
 					mode === "larm-only" ||
 					!fallbackErrors.test(r.reason)
 				)
@@ -309,7 +334,7 @@ export async function executeRequest(
 	requestId: string,
 	input: Input,
 	caller: AbortSignal,
-	onDelta?: (text: string) => void,
+	onDelta?: (text: string) => void | false,
 	preparation?: SpeechPreparation,
 	tools?: import("../../../infrastructure/chat-stream").NativeTool[],
 	control?: ControlContract,
@@ -360,6 +385,8 @@ export async function executeRequest(
 	if (voiceOverride && row.purpose !== "tts")
 		throw new Error("invalid_voice_override");
 	const resolvedSession = resolveSession(row, session);
+	if (outputContract && resolvedSession?.outputSchema)
+		throw new Error("invalid_output_contract");
 	// Optional helpers are hidden calls: even partial provider text cannot be published as answer output.
 	if (session?.failureScope === "call") onDelta = undefined;
 	if (
@@ -370,6 +397,9 @@ export async function executeRequest(
 	)
 		throw new Error("invalid_audio");
 	const selected = env.resolve(row);
+	// A call that must answer on the cloud fails before any attempt when the route allows none.
+	if (resolvedSession?.target === "cloud" && !cloudAnswerAllowed(row, selected))
+		throw new Error("cloud_fallback_unavailable");
 	const controller = new AbortController();
 	// A request with its own attempt time (a toolchain's) may run that long; others keep the usual bound.
 	const deadline = Math.min(
@@ -420,6 +450,7 @@ export async function executeRequest(
 		session: resolvedSession,
 		reason: null,
 		published: false,
+		deltaRefused: false,
 	};
 	const routeConfig = row.snapshot.routes[row.purpose];
 	// English and Japanese clauses use separate LARM voices; one voice's outage must not cool down the other.
@@ -432,8 +463,13 @@ export async function executeRequest(
 		return await runAttempts(request, key);
 	} catch (error) {
 		// Optional auxiliary work shares the answer's authority, but its provider failure is not the answer's
-		// terminal state. Attempts still record the failure; cancellation/deadline and published output stay terminal.
-		if (session?.failureScope !== "call" || signal.aborted || request.published)
+		// terminal state, and a retained call leaves the request for another call. Attempts still record the
+		// failure; cancellation/deadline and published output stay terminal.
+		if (
+			(session?.failureScope !== "call" && !resolvedSession?.retainRequest) ||
+			signal.aborted ||
+			request.published
+		)
 			await env.store.write((db) =>
 				db
 					.query(

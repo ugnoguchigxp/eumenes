@@ -118,6 +118,25 @@ export type CallSession = {
 	 * output bound, so the call's `outputLimit` must leave room for it.
 	 */
 	reasoning?: { larm: ReasoningLevel; cloud: ReasoningLevel };
+	/**
+	 * `main` only: the answer is one JSON value of this strict schema (the conversation's local decision call, the
+	 * conversation harness design, section 5.3). On LARM it is sent as the strict response format and the native tools
+	 * field is left out (the schema names the choices); a cloud attempt passes it as the output schema.
+	 */
+	outputSchema?: Record<string, unknown>;
+	/**
+	 * `main` only: answer on the cloud without trying LARM first (a local answer failed the host's checks, section
+	 * 5.3). Allowed when the run's route lets a call fall back to the cloud or is cloud-only; otherwise the call fails
+	 * with `cloud_fallback_unavailable` before any attempt.
+	 */
+	target?: "cloud";
+	/**
+	 * `main` only: a failure of this call ends this call, not the request, so the caller can make another call on the
+	 * same request (a local reply that failed the host's checks is answered again on the cloud, section 5.3). Applies
+	 * while the caller's signal is not aborted and nothing was published; text a delta function refused (it threw) is
+	 * not published.
+	 */
+	retainRequest?: true;
 	/** Hidden auxiliary work on an answer request: publishes no deltas; provider failure ends only this call. */
 	failureScope?: "call";
 	taskId?: string;
@@ -270,7 +289,11 @@ export interface InferencePort {
 		requestId: string,
 		messages: Messages,
 		signal: AbortSignal,
-		onDelta: (text: string) => void,
+		/**
+		 * Receives each piece of the answer. Returning `false` says the caller holds the piece unpublished (a reply
+		 * whose head the host checks first): it does not count as published output.
+		 */
+		onDelta: ((text: string) => void | false) | undefined,
 		preparation?: SpeechPreparation,
 		tools?: NativeTool[],
 		session?: CallSession,

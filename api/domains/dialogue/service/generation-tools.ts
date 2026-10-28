@@ -78,6 +78,8 @@ export const delegateArgs = z.discriminatedUnion("mode", [
 			mode: z.literal("approve"),
 			confirmation: id,
 			announcement: announcement.optional(),
+			/** Not needed to approve; a call that carries it is not refused. */
+			impact: z.enum(impacts).optional(),
 		})
 		.strict(),
 ]);
@@ -178,7 +180,7 @@ export const generationTools: NativeTool[] = [
 				"approveで実行する確認待ちの番号（「## State」の仕事の c1 など）。",
 			),
 		},
-		["mode"],
+		["mode", "impact"],
 	),
 	tool(
 		TOOL_NAMES.work,

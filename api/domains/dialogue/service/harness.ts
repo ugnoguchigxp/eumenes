@@ -32,6 +32,12 @@ export type ConversationHarness = {
 		/** An answer that copies the system part fails. */
 		systemCopy: boolean;
 	};
+	/**
+	 * How a model call answers: `single` is one call that replies or calls a tool; `decide-then-reply` first decides
+	 * silently (reply or which tool), then streams the reply with its head checked, and goes to the cloud when a check
+	 * fails (the conversation harness design, section 5.3).
+	 */
+	turn: "single" | "decide-then-reply";
 };
 
 /** The harness for a model served by a cloud connection. */
@@ -41,6 +47,7 @@ export const cloudHarness: ConversationHarness = {
 	history: { toolExchanges: true, notices: true, copyFilter: true },
 	call: { reasoning: "low", outputLimit: 1024 },
 	gates: { systemCopy: true },
+	turn: "single",
 };
 
 /** The harness for a model served by LARM: the one the background calls on the conversation also use. */
@@ -50,6 +57,7 @@ export const localHarness: ConversationHarness = {
 	history: { toolExchanges: true, notices: true, copyFilter: true },
 	call: { reasoning: "medium", outputLimit: 4096 },
 	gates: { systemCopy: true },
+	turn: "single",
 };
 
 /** The harness for the kind of connection that serves the conversation (LARM has none). */

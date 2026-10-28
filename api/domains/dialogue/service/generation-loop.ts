@@ -11,8 +11,14 @@ import type {
 	ConversationAgentPort,
 } from "../contracts";
 import type { ChatMessage, DialogueDeps, GenerateInput } from "./context";
-import { conversationOutput } from "./conversation-output";
+import { conversationOutput, systemCopyCheck } from "./conversation-output";
 import { cloudHarness, localHarness } from "./harness";
+import {
+	decisionMessages,
+	decisionSchema,
+	runLocalTurn,
+	type TurnResult,
+} from "./local-turn";
 import { toolResultText } from "./result-text";
 import { carriesExchange, type ExchangeStep } from "./tool-exchange";
 import {
@@ -138,28 +144,97 @@ export async function runGeneration(
 				output.delta(text);
 				return { text: output.finish(text), toolCalls: [] };
 			}
-			receipt = await withLogContext({ phase: "generation" }, () =>
-				deps.larm.executeStream!(
-					input.requestId!,
-					messages,
-					signal,
+			const requestId = input.requestId;
+			// The decision call has no delta function at all: nothing flows, so the run is not marked as having published.
+			const stream = deps.larm.executeStream;
+			const call = (
+				onDelta: ((text: string) => void) | undefined,
+				callSignal: AbortSignal,
+				offering: NativeTool[] | undefined,
+				session: CallSession,
+				preparation: SpeechPreparation | undefined,
+				sent: ChatMessage[] = messages,
+			) =>
+				withLogContext({ phase: "generation" }, () =>
+					stream.call(
+						deps.larm,
+						requestId,
+						sent,
+						callSignal,
+						onDelta,
+						preparation,
+						offering,
+						session,
+					),
+				);
+			/** One call that replies or calls a tool, published as it streams. */
+			const single = async (session: CallSession): Promise<TurnResult> => {
+				const answered = await call(
 					output.delta,
-					options.preparation,
+					signal,
 					offered,
-					callSession,
-				),
-			);
-			signal.throwIfAborted();
-			// The answer is what was published: control syntax written as text is not part of it.
-			const text = output.finish(receipt.value as string);
-			return {
-				text,
-				toolCalls: (receipt.toolCalls ?? []).map((call) => ({
-					id: call.id,
-					name: call.name,
-					arguments: call.arguments,
-				})),
+					session,
+					options.preparation,
+				);
+				signal.throwIfAborted();
+				// The answer is what was published: control syntax written as text is not part of it.
+				return {
+					text: output.finish(answered.value as string),
+					toolCalls: (answered.toolCalls ?? []).map((call) => ({
+						id: call.id,
+						name: call.name,
+						arguments: call.arguments,
+					})),
+					receipt: answered,
+				};
 			};
+			const taken =
+				input.harness.turn === "decide-then-reply"
+					? await runLocalTurn(
+							{
+								decide: () =>
+									call(
+										undefined,
+										signal,
+										undefined,
+										{ ...callSession, outputSchema: decisionSchema(offered) },
+										// A silent call: no speech is collected from it.
+										undefined,
+										// A schema call carries no tool definitions: the functions are listed in its input.
+										decisionMessages(messages, offered),
+									),
+								// A failed head stops the call from its delta; the request stays usable for the cloud call.
+								reply: (onDelta) =>
+									call(
+										onDelta,
+										signal,
+										offered,
+										{
+											...callSession,
+											// With no tool offered (the call limit is reached) there is nothing to hold back.
+											...(offered.length
+												? { toolChoice: "none" as const }
+												: {}),
+											retainRequest: true,
+										},
+										options.preparation,
+									),
+								cloud: () => single({ ...callSession, target: "cloud" }),
+							},
+							{
+								base,
+								own: messages.slice(base.length),
+								offered: offered.map((tool) => tool.function.name),
+								output,
+								...(input.harness.gates.systemCopy && base[0]?.role === "system"
+									? { copies: systemCopyCheck(base[0].content) }
+									: {}),
+								signal,
+							},
+						)
+					: await single(callSession);
+			receipt = taken.receipt;
+			return { text: taken.text, toolCalls: taken.toolCalls };
 		},
 	};
 

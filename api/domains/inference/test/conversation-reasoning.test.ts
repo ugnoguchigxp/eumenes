@@ -17,6 +17,7 @@ import {
 	migrations as inferenceMigrations,
 } from "..";
 import type { LarmPort } from "../../larm";
+import type { Settings } from "../../settings/contracts";
 import type { CloudAgentCall, CloudAgents } from "../adapters/cloud-agents";
 
 type CloudAgentResult = Awaited<ReturnType<CloudAgents["run"]>>;
@@ -48,6 +49,8 @@ async function setup(
 	route: {
 		mode?: "cloud-only" | "larm-preferred";
 		localStream?: LarmPort["answerStream"];
+		/** Changes the saved settings before they are applied. */
+		edit?: (s: Settings) => void;
 	} = {},
 ) {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-conversation-reasoning-"));
@@ -87,6 +90,7 @@ async function setup(
 	s.routes.llm.mode = route.mode ?? "cloud-only";
 	s.routes.llm.cloudAllowed = true;
 	s.routes.llm.fallbackId = resourceId;
+	route.edit?.(s);
 	await settings.apply({
 		requestId: crypto.randomUUID(),
 		expectedRevision: 0,
@@ -135,7 +139,7 @@ async function setup(
 			inference.setContextPolicyInTransaction!(db, id, "exact");
 			return id;
 		});
-	return { inference, calls, request };
+	return { inference, calls, request, store };
 }
 
 test("a main streamed call on a cloud-only Codex SDK route passes the reasoning as the effort, and gets its tool calls back", async () => {
@@ -220,4 +224,337 @@ test("a fallback from LARM to the cloud inside one call gives each attempt the l
 	expect(larm).toEqual(["off"]);
 	expect(h.calls).toHaveLength(1);
 	expect(h.calls[0]!.reasoningEffort).toBe("medium");
+});
+
+const schema = {
+	type: "object",
+	properties: { kind: { type: "string", enum: ["reply"] } },
+	required: ["kind"],
+	additionalProperties: false,
+};
+
+/** The options of each LARM call, the stream returning the JSON text. */
+function larmCalls(text = '{"kind":"reply"}') {
+	const options: Array<Parameters<NonNullable<LarmPort["answerStream"]>>[3]> =
+		[];
+	const localStream: LarmPort["answerStream"] = async (
+		_messages,
+		_signal,
+		onDelta,
+		o,
+	) => {
+		options.push(o);
+		onDelta(text);
+		return text;
+	};
+	return { options, localStream };
+}
+
+test("a main call with an output schema on LARM sends it as the strict format, no native tools, and gets the JSON text back", async () => {
+	const larm = larmCalls();
+	const h = await setup(
+		{ text: "cloud" },
+		{ mode: "larm-preferred", localStream: larm.localStream },
+	);
+	const deltas: string[] = [];
+	const receipt = await h.inference.executeStream(
+		await h.request(),
+		messages,
+		new AbortController().signal,
+		(t) => {
+			deltas.push(t);
+		},
+		undefined,
+		tools,
+		{ sessionRole: "main", outputSchema: schema },
+	);
+	expect(receipt.value).toBe('{"kind":"reply"}');
+	expect(receipt.toolCalls).toBeUndefined();
+	expect(larm.options).toHaveLength(1);
+	expect(larm.options[0]).toMatchObject({
+		jsonOutput: true,
+		jsonSchema: schema,
+		toolOutputFormat: "json-schema",
+	});
+	expect(larm.options[0]!.tools).toBeUndefined();
+	expect(larm.options[0]!.onToolCalls).toBeUndefined();
+	expect(deltas.join("")).toBe('{"kind":"reply"}');
+	expect(h.calls).toHaveLength(0);
+});
+
+test("a main call with an output schema on the cloud passes it as the output schema and no tools", async () => {
+	const h = await setup({ text: '{"kind":"reply"}' });
+	const receipt = await h.inference.executeStream(
+		await h.request(),
+		messages,
+		new AbortController().signal,
+		() => {},
+		undefined,
+		tools,
+		{ sessionRole: "main", outputSchema: schema },
+	);
+	expect(receipt.value).toBe('{"kind":"reply"}');
+	expect(h.calls).toHaveLength(1);
+	expect(h.calls[0]!.outputSchema).toEqual(schema);
+	expect(h.calls[0]!.tools).toBeUndefined();
+});
+
+test("target cloud on a larm-preferred route skips LARM and runs the cloud with the cloud level", async () => {
+	const larm = larmCalls();
+	const h = await setup(
+		{ text: "answer" },
+		{ mode: "larm-preferred", localStream: larm.localStream },
+	);
+	const receipt = await h.inference.executeStream(
+		await h.request(),
+		messages,
+		new AbortController().signal,
+		() => {},
+		undefined,
+		undefined,
+		{
+			sessionRole: "main",
+			target: "cloud",
+			reasoning: { larm: "off", cloud: "high" },
+		},
+	);
+	expect(receipt.value).toBe("answer");
+	expect(larm.options).toHaveLength(0);
+	expect(h.calls).toHaveLength(1);
+	expect(h.calls[0]!.reasoningEffort).toBe("high");
+});
+
+test("target cloud without a usable cloud answer fails before any attempt", async () => {
+	for (const edit of [
+		(s: Settings) => {
+			s.routes.llm.mode = "larm-only";
+		},
+		(s: Settings) => {
+			s.routes.llm.cloudAllowed = false;
+		},
+	]) {
+		const larm = larmCalls();
+		const h = await setup(
+			{ text: "answer" },
+			{ mode: "larm-preferred", localStream: larm.localStream, edit },
+		);
+		const id = await h.request();
+		await expect(
+			h.inference.executeStream(
+				id,
+				messages,
+				new AbortController().signal,
+				() => {},
+				undefined,
+				undefined,
+				{ sessionRole: "main", target: "cloud" },
+			),
+		).rejects.toThrow("cloud_fallback_unavailable");
+		expect(larm.options).toHaveLength(0);
+		expect(h.calls).toHaveLength(0);
+	}
+});
+
+test("a main call may offer tools with toolChoice none: LARM gets the tools and the choice", async () => {
+	const larm = larmCalls("hello");
+	const h = await setup(
+		{ text: "cloud" },
+		{ mode: "larm-preferred", localStream: larm.localStream },
+	);
+	await h.inference.executeStream(
+		await h.request(),
+		messages,
+		new AbortController().signal,
+		() => {},
+		undefined,
+		tools,
+		{ sessionRole: "main", toolChoice: "none" },
+	);
+	expect(larm.options[0]).toMatchObject({ tools, toolChoice: "none" });
+});
+
+test("an output schema or a target on a non-main call is refused", async () => {
+	const h = await setup({ text: "answer" });
+	for (const session of [
+		{ outputSchema: schema },
+		{ target: "cloud" as const },
+		{ sessionRole: "auxiliary" as const, outputSchema: schema },
+		{ sessionRole: "auxiliary" as const, target: "cloud" as const },
+	])
+		await expect(
+			h.inference.executeStream(
+				await h.request(),
+				messages,
+				new AbortController().signal,
+				() => {},
+				undefined,
+				undefined,
+				session,
+			),
+		).rejects.toThrow("invalid_session_role");
+	expect(h.calls).toHaveLength(0);
+});
+
+const status = (h: Awaited<ReturnType<typeof setup>>, id: string) =>
+	(
+		h.store.read((db) =>
+			db.query("SELECT status FROM inference_requests WHERE id=?").get(id),
+		) as { status: string }
+	).status;
+
+const attempts = (h: Awaited<ReturnType<typeof setup>>, id: string) =>
+	h.store.read((db) =>
+		db
+			.query(
+				"SELECT source,status FROM inference_attempts WHERE request_id=? ORDER BY started",
+			)
+			.all(id),
+	);
+
+/** A first call whose delta function refuses the first text, as the dialogue does when the held head fails its checks. */
+async function refusedFirstCall(retain: boolean) {
+	const larm = larmCalls("hello there");
+	const h = await setup(
+		{ text: "cloud answer" },
+		{ mode: "larm-preferred", localStream: larm.localStream },
+	);
+	const id = await h.request();
+	const first = h.inference.executeStream(
+		id,
+		messages,
+		new AbortController().signal,
+		() => {
+			throw new Error("head_refused");
+		},
+		undefined,
+		undefined,
+		{
+			sessionRole: "main",
+			...(retain ? { retainRequest: true as const } : {}),
+		},
+	);
+	return { h, id, first, larm };
+}
+
+test("a main call that retains its request leaves it pending when its delta refuses, and the cloud answers it next", async () => {
+	const { h, id, first, larm } = await refusedFirstCall(true);
+	await expect(first).rejects.toThrow("head_refused");
+	expect(status(h, id)).toBe("pending");
+	expect(larm.options).toHaveLength(1);
+	expect(h.calls).toHaveLength(0);
+	expect(await attempts(h, id)).toEqual([{ source: "larm", status: "failed" }]);
+	const receipt = await h.inference.executeStream(
+		id,
+		messages,
+		new AbortController().signal,
+		() => {},
+		undefined,
+		undefined,
+		{ sessionRole: "main", target: "cloud", retainRequest: true },
+	);
+	expect(receipt.value).toBe("cloud answer");
+	expect(h.calls).toHaveLength(1);
+	expect(
+		await h.store.write((db) => h.inference.acceptInTransaction!(db, receipt)),
+	).toBe(true);
+});
+
+test("without retainRequest a refused delta still fails the request", async () => {
+	const { h, id, first } = await refusedFirstCall(false);
+	await expect(first).rejects.toThrow("head_refused");
+	expect(status(h, id)).toBe("failed");
+	expect(h.calls).toHaveLength(0);
+});
+
+/** A stream of pieces; the delta function receives each, and the stream stops at the first throw. */
+function streamOf(pieces: string[]) {
+	const localStream: LarmPort["answerStream"] = async (
+		_messages,
+		_signal,
+		onDelta,
+	) => {
+		for (const piece of pieces) onDelta(piece);
+		return pieces.join("");
+	};
+	return localStream;
+}
+const pieces = ["hel", "lo, ", "how ", "are you?"];
+
+test("pieces held unpublished (the delta returns false) then a throw leave the request pending for the cloud", async () => {
+	const h = await setup(
+		{ text: "cloud answer" },
+		{ mode: "larm-preferred", localStream: streamOf(pieces) },
+	);
+	const id = await h.request();
+	let seen = "";
+	await expect(
+		h.inference.executeStream(
+			id,
+			messages,
+			new AbortController().signal,
+			(text) => {
+				seen += text;
+				if (seen.length > 8) throw new Error("head_refused");
+				return false;
+			},
+			undefined,
+			undefined,
+			{ sessionRole: "main", retainRequest: true },
+		),
+	).rejects.toThrow("head_refused");
+	expect(status(h, id)).toBe("pending");
+	expect(h.calls).toHaveLength(0);
+	expect(await attempts(h, id)).toEqual([{ source: "larm", status: "failed" }]);
+	const receipt = await h.inference.executeStream(
+		id,
+		messages,
+		new AbortController().signal,
+		() => {},
+		undefined,
+		undefined,
+		{ sessionRole: "main", target: "cloud", retainRequest: true },
+	);
+	expect(receipt.value).toBe("cloud answer");
+	expect(
+		await h.store.write((db) => h.inference.acceptInTransaction!(db, receipt)),
+	).toBe(true);
+});
+
+test("once a piece was published (the delta returned void) a later throw still fails the request", async () => {
+	const h = await setup(
+		{ text: "cloud" },
+		{ mode: "larm-preferred", localStream: streamOf(pieces) },
+	);
+	const id = await h.request();
+	let count = 0;
+	await expect(
+		h.inference.executeStream(
+			id,
+			messages,
+			new AbortController().signal,
+			() => {
+				if (++count > 1) throw new Error("late_refusal");
+			},
+			undefined,
+			undefined,
+			{ sessionRole: "main", retainRequest: true },
+		),
+	).rejects.toThrow("late_refusal");
+	expect(status(h, id)).toBe("failed");
+	expect(h.calls).toHaveLength(0);
+});
+
+test("retainRequest on a non-main call is refused", async () => {
+	const h = await setup({ text: "answer" });
+	await expect(
+		h.inference.executeStream(
+			await h.request(),
+			messages,
+			new AbortController().signal,
+			() => {},
+			undefined,
+			undefined,
+			{ sessionRole: "auxiliary", retainRequest: true },
+		),
+	).rejects.toThrow("invalid_session_role");
 });

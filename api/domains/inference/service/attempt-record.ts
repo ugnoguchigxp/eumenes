@@ -15,6 +15,12 @@ export type CallSessionRole = {
 	readAhead?: true;
 	/** `main` only: how much the model thinks before it answers, per target (see `CallSession`). */
 	reasoning?: NonNullable<CallSession["reasoning"]>;
+	/** `main` only: the answer is one JSON value of this strict schema (no native tools field). */
+	outputSchema?: NonNullable<CallSession["outputSchema"]>;
+	/** `main` only: answer on the cloud without trying LARM first. */
+	target?: "cloud";
+	/** `main` only: a failure of this call leaves the request pending for another call. */
+	retainRequest?: true;
 	context?: NonNullable<CallSession["context"]>;
 	refs?: { messageIds: string[]; itemIds: string[] };
 };
@@ -61,7 +67,16 @@ export function resolveSession(
 	)
 		throw new Error("invalid_failure_scope");
 	if (row.purpose !== "llm") {
-		if (given?.sessionRole || given?.taskId || given?.context || given?.refs)
+		if (
+			given?.sessionRole ||
+			given?.taskId ||
+			given?.context ||
+			given?.refs ||
+			given?.reasoning !== undefined ||
+			given?.outputSchema !== undefined ||
+			given?.target !== undefined ||
+			given?.retainRequest !== undefined
+		)
 			throw new Error("invalid_session_role");
 		return undefined;
 	}
@@ -71,10 +86,21 @@ export function resolveSession(
 		(given?.prefixTools && !given.onConversation) ||
 		(given?.readAhead && !given.onConversation) ||
 		(given?.reasoning !== undefined && sessionRole !== "main") ||
+		(given?.outputSchema !== undefined && sessionRole !== "main") ||
+		(given?.target !== undefined && sessionRole !== "main") ||
+		(given?.retainRequest !== undefined && sessionRole !== "main") ||
 		(sessionRole === "main" && row.mode !== "answer") ||
 		(sessionRole === "subagent") !== !!given?.taskId ||
 		(given?.taskId !== undefined && !TASK_ID.test(given.taskId))
 	)
+		throw new Error("invalid_session_role");
+	const schema = given?.outputSchema;
+	if (
+		schema !== undefined &&
+		(!schema || typeof schema !== "object" || Array.isArray(schema))
+	)
+		throw new Error("invalid_output_contract");
+	if (given?.target !== undefined && given.target !== "cloud")
 		throw new Error("invalid_session_role");
 	const context = given?.context;
 	if (
@@ -97,6 +123,9 @@ export function resolveSession(
 					},
 				}
 			: {}),
+		...(schema ? { outputSchema: schema } : {}),
+		...(given?.target ? { target: given.target } : {}),
+		...(given?.retainRequest ? { retainRequest: true as const } : {}),
 		...(context
 			? {
 					context: {

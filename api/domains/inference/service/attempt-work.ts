@@ -59,7 +59,8 @@ export function callOptionsFor(
 	const exchanges: LarmExchange[] = [];
 	return {
 		...(r.voiceOverride ? { speechOverride: r.voiceOverride } : {}),
-		...(r.tools?.length
+		// A decision call names its choices in the output schema: no native tools field, no tool calls back.
+		...(r.tools?.length && !r.session?.outputSchema
 			? {
 					tools: r.tools,
 					...(r.toolChoice ? { toolChoice: r.toolChoice } : {}),
@@ -72,13 +73,21 @@ export function callOptionsFor(
 			: {}),
 		// A control call answers in JSON; tools it may not call (`none`) only keep the conversation's prefix.
 		...(r.outputContract ||
+		r.session?.outputSchema ||
 		(r.row.mode === "control" && (!r.tools?.length || r.toolChoice === "none"))
 			? controlJsonOptions(
-					r.outputContract ?? r.control,
-					!!r.outputContract || r.row.structuredOutput,
+					r.outputContract ??
+						(r.session?.outputSchema
+							? { instructions: "", outputSchema: r.session.outputSchema }
+							: r.control),
+					!!r.outputContract ||
+						!!r.session?.outputSchema ||
+						r.row.structuredOutput,
 				)
 			: {}),
-		...(r.outputContract ? { toolOutputFormat: "json-schema" as const } : {}),
+		...(r.outputContract || r.session?.outputSchema
+			? { toolOutputFormat: "json-schema" as const }
+			: {}),
 		...(r.row.mode === "control" && r.control?.reasoningEffort
 			? { reasoningEffort: r.control.reasoningEffort }
 			: {}),

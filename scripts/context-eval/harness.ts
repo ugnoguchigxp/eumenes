@@ -4,11 +4,15 @@
  * is judged and timed. Usage:
  *   bun scripts/context-eval/harness.ts [--harness local|cloud] [--client larm|codex] [--model <id>]
  *       [--reasoning off|low|medium|high] [--chains <key,...>] [--forms <form,...>] [--reps <n>]
+ *       [--turn single|decide-then-reply] [--fallback-client codex --fallback-model <id>]
  *       [--probe] [--dry-run]
  * Without `--client` the saved LARM connection answers (in this process; no server is started). `--client codex`
  * runs the Codex SDK path with `--model`; the model id is only ever this argument. The harness decides the call's
  * reasoning and output limit; `--reasoning` overrides the reasoning for an experiment. `--probe` tries the first
- * request six times in the empty form. `--dry-run` composes and prints the first step of each chain and form
+ * request six times in the empty form. `--turn decide-then-reply` runs the local turn of design section 5.3 (a
+ * silent decision, then the reply once its head passes the host's checks; saved LARM connection only); a failed
+ * check fails the step as `fallback:<check>`, or, with `--fallback-client codex --fallback-model <id>`, the Codex
+ * path (cloud harness) answers that round and its answer is judged. `--dry-run` composes and prints the first step of each chain and form
  * without calling any model. Runs interleave rep, chain, form. Reports go to
  * verification-reports/context-eval/harness/<timestamp>/ (new directories, never overwritten). It is outside verify.
  */
@@ -26,7 +30,13 @@ import {
 	type ConversationHarness,
 } from "../../api/domains/dialogue/service/harness";
 import { NOTICE_MARK } from "../../api/domains/dialogue/service/report-notice";
+import {
+	decisionMessages,
+	decisionSchema,
+} from "../../api/domains/dialogue/service/local-turn";
+import { generationTools } from "../../api/domains/dialogue/service/generation-tools";
 import { estimateMessageTokens } from "../../api/domains/inference";
+import { estimateTextTokens } from "../../api/infrastructure/context-budget";
 import { CHAINS, PROBE_CHAIN, PROBE_TRIES, type Chain } from "./harness-chains";
 import {
 	REASONINGS,
@@ -44,10 +54,12 @@ import {
 	type Work,
 } from "./harness-compose";
 import {
+	copyRunOf,
 	judgeStep,
 	reportMarkdown,
 	timingOf,
 	type ReportMeta,
+	type TurnMode,
 	type StepRecord,
 } from "./harness-judge";
 import { readSaved, type Saved } from "./harness-source";
@@ -60,6 +72,10 @@ export type Options = {
 	reasoning: Reasoning;
 	/** Whether `--reasoning` was given (the override of the harness's value). */
 	reasoningOverridden: boolean;
+	/** How a model round is made: one call, or a decision and then the reply. */
+	turn: TurnMode;
+	/** The model that answers a round whose local answer failed a check (Codex path); null for none. */
+	fallbackModel: string | null;
 	chains: Chain[];
 	forms: Form[];
 	reps: number;
@@ -88,6 +104,9 @@ export function parseOptions(argv: readonly string[]): Options {
 		"reps",
 		"probe",
 		"dry-run",
+		"turn",
+		"fallback-client",
+		"fallback-model",
 	]);
 	for (const arg of argv)
 		if (arg.startsWith("--") && !known.has(arg.slice(2)))
@@ -112,6 +131,21 @@ export function parseOptions(argv: readonly string[]): Options {
 		throw new Error("--reasoning is off, low, medium or high");
 	if (client === "codex" && reasoning === "off")
 		throw new Error("--reasoning off is not available on the Codex path");
+	const turn = value("turn") ?? harness.turn;
+	if (turn !== "single" && turn !== "decide-then-reply")
+		throw new Error("--turn is single or decide-then-reply");
+	if (turn === "decide-then-reply" && client !== "larm")
+		throw new Error("--turn decide-then-reply needs the saved LARM connection");
+	const fallbackClient = value("fallback-client");
+	if (fallbackClient && fallbackClient !== "codex")
+		throw new Error("--fallback-client is codex");
+	const fallbackModel = value("fallback-model") ?? null;
+	if (fallbackClient && !fallbackModel && !dryRun)
+		throw new Error("--fallback-client codex needs --fallback-model <id>");
+	if (fallbackModel && !fallbackClient)
+		throw new Error("--fallback-model needs --fallback-client codex");
+	if (fallbackClient && turn !== "decide-then-reply")
+		throw new Error("--fallback-client needs --turn decide-then-reply");
 	const probe = flag("probe");
 	const keys = value("chains")?.split(",");
 	const chains = probe
@@ -142,6 +176,8 @@ export function parseOptions(argv: readonly string[]): Options {
 		model,
 		reasoning: (reasoning as Reasoning | undefined) ?? harness.call.reasoning,
 		reasoningOverridden: !!reasoning,
+		turn,
+		fallbackModel: fallbackClient ? (fallbackModel ?? "") : null,
 		chains,
 		forms,
 		reps,
@@ -173,6 +209,9 @@ type Run = {
 	system: string;
 	harness: ConversationHarness;
 	settings: CallSettings;
+	turn: TurnMode;
+	/** The Codex path for a round whose local answer failed (the cloud harness's call settings). */
+	cloud: { client: ModelClient; settings: CallSettings } | null;
 	onStep: (record: StepRecord) => void;
 };
 
@@ -202,25 +241,30 @@ async function runChain(
 		});
 		presented = null;
 		await run.client.take();
+		await run.cloud?.client.take();
 		const startedAt = performance.now();
 		const turn = await runTurn(
-			run.client,
+			{
+				client: run.client,
+				settings: run.settings,
+				mode: run.turn,
+				cloud: run.cloud,
+				...(run.harness.gates.systemCopy ? { copies } : {}),
+			},
 			messages,
-			run.settings,
 			run.saved.cards,
 			handed + 1,
 		);
 		const turnMs = performance.now() - startedAt;
 		const timing = timingOf(
-			await run.client.take(),
+			turn.calls,
 			startedAt,
 			turnMs,
 			!!turn.delegated,
+			turn.publishedAt,
 		);
-		const verdict = judgeStep(step, turn, {
-			copies,
-			lastAgent: lastOf(log, (e) => e.role === "agent")?.text ?? "",
-		});
+		const lastAgent = lastOf(log, (e) => e.role === "agent")?.text ?? "";
+		const verdict = judgeStep(step, turn, { copies, lastAgent });
 		const record: StepRecord = {
 			...timing,
 			chain: chain.name,
@@ -232,12 +276,19 @@ async function runChain(
 			...verdict,
 			...turn.delegated,
 			said: turn.said.slice(0, 120),
+			turnMode: run.turn,
+			failedCheck: turn.failedChecks[0] ?? null,
+			failedChecks: turn.failedChecks,
+			cloudAnswered: turn.cloudAnswered,
+			copyRun: copyRunOf(turn.said, lastAgent),
+			stop: turn.stop,
+			callDetails: turn.details,
 		};
 		records.push(record);
 		run.onStep(record);
 		// The talk grows as the product stores it; a reply that copies the system part is not kept.
 		log.push({ role: "user", text: step.say });
-		if (!turn.error && !copies(turn.said))
+		if (!turn.error && !turn.localFailure && !copies(turn.said))
 			log.push({ role: "agent", text: turn.said, toolCalls: turn.toolCalls });
 		if (!turn.delegated) continue;
 		handed++;
@@ -266,12 +317,28 @@ async function runChain(
 	return records;
 }
 
+/** What a decide-then-reply measurement sends beyond the messages: the schema of the decision, the tools of the reply. */
+export function decisionNotes(fallback: boolean): string[] {
+	const schema = JSON.stringify(decisionSchema(generationTools));
+	const tools = JSON.stringify(generationTools);
+	return [
+		"turn: decide-then-reply (a silent decision, then the reply once its head passes the host's checks)",
+		`fallback: ${fallback ? "the Codex path answers a failed round (cloud harness)" : "none; a failed check fails the step as fallback:<check>"}`,
+		`decision schema: ${schema.length} chars, ~${estimateTextTokens(schema)} tokens, response_format json_schema, no native tools field`,
+		`reply call: ${generationTools.length} tool definitions (${tools.length} chars, ~${estimateTextTokens(tools)} tokens) offered, tool_choice none`,
+		`decision schema (as sent): ${schema}`,
+	];
+}
+
 /** The first step of each chain and form, composed and printed; no model is called. */
 export function dryRunText(opts: Options, saved: Saved): string {
 	const system = buildSystem(saved.source, opts.harness);
 	const lines = [
 		`harness=${opts.harness.name} client=${opts.client} reasoning=${opts.reasoning}${opts.reasoningOverridden ? " (override)" : ""} outputLimit=${opts.harness.call.outputLimit}`,
 		`system: ${system.length} chars, ~${estimateMessageTokens([{ content: system }])} tokens, ${system.split("\n").filter((l) => l.startsWith("## ")).length} sections`,
+		...(opts.turn === "decide-then-reply"
+			? decisionNotes(opts.fallbackModel !== null)
+			: [`turn: single (one call with the native tools)`]),
 		"",
 		"=== system (shared by every message list below) ===",
 		system,
@@ -291,6 +358,14 @@ export function dryRunText(opts: Options, saved: Saved): string {
 				"",
 				`=== ${chain.key} / ${form}: ${messages.length} messages, ~${estimateMessageTokens(messages)} tokens ===`,
 			);
+			if (opts.turn === "decide-then-reply") {
+				const asked = decisionMessages(messages, generationTools);
+				const added =
+					asked.at(-1)!.content.length - messages.at(-1)!.content.length;
+				lines.push(
+					`(decision call: these ${messages.length} messages with the functions added to the last user message, +${added} chars, no native tools, response_format json_schema; the reply call: the messages as they are with the tools offered, tool_choice none)`,
+				);
+			}
 			for (const [i, m] of messages.entries()) {
 				const calls = m.tool_calls
 					?.map((c) => `${c.function.name}(${c.function.arguments})`)
@@ -322,6 +397,16 @@ async function main() {
 		reasoning: opts.reasoning,
 		outputLimit: opts.harness.call.outputLimit,
 	};
+	// A failed round is answered by the cloud harness's call, on the Codex path.
+	const cloud = opts.fallbackModel
+		? {
+				client: await clients.createCodexClient(opts.fallbackModel),
+				settings: {
+					reasoning: cloudHarness.call.reasoning,
+					outputLimit: cloudHarness.call.outputLimit,
+				},
+			}
+		: null;
 	const now = new Date();
 	const repoRoot = resolve(import.meta.dir, "../..");
 	const dir = createReportDir(
@@ -336,11 +421,13 @@ async function main() {
 		system: buildSystem(saved.source, opts.harness),
 		harness: opts.harness,
 		settings,
+		turn: opts.turn,
+		cloud,
 		onStep: (record) => {
 			records.push(record);
 			appendReportLine(dir, "steps.jsonl", record);
 			console.log(
-				`${record.chain} | ${record.form} | 回${record.rep + 1} | ${record.say} | ${record.pass ? "合格" : `不合格 ${record.why}`} | 聞こえるまで ${record.heardMs === null ? "-" : (record.heardMs / 1000).toFixed(1)}秒`,
+				`${record.chain} | ${record.form} | 回${record.rep + 1} | ${record.say} | ${record.pass ? "合格" : `不合格 ${record.why}`}${record.cloudAnswered ? " (cloud回答)" : ""} | 聞こえるまで ${record.heardMs === null ? "-" : (record.heardMs / 1000).toFixed(1)}秒`,
 			);
 		},
 	};
@@ -350,6 +437,7 @@ async function main() {
 			await runChain(run, chain, form, rep);
 	} finally {
 		await client.close();
+		await cloud?.client.close();
 	}
 	const meta: ReportMeta = {
 		startedAt: now.toISOString(),
@@ -359,6 +447,13 @@ async function main() {
 		outputLimit: settings.outputLimit,
 		reps: opts.reps,
 		probe: opts.probe,
+		turn: opts.turn,
+		fallback:
+			opts.turn === "single"
+				? "-"
+				: opts.fallbackModel !== null
+					? "codex（cloud ハーネス）"
+					: "なし（失敗として数える）",
 		chains: opts.chains.map((c) => c.name),
 		forms: opts.forms,
 		settings:
