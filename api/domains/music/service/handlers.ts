@@ -8,7 +8,7 @@ import type { HandlerDefinition } from "../../queue";
 import { findServiceTarget, type TestOutput } from "../../larm";
 import type { MusicRecord } from "../contracts";
 import { row, record, patch } from "../repository";
-import { musicContext, musicSchema } from "./context";
+import { musicContext, musicSchema, PLAN_MS } from "./context";
 import type { createMusic } from "./index";
 type GenerationPlan = Omit<z.infer<typeof musicPlanV3>, "task"> & {
 	task?: "music" | "sound-effect";
@@ -65,7 +65,7 @@ export function registerMusicHandlers(
 			const capture = {
 				subject: `music:${r.id}:plan`,
 				policySubject: r.run_id,
-				deadline: Math.min(r.deadline - 15000, Date.now() + 45000),
+				deadline: Math.min(r.deadline - 15000, Date.now() + PLAN_MS),
 				maxOutputTokens: prepared.package.revision >= 2 ? 4096 : 2048,
 			};
 			const requestId = execution

@@ -64,8 +64,8 @@ test("a call's reasoning becomes the chat template's thinking switch and the rea
 	const off = body("off");
 	expect(off).toMatchObject({
 		chat_template_kwargs: { enable_thinking: false },
+		reasoning_effort: "none",
 	});
-	expect(off).not.toHaveProperty("reasoning_effort");
 	for (const level of ["low", "medium", "high"] as const)
 		expect(body(level)).toMatchObject({
 			chat_template_kwargs: { enable_thinking: true },

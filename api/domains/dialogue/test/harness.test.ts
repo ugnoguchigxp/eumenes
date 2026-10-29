@@ -39,7 +39,7 @@ test("the two values compose today's input and differ in the call's settings", (
 		expect(harness.gates).toEqual({ systemCopy: true });
 	}
 	expect(cloudHarness.call).toEqual({ reasoning: "low", outputLimit: 1024 });
-	expect(localHarness.call).toEqual({ reasoning: "medium", outputLimit: 4096 });
+	expect(localHarness.call).toEqual({ reasoning: "low", outputLimit: 4096 });
 });
 
 test("LARM is served with the local harness, every cloud connection kind with the cloud one", () => {

@@ -55,7 +55,7 @@ export const localHarness: ConversationHarness = {
 	name: "local",
 	system: SYSTEM_SECTIONS,
 	history: { toolExchanges: true, notices: true, copyFilter: true },
-	call: { reasoning: "medium", outputLimit: 4096 },
+	call: { reasoning: "low", outputLimit: 4096 },
 	gates: { systemCopy: true },
 	turn: "single",
 };

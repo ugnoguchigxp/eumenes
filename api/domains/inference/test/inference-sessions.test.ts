@@ -340,7 +340,7 @@ test("a cloud fallback attempt records the role and the connection's billing pat
 			.map((u) => u.billingPath),
 	).toEqual(["openai-compatible"]);
 });
-test("a main call's reasoning reaches the LARM stream call, and any other role is rejected", async () => {
+test("a main call's reasoning reaches the LARM stream call, a call without one does not think, and any other role is rejected", async () => {
 	const seen: Array<unknown> = [];
 	const h = await setup({
 		localStream: async (_messages, _signal, onDelta, options) => {
@@ -361,7 +361,7 @@ test("a main call's reasoning reaches the LARM stream call, and any other role i
 		() => {},
 		undefined,
 		undefined,
-		{ sessionRole: "main", reasoning: { larm: "off", cloud: "high" } },
+		{ sessionRole: "main", reasoning: { larm: "low", cloud: "high" } },
 	);
 	await h.inference.executeStream(
 		await capture("without-reasoning"),
@@ -372,7 +372,7 @@ test("a main call's reasoning reaches the LARM stream call, and any other role i
 		undefined,
 		{ sessionRole: "main" },
 	);
-	expect(seen).toEqual(["off", undefined]);
+	expect(seen).toEqual(["low", "off"]);
 	for (const session of [
 		{ reasoning: { larm: "low", cloud: "low" } as const },
 		{

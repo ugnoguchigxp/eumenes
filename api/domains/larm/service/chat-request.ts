@@ -56,9 +56,13 @@ export function chatRequest(
 		),
 		// A call offered tools decides on them greedily, a spoken reply too: sampled, the model talks instead of calling.
 		...(options?.tools?.length ? { temperature: 0 } : {}),
-		// Absent: nothing is sent and the served model's own default applies.
+		// Absent: nothing is sent and the served model's own default applies. Off is an effort too: a provider that
+		// requires reasoning takes `none` from `reasoning_effort`, not from the template switch.
 		...(options?.reasoning === "off"
-			? { chat_template_kwargs: { enable_thinking: false } }
+			? {
+					chat_template_kwargs: { enable_thinking: false },
+					reasoning_effort: "none",
+				}
 			: options?.reasoning
 				? {
 						chat_template_kwargs: { enable_thinking: true },

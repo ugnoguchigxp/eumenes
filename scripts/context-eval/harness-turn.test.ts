@@ -10,6 +10,7 @@ import {
 } from "./harness-client";
 import { buildSystem, composeInput } from "./harness-compose";
 import {
+	cacheSection,
 	cellOf,
 	checkCounts,
 	copyRunOf,
@@ -27,7 +28,7 @@ import {
 } from "./harness-detail";
 import { ValidationFailure } from "../../api/infrastructure/validation-log";
 import { parseCall } from "../../api/domains/dialogue/service/generation-tools";
-import { failureDetails } from "./harness-judge";
+import { failureDetails, tokensOf } from "./harness-judge";
 import { decisionNotes, dryRunText, parseOptions, startLog } from "./harness";
 import { runTurn, type TurnEnv } from "./harness-turn";
 
@@ -439,6 +440,7 @@ describe("decide-then-reply timing and metrics", () => {
 		cloudAnswered: false,
 		copyRun: 3,
 		stop: "answer",
+		callTokens: [],
 		callDetails: [],
 		...over,
 	});
@@ -556,7 +558,7 @@ describe("options and dry run for the turn", () => {
 		const notes = decisionNotes(false).join("\n");
 		expect(notes).toMatch(/decision schema: \d+ chars, ~\d+ tokens/);
 		expect(notes).toContain("tool_choice none");
-		expect(notes).toContain('"enum":["reply","call"]');
+		expect(notes).toContain("decision schema (as sent): {");
 		const text = dryRunText(
 			parseOptions([
 				"--turn",
@@ -860,6 +862,7 @@ describe("the record of each model call", () => {
 			cloudAnswered: false,
 			copyRun: null,
 			stop: r.stop,
+			callTokens: tokensOf(r.calls),
 			callDetails: r.details,
 		};
 		const text = failureDetails([failed]).join("\n");
@@ -957,5 +960,92 @@ describe("the decision call's input", () => {
 			target: null,
 			inputs: '{"a":1}',
 		});
+	});
+});
+
+describe("the cache figures", () => {
+	const record = (over: Partial<StepRecord>): StepRecord => ({
+		...timingOf([], 0, 0, false),
+		chain: "続けて頼む",
+		form: "current",
+		rep: 0,
+		index: 0,
+		say: "s",
+		scored: true,
+		pass: true,
+		why: "",
+		said: "",
+		turnMode: "single",
+		failedCheck: null,
+		failedChecks: [],
+		cloudAnswered: false,
+		copyRun: null,
+		stop: "answer",
+		callTokens: [],
+		callDetails: [],
+		...over,
+	});
+	test("the cached share counts every call, not only the first", () => {
+		const cell = cellOf([
+			record({
+				callTokens: [
+					{ kind: "single", promptTokens: 1000, cachedPromptTokens: 0 },
+					{ kind: "single", promptTokens: 1000, cachedPromptTokens: 1000 },
+				],
+			}),
+			record({
+				callTokens: [
+					{ kind: "single", promptTokens: null, cachedPromptTokens: null },
+				],
+			}),
+		]);
+		expect(cell.cachedShareAll).toBe(0.5);
+		expect(cellOf([record({})]).cachedShareAll).toBeNull();
+	});
+	test("every run lists its calls with form and round, in the report", () => {
+		const rows = [
+			record({
+				index: 0,
+				callTokens: [
+					{ kind: "single", promptTokens: 3800, cachedPromptTokens: 0 },
+				],
+			}),
+			record({
+				form: "empty",
+				index: 1,
+				callTokens: [
+					{ kind: "decision", promptTokens: 3900, cachedPromptTokens: 3700 },
+					{ kind: "reply", promptTokens: 3900, cachedPromptTokens: 3800 },
+				],
+			}),
+		];
+		const lines = cacheSection(rows);
+		expect(lines[0]).toBe("## キャッシュ（呼出しごと）");
+		expect(lines).toContain(
+			"| 続けて頼む | current | 1 | 1 | 1 | single | 3800 | 0 | 0% |",
+		);
+		expect(lines).toContain(
+			"| 続けて頼む | empty | 1 | 2 | 2 | reply | 3900 | 3800 | 97% |",
+		);
+		expect(cacheSection([record({})])).toEqual([]);
+		const md = reportMarkdown(
+			{
+				startedAt: "t",
+				client: "larm",
+				harness: "local",
+				reasoning: "medium",
+				outputLimit: 4096,
+				reps: 1,
+				probe: false,
+				turn: "single",
+				fallback: "-",
+				chains: ["続けて頼む"],
+				forms: ["current", "empty"],
+				settings: null,
+			},
+			rows,
+		);
+		expect(md).toContain("cache(全呼出し)");
+		expect(md).toContain("## キャッシュ（呼出しごと）");
 	});
 });

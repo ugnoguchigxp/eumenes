@@ -51,6 +51,8 @@ async function setup(
 		localStream?: LarmPort["answerStream"];
 		/** Changes the saved settings before they are applied. */
 		edit?: (s: Settings) => void;
+		/** The LARM level of the conversation, for the calls on it. */
+		conversationReasoning?: "off" | "low" | "medium" | "high";
 	} = {},
 ) {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-conversation-reasoning-"));
@@ -115,6 +117,9 @@ async function setup(
 	};
 	const inference = createInference(store, settings, {
 		larmFactory: () => port,
+		...(route.conversationReasoning
+			? { conversationReasoning: route.conversationReasoning }
+			: {}),
 		cloudAgents: {
 			run: async (call) => {
 				calls.push(call);
@@ -351,6 +356,47 @@ test("target cloud without a usable cloud answer fails before any attempt", asyn
 			),
 		).rejects.toThrow("cloud_fallback_unavailable");
 		expect(larm.options).toHaveLength(0);
+		expect(h.calls).toHaveLength(0);
+	}
+});
+
+test("a LARM call that names no reasoning does not think; a call on the conversation takes the conversation's level; a named level is sent as it is", async () => {
+	for (const conversationReasoning of [undefined, "low"] as const) {
+		const larm = larmCalls("hello");
+		const h = await setup(
+			{ text: "cloud" },
+			{
+				mode: "larm-preferred",
+				localStream: larm.localStream,
+				conversationReasoning,
+			},
+		);
+		for (const session of [
+			undefined,
+			{ sessionRole: "auxiliary" as const },
+			{ sessionRole: "auxiliary" as const, onConversation: true },
+			{ sessionRole: "main" as const },
+			{
+				sessionRole: "main" as const,
+				reasoning: { larm: "high", cloud: "low" },
+			},
+		] as const)
+			await h.inference.executeStream(
+				await h.request(),
+				messages,
+				new AbortController().signal,
+				() => {},
+				undefined,
+				undefined,
+				session,
+			);
+		expect(larm.options.map((o) => o?.reasoning)).toEqual([
+			"off",
+			"off",
+			conversationReasoning ?? "off",
+			"off",
+			"high",
+		]);
 		expect(h.calls).toHaveLength(0);
 	}
 });

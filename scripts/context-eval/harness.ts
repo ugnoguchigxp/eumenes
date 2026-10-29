@@ -58,6 +58,7 @@ import {
 	judgeStep,
 	reportMarkdown,
 	timingOf,
+	tokensOf,
 	type ReportMeta,
 	type TurnMode,
 	type StepRecord,
@@ -281,6 +282,7 @@ async function runChain(
 			failedChecks: turn.failedChecks,
 			cloudAnswered: turn.cloudAnswered,
 			copyRun: copyRunOf(turn.said, lastAgent),
+			callTokens: tokensOf(turn.calls),
 			stop: turn.stop,
 			callDetails: turn.details,
 		};

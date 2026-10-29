@@ -98,8 +98,19 @@ export function callOptionsFor(
 			? { history: r.session.context }
 			: {}),
 		...sessionCallOptions(r.session),
-		// The level of the side that answers: a fallback attempt on the cloud takes the cloud's.
-		...(r.session?.reasoning ? { reasoning: r.session.reasoning[source] } : {}),
+		// The level of the side that answers: a fallback attempt on the cloud takes the cloud's. Only the conversation's
+		// own call names one; a call on the conversation takes the conversation's LARM level (it reads the same prefix),
+		// and every other LARM chat call does not think (left out, LARM's default would think at medium).
+		...(r.session?.reasoning
+			? { reasoning: r.session.reasoning[source] }
+			: source === "larm" && r.row.purpose === "llm"
+				? {
+						reasoning:
+							(r.session?.onConversation &&
+								r.env.options.conversationReasoning) ||
+							"off",
+					}
+				: {}),
 		...(r.row.outputLimit || r.outputLimit
 			? {
 					maxOutputTokens: Math.min(

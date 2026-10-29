@@ -11,6 +11,7 @@ import type { SettingsService } from "../../settings";
 import {
 	type ControlContract,
 	type Messages,
+	type ReasoningLevel,
 	type SpeechOverride,
 } from "../contracts";
 import { type RequestRow } from "../repository";
@@ -34,6 +35,12 @@ export type InferenceOptions = {
 	keepLarmConnection?: true;
 	/** Records attitude judge outcomes of the saved LARM connection (monitoring). */
 	judgeActivity?: ActivityRecorder;
+	/**
+	 * The LARM level the conversation's own calls name. A call on the conversation reads the conversation's prefix and
+	 * names the same level: LARM renders a thinking call's input apart from a non-thinking one, and the prefix would no
+	 * longer be the one the conversation keeps. Absent, such a call does not think, as every other one.
+	 */
+	conversationReasoning?: ReasoningLevel;
 	localMs?: number;
 	cloudMs?: number;
 	decisionMs?: number;

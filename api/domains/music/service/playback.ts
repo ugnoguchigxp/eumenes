@@ -14,7 +14,7 @@ import {
 	patchPlaylist,
 	playlists,
 } from "../repository/playlists";
-import { musicContext } from "./context";
+import { musicContext, PLAN_MS } from "./context";
 import { openedTracks, playbackSchemaOf } from "./playback-tracks";
 import type { createMusic } from "./index";
 import type { ChildExecution, ExecutionReference } from "../../tool-runtime";
@@ -64,7 +64,7 @@ export function createPlayback(deps: Parameters<typeof createMusic>[0]) {
 			const capture = {
 				subject: `music:${r.id}:playback`,
 				policySubject: r.run_id,
-				deadline: Math.min(r.deadline - 15000, Date.now() + 45000),
+				deadline: Math.min(r.deadline - 15000, Date.now() + PLAN_MS),
 				maxOutputTokens: 2048,
 			};
 			const requestId = execution

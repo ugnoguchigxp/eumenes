@@ -35,6 +35,7 @@ export type {
 } from "./contracts/resources";
 export { replaceResourceUrisIn } from "./service/resource-text";
 export { INPUT_HEADINGS } from "./service/input-text";
+export { localHarness } from "./service/harness";
 
 export { type DelegationPort } from "./contracts/delegation";
 export { INTERACTION_POLICY } from "./contracts/command-interactions";

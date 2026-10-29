@@ -521,6 +521,7 @@ describe("timing and aggregation", () => {
 		cloudAnswered: false,
 		copyRun: null,
 		stop: "answer",
+		callTokens: [],
 		callDetails: [],
 		...over,
 	});
@@ -580,7 +581,7 @@ describe("options and plan", () => {
 			reps: 1,
 			probe: false,
 			dryRun: false,
-			reasoning: "medium",
+			reasoning: "low",
 			reasoningOverridden: false,
 		});
 		expect(o.harness.name).toBe("local");

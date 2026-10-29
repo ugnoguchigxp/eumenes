@@ -185,6 +185,20 @@ export function copyRunOf(said: string, previous: string): number | null {
 /** A shared run this long is a copy of the previous reply (the local turn's own bound). */
 export const COPY_RUN = 20;
 
+export type CallTokens = {
+	kind: string;
+	promptTokens: number | null;
+	cachedPromptTokens: number | null;
+};
+
+/** The tokens of every call of a turn. */
+export const tokensOf = (calls: readonly TaggedCall[]): CallTokens[] =>
+	calls.map(({ kind, metrics }) => ({
+		kind,
+		promptTokens: metrics.promptTokens,
+		cachedPromptTokens: metrics.cachedPromptTokens,
+	}));
+
 /** One measured step. */
 export type StepRecord = Timing & {
 	chain: string;
@@ -209,6 +223,8 @@ export type StepRecord = Timing & {
 	copyRun: number | null;
 	/** Why the turn ended. */
 	stop: string;
+	/** The prompt and cached tokens of each model call, in order. */
+	callTokens: CallTokens[];
 	/** What each model call did: its tool calls with the host's verdicts, texts, finish reason and error. */
 	callDetails: CallDetail[];
 };
@@ -222,6 +238,8 @@ export type Cell = {
 	tokensPerSecond: number | null;
 	/** Cached share of the first calls' prompt tokens (null when no call said). */
 	cachedShare: number | null;
+	/** Cached share of the prompt tokens of every call (null when no call said). */
+	cachedShareAll: number | null;
 	truncated: number;
 	/** Share of decide-then-reply steps with a failed check (null when no step used that turn). */
 	fallbackShare: number | null;
@@ -240,6 +258,9 @@ export function cellOf(records: readonly StepRecord[]): Cell {
 	);
 	const decided = records.filter((r) => r.turnMode === "decide-then-reply");
 	const measured = records.filter((r) => r.copyRun !== null);
+	const allCalls = scored
+		.flatMap((r) => r.callTokens)
+		.filter((c) => c.promptTokens && c.cachedPromptTokens !== null);
 	const prompt = prompted.reduce((s, r) => s + r.promptTokens!, 0);
 	return {
 		passed: scored.filter((r) => r.pass).length,
@@ -250,6 +271,10 @@ export function cellOf(records: readonly StepRecord[]): Cell {
 		tokensPerSecond: nums((r) => r.tokensPerSecond),
 		cachedShare: prompt
 			? prompted.reduce((s, r) => s + r.cachedPromptTokens!, 0) / prompt
+			: null,
+		cachedShareAll: allCalls.length
+			? allCalls.reduce((s, c) => s + c.cachedPromptTokens!, 0) /
+				allCalls.reduce((s, c) => s + c.promptTokens!, 0)
 			: null,
 		truncated: scored.filter((r) => r.truncated).length,
 		fallbackShare: decided.length
@@ -342,7 +367,8 @@ export function reportMarkdown(
 			"1手(秒)",
 			"推論(字)",
 			"tok/s",
-			"cache",
+			"cache(最初の呼出し)",
+			"cache(全呼出し)",
 			"上限で途切れ",
 			"fallback率",
 			"cloud回答",
@@ -351,12 +377,12 @@ export function reportMarkdown(
 		...meta.chains.flatMap((chain) =>
 			meta.forms.map((form) => {
 				const c = where(chain, form);
-				return `| ${chain} | ${form} | ${seconds(c.heardMs)} | ${seconds(c.turnMs)} | ${whole(c.reasoningChars)} | ${whole(c.tokensPerSecond)} | ${share(c.cachedShare)} | ${c.truncated} | ${share(c.fallbackShare)} | ${c.cloudAnswered} | ${share(c.copyShare)} |`;
+				return `| ${chain} | ${form} | ${seconds(c.heardMs)} | ${seconds(c.turnMs)} | ${whole(c.reasoningChars)} | ${whole(c.tokensPerSecond)} | ${share(c.cachedShare)} | ${share(c.cachedShareAll)} | ${c.truncated} | ${share(c.fallbackShare)} | ${c.cloudAnswered} | ${share(c.copyShare)} |`;
 			}),
 		),
 		...meta.forms.map((form) => {
 			const c = where(null, form);
-			return `| 合計 | ${form} | ${seconds(c.heardMs)} | ${seconds(c.turnMs)} | ${whole(c.reasoningChars)} | ${whole(c.tokensPerSecond)} | ${share(c.cachedShare)} | ${c.truncated} | ${share(c.fallbackShare)} | ${c.cloudAnswered} | ${share(c.copyShare)} |`;
+			return `| 合計 | ${form} | ${seconds(c.heardMs)} | ${seconds(c.turnMs)} | ${whole(c.reasoningChars)} | ${whole(c.tokensPerSecond)} | ${share(c.cachedShare)} | ${share(c.cachedShareAll)} | ${c.truncated} | ${share(c.fallbackShare)} | ${c.cloudAnswered} | ${share(c.copyShare)} |`;
 		}),
 		...(records.some((r) => r.turnMode === "decide-then-reply")
 			? [
@@ -387,6 +413,7 @@ export function reportMarkdown(
 				]
 			: []),
 		"",
+		...cacheSection(records),
 		"## 落ちた手",
 		"",
 		...(cellOf(records).fails.length
@@ -420,4 +447,23 @@ export function failureDetails(records: readonly StepRecord[]): string[] {
 		`- ${r.chain} / ${r.form} / 回${r.rep + 1} / ${r.say}: ${r.why}（終わり方: ${r.stop}、モデルの呼出し ${r.callDetails.length} 回）`,
 		...r.callDetails.flatMap((detail, i) => detailLines(detail, i + 1)),
 	]);
+}
+
+/** The prompt and cached tokens of every call, by form and round: does the shared prefix hit as rounds grow. */
+export function cacheSection(records: readonly StepRecord[]): string[] {
+	const timed = records.filter((r) => r.callTokens.length);
+	if (!timed.length) return [];
+	return [
+		"## キャッシュ（呼出しごと）",
+		"",
+		"| 連続依頼 | 形 | 回 | ラウンド | 呼出し | 種別 | prompt | cached | 割合 |",
+		"| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+		...timed.flatMap((r) =>
+			r.callTokens.map(
+				(c, i) =>
+					`| ${r.chain} | ${r.form} | ${r.rep + 1} | ${r.index + 1} | ${i + 1} | ${c.kind} | ${c.promptTokens ?? "-"} | ${c.cachedPromptTokens ?? "-"} | ${c.promptTokens && c.cachedPromptTokens !== null ? share(c.cachedPromptTokens / c.promptTokens) : "-"} |`,
+			),
+		),
+		"",
+	];
 }

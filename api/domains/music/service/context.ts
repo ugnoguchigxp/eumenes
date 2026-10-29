@@ -6,6 +6,11 @@ import {
 } from "../../capabilities";
 import { z } from "zod";
 import { delegatedTaskRules } from "../../inference";
+/**
+ * How long the model may plan a piece or a playback (the run's deadline, less the 15 s kept after it, still bounds
+ * it). A local dense model reads the whole plan input without a cache hit: 45 s ran out before it answered.
+ */
+export const PLAN_MS = 120_000;
 export const musicSchema = (prepared: Prepared) =>
 	prepared.package.revision >= 3
 		? musicPlanV3
