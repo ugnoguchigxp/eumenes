@@ -17,6 +17,7 @@ import {
 	migrations as inferenceMigrations,
 } from "..";
 import type { LarmPort } from "../../larm";
+import { REASONING_ALLOWANCE_TOKENS } from "../service/attempt-work";
 import type { Settings } from "../../settings/contracts";
 import type { CloudAgentCall, CloudAgents } from "../adapters/cloud-agents";
 
@@ -360,8 +361,8 @@ test("target cloud without a usable cloud answer fails before any attempt", asyn
 	}
 });
 
-test("a LARM call that names no reasoning does not think; a call on the conversation takes the conversation's level; a named level is sent as it is", async () => {
-	for (const conversationReasoning of [undefined, "low"] as const) {
+test("a LARM call that names no reasoning thinks at low; a call on the conversation takes the conversation's level; a named level is sent as it is", async () => {
+	for (const conversationReasoning of [undefined, "medium"] as const) {
 		const larm = larmCalls("hello");
 		const h = await setup(
 			{ text: "cloud" },
@@ -391,14 +392,43 @@ test("a LARM call that names no reasoning does not think; a call on the conversa
 				session,
 			);
 		expect(larm.options.map((o) => o?.reasoning)).toEqual([
-			"off",
-			"off",
-			conversationReasoning ?? "off",
-			"off",
+			"low",
+			"low",
+			conversationReasoning ?? "low",
+			"low",
 			"high",
 		]);
 		expect(h.calls).toHaveLength(0);
 	}
+});
+
+test("a call this domain makes think gets room for the thinking on its output limit; a call that names its level does not", async () => {
+	const larm = larmCalls("hello");
+	const h = await setup(
+		{ text: "cloud" },
+		{ mode: "larm-preferred", localStream: larm.localStream },
+	);
+	for (const session of [
+		{ sessionRole: "auxiliary" as const, outputLimit: 1200 },
+		{
+			sessionRole: "main" as const,
+			outputLimit: 4096,
+			reasoning: { larm: "low", cloud: "low" },
+		},
+	] as const)
+		await h.inference.executeStream(
+			await h.request(),
+			messages,
+			new AbortController().signal,
+			() => {},
+			undefined,
+			undefined,
+			session,
+		);
+	expect(larm.options.map((o) => o?.maxOutputTokens)).toEqual([
+		1200 + REASONING_ALLOWANCE_TOKENS,
+		4096,
+	]);
 });
 
 test("a main call may offer tools with toolChoice none: LARM gets the tools and the choice", async () => {

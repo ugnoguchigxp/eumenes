@@ -279,5 +279,25 @@ export function executionCommands(
 		}
 		return executionView(executionRow(db, row.id)!);
 	}
-	return { startInTransaction, controlInTransaction };
+	/**
+	 * The user stopped the work on the TODO screen: the screen is the user's own act, so no utterance stands on it.
+	 * Work that already ended stays as it ended.
+	 */
+	function cancelByUserInTransaction(
+		db: Database,
+		conversationId: string,
+		workRef: string,
+	) {
+		const row = executionRow(db, workRef);
+		if (!row || row.conversation_id !== conversationId)
+			throw new Error("execution_not_found");
+		if (isExecutionActive(row))
+			ops.fail(db, row, executionState(row), "cancel_requested", "cancelled");
+		return executionView(executionRow(db, row.id)!);
+	}
+	return {
+		startInTransaction,
+		controlInTransaction,
+		cancelByUserInTransaction,
+	};
 }

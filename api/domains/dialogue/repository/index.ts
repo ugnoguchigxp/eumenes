@@ -1,5 +1,11 @@
+import { intentJudgmentsMigration } from "./intent";
 import type { Database } from "bun:sqlite";
-import { workMigration, workOriginsMigration, workRefsMigration } from "./work";
+import {
+	workMigration,
+	workNoticesMigration,
+	workOriginsMigration,
+	workRefsMigration,
+} from "./work";
 import {
 	confirmationRefsMigration,
 	resourcesMigration,
@@ -382,6 +388,16 @@ export const migrations: readonly Migration[] = [
 		id: "dialogue/0025-viewing-resource",
 		after: ["dialogue/0024-confirmation-refs"],
 		sql: runViewingResourceMigration,
+	},
+	{
+		id: "dialogue/0026-work-notices",
+		after: ["dialogue/0025-viewing-resource"],
+		sql: workNoticesMigration,
+	},
+	{
+		id: "dialogue/0027-intent-judgments",
+		after: ["dialogue/0026-work-notices"],
+		sql: intentJudgmentsMigration,
 	},
 ];
 

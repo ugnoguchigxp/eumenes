@@ -329,13 +329,14 @@ const stateOfLastCall = () => {
 	return last.slice(start, end < 0 ? undefined : end).split("\n");
 };
 
-test("a finished image TODO links its image, the reply shows it as a chip, and the next prompt shows its number", async () => {
+test("a finished image TODO links its image, its notice and a message citing it show it, and the next prompt shows its number", async () => {
 	const resources = fakeResources({ [IMAGE.id]: ["image"], [MUSIC.id]: [] });
 	h = await setup({ resources: resources.access });
 	const { uri } = await doneImage(resources);
-	const [todo] = h.todos();
-	expect(todo).toMatchObject({
-		toolchainId: IMAGE.id,
+	const [todo] = h.archived();
+	expect(todo).toMatchObject({ toolchainId: IMAGE.id });
+	expect(h.notices().notices[0]).toMatchObject({
+		id: todo!.id,
 		links: [{ uri, kind: "image", label: "夜のドライブ" }],
 	});
 	const hono = new Hono();
@@ -358,29 +359,15 @@ test("a finished image TODO links its image, the reply shows it as a chip, and t
 	h.state.steps.push({ text: "はい。" });
 	await h.say("さっきの絵は？");
 	const lines = stateOfLastCall();
-	expect(lines).toContain(
-		"- t1 夜のドライブの絵 完了 未報告 a1「夜のドライブ」",
-	);
+	expect(lines).toContain("- t1 夜のドライブの絵 通知済み a1「夜のドライブ」");
 	expect(
 		h.state.calls
 			.at(-1)!
 			.messages.some((m) => m.content.includes("eumenes://")),
 	).toBe(false);
-	// The reply that tells the result shows the image as a chip.
-	h.state.steps.push({ text: "夜のドライブの絵ができました。" });
-	const reply = await h.say("絵はできた？");
-	await h.store.write((db) =>
-		h!.dialogue.archiveReportedInTransaction(db, {
-			conversationId: "main",
-			messageId: reply.answerMessageId!,
-			todoIds: [todo!.id],
-		}),
-	);
-	expect(await get()).toEqual({
-		resources: [image],
-		messages: [{ messageId: reply.answerMessageId!, uris: [uri] }],
-	});
-	// The agency's own report of a finished TODO is linked when it is stored.
+	// A reply is not a report: its notice told the work, so no reply shows the image as a chip.
+	expect((await get()).messages).toEqual([]);
+	// An agency utterance that cites the TODO is linked when it is stored.
 	await h.store.write((db) =>
 		h!.dialogue.recordSpontaneousInTransaction(db, {
 			conversationId: "main",
@@ -468,7 +455,8 @@ test("forgetting the messages a TODO came from empties its links and hides the r
 	const resources = fakeResources({ [IMAGE.id]: ["image"] });
 	h = await setup({ resources: resources.access });
 	await doneImage(resources);
-	const [todo] = h.todos();
+	const [todo] = h.archived();
+	expect(h.notices().notices).toHaveLength(1);
 	const messageIds = h.store.read((db) => workById(db, todo!.id)!.messageIds);
 	expect(messageIds.length).toBeGreaterThan(0);
 	await h.store.write((db) => {
@@ -484,9 +472,15 @@ test("forgetting the messages a TODO came from empties its links and hides the r
 	).toBeUndefined();
 	const response = h.dialogue.conversationResources("main");
 	expect(response).toEqual({ resources: [], messages: [] });
+	// A forgotten TODO's notice goes with it.
+	expect(h.notices()).toEqual({ notices: [], unread: 0 });
 	h.state.steps.push({ text: "はい。" });
 	await h.say("さっきの絵は？");
 	expect(stateOfLastCall().some((line) => line.startsWith("a1 "))).toBe(false);
+	// A forgotten TODO is never named in the state, not even as notified.
+	expect(stateOfLastCall().some((line) => line.startsWith("- t1 "))).toBe(
+		false,
+	);
 });
 
 test("the resources a confirmation was issued with are kept with it", async () => {

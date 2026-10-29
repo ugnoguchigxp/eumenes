@@ -87,7 +87,8 @@ test("a run pinned to a command toolchain (the CLI's --toolchain) hands its body
 	// The command job runs next; this fixture has no command set, so only the hand-over is checked.
 	await waitFor(() => h!.state.selections.length > 0);
 	expect(h.state.calls).toHaveLength(0);
-	expect(h.todos()).toMatchObject([
+	// The command job may already have ended it (the fixture has no command): finished work is archived at once.
+	expect([...h.todos(), ...h.archived()]).toMatchObject([
 		{ title: "このタブで商品名を検索して", toolchainId: command.id },
 	]);
 	expect(h.state.selections.at(-1)).toMatchObject({

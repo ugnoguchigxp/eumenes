@@ -31,6 +31,7 @@ test("TODO artifact renders and pages in desktop and narrow layouts", async ({
 	let empty = false;
 	const reads: Array<{ state: string; pageIndex: number; pageSize: number }> =
 		[];
+	const actions: Array<Record<string, unknown>> = [];
 	page.on("pageerror", (error) => errors.push(error.message));
 	const baseTime = Date.UTC(2026, 9, 23, 22, 10);
 	const requests = [
@@ -49,21 +50,15 @@ test("TODO artifact renders and pages in desktop and narrow layouts", async ({
 			);
 			reads.push({ state, pageIndex, pageSize });
 			const counts = empty
-				? { todo: 0, done: 0, archived: 0 }
-				: { todo: 12, done: 3, archived: 28 };
-			const total =
-				state === "active" ? counts.todo + counts.done : counts.archived;
+				? { todo: 0, archived: 0 }
+				: { todo: 15, archived: 28 };
+			const total = state === "active" ? counts.todo : counts.archived;
 			const rows = Array.from(
 				{ length: Math.min(pageSize, total - pageIndex * pageSize) },
 				(_, n) => {
 					const index = pageIndex * pageSize + n;
-					const rowState =
-						state === "archived"
-							? "archived"
-							: index % 5 === 1
-								? "done"
-								: "todo";
-					// The current source contract (todoPageSchema): todo/waiting/done and the archive flag.
+					const rowState = state === "archived" ? "archived" : "todo";
+					// The current source contract (todoPageSchema): open work is todo/waiting, the archive is done.
 					return {
 						id: `work-${index}`,
 						request: `${requests[index % requests.length]} (${index + 1})`,
@@ -89,12 +84,35 @@ test("TODO artifact renders and pages in desktop and narrow layouts", async ({
 				},
 			});
 		}
+		if (
+			url.pathname === "/api/toolchain-actions" &&
+			route.request().method() === "POST"
+		) {
+			const event = route.request().postDataJSON() as Record<string, unknown>;
+			actions.push(event);
+			return route.fulfill({
+				json: {
+					eventId: event.eventId,
+					status: "accepted",
+					createdAt: new Date(baseTime).toISOString(),
+					result: {
+						version: 1,
+						executionId: "archive-1",
+						artifactRevisionId: "artifact:agency.todos@4",
+						outcome: "completed",
+						resultRefs: [],
+						artifactRefs: [],
+						receipt: { todoId: "work-0" },
+					},
+				},
+			});
+		}
 		if (url.pathname === "/api/toolchain-artifacts")
 			return route.fulfill({
 				json: {
 					artifacts: [
 						{
-							artifactRevisionId: "artifact:agency.todos@3",
+							artifactRevisionId: "artifact:agency.todos@4",
 							title: "TODOリスト",
 							adapterRefs: ["adapter:task-execution@1"],
 							launcher: bundle.artifacts.at(-1)!.launcher,
@@ -106,7 +124,7 @@ test("TODO artifact renders and pages in desktop and narrow layouts", async ({
 			return route.fulfill({
 				json: {
 					artifact: bundle.artifacts.at(-1),
-					artifactRevisionId: "artifact:agency.todos@3",
+					artifactRevisionId: "artifact:agency.todos@4",
 					digest: "fixture",
 					scopeRef: "scope:fixture",
 				},
@@ -131,20 +149,18 @@ test("TODO artifact renders and pages in desktop and narrow layouts", async ({
 	await page.addStyleTag({ path: join(build, "agency-todos.css") });
 	await page.addScriptTag({ path: join(build, "agency-todos.js") });
 	await expect(
-		page.getByRole("tab", { name: "todo・done", exact: true }),
+		page.getByRole("tab", { name: "進行中", exact: true }),
 	).toBeVisible();
 	await expect(page.getByRole("table")).toHaveCount(1);
 	await expect(
-		page
-			.getByRole("table", { name: "todo・done", exact: true })
-			.getByRole("row"),
+		page.getByRole("table", { name: "進行中", exact: true }).getByRole("row"),
 	).toHaveCount(11);
 	await expect(
 		page.getByRole("table").getByText("todo", { exact: true }).first(),
 	).toBeVisible();
-	await expect(
-		page.getByRole("table").getByText("done", { exact: true }).first(),
-	).toBeVisible();
+	await expect(page.getByRole("button", { name: /をアーカイブ$/ })).toHaveCount(
+		10,
+	);
 	await expect(page.getByRole("combobox")).toHaveCount(1);
 	await expect(
 		page.getByRole("region", { name: "会話", exact: true }),
@@ -160,15 +176,38 @@ test("TODO artifact renders and pages in desktop and narrow layouts", async ({
 		path: join(out, "implemented-desktop-v4.png"),
 		fullPage: true,
 	});
-	await page.getByRole("button", { name: "todo・doneの次のページ" }).click();
+	// Archiving asks first; confirmed, the archive goes to the action route.
+	await page
+		.getByRole("button", {
+			name: "「調査結果をまとめて、比較表を作成する (1)」をアーカイブ",
+		})
+		.click();
+	const confirm = page.getByRole("dialog");
+	await expect(
+		confirm.getByText("実行中の仕事を止めてアーカイブしますか"),
+	).toBeVisible();
+	await page.screenshot({
+		path: join(out, "implemented-archive-confirm.png"),
+		fullPage: true,
+	});
+	await confirm.getByRole("button", { name: "止めてアーカイブ" }).click();
+	await expect.poll(() => actions.length).toBe(1);
+	expect(actions[0]).toMatchObject({
+		artifactRevisionId: "artifact:agency.todos@4",
+		source: "agency-todos",
+		actionId: "archive",
+		input: { todoId: "work-0" },
+	});
+	await expect(page.getByRole("dialog")).toHaveCount(0);
+	await page.getByRole("button", { name: "進行中の次のページ" }).click();
 	await expect(page.getByRole("table").getByRole("row")).toHaveCount(6);
 	await expect(page.getByText("15件 · 2 / 2ページ")).toBeVisible();
 	await expect(
-		page.getByRole("button", { name: "todo・doneの次のページ" }),
+		page.getByRole("button", { name: "進行中の次のページ" }),
 	).toBeDisabled();
 	await expect(page.getByRole("table")).toHaveCount(1);
 	expect(reads.every((query) => query.state === "active")).toBe(true);
-	await page.getByRole("tab", { name: "archived", exact: true }).click();
+	await page.getByRole("tab", { name: "アーカイブ", exact: true }).click();
 	await expect(page.getByRole("table").getByRole("row")).toHaveCount(21);
 	expect(reads.at(-1)).toEqual({
 		state: "archived",
@@ -179,7 +218,7 @@ test("TODO artifact renders and pages in desktop and narrow layouts", async ({
 	await expect(page.getByRole("button", { name: /詳細/ })).toHaveCount(0);
 	await expect(page.locator("time")).toHaveCount(0);
 	await expect(
-		page.getByRole("button", { name: "報告済みの次のページ" }),
+		page.getByRole("button", { name: "アーカイブの次のページ" }),
 	).toHaveCount(0);
 	await expect(page.getByRole("combobox")).toHaveCount(0);
 	await page.setViewportSize({ width: 390, height: 844 });
@@ -192,7 +231,10 @@ test("TODO artifact renders and pages in desktop and narrow layouts", async ({
 			() => document.documentElement.scrollWidth <= window.innerWidth,
 		),
 	).toBe(true);
-	const table = page.getByRole("region", { name: "報告済みの表", exact: true });
+	const table = page.getByRole("region", {
+		name: "アーカイブの表",
+		exact: true,
+	});
 	expect(await table.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(
 		true,
 	);
@@ -200,9 +242,11 @@ test("TODO artifact renders and pages in desktop and narrow layouts", async ({
 	empty = true;
 	await page.setViewportSize({ width: 1200, height: 870 });
 	await page.getByRole("button", { name: "更新", exact: true }).click();
-	await expect(page.getByText("報告済みの仕事はありません。")).toBeVisible();
 	await expect(
-		page.getByRole("button", { name: "報告済みの次のページ" }),
+		page.getByText("アーカイブした仕事はありません。"),
+	).toBeVisible();
+	await expect(
+		page.getByRole("button", { name: "アーカイブの次のページ" }),
 	).toHaveCount(0);
 	await page.screenshot({
 		path: join(out, "implemented-empty-v4.png"),

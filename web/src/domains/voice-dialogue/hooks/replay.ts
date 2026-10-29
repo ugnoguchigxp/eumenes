@@ -114,8 +114,6 @@ export function useReplay(
 			const { signal } = mine.abort;
 			const valid = () => !signal.aborted && run.current === mine;
 			const playbackKey = crypto.randomUUID();
-			let heardClauses = 0;
-			let completed = false;
 			try {
 				const { deps: live } = latest.current;
 				// A new playback interrupts the live reply, like barge-in does.
@@ -145,9 +143,8 @@ export function useReplay(
 						Math.max(0, latest.current.settings.outputVolume ?? 1),
 					);
 					let cut = false;
-					let ended = false;
-					let started = false;
 					await new Promise<void>((resolve, reject) => {
+						let started = false;
 						const finish = () => {
 							signal.removeEventListener("abort", finish);
 							if (started && valid()) {
@@ -158,47 +155,37 @@ export function useReplay(
 						};
 						signal.addEventListener("abort", finish, { once: true });
 						target
-							.play(
-								speech.wav,
-								() => {
-									ended = true;
+							.play(speech.wav, finish, {
+								timing: { runId: runId ?? undefined, chunkIndex: i },
+								volume,
+								shouldPlay: valid,
+								onInterrupted: () => {
+									cut = true;
 									finish();
 								},
-								{
-									timing: { runId: runId ?? undefined, chunkIndex: i },
-									volume,
-									shouldPlay: valid,
-									onInterrupted: () => {
-										cut = true;
-										finish();
-									},
-									onStarted: () => {
-										if (!valid()) return;
-										started = true;
-										setSubtitle(sentences[i] ?? null);
-										if (volume > 0)
-											setAvatarCue({
-												key,
-												motion: speech.motion,
-												speaking: true,
-											});
-									},
+								onStarted: () => {
+									if (!valid()) return;
+									started = true;
+									setSubtitle(sentences[i] ?? null);
+									if (volume > 0)
+										setAvatarCue({
+											key,
+											motion: speech.motion,
+											speaking: true,
+										});
 								},
-							)
+							})
 							.then(() => {
 								// Discarded before it began (superseded): nothing will end it.
 								if (!started) finish();
 							}, reject);
 					});
 					// Interrupted by something else: stop reading the rest.
-					if (!valid() || cut || !started || !ended || volume === 0) return;
-					heardClauses++;
+					if (!valid() || cut) return;
 				}
-				completed = sentences.length > 0;
 			} catch (e) {
 				if (!signal.aborted) setError(describeError(e));
 			} finally {
-				const current = valid();
 				// A microphone interruption may leave the next clause's synthesis in flight.
 				mine.abort.abort();
 				if (run.current === mine) {
@@ -207,17 +194,6 @@ export function useReplay(
 					setSubtitle(null);
 					setAvatarCue(null);
 				}
-				// The screen is restored first; a slow or failed record must not keep the stop button or subtitle.
-				client
-					.replayPlayed({
-						messageId: id,
-						text,
-						playbackId: playbackKey,
-						heard: completed ? "full" : heardClauses > 0 ? "partial" : "none",
-					})
-					.catch((e) => {
-						if (current && run.current === null) setError(describeError(e));
-					});
 			}
 		},
 		[client, stop, prepare],

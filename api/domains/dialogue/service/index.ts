@@ -32,6 +32,7 @@ import { createAgentSync } from "./agent-sync";
 import { DEFAULT_DEADLINE_MS, TERMINAL, type DialogueDeps } from "./context";
 import { createGenerationHandler } from "./generation-handler";
 import { createWorkLedger } from "./work-ledger";
+import { createTodoScreenPorts } from "./work-stop";
 import {
 	conversationResources,
 	createResourceLedger,
@@ -257,6 +258,7 @@ export function createDialogueService({
 		/** `GET /api/conversations/:id/resources`: the resources the conversation has met and each message's chips. */
 		conversationResources: (conversationId: string) =>
 			conversationResources(deps, conversationId),
+		...createTodoScreenPorts(deps),
 		/** The conversation's resource ledger (`a<n>`), for the `resources` tool and the screen receipts. */
 		resourceLedger: deps.resourceLedger,
 		/** The conversation's live specialist session, or null (`GET /api/conversations/:id/specialist`). */

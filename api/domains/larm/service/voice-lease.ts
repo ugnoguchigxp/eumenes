@@ -1,5 +1,4 @@
-import type { Capability } from "../contracts";
-import type { Lease } from "./profiles";
+import type { Lease, ProviderName } from "./profiles";
 import { createConnection, fetchCatalog, type Control } from "./connect";
 import { string } from "./guards";
 
@@ -12,9 +11,11 @@ export async function createVoiceLease(
 		audience: string;
 		idleTimeoutMs: number;
 		fullProfile: boolean;
+		/** The Providers a partial connection selects. */
+		providers?: string[];
 		lifetime: AbortSignal;
 	},
-	required: Capability[],
+	required: ProviderName[],
 	idempotencyKey: string,
 ): Promise<Lease> {
 	const {
@@ -24,10 +25,18 @@ export async function createVoiceLease(
 		audience,
 		idleTimeoutMs,
 		fullProfile,
+		providers,
 	} = deps;
 	const { catalogRevision, catalogProfile, catalogProviders } =
 		await fetchCatalog(scopedControl, profile, required);
-	const request = { profile, client, audience, fullProfile, catalogRevision };
+	const request = {
+		profile,
+		client,
+		audience,
+		fullProfile,
+		...(providers ? { providers } : {}),
+		catalogRevision,
+	};
 	const startedAt = performance.now();
 	const create = () =>
 		createConnection(scopedControl, { ...request, idempotencyKey });

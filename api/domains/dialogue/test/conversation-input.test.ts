@@ -13,6 +13,7 @@ import {
 	type ConversationPrefix,
 } from "../service/conversation-input";
 import { dataText, fitLines, jstNowLine } from "../service/input-text";
+import { cloudHarness } from "../service/harness";
 import { resultText, toolResultText } from "../service/result-text";
 import { estimateTextTokens } from "../../../infrastructure/context-budget";
 
@@ -22,6 +23,8 @@ import { estimateTextTokens } from "../../../infrastructure/context-budget";
  * checks them.
  */
 let seq = 0;
+/** Every part of the history drawn: what each one adds is what these tests check. */
+const drawn = cloudHarness.history;
 const said = (
 	speaker: "user" | "agent",
 	text: string,
@@ -52,7 +55,7 @@ test("the recent conversation starts with the agent, leaves out what waits for a
 		"できました",
 		"はい",
 	]);
-	expect(recentMessages(recent)).toEqual([
+	expect(recentMessages(recent, drawn)).toEqual([
 		{ role: "assistant", content: "作りますね\nできました" },
 		{ role: "user", content: "はい" },
 	]);
@@ -66,12 +69,15 @@ test("an utterance's kept tool calls come before its words, the first joining th
 		arguments: '{"query":"曲"}',
 		result: "{}",
 	};
-	const messages = recentMessages([
-		said("agent", "できました"),
-		{ ...said("agent", "作りますね"), toolCalls: [find] },
-		said("agent", "もう少しです"),
-		said("user", "はい"),
-	]);
+	const messages = recentMessages(
+		[
+			said("agent", "できました"),
+			{ ...said("agent", "作りますね"), toolCalls: [find] },
+			said("agent", "もう少しです"),
+			said("user", "はい"),
+		],
+		drawn,
+	);
 	expect(messages).toEqual([
 		{
 			role: "assistant",
@@ -97,22 +103,25 @@ test("a report follows its notice as the host's line: joined to the user's words
 		notice,
 	});
 	expect(
-		recentMessages([
-			report(
-				"できあがりました。",
-				"[ホストの知らせ] t1「曲」が終わりました（成功）。",
-			),
-			said("user", "ありがとう"),
-			report(
-				"絵もできました。",
-				"[ホストの知らせ] t2「絵」が終わりました（成功）。",
-			),
-			said("agent", "表示しますか？"),
-			report(
-				"効果音もできました。",
-				"[ホストの知らせ] t3「音」が終わりました（成功）。",
-			),
-		]),
+		recentMessages(
+			[
+				report(
+					"できあがりました。",
+					"[ホストの知らせ] t1「曲」が終わりました（成功）。",
+				),
+				said("user", "ありがとう"),
+				report(
+					"絵もできました。",
+					"[ホストの知らせ] t2「絵」が終わりました（成功）。",
+				),
+				said("agent", "表示しますか？"),
+				report(
+					"効果音もできました。",
+					"[ホストの知らせ] t3「音」が終わりました（成功）。",
+				),
+			],
+			drawn,
+		),
 	).toEqual([
 		{ role: "assistant", content: "できあがりました。" },
 		{
@@ -130,9 +139,10 @@ test("a report follows its notice as the host's line: joined to the user's words
 
 test("an utterance is cut at its bound, and its data can not open a heading", () => {
 	seq = 0;
-	const [message] = recentMessages([
-		said("user", `# 見出し\n${"あ".repeat(5000)}`),
-	]);
+	const [message] = recentMessages(
+		[said("user", `# 見出し\n${"あ".repeat(5000)}`)],
+		drawn,
+	);
 	expect(message!.content.startsWith("\\# 見出し")).toBe(true);
 	expect(message!.content.endsWith("…")).toBe(true);
 	expect(estimateTextTokens(message!.content)).toBeLessThanOrEqual(

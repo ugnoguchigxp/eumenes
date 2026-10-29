@@ -89,6 +89,25 @@ export function registerSettings(app: Hono, settings: SettingsService) {
 		);
 	});
 	app.get("/api/settings", (c) => c.json(settings.get()));
+	app.get("/api/settings/intent", (c) =>
+		c.json(settings.get().intent, 200, { "Cache-Control": "no-store" }),
+	);
+	app.put("/api/settings/intent", async (c) => {
+		const raw = await readBounded(c.req.raw.body, {
+			limit: 4096,
+			tooLarge: "invalid_body_size",
+			missing: "invalid_body",
+		});
+		let input: unknown;
+		try {
+			input = JSON.parse(new TextDecoder().decode(raw));
+		} catch {
+			throw new Error("invalid_intent_settings");
+		}
+		return c.json(await settings.configureIntent(input), 200, {
+			"Cache-Control": "no-store",
+		});
+	});
 	app.get("/api/settings/diagnostics", (c) => c.json(settings.diagnostics()));
 	app.post("/api/settings/apply", async (c) => {
 		const bytes = await readBounded(c.req.raw.body, {

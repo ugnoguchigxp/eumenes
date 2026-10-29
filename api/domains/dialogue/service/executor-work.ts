@@ -1,17 +1,16 @@
 import type { Database } from "bun:sqlite";
 import type { Run } from "../contracts";
-import { byId } from "../repository";
 import type { WorkRow } from "../repository/work";
 import type { DialogueDeps } from "./context";
 import type { ToolOutcome } from "./generation-loop";
 import { type ParsedCall, type WorkArgs } from "./generation-tools";
-import { endRun } from "./run-end";
 import { hideUris, type DocumentRefs } from "./work-items";
 import { CHECK_MAX_TOKENS } from "./input-text";
 import { resultText } from "./result-text";
 import { madeOf } from "./state-text";
 import { resultFields } from "./work-ledger";
 import { dispatchInTransaction } from "./work-dispatch";
+import { stopWaitingRunInTransaction } from "./work-stop";
 
 import {
 	HandoverRefused,
@@ -120,23 +119,8 @@ export async function work(
 			if (args.operation === "answer")
 				return answerCommand(x, tx, run, row, args, record, state);
 			if (args.operation === "cancel") {
-				const waiting = byId(tx, row.runId);
-				if (
-					waiting &&
-					(waiting.status === "queued" || waiting.status === "running") &&
-					waiting.id !== run.id
-				) {
-					deps.agents?.cancelTreeInTransaction(tx, waiting.id);
-					if (waiting.jobId) {
-						deps.queue.cancelInTransaction(
-							tx,
-							waiting.jobId,
-							"cancel_requested",
-						);
-						cancelled.push(waiting.jobId);
-					}
-					endRun(deps, tx, waiting, "cancelled", "cancel_requested");
-				}
+				const job = stopWaitingRunInTransaction(deps, tx, row, run.id);
+				if (job) cancelled.push(job);
 				const next = ledger.reportInTransaction(tx, row.id, {
 					status: "done",
 					outcome: "cancelled",

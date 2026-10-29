@@ -204,8 +204,9 @@ export function createPrepare(
 		// A host note the work did not take as its report (a specialist switch to confirm) is this run's trigger.
 		const hostNote = changed ? null : (claim.payload.commandNote ?? null);
 		const notAdopted = claim.payload.notAdopted === true;
-		// A TODO that changed is the conversation agent's to report, on its own opportunity: no generation runs for
-		// it. The sub-agent's answer is consumed here (one whose evidence changed drops its result).
+		// A TODO that changed runs no generation: finished work is told by its notice on screen, a question is the
+		// agency's to ask on its own opportunity. The sub-agent's answer is consumed here (one whose evidence changed
+		// drops its result).
 		if (changed?.length && !hostNote && !notAdopted && pending.length === 0) {
 			if (agent) consumeAnswer(deps, tx, current, agent);
 			// The report is recorded in the TODO already: a request that can no longer be accepted (settings changed,
@@ -299,9 +300,10 @@ export function createPrepare(
 			tx,
 			conversationId,
 		) ?? { todo: () => null, confirmation: () => null, resource: () => null };
-		// The results this generation was triggered by: the host notice shows them, this call only.
+		// The questions this generation was triggered by: the host notice shows them, this call only. Finished work
+		// is archived as it finishes and told by its notice on screen, never here.
 		const reported = (changed ?? []).filter(
-			(row) => row.status !== "todo" && !row.archivedAt,
+			(row) => row.status === "waiting" && !row.archivedAt,
 		);
 		// The reply to them follows their notice in the recent conversation (section 5.5 #4).
 		const reportNotice = reportNoticeInTransaction(

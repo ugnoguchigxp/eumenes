@@ -41,13 +41,12 @@ function fixture(
 ) {
 	const fake = fakeOutput();
 	const client = {
-		replayPlayed: vi.fn(async () => ({ recorded: true })),
 		replaySentences: async () => ["句。"],
 		replaySpeech: async () => ({ wav: new Uint8Array(44), motion: "joyful" }),
 	} as unknown as VoiceDialogueClient;
 	const createOutput = vi.fn((_device: string) => fake.output);
 	const hook = renderHook(() => useReplay(client, settings, { createOutput }));
-	return { hook, createOutput, client, ...fake };
+	return { hook, createOutput, ...fake };
 }
 
 test("replay plays through the audio controller with the output device and volume", async () => {
@@ -116,7 +115,6 @@ test("replay shares the live session controller and interrupts the live reply fi
 	const fake = fakeOutput();
 	const interruptLive = vi.fn();
 	const client = {
-		replayPlayed: vi.fn(async () => ({ recorded: true })),
 		replaySentences: async () => ["句。"],
 		replaySpeech: async () => ({ wav: new Uint8Array(44), motion: "neutral" }),
 	} as unknown as VoiceDialogueClient;
@@ -165,7 +163,6 @@ test("automatic speech shares microphone output without cancelling the live sess
 	let resolveSpeech!: (value: { wav: Uint8Array; motion: "neutral" }) => void;
 	let signal!: AbortSignal;
 	const client = {
-		replayPlayed: vi.fn(async () => ({ recorded: true })),
 		replaySentences: async () => ["句。"],
 		replaySpeech: vi.fn((_text: string, abort: AbortSignal) => {
 			signal = abort;
@@ -207,98 +204,4 @@ test("automatic mute leaves explicitly requested replay playing", async () => {
 		played[0]!.onEnded();
 		await done;
 	});
-});
-
-test("only the end of every audible clause acknowledges a full message playback", async () => {
-	const { hook, client, played } = fixture();
-	client.replaySentences = async () => ["一。", "二。"];
-	let done!: Promise<void>;
-	act(() => {
-		done = hook.result.current.play("message", "一。二。");
-	});
-	await waitFor(() => expect(played).toHaveLength(1));
-	expect(client.replayPlayed).not.toHaveBeenCalled();
-	act(() => played[0]!.onEnded());
-	await waitFor(() => expect(played).toHaveLength(2));
-	expect(client.replayPlayed).not.toHaveBeenCalled();
-	await act(async () => {
-		played[1]!.onEnded();
-		await done;
-	});
-	expect(client.replayPlayed).toHaveBeenCalledExactlyOnceWith({
-		messageId: "message",
-		text: "一。二。",
-		playbackId: expect.any(String),
-		heard: "full",
-	});
-});
-
-test("interrupting after a clause acknowledges partial playback, never full", async () => {
-	const { hook, client, played } = fixture();
-	client.replaySentences = async () => ["一。", "二。"];
-	let done!: Promise<void>;
-	act(() => {
-		done = hook.result.current.play("message", "一。二。");
-	});
-	await waitFor(() => expect(played).toHaveLength(1));
-	act(() => played[0]!.onEnded());
-	await waitFor(() => expect(played).toHaveLength(2));
-	await act(async () => {
-		hook.result.current.stop();
-		await done;
-	});
-	expect(client.replayPlayed).toHaveBeenCalledWith(
-		expect.objectContaining({ heard: "partial" }),
-	);
-	act(() => played[1]!.onEnded());
-	expect(client.replayPlayed).toHaveBeenCalledTimes(1);
-});
-
-test("muted, failed and discarded playback cannot acknowledge full delivery", async () => {
-	for (const kind of ["muted", "failed", "discarded"] as const) {
-		const { hook, client, output, played } = fixture({
-			outputVolume: kind === "muted" ? 0 : 1,
-		});
-		if (kind === "failed")
-			client.replaySpeech = async () => {
-				throw new Error("failed");
-			};
-		if (kind === "discarded") output.play.mockImplementation(async () => {});
-		let done!: Promise<void>;
-		act(() => {
-			done = hook.result.current.play("message", "一。");
-		});
-		if (kind === "muted") {
-			await waitFor(() => expect(played).toHaveLength(1));
-			act(() => played[0]!.onEnded());
-		}
-		await act(async () => {
-			await done;
-		});
-		expect(client.replayPlayed).toHaveBeenCalledWith(
-			expect.objectContaining({ heard: "none" }),
-		);
-		hook.unmount();
-	}
-});
-
-test("the screen is restored at the end even while the played record is still pending", async () => {
-	const { hook, client, played } = fixture();
-	client.replayPlayed = vi.fn(() => new Promise<never>(() => {}));
-	let done!: Promise<void>;
-	act(() => {
-		done = hook.result.current.play("message", "句。");
-	});
-	await waitFor(() => expect(played).toHaveLength(1));
-	expect(hook.result.current.playingId).toBe("message");
-	await act(async () => {
-		played[0]!.onEnded();
-		await done;
-	});
-	expect(client.replayPlayed).toHaveBeenCalledWith(
-		expect.objectContaining({ heard: "full" }),
-	);
-	expect(hook.result.current.playingId).toBeNull();
-	expect(hook.result.current.subtitle).toBeNull();
-	expect(hook.result.current.avatarCue).toBeNull();
 });

@@ -6,9 +6,10 @@ import {
 	specialistCommandKinds,
 	specialistCommandSchema,
 	specialistRetargetSchema,
+	todoNoticesQuery,
 	type RunProgress,
 } from "../contracts";
-import { parseJsonBody } from "../../../infrastructure/http";
+import { parseJsonBody, parseQuery } from "../../../infrastructure/http";
 import { snapshotStream } from "../../../infrastructure/snapshot-stream";
 import { SSE_HEADERS } from "../../../infrastructure/sse";
 export { registerCommandInteractions } from "./interactions";
@@ -32,6 +33,16 @@ export function registerDialogue(app: Hono, service: DialogueService) {
 	app.get("/api/conversations/:id/resources", (c) =>
 		c.json(service.conversationResources(c.req.param("id"))),
 	);
+	app.get("/api/todo-notices", (c) => {
+		const query = parseQuery(c, todoNoticesQuery, { code: "invalid_input" });
+		if (!query.ok) return query.response;
+		return c.json(service.todoNotices(query.data.limit));
+	});
+	app.post("/api/todo-notices/:id/read", async (c) => {
+		if (!(await service.readTodoNotice(c.req.param("id"))))
+			return c.json({ error: "work_not_found" }, 404);
+		return c.json({ ok: true });
+	});
 	app.post("/api/runs", async (c) => {
 		const parsed = await parseJsonBody(c, publicSubmitSchema);
 		if (!parsed.ok) return parsed.response;

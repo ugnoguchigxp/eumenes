@@ -6,8 +6,8 @@ import { saveItem } from "./memory-seed";
 
 /**
  * The work the conversation agent does through its tools (the ContextWindow specification, sections 6.1, 6.7, 9
- * and 14): checking a TODO, the confirmation an approval needs to have been heard, the archive of a reported TODO,
- * the agency's spontaneous utterance and the memory read.
+ * and 14): checking a TODO, the confirmation an approval needs to have been heard, the archive of finished work with
+ * its notice, the agency's spontaneous utterance and the memory read.
  */
 let h: Harness | undefined;
 afterEach(async () => {
@@ -58,7 +58,7 @@ test("check reads a TODO's state and result into the tool result, and logs only 
 	);
 	const waiting = await h.say("猫の絵を描いて", "queued");
 	await h.finishImage(waiting.id, { state: "completed", title: "猫" });
-	const [todo] = h.todos();
+	const [todo] = h.archived();
 	// The user asks later; the generation checks the TODO before it speaks.
 	h.state.steps.push(
 		{
@@ -279,7 +279,7 @@ test("an irreversible confirmation heard only in part is not enough to approve",
 	expect(h.todos()).toEqual([]);
 });
 
-/** A done image TODO: the delegating run is over (no generation for the result), the TODO waits to be reported. */
+/** A done image TODO: the delegating run is over (no generation for the result), the TODO archived with its notice. */
 async function doneTodo(request: string) {
 	h!.state.steps.push(
 		{ calls: [{ name: "find_toolchain", args: { query: "絵" } }] },
@@ -300,7 +300,7 @@ async function doneTodo(request: string) {
 	);
 	const waiting = await h!.say(request + "を描いて", "queued");
 	await h!.finishImage(waiting.id, { state: "completed", title: request });
-	return h!.todos().find((todo) => todo.title === request)!;
+	return h!.archived().find((todo) => todo.title === request)!;
 }
 
 /**
@@ -345,76 +345,35 @@ test("a partial playback records what was heard of the reply", async () => {
 	});
 });
 
-test("a text report waits for actual speech completion before archiving its TODO", async () => {
+test("finished work is archived as it finishes, with an unread notice the screen reads and marks read", async () => {
 	h = await setup();
 	const todo = await doneTodo("猫の絵");
-	h.state.steps.push({ text: "猫の絵ができました。" });
-	const reply = await h.say("どうなった？");
-	await h.store.write((db) =>
-		h!.dialogue.archiveReportedInTransaction(db, {
-			conversationId: "main",
-			messageId: reply.answerMessageId!,
-			todoIds: [todo.id],
-		}),
-	);
-	expect(h.todos()).toMatchObject([{ id: todo.id, status: "done" }]);
-	await h.store.write((db) =>
-		h!.dialogue.recordMessageHeardInTransaction(db, {
-			messageId: reply.answerMessageId!,
-			playbackId: "replay-full",
-			heard: "full",
-			text: "猫の絵ができました。",
-		}),
-	);
 	expect(h.todos()).toEqual([]);
-	// The result stays in the log as its own line; archiving only takes the TODO out of the state.
+	expect(todo).toMatchObject({ status: "done", outcome: "succeeded" });
+	expect(todo.archivedAt).not.toBeNull();
+	// The result stays in the log as its own line; nothing waits for the conversation to tell it.
 	expect(h.results()).toHaveLength(1);
-	expect(
-		h.log().filter((e) => h!.fields(e).action === "work.archived"),
-	).toHaveLength(1);
+	const { notices, unread } = h.notices();
+	expect(unread).toBe(1);
+	expect(notices).toMatchObject([
+		{
+			id: todo.id,
+			conversationId: "main",
+			title: "猫の絵",
+			outcome: "succeeded",
+			read: false,
+		},
+	]);
+	expect(await h.dialogue.readTodoNotice(todo.id)).toBe(true);
+	expect(h.notices()).toMatchObject({ unread: 0, notices: [{ read: true }] });
+	// The image toolchain has no registered screen: the notice launches what it made instead.
+	expect(h.notices().notices[0]).not.toHaveProperty("artifactId");
+	// Reading again changes nothing; a TODO with no notice is not found.
+	expect(await h.dialogue.readTodoNotice(todo.id)).toBe(true);
+	expect(await h.dialogue.readTodoNotice("no-such-todo")).toBe(false);
 });
 
-test("a reported TODO whose reply is still being played requests the archive, and the delivery confirms it only when heard in full", async () => {
-	h = await setup();
-	const full = await doneTodo("猫の絵");
-	h.state.steps.push({ text: "猫の絵ができました。" });
-	const spoken = await speakVoice("どうなった？", "voice-full");
-	const report = (messageId: string, todoIds: string[]) =>
-		h!.store.write((db) =>
-			h!.dialogue.archiveReportedInTransaction(db, {
-				conversationId: "main",
-				messageId,
-				todoIds,
-			}),
-		);
-	// Not heard yet: nothing is archived, the request is kept for the delivery.
-	await report(spoken.answerMessageId!, [full.id]);
-	expect(h.todos()).toMatchObject([{ id: full.id, status: "done" }]);
-	await h.store.write((db) =>
-		h!.dialogue.recordHeardInTransaction(db, spoken.id, "full"),
-	);
-	expect(h.todos()).toEqual([]);
-	expect(
-		h.log().find((e) => h!.fields(e).action === "work.archived"),
-	).toBeDefined();
-
-	// Heard only in part: the TODO stays done and the log says why; it is reported again on a later opportunity.
-	const partial = await doneTodo("犬の絵");
-	h.state.steps.push({ text: "犬の絵ができました。" });
-	const cut = await speakVoice("犬の絵は？", "voice-cut");
-	await report(cut.answerMessageId!, [partial.id]);
-	await h.store.write((db) =>
-		h!.dialogue.recordHeardInTransaction(db, cut.id, "partial", "犬の"),
-	);
-	expect(h.todos()).toMatchObject([{ id: partial.id, status: "done" }]);
-	expect(
-		h.log().find((e) => h!.fields(e).action === "work.archive_unconfirmed"),
-	).toMatchObject({ type: "acted", by: "host" });
-	// Both reports are log lines; the partially heard one stays in the state, done and unarchived.
-	expect(h.results()).toHaveLength(2);
-});
-
-test("a TODO that is not done, or belongs to no reply of the conversation, is never archived by a report", async () => {
+test("the TODO screen's archive stops the run an open TODO waits on and archives it as cancelled, with no notice", async () => {
 	h = await setup();
 	h.state.steps.push(
 		{ calls: [{ name: "find_toolchain", args: { query: "絵" } }] },
@@ -433,23 +392,27 @@ test("a TODO that is not done, or belongs to no reply of the conversation, is ne
 			],
 		},
 	);
-	await h.say("鳥の絵を描いて", "queued");
+	const waiting = await h.say("鳥の絵を描いて", "queued");
 	const [open] = h.todos();
-	h.state.steps.push({ text: "まだです。" });
-	const reply = await h.say("できた？");
-	await h.store.write((db) => {
-		h!.dialogue.archiveReportedInTransaction(db, {
-			conversationId: "main",
-			messageId: reply.answerMessageId!,
-			todoIds: [open!.id],
-		});
-		h!.dialogue.archiveReportedInTransaction(db, {
-			conversationId: "main",
-			messageId: "no-such-message",
-			todoIds: [open!.id],
-		});
-	});
-	expect(h.todos()).toMatchObject([{ id: open!.id, status: "todo" }]);
+	const { row, jobs } = await h.store.write((db) =>
+		h!.dialogue.archiveTodoInTransaction(db, open!.id),
+	);
+	h.dialogue.flushTodoCancellations(jobs);
+	expect(row).toMatchObject({ status: "done", outcome: "cancelled" });
+	expect(row.archivedAt).not.toBeNull();
+	expect(h.dialogue.get(waiting.id)?.status).toBe("cancelled");
+	expect(h.todos()).toEqual([]);
+	expect(h.notices()).toEqual({ notices: [], unread: 0 });
+	// Archived already: the screen's second press changes nothing.
+	const again = await h.store.write((db) =>
+		h!.dialogue.archiveTodoInTransaction(db, open!.id),
+	);
+	expect(again).toEqual({ row, jobs: [] });
+	await expect(
+		h.store.write((db) =>
+			h!.dialogue.archiveTodoInTransaction(db, "no-such-todo"),
+		),
+	).rejects.toThrow("work_not_found");
 });
 
 test("an agency utterance is recorded as a spontaneous said event, and the next input carries it as the agent's", async () => {
@@ -476,63 +439,6 @@ test("an agency utterance is recorded as a spontaneous said event, and the next 
 		role: "assistant",
 		content: "そういえば、紅葉の見頃みたいですよ。",
 	});
-});
-
-test("a spontaneous report keeps its completed TODO until its speech is heard in full", async () => {
-	h = await setup();
-	const done = await doneTodo("猫の絵");
-	h.state.steps.push(
-		{ calls: [{ name: "find_toolchain", args: { query: "絵" } }] },
-		{
-			calls: [
-				{
-					name: "delegate",
-					args: {
-						mode: "execute",
-						toolchain: IMAGE.id,
-						request: "鳥の絵",
-						impact: "create",
-						announcement: "描きます。",
-					},
-				},
-			],
-		},
-	);
-	await h.say("鳥の絵を描いて", "queued");
-	const open = h.todos().find((todo) => todo.title === "鳥の絵")!;
-	await h.store.write((db) => {
-		h!.conversation.appendInTransaction(db, {
-			id: "spontaneous-todo",
-			conversationId: "main",
-			role: "assistant",
-			text: "猫の絵ができましたよ。",
-			createdAt: new Date().toISOString(),
-			runId: null,
-		});
-		h!.dialogue.recordSpontaneousInTransaction(db, {
-			conversationId: "main",
-			messageId: "spontaneous-todo",
-			text: "猫の絵ができましたよ。",
-			at: new Date().toISOString(),
-			todoRefs: [done.id, open.id],
-		});
-	});
-	expect(h.todos()).toHaveLength(2);
-	await h.store.write((db) =>
-		h!.dialogue.recordMessageHeardInTransaction(db, {
-			messageId: "spontaneous-todo",
-			playbackId: "spontaneous-full",
-			heard: "full",
-			text: "猫の絵ができましたよ。",
-		}),
-	);
-	// The reported one is archived; the one still being worked on stays.
-	expect(h.todos()).toMatchObject([{ id: open.id, status: "todo" }]);
-	const said = h.log().find((e) => h!.fields(e).origin === "spontaneous")!;
-	expect(h.fields(said)).toMatchObject({ todoRefs: [done.id, open.id] });
-	expect(
-		h.log().filter((e) => h!.fields(e).action === "work.archived"),
-	).toMatchObject([{ type: "acted", by: "host" }]);
 });
 
 test("a memory read returns the long-term items that match, and logs the read", async () => {
@@ -643,7 +549,7 @@ test("cancel of a waiting TODO from a later utterance ends the run it waits on, 
 	expect(h.todos()).toEqual([]);
 });
 
-test("the TODO screen's page shows the whole request, newest request first, and the archive apart", async () => {
+test("the TODO screen's page shows the whole request, the newest finished first, in the archive", async () => {
 	h = await setup();
 	const long = `${"とても長い依頼の説明".repeat(8)}の絵`;
 	await doneTodo("猫の絵");
@@ -656,24 +562,18 @@ test("the TODO screen's page shows the whole request, newest request first, and 
 				pageSize: 10,
 			}),
 		);
-	const active = page("active");
-	expect(active.total).toBe(2);
-	expect(active.counts).toEqual({ todo: 0, done: 2, archived: 0 });
+	const archived = page("archived");
+	expect(archived.total).toBe(2);
+	expect(archived.counts).toEqual({ todo: 0, archived: 2 });
 	// The ledger's title is cut for the model's state; the screen reads the request itself.
-	expect(active.rows.map((row) => row.request)).toEqual([long, "猫の絵"]);
-	expect(active.rows[0]!.title.length).toBeLessThan(long.length);
-	expect(page("archived").rows).toEqual([]);
+	expect(archived.rows.map((row) => row.request)).toEqual([long, "猫の絵"]);
+	expect(archived.rows[0]!.title.length).toBeLessThan(long.length);
+	expect(page("active").rows).toEqual([]);
 });
 
-test("a reported TODO can still be checked: its report is read again, with room for what the notice left out", async () => {
+test("a finished TODO can still be checked: its result is read again, with room for what the notice left out", async () => {
 	h = await setup();
 	const todo = await doneTodo("猫の絵");
-	// Reported and heard: the TODO is archived.
-	await h.store.write((db) =>
-		db
-			.query("UPDATE dialogue_work SET archived_at = ? WHERE id = ?")
-			.run(new Date().toISOString(), todo.id),
-	);
 	expect(h.todos()).toEqual([]);
 	h.state.steps.push(
 		{
@@ -691,12 +591,12 @@ test("a reported TODO can still be checked: its report is read again, with room 
 	expect(checked).toStartWith(
 		`- ok: true\nt${todo.ref}「猫の絵」が終わりました`,
 	);
-	// The state names it as reported, so the model knows the number to read.
+	// The state names it as notified, so the model knows the number to read.
 	const last = h.state.calls
 		.at(-1)!
 		.messages.filter((m) => m.role === "user")
 		.at(-1)!.content;
-	expect(last).toContain(`- t${todo.ref} 猫の絵 報告済み`);
+	expect(last).toContain(`- t${todo.ref} 猫の絵 通知済み`);
 });
 
 test("a spoken reply takes its place when adopted and keeps only what was heard; one not heard at all leaves the input", async () => {

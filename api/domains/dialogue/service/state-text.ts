@@ -6,15 +6,14 @@ import type { DialogueDeps } from "./context";
 import type { DocumentRefs, TodoItem } from "./work-items";
 import { INPUT_HEADINGS, gapText, jstNowLine, lineText } from "./input-text";
 import { viewingLineInTransaction } from "./resource-context";
-import { resultText } from "./result-text";
 import { viewedSpecialistTarget } from "./specialist-context";
 
 /** Bounds of the host's fields of `## State` (the conversation input specification, section 7.1). */
 export const STATE_LIMITS = {
 	work: 8,
 	presented: 4,
-	/** A TODO archived this long ago is no longer named as reported. */
-	reportedMs: 2 * 60 * 60 * 1000,
+	/** A TODO archived this long ago is no longer named (its notice told the user it finished). */
+	archivedMs: 2 * 60 * 60 * 1000,
 	/** A gap this long since the last utterance is said in the `今` line. */
 	gapMs: 30 * 60 * 1000,
 } as const;
@@ -22,7 +21,6 @@ export const STATE_LIMITS = {
 const OUTCOMES: Record<string, string> = {
 	partial: "一部のみ",
 	failed: "失敗",
-	cancelled: "取消",
 	interrupted: "中断",
 };
 const IMPACTS: Record<string, string> = {
@@ -46,15 +44,16 @@ function todoLine(
 	archived: boolean,
 ): string {
 	const made = madeOf(todo, refs);
+	// Finished work is archived as it finishes and told by a notice on screen; work the user cancelled has none.
 	const status = archived
-		? "報告済み"
+		? todo.outcome === "cancelled"
+			? "取消済み"
+			: "通知済み"
 		: todo.status === "waiting"
 			? "質問待ち"
-			: todo.status === "done"
-				? "完了 未報告"
-				: "実行中";
+			: "実行中";
 	const outcome =
-		todo.status === "done" && todo.outcome && OUTCOMES[todo.outcome]
+		archived && todo.outcome && OUTCOMES[todo.outcome]
 			? `（${OUTCOMES[todo.outcome]}）`
 			: "";
 	return `- t${todo.ref} ${lineText(todo.title)} ${status}${outcome}${made.length ? ` ${made.join(" ")}` : ""}`;
@@ -145,7 +144,7 @@ export function stateLinesInTransaction(
 				.recentlyArchivedInTransaction(
 					tx,
 					input.conversationId,
-					new Date(input.nowMs - STATE_LIMITS.reportedMs).toISOString(),
+					new Date(input.nowMs - STATE_LIMITS.archivedMs).toISOString(),
 					room,
 				)
 				.map((todo) => todoLine(todo, refs, true)),
@@ -181,8 +180,8 @@ export function stateLinesInTransaction(
 }
 
 /**
- * What is in front of the user: the item on screen, and what the agent's newest reply showed (its resources, and
- * how many items its report listed). Drawn by fixed rules from the records, never by the model.
+ * What is in front of the user: the item on screen, and the resources the agent's newest reply showed. Drawn by
+ * fixed rules from the records, never by the model.
  */
 function presentedLines(
 	deps: DialogueDeps,
@@ -215,21 +214,6 @@ function presentedLines(
 		const full = `${ref}「${lineText(row.label)}」`;
 		lines.push(`- ${named.has(full) ? ref : full}（直前の返事で示した）`);
 	}
-	if (message.runId && deps.work)
-		for (const row of deps.work.reportedByRunInTransaction(tx, message.runId)) {
-			const ref = refs.todo(row.id);
-			if (!ref) continue;
-			const { items } = resultText({
-				ref,
-				title: row.title,
-				status: row.status,
-				...(row.outcome ? { outcome: row.outcome } : {}),
-				result: row.result,
-				made: [],
-				resource: refs.resource,
-			});
-			if (items > 0) lines.push(`- ${ref} の報告の項目 1〜${items}`);
-		}
 	return lines;
 }
 

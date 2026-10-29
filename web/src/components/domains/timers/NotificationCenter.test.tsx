@@ -7,7 +7,7 @@ import {
 } from "@testing-library/react";
 import { StrictMode } from "react";
 import { afterEach, expect, test, vi } from "vitest";
-import type { KanbanNoticeView } from "./NotificationCenter";
+import type { KanbanNoticeView, TodoNoticeView } from "./NotificationCenter";
 import type { TimerNotificationDto } from "../../../../../api/domains/timers/contracts";
 import { NotificationCenter } from "./NotificationCenter";
 
@@ -242,4 +242,109 @@ test("audio guidance and errors also collapse and remain available in the drawer
 	);
 	fireEvent.click(screen.getByRole("button", { name: "通知音を有効にする" }));
 	expect(prepareAudio).toHaveBeenCalledOnce();
+});
+
+const todoNotice = (over: Partial<TodoNoticeView> = {}): TodoNoticeView => ({
+	id: "w1",
+	conversationId: "main",
+	title: "夕焼けの海の画像を作って",
+	toolchainTitle: "画像の作成",
+	outcome: "succeeded",
+	summary: "夕焼けの海の画像を1枚作りました。",
+	links: [{ uri: "eumenes://image/i1", label: "夕焼けの海", kind: "image" }],
+	read: false,
+	createdAt: "2026-10-14T12:00:00.000Z",
+	...over,
+});
+
+function showTodos(items: TodoNoticeView[]) {
+	const onOpen = vi.fn();
+	const onRead = vi.fn();
+	render(
+		<NotificationCenter
+			notices={[timer()]}
+			todo={{
+				notices: items,
+				unread: items.filter((n) => !n.read).length,
+				error: null,
+				loadError: null,
+				onOpen,
+				onRead,
+			}}
+			ringingId={null}
+			stoppingIds={[]}
+			onStop={vi.fn()}
+			error={null}
+		/>,
+	);
+	return { onOpen, onRead };
+}
+
+test("a finished TODO is a small notice: the work and its result on a line each, how it ended only when it failed", async () => {
+	showTodos([
+		todoNotice(),
+		todoNotice({
+			id: "w2",
+			outcome: "failed",
+			title: "来週の天気を調べて",
+			toolchainTitle: undefined,
+			summary: null,
+			links: [],
+			read: true,
+			createdAt: "2026-10-14T09:30:00.000Z",
+		}),
+	]);
+	// The unread finished TODO pops up over the screen with the timer; the read one does not.
+	const stack = screen.getByRole("status", { name: "新しい通知" });
+	const popped = stack.querySelector(".todo-notice")!;
+	expect(popped.querySelector(".todo-notice-head")!.textContent).toBe(
+		"[画像の作成] 夕焼けの海の画像を作って",
+	);
+	expect(popped.querySelector(".todo-notice-summary")!.textContent).toBe(
+		"夕焼けの海の画像を1枚作りました。",
+	);
+	// No app icon, app name, time or title: only the text and what launches.
+	expect(popped.querySelector("h3, time, .notification-card-icon")).toBeNull();
+	expect(stack.textContent).not.toContain("来週の天気を調べて");
+	fireEvent.click(screen.getByRole("button", { name: "通知センター、2件" }));
+	const drawer = await screen.findByRole("dialog", { name: "通知センター" });
+	const failed = drawer.querySelector(".todo-notice-read")!;
+	expect(failed.querySelector(".todo-notice-head")!.textContent).toBe(
+		"失敗来週の天気を調べて",
+	);
+	// A read one is history: pressing it does nothing more.
+	expect(failed.querySelector("button")).toBeNull();
+});
+
+test("pressing a TODO notice reads it; its icon launches what the work made, else its toolchain's screen", async () => {
+	const h = showTodos([
+		todoNotice(),
+		todoNotice({
+			id: "w2",
+			title: "3分のタイマー",
+			toolchainTitle: "タイマー",
+			artifactId: "timers.workspace",
+			links: [],
+		}),
+		todoNotice({ id: "w3", toolchainTitle: undefined, links: [] }),
+	]);
+	const stack = screen.getByRole("status", { name: "新しい通知" });
+	const made = screen.getByRole("button", { name: "「夕焼けの海」を開く" });
+	// An icon, named for the screen reader and the pointer.
+	expect(made.textContent).toBe("");
+	expect(made.querySelector("svg")).toBeTruthy();
+	fireEvent.click(made);
+	expect(h.onOpen).toHaveBeenCalledWith(expect.objectContaining({ id: "w1" }), {
+		uri: "eumenes://image/i1",
+	});
+	fireEvent.click(screen.getByRole("button", { name: "タイマーの画面を開く" }));
+	expect(h.onOpen).toHaveBeenLastCalledWith(
+		expect.objectContaining({ id: "w2" }),
+		{ artifactId: "timers.workspace" },
+	);
+	// With nothing made and no screen there is no icon.
+	expect(stack.querySelectorAll(".todo-notice-open")).toHaveLength(2);
+	expect(screen.queryByRole("button", { name: "既読にする" })).toBeNull();
+	fireEvent.click(stack.querySelectorAll("button.todo-notice-body")[2]!);
+	expect(h.onRead).toHaveBeenCalledWith(expect.objectContaining({ id: "w3" }));
 });

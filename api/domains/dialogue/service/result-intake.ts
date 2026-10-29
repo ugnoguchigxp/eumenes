@@ -7,8 +7,6 @@ import {
 import type { SelectionOutcome } from "../../toolchain-history";
 import type { Run } from "../contracts";
 import { researchCitations } from "./research-citations";
-import { resultText } from "./result-text";
-import { madeOf } from "./state-text";
 import type { DialogueDeps, GenerateInput, GeneratePayload } from "./context";
 import type { WorkOutcome, WorkRow } from "../repository/work";
 
@@ -229,18 +227,15 @@ function taskNotice(
 }
 
 /**
- * Right before the model speaks of a result, an operation's result is read again (a cancel after the report shows
- * at once): a changed result overwrites its TODO, and its text in the host notice of the last message is drawn
- * again. The rest of the prepared prompt stays as it was.
+ * Right before the model speaks, the sub-agent's answer it consumes is read again: a change since the prepare (a
+ * write queued before this one) is read here too.
  */
-export async function refreshActionResults(
+export async function refreshAgentAnswer(
 	deps: DialogueDeps,
 	input: GenerateInput,
 ): Promise<void> {
-	const ledger = deps.work;
 	const agents = deps.agents;
-	// The answer is consumed as it is when the agent phrases it: a change since the prepare (a write queued before
-	// this one) is read here too. One whose evidence no longer holds keeps the old ticket, which the adoption refuses.
+	// One whose evidence no longer holds keeps the old ticket, which the adoption refuses.
 	if (input.agent && agents)
 		input.agent = await deps.store.write((tx) => {
 			try {
@@ -249,51 +244,6 @@ export async function refreshActionResults(
 				return input.agent!;
 			}
 		});
-	const todoIds = input.shown.todos;
-	if (!ledger || !agents || todoIds.length === 0) return;
-	const redrawn = await deps.store.write((tx) => {
-		const refs = ledger.refsInTransaction(tx, input.conversationId);
-		const text = (row: WorkRow) =>
-			resultText({
-				ref: refs.todo(row.id) ?? "t?",
-				title: row.title,
-				status: row.status,
-				...(row.outcome ? { outcome: row.outcome } : {}),
-				...(row.question ? { question: row.question } : {}),
-				result: row.result,
-				made: ledger
-					.todosInTransaction(tx, input.conversationId)
-					.filter((todo) => todo.id === row.id)
-					.flatMap((todo) => madeOf(todo, refs)),
-				resource: refs.resource,
-			}).text;
-		const changes: Array<{ before: string; after: string }> = [];
-		for (const id of todoIds) {
-			const row = ledger.workInTransaction(tx, id);
-			if (!row || row.status !== "done" || row.archivedAt) continue;
-			// Reading again is an aid: when the operation cannot be read now, the reported result stands.
-			let payload: string | null;
-			try {
-				payload = agents.actionPayloadInTransaction(tx, row.runId);
-			} catch {
-				continue;
-			}
-			if (!payload || payload === JSON.stringify(row.result)) continue;
-			const before = text(row);
-			ledger.reportInTransaction(tx, row.id, {
-				status: "done",
-				outcome: row.outcome ?? "succeeded",
-				result: JSON.parse(payload) as unknown,
-			});
-			changes.push({ before, after: text(ledger.workInTransaction(tx, id)!) });
-		}
-		return changes;
-	});
-	const last = [...input.messages].reverse().find((m) => m.role === "user");
-	if (!last) return;
-	// A replacer function: the result text is external, and `$` patterns in a replacement string would be expanded.
-	for (const { before, after } of redrawn)
-		last.content = last.content.replace(before, () => after);
 }
 
 /**

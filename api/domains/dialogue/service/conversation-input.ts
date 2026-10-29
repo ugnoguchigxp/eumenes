@@ -127,7 +127,7 @@ export function recentUtterances(
  */
 export function recentMessages(
 	utterances: readonly Utterance[],
-	history: ConversationHarness["history"] = localHarness.history,
+	history: ConversationHarness["history"],
 ): ChatMessage[] {
 	const messages: ChatMessage[] = [];
 	for (const u of utterances) {

@@ -35,7 +35,7 @@ function rowOf(
 	return {
 		id: row.id,
 		request: row.request,
-		state: row.archived ? "archived" : row.status === "done" ? "done" : "todo",
+		state: row.archived ? "archived" : "todo",
 		pipeline: row.pipeline,
 		resultSummary: note.length ? note.join("：") : null,
 	};
@@ -146,7 +146,10 @@ export const todosWebAdapter: WebArtifactAdapter = {
 				}
 				return { status: "rejected", message: "表示条件を確認してください。" };
 			},
-			settled: () => {},
+			// An archive was accepted: the page reads the ledger again.
+			settled: () => {
+				void read.refetch();
+			},
 			refresh: () => {
 				if (visible) void read.refetch();
 			},

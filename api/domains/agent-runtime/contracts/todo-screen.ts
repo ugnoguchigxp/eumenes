@@ -2,7 +2,7 @@ import { z } from "zod";
 
 /** Read-only display parameters of the TODO screen (the dialogue ledger's page query). */
 export const todoQuery = z.object({
-	state: z.enum(["active", "todo", "done", "archived"]),
+	state: z.enum(["active", "archived"]),
 	pageIndex: z.coerce.number().int().min(0).max(1_000_000).default(0),
 	pageSize: z.coerce
 		.number()
@@ -31,7 +31,6 @@ export const todoPageSchema = z.object({
 	rows: z.array(todoRowSchema),
 	counts: z.object({
 		todo: z.number().int().nonnegative(),
-		done: z.number().int().nonnegative(),
 		archived: z.number().int().nonnegative(),
 	}),
 	total: z.number().int().nonnegative(),

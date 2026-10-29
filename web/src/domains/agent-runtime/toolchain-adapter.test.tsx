@@ -29,7 +29,7 @@ const bundle = JSON.parse(
 	),
 );
 const artifact = artifactDefinitionV1.parse(bundle.artifacts.at(-1));
-const revision = "artifact:agency.todos@3";
+const revision = "artifact:agency.todos@4";
 const adapters = createWebAdapterRegistry([todosWebAdapter]);
 const row: TodoPage["rows"][number] = {
 	id: "one",
@@ -41,10 +41,11 @@ const row: TodoPage["rows"][number] = {
 	archived: false,
 	updatedAt: "2026-10-24T00:00:00.000Z",
 };
+/** Open work asks a question (`todo`) or runs (`run`); the archive holds what finished. */
 function page(query: TodoQuery): TodoPage {
 	const states =
 		query.state === "active"
-			? (["todo", "done"] as const)
+			? (["todo", "run"] as const)
 			: (["archived"] as const);
 	return {
 		...query,
@@ -52,15 +53,42 @@ function page(query: TodoQuery): TodoPage {
 			...row,
 			id: `${state}-${query.pageIndex}`,
 			request: `${state} ${query.pageIndex} の仕事`,
-			status: state === "todo" ? ("waiting" as const) : ("done" as const),
-			outcome: state === "todo" ? null : ("succeeded" as const),
-			summary: state === "todo" ? "どの曲調にしますか" : "作成できました",
+			status:
+				state === "todo"
+					? ("waiting" as const)
+					: state === "run"
+						? ("todo" as const)
+						: ("done" as const),
+			outcome: state === "archived" ? ("succeeded" as const) : null,
+			summary:
+				state === "todo"
+					? "どの曲調にしますか"
+					: state === "archived"
+						? "作成できました"
+						: null,
 			archived: state === "archived",
 		})),
-		counts: { todo: 12, done: 11, archived: 28 },
+		counts: { todo: 23, archived: 28 },
 		total: query.state === "active" ? 23 : 28,
 	};
 }
+const accepted = {
+	httpStatus: 200,
+	view: {
+		eventId: "x",
+		status: "accepted" as const,
+		createdAt: new Date().toISOString(),
+		result: {
+			version: 1 as const,
+			executionId: "e",
+			artifactRevisionId: revision,
+			outcome: "completed" as const,
+			resultRefs: [],
+			artifactRefs: [],
+			receipt: { todoId: "run-0" },
+		},
+	},
+};
 function setup(
 	readWork: (query: TodoQuery, signal?: AbortSignal) => Promise<TodoPage>,
 	visible = true,
@@ -84,6 +112,9 @@ function setup(
 				launcher: artifact.launcher,
 			},
 		]),
+		submitToolchainAction: vi.fn(async (_event: object) => accepted),
+		toolchainAction: vi.fn(),
+		unsettledToolchainActions: vi.fn(async () => []),
 		toolchainArtifactSource: vi.fn(
 			async (
 				_revision: string,
@@ -123,23 +154,24 @@ function setup(
 	return { client, show: (shown: boolean) => view.rerender(content(shown)) };
 }
 
-test("todo and done are rows of one table with one pagination and a changing state", async () => {
+test("open work is one paged table with an archive button on each row; the archive is apart", async () => {
 	const read = vi.fn(async (query: TodoQuery) => page(query));
 	setup(read);
 	await screen.findByText("todo 0 の仕事");
-	await screen.findByText("done 0 の仕事");
+	await screen.findByText("run 0 の仕事");
 	const table = screen.getByRole("table");
 	expect(
 		within(table)
 			.getAllByRole("columnheader")
 			.map((cell) => cell.textContent),
-	).toEqual(["依頼内容", "状態"]);
+	).toEqual(["依頼内容", "状態", "操作"]);
 	expect(within(table).getAllByRole("row")).toHaveLength(3);
-	expect(within(table).getByText("todo")).toBeTruthy();
-	expect(within(table).getByText("done")).toBeTruthy();
+	expect(within(table).getAllByText("todo", { exact: true })).toHaveLength(2);
+	expect(
+		within(table).getAllByRole("button", { name: /をアーカイブ$/ }),
+	).toHaveLength(2);
 	expect(screen.getAllByRole("combobox")).toHaveLength(1);
-	// The outcome and the one-line summary are the only result the screen shows; a waiting TODO shows its question.
-	expect(screen.getByText("完了：作成できました")).toBeTruthy();
+	// A waiting TODO shows its question; no result is shown for open work.
 	expect(screen.getByText("確認待ち：どの曲調にしますか")).toBeTruthy();
 	expect(screen.queryByText("archived 0 の仕事")).toBeNull();
 	expect(read.mock.calls.every(([query]) => query.state === "active")).toBe(
@@ -147,15 +179,11 @@ test("todo and done are rows of one table with one pagination and a changing sta
 	);
 	expect(screen.queryByRole("button", { name: /詳細/ })).toBeNull();
 	expect(document.querySelector(".ds-todo-workspace time")).toBeNull();
-	fireEvent.click(
-		screen.getByRole("button", { name: "todo・doneの次のページ" }),
-	);
+	fireEvent.click(screen.getByRole("button", { name: "進行中の次のページ" }));
 	await screen.findByText("todo 1 の仕事");
-	await screen.findByText("done 1 の仕事");
-	fireEvent.change(
-		screen.getByRole("combobox", { name: "todo・doneの表示件数" }),
-		{ target: { value: "25" } },
-	);
+	fireEvent.change(screen.getByRole("combobox", { name: "進行中の表示件数" }), {
+		target: { value: "25" },
+	});
 	await waitFor(() =>
 		expect(read).toHaveBeenLastCalledWith(
 			{ state: "active", pageIndex: 0, pageSize: 25 },
@@ -163,53 +191,63 @@ test("todo and done are rows of one table with one pagination and a changing sta
 		),
 	);
 	await screen.findByText("todo 0 の仕事");
-	await waitFor(() =>
-		expect(
-			screen.getByRole("button", { name: "更新" }).hasAttribute("disabled"),
-		).toBe(false),
-	);
-	const before = read.mock.calls.length;
-	// The same execution remains one row as its reporting state changes.
-	read.mockResolvedValueOnce({
-		...page({ state: "active", pageIndex: 0, pageSize: 25 }),
-		rows: [
-			{
-				...row,
-				id: "todo-0",
-				request: "todo 0 の仕事",
-				status: "done",
-				outcome: "succeeded",
-			},
-		],
-	});
-	fireEvent.click(screen.getByRole("button", { name: "更新" }));
-	await screen.findByText("todo 0 の仕事");
-	await waitFor(() =>
-		expect(
-			within(screen.getByRole("table")).queryByText("todo", { exact: true }),
-		).toBeNull(),
-	);
-	expect(read.mock.calls.length).toBe(before + 1);
-	expect(within(screen.getByRole("table")).getAllByRole("row")).toHaveLength(2);
-	expect(within(screen.getByRole("table")).getByText("done")).toBeTruthy();
-	fireEvent.mouseDown(screen.getByRole("tab", { name: "archived" }));
+	fireEvent.mouseDown(screen.getByRole("tab", { name: "アーカイブ" }));
 	await screen.findByText("archived 0 の仕事");
 	expect(screen.getAllByRole("table")).toHaveLength(1);
 	expect(screen.queryByText("todo 0 の仕事")).toBeNull();
+	// The outcome and the one-line summary are the only result the screen shows.
+	expect(screen.getByText("完了：作成できました")).toBeTruthy();
+	expect(screen.queryByRole("button", { name: /をアーカイブ$/ })).toBeNull();
 	expect(read).toHaveBeenLastCalledWith(
 		{ state: "archived", pageIndex: 0, pageSize: 20 },
 		expect.any(AbortSignal),
 	);
 	expect(
-		screen.queryByRole("button", { name: "報告済みの次のページ" }),
+		screen.queryByRole("button", { name: "アーカイブの次のページ" }),
 	).toBeNull();
 	expect(screen.queryByRole("combobox")).toBeNull();
-	fireEvent.mouseDown(screen.getByRole("tab", { name: "todo・done" }));
+	fireEvent.mouseDown(screen.getByRole("tab", { name: "進行中" }));
 	await screen.findByText("todo 0 の仕事");
 	expect(read).toHaveBeenLastCalledWith(
 		{ state: "active", pageIndex: 0, pageSize: 25 },
 		expect.any(AbortSignal),
 	);
+});
+
+test("archiving asks first; once confirmed it sends the archive and reads the page again", async () => {
+	const read = vi.fn(async (query: TodoQuery) => page(query));
+	const { client } = setup(read);
+	await screen.findByText("run 0 の仕事");
+	fireEvent.click(
+		screen.getByRole("button", { name: "「run 0 の仕事」をアーカイブ" }),
+	);
+	const dialog = await screen.findByRole("dialog");
+	expect(
+		within(dialog).getByText("実行中の仕事を止めてアーカイブしますか"),
+	).toBeTruthy();
+	// Cancelling sends nothing.
+	fireEvent.click(within(dialog).getByRole("button", { name: "キャンセル" }));
+	await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+	expect(client.submitToolchainAction).not.toHaveBeenCalled();
+	fireEvent.click(
+		screen.getByRole("button", { name: "「run 0 の仕事」をアーカイブ" }),
+	);
+	const reads = read.mock.calls.length;
+	fireEvent.click(
+		within(await screen.findByRole("dialog")).getByRole("button", {
+			name: "止めてアーカイブ",
+		}),
+	);
+	await waitFor(() =>
+		expect(client.submitToolchainAction).toHaveBeenCalledTimes(1),
+	);
+	expect(client.submitToolchainAction.mock.calls[0]![0]).toMatchObject({
+		artifactRevisionId: revision,
+		source: "agency-todos",
+		actionId: "archive",
+		input: { todoId: "run-0" },
+	});
+	await waitFor(() => expect(read.mock.calls.length).toBeGreaterThan(reads));
 });
 
 test("switching to archived cancels the pending combined read and ignores its late response", async () => {
@@ -226,14 +264,14 @@ test("switching to archived cancels the pending combined read and ignores its la
 				}),
 	);
 	await waitFor(() => expect(pending).toHaveLength(1));
-	fireEvent.mouseDown(screen.getByRole("tab", { name: "archived" }));
+	fireEvent.mouseDown(screen.getByRole("tab", { name: "アーカイブ" }));
 	await screen.findByText("archived 0 の仕事");
 	expect(pending.every((p) => p.signal?.aborted)).toBe(true);
 	await act(async () => {
 		for (const p of pending) p.finish(page(p.query));
 	});
 	expect(screen.queryByText("todo 0 の仕事")).toBeNull();
-	expect(screen.queryByText("done 0 の仕事")).toBeNull();
+	expect(screen.queryByText("run 0 の仕事")).toBeNull();
 });
 
 test("the combined empty table remains visible; a failed read can recover without a modal or HTML execution", async () => {
@@ -241,15 +279,15 @@ test("the combined empty table remains visible; a failed read can recover withou
 		...page(query),
 		rows: [],
 		total: 0,
-		counts: { todo: 0, done: 0, archived: 0 },
+		counts: { todo: 0, archived: 0 },
 	});
 	const read = vi.fn(async (query: TodoQuery) => empty(query));
 	setup(read);
-	await screen.findByText("進行中・未報告の仕事はありません。");
+	await screen.findByText("進行中の仕事はありません。");
 	read.mockRejectedValueOnce(new Error("offline"));
 	fireEvent.click(screen.getByRole("button", { name: "更新" }));
 	await screen.findByRole("alert");
-	expect(screen.queryByText("進行中・未報告の仕事はありません。")).toBeNull();
+	expect(screen.queryByText("進行中の仕事はありません。")).toBeNull();
 	read.mockResolvedValueOnce({
 		...page({ state: "active", pageIndex: 0, pageSize: 10 }),
 		rows: [row],
@@ -264,14 +302,14 @@ test("the combined empty table remains visible; a failed read can recover withou
 test("a hidden artifact reads no TODOs and reads only active work when shown", async () => {
 	const read = vi.fn(async (query: TodoQuery) => page(query));
 	const view = setup(read, false);
-	await screen.findByRole("tab", { name: "todo・done" });
+	await screen.findByRole("tab", { name: "進行中" });
 	expect(read).not.toHaveBeenCalled();
 	view.show(true);
 	await screen.findByText("todo 0 の仕事");
 	expect(read.mock.calls.every(([query]) => query.state === "active")).toBe(
 		true,
 	);
-	fireEvent.mouseDown(screen.getByRole("tab", { name: "archived" }));
+	fireEvent.mouseDown(screen.getByRole("tab", { name: "アーカイブ" }));
 	await screen.findByText("archived 0 の仕事");
 	expect(read).toHaveBeenLastCalledWith(
 		{ state: "archived", pageIndex: 0, pageSize: 20 },

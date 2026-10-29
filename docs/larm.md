@@ -137,6 +137,25 @@ music domainのプレイリストは会話/run・検索条件・曲IDを保存�
 
 再確認は `bun scripts/mixed-speech-live.ts --run`。隔離backendに保存済みLARM設定を保存し、固定の日英混在回答を区間化して、区間ごとに日本語・英語TTSのどちらで合成されたか（attemptのmodel）とWAV取得を `verification-reports/mixed-speech-live/`（ローカルの検証記録。リポジトリには含めない）に記録する。合成音声の取得はスピーカー再生の実機器受入に数えない。旧Ruri分類の接続記録は [検証記録](../spec/verification/ruri-sentence-language-2026-10-12/README.md) に残す。
 
+## ユーザー意図判定
+
+利用者の発言が確定した後、LLM へ渡す前に、LARM の Ruri ユーザー意図判定を呼ぶ（[設計](../spec/intent-gate-design-2026-10-29.md)）。表情・声色判定（エージェント自身の回答チャンクを判定）とは、口（`judgeIntent` と `judge`）・入力・結果・設定・接続を分ける。意図判定の口は、保存済みの intent profile で `providers: ["system-one"]` だけの接続を作り、その claim の `endpoint`・credential・model で判定する。renew・再 claim・release は既存の provider の扱いと同じ。表情判定の credential を使い回さない。
+
+設定は SQLite の設定文書の `intent`（表情判定の設定とは別）。`mode` は `legacy`・`shadow`（初期値）・`ruri`、`profile` は保存するまで空（空の間は判定も記録もしない。保存すると最初の発言を待たずに接続を作る）、`timeoutMs`（`ruri` で待つ上限）、`searchScore`（`ruri` で Tool 探索を強制する `request` のスコアの閾値）。
+
+```sh
+bun run cli -- intent status
+bun run cli -- intent set profile <意図判定の Agent Profile>
+bun run cli -- intent set mode shadow
+bun run cli -- intent set mode ruri
+bun run cli -- intent set searchScore 0.6
+bun run cli -- intent clear-profile
+```
+
+API は `GET /api/settings/intent` と `PUT /api/settings/intent`（変える項目だけを送る）。
+
+判定ごとの記録は表 `dialogue_intent_judgments`（本文と秘密は持たない）。ログは `dialogue.intent_judged`（`kind` がモード、`decision` が Ruri のラベル、`route` が選んだルーティング、`reason` が判定を使えなかった理由）。判定の失敗・時間切れでは、今のルーティングで続ける。`ruri` の強制はその手の1回目の呼出しだけを `tool_choice: "required"` にするので、LARM がこれを受け付けることを live で確かめてから使う。
+
 ## チャットの画像入力
 
 画像入力（JPG・PNG・BMP）は、Providerの`llm.vision`と`chatInput`を確認して使います。保存、履歴再送、正式token計数と保持説明は[チャット画像入力](chat-images.md)を参照してください。

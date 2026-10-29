@@ -5,6 +5,8 @@ import type { DialogueDeps } from "./context";
 import type { PendingConfirmation, TodoItem } from "./work-items";
 import { forgetWorkResources, workLinksOf } from "../repository/resources";
 import { recordWorkLinksInTransaction } from "./work-links";
+import { noticeOf } from "./todo-notices";
+import type { TodoNotice } from "../contracts/todo-notices";
 import {
 	archiveWork,
 	dropRunResults,
@@ -17,18 +19,17 @@ import {
 	openConfirmations,
 	openWork,
 	recentToolchains,
+	readWorkNotice,
 	recentlyArchivedWork,
-	requestArchive,
 	updateWork,
 	useConfirmation,
-	waitingArchives,
 	workByDedupe,
 	workById,
 	workByRef,
 	workBySource,
 	workOfRun,
+	workNotices,
 	workPage,
-	workReportedBy,
 	workRefs,
 	type ConfirmationRow,
 	type WorkOutcome,
@@ -134,6 +135,20 @@ function toolchainTitleOf(
 		: undefined;
 }
 
+/** The registered screen of each active toolchain bound to one (`artifact:timers.workspace@2` → `timers.workspace`). */
+function toolchainScreens(
+	toolchains: DialogueDeps["toolchains"],
+	db: Database,
+): Map<string, string> {
+	const screens = new Map<string, string>();
+	for (const entry of toolchains?.catalogInTransaction(db) ?? []) {
+		const revision = entry.runtime.binding?.artifactRevisionId;
+		const id = revision && /^artifact:(.+)@[0-9]+$/.exec(revision)?.[1];
+		if (id) screens.set(entry.id, id);
+	}
+	return screens;
+}
+
 /** What an owner reports into a TODO. */
 type WorkReport =
 	| { status: "waiting"; questionId: string; question: string }
@@ -167,26 +182,54 @@ function recordReportLinks(
 		);
 }
 
-/** What `## State` reads of the TODOs already reported (the conversation input specification, section 7.1). */
-const reportedViews = {
-	/** The TODOs archived since `since` (an ISO time), with their links: what `## State` names as reported. */
-	recentlyArchivedInTransaction(
-		db: Database,
-		conversationId: string,
-		since: string,
-		limit: number,
-	): TodoItem[] {
-		return itemsOf(db, recentlyArchivedWork(db, conversationId, since, limit));
-	},
-	/** The TODOs a run's reply reported (its archive was asked as `run:<id>`). */
-	reportedByRunInTransaction: (db: Database, runId: string) =>
-		workReportedBy(db, `run:${runId}`),
-};
+/** What `## State`, the TODO screen and the notices read of finished (archived) work. */
+function finishedViews(deps: Pick<DialogueDeps, "clock" | "toolchains">) {
+	return {
+		/** The TODOs archived since `since` (an ISO time), with their links: what `## State` names as notified. */
+		recentlyArchivedInTransaction(
+			db: Database,
+			conversationId: string,
+			since: string,
+			limit: number,
+		): TodoItem[] {
+			return itemsOf(
+				db,
+				recentlyArchivedWork(db, conversationId, since, limit),
+			);
+		},
+		/** The completion notices of every conversation, newest first, and how many are unread in all. */
+		noticesInTransaction(
+			db: Database,
+			limit: number,
+		): { notices: TodoNotice[]; unread: number } {
+			const { rows, unread } = workNotices(db, limit);
+			const links = workLinksOf(
+				db,
+				rows.map((row) => row.id),
+			);
+			const screens = toolchainScreens(deps.toolchains, db);
+			return {
+				notices: rows.map((row) =>
+					noticeOf(
+						row,
+						links.get(row.id) ?? [],
+						toolchainTitleOf(deps.toolchains, db, row),
+						screens.get(row.toolchainId),
+					),
+				),
+				unread,
+			};
+		},
+		/** Marks a TODO's notice read; false when the TODO has no notice. */
+		readNoticeInTransaction: (db: Database, workId: string) =>
+			readWorkNotice(db, workId, deps.clock()),
+	};
+}
 
 /**
  * The conversation's TODO ledger: a TODO per piece of work handed to a toolchain, its state as the work's owner
- * reports it, each reported question or result as an event of the log, the archive in two steps (request, then the
- * delivery that confirms it), and the confirmations issued before executing a change.
+ * reports it, each reported question or result as an event of the log, the archive as the work finishes with its
+ * notice on screen (the TODO completion notice design), and the confirmations issued before executing a change.
  */
 export function createWorkLedger(
 	deps: Pick<
@@ -234,32 +277,21 @@ export function createWorkLedger(
 		todosInTransaction(db: Database, conversationId: string): TodoItem[] {
 			return itemsOf(db, openWork(db, conversationId));
 		},
-		...reportedViews,
+		...finishedViews(deps),
 		/** The unarchived TODOs' revisions: what the work tool checks an operation against. */
 		todoRevisionsInTransaction: (db: Database, conversationId: string) =>
 			openWork(db, conversationId).map((row) => ({
 				id: row.id,
 				revision: row.revision,
 			})),
-		/**
-		 * The unarchived TODOs as the host's other parts see them: the model's view, the request time and the result.
-		 * `current` reads a finished TODO's result as it is now (a cancel after the report shows); undefined keeps the
-		 * recorded one.
-		 */
-		hostTodosInTransaction: (
-			db: Database,
-			conversationId: string,
-			current?: (row: WorkRow) => unknown,
-		) =>
+		/** The unarchived TODOs as the host's other parts see them: the model's view, the toolchain and the request time. */
+		hostTodosInTransaction: (db: Database, conversationId: string) =>
 			openWork(db, conversationId).map((row) => {
-				const now = row.status === "done" ? current?.(row) : undefined;
 				const title = toolchainTitleOf(deps.toolchains, db, row);
 				return {
 					...itemsOf(db, [row])[0]!,
 					...(title ? { toolchainTitle: title } : {}),
 					createdAt: row.createdAt,
-					changedAt: row.updatedAt,
-					result: now === undefined ? row.result : now,
 				};
 			}),
 		workInTransaction: workById,
@@ -321,7 +353,9 @@ export function createWorkLedger(
 		},
 		/**
 		 * The owner reports a state: waiting with a question, or done with an outcome and a result. The result slot is
-		 * overwritten; returns the TODO as it now is, or null when it is gone or already archived.
+		 * overwritten; returns the TODO as it now is, or null when it is gone or already archived. Finished work is
+		 * archived at once: the user is told by its notice on screen (none for work the user cancelled), never by the
+		 * conversation agent.
 		 */
 		reportInTransaction(
 			db: Database,
@@ -351,13 +385,13 @@ export function createWorkLedger(
 								question: null,
 							};
 			if (!updateWork(db, workId, row.revision, patch, clock())) return null;
-			const next = workById(db, workId)!;
-			// Work the user cancelled is not reported back (the agency is not given it): it is archived at once.
 			if (report.status === "done" && report.outcome === "cancelled") {
 				archiveWork(db, workId, clock());
-				return next;
+				return workById(db, workId)!;
 			}
-			recordReportLinks(deps, db, next, report);
+			recordReportLinks(deps, db, workById(db, workId)!, report);
+			if (report.status === "done") archiveWork(db, workId, clock());
+			const next = workById(db, workId)!;
 			logResult(db, next);
 			return next;
 		},
@@ -421,12 +455,6 @@ export function createWorkLedger(
 		dropRunResultsInTransaction(db: Database, runId: string) {
 			clearResults(db, dropRunResults(db, runId, clock()));
 		},
-		requestArchiveInTransaction: requestArchive,
-		/** Archives a finished TODO (section 9.4). */
-		archiveInTransaction(db: Database, workId: string): boolean {
-			return !!workById(db, workId) && archiveWork(db, workId, clock());
-		},
-		waitingArchivesInTransaction: waitingArchives,
 		/** The toolchains used most recently, with their one-line summary and the last request (section 6.2). */
 		retainedInTransaction(
 			db: Database,

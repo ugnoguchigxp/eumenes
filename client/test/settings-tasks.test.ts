@@ -16,6 +16,7 @@ const settings = {
 	codingSupervision: { approveInstructions: true },
 	agency: { emotion: true, idleSec: 20, interests: [], maxUnanswered: 1 },
 	world: { enabled: false, curationResourceId: null },
+	intent: { mode: "shadow", timeoutMs: 1500, searchScore: 0.6 },
 	larm: {
 		baseUrl: "http://127.0.0.1:9000",
 		profile: "default",

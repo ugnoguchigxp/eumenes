@@ -204,6 +204,37 @@ const personas = ["butler", "maid", "strategist", "sage"] as const;
 const backgroundSchema = z.enum(["light-fairy", "spatial"]);
 export type BackgroundKind = z.infer<typeof backgroundSchema>;
 export const backgroundKinds = backgroundSchema.options;
+/**
+ * The user-intent judge (the intent gate design, section 5), apart from the speaking-attitude judge's settings:
+ * `legacy` keeps the existing routing, `shadow` also asks the judge and records it, `ruri` lets the judge's result
+ * feed the routing (a trial).
+ */
+export const intentModes = ["legacy", "shadow", "ruri"] as const;
+const intentProfile = z.string().trim().min(1).max(200);
+const intentTimeoutMs = z.number().int().min(100).max(5000);
+const intentSearchScore = z.number().min(0).max(1);
+export const intentSettingsSchema = z
+	.object({
+		mode: z.enum(intentModes).default("shadow"),
+		/** The LARM Agent Profile of the judge; absent until saved, and then no judge is asked. */
+		profile: intentProfile.optional(),
+		/** How long `ruri` waits for the judge before the existing routing goes on alone. */
+		timeoutMs: intentTimeoutMs.default(1500),
+		/** `ruri` asks for the toolchain search first when `request` scores at least this (a threshold, not a chance). */
+		searchScore: intentSearchScore.default(0.6),
+	})
+	.strict();
+export type IntentSettings = z.infer<typeof intentSettingsSchema>;
+/** A change of the judge's settings: the fields given replace the saved ones; a null profile removes it. */
+export const intentPatchSchema = z
+	.object({
+		mode: z.enum(intentModes),
+		profile: intentProfile.nullable(),
+		timeoutMs: intentTimeoutMs,
+		searchScore: intentSearchScore,
+	})
+	.partial()
+	.strict();
 export const settingsSchema = z
 	.object({
 		revision: z.number().int().nonnegative(),
@@ -269,6 +300,11 @@ export const settingsSchema = z
 				subtitles: subtitleSchema.default(defaultSubtitles),
 			})
 			.strict(),
+		intent: intentSettingsSchema.default({
+			mode: "shadow",
+			timeoutMs: 1500,
+			searchScore: 0.6,
+		}),
 		codingSupervision: z
 			.object({
 				/** Supervisor-generated instructions wait for user approval before reaching the CLI. */

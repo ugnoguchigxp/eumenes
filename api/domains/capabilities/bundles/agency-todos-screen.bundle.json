@@ -114,6 +114,69 @@
 				"description": "この会話の進行中・完了未報告・報告済みの仕事を見る",
 				"order": 15
 			}
+		},
+		{
+			"kind": "artifact",
+			"id": "agency.todos",
+			"revision": 4,
+			"title": "TODOリスト",
+			"variants": [
+				{
+					"id": "standard",
+					"label": "標準",
+					"definition": {
+						"view": "todo-workspace",
+						"source": "agency-todos",
+						"title": "TODOリスト"
+					}
+				}
+			],
+			"defaultVariant": "standard",
+			"sourceBindings": [
+				{
+					"source": "agency-todos",
+					"adapterRef": "adapter:task-execution@1",
+					"query": "query:agent-runtime.todos@1",
+					"target": "none",
+					"paramsSchemaRef": "schema:todo-screen-query@4"
+				}
+			],
+			"actionBindings": [
+				{
+					"actionId": "view",
+					"eventAction": "todo-view",
+					"source": "agency-todos",
+					"inputSchemaRef": "schema:todo-screen-view@1",
+					"effect": "local"
+				},
+				{
+					"actionId": "page",
+					"eventAction": "todo-page",
+					"source": "agency-todos",
+					"inputSchemaRef": "schema:todo-screen-page@1",
+					"effect": "local"
+				},
+				{
+					"actionId": "refresh",
+					"eventAction": "todo-refresh",
+					"source": "agency-todos",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "local"
+				},
+				{
+					"actionId": "archive",
+					"eventAction": "todo-archive",
+					"source": "agency-todos",
+					"operationId": "todos.archive",
+					"inputSchemaRef": "schema:todo-screen-archive@1",
+					"effect": "write"
+				}
+			],
+			"launcher": {
+				"label": "TODOリスト",
+				"description": "この会話の進行中の仕事と、終わってアーカイブした仕事を見る",
+				"order": 15
+			}
 		}
 	],
 	"schemas": [
@@ -212,6 +275,53 @@
 					}
 				},
 				"required": ["conversationId", "state", "pageIndex", "pageSize"]
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "todo-screen-query",
+			"revision": 4,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"conversationId": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 120
+					},
+					"state": {
+						"type": "string",
+						"enum": ["active", "archived"]
+					},
+					"pageIndex": {
+						"type": "integer",
+						"minimum": 0,
+						"maximum": 1000000
+					},
+					"pageSize": {
+						"type": "integer",
+						"enum": [10, 20, 25, 50]
+					}
+				},
+				"required": ["conversationId", "state", "pageIndex", "pageSize"]
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "todo-screen-archive",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"todoId": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 120
+					}
+				},
+				"required": ["todoId"]
 			}
 		}
 	]

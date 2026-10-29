@@ -131,6 +131,7 @@ export async function acquireProvider(
 						: [],
 				catalogProviders: catalog,
 				fullProfile: current.request.fullProfile,
+				decision: name === "system-one",
 				claimNames: [externalName],
 				hosts,
 			});

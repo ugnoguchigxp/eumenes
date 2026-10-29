@@ -26,7 +26,6 @@ export function assembleAgency(
 		DialogueService,
 		| "conversationHasActiveRunInTransaction"
 		| "recordSpontaneousInTransaction"
-		| "archiveReportedInTransaction"
 		| "conversationTaskInTransaction"
 	>,
 ) {
@@ -37,8 +36,6 @@ export function assembleAgency(
 			dialogue().conversationHasActiveRunInTransaction(db, conversationId),
 		recordSpokeInTransaction: (db, input) =>
 			dialogue().recordSpontaneousInTransaction(db, input),
-		archiveReportedInTransaction: (db, input) =>
-			dialogue().archiveReportedInTransaction(db, input),
 		createLlm: (next) =>
 			createAgencyLlmPort({
 				store,

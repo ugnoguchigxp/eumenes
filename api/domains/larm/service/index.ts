@@ -15,6 +15,7 @@ import { createInfer } from "./infer";
 import { createConversationYield } from "./conversation-yield";
 import { createHelperConnections } from "./helper-connections";
 import { createProviderLeases as createLeaseManager } from "./provider-leases";
+import { requestIntent } from "./user-intent";
 import { leasePort } from "./lease-port";
 import { type Fetcher, type Provider } from "./profiles";
 import { localEndpoint, readJson, record, untilAborted } from "./guards";
@@ -58,6 +59,11 @@ export function createLarm(config: {
 	keepAlive?: boolean;
 	/** Records attitude judge outcomes for monitoring; the judge has no attempt record of its own. */
 	judgeActivity?: ActivityRecorder;
+	/**
+	 * A port of the user-intent judge: its connection selects the decision provider of the saved intent profile and
+	 * nothing else. It answers `judgeIntent` only; the conversation's port answers the attitude `judge` only.
+	 */
+	decisionOnly?: boolean;
 }): LarmPort {
 	const baseText = config.baseUrl?.trim();
 	const base = baseText
@@ -136,6 +142,7 @@ export function createLarm(config: {
 		hostsFor,
 		control,
 		lifetime,
+		decisionOnly: config.decisionOnly,
 	});
 	const { connect, withProvider, status } = leases;
 	async function inferAnswer(
@@ -267,9 +274,19 @@ export function createLarm(config: {
 		...leasePort(leases),
 		retain: leases.retain,
 		async judge(state, questions, signal) {
+			if (config.decisionOnly) throw new Error("larm_attitude_port_required");
 			if (judging) throw new Error("larm_decision_busy");
 			const call = () => judgeOnce(state, questions, signal);
 			return config.judgeActivity?.track(call, signal) ?? call();
+		},
+		async judgeIntent(input, signal) {
+			if (!config.decisionOnly) throw new Error("larm_intent_port_required");
+			const scoped = AbortSignal.any([signal, lifetime.signal]);
+			return withProvider("system-one", scoped, (p, connectionId) =>
+				requestIntent(p, input, scoped, (init) =>
+					judgeInfer(p, "systemone", init, scoped, connectionId),
+				),
+			);
 		},
 		async voices(signal, language) {
 			return withProvider(
@@ -279,7 +296,11 @@ export function createLarm(config: {
 			);
 		},
 		async connect() {
-			await connect(["llm"], undefined, true);
+			await connect(
+				[config.decisionOnly ? "system-one" : "llm"],
+				undefined,
+				true,
+			);
 		},
 		async conversationProfiles(signal) {
 			// The unselected catalog lists every profile; only the generally selectable ones with an llm provider

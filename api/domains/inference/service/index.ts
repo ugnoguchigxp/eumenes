@@ -72,6 +72,7 @@ const runControl = (env: Env, ...[id, m, s, c, session]: ControlArgs) =>
 		session,
 	);
 import { createIndependentControls } from "./independent-control";
+import { createIntentJudge } from "./intent-judge";
 export function createInference(
 	store: SqliteStore,
 	settings: SettingsService,
@@ -102,6 +103,7 @@ export function createInference(
 	const active = new Map<string, Running>();
 	const cooldown = new Map<string, number>();
 	const closingPorts = new Set<Promise<void>>();
+	const intentJudge = createIntentJudge({ settings, options });
 	const screen = createScreenPresence(
 		() => port(settings.get()),
 		(changed) => settings.onChange(changed),
@@ -559,6 +561,8 @@ export function createInference(
 			// Task sessions nobody released and a crashed host's temporary directories, now and then hourly.
 			await sweeper.start();
 		},
+		/** The user-intent judge, on its own port (the intent gate design, section 3). */
+		judgeIntent: intentJudge.judge,
 		async close() {
 			screen.close();
 			unsubscribeCollection();
@@ -584,6 +588,7 @@ export function createInference(
 				),
 			);
 			await Promise.allSettled(closingPorts);
+			await intentJudge.close();
 		},
 	} satisfies InferencePort & Record<string, unknown>;
 	return service;

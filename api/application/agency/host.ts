@@ -1,6 +1,7 @@
 import type { Database } from "bun:sqlite";
 import {
 	createAgencyRuntime,
+	createIdlePlanner,
 	createIdleScheduler,
 	emotionName,
 	reportedTodoIds,
@@ -13,6 +14,7 @@ import {
 	type CycleOutcome,
 	type Decision,
 	type EmotionName,
+	type IdlePlanner,
 	type LlmPort,
 	type LlmRequest,
 	type Opportunity,
@@ -34,7 +36,6 @@ import type { SqliteStore } from "../../infrastructure/sqlite";
 import type { AgencyCallIdentity } from "./llm-port";
 import { selectMemoryTopics } from "./topics";
 import type { AgencyWork } from "./work";
-import { createReportIdlePlanner, type ReportIdlePlanner } from "./report-idle";
 
 export type AgencySettings = Settings["agency"];
 
@@ -84,17 +85,8 @@ export type AgencyHostDeps = {
 			messageId: string;
 			text: string;
 			at: string;
-			/** The finished TODOs it reported: archived after playback completes. */
+			/** The TODOs it cited (a question it asks for the work). */
 			todoRefs?: readonly string[];
-		},
-	): void;
-	/** The finished TODOs a run's reply reported (the update found it): archived once the reply was heard. */
-	archiveReportedInTransaction(
-		db: Database,
-		input: {
-			conversationId: string;
-			messageId: string;
-			todoIds: readonly string[];
 		},
 	): void;
 	nowMs?(): number;
@@ -107,7 +99,7 @@ type Conv = {
 	/** Unique per runtime instance: ticket ids restart per runtime, message ids must not repeat. */
 	scope: string;
 	runtime: AgencyRuntime;
-	planner: ReportIdlePlanner;
+	planner: IdlePlanner;
 	scheduler: ReturnType<typeof createIdleScheduler>;
 	generation: number;
 	background: AbortController | null;
@@ -115,7 +107,7 @@ type Conv = {
 	calls: number;
 	/** Last time the conversation had an event or a cycle (for forgetting idle conversations). */
 	touched: number;
-	/** The finished TODOs and questions the agent was last given an opportunity for. */
+	/** The questions of TODOs the agent was last given an opportunity for. */
 	reportable: Set<string>;
 };
 
@@ -274,14 +266,10 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 		});
 	}
 
-	function newPlanner(id: string): ReportIdlePlanner {
-		const planner = createReportIdlePlanner(
+	function newPlanner(id: string): IdlePlanner {
+		const planner = createIdlePlanner(
 			{ idleSec: cfg.idleSec, maxUnanswered: cfg.maxUnanswered },
 			nowMs(),
-			() => {
-				const c = convs.get(id);
-				return !!c && todosNow(c).some((todo) => todo.status === "done");
-			},
 		);
 		// Only the conversation the user spoke in last gets idle cycles.
 		planner.setPaused(id !== activeId, nowMs());
@@ -295,12 +283,7 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 			now: nowMs,
 			setTimer,
 			clearTimer,
-			run: () =>
-				runCycle(
-					c,
-					c.planner.reportsOnly() ? "result_received" : "idle",
-					false,
-				),
+			run: () => runCycle(c, "idle", false),
 			onCycle: (outcome) =>
 				log.info("agency.idle_cycle", {
 					subjectId: c.id,
@@ -330,7 +313,7 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 		return c;
 	}
 
-	const idleFields = (planner: ReportIdlePlanner) => {
+	const idleFields = (planner: IdlePlanner) => {
 		const status = planner.status();
 		return {
 			phase: status.blockedBy ?? "armed",
@@ -462,12 +445,11 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 	type Cycle = {
 		c: Conv;
 		runtime: AgencyRuntime;
-		planner: ReportIdlePlanner;
+		planner: IdlePlanner;
 		trigger: Opportunity["trigger"];
 		controller: AbortController;
 		mine: number;
 		ordinal: number;
-		reportsOnly: boolean;
 	};
 
 	/** Returns true when the utterance was appended. */
@@ -490,7 +472,6 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 		const text = ticket.utterance ?? "";
 		const messageId = `agency:${c.scope}:${ticket.id}`;
 		const at = nowMs();
-		let reported = false;
 		let outcome: "appended" | "stale";
 		try {
 			outcome = await store.write((db) => {
@@ -521,9 +502,6 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 						: {}),
 				});
 				const todoRefs = reportedTodoIds(evidenceRefs);
-				reported = todoRefs.some((id) =>
-					todosNow(c).some((todo) => todo.id === id && todo.status === "done"),
-				);
 				deps.recordSpokeInTransaction(db, {
 					conversationId: c.id,
 					messageId,
@@ -554,8 +532,7 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 			receipt(cy, ticket, "interrupted", "");
 			return false;
 		}
-		if (reported) cy.planner.reportSpoke(nowMs());
-		else cy.planner.proactiveSpoke(nowMs());
+		cy.planner.proactiveSpoke(nowMs());
 		log.info("agency.delivered", {
 			subjectId: c.id,
 			attemptId: ticket.id,
@@ -608,37 +585,10 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 		}
 	}
 
-	/** The finished TODOs the update found a run's reply reported: archived by the reply's delivery. */
-	function archiveReported(c: Conv, runtime: AgencyRuntime) {
-		const byMessage = new Map<string, string[]>();
-		for (const { todoId, observationId } of runtime.takeReportedTodos())
-			byMessage.set(observationId, [
-				...(byMessage.get(observationId) ?? []),
-				todoId,
-			]);
-		for (const [messageId, todoIds] of byMessage)
-			void Promise.resolve(
-				store.write((db) =>
-					deps.archiveReportedInTransaction(db, {
-						conversationId: c.id,
-						messageId,
-						todoIds,
-					}),
-				),
-			).catch((error: unknown) =>
-				log.warn("agency.todos_failed", {
-					subjectId: c.id,
-					reason: toErrorCode(error, "archive_failed"),
-				}),
-			);
-	}
-
 	async function cycleBody(cy: Cycle, update: boolean): Promise<CycleOutcome> {
 		const { c, runtime, trigger, controller } = cy;
-		if (update) {
+		if (update)
 			logCalls(c, await runtime.runBackground(nowMs(), controller.signal));
-			archiveReported(c, runtime);
-		}
 		if (controller.signal.aborted) return "aborted";
 		const opportunity: Opportunity = {
 			id: `o${++c.opportunities}`,
@@ -647,17 +597,14 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 			presence: "quiet",
 			foregroundBusy: hostBusy(c),
 			playerBusy: false,
-			topics: cy.reportsOnly ? [] : topicsNow(),
-			todos: todosNow(c).filter(
-				(todo) => !cy.reportsOnly || todo.status === "done",
-			),
+			topics: topicsNow(),
+			todos: todosNow(c),
 		};
 		const { decision, calls } = await runtime.decide(
 			opportunity,
 			controller.signal,
 		);
 		logCalls(c, calls);
-		archiveReported(c, runtime);
 		const superseded =
 			!on() ||
 			convs.get(c.id) !== c ||
@@ -668,15 +615,6 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 		// A busy moment is not a silent one: it must not spend the idle backoff.
 		if (decision.source === "host_blocked") return "aborted";
 		if (!decision.ticket) return "silent";
-		if (
-			cy.reportsOnly &&
-			!reportedTodoIds(decision.evidenceRefs).some((id) =>
-				todosNow(c).some((todo) => todo.id === id && todo.status === "done"),
-			)
-		) {
-			receipt(cy, decision.ticket, "failed", "completed_todo_required");
-			return "silent";
-		}
 		return (await deliver(cy, decision.ticket, decision.evidenceRefs))
 			? "spoke"
 			: "silent";
@@ -705,7 +643,6 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 			trigger,
 			controller,
 			mine: ++c.generation,
-			reportsOnly: c.planner.reportsOnly(),
 			ordinal: store.read((db) =>
 				conversation.latestOrdinalInTransaction(db, c.id),
 			),
@@ -756,20 +693,19 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 	// ---- feed handling ----------------------------------------------------
 
 	type Pending = { turnEnd: boolean };
-	/** Conversations whose TODOs finished or ask something, told inside a transaction: opened after its commit. */
+	/** Conversations whose TODOs ask something, told inside a transaction: opened after its commit. */
 	const workChanged = new Set<string>();
 	/**
-	 * Whether the conversation holds a finished TODO or a question the agent was not yet given an opportunity for.
-	 * A transaction that told of work and then rolled back changed no TODO, so it opens nothing.
+	 * Whether the conversation holds a question the agent was not yet given an opportunity for (finished work is told
+	 * by its notice on screen). A transaction that told of work and then rolled back changed no TODO, so it opens
+	 * nothing.
 	 */
 	function newWork(c: Conv) {
 		const now = new Set(
 			todosNow(c).flatMap((todo) =>
-				todo.status === "done"
-					? [`${todo.id}:done:${todo.doneAt}`]
-					: todo.status === "waiting"
-						? [`${todo.id}:waiting:${todo.question}`]
-						: [],
+				todo.status === "waiting"
+					? [`${todo.id}:waiting:${todo.question}`]
+					: [],
 			),
 		);
 		const fresh = [...now].some((key) => !c.reportable.has(key));
@@ -879,12 +815,11 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 				launch(c, "turn_end", true);
 			}
 		}
-		// Work that changed is reported where the user is talking; elsewhere it waits for the next turn there.
+		// A question is asked where the user is talking; elsewhere it waits for the next turn there.
 		for (const conversationId of workChanged) {
 			if (conversationId !== activeId) continue;
 			const c = convOf(conversationId);
 			if (newWork(c)) launch(c, "result_received", true);
-			c.scheduler.rearm();
 		}
 		workChanged.clear();
 		prune();

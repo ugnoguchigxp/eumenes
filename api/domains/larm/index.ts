@@ -5,6 +5,13 @@ export type {
 	LarmCallOptions,
 	LarmStatus,
 } from "./contracts";
+export {
+	intentLabels,
+	intentQuestion,
+	type IntentInput,
+	type IntentJudgment,
+	type IntentLabel,
+} from "./contracts/user-intent";
 export { registerLarmStatus } from "./controller";
 export { createLarm } from "./service";
 export { createActivityRecorder } from "./service/activity";

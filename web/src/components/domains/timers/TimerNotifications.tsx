@@ -8,6 +8,7 @@ import { activeTimersQuery } from "../../../domains/timers/queries";
 import {
 	NotificationCenter,
 	type KanbanNotifications,
+	type TodoNotifications,
 } from "./NotificationCenter";
 
 type Attempt = {
@@ -32,6 +33,7 @@ type TimerNotificationsProps = {
 	prepareAudio?: () => Promise<void>;
 	repeatTone?: (signal: AbortSignal) => Promise<void>;
 	kanban?: KanbanNotifications;
+	todo?: TodoNotifications;
 };
 
 function useTimerNotifications(
@@ -77,7 +79,7 @@ function useTimerNotifications(
 
 /**
  * Scope-wide notices survive panel changes and refreshes during a claim. It owns the timer
- * notices and shows the Kanban ones (loaded by the caller) in the same notification center.
+ * notices and shows the Kanban and TODO ones (loaded by the caller) in the same notification center.
  */
 export function TimerNotifications({
 	client,
@@ -89,6 +91,7 @@ export function TimerNotifications({
 	prepareAudio,
 	repeatTone,
 	kanban,
+	todo,
 }: TimerNotificationsProps) {
 	const cache = useQueryClient();
 	const clientId = useRef(crypto.randomUUID());
@@ -368,6 +371,7 @@ export function TimerNotifications({
 		<NotificationCenter
 			notices={notices}
 			kanban={kanban}
+			todo={todo}
 			ringingId={canRing ? ringingId : null}
 			stoppingIds={stoppingIds}
 			onStop={stop}

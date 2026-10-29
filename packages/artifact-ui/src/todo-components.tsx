@@ -4,7 +4,7 @@ import { useAction } from "./components";
 
 export type TodoResource = Omit<
 	TodoWorkspaceProps,
-	"onView" | "onPage" | "onRefresh"
+	"onView" | "onPage" | "onRefresh" | "onArchive"
 > & { kind: "todo-workspace"; revision: number };
 export function TodoWorkspaceView({ request }: { request: ArtifactRequest }) {
 	const action = useAction(request);
@@ -21,6 +21,7 @@ export function TodoWorkspaceView({ request }: { request: ArtifactRequest }) {
 				})
 			}
 			onRefresh={() => void action.send("todo-refresh", {})}
+			onArchive={(todoId) => void action.send("todo-archive", { todoId })}
 		/>
 	);
 }

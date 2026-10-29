@@ -867,18 +867,23 @@ export async function harness(options: HarnessOptions = {}) {
 		queue,
 		request,
 		parentContexts,
-		/** The conversation's TODOs (the ledger the agency reports from). */
+		/** The conversation's open TODOs (the ledger the agency asks from). */
 		todos: (conversationId = "main") =>
 			store.read((db) => dialogue.todosInTransaction(db, conversationId)),
 		/**
-		 * The result of the conversation's newest finished TODO as text. A finished TODO is reported by the agency,
-		 * not by a conversation reply of the run, so the work's own result is what a test reads.
+		 * The result of the conversation's newest finished TODO as text. Finished work is archived as it finishes and
+		 * told by its notice, not by a conversation reply of the run, so the work's own result is what a test reads.
 		 */
 		reported: (conversationId = "main") => {
 			const done = store
-				.read((db) => dialogue.todosInTransaction(db, conversationId))
-				.filter((todo) => todo.status === "done")
-				.at(-1);
+				.read((db) =>
+					dialogue.todoPageInTransaction(db, conversationId, {
+						state: "archived",
+						pageIndex: 0,
+						pageSize: 10,
+					}),
+				)
+				.rows.find((row) => row.outcome !== "cancelled");
 			return done ? JSON.stringify(done.result ?? null) : "";
 		},
 		voice,

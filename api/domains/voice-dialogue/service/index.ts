@@ -11,7 +11,7 @@ const log = getLogger("voice-dialogue");
 import { SpeechSentences } from "./sentences";
 import { spokenText } from "./spoken-text";
 import { cancelHeard, recordPlayed } from "./playback";
-import { createReplayPlayback } from "./replay-playback";
+import { replaySentences } from "./replay-playback";
 import { connectAnnouncementDelivery } from "./announcement-delivery";
 
 import type { SqliteStore } from "../../../infrastructure/sqlite";
@@ -199,7 +199,7 @@ export function createVoiceDialogue(
 	});
 	return {
 		commit: input.commit,
-		...createReplayPlayback(store, dialogue),
+		replaySentences,
 		/** Synthesizes one clause on demand; it is not tied to any voice turn. */
 		async replayAudio(text: string, signal: AbortSignal) {
 			if (!text.trim() || text.length > 400)

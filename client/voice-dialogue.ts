@@ -4,7 +4,6 @@ import {
 	voiceTurnSchema,
 	type InputTiming,
 	type ChunkGap,
-	type ReplayPlayed,
 } from "../api/domains/voice-dialogue/contracts";
 import { avatarMotionSchema } from "../api/domains/delivery/contracts";
 import { z } from "zod";
@@ -117,13 +116,6 @@ export function voiceDialogueClient(transport: Transport) {
 					index,
 				}),
 				json(gap ?? {}),
-			),
-		replayPlayed: (played: ReplayPlayed) =>
-			callJson(
-				transport,
-				z.object({ recorded: z.boolean() }),
-				"/api/voice/replay/played",
-				json(played),
 			),
 		replaySentences: async (text: string): Promise<string[]> =>
 			(

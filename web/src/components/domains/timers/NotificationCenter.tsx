@@ -19,9 +19,24 @@ export type KanbanNoticeView = {
 	cardId?: string;
 	runId?: string;
 };
+/** A finished TODO's notice as the center shows it (structural, like the Kanban notice). */
+export type TodoNoticeView = {
+	id: string;
+	conversationId: string;
+	title: string;
+	toolchainTitle?: string;
+	/** The registered screen of the toolchain the work went to. */
+	artifactId?: string;
+	outcome: "succeeded" | "partial" | "failed" | "interrupted";
+	summary: string | null;
+	links: Array<{ uri: string; label: string; kind: string }>;
+	read: boolean;
+	createdAt: string;
+};
 import type { TimerNotificationDto } from "../../../../../api/domains/timers/contracts";
 import { Button, Drawer, NotificationCard } from "../../../design-system";
 import "./TimerNotifications.css";
+import { ArtifactIcon, KindIcon } from "../../../domains/resources/kind-icon";
 import { useNotificationBanners } from "./useNotificationBanners";
 
 function NotificationIcon({
@@ -76,6 +91,30 @@ export type KanbanNotifications = {
 	onRead: (notice: KanbanNoticeView) => void;
 };
 
+export type TodoNotifications = {
+	notices: TodoNoticeView[];
+	/** Unread across the whole ledger, not only the listed page. */
+	unread: number;
+	/** An action failed (shown wherever notices are). */
+	error: string | null;
+	/** The list could not be loaded (shown in the drawer only, never over the screen). */
+	loadError: string | null;
+	/** Opens what the work made (a resource) or the screen of its toolchain, and reads the notice. */
+	onOpen: (
+		notice: TodoNoticeView,
+		target: { uri: string } | { artifactId: string },
+	) => void;
+	/** Reads the notice: it hides at once. */
+	onRead: (notice: TodoNoticeView) => void;
+};
+
+/** How a TODO ended when it did not simply succeed, shown before the work. */
+const TODO_OUTCOMES: Partial<Record<TodoNoticeView["outcome"], string>> = {
+	partial: "一部完了",
+	failed: "失敗",
+	interrupted: "中断",
+};
+
 const KANBAN_TITLES: Record<KanbanNoticeView["kind"], string> = {
 	done: "タスクが完了しました",
 	blocker: "タスクが止まりました",
@@ -88,7 +127,8 @@ const KANBAN_TITLES: Record<KanbanNoticeView["kind"], string> = {
 
 type Entry =
 	| { source: "timer"; id: string; at: string; item: TimerNotificationDto }
-	| { source: "kanban"; id: string; at: string; item: KanbanNoticeView };
+	| { source: "kanban"; id: string; at: string; item: KanbanNoticeView }
+	| { source: "todo"; id: string; at: string; item: TodoNoticeView };
 
 const formatTime = (value: string) =>
 	new Intl.DateTimeFormat("ja-JP", {
@@ -98,10 +138,90 @@ const formatTime = (value: string) =>
 		minute: "2-digit",
 	}).format(new Date(value));
 
-/** One drawer for every source (timers, Kanban), newest first. */
+/**
+ * A finished TODO's notice, kept small: the work and its result on a line each, and an icon that launches what can be
+ * opened. Pressing it reads it, which hides it from the screen; the drawer keeps it, dimmed.
+ */
+function TodoNoticeCard({
+	item,
+	todo,
+}: {
+	item: TodoNoticeView;
+	todo: TodoNotifications;
+}) {
+	// What can be opened: what the work made, else the screen of its toolchain.
+	const opens = item.links.length
+		? item.links.slice(0, 3).map((link) => ({
+				key: link.uri,
+				label: `「${link.label}」を開く`,
+				icon: <KindIcon kind={link.kind} />,
+				target: { uri: link.uri },
+			}))
+		: item.artifactId
+			? [
+					{
+						key: item.artifactId,
+						label: `${item.toolchainTitle ?? "担当"}の画面を開く`,
+						icon: <ArtifactIcon />,
+						target: { artifactId: item.artifactId },
+					},
+				]
+			: [];
+	const head = item.toolchainTitle
+		? `[${item.toolchainTitle}] ${item.title}`
+		: item.title;
+	const outcome = TODO_OUTCOMES[item.outcome];
+	const text = (
+		<>
+			<span className="todo-notice-head">
+				{outcome && <span className="todo-notice-outcome">{outcome}</span>}
+				{head}
+			</span>
+			{item.summary && (
+				<span className="todo-notice-summary">{item.summary}</span>
+			)}
+		</>
+	);
+	return (
+		<article
+			className={`todo-notice${item.read ? " todo-notice-read" : ""}`}
+			data-outcome={item.outcome}
+		>
+			{item.read ? (
+				<div className="todo-notice-body">{text}</div>
+			) : (
+				<button
+					type="button"
+					className="todo-notice-body"
+					title="押すと閉じます"
+					onClick={() => todo.onRead(item)}
+				>
+					{text}
+				</button>
+			)}
+			{opens.map((open) => (
+				<Button
+					key={open.key}
+					type="button"
+					variant="secondary"
+					size="icon"
+					className="todo-notice-open"
+					aria-label={open.label}
+					title={open.label}
+					onClick={() => todo.onOpen(item, open.target)}
+				>
+					{open.icon}
+				</Button>
+			))}
+		</article>
+	);
+}
+
+/** One drawer for every source (timers, Kanban, finished TODOs), newest first. */
 export function NotificationCenter({
 	notices,
 	kanban,
+	todo,
 	ringingId,
 	stoppingIds,
 	onStop,
@@ -110,6 +230,7 @@ export function NotificationCenter({
 }: {
 	notices: TimerNotificationDto[];
 	kanban?: KanbanNotifications;
+	todo?: TodoNotifications;
 	ringingId: string | null;
 	stoppingIds: string[];
 	onStop: (item: TimerNotificationDto) => void;
@@ -133,12 +254,23 @@ export function NotificationCenter({
 		at: item.createdAt,
 		item,
 	}));
-	const sorted = sortEntries([...timerEntries, ...kanbanEntries]);
+	const todoEntries = (todo?.notices ?? []).map((item): Entry => ({
+		source: "todo",
+		id: item.id,
+		at: item.createdAt,
+		item,
+	}));
+	const sorted = sortEntries([
+		...timerEntries,
+		...kanbanEntries,
+		...todoEntries,
+	]);
 	const pending = sorted.filter(
 		(entry) => entry.source === "timer" || !entry.item.read,
 	);
-	const shownError = error ?? kanban?.error ?? null;
-	const drawerError = shownError ?? kanban?.loadError ?? null;
+	const shownError = error ?? kanban?.error ?? todo?.error ?? null;
+	const drawerError =
+		shownError ?? kanban?.loadError ?? todo?.loadError ?? null;
 	const entryKey = (entry: Entry) => `${entry.source}:${entry.id}`;
 	const errorKey = `error:${shownError}`;
 	const isBannerVisible = useNotificationBanners([
@@ -149,7 +281,7 @@ export function NotificationCenter({
 	const floating = pending.filter((entry) => isBannerVisible(entryKey(entry)));
 	const showAudioBanner = onPrepareAudio && isBannerVisible("audio");
 	const showErrorBanner = shownError && isBannerVisible(errorKey);
-	const count = notices.length + (kanban?.unread ?? 0);
+	const count = notices.length + (kanban?.unread ?? 0) + (todo?.unread ?? 0);
 	const audioPrompt = onPrepareAudio && (
 		<NotificationCard
 			appName="Eumenes"
@@ -240,7 +372,15 @@ export function NotificationCenter({
 	const card = (entry: Entry, announce = false) =>
 		entry.source === "timer"
 			? timerCard(entry.item, announce)
-			: kanbanCard(entry.item);
+			: entry.source === "kanban"
+				? kanbanCard(entry.item)
+				: todo && (
+						<TodoNoticeCard
+							key={`todo:${entry.id}`}
+							item={entry.item}
+							todo={todo}
+						/>
+					);
 	return (
 		<>
 			<Drawer
@@ -281,7 +421,9 @@ export function NotificationCenter({
 						<div className="notification-center-empty">
 							<NotificationIcon />
 							<h3>通知はありません</h3>
-							<p>タイマーの終了やタスクの結果が、ここに表示されます。</p>
+							<p>
+								タイマーの終了や、仕事・タスクの結果が、ここに表示されます。
+							</p>
 						</div>
 					)}
 					{drawerError && (
@@ -295,7 +437,7 @@ export function NotificationCenter({
 				<output
 					className="timer-notifications"
 					aria-label={
-						floating.some((entry) => entry.source === "kanban")
+						floating.some((entry) => entry.source !== "timer")
 							? "新しい通知"
 							: "タイマーの終了"
 					}

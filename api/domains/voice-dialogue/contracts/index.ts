@@ -24,16 +24,6 @@ export const replayInputSchema = z.object({
 	messageId: z.string().min(1).max(512).optional(),
 	text: z.string().trim().min(1).max(65536),
 });
-/** Actual completion of a message playback, independent of text having been displayed. */
-export const replayPlayedSchema = z
-	.object({
-		messageId: z.string().min(1).max(512),
-		playbackId: z.uuid(),
-		text: z.string().min(1).max(65536),
-		heard: z.enum(["full", "partial", "none"]),
-	})
-	.strict();
-export type ReplayPlayed = z.infer<typeof replayPlayedSchema>;
 export const voiceTurnSchema = z.object({
 	utteranceId: z.uuid(),
 	sessionId: z.uuid(),

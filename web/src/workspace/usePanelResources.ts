@@ -21,16 +21,15 @@ import type { WorkspaceState } from "./useWorkspace";
 
 const CONVERSATION_ID = "main";
 
-/** The resources of the conversation, the way one is opened, and the notice shown when it cannot be. */
-export function usePanelResources(
+/** How a resource reaches a screen: the registered artifact of its adapter, or the playlist or drawing tab. */
+export function useWorkspaceLauncher(
 	client: EumenesClient,
-	state: WorkspaceState,
-) {
+	state: Pick<WorkspaceState, "toolchain" | "openPlaylist" | "openDrawing">,
+): ResourceLauncher {
 	const cache = useQueryClient();
 	const { openByAdapter } = state.toolchain;
 	const { openPlaylist, openDrawing } = state;
-	// How a resource reaches a screen: the registered artifact of its adapter, or the playlist or drawing tab.
-	const launcher = useMemo<ResourceLauncher>(
+	return useMemo<ResourceLauncher>(
 		() => ({
 			open: async (adapterRef, targetRef) => {
 				if (adapterRef === MUSIC_PLAYLIST_ADAPTER_REF) {
@@ -58,6 +57,14 @@ export function usePanelResources(
 		}),
 		[cache, client, openByAdapter, openPlaylist, openDrawing],
 	);
+}
+
+/** The resources of the conversation, the way one is opened, and the notice shown when it cannot be. */
+export function usePanelResources(
+	client: EumenesClient,
+	state: WorkspaceState,
+) {
+	const launcher = useWorkspaceLauncher(client, state);
 	const notice = useResourceNotice();
 	const openResource = useResourceOpener({
 		client,

@@ -3,13 +3,14 @@ import {
 	errorReportSchema,
 	runSchema,
 	specialistSessionResponseSchema,
+	todoNoticesSchema,
 	type PublicSubmit,
 	type Resubmit,
 	type SpecialistCommand,
 	type SpecialistCommandKind,
 	type SpecialistRetarget,
 } from "../api/domains/dialogue/contracts";
-import { callJson, json, type Transport } from "./transport";
+import { callJson, json, withQuery, type Transport } from "./transport";
 import { watchRun } from "./run-stream";
 export function dialogueClient(transport: Transport) {
 	return {
@@ -26,6 +27,19 @@ export function dialogueClient(transport: Transport) {
 				`/api/conversations/${encodeURIComponent(id)}/runs`,
 				{ signal },
 			),
+		/** The finished TODOs' notices, newest first; `unread` counts all unread ones, not only the listed page. */
+		todoNotices: async (limit = 50, signal?: AbortSignal) =>
+			callJson(
+				transport,
+				todoNoticesSchema,
+				withQuery("/api/todo-notices", { limit }),
+				{ signal },
+			),
+		readTodoNotice: async (id: string) => {
+			await transport.call(`/api/todo-notices/${encodeURIComponent(id)}/read`, {
+				method: "POST",
+			});
+		},
 		submit: async (input: PublicSubmit) =>
 			callJson(transport, runSchema, "/api/runs", json(input)),
 		run: async (id: string, signal?: AbortSignal) =>

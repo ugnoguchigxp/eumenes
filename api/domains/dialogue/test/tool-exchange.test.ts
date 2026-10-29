@@ -4,9 +4,9 @@ import { carriedToolCalls } from "../service/tool-exchange";
 import { IMAGE, INSTANT, setup, type Harness } from "./generation.fixture";
 
 /**
- * What a later turn sees of a turn's searches and hand-overs (the tool-call reliability design, P1): the calls and
- * the host's short results, as native tool messages before the agent's words. Seeing only its own announcement, the
- * model answered the next request in words only.
+ * What a turn keeps of its searches and hand-overs (the tool-call reliability design, P1): the calls and the host's
+ * short results, kept with the agent's words for a harness that draws them as native tool messages. The local
+ * harness draws the words alone (the local context budget design, section 4.3): these runs are served by LARM.
  */
 let h: Harness | undefined;
 afterEach(async () => {
@@ -24,17 +24,13 @@ const NO_REFS = {
 const recent = (): ChatMessage[] =>
 	h!.state.calls.at(-1)!.messages.slice(2, -1);
 
-const toolCall = (id: string, name: string, args: Record<string, unknown>) => ({
-	role: "assistant",
-	content: "",
-	tool_calls: [
-		{
-			id,
-			type: "function",
-			function: { name, arguments: JSON.stringify(args) },
-		},
-	],
-});
+/** The stored utterance of the agent that said `text`. */
+const kept = (text: string) =>
+	h!.store
+		.read((db) =>
+			h!.conversation.input.utterancesAfterInTransaction(db, "main", 0),
+		)
+		.find((u) => u.text === text)!;
 
 /** The fixture's search finds these two: kept by id, title, summary and execution only. */
 const FOUND = {
@@ -46,7 +42,7 @@ const FOUND = {
 	})),
 };
 
-test("a hand-over's search and delegation come before its announcement in the next turn, and the background calls read the same prefix", async () => {
+test("a hand-over's search and delegation are kept with its announcement, the next local turn draws the words alone, and the background calls read the same prefix", async () => {
 	h = await setup();
 	const handOver = {
 		mode: "execute",
@@ -63,18 +59,22 @@ test("a hand-over's search and delegation come before its announcement in the ne
 	await h.finishImage(waiting.id, { state: "completed", title: "猫" });
 	h.state.steps.push({ text: "どういたしまして。" });
 	await h.say("ありがとう");
-	// The request opened the recent conversation and is left out (it starts at the agent's); the calls carry it.
-	expect(recent()).toEqual([
-		toolCall("u2-1", "find_toolchain", { query: "猫の絵を描く" }),
+	// The request opened the recent conversation and is left out (it starts at the agent's).
+	expect(recent()).toEqual([{ role: "assistant", content: "描きますね。" }]);
+	expect(
+		kept("描きますね。").toolCalls.map(({ name, arguments: args, result }) => ({
+			name,
+			args: JSON.parse(args),
+			result,
+		})),
+	).toEqual([
 		{
-			role: "tool",
-			tool_call_id: "u2-1",
-			content: JSON.stringify(FOUND),
+			name: "find_toolchain",
+			args: { query: "猫の絵を描く" },
+			result: JSON.stringify(FOUND),
 		},
-		toolCall("u2-2", "delegate", handOver),
-		{ role: "tool", tool_call_id: "u2-2", content: '{"todo":"t1"}' },
-		{ role: "assistant", content: "描きますね。" },
-	] as ChatMessage[]);
+		{ name: "delegate", args: handOver, result: '{"todo":"t1"}' },
+	]);
 	const prefix = h.state.calls.at(-1)!.messages.slice(0, -1);
 	const background = h.store.read((db) =>
 		h!.dialogue.conversationTaskInTransaction(db, "main", "読むだけです。"),
@@ -121,23 +121,20 @@ test("a confirmation's number and a refused call are kept; the memory and work t
 	await h.say("壁紙を差し替えて");
 	h.state.steps.push({ text: "わかりました。" });
 	await h.say("やっぱりやめておく");
-	const names = recent().flatMap((m) =>
-		(m.tool_calls ?? []).map((c) => c.function.name),
-	);
-	expect(names).toEqual(["delegate", "find_toolchain", "delegate"]);
-	expect(
-		recent()
-			.filter((m) => m.role === "tool")
-			.map((m) => m.content),
-	).toEqual([
+	const calls = kept("差し替えてよいですか？").toolCalls;
+	expect(calls.map((c) => c.name)).toEqual([
+		"delegate",
+		"find_toolchain",
+		"delegate",
+	]);
+	expect(calls.map((c) => c.result)).toEqual([
 		'{"refused":true}',
 		JSON.stringify(FOUND),
 		'{"confirmation":"c1"}',
 	]);
-	expect(recent().at(-1)).toEqual({
-		role: "assistant",
-		content: "差し替えてよいですか？",
-	});
+	expect(recent()).toEqual([
+		{ role: "assistant", content: "差し替えてよいですか？" },
+	]);
 });
 
 test("a result keeps only the candidates' names and the host's numbers, never an instant answer's text", () => {
@@ -209,7 +206,7 @@ test("a replayed call's arguments are always a JSON object, each text within its
 	expect(long.inputs.prompt).toBe(`${"い".repeat(300)}…`);
 });
 
-test("a report follows the notice of the work it told, in the next turn's recent conversation", async () => {
+test("a report keeps the notice of the work it told; the next local turn draws the words alone", async () => {
 	h = await setup();
 	h.state.steps.push(
 		{ calls: [{ name: "find_toolchain", args: { query: "猫の絵を描く" } }] },
@@ -230,7 +227,7 @@ test("a report follows the notice of the work it told, in the next turn's recent
 	);
 	const waiting = await h.say("猫の絵を描いて", "queued");
 	await h.finishImage(waiting.id, { state: "completed", title: "猫" });
-	const [todo] = h.todos();
+	const [todo] = h.archived();
 	await h.store.write((db) =>
 		h!.dialogue.recordSpontaneousInTransaction(db, {
 			conversationId: "main",
@@ -242,16 +239,10 @@ test("a report follows the notice of the work it told, in the next turn's recent
 	);
 	h.state.steps.push({ text: "どういたしまして。" });
 	await h.say("ありがとう");
-	const messages = recent();
-	const at = messages.findIndex(
-		(m) => m.content === "猫の絵ができあがりました。",
+	expect(kept("猫の絵ができあがりました。").notice).toBe(
+		`[ホストの知らせ] t${todo!.ref}「猫の絵」が終わりました（成功）。`,
 	);
-	expect(messages[at - 1]).toEqual({
-		role: "user",
-		content: `[ホストの知らせ] t${todo!.ref}「猫の絵」が終わりました（成功）。`,
-	});
-	expect(messages[at - 2]).toEqual({
-		role: "assistant",
-		content: "描きますね。",
-	});
+	expect(recent()).toEqual([
+		{ role: "assistant", content: "描きますね。\n猫の絵ができあがりました。" },
+	]);
 });

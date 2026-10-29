@@ -13,6 +13,7 @@ import type {
 import type { ChatMessage, DialogueDeps, GenerateInput } from "./context";
 import { conversationOutput, systemCopyCheck } from "./conversation-output";
 import { cloudHarness, localHarness } from "./harness";
+import { openIntentGate } from "./intent-gate";
 import {
 	decisionMessages,
 	decisionSchema,
@@ -22,6 +23,7 @@ import {
 import { toolResultText } from "./result-text";
 import { carriesExchange, type ExchangeStep } from "./tool-exchange";
 import {
+	TOOL_NAMES,
 	generationTools,
 	parseCall,
 	toolRejection,
@@ -114,6 +116,12 @@ export async function runGeneration(
 		...(options.session?.context ? { context: options.session.context } : {}),
 		...(options.session?.refs ? { refs: options.session.refs } : {}),
 	};
+	// The user-intent judge runs before the first model call (the intent gate design, section 5).
+	const gate = await openIntentGate(deps, input, options.signal);
+	const searched = () =>
+		executed.some(({ call }) => call.name === TOOL_NAMES.search);
+	// Only the turn's first call is made to call a tool; later ones keep the search-first refusal alone.
+	let forced = false;
 
 	const chat: Parameters<ConversationAgentPort["respond"]>[0]["chat"] = {
 		async complete(request, onDelta, signal) {
@@ -188,6 +196,13 @@ export async function runGeneration(
 					receipt: answered,
 				};
 			};
+			// A search the judge asked for: the turn's first call must call a tool, and the search is the one taken.
+			const forceSearch =
+				input.harness.turn === "single" &&
+				gate.route === "search" &&
+				!forced &&
+				offered.some((t) => t.function.name === TOOL_NAMES.search);
+			if (forceSearch) forced = true;
 			const taken =
 				input.harness.turn === "decide-then-reply"
 					? await runLocalTurn(
@@ -232,7 +247,11 @@ export async function runGeneration(
 								signal,
 							},
 						)
-					: await single(callSession);
+					: await single(
+							forceSearch
+								? { ...callSession, toolChoice: "required" }
+								: callSession,
+						);
 			receipt = taken.receipt;
 			return { text: taken.text, toolCalls: taken.toolCalls };
 		},
@@ -260,6 +279,12 @@ export async function runGeneration(
 				const parsed = parseCall(call);
 				if (executed.length >= MAX_TOOL_CALLS)
 					throw toolRejection("tool_call_limit");
+				if (
+					gate.route === "search" &&
+					parsed.name !== TOOL_NAMES.search &&
+					!searched()
+				)
+					throw toolRejection("search_first");
 				const outcome = await options.execute(parsed, {
 					signal,
 					...(receipt ? { receipt } : {}),
@@ -281,13 +306,22 @@ export async function runGeneration(
 		},
 	};
 
-	const reply = await deps.conversationAgent.respond({
-		messages: base as AgentMessage[],
-		chat,
-		tools,
-		signal: options.signal,
-		onDelta: options.delta,
-	});
+	const reply = await deps.conversationAgent
+		.respond({
+			messages: base as AgentMessage[],
+			chat,
+			tools,
+			signal: options.signal,
+			onDelta: options.delta,
+		})
+		.finally(() =>
+			gate.observe({
+				searched: searched(),
+				delegated: executed.some(
+					({ call }) => call.name === TOOL_NAMES.delegate,
+				),
+			}),
+		);
 	// The work was handed over (committed by its tool): the run waits for it, and this generation says nothing more.
 	// A later commit (the work failing at once) must not discard the hand-over, so no abort check comes first.
 	if (reply.ended)

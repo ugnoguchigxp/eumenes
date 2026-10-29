@@ -468,12 +468,19 @@ export async function boot(steps: Step[], options: BootOptions = {}) {
 		ask,
 		packets,
 		workerMessages,
-		/** The results of the conversation's TODOs: what the agency is given to report. */
+		/** The results of the conversation's finished TODOs, oldest first: what their notices tell. */
 		reported: () =>
 			JSON.stringify(
 				store
-					.read((db) => dialogue.todosInTransaction(db, "main"))
-					.map((todo) => todo.result),
+					.read((db) =>
+						dialogue.todoPageInTransaction(db, "main", {
+							state: "archived",
+							pageIndex: 0,
+							pageSize: 50,
+						}),
+					)
+					.rows.reverse()
+					.map((row) => row.result),
 			),
 		offered,
 		hooks,

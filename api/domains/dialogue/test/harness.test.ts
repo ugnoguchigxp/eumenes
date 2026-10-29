@@ -26,18 +26,23 @@ import { waitFor } from "../../../infrastructure/wait-for";
  * the saved route, and what each part of a value changes. Step 1: both values compose the messages of today and
  * differ only in the call's settings.
  */
-test("the two values compose today's input and differ in the call's settings", () => {
+test("the two values differ in the recent conversation and the call's settings: local draws the words alone", () => {
 	expect(cloudHarness.name).toBe("cloud");
 	expect(localHarness.name).toBe("local");
 	for (const harness of [cloudHarness, localHarness]) {
 		expect(harness.system).toEqual(SYSTEM_SECTIONS);
-		expect(harness.history).toEqual({
-			toolExchanges: true,
-			notices: true,
-			copyFilter: true,
-		});
 		expect(harness.gates).toEqual({ systemCopy: true });
 	}
+	expect(cloudHarness.history).toEqual({
+		toolExchanges: true,
+		notices: true,
+		copyFilter: true,
+	});
+	expect(localHarness.history).toEqual({
+		toolExchanges: false,
+		notices: false,
+		copyFilter: true,
+	});
 	expect(cloudHarness.call).toEqual({ reasoning: "low", outputLimit: 1024 });
 	expect(localHarness.call).toEqual({ reasoning: "low", outputLimit: 4096 });
 });
@@ -134,10 +139,14 @@ test("a history flag turned off leaves out only its part of the recent conversat
 		}),
 		said(4, "agent", "報告です", { notice: "[ホストの知らせ] t2" }),
 	];
-	const all = localHarness.history;
+	const all = cloudHarness.history;
 	const roles = (history: ConversationHarness["history"]) =>
 		recentMessages(utterances, history).map((m) => m.role);
-	expect(recentMessages(utterances)).toEqual(recentMessages(utterances, all));
+	expect(roles(localHarness.history)).toEqual([
+		"assistant",
+		"user",
+		"assistant",
+	]);
 	const joined = (history: ConversationHarness["history"]) =>
 		recentMessages(utterances, history)
 			.map((m) => m.content)

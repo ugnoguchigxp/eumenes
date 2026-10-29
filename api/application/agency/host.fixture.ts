@@ -109,7 +109,6 @@ export function harness(
 	const inference = { busy: false };
 	const memoryReads = { count: 0 };
 	const spoke: Array<Record<string, unknown>> = [];
-	const archived: Array<Record<string, unknown>> = [];
 	const host = createAgencyHost({
 		store,
 		conversation,
@@ -132,9 +131,6 @@ export function harness(
 		conversationBusy: () => options.busy?.() ?? false,
 		recordSpokeInTransaction: (_db, input) => {
 			spoke.push(input);
-		},
-		archiveReportedInTransaction: (_db, input) => {
-			archived.push(input);
 		},
 		createLlm:
 			options.llm ??
@@ -197,7 +193,6 @@ export function harness(
 		inference,
 		memoryReads,
 		spoke,
-		archived,
 		setSelect: (reply: Reply) => {
 			select = reply;
 		},
@@ -278,6 +273,5 @@ export const attachLedger = (
 	h.host.attachWork(
 		createAgencyWork({
 			dialogue: { todosInTransaction: () => todos() as never },
-			resources: { kind: () => null },
 		}),
 	);

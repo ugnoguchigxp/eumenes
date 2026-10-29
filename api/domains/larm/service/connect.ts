@@ -27,6 +27,8 @@ export type ProfileRequest = {
 	client: string;
 	audience: string;
 	fullProfile: boolean;
+	/** The Providers a partial connection selects (absent: the LLM alone). */
+	providers?: string[];
 	catalogRevision: string;
 };
 
@@ -38,7 +40,7 @@ const providersOf = (value: Rec): Rec[] =>
 export async function fetchCatalog(
 	control: Control,
 	profile: string,
-	required: Capability[],
+	required: ProviderName[],
 ) {
 	const catalog = record(
 		await readJson(
@@ -97,7 +99,7 @@ export async function createConnection(
 				ttlSeconds: 900,
 				allowFallback: false,
 				deploymentPolicy: "existing-only",
-				...(input.fullProfile ? {} : { providers: ["llm"] }),
+				...(input.fullProfile ? {} : { providers: input.providers ?? ["llm"] }),
 				expectedCatalogRevision: input.catalogRevision,
 			}),
 		},
@@ -207,6 +209,8 @@ export async function claimProviders(
 		required: Capability[];
 		catalogProviders: Rec[];
 		fullProfile: boolean;
+		/** The decision provider is claimed on its own (a connection that carries it alone). */
+		decision?: boolean;
 		claimNames?: string[];
 		hosts: ProviderHosts;
 	},
@@ -266,7 +270,8 @@ export async function claimProviders(
 		providers.set(name, speechProvider(name, info, hosts));
 	}
 	const decision = decisionProvider(claimed, created, catalogProviders, hosts);
-	if (input.fullProfile && decision) providers.set("system-one", decision);
+	if ((input.fullProfile || input.decision) && decision)
+		providers.set("system-one", decision);
 	const english = input.fullProfile
 		? englishSpeechProvider(claimed, created, catalogProviders, hosts)
 		: undefined;

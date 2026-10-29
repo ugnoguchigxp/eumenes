@@ -111,14 +111,13 @@ export function createSession(
 						questionId: seed.questionId!,
 						question: seed.question!,
 					});
-				else {
+				// Finished work is archived as it finishes (its notice told the user).
+				else
 					work.reportInTransaction(db, row.id, {
 						status: "done",
 						outcome: seed.outcome!,
 						result: seed.result ?? null,
 					});
-					if (seed.archived) work.archiveInTransaction(db, row.id);
-				}
 			});
 		},
 

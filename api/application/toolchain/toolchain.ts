@@ -13,7 +13,7 @@ import { createModel3dAdapter } from "../media/model3d-adapter";
 import { createBrowserAdapter } from "../browser/browser-adapter";
 import {
 	createTaskAdapter,
-	type TodoPageReader,
+	type TodoLedgerPort,
 } from "./task-execution-adapter";
 import { createPipelinesAdapter } from "../pipelines/pipelines-adapter";
 import type { BrowserAssembly } from "../browser/browser-composition";
@@ -87,8 +87,8 @@ type ToolchainOptions = {
 	dotsWork?: import("../work/dots-work").DotsWork;
 	dotsConfiguration?: import("../work/dots-tasks").DotsTasks["config"];
 	dotsMessages?: import("../work/dots-messages").DotsMessages;
-	/** The conversation's TODO ledger the TODO screen pages (absent until dialogue is attached). */
-	todoPage?: () => TodoPageReader | undefined;
+	/** The conversation's TODO ledger the TODO screen pages and archives (absent until dialogue is attached). */
+	todos?: () => TodoLedgerPort | undefined;
 	dots?: boolean;
 	kanbanSdk?: ReturnType<typeof createKanbanSdkHost>;
 	music?: boolean;
@@ -221,7 +221,7 @@ export async function createToolchain(
 	// Typed domain adapters this host offers; bundles naming any other adapter are not registered.
 	const registry = createAdapterRegistry([
 		...(options.docling ? [createDoclingAdapter(options.docling)] : []),
-		createTaskAdapter(() => taskRuntime, options.todoPage),
+		createTaskAdapter(() => taskRuntime, options.todos),
 		createPipelinesAdapter(
 			() => taskRuntime,
 			() => pipelines,

@@ -50,11 +50,15 @@ export const cloudHarness: ConversationHarness = {
 	turn: "single",
 };
 
-/** The harness for a model served by LARM: the one the background calls on the conversation also use. */
+/**
+ * The harness for a model served by LARM: the one the background calls on the conversation also use. Its recent
+ * conversation is the words alone (the local context budget design, section 4.3): a past turn's exchange handed the
+ * model an old todo to check instead of asking anew (run `bcefbc1b`).
+ */
 export const localHarness: ConversationHarness = {
 	name: "local",
 	system: SYSTEM_SECTIONS,
-	history: { toolExchanges: true, notices: true, copyFilter: true },
+	history: { toolExchanges: false, notices: false, copyFilter: true },
 	call: { reasoning: "low", outputLimit: 4096 },
 	gates: { systemCopy: true },
 	turn: "single",

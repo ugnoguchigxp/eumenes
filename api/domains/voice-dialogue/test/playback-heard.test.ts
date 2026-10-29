@@ -168,7 +168,7 @@ test("a muted chunk acknowledgement releases the voice queue without claiming it
 	await h.voice.played(id, 0, false);
 	expect(h.voice.get(id)?.status).toBe("played");
 	expect(deliveredFields(h)).toEqual([
-		expect.objectContaining({ heard: "none", channel: "speech" }),
+		expect.objectContaining({ heard: "none" }),
 	]);
 });
 

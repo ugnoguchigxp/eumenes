@@ -84,7 +84,7 @@ function viewOf(input: GenerateInput): DocumentView {
 	const lines = last.split("\n");
 	return {
 		todos: lines.flatMap((line) => {
-			const todo = /^- (t\d+) .* (実行中|質問待ち|完了 未報告|報告済み)/.exec(
+			const todo = /^- (t\d+) .* (実行中|質問待ち|通知済み|取消済み)/.exec(
 				line,
 			);
 			return todo ? [{ id: todo[1]!, status: todo[2]! }] : [];

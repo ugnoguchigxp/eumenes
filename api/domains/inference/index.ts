@@ -17,6 +17,9 @@ export { registerInference } from "./controller";
 export type {
 	CallSession,
 	InferencePort,
+	IntentInput,
+	IntentJudgment,
+	IntentLabel,
 	Messages,
 	Receipt,
 	SpeechOverride,

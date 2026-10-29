@@ -452,6 +452,18 @@ export async function setup(
 		write: (sql: string, ...params: Array<string | number>) =>
 			store.write((db) => db.query(sql).run(...params)),
 		todos: () => store.read((db) => dialogue.todosInTransaction(db, "main")),
+		/** The archived TODOs, newest first: finished work is archived as it finishes. */
+		archived: () =>
+			store.read(
+				(db) =>
+					dialogue.todoPageInTransaction(db, "main", {
+						state: "archived",
+						pageIndex: 0,
+						pageSize: 50,
+					}).rows,
+			),
+		/** The finished TODOs' notices, newest first, and the unread count. */
+		notices: () => dialogue.todoNotices(50),
 		/** Script the conversation model's next call: speech. */
 		speak(text: string) {
 			state.steps.push({ text });

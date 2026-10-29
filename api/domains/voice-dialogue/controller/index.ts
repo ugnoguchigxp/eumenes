@@ -11,7 +11,6 @@ import { toErrorCode } from "../../../infrastructure/error-code";
 import { getLogger } from "../../../infrastructure/logger";
 import {
 	replayInputSchema,
-	replayPlayedSchema,
 	sampleInputSchema,
 	voiceStartSchema,
 	chunkPlayedSchema,
@@ -114,12 +113,6 @@ export function registerVoiceDialogue(
 		const parsed = await parseJsonBody(c, replayInputSchema);
 		if (!parsed.ok) return parsed.response;
 		return c.json({ sentences: service.replaySentences(parsed.data.text) });
-	});
-	app.post("/api/voice/replay/played", async (c) => {
-		const parsed = await parseJsonBody(c, replayPlayedSchema);
-		if (!parsed.ok) return parsed.response;
-		const recorded = await service.replayPlayed(parsed.data);
-		return c.json({ recorded }, recorded ? 200 : 400);
 	});
 	app.post("/api/voice/replay/audio", async (c) => {
 		const parsed = await parseJsonBody(c, replayInputSchema);

@@ -1,10 +1,12 @@
+import { useState } from "react";
 import { Archive, CheckCheck, ListTodo, RefreshCw } from "lucide-react";
 import { Button } from "../Button";
+import { ConfirmModal } from "../ConfirmModal";
 import { ServerDataTable, type ServerDataTableProps } from "../ServerDataTable";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../Tabs";
 import "./TodoWorkspace.css";
 
-export type TodoState = "todo" | "done" | "archived";
+export type TodoState = "todo" | "archived";
 export type TodoRow = {
 	id: string;
 	request: string;
@@ -28,8 +30,12 @@ export type TodoWorkspaceProps = {
 	onView: (view: "active" | "archived") => void;
 	onPage: (pageIndex: number, pageSize: number) => void;
 	onRefresh: () => void;
+	/** Stops an open TODO's work and archives it; absent: the rows have no archive button. */
+	onArchive?: (id: string) => void;
 };
-const columns: ServerDataTableProps<TodoRow>["columns"] = [
+const columns = (
+	archive: ((row: TodoRow) => void) | undefined,
+): ServerDataTableProps<TodoRow>["columns"] => [
 	{
 		id: "request",
 		header: "依頼内容",
@@ -54,8 +60,28 @@ const columns: ServerDataTableProps<TodoRow>["columns"] = [
 			</span>
 		),
 	},
+	...(archive
+		? [
+				{
+					id: "actions",
+					header: "操作",
+					enableSorting: false,
+					cell: ({ row }: { row: { original: TodoRow } }) => (
+						<Button
+							variant="secondary"
+							size="sm"
+							aria-label={`「${row.original.request}」をアーカイブ`}
+							onClick={() => archive(row.original)}
+						>
+							<Archive size={14} aria-hidden="true" />
+							アーカイブ
+						</Button>
+					),
+				},
+			]
+		: []),
 ];
-/** Current work shares one table; each row carries its persisted reporting state. */
+/** Current work and the archive; an open TODO can be stopped and archived after a confirmation. */
 export function TodoWorkspace({
 	view,
 	page,
@@ -64,7 +90,10 @@ export function TodoWorkspace({
 	onView,
 	onPage,
 	onRefresh,
+	onArchive,
 }: TodoWorkspaceProps) {
+	const [confirming, setConfirming] = useState<TodoRow | null>(null);
+	const archive = view === "active" && onArchive ? setConfirming : undefined;
 	return (
 		<section
 			className="ds-todo-workspace"
@@ -96,23 +125,21 @@ export function TodoWorkspace({
 				onValueChange={(value) => onView(value as "active" | "archived")}
 			>
 				<TabsList aria-label="仕事の表示" className="ds-todo-tabs">
-					<TabsTrigger value="active" icon={CheckCheck} aria-label="todo・done">
-						<span>todo・done</span>
-						<span className="ds-todo-count">
-							{counts ? counts.todo + counts.done : "—"}
-						</span>
+					<TabsTrigger value="active" icon={CheckCheck} aria-label="進行中">
+						<span>進行中</span>
+						<span className="ds-todo-count">{counts?.todo ?? "—"}</span>
 					</TabsTrigger>
-					<TabsTrigger value="archived" icon={Archive} aria-label="archived">
-						<span>archived</span>
+					<TabsTrigger value="archived" icon={Archive} aria-label="アーカイブ">
+						<span>アーカイブ</span>
 						<span className="ds-todo-count">{counts?.archived ?? "—"}</span>
 					</TabsTrigger>
 				</TabsList>
 				<TabsContent value={view} className="ds-todo-content">
-					{view === "archived" && <p>直近20件の報告済みの仕事</p>}
+					{view === "archived" && <p>直近20件の終わった仕事</p>}
 					<ServerDataTable
-						label={view === "active" ? "todo・done" : "報告済み"}
+						label={view === "active" ? "進行中" : "アーカイブ"}
 						{...page}
-						columns={columns}
+						columns={columns(archive)}
 						query={{
 							pageIndex: page.pageIndex,
 							pageSize: page.pageSize,
@@ -125,12 +152,30 @@ export function TodoWorkspace({
 						onQuery={(query) => onPage(query.pageIndex, query.pageSize)}
 						emptyMessage={
 							view === "active"
-								? "進行中・未報告の仕事はありません。"
-								: "報告済みの仕事はありません。"
+								? "進行中の仕事はありません。"
+								: "アーカイブした仕事はありません。"
 						}
 					/>
 				</TabsContent>
 			</Tabs>
+			<ConfirmModal
+				open={confirming !== null}
+				onOpenChange={(open) => {
+					if (!open) setConfirming(null);
+				}}
+				title="実行中の仕事を止めてアーカイブしますか"
+				description={
+					confirming
+						? `「${confirming.request}」を止めて、TODOリストから外します。この後の結果は届きません。`
+						: undefined
+				}
+				confirmText="止めてアーカイブ"
+				variant="destructive"
+				onConfirm={() => {
+					if (confirming) onArchive?.(confirming.id);
+					setConfirming(null);
+				}}
+			/>
 		</section>
 	);
 }

@@ -50,6 +50,13 @@ export function attemptDuration(r: Request, source: Source) {
 	return Math.min(configured, Math.max(1, remaining - reserve));
 }
 
+/**
+ * Tokens added to the output limit of a LARM call this domain makes think (`low`): its caller's limit is for the
+ * answer, and LARM counts the thinking in it. A memory step capped at 1,200 thought about 1,000 tokens and was cut
+ * (`chat_stream_incomplete`, 2026-10-29).
+ */
+export const REASONING_ALLOWANCE_TOKENS = 2048;
+
 /** Provider options and bounded exchange correlation across language, delivery and synthesis. */
 export function callOptionsFor(
 	r: Request,
@@ -57,6 +64,9 @@ export function callOptionsFor(
 	source: Source,
 ): LarmCallOptions {
 	const exchanges: LarmExchange[] = [];
+	// Only the conversation's own call names its level, and its limit already counts the thinking.
+	const thinksByDefault =
+		!r.session?.reasoning && source === "larm" && r.row.purpose === "llm";
 	return {
 		...(r.voiceOverride ? { speechOverride: r.voiceOverride } : {}),
 		// A decision call names its choices in the output schema: no native tools field, no tool calls back.
@@ -100,23 +110,23 @@ export function callOptionsFor(
 		...sessionCallOptions(r.session),
 		// The level of the side that answers: a fallback attempt on the cloud takes the cloud's. Only the conversation's
 		// own call names one; a call on the conversation takes the conversation's LARM level (it reads the same prefix),
-		// and every other LARM chat call does not think (left out, LARM's default would think at medium).
+		// and every other LARM chat call thinks at `low`, the least level every model accepts (one refuses `none` with
+		// 400; left out, LARM's default would think at medium).
 		...(r.session?.reasoning
 			? { reasoning: r.session.reasoning[source] }
-			: source === "larm" && r.row.purpose === "llm"
+			: thinksByDefault
 				? {
 						reasoning:
 							(r.session?.onConversation &&
 								r.env.options.conversationReasoning) ||
-							"off",
+							"low",
 					}
 				: {}),
 		...(r.row.outputLimit || r.outputLimit
 			? {
-					maxOutputTokens: Math.min(
-						r.row.outputLimit || Infinity,
-						r.outputLimit || Infinity,
-					),
+					maxOutputTokens:
+						Math.min(r.row.outputLimit || Infinity, r.outputLimit || Infinity) +
+						(thinksByDefault ? REASONING_ALLOWANCE_TOKENS : 0),
 				}
 			: {}),
 		...(r.row.attemptMs ? { attemptMs: r.row.attemptMs } : {}),

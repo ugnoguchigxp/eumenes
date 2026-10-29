@@ -230,8 +230,8 @@ describe("composeInput", () => {
 			presented: null,
 			say: "カエルの絵を作って",
 		});
-	test("current: system, memory, the recent conversation with the tool exchange, then State and User", () => {
-		const m = compose("current");
+	test("current: system, memory, the recent conversation (the cloud harness with its tool exchange), then State and User", () => {
+		const m = compose("current", cloudHarness);
 		expect(m[0]).toEqual({ role: "system", content: system });
 		expect(m[1]).toEqual({ role: "user", content: "## Memory\n- なし" });
 		expect(m.map((x) => x.role)).toEqual([
@@ -266,12 +266,15 @@ describe("composeInput", () => {
 		expect(m[1]!.content).toContain("直前のあなたの返事: 「承りました。」");
 		expect(lastLines([])).toEqual([]);
 	});
-	test("a harness that leaves the exchanges and notices out draws them out of the recent conversation", () => {
-		const bare = {
-			...localHarness,
-			history: { ...localHarness.history, toolExchanges: false },
-		};
-		expect(compose("current", bare).some((x) => x.role === "tool")).toBe(false);
+	test("the local harness draws the recent conversation as words alone", () => {
+		expect(compose("current").map((x) => x.role)).toEqual([
+			"system",
+			"user",
+			"assistant",
+			"user",
+			"assistant",
+			"user",
+		]);
 		expect(cloudHarness.history.toolExchanges).toBe(true);
 	});
 	test("the agent's utterance that copies the system part is not drawn", () => {

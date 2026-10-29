@@ -15,6 +15,8 @@ import {
 } from "../api/domains/inference/contracts";
 import {
 	diagnosticsSchema,
+	intentPatchSchema,
+	intentSettingsSchema,
 	settingsSchema,
 	type ApplySettings,
 } from "../api/domains/settings/contracts";
@@ -48,6 +50,16 @@ export function settingsClient(t: Transport) {
 				{ signal },
 			),
 		settings: async () => callJson(t, settingsSchema, "/api/settings"),
+		/** The user-intent judge's settings, apart from the speaking-attitude judge's. */
+		intentSettings: async () =>
+			callJson(t, intentSettingsSchema, "/api/settings/intent"),
+		configureIntent: async (input: z.infer<typeof intentPatchSchema>) =>
+			callJson(
+				t,
+				intentSettingsSchema,
+				"/api/settings/intent",
+				json(intentPatchSchema.parse(input), "PUT"),
+			),
 		applySettings: async (input: ApplySettings) =>
 			callJson(t, settingsSchema, "/api/settings/apply", json(input)),
 		connectionModels: async (

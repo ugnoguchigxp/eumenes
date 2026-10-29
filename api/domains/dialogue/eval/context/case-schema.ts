@@ -176,7 +176,10 @@ const seedWork = z
 		result: z.unknown().optional(),
 		questionId: text.optional(),
 		question: text.optional(),
-		/** The agent archived the (done) TODO: it is out of `state.todos` and its slot in `active` is gone. */
+		/**
+		 * Written by cases from before finished work was archived as it finishes (2026-10-29); every done TODO is
+		 * archived now, so the seed ignores it.
+		 */
 		archived: z.boolean().optional(),
 	})
 	.strict();

@@ -4,6 +4,7 @@ import type { Database } from "bun:sqlite";
 import type { Settings, Purpose } from "../../settings/contracts";
 import type { SpeechDelivery, SpeechPreparation } from "../../delivery";
 export type { ChatImage } from "../../larm";
+export type { IntentInput, IntentJudgment, IntentLabel } from "../../larm";
 export type Messages = ChatMessage[];
 /** How much a model thinks before it answers (`off`: not at all). */
 export type ReasoningLevel = "off" | "low" | "medium" | "high";
@@ -59,7 +60,12 @@ import type {
 	NativeTool,
 	NativeToolCall,
 } from "../../../infrastructure/chat-stream";
-import type { ChatInput, ChatMessage } from "../../larm";
+import type {
+	ChatInput,
+	ChatMessage,
+	IntentInput,
+	IntentJudgment,
+} from "../../larm";
 import type { HttpErrorStatus } from "../../../infrastructure/http";
 export interface Receipt {
 	toolCalls?: NativeToolCall[];
@@ -236,6 +242,14 @@ export interface InferencePort {
 		onDelta: (text: string) => void,
 	): Promise<string>;
 	answer(messages: Messages, signal: AbortSignal): Promise<string>;
+	/**
+	 * The user-intent judge of the saved intent profile, on its own LARM connection (the intent gate design,
+	 * section 3); it throws when unconfigured or failed, and the caller keeps the existing routing.
+	 */
+	judgeIntent?(
+		input: IntentInput,
+		signal: AbortSignal,
+	): Promise<IntentJudgment>;
 	transcribe(wav: Uint8Array, signal: AbortSignal): Promise<string>;
 	speak(
 		text: string,

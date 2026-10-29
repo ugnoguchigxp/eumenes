@@ -196,11 +196,12 @@ test("the recent conversation is what reached the user: a partial delivery as he
 test("TODOs and confirmations come from the work ledger as lines of `## State`", async () => {
 	const m = await prepared(fullCase);
 	const state = sect(m, "State");
-	expect(state).toContain("- t1 宿の候補を調べる 完了 未報告");
+	// Finished work is archived as it finishes: the state names it as notified.
+	expect(state).toContain("- t1 宿の候補を調べる 通知済み");
 	expect(state).toContain(
 		"- c1 確認待ち code_workspace「設定を書き換える」（変更）",
 	);
-	expect(state.join("\n")).not.toMatch(/海の絵を描く 完了 未報告/);
+	expect(state).toContain("- t2 海の絵を描く 通知済み");
 	// No result is shown in this input: nothing it shows may be reported with its sources.
 	expect(m.input.shown.todos).toEqual([]);
 });
@@ -231,7 +232,7 @@ test("a generation without an utterance answers a host notice, with the TODO in 
 	expect(m.input.final).toEqual({ kind: "fixed" });
 	expect(sect(m, "Host notice")).toEqual(["- kind: todo_changed"]);
 	expect(sect(m, "User")).toEqual([]);
-	expect(sect(m, "State")).toContain("- t1 調べる 完了 未報告");
+	expect(sect(m, "State")).toContain("- t1 調べる 通知済み");
 });
 
 test("the input is deterministic, and outside text keeps its characters but can not open a heading", async () => {

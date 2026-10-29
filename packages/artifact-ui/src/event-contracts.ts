@@ -140,6 +140,7 @@ export type ArtifactEvent = {
 		| "browser-cancel-replay"
 		| "todo-view"
 		| "todo-page"
-		| "todo-refresh";
+		| "todo-refresh"
+		| "todo-archive";
 	values: Record<string, string | boolean>;
 };

@@ -1,4 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
+import { REASONING_ALLOWANCE_TOKENS } from "../service/attempt-work";
 import { attemptDuration } from "../service/attempt-work";
 import { cleanup, messages, setup } from "./inference.fixture";
 afterEach(async () => {
@@ -40,7 +41,7 @@ test("control calls preserve exact context, stay local, skip emotion judgement, 
 	expect(receipt.value).toBe('{"action":"respond"}');
 	expect(opts).toMatchObject({
 		contextPolicy: "exact",
-		maxOutputTokens: 2048,
+		maxOutputTokens: 2048 + REASONING_ALLOWANCE_TOKENS,
 		jsonOutput: true,
 	});
 	expect(judgement).toBe(0);
@@ -306,13 +307,17 @@ test("a control request may ask for a long output (a large draft), up to 32k tok
 		messages,
 		new AbortController().signal,
 	);
-	expect(opts).toMatchObject({ maxOutputTokens: 24_576 });
+	expect(opts).toMatchObject({
+		maxOutputTokens: 24_576 + REASONING_ALLOWANCE_TOKENS,
+	});
 	await h.inference.executeControl(
 		await capture(100_000, 2),
 		messages,
 		new AbortController().signal,
 	);
-	expect(opts).toMatchObject({ maxOutputTokens: 32_768 });
+	expect(opts).toMatchObject({
+		maxOutputTokens: 32_768 + REASONING_ALLOWANCE_TOKENS,
+	});
 });
 test("a toolchain's own limits: the run's requests are moved later (never earlier) and an attempt carries its own time", async () => {
 	let opts: unknown;

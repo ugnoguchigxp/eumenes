@@ -28,6 +28,8 @@ export type InferenceOptions = {
 	providerHosts?: readonly string[];
 	fetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 	larmFactory?: (s: Settings) => LarmPort;
+	/** The user-intent judge's port of these settings, in place of a LARM port of the saved intent profile. */
+	intentLarmFactory?: (s: Settings) => LarmPort;
 	/**
 	 * The host process: the saved LARM connection is held while it runs, under a client stable across restarts, and
 	 * kept at shutdown, so LARM's input cache (which lives on the connection) outlasts idle time and restarts.
@@ -38,7 +40,7 @@ export type InferenceOptions = {
 	/**
 	 * The LARM level the conversation's own calls name. A call on the conversation reads the conversation's prefix and
 	 * names the same level: LARM renders a thinking call's input apart from a non-thinking one, and the prefix would no
-	 * longer be the one the conversation keeps. Absent, such a call does not think, as every other one.
+	 * longer be the one the conversation keeps. Absent, such a call thinks at `low`, as every other one.
 	 */
 	conversationReasoning?: ReasoningLevel;
 	localMs?: number;

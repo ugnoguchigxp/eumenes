@@ -15,7 +15,7 @@ import { answerSession, createAnswerStream } from "./generation-stream";
 import { generationTiming } from "./generation-timing";
 import { isPinnedDecision, pinnedGeneration } from "./pinned-operation";
 import type { Progress } from "./progress";
-import { refreshActionResults, reportedLinks } from "./result-intake";
+import { refreshAgentAnswer, reportedLinks } from "./result-intake";
 import { endRun } from "./run-end";
 import { flushDeferred } from "./specialist-core";
 
@@ -79,7 +79,7 @@ export function createGenerationHandler(
 						return pinnedGeneration(deps, input, run!);
 					}
 					resolveAttachmentContext(deps, input, run!.conversationId);
-					await refreshActionResults(deps, input);
+					await refreshAgentAnswer(deps, input);
 					const body = createAnswerStream(
 						deps,
 						input,

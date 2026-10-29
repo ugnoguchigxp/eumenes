@@ -61,6 +61,71 @@
 .kanban-notification-read {
 	opacity: 0.65;
 }
+.todo-notice {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 6px 6px 6px 12px;
+	border: 1px solid color-mix(in srgb, var(--foreground) 10%, transparent);
+	border-radius: 12px;
+	color: var(--foreground);
+	background: color-mix(in srgb, var(--card) 94%, transparent);
+	box-shadow: 0 4px 16px color-mix(in srgb, #000 12%, transparent);
+	backdrop-filter: blur(24px) saturate(150%);
+}
+.todo-notice-read {
+	opacity: 0.6;
+}
+.todo-notice-body {
+	display: grid;
+	gap: 1px;
+	flex: 1;
+	min-width: 0;
+	padding: 2px 0;
+	border: 0;
+	color: inherit;
+	background: none;
+	font: inherit;
+	text-align: left;
+}
+button.todo-notice-body {
+	cursor: pointer;
+}
+.todo-notice-head,
+.todo-notice-summary {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.todo-notice-head {
+	font-size: 12px;
+	font-weight: 600;
+	line-height: 1.5;
+}
+.todo-notice-summary {
+	color: var(--muted-foreground);
+	font-size: 11px;
+	line-height: 1.5;
+}
+.todo-notice-outcome {
+	margin-right: 6px;
+	padding: 0 5px;
+	border-radius: 4px;
+	color: #df4b54;
+	background: color-mix(in srgb, #df4b54 14%, transparent);
+	font-size: 10px;
+}
+.todo-notice-open {
+	flex-shrink: 0;
+	width: 28px;
+	height: 28px;
+	border-radius: 8px;
+	box-shadow: none;
+}
+.todo-notice-open svg {
+	width: 16px;
+	height: 16px;
+}
 .notification-ringing {
 	display: inline-flex;
 	align-items: center;

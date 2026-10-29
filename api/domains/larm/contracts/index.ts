@@ -110,7 +110,9 @@ export type LarmStatus = {
 	error?: string;
 };
 import type { TtsVoices } from "./voices";
+import type { IntentInput, IntentJudgment } from "./user-intent";
 export { ttsVoicesSchema, type TtsVoices } from "./voices";
+export * from "./user-intent";
 export interface LarmPort {
 	decisionModel?(): string | null;
 	/**
@@ -118,6 +120,7 @@ export interface LarmPort {
 	 * window is part of the provider's claim, and a claim is made only to serve a call).
 	 */
 	llmContextWindow?(): number | null;
+	/** The speaking-attitude judge of the agent's own answer (the conversation's port only). */
 	judge?(
 		state: Record<string, string>,
 		questions: Record<
@@ -126,6 +129,11 @@ export interface LarmPort {
 		>,
 		signal: AbortSignal,
 	): Promise<unknown>;
+	/** The user-intent judge of the user's newest utterance (an intent port, `decisionOnly`, only). */
+	judgeIntent?(
+		input: IntentInput,
+		signal: AbortSignal,
+	): Promise<IntentJudgment>;
 	voices?(signal: AbortSignal, language?: SpeechLanguage): Promise<TtsVoices>;
 	status(): LarmStatus;
 	onChange?(listener: () => void): () => void;

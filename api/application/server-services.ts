@@ -292,9 +292,7 @@ export async function buildServices(
 			resources: resources.access.registry,
 		});
 	// The agency sees the conversation's open TODOs; the conversation reports their results itself.
-	agency.attachWork(
-		createAgencyWork({ dialogue, resources: resources.access.registry }),
-	);
+	agency.attachWork(createAgencyWork({ dialogue }));
 	lateResources.attach(resources.access.registry);
 	stewardAssembly.attachDialogue(dialogue);
 	// The latest conversation's prompt is read ahead when it would be cold (started, shown, idle while shown).

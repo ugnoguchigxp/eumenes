@@ -85,7 +85,7 @@ type ConversationHarness = {
 
 local の初期値は、今の本番の動き（LARM の既定 medium）を明示しただけのものにした。2026-10-29 に low へ変えた。上限は、考えた分で途切れないように上げてある。
 
-会話の本体以外の LARM の呼出しは、reasoning を none で送る（2026-10-29 利用者決定）。何も送らないと LARM の既定（medium）で考えてしまうので、推論 domain が `reasoning_effort: "none"` を付ける（`attempt-work.ts`）。対象は、音楽の計画・担当の呼出しなど、reasoning を指定しない呼出しです。クラウドの呼出しは変えない。
+会話の本体以外の LARM の呼出しは、reasoning を low で送る（2026-10-29 利用者決定）。何も送らないと LARM の既定（medium）で考えてしまうので、推論 domain が `reasoning_effort` を付ける（`attempt-work.ts`）。対象は、音楽の計画・担当の呼出しなど、reasoning を指定しない呼出しです。クラウドの呼出しは変えない。最初は none と決めたが、LFM の LARM は none を 400 で断った（`this provider supports reasoning_effort low, medium, high, or max`、2026-10-29 12:40）。すべてのモデルが受け付ける最も低い段階の low に改めた（同日の利用者決定）。low にすると、LFM はメモリー担当や agency の呼出しで毎回約1,000 token 考え、呼出し側の出力の上限（1,200）を使い切って JSON が途中で切れた（`chat_stream_incomplete`、12:47〜12:53 に steward 6回・agency 1回）。呼出し側の上限は答えの分なので、推論 domain が段階を付けた呼出しには、考える分として 2,048 token を上限に足す（`REASONING_ALLOWANCE_TOKENS`）。会話の本体は自分の上限（4,096）に考える分を含めているので足さない。
 
 ただし、会話の上に乗る呼出し（`onConversation`：先読み・文脈係・steward・agency の裏の呼出し）は、会話と同じ段階（今は low）で送る。これらは会話の先頭（system と会話）をそのまま読み、会話のキャッシュを使い回すための呼出しだからです。LARM は、考える呼出しと考えない呼出しで、入力を違う形に組み立てる。同じ入力で、none は low・medium・high より 36 token 少なかった（2026-10-29 の計測）。段階をそろえないと、先頭が会話のものと一致しなくなる。値は起動時に local ハーネスの段階を推論 domain に渡す（`conversationReasoning`）。それ以外の違いは、§5 の測定で点が上がったものだけを足す。
 

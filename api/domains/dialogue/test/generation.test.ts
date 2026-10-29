@@ -157,7 +157,7 @@ test("an instant toolchain's answer comes back as the tool result, and makes no 
 	expect(h.state.selections.at(-1)).toMatchObject({ decision: "toolchain" });
 });
 
-test("a delegation is announced, opens a TODO and hands the run over; the finished work ends the run without a generation and opens the agent's opportunity", async () => {
+test("a delegation is announced, opens a TODO and hands the run over; the finished work ends the run without a generation and is archived with its notice", async () => {
 	const notified: string[] = [];
 	h = await setup({
 		agency: {
@@ -203,7 +203,8 @@ test("a delegation is announced, opens a TODO and hands the run over; the finish
 	]);
 	expect(notified).toEqual([]);
 	const calls = h.state.calls.length;
-	// The result: the TODO is done, its result is a line of the log; no model call is made for it, and the agent is told.
+	// The result: the TODO is done and archived with its notice, its result is a line of the log; no model call is
+	// made for it, and the agent is told (it asks only what work asks).
 	const done = await h.finishImage(waiting.id, {
 		state: "completed",
 		title: "猫",
@@ -212,16 +213,18 @@ test("a delegation is announced, opens a TODO and hands the run over; the finish
 	expect(h.dialogue.answerText(done.id)).toBeNull();
 	expect(h.state.calls).toHaveLength(calls);
 	expect(notified).toEqual(["main"]);
-	expect(h.todos()[0]).toMatchObject({ status: "done", outcome: "succeeded" });
+	expect(h.todos()).toEqual([]);
+	expect(h.archived()[0]).toMatchObject({
+		status: "done",
+		outcome: "succeeded",
+	});
+	expect(h.notices()).toMatchObject({ unread: 1, notices: [{ read: false }] });
 	expect(h.results()).toHaveLength(1);
 	expect(JSON.stringify(h.results())).toContain("猫");
-	// Reporting the result is the agent's job: nothing was said or archived by the host.
+	// The notice tells the result: nothing was said by the host.
 	expect(
 		h.log().filter((e) => e.by === "agent" && e.type === "said"),
 	).toHaveLength(1);
-	expect(h.log().some((e) => h!.fields(e).action === "work.archived")).toBe(
-		false,
-	);
 });
 
 test("a finished TODO with no agency port ends its run without a generation too", async () => {
@@ -251,7 +254,7 @@ test("a finished TODO with no agency port ends its run without a generation too"
 	});
 	expect(done.status).toBe("completed");
 	expect(h.state.calls).toHaveLength(calls);
-	expect(h.todos()).toMatchObject([{ status: "done" }]);
+	expect(h.archived()).toMatchObject([{ status: "done" }]);
 });
 
 test("an answer delivery uses the emotion of the reply, never judged again", async () => {
@@ -391,14 +394,9 @@ test("a spoken answer cut short records what was heard, without the announcement
 	h = await setup();
 	h.state.steps.push({ text: "長い答えです。続きがあります。" });
 	const run = await h.say("教えて");
-	// Text display stays full; actual speech is tracked separately and may be partial.
+	// A text reply is delivered in full at once; a later playback report adds nothing.
 	await h.store.write((db) =>
 		h!.dialogue.recordHeardInTransaction(db, run.id, "partial", "長い答え"),
 	);
-	expect(
-		h
-			.log()
-			.filter((e) => e.type === "delivered")
-			.map((e) => h!.fields(e)),
-	).toMatchObject([{ heard: "full" }, { heard: "partial", channel: "speech" }]);
+	expect(h.log().filter((e) => e.type === "delivered")).toHaveLength(1);
 });

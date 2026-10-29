@@ -29,10 +29,12 @@ import { createFileExclusive } from "../../../infrastructure/atomic-file";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import {
 	defaultSubtitles,
+	intentPatchSchema,
 	purposeSchema,
 	settingsSchema,
 	type ApplySettings,
 	type Connection,
+	type IntentSettings,
 	type Settings,
 } from "../contracts";
 import { persistStoredMigration, read, save } from "../repository";
@@ -270,6 +272,30 @@ export async function createSettings(
 		valid: validSettings,
 		applyInTransaction,
 		notifyChanged,
+		/**
+		 * Changes the user-intent judge's settings alone (the intent gate design, section 7): the given fields replace
+		 * the saved ones and the document's revision moves on; the speaking-attitude judge's settings are not touched.
+		 */
+		async configureIntent(raw: unknown): Promise<IntentSettings> {
+			const patch = intentPatchSchema.safeParse(raw);
+			if (!patch.success) throw new Error("invalid_intent_settings");
+			const saved = await store.write((db) => {
+				const current = read(db);
+				const { profile, ...rest } = patch.data;
+				const intent = { ...current.intent, ...rest };
+				if (profile === null) delete intent.profile;
+				else if (profile !== undefined) intent.profile = profile;
+				const next = settingsSchema.parse({
+					...current,
+					revision: current.revision + 1,
+					intent,
+				});
+				save(db, next);
+				return next.intent;
+			});
+			notifyChanged();
+			return saved;
+		},
 		/** Idempotent replay is guaranteed only for the newest 64 requests. */
 		async apply(raw: ApplySettings) {
 			const result = await store.write((db) => applyInTransaction(db, raw));

@@ -86,7 +86,7 @@ test("the delegation's TODO is a line of the state, and a notice is the host not
 	expect(todos(calls[4]!)).toEqual([]);
 	expect(calls[5]!.input.final).toEqual({ kind: "fixed" });
 	expect(todos(calls[5]!)).toEqual([
-		"- t1 旅行先のイメージ画像を作る 完了 未報告",
+		"- t1 旅行先のイメージ画像を作る 通知済み",
 	]);
 	expect(calls[7]!.input.final).toEqual({ kind: "fixed" });
 	expect(sectionOf(calls[7]!, "Host notice")).toEqual([

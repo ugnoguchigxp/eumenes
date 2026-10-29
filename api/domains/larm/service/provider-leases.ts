@@ -60,10 +60,13 @@ type Options = {
 	hostsFor: () => ProviderHosts;
 	control: Control;
 	lifetime: AbortController;
+	/** The port serves the decision provider alone (the user-intent judge): its connection selects nothing else. */
+	decisionOnly?: boolean;
 };
 
 /** LARM identifies different Provider scopes as different Connections, even for the same client. */
 export function createProviderLeases(options: Options) {
+	if (options.decisionOnly) return decisionLeases(options);
 	const main = createLeaseManager(options);
 	let voice: ReturnType<typeof createScope> | undefined;
 	let retained = false;
@@ -147,6 +150,21 @@ export function createProviderLeases(options: Options) {
 	};
 }
 
+/** A port of the decision provider alone: one connection that selects it, claimed, renewed and released as a voice scope's. */
+function decisionLeases(options: Options) {
+	const scope = createScope(options);
+	return {
+		retain: scope.retain,
+		status: scope.status,
+		connect: scope.connect,
+		withProvider: scope.withProvider,
+		current: (_name?: ProviderName) => scope.current(),
+		providers: () => new Map(scope.current()?.providers ?? []),
+		onChange: scope.onChange,
+		close: scope.close,
+	};
+}
+
 /** Shares acquisition only; each Provider waits, fails and refreshes independently. */
 function createScope({
 	base,
@@ -159,6 +177,7 @@ function createScope({
 	hostsFor,
 	control,
 	lifetime,
+	decisionOnly = false,
 }: Options) {
 	let lease: Lease | undefined;
 	let creating: Promise<Lease> | undefined;
@@ -244,10 +263,11 @@ function createScope({
 					client,
 					audience,
 					idleTimeoutMs,
-					fullProfile: true,
+					fullProfile: !decisionOnly,
+					...(decisionOnly ? { providers: ["system-one"] } : {}),
 					lifetime: lifetime.signal,
 				},
-				["asr", "tts"],
+				decisionOnly ? ["system-one"] : ["asr", "tts"],
 				crypto.randomUUID(),
 			).then((current) => {
 				lease = current;
@@ -360,7 +380,8 @@ function createScope({
 			if (!base || !token || !profile) return;
 			const current = await getLease(signal);
 			await repeatProfile(control, current, signal);
-			if (!current.providers.size) await connect(["asr"], signal);
+			if (!current.providers.size)
+				await connect([decisionOnly ? "system-one" : "asr"], signal);
 		},
 		(active) => {
 			retained = active;

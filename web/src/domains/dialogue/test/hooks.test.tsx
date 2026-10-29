@@ -26,6 +26,8 @@ function setup() {
 		cancel: async (id) => accepted.get(id)!,
 		runErrorReport: async (id) => ({ runId: id, text: "" }),
 		specialistSession: async () => ({ session: null }),
+		todoNotices: async () => ({ notices: [], unread: 0 }),
+		readTodoNotice: async () => {},
 		specialistCommand: async () => {
 			throw new Error("not_used");
 		},

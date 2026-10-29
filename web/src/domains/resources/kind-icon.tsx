@@ -36,7 +36,15 @@ const ICON_OF_KIND: Record<string, keyof typeof ICONS> = {
 };
 
 export function KindIcon({ kind }: { kind: string }) {
-	const path = ICONS[ICON_OF_KIND[kind] ?? "file"];
+	return <PathIcon path={ICONS[ICON_OF_KIND[kind] ?? "file"]!} />;
+}
+
+/** A registered screen (an artifact) as a launcher icon. */
+export function ArtifactIcon() {
+	return <PathIcon path={ICONS.screen!} />;
+}
+
+function PathIcon({ path }: { path: string }) {
 	return (
 		<svg
 			viewBox="0 0 24 24"

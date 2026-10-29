@@ -2,8 +2,8 @@ import type { Database } from "bun:sqlite";
 
 /**
  * The conversation's TODOs (the ContextWindow specification, section 10.1): every piece of work the conversation
- * agent handed to a toolchain, its state as the work's owner reports it, its result held for the conversation, and
- * whether the agent archived it. The confirmations issued before executing a change (section 6.7) live beside.
+ * agent handed to a toolchain, its state as the work's owner reports it, its result, and whether it is archived (a
+ * finished TODO is archived as it finishes). The confirmations issued before executing a change (section 6.7) live beside.
  */
 export const workMigration = `
 CREATE TABLE dialogue_work (
@@ -47,6 +47,18 @@ UPDATE dialogue_confirmations SET ref = (SELECT COUNT(*) FROM dialogue_confirmat
  WHERE c.conversation_id = dialogue_confirmations.conversation_id
  AND (c.issued_at < dialogue_confirmations.issued_at OR (c.issued_at = dialogue_confirmations.issued_at AND c.rowid <= dialogue_confirmations.rowid)));
 CREATE UNIQUE INDEX dialogue_confirmations_ref ON dialogue_confirmations(conversation_id, ref);`;
+
+/**
+ * A TODO is archived as it finishes and the user is told by a notice on screen, unread until `notice_read_at` (the
+ * TODO completion notice design, 2026-10-29). TODOs archived before are read; finished ones that still waited for
+ * their spoken report are archived now and told once.
+ */
+export const workNoticesMigration = `
+ALTER TABLE dialogue_work ADD COLUMN notice_read_at TEXT;
+UPDATE dialogue_work SET notice_read_at = archived_at WHERE archived_at IS NOT NULL;
+UPDATE dialogue_work SET archived_at = updated_at WHERE status = 'done' AND archived_at IS NULL;
+ALTER TABLE dialogue_work DROP COLUMN archive_requested;
+CREATE INDEX dialogue_work_archived ON dialogue_work(archived_at);`;
 
 const fromMessages = (table: string, count: number) =>
 	`EXISTS (SELECT 1 FROM json_each(${table}.message_ids_json) m WHERE m.value IN (${Array.from({ length: count }, () => "?").join(",")}))`;
@@ -120,8 +132,9 @@ export type WorkRow = {
 	question: string | null;
 	result: unknown;
 	sourceRef: string | null;
-	archiveRequested: string | null;
 	archivedAt: string | null;
+	/** When the user read the TODO's completion notice; null while unread (or when it has none). */
+	noticeReadAt: string | null;
 	createdAt: string;
 	updatedAt: string;
 	/** The user's messages the request comes from. */
@@ -129,7 +142,7 @@ export type WorkRow = {
 };
 
 const columns =
-	"id, ref, conversation_id, run_id, toolchain_id, toolchain_revision_id, execution, request, title, status, outcome, revision, question_id, question, result_json, source_ref, archive_requested, archived_at, created_at, updated_at, message_ids_json";
+	"id, ref, conversation_id, run_id, toolchain_id, toolchain_revision_id, execution, request, title, status, outcome, revision, question_id, question, result_json, source_ref, archived_at, notice_read_at, created_at, updated_at, message_ids_json";
 function map(row: Record<string, unknown>): WorkRow {
 	return {
 		id: row.id as string,
@@ -149,8 +162,8 @@ function map(row: Record<string, unknown>): WorkRow {
 		result:
 			row.result_json === null ? null : JSON.parse(row.result_json as string),
 		sourceRef: (row.source_ref as string | null) ?? null,
-		archiveRequested: (row.archive_requested as string | null) ?? null,
 		archivedAt: (row.archived_at as string | null) ?? null,
+		noticeReadAt: (row.notice_read_at as string | null) ?? null,
 		createdAt: row.created_at as string,
 		updatedAt: row.updated_at as string,
 		messageIds: JSON.parse(row.message_ids_json as string) as string[],
@@ -167,8 +180,8 @@ export function insertWork(
 		| "questionId"
 		| "question"
 		| "result"
-		| "archiveRequested"
 		| "archivedAt"
+		| "noticeReadAt"
 		| "updatedAt"
 		| "ref"
 		| "messageIds"
@@ -274,7 +287,7 @@ export function openWork(db: Database, conversationId: string): WorkRow[] {
 	).map(map);
 }
 
-/** The TODOs archived since `since` (an ISO time), newest last, at most `limit`. */
+/** The TODOs archived since `since` (an ISO time), newest last, at most `limit`; a forgotten one (no title) is never read. */
 export function recentlyArchivedWork(
 	db: Database,
 	conversationId: string,
@@ -284,7 +297,7 @@ export function recentlyArchivedWork(
 	return (
 		db
 			.query(
-				`SELECT ${columns} FROM dialogue_work WHERE conversation_id = ? AND archived_at IS NOT NULL AND archived_at >= ? ORDER BY archived_at DESC, id DESC LIMIT ?`,
+				`SELECT ${columns} FROM dialogue_work WHERE conversation_id = ? AND archived_at IS NOT NULL AND archived_at >= ? AND title != '' ORDER BY archived_at DESC, id DESC LIMIT ?`,
 			)
 			.all(conversationId, since, limit) as Record<string, unknown>[]
 	)
@@ -292,19 +305,8 @@ export function recentlyArchivedWork(
 		.reverse();
 }
 
-/** The TODOs a reply was asked to archive (`archive_requested`), archived or not. */
-export function workReportedBy(db: Database, told: string): WorkRow[] {
-	return (
-		db
-			.query(
-				`SELECT ${columns} FROM dialogue_work WHERE archive_requested = ? ORDER BY created_at, id`,
-			)
-			.all(told) as Record<string, unknown>[]
-	).map(map);
-}
-
-/** Which TODOs a page lists: the unarchived ones, the open ones, the finished unarchived ones, or the archived. */
-export type WorkPageState = "active" | "todo" | "done" | "archived";
+/** Which TODOs a page lists: the unarchived (open) ones, or the archived. */
+export type WorkPageState = "active" | "archived";
 
 /** One page of a conversation's TODOs for display, newest first, with the count of each state. */
 export function workPage(
@@ -315,23 +317,14 @@ export function workPage(
 	rows: WorkRow[];
 	total: number;
 	pageIndex: number;
-	counts: { todo: number; done: number; archived: number };
+	counts: { todo: number; archived: number };
 } {
 	const totals = db
 		.query(
-			`SELECT
-			 COUNT(CASE WHEN archived_at IS NULL AND status != 'done' THEN 1 END) todo,
-			 COUNT(CASE WHEN archived_at IS NULL AND status = 'done' THEN 1 END) done,
-			 COUNT(archived_at) archived,
-			 COUNT(CASE WHEN archived_at IS NULL THEN 1 END) active
+			`SELECT COUNT(CASE WHEN archived_at IS NULL THEN 1 END) active, COUNT(archived_at) archived
 			 FROM dialogue_work WHERE conversation_id = ?`,
 		)
-		.get(conversationId) as {
-		todo: number;
-		done: number;
-		archived: number;
-		active: number;
-	};
+		.get(conversationId) as { active: number; archived: number };
 	const total = totals[query.state];
 	const pageIndex = Math.min(
 		query.pageIndex,
@@ -339,17 +332,10 @@ export function workPage(
 	);
 	const condition = {
 		active: "archived_at IS NULL",
-		todo: "archived_at IS NULL AND status != 'done'",
-		done: "archived_at IS NULL AND status = 'done'",
 		archived: "archived_at IS NOT NULL",
 	}[query.state];
-	// Current work keeps the order it was asked in (newest first); a state's own list follows its last change.
-	const order = {
-		active: "created_at",
-		todo: "updated_at",
-		done: "updated_at",
-		archived: "archived_at",
-	}[query.state];
+	// Current work keeps the order it was asked in (newest first); the archive follows when each was archived.
+	const order = { active: "created_at", archived: "archived_at" }[query.state];
 	const rows = (
 		db
 			.query(
@@ -365,7 +351,7 @@ export function workPage(
 		rows,
 		total,
 		pageIndex,
-		counts: { todo: totals.todo, done: totals.done, archived: totals.archived },
+		counts: { todo: totals.active, archived: totals.archived },
 	};
 }
 
@@ -421,7 +407,7 @@ export function updateWork(
 	return (
 		db
 			.query(
-				"UPDATE dialogue_work SET archive_requested = NULL, status = ?, outcome = ?, question_id = ?, question = ?, result_json = ?, request = ?, source_ref = ?, run_id = ?, revision = revision + 1, updated_at = ? WHERE id = ? AND revision = ?",
+				"UPDATE dialogue_work SET status = ?, outcome = ?, question_id = ?, question = ?, result_json = ?, request = ?, source_ref = ?, run_id = ?, revision = revision + 1, updated_at = ? WHERE id = ? AND revision = ?",
 			)
 			.run(
 				next.status,
@@ -441,12 +427,6 @@ export function updateWork(
 	);
 }
 
-export function requestArchive(db: Database, id: string, told: string) {
-	db.query(
-		"UPDATE dialogue_work SET archive_requested = ? WHERE id = ? AND archived_at IS NULL",
-	).run(told, id);
-}
-
 export function archiveWork(db: Database, id: string, at: string): boolean {
 	return (
 		db
@@ -457,18 +437,43 @@ export function archiveWork(db: Database, id: string, at: string): boolean {
 	);
 }
 
-/** The archive requests waiting for the delivery of the utterance they stand on. */
-export function waitingArchives(
+/**
+ * A finished TODO's notice: one that ended with a result to tell (not cancelled) and was not forgotten (a forgotten
+ * TODO loses its title).
+ */
+const NOTICE =
+	"archived_at IS NOT NULL AND status = 'done' AND outcome IN ('succeeded','partial','failed','interrupted') AND title != ''";
+
+/** The completion notices of every conversation, newest first, at most `limit`, and how many are unread in all. */
+export function workNotices(
 	db: Database,
-	conversationId: string,
-): WorkRow[] {
-	return (
+	limit: number,
+): { rows: WorkRow[]; unread: number } {
+	const rows = (
 		db
 			.query(
-				`SELECT ${columns} FROM dialogue_work WHERE conversation_id = ? AND archive_requested IS NOT NULL AND archived_at IS NULL`,
+				`SELECT ${columns} FROM dialogue_work WHERE ${NOTICE} ORDER BY archived_at DESC, id DESC LIMIT ?`,
 			)
-			.all(conversationId) as Record<string, unknown>[]
+			.all(limit) as Record<string, unknown>[]
 	).map(map);
+	const { unread } = db
+		.query(
+			`SELECT COUNT(*) unread FROM dialogue_work WHERE ${NOTICE} AND notice_read_at IS NULL`,
+		)
+		.get() as { unread: number };
+	return { rows, unread };
+}
+
+/** Marks a TODO's notice read; false when the TODO has no notice. Reading it again changes nothing. */
+export function readWorkNotice(db: Database, id: string, at: string): boolean {
+	if (
+		!db.query(`SELECT 1 FROM dialogue_work WHERE id = ? AND ${NOTICE}`).get(id)
+	)
+		return false;
+	db.query(
+		"UPDATE dialogue_work SET notice_read_at = ? WHERE id = ? AND notice_read_at IS NULL",
+	).run(at, id);
+	return true;
 }
 
 export type ConfirmationRow = {

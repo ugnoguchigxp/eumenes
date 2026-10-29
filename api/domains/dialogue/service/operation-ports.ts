@@ -2,17 +2,12 @@ import type { Database } from "bun:sqlite";
 import { byId, byRequest, linkAnswer } from "../repository";
 import { GENERATE_KIND, type DialogueDeps } from "./context";
 import {
-	archiveReportedInTransaction,
 	recordHeardInTransaction,
 	recordSpontaneousInTransaction,
 } from "./delivery-record";
 import type { Heard } from "./event-fields";
 import { endRun } from "./run-end";
 import type { WorkLedger } from "./work-ledger";
-import {
-	recordMessageHeardInTransaction,
-	reportPending,
-} from "./speech-delivery";
 
 /**
  * What the rest of the application tells the conversation and reads of it: notice delivery, the TODOs, the
@@ -40,27 +35,12 @@ export function createOperationPorts(deps: DialogueDeps) {
 					? ("delivered" as const)
 					: ("failed" as const);
 		},
-		/**
-		 * The conversation's TODOs that are not archived, with their results (the agency reports them). A finished
-		 * operation's result is read again as it is now, so a cancel after the report is what the agent says.
-		 */
+		/** The conversation's open TODOs (the agency asks what they ask; finished work is told on screen). */
 		todosInTransaction: (db: Database, conversationId: string) =>
-			deps
-				.work!.hostTodosInTransaction(db, conversationId, (row) =>
-					currentResult(db, row.runId),
-				)
-				.map((todo) => {
-					const row = deps.work!.workInTransaction(db, todo.id)!;
-					return {
-						...todo,
-						...(reportPending(deps, db, row)
-							? { reportPending: true as const }
-							: {}),
-					};
-				}),
+			deps.work!.hostTodosInTransaction(db, conversationId),
 		/**
 		 * One page of the conversation's TODOs for display (the TODO screen reads it inside its own read). A finished
-		 * TODO shows its result as it is now, the same one the agency reports.
+		 * TODO shows its result as it is now (a cancel after it finished shows).
 		 */
 		todoPageInTransaction: (
 			db: Database,
@@ -82,15 +62,6 @@ export function createOperationPorts(deps: DialogueDeps) {
 			db: Database,
 			input: Parameters<typeof recordSpontaneousInTransaction>[2],
 		) => recordSpontaneousInTransaction(deps, db, input),
-		/** The finished TODOs a run's reply reported (found by the agent's background update): archived once heard. */
-		archiveReportedInTransaction: (
-			db: Database,
-			input: Parameters<typeof archiveReportedInTransaction>[2],
-		) => archiveReportedInTransaction(deps, db, input),
-		recordMessageHeardInTransaction: (
-			db: Database,
-			input: Parameters<typeof recordMessageHeardInTransaction>[2],
-		) => recordMessageHeardInTransaction(deps, db, input),
 		/** How much of a run's spoken answer reached the user (the voice playback's report). */
 		recordHeardInTransaction: (
 			db: Database,

@@ -79,9 +79,14 @@ test("the work tool's answer is accepted once and the same run resumes the inter
 	expect(prompt).toContain("何秒ですか");
 	expect(h.started.at(-1)!.rootRunId).toBe(second.id);
 	expect(h.started.at(-1)!.input.command.input).toEqual({ seconds: 180 });
-	// The TODO ends with the operation's result.
-	expect(h.todos()).toMatchObject([
+	// The TODO ends with the operation's result, archived as it finishes.
+	expect(h.todos()).toEqual([]);
+	expect(h.archived()).toMatchObject([
 		{ id: todo!.id, status: "done", outcome: "succeeded" },
+	]);
+	// Its notice names the screen registered for the toolchain, so the notice can launch it.
+	expect(h.notices().notices).toMatchObject([
+		{ id: todo!.id, artifactId: "fake.workspace", read: false },
 	]);
 	// The question was answered: the UI can no longer answer it.
 	await expect(
@@ -163,7 +168,8 @@ test("a second answer to the same question is refused: the TODO no longer waits"
 	});
 	await h.say("1分");
 	await until(() => h!.interaction()?.status === "completed");
-	const [done] = h.todos();
+	expect(h.todos()).toEqual([]);
+	const [done] = h.archived();
 	expect(done!.status).toBe("done");
 	h.state.steps.push({
 		calls: [answerCall(done!, { text: "2分" })],
@@ -171,10 +177,10 @@ test("a second answer to the same question is refused: the TODO no longer waits"
 	h.speak("もう答えています。");
 	const starts = h.started.length;
 	await h.say("2分");
-	// Finished work is not answered again: its result stays as reported.
+	// Finished work is archived as it finishes: it is not answered again.
 	expect(lastToolResult()).toMatchObject({
 		ok: false,
-		code: "todo_done",
+		code: "todo_not_found",
 	});
 	expect(h.started).toHaveLength(starts);
 });
@@ -255,8 +261,8 @@ test("an answer the UI gave completes the operation into the TODO that asked the
 		input: { durationSeconds: 180 },
 	});
 	await until(() => h!.interaction()?.status === "completed");
-	await until(() => h!.todos()[0]?.status !== "waiting");
-	expect(h.todos()).toMatchObject([
+	await until(() => h!.todos().length === 0);
+	expect(h.archived()).toMatchObject([
 		{ id: todo!.id, status: "done", outcome: "succeeded" },
 	]);
 });

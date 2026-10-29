@@ -450,6 +450,21 @@ export async function setup(options: SetupOptions = {}) {
 		todos() {
 			return store.read((db) => dialogue.todosInTransaction(db, "main"));
 		},
+		/** The archived TODOs, newest first: finished work is archived as it finishes. */
+		archived() {
+			return store.read(
+				(db) =>
+					dialogue.todoPageInTransaction(db, "main", {
+						state: "archived",
+						pageIndex: 0,
+						pageSize: 50,
+					}).rows,
+			);
+		},
+		/** The finished TODOs' notices, newest first, and the unread count. */
+		notices() {
+			return dialogue.todoNotices(50);
+		},
 		/** The work results the log holds (`work.result` events), in log order: what the owners reported. */
 		results(): ConversationEvent[] {
 			return store

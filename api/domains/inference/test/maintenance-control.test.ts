@@ -1,4 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
+import { REASONING_ALLOWANCE_TOKENS } from "../service/attempt-work";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -147,9 +148,10 @@ test("I01 captures after the source answer was accepted, with its own deadline a
 		new AbortController().signal,
 	);
 	expect(receipt.value).toBe('{"ok":true}');
+	// The answer's limit, and room for the thinking this domain turned on.
 	expect(h.opts()).toMatchObject({
 		contextPolicy: "exact",
-		maxOutputTokens: 2048,
+		maxOutputTokens: 2048 + REASONING_ALLOWANCE_TOKENS,
 	});
 	expect(
 		await h.store.write((db) => h.inference.acceptInTransaction(db, receipt)),
@@ -270,7 +272,7 @@ test("background control binds task authority independently of an expired conver
 		new AbortController().signal,
 	);
 	expect(h.opts()).toMatchObject({
-		maxOutputTokens: 1500,
+		maxOutputTokens: 1500 + REASONING_ALLOWANCE_TOKENS,
 		contextPolicy: "exact",
 	});
 	expect(
