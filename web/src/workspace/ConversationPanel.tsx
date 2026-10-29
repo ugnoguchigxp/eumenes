@@ -17,10 +17,13 @@ export function ConversationPanel({
 	client,
 	store,
 	state,
+	chatHidden = false,
 }: {
 	client: EumenesClient;
 	store: AudioStore;
 	state: WorkspaceState;
+	/** Background mode: the chat stays mounted but hidden, and the background takes input. */
+	chatHidden?: boolean;
 }) {
 	useScreenPresence(client);
 	const resources = usePanelResources(client, state);
@@ -47,7 +50,12 @@ export function ConversationPanel({
 		[settings.data?.general],
 	);
 	return (
-		<section ref={panel} className="chat-panel" aria-label="会話">
+		<section
+			ref={panel}
+			className="chat-panel"
+			data-chat-hidden={chatHidden || undefined}
+			aria-label="会話"
+		>
 			{dragging && (
 				<div className="chat-drop-target" aria-live="polite">
 					画像を追加
@@ -57,6 +65,7 @@ export function ConversationPanel({
 				kind={backgroundKind}
 				spatial={spatial}
 				items={monitored}
+				interactive={chatHidden}
 				active={!settings.isPending}
 				cue={replay.avatarCue ?? voice.avatarCue}
 				phase={

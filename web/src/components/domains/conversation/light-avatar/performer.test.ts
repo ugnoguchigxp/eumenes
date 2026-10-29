@@ -88,3 +88,54 @@ test("consecutive cues of one motion never pick the same variant twice in a row"
 	for (let i = 1; i < picks.length; i++)
 		expect(picks[i]).not.toBe(picks[i - 1]);
 });
+
+test("a touch reaction overlays the motion underneath, which keeps its own time", () => {
+	const plain = createPerformer(),
+		touched = createPerformer();
+	for (const performer of [plain, touched])
+		performer.begin({ variant: "joyful-spin" });
+	expect(touched.react("missing")).toBe(0);
+	const seconds = touched.react("touched-body");
+	expect(seconds).toBeGreaterThan(2);
+	expect(seconds).toBeLessThanOrEqual(2.4);
+	const at = (time: number) =>
+		[plain, touched].map((performer) =>
+			performer.sample(time, "joyful", time, false, quiet),
+		);
+	at(0);
+	const [during, reacting] = at(1);
+	expect(reacting).not.toEqual(during);
+	const [after, recovered] = at(seconds + 0.05);
+	expect(recovered).toEqual(after);
+});
+
+test("a conversation cue fades a touch reaction out within 0.3 seconds", () => {
+	const plain = createPerformer(),
+		touched = createPerformer();
+	touched.react("touched-head");
+	const at = (time: number) =>
+		[plain, touched].map((performer) =>
+			performer.sample(time, "neutral", time, false, quiet),
+		);
+	at(0);
+	at(0.5);
+	for (const performer of [plain, touched]) performer.begin();
+	const [fading, still] = at(0.6);
+	expect(still).not.toEqual(fading);
+	const [after, gone] = at(0.81);
+	expect(gone).toEqual(after);
+});
+
+test("a reaction never drawn is dropped by a cue, so a rebuilt clock cannot amplify it", () => {
+	const plain = createPerformer(),
+		touched = createPerformer();
+	const at = (time: number) =>
+		[plain, touched].map((performer) =>
+			performer.sample(time, "neutral", time, false, quiet),
+		);
+	at(300);
+	touched.react("touched-startle");
+	for (const performer of [plain, touched]) performer.begin();
+	const [after, dropped] = at(0.1);
+	expect(dropped).toEqual(after);
+});

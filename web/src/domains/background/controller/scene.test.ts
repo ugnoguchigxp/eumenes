@@ -183,3 +183,30 @@ test("a model update failure releases the model and leaves the scene failed", ()
 	expect(status).toHaveBeenLastCalledWith("failed");
 	expect(frames.size).toBe(0);
 });
+test("pick finds the object under the pointer within a finger-sized circle and nothing elsewhere", () => {
+	const host = document.createElement("div");
+	vi.spyOn(host, "getBoundingClientRect").mockReturnValue({
+		left: 100,
+		top: 50,
+		width: 800,
+		height: 600,
+	} as DOMRect);
+	const model: SpatialModel = {
+		object: new Group(),
+		update: vi.fn(),
+		bounds: () => ({ radius: 0, depth: 0 }),
+		dispose: vi.fn(),
+	};
+	const scene = createSpatialScene(host, [item()], {
+		models: { test: () => model },
+		onStatus: vi.fn(),
+	});
+	live.push(scene);
+	// The overview centres the origin in the host.
+	expect(scene.pick(500, 350)).toBe("cpu");
+	expect(scene.pick(520, 350)).toBe("cpu");
+	expect(scene.pick(530, 350)).toBeNull();
+	expect(scene.pick(110, 60)).toBeNull();
+	scene.dispose();
+	expect(scene.pick(500, 350)).toBeNull();
+});

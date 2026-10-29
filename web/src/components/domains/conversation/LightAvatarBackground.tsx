@@ -18,17 +18,25 @@ function scheduleIdle(callback: () => void): () => void {
 	return () => window.clearTimeout(id);
 }
 
+type Touch = { id: number; x: number; y: number; hit: boolean };
+
 export function LightAvatarBackground({
 	active,
 	cue = null,
 	phase = "neutral",
+	interactive = false,
 }: {
 	active: boolean;
 	cue?: AvatarCue | null;
 	phase?: "neutral" | "listening" | "thinking";
+	/** Background mode: the chat is hidden, so touching the spirit makes it react. */
+	interactive?: boolean;
 }) {
 	const host = useRef<HTMLDivElement>(null);
 	const playback = useRef<ReturnType<typeof createAvatarPlayback> | null>(null);
+	const avatar = useRef<LightAvatar | null>(null);
+	const [touches, setTouches] = useState<Touch[]>([]);
+	const touchId = useRef(0);
 	const [reduced, setReduced] = useState(
 		() => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
 	);
@@ -78,6 +86,7 @@ export function LightAvatarBackground({
 		};
 		const release = () => {
 			resync.current = null;
+			avatar.current = null;
 			if (model) setBackgroundAvatar(null);
 			observer?.disconnect();
 			disposePlayback();
@@ -139,6 +148,7 @@ export function LightAvatarBackground({
 					model = createLightAvatar(element);
 					if (!model) return;
 					model.canvas.addEventListener("webglcontextlost", contextLost);
+					avatar.current = model;
 					resync.current = sync;
 					setBackgroundAvatar(model);
 					sync();
@@ -187,12 +197,79 @@ export function LightAvatarBackground({
 			(phase === "neutral" ? null : { key: `phase:${phase}`, motion: phase });
 		playback.current?.setCue(latest.current);
 	}, [cue, phase]);
+	useEffect(() => {
+		const element = host.current;
+		if (!active || !interactive || !element) return;
+		let frame = 0;
+		let pointer: { x: number; y: number } | null = null;
+		const hover = () => {
+			frame = 0;
+			if (pointer && avatar.current?.hitTest(pointer.x, pointer.y))
+				element.dataset.touchable = "true";
+			else delete element.dataset.touchable;
+		};
+		const move = (event: PointerEvent) => {
+			if (event.pointerType === "touch") return;
+			pointer = { x: event.clientX, y: event.clientY };
+			frame ||= requestAnimationFrame(hover);
+		};
+		const leave = () => {
+			pointer = null;
+			cancelAnimationFrame(frame);
+			frame = 0;
+			delete element.dataset.touchable;
+		};
+		// While the motion lab drives the model there is no playback: only the light ring shows.
+		const touch = (event: MouseEvent) => {
+			const part =
+				avatar.current?.hitTest(event.clientX, event.clientY) ?? null;
+			if (part) playback.current?.react(part);
+			const rect = element.getBoundingClientRect();
+			const next = {
+				id: ++touchId.current,
+				x: event.clientX - rect.left,
+				y: event.clientY - rect.top,
+				hit: part !== null,
+			};
+			setTouches((current) => [...current.slice(-5), next]);
+		};
+		element.addEventListener("pointermove", move);
+		element.addEventListener("pointerleave", leave);
+		element.addEventListener("click", touch);
+		return () => {
+			element.removeEventListener("pointermove", move);
+			element.removeEventListener("pointerleave", leave);
+			element.removeEventListener("click", touch);
+			leave();
+			setTouches([]);
+		};
+	}, [active, interactive]);
 	return (
-		<div
-			ref={host}
-			className="light-avatar-background"
-			data-avatar-motion={reduced ? "static" : "animated"}
-			aria-hidden="true"
-		/>
+		<>
+			<div
+				ref={host}
+				className="light-avatar-background"
+				data-avatar-motion={reduced ? "static" : "animated"}
+				data-interactive={interactive || undefined}
+				aria-hidden="true"
+			/>
+			{touches.length > 0 && (
+				<div className="light-avatar-touches" aria-hidden="true">
+					{touches.map((touch) => (
+						<span
+							key={touch.id}
+							className="light-avatar-touch"
+							data-hit={touch.hit || undefined}
+							style={{ left: touch.x, top: touch.y }}
+							onAnimationEnd={() =>
+								setTouches((current) =>
+									current.filter((t) => t.id !== touch.id),
+								)
+							}
+						/>
+					))}
+				</div>
+			)}
+		</>
 	);
 }

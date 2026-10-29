@@ -8,6 +8,7 @@ import {
 	variantRate,
 	wrapSpin,
 	type Motion,
+	type MotionVariant,
 	type Pose,
 } from "./clips";
 import { motionById, motionsIn } from "./motions/index";
@@ -27,6 +28,16 @@ export const defaultLayers: AvatarLayers = {
 export type MotionChoice = { variant?: string; rate?: number };
 const fade = 0.7;
 const subdued = new Set(["downcast", "shy", "sleepy"]);
+/** A superseded or interrupted touch reaction fades out this fast. */
+const reactionFade = 0.3;
+type Reaction = {
+	variant: MotionVariant;
+	duration: number;
+	rate: number;
+	/** Set on the first sampled frame, on the display clock. */
+	start: number | null;
+	fadeAt: number | null;
+};
 
 /** Gesture slots on the display clock: deterministic, spaced 15–40 s apart. */
 function createGestureSchedule() {
@@ -59,7 +70,7 @@ function createGestureSchedule() {
 
 /**
  * Composes the layers in order: idle → state/emotion (0.7 s crossfade) → speech overlay
- * → idle gestures → gaze. Spin turns into a short look-back while speaking.
+ * → idle gestures → touch reaction → gaze. Spin turns into a short look-back while speaking.
  */
 export function createPerformer() {
 	const gestureAt = createGestureSchedule();
@@ -73,7 +84,14 @@ export function createPerformer() {
 		/** Per motion: the last (cue, round) seen and how many clips have started. */
 		starts = new Map<string, { key: string; count: number }>(),
 		choice: MotionChoice = {},
-		current = { variant: "", label: "" };
+		current = { variant: "", label: "" },
+		reactions: Reaction[] = [],
+		reactionCount = 0;
+	const fadeReactions = () => {
+		// One never drawn has no start on this clock (a rebuilt playback restarts it): drop it.
+		reactions = reactions.filter((reaction) => reaction.start !== null);
+		for (const reaction of reactions) reaction.fadeAt ??= lastTime;
+	};
 	function clip(id: string, elapsed: number, loop: boolean, seed: number) {
 		const motion = motionById(id);
 		if (!motion) return { pose: {} as Pose, variant: "", label: "" };
@@ -103,6 +121,29 @@ export function createPerformer() {
 			activeMode = null;
 			choice = next;
 			plays++;
+			// A conversation cue takes over from a touch reaction.
+			fadeReactions();
+		},
+		/**
+		 * Overlays a reaction variant on whatever plays; its tracks start and end at rest, so the
+		 * motion underneath keeps its own time. Returns the playing length in seconds, 0 if unknown.
+		 */
+		react(variantId: string): number {
+			for (const motion of motionsIn("reaction")) {
+				const variant = motion.variants.find((v) => v.id === variantId);
+				if (!variant) continue;
+				fadeReactions();
+				const rate = variantRate(++reactionCount);
+				reactions.push({
+					variant,
+					duration: motion.duration,
+					rate,
+					start: null,
+					fadeAt: null,
+				});
+				return motion.duration / rate;
+			}
+			return 0;
 		},
 		current: () => current,
 		sample(
@@ -138,7 +179,22 @@ export function createPerformer() {
 			const idleTarget = mode === "neutral" && !speaking ? 1 : 0;
 			idleWeight += Math.max(-step, Math.min(step, idleTarget - idleWeight));
 			const pose = addPose(sampleIdlePose(time, idleWeight), acting);
-			if (layers.gestures && idleWeight > 0) {
+			const touch: Pose = {};
+			let touching = 0;
+			reactions = reactions.filter((reaction) => {
+				reaction.start ??= time;
+				const local = (time - reaction.start) * reaction.rate;
+				const weight =
+					reaction.fadeAt === null
+						? 1
+						: 1 - (time - reaction.fadeAt) / reactionFade;
+				if (local < 0 || local >= reaction.duration || weight <= 0)
+					return false;
+				addPose(touch, sampleVariant(reaction.variant, local), weight);
+				touching = Math.max(touching, weight);
+				return true;
+			});
+			if (layers.gestures && idleWeight > 0 && touching < 1) {
 				const gesture = gestureAt(time);
 				if (gesture)
 					addPose(
@@ -149,9 +205,10 @@ export function createPerformer() {
 							]!,
 							gesture.local,
 						),
-						idleWeight * idleWeight * (3 - 2 * idleWeight),
+						idleWeight * idleWeight * (3 - 2 * idleWeight) * (1 - touching),
 					);
 			}
+			addPose(pose, touch, mode === "neutral" && !speaking ? 1 : 0.7);
 			if (layers.gaze)
 				addPose(
 					pose,

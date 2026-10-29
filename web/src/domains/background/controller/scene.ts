@@ -2,6 +2,7 @@ import {
 	OrthographicCamera,
 	Scene,
 	SRGBColorSpace,
+	Vector3,
 	WebGLRenderer,
 } from "three";
 import type {
@@ -19,6 +20,46 @@ import {
 import { createPlaceholder } from "../models/placeholder";
 import { createCameraController } from "./camera";
 import { fitEnvelope } from "./placement";
+
+// Pointer targets stay finger-sized however far the camera pulls back.
+const minimumPickRadius = 22;
+const projected = new Vector3();
+
+/** Screen-space circles: points and shader displacement make ray casting unreliable. */
+function pickEntry(
+	entries: ReadonlyMap<string, { model: SpatialModel }>,
+	camera: OrthographicCamera,
+	rect: DOMRect,
+	core: number,
+	clientX: number,
+	clientY: number,
+) {
+	const span = camera.top - camera.bottom;
+	if (!rect.width || !rect.height || !(span > 0)) return null;
+	const perUnit = rect.height / span;
+	let best: string | null = null,
+		bestScore = Infinity,
+		bestDepth = Infinity;
+	for (const [id, { model }] of entries) {
+		projected.copy(model.object.position).project(camera);
+		const x = rect.left + ((projected.x + 1) / 2) * rect.width;
+		const y = rect.top + ((1 - projected.y) / 2) * rect.height;
+		const radius = Math.max(
+			minimumPickRadius,
+			(model.bounds?.(0, core).radius ?? 1.1) * perUnit,
+		);
+		const score = Math.hypot(clientX - x, clientY - y) / radius;
+		if (
+			score <= 1 &&
+			(score < bestScore || (score === bestScore && projected.z < bestDepth))
+		) {
+			best = id;
+			bestScore = score;
+			bestDepth = projected.z;
+		}
+	}
+	return best;
+}
 
 /** One context, one loop, immutable point buffers; the scene owns layout separately from model motion. */
 export function createSpatialScene(
@@ -283,6 +324,17 @@ export function createSpatialScene(
 			settings = normalizeOptions(next);
 			view.begin();
 			synchronize();
+		},
+		pick(clientX: number, clientY: number): string | null {
+			if (disposed) return null;
+			return pickEntry(
+				entries,
+				camera,
+				host.getBoundingClientRect(),
+				Math.min(settings.core, settings.focusCore),
+				clientX,
+				clientY,
+			);
 		},
 		select(id: string | null) {
 			if (disposed) return;

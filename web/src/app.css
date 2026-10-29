@@ -59,7 +59,7 @@ select:focus-visible {
 	gap: 4px 10px;
 	width: fit-content;
 	max-width: calc(
-		100% - 92px - env(safe-area-inset-left, 0px) -
+		100% - 136px - env(safe-area-inset-left, 0px) -
 			env(safe-area-inset-right, 0px)
 	);
 	padding: 8px 12px;
@@ -151,6 +151,70 @@ select:focus-visible {
 	width: 100%;
 	height: 100%;
 	pointer-events: none;
+}
+/* Background mode: the chat stays mounted (draft, scroll, voice) but is hidden; the background takes input. */
+.chat-panel[data-chat-hidden]
+	> :not(
+		.light-avatar-background,
+		.light-avatar-touches,
+		.spatial-container,
+		.subtitle,
+		.chat-drop-target
+	) {
+	visibility: hidden;
+}
+.light-avatar-background[data-interactive] {
+	pointer-events: auto;
+}
+.light-avatar-background[data-touchable] {
+	cursor: pointer;
+}
+.light-avatar-touches {
+	position: absolute;
+	inset: 0;
+	z-index: -1;
+	overflow: hidden;
+	pointer-events: none;
+}
+.light-avatar-touch {
+	position: absolute;
+	width: 64px;
+	height: 64px;
+	margin: -32px 0 0 -32px;
+	border: 2px solid #b3dbff;
+	border-radius: 50%;
+	box-shadow: 0 0 12px #b3dbff;
+	animation: light-avatar-touch 0.6s ease-out forwards;
+}
+.light-avatar-touch[data-hit] {
+	width: 96px;
+	height: 96px;
+	margin: -48px 0 0 -48px;
+	border-color: #ffdca2;
+	box-shadow: 0 0 18px #ffdca2;
+}
+@keyframes light-avatar-touch {
+	from {
+		opacity: 0.9;
+		transform: scale(0.5);
+	}
+	to {
+		opacity: 0;
+		transform: scale(1);
+	}
+}
+@keyframes light-avatar-touch-still {
+	from {
+		opacity: 0.8;
+	}
+	to {
+		opacity: 0;
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	.light-avatar-touch {
+		animation: light-avatar-touch-still 0.4s steps(1, end) forwards;
+	}
 }
 .model-label {
 	min-width: 0;
@@ -642,9 +706,9 @@ select:focus-visible {
 	min-width: 0;
 }
 @media (min-width: 701px) {
-	/* Keep tabs clear of the fixed launcher and notification buttons. */
+	/* Keep tabs clear of the fixed chat toggle, launcher and notification buttons. */
 	.artifact-panel-header .ds-tabs-list {
-		padding-right: calc(104px + env(safe-area-inset-right, 0px));
+		padding-right: calc(148px + env(safe-area-inset-right, 0px));
 	}
 }
 .artifact-panel-header .ds-tabs-list {

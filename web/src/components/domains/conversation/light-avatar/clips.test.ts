@@ -172,3 +172,19 @@ test("variant choice never repeats on consecutive plays", () => {
 		expect(new Set(picks).size).toBe(count);
 	}
 });
+
+test("touch reactions are short overlays with one variant per touched part", () => {
+	const touched = motionById("touched")!;
+	expect(touched.group).toBe("reaction");
+	expect(touched.variants.map((variant) => variant.id)).toEqual([
+		"touched-head",
+		"touched-body",
+		"touched-startle",
+	]);
+	expect(() =>
+		compileMotion({ ...base({}), group: "reaction", duration: 2.4 }),
+	).not.toThrow();
+	expect(() =>
+		compileMotion({ ...base({}), group: "reaction", duration: 9 }),
+	).toThrow("duration");
+});

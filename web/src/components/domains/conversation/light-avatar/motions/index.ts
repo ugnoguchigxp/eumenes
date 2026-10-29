@@ -20,6 +20,7 @@ import stretch from "./stretch.json";
 import surprised from "./surprised.json";
 import sway from "./sway.json";
 import thinking from "./thinking.json";
+import touched from "./touched.json";
 import twirl from "./twirl.json";
 
 /** One file per motion; each is validated when the renderer module loads. */
@@ -41,6 +42,7 @@ export const motions: readonly Motion[] = [
 	stretch,
 	sparkle,
 	sway,
+	touched,
 ].map((data) => compileMotion(data as MotionData));
 const byId = new Map(motions.map((motion) => [motion.id, motion]));
 export const motionById = (id: string) => byId.get(id);

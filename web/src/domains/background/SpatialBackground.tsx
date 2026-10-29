@@ -6,6 +6,7 @@ import {
 	type SpatialState,
 } from "./contracts";
 import { initialSpatialItems } from "./initial-items";
+import { SpatialDetail } from "./SpatialDetail";
 import {
 	defaultSpatialOptions,
 	normalizeOptions,
@@ -39,19 +40,28 @@ export function SpatialBackground({
 	active,
 	items = initialSpatialItems,
 	options: input = defaultSpatialOptions,
+	interactive = false,
 }: {
 	active: boolean;
+	/** Background mode: the chat is hidden, so objects take clicks and show details. */
+	interactive?: boolean;
 	items?: readonly SpatialItem[];
 	options?: Partial<SpatialOptions>;
 }) {
 	const settings = useMemo(() => normalizeOptions(input), [input]);
 	const host = useRef<HTMLDivElement>(null);
+	const detail = useRef<HTMLElement>(null);
 	const scene = useRef<ReturnType<SceneModule["createSpatialScene"]> | null>(
 		null,
 	);
 	const [status, setStatus] = useState<SceneStatus | "loading">("loading");
 	const [retry, setRetry] = useState(0);
 	const [selected, setSelected] = useState<string | null>(null);
+	const [hovered, setHovered] = useState<{
+		id: string;
+		x: number;
+		y: number;
+	} | null>(null);
 	const [demoOverrides, setDemoOverrides] = useState<
 		Record<string, Partial<SpatialState>>
 	>({});
@@ -117,14 +127,83 @@ export function SpatialBackground({
 			scene.current = null;
 		};
 	}, [active, retry]);
+	useEffect(() => {
+		if (!interactive) queueMicrotask(() => setSelected(null));
+	}, [interactive]);
+	useEffect(() => {
+		const element = host.current;
+		if (!active || !interactive || !element) return;
+		let frame = 0;
+		let pointer: { x: number; y: number } | null = null;
+		const hover = () => {
+			frame = 0;
+			if (!pointer) return;
+			const id = scene.current?.pick(pointer.x, pointer.y) ?? null;
+			const rect = element.getBoundingClientRect();
+			setHovered(
+				id ? { id, x: pointer.x - rect.left, y: pointer.y - rect.top } : null,
+			);
+		};
+		const move = (event: PointerEvent) => {
+			if (event.pointerType === "touch") return;
+			pointer = { x: event.clientX, y: event.clientY };
+			frame ||= requestAnimationFrame(hover);
+		};
+		const leave = () => {
+			pointer = null;
+			cancelAnimationFrame(frame);
+			frame = 0;
+			setHovered(null);
+		};
+		// Empty space returns to the overview; another object moves the selection.
+		const click = (event: MouseEvent) =>
+			setSelected(scene.current?.pick(event.clientX, event.clientY) ?? null);
+		element.addEventListener("pointermove", move);
+		element.addEventListener("pointerleave", leave);
+		element.addEventListener("click", click);
+		return () => {
+			element.removeEventListener("pointermove", move);
+			element.removeEventListener("pointerleave", leave);
+			element.removeEventListener("click", click);
+			leave();
+		};
+	}, [active, interactive]);
+	useEffect(() => {
+		if (!interactive || !selected) return;
+		// Menus and dialogs that hold focus keep their own Escape.
+		const escape = (event: KeyboardEvent) => {
+			const focus = document.activeElement;
+			if (
+				event.key === "Escape" &&
+				!event.defaultPrevented &&
+				(!focus || focus === document.body || detail.current?.contains(focus))
+			)
+				setSelected(null);
+		};
+		document.addEventListener("keydown", escape);
+		return () => document.removeEventListener("keydown", escape);
+	}, [interactive, selected]);
 	const selection = displayItems.find((item) => item.id === selected);
-	const override = (next: Partial<SpatialState>) => {
-		if (selection)
-			setDemoOverrides((current) => ({
-				...current,
-				[selection.id]: { ...current[selection.id], ...next },
-			}));
-	};
+	const hoveredItem =
+		interactive && hovered
+			? displayItems.find((item) => item.id === hovered.id)
+			: undefined;
+	const demo =
+		settings.demoEnabled && selection
+			? {
+					override: (next: Partial<SpatialState>) =>
+						setDemoOverrides((current) => ({
+							...current,
+							[selection.id]: { ...current[selection.id], ...next },
+						})),
+					reset: () =>
+						setDemoOverrides((current) => {
+							const next = { ...current };
+							delete next[selection.id];
+							return next;
+						}),
+				}
+			: undefined;
 	return (
 		<div className="spatial-container">
 			<div
@@ -132,11 +211,42 @@ export function SpatialBackground({
 				className="spatial-background"
 				data-background-state={active ? status : "inactive"}
 				data-model-count={displayItems.length}
+				data-interactive={interactive || undefined}
+				data-pointer={hoveredItem ? "item" : undefined}
 				aria-hidden
 			/>
+			{active && hoveredItem && hovered && (
+				<div
+					className="spatial-hover-label"
+					style={{ left: hovered.x + 14, top: hovered.y + 14 }}
+					aria-hidden="true"
+				>
+					{hoveredItem.label} · {healthLabels[hoveredItem.state.health]}
+				</div>
+			)}
+			{active && interactive && selection && status !== "failed" && (
+				<aside
+					ref={detail}
+					className="spatial-detail"
+					aria-label={`${selection.label}の詳細`}
+				>
+					<header>
+						<h2>{selection.label}</h2>
+						<button
+							type="button"
+							aria-label="詳細を閉じる"
+							title="詳細を閉じる"
+							onClick={() => setSelected(null)}
+						>
+							×
+						</button>
+					</header>
+					<SpatialDetail item={selection} demo={demo} />
+				</aside>
+			)}
 			{active && (
 				<div className="spatial-background-controls">
-					{selected && (
+					{selected && !interactive && (
 						<button type="button" onClick={() => setSelected(null)}>
 							全体に戻る
 						</button>
@@ -187,87 +297,7 @@ export function SpatialBackground({
 							{selection && (
 								<div className="spatial-selection-detail">
 									<output>選択中：{selection.label}</output>
-									{selection.state.details?.map((note, index) => (
-										<p key={index}>{note}</p>
-									))}
-									<p>
-										活動：
-										{
-											{ idle: "待機", starting: "準備中", working: "処理中" }[
-												selection.state.activity
-											]
-										}
-										<br />
-										利用率：
-										{selection.state.utilization === undefined
-											? "未取得"
-											: Math.round(selection.state.utilization * 100) + "%"}
-									</p>
-									{settings.demoEnabled && (
-										<fieldset>
-											<legend>このモデルのデモ値</legend>
-											<label>
-												health
-												<select
-													aria-label="health"
-													value={selection.state.health}
-													onChange={(e) =>
-														override({
-															health: e.target.value as SpatialState["health"],
-														})
-													}
-												>
-													{Object.entries(healthLabels).map(([key, label]) => (
-														<option key={key} value={key}>
-															{label}
-														</option>
-													))}
-												</select>
-											</label>
-											<label>
-												活動
-												<select
-													value={selection.state.activity}
-													onChange={(e) =>
-														override({
-															activity: e.target
-																.value as SpatialState["activity"],
-														})
-													}
-												>
-													<option value="idle">待機</option>
-													<option value="starting">準備中</option>
-													<option value="working">処理中</option>
-												</select>
-											</label>
-											<label>
-												利用率
-												<input
-													type="range"
-													min="0"
-													max="100"
-													value={(selection.state.utilization ?? 0) * 100}
-													onChange={(e) =>
-														override({
-															utilization: Number(e.target.value) / 100,
-														})
-													}
-												/>
-											</label>
-											<button
-												type="button"
-												onClick={() =>
-													setDemoOverrides((current) => {
-														const next = { ...current };
-														delete next[selection.id];
-														return next;
-													})
-												}
-											>
-												共通のデモ値に戻す
-											</button>
-										</fieldset>
-									)}
+									<SpatialDetail item={selection} demo={demo} />
 								</div>
 							)}
 						</section>

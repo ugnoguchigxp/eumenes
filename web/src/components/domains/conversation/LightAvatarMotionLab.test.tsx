@@ -44,6 +44,8 @@ const model = () => ({
 	beginMotion: vi.fn(),
 	setLayers: vi.fn(),
 	showSkeleton: vi.fn(),
+	react: vi.fn(() => 0),
+	hitTest: vi.fn(() => null),
 	dispose: vi.fn(),
 	stats: () => ({ variantLabel: "跳ねて1回転" }),
 });

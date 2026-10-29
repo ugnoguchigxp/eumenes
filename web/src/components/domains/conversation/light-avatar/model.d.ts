@@ -30,6 +30,10 @@ export interface LightAvatar {
 	): void;
 	/** Starts a new cue; without a choice the variant and ±10% rate are picked automatically. */
 	beginMotion(choice?: MotionChoice): void;
+	/** Overlays a `reaction` variant on whatever plays; returns its length in seconds, 0 if unknown. */
+	react(variant: string): number;
+	/** Which part of the spirit, as last drawn, lies under a viewport point. */
+	hitTest(clientX: number, clientY: number): "head" | "body" | null;
 	setLayers(layers: Partial<AvatarLayers>): void;
 	showSkeleton(visible: boolean): void;
 	dispose(): void;

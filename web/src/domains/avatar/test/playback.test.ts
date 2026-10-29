@@ -2,7 +2,11 @@ import { expect, test, vi } from "vitest";
 import { createAvatarPlayback } from "..";
 
 function playback(reduced = false) {
-	const model = { render: vi.fn(), beginMotion: vi.fn() };
+	const model = {
+		render: vi.fn(),
+		beginMotion: vi.fn(),
+		react: vi.fn((_variant: string) => 2.4),
+	};
 	const frames = new Map<number, FrameRequestCallback>();
 	let next = 0,
 		clock = 0;
@@ -113,6 +117,7 @@ test("a rendering failure stops the idle loop and reports once", () => {
 	const controller = createAvatarPlayback(
 		{
 			beginMotion() {},
+			react: () => 0,
 			render: () => {
 				throw new Error("context lost");
 			},
@@ -131,4 +136,38 @@ test("a rendering failure stops the idle loop and reports once", () => {
 	controller.redraw();
 	expect(onError).toHaveBeenCalledOnce();
 	expect(frames.size).toBe(0);
+});
+
+test("touches pick the reaction by part, rest 0.6 s, startle on the third within 4 s and draw at 24 fps", () => {
+	const h = playback();
+	h.controller.setCue(null);
+	h.step(0);
+	h.step(100);
+	const idleRenders = h.model.render.mock.calls.length;
+	expect(h.controller.react("head")).toBe(true);
+	expect(h.model.react).toHaveBeenLastCalledWith("touched-head");
+	h.step(141);
+	expect(h.model.render.mock.calls.length).toBe(idleRenders + 1);
+	h.step(183);
+	expect(h.model.render.mock.calls.length).toBe(idleRenders + 2);
+	h.step(500);
+	expect(h.controller.react("body")).toBe(false);
+	h.step(900);
+	expect(h.controller.react("body")).toBe(true);
+	expect(h.model.react).toHaveBeenLastCalledWith("touched-startle");
+	h.step(9000);
+	expect(h.controller.react("body")).toBe(true);
+	expect(h.model.react).toHaveBeenLastCalledWith("touched-body");
+	expect(h.model.react).toHaveBeenCalledTimes(3);
+	h.model.react.mockReturnValueOnce(0);
+	h.step(10000);
+	expect(h.controller.react("head")).toBe(false);
+	h.controller.dispose();
+	expect(h.controller.react("head")).toBe(false);
+});
+
+test("reduced motion never plays a touch reaction", () => {
+	const h = playback(true);
+	expect(h.controller.react("head")).toBe(false);
+	expect(h.model.react).not.toHaveBeenCalled();
 });

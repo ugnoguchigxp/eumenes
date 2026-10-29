@@ -5,8 +5,19 @@ export type AvatarCue = {
 	motion: AvatarMotion;
 	speaking?: boolean;
 };
+/** Reaction variants of the `touched` motion, by what was touched. */
+const reactions = {
+	head: "touched-head",
+	body: "touched-body",
+	repeated: "touched-startle",
+} as const;
+/** Touches inside the rest window keep the reaction; the third within the count window startles. */
+const touchRestMs = 600;
+const touchCountMs = 4000;
 type Model = {
 	beginMotion(): void;
+	/** Returns the reaction's length in seconds, 0 if the variant is unknown. */
+	react(variant: string): number;
 	render(
 		time?: number,
 		motion?: AvatarMotion,
@@ -40,6 +51,9 @@ export function createAvatarPlayback(
 	let speaking = false;
 	let disposed = false;
 	let epoch = 0;
+	let touches: number[] = [],
+		reactedAt = -Infinity,
+		reactingUntil = -Infinity;
 	const stop = () => {
 		epoch++;
 		cancel(frame);
@@ -60,7 +74,10 @@ export function createAvatarPlayback(
 		if (disposed || generation !== epoch) return;
 		if (
 			timestamp - lastFrame >=
-			1000 / (motion === "neutral" && !speaking ? 12 : 24)
+			1000 /
+				(motion === "neutral" && !speaking && timestamp >= reactingUntil
+					? 12
+					: 24)
 		) {
 			lastFrame = timestamp;
 			clock = Math.max(0, (timestamp - origin) / 1000);
@@ -104,6 +121,21 @@ export function createAvatarPlayback(
 			if (disposed) return;
 			const generation = epoch;
 			frame = request((timestamp) => tick(timestamp, generation));
+		},
+		/** A touch on the spirit; returns whether a reaction started (reduced motion never moves). */
+		react(part: "head" | "body") {
+			if (disposed || options.reduced) return false;
+			const at = now();
+			touches = [...touches.filter((t) => at - t < touchCountMs), at];
+			if (at - reactedAt < touchRestMs) return false;
+			const seconds = model.react(
+				touches.length >= 3 ? reactions.repeated : reactions[part],
+			);
+			if (!seconds) return false;
+			reactedAt = at;
+			reactingUntil = at + seconds * 1000;
+			lastFrame = -Infinity;
+			return true;
 		},
 		redraw: draw,
 		dispose() {

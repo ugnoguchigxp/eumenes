@@ -70,19 +70,6 @@
 	border-top: 1px solid var(--border);
 	padding-top: 12px;
 }
-.spatial-selection-detail fieldset {
-	margin: 8px 0;
-	padding: 8px;
-	border: 1px solid var(--border);
-}
-.spatial-selection-detail label {
-	display: grid;
-	gap: 4px;
-	margin-top: 8px;
-}
-.spatial-selection-detail select {
-	width: 100%;
-}
 @media (max-width: 600px) {
 	.spatial-background-controls {
 		right: 8px;
@@ -97,4 +84,120 @@ div.spatial-background {
 	width: 100%;
 	height: 100%;
 	display: block;
+}
+
+/* Background mode: the chat is hidden and objects take pointer input. */
+.spatial-background[data-interactive] {
+	pointer-events: auto;
+}
+.spatial-background[data-pointer="item"] {
+	cursor: pointer;
+}
+.spatial-hover-label {
+	position: absolute;
+	z-index: 4;
+	padding: 3px 8px;
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	color: var(--foreground);
+	background: var(--card);
+	font-size: 0.72rem;
+	white-space: nowrap;
+	pointer-events: none;
+}
+/* Sits in the lane the camera reserves on the right while an object is selected. */
+.spatial-detail {
+	position: absolute;
+	z-index: 4;
+	top: calc(60px + env(safe-area-inset-top, 0px));
+	right: 16px;
+	width: 280px;
+	max-height: calc(100% - 80px);
+	overflow-y: auto;
+	padding: 12px 14px;
+	border: 1px solid var(--border);
+	border-radius: 12px;
+	color: var(--foreground);
+	background: var(--card);
+	font-size: 0.75rem;
+}
+.spatial-detail header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+}
+.spatial-detail h2 {
+	margin: 0;
+	font-size: 0.9rem;
+}
+.spatial-detail header button {
+	width: 28px;
+	height: 28px;
+	padding: 0;
+	border: 0;
+	border-radius: 50%;
+	color: var(--muted-foreground);
+	background: transparent;
+	font-size: 1rem;
+	cursor: pointer;
+}
+.spatial-detail header button:hover {
+	color: var(--foreground);
+	background: var(--accent);
+}
+.spatial-detail-health {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin: 8px 0;
+}
+.spatial-detail-health i {
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+}
+.spatial-detail-source {
+	margin-left: auto;
+	color: var(--muted-foreground);
+}
+.spatial-detail-body dl {
+	display: grid;
+	grid-template-columns: auto 1fr;
+	gap: 4px 12px;
+	margin: 0;
+}
+.spatial-detail-body dt {
+	color: var(--muted-foreground);
+}
+.spatial-detail-body dd {
+	margin: 0;
+}
+.spatial-detail-notes {
+	margin: 10px 0 0;
+	padding: 10px 0 0;
+	border-top: 1px solid var(--border);
+	list-style: none;
+	display: grid;
+	gap: 4px;
+	line-height: 1.6;
+}
+.spatial-detail-body fieldset {
+	margin: 8px 0;
+	padding: 8px;
+	border: 1px solid var(--border);
+}
+.spatial-detail-body label {
+	display: grid;
+	gap: 4px;
+	margin-top: 8px;
+}
+.spatial-detail-body select {
+	width: 100%;
+}
+@media (max-width: 600px) {
+	.spatial-detail {
+		right: 8px;
+		width: 45%;
+	}
 }

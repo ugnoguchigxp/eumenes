@@ -11,6 +11,7 @@ export const motionGroups = {
 	emotion: "感情と仕草",
 	speech: "発話",
 	"idle-gesture": "待機中の仕草",
+	reaction: "触れたときの反応",
 } as const;
 export type MotionGroup = keyof typeof motionGroups;
 const lightChannels = ["energy", "sparkle", "swirl", "core"] as const;
@@ -102,9 +103,9 @@ export function compileMotion(data: MotionData): Motion {
 	};
 	if (!/^[a-z][a-z0-9-]{1,40}$/.test(data.id)) fail("id が不正です");
 	if (!(data.group in motionGroups)) fail("group が不正です");
-	// The playback controller recovers to neutral after 8 seconds.
+	// The playback controller recovers to neutral after 8 seconds; gestures and reactions are short overlays.
 	if (
-		data.group === "idle-gesture"
+		data.group === "idle-gesture" || data.group === "reaction"
 			? !(data.duration >= 1 && data.duration <= 8)
 			: data.duration !== 8
 	)

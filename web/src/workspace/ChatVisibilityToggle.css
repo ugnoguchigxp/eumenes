@@ -1,0 +1,31 @@
+.chat-visibility-trigger {
+	position: fixed;
+	z-index: 11;
+	top: calc(12px + env(safe-area-inset-top, 0px));
+	right: calc(104px + env(safe-area-inset-right, 0px));
+	width: 36px;
+	height: 36px;
+	padding: 0;
+	border: 1px solid var(--border);
+	border-radius: 50%;
+	color: var(--foreground);
+	background: var(--card);
+	box-shadow: none;
+	overflow: visible;
+}
+.chat-visibility-trigger:hover {
+	background: var(--accent);
+}
+/* A warning inside the hidden chat (connection failures and the like) marks the button. */
+.app-shell:has(.chat-panel[data-chat-hidden] [role="alert"])
+	.chat-visibility-trigger::after {
+	content: "";
+	position: absolute;
+	top: -2px;
+	right: -2px;
+	width: 10px;
+	height: 10px;
+	border: 2px solid var(--background);
+	border-radius: 50%;
+	background: var(--destructive);
+}

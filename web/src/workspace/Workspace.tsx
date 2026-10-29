@@ -1,9 +1,10 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useState } from "react";
 import type { EumenesClient } from "../../../client";
 import type { AudioStore } from "../domains/audio";
 import { ArtifactLauncher } from "../components/domains/artifact/ArtifactLauncher";
 import { ResizableWorkspace } from "../components/domains/artifact/ResizableWorkspace";
 import { TimerNotifications } from "../components/domains/timers/TimerNotifications";
+import { ChatVisibilityToggle } from "./ChatVisibilityToggle";
 import { ConversationPanel } from "./ConversationPanel";
 import { SpecialistCloseConfirm } from "./SpecialistCloseConfirm";
 import { SpecialistBridgeContext } from "../domains/toolchain-artifacts/specialist-bridge";
@@ -38,8 +39,20 @@ export function Workspace({
 		artifacts,
 		specialist,
 	} = state;
+	// Background mode is a view state only: a reload shows the chat again.
+	const [chatHidden, setChatHidden] = useState(false);
+	const fullscreen =
+		artifacts.active?.kind === "toolchain" &&
+		artifactIdOf(artifacts.active.artifactRevisionId) ===
+			"settings.service-tests";
 	return (
 		<main className="app-shell">
+			{!fullscreen && (
+				<ChatVisibilityToggle
+					hidden={chatHidden}
+					onToggle={() => setChatHidden((hidden) => !hidden)}
+				/>
+			)}
 			<ArtifactLauncher
 				entries={[
 					{ label: "図を描く・編集する", onSelect: openDrawing },
@@ -71,11 +84,7 @@ export function Workspace({
 				}
 			/>
 			<ResizableWorkspace
-				fullscreen={
-					artifacts.active?.kind === "toolchain" &&
-					artifactIdOf(artifacts.active.artifactRevisionId) ===
-						"settings.service-tests"
-				}
+				fullscreen={fullscreen}
 				artifact={
 					artifacts.tabs.length > 0 ? (
 						<Suspense
@@ -96,7 +105,12 @@ export function Workspace({
 					) : null
 				}
 			>
-				<ConversationPanel client={client} store={store} state={state} />
+				<ConversationPanel
+					client={client}
+					store={store}
+					state={state}
+					chatHidden={chatHidden}
+				/>
 			</ResizableWorkspace>
 			<SpecialistCloseConfirm confirm={specialist.confirm} />
 		</main>

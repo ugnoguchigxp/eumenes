@@ -16,17 +16,21 @@ export function ConversationBackground({
 	kind,
 	spatial,
 	items,
+	interactive = false,
 	...avatar
 }: {
 	kind: BackgroundKind;
 	spatial?: Partial<SpatialOptions>;
 	/** Monitored states for Spatial; absent: its unconfirmed samples. */
 	items?: readonly SpatialItem[];
+	/** Background mode: the chat is hidden and the background takes pointer input. */
+	interactive?: boolean;
 	active: boolean;
 	cue?: AvatarCue | null;
 	phase?: "neutral" | "listening" | "thinking";
 }) {
-	if (kind === "light-fairy") return <LightAvatarBackground {...avatar} />;
+	if (kind === "light-fairy")
+		return <LightAvatarBackground {...avatar} interactive={interactive} />;
 	return (
 		<ErrorBoundary label="background">
 			<Suspense fallback={null}>
@@ -34,6 +38,7 @@ export function ConversationBackground({
 					active={avatar.active}
 					options={spatial}
 					items={items}
+					interactive={interactive}
 				/>
 			</Suspense>
 		</ErrorBoundary>

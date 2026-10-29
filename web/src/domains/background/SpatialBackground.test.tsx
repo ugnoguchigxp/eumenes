@@ -22,6 +22,7 @@ function mockScene() {
 		select: vi.fn(),
 		setItems: vi.fn(),
 		setOptions: vi.fn(),
+		pick: vi.fn((): string | null => null),
 	};
 	vi.mocked(createSpatialScene).mockImplementation(
 		(_host, _items, { onStatus }) => {
@@ -111,4 +112,76 @@ test("fallback details keep the owner-provided measurement quality and history g
 	);
 	expect(screen.getByText("計測権限なし")).toBeTruthy();
 	expect(screen.getByText("過去の履歴に欠落があります")).toBeTruthy();
+});
+
+test("background mode shows a clicked object's details and closes them by empty space, Escape or leaving the mode", async () => {
+	const scene = mockScene();
+	const view = render(<SpatialBackground active interactive />);
+	await waitFor(() => expect(createSpatialScene).toHaveBeenCalledOnce());
+	const host = view.container.querySelector(".spatial-background")!;
+	expect(host.hasAttribute("data-interactive")).toBe(true);
+	scene.pick.mockReturnValue("mac-cpu");
+	fireEvent.click(host, { clientX: 10, clientY: 20 });
+	expect(scene.pick).toHaveBeenLastCalledWith(10, 20);
+	expect(screen.getByRole("complementary", { name: "CPUの詳細" })).toBeTruthy();
+	expect(screen.getAllByText("未確認")).toHaveLength(2);
+	expect(screen.getAllByText("未取得")).toHaveLength(2);
+	await waitFor(() => expect(scene.select).toHaveBeenLastCalledWith("mac-cpu"));
+	scene.pick.mockReturnValue(null);
+	fireEvent.click(host);
+	expect(screen.queryByRole("complementary")).toBeNull();
+	scene.pick.mockReturnValue("mac-ssd");
+	fireEvent.click(host);
+	expect(screen.getByRole("complementary", { name: "SSDの詳細" })).toBeTruthy();
+	const menu = document.createElement("button");
+	document.body.append(menu);
+	menu.focus();
+	fireEvent.keyDown(document, { key: "Escape" });
+	expect(screen.getByRole("complementary", { name: "SSDの詳細" })).toBeTruthy();
+	menu.remove();
+	fireEvent.keyDown(document, { key: "Escape" });
+	expect(screen.queryByRole("complementary")).toBeNull();
+	fireEvent.click(host);
+	fireEvent.click(screen.getByRole("button", { name: "詳細を閉じる" }));
+	expect(screen.queryByRole("complementary")).toBeNull();
+	fireEvent.click(host);
+	view.rerender(<SpatialBackground active interactive={false} />);
+	await waitFor(() => expect(screen.queryByRole("complementary")).toBeNull());
+	expect(host.hasAttribute("data-interactive")).toBe(false);
+	fireEvent.click(host);
+	expect(screen.queryByRole("complementary")).toBeNull();
+});
+
+test("the click panel shows supplied measurements and owner notes", async () => {
+	const scene = mockScene();
+	render(
+		<SpatialBackground
+			active
+			interactive
+			items={[
+				{
+					id: "llm",
+					model: "llm",
+					label: "LLM",
+					position: [0, 0, 0],
+					state: {
+						health: "healthy",
+						activity: "working",
+						stale: false,
+						utilization: 0.63,
+						source: "measurement",
+						observedAt: Date.now(),
+						details: ["取得済み"],
+					},
+				},
+			]}
+		/>,
+	);
+	await waitFor(() => expect(createSpatialScene).toHaveBeenCalledOnce());
+	scene.pick.mockReturnValue("llm");
+	fireEvent.click(document.querySelector(".spatial-background")!);
+	const panel = screen.getByRole("complementary", { name: "LLMの詳細" });
+	for (const text of ["正常", "実測", "処理中", "63%", "取得済み"])
+		expect(panel.textContent).toContain(text);
+	expect(panel.textContent).toMatch(/（\d+秒前）/);
 });
