@@ -236,8 +236,8 @@ export async function buildServices(
 		agency: agency.dialoguePort,
 		conversationAgent: agency.conversationAgent,
 		logFile: () => config.logFile,
-		// The context keeper reads the conversation on its own prompt and connection, and yields to it.
-		keeper: { inference },
+		// The context keeper is off for now (2026-10-29 user instruction, the review fixes design C5): no State of its
+		// own reaches the input, and the recent conversation is cut by the host's fixed rules alone.
 		objectRecognition: enabled
 			? media.objectRecognition.port(CONVERSATION_DEFAULT_PRINCIPAL)
 			: undefined,

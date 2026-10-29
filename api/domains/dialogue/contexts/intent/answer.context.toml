@@ -1,0 +1,2 @@
+# Source: api/domains/dialogue/service/intent-gate.ts
+text = '''- 利用者の今の発言は、担当への依頼ではありません（意図の判定）。担当やツールは使わず、話して返します。'''

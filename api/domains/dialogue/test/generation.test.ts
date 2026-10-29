@@ -127,6 +127,104 @@ test("a second search runs like the first, a call the host cannot read is refuse
 	expect(toolFields(tool[2]!)).toMatchObject({ refused: true });
 });
 
+test("refused calls do not use up the reply: the refusal names the missing field, and the reply's last call keeps the tools with no call allowed", async () => {
+	h = await setup();
+	// A call without its request: refused every time.
+	const unannounced = {
+		name: "delegate",
+		args: { mode: "execute", toolchain: IMAGE.id, impact: "create" },
+	};
+	h.state.steps.push(
+		{ calls: [{ name: "find_toolchain", args: { query: "絵" } }] },
+		...Array.from({ length: 5 }, () => ({ calls: [unannounced] })),
+		{ text: "うまく頼めませんでした。" },
+	);
+	const run = await h.say("夜の絵を描いて");
+	expect(h.dialogue.answerText(run.id)).toBe("うまく頼めませんでした。");
+	// The search and five refusals are the reply's six calls; every call but the last offers them.
+	expect(h.state.calls).toHaveLength(7);
+	const all = ["memory", "find_toolchain", "delegate", "work"];
+	for (const call of h.state.calls) expect(call.tools).toEqual(all);
+	expect(h.state.calls.map((c) => c.session?.toolChoice ?? null)).toEqual([
+		...Array.from({ length: 6 }, () => null),
+		"none",
+	]);
+	const results = h.state.calls
+		.at(-1)!
+		.messages.filter((m) => m.role === "tool")
+		.map((m) => m.content);
+	expect(results).toHaveLength(6);
+	// A call written wrong is told which field is missing and what it may be; nothing of the log's issues.
+	expect(toolFields(results[1]!)).toEqual({
+		refused: true,
+		reason: "invalid_tool_arguments",
+		request: "required（expected string）",
+	});
+	expect(results[1]).not.toContain("validationPath");
+	expect(results.at(-1)).toEndWith(
+		"この返事ではもうツールを使えません。ここまでにわかっていることだけで返事をします。",
+	);
+	expect(results.slice(0, -1).join("\n")).not.toContain(
+		"この返事ではもうツールを使えません",
+	);
+	// It asked a toolchain and nothing was accepted: the selection's output broke the contract.
+	expect(h.state.selections.at(-1)).toMatchObject({ decision: "rejected" });
+});
+
+test("a call that ends cleanly with nothing to say completes the run with no answer; a broken stream still fails it", async () => {
+	h = await setup();
+	h.state.steps.push({ fail: "chat_output_empty" });
+	const silent = await h.say("いやあ、それはそうと、");
+	expect(silent.status).toBe("completed");
+	expect(h.dialogue.answerText(silent.id)).toBeFalsy();
+	h.state.steps.push({ fail: "chat_stream_incomplete" });
+	const broken = await h.say("続きです", "failed");
+	expect(broken.error).toBe("chat_stream_incomplete");
+});
+
+test("a delegation without impact is taken at the toolchain's least impact; on a saved target it is confirmed first", async () => {
+	h = await setup();
+	h.state.steps.push(
+		{ calls: [{ name: "find_toolchain", args: { query: "絵を描く" } }] },
+		{
+			calls: [
+				{
+					name: "delegate",
+					args: {
+						mode: "execute",
+						toolchain: IMAGE.id,
+						request: "猫の絵",
+						target: "s1",
+						announcement: "描きますね。",
+					},
+				},
+			],
+		},
+		{
+			calls: [
+				{
+					name: "delegate",
+					args: {
+						mode: "execute",
+						toolchain: IMAGE.id,
+						request: "猫の絵",
+						announcement: "描きますね。",
+					},
+				},
+			],
+		},
+	);
+	const waiting = await h.say("猫の絵を描いて", "queued");
+	expect(waiting.announcement).toBe("描きますね。");
+	// The first call named a saved target with no impact: taken as changing it, it needs a confirmation.
+	const results = h.state.calls
+		.at(-1)!
+		.messages.filter((m) => m.role === "tool")
+		.map((m) => toolFields(m.content));
+	expect(String(results[1]!.issues)).toContain("confirmation_required");
+	expect(h.todos()).toHaveLength(1);
+});
+
 test("an instant toolchain's answer comes back as the tool result, and makes no TODO", async () => {
 	h = await setup();
 	h.state.steps.push(

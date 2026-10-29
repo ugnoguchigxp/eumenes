@@ -24,6 +24,7 @@ function setup() {
 		watchRun: async () => {},
 		run: async (id) => accepted.get(id)!,
 		cancel: async (id) => accepted.get(id)!,
+		clearRecent: async () => ({ ok: true as const }),
 		runErrorReport: async (id) => ({ runId: id, text: "" }),
 		specialistSession: async () => ({ session: null }),
 		todoNotices: async () => ({ notices: [], unread: 0 }),

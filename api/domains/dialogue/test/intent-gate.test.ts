@@ -8,8 +8,9 @@ import { settings, type Snapshot } from "./harness.fixture";
 
 /**
  * The user-intent judge before the first model call (the intent gate design, sections 5 and 6): `shadow` records it
- * and leaves the routing as it is; `ruri` asks for the search first on a confident `request` and leaves every other
- * label to the model; a failure keeps today's routing; every judgement is recorded with what the model then did.
+ * and leaves the routing as it is; `ruri` asks for the search first on a confident `request`, lets no tool be called
+ * on talk (`chat`, `noise`, `incomplete`) and leaves a reply to work to the model; a failure keeps today's routing;
+ * every judgement is recorded with what the model then did.
  */
 let h: Harness | undefined;
 afterEach(async () => {
@@ -63,6 +64,9 @@ async function start(
 }
 const recorded = (messageId: string) =>
 	h!.store.read((db) => intentJudgmentsOfMessage(db, messageId));
+/** The last section of a call's system part. */
+const lastSection = (call: { messages: Array<{ content: string }> }) =>
+	call.messages[0]!.content.split("\n\n## ").at(-1)!;
 
 test("shadow asks the judge with the newest utterance and the agent's words before it, records it, and routes as today", async () => {
 	const asked = await start({ mode: "shadow" }, async () =>
@@ -76,8 +80,11 @@ test("shadow asks the judge with the newest utterance and the agent's words befo
 		text: "明日の天気を調べて",
 		previousAgent: "こんにちは。",
 	});
-	// The first call of the turn is today's: no tool is required.
+	// The first call of the turn is today's: no tool is required, and the system part states no judgement.
 	expect(h!.state.calls.at(-1)!.session?.toolChoice).toBeUndefined();
+	expect(h!.state.calls.at(-1)!.messages[0]!.content).not.toContain(
+		"## Intent",
+	);
 	await waitFor(() => recorded(run.inputMessageId)[0]?.observedSearch !== null);
 	expect(recorded(run.inputMessageId)).toEqual([
 		expect.objectContaining({
@@ -120,6 +127,11 @@ test("ruri asks for the search first on a confident request: the first call requ
 	);
 	const run = await h!.say("猫の絵を描いて", "queued");
 	expect(h!.state.calls[0]!.session?.toolChoice).toBe("required");
+	// The system part ends with the judgement, in every call of the turn.
+	for (const call of h!.state.calls)
+		expect(lastSection(call)).toBe(
+			"Intent\n- 利用者の今の発言は、担当への依頼です（意図の判定）。担当を探して、今の発言の内容を頼みます。",
+		);
 	// The refused call is answered with its reason; only the first call required a tool, and the model may answer in
 	// words from then on. Here it searches and hands the work over.
 	expect(h!.state.calls[1]!.messages.at(-1)!.content).toContain("search_first");
@@ -134,18 +146,16 @@ test("ruri asks for the search first on a confident request: the first call requ
 	});
 });
 
-test("ruri leaves the routing as it is on a label other than a confident request; the model may still use any tool", async () => {
+test("ruri leaves a reply to work and an unsure request to the model; the model may use any tool", async () => {
 	for (const [choice, request] of [
 		["request", 0.4],
-		["chat", 0.1],
 		["followup", 0.2],
-		["noise", 0],
-		["incomplete", 0.1],
 	] as const) {
 		await start({ mode: "ruri" }, async () => judgment(choice, request));
 		h!.state.steps.push({ text: "はい。" });
 		const run = await h!.say("それで");
 		expect(h!.state.calls[0]!.session?.toolChoice).toBeUndefined();
+		expect(h!.state.calls[0]!.messages[0]!.content).not.toContain("## Intent");
 		expect(recorded(run.inputMessageId)[0]).toMatchObject({
 			choice,
 			finalRoute: "free",
@@ -155,6 +165,42 @@ test("ruri leaves the routing as it is on a label other than a confident request
 	}
 	expect(routeOf(judgment("request", 0.6), 0.6)).toBe("search");
 	expect(routeOf(judgment("request", 0.59), 0.6)).toBe("free");
+});
+
+test("ruri lets no tool be called on talk: the turn's calls keep the tools with no call allowed, and a call that still comes is refused", async () => {
+	for (const choice of ["chat", "noise", "incomplete"] as const) {
+		await start({ mode: "ruri" }, async () => judgment(choice, 0.05));
+		h!.state.steps.push(
+			{ calls: [{ name: "find_toolchain", args: { query: "音楽" } }] },
+			{ text: "こんばんは。" },
+		);
+		const run = await h!.say("こんばんは");
+		expect(h!.dialogue.answerText(run.id)).toBe("こんばんは。");
+		expect(h!.state.calls.map((c) => c.session?.toolChoice)).toEqual([
+			"none",
+			"none",
+		]);
+		expect(lastSection(h!.state.calls[0]!)).toBe(
+			"Intent\n- 利用者の今の発言は、担当への依頼ではありません（意図の判定）。担当やツールは使わず、話して返します。",
+		);
+		expect(h!.state.calls[0]!.tools).toEqual([
+			"memory",
+			"find_toolchain",
+			"delegate",
+			"work",
+		]);
+		expect(h!.state.calls[1]!.messages.at(-1)!.content).toContain(
+			"tools_not_needed",
+		);
+		await waitFor(() => recorded(run.inputMessageId)[0]?.observedSearch === 0);
+		expect(recorded(run.inputMessageId)[0]).toMatchObject({
+			choice,
+			finalRoute: "answer",
+		});
+		await h!.close();
+		h = undefined;
+	}
+	expect(routeOf(judgment("chat", 0.9), 0.6)).toBe("answer");
 });
 
 test("a failed or late judge keeps today's routing and the conversation goes on", async () => {
@@ -179,6 +225,7 @@ test("a failed or late judge keeps today's routing and the conversation goes on"
 		h!.state.steps.push({ text: "晴れです。" });
 		const run = await h!.say("明日の天気は");
 		expect(h!.state.calls[0]!.session?.toolChoice).toBeUndefined();
+		expect(h!.state.calls[0]!.messages[0]!.content).not.toContain("## Intent");
 		expect(recorded(run.inputMessageId)[0]).toMatchObject({
 			mode: "ruri",
 			choice: null,
@@ -232,9 +279,10 @@ test("a judgement belongs to its own run: a cancelled run's judgement stops with
 	expect(h!.state.calls).toEqual([]);
 	h!.state.steps.push({ text: "わかりました。" });
 	const next = await h!.say("やっぱりいいや");
-	expect(h!.state.calls[0]!.session?.toolChoice).toBeUndefined();
+	// Its own judgement (talk) routes it, not the cancelled one's.
+	expect(h!.state.calls[0]!.session?.toolChoice).toBe("none");
 	expect(recorded(next.inputMessageId)).toEqual([
-		expect.objectContaining({ choice: "chat", finalRoute: "free" }),
+		expect.objectContaining({ choice: "chat", finalRoute: "answer" }),
 	]);
 	expect(recorded(first.inputMessageId)).toHaveLength(1);
 });

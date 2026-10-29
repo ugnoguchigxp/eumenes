@@ -28,6 +28,7 @@ import {
 	placeCutInTransaction,
 	withLastMessage,
 } from "./conversation-input";
+import { toolchainTitlesInTransaction } from "./delegate-conversation";
 import { generationTools } from "./generation-tools";
 import { harnessOf, routeConversation } from "./harness";
 import { INPUT_HEADINGS, dataText, lineText, section } from "./input-text";
@@ -281,6 +282,7 @@ export function createPrepare(
 			window,
 			nowMs,
 			pending: pendingIds,
+			history: harness.history,
 		});
 		window = placed.window;
 		if (placed.reason)
@@ -342,15 +344,13 @@ export function createPrepare(
 		];
 		const lastAgent =
 			[...prefix.recent].reverse().find((u) => u.speaker === "agent") ?? null;
-		const lastAt = prefix.recent.at(-1)
-			? Date.parse(prefix.recent.at(-1)!.at)
-			: null;
 		const state = stateText(
 			stateLinesInTransaction(deps, tx, {
 				conversationId,
 				run: current,
 				nowMs,
-				lastAt,
+				lastAt: prefix.lastAt,
+				since: prefix.since,
 				lastAgent,
 				state: deps.conversation.input.latestStateInTransaction(
 					tx,
@@ -389,6 +389,7 @@ export function createPrepare(
 				...(requestId ? { requestId } : {}),
 				harness,
 				messages,
+				toolchainTitles: toolchainTitlesInTransaction(deps, tx),
 				utterances: texts,
 				final,
 				trigger: triggerOf(

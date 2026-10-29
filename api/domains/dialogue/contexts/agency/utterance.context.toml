@@ -1,0 +1,2 @@
+# Source: api/application/agency/host.ts
+text = '''この発話では何も実行されない。作る・調べる・始める・再生すると約束せず、済んだことと尋ねたいことだけを話す。'''

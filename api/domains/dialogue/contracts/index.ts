@@ -229,6 +229,8 @@ export interface ConversationAgentPort {
 		};
 		signal: AbortSignal;
 		onDelta(text: string): void;
+		/** The calls one reply may make in all, refused ones included; the next chat call offers no call. */
+		maxToolCalls: number;
 	}): Promise<{
 		text: string;
 		/** The feeling the reply is said with (voice tone and motion); absent when none was chosen. */

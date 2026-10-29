@@ -96,6 +96,8 @@ export interface GenerateInput {
 	 * `## User`). Tool calls and results are added while it runs.
 	 */
 	messages: ChatMessage[];
+	/** The toolchain titles the system part lists: a reply may name them as they are (not a copy of the system). */
+	toolchainTitles?: string[];
 	/** The texts of the pending utterances `## User` shows, in receipt order. */
 	utterances: string[];
 	final: FinalMessage;

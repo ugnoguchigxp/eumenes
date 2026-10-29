@@ -1,4 +1,4 @@
-import { intentJudgmentsMigration } from "./intent";
+import { intentAnswerRouteMigration, intentJudgmentsMigration } from "./intent";
 import type { Database } from "bun:sqlite";
 import {
 	workMigration,
@@ -398,6 +398,11 @@ export const migrations: readonly Migration[] = [
 		id: "dialogue/0027-intent-judgments",
 		after: ["dialogue/0026-work-notices"],
 		sql: intentJudgmentsMigration,
+	},
+	{
+		id: "dialogue/0028-intent-answer-route",
+		after: ["dialogue/0027-intent-judgments"],
+		sql: intentAnswerRouteMigration,
 	},
 ];
 

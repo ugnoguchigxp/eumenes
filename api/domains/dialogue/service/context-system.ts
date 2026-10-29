@@ -48,6 +48,10 @@ export const SYSTEM_SECTIONS = [
 ] as const;
 export type SystemSection = (typeof SYSTEM_SECTIONS)[number];
 
+/** The toolchain titles as the system part lists them. */
+export const toolchainListing = (titles: readonly string[]) =>
+	titles.join("、");
+
 /**
  * The system part: the agent's parts and the host's rules under their section headings. Each rule says when it
  * applies and stands in one section only, so the text is the same in every call and changes only with the
@@ -91,7 +95,9 @@ export function systemText(
 		],
 		Toolchains: [
 			systemContext("dialogue.contexts.system.toolchains", {
-				titles: toolchainTitles.length ? toolchainTitles.join("、") : "なし",
+				titles: toolchainTitles.length
+					? toolchainListing(toolchainTitles)
+					: "なし",
 			}),
 		],
 		Results: [systemContext("dialogue.contexts.system.results", {})],

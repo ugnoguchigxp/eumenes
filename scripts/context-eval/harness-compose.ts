@@ -164,6 +164,11 @@ const storeOf = (utterances: readonly Utterance[]) =>
 			input: {
 				cutInTransaction: () => null,
 				utterancesAfterInTransaction: () => [...utterances],
+				latestUtterancesInTransaction: (
+					_tx: unknown,
+					_id: string,
+					limit: number,
+				) => utterances.slice(-limit),
 			},
 		},
 	}) as unknown as DialogueDeps;
@@ -203,6 +208,8 @@ export function composeInput(s: Situation): ChatMessage[] {
 					carry: null,
 					cut: null,
 					recent: [],
+					lastAt: null,
+					since: null,
 					memoryItemIds: [],
 				};
 	const state = stateText([

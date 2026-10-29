@@ -58,6 +58,8 @@ export type Call = {
 export type Step = {
 	text?: string;
 	calls?: Array<{ name: string; args: Record<string, unknown> }>;
+	/** The call fails with this code instead (`chat_output_empty`: it ended cleanly with nothing in it). */
+	fail?: string;
 };
 
 export const IMAGE: ToolchainCard = {
@@ -260,6 +262,7 @@ export async function setup(options: SetupOptions = {}) {
 			if (!step) throw new Error("fixture_step_missing");
 			if (state.gate) await state.gate;
 			signal.throwIfAborted();
+			if (step.fail) throw new Error(step.fail);
 			if (step.text) delta(step.text);
 			return receipt(requestId, step);
 		},

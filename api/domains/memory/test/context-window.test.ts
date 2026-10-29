@@ -169,6 +169,66 @@ test("the first read publishes the profile and an unchanged input returns the sa
 	expect(second.profile).toEqual(first.profile);
 });
 
+test("what the agent inferred is shown as an inference, never as the user's own words", async () => {
+	const h = await setup();
+	await h.remember("コーヒーが好き");
+	await saveItem(h.store, h.memory, {
+		conversationId: "c1",
+		messageId: "m1",
+		quote: "コーヒーが好き",
+		kind: "preference",
+		semanticKey: "inferred-key",
+		text: "濃い味を好む",
+		explicit: false,
+	});
+	const window = must(await h.read());
+	const sources = Object.fromEntries(
+		[...window.profile.items, ...window.newMemories].map((item) => [
+			item.text,
+			item.source,
+		]),
+	);
+	expect(sources).toEqual({
+		コーヒーが好き: "user_said",
+		濃い味を好む: "inferred",
+	});
+});
+
+test("a window stored before the sources were told apart is built again, so an inference stops reading as the user's words", async () => {
+	const h = await setup();
+	await saveItem(h.store, h.memory, {
+		conversationId: "c1",
+		messageId: "m1",
+		quote: "コーヒーが好き",
+		kind: "preference",
+		semanticKey: "inferred-key",
+		text: "濃い味を好む",
+		explicit: false,
+	});
+	const first = must(await h.read());
+	// As it was stored before: no format, and every State item the user's own words.
+	await h.store.write((db) => {
+		const row = db
+			.query(
+				"SELECT snapshot FROM memory_context_window WHERE conversation_id = 'c1'",
+			)
+			.get() as { snapshot: string };
+		const old = JSON.parse(row.snapshot) as Record<string, unknown> & {
+			profile: { items: Array<{ source: string }> };
+		};
+		delete old.format;
+		for (const item of old.profile.items) item.source = "user_said";
+		db.query(
+			"UPDATE memory_context_window SET snapshot = ?, build_id = 'before' WHERE conversation_id = 'c1'",
+		).run(JSON.stringify(old));
+	});
+	const rebuilt = must(await h.read());
+	expect(rebuilt.version).toBe(first.version + 1);
+	expect(rebuilt.profile.items.map((item) => item.source)).toEqual([
+		"inferred",
+	]);
+});
+
 test("an empty memory has an empty profile and is not treated as unavailable", async () => {
 	const h = await setup();
 	const window = must(await h.read());

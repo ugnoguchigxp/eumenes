@@ -7,13 +7,15 @@ import {
 	RECENT,
 	keepNewestCut,
 	memoryLines,
+	placeCutInTransaction,
 	recentMessages,
+	systemDigestOf,
 	recentUtterances,
 	withLastMessage,
 	type ConversationPrefix,
 } from "../service/conversation-input";
 import { dataText, fitLines, jstNowLine } from "../service/input-text";
-import { cloudHarness } from "../service/harness";
+import { cloudHarness, localHarness } from "../service/harness";
 import { resultText, toolResultText } from "../service/result-text";
 import { estimateTextTokens } from "../../../infrastructure/context-budget";
 
@@ -183,12 +185,11 @@ test("`## Memory` holds the leanings only, with source and date, within its boun
 		item("p1", "preference", "ピアノの曲が好き"),
 		item("p2", "personal_fact", "住所は鎌倉"),
 		item("p3", "tendency", "夜は静かな曲を聴く"),
+		{ ...item("p4", "preference", "元気が出る曲を好む"), source: "inferred" },
 	]);
-	expect(lines).toEqual([
-		"- ピアノの曲が好き（本人の発言、10-20から）",
-		"- 夜は静かな曲を聴く（観察、10-20から）",
-	]);
-	expect(ids).toEqual(["p1", "p3"]);
+	// The user's own words only: an inference or an observation is not shown as a fact (C4).
+	expect(lines).toEqual(["- ピアノの曲が好き（本人の発言、10-20から）"]);
+	expect(ids).toEqual(["p1"]);
 	const many = Array.from({ length: 200 }, (_, i) =>
 		item(`x${i}`, "preference", `好きなもの${i}番目の長めの説明`),
 	);
@@ -208,6 +209,8 @@ test("the last message joins a trailing user message and carries `## Memory` whe
 			tools: [],
 			cut: null,
 			recent: [],
+			lastAt: null,
+			since: null,
 			memoryItemIds: [],
 		}) as ConversationPrefix;
 	expect(
@@ -434,4 +437,75 @@ test("the keeper's operations apply by the numbers shown; a rule broken anywhere
 	expect(
 		applyKeeperOutput(before, { ops: tooMany }, candidates, points),
 	).toBeNull();
+});
+
+test("after a gap nothing said before stays, even when the memory or the system part changed meanwhile", () => {
+	const nowMs = Date.parse("2026-10-29T13:51:00.000Z");
+	const system = "## Role\n- 執事です。";
+	const said = (
+		seq: number,
+		speaker: "user" | "agent",
+		minutesAgo: number,
+	) => ({
+		conversationId: "c1",
+		seq,
+		speaker,
+		text: `${speaker}${seq}`,
+		messageId: `m${seq}`,
+		at: new Date(nowMs - minutesAgo * 60_000).toISOString(),
+		toolCalls: [],
+		notice: null,
+	});
+	const shown = [
+		said(96, "agent", 75),
+		said(97, "user", 74),
+		said(98, "user", 73),
+		said(99, "agent", 72),
+	];
+	for (const changed of [
+		{ memoryDigest: "the memory before the restart" },
+		{ systemDigest: "another system part" },
+		{ due: "forgotten" },
+	]) {
+		const written: number[] = [];
+		let dropped = 0;
+		const deps = {
+			conversation: {
+				input: {
+					cutInTransaction: () => ({
+						seq: 95,
+						revision: 1,
+						systemDigest: systemDigestOf(system),
+						memoryDigest: "",
+						due: null,
+						at: "2026-10-29T12:00:00.000Z",
+						...changed,
+					}),
+					utterancesAfterInTransaction: () => shown,
+					dropStatesInTransaction: () => {
+						dropped++;
+					},
+					writeCutInTransaction: (
+						_tx: unknown,
+						_id: string,
+						cut: { seq: number },
+					) => {
+						written.push(cut.seq);
+						return { ...cut, revision: 1, due: null };
+					},
+				},
+			},
+		} as unknown as Parameters<typeof placeCutInTransaction>[0];
+		const placed = placeCutInTransaction(deps, {} as never, "c1", {
+			system,
+			window: null,
+			nowMs,
+			pending: new Set(),
+			history: localHarness.history,
+		});
+		expect(placed.reason).toBe("resumed");
+		expect(written).toEqual([99]);
+		// What the context keeper made of the earlier words goes with them.
+		expect(dropped).toBe(1);
+	}
 });

@@ -47,6 +47,8 @@ export type WindowInputs = {
  * re-construction (`republishInTransaction`) or an immediate change; additions wait in `newMemories` meanwhile.
  */
 export type WindowSnapshot = {
+	/** How the items are drawn (`WINDOW_FORMAT`): a snapshot of another form is built again on its next read. */
+	format: number;
 	conversationId: string;
 	version: number;
 	buildId: string;
@@ -66,6 +68,8 @@ export type WindowSnapshot = {
 };
 
 const CONTRACT_VERSION = 1 as const;
+/** 2: a State item's source follows its origin (an inference is not the user's own words). */
+const WINDOW_FORMAT = 2;
 
 /** The package's change counter for the shared profile: it moves whenever State there changes. */
 function latestStateChange(db: Database, policyRevision: string): number {
@@ -149,7 +153,11 @@ function currentItems(db: Database, policyRevision: string, nowMs: number) {
 				kind: item.kind,
 				text: item.value.text.replace(/\s+/g, " ").trim(),
 				negated: item.value.polarity === "negated",
-				source: "user_said",
+				// What the user confirmed or edited is theirs; what the agent inferred is shown as an inference.
+				source:
+					item.origin === "user_confirmed" || item.origin === "user_edited"
+						? "user_said"
+						: "inferred",
 				...(since ? { since } : {}),
 				...(until ? { until } : {}),
 				revision: item.revision,
@@ -246,8 +254,8 @@ export function createContextWindowStore(deps: {
 		const row = readWindowRow(db, conversationId);
 		if (!row) return null;
 		const parsed = JSON.parse(row.snapshot) as WindowSnapshot;
-		// Built before the profile carried its items: the next read builds it again.
-		if (!parsed.profile) return null;
+		// Built before the profile carried its items, or drawn in another form: the next read builds it again.
+		if (!parsed.profile || parsed.format !== WINDOW_FORMAT) return null;
 		cache.set(conversationId, parsed);
 		return parsed;
 	}
@@ -306,6 +314,7 @@ export function createContextWindowStore(deps: {
 			(item) => published.get(item.id) !== item.revision,
 		);
 		const snapshot: WindowSnapshot = {
+			format: WINDOW_FORMAT,
 			conversationId,
 			version: (readWindowKey(db, conversationId)?.version ?? 0) + 1,
 			buildId: id(),

@@ -285,7 +285,7 @@ function candidateLine(candidate: Candidate): string {
 		text(candidate.execution)
 			? `execution: ${text(candidate.execution)}`
 			: null,
-		text(candidate.minImpact) ? `影響: ${text(candidate.minImpact)}` : null,
+		text(candidate.minImpact) ? `impact: ${text(candidate.minImpact)}` : null,
 		Array.isArray(candidate.produces) && candidate.produces.length
 			? `作るもの: ${candidate.produces.map(String).join("・")}`
 			: null,
@@ -344,8 +344,41 @@ export function toolResultText(name: string, result: unknown): string {
 		: "- なし";
 }
 
+/**
+ * A call the host refused for its arguments, as the model reads it: the reason, then one line per field to repair,
+ * named by its path, with what is wrong and what it may be (`- impact: required（none・create・…）`).
+ */
+export function refusalText(
+	reason: string,
+	fields: ReadonlyArray<
+		Record<string, unknown> & { path: string; code: string }
+	>,
+): string {
+	const list = (value: unknown) =>
+		Array.isArray(value)
+			? value.map((v) => lineText(String(v))).join("・")
+			: null;
+	return [
+		"- refused: true",
+		`- reason: ${reason}`,
+		...fields.map((field) => {
+			const details = [
+				list(field.allowed),
+				list(field.keys),
+				typeof field.expected === "string"
+					? `expected ${field.expected}`
+					: null,
+				typeof field.maximum === "number" ? `max ${field.maximum}` : null,
+				typeof field.minimum === "number" ? `min ${field.minimum}` : null,
+			].filter((detail): detail is string => !!detail);
+			return `- ${lineText(field.path) || "arguments"}: ${field.code}${details.length ? `（${details.join("、")}）` : ""}`;
+		}),
+	].join("\n");
+}
+
 const MEMORY_SOURCES: Record<string, string> = {
 	user_said: "本人の発言",
+	inferred: "推測",
 	observed: "観察",
 };
 

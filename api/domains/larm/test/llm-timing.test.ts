@@ -214,6 +214,29 @@ test("a failed read logs outcome=error with known timings, usage only when prese
 		expect(JSON.stringify(lines)).not.toContain(text);
 });
 
+test("a stop after reasoning alone logs empty_output with the reasoning's length, never its text", async () => {
+	const lines = capture();
+	const timing = startLlmTiming("SAAA", messages, window, undefined, () => {});
+	const failure = await timing
+		.read(
+			sse(
+				'{"choices":[{"delta":{"reasoning_content":"secret-thought"}}]}',
+				'{"choices":[{"delta":{"content":" "},"finish_reason":"stop"}]}',
+				"[DONE]",
+			),
+			new AbortController().signal,
+		)
+		.catch((error) => error);
+	expect((failure as Error).message).toBe("chat_output_empty");
+	expect(timings(lines)[0]).toMatchObject({
+		outcome: "error",
+		finishReason: "stop",
+		streamFailure: "empty_output",
+		reasoningChars: "secret-thought".length,
+	});
+	expect(JSON.stringify(lines)).not.toContain("secret-thought");
+});
+
 test("a failure before any response is logged once; abort is distinguished from error", async () => {
 	const lines = capture();
 	const failed = startLlmTiming("SAAA", messages, window, undefined, undefined);
@@ -287,7 +310,7 @@ test("a logging failure never replaces the inference result or error", async () 
 		const error = await bad
 			.read(sse("[DONE]"), new AbortController().signal)
 			.catch((e) => e);
-		expect((error as Error).message).toBe("chat_stream_incomplete");
+		expect((error as Error).message).toBe("chat_output_empty");
 	} finally {
 		warn.mockRestore();
 		info.mockRestore();

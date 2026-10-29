@@ -343,11 +343,14 @@ export async function delegate(
 		...(args.target ? { target: args.target } : {}),
 		...(args.resolveUnsaved ? { resolveUnsaved: args.resolveUnsaved } : {}),
 	};
+	// A call without `impact` (a local model often leaves it out) is not refused: a request on a saved target is
+	// taken as changing it, anything else as no change of its own (the review fixes design, D7).
+	const declared = args.impact ?? (args.target ? "modify_existing" : "none");
 	// The toolchain's declared least impact raises the conversation's estimate, never lowers it (section 6.7).
 	const impact =
 		IMPACT_ORDER[
 			Math.max(
-				IMPACT_ORDER.indexOf(args.impact),
+				IMPACT_ORDER.indexOf(declared),
 				card.minImpact ? IMPACT_ORDER.indexOf(card.minImpact) : 0,
 			)
 		]!;

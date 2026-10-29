@@ -243,6 +243,23 @@ describe("agency LLM port", () => {
 		expect(c).toMatchObject({ reasonCode: "inference_failed" });
 	});
 
+	test("a call that yielded to the foreground is not tried again at once", async () => {
+		const yielded = harness({
+			execute: async () => {
+				throw new Error("larm_preempted");
+			},
+		});
+		const error = await yielded.port
+			.complete(request(), new AbortController().signal)
+			.catch((e) => e);
+		// An abort from below: the core neither retries it nor counts it toward quarantine.
+		expect(error).not.toBeInstanceOf(LlmCallError);
+		expect(error).toMatchObject({
+			name: "AbortError",
+			message: "larm_preempted",
+		});
+	});
+
 	test("a capture refusal of inference is a non-retryable call error", async () => {
 		const h = harness();
 		const port = createAgencyLlmPort({

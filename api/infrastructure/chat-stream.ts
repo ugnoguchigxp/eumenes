@@ -59,6 +59,8 @@ export type ChatDiagnostics = ProviderTimings & {
 	promptTokens?: number;
 	completionTokens?: number;
 	cachedTokens?: number;
+	/** Characters of the provider's reasoning deltas: tells a thought-only stop from a silent one. Never the text. */
+	reasoningChars?: number;
 };
 function usageCounts(usage: Record<string, unknown> | undefined) {
 	const details = usage?.prompt_tokens_details;
@@ -118,6 +120,7 @@ export async function readChatResponse(
 		data: string[] = [],
 		text = "",
 		bytes = 0,
+		reasoningChars = 0,
 		done = false;
 	let usage: Record<string, unknown> | undefined;
 	let observedUsage: Pick<
@@ -186,8 +189,18 @@ export async function readChatResponse(
 			timings?: unknown;
 			choices?: Array<{
 				index?: number;
-				delta?: { content?: unknown; tool_calls?: unknown };
-				message?: { content?: unknown; tool_calls?: unknown };
+				delta?: {
+					content?: unknown;
+					tool_calls?: unknown;
+					reasoning_content?: unknown;
+					reasoning?: unknown;
+				};
+				message?: {
+					content?: unknown;
+					tool_calls?: unknown;
+					reasoning_content?: unknown;
+					reasoning?: unknown;
+				};
 				finish_reason?: string;
 			}>;
 		};
@@ -210,10 +223,11 @@ export async function readChatResponse(
 				? (choice.finish_reason as NonNullable<ChatDiagnostics["finishReason"]>)
 				: "unknown";
 		}
-		content(streaming ? choice?.delta?.content : choice?.message?.content);
-		toolCalls(
-			streaming ? choice?.delta?.tool_calls : choice?.message?.tool_calls,
-		);
+		const part = streaming ? choice?.delta : choice?.message;
+		const thought = part?.reasoning_content ?? part?.reasoning;
+		if (typeof thought === "string") reasoningChars += thought.length;
+		content(part?.content);
+		toolCalls(part?.tool_calls);
 		if (choice?.finish_reason === "length") truncated ??= "output_limit";
 		if (choice?.finish_reason === "content_filter")
 			truncated ??= "content_filter";
@@ -251,7 +265,12 @@ export async function readChatResponse(
 			(!options.readAhead && (truncated || (!text.trim() && !calls.size)))
 		) {
 			streamFailure = truncated ?? (!done ? "missing_end" : "empty_output");
-			throw new Error("chat_stream_incomplete");
+			// A stream that ended cleanly with nothing in it is the model saying nothing, not a broken stream.
+			throw new Error(
+				streamFailure === "empty_output"
+					? "chat_output_empty"
+					: "chat_stream_incomplete",
+			);
 		}
 		const native = [...calls.entries()]
 			.sort(([a], [b]) => a - b)
@@ -290,6 +309,7 @@ export async function readChatResponse(
 				...(finishReason ? { finishReason } : {}),
 				streamDone: done ? 1 : 0,
 				...(streamFailure ? { streamFailure } : {}),
+				...(reasoningChars ? { reasoningChars } : {}),
 			});
 		} catch {
 			// Observation must never replace the result, cancellation or original error.

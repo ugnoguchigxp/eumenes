@@ -12,16 +12,16 @@ afterEach(async () => {
 	for (const close of cleanup.splice(0)) await close();
 });
 
-test("the judge starts in shadow without a profile, and an older document reads the same", async () => {
+test("the judge starts in ruri without a profile (so nothing is asked until one is saved), and an older document reads the same", async () => {
 	const h = await setup();
 	expect(h.settings.get().intent).toEqual({
-		mode: "shadow",
+		mode: "ruri",
 		timeoutMs: 1500,
 		searchScore: 0.6,
 	});
 	const older = structuredClone(h.settings.get()) as Record<string, unknown>;
 	delete older.intent;
-	expect(settingsSchema.parse(older).intent.mode).toBe("shadow");
+	expect(settingsSchema.parse(older).intent.mode).toBe("ruri");
 });
 
 test("a change of the judge's settings moves the revision and leaves the LARM settings as they were", async () => {
@@ -73,15 +73,15 @@ test("the API reads and changes the judge's settings", async () => {
 	const app = new Hono();
 	registerSettings(app, h.settings);
 	expect(await (await app.request("/api/settings/intent")).json()).toEqual({
-		mode: "shadow",
+		mode: "ruri",
 		timeoutMs: 1500,
 		searchScore: 0.6,
 	});
 	const put = await app.request("/api/settings/intent", {
 		method: "PUT",
-		body: JSON.stringify({ mode: "ruri", timeoutMs: 800 }),
+		body: JSON.stringify({ mode: "shadow", timeoutMs: 800 }),
 	});
 	expect(put.status).toBe(200);
-	expect(await put.json()).toMatchObject({ mode: "ruri", timeoutMs: 800 });
-	expect(h.settings.get().intent.mode).toBe("ruri");
+	expect(await put.json()).toMatchObject({ mode: "shadow", timeoutMs: 800 });
+	expect(h.settings.get().intent.mode).toBe("shadow");
 });

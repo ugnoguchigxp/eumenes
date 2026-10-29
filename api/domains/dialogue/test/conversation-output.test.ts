@@ -158,6 +158,28 @@ test("a tool name followed by a parenthesis in prose is not a call", () => {
 	expect(visible.join("")).toBe(text);
 });
 
+test("the toolchain titles the system lists may be said as they are; the rule around them is still checked", () => {
+	const titles = ["音楽ライブラリの再生と管理", "イメージ画像の生成と編集"];
+	const system = [
+		"## Toolchains",
+		`- 依頼できる担当: ${titles.join("、")}。何ができるかを聞かれたときに答えるための一覧で、一覧にあっても探します。`,
+	].join("\n");
+	const answer = `できることは、${titles.join("、")}です。`;
+	expect(() =>
+		conversationOutput(() => {}, generationTools, system, titles).finish(
+			answer,
+		),
+	).not.toThrow();
+	expect(() =>
+		conversationOutput(() => {}, generationTools, system).finish(answer),
+	).toThrow("system_text_copied");
+	expect(() =>
+		conversationOutput(() => {}, generationTools, system, titles).finish(
+			"何ができるかを聞かれたときに答えるための一覧です。",
+		),
+	).toThrow("system_text_copied");
+});
+
 test("an answer that copies a line of the system part fails as it streams, and an ordinary answer passes", () => {
 	const system = [
 		"## Results",

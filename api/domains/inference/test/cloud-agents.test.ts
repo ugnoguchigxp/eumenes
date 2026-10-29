@@ -202,6 +202,48 @@ test("agent tool calls are forwarded to the conversation", async () => {
 	]);
 });
 
+test("a call that may make no tool call reaches the agent without tools (the SDKs take no tool choice)", async () => {
+	const sent: Array<CloudAgentCall["tools"]> = [];
+	const { env } = fakeEnv({
+		async run(call) {
+			sent.push(call.tools);
+			return { text: "わかっていることだけお伝えします。" };
+		},
+	});
+	const tools = [
+		{
+			type: "function" as const,
+			function: {
+				name: "web_search",
+				description: "search",
+				parameters: { type: "object", properties: {}, required: [] },
+			},
+		},
+	];
+	const connection = {
+		id: connectionId,
+		kind: "codex-sdk" as const,
+		name: "codex",
+		baseUrl: "https://api.openai.com/v1",
+		enabled: true,
+		epoch: 0,
+		envRef: null,
+	};
+	for (const toolChoice of [undefined, "none"] as const)
+		await cloudRequest(
+			env,
+			row,
+			[{ role: "user", content: "search x" }],
+			connection,
+			resource,
+			new AbortController().signal,
+			"attempt",
+			undefined,
+			{ tools, onToolCalls: () => {}, ...(toolChoice ? { toolChoice } : {}) },
+		);
+	expect(sent).toEqual([tools, undefined]);
+});
+
 test("a Codex choice streams only its decoded reply, growing monotonically", () => {
 	const reply = 'こんにちは\n"引用" 😀 end';
 	const full = JSON.stringify({ reply, tool: null });

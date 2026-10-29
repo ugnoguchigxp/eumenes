@@ -3,7 +3,7 @@
   "artifactVersion": 2,
   "compilerVersion": "0.1.2",
   "releaseProfile": "application",
-  "policyDigest": "sha256:128b367a7eb2f55f4eb3666e6f2c1b9ffe1c408d2e7b013af79c795b37f5642b",
+  "policyDigest": "sha256:6483f8111af6b165e022c87ac651159edd0a9fc13dc14025d39e2139635fddf2",
   "createdFrom": {
     "configPath": "s11tnext.config.toml",
     "sourceFiles": [
@@ -38,9 +38,13 @@
       "api/domains/capabilities/contexts/web-research/body-5.context.toml",
       "api/domains/capabilities/contexts/web-research/body.context.toml",
       "api/domains/coding-supervision/contexts/prompt/supervisor-instruction.context.toml",
+      "api/domains/dialogue/contexts/agency/utterance.context.toml",
       "api/domains/dialogue/contexts/context-eval/judge-rules.context.toml",
       "api/domains/dialogue/contexts/context-keeper/task.context.toml",
+      "api/domains/dialogue/contexts/generation-loop/tool-limit.context.toml",
       "api/domains/dialogue/contexts/generation-prepare/specialist-switch.context.toml",
+      "api/domains/dialogue/contexts/intent/answer.context.toml",
+      "api/domains/dialogue/contexts/intent/search.context.toml",
       "api/domains/dialogue/contexts/specialist-turn/correction.context.toml",
       "api/domains/dialogue/contexts/specialist-turn/reference.context.toml",
       "api/domains/dialogue/contexts/specialist-turn/rules.context.toml",
@@ -1102,6 +1106,39 @@
       "definitionHash": "sha256:b5c943f3dc85478a4050323ac838fc1754054fc3ea2ccd96ce65eab09a5d2921",
       "releaseDigest": "sha256:7b5521acd027f8b170afbf5d939a033a31853c0560b0cca7e5c63a2ceb442b8f"
     },
+    "dialogue.contexts.agency.utterance": {
+      "key": "dialogue.contexts.agency.utterance",
+      "owner": "unowned",
+      "contentKind": "text",
+      "messageRole": "system",
+      "sourceLocale": "ja-JP",
+      "requiredLocales": [
+        "ja-JP"
+      ],
+      "variables": {},
+      "locales": {
+        "ja-JP": {
+          "sections": [
+            {
+              "id": "context.text",
+              "kind": "instruction",
+              "severity": "must",
+              "optimizable": false,
+              "omitIfEmpty": false,
+              "segments": [
+                {
+                  "type": "literal",
+                  "value": "この発話では何も実行されない。作る・調べる・始める・再生すると約束せず、済んだことと尋ねたいことだけを話す。"
+                }
+              ]
+            }
+          ],
+          "artifactHash": "sha256:0d5ff20e8a7fc257511b0b1e4b4abc05dd9c88d5bbd5288d40658d565f888193"
+        }
+      },
+      "definitionHash": "sha256:b6741afdc8233ebcdfb3ff9d335a7104eb2f720374645f4011fb3fbfbfcb70b2",
+      "releaseDigest": "sha256:9ac3f43b74702dd48102e0cec7024e32c187a0d77e078c83151a49331c7f1bb6"
+    },
     "dialogue.contexts.context-eval.judge-rules": {
       "key": "dialogue.contexts.context-eval.judge-rules",
       "owner": "unowned",
@@ -1168,6 +1205,39 @@
       "definitionHash": "sha256:3689039b3cd832af975cf20b5565737a01f5f0de13243dcccb93e5b25b66462b",
       "releaseDigest": "sha256:a230a0a60d751df99603c1a34d8e03b69e76c7e04bd795c59fa9e761526c065c"
     },
+    "dialogue.contexts.generation-loop.tool-limit": {
+      "key": "dialogue.contexts.generation-loop.tool-limit",
+      "owner": "unowned",
+      "contentKind": "text",
+      "messageRole": "system",
+      "sourceLocale": "ja-JP",
+      "requiredLocales": [
+        "ja-JP"
+      ],
+      "variables": {},
+      "locales": {
+        "ja-JP": {
+          "sections": [
+            {
+              "id": "context.text",
+              "kind": "instruction",
+              "severity": "must",
+              "optimizable": false,
+              "omitIfEmpty": false,
+              "segments": [
+                {
+                  "type": "literal",
+                  "value": "- この返事ではもうツールを使えません。ここまでにわかっていることだけで返事をします。"
+                }
+              ]
+            }
+          ],
+          "artifactHash": "sha256:01dae9dc3f16ca382eebb46d8b8495fae73d48c3e7d3a5c3e8e95319bdcfb20d"
+        }
+      },
+      "definitionHash": "sha256:dbdedd432fc33de5047de76a4eb8e861324b5ca33c1d1aecafbf28c9f1c7d6ec",
+      "releaseDigest": "sha256:34e98a35aa9dbb949754acc53ab45b405c7a2ba1727eb92eaf3d46443731d66e"
+    },
     "dialogue.contexts.generation-prepare.specialist-switch": {
       "key": "dialogue.contexts.generation-prepare.specialist-switch",
       "owner": "unowned",
@@ -1200,6 +1270,72 @@
       },
       "definitionHash": "sha256:a24cebb5793a03ed8dc4d15220fee57c3a41be17407a9a1bd667103f486ca294",
       "releaseDigest": "sha256:968c2c58dd37ad96e88efabc29ae10c77d61590e34148be0e8689f476b1a1f05"
+    },
+    "dialogue.contexts.intent.answer": {
+      "key": "dialogue.contexts.intent.answer",
+      "owner": "unowned",
+      "contentKind": "text",
+      "messageRole": "system",
+      "sourceLocale": "ja-JP",
+      "requiredLocales": [
+        "ja-JP"
+      ],
+      "variables": {},
+      "locales": {
+        "ja-JP": {
+          "sections": [
+            {
+              "id": "context.text",
+              "kind": "instruction",
+              "severity": "must",
+              "optimizable": false,
+              "omitIfEmpty": false,
+              "segments": [
+                {
+                  "type": "literal",
+                  "value": "- 利用者の今の発言は、担当への依頼ではありません（意図の判定）。担当やツールは使わず、話して返します。"
+                }
+              ]
+            }
+          ],
+          "artifactHash": "sha256:5107f4b862d0872def4f9d184ee44e2893ed1f745f3cfbc2eea7064df4048d07"
+        }
+      },
+      "definitionHash": "sha256:cddb008d23734a7d4eddfffba4b9e656e149c86079cef1a0e7438ba6c7740c89",
+      "releaseDigest": "sha256:405fb573480e98315fc0f592161ab3abb7cf3cb47477233b024c107b5b8d509d"
+    },
+    "dialogue.contexts.intent.search": {
+      "key": "dialogue.contexts.intent.search",
+      "owner": "unowned",
+      "contentKind": "text",
+      "messageRole": "system",
+      "sourceLocale": "ja-JP",
+      "requiredLocales": [
+        "ja-JP"
+      ],
+      "variables": {},
+      "locales": {
+        "ja-JP": {
+          "sections": [
+            {
+              "id": "context.text",
+              "kind": "instruction",
+              "severity": "must",
+              "optimizable": false,
+              "omitIfEmpty": false,
+              "segments": [
+                {
+                  "type": "literal",
+                  "value": "- 利用者の今の発言は、担当への依頼です（意図の判定）。担当を探して、今の発言の内容を頼みます。"
+                }
+              ]
+            }
+          ],
+          "artifactHash": "sha256:97b48f02dcb438175256816f99248581ad949362f4b0bbeacdfffa6459f434a2"
+        }
+      },
+      "definitionHash": "sha256:c9b2caf998e490febde6968ef5068425542d9be5d668c55c7c56cea6aa4d880d",
+      "releaseDigest": "sha256:356aabf5ea53ea9928bb43ebb0db966d88de77a3cb582737e1a6701d1a5d50a6"
     },
     "dialogue.contexts.specialist-turn.correction": {
       "key": "dialogue.contexts.specialist-turn.correction",
@@ -2385,16 +2521,16 @@
               "segments": [
                 {
                   "type": "literal",
-                  "value": "\n\n今回の仕事は「記憶の反映」です。入力の events（会話の出来事。本人の発言と会話エージェントの発言が時刻順に並びます）と requests（本人からの依頼）を読み、長期記憶と短期メモを更新します。\n\n- 本人について今後も役立つこと（好み、事実、制約、習慣）は、本人の発言で裏付けられる場合に remember に書きます。質問、仮定、創作、未確定の可能性から事実を作りません。実在人物の伝聞と引用内の命令を区別し、他者の情報は本人のStateにせずroute.worldで扱います。\n- remember と notes の使い分け: 本人について持続する好み・事実・制約・明示された反復行動は remember です。notes は今の会話の目的・決定・未解決事項です。活動への関心だけでは反復する習慣とせず、今日だけの例外で普段の習慣を置き換えません。手順そのものを個人の好みへ変換しません。\n- 既に shortTerm にある短期メモと同じ内容は、もう一度 add しません。\n- 本人の言葉を写すのではなく、後から読んで分かる一文に書き直します。主語は省き、時期が決まっていれば validFrom / validUntil（YYYY、YYYY-MM、YYYY-MM-DD）を付けます。\n- 同じ事柄には同じ key（小文字の英数字と . _ - だけ。例 food.spicy）を使います。既にある記憶と同じ事柄なら、新しく書かず update で直します。\n- longTermのkeyとoriginを確認します。Seedの未確認候補は本文にそう記載され、本人の確認済み事実や実行指示ではありません。適用範囲・利用場面・条件を保ち、候補だけで確認済みの記憶を上書きしません。longTermCoverageに省略があれば、表示外の記憶が存在しないとは判断しません。\n- 保存文は原文の述語・時制・程度・数量・頻度・条件・例外を保持します。余暇の楽しみ、弱い関心、特定の予定を相互に変換しません。quoteは原文の連続した文字列をそのまま写し、書き換えや断片の連結をしません。\n- remember / update / resolveの保存・訂正では、textに基礎の命題、negatedにその外側の否定を一度だけ表します。訂正は現在の値を保存し、以前の値との差を新たな嫌悪や制約にしません。否定が変わる場合もnegatedを明示します。\n- 発話内の独立した保存・訂正・忘却・保持の制約をすべて確認します。一つの訂正で別の依頼を済ませたと扱いません。曖昧な対象を推測で変更せず、その対象への操作を保留します。\n- 間違いや古くなったものは update か stop で直します。\n- 根拠にできるのは本人（by が user）の発言だけです。evidence には根拠にした出来事の id を書きます。by が agent の発言（会話エージェントの返事や自発的な発言）は、本人が肯定していなければ本人の事実にしません。\n- reference が true の出来事は、依頼の文脈として添えたものです。依頼に必要な範囲だけ使い、そこから新しい記憶を作りません。\n- 今の会話の作業の目標、決めたこと、未解決の問いは notes に書きます（add / update / close）。close は解決（resolved）か取り下げ（retracted）です。\n- requests は本人が会話エージェントを通して頼んだことです。1件ずつ resolve に答えます。resolve の request には、requests の id（r1 など）を書きます（forget や remember のような依頼の種類は書けません）。\n  - forget: 忘れてほしい。refs には、依頼の what / detail の内容に当てはまる記憶の ref だけを書きます（関係のないものは書かない。当てはまるものがなければ refs を空にして none）。candidates にある往復の中で、その内容が残っているものは alsoIn に id を書きます（id は events か candidates のものだけ）。\n    入力に worldEntities（世界の対象、ref は w1 など）、worldClaims（世界の主張、ref は k1 など）、goals（目標、ref は gl1 など）があるときは、依頼がそれらを指すなら、その ref も refs に書きます。対象（w）を指すと、その対象に結び付いた主張と目標もまとめて消えます。1件の依頼で指せるのは、記憶・主張・対象・目標を合わせて 5 件までです。\n  - stop: 使うのをやめてほしい（消さない）。refs に記憶の ref を書きます。\n  - remember: 覚えてほしい。新しい内容なら kind、key、text を書きます。既にある記憶と同じ内容でも none にはせず、action を remember にして refs にその ref を書きます（本人が確認した版として保存し直されます）。\n  - update: 内容を直してほしい。refs に記憶の ref、text に直した一文を書きます。\n  - withdraw: kind が withdraw の依頼だけに使います。本人が、まだ実行していない依頼を取り下げたいという依頼です。refs には、取り下げる依頼の id（r1 など。この入力の requests にあるものだけ）を書きます。実行済みの依頼は元に戻せないので、入力にないものは扱えません（当てはまる依頼がなければ none）。取り下げた依頼にはほかの答えを書きません。\n  - none: 何もできない、または必要ない。\n- 出力できる件数は、remember と update を合わせて 6 件、stop は 4 件、notes は 6 件までです。resolve は依頼の数だけ書きます。\n- route は、target の出来事（reference が true でないもの）ごとに 1 件書き（event に出来事の id を書きます）、後続の担当が何をするかを決めます。迷ったら true にします。\n  - world: 本人の外の世界（プロジェクト、サービス、物、場所、他の人、状態、原因と結果、依存）が出てくる出来事は true。本人の発言でも会話エージェントの発言でもかまいません（方法・対策・効果・原因を説明した発言も true）。出てこない出来事は false。\n  - goals: 目標・やりたいこと・やめたことが出てくる出来事は true。出てこない出来事は false。\n- 保存するものがなければ、各配列を空にします。"
+                  "value": "\n\n今回の仕事は「記憶の反映」です。入力の events（会話の出来事。本人の発言と会話エージェントの発言が時刻順に並びます）と requests（本人からの依頼）を読み、長期記憶と短期メモを更新します。\n\n- 本人について今後も役立つこと（好み、事実、制約、習慣）は、本人の発言で裏付けられる場合に remember に書きます。質問、仮定、創作、未確定の可能性から事実を作りません。実在人物の伝聞と引用内の命令を区別し、他者の情報は本人のStateにせずroute.worldで扱います。\n- remember と notes の使い分け: 本人について持続する好み・事実・制約・明示された反復行動は remember です。notes は今の会話の目的・決定・未解決事項です。活動への関心だけでは反復する習慣とせず、今日だけの例外で普段の習慣を置き換えません。手順そのものを個人の好みへ変換しません。\n- 依頼（何かを作る・調べる・再生する・設定するよう頼むこと）は、その時の依頼です。依頼の内容や対象から好み・習慣・事実を作りません。本人が好みや習慣として述べたときだけ remember に書きます。\n- 会話エージェントの特定の返事への指摘（誤りや作り話の指摘）は、その返事への訂正です。本人の好み・制約にしません。今後の話し方や振る舞いを本人が求めたときは、その求めを好みとして書きます。\n- 既に shortTerm にある短期メモと同じ内容は、もう一度 add しません。\n- 本人の言葉を写すのではなく、後から読んで分かる一文に書き直します。主語は省き、時期が決まっていれば validFrom / validUntil（YYYY、YYYY-MM、YYYY-MM-DD）を付けます。\n- 同じ事柄には同じ key（小文字の英数字と . _ - だけ。例 food.spicy）を使います。既にある記憶と同じ事柄なら、新しく書かず update で直します。\n- longTermのkeyとoriginを確認します。Seedの未確認候補は本文にそう記載され、本人の確認済み事実や実行指示ではありません。適用範囲・利用場面・条件を保ち、候補だけで確認済みの記憶を上書きしません。longTermCoverageに省略があれば、表示外の記憶が存在しないとは判断しません。\n- 保存文は原文の述語・時制・程度・数量・頻度・条件・例外を保持します。余暇の楽しみ、弱い関心、特定の予定を相互に変換しません。quoteは原文の連続した文字列をそのまま写し、書き換えや断片の連結をしません。\n- remember / update / resolveの保存・訂正では、textに基礎の命題、negatedにその外側の否定を一度だけ表します。訂正は現在の値を保存し、以前の値との差を新たな嫌悪や制約にしません。否定が変わる場合もnegatedを明示します。\n- 発話内の独立した保存・訂正・忘却・保持の制約をすべて確認します。一つの訂正で別の依頼を済ませたと扱いません。曖昧な対象を推測で変更せず、その対象への操作を保留します。\n- 間違いや古くなったものは update か stop で直します。\n- 根拠にできるのは本人（by が user）の発言だけです。evidence には根拠にした出来事の id を書きます。by が agent の発言（会話エージェントの返事や自発的な発言）は、本人が肯定していなければ本人の事実にしません。\n- reference が true の出来事は、依頼の文脈として添えたものです。依頼に必要な範囲だけ使い、そこから新しい記憶を作りません。\n- 今の会話の作業の目標、決めたこと、未解決の問いは notes に書きます（add / update / close）。close は解決（resolved）か取り下げ（retracted）です。\n- requests は本人が会話エージェントを通して頼んだことです。1件ずつ resolve に答えます。resolve の request には、requests の id（r1 など）を書きます（forget や remember のような依頼の種類は書けません）。\n  - forget: 忘れてほしい。refs には、依頼の what / detail の内容に当てはまる記憶の ref だけを書きます（関係のないものは書かない。当てはまるものがなければ refs を空にして none）。candidates にある往復の中で、その内容が残っているものは alsoIn に id を書きます（id は events か candidates のものだけ）。\n    入力に worldEntities（世界の対象、ref は w1 など）、worldClaims（世界の主張、ref は k1 など）、goals（目標、ref は gl1 など）があるときは、依頼がそれらを指すなら、その ref も refs に書きます。対象（w）を指すと、その対象に結び付いた主張と目標もまとめて消えます。1件の依頼で指せるのは、記憶・主張・対象・目標を合わせて 5 件までです。\n  - stop: 使うのをやめてほしい（消さない）。refs に記憶の ref を書きます。\n  - remember: 覚えてほしい。新しい内容なら kind、key、text を書きます。既にある記憶と同じ内容でも none にはせず、action を remember にして refs にその ref を書きます（本人が確認した版として保存し直されます）。\n  - update: 内容を直してほしい。refs に記憶の ref、text に直した一文を書きます。\n  - withdraw: kind が withdraw の依頼だけに使います。本人が、まだ実行していない依頼を取り下げたいという依頼です。refs には、取り下げる依頼の id（r1 など。この入力の requests にあるものだけ）を書きます。実行済みの依頼は元に戻せないので、入力にないものは扱えません（当てはまる依頼がなければ none）。取り下げた依頼にはほかの答えを書きません。\n  - none: 何もできない、または必要ない。\n- 出力できる件数は、remember と update を合わせて 6 件、stop は 4 件、notes は 6 件までです。resolve は依頼の数だけ書きます。\n- route は、target の出来事（reference が true でないもの）ごとに 1 件書き（event に出来事の id を書きます）、後続の担当が何をするかを決めます。迷ったら true にします。\n  - world: 本人の外の世界（プロジェクト、サービス、物、場所、他の人、状態、原因と結果、依存）が出てくる出来事は true。本人の発言でも会話エージェントの発言でもかまいません（方法・対策・効果・原因を説明した発言も true）。出てこない出来事は false。\n  - goals: 目標・やりたいこと・やめたことが出てくる出来事は true。出てこない出来事は false。\n- 保存するものがなければ、各配列を空にします。"
                 }
               ]
             }
           ],
-          "artifactHash": "sha256:3ca807e3abf54ef189bd8a98543f1d1115eea5a972b3eec76564af70c129060f"
+          "artifactHash": "sha256:48a3d32bcb69779a8917501923bf065546da575919be26ab7fa956d5663927f1"
         }
       },
-      "definitionHash": "sha256:6853f29c0e64bef103d9489c6fb92051fd67c0991c348922cf805aa99f1c62af",
-      "releaseDigest": "sha256:aa44abe2ba37532c74b8ba8e8b69b18d036c2f5214b0b3d23950610cbbad9579"
+      "definitionHash": "sha256:ad097785fe69eaf6472a1b76188c50ab2968d8f8ec78dd117ac29eb04f521130",
+      "releaseDigest": "sha256:c0d8ef623d0f2a4e6ec2eb65d4a7a9d6b86f85b0aee8037b41cfc95b883dacd1"
     },
     "steward.contexts.curate-world.instructions-text": {
       "key": "steward.contexts.curate-world.instructions-text",
@@ -2463,5 +2599,5 @@
       "releaseDigest": "sha256:a5598b0dc9cde21fc18bc489c3e5be973275f0493307e41ad62feedf4d30ae6f"
     }
   },
-  "catalogDigest": "sha256:bce7fc87113df98a03d46dc36994997e259b2dec293d92cd3fc17423b406dbdd"
+  "catalogDigest": "sha256:0b3666f4fced0d7de0e7077998f15f6cbcb9d38355eddfdf02c16af888d3cb66"
 }

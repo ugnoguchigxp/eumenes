@@ -223,7 +223,7 @@ async function runChain(
 	form: Form,
 	rep: number,
 ): Promise<StepRecord[]> {
-	const copies = systemCopyCheck(run.system);
+	const copies = systemCopyCheck(run.system, run.saved.source.titles);
 	const log = startLog(chain);
 	const works: Work[] = [];
 	let handed = 0;

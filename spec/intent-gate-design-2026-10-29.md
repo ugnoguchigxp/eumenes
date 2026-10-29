@@ -6,7 +6,7 @@
 
 - 利用者の発言が確定した後、LLM へ渡す前に、LARM の Ruri 意図判定（5分類）を呼ぶ。
 - 従来の表情・声色判定（エージェント自身の回答チャンクを判定）とは、呼出し口・結果の型・設定・接続（credential）を分ける。互いの結果を他方の判断に使わない。
-- 利用モードは `legacy`（今のまま）、`shadow`（今のまま動かしつつ Ruri も呼んで記録する）、`ruri`（Ruri の結果をルーティングに使う試用）。初期値は `shadow`。
+- 利用モードは `legacy`（今のまま）、`shadow`（今のまま動かしつつ Ruri も呼んで記録する）、`ruri`（Ruri の結果をルーティングに使う）。初期値は `ruri`（2026-10-29 利用者指示「いきなり分類器に判断させる」で `shadow` から変更）。
 - Ruri の生の分類と、Eumenes が選んだルーティングを別々に記録する。分類ラベルをそのまま実行命令にしない。
 - Ruri の失敗（時間切れ・接続失効・API エラー・不正な応答）では、今のルーティングで続ける。会話を止めない。
 - 対象は local ハーネス（LARM）の、利用者の発言で始まる手。cloud ハーネスと、ホストの知らせで始まる手は判定しない。
@@ -70,7 +70,7 @@
 
 | 項目 | 初期値 | 意味 |
 | --- | --- | --- |
-| `mode` | `shadow` | `legacy`・`shadow`・`ruri` |
+| `mode` | `ruri` | `legacy`・`shadow`・`ruri` |
 | `profile` | なし | 意図判定の LARM Agent Profile。保存されるまでは判定も記録もしない。保存されている間は、最初の発言を待たずに接続を作っておく |
 | `timeoutMs` | 1500 | `ruri` で判定を待つ上限。超えたら今のルーティングで続ける |
 | `searchScore` | 0.6 | `ruri` で、`request` のスコアがこれ以上なら Tool 探索を強制する |
@@ -82,16 +82,14 @@
 | Ruri を呼ぶ | 呼ばない | 呼ぶ（待たない。LLM の呼出しと並べて走らせる） | 呼ぶ（`timeoutMs` まで待つ） |
 | ルーティング | 今のまま（LLM が判断） | 今のまま | 下の方策 |
 
-`ruri` の方策（今のルーティング＝「LLM が自由に判断する」に、次だけを足す）:
+`ruri` の方策（2026-10-29 利用者指示で、`chat`・`noise`・`incomplete` はツールを使わせない形に変更）:
 
 | Ruri の結果 | ルーティング |
 | --- | --- |
 | `request` で、スコアが `searchScore` 以上 | Tool 探索を強制する。その手の1回目の呼出しだけを `toolChoice: "required"` にし、`find_toolchain` より前の別のツールの呼出しは `search_first` で断る（2回目以降の呼出しは文で答えてもよい）。探した後に頼むか断るかは LLM が判断する |
 | `request` で、スコアが閾値未満 | 今のまま |
 | `followup` | 今のまま。ツールは使える（進行中の仕事・確認待ちへの返事や取消・訂正は、LLM が `work`・`delegate` の approve で扱う） |
-| `chat` | 今のまま。ツールは使える（`chat` だけを理由に Tool を禁止しない） |
-| `noise` | 今のまま（`noise` だけを理由に発言を捨てない） |
-| `incomplete` | 今のまま（`incomplete` だけを理由に待たない） |
+| `chat`・`noise`・`incomplete` | ツールを使わせない（`answer`）。その手のすべての呼出しをツール定義つき（キャッシュの先頭を保つ）・`toolChoice: "none"` で行い、それでも届いたツールの呼出しは `tools_not_needed` で断る。返事を書くかどうかは LLM が判断する（発言は捨てず、待ちもしない） |
 | 判定なし（失敗・時間切れ・profile なし） | 今のまま。理由を記録する |
 
 古い結果: 判定はその手（run）と発言 ID に結び付き、その手の中でだけ使う。新しい発言や取消でその手が取り消されると、判定の待ちも中断される。後から届いた古い結果は、記録されるだけで、どの手のルーティングも変えない。
@@ -108,7 +106,7 @@ dialogue の表 `dialogue_intent_judgments`（1発言の判定につき1行。�
 | `choice`・`probabilities_json` | Ruri の生の分類と全ラベルのスコア |
 | `truncated`・`history_tokens_dropped`・`state_tokens_dropped` | 入力の切り詰め |
 | `legacy_route` | 今のルーティングならどうしたか（常に `free`） |
-| `final_route` | Eumenes が選んだもの（`free`・`search`） |
+| `final_route` | Eumenes が選んだもの（`free`・`search`・`answer`）。`answer` を記録できるよう、マイグレーション `dialogue/0028-intent-answer-route` で表を作り直す（列と値はそのまま） |
 | `duration_ms` | 判定にかかった時間 |
 | `fallback_reason` | 判定を使えなかった理由（`timeout`・`cancelled`・`larm_*` など） |
 | `observed_search`・`observed_delegate` | その手で LLM が実際に `find_toolchain`・`delegate` を呼んだか（`shadow` の比較用） |

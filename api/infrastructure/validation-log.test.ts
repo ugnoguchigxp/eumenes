@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { z } from "zod";
-import { validationIssues } from "./validation-log";
+import { repairIssues, validationIssues } from "./validation-log";
 
 test("validation diagnostics expose paths, types and bounds, but never values, unknown keys or Zod messages", () => {
 	const schema = z
@@ -51,4 +51,28 @@ test("many invalid entries keep the first eight field locations, including array
 		expectedType: "string",
 		actualType: "null",
 	});
+});
+
+test("a conversation tool's call names its tool and field in the log, and tells the model a missing field is required", () => {
+	const schema = z
+		.object({ mode: z.literal("execute"), impact: z.enum(["none", "create"]) })
+		.strict();
+	const value = { mode: "execute" };
+	const parsed = schema.safeParse(value);
+	if (parsed.success) throw new Error("fixture_must_fail");
+	expect(validationIssues(parsed.error, value, ["delegate"])[0]).toMatchObject({
+		validationPath: "delegate.impact",
+		actualType: "undefined",
+	});
+	expect(repairIssues(parsed.error, value)[0]).toEqual({
+		path: "impact",
+		code: "required",
+		allowed: ["none", "create"],
+	});
+	// A value that is there but wrong keeps its own code.
+	const wrong = schema.safeParse({ mode: "execute", impact: "huge" });
+	if (wrong.success) throw new Error("fixture_must_fail");
+	expect(
+		repairIssues(wrong.error, { mode: "execute", impact: "huge" })[0],
+	).toMatchObject({ path: "impact", code: "invalid_value" });
 });

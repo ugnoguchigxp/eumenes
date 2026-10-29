@@ -103,6 +103,14 @@ export function dialogueClient(transport: Transport) {
 				`/api/runs/${encodeURIComponent(id)}/cancel`,
 				json({}),
 			),
+		/** The conversation's next input starts with no earlier words; nothing is deleted. 409 while a run is active. */
+		clearRecent: async (conversationId: string) =>
+			callJson(
+				transport,
+				z.object({ ok: z.literal(true) }),
+				`/api/conversations/${encodeURIComponent(conversationId)}/recent/clear`,
+				json({}),
+			),
 	};
 }
 export type DialogueClient = ReturnType<typeof dialogueClient>;

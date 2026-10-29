@@ -24,8 +24,8 @@ export type ProfileItem = {
 	text: string;
 	/** The State says the opposite of `text` ("not …"). */
 	negated: boolean;
-	/** The user's own statement (State), or an observation (tendency). */
-	source: "user_said" | "observed";
+	/** The user's own statement (State), the agent's inference (State), or an observation (tendency). */
+	source: "user_said" | "inferred" | "observed";
 	/** The first and last day it holds (Asia/Tokyo, YYYY-MM-DD); absent when unbounded. */
 	since?: string;
 	until?: string;
@@ -72,13 +72,22 @@ export function publishedOrder(
 	});
 }
 
+/** Sources in the order the budget keeps them: what the user said before what was inferred or observed. */
+const SOURCE_ORDER: readonly ProfileItem["source"][] = [
+	"user_said",
+	"inferred",
+	"observed",
+];
+
 /**
- * The items kept when the profile is over its budget: kinds in their fixed order, newest first inside a kind.
- * This is the order of keeping, never of showing: the kept items are shown in their published order.
+ * The items kept when the profile is over its budget: the user's own statements first, then kinds in their fixed
+ * order, newest first inside a kind. This is the order of keeping, never of showing: the kept items are shown in
+ * their published order.
  */
 export function keepOrder(items: readonly ProfileItem[]): ProfileItem[] {
 	return [...items].sort(
 		(a, b) =>
+			SOURCE_ORDER.indexOf(a.source) - SOURCE_ORDER.indexOf(b.source) ||
 			rank(a.kind) - rank(b.kind) ||
 			b.newness - a.newness ||
 			(a.id < b.id ? -1 : a.id > b.id ? 1 : 0),

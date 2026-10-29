@@ -185,6 +185,7 @@ test("the copy filter leaves out an agent's utterance that copies the system par
 					utterance(1, "agent", "曲を生成します。: 完成と名前を短く伝えます。"),
 					utterance(2, "agent", "おはようございます"),
 				],
+				latestUtterancesInTransaction: () => [],
 			},
 		},
 	} as unknown as DialogueDeps;

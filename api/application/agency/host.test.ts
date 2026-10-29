@@ -317,6 +317,30 @@ describe("delivery", () => {
 		).toEqual(["interrupted"]);
 	});
 
+	test("the user speaking or being answered at the delivery time interrupts the ticket", async () => {
+		let release: () => void = () => {};
+		const gate = new Promise<void>((resolve) => (release = resolve));
+		const h = harness({
+			select: async () => {
+				await gate;
+				return choice("speak", { refs: ["u1"] });
+			},
+		});
+		await exchange(h, 1);
+		await waitFor(() => h.calls.select === 1);
+		// ASR or TTS in flight: no message is written yet, but the moment is the user's.
+		h.inference.busy = true;
+		release();
+		await waitFor(
+			() => h.host.inspect("c1")?.snapshot.state.attempts.length === 1,
+		);
+		await settle();
+		expect(h.texts()).toEqual(["u1", "a1"]);
+		expect(
+			h.host.inspect("c1")?.snapshot.state.attempts.map((a) => a.status),
+		).toEqual(["interrupted"]);
+	});
+
 	test("a foreground request in progress blocks the opportunity without a model choice", async () => {
 		const h = harness({ select: () => choice("speak", { refs: ["u1"] }) });
 		h.inference.busy = true;
@@ -408,6 +432,34 @@ describe("idle", () => {
 		h.inference.busy = false;
 		await h.advance(20_000);
 		expect(h.calls.select).toBe(2);
+		expect(h.host.inspect("c1")?.idle.level).toBe(1);
+	});
+
+	test("a cycle whose call yielded to the foreground does not spend the backoff", async () => {
+		let yielding = false;
+		const h = harness({
+			select: (request) => {
+				if (yielding) {
+					// What the LLM port throws for `larm_preempted`.
+					const yielded = new Error("larm_preempted");
+					yielded.name = "AbortError";
+					throw yielded;
+				}
+				return wait(request);
+			},
+		});
+		await exchange(h, 1);
+		await waitFor(() => h.calls.select === 1);
+		await settle();
+		yielding = true;
+		await h.advance(20_000);
+		await waitFor(() => h.calls.select === 2);
+		await settle();
+		expect(h.host.inspect("c1")?.idle.level).toBe(0);
+		yielding = false;
+		await h.advance(20_000);
+		await waitFor(() => h.calls.select === 3);
+		await settle();
 		expect(h.host.inspect("c1")?.idle.level).toBe(1);
 	});
 

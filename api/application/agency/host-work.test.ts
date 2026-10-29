@@ -282,6 +282,7 @@ describe("the conversation agent", () => {
 				tools: toolPort,
 				signal: new AbortController().signal,
 				onDelta: (text) => spoken.push(text),
+				maxToolCalls: 6,
 			})
 			.then((result) => ({ result, spoken, script }));
 	};

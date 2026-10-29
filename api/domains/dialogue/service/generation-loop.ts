@@ -3,6 +3,7 @@ import { estimateMessageTokens } from "../../inference";
 import type { DeliveryEmotion, SpeechPreparation } from "../../delivery";
 import type { NativeTool } from "../../../infrastructure/chat-stream";
 import { getLogger, withLogContext } from "../../../infrastructure/logger";
+import { systemContext } from "../../../infrastructure/system-context";
 import { ValidationFailure } from "../../../infrastructure/validation-log";
 import type {
 	AgentMessage,
@@ -13,14 +14,14 @@ import type {
 import type { ChatMessage, DialogueDeps, GenerateInput } from "./context";
 import { conversationOutput, systemCopyCheck } from "./conversation-output";
 import { cloudHarness, localHarness } from "./harness";
-import { openIntentGate } from "./intent-gate";
+import { openIntentGate, withIntent } from "./intent-gate";
 import {
 	decisionMessages,
 	decisionSchema,
 	runLocalTurn,
 	type TurnResult,
 } from "./local-turn";
-import { toolResultText } from "./result-text";
+import { refusalText, toolResultText } from "./result-text";
 import { carriesExchange, type ExchangeStep } from "./tool-exchange";
 import {
 	TOOL_NAMES,
@@ -31,9 +32,17 @@ import {
 } from "./generation-tools";
 
 const log = getLogger("dialogue");
+const TOOL_LIMIT_NOTE = systemContext(
+	"dialogue.contexts.generation-loop.tool-limit",
+	{},
+);
 
 /** Tool calls one generation may make in all (section 6.1, initial value). */
 export const MAX_TOOL_CALLS = 4;
+/** Refused calls one generation may make besides: a refusal is answered, for the agent to repair its call. */
+export const MAX_REFUSED_CALLS = 2;
+/** The calls one reply may make, refused ones included; after the last, the reply is made without a call. */
+export const REPLY_CALLS = MAX_TOOL_CALLS + MAX_REFUSED_CALLS;
 
 /** What one executed tool call gave the generation. */
 export type ToolOutcome = {
@@ -101,7 +110,10 @@ export async function runGeneration(
 		if (carriesExchange(call.name))
 			exchange.push({ name: call.name, arguments: call.arguments, result });
 	};
-	const base = input.messages;
+	// The user-intent judge runs before the first model call (the intent gate design, section 5); the system part
+	// states what it found (the route-context design, section 2.1).
+	const gate = await openIntentGate(deps, input, options.signal);
+	const base = withIntent(input.messages, gate.route);
 	let receipt: Receipt | undefined;
 	const callSession: CallSession = {
 		sessionRole: "main",
@@ -116,8 +128,6 @@ export async function runGeneration(
 		...(options.session?.context ? { context: options.session.context } : {}),
 		...(options.session?.refs ? { refs: options.session.refs } : {}),
 	};
-	// The user-intent judge runs before the first model call (the intent gate design, section 5).
-	const gate = await openIntentGate(deps, input, options.signal);
 	const searched = () =>
 		executed.some(({ call }) => call.name === TOOL_NAMES.search);
 	// Only the turn's first call is made to call a tool; later ones keep the search-first refusal alone.
@@ -134,12 +144,18 @@ export async function runGeneration(
 				const native = nativeTools.get(tool.name);
 				return native ? [native] : [];
 			});
+			// The calls are used up, or the judge found the turn to be talk: the same definitions go (the cached prefix
+			// holds) and no call can be made.
+			const noCall =
+				(offered.length === 0 && agentTools.length > 0) ||
+				gate.route === "answer";
 			const output = conversationOutput(
 				onDelta,
 				generationTools,
 				input.harness.gates.systemCopy && base[0]?.role === "system"
 					? base[0].content
 					: undefined,
+				input.toolchainTitles,
 			);
 			log.debug("dialogue.input_measured", {
 				phase: "generation",
@@ -180,8 +196,8 @@ export async function runGeneration(
 				const answered = await call(
 					output.delta,
 					signal,
-					offered,
-					session,
+					noCall ? generationTools : offered,
+					noCall ? { ...session, toolChoice: "none" } : session,
 					options.preparation,
 				);
 				signal.throwIfAborted();
@@ -203,9 +219,9 @@ export async function runGeneration(
 				!forced &&
 				offered.some((t) => t.function.name === TOOL_NAMES.search);
 			if (forceSearch) forced = true;
-			const taken =
+			const turn = (): Promise<TurnResult> =>
 				input.harness.turn === "decide-then-reply"
-					? await runLocalTurn(
+					? runLocalTurn(
 							{
 								decide: () =>
 									call(
@@ -242,16 +258,34 @@ export async function runGeneration(
 								offered: offered.map((tool) => tool.function.name),
 								output,
 								...(input.harness.gates.systemCopy && base[0]?.role === "system"
-									? { copies: systemCopyCheck(base[0].content) }
+									? {
+											copies: systemCopyCheck(
+												base[0].content,
+												input.toolchainTitles,
+											),
+										}
 									: {}),
 								signal,
 							},
 						)
-					: await single(
+					: single(
 							forceSearch
 								? { ...callSession, toolChoice: "required" }
 								: callSession,
 						);
+			let taken: TurnResult;
+			try {
+				taken = await turn();
+			} catch (error) {
+				// A call that ended cleanly with nothing to say: the reply says nothing, as the system allows.
+				if (
+					!signal.aborted &&
+					error instanceof Error &&
+					error.message === "chat_output_empty"
+				)
+					return { text: output.finish(""), toolCalls: [] };
+				throw error;
+			}
 			receipt = taken.receipt;
 			return { text: taken.text, toolCalls: taken.toolCalls };
 		},
@@ -264,47 +298,59 @@ export async function runGeneration(
 				issueCount: error.issues.length,
 			});
 		return {
-			content: toolResultText("refused", {
-				refused: true,
-				issues: error.issues,
-				...(error.repair?.length ? { fields: error.repair } : {}),
-			}),
+			// The log's sanitized issues are not for the model: a call it wrote wrong gets the fields to repair.
+			content: error.repair?.length
+				? refusalText(error.message, error.repair)
+				: toolResultText("refused", { refused: true, issues: error.issues }),
 		};
 	};
 
+	let calls = 0;
 	const tools: Parameters<ConversationAgentPort["respond"]>[0]["tools"] = {
 		tools: agentTools,
 		async call(call: AgentToolCall, signal: AbortSignal) {
-			try {
-				const parsed = parseCall(call);
-				if (executed.length >= MAX_TOOL_CALLS)
-					throw toolRejection("tool_call_limit");
-				if (
-					gate.route === "search" &&
-					parsed.name !== TOOL_NAMES.search &&
-					!searched()
-				)
-					throw toolRejection("search_first");
-				const outcome = await options.execute(parsed, {
-					signal,
-					...(receipt ? { receipt } : {}),
-					exchange,
-				});
-				executed.push({ call: parsed, outcome });
-				carry(call, outcome.result);
-				return {
-					content: toolResultText(parsed.name, outcome.result),
-					...(outcome.end ? { end: true } : {}),
-				};
-			} catch (error) {
-				if (error instanceof ValidationFailure) {
-					carry(call, { refused: true });
-					return refused(error);
-				}
-				throw error;
-			}
+			const answer = await callTool(call, signal);
+			// The reply's last call: the agent is told it answers with what it has.
+			return ++calls === REPLY_CALLS
+				? { ...answer, content: `${answer.content}\n${TOOL_LIMIT_NOTE}` }
+				: answer;
 		},
 	};
+	async function callTool(
+		call: AgentToolCall,
+		signal: AbortSignal,
+	): Promise<{ content: string; end?: boolean }> {
+		try {
+			// The judge found the turn to be talk: no tool is run, whatever came back.
+			if (gate.route === "answer") throw toolRejection("tools_not_needed");
+			const parsed = parseCall(call);
+			if (executed.length >= MAX_TOOL_CALLS)
+				throw toolRejection("tool_call_limit");
+			if (
+				gate.route === "search" &&
+				parsed.name !== TOOL_NAMES.search &&
+				!searched()
+			)
+				throw toolRejection("search_first");
+			const outcome = await options.execute(parsed, {
+				signal,
+				...(receipt ? { receipt } : {}),
+				exchange,
+			});
+			executed.push({ call: parsed, outcome });
+			carry(call, outcome.result);
+			return {
+				content: toolResultText(parsed.name, outcome.result),
+				...(outcome.end ? { end: true } : {}),
+			};
+		} catch (error) {
+			if (error instanceof ValidationFailure) {
+				carry(call, { refused: true });
+				return refused(error);
+			}
+			throw error;
+		}
+	}
 
 	const reply = await deps.conversationAgent
 		.respond({
@@ -313,6 +359,7 @@ export async function runGeneration(
 			tools,
 			signal: options.signal,
 			onDelta: options.delta,
+			maxToolCalls: REPLY_CALLS,
 		})
 		.finally(() =>
 			gate.observe({

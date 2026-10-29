@@ -1,5 +1,6 @@
 import type { NativeTool } from "../../../infrastructure/chat-stream";
 import { getLogger } from "../../../infrastructure/logger";
+import { toolchainListing } from "./context-system";
 
 const log = getLogger("dialogue");
 /** A reply sharing this many characters, as they are, with a line of the system part copies it. */
@@ -9,13 +10,21 @@ const COPY_CHARS = 15;
  * Whether a text copies the system part: it holds `COPY_CHARS` characters of one of its lines as they are. A reply
  * that did was copied again from the recent conversation until nothing else was said (the tool-call reliability
  * design, section 5.5); ordinary replies share no such run with the rules (none of 292 measured replies did).
+ * The toolchain titles the system lists (`titles`) are what a reply may say as they are: their listing is left out.
  */
-export function systemCopyCheck(system: string): (text: string) => boolean {
+export function systemCopyCheck(
+	system: string,
+	titles: readonly string[] = [],
+): (text: string) => boolean {
+	const listing = toolchainListing(titles);
 	const windows = new Set(
 		system
 			.split("\n")
 			.filter((line) => !line.startsWith("## "))
 			.map((line) => line.replace(/^- /, ""))
+			.flatMap((line) =>
+				listing && line.includes(listing) ? line.split(listing) : [line],
+			)
 			.flatMap((line) =>
 				Array.from(
 					{ length: Math.max(0, line.length - COPY_CHARS + 1) },
@@ -44,8 +53,9 @@ export function conversationOutput(
 	publish: (text: string) => void,
 	tools: NativeTool[],
 	system?: string,
+	toolchainTitles: readonly string[] = [],
 ) {
-	const copies = system ? systemCopyCheck(system) : null;
+	const copies = system ? systemCopyCheck(system, toolchainTitles) : null;
 	/** Where the copy check has looked up to (each window is checked once). */
 	let checked = 0;
 	const checkCopy = (text: string) => {

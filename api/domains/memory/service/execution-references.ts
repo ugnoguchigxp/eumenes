@@ -31,15 +31,16 @@ export function executionReferences(deps: {
 		db.query("DELETE FROM memory_execution_refs WHERE expires_at<=?").run(
 			now(),
 		);
-		// State items only (a tendency is an observation, not something the user said), the published ones first.
+		// State items only (a tendency is an observation), the published ones first; an inference is marked as one.
 		const states = [...window.profile.items, ...window.newMemories].filter(
-			(item) => item.source === "user_said",
+			(item) => item.source !== "observed",
 		);
 		return states.slice(0, 8).map((item) => {
 			const body = JSON.stringify({
 				kind: item.kind,
 				text: item.text,
 				negated: item.negated,
+				...(item.source === "inferred" ? { inferred: true } : {}),
 				...(item.since ? { since: item.since } : {}),
 				...(item.until ? { until: item.until } : {}),
 			});

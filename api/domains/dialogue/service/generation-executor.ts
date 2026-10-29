@@ -116,6 +116,6 @@ export function createGenerationExecutor(
 	return {
 		execute,
 		handover: () => x.state.handover,
-		answered: () => answered(x),
+		answered: (refused?: boolean) => answered(x, refused),
 	};
 }

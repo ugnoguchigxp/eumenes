@@ -4,6 +4,23 @@ import type { LogFields } from "./logger";
 // Paths come from contracts. Unknown keys, enum values and Zod messages may
 // contain provider text or secrets, so none of them are copied into logs.
 const fields = new Set([
+	// The conversation's fixed tools and their arguments (the names are the schema's, never the model's values).
+	"memory",
+	"find_toolchain",
+	"delegate",
+	"work",
+	"mode",
+	"impact",
+	"toolchain",
+	"request",
+	"announcement",
+	"inputs",
+	"target",
+	"refs",
+	"resolveUnsaved",
+	"confirmation",
+	"todo",
+	"what",
 	"action",
 	"tool",
 	"intent",
@@ -158,10 +175,19 @@ export function validationIssues(
  * The issues as the model that wrote the value needs them to repair it: the exact path and what is allowed there.
  * The names come from the schema and from the model's own output, never from the user's text. Not for logs.
  */
-export function repairIssues(error: z.ZodError): RepairIssue[] {
+export function repairIssues(
+	error: z.ZodError,
+	value?: unknown,
+): RepairIssue[] {
 	return error.issues.slice(0, 8).map((issue) => ({
 		path: issue.path.map(String).join("."),
-		code: issue.code,
+		// A field the value does not have at all is named as missing, not as a wrong value.
+		code:
+			value !== undefined &&
+			issue.path.length > 0 &&
+			atPath(value, issue.path) === undefined
+				? "required"
+				: issue.code,
 		...(issue.code === "invalid_value" ? { allowed: issue.values } : {}),
 		...(issue.code === "unrecognized_keys" ? { keys: issue.keys } : {}),
 		...("expected" in issue && typeof issue.expected === "string"

@@ -5,7 +5,8 @@ import { byId } from "../repository";
 import { resolveAttachmentContext } from "./attachment-context";
 import { GENERATE_KIND, type DialogueDeps } from "./context";
 import { createGenerationExecutor } from "./generation-executor";
-import { runGeneration } from "./generation-loop";
+import { runGeneration, type GenerationOutcome } from "./generation-loop";
+import { TOOL_NAMES } from "./generation-tools";
 import { createPrepare } from "./generation-prepare";
 import {
 	createGenerationSettlement,
@@ -20,6 +21,18 @@ import { endRun } from "./run-end";
 import { flushDeferred } from "./specialist-core";
 
 const log = getLogger("dialogue");
+
+/** The generation asked a toolchain and every such call was refused: nothing was handed over or answered by one. */
+function delegationRefused(generated: GenerationOutcome): boolean {
+	return (
+		generated.exchange.some(
+			(step) =>
+				step.name === TOOL_NAMES.delegate &&
+				(step.result as { refused?: unknown } | null)?.refused === true,
+		) &&
+		!generated.executed.some(({ call }) => call.name === TOOL_NAMES.delegate)
+	);
+}
 
 function speaksChunks(deps: DialogueDeps, run: Run | null) {
 	return (
@@ -115,6 +128,13 @@ export function createGenerationHandler(
 						}
 						if (generated.text.length > 65536)
 							throw new Error("chat_output_too_large");
+						// Saying nothing completes the run (the system allows it); it is kept countable.
+						if (!generated.text.trim())
+							log.info("dialogue.no_answer", {
+								kind: input.final.kind,
+								// Calls run before saying nothing (a search with no hand-over, for one).
+								count: generated.executed.length,
+							});
 						log.info("dialogue.generation_completed");
 						return {
 							text: reportedLinks(deps, input, generated.text),
@@ -125,7 +145,9 @@ export function createGenerationHandler(
 								? { confirmation: true as const }
 								: {}),
 							...(input.final.kind === "utterances"
-								? { selection: executor.answered() }
+								? {
+										selection: executor.answered(delegationRefused(generated)),
+									}
 								: {}),
 						};
 					} catch (error) {

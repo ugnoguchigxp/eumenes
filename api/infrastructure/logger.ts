@@ -90,6 +90,7 @@ export interface LogFields {
 	providerPromptTokens?: number;
 	providerCachedTokens?: number;
 	providerOutputTokens?: number;
+	reasoningChars?: number;
 	totalMs?: number;
 	/** voice.input_timing: the browser's side of speech end → transcript on screen. */
 	audioMs?: number;
@@ -154,6 +155,7 @@ const keys = new Set<keyof LogFields>([
 	"providerPromptTokens",
 	"providerCachedTokens",
 	"providerOutputTokens",
+	"reasoningChars",
 	"totalMs",
 	"requestBytes",
 	"droppedMessages",

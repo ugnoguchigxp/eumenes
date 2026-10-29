@@ -163,7 +163,8 @@ test("`## Memory` is the published leanings: a waiting memory, the notes, goals 
 	const m = await prepared(fullCase);
 	const memory = memoryOf(m).join("\n");
 	expect(memory).toContain("辛い物が好き（本人の発言）");
-	expect(memory).toContain("刺激の強い食事を好む傾向（観察）");
+	// An observation is not shown as a fact (the review fixes design C4).
+	expect(memory).not.toContain("刺激の強い食事を好む傾向");
 	expect(memory).not.toContain("夜は通知を控える");
 	const all = allOf(m);
 	for (const absent of [
@@ -308,7 +309,7 @@ test("the generation time is just after the newest thing the seed records", () =
 	).toBe(new Date(Date.parse(T(45)) + 1000).toISOString());
 });
 
-test("a generation after a long silence cuts the recent conversation to the newest few first, and says why", async () => {
+test("a generation after a long silence keeps nothing said before it, and says why and how long", async () => {
 	const wiring = await openSeedWiring();
 	try {
 		const session = createSession(wiring);
@@ -326,12 +327,8 @@ test("a generation after a long silence cuts the recent conversation to the newe
 			utterance: "三時間後",
 		});
 		expect(later.cut).toMatchObject({ reason: "resumed" });
-		// The newest four from an agent's utterance stay, in the order they were said.
-		expect(later.input.messages.slice(2, -1).map((m) => m.content)).toEqual([
-			"はい",
-			"一つ目",
-			"どうぞ",
-		]);
+		// Nothing said before the silence stays: the work and the memory carry on.
+		expect(later.input.messages.map((m) => m.role)).toEqual(["system", "user"]);
 		expect(
 			sectionLines(later.input.messages.at(-1)!.content, "State")[0],
 		).toMatch(/（前の発言から3時間）$/);

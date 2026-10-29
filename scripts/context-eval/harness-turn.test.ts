@@ -872,7 +872,7 @@ describe("the record of each model call", () => {
 		expect(text).toContain("1. decision / finish=stop");
 		expect(text).toContain("check=tool_arguments_invalid");
 		expect(text).toContain(
-			'delegate `{"mode":"execute","toolchain":"image.create"}` → 拒否 tool_arguments_invalid [request invalid_type expected string got undefined',
+			'delegate `{"mode":"execute","toolchain":"image.create"}` → 拒否 tool_arguments_invalid [request required expected string got undefined',
 		);
 		expect(failureDetails([{ ...failed, pass: true }])).toEqual(["なし"]);
 		const md = reportMarkdown(

@@ -48,7 +48,10 @@ import { createProgress } from "./progress";
 import { createErrorReport } from "./error-report";
 import { executionSourceInTransaction } from "./execution-source";
 import { executionCommands } from "./execution-command";
-import { conversationTaskPort } from "./conversation-input";
+import {
+	clearRecentInTransaction,
+	conversationTaskPort,
+} from "./conversation-input";
 import { createContextKeeper, type KeeperInference } from "./context-keeper";
 import { revokeExecutionNotice } from "./execution-notices";
 import type { MusicPort } from "../contracts/music";
@@ -176,6 +179,25 @@ interface DialogueServiceOptions {
 	 */
 	keeper?: { inference: KeeperInference; quietMs?: number };
 }
+/** The user's hand on the recent conversation (`POST /api/conversations/:id/recent/clear`). */
+function createRecentPorts(deps: DialogueDeps) {
+	return {
+		/** The next input starts with no earlier words (nothing is deleted). False while a run is queued or running. */
+		clearRecent: async (conversationId: string) => {
+			const cleared = await deps.store.write((tx) =>
+				clearRecentInTransaction(
+					deps,
+					tx,
+					conversationId,
+					Date.parse(deps.clock()),
+				),
+			);
+			if (cleared) log.info("dialogue.input_cut", { reason: "user_cleared" });
+			return cleared;
+		},
+	};
+}
+
 export function createDialogueService({
 	store,
 	conversation,
@@ -258,6 +280,7 @@ export function createDialogueService({
 		/** `GET /api/conversations/:id/resources`: the resources the conversation has met and each message's chips. */
 		conversationResources: (conversationId: string) =>
 			conversationResources(deps, conversationId),
+		...createRecentPorts(deps),
 		...createTodoScreenPorts(deps),
 		/** The conversation's resource ledger (`a<n>`), for the `resources` tool and the screen receipts. */
 		resourceLedger: deps.resourceLedger,

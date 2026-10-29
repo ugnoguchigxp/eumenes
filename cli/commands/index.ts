@@ -6,6 +6,7 @@ import { run as collection } from "./collection";
 import { run as history } from "./history";
 import { run as intent } from "./intent";
 import { run as memory } from "./memory";
+import { run as recentClear } from "./recent";
 import { run as toolchainHistory } from "./toolchain-history";
 import { run as runCommand } from "./run";
 import { run as send } from "./send";
@@ -26,6 +27,7 @@ export const commands: Readonly<Record<string, CommandRun>> = {
 	"history-read": history,
 	intent,
 	memory,
+	"recent-clear": recentClear,
 	run: runCommand,
 	send,
 	status,

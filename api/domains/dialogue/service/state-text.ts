@@ -100,6 +100,8 @@ export type StateInput = {
 	nowMs: number;
 	/** When the newest utterance before this input was said. */
 	lastAt: number | null;
+	/** When the recent conversation begins: work finished before it is no part of this input (C4). */
+	since?: number | null;
 	/** The agent's newest utterance in the recent conversation. */
 	lastAgent: Utterance | null;
 	state: ConversationState | null;
@@ -144,7 +146,12 @@ export function stateLinesInTransaction(
 				.recentlyArchivedInTransaction(
 					tx,
 					input.conversationId,
-					new Date(input.nowMs - STATE_LIMITS.archivedMs).toISOString(),
+					new Date(
+						Math.max(
+							input.nowMs - STATE_LIMITS.archivedMs,
+							input.since ?? Number.NEGATIVE_INFINITY,
+						),
+					).toISOString(),
 					room,
 				)
 				.map((todo) => todoLine(todo, refs, true)),
@@ -155,7 +162,8 @@ export function stateLinesInTransaction(
 	if (presented.length)
 		lines.push("提示中:", ...presented.slice(0, STATE_LIMITS.presented));
 
-	const body = input.state?.body;
+	// The context keeper's fields, only while it runs (it is off for now: the review fixes design C5).
+	const body = deps.contextKeeper ? input.state?.body : undefined;
 	if (body?.topic) lines.push(`話題: ${lineText(body.topic)}`);
 	const items = (
 		label: string,

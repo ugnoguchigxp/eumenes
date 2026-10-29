@@ -206,8 +206,8 @@ export type BackgroundKind = z.infer<typeof backgroundSchema>;
 export const backgroundKinds = backgroundSchema.options;
 /**
  * The user-intent judge (the intent gate design, section 5), apart from the speaking-attitude judge's settings:
- * `legacy` keeps the existing routing, `shadow` also asks the judge and records it, `ruri` lets the judge's result
- * feed the routing (a trial).
+ * `legacy` keeps the existing routing, `shadow` also asks the judge and records it, `ruri` (the default) lets the
+ * judge's result decide the routing.
  */
 export const intentModes = ["legacy", "shadow", "ruri"] as const;
 const intentProfile = z.string().trim().min(1).max(200);
@@ -215,7 +215,7 @@ const intentTimeoutMs = z.number().int().min(100).max(5000);
 const intentSearchScore = z.number().min(0).max(1);
 export const intentSettingsSchema = z
 	.object({
-		mode: z.enum(intentModes).default("shadow"),
+		mode: z.enum(intentModes).default("ruri"),
 		/** The LARM Agent Profile of the judge; absent until saved, and then no judge is asked. */
 		profile: intentProfile.optional(),
 		/** How long `ruri` waits for the judge before the existing routing goes on alone. */
@@ -301,7 +301,7 @@ export const settingsSchema = z
 			})
 			.strict(),
 		intent: intentSettingsSchema.default({
-			mode: "shadow",
+			mode: "ruri",
 			timeoutMs: 1500,
 			searchScore: 0.6,
 		}),

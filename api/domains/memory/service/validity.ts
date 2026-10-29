@@ -1,3 +1,5 @@
+import { lastTokyoDay, tokyoDay } from "./profile";
+
 export type DatePart = {
 	precision: "year" | "month" | "day";
 	year: number;
@@ -22,14 +24,9 @@ function formatDatePart(date: DatePart): string {
 		return `${String(date.year).padStart(4, "0")}-${pad(date.month ?? 1)}`;
 	return `${String(date.year).padStart(4, "0")}-${pad(date.month ?? 1)}-${pad(date.day ?? 1)}`;
 }
-/** The host's local calendar day of an instant, `YYYY-MM-DD`. */
-function localDay(ms: number): string {
-	const date = new Date(ms);
-	return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-}
 /**
  * The period of an item as the screen and the agent read it. The precise calendar period wins;
- * millisecond bounds are shown as local days (an exclusive end is the day before).
+ * millisecond bounds are shown as Asia/Tokyo days, as the profile shows them (an exclusive end is the day before).
  */
 export function validityOf(item: {
 	validity?: { from?: DatePart; until?: DatePart } | undefined;
@@ -40,12 +37,12 @@ export function validityOf(item: {
 		? formatDatePart(item.validity.from)
 		: item.validFromMs === null
 			? undefined
-			: localDay(item.validFromMs);
+			: tokyoDay(item.validFromMs);
 	const until = item.validity?.until
 		? formatDatePart(item.validity.until)
 		: item.validUntilMs === null
 			? undefined
-			: localDay(item.validUntilMs - 1);
+			: lastTokyoDay(item.validUntilMs);
 	if (from === undefined && until === undefined) return null;
 	return {
 		...(from === undefined ? {} : { from }),

@@ -11,6 +11,7 @@ import { keepOrder, type ProfileItem, type WindowSnapshot } from "../../memory";
 import { latestConversationId } from "../repository";
 import type { ChatMessage, DialogueDeps } from "./context";
 import { systemText } from "./context-system";
+import { conversationHasActiveRun } from "./active-run";
 import { toolchainTitlesInTransaction } from "./delegate-conversation";
 import { generationTools } from "./generation-tools";
 import { localHarness, type ConversationHarness } from "./harness";
@@ -71,7 +72,10 @@ export function memoryLines(items: readonly ProfileItem[]): {
 	lines: string[];
 	ids: string[];
 } {
-	const leanings = items.filter((item) => MEMORY_KINDS.has(item.kind));
+	// The user's own words only: an inference or an observation read as a fact steers the reply (C4).
+	const leanings = items.filter(
+		(item) => MEMORY_KINDS.has(item.kind) && item.source === "user_said",
+	);
 	const line = (item: ProfileItem) =>
 		memoryItemLine({
 			text: item.text,
@@ -95,17 +99,20 @@ export function memoryLines(items: readonly ProfileItem[]): {
 	return { lines: shown.map(line), ids: shown.map((item) => item.id) };
 }
 
-/** An utterance's size in the recent conversation: its words, and the notice and tool calls kept with it. */
-const utteranceTokens = (u: Utterance) =>
+/** An utterance's size in the recent conversation: its words, and the notice and tool calls the harness draws. */
+const utteranceTokens = (u: Utterance, history: HarnessHistory) =>
 	estimateTextTokens(u.text) +
-	(u.notice ? estimateTextTokens(u.notice) : 0) +
-	u.toolCalls.reduce(
-		(sum, call) =>
-			sum + estimateTextTokens(call.name + call.arguments + call.result),
-		0,
-	);
-const tokensOf = (utterances: readonly Utterance[]) =>
-	utterances.reduce((sum, u) => sum + utteranceTokens(u), 0);
+	(history.notices && u.notice ? estimateTextTokens(u.notice) : 0) +
+	(history.toolExchanges
+		? u.toolCalls.reduce(
+				(sum, call) =>
+					sum + estimateTextTokens(call.name + call.arguments + call.result),
+				0,
+			)
+		: 0);
+const tokensOf = (utterances: readonly Utterance[], history: HarnessHistory) =>
+	utterances.reduce((sum, u) => sum + utteranceTokens(u, history), 0);
+type HarnessHistory = ConversationHarness["history"];
 
 /** The utterances the recent conversation shows: from the agent's first one, those not waiting for an answer. */
 export function recentUtterances(
@@ -172,24 +179,35 @@ export function keepNewestCut(
 function fixedCutReason(
 	cut: ConversationCut,
 	shown: readonly Utterance[],
-	input: { systemDigest: string; memoryDigest: string; nowMs: number },
+	input: {
+		systemDigest: string;
+		memoryDigest: string;
+		nowMs: number;
+		history: HarnessHistory;
+	},
 ): string | null {
-	if (cut.due) return cut.due;
-	if (cut.systemDigest !== input.systemDigest) return "system_changed";
-	if (cut.memoryDigest !== input.memoryDigest) return "memory_changed";
+	// A gap comes first: it keeps nothing of what was said before, which serves every other reason too (a memory or
+	// system part changed while away must not leave the old words standing).
 	const last = shown.at(-1);
 	if (last && input.nowMs - Date.parse(last.at) >= RECENT.gapMs)
 		return "resumed";
-	if (shown.length > RECENT.hardCount || tokensOf(shown) > RECENT.hardTokens)
+	if (cut.due) return cut.due;
+	if (cut.systemDigest !== input.systemDigest) return "system_changed";
+	if (cut.memoryDigest !== input.memoryDigest) return "memory_changed";
+	if (
+		shown.length > RECENT.hardCount ||
+		tokensOf(shown, input.history) > RECENT.hardTokens
+	)
 		return "over_limit";
 	return null;
 }
 
 /**
  * Places the recent conversation's cut by the host's fixed rules (section 6.1.1 ② to ⑤), inside the caller's write
- * transaction: a first input starts at the beginning; a forget inside it, another system part or memory version, a
- * resumed conversation or the hard limit keep the newest few. A cut that changes the memory republishes it first
- * (the waiting additions join `## Memory` only here). Returns the cut and why it moved (null when it stayed).
+ * transaction: a first input starts at the beginning; a forget inside it, another system part or memory version or
+ * the hard limit keep the newest few; a conversation resumed after a gap keeps none of what was said before it (the
+ * work and the memory carry on). A cut that changes the memory republishes it first (the waiting additions join
+ * `## Memory` only here). Returns the cut and why it moved (null when it stayed).
  */
 export function placeCutInTransaction(
 	deps: DialogueDeps,
@@ -200,6 +218,8 @@ export function placeCutInTransaction(
 		window: WindowSnapshot | null;
 		nowMs: number;
 		pending: ReadonlySet<string>;
+		/** What the harness draws of the recent conversation: only that counts toward its limit. */
+		history: HarnessHistory;
 	},
 ): {
 	cut: ConversationCut;
@@ -236,10 +256,16 @@ export function placeCutInTransaction(
 		systemDigest,
 		memoryDigest: memoryDigestOf(window),
 		nowMs: input.nowMs,
+		history: input.history,
 	});
 	if (!reason) return { cut: existing, reason: null, window };
+	// Nothing said before a gap stays, nor what the context keeper made of it.
+	if (reason === "resumed") store.dropStatesInTransaction(tx, conversationId);
 	const moved = moveCutInTransaction(deps, tx, conversationId, {
-		seq: keepNewestCut(shown, existing.seq),
+		seq:
+			reason === "resumed"
+				? (shown.at(-1)?.seq ?? existing.seq)
+				: keepNewestCut(shown, existing.seq),
 		window,
 		nowMs: input.nowMs,
 		system: input.system,
@@ -281,6 +307,38 @@ export function moveCutInTransaction(
 	return { cut, window };
 }
 
+/**
+ * Clears the recent conversation at the user's request: the cut moves after the newest utterance, so the next input
+ * has none of the earlier words. Nothing is deleted, and what is said from then on is kept as always. False while a
+ * run of the conversation is queued or running (its input must not change under it).
+ */
+export function clearRecentInTransaction(
+	deps: DialogueDeps,
+	tx: Database,
+	conversationId: string,
+	nowMs: number,
+): boolean {
+	if (conversationHasActiveRun(tx, conversationId)) return false;
+	const store = deps.conversation.input;
+	const newest = store.latestUtterancesInTransaction(tx, conversationId, 1)[0];
+	const cut = store.cutInTransaction(tx, conversationId);
+	if (!newest || (cut && cut.seq >= newest.seq)) return true;
+	// What the context keeper made of the earlier words goes with them.
+	store.dropStatesInTransaction(tx, conversationId);
+	let window: WindowSnapshot | null = null;
+	try {
+		window = deps.memory?.storedWindowInTransaction(tx, conversationId) ?? null;
+	} catch {
+		// An unreadable memory window is drawn again by the next input.
+	}
+	moveCutInTransaction(deps, tx, conversationId, {
+		seq: newest.seq,
+		window,
+		nowMs,
+	});
+	return true;
+}
+
 /** The prefix every call on the conversation's prompt shares, and what it was drawn from. */
 export type ConversationPrefix = {
 	/** System, `## Memory` (when there is a recent conversation to put it before) and the recent conversation. */
@@ -290,6 +348,10 @@ export type ConversationPrefix = {
 	carry: string | null;
 	cut: ConversationCut | null;
 	recent: Utterance[];
+	/** When the newest utterance not waiting for an answer was said, behind the cut too (the gap `## State` names). */
+	lastAt: number | null;
+	/** When the recent conversation begins (its first utterance, else the cut): what came before is no record of it. */
+	since: number | null;
 	/** The memory items `## Memory` shows. */
 	memoryItemIds: string[];
 };
@@ -316,7 +378,9 @@ export function conversationPrefixFrom(
 	// An utterance of the agent that copies the system part is not drawn: it was copied again turn after turn
 	// (section 5.5 #1). The generation's gate keeps new ones out; this keeps out those kept before it, and the
 	// agency's, which no generation gate checks.
-	const copies = history.copyFilter ? systemCopyCheck(input.system) : null;
+	const copies = history.copyFilter
+		? systemCopyCheck(input.system, toolchainTitlesInTransaction(deps, tx))
+		: null;
 	const recent = recentUtterances(
 		store
 			.utterancesAfterInTransaction(tx, conversationId, cut?.seq ?? 0)
@@ -334,12 +398,31 @@ export function conversationPrefixFrom(
 	if (memory && conversation.length)
 		messages.push({ role: "user", content: memory });
 	messages.push(...conversation);
+	// A conversation resumed after a gap keeps nothing before it, but the gap is still the time since the last words.
+	const last = store
+		.latestUtterancesInTransaction(tx, conversationId, input.pending.size + 1)
+		.reverse()
+		.find(
+			(u) =>
+				!(
+					u.speaker === "user" &&
+					u.messageId &&
+					input.pending.has(u.messageId)
+				),
+		);
 	return {
 		messages,
 		tools: generationTools,
 		carry: conversation.length || !lines.length ? null : memory,
 		cut,
 		recent,
+		lastAt: last ? Date.parse(last.at) : null,
+		// A cut at the start drops nothing: only a moved cut leaves earlier words behind.
+		since: recent[0]
+			? Date.parse(recent[0].at)
+			: cut && cut.seq > 0
+				? Date.parse(cut.at)
+				: null,
 		memoryItemIds: ids,
 	};
 }
@@ -448,14 +531,12 @@ export function backgroundTaskInTransaction(
 	const prefix = backgroundPrefixInTransaction(deps, tx, conversationId);
 	if (!prefix) return null;
 	const nowMs = Date.parse(deps.clock());
-	const lastAt = prefix.recent.at(-1)
-		? Date.parse(prefix.recent.at(-1)!.at)
-		: null;
 	const state = stateText(
 		stateLinesInTransaction(deps, tx, {
 			conversationId,
 			nowMs,
-			lastAt,
+			lastAt: prefix.lastAt,
+			since: prefix.since,
 			lastAgent:
 				[...prefix.recent].reverse().find((u) => u.speaker === "agent") ?? null,
 			state: deps.conversation.input.latestStateInTransaction(

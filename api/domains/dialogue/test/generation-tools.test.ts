@@ -35,7 +35,7 @@ test("the compact definitions leave each mode's required fields to the host's ch
 	).toBe("delegate");
 });
 
-test("the native delegate definition marks impact required; a call without it is still refused, approve may carry it", () => {
+test("the native delegate definition asks for impact; a call without it is taken (the host fills it), approve may carry it", () => {
 	const delegate = generationTools.find((t) => t.function.name === "delegate")!;
 	expect(delegate.function.parameters.required).toEqual(["mode", "impact"]);
 	const call = (args: unknown) => ({
@@ -43,14 +43,18 @@ test("the native delegate definition marks impact required; a call without it is
 		name: "delegate",
 		arguments: JSON.stringify(args),
 	});
-	expect(() =>
+	expect(
 		parseCall(
 			call({
 				mode: "execute",
 				toolchain: "fake.image",
 				request: "猫の絵",
 			}),
-		),
+		).name,
+	).toBe("delegate");
+	// The request itself is still required.
+	expect(() =>
+		parseCall(call({ mode: "execute", toolchain: "fake.image" })),
 	).toThrow();
 	expect(
 		parseCall(call({ mode: "approve", confirmation: "c1", impact: "create" }))

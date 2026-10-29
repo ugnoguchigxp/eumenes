@@ -7,6 +7,7 @@ import {
 	tokyoDay,
 	type ProfileItem,
 } from "../service/profile";
+import { validityOf } from "../service/validity";
 
 const item = (
 	id: string,
@@ -69,6 +70,21 @@ test("the keep order is kinds first, newest first inside a kind (never the showi
 	]);
 });
 
+test("over the budget the user's own words are kept before inferences and observations", () => {
+	const items = [
+		item("c-inferred", "constraint", 9, { source: "inferred" }),
+		item("t", "tendency", 99),
+		item("p-said", "preference", 1),
+		item("p-inferred", "preference", 5, { source: "inferred" }),
+	];
+	expect(keepOrder(items).map((i) => i.id)).toEqual([
+		"p-said",
+		"c-inferred",
+		"p-inferred",
+		"t",
+	]);
+});
+
 test("an item shows its text, source and absolute days; hidden fields stay out", () => {
 	expect(
 		profileItemFields(
@@ -101,4 +117,16 @@ test("days are Asia/Tokyo calendar days; an exclusive end shows its last day", (
 	// 2026-10-13T15:00Z is 2026-10-14 00:00 in Tokyo.
 	expect(tokyoDay(Date.parse("2026-10-13T15:00:00Z"))).toBe("2026-10-14");
 	expect(lastTokyoDay(Date.parse("2026-10-13T15:00:00Z"))).toBe("2026-10-13");
+});
+
+test("the period the screen shows is in Asia/Tokyo days too, whatever the host's zone", () => {
+	// 2026-10-28T15:00Z is 10-29 00:00 in Tokyo (still 10-28 in most other zones): it starts 10-29, and an
+	// exclusive end there leaves 10-28 as the last day.
+	const at = Date.parse("2026-10-28T15:00:00.000Z");
+	expect(validityOf({ validFromMs: at, validUntilMs: null })).toEqual({
+		from: "2026-10-29",
+	});
+	expect(validityOf({ validFromMs: null, validUntilMs: at })).toEqual({
+		until: "2026-10-28",
+	});
 });

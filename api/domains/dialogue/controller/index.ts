@@ -33,6 +33,11 @@ export function registerDialogue(app: Hono, service: DialogueService) {
 	app.get("/api/conversations/:id/resources", (c) =>
 		c.json(service.conversationResources(c.req.param("id"))),
 	);
+	app.post("/api/conversations/:id/recent/clear", async (c) => {
+		if (!(await service.clearRecent(c.req.param("id"))))
+			return c.json({ error: "conversation_busy" }, 409);
+		return c.json({ ok: true });
+	});
 	app.get("/api/todo-notices", (c) => {
 		const query = parseQuery(c, todoNoticesQuery, { code: "invalid_input" });
 		if (!query.ok) return query.response;

@@ -215,7 +215,7 @@ LARMが`timings`を返す場合、`larm.llm_timing`に`providerPromptMs`（入�
 
 `larm.llm_timing`は読取りに失敗した場合も、届いていた許可済みのusage・Provider timingsを記録します。`finishReason`は`stop`・`tool_calls`・`function_call`・`length`・`content_filter`・`unknown`だけです。`streamDone`はstream終端の受信（JSON応答では本文の解析完了）を1/0で示します。終了理由自体が届かない場合は省略します。
 
-`streamFailure`は`output_limit`・`content_filter`・`missing_end`・`empty_output`・`invalid_tool_calls`・`aborted`・`invalid_response`・`read_error`を区別します。外向きの`chat_stream_incomplete`と、途中の本文・引数を採用しない判定は維持します。例えば`output_limit`は出力上限到達を観測したもので、LARMの中継切断を示しません。usageやtimingsが届かない場合は不明として省略し、0にはしません。これらの診断には本文・引数・Providerの自由文は含めません。
+`streamFailure`は`output_limit`・`content_filter`・`missing_end`・`empty_output`・`invalid_tool_calls`・`aborted`・`invalid_response`・`read_error`を区別します。外向きのエラーは`chat_stream_incomplete`で、途中の本文・引数を採用しない判定は維持します。ただし、正常に終わって本文もツール呼出しも無い`empty_output`だけは外向きを`chat_output_empty`に分けます（会話の呼出しでは返事なしとして完了し、`dialogue.no_answer`を記録します。ほかの呼出しでは失敗です）。思考（reasoning）の文字数は`reasoningChars`に数だけを記録します。例えば`output_limit`は出力上限到達を観測したもので、LARMの中継切断を示しません。usageやtimingsが届かない場合は不明として省略し、0にはしません。これらの診断には本文・引数・Providerの自由文は含めません。
 
 補助接続の内部処理では物理的にmainへ置き換わっても、`sessionRole`へ呼出し元の`auxiliary`または`subagent`を保持します。`profile`だけで会話段を分類せず、`phase`・runId・attemptId等と対応させてください。接続を比較するrunnerは、同一接続の対照でも論理的な呼出し元を記録します。
 

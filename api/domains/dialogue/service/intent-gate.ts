@@ -1,4 +1,5 @@
 import { getLogger } from "../../../infrastructure/logger";
+import { systemContext } from "../../../infrastructure/system-context";
 import type { IntentJudgment } from "../../inference";
 import {
 	insertIntentJudgment,
@@ -11,20 +12,22 @@ const log = getLogger("dialogue");
 
 /**
  * How a generation is routed (the intent gate design, section 5): `free` is today's routing (the model decides,
- * every tool offered); `search` asks for the toolchain search first. The judge's label is a signal for this one
- * decision, never an instruction: `chat`, `followup`, `noise` and `incomplete` leave the routing as it is.
+ * every tool offered); `search` asks for the toolchain search first; `answer` lets no tool be called (the turn is
+ * talk). The judge's label decides this one thing only: `followup` leaves the routing as it is.
  */
-export type IntentRoute = "free" | "search";
+export type IntentRoute = "free" | "search" | "answer";
+
+/** Labels that are no request of work: the model answers (or says nothing) without a tool. */
+const TALK = new Set<IntentJudgment["choice"]>(["chat", "noise", "incomplete"]);
 
 /** The routing a judgement asks for under the saved threshold (a threshold on a score, not a chance of being right). */
 export function routeOf(
 	judgment: IntentJudgment,
 	searchScore: number,
 ): IntentRoute {
-	return judgment.choice === "request" &&
-		judgment.probabilities.request >= searchScore
-		? "search"
-		: "free";
+	if (judgment.choice === "request")
+		return judgment.probabilities.request >= searchScore ? "search" : "free";
+	return TALK.has(judgment.choice) ? "answer" : "free";
 }
 
 export type IntentGate = {
@@ -32,6 +35,29 @@ export type IntentGate = {
 	/** What the model then did in the generation, kept with the judgement (the shadow comparison). */
 	observe(observed: { searched: boolean; delegated: boolean }): void;
 };
+
+/** What the judge found, as the system part states it: a toolchain request or not (the route-context design, 2.1). */
+const INTENT_TEXTS: Partial<Record<IntentRoute, string>> = {
+	search: systemContext("dialogue.contexts.intent.search", {}),
+	answer: systemContext("dialogue.contexts.intent.answer", {}),
+};
+
+/**
+ * The system part with the judgement as its last section: it changes turn by turn, so the part before it stays the
+ * cached prefix. `free` (no judgement, or one it does not route by) adds nothing.
+ */
+export function withIntent<M extends { role: string; content: string }>(
+	messages: readonly M[],
+	route: IntentRoute,
+): M[] {
+	const text = INTENT_TEXTS[route];
+	const [first, ...rest] = messages;
+	if (!text || first?.role !== "system") return [...messages];
+	return [
+		{ ...first, content: `${first.content}\n\n## Intent\n${text}` },
+		...rest,
+	];
+}
 
 const NO_GATE: IntentGate = { route: "free", observe() {} };
 /** How long `shadow` lets a judgement run for its record; the generation never waits for it. */

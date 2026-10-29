@@ -261,8 +261,12 @@ async function agentRequest(
 		credential,
 		auth: connection.auth,
 		messages: fitted.messages,
+		// The agent SDKs take no tool choice: a call that may make no tool call (`none`) is sent without tools.
 		tools:
-			options?.toolOutputFormat === "json-schema" ? undefined : options?.tools,
+			options?.toolOutputFormat === "json-schema" ||
+			options?.toolChoice === "none"
+				? undefined
+				: options?.tools,
 		outputSchema: options?.jsonOutput ? options.jsonSchema : undefined,
 		// The conversation's level for the cloud (`off` sends none) takes the place of a control call's effort.
 		reasoningEffort:

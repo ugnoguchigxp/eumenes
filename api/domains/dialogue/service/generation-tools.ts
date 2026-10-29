@@ -62,7 +62,8 @@ export const delegateArgs = z.discriminatedUnion("mode", [
 			toolchain: id,
 			request: z.string().trim().min(1).max(8000),
 			announcement: announcement.optional(),
-			impact: z.enum(impacts),
+			/** Asked for by the definition; absent, the host takes it from the target and the toolchain (D7). */
+			impact: z.enum(impacts).optional(),
 			inputs: z.record(z.string(), z.unknown()).optional(),
 			target: id.optional(),
 			/** The resources handed over with the request (`a<n>` of the ledger). */
@@ -246,7 +247,7 @@ export function parseCall(call: NativeToolCall): ParsedCall {
 			"invalid_tool_arguments",
 			validationIssues(parsed.error, value, [call.name]),
 			undefined,
-			repairIssues(parsed.error),
+			repairIssues(parsed.error, value),
 		);
 	return { name: call.name, call, args: parsed.data } as ParsedCall;
 }

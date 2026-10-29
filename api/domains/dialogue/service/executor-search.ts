@@ -134,9 +134,13 @@ export async function instant(
 			};
 }
 
-/** The trace of an utterance generation that answered without handing work over. */
+/**
+ * The trace of an utterance generation that answered without handing work over. `refused`: it asked a toolchain
+ * and every such call was refused (its output broke the contract).
+ */
 export function answered(
 	x: ExecutorContext,
+	refused = false,
 ): Omit<
 	Parameters<ToolchainRoutingPort["recordSelectionInTransaction"]>[1],
 	"runId"
@@ -163,7 +167,7 @@ export function answered(
 					functionName: instant.card.functionName,
 					request: JSON.stringify(instant.inputs),
 				}
-			: { decision: "answer" as const }),
+			: { decision: refused ? ("rejected" as const) : ("answer" as const) }),
 		...(x.state.search?.query ? { query: x.state.search.query } : {}),
 	};
 }

@@ -68,12 +68,19 @@ export type AgencyLlmPortDeps = {
 };
 
 const TRANSIENT =
-	/^(deadline_exceeded|local_timeout|network_unavailable|larm_preempted|larm_connection_failed|larm_(control|inference)_(429|502|503|504))$/;
+	/^(deadline_exceeded|local_timeout|network_unavailable|larm_connection_failed|larm_(control|inference)_(429|502|503|504))$/;
 
 /** Maps an inference failure to the core's call error; an abort of the caller's signal propagates as is. */
 function callError(error: unknown, signal: AbortSignal): never {
 	if (signal.aborted) throw error;
 	const code = toErrorCode(error, "inference_failed");
+	// The call yielded its LARM slot to the foreground: an abort from below, so the core neither tries it again at
+	// once (the foreground has just begun) nor counts it against the batch.
+	if (code === "larm_preempted") {
+		const yielded = new Error(code);
+		yielded.name = "AbortError";
+		throw yielded;
+	}
 	if (TRANSIENT.test(code)) throw new LlmCallError("connection", true);
 	if (error instanceof DOMException && error.name === "TimeoutError")
 		throw new LlmCallError("connection", true);

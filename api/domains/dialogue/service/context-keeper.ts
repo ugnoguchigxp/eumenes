@@ -314,7 +314,8 @@ function prepareKeeper(
 	const stateLines = stateLinesInTransaction(deps, db, {
 		conversationId,
 		nowMs: Date.parse(deps.clock()),
-		lastAt: recent.at(-1) ? Date.parse(recent.at(-1)!.at) : null,
+		lastAt: prefix.lastAt,
+		since: prefix.since,
 		lastAgent: [...recent].reverse().find((u) => u.speaker === "agent") ?? null,
 		state,
 		refs: deps.work?.refsInTransaction(db, conversationId) ?? {
@@ -464,6 +465,7 @@ export function createContextKeeper(
 					window,
 					nowMs: Date.parse(deps.clock()),
 					pending: pendingMessageIdsInTransaction(deps, db, conversationId),
+					history: localHarness.history,
 				}).reason;
 			})
 			.catch(() => false);

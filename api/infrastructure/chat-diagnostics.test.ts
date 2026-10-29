@@ -30,7 +30,13 @@ for (const [finish, done, text, failure] of [
 			undefined,
 			(value) => diagnostics.push(value),
 		);
-		if (failure) await expect(result).rejects.toThrow("chat_stream_incomplete");
+		// A clean end with nothing in it is the model saying nothing; the others are broken streams.
+		if (failure)
+			await expect(result).rejects.toThrow(
+				failure === "empty_output"
+					? "chat_output_empty"
+					: "chat_stream_incomplete",
+			);
 		else expect((await result).text).toBe(text);
 		expect(diagnostics).toHaveLength(1);
 		expect(diagnostics[0]).toMatchObject({

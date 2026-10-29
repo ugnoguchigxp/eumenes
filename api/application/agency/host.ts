@@ -33,6 +33,7 @@ import type { Settings } from "../../domains/settings";
 import { toErrorCode } from "../../infrastructure/error-code";
 import { getLogger } from "../../infrastructure/logger";
 import type { SqliteStore } from "../../infrastructure/sqlite";
+import { systemContext } from "../../infrastructure/system-context";
 import type { AgencyCallIdentity } from "./llm-port";
 import { selectMemoryTopics } from "./topics";
 import type { AgencyWork } from "./work";
@@ -48,6 +49,9 @@ const TOPICS_TTL_MS = 30_000;
 /** Outbox events read per pass. */
 const FEED_PAGE = 200;
 const LOG_REASON_CHARS = 120;
+/** A proactive utterance runs nothing: it is read aloud, and it never promises to make, look up, start or play. */
+const UTTERANCE_STYLE =
+	ttsUtteranceStyle + systemContext("dialogue.contexts.agency.utterance", {});
 export type AgencyHostDeps = {
 	store: Pick<SqliteStore, "read" | "write" | "onCommit">;
 	conversation: Pick<
@@ -258,7 +262,7 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 			hostTopics: true,
 			hostTodos: true,
 			...(cfg.emotion ? { utteranceEmotion: true } : {}),
-			utteranceStyle: ttsUtteranceStyle,
+			utteranceStyle: UTTERANCE_STYLE,
 			...(interests.length > 0 ? { standingInterests: interests } : {}),
 			todos: () => todosNow(c),
 			tools: [],
@@ -486,7 +490,9 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 					c.runtime !== cy.runtime ||
 					convs.get(c.id) !== c ||
 					conversation.latestOrdinalInTransaction(db, c.id) !== cy.ordinal ||
-					deps.conversationBusy(db, c.id)
+					deps.conversationBusy(db, c.id) ||
+					// The user is speaking or being answered (ASR, TTS) though no message is written yet.
+					inference.foregroundBusy()
 				)
 					return "stale";
 				conversation.appendInTransaction(db, {
@@ -609,7 +615,10 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 			!on() ||
 			convs.get(c.id) !== c ||
 			cy.mine !== c.generation ||
-			controller.signal.aborted;
+			controller.signal.aborted ||
+			// A call cut off from below (yielded to the foreground) is not a silent moment: it must not spend the
+			// idle backoff.
+			calls.some((call) => call.code === "aborted");
 		logDecision(c, trigger, decision, superseded);
 		if (superseded) return "aborted";
 		// A busy moment is not a silent one: it must not spend the idle backoff.
