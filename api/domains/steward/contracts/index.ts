@@ -95,14 +95,15 @@ export const RETRY_DELAYS_MS = [0, 15_000, 60_000] as const;
 export const CAPTURE_RETRY_MS = 30_000;
 export const CAPTURE_RETRY_MAX_MS = 5 * 60_000;
 /**
- * The control request's deadline and output cap (inference allows a structured request 90 s and
- * 1500 tokens). The cloud fallback reserves up to 60 s of the deadline, so LARM gets about 30 s.
+ * The control request's deadline and output cap (inference allows a structured request 300 s and 1500 tokens).
+ * LARM thinks on top of the cap (inference adds 10,000 tokens for it) at about 45 tokens/s: the deadline lets it
+ * finish. The cloud fallback reserves up to 60 s of the deadline.
  */
-export const INFERENCE_MS = 90_000;
+export const INFERENCE_MS = 300_000;
 export const MAX_OUTPUT_TOKENS = 1200;
 export const MAX_OUTPUT_BYTES = 32 * 1024;
-/** The queue deadline of a job: it covers waiting behind earlier jobs and the retries. */
-export const JOB_DEADLINE_MS = 5 * 60_000;
+/** The queue deadline of a job: it covers waiting behind earlier jobs, the call (`INFERENCE_MS`) and a retry. */
+export const JOB_DEADLINE_MS = 15 * 60_000;
 
 // ---- ports the application provides (queue and inference are lower than the steward's callers) ----
 

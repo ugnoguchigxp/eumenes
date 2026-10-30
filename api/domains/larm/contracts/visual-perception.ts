@@ -27,13 +27,33 @@ export const perceptionOptions = z
 	});
 const dim = z.number().int().positive().max(8192);
 const ms = z.number().finite().nonnegative();
+const positiveTokens = z.number().int().positive();
+const perceptionExecution = z.discriminatedUnion("backend", [
+	z.strictObject({
+		device: z.literal("cuda:0"),
+		backend: z.literal("transformers"),
+		dtype: z.literal("bfloat16"),
+		decoderDtype: z.literal("float32"),
+		outputTokens: positiveTokens,
+		visualTokens: positiveTokens,
+	}),
+	z.strictObject({
+		device: z.literal("cpu"),
+		backend: z.literal("llama.cpp"),
+		dtype: z.literal("qad-q4_0"),
+		decoderDtype: z.null(),
+		outputTokens: z.number().int().nonnegative(),
+		visualTokens: positiveTokens,
+		inputTokens: positiveTokens,
+	}),
+]);
 export const perceptionResult = z
-	.object({
+	.strictObject({
 		contractVersion: z.literal("larm.visual-perception.v1"),
 		model: z.string().min(1).max(128),
-		modelRevision: z.string().min(1).max(200),
+		modelRevision: z.string().regex(/^[a-f0-9]{40}$/),
 		task: perceptionTask,
-		image: z.object({
+		image: z.strictObject({
 			width: dim,
 			height: dim,
 			orientation: z.literal("exif-normalized"),
@@ -41,7 +61,7 @@ export const perceptionResult = z
 		response: z.string().max(65536),
 		detections: z
 			.array(
-				z.object({
+				z.strictObject({
 					label: z.string().max(4096),
 					box: z.tuple([ms, ms, ms, ms]),
 					text: z.string().max(4096).optional(),
@@ -50,19 +70,20 @@ export const perceptionResult = z
 			.max(128),
 		masks: z
 			.array(
-				z.object({
+				z.strictObject({
 					detectionIndex: z.number().int().min(0).max(127),
 					encoding: z.literal("png-base64"),
 					mode: z.enum(["binary", "alpha"]),
 					width: dim,
 					height: dim,
+					// List/detail APIs strip mask data; the provider boundary validates actual base64 and PNG bytes.
 					data: z.string().max(5_600_000),
 				}),
 			)
 			.max(8),
 		count: z.number().int().nonnegative().optional(),
 		truncated: z.boolean(),
-		timings: z.object({
+		timings: z.strictObject({
 			imageDecodeMs: ms,
 			preprocessMs: ms,
 			generationMs: ms,
@@ -70,16 +91,18 @@ export const perceptionResult = z
 			postprocessMs: ms,
 			totalMs: ms,
 		}),
-		execution: z.object({
-			device: z.string().max(128),
-			backend: z.string().max(128),
-			dtype: z.string().max(128),
-			decoderDtype: z.string().max(128),
-			outputTokens: z.number().int().nonnegative(),
-			visualTokens: z.number().int().nonnegative(),
-		}),
+		execution: perceptionExecution,
 	})
 	.superRefine((v, c) => {
+		if (
+			v.execution.backend === "llama.cpp" &&
+			(v.task !== "describe" ||
+				v.detections.length !== 0 ||
+				v.masks.length !== 0 ||
+				Object.hasOwn(v, "count") ||
+				v.execution.visualTokens >= v.execution.inputTokens)
+		)
+			c.addIssue({ code: "custom", message: "invalid_visual_cpu_result" });
 		if (
 			v.image.width * v.image.height > 4194304 ||
 			v.detections.some(

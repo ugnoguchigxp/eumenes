@@ -123,11 +123,14 @@ export function callOptionsFor(
 							"low",
 					}
 				: {}),
+		// A read-ahead only reads the prompt and stops at its own bound (one token): it gets no room for thinking.
 		...(r.row.outputLimit || r.outputLimit
 			? {
 					maxOutputTokens:
 						Math.min(r.row.outputLimit || Infinity, r.outputLimit || Infinity) +
-						(thinksByDefault ? REASONING_ALLOWANCE_TOKENS : 0),
+						(thinksByDefault && !r.session?.readAhead
+							? REASONING_ALLOWANCE_TOKENS
+							: 0),
 				}
 			: {}),
 		...(r.row.attemptMs ? { attemptMs: r.row.attemptMs } : {}),

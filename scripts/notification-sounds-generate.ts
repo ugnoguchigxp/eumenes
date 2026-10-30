@@ -1,35 +1,21 @@
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createLarmPlayground, findServiceTarget } from "../api/domains/larm";
 import { resolveLarmToken } from "../api/infrastructure/auth-config";
 import { liveLarmSettings } from "./live-larm";
 
-if (!process.argv.includes("--run"))
-	throw new Error("use --run to generate notification assets");
-const output = resolve("web/src/domains/settings/sounds");
-const evidence = resolve("verification-reports/notification-sounds");
+const candidateAt = process.argv.indexOf("--candidate");
+const candidateId = candidateAt < 0 ? undefined : process.argv[candidateAt + 1];
+if (!process.argv.includes("--run") || !candidateId)
+	throw new Error(
+		"use --run --candidate <id> for one 5-second preview; production assets are never replaced",
+	);
+const output = resolve(
+	"verification-reports/notification-sounds/candidates",
+	new Date().toISOString().replaceAll(":", "-"),
+);
+const evidence = output;
 mkdirSync(output, { recursive: true });
-mkdirSync(evidence, { recursive: true });
-const saved = liveLarmSettings();
-const gateway = createLarmPlayground({
-	...saved,
-	baseUrl: saved.baseUrl ?? undefined,
-	voice: saved.voice ?? undefined,
-	token: resolveLarmToken(process.env),
-});
-const target = findServiceTarget(
-	(await gateway.catalog(AbortSignal.timeout(30000))).targets,
-	"media.music.generate",
-	"larm.music-generation.v1",
-);
-if (!target?.description) throw new Error("music_service_unavailable");
-console.log(
-	JSON.stringify({
-		event: "service_discovered",
-		endpoint: target.endpoint,
-		description: target.description,
-	}),
-);
 const motifs = [
 	[
 		"soft-chime",
@@ -72,65 +58,68 @@ const motifs = [
 		"A soft warm synth mallet chord blooming gently then fading, a friendly completion sound",
 	],
 ] as const;
-for (const [id, motif] of motifs) {
-	const path = `${output}/${id}.wav`;
-	if (existsSync(path)) {
-		console.log(JSON.stringify({ id, status: "already_exists" }));
-		continue;
-	}
-	const signal = AbortSignal.timeout(300000);
-	const result = await gateway.execute(
-		target,
+const selected = motifs.find(([id]) => id === candidateId);
+if (!selected) throw new Error("unknown_notification_candidate");
+const saved = liveLarmSettings();
+const gateway = createLarmPlayground({
+	...saved,
+	baseUrl: saved.baseUrl ?? undefined,
+	voice: saved.voice ?? undefined,
+	token: resolveLarmToken(process.env),
+});
+const target = findServiceTarget(
+	(await gateway.catalog(AbortSignal.timeout(30000))).targets,
+	"media.music.generate",
+	"larm.music-generation.v1",
+);
+if (!target?.description) throw new Error("music_service_unavailable");
+console.log(
+	JSON.stringify({
+		event: "service_discovered",
+		endpoint: target.endpoint,
+		description: target.description,
+	}),
+);
+
+const [id, motif] = selected;
+const path = `${output}/${id}.wav`;
+const signal = AbortSignal.timeout(300000);
+const result = await gateway.execute(
+	target,
+	{
+		text: `${motif}. A polished subtle desktop notification sound effect. Only one short isolated event, immediate gentle attack, fully fades to silence. No voice, no speech, no background music, no harsh beep, no alarm, no hiss.`,
+		task: "sound-effect",
+		durationSeconds: 5,
+		quality: "balanced",
+		outputFormat: "wav",
+	},
+	signal,
+	async (progress) => {
+		console.log(
+			JSON.stringify({ id, phase: progress.phase, jobId: progress.jobId }),
+		);
+	},
+);
+signal.throwIfAborted();
+if (!result.bytes) throw new Error("audio_missing");
+writeFileSync(path, result.bytes);
+writeFileSync(
+	`${evidence}/${id}.json`,
+	JSON.stringify(
 		{
-			text: `${motif}. A polished subtle desktop notification sound effect. Only one short isolated event, immediate gentle attack, fully fades to silence. No voice, no speech, no background music, no harsh beep, no alarm, no hiss.`,
-			task: "sound-effect",
-			durationSeconds: 1.5,
-			outputFormat: "wav",
+			id,
+			prompt: motif,
+			artifactId: result.artifact?.id,
+			actualModel: result.actualModel,
+			runtime: result.runtime,
+			requestedSeconds: 5,
+			listeningStatus: "pending",
+			sourceBytes: result.bytes.length,
 		},
-		signal,
-		async (progress) => {
-			console.log(
-				JSON.stringify({ id, phase: progress.phase, jobId: progress.jobId }),
-			);
-		},
-	);
-	signal.throwIfAborted();
-	if (!result.bytes) throw new Error("audio_missing");
-	const raw = `${evidence}/${id}-source.wav`;
-	writeFileSync(raw, result.bytes);
-	const normalized = Bun.spawnSync([
-		"ffmpeg",
-		"-v",
-		"error",
-		"-y",
-		"-i",
-		raw,
-		"-af",
-		"loudnorm=I=-22:TP=-3:LRA=7,afade=t=in:d=0.015,areverse,afade=t=in:d=0.12,areverse",
-		"-ar",
-		"24000",
-		"-ac",
-		"1",
-		"-c:a",
-		"pcm_s16le",
-		path,
-	]);
-	if (normalized.exitCode !== 0) throw new Error("audio_normalization_failed");
-	writeFileSync(
-		`${evidence}/${id}.json`,
-		JSON.stringify(
-			{
-				id,
-				prompt: motif,
-				artifactId: result.artifact?.id,
-				actualModel: result.actualModel,
-				runtime: result.runtime,
-				requestedSeconds: 1.5,
-				sourceBytes: result.bytes.length,
-			},
-			null,
-			2,
-		) + "\n",
-	);
-	console.log(JSON.stringify({ id, status: "completed" }));
-}
+		null,
+		2,
+	) + "\n",
+);
+console.log(
+	JSON.stringify({ id, status: "candidate_ready_for_listening", path }),
+);

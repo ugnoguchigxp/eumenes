@@ -27,9 +27,9 @@ test("the selected bundled WAV is loaded; HTTP failures and non-audio are reject
 	);
 	vi.stubGlobal("fetch", fetcher);
 	expect(
-		await notificationSoundWav("water-drop", new AbortController().signal),
+		await notificationSoundWav("glass-bell", new AbortController().signal),
 	).toEqual(wav);
-	expect(fetcher.mock.calls[0]?.[0]).toContain("water-drop.wav");
+	expect(fetcher.mock.calls[0]?.[0]).toContain("glass-bell.wav");
 	fetcher.mockImplementationOnce(
 		async () => new Response("missing", { status: 404 }),
 	);
@@ -55,4 +55,13 @@ test("cancellation after download discards the late bytes", async () => {
 	await expect(
 		notificationSoundWav("soft-chime", abort.signal),
 	).rejects.toThrow();
+});
+
+test("retired assets cannot sound and are not replaced with a beep", async () => {
+	const fetcher = vi.fn();
+	vi.stubGlobal("fetch", fetcher);
+	await expect(
+		notificationSoundWav("tiny-harp", new AbortController().signal),
+	).rejects.toThrow("notification_sound_missing");
+	expect(fetcher).not.toHaveBeenCalled();
 });

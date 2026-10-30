@@ -80,6 +80,13 @@ export function createRuleOf({
 		};
 		const value = String(readPath(effective, field.path, target) ?? "");
 		switch (field.path) {
+			case "$.voice.notificationSound":
+				rule.options = selectedOptions(
+					[...(field.options ?? [])],
+					value,
+					"再制作待ち（以前の通知音）",
+				);
+				break;
 			case "$.larm.voice": {
 				rule.options = selectedOptions(
 					[

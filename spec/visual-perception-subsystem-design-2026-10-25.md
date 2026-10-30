@@ -78,6 +78,18 @@ HTTP 400、413、401、429、接続管理409、サービス503/504、通信断�
 
 ## 5. 画像・応答の検証
 
+2026-10-31改訂（利用者の明示依頼、LARM commit `8fb87c76fd3210f9a8c0058207240bac604e58be`）: 保存済みControlの公開`/openapi.json`にある`VisualPerceptionResponse`と照合する。executionは公開契約の2分岐を検査し、profile/model名では分岐しない。CPU（cpu/llama.cpp/qad-q4_0）はdescribeだけで、decoderDtypeは必須null（decoder非搭載）、detections/masksは空、countは存在不可。visualTokensとinputTokensは必須正整数で前者が後者未満、outputTokensは0以上の整数。Transformers（cuda:0/transformers/bfloat16）はdecoderDtype=float32を維持し、公開契約どおり両token数を正整数とする。必須項目の省略・既定値補完・全分岐へのnull許可は行わない。
+
+検証順は契約の正常/拒否境界→LARM・OCR・物体認識の結合と取消回帰→`bun run verify -- --domain larm --domain ocr --domain object-recognition`→対象を明示したサーバー不要のブラウザE2E→実LARMの説明・失敗・推論途中取消と解放/資格失効/新鮮なCOLD・通常検出のHTTP確認とする。fixtureと実接続を分けて記録し、失敗は根拠を確認してから再試行する。既存の状態取得・エラー表示、catalog発見、単一queueと取消後の不採用を再利用する。サーバー操作は明示許可がある場合だけとし、通常検出の保存先変更は必要な場合だけ既存設定APIで行う。
+
+2026-10-31検証結果: 公開OpenAPIはHTTP 200で、上記2分岐と必須項目を確認した。契約・視覚解析・OCR/物体認識の対象75試験、Web対象33試験、表示部品8試験が成功。追加のdomain試験はLARM backend402件、OCR backend48件・表示部品18件・Web10件、物体認識backend21件・Web9件が成功（対象試験との重複を含む）。型検査・DesignSystemビルド・変更箇所のlint/整形/サイズ検査も成功。一括verifyは、今回未変更の`useRecognitionRuntime`が306行で関数上限300行を超えるため停止し、担当外を修正して通してはいない。
+
+ブラウザE2Eは`bun x --no-install playwright test tests/browser/visual-response.spec.ts`でCPU説明・Transformersマスク・失敗・取消の4件成功。初回は試験用URLがclientのloopback制約に合わず、その修正後は分析状態と停止観測の同一role選択で失敗した。試験側の接続先とlocatorを修正し、製品の制約・期待結果は緩めていない。`EUMENES_VISUAL_RESULT=verification-reports/visual-response-live/accepted-result.json`を付けた同試験1件では、実LARMの検証済み結果を実client/hookへ渡し、説明とdecoder非搭載の表示を確認した。
+
+実接続は`scripts/visual-response-live.ts --run`。説明HTTP 200（`req_64160556-a5cf-4301-b851-942efc004553`）、非対応用途による意図したHTTP 400（`req_3dfa768a-7e32-4c67-a915-8bc09d3a1cb3`）、推論POST開始300ms後の取消を確認。3操作とも自分のConnectionをDELETE 204で解放し、旧資格でのPOSTは401、releasedAt以降の新鮮なCOLDを確認した。CPU実測はvisualTokens=850/inputTokens=872/outputTokens=19、decoderDtype=null。通常検出の新入口はこのEumenesホストから`GET /hosting/status`と`POST /api/analyze`がともに200（Request IDヘッダーなし）。資格・claim・生応答は診断ログへ保存していない。診断と検証済みの結果資産は`verification-reports/visual-response-live/`に分けて保持する。
+
+利用者から再起動済みとの連絡後、稼働APIで通常検出の保存先を必要な1回だけ更新し、revision1→2、credentialSource=larmを確認した。`scripts/visual-response-app-live.ts --run`はサーバーを起動せず、実アーティファクトへの画像入力、通常検出完了、詳細説明の保存・本文とdecoder非搭載の画面表示、HTTP400の失敗表示、画面からの途中取消後のcancelled/result=null/releaseConfirmed=true/COLDを確認した。pageerrorは0件。Eumenesの受付Request IDは通常検出`0c34d5f7-d9cc-4b8e-9484-6027ff42035b`、説明`9bf14ee1-a51d-40f4-8194-b3ba036eb0a8`、取消`f12bf6f0-63bd-4f53-b5bf-dcd2de3080f4`。記録と画面は`verification-reports/visual-response-app-live/`。検証用の公開サンプル画像1件とその分析履歴を保持している。実Transformersのマスク生成、動画入力、実機器での撮影は今回の実接続受入には含めていない。Context Stillは今回context_compile/compile_eval各1回。
+
 PNG/JPEG/WebPの静止画1枚を正規化し、実データとMIMEを照合する。復号後4MiB以下、4,194,304pixels以下、各辺8,192px以下、JSON要求全体8MiB以下を送信前に検査する。queryは通常2,048文字以内。detection配列は最大32要素・各1〜128文字、maxNewTokensの指定を公開する場合も16〜512を強制する。未知のフィールドを送らない。
 
 元資料の16MiB/16MP受付と詳細分析の上限は異なるため、詳細分析だけが上限超過になる場合を画面に示す。初版は黙って縮小・切抜き・部分送信せず、原寸の向き正規化とPNG/JPEGへの変換で収まらなければ413相当で失敗する。

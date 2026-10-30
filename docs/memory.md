@@ -74,7 +74,7 @@ ContextWindowの内容・並び・予算・保持・再構成・忘却の扱い�
 | 手入れ | 会話の `maintenance_revision` ごとに 1 つ |
 
 - ジョブ種別は `steward.step.v1`、`dedupeKey` ＝ unitId。資源は `inference.aux`。
-- **prepare** で対象がまだ有効か確かめ、推論の期限と request を取り、忘却の連番 `forget_seq` を単位に記録する。**execute** は schema 付きの推論 1 回（上限は期限90秒・出力1200 tokens。会話と同じ route を使い、cloud への切替が期限から最大60秒を確保するので、LARM には約30秒が残る）。**settle** は 1 つの transaction で、再検証、結果の適用、完了印、判断記録、Window の再公開、次の単位の enqueue を行う。
+- **prepare** で対象がまだ有効か確かめ、推論の期限と request を取り、忘却の連番 `forget_seq` を単位に記録する。**execute** は schema 付きの推論 1 回（上限は期限300秒・出力1200 tokens。LARM の考えるモデルには inference が考える分 10,000 tokens を足すので、約45 tokens/秒でも書き終わる長さにしている。会話と同じ route を使い、cloud への切替が期限から最大60秒を確保する。ジョブの期限は15分で、待ち・推論・再試行を含む）。**settle** は 1 つの transaction で、再検証、結果の適用、完了印、判断記録、Window の再公開、次の単位の enqueue を行う。
 - 一時的な失敗（タイムアウト・接続失敗）は Queue の retry（最大3回）で同じジョブのまま再試行する。Queue で終わった（failed / expired / interrupted）単位、または出力が使えなかった単位は `failed` で閉じ、対象ごとに失敗を数える。`kick` が**新しい unitId** の単位を作り直す。3回失敗した往復は `skipped` の印で次へ進み（`dispose-exchanges` が見送られた往復は未処理と同じ扱い、`summarize` が見送られた往復は中身を失わないよう逐語のまま）、依頼は `none`（`steward_failed`）にする。
 - 往復の完了は、3つの反映 step すべてに印（`done` / `skipped`）が付いたときである。`summarize` を選ばれた往復は、要約に入るまで逐語のまま残る。
 - 長期記憶を書く step（`curate-memory`、`consolidate-memory`）の `concurrencyKey` は全会話共通の `steward:long-term`。Window だけを扱う step は `steward:<conversationId>`。

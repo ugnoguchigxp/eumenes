@@ -43,6 +43,8 @@ const errors: Record<string, string> = {
 	larm_http_504: "解析サービスの待機時間を超えました。",
 	invalid_larm_audience: "保存済みのLARM接続方式では詳細分析を利用できません。",
 };
+const decoderLabel = (value: string | null) =>
+	value === null ? "decoder非搭載" : value;
 export function VisualAnalysis(props: VisualAnalysisProps) {
 	const id = useId().replace(/:/g, "");
 	const [task, setTask] = useState<VisualAnalysisTask>("describe");
@@ -324,7 +326,8 @@ export function VisualAnalysis(props: VisualAnalysisProps) {
 								</p>
 								<p>
 									{result.execution.device} / {result.execution.backend} /{" "}
-									{result.execution.dtype} / {result.execution.decoderDtype}
+									{result.execution.dtype} /{" "}
+									{decoderLabel(result.execution.decoderDtype)}
 								</p>
 								<p>
 									出力 {result.execution.outputTokens} tokens · 画像{" "}

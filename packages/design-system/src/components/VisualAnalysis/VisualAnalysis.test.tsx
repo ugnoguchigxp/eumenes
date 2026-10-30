@@ -40,6 +40,45 @@ const record: VisualAnalysisRecord = {
 	},
 };
 describe("explicit visual analysis", () => {
+	it("explains the CPU decoder absence without changing the mask decoder display", () => {
+		const cpu = {
+			...record,
+			result: {
+				...record.result!,
+				task: "describe" as const,
+				detections: [],
+				masks: [],
+				execution: {
+					device: "cpu",
+					backend: "llama.cpp",
+					dtype: "qad-q4_0",
+					decoderDtype: null,
+					visualTokens: 10,
+					inputTokens: 20,
+					outputTokens: 0,
+				},
+			},
+		};
+		const { rerender } = render(
+			<VisualAnalysis analysisAvailable analysisOpen analysis={cpu} />,
+		);
+		expect(screen.getByText(/decoder非搭載/)).toBeInTheDocument();
+		rerender(
+			<VisualAnalysis
+				analysisAvailable
+				analysisOpen
+				analysis={{
+					...record,
+					result: {
+						...record.result!,
+						execution: { ...record.result!.execution, decoderDtype: "float32" },
+					},
+				}}
+			/>,
+		);
+		expect(screen.queryByText(/decoder非搭載/)).not.toBeInTheDocument();
+		expect(screen.getByText(/float32/)).toBeInTheDocument();
+	});
 	it("shows a provider contract failure instead of leaving the analysis running", () => {
 		render(
 			<VisualAnalysis

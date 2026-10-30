@@ -402,7 +402,7 @@ test("a LARM call that names no reasoning thinks at low; a call on the conversat
 	}
 });
 
-test("a call this domain makes think gets room for the thinking on its output limit; a call that names its level does not", async () => {
+test("a call this domain makes think gets room for the thinking on its output limit; a call that names its level, or a read-ahead, does not", async () => {
 	const larm = larmCalls("hello");
 	const h = await setup(
 		{ text: "cloud" },
@@ -414,6 +414,13 @@ test("a call this domain makes think gets room for the thinking on its output li
 			sessionRole: "main" as const,
 			outputLimit: 4096,
 			reasoning: { larm: "low", cloud: "low" },
+		},
+		// The prewarm: it reads the conversation's prompt and stops at its one token.
+		{
+			sessionRole: "auxiliary" as const,
+			onConversation: true,
+			readAhead: true,
+			outputLimit: 1,
 		},
 	] as const)
 		await h.inference.executeStream(
@@ -428,6 +435,7 @@ test("a call this domain makes think gets room for the thinking on its output li
 	expect(larm.options.map((o) => o?.maxOutputTokens)).toEqual([
 		1200 + REASONING_ALLOWANCE_TOKENS,
 		4096,
+		1,
 	]);
 });
 

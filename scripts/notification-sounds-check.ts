@@ -1,6 +1,6 @@
 import { writeFileSync } from "node:fs";
 import { chromium } from "@playwright/test";
-import { notificationSoundIds } from "../api/domains/settings/contracts/notification-sounds";
+import { notificationSoundOptions } from "../api/domains/settings/contracts/notification-sounds";
 const browser = await chromium.launch({
 	headless: true,
 	args: ["--autoplay-policy=no-user-gesture-required"],
@@ -11,7 +11,9 @@ try {
 	await page.setContent(
 		"<!doctype html><title>Notification audio acceptance</title>",
 	);
-	for (const id of notificationSoundIds.filter((id) => id !== "beep")) {
+	for (const { value: id } of notificationSoundOptions.filter(
+		(option) => option.value !== "beep",
+	)) {
 		const path = `web/src/domains/settings/sounds/${id}.wav`;
 		const probe = Bun.spawnSync([
 			"ffprobe",
@@ -26,7 +28,8 @@ try {
 		if (probe.exitCode !== 0) throw new Error("audio_probe_failed");
 		const measurement = JSON.parse(probe.stdout.toString());
 		const duration = Number(measurement.format.duration);
-		if (duration < 1 || duration > 2) throw new Error("audio_duration_invalid");
+		if (duration < 1 || duration > 5.01)
+			throw new Error("audio_duration_invalid");
 		const decoded = Bun.spawnSync([
 			"ffmpeg",
 			"-v",
@@ -86,7 +89,7 @@ try {
 	await browser.close();
 }
 writeFileSync(
-	"verification-reports/notification-sounds/audio-check.json",
+	"verification-reports/notification-sounds/approved-audio-playback.json",
 	JSON.stringify(results, null, 2) + "\n",
 );
 console.log(JSON.stringify({ checked: results.length, status: "passed" }));

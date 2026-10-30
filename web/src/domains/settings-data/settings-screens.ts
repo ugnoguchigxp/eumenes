@@ -280,7 +280,8 @@ export function buildActions({
 			if (base.group === "speech" && voice.target !== "local") continue;
 			const disabled =
 				id === "notification-sample"
-					? effective.voice.outputVolume <= 0 && !voice.notification.playing
+					? !voice.notification.available ||
+						(effective.voice.outputVolume <= 0 && !voice.notification.playing)
 					: id === "voice-refresh"
 						? voice.connectionChanged ||
 							!saved.larm.baseUrl ||
@@ -450,6 +451,9 @@ export function groupsFor(
 		status +
 		(voice.selected?.credit ? "\nクレジット：" + voice.selected.credit : "") +
 		(voice.sample.error ? "\n" + voice.sample.error : "");
+	if (!voice.notification.available)
+		info.notifications!.description +=
+			"\n以前に選んだ通知音は再制作待ちです。試聴確認済みの音を選び、保存してください。";
 	if (voice.notification.error)
 		info.notifications!.description += "\n" + voice.notification.error;
 	info.devices!.description =

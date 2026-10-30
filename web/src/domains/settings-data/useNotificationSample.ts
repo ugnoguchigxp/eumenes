@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Settings } from "../../../../api/domains/settings/contracts";
+import {
+	defaultNotificationSound,
+	notificationSoundOptions,
+	type Settings,
+} from "../../../../api/domains/settings/contracts";
 import { notificationSoundWav } from "../settings";
 import { useTimerTone } from "../audio";
 
@@ -8,6 +12,11 @@ export function useNotificationSample(
 	settings: Settings["voice"] | undefined,
 	active: boolean,
 ) {
+	const available = notificationSoundOptions.some(
+		(option) =>
+			option.value ===
+			(settings?.notificationSound ?? defaultNotificationSound),
+	);
 	const tone = useTimerTone(
 		{
 			...settings,
@@ -43,7 +52,7 @@ export function useNotificationSample(
 	// A new selection owns its UI state; the effect only releases external playback.
 	useEffect(() => release, [target, release]);
 	async function play() {
-		if (!active) return;
+		if (!active || !available) return;
 		stop();
 		const mine = new AbortController();
 		run.current = mine;
@@ -69,5 +78,5 @@ export function useNotificationSample(
 			}
 		}
 	}
-	return { playing, error, play, stop };
+	return { playing, error, play, stop, available };
 }

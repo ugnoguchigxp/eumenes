@@ -343,3 +343,23 @@ Q1〜Q4 の差分に独立したレビューを1回かけた（中1件・低6件
 | `bun test api/application` | 961件成功。失敗6件・エラー3件は既存のもの（§10.1 と同じ） |
 | `bun test scripts/context-eval` | 72件成功 |
 | 型検査・`oxlint`・`oxfmt --check`・`context:check` | エラー0件 |
+
+### 10.4 UI自由制作の失敗の調査と直し（2026-10-31）
+
+run `13057cfa`「イヤホンのランディングページを作ってみて」→ 確認 → run `a6588517` 承認 → 専門担当の2回目の呼出しが出力の上限で失敗。
+
+| # | 原因 | 扱い |
+| --- | --- | --- |
+| 1 | LARM の claim の出力予約（`outputReserveTokens`）が 4,096。専門担当は 24,576 を頼むが、送る `max_tokens` は小さい方の 4,096。直しの呼出しは考える分 15,544字で本体を書く前に切れた。10-15 以降 2,513 回の呼出しで出力が 4,096 を超えた回は0 | 利用者が LARM 側の上限を撤廃した（10-31）。主会話の接続は backend の稼働中ずっと持つので、新しい claim は backend の再起動から効く |
+| 2 | 新しく作る依頼に、選ぶ呼出しが既存の保存作品を `target` に付けた（確認が「今あるものを変える」になり、承認で既存の作品が開いた） | 選ぶ呼出しの決まりに「target は、今の発言が保存済みの作品を直す・続けると言っているときだけ。新しく作る依頼には付けない」を足した |
+| 3 | 専門担当の1回目の出力が契約違反で断られたが、ログから違反の中身が分からない | `dialogue.specialist_output_rejected` に `violations`（欄と違反の種類、返答の測った長さ。値は残さない） |
+| 4 | 送った出力の上限が claim で削られたことがログから分からない | `larm.llm_timing` に `maxTokens`（送った上限）と、削られたときだけ `requestedMaxTokens` |
+| 5 | 撤廃で効き始める不具合: prewarm（1トークンで前置きを読むだけの呼出し）に、考えるモデル向けの上乗せ 10,000 が付き、10,001 トークンまで生成し得た（撤廃前も 4,096 まで） | 前読み（`readAhead`）には上乗せを付けない |
+| 6 | steward（記憶・World の整理）の失敗（利用者のエラーレポート）。`chat_stream_incomplete` は撤廃前の 4,096 の上限（撤廃・再起動後は上限 11,200 で 42.5 秒で成功）。`deadline_exceeded` は推論の期限 90 秒（inference の構造化の裏の呼出しの上限も 90 秒）で、考える分 10,000〜16,000字（約 45 tokens/秒）の途中で切れた。`shutdown` は再起動による打ち切り | 期限を上乗せに見合う長さにした: inference の構造化の裏の呼出しの上限と steward の推論の期限を 300 秒、steward のジョブの期限を 15 分（待ち・推論・再試行）。`docs/memory.md` も直した |
+
+| 検証 | 結果 |
+| --- | --- |
+| `bun run verify -- --domain dialogue --domain larm --domain inference`（#2〜#4） | pass（1,048件） |
+| `bun test api/domains/inference api/application/conversation-prewarm.test.ts`（#5） | 221件成功。読み取り専用の前読みは上限 1 のまま、ほかの呼出しの上乗せは今までどおり |
+| 選ぶ呼出し・voice-dialogue・infrastructure | 119件・207件成功 |
+| `bun run verify -- --domain steward --domain inference --domain memory`（#6） | pass（459件） |

@@ -68,12 +68,26 @@ export async function visualResult(
 			totalMs: 15,
 		},
 		execution: {
-			device: "fixture",
-			backend: "fixture",
-			dtype: "fixture",
-			decoderDtype: "fixture",
+			device: "cuda:0",
+			backend: "transformers",
+			dtype: "bfloat16",
+			decoderDtype: "float32",
 			outputTokens: 5,
 			visualTokens: 10,
+		},
+	};
+}
+export async function cpuVisualResult(): Promise<PerceptionResult> {
+	return {
+		...(await visualResult("describe")),
+		execution: {
+			device: "cpu",
+			backend: "llama.cpp",
+			dtype: "qad-q4_0",
+			decoderDtype: null,
+			visualTokens: 10,
+			inputTokens: 20,
+			outputTokens: 0,
 		},
 	};
 }

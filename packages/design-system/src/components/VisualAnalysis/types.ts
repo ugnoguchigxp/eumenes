@@ -51,7 +51,8 @@ export type VisualAnalysisRecord = {
 			device: string;
 			backend: string;
 			dtype: string;
-			decoderDtype: string;
+			decoderDtype: string | null;
+			inputTokens?: number;
 			outputTokens: number;
 			visualTokens: number;
 		};

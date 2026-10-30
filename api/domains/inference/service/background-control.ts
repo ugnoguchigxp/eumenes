@@ -16,10 +16,11 @@ const log = getLogger("inference");
 /** A background control request's deadline cap. */
 const BACKGROUND_MS = 30_000;
 /**
- * The cap of a structured request on the conversation route (the steward): the cloud fallback
- * reserves its own time out of the deadline, so the local attempt keeps 30 s of it.
+ * The cap of a structured request on the conversation route (the steward): long enough for LARM to write its whole
+ * output with the room for thinking (1,200 + 10,000 tokens at about 45 tokens/s, 2026-10-31: 90 s cut the thinking
+ * of World curation). The cloud fallback reserves its own time out of the deadline.
  */
-const STRUCTURED_BACKGROUND_MS = 90_000;
+const STRUCTURED_BACKGROUND_MS = 300_000;
 
 /**
  * Sends a request to a dedicated saved cloud LLM resource (World curation, task sub-agents) while it is registered,
