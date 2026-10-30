@@ -98,8 +98,8 @@ describe("agency LLM port", () => {
 		// Every call uses the LLM the conversation is set to; no other is chosen here.
 		expect(captured.route).toBe("conversation");
 		expect(captured.deadline).toBe(captured.taskDeadline);
-		// The structured cap: the local attempt keeps 30 s besides the cloud fallback's reserve.
-		expect(captured.deadline).toBe(1_000 + 90_000);
+		// The structured cap: LARM may think at length, the call yielding to the user's calls.
+		expect(captured.deadline).toBe(1_000 + 300_000);
 		const executed = h.calls.executed[0]!;
 		expect(executed.requestId).toBe("req-1");
 		// Without the conversation's prefix the call is its own system and prompt.

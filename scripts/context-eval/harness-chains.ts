@@ -239,6 +239,18 @@ export const ACCEPT_CHAINS: readonly AcceptChain[] = [
 		],
 	},
 	{
+		key: "accept-new",
+		name: "新しく作る → 担当に切り替わる",
+		reports: false,
+		saved: ["来場者アンケート"],
+		steps: [
+			{
+				say: "イヤホンのランディングページを作りたいです",
+				expect: { toolchain: "ui.compose", has: /イヤホン|ランディング/ },
+			},
+		],
+	},
+	{
 		key: "accept-running",
 		name: "進行中の仕事を確かめる・取り消す",
 		reports: false,

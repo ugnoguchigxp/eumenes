@@ -53,3 +53,32 @@ test("ASR keeps its own 15-second local attempt and cloud reservation", () => {
 	expect(attemptDuration(r, "larm")).toBe(15_000);
 	expect(attemptDuration(r, "cloud")).toBe(30_000);
 });
+
+test("a LARM chat attempt may take its request's whole deadline, less the cloud's reserve", () => {
+	const clock = spyOn(Date, "now").mockReturnValue(1000);
+	try {
+		const r = request(300_000, false);
+		r.row.purpose = "llm";
+		r.row.snapshot.routes.llm = {
+			mode: "larm-only",
+			cloudAllowed: false,
+		} as typeof r.row.snapshot.routes.llm;
+		expect(attemptDuration(r, "larm")).toBe(300_000);
+		// With a cloud fallback, the cloud keeps its share of the deadline.
+		r.row.snapshot.routes.llm = {
+			mode: "larm-preferred",
+			cloudAllowed: true,
+		} as typeof r.row.snapshot.routes.llm;
+		r.selected = { connection: { enabled: true } } as Request["selected"];
+		expect(attemptDuration(r, "larm")).toBe(240_000);
+		// A request's own attempt limit still holds.
+		r.row.snapshot.routes.llm = {
+			mode: "larm-only",
+			cloudAllowed: false,
+		} as typeof r.row.snapshot.routes.llm;
+		r.row.attemptMs = 100_000;
+		expect(attemptDuration(r, "larm")).toBe(100_000);
+	} finally {
+		clock.mockRestore();
+	}
+});

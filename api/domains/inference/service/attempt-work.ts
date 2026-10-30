@@ -29,13 +29,15 @@ export function attemptDuration(r: Request, source: Source) {
 	const { options } = r.env;
 	// A request's own limit (a toolchain's) takes the place of both defaults.
 	const cloudMs = r.row.attemptMs ?? options.cloudMs ?? deltaFallback(r);
+	// A LARM chat call may take its request's whole deadline (each caller sets one for its purpose; LARM's own bound is
+	// far longer): it thinks at length, and an attempt cut sooner starts over from nothing.
 	const configured =
 		source === "cloud"
 			? cloudMs
 			: (r.row.attemptMs ??
 				options.localMs ??
 				(r.row.purpose === "llm"
-					? 120_000
+					? Number.POSITIVE_INFINITY
 					: r.row.purpose === "tts"
 						? 30_000
 						: 15_000));

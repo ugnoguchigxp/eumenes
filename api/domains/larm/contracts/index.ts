@@ -60,6 +60,11 @@ export type LarmCallOptions = {
 	 * shared prefix is in its cache) and yields: a conversation call aborts it (`larm_preempted`).
 	 */
 	onConversation?: true;
+	/**
+	 * `auxiliary` only: the host's own background work on a connection of its own. It yields like a call on the
+	 * conversation's prompt: a call made for the user aborts it (`larm_preempted`); LARM infers one call at a time.
+	 */
+	yields?: true;
 	/** With `onConversation`: a read-ahead whose output ends at its bound by design; that end is not a failure. */
 	readAhead?: true;
 	/** `main` only: how much the model thinks first (off turns the chat template's thinking off). */

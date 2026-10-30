@@ -126,15 +126,18 @@ test("upkeep waits while an answer is generated: 30 s, then 2 min, then 10 min",
 		remember: [item("a.one", "一つ目"), item("a.two", "二つ目")],
 	});
 	await h.run({ user: "二つ", end: "completed" });
-	// Upkeep never runs before a quiet spell after the last event: its timer fires once the spell is over.
+	// The run has reported: its words are curated now.
+	await h.pump(12);
+	// Upkeep never runs before a quiet spell after the last event: its timer fires once the spell is over, while a run
+	// is generating an answer.
 	h.time.ms += MAINTENANCE_QUIET_MS;
-	await h.fireTimer();
 	h.foreground.add("c1");
+	await h.fireTimer();
 	const tick = async () => {
 		await h.queue.tick();
 		for (let i = 0; i < 20; i++) await new Promise((r) => setImmediate(r));
 	};
-	// Reflecting steps are not delayed by the foreground; upkeep is.
+	// A run is generating an answer: upkeep waits for it.
 	for (let i = 0; i < 12; i++) {
 		await tick();
 		if (h.units().some((u) => u.step === "consolidate-memory")) break;
@@ -172,15 +175,17 @@ test("after the quiet spell, the pending limit starts a consolidation without wa
 	h.inference.script("curate-memory", empty);
 	await h.run({ user: "最初", end: "completed" });
 	await h.drain();
-	h.foreground.add("c1");
 	h.inference.script("curate-memory", {
 		...empty,
 		remember: ["a", "b", "c", "d", "e"].map((k) => item(`k.${k}`, `項目${k}`)),
 	});
 	h.inference.script("consolidate-memory", unchanged, unchanged, unchanged);
 	await h.run({ user: "たくさん", end: "completed" });
+	// The run has reported: its words are curated before the next run starts.
+	await h.drain();
+	h.foreground.add("c1");
 	h.time.ms += MAINTENANCE_QUIET_MS;
-	// The foreground stays active the whole time; the reflecting steps and the urgent upkeep still run.
+	// The foreground stays active from here on; the urgent upkeep still runs.
 	for (
 		let i = 0;
 		i < 40 && h.inference.callsOf("consolidate-memory").length === 0;

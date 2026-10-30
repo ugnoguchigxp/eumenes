@@ -77,6 +77,7 @@ export function createUnitHandler(deps: StewardDeps, kick: Kick, wake: Wake) {
 				instructions: step.instructions,
 				outputSchema: step.outputSchema(prepared),
 			},
+			// Either way the step yields: a call made for the user aborts it and the unit is tried again later.
 			prefix
 				? {
 						sessionRole: "auxiliary",
@@ -84,7 +85,7 @@ export function createUnitHandler(deps: StewardDeps, kick: Kick, wake: Wake) {
 						prefixTools: prefix.tools,
 						toolChoice: "none",
 					}
-				: undefined,
+				: { sessionRole: "auxiliary", yields: true },
 		);
 		// A malformed answer is data, not a failure: settle counts it and moves on.
 		let output: unknown | null = null;

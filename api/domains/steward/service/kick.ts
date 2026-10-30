@@ -192,15 +192,22 @@ export function createKick(deps: StewardDeps, wake: Wake) {
 	 * Upkeep, only after a quiet spell (`MAINTENANCE_QUIET_MS` without an event; the timer kicks when it is over): a
 	 * pending-limit consolidation first; otherwise rounds of at most three steps per revision.
 	 */
-	function kickMaintenance(env: StepEnv, reflecting: boolean) {
-		const { db, deps: d, conversationId } = env;
-		if (openUnitOf(db, conversationId, "maintenance")) return;
-		const now = d.nowMs();
+	/**
+	 * Whether the user has left the conversation for a quiet spell (`MAINTENANCE_QUIET_MS` without an event). While
+	 * not, the timer is set to kick when it is over.
+	 */
+	function quietSpellOver(env: StepEnv): boolean {
 		const last = lastEventMs(env);
-		if (last !== null && now - last < MAINTENANCE_QUIET_MS) {
-			wake.at(last + MAINTENANCE_QUIET_MS);
-			return;
-		}
+		if (last === null || env.deps.nowMs() - last >= MAINTENANCE_QUIET_MS)
+			return true;
+		wake.at(last + MAINTENANCE_QUIET_MS);
+		return false;
+	}
+
+	function kickMaintenance(env: StepEnv, reflecting: boolean) {
+		const { db, conversationId } = env;
+		if (openUnitOf(db, conversationId, "maintenance")) return;
+		if (!quietSpellOver(env)) return;
 		const state = readState(db, conversationId);
 		const revision = state.maintenanceRevision;
 		const count = pendingAdditions(env);
@@ -253,7 +260,7 @@ export function createKick(deps: StewardDeps, wake: Wake) {
 		}
 		if (chosen !== null && state.nextMaintenanceAt !== null) {
 			// Upkeep deferred for a foreground run: nothing is enqueued before the time; the timer kicks again.
-			if (state.nextMaintenanceAt > now) {
+			if (state.nextMaintenanceAt > env.deps.nowMs()) {
 				wake.at(state.nextMaintenanceAt);
 				return;
 			}
@@ -296,14 +303,17 @@ export function createKick(deps: StewardDeps, wake: Wake) {
 					? true
 					: kickReflect(env);
 				kickMaintenance(env, reflecting);
-				kickWorld(env, wake, (spec) =>
-					createUnit(db, conversationId, {
-						step: "curate-world",
-						kind: "world_events",
-						targets: { events: spec.events },
-						attempt: spec.attempt,
-					}),
-				);
+				// World is edited only while the user leaves the conversation, never between turns: between them only
+				// the memory and its window take what the last report brought.
+				if (quietSpellOver(env))
+					kickWorld(env, wake, (spec) =>
+						createUnit(db, conversationId, {
+							step: "curate-world",
+							kind: "world_events",
+							targets: { events: spec.events },
+							attempt: spec.attempt,
+						}),
+					);
 			}
 		} catch (error) {
 			log.warn("steward.kick_failed", { reason: "kick_failed" }, error);

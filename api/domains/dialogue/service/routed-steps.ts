@@ -7,6 +7,7 @@ import { TOOL_NAMES } from "./generation-tools";
 import { lineText } from "./input-text";
 import { toolResultText } from "./result-text";
 import {
+	NEW_TARGET,
 	choiceMessages,
 	choiceSchema,
 	pendingMessages,
@@ -226,7 +227,10 @@ async function carryOut(
 		announcement: say,
 		// A pipeline's branch has no request text: the user's words are what its inputs quote.
 		request: typeof chosen.request === "string" ? chosen.request : words,
-		...(typeof chosen.target === "string" ? { target: chosen.target } : {}),
+		// `new` makes something new: the request names no saved item.
+		...(typeof chosen.target === "string" && chosen.target !== NEW_TARGET
+			? { target: chosen.target }
+			: {}),
 		...(Array.isArray(chosen.refs) && chosen.refs.length
 			? { refs: chosen.refs }
 			: {}),

@@ -88,7 +88,8 @@ const right =
 				choice: "ui.compose",
 				say: "直します。",
 				request: "来場者アンケートに年代を聞く質問を足す",
-				target: enumOf(schema, "ui.compose", "target")[0],
+				// The scene changes a saved item: the first item after `new`.
+				target: enumOf(schema, "ui.compose", "target").find((t) => t !== "new"),
 			};
 		if (/猫/.test(words) && offered.includes("image.create"))
 			return { choice: "image.create", say: "描きます。", request: "猫の絵" };
@@ -110,7 +111,9 @@ const OTHER = axis(AXES.length);
 const embed: NonNullable<AcceptPorts["embed"]> = async (texts, type) => ({
 	vectors: texts.map((text) => {
 		if (type === "passage") return OTHER;
-		const at = [/天気/, /アンケート/, /猫|絵/].findIndex((w) => w.test(text));
+		const at = [/天気/, /アンケート|ランディング/, /猫|絵/].findIndex((w) =>
+			w.test(text),
+		);
 		return at < 0 ? OTHER : axis(at);
 	}),
 	space,
@@ -175,6 +178,26 @@ test("scenes the product and the model do right pass: an instant answer, a confi
 	expect(answer.map((r) => [r.pass, r.why])).toEqual([[true, ""]]);
 	expect(inputs[0]).toContain("聞き返した依頼: 絵を描いて");
 }, 60_000);
+
+test("a request to make something new is handed to the studio at once, and the work opens on no saved item", async () => {
+	const studio = (offered: string[], schema: Schema, words: string) =>
+		/ランディング/.test(words) && offered.includes("ui.compose")
+			? {
+					choice: "ui.compose",
+					say: "作りますね。",
+					request: "イヤホンのランディングページを作る",
+					target: enumOf(schema, "ui.compose", "target")[0],
+				}
+			: right()(offered, schema, words);
+	const [record] = await runAcceptChain(
+		ports({ main: scripted(studio) }),
+		chain("accept-new"),
+		0,
+	);
+	expect([record!.pass, record!.why]).toEqual([true, ""]);
+	expect(record!.handed).toMatchObject({ toolchain: "ui.compose" });
+	expect(record!.opened).toEqual([null]);
+}, 30_000);
 
 test("a judge that routes every utterance to the talk turn is caught", async () => {
 	const [record] = await runAcceptChain(

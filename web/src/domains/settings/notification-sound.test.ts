@@ -1,4 +1,5 @@
 import { afterEach, expect, test, vi } from "vitest";
+import { notificationSoundOptions } from "../../../../api/domains/settings/contracts";
 import { notificationSoundWav } from "./notification-sound";
 const timerToneWav = () => {
 	const bytes = new Uint8Array(44);
@@ -57,11 +58,19 @@ test("cancellation after download discards the late bytes", async () => {
 	).rejects.toThrow();
 });
 
-test("retired assets cannot sound and are not replaced with a beep", async () => {
-	const fetcher = vi.fn();
+test("all ten listening-approved assets can be fetched, including formerly retired choices", async () => {
+	const fetcher = vi.fn(
+		async (_url: string) => new Response(new Uint8Array(timerToneWav())),
+	);
 	vi.stubGlobal("fetch", fetcher);
-	await expect(
-		notificationSoundWav("tiny-harp", new AbortController().signal),
-	).rejects.toThrow("notification_sound_missing");
-	expect(fetcher).not.toHaveBeenCalled();
+	const sounds = notificationSoundOptions.filter(
+		(option) => option.value !== "beep",
+	);
+	expect(sounds).toHaveLength(10);
+	for (const sound of sounds) {
+		expect(
+			await notificationSoundWav(sound.value, new AbortController().signal),
+		).toEqual(timerToneWav());
+		expect(fetcher.mock.calls.at(-1)?.[0]).toContain(sound.value + ".wav");
+	}
 });

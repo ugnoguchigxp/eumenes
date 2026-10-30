@@ -1,4 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
+import { MAINTENANCE_QUIET_MS } from "../contracts";
 import { setupSteward, type StewardHarness } from "./steward.fixture";
 import { createFakeWorld, type FakeWorld } from "./world.fake";
 
@@ -110,6 +111,25 @@ test("the events of one exchange become one world_events unit; settle, unit and 
 	expect(h.inference.captures.every((c) => c.route === "conversation")).toBe(
 		true,
 	);
+});
+
+test("World is edited only while the user leaves the conversation: between turns only the memory is curated", async () => {
+	const { h, fake } = await setup();
+	h.inference.script("curate-memory", judged(true));
+	h.inference.script("curate-world", answerWith([claim]));
+	const ex = await exchangeWithEvents(h, fake);
+	await ex.receive();
+	// The clock does not move: the exchange is reflected, and World waits for the quiet spell.
+	await h.pump(16);
+	expect(h.inference.callsOf("curate-memory")).toHaveLength(1);
+	expect(worldUnits(h)).toEqual([]);
+	expect(h.timerTimes().length).toBeGreaterThan(0);
+	// The user has left the conversation for the spell: its timer kicks, and World is edited.
+	h.time.ms += MAINTENANCE_QUIET_MS;
+	await h.fireTimer();
+	await h.pump(16);
+	expect(worldUnits(h).map((u) => u.state)).toEqual(["applied"]);
+	expect(fake.events().map((e) => e.state)).toEqual(["applied", "applied"]);
 });
 
 test("an event that arrives before curate-memory judged its exchange waits; no unit is made and no model is asked", async () => {

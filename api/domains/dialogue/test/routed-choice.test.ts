@@ -166,7 +166,7 @@ test("every work may be checked; only open work may be corrected or cancelled, a
 	);
 });
 
-test("the choice system names an item only for a change of it: a request to make something new carries no target", () => {
+test("a toolchain with saved items always names its target: new first, then the items; the system says when each", () => {
 	const [system] = choiceMessages({
 		style: "丁寧",
 		routed: {
@@ -183,6 +183,24 @@ test("the choice system names an item only for a change of it: a request to make
 		utterance: "イヤホンのランディングページを作ってみて",
 	});
 	expect(system!.content).toContain(
-		"target は、今の発言が保存済みの作品を直す・続けると言っているときだけ、その作品を選びます。新しく作る依頼には付けません。",
+		"target は、新しく作る依頼なら new を選びます。今の発言が保存済みの作品を直す・続けると言っているときだけ、その作品を選びます。",
 	);
+	const studio = (
+		choiceSchema(
+			[
+				{
+					id: "ui.compose",
+					title: "UI自由制作",
+					execution: "session",
+					targets: [{ ref: "item-1", label: "保存済み1" }],
+				},
+			],
+			{ todos: [], resources: [] },
+		).anyOf as Array<{
+			required: string[];
+			properties: Record<string, { enum?: string[] }>;
+		}>
+	).find((branch) => branch.properties.choice?.enum?.[0] === "ui.compose")!;
+	expect(studio.required).toContain("target");
+	expect(studio.properties.target!.enum).toEqual(["new", "item-1"]);
 });

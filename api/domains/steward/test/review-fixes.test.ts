@@ -244,16 +244,17 @@ async function quietSpell(h: StewardHarness) {
 	await h.pump(12);
 }
 
-test("a deferred upkeep waits in the timer, and never delays a reflecting unit or another conversation", async () => {
+test("a deferred upkeep waits in the timer and never delays another conversation; a reflecting unit waits for the run to report", async () => {
 	const h = await setup();
 	h.inference.script("curate-memory", {
 		...empty,
 		remember: [item("a.one", "一つ目"), item("a.two", "二つ目")],
 	});
-	h.foreground.add("c1");
 	await h.run({ user: "二つ", end: "completed" });
-	// Reflecting steps run; after the quiet spell the upkeep unit is made, prepared, and deferred.
+	// Reflecting steps run once the run has reported; then a run is generating, and after the quiet spell the upkeep
+	// unit is made, prepared, and deferred.
 	await h.pump(12);
+	h.foreground.add("c1");
 	await quietSpell(h);
 	const deferredAt = h.state()!.nextAt;
 	expect(deferredAt).not.toBeNull();
@@ -264,7 +265,7 @@ test("a deferred upkeep waits in the timer, and never delays a reflecting unit o
 		h.units().filter((u) => u.slot === "maintenance" && u.state === "open"),
 	).toEqual([]);
 
-	// Same conversation and another one: both are curated now, without the clock moving.
+	// Another conversation is curated now; this one's words wait for its run to report. The clock does not move.
 	h.inference.script("curate-memory", empty, empty);
 	await h.exchange("続き", "はい");
 	await h.exchange("別", "はい", {
@@ -273,8 +274,14 @@ test("a deferred upkeep waits in the timer, and never delays a reflecting unit o
 	const before = h.time.ms;
 	await h.pump(16);
 	expect(h.time.ms).toBe(before);
-	expect(h.log("c1").every((e) => e.curated)).toBe(true);
 	expect(h.log("c2").every((e) => e.curated)).toBe(true);
+	expect(h.log("c1").every((e) => e.curated)).toBe(false);
+	// The run reports: its end kicks the steward, and the words are curated at once.
+	h.foreground.clear();
+	await h.kick();
+	await h.pump(16);
+	expect(h.time.ms).toBe(before);
+	expect(h.log("c1").every((e) => e.curated)).toBe(true);
 	expect(h.futureJobs()).toEqual([]);
 	// The upkeep has not run: it is still waiting for its time.
 	expect(
@@ -296,9 +303,9 @@ test("the startup kick makes the upkeep that is due and waits for the one that i
 		...empty,
 		remember: [item("a.one", "一つ目"), item("a.two", "二つ目")],
 	});
-	h.foreground.add("c1");
 	await h.run({ user: "二つ", end: "completed" });
 	await h.pump(12);
+	h.foreground.add("c1");
 	await quietSpell(h);
 	const dueAt = h.state()!.nextAt!;
 	// A kick before the time makes no unit; the timer already waits for it.

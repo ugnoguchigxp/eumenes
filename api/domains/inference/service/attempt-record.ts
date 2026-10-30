@@ -11,6 +11,8 @@ export type CallSessionRole = {
 	taskId?: string;
 	/** An auxiliary call on the conversation's connection, yielding to the conversation. */
 	onConversation?: true;
+	/** The host's own background work on a connection of its own, yielding to calls made for the user. */
+	yields?: true;
 	/** A read-ahead on the conversation's connection: its output ends at its bound by design. */
 	readAhead?: true;
 	/** `main` only: how much the model thinks before it answers, per target (see `CallSession`). */
@@ -32,6 +34,7 @@ export const sessionCallOptions = (session?: CallSessionRole) =>
 				sessionRole: session.sessionRole,
 				...(session.taskId ? { taskId: session.taskId } : {}),
 				...(session.onConversation ? { onConversation: true as const } : {}),
+				...(session.yields ? { yields: true as const } : {}),
 				...(session.readAhead ? { readAhead: true as const } : {}),
 			}
 		: {};
@@ -83,6 +86,7 @@ export function resolveSession(
 	const sessionRole = given?.sessionRole ?? "auxiliary";
 	if (
 		(given?.onConversation && sessionRole !== "auxiliary") ||
+		(given?.yields && sessionRole !== "auxiliary") ||
 		(given?.prefixTools && !given.onConversation) ||
 		(given?.readAhead && !given.onConversation) ||
 		(given?.reasoning !== undefined && sessionRole !== "main") ||
@@ -114,6 +118,7 @@ export function resolveSession(
 		sessionRole,
 		...(given?.taskId ? { taskId: given.taskId } : {}),
 		...(given?.onConversation ? { onConversation: true as const } : {}),
+		...(given?.yields ? { yields: true as const } : {}),
 		...(given?.readAhead ? { readAhead: true as const } : {}),
 		...(given?.reasoning
 			? {

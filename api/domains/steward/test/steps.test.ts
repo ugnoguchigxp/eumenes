@@ -325,6 +325,19 @@ test("at most eight events and 16 KB go into one step; the rest waits", async ()
 	expect(curated(h).every(Boolean)).toBe(true);
 });
 
+test("a step on its own prompt runs on a connection of its own and yields to the user's calls", async () => {
+	const h = await setupSteward();
+	harnesses.push(h);
+	h.inference.script("curate-memory", {
+		...empty,
+		remember: [remember({ quote: "辛いものが好きです" })],
+	});
+	await h.exchange("辛いものが好きです", "覚えておきます");
+	await h.drain();
+	const [call] = h.inference.callsOf("curate-memory");
+	expect(call!.session).toEqual({ sessionRole: "auxiliary", yields: true });
+});
+
 test("a step reading the conversation runs on the conversation's prompt with its own task last, on the conversation's connection", async () => {
 	const tool = {
 		type: "function" as const,

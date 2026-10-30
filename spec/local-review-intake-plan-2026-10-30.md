@@ -356,6 +356,13 @@ run `13057cfa`「イヤホンのランディングページを作ってみて」
 | 4 | 送った出力の上限が claim で削られたことがログから分からない | `larm.llm_timing` に `maxTokens`（送った上限）と、削られたときだけ `requestedMaxTokens` |
 | 5 | 撤廃で効き始める不具合: prewarm（1トークンで前置きを読むだけの呼出し）に、考えるモデル向けの上乗せ 10,000 が付き、10,001 トークンまで生成し得た（撤廃前も 4,096 まで） | 前読み（`readAhead`）には上乗せを付けない |
 | 6 | steward（記憶・World の整理）の失敗（利用者のエラーレポート）。`chat_stream_incomplete` は撤廃前の 4,096 の上限（撤廃・再起動後は上限 11,200 で 42.5 秒で成功）。`deadline_exceeded` は推論の期限 90 秒（inference の構造化の裏の呼出しの上限も 90 秒）で、考える分 10,000〜16,000字（約 45 tokens/秒）の途中で切れた。`shutdown` は再起動による打ち切り | 期限を上乗せに見合う長さにした: inference の構造化の裏の呼出しの上限と steward の推論の期限を 300 秒、steward のジョブの期限を 15 分（待ち・推論・再試行）。`docs/memory.md` も直した |
+| 7 | 新しく作る依頼で UI 制作の担当に切り替わらない（run `becd1334`、10-31 05:42）。選ぶ呼出しは `ui.compose` を選んだが、既存の作品を `target` に付け、確認になった。#2 の決まりの文は効かなかった | 対象を持つ担当の枝では `target` を必須にし、先頭を `"new"`（新しく作る）にした。`"new"` は対象なしで引き渡す（確認なしでその場で担当に切り替わる）。決まりの文も「新しく作る依頼なら new」に直した。受入に「新しく作る → 担当に切り替わる」場面（`accept-new`）を足した。修正前に試験が落ちることを確かめた |
+| 8 | 会話の呼出しが LARM を使えず時間切れ（run `20b7c0af`、10-31 05:59「イヤホンのためのランディングページを作りたいです」、120 秒で `local_timeout`）。会話を読まない steward の手順（World の記録など）と agency は自分の接続で動き、会話が来ても止まらない（止まるのは会話の前置きを共有する呼出しだけ）。LARM は1回に1つずつ推論するので、会話の呼出しは裏の生成の後ろで待った。上限の撤廃と #6 の期限延長で、裏の呼出しが2分以上 LARM を占めるようになって表に出た | ホスト自身の裏仕事は、自分の接続でも利用者に譲る（呼出しの選択肢 `yields`）。steward の会話を読まない手順と agency の呼出しが `yields` を名乗り、利用者のための呼出し（会話・専門担当・一回の呼出し）が始まると取り消される（`larm_preempted`、今の仕組みどおり後でやり直す）。利用者が頼んだタスクの裏の呼出し（件名は同じ `background:`）は止めない。`docs/memory.md` も直した |
+| 9 | 会話の回が成果物（ランディングページの文章）を書いた（run `88348ae4`・`17689ac4`） | 会話の回の `## Facts` に「文章・ページ・画面・コードなどの制作物は、この返事では書きません。作ってほしいと言われたら、何を作るかを一言で言い直してもらいます」を足した（会話の回の役割を守らせる調整） |
+| 10 | 利用者の指示（10-31）「メモリー整理は、現在の推論が結果報告したら始めましょう」。今は保守の手順（`maintenance`）だけが run の間は後回しで、記憶の整理（`curate-memory`・`curate-goals`）と World の記録（`curate-world`）は、利用者の発言を受けた瞬間に、その発言の run と並んで始まっていた | steward のどの手順も、会話に動いている run（`queued`・`running`。担当に渡して結果を待つ run を含む）がある間は始めない。記憶の整理・World の記録は閉じるだけで、run の終わり（どの終わり方でも steward を起こす）で始まる。保守の手順は今までどおり 30 秒・2 分・10 分の待ち。保留の上限で急ぐ保守（`urgent`）は待たない。前の決まり（記憶の整理は run を待たない）を前提にした試験4件を新しい決まりに直した |
+| 11 | 記憶の整理が終わらない（`ceb3d2ce`、06:15〜06:20）。#6 で期限を 300 秒にしたが、LARM の LLM の1回の推論は既定で 120 秒（`attemptDuration`）。考える途中で `local_timeout` になり、一時的な失敗として期限内にやり直しを繰り返して、120 秒ずつ LARM を使っては切れた。#6 の見落とし | 構造化された裏の要求（steward と agency。件名 `background:`、`structuredOutput`、上限 300 秒）は、LARM の1回の推論に期限いっぱいを使える（クラウドへの切替が許されていれば、その持ち時間は残す）。要求の `attemptMs` は使わない（クラウドの持ち時間にも効き、LARM の持ち時間が0になるため） |
+| 12 | 利用者「LARMはタイムアウト2時間っていってるけど」。LARM の LLM の1回の推論に Eumenes が既定で 120 秒の上限を掛けていた（出力が 4,096 で切れていた頃の値）。agency の裏の呼出しも期限 90 秒で毎回切れていた | LARM の LLM の1回の推論は、要求の期限いっぱい（各呼出し元が用途ごとに決める。会話の run 180 秒、steward・agency 300 秒、UI 制作の担当 10 分）まで使える。#11 の特例は消した。agency の期限を 300 秒にした（会話に譲る） |
+| 13 | 利用者の指示（10-31）「メモリー整理は全部をいっぺんにやる仕様を辞めましょう。WorldModelの編集とかは、会話の間にはやらず、ユーザーが放置しているタイミングで。ContextWindowやメモリーは会話の間でやって構わないが今の完了報告までの纏めまでに。それより古いメモリのメンテとかしないように」。結果報告のたびに記憶の整理と World の編集が一緒に起こされていた | World の編集（`curate-world`）は、会話の最後の出来事から10分後（放置中）だけにした（古い記憶の整理と同じ線・同じ timer）。結果報告ごとに走るのは記憶と目標の整理（ContextWindow の再公開を含む）だけ。古い記憶の整理（`consolidate-*`）はもともと放置中だけ |
 
 | 検証 | 結果 |
 | --- | --- |
@@ -363,3 +370,8 @@ run `13057cfa`「イヤホンのランディングページを作ってみて」
 | `bun test api/domains/inference api/application/conversation-prewarm.test.ts`（#5） | 221件成功。読み取り専用の前読みは上限 1 のまま、ほかの呼出しの上乗せは今までどおり |
 | 選ぶ呼出し・voice-dialogue・infrastructure | 119件・207件成功 |
 | `bun run verify -- --domain steward --domain inference --domain memory`（#6） | pass（459件） |
+| `bun run verify -- --domain dialogue`（#7） | pass（471件）。voice-dialogue 90件、`scripts/context-eval` 73件、`api/application/toolchain` 146件成功（失敗3件は既存の `toolchain.test.ts`） |
+| `bun run verify -- --domain dialogue --domain larm --domain inference --domain steward`（#8・#9） | pass（1,205件）。voice-dialogue 90件、agency を含む steward・inference・larm 800件。#8 の LARM の試験は、修正前に落ちる（裏の呼出しが止まらず5秒で時間切れ）ことを確かめた |
+| `bun run verify -- --domain steward --domain world --domain memory --domain dialogue --domain larm --domain inference`（#10） | pass（1,506件）。`api/application/world`・`agency` 128件成功（ほかの3件は `verification-reports/.../before/` の読み込みで既存） |
+| `bun run verify -- --domain inference --domain steward`（#11） | pass（332件） |
+| `bun run verify -- --domain inference --domain steward --domain world --domain memory --domain dialogue --domain larm`（#12・#13） | pass（1,508件）。`api/application/world`・`agency`・voice-dialogue 218件。#13 の試験は修正前に落ちることを確かめた |

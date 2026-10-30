@@ -45,6 +45,11 @@ const oneOf = (values: readonly string[]): Schema => ({
 	enum: [...values],
 });
 const ANY_OBJECT: Schema = { type: "object" };
+/**
+ * The target a choice names for a request that makes something new: a candidate with saved items has its target
+ * always filled, so a new piece is chosen as such and never left to an item the model happened to fill in.
+ */
+export const NEW_TARGET = "new";
 
 /** One branch of a choice: these fields, all required but the optional ones. */
 function branch(
@@ -61,7 +66,8 @@ function branch(
 
 /**
  * The branch of one candidate: an instant answer takes its inputs, any other work its request (or inputs) and `say`,
- * and the resources it works on from those `## State` names.
+ * the resources it works on from those `## State` names, and, for a toolchain with saved items, which item it
+ * changes or `new`.
  */
 function candidateBranch(
 	candidate: ChoiceCandidate,
@@ -78,13 +84,18 @@ function candidateBranch(
 			say: SAY,
 			request: text(REQUEST_CHARS),
 			...(candidate.targets?.length
-				? { target: oneOf(candidate.targets.map((target) => target.ref)) }
+				? {
+						target: oneOf([
+							NEW_TARGET,
+							...candidate.targets.map((target) => target.ref),
+						]),
+					}
 				: {}),
 			...(resources.length
 				? { refs: { type: "array", maxItems: 8, items: oneOf(resources) } }
 				: {}),
 		},
-		["target", "refs"],
+		["refs"],
 	);
 }
 

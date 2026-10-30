@@ -22,7 +22,7 @@ import type { UnitEnd } from "./unit-end";
 import type { PreparedUnit, StepEnv, StewardDeps, StewardInput } from "./types";
 import type { Wake } from "./wake";
 
-/** Prepare: fences the unit (memory ready, upkeep not behind a foreground run), builds the input and takes the request. */
+/** Prepare: fences the unit (memory ready, not behind a foreground run), builds the input and takes the request. */
 export function createPrepare(
 	deps: StewardDeps,
 	kick: Kick,
@@ -115,11 +115,13 @@ export function createPrepare(
 			return { status: "stale" as const, reason };
 		};
 		if (!memory.readyInTransaction(db)) return close("memory_unavailable");
+		// Every step starts after the conversation's run has reported: LARM infers one call at a time and the user's call
+		// comes first. The run's end kicks the steward again; upkeep also waits on its own timer.
 		if (
-			unit.slot === "maintenance" &&
 			!unit.targets.urgent &&
 			deps.foregroundActive(db, unit.conversationId)
 		) {
+			if (unit.slot !== "maintenance") return close("foreground_active");
 			deferForForeground(env, unit);
 			return { status: "stale", reason: "foreground_active" };
 		}

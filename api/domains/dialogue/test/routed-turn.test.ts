@@ -207,6 +207,10 @@ test("no candidate fits: the talk turn answers, on a system that names no toolch
 	])
 		expect(system).not.toContain(word);
 	expect(system).toContain("この返事では、作業を始めることも");
+	// Nor does it write what a toolchain makes: a page or a text it is asked for goes to a toolchain.
+	expect(system).toContain(
+		"文章・ページ・画面・コードなどの制作物は、この返事では書きません。",
+	);
 	const last = talk.messages.at(-1)!.content;
 	expect(last).toMatch(/^## State\n今: [^\n]+\n\n## User\nこんにちは$/);
 });

@@ -123,12 +123,15 @@ export type ChatMessage = {
  * conversation's connection with the conversation's tools (not to be called), so the shared prefix is read from
  * the cache, and it yields to the conversation (`larm_preempted`).
  */
-export type ConversationSession = {
-	sessionRole: "auxiliary";
-	onConversation: true;
-	prefixTools: NativeTool[];
-	toolChoice: "none";
-};
+export type ConversationSession =
+	| {
+			sessionRole: "auxiliary";
+			onConversation: true;
+			prefixTools: NativeTool[];
+			toolChoice: "none";
+	  }
+	/** A call on a connection of its own: the host's own background work, it yields to calls made for the user. */
+	| { sessionRole: "auxiliary"; yields: true };
 export interface ControlReceipt {
 	requestId: string;
 	attemptId: string;

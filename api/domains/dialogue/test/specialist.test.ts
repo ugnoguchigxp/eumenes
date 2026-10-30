@@ -420,6 +420,24 @@ test("local: a change of a saved item is confirmed naming the item, and the appr
 	expect(h.work()[0]!.savedRef).toBe("item-2");
 });
 
+test("local: a request to make something new is handed to the specialist at once, on a new work", async () => {
+	const h = await harness({ harness: "local" });
+	h.state.steps.push(
+		choice({
+			choice: STUDIO.id,
+			say: "作りますね。",
+			request: "イヤホンのランディングページを作る",
+			target: "new",
+		}),
+	);
+	h.state.specialist.push(reply("どんな雰囲気にしますか。"));
+	await h.ask("イヤホンのランディングページを作りたいです");
+	expect(h.rows("SELECT id FROM dialogue_confirmations")).toEqual([]);
+	expect(await h.session()).toMatchObject({ label: "新規" });
+	expect(h.work()[0]!.savedRef).toBeNull();
+	expect(h.state.specialistPrompts).toHaveLength(1);
+});
+
 test("a confirmation keeps its target: the same request on two items stays two confirmations, and the approved one opens its item", async () => {
 	const h = await harness();
 	h.state.steps.push(

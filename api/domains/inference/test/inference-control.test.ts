@@ -383,7 +383,10 @@ test("an attempt's own time replaces the LARM and cloud defaults, within the req
 			},
 			deadline: Date.now() + deadlineIn,
 		}) as unknown as Parameters<typeof attemptDuration>[0];
-	expect(attemptDuration(request(null, 900_000), "larm")).toBe(120_000);
+	// Without its own time, a LARM chat attempt may take the request's whole deadline.
+	const whole = attemptDuration(request(null, 900_000), "larm");
+	expect(whole).toBeLessThanOrEqual(900_000);
+	expect(whole).toBeGreaterThan(899_000);
 	expect(attemptDuration(request(null, 900_000), "cloud")).toBe(60_000);
 	expect(attemptDuration(request(600_000, 900_000), "larm")).toBe(600_000);
 	expect(attemptDuration(request(600_000, 900_000), "cloud")).toBe(600_000);

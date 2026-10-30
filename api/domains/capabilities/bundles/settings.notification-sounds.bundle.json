@@ -739,6 +739,390 @@
 					"visibleWhen": "condition:settings.output-device-selectable@1"
 				}
 			]
+		},
+		{
+			"kind": "artifact",
+			"id": "settings.voice-input",
+			"revision": 11,
+			"title": "音声と入力",
+			"variants": [
+				{
+					"id": "standard",
+					"label": "標準",
+					"definition": {
+						"view": "settings-section",
+						"source": "settings-voice-input",
+						"title": "音声と入力"
+					}
+				}
+			],
+			"defaultVariant": "standard",
+			"sourceBindings": [
+				{
+					"source": "settings-voice-input",
+					"adapterRef": "adapter:settings@1",
+					"query": "query:settings.document@1",
+					"target": "none"
+				},
+				{
+					"source": "settings-tts-resources",
+					"adapterRef": "adapter:settings@1",
+					"query": "query:settings.tts-resources@1",
+					"target": "none"
+				},
+				{
+					"source": "settings-asr-languages",
+					"adapterRef": "adapter:settings@1",
+					"query": "query:settings.asr-languages@1",
+					"target": "none"
+				}
+			],
+			"actionBindings": [
+				{
+					"actionId": "edit",
+					"eventAction": "settings-edit",
+					"source": "settings-voice-input",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "draft",
+					"draftAction": "edit",
+					"draftDocument": "document:settings@1"
+				},
+				{
+					"actionId": "apply",
+					"eventAction": "settings-apply",
+					"source": "settings-voice-input",
+					"inputSchemaRef": "schema:settings-apply@4",
+					"effect": "write",
+					"operationId": "settings.apply-v4",
+					"draftDocument": "document:settings@1",
+					"confidentialFields": ["keys"]
+				},
+				{
+					"actionId": "review",
+					"eventAction": "settings-review",
+					"source": "settings-voice-input",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "navigate",
+					"navigateTo": {
+						"artifactId": "settings.changes"
+					}
+				},
+				{
+					"actionId": "action",
+					"eventAction": "settings-action",
+					"source": "settings-voice-input",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "local"
+				}
+			],
+			"launcher": {
+				"icon": "voice",
+				"label": "音声と入力",
+				"group": "使い方を変える",
+				"order": 20,
+				"description": "読み上げ 通知音 聞き取り 機器"
+			},
+			"fields": [
+				{
+					"fieldId": "speech.enabled",
+					"document": "document:settings@1",
+					"path": "$.voice.autoSpeak",
+					"label": "回答を読み上げる",
+					"control": "toggle",
+					"group": "speech",
+					"help": "オフでも回答のテキストは会話に残ります。"
+				},
+				{
+					"fieldId": "speech.volume",
+					"document": "document:settings@1",
+					"path": "$.voice.outputVolume",
+					"label": "音量",
+					"control": "range",
+					"group": "speech",
+					"min": 0,
+					"max": 1,
+					"step": 0.05
+				},
+				{
+					"fieldId": "notification.sound",
+					"document": "document:settings@1",
+					"path": "$.voice.notificationSound",
+					"label": "通知音の種類",
+					"control": "select",
+					"group": "notifications",
+					"defaultValue": "soft-chime",
+					"options": [
+						{
+							"value": "soft-chime",
+							"label": "やわらかなチャイム"
+						},
+						{
+							"value": "wooden-notes",
+							"label": "木琴の便り"
+						},
+						{
+							"value": "glass-bell",
+							"label": "澄んだベル"
+						},
+						{
+							"value": "water-drop",
+							"label": "水滴"
+						},
+						{
+							"value": "warm-marimba",
+							"label": "あたたかなマリンバ"
+						},
+						{
+							"value": "tiny-harp",
+							"label": "小さなハープ"
+						},
+						{
+							"value": "felt-piano",
+							"label": "やさしいピアノ"
+						},
+						{
+							"value": "soft-sparkle",
+							"label": "星のきらめき"
+						},
+						{
+							"value": "bamboo",
+							"label": "竹の響き"
+						},
+						{
+							"value": "gentle-bloom",
+							"label": "花ひらく音"
+						},
+						{
+							"value": "beep",
+							"label": "ビープ（従来の音）"
+						}
+					],
+					"help": "試聴確認済みの10音と、従来のビープから選べます。"
+				},
+				{
+					"fieldId": "speech.barge-in",
+					"document": "document:settings@1",
+					"path": "$.voice.bargeIn",
+					"label": "話し始めたら読み上げを止める",
+					"control": "toggle",
+					"group": "speech"
+				},
+				{
+					"fieldId": "larm.speech-voice",
+					"document": "document:settings@1",
+					"path": "$.larm.voice",
+					"label": "キャラクター",
+					"control": "select",
+					"group": "speech",
+					"options": [
+						{
+							"value": "",
+							"label": "サービスの既定のキャラクター"
+						}
+					],
+					"searchable": true,
+					"visibleWhen": "condition:settings.speech-local@1"
+				},
+				{
+					"fieldId": "larm.speech-style",
+					"document": "document:settings@1",
+					"path": "$.larm.style",
+					"label": "話し方（スタイル）",
+					"control": "select",
+					"group": "speech",
+					"options": [
+						{
+							"value": "",
+							"label": "サービスの標準"
+						}
+					],
+					"detail": true,
+					"unset": "delete-key",
+					"visibleWhen": "condition:settings.larm-style@1"
+				},
+				{
+					"fieldId": "larm.speech-speed",
+					"document": "document:settings@1",
+					"path": "$.larm.speed",
+					"label": "話す速さ",
+					"control": "range",
+					"group": "speech",
+					"defaultValue": "1",
+					"min": 0.5,
+					"max": 2,
+					"step": 0.1,
+					"visibleWhen": "condition:settings.larm-speed@1"
+				},
+				{
+					"fieldId": "larm.speech-pitch",
+					"document": "document:settings@1",
+					"path": "$.larm.pitchScale",
+					"label": "声の高さ",
+					"control": "range",
+					"group": "speech",
+					"defaultValue": "0",
+					"detail": true,
+					"min": -0.15,
+					"max": 0.15,
+					"step": 0.01,
+					"visibleWhen": "condition:settings.larm-pitch@1"
+				},
+				{
+					"fieldId": "larm.speech-intonation",
+					"document": "document:settings@1",
+					"path": "$.larm.intonationScale",
+					"label": "抑揚",
+					"control": "range",
+					"group": "speech",
+					"defaultValue": "1",
+					"detail": true,
+					"min": 0,
+					"max": 2,
+					"step": 0.05,
+					"visibleWhen": "condition:settings.larm-intonation@1"
+				},
+				{
+					"fieldId": "larm.speech-auto",
+					"document": "document:settings@1",
+					"path": "$.larm.autoIntonation",
+					"label": "文章に合わせて抑揚・速さ・高さを変える（簡易）",
+					"control": "toggle",
+					"group": "speech",
+					"defaultValue": "true",
+					"detail": true,
+					"visibleWhen": "condition:settings.larm-intonation@1"
+				},
+				{
+					"fieldId": "larm.speech-strength",
+					"document": "document:settings@1",
+					"path": "$.larm.autoStrength",
+					"label": "自動調整の強さ",
+					"control": "range",
+					"group": "speech",
+					"defaultValue": "1",
+					"detail": true,
+					"min": 0,
+					"max": 2,
+					"step": 0.05,
+					"visibleWhen": "condition:settings.larm-auto-strength@1"
+				},
+				{
+					"fieldId": "resource.voice",
+					"document": "document:settings@1",
+					"path": "$.resources[id=$target].voice",
+					"label": "音声ID",
+					"control": "text",
+					"group": "speech",
+					"maxLength": 200,
+					"help": "サービスが提供する音声IDを入力してください。",
+					"target": "settings-tts-resources"
+				},
+				{
+					"fieldId": "resource.speed",
+					"document": "document:settings@1",
+					"path": "$.resources[id=$target].speed",
+					"label": "話す速さ",
+					"control": "range",
+					"group": "speech",
+					"defaultValue": "1",
+					"min": 0.5,
+					"max": 2,
+					"step": 0.1,
+					"target": "settings-tts-resources"
+				},
+				{
+					"fieldId": "input.languages",
+					"document": "document:settings@1",
+					"path": "$.general.asrLanguages",
+					"label": "利用する言語",
+					"control": "multiple",
+					"group": "input",
+					"help": "聞き取り結果に許可する言語です。最低1つ選んでください。",
+					"optionsSource": "query:settings.asr-languages@1"
+				},
+				{
+					"fieldId": "input.threshold",
+					"document": "document:settings@1",
+					"path": "$.voice.threshold",
+					"label": "声を検出するしきい値",
+					"control": "number",
+					"group": "input",
+					"detail": true,
+					"min": 0.001,
+					"max": 0.1,
+					"step": 0.001,
+					"help": "小さい値ほど小さな声を拾います。"
+				},
+				{
+					"fieldId": "input.silence",
+					"document": "document:settings@1",
+					"path": "$.voice.silenceMs",
+					"label": "発話を確定する無音時間（ミリ秒）",
+					"control": "number",
+					"group": "input",
+					"detail": true,
+					"min": 300,
+					"max": 3000,
+					"step": 100,
+					"help": "標準は1500ミリ秒（1.5秒）です。"
+				},
+				{
+					"fieldId": "input.echo-cancellation",
+					"document": "document:settings@1",
+					"path": "$.voice.echoCancellation",
+					"label": "エコーを抑える",
+					"control": "toggle",
+					"group": "input",
+					"detail": true
+				},
+				{
+					"fieldId": "input.noise-suppression",
+					"document": "document:settings@1",
+					"path": "$.voice.noiseSuppression",
+					"label": "周囲の雑音を抑える",
+					"control": "toggle",
+					"group": "input",
+					"detail": true
+				},
+				{
+					"fieldId": "input.auto-gain",
+					"document": "document:settings@1",
+					"path": "$.voice.autoGainControl",
+					"label": "マイクの音量を自動調整する",
+					"control": "toggle",
+					"group": "input",
+					"detail": true
+				},
+				{
+					"fieldId": "input.device",
+					"document": "document:settings@1",
+					"path": "$.voice.inputDevice",
+					"label": "マイク",
+					"control": "select",
+					"group": "devices",
+					"options": [
+						{
+							"value": "",
+							"label": "システム標準"
+						}
+					]
+				},
+				{
+					"fieldId": "output.device",
+					"document": "document:settings@1",
+					"path": "$.voice.outputDevice",
+					"label": "再生機器",
+					"control": "select",
+					"group": "devices",
+					"options": [
+						{
+							"value": "",
+							"label": "システム標準"
+						}
+					],
+					"visibleWhen": "condition:settings.output-device-selectable@1"
+				}
+			]
 		}
 	],
 	"schemas": []

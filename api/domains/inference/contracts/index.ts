@@ -106,6 +106,12 @@ export type CallSession = {
 	 * conversation (a conversation call aborts it with `larm_preempted`). Auxiliary only.
 	 */
 	onConversation?: true;
+	/**
+	 * Auxiliary only: the host's own background work (memory and World curation, the agency) on a connection of its
+	 * own. It yields like a call on the conversation's prompt: a call made for the user aborts it (`larm_preempted`).
+	 * LARM infers one call at a time, so it would otherwise hold the user's call behind it.
+	 */
+	yields?: true;
 	/** With `onConversation`: the conversation's tool definitions, sent unchanged to keep the prefix (`toolChoice: none`). */
 	prefixTools?: import("../../../infrastructure/chat-stream").NativeTool[];
 	/** This call's own bound on output tokens, below the request's: a call whose output is short by contract. */

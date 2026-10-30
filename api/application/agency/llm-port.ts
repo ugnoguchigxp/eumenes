@@ -15,10 +15,10 @@ import type { SqliteStore } from "../../infrastructure/sqlite";
 /** The background control limits of the inference domain (`background-control.ts`). */
 export const BACKGROUND_OUTPUT_LIMIT = 1500;
 /**
- * A structured call on the conversation route takes the structured cap: the cloud fallback reserves its own time
- * out of the deadline, so the local attempt keeps 30 s of it.
+ * A structured call on the conversation route takes the structured cap (300 s): LARM thinks at length before the
+ * answer, and the call yields to the user's calls meanwhile. The cloud fallback reserves its own time out of it.
  */
-export const BACKGROUND_DEADLINE_MS = 90_000;
+export const BACKGROUND_DEADLINE_MS = 300_000;
 /** A decision id is `<conversation>.<opportunity|bg>.<n>`; inference accepts `[a-zA-Z0-9_.:-]{1,160}`. */
 const DECISION_ID = /^[a-zA-Z0-9_.:-]{1,160}$/;
 
@@ -147,6 +147,7 @@ export function createAgencyLlmPort(deps: AgencyLlmPortDeps): LlmPort {
 						AbortSignal.timeout(BACKGROUND_DEADLINE_MS),
 					]),
 					{ instructions: request.system, outputSchema },
+					// Either way the agency yields: a call made for the user aborts it (`larm_preempted`).
 					prefix
 						? {
 								sessionRole: "auxiliary",
@@ -154,7 +155,7 @@ export function createAgencyLlmPort(deps: AgencyLlmPortDeps): LlmPort {
 								prefixTools: prefix.tools,
 								toolChoice: "none",
 							}
-						: undefined,
+						: { sessionRole: "auxiliary", yields: true },
 				);
 			} catch (error) {
 				return callError(error, signal);

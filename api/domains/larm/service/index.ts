@@ -167,24 +167,30 @@ export function createLarm(config: {
 		onDelta?: (text: string) => void,
 		options?: LarmCallOptions,
 	) {
-		// Background work on the conversation's prompt yields: a conversation call takes the connection at once.
-		const yields = options?.onConversation ? yielding.enter() : null;
+		// Background work yields (on the conversation's prompt, or the host's own on a connection of its own): LARM infers
+		// one call at a time, so a call made for the user aborts it and goes first.
+		const yields =
+			options?.onConversation || options?.yields ? yielding.enter() : null;
 		const scoped = AbortSignal.any([
 			signal,
 			lifetime.signal,
 			...(yields ? [yields.signal] : []),
 		]);
+		if (!yields) yielding.preempt();
 		if (
-			!yields &&
+			!options?.onConversation &&
 			(options?.sessionRole === "auxiliary" ||
 				options?.sessionRole === "subagent")
 		) {
 			// Independent sessions (one-shot calls and task sub-agents) share the saved profile; admission and KV capacity belong to LARM.
-			return helpers.answer(messages, scoped, onDelta, options, (run) =>
-				withProvider("llm", scoped, run),
-			);
+			try {
+				return await helpers.answer(messages, scoped, onDelta, options, (run) =>
+					withProvider("llm", scoped, run),
+				);
+			} finally {
+				yields?.leave();
+			}
 		}
-		if (!yields) yielding.preempt();
 		// One call may infer on the conversation's connection at a time.
 		const previous = mainAnswer;
 		let finish!: () => void;

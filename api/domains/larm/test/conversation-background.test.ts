@@ -148,6 +148,63 @@ test("background work on the conversation's prompt runs on its connection and yi
 	}
 });
 
+test("the host's own background work on a connection of its own yields to every call made for the user; other one-shot calls do not", async () => {
+	const { p, inputs } = fixture();
+	const signal = AbortSignal.timeout(5000);
+	const housekeeping = (content: string) =>
+		Promise.allSettled([
+			p.answer([{ role: "user", content }], signal, {
+				sessionRole: "auxiliary",
+				yields: true,
+				jsonOutput: true,
+			}),
+		]);
+	try {
+		// A conversation call aborts it at once: LARM infers one call at a time.
+		const memory = housekeeping("memory curation");
+		await waitFor(() => inputs.length === 1);
+		expect(
+			await p.answer([{ role: "user", content: "quick answer" }], signal),
+		).toBe("quick answer:-");
+		const [first] = await memory;
+		expect(((first as PromiseRejectedResult).reason as Error).message).toBe(
+			"larm_preempted",
+		);
+		// A specialist's call (a task sub-agent) is made for the user too.
+		const world = housekeeping("world curation");
+		await waitFor(() => inputs.length === 3);
+		expect(
+			await p.answer([{ role: "user", content: "quick specialist" }], signal, {
+				sessionRole: "subagent",
+				taskId: "studio",
+			}),
+		).toBe("quick specialist:-");
+		const [second] = await world;
+		expect(((second as PromiseRejectedResult).reason as Error).message).toBe(
+			"larm_preempted",
+		);
+		// A one-shot call that does not yield is not aborted by another, and a finished one leaves nothing to abort.
+		const other = Promise.allSettled([
+			p.answer([{ role: "user", content: "one-shot" }], signal, {
+				sessionRole: "auxiliary",
+			}),
+		]);
+		await waitFor(() => inputs.length === 5);
+		expect(
+			await p.answer([{ role: "user", content: "quick again" }], signal),
+		).toBe("quick again:-");
+		await new Promise((resolve) => setTimeout(resolve, 50));
+		expect(inputs.length).toBe(6);
+		await p.close();
+		const [unrelated] = await other;
+		expect(
+			((unrelated as PromiseRejectedResult).reason as Error).message,
+		).not.toBe("larm_preempted");
+	} finally {
+		await p.close();
+	}
+});
+
 test("a read-ahead on the conversation's prompt ends normally at its output bound; another call does not", async () => {
 	const { p } = fixture();
 	const signal = AbortSignal.timeout(5000);

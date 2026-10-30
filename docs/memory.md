@@ -59,11 +59,12 @@ ContextWindowの内容・並び・予算・保持・再構成・忘却の扱い�
 
 | 種類 | step | 役割 |
 | --- | --- | --- |
-| 反映 step（処理済みの出来事ごと） | `curate-memory`、`curate-goals`、`curate-world` | 記憶の保存・更新・停止と短期メモ（決定・利用者への問い・目標・一時的な例外）、目標、World |
+| 反映 step（run の結果報告ごと） | `curate-memory`、`curate-goals` | 記憶の保存・更新・停止と短期メモ（決定・利用者への問い・目標・一時的な例外）、目標、ContextWindow の再公開 |
+| World step（会話の最後の出来事から10分後だけ。会話の間はやらない） | `curate-world` | World |
 | 経緯の step（次の再構成が適用する） | `summarize`、`refine-summary` | `log` から外れる出来事の要約、続いた要約のまとめ直し |
 | 手入れ step（会話の最後の出来事から10分後だけ） | `consolidate-memory`、`consolidate-goals` | 記憶の統合・停止・傾向、目標の整理 |
 
-会話の内容を読む step（`curate-memory`・`curate-goals`・`summarize`・`refine-summary`）は、主会話と同じ先頭（system・tool定義・資料の文書）の後に自分の指示と入力を置き、主会話の接続で推論する。主会話の呼出しや音声の文字起こしが始まると取り消され（`larm_preempted`）、失敗に数えずに15秒後に作り直される。記憶の依頼の結果は、会話の `log` に `memory.notice` の出来事として足す。
+会話の内容を読む step（`curate-memory`・`curate-goals`・`summarize`・`refine-summary`）は、主会話と同じ先頭（system・tool定義・資料の文書）の後に自分の指示と入力を置き、主会話の接続で推論する。主会話の呼出しや音声の文字起こしが始まると取り消され（`larm_preempted`）、失敗に数えずに15秒後に作り直される。どの step も、会話に動いている run（担当に渡して結果を待つ run を含む）がある間は始めず、run の終わりで始まる（保守の step は 30秒・2分・10分の待ち）。会話を読まない step（`curate-world`・`consolidate-memory` など）は自分の接続で推論するが、同じく利用者のための呼出し（会話・専門担当など）が始まると取り消される（LARM は1回に1つずつ推論するので、譲らないと利用者の呼出しが待たされる）。記憶の依頼の結果は、会話の `log` に `memory.notice` の出来事として足す。
 
 **実行単位**（`steward_unit`）は 1 step ＝ 1 ジョブ。同じ対象に開いている単位は 1 つだけである。
 

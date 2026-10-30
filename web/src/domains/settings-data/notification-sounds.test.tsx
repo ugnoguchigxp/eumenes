@@ -60,6 +60,7 @@ test("shipped picker previews the unsaved choice on configured output, stops on 
 	);
 	fireEvent.click(await screen.findByRole("button", { name: "通知音" }));
 	const picker = await screen.findByLabelText("通知音の種類");
+	expect(screen.getAllByRole("option")).toHaveLength(11);
 	for (const option of notificationSoundOptions)
 		expect(screen.getByRole("option", { name: option.label })).toBeTruthy();
 	expect((picker as HTMLSelectElement).value).toBe("soft-chime");
@@ -91,7 +92,7 @@ test("shipped picker previews the unsaved choice on configured output, stops on 
 	).toBe("beep");
 });
 
-test("a saved retired choice stays readable until the user selects an approved sound", async () => {
+test("formerly retired saved choices are now available for preview and remain saved", async () => {
 	const backend = createSettingsBackend({ artifacts });
 	const saved = backend.saved();
 	saved.voice.notificationSound = "tiny-harp";
@@ -102,25 +103,27 @@ test("a saved retired choice stays readable until the user selects an approved s
 	fireEvent.click(await screen.findByRole("button", { name: "通知音" }));
 	const picker = await screen.findByLabelText("通知音の種類");
 	expect((picker as HTMLSelectElement).value).toBe("tiny-harp");
-	expect(
-		screen.getByRole("option", { name: "再制作待ち（以前の通知音）" }),
-	).toBeTruthy();
-	expect(
-		screen
-			.getByRole("button", { name: "通知音を試聴" })
-			.hasAttribute("disabled"),
-	).toBe(true);
-	expect(backend.saved().voice.notificationSound).toBe("tiny-harp");
-	fireEvent.change(picker, { target: { value: "glass-bell" } });
+	expect(screen.getByRole("option", { name: "小さなハープ" })).toBeTruthy();
+	expect(screen.queryByText("再制作待ち（以前の通知音）")).toBeNull();
 	expect(
 		screen
 			.getByRole("button", { name: "通知音を試聴" })
 			.hasAttribute("disabled"),
 	).toBe(false);
+	fireEvent.click(screen.getByRole("button", { name: "通知音を試聴" }));
+	await waitFor(() =>
+		expect(fake.load).toHaveBeenCalledWith(
+			"tiny-harp",
+			expect.any(AbortSignal),
+		),
+	);
+	expect(backend.saved().voice.notificationSound).toBe("tiny-harp");
+	fireEvent.click(screen.getByRole("button", { name: "通知音の試聴を停止" }));
+	fireEvent.change(picker, { target: { value: "bamboo" } });
 	fireEvent.click(
 		screen.getByRole("button", { name: "設定の変更をすべて保存" }),
 	);
 	await waitFor(() =>
-		expect(backend.saved().voice.notificationSound).toBe("glass-bell"),
+		expect(backend.saved().voice.notificationSound).toBe("bamboo"),
 	);
 });
