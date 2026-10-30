@@ -206,6 +206,27 @@ export function createSelections(store: SqliteStore, now: () => number) {
 				outcome: (r.outcome as SelectionOutcome | null) ?? null,
 			}));
 	}
+	/** The past requests a toolchain was chosen for, with their stored query vectors, oldest first (the search check). */
+	function chosenQueriesInTransaction(db: Database) {
+		return (
+			db
+				.query(
+					"SELECT id,toolchain_id,query_space,query_vector,created_at FROM toolchain_selections WHERE decision='toolchain' AND toolchain_id IS NOT NULL AND query_vector IS NOT NULL ORDER BY created_at",
+				)
+				.all() as Array<
+				Pick<
+					SelectionRow,
+					"id" | "toolchain_id" | "query_space" | "query_vector" | "created_at"
+				>
+			>
+		).map((r) => ({
+			selectionId: r.id,
+			toolchainId: r.toolchain_id!,
+			spaceKey: r.query_space!,
+			vector: unpackVector(r.query_vector!),
+			createdAt: r.created_at,
+		}));
+	}
 	/** The toolchain the conversation chose for a run, if any. */
 	function toolchainOfRunInTransaction(db: Database, runId: string) {
 		const row = db
@@ -301,6 +322,7 @@ export function createSelections(store: SqliteStore, now: () => number) {
 		},
 		queryOfRunInTransaction,
 		similarSelectionsInTransaction,
+		chosenQueriesInTransaction,
 		listSelections,
 		getSelection,
 	};

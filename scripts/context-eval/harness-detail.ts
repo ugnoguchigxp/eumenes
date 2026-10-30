@@ -1,7 +1,7 @@
 /**
  * What each model call of a step did, for finding out why a step failed: the call's kind, the tool calls it returned
- * with the host's verdict on each, the decision's raw JSON, the head of the text that arrived, the finish reason, and
- * how an error stopped it. The conversations are synthetic, so arguments and texts are recorded as they were. Pure
+ * (or the choice it made) with the host's verdict on each, the choice's raw JSON, the head of the text that arrived,
+ * the finish reason, and how an error stopped it. The conversations are synthetic, so arguments and texts are recorded as they were. Pure
  * helpers; nothing here calls a model.
  */
 import { ValidationFailure } from "../../api/infrastructure/validation-log";
@@ -9,8 +9,8 @@ import type { CallKind } from "./harness-client";
 
 /** An argument string shows at most this much; the rest is cut with `…`. */
 export const ARGUMENT_CHARS = 300;
-/** The decision's raw JSON shows at most this much. */
-export const DECISION_CHARS = 500;
+/** A choice's raw JSON shows at most this much. */
+export const CHOICE_CHARS = 500;
 /** The head of the text that arrived. */
 export const HEAD_CHARS = 200;
 
@@ -44,14 +44,14 @@ export type CallVerdict = {
 export type CallDetail = {
 	kind: CallKind;
 	toolCalls: CallVerdict[];
-	/** The decision call's raw JSON text, cut. */
-	decisionJson?: string;
+	/** The choice call's raw JSON text, cut. */
+	choiceJson?: string;
 	/** The head of the text that arrived. */
 	text: string;
 	textChars: number;
 	reasoningChars: number;
 	finishReason: string | null;
-	/** The local check this call's answer failed. */
+	/** Why the host did not take this call's answer (a choice it could not carry out, the same reason the retry names). */
 	check?: string;
 	/** The error that ended the call: its code and how much had arrived. */
 	error?: { code: string; textChars: number; reasoningChars: number };
@@ -143,49 +143,14 @@ export function errorCodeOf(error: unknown): string {
 			: String(error).slice(0, 80);
 }
 
-/**
- * The call a decision's JSON names, as far as it can be read: the arguments as sent, and a diagnostic form of them
- * (nulls dropped, a text that is a JSON object read as one) to run through the product's validation for its issues.
- * The diagnosis only explains a failed check; the check itself is the product's.
- */
-export function decisionCall(
-	text: string,
-): { name: string; arguments: string; checked: string } | null {
-	try {
-		const tool = (JSON.parse(text) as { tool?: unknown }).tool as {
-			name?: unknown;
-			arguments?: unknown;
-		} | null;
-		if (!tool || typeof tool.name !== "string") return null;
-		const sent = tool.arguments;
-		const plain = (value: unknown): unknown => {
-			if (typeof value !== "string") return value;
-			try {
-				const parsed: unknown = JSON.parse(value);
-				return parsed && typeof parsed === "object" && !Array.isArray(parsed)
-					? parsed
-					: value;
-			} catch {
-				return value;
-			}
-		};
-		const checked =
-			sent && typeof sent === "object" && !Array.isArray(sent)
-				? Object.fromEntries(
-						Object.entries(sent)
-							.filter(([, v]) => v !== null)
-							.map(([k, v]) => [k, plain(v)]),
-					)
-				: sent;
-		return {
-			name: tool.name,
-			arguments: typeof sent === "string" ? sent : JSON.stringify(sent ?? null),
-			checked:
-				typeof checked === "string" ? checked : JSON.stringify(checked ?? null),
-		};
-	} catch {
-		return null;
-	}
+/** Takes text that arrived into the call's detail: its length, and its head. */
+export function arrived(detail: CallDetail, delta: string): void {
+	detail.textChars += delta.length;
+	if (detail.text.length < HEAD_CHARS)
+		detail.text = cut(
+			`${detail.text}${delta}`.slice(0, HEAD_CHARS),
+			HEAD_CHARS,
+		);
 }
 
 const verdictText = (v: CallVerdict) => {
@@ -216,7 +181,7 @@ export function detailLines(detail: CallDetail, number: number): string[] {
 	].join(" / ");
 	return [
 		`  - ${head}`,
-		...(detail.decisionJson ? [`    - 判断: \`${detail.decisionJson}\``] : []),
+		...(detail.choiceJson ? [`    - 選択: \`${detail.choiceJson}\``] : []),
 		...(detail.text ? [`    - 本文の頭: 「${detail.text}」`] : []),
 		...detail.toolCalls.map(
 			(v) => `    - ${v.name} \`${v.arguments}\` → ${verdictText(v)}`,

@@ -1,5 +1,10 @@
 import type { InferencePort } from "../../inference";
-import { SYSTEM_SECTIONS, type SystemSection } from "./context-system";
+import {
+	SYSTEM_SECTIONS,
+	TALK_SECTIONS,
+	type SystemSection,
+	type SystemTexts,
+} from "./context-system";
 
 type Snapshot = ReturnType<NonNullable<InferencePort["snapshotInTransaction"]>>;
 type Connection = Snapshot["connections"][number];
@@ -15,6 +20,11 @@ export type ConversationHarness = {
 	name: HarnessName;
 	/** The system part's sections, in the order they are written. */
 	system: readonly SystemSection[];
+	/**
+	 * The texts the sections carry: `full` for a reply that calls the tools itself, `talk` for the local talk turn,
+	 * which names no toolchain or tool (the local harness rebuild plan, section 4.2).
+	 */
+	systemTexts: SystemTexts;
 	history: {
 		/** The searches and hand-overs of the turn a request was made in. */
 		toolExchanges: boolean;
@@ -22,6 +32,8 @@ export type ConversationHarness = {
 		notices: boolean;
 		/** Leave out the agent's utterances that copy the system part. */
 		copyFilter: boolean;
+		/** The user's utterances the recent conversation keeps, with the agent's words after the oldest; absent: all. */
+		users?: number;
 	};
 	call: {
 		reasoning: "off" | "low" | "medium" | "high";
@@ -33,17 +45,18 @@ export type ConversationHarness = {
 		systemCopy: boolean;
 	};
 	/**
-	 * How a model call answers: `single` is one call that replies or calls a tool; `decide-then-reply` first decides
-	 * silently (reply or which tool), then streams the reply with its head checked, and goes to the cloud when a check
-	 * fails (the conversation harness design, section 5.3).
+	 * How a turn runs: `single`, the agent's reply loop calls the tools itself; `routed`, the host routes each turn by
+	 * the user-intent judge and what it holds pending, then talks or has one choice made (the local harness rebuild
+	 * plan, section 4).
 	 */
-	turn: "single" | "decide-then-reply";
+	turn: "single" | "routed";
 };
 
 /** The harness for a model served by a cloud connection. */
 export const cloudHarness: ConversationHarness = {
 	name: "cloud",
 	system: SYSTEM_SECTIONS,
+	systemTexts: "full",
 	history: { toolExchanges: true, notices: true, copyFilter: true },
 	call: { reasoning: "low", outputLimit: 1024 },
 	gates: { systemCopy: true },
@@ -51,17 +64,19 @@ export const cloudHarness: ConversationHarness = {
 };
 
 /**
- * The harness for a model served by LARM: the one the background calls on the conversation also use. Its recent
- * conversation is the words alone (the local context budget design, section 4.3): a past turn's exchange handed the
- * model an old todo to check instead of asking anew (run `bcefbc1b`).
+ * The harness for a model served by LARM (the local harness rebuild plan): the host routes each turn, the talk turn
+ * reads a talk-only system and the last two of the user's utterances, and no call carries tool definitions. The
+ * background calls on the conversation share its prefix. It thinks at `low`, the least level every served model
+ * accepts (one refused `none` with 400, 2026-10-29); its limit holds the thinking and the answer.
  */
 export const localHarness: ConversationHarness = {
 	name: "local",
-	system: SYSTEM_SECTIONS,
-	history: { toolExchanges: false, notices: false, copyFilter: true },
+	system: TALK_SECTIONS,
+	systemTexts: "talk",
+	history: { toolExchanges: false, notices: false, copyFilter: true, users: 2 },
 	call: { reasoning: "low", outputLimit: 4096 },
 	gates: { systemCopy: true },
-	turn: "single",
+	turn: "routed",
 };
 
 /** The harness for the kind of connection that serves the conversation (LARM has none). */

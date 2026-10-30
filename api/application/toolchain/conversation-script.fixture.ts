@@ -250,6 +250,125 @@ export function scripted(
 }
 
 /**
+ * Which silent choice of the local harness's routed turn a call is (the local harness rebuild plan, sections 4.3 and
+ * 4.4): its input has the request turn's candidates or the pending turn's open items; null for any other call.
+ */
+export function choiceRound(
+	messages: ConversationMessage[],
+): "request" | "pending" | null {
+	const last = lastUserMessage(messages);
+	if (sectionOf(last, INPUT_HEADINGS.candidates) !== undefined)
+		return "request";
+	if (sectionOf(last, INPUT_HEADINGS.pending) !== undefined) return "pending";
+	return null;
+}
+
+/** What a routed turn's choice says when it makes no choice: none (the talk turn answers). */
+const NONE = JSON.stringify({ choice: "none" });
+/** The words a script's operation is said with when it carries none of its own. */
+const SAY = "承りました。";
+
+/**
+ * A routed turn's choice from a script written for the agent loop: the script runs as the loop would, its search
+ * answered with this turn's candidates (the host searched already), and its first call that acts becomes the choice.
+ * A script that answers in words chooses none; on the pending turn only an approval or an answer to a work is a
+ * choice.
+ */
+export async function choiceByScript(
+	messages: ConversationMessage[],
+	round: "request" | "pending",
+	step: (loop: ConversationMessage[]) => Promise<Step> | Step,
+): Promise<string> {
+	const candidates =
+		sectionOf(lastUserMessage(messages), INPUT_HEADINGS.candidates) ?? "";
+	let loop = messages.map((m) => ({ ...m }));
+	for (let index = 0; index < 4; index++) {
+		const call = (await step(loop)).calls?.[0];
+		if (!call) return NONE;
+		if (call.name !== "find_toolchain") {
+			const choice = choiceOf(call, round);
+			return choice ? JSON.stringify(choice) : NONE;
+		}
+		const id = `script-${index}`;
+		loop = [
+			...loop,
+			{
+				role: "assistant",
+				content: "",
+				tool_calls: [
+					{
+						id,
+						function: { name: call.name, arguments: JSON.stringify(call.args) },
+					},
+				],
+			},
+			{ role: "tool", tool_call_id: id, content: candidates },
+		];
+	}
+	return NONE;
+}
+
+/**
+ * The routed turn's choice when this call is one (it carries a schema and the choice's sections), made from the
+ * step a loop script takes; undefined for any other call.
+ */
+export function routedChoice<M>(
+	options: { jsonSchema?: unknown } | undefined,
+	messages: readonly M[],
+	step: (loop: M[]) => Promise<Step> | Step,
+): Promise<string> | undefined {
+	// The loop messages a script reads are the conversation's own shape, whatever type the caller holds them as.
+	const conversation = messages as unknown as ConversationMessage[];
+	const round = options?.jsonSchema ? choiceRound(conversation) : null;
+	return round
+		? choiceByScript(conversation, round, (loop) =>
+				step(loop as unknown as M[]),
+			)
+		: undefined;
+}
+
+/** A loop call as the routed turn's choice; null when the round has no such choice. */
+function choiceOf(
+	call: Call,
+	round: "request" | "pending",
+): Record<string, unknown> | null {
+	const a = call.args;
+	if (call.name === "work")
+		return a.operation === "answer"
+			? { choice: "answer", todo: a.todo, text: a.text }
+			: round === "request"
+				? {
+						choice: a.todo,
+						operation: a.operation,
+						...(a.text ? { text: a.text } : {}),
+						say: SAY,
+					}
+				: null;
+	if (call.name === "delegate" && a.mode === "approve")
+		return { choice: "approve", confirmation: a.confirmation };
+	if (round === "pending") return null;
+	if (call.name === "memory")
+		return a.operation === "read"
+			? { choice: "memory.recall", query: a.query }
+			: {
+					choice: "memory.request",
+					kind: a.kind,
+					what: a.what,
+					...(a.detail ? { detail: a.detail } : {}),
+					say: SAY,
+				};
+	if (call.name !== "delegate") return null;
+	return {
+		choice: a.toolchain,
+		...(a.inputs !== undefined ? { inputs: a.inputs } : {}),
+		...(typeof a.request === "string" ? { request: a.request } : {}),
+		say: typeof a.announcement === "string" ? a.announcement : SAY,
+		...(a.target ? { target: a.target } : {}),
+		...(a.refs ? { refs: a.refs } : {}),
+	};
+}
+
+/**
  * The context window a fake LARM connection reports for the conversation's generations. The generation's fixed part
  * (the system prompt and the fixed tool definitions) must fit it, so a fixture that reports the small reference
  * window would refuse every utterance (`window_too_small`).

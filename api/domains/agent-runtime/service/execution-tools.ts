@@ -31,7 +31,7 @@ const controls = {
 	},
 	find_toolchain: {
 		description:
-			"今回の目的に必要な能力を探す。上位4候補だけを比較する。検索は操作ではない。",
+			"今回の目的に必要な能力を探す。示された候補だけを比較する。検索は操作ではない。",
 		schema: z.strictObject({ query: z.string().trim().min(1).max(2000) }),
 	},
 	read_reference: {

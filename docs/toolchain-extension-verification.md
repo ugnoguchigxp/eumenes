@@ -70,6 +70,7 @@ bun test api/application/toolchain/search-results.test.ts api/application/toolch
 登録手順は[データドリブン形式の手順](toolchain-extension.md#3-bundleだけで追加改訂する)。変更した段階から次の順に確認する。
 
 1. **bundle**: `bun run toolchain:bundle -- check <bundle>` がissue無し。pinは `bun run toolchain:bundle -- pins <revisionId>...` の値と一致。旧revisionのhashが変わらないこと、fresh DBと旧版seed済みDBの両方で登録できること、二度目のseedが冪等であることを `api/domains/capabilities/test/bundles.test.ts` の形で確認する。
+   **検索の確認**: `summary`・`useWhen`・`examples`・`general` を変えたら、再起動して索引の埋め込みが作り直された後に `bun scripts/toolchain-search-check.ts` を実行し、過去に担当が選ばれた発言で、選ばれた担当の順位と候補の枠に入る数を変更の前後で比べる。LARM は呼ばない（保存済みのベクトルだけで計算する）。結果には発言の本文を出さない。
 2. **adapter**: 追加・変更した操作ごとに、正常・domainの拒否・同requestIdのreplay・revision競合・会話originの対象検査を単体で確認する。domainの業務判断はdomainの試験に置き、adapterでは接続だけを試す。
 3. **会話の結合**: 固定モデルで候補提示 → command → 保存receipt → 回答と、clarify → 質問保存 → 回答 → 再開を通す（例 `api/application/timers/timer-toolchain.test.ts`、`api/domains/dialogue/test/command-interactions.test.ts`）。
 4. **UI操作**: 受付と実行の原子性、同eventIdの再送、異なる入力の409、時刻窓、source/action偽装の拒否、field errorの非保存は共通機構の試験（`api/domains/tool-runtime/test/action-requests.test.ts`）が持つ。新しいdomainでは、そのadapterを通る代表操作を1件以上の結合試験で通す。

@@ -1,3 +1,4 @@
+import { settings } from "./harness.fixture";
 import { join } from "node:path";
 import { rmSync } from "node:fs";
 import { waitFor } from "../../../infrastructure/wait-for";
@@ -158,6 +159,11 @@ export async function setup(options: Options = {}) {
 			signal?.addEventListener("abort", () => reject(new Error("aborted")));
 		});
 	const larm = {
+		// The conversation is served by a cloud model: the agent's reply loop calls the tools itself.
+		snapshotFor: () => ({
+			...settings({ mode: "cloud-only" }),
+			voice: { autoSpeak: true },
+		}),
 		status: () => ({ state: "ready", capabilities: ["llm"] }),
 		captureInTransaction: () => {},
 		captureControlInTransaction: (

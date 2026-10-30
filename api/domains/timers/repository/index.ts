@@ -17,6 +17,7 @@ export {
 	latestOpenNotification,
 	undismissedCount,
 	dismissNotifications,
+	archiveNotifications,
 	listNotifications,
 	claimNotification,
 	releaseClaim,

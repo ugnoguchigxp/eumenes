@@ -10,6 +10,7 @@ import { CONVERSATION_DEFAULT_PRINCIPAL } from "../domains/conversation/contract
 import { createContinuityService } from "../domains/continuity";
 import { createDialogueService } from "../domains/dialogue";
 import { configureTaskExecution } from "./toolchain/task-execution-port";
+import { createSearchCheck } from "./toolchain/toolchain-search-check";
 import { taskMediaPorts } from "./toolchain/task-media-execution";
 import { taskLegacyPorts } from "./toolchain/task-legacy-execution";
 import {
@@ -338,6 +339,14 @@ export async function buildServices(
 			})
 		: undefined;
 	if (pipelines) toolchain.attachPipelines(pipelines);
+	const searchCheck = toolchains
+		? createSearchCheck({
+				store,
+				capabilities: toolchain.capabilities,
+				history: toolchain.history,
+				routing: toolchains,
+			})
+		: undefined;
 	const pipelineTrials =
 		pipelines && toolchains
 			? createPipelineTrials({
@@ -388,6 +397,7 @@ export async function buildServices(
 		toolchain,
 		pipelines,
 		pipelineTrials,
+		searchCheck,
 		resources,
 		dialogue,
 		agency,

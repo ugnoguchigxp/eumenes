@@ -12,6 +12,7 @@ import {
 	timerReceiptSchema,
 } from "../contracts";
 import {
+	archiveNotifications,
 	getNotification,
 	getOperation,
 	getStartedReceiptByRun,
@@ -307,6 +308,8 @@ export function createTimers(
 				),
 			);
 		},
+		archiveNotifications: () =>
+			commit((tx) => archiveNotifications(tx, scope, deps.now()), true),
 		claim: (id: string, input: unknown) =>
 			commit((tx) => claimInTransaction(tx, deps, id, scope, input), true),
 		ack: (id: string, input: unknown) =>

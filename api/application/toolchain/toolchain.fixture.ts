@@ -60,6 +60,8 @@ import type { LarmPort } from "../../domains/larm";
 import {
 	callsOf,
 	candidatesOf,
+	choiceByScript,
+	choiceRound,
 	delegate,
 	findToolchain,
 	handedStep,
@@ -70,6 +72,10 @@ import {
 	type Step,
 	UNAVAILABLE_TEXT,
 } from "./conversation-script.fixture";
+/** The conversation agent's fixed tools, as a script reads what it may call. */
+const CONVERSATION_TOOLS = ["memory", "find_toolchain", "delegate", "work"].map(
+	(name) => ({ function: { name } }),
+);
 /** Trusted packet merged with the separate UNTRUSTED_MATERIALS message. */
 export function workerPacket(
 	messages: import("../../domains/inference/contracts").Messages,
@@ -199,6 +205,8 @@ export async function harness(options: HarnessOptions = {}) {
 		messages: import("../../domains/inference/contracts").Messages,
 		question: string,
 		tools: ReadonlyArray<{ function: { name: string } }>,
+		/** A routed turn's choice: an answer in words is the talk turn's, not this call's. */
+		choosing = false,
 	): Promise<Step> => {
 		const scripted = options.firstRound?.(tools, question, messages);
 		if (scripted) return scripted;
@@ -208,7 +216,8 @@ export async function harness(options: HarnessOptions = {}) {
 			!!options.history ||
 			(!!options.timers && /タイマー/.test(question)) ||
 			/天気|株価|weather|stock|調べ|検索|https?:|確認/.test(question);
-		if (options.clarify || !delegates) return { text: await reply(messages) };
+		if (options.clarify || !delegates)
+			return choosing ? {} : { text: await reply(messages) };
 		const handed = handedStep(messages);
 		if (handed) return handed;
 		const named = options.history
@@ -282,6 +291,17 @@ export async function harness(options: HarnessOptions = {}) {
 				]);
 				return "";
 			}
+			// The local harness's routed turn: a silent choice held to a schema, from the same script.
+			const round = callOptions?.jsonSchema ? choiceRound(messages) : null;
+			if (round)
+				return choiceByScript(messages, round, (loop) =>
+					utteranceStep(
+						loop as never,
+						utteranceOf(messages),
+						CONVERSATION_TOOLS,
+						true,
+					),
+				);
 			if (isUtteranceRound(callOptions) && !isNoticeRound(messages)) {
 				const step = await utteranceStep(
 					messages,

@@ -1,9 +1,9 @@
 import { afterEach, expect, test } from "bun:test";
 import type { LarmPort } from "../../domains/larm";
 import {
-	callsOf,
-	isUtteranceRound,
 	searchThenDelegate,
+	routedChoice,
+	utteranceOf,
 } from "./conversation-script.fixture";
 import { waitFor } from "../../infrastructure/wait-for";
 import { harness } from "./toolchain.fixture";
@@ -69,19 +69,15 @@ function model(): LarmPort {
 					text: replies[spoken],
 				});
 			}
-			// The conversation's round delegates the request to the studio (a search, then the hand-over).
-			if (isUtteranceRound(options)) {
-				const step = searchThenDelegate(
+			// The conversation's choice (the local harness's routed turn) hands the request to the studio.
+			const routed = routedChoice(options, messages, (loop) =>
+				searchThenDelegate(
 					(candidate) => candidate.id === "ui.compose",
-					messages.at(-1)!.content,
+					utteranceOf(loop),
 					{ announcement: "制作担当に引き継ぎます。", impact: "create" },
-				)(messages);
-				if (step.calls?.length)
-					options!.onToolCalls!(
-						callsOf(step, () => crypto.randomUUID()) as never,
-					);
-				return step.text ?? "";
-			}
+				)(loop),
+			);
+			if (routed) return routed;
 			return "かしこまりました。";
 		},
 	};

@@ -29,6 +29,7 @@ function setup() {
 		specialistSession: async () => ({ session: null }),
 		todoNotices: async () => ({ notices: [], unread: 0 }),
 		readTodoNotice: async () => {},
+		archiveTodoNotices: async () => {},
 		specialistCommand: async () => {
 			throw new Error("not_used");
 		},

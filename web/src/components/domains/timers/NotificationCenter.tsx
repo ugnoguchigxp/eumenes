@@ -226,6 +226,8 @@ export function NotificationCenter({
 	stoppingIds,
 	onStop,
 	onPrepareAudio,
+	onClearHistory,
+	clearing = false,
 	error,
 }: {
 	notices: TimerNotificationDto[];
@@ -235,6 +237,8 @@ export function NotificationCenter({
 	stoppingIds: string[];
 	onStop: (item: TimerNotificationDto) => void;
 	onPrepareAudio?: () => void;
+	onClearHistory?: () => void;
+	clearing?: boolean;
 	error: string | null;
 }) {
 	const [open, setOpen] = useState(false);
@@ -414,6 +418,20 @@ export function NotificationCenter({
 					</Button>
 				}
 			>
+				{onClearHistory && (
+					<div className="notification-center-toolbar">
+						<Button
+							type="button"
+							variant="secondary"
+							size="sm"
+							disabled={clearing || (!sorted.length && !count)}
+							onClick={onClearHistory}
+							title="通知をアーカイブして一覧から消します"
+						>
+							{clearing ? "クリア中…" : "履歴をクリア"}
+						</Button>
+					</div>
+				)}
 				<div className="notification-center-list" aria-label="通知一覧">
 					{audioPrompt}
 					{sorted.map((entry) => card(entry))}

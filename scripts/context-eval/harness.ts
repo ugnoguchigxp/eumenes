@@ -4,16 +4,20 @@
  * is judged and timed. Usage:
  *   bun scripts/context-eval/harness.ts [--harness local|cloud] [--client larm|codex] [--model <id>]
  *       [--reasoning off|low|medium|high] [--chains <key,...>] [--forms <form,...>] [--reps <n>]
- *       [--turn single|decide-then-reply] [--fallback-client codex --fallback-model <id>]
- *       [--probe] [--dry-run]
+ *       [--turn single|routed] [--probe] [--dry-run]
  * Without `--client` the saved LARM connection answers (in this process; no server is started). `--client codex`
  * runs the Codex SDK path with `--model`; the model id is only ever this argument. The harness decides the call's
  * reasoning and output limit; `--reasoning` overrides the reasoning for an experiment. `--probe` tries the first
- * request six times in the empty form. `--turn decide-then-reply` runs the local turn of design section 5.3 (a
- * silent decision, then the reply once its head passes the host's checks; saved LARM connection only); a failed
- * check fails the step as `fallback:<check>`, or, with `--fallback-client codex --fallback-model <id>`, the Codex
- * path (cloud harness) answers that round and its answer is judged. `--dry-run` composes and prints the first step of each chain and form
- * without calling any model. Runs interleave rep, chain, form. Reports go to
+ * request six times in the empty form.
+ *
+ * The turn is the harness's own (`single`: the reply loop with the native tools, the cloud harness; `routed`: the
+ * local harness's turn, `harness-routed.ts`; saved LARM connection only). In a routed run the host routes each step
+ * by the step's expectation as a stand-in for a correct judge: a step that expects a hand-over (`expect`) is a
+ * request turn (a search with the user's words, then one silent choice held to the candidates' schema), any other
+ * step (`free`, `notBroken`, `repeatOf`, plain talk) is a talk turn (one call, no tools). The judge is assumed
+ * right; its own accuracy is measured from the production records, not here. `--dry-run` composes and prints the
+ * first step of each chain and form (for a routed harness also the choice input of the chain's first step) without
+ * calling any model. Runs interleave rep, chain, form. Reports go to
  * verification-reports/context-eval/harness/<timestamp>/ (new directories, never overwritten). It is outside verify.
  */
 import { join, resolve } from "node:path";
@@ -29,15 +33,22 @@ import {
 	localHarness,
 	type ConversationHarness,
 } from "../../api/domains/dialogue/service/harness";
+import { ASK_STEP } from "../../api/domains/dialogue/service/tool-exchange";
 import { NOTICE_MARK } from "../../api/domains/dialogue/service/report-notice";
+import { personaStyle } from "../../api/domains/dialogue/service/context-system";
 import {
-	decisionMessages,
-	decisionSchema,
-} from "../../api/domains/dialogue/service/local-turn";
-import { generationTools } from "../../api/domains/dialogue/service/generation-tools";
+	choiceMessages,
+	choiceSchema,
+} from "../../api/domains/dialogue/service/routed-choice";
 import { estimateMessageTokens } from "../../api/domains/inference";
 import { estimateTextTokens } from "../../api/infrastructure/context-budget";
-import { CHAINS, PROBE_CHAIN, PROBE_TRIES, type Chain } from "./harness-chains";
+import {
+	CHAINS,
+	PROBE_CHAIN,
+	PROBE_TRIES,
+	candidatesFor,
+	type Chain,
+} from "./harness-chains";
 import {
 	REASONINGS,
 	type CallSettings,
@@ -49,6 +60,7 @@ import {
 	lastOf,
 	buildSystem,
 	composeInput,
+	routedInputOf,
 	type Entry,
 	type Form,
 	type Work,
@@ -64,6 +76,7 @@ import {
 	type StepRecord,
 } from "./harness-judge";
 import { readSaved, type Saved } from "./harness-source";
+import { runRoutedTurn, type RequestInput } from "./harness-routed";
 import { runTurn } from "./harness-turn";
 
 export type Options = {
@@ -73,10 +86,8 @@ export type Options = {
 	reasoning: Reasoning;
 	/** Whether `--reasoning` was given (the override of the harness's value). */
 	reasoningOverridden: boolean;
-	/** How a model round is made: one call, or a decision and then the reply. */
+	/** How a model round is made: the reply loop with the native tools, or the routed turn. */
 	turn: TurnMode;
-	/** The model that answers a round whose local answer failed a check (Codex path); null for none. */
-	fallbackModel: string | null;
 	chains: Chain[];
 	forms: Form[];
 	reps: number;
@@ -106,8 +117,6 @@ export function parseOptions(argv: readonly string[]): Options {
 		"probe",
 		"dry-run",
 		"turn",
-		"fallback-client",
-		"fallback-model",
 	]);
 	for (const arg of argv)
 		if (arg.startsWith("--") && !known.has(arg.slice(2)))
@@ -133,20 +142,14 @@ export function parseOptions(argv: readonly string[]): Options {
 	if (client === "codex" && reasoning === "off")
 		throw new Error("--reasoning off is not available on the Codex path");
 	const turn = value("turn") ?? harness.turn;
-	if (turn !== "single" && turn !== "decide-then-reply")
-		throw new Error("--turn is single or decide-then-reply");
-	if (turn === "decide-then-reply" && client !== "larm")
-		throw new Error("--turn decide-then-reply needs the saved LARM connection");
-	const fallbackClient = value("fallback-client");
-	if (fallbackClient && fallbackClient !== "codex")
-		throw new Error("--fallback-client is codex");
-	const fallbackModel = value("fallback-model") ?? null;
-	if (fallbackClient && !fallbackModel && !dryRun)
-		throw new Error("--fallback-client codex needs --fallback-model <id>");
-	if (fallbackModel && !fallbackClient)
-		throw new Error("--fallback-model needs --fallback-client codex");
-	if (fallbackClient && turn !== "decide-then-reply")
-		throw new Error("--fallback-client needs --turn decide-then-reply");
+	if (turn !== "single" && turn !== "routed")
+		throw new Error("--turn is single or routed");
+	if (turn !== harness.turn)
+		throw new Error(
+			`--turn ${turn} does not fit the ${harness.name} harness (its turn is ${harness.turn})`,
+		);
+	if (turn === "routed" && client !== "larm")
+		throw new Error("--turn routed needs the saved LARM connection");
 	const probe = flag("probe");
 	const keys = value("chains")?.split(",");
 	const chains = probe
@@ -178,7 +181,6 @@ export function parseOptions(argv: readonly string[]): Options {
 		reasoning: (reasoning as Reasoning | undefined) ?? harness.call.reasoning,
 		reasoningOverridden: !!reasoning,
 		turn,
-		fallbackModel: fallbackClient ? (fallbackModel ?? "") : null,
 		chains,
 		forms,
 		reps,
@@ -198,10 +200,23 @@ export function planOf(
 	).flat();
 }
 
-/** The talk before a chain's first step. */
-export const startLog = (chain: Chain): Entry[] => [
+/** The talk before a chain's first step; in a routed run a planted question back carries its `ask` step. */
+export const startLog = (chain: Chain, turn: TurnMode = "single"): Entry[] => [
 	{ role: "agent", text: "こんにちは。" },
-	...(chain.planted ?? []).map(({ role, text }): Entry => ({ role, text })),
+	...(chain.planted ?? []).map(({ role, text, asked }): Entry => {
+		if (turn !== "routed" || !asked) return { role, text };
+		return {
+			role,
+			text,
+			toolCalls: [
+				{
+					name: ASK_STEP,
+					arguments: JSON.stringify({ request: asked }),
+					result: "{}",
+				},
+			],
+		};
+	}),
 ];
 
 type Run = {
@@ -211,8 +226,8 @@ type Run = {
 	harness: ConversationHarness;
 	settings: CallSettings;
 	turn: TurnMode;
-	/** The Codex path for a round whose local answer failed (the cloud harness's call settings). */
-	cloud: { client: ModelClient; settings: CallSettings } | null;
+	/** The persona's tone for the choice call's `say`. */
+	style: string;
 	onStep: (record: StepRecord) => void;
 };
 
@@ -224,7 +239,7 @@ async function runChain(
 	rep: number,
 ): Promise<StepRecord[]> {
 	const copies = systemCopyCheck(run.system, run.saved.source.titles);
-	const log = startLog(chain);
+	const log = startLog(chain, run.turn);
 	const works: Work[] = [];
 	let handed = 0;
 	let made = 0;
@@ -240,30 +255,34 @@ async function runChain(
 			presented,
 			say: step.say,
 		});
+		const request: RequestInput | null =
+			run.turn === "routed" && step.expect
+				? {
+						routed: routedInputOf({ log, works, presented }),
+						utterance: step.say,
+						style: run.style,
+					}
+				: null;
 		presented = null;
 		await run.client.take();
-		await run.cloud?.client.take();
+		const env = {
+			client: run.client,
+			settings: run.settings,
+			...(run.harness.gates.systemCopy ? { copies } : {}),
+		};
 		const startedAt = performance.now();
-		const turn = await runTurn(
-			{
-				client: run.client,
-				settings: run.settings,
-				mode: run.turn,
-				cloud: run.cloud,
-				...(run.harness.gates.systemCopy ? { copies } : {}),
-			},
-			messages,
-			run.saved.cards,
-			handed + 1,
-		);
+		const turn =
+			run.turn === "routed"
+				? await runRoutedTurn(
+						env,
+						messages,
+						run.saved.cards,
+						handed + 1,
+						request,
+					)
+				: await runTurn(env, messages, run.saved.cards, handed + 1);
 		const turnMs = performance.now() - startedAt;
-		const timing = timingOf(
-			turn.calls,
-			startedAt,
-			turnMs,
-			!!turn.delegated,
-			turn.publishedAt,
-		);
+		const timing = timingOf(turn.calls, startedAt, turnMs, turn.hostSpoke);
 		const lastAgent = lastOf(log, (e) => e.role === "agent")?.text ?? "";
 		const verdict = judgeStep(step, turn, { copies, lastAgent });
 		const record: StepRecord = {
@@ -278,9 +297,6 @@ async function runChain(
 			...turn.delegated,
 			said: turn.said.slice(0, 120),
 			turnMode: run.turn,
-			failedCheck: turn.failedChecks[0] ?? null,
-			failedChecks: turn.failedChecks,
-			cloudAnswered: turn.cloudAnswered,
 			copyRun: copyRunOf(turn.said, lastAgent),
 			callTokens: tokensOf(turn.calls),
 			stop: turn.stop,
@@ -290,7 +306,7 @@ async function runChain(
 		run.onStep(record);
 		// The talk grows as the product stores it; a reply that copies the system part is not kept.
 		log.push({ role: "user", text: step.say });
-		if (!turn.error && !turn.localFailure && !copies(turn.said))
+		if (!turn.error && !turn.choiceFailure && !copies(turn.said))
 			log.push({ role: "agent", text: turn.said, toolCalls: turn.toolCalls });
 		if (!turn.delegated) continue;
 		handed++;
@@ -319,55 +335,36 @@ async function runChain(
 	return records;
 }
 
-/** What a decide-then-reply measurement sends beyond the messages: the schema of the decision, the tools of the reply. */
-export function decisionNotes(fallback: boolean): string[] {
-	const schema = JSON.stringify(decisionSchema(generationTools));
-	const tools = JSON.stringify(generationTools);
-	return [
-		"turn: decide-then-reply (a silent decision, then the reply once its head passes the host's checks)",
-		`fallback: ${fallback ? "the Codex path answers a failed round (cloud harness)" : "none; a failed check fails the step as fallback:<check>"}`,
-		`decision schema: ${schema.length} chars, ~${estimateTextTokens(schema)} tokens, response_format json_schema, no native tools field`,
-		`reply call: ${generationTools.length} tool definitions (${tools.length} chars, ~${estimateTextTokens(tools)} tokens) offered, tool_choice none`,
-		`decision schema (as sent): ${schema}`,
-	];
-}
-
 /** The first step of each chain and form, composed and printed; no model is called. */
 export function dryRunText(opts: Options, saved: Saved): string {
 	const system = buildSystem(saved.source, opts.harness);
+	const routed = opts.turn === "routed";
 	const lines = [
 		`harness=${opts.harness.name} client=${opts.client} reasoning=${opts.reasoning}${opts.reasoningOverridden ? " (override)" : ""} outputLimit=${opts.harness.call.outputLimit}`,
 		`system: ${system.length} chars, ~${estimateMessageTokens([{ content: system }])} tokens, ${system.split("\n").filter((l) => l.startsWith("## ")).length} sections`,
-		...(opts.turn === "decide-then-reply"
-			? decisionNotes(opts.fallbackModel !== null)
-			: [`turn: single (one call with the native tools)`]),
+		routed
+			? "turn: routed (a request turn is one silent choice held to a schema, a talk turn one call with no tools; the step's expectation stands in for the judge)"
+			: "turn: single (one call with the native tools)",
 		"",
-		"=== system (shared by every message list below) ===",
+		`=== system${routed ? " of the talk turn" : ""} (shared by every message list below) ===`,
 		system,
 	];
-	for (const chain of opts.chains)
+	for (const chain of opts.chains) {
+		const log = startLog(chain, opts.turn);
 		for (const form of opts.forms) {
 			const messages = composeInput({
 				form,
 				harness: opts.harness,
 				system,
-				log: startLog(chain),
+				log,
 				works: [],
 				presented: null,
 				say: chain.steps[0]!.say,
 			});
 			lines.push(
 				"",
-				`=== ${chain.key} / ${form}: ${messages.length} messages, ~${estimateMessageTokens(messages)} tokens ===`,
+				`=== ${chain.key} / ${form}: ${messages.length} messages, ~${estimateMessageTokens(messages)} tokens${routed ? " (the talk turn)" : ""} ===`,
 			);
-			if (opts.turn === "decide-then-reply") {
-				const asked = decisionMessages(messages, generationTools);
-				const added =
-					asked.at(-1)!.content.length - messages.at(-1)!.content.length;
-				lines.push(
-					`(decision call: these ${messages.length} messages with the functions added to the last user message, +${added} chars, no native tools, response_format json_schema; the reply call: the messages as they are with the tools offered, tool_choice none)`,
-				);
-			}
 			for (const [i, m] of messages.entries()) {
 				const calls = m.tool_calls
 					?.map((c) => `${c.function.name}(${c.function.arguments})`)
@@ -378,7 +375,40 @@ export function dryRunText(opts: Options, saved: Saved): string {
 				);
 			}
 		}
+		if (routed) lines.push(...choiceDryRun(chain, saved));
+	}
 	return lines.join("\n");
+}
+
+/** The choice call of a chain's first step (the request turn's input), printed with the size of its schema. */
+function choiceDryRun(chain: Chain, saved: Saved): string[] {
+	const say = chain.steps[0]!.say;
+	const routed = routedInputOf({
+		log: startLog(chain, "routed"),
+		works: [],
+		presented: null,
+	});
+	const candidates = candidatesFor(
+		saved.cards,
+		routed.asked ? `${routed.asked.request}\n${say}` : say,
+	);
+	const messages = choiceMessages({
+		style: personaStyle(saved.source.persona),
+		routed,
+		candidates,
+		utterance: say,
+	});
+	const schema = JSON.stringify(choiceSchema(candidates, routed));
+	return [
+		"",
+		`=== ${chain.key}: the choice call of the first step (the request turn; a step without an expectation only talks): ${messages.length} messages, ~${estimateMessageTokens(messages)} tokens ===`,
+		`schema: ${schema.length} chars, ~${estimateTextTokens(schema)} tokens, response_format json_schema, no native tools field`,
+		...messages.flatMap((m, i) => [
+			`--- [${i}] ${m.role}, ${m.content.length} chars`,
+			m.content,
+		]),
+		`schema (as sent): ${schema}`,
+	];
 }
 
 const DB_PATH = () => process.env.EUMENES_DB || "./data/eumenes.sqlite3";
@@ -399,16 +429,6 @@ async function main() {
 		reasoning: opts.reasoning,
 		outputLimit: opts.harness.call.outputLimit,
 	};
-	// A failed round is answered by the cloud harness's call, on the Codex path.
-	const cloud = opts.fallbackModel
-		? {
-				client: await clients.createCodexClient(opts.fallbackModel),
-				settings: {
-					reasoning: cloudHarness.call.reasoning,
-					outputLimit: cloudHarness.call.outputLimit,
-				},
-			}
-		: null;
 	const now = new Date();
 	const repoRoot = resolve(import.meta.dir, "../..");
 	const dir = createReportDir(
@@ -424,12 +444,12 @@ async function main() {
 		harness: opts.harness,
 		settings,
 		turn: opts.turn,
-		cloud,
+		style: personaStyle(saved.source.persona),
 		onStep: (record) => {
 			records.push(record);
 			appendReportLine(dir, "steps.jsonl", record);
 			console.log(
-				`${record.chain} | ${record.form} | 回${record.rep + 1} | ${record.say} | ${record.pass ? "合格" : `不合格 ${record.why}`}${record.cloudAnswered ? " (cloud回答)" : ""} | 聞こえるまで ${record.heardMs === null ? "-" : (record.heardMs / 1000).toFixed(1)}秒`,
+				`${record.chain} | ${record.form} | 回${record.rep + 1} | ${record.say} | ${record.pass ? "合格" : `不合格 ${record.why}`} | 聞こえるまで ${record.heardMs === null ? "-" : (record.heardMs / 1000).toFixed(1)}秒`,
 			);
 		},
 	};
@@ -439,7 +459,6 @@ async function main() {
 			await runChain(run, chain, form, rep);
 	} finally {
 		await client.close();
-		await cloud?.client.close();
 	}
 	const meta: ReportMeta = {
 		startedAt: now.toISOString(),
@@ -450,12 +469,6 @@ async function main() {
 		reps: opts.reps,
 		probe: opts.probe,
 		turn: opts.turn,
-		fallback:
-			opts.turn === "single"
-				? "-"
-				: opts.fallbackModel !== null
-					? "codex（cloud ハーネス）"
-					: "なし（失敗として数える）",
 		chains: opts.chains.map((c) => c.name),
 		forms: opts.forms,
 		settings:

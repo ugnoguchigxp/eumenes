@@ -78,6 +78,25 @@ export type FinalMessage =
 	| { kind: "fixed" };
 
 /** What a generation's prepare fixes, inside the claim transaction. */
+/** The host's records a routed turn chooses on, fixed at the claim (the local harness rebuild plan, sections 4.3–4.4). */
+export type RoutedInput = {
+	/** `## State` of the choice calls: now, the work by its numbers and what is presented. */
+	state: string;
+	/** The agent's last words, for 「それ」「さっきの」 (cut to their head). */
+	previousReply: string | null;
+	/** The request the agent asked about when that question was the last thing said, shortly before. */
+	asked: { request: string } | null;
+	/** Confirmations not yet answered, and the questions the work asks the user. */
+	pending: {
+		confirmations: Array<{ ref: number; toolchain: string; request: string }>;
+		questions: Array<{ ref: number; title: string; question: string }>;
+	};
+	/** The open work the user may correct or cancel. */
+	todos: Array<{ ref: number; title: string }>;
+	/** The resources `## State` names (`a<n>`): the only ones a choice may hand over with its request. */
+	resources: string[];
+};
+
 export interface GenerateInput {
 	runId: string;
 	/** The run's own input message (the user's request a later generation of the run still acts for). */
@@ -100,6 +119,8 @@ export interface GenerateInput {
 	toolchainTitles?: string[];
 	/** The texts of the pending utterances `## User` shows, in receipt order. */
 	utterances: string[];
+	/** What a routed turn's choice calls read besides the talk input (the local harness rebuild plan, section 4). */
+	routed?: RoutedInput;
 	final: FinalMessage;
 	/** Why this generation runs (the TODOs that changed, the utterances, a host note). */
 	trigger: ReadonlyArray<Record<string, unknown>>;

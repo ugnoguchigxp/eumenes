@@ -1,36 +1,51 @@
 import { describe, expect, test } from "bun:test";
 import type { NativeToolCall } from "../../api/infrastructure/chat-stream";
 import { localHarness } from "../../api/domains/dialogue/service/harness";
+import { INPUT_HEADINGS } from "../../api/domains/dialogue/service/input-text";
+import { parseCall } from "../../api/domains/dialogue/service/generation-tools";
+import { ValidationFailure } from "../../api/infrastructure/validation-log";
 import { CARD_IDS, CHAINS, type Card } from "./harness-chains";
+import { callSignal, type TurnEnv } from "./harness-calls";
 import {
+	createCodexClient,
 	createMetricsFetch,
 	type CallMetrics,
 	type CallSettings,
 	type ModelClient,
 } from "./harness-client";
-import { buildSystem, composeInput } from "./harness-compose";
 import {
-	cacheSection,
-	cellOf,
-	checkCounts,
-	copyRunOf,
-	judgeStep,
-	reportMarkdown,
-	timingOf,
-	type StepRecord,
-} from "./harness-judge";
+	buildSystem,
+	composeInput,
+	routedInputOf,
+	type Entry,
+} from "./harness-compose";
 import {
+	arrived,
 	cut,
-	decisionCall,
 	detailLines,
 	errorCodeOf,
 	issuesOf,
+	newDetail,
 } from "./harness-detail";
-import { ValidationFailure } from "../../api/infrastructure/validation-log";
-import { parseCall } from "../../api/domains/dialogue/service/generation-tools";
-import { failureDetails, tokensOf } from "./harness-judge";
-import { decisionNotes, dryRunText, parseOptions, startLog } from "./harness";
-import { runTurn, type TurnEnv } from "./harness-turn";
+import {
+	cacheSection,
+	cellOf,
+	copyRunOf,
+	failureDetails,
+	judgeStep,
+	reportMarkdown,
+	stopCounts,
+	timingOf,
+	tokensOf,
+	type StepRecord,
+} from "./harness-judge";
+import { dryRunText, parseOptions, startLog } from "./harness";
+import {
+	FAILED_SAID,
+	runRoutedTurn,
+	type RequestInput,
+} from "./harness-routed";
+import { runTurn } from "./harness-turn";
 
 const cards = Object.fromEntries(
 	CARD_IDS.map((id): [string, Card] => [
@@ -63,12 +78,16 @@ type Reply = {
 	/** The stream breaks with this error after its chunks. */
 	error?: string;
 };
-/** A scripted model: the decisions and the streamed replies it gives in order, and the chunks each reply delivered. */
-function fakeClient(script: { decisions?: string[]; replies?: Reply[] }) {
-	const decisions = [...(script.decisions ?? [])];
+/** A scripted model: the streamed replies and the choices it gives in order, and what each call was sent. */
+function fakeClient(script: { replies?: Reply[]; choices?: string[] }) {
 	const replies = [...(script.replies ?? [])];
+	const choices = [...(script.choices ?? [])];
 	const delivered: string[][] = [];
-	const decided: Array<readonly { role: string; content: string }[]> = [];
+	const streamed: Array<{ tools?: false } | undefined> = [];
+	const chosen: Array<{
+		messages: readonly { role: string; content: string }[];
+		schema: Record<string, unknown>;
+	}> = [];
 	let made = 0;
 	const client: ModelClient = {
 		async connect() {},
@@ -78,8 +97,9 @@ function fakeClient(script: { decisions?: string[]; replies?: Reply[] }) {
 			made = 0;
 			return Array.from({ length: n }, () => metric());
 		},
-		async stream(_messages, _settings, _signal, onDelta) {
+		async stream(_messages, _settings, _signal, onDelta, extra) {
 			made++;
+			streamed.push(extra);
 			const reply = replies.shift()!;
 			const seen: string[] = [];
 			delivered.push(seen);
@@ -90,18 +110,15 @@ function fakeClient(script: { decisions?: string[]; replies?: Reply[] }) {
 			if (reply.error) throw new Error(reply.error);
 			return { text: reply.chunks.join(""), toolCalls: reply.toolCalls ?? [] };
 		},
-		async decide(messages) {
+		async decide(messages, _settings, _signal, schema) {
 			made++;
-			decided.push(messages);
-			return decisions.shift()!;
+			chosen.push({ messages, schema });
+			return choices.shift()!;
 		},
 	};
-	return { client, delivered, decided };
+	return { client, delivered, streamed, chosen };
 }
 
-const call = (name: string, args: unknown) =>
-	JSON.stringify({ action: "call", tool: { name, arguments: args } });
-const REPLY = JSON.stringify({ action: "reply", tool: null });
 const system = buildSystem(
 	{
 		persona: { agentName: "", userName: "", persona: "butler" },
@@ -116,7 +133,10 @@ const input = (say: string, chain = "sequence") =>
 		form: "current",
 		harness: localHarness,
 		system,
-		log: startLog(CHAINS.find((c) => c.key === chain)!),
+		log: startLog(
+			CHAINS.find((c) => c.key === chain)!,
+			"routed",
+		),
 		works: [],
 		presented: null,
 		say,
@@ -124,40 +144,83 @@ const input = (say: string, chain = "sequence") =>
 const env = (client: ModelClient, over: Partial<TurnEnv> = {}): TurnEnv => ({
 	client,
 	settings,
-	mode: "decide-then-reply",
-	cloud: null,
 	...over,
 });
 const kinds = (r: { calls: Array<{ kind: string }> }) =>
 	r.calls.map((c) => c.kind);
+const json = (value: unknown) => JSON.stringify(value);
 
-describe("runTurn, decide-then-reply", () => {
-	test("a reply whose head passes is published; the calls are filed as decision and reply", async () => {
-		const { client } = fakeClient({
-			decisions: [REPLY],
-			replies: [{ chunks: ["どういたしまして。", "また何かあれば。"] }],
+/** The request turn's input for a step of a chain, over an empty talk (or the log given). */
+const requestOf = (
+	utterance: string,
+	log: Entry[] = startLog(CHAINS[0]!, "routed"),
+	works: Parameters<typeof routedInputOf>[0]["works"] = [],
+): RequestInput => ({
+	routed: routedInputOf({ log, works, presented: null }),
+	utterance,
+	style: "丁寧に話す",
+});
+
+const record = (over: Partial<StepRecord>): StepRecord => ({
+	...timingOf(
+		[{ kind: "single", metrics: metric({ firstContentMs: 500 }) }],
+		0,
+		1000,
+		false,
+	),
+	chain: "続けて頼む",
+	form: "current",
+	rep: 0,
+	index: 0,
+	say: "s",
+	scored: true,
+	pass: true,
+	why: "",
+	said: "",
+	turnMode: "single",
+	copyRun: 3,
+	stop: "answer",
+	callTokens: [],
+	callDetails: [],
+	...over,
+});
+
+describe("runTurn, the reply loop", () => {
+	test("the single turn is one call per round, filed as single, with the native tools", async () => {
+		const { client, streamed } = fakeClient({
+			replies: [{ chunks: ["こんにちは。"] }],
 		});
-		const r = await runTurn(env(client), input("ありがとう"), cards, 1);
-		expect(r).toMatchObject({
-			said: "どういたしまして。また何かあれば。",
-			acted: false,
-			cloudAnswered: false,
-			failedChecks: [],
-		});
-		expect(r.publishedAt).not.toBeNull();
-		expect(kinds(r)).toEqual(["decision", "reply"]);
+		const r = await runTurn(env(client), input("やあ"), cards, 1);
+		expect(kinds(r)).toEqual(["single"]);
+		expect(r.said).toBe("こんにちは。");
+		expect(r.hostSpoke).toBe(false);
+		expect(streamed).toEqual([undefined]);
 	});
-	test("a search and a hand-over are decisions run on the simulated host; the hand-over ends the turn", async () => {
+	test("a search and a hand-over run on the simulated host; the hand-over ends the turn", async () => {
 		const { client } = fakeClient({
-			decisions: [
-				call("find_toolchain", { query: "画像 猫" }),
-				call("delegate", {
-					mode: "execute",
-					toolchain: "image.create",
-					request: "猫の絵",
-					impact: "create",
-					announcement: "承りました。",
-				}),
+			replies: [
+				{
+					chunks: [],
+					toolCalls: [
+						{ id: "a", name: "find_toolchain", arguments: '{"query":"画像"}' },
+					],
+				},
+				{
+					chunks: [],
+					toolCalls: [
+						{
+							id: "b",
+							name: "delegate",
+							arguments: json({
+								mode: "execute",
+								toolchain: "image.create",
+								request: "猫の絵",
+								impact: "create",
+								announcement: "承りました。",
+							}),
+						},
+					],
+				},
 			],
 		});
 		const r = await runTurn(env(client), input("猫の絵作って"), cards, 1);
@@ -166,195 +229,472 @@ describe("runTurn, decide-then-reply", () => {
 			request: "猫の絵",
 		});
 		expect(r.said).toBe("承りました。");
-		expect(kinds(r)).toEqual(["decision", "decision"]);
+		expect(r.stop).toBe("handover");
+		expect(r.hostSpoke).toBe(true);
 		expect(r.toolCalls.map((c) => c.name)).toEqual([
 			"find_toolchain",
 			"delegate",
 		]);
-		expect(r.publishedAt).toBeNull();
 	});
-	test("a head that promises without a call stops the reply and fails the step with the check", async () => {
-		const { client, delivered } = fakeClient({
-			decisions: [REPLY],
+	test("a hand-over to an unsearched toolchain is refused by the host, then the rounds run out", async () => {
+		const search = {
+			chunks: [],
+			toolCalls: [
+				{ id: "a", name: "find_toolchain", arguments: '{"query":"画像"}' },
+			],
+		};
+		const wrong = {
+			chunks: [],
+			toolCalls: [
+				{
+					id: "b",
+					name: "delegate",
+					arguments: json({
+						mode: "execute",
+						toolchain: "music.create",
+						request: "猫",
+						impact: "create",
+					}),
+				},
+			],
+		};
+		const r = await runTurn(
+			env(fakeClient({ replies: [search, wrong, wrong, wrong] }).client),
+			input("猫の絵作って"),
+			cards,
+			1,
+		);
+		expect(r.stop).toBe("rounds");
+		expect(r.details[0]!.toolCalls[0]).toMatchObject({
+			verdict: "accepted",
+			outcome: "候補 image.create, model3d.studio, excalidraw.edit",
+		});
+		expect(r.details[1]!.toolCalls[0]).toMatchObject({ verdict: "refused" });
+		expect(r.details[1]!.toolCalls[0]!.reason).toContain("toolchain_not_found");
+	});
+	test("the refusal of a call without its request is recorded with the path", async () => {
+		const { client } = fakeClient({
 			replies: [
 				{
-					chunks: [
-						"猫の絵を",
-						"作ります。",
-						"少々お待ちください。",
-						"ありがとうございます。",
+					chunks: [],
+					toolCalls: [
+						{ id: "a", name: "find_toolchain", arguments: '{"query":"画像"}' },
 					],
 				},
+				{
+					chunks: [],
+					toolCalls: [
+						{
+							id: "b",
+							name: "delegate",
+							arguments: json({ mode: "execute", toolchain: "image.create" }),
+						},
+					],
+				},
+				{ chunks: ["承りました。"] },
 			],
 		});
 		const r = await runTurn(env(client), input("猫の絵作って"), cards, 1);
-		expect(r.localFailure).toBe("promise_without_call");
-		expect(r.failedChecks).toEqual(["promise_without_call"]);
-		expect(r.said).toBe("");
-		// The reply call was stopped at the head: the rest of the stream was not read.
-		expect(delivered[0]).toEqual([
-			"猫の絵を",
-			"作ります。",
-			"少々お待ちください。",
+		expect(r.details.map((d) => d.kind)).toEqual([
+			"single",
+			"single",
+			"single",
 		]);
+		const refusedCall = r.details[1]!.toolCalls[0]!;
+		expect(refusedCall).toMatchObject({
+			name: "delegate",
+			verdict: "refused",
+			reason: "invalid_tool_arguments",
+		});
+		expect(refusedCall.issues!.some((i) => i.path.endsWith("request"))).toBe(
+			true,
+		);
+		expect(r.details[2]).toMatchObject({
+			text: "承りました。",
+			textChars: 6,
+			finishReason: "stop",
+		});
+		expect(r.stop).toBe("answer");
+	});
+	test("an error that ends a call keeps its code and how much text had arrived", async () => {
+		const { client } = fakeClient({
+			replies: [
+				{ chunks: ["こんにちは、", "ええと"], error: "chat_stream_incomplete" },
+			],
+		});
+		const r = await runTurn(env(client), input("やあ"), cards, 1);
+		expect(r.stop).toBe("error");
+		expect(r.error).toBe("chat_stream_incomplete");
+		expect(r.details[0]!.error).toEqual({
+			code: "chat_stream_incomplete",
+			textChars: 9,
+			reasoningChars: 0,
+		});
+		expect(r.details[0]!.text).toBe("こんにちは、ええと");
+	});
+});
+
+describe("runRoutedTurn, the request turn", () => {
+	const handOver = json({
+		choice: "image.create",
+		say: "猫の絵を描きます。",
+		request: "猫の絵",
+	});
+	test("a candidate is handed over with its say; one silent choice call is made on the product's input and schema", async () => {
+		const fake = fakeClient({ choices: [handOver] });
+		const r = await runRoutedTurn(
+			env(fake.client),
+			input("猫の絵作って"),
+			cards,
+			1,
+			requestOf("猫の絵作って"),
+		);
+		expect(r.delegated).toEqual({
+			toolchain: "image.create",
+			request: "猫の絵",
+		});
+		expect(r.said).toBe("猫の絵を描きます。");
+		expect(r).toMatchObject({ stop: "handover", hostSpoke: true, acted: true });
+		expect(kinds(r)).toEqual(["choice"]);
+		expect(r.toolCalls.map((c) => c.name)).toEqual([
+			"find_toolchain",
+			"delegate",
+		]);
+		expect(JSON.parse(r.toolCalls[1]!.result)).toEqual({ todo: "t1" });
+		expect(fake.streamed).toEqual([]);
+		const [sent] = fake.chosen;
+		const last = sent!.messages.at(-1)!.content;
+		expect(sent!.messages[0]!.role).toBe("system");
+		expect(last).toContain(INPUT_HEADINGS.candidates);
+		expect(last).toContain("image.create");
+		expect(last).toContain("猫の絵作って");
+		expect(last).not.toContain(INPUT_HEADINGS.retry);
+		expect(JSON.stringify(sent!.schema)).toContain('"image.create"');
+		expect(r.details[0]).toMatchObject({
+			kind: "choice",
+			choiceJson: handOver,
+		});
+		expect(r.details[0]!.toolCalls[0]).toMatchObject({
+			name: "image.create",
+			verdict: "accepted",
+			outcome: "引き渡し image.create",
+		});
+	});
+	test("none goes on to the talk turn: a streamed call that offers no tools, heard at its first text", async () => {
+		const fake = fakeClient({
+			choices: [json({ choice: "none" })],
+			replies: [{ chunks: ["どういたしまして。"] }],
+		});
+		const r = await runRoutedTurn(
+			env(fake.client),
+			input("ありがとう"),
+			cards,
+			1,
+			requestOf("ありがとう"),
+		);
+		expect(kinds(r)).toEqual(["choice", "talk"]);
+		expect(r).toMatchObject({
+			said: "どういたしまして。",
+			stop: "answer",
+			hostSpoke: false,
+		});
+		expect(r.delegated).toBeUndefined();
+		expect(fake.streamed).toEqual([{ tools: false }]);
+		expect(r.details[0]!.toolCalls[0]).toMatchObject({ outcome: "会話の回へ" });
+	});
+	test("a step the judge sends to talk makes the one talk call and no choice", async () => {
+		const fake = fakeClient({ replies: [{ chunks: ["はい。"] }] });
+		const r = await runRoutedTurn(
+			env(fake.client),
+			input("ありがとう"),
+			cards,
+			1,
+			null,
+		);
+		expect(kinds(r)).toEqual(["talk"]);
+		expect(r).toMatchObject({ said: "はい。", acted: false, stop: "answer" });
+		expect(fake.chosen).toEqual([]);
+		expect(fake.streamed).toEqual([{ tools: false }]);
+		expect(r.toolCalls).toEqual([]);
+	});
+	test("the talk call stops when it copies the system part", async () => {
+		const rule = system
+			.split("\n")
+			.find((l) => l.startsWith("- 返事は利用者の言語で"))!
+			.slice(2);
+		const { systemCopyCheck } =
+			await import("../../api/domains/dialogue/service/conversation-output");
+		const fake = fakeClient({ replies: [{ chunks: [rule, "続き。"] }] });
+		const r = await runRoutedTurn(
+			env(fake.client, { copies: systemCopyCheck(system) }),
+			input("やあ"),
+			cards,
+			1,
+			null,
+		);
+		expect(r.stop).toBe("error");
+		expect(r.error).toBe("system_text_copied");
+		expect(fake.delivered[0]).toEqual([rule]);
+	});
+	test("ask says the question and carries the ask step; the next turn takes the answer with the request", async () => {
+		const fake = fakeClient({
+			choices: [json({ choice: "ask", say: "何の絵にしましょうか？" })],
+		});
+		const r = await runRoutedTurn(
+			env(fake.client),
+			input("絵を描いて"),
+			cards,
+			1,
+			requestOf("絵を描いて"),
+		);
+		expect(r).toMatchObject({
+			said: "何の絵にしましょうか？",
+			stop: "ask",
+			hostSpoke: true,
+		});
+		expect(r.toolCalls.map((c) => c.name)).toEqual(["find_toolchain", "ask"]);
+		const log: Entry[] = [
+			{ role: "user", text: "絵を描いて" },
+			{ role: "agent", text: r.said, toolCalls: r.toolCalls },
+		];
+		expect(routedInputOf({ log, works: [], presented: null }).asked).toEqual({
+			request: "絵を描いて",
+		});
+	});
+	test("an answer to a question back is searched with the asked request and the answer together", async () => {
+		const log = startLog(
+			CHAINS.find((c) => c.key === "answer-picture")!,
+			"routed",
+		);
+		const asked = requestOf("猫で", log);
+		expect(asked.routed.asked).toEqual({ request: "絵を描いて" });
+		const withAsk = fakeClient({
+			choices: [
+				json({ choice: "image.create", say: "描きます。", request: "猫の絵" }),
+			],
+		});
+		await runRoutedTurn(env(withAsk.client), input("猫で"), cards, 1, asked);
+		const shown = withAsk.chosen[0]!.messages.at(-1)!.content;
+		expect(shown).toContain("model3d.studio");
+		expect(shown).toContain("聞き返した依頼: 絵を描いて");
+		// Without the question the words alone find the general candidates.
+		const alone = fakeClient({
+			choices: [json({ choice: "none" })],
+			replies: [{ chunks: ["はい。"] }],
+		});
+		await runRoutedTurn(
+			env(alone.client),
+			input("猫で"),
+			cards,
+			1,
+			requestOf("猫で"),
+		);
+		expect(alone.chosen[0]!.messages.at(-1)!.content).not.toContain(
+			"model3d.studio",
+		);
+	});
+	test("an unreadable choice is not made again: the talk turn answers, and the choice is marked as its check", async () => {
+		const fake = fakeClient({
+			choices: ["not json"],
+			replies: [{ chunks: ["はい。"] }],
+		});
+		const r = await runRoutedTurn(
+			env(fake.client),
+			input("猫の絵作って"),
+			cards,
+			1,
+			requestOf("猫の絵作って"),
+		);
+		expect(kinds(r)).toEqual(["choice", "talk"]);
+		expect(r.stop).toBe("answer");
+		expect(r.said).toBe("はい。");
+		expect(r.details[0]).toMatchObject({
+			check: "choice_unreadable",
+			choiceJson: "not json",
+		});
+		expect(r.details[0]!.toolCalls[0]).toMatchObject({
+			verdict: "refused",
+			reason: "choice_unreadable",
+		});
+	});
+	test("after the second failure the host says its fixed phrase and the step fails", async () => {
+		const fake = fakeClient({
+			choices: [
+				json({ choice: "weather.forecast", inputs: {} }),
+				json({ choice: "weather.forecast", inputs: {} }),
+			],
+		});
+		const r = await runRoutedTurn(
+			env(fake.client),
+			input("猫の絵作って"),
+			cards,
+			1,
+			requestOf("猫の絵作って"),
+		);
+		expect(kinds(r)).toEqual(["choice", "choice"]);
+		expect(r).toMatchObject({
+			stop: "check",
+			said: FAILED_SAID,
+			hostSpoke: true,
+			choiceFailure: "choice_not_offered",
+		});
+		expect(FAILED_SAID.length).toBeGreaterThan(0);
 		expect(
 			judgeStep({ say: "x", free: true }, r, {
 				copies: () => false,
 				lastAgent: "",
 			}),
-		).toEqual({
-			pass: false,
-			why: "fallback:promise_without_call",
-		});
+		).toEqual({ pass: false, why: "choice:choice_not_offered" });
 	});
-	test("an unreadable decision and an unknown tool are checks too", async () => {
-		const garbled = await runTurn(
-			env(fakeClient({ decisions: ["not json"] }).client),
-			input("x"),
-			cards,
-			1,
-		);
-		expect(garbled.failedChecks).toEqual(["decision_unparsed"]);
-		const unknown = await runTurn(
-			env(fakeClient({ decisions: [call("nope", {})] }).client),
-			input("x"),
-			cards,
-			1,
-		);
-		expect(unknown.failedChecks).toEqual(["tool_unknown"]);
-		const invalid = await runTurn(
-			env(
-				fakeClient({ decisions: [call("delegate", { mode: "execute" })] })
-					.client,
-			),
-			input("x"),
-			cards,
-			1,
-		);
-		expect(invalid.failedChecks).toEqual(["tool_arguments_invalid"]);
-	});
-	test("after a search with candidates the reply is held to its end and must ask or refuse", async () => {
-		const { client } = fakeClient({
-			decisions: [call("find_toolchain", { query: "画像" }), REPLY],
-			replies: [{ chunks: ["画像生成と3Dモデルがあります。"] }],
+	test("a work candidate without its request is not taken; a todo not shown is not offered", async () => {
+		const noRequest = fakeClient({
+			choices: [
+				json({ choice: "image.create", say: "描きます。", request: " " }),
+				handOver,
+			],
 		});
-		const r = await runTurn(env(client), input("猫の絵作って"), cards, 1);
-		expect(r.localFailure).toBe("searched_not_handed");
-		const ok = fakeClient({
-			decisions: [call("find_toolchain", { query: "画像" }), REPLY],
-			replies: [{ chunks: ["どちらで作りますか？"] }],
-		});
-		const asked = await runTurn(
-			env(ok.client),
+		const r = await runRoutedTurn(
+			env(noRequest.client),
 			input("猫の絵作って"),
 			cards,
 			1,
+			requestOf("猫の絵作って"),
 		);
-		expect(asked.said).toBe("どちらで作りますか？");
-		expect(asked.failedChecks).toEqual([]);
-	});
-	test("a reply that copies the previous reply fails; asking to hear it again does not", async () => {
-		const prev = "おすすめの映画は、雨に唄えば、です。";
-		const copied = fakeClient({
-			decisions: [REPLY],
-			replies: [{ chunks: [prev] }],
+		expect(r.details[0]!.check).toBe("request_required");
+		expect(r.stop).toBe("handover");
+		const stray = fakeClient({
+			choices: [
+				json({ choice: "t9", operation: "cancel", say: "止めます。" }),
+				json({ choice: "t1", operation: "cancel", say: "止めます。" }),
+			],
 		});
-		const r = await runTurn(
-			env(copied.client),
-			composeInput({
-				form: "current",
-				harness: localHarness,
-				system,
-				log: [
-					...startLog(CHAINS.find((c) => c.key === "reword")!),
-					{ role: "user", text: "映画を教えて" },
-					{ role: "agent", text: prev },
-				],
-				works: [],
-				presented: null,
-				say: "ありがとう",
-			}),
+		const cancelled = await runRoutedTurn(
+			env(stray.client),
+			input("やめて"),
 			cards,
-			1,
+			2,
+			requestOf("やめて", undefined, [
+				{ ref: 1, title: "猫の絵", state: "running" },
+			]),
 		);
-		expect(r.failedChecks).toEqual(["previous_reply_copied"]);
+		expect(cancelled.details[0]!.check).toBe("choice_not_offered");
+		expect(cancelled).toMatchObject({ said: "止めます。", stop: "answer" });
+		expect(cancelled.delegated).toBeUndefined();
+		expect(JSON.stringify(stray.chosen[1]!.schema)).toContain('"t1"');
 	});
-	test("with a cloud path the failed round is answered there, and its answer is the turn's", async () => {
-		// After the cloud's search the next round is local again, and hands the work over.
-		const local = fakeClient({
-			decisions: [
-				REPLY,
-				call("delegate", {
-					mode: "execute",
-					toolchain: "image.create",
-					request: "猫の絵",
-					impact: "create",
-				}),
-			],
-			replies: [{ chunks: ["猫の絵を作ります。"] }],
+	test("a choice cut at the output limit is not made again: the talk turn answers", async () => {
+		const fake = fakeClient({
+			replies: [{ chunks: ["決めきれませんでした。"] }],
 		});
-		const cloud = fakeClient({
-			replies: [
-				{
-					chunks: [],
-					toolCalls: [
-						{
-							id: "c1",
-							name: "find_toolchain",
-							arguments: JSON.stringify({ query: "画像 猫" }),
-						},
-					],
-				},
-			],
-			decisions: [],
-		});
-		const r = await runTurn(
-			env(local.client, { cloud: { client: cloud.client, settings } }),
+		let choices = 0;
+		fake.client.decide = async () => {
+			choices++;
+			throw new Error("chat_stream_incomplete");
+		};
+		const r = await runRoutedTurn(
+			env(fake.client),
 			input("猫の絵作って"),
 			cards,
 			1,
+			requestOf("猫の絵作って"),
 		);
-		expect(r.cloudAnswered).toBe(true);
-		expect(r.failedChecks).toEqual(["promise_without_call"]);
-		expect(r.localFailure).toBeUndefined();
-		expect(kinds(r)).toEqual(["decision", "reply", "cloud", "decision"]);
-		expect(r.delegated?.toolchain).toBe("image.create");
-	});
-	test("the single turn is one call per round, filed as single", async () => {
-		const { client } = fakeClient({
-			replies: [{ chunks: ["こんにちは。"] }],
+		expect(choices).toBe(1);
+		expect(fake.streamed).toEqual([{ tools: false }]);
+		expect(r).toMatchObject({
+			stop: "answer",
+			said: "決めきれませんでした。",
+			hostSpoke: false,
 		});
-		const r = await runTurn(
-			env(client, { mode: "single" }),
-			input("やあ"),
+		expect(r.details.map((detail) => detail.kind)).toEqual(["choice", "talk"]);
+		expect(r.details[0]!.error?.code).toBe("chat_stream_incomplete");
+	});
+	test("an error of the choice call ends the turn with its code", async () => {
+		const fake = fakeClient({});
+		fake.client.decide = async () => {
+			throw new Error("larm_unreachable");
+		};
+		const r = await runRoutedTurn(
+			env(fake.client),
+			input("猫の絵作って"),
 			cards,
 			1,
+			requestOf("猫の絵作って"),
 		);
-		expect(kinds(r)).toEqual(["single"]);
-		expect(r.said).toBe("こんにちは。");
-		expect(r.publishedAt).toBeNull();
+		expect(r).toMatchObject({ stop: "error", error: "larm_unreachable" });
+		expect(r.details[0]!.error?.code).toBe("larm_unreachable");
+		const without = { ...fake.client, decide: undefined };
+		expect(
+			(await runRoutedTurn(env(without), input("x"), cards, 1, requestOf("x")))
+				.error,
+		).toBe("harness_decide_unsupported");
 	});
 });
 
-describe("decide-then-reply timing and metrics", () => {
+describe("the talk input and the choice input of a routed harness", () => {
+	test("the talk turn's State is the today line alone; the works go to the choice input", () => {
+		const works = [{ ref: 1, title: "猫の絵", state: "running" as const }];
+		const talk = composeInput({
+			form: "current",
+			harness: localHarness,
+			system,
+			log: startLog(CHAINS[0]!, "routed"),
+			works,
+			presented: null,
+			say: "まだかな",
+		});
+		expect(talk.at(-1)!.content).toBe(
+			"## State\n今: 10-28（水）10:00\n\n## User\nまだかな",
+		);
+		const routed = routedInputOf({
+			log: [
+				{ role: "user", text: "猫の絵作って" },
+				{ role: "agent", text: "承りました。" },
+			],
+			works,
+			presented: null,
+		});
+		expect(routed).toEqual({
+			state: "## State\n今: 10-28（水）10:00\n仕事:\n- t1 猫の絵 実行中",
+			previousReply: "承りました。",
+			asked: null,
+			pending: { confirmations: [], questions: [] },
+			todos: [{ ref: 1, title: "猫の絵" }],
+			resources: [],
+		});
+	});
+	test("the previous reply is cut to 200 characters; only running works are open todos", () => {
+		const routed = routedInputOf({
+			log: [{ role: "agent", text: "あ".repeat(300) }],
+			works: [
+				{ ref: 1, title: "a", state: "running" },
+				{ ref: 2, title: "b", state: "reported" },
+			],
+			presented: null,
+		});
+		expect(routed.previousReply).toHaveLength(200);
+		expect(routed.todos).toEqual([{ ref: 1, title: "a" }]);
+	});
+});
+
+describe("timing and metrics", () => {
 	const tagged = (
-		kind: "decision" | "reply" | "cloud" | "single",
+		kind: "choice" | "talk" | "single",
 		over: Partial<CallMetrics>,
 	) => ({
 		kind,
 		metrics: metric(over),
 	});
-	test("a decision's JSON text is never heard; a local reply is heard when it was published", () => {
+	test("a choice is never heard; a talk call is heard at its first text", () => {
 		const t = timingOf(
 			[
-				tagged("decision", {
+				tagged("choice", {
 					startedAt: 1000,
 					totalMs: 800,
 					firstTokenMs: 30,
 					firstTextMs: 40,
 					firstContentMs: 40,
 				}),
-				tagged("reply", {
+				tagged("talk", {
 					startedAt: 1800,
 					totalMs: 600,
 					firstTokenMs: 50,
@@ -365,41 +705,22 @@ describe("decide-then-reply timing and metrics", () => {
 			1000,
 			1400,
 			false,
-			1950,
 		);
-		expect(t.heardMs).toBe(950);
+		expect(t.heardMs).toBe(860);
 		expect(t).toMatchObject({
 			calls: 2,
-			decisionFirstTokenMs: 30,
-			decisionFirstTextMs: 40,
-			decisionMs: 800,
-			replyFirstTokenMs: 50,
-			replyFirstTextMs: 60,
-			replyMs: 600,
+			choiceFirstTokenMs: 30,
+			choiceFirstTextMs: 40,
+			choiceMs: 800,
+			talkFirstTokenMs: 50,
+			talkFirstTextMs: 60,
+			talkMs: 600,
 		});
 	});
-	test("a cloud answer is heard at its first text; a hand-over at the end of its call", () => {
-		const cloud = timingOf(
+	test("words the host says are heard at the end of the last call", () => {
+		const spoke = timingOf(
 			[
-				tagged("decision", {
-					startedAt: 1000,
-					totalMs: 500,
-					firstContentMs: 10,
-				}),
-				tagged("cloud", {
-					startedAt: 1500,
-					totalMs: 2000,
-					firstContentMs: 900,
-				}),
-			],
-			1000,
-			2500,
-			false,
-		);
-		expect(cloud.heardMs).toBe(1400);
-		const handed = timingOf(
-			[
-				tagged("decision", {
+				tagged("choice", {
 					startedAt: 1000,
 					totalMs: 500,
 					firstContentMs: 10,
@@ -409,8 +730,9 @@ describe("decide-then-reply timing and metrics", () => {
 			500,
 			true,
 		);
-		expect(handed.heardMs).toBe(500);
-		expect(handed.replyMs).toBeNull();
+		expect(spoke.heardMs).toBe(500);
+		expect(spoke.talkMs).toBeNull();
+		expect(timingOf([], 0, 5, false).heardMs).toBeNull();
 	});
 	test("the longest run shared with the previous reply, spaces left out", () => {
 		expect(
@@ -423,179 +745,129 @@ describe("decide-then-reply timing and metrics", () => {
 		expect(copyRunOf("", "あ")).toBeNull();
 		expect(copyRunOf("abc", "xyz")).toBe(0);
 	});
-	const record = (over: Partial<StepRecord>): StepRecord => ({
-		...timingOf([tagged("single", { firstContentMs: 500 })], 0, 1000, false),
-		chain: "続けて頼む",
-		form: "current",
-		rep: 0,
-		index: 0,
-		say: "s",
-		scored: true,
-		pass: true,
-		why: "",
-		said: "",
-		turnMode: "decide-then-reply",
-		failedCheck: null,
-		failedChecks: [],
-		cloudAnswered: false,
-		copyRun: 3,
-		stop: "answer",
-		callTokens: [],
-		callDetails: [],
-		...over,
-	});
-	test("a cell has the fallback rate, the cloud answers and the share of replies copying 20+ characters", () => {
+	const choiceDetail = () => newDetail("choice");
+	test("a cell has the calls per step, the retry share of the steps that chose and the share of replies copying 20+ characters", () => {
 		const cell = cellOf([
-			record({}),
+			record({ turnMode: "routed", callDetails: [choiceDetail()] }),
 			record({
-				failedCheck: "promise_without_call",
-				failedChecks: ["promise_without_call"],
-				pass: false,
-				why: "fallback:promise_without_call",
+				turnMode: "routed",
+				callDetails: [choiceDetail(), choiceDetail()],
 				copyRun: null,
 			}),
-			record({
-				failedCheck: "tool_unknown",
-				failedChecks: ["tool_unknown"],
-				cloudAnswered: true,
-				copyRun: 25,
-			}),
+			record({ copyRun: 25 }),
 			record({ copyRun: 20, scored: false }),
 		]);
-		expect(cell.fallbackShare).toBe(0.5);
-		expect(cell.cloudAnswered).toBe(1);
+		expect(cell.retryShare).toBe(0.5);
+		expect(cell.calls).toBe(1);
 		// Three replies were measured, and two of them share 20 characters or more.
 		expect(cell.copyShare).toBeCloseTo(2 / 3);
-		expect(cellOf([record({ turnMode: "single" })]).fallbackShare).toBeNull();
+		expect(cellOf([record({})]).retryShare).toBeNull();
 		expect(cellOf([record({ copyRun: null })]).copyShare).toBeNull();
 	});
-	test("the Markdown carries the new columns, the phase timings and the failed checks", () => {
+	test("the Markdown carries the columns, the routed phase timings and how the turns ended", () => {
 		const md = reportMarkdown(
 			{
 				startedAt: "2026-10-28T00:00:00.000Z",
 				client: "larm",
 				harness: "local",
-				reasoning: "medium",
-				outputLimit: 4096,
+				reasoning: "off",
+				outputLimit: 512,
 				reps: 1,
 				probe: false,
-				turn: "decide-then-reply",
-				fallback: "なし（失敗として数える）",
+				turn: "routed",
 				chains: ["続けて頼む"],
 				forms: ["current"],
 				settings: null,
 			},
 			[
-				record({}),
+				record({ turnMode: "routed", callDetails: [choiceDetail()] }),
 				record({
-					failedCheck: "tool_unknown",
-					failedChecks: ["tool_unknown"],
+					turnMode: "routed",
+					stop: "check",
 					pass: false,
-					why: "fallback:tool_unknown",
+					why: "choice:choice_unreadable",
+					callDetails: [choiceDetail(), choiceDetail()],
 				}),
 			],
 		);
-		expect(md).toContain("| ターン | decide-then-reply |");
-		expect(md).toContain("fallback率 | cloud回答 | 前の返事の写し(20字以上)");
-		expect(md).toContain("| 50% | 0 | 0% |");
-		expect(md).toContain("## 判断と返事の時間");
-		expect(md).toContain("- tool_unknown: 1");
-		expect(checkCounts([record({})])).toEqual(["なし"]);
+		expect(md).toContain("| ターン | routed |");
+		expect(md).toContain("呼出し数 |");
+		expect(md).toContain("選び直し率 | 前の返事の写し(20字以上)");
+		expect(md).toContain("| 50% | 0% |");
+		expect(md).toContain("## 選ぶ呼出しと話す呼出しの時間");
+		expect(md).toContain("- check: 1");
+		expect(stopCounts([])).toEqual(["なし"]);
+		expect(
+			reportMarkdown(
+				{
+					startedAt: "t",
+					client: "larm",
+					harness: "cloud",
+					reasoning: "low",
+					outputLimit: 1,
+					reps: 1,
+					probe: false,
+					turn: "single" as const,
+					chains: ["続けて頼む"],
+					forms: ["current"],
+					settings: null,
+				},
+				[record({})],
+			),
+		).not.toContain("## 選ぶ呼出し");
 	});
 });
 
 describe("options and dry run for the turn", () => {
-	test("the harness's own turn is the default; --turn and the fallback are checked", () => {
+	const source = {
+		persona: { agentName: "", userName: "", persona: "butler" as const },
+		interests: [],
+		emotion: false,
+		titles: ["画像生成"],
+	};
+	test("the harness's own turn is the default; --turn must fit the harness and the connection", () => {
 		expect(parseOptions([]).turn).toBe(localHarness.turn);
-		const o = parseOptions(["--turn", "decide-then-reply"]);
-		expect(o).toMatchObject({ turn: "decide-then-reply", fallbackModel: null });
-		expect(() => parseOptions(["--turn", "x"])).toThrow("--turn");
+		expect(parseOptions(["--turn", "routed"]).turn).toBe("routed");
+		expect(parseOptions(["--harness", "cloud"]).turn).toBe("single");
+		expect(() => parseOptions(["--turn", "x"])).toThrow("--turn is single or");
+		expect(() => parseOptions(["--turn", "decide-then-reply"])).toThrow(
+			"--turn is single or routed",
+		);
+		expect(() => parseOptions(["--turn", "single"])).toThrow("does not fit");
 		expect(() =>
-			parseOptions([
-				"--client",
-				"codex",
-				"--model",
-				"m",
-				"--turn",
-				"decide-then-reply",
-			]),
+			parseOptions(["--client", "codex", "--model", "m", "--harness", "local"]),
 		).toThrow("LARM");
-		expect(() =>
-			parseOptions([
-				"--turn",
-				"decide-then-reply",
-				"--fallback-client",
-				"codex",
-			]),
-		).toThrow("--fallback-model");
-		expect(() =>
-			parseOptions(["--turn", "decide-then-reply", "--fallback-model", "m"]),
-		).toThrow("--fallback-client");
-		expect(() =>
-			parseOptions(["--fallback-client", "codex", "--fallback-model", "m"]),
-		).toThrow("--turn");
-		expect(
-			parseOptions([
-				"--turn",
-				"decide-then-reply",
-				"--fallback-client",
-				"codex",
-				"--fallback-model",
-				"m",
-			]).fallbackModel,
-		).toBe("m");
-		expect(
-			parseOptions([
-				"--turn",
-				"decide-then-reply",
-				"--fallback-client",
-				"codex",
-				"--dry-run",
-			]).fallbackModel,
-		).toBe("");
+		expect(() => parseOptions(["--fallback-client", "codex"])).toThrow(
+			"unknown option",
+		);
 	});
-	test("the dry run of the decide-then-reply turn states the schema size and the two calls", () => {
-		const notes = decisionNotes(false).join("\n");
-		expect(notes).toMatch(/decision schema: \d+ chars, ~\d+ tokens/);
-		expect(notes).toContain("tool_choice none");
-		expect(notes).toContain("decision schema (as sent): {");
+	test("the dry run of a local harness prints the talk system, the talk messages, and the choice messages and schema", () => {
 		const text = dryRunText(
-			parseOptions([
-				"--turn",
-				"decide-then-reply",
-				"--chains",
-				"topic",
-				"--dry-run",
-			]),
-			{
-				source: {
-					persona: { agentName: "", userName: "", persona: "butler" },
-					interests: [],
-					emotion: false,
-					titles: ["画像生成"],
-				},
-				cards,
-			},
+			parseOptions(["--chains", "answer-picture", "--dry-run"]),
+			{ source, cards },
 		);
-		expect(text).toContain("turn: decide-then-reply");
-		expect(text).toContain(
-			"(decision call: these 4 messages with the functions added to the last user message, +",
+		expect(text).toContain("turn: routed");
+		expect(text).toContain("=== system of the talk turn");
+		expect(text).toContain("=== answer-picture / current: ");
+		expect(text).toContain("(the talk turn)");
+		expect(text).toContain("the choice call of the first step");
+		expect(text).toMatch(/schema: \d+ chars, ~\d+ tokens/);
+		expect(text).toContain("schema (as sent): {");
+		expect(text).toContain("## Candidates");
+		expect(text).toContain("聞き返した依頼: 絵を描いて");
+		expect(text).not.toContain("## Functions");
+	});
+	test("the dry run of the cloud harness is the single turn without a choice", () => {
+		const text = dryRunText(
+			parseOptions(["--harness", "cloud", "--chains", "topic", "--dry-run"]),
+			{ source, cards },
 		);
-		expect(
-			dryRunText(parseOptions(["--chains", "topic", "--dry-run"]), {
-				source: {
-					persona: { agentName: "", userName: "", persona: "butler" },
-					interests: [],
-					emotion: false,
-					titles: [],
-				},
-				cards,
-			}),
-		).toContain("turn: single");
+		expect(text).toContain("turn: single");
+		expect(text).not.toContain("the choice call");
 	});
 });
 
-describe("the metrics fetch", () => {
+describe("the metrics fetch and the clients", () => {
 	test("a call the reader stops ends its timing there, without a finish reason from the server", async () => {
 		const original = globalThis.fetch;
 		const data = new TextEncoder().encode(
@@ -631,182 +903,17 @@ describe("the metrics fetch", () => {
 			globalThis.fetch = original;
 		}
 	});
+	test("the Codex path answers the cloud harness's reply loop only", async () => {
+		const codex = await createCodexClient("m");
+		await expect(
+			codex.stream([], settings, callSignal(), () => {}, { tools: false }),
+		).rejects.toThrow("harness_routed_unsupported");
+		expect(codex.decide).toBeUndefined();
+	});
 });
 
 describe("the record of each model call", () => {
-	const delegateWithout = JSON.stringify({
-		mode: "execute",
-		toolchain: "image.create",
-	});
-	test("a decision that fails the argument check keeps its raw JSON, the call and the issues", async () => {
-		const bad = call("delegate", {
-			mode: "execute",
-			toolchain: "image.create",
-		});
-		const r = await runTurn(
-			env(fakeClient({ decisions: [bad] }).client),
-			input("x"),
-			cards,
-			1,
-		);
-		expect(r.stop).toBe("check");
-		const [d] = r.details;
-		expect(d).toMatchObject({
-			kind: "decision",
-			check: "tool_arguments_invalid",
-			decisionJson: bad,
-		});
-		expect(d!.toolCalls).toHaveLength(1);
-		expect(d!.toolCalls[0]).toMatchObject({
-			name: "delegate",
-			arguments: delegateWithout,
-			verdict: "refused",
-			reason: "tool_arguments_invalid",
-		});
-		expect(d!.toolCalls[0]!.issues!.map((i) => i.path)).toContain("request");
-	});
-	test("an unreadable decision and an unknown tool say so in the record", async () => {
-		const garbled = await runTurn(
-			env(fakeClient({ decisions: ["not json"] }).client),
-			input("x"),
-			cards,
-			1,
-		);
-		expect(garbled.details[0]).toMatchObject({
-			decisionJson: "not json",
-			check: "decision_unparsed",
-		});
-		expect(garbled.details[0]!.toolCalls[0]).toMatchObject({
-			verdict: "refused",
-			reason: "decision_unparsed",
-		});
-		const unknown = await runTurn(
-			env(fakeClient({ decisions: [call("nope", { a: 1 })] }).client),
-			input("x"),
-			cards,
-			1,
-		);
-		expect(unknown.details[0]!.toolCalls[0]).toMatchObject({
-			name: "nope",
-			arguments: '{"a":1}',
-			reason: "tool_unknown",
-		});
-	});
-	test("a search is accepted with its candidates, a hand-over to an unsearched toolchain is refused by the host, then the rounds run out", async () => {
-		const search = call("find_toolchain", { query: "画像" });
-		const wrong = call("delegate", {
-			mode: "execute",
-			toolchain: "music.create",
-			request: "猫",
-			impact: "create",
-		});
-		const r = await runTurn(
-			env(fakeClient({ decisions: [search, wrong, wrong, wrong] }).client),
-			input("猫の絵作って"),
-			cards,
-			1,
-		);
-		expect(r.stop).toBe("rounds");
-		expect(r.details.map((d) => d.kind)).toEqual([
-			"decision",
-			"decision",
-			"decision",
-			"decision",
-		]);
-		expect(r.details[0]!.toolCalls[0]).toMatchObject({
-			verdict: "accepted",
-			outcome: "候補 image.create, model3d.studio, excalidraw.edit",
-		});
-		expect(r.details[1]!.toolCalls[0]).toMatchObject({ verdict: "refused" });
-		expect(r.details[1]!.toolCalls[0]!.reason).toContain("toolchain_not_found");
-		expect(r.details[1]!.toolCalls[0]!.reason).toContain("image.create");
-		expect(r.details[1]!.decisionJson).toBe(wrong);
-	});
-	test("in a single turn the refusal of a call without its request is recorded with the path", async () => {
-		const { client } = fakeClient({
-			replies: [
-				{
-					chunks: [],
-					toolCalls: [
-						{ id: "a", name: "find_toolchain", arguments: '{"query":"画像"}' },
-					],
-				},
-				{
-					chunks: [],
-					toolCalls: [
-						{ id: "b", name: "delegate", arguments: delegateWithout },
-					],
-				},
-				{ chunks: ["承りました。"] },
-			],
-		});
-		const r = await runTurn(
-			env(client, { mode: "single" }),
-			input("猫の絵作って"),
-			cards,
-			1,
-		);
-		expect(r.details.map((d) => d.kind)).toEqual([
-			"single",
-			"single",
-			"single",
-		]);
-		const refusedCall = r.details[1]!.toolCalls[0]!;
-		expect(refusedCall).toMatchObject({
-			name: "delegate",
-			verdict: "refused",
-			reason: "invalid_tool_arguments",
-		});
-		expect(refusedCall.issues!.some((i) => i.path.endsWith("request"))).toBe(
-			true,
-		);
-		expect(r.details[2]).toMatchObject({
-			text: "承りました。",
-			textChars: 6,
-			finishReason: "stop",
-		});
-		expect(r.stop).toBe("answer");
-	});
-	test("a stopped reply keeps the head that arrived and its check", async () => {
-		const { client } = fakeClient({
-			decisions: [REPLY],
-			replies: [{ chunks: ["猫の絵を", "作ります。", "まだ続く。"] }],
-		});
-		const r = await runTurn(env(client), input("猫の絵作って"), cards, 1);
-		const reply = r.details[1]!;
-		expect(reply).toMatchObject({
-			kind: "reply",
-			check: "promise_without_call",
-			text: "猫の絵を作ります。まだ続く。",
-		});
-		expect(reply.error).toBeUndefined();
-		expect(r.details[0]).toMatchObject({
-			kind: "decision",
-			decisionJson: REPLY,
-		});
-	});
-	test("an error that ends a call keeps its code and how much text had arrived", async () => {
-		const { client } = fakeClient({
-			replies: [
-				{ chunks: ["こんにちは、", "ええと"], error: "chat_stream_incomplete" },
-			],
-		});
-		const r = await runTurn(
-			env(client, { mode: "single" }),
-			input("やあ"),
-			cards,
-			1,
-		);
-		expect(r.stop).toBe("error");
-		expect(r.error).toBe("chat_stream_incomplete");
-		expect(r.details[0]!.error).toEqual({
-			code: "chat_stream_incomplete",
-			textChars: 9,
-			reasoningChars: 0,
-		});
-		expect(r.details[0]!.text).toBe("こんにちは、ええと");
-	});
-	test("the helpers: cut, error code, the named call of a decision, issues of a refused call", () => {
+	test("the helpers: cut, error code, what arrived, issues of a refused call", () => {
 		expect(cut("abcdef", 3)).toBe("abc…");
 		expect(cut("abc", 3)).toBe("abc");
 		expect(errorCodeOf(Object.assign(new Error("m"), { code: "c1" }))).toBe(
@@ -815,101 +922,77 @@ describe("the record of each model call", () => {
 		expect(errorCodeOf(new Error("chat_stream_incomplete"))).toBe(
 			"chat_stream_incomplete",
 		);
-		expect(
-			decisionCall(
-				'{"action":"call","tool":{"name":"delegate","arguments":"{}"}}',
-			),
-		).toEqual({ name: "delegate", arguments: "{}", checked: "{}" });
-		expect(decisionCall('{"action":"reply","tool":null}')).toBeNull();
-		expect(decisionCall("x")).toBeNull();
+		const detail = newDetail("talk");
+		arrived(detail, "こんにちは");
+		arrived(detail, "。");
+		expect(detail).toMatchObject({ text: "こんにちは。", textChars: 6 });
 		let failure: unknown;
 		try {
-			parseCall({ id: "i", name: "delegate", arguments: delegateWithout });
+			parseCall({
+				id: "i",
+				name: "delegate",
+				arguments: json({ mode: "execute", request: "猫の絵" }),
+			});
 		} catch (error) {
 			failure = error;
 		}
 		expect(failure).toBeInstanceOf(ValidationFailure);
 		expect(issuesOf(failure as ValidationFailure)[0]).toMatchObject({
 			code: expect.any(String),
-			path: expect.stringContaining("request"),
+			path: expect.stringContaining("toolchain"),
 		});
 	});
-	test("the details section lists each failed step's calls with tool, verdict and reason", async () => {
-		const bad = call("delegate", {
-			mode: "execute",
-			toolchain: "image.create",
+	test("the details section lists a failed routed step's calls with the choice and the reason it was not taken", async () => {
+		const fake = fakeClient({
+			choices: [json({ choice: "nope" }), json({ choice: "nope" })],
 		});
-		const r = await runTurn(
-			env(fakeClient({ decisions: [bad] }).client),
+		const r = await runRoutedTurn(
+			env(fake.client),
 			input("x"),
 			cards,
 			1,
+			requestOf("x"),
 		);
-		const failed = {
-			...timingOf(r.calls, 0, 100, false),
-			chain: "続けて頼む",
-			form: "current",
-			rep: 0,
-			index: 0,
+		const failed = record({
+			...timingOf(r.calls, 0, 100, r.hostSpoke),
 			say: "猫の絵作って",
-			scored: true,
 			pass: false,
-			why: "fallback:tool_arguments_invalid",
-			said: "",
-			turnMode: "decide-then-reply" as const,
-			failedCheck: "tool_arguments_invalid",
-			failedChecks: ["tool_arguments_invalid"],
-			cloudAnswered: false,
-			copyRun: null,
+			why: "choice:choice_not_offered",
+			turnMode: "routed",
 			stop: r.stop,
 			callTokens: tokensOf(r.calls),
 			callDetails: r.details,
-		};
+		});
 		const text = failureDetails([failed]).join("\n");
 		expect(text).toContain(
-			"続けて頼む / current / 回1 / 猫の絵作って: fallback:tool_arguments_invalid（終わり方: check、モデルの呼出し 1 回）",
+			"続けて頼む / current / 回1 / 猫の絵作って: choice:choice_not_offered（終わり方: check、モデルの呼出し 2 回）",
 		);
-		expect(text).toContain("1. decision / finish=stop");
-		expect(text).toContain("check=tool_arguments_invalid");
+		expect(text).toContain("1. choice / finish=stop");
+		expect(text).toContain("check=choice_not_offered");
+		expect(text).toContain('選択: `{"choice":"nope"}`');
 		expect(text).toContain(
-			'delegate `{"mode":"execute","toolchain":"image.create"}` → 拒否 tool_arguments_invalid [request required expected string got undefined',
+			'nope `{"choice":"nope"}` → 拒否 choice_not_offered',
 		);
 		expect(failureDetails([{ ...failed, pass: true }])).toEqual(["なし"]);
-		const md = reportMarkdown(
-			{
-				startedAt: "t",
-				client: "larm",
-				harness: "local",
-				reasoning: "medium",
-				outputLimit: 4096,
-				reps: 1,
-				probe: false,
-				turn: "decide-then-reply",
-				fallback: "-",
-				chains: ["続けて頼む"],
-				forms: ["current"],
-				settings: null,
-			},
-			[failed],
-		);
-		expect(md).toContain("## 落ちた手の詳細");
-		expect(md).toContain("拒否 tool_arguments_invalid");
-		expect(detailLines(r.details[0]!, 1)[0]).toContain("1. decision");
+		expect(detailLines(r.details[0]!, 1)[0]).toContain("1. choice");
 	});
 	test("the step record carries the details as JSON", async () => {
-		const r = await runTurn(
+		const r = await runRoutedTurn(
 			env(
-				fakeClient({ decisions: [REPLY], replies: [{ chunks: ["はい。"] }] })
-					.client,
+				fakeClient({
+					choices: [json({ choice: "none" })],
+					replies: [{ chunks: ["はい。"] }],
+				}).client,
 			),
 			input("ありがとう"),
 			cards,
 			1,
+			requestOf("ありがとう"),
 		);
 		const roundTrip = JSON.parse(JSON.stringify(r.details));
 		expect(roundTrip.map((d: { kind: string }) => d.kind)).toEqual([
-			"decision",
-			"reply",
+			"choice",
+			"talk",
 		]);
 		expect(roundTrip[1]).toMatchObject({
 			text: "はい。",
@@ -919,72 +1002,7 @@ describe("the record of each model call", () => {
 	});
 });
 
-describe("the decision call's input", () => {
-	test("the decision call reads the messages with the offered functions added to the last user message", async () => {
-		const fake = fakeClient({
-			decisions: [REPLY],
-			replies: [{ chunks: ["はい。"] }],
-		});
-		const messages = input("ありがとう");
-		await runTurn(env(fake.client), messages, cards, 1);
-		const sent = fake.decided[0]!;
-		expect(sent).toHaveLength(messages.length);
-		expect(sent.at(-1)!.content.startsWith(messages.at(-1)!.content)).toBe(
-			true,
-		);
-		expect(sent.at(-1)!.content).toContain("## Functions");
-		expect(sent.at(-1)!.content).toContain('"name":"delegate"');
-		expect(sent.slice(0, -1)).toEqual(messages.slice(0, -1));
-	});
-	test("the diagnosis form of a decision's arguments drops nulls and reads a JSON text as the object", () => {
-		const named = decisionCall(
-			JSON.stringify({
-				action: "call",
-				tool: {
-					name: "delegate",
-					arguments: {
-						mode: "execute",
-						target: null,
-						inputs: '{"a":1}',
-						request: "x",
-					},
-				},
-			}),
-		);
-		expect(JSON.parse(named!.checked)).toEqual({
-			mode: "execute",
-			inputs: { a: 1 },
-			request: "x",
-		});
-		expect(JSON.parse(named!.arguments)).toMatchObject({
-			target: null,
-			inputs: '{"a":1}',
-		});
-	});
-});
-
 describe("the cache figures", () => {
-	const record = (over: Partial<StepRecord>): StepRecord => ({
-		...timingOf([], 0, 0, false),
-		chain: "続けて頼む",
-		form: "current",
-		rep: 0,
-		index: 0,
-		say: "s",
-		scored: true,
-		pass: true,
-		why: "",
-		said: "",
-		turnMode: "single",
-		failedCheck: null,
-		failedChecks: [],
-		cloudAnswered: false,
-		copyRun: null,
-		stop: "answer",
-		callTokens: [],
-		callDetails: [],
-		...over,
-	});
 	test("the cached share counts every call, not only the first", () => {
 		const cell = cellOf([
 			record({
@@ -1014,8 +1032,8 @@ describe("the cache figures", () => {
 				form: "empty",
 				index: 1,
 				callTokens: [
-					{ kind: "decision", promptTokens: 3900, cachedPromptTokens: 3700 },
-					{ kind: "reply", promptTokens: 3900, cachedPromptTokens: 3800 },
+					{ kind: "choice", promptTokens: 3900, cachedPromptTokens: 3700 },
+					{ kind: "talk", promptTokens: 3900, cachedPromptTokens: 3800 },
 				],
 			}),
 		];
@@ -1025,7 +1043,7 @@ describe("the cache figures", () => {
 			"| 続けて頼む | current | 1 | 1 | 1 | single | 3800 | 0 | 0% |",
 		);
 		expect(lines).toContain(
-			"| 続けて頼む | empty | 1 | 2 | 2 | reply | 3900 | 3800 | 97% |",
+			"| 続けて頼む | empty | 1 | 2 | 2 | talk | 3900 | 3800 | 97% |",
 		);
 		expect(cacheSection([record({})])).toEqual([]);
 		const md = reportMarkdown(
@@ -1038,7 +1056,6 @@ describe("the cache figures", () => {
 				reps: 1,
 				probe: false,
 				turn: "single",
-				fallback: "-",
 				chains: ["続けて頼む"],
 				forms: ["current", "empty"],
 				settings: null,

@@ -146,6 +146,12 @@
 				"指定URLのページの内容を確認したい"
 			],
 			"avoidWhen": ["ニュースの整理", "複数資料の比較"],
+			"redirects": [
+				{
+					"when": "ニュースや話題を集めて整理する、複数資料を比べる",
+					"toolchainId": "web.research.codex"
+				}
+			],
 			"examples": [
 				"鎌倉の天気を教えて",
 				"明日の東京の天気は？",
@@ -279,6 +285,12 @@
 				"指定URLのページの内容を確認したい"
 			],
 			"avoidWhen": ["ニュースの整理", "複数資料の比較"],
+			"redirects": [
+				{
+					"when": "ニュースや話題を集めて整理する、複数資料を比べる",
+					"toolchainId": "web.research.codex"
+				}
+			],
 			"examples": [
 				"鎌倉の天気を教えて",
 				"明日の東京の天気は？",
@@ -412,6 +424,12 @@
 				"指定URLのページの内容を確認したい"
 			],
 			"avoidWhen": ["ニュースの整理", "複数資料の比較"],
+			"redirects": [
+				{
+					"when": "ニュースや話題を集めて整理する、複数資料を比べる",
+					"toolchainId": "web.research.codex"
+				}
+			],
 			"examples": [
 				"鎌倉の天気を教えて",
 				"明日の東京の天気は？",
@@ -426,6 +444,39 @@
 				"kind": "component",
 				"component": "ResearchTaskCard"
 			}
+		},
+		{
+			"revision": 8,
+			"aliases": [],
+			"tags": [],
+			"kind": "toolchain",
+			"id": "web.search",
+			"functionName": "web_search",
+			"title": "Web検索",
+			"summary": "Webで公開情報を一つ調べ、出典付きで返す。言葉の定義・地名・人物・組織・指定URLの一項目など、専用の担当がない事柄に使う",
+			"useWhen": [
+				"Webで公開情報を一つ調べて確かめたい",
+				"言葉の意味・地名・人物・組織を確認したい",
+				"指定URLのページの内容を確認したい"
+			],
+			"avoidWhen": [
+				"ニュースの整理",
+				"複数資料の比較",
+				"天気予報・株価など、専用の担当がある事柄"
+			],
+			"examples": [
+				"WBSってなんだっけ",
+				"このURLの営業時間を確認して",
+				"今のドル円は？",
+				"富士山の標高を調べて"
+			],
+			"dependencies": ["package:web.recipe@6"],
+			"packageRevisionId": "package:web.recipe@6",
+			"artifact": {
+				"kind": "component",
+				"component": "ResearchTaskCard"
+			},
+			"general": true
 		}
 	],
 	"bindings": [],

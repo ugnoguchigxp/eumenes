@@ -15,6 +15,10 @@ export function registerKanban(app: Hono, kanban: KanbanService) {
 		if (!query.ok) return query.response;
 		return c.json(kanban.notices(query.data.limit));
 	});
+	app.post("/api/kanban/notices/archive", async (c) => {
+		await kanban.archiveNotices();
+		return c.body(null, 204);
+	});
 	app.post("/api/kanban/notices/:id/read", async (c) => {
 		const id = c.req.param("id");
 		if (!idSchema.safeParse(id).success)

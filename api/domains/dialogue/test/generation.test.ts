@@ -255,6 +255,50 @@ test("an instant toolchain's answer comes back as the tool result, and makes no 
 	expect(h.state.selections.at(-1)).toMatchObject({ decision: "toolchain" });
 });
 
+test("an instant toolchain needs no request text; any other toolchain is refused without it, naming the field", async () => {
+	h = await setup();
+	h.state.steps.push(
+		{ calls: [{ name: "find_toolchain", args: { query: "時刻と絵" } }] },
+		{
+			calls: [
+				{
+					name: "delegate",
+					args: {
+						mode: "execute",
+						toolchain: IMAGE.id,
+						impact: "create",
+						announcement: "描きますね。",
+					},
+				},
+			],
+		},
+		{
+			calls: [
+				{
+					name: "delegate",
+					args: {
+						mode: "execute",
+						toolchain: INSTANT.id,
+						impact: "none",
+						inputs: { city: "東京" },
+					},
+				},
+			],
+		},
+		{ text: "東京は12時です。" },
+	);
+	const run = await h.say("東京は今何時？");
+	expect(h.dialogue.answerText(run.id)).toBe("東京は12時です。");
+	const tool = h.state.calls.at(-1)!.messages.filter((m) => m.role === "tool");
+	expect(tool.at(-2)!.content).toBe(
+		"- refused: true\n- reason: invalid_tool_arguments\n- request: required（expected string）",
+	);
+	expect(tool.at(-1)!.content).toBe(
+		"- answered: true\n- answer: 東京は12時です。",
+	);
+	expect(h.todos()).toEqual([]);
+});
+
 test("a delegation is announced, opens a TODO and hands the run over; the finished work ends the run without a generation and is archived with its notice", async () => {
 	const notified: string[] = [];
 	h = await setup({

@@ -41,24 +41,27 @@ export type CallMetrics = {
 	tokensPerSecond: number | null;
 };
 
-/** Which call of a turn a timed call was: the one call of a single turn, or a part of a decide-then-reply turn. */
-export type CallKind = "single" | "decision" | "reply" | "cloud";
+/**
+ * Which call of a turn a timed call was: a call of the reply loop (`single`), or a part of a routed turn: the silent
+ * `choice` held to a schema, and the `talk` call that offers no tools.
+ */
+export type CallKind = "single" | "choice" | "talk";
 export type TaggedCall = { kind: CallKind; metrics: CallMetrics };
 
 export type ModelClient = {
 	connect(): Promise<void>;
 	close(): Promise<void>;
-	/** One streamed call with the fixed tools; `toolChoice: "none"` offers them without letting the model call. */
+	/** One streamed call with the fixed tools; `tools: false` sends none (the routed turn's talk call). */
 	stream(
 		messages: ChatMessage[],
 		settings: CallSettings,
 		signal: AbortSignal,
 		onDelta: (text: string) => void,
-		extra?: { toolChoice?: "none" },
+		extra?: { tools?: false },
 	): Promise<{ text: string; toolCalls: NativeToolCall[] }>;
 	/**
-	 * The silent decision call: strict JSON by `schema` and no native tools field (the offered tools are the
-	 * schema's choices), as the app calls LARM for a schema. Absent on a path that cannot.
+	 * The silent choice call: strict JSON by `schema` and no native tools field (what may be chosen is the schema's
+	 * branches), as the app calls LARM for a schema. Absent on a path that cannot.
 	 */
 	decide?(
 		messages: ChatMessage[],
@@ -251,11 +254,14 @@ export async function createLarmClient(): Promise<ModelClient> {
 			let toolCalls: NativeToolCall[] = [];
 			const text = await live.answerStream!(messages, signal, onDelta, {
 				...base(settings),
-				tools: generationTools,
-				...(extra?.toolChoice ? { toolChoice: extra.toolChoice } : {}),
-				onToolCalls: (calls) => {
-					toolCalls = calls;
-				},
+				...(extra?.tools === false
+					? {}
+					: {
+							tools: generationTools,
+							onToolCalls: (calls: NativeToolCall[]) => {
+								toolCalls = calls;
+							},
+						}),
 			});
 			return { text, toolCalls };
 		},
@@ -282,7 +288,9 @@ export async function createCodexClient(model: string): Promise<ModelClient> {
 		async take() {
 			return done.splice(0);
 		},
-		async stream(messages, settings, signal, onDelta) {
+		async stream(messages, settings, signal, onDelta, extra) {
+			// The routed turn is the local harness's; the Codex path answers the cloud harness's reply loop only.
+			if (extra?.tools === false) throw new Error("harness_routed_unsupported");
 			if (settings.reasoning === "off")
 				throw new Error("harness_codex_reasoning_off_unsupported");
 			const startedAt = performance.now();

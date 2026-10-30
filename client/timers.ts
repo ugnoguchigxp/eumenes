@@ -67,6 +67,11 @@ export function timersClient(transport: Transport) {
 				withQuery("/api/timer-notifications", query),
 				{ signal },
 			),
+		archiveTimerNotifications: async () => {
+			await transport.call("/api/timer-notifications/archive", {
+				method: "POST",
+			});
+		},
 		claimTimerNotification: async (
 			id: string,
 			input: {

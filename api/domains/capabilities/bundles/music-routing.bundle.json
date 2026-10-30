@@ -96,6 +96,34 @@
 			"aliases": [],
 			"tags": [],
 			"useWhen": [
+				"新しい音楽・歌・BGM・効果音を作ってほしい",
+				"場面・時間帯・気分に合う曲やBGMを新しく作ってほしい（「〜に合う曲を作って」「〜向けのBGMを作って」）"
+			],
+			"avoidWhen": ["保存済みの音声を再生する"],
+			"dependencies": ["package:music.create@3"],
+			"kind": "toolchain",
+			"id": "music.create",
+			"revision": 4,
+			"title": "音楽・効果音制作",
+			"summary": "歌なし音楽・BGM、ボーカル・歌詞付き音楽、効果音を新しく生成する。作成済みの曲の再生には使わない",
+			"functionName": "music",
+			"examples": [
+				"30秒のオーケストラBGMを作って",
+				"日本語の歌詞付きポップソングを作って",
+				"1.5秒の通知用効果音を作って",
+				"雨の日に聴きたい落ち着いた曲を作って",
+				"作業用のBGMを作って"
+			],
+			"packageRevisionId": "package:music.create@3",
+			"artifact": {
+				"kind": "component",
+				"component": "MusicArtifact"
+			}
+		},
+		{
+			"aliases": [],
+			"tags": [],
+			"useWhen": [
 				"作った曲・さっきの曲・保存済みの曲を再生してほしい（「再生して」「流して」「聴かせて」）",
 				"完成の報告のあとで「はい、再生して」と頼んでいる",
 				"お気に入りやライブラリ、プレイリストを開きたい"

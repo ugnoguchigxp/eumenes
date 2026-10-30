@@ -1,4 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
+import { Hono } from "hono";
+import { registerDialogue } from "..";
 import { toolFields } from "./tool-text.fixture";
 import { waitFor } from "../../../infrastructure/wait-for";
 import { IMAGE, setup, type Harness } from "./generation.fixture";
@@ -371,6 +373,36 @@ test("finished work is archived as it finishes, with an unread notice the screen
 	// Reading again changes nothing; a TODO with no notice is not found.
 	expect(await h.dialogue.readTodoNotice(todo.id)).toBe(true);
 	expect(await h.dialogue.readTodoNotice("no-such-todo")).toBe(false);
+});
+
+test("clearing notification history keeps TODO results, archives every page, and leaves future completion notices visible", async () => {
+	h = await setup();
+	const old = await doneTodo("山の絵");
+	await doneTodo("海の絵");
+	await h.dialogue.readTodoNotice(old.id);
+	expect(h.dialogue.todoNotices(1).notices).toHaveLength(1);
+	const work = h.archived();
+	const results = h.results();
+	const app = new Hono();
+	registerDialogue(app, h.dialogue);
+	for (let i = 0; i < 2; i++) {
+		expect(
+			(await app.request("/api/todo-notices/archive", { method: "POST" }))
+				.status,
+		).toBe(204);
+		expect(await (await app.request("/api/todo-notices")).json()).toEqual({
+			notices: [],
+			unread: 0,
+		});
+		expect(h.archived()).toEqual(work);
+		expect(h.results()).toEqual(results);
+	}
+	await doneTodo("森の絵");
+	expect(h.notices()).toMatchObject({
+		unread: 1,
+		notices: [{ title: "森の絵", read: false }],
+	});
+	expect(h.archived()).toHaveLength(3);
 });
 
 test("the TODO screen's archive stops the run an open TODO waits on and archives it as cancelled, with no notice", async () => {

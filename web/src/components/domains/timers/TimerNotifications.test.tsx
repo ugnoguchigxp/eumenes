@@ -60,6 +60,11 @@ function fixture(status = "pending", extraPages = false) {
 		cancelTimer: vi.fn(async () => {
 			note = { ...note, status: "dismissed", revision: 4 };
 		}),
+		archiveTimerNotifications: vi.fn(async () => {
+			note = { ...note, status: "dismissed", revision: 4 };
+		}),
+		archiveKanbanNotices: vi.fn(async () => {}),
+		archiveTodoNotices: vi.fn(async () => {}),
 	};
 	const cache = new QueryClient({
 		defaultOptions: { queries: { retry: false } },
@@ -112,6 +117,29 @@ test("polling an owned claim keeps the tone alive and acknowledges only its comp
 		),
 	);
 	expect(tone).toHaveBeenCalledOnce();
+});
+
+test("clearing history aborts the owned playback when archived notifications disappear from the response", async () => {
+	const h = fixture();
+	const tone = vi.fn(
+		(signal: AbortSignal) =>
+			new Promise<void>((resolve) =>
+				signal.addEventListener("abort", () => resolve()),
+			),
+	);
+	h.show(tone);
+	await waitFor(() => expect(tone).toHaveBeenCalledOnce());
+	// The real listing excludes dismissed records, unlike older fixtures in this file.
+	h.api.timerNotifications.mockImplementation(async () => ({
+		serverNow: NOW,
+		items: [],
+		nextCursor: null,
+	}));
+	fireEvent.click(screen.getByRole("button", { name: "通知センター、1件" }));
+	fireEvent.click(screen.getByRole("button", { name: "履歴をクリア" }));
+	await screen.findByText("通知はありません");
+	await waitFor(() => expect(tone.mock.calls[0]![0].aborted).toBe(true));
+	expect(h.api.cancelTimer).not.toHaveBeenCalled();
 });
 
 test("blocked audio settles the owned claim, and the silent notice can be dismissed", async () => {

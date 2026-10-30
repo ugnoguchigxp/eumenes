@@ -6,6 +6,7 @@ export function appServices(s: Services) {
 		capabilities: s.toolchain.capabilities,
 		pipelines: s.pipelines,
 		pipelineTrials: s.pipelineTrials,
+		searchCheck: s.searchCheck,
 		agents: s.toolchain.agents,
 		attitudeDataset: s.attitudeDataset,
 		conversation: s.conversation,

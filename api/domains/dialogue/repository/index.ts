@@ -404,6 +404,11 @@ export const migrations: readonly Migration[] = [
 		after: ["dialogue/0027-intent-judgments"],
 		sql: intentAnswerRouteMigration,
 	},
+	{
+		id: "dialogue/0029-notice-archive",
+		after: ["dialogue/0028-intent-answer-route"],
+		sql: "ALTER TABLE dialogue_work ADD COLUMN notice_archived_at TEXT;",
+	},
 ];
 
 /** A screen's form submit names its toolchain; only such a run writes the column. */

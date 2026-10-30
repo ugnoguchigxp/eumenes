@@ -92,7 +92,7 @@ test("new Web revisions upgrade and reseed without changing archived definitions
 			{ key: "package:web.quick", active_revision_id: "package:web.quick@7" },
 			{
 				key: "toolchain:web.search",
-				active_revision_id: "toolchain:web.search@7",
+				active_revision_id: "toolchain:web.search@8",
 			},
 		]);
 		const registered = active();

@@ -2,7 +2,11 @@ import { afterEach, expect, test } from "bun:test";
 import type { Database } from "bun:sqlite";
 import type { Utterance } from "../../conversation";
 import type { DialogueDeps, GenerateInput } from "../service/context";
-import { SYSTEM_SECTIONS, systemText } from "../service/context-system";
+import {
+	SYSTEM_SECTIONS,
+	TALK_SECTIONS,
+	systemText,
+} from "../service/context-system";
 import {
 	conversationPrefixFrom,
 	recentMessages,
@@ -26,13 +30,17 @@ import { waitFor } from "../../../infrastructure/wait-for";
  * the saved route, and what each part of a value changes. Step 1: both values compose the messages of today and
  * differ only in the call's settings.
  */
-test("the two values differ in the recent conversation and the call's settings: local draws the words alone", () => {
+test("the two values: the cloud's agent loop on the full system, the local's routed turn on the talk system with the last two utterances", () => {
 	expect(cloudHarness.name).toBe("cloud");
 	expect(localHarness.name).toBe("local");
-	for (const harness of [cloudHarness, localHarness]) {
-		expect(harness.system).toEqual(SYSTEM_SECTIONS);
+	for (const harness of [cloudHarness, localHarness])
 		expect(harness.gates).toEqual({ systemCopy: true });
-	}
+	expect(cloudHarness.system).toEqual(SYSTEM_SECTIONS);
+	expect(cloudHarness.systemTexts).toBe("full");
+	expect(cloudHarness.turn).toBe("single");
+	expect(localHarness.system).toEqual(TALK_SECTIONS);
+	expect(localHarness.systemTexts).toBe("talk");
+	expect(localHarness.turn).toBe("routed");
 	expect(cloudHarness.history).toEqual({
 		toolExchanges: true,
 		notices: true,
@@ -42,6 +50,7 @@ test("the two values differ in the recent conversation and the call's settings: 
 		toolExchanges: false,
 		notices: false,
 		copyFilter: true,
+		users: 2,
 	});
 	expect(cloudHarness.call).toEqual({ reasoning: "low", outputLimit: 1024 });
 	expect(localHarness.call).toEqual({ reasoning: "low", outputLimit: 4096 });
@@ -245,9 +254,15 @@ const BOTH = {
 	cloud: cloudHarness.call.reasoning,
 };
 
-test("a run with the default settings is served with the local harness: the call carries its limit and reasoning", async () => {
-	h = await setup();
-	h.state.steps.push({ text: "はい" });
+/** A routed turn with no judgement: the request turn chooses nothing, then the talk turn says `text`. */
+const talked = (text: string) => [
+	{ text: JSON.stringify({ choice: "none" }) },
+	{ text },
+];
+
+test("a run served by LARM is the local harness's routed turn: its calls carry the local limit and reasoning", async () => {
+	h = await setup({ harness: "local" });
+	h.state.steps.push(...talked("はい"));
 	await h.say("こんにちは");
 	expect(lastCall().session).toMatchObject({
 		sessionRole: "main",
@@ -256,16 +271,18 @@ test("a run with the default settings is served with the local harness: the call
 	});
 });
 
-test("a run takes the saved cloud model's route and harness, and the messages are the local harness's", async () => {
+test("a run takes the saved cloud model's route and harness: the cloud's system names the toolchains, the local talk turn's does not", async () => {
 	h = await setup({ settings: settings({ mode: "larm-only" }) });
-	h.state.steps.push({ text: "a" }, { text: "b" });
+	h.state.steps.push(...talked("a"), ...talked("b"));
 	await h.say("こんにちは");
 	await h.say("もう一度");
-	const local = h.state.calls.map((c) => c.messages);
 	expect(h.state.captures).toHaveLength(2);
 	expect(h.state.calls.map((c) => c.session?.outputLimit)).toEqual([
-		4096, 4096,
+		4096, 4096, 4096, 4096,
 	]);
+	const talk = h.state.calls.at(-1)!.messages[0]!.content;
+	expect(talk).not.toContain("## Toolchains");
+	expect(talk).not.toContain("find_toolchain");
 	await h.close();
 
 	h = await setup({ settings: settings({ mode: "cloud-only" }) });
@@ -283,7 +300,7 @@ test("a run takes the saved cloud model's route and harness, and the messages ar
 		expect.objectContaining({ outputLimit: 1024, reasoning: BOTH }),
 		expect.objectContaining({ outputLimit: 1024, reasoning: BOTH }),
 	]);
-	expect(h.state.calls.map((c) => c.messages)).toEqual(local);
+	expect(h.state.calls.at(-1)!.messages[0]!.content).toContain("## Toolchains");
 });
 
 test("a saved cloud model that can not be used falls back to LARM and the local harness", async () => {
@@ -291,7 +308,7 @@ test("a saved cloud model that can not be used falls back to LARM and the local 
 		settings: settings({ mode: "cloud-only", enabled: false }),
 		lateCapture: true,
 	});
-	h.state.steps.push({ text: "はい" });
+	h.state.steps.push(...talked("はい"));
 	await h.say("こんにちは");
 	expect((h.state.captures[0]!.snapshot as Snapshot).routes.llm).toMatchObject({
 		mode: "larm-only",
@@ -305,7 +322,7 @@ test("a saved cloud model that can not be used falls back to LARM and the local 
 
 test("a run accepted keeps the saved route as it is: a LARM-preferred one stays so, and keeps the local harness", async () => {
 	h = await setup({ settings: settings({ mode: "larm-preferred" }) });
-	h.state.steps.push({ text: "はい" });
+	h.state.steps.push(...talked("はい"));
 	await h.say("こんにちは");
 	expect(h.state.captures).toHaveLength(1);
 	expect((h.state.captures[0]!.snapshot as Snapshot).routes.llm).toMatchObject({
@@ -356,7 +373,7 @@ test("a resubmitted utterance is captured with the saved route as it is", async 
 		mode: "larm-preferred",
 		cloudAllowed: true,
 	});
-	h.state.steps.push({ text: "Bです。" });
+	h.state.steps.push(...talked("Bです。"));
 	h.start();
 	await waitFor(() => h!.dialogue.get(result.run.id)?.status === "completed");
 });

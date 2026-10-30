@@ -73,16 +73,19 @@ export function conversationOutput(
 	const escaped = names.map((name) =>
 		name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
 	);
-	// A call written as text: `name({` or `name {"key` / `name {key`. A tool name in ordinary speech is not one.
-	const callSyntax = new RegExp(
-		`(?:${escaped.join("|")})\\s*(?:\\(\\s*\\{|\\{\\s*["\\w])`,
-	);
-	const callStart = new RegExp(
-		`(?:${escaped.join("|")})\\s*(?:\\(\\s*)?\\{?\\s*$`,
-	);
+	// A call written as text: `name({` or `name {"key` / `name {key`. A tool name in ordinary speech is not one. A
+	// call offering no tool (the routed talk turn) has no names to look for.
+	const callSyntax = escaped.length
+		? new RegExp(`(?:${escaped.join("|")})\\s*(?:\\(\\s*\\{|\\{\\s*["\\w])`)
+		: null;
+	const callStart = escaped.length
+		? new RegExp(`(?:${escaped.join("|")})\\s*(?:\\(\\s*)?\\{?\\s*$`)
+		: null;
 	// An offered tool written as an XML tag: `<delegate>`, `<work\n` (run `a3c89c6e`). The full-width brackets are
 	// the same tag: the log draws past text with them, and the model copies them back (run `6c08b000`).
-	const tagSyntax = new RegExp(`[<＜]/?(?:${escaped.join("|")})[\\s>＞]`);
+	const tagSyntax = escaped.length
+		? new RegExp(`[<＜]/?(?:${escaped.join("|")})[\\s>＞]`)
+		: null;
 	const tags = names.flatMap((name) => [`<${name}`, `＜${name}`]);
 	// These are provider control delimiters, not ordinary answer text (`<tool_call>` / `<function=`: run `f4764696`).
 	const delimiters = [
@@ -108,8 +111,8 @@ export function conversationOutput(
 	function controlStart(text: string) {
 		const starts = [
 			...delimiters.map((token) => text.indexOf(token)),
-			text.search(callSyntax),
-			text.search(tagSyntax),
+			callSyntax ? text.search(callSyntax) : -1,
+			tagSyntax ? text.search(tagSyntax) : -1,
 		].filter((at) => at >= 0);
 		return starts.length ? Math.min(...starts) : -1;
 	}
@@ -120,7 +123,7 @@ export function conversationOutput(
 		for (const prefix of prefixes)
 			if (text.endsWith(prefix)) held = Math.max(held, prefix.length);
 		// Hold a complete function name, and its opening bracket, until what follows shows whether it is a call.
-		const opened = text.match(callStart);
+		const opened = callStart ? text.match(callStart) : null;
 		if (opened) held = Math.max(held, opened[0].length);
 		return held;
 	}

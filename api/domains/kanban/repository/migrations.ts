@@ -169,4 +169,9 @@ DROP TABLE kanban_notices_legacy;
 CREATE UNIQUE INDEX kanban_notices_run_kind ON kanban_notices(run_id,kind) WHERE run_id IS NOT NULL;
 `,
 	},
+	{
+		id: "kanban/0005-notice-archive",
+		after: ["kanban/0004-git"],
+		sql: "ALTER TABLE kanban_notices ADD COLUMN archived_at INTEGER;",
+	},
 ];

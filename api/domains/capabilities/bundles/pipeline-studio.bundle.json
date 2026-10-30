@@ -135,6 +135,36 @@
 			"redirects": [],
 			"bindingRevisionId": "binding:pipeline.studio@2",
 			"artifactRevisionId": "artifact:pipeline.studio@2"
+		},
+		{
+			"kind": "toolchain",
+			"id": "pipeline.studio",
+			"revision": 3,
+			"title": "パイプライン制作",
+			"summary": "パイプライン制作の担当と対話して、いくつかの担当を決まった順に使う手順（パイプライン）を作り、直し、画面で試して公開する",
+			"aliases": ["パイプライン", "手順の登録"],
+			"tags": [],
+			"useWhen": [
+				"いくつかの担当を決まった順に使う手順（パイプライン）を作って登録したい",
+				"公開した手順（パイプライン）の内容や、検索で拾われる言い方を直したい",
+				"パイプライン制作の担当と続けて手順を作り込みたい"
+			],
+			"avoidWhen": [
+				"手順を作るのではなく、今その依頼を実行してほしい",
+				"既存の手順の使い方を質問しているだけ"
+			],
+			"examples": [
+				"決まった順に担当を使う手順をパイプラインとして登録したい",
+				"いつもの作業の流れを、手順として作って公開して",
+				"さっき作った手順の入力欄を増やして",
+				"公開したパイプラインが検索で拾われやすいように使う場面を直して"
+			],
+			"dependencies": ["package:pipeline.studio@2"],
+			"packageRevisionId": "package:pipeline.studio@2",
+			"functionName": "pipeline_studio",
+			"redirects": [],
+			"bindingRevisionId": "binding:pipeline.studio@2",
+			"artifactRevisionId": "artifact:pipeline.studio@2"
 		}
 	],
 	"bindings": [

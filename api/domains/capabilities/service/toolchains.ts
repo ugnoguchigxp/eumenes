@@ -34,6 +34,130 @@ export function toolchainPassages(d: FixedDefinition) {
 	return [`${d.title}: ${d.summary}`, ...d.useWhen, ...(d.examples ?? [])];
 }
 
+/**
+ * The search's slots by kind (the toolchain search and choice design, section 3): the dedicated toolchains closest
+ * to the request, and pipelines and general toolchains of their own, those within `near` of the closest candidate.
+ */
+export const CANDIDATE_SLOTS = {
+	dedicated: 3,
+	pipeline: 2,
+	general: 2,
+	near: 0.05,
+} as const;
+type CandidateKind = "dedicated" | "pipeline" | "general";
+
+/** A pipeline by its stored binding, a general toolchain by its definition, any other dedicated. */
+function kindOf(db: Database, d: FixedDefinition): CandidateKind {
+	if (d.general) return "general";
+	return d.bindingRevisionId &&
+		storedBindingInTransaction(db, d.bindingRevisionId)?.document.execution ===
+			"pipeline"
+		? "pipeline"
+		: "dedicated";
+}
+/**
+ * The ranked entries (closest first) each kind's slots take, in the ranked order. Past the closest dedicated ones,
+ * an entry farther than `near` from the closest can take no slot, nor can any after it.
+ */
+function slotted<T>(
+	ranked: readonly T[],
+	similarityOf: (entry: T) => number,
+	kind: (entry: T) => CandidateKind,
+): T[] {
+	const best = ranked[0] ? similarityOf(ranked[0]) : 0;
+	const taken: Record<CandidateKind, number> = {
+		dedicated: 0,
+		pipeline: 0,
+		general: 0,
+	};
+	const out: T[] = [];
+	for (const entry of ranked) {
+		const far = best - similarityOf(entry) > CANDIDATE_SLOTS.near;
+		if (far && taken.dedicated >= CANDIDATE_SLOTS.dedicated) break;
+		const k = kind(entry);
+		if (taken[k] >= CANDIDATE_SLOTS[k] || (k !== "dedicated" && far)) continue;
+		taken[k]++;
+		out.push(entry);
+	}
+	return out;
+}
+/** The index's passage vectors of one space. */
+function indexRows(db: Database, spaceKey: string) {
+	return (
+		db
+			.query(
+				"SELECT revision_id,vector FROM capability_toolchain_vectors WHERE space=?",
+			)
+			.all(spaceKey) as { revision_id: string; vector: Uint8Array }[]
+	).map((row) => ({
+		revisionId: row.revision_id,
+		values: unpackVector(row.vector),
+	}));
+}
+/** Each toolchain's closest passage to the request. */
+function similaritiesOf(
+	rows: ReturnType<typeof indexRows>,
+	values: ArrayLike<number>,
+	active: ReadonlyMap<string, FixedDefinition>,
+) {
+	const similarity = new Map<string, number>();
+	for (const row of rows) {
+		if (!active.has(row.revisionId) || row.values.length !== values.length)
+			continue;
+		const score = dot(row.values, values);
+		if (score > (similarity.get(row.revisionId) ?? -Infinity))
+			similarity.set(row.revisionId, score);
+	}
+	return similarity;
+}
+/** The toolchains the index found, closest first (ties by id). */
+function rankBy(
+	active: readonly FixedDefinition[],
+	similarity: ReadonlyMap<string, number>,
+) {
+	return active
+		.filter((d) => similarity.has(d.revisionId))
+		.sort(
+			(a, b) =>
+				similarity.get(b.revisionId)! - similarity.get(a.revisionId)! ||
+				a.id.localeCompare(b.id),
+		);
+}
+/**
+ * The search check's ranking (the toolchain search and choice design, section 6): for each past request, by its
+ * stored vector and its space's key, the toolchains closest first and those the slots take. The index is read once
+ * per space, and each toolchain's kind once.
+ */
+function rankPastRequests(
+	db: Database,
+	active: readonly FixedDefinition[],
+	queries: ReadonlyArray<{ spaceKey: string; values: ArrayLike<number> }>,
+) {
+	const byRevision = new Map(active.map((d) => [d.revisionId, d]));
+	const kinds = new Map<string, CandidateKind>();
+	const kind = (d: FixedDefinition) => {
+		if (!kinds.has(d.revisionId)) kinds.set(d.revisionId, kindOf(db, d));
+		return kinds.get(d.revisionId)!;
+	};
+	const spaces = new Map<string, ReturnType<typeof indexRows>>();
+	return queries.map((query) => {
+		if (!spaces.has(query.spaceKey))
+			spaces.set(query.spaceKey, indexRows(db, query.spaceKey));
+		const similarity = similaritiesOf(
+			spaces.get(query.spaceKey)!,
+			query.values,
+			byRevision,
+		);
+		const ranked = rankBy(active, similarity);
+		return {
+			ranked: ranked.map((d) => d.id),
+			offered: slotted(ranked, (d) => similarity.get(d.revisionId)!, kind).map(
+				(d) => d.id,
+			),
+		};
+	});
+}
+
 export function createToolchains(
 	closure: (db: Database, revisionId: string) => FixedDefinition[],
 	now: () => number,
@@ -113,41 +237,33 @@ export function createToolchains(
 			fromHistory?: string[];
 			limit?: number;
 			strict?: boolean;
+			/** Fill the slots of each kind (`CANDIDATE_SLOTS`) instead of the first `limit`. */
+			slots?: true;
 		},
 	): ToolchainCard[] {
 		const active = activeInTransaction(db).filter((d) => input.available(d.id));
-		const byRevision = new Map(active.map((d) => [d.revisionId, d]));
-		const similarity = new Map<string, number>();
-		if (input.vector) {
-			const key = vectorSpaceKey(input.vector.space);
-			for (const row of db
-				.query(
-					"SELECT revision_id,vector FROM capability_toolchain_vectors WHERE space=?",
+		const similarity = input.vector
+			? similaritiesOf(
+					indexRows(db, vectorSpaceKey(input.vector.space)),
+					input.vector.values,
+					new Map(active.map((d) => [d.revisionId, d])),
 				)
-				.all(key) as { revision_id: string; vector: Uint8Array }[]) {
-				if (!byRevision.has(row.revision_id)) continue;
-				const values = unpackVector(row.vector);
-				if (values.length !== input.vector.values.length) continue;
-				const score = dot(values, input.vector.values);
-				if (score > (similarity.get(row.revision_id) ?? -Infinity))
-					similarity.set(row.revision_id, score);
-			}
-		}
+			: new Map<string, number>();
 		const historical = new Set<string>();
 		for (const id of input.fromHistory ?? []) {
 			const d = active.find((x) => x.id === id);
 			if (d) historical.add(d.revisionId);
 		}
+		const ranked = rankBy(active, similarity);
 		// Preserve the existing all-capability fallback when embeddings are unavailable.
 		const candidates = similarity.size
-			? active
-					.filter((d) => similarity.has(d.revisionId))
-					.sort(
-						(a, b) =>
-							similarity.get(b.revisionId)! - similarity.get(a.revisionId)! ||
-							a.id.localeCompare(b.id),
+			? input.slots
+				? slotted(
+						ranked,
+						(d) => similarity.get(d.revisionId)!,
+						(d) => kindOf(db, d),
 					)
-					.slice(0, Math.min(8, Math.max(1, input.limit ?? 4)))
+				: ranked.slice(0, Math.min(8, Math.max(1, input.limit ?? 4)))
 			: input.strict
 				? []
 				: active;
@@ -161,6 +277,7 @@ export function createToolchains(
 			summary: d.summary,
 			useWhen: d.useWhen,
 			...(d.minImpact ? { minImpact: d.minImpact } : {}),
+			...(d.general ? { general: true as const } : {}),
 			...(producers.has(d.id) ? { produces: producers.get(d.id)! } : {}),
 			redirects: (d.redirects ?? []).flatMap((r) =>
 				functionOf.has(r.toolchainId)
@@ -287,6 +404,18 @@ export function createToolchains(
 		pendingToolchainVectorsInTransaction: pendingVectorsInTransaction,
 		saveToolchainVectorsInTransaction: saveVectorsInTransaction,
 		toolchainCandidatesInTransaction: candidatesInTransaction,
+		rankPastRequestsInTransaction: (
+			db: Database,
+			input: {
+				queries: Parameters<typeof rankPastRequests>[2];
+				available: (toolchainId: string) => boolean;
+			},
+		) =>
+			rankPastRequests(
+				db,
+				activeInTransaction(db).filter((d) => input.available(d.id)),
+				input.queries,
+			),
 		resolveToolchainInTransaction: resolveInTransaction,
 		toolchainSetInTransaction: setInTransaction,
 		toolchainBindingInTransaction: bindingInTransaction,

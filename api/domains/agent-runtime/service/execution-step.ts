@@ -196,7 +196,8 @@ export function executionStep(
 				return {
 					receipt,
 					decision,
-					candidates: cards.slice(0, 4).map((c) => c.revisionId),
+					// The search bounds the candidates by its slots (the toolchain search and choice design, section 3).
+					candidates: cards.map((c) => c.revisionId),
 				};
 			} catch {
 				signal.throwIfAborted();

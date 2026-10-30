@@ -1,5 +1,6 @@
 import { registerDocling, type DoclingService } from "../domains/docling";
 import { registerPipelines } from "./pipelines/pipelines-controller";
+import { registerSearchCheck } from "./toolchain/toolchain-search-check";
 import {
 	registerGoogleAccounts,
 	type GoogleAccounts,
@@ -115,6 +116,7 @@ export type AppServices = {
 	capabilities?: Capabilities;
 	pipelines?: import("./pipelines/pipelines-service").PipelinesService;
 	pipelineTrials?: import("./pipelines/pipelines-trials").PipelineTrials;
+	searchCheck?: import("./toolchain/toolchain-search-check").SearchCheck;
 	agents?: AgentRuntime;
 	attitudeDataset?: AttitudeDataset;
 	conversation: ConversationService;
@@ -245,6 +247,9 @@ export function appModules(services: AppServices): AppModule[] {
 		},
 		s.pipelines && {
 			mount: (app) => registerPipelines(app, s.pipelines!, s.pipelineTrials),
+		},
+		s.searchCheck && {
+			mount: (app) => registerSearchCheck(app, s.searchCheck!),
 		},
 		s.agents && {
 			mount: (app) => registerAgentRuntime(app, s.agents!, s.dialogue.cancel),

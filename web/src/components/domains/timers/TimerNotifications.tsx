@@ -5,6 +5,7 @@ import { queryRoots } from "../../../queryKeys";
 import type { TimerNotificationDto } from "../../../../../api/domains/timers/contracts";
 import { useDeadline } from "../../../domains/timers/deadline";
 import { activeTimersQuery } from "../../../domains/timers/queries";
+import { useNotificationArchive } from "./useNotificationArchive";
 import {
 	NotificationCenter,
 	type KanbanNotifications,
@@ -35,6 +36,18 @@ type TimerNotificationsProps = {
 	kanban?: KanbanNotifications;
 	todo?: TodoNotifications;
 };
+
+function notificationAudioAction(
+	prepareAudio: (() => Promise<void>) | undefined,
+	onError: (message: string) => void,
+) {
+	if (!prepareAudio) return undefined;
+	return () => {
+		void prepareAudio().catch(() =>
+			onError("音声を開始できませんでした。もう一度お試しください。"),
+		);
+	};
+}
 
 function useTimerNotifications(
 	client: EumenesClient,
@@ -94,6 +107,7 @@ export function TimerNotifications({
 	todo,
 }: TimerNotificationsProps) {
 	const cache = useQueryClient();
+	const archive = useNotificationArchive(client);
 	const clientId = useRef(crypto.randomUUID());
 	const active = useRef<{ attempt: Attempt | null }>({ attempt: null });
 	const lifecycle = useRef({ epoch: 0 });
@@ -140,6 +154,7 @@ export function TimerNotifications({
 			busy ||
 			latest.current.inputBusy?.() ||
 			muted ||
+			(query.data && !note) ||
 			(note &&
 				note.revision >= attempt.revision &&
 				["dismissed", "silent", "played"].includes(note.status))
@@ -375,18 +390,14 @@ export function TimerNotifications({
 			ringingId={canRing ? ringingId : null}
 			stoppingIds={stoppingIds}
 			onStop={stop}
-			onPrepareAudio={
-				needsAudio
-					? () => {
-							void prepareAudio!().catch(() =>
-								setError(
-									"音声を開始できませんでした。もう一度お試しください。",
-								),
-							);
-						}
-					: undefined
-			}
+			onClearHistory={() => void archive.clear()}
+			clearing={archive.clearing}
+			onPrepareAudio={notificationAudioAction(
+				needsAudio ? prepareAudio : undefined,
+				setError,
+			)}
 			error={
+				archive.error ??
 				error ??
 				(query.isError
 					? "通知を取得できませんでした。画面を再読み込みしてください。"

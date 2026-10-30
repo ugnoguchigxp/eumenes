@@ -11,6 +11,7 @@ import { referencesOfUris, resolveDelegateRefs } from "./delegate-refs";
 import type { ToolOutcome } from "./generation-loop";
 import {
 	TOOL_NAMES,
+	requestRequired,
 	toolRejection,
 	type DelegateArgs,
 	type ParsedCall,
@@ -315,6 +316,9 @@ export async function delegate(
 		]);
 	if (card.instant && args.mode === "execute")
 		return instant(x, call, card, args.inputs, signal);
+	// The request text is what the toolchain works from; an instant one needed only its inputs.
+	const request = args.request;
+	if (!request) throw requestRequired();
 	let inputs = args.inputs;
 	if (card.pipeline) {
 		const parsed = card.pipeline.parse(args.inputs ?? {}, x.utteranceText());
@@ -337,7 +341,7 @@ export async function delegate(
 	);
 	const chosen = {
 		card,
-		request: args.request,
+		request,
 		...(uris.length ? { references, refUris: uris } : {}),
 		...(inputs ? { inputs } : {}),
 		...(args.target ? { target: args.target } : {}),

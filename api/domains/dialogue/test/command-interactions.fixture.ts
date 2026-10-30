@@ -1,3 +1,4 @@
+import { settings } from "./harness.fixture";
 import { rmSync } from "node:fs";
 import { toolFields } from "./tool-text.fixture";
 import type { NativeToolCall } from "../../../infrastructure/chat-stream";
@@ -146,6 +147,11 @@ export async function setup(
 	const settled: Array<{ outcome: string; code?: string | null }> = [];
 	const clock = () => new Date(Date.now() + state.offset).toISOString();
 	const larm = {
+		// The conversation is served by a cloud model: the agent's reply loop calls the tools itself.
+		snapshotFor: () => ({
+			...settings({ mode: "cloud-only" }),
+			voice: { autoSpeak: true },
+		}),
 		status: () => ({ state: "ready", capabilities: ["llm"] }),
 		requestFor: (_db: unknown, runId: string) => `req:${runId}`,
 		llmContextWindowInTransaction: () => undefined,

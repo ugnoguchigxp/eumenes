@@ -225,6 +225,20 @@ function presentedLines(
 	return lines;
 }
 
+/**
+ * The resources (`a<n>`) the lines of `## State` name, in order: the only ones a choice may hand over. A label in
+ * 「」 is the resource's own words, not a reference.
+ */
+export function namedResources(lines: readonly string[]): string[] {
+	const named = new Set<string>();
+	for (const line of lines)
+		for (const [ref] of line
+			.replace(/「[^」]*」/g, "")
+			.matchAll(/(?<![\p{L}\p{N}_])a\d+(?!\p{N})/gu))
+			named.add(ref);
+	return [...named];
+}
+
 /** `## State` as the input shows it. */
 export function stateText(lines: readonly string[]): string {
 	return `${INPUT_HEADINGS.state}\n${lines.join("\n")}`;

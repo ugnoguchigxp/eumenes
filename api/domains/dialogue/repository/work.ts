@@ -452,16 +452,24 @@ export function workNotices(
 	const rows = (
 		db
 			.query(
-				`SELECT ${columns} FROM dialogue_work WHERE ${NOTICE} ORDER BY archived_at DESC, id DESC LIMIT ?`,
+				`SELECT ${columns} FROM dialogue_work WHERE ${NOTICE} AND notice_archived_at IS NULL ORDER BY archived_at DESC, id DESC LIMIT ?`,
 			)
 			.all(limit) as Record<string, unknown>[]
 	).map(map);
 	const { unread } = db
 		.query(
-			`SELECT COUNT(*) unread FROM dialogue_work WHERE ${NOTICE} AND notice_read_at IS NULL`,
+			`SELECT COUNT(*) unread FROM dialogue_work WHERE ${NOTICE} AND notice_archived_at IS NULL AND notice_read_at IS NULL`,
 		)
 		.get() as { unread: number };
 	return { rows, unread };
+}
+
+/** Archives completion notices without changing the work, result, or read state. */
+export function archiveWorkNotices(db: Database, at: string) {
+	return db
+		.query(`UPDATE dialogue_work SET notice_archived_at=?
+		WHERE ${NOTICE} AND notice_archived_at IS NULL`)
+		.run(at).changes;
 }
 
 /** Marks a TODO's notice read; false when the TODO has no notice. Reading it again changes nothing. */
@@ -590,6 +598,22 @@ export function openConfirmations(
 			)
 			.all(conversationId, now) as Record<string, unknown>[]
 	).map(mapConfirmation);
+}
+
+/** A confirmation the user declined: closed, as a newer one for the same request would close it. */
+export function withdrawConfirmation(
+	db: Database,
+	conversationId: string,
+	ref: number,
+	at: string,
+): boolean {
+	return (
+		db
+			.query(
+				"UPDATE dialogue_confirmations SET superseded_at = ? WHERE conversation_id = ? AND ref = ? AND used_at IS NULL AND superseded_at IS NULL",
+			)
+			.run(at, conversationId, ref).changes === 1
+	);
 }
 
 export function useConfirmation(db: Database, id: string, at: string): boolean {

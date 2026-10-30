@@ -1,11 +1,8 @@
 import { expect, test } from "bun:test";
 import { harness } from "../toolchain/toolchain.fixture";
 import {
-	afterUtterance,
 	candidatesOf,
-	resultField,
 	searchThenDelegate,
-	toolResults,
 	type Candidate,
 } from "../toolchain/conversation-script.fixture";
 import { softbankSentence, stockFetch } from "./stock.fixture";
@@ -38,7 +35,7 @@ async function stockHarness(
 	return { h, service, candidates };
 }
 
-test("a cold stock request is answered after one search and one instant answer: fixed sentence, no TODO, no notice", async () => {
+test("a cold stock request is answered after the host's search and one choice: fixed sentence, no TODO, no notice", async () => {
 	const { h, service, candidates } = await stockHarness();
 	try {
 		const run = await h.dialogue.submit({
@@ -50,9 +47,10 @@ test("a cold stock request is answered after one search and one instant answer: 
 			(await h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 }))?.status,
 		).toBe("completed");
 		expect(h.dialogue.answerText(run.id)).toBe(softbankSentence);
-		// One search, then the instant answer: nothing reached a worker, the web, or a second answer round.
-		expect(candidates.filter(Boolean)).toHaveLength(2);
-		expect(h.calls).toBe(3);
+		// The host searched and the one choice named the quote with its query: the host said the answer, and nothing
+		// reached a worker, the web, or another model call.
+		expect(candidates.filter(Boolean)).toHaveLength(1);
+		expect(h.calls).toBe(1);
 		expect(h.workerContexts).toHaveLength(0);
 		expect(h.routeContexts).toHaveLength(0);
 		expect(h.acquisitions).toBe(0);
@@ -128,17 +126,22 @@ test("without the stock services configured the stock toolchain is not among the
 	}
 });
 
-test("a query that is not text is refused with the fields to repair, and nothing is fetched", async () => {
+test("a query that is not text is refused, the choice is made once more with the reason, and nothing is fetched", async () => {
 	const service = stockFetch();
 	const refusals: string[] = [];
 	const h = await harness({
 		stock: { fetch: service.fetch },
+		// The talk turn's answer once the choice gave up.
+		parentAnswer: "株価を取得できませんでした。",
 		firstRound: (_tools, _question, messages) => {
-			// The refusal is the tool's result; the agent goes on with it (here it gives up and says so).
-			const refused = toolResults(afterUtterance(messages), "delegate");
-			if (refused.length) {
-				refusals.push(...refused);
-				return { text: "株価を取得できませんでした。" };
+			// The refusal comes back as the retry's reason; the model gives up and chooses none (the talk turn answers).
+			const retry = messages
+				.at(-1)!
+				.content.split("\n")
+				.find((line) => line.startsWith("前の選び方では頼めませんでした"));
+			if (retry) {
+				refusals.push(retry);
+				return {};
 			}
 			return askStock({ query: 123 })(messages);
 		},
@@ -153,7 +156,7 @@ test("a query that is not text is refused with the fields to repair, and nothing
 		const done = await h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 });
 		expect(done?.status).toBe("completed");
 		expect(refusals).toHaveLength(1);
-		expect(resultField(refusals[0]!, "refused")).toBe("true");
+		expect(refusals[0]).toContain("refused: true");
 		expect(h.dialogue.answerText(run.id)).toBe("株価を取得できませんでした。");
 		expect(service.charts()).toHaveLength(0);
 	} finally {
@@ -184,19 +187,14 @@ test("a failed quote is returned as the instant result: the run does not fall ba
 });
 
 test("a ticker request is answered with the foreign company's name and ticker", async () => {
-	// The model speaks a short sentence that carries the quote's facts: the verbatim quote segments into three
-	// sentences, over the two-sentence speech contract (a model would shorten it the same way).
+	// The host says the quote's own sentence (the local harness's routed turn): it names the company and the ticker.
 	const service = stockFetch({
 		searches: { AAPL: [{ symbol: "AAPL", longname: "Apple Inc." }] },
 	});
 	const h = await harness({
 		stock: { fetch: service.fetch },
-		firstRound: (_tools, _question, messages) => {
-			const step = askStock({ query: "AAPL" })(messages);
-			return step.text
-				? { ...step, text: "Apple Inc.（AAPL）の株価は343.46ドルです。" }
-				: step;
-		},
+		firstRound: (_tools, _question, messages) =>
+			askStock({ query: "AAPL" })(messages),
 	});
 	try {
 		await h.toolchain.stock!.maintain();
@@ -207,8 +205,8 @@ test("a ticker request is answered with the foreign company's name and ticker", 
 		});
 		const done = await h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 });
 		expect(done).toMatchObject({ status: "completed", error: null });
-		expect(h.dialogue.answerText(run.id)).toBe(
-			"Apple Inc.（AAPL）の株価は343.46ドルです。",
+		expect(h.dialogue.answerText(run.id)).toStartWith(
+			"Apple Inc.（AAPL）の株価は343.46ドル",
 		);
 	} finally {
 		await h.close();

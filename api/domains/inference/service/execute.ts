@@ -463,10 +463,18 @@ export async function executeRequest(
 		return await runAttempts(request, key);
 	} catch (error) {
 		// Optional auxiliary work shares the answer's authority, but its provider failure is not the answer's
-		// terminal state, and a retained call leaves the request for another call. Attempts still record the
-		// failure; cancellation/deadline and published output stay terminal.
+		// terminal state, and a retained call leaves the request for another call. A conversation's call (`main`)
+		// that ended cleanly with nothing said ends only that call: the dialogue says what it means (a reply that says
+		// nothing more) and settles the request itself. Attempts still record the failure; cancellation/deadline and
+		// published output stay terminal.
+		const empty =
+			resolvedSession?.sessionRole === "main" &&
+			error instanceof Error &&
+			error.message === "chat_output_empty";
 		if (
-			(session?.failureScope !== "call" && !resolvedSession?.retainRequest) ||
+			(session?.failureScope !== "call" &&
+				!resolvedSession?.retainRequest &&
+				!empty) ||
 			signal.aborted ||
 			request.published
 		)

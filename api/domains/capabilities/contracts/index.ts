@@ -444,6 +444,12 @@ export type Definition = {
 	 */
 	minImpact?: ToolchainImpact;
 	/**
+	 * Toolchain only: a general toolchain serves requests of any topic by a general means (the Web, a browser, a
+	 * shell, a general agent). The search offers it in its own slot, and a dedicated toolchain that fits comes first
+	 * (the toolchain search and choice design, sections 2 to 4).
+	 */
+	general?: true;
+	/**
 	 * Toolchain only, new revisions only (absent from the JSON of earlier ones): the stored
 	 * binding that connects the package's tools to a host adapter, and the stored artifact
 	 * registration that presents it. Both are set together.

@@ -35,6 +35,9 @@ export function dialogueClient(transport: Transport) {
 				withQuery("/api/todo-notices", { limit }),
 				{ signal },
 			),
+		archiveTodoNotices: async () => {
+			await transport.call("/api/todo-notices/archive", { method: "POST" });
+		},
 		readTodoNotice: async (id: string) => {
 			await transport.call(`/api/todo-notices/${encodeURIComponent(id)}/read`, {
 				method: "POST",

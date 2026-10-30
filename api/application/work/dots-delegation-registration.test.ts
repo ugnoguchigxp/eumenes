@@ -37,7 +37,7 @@ test("stored first document revisions survive upgrade and do not block the curre
 		expect(old).not.toBeNull();
 		expect(
 			f.store.readSnapshot((db) =>
-				f.caps.toolchainSetInTransaction(db, "toolchain:dots.delegate@5"),
+				f.caps.toolchainSetInTransaction(db, "toolchain:dots.delegate@6"),
 			).binding?.revisionId,
 		).toBe("binding:dots.delegate@3");
 		await f.caps.seed();
@@ -55,7 +55,7 @@ test("fresh seed registers one launcher and immutable revisions; reseed keeps di
 	try {
 		const read = () =>
 			f.store.readSnapshot((db) =>
-				f.caps.toolchainSetInTransaction(db, "toolchain:dots.delegate@5"),
+				f.caps.toolchainSetInTransaction(db, "toolchain:dots.delegate@6"),
 			);
 		expect(read().binding?.revisionId).toBe("binding:dots.delegate@3");
 		expect(read().package.revisionId).toBe("package:dots.request@2");
@@ -100,7 +100,7 @@ test("an old seeded revision retains its hash while publication migrates to the 
 		).toEqual(f.legacyBefore);
 		expect(
 			f.store.readSnapshot((db) =>
-				f.caps.toolchainSetInTransaction(db, "toolchain:dots.delegate@5"),
+				f.caps.toolchainSetInTransaction(db, "toolchain:dots.delegate@6"),
 			).binding?.revisionId,
 		).toBe("binding:dots.delegate@3");
 		await f.caps.seed();

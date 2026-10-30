@@ -249,6 +249,22 @@ test("cancelling after playback during generation discards ready and queued clau
 	await settle();
 	expect(spoken).toEqual(["一。", "二。", "三。", "四。"]);
 	expect(h.voice.get(id)?.audioChunks).toEqual([]);
+	// The stopped run kept no answer: what was played of it is the agent's words in the chat.
+	const runId = h.voice.get(id)!.runId!;
+	await until(() =>
+		["cancelled", "failed", "interrupted"].includes(
+			h.dialogue.get(runId)?.status ?? "",
+		),
+	);
+	await until(() =>
+		h.conversation.get("main").messages.some((m) => m.role === "assistant"),
+	);
+	expect(
+		h.conversation
+			.get("main")
+			.messages.filter((m) => m.role === "assistant")
+			.map((m) => m.text),
+	).toEqual(["一。"]);
 });
 
 test("clauses played before generation ends are recorded as heard once the answer is adopted", async () => {
@@ -274,6 +290,13 @@ test("clauses played before generation ends are recorded as heard once the answe
 			.map((event) => JSON.parse(event.text ?? "{}")),
 	);
 	expect(delivered).toEqual([expect.objectContaining({ heard: "full" })]);
+	// The adopted answer is the one record of what was said.
+	expect(
+		h.conversation
+			.get("main")
+			.messages.filter((m) => m.role === "assistant")
+			.map((m) => m.text),
+	).toEqual(["一。二。"]);
 });
 
 test("correcting the source while generating aborts queued speech and discards a late TTS result", async () => {
@@ -323,6 +346,40 @@ test("a failed generation discards ready audio without mixing a fallback answer 
 	expect(h.voice.takeAudio(id, 0)).toBeNull();
 	expect(h.dialogue.answerText(h.voice.get(id)!.runId!)).toBeNull();
 	expect(h.calls).toEqual([]);
+});
+
+test("a generation that fails after a clause was played keeps the played words in the chat and the record", async () => {
+	const source = stream();
+	const h = await setup(undefined, {
+		transcribe: async () => "話してください。",
+		answerStream: source.answerStream,
+		speak: async () => wav(),
+	});
+	const id = await start(h, source);
+	source.push("先に届いた句。後の句。");
+	await until(() => h.voice.get(id)?.audioChunks.length === 2);
+	await h.voice.played(id, 0);
+	source.fail(new Error("network_unavailable"));
+	await until(() => h.voice.get(id)?.status === "failed");
+	const runId = h.voice.get(id)!.runId!;
+	expect(h.dialogue.get(runId)?.status).toBe("failed");
+	await until(() =>
+		h.conversation.get("main").messages.some((m) => m.role === "assistant"),
+	);
+	// Only what was played: the clause synthesized but never played did not reach the user.
+	expect(
+		h.conversation
+			.get("main")
+			.messages.filter((m) => m.role === "assistant")
+			.map((m) => ({ text: m.text, runId: m.runId })),
+	).toEqual([{ text: "先に届いた句。", runId }]);
+	const said = h.store.read((db) =>
+		createContinuityService(h.store)
+			.events.logInTransaction(db, "main")
+			.filter((event) => event.type === "said" && event.by === "agent")
+			.map((event) => JSON.parse(event.text ?? "{}").text),
+	);
+	expect(said).toEqual(["先に届いた句。"]);
 });
 
 test("a failure to read the generation's speech context fails speech instead of being swallowed", async () => {

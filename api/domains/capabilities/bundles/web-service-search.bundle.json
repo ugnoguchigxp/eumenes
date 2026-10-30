@@ -795,6 +795,33 @@
 				"kind": "component",
 				"component": "ResearchTaskCard"
 			}
+		},
+		{
+			"revision": 5,
+			"aliases": [],
+			"tags": [],
+			"useWhen": [
+				"サービスやドメインを指定してその中の動画・投稿・記事などを探したい",
+				"指定サイトの検索欄を使って検索したい"
+			],
+			"avoidWhen": ["ページの更新・投稿・購入などの操作"],
+			"dependencies": ["package:web.service-search@4"],
+			"kind": "toolchain",
+			"id": "web.service-search",
+			"functionName": "service_search",
+			"title": "サービス内検索",
+			"summary": "指定されたサービス・サイト内の検索を使って探す。検索できない場合は対象ドメインを含む外部検索で補う",
+			"examples": [
+				"YouTubeでpython3の入門動画を探して",
+				"Xで今日の発表を探して",
+				"このWiki内で用語を調べて"
+			],
+			"packageRevisionId": "package:web.service-search@4",
+			"artifact": {
+				"kind": "component",
+				"component": "ResearchTaskCard"
+			},
+			"general": true
 		}
 	],
 	"bindings": [],

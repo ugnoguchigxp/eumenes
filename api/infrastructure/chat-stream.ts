@@ -95,6 +95,13 @@ function providerTimings(value: unknown): ProviderTimings | undefined {
 }
 
 /**
+ * The most a response stream may carry. Each streamed token is one event of a few hundred bytes, so the bound sits
+ * well above the largest output limit asked for (4096 tokens): an output that runs long ends at that limit (finish
+ * reason `length`), not as a broken stream (2026-10-30, 7,634 characters of reasoning hit the earlier 1MB first).
+ */
+const STREAM_BYTES_LIMIT = 4_000_000;
+
+/**
  * Consume provider bytes as they arrive; only answer content is projected. A `readAhead` call only reads the prompt:
  * its output stops at its bound by design and is discarded, so a stream that ended is its normal end.
  */
@@ -239,7 +246,7 @@ export async function readChatResponse(
 			signal.throwIfAborted();
 			if (next.done) break;
 			bytes += next.value.byteLength;
-			if (bytes > 1000000) throw new Error("chat_stream_too_large");
+			if (bytes > STREAM_BYTES_LIMIT) throw new Error("chat_stream_too_large");
 			buffer += decoder.decode(next.value, { stream: true });
 			if (!streaming) continue;
 			let end: number;

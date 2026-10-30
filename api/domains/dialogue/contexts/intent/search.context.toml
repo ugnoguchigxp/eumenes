@@ -1,2 +1,0 @@
-# Source: api/domains/dialogue/service/intent-gate.ts
-text = '''- 利用者の今の発言は、担当への依頼です（意図の判定）。担当を探して、今の発言の内容を頼みます。'''

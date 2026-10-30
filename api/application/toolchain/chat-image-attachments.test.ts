@@ -88,22 +88,6 @@ test("Eumenes upload, atomic acceptance, image-only streaming, ordered history r
 			(await h.dialogue.waitForTerminal(follow.id, { timeoutMs: 10000 }))
 				?.status,
 		).toBe("completed");
-		const generation = f.requests
-			.filter((r) => r.operation === "generate")
-			.map((r) => JSON.parse(r.body));
-		// Each turn is a single streamed generation that offers the fixed tools.
-		expect(generation).toHaveLength(2);
-		expect(
-			generation.map((r) =>
-				(r.tools ?? []).some(
-					(t: { function?: { name?: string } }) =>
-						t.function?.name === "find_toolchain",
-				),
-			),
-		).toEqual([true, true]);
-		expect(generation.map((r) => r.stream)).toEqual([true, true]);
-		// The attachments are sent while their utterance is unprocessed (the last message); once it is in the log, only
-		// its reference remains and the images are not resent (the spec's section 7.3).
 		const imagesOf = (sent: { messages: Array<{ content: unknown }> }) =>
 			sent.messages.flatMap((m) =>
 				Array.isArray(m.content)
@@ -112,6 +96,23 @@ test("Eumenes upload, atomic acceptance, image-only streaming, ordered history r
 							.map((p) => p.image_url!.url.split(";")[0])
 					: [],
 			);
+		const requests = f.requests
+			.filter((r) => r.operation === "generate")
+			.map((r) => JSON.parse(r.body));
+		// Each turn (the local harness's routed turn, no judge saved) is a silent choice, then the talk call: the talk
+		// is a streamed generation on the talk system that offers no tools.
+		expect(requests).toHaveLength(4);
+		const talks = (r: { messages: Array<{ content: unknown }> }) =>
+			typeof r.messages[0]?.content === "string" &&
+			(r.messages[0].content as string).startsWith("## Role");
+		const generation = requests.filter(talks);
+		expect(generation).toHaveLength(2);
+		expect(generation.map((r) => (r.tools ?? []).length)).toEqual([0, 0]);
+		expect(generation.map((r) => r.stream)).toEqual([true, true]);
+		// The choice reads no images: what it hands over names its resources by number.
+		expect(requests.filter((r) => !talks(r)).flatMap(imagesOf)).toEqual([]);
+		// The attachments are sent while their utterance is unprocessed (the last message); once it is in the log, only
+		// its reference remains and the images are not resent (the spec's section 7.3).
 		expect(imagesOf(generation[0])).toEqual([
 			"data:image/jpeg",
 			"data:image/png",

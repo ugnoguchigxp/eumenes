@@ -4,6 +4,7 @@ import type { HandlerDefinition } from "../../queue";
 import type { Receipt } from "../../inference";
 import { hostDelivery, type DeliveryEmotion } from "../../delivery";
 import { jstSeconds } from "../../../infrastructure/jst-time";
+import { getLogger } from "../../../infrastructure/logger";
 import type { Run } from "../contracts";
 import type { ToolchainRoutingPort } from "../contracts/toolchains";
 import { byId, linkAnswer, transition } from "../repository";
@@ -19,8 +20,10 @@ import { eventFields, SIDE_EFFECTS } from "./event-fields";
 import { generationStale } from "./generation-stream";
 import { adoptMemoryWindow } from "./memory-window";
 import { consumeAnswer } from "./result-intake";
-import { endRun, type RunEndState } from "./run-end";
+import { acceptRunAnswer, endRun, type RunEndState } from "./run-end";
 import { carriedToolCalls, type ExchangeStep } from "./tool-exchange";
+
+const log = getLogger("dialogue");
 
 export type GenerationResult = {
 	/** The speech the generation ends with ("" for silence or a handover). */
@@ -172,6 +175,18 @@ export function createGenerationSettlement(
 					? "applied"
 					: fail(deps, tx, run, "permission_revoked", input);
 			}
+			// A turn the host answered itself (its own words, or nothing) has no model answer to accept: its request is
+			// accepted as the host's answer, so what stands on it (the voice turn) goes on as for a model answer. One that
+			// can no longer be accepted only means nothing stands on it: the run still completes.
+			if (
+				!result.receipt &&
+				!result.handover &&
+				!acceptRunAnswer(deps, tx, run)
+			)
+				log.warn("dialogue.answer_request_not_accepted", {
+					runId: run.id,
+					reason: "permission_revoked",
+				});
 			if (input.final.kind === "utterances")
 				events.handleInTransaction(tx, run.conversationId, input.final.seqs);
 			// A task or a pipeline runs on its own: its announcement is the answer of this run.

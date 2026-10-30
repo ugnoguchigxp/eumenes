@@ -92,6 +92,8 @@ export type ToolchainCard = {
 	useWhen: string[];
 	/** The least impact the toolchain's work has (section 6.7); absent when its definition declares none. */
 	minImpact?: import("./index").ToolchainImpact;
+	/** A general toolchain (its definition's `general`): offered in its own slot, after a dedicated one that fits. */
+	general?: true;
 	/** The resource kinds this toolchain's results create (registered `resource-kind` items); absent when none. */
 	produces?: string[];
 	/** Only redirects to toolchains active on this host; the caller drops ones it does not offer. */

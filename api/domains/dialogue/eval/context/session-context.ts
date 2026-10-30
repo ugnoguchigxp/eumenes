@@ -33,6 +33,27 @@ function cardOf(
 	};
 }
 
+/**
+ * The settings the evaluated conversation is served by: a saved cloud conversation model, so a run is composed with
+ * the cloud harness, whose input is the whole conversation input the cases are written for (the local harness's
+ * talk turn reads the time alone of `## State`).
+ */
+const CLOUD_SETTINGS = {
+	routes: {
+		llm: {
+			mode: "cloud-only",
+			cloudAllowed: true,
+			fallbackId: "eval-model",
+			epoch: 0,
+		},
+	},
+	resources: [
+		{ id: "eval-model", connectionId: "eval-connection", purpose: "llm" },
+	],
+	connections: [{ id: "eval-connection", kind: "codex-sdk", enabled: true }],
+	voice: { autoSpeak: false },
+};
+
 export function createSessionContext(
 	wiring: SeedWiring,
 	options: { catalog?: readonly EvalCard[] },
@@ -75,6 +96,7 @@ export function createSessionContext(
 		llmContextWindowInTransaction: () => ports.modelWindow,
 		setContextPolicyInTransaction: () => {},
 		snapshotInTransaction: () => ({ general: ports.persona }),
+		snapshotFor: () => CLOUD_SETTINGS,
 	} as unknown as InferencePort;
 	const deps: DialogueDeps = {
 		store,

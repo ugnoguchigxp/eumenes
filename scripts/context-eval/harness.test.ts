@@ -305,6 +305,23 @@ describe("composeInput", () => {
 	});
 });
 
+describe("startLog", () => {
+	const chain = CHAINS.find((c) => c.key === "answer-picture")!;
+	test("a routed run carries the planted question back as its ask step; the reply loop does not", () => {
+		const routed = startLog(chain, "routed").at(-1)!;
+		expect(routed.toolCalls).toEqual([
+			{ name: "ask", arguments: '{"request":"絵を描いて"}', result: "{}" },
+		]);
+		expect(startLog(chain).at(-1)!.toolCalls).toBeUndefined();
+		expect(
+			startLog(
+				CHAINS.find((c) => c.key === "answer-offer")!,
+				"routed",
+			).at(-1)!.toolCalls,
+		).toBeUndefined();
+	});
+});
+
 describe("workLines", () => {
 	test("works and the presented item in the State's own format", () => {
 		expect(
@@ -519,9 +536,6 @@ describe("timing and aggregation", () => {
 		why: "",
 		said: "",
 		turnMode: "single",
-		failedCheck: null,
-		failedChecks: [],
-		cloudAnswered: false,
 		copyRun: null,
 		stop: "answer",
 		callTokens: [],
@@ -556,7 +570,6 @@ describe("timing and aggregation", () => {
 			reps: 1,
 			probe: false,
 			turn: "single" as const,
-			fallback: "-",
 			chains: ["続けて頼む", "話の続き"],
 			forms: ["current", "empty"],
 			settings: null,
@@ -584,8 +597,9 @@ describe("options and plan", () => {
 			reps: 1,
 			probe: false,
 			dryRun: false,
-			reasoning: "low",
+			reasoning: localHarness.call.reasoning,
 			reasoningOverridden: false,
+			turn: "routed",
 		});
 		expect(o.harness.name).toBe("local");
 		expect(o.forms).toEqual(["current"]);

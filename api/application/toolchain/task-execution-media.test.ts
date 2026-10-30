@@ -2,7 +2,7 @@ import { taskPlan, taskItem } from "./task-plan.fixture";
 import { expect, test } from "bun:test";
 import { harness } from "./toolchain.fixture";
 import { imageFixture } from "../media/image.fixture";
-import { callsOf, isUtteranceRound } from "./conversation-script.fixture";
+import { routedChoice } from "./conversation-script.fixture";
 import { handOverTask } from "./task-delegation.fixture";
 import { waitFor } from "../../infrastructure/wait-for";
 
@@ -52,16 +52,14 @@ test("two image calls from one public source keep distinct generation/artifact I
 				]);
 				return "";
 			}
-			if (isUtteranceRound(options)) {
-				const step = handOverTask(
+			// The conversation's choice (the local harness's routed turn): the task is handed over.
+			const routed = routedChoice(options, messages, (loop) =>
+				handOverTask(
 					"Create two distinct images",
 					"二つの画像を生成します。",
-				)(messages);
-				options!.onToolCalls!(
-					callsOf(step, () => crypto.randomUUID()) as never,
-				);
-				return step.text ?? "";
-			}
+				)(loop),
+			);
+			if (routed) return routed;
 			return f.model.answer(...args);
 		},
 	};
@@ -173,16 +171,11 @@ function repeatMediaModel(
 				]);
 				return "";
 			}
-			if (isUtteranceRound(options)) {
-				const step = handOverTask(
-					"Create two items",
-					"二つの処理を進めます。",
-				)(messages);
-				options!.onToolCalls!(
-					callsOf(step, () => crypto.randomUUID()) as never,
-				);
-				return step.text ?? "";
-			}
+			// The conversation's choice (the local harness's routed turn): the task is handed over.
+			const routed = routedChoice(options, messages, (loop) =>
+				handOverTask("Create two items", "二つの処理を進めます。")(loop),
+			);
+			if (routed) return routed;
 			if (messages.some((m) => m.content.includes("task_result")))
 				return "処理結果を確認しました。";
 			return base.answer(...args);

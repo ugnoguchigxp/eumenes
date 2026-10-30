@@ -9,6 +9,7 @@ import { noticeOf } from "./todo-notices";
 import type { TodoNotice } from "../contracts/todo-notices";
 import {
 	archiveWork,
+	archiveWorkNotices,
 	dropRunResults,
 	forgetWork,
 	confirmationById,
@@ -23,6 +24,7 @@ import {
 	recentlyArchivedWork,
 	updateWork,
 	useConfirmation,
+	withdrawConfirmation,
 	workByDedupe,
 	workById,
 	workByRef,
@@ -220,6 +222,8 @@ function finishedViews(deps: Pick<DialogueDeps, "clock" | "toolchains">) {
 				unread,
 			};
 		},
+		archiveNoticesInTransaction: (db: Database) =>
+			archiveWorkNotices(db, deps.clock()),
 		/** Marks a TODO's notice read; false when the TODO has no notice. */
 		readNoticeInTransaction: (db: Database, workId: string) =>
 			readWorkNotice(db, workId, deps.clock()),
@@ -501,6 +505,12 @@ export function createWorkLedger(
 		confirmationInTransaction: confirmationById,
 		useConfirmationInTransaction: (db: Database, confirmationId: string) =>
 			useConfirmation(db, confirmationId, clock()),
+		/** The user declined the confirmation `c<ref>`: it is closed and can no longer be approved. */
+		withdrawConfirmationInTransaction: (
+			db: Database,
+			conversationId: string,
+			ref: number,
+		) => withdrawConfirmation(db, conversationId, ref, clock()),
 		pendingConfirmationsInTransaction(
 			db: Database,
 			conversationId: string,

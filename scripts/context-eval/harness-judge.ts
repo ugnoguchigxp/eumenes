@@ -14,13 +14,14 @@ export type Turn = {
 	delegated?: { toolchain: string; request: string };
 	error?: string;
 	/**
-	 * The check a local answer failed when nothing answered in its place (no cloud fallback): the turn has no answer
-	 * and fails with that check.
+	 * Why a routed turn's choice could not be carried out after its retry (the reason of the last attempt): the host
+	 * says its fixed phrase and the step fails.
 	 */
-	localFailure?: string;
+	choiceFailure?: string;
 };
 
-export type TurnMode = "single" | "decide-then-reply";
+/** How a model round is made: the reply loop with the native tools, or a routed turn (a choice, or a talk call). */
+export type TurnMode = "single" | "routed";
 
 const norm = (text: string) => text.replace(/\s+/g, "");
 
@@ -48,7 +49,7 @@ export function judgeStep(
 	const fail = (why: string) => ({ pass: false, why });
 	const ok = { pass: true, why: "" };
 	if (turn.error) return fail(`error ${turn.error.slice(0, 60)}`);
-	if (turn.localFailure) return fail(`fallback:${turn.localFailure}`);
+	if (turn.choiceFailure) return fail(`choice:${turn.choiceFailure}`);
 	if (context.copies(turn.said)) return fail("system を写した");
 	if (step.free) return ok;
 	if (step.notBroken)
@@ -88,14 +89,14 @@ export type Timing = {
 	/** The first call's first token and first text. */
 	firstTokenMs: number | null;
 	firstTextMs: number | null;
-	/** The first decision call (decide-then-reply): its first token, first text, and the decision calls' total time. */
-	decisionFirstTokenMs: number | null;
-	decisionFirstTextMs: number | null;
-	decisionMs: number | null;
-	/** The same for the reply calls. */
-	replyFirstTokenMs: number | null;
-	replyFirstTextMs: number | null;
-	replyMs: number | null;
+	/** The first choice call (routed): its first token, first text, and the choice calls' total time. */
+	choiceFirstTokenMs: number | null;
+	choiceFirstTextMs: number | null;
+	choiceMs: number | null;
+	/** The same for the talk call. */
+	talkFirstTokenMs: number | null;
+	talkFirstTextMs: number | null;
+	talkMs: number | null;
 	tokensPerSecond: number | null;
 	outputTokens: number;
 	/** The first call's prompt tokens and how many of them were cached (null when the server does not say). */
@@ -111,27 +112,25 @@ const mean = (xs: readonly number[]) =>
 	xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null;
 
 /**
- * The timing of a turn's calls. The user first hears words at the first text of a single or cloud call; a decision
- * is never spoken, and a local reply is heard when its head passed the checks (`publishedAt`, a performance.now()
- * time), or at its end when the whole reply was awaited.
+ * The timing of a turn's calls. The user first hears words at the first text of a single or talk call; a choice is
+ * never spoken, so words the host says after the last call (`hostSpoke`: a hand-over's announcement, a question
+ * back, a fixed phrase) are heard when that call ends.
  */
 export function timingOf(
 	calls: readonly TaggedCall[],
 	turnStartedAt: number,
 	turnMs: number,
-	delegated: boolean,
-	publishedAt: number | null = null,
+	hostSpoke: boolean,
 ): Timing {
 	const metrics = calls.map((c) => c.metrics);
 	const last = metrics.at(-1);
 	const heard = [
 		...calls.flatMap(({ kind, metrics: m }) =>
-			(kind === "single" || kind === "cloud") && m.firstContentMs !== null
+			(kind === "single" || kind === "talk") && m.firstContentMs !== null
 				? [m.startedAt + m.firstContentMs - turnStartedAt]
 				: [],
 		),
-		...(publishedAt === null ? [] : [publishedAt - turnStartedAt]),
-		...(delegated && last
+		...(hostSpoke && last
 			? [last.startedAt + last.totalMs - turnStartedAt]
 			: []),
 	];
@@ -146,8 +145,8 @@ export function timingOf(
 			total: list.length ? list.reduce((sum, m) => sum + m.totalMs, 0) : null,
 		};
 	};
-	const decision = phase("decision");
-	const reply = phase("reply");
+	const choice = phase("choice");
+	const talk = phase("talk");
 	return {
 		heardMs: heard.length ? Math.min(...heard) : null,
 		turnMs,
@@ -156,12 +155,12 @@ export function timingOf(
 		reasoningChars: metrics.reduce((sum, m) => sum + m.reasoningChars, 0),
 		firstTokenMs: first?.firstTokenMs ?? null,
 		firstTextMs: first?.firstTextMs ?? null,
-		decisionFirstTokenMs: decision.firstToken,
-		decisionFirstTextMs: decision.firstText,
-		decisionMs: decision.total,
-		replyFirstTokenMs: reply.firstToken,
-		replyFirstTextMs: reply.firstText,
-		replyMs: reply.total,
+		choiceFirstTokenMs: choice.firstToken,
+		choiceFirstTextMs: choice.firstText,
+		choiceMs: choice.total,
+		talkFirstTokenMs: talk.firstToken,
+		talkFirstTextMs: talk.firstText,
+		talkMs: talk.total,
 		tokensPerSecond: mean(
 			metrics.flatMap((m) =>
 				m.tokensPerSecond === null ? [] : [m.tokensPerSecond],
@@ -182,7 +181,7 @@ export function copyRunOf(said: string, previous: string): number | null {
 	return a && b ? commonRun(a, b) : null;
 }
 
-/** A shared run this long is a copy of the previous reply (the local turn's own bound). */
+/** A shared run this long is a copy of the previous reply (the measurement's own bound). */
 export const COPY_RUN = 20;
 
 export type CallTokens = {
@@ -214,11 +213,6 @@ export type StepRecord = Timing & {
 	request?: string;
 	said: string;
 	turnMode: TurnMode;
-	/** The first check a local answer failed in this step (decide-then-reply), null for none. */
-	failedCheck: string | null;
-	failedChecks: string[];
-	/** The cloud answered a round the local answer failed. */
-	cloudAnswered: boolean;
 	/** The longest run the reply shares with the agent's previous reply. */
 	copyRun: number | null;
 	/** Why the turn ended. */
@@ -241,9 +235,10 @@ export type Cell = {
 	/** Cached share of the prompt tokens of every call (null when no call said). */
 	cachedShareAll: number | null;
 	truncated: number;
-	/** Share of decide-then-reply steps with a failed check (null when no step used that turn). */
-	fallbackShare: number | null;
-	cloudAnswered: number;
+	/** Model calls per step. */
+	calls: number | null;
+	/** Share of routed request turns that made a second choice (null when no step had a choice). */
+	retryShare: number | null;
 	/** Share of replies (all steps) whose run with the previous reply is `COPY_RUN` or more (null when none measured). */
 	copyShare: number | null;
 	fails: string[];
@@ -256,7 +251,9 @@ export function cellOf(records: readonly StepRecord[]): Cell {
 	const prompted = scored.filter(
 		(r) => r.promptTokens && r.cachedPromptTokens !== null,
 	);
-	const decided = records.filter((r) => r.turnMode === "decide-then-reply");
+	const chosen = records.filter((r) =>
+		r.callDetails.some((d) => d.kind === "choice"),
+	);
 	const measured = records.filter((r) => r.copyRun !== null);
 	const allCalls = scored
 		.flatMap((r) => r.callTokens)
@@ -277,10 +274,12 @@ export function cellOf(records: readonly StepRecord[]): Cell {
 				allCalls.reduce((s, c) => s + c.promptTokens!, 0)
 			: null,
 		truncated: scored.filter((r) => r.truncated).length,
-		fallbackShare: decided.length
-			? decided.filter((r) => r.failedCheck !== null).length / decided.length
+		calls: nums((r) => r.calls),
+		retryShare: chosen.length
+			? chosen.filter(
+					(r) => r.callDetails.filter((d) => d.kind === "choice").length > 1,
+				).length / chosen.length
 			: null,
-		cloudAnswered: records.filter((r) => r.cloudAnswered).length,
 		copyShare: measured.length
 			? measured.filter((r) => r.copyRun! >= COPY_RUN).length / measured.length
 			: null,
@@ -304,8 +303,6 @@ export type ReportMeta = {
 	chains: readonly string[];
 	forms: readonly string[];
 	turn: TurnMode;
-	/** "なし", or the path that answers a round the local answer failed. */
-	fallback: string;
 	/** Digest of the saved LARM settings (null for another client). */
 	settings: string | null;
 };
@@ -313,6 +310,7 @@ export type ReportMeta = {
 const seconds = (ms: number | null) =>
 	ms === null ? "-" : (ms / 1000).toFixed(1);
 const whole = (n: number | null) => (n === null ? "-" : String(Math.round(n)));
+const decimal = (n: number | null) => (n === null ? "-" : n.toFixed(1));
 const share = (n: number | null) =>
 	n === null ? "-" : `${Math.round(n * 100)}%`;
 const score = (cell: Cell) =>
@@ -344,7 +342,6 @@ export function reportMarkdown(
 		`| reasoning | ${meta.reasoning} |`,
 		`| 出力の上限（ハーネス / 実際に求めた値） | ${meta.outputLimit} / ${distinct(records.map((r) => r.requestedLimit))} |`,
 		`| ターン | ${meta.turn} |`,
-		`| 失敗した回のやり直し | ${meta.fallback} |`,
 		`| 回数 | ${meta.reps}${meta.probe ? "（probe）" : ""} |`,
 		`| サーバーが返したモデル名 | ${distinct(records.map((r) => r.model))} |`,
 		`| 設定の digest | ${meta.settings ?? "-"} |`,
@@ -365,51 +362,51 @@ export function reportMarkdown(
 			"形",
 			"聞こえるまで(秒)",
 			"1手(秒)",
+			"呼出し数",
 			"推論(字)",
 			"tok/s",
 			"cache(最初の呼出し)",
 			"cache(全呼出し)",
 			"上限で途切れ",
-			"fallback率",
-			"cloud回答",
+			"選び直し率",
 			`前の返事の写し(${COPY_RUN}字以上)`,
 		]),
 		...meta.chains.flatMap((chain) =>
 			meta.forms.map((form) => {
 				const c = where(chain, form);
-				return `| ${chain} | ${form} | ${seconds(c.heardMs)} | ${seconds(c.turnMs)} | ${whole(c.reasoningChars)} | ${whole(c.tokensPerSecond)} | ${share(c.cachedShare)} | ${share(c.cachedShareAll)} | ${c.truncated} | ${share(c.fallbackShare)} | ${c.cloudAnswered} | ${share(c.copyShare)} |`;
+				return `| ${chain} | ${form} | ${seconds(c.heardMs)} | ${seconds(c.turnMs)} | ${decimal(c.calls)} | ${whole(c.reasoningChars)} | ${whole(c.tokensPerSecond)} | ${share(c.cachedShare)} | ${share(c.cachedShareAll)} | ${c.truncated} | ${share(c.retryShare)} | ${share(c.copyShare)} |`;
 			}),
 		),
 		...meta.forms.map((form) => {
 			const c = where(null, form);
-			return `| 合計 | ${form} | ${seconds(c.heardMs)} | ${seconds(c.turnMs)} | ${whole(c.reasoningChars)} | ${whole(c.tokensPerSecond)} | ${share(c.cachedShare)} | ${share(c.cachedShareAll)} | ${c.truncated} | ${share(c.fallbackShare)} | ${c.cloudAnswered} | ${share(c.copyShare)} |`;
+			return `| 合計 | ${form} | ${seconds(c.heardMs)} | ${seconds(c.turnMs)} | ${decimal(c.calls)} | ${whole(c.reasoningChars)} | ${whole(c.tokensPerSecond)} | ${share(c.cachedShare)} | ${share(c.cachedShareAll)} | ${c.truncated} | ${share(c.retryShare)} | ${share(c.copyShare)} |`;
 		}),
-		...(records.some((r) => r.turnMode === "decide-then-reply")
+		...(records.some((r) => r.turnMode === "routed")
 			? [
 					"",
-					"## 判断と返事の時間（decide-then-reply、平均 ms）",
+					"## 選ぶ呼出しと話す呼出しの時間（routed、平均 ms）",
 					"",
 					head([
 						"形",
-						"判断 初token",
-						"判断 初text",
-						"判断 計",
-						"返事 初token",
-						"返事 初text",
-						"返事 計",
+						"選ぶ 初token",
+						"選ぶ 初text",
+						"選ぶ 計",
+						"話す 初token",
+						"話す 初text",
+						"話す 計",
 					]),
 					...meta.forms.map((form) => {
 						const rows = records.filter(
-							(r) => r.form === form && r.turnMode === "decide-then-reply",
+							(r) => r.form === form && r.turnMode === "routed",
 						);
 						const avg = (pick: (r: StepRecord) => number | null) =>
 							whole(mean(rows.flatMap((r) => pick(r) ?? [])));
-						return `| ${form} | ${avg((r) => r.decisionFirstTokenMs)} | ${avg((r) => r.decisionFirstTextMs)} | ${avg((r) => r.decisionMs)} | ${avg((r) => r.replyFirstTokenMs)} | ${avg((r) => r.replyFirstTextMs)} | ${avg((r) => r.replyMs)} |`;
+						return `| ${form} | ${avg((r) => r.choiceFirstTokenMs)} | ${avg((r) => r.choiceFirstTextMs)} | ${avg((r) => r.choiceMs)} | ${avg((r) => r.talkFirstTokenMs)} | ${avg((r) => r.talkFirstTextMs)} | ${avg((r) => r.talkMs)} |`;
 					}),
 					"",
-					"## 落ちた確認（回数）",
+					"## 終わり方（回数）",
 					"",
-					...checkCounts(records),
+					...stopCounts(records),
 				]
 			: []),
 		"",
@@ -428,14 +425,12 @@ export function reportMarkdown(
 	return lines.join("\n");
 }
 
-/** How often each check failed, as list lines (or "なし"). */
-export function checkCounts(records: readonly StepRecord[]): string[] {
+/** How often a turn ended each way (an answer, a hand-over, a question back, a failed choice, an error), as list lines. */
+export function stopCounts(records: readonly StepRecord[]): string[] {
 	const counts = new Map<string, number>();
-	for (const r of records)
-		for (const check of r.failedChecks)
-			counts.set(check, (counts.get(check) ?? 0) + 1);
+	for (const r of records) counts.set(r.stop, (counts.get(r.stop) ?? 0) + 1);
 	return counts.size
-		? [...counts].map(([check, n]) => `- ${check}: ${n}`)
+		? [...counts].map(([stop, n]) => `- ${stop}: ${n}`)
 		: ["なし"];
 }
 

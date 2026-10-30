@@ -36,7 +36,7 @@ Docling Deskの入口は`docling-desk.bundle.json`と`adapter:docling@1`で追�
 
 `task-execution.bundle.dormant.json`（休止中）の `task.execute` は画面・通常toolを持たない担当で、登録adapterの `task` lifecycleに結ぶ。会話エージェントの依頼（`delegate`の`execute`）で目的を受け、agent-runtimeが会話runとは独立した親実行を所有する。commandの翻訳を親の開始に追加しない。
 
-親は `find_toolchain` の上位4件からLLMが一つを選び、子の確定結果から次の能力を選ぶ。instantは登録済みの実引数schema、その他は `stepRequest` と `contextRefs` を使う。commandは既存の翻訳・snapshot・adapterを通す。非同期adapterは `execution.currentInTransaction` / `cancelInTransaction` と必要なwriter外の `stop` を実装し、受付を実行完了と扱わない。共通契約に接続できない能力は公開候補から除く。
+親は `find_toolchain` の候補（種類ごとの枠）からLLMが一つを選び、子の確定結果から次の能力を選ぶ。instantは登録済みの実引数schema、その他は `stepRequest` と `contextRefs` を使う。commandは既存の翻訳・snapshot・adapterを通す。非同期adapterは `execution.currentInTransaction` / `cancelInTransaction` と必要なwriter外の `stop` を実装し、受付を実行完了と扱わない。共通契約に接続できない能力は公開候補から除く。
 
 会話エージェントの固定ツール名 `memory`・`find_toolchain`・`delegate`・`work`・`respond` と、制御名 `task_control`、`read_reference`、`ask_user`、`complete_task`、`report_partial` は通常のツールチェーン名として登録しない。`execute_task` はtask binding専用で、重複登録は拒否する。session型は公開状態と未保存確認を検査して会話へ引き継ぐ。親から隠れたsessionを開かない。
 
@@ -95,6 +95,8 @@ Seedに含めるのは再利用する定義だけで、会話、実行・操作�
    bun run toolchain:bundle -- pins package:timers.manage@1 tool:timer.start@1
    ```
 3. **definitionsを書く**: 新しいprofile・skill・package・toolchainを書く。本文はJSON文字列で持ち、既存revisionの本文は変えない。toolchainの必須項目は `functionName`（`^[a-z][a-z0-9_]{2,40}$`、全体で一意）、`summary`、`useWhen`（1件以上）、`examples`（3件以上・各200字以内。候補検索の索引と評価に使う）、`redirects`、`dependencies` と `packageRevisionId`（同じpackage一つ）、`bindingRevisionId`、`artifactRevisionId`。任意の `minImpact`（`none`・`create`・`modify_existing`・`irreversible`）は、その担当の仕事が既存のものに与える影響の下限で、会話エージェントの申告より大きければこちらを使う。`modify_existing`・`irreversible`の仕事は、会話エージェントが実行前の確認（依頼の`confirm`）を出してからでないと実行されない（[ContextWindow仕様](../spec/context-window-spec-2026-10-24.md) §6.7）。未宣言なら申告を使う。表示はartifact登録が担うので、旧形式の `artifact` 項目は不要（書いても使われない。新しく書かない）。
+   任意の `general`（値は `true` だけ）は、話題を問わず一般的な手段（Web・ブラウザ・シェル・汎用のエージェント）で依頼をこなす汎用の担当に付ける。担当の検索は、専用の担当の上位3件とは別の枠で、1位の候補との差が 0.05 以内の汎用の担当を2件まで候補に足し、会話エージェントは合う専用の担当がないときだけ使う（[担当の検索と選び方の設計](../spec/toolchain-search-choice-design-2026-10-30.md) §2〜§4）。パイプライン（bindingの `execution:"pipeline"`）も同じ形で2件までの枠を持つ。
+   `summary`・`useWhen`・`examples` は担当の検索の索引になる。種類ごとに書くものを分ける。専用の担当は何を扱うか（対象・物・結果）を書き、ほかの担当の持ち分の依頼を書かない。パイプラインは依頼の全体の流れを書き、各ステップ単独の依頼に似た文を書かない。汎用の担当はどうやるか（手段・場所）を書き、専用の担当がある話題（天気・株価など）の例を書かない。例文は、効果の確かめに使う過去の発言の写しにしない。
 4. **bindingを書く**:
 
    | 項目 | 内容 |

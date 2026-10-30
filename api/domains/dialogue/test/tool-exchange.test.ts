@@ -5,8 +5,9 @@ import { IMAGE, INSTANT, setup, type Harness } from "./generation.fixture";
 
 /**
  * What a turn keeps of its searches and hand-overs (the tool-call reliability design, P1): the calls and the host's
- * short results, kept with the agent's words for a harness that draws them as native tool messages. The local
- * harness draws the words alone (the local context budget design, section 4.3): these runs are served by LARM.
+ * short results, kept with the agent's words for a harness that draws them as native tool messages (the cloud
+ * harness). The local harness draws the words alone (the local context budget design, section 4.3); its turns are
+ * routed by the host, which searches with the user's words (the local harness rebuild plan).
  */
 let h: Harness | undefined;
 afterEach(async () => {
@@ -42,24 +43,27 @@ const FOUND = {
 	})),
 };
 
+/** A routed turn's choice, as the model answers it (a JSON object held to the turn's schema). */
+const choice = (value: Record<string, unknown>) => ({
+	text: JSON.stringify(value),
+});
+
 test("a hand-over's search and delegation are kept with its announcement, the next local turn draws the words alone, and the background calls read the same prefix", async () => {
-	h = await setup();
-	const handOver = {
-		mode: "execute",
-		toolchain: IMAGE.id,
-		request: "猫の絵",
-		impact: "create",
-		announcement: "描きますね。",
-	};
+	h = await setup({ harness: "local" });
 	h.state.steps.push(
-		{ calls: [{ name: "find_toolchain", args: { query: "猫の絵を描く" } }] },
-		{ calls: [{ name: "delegate", args: handOver }] },
+		choice({
+			choice: IMAGE.id,
+			say: "描きますね。",
+			request: "猫の絵",
+		}),
 	);
 	const waiting = await h.say("猫の絵を描いて", "queued");
 	await h.finishImage(waiting.id, { state: "completed", title: "猫" });
-	h.state.steps.push({ text: "どういたしまして。" });
+	h.state.steps.push(choice({ choice: "none" }), {
+		text: "どういたしまして。",
+	});
 	await h.say("ありがとう");
-	// The request opened the recent conversation and is left out (it starts at the agent's).
+	// The request opens the recent conversation with `## Memory`; the agent's words follow it, alone.
 	expect(recent()).toEqual([{ role: "assistant", content: "描きますね。" }]);
 	expect(
 		kept("描きますね。").toolCalls.map(({ name, arguments: args, result }) => ({
@@ -69,11 +73,21 @@ test("a hand-over's search and delegation are kept with its announcement, the ne
 		})),
 	).toEqual([
 		{
+			// The host searched with the user's words.
 			name: "find_toolchain",
-			args: { query: "猫の絵を描く" },
+			args: { query: "猫の絵を描いて" },
 			result: JSON.stringify(FOUND),
 		},
-		{ name: "delegate", args: handOver, result: '{"todo":"t1"}' },
+		{
+			name: "delegate",
+			args: {
+				mode: "execute",
+				toolchain: IMAGE.id,
+				announcement: "描きますね。",
+				request: "猫の絵",
+			},
+			result: '{"todo":"t1"}',
+		},
 	]);
 	const prefix = h.state.calls.at(-1)!.messages.slice(0, -1);
 	const background = h.store.read((db) =>
@@ -132,9 +146,12 @@ test("a confirmation's number and a refused call are kept; the memory and work t
 		JSON.stringify(FOUND),
 		'{"confirmation":"c1"}',
 	]);
-	expect(recent()).toEqual([
-		{ role: "assistant", content: "差し替えてよいですか？" },
-	]);
+	// The cloud harness draws them as the native calls before the words they led to.
+	expect(
+		recent().flatMap(
+			(m) => m.tool_calls?.map((call) => call.function.name) ?? [],
+		),
+	).toEqual(["delegate", "find_toolchain", "delegate"]);
 });
 
 test("a result keeps only the candidates' names and the host's numbers, never an instant answer's text", () => {
@@ -207,23 +224,9 @@ test("a replayed call's arguments are always a JSON object, each text within its
 });
 
 test("a report keeps the notice of the work it told; the next local turn draws the words alone", async () => {
-	h = await setup();
+	h = await setup({ harness: "local" });
 	h.state.steps.push(
-		{ calls: [{ name: "find_toolchain", args: { query: "猫の絵を描く" } }] },
-		{
-			calls: [
-				{
-					name: "delegate",
-					args: {
-						mode: "execute",
-						toolchain: IMAGE.id,
-						request: "猫の絵",
-						impact: "create",
-						announcement: "描きますね。",
-					},
-				},
-			],
-		},
+		choice({ choice: IMAGE.id, say: "描きますね。", request: "猫の絵" }),
 	);
 	const waiting = await h.say("猫の絵を描いて", "queued");
 	await h.finishImage(waiting.id, { state: "completed", title: "猫" });
@@ -237,7 +240,9 @@ test("a report keeps the notice of the work it told; the next local turn draws t
 			todoRefs: [todo!.id],
 		}),
 	);
-	h.state.steps.push({ text: "どういたしまして。" });
+	h.state.steps.push(choice({ choice: "none" }), {
+		text: "どういたしまして。",
+	});
 	await h.say("ありがとう");
 	expect(kept("猫の絵ができあがりました。").notice).toBe(
 		`[ホストの知らせ] t${todo!.ref}「猫の絵」が終わりました（成功）。`,

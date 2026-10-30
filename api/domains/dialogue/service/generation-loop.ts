@@ -12,19 +12,10 @@ import type {
 	ConversationAgentPort,
 } from "../contracts";
 import type { ChatMessage, DialogueDeps, GenerateInput } from "./context";
-import { conversationOutput, systemCopyCheck } from "./conversation-output";
-import { cloudHarness, localHarness } from "./harness";
-import { openIntentGate, withIntent } from "./intent-gate";
-import {
-	decisionMessages,
-	decisionSchema,
-	runLocalTurn,
-	type TurnResult,
-} from "./local-turn";
+import { conversationOutput } from "./conversation-output";
 import { refusalText, toolResultText } from "./result-text";
 import { carriesExchange, type ExchangeStep } from "./tool-exchange";
 import {
-	TOOL_NAMES,
 	generationTools,
 	parseCall,
 	toolRejection,
@@ -110,28 +101,20 @@ export async function runGeneration(
 		if (carriesExchange(call.name))
 			exchange.push({ name: call.name, arguments: call.arguments, result });
 	};
-	// The user-intent judge runs before the first model call (the intent gate design, section 5); the system part
-	// states what it found (the route-context design, section 2.1).
-	const gate = await openIntentGate(deps, input, options.signal);
-	const base = withIntent(input.messages, gate.route);
+	const base = input.messages;
 	let receipt: Receipt | undefined;
 	const callSession: CallSession = {
 		sessionRole: "main",
 		// The harness's bound stops a runaway output; the reasoning counts in it.
 		outputLimit: input.harness.call.outputLimit,
-		// Each side answers with its own harness's reasoning: a call that falls back from LARM to the cloud moves to
-		// the cloud harness's (the input stays the one this run built).
+		// The agent loop serves the cloud harness only: both sides take its level.
 		reasoning: {
-			larm: localHarness.call.reasoning,
-			cloud: cloudHarness.call.reasoning,
+			larm: input.harness.call.reasoning,
+			cloud: input.harness.call.reasoning,
 		},
 		...(options.session?.context ? { context: options.session.context } : {}),
 		...(options.session?.refs ? { refs: options.session.refs } : {}),
 	};
-	const searched = () =>
-		executed.some(({ call }) => call.name === TOOL_NAMES.search);
-	// Only the turn's first call is made to call a tool; later ones keep the search-first refusal alone.
-	let forced = false;
 
 	const chat: Parameters<ConversationAgentPort["respond"]>[0]["chat"] = {
 		async complete(request, onDelta, signal) {
@@ -144,11 +127,8 @@ export async function runGeneration(
 				const native = nativeTools.get(tool.name);
 				return native ? [native] : [];
 			});
-			// The calls are used up, or the judge found the turn to be talk: the same definitions go (the cached prefix
-			// holds) and no call can be made.
-			const noCall =
-				(offered.length === 0 && agentTools.length > 0) ||
-				gate.route === "answer";
+			// The calls are used up: the same definitions go (the cached prefix holds) and no call can be made.
+			const noCall = offered.length === 0 && agentTools.length > 0;
 			const output = conversationOutput(
 				onDelta,
 				generationTools,
@@ -169,113 +149,21 @@ export async function runGeneration(
 				return { text: output.finish(text), toolCalls: [] };
 			}
 			const requestId = input.requestId;
-			// The decision call has no delta function at all: nothing flows, so the run is not marked as having published.
 			const stream = deps.larm.executeStream;
-			const call = (
-				onDelta: ((text: string) => void) | undefined,
-				callSignal: AbortSignal,
-				offering: NativeTool[] | undefined,
-				session: CallSession,
-				preparation: SpeechPreparation | undefined,
-				sent: ChatMessage[] = messages,
-			) =>
-				withLogContext({ phase: "generation" }, () =>
+			let answered: Receipt;
+			try {
+				answered = await withLogContext({ phase: "generation" }, () =>
 					stream.call(
 						deps.larm,
 						requestId,
-						sent,
-						callSignal,
-						onDelta,
-						preparation,
-						offering,
-						session,
+						messages,
+						signal,
+						output.delta,
+						options.preparation,
+						noCall ? generationTools : offered,
+						noCall ? { ...callSession, toolChoice: "none" } : callSession,
 					),
 				);
-			/** One call that replies or calls a tool, published as it streams. */
-			const single = async (session: CallSession): Promise<TurnResult> => {
-				const answered = await call(
-					output.delta,
-					signal,
-					noCall ? generationTools : offered,
-					noCall ? { ...session, toolChoice: "none" } : session,
-					options.preparation,
-				);
-				signal.throwIfAborted();
-				// The answer is what was published: control syntax written as text is not part of it.
-				return {
-					text: output.finish(answered.value as string),
-					toolCalls: (answered.toolCalls ?? []).map((call) => ({
-						id: call.id,
-						name: call.name,
-						arguments: call.arguments,
-					})),
-					receipt: answered,
-				};
-			};
-			// A search the judge asked for: the turn's first call must call a tool, and the search is the one taken.
-			const forceSearch =
-				input.harness.turn === "single" &&
-				gate.route === "search" &&
-				!forced &&
-				offered.some((t) => t.function.name === TOOL_NAMES.search);
-			if (forceSearch) forced = true;
-			const turn = (): Promise<TurnResult> =>
-				input.harness.turn === "decide-then-reply"
-					? runLocalTurn(
-							{
-								decide: () =>
-									call(
-										undefined,
-										signal,
-										undefined,
-										{ ...callSession, outputSchema: decisionSchema(offered) },
-										// A silent call: no speech is collected from it.
-										undefined,
-										// A schema call carries no tool definitions: the functions are listed in its input.
-										decisionMessages(messages, offered),
-									),
-								// A failed head stops the call from its delta; the request stays usable for the cloud call.
-								reply: (onDelta) =>
-									call(
-										onDelta,
-										signal,
-										offered,
-										{
-											...callSession,
-											// With no tool offered (the call limit is reached) there is nothing to hold back.
-											...(offered.length
-												? { toolChoice: "none" as const }
-												: {}),
-											retainRequest: true,
-										},
-										options.preparation,
-									),
-								cloud: () => single({ ...callSession, target: "cloud" }),
-							},
-							{
-								base,
-								own: messages.slice(base.length),
-								offered: offered.map((tool) => tool.function.name),
-								output,
-								...(input.harness.gates.systemCopy && base[0]?.role === "system"
-									? {
-											copies: systemCopyCheck(
-												base[0].content,
-												input.toolchainTitles,
-											),
-										}
-									: {}),
-								signal,
-							},
-						)
-					: single(
-							forceSearch
-								? { ...callSession, toolChoice: "required" }
-								: callSession,
-						);
-			let taken: TurnResult;
-			try {
-				taken = await turn();
 			} catch (error) {
 				// A call that ended cleanly with nothing to say: the reply says nothing, as the system allows.
 				if (
@@ -286,8 +174,17 @@ export async function runGeneration(
 					return { text: output.finish(""), toolCalls: [] };
 				throw error;
 			}
-			receipt = taken.receipt;
-			return { text: taken.text, toolCalls: taken.toolCalls };
+			signal.throwIfAborted();
+			receipt = answered;
+			// The answer is what was published: control syntax written as text is not part of it.
+			return {
+				text: output.finish(answered.value as string),
+				toolCalls: (answered.toolCalls ?? []).map((call) => ({
+					id: call.id,
+					name: call.name,
+					arguments: call.arguments,
+				})),
+			};
 		},
 	};
 
@@ -321,17 +218,9 @@ export async function runGeneration(
 		signal: AbortSignal,
 	): Promise<{ content: string; end?: boolean }> {
 		try {
-			// The judge found the turn to be talk: no tool is run, whatever came back.
-			if (gate.route === "answer") throw toolRejection("tools_not_needed");
 			const parsed = parseCall(call);
 			if (executed.length >= MAX_TOOL_CALLS)
 				throw toolRejection("tool_call_limit");
-			if (
-				gate.route === "search" &&
-				parsed.name !== TOOL_NAMES.search &&
-				!searched()
-			)
-				throw toolRejection("search_first");
 			const outcome = await options.execute(parsed, {
 				signal,
 				...(receipt ? { receipt } : {}),
@@ -352,23 +241,14 @@ export async function runGeneration(
 		}
 	}
 
-	const reply = await deps.conversationAgent
-		.respond({
-			messages: base as AgentMessage[],
-			chat,
-			tools,
-			signal: options.signal,
-			onDelta: options.delta,
-			maxToolCalls: REPLY_CALLS,
-		})
-		.finally(() =>
-			gate.observe({
-				searched: searched(),
-				delegated: executed.some(
-					({ call }) => call.name === TOOL_NAMES.delegate,
-				),
-			}),
-		);
+	const reply = await deps.conversationAgent.respond({
+		messages: base as AgentMessage[],
+		chat,
+		tools,
+		signal: options.signal,
+		onDelta: options.delta,
+		maxToolCalls: REPLY_CALLS,
+	});
 	// The work was handed over (committed by its tool): the run waits for it, and this generation says nothing more.
 	// A later commit (the work failing at once) must not discard the hand-over, so no abort check comes first.
 	if (reply.ended)

@@ -1,14 +1,17 @@
 import { afterEach, expect, test } from "bun:test";
 import { harness } from "./toolchain.fixture";
-import { isUtteranceRound } from "../toolchain/conversation-script.fixture";
+import { utteranceOf } from "../toolchain/conversation-script.fixture";
 import { musicFixture } from "../media/music.fixture";
 import type { LarmPort } from "../../domains/larm";
 import { configureLogging } from "../../infrastructure/logger";
+import { systemContext } from "../../infrastructure/system-context";
 import { waitFor } from "../../infrastructure/wait-for";
 
 afterEach(() => configureLogging({ level: "silent" }));
 const control =
 	'create_music{question:<|"|>夜にふさわしい、しっとりとした落ち着いた雰囲気の楽曲。2分間。<|"|>}';
+/** The host's words for a turn that told the user nothing. */
+const TURN_FAILED = systemContext("dialogue.contexts.local.turn-failed", {});
 const wave = () => {
 	const wav = new Uint8Array(48);
 	wav.set(new TextEncoder().encode("RIFF"));
@@ -19,7 +22,7 @@ async function until(check: () => boolean) {
 	await waitFor(check);
 	expect(check()).toBe(true);
 }
-test("voice does not display, persist or speak text-only control output: the reply is what came before it (here nothing)", async () => {
+test("voice does not display, persist or speak text-only control output: a reply of nothing else gets the host's words", async () => {
 	const f = musicFixture();
 	const spoken: string[] = [],
 		visible: string[] = [];
@@ -44,10 +47,17 @@ test("voice does not display, persist or speak text-only control output: the rep
 						languages: ["ja"],
 						confidence: 0.99,
 					})
-				: f.model.answer(messages, signal, options),
+				: // The routed turn's choice: nothing fits, so the talk turn answers.
+					options?.jsonSchema
+					? JSON.stringify({ choice: "none" })
+					: f.model.answer(messages, signal, options),
 		answerStream: async (messages, signal, delta, options) => {
-			const utterance = isUtteranceRound(options);
-			if (utterance) {
+			// The routed turn's talk call: the conversation's input, offering no tools.
+			const talk =
+				!options?.tools?.length &&
+				!options?.jsonSchema &&
+				utteranceOf(messages) !== "";
+			if (talk) {
 				// Control text beside no tool call: it is dropped, and the reply is the text before it (nothing here).
 				routes++;
 				for (const character of control) delta(character);
@@ -77,9 +87,9 @@ test("voice does not display, persist or speak text-only control output: the rep
 		expect(h.dialogue.progress(runId)?.text).toBe("");
 		expect(spoken).toEqual([]);
 		release();
-		// The reply is empty: the run completes and the turn ends without speech.
+		// The reply told the user nothing: the run completes with the host's words, which the turn speaks.
 		await until(() => h.dialogue.get(runId)?.status === "completed");
-		await until(() => h.voice.get(id)?.status === "played");
+		await until(() => h.voice.get(id)?.status === "ready");
 		expect(routes).toBe(1);
 		expect(
 			visible.every(
@@ -92,10 +102,10 @@ test("voice does not display, persist or speak text-only control output: the rep
 				.messages.every((m) => !m.text.includes(control)),
 		).toBe(true);
 		expect(h.dialogue.get(runId)?.status).toBe("completed");
-		expect(h.dialogue.answerText(runId)).toBeNull();
+		expect(h.dialogue.answerText(runId)).toBe(TURN_FAILED);
 		expect(h.music!.list("main")).toEqual([]);
 		expect(f.requests.filter((r) => r.method === "POST")).toHaveLength(0);
-		expect(spoken).toEqual([]);
+		await until(() => spoken.join("") === TURN_FAILED);
 	} finally {
 		release();
 		stop();

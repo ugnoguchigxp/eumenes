@@ -90,6 +90,38 @@
 		}
 	},
 	{
+		"revision": 2,
+		"aliases": [],
+		"tags": [],
+		"kind": "toolchain",
+		"id": "image.create",
+		"functionName": "image",
+		"title": "画像生成",
+		"summary": "LARMで新しい画像を生成する、画像の制作プロンプト編集画面を開く、保存済み画像の一覧を開く実操作。画面を開く依頼にもこの関数を実行する。自然文の返答だけでは画面は開かない",
+		"useWhen": [
+			"写真やイラストなどの画像を作ってほしい",
+			"話題や場面に合う絵・イラスト・写真を新しく作ってほしい（「〜の絵を描いて」「〜に合う画像を作って」）",
+			"画像の制作プロンプトを編集したい",
+			"以前に生成した画像を見たい"
+		],
+		"avoidWhen": ["参照画像を編集する"],
+		"redirects": [],
+		"examples": [
+			"夕焼けの海のイラストを作って",
+			"猫が昼寝しているイラストを描いて",
+			"旅行の思い出に合う写真風の画像を作って",
+			"画像のプロンプト編集画面を開いて",
+			"前に作った画像を見せて",
+			"商品写真を1200×800のPNGで生成して"
+		],
+		"dependencies": ["package:image.create@1"],
+		"packageRevisionId": "package:image.create@1",
+		"artifact": {
+			"kind": "component",
+			"component": "ImageWorkspace"
+		}
+	},
+	{
 		"revision": 1,
 		"aliases": [],
 		"tags": [],

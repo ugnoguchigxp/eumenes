@@ -20,6 +20,7 @@ import {
 	type FinalMessage,
 	type GenerateInput,
 	type GeneratePayload,
+	type RoutedInput,
 } from "./context";
 import type { DocumentRefs } from "./work-items";
 import {
@@ -40,7 +41,13 @@ import {
 import { resultText } from "./result-text";
 import { acceptRunAnswer, endRun } from "./run-end";
 import type { WorkRow } from "../repository/work";
-import { madeOf, stateLinesInTransaction, stateText } from "./state-text";
+import {
+	madeOf,
+	namedResources,
+	stateLinesInTransaction,
+	stateText,
+} from "./state-text";
+import { ASK_STEP } from "./tool-exchange";
 
 const log = getLogger("dialogue");
 
@@ -167,6 +174,71 @@ function triggerOf(
 	return [{ kind: run.sourceKind }];
 }
 
+/** How long after the agent asked back the user's next words are taken as the answer to it. */
+const ASKED_MS = 5 * 60 * 1000;
+/** The agent's last words a choice call reads, at most. */
+const PREVIOUS_REPLY_CHARS = 200;
+
+/** What a routed turn's choice calls read of the host's records (the local harness rebuild plan, 4.3–4.4). */
+function routedInputInTransaction(
+	deps: DialogueDeps,
+	tx: Database,
+	input: {
+		conversationId: string;
+		nowMs: number;
+		/** The lines of `## State` the choice calls read. */
+		state: readonly string[];
+		lastAgent: {
+			text: string;
+			at: string;
+			toolCalls?: ReadonlyArray<{ name: string; arguments: string }>;
+		} | null;
+	},
+): RoutedInput {
+	const { lastAgent } = input;
+	const askStep = lastAgent?.toolCalls?.find((call) => call.name === ASK_STEP);
+	let asked: RoutedInput["asked"] = null;
+	if (askStep && input.nowMs - Date.parse(lastAgent!.at) <= ASKED_MS) {
+		try {
+			const request = (JSON.parse(askStep.arguments) as { request?: unknown })
+				.request;
+			if (typeof request === "string" && request.trim()) asked = { request };
+		} catch {
+			// A step it cannot read asks nothing.
+		}
+	}
+	const todos =
+		deps.work
+			?.todosInTransaction(tx, input.conversationId)
+			.filter((todo) => todo.status !== "done") ?? [];
+	return {
+		state: stateText(input.state),
+		previousReply: lastAgent
+			? lineText(lastAgent.text).slice(0, PREVIOUS_REPLY_CHARS)
+			: null,
+		asked,
+		pending: {
+			confirmations: (
+				deps.work?.pendingConfirmationsInTransaction(
+					tx,
+					input.conversationId,
+				) ?? []
+			).map((c) => ({
+				ref: c.ref,
+				toolchain: c.toolchain,
+				request: c.request,
+			})),
+			questions: todos.flatMap((todo) =>
+				todo.status === "waiting" && todo.question
+					? [{ ref: todo.ref, title: todo.title, question: todo.question }]
+					: [],
+			),
+		},
+		todos: todos.map((todo) => ({ ref: todo.ref, title: todo.title })),
+		resources: namedResources(input.state),
+	};
+}
+
 /**
  * The claim-time half of a generation (the conversation input specification, sections 3 to 8): the pending
  * utterances it handles, the cut of the recent conversation, and the messages (the system part, `## Memory`, the
@@ -269,7 +341,9 @@ export function createPrepare(
 		// This run's context is fixed by the host: the server must neither trim nor reorder it.
 		if (requestId) larm.setContextPolicyInTransaction?.(tx, requestId, "exact");
 		const system = conversationSystem(deps, tx, harness);
-		const fixed = tokens(system) + estimateJsonTokens(generationTools);
+		const routed = harness.turn === "routed";
+		const fixed =
+			tokens(system) + (routed ? 0 : estimateJsonTokens(generationTools));
 		const plan = planWindow({ window: windowOf(deps, tx, run.id), fixed });
 		if (!plan.usable) {
 			endRun(deps, tx, current, "failed", "window_too_small");
@@ -344,24 +418,24 @@ export function createPrepare(
 		];
 		const lastAgent =
 			[...prefix.recent].reverse().find((u) => u.speaker === "agent") ?? null;
-		const state = stateText(
-			stateLinesInTransaction(deps, tx, {
+		const stateLines = stateLinesInTransaction(deps, tx, {
+			conversationId,
+			run: current,
+			nowMs,
+			lastAt: prefix.lastAt,
+			since: prefix.since,
+			lastAgent,
+			state: deps.conversation.input.latestStateInTransaction(
+				tx,
 				conversationId,
-				run: current,
-				nowMs,
-				lastAt: prefix.lastAt,
-				since: prefix.since,
-				lastAgent,
-				state: deps.conversation.input.latestStateInTransaction(
-					tx,
-					conversationId,
-				),
-				...(claim.payload.specialistHandoff
-					? { handoff: handoffLine(claim.payload.specialistHandoff) }
-					: {}),
-				refs,
-			}),
-		);
+			),
+			...(claim.payload.specialistHandoff
+				? { handoff: handoffLine(claim.payload.specialistHandoff) }
+				: {}),
+			refs,
+		});
+		// A routed turn talks on the time alone; its choice calls read the work and what is presented.
+		const state = stateText(routed ? stateLines.slice(0, 1) : stateLines);
 		const messages = withLastMessage(
 			prefix,
 			[
@@ -391,6 +465,16 @@ export function createPrepare(
 				messages,
 				toolchainTitles: toolchainTitlesInTransaction(deps, tx),
 				utterances: texts,
+				...(routed && final.kind === "utterances"
+					? {
+							routed: routedInputInTransaction(deps, tx, {
+								conversationId,
+								nowMs,
+								state: stateLines,
+								lastAgent,
+							}),
+						}
+					: {}),
 				final,
 				trigger: triggerOf(
 					current,

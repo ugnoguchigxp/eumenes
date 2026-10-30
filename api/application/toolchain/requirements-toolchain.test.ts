@@ -1,8 +1,7 @@
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import {
-	callsOf,
-	isUtteranceRound,
+	routedChoice,
 	searchThenDelegate,
 } from "./conversation-script.fixture";
 import { workerPacket } from "./toolchain.fixture";
@@ -30,19 +29,15 @@ for (const c of cases)
 				speak: async () => new Uint8Array(),
 				answer: async (messages, _signal, options) => {
 					calls++;
-					if (isUtteranceRound(options)) {
-						// The conversation's round: search for the source's toolchain, then hand the request over.
-						const step = searchThenDelegate(
+					// The conversation's choice (the local harness's routed turn): hand the request to the source's toolchain.
+					const routed = routedChoice(options, messages, (loop) =>
+						searchThenDelegate(
 							(candidate) => candidate.id === "history.research",
 							c.request,
 							{ announcement: "お調べします。", impact: "none" },
-						)(messages);
-						if (step.calls?.length)
-							options!.onToolCalls!(
-								callsOf(step, () => crypto.randomUUID()) as never,
-							);
-						return step.text ?? "";
-					}
+						)(loop),
+					);
+					if (routed) return routed;
 					if (messages[0]!.content.includes("TOOLS=")) {
 						const data = workerPacket(messages);
 						if (data.draftReport)
@@ -104,8 +99,8 @@ for (const c of cases)
 			const result = await evaluateRequirements(c, profiles, model, true);
 			expect(result.structureMatched).toBe(true);
 			expect(result.counts.worker).toBe(3);
-			// A search, a hand-over and the sub-agent's three calls; the finished work is reported by the agency.
-			expect(calls).toBe(5);
+			// One choice (the host searched) and the sub-agent's three calls; the finished work is reported by the agency.
+			expect(calls).toBe(4);
 			expect(result.semanticChecks.every((v) => v.status === "unchecked")).toBe(
 				true,
 			);

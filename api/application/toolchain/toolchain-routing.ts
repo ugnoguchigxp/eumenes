@@ -193,7 +193,8 @@ export function createToolchainRouting(
 				available: (id) => input.available.has(id),
 				fromHistory,
 				strict: input.strict,
-				limit: input.strict ? 4 : undefined,
+				// The conversation's and a task's search fill each kind's slots.
+				...(input.strict ? { slots: true as const } : {}),
 			});
 			const offered = cards.flatMap((card) => enrich(db, card));
 			const fts = cards.some((c) => c.score.ftsRank !== null);

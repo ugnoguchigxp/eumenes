@@ -328,7 +328,9 @@ export function insertNotice(db: Database, notice: NoticeRow): boolean {
 export const listNotices = (db: Database, limit: number): NoticeRow[] =>
 	(
 		db
-			.query("SELECT * FROM kanban_notices ORDER BY seq DESC LIMIT ?")
+			.query(
+				"SELECT * FROM kanban_notices WHERE archived_at IS NULL ORDER BY seq DESC LIMIT ?",
+			)
 			.all(limit) as Array<{
 			id: string;
 			kind: NoticeKind;
@@ -351,7 +353,9 @@ export const listNotices = (db: Database, limit: number): NoticeRow[] =>
 export const unreadNotices = (db: Database): number =>
 	(
 		db
-			.query("SELECT COUNT(*) AS n FROM kanban_notices WHERE is_read=0")
+			.query(
+				"SELECT COUNT(*) AS n FROM kanban_notices WHERE is_read=0 AND archived_at IS NULL",
+			)
 			.get() as { n: number }
 	).n;
 
@@ -361,4 +365,11 @@ export function markNoticeRead(db: Database, id: string): boolean {
 	if (!found) return false;
 	db.query("UPDATE kanban_notices SET is_read=1 WHERE id=?").run(id);
 	return true;
+}
+
+/** Keeps the notices and their read state; excludes them from the notification center. */
+export function archiveNotices(db: Database, at: number) {
+	return db
+		.query("UPDATE kanban_notices SET archived_at=? WHERE archived_at IS NULL")
+		.run(at).changes;
 }

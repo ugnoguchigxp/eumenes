@@ -1,11 +1,8 @@
 import { expect, test } from "bun:test";
 import { harness } from "../toolchain/toolchain.fixture";
 import {
-	afterUtterance,
 	candidatesOf,
-	resultField,
 	searchThenDelegate,
-	toolResults,
 	type Candidate,
 } from "../toolchain/conversation-script.fixture";
 import { waitFor } from "../../infrastructure/wait-for";
@@ -40,7 +37,7 @@ async function weatherHarness(
 	return { h, service, candidates };
 }
 
-test("a cold weather request is answered after one search and one instant answer: fixed sentence, no TODO, no notice", async () => {
+test("a cold weather request is answered after the host's search and one choice: fixed sentence, no TODO, no notice", async () => {
 	const { h, service, candidates } = await weatherHarness();
 	try {
 		const run = await h.dialogue.submit({
@@ -52,9 +49,10 @@ test("a cold weather request is answered after one search and one instant answer
 			(await h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 }))?.status,
 		).toBe("completed");
 		expect(h.dialogue.answerText(run.id)).toBe(tomorrowKamakura);
-		// One search, then the instant answer: nothing reached a worker, the web, or a second answer round.
-		expect(candidates.filter(Boolean)).toHaveLength(2);
-		expect(h.calls).toBe(3);
+		// The host searched and the one choice named the weather with its inputs: the host said the answer, and nothing
+		// reached a worker, the web, or another model call.
+		expect(candidates.filter(Boolean)).toHaveLength(1);
+		expect(h.calls).toBe(1);
 		expect(h.workerContexts).toHaveLength(0);
 		expect(h.routeContexts).toHaveLength(0);
 		expect(h.acquisitions).toBe(0);
@@ -143,17 +141,22 @@ test("without the list of areas the weather toolchain is not among the candidate
 	}
 });
 
-test("instant inputs outside the schema are refused with the fields to repair, and nothing is fetched", async () => {
+test("instant inputs outside the schema are refused, the choice is made once more with the reason, and nothing is fetched", async () => {
 	const service = weatherFetch();
 	const refusals: string[] = [];
 	const g = await harness({
 		weather: { fetch: service.fetch },
+		// The talk turn's answer once the choice gave up.
+		parentAnswer: "天気を取得できませんでした。",
 		firstRound: (_tools, _question, messages) => {
-			// The refusal is the tool's result; the agent goes on with it (here it gives up and says so).
-			const refused = toolResults(afterUtterance(messages), "delegate");
-			if (refused.length) {
-				refusals.push(...refused);
-				return { text: "天気を取得できませんでした。" };
+			// The refusal comes back as the retry's reason; the model gives up and chooses none (the talk turn answers).
+			const retry = messages
+				.at(-1)!
+				.content.split("\n")
+				.find((line) => line.startsWith("前の選び方では頼めませんでした"));
+			if (retry) {
+				refusals.push(retry);
+				return {};
 			}
 			return askWeather({ place: "鎌倉", day: "tomorrow" })(messages);
 		},
@@ -168,7 +171,8 @@ test("instant inputs outside the schema are refused with the fields to repair, a
 		const done = await g.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 });
 		expect(done?.status).toBe("completed");
 		expect(refusals).toHaveLength(1);
-		expect(resultField(refusals[0]!, "refused")).toBe("true");
+		expect(refusals[0]).toContain("refused: true");
+		expect(refusals[0]).toContain("inputs");
 		expect(g.dialogue.answerText(run.id)).toBe("天気を取得できませんでした。");
 		expect(
 			service.urls.filter((u) => u.includes("/api/forecast/")),

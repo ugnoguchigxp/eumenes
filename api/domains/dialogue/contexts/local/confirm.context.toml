@@ -1,0 +1,20 @@
+# Source: api/domains/dialogue/service/routed-turn.ts
+text = '''[[title]]に「[[request]]」を頼みます。[[impact]]。よろしいですか？'''
+
+[variables.title]
+type = "string"
+trust = "trusted"
+placement = "inline"
+encoding = "raw"
+
+[variables.request]
+type = "string"
+trust = "trusted"
+placement = "inline"
+encoding = "raw"
+
+[variables.impact]
+type = "string"
+trust = "trusted"
+placement = "inline"
+encoding = "raw"

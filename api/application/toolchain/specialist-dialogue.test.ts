@@ -1,9 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import type { LarmPort } from "../../domains/larm";
 import {
-	afterUtterance,
-	callsOf,
-	isUtteranceRound,
+	routedChoice,
 	searchThenDelegate,
 } from "./conversation-script.fixture";
 import { harness } from "./toolchain.fixture";
@@ -125,36 +123,31 @@ async function rig() {
 				return typeof value === "string" ? value : JSON.stringify(value);
 			}
 			mainPrompts.push(messages.map((m) => ({ ...m })));
-			// The conversation's round for a user's utterance: the script decides whether the request is delegated (a
-			// search, then the hand-over) or answered in plain text with the scripted reply.
-			if (isUtteranceRound(options)) {
-				if (afterUtterance(messages).length === 0) routeCalls++;
+			// The conversation's choice for a user's utterance (the local harness's routed turn): the script decides
+			// whether the request is handed over (a scripted tool) or answered by the talk turn with the scripted reply.
+			const routed = routedChoice(options, messages, (loop) => {
 				const head = script.main[0];
-				if (typeof head === "object") {
-					const { announcement, ...request } = head.args as Record<
-						string,
-						unknown
-					>;
-					const text = String(request.request);
-					const step = searchThenDelegate(
-						(candidate) => candidate.id === toolchainOf(head.tool),
-						text,
-						{
-							announcement:
-								(announcement as string | undefined) ??
-								"制作担当に引き継ぎます。",
-							impact: "create",
-						},
-					)(messages);
-					if (step.calls?.[0]?.name === "delegate") script.main.shift();
-					if (step.calls?.length)
-						options!.onToolCalls!(callsOf(step, () => id()) as never);
-					return step.text ?? "";
-				}
-				const reply = script.main.shift() ?? "かしこまりました。";
-				if (typeof reply !== "string")
-					throw new Error("script_tool_after_route");
-				return reply;
+				if (typeof head !== "object") return {};
+				const { announcement, ...request } = head.args as Record<
+					string,
+					unknown
+				>;
+				const step = searchThenDelegate(
+					(candidate) => candidate.id === toolchainOf(head.tool),
+					String(request.request),
+					{
+						announcement:
+							(announcement as string | undefined) ??
+							"制作担当に引き継ぎます。",
+						impact: "create",
+					},
+				)(loop);
+				if (step.calls?.[0]?.name === "delegate") script.main.shift();
+				return step;
+			});
+			if (routed) {
+				routeCalls++;
+				return routed;
 			}
 			const step = script.main.shift() ?? "かしこまりました。";
 			if (typeof step !== "string") throw new Error("script_tool_after_route");
@@ -309,6 +302,11 @@ async function rig() {
 }
 
 const text = (prompt: Prompt) => prompt.map((m) => m.content).join("\n");
+/** The newest of the main agent's prompts that was a choice (it lists the candidates). */
+const choiceOf = (prompts: Prompt[]) =>
+	[...prompts]
+		.reverse()
+		.find((prompt) => text(prompt).includes("## Candidates"))!;
 
 test("ui_create opens the work and the same run continues as the specialist's turn, which drafts and replies", async () => {
 	const r = await rig();
@@ -316,8 +314,8 @@ test("ui_create opens the work and the same run continues as the specialist's tu
 	expect(first.status).toBe("completed");
 	// The main agent decided, then selected the toolchain; the specialist answered the run.
 	expect(r.mainRuns).toBe(1);
-	// The search and the hand-over (the main agent's two calls); the specialist then answers the run.
-	expect(r.mainPrompts).toHaveLength(2);
+	// The host searched and the main agent made one choice, the hand-over; the specialist then answers the run.
+	expect(r.mainPrompts).toHaveLength(1);
 	expect(r.h.dialogue.answerText(first.id)).toBe("初稿です。");
 	expect(r.h.dialogue.get(first.id)!.specialistSessionId).toBe(
 		(await r.session())!.id,
@@ -499,8 +497,9 @@ test("return with unsaved work suspends the session, the main agent answers, and
 	const next = await r.sayAndWait("こんにちは");
 	expect(r.mainRuns).toBe(mainBefore + 1);
 	expect(r.h.dialogue.answerText(next.id)).toBe("ご用件をどうぞ。");
-	const pending = text(r.mainPrompts.at(-1)!);
-	// The suspended work is a line of the work in `## State` (section 7.1).
+	// The choice the main agent made before it talked reads the work: the suspended work is a line of its `## State`
+	// (section 7.1); the talk turn reads the time alone.
+	const pending = text(choiceOf(r.mainPrompts));
 	expect(pending).toContain("## State");
 	expect(pending).toContain("UI自由制作「来場者アンケート」保留中（未保存");
 	// Only the record's facts, never the draft's definition.
@@ -725,7 +724,7 @@ test("a session idle past its expiry is ended by the sweep and its work is remov
 	// The main agent is told once why the session ended, then the conversation is plain.
 	r.script.main.push("承知しました。");
 	await r.sayAndWait("こんにちは");
-	expect(text(r.mainPrompts.at(-1)!)).toContain("expired");
+	expect(text(choiceOf(r.mainPrompts))).toContain("expired");
 });
 
 test("the specialist's prompt holds no conversation, World or memory material; what was said during the switch is not in the main agent's input", async () => {

@@ -61,7 +61,7 @@ test("the model-named Web research toolchain is retired and the Web research too
 		).toEqual([
 			{
 				key: "toolchain:web.search",
-				active_revision_id: "toolchain:web.search@7",
+				active_revision_id: "toolchain:web.search@8",
 			},
 		]);
 	} finally {

@@ -1,7 +1,6 @@
 import { expect, test } from "bun:test";
 import { harness } from "./toolchain.fixture";
 import { waitFor } from "../../infrastructure/wait-for";
-import { delegate, findToolchain } from "./conversation-script.fixture";
 
 test("research announces before the worker, retains the notice over API reads, then finishes without a reply of its own", async () => {
 	const h = await harness();
@@ -84,51 +83,6 @@ for (const notice of ["お調べします。", "お調べします"])
 			await h.close();
 		}
 	});
-
-test("a streamed preamble stays before the handover notice and both must play before the worker starts", async () => {
-	let first = true;
-	let target = "";
-	const h = await harness({
-		voiceText: "東京の天気を調べて",
-		firstRound: (_tools, question) => {
-			if (!first)
-				return {
-					calls: [
-						delegate(target, question, { announcement: "お調べします。" }),
-					],
-				};
-			first = false;
-			return { text: "承知しました。", calls: [findToolchain(question)] };
-		},
-	});
-	try {
-		target = h.store.read(
-			(db) =>
-				h.toolchain.capabilities
-					.toolchainsInTransaction(db)
-					.find((card) => card.functionName === "web_search")!.id,
-		);
-		const session = crypto.randomUUID(),
-			id = crypto.randomUUID();
-		const wav = new Uint8Array(48);
-		wav.set(new TextEncoder().encode("RIFF"));
-		wav.set(new TextEncoder().encode("WAVE"), 8);
-		h.voice.start(session, 1);
-		await h.voice.accept(session, 1, 1, id, wav);
-		await waitFor(() => h.voice.get(id)?.status === "input_ready");
-		await h.voice.commit(id, h.voice.get(id)!.revision);
-		await waitFor(() => h.voice.get(id)?.audioChunks.length === 2);
-		expect(h.spoken).toEqual(["承知しました。", "お調べします。"]);
-		expect(h.workerContexts).toHaveLength(0);
-		await h.voice.played(id, 0);
-		expect(h.workerContexts).toHaveLength(0);
-		await h.voice.played(id, 1);
-		await waitFor(() => h.workerContexts.length > 0);
-		expect(h.spoken).toEqual(["承知しました。", "お調べします。"]);
-	} finally {
-		await h.close();
-	}
-});
 
 test("cancelling during the spoken notice never starts the research worker", async () => {
 	const h = await harness({ voiceText: "鎌倉の天気を調べて" });

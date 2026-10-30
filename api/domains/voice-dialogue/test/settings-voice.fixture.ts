@@ -51,9 +51,39 @@ export function wav() {
 	b.set(new TextEncoder().encode("WAVE"), 8);
 	return b;
 }
+/**
+ * The conversation on LARM is the local harness's routed turn: with no judge saved it makes a silent choice first.
+ * The scripted answers are the talk: a call held to a schema (the choice) is answered by `choose`, which chooses
+ * nothing unless a test says otherwise, so the talk turn answers.
+ */
+function choosing(
+	local: Partial<LarmPort>,
+	choose: () => Promise<string> = async () =>
+		JSON.stringify({ choice: "none" }),
+): Partial<LarmPort> {
+	const { answer, answerStream } = local;
+	return {
+		answer: async (messages, signal, options) => {
+			if (options?.jsonSchema) return choose();
+			if (!answer) throw new Error("larm_unconfigured");
+			return answer(messages, signal, options);
+		},
+		...(answerStream
+			? {
+					answerStream: (messages, signal, onDelta, options) =>
+						options?.jsonSchema
+							? choose()
+							: answerStream(messages, signal, onDelta, options),
+				}
+			: {}),
+	};
+}
+
 export async function setup(
 	fetcher?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>,
 	local: Partial<LarmPort> = {},
+	/** Answers the routed turn's choices (nothing is chosen by default). */
+	choose?: () => Promise<string>,
 ) {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-settings-voice-"));
 	const dbPath = join(dir, "test.db");
@@ -124,6 +154,7 @@ export async function setup(
 				throw new Error("larm_unconfigured");
 			},
 			...local,
+			...choosing(local, choose),
 		}),
 	});
 	const conversation = createConversationService(store);

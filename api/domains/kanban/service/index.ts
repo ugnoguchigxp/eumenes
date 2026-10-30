@@ -36,6 +36,7 @@ import { createRuns } from "./runs";
 import {
 	getRun,
 	listNotices,
+	archiveNotices,
 	markNoticeRead,
 	unreadNotices,
 } from "../repository/runs";
@@ -315,6 +316,8 @@ export function createKanban(options: {
 		/** Newest first, with the unread count (`GET /api/kanban/notices`). */
 		notices: (limit: number) =>
 			options.store.readSnapshot((tx) => notices(tx, limit)),
+		archiveNotices: () =>
+			options.store.write((tx) => archiveNotices(tx, core.now())),
 		/** Marks a notice read; `kanban_notice_not_found` when there is none. */
 		readNotice: (id: string) =>
 			options.store.write((tx) => {

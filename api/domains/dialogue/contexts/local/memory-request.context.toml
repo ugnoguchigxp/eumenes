@@ -1,0 +1,2 @@
+# Source: api/domains/dialogue/service/routed-choice.ts
+text = '''記憶の依頼。本人が、忘れて・覚えて・直して・目標の登録や変更を頼んだときに渡す。kind は forget（忘れる）・remember（覚える）・correct（直す）・goal（目標）・withdraw（目標をやめる）。what に対象を書く。'''

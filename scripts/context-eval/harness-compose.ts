@@ -13,6 +13,7 @@ import type {
 import type {
 	ChatMessage,
 	DialogueDeps,
+	RoutedInput,
 } from "../../api/domains/dialogue/service/context";
 import {
 	systemText,
@@ -31,7 +32,14 @@ import {
 	jstNowLine,
 	lineText,
 } from "../../api/domains/dialogue/service/input-text";
-import { stateText } from "../../api/domains/dialogue/service/state-text";
+import {
+	namedResources,
+	stateText,
+} from "../../api/domains/dialogue/service/state-text";
+import { ASK_STEP } from "../../api/domains/dialogue/service/tool-exchange";
+
+/** The agent's last words a choice call reads, at most (the product's bound). */
+const PREVIOUS_REPLY_CHARS = 200;
 
 /** The forms of the input a measurement compares. */
 export const FORMS = ["current", "empty", "empty-last"] as const;
@@ -66,6 +74,7 @@ export function buildSystem(
 		}),
 		source.titles,
 		harness.system,
+		harness.systemTexts,
 	);
 }
 
@@ -135,6 +144,44 @@ export function workLines(
 	return lines;
 }
 
+/** The request an agent entry asked back (its carried `ask` step), when it asked. */
+function askedOf(entry: Entry | undefined): { request: string } | null {
+	const step = entry?.toolCalls?.find((call) => call.name === ASK_STEP);
+	if (!step) return null;
+	try {
+		const request = (JSON.parse(step.arguments) as { request?: unknown })
+			.request;
+		return typeof request === "string" && request.trim() ? { request } : null;
+	} catch {
+		return null;
+	}
+}
+
+/** What a routed turn's choice call reads of the host's records, as the product draws them at the claim. */
+export function routedInputOf(s: {
+	log: readonly Entry[];
+	works: readonly Work[];
+	presented: string | null;
+}): RoutedInput {
+	const lastAgent = lastOf(s.log, (e) => e.role === "agent");
+	const state = [
+		`今: ${jstNowLine(NOW_MS)}`,
+		...workLines(s.works, s.presented),
+	];
+	return {
+		state: stateText(state),
+		previousReply: lastAgent
+			? lineText(lastAgent.text).slice(0, PREVIOUS_REPLY_CHARS)
+			: null,
+		asked: askedOf(lastAgent),
+		pending: { confirmations: [], questions: [] },
+		todos: s.works
+			.filter((work) => work.state === "running")
+			.map(({ ref, title }) => ({ ref, title })),
+		resources: namedResources(state),
+	};
+}
+
 /** The newest entry that matches (the runtime library has no `findLast`). */
 export function lastOf(
 	log: readonly Entry[],
@@ -184,9 +231,10 @@ export type Situation = {
 };
 
 /**
- * The input of one step. `current` is the product's form (`## Memory`, the recent conversation, then the last
- * message); `empty` has neither the memory section nor the recent conversation; `empty-last` is `empty` with the
- * last words said as State lines.
+ * The input of one step (for a routed harness, the talk turn's). `current` is the product's form (`## Memory`, the
+ * recent conversation, then the last message); `empty` has neither the memory section nor the recent conversation;
+ * `empty-last` is `empty` with the last words said as State lines. A routed harness's `## State` is the `今` line
+ * alone: the works go to the choice input (`routedInputOf`) instead.
  */
 export function composeInput(s: Situation): ChatMessage[] {
 	const prefix: ConversationPrefix =
@@ -215,7 +263,7 @@ export function composeInput(s: Situation): ChatMessage[] {
 	const state = stateText([
 		`今: ${jstNowLine(NOW_MS)}`,
 		...(s.form === "empty-last" ? lastLines(s.log) : []),
-		...workLines(s.works, s.presented),
+		...(s.harness.turn === "routed" ? [] : workLines(s.works, s.presented)),
 	]);
 	return withLastMessage(prefix, [
 		state,

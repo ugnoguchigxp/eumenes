@@ -13,6 +13,35 @@ export type VoiceAdvance = (
 	id: string,
 	status: VoiceTurn["status"],
 ) => Promise<boolean>;
+/**
+ * How long a played turn waits at most for its run to end before it records what was heard: one still running then
+ * keeps its own words (a hand-over's work answers with its report).
+ */
+const UNADOPTED_WAIT_MS = 180_000;
+/** Waits for the run to end (up to its deadline), then records what was heard of it if it kept no answer. */
+async function recordUnadopted(
+	store: SqliteStore,
+	dialogue: DialogueService,
+	runId: string,
+	deadlineAt: string | null | undefined,
+	heard: string,
+) {
+	try {
+		await dialogue.waitForTerminal(runId, {
+			timeoutMs: Math.min(
+				UNADOPTED_WAIT_MS,
+				deadlineAt
+					? Math.max(0, Date.parse(deadlineAt) - Date.now()) + 10_000
+					: UNADOPTED_WAIT_MS,
+			),
+		});
+		await store.write((db) =>
+			dialogue.recordUnadoptedSpeechInTransaction(db, runId, heard),
+		);
+	} catch {
+		// The store closed or the wait ended: the run's own record stands.
+	}
+}
 export function createVoiceResponder({
 	store,
 	dialogue,
@@ -294,6 +323,11 @@ export function createVoiceResponder({
 				speechController.abort();
 				audio.delete(turn.utteranceId);
 			}
+			// What was played of a run that keeps no answer is what the user heard: the chat and the record keep it once
+			// the run has ended (a stop ends it just after this turn lets go; one still answering keeps its own words).
+			const heard = (speech?.played ?? []).map((part) => part.text).join("");
+			if (heard)
+				void recordUnadopted(store, dialogue, run.id, run.deadlineAt, heard);
 		}
 	};
 }

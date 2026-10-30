@@ -16,7 +16,15 @@ export type Step = {
 	/** The turn repeats the agent's last reply without a call. */
 	repeatOf?: boolean;
 };
-export type Planted = { role: "user" | "agent"; text: string };
+export type Planted = {
+	role: "user" | "agent";
+	text: string;
+	/**
+	 * For an agent entry that asked back: the request it asked about. A routed turn carries that as the question's
+	 * `ask` step, so the user's answer is taken with the request (the reply loop never asks back).
+	 */
+	asked?: string;
+};
 export type Chain = {
 	/** The name an argument selects it by. */
 	key: string;
@@ -137,7 +145,7 @@ export const CHAINS: readonly Chain[] = [
 		reports: false,
 		planted: [
 			{ role: "user", text: "絵を描いて" },
-			{ role: "agent", text: "🙂何の絵にしましょうか？" },
+			{ role: "agent", text: "🙂何の絵にしましょうか？", asked: "絵を描いて" },
 		],
 		steps: [{ say: "猫で", expect: img(CAT) }, { say: "ありがとう" }],
 	},
@@ -147,7 +155,11 @@ export const CHAINS: readonly Chain[] = [
 		reports: false,
 		planted: [
 			{ role: "user", text: "曲を作って" },
-			{ role: "agent", text: "🙂どんな雰囲気の曲にしましょうか？" },
+			{
+				role: "agent",
+				text: "🙂どんな雰囲気の曲にしましょうか？",
+				asked: "曲を作って",
+			},
 		],
 		steps: [
 			{ say: "明るい感じで", expect: snd(/明る/) },

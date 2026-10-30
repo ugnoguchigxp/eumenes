@@ -4,6 +4,7 @@ import { GENERATE_KIND, type DialogueDeps } from "./context";
 import {
 	recordHeardInTransaction,
 	recordSpontaneousInTransaction,
+	recordUnadoptedSpeechInTransaction,
 } from "./delivery-record";
 import type { Heard } from "./event-fields";
 import { endRun } from "./run-end";
@@ -69,6 +70,12 @@ export function createOperationPorts(deps: DialogueDeps) {
 			heard: Heard,
 			spokenText?: string,
 		) => recordHeardInTransaction(deps, db, runId, heard, spokenText),
+		/** What was heard of a run that kept no answer: it joins the chat and the record as the agent's words. */
+		recordUnadoptedSpeechInTransaction: (
+			db: Database,
+			runId: string,
+			heardText: string,
+		) => recordUnadoptedSpeechInTransaction(deps, db, runId, heardText),
 		/** One delivery owner; its disposer cannot remove a newer owner's registration. */
 		setAnnouncementDelivery(
 			deliver: NonNullable<DialogueDeps["deliverAnnouncement"]>,

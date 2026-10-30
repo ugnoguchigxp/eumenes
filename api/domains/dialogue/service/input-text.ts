@@ -13,6 +13,8 @@ export const INPUT_HEADINGS = {
 	user: "## User",
 	notice: "## Host notice",
 	candidates: "## Candidates",
+	pending: "## Pending",
+	retry: "## Retry",
 	points: "## Points",
 	task: "## Task",
 } as const;

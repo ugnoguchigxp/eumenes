@@ -92,6 +92,36 @@
 			"redirects": [],
 			"bindingRevisionId": "binding:cli.run@1",
 			"artifactRevisionId": "artifact:cli.workspace@1"
+		},
+		{
+			"kind": "toolchain",
+			"id": "cli.run",
+			"revision": 2,
+			"title": "CLI",
+			"summary": "シェルコマンドを実行し、終了コードと出力を受け取る",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [
+				"CLIコマンドを実行して結果を知りたい",
+				"ファイル一覧やgitの状態などをコマンドで確認・操作したい"
+			],
+			"avoidWhen": [
+				"コードの実装・修正をClaude Codeに任せたい",
+				"コマンドの使い方を聞いているだけ"
+			],
+			"dependencies": ["package:cli.run@1"],
+			"examples": [
+				"git status を見て",
+				"このプロジェクトのファイル一覧を表示して",
+				"現在の作業ディレクトリを確かめて",
+				"ディスクの空き容量を確認して"
+			],
+			"packageRevisionId": "package:cli.run@1",
+			"functionName": "cli_command",
+			"redirects": [],
+			"bindingRevisionId": "binding:cli.run@1",
+			"artifactRevisionId": "artifact:cli.workspace@1",
+			"general": true
 		}
 	],
 	"bindings": [

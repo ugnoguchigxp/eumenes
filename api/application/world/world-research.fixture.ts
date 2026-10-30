@@ -4,6 +4,7 @@ import {
 	isNoticeRound,
 	utteranceOf,
 	isUtteranceRound,
+	routedChoice,
 	searchThenDelegate,
 } from "../toolchain/conversation-script.fixture";
 import { afterEach } from "bun:test";
@@ -209,16 +210,21 @@ export async function boot(steps: Step[], options: BootOptions = {}) {
 					languages: ["ja"],
 					confidence: 0.99,
 				});
-			if (isUtteranceRound(callOptions) && !isNoticeRound(messages)) {
-				// The conversation's round: search for the World query toolchain, then hand the question over.
-				const question = utteranceOf(messages);
-				const candidates = candidatesOf(messages);
+			// The conversation's round: search for the World query toolchain, then hand the question over (the local
+			// harness's routed turn makes it one silent choice from the same step).
+			const conversationStep = (loop: typeof messages) => {
+				const candidates = candidatesOf(loop);
 				if (candidates) offered.push(JSON.stringify(candidates));
-				const step = searchThenDelegate(
+				return searchThenDelegate(
 					(candidate) => candidate.id === "world.query",
-					question,
+					utteranceOf(loop),
 					{ announcement: "照会します。", impact: "none" },
-				)(messages);
+				)(loop);
+			};
+			const routed = routedChoice(callOptions, messages, conversationStep);
+			if (routed) return routed;
+			if (isUtteranceRound(callOptions) && !isNoticeRound(messages)) {
+				const step = conversationStep(messages);
 				if (step.calls?.length)
 					callOptions!.onToolCalls!(
 						callsOf(step, () => crypto.randomUUID()) as never,

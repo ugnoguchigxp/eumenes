@@ -201,7 +201,7 @@ test("a validated invocation reaches the adapter and starts a capture of that ta
 	await until(() => s.driver.calls.includes("measure"));
 });
 
-const OPERATE = "toolchain:browser.operate@7";
+const OPERATE = "toolchain:browser.operate@8";
 const OPERATE_BINDING = "binding:browser.operate@6";
 
 test("the operate toolchain is a command toolchain that starts a single-shot task with the binding's policy", async () => {

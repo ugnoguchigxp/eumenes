@@ -72,6 +72,10 @@ export function registerTimers(app: Hono, service: TimersService) {
 		if (!query.ok) return query.response;
 		return c.json(service.notifications(query.data));
 	});
+	app.post("/api/timer-notifications/archive", async (c) => {
+		await service.archiveNotifications();
+		return c.body(null, 204);
+	});
 	app.post("/api/timer-notifications/:id/claim", async (c) => {
 		const parsed = await parseJsonBody(c, claimNotificationSchema, {
 			code: "invalid_timer_input",

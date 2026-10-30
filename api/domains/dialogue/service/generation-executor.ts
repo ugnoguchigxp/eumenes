@@ -1,3 +1,4 @@
+import type { Receipt } from "../../inference";
 import { isSystemPrompt } from "../contracts";
 import type { DialogueDeps } from "./context";
 import type { ToolExecutor, ToolOutcome } from "./generation-loop";
@@ -113,8 +114,34 @@ export function createGenerationExecutor(
 				return work(x, call, call.args);
 		}
 	};
+	/**
+	 * The user declined the confirmation `c<ref>` (the routed turn's pending turn, the local harness rebuild plan,
+	 * section 4.4): closed as an action of this run, with the same authority checks as every other. False when it was
+	 * no longer open.
+	 */
+	const decline = (ref: number, receipt?: Receipt) => {
+		x.state.receipt = receipt;
+		return deps.store.write((tx) => {
+			const run = x.current(tx);
+			const closed =
+				deps.work?.withdrawConfirmationInTransaction(
+					tx,
+					run.conversationId,
+					ref,
+				) ?? false;
+			if (closed) {
+				x.handle(tx);
+				x.acted(tx, `decline:c${ref}`, {
+					action: "decline",
+					confirmation: `c${ref}`,
+				});
+			}
+			return closed;
+		});
+	};
 	return {
 		execute,
+		decline,
 		handover: () => x.state.handover,
 		answered: (refused?: boolean) => answered(x, refused),
 	};

@@ -193,6 +193,11 @@ button.todo-notice-body {
 	border-radius: 50%;
 	background: color-mix(in srgb, var(--foreground) 6%, transparent);
 }
+.notification-center-toolbar {
+	display: flex;
+	justify-content: flex-end;
+	margin-bottom: 12px;
+}
 .notification-center-list {
 	display: grid;
 	gap: 12px;

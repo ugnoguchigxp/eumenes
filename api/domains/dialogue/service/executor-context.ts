@@ -55,6 +55,7 @@ export function candidateOf(
 		useWhen: card.useWhen,
 		...(card.execution ? { execution: card.execution } : {}),
 		...(card.minImpact ? { minImpact: card.minImpact } : {}),
+		...(card.general ? { general: true as const } : {}),
 		...(produces.length ? { produces } : {}),
 		...(card.instant ? { inputs: card.instant.parameters } : {}),
 		...(card.pipeline

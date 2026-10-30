@@ -56,6 +56,7 @@ export function conversationSystem(
 		deps.conversationAgent.system(),
 		toolchainTitlesInTransaction(deps, tx),
 		harness.system,
+		harness.systemTexts,
 	);
 }
 
@@ -118,12 +119,22 @@ type HarnessHistory = ConversationHarness["history"];
 export function recentUtterances(
 	after: readonly Utterance[],
 	pending: ReadonlySet<string>,
+	users?: number,
 ): Utterance[] {
 	const shown = after.filter(
 		(u) => !(u.speaker === "user" && u.messageId && pending.has(u.messageId)),
 	);
-	const start = shown.findIndex((u) => u.speaker === "agent");
-	return start < 0 ? [] : shown.slice(start);
+	// A harness that keeps the last few of the user's utterances starts after the one before them: at the agent's
+	// reply to it, so the recent conversation still opens with the agent's words and `## Memory` stays a message of
+	// its own, the same from turn to turn (the cached prefix).
+	let from = 0;
+	if (users !== undefined) {
+		const asked = shown.flatMap((u, i) => (u.speaker === "user" ? [i] : []));
+		if (asked.length > users) from = asked[asked.length - users - 1]! + 1;
+	}
+	const kept = shown.slice(from);
+	const start = kept.findIndex((u) => u.speaker === "agent");
+	return start < 0 ? [] : kept.slice(start);
 }
 
 /**
@@ -386,6 +397,7 @@ export function conversationPrefixFrom(
 			.utterancesAfterInTransaction(tx, conversationId, cut?.seq ?? 0)
 			.filter((u) => !(copies && u.speaker === "agent" && copies(u.text))),
 		input.pending,
+		history.users,
 	);
 	const { lines, ids } = memoryLines(input.window?.profile.items ?? []);
 	// Always there before a recent conversation, so the conversation never opens with the agent's message.
@@ -412,7 +424,8 @@ export function conversationPrefixFrom(
 		);
 	return {
 		messages,
-		tools: generationTools,
+		// A routed turn sends no tool definitions: the background calls share its prefix as it is.
+		tools: input.harness.turn === "routed" ? [] : generationTools,
 		carry: conversation.length || !lines.length ? null : memory,
 		cut,
 		recent,

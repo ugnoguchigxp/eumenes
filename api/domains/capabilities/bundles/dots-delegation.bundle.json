@@ -167,6 +167,32 @@
 		{
 			"aliases": [],
 			"tags": [],
+			"useWhen": [
+				"外部のdotsへ実装・レビュー・調査・コンテンツ作業を任せたい",
+				"委任した作業の状態・成果を確認したい",
+				"質問への回答・仕事の停止をしたい"
+			],
+			"avoidWhen": [],
+			"dependencies": ["package:dots.request@2"],
+			"kind": "toolchain",
+			"id": "dots.delegate",
+			"revision": 6,
+			"title": "dotsへの作業依頼",
+			"summary": "登録済みのdotsに作業を任せ、状況確認・回答・停止を行う",
+			"functionName": "delegate_project",
+			"packageRevisionId": "package:dots.request@2",
+			"bindingRevisionId": "binding:dots.delegate@3",
+			"artifactRevisionId": "artifact:dots.workspace@3",
+			"examples": [
+				"登録済みの作業先で調査を進めて",
+				"依頼した仕事の結果を確認して",
+				"委任先の質問に回答して"
+			],
+			"general": true
+		},
+		{
+			"aliases": [],
+			"tags": [],
 			"useWhen": [],
 			"avoidWhen": [],
 			"dependencies": [],

@@ -93,3 +93,38 @@ test("POST read marks a notice read (204) and refuses an unknown one (404)", asy
 		expect(await missing.json()).toEqual({ error: "kanban_notice_not_found" });
 	}
 });
+
+test("archive clears read and unread notices beyond the listed page, retains cards and records, and accepts new notices", async () => {
+	const ctx = api();
+	await twoNotices(ctx);
+	const one = ctx.kanban.notices(1);
+	await ctx.kanban.readNotice(one.notices[0]!.id);
+	const records = () =>
+		ctx.store.read((tx) => ({
+			cards: tx.query("SELECT * FROM kanban_cards ORDER BY id").all(),
+			runs: tx.query("SELECT * FROM kanban_runs ORDER BY seq").all(),
+			notices: tx
+				.query("SELECT id,text,is_read FROM kanban_notices ORDER BY seq")
+				.all(),
+		}));
+	const before = records();
+	for (let i = 0; i < 2; i++) {
+		expect(
+			(await ctx.app.request("/api/kanban/notices/archive", { method: "POST" }))
+				.status,
+		).toBe(204);
+		expect(ctx.kanban.notices(50)).toEqual({ notices: [], unread: 0 });
+		expect(records()).toEqual(before);
+	}
+	await ctx.store.write((tx) =>
+		tx
+			.query(
+				"INSERT INTO kanban_notices(id,kind,text,created_at) VALUES(?,'done','新着',?)",
+			)
+			.run(crypto.randomUUID(), Date.now()),
+	);
+	expect(ctx.kanban.notices(50)).toMatchObject({
+		unread: 1,
+		notices: [{ text: "新着" }],
+	});
+});

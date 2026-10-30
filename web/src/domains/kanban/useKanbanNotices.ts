@@ -4,7 +4,10 @@ import type { kanbanClient } from "../../../../client/kanban";
 import type { KanbanNoticeView } from "../../../../api/domains/kanban/contracts";
 import { queryRoots } from "../../queryKeys";
 
-type NoticeClient = { identity: string } & ReturnType<typeof kanbanClient>;
+type NoticeClient = { identity: string } & Pick<
+	ReturnType<typeof kanbanClient>,
+	"kanbanNotices" | "readKanbanNotice"
+>;
 
 /**
  * Loads the Kanban notices for the notification center and sounds the short tone when new

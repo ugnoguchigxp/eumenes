@@ -1,3 +1,4 @@
+import { settings } from "./harness.fixture";
 import { join } from "node:path";
 import { rmSync } from "node:fs";
 import { waitFor } from "../../../infrastructure/wait-for";
@@ -152,6 +153,11 @@ export type SetupOptions = {
 	settings?: unknown;
 	/** With `settings`: the run is not captured when it is accepted, so its prepare takes the request. */
 	lateCapture?: boolean;
+	/**
+	 * Without `settings`: the harness the runs are served by. `cloud` (default): the agent's reply loop that calls the
+	 * tools itself; `local`: the routed turn (the local harness rebuild plan). With `settings`, they decide it.
+	 */
+	harness?: "cloud" | "local";
 	/** The context keeper's inference and quiet wait; absent: no keeper runs. */
 	keeper?: NonNullable<Parameters<typeof createDialogueService>[0]["keeper"]>;
 };
@@ -229,7 +235,15 @@ export async function setup(options: SetupOptions = {}) {
 					snapshotFor: (_db: unknown, subject: string) =>
 						captured.get(subject) ?? null,
 				}
-			: {}),
+			: options.harness === "local"
+				? {}
+				: {
+						// The settings a cloud conversation model is chosen by: the run is served by the cloud harness.
+						snapshotFor: () => ({
+							...settings({ mode: "cloud-only" }),
+							voice: { autoSpeak: true },
+						}),
+					}),
 		llmContextWindowInTransaction: () => options.window,
 		setContextPolicyInTransaction: (
 			_db: unknown,
@@ -247,7 +261,8 @@ export async function setup(options: SetupOptions = {}) {
 			requestId: string,
 			messages: ChatMessage[],
 			signal: AbortSignal,
-			delta: (text: string) => void,
+			/** Absent for a silent call (a routed turn's choice). */
+			delta: ((text: string) => void) | undefined,
 			_preparation: unknown,
 			tools: Array<{ function: { name: string } }> | undefined,
 			session?: CallSession,
@@ -263,7 +278,7 @@ export async function setup(options: SetupOptions = {}) {
 			if (state.gate) await state.gate;
 			signal.throwIfAborted();
 			if (step.fail) throw new Error(step.fail);
-			if (step.text) delta(step.text);
+			if (step.text) delta?.(step.text);
 			return receipt(requestId, step);
 		},
 	} as unknown as InferencePort;

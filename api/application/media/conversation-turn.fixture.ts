@@ -1,6 +1,8 @@
 import {
 	callsOf,
 	candidatesOf,
+	choiceByScript,
+	choiceRound,
 	delegate,
 	findToolchain,
 	isNoticeRound,
@@ -40,15 +42,29 @@ export function handOver(
 }
 
 /**
- * Answers one model call when it is the user's utterance's generation (the conversation's fixed tools are offered). Returns undefined for every other call, which the caller answers itself.
+ * Answers one model call when it is the user's utterance's generation: the conversation's fixed tools are offered
+ * (the agent loop), or it is the local harness's silent choice, made from the same step. Returns undefined for every
+ * other call, which the caller answers itself (the routed turn's talk call among them).
  */
 export function answerUtterance(
-	options: Parameters<typeof isUtteranceRound>[0],
+	options:
+		| (NonNullable<Parameters<typeof isUtteranceRound>[0]> & {
+				jsonSchema?: unknown;
+		  })
+		| undefined,
 	messages: ConversationMessage[],
 	onToolCalls: ((calls: ReturnType<typeof callsOf>) => void) | undefined,
 	step: (messages: ConversationMessage[]) => Step,
 	onHandOver?: () => void,
-): string | undefined {
+): string | Promise<string> | undefined {
+	const round = options?.jsonSchema ? choiceRound(messages) : null;
+	if (round)
+		return choiceByScript(messages, round, (loop) => {
+			const chosen = step(loop);
+			if (chosen.calls?.some((call) => call.name === "delegate"))
+				onHandOver?.();
+			return chosen;
+		});
 	if (!isUtteranceRound(options) || isNoticeRound(messages)) return undefined;
 	const chosen = step(messages);
 	if (chosen.calls?.length) {

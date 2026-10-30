@@ -1,0 +1,8 @@
+# Source: api/domains/dialogue/service/routed-choice.ts
+text = '''前の選び方では頼めませんでした（[[reason]]）。欄を直して選び直すか、合うものがなければ none を選びます。'''
+
+[variables.reason]
+type = "string"
+trust = "trusted"
+placement = "inline"
+encoding = "raw"

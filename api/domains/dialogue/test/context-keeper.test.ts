@@ -67,8 +67,12 @@ const keeperCalls = (k: ReturnType<typeof keeperInference>) =>
 
 /** Three exchanges: from then on the keeper has a cut point to offer (a2, the newest two stay). */
 async function talk(turns = 3) {
+	// Each routed turn chooses nothing (there is no judge), then talks.
 	h!.state.steps.push(
-		...Array.from({ length: turns + 1 }, (_, i) => ({ text: `a${i + 1}` })),
+		...Array.from({ length: turns + 1 }, (_, i) => [
+			{ text: JSON.stringify({ choice: "none" }) },
+			{ text: `a${i + 1}` },
+		]).flat(),
 	);
 	for (let i = 1; i <= turns; i++) await h!.say(`u${i}`);
 }
@@ -82,7 +86,10 @@ test("the keeper reads the shared prefix with its own sections under a strict sc
 			],
 		}),
 	]);
-	h = await setup({ keeper: { inference: k.inference, quietMs: 10 } });
+	h = await setup({
+		harness: "local",
+		keeper: { inference: k.inference, quietMs: 10 },
+	});
 	await talk();
 	await waitFor(() => k.accepted.length === 1);
 	const [read] = keeperCalls(k);
@@ -109,7 +116,10 @@ test("the keeper reads the shared prefix with its own sections under a strict sc
 
 test("with no cut point to offer, the keeper is not called while its state is held", async () => {
 	const k = keeperInference([]);
-	h = await setup({ keeper: { inference: k.inference, quietMs: 10 } });
+	h = await setup({
+		harness: "local",
+		keeper: { inference: k.inference, quietMs: 10 },
+	});
 	await talk(2);
 	await Bun.sleep(100);
 	expect(keeperCalls(k)).toHaveLength(0);
@@ -136,6 +146,7 @@ test("the keeper's provider schema keeps each op's shape and types, and leaves t
 test("the keeper offers the World names it reads inside one read transaction", async () => {
 	const k = keeperInference(['{"ops":[]}']);
 	h = await setup({
+		harness: "local",
 		keeper: { inference: k.inference, quietMs: 10 },
 		// World refuses a read outside a transaction, as its host repository does.
 		worldContext: {
@@ -162,7 +173,10 @@ test("a held state op that breaks a rule is only counted: the cut it chose is ta
 			],
 		}),
 	]);
-	h = await setup({ keeper: { inference: k.inference, quietMs: 10 } });
+	h = await setup({
+		harness: "local",
+		keeper: { inference: k.inference, quietMs: 10 },
+	});
 	await talk();
 	await waitFor(() => k.accepted.length === 1);
 	expect(k.rejected.filter((r) => r.endsWith(":context_refused"))).toEqual([]);
@@ -180,7 +194,10 @@ test("a cut at a point it was not offered refuses the whole output", async () =>
 	const k = keeperInference([
 		JSON.stringify({ ops: [{ op: "cut_before", point: "k9" }] }),
 	]);
-	h = await setup({ keeper: { inference: k.inference, quietMs: 10 } });
+	h = await setup({
+		harness: "local",
+		keeper: { inference: k.inference, quietMs: 10 },
+	});
 	await talk();
 	await waitFor(() => k.rejected.length === 1);
 	expect(k.rejected).toEqual(["keeper-1:context_refused"]);
@@ -191,7 +208,10 @@ test("the keeper's cut moves the recent conversation, and the new prefix is read
 	const k = keeperInference([
 		JSON.stringify({ ops: [{ op: "cut_before", point: "k1" }] }),
 	]);
-	h = await setup({ keeper: { inference: k.inference, quietMs: 10 } });
+	h = await setup({
+		harness: "local",
+		keeper: { inference: k.inference, quietMs: 10 },
+	});
 	await talk();
 	await waitFor(() => k.accepted.length === 1);
 	// It cut before a2 (the first point it was offered), and a warm-up followed.
@@ -206,13 +226,16 @@ test("the keeper's cut moves the recent conversation, and the new prefix is read
 
 test("a user utterance stops the keeper of that conversation: the answer comes first", async () => {
 	const k = keeperInference([]);
-	h = await setup({ keeper: { inference: k.inference, quietMs: 200 } });
+	h = await setup({
+		harness: "local",
+		keeper: { inference: k.inference, quietMs: 200 },
+	});
 	await talk(4);
 	// Each utterance came before the quiet wait ended: the keeper did not run in between.
 	expect(keeperCalls(k)).toHaveLength(0);
 	await waitFor(() => keeperCalls(k).length === 1);
-	// It read every reply in one call.
+	// It read every reply of the recent conversation (the last two utterances and the reply before them) in one call.
 	expect(
 		sectionLines(keeperCalls(k)[0]!.messages.at(-1)!.content, "Points")[0],
-	).toBe("- 未反映の始まり:「a1」");
+	).toBe("- 未反映の始まり:「a2」");
 });

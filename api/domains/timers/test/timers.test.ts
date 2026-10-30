@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { Hono } from "hono";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -10,6 +11,7 @@ import {
 } from "../../scheduler";
 import {
 	createTimers,
+	registerTimers,
 	migrations as timerMigrations,
 	startTimerSchema,
 	type TimersService,
@@ -65,6 +67,69 @@ export async function openTimers(options?: {
 }
 
 const issued = "2026-10-09T00:00:00.000Z";
+
+test("notification archive preserves records and active timers, invalidates claims, and lets later expiries notify", async () => {
+	const h = await openTimers();
+	try {
+		const firstReceipt = (await h.timers.start(startBody(1))).receipt;
+		const nextReceipt = (await h.timers.start(startBody(60))).receipt;
+		if (firstReceipt.action !== "started" || nextReceipt.action !== "started")
+			throw new Error("expected start");
+		const first = firstReceipt.timer;
+		const next = nextReceipt.timer;
+		h.setNow(T0 + 1000);
+		await h.scheduler.tick();
+		await settle(h.queue);
+		const note = h.timers.notifications().items[0]!;
+		const clientId = crypto.randomUUID();
+		const claim = await h.timers.claim(note.id, {
+			clientId,
+			claimRequestId: crypto.randomUUID(),
+			expectedRevision: note.revision,
+		});
+		const before = [
+			h.timers.get(first.id)?.timer,
+			h.timers.get(next.id)?.timer,
+		];
+		const app = new Hono();
+		registerTimers(app, h.timers);
+		for (let i = 0; i < 2; i++) {
+			expect(
+				(
+					await app.request("/api/timer-notifications/archive", {
+						method: "POST",
+					})
+				).status,
+			).toBe(204);
+			expect(h.timers.notifications()).toMatchObject({
+				items: [],
+				activeTimers: 1,
+			});
+			expect([
+				h.timers.get(first.id)?.timer,
+				h.timers.get(next.id)?.timer,
+			]).toEqual(before);
+		}
+		expect(
+			h.store.read((tx) => h.timers.readNotification(tx, note.id)),
+		).toMatchObject({ status: "dismissed", claimId: null });
+		await expect(
+			h.timers.ack(note.id, {
+				clientId,
+				claimId: claim.claimId,
+				outcome: "played",
+			}),
+		).rejects.toThrow("claim_invalid");
+		h.setNow(T0 + 60000);
+		await h.scheduler.tick();
+		await settle(h.queue);
+		expect(h.timers.notifications().items).toMatchObject([
+			{ timerId: next.id, status: "pending" },
+		]);
+	} finally {
+		await h.close();
+	}
+});
 
 export function startBody(
 	durationSeconds: number,

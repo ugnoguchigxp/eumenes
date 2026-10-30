@@ -110,6 +110,16 @@ export function listNotifications(
 	return rows.map(mapNotification);
 }
 
+/** Archives the scope's existing notices without changing timers or deleting records. */
+export function archiveNotifications(db: Database, scope: string, at: number) {
+	return db
+		.query(`UPDATE timer_notifications
+		SET status='dismissed', dismissed_at_ms=?, claim_id=NULL, lease_until_ms=NULL,
+			revision=revision+1, updated_at_ms=?
+		WHERE scope=? AND status!='dismissed'`)
+		.run(at, at, scope).changes;
+}
+
 export function claimNotification(
 	db: Database,
 	id: string,

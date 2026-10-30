@@ -266,6 +266,7 @@ type Candidate = {
 	useWhen?: unknown;
 	execution?: unknown;
 	minImpact?: unknown;
+	general?: unknown;
 	produces?: unknown;
 	inputs?: unknown;
 	steps?: unknown;
@@ -280,6 +281,7 @@ function candidateLine(candidate: Candidate): string {
 		typeof value === "string" ? lineText(value) : null;
 	const parts = [
 		text(candidate.title),
+		candidate.general === true ? "汎用の担当" : null,
 		text(candidate.summary),
 		text(candidate.useWhen) ? `使うとき: ${text(candidate.useWhen)}` : null,
 		text(candidate.execution)

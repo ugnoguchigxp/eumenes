@@ -47,6 +47,20 @@ export const SYSTEM_SECTIONS = [
 	"Results",
 ] as const;
 export type SystemSection = (typeof SYSTEM_SECTIONS)[number];
+/** The talk turn's sections (the local harness rebuild plan, section 4.2): nothing of toolchains, tools or results. */
+export const TALK_SECTIONS = [
+	"Role",
+	"Speaking",
+	"Emotion",
+	"Input",
+	"Facts",
+] as const satisfies readonly SystemSection[];
+/** `full`: a reply that calls the tools itself; `talk`: the local talk turn, which names no toolchain or tool. */
+export type SystemTexts = "full" | "talk";
+
+/** The persona's tone, for words the host has the model write outside the talk turn (the choice call's `say`). */
+export const personaStyle = (persona: PersonaSpec) =>
+	(PERSONAS[persona.persona] ?? PERSONAS.butler).style;
 
 /** The toolchain titles as the system part lists them. */
 export const toolchainListing = (titles: readonly string[]) =>
@@ -62,7 +76,9 @@ export function systemText(
 	agent: ConversationAgentSystem,
 	toolchainTitles: readonly string[] = [],
 	order: readonly SystemSection[] = SYSTEM_SECTIONS,
+	texts: SystemTexts = "full",
 ): string {
+	const talk = texts === "talk";
 	const own = PERSONAS[persona.persona] ?? PERSONAS.butler;
 	const sections: Record<SystemSection, Array<string | undefined>> = {
 		Role: [
@@ -84,11 +100,24 @@ export function systemText(
 		],
 		Speaking: [
 			agent.spokenReplyStyle,
-			systemContext("dialogue.contexts.system.speaking", { style: own.style }),
+			talk
+				? systemContext("dialogue.contexts.system.talk-speaking", {
+						style: own.style,
+					})
+				: systemContext("dialogue.contexts.system.speaking", {
+						style: own.style,
+					}),
 		],
 		Emotion: [agent.emotionRules],
 		Input: [systemContext("dialogue.contexts.system.input", {})],
-		Facts: [systemContext("dialogue.contexts.system.facts", {})],
+		Facts: [
+			systemContext(
+				talk
+					? "dialogue.contexts.system.talk-facts"
+					: "dialogue.contexts.system.facts",
+				{},
+			),
+		],
 		Tools: [
 			agent.toolRules,
 			systemContext("dialogue.contexts.system.tools", {}),

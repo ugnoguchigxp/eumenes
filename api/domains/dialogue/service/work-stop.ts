@@ -73,6 +73,8 @@ export function createTodoScreenPorts(deps: DialogueDeps) {
 						unread: 0,
 					},
 			),
+		archiveTodoNotices: () =>
+			deps.store.write((db) => deps.work?.archiveNoticesInTransaction(db) ?? 0),
 		/** False when the TODO has no notice. */
 		readTodoNotice: (todoId: string) =>
 			deps.store.write(

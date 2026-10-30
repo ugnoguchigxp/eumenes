@@ -43,6 +43,10 @@ export function registerDialogue(app: Hono, service: DialogueService) {
 		if (!query.ok) return query.response;
 		return c.json(service.todoNotices(query.data.limit));
 	});
+	app.post("/api/todo-notices/archive", async (c) => {
+		await service.archiveTodoNotices();
+		return c.body(null, 204);
+	});
 	app.post("/api/todo-notices/:id/read", async (c) => {
 		if (!(await service.readTodoNotice(c.req.param("id"))))
 			return c.json({ error: "work_not_found" }, 404);

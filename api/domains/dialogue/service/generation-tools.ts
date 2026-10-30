@@ -7,6 +7,7 @@ import {
 	ValidationFailure,
 	repairIssues,
 	validationIssues,
+	type RepairIssue,
 } from "../../../infrastructure/validation-log";
 
 /**
@@ -60,7 +61,8 @@ export const delegateArgs = z.discriminatedUnion("mode", [
 		.object({
 			mode: z.enum(["execute", "confirm"]),
 			toolchain: id,
-			request: z.string().trim().min(1).max(8000),
+			/** Asked for by the definition; an instant toolchain answers from its inputs alone, any other refuses it absent. */
+			request: z.string().trim().min(1).max(8000).optional(),
 			announcement: announcement.optional(),
 			/** Asked for by the definition; absent, the host takes it from the target and the toolchain (D7). */
 			impact: z.enum(impacts).optional(),
@@ -139,7 +141,7 @@ export const generationTools: NativeTool[] = [
 	),
 	tool(
 		TOOL_NAMES.search,
-		"依頼に合う担当の候補（最大4件）と、その使い方（execution・inputs・target など）を返す。実行はしない。",
+		"依頼に合う担当の候補（種類ごとの枠で最大7件）と、その使い方（execution・inputs・target など）を返す。実行はしない。",
 		{
 			query: text(
 				"最初の一つの作業に必要な担当の用途と対象。対象・時点・条件を保つ。",
@@ -217,16 +219,30 @@ const schemas: Record<ToolName, z.ZodType> = {
 	work: workArgs,
 };
 
-/** A call the host refuses; the agent reads the reason as the call's result (no arguments or text reach the log). */
+/**
+ * A call the host refuses; the agent reads the reason as the call's result (no arguments or text reach the log), and
+ * the fields to repair when they are given.
+ */
 export function toolRejection(
 	code: string,
 	issues: Record<string, unknown>[] = [],
+	repair?: RepairIssue[],
 ) {
 	return new ValidationFailure(
 		code,
 		issues.length ? issues : [{ reason: code }],
+		undefined,
+		repair,
 	);
 }
+
+/** A hand-over without its request text: every toolchain but an instant one works from it. */
+export const requestRequired = () =>
+	toolRejection(
+		"invalid_tool_arguments",
+		[{ tool: TOOL_NAMES.delegate, path: "request", reason: "required" }],
+		[{ path: "request", code: "required", expected: "string" }],
+	);
 
 /** Checks one call against its tool's schema; an unknown tool or invalid arguments is a structural violation. */
 export function parseCall(call: NativeToolCall): ParsedCall {

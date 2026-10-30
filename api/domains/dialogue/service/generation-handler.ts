@@ -8,6 +8,7 @@ import { createGenerationExecutor } from "./generation-executor";
 import { runGeneration, type GenerationOutcome } from "./generation-loop";
 import { TOOL_NAMES } from "./generation-tools";
 import { createPrepare } from "./generation-prepare";
+import { runRoutedTurn } from "./routed-turn";
 import {
 	createGenerationSettlement,
 	type GenerationHandler,
@@ -107,13 +108,19 @@ export function createGenerationHandler(
 							jobId: input.jobId,
 							publish: publishNow,
 						});
-						const generated = await runGeneration(deps, input, {
+						const turn = {
 							signal: body.signal,
 							delta: body.delta,
 							preparation: answerCollection(run, speaksChunks(deps, run)),
 							session: answerSession(input),
 							execute: executor.execute,
-						});
+							decline: executor.decline,
+						};
+						// The local harness routes the turn itself; the cloud harness's agent calls the tools.
+						const generated =
+							input.harness.turn === "routed"
+								? await runRoutedTurn(deps, input, turn)
+								: await runGeneration(deps, input, turn);
 						const handover = executor.handover();
 						if (handover) {
 							log.info("dialogue.generation_handed_over", {

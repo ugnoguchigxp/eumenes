@@ -1394,6 +1394,49 @@
 			"artifactRevisionId": "artifact:browser.workspace@6"
 		},
 		{
+			"aliases": ["ブラウザ", "タブ操作", "ページ操作"],
+			"tags": [],
+			"useWhen": [
+				"開いているタブやEumenesの画面を読み取って操作したい",
+				"URLを開いて、ページの中を探す・入力する・開く",
+				"ブラウザへの接続を始めたい",
+				"操作の状況を知りたい・操作をやめたい"
+			],
+			"avoidWhen": [
+				"公開情報の検索や本文の取得だけで足りる",
+				"タブを画像として保存したいだけ"
+			],
+			"dependencies": ["package:browser.operate@5"],
+			"kind": "toolchain",
+			"id": "browser.operate",
+			"revision": 8,
+			"title": "ブラウザの操作",
+			"summary": "利用者のBraveのタブやEumenesの画面を読み取り、操作する",
+			"examples": [
+				"このタブで商品名を検索して",
+				"さっき開いたページの次の項目を開いて",
+				"この画面の設定を開いて",
+				"このURLを開いて中を見て",
+				"ブラウザに接続して",
+				"さっきの操作はどうなった？"
+			],
+			"redirects": [
+				{
+					"when": "公開情報の検索や本文の取得だけで足りる依頼",
+					"toolchainId": "web.search"
+				},
+				{
+					"when": "タブやページを画像として保存したいだけの依頼",
+					"toolchainId": "browser.capture"
+				}
+			],
+			"packageRevisionId": "package:browser.operate@5",
+			"functionName": "browser_operate",
+			"bindingRevisionId": "binding:browser.operate@6",
+			"artifactRevisionId": "artifact:browser.workspace@6",
+			"general": true
+		},
+		{
 			"aliases": ["ブラウザ", "スクリーンショット", "画面キャプチャ"],
 			"tags": [],
 			"useWhen": [

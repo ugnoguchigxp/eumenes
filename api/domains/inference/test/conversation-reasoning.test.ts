@@ -542,6 +542,48 @@ test("without retainRequest a refused delta still fails the request", async () =
 	expect(h.calls).toHaveLength(0);
 });
 
+test("a call that ends with nothing said ends only that call: the request stays pending and an earlier answer is adopted", async () => {
+	let call = 0;
+	const h = await setup(
+		{ text: "cloud answer" },
+		{
+			mode: "larm-preferred",
+			localStream: async (_messages, _signal, onDelta) => {
+				if (++call > 1) throw new Error("chat_output_empty");
+				onDelta("担当に頼みます。");
+				return "担当に頼みます。";
+			},
+		},
+	);
+	const id = await h.request();
+	const session = { sessionRole: "main" as const };
+	const first = await h.inference.executeStream(
+		id,
+		messages,
+		new AbortController().signal,
+		() => {},
+		undefined,
+		undefined,
+		session,
+	);
+	await expect(
+		h.inference.executeStream(
+			id,
+			messages,
+			new AbortController().signal,
+			() => {},
+			undefined,
+			undefined,
+			session,
+		),
+	).rejects.toThrow("chat_output_empty");
+	expect(status(h, id)).toBe("pending");
+	expect(h.calls).toHaveLength(0);
+	expect(
+		await h.store.write((db) => h.inference.acceptInTransaction!(db, first)),
+	).toBe(true);
+});
+
 /** A stream of pieces; the delta function receives each, and the stream stops at the first throw. */
 function streamOf(pieces: string[]) {
 	const localStream: LarmPort["answerStream"] = async (

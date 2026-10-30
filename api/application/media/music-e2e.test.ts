@@ -3,16 +3,11 @@ import { harness } from "../toolchain/toolchain.fixture";
 import { musicFixture, musicQuestion, musicTestPlan } from "./music.fixture";
 import { imageFixture, imageQuestion } from "./image.fixture";
 import { waitFor } from "../../infrastructure/wait-for";
-import {
-	afterUtterance,
-	isUtteranceRound,
-	toolResults,
-} from "../toolchain/conversation-script.fixture";
+import { isUtteranceRound } from "../toolchain/conversation-script.fixture";
 
-test("a premature creation claim accompanying the selected operation is withheld until music completes", async () => {
+test("the choice that hands music over says nothing of its own: only the announcement shows until music completes", async () => {
 	const f = musicFixture("success");
-	const claim = "新しい曲を1曲作りました。再生：https://127.0.0.1:8000/play/";
-	let reviewed = 0;
+	let chosen = 0;
 	let release!: () => void;
 	const paused = new Promise<void>((resolve) => (release = resolve));
 	const visible: string[] = [];
@@ -20,15 +15,10 @@ test("a premature creation claim accompanying the selected operation is withheld
 		...f.model,
 		answer: async (...args: Parameters<typeof f.model.answer>) => {
 			const [messages, signal, options] = args;
-			// The generation that hands the work over: its speech beside the delegate call is a preamble (withdrawn).
-			const handsOver =
-				isUtteranceRound(options) &&
-				toolResults(afterUtterance(messages), "find_toolchain").length > 0;
-			if (handsOver) {
+			// The routed turn's silent choice: held until the progress is watched.
+			if (options?.jsonSchema) {
 				await paused;
-				reviewed++;
-				await f.model.answer(messages, signal, options);
-				return claim;
+				chosen++;
 			}
 			return f.model.answer(messages, signal, options);
 		},
@@ -51,11 +41,12 @@ test("a premature creation claim accompanying the selected operation is withheld
 			timeoutMs: 5000,
 		});
 		expect(run?.status).toBe("completed");
-		expect(reviewed).toBe(1);
+		expect(chosen).toBe(1);
 		expect(h.music!.list("main")[0]?.state).toBe("completed");
 		expect(f.requests.filter((r) => r.method === "POST")).toHaveLength(1);
-		expect(h.dialogue.answerText(submitted.id) ?? "").not.toContain(claim);
-		expect(visible.every((text) => !text.includes(claim))).toBe(true);
+		expect(
+			visible.filter(Boolean).every((text) => text === "準備します。"),
+		).toBe(true);
 	} finally {
 		release();
 		unsubscribe();

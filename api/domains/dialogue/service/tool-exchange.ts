@@ -8,7 +8,15 @@ import type { DocumentRefs } from "./work-items";
  * search and the hand-over. A later turn sees that a request was found and handed over, not only the announcement;
  * with the announcement alone the model answers the next request in words only, as it sees itself do.
  */
-const CARRIED = new Set<string>([TOOL_NAMES.search, TOOL_NAMES.delegate]);
+const CARRIED = new Set<string>([
+	TOOL_NAMES.search,
+	TOOL_NAMES.delegate,
+	// A routed turn's question back: the next turn takes the user's answer with the request it asked about.
+	"ask",
+]);
+
+/** The step a routed turn keeps when it asked back instead of choosing (the local harness rebuild plan, 4.3). */
+export const ASK_STEP = "ask";
 
 /** One call of a turn as it ran: the model's call and the host's result (`{ refused: true }` for a refused call). */
 export type ExchangeStep = { name: string; arguments: string; result: unknown };
@@ -16,7 +24,7 @@ export type ExchangeStep = { name: string; arguments: string; result: unknown };
 export const carriesExchange = (name: string) => CARRIED.has(name);
 
 /** A carried argument string shows at most this many characters; the rest is cut with `…`. */
-const ARGUMENT_CHARS = 300;
+export const ARGUMENT_CHARS = 300;
 
 const recordOf = (value: unknown): Record<string, unknown> =>
 	value && typeof value === "object" && !Array.isArray(value)
@@ -34,6 +42,7 @@ function carriedResult(
 ): Record<string, unknown> {
 	const record = recordOf(result);
 	if (record.refused === true) return { refused: true };
+	if (name === ASK_STEP) return {};
 	if (name === TOOL_NAMES.search)
 		return {
 			candidates: (Array.isArray(record.candidates)

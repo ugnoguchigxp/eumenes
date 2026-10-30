@@ -35,6 +35,9 @@ export function kanbanClient(transport: Transport) {
 				withQuery("/api/kanban/notices", { limit }),
 				{ signal },
 			),
+		archiveKanbanNotices: async () => {
+			await transport.call("/api/kanban/notices/archive", { method: "POST" });
+		},
 		readKanbanNotice: async (id: string) => {
 			await transport.call(
 				`/api/kanban/notices/${encodeURIComponent(id)}/read`,

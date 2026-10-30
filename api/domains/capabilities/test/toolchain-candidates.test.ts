@@ -125,3 +125,78 @@ test("strict discovery has no all-catalog fallback and returns the top four", as
 		rmSync(dir, { recursive: true, force: true });
 	}
 });
+
+test("the search fills each kind's slots: the three closest dedicated toolchains, and general ones near the closest candidate", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "eumenes-discovery-slots-"));
+	const store = openStore(join(dir, "db"), migrations);
+	const caps = createCapabilities(
+		store,
+		new Set(["web", "history", "music", "image", "excalidraw", "dots"]),
+		{
+			bundleHost: () => ({
+				adapters: new Map(),
+				availability: new Set(),
+				inputAdapters: new Set(),
+				projections: new Set(),
+				domainSchemas: new Set(),
+			}),
+		},
+	);
+	try {
+		await caps.seed();
+		const active = store.read((db) => caps.toolchainsInTransaction(db));
+		const general = active.filter((d) => d.general);
+		const dedicated = active.filter((d) => !d.general);
+		expect(general.map((d) => d.id)).toContain("web.search");
+		expect(dedicated.length).toBeGreaterThan(3);
+		/** Saves each toolchain's passages at `similarity` to the request [1, 0]. */
+		const place = (similarity: (id: string) => number) =>
+			store.write((db) =>
+				caps.saveToolchainVectorsInTransaction(
+					db,
+					space,
+					active.flatMap((d) => {
+						const s = similarity(d.id);
+						return toolchainPassages(d).map((text, item) => ({
+							revisionId: d.revisionId,
+							text,
+							item,
+							vector: [s, Math.sqrt(1 - s * s)],
+						}));
+					}),
+				),
+			);
+		const rank = (id: string) => dedicated.findIndex((d) => d.id === id);
+		const search = () =>
+			store.read((db) =>
+				caps.toolchainCandidatesInTransaction(db, {
+					text: "",
+					vector: { space, values: [1, 0] },
+					available: () => true,
+					strict: true,
+					slots: true,
+				}),
+			);
+		// The general toolchain is the closest: it is offered beside the three closest dedicated ones, marked general.
+		await place((id) =>
+			id === "web.search" ? 1 : rank(id) >= 0 ? 0.95 - rank(id) * 0.01 : 0.5,
+		);
+		const near = search();
+		expect(near.map((c) => c.id)).toEqual([
+			"web.search",
+			...dedicated.slice(0, 3).map((d) => d.id),
+		]);
+		expect(near[0]!.general).toBe(true);
+		expect(near.slice(1).every((c) => !c.general)).toBe(true);
+		// A general toolchain farther than the slot's distance from the closest candidate is not offered.
+		await place((id) =>
+			id === "web.search" ? 0.9 : rank(id) >= 0 ? 0.99 - rank(id) * 0.01 : 0.5,
+		);
+		expect(search().map((c) => c.id)).toEqual(
+			dedicated.slice(0, 3).map((d) => d.id),
+		);
+	} finally {
+		await store.close();
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
