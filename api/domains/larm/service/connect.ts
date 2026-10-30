@@ -294,10 +294,12 @@ function speechProvider(
 	const contextWindow = name === "llm" ? record(info.contextWindow) : undefined;
 	if (
 		contextWindow &&
-		!["maxTokens", "outputReserveTokens", "safetyMarginTokens"].every(
+		(!["maxTokens", "outputReserveTokens", "safetyMarginTokens"].every(
 			(key) =>
 				Number.isInteger(contextWindow[key]) && Number(contextWindow[key]) > 0,
-		)
+		) ||
+			(contextWindow.outputLimit !== undefined &&
+				contextWindow.outputLimit !== "remaining-context"))
 	)
 		throw new Error("larm_invalid_context_window");
 	return {

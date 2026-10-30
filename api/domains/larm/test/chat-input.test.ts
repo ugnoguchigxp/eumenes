@@ -20,6 +20,40 @@ const messages: ChatMessage[] = [
 		],
 	},
 ];
+
+test.each([undefined, "remaining-context"])(
+	"claim output policy %s controls the wire limit and formal input budget",
+	async (outputLimit) => {
+		const f = imageLarmFixture({ outputLimit });
+		try {
+			await f.p.answer(messages, new AbortController().signal, {
+				maxOutputTokens: 11200,
+			});
+			const count = f.requests.find((r) => r.operation === "count")!;
+			const generation = f.requests.find((r) => r.operation === "generate")!;
+			expect(count.body).toBe(generation.body);
+			expect(JSON.parse(generation.body).max_tokens).toBe(
+				outputLimit ? 11200 : 4096,
+			);
+		} finally {
+			await f.p.close();
+		}
+	},
+);
+
+test("an unknown claim output policy is rejected before counting or generating", async () => {
+	const f = imageLarmFixture({ outputLimit: "unsupported-policy" });
+	try {
+		await expect(
+			f.p.answer(messages, new AbortController().signal, {
+				maxOutputTokens: 11200,
+			}),
+		).rejects.toThrow("larm_invalid_context_window");
+		expect(f.requests).toHaveLength(0);
+	} finally {
+		await f.p.close();
+	}
+});
 test("a schema operation omits native tools while existing combined requests keep them", () => {
 	const provider = {
 		model: "fixture",

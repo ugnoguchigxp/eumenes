@@ -21,6 +21,8 @@ export type Provider = {
 	contextWindow?: {
 		maxTokens: number;
 		outputReserveTokens: number;
+		/** Explicit newer contract: the reserve is a default, and input plus output must fit the remaining window. */
+		outputLimit?: "remaining-context";
 		safetyMarginTokens: number;
 	};
 	voice?: string;

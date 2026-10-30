@@ -2,17 +2,26 @@ import type { ChatContentPart } from "../contracts/chat-input";
 import type { LarmPort, LarmCallOptions } from "../contracts";
 import { nativeToolOptions } from "../../../infrastructure/chat-stream";
 import { operationSchema } from "./operation-schema";
+import type { Provider } from "./profiles";
 
-/** The output tokens one call is sent with: what it asked for, within the claim's output reserve (the claim decides). */
+type OutputWindow = Pick<
+	NonNullable<Provider["contextWindow"]>,
+	"outputReserveTokens" | "outputLimit"
+>;
+
+/** A legacy claim caps output at its reserve; remaining-context uses the request and the formal input check. */
 export function sentMaxTokens(
-	outputReserveTokens: number,
+	window: OutputWindow,
 	options: Pick<LarmCallOptions, "maxOutputTokens"> | undefined,
 ): number {
-	return Math.min(outputReserveTokens, options?.maxOutputTokens ?? 4096);
+	const requested = options?.maxOutputTokens ?? 4096;
+	return window.outputLimit === "remaining-context"
+		? requested
+		: Math.min(window.outputReserveTokens, requested);
 }
 
 export function chatRequest(
-	provider: { model: string; contextWindow?: { outputReserveTokens: number } },
+	provider: { model: string; contextWindow?: OutputWindow },
 	messages: Parameters<LarmPort["answer"]>[0],
 	stream: boolean,
 	options?: LarmCallOptions,
@@ -79,9 +88,6 @@ export function chatRequest(
 					}
 				: {}),
 		stream,
-		max_tokens: sentMaxTokens(
-			provider.contextWindow!.outputReserveTokens,
-			options,
-		),
+		max_tokens: sentMaxTokens(provider.contextWindow!, options),
 	};
 }

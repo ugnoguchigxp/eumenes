@@ -42,6 +42,7 @@ export function imageLarmFixture(
 		countError?: boolean;
 		gate?: "count" | "generate";
 		renew?: boolean;
+		outputLimit?: string;
 		response?: string;
 		generationNetworkError?: boolean;
 		generationGate?: Promise<void>;
@@ -57,6 +58,7 @@ export function imageLarmFixture(
 		contextWindow: {
 			maxTokens: 262144,
 			outputReserveTokens: 4096,
+			...(options.outputLimit ? { outputLimit: options.outputLimit } : {}),
 			safetyMarginTokens: 1976,
 		},
 		supportedCapabilities:

@@ -411,3 +411,44 @@ test("the timing names the output bound sent, and what the call asked for when t
 	expect(within).toMatchObject({ maxTokens: 80 });
 	expect(within).not.toHaveProperty("requestedMaxTokens");
 });
+
+test("remaining-context timing reports the requested limit without calling the reservation a cap", async () => {
+	const lines = capture();
+	const timing = startLlmTiming(
+		"fixture",
+		messages,
+		{
+			...window,
+			maxTokens: 200000,
+			outputReserveTokens: 4096,
+			outputLimit: "remaining-context",
+		},
+		{ maxOutputTokens: 11200 },
+		undefined,
+	);
+	await timing.read(
+		Response.json({
+			choices: [{ message: { content: "ok" }, finish_reason: "stop" }],
+		}),
+		new AbortController().signal,
+	);
+	expect(timings(lines)[0]).toMatchObject({ maxTokens: 11200 });
+	expect(timings(lines)[0]).not.toHaveProperty("requestedMaxTokens");
+});
+
+test("legacy input estimation reserves the requested output under remaining-context", () => {
+	const list = [
+		{ role: "system" as const, content: "policy" },
+		{ role: "user" as const, content: "old".repeat(1000) },
+		{ role: "assistant" as const, content: "reply".repeat(600) },
+		{ role: "user" as const, content: "question" },
+	];
+	const timing = startLlmTiming(
+		"fixture",
+		list,
+		{ ...window, outputLimit: "remaining-context" },
+		{ maxOutputTokens: 3000 },
+		undefined,
+	);
+	expect(timing.selected).toEqual([list[0]!, list.at(-1)!]);
+});

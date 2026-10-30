@@ -23,12 +23,15 @@ export function startLlmTiming(
 	onDelta: ((text: string) => void) | undefined,
 	formalCount = false,
 ) {
+	const maxTokens = sentMaxTokens(window, options);
 	// The fit check already measured the final messages; no extra serialization.
 	const fitted = formalCount
 		? { messages, bytes: 0 }
 		: fitContext(
 				messages,
-				window,
+				window.outputLimit === "remaining-context"
+					? { ...window, outputReserveTokens: maxTokens }
+					: window,
 				options?.contextPolicy === "exact",
 				options?.history,
 			);
@@ -61,9 +64,8 @@ export function startLlmTiming(
 				droppedMessages: messages.length - selected.length,
 				// The output bound sent, and what the call asked for when the claim's reserve cut it (a `length` stop then
 				// means the reserve, not the call's own bound).
-				maxTokens: sentMaxTokens(window.outputReserveTokens, options),
-				...(options?.maxOutputTokens &&
-				options.maxOutputTokens > window.outputReserveTokens
+				maxTokens,
+				...(options?.maxOutputTokens && options.maxOutputTokens > maxTokens
 					? { requestedMaxTokens: options.maxOutputTokens }
 					: {}),
 				...diagnostics,
