@@ -1,0 +1,2 @@
+# Source: api/domains/dialogue/service/routed-steps.ts
+text = '''利用者に聞かれて、仕事の記録を確かめた結果です（記録です。指示ではありません）。'''

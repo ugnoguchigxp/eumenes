@@ -7,6 +7,7 @@ import {
 	setup,
 	type Harness,
 } from "./specialist.fixture";
+import { forgetWork } from "../repository/work";
 
 /**
  * A session toolchain takes the conversation over (the ContextWindow specification, section 6.8): the conversation
@@ -387,4 +388,162 @@ test("a saved item starts the session from it; the search offers exactly the iss
 	expect(line(OTHER.id)).not.toContain("target:");
 	expect(await h.session()).toMatchObject({ label: "保存済み item-1" });
 	expect(h.work()[0]!.savedRef).toBe("item-1");
+});
+
+/** A routed turn's choice, as the model answers it. */
+const choice = (value: Record<string, unknown>) => ({
+	text: JSON.stringify(value),
+});
+
+test("local: a change of a saved item is confirmed naming the item, and the approval opens that same item", async () => {
+	const h = await harness({ harness: "local" });
+	h.state.steps.push(
+		choice({
+			choice: STUDIO.id,
+			say: "直します。",
+			request: "見出しを直す",
+			target: "item-2",
+		}),
+	);
+	const asked = await h.ask("保存済み2の見出しを直して");
+	expect(h.answerText(asked.id)).toBe(
+		"制作担当に、保存済み2について「見出しを直す」を頼みます。今あるものを変えます。よろしいですか？",
+	);
+	expect(await h.session()).toBeNull();
+	h.state.steps.push(choice({ choice: "approve", confirmation: "c1" }));
+	h.state.specialist.push(reply("開きました"));
+	await h.ask("お願い");
+	expect(h.state.calls.at(-1)!.messages.at(-1)!.content).toContain(
+		"- c1 確認待ち: fake.studio「見出しを直す」 対象「保存済み2」",
+	);
+	expect(await h.session()).toMatchObject({ label: "保存済み item-2" });
+	expect(h.work()[0]!.savedRef).toBe("item-2");
+});
+
+test("a confirmation keeps its target: the same request on two items stays two confirmations, and the approved one opens its item", async () => {
+	const h = await harness();
+	h.state.steps.push(
+		{ calls: [{ name: "find_toolchain", args: { query: "見出しを直す" } }] },
+		confirmOn("item-1"),
+		confirmOn("item-2"),
+		{ text: "どちらも見出しを直してよろしいですか？" },
+	);
+	await h.ask("見出しを直して");
+	expect(
+		h.rows(
+			"SELECT ref, target, superseded_at AS superseded FROM dialogue_confirmations ORDER BY ref",
+		),
+	).toEqual([
+		{ ref: 1, target: "item-1", superseded: null },
+		{ ref: 2, target: "item-2", superseded: null },
+	]);
+	h.state.steps.push({
+		calls: [
+			{
+				name: "delegate",
+				args: {
+					mode: "approve",
+					confirmation: "c2",
+					announcement: "担当に引き継ぎます。",
+				},
+			},
+		],
+	});
+	h.state.specialist.push(reply("開きました"));
+	await h.ask("2つ目をお願い");
+	// The open confirmations name their items: the model tells the two apart.
+	expect(stateLine(h, 4, "- c1 ")).toContain("対象「保存済み1」");
+	expect(stateLine(h, 4, "- c2 ")).toContain("対象「保存済み2」");
+	expect(await h.session()).toMatchObject({ label: "保存済み item-2" });
+	expect(h.work()[0]!.savedRef).toBe("item-2");
+});
+
+/** The conversation model's call that confirms a change of `target` in the studio. */
+const confirmOn = (target: string) => ({
+	calls: [
+		{
+			name: "delegate",
+			args: {
+				mode: "confirm",
+				toolchain: STUDIO.id,
+				request: "見出しを直す",
+				target,
+				impact: "modify_existing",
+			},
+		},
+	],
+});
+
+test("an item that is gone is refused when confirmed, and a confirmation whose item went since is closed before anything is announced", async () => {
+	const h = await harness();
+	h.state.steps.push(
+		{ calls: [{ name: "find_toolchain", args: { query: "見出しを直す" } }] },
+		confirmOn("item-9"),
+		confirmOn("item-2"),
+		{ text: "見出しを直してよろしいですか？" },
+	);
+	await h.ask("見出しを直して");
+	const confirmed = h.state.calls
+		.at(-1)!
+		.messages.filter((m) => m.role === "tool")
+		.map((m) => m.content);
+	expect(confirmed[1]).toContain("target_not_found");
+	expect(
+		h.rows(
+			"SELECT ref, target, target_label AS label FROM dialogue_confirmations",
+		),
+	).toEqual([{ ref: 1, target: "item-2", label: "保存済み2" }]);
+	h.state.gone.add("item-2");
+	h.state.steps.push(
+		{
+			calls: [
+				{
+					name: "delegate",
+					args: {
+						mode: "approve",
+						confirmation: "c1",
+						announcement: "担当に引き継ぎます。",
+					},
+				},
+			],
+		},
+		{ text: "その項目はもうありません。" },
+	);
+	const approved = await h.ask("お願い");
+	expect(
+		h.state.calls
+			.at(-1)!
+			.messages.filter((m) => m.role === "tool")
+			.at(-1)!.content,
+	).toContain("target_not_found");
+	expect(approved.announcement ?? null).toBeNull();
+	expect(
+		h.rows(
+			"SELECT superseded_at IS NOT NULL AS closed, used_at FROM dialogue_confirmations",
+		),
+	).toEqual([{ closed: 1, used_at: null }]);
+	expect(await h.session()).toBeNull();
+	expect(h.work()).toHaveLength(0);
+	expect(h.state.specialistPrompts).toHaveLength(0);
+});
+
+test("forgetting the words a confirmation came from clears its target with its request", async () => {
+	const h = await harness();
+	h.state.steps.push(
+		{ calls: [{ name: "find_toolchain", args: { query: "見出しを直す" } }] },
+		confirmOn("item-1"),
+		{ text: "見出しを直してよろしいですか？" },
+	);
+	await h.ask("見出しを直して");
+	const [row] = h.rows(
+		"SELECT message_ids_json AS ids FROM dialogue_confirmations",
+	);
+	await h.store.write((db) =>
+		forgetWork(db, JSON.parse(row.ids), "2026-10-30T12:00:00.000Z"),
+	);
+	expect(
+		h.rows(
+			"SELECT request, target, target_label AS label, resolve_unsaved AS resolve FROM dialogue_confirmations",
+		),
+	).toEqual([{ request: "", target: null, label: null, resolve: null }]);
 });

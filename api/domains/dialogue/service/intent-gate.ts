@@ -13,7 +13,8 @@ const log = getLogger("dialogue");
  * How a turn is routed (the local harness rebuild plan, section 4.1): `search`, the judge found a request of work
  * (the request turn); `answer`, it found none (the talk turn); `free`, there is no judgement to route by (a failure,
  * or `shadow`): the request turn decides, and its choice may be none. The judge is read as two choices: a `request`
- * scored at the saved threshold or above, or anything else.
+ * scored at the saved threshold or above, or anything else; a reply to the work (`followup`) while there is work to
+ * read or act on is the request turn's too (the review intake plan, section 4.1).
  */
 export type IntentRoute = "free" | "search" | "answer";
 
@@ -21,7 +22,10 @@ export type IntentRoute = "free" | "search" | "answer";
 export function routeOf(
 	judgment: IntentJudgment,
 	searchScore: number,
+	/** Whether the request turn has work to offer (a `t<n>` it may check, correct or cancel). */
+	work: boolean,
 ): IntentRoute {
+	if (judgment.choice === "followup" && work) return "search";
 	return judgment.choice === "request" &&
 		judgment.probabilities.request >= searchScore
 		? "search"
@@ -166,7 +170,11 @@ export async function openIntentGate(
 	// A cancelled run is recorded as judged (or not) and goes no further: its result reaches no other run.
 	const route =
 		result.judgment && !signal.aborted
-			? routeOf(result.judgment, settings.searchScore)
+			? routeOf(
+					result.judgment,
+					settings.searchScore,
+					!!input.routed?.todos.length,
+				)
 			: "free";
 	written = record(result, route);
 	signal.throwIfAborted();

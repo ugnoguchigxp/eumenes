@@ -6,6 +6,7 @@ import { getLogger } from "../../../infrastructure/logger";
 import type { LarmCallOptions, LarmPort } from "../contracts";
 import { type Provider } from "./profiles";
 import { fitContext } from "./context";
+import { sentMaxTokens } from "./chat-request";
 
 const log = getLogger("larm");
 
@@ -58,6 +59,13 @@ export function startLlmTiming(
 					: {}),
 				requestBytes,
 				droppedMessages: messages.length - selected.length,
+				// The output bound sent, and what the call asked for when the claim's reserve cut it (a `length` stop then
+				// means the reserve, not the call's own bound).
+				maxTokens: sentMaxTokens(window.outputReserveTokens, options),
+				...(options?.maxOutputTokens &&
+				options.maxOutputTokens > window.outputReserveTokens
+					? { requestedMaxTokens: options.maxOutputTokens }
+					: {}),
 				...diagnostics,
 			};
 			if (outcome === "error") log.warn("larm.llm_timing", fields);

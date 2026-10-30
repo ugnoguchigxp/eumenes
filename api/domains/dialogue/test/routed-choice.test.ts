@@ -4,7 +4,7 @@ import {
 	choiceSchema,
 	type ChoiceCandidate,
 } from "../service/routed-choice";
-import { namedResources } from "../service/state-text";
+import { namedResources, namedTodos } from "../service/state-text";
 
 /**
  * A hand-over refers only to the resources `## State` names (the local harness rebuild plan, section 4.3): the schema
@@ -56,6 +56,8 @@ test("a general toolchain is marked so in its line, and the choice's rules put a
 	const [system, input] = choiceMessages({
 		style: "丁寧",
 		routed: {
+			memory: null,
+			earlier: [],
 			state: "## State\n今: 10-30（木）14:00",
 			previousReply: null,
 			asked: null,
@@ -83,6 +85,8 @@ test("the choice system leaves creation details to the toolchain and asks only w
 	const [system] = choiceMessages({
 		style: "丁寧",
 		routed: {
+			memory: null,
+			earlier: [],
 			state: "## State\n今: 10-30（木）14:00",
 			previousReply: null,
 			asked: null,
@@ -99,5 +103,86 @@ test("the choice system leaves creation details to the toolchain and asks only w
 	);
 	expect(system!.content).toContain(
 		"頼む担当か対象が決まらないときだけ ask を選び、say に短い質問を一つ書きます。",
+	);
+});
+
+test("the work State lists is read by its lines' heads: a title that holds a number is not work", () => {
+	expect(
+		namedTodos([
+			"## State",
+			"仕事:",
+			"- t1 t5の見直し 実行中",
+			"- t3 朝の曲 通知済み a3「朝の曲 t9」",
+			"- c2 確認待ち fake.image「t7」",
+		]),
+	).toEqual([1, 3]);
+});
+
+test("every work may be checked; only open work may be corrected or cancelled, and its line says which", () => {
+	const todos = [
+		{ ref: 1, title: "調査", open: true },
+		{ ref: 3, title: "朝の曲", open: false },
+	];
+	const branches = (
+		choiceSchema([], { todos, resources: [] }).anyOf as Array<{
+			properties: {
+				choice: { enum: string[] };
+				operation?: { enum: string[] };
+			};
+		}>
+	).filter((branch) => branch.properties.operation);
+	expect(
+		branches.map((branch) => [
+			branch.properties.choice.enum,
+			branch.properties.operation!.enum,
+		]),
+	).toEqual([
+		[["t1", "t3"], ["check"]],
+		[["t1"], ["amend", "cancel"]],
+	]);
+	const [system, input] = choiceMessages({
+		style: "丁寧",
+		routed: {
+			memory: null,
+			earlier: [],
+			state: "## State\n今: 10-30（木）14:00",
+			previousReply: null,
+			asked: null,
+			pending: { confirmations: [], questions: [] },
+			todos,
+			resources: [],
+		},
+		candidates: [],
+		utterance: "さっきの曲はどうなった？",
+	});
+	expect(input!.content).toContain(
+		"- t1: 「調査」の仕事の確認（check）、訂正（amend。text に直す内容を書く）か取り消し（cancel）。",
+	);
+	expect(input!.content).toContain(
+		"- t3: 「朝の曲」の仕事の確認（check）。終わった仕事なので、確認だけ。",
+	);
+	expect(system!.content).toContain(
+		"その仕事を check で選びます。進行中の仕事の訂正・取り消しを頼まれたら、その仕事を amend か cancel で選びます。終わった仕事は check だけです。",
+	);
+});
+
+test("the choice system names an item only for a change of it: a request to make something new carries no target", () => {
+	const [system] = choiceMessages({
+		style: "丁寧",
+		routed: {
+			memory: null,
+			earlier: [],
+			state: "## State\n今: 10-31（金）00:21",
+			previousReply: null,
+			asked: null,
+			pending: { confirmations: [], questions: [] },
+			todos: [],
+			resources: [],
+		},
+		candidates: [MUSIC],
+		utterance: "イヤホンのランディングページを作ってみて",
+	});
+	expect(system!.content).toContain(
+		"target は、今の発言が保存済みの作品を直す・続けると言っているときだけ、その作品を選びます。新しく作る依頼には付けません。",
 	);
 });

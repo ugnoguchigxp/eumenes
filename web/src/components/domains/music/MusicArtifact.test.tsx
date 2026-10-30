@@ -27,6 +27,12 @@ function setup(
 	items = [record("a"), record("b")],
 	definition = musicArtifactDefinition("a"),
 ) {
+	const play = vi
+		.spyOn(HTMLMediaElement.prototype, "play")
+		.mockImplementation(function (this: HTMLMediaElement) {
+			this.dispatchEvent(new Event("play"));
+			return Promise.resolve();
+		});
 	vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {});
 	const revoke = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
 	let count = 0;
@@ -46,7 +52,7 @@ function setup(
 			<MusicArtifact client={api as never} definition={definition} />
 		</QueryClientProvider>,
 	);
-	return { ...view, api, cache, revoke };
+	return { ...view, api, cache, revoke, play };
 }
 test("JSON composition loads authenticated audio, selects playlist tracks, and releases URLs", async () => {
 	const result = setup();
@@ -56,6 +62,7 @@ test("JSON composition loads authenticated audio, selects playlist tracks, and r
 		),
 	);
 	expect(screen.getByRole("button", { name: "再生" })).toBeTruthy();
+	expect(result.play).not.toHaveBeenCalled();
 	fireEvent.click(screen.getByRole("button", { name: "詳細" }));
 	expect(
 		screen.getByRole("link", { name: "楽曲を保存" }).getAttribute("href"),
@@ -108,6 +115,21 @@ test("same JSON transitions from generating to playable when authorized data upd
 		expect(result.container.querySelector("audio")).not.toBeNull(),
 	);
 	expect(screen.queryByText("楽曲を生成しています")).toBeNull();
+	await screen.findByRole("button", { name: "一時停止" });
+	expect(result.play).toHaveBeenCalledTimes(1);
+});
+test("autoplay refusal highlights the play button and permits a manual retry", async () => {
+	const r = setup([record("a", "generating")]);
+	r.play.mockRejectedValueOnce(new DOMException("blocked", "NotAllowedError"));
+	await screen.findByText("楽曲を生成しています");
+	r.cache.setQueryData(["music", "list", "main"], [record("a")]);
+	const button = await screen.findByRole("button", { name: "再生" });
+	await waitFor(() =>
+		expect(button.className).toContain("music-player-attention"),
+	);
+	fireEvent.click(button);
+	await screen.findByRole("button", { name: "一時停止" });
+	expect(r.play).toHaveBeenCalledTimes(2);
 });
 test("a conversation-generated song populates the prompt and retains it through completion and reset", async () => {
 	const r = setup([], musicArtifactDefinition());

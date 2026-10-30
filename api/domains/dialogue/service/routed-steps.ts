@@ -27,6 +27,7 @@ const SAID = {
 	answered: systemContext("dialogue.contexts.local.answered", {}),
 	recalled: systemContext("dialogue.contexts.local.recalled", {}),
 	notRecalled: systemContext("dialogue.contexts.local.not-recalled", {}),
+	checked: systemContext("dialogue.contexts.local.checked", {}),
 };
 const IMPACT_SAID: Record<string, string> = {
 	modify_existing: systemContext("dialogue.contexts.local.impact-modify", {}),
@@ -168,6 +169,21 @@ async function carryOut(
 		turn.speak(accepted === true ? say : SAID.failed);
 		return "done";
 	}
+	if (/^t\d+$/.test(choice) && chosen.operation === "check") {
+		// A check only reads the work's record; the talk turn tells it (what it read is what the reply may report).
+		const read = await turn.act(TOOL_NAMES.work, {
+			todo: choice,
+			operation: "check",
+		});
+		if ("refused" in read) return { retry: turn.reasonOf(read.refused) };
+		const result = read.outcome.result;
+		if (typeof result !== "string")
+			return {
+				retry: String((result as { code?: unknown }).code ?? "todo_not_found"),
+			};
+		await turn.talk(`${SAID.checked}\n${result}`);
+		return "done";
+	}
 	if (/^t\d+$/.test(choice)) {
 		const worked = await turn.act(TOOL_NAMES.work, {
 			todo: choice,
@@ -231,7 +247,13 @@ async function carryOut(
 			...request,
 		});
 		if ("refused" in issued) return { retry: turn.reasonOf(issued.refused) };
-		if (!issued.outcome.confirmation) return { retry: "confirmation_failed" };
+		if (!issued.outcome.confirmation)
+			return {
+				retry: String(
+					(issued.outcome.result as { code?: unknown }).code ??
+						"confirmation_failed",
+				),
+			};
 		turn.speak(confirmStatement(candidate, request));
 		return "done";
 	}
@@ -345,9 +367,17 @@ function confirmStatement(
 					: 0,
 			)
 		]!;
-	return systemContext("dialogue.contexts.local.confirm", {
+	const words = {
 		title: lineText(candidate.title),
 		request: lineText(request.request ?? "").slice(0, CONFIRM_REQUEST_CHARS),
 		impact: IMPACT_SAID[impact] ?? IMPACT_SAID.modify_existing!,
-	});
+	};
+	// The item it changes is named as the candidate showed it: the user approves that item, not any.
+	const target = candidate.targets?.find((t) => t.ref === request.target);
+	return target
+		? systemContext("dialogue.contexts.local.confirm-target", {
+				...words,
+				target: lineText(target.label),
+			})
+		: systemContext("dialogue.contexts.local.confirm", words);
 }

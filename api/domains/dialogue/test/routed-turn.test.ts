@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import type { ToolchainCard } from "../../capabilities";
 import { IMAGE, INSTANT, setup, type Harness } from "./generation.fixture";
+import { saveItem } from "./memory-seed";
 
 /**
  * The local harness's routed turn (the local harness rebuild plan, section 4): with no judge, the request turn runs
@@ -99,23 +100,8 @@ test("an answer that is no choice is not made again: the talk turn answers", asy
 	expect(h.state.calls[1]!.session?.outputSchema).toBeUndefined();
 });
 
-test("a choice cut at the output limit is not made again: the talk turn answers; a failed talk gets the host's words", async () => {
+test("a talk cut before a word gets the host's words", async () => {
 	h = await setup({ harness: "local" });
-	h.state.steps.push(
-		{ fail: "chat_stream_incomplete" },
-		{ text: "決めきれませんでした。" },
-		// The old path spends the second reply on another choice; let it finish so the call count fails explicitly.
-		{ text: "決めきれませんでした。" },
-	);
-	const run = await h.say("東京は今何時？");
-	expect(h.dialogue.answerText(run.id)).toBe("決めきれませんでした。");
-	expect(h.state.calls).toHaveLength(2);
-	expect(
-		h.state.calls.filter((call) => call.session?.outputSchema),
-	).toHaveLength(1);
-	expect(h.state.calls[1]!.session?.outputSchema).toBeUndefined();
-	expect(h.state.calls[1]!.messages.at(-1)!.content).not.toContain("## Retry");
-	h.state.steps.length = 0;
 	h.state.steps.push(choice({ choice: "none" }), {
 		fail: "chat_stream_incomplete",
 	});
@@ -358,4 +344,90 @@ test("the talk turn's recent conversation is the last two of the user's utteranc
 		.messages.slice(2, -1)
 		.map((m) => m.content);
 	expect(recent).toEqual(["a1", "u2", "a2", "u3", "a3"]);
+});
+
+test("finished work State still lists may be checked, never corrected: the check's record is what the talk turn tells", async () => {
+	h = await setup({ harness: "local" });
+	h.state.steps.push(
+		choice({ choice: IMAGE.id, say: "描きますね。", request: "猫の絵" }),
+	);
+	const waiting = await h.say("猫の絵を描いて", "queued");
+	await h.finishImage(waiting.id, { state: "completed", title: "猫の絵" });
+	expect(h.archived().map((todo) => todo.title)).toEqual(["猫の絵"]);
+	h.state.steps.push(choice({ choice: "t1", operation: "check" }), {
+		text: "猫の絵はできあがっています。",
+	});
+	const run = await h.say("猫の絵はどうなった？");
+	expect(h.dialogue.answerText(run.id)).toBe("猫の絵はできあがっています。");
+	const [chose, talked] = h.state.calls.slice(-2);
+	const work = (
+		chose!.session!.outputSchema as {
+			anyOf: Array<{
+				properties: {
+					choice: { enum: string[] };
+					operation?: { enum: string[] };
+				};
+			}>;
+		}
+	).anyOf.filter((branch) => branch.properties.operation);
+	expect(
+		work.map((branch) => [
+			branch.properties.choice.enum,
+			branch.properties.operation!.enum,
+		]),
+	).toEqual([[["t1"], ["check"]]]);
+	expect(chose!.messages.at(-1)!.content).toContain(
+		"- t1: 「猫の絵」の仕事の確認（check）。終わった仕事なので、確認だけ。",
+	);
+	expect(talked!.messages.at(-1)!.content).toContain(
+		"仕事の記録を確かめた結果です",
+	);
+	expect(talked!.messages.at(-1)!.content).toContain(
+		"t1「猫の絵」が終わりました（成功）。",
+	);
+	expect(h.todos()).toEqual([]);
+});
+
+test("the choice reads the user's earlier words of the talk window: a request carries the condition they point to", async () => {
+	h = await setup({ harness: "local" });
+	h.state.steps.push(choice({ choice: "none" }), { text: "承知しました。" });
+	await h.say("好きな色は藍色です。");
+	h.state.steps.push(
+		choice({ choice: IMAGE.id, say: "描きますね。", request: "藍色の花の絵" }),
+	);
+	await h.say("好きな色で花の絵を描いて", "queued");
+	const chose = h.state.calls.at(-1)!;
+	expect(chose.session?.outputSchema).toBeDefined();
+	const input = chose.messages.at(-1)!.content;
+	expect(input).toContain("## Earlier\n- 好きな色は藍色です。\n## State\n");
+	expect(input).toContain("直前の返事: 承知しました。");
+	expect(chose.messages[0]!.content).toContain(
+		"今の発言が「## Earlier」の発言や「## Memory」の項目を指しているときは、指された中身を request に書き写します。",
+	);
+	expect(h.todos()[0]).toMatchObject({ title: "藍色の花の絵" });
+});
+
+test("the choice reads `## Memory` as the talk turn shows it", async () => {
+	h = await setup({ harness: "local", memory: true });
+	h.state.steps.push(choice({ choice: "none" }), { text: "はい。" });
+	const first = await h.say("好きな色は藍色です", "completed");
+	const saved = await saveItem(h.store, h.memory!, {
+		conversationId: "main",
+		messageId: first.inputMessageId,
+		quote: "好きな色は藍色",
+		kind: "preference",
+		semanticKey: "color.favorite",
+		text: "好きな色は藍色",
+	});
+	await h.store.write((db) =>
+		h!.memory!.republishWindowInTransaction(db, "main"),
+	);
+	h.state.steps.push(
+		choice({ choice: IMAGE.id, say: "描きますね。", request: "藍色の花の絵" }),
+	);
+	await h.say("好きな色で花の絵を描いて", "queued");
+	const input = h.state.calls.at(-1)!.messages.at(-1)!.content;
+	expect(input).toStartWith("## Memory\n");
+	expect(input).toContain(`- ${saved.text}`);
+	expect(input.indexOf("## Memory")).toBeLessThan(input.indexOf("## State"));
 });

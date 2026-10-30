@@ -1,0 +1,26 @@
+# Source: api/domains/dialogue/service/routed-steps.ts
+text = '''[[title]]に、[[target]]について「[[request]]」を頼みます。[[impact]]。よろしいですか？'''
+
+[variables.title]
+type = "string"
+trust = "trusted"
+placement = "inline"
+encoding = "raw"
+
+[variables.target]
+type = "string"
+trust = "trusted"
+placement = "inline"
+encoding = "raw"
+
+[variables.request]
+type = "string"
+trust = "trusted"
+placement = "inline"
+encoding = "raw"
+
+[variables.impact]
+type = "string"
+trust = "trusted"
+placement = "inline"
+encoding = "raw"

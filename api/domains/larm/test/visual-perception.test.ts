@@ -20,6 +20,29 @@ const client = (f: ReturnType<typeof visualFetcher>) =>
 		fetch: f.fetcher,
 		pollMs: 1,
 	});
+test("a response missing execution metadata is a contract error, is not retried, and releases its connection", async () => {
+	const f = visualFetcher({
+		infer: async () => {
+			const result = await visualResult();
+			const execution: Record<string, unknown> = { ...result.execution };
+			delete execution.decoderDtype;
+			delete execution.visualTokens;
+			return Response.json({ ...result, execution });
+		},
+	});
+	await expect(
+		client(f).perceive(
+			await visualImage(),
+			{ task: "describe", query: "説明" },
+			AbortSignal.timeout(5000),
+			async () => {},
+		),
+	).rejects.toThrow("invalid_visual_response");
+	expect(
+		f.requests.filter((r) => r.path === "/v1/vision/perceive"),
+	).toHaveLength(1);
+	expect(f.requests.filter((r) => r.method === "DELETE")).toHaveLength(1);
+});
 test("a valid large response containing all eight alpha masks is not rejected by the HTTP read bound", async () => {
 	const width = 1000,
 		height = 500;

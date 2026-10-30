@@ -365,6 +365,13 @@ export type ConversationPrefix = {
 	since: number | null;
 	/** The memory items `## Memory` shows. */
 	memoryItemIds: string[];
+	/** `## Memory` as this prefix shows it, when it shows any item (a routed turn's choice reads the same). */
+	memory: string | null;
+	/**
+	 * The user's words before the pending ones, after the cut, as many as the window keeps (`history.users`): the
+	 * window opens at an agent's words and may leave the first of them out, a routed turn's choice reads them all.
+	 */
+	earlier: string[];
 };
 
 /**
@@ -392,12 +399,13 @@ export function conversationPrefixFrom(
 	const copies = history.copyFilter
 		? systemCopyCheck(input.system, toolchainTitlesInTransaction(deps, tx))
 		: null;
-	const recent = recentUtterances(
-		store
-			.utterancesAfterInTransaction(tx, conversationId, cut?.seq ?? 0)
-			.filter((u) => !(copies && u.speaker === "agent" && copies(u.text))),
-		input.pending,
-		history.users,
+	const after = store
+		.utterancesAfterInTransaction(tx, conversationId, cut?.seq ?? 0)
+		.filter((u) => !(copies && u.speaker === "agent" && copies(u.text)));
+	const recent = recentUtterances(after, input.pending, history.users);
+	const said = after.filter(
+		(u) =>
+			u.speaker === "user" && !(u.messageId && input.pending.has(u.messageId)),
 	);
 	const { lines, ids } = memoryLines(input.window?.profile.items ?? []);
 	// Always there before a recent conversation, so the conversation never opens with the agent's message.
@@ -437,6 +445,11 @@ export function conversationPrefixFrom(
 				? Date.parse(cut.at)
 				: null,
 		memoryItemIds: ids,
+		memory: lines.length ? memory : null,
+		earlier: (history.users === undefined
+			? said
+			: said.slice(-history.users)
+		).map((u) => u.text),
 	};
 }
 

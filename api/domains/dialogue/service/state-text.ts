@@ -134,7 +134,7 @@ export function stateLinesInTransaction(
 			ledger?.pendingConfirmationsInTransaction(tx, input.conversationId) ?? []
 		).map(
 			(c) =>
-				`- c${c.ref} 確認待ち ${c.toolchain}「${lineText(c.request)}」（${IMPACTS[c.impact] ?? c.impact}）`,
+				`- c${c.ref} 確認待ち ${c.toolchain}「${lineText(c.request)}」${c.target ? ` 対象「${lineText(c.target)}」` : ""}（${IMPACTS[c.impact] ?? c.impact}）`,
 		),
 		...specialistLines(deps, tx, input.conversationId, !!input.run),
 		...(input.handoff ? [`- ${lineText(input.handoff)}`] : []),
@@ -236,6 +236,18 @@ export function namedResources(lines: readonly string[]): string[] {
 			.replace(/「[^」]*」/g, "")
 			.matchAll(/(?<![\p{L}\p{N}_])a\d+(?!\p{N})/gu))
 			named.add(ref);
+	return [...named];
+}
+
+/**
+ * The work `## State` lists (its `- t<n> ` lines, by number; a title is not quoted, so only a line's head is read):
+ * the only finished work a choice may check.
+ */
+export function namedTodos(lines: readonly string[]): number[] {
+	const named = new Set<number>();
+	for (const line of lines)
+		for (const [, ref] of line.matchAll(/^- t(\d+) /gmu))
+			named.add(Number(ref));
 	return [...named];
 }
 

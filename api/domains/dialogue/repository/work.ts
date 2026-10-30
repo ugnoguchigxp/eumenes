@@ -48,6 +48,15 @@ UPDATE dialogue_confirmations SET ref = (SELECT COUNT(*) FROM dialogue_confirmat
  AND (c.issued_at < dialogue_confirmations.issued_at OR (c.issued_at = dialogue_confirmations.issued_at AND c.rowid <= dialogue_confirmations.rowid)));
 CREATE UNIQUE INDEX dialogue_confirmations_ref ON dialogue_confirmations(conversation_id, ref);`;
 
+/** The saved item a confirmed request changes, and how its unsaved edits are resolved: the approval hands them over. */
+export const confirmationTargetMigration = `
+ALTER TABLE dialogue_confirmations ADD COLUMN target TEXT;
+ALTER TABLE dialogue_confirmations ADD COLUMN resolve_unsaved TEXT;`;
+
+/** The name the confirmed item was shown by: the open confirmations name it, so two on one request stay apart. */
+export const confirmationTargetLabelMigration = `
+ALTER TABLE dialogue_confirmations ADD COLUMN target_label TEXT;`;
+
 /**
  * A TODO is archived as it finishes and the user is told by a notice on screen, unread until `notice_read_at` (the
  * TODO completion notice design, 2026-10-29). TODOs archived before are read; finished ones that still waited for
@@ -84,7 +93,7 @@ export function forgetWork(
 		).run(at, at, row.id);
 	// The row stays without its words, so its number (`c<ref>`) is never given to another confirmation.
 	db.query(
-		`UPDATE dialogue_confirmations SET request = '', inputs_json = NULL, superseded_at = COALESCE(superseded_at, ?) WHERE ${fromMessages("dialogue_confirmations", messageIds.length)}`,
+		`UPDATE dialogue_confirmations SET request = '', inputs_json = NULL, target = NULL, target_label = NULL, resolve_unsaved = NULL, superseded_at = COALESCE(superseded_at, ?) WHERE ${fromMessages("dialogue_confirmations", messageIds.length)}`,
 	).run(at, ...messageIds);
 	return rows;
 }
@@ -493,6 +502,11 @@ export type ConfirmationRow = {
 	toolchainRevisionId: string;
 	request: string;
 	inputs: Record<string, unknown> | null;
+	/** The saved item the request changes (a specialist's target), handed over as it was confirmed. */
+	target: string | null;
+	/** The target's name as the confirmation showed it. */
+	targetLabel: string | null;
+	resolveUnsaved: "discard" | null;
 	impact: string;
 	statementDeliveryKey: string;
 	issuedAt: string;
@@ -512,6 +526,9 @@ function mapConfirmation(row: Record<string, unknown>): ConfirmationRow {
 			row.inputs_json === null
 				? null
 				: (JSON.parse(row.inputs_json as string) as Record<string, unknown>),
+		target: (row.target as string | null) ?? null,
+		targetLabel: (row.target_label as string | null) ?? null,
+		resolveUnsaved: (row.resolve_unsaved as "discard" | null) ?? null,
 		impact: row.impact as string,
 		statementDeliveryKey: row.statement_delivery_key as string,
 		issuedAt: row.issued_at as string,
@@ -521,7 +538,7 @@ function mapConfirmation(row: Record<string, unknown>): ConfirmationRow {
 	};
 }
 
-/** Issues a confirmation; an open one for the same toolchain and request is superseded. */
+/** Issues a confirmation; an open one for the same toolchain, request and target is superseded. */
 export function insertConfirmation(
 	db: Database,
 	row: Omit<ConfirmationRow, "ref" | "usedAt" | "supersededAt">,
@@ -529,10 +546,16 @@ export function insertConfirmation(
 	messageIds: readonly string[],
 ) {
 	db.query(
-		"UPDATE dialogue_confirmations SET superseded_at = ? WHERE conversation_id = ? AND toolchain_id = ? AND request = ? AND used_at IS NULL AND superseded_at IS NULL",
-	).run(row.issuedAt, row.conversationId, row.toolchainId, row.request);
+		"UPDATE dialogue_confirmations SET superseded_at = ? WHERE conversation_id = ? AND toolchain_id = ? AND request = ? AND target IS ? AND used_at IS NULL AND superseded_at IS NULL",
+	).run(
+		row.issuedAt,
+		row.conversationId,
+		row.toolchainId,
+		row.request,
+		row.target,
+	);
 	db.query(
-		"INSERT INTO dialogue_confirmations (id, ref, conversation_id, toolchain_id, toolchain_revision_id, request, inputs_json, impact, statement_delivery_key, issued_at, expires_at, message_ids_json) VALUES (?,(SELECT COALESCE(MAX(ref), 0) + 1 FROM dialogue_confirmations WHERE conversation_id = ?),?,?,?,?,?,?,?,?,?,?)",
+		"INSERT INTO dialogue_confirmations (id, ref, conversation_id, toolchain_id, toolchain_revision_id, request, inputs_json, target, target_label, resolve_unsaved, impact, statement_delivery_key, issued_at, expires_at, message_ids_json) VALUES (?,(SELECT COALESCE(MAX(ref), 0) + 1 FROM dialogue_confirmations WHERE conversation_id = ?),?,?,?,?,?,?,?,?,?,?,?,?,?)",
 	).run(
 		row.id,
 		row.conversationId,
@@ -541,6 +564,9 @@ export function insertConfirmation(
 		row.toolchainRevisionId,
 		row.request,
 		row.inputs === null ? null : JSON.stringify(row.inputs),
+		row.target,
+		row.targetLabel,
+		row.resolveUnsaved,
 		row.impact,
 		row.statementDeliveryKey,
 		row.issuedAt,

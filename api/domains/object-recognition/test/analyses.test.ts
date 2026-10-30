@@ -90,6 +90,29 @@ async function fixture(
 		}),
 	};
 }
+test("an invalid provider result persists as a contract failure and releases without retrying", async () => {
+	const h = await fixture(undefined, true, {
+		infer: async () => {
+			const result = await visualResult();
+			const execution: Record<string, unknown> = { ...result.execution };
+			delete execution.decoderDtype;
+			delete execution.visualTokens;
+			return Response.json({ ...result, execution });
+		},
+	});
+	const created = await h.a.create("alice", h.source.id, h.input("describe"));
+	await waitFor(
+		() => h.a.get("alice", h.source.id, created.id, "main").state === "failed",
+	);
+	const saved = h.a.get("alice", h.source.id, created.id, "main");
+	expect(saved.errorCode).toBe("invalid_visual_response");
+	expect(saved.result).toBeNull();
+	expect(saved.releaseConfirmed).toBe(true);
+	expect(
+		h.f.requests.filter((r) => r.path === "/v1/vision/perceive"),
+	).toHaveLength(1);
+	expect(h.f.requests.filter((r) => r.method === "DELETE")).toHaveLength(1);
+});
 test("object-recognition detail analysis persists separately, reopens without inference, and exposes authenticated mask/image routes", async () => {
 	const h = await fixture(),
 		input = h.input("segmentation");

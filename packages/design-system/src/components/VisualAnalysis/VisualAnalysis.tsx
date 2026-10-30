@@ -32,6 +32,8 @@ const errors: Record<string, string> = {
 	analysis_timeout: "解析の待機時間を超えました。",
 	analysis_interrupted:
 		"解析が中断されました。受付不明の推論は再送していません。",
+	invalid_visual_response:
+		"解析サービスの応答形式が正しくありません。LARM側の対応状況を確認してください。",
 	larm_http_400: "分析条件を確認してください。",
 	larm_http_413: "画像または出力が上限を超えました。",
 	larm_http_401: "接続の資格が無効です。改めて分析を実行してください。",

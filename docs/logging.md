@@ -115,6 +115,8 @@ APIが停止している状態で `bun run db:backup` を実行すると、通�
 
 専門担当の操作が拒否されると `dialogue.operation_rejected`（`reason=specialist_operation_refused`・`validationCode`）に、操作が返した修正の手がかり `repairHint`（位置と規則名だけ。定義や文言の値は含めない。200文字まで）を残します。UI自由制作の下書きが反映されない原因は、ここから調べます。
 
+専門担当の出力が契約に合わず断られると `dialogue.specialist_output_rejected`（`reason=invalid_contract`・`repairAttempt`）に、断った点 `violations` を残します。欄と違反の種類（`text:invalid_type` など）、長すぎる返答の測った長さ（`text:chars=50/300:sentences=5/2`）、操作に足りない欄・付けてはいけない欄（`invoke:missing=-:unexpected=forward`）だけで、出力の値は含めません（256文字まで）。
+
 出さないもの: 発話・依頼文・候補の説明、手順のsignature・URL・読む箇所、取得本文。これらは `GET /api/toolchain-history/selections?runId=<runId>` と `bun run cli -- toolchain-history show <runId>` で確認します。調査は `bun run logs -- --level warn` で runId を得てから、選択の記録を引きます。
 
 旧「取得先学習(research-routes)」は2026-10-12に廃止しました。`research_routes.*` のイベントは出ません。
@@ -213,11 +215,11 @@ LARMが`timings`を返す場合、`larm.llm_timing`に`providerPromptMs`（入�
 
 ### LLM streamの終了診断
 
-`larm.llm_timing`は読取りに失敗した場合も、届いていた許可済みのusage・Provider timingsを記録します。`finishReason`は`stop`・`tool_calls`・`function_call`・`length`・`content_filter`・`unknown`だけです。`streamDone`はstream終端の受信（JSON応答では本文の解析完了）を1/0で示します。終了理由自体が届かない場合は省略します。
+`larm.llm_timing`は読取りに失敗した場合も、届いていた許可済みのusage・Provider timingsを記録します。`finishReason`は`stop`・`tool_calls`・`function_call`・`length`・`content_filter`・`unknown`だけです。`streamDone`はstream終端の受信（JSON応答では本文の解析完了）を1/0で示します。終了理由自体が届かない場合は省略します。`maxTokens` は送った出力の上限（呼出しが頼んだ値と、接続先が claim で返した出力予約 `outputReserveTokens` の小さい方）です。予約で削られたときだけ、呼出しが頼んだ値を `requestedMaxTokens` に残します。`finishReason=length` で `requestedMaxTokens` があれば、切れたのは呼出しの上限ではなく接続先の出力予約です。
 
 `streamFailure`は`output_limit`・`content_filter`・`missing_end`・`empty_output`・`invalid_tool_calls`・`aborted`・`invalid_response`・`read_error`を区別します。外向きのエラーは`chat_stream_incomplete`で、途中の本文・引数を採用しない判定は維持します。ただし、正常に終わって本文もツール呼出しも無い`empty_output`だけは外向きを`chat_output_empty`に分けます（会話の呼出しでは、その呼出しだけが終わり、推論の依頼は残ります。返事なしとして完了して`dialogue.no_answer`を記録します。ただし local ハーネスで利用者の発言に何も返さなかった回は、下の`dialogue.turn_failed`になります。ほかの呼出しでは失敗です）。思考（reasoning）の文字数は`reasoningChars`に数だけを記録します。例えば`output_limit`は出力上限到達を観測したもので、LARMの中継切断を示しません。usageやtimingsが届かない場合は不明として省略し、0にはしません。これらの診断には本文・引数・Providerの自由文は含めません。
 
-local ハーネス（LARM）の会話の回は、ホストが振り分けます（[計画](../spec/local-harness-rebuild-plan-2026-10-30.md)）。`dialogue.turn_routed`は回ごとに1件で、`kind`が回の種類（`talk`＝会話の回、`request`＝依頼の回、`pending`＝保留の回）、`count`がその回のモデル呼出しの数です。`dialogue.choice_made`は選ぶ呼出しごとに1件で、`kind`が回の種類、`decision`が選んだものの種類（`none`・`ask`・`memory.recall`・`memory.request`・`todo`・`toolchain_<実行の種類>`・`approve`・`decline`・`answer`・`unreadable`）、`attempt`が何回目の選択か（依頼の回は2回まで）です。利用者の言葉・選んだ担当への依頼文・`say`は記録しません。`dialogue.turn_failed`は、回の中の呼出しがまだ何も話さないうちに失敗した（利用者の発言に会話の呼出しが何も返さなかったときを含む）回ごとに1件で、`kind`が回の種類、`reason`が失敗の符号です。このときホストは決まった一言を回の答えにします。モデルの答えのない回（ホストの言葉だけ、または何も話さない回）は、推論の依頼をホストの答えとして受け入れます。受け入れられなかった（設定の変更・期限切れ）ときは`dialogue.answer_request_not_accepted`（`reason`）を記録し、回は完了します。回が採用されずに終わった後でも、音声で再生できた文はエージェントの発言として会話の記録とチャット欄に残ります。
+local ハーネス（LARM）の会話の回は、ホストが振り分けます（[計画](../spec/local-harness-rebuild-plan-2026-10-30.md)）。`dialogue.turn_routed`は回ごとに1件で、`kind`が回の種類（`talk`＝会話の回、`request`＝依頼の回、`pending`＝保留の回）、`count`がその回のモデル呼出しの数です。`dialogue.choice_made`は選ぶ呼出しごとに1件で、`kind`が回の種類、`decision`が選んだものの種類（`none`・`ask`・`memory.recall`・`memory.request`・`todo`・`toolchain_<実行の種類>`・`approve`・`decline`・`answer`・`unreadable`・`cut`）、`attempt`が何回目の選択か（依頼の回は2回まで）です。`cut`は選ぶ呼出しが出力の上限で切れ、決めきれなかったことを示します。依頼の回は選び直さずに会話の回へ渡します。選び直すのは、ホストが選んだものを断ったときだけです。利用者の言葉・選んだ担当への依頼文・`say`は記録しません。`dialogue.turn_failed`は、回の中の呼出しがまだ何も話さないうちに失敗した（利用者の発言に会話の呼出しが何も返さなかったときを含む）回ごとに1件で、`kind`が回の種類、`reason`が失敗の符号です。このときホストは決まった一言を回の答えにします。モデルの答えのない回（ホストの言葉だけ、または何も話さない回）は、推論の依頼をホストの答えとして受け入れます。受け入れられなかった（設定の変更・期限切れ）ときは`dialogue.answer_request_not_accepted`（`reason`）を記録し、回は完了します。回が採用されずに終わった後でも、音声で再生できた文はエージェントの発言として会話の記録とチャット欄に残ります。
 
 補助接続の内部処理では物理的にmainへ置き換わっても、`sessionRole`へ呼出し元の`auxiliary`または`subagent`を保持します。`profile`だけで会話段を分類せず、`phase`・runId・attemptId等と対応させてください。接続を比較するrunnerは、同一接続の対照でも論理的な呼出し元を記録します。
 

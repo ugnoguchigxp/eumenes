@@ -190,6 +190,106 @@ export const PROBE_CHAIN: Chain = {
 };
 export const PROBE_TRIES = 6;
 
+/**
+ * A step of the acceptance lane (the review intake plan, section 6.3): a step of the chains above, or one that checks
+ * what the host did besides a hand-over. A seeded saved item is named by its title.
+ */
+export type AcceptStep = Step & {
+	/** The turn issues a confirmation for this toolchain, its statement names the item, and nothing is handed over. */
+	confirm?: { toolchain: string; target: string };
+	/** The approval hands the item over to this toolchain. */
+	approve?: { toolchain: string; target: string };
+	/** The turn reads the chain's work `t<n>` and starts no new work. */
+	check?: number;
+	/** The turn cancels the chain's work `t<n>`. */
+	cancel?: number;
+	/** This instant toolchain answers: its inputs passed the host's check. */
+	instant?: string;
+};
+export type AcceptChain = Omit<Chain, "steps"> & {
+	steps: AcceptStep[];
+	/** The saved items (by title) made before the first step, for the steps to name. */
+	saved?: string[];
+	/**
+	 * Memory items the user asked to keep, each from a planted utterance (`said`), saved after the planted talk: what
+	 * the turns' `## Memory` shows.
+	 */
+	remembered?: Array<{ said: string; key: string; text: string }>;
+};
+
+/**
+ * The scenes the acceptance lane adds to the chains above (the review intake plan, section 6.3). A condition said
+ * before (`topic`) and a request that must not take the earlier ones (`sequence`) are the chains above.
+ */
+export const ACCEPT_CHAINS: readonly AcceptChain[] = [
+	{
+		key: "accept-target",
+		name: "対象を選んで直す → 承認",
+		reports: false,
+		saved: ["来場者アンケート"],
+		steps: [
+			{
+				say: "保存してある来場者アンケートに、年代を聞く質問を足して",
+				confirm: { toolchain: "ui.compose", target: "来場者アンケート" },
+			},
+			{
+				say: "はい、お願いします",
+				approve: { toolchain: "ui.compose", target: "来場者アンケート" },
+			},
+		],
+	},
+	{
+		key: "accept-running",
+		name: "進行中の仕事を確かめる・取り消す",
+		reports: false,
+		steps: [
+			{
+				say: "最新のスマートフォンの売れ行きを調べて",
+				expect: { toolchain: "web.search", has: /スマートフォン|スマホ/ },
+			},
+			{ say: "さっきの調べものはどうなった？", check: 1 },
+			{ say: "やっぱりその調べものは取り消して", cancel: 1 },
+		],
+	},
+	{
+		key: "accept-done",
+		name: "終わった仕事を確かめる",
+		reports: false,
+		steps: [
+			{ say: "猫の絵を作って", expect: img(CAT) },
+			{ say: "さっきの絵はどうなった？", check: 1 },
+		],
+	},
+	{
+		key: "accept-weather",
+		name: "即答（天気）",
+		reports: false,
+		steps: [{ say: "明日の鎌倉の天気を教えて", instant: "weather.forecast" }],
+	},
+	{
+		// The preference was said three utterances ago: past `## Earlier`, only `## Memory` holds it.
+		key: "accept-memory",
+		name: "記憶の好み",
+		reports: false,
+		planted: [
+			{ role: "user", text: "好きな色は藍色です" },
+			{ role: "agent", text: "承知しました。" },
+			{ role: "user", text: "今日は暑いですね" },
+			{ role: "agent", text: "そうですね。" },
+			{ role: "user", text: "週末は出かける予定です" },
+			{ role: "agent", text: "いいですね。" },
+		],
+		remembered: [
+			{
+				said: "好きな色は藍色です",
+				key: "color.favorite",
+				text: "好きな色は藍色",
+			},
+		],
+		steps: [{ say: "好きな色で花の絵を描いて", expect: img(/藍/) }],
+	},
+];
+
 /** A toolchain card as a search returns it (the fields of the product's candidate that the model reads). */
 export type Card = {
 	id: string;

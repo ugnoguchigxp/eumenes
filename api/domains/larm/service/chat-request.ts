@@ -2,6 +2,15 @@ import type { ChatContentPart } from "../contracts/chat-input";
 import type { LarmPort, LarmCallOptions } from "../contracts";
 import { nativeToolOptions } from "../../../infrastructure/chat-stream";
 import { operationSchema } from "./operation-schema";
+
+/** The output tokens one call is sent with: what it asked for, within the claim's output reserve (the claim decides). */
+export function sentMaxTokens(
+	outputReserveTokens: number,
+	options: Pick<LarmCallOptions, "maxOutputTokens"> | undefined,
+): number {
+	return Math.min(outputReserveTokens, options?.maxOutputTokens ?? 4096);
+}
+
 export function chatRequest(
 	provider: { model: string; contextWindow?: { outputReserveTokens: number } },
 	messages: Parameters<LarmPort["answer"]>[0],
@@ -70,9 +79,9 @@ export function chatRequest(
 					}
 				: {}),
 		stream,
-		max_tokens: Math.min(
+		max_tokens: sentMaxTokens(
 			provider.contextWindow!.outputReserveTokens,
-			options?.maxOutputTokens ?? 4096,
+			options,
 		),
 	};
 }

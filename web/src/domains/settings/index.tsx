@@ -198,3 +198,5 @@ export function useBackground(client: EumenesClient) {
 	}
 	return { ready: !!value, selected, busy, error, select };
 }
+
+export { notificationSoundWav } from "./notification-sound";

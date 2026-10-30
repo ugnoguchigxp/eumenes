@@ -78,6 +78,8 @@ export type Options = {
 	limits?: SpecialistSet["timeLimits"];
 	/** The studio's agent settings: a work document makes the host offer doc.* tools. */
 	agent?: SpecialistSet["agent"];
+	/** The harness the conversation's runs are served by: `cloud` (default) or `local` (the routed turn). */
+	harness?: "cloud" | "local";
 };
 
 /** The fixture document's canonical text: the same value always gives the same text. */
@@ -132,6 +134,8 @@ export async function setup(options: Options = {}) {
 		works: new Map<string, Work>(),
 		invocations: [] as Array<Record<string, unknown>>,
 		endWorkFails: false,
+		/** Saved items deleted since: no longer offered, and opening one is refused. */
+		gone: new Set<string>(),
 		/** A safe code the next operations are refused with. */
 		invokeError: null as string | null,
 		/** A refusal the fake work document's commit throws (as a domain does, a plain Error(code)). */
@@ -159,11 +163,15 @@ export async function setup(options: Options = {}) {
 			signal?.addEventListener("abort", () => reject(new Error("aborted")));
 		});
 	const larm = {
-		// The conversation is served by a cloud model: the agent's reply loop calls the tools itself.
-		snapshotFor: () => ({
-			...settings({ mode: "cloud-only" }),
-			voice: { autoSpeak: true },
-		}),
+		...(options.harness === "local"
+			? {}
+			: {
+					// The conversation is served by a cloud model: the agent's reply loop calls the tools itself.
+					snapshotFor: () => ({
+						...settings({ mode: "cloud-only" }),
+						voice: { autoSpeak: true },
+					}),
+				}),
 		status: () => ({ state: "ready", capabilities: ["llm"] }),
 		captureInTransaction: () => {},
 		captureControlInTransaction: (
@@ -216,7 +224,8 @@ export async function setup(options: Options = {}) {
 			requestId: string,
 			messages: ChatMessage[],
 			signal: AbortSignal,
-			delta: (text: string) => void,
+			/** Absent for a silent call (a routed turn's choice). */
+			delta: ((text: string) => void) | undefined,
 			_preparation: unknown,
 			tools: Array<{ function: { name: string } }> | undefined,
 		) => {
@@ -227,7 +236,7 @@ export async function setup(options: Options = {}) {
 			const step = state.steps.shift();
 			if (!step) throw new Error("fixture_step_missing");
 			signal.throwIfAborted();
-			if (step.text) delta(step.text);
+			if (step.text) delta?.(step.text);
 			return receipt(requestId, step);
 		},
 	} as unknown as InferencePort;
@@ -299,12 +308,13 @@ export async function setup(options: Options = {}) {
 							: []),
 						{ ref: "item-1", label: "保存済み1" },
 						{ ref: "item-2", label: "保存済み2" },
-					]
+					].filter((item) => !state.gone.has(item.ref))
 				: [],
 		openWorkInTransaction: (_db, set, input) => {
 			if (
 				input.targetRef &&
-				!["item-1", "item-2", "item-old"].includes(input.targetRef)
+				(!["item-1", "item-2", "item-old"].includes(input.targetRef) ||
+					state.gone.has(input.targetRef))
 			)
 				fail("target_not_found");
 			const work: Work = {

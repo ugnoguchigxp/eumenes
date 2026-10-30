@@ -1,3 +1,4 @@
+import { notificationSoundWav } from "../domains/settings";
 import { chatSend } from "./chat-send";
 import { useChatAttachments } from "./useChatAttachments";
 import { useDrawingArtifacts } from "../domains/excalidraw/useDrawingArtifacts";
@@ -132,7 +133,11 @@ export function useWorkspace({
 		settings.data?.voice,
 	);
 	const timerAudio = useTimerTone(
-		settings.data?.voice,
+		{
+			...settings.data?.voice,
+			loadTone: (signal) =>
+				notificationSoundWav(settings.data?.voice.notificationSound, signal),
+		},
 		voice.audio,
 		(text, signal) => client.replayAudio(text, signal),
 	);

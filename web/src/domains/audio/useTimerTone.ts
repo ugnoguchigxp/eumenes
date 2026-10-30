@@ -8,9 +8,14 @@ import { timerToneWav } from "./tone";
 
 /** Reuses configured output; the caller defers notices while voice/replay is busy. */
 export function useTimerTone(
-	settings: { outputDevice?: string; outputVolume?: number } = {},
+	settings: {
+		outputDevice?: string;
+		outputVolume?: number;
+		loadTone?: (signal: AbortSignal) => Promise<Uint8Array | undefined>;
+	} = {},
 	sessionAudio?: () => Pick<AudioController, "play" | "stopPlayback"> | null,
 	speech?: (text: string, signal: AbortSignal) => Promise<Uint8Array>,
+	prepareOnGesture = true,
 ) {
 	const [ready, setReadyState] = useState(false);
 	const readyRef = useRef(false);
@@ -73,6 +78,7 @@ export function useTimerTone(
 	useEffect(() => {
 		// Finish the gesture before hiding the preparation card. Preparing on pointerdown
 		// can remove a pressed button before its click and send the click to another card.
+		if (!prepareOnGesture) return;
 		let lastFailure = Number.NEGATIVE_INFINITY;
 		const unlock = () => {
 			if (readyRef.current) return;
@@ -88,7 +94,7 @@ export function useTimerTone(
 			window.removeEventListener("click", unlock, { capture: true });
 			window.removeEventListener("keyup", unlock, { capture: true });
 		};
-	}, [prepare]);
+	}, [prepare, prepareOnGesture]);
 	const playTone = useCallback(
 		async (
 			signal: AbortSignal,
@@ -148,7 +154,9 @@ export function useTimerTone(
 						}
 					})();
 				});
-			await play(timerToneWav());
+			await play(
+				(await latest.current.settings.loadTone?.(signal)) ?? timerToneWav(),
+			);
 			onToneDelivered?.();
 			// Speech is best effort: an unavailable TTS provider must not erase a delivered beep.
 			if (message && latest.current.speech) {

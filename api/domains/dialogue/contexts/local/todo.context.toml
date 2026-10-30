@@ -1,5 +1,5 @@
 # Source: api/domains/dialogue/service/routed-choice.ts
-text = '''「[[title]]」の仕事の訂正（amend。text に直す内容を書く）か取り消し（cancel）。'''
+text = '''「[[title]]」の仕事の確認（check）、訂正（amend。text に直す内容を書く）か取り消し（cancel）。'''
 
 [variables.title]
 type = "string"

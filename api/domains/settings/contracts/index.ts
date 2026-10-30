@@ -1,4 +1,11 @@
 import { z } from "zod";
+import { notificationSoundIds } from "./notification-sounds";
+export {
+	notificationSoundIds,
+	notificationSoundOptions,
+	defaultNotificationSound,
+	type NotificationSound,
+} from "./notification-sounds";
 import { spatialSettingsShape } from "./spatial";
 export { spatialControls } from "./spatial";
 import { endpoint, cloudEndpoint } from "./endpoints";
@@ -272,6 +279,7 @@ export const settingsSchema = z
 		voice: z
 			.object({
 				autoSpeak: z.boolean(),
+				notificationSound: z.enum(notificationSoundIds).optional(),
 				outputVolume: z.number().min(0).max(1).default(1),
 				bargeIn: z.boolean(),
 				inputDevice: z.string().max(300),

@@ -85,6 +85,12 @@ const groupInfo = (s: Settings): Record<string, SettingsFieldGroup> => ({
 			serviceSummary(s, "asr") +
 			"\n録音の調整は適用後、次の音声開始から反映します。",
 	},
+	notifications: {
+		id: "notifications",
+		label: "通知音",
+		description:
+			"生成やタスクの完了などを知らせる音です。保存前でも試聴できます。読み上げと共通の音量・再生機器を使います。",
+	},
 	devices: { id: "devices", label: "機器", description: "" },
 	larm: { id: "larm", label: "LARM接続" },
 	"route-llm": { id: "route-llm", label: "会話の利用先" },
@@ -94,6 +100,7 @@ const groupInfo = (s: Settings): Record<string, SettingsFieldGroup> => ({
 
 /** The panel actions of the voice screen, performed locally (the browser or the voice API). */
 const panelActions: Record<string, { label: string; group: string }> = {
+	"notification-sample": { label: "通知音を試聴", group: "notifications" },
 	"voice-refresh": { label: "声の一覧を再取得", group: "speech" },
 	"voice-sample": { label: "サンプルを再生", group: "speech" },
 	"devices-discover": { label: "音声機器を確認", group: "devices" },
@@ -270,29 +277,35 @@ export function buildActions({
 	const actions: SettingsPanelAction[] = [];
 	if (effective && saved && speechActive && panelSources.size > 0)
 		for (const [id, base] of Object.entries(panelActions)) {
-			if (id !== "devices-discover" && voice.target !== "local") continue;
+			if (base.group === "speech" && voice.target !== "local") continue;
 			const disabled =
-				id === "voice-refresh"
-					? voice.connectionChanged ||
-						!saved.larm.baseUrl ||
-						voice.voices.isFetching
-					: id === "voice-sample"
-						? voice.connectionChanged || !voice.canSample
-						: voice.checking;
+				id === "notification-sample"
+					? effective.voice.outputVolume <= 0 && !voice.notification.playing
+					: id === "voice-refresh"
+						? voice.connectionChanged ||
+							!saved.larm.baseUrl ||
+							voice.voices.isFetching
+						: id === "voice-sample"
+							? voice.connectionChanged || !voice.canSample
+							: voice.checking;
 			actions.push({
 				id,
 				group: base.group,
 				disabled,
 				label:
-					id === "voice-sample"
-						? voice.sample.state === "loading"
-							? "サンプルの準備を取消"
-							: voice.sample.state === "playing"
-								? "サンプルを停止"
-								: base.label
-						: id === "devices-discover" && voice.checking
-							? "音声機器を確認中…"
-							: base.label,
+					id === "notification-sample"
+						? voice.notification.playing
+							? "通知音の試聴を停止"
+							: base.label
+						: id === "voice-sample"
+							? voice.sample.state === "loading"
+								? "サンプルの準備を取消"
+								: voice.sample.state === "playing"
+									? "サンプルを停止"
+									: base.label
+							: id === "devices-discover" && voice.checking
+								? "音声機器を確認中…"
+								: base.label,
 			});
 		}
 	return actions;
@@ -437,6 +450,8 @@ export function groupsFor(
 		status +
 		(voice.selected?.credit ? "\nクレジット：" + voice.selected.credit : "") +
 		(voice.sample.error ? "\n" + voice.sample.error : "");
+	if (voice.notification.error)
+		info.notifications!.description += "\n" + voice.notification.error;
 	info.devices!.description =
 		"機器確認ボタンを押すとマイクの許可を求めます。変更は適用後、次の音声開始から反映します。" +
 		(voice.outputSupported

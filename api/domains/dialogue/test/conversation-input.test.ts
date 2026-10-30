@@ -212,6 +212,8 @@ test("the last message joins a trailing user message and carries `## Memory` whe
 			lastAt: null,
 			since: null,
 			memoryItemIds: [],
+			memory: null,
+			earlier: [],
 		}) as ConversationPrefix;
 	expect(
 		withLastMessage(

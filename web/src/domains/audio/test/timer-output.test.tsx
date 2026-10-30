@@ -236,3 +236,58 @@ test("a rejecting output is retried at most once every five seconds", async () =
 		vi.useRealTimers();
 	}
 });
+
+test("a supplied notification waveform uses the same output and waits for its ended callback", async () => {
+	const bytes = new Uint8Array([1, 2, 3]);
+	const loadTone = vi.fn(async (_signal: AbortSignal) => bytes);
+	let ended: (() => void) | undefined;
+	fake.output.play.mockImplementation(async (_bytes, done, options) => {
+		ended = done;
+		options.onStarted();
+	});
+	const hook = renderHook(() => useTimerTone({ loadTone, outputVolume: 0.3 }));
+	const abort = new AbortController();
+	const delivered = vi.fn();
+	const playback = hook.result.current.play(abort.signal, undefined, delivered);
+	await waitFor(() => expect(fake.output.play).toHaveBeenCalledOnce());
+	expect(loadTone).toHaveBeenCalledWith(abort.signal);
+	expect(fake.output.play.mock.calls[0]?.[0]).toBe(bytes);
+	expect(delivered).not.toHaveBeenCalled();
+	await act(async () => {
+		ended!();
+		await playback;
+	});
+	expect(delivered).toHaveBeenCalledOnce();
+});
+
+test("a failed or cancelled asset load never sounds the beep or acknowledges delivery", async () => {
+	const loadTone = vi.fn(async (_signal: AbortSignal): Promise<Uint8Array> => {
+		throw new Error("asset_unavailable");
+	});
+	const hook = renderHook(() => useTimerTone({ loadTone }));
+	const delivered = vi.fn();
+	await expect(
+		hook.result.current.play(
+			new AbortController().signal,
+			undefined,
+			delivered,
+		),
+	).rejects.toThrow("asset_unavailable");
+	expect(fake.output.play).not.toHaveBeenCalled();
+	expect(delivered).not.toHaveBeenCalled();
+	let complete!: (bytes: Uint8Array) => void;
+	loadTone.mockImplementationOnce(
+		() =>
+			new Promise((resolve) => {
+				complete = resolve;
+			}),
+	);
+	const abort = new AbortController();
+	const playback = hook.result.current.play(abort.signal, undefined, delivered);
+	const rejected = expect(playback).rejects.toThrow("audio_interrupted");
+	abort.abort();
+	complete(new Uint8Array([1, 2]));
+	await rejected;
+	expect(fake.output.play).not.toHaveBeenCalled();
+	expect(delivered).not.toHaveBeenCalled();
+});

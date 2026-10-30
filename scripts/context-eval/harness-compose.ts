@@ -25,7 +25,10 @@ import {
 	type ConversationPrefix,
 } from "../../api/domains/dialogue/service/conversation-input";
 import { generationTools } from "../../api/domains/dialogue/service/generation-tools";
-import type { ConversationHarness } from "../../api/domains/dialogue/service/harness";
+import {
+	localHarness,
+	type ConversationHarness,
+} from "../../api/domains/dialogue/service/harness";
 import {
 	INPUT_HEADINGS,
 	dataText,
@@ -169,15 +172,26 @@ export function routedInputOf(s: {
 		...workLines(s.works, s.presented),
 	];
 	return {
+		// The harness keeps no memory window (`composeInput` draws none); the user's earlier words, as many as the local
+		// talk window keeps.
+		memory: null,
+		earlier: s.log
+			.filter((e) => e.role === "user")
+			.slice(-(localHarness.history.users ?? 0))
+			.map((e) => lineText(e.text).slice(0, PREVIOUS_REPLY_CHARS))
+			.filter((said) => said.trim()),
 		state: stateText(state),
 		previousReply: lastAgent
 			? lineText(lastAgent.text).slice(0, PREVIOUS_REPLY_CHARS)
 			: null,
 		asked: askedOf(lastAgent),
 		pending: { confirmations: [], questions: [] },
-		todos: s.works
-			.filter((work) => work.state === "running")
-			.map(({ ref, title }) => ({ ref, title })),
+		// A reported work `## State` lists may only be checked, as in the product.
+		todos: s.works.map(({ ref, title, state }) => ({
+			ref,
+			title,
+			open: state === "running",
+		})),
 		resources: namedResources(state),
 	};
 }
@@ -259,6 +273,8 @@ export function composeInput(s: Situation): ChatMessage[] {
 					lastAt: null,
 					since: null,
 					memoryItemIds: [],
+					memory: null,
+					earlier: [],
 				};
 	const state = stateText([
 		`今: ${jstNowLine(NOW_MS)}`,

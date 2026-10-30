@@ -4,6 +4,7 @@ import type { EumenesClient } from "../../../../client";
 import type { Settings } from "../../../../api/domains/settings/contracts";
 import { queryRoots } from "../../queryKeys";
 import { useVoiceSample } from "../settings/useVoiceSample";
+import { useNotificationSample } from "./useNotificationSample";
 import type { VoiceCatalog } from "./voice-presentation";
 
 /**
@@ -31,6 +32,7 @@ export function useVoiceTools({
 		cloud: ReadonlyArray<{ id: string; label: string }>;
 	};
 }) {
+	const notification = useNotificationSample(effective?.voice, active);
 	const connectionChanged =
 		!!saved &&
 		!!effective &&
@@ -142,6 +144,7 @@ export function useVoiceTools({
 		}
 	}
 	return {
+		notification,
 		catalog,
 		selected,
 		voices,

@@ -17,6 +17,7 @@ import {
 	type ParsedCall,
 } from "./generation-tools";
 import { eventText } from "./event-text";
+import { sessionTargetsInTransaction } from "./specialist-context";
 import { dispatchInTransaction } from "./work-dispatch";
 
 import { instant } from "./executor-search";
@@ -222,6 +223,22 @@ export async function handOver(
 	};
 }
 
+/**
+ * The saved item a request names, as the toolchain offers it now (the same choices a session starts from): its name,
+ * or null when the toolchain offers no such item. A toolchain without saved items takes the request as it is.
+ */
+function targetOf(
+	x: ExecutorContext,
+	db: Database,
+	card: Request["card"],
+	target: string,
+): { label: string | null } | null {
+	const targets = sessionTargetsInTransaction(x.deps, db, card, x.input.runId);
+	if (!targets) return { label: null };
+	const found = targets.find((t) => t.ref === target);
+	return found ? { label: found.label } : null;
+}
+
 /** A confirmation before a change (section 6.7): saved, never executed; the generation's speech states it. */
 export function confirm(
 	x: ExecutorContext,
@@ -231,8 +248,14 @@ export function confirm(
 ): Promise<ToolOutcome> {
 	const { deps, current, acted, handle, origin } = x;
 	const { store } = deps;
-	return store.write((tx) => {
+	return store.write((tx): ToolOutcome => {
 		const run = current(tx);
+		// The item is named as the toolchain offers it, so the open confirmations tell two on one request apart.
+		const target = chosen.target
+			? targetOf(x, tx, chosen.card, chosen.target)
+			: { label: null };
+		if (!target)
+			return { result: { delegated: false, code: "target_not_found" } };
 		const row = deps.work!.issueConfirmationInTransaction(
 			tx,
 			{
@@ -241,6 +264,9 @@ export function confirm(
 				toolchainRevisionId: chosen.card.revisionId,
 				request: chosen.request,
 				inputs: chosen.inputs ?? null,
+				target: chosen.target ?? null,
+				targetLabel: target.label,
+				resolveUnsaved: chosen.resolveUnsaved ?? null,
 				impact,
 				statementDeliveryKey: `run:${run.id}`,
 			},
@@ -278,8 +304,20 @@ export async function delegate(
 		return { result: { delegated: false, code: "not_from_user" } };
 	if (args.mode === "approve") {
 		const approved = store.read((db) => approval(x, db, args.confirmation));
-		if (!approved.ok)
+		if (!approved.ok) {
+			// A confirmation whose item is gone can never be approved: it is closed, so a second yes asks nothing.
+			if (approved.code === "target_not_found")
+				await store.write((tx) => {
+					const run = x.current(tx);
+					const closed = deps.work!.withdrawConfirmationInTransaction(
+						tx,
+						run.conversationId,
+						Number(args.confirmation.slice(1)),
+					);
+					if (closed) x.handle(tx);
+				});
 			return { result: { delegated: false, code: approved.code } };
+		}
 		if (!args.announcement)
 			throw toolRejection("announcement_required", [
 				{
@@ -439,12 +477,17 @@ export function approval(
 	if (!enough) return { ok: false, code: "confirmation_not_heard" };
 	const card = toolchains!.cardInTransaction(db, row.toolchainRevisionId);
 	if (!card) return { ok: false, code: "toolchain_unavailable" };
+	// The item must still be there before the approval is announced (its hand-over would be refused after it).
+	if (row.target && !targetOf(x, db, card, row.target))
+		return { ok: false, code: "target_not_found" };
 	return {
 		ok: true,
 		request: {
 			card,
 			request: row.request,
 			...(row.inputs ? { inputs: row.inputs } : {}),
+			...(row.target ? { target: row.target } : {}),
+			...(row.resolveUnsaved ? { resolveUnsaved: row.resolveUnsaved } : {}),
 			confirmationId: row.id,
 			refUris: confirmationResourceUris(db, row.id),
 		},

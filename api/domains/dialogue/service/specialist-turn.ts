@@ -31,6 +31,7 @@ import {
 	parseSpecialistAction,
 	specialistControl,
 	specialistViolations,
+	violationNames,
 	type SpecialistAction,
 } from "./specialist-prompt";
 import { viewedSpecialistTarget } from "./specialist-context";
@@ -356,9 +357,11 @@ export function createSpecialistTurnHandler(
 				action = null;
 			}
 			if (!action) {
+				const violations = specialistViolations(value);
 				log.warn("dialogue.specialist_output_rejected", {
 					reason: "invalid_contract",
 					repairAttempt: repaired ? 1 : 0,
+					violations: violationNames(violations).join(" ").slice(0, 256),
 				});
 				if (repaired || call === max) {
 					if (applied) return updated();
@@ -367,9 +370,7 @@ export function createSpecialistTurnHandler(
 					);
 				}
 				repaired = true;
-				messages.push(
-					correctionMessage(raw, specialistViolations(value), max - call),
-				);
+				messages.push(correctionMessage(raw, violations, max - call));
 				continue;
 			}
 			repaired = false;

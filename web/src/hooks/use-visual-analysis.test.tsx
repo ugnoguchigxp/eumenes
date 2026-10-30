@@ -5,7 +5,11 @@ import type { ReactNode } from "react";
 import { createClient } from "../../../client";
 import type { AnalysisRecord } from "../../../api/domains/larm/contracts";
 import { useVisualAnalysis } from "./use-visual-analysis";
-afterEach(cleanup);
+afterEach(() => {
+	cleanup();
+	vi.useRealTimers();
+	vi.unstubAllGlobals();
+});
 const source = {
 	id: "source",
 	revision: 3,
@@ -43,6 +47,9 @@ function fixture(records: AnalysisRecord[] = []) {
 		analysisCreate: vi.fn(async () => record),
 		analysisGet: vi.fn(async () => record),
 		analysisCancel: vi.fn(async () => record),
+		analysisAsset: vi.fn(
+			async () => new Blob(["image"], { type: "image/png" }),
+		),
 	};
 	const wrapper = ({ children }: { children: ReactNode }) => (
 		<QueryClientProvider client={cache}>{children}</QueryClientProvider>
@@ -77,6 +84,87 @@ it("does not infer on render, and one explicit open creates the default descript
 		}),
 	]);
 	expect(result.current.resource.analysisOpen).toBe(true);
+});
+
+it("fetches completed assets and follows stop observation without repeating inference", async () => {
+	vi.stubGlobal(
+		"URL",
+		class extends URL {
+			static override createObjectURL = vi.fn(() => "blob:analysis-image");
+			static override revokeObjectURL = vi.fn();
+		},
+	);
+	vi.useFakeTimers();
+	const h = fixture([{ ...record, state: "running" }]);
+	const { result } = renderHook(
+		() => useVisualAnalysis(h.client, "object-recognition", "main", source, 0),
+		{ wrapper: h.wrapper },
+	);
+	await act(async () => {
+		await vi.advanceTimersByTimeAsync(50);
+	});
+	const completed: AnalysisRecord = {
+		...record,
+		state: "completed",
+		releaseConfirmed: true,
+		stopObservation: {
+			status: "observing",
+			connectionId: "connection",
+			checkedAt: Date.now(),
+		},
+		result: {
+			contractVersion: "larm.visual-perception.v1",
+			model: "fixture",
+			modelRevision: "revision",
+			task: "describe",
+			image: { width: 8, height: 6, orientation: "exif-normalized" },
+			response: "画像の説明",
+			detections: [],
+			masks: [],
+			truncated: false,
+			timings: {
+				imageDecodeMs: 1,
+				preprocessMs: 1,
+				generationMs: 1,
+				maskMs: 0,
+				postprocessMs: 1,
+				totalMs: 4,
+			},
+			execution: {
+				device: "fixture",
+				backend: "fixture",
+				dtype: "fixture",
+				decoderDtype: "fixture",
+				outputTokens: 1,
+				visualTokens: 1,
+			},
+		},
+	};
+	h.client.analysesList.mockResolvedValue([completed]);
+	await act(async () => {
+		await vi.advanceTimersByTimeAsync(1100);
+	});
+	expect(result.current.resource.analysis?.result?.response).toBe("画像の説明");
+	expect(result.current.resource.analysisImageUrl).toBe("blob:analysis-image");
+	expect(h.client.analysisAsset).toHaveBeenCalledTimes(1);
+	h.client.analysesList.mockResolvedValue([
+		{
+			...completed,
+			stopObservation: { ...completed.stopObservation!, status: "cold" },
+		},
+	]);
+	await act(async () => {
+		await vi.advanceTimersByTimeAsync(1100);
+	});
+	expect(result.current.resource.analysis?.stopObservation?.status).toBe(
+		"cold",
+	);
+	const calls = h.client.analysesList.mock.calls.length;
+	await act(async () => {
+		await vi.advanceTimersByTimeAsync(3000);
+	});
+	expect(h.client.analysesList).toHaveBeenCalledTimes(calls);
+	expect(h.client.analysisCreate).not.toHaveBeenCalled();
 });
 it("opening existing analysis reuses its receipt and rejects stale source events", async () => {
 	const h = fixture([record]);
@@ -134,3 +222,39 @@ it("reconciles a lost create response by receipt without repeating the POST", as
 	expect(h.client.analysisCreate).toHaveBeenCalledTimes(1);
 	expect(h.client.analysisGet).toHaveBeenCalledTimes(1);
 });
+
+it.each(["ocr", "object-recognition"] as const)(
+	"%s follows server progress and stops polling after failure",
+	async (domain) => {
+		const h = fixture([record]);
+		vi.useFakeTimers();
+		const { result } = renderHook(
+			() => useVisualAnalysis(h.client, domain, "main", source, 0),
+			{ wrapper: h.wrapper },
+		);
+		await act(async () => {
+			await vi.advanceTimersByTimeAsync(50);
+		});
+		expect(result.current.resource.analysis?.state).toBe("queued");
+		for (const state of ["starting", "running", "failed"] as const) {
+			h.client.analysesList.mockResolvedValue([
+				{
+					...record,
+					state,
+					updatedAt: Date.now(),
+					errorCode: state === "failed" ? "analysis_failed" : null,
+				},
+			]);
+			await act(async () => {
+				await vi.advanceTimersByTimeAsync(1100);
+			});
+			expect(result.current.resource.analysis?.state).toBe(state);
+		}
+		const calls = h.client.analysesList.mock.calls.length;
+		await act(async () => {
+			await vi.advanceTimersByTimeAsync(3000);
+		});
+		expect(h.client.analysesList).toHaveBeenCalledTimes(calls);
+		expect(h.client.analysisCreate).not.toHaveBeenCalled();
+	},
+);

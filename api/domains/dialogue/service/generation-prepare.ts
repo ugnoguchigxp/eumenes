@@ -28,6 +28,7 @@ import {
 	conversationSystem,
 	placeCutInTransaction,
 	withLastMessage,
+	type ConversationPrefix,
 } from "./conversation-input";
 import { toolchainTitlesInTransaction } from "./delegate-conversation";
 import { generationTools } from "./generation-tools";
@@ -44,6 +45,7 @@ import type { WorkRow } from "../repository/work";
 import {
 	madeOf,
 	namedResources,
+	namedTodos,
 	stateLinesInTransaction,
 	stateText,
 } from "./state-text";
@@ -176,10 +178,14 @@ function triggerOf(
 
 /** How long after the agent asked back the user's next words are taken as the answer to it. */
 const ASKED_MS = 5 * 60 * 1000;
-/** The agent's last words a choice call reads, at most. */
+/** The agent's last words a choice call reads, at most; and each of the user's earlier utterances. */
 const PREVIOUS_REPLY_CHARS = 200;
 
-/** What a routed turn's choice calls read of the host's records (the local harness rebuild plan, 4.3–4.4). */
+/**
+ * What a routed turn's choice calls read of the host's records (the local harness rebuild plan, 4.3–4.4): with the
+ * talk turn's `## Memory` and the user's words of its window, so a request carries what it points to (the review
+ * intake plan, section 5).
+ */
 function routedInputInTransaction(
 	deps: DialogueDeps,
 	tx: Database,
@@ -193,6 +199,7 @@ function routedInputInTransaction(
 			at: string;
 			toolCalls?: ReadonlyArray<{ name: string; arguments: string }>;
 		} | null;
+		prefix: Pick<ConversationPrefix, "memory" | "earlier">;
 	},
 ): RoutedInput {
 	const { lastAgent } = input;
@@ -211,7 +218,22 @@ function routedInputInTransaction(
 		deps.work
 			?.todosInTransaction(tx, input.conversationId)
 			.filter((todo) => todo.status !== "done") ?? [];
+	// The finished work `## State` lists may be checked, as it shows them (a forgotten one has no title).
+	const finished = namedTodos(input.state).flatMap((ref) => {
+		if (todos.some((todo) => todo.ref === ref)) return [];
+		const row = deps.work?.workByRefInTransaction(
+			tx,
+			input.conversationId,
+			ref,
+		);
+		return row?.title ? [{ ref, title: row.title, open: false }] : [];
+	});
 	return {
+		memory: input.prefix.memory,
+		// Words with no text (a voice message left empty) name nothing a request could point to.
+		earlier: input.prefix.earlier
+			.map((said) => lineText(said).slice(0, PREVIOUS_REPLY_CHARS))
+			.filter((said) => said.trim()),
 		state: stateText(input.state),
 		previousReply: lastAgent
 			? lineText(lastAgent.text).slice(0, PREVIOUS_REPLY_CHARS)
@@ -227,6 +249,7 @@ function routedInputInTransaction(
 				ref: c.ref,
 				toolchain: c.toolchain,
 				request: c.request,
+				target: c.target,
 			})),
 			questions: todos.flatMap((todo) =>
 				todo.status === "waiting" && todo.question
@@ -234,7 +257,14 @@ function routedInputInTransaction(
 					: [],
 			),
 		},
-		todos: todos.map((todo) => ({ ref: todo.ref, title: todo.title })),
+		todos: [
+			...todos.map((todo) => ({
+				ref: todo.ref,
+				title: todo.title,
+				open: true,
+			})),
+			...finished,
+		],
 		resources: namedResources(input.state),
 	};
 }
@@ -472,6 +502,7 @@ export function createPrepare(
 								nowMs,
 								state: stateLines,
 								lastAgent,
+								prefix,
 							}),
 						}
 					: {}),

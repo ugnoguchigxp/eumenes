@@ -1,6 +1,7 @@
 import { reportShellRuns } from "../shell/shell-reports";
 import { createDotsHarness } from "../work/dots-harness.fixture";
 import { createContinuityService } from "../../domains/continuity";
+import { createMemoryService } from "../../domains/memory";
 import { createPipelinesService } from "../pipelines/pipelines-service";
 import { dormantBundleFile } from "../../domains/capabilities";
 import { bundleHostOf } from "./toolchain-adapters";
@@ -757,6 +758,13 @@ export async function harness(options: HarnessOptions = {}) {
 		toolchain.registry,
 		toolchain.schemas,
 	);
+	const continuity = createContinuityService(store);
+	const memory = options.memory
+		? createMemoryService(store, conversation, continuity, {
+				journalPath: join(dir, "journal.jsonl"),
+			})
+		: undefined;
+	await memory?.recover();
 	const dialogue = createDialogueService({
 		conversationAgent: testConversationAgent,
 		excalidraw: drawingOperations,
@@ -765,7 +773,8 @@ export async function harness(options: HarnessOptions = {}) {
 		music,
 		store,
 		conversation,
-		continuity: createContinuityService(store),
+		continuity,
+		...(memory ? { memory } : {}),
 		larm: inference,
 		queue,
 		agents: toolchain.agents,
@@ -862,6 +871,7 @@ export async function harness(options: HarnessOptions = {}) {
 		});
 	return {
 		dir,
+		memory,
 		dotsWork,
 		browser,
 		shell,

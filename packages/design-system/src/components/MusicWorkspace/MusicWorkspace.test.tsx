@@ -40,6 +40,36 @@ function setup() {
 	const result = render(<MusicWorkspace {...props} />);
 	return { ...result, props, favorite, select };
 }
+it.each([false, true])(
+	"retains music volume through selection and loading (creation=%s)",
+	(creation) => {
+		const r = setup();
+		const props = {
+			...r.props,
+			creation: creation ? { onGenerate: vi.fn() } : undefined,
+		};
+		r.rerender(<MusicWorkspace {...props} />);
+		fireEvent.change(screen.getByRole("slider", { name: "音量" }), {
+			target: { value: "0.2" },
+		});
+		fireEvent.click(screen.getByRole("button", { name: "次の楽曲" }));
+		expect(r.select).toHaveBeenCalledWith("b");
+		r.rerender(<MusicWorkspace {...props} currentTrackId="b" track={null} />);
+		expect(r.container.querySelector("audio")).toBeNull();
+		r.rerender(
+			<MusicWorkspace
+				{...props}
+				currentTrackId="b"
+				track={{ ...tracks[1]!, src: "blob:second" }}
+			/>,
+		);
+		expect(r.container.querySelector("audio")?.volume).toBe(0.2);
+		fireEvent.click(screen.getByRole("button", { name: "前の楽曲" }));
+		expect(r.select).toHaveBeenLastCalledWith("a");
+		r.rerender(<MusicWorkspace {...props} />);
+		expect(r.container.querySelector("audio")?.volume).toBe(0.2);
+	},
+);
 it("switches left display without replacing the shared audio, and reports missing artwork", () => {
 	const r = setup();
 	const audio = r.container.querySelector("audio");

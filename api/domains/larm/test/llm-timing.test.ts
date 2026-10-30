@@ -383,3 +383,31 @@ test("an exact request is fitted by dropping the oldest history it was told abou
 	);
 	expect(whole.selected).toEqual(list);
 });
+
+test("the timing names the output bound sent, and what the call asked for when the claim's reserve cut it", async () => {
+	const lines = capture();
+	const finished = JSON.stringify({
+		choices: [{ message: { content: "ok" }, finish_reason: "stop" }],
+	});
+	for (const maxOutputTokens of [24_576, 80]) {
+		const timing = startLlmTiming(
+			"SAAA",
+			messages,
+			window,
+			{
+				maxOutputTokens,
+			},
+			undefined,
+		);
+		await timing.read(
+			new Response(finished, {
+				headers: { "content-type": "application/json" },
+			}),
+			new AbortController().signal,
+		);
+	}
+	const [cut, within] = timings(lines);
+	expect(cut).toMatchObject({ maxTokens: 100, requestedMaxTokens: 24_576 });
+	expect(within).toMatchObject({ maxTokens: 80 });
+	expect(within).not.toHaveProperty("requestedMaxTokens");
+});

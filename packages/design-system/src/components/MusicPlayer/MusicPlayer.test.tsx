@@ -52,6 +52,29 @@ describe("MusicPlayer", () => {
 		});
 		expect(audio.volume).toBe(0.3);
 	});
+	it.each([0, 0.3])(
+		"retains volume %s across track and source changes without changing other audio",
+		(volume) => {
+			const speech = document.createElement("audio");
+			speech.volume = 0.7;
+			const { container, rerender } = setup();
+			fireEvent.change(screen.getByRole("slider", { name: "音量" }), {
+				target: { value: String(volume) },
+			});
+			for (const next of [
+				{ ...track, id: "two", src: "blob:two" },
+				{ ...track, id: "two", src: "blob:refreshed" },
+				track,
+			]) {
+				rerender(<MusicPlayer track={next} />);
+				expect(container.querySelector("audio")?.volume).toBe(volume);
+				expect(screen.getByRole("slider", { name: "音量" })).toHaveValue(
+					String(volume),
+				);
+				expect(speech.volume).toBe(0.7);
+			}
+		},
+	);
 	it("keeps playing after the playing intent is recorded", async () => {
 		const { audio } = setup();
 		fireEvent.click(screen.getByRole("button", { name: "再生" }));
@@ -106,12 +129,26 @@ describe("MusicPlayer", () => {
 	it("advances on end and keeps playing the next track", async () => {
 		const ended = vi.fn();
 		const { audio, container, rerender } = setup({ onEnded: ended });
+		fireEvent.change(screen.getByRole("slider", { name: "音量" }), {
+			target: { value: "0.25" },
+		});
 		fireEvent.click(screen.getByRole("button", { name: "再生" }));
 		await screen.findByRole("button", { name: "一時停止" });
 		Object.defineProperty(audio, "ended", { configurable: true, value: true });
-		audio.pause();
+		act(() => audio.pause());
 		fireEvent.ended(audio);
 		expect(ended).toHaveBeenCalledOnce();
+		vi.mocked(HTMLMediaElement.prototype.play).mockImplementationOnce(function (
+			this: HTMLMediaElement,
+		) {
+			expect(this.volume).toBe(0.25);
+			Object.defineProperty(this, "paused", {
+				configurable: true,
+				value: false,
+			});
+			this.dispatchEvent(new Event("play"));
+			return Promise.resolve();
+		});
 		rerender(
 			<MusicPlayer
 				track={{ ...track, id: "two", src: "blob:two" }}
@@ -121,6 +158,7 @@ describe("MusicPlayer", () => {
 		await waitFor(() =>
 			expect(container.querySelector("audio")?.paused).toBe(false),
 		);
+		expect(container.querySelector("audio")?.volume).toBe(0.25);
 	});
 	it("repeats the current track across track changes", () => {
 		const { audio, container, rerender } = setup();
@@ -146,6 +184,11 @@ describe("MusicPlayer", () => {
 	});
 	it("retains playback intent while the host loads the next selected track", async () => {
 		const { container, rerender } = setup();
+		const audio = container.querySelector("audio")!;
+		act(() => {
+			audio.volume = 0.4;
+		});
+		fireEvent.volumeChange(audio);
 		fireEvent.click(screen.getByRole("button", { name: "再生" }));
 		await screen.findByRole("button", { name: "一時停止" });
 		rerender(<MusicPlayer track={null} loading />);
@@ -154,6 +197,7 @@ describe("MusicPlayer", () => {
 		await waitFor(() =>
 			expect(container.querySelector("audio")?.paused).toBe(false),
 		);
+		expect(container.querySelector("audio")?.volume).toBe(0.4);
 	});
 	it("keeps native playback available when audio analysis is unsupported", async () => {
 		vi.stubGlobal("AudioContext", undefined);

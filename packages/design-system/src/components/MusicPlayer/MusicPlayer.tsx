@@ -24,6 +24,7 @@ export type MusicPlayerProps = {
 export function MusicPlayer(props: MusicPlayerProps) {
 	const [resume, setResume] = useState(false);
 	const [repeat, setRepeat] = useState(false);
+	const [volume, setVolume] = useState(1);
 	if (!props.track) {
 		if (!props.loading && resume) setResume(false);
 		return (
@@ -52,6 +53,8 @@ export function MusicPlayer(props: MusicPlayerProps) {
 			track={props.track}
 			autoPlay={resume}
 			repeat={repeat}
+			volume={volume}
+			onVolumeChange={setVolume}
 			onRepeatChange={setRepeat}
 			onPlayingChange={(playing) => {
 				setResume(playing);
@@ -72,15 +75,21 @@ function Player({
 	repeat,
 	onRepeatChange,
 	onPlayingChange,
+	volume,
+	onVolumeChange,
 }: MusicPlayerProps & {
 	track: MusicTrack;
 	autoPlay: boolean;
 	repeat: boolean;
 	onRepeatChange: (repeat: boolean) => void;
 	onPlayingChange: (playing: boolean) => void;
+	volume: number;
+	onVolumeChange: (volume: number) => void;
 }) {
 	const { ref: audioRef, ...playback } = usePlayback(
 		autoPlay,
+		volume,
+		onVolumeChange,
 		!!onPlaybackChange,
 	);
 	// A request from code that the browser refused: the play button asks to be pressed.

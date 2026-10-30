@@ -7,6 +7,8 @@ import type { Step } from "./conversation-script.fixture";
 
 /** The knobs of the toolchain harness (`harness` in toolchain.fixture.ts). */
 export type HarnessOptions = {
+	/** A real memory service (its journal in the harness directory): what the conversation's `## Memory` shows. */
+	memory?: boolean;
 	everyday?: boolean;
 	/** Task pipelines run on the parent execution, without the suspended task bundle. */
 	pipelines?: boolean;

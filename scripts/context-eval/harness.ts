@@ -5,6 +5,8 @@
  *   bun scripts/context-eval/harness.ts [--harness local|cloud] [--client larm|codex] [--model <id>]
  *       [--reasoning off|low|medium|high] [--chains <key,...>] [--forms <form,...>] [--reps <n>]
  *       [--turn single|routed] [--probe] [--dry-run]
+ *   bun scripts/context-eval/harness.ts --harness local --lane accept [--judge ruri|expect] [--chains <key,...>]
+ *       [--reps <n>] [--dry-run]
  * Without `--client` the saved LARM connection answers (in this process; no server is started). `--client codex`
  * runs the Codex SDK path with `--model`; the model id is only ever this argument. The harness decides the call's
  * reasoning and output limit; `--reasoning` overrides the reasoning for an experiment. `--probe` tries the first
@@ -19,6 +21,11 @@
  * first step of each chain and form (for a routed harness also the choice input of the chain's first step) without
  * calling any model. Runs interleave rep, chain, form. Reports go to
  * verification-reports/context-eval/harness/<timestamp>/ (new directories, never overwritten). It is outside verify.
+ *
+ * `--lane accept` (the review intake plan, section 6) runs each chain whole through the product's routed turn
+ * instead, with the real judge (`--judge ruri`, the saved intent connection; `--judge expect` puts the step's
+ * expectation in its place), search and host checks (`harness-accept.ts`): the chains above and the scenes it adds
+ * (`ACCEPT_CHAINS`). Its reports go to verification-reports/context-eval/accept/<timestamp>/.
  */
 import { join, resolve } from "node:path";
 import {
@@ -43,10 +50,12 @@ import {
 import { estimateMessageTokens } from "../../api/domains/inference";
 import { estimateTextTokens } from "../../api/infrastructure/context-budget";
 import {
+	ACCEPT_CHAINS,
 	CHAINS,
 	PROBE_CHAIN,
 	PROBE_TRIES,
 	candidatesFor,
+	type AcceptChain,
 	type Chain,
 } from "./harness-chains";
 import {
@@ -75,6 +84,7 @@ import {
 	type TurnMode,
 	type StepRecord,
 } from "./harness-judge";
+import type { AcceptMeta, AcceptRecord } from "./harness-accept";
 import { readSaved, type Saved } from "./harness-source";
 import { runRoutedTurn, type RequestInput } from "./harness-routed";
 import { runTurn } from "./harness-turn";
@@ -88,7 +98,11 @@ export type Options = {
 	reasoningOverridden: boolean;
 	/** How a model round is made: the reply loop with the native tools, or the routed turn. */
 	turn: TurnMode;
-	chains: Chain[];
+	/** The chooser measurement on the harness's own turn, or the acceptance lane on the product's. */
+	lane: "choice" | "accept";
+	/** The acceptance lane's judge: the saved Ruri connection, or the step's expectation. */
+	judge: "ruri" | "expect";
+	chains: AcceptChain[];
 	forms: Form[];
 	reps: number;
 	probe: boolean;
@@ -117,6 +131,8 @@ export function parseOptions(argv: readonly string[]): Options {
 		"probe",
 		"dry-run",
 		"turn",
+		"lane",
+		"judge",
 	]);
 	for (const arg of argv)
 		if (arg.startsWith("--") && !known.has(arg.slice(2)))
@@ -150,20 +166,39 @@ export function parseOptions(argv: readonly string[]): Options {
 		);
 	if (turn === "routed" && client !== "larm")
 		throw new Error("--turn routed needs the saved LARM connection");
+	const lane = value("lane") ?? "choice";
+	if (lane !== "choice" && lane !== "accept")
+		throw new Error("--lane is choice or accept");
+	const judge = value("judge") ?? "ruri";
+	if (judge !== "ruri" && judge !== "expect")
+		throw new Error("--judge is ruri or expect");
+	if (lane === "accept") {
+		// The product's own turn decides its calls: only the local harness on the saved LARM connection runs it.
+		if (harness.name !== "local" || client !== "larm")
+			throw new Error(
+				"--lane accept runs the local harness on the saved LARM connection",
+			);
+		for (const fixed of ["model", "reasoning", "forms", "probe", "turn"])
+			if (argv.includes(`--${fixed}`))
+				throw new Error(`--${fixed} does not apply to --lane accept`);
+	} else if (argv.includes("--judge"))
+		throw new Error("--judge applies to --lane accept");
 	const probe = flag("probe");
+	const chainsOfLane: readonly AcceptChain[] =
+		lane === "accept" ? [...CHAINS, ...ACCEPT_CHAINS] : CHAINS;
 	const keys = value("chains")?.split(",");
 	const chains = probe
 		? [PROBE_CHAIN]
 		: keys
 			? keys.map((key) => {
-					const chain = CHAINS.find((c) => c.key === key);
+					const chain = chainsOfLane.find((c) => c.key === key);
 					if (!chain)
 						throw new Error(
-							`unknown chain ${key} (${CHAINS.map((c) => c.key).join(", ")})`,
+							`unknown chain ${key} (${chainsOfLane.map((c) => c.key).join(", ")})`,
 						);
 					return chain;
 				})
-			: [...CHAINS];
+			: [...chainsOfLane];
 	const forms = probe
 		? ["empty" as Form]
 		: (value("forms")?.split(",") ?? ["current"]).map((form) => {
@@ -181,6 +216,8 @@ export function parseOptions(argv: readonly string[]): Options {
 		reasoning: (reasoning as Reasoning | undefined) ?? harness.call.reasoning,
 		reasoningOverridden: !!reasoning,
 		turn,
+		lane,
+		judge,
 		chains,
 		forms,
 		reps,
@@ -343,7 +380,7 @@ export function dryRunText(opts: Options, saved: Saved): string {
 		`harness=${opts.harness.name} client=${opts.client} reasoning=${opts.reasoning}${opts.reasoningOverridden ? " (override)" : ""} outputLimit=${opts.harness.call.outputLimit}`,
 		`system: ${system.length} chars, ~${estimateMessageTokens([{ content: system }])} tokens, ${system.split("\n").filter((l) => l.startsWith("## ")).length} sections`,
 		routed
-			? "turn: routed (a request turn is one silent choice held to a schema, a talk turn one call with no tools; the step's expectation stands in for the judge)"
+			? `turn: routed (a request turn is one silent choice held to a schema, a talk turn one call with no tools; stand-ins: ${ROUTED_STAND_INS.join(" / ")})`
 			: "turn: single (one call with the native tools)",
 		"",
 		`=== system${routed ? " of the talk turn" : ""} (shared by every message list below) ===`,
@@ -412,9 +449,40 @@ function choiceDryRun(chain: Chain, saved: Saved): string[] {
 }
 
 const DB_PATH = () => process.env.EUMENES_DB || "./data/eumenes.sqlite3";
+const REPORT_ROOT = join(
+	resolve(import.meta.dir, "../.."),
+	"verification-reports",
+	"context-eval",
+);
+
+/**
+ * What the chooser measurement of a routed turn stands in for (the review intake plan, section 6.1): its results say
+ * how well the choice call chooses, not whether the local turn passes; that is the acceptance lane's.
+ */
+export const ROUTED_STAND_INS = [
+	"判定: ステップの期待（期待のあるステップは依頼の回、ほかは会話の回）",
+	"担当探し: 固定の振り分け（candidatesFor。製品の検索ではない）",
+	"即答: 担当を呼ばず、決まった文",
+	"確認と承認・保留の回: なし（保存済みの定義に入力の schema と最小の影響がない）",
+];
+
+/** The chooser report with what it stands in for, after its table of settings. */
+export function withStandIns(markdown: string): string {
+	const lines = markdown.split("\n");
+	const at = lines.findIndex((line) => line.startsWith("## "));
+	return [
+		...lines.slice(0, at),
+		"## 代用している部分（選ぶ呼出しの測定。local の通しの合否は --lane accept）",
+		"",
+		...ROUTED_STAND_INS.map((line) => `- ${line}`),
+		"",
+		...lines.slice(at),
+	].join("\n");
+}
 
 async function main() {
 	const opts = parseOptions(process.argv.slice(2));
+	if (opts.lane === "accept") return mainAccept(opts);
 	const saved = readSaved(DB_PATH());
 	if (opts.dryRun) {
 		console.log(dryRunText(opts, saved));
@@ -430,12 +498,7 @@ async function main() {
 		outputLimit: opts.harness.call.outputLimit,
 	};
 	const now = new Date();
-	const repoRoot = resolve(import.meta.dir, "../..");
-	const dir = createReportDir(
-		join(repoRoot, "verification-reports", "context-eval"),
-		"harness",
-		now,
-	);
+	const dir = createReportDir(REPORT_ROOT, "harness", now);
 	const records: StepRecord[] = [];
 	const run: Run = {
 		client,
@@ -476,7 +539,71 @@ async function main() {
 				? (await import("./live")).liveSettingsSnapshot()
 				: null,
 	};
-	const markdown = reportMarkdown(meta, records);
+	const report = reportMarkdown(meta, records);
+	const markdown = opts.turn === "routed" ? withStandIns(report) : report;
+	writeReportFile(
+		dir,
+		"results.json",
+		`${JSON.stringify({ meta, records }, null, 2)}\n`,
+	);
+	writeReportFile(dir, "results.md", markdown);
+	console.log(`\n${markdown}\n報告: ${dir}`);
+}
+
+/** The acceptance lane (`--lane accept`): every chain, once per rep, whole through the product's routed turn. */
+async function mainAccept(opts: Options) {
+	const accept = await import("./harness-accept");
+	const live = await import("./harness-accept-live");
+	if (opts.dryRun) {
+		console.log(
+			await accept.acceptDryRunText(opts.chains, live.savedIntent(DB_PATH())),
+		);
+		return;
+	}
+	const ports = await live.liveAcceptPorts(DB_PATH(), opts.judge);
+	const now = new Date();
+	const dir = createReportDir(REPORT_ROOT, "accept", now);
+	const records: AcceptRecord[] = [];
+	const stopped: AcceptMeta["stopped"] = [];
+	try {
+		for (let rep = 0; rep < opts.reps; rep++)
+			for (const chain of opts.chains)
+				// A scene that stops is recorded as stopped; the others still run and the report is still written.
+				try {
+					await accept.runAcceptChain(ports, chain, rep, {
+						onStep: (record) => {
+							records.push(record);
+							appendReportLine(dir, "steps.jsonl", record);
+							console.log(
+								`${record.chain} | 回${record.rep + 1} | ${record.say} | ${record.pass ? "合格" : `不合格 ${record.why}`} | ${(record.turnMs / 1000).toFixed(1)}秒`,
+							);
+						},
+					});
+				} catch (error) {
+					const reason = error instanceof Error ? error.message : "unknown";
+					stopped.push({ chain: chain.name, rep, reason });
+					appendReportLine(dir, "steps.jsonl", {
+						chain: chain.name,
+						rep,
+						stopped: reason,
+					});
+					console.log(
+						`${chain.name} | 回${rep + 1} | 途中で止まった（${reason}）`,
+					);
+				}
+	} finally {
+		await ports.close();
+	}
+	const meta: AcceptMeta = {
+		startedAt: now.toISOString(),
+		judge: opts.judge,
+		searchScore: ports.intent.searchScore,
+		reps: opts.reps,
+		chains: opts.chains.map((c) => c.name),
+		settings: (await import("./live")).liveSettingsSnapshot(),
+		stopped,
+	};
+	const markdown = accept.acceptReport(meta, records);
 	writeReportFile(
 		dir,
 		"results.json",

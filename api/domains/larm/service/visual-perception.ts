@@ -278,9 +278,11 @@ export function createVisualPerception(config: {
 						missing: "invalid_visual_response",
 						signal,
 					});
-					const result = perceptionResult.parse(
+					const parsedResult = perceptionResult.safeParse(
 						JSON.parse(new TextDecoder().decode(bytes)),
 					);
+					if (!parsedResult.success) throw new Error("invalid_visual_response");
+					const result = parsedResult.data;
 					if (
 						result.model !== p.model ||
 						result.task !== parsed.task ||

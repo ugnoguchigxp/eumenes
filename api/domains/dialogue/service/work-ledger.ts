@@ -521,6 +521,7 @@ export function createWorkLedger(
 				toolchain: row.toolchainId,
 				request: row.request,
 				impact: row.impact,
+				target: row.targetLabel,
 			}));
 		},
 	};

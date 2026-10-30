@@ -25,6 +25,8 @@ export type PendingConfirmation = {
 	toolchain: string;
 	request: string;
 	impact: string;
+	/** The name of the saved item it changes, as the confirmation showed it. */
+	target: string | null;
 };
 
 /** The numbers the model reads host records by: a TODO's `t<ref>`, a confirmation's `c<ref>`, a resource's `a<ref>`. */

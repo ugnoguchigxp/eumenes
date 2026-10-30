@@ -32,7 +32,6 @@ import {
 	cellOf,
 	copyRunOf,
 	failureDetails,
-	judgeStep,
 	reportMarkdown,
 	stopCounts,
 	timingOf,
@@ -40,11 +39,7 @@ import {
 	type StepRecord,
 } from "./harness-judge";
 import { dryRunText, parseOptions, startLog } from "./harness";
-import {
-	FAILED_SAID,
-	runRoutedTurn,
-	type RequestInput,
-} from "./harness-routed";
+import { runRoutedTurn, type RequestInput } from "./harness-routed";
 import { runTurn } from "./harness-turn";
 
 const cards = Object.fromEntries(
@@ -493,59 +488,6 @@ describe("runRoutedTurn, the request turn", () => {
 			"model3d.studio",
 		);
 	});
-	test("an unreadable choice is not made again: the talk turn answers, and the choice is marked as its check", async () => {
-		const fake = fakeClient({
-			choices: ["not json"],
-			replies: [{ chunks: ["はい。"] }],
-		});
-		const r = await runRoutedTurn(
-			env(fake.client),
-			input("猫の絵作って"),
-			cards,
-			1,
-			requestOf("猫の絵作って"),
-		);
-		expect(kinds(r)).toEqual(["choice", "talk"]);
-		expect(r.stop).toBe("answer");
-		expect(r.said).toBe("はい。");
-		expect(r.details[0]).toMatchObject({
-			check: "choice_unreadable",
-			choiceJson: "not json",
-		});
-		expect(r.details[0]!.toolCalls[0]).toMatchObject({
-			verdict: "refused",
-			reason: "choice_unreadable",
-		});
-	});
-	test("after the second failure the host says its fixed phrase and the step fails", async () => {
-		const fake = fakeClient({
-			choices: [
-				json({ choice: "weather.forecast", inputs: {} }),
-				json({ choice: "weather.forecast", inputs: {} }),
-			],
-		});
-		const r = await runRoutedTurn(
-			env(fake.client),
-			input("猫の絵作って"),
-			cards,
-			1,
-			requestOf("猫の絵作って"),
-		);
-		expect(kinds(r)).toEqual(["choice", "choice"]);
-		expect(r).toMatchObject({
-			stop: "check",
-			said: FAILED_SAID,
-			hostSpoke: true,
-			choiceFailure: "choice_not_offered",
-		});
-		expect(FAILED_SAID.length).toBeGreaterThan(0);
-		expect(
-			judgeStep({ say: "x", free: true }, r, {
-				copies: () => false,
-				lastAgent: "",
-			}),
-		).toEqual({ pass: false, why: "choice:choice_not_offered" });
-	});
 	test("a work candidate without its request is not taken; a todo not shown is not offered", async () => {
 		const noRequest = fakeClient({
 			choices: [
@@ -582,52 +524,6 @@ describe("runRoutedTurn, the request turn", () => {
 		expect(cancelled.delegated).toBeUndefined();
 		expect(JSON.stringify(stray.chosen[1]!.schema)).toContain('"t1"');
 	});
-	test("a choice cut at the output limit is not made again: the talk turn answers", async () => {
-		const fake = fakeClient({
-			replies: [{ chunks: ["決めきれませんでした。"] }],
-		});
-		let choices = 0;
-		fake.client.decide = async () => {
-			choices++;
-			throw new Error("chat_stream_incomplete");
-		};
-		const r = await runRoutedTurn(
-			env(fake.client),
-			input("猫の絵作って"),
-			cards,
-			1,
-			requestOf("猫の絵作って"),
-		);
-		expect(choices).toBe(1);
-		expect(fake.streamed).toEqual([{ tools: false }]);
-		expect(r).toMatchObject({
-			stop: "answer",
-			said: "決めきれませんでした。",
-			hostSpoke: false,
-		});
-		expect(r.details.map((detail) => detail.kind)).toEqual(["choice", "talk"]);
-		expect(r.details[0]!.error?.code).toBe("chat_stream_incomplete");
-	});
-	test("an error of the choice call ends the turn with its code", async () => {
-		const fake = fakeClient({});
-		fake.client.decide = async () => {
-			throw new Error("larm_unreachable");
-		};
-		const r = await runRoutedTurn(
-			env(fake.client),
-			input("猫の絵作って"),
-			cards,
-			1,
-			requestOf("猫の絵作って"),
-		);
-		expect(r).toMatchObject({ stop: "error", error: "larm_unreachable" });
-		expect(r.details[0]!.error?.code).toBe("larm_unreachable");
-		const without = { ...fake.client, decide: undefined };
-		expect(
-			(await runRoutedTurn(env(without), input("x"), cards, 1, requestOf("x")))
-				.error,
-		).toBe("harness_decide_unsupported");
-	});
 });
 
 describe("the talk input and the choice input of a routed harness", () => {
@@ -654,15 +550,17 @@ describe("the talk input and the choice input of a routed harness", () => {
 			presented: null,
 		});
 		expect(routed).toEqual({
+			memory: null,
+			earlier: ["猫の絵作って"],
 			state: "## State\n今: 10-28（水）10:00\n仕事:\n- t1 猫の絵 実行中",
 			previousReply: "承りました。",
 			asked: null,
 			pending: { confirmations: [], questions: [] },
-			todos: [{ ref: 1, title: "猫の絵" }],
+			todos: [{ ref: 1, title: "猫の絵", open: true }],
 			resources: [],
 		});
 	});
-	test("the previous reply is cut to 200 characters; only running works are open todos", () => {
+	test("the previous reply is cut to 200 characters; a reported work may only be checked", () => {
 		const routed = routedInputOf({
 			log: [{ role: "agent", text: "あ".repeat(300) }],
 			works: [
@@ -672,7 +570,10 @@ describe("the talk input and the choice input of a routed harness", () => {
 			presented: null,
 		});
 		expect(routed.previousReply).toHaveLength(200);
-		expect(routed.todos).toEqual([{ ref: 1, title: "a" }]);
+		expect(routed.todos).toEqual([
+			{ ref: 1, title: "a", open: true },
+			{ ref: 2, title: "b", open: false },
+		]);
 	});
 });
 

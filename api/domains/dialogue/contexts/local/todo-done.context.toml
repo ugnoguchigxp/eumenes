@@ -1,0 +1,8 @@
+# Source: api/domains/dialogue/service/routed-choice.ts
+text = '''「[[title]]」の仕事の確認（check）。終わった仕事なので、確認だけ。'''
+
+[variables.title]
+type = "string"
+trust = "trusted"
+placement = "inline"
+encoding = "raw"

@@ -43,6 +43,8 @@ export interface LogFields {
 	validationCode?: string;
 	/** A rejected operation's repair note: a position and a rule, never a value. */
 	repairHint?: string;
+	/** A rejected output's broken points: the fields and kinds of break, a reply's measured length; never a value. */
+	violations?: string;
 	expectedType?: string;
 	actualType?: string;
 	issueCount?: number;
@@ -109,6 +111,9 @@ export interface LogFields {
 	promptTokens?: number;
 	completionTokens?: number;
 	cachedTokens?: number;
+	/** The output tokens a model call was sent with, and what it asked for when the provider's reserve cut it. */
+	maxTokens?: number;
+	requestedMaxTokens?: number;
 	omitted?: number;
 	messageCount?: number;
 	applied?: number;
@@ -162,6 +167,8 @@ const keys = new Set<keyof LogFields>([
 	"promptTokens",
 	"completionTokens",
 	"cachedTokens",
+	"maxTokens",
+	"requestedMaxTokens",
 	"audioMs",
 	"preRollMs",
 	"trailMs",
@@ -210,6 +217,7 @@ const keys = new Set<keyof LogFields>([
 	"validationPath",
 	"validationCode",
 	"repairHint",
+	"violations",
 	"expectedType",
 	"actualType",
 	"issueCount",

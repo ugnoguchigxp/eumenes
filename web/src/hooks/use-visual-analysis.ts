@@ -44,6 +44,15 @@ export function useVisualAnalysis(
 		retry: false,
 		queryFn: ({ signal }) =>
 			client.analysesList(domain, source!.id, conversationId, frame, signal),
+		refetchInterval: (query) =>
+			query.state.data?.some(
+				(record) =>
+					["queued", "starting", "running", "cancelling"].includes(
+						record.state,
+					) || record.stopObservation?.status === "observing",
+			)
+				? 1000
+				: false,
 	});
 	const matching = (records.data ?? []).filter(
 		(r) => r.sourceRevision === source?.revision,

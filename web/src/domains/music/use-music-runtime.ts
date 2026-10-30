@@ -13,6 +13,7 @@ import { queryRoots } from "../../queryKeys";
 import { useMusicCreation } from "./use-music-creation";
 import { useMusicArtworkUrl } from "./use-music-artwork";
 import { musicStudioSource } from "./artifact-definition";
+import { useMusicAutoplay } from "./use-music-autoplay";
 
 export function useMusicRuntime(
 	client: EumenesClient,
@@ -94,6 +95,7 @@ export function useMusicRuntime(
 	const operation = useRef(false);
 	const id = selectedItem?.id;
 	const ready = selectedItem?.state === "completed";
+	useMusicAutoplay(conversationId, query.data, id, audio?.id);
 	useEffect(() => {
 		if (!id || !ready) return;
 		const controller = new AbortController();

@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { Hono } from "hono";
 import { answerError } from "../../../application/app";
+import { configureLogging } from "../../../infrastructure/logger";
 import { registerDialogue } from "../controller";
 import {
 	STUDIO,
@@ -11,6 +12,7 @@ import {
 
 const open: Harness[] = [];
 afterEach(async () => {
+	configureLogging({ level: "silent" });
 	for (const h of open.splice(0)) await h.close();
 });
 async function harness(options: Parameters<typeof setup>[0] = {}) {
@@ -54,6 +56,31 @@ test("a malformed output is repaired once with the rejected output as data; a se
 	// A failed turn releases the work and leaves the session as it was.
 	expect(h.work()[0]!.holder).toBeNull();
 	expect((await h.session())!.state).toBe("active");
+});
+
+test("a rejected output is logged with where it broke the contract, never with what it said", async () => {
+	const lines: Array<Record<string, unknown>> = [];
+	const h = await harness();
+	await start(h);
+	configureLogging({
+		level: "info",
+		destination: { write: (line) => void lines.push(JSON.parse(line)) },
+	});
+	const long = "これは長い説明です。".repeat(5);
+	h.state.specialist.push(reply(long), {
+		action: "invoke",
+		tool: "draft.apply",
+		forward: true,
+	});
+	await h.ask("説明して");
+	const rejected = lines.filter(
+		(line) => line.event === "dialogue.specialist_output_rejected",
+	);
+	expect(rejected.map((line) => line.violations)).toEqual([
+		"text:chars=50/300:sentences=5/2",
+		"invoke:missing=-:unexpected=forward",
+	]);
+	expect(JSON.stringify(rejected)).not.toContain("長い説明");
 });
 
 /** The `issues` the repair call carried for the rejected output (data after REJECTED_OUTPUT=). */

@@ -1,6 +1,8 @@
 import { intentAnswerRouteMigration, intentJudgmentsMigration } from "./intent";
 import type { Database } from "bun:sqlite";
 import {
+	confirmationTargetLabelMigration,
+	confirmationTargetMigration,
 	workMigration,
 	workNoticesMigration,
 	workOriginsMigration,
@@ -408,6 +410,16 @@ export const migrations: readonly Migration[] = [
 		id: "dialogue/0029-notice-archive",
 		after: ["dialogue/0028-intent-answer-route"],
 		sql: "ALTER TABLE dialogue_work ADD COLUMN notice_archived_at TEXT;",
+	},
+	{
+		id: "dialogue/0030-confirmation-target",
+		after: ["dialogue/0029-notice-archive"],
+		sql: confirmationTargetMigration,
+	},
+	{
+		id: "dialogue/0031-confirmation-target-label",
+		after: ["dialogue/0030-confirmation-target"],
+		sql: confirmationTargetLabelMigration,
 	},
 ];
 

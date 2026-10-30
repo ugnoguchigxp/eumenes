@@ -40,6 +40,25 @@ const record: VisualAnalysisRecord = {
 	},
 };
 describe("explicit visual analysis", () => {
+	it("shows a provider contract failure instead of leaving the analysis running", () => {
+		render(
+			<VisualAnalysis
+				analysisAvailable
+				analysisOpen
+				analysis={{
+					...record,
+					state: "failed",
+					result: null,
+					errorCode: "invalid_visual_response",
+				}}
+			/>,
+		);
+		expect(screen.getByRole("status")).toHaveTextContent("失敗");
+		expect(screen.getByRole("alert")).toHaveTextContent(
+			"解析サービスの応答形式が正しくありません。LARM側の対応状況を確認してください。",
+		);
+		expect(screen.getByRole("button", { name: "分析する" })).toBeEnabled();
+	});
 	it("opens only on the button and sends the chosen task and unmodified query", () => {
 		const open = vi.fn(),
 			run = vi.fn();

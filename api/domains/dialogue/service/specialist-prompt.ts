@@ -183,6 +183,22 @@ export function specialistViolations(value: unknown): SpecialistViolation[] {
 		.slice(0, MAX_VIOLATIONS);
 }
 
+/**
+ * A rejected output's violations as the log names them: the field and the kind of break, the measured length of a
+ * long reply, or the fields an action lacks or must not carry. No value the model wrote.
+ */
+export function violationNames(
+	violations: ReturnType<typeof specialistViolations>,
+): string[] {
+	return violations.map((v) =>
+		"action" in v
+			? `${v.action}:missing=${v.missing.join("+") || "-"}:unexpected=${v.unexpected.join("+") || "-"}`
+			: "chars" in v
+				? `text:chars=${v.chars}/${v.maxChars}:sentences=${v.sentences}/${v.maxSentences}`
+				: `${v.path || "(root)"}:${v.code}`,
+	);
+}
+
 const RULES = systemContext("dialogue.contexts.specialist-turn.rules", {});
 const CORRECTION = systemContext(
 	"dialogue.contexts.specialist-turn.correction",

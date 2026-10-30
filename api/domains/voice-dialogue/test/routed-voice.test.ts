@@ -81,3 +81,20 @@ test("a talk that fails before a word gets the host's words, and the voice turn 
 	expect(turn.status).toBe("ready");
 	expect(h.dialogue.answerText(turn.runId!)).toBe(FAILED);
 });
+
+test("a cut choice followed by a failed talk adopts and speaks the host's answer on the same request", async () => {
+	let chosen = 0;
+	const { h, turn, spoken } = await turnOf(
+		failing("chat_stream_incomplete"),
+		async () => {
+			chosen++;
+			throw new Error("chat_stream_incomplete");
+		},
+	);
+	expect(chosen).toBe(1);
+	expect(turn.error).toBeNull();
+	expect(turn.status).toBe("ready");
+	expect(h.dialogue.get(turn.runId!)?.status).toBe("completed");
+	expect(h.dialogue.answerText(turn.runId!)).toBe(FAILED);
+	expect(spoken.join("")).toBe(FAILED);
+});

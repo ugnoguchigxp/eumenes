@@ -80,6 +80,10 @@ export type FinalMessage =
 /** What a generation's prepare fixes, inside the claim transaction. */
 /** The host's records a routed turn chooses on, fixed at the claim (the local harness rebuild plan, sections 4.3–4.4). */
 export type RoutedInput = {
+	/** `## Memory` as the talk turn shows it (the user's own words only), when it shows any item. */
+	memory: string | null;
+	/** The user's earlier utterances in the talk turn's window, oldest first (cut to their head): what a request may point to. */
+	earlier: string[];
 	/** `## State` of the choice calls: now, the work by its numbers and what is presented. */
 	state: string;
 	/** The agent's last words, for 「それ」「さっきの」 (cut to their head). */
@@ -88,11 +92,20 @@ export type RoutedInput = {
 	asked: { request: string } | null;
 	/** Confirmations not yet answered, and the questions the work asks the user. */
 	pending: {
-		confirmations: Array<{ ref: number; toolchain: string; request: string }>;
+		confirmations: Array<{
+			ref: number;
+			toolchain: string;
+			request: string;
+			/** The name of the saved item it changes, as the confirmation showed it. */
+			target: string | null;
+		}>;
 		questions: Array<{ ref: number; title: string; question: string }>;
 	};
-	/** The open work the user may correct or cancel. */
-	todos: Array<{ ref: number; title: string }>;
+	/**
+	 * The work the choice may name: the open work, which it may check, correct or cancel, and the finished work
+	 * `## State` shows, which it may only check.
+	 */
+	todos: Array<{ ref: number; title: string; open: boolean }>;
 	/** The resources `## State` names (`a<n>`): the only ones a choice may hand over with its request. */
 	resources: string[];
 };

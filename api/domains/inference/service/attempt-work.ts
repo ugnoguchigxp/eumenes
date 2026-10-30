@@ -52,10 +52,11 @@ export function attemptDuration(r: Request, source: Source) {
 
 /**
  * Tokens added to the output limit of a LARM call this domain makes think (`low`): its caller's limit is for the
- * answer, and LARM counts the thinking in it. A memory step capped at 1,200 thought about 1,000 tokens and was cut
- * (`chat_stream_incomplete`, 2026-10-29).
+ * answer, and LARM counts the thinking in it. World curation exhausted all 3,248 tokens (1,200 + the former 2,048
+ * allowance) with about 12,500 reasoning characters (`finishReason=length`, 2026-10-31). The user approved 10,000
+ * tokens for the reasoning; the provider's advertised cap and the request's deadline still apply.
  */
-export const REASONING_ALLOWANCE_TOKENS = 2048;
+export const REASONING_ALLOWANCE_TOKENS = 10_000;
 
 /** Provider options and bounded exchange correlation across language, delivery and synthesis. */
 export function callOptionsFor(

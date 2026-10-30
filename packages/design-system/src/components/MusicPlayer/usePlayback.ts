@@ -1,16 +1,24 @@
 import { useEffect, useRef, useState } from "react";
 import { useAudioAnalysis } from "./useAudioAnalysis";
 
-export function usePlayback(autoPlay: boolean, analyse = false) {
+export function usePlayback(
+	autoPlay: boolean,
+	volume: number,
+	onVolumeChange: (volume: number) => void,
+	analyse = false,
+) {
 	const ref = useRef<HTMLAudioElement>(null);
 	const analysis = useAudioAnalysis(ref, analyse);
 	const [playing, setPlaying] = useState(false);
 	const [position, setPosition] = useState(0);
 	const [duration, setDuration] = useState(0);
-	const [volume, setVolume] = useState(1);
 	const [error, setError] = useState(false);
 	// Playback intent applies once per mounted track; later changes come from this player's own events.
 	const [initialAutoPlay] = useState(autoPlay);
+	// Apply the player's retained volume before a replacement track can start.
+	useEffect(() => {
+		if (ref.current) ref.current.volume = volume;
+	}, [volume]);
 	useEffect(() => {
 		const audio = ref.current;
 		let active = true;
@@ -62,7 +70,7 @@ export function usePlayback(autoPlay: boolean, analyse = false) {
 		start,
 		setVolume: (value: number) => {
 			if (ref.current) ref.current.volume = value;
-			setVolume(value);
+			onVolumeChange(value);
 		},
 		events: {
 			onPlay: () => {
@@ -79,7 +87,9 @@ export function usePlayback(autoPlay: boolean, analyse = false) {
 				setError(true);
 				setPlaying(false);
 			},
-			onVolumeChange: () => setVolume(ref.current?.volume ?? 1),
+			onVolumeChange: () => {
+				if (ref.current) onVolumeChange(ref.current.volume);
+			},
 		},
 	};
 }

@@ -115,17 +115,27 @@ export function choiceSchema(
 				},
 				["detail"],
 			),
-			...todos.map((todo) =>
-				branch(
-					{
-						choice: only(`t${todo.ref}`),
-						operation: oneOf(["amend", "cancel"]),
-						text: text(8000),
-						say: SAY,
-					},
-					["text"],
+			...(todos.length
+				? [
+						branch({
+							choice: oneOf(todos.map((todo) => `t${todo.ref}`)),
+							operation: only("check"),
+						}),
+					]
+				: []),
+			...todos
+				.filter((todo) => todo.open)
+				.map((todo) =>
+					branch(
+						{
+							choice: only(`t${todo.ref}`),
+							operation: oneOf(["amend", "cancel"]),
+							text: text(8000),
+							say: SAY,
+						},
+						["text"],
+					),
 				),
-			),
 		],
 	};
 }
@@ -178,6 +188,10 @@ export function choiceMessages(input: {
 		(candidate) => !input.excluded?.has(candidate.id),
 	);
 	const lines = [
+		...(routed.memory ? [routed.memory] : []),
+		...(routed.earlier.length
+			? [INPUT_HEADINGS.earlier, ...routed.earlier.map((said) => `- ${said}`)]
+			: []),
 		routed.state,
 		...previousLine(routed),
 		...(routed.asked
@@ -191,7 +205,7 @@ export function choiceMessages(input: {
 		`- memory.request: ${systemContext("dialogue.contexts.local.memory-request", {})}`,
 		...routed.todos.map(
 			(todo) =>
-				`- t${todo.ref}: ${systemContext("dialogue.contexts.local.todo", { title: lineText(todo.title) })}`,
+				`- t${todo.ref}: ${systemContext(todo.open ? "dialogue.contexts.local.todo" : "dialogue.contexts.local.todo-done", { title: lineText(todo.title) })}`,
 		),
 		...(input.retry
 			? [
@@ -223,7 +237,7 @@ export function pendingMessages(
 		INPUT_HEADINGS.pending,
 		...routed.pending.confirmations.map(
 			(c) =>
-				`- c${c.ref} 確認待ち: ${lineText(c.toolchain)}「${lineText(c.request)}」`,
+				`- c${c.ref} 確認待ち: ${lineText(c.toolchain)}「${lineText(c.request)}」${c.target ? ` 対象「${lineText(c.target)}」` : ""}`,
 		),
 		...routed.pending.questions.map(
 			(q) =>

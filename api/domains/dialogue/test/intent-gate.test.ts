@@ -149,9 +149,39 @@ test("ruri takes anything else to the talk turn: one streamed call with no tools
 		await h!.close();
 		h = undefined;
 	}
-	expect(routeOf(judgment("request", 0.6), 0.6)).toBe("search");
-	expect(routeOf(judgment("request", 0.59), 0.6)).toBe("answer");
-	expect(routeOf(judgment("chat", 0.9), 0.6)).toBe("answer");
+	expect(routeOf(judgment("request", 0.6), 0.6, false)).toBe("search");
+	expect(routeOf(judgment("request", 0.59), 0.6, false)).toBe("answer");
+	expect(routeOf(judgment("chat", 0.9), 0.6, true)).toBe("answer");
+	// A reply to the work goes to the request turn only while there is work it may check, correct or cancel.
+	expect(routeOf(judgment("followup", 0.2), 0.6, true)).toBe("search");
+	expect(routeOf(judgment("followup", 0.2), 0.6, false)).toBe("answer");
+});
+
+test("ruri takes a reply to the work to the request turn while there is work: a check reads it, the talk turn tells it, and nothing starts", async () => {
+	const judged = [judgment("request", 0.8), judgment("followup", 0.2)];
+	await start({ mode: "ruri" }, async () => judged.shift()!);
+	h!.state.steps.push(
+		choice({ choice: IMAGE.id, say: "描きますね。", request: "猫の絵" }),
+	);
+	await h!.say("猫の絵を描いて", "queued");
+	h!.state.steps.push(choice({ choice: "t1", operation: "check" }), {
+		text: "まだ描いています。",
+	});
+	const run = await h!.say("さっきの絵はどうなった？");
+	expect(h!.dialogue.answerText(run.id)).toBe("まだ描いています。");
+	const [chose, talked] = h!.state.calls.slice(-2);
+	expect(JSON.stringify(chose!.session?.outputSchema)).toContain('"check"');
+	expect(talked!.session?.outputSchema).toBeUndefined();
+	expect(talked!.messages.at(-1)!.content).toContain(
+		"仕事の記録を確かめた結果です",
+	);
+	expect(talked!.messages.at(-1)!.content).toContain("t1");
+	expect(h!.todos()).toHaveLength(1);
+	await waitFor(() => recorded(run.inputMessageId)[0]?.observedSearch === 1);
+	expect(recorded(run.inputMessageId)[0]).toMatchObject({
+		choice: "followup",
+		finalRoute: "search",
+	});
 });
 
 test("a failed or late judge leaves the turn to the request turn and the conversation goes on", async () => {
