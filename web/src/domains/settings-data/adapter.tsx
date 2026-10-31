@@ -23,6 +23,7 @@ import {
 import { useFieldOptions, useTargets } from "./settings-sources";
 import { useModelCatalog } from "./useModelCatalog";
 import { useVoiceTools } from "./useVoiceTools";
+import { useLiveSettings } from "./useLiveSettings";
 
 const SETTINGS_ADAPTER_REF = "adapter:settings@1";
 export const SETTINGS_DOCUMENT = "document:settings@1";
@@ -99,6 +100,13 @@ function useSettingsArtifact(context: AdapterHostContext): AdapterState {
 		dirtyEntries(view, all, access).length > 0 ||
 		view.structural.length > 0 ||
 		view.secrets.length > 0;
+	const liveTools = useLiveSettings({
+		client,
+		saved,
+		effective,
+		active: own.some((f) => f.path.startsWith("$.live.")),
+		dirty,
+	});
 	// The saved revision and the draft version never collide as one number.
 	const revision = access.revision * 1_000_000 + view.version;
 	const { inputs, targetGroups } = buildInputs({
@@ -127,12 +135,18 @@ function useSettingsArtifact(context: AdapterHostContext): AdapterState {
 		view,
 		revision,
 		dirty,
-		inputs,
+		inputs: liveTools.inputs(inputs),
 		groups,
-		actions,
+		actions: [...actions, ...liveTools.actions],
 		catalog,
 		documentFieldsReady,
 	});
+	if (liveTools.actions.length)
+		for (const value of Object.values(snapshot))
+			if (value.kind === "settings-section")
+				value.description = [value.description, liveTools.describe]
+					.filter(Boolean)
+					.join("\n");
 
 	if (catalogActive) snapshot["settings-model-catalog"] = modelCatalog.resource;
 
@@ -150,6 +164,11 @@ function useSettingsArtifact(context: AdapterHostContext): AdapterState {
 		event: ArtifactEvent,
 	): Promise<Receipt> {
 		const id = String(event.values.id ?? "");
+		if (binding.eventAction === "settings-action" && id.startsWith("live-"))
+			return {
+				status: (await liveTools.run(id)) ? "accepted" : "rejected",
+				message: "",
+			};
 		if (binding.source === "settings-model-catalog")
 			return (
 				(await modelCatalog.run(id)) ?? {

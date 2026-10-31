@@ -1,6 +1,7 @@
 import { resolve } from "node:path";
 import {
 	groupTests,
+	integrationTestFiles,
 	parseSelection,
 	selectionPaths,
 	sourceFiles,
@@ -12,9 +13,12 @@ import {
 const root = resolve(import.meta.dir, "..");
 try {
 	const { selected, sub } = parseSelection(process.argv.slice(2), true);
-	const tests = selectionPaths(selected, sub)
-		.flatMap((path) => sourceFiles(root, path))
-		.filter((path) => testPattern.test(path));
+	const tests = [
+		...selectionPaths(selected, sub)
+			.flatMap((path) => sourceFiles(root, path))
+			.filter((path) => testPattern.test(path)),
+		...integrationTestFiles(root, selected),
+	];
 	if (!tests.length) {
 		console.error(
 			`No tests selected for ${selected.join(",")}${sub ? `/${sub}` : ""}`,

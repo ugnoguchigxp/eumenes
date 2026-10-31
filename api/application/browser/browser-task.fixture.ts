@@ -6,6 +6,7 @@ import { createBrowser, type BrowserCompletion } from "../../domains/browser";
 import {
 	connect,
 	FakeDriver,
+	retarget,
 	FakeEncoder,
 	FakeFiles,
 	fakeResolver,
@@ -158,6 +159,8 @@ export async function start(
 	} = {},
 ) {
 	const tabRef = await connect(s.env);
+	// These tests exercise the operator, not Eumenes' own page. Clicks there need approval (spec §4.4).
+	await retarget(s.env, tabRef, "https://example.com/");
 	return { tabRef, taskId: await begin(s, tabRef, extra) };
 }
 /** A task on a tab that is already connected (a follow-up uses the same tab). */

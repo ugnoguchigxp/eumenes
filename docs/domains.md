@@ -2,7 +2,7 @@
 
 ## Domain 一覧(自動生成)
 
-次の表は `scripts/domains.ts` から `bun scripts/domain-docs.ts` が生成します。手で編集しないでください。`bun scripts/domain-docs.ts --check` が差分を検出します(`verify --all` に組み込みます)。依存の方向は `scripts/boundaries.ts` が検査します。各 domain は `scripts/domains.ts` で明示した Tier(0 が最下位)を持ち、宣言した依存(api・web・試験のみ)は必ず自分より低い Tier の domain だけを指します。許可リストに加えてこの Tier 検査を通らなければならないため、下位 domain は上位 domain を参照できません。依存を足して Tier が合わなくなった場合は、設計を見直したうえで `scripts/domains.ts` の Tier を更新します。
+次の表は `scripts/domains.ts` から `bun scripts/domain-docs.ts` が生成します。手で編集しないでください。`bun scripts/domain-docs.ts --check` が差分を検出します（すべての `verify` で実行します）。依存の方向は `scripts/boundaries.ts` が検査します。各 domain は `scripts/domains.ts` で明示した Tier(0 が最下位)を持ち、宣言した依存(api・web・試験のみ)は必ず自分より低い Tier の domain だけを指します。許可リストに加えてこの Tier 検査を通らなければならないため、下位 domain は上位 domain を参照できません。依存を足して Tier が合わなくなった場合は、設計を見直したうえで `scripts/domains.ts` の Tier を更新します。
 
 <!-- domains:start -->
 | Domain | Tier | Backend 入口 | Web 入口 | Components | 依存 (api) | 依存 (web) | 依存 (試験のみ) |
@@ -40,6 +40,7 @@
 | `delivery` | 0 | `api/domains/delivery/index.ts` | なし | なし | なし | なし | なし |
 | `avatar` | 1 | なし | `web/src/domains/avatar/index.ts` | なし | なし | `delivery` | なし |
 | `settings` | 0 | `api/domains/settings/index.ts` | `web/src/domains/settings/index.tsx` | なし | なし | なし | なし |
+| `live-voice` | 3 | `api/domains/live-voice/index.ts` | `web/src/domains/live-voice/index.ts` | なし | `settings` | `audio`、`settings` | `conversation` |
 | `inference` | 2 | `api/domains/inference/index.ts` | なし | なし | `attitude-dataset`、`delivery`、`larm`、`settings` | なし | なし |
 | `tts-dictionary` | 0 | `api/domains/tts-dictionary/index.ts` | なし | なし | なし | なし | なし |
 | `conversation` | 2 | `api/domains/conversation/index.ts` | `web/src/domains/conversation/index.ts` | `web/src/components/domains/conversation/index.ts` | `delivery` | `avatar`、`delivery` | なし |
@@ -68,16 +69,16 @@
 | attitude-dataset | `api/domains/attitude-dataset/index.ts` | CLI/API（`docs/ruri-collection.md`） | `api/domains/attitude-dataset/test/` |
 | delivery | `api/domains/delivery/index.ts` | なし | `api/domains/delivery/test/` |
 | avatar | なし | `web/src/domains/avatar/index.ts` | `web/src/domains/avatar/test/` |
-| service-tests | `api/domains/service-tests/index.ts` | `web/src/domains/service-tests/index.tsx` | `api/domains/service-tests/test/`、`web/src/domains/service-tests/index.test.tsx` |
+| service-tests | `api/domains/service-tests/index.ts` | `web/src/domains/service-tests/toolchain-adapter.tsx` | `api/domains/service-tests/test/` |
 | settings | `api/domains/settings/index.ts` | `web/src/domains/settings/index.tsx`（カテゴリ別の画面は `sections/`、共通部品は `shared.tsx`） | `api/domains/settings/test/`、`web/src/domains/settings/sections/*.test.tsx` |
 | inference | `api/domains/inference/index.ts` | なし | `api/domains/inference/test/` |
-| tts-dictionary | `api/domains/tts-dictionary/index.ts` | `web/src/domains/tts-dictionary/index.tsx` | `api/domains/tts-dictionary/test/` |
+| tts-dictionary | `api/domains/tts-dictionary/index.ts` | なし | `api/domains/tts-dictionary/test/` |
 | conversation | `api/domains/conversation/index.ts` | `web/src/domains/conversation/index.ts` | `api/domains/conversation/test/` |
 | continuity | `api/domains/continuity/index.ts` | なし | `api/domains/continuity/test/` |
 | capabilities | `api/domains/capabilities/index.ts` | CLI/API | `api/domains/capabilities/test/` |
 | tool-runtime | `api/domains/tool-runtime/index.ts` | なし | `api/domains/tool-runtime/test/` |
 | agent-runtime | `api/domains/agent-runtime/index.ts` | `web/src/domains/agent-runtime/index.ts` | `api/domains/agent-runtime/test/`、`api/application/toolchain/toolchain.test.ts`、`tests/browser/toolchain.spec.ts` |
-| toolchain-history | `api/domains/toolchain-history/index.ts` | `web/src/domains/toolchain-history/index.tsx`（設定の「ツールチェーンの記録」） / CLI/API（`docs/toolchain.md`） | `api/domains/toolchain-history/test/`、結合試験 `api/application/toolchain/toolchain-history.test.ts`・`toolchain-recipe-e2e.test.ts` |
+| toolchain-history | `api/domains/toolchain-history/index.ts` | なし（設定の「ツールチェーンの記録」は `web/src/domains/settings-data/records-adapter.tsx`。CLI/API は `docs/toolchain.md`） | `api/domains/toolchain-history/test/`、結合試験 `api/application/toolchain/toolchain-history.test.ts`・`toolchain-recipe-e2e.test.ts` |
 | web-research | `api/domains/web-research/index.ts` | CLI/API | `api/domains/web-research/test/` |
 | memory | `api/domains/memory/index.ts` | なし | `api/domains/memory/test/` |
 | larm | `api/domains/larm/index.ts` | なし | `api/domains/larm/test/` |
@@ -86,7 +87,7 @@
 | scheduler | `api/domains/scheduler/index.ts` | なし | `api/domains/scheduler/test/` |
 | ocr | `api/domains/ocr/index.ts` | `web/src/domains/ocr/`（アーティファクト「文字を読み取る」、`docs/ocr.md`） | `api/domains/ocr/test/`、`api/application/media/ocr-e2e.test.ts`、`api/application/media/ocr-adapter.test.ts`、`tests/browser/ocr.spec.ts` |
 | terminals | `api/domains/terminals/index.ts` | `web/src/domains/terminals/index.ts`（アーティファクト「ターミナル」、`docs/terminals.md`） | `api/domains/terminals/test/`、`api/application/work/terminals-adapter.test.ts`、`web/src/domains/terminals/connection.test.ts` |
-| timers | `api/domains/timers/index.ts` | `web/src/domains/timers` と `web/src/components/domains/timers/TimerArtifact.tsx` | `api/domains/timers/test/` |
+| timers | `api/domains/timers/index.ts` | `web/src/domains/timers/` と `web/src/components/domains/timers/` | `api/domains/timers/test/` |
 | dialogue | `api/domains/dialogue/index.ts` | `web/src/domains/dialogue/index.ts` | `api/domains/dialogue/test/`、`web/src/domains/dialogue/test/` |
 | voice-dialogue | `api/domains/voice-dialogue/index.ts` | `web/src/domains/voice-dialogue/index.ts` | `api/domains/voice-dialogue/test/`、`web/src/domains/voice-dialogue/test/` |
 

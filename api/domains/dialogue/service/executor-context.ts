@@ -162,6 +162,7 @@ export function createExecutorContext(
 	const utteranceText = () => input.utterances.join("\n");
 	/** The run must still be this generation's, and every authority the prompt stood on current. */
 	function current(tx: Database): Run {
+		deps.externalOutput?.assertCurrent(tx, input.runId);
 		const run = byId(tx, input.runId);
 		if (!run || run.status !== "running" || run.revision !== input.revision)
 			throw new Error("run_changed");

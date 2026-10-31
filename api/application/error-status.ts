@@ -28,6 +28,7 @@ import { errorStatus as shell } from "../domains/shell/contracts";
 import { errorStatus as terminals } from "../domains/terminals/contracts";
 import { errorStatus as kanban } from "../domains/kanban/contracts";
 import { errorStatus as voiceDialogue } from "../domains/voice-dialogue/contracts";
+import { errorStatus as liveVoice } from "../domains/live-voice/contracts";
 
 export type ErrorStatus = HttpErrorStatus;
 
@@ -99,6 +100,7 @@ const statusByCode = mergeErrorStatus(
 	terminals,
 	kanban,
 	voiceDialogue,
+	liveVoice,
 );
 
 const statusByPrefix: Array<[prefix: string, status: ErrorStatus]> = [

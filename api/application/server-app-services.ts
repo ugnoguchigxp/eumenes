@@ -12,6 +12,7 @@ export function appServices(s: Services) {
 		conversation: s.conversation,
 		dialogue: s.dialogue,
 		voice: s.voice,
+		liveVoice: s.liveVoice,
 		larm: s.inference,
 		queue: s.queue,
 		scheduler: s.scheduler,

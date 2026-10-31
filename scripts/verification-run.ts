@@ -1,10 +1,15 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import {
+	createWriteStream,
+	existsSync,
 	mkdirSync,
 	readdirSync,
 	readFileSync,
 	renameSync,
+	rmSync,
+	statSync,
+	type WriteStream,
 	writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
@@ -50,6 +55,10 @@ export type VerificationReport = {
 		exitCode?: number;
 		error?: string;
 		warnings?: string[];
+		/** Path of the command log, relative to the run directory. */
+		log?: string;
+		/** Failing test lines, or the log tail when none were recognised. */
+		failures?: string[];
 	}[];
 	totalMs: number;
 	stopReason?: string;
@@ -91,6 +100,82 @@ export function distRevision(root: string) {
 	return hash.digest("hex");
 }
 
+/** CSI sequences, built without a control character in the source (oxlint no-control-regex). */
+const ANSI = new RegExp(
+	`${String.fromCharCode(0x1b)}\\[[0-?]*[ -/]*[@-~]`,
+	"g",
+);
+/** Lines a failed command log contributes to the report. */
+export function stepFailures(text: string): string[] {
+	ANSI.lastIndex = 0;
+	const lines = text.replace(ANSI, "").split(/\r?\n/);
+	const matched = lines.filter(
+		(line) =>
+			line.startsWith("(fail) ") ||
+			line.includes("FAIL ") ||
+			line.includes("×"),
+	);
+	const chosen = matched.length ? matched : lines.slice(-40);
+	return chosen.slice(0, 50).map((line) => line.slice(0, 300));
+}
+
+function stepLogPath(index: number, name: string) {
+	const slug =
+		name
+			.replace(/[^A-Za-z0-9-]+/g, "-")
+			.replace(/-+/g, "-")
+			.replace(/^-|-$/g, "") || "step";
+	return `steps/${String(index + 1).padStart(2, "0")}-${slug}.log`;
+}
+
+function finishLog(stream: WriteStream) {
+	return new Promise<void>((resolve, reject) => {
+		stream.once("error", reject);
+		stream.end(() => resolve());
+	});
+}
+
+/** Runs one command, mirroring its output to the terminal and a step log. */
+async function runCommand(
+	root: string,
+	directory: string,
+	logPath: string,
+	file: string,
+	args: string[],
+	onSpawn: (child: ChildProcess) => void,
+): Promise<number> {
+	mkdirSync(join(directory, "steps"), { recursive: true });
+	const log = createWriteStream(join(directory, logPath), { flags: "a" });
+	const forward = (chunk: Buffer, dest: NodeJS.WriteStream) => {
+		dest.write(chunk);
+		log.write(chunk);
+	};
+	try {
+		return await new Promise<number>((resolve, reject) => {
+			const child = spawn(file, args, {
+				cwd: root,
+				stdio: ["inherit", "pipe", "pipe"],
+				detached: process.platform !== "win32",
+			});
+			onSpawn(child);
+			child.stdout?.on("data", (chunk: Buffer) =>
+				forward(chunk, process.stdout),
+			);
+			child.stderr?.on("data", (chunk: Buffer) =>
+				forward(chunk, process.stderr),
+			);
+			child.once("error", reject);
+			child.once("close", (code, signal) =>
+				signal
+					? reject(new Error(`terminated by ${signal}`))
+					: resolve(code ?? 1),
+			);
+		});
+	} finally {
+		await finishLog(log);
+	}
+}
+
 export function createReport(
 	root: string,
 	scope: VerificationReport["scope"],
@@ -119,6 +204,48 @@ export function createReport(
 		integrityErrors: [],
 		build: { sharedOutput: true },
 	};
+}
+
+/** Newest verify runs kept beside `latest.json`. */
+export const VERIFY_RUNS_KEPT = 20;
+/** Newest natural-language acceptance directories kept. */
+export const NL_ACCEPTANCE_RUNS_KEPT = 5;
+
+function newestDirectories(dir: string): string[] {
+	if (!existsSync(dir)) return [];
+	return readdirSync(dir, { withFileTypes: true })
+		.filter((entry) => entry.isDirectory())
+		.map((entry) => ({
+			name: entry.name,
+			mtime: statSync(join(dir, entry.name)).mtimeMs,
+		}))
+		.sort((a, b) => b.mtime - a.mtime || b.name.localeCompare(a.name))
+		.map((entry) => entry.name);
+}
+
+/** Drops old verify runs and acceptance outputs. The run `latest.json` names is kept. */
+export function pruneVerificationReports(reports: string) {
+	let latest = "";
+	try {
+		latest = JSON.parse(
+			readFileSync(join(reports, "latest.json"), "utf8"),
+		).runId;
+	} catch {
+		latest = "";
+	}
+	const runs = join(reports, "runs");
+	const keepRuns = new Set(newestDirectories(runs).slice(0, VERIFY_RUNS_KEPT));
+	if (latest) keepRuns.add(latest);
+	for (const name of newestDirectories(runs))
+		if (!keepRuns.has(name))
+			rmSync(join(runs, name), { recursive: true, force: true });
+	const acceptance = join(reports, "nl-acceptance");
+	const keepAcceptance = new Set(
+		newestDirectories(acceptance).slice(0, NL_ACCEPTANCE_RUNS_KEPT),
+	);
+	for (const name of newestDirectories(acceptance))
+		if (!keepAcceptance.has(name))
+			rmSync(join(acceptance, name), { recursive: true, force: true });
 }
 
 export async function executeVerification(
@@ -187,22 +314,43 @@ export async function executeVerification(
 				if (step.command) {
 					const [file, ...args] = step.command;
 					if (!file) throw new Error(`Empty command: ${step.name}`);
-					result.exitCode = await new Promise<number>((resolve, reject) => {
-						active = spawn(file, args, {
-							cwd: root,
-							stdio: "inherit",
-							detached: process.platform !== "win32",
-						});
-						active.once("error", reject);
-						active.once("close", (code, signal) =>
-							signal
-								? reject(new Error(`${step.name} terminated by ${signal}`))
-								: resolve(code ?? 1),
+					const logPath = stepLogPath(index, step.name);
+					result.log = logPath;
+					try {
+						result.exitCode = await runCommand(
+							root,
+							directory,
+							logPath,
+							file,
+							args,
+							(child) => {
+								active = child;
+							},
 						);
-					});
-					active = undefined;
-					if (result.exitCode !== 0)
+					} catch (error) {
+						const message =
+							error instanceof Error ? error.message : String(error);
+						try {
+							result.failures = stepFailures(
+								readFileSync(join(directory, logPath), "utf8"),
+							);
+						} catch {
+							/* The log was not created. */
+						}
+						throw new Error(
+							message.startsWith("terminated by ")
+								? `${step.name} ${message}`
+								: message,
+						);
+					} finally {
+						active = undefined;
+					}
+					if (result.exitCode !== 0) {
+						result.failures = stepFailures(
+							readFileSync(join(directory, logPath), "utf8"),
+						);
 						throw new Error(`${step.name} failed (${result.exitCode})`);
+					}
 				}
 				const outcome = step.action ? await step.action() : undefined;
 				if (outcome?.warnings.length) {
@@ -266,6 +414,7 @@ export async function executeVerification(
 		}
 		report.finishedAt = new Date().toISOString();
 		save();
+		pruneVerificationReports(reports);
 	}
 	console.log(
 		`[verify] ${report.result}: ${report.totalMs} ms; ${join(directory, "report.json")}`,

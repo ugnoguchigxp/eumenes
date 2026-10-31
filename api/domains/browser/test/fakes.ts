@@ -78,7 +78,7 @@ export class FakeDriver implements BrowserDriver {
 	};
 	pngSize: PlannedSize = { width: 1000, height: 800 };
 	/** What the fixed inspection reports; a test sets the element a click or key press would act on. */
-	targetInfo: TargetInfo = { tag: "button", inForm: false, submits: false };
+	targetInfo: TargetInfo = { tag: "a", inForm: false, submits: false };
 	inspectError: BrowserDriverError | null = null;
 	/** The code of every replay run, in order (never written anywhere else). */
 	replayCodes: string[] = [];
@@ -353,6 +353,16 @@ export function fakeBrave(dir: string) {
 }
 
 /** Configured and connected, with the Eumenes tab registered. */
+/** Point a connected tab at another page without performing an operation. */
+export async function retarget(env: Env, tabRef: string, url: string) {
+	const tab =
+		env.driver.tabs.find((item) => item.current) ?? env.driver.tabs[0];
+	if (tab) tab.url = url;
+	await env.store.write((db) => {
+		db.run("UPDATE browser_tabs SET url = ? WHERE tab_ref = ?", [url, tabRef]);
+	});
+}
+
 export async function connect(env: Env) {
 	await env.service.setting.save(fakeBrave(env.dir));
 	await env.service.connect();

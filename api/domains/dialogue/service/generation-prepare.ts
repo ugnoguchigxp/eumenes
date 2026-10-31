@@ -393,7 +393,7 @@ export function createPrepare(
 		const harness = localHarness;
 		// This run's context is fixed by the host: the server must neither trim nor reorder it.
 		if (requestId) larm.setContextPolicyInTransaction?.(tx, requestId, "exact");
-		const system = conversationSystem(deps, tx);
+		const system = conversationSystem(deps, tx, conversationId);
 		const fixed = tokens(system);
 		const plan = planWindow({ window: windowOf(deps, tx, run.id), fixed });
 		if (!plan.usable) {

@@ -1,6 +1,8 @@
 import type { Database } from "bun:sqlite";
 import { getLogger } from "../../../infrastructure/logger";
+import { sha256Hex } from "../../../infrastructure/digest";
 import {
+	APPROVAL_MS,
 	isFinal,
 	type EnqueueRun,
 	type ShellRun,
@@ -123,6 +125,19 @@ export function createShell(input: ShellOptions = {}) {
 		for (const [id, change] of pending) {
 			await finish(id, change);
 		}
+		await store().write((db) => {
+			for (const r of repository.list(db, true))
+				if (
+					r.state === "awaiting_approval" &&
+					Date.parse(r.createdAt) + APPROVAL_MS <= Date.parse(now())
+				)
+					ledger.finalize(
+						db,
+						r.id,
+						{ state: "cancelled", reason: "approval_expired" },
+						["awaiting_approval"],
+					);
+		});
 		const rows = store().read((db) => repository.list(db, true));
 		if (
 			rows.some((r) => r.state === "running") ||
@@ -162,11 +177,24 @@ export function createShell(input: ShellOptions = {}) {
 					options.store?.read((db) => repository.get(db, attemptId));
 				if (saved) s.state = saved.state;
 			}
+			const approvals =
+				options.store?.read((db) =>
+					repository
+						.list(db, true)
+						.filter((r) => r.state === "awaiting_approval")
+						.map((r) => ({
+							id: r.id,
+							task: r.task,
+							command: r.command,
+							digest: sha256Hex(r.command),
+						})),
+				) ?? [];
 			return {
 				available: !!shell,
 				revision,
 				limit: options.limit ?? 4,
 				sessions: list,
+				approvals,
 			};
 		},
 		start: (
@@ -183,6 +211,22 @@ export function createShell(input: ShellOptions = {}) {
 		runInTransaction: repository.get,
 		recentInTransaction: (db: Database) => repository.list(db, false, 5),
 		cancelInTransaction: ledger.cancel,
+		async decide(
+			id: string,
+			input: { decision: "execute" | "cancel"; digest: string },
+		) {
+			const result = await store().write((db) => {
+				if (input.decision === "cancel") {
+					if (!ledger.cancel(db, id)) throw new Error("shell_not_found");
+					return repository.get(db, id)!;
+				}
+				return ledger.approve(db, id, input.digest);
+			});
+			// Expiry is committed above. Throwing inside the write would undo it.
+			if (result === "expired") throw new Error("shell_not_found");
+			return result;
+		},
+		onAwaitingCommitted: ledger.onAwaitingCommitted,
 		pruneInTransaction: repository.prune,
 		onFinishedInTransaction: ledger.onFinishedInTransaction,
 		onFinishedCommitted: ledger.onFinishedCommitted,
@@ -208,7 +252,7 @@ export function createShell(input: ShellOptions = {}) {
 					? "unconfirmed"
 					: "final";
 			}
-			if (r.state === "queued") {
+			if (r.state === "queued" || r.state === "awaiting_approval") {
 				const cancelled = await store().write((db) => ledger.cancel(db, id));
 				if (cancelled) return "stopped";
 				return this.stop(id);

@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { Hono } from "hono";
 import { createShell, registerShell } from "..";
+import { APPROVAL_MS } from "../contracts";
 import { childEnv } from "../../../infrastructure/pty";
 import { waitFor } from "../../../infrastructure/wait-for";
 import { createOutput } from "../service/output";
@@ -328,4 +329,101 @@ test("live output is complete even when one chunk is larger than the bounded rep
 		Buffer.from("5678").toString("base64"),
 	);
 	await replay.cancel();
+});
+
+test("a conversation command waits for the displayed digest and does not run before that", async () => {
+	const h = make();
+	await h.shell.recover();
+	const r = request({ origin: "conversation", conversationId: "main" });
+	await h.enqueue(r);
+	expect(h.view(r.attemptId)?.state).toBe("awaiting_approval");
+	expect(h.pty.spawned).toHaveLength(0);
+	const digest = h.shell.list().approvals[0]?.digest ?? "";
+	await expect(
+		h.shell.decide(r.attemptId, {
+			decision: "execute",
+			digest: "0".repeat(64),
+		}),
+	).rejects.toThrow("shell_run_conflict");
+	expect(h.pty.spawned).toHaveLength(0);
+	await h.shell.decide(r.attemptId, { decision: "execute", digest });
+	await waitFor(() => h.pty.spawned.length === 1);
+	expect(h.pty.spawned[0]?.command.at(-1)).toBe(r.command);
+});
+
+test("executing an expired approval cancels it without rolling the cancel back", async () => {
+	let now = new Date("2026-10-31T00:00:00.000Z");
+	const h = make({ now: () => now });
+	await h.shell.recover();
+	const r = request({
+		origin: "conversation",
+		conversationId: "main",
+		command: "printf late",
+	});
+	await h.enqueue(r);
+	const digest = h.shell.list().approvals[0]!.digest;
+	now = new Date(now.getTime() + APPROVAL_MS + 1000);
+	await expect(
+		h.shell.decide(r.attemptId, { decision: "execute", digest }),
+	).rejects.toThrow("shell_not_found");
+	expect(h.view(r.attemptId)).toMatchObject({
+		state: "cancelled",
+		reason: "approval_expired",
+	});
+	expect(h.pty.spawned).toHaveLength(0);
+});
+
+test("cancelling a waiting command and letting it expire both leave it unrun", async () => {
+	let now = new Date("2026-10-31T00:00:00.000Z");
+	const h = make({ now: () => now });
+	await h.shell.recover();
+	const cancelled = request({ origin: "conversation", conversationId: "main" });
+	await h.enqueue(cancelled);
+	await h.shell.decide(cancelled.attemptId, {
+		decision: "cancel",
+		digest: h.shell.list().approvals[0]!.digest,
+	});
+	expect(h.view(cancelled.attemptId)).toMatchObject({
+		state: "cancelled",
+		reason: "cancelled_by_person",
+	});
+	const waiting = request({
+		origin: "conversation",
+		conversationId: "main",
+		command: "printf later",
+	});
+	await h.enqueue(waiting);
+	h.shell.closeAll();
+	const pty = fakePty();
+	const next = createShell({
+		store: h.store,
+		shell: "/bin/sh",
+		spawn: pty.spawn,
+		now: () => now,
+	});
+	try {
+		await next.recover();
+		expect(h.view(waiting.attemptId)?.state).toBe("awaiting_approval");
+		expect(pty.spawned).toHaveLength(0);
+		next.closeAll();
+		now = new Date(now.getTime() + APPROVAL_MS + 1000);
+		const later = createShell({
+			store: h.store,
+			shell: "/bin/sh",
+			spawn: pty.spawn,
+			now: () => now,
+		});
+		try {
+			await later.recover();
+			expect(h.view(waiting.attemptId)).toMatchObject({
+				state: "cancelled",
+				reason: "approval_expired",
+			});
+			expect(pty.spawned).toHaveLength(0);
+		} finally {
+			later.closeAll();
+		}
+	} finally {
+		next.closeAll();
+	}
 });

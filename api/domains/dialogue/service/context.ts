@@ -165,6 +165,8 @@ export interface GenerateInput {
 	};
 }
 export interface Accept {
+	/** Internal only: reuse an already published voice transcript, never accepted from the public submit API. */
+	existingMessageId?: string;
 	attachmentIds?: string[];
 	requestId: string;
 	conversationId: string;
@@ -191,6 +193,7 @@ export interface Accept {
 }
 /** Everything the dialogue service parts share: the injected ports. */
 export type DialogueDeps = {
+	externalOutput?: import("../contracts/external-output").ExternalOutputPort;
 	store: SqliteStore;
 	conversation: ConversationService;
 	larm: InferencePort;

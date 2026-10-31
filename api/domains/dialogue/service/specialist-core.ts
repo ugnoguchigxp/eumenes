@@ -118,8 +118,12 @@ export function flushCancelled(
 ) {
 	const jobs = jobIds.filter(Boolean);
 	if (jobs.length) deps.queue.flushCancellations(jobs);
-	for (const runId of runIds)
+	for (const runId of runIds) {
+		// A rolled-back transaction can still list the run here. Do not cancel one the database kept alive.
+		const run = deps.store.read((db) => byId(db, runId));
+		if (run?.status === "queued" || run?.status === "running") continue;
 		void deps.larm.cancelSubject?.(runId)?.catch(() => undefined);
+	}
 }
 
 /** The session as the screen and the model see it: the stored row plus the domain's current work state. */

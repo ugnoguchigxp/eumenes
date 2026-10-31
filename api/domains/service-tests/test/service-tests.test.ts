@@ -283,3 +283,50 @@ test("image inputs accept arbitrary integer dimensions and reject values outside
 		);
 	}
 });
+
+test("Live blocks both speech test kinds without blocking image tests, and cancels an existing audio test", async () => {
+	const speech = { ...target, id: "speech", kind: "tts" as const };
+	const recognition = { ...speech, id: "recognition", kind: "asr" as const };
+	let calls = 0;
+	const h = await setup({
+		catalog: async () => ({
+			targets: [target, speech, recognition],
+			errors: [],
+			discoveredAt: Date.now(),
+		}),
+		execute: async (_t, _input, signal) => {
+			calls++;
+			await new Promise<void>((_resolve, reject) =>
+				signal.addEventListener("abort", () => reject(signal.reason), {
+					once: true,
+				}),
+			);
+			return { text: "late" };
+		},
+	});
+	let allowed = true;
+	h.service.setVoiceAvailability(() => allowed);
+	const run = await start(h, { ...h.request(), targetId: "speech" });
+	await waitFor(() => calls === 1);
+	allowed = false;
+	await h.service.pauseVoice();
+	expect((await settled(h, run.id)).status).toBe("cancelled");
+	expect(h.service.preview(run.id)).toBeUndefined();
+	expect(
+		h.service.catalog().targets.find((t) => t.id === "speech"),
+	).toMatchObject({ testable: false, reason: "live_legacy_voice_disabled" });
+	await expect(
+		start(h, { ...h.request(), targetId: "speech" }),
+	).rejects.toThrow("live_legacy_voice_disabled");
+	await expect(
+		start(h, { ...h.request(), targetId: "recognition" }),
+	).rejects.toThrow("live_legacy_voice_disabled");
+	expect(calls).toBe(1);
+	expect(
+		h.service.catalog().targets.find((t) => t.id === "image")?.testable,
+	).toBe(true);
+	allowed = true;
+	expect(
+		h.service.catalog().targets.find((t) => t.id === "speech")?.testable,
+	).toBe(true);
+});

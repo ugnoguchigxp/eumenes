@@ -90,4 +90,4 @@ EUMENES_EXCALIDRAW_LIVE=1 bunx playwright test tests/browser/excalidraw-live.spe
 
 2026年10月14日、当時のmainの固定版（0cacd23）で実接続受入を実施した。MacBookのBraveで、実LLMが返したURLから描画・版2保存・再表示、backend再起動後の同じsceneと設定の保持、追加編集・版3保存を確認した。ブラウザを表示したままworkerがPID 0へ自然停止し、「再接続」から別PIDで復帰した後、矩形3個を版4で保存・再表示できた。実LLMによるmain会話の担当選択、回答リンク、Artifactの一覧・準備中・利用可能・編集画面への移動も確認済み。
 
-固定の部分試験・API結合・ブラウザfixtureは成功。正式接続の自動通し試験は、自然停止後にブラウザが閉じられたため未完走であり、MacBook実画面による受入とは分ける。当時のverify:allは既存のsettings→memory試験依存違反で未完了であり、当時の並行改修による共有clientの契約不整合も実接続受入には含めていなかった。この旧記録を現在の全体gateの結果として扱わない。証拠は`spec/verification/excalidraw-live/native-acceptance-2026-10-14.json`、詳細は`spec/excalidraw-work-record-2026-10-13.md`に記録する。
+固定の部分試験・API結合・ブラウザfixtureは成功。正式接続の自動通し試験は、自然停止後にブラウザが閉じられたため未完走であり、MacBook実画面による受入とは分ける。当時のverify:allは既存のsettings→memory試験依存違反で未完了であり、当時の並行改修による共有clientの契約不整合も実接続受入には含めていなかった。この旧記録を現在の全体gateの結果として扱わない。証拠は`spec/verification/excalidraw-live/native-acceptance-2026-10-14.json`、詳細は`spec/.archived/excalidraw-work-record-2026-10-13.md`に記録する。

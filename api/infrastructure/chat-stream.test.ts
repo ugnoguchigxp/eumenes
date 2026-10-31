@@ -36,6 +36,27 @@ test("provider UTF-8 splits publish answer text before completion and exclude re
 	sink.close();
 	expect((await work).text).toBe("こんにちは。");
 });
+test("silence after the first byte fails as a stalled stream", async () => {
+	let sink!: ReadableStreamDefaultController<Uint8Array>;
+	const response = new Response(
+		new ReadableStream<Uint8Array>({
+			start: (c) => {
+				sink = c;
+			},
+		}),
+		{ headers: { "Content-Type": "text/event-stream" } },
+	);
+	const work = readChatResponse(
+		response,
+		new AbortController().signal,
+		undefined,
+		undefined,
+		{ stallMs: 30 },
+	);
+	sink.enqueue(encode(delta("途中")));
+	await expect(work).rejects.toThrow("llm_stream_stalled");
+});
+
 test("a disconnected stream is not adopted as a complete answer", async () => {
 	const response = new Response(encode(delta("途中")), {
 		headers: { "Content-Type": "text/event-stream" },

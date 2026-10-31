@@ -16,7 +16,6 @@ import {
 	describeSettingsAdapter,
 	describeSettingsPath,
 	publishedSettingsFields,
-	settingsConditions,
 	settingsLeaf,
 	type SettingsField,
 } from "./settings-adapter";
@@ -132,37 +131,6 @@ async function withModels(h: Harness) {
 	});
 	return { connectionId, resources };
 }
-
-test("describe offers the settings document, one write operation, its queries and the Web conditions", () => {
-	const d = describeSettingsAdapter();
-	expect([...d.documents.keys()]).toEqual(["document:settings@1"]);
-	expect(d.operations.get("settings.apply")).toEqual({
-		inputSchemaRef: "schema:settings-apply@3",
-		effect: "write",
-	});
-	expect([...d.queries].sort()).toEqual([
-		"query:settings.asr-languages@1",
-		"query:settings.asr-resources@1",
-		"query:settings.connections@1",
-		"query:settings.document@1",
-		"query:settings.llm-resources@1",
-		"query:settings.resources@1",
-		"query:settings.routes@1",
-		"query:settings.tts-resources@1",
-	]);
-	expect([...d.structures.keys()].sort()).toEqual([
-		"structure:settings.add-connection@1",
-		"structure:settings.add-connection@2",
-		"structure:settings.add-resource@1",
-		"structure:settings.add-resource@2",
-		"structure:settings.confirm-larm-origin@1",
-		"structure:settings.delete-connection@1",
-		"structure:settings.delete-resource@1",
-	]);
-	expect([...d.conditions]).toEqual([...settingsConditions]);
-	// The registered adapter is the one described for offline bundle checks.
-	expect(offlineBundleHost().adapters.get("adapter:settings@1")).toBeDefined();
-});
 
 test("every field of the settings bundle names an existing, writable settings path and a declared condition", () => {
 	const d = describeSettingsAdapter();

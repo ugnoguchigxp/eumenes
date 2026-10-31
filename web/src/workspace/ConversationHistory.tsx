@@ -5,6 +5,7 @@ import { ResourceChips } from "../domains/resources";
 import { LiveMessageList } from "./LiveMessageList";
 import { RunDetails, RunFailure } from "./RunDetails";
 import { ThinkingRow } from "./ThinkingRow";
+import { LiveVoicePanel } from "../domains/live-voice";
 import type { usePanelResources } from "./usePanelResources";
 import type { WorkspaceState } from "./useWorkspace";
 
@@ -105,6 +106,7 @@ export function ConversationHistory({
 				onReplay={onReplay}
 			/>
 			{activeRun && <ThinkingRow state={state} run={activeRun} />}
+			{state.live && <LiveVoicePanel live={state.live} />}
 		</div>
 	);
 }

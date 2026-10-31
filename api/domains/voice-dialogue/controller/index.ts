@@ -38,6 +38,16 @@ export function registerVoiceDialogue(
 	app: Hono,
 	service: VoiceDialogueService,
 ) {
+	app.use("/api/voice/*", async (c, next) => {
+		if (
+			!service.available() &&
+			c.req.method === "POST" &&
+			!c.req.path.endsWith("/stop") &&
+			!c.req.path.endsWith("/cancel")
+		)
+			return c.json({ error: "live_legacy_voice_disabled" }, 409);
+		await next();
+	});
 	app.post("/api/voice/sessions", async (c) => {
 		const parsed = await parseJsonBody(c, voiceStartSchema);
 		if (!parsed.ok) return parsed.response;

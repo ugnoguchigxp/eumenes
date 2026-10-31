@@ -34,6 +34,7 @@ const LLM_RESOURCES_QUERY = "query:settings.llm-resources@1";
 const ASR_RESOURCES_QUERY = "query:settings.asr-resources@1";
 const RESOURCES_QUERY = "query:settings.resources@1";
 const CONNECTIONS_QUERY = "query:settings.connections@1";
+const LIVE_CONNECTIONS_QUERY = "query:settings.live-connections@1";
 const ROUTES_QUERY = "query:settings.routes@1";
 const ASR_LANGUAGES_QUERY = "query:settings.asr-languages@1";
 /** The connection's API key: a confidential field that travels in `keys`, not in `changes`. */
@@ -466,6 +467,7 @@ export const describeSettingsAdapter = () => ({
 		ASR_RESOURCES_QUERY,
 		RESOURCES_QUERY,
 		CONNECTIONS_QUERY,
+		LIVE_CONNECTIONS_QUERY,
 		ROUTES_QUERY,
 		ASR_LANGUAGES_QUERY,
 	]),
@@ -609,6 +611,20 @@ export function createSettingsAdapter(
 		sourceInTransaction(tx, query) {
 			const current = settings.inTransaction(tx);
 			const revision = current.revision;
+			if (query === LIVE_CONNECTIONS_QUERY)
+				return {
+					revision,
+					data: {
+						options: current.connections
+							.filter(
+								(c) =>
+									c.enabled &&
+									(!c.kind || c.kind === "openai-compatible") &&
+									new URL(c.baseUrl).origin === "https://api.openai.com",
+							)
+							.map((c) => ({ value: c.id, label: c.name })),
+					},
+				};
 			if (query === DOCUMENT_QUERY)
 				return { revision, data: { revision, settings: current } };
 			if (query === ROUTES_QUERY)

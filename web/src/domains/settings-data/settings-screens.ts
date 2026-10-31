@@ -108,6 +108,8 @@ const panelActions: Record<string, { label: string; group: string }> = {
 };
 
 function sectionDescription(fields: readonly RegisteredField[]) {
+	if (fields.some((f) => f.path.startsWith("$.live.")))
+		return "音声会話中は既存のASR・TTSを使わず、双方の文字起こしをチャットに残します。音声ファイルは保存しません。接続・試用にはAPIの利用料金が発生します。";
 	const first = fields[0]?.path ?? "";
 	if (
 		first.startsWith("$.general.agentName") ||

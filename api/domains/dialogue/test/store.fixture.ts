@@ -41,12 +41,18 @@ export function dialogueMigrationList() {
 }
 
 /** A fresh SQLite file in its own directory, with dialogue's full schema. */
-export function openDialogueStore(prefix: string): {
+export function openDialogueStore(
+	prefix: string,
+	extra: import("../../../infrastructure/sqlite").Migration[] = [],
+): {
 	dir: string;
 	store: SqliteStore;
 } {
 	const dir = mkdtempSync(join(tmpdir(), prefix));
-	const store = openStore(join(dir, "db.sqlite3"), dialogueMigrationList());
+	const store = openStore(
+		join(dir, "db.sqlite3"),
+		orderMigrations([...dialogueMigrationList(), ...extra]),
+	);
 	return { dir, store };
 }
 

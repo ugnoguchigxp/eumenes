@@ -104,6 +104,7 @@ export function ConversationComposer({
 		edit,
 	} = state;
 	const editing = edit.editing;
+	const live = state.live;
 	const inputPhase = useStore(store, (audio) => audio.inputPhase);
 	const starting = voice.active && inputPhase === "starting";
 	const route = [
@@ -112,9 +113,17 @@ export function ConversationComposer({
 			label: "マイク",
 			active: voice.active && !starting && phase === "listening",
 		},
-		{ id: "asr", label: "音声認識", active: !!voice.turn && !voice.turn.text },
+		{
+			id: "asr",
+			label: live?.active ? "ASR: OFF" : "音声認識",
+			active: !live?.active && !!voice.turn && !voice.turn.text,
+		},
 		{ id: "llm", label: "回答", active: !!activeRun },
-		{ id: "speech", label: "音声再生", active: phase === "playing" },
+		{
+			id: "speech",
+			label: live?.active ? "TTS: OFF" : "音声再生",
+			active: !live?.active && phase === "playing",
+		},
 	];
 	return (
 		<div className="chat-bottom">
@@ -138,6 +147,16 @@ export function ConversationComposer({
 				/>
 			</div>
 			<output className="composer-status" aria-live="polite">
+				{live?.active && (
+					<small>
+						音声会話中 ·{" "}
+						{live.session?.muted
+							? "マイク休止中"
+							: live.playing
+								? "Live再生中"
+								: "Live接続中"}
+					</small>
+				)}
 				{starting ? (
 					<small>
 						<Spinner size="xs" aria-hidden="true" />{" "}
@@ -204,7 +223,10 @@ export function ConversationComposer({
 									? voice.pause()
 									: (replay.stop(), voice.start()))
 							}
-							disabled={!voice.active && (phase !== "idle" || !!editing)}
+							disabled={
+								live?.active ||
+								(!voice.active && (phase !== "idle" || !!editing))
+							}
 							aria-label={voice.active ? "マイクを停止" : "音声を開始"}
 						>
 							{voice.active ? "マイクを停止" : "音声を開始"}
@@ -214,7 +236,7 @@ export function ConversationComposer({
 							variant={mute.muted ? "destructive" : "secondary"}
 							size="icon"
 							onClick={() => void mute.toggle()}
-							disabled={!mute.ready || mute.busy}
+							disabled={live?.active || !mute.ready || mute.busy}
 							aria-pressed={mute.muted}
 							aria-label={mute.muted ? "ミュートを解除" : "ミュート"}
 							title={
@@ -246,25 +268,102 @@ export function ConversationComposer({
 						<MicLevelMeter store={store} />
 					</div>
 					{editing ? (
-						<Button type="submit" disabled={!draft.trim() || edit.pending}>
-							更新して送信
-						</Button>
-					) : (
 						<Button
 							type="submit"
 							disabled={
-								(!draft.trim() && !state.attachments.items.length) ||
-								(automaticInput && !state.attachments.items.length) ||
-								submit.isPending ||
-								state.attachments.busy
+								!draft.trim() ||
+								edit.pending ||
+								(!!live?.active && live.session?.status !== "active")
 							}
-							aria-label="送信"
 						>
-							送信
+							更新して送信
 						</Button>
+					) : (
+						<>
+							{live && (
+								<>
+									{live.active && (
+										<Button
+											type="button"
+											size="icon"
+											variant="secondary"
+											onClick={() => void live.mute()}
+											aria-label={
+												live.session?.muted
+													? "音声会話のマイクを再開"
+													: "音声会話のマイクを休止"
+											}
+										>
+											{live.session?.muted ? "▶" : "Ⅱ"}
+										</Button>
+									)}
+									<Button
+										type="button"
+										size="icon"
+										variant={live.active ? "destructive" : "secondary"}
+										disabled={live.busy}
+										onClick={() =>
+											void (live.active
+												? live.stop()
+												: state.settings.data?.live.enabled &&
+													  state.settings.data?.live.model
+													? live.start()
+													: state.openLiveSettings())
+										}
+										aria-label={
+											live.active ? "音声会話を終了" : "音声会話を開始"
+										}
+										title={live.active ? "音声会話を終了" : "音声会話を開始"}
+									>
+										<svg
+											width="20"
+											height="20"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="currentColor"
+											strokeWidth="1.8"
+											aria-hidden="true"
+										>
+											{live.active ? (
+												<rect x="6" y="6" width="12" height="12" rx="2" />
+											) : (
+												<path d="M4 10v4m4-8v12m4-15v18m4-15v12m4-8v4" />
+											)}
+										</svg>
+									</Button>
+									<Button
+										type="button"
+										variant="ghost"
+										size="icon"
+										onClick={state.openLiveSettings}
+										aria-label="音声会話の設定"
+									>
+										⚙
+									</Button>
+								</>
+							)}
+							<Button
+								type="submit"
+								disabled={
+									(!draft.trim() && !state.attachments.items.length) ||
+									(automaticInput && !state.attachments.items.length) ||
+									submit.isPending ||
+									(!!live?.active && live.session?.status !== "active") ||
+									state.attachments.busy
+								}
+								aria-label="送信"
+							>
+								送信
+							</Button>
+						</>
 					)}
 				</div>
 			</form>
+			{live?.error && (
+				<p className="chat-error" role="alert">
+					{live.error}
+				</p>
+			)}
 			{(submit.isError || voice.error || audioError) && (
 				<p className="chat-error" role="alert">
 					{submit.isError

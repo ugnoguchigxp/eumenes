@@ -92,12 +92,20 @@ import {
 	type MonitoringService,
 } from "../domains/monitoring";
 import type { Resources } from "./resources/wiring";
+import {
+	registerLiveVoice,
+	type LiveVoiceService,
+} from "../domains/live-voice";
 
 /** One independently mountable group of routes. Mounting order is registration order. */
 export type AppModule = { mount(app: Hono): void };
 
 /** The services a production or test composition may route to. Only the core five are mandatory. */
 export type AppServices = {
+	liveVoice?: {
+		live: LiveVoiceService;
+		displayed: (id: string, notice: string) => Promise<void>;
+	};
 	dotsModule?: AppModule;
 	capabilities?: Capabilities;
 	pipelines?: import("./pipelines/pipelines-service").PipelinesService;
@@ -159,6 +167,16 @@ export type AppServices = {
 export function appModules(services: AppServices): AppModule[] {
 	const s = services;
 	const modules: Array<AppModule | undefined> = [
+		s.liveVoice && {
+			mount: (app) =>
+				registerLiveVoice(app, {
+					...s.liveVoice!.live,
+					delivery: {
+						...s.liveVoice!.live.delivery,
+						displayed: s.liveVoice!.displayed,
+					},
+				}),
+		},
 		s.docling && { mount: (app) => registerDocling(app, s.docling!) },
 		s.changes && {
 			mount: (app) =>

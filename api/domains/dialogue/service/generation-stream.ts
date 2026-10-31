@@ -15,6 +15,11 @@ export function generationStale(
 	db: Database,
 	input: GenerateInput,
 ): string | null {
+	try {
+		deps.externalOutput?.assertCurrent(db, input.runId);
+	} catch (error) {
+		return error instanceof Error ? error.message : "live_input_changed";
+	}
 	const run = byId(db, input.runId);
 	// Handed over: the run waits for its work now (behind its job, or for a task's answer still on this job id), and
 	// this generation has nothing left to adopt. Only this generation's hand-over queues it at the next revision.

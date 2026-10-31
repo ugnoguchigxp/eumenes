@@ -146,8 +146,10 @@ function packageMigrations(
 	});
 }
 
+import { migrations as liveVoiceMigrations } from "../domains/live-voice";
 /** Every migration of the product, in no meaningful order. */
 const catalog: readonly Migration[] = [
+	...liveVoiceMigrations,
 	retiredContinuityMigration,
 	...conversationMigrations,
 	...dialogueMigrations,

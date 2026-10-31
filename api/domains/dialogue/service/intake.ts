@@ -43,6 +43,21 @@ import {
 	addressedSession,
 	sessionRunMs,
 } from "./specialist-intake";
+type ExistingInput = {
+	requestId: string;
+	conversationId: string;
+	messageId: string;
+	text: string;
+};
+function existingAccept(input: ExistingInput): Accept {
+	return {
+		requestId: input.requestId,
+		conversationId: input.conversationId,
+		existingMessageId: input.messageId,
+		text: input.text,
+		sourceKind: "manual",
+	};
+}
 const log = getLogger("dialogue");
 
 /**
@@ -147,7 +162,7 @@ export function createIntake(deps: DialogueDeps) {
 		}
 		const now = clock();
 		const runId = id();
-		const messageId = id();
+		const messageId = input.existingMessageId ?? id();
 		// An active specialist session takes the utterance directly: no main-agent generation at all.
 		// A screen's pinned form submit is the main conversation's: it never goes to a session.
 		const { session: addressee, cancelled } =
@@ -157,24 +172,34 @@ export function createIntake(deps: DialogueDeps) {
 		// What the screen showed when the user sent must still be who listens, or nothing is stored.
 		if (input.addressee && !addresseeMatches(input.addressee, addressee))
 			throw new Error("addressee_changed");
-		conversation.appendInTransaction(db, {
-			id: messageId,
-			conversationId: input.conversationId,
-			role: "user",
-			text: input.text,
-			presentation: input.presentation ?? "conversation",
-			...(input.attachmentIds?.length
-				? {
-						attachments: conversation.attachmentsByIdsInTransaction(
-							db,
-							input.conversationId,
-							input.attachmentIds,
-						),
-					}
-				: {}),
-			createdAt: now,
-			runId,
-		});
+		if (input.existingMessageId) {
+			const found = conversation.messageInTransaction(db, messageId)?.message;
+			if (
+				!found ||
+				found.conversationId !== input.conversationId ||
+				found.role !== "user" ||
+				found.text !== input.text
+			)
+				throw new Error("live_input_changed");
+		} else
+			conversation.appendInTransaction(db, {
+				id: messageId,
+				conversationId: input.conversationId,
+				role: "user",
+				text: input.text,
+				presentation: input.presentation ?? "conversation",
+				...(input.attachmentIds?.length
+					? {
+							attachments: conversation.attachmentsByIdsInTransaction(
+								db,
+								input.conversationId,
+								input.attachmentIds,
+							),
+						}
+					: {}),
+				createdAt: now,
+				runId,
+			});
 		// A session toolchain with its own run time gives the utterance addressed to it that time.
 		const runMs = addressee ? sessionRunMs(deps, db, addressee) : 0;
 		const deadlineAtMs =
@@ -243,6 +268,10 @@ export function createIntake(deps: DialogueDeps) {
 		// A voice turn's requests were captured with the voice deadline: the toolchain's run time reaches them too.
 		if (runMs) larm.extendDeadlineInTransaction?.(db, runId, deadlineAtMs);
 		insert(db, run);
+		deps.externalOutput?.reattach(db, runId, input.conversationId, {
+			text: input.text,
+			existing: !!input.existingMessageId,
+		});
 		saveDeadlinePolicy(db, run.id, input.deadlineMs !== undefined);
 		if (input.toolchainId) savePinnedToolchain(db, runId, input.toolchainId);
 		if (addressee) {
@@ -295,6 +324,8 @@ export function createIntake(deps: DialogueDeps) {
 		},
 	};
 	return {
+		acceptExistingInTransaction: (db: Tx, input: ExistingInput) =>
+			acceptInTransaction(db, existingAccept(input)).run,
 		promptTarget,
 		acceptInTransaction,
 		async submitVoice(

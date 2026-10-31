@@ -183,3 +183,53 @@ test("the memory keeper is lit while a step runs and offers the error report fro
 		screen.queryByRole("button", { name: "メモリー整理のエラーの詳細" }),
 	).toBeNull();
 });
+
+test("Live starts beside send, offers settings, and turns both legacy routes OFF while active", () => {
+	const start = vi.fn(),
+		stop = vi.fn(),
+		settings = vi.fn();
+	const base = {
+		voice: { active: false },
+		phase: "idle",
+		attachments: { items: [], busy: false },
+		status: {},
+		specialist: { addressee: { kind: "normal", label: "会話" } },
+		mute: { muted: false, ready: true, busy: false },
+		draft: "文字でも補足",
+		submit: { isPending: false },
+		edit: { editing: null, target: null },
+		stewardActivity: {},
+		settings: { data: { live: { enabled: true, model: "fixture-voice" } } },
+		openLiveSettings: settings,
+		live: { active: false, busy: false, start, stop },
+	} as unknown as WorkspaceState;
+	const store = createAudioStore();
+	const view = render(<ConversationComposer state={base} store={store} />);
+	fireEvent.click(screen.getByRole("button", { name: "音声会話を開始" }));
+	expect(start).toHaveBeenCalledOnce();
+	fireEvent.click(screen.getByRole("button", { name: "音声会話の設定" }));
+	expect(settings).toHaveBeenCalledOnce();
+	view.rerender(
+		<ConversationComposer
+			state={
+				{
+					...base,
+					live: { ...base.live, active: true, session: { status: "active" } },
+				} as WorkspaceState
+			}
+			store={store}
+		/>,
+	);
+	expect(screen.getByText("ASR: OFF")).toBeTruthy();
+	expect(screen.getByText("TTS: OFF")).toBeTruthy();
+	expect(screen.getByRole("button", { name: "音声を開始" })).toHaveProperty(
+		"disabled",
+		true,
+	);
+	expect(screen.getByRole("button", { name: "送信" })).toHaveProperty(
+		"disabled",
+		false,
+	);
+	fireEvent.click(screen.getByRole("button", { name: "音声会話を終了" }));
+	expect(stop).toHaveBeenCalledOnce();
+});

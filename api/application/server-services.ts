@@ -1,4 +1,5 @@
 import { buildVisualPerception } from "./media/visual-perception";
+import { createLiveBridge } from "./media/live-bridge";
 import { createLateResources } from "./resources/late";
 import { buildResources } from "./resources/wiring";
 import { buildDocling } from "./docling/docling-composition";
@@ -23,7 +24,6 @@ import { createOcr } from "../domains/ocr";
 import { createScheduler } from "../domains/scheduler";
 import { createTimers } from "../domains/timers";
 import { createUiCompositions } from "../domains/ui-compositions";
-import { createVoiceDialogue } from "../domains/voice-dialogue";
 import type { Capabilities } from "../domains/capabilities";
 import { getLogger } from "../infrastructure/logger";
 import type { Config } from "../infrastructure/config";
@@ -46,7 +46,6 @@ import { createPipelinesService } from "./pipelines/pipelines-service";
 import { createPipelineTrials } from "./pipelines/pipelines-trials";
 import { createHostToolchain } from "./toolchain/toolchain-host";
 import { assembleAgency } from "./agency/assembly";
-import { createConversationPrewarm } from "./conversation-prewarm";
 import { createAgencyWork } from "./agency/work";
 
 const log = getLogger("server");
@@ -223,11 +222,14 @@ export async function buildServices(
 		: undefined;
 	// The conversation agent: its replies, and its spontaneous speech (runtimes per conversation, fed by the
 	// conversation outbox). The dialogue service is built below (it takes this host's ports).
+	const liveBridge = createLiveBridge();
+	const agencyDeps = { store, conversation, inference, settings, memory };
 	const agency = assembleAgency(
-		{ store, conversation, inference, settings, memory },
+		{ ...agencyDeps, ...liveBridge.agency },
 		() => dialogue,
 	);
 	const dialogue = createDialogueService({
+		externalOutput: liveBridge.externalOutput,
 		resources: {
 			registry: resources.access.registry,
 			producesInTransaction: (db, toolchainId) =>
@@ -294,18 +296,11 @@ export async function buildServices(
 	agency.attachWork(createAgencyWork({ dialogue }));
 	lateResources.attach(resources.access.registry);
 	stewardAssembly.attachDialogue(dialogue);
-	// The latest conversation's prompt is read ahead when it would be cold (started, shown, idle while shown).
-	const prewarm = createConversationPrewarm({
-		store,
-		inference,
-		latestConversationIdInTransaction:
-			dialogue.latestConversationIdInTransaction,
-		task: dialogue.conversationTaskInTransaction,
-	});
 	memory.registerForgetPurge(
 		toolchain.agents.executions.purgeSourcesInTransaction,
 	);
-	const voice = createVoiceDialogue(store, dialogue, inference);
+	const audioDeps = { ...core, conversation, continuity, dialogue, memory };
+	const { voice, liveVoice, prewarm } = liveBridge.attach(audioDeps);
 	const monitoring = createMonitoring({
 		remote: createLarmCollector({
 			config: () => ({
@@ -357,6 +352,7 @@ export async function buildServices(
 				})
 			: undefined;
 	return {
+		liveVoice,
 		store,
 		changes,
 		unsubscribeCommits: core.unsubscribeCommits,

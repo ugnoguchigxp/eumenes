@@ -1,3 +1,4 @@
+import { Button } from "@eumenes/design-system";
 import {
 	TerminalWorkspace,
 	type TerminalOutput,
@@ -27,6 +28,13 @@ export type TerminalsResource = {
 	startingLabel?: string;
 	startNeeded?: boolean;
 	sessions: TerminalSessionResource[];
+	/** Commands waiting for the person to execute or cancel them. */
+	approvals?: Array<{
+		id: string;
+		task: string;
+		command: string;
+		digest: string;
+	}>;
 };
 /** One live PTY session as the host connects it; credentials stay with the host. */
 export type TerminalConnection = {
@@ -74,32 +82,63 @@ export function TerminalWorkspaceView({
 				? action.message
 				: undefined;
 	return (
-		<TerminalWorkspace
-			title={request.title}
-			message={message}
-			emptyLabel={resource.startingLabel ?? "Claude Code を起動しています…"}
-			panes={resource.sessions.flatMap((session) => {
-				const connection = connections.get(`${session.id}:${session.run}`);
-				if (!connection) return [];
-				return [
-					{
-						id: `${session.id}:${session.run}`,
-						title: session.title,
-						heading: session.heading,
-						status: session.status,
-						statusMessage: session.statusMessage,
-						output: connection.output,
-						onInput: connection.input,
-						onResize: connection.resize,
-						onRestart:
-							session.restartable === false
-								? undefined
-								: () => {
-										void action.send("terminal-restart", { id: session.id });
-									},
-					},
-				];
-			})}
-		/>
+		<>
+			{(resource.approvals ?? []).map((approval) => (
+				<div key={approval.id}>
+					<p>{approval.task}</p>
+					<pre>{approval.command}</pre>
+					<Button
+						type="button"
+						onClick={() => {
+							void action.send("shell-approve", {
+								id: approval.id,
+								digest: approval.digest,
+							});
+						}}
+					>
+						実行
+					</Button>
+					<Button
+						type="button"
+						variant="secondary"
+						onClick={() => {
+							void action.send("shell-cancel", {
+								id: approval.id,
+								digest: approval.digest,
+							});
+						}}
+					>
+						取消
+					</Button>
+				</div>
+			))}
+			<TerminalWorkspace
+				title={request.title}
+				message={message}
+				emptyLabel={resource.startingLabel ?? "Claude Code を起動しています…"}
+				panes={resource.sessions.flatMap((session) => {
+					const connection = connections.get(`${session.id}:${session.run}`);
+					if (!connection) return [];
+					return [
+						{
+							id: `${session.id}:${session.run}`,
+							title: session.title,
+							heading: session.heading,
+							status: session.status,
+							statusMessage: session.statusMessage,
+							output: connection.output,
+							onInput: connection.input,
+							onResize: connection.resize,
+							onRestart:
+								session.restartable === false
+									? undefined
+									: () => {
+											void action.send("terminal-restart", { id: session.id });
+										},
+						},
+					];
+				})}
+			/>
+		</>
 	);
 }

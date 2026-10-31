@@ -20,9 +20,13 @@ import {
 	tabRow,
 	transitionOperation,
 } from "../repository";
-import { needsApproval, type Approvals } from "./approvals";
+import {
+	needsApproval,
+	needsButtonClickApproval,
+	type Approvals,
+} from "./approvals";
 import { codeOf, type Ctx } from "./context";
-import type { Grants } from "./grants";
+import { originOf, type Grants } from "./grants";
 import { finishTask } from "./lifecycle";
 import { begin, checkRef, guard } from "./operation-checks";
 import { digestOf, planOperation, type CommitGuard } from "./operation-plan";
@@ -60,7 +64,11 @@ export function createOperations(
 				e instanceof BrowserDriverError ? e.code : "browser_driver_failed",
 			);
 		}
-		return needsApproval(info);
+		return (
+			needsApproval(info) ||
+			(guardInfo.request.action === "click" &&
+				needsButtonClickApproval(info, originOf(guardInfo.request.url)))
+		);
 	}
 
 	async function operate(

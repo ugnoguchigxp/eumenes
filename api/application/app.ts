@@ -13,6 +13,7 @@ const quietWriteRoutes = new Set([
 	"/api/inference/screen/:id",
 	"/api/terminals/:id/input",
 	"/api/terminals/:id/resize",
+	"/api/live/sessions/:id/audio",
 ]);
 /**
  * Routes that read their body through their own bounded streaming reader

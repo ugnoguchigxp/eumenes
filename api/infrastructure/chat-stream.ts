@@ -55,7 +55,8 @@ export type ChatDiagnostics = ProviderTimings & {
 		| "invalid_tool_calls"
 		| "aborted"
 		| "invalid_response"
-		| "read_error";
+		| "read_error"
+		| "stalled";
 	promptTokens?: number;
 	completionTokens?: number;
 	cachedTokens?: number;
@@ -100,6 +101,8 @@ function providerTimings(value: unknown): ProviderTimings | undefined {
  * reason `length`), not as a broken stream (2026-10-30, 7,634 characters of reasoning hit the earlier 1MB first).
  */
 const STREAM_BYTES_LIMIT = 4_000_000;
+/** Silence after the first streamed byte. Time before that byte stays on the attempt deadline. */
+const STREAM_STALL_MS = 60_000;
 
 /**
  * Consume provider bytes as they arrive; only answer content is projected. A `readAhead` call only reads the prompt:
@@ -110,7 +113,7 @@ export async function readChatResponse(
 	signal: AbortSignal,
 	onDelta?: TextDelta,
 	onDiagnostics?: (value: ChatDiagnostics) => void,
-	options: { readAhead?: boolean } = {},
+	options: { readAhead?: boolean; stallMs?: number } = {},
 ): Promise<{
 	text: string;
 	usage?: Record<string, unknown>;
@@ -239,10 +242,27 @@ export async function readChatResponse(
 		if (choice?.finish_reason === "content_filter")
 			truncated ??= "content_filter";
 	}
+	const stallMs = options.stallMs ?? STREAM_STALL_MS;
+	async function nextChunk() {
+		if (!reader) throw new Error("chat_stream_missing");
+		if (bytes === 0) return reader.read();
+		let stalled = false;
+		const timer = setTimeout(() => {
+			stalled = true;
+			void reader.cancel().catch(() => {});
+		}, stallMs);
+		try {
+			const next = await reader.read();
+			if (stalled) throw new Error("llm_stream_stalled");
+			return next;
+		} finally {
+			clearTimeout(timer);
+		}
+	}
 	try {
 		for (;;) {
 			signal.throwIfAborted();
-			const next = await reader.read();
+			const next = await nextChunk();
 			signal.throwIfAborted();
 			if (next.done) break;
 			bytes += next.value.byteLength;
@@ -294,19 +314,22 @@ export async function readChatResponse(
 		streamFailure = signal.aborted
 			? "aborted"
 			: (streamFailure ??
-				(error instanceof Error && error.message === "chat_tool_calls_invalid"
-					? "invalid_tool_calls"
-					: error instanceof SyntaxError ||
-						  (error instanceof Error &&
-								[
-									"chat_stream_error",
-									"chat_stream_after_done",
-									"chat_output_too_large",
-									"chat_stream_too_large",
-									"chat_frame_too_large",
-								].includes(error.message))
-						? "invalid_response"
-						: "read_error"));
+				(error instanceof Error && error.message === "llm_stream_stalled"
+					? "stalled"
+					: error instanceof Error &&
+						  error.message === "chat_tool_calls_invalid"
+						? "invalid_tool_calls"
+						: error instanceof SyntaxError ||
+							  (error instanceof Error &&
+									[
+										"chat_stream_error",
+										"chat_stream_after_done",
+										"chat_output_too_large",
+										"chat_stream_too_large",
+										"chat_frame_too_large",
+									].includes(error.message))
+							? "invalid_response"
+							: "read_error"));
 		throw error;
 	} finally {
 		try {

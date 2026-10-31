@@ -8,15 +8,15 @@ README の「検証」の詳細です。
 
 `verification-reports/` はローカルの作業記録で、リポジトリに入れません。残す証跡は `spec/verification/` に置きます。
 
-会話backendをAIから再現するときは、[CLI対話モードのデバッグ手順](cli-chat.md#aiによる再現デバッグ)を使えます。検証用の会話IDへ複数行を順に送り、JSONLのrunIdから実行状態・エラーレポート・ログを追います。CLIの単体・API/SSE結合・エラー・実プロセス試験はdomainの所有範囲外なので、同ページの対象ファイルを明示して別途実行します。画面の描画や操作、音声入力・再生の受入は別に行います。
+会話backendをAIから再現するときは、[CLI対話モードのデバッグ手順](cli-chat.md#aiによる再現デバッグ)を使えます。検証用の会話IDへ複数行を順に送り、JSONLのrunIdから実行状態・エラーレポート・ログを追います。CLIの単体・API/SSE結合・エラー・実プロセス試験のうち、domain の公開入口を直接 import しているものは、その domain の verify と test:domain に含まれます。公開入口を import していないものは、同ページの対象ファイルを明示して実行します。画面の描画や操作、音声入力・再生の受入は別に行います。
 
-複数domainは `bun run verify -- --domain ocr --domain google-accounts` のように繰り返し指定します。所有パスと試験ファイルは重複排除されます。試験だけなら `bun run test:domain -- --domain ocr --domain google-accounts` を使えます。従来の `bun run test:domain -- ocr` と `bun run test:domain -- <domain> <subdomain>` も維持しています。依存閉包の表示は利用側domainの自動選択ではありません。影響のある利用側は引き続き明示してください。
+複数domainは `bun run verify -- --domain ocr --domain google-accounts` のように繰り返し指定します。所有パスの試験に加え、`api/application/**/*.test.ts` のうち、選んだ domain の公開入口（`api/domains/<name>` またはその `index`）を直接 import しているファイルを実行します。判定は境界検査と同じ import の解析で、間接の import はたどりません。`api/infrastructure` の試験と、公開入口を import していない結合試験は `--all` かファイル指定です。静的検査で範囲外を警告のままにする扱いは変えません。所有パスと試験ファイルは重複排除されます。試験だけなら `bun run test:domain -- --domain ocr --domain google-accounts` を使えます。従来の `bun run test:domain -- ocr` と `bun run test:domain -- <domain> <subdomain>` も維持しています。依存閉包の表示は利用側domainの自動選択ではありません。影響のある利用側は引き続き明示してください。
 
 検証順序は境界・サイズ等の確認、format、lint、DesignSystem通常型検査、DesignSystem build、rootの型検査（`bun check --no-pretty --all`、全体）、試験です。全件では最後にWeb buildを行い、続けて `scripts/bundle-budget.ts` で初期JS（entryと起動時に読むchunk）のgzipサイズを `scripts/bundle-budget.json` の記録値と比べます。2%を超えて増えると失敗し、5%を超えて減った場合は `--write` で記録を更新します。DesignSystemは再ビルドしません。DS通常型検査は試験・storiesを含み、build用型検査はこれらを除外するため両方必要です。DSソースはDS専用設定で検査し、root設定へ混在させません。キャッシュstampを検証合格の根拠にせず、毎回buildします。`test:domain` 単独は試験の実行のみで、この準備・整合確認を含みません。
 
 DesignSystemの `dist` は共有です。`verify` の実行中は開発サーバー・ブラウザ試験・別のbuildを重ねないでください。検証同士はlockで排他しますが、他の利用者までlockするものではありません。build直後と全consumer終了時の出力パス・内容のhashを比較し、変更・欠落・読み取り失敗があれば結果を無効にします。前後で元に戻る一時的な変更や、他プロセスへの影響は検出・防止できません。snapshotによる隔離は後続段階です。
 
-各実行には対象、基準commit、前後の入力hash、Bun・OS・runner、工程ごとの時間と状態、停止理由、DS出力hashを保存します。`pass`、`fail`、`interrupted`、`invalidated` を区別し、到達しなかった工程は `not_run` です。実行中は `running` を保存するため、強制終了やホスト停止で残った記録を合格として扱えません。SIGINT/SIGTERMでは実行中の子プロセス群を停止して記録を確定します。CI（GitHub Actions の `verify`）は手動で起動したときだけ動き、push と PR では動きません（2026-10-27）。起動した場合は成功・失敗の両方でレポートと準備時間をartifactへ保存します。手元の過去レポートは自動削除せず、CIの保持期間は7日です。
+各実行には対象、基準commit、前後の入力hash、Bun・OS・runner、工程ごとの時間と状態、停止理由、DS出力hashを保存します。コマンドを実行する工程は、その出力を run ディレクトリの `steps/` に残し、失敗した工程は `(fail)`・`FAIL `・`×` の行（該当がなければ末尾40行）を最大50件、`steps[].failures` に残します。`pass`、`fail`、`interrupted`、`invalidated` を区別し、到達しなかった工程は `not_run` です。実行中は `running` を保存するため、強制終了やホスト停止で残った記録を合格として扱えません。SIGINT/SIGTERMでは実行中の子プロセス群を停止して記録を確定します。CI（GitHub Actions の `verify`）は手動で起動したときだけ動き、push と PR では動きません（2026-10-27）。起動した場合は成功・失敗の両方でレポートと準備時間をartifactへ保存します。verify の終了時に、`runs/` は新しい順に20件と `latest.json` が指す run だけを残し、`nl-acceptance/` は新しい順に5件だけを残します。CIの保持期間は7日です。
 
 `bun run test:inventory` はrunner/projectごとの試験・生成元・別実行経路をJSONで出力します。`verify:all` には自然言語受入のjudge・frozen・tester-parser・runnerの4本を追加しています。runnerはfakeDriverを注入する試験です。Chromiumを起動するdriverは `bun test tests/acceptance/nl/driver.test.ts` の明示実行に残します。DSの `unit` は全件検証と所有domainの選択実行に含め、storiesから生成する `storybook` projectは初回CIから除外します。別途実行する場合はブラウザを準備し、`cd packages/design-system && bun x vitest run --project storybook src/components/GoogleAccounts/GoogleAccounts.stories.tsx` のようにstoryを明示してください。独立したOAuth試験の `.test.mjs` も棚卸しに含め、従来のBun全件実行範囲を維持します。runner設定や生成元のpatternを変えるときは棚卸しも更新します。
 

@@ -153,6 +153,37 @@
 			"artifactRevisionId": "artifact:cli.workspace@1",
 			"general": true,
 			"minImpact": "modify_existing"
+		},
+		{
+			"kind": "toolchain",
+			"id": "cli.run",
+			"revision": 4,
+			"title": "CLI",
+			"summary": "シェルコマンドを実行し、終了コードと出力を受け取る",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [
+				"CLIコマンドを実行して結果を知りたい",
+				"ファイル一覧やgitの状態などをコマンドで確認・操作したい"
+			],
+			"avoidWhen": [
+				"コードの実装・修正をClaude Codeに任せたい",
+				"コマンドの使い方を聞いているだけ"
+			],
+			"dependencies": ["package:cli.run@1"],
+			"examples": [
+				"git status を見て",
+				"このプロジェクトのファイル一覧を表示して",
+				"現在の作業ディレクトリを確かめて",
+				"ディスクの空き容量を確認して"
+			],
+			"packageRevisionId": "package:cli.run@1",
+			"functionName": "cli_command",
+			"redirects": [],
+			"bindingRevisionId": "binding:cli.run@2",
+			"artifactRevisionId": "artifact:cli.workspace@2",
+			"general": true,
+			"minImpact": "modify_existing"
 		}
 	],
 	"bindings": [
@@ -173,6 +204,24 @@
 			"outputSchemaRef": "domain:shell.run-receipt@1",
 			"resultProjectionRef": "projection:shell.run-result@1",
 			"artifactRevisionId": "artifact:cli.workspace@1"
+		},
+		{
+			"kind": "binding",
+			"id": "cli.run",
+			"revision": 2,
+			"execution": "command",
+			"adapterRef": "adapter:shell@1",
+			"availabilityRef": "availability:shell@1",
+			"tools": [
+				{
+					"toolRevisionId": "tool:cli.run@1",
+					"operationId": "shell.run",
+					"inputSchemaRef": "builtin:cliRun"
+				}
+			],
+			"outputSchemaRef": "domain:shell.run-receipt@1",
+			"resultProjectionRef": "projection:shell.run-result@1",
+			"artifactRevisionId": "artifact:cli.workspace@2"
 		}
 	],
 	"artifacts": [
@@ -221,6 +270,66 @@
 				"label": "CLI",
 				"order": 51
 			}
+		},
+		{
+			"kind": "artifact",
+			"id": "cli.workspace",
+			"revision": 2,
+			"title": "CLI",
+			"variants": [
+				{
+					"id": "standard",
+					"label": "標準",
+					"definition": {
+						"view": "terminal-workspace",
+						"source": "shell",
+						"title": "CLI"
+					}
+				}
+			],
+			"defaultVariant": "standard",
+			"sourceBindings": [
+				{
+					"source": "shell",
+					"adapterRef": "adapter:shell@1",
+					"query": "query:shell.sessions@1",
+					"target": "none"
+				}
+			],
+			"actionBindings": [
+				{
+					"actionId": "start",
+					"eventAction": "terminal-start",
+					"source": "shell",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "local"
+				},
+				{
+					"actionId": "restart",
+					"eventAction": "terminal-restart",
+					"source": "shell",
+					"inputSchemaRef": "schema:shell-session-id@1",
+					"effect": "local"
+				},
+				{
+					"actionId": "approve",
+					"eventAction": "shell-approve",
+					"source": "shell",
+					"inputSchemaRef": "schema:shell-run-decision@1",
+					"effect": "local"
+				},
+				{
+					"actionId": "cancel",
+					"eventAction": "shell-cancel",
+					"source": "shell",
+					"inputSchemaRef": "schema:shell-run-decision@1",
+					"effect": "local"
+				}
+			],
+			"launcher": {
+				"label": "CLI",
+				"order": 51
+			}
 		}
 	],
 	"schemas": [
@@ -238,6 +347,24 @@
 					}
 				},
 				"required": ["id"]
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "shell-run-decision",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"id": { "type": "string", "minLength": 1 },
+					"digest": {
+						"type": "string",
+						"minLength": 64,
+						"maxLength": 64
+					}
+				},
+				"required": ["id", "digest"]
 			}
 		}
 	]

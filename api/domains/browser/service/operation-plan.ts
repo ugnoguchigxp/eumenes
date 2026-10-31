@@ -13,11 +13,24 @@ import { keyCommits } from "./approvals";
 import type { Ctx } from "./context";
 import type { Grants } from "./grants";
 import { originOf } from "./grants";
-import { checkNavigationTarget } from "./navigation";
+import { checkNavigationTarget, isWebOrigin } from "./navigation";
 import { checkRef, type TaskRef } from "./operation-checks";
 
 export const digestOf = (value: unknown) =>
 	createHash("sha256").update(JSON.stringify(value)).digest("hex");
+
+/** Eumenes' own pages (spec §4.4). A tab URL that cannot be parsed is treated as one of them. */
+function pageIsEumenes(
+	url: string | null | undefined,
+	webOrigins: readonly string[],
+) {
+	if (!url) return false;
+	try {
+		return isWebOrigin(new URL(url), webOrigins);
+	} catch {
+		return true;
+	}
+}
 
 /**
  * What decides whether an operation needs the user's approval: the model's own declaration, or what the
@@ -56,6 +69,7 @@ export function planOperation(
 		at: tab?.url ?? null,
 	};
 	const none = { newTabUrl: null, observation: null, commit: null };
+	const onEumenes = pageIsEumenes(tab?.url, ctx.webOrigins);
 	const declaredEffect = (effect: Effect | undefined) =>
 		effect ? { effect } : {};
 	const request = (
@@ -122,7 +136,7 @@ export function planOperation(
 					...declaredEffect(action.effect),
 				},
 				commit: {
-					declared: action.effect === "commit",
+					declared: onEumenes || action.effect === "commit",
 					probe: { ref: action.ref },
 					request: request(
 						"click",
@@ -183,7 +197,7 @@ export function planOperation(
 				},
 				commit: commits
 					? {
-							declared: action.effect === "commit",
+							declared: onEumenes || action.effect === "commit",
 							probe: { ref: action.ref },
 							request: request(
 								"type",
@@ -212,24 +226,24 @@ export function planOperation(
 		}
 		case "press": {
 			const declared = action.effect === "commit";
+			const commitsKey = declared || keyCommits(action.key);
 			return {
 				driver: { kind: "press", key: action.key },
 				newTabUrl: null,
 				observation: null,
 				digest: { ...base, key: action.key },
 				detail: { key: action.key, ...declaredEffect(action.effect) },
-				commit:
-					declared || keyCommits(action.key)
-						? {
-								declared,
-								probe: "focused",
-								request: request(
-									"press",
-									action.key,
-									`キー ${action.key} を押します（送信・確定の操作）`,
-								),
-							}
-						: null,
+				commit: commitsKey
+					? {
+							declared: onEumenes || declared,
+							probe: "focused",
+							request: request(
+								"press",
+								action.key,
+								`キー ${action.key} を押します（送信・確定の操作）`,
+							),
+						}
+					: null,
 			};
 		}
 		case "wait":

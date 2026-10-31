@@ -120,7 +120,7 @@ test("the runner acts through the task's api: observe, operate, grants and captu
 			element: "box",
 			inputValueRef: g.inputValueRef,
 			purpose: "search",
-			submit: true,
+			submit: false,
 		});
 		const shot = await api.capture({ tabRef: step.tabRef!, range: "viewport" });
 		await until(

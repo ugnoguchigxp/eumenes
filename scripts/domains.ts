@@ -304,6 +304,17 @@ export const domains = {
 			test: [],
 		},
 	},
+	"live-voice": {
+		tier: 3,
+		backend: "api/domains/live-voice",
+		web: "web/src/domains/live-voice",
+		components: null,
+		depends: {
+			api: ["settings"],
+			web: ["audio", "settings"],
+			test: ["conversation"],
+		},
+	},
 	inference: {
 		tier: 2,
 		backend: "api/domains/inference",

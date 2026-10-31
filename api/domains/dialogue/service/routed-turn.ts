@@ -48,6 +48,7 @@ const CALL_FAILURES = new Set([
 	"chat_output_empty",
 	"chat_stream_incomplete",
 	"chat_stream_too_large",
+	"llm_stream_stalled",
 	"chat_output_too_large",
 	"chat_frame_too_large",
 	"chat_stream_error",

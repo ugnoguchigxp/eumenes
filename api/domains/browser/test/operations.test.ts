@@ -4,6 +4,7 @@ import {
 	WEB,
 	connect,
 	parkedRunner,
+	retarget,
 	runCleanup,
 	setup,
 	startRunningTask,
@@ -26,12 +27,14 @@ const acts = (env: Env) =>
 test("an observation gives refs that work once; any action on the tab invalidates them", async () => {
 	const env = setup();
 	const tabRef = await connect(env);
+	await operate(env, tabRef, { kind: "navigate", url: "https://example.com/" });
+	env.driver.calls.length = 0;
 	const o = await observe(env, tabRef);
 	expect(o).toMatchObject({
 		tabRef,
 		truncated: false,
 		refCount: 2,
-		url: `${WEB}/`,
+		url: "https://example.com/",
 	});
 	expect(o.text).toContain("[ref=e2]");
 	const click = {
@@ -87,6 +90,7 @@ test("a newer observation replaces the older one, and a ref of another tab's obs
 test("only refs inside the cut text are actionable", async () => {
 	const env = setup();
 	const tabRef = await connect(env);
+	await operate(env, tabRef, { kind: "navigate", url: "https://example.com/" });
 	env.driver.snapshotText = Array.from(
 		{ length: 300 },
 		(_, i) => `- link "l${i}" [ref=e${i}]`,
@@ -160,6 +164,7 @@ test("an operation that may have reached the page is indeterminate, stops its ta
 		"press the button",
 		"conversation",
 	);
+	await retarget(env, tabRef, "https://example.com/");
 	env.driver.actResults.push({
 		ok: false,
 		code: "action_timeout",
@@ -201,6 +206,7 @@ test("a driver exception after dispatch is indeterminate; a refusal before dispa
 		state: "indeterminate",
 	});
 	env.driver.actThrows = null;
+	await operate(env, tabRef, { kind: "navigate", url: "https://example.com/" });
 	const o = await observe(env, tabRef);
 	env.driver.actResults.push({
 		ok: false,

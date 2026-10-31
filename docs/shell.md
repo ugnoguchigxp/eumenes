@@ -2,15 +2,15 @@
 
 アーティファクト一覧の「CLI」から、backendのログインシェルを開く。閉じて開き直しても同じセッションへ再接続する。シェルが終了したら画面から再起動できる。
 
-会話の `cli_command` は登録プロジェクトのルートでコマンドを一件ずつ実行する。toolchain `cli.run@3` は `minImpact: modify_existing` を宣言するため、会話からの依頼は委任の確認（対象と影響を示して本人の承認を得る）を経てから受付ける。承認前はプロセスを起動せず、実行台帳にも残さない。受付後、終わるとタスク名・終了コード・出力の要点を会話へ返す。画面には対話シェルと直近の実行が表示される。入力待ちには実行の端末から手で入力できる。実行端末は再起動できない。画面「CLI」の対話シェルと、登録実行（execution origin）の経路はこの確認の対象外。
+会話の `cli_command` は登録プロジェクトのルートでコマンドを一件ずつ実行する。toolchain `cli.run@4` は `minImpact: modify_existing` を宣言するため、会話からの依頼は委任の確認を経てからコマンドを受け付ける。受け付けたコマンドは `awaiting_approval` になり、画面「CLI」に全文と「実行」「取消」が出る。API はコマンドの sha256 と一致する決定だけを受け、モデルはこの決定を作れない。10分を過ぎると `approval_expired` で取消になる。再起動しても承認待ちは実行せず、期限切れだけを取消にする。実行が終わるとタスク名・終了コード・出力の要点を会話へ返す。画面には対話シェルと直近の実行が表示される。入力待ちには実行の端末から手で入力できる。実行端末は再起動できない。画面「CLI」の対話シェルと、登録実行（execution origin）の経路は、この実行前承認の対象外で、すぐ実行待ちになる。
 
 実行は一件ごとに `$SHELL -l -c` のPTYを作る。`cd`の効果は一件の中だけ有効。既定の期限は120秒、最大600秒。時間切れはSIGTERM、5秒後にSIGKILL、10秒以内に終了を確認する。停止を確認できなければ結果不明とし、そのプロセスが残っている間は次の実行を開始しない。常駐プロセスの管理は対象外。
 
-実行台帳は `shell_runs`。再起動後は未実行を取消、実行中を結果不明にして、自動再実行しない。確定結果は30日・最新2000件を保持する。PTYセッションはbackendのメモリにだけあり、backend停止で終了する。会話用出力はANSIとCRを除き、3万字を超えると先頭と末尾を残す。画面は直近512KiBを再送する。子に渡す環境変数はログインセッションの分（`HOME`・`PATH`・`TMPDIR`・ロケール・`SSH_AUTH_SOCK` など）だけで、LARMのtoken・クラウドのキー・`EUMENES_*`・起動元Claude Codeの印は渡さない（一覧は [terminals.md](terminals.md)）。コマンド・出力を運用ログに出さない。
+実行台帳は `shell_runs`。再起動後は、承認待ちを残し、実行待ちを取消、実行中を結果不明にして、自動再実行しない。確定結果は30日・最新2000件を保持する。PTYセッションはbackendのメモリにだけあり、backend停止で終了する。会話用出力はANSIとCRを除き、3万字を超えると先頭と末尾を残す。画面は直近512KiBを再送する。子に渡す環境変数はログインセッションの分（`HOME`・`PATH`・`TMPDIR`・ロケール・`SSH_AUTH_SOCK` など）だけで、LARMのtoken・クラウドのキー・`EUMENES_*`・起動元Claude Codeの印は渡さない（一覧は [terminals.md](terminals.md)）。コマンド・出力を運用ログに出さない。
 
-HTTPは `GET/POST /api/shell/sessions`、`POST /api/shell/sessions/:id/input`・`/resize`・`/restart`、`GET /api/shell/sessions/:id/output`。既存APIと同じBearer・同一origin・loopbackの認証を使う。
+HTTPは `GET/POST /api/shell/sessions`、`POST /api/shell/sessions/:id/input`・`/resize`・`/restart`、`GET /api/shell/sessions/:id/output`、`POST /api/shell/runs/:id/decision`。既存APIと同じBearer・同一origin・loopbackの認証を使う。
 
-接続: `cli_command` → `toolchain:cli.run@1` → `package:cli.run@1` → `binding:cli.run@1` → `adapter:shell@1` の `shell.run` → shell domain。画面は `artifact:cli.workspace@1`、source `shell`、query `query:shell.sessions@1`。既存のOpenUI `terminal-workspace` とDesignSystemを使う。
+接続: `cli_command` → `toolchain:cli.run@4` → `package:cli.run@1` → `binding:cli.run@2` → `adapter:shell@1` の `shell.run` → shell domain。画面は `artifact:cli.workspace@2`、source `shell`、query `query:shell.sessions@1`。既存のOpenUI `terminal-workspace` とDesignSystemを使う。
 
 ## 検証
 

@@ -1,6 +1,41 @@
 import { ApiConnectionError, ApiError } from "../../client/transport";
 
 const messages: Record<string, string> = {
+	live_storage_failed:
+		"会話を保存できないため、音声会話を停止しました。保存先の問題を解消してから開始してください。",
+	live_permission_required:
+		"音声会話の設定で、利用とクラウドへの送信を許可してください。",
+	live_permission_revoked:
+		"音声会話の許可またはAPIキーが変更されたため停止しました。",
+	live_credential_missing:
+		"音声会話に使用する接続のAPIキーを設定してください。",
+	live_connection_invalid:
+		"音声会話には有効なOpenAI公式API接続を選んでください。",
+	live_model_required: "音声会話のモデルを設定してください。",
+	live_conversation_busy:
+		"音声会話は既に開始されています。現在の会話を終了してから開始してください。",
+	live_session_inactive: "音声会話が終了しました。もう一度開始してください。",
+	live_connect_failed:
+		"音声会話に接続できません。接続設定・APIキー・モデルの利用権限を確認してください。",
+	live_start_timeout: "音声会話の接続が時間内に完了しませんでした。",
+	live_provider_error:
+		"音声APIがエラーを返しました。設定と利用状況を確認してください。",
+	live_model_catalog_failed:
+		"モデル一覧を取得できません。接続とAPIキーを確認してください。",
+	live_disconnected:
+		"音声会話の接続が切れました。受信済みの字幕を保存しました。",
+	live_close_unconfirmed:
+		"音声会話を停止しました。APIの最終利用量は確認できていません。",
+	live_history_changed:
+		"会話の訂正・削除を反映するため、音声会話を終了しました。",
+	live_process_restarted:
+		"前回の音声会話は中断されました。もう一度開始してください。",
+	live_stream_backpressure:
+		"音声の受信が追いつかないため、会話を停止しました。",
+	live_protocol_failed:
+		"音声会話を続けられないため停止しました。受信済みの字幕を確認してください。",
+	live_legacy_voice_disabled: "音声会話中は通常のASR・TTSを利用できません。",
+
 	invalid_input: "入力内容が正しくありません。",
 	request_conflict:
 		"同じ操作が別の内容で実行済みです。画面を更新してください。",

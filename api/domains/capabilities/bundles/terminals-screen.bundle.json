@@ -201,6 +201,36 @@
 			"redirects": [],
 			"bindingRevisionId": "binding:claude-code.request@2",
 			"artifactRevisionId": "artifact:terminals.workspace@2"
+		},
+		{
+			"kind": "toolchain",
+			"id": "claude-code.request",
+			"revision": 4,
+			"title": "Claude Code",
+			"summary": "Claude Code にコーディング作業を依頼し、画面で進み具合を見る",
+			"aliases": ["Claude Code", "クロードコード"],
+			"tags": [],
+			"useWhen": [
+				"コードの実装・修正・調査・テストを Claude Code に頼みたい",
+				"Claude Code を開いて作業を始めさせたい"
+			],
+			"avoidWhen": [
+				"プログラミングの一般的な質問に答えるだけ",
+				"Claude Code の使い方や料金を聞いているだけ"
+			],
+			"dependencies": ["package:claude-code.request@2"],
+			"examples": [
+				"Claude Code でログイン画面のバグを直して",
+				"README のセットアップ手順を最新にするよう Claude Code に頼んで",
+				"Claude Code で設定画面に項目を足して",
+				"別のセッションの Claude Code で依存パッケージを更新して"
+			],
+			"packageRevisionId": "package:claude-code.request@2",
+			"functionName": "claude_code",
+			"redirects": [],
+			"bindingRevisionId": "binding:claude-code.request@2",
+			"artifactRevisionId": "artifact:terminals.workspace@2",
+			"minImpact": "modify_existing"
 		}
 	],
 	"bindings": [

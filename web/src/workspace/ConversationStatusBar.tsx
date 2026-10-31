@@ -56,16 +56,27 @@ export function ConversationStatusBar({
 					running={!!activeRun || speechModels.busy}
 					actualModel={actualModel}
 				/>
-				<SpeechModelSelect
-					models={speechModels}
-					disabled={
-						!!activeRun ||
-						model.busy ||
-						voice.active ||
-						phase === "playing" ||
-						replay.playingId !== null
-					}
-				/>
+				{state.live?.active ? (
+					<>
+						<span className="model-select" aria-label="ASR: OFF（Live使用中）">
+							ASR: OFF
+						</span>
+						<span className="model-select" aria-label="TTS: OFF（Live使用中）">
+							TTS: OFF
+						</span>
+					</>
+				) : (
+					<SpeechModelSelect
+						models={speechModels}
+						disabled={
+							!!activeRun ||
+							model.busy ||
+							voice.active ||
+							phase === "playing" ||
+							replay.playingId !== null
+						}
+					/>
+				)}
 				<BackgroundSelect background={background} />
 				<span
 					className="connection-health"

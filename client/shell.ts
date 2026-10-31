@@ -19,5 +19,14 @@ export function shellClient(transport: Transport) {
 		/** Server-sent events of the session's PTY output (`output` base64 frames, then `exit`). */
 		shellOutput: (id: string, signal: AbortSignal) =>
 			transport.call(`${path(id)}/output`, { signal }),
+		decideShellRun: async (
+			id: string,
+			input: { decision: "execute" | "cancel"; digest: string },
+		) => {
+			await transport.call(
+				`/api/shell/runs/${encodeURIComponent(id)}/decision`,
+				json(input),
+			);
+		},
 	};
 }

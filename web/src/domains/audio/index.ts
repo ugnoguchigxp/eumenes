@@ -8,3 +8,4 @@ export { useTimerTone } from "./useTimerTone";
 export type { AudioStore } from "./store";
 export type { SegmentTiming } from "./controller/segment-timing";
 export { createAudioStore } from "./store";
+export { createLivePcm } from "./live-pcm";

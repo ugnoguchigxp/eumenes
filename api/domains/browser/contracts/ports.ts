@@ -75,6 +75,8 @@ export type PlannedSize = { width: number; height: number };
 export type TargetInfo = {
 	tag: string;
 	type?: string;
+	/** Present when the element is `[role=button]`. */
+	role?: "button";
 	inForm: boolean;
 	formMethod?: string;
 	submits: boolean;

@@ -5,6 +5,7 @@ import {
 	connect,
 	fakeResolver,
 	parkedRunner,
+	retarget,
 	runCleanup,
 	setup,
 	startRunningTask,
@@ -78,6 +79,7 @@ test("a page an action ended on is checked before it is adopted; the tab is bloc
 	const env = setup({ runTaskStep: parkedRunner });
 	const tabRef = await connect(env);
 	const taskId = await startRunningTask(env, tabRef);
+	await retarget(env, tabRef, "https://example.com/");
 	const o = await observe(env, tabRef, taskId);
 	env.driver.actResults.push({
 		ok: true,

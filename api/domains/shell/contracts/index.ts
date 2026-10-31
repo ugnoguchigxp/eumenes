@@ -33,6 +33,7 @@ export const enqueueSchema = runInputSchema.extend({
 });
 export type EnqueueRun = z.infer<typeof enqueueSchema>;
 export type RunState =
+	| "awaiting_approval"
 	| "queued"
 	| "running"
 	| "completed"
@@ -40,11 +41,18 @@ export type RunState =
 	| "cancelled"
 	| "unknown";
 export type RunReason =
+	| "approval_expired"
 	| "cancelled_by_person"
 	| "restarted"
 	| "spawn_failed"
 	| "stop_unconfirmed"
 	| "stopped_by_person";
+/** How long a conversation run waits for the person to execute or cancel it. */
+export const APPROVAL_MS = 10 * 60 * 1000;
+export const decisionSchema = z.strictObject({
+	decision: z.enum(["execute", "cancel"]),
+	digest: z.string().regex(/^[a-f0-9]{64}$/),
+});
 export type ShellRun = Omit<EnqueueRun, "attemptId" | "timeoutSeconds"> & {
 	id: string;
 	timeoutSeconds: number;
@@ -61,10 +69,10 @@ export type ShellRun = Omit<EnqueueRun, "attemptId" | "timeoutSeconds"> & {
 	updatedAt: string;
 };
 export type RunFinished = ShellRun & {
-	state: Exclude<RunState, "queued" | "running">;
+	state: Exclude<RunState, "awaiting_approval" | "queued" | "running">;
 };
 export const isFinal = (state: RunState) =>
-	state !== "queued" && state !== "running";
+	state !== "awaiting_approval" && state !== "queued" && state !== "running";
 export type ProjectResolver = (id: string) => { cwd: string } | null;
 export const sessionSchema = z.strictObject({
 	id: z.string(),
@@ -75,6 +83,7 @@ export const sessionSchema = z.strictObject({
 	exitCode: z.number().int().nullable().optional(),
 	state: z
 		.enum([
+			"awaiting_approval",
 			"queued",
 			"running",
 			"completed",
@@ -86,11 +95,18 @@ export const sessionSchema = z.strictObject({
 	startedAt: z.string(),
 	endedAt: z.string().optional(),
 });
+export const approvalViewSchema = z.strictObject({
+	id: z.uuid(),
+	task: z.string(),
+	command: z.string(),
+	digest: z.string(),
+});
 export const sessionsSchema = z.strictObject({
 	available: z.boolean(),
 	revision: z.number().int(),
 	limit: z.number().int(),
 	sessions: z.array(sessionSchema),
+	approvals: z.array(approvalViewSchema),
 });
 export type SessionView = z.infer<typeof sessionSchema>;
 export const errorStatus = {

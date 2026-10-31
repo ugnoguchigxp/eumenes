@@ -24,6 +24,7 @@ import {
 import {
 	groupTests,
 	parseSelection,
+	integrationTestFiles,
 	selectionPaths,
 	sourceFiles,
 	testCommand,
@@ -164,9 +165,12 @@ export function verificationPlan(
 					!path.startsWith("tests/browser/") &&
 					path !== "tests/acceptance/nl/driver.test.ts",
 			)
-		: paths
-				.flatMap((path) => sourceFiles(root, path))
-				.filter((path) => testPattern.test(path));
+		: [
+				...paths
+					.flatMap((path) => sourceFiles(root, path))
+					.filter((path) => testPattern.test(path)),
+				...integrationTestFiles(root, selection.selected),
+			];
 	const groups = groupTests(tests);
 	if (!tests.length)
 		plan.push({

@@ -80,7 +80,8 @@ test("a click that submits a non-GET form needs approval and nothing is dispatch
 		summary: expect.stringContaining("Send"),
 	});
 	expect(acts(env)).toBe(0);
-	expect(env.driver.calls).toContain("inspectTarget:e2");
+	// Eumenes' own page: the click is a commit without inspecting the element (spec §4.4).
+	expect(env.driver.calls.some((c) => c.startsWith("inspect"))).toBe(false);
 	const op = env.store.read((db) =>
 		db.query("SELECT state, error_code FROM browser_operations").get(),
 	);
@@ -89,22 +90,20 @@ test("a click that submits a non-GET form needs approval and nothing is dispatch
 	expect(env.service.taskStatus(OWNER, taskId).state).toBe("running");
 });
 
-test("GET forms, dialog forms, links and controls outside forms run without approval", async () => {
+test("GET forms, dialog forms and links run without approval", async () => {
 	const env = setup({ runTaskStep: parkedRunner });
 	const tabRef = await connect(env);
 	const taskId = await startRunningTask(env, tabRef);
+	await operate(env, tabRef, taskId, {
+		kind: "navigate",
+		url: "https://example.com/",
+	});
+	env.driver.calls.length = 0;
 	const open: TargetInfo[] = [
 		{ ...POST_SUBMIT, formMethod: "get" },
 		{ ...POST_SUBMIT, formMethod: "dialog" },
 		{ tag: "a", inForm: false, submits: false },
-		{ tag: "button", type: "button", inForm: false, submits: false },
-		{
-			tag: "button",
-			type: "button",
-			inForm: true,
-			formMethod: "post",
-			submits: false,
-		},
+		{ tag: "div", inForm: false, submits: false },
 	];
 	for (const info of open) {
 		env.driver.targetInfo = info;
@@ -113,6 +112,35 @@ test("GET forms, dialog forms, links and controls outside forms run without appr
 		});
 	}
 	expect(acts(env)).toBe(open.length);
+});
+
+test("a button or role=button whose effect is unknown needs approval on every site", async () => {
+	const env = setup({ runTaskStep: parkedRunner });
+	const tabRef = await connect(env);
+	const taskId = await startRunningTask(env, tabRef);
+	await operate(env, tabRef, taskId, {
+		kind: "navigate",
+		url: "https://example.com/",
+	});
+	env.driver.calls.length = 0;
+	const held: TargetInfo[] = [
+		{ tag: "button", type: "button", inForm: false, submits: false },
+		{
+			tag: "button",
+			type: "button",
+			inForm: true,
+			formMethod: "post",
+			submits: false,
+		},
+		{ tag: "div", role: "button", inForm: false, submits: false },
+	];
+	for (const info of held) {
+		env.driver.targetInfo = info;
+		await expect(click(env, tabRef, taskId)).rejects.toBeInstanceOf(
+			BrowserApprovalRequired,
+		);
+	}
+	expect(acts(env)).toBe(0);
 });
 
 test("the model's own commit declaration needs approval without any inspection", async () => {
@@ -134,6 +162,11 @@ test("pressing Enter or Space inspects the focused element; other keys do not", 
 	env.driver.targetInfo = POST_SUBMIT;
 	const press = (key: string, extra: Record<string, unknown> = {}) =>
 		operate(env, tabRef, taskId, { kind: "press", key, ...extra });
+	await operate(env, tabRef, taskId, {
+		kind: "navigate",
+		url: "https://example.com/",
+	});
+	env.driver.calls.length = 0;
 	await expect(press("Enter")).rejects.toBeInstanceOf(BrowserApprovalRequired);
 	await expect(press("NumpadEnter")).rejects.toBeInstanceOf(
 		BrowserApprovalRequired,
@@ -152,6 +185,51 @@ test("pressing Enter or Space inspects the focused element; other keys do not", 
 	await expect(press("Escape", { effect: "commit" })).rejects.toBeInstanceOf(
 		BrowserApprovalRequired,
 	);
+});
+
+const OUTSIDE_FORM: TargetInfo = {
+	tag: "button",
+	type: "button",
+	inForm: false,
+	submits: false,
+};
+
+test("a click on an Eumenes page needs approval even outside a form, and that approval is used once", async () => {
+	const env = setup({ runTaskStep: sendRunner });
+	const tabRef = await connect(env);
+	env.driver.targetInfo = OUTSIDE_FORM;
+	const first = await start(env, tabRef);
+	await finished(env, first.taskId);
+	expect(env.service.taskStatus(OWNER, first.taskId).state).toBe("needs_input");
+	expect(env.driver.calls.some((c) => c.startsWith("inspect"))).toBe(false);
+	expect(acts(env)).toBe(0);
+	const second = await start(env, tabRef, {
+		continueFrom: first.taskId,
+		approvePending: true,
+	});
+	await finished(env, second.taskId);
+	expect(env.service.taskStatus(OWNER, second.taskId).state).toBe("completed");
+	expect(acts(env)).toBe(1);
+	const third = await start(env, tabRef, {
+		continueFrom: first.taskId,
+		approvePending: true,
+	});
+	await finished(env, third.taskId);
+	expect(env.service.taskStatus(OWNER, third.taskId).state).toBe("needs_input");
+	expect(acts(env)).toBe(1);
+});
+
+test("Enter on an Eumenes page needs approval without inspection; reading the page does not", async () => {
+	const env = setup({ runTaskStep: parkedRunner });
+	const tabRef = await connect(env);
+	const taskId = await startRunningTask(env, tabRef);
+	await observe(env, tabRef, taskId);
+	expect(env.service.tabs().length).toBeGreaterThan(0);
+	await expect(
+		operate(env, tabRef, taskId, { kind: "press", key: "Enter" }),
+	).rejects.toBeInstanceOf(BrowserApprovalRequired);
+	expect(env.driver.calls.some((c) => c === "inspectFocused")).toBe(false);
+	expect(acts(env)).toBe(0);
 });
 
 test("typing with submit inspects the field; typing without submit does not", async () => {
@@ -205,6 +283,11 @@ test("a failing inspection stops the operation before it is sent", async () => {
 	const taskId = await startRunningTask(env, tabRef);
 	const { BrowserDriverError } = await import("../contracts/ports");
 	env.driver.inspectError = new BrowserDriverError("ref_not_found", true);
+	await operate(env, tabRef, taskId, {
+		kind: "navigate",
+		url: "https://example.com/",
+	});
+	env.driver.calls.length = 0;
 	await expect(click(env, tabRef, taskId)).rejects.toThrow("ref_not_found");
 	expect(acts(env)).toBe(0);
 	const op = env.store.read((db) =>

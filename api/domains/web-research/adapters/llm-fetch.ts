@@ -1,4 +1,5 @@
 import {
+	createBuiltinContextGuard,
 	createLlmFetch,
 	createSafeHttpFetcher,
 	duckDuckGo,
@@ -172,6 +173,11 @@ export function createWebAcquisition(
 			return valid;
 		},
 	};
+	const searchGuard = createBuiltinContextGuard({
+		maxSegments: 4096,
+		maxCharacters: 2_000_000,
+		...(options.review ? { review: options.review } : {}),
+	});
 	const hitsClient = createLlmFetch({
 		search,
 		cache: { enabled: false },
@@ -328,7 +334,38 @@ export function createWebAcquisition(
 				log.info("web_research.hits_filtered", {
 					count: hits.length - valid.length,
 				});
-			result.hits = valid.slice(0, 5).map((hit) => ({
+			const guarded = [];
+			let withheld = 0;
+			for (const hit of valid.slice(0, 5)) {
+				let refused = false;
+				for (const field of [hit.title, hit.snippet]) {
+					if (!field) continue;
+					const inspected = await searchGuard.inspectRaw({
+						rawBody: new TextEncoder().encode(field),
+						contentType: "text/plain",
+						source: {
+							kind: "search_result",
+							trust: "untrusted",
+							url: hit.url,
+							provider: hit.provider,
+							query: request.query,
+							rank: hit.rank,
+							snippet: hit.snippet,
+						},
+						requestedUse: "answer_with_citation",
+						signal,
+					});
+					refused =
+						inspected.decision === "deny" ||
+						inspected.decision === "require_approval";
+					if (refused) break;
+				}
+				if (refused) withheld++;
+				else guarded.push(hit);
+			}
+			if (withheld > 0)
+				log.info("web_research.hits_withheld", { count: withheld });
+			result.hits = guarded.map((hit) => ({
 				url: hit.url,
 				title: limited(hit.title, 300),
 				snippet: limited(hit.snippet, 500),

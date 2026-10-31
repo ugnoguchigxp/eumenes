@@ -1,3 +1,4 @@
+import { linkVoiceRun, pauseLegacy } from "./exclusive";
 import { createSpeechSynthesis } from "./synthesis";
 import { createVoiceIntake } from "./intake";
 import { createVoiceResponder } from "./respond";
@@ -33,6 +34,7 @@ export function createVoiceDialogue(
 	dialogue: DialogueService,
 	larm: InferencePort,
 	clock: () => string = () => new Date().toISOString(),
+	externalActive: () => boolean = () => false,
 ) {
 	const sessions = new Map<string, number>();
 	const controllers = new Map<string, AbortController>();
@@ -169,18 +171,8 @@ export function createVoiceDialogue(
 		else log.debug("voice.transition_skipped", { utteranceId: id, status });
 		return result;
 	}
-	function linkRunInTransaction(db: Database, id: string, runId: string) {
-		const current = get(db, id);
-		if (
-			!current ||
-			current.status !== "responding" ||
-			sessions.get(current.sessionId) !== current.generation
-		)
-			throw new Error("voice_turn_inactive");
-		if (current.runId === runId) return;
-		if (!update(db, id, current.revision, "responding", clock(), { runId }))
-			throw new Error("voice_turn_inactive");
-	}
+	const linkRunInTransaction = (db: Database, id: string, runId: string) =>
+		linkVoiceRun(db, id, runId, sessions, clock());
 	const input = createInputCollector({
 		store,
 		larm,
@@ -198,10 +190,15 @@ export function createVoiceDialogue(
 		clock,
 	});
 	return {
+		available: () => !externalActive(),
+		pauseAll() {
+			return pauseLegacy(sessions, this.stop, controllers, warming, audio);
+		},
 		commit: input.commit,
 		replaySentences,
 		/** Synthesizes one clause on demand; it is not tied to any voice turn. */
 		async replayAudio(text: string, signal: AbortSignal) {
+			if (externalActive()) throw new Error("live_legacy_voice_disabled");
 			if (!text.trim() || text.length > 400)
 				throw new Error("replay_text_invalid");
 			return larm.speak(text, signal);
@@ -212,6 +209,7 @@ export function createVoiceDialogue(
 			runId?: string,
 			messageId?: string,
 		) {
+			if (externalActive()) throw new Error("live_legacy_voice_disabled");
 			if (!text.trim() || text.length > 400)
 				throw new Error("replay_text_invalid");
 			if (runId) {
@@ -267,6 +265,7 @@ export function createVoiceDialogue(
 		},
 		/** Synthesizes a fixed sample with unsaved voice settings. */
 		async sampleAudio(override: SpeechOverride, signal: AbortSignal) {
+			if (externalActive()) throw new Error("live_legacy_voice_disabled");
 			return larm.speak(
 				"こんにちは。これは音声のサンプルです。",
 				signal,
@@ -281,6 +280,7 @@ export function createVoiceDialogue(
 			for (const runId of runIds) await dialogue.cancel(runId);
 		},
 		start(sessionId: string, generation: number) {
+			if (externalActive()) throw new Error("live_legacy_voice_disabled");
 			const previous = sessions.get(sessionId) ?? 0;
 			if (generation <= previous) throw new Error("stale_voice_generation");
 			sessions.set(sessionId, generation);

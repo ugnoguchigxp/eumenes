@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import { systemContext } from "../../../infrastructure/system-context";
 import { systemCopyCheck } from "./conversation-output";
 import {
 	estimateTextTokens,
@@ -37,13 +38,20 @@ export const MEMORY_TOKENS = 300;
 const MEMORY_KINDS = new Set(["preference", "habit", "tendency", "constraint"]);
 
 /** The system part of every call on the conversation's prompt (section 4). */
-export function conversationSystem(deps: DialogueDeps, tx: Database): string {
+export function conversationSystem(
+	deps: DialogueDeps,
+	tx: Database,
+	conversationId?: string,
+): string {
 	const persona = deps.larm.snapshotInTransaction?.(tx).general ?? {
 		agentName: "",
 		userName: "",
 		persona: "butler" as const,
 	};
-	return systemText(persona, deps.conversationAgent.system());
+	const base = systemText(persona, deps.conversationAgent.system());
+	return conversationId && deps.externalOutput?.active(tx, conversationId)
+		? `${base}\n${systemContext("dialogue.contexts.live-output", {})}`
+		: base;
 }
 
 /** What the cached prefix is fixed by: the system part. */
@@ -255,7 +263,7 @@ export function moveCutInTransaction(
 		{
 			seq: input.seq,
 			systemDigest: systemDigestOf(
-				input.system ?? conversationSystem(deps, tx),
+				input.system ?? conversationSystem(deps, tx, conversationId),
 			),
 			memoryDigest: memoryDigestOf(window),
 			at: new Date(input.nowMs).toISOString(),
@@ -446,7 +454,7 @@ export function backgroundPrefixInTransaction(
 	}
 	return conversationPrefixFrom(deps, tx, conversationId, {
 		harness: localHarness,
-		system: conversationSystem(deps, tx),
+		system: conversationSystem(deps, tx, conversationId),
 		window,
 		pending: pendingMessageIdsInTransaction(deps, tx, conversationId),
 	});

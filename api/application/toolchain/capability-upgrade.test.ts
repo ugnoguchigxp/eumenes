@@ -82,6 +82,19 @@ test("seed upgrades the deployed board and terminal schemas without replacing ar
 				),
 			),
 		);
+		// The deployed bundle had one request toolchain and no repair toolchain.
+		oldTerminal.definitions = oldTerminal.definitions.filter(
+			(d) =>
+				d.id !== "claude-code.repair" &&
+				!(
+					d.kind === "toolchain" &&
+					d.id === "claude-code.request" &&
+					d.revision !== 2
+				),
+		);
+		oldTerminal.bindings = oldTerminal.bindings.filter(
+			(b) => b.id !== "claude-code.repair",
+		);
 		for (const d of [...oldTerminal.definitions, ...oldTerminal.bindings])
 			if (["tool", "package", "binding", "toolchain"].includes(String(d.kind)))
 				d.revision = 1;
@@ -152,7 +165,7 @@ test("seed upgrades the deployed board and terminal schemas without replacing ar
 			}));
 		expect(published()).toEqual({
 			toolchains: [
-				"toolchain:claude-code.request@2",
+				"toolchain:claude-code.request@4",
 				"toolchain:kanban.manage@4",
 			],
 			board: ["artifact:kanban.board@4"],

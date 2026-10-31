@@ -135,6 +135,10 @@ export const INSTANT: ToolchainCard = {
 const DEFAULT_CARDS = [IMAGE, INSTANT];
 
 export type SetupOptions = {
+	externalOutput?: Parameters<
+		typeof createDialogueService
+	>[0]["externalOutput"];
+	extraMigrations?: import("../../../infrastructure/sqlite").Migration[];
 	/** Cards the catalog lists (default: image and instant). */
 	cards?: ToolchainCard[];
 	/** Offer the music port (the music toolchain is then available). */
@@ -172,7 +176,10 @@ export type SetupOptions = {
 
 /** A real store, queue, continuity and dialogue with a scripted model, a fake toolchain catalog and image port. */
 export async function setup(options: SetupOptions = {}) {
-	const { dir, store } = openDialogueStore("eumenes-generation-");
+	const { dir, store } = openDialogueStore(
+		"eumenes-generation-",
+		options.extraMigrations,
+	);
 	const conversation = createConversationService(store);
 	const continuity = createContinuityService(store);
 	const cards = options.cards ?? DEFAULT_CARDS;
@@ -387,6 +394,7 @@ export async function setup(options: SetupOptions = {}) {
 	if (memory) await memory.recover();
 	const queue = createQueue(store, options.queue ?? {});
 	const dialogue = createDialogueService({
+		externalOutput: options.externalOutput,
 		store,
 		conversation,
 		larm,

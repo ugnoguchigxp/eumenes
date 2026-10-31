@@ -170,7 +170,7 @@ test("the first call has the D7 context: system layer, enclosed reference with t
 		handedOverRequest: "イヤホンを探す",
 		requestedUrl: `${WEB}/settings`,
 		callsLeft: 12,
-		target: { place: `${WEB}/` },
+		target: { place: "https://example.com/" },
 		observation: { truncated: false, refCount: 2 },
 	});
 	expect(ref.observation.text).toContain('button "Go" [ref=e2]');
@@ -591,10 +591,10 @@ test("a newer observation turns the older ones into a one-line stub, and nothing
 		tag(s.model.state.calls[0]![1]!.content, "REFERENCE").observation.text,
 	).toContain('button "Go"');
 	expect(tag(reference!.content, "REFERENCE").observation).toBe(
-		`失効済み: ${WEB}/ 「設定」`,
+		`失効済み: https://example.com/ 「設定」`,
 	);
 	expect(tag(first!.content, "TOOL_RESULT").observation).toBe(
-		`失効済み: ${WEB}/ 「設定」`,
+		`失効済み: https://example.com/ 「設定」`,
 	);
 	expect(tag(second!.content, "TOOL_RESULT").observation.text).toContain(
 		'button "Go"',
@@ -603,7 +603,7 @@ test("a newer observation turns the older ones into a one-line stub, and nothing
 	expect(system).toEqual(s.model.state.calls[0]![0]!);
 	expect(request).toEqual({ role: "user", content: ASKED });
 	expect(tag(reference!.content, "REFERENCE")).toMatchObject({
-		target: { place: `${WEB}/` },
+		target: { place: "https://example.com/" },
 		callsLeft: 12,
 	});
 	expect(s.model.state.calls[2]!.map((m) => m.role)).toEqual(

@@ -146,6 +146,23 @@ test("fresh initialization installs every repository seed and bundle without run
 			functionName: "repair_error",
 			minImpact: "modify_existing",
 		});
+		const request = store.read((db) =>
+			caps
+				.toolchainsInTransaction(db)
+				.find((d) => d.id === "claude-code.request"),
+		);
+		expect(request).toMatchObject({
+			functionName: "claude_code",
+			revisionId: "toolchain:claude-code.request@4",
+			minImpact: "modify_existing",
+		});
+		expect(
+			store.read((db) =>
+				db
+					.query("SELECT id FROM capability_revisions WHERE id=?")
+					.get("toolchain:claude-code.request@3"),
+			),
+		).toEqual({ id: "toolchain:claude-code.request@3" });
 		for (const id of [
 			"profile:claude-code.repair@2",
 			"skill:claude-code.repair@2",

@@ -1,17 +1,21 @@
+import {
+	persistSpeech,
+	speechReceipt,
+	deliveryEmotionOf,
+	type SpeechRouter,
+} from "./speech";
 import type { Database } from "bun:sqlite";
 import {
 	createAgencyRuntime,
 	createIdlePlanner,
 	createIdleScheduler,
 	emotionName,
-	reportedTodoIds,
 	runRespond,
 	type ActionTicket,
 	type AgencyRuntime,
 	type CallOutcome,
 	type CycleOutcome,
 	type Decision,
-	type EmotionName,
 	type IdlePlanner,
 	type LlmPort,
 	type LlmRequest,
@@ -25,7 +29,6 @@ import type {
 	AgencyLayerPort,
 	ConversationAgentPort,
 } from "../../domains/dialogue/contracts";
-import { hostDelivery, type DeliveryEmotion } from "../../domains/delivery";
 import type { MemoryService } from "../../domains/memory";
 import type { Settings } from "../../domains/settings";
 import { toErrorCode } from "../../infrastructure/error-code";
@@ -56,6 +59,7 @@ const TOPICS_TTL_MS = 30_000;
 const FEED_PAGE = 200;
 const LOG_REASON_CHARS = 120;
 export type AgencyHostDeps = {
+	routeSpeechInTransaction?: SpeechRouter;
 	store: Pick<SqliteStore, "read" | "write" | "onCommit">;
 	conversation: Pick<
 		ConversationService,
@@ -123,9 +127,6 @@ type Conv = {
 
 const sanitize = (id: string) =>
 	id.replace(/[^a-zA-Z0-9_.:-]/g, "_").slice(0, 60);
-/** The agency's calm is the delivery's "none"; every other feeling keeps its name. */
-const deliveryEmotionOf = (emotion: EmotionName): DeliveryEmotion =>
-	emotion === "calm" ? "none" : emotion;
 
 const sameSettings = (a: AgencySettings, b: AgencySettings) =>
 	JSON.stringify(a) === JSON.stringify(b);
@@ -488,7 +489,7 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 		const text = ticket.utterance ?? "";
 		const messageId = `agency:${c.scope}:${ticket.id}`;
 		const at = nowMs();
-		let outcome: "appended" | "stale";
+		let outcome: "appended" | "stale" | "routed";
 		try {
 			outcome = await store.write((db) => {
 				// Re-checked inside the writer transaction: the setting as committed (not the cached copy),
@@ -508,27 +509,14 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 					inference.foregroundBusy()
 				)
 					return "stale";
-				conversation.appendInTransaction(db, {
-					id: messageId,
-					conversationId: c.id,
-					role: "assistant",
-					text,
-					createdAt: new Date(at).toISOString(),
-					runId: null,
-					// The feeling chosen with the utterance sets its voice tone and motion (never judged again).
-					...(ticket.emotion
-						? { delivery: hostDelivery(deliveryEmotionOf(ticket.emotion)) }
-						: {}),
-				});
-				const todoRefs = reportedTodoIds(evidenceRefs);
-				deps.recordSpokeInTransaction(db, {
+				return persistSpeech(deps, db, {
 					conversationId: c.id,
 					messageId,
 					text,
-					at: new Date(at).toISOString(),
-					...(todoRefs.length ? { todoRefs } : {}),
+					at,
+					ticket,
+					evidenceRefs,
 				});
-				return "appended";
 			});
 		} catch (error) {
 			log.warn("agency.delivered", {
@@ -556,11 +544,11 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 			subjectId: c.id,
 			attemptId: ticket.id,
 			kind: trigger,
-			outcome: "appended",
+			outcome,
 			outputCharacters: text.length,
 			...(ticket.emotion ? { emotion: ticket.emotion } : {}),
 		});
-		receipt(cy, ticket, "succeeded", text);
+		receipt(cy, ticket, "succeeded", speechReceipt(outcome, text));
 		return true;
 	}
 

@@ -1,5 +1,6 @@
-import { readdirSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { applicationDomainEntries } from "./boundaries";
 import { type Domain, domains, ownedPaths } from "./domains";
 
 export function parseSelection(raw: string[], legacy = false) {
@@ -64,6 +65,18 @@ export function sourceFiles(root: string, directory: string): string[] {
 			return entry.isFile() ? [path] : [];
 		})
 		.sort();
+}
+
+/** Application tests that import one of the selected domains' public entries. */
+export function integrationTestFiles(root: string, selected: Domain[]) {
+	const wanted = new Set(selected);
+	return sourceFiles(root, "api/application").filter((path) => {
+		if (!testPattern.test(path)) return false;
+		return applicationDomainEntries(
+			path,
+			readFileSync(join(root, path), "utf8"),
+		).some((domain) => wanted.has(domain));
+	});
 }
 
 export function selectionPaths(selected: Domain[], sub?: string) {

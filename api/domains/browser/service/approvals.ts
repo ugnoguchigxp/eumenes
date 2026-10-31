@@ -31,6 +31,12 @@ export const keyCommits = (key: string) =>
 	COMMIT_KEYS.has((key.split("+").at(-1) ?? "").toLowerCase());
 
 /**
+ * Origins where a button whose effect cannot be judged may run without approval.
+ * Empty: no site is exempt.
+ */
+const BUTTON_COMMIT_EXEMPT_ORIGINS = new Set<string>();
+
+/**
  * Whether what the element would do needs the user's approval (spec §5.3): it submits a form whose method is
  * not GET. A form without a method is a GET form, and `dialog` forms only close a dialog. A form the page
  * did not describe is treated as a non-GET form.
@@ -40,6 +46,15 @@ export const needsApproval = (info: TargetInfo) =>
 	info.submits &&
 	info.formMethod !== "get" &&
 	info.formMethod !== "dialog";
+
+/** A click on `button` or `[role=button]` whose effect the form rules do not decide. */
+export const needsButtonClickApproval = (
+	info: TargetInfo,
+	origin: string | null,
+) =>
+	!BUTTON_COMMIT_EXEMPT_ORIGINS.has(origin ?? "") &&
+	(info.tag === "button" || info.role === "button") &&
+	!info.submits;
 
 /**
  * The approvals ledger. A confirmed operation is run only against an approval the user gave the task: same

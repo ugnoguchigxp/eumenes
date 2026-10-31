@@ -192,7 +192,21 @@ export function createGenerationSettlement(
 			// A task or a pipeline runs on its own: its announcement is the answer of this run.
 			const text = result.handover?.announcement ?? result.text;
 			let messageId: string | null = null;
-			if (text.trim()) {
+			const external =
+				deps.externalOutput?.offer(tx, run, text, !!result.confirmation) ??
+				false;
+			if (external && result.confirmation) {
+				events.appendInTransaction(tx, {
+					conversationId: run.conversationId,
+					at: jstSeconds(Date.parse(clock())),
+					type: "said",
+					by: "agent",
+					fields: { text, origin: "confirmation" },
+					messageIds: [run.inputMessageId],
+					deliveryKey: `run:${run.id}`,
+				});
+			}
+			if (text.trim() && !external) {
 				messageId = id();
 				conversation.appendInTransaction(tx, {
 					id: messageId,

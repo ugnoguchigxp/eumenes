@@ -1,7 +1,12 @@
 import { z } from "zod";
 import type { Context, Hono } from "hono";
 import { parseJsonBody } from "../../../infrastructure/http";
-import { startSchema, sizeSchema, inputSchema } from "../contracts";
+import {
+	startSchema,
+	sizeSchema,
+	inputSchema,
+	decisionSchema,
+} from "../contracts";
 import type { ShellService } from "../service";
 const invalid = (c: Context) => c.json({ error: "invalid_shell_input" }, 400);
 const options = { code: "invalid_shell_input" };
@@ -27,6 +32,21 @@ export function registerShell(app: Hono, service: ShellService) {
 			service.resize(id, p.data);
 			return c.body(null, 204);
 		});
+	app.post("/api/shell/runs/:id/decision", async (c) => {
+		const id = c.req.param("id");
+		if (!z.uuid().safeParse(id).success) return invalid(c);
+		const p = await parseJsonBody(c, decisionSchema, options);
+		if (!p.ok) return p.response;
+		try {
+			return c.json(await service.decide(id, p.data));
+		} catch (error) {
+			const message = error instanceof Error ? error.message : "";
+			if (message === "shell_run_conflict")
+				return c.json({ error: message }, 409);
+			if (message === "shell_not_found") return c.json({ error: message }, 404);
+			throw error;
+		}
+	});
 	app.get("/api/shell/sessions/:id/output", (c) => {
 		const id = c.req.param("id");
 		return z.uuid().safeParse(id).success

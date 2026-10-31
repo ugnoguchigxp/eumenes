@@ -3,8 +3,10 @@ import {
 	mkdtempSync,
 	mkdirSync,
 	readFileSync,
+	readdirSync,
 	renameSync,
 	rmSync,
+	utimesSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -15,11 +17,15 @@ import {
 	createReport,
 	distRevision,
 	executeVerification,
+	NL_ACCEPTANCE_RUNS_KEPT,
+	pruneVerificationReports,
+	VERIFY_RUNS_KEPT,
 	type VerificationReport,
 } from "./verification-run";
 import {
 	acceptanceFiles,
 	groupTests,
+	integrationTestFiles,
 	parseSelection,
 	runnerFor,
 	selectionPaths,
@@ -82,6 +88,48 @@ describe("verification selection and runner coverage", () => {
 			expect(() => parseSelection(args)).toThrow();
 		expect(() => parseSelection(["ocr", "../escape"], true)).toThrow();
 		expect(() => parseSelection(["ocr", "upload", "extra"], true)).toThrow();
+	});
+	test("old verify runs and acceptance outputs are pruned to the kept counts", () => {
+		const reports = fixture();
+		const runs = join(reports, "runs");
+		const acceptance = join(reports, "nl-acceptance");
+		mkdirSync(runs);
+		mkdirSync(acceptance);
+		const at = (i: number) => new Date(1_700_000_000_000 + i * 1000);
+		for (let i = 0; i < VERIFY_RUNS_KEPT + 3; i++) {
+			const name = `run-${String(i).padStart(3, "0")}`;
+			mkdirSync(join(runs, name));
+			utimesSync(join(runs, name), at(i), at(i));
+		}
+		for (let i = 0; i < NL_ACCEPTANCE_RUNS_KEPT + 2; i++) {
+			const name = `accept-${i}`;
+			mkdirSync(join(acceptance, name));
+			utimesSync(join(acceptance, name), at(i), at(i));
+		}
+		writeFileSync(
+			join(reports, "latest.json"),
+			JSON.stringify({ runId: "run-000" }),
+		);
+		pruneVerificationReports(reports);
+		const keptRuns = readdirSync(runs).sort();
+		expect(keptRuns).toContain("run-000");
+		expect(keptRuns).toHaveLength(VERIFY_RUNS_KEPT + 1);
+		expect(keptRuns).toContain(
+			`run-${String(VERIFY_RUNS_KEPT + 2).padStart(3, "0")}`,
+		);
+		expect(readdirSync(acceptance).sort()).toEqual(
+			[2, 3, 4, 5, 6].map((i) => `accept-${i}`),
+		);
+	});
+	test("application tests that import a domain entry join that domain", () => {
+		const tasks = integrationTestFiles(root, ["tasks"]);
+		expect(tasks).toContain("api/application/work/tasks-http.test.ts");
+		const dialogue = integrationTestFiles(root, ["dialogue"]);
+		expect(dialogue).toContain("api/application/work/tasks-http.test.ts");
+		expect(dialogue).not.toContain("api/application/cli-chat.test.ts");
+		expect(integrationTestFiles(root, ["ocr"])).not.toContain(
+			"api/application/work/tasks-http.test.ts",
+		);
 	});
 	test("owned DS tests dispatch once to the unit project", () => {
 		const paths = selectionPaths(["ocr", "google-accounts", "ocr"]);
@@ -236,6 +284,35 @@ describe("verification evidence and integrity", () => {
 				readFileSync(join(reports, "runs", first.runId, "report.json"), "utf8"),
 			).result,
 		).toBe("fail");
+	});
+	test("a command step keeps its log, and a failure names the failing test", async () => {
+		const dir = fixture();
+		const reports = join(dir, "verification-reports");
+		const report = reportFor(dir);
+		const result = await executeVerification(dir, reports, report, [
+			{ name: "ok", command: [process.execPath, "-e", "process.exit(0)"] },
+			{
+				name: "bun tests",
+				command: [
+					process.execPath,
+					"-e",
+					"console.log('(fail) sample > case'); process.exit(1)",
+				],
+			},
+		]);
+		expect(result).toBe(1);
+		expect(report.steps[0]).toMatchObject({
+			status: "pass",
+			log: "steps/01-ok.log",
+		});
+		expect(report.steps[1]?.failures).toEqual(["(fail) sample > case"]);
+		expect(report.steps[1]?.log).toBe("steps/02-bun-tests.log");
+		expect(
+			readFileSync(
+				join(reports, "runs", report.runId, "steps/02-bun-tests.log"),
+				"utf8",
+			),
+		).toContain("(fail) sample > case");
 	});
 	test("output hash covers names and bytes, rejects missing outputs", () => {
 		const dir = fixture();

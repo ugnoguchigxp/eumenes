@@ -12,4 +12,6 @@ export type WorkspaceAction =
 	| "recognition-incorporate"
 	| "recognition-handoff-cancel"
 	| "terminal-start"
-	| "terminal-restart";
+	| "terminal-restart"
+	| "shell-approve"
+	| "shell-cancel";

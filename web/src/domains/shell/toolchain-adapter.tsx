@@ -78,6 +78,7 @@ export const shellWebAdapter: WebArtifactAdapter = {
 			unavailableMessage: "ログインシェルが見つかりません。",
 			startingLabel: "CLIを起動しています…",
 			startNeeded: !data.sessions.some((s) => s.kind === "shell"),
+			approvals: data.approvals,
 			sessions: data.sessions.map((s) => ({
 				id: s.id,
 				title: s.title,
@@ -114,7 +115,19 @@ export const shellWebAdapter: WebArtifactAdapter = {
 			targetOf: () => undefined,
 			async local(_binding, event) {
 				const id = typeof event.values.id === "string" ? event.values.id : "";
+				const digest =
+					typeof event.values.digest === "string" ? event.values.digest : "";
 				try {
+					if (
+						event.action === "shell-approve" ||
+						event.action === "shell-cancel"
+					) {
+						await client.decideShellRun(id, {
+							decision: event.action === "shell-approve" ? "execute" : "cancel",
+							digest,
+						});
+						return accepted;
+					}
 					if (event.action === "terminal-start")
 						await client.startShell(INITIAL_SIZE);
 					else if (event.action === "terminal-restart")

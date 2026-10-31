@@ -37,6 +37,7 @@ import {
 	useVoiceDialogue,
 } from "../domains/voice-dialogue";
 import { useSettings, useVoiceMute } from "../domains/settings";
+import { useWorkspaceLive } from "./useWorkspaceLive";
 import { useKanbanNotices } from "../domains/kanban/useKanbanNotices";
 import { useTodoNotices } from "../domains/dialogue";
 import { useClaudeCodeArtifacts } from "../domains/terminals";
@@ -145,10 +146,11 @@ export function useWorkspace({
 		sessionAudio: voice.audio,
 		interruptLive: voice.interrupt,
 	});
+	const live = useWorkspaceLive(client, settings.data, voice, replay);
 	useAutomaticSpeech({
 		runs: runs.data,
 		messages: conversation.data?.messages,
-		enabled: settings.data?.voice.autoSpeak,
+		enabled: !live.active && settings.data?.voice.autoSpeak,
 		player: replay,
 		ownsSpeech: voice.ownsSpeech,
 		blocked:
@@ -289,6 +291,8 @@ export function useWorkspace({
 	}, [voice.turn?.runId, watchTimerRun]);
 	return {
 		attachments,
+		live,
+		openLiveSettings: () => void openById("settings.live"),
 		draft,
 		artifacts,
 		openDrawing,

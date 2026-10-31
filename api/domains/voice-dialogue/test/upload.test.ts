@@ -18,6 +18,7 @@ test("bounded audio stream rejects oversized upload before ASR", async () => {
 	let accepted = 0;
 	const app = new Hono();
 	registerVoiceDialogue(app, {
+		available: () => true,
 		accept: async () => {
 			accepted++;
 			return { status: "recognizing" };
@@ -46,6 +47,7 @@ test("valid bounded WAV reaches voice service once", async () => {
 	let accepted = 0;
 	const app = new Hono();
 	registerVoiceDialogue(app, {
+		available: () => true,
 		accept: async (
 			session: string,
 			generation: number,
@@ -85,6 +87,7 @@ test("replay failure logs and returns a code, never the raw message", async () =
 	try {
 		const app = new Hono();
 		registerVoiceDialogue(app, {
+			available: () => true,
 			replaySpeech: async () => {
 				throw new Error("http://192.168.0.2/secret failed");
 			},
@@ -116,6 +119,7 @@ test("a commit's browser timing is logged as numbers, and unknown timing fields 
 		const commits: unknown[] = [];
 		const app = new Hono();
 		registerVoiceDialogue(app, {
+			available: () => true,
 			commit: async (...args: unknown[]) => {
 				commits.push(args);
 				return { status: "responding" };
@@ -161,6 +165,7 @@ test("a played report's chunk gap is logged as numbers; a report without one sti
 		const reported: unknown[] = [];
 		const app = new Hono();
 		registerVoiceDialogue(app, {
+			available: () => true,
 			played: async (...args: unknown[]) => {
 				reported.push(args);
 				return { status: "synthesizing" };
@@ -189,4 +194,40 @@ test("a played report's chunk gap is logged as numbers; a report without one sti
 	} finally {
 		configureLogging({ level: "silent" });
 	}
+});
+
+test("Live prevents legacy ASR and TTS requests before any body or provider operation is processed", async () => {
+	let requests = 0;
+	const app = new Hono();
+	registerVoiceDialogue(app, {
+		available: () => false,
+		accept: async () => {
+			requests++;
+		},
+		replaySpeech: async () => {
+			requests++;
+		},
+		start: () => {
+			requests++;
+		},
+		stop: async () => {
+			requests++;
+		},
+	} as unknown as VoiceDialogueService);
+	for (const path of [
+		"/api/voice/sessions",
+		"/api/voice/turns",
+		"/api/voice/replay/audio",
+		"/api/voice/sample",
+	]) {
+		const response = await app.request(path, {
+			method: "POST",
+			body: "invalid fixture body",
+		});
+		expect(response.status).toBe(409);
+		expect(await response.json()).toEqual({
+			error: "live_legacy_voice_disabled",
+		});
+	}
+	expect(requests).toBe(0);
 });

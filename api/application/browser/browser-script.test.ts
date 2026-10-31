@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { connect, fakeBrave } from "../../domains/browser/test/fakes";
+import { connect, fakeBrave, retarget } from "../../domains/browser/test/fakes";
 import {
 	cleanup,
 	setup,
@@ -58,6 +58,7 @@ test("Script is committed before dispatch; observed evidence completes a step an
 		finish("対象の表示を確認しました。"),
 	]);
 	const tabRef = await connect(s.env);
+	await retarget(s.env, tabRef, "https://example.com/");
 	const t = await s.service.startTask({
 		owner: OWNER,
 		conversationId: "main",
@@ -88,6 +89,7 @@ test("Script is committed before dispatch; observed evidence completes a step an
 test("an operation without a published Script is refused before dispatch", async () => {
 	const s = await setup([clickGo(), finish("実行できませんでした。")]);
 	const tabRef = await connect(s.env);
+	await retarget(s.env, tabRef, "https://example.com/");
 	const t = await s.service.startTask({
 		owner: OWNER,
 		conversationId: "main",
@@ -116,6 +118,7 @@ test("completion without an observation are refused", async () => {
 		finish("確認できませんでした。"),
 	]);
 	const tabRef = await connect(s.env);
+	await retarget(s.env, tabRef, "https://example.com/");
 	const t = await s.service.startTask({
 		owner: OWNER,
 		conversationId: "main",
@@ -138,6 +141,7 @@ test("a stale Script revision cannot overwrite the published plan", async () => 
 		finish("更新できませんでした。"),
 	]);
 	const tabRef = await connect(s.env);
+	await retarget(s.env, tabRef, "https://example.com/");
 	const t = await s.service.startTask({
 		owner: OWNER,
 		conversationId: "main",
@@ -186,6 +190,7 @@ test("changing credential revision immediately prevents use of the old connectio
 		credentialRevision: () => revision,
 	});
 	const tabRef = await connect(s.env);
+	await retarget(s.env, tabRef, "https://example.com/");
 	revision++;
 	expect(s.service.availability().available).toBe(false);
 	await expect(s.service.focusTab(OWNER, null, tabRef)).rejects.toThrow(
@@ -212,6 +217,7 @@ test("Script responses carry the current revision without copying the complete U
 		},
 	]);
 	const tabRef = await connect(s.env);
+	await retarget(s.env, tabRef, "https://example.com/");
 	const t = await s.service.startTask({
 		owner: OWNER,
 		conversationId: "main",
@@ -236,6 +242,7 @@ test("persisted progress distinguishes thinking, operation dispatch and the term
 		finish("確認しました。"),
 	]);
 	const tabRef = await connect(s.env);
+	await retarget(s.env, tabRef, "https://example.com/");
 	let id = "";
 	const act = s.driver.act.bind(s.driver);
 	s.driver.act = async (action, signal) => {

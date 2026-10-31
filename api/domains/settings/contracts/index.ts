@@ -248,6 +248,26 @@ export const intentPatchSchema = z
 export const settingsSchema = z
 	.object({
 		revision: z.number().int().nonnegative(),
+		live: z
+			.object({
+				enabled: z.boolean(),
+				cloudAllowed: z.boolean(),
+				connectionId: z.string().max(120),
+				model: z.string().trim().max(200),
+				voice: z.string().trim().max(200),
+				startWithMicrophone: z.boolean(),
+				instructions: z.string().max(4000),
+			})
+			.strict()
+			.prefault({
+				enabled: false,
+				cloudAllowed: false,
+				connectionId: "",
+				model: "",
+				voice: "",
+				startWithMicrophone: true,
+				instructions: "",
+			}),
 		larm: z
 			.object({
 				baseUrl: endpoint.nullable(),

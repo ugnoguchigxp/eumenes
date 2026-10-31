@@ -29,3 +29,9 @@
 	color: var(--foreground);
 	font-size: 13px;
 }
+
+/* Registered settings use container queries so the same panel fits a narrow artifact tab. */
+.toolchain-artifact:has(.ds-settings-panel) {
+	container-type: inline-size;
+	min-width: 0;
+}

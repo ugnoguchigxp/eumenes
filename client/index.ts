@@ -29,6 +29,7 @@ import { terminalsClient } from "./terminals";
 import { kanbanClient } from "./kanban";
 import { toolchainActionsClient } from "./toolchain-actions";
 import { voiceDialogueClient } from "./voice-dialogue";
+import { liveVoiceClient } from "./live-voice";
 import { webResearchClient } from "./web-research";
 
 export { ApiError, ApiConnectionError } from "./transport";
@@ -58,6 +59,7 @@ export function createClient(baseUrl: string, token?: string) {
 		...memoryClient(transport),
 		...monitoringClient(transport),
 		...voiceDialogueClient(transport),
+		...liveVoiceClient(transport),
 		...webResearchClient(transport),
 		...agentRuntimeClient(transport),
 		...tasksClient(transport),

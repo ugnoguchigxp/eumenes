@@ -10,7 +10,11 @@ import { createAgencyLlmPort } from "./llm-port";
 export function assembleAgency(
 	deps: Pick<
 		AgencyHostDeps,
-		"store" | "conversation" | "settings" | "memory"
+		| "store"
+		| "conversation"
+		| "settings"
+		| "memory"
+		| "routeSpeechInTransaction"
 	> & {
 		inference: AgencyHostDeps["inference"] &
 			Parameters<typeof createAgencyLlmPort>[0]["inference"] & {

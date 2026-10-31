@@ -2,7 +2,10 @@ import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { createTerminals, type SpawnPty } from "../../domains/terminals";
 import { harness } from "../toolchain/toolchain.fixture";
-import { isNoticeRound } from "../toolchain/conversation-script.fixture";
+import {
+	approve,
+	isNoticeRound,
+} from "../toolchain/conversation-script.fixture";
 import { waitFor } from "../../infrastructure/wait-for";
 
 type Store = Parameters<
@@ -56,6 +59,18 @@ function fakeClaude() {
 	};
 }
 
+/** Approves the open confirmation when the utterance starts with はい. */
+function confirmWhenAsked(
+	messages: ReadonlyArray<{ content: string }>,
+	question: string,
+) {
+	if (!question.startsWith("はい")) return undefined;
+	const ref = /- (c\d+) 確認待ち/.exec(
+		messages.map((m) => m.content).join("\n"),
+	)?.[1];
+	return ref ? { calls: [approve(ref)] } : undefined;
+}
+
 async function until<T>(read: () => T | null | undefined | false): Promise<T> {
 	let value: T | null | undefined | false = undefined;
 	await waitFor(() => !!(value = read()));
@@ -88,6 +103,8 @@ test("a conversation request reaches Claude Code once saved, and its finished ta
 			JSON.stringify(messages).includes("README の手順修正")
 				? "README の手順修正が終わりました。変更をコミットしますか？"
 				: "承知しました。終わったらお知らせします。",
+		firstRound: (_tools, question, messages) =>
+			confirmWhenAsked(messages, question),
 	});
 	try {
 		const first = await h.dialogue.submit({
@@ -97,6 +114,17 @@ test("a conversation request reaches Claude Code once saved, and its finished ta
 		});
 		expect(
 			(await h.dialogue.waitForTerminal(first.id, { timeoutMs: 8000 }))?.status,
+		).toBe("completed");
+		// minImpact modify_existing holds the request until this utterance approves it.
+		expect(claude.spawned).toHaveLength(0);
+		const approved = await h.dialogue.submit({
+			requestId: crypto.randomUUID(),
+			conversationId: "main",
+			text: "はい、お願い",
+		});
+		expect(
+			(await h.dialogue.waitForTerminal(approved.id, { timeoutMs: 8000 }))
+				?.status,
 		).toBe("completed");
 		const run = await until(() => claude.spawned[0]);
 		const command = run.command;
@@ -259,6 +287,15 @@ test("a conversation request reaches Claude Code once saved, and its finished ta
 			(await h.dialogue.waitForTerminal(second.id, { timeoutMs: 8000 }))
 				?.status,
 		).toBe("completed");
+		const continued = await h.dialogue.submit({
+			requestId: crypto.randomUUID(),
+			conversationId: "main",
+			text: "はい、続けて",
+		});
+		expect(
+			(await h.dialogue.waitForTerminal(continued.id, { timeoutMs: 8000 }))
+				?.status,
+		).toBe("completed");
 		await until(() => claude.writes.length >= 2);
 		expect(claude.spawned).toHaveLength(1);
 		expect(h.commandContexts.at(-1)).toContain('\\"status\\":\\"running\\"');
@@ -321,6 +358,8 @@ test("a conversation request whose run cannot be tracked is stopped and reported
 			parents.push(JSON.stringify(messages));
 			return "承知しました。";
 		},
+		firstRound: (_tools, question, messages) =>
+			confirmWhenAsked(messages, question),
 	});
 	try {
 		const first = await h.dialogue.submit({
@@ -329,6 +368,12 @@ test("a conversation request whose run cannot be tracked is stopped and reported
 			text: "Claude Code で何かして",
 		});
 		await h.dialogue.waitForTerminal(first.id, { timeoutMs: 8000 });
+		const approved = await h.dialogue.submit({
+			requestId: crypto.randomUUID(),
+			conversationId: "main",
+			text: "はい、お願い",
+		});
+		await h.dialogue.waitForTerminal(approved.id, { timeoutMs: 8000 });
 		// SessionStart never arrives: the request is unknown (tracking_lost) and reported.
 		const notice = await until(() =>
 			parents.find((p) => p.includes("状態を追えないため止めました")),
@@ -342,6 +387,58 @@ test("a conversation request whose run cannot be tracked is stopped and reported
 				},
 		);
 		expect(row).toEqual({ state: "unknown", reason: "tracking_lost" });
+	} finally {
+		await h.close();
+	}
+});
+
+test("a conversation request starts nothing before the user confirms it", async () => {
+	const claude = fakeClaude();
+	const h = await harness({
+		terminals: claude.terminals,
+		routeTool: "claude_code",
+		command: () =>
+			JSON.stringify({
+				action: "invoke",
+				tool: "claude-code.request",
+				arguments: {
+					prompt: "README の手順を直して",
+					task: "README の手順修正",
+				},
+			}),
+		parent: () => "承知しました。終わったらお知らせします。",
+	});
+	try {
+		const first = await h.dialogue.submit({
+			requestId: crypto.randomUUID(),
+			conversationId: "main",
+			text: "README の手順を直して",
+		});
+		expect(
+			(await h.dialogue.waitForTerminal(first.id, { timeoutMs: 8000 }))?.status,
+		).toBe("completed");
+		expect(
+			h.store.read(
+				(db) =>
+					(
+						db
+							.query("SELECT COUNT(*) AS n FROM dialogue_confirmations")
+							.get() as { n: number }
+					).n,
+			),
+		).toBe(1);
+		expect(claude.spawned).toHaveLength(0);
+		expect(
+			h.store.read(
+				(db) =>
+					(
+						db.query("SELECT COUNT(*) AS n FROM terminal_requests").get() as {
+							n: number;
+						}
+					).n,
+			),
+		).toBe(0);
+		expect(h.commandContexts).toHaveLength(0);
 	} finally {
 		await h.close();
 	}

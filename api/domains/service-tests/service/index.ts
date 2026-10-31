@@ -1,3 +1,4 @@
+import { createTestControls } from "./controls";
 import type { Database } from "bun:sqlite";
 import { createHash } from "node:crypto";
 import { z } from "zod";
@@ -45,6 +46,8 @@ export function createServiceTests(
 	const tasks = new Set<Promise<void>>();
 	const previews = new Map<string, { output: TestOutput; expires: number }>();
 	const uploads = new Map<string, { bytes: Uint8Array; expires: number }>();
+	const controls = createTestControls(store, active, previews);
+	const { cancelInTransaction } = controls;
 	function gateway(s = settings.get()) {
 		return (
 			options.gateway?.(s) ??
@@ -115,7 +118,9 @@ export function createServiceTests(
 		const s = settings.get();
 		const prior = discovered?.catalog;
 		return {
-			targets: [...(prior?.targets ?? []), ...cloudTargets()],
+			targets: [...(prior?.targets ?? []), ...cloudTargets()].map(
+				controls.target,
+			),
 			errors: prior?.errors ?? [],
 			discoveredAt: prior?.discoveredAt ?? null,
 			revision: s.revision,
@@ -212,6 +217,7 @@ export function createServiceTests(
 			try {
 				if (settings.get().revision !== record.revision)
 					throw new Error("invalid_stale_settings");
+				store.read((db) => controls.assertAllowed(db, record.kind));
 				const output = await work(signal);
 				signal.throwIfAborted();
 				if (settings.get().revision !== record.revision)
@@ -320,6 +326,7 @@ export function createServiceTests(
 		)
 			throw new Error("invalid_stale_settings");
 		const target = catalog().targets.find((t) => t.id === input.targetId);
+		if (target) controls.assertAllowed(db, target.kind);
 		if (!target?.testable) throw new Error("invalid_test_target");
 		prune();
 		if (input.input.uploadId && !uploads.has(input.input.uploadId))
@@ -382,24 +389,6 @@ export function createServiceTests(
 			launch: () => launchCommitted(record, diagnoseWork(workDeps, record, s)),
 		};
 	}
-	/**
-	 * Mark the run as stopping; the returned function aborts it once the write commits. It
-	 * decides by the run's status, not its phase: a progress save between the commit and this
-	 * call may rewrite the phase, but a run that is still running must still be aborted.
-	 */
-	function cancelInTransaction(db: Database, id: string) {
-		const r = readRun(db, id);
-		if (!r) throw new Error("invalid_test_run");
-		if (r.status !== "running") return () => true;
-		updateRun(db, id, { phase: "cancelling" });
-		return () => {
-			if (store.read((d) => readRun(d, id))?.status === "running") {
-				active.get(id)?.abort();
-				previews.delete(id);
-			}
-			return true;
-		};
-	}
 	function retryArtifactInTransaction(db: Database, id: string): Accepted {
 		const r = readRun(db, id);
 		if (
@@ -427,6 +416,8 @@ export function createServiceTests(
 	return {
 		catalog,
 		refresh,
+		setVoiceAvailability: controls.setVoiceAvailability,
+		pauseVoice: controls.pauseVoice,
 		startInTransaction,
 		diagnoseInTransaction,
 		cancelInTransaction,

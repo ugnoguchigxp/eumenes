@@ -31,7 +31,8 @@ export function createProgress(deps: DialogueDeps) {
 	function publish(runId: string) {
 		const value = progress(runId);
 		if (!value) return;
-		watchedStatuses.set(runId, value.status);
+		// A run nobody is watching must not stay in the map for the life of the process.
+		if (watchers.has(runId)) watchedStatuses.set(runId, value.status);
 		for (const listener of watchers.get(runId) ?? []) {
 			try {
 				listener(value);

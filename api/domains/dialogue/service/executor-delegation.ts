@@ -85,11 +85,17 @@ export async function handOver(
 				at: at(),
 				type: "delivered",
 				by: "host",
-				fields: { ref: said.id, heard },
+				fields: {
+					ref: said.id,
+					heard,
+					...(deps.externalOutput?.owns(tx, run.id)
+						? { channel: "screen" }
+						: {}),
+				},
 				dedupeKey: `delivered:${said.id}`,
 			});
 			// The announcement reached the user: it is the agent's utterance of the conversation's input.
-			if (created && heard !== "none")
+			if (created && heard !== "none" && !deps.externalOutput?.owns(tx, run.id))
 				recordUtteranceInTransaction(deps, tx, {
 					conversationId: run.conversationId,
 					speaker: "agent",
@@ -101,7 +107,16 @@ export async function handOver(
 		});
 	// A spoken announcement is delivered before the work is handed over; one that failed hands nothing over.
 	let heard: "full" | "partial" = "full";
-	if (run.utteranceId) {
+	if (
+		deps.externalOutput &&
+		store.read((tx) => deps.externalOutput!.owns(tx, run.id))
+	) {
+		heard = await deps.externalOutput.announce(
+			run,
+			chosen.announcement,
+			signal,
+		);
+	} else if (run.utteranceId) {
 		if (!deps.deliverAnnouncement)
 			throw new Error("announcement_delivery_unavailable");
 		try {

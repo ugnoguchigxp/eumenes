@@ -1,5 +1,4 @@
 import { afterEach, expect, test } from "bun:test";
-import { WEB } from "../../domains/browser/test/fakes";
 import {
 	approvalRows,
 	begin,
@@ -42,7 +41,7 @@ test("an operation the model declares as commit is held by the host: the task as
 		const status = s.service.taskStatus(OWNER, taskId);
 		expect(status.state).toBe("needs_input");
 		// The element (or key), the action and the page origin are named; nothing from the page body.
-		expect(status.resultSummary).toContain(WEB);
+		expect(status.resultSummary).toContain("https://example.com");
 		expect(status.resultSummary).toContain(
 			action === "click"
 				? "「Goボタン」をクリックします"
@@ -97,7 +96,7 @@ test("the user's approval reaches the follow-up task, which shows it to the mode
 					kind: "operation",
 					action: "click",
 					element: "Goボタン",
-					place: `${WEB}/`,
+					place: "https://example.com/",
 				}),
 			]);
 			return clickGo("navigate")(messages, 2);

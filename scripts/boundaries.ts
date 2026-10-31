@@ -158,6 +158,27 @@ function checkInfrastructure(
 		: [];
 }
 
+/**
+ * Domain public entries (`api/domains/<name>` or its `index`) that this file imports directly.
+ * The same module walk as the boundary checks. Transitive imports are not followed.
+ */
+export function applicationDomainEntries(name: string, text: string): Domain[] {
+	const path = resolve(root, name);
+	if (!inside(path, "api/application")) return [];
+	const found = new Set<Domain>();
+	const tree = ts.createSourceFile(path, text, ts.ScriptTarget.Latest, true);
+	for (const { spec } of references(tree)) {
+		if (!spec?.startsWith(".")) continue;
+		const target = posix(relative(root, resolve(dirname(path), spec)));
+		const match = /^api\/domains\/([a-z0-9-]+)(?:\/index(?:\.tsx?)?)?$/.exec(
+			target,
+		);
+		const domain = match?.[1];
+		if (domain && Object.hasOwn(domains, domain)) found.add(domain as Domain);
+	}
+	return [...found];
+}
+
 /** Checks one file's source text; `name` is only used in messages. */
 export function checkSource(name: string, text: string): string[] {
 	const errors: string[] = [];

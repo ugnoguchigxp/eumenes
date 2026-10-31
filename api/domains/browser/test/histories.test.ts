@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { REDACTED_VALUE } from "../contracts/history";
-import { OWNER, runCleanup, until } from "./fakes";
+import { OWNER, retarget, runCleanup, until } from "./fakes";
 import {
 	SITE,
 	apiOf,
@@ -226,6 +226,7 @@ test("§4: a completed run with nothing to keep, and runs that did not complete,
 	// A failed operation is not recorded either.
 	const failed = await begin(h, "失敗する");
 	await publish(h, failed);
+	await retarget(h.env, h.tabRef, `${SITE}/`);
 	h.env.driver.actResults.push({
 		ok: false,
 		code: "ref_not_found",

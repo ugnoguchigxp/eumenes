@@ -45,7 +45,8 @@ function appendSpecialistAnswer(
 	tx: Database,
 	run: Run,
 	text: string,
-): string {
+): string | null {
+	if (deps.externalOutput?.offer(tx, run, text)) return null;
 	const messageId = deps.id();
 	deps.conversation.appendInTransaction(tx, {
 		id: messageId,

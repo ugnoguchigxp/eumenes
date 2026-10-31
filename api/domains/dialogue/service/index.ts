@@ -146,6 +146,7 @@ function registerHandlers(
 }
 
 interface DialogueServiceOptions {
+	externalOutput?: import("../contracts/external-output").ExternalOutputPort;
 	store: SqliteStore;
 	conversation: ConversationService;
 	larm: InferencePort;
@@ -197,7 +198,20 @@ function createRecentPorts(deps: DialogueDeps) {
 	};
 }
 
+/** A voice interruption ends only a reply whose work has not been handed over. */
+async function stopUnhandedReply(
+	deps: DialogueDeps,
+	runId: string,
+	cancel: (id: string) => Promise<Run | null>,
+) {
+	const handed = deps.store.read((db) =>
+		workOfRun(db, runId).some((row) => row.status !== "done"),
+	);
+	return handed ? deps.store.read((db) => byId(db, runId)) : cancel(runId);
+}
+
 export function createDialogueService({
+	externalOutput,
 	store,
 	conversation,
 	larm,
@@ -222,6 +236,7 @@ export function createDialogueService({
 	keeper: keeperOptions,
 }: DialogueServiceOptions) {
 	const deps: DialogueDeps = {
+		externalOutput,
 		store,
 		conversation,
 		larm,
@@ -265,6 +280,7 @@ export function createDialogueService({
 		logFile: logFile ?? (() => undefined),
 	});
 	const service = {
+		acceptExistingInTransaction: intake.acceptExistingInTransaction,
 		executionCommands: executionCommands(deps),
 		/** True while the conversation has a queued or running run (the agency host waits for a quiet moment). */
 		conversationHasActiveRunInTransaction: conversationHasActiveRun,
@@ -481,11 +497,7 @@ export function createDialogueService({
 		 * for that work, whose lifetime is not the reply's: the run and its open TODO stay. Any other run is cancelled.
 		 */
 		async stopReply(runId: string): Promise<Run | null> {
-			const handedOver = store.read((db) =>
-				workOfRun(db, runId).some((row) => row.status !== "done"),
-			);
-			if (handedOver) return store.read((db) => byId(db, runId));
-			return service.cancel(runId);
+			return stopUnhandedReply(deps, runId, service.cancel);
 		},
 		/** Runs are stopped by the queue's own shutdown; nothing is owned here. */
 		async close() {

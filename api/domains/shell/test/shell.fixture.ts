@@ -81,7 +81,7 @@ export const request = (over: Partial<EnqueueRun> = {}): EnqueueRun => ({
 	projectId: "eumenes",
 	command: "printf test",
 	task: "確認",
-	origin: "conversation",
+	origin: "execution",
 	conversationId: "main",
 	...over,
 });
