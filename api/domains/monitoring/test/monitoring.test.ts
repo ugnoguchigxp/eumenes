@@ -1,5 +1,9 @@
 import { expect, test } from "bun:test";
-import { createActivityRecorder, type LarmStatus } from "../../larm";
+import {
+	createActivityRecorder,
+	type ActivityObservation,
+	type LarmStatus,
+} from "../../larm";
 import type { Settings } from "../../settings/contracts";
 import { createMonitoring, type MonitoringDeps } from "../service";
 import {
@@ -276,4 +280,48 @@ test("concurrent reads share one host sample instead of measuring a tiny window"
 	clock = 2000;
 	await host.sample();
 	expect(reads).toBe(2);
+});
+
+test("SDK login is not a missing HTTP credential, and health still follows actual outcomes", async () => {
+	const saved = settings({ mode: "cloud-only", fallbackId: resourceId });
+	saved.connections[0] = {
+		...saved.connections[0]!,
+		kind: "codex-sdk",
+		name: "選択した接続",
+	};
+	saved.resources[0] = { ...saved.resources[0]!, model: "configured-model" };
+	let outcome: ActivityObservation = idle;
+	const m = monitoring({
+		settings: {
+			get: () => saved,
+			diagnostics: () => ({
+				connections: [{ id: connectionId, credentialAvailable: false }],
+			}),
+		},
+		attempts: () => ({ llm: outcome, asr: idle, tts: idle }),
+	});
+	expect((await byShape(m)).llm?.state).toMatchObject({
+		health: "unknown",
+		service: {
+			connectionName: "選択した接続",
+			model: "configured-model",
+			lastSuccessAt: null,
+		},
+	});
+	outcome = { ...idle, lastSuccessAt: 999900 };
+	expect((await byShape(m)).llm?.state.health).toBe("healthy");
+	outcome = {
+		...idle,
+		lastFailure: { at: 999950, reason: "local_timeout" },
+	};
+	expect((await byShape(m)).llm?.state).toMatchObject({
+		health: "fault",
+		reason: "local_timeout",
+		service: { lastFailure: { at: 999950, reason: "local_timeout" } },
+	});
+	saved.connections[0]!.enabled = false;
+	expect((await byShape(m)).llm?.state.health).toBe("disconnected");
+	saved.connections[0]!.enabled = true;
+	saved.connections[0]!.kind = "claude-agent-sdk";
+	expect((await byShape(m)).llm?.state.health).toBe("disconnected");
 });

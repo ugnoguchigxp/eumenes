@@ -45,10 +45,12 @@ export function createRuleOf({
 	effective,
 	voice,
 	fetchedOptions,
+	liveModels = [],
 }: {
 	effective: Settings | undefined;
 	voice: VoiceTools;
 	fetchedOptions: ReadonlyMap<string, { value: string; label: string }[]>;
+	liveModels?: ReadonlyArray<string>;
 }) {
 	const ruleOf = (
 		field: RegisteredField,
@@ -80,6 +82,24 @@ export function createRuleOf({
 		};
 		const value = String(readPath(effective, field.path, target) ?? "");
 		switch (field.path) {
+			case "$.live.model":
+				rule.options = selectedOptions(
+					[
+						...placeholder(field, "接続を選び、モデル一覧を更新してください"),
+						...liveModels.map((id) => ({ value: id, label: id })),
+					],
+					value,
+					value,
+				);
+				break;
+			case "$.live.voice":
+				rule.options = selectedOptions(
+					[...(field.options ?? [])],
+					value,
+					value,
+				);
+				break;
+
 			case "$.voice.notificationSound":
 				rule.options = selectedOptions(
 					[...(field.options ?? [])],

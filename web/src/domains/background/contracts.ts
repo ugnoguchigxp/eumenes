@@ -9,8 +9,10 @@ export type SpatialState = {
 	/** Optional observations: absence means unavailable, not zero. */
 	utilization?: number;
 	strength?: number;
-	source?: "unconfirmed" | "demo" | "measurement";
+	source?: "unconfirmed" | "demo" | "measurement" | "activity";
 	observedAt?: number;
+	/** Time the service records were checked, distinct from a measurement or successful probe. */
+	checkedAt?: number;
 	/** Owner-supplied observation notes; the background does not classify measurements. */
 	details?: readonly string[];
 };

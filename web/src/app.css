@@ -533,6 +533,25 @@ select:focus-visible {
 	gap: 8px;
 	padding-bottom: 2px;
 }
+.composer-live-controls {
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
+	margin: 0;
+	padding: 0 0 0 8px;
+	min-width: 0;
+	border: 0;
+	border-inline-start: 1px solid var(--border);
+	color: var(--muted-foreground);
+}
+.composer-live-controls button {
+	gap: 5px;
+	min-height: 32px;
+}
+.composer-live-controls .composer-live-icon {
+	width: 32px;
+	height: 32px;
+}
 .chat-composer textarea {
 	width: 100%;
 	min-height: 95px;

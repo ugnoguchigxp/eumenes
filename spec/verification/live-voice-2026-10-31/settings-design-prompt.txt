@@ -1,0 +1,9 @@
+Use case: ui-mockup
+Asset type: high fidelity desktop settings UI design reference for Eumenes, Japanese language.
+Primary request: Completely redesign the attached broken voice conversation settings into a polished readable application settings panel. Reference image is ONLY a record of the broken old interface; keep the dark charcoal theme, restrained blue accent and same settings functions.
+Composition: front-on flat screenshot of an 1100px-wide panel, generous 28px padding, no device frame. Title "音声会話" with short subtitle. Compact sticky top bar with subtle status "すべて保存済み", secondary "変更一覧", blue primary "変更を保存". Thin tab navigation "接続とAPIキー", "音声会話", "APIキーの管理".
+Form: orderly single column, thin dividers separating groups. Two toggle rows full width with label and short description on LEFT and small switch on FAR RIGHT: "音声会話を使う", "クラウドへの送信を許可". Then section heading "接続と音声", labels ABOVE full-width select fields "OpenAIの接続" value "OpenAI", "会話モデル" value "モデルを選択", "声" value "APIの既定値". Model row may have a discreet "モデル一覧を取得" button. Then "話し方の補足" full-width multiline field with placeholder "例：落ち着いた口調で、簡潔に話してください". Bottom row "開始時にマイクをオン" toggle. Small muted note "会話の文字起こしをチャットに保存します。音声ファイルは保存しません。".
+Typography: excellent Japanese sans serif, 16px labels, 13px hints, 26px title. Balanced compact readable density. All descriptions use available full width, never narrow columns or vertical text. Controls minimum 44px tall, subtle borders, 10px radii. Background #151b23, card #1b222c, control #111820, border #303b49, text #eef2f7, muted #9ba9bb, accent #438af7.
+Avoid: giant text, excessive blue outlines, decorative graphics, multiple competing save buttons, narrow squeezed text, gradients, illustration, ornamental icons.
+
+Built-in image_gen tool; reference is the user-attached broken settings screenshot.

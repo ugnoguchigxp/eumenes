@@ -1,3 +1,4 @@
+import { LiveComposerControls } from "./LiveComposerControls";
 import { useState } from "react";
 import { ChatImageInput, ChatImagePreviews } from "./ChatImageInput";
 import { useStore } from "zustand";
@@ -266,6 +267,7 @@ export function ConversationComposer({
 							</svg>
 						</Button>
 						<MicLevelMeter store={store} />
+						{!editing && <LiveComposerControls state={state} />}
 					</div>
 					{editing ? (
 						<Button
@@ -279,83 +281,19 @@ export function ConversationComposer({
 							更新して送信
 						</Button>
 					) : (
-						<>
-							{live && (
-								<>
-									{live.active && (
-										<Button
-											type="button"
-											size="icon"
-											variant="secondary"
-											onClick={() => void live.mute()}
-											aria-label={
-												live.session?.muted
-													? "音声会話のマイクを再開"
-													: "音声会話のマイクを休止"
-											}
-										>
-											{live.session?.muted ? "▶" : "Ⅱ"}
-										</Button>
-									)}
-									<Button
-										type="button"
-										size="icon"
-										variant={live.active ? "destructive" : "secondary"}
-										disabled={live.busy}
-										onClick={() =>
-											void (live.active
-												? live.stop()
-												: state.settings.data?.live.enabled &&
-													  state.settings.data?.live.model
-													? live.start()
-													: state.openLiveSettings())
-										}
-										aria-label={
-											live.active ? "音声会話を終了" : "音声会話を開始"
-										}
-										title={live.active ? "音声会話を終了" : "音声会話を開始"}
-									>
-										<svg
-											width="20"
-											height="20"
-											viewBox="0 0 24 24"
-											fill="none"
-											stroke="currentColor"
-											strokeWidth="1.8"
-											aria-hidden="true"
-										>
-											{live.active ? (
-												<rect x="6" y="6" width="12" height="12" rx="2" />
-											) : (
-												<path d="M4 10v4m4-8v12m4-15v18m4-15v12m4-8v4" />
-											)}
-										</svg>
-									</Button>
-									<Button
-										type="button"
-										variant="ghost"
-										size="icon"
-										onClick={state.openLiveSettings}
-										aria-label="音声会話の設定"
-									>
-										⚙
-									</Button>
-								</>
-							)}
-							<Button
-								type="submit"
-								disabled={
-									(!draft.trim() && !state.attachments.items.length) ||
-									(automaticInput && !state.attachments.items.length) ||
-									submit.isPending ||
-									(!!live?.active && live.session?.status !== "active") ||
-									state.attachments.busy
-								}
-								aria-label="送信"
-							>
-								送信
-							</Button>
-						</>
+						<Button
+							type="submit"
+							disabled={
+								(!draft.trim() && !state.attachments.items.length) ||
+								(automaticInput && !state.attachments.items.length) ||
+								submit.isPending ||
+								(!!live?.active && live.session?.status !== "active") ||
+								state.attachments.busy
+							}
+							aria-label="送信"
+						>
+							送信
+						</Button>
 					)}
 				</div>
 			</form>

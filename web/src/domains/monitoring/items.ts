@@ -1,9 +1,8 @@
 import type { MonitoringSnapshot } from "../../../../api/domains/monitoring/contracts";
 import { initialSpatialItems, type SpatialItem } from "../background";
 import { monitoringDetails } from "./details";
-
-/** Three missed one-minute reads make an observation old (spec §3). */
-export const STALE_AFTER_MS = 3 * 60_000;
+import { displayStale, STALE_AFTER_MS } from "./freshness";
+export { STALE_AFTER_MS } from "./freshness";
 
 /**
  * Snapshot items placed on the Spatial layout by shape. Before the first read nothing is
@@ -37,14 +36,7 @@ export function monitoringItems(
 			};
 		if (!item) return { ...layout, state: { ...layout.state, stale: old } };
 		const observations = item.state.observations;
-		const stale =
-			old ||
-			!!item.state.stale ||
-			!!observations?.some(
-				(o) =>
-					o.status === "stale" ||
-					(o.observedAt !== null && o.ageMs + ageMs > o.maxAgeMs),
-			);
+		const stale = displayStale(snapshot!, item, ageMs, failed);
 		const observed = observations?.flatMap((o) =>
 			o.observedAt === null ? [] : [o.observedAt],
 		);
@@ -53,6 +45,10 @@ export function monitoringItems(
 			ageMs >= item.state.faultRemainingMs
 				? (item.state.settledHealth ?? item.state.health)
 				: item.state.health;
+		const details = monitoringDetails(
+			item.state,
+			observations ? snapshot!.larm : undefined,
+		);
 		return {
 			...layout,
 			id: item.id,
@@ -64,16 +60,19 @@ export function monitoringItems(
 				...(item.state.utilization === undefined
 					? {}
 					: { utilization: item.state.utilization }),
-				source:
-					observations && !observed?.length ? "unconfirmed" : "measurement",
-				...(observations
-					? observed?.length
-						? { observedAt: Math.min(...observed) }
-						: {}
-					: { observedAt: snapshot!.observedAt }),
-				...(observations
-					? { details: monitoringDetails(item.state, ageMs) }
-					: {}),
+				source: item.state.service
+					? "activity"
+					: observations && !observed?.length
+						? "unconfirmed"
+						: "measurement",
+				...(item.state.service
+					? { checkedAt: snapshot!.observedAt }
+					: observations
+						? observed?.length
+							? { observedAt: Math.min(...observed) }
+							: {}
+						: { observedAt: snapshot!.observedAt }),
+				...(details.length ? { details } : {}),
 			},
 		};
 	});

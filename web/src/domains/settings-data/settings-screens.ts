@@ -191,6 +191,7 @@ export function buildInputs({
 							: field.label,
 					...(field.help ? { help: field.help } : {}),
 					control: field.control,
+					...(field.multiline ? { multiline: true } : {}),
 					...(field.presentation ? { presentation: field.presentation } : {}),
 					value: field.confidential
 						? SECRET_MASK.repeat(

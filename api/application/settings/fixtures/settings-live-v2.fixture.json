@@ -1,0 +1,530 @@
+{
+	"formatVersion": 1,
+	"bundleId": "settings-live",
+	"pins": [],
+	"definitions": [],
+	"bindings": [],
+	"artifacts": [
+		{
+			"kind": "artifact",
+			"id": "settings.live",
+			"revision": 2,
+			"title": "音声会話",
+			"variants": [
+				{
+					"id": "standard",
+					"label": "標準",
+					"definition": {
+						"view": "layout",
+						"direction": "tabs",
+						"title": "音声会話",
+						"children": [
+							{
+								"view": "settings-section",
+								"source": "settings-live",
+								"title": "音声会話の設定"
+							},
+							{
+								"view": "collection-workspace",
+								"source": "settings-connections",
+								"title": "接続とAPIキー"
+							},
+							{
+								"view": "settings-navigation",
+								"source": "settings-live-navigation",
+								"title": "APIキーの更新・削除"
+							}
+						],
+						"draftSource": "settings-live",
+						"tabs": [
+							{
+								"label": "接続とAPIキー",
+								"children": [1]
+							},
+							{
+								"label": "音声会話",
+								"children": [0]
+							},
+							{
+								"label": "APIキーの更新・削除",
+								"children": [2]
+							}
+						]
+					}
+				}
+			],
+			"defaultVariant": "standard",
+			"sourceBindings": [
+				{
+					"source": "settings-live",
+					"adapterRef": "adapter:settings@1",
+					"query": "query:settings.document@1",
+					"target": "none"
+				},
+				{
+					"source": "settings-connections",
+					"adapterRef": "adapter:settings@1",
+					"query": "query:settings.connections@1",
+					"target": "none"
+				},
+				{
+					"source": "settings-live-connections",
+					"adapterRef": "adapter:settings@1",
+					"query": "query:settings.live-connections@1",
+					"target": "none"
+				},
+				{
+					"source": "settings-live-navigation",
+					"adapterRef": "adapter:settings@1",
+					"query": "query:settings.document@1",
+					"target": "none"
+				}
+			],
+			"actionBindings": [
+				{
+					"actionId": "edit",
+					"eventAction": "settings-edit",
+					"source": "settings-live",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "draft",
+					"draftAction": "edit",
+					"draftDocument": "document:settings@1"
+				},
+				{
+					"actionId": "apply",
+					"eventAction": "settings-apply",
+					"source": "settings-live",
+					"inputSchemaRef": "schema:settings-apply@4",
+					"effect": "write",
+					"operationId": "settings.apply-v4",
+					"draftDocument": "document:settings@1",
+					"confidentialFields": ["keys"]
+				},
+				{
+					"actionId": "review",
+					"eventAction": "settings-review",
+					"source": "settings-live",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "navigate",
+					"navigateTo": {
+						"artifactId": "settings.changes"
+					}
+				},
+				{
+					"actionId": "add-connection",
+					"eventAction": "settings-add-connection",
+					"source": "settings-live",
+					"inputSchemaRef": "schema:settings-add-connection@4",
+					"effect": "draft",
+					"draftAction": "structure",
+					"structure": "structure:settings.add-connection@2",
+					"draftDocument": "document:settings@1",
+					"label": "クラウドAPIを登録",
+					"rowInput": {
+						"connectionId": {
+							"generate": "uuid"
+						},
+						"resourceId": {
+							"generate": "uuid"
+						}
+					},
+					"confidentialFields": ["apiKey"]
+				},
+				{
+					"actionId": "delete-connection",
+					"eventAction": "settings-delete-connection",
+					"source": "settings-live",
+					"inputSchemaRef": "schema:settings-delete-connection@1",
+					"effect": "draft",
+					"draftAction": "structure",
+					"structure": "structure:settings.delete-connection@1",
+					"draftDocument": "document:settings@1",
+					"label": "削除",
+					"rowInput": {
+						"connectionId": "$row.id"
+					}
+				},
+				{
+					"actionId": "action",
+					"eventAction": "settings-action",
+					"source": "settings-live",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "local"
+				},
+				{
+					"actionId": "manage-connection",
+					"eventAction": "settings-open",
+					"source": "settings-live-navigation",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "navigate",
+					"navigateTo": {
+						"byValue": "id",
+						"artifacts": {
+							"keys": "settings.ai-connections"
+						}
+					}
+				}
+			],
+			"launcher": {
+				"icon": "voice",
+				"label": "音声会話",
+				"group": "使い方を変える",
+				"order": 25,
+				"description": "GPT-Live 音声会話 APIキー モデル 声 記録と動作確認"
+			},
+			"fields": [
+				{
+					"fieldId": "live.enabled",
+					"document": "document:settings@1",
+					"path": "$.live.enabled",
+					"label": "音声会話を使う",
+					"control": "toggle",
+					"help": "開始ボタンからGPT-Liveへ接続します。通常のASR・TTSはLive中に使いません。"
+				},
+				{
+					"fieldId": "live.cloud-allowed",
+					"document": "document:settings@1",
+					"path": "$.live.cloudAllowed",
+					"label": "音声と必要な会話のクラウド送信を許可",
+					"control": "toggle",
+					"help": "OFFにすると進行中の音声会話も停止します。"
+				},
+				{
+					"fieldId": "live.connection",
+					"document": "document:settings@1",
+					"path": "$.live.connectionId",
+					"label": "OpenAIの接続",
+					"control": "select",
+					"help": "下の接続一覧からAPIキーを登録・保存し、接続を選んでください。",
+					"optionsSource": "query:settings.live-connections@1"
+				},
+				{
+					"fieldId": "live.model",
+					"document": "document:settings@1",
+					"path": "$.live.model",
+					"label": "音声会話のモデル",
+					"control": "select",
+					"help": "接続確認で取得したモデルから選びます。Live対応と利用権限は音声テストで確認します。",
+					"options": [
+						{
+							"value": "",
+							"label": "接続を選び、モデル一覧を更新してください"
+						}
+					]
+				},
+				{
+					"fieldId": "live.voice",
+					"document": "document:settings@1",
+					"path": "$.live.voice",
+					"label": "声の指定",
+					"control": "select",
+					"help": "公式Live APIに列挙された声から選びます。変更は次の音声会話から反映します。",
+					"options": [
+						{
+							"value": "",
+							"label": "APIの既定"
+						},
+						{
+							"value": "alloy",
+							"label": "alloy"
+						},
+						{
+							"value": "ash",
+							"label": "ash"
+						},
+						{
+							"value": "ballad",
+							"label": "ballad"
+						},
+						{
+							"value": "beacon",
+							"label": "beacon"
+						},
+						{
+							"value": "bossa",
+							"label": "bossa"
+						},
+						{
+							"value": "brise",
+							"label": "brise"
+						},
+						{
+							"value": "cedar",
+							"label": "cedar"
+						},
+						{
+							"value": "cinder",
+							"label": "cinder"
+						},
+						{
+							"value": "coral",
+							"label": "coral"
+						},
+						{
+							"value": "delta",
+							"label": "delta"
+						},
+						{
+							"value": "echo",
+							"label": "echo"
+						},
+						{
+							"value": "flitz",
+							"label": "flitz"
+						},
+						{
+							"value": "gleam",
+							"label": "gleam"
+						},
+						{
+							"value": "harema",
+							"label": "harema"
+						},
+						{
+							"value": "juni",
+							"label": "juni"
+						},
+						{
+							"value": "marin",
+							"label": "marin"
+						},
+						{
+							"value": "meridian",
+							"label": "meridian"
+						},
+						{
+							"value": "nira",
+							"label": "nira"
+						},
+						{
+							"value": "noeul",
+							"label": "noeul"
+						},
+						{
+							"value": "nuri",
+							"label": "nuri"
+						},
+						{
+							"value": "quartz",
+							"label": "quartz"
+						},
+						{
+							"value": "ripple",
+							"label": "ripple"
+						},
+						{
+							"value": "sage",
+							"label": "sage"
+						},
+						{
+							"value": "shida",
+							"label": "shida"
+						},
+						{
+							"value": "shimmer",
+							"label": "shimmer"
+						},
+						{
+							"value": "sillage",
+							"label": "sillage"
+						},
+						{
+							"value": "stone",
+							"label": "stone"
+						},
+						{
+							"value": "tempo",
+							"label": "tempo"
+						},
+						{
+							"value": "verse",
+							"label": "verse"
+						},
+						{
+							"value": "vesper",
+							"label": "vesper"
+						},
+						{
+							"value": "willow",
+							"label": "willow"
+						}
+					]
+				},
+				{
+					"fieldId": "live.start-microphone",
+					"document": "document:settings@1",
+					"path": "$.live.startWithMicrophone",
+					"label": "開始時にマイクを有効にする",
+					"control": "toggle",
+					"help": "OFFでも会話は接続したままです。"
+				},
+				{
+					"fieldId": "live.instructions",
+					"document": "document:settings@1",
+					"path": "$.live.instructions",
+					"label": "話し方の補足",
+					"control": "text",
+					"help": "自由記述です。固定候補はありません。人格の設定に加える話し方を入力します。変更は次回の接続から反映します。"
+				}
+			],
+			"collections": [
+				{
+					"source": "settings-connections",
+					"title": "クラウド接続",
+					"description": "OpenAI公式の接続とAPIキーを登録します。暗号化して保存し、キーは再表示しません。既存接続を更新すると他の利用先にも反映します。",
+					"rowKey": "id",
+					"rowsPath": "targets",
+					"columns": [
+						{
+							"key": "label",
+							"label": "接続名",
+							"format": "text"
+						},
+						{
+							"key": "kind",
+							"label": "種類",
+							"format": "badge"
+						},
+						{
+							"key": "auth",
+							"label": "認証方式",
+							"format": "badge"
+						},
+						{
+							"key": "enabled",
+							"label": "有効",
+							"format": "boolean"
+						},
+						{
+							"key": "credential",
+							"label": "認証",
+							"format": "badge"
+						}
+					],
+					"rowActions": [
+						{
+							"actionId": "delete-connection",
+							"confirm": "この接続と、登録済みのモデルを削除します。割当は解除されます。"
+						}
+					],
+					"create": {
+						"actionId": "add-connection",
+						"fields": [
+							{
+								"fieldId": "kind",
+								"label": "接続の種類",
+								"control": "select",
+								"required": false,
+								"defaultValue": "openai-compatible",
+								"options": [
+									{
+										"value": "openai-compatible",
+										"label": "OpenAI API"
+									}
+								]
+							},
+							{
+								"fieldId": "name",
+								"label": "接続名",
+								"control": "text",
+								"required": true,
+								"maxLength": 80,
+								"help": "見分けるための自由な名前です。例: OpenAI音声。OpenAI側のキー名と一致させる必要はありません。"
+							},
+							{
+								"fieldId": "baseUrl",
+								"label": "APIのベースURL",
+								"control": "text",
+								"required": true,
+								"maxLength": 2048,
+								"help": "OpenAI公式APIのURLを使用します。",
+								"defaultValue": "https://api.openai.com/v1",
+								"when": {
+									"key": "kind",
+									"in": ["openai-compatible"]
+								}
+							},
+							{
+								"fieldId": "apiKey",
+								"label": "APIキー／APIトークン",
+								"control": "secret",
+								"confidential": true,
+								"maxLength": 4096,
+								"help": "キーは暗号化して保存し、保存後は再表示しません。"
+							},
+							{
+								"fieldId": "envRef",
+								"label": "環境変数名（APIキーの代わり）",
+								"control": "text",
+								"maxLength": 128
+							}
+						],
+						"preview": {
+							"label": "name",
+							"kind": "kind"
+						}
+					}
+				}
+			]
+		},
+		{
+			"kind": "artifact",
+			"id": "settings.hub",
+			"revision": 9,
+			"title": "設定",
+			"variants": [
+				{
+					"id": "standard",
+					"label": "標準",
+					"definition": {
+						"view": "settings-navigation",
+						"source": "settings-hub",
+						"title": "設定"
+					}
+				}
+			],
+			"defaultVariant": "standard",
+			"sourceBindings": [
+				{
+					"source": "settings-hub",
+					"adapterRef": "adapter:settings@1",
+					"query": "query:settings.document@1",
+					"target": "none"
+				}
+			],
+			"actionBindings": [
+				{
+					"actionId": "open",
+					"eventAction": "settings-open",
+					"source": "settings-hub",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "navigate",
+					"navigateTo": {
+						"byValue": "id",
+						"artifacts": {
+							"conversation": "settings.conversation",
+							"voice": "settings.voice-input",
+							"display": "settings.display",
+							"records": "settings.records",
+							"ai": "settings.ai-connections",
+							"external": "settings.external-work",
+							"dictionary": "settings.dictionary",
+							"memory": "settings.memory",
+							"world": "settings.world",
+							"service-tests": "settings.service-tests",
+							"google": "settings.google-accounts",
+							"browser": "settings.browser",
+							"dots": "settings.dots",
+							"live": "settings.live"
+						}
+					}
+				}
+			],
+			"launcher": {
+				"label": "設定",
+				"order": 100
+			}
+		}
+	],
+	"schemas": []
+}

@@ -1,0 +1,11 @@
+{
+  "apiReady": true,
+  "liveRevision": [
+    "artifact:settings.live@2"
+  ],
+  "officialCredentialAvailable": true,
+  "liveEnabled": true,
+  "cloudAllowed": false,
+  "connectionSelected": false,
+  "modelSelected": false
+}

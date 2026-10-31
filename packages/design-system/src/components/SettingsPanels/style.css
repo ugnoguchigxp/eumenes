@@ -1,5 +1,6 @@
 .ds-settings-panel {
 	min-width: 0;
+	white-space: normal;
 	overflow: hidden;
 	background: color-mix(
 		in srgb,
@@ -65,8 +66,9 @@
 }
 .ds-settings-fields {
 	display: grid;
-	gap: 1.15rem;
-	padding: 1.45rem 0 1.8rem;
+	grid-template-columns: minmax(0, 1fr);
+	gap: 0;
+	padding: 0.25rem 0 1.5rem;
 }
 .ds-settings-field-card {
 	display: grid;
@@ -78,10 +80,27 @@
 }
 .ds-settings-field {
 	display: grid;
-	grid-template-columns: minmax(9rem, 28%) minmax(0, 1fr);
-	gap: 0.35rem 1rem;
+	grid-template-columns: minmax(9rem, 24%) minmax(0, 1fr);
+	gap: 0.45rem 1.5rem;
 	align-items: center;
 	min-width: 0;
+	padding: 1.25rem 0;
+	border-bottom: 1px solid var(--color-border);
+	font-size: 0.9375rem;
+}
+.ds-settings-field[data-control="toggle"] {
+	grid-template-columns: minmax(0, 1fr) auto;
+}
+.ds-settings-field[data-control="toggle"] > input {
+	grid-column: 2;
+	grid-row: 1 / 3;
+	align-self: center;
+}
+.ds-settings-field[data-control="toggle"] > .ds-settings-hint {
+	grid-column: 1;
+}
+.ds-settings-field[data-control="toggle"] > label {
+	grid-column: 1;
 }
 .ds-settings-field > label,
 .ds-settings-field > .ds-settings-field-label,
@@ -99,8 +118,10 @@
 .ds-settings-field > .ds-settings-hint {
 	grid-column: 2;
 	margin: 0;
+	overflow-wrap: anywhere;
 }
 .ds-settings-field select,
+.ds-settings-field textarea,
 .ds-settings-field input:not([type="checkbox"]):not([type="range"]) {
 	width: 100%;
 	min-height: 2.75rem;
@@ -114,7 +135,14 @@
 	);
 	color: var(--color-foreground);
 }
+.ds-settings-field textarea {
+	resize: vertical;
+	min-height: 6rem;
+	line-height: 1.6;
+	font: inherit;
+}
 .ds-settings-field input:focus-visible,
+.ds-settings-field textarea:focus-visible,
 .ds-settings-field select:focus-visible,
 .ds-settings-choice:focus-visible {
 	outline: 2px solid var(--color-ring);
@@ -137,7 +165,8 @@
 }
 .ds-settings-field > input[type="checkbox"] {
 	appearance: none;
-	justify-self: start;
+	justify-self: end;
+	margin: 0;
 	position: relative;
 	width: 2.7rem;
 	height: 1.55rem;
@@ -285,7 +314,8 @@
 	display: flex;
 	gap: 0.6rem;
 	flex-wrap: wrap;
-	grid-column: 2;
+	grid-column: 1 / -1;
+	padding-top: 1.25rem;
 }
 .ds-settings-footer {
 	display: flex;
@@ -297,6 +327,8 @@
 	border-top: 1px solid var(--color-border);
 	padding: 1rem 1.7rem;
 	background: color-mix(in srgb, var(--color-card) 94%, var(--color-muted));
+	grid-column: 1 / -1;
+	white-space: normal;
 }
 .ds-settings-footer output {
 	flex: 1 1 10rem;
@@ -408,7 +440,7 @@
 		grid-column: 1;
 	}
 	.ds-settings-actions {
-		grid-column: 1;
+		grid-column: 1 / -1;
 	}
 	.ds-settings-groups {
 		grid-template-columns: 1fr;

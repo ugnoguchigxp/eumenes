@@ -125,7 +125,8 @@ test("background mode shows a clicked object's details and closes them by empty 
 	expect(scene.pick).toHaveBeenLastCalledWith(10, 20);
 	expect(screen.getByRole("complementary", { name: "CPUの詳細" })).toBeTruthy();
 	expect(screen.getAllByText("未確認")).toHaveLength(2);
-	expect(screen.getAllByText("未取得")).toHaveLength(2);
+	expect(screen.getAllByText("未取得")).toHaveLength(1);
+	expect(screen.queryByText("利用率")).toBeNull();
 	await waitFor(() => expect(scene.select).toHaveBeenLastCalledWith("mac-cpu"));
 	scene.pick.mockReturnValue(null);
 	fireEvent.click(host);

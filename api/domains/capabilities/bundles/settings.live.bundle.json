@@ -8,7 +8,7 @@
 		{
 			"kind": "artifact",
 			"id": "settings.live",
-			"revision": 1,
+			"revision": 3,
 			"title": "音声会話",
 			"variants": [
 				{
@@ -16,13 +16,13 @@
 					"label": "標準",
 					"definition": {
 						"view": "layout",
-						"direction": "stack",
-						"title": "音声会話",
+						"direction": "tabs",
+						"title": "設定",
 						"children": [
 							{
 								"view": "settings-section",
 								"source": "settings-live",
-								"title": "音声会話の設定"
+								"title": "音声会話"
 							},
 							{
 								"view": "collection-workspace",
@@ -32,7 +32,22 @@
 							{
 								"view": "settings-navigation",
 								"source": "settings-live-navigation",
-								"title": "APIキーの更新・削除"
+								"title": "APIキーの管理"
+							}
+						],
+						"draftSource": "settings-live",
+						"tabs": [
+							{
+								"label": "接続とAPIキー",
+								"children": [1]
+							},
+							{
+								"label": "音声会話",
+								"children": [0]
+							},
+							{
+								"label": "APIキーの管理",
+								"children": [2]
 							}
 						]
 					}
@@ -188,16 +203,161 @@
 					"document": "document:settings@1",
 					"path": "$.live.model",
 					"label": "音声会話のモデル",
-					"control": "text",
-					"help": "接続確認で一覧を取得できます。Live対応と利用権限は音声テストで確認します。"
+					"control": "select",
+					"help": "接続確認で取得したモデルから選びます。Live対応と利用権限は音声テストで確認します。",
+					"options": [
+						{
+							"value": "",
+							"label": "接続を選び、モデル一覧を更新してください"
+						}
+					]
 				},
 				{
 					"fieldId": "live.voice",
 					"document": "document:settings@1",
 					"path": "$.live.voice",
 					"label": "声の指定",
+					"control": "select",
+					"help": "公式Live APIに列挙された声から選びます。変更は次の音声会話から反映します。",
+					"options": [
+						{
+							"value": "",
+							"label": "APIの既定"
+						},
+						{
+							"value": "alloy",
+							"label": "alloy"
+						},
+						{
+							"value": "ash",
+							"label": "ash"
+						},
+						{
+							"value": "ballad",
+							"label": "ballad"
+						},
+						{
+							"value": "beacon",
+							"label": "beacon"
+						},
+						{
+							"value": "bossa",
+							"label": "bossa"
+						},
+						{
+							"value": "brise",
+							"label": "brise"
+						},
+						{
+							"value": "cedar",
+							"label": "cedar"
+						},
+						{
+							"value": "cinder",
+							"label": "cinder"
+						},
+						{
+							"value": "coral",
+							"label": "coral"
+						},
+						{
+							"value": "delta",
+							"label": "delta"
+						},
+						{
+							"value": "echo",
+							"label": "echo"
+						},
+						{
+							"value": "flitz",
+							"label": "flitz"
+						},
+						{
+							"value": "gleam",
+							"label": "gleam"
+						},
+						{
+							"value": "harema",
+							"label": "harema"
+						},
+						{
+							"value": "juni",
+							"label": "juni"
+						},
+						{
+							"value": "marin",
+							"label": "marin"
+						},
+						{
+							"value": "meridian",
+							"label": "meridian"
+						},
+						{
+							"value": "nira",
+							"label": "nira"
+						},
+						{
+							"value": "noeul",
+							"label": "noeul"
+						},
+						{
+							"value": "nuri",
+							"label": "nuri"
+						},
+						{
+							"value": "quartz",
+							"label": "quartz"
+						},
+						{
+							"value": "ripple",
+							"label": "ripple"
+						},
+						{
+							"value": "sage",
+							"label": "sage"
+						},
+						{
+							"value": "shida",
+							"label": "shida"
+						},
+						{
+							"value": "shimmer",
+							"label": "shimmer"
+						},
+						{
+							"value": "sillage",
+							"label": "sillage"
+						},
+						{
+							"value": "stone",
+							"label": "stone"
+						},
+						{
+							"value": "tempo",
+							"label": "tempo"
+						},
+						{
+							"value": "verse",
+							"label": "verse"
+						},
+						{
+							"value": "vesper",
+							"label": "vesper"
+						},
+						{
+							"value": "willow",
+							"label": "willow"
+						}
+					]
+				},
+				{
+					"fieldId": "live.instructions",
+					"document": "document:settings@1",
+					"path": "$.live.instructions",
+					"label": "話し方の補足",
 					"control": "text",
-					"help": "空欄はAPIの既定です。変更は次の音声会話から反映します。"
+					"help": "自由記述です。固定候補はありません。人格の設定に加える話し方を入力します。変更は次回の接続から反映します。",
+					"multiline": true
 				},
 				{
 					"fieldId": "live.start-microphone",
@@ -206,14 +366,6 @@
 					"label": "開始時にマイクを有効にする",
 					"control": "toggle",
 					"help": "OFFでも会話は接続したままです。"
-				},
-				{
-					"fieldId": "live.instructions",
-					"document": "document:settings@1",
-					"path": "$.live.instructions",
-					"label": "話し方の補足",
-					"control": "text",
-					"help": "人格の設定に加える話し方です。変更は次の音声会話から反映します。"
 				}
 			],
 			"collections": [

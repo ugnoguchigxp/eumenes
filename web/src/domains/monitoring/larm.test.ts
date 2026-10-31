@@ -34,7 +34,9 @@ const cpu = (s: MonitoringSnapshot, age: number) =>
 	monitoringItems(s, false, age)!.find((i) => i.model === "larm-cpu")!.state;
 test("LARM age starts at the original observation, not the successful product response", () => {
 	expect(cpu(snapshot(), 0).stale).toBe(false);
-	expect(cpu(snapshot(), 8001).stale).toBe(true);
+	// A valid sample remains the last checked value between the agreed minute polls.
+	expect(cpu(snapshot(), 47000).stale).toBe(false);
+	expect(cpu(snapshot(), 180001).stale).toBe(true);
 	expect(cpu(snapshot(), 0).observedAt).toBe(observation.observedAt);
 	expect(cpu(snapshot(), 0).utilization).toBe(0);
 	expect(

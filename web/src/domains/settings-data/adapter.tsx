@@ -23,7 +23,7 @@ import {
 import { useFieldOptions, useTargets } from "./settings-sources";
 import { useModelCatalog } from "./useModelCatalog";
 import { useVoiceTools } from "./useVoiceTools";
-import { useLiveSettings } from "./useLiveSettings";
+import { useLiveSettings, useLiveModelCatalog } from "./useLiveSettings";
 
 const SETTINGS_ADAPTER_REF = "adapter:settings@1";
 export const SETTINGS_DOCUMENT = "document:settings@1";
@@ -93,7 +93,13 @@ function useSettingsArtifact(context: AdapterHostContext): AdapterState {
 		catalogActive,
 	);
 	const fetchedOptions = useFieldOptions(client, all);
-	const ruleOf = createRuleOf({ effective, voice, fetchedOptions });
+	const liveCatalog = useLiveModelCatalog(client, saved);
+	const ruleOf = createRuleOf({
+		effective,
+		voice,
+		fetchedOptions,
+		liveModels: liveCatalog.data?.models,
+	});
 	const access = createAccess({ saved, effective, voice, targetsOf, ruleOf });
 
 	const dirty =
@@ -101,6 +107,7 @@ function useSettingsArtifact(context: AdapterHostContext): AdapterState {
 		view.structural.length > 0 ||
 		view.secrets.length > 0;
 	const liveTools = useLiveSettings({
+		catalog: liveCatalog,
 		client,
 		saved,
 		effective,

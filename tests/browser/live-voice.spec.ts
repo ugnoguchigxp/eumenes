@@ -29,6 +29,8 @@ for (const [width, theme] of [
 	[390, "light"],
 	[900, "dark"],
 	[390, "dark"],
+	[1440, "light"],
+	[1440, "dark"],
 ] as const)
 	test(`Live controls, exact subtitles and registered settings at ${width}px ${theme} without a server`, async ({
 		page,
@@ -63,6 +65,34 @@ for (const [width, theme] of [
 			page.getByRole("heading", { name: "音声会話 UI fixture" }),
 			errors.join("\n"),
 		).toBeVisible({ timeout: 5000 });
+		expect(
+			await page
+				.locator(".composer-actions")
+				.evaluate(
+					(row) =>
+						[...row.children].filter(
+							(child) => getComputedStyle(child).display !== "none",
+						).length,
+				),
+		).toBe(3);
+		await expect(
+			page.locator('.composer-actions > button[type="submit"]'),
+		).toHaveText("送信");
+		const send = await page
+			.locator('.composer-actions > button[type="submit"]')
+			.boundingBox();
+		const actions = await page.locator(".composer-actions").boundingBox();
+		expect(
+			Math.abs(send!.x + send!.width - actions!.x - actions!.width),
+		).toBeLessThan(2);
+		await expect(
+			page
+				.locator(".voice-controls")
+				.getByRole("group", { name: "Live音声会話" }),
+		).toBeVisible();
+		await page
+			.locator(".chat-composer")
+			.screenshot({ path: `${evidence}/composer-${width}-${theme}.png` });
 		await page
 			.getByRole("button", { name: "音声会話を開始", exact: true })
 			.click();
@@ -82,15 +112,84 @@ for (const [width, theme] of [
 			.getByRole("button", { name: "音声会話の設定", exact: true })
 			.click();
 		await expect(
+			page.getByRole("region", { name: "設定の保存" }),
+		).toBeVisible();
+		if (width >= 900) {
+			const header = page.locator(".aui-settings-heading");
+			const title = await header
+				.locator(".aui-composition-title")
+				.boundingBox();
+			const bar = await header
+				.getByRole("region", { name: "設定の保存" })
+				.boundingBox();
+			expect(
+				Math.abs(title!.y + title!.height / 2 - bar!.y - bar!.height / 2),
+			).toBeLessThan(3);
+		}
+		await expect(
+			page.getByText(
+				"見分けるための自由な名前です。例: OpenAI音声。OpenAI側のキー名と一致させる必要はありません。",
+				{ exact: true },
+			),
+		).toBeVisible();
+		await page.getByRole("tab", { name: "音声会話", exact: true }).click();
+		await expect(
 			page.getByLabel("音声会話を使う", { exact: true }),
 		).toBeVisible();
 		await expect(
 			page.getByLabel("音声会話のモデル", { exact: true }),
 		).toBeVisible();
+		expect(
+			await page
+				.getByLabel("音声会話のモデル", { exact: true })
+				.evaluate((node) => node.tagName),
+		).toBe("SELECT");
+		expect(
+			await page
+				.getByLabel("声の指定", { exact: true })
+				.evaluate((node) => node.tagName),
+		).toBe("SELECT");
+		expect(
+			await page
+				.getByLabel("声の指定", { exact: true })
+				.locator("option")
+				.count(),
+		).toBeGreaterThan(1);
 		const model = await page
 			.getByLabel("音声会話のモデル", { exact: true })
 			.boundingBox();
 		expect(model!.width).toBeGreaterThanOrEqual(160);
+		expect(model!.x + model!.width).toBeLessThanOrEqual(width);
+		const supplement = page.getByLabel("話し方の補足", { exact: true });
+		expect(await supplement.evaluate((node) => node.tagName)).toBe("TEXTAREA");
+		const toggleLayout = await page
+			.locator('.ds-settings-field[data-control="toggle"]')
+			.evaluateAll((rows) =>
+				rows.map((row) => {
+					const field = row.getBoundingClientRect();
+					const hint = row
+						.querySelector(".ds-settings-hint")
+						?.getBoundingClientRect();
+					const toggle = row.querySelector("input")!.getBoundingClientRect();
+					return {
+						width: field.width,
+						hintWidth: hint?.width,
+						hintHeight: hint?.height,
+						rightGap: field.right - toggle.right,
+					};
+				}),
+			);
+		for (const row of toggleLayout) {
+			expect(row.rightGap).toBeLessThanOrEqual(2);
+			if (row.hintWidth) expect(row.hintWidth).toBeGreaterThan(row.width - 90);
+			if (width >= 900 && row.hintHeight)
+				expect(row.hintHeight).toBeLessThan(65);
+		}
+		const saveButton = await page
+			.getByRole("region", { name: "設定の保存" })
+			.getByRole("button", { name: "設定の変更をすべて保存", exact: true })
+			.boundingBox();
+		expect(saveButton!.x + saveButton!.width).toBeLessThanOrEqual(width);
 		expect(
 			await page
 				.locator(".ds-settings-field")
@@ -112,6 +211,9 @@ for (const [width, theme] of [
 			path: `${evidence}/ui-${width}-${theme}.png`,
 			fullPage: true,
 		});
+		await page
+			.locator(".toolchain-artifact")
+			.screenshot({ path: `${evidence}/settings-${width}-${theme}.png` });
 		await page
 			.getByRole("button", { name: "音声会話を終了", exact: true })
 			.click();

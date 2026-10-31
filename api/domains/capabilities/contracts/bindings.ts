@@ -355,6 +355,8 @@ const documentFieldV1 = z.strictObject({
 	/** Shown under the detail disclosure. */
 	detail: z.boolean().optional(),
 	control: z.enum(["text", "select", "toggle", "range", "number", "multiple"]),
+	/** Render non-confidential text as a multiline input; its value contract is unchanged. */
+	multiline: z.boolean().optional(),
 	/** A visual treatment for registered select choices; values and validation are unchanged. */
 	presentation: z.enum(["segmented", "cards"]).optional(),
 	options: z

@@ -74,8 +74,10 @@ test("LARM measurement quality reaches the existing fourteen-shape fallback with
 		.click();
 	await expect(page.getByText("計測権限なし", { exact: true })).toBeVisible();
 	await expect(
-		page.getByText("利用率：未取得", { exact: false }),
-	).toBeVisible();
+		page
+			.locator(".spatial-selection-detail")
+			.getByText("利用率", { exact: true }),
+	).toHaveCount(0);
 	await page.screenshot({
 		path: test.info().outputPath("spatial-larm-measurement-quality.png"),
 	});

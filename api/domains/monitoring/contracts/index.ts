@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { larmViewSchema } from "./larm";
+export type { LarmView } from "./larm";
 
 /** The Spatial shape each monitored item is drawn with; `network` draws the Eumenes backend. */
 export const monitoringShapes = [
@@ -42,6 +43,20 @@ export const monitoringItemSchema = z.object({
 		/** Machine-readable code of the newest failure behind a fault or disconnection. */
 		reason: z.string().optional(),
 		stale: z.boolean().optional(),
+		/** Saved route and actual recent outcomes; configuration alone is not a successful probe. */
+		service: z
+			.object({
+				mode: z.enum(["larm-preferred", "larm-only", "cloud-only"]),
+				cloudAllowed: z.boolean().optional(),
+				connectionName: z.string().optional(),
+				model: z.string().optional(),
+				running: z.number().int().nonnegative(),
+				lastSuccessAt: z.number().nullable(),
+				lastFailure: z
+					.object({ at: z.number(), reason: z.string() })
+					.nullable(),
+			})
+			.optional(),
 		observations: z
 			.array(
 				z.object({

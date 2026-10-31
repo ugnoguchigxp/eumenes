@@ -74,6 +74,8 @@ LARMのcoverage、continuity、availableSince、previousBootHistory、droppedEve
 
 ### 6.1 共通
 
+2026-10-31追記: 利用者の約1分の確認でよいという指示に基づき、以下の10秒経過ごとのWeb警告・停止は[表示修正](spatial-status-display-fix-2026-10-31.md)で更新する。LARMの品質・時刻・期限とbackendのraw判定は維持する。
+
 既存のhealth色・描画・公転は維持する。LARM不達時に星系を消す案は採用せず、4体を残してdisconnected・staleとして示す。観測品質の不足と履歴欠落を問題なしと表示しない。
 
 通常2秒更新の値にはmaxAgeMs=10秒がある。**60秒取得を維持すると、取得直後以外の多くの時間は参考値（stale）となる**。受信から3分をLARM計測の期限に流用せず、LARMが返す項目別期限を守る。値・時刻は保持し、既存のstale時の光の停止を利用する。常時新しい状態で動かすには取得周期の変更が必要であり、今回無断で短縮しない。

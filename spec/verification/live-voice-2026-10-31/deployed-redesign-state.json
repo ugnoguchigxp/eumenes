@@ -1,0 +1,9 @@
+{
+  "model": "gpt-live-1",
+  "voice": "beacon",
+  "multiline": "TEXTAREA",
+  "cloudAllowed": true,
+  "liveEnabled": true,
+  "sendAtRight": 1,
+  "liveInAuxiliary": 1
+}

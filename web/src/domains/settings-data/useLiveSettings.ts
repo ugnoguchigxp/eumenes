@@ -7,26 +7,40 @@ import type { EumenesClient } from "../../../../client";
 import type { Settings } from "../../../../api/domains/settings/contracts";
 import { useLiveVoice } from "../live-voice";
 
+export function useLiveModelCatalog(
+	client: EumenesClient,
+	saved: Settings | undefined,
+) {
+	return useQuery({
+		queryKey: [
+			"live-models",
+			client.identity,
+			saved?.live.connectionId,
+			saved?.connections.find((c) => c.id === saved.live.connectionId)?.epoch,
+		],
+		queryFn: ({ signal }) => client.liveModels(signal),
+		enabled: false,
+		retry: false,
+	});
+}
+
 export function useLiveSettings({
 	client,
 	saved,
 	effective,
 	active,
 	dirty,
+	catalog,
 }: {
 	client: EumenesClient;
 	saved: Settings | undefined;
 	effective: Settings | undefined;
 	active: boolean;
 	dirty: boolean;
+	catalog: ReturnType<typeof useLiveModelCatalog>;
 }) {
 	const live = useLiveVoice(client, saved, undefined, active);
-	const catalog = useQuery({
-		queryKey: ["live-models", client.identity, saved?.revision],
-		queryFn: ({ signal }) => client.liveModels(signal),
-		enabled: false,
-		retry: false,
-	});
+
 	const disabled =
 		dirty ||
 		!saved?.live.enabled ||
@@ -77,13 +91,21 @@ export function useLiveSettings({
 		describe,
 		inputs: (inputs: SettingsInputField[]) =>
 			inputs.map((field) =>
-				field.id === "live.model" && models.length
+				field.id === "live.model"
 					? {
 							...field,
 							control: "select" as const,
-							options: [...new Set([effective?.live.model ?? "", ...models])]
-								.filter(Boolean)
-								.map((id) => ({ value: id, label: id })),
+							options: [
+								{
+									value: "",
+									label: models.length
+										? "モデルを選択してください"
+										: "接続を選び、モデル一覧を更新してください",
+								},
+								...[...new Set([effective?.live.model ?? "", ...models])]
+									.filter(Boolean)
+									.map((id) => ({ value: id, label: id })),
+							],
 						}
 					: field,
 			),

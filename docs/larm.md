@@ -16,7 +16,7 @@ SpatialのLARM Core・CPU・Memory・GPUは、保存済みControl接続先の `G
 
 表示中の既存monitoring取得を入口にbackendで60秒ごとに共有し、同時表示・失敗時の即時再試行を抑える。イベントとcursorは同じtransactionで保存し、409/410、再起動、取得品質、coverageの欠落を保持する。一般的な要求失敗をGPU障害にしない。
 
-LARMが返す `observedAt` と `maxAgeMs` を守るため、約10秒の期限を超えた値は参考値となる。受信時刻で更新し直さず、Webは取得間隔の間も古さを再判定する。詳しい計測値・状態・履歴の品質は認証付き `GET /api/monitoring/snapshot` の `larm` に保持する。多くのGPU等がある場合は設定の `larm.monitoringNodeId`・`larm.monitoringGpuId` で対象IDを指定し、一意な対象だけなら自動選択する。
+LARMが返す `observedAt` と `maxAgeMs`、rawな期限切れの判定は保持する。Webは約1分の定期確認の間、取得時に有効だった前回値を表示し、通常の更新待ちでは警告しない。受信前からの古い計測・取得失敗・3分の更新停止は区別し、時刻を更新して新しい計測には見せない（[表示修正](../spec/spatial-status-display-fix-2026-10-31.md)）。詳しい計測値・状態・履歴の品質は認証付き `GET /api/monitoring/snapshot` の `larm` に保持する。多くのGPU等がある場合は設定の `larm.monitoringNodeId`・`larm.monitoringGpuId` で対象IDを指定し、一意な対象だけなら自動選択する。
 
 契約は `larm-monitoring.v1`。正本と固定応答は[参照コピー](../spec/reference/larm-monitoring-v1/README.md)、責務・表示規則・配備との区別は[接続設計](../spec/larm-spatial-monitoring-integration-design-2026-10-18.md)。ソース実装とLARM本番APIの公開・Spatial実画面確認は分けて記録する。
 

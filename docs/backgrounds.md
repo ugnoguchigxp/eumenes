@@ -28,7 +28,7 @@
 
 `SpatialBackground.items` が唯一の観測入力。取得側の `web/src/domains/monitoring` が既存 `GET /api/monitoring/snapshot` をSpatial表示中だけ1分ごとに読み、実体IDと状態を渡す。Sceneやモデルはhealthを判断せず、観測値がないことと0を区別する。APIの旧shape=`network`だけはWeb取得境界で新モデル=`backend`へ対応付ける（既存APIの互換接続）。
 
-CPU・Memory・SSD・Backendと既存5サービスの状態は既存APIを利用する。LARM4体は既存のControl認証を使う読み取り専用監視APIへ接続する。個別の計測時刻・取得品質・履歴欠落を保持し、LARM側で約10秒の期限を超えた値は参考値として扱う。外部連携は引き続き未計測で、他サービスの状態を流用しない。言語・画像・楽曲の監視はAPIに残るが新しい形へ勝手に割り当てない。LARM本番APIの公開と実画面確認は[接続設計の記録](../spec/larm-spatial-monitoring-integration-design-2026-10-18.md)を参照する。
+CPU・Memory・SSD・Backendと既存5サービスの状態は既存APIを利用する。LARM4体は既存のControl認証を使う読み取り専用監視APIへ接続する。個別の計測時刻・取得品質・履歴欠落を保持する。約1分の定期確認の間は、取得時に有効だった前回値を表示し、10秒の期限を超えただけでは画面の警告・停止を行わない。受信前から古い計測、取得失敗・世代不一致・3分以上の更新停止は区別する。時刻は1回だけ表示し、履歴は確認済み範囲と欠落を分ける。サービスは実行記録と設定経路を表示し、API取得時刻を疎通時刻とは呼ばない。詳細は[表示修正](../spec/spatial-status-display-fix-2026-10-31.md)。外部連携は引き続き未計測で、他サービスの状態を流用しない。言語・画像・楽曲の監視はAPIに残るが新しい形へ勝手に割り当てない。LARM本番APIの公開と実画面確認は[接続設計の記録](../spec/larm-spatial-monitoring-integration-design-2026-10-18.md)を参照する。
 
 接続断（disconnected）はfaultと同じ赤で減光せず、光の時間変化だけを止めて動くfaultと区別する。LARMのあるLANの外ではLARM経由の用途とLARM4体の不達をunknown（`larm_off_lan`）にする（[§12](../spec/spatial-monitoring-eumenes-design-2026-10-18.md)）。取得失敗時はBackendをdisconnected、他をstaleへ。明示的な状態プレビューだけはデモ値を優先する。デモは実測として保存・表示しない。既存の監視判定の正本は[実測接続の設計](../spec/spatial-monitoring-eumenes-design-2026-10-18.md)。
 

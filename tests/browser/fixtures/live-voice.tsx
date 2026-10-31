@@ -18,7 +18,7 @@ import "@eumenes/design-system/styles";
 import "../../../web/src/app.css";
 
 const artifact = bundle.artifacts[0] as ArtifactDefinitionV1;
-const revision = "artifact:settings.live@1";
+const revision = `artifact:settings.live@${artifact.revision}`;
 const keys = existing.artifacts.find(
 	(a) => a.id === "settings.ai-connections",
 )!;
@@ -121,7 +121,7 @@ function Fixture() {
 	} as unknown as WorkspaceState;
 	return (
 		<QueryClientProvider client={cache}>
-			<main style={{ maxWidth: 900, margin: "auto", padding: 12 }}>
+			<main style={{ maxWidth: 1100, margin: "auto", padding: 12 }}>
 				<h1>音声会話 UI fixture</h1>
 				<LiveVoicePanel live={live} />
 				<ConversationComposer state={state} store={store} />

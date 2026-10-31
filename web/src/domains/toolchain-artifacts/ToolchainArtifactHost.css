@@ -35,3 +35,10 @@
 	container-type: inline-size;
 	min-width: 0;
 }
+
+.toolchain-artifact:has(.ds-settings-panel) .aui-composition-tabs {
+	grid-template-columns: minmax(0, 1fr);
+}
+.toolchain-artifact:has(.ds-settings-panel) .aui-composition-tabs > * {
+	min-width: 0;
+}

@@ -133,10 +133,13 @@ test("returning to an old cached snapshot marks it stale while its new read is p
 	expect(backend(h.result.current)?.stale).toBe(true);
 });
 
-test("LARM's ten-second expiry updates between minute polls without adding requests", async () => {
+test("a valid LARM sample stays normal between minute polls without adding requests", async () => {
 	const h = setup(false);
 	const larm = larmViewSchema.parse({
 		...emptyLarm(1000000),
+		snapshotReceivedAt: 1000000,
+		snapshotStatus: { status: "ok", at: 1000000 },
+		eventsStatus: { status: "ok", at: 1000000 },
 		history: {
 			hasMore: false,
 			coverageComplete: false,
@@ -177,6 +180,6 @@ test("LARM's ten-second expiry updates between minute polls without adding reque
 	await advance(11000);
 	expect(
 		h.result.current?.find((i) => i.model === "larm-cpu")?.state.stale,
-	).toBe(true);
+	).toBe(false);
 	expect(h.monitoringSnapshot).toHaveBeenCalledTimes(1);
 });

@@ -23,6 +23,7 @@ export type SettingsInputField = {
 	label: string;
 	help?: string;
 	control: "text" | "select" | "toggle" | "range" | "number" | "multiple";
+	multiline?: boolean;
 	presentation?: "segmented" | "cards";
 	value: string;
 	defaultValue?: string;
@@ -233,14 +234,20 @@ export function SettingsDraftBar({
 			{onApply && (
 				<Button
 					type="button"
+					aria-label={busy ? "保存中…" : "設定の変更をすべて保存"}
 					disabled={!dirty || busy || blocked}
 					onClick={onApply}
 				>
-					{busy ? "保存中…" : "設定の変更をすべて保存"}
+					{busy ? "保存中…" : "変更を保存"}
 				</Button>
 			)}
-			<Button type="button" variant="secondary" onClick={onReview}>
-				変更一覧を開く
+			<Button
+				type="button"
+				variant="secondary"
+				aria-label="変更一覧を開く"
+				onClick={onReview}
+			>
+				変更一覧
 			</Button>
 		</footer>
 	);
@@ -267,7 +274,7 @@ function SettingsField({
 			o.label.toLocaleLowerCase().includes(search.toLocaleLowerCase()),
 	);
 	return (
-		<div className="ds-settings-field">
+		<div className="ds-settings-field" data-control={field.control}>
 			{field.control === "multiple" ? (
 				<fieldset disabled={field.disabled}>
 					<legend>{field.label}</legend>
@@ -380,6 +387,18 @@ function SettingsField({
 							/>
 							<output htmlFor={prefix}>{value}</output>
 						</div>
+					) : field.control === "text" &&
+					  field.multiline &&
+					  !field.confidential ? (
+						<textarea
+							{...props}
+							rows={3}
+							value={value}
+							maxLength={field.maxLength}
+							aria-invalid={!!field.error}
+							aria-errormessage={field.error ? prefix + "-error" : undefined}
+							onChange={(e) => change(e.target.value)}
+						/>
 					) : (
 						<Input
 							{...props}

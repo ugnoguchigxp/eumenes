@@ -5,7 +5,7 @@ import type {
 	LarmStatus,
 } from "../../larm";
 import type { QueueStatus } from "../../queue";
-import type { Purpose, Settings } from "../../settings/contracts";
+import type { Settings } from "../../settings/contracts";
 import type {
 	MonitoringItem,
 	MonitoringShape,
@@ -16,6 +16,7 @@ import { createLanPresence } from "./lan";
 import { hostLimits, hostState, serviceState } from "./rules";
 import type { LarmCollector } from "./larm-collector";
 import { larmItems } from "./larm-items";
+import { routeState } from "./route-state";
 
 const log = getLogger("monitoring");
 /** Outcomes older than this say nothing about the service now (§3). */
@@ -98,29 +99,6 @@ export function createMonitoring(deps: MonitoringDeps) {
 	function larmReachable(status: LarmStatus) {
 		return status.state !== "unconfigured" && status.state !== "failed";
 	}
-	/** A route reaches its service when LARM is up, or when its cloud resource is usable. */
-	function routeReachable(purpose: Purpose, settings: Settings, larm: boolean) {
-		const cloud = cloudUsable(purpose, settings);
-		const route = settings.routes[purpose];
-		if (route.mode === "cloud-only")
-			return { reachable: cloud, viaLarm: false };
-		if (route.mode === "larm-preferred" && route.cloudAllowed && cloud)
-			return { reachable: true, viaLarm: false };
-		return { reachable: larm, viaLarm: true };
-	}
-	function cloudUsable(purpose: Purpose, settings: Settings) {
-		const route = settings.routes[purpose];
-		const resource = settings.resources.find((r) => r.id === route.fallbackId);
-		const connection = settings.connections.find(
-			(c) => c.id === resource?.connectionId,
-		);
-		return (
-			!!connection?.enabled &&
-			!!deps.settings
-				.diagnostics()
-				.connections.find((c) => c.id === connection.id)?.credentialAvailable
-		);
-	}
 
 	function item(
 		shape: MonitoringShape,
@@ -158,16 +136,16 @@ export function createMonitoring(deps: MonitoringDeps) {
 			const busy =
 				Object.values(queue.lanes).some((lane) => lane.running > 0) ||
 				Object.values(attempts).some((a) => a.running > 0);
-			const route = (purpose: Group) => {
-				const { reachable, viaLarm } = routeReachable(purpose, settings, larm);
-				return serviceState(
+			const credentials = deps.settings.diagnostics().connections;
+			const route = (purpose: Group) =>
+				routeState(
+					settings,
+					purpose,
 					attempts[purpose],
-					reachable,
-					// A cloud-only route does not wait for the LARM connection.
-					starting && settings.routes[purpose].mode !== "cloud-only",
-					viaLarm && !lan,
+					status,
+					lan,
+					credentials,
 				);
-			};
 			const recorded = (o: ActivityObservation) =>
 				serviceState({ ...o, ...recentOnly(o, since) }, larm, starting, !lan);
 			return {

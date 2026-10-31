@@ -312,13 +312,15 @@ function LayoutView({ request, nested }: { request: Layout; nested: boolean }) {
 				aria-label={request.title ?? "組合せ表示"}
 				className="aui-composition aui-composition-tabs"
 			>
-				{request.headerLayout === "inline" ? (
+				{request.draftSource ? (
+					<header className="aui-settings-heading">
+						{heading}
+						<SettingsDraftBarView source={request.draftSource} />
+					</header>
+				) : request.headerLayout === "inline" ? (
 					<div className="aui-composition-heading">{heading}</div>
 				) : (
 					heading
-				)}
-				{request.draftSource && (
-					<SettingsDraftBarView source={request.draftSource} />
 				)}
 				<Tabs value={selected} onValueChange={setSelected}>
 					<TabsList aria-label={`${request.title ?? "画面"}の区分`}>

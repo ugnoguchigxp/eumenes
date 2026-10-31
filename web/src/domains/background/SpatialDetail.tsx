@@ -9,6 +9,7 @@ const activityLabels: Record<SpatialState["activity"], string> = {
 };
 const sourceLabels: Record<NonNullable<SpatialState["source"]>, string> = {
 	measurement: "実測",
+	activity: "実行記録",
 	demo: "デモ値",
 	unconfirmed: "未確認",
 };
@@ -28,13 +29,14 @@ export function SpatialDetail({
 	demo?: { override(next: Partial<SpatialState>): void; reset(): void };
 }) {
 	const { state } = item;
+	const at = state.checkedAt ?? state.observedAt;
 	// The age keeps counting while the panel stays open between monitoring updates.
 	const [now, setNow] = useState(() => Date.now());
 	useEffect(() => {
-		if (state.observedAt === undefined) return;
+		if (at === undefined) return;
 		const timer = setInterval(() => setNow(Date.now()), 1000);
 		return () => clearInterval(timer);
-	}, [state.observedAt]);
+	}, [at]);
 	return (
 		<div className="spatial-detail-body">
 			<p className="spatial-detail-health">
@@ -44,7 +46,7 @@ export function SpatialDetail({
 				/>
 				<span>
 					{healthLabels[state.health]}
-					{state.stale ? "（情報が古い）" : ""}
+					{state.stale ? "（更新を確認できません）" : ""}
 				</span>
 				<span className="spatial-detail-source">
 					{sourceLabels[state.source ?? "unconfirmed"]}
@@ -53,14 +55,14 @@ export function SpatialDetail({
 			<dl>
 				<dt>活動</dt>
 				<dd>{activityLabels[state.activity]}</dd>
-				<dt>利用率</dt>
-				<dd>
-					{state.utilization === undefined
-						? "未取得"
-						: `${Math.round(state.utilization * 100)}%`}
-				</dd>
-				<dt>観測</dt>
-				<dd>{observed(state.observedAt, now)}</dd>
+				{state.utilization !== undefined && (
+					<>
+						<dt>利用率</dt>
+						<dd>{`${Math.round(state.utilization * 100)}%`}</dd>
+					</>
+				)}
+				<dt>最終確認</dt>
+				<dd>{observed(at, now)}</dd>
 			</dl>
 			{state.details?.length ? (
 				<ul className="spatial-detail-notes">
