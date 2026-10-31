@@ -9,6 +9,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MusicPlayer, type MusicPlayerProps } from "./MusicPlayer";
 import { requestPlayback } from "./playbackRequest";
+import { StrictMode, useEffect } from "react";
 
 const track = { id: "one", title: "試験曲", src: "blob:one" };
 beforeEach(() => {
@@ -40,6 +41,30 @@ function setup(props: Partial<MusicPlayerProps> = {}) {
 	return { ...result, audio };
 }
 describe("MusicPlayer", () => {
+	it("keeps a host's start playing through StrictMode replay and stops on real unmount", async () => {
+		function Host({ ready }: { ready: boolean }) {
+			useEffect(() => {
+				if (ready) void requestPlayback(track.id, 0);
+			}, [ready]);
+			return <MusicPlayer track={ready ? track : null} />;
+		}
+		const view = render(
+			<StrictMode>
+				<Host ready={false} />
+			</StrictMode>,
+		);
+		view.rerender(
+			<StrictMode>
+				<Host ready />
+			</StrictMode>,
+		);
+		const audio = view.container.querySelector("audio")!;
+		await screen.findByRole("button", { name: "一時停止" });
+		expect(audio.paused).toBe(false);
+		expect(HTMLMediaElement.prototype.play).toHaveBeenCalledTimes(1);
+		view.unmount();
+		await waitFor(() => expect(audio.paused).toBe(true));
+	});
 	it("plays, pauses and changes actual media volume", async () => {
 		const { audio } = setup();
 		fireEvent.click(screen.getByRole("button", { name: "再生" }));

@@ -100,6 +100,7 @@ const groupInfo = (s: Settings): Record<string, SettingsFieldGroup> => ({
 
 /** The panel actions of the voice screen, performed locally (the browser or the voice API). */
 const panelActions: Record<string, { label: string; group: string }> = {
+	"completion-sample": { label: "完了音声を試聴", group: "notifications" },
 	"notification-sample": { label: "通知音を試聴", group: "notifications" },
 	"voice-refresh": { label: "声の一覧を再取得", group: "speech" },
 	"voice-sample": { label: "サンプルを再生", group: "speech" },
@@ -277,34 +278,41 @@ export function buildActions({
 		for (const [id, base] of Object.entries(panelActions)) {
 			if (base.group === "speech" && voice.target !== "local") continue;
 			const disabled =
-				id === "notification-sample"
-					? !voice.notification.available ||
-						(effective.voice.outputVolume <= 0 && !voice.notification.playing)
-					: id === "voice-refresh"
-						? voice.connectionChanged ||
-							!saved.larm.baseUrl ||
-							voice.voices.isFetching
-						: id === "voice-sample"
-							? voice.connectionChanged || !voice.canSample
-							: voice.checking;
+				id === "completion-sample"
+					? !voice.completion.available ||
+						(effective.voice.outputVolume <= 0 && !voice.completion.playing)
+					: id === "notification-sample"
+						? !voice.notification.available ||
+							(effective.voice.outputVolume <= 0 && !voice.notification.playing)
+						: id === "voice-refresh"
+							? voice.connectionChanged ||
+								!saved.larm.baseUrl ||
+								voice.voices.isFetching
+							: id === "voice-sample"
+								? voice.connectionChanged || !voice.canSample
+								: voice.checking;
 			actions.push({
 				id,
 				group: base.group,
 				disabled,
 				label:
-					id === "notification-sample"
-						? voice.notification.playing
-							? "通知音の試聴を停止"
+					id === "completion-sample"
+						? voice.completion.playing
+							? "完了音声の試聴を停止"
 							: base.label
-						: id === "voice-sample"
-							? voice.sample.state === "loading"
-								? "サンプルの準備を取消"
-								: voice.sample.state === "playing"
-									? "サンプルを停止"
-									: base.label
-							: id === "devices-discover" && voice.checking
-								? "音声機器を確認中…"
-								: base.label,
+						: id === "notification-sample"
+							? voice.notification.playing
+								? "通知音の試聴を停止"
+								: base.label
+							: id === "voice-sample"
+								? voice.sample.state === "loading"
+									? "サンプルの準備を取消"
+									: voice.sample.state === "playing"
+										? "サンプルを停止"
+										: base.label
+								: id === "devices-discover" && voice.checking
+									? "音声機器を確認中…"
+									: base.label,
 			});
 		}
 	return actions;
@@ -452,6 +460,8 @@ export function groupsFor(
 	if (!voice.notification.available)
 		info.notifications!.description +=
 			"\n以前に選んだ通知音は再制作待ちです。試聴確認済みの音を選び、保存してください。";
+	if (voice.completion.error)
+		info.notifications!.description += "\n" + voice.completion.error;
 	if (voice.notification.error)
 		info.notifications!.description += "\n" + voice.notification.error;
 	info.devices!.description =

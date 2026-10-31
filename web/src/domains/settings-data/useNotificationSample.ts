@@ -2,26 +2,37 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
 	defaultNotificationSound,
 	notificationSoundOptions,
+	completionVoiceOptions,
 	type Settings,
 } from "../../../../api/domains/settings/contracts";
-import { notificationSoundWav } from "../settings";
+import { notificationSoundWav, completionVoiceWav } from "../settings";
 import { useTimerTone } from "../audio";
 
 /** Preview the current draft through the same output path as a real notification. */
 export function useNotificationSample(
 	settings: Settings["voice"] | undefined,
 	active: boolean,
+	kind: "notification" | "completion" = "notification",
 ) {
-	const available = notificationSoundOptions.some(
-		(option) =>
-			option.value ===
-			(settings?.notificationSound ?? defaultNotificationSound),
-	);
+	const available =
+		kind === "completion"
+			? !!settings?.completionVoice &&
+				settings.completionVoice !== "none" &&
+				completionVoiceOptions.some(
+					(option) => option.value === settings.completionVoice,
+				)
+			: notificationSoundOptions.some(
+					(option) =>
+						option.value ===
+						(settings?.notificationSound ?? defaultNotificationSound),
+				);
 	const tone = useTimerTone(
 		{
 			...settings,
 			loadTone: (signal) =>
-				notificationSoundWav(settings?.notificationSound, signal),
+				kind === "completion"
+					? completionVoiceWav(settings?.completionVoice, signal)
+					: notificationSoundWav(settings?.notificationSound, signal),
 		},
 		undefined,
 		undefined,
@@ -29,6 +40,8 @@ export function useNotificationSample(
 	);
 	const run = useRef<AbortController | null>(null);
 	const target = JSON.stringify([
+		kind,
+		settings?.completionVoice,
 		settings?.notificationSound,
 		settings?.outputDevice,
 		settings?.outputVolume,

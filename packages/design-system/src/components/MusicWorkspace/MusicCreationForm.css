@@ -117,6 +117,8 @@
 	flex-shrink: 0;
 }
 .music-creation-genres .music-creation-choices {
+	/* Keep the visually hidden legend inside its fieldset's scroll region. */
+	position: relative;
 	padding: 0;
 	border: 0;
 }

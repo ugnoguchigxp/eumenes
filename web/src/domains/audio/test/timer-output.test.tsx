@@ -291,3 +291,70 @@ test("a failed or cancelled asset load never sounds the beep or acknowledges del
 	expect(fake.output.play).not.toHaveBeenCalled();
 	expect(delivered).not.toHaveBeenCalled();
 });
+
+test("successful completion plays the selected tone then its voice on the same output; ordinary notices stay tone-only", async () => {
+	const tone = new Uint8Array([1]),
+		voice = new Uint8Array([2]);
+	const loadTone = vi.fn(async () => tone),
+		loadCompletion = vi.fn(async () => voice);
+	const ended: Array<() => void> = [];
+	fake.output.play.mockImplementation(async (_bytes, done, options) => {
+		ended.push(done);
+		options.onStarted();
+	});
+	const h = renderHook(() =>
+		useTimerTone({ loadTone, loadCompletion, outputVolume: 0.4 }),
+	);
+	const playback = h.result.current.playCompletion(
+		new AbortController().signal,
+	);
+	await waitFor(() => expect(fake.output.play).toHaveBeenCalledOnce());
+	expect(loadCompletion).not.toHaveBeenCalled();
+	await act(async () => {
+		ended[0]!();
+	});
+	await waitFor(() => expect(fake.output.play).toHaveBeenCalledTimes(2));
+	expect(fake.output.play.mock.calls.map((call) => call[0])).toEqual([
+		tone,
+		voice,
+	]);
+	expect(fake.output.play.mock.calls[1]?.[2]).toMatchObject({
+		volume: 0.4,
+		suppressInput: true,
+	});
+	await act(async () => {
+		ended[1]!();
+		await playback;
+	});
+	const normal = h.result.current.play(new AbortController().signal);
+	await waitFor(() => expect(fake.output.play).toHaveBeenCalledTimes(3));
+	await act(async () => {
+		ended[2]!();
+		await normal;
+	});
+	expect(loadCompletion).toHaveBeenCalledOnce();
+	expect(fake.create).toHaveBeenCalledOnce();
+});
+
+test("cancelling while the completion voice is loading discards late bytes after an already delivered tone", async () => {
+	let complete!: (bytes: Uint8Array) => void;
+	const loadCompletion = vi.fn(
+		() =>
+			new Promise<Uint8Array>((resolve) => {
+				complete = resolve;
+			}),
+	);
+	fake.output.play.mockImplementation(async (_bytes, done, options) => {
+		options.onStarted();
+		done();
+	});
+	const h = renderHook(() => useTimerTone({ loadCompletion }));
+	const abort = new AbortController();
+	const playback = h.result.current.playCompletion(abort.signal);
+	const rejected = expect(playback).rejects.toThrow();
+	await waitFor(() => expect(loadCompletion).toHaveBeenCalledOnce());
+	abort.abort();
+	complete(new Uint8Array([2]));
+	await rejected;
+	expect(fake.output.play).toHaveBeenCalledOnce();
+});

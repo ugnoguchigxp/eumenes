@@ -61,3 +61,21 @@ export const notificationSoundOptions = [
 		label: "ビープ（従来の音）",
 	},
 ] satisfies { value: NotificationSound; label: string }[];
+
+export const completionVoiceIds = [
+	"none",
+	"task-completed-ja-male",
+	"task-completed-en-male",
+] as const;
+export type CompletionVoice = (typeof completionVoiceIds)[number];
+export const completionVoiceOptions = [
+	{ value: "none", label: "音声なし" },
+	{
+		value: "task-completed-ja-male",
+		label: "日本語・男性「タスクが完了しました」",
+	},
+	{
+		value: "task-completed-en-male",
+		label: "英語・男性「Task has been completed」",
+	},
+] satisfies { value: CompletionVoice; label: string }[];

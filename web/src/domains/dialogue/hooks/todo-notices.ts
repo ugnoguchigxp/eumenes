@@ -16,7 +16,10 @@ type NoticeClient = Pick<
  * Loads the finished TODOs' notices for the notification center (the TODO completion notice design, section 3) and
  * sounds the short tone when new unread ones arrive. Notices already present at the first load do not sound.
  */
-export function useTodoNotices(client: NoticeClient, chime: () => void) {
+export function useTodoNotices(
+	client: NoticeClient,
+	chime: (completed?: boolean) => void,
+) {
 	const cache = useQueryClient();
 	const seen = useRef<Set<string> | null>(null);
 	const query = useQuery({
@@ -29,8 +32,10 @@ export function useTodoNotices(client: NoticeClient, chime: () => void) {
 		if (!data) return;
 		const before = seen.current;
 		seen.current = new Set(data.notices.map((notice) => notice.id));
-		if (before && data.notices.some((n) => !n.read && !before.has(n.id)))
-			chime();
+		if (before) {
+			const fresh = data.notices.filter((n) => !n.read && !before.has(n.id));
+			if (fresh.length) chime(fresh.some((n) => n.outcome === "succeeded"));
+		}
 	}, [data, chime]);
 	const [readError, setReadError] = useState<string | null>(null);
 	const markRead = useCallback(

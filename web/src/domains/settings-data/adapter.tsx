@@ -161,7 +161,13 @@ function useSettingsArtifact(context: AdapterHostContext): AdapterState {
 		if (binding.eventAction !== "settings-action" || !action)
 			return { status: "rejected", message: "この操作は利用できません" };
 		switch (id) {
+			case "completion-sample":
+				voice.notification.stop();
+				if (voice.completion.playing) voice.completion.stop();
+				else void voice.completion.play();
+				break;
 			case "notification-sample":
+				voice.completion.stop();
 				if (voice.notification.playing) voice.notification.stop();
 				else void voice.notification.play();
 				break;

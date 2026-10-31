@@ -90,3 +90,25 @@ test("a failed read reports an error; the board opens by its artifact id", async
 	act(() => h.hook.result.current.onOpenBoard());
 	expect(h.openById).toHaveBeenCalledWith("kanban.board");
 });
+
+test("only a new done notice requests completion speech; waiting, blockers and git steps do not", async () => {
+	const baseline = notice("loaded", true);
+	const h = setup([baseline]);
+	await waitFor(() => expect(h.hook.result.current.notices).toHaveLength(1));
+	const previous: KanbanNoticeView[] = [baseline];
+	for (const kind of [
+		"waiting",
+		"blocker",
+		"commit_push",
+		"git_completed",
+		"queue_paused",
+		"stopped",
+		"done",
+	] as const) {
+		previous.unshift({ ...notice(kind), kind });
+		await h.change([...previous]);
+		await waitFor(() =>
+			expect(h.chime).toHaveBeenLastCalledWith(kind === "done"),
+		);
+	}
+});

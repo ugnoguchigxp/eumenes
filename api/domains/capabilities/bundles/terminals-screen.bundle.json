@@ -92,12 +92,139 @@
 			"redirects": [],
 			"bindingRevisionId": "binding:claude-code.request@2",
 			"artifactRevisionId": "artifact:terminals.workspace@2"
+		},
+		{
+			"kind": "profile",
+			"id": "claude-code.repair",
+			"revision": 2,
+			"title": "エラー修正担当",
+			"summary": "発生したエラーを調べ、承認された範囲で修正する",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [],
+			"avoidWhen": [],
+			"dependencies": [],
+			"body": "発生したエラーの修正を Claude Code へ渡す担当。対象の run と、その診断（error-report）を特定し、依頼文に結び付ける。作業は分析と実装の2回に分け、進め方は SKILL に従う。依頼を渡したことと作業が終わったことを区別する。"
+		},
+		{
+			"kind": "skill",
+			"id": "claude-code.repair",
+			"revision": 2,
+			"title": "エラー修正の依頼手順",
+			"summary": "分析・評価・改善案・実装の順序と報告の形",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [],
+			"avoidWhen": [],
+			"dependencies": [],
+			"body": "依頼を claude-code.request の一操作に整える。\n\n対象は、会話で示された失敗した run 一件とする。prompt には対象の run の ID と、診断の取得手段 `bun run cli -- run <runId> --error-report`（backend 起動中、API 経由）を必ず書く。対象が特定できない、または複数あって選べない場合は、操作せずに一度だけ確認する。\n\n作業は2回に分ける。1回目は分析だけとする。error-report と関係するログ・コードを読み、エラーを再現する。再現できなければ、そのことを報告して終える。原因と対象範囲を特定し、原因が実在のコードと一致するか評価し、改善案（変更対象・変更内容・完了条件）だけを報告して終える。1回目ではコードを実装しない。\n\n利用者が改善案を承認して改めて依頼した場合だけ、2回目として実装する。承認された改善案の範囲だけを変更し、対象 domain の試験を実行し、分析・評価・改善案・差分・試験結果を報告する。commit と push は行わない。\n\n会話本文・音声・秘密を prompt に入れない。診断に含まれるのは ID と固定の理由コードだけである。task には短いタスク名（40字以内、例: エラーの調査と修正）を付ける。session は既定で current を使う。結果は「引き受けた」ことと「終わったら知らせる」ことだけを伝え、完了・成功・変更内容は述べない。操作結果を得たら一度で終了する。"
+		},
+		{
+			"kind": "package",
+			"id": "claude-code.repair",
+			"revision": 2,
+			"title": "エラー修正",
+			"summary": "発生したエラーを Claude Code に調べさせ、承認された範囲で修正させる",
+			"aliases": [],
+			"tags": [],
+			"useWhen": ["発生したエラーの調査と修正を Claude Code に頼みたい"],
+			"avoidWhen": [
+				"エラーが起きていない作業を頼みたい",
+				"エラーの説明だけを聞きたい"
+			],
+			"dependencies": [
+				"profile:claude-code.repair@2",
+				"skill:claude-code.repair@2",
+				"tool:claude-code.request@2"
+			],
+			"backend": "claude-code",
+			"schemaKey": "claudeCodeRequest",
+			"profileRevisionId": "profile:claude-code.repair@2",
+			"requiredSkillRevisionIds": ["skill:claude-code.repair@2"],
+			"toolRevisionIds": ["tool:claude-code.request@2"]
+		},
+		{
+			"kind": "toolchain",
+			"id": "claude-code.repair",
+			"revision": 2,
+			"title": "エラー修正",
+			"summary": "発生したエラーを Claude Code に調べさせ、承認された範囲で修正させる",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [
+				"発生したエラーの原因調査と修正を頼みたい",
+				"失敗した実行を調べて直してほしい"
+			],
+			"avoidWhen": [
+				"エラーが起きていない作業を頼みたい",
+				"エラーの意味や一般的な説明を聞いているだけ",
+				"Claude Code の使い方を聞いているだけ"
+			],
+			"dependencies": ["package:claude-code.repair@2"],
+			"examples": [
+				"このエラーを調べて修正して",
+				"さっき失敗した実行の原因を調べて直して",
+				"エラーが出たので、調べて修正を頼みたい"
+			],
+			"packageRevisionId": "package:claude-code.repair@2",
+			"functionName": "repair_error",
+			"redirects": [],
+			"bindingRevisionId": "binding:claude-code.repair@2",
+			"artifactRevisionId": "artifact:terminals.workspace@2",
+			"minImpact": "modify_existing"
+		},
+		{
+			"kind": "toolchain",
+			"id": "claude-code.request",
+			"revision": 3,
+			"title": "Claude Code",
+			"summary": "Claude Code にコーディング作業を依頼し、画面で進み具合を見る",
+			"aliases": ["Claude Code", "クロードコード"],
+			"tags": [],
+			"useWhen": [
+				"コードの実装・修正・調査・テストを Claude Code に頼みたい",
+				"Claude Code を開いて作業を始めさせたい"
+			],
+			"avoidWhen": [
+				"プログラミングの一般的な質問に答えるだけ",
+				"Claude Code の使い方や料金を聞いているだけ"
+			],
+			"dependencies": ["package:claude-code.request@2"],
+			"examples": [
+				"Claude Code でログイン画面のバグを直して",
+				"README のセットアップ手順を最新にするよう Claude Code に頼んで",
+				"Claude Code で設定画面に項目を足して",
+				"別のセッションの Claude Code で依存パッケージを更新して"
+			],
+			"packageRevisionId": "package:claude-code.request@2",
+			"functionName": "claude_code",
+			"redirects": [],
+			"bindingRevisionId": "binding:claude-code.request@2",
+			"artifactRevisionId": "artifact:terminals.workspace@2"
 		}
 	],
 	"bindings": [
 		{
 			"kind": "binding",
 			"id": "claude-code.request",
+			"revision": 2,
+			"execution": "command",
+			"adapterRef": "adapter:terminals@1",
+			"availabilityRef": "availability:terminals@1",
+			"tools": [
+				{
+					"toolRevisionId": "tool:claude-code.request@2",
+					"operationId": "claude-code.request",
+					"inputSchemaRef": "builtin:claudeCodeRequest"
+				}
+			],
+			"outputSchemaRef": "domain:claude-code.receipt@1",
+			"resultProjectionRef": "projection:claude-code.result@1",
+			"artifactRevisionId": "artifact:terminals.workspace@2"
+		},
+		{
+			"kind": "binding",
+			"id": "claude-code.repair",
 			"revision": 2,
 			"execution": "command",
 			"adapterRef": "adapter:terminals@1",

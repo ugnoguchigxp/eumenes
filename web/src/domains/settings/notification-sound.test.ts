@@ -1,6 +1,6 @@
 import { afterEach, expect, test, vi } from "vitest";
 import { notificationSoundOptions } from "../../../../api/domains/settings/contracts";
-import { notificationSoundWav } from "./notification-sound";
+import { notificationSoundWav, completionVoiceWav } from "./notification-sound";
 const timerToneWav = () => {
 	const bytes = new Uint8Array(44);
 	bytes.set(new TextEncoder().encode("RIFF"));
@@ -72,5 +72,28 @@ test("all ten listening-approved assets can be fetched, including formerly retir
 			await notificationSoundWav(sound.value, new AbortController().signal),
 		).toEqual(timerToneWav());
 		expect(fetcher.mock.calls.at(-1)?.[0]).toContain(sound.value + ".wav");
+	}
+});
+
+test("the optional completion voice is silent by default and uses only bundled approved recordings", async () => {
+	const fetcher = vi.fn(
+		async (_url: string) => new Response(new Uint8Array(timerToneWav())),
+	);
+	vi.stubGlobal("fetch", fetcher);
+	expect(
+		await completionVoiceWav(undefined, new AbortController().signal),
+	).toBeUndefined();
+	expect(
+		await completionVoiceWav("none", new AbortController().signal),
+	).toBeUndefined();
+	expect(fetcher).not.toHaveBeenCalled();
+	for (const voice of [
+		"task-completed-ja-male",
+		"task-completed-en-male",
+	] as const) {
+		expect(
+			await completionVoiceWav(voice, new AbortController().signal),
+		).toEqual(timerToneWav());
+		expect(fetcher.mock.calls.at(-1)?.[0]).toContain(voice + ".wav");
 	}
 });

@@ -33,6 +33,11 @@ export function useVoiceTools({
 	};
 }) {
 	const notification = useNotificationSample(effective?.voice, active);
+	const completion = useNotificationSample(
+		effective?.voice,
+		active,
+		"completion",
+	);
 	const connectionChanged =
 		!!saved &&
 		!!effective &&
@@ -145,6 +150,7 @@ export function useVoiceTools({
 	}
 	return {
 		notification,
+		completion,
 		catalog,
 		selected,
 		voices,

@@ -41,6 +41,7 @@ command 担当の SystemContext は、登録 profile・SKILL・共通の操作�
 | SKILL | `skill:claude-code.request@1`：依頼文を省略・言い換えしない、秘密を入れない、`new` は明示時だけ、対象も目的も無ければ一度確認、「渡した」ことだけを伝える |
 | tool / package | `tool:claude-code.request@1`・`package:claude-code.request@1`（backend `claude-code`、入力 `builtin:claudeCodeRequest`） |
 | binding | `binding:claude-code.request@1`：→ `adapter:terminals@1` の `claude-code.request`、結果 `domain:claude-code.receipt@1`、`projection:claude-code.result@1` |
+| エラー修正 | `profile:claude-code.repair@2`・`skill:claude-code.repair@2`・`package:claude-code.repair@2`・`toolchain:claude-code.repair@2`（会話関数 `repair_error`、`binding:claude-code.repair@2` → 同じ操作）。発生したエラーを利用者が「調べて修正して」と頼んだときだけ使う。`minImpact: modify_existing` で実行前の確認が必須。作業は2回に分ける。1回目は分析だけ（対象 run の error-report を `bun run cli -- run <runId> --error-report` で読み、再現し、原因を評価して改善案を報告する。実装しない）。利用者が改善案を承認して改めて依頼したときだけ、2回目で承認された範囲を実装し、対象 domain の試験と差分を報告する。対象の run は会話で示された失敗から特定し、候補の一覧から選ぶ仕組みは持たない（特定できなければ確認質問で止まる）。自動では始まらない |
 
 ## フックと追跡
 

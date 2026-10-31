@@ -137,6 +137,34 @@ test("fresh initialization installs every repository seed and bundle without run
 					.sort(),
 			),
 		).toEqual([...expected].sort());
+		const repair = store.read((db) =>
+			caps
+				.toolchainsInTransaction(db)
+				.find((d) => d.id === "claude-code.repair"),
+		);
+		expect(repair).toMatchObject({
+			functionName: "repair_error",
+			minImpact: "modify_existing",
+		});
+		for (const id of [
+			"profile:claude-code.repair@2",
+			"skill:claude-code.repair@2",
+			"package:claude-code.repair@2",
+			"toolchain:claude-code.repair@2",
+		]) {
+			expect(
+				store.read((db) =>
+					db.query("SELECT id FROM capability_revisions WHERE id=?").get(id),
+				),
+			).toEqual({ id });
+		}
+		expect(
+			store.read((db) =>
+				db
+					.query("SELECT id FROM capability_documents WHERE id=?")
+					.get("binding:claude-code.repair@2"),
+			),
+		).toEqual({ id: "binding:claude-code.repair@2" });
 		expect(
 			store.read((db) =>
 				db.query("SELECT DISTINCT origin FROM capability_items").all(),

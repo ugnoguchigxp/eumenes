@@ -10,10 +10,89 @@ import { afterEach, expect, test, vi } from "vitest";
 import { createWebAdapterRegistry } from "../toolchain-artifacts/registry";
 import { ToolchainArtifactHost } from "../toolchain-artifacts/ToolchainArtifactHost";
 import { musicScreenWebAdapter } from "./toolchain-adapter";
+import { StrictMode } from "react";
 
 afterEach(() => {
 	cleanup();
 	vi.restoreAllMocks();
+});
+
+test("the registered music screen autoplays a conversation generation through StrictMode replay", async () => {
+	const play = vi
+		.spyOn(HTMLMediaElement.prototype, "play")
+		.mockImplementation(function (this: HTMLMediaElement) {
+			Object.defineProperty(this, "paused", {
+				configurable: true,
+				value: false,
+			});
+			this.dispatchEvent(new Event("play"));
+			return Promise.resolve();
+		});
+	vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(function (
+		this: HTMLMediaElement,
+	) {
+		Object.defineProperty(this, "paused", { configurable: true, value: true });
+		this.dispatchEvent(new Event("pause"));
+	});
+	vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:music");
+	vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+	const artifact = {
+		defaultVariant: "standard",
+		variants: [
+			{
+				id: "standard",
+				definition: { view: "music-workspace", source: "music-studio" },
+			},
+		],
+		sourceBindings: [
+			{ source: "music-studio", adapterRef: "adapter:music-screen@1" },
+		],
+		actionBindings: [],
+	};
+	const item = {
+		id: "new",
+		state: "generating",
+		title: "新しい曲",
+		description: "",
+		createdAt: 2,
+		updatedAt: 2,
+		mime: "audio/wav",
+	};
+	const client = {
+		identity: crypto.randomUUID(),
+		toolchainArtifact: vi.fn(async () => ({
+			artifact,
+			artifactRevisionId: "artifact:music.generation@3",
+			scopeRef: "scope:main",
+		})),
+		unsettledToolchainActions: vi.fn(async () => []),
+		musicList: vi.fn(async () => [item]),
+		musicProviders: vi.fn(async () => ({ providers: [] })),
+		musicAudio: vi.fn(async () => new Blob(["fixture"])),
+	};
+	const cache = new QueryClient({
+		defaultOptions: { queries: { retry: false } },
+	});
+	const view = render(
+		<StrictMode>
+			<QueryClientProvider client={cache}>
+				<ToolchainArtifactHost
+					client={client as never}
+					adapters={createWebAdapterRegistry([musicScreenWebAdapter])}
+					artifactRevisionId="artifact:music.generation@3"
+					artifactId="music-test"
+				/>
+			</QueryClientProvider>
+		</StrictMode>,
+	);
+	await screen.findByRole("textbox", { name: "音楽作成プロンプト" });
+	cache.setQueryData(
+		["music", "list", "main"],
+		[{ ...item, state: "completed", updatedAt: 3 }],
+	);
+	await screen.findByRole("button", { name: "一時停止" });
+	expect(play).toHaveBeenCalledTimes(1);
+	expect(view.container.querySelector("audio")?.paused).toBe(false);
 });
 
 test("registered music screen creates and cancels through the existing conversation API", async () => {

@@ -12,6 +12,7 @@ export function useTimerTone(
 		outputDevice?: string;
 		outputVolume?: number;
 		loadTone?: (signal: AbortSignal) => Promise<Uint8Array | undefined>;
+		loadCompletion?: (signal: AbortSignal) => Promise<Uint8Array | undefined>;
 	} = {},
 	sessionAudio?: () => Pick<AudioController, "play" | "stopPlayback"> | null,
 	speech?: (text: string, signal: AbortSignal) => Promise<Uint8Array>,
@@ -100,6 +101,7 @@ export function useTimerTone(
 			signal: AbortSignal,
 			message?: string,
 			onToneDelivered?: () => void,
+			completed = false,
 		) => {
 			signal.throwIfAborted();
 			const { outputDevice = "", outputVolume = 1 } = latest.current.settings;
@@ -158,6 +160,11 @@ export function useTimerTone(
 				(await latest.current.settings.loadTone?.(signal)) ?? timerToneWav(),
 			);
 			onToneDelivered?.();
+			if (completed) {
+				const voice = await latest.current.settings.loadCompletion?.(signal);
+				signal.throwIfAborted();
+				if (voice) await play(voice);
+			}
 			// Speech is best effort: an unavailable TTS provider must not erase a delivered beep.
 			if (message && latest.current.speech) {
 				const speechAbort = new AbortController();
@@ -198,5 +205,9 @@ export function useTimerTone(
 		},
 		[playTone],
 	);
-	return { play: playTone, repeat, ready, prepare };
+	const playCompletion = useCallback(
+		(signal: AbortSignal) => playTone(signal, undefined, undefined, true),
+		[playTone],
+	);
+	return { play: playTone, playCompletion, repeat, ready, prepare };
 }

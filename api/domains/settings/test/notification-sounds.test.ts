@@ -35,3 +35,41 @@ test("notification choice persists across reopen; old documents and only registe
 		}).success,
 	).toBe(false);
 });
+
+test("completion voice is optional for old settings, persists independently and rejects arbitrary assets", async () => {
+	const h = await setup();
+	const original = h.settings.get();
+	expect(settingsSchema.parse(original).voice.completionVoice).toBeUndefined();
+	for (const completionVoice of [
+		"none",
+		"task-completed-ja-male",
+		"task-completed-en-male",
+	] as const) {
+		const settings = h.settings.get();
+		settings.voice.completionVoice = completionVoice;
+		await h.settings.apply({
+			requestId: crypto.randomUUID(),
+			expectedRevision: settings.revision,
+			settings,
+			keys: [],
+		});
+		const reopened = await createSettings(h.store, {
+			dbPath: h.dbPath,
+			env: {},
+		});
+		expect(reopened.get().voice.completionVoice).toBe(completionVoice);
+		expect(reopened.get().voice.notificationSound).toBe(
+			original.voice.notificationSound,
+		);
+		expect(reopened.get().larm).toEqual(original.larm);
+	}
+	expect(
+		settingsSchema.safeParse({
+			...original,
+			voice: {
+				...original.voice,
+				completionVoice: "https://outside.test/voice.wav",
+			},
+		}).success,
+	).toBe(false);
+});

@@ -346,3 +346,63 @@ test("a conversation request whose run cannot be tracked is stopped and reported
 		await h.close();
 	}
 });
+
+test("an error repair request waits for confirmation and starts nothing on its own", async () => {
+	const claude = fakeClaude();
+	const h = await harness({
+		terminals: claude.terminals,
+		routeTool: "repair_error",
+		command: () =>
+			JSON.stringify({
+				action: "invoke",
+				tool: "claude-code.repair",
+				arguments: {
+					prompt:
+						"run 00000000-0000-4000-8000-000000000001 の error-report を読み、調べて修正して",
+					task: "エラーの調査と修正",
+				},
+			}),
+		parent: () => "承知しました。終わったらお知らせします。",
+	});
+	try {
+		const first = await h.dialogue.submit({
+			requestId: crypto.randomUUID(),
+			conversationId: "main",
+			text: "このエラーを調べて修正して",
+		});
+		expect(
+			(await h.dialogue.waitForTerminal(first.id, { timeoutMs: 8000 }))?.status,
+		).toBe("completed");
+		// repair_error declares minImpact modify_existing: the request is held at
+		// the confirmation gate, so no Claude Code process and no work request
+		// are created until the person approves. The run is already terminal, so
+		// this negative check needs no timing wait.
+		expect(
+			h.store.read(
+				(db) =>
+					(
+						db
+							.query("SELECT COUNT(*) AS n FROM dialogue_confirmations")
+							.get() as {
+							n: number;
+						}
+					).n,
+			),
+		).toBe(1);
+		expect(claude.spawned).toHaveLength(0);
+		expect(
+			h.store.read(
+				(db) =>
+					(
+						db.query("SELECT COUNT(*) AS n FROM terminal_requests").get() as {
+							n: number;
+						}
+					).n,
+			),
+		).toBe(0);
+		// The gate holds before the command sub-agent runs: no command context yet.
+		expect(h.commandContexts).toHaveLength(0);
+	} finally {
+		await h.close();
+	}
+});

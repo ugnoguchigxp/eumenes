@@ -15,6 +15,7 @@ export function usePlayback(
 	const [error, setError] = useState(false);
 	// Playback intent applies once per mounted track; later changes come from this player's own events.
 	const [initialAutoPlay] = useState(autoPlay);
+	const attached = useRef(false);
 	// Apply the player's retained volume before a replacement track can start.
 	useEffect(() => {
 		if (ref.current) ref.current.volume = volume;
@@ -22,11 +23,21 @@ export function usePlayback(
 	useEffect(() => {
 		const audio = ref.current;
 		let active = true;
+		attached.current = true;
 		if (initialAutoPlay)
 			void audio?.play().catch(() => active && setError(true));
 		return () => {
 			active = false;
-			audio?.pause();
+			attached.current = false;
+			if (!audio?.isConnected) {
+				audio?.pause();
+				return;
+			}
+			// StrictMode replays setup with the same element. Only a real unmount
+			// stops playback requested by the host after the player first mounted.
+			queueMicrotask(() => {
+				if (!attached.current) audio?.pause();
+			});
 		};
 	}, [initialAutoPlay]);
 	const seek = (seconds: number) => {

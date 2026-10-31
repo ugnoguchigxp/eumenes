@@ -1,6 +1,6 @@
 # ハーネスの自己改善 設計（案・合意待ち）
 
-状態: 案。実装前に本書への合意が必要（新しい判断方式の導入に当たるため）。
+状態: 合意・実装済み（2026-10-31、形を変更）。当初の「候補の台帳と自動起票」は採用せず、ツールチェーン項目として実装した。エラー発生時に利用者が「調べて修正して」と依頼すると、専用担当が Claude Code へ、分析・評価・改善案・実装の手順で作業を渡す。自動では始まらない。実装は `api/domains/capabilities/bundles/terminals-screen.bundle.json` の `claude-code.repair@2` 一式（会話関数 `repair_error`、`minImpact: modify_existing`、作業は分析と実装の2回に分ける）で、接続と検証は [score-improvement-plan-2026-10-31.md](score-improvement-plan-2026-10-31.md) の実施記録に残す。以下の設計のうち台帳と自動起票の部分は、将来必要になった場合の案として残す。
 
 ## 目的
 

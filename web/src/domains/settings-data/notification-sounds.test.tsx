@@ -15,6 +15,10 @@ const fake = vi.hoisted(() => ({
 		async (_choice?: string, _signal?: AbortSignal) =>
 			new Uint8Array([1, 2, 3]),
 	),
+	completionLoad: vi.fn(
+		async (_choice?: string, _signal?: AbortSignal) =>
+			new Uint8Array([4, 5, 6]),
+	),
 	output: {
 		startOutput: vi.fn(async () => {}),
 		play: vi.fn(async (_bytes, _ended, options) => {
@@ -26,6 +30,7 @@ const fake = vi.hoisted(() => ({
 }));
 vi.mock("../settings/notification-sound", () => ({
 	notificationSoundWav: fake.load,
+	completionVoiceWav: fake.completionLoad,
 }));
 vi.mock("../audio/controller", () => ({
 	createAudioController: () => fake.output,
@@ -60,7 +65,7 @@ test("shipped picker previews the unsaved choice on configured output, stops on 
 	);
 	fireEvent.click(await screen.findByRole("button", { name: "通知音" }));
 	const picker = await screen.findByLabelText("通知音の種類");
-	expect(screen.getAllByRole("option")).toHaveLength(11);
+	expect((picker as HTMLSelectElement).options).toHaveLength(11);
 	for (const option of notificationSoundOptions)
 		expect(screen.getByRole("option", { name: option.label })).toBeTruthy();
 	expect((picker as HTMLSelectElement).value).toBe("soft-chime");
@@ -126,4 +131,50 @@ test("formerly retired saved choices are now available for preview and remain sa
 	await waitFor(() =>
 		expect(backend.saved().voice.notificationSound).toBe("bamboo"),
 	);
+});
+
+test("completion speech can be previewed before saving, stopped by a tone preview, saved and reopened", async () => {
+	const backend = createSettingsBackend({ artifacts });
+	render(
+		<Screens backend={backend} start="voice-input" cache={newCache(backend)} />,
+	);
+	fireEvent.click(await screen.findByRole("button", { name: "通知音" }));
+	const picker = await screen.findByLabelText("タスク完了時の音声");
+	expect((picker as HTMLSelectElement).value).toBe("none");
+	expect((picker as HTMLSelectElement).options).toHaveLength(3);
+	expect(
+		screen
+			.getByRole("button", { name: "完了音声を試聴" })
+			.hasAttribute("disabled"),
+	).toBe(true);
+	fireEvent.change(picker, { target: { value: "task-completed-ja-male" } });
+	fireEvent.click(screen.getByRole("button", { name: "完了音声を試聴" }));
+	await waitFor(() =>
+		expect(fake.completionLoad).toHaveBeenCalledWith(
+			"task-completed-ja-male",
+			expect.any(AbortSignal),
+		),
+	);
+	await screen.findByRole("button", { name: "完了音声の試聴を停止" });
+	expect(backend.saved().voice.completionVoice).toBeUndefined();
+	fireEvent.click(screen.getByRole("button", { name: "通知音を試聴" }));
+	await waitFor(() => expect(fake.output.stopPlayback).toHaveBeenCalled());
+	await screen.findByRole("button", { name: "完了音声を試聴" });
+	fireEvent.click(screen.getByRole("button", { name: "通知音の試聴を停止" }));
+	fireEvent.change(picker, { target: { value: "task-completed-en-male" } });
+	fireEvent.click(
+		screen.getByRole("button", { name: "設定の変更をすべて保存" }),
+	);
+	await waitFor(() =>
+		expect(backend.saved().voice.completionVoice).toBe(
+			"task-completed-en-male",
+		),
+	);
+	fireEvent.click(screen.getByRole("button", { name: "閉じる" }));
+	fireEvent.click(screen.getByRole("button", { name: "開く:voice-input" }));
+	fireEvent.click(await screen.findByRole("button", { name: "通知音" }));
+	expect(
+		((await screen.findByLabelText("タスク完了時の音声")) as HTMLSelectElement)
+			.value,
+	).toBe("task-completed-en-male");
 });

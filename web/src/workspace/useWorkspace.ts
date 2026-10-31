@@ -1,4 +1,4 @@
-import { notificationSoundWav } from "../domains/settings";
+import { useNotificationAudio } from "./useNotificationAudio";
 import { chatSend } from "./chat-send";
 import { useChatAttachments } from "./useChatAttachments";
 import { useDrawingArtifacts } from "../domains/excalidraw/useDrawingArtifacts";
@@ -24,7 +24,7 @@ import { activeTimersQuery } from "../domains/timers/queries";
 import { TIMER_ADAPTER_REF } from "../domains/timers/toolchain-adapter";
 import { useTimerArtifacts } from "../domains/timers/useTimerArtifacts";
 import { useToolchainArtifacts } from "../domains/toolchain-artifacts";
-import { useTimerTone, type AudioStore } from "../domains/audio";
+import type { AudioStore } from "../domains/audio";
 import { useArtifactWorkspace } from "../domains/artifact";
 import { useConversation } from "../domains/conversation";
 import { useCancel, useRuns, useSubmit } from "../domains/dialogue";
@@ -132,21 +132,12 @@ export function useWorkspace({
 		undefined,
 		settings.data?.voice,
 	);
-	const timerAudio = useTimerTone(
-		{
-			...settings.data?.voice,
-			loadTone: (signal) =>
-				notificationSoundWav(settings.data?.voice.notificationSound, signal),
-		},
+	const timerAudio = useNotificationAudio(
+		settings.data?.voice,
 		voice.audio,
 		(text, signal) => client.replayAudio(text, signal),
 	);
-	const playTone = timerAudio.play;
-	// A finished task, a question from a delegated session, a new Kanban notice or a finished TODO
-	// sounds the same short tone.
-	const chime = useCallback(() => {
-		void playTone(new AbortController().signal).catch(() => {});
-	}, [playTone]);
+	const chime = timerAudio.chime;
 	useClaudeCodeArtifacts(client, openClaudeCode, chime);
 	const kanbanNotices = useKanbanNotices(client, chime, openById);
 	const todoNotices = useTodoNotices(client, chime);

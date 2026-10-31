@@ -111,3 +111,22 @@ test("a read that fails brings the notice back and reports it", async () => {
 	);
 	expect(h.hook.result.current.unread).toBe(1);
 });
+
+test("only a newly succeeded TODO requests completion speech", async () => {
+	const baseline = notice("loaded", true);
+	const h = setup([baseline]);
+	await waitFor(() => expect(h.hook.result.current.notices).toHaveLength(1));
+	const previous: TodoNotice[] = [baseline];
+	for (const outcome of [
+		"failed",
+		"partial",
+		"interrupted",
+		"succeeded",
+	] as const) {
+		previous.unshift({ ...notice(outcome), outcome });
+		await h.change([...previous]);
+		await waitFor(() =>
+			expect(h.chime).toHaveBeenLastCalledWith(outcome === "succeeded"),
+		);
+	}
+});
