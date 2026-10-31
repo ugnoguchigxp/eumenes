@@ -72,8 +72,8 @@ export {
 	uiWorkSave,
 	uiWorkStep,
 };
-import { imageRequest, imagePlan } from "./image";
-export { imageRequest, imagePlan };
+import { imageRequest, imagePlan, imagePlanV2 } from "./image";
+export { imageRequest, imagePlan, imagePlanV2 };
 import { musicRequest, musicPlanV3 } from "./music";
 export { musicRequest, musicPlanV3 };
 import {
@@ -274,6 +274,7 @@ export const validators = {
 	drawingPlan,
 	imageRequest,
 	imagePlan,
+	imagePlanV2,
 	musicRequest,
 	musicPlanV3,
 	dotsDelegation: z.strictObject({}),

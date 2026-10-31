@@ -61,6 +61,7 @@ export function imageFixture(
 		| "fetch-failure" = "success",
 	gate?: Promise<void>,
 	artifactId: (ordinal: number) => string = () => "new-image",
+	failure?: { status: number; code: string },
 ) {
 	let generated = 0;
 	const requests: Array<{
@@ -160,6 +161,11 @@ export function imageFixture(
 					return new Response(null, { status: 204 });
 				if (path === "/v1/images/generations") {
 					if (gate) await gate;
+					if (failure)
+						return Response.json(
+							{ error: { code: failure.code } },
+							{ status: failure.status },
+						);
 					if (mode === "failure") return new Response(null, { status: 503 });
 					const bytes = png(body.width, body.height);
 					const metadata = descriptor(
@@ -168,6 +174,7 @@ export function imageFixture(
 						body.height,
 						bytes,
 					);
+					metadata.model = body.model ?? metadata.model;
 					images.set(metadata.id, { metadata, bytes });
 					return Response.json({ status: "succeeded", artifact: metadata });
 				}

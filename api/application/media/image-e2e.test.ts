@@ -41,15 +41,17 @@ for (const mode of [
 			expect(posts).toHaveLength(
 				["invalid-plan", "library", "studio"].includes(mode) ? 0 : 1,
 			);
-			if (posts[0])
+			if (posts[0]) {
+				expect(posts[0].body).not.toHaveProperty("model");
+				expect(posts[0].body).not.toHaveProperty("steps");
 				expect(posts[0].body).toMatchObject({
 					prompt: imageTestPlan.prompt,
 					width: 121,
 					height: 177,
 					seed: 42,
 					format: "png",
-					model: "fixture-image",
 				});
+			}
 			expect(f.stages).toEqual(["route", "plan"]);
 			const library = await (await h.request("/api/images/library")).json();
 			expect(
@@ -260,3 +262,86 @@ test("an image screen submit generates an image though the conversation earlier 
 		await h.close();
 	}
 });
+
+for (const model of ["qwen-image-2.1-turbo", "flux-3-image-klein"])
+	test(`artifact submit carries ${model} through planning, storage and the authenticated LARM POST`, async () => {
+		const f = imageFixture("success");
+		const h = await harness({ model: f.model, imageGateway: f.gateway });
+		try {
+			const values = {
+				prompt: "窓辺で眠る猫の写真",
+				model,
+				width: 768,
+				height: 768,
+				seed: 42,
+				format: "webp",
+			};
+			const submitted = await (
+				await h.request("/api/runs", {
+					requestId: crypto.randomUUID(),
+					conversationId: "main",
+					presentation: "artifact",
+					toolchainId: "image.create",
+					text: `制作条件をそのまま使って画像を1枚生成してください。\n\n${JSON.stringify(values)}`,
+				})
+			).json();
+			await h.dialogue.waitForTerminal(submitted.id, { timeoutMs: 5000 });
+			const record = h.image!.list("main")[0]!;
+			expect(record).toMatchObject({
+				state: "completed",
+				model,
+				actualModel: model,
+			});
+			const posts = f.requests.filter(
+				(r) => r.method === "POST" && r.path === "/v1/images/generations",
+			);
+			expect(posts).toHaveLength(1);
+			expect(posts[0]!.body).toEqual(values);
+			expect(posts[0]!.auth).toBe("Bearer fixture-image-secret");
+		} finally {
+			await h.close();
+		}
+	});
+
+for (const [status, code] of [
+	[503, "image_model_unavailable"],
+	[409, "media_variant_busy"],
+	[400, "invalid_model"],
+] as const)
+	test(`artifact image ${code} settles as failed with a single POST and no model switch`, async () => {
+		const f = imageFixture("success", undefined, undefined, { status, code });
+		const h = await harness({ model: f.model, imageGateway: f.gateway });
+		try {
+			const values = {
+				prompt: "窓辺で眠る猫の写真",
+				model: "flux-3-image-klein",
+				width: 768,
+				height: 768,
+				seed: 42,
+				format: "webp",
+			};
+			const submitted = await (
+				await h.request("/api/runs", {
+					requestId: crypto.randomUUID(),
+					conversationId: "main",
+					presentation: "artifact",
+					toolchainId: "image.create",
+					text: `制作条件をそのまま使って画像を1枚生成してください。\n\n${JSON.stringify(values)}`,
+				})
+			).json();
+			await h.dialogue.waitForTerminal(submitted.id, { timeoutMs: 5000 });
+			expect(h.image!.list("main")[0]).toMatchObject({
+				state: "failed",
+				model: values.model,
+				artifactId: null,
+				errorCode: status === 400 ? "larm_http_400" : code,
+			});
+			const posts = f.requests.filter(
+				(r) => r.method === "POST" && r.path === "/v1/images/generations",
+			);
+			expect(posts).toHaveLength(1);
+			expect(posts[0]!.body).toEqual(values);
+		} finally {
+			await h.close();
+		}
+	});

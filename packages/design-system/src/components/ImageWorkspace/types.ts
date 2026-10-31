@@ -2,6 +2,7 @@ import type { GenerationStatusProps } from "../GenerationStatus";
 import type { ImageCreationOptions } from "./image-creation-options";
 export type ImagePromptValues = {
 	prompt: string;
+	model?: string;
 	width: number;
 	height: number;
 	format: "png" | "webp";

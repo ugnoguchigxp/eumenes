@@ -34,6 +34,17 @@ export const question = z.strictObject({
 const musicChoices = z.array(z.string().min(1).max(80)).min(1).max(80);
 const imageChoices = z.array(z.string().min(1).max(80)).min(1).max(80);
 const imageCreationOptions = z.strictObject({
+	models: z
+		.array(
+			z.strictObject({
+				value: z.string().min(1).max(200),
+				label: z.string().min(1).max(80),
+				description: z.string().max(500).optional(),
+			}),
+		)
+		.min(1)
+		.max(20)
+		.optional(),
 	styleGroups: z
 		.array(
 			z.strictObject({
@@ -47,6 +58,7 @@ const imageCreationOptions = z.strictObject({
 	compositions: imageChoices,
 	lighting: imageChoices,
 	defaults: z.strictObject({
+		model: z.string().min(1).max(200).optional(),
 		width: z.number().int().min(100).max(1280),
 		height: z.number().int().min(100).max(1280),
 		format: z.enum(["png", "webp"]),

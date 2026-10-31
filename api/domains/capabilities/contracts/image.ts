@@ -13,3 +13,8 @@ export const imagePlan = z.strictObject({
 	format: z.enum(["png", "webp"]),
 	seed: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
 });
+
+/** Explicit request model; omission keeps LARM's default. Steps stay owned by LARM. */
+export const imagePlanV2 = imagePlan.extend({
+	model: z.string().trim().min(1).max(200).optional(),
+});

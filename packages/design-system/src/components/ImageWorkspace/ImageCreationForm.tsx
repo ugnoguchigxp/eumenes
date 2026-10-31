@@ -176,6 +176,49 @@ function ImageParameters({
 		</div>
 	);
 }
+function ImageModelSelect({
+	id,
+	options,
+	value,
+	disabled,
+	onChange,
+}: {
+	id: string;
+	options: ImageCreationOptions["models"];
+	value?: string;
+	disabled?: boolean;
+	onChange: (model: string) => void;
+}) {
+	if (!options?.length) return null;
+	const description = options.find((m) => m.value === value)?.description;
+	return (
+		<label className="image-creation-select image-creation-model">
+			<span>推論モデル</span>
+			<select
+				aria-label="推論モデル"
+				value={value ?? ""}
+				aria-describedby={description ? `${id}-model-description` : undefined}
+				disabled={disabled}
+				onChange={(event) => onChange(event.target.value)}
+			>
+				{options.map((model) => (
+					<option key={model.value} value={model.value}>
+						{model.label}
+					</option>
+				))}
+			</select>
+			{description && (
+				<span
+					className="image-creation-model-description"
+					id={`${id}-model-description`}
+				>
+					{description}
+				</span>
+			)}
+		</label>
+	);
+}
+
 /** Like MusicCreationForm, choices assemble the draft and manual edits require an explicit replacement decision. */
 export function ImageCreationForm({
 	initialValues,
@@ -189,6 +232,9 @@ export function ImageCreationForm({
 		emptyImageSelection(creationOptions),
 	);
 	const [parameters, setParameters] = useState(() => ({
+		...((initialValues.model ?? creationOptions.defaults.model)
+			? { model: initialValues.model ?? creationOptions.defaults.model }
+			: {}),
 		width: initialValues.width,
 		height: initialValues.height,
 		format: initialValues.format,
@@ -251,6 +297,13 @@ export function ImageCreationForm({
 						リセット
 					</Button>
 				</header>
+				<ImageModelSelect
+					id={id}
+					options={creationOptions.models}
+					value={parameters.model}
+					disabled={disabled}
+					onChange={(model) => setParameters({ ...parameters, model })}
+				/>
 				<label className="image-creation-theme" htmlFor={`${id}-theme`}>
 					テーマ・描きたいもの
 					<Input

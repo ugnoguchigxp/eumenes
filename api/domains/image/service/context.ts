@@ -1,10 +1,10 @@
-import { imagePlan, type Prepared } from "../../capabilities";
+import { imagePlanV2, type Prepared } from "../../capabilities";
 import { z } from "zod";
 import { delegatedTaskRules } from "../../inference";
 export function imageContext(
 	prepared: Prepared,
 	request: unknown,
-	schema: z.ZodType = imagePlan,
+	schema: z.ZodType = imagePlanV2,
 ) {
 	const required = [
 		prepared.package.profileRevisionId,

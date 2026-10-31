@@ -150,3 +150,70 @@ it("individual image views compile with one authorized source and compose throug
 		),
 	).toThrow();
 });
+
+it("OpenUI image artifact defaults to Qwen and sends the explicitly selected preparation model", async () => {
+	const definition = {
+		view: "image-workspace",
+		source: "image-studio",
+		creationOptions: {
+			styleGroups: [{ label: "画風", options: ["写真"] }],
+			moods: ["落ち着いた"],
+			compositions: ["おまかせ"],
+			lighting: ["おまかせ"],
+			defaults: {
+				width: 512,
+				height: 512,
+				format: "webp",
+				seed: 0,
+				model: "qwen-image-2.1-turbo",
+			},
+			models: [
+				{ value: "qwen-image-2.1-turbo", label: "Qwen Turbo（既定）" },
+				{
+					value: "flux-3-image-klein",
+					label: "FLUX 3 Image Klein（準備中）",
+					description:
+						"準備中です。LARMへの配置・実生成確認・本番配備は未完了です。",
+				},
+			],
+		},
+	};
+	const dispatch = vi.fn(async () => ({
+		status: "accepted" as const,
+		message: "受付",
+	}));
+	render(
+		<ArtifactRenderer
+			definition={JSON.stringify(definition)}
+			runtime={{ snapshot: { "image-studio": image }, dispatch }}
+		/>,
+	);
+	expect(screen.getByLabelText("推論モデル")).toHaveProperty(
+		"value",
+		"qwen-image-2.1-turbo",
+	);
+	fireEvent.change(screen.getByLabelText("推論モデル"), {
+		target: { value: "flux-3-image-klein" },
+	});
+	expect(
+		screen.getByText(
+			"準備中です。LARMへの配置・実生成確認・本番配備は未完了です。",
+		),
+	).toBeTruthy();
+	fireEvent.click(screen.getByRole("button", { name: "画像を生成" }));
+	await waitFor(() =>
+		expect(dispatch).toHaveBeenCalledWith(
+			expect.objectContaining({
+				action: "image-generate",
+				values: {
+					prompt: "森",
+					model: "flux-3-image-klein",
+					width: "512",
+					height: "512",
+					format: "webp",
+					seed: "0",
+				},
+			}),
+		),
+	);
+});

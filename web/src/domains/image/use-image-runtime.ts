@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
-import { imagePlan } from "../../../../api/domains/image/contracts";
+import { imagePlanV2 } from "../../../../api/domains/image/contracts";
 import type { EumenesClient } from "../../../../client";
 import type { ArtifactEvent, Receipt } from "@eumenes/artifact-ui/contracts";
 import type { ImageWorkspaceResource } from "@eumenes/artifact-ui/contracts";
@@ -73,6 +73,7 @@ export function useImageRuntime(
 		title: "画像生成",
 		defaults: {
 			prompt: shown?.prompt ?? "",
+			model: shown?.model ?? defaults.model,
 			width: shown?.width ?? defaults.width,
 			height: shown?.height ?? defaults.height,
 			format: shown?.format ?? defaults.format,
@@ -132,11 +133,12 @@ export function useImageRuntime(
 			} else if (event.action === "image-generate") {
 				if (creation.busy)
 					return { status: "rejected", message: "生成中です。" };
-				const plan = imagePlan.safeParse({
+				const plan = imagePlanV2.safeParse({
 					action: "generate",
 					title: "画像",
 					description: "",
 					prompt: event.values.prompt,
+					...(event.values.model ? { model: event.values.model } : {}),
 					width: Number(event.values.width),
 					height: Number(event.values.height),
 					format: event.values.format,
@@ -147,9 +149,9 @@ export function useImageRuntime(
 						status: "rejected",
 						message: "プロンプトと画像の設定を確認してください。",
 					};
-				const { prompt, width, height, format, seed } = plan.data;
+				const { prompt, model, width, height, format, seed } = plan.data;
 				await creation.generate(
-					JSON.stringify({ prompt, width, height, format, seed }),
+					JSON.stringify({ prompt, model, width, height, format, seed }),
 				);
 			} else if (event.action === "image-cancel") {
 				if (!creation.creation.canCancel)

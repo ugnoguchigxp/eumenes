@@ -349,6 +349,21 @@ Codex を動かす経路は2本あります。稼働中は `@openai/codex-sdk` �
 | 試験だけが使っていた本番コード | `interaction-answers.ts` の `cancel`（HTTP の取消しはC2で削除済み）と `OPEN_STATUSES` を削除。取消しだけを試す2件を削除し、保持期間の試験は期限切れ（`maintenance` の expired）でやり取りを終える形に変更。`intentJudgmentsOfMessage` は別セッションの `executor-read.ts` が本番で使うようになったので `@public` を外した |
 | `bun run deadcode` | 0件 |
 
+### 8.1.2 最後のコードレビュー（2026-10-31、`/code-review medium`）
+
+指摘10件はすべて別セッションのコミット（`ebf0709d`・`ea72258e`）の対話・agency の部分で、整理の変更への指摘はなかった。利用者「今なら作業していいです」を受けて、設計書と照らして次のとおり扱った（未コミット）。
+
+| 指摘 | 扱い |
+| --- | --- |
+| `routed-turn.ts` の呼出し失敗に提供元・通信の失敗を含める／選ぶ呼出しの失敗で会話の回へ進む | 変えない。`single-harness-plan-2026-10-31.md` のレビュー対応2（高）で合意した動き |
+| `routed-steps.ts` の TODO の check で会話の回に読む道具を渡す | 直した。ホストが読んだ回は `{ tools: false }`（`talk` の説明と読む道具の候補の枝に合わせる） |
+| `routed-turn.ts` の読取り後の2回目の道具呼出し | 変えない。どちらの経路でもホストの一言で終わり、読んだ内容は利用者に話していない |
+| `routed-choice.ts` の strict スキーマ（型のない欄、別の分岐の `resolveUnsaved`） | 直した。型のない欄は `anyOf` で null を足す。`resolveUnsaved` は切替の確認待ちの担当を選んだときだけ渡す（破棄そのものは `specialist-start.ts` が確認待ちとの一致で守っていた） |
+| `executor-read.ts` の保留中の発言の除外 | 変えない。除外は rowid の境界で、保留中の発言は古い順 |
+| `executor-read.ts` の運用ログの読取り | 変えない。実ログ7.8MBで94ms、上限3秒 |
+| `llm-port.ts` の背景呼出しの system | 変えない（`agency-host-system-context-integration-2026-10-31.md` の決定）。`harness.ts` の古い説明を直した |
+| `host.ts` の自発発話の TTS 文体 | 変えない。`select.context.toml` が読み上げの決まりを持つ |
+
 ### 8.2 検証（fixture、2026-10-31 12:05 時点）
 
 | 確認 | 結果 |

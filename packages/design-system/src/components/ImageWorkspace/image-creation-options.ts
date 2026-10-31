@@ -41,11 +41,13 @@ export const imageLighting = [
 	"逆光",
 ] as const;
 export type ImageCreationOptions = {
+	models?: readonly { value: string; label: string; description?: string }[];
 	styleGroups: readonly { label: string; options: readonly string[] }[];
 	moods: readonly string[];
 	compositions: readonly string[];
 	lighting: readonly string[];
 	defaults: {
+		model?: string;
 		width: number;
 		height: number;
 		format: "png" | "webp";

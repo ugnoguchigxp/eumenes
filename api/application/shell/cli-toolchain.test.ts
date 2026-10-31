@@ -6,7 +6,7 @@ import { fakePty } from "../../domains/shell/test/shell.fixture";
 import { createShellAdapter, shellAttemptId } from "./shell-adapter";
 import { shellFinishedNotice } from "./shell-reports";
 
-test("CLI is published in the artifact list and source API; conversation acceptance and completion stay distinct", async () => {
+test("CLI is published in the artifact list and source API; conversation runs wait for confirmation", async () => {
 	const pty = fakePty();
 	let shell!: ShellService;
 	const parentContexts: string[] = [];
@@ -45,43 +45,12 @@ test("CLI is published in the artifact list and source API; conversation accepta
 			(await h.dialogue.waitForTerminal(submitted.id, { timeoutMs: 8000 }))
 				?.status,
 		).toBe("completed");
-		await waitFor(() => pty.spawned.length === 1);
-		expect(pty.spawned[0]!.command).toEqual([
-			"/bin/sh",
-			"-l",
-			"-c",
-			"git status --short",
-		]);
-		// The work's result is only the acceptance, not the completion.
-		expect(h.reported()).toContain('"completed":false');
-		const runs = h.store.read((db) => shell.recentInTransaction(db));
-		expect(runs).toHaveLength(1);
-		const run = runs[0]!;
-		expect(run.state).toBe("running");
-		const adapter = createShellAdapter(shell);
-		const receipt = h.store.read((db) => adapter.readInTransaction(db, run.id));
-		expect(receipt).toBeNull();
-		const source = h.store.read((db) =>
-			adapter.sourceInTransaction!(db, "query:shell.sessions@1", undefined),
-		);
-		expect(JSON.stringify(source)).toContain(run.sessionId!);
-		pty.spawned[0]!.data("clean\r\n");
-		pty.spawned[0]!.exit(0);
-		await waitFor(
-			() =>
-				h.store.read((db) => shell.runInTransaction(db, run.id)?.state) ===
-				"completed",
-		);
-		await waitFor(
-			() =>
-				parentContexts.some(
-					(c) => c.includes("【通知】") && c.includes("clean"),
-				),
-			{ timeout: 8000 },
-		);
-		expect(
-			h.store.read((db) => shell.runInTransaction(db, run.id)),
-		).toMatchObject({ output: "clean\n", exitCode: 0 });
+		// The CLI toolchain declares minImpact modify_existing, so a conversation
+		// request is held at the confirmation gate: nothing is spawned or saved
+		// as a shell run until the person approves the confirmation.
+		await Bun.sleep(50);
+		expect(pty.spawned).toHaveLength(0);
+		expect(h.store.read((db) => shell.recentInTransaction(db))).toHaveLength(0);
 	} finally {
 		await h.close();
 	}

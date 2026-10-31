@@ -33,6 +33,8 @@ export interface LarmTestTarget {
 	primary: boolean;
 }
 export interface TestInput {
+	/** Optional image generation model; independent of the catalog service binding. */
+	model?: string;
 	text: string;
 	comparison?: string;
 	voice?: string;

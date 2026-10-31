@@ -1,3 +1,4 @@
+import { generateImageRequest } from "./image-generation";
 import { withAgentConnection } from "./provider-connection";
 import { createImageLibrary } from "./image-library";
 import { createImageImports } from "./image-import";
@@ -354,32 +355,12 @@ export function createLarmPlayground(config: {
 			if (target.kind === "image") {
 				return connection(target, signal, async (_id, service) => {
 					await progress({ phase: "generating" });
-					let data: Record<string, unknown>;
-					try {
-						data = await json(
-							await control(
-								service.endpoint,
-								signal,
-								post({
-									prompt: input.text,
-									model: service.model,
-									width: input.width ?? 512,
-									height: input.height ?? 512,
-									format: input.format ?? "webp",
-									seed: input.seed ?? 0,
-								}),
-								[200],
-								true,
-							),
-						);
-					} catch (e) {
-						if (
-							signal.aborted ||
-							["network_unavailable", "deadline_exceeded"].includes(code(e))
-						)
-							throw new Error("generation_unknown");
-						throw e;
-					}
+					const data = await generateImageRequest(
+						control,
+						service.endpoint,
+						input,
+						signal,
+					);
 					if (data.status !== "succeeded")
 						throw new Error("invalid_image_result");
 					const a = object(data.artifact ?? list(data.artifacts)[0]);

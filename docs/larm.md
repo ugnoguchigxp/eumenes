@@ -76,11 +76,10 @@ LLM・TTS・ASR・画像生成・音楽生成の通信は、backendの共通入�
 
 ## 画像生成
 
-画像生成は、保存済みControl接続先のcatalogから、capability `media.image.generate`（protocol `larm.image-generation.v1`）を持つ `services` のサービスを発見して使います。複数あるときはcatalogの順で最初のサービスです。Profile名・モデル名は設定・コード・手順に固定せず、サービス発見・確保応答が返す値を使います。発見したサービスの公開Profile selectorとcatalog revisionで `POST /v1/agent-connections` に接続を依頼します。画像は生成POSTで起動するため、Providerのreadyを待たず、pending・probing・readyの接続応答に含まれるサービスを使います。サービス選択用の要求フィールドがないため、既存のLLM接続と同じ `providers: ["llm"]` で接続し、その応答に含まれる画像サービスを使います。Profile全体を予約して音声等の準備を待たないようにします。接続応答のProfile・revisionと対象サービスのcapability・protocol・modelを照合し、その応答のURL・descriptionを使います。Providerのclaimは行いません。画像取得後、失敗時、取消時は接続を解放します。生成APIは `POST /v1/images/generations` です。Controlの接続先はSQLiteの保存済みLARM設定を使います。サービス発見・確保応答の `services[].url` を生成先として使い、`description` で利用条件を確認します。URLを設定や手順に固定しません。Profile指定なしの `GET /v3/agent-profiles` は `services` を省くことがあるため、`services` が空のProfileはIDを指定して取り直します。取り直した応答が `url` を含まず `endpoint` を返す場合は、返された `endpoint` をControlのURLに解決します。試用経路は `url` があればそちらを優先します。
+画像生成は、保存済みControl接続先のcatalogから、capability `media.image.generate`（protocol `larm.image-generation.v1`）を持つ `services` のサービスを発見して使います。複数あるときはcatalogの順で最初のサービスです。接続先とサービスの照合にはcatalog・確保応答の値を使います。生成要求のmodelはサービス識別子とは分け、未指定時は省略します。アーティファクトでは利用者が要求モデルを選べます。発見したサービスの公開Profile selectorとcatalog revisionで `POST /v1/agent-connections` に接続を依頼します。画像は生成POSTで起動するため、Providerのreadyを待たず、pending・probing・readyの接続応答に含まれるサービスを使います。サービス選択用の要求フィールドがないため、既存のLLM接続と同じ `providers: ["llm"]` で接続し、その応答に含まれる画像サービスを使います。Profile全体を予約して音声等の準備を待たないようにします。接続応答のProfile・revisionと対象サービスのcapability・protocol・modelを照合し、その応答のURL・descriptionを使います。Providerのclaimは行いません。画像取得後、失敗時、取消時は接続を解放します。生成APIは `POST /v1/images/generations` です。Controlの接続先はSQLiteの保存済みLARM設定を使います。サービス発見・確保応答の `services[].url` を生成先として使い、`description` で利用条件を確認します。URLを設定や手順に固定しません。Profile指定なしの `GET /v3/agent-profiles` は `services` を省くことがあるため、`services` が空のProfileはIDを指定して取り直します。取り直した応答が `url` を含まず `endpoint` を返す場合は、返された `endpoint` をControlのURLに解決します。試用経路は `url` があればそちらを優先します。
 
 ```json
 {
-  "model": "<発見したサービスのmodel>",
   "prompt": "自然光の入る室内。木目と布地を自然な質感で描いた写真。",
   "width": 1200,
   "height": 800,
@@ -92,14 +91,15 @@ LLM・TTS・ASR・画像生成・音楽生成の通信は、backendの共通入�
 | 項目 | 指定方法・省略時の値 |
 | --- | --- |
 | `width` / `height` | 各辺100〜1280の整数。省略した辺は512。縦横を別々に指定できる。 |
-| `steps` | 8固定。省略可能。 |
+| `model` | 省略または `qwen-image-2.1-turbo` はQwen Turbo（既定）。`flux-3-image-klein` はFLUX 3 Image Klein（準備中）。 |
+| `steps` | Eumenesは送信しません。LARMではQwenは8、FLUXは16固定。 |
 | `seed` | 省略時0。 |
 | `format` | `webp` または `png`。省略時 `webp`。 |
 | 品質・画風 | `prompt` に具体的に記述する。品質指定の別パラメータは使わない。 |
 
 内部では各辺を32ピクセル刻みに合わせて生成し、保存・返却画像は指定どおりの寸法に縮小されます。利用側では32の倍数に丸めません。下書きには小さめのサイズ、写真風・イラストの仕上げには大きめのサイズと具体的な描写指示を使います。参照画像による編集は現行APIでは未対応です。
 
-要求時にモデルを起動し、画像保存後に停止します。生成APIは同期応答で、起動・生成・停止の待ち時間を含みます。応答の `artifacts[0].contentUrl` または `artifact.contentUrl` をControlのURLに解決してGETします。保存画像はモデル停止後も取得できるため、取得失敗時はGETだけを再試行します。生成POSTは自動再送しません。
+モデルの起動・生成・保存・停止とFLUXの指示文補完はLARMが管理します。FLUXの重み・対応エンジン配置、実生成確認、本番配備は未完了です。503 `image_model_unavailable` はモデル未準備、409 `media_variant_busy` は重量級処理の競合として表示します。未知モデルやmodelとstepsの不一致は400です。別モデルへ自動切替しません。生成APIは同期応答で、起動・生成・停止の待ち時間を含みます。応答の `artifacts[0].contentUrl` または `artifact.contentUrl` をControlのURLに解決してGETします。保存画像はモデル停止後も取得できるため、取得失敗時はGETだけを再試行します。生成POSTは自動再送しません。
 
 利用者が示したこのPCでの実測目安（2026-10-10）は、512角約16秒、768角約31秒、1024角約58秒、1200×777約53秒、1280角約102秒です。負荷や起動状態で変わります。試用の待機上限は既存の15分を維持します。
 

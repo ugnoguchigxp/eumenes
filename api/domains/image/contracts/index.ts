@@ -16,6 +16,7 @@ export const imageRecord = z.object({
 	phase: z.string(),
 	artifactId: z.string().nullable(),
 	mime: z.string().nullable(),
+	model: z.string().optional(),
 	actualModel: z.string().nullable(),
 	errorCode: z.string().nullable(),
 	createdAt: z.number(),
@@ -23,7 +24,7 @@ export const imageRecord = z.object({
 });
 export type ImageRecord = z.infer<typeof imageRecord>;
 
-export { imagePlan } from "../../capabilities/contracts";
+export { imagePlan, imagePlanV2 } from "../../capabilities/contracts";
 export { imageImportView, type ImageImportView } from "./imports";
 
 /** HTTP status of the image codes, which the conversation's attachments and the imports share. */

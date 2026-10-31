@@ -165,7 +165,7 @@ async function carryOut(
 			return {
 				retry: String((result as { code?: unknown }).code ?? "todo_not_found"),
 			};
-		await turn.talk(`${SAID.checked}\n${result}`);
+		await turn.talk(`${SAID.checked}\n${result}`, { tools: false });
 		return "done";
 	}
 	if (/^t\d+$/.test(choice)) {
@@ -230,7 +230,10 @@ async function carryOut(
 		...(Array.isArray(chosen.refs) && chosen.refs.length
 			? { refs: chosen.refs }
 			: {}),
-		...(chosen.resolveUnsaved === "discard"
+		// Only the hand-over the user's word waits for may let the unsaved work go: the cloud's strict schema carries
+		// the field on every branch.
+		...(chosen.resolveUnsaved === "discard" &&
+		candidate.id === turn.routed?.switching
 			? { resolveUnsaved: "discard" as const }
 			: {}),
 		...(candidate.execution === "pipeline" && chosen.inputs

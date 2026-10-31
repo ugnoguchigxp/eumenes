@@ -2,7 +2,7 @@ import { executionCallSession, type ChildExecution } from "../../tool-runtime";
 import { parseLlmJson } from "../../../infrastructure/llm-json";
 import type { Database } from "bun:sqlite";
 import { z } from "zod";
-import { imagePlan, type Prepared } from "../../capabilities";
+import { imagePlanV2, type Prepared } from "../../capabilities";
 import type { Receipt } from "../../inference";
 import type { HandlerDefinition } from "../../queue";
 import { findServiceTarget, type TestOutput } from "../../larm";
@@ -41,7 +41,7 @@ export function registerImageHandlers(
 	const planHandler: HandlerDefinition<
 		{ id: string },
 		PlanInput,
-		{ receipt: Receipt; plan: z.infer<typeof imagePlan> }
+		{ receipt: Receipt; plan: z.infer<typeof imagePlanV2> }
 	> = {
 		kind: "image.plan",
 		payloadVersions: [1],
@@ -96,7 +96,7 @@ export function registerImageHandlers(
 			} catch {
 				throw new Error("image_plan_invalid_json");
 			}
-			const schema = imagePlan;
+			const schema = imagePlanV2;
 			const parsed = schema.safeParse(value);
 			if (!parsed.success) throw new Error("image_plan_invalid_contract");
 			if (parsed.data.action === "generate" && !parsed.data.prompt.trim())
@@ -145,7 +145,7 @@ export function registerImageHandlers(
 	};
 	type GenerateInput = {
 		id: string;
-		plan: z.infer<typeof imagePlan>;
+		plan: z.infer<typeof imagePlanV2>;
 		prepared: Prepared;
 		execution?: ChildExecution;
 		deadline: number;
@@ -172,7 +172,7 @@ export function registerImageHandlers(
 					id: r.id,
 					deadline: r.deadline,
 					plan: {
-						...imagePlan.parse(JSON.parse(r.plan_json)),
+						...imagePlanV2.parse(JSON.parse(r.plan_json)),
 					},
 					prepared,
 				},
@@ -199,6 +199,7 @@ export function registerImageHandlers(
 					target,
 					{
 						text: input.plan.prompt,
+						...(input.plan.model ? { model: input.plan.model } : {}),
 						width: input.plan.width,
 						height: input.plan.height,
 						format: input.plan.format,
@@ -215,7 +216,10 @@ export function registerImageHandlers(
 									? {
 											artifactId: p.artifact.id,
 											mime: p.artifact.mime,
-											actualModel: p.artifact.actualModel ?? target.model,
+											actualModel:
+												p.artifact.actualModel ??
+												input.plan.model ??
+												target.model,
 										}
 									: {}),
 							});

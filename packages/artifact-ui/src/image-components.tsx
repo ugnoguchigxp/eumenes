@@ -37,6 +37,7 @@ function useImageActions(request: ArtifactRequest) {
 		onGenerate: (values: ImageWorkspaceProps["defaults"]) => {
 			void action.send("image-generate", {
 				prompt: values.prompt,
+				...(values.model ? { model: values.model } : {}),
 				width: String(values.width),
 				height: String(values.height),
 				format: values.format,

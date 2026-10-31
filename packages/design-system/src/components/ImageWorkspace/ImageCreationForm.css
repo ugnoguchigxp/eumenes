@@ -138,6 +138,14 @@
 	font-size: 0.875rem;
 	min-width: 0;
 }
+.image-creation-model {
+	flex-wrap: wrap;
+}
+.image-creation-model-description {
+	flex-basis: 100%;
+	color: var(--muted-foreground);
+	font-size: 0.8rem;
+}
 .image-creation-select select {
 	flex: 1;
 	min-width: 0;

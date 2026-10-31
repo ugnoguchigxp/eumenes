@@ -5,13 +5,13 @@ import type { ReactNode } from "react";
 import type { ArtifactEvent } from "@eumenes/artifact-ui/contracts";
 import { imageStudioSource, useImageRuntime } from "./use-image-runtime";
 afterEach(cleanup);
-function setup(onClose?: () => void) {
+function setup(onClose?: () => void, errorCode: string | null = null) {
 	const items = [
 		{
 			id: "image-record",
 			runId: "old-run",
 			conversationId: "main",
-			state: "completed",
+			state: errorCode ? "failed" : "completed",
 			action: "generate",
 			title: "森",
 			description: "",
@@ -24,7 +24,7 @@ function setup(onClose?: () => void) {
 			phase: "completed",
 			mime: "image/png",
 			actualModel: "fixture-model",
-			errorCode: null,
+			errorCode,
 			createdAt: 1,
 			updatedAt: 1,
 		},
@@ -112,6 +112,7 @@ test("host passes precise edited input through authenticated submission, rejects
 	expect(r.api.submit).not.toHaveBeenCalled();
 	const values = {
 		prompt: "柔らかな朝の光の森",
+		model: "flux-3-image-klein",
 		width: "121",
 		height: "777",
 		format: "png",
@@ -125,6 +126,7 @@ test("host passes precise edited input through authenticated submission, rejects
 	expect(input.toolchainId).toBe("image.create");
 	expect(JSON.parse(input.text.slice(input.text.indexOf("\n\n") + 2))).toEqual({
 		prompt: values.prompt,
+		model: values.model,
 		width: 121,
 		height: 777,
 		format: "png",
@@ -237,3 +239,19 @@ test("escaped prompt payload capacity is checked before submission", async () =>
 	expect(r.api.submit).not.toHaveBeenCalled();
 	r.cache.clear();
 });
+
+for (const [code, description] of [
+	["image_model_unavailable", "選択したモデルは準備中、または利用できません。"],
+	[
+		"media_variant_busy",
+		"ほかの重量級処理が実行中です。完了後に再度操作してください。",
+	],
+	["larm_http_400", "モデルと画像の設定を確認してください。"],
+])
+	test(`failed image ${code} is shown without another submission`, async () => {
+		const r = setup(undefined, code);
+		await waitFor(() => expect(r.resource().status).toBe("failed"));
+		expect(r.resource().statusDescription).toBe(description);
+		expect(r.api.submit).not.toHaveBeenCalled();
+		r.cache.clear();
+	});

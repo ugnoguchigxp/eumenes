@@ -1,5 +1,6 @@
 import { afterEach, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { defaultImageCreationOptions } from "./image-creation-options";
 import { ImageCreationForm } from "./ImageCreationForm";
 afterEach(cleanup);
 const defaults = {
@@ -133,4 +134,68 @@ it("uses registered choices and reset defaults without changing the form layout"
 	expect(screen.getByLabelText("幅（px）")).toHaveProperty("value", "640");
 	expect(screen.getByLabelText("保存形式")).toHaveProperty("value", "webp");
 	expect(screen.getByLabelText("シード")).toHaveProperty("value", "7");
+});
+
+it("registered model choices preserve the prompt, show preparation status, and reset to the default", () => {
+	const generate = vi.fn();
+	const creationOptions = {
+		...defaultImageCreationOptions,
+		models: [
+			{ value: "default-image", label: "既定モデル" },
+			{
+				value: "next-image",
+				label: "追加モデル（準備中）",
+				description: "準備中です。配置と実生成は未確認です。",
+			},
+		],
+		defaults: {
+			...defaultImageCreationOptions.defaults,
+			model: "default-image",
+		},
+	};
+	const view = render(
+		<ImageCreationForm
+			initialValues={{ ...defaults, prompt: "手書きの指示" }}
+			creationOptions={creationOptions}
+			onGenerate={generate}
+		/>,
+	);
+	expect(screen.getByLabelText("推論モデル")).toHaveProperty(
+		"value",
+		"default-image",
+	);
+	fireEvent.change(screen.getByLabelText("推論モデル"), {
+		target: { value: "next-image" },
+	});
+	expect(
+		screen.getByText("準備中です。配置と実生成は未確認です。"),
+	).toBeTruthy();
+	expect(prompt().value).toBe("手書きの指示");
+	fireEvent.click(screen.getByRole("button", { name: "画像を生成" }));
+	expect(generate).toHaveBeenCalledWith({
+		...defaults,
+		prompt: "手書きの指示",
+		model: "next-image",
+	});
+	view.rerender(
+		<ImageCreationForm
+			initialValues={defaults}
+			creationOptions={creationOptions}
+			onGenerate={generate}
+			busy
+		/>,
+	);
+	expect(screen.getByLabelText("推論モデル")).toHaveProperty("disabled", true);
+	view.rerender(
+		<ImageCreationForm
+			initialValues={defaults}
+			creationOptions={creationOptions}
+			onGenerate={generate}
+		/>,
+	);
+	fireEvent.click(screen.getByRole("button", { name: "リセット" }));
+	expect(screen.getByLabelText("推論モデル")).toHaveProperty(
+		"value",
+		"default-image",
+	);
 });

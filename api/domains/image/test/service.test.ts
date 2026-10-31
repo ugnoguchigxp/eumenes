@@ -345,3 +345,30 @@ test("the content route validates ids and maps library failures to stable errors
 	expect(await listed.json()).toEqual([]);
 	await h.queue.close(100);
 });
+
+test("planner model is saved and sent independently of the catalog service model", async () => {
+	const h = setup({
+		planValue: JSON.stringify({ ...plan, model: "flux-3-image-klein" }),
+	});
+	try {
+		const { id } = await h.start();
+		await until(settled(h, id));
+		expect(h.image.get(id)).toMatchObject({
+			state: "completed",
+			model: "flux-3-image-klein",
+			actualModel: "flux-3-image-klein",
+		});
+		expect(h.executed).toEqual([
+			{
+				text: plan.prompt,
+				model: "flux-3-image-klein",
+				width: plan.width,
+				height: plan.height,
+				format: plan.format,
+				seed: plan.seed,
+			},
+		]);
+	} finally {
+		await h.queue.close(100);
+	}
+});

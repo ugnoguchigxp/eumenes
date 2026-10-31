@@ -110,7 +110,7 @@ export function createImage(deps: {
 			const prepared = capabilities.prepareActiveByIdInTransaction(
 				db,
 				{ rootRunId: input.runId, taskId: id, cancelEpoch: 0 },
-				"package:image.create@1",
+				"package:image.create@2",
 				request,
 			);
 			const now = Date.now();

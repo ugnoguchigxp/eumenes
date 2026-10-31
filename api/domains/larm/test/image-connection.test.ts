@@ -1,3 +1,4 @@
+import type { TestInput } from "../contracts/playground";
 import { expect, test } from "bun:test";
 import { createLarmPlayground, type LarmTestTarget } from "..";
 
@@ -80,8 +81,10 @@ function fixture(
 	});
 	return {
 		calls,
-		execute: (signal = AbortSignal.timeout(1000)) =>
-			gateway.execute(target, { text: "fixture" }, signal, async () => {}),
+		execute: (
+			signal = AbortSignal.timeout(1000),
+			input: TestInput = { text: "fixture" },
+		) => gateway.execute(target, input, signal, async () => {}),
 	};
 }
 for (const status of ["pending", "probing", "ready"])
@@ -175,3 +178,89 @@ for (const status of [500, 503])
 			"DELETE /v1/agent-connections/image-connection",
 		]);
 	});
+
+for (const model of [undefined, "qwen-image-2.1-turbo", "flux-3-image-klein"])
+	test(`image request preserves explicit model ${model ?? "omitted"} and omits steps`, async () => {
+		const h = fixture((path, init) => {
+			if (path !== "/acquired-image") return;
+			const body = JSON.parse(String(init.body));
+			expect(body).toEqual({
+				prompt: "猫",
+				...(model ? { model } : {}),
+				width: 768,
+				height: 768,
+				seed: 42,
+				format: "webp",
+			});
+			expect(new Headers(init.headers).get("authorization")).toBe(
+				"Bearer fixture-control",
+			);
+		});
+		await h.execute(undefined, {
+			text: "猫",
+			model,
+			width: 768,
+			height: 768,
+			seed: 42,
+			format: "webp",
+		});
+		expect(h.calls.filter((c) => c === "POST /acquired-image")).toHaveLength(1);
+	});
+for (const [status, errorCode] of [
+	[503, "image_model_unavailable"],
+	[409, "media_variant_busy"],
+	[400, "invalid_model"],
+	[400, "invalid_steps"],
+] as const)
+	test(`image ${errorCode} is reported without switching model or resubmitting`, async () => {
+		const h = fixture((path, init) => {
+			if (path !== "/acquired-image") return;
+			expect(JSON.parse(String(init.body)).model).toBe("flux-3-image-klein");
+			return Response.json(
+				{ error: { code: errorCode, message: "private response" } },
+				{ status },
+			);
+		});
+		await expect(
+			h.execute(undefined, { text: "猫", model: "flux-3-image-klein" }),
+		).rejects.toThrow(status === 400 ? "larm_http_400" : errorCode);
+		expect(h.calls).toEqual([
+			"POST /v1/agent-connections",
+			"POST /acquired-image",
+			"DELETE /v1/agent-connections/image-connection",
+		]);
+	});
+test("image supports artifacts array and reports the actual selected model", async () => {
+	const h = fixture((path) =>
+		path === "/acquired-image"
+			? Response.json({
+					status: "succeeded",
+					artifacts: [
+						{
+							id: "created-image",
+							mimeType: "image/png",
+							contentUrl: "/v1/image-artifacts/created-image/content",
+							model: "flux-3-image-klein",
+						},
+					],
+				})
+			: undefined,
+	);
+	expect(
+		(await h.execute(undefined, { text: "猫", model: "flux-3-image-klein" }))
+			.actualModel,
+	).toBe("flux-3-image-klein");
+});
+test("image transport failure never resubmits or fetches an unconfirmed result", async () => {
+	const h = fixture((path) => {
+		if (path === "/acquired-image") throw new TypeError("network");
+	});
+	await expect(
+		h.execute(undefined, { text: "猫", model: "flux-3-image-klein" }),
+	).rejects.toThrow("generation_unknown");
+	expect(h.calls).toEqual([
+		"POST /v1/agent-connections",
+		"POST /acquired-image",
+		"DELETE /v1/agent-connections/image-connection",
+	]);
+});

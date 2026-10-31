@@ -2,7 +2,10 @@ import { expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createCapabilities } from "../../domains/capabilities";
+import {
+	createCapabilities,
+	artifactDefinitionV1,
+} from "../../domains/capabilities";
 import { openStore } from "../../infrastructure/sqlite";
 import { migrations } from "../migrations";
 import {
@@ -24,11 +27,29 @@ test("image screen bundle seeds one registered screen and reads the image domain
 			entries.filter((entry) => entry.artifactId === "image.generation"),
 		).toEqual([
 			expect.objectContaining({
-				artifactRevisionId: "artifact:image.generation@1",
+				artifactRevisionId: "artifact:image.generation@2",
 				adapterRefs: [IMAGE_SCREEN_ADAPTER_REF],
 				title: "画像生成",
 			}),
 		]);
+
+		const artifact = store.read((db) =>
+			artifactDefinitionV1.parse(
+				caps.documentInTransaction(db, "artifact:image.generation@2")?.document,
+			),
+		);
+		expect(artifact.variants[0]!.definition).toMatchObject({
+			creationOptions: {
+				defaults: { model: "qwen-image-2.1-turbo" },
+				models: [
+					{ value: "qwen-image-2.1-turbo", label: "Qwen Turbo（既定）" },
+					{
+						value: "flux-3-image-klein",
+						label: "FLUX 3 Image Klein（準備中）",
+					},
+				],
+			},
+		});
 		await caps.seed();
 		expect(
 			store

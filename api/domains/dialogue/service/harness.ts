@@ -29,7 +29,8 @@ export type ConversationHarness = {
 /**
  * The harness of the conversation (the local harness rebuild plan, the single harness plan): the host routes each
  * turn, the talk turn reads a talk-only system and the last two of the user's utterances, and no call carries tool
- * definitions. The background calls on the conversation share its prefix. It thinks at `low`, the least level every
+ * definitions. The background calls on the conversation reuse its history under their own system (the agency
+ * SystemContext integration). It thinks at `low`, the least level every
  * served model accepts (one refused `none` with 400, 2026-10-29); its limit holds the thinking and the answer.
  */
 export const localHarness: ConversationHarness = {

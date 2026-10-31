@@ -47,3 +47,48 @@ test("image seed is additive, repeatable and published with one flat request sch
 		rmSync(dir, { recursive: true, force: true });
 	}
 });
+
+test("image model-selection bundle upgrades legacy definitions without rewriting their revisions", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "eumenes-image-models-"));
+	const store = openStore(join(dir, "db"), migrations);
+	try {
+		await createCapabilities(store, new Set(["image"])).seed();
+		const legacy = () =>
+			store.read((db) =>
+				db
+					.query(
+						"SELECT * FROM capability_revisions WHERE id IN ('package:image.create@1','skill:image.create@1','tool:image.generate@1') ORDER BY id",
+					)
+					.all(),
+			);
+		const before = legacy();
+		const c = createCapabilities(store, new Set(["image"]), {
+			bundleHost: () => ({
+				adapters: new Map(),
+				availability: new Set(),
+				inputAdapters: new Set(),
+				projections: new Set(),
+				domainSchemas: new Set(),
+			}),
+		});
+		await c.seed();
+		await c.seed();
+		expect(legacy()).toEqual(before);
+		const p = store.read((db) =>
+			c.prepareActiveByIdInTransaction(
+				db,
+				{ rootRunId: "run", taskId: "task", cancelEpoch: 0 },
+				"package:image.create@2",
+				{ question: "描いて" },
+			),
+		);
+		expect(p.package.toolRevisionIds).toEqual(["tool:image.generate@2"]);
+		expect(p.dependencies.find((d) => d.kind === "skill")?.body).toContain(
+			"modelを省略",
+		);
+		expect(zSchema("imagePlanV2").type).toBe("object");
+	} finally {
+		await store.close();
+		rmSync(dir, { recursive: true, force: true });
+	}
+});

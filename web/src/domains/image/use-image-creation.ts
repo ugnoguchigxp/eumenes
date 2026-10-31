@@ -63,7 +63,7 @@ export function useImageCreation(
 				? pending.current
 				: { prompt, requestId: crypto.randomUUID() };
 		pending.current = request;
-		const text = `次の入力の制作プロンプト・幅・高さ・保存形式・シードをそのまま使い、画像を1枚生成してください。\n\n${prompt}`;
+		const text = `次の入力の制作プロンプト・モデル・幅・高さ・保存形式・シードをそのまま使い、画像を1枚生成してください。\n\n${prompt}`;
 		if (text.length > 8000) throw new Error("image_prompt_too_long");
 		const result = await client.submit({
 			requestId: request.requestId,
@@ -138,7 +138,14 @@ export function useImageCreation(
 							? "通信が途切れ、生成結果を確認できませんでした。過去の画像の一覧を更新してください。"
 							: statusItem?.errorCode === "larm_http_507"
 								? "画像の保存容量が不足しています。"
-								: undefined,
+								: statusItem?.errorCode === "image_model_unavailable"
+									? "選択したモデルは準備中、または利用できません。"
+									: statusItem?.errorCode === "media_variant_busy" ||
+										  statusItem?.errorCode === "larm_http_409"
+										? "ほかの重量級処理が実行中です。完了後に再度操作してください。"
+										: statusItem?.errorCode === "larm_http_400"
+											? "モデルと画像の設定を確認してください。"
+											: undefined,
 			canCancel: !!cancelRunId,
 		},
 	};

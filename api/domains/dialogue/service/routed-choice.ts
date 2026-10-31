@@ -344,6 +344,7 @@ function mergedField(variants: readonly Schema[]): Schema {
 function nullable(field: Schema): Schema {
 	if (Array.isArray(field.anyOf))
 		return { anyOf: [...(field.anyOf as Schema[]), { type: "null" }] };
+	if (field.type === undefined) return { anyOf: [field, { type: "null" }] };
 	if (Array.isArray(field.enum))
 		return {
 			...field,
