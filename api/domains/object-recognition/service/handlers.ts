@@ -5,7 +5,7 @@ import type { HandlerDefinition } from "../../queue";
 import {
 	isCapacityBusy,
 	LARM_CAPACITY_TIMEOUT,
-	planCapacityWait,
+	settleCapacityWait,
 } from "../../larm";
 import type { createObjectRecognition } from "./index";
 import { row, patch, record } from "../repository";
@@ -177,43 +177,33 @@ function registerStage(deps: Deps, stage: Stage) {
 					return "applied";
 				}
 				const now = Date.now();
-				const wait = planCapacityWait({
+				const waiting = settleCapacityWait({
+					domain: "object-recognition",
+					subjectId: r.id,
 					now,
 					previous: v.capacityWait,
 					retryAfterMs: result.capacityWait,
 					budgetMs: ANALYZE_BUDGET_MS,
-					limitAt: null,
+					expire: () =>
+						patch(db, r.id, {
+							state: "failed",
+							errorCode: LARM_CAPACITY_TIMEOUT,
+							result: null,
+						}),
+					schedule(wait) {
+						db.query(
+							"UPDATE object_recognition_inputs SET deadline=? WHERE id=?",
+						).run(wait.deadline, r.id);
+						patch(db, r.id, {
+							state: "queued",
+							capacityWait: { startedAt: wait.startedAt, count: wait.count },
+						});
+						return deps.enqueue(db, r.id, "analyze", wait.at - now);
+					},
 				});
-				if (!wait) {
-					log.warn("object-recognition.capacity_wait_expired", {
-						jobId: claim.jobId,
-						subjectId: r.id,
-						reason: LARM_CAPACITY_TIMEOUT,
-						waitedMs: now - (v.capacityWait?.startedAt ?? now),
-					});
-					patch(db, r.id, {
-						state: "failed",
-						errorCode: LARM_CAPACITY_TIMEOUT,
-						result: null,
-					});
-					return { status: "failed", errorCode: LARM_CAPACITY_TIMEOUT };
-				}
-				db.query(
-					"UPDATE object_recognition_inputs SET deadline=? WHERE id=?",
-				).run(wait.deadline, r.id);
-				patch(db, r.id, {
-					state: "queued",
-					capacityWait: { startedAt: wait.startedAt, count: wait.count },
-				});
-				const jobId = deps.enqueue(db, r.id, "analyze", wait.at - now);
-				log.info("object-recognition.capacity_wait_scheduled", {
-					jobId,
-					subjectId: r.id,
-					waitCount: wait.count,
-					waitedMs: now - wait.startedAt,
-					nextInMs: wait.at - now,
-				});
-				return "applied";
+				return waiting
+					? "applied"
+					: { status: "failed", errorCode: LARM_CAPACITY_TIMEOUT };
 			}
 			if ("statusUrl" in result) {
 				db.query(

@@ -1,6 +1,7 @@
 import { readBounded } from "../../../infrastructure/bounded-read";
 import {
 	isCapacityBusy,
+	LARM_CAPACITY_RETRY_MS,
 	type LarmCapacityBusy,
 	type LocalServiceLease,
 	type LocalServicesPort,
@@ -21,8 +22,11 @@ type Use = {
 	active: number;
 	lastOperation: number;
 	epoch: number;
-	/** LARM had no free memory for this use; only `reset` (a new start) sends the lease request again. */
-	refused?: LarmCapacityBusy;
+	/**
+	 * LARM had no free memory for this use. Until `until` (the wait LARM asked for) `ready` repeats the
+	 * refusal without sending; after it, or after `reset` (a new start), the lease request is sent again.
+	 */
+	refused?: { error: LarmCapacityBusy; until: number };
 };
 /** How long a start may wait for its lease to become ready, and its budget once LARM accepts it. */
 export const START_WAIT_MS = 180_000;
@@ -67,7 +71,10 @@ export function drawingConnection(
 			uses.set(id, use);
 		}
 		use.lastOperation = clock();
-		if (use.refused) throw use.refused;
+		if (use.refused) {
+			if (clock() < use.refused.until) throw use.refused.error;
+			use.refused = undefined;
+		}
 		if (use.pending) return use.pending;
 		const selected = use,
 			epoch = use.epoch;
@@ -133,7 +140,11 @@ export function drawingConnection(
 		try {
 			return await task;
 		} catch (e) {
-			if (isCapacityBusy(e)) selected.refused = e;
+			if (isCapacityBusy(e))
+				selected.refused = {
+					error: e,
+					until: clock() + (e.retryAfterMs ?? LARM_CAPACITY_RETRY_MS),
+				};
 			// A reset may already have installed a new use under this session ID.
 			await releaseUse(selected);
 			throw e;
@@ -207,6 +218,17 @@ export function drawingConnection(
 		async tick() {
 			const released: string[] = [];
 			for (const [id, use] of uses) {
+				// A refusal that has lapsed leaves nothing to keep: the next use starts afresh.
+				if (
+					use.refused &&
+					clock() >= use.refused.until &&
+					!use.active &&
+					!use.pending &&
+					!use.lease
+				) {
+					uses.delete(id);
+					continue;
+				}
 				if (
 					!use.active &&
 					!use.pending &&

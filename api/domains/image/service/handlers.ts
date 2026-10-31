@@ -14,12 +14,10 @@ import {
 	type TestOutput,
 } from "../../larm";
 import { MEDIA_GENERATION_TIMEOUT_MS } from "../../capabilities";
-import { getLogger } from "../../../infrastructure/logger";
 import type { ImageRecord } from "../contracts";
-import { row, record, patch, type Row } from "../repository";
+import { row, record, patch } from "../repository";
 import { imageContext } from "./context";
 import type { createImage } from "./index";
-const log = getLogger("image");
 const payload = z.object({ id: z.string() });
 const active = (r: ImageRecord) =>
 	r.state === "planning" || r.state === "generating";

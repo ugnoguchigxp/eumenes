@@ -6,15 +6,13 @@ import {
 	isCapacityBusy,
 	LARM_CAPACITY_TIMEOUT,
 	LARM_CAPACITY_WAITING,
-	planCapacityWait,
+	settleCapacityWait,
 	type TestOutput,
 } from "../../larm";
 import { MEDIA_GENERATION_TIMEOUT_MS } from "../../capabilities";
-import { getLogger } from "../../../infrastructure/logger";
 import type { MusicRecord } from "../contracts";
 import { row, record, patch, media } from "../repository";
 import type { createMusic } from "./index";
-const log = getLogger("music");
 const payload = z.object({ id: z.string(), revision: z.number().int() });
 const SIZE = 256;
 const MAX_BYTES = 4 * 1024 * 1024;
@@ -120,52 +118,43 @@ export function createArtwork(deps: Parameters<typeof createMusic>[0]) {
 				input &&
 				"capacityWait" in outcome.result
 			) {
-				const now = Date.now();
-				const plan = planCapacityWait({
-					now,
+				settleCapacityWait({
+					domain: "music",
+					subjectId: r.id,
+					now: Date.now(),
 					previous,
 					retryAfterMs: outcome.result.capacityWait,
 					budgetMs: MEDIA_GENERATION_TIMEOUT_MS,
-				});
-				if (!plan) {
-					log.warn("music.capacity_wait_expired", {
-						reason: LARM_CAPACITY_TIMEOUT,
-						waitedMs: now - (previous?.startedAt ?? now),
-					});
-					patch(db, r.id, {
-						artwork: {
-							...artwork,
-							state: "failed",
-							errorCode: LARM_CAPACITY_TIMEOUT,
-						},
-					});
-					return "applied";
-				}
-				const { job } = queue.enqueueInTransaction(db, {
-					scope: "music",
-					kind: "music.artwork",
-					dedupeKey: `${r.id}:artwork:${artwork.revision}:w${plan.count}`,
-					payload: claim.payload,
-					subjectRef: r.id,
-					lane: "interactive",
-					resourceKey: "image.generate",
-					maxAttempts: 1,
-					availableAtMs: plan.at,
-					deadlineAtMs: plan.deadline,
-				});
-				patch(db, r.id, {
-					artwork: {
-						...artwork,
-						phase: LARM_CAPACITY_WAITING,
-						capacityWait: { startedAt: plan.startedAt, count: plan.count },
+					expire: () =>
+						patch(db, r.id, {
+							artwork: {
+								...artwork,
+								state: "failed",
+								errorCode: LARM_CAPACITY_TIMEOUT,
+							},
+						}),
+					schedule(plan) {
+						const { job } = queue.enqueueInTransaction(db, {
+							scope: "music",
+							kind: "music.artwork",
+							dedupeKey: `${r.id}:artwork:${artwork.revision}:w${plan.count}`,
+							payload: claim.payload,
+							subjectRef: r.id,
+							lane: "interactive",
+							resourceKey: "image.generate",
+							maxAttempts: 1,
+							availableAtMs: plan.at,
+							deadlineAtMs: plan.deadline,
+						});
+						patch(db, r.id, {
+							artwork: {
+								...artwork,
+								phase: LARM_CAPACITY_WAITING,
+								capacityWait: { startedAt: plan.startedAt, count: plan.count },
+							},
+						});
+						return job.id;
 					},
-				});
-				log.info("music.capacity_wait_scheduled", {
-					jobId: job.id,
-					subjectId: r.id,
-					waitCount: plan.count,
-					waitedMs: now - plan.startedAt,
-					nextInMs: plan.at - now,
 				});
 				return "applied";
 			}

@@ -14,15 +14,13 @@ import {
 	type TestOutput,
 } from "../../larm";
 import { MEDIA_GENERATION_TIMEOUT_MS } from "../../capabilities";
-import { getLogger } from "../../../infrastructure/logger";
 import type { MusicRecord } from "../contracts";
-import { row, record, patch, type Row } from "../repository";
+import { row, record, patch } from "../repository";
 import { musicContext, PLAN_MS } from "./context";
 import type { createMusic } from "./index";
 type GenerationPlan = Omit<z.infer<typeof musicPlanV3>, "task"> & {
 	task?: "music" | "sound-effect";
 };
-const log = getLogger("music");
 const payload = z.object({ id: z.string() });
 const active = (r: MusicRecord) =>
 	r.state === "planning" || r.state === "generating";
