@@ -28,6 +28,7 @@ export async function establishLease(
 		hosts: () => ProviderHosts;
 		profile: string;
 		client: string;
+		connectionRole?: "main" | "sub";
 		audience: string;
 		idleTimeoutMs: number;
 		/** Aborted when the port closes. */
@@ -53,6 +54,7 @@ export async function establishLease(
 		await fetchCatalog(scopedControl, profile, required);
 	const fullProfile = required.some((name) => name !== "llm");
 	const creation = {
+		connectionRole: deps.connectionRole,
 		profile,
 		client,
 		audience,
@@ -78,6 +80,7 @@ export async function establishLease(
 	const { id, created } = creationResult;
 	try {
 		const readyInput = {
+			connectionRole: deps.connectionRole,
 			startedAt,
 			readinessLog: new Map<string, string>(),
 			id,
@@ -93,6 +96,7 @@ export async function establishLease(
 		for (let attempt = 1; ; attempt++) {
 			try {
 				claimed = await claimProviders(scopedControl, {
+					connectionRole: deps.connectionRole,
 					id,
 					created: ready,
 					required,
@@ -119,6 +123,8 @@ export async function establishLease(
 		for (const [name, p] of providers) {
 			p.startedAt = startedAt;
 			getLogger("larm").info("larm.provider_claimed", {
+				sessionRole: deps.connectionRole,
+				maxTokens: p.contextWindow?.maxTokens,
 				connectionId: id,
 				kind: name,
 				durationMs: Math.round(performance.now() - startedAt),
@@ -128,8 +134,17 @@ export async function establishLease(
 		lifetime.throwIfAborted();
 		const current: Lease = {
 			readinessLog: readyInput.readinessLog,
-			request: { profile, client, audience, fullProfile, catalogRevision },
+			request: {
+				profile,
+				client,
+				audience,
+				fullProfile,
+				catalogRevision,
+				connectionRole: deps.connectionRole,
+			},
 			id,
+			bootEpoch:
+				typeof created.bootEpoch === "string" ? created.bootEpoch : undefined,
 			expiresAt,
 			providers,
 			agentProfile: string(catalogProfile.id),

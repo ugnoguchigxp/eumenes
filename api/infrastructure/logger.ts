@@ -28,6 +28,8 @@ export interface LogFields {
 	subjectId?: string;
 	utteranceId?: string;
 	sessionId?: string;
+	/** A conversation screen (tab) of the Web, e.g. the one that plays sound. */
+	screenId?: string;
 	inferenceId?: string;
 	attemptId?: string;
 	stepId?: string;
@@ -211,6 +213,7 @@ const keys = new Set<keyof LogFields>([
 	"subjectId",
 	"utteranceId",
 	"sessionId",
+	"screenId",
 	"inferenceId",
 	"attemptId",
 	"stepId",

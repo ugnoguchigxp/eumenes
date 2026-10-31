@@ -103,6 +103,7 @@ test("polling an owned claim keeps the tone alive and acknowledges only its comp
 		expect.any(AbortSignal),
 		"3分のタイマーが終了しました。",
 		expect.any(Function),
+		expect.any(Function),
 	);
 	await h.refresh();
 	expect(tone.mock.calls[0]![0].aborted).toBe(false);

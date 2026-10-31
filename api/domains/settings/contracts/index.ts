@@ -468,6 +468,13 @@ export const settingsSchema = z
 					code: "custom",
 					message: "クラウド専用には許可と代替先が必要です",
 				});
+			// A failed clause is not spoken: speech never switches to another voice midway.
+			if (p === "tts" && route.mode === "larm-preferred")
+				ctx.addIssue({
+					code: "custom",
+					message: "読み上げはLARMかクラウドの一方だけを使います",
+					path: ["routes", "tts", "mode"],
+				});
 		}
 		const worldResource = s.world.curationResourceId;
 		if (

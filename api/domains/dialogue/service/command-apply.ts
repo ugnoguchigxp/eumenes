@@ -7,6 +7,7 @@ import type { DialogueDeps } from "./context";
 import { delegateConversation } from "./delegate-conversation";
 
 export type CommandInput = {
+	conversationId: string;
 	runId: string;
 	revision: number;
 	toolchainRevisionId: string;

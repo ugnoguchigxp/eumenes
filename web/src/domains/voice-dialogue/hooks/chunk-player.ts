@@ -36,6 +36,8 @@ export function queueChunks(
 		setSubtitle: (update: (s: Subtitle) => Subtitle) => void;
 		setAvatarCue: (update: (cue: KeyedCue) => KeyedCue) => void;
 		fail: (error: unknown) => void;
+		/** Waits for a notice that is sounding on the screen (spec tts-single-lane §4.4). */
+		noticeQuiet?: () => Promise<void>;
 	},
 ) {
 	const { client, queued, valid } = deps;
@@ -58,6 +60,7 @@ export function queueChunks(
 			.then(async () => {
 				if (!playable()) return;
 				const { bytes, at } = await audio;
+				await deps.noticeQuiet?.();
 				if (!playable()) return;
 				const volume = deps.volume();
 				let gap: { gapMs: number; fetchLateMs: number } | undefined;

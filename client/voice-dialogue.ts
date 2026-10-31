@@ -7,13 +7,20 @@ import {
 } from "../api/domains/voice-dialogue/contracts";
 import { avatarMotionSchema } from "../api/domains/delivery/contracts";
 import { z } from "zod";
-import { callJson, json, withQuery, type Transport } from "./transport";
+import {
+	ApiError,
+	callJson,
+	json,
+	withQuery,
+	type Transport,
+} from "./transport";
 
 const voiceSessionSchema = z.object({
 	sessionId: z.string(),
 	generation: z.number().int(),
 });
 const voiceStoppedSchema = z.object({ stopped: z.literal(true) });
+const speechClaimedSchema = z.object({ claimed: z.literal(true) });
 export function voiceDialogueClient(transport: Transport) {
 	return {
 		identity: transport.identity,
@@ -175,6 +182,24 @@ export function voiceDialogueClient(transport: Transport) {
 					})
 				).arrayBuffer(),
 			),
+		/**
+		 * Claims an automatic speech or notice for this screen before it is played. False when another
+		 * screen plays sound, has claimed it already, or it is not Eumenes' speaker's to say.
+		 */
+		claimSpeech: async (screenId: string, sourceKey: string) => {
+			try {
+				await callJson(
+					transport,
+					speechClaimedSchema,
+					"/api/voice/speech-claims",
+					json({ screenId, sourceKey }),
+				);
+				return true;
+			} catch (error) {
+				if (error instanceof ApiError && error.status === 409) return false;
+				throw error;
+			}
+		},
 		voiceCancel: async (id: string) =>
 			callJson(
 				transport,

@@ -1,9 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-	createAudioController,
-	type AudioController,
-	type OutputController,
-} from "./controller";
+import type { AudioController } from "./controller";
+import { createScreenOutput, type ScreenOutput } from "./screen-output";
 import { timerToneWav } from "./tone";
 
 type PlaybackTrace = (
@@ -11,7 +8,11 @@ type PlaybackTrace = (
 	phase: "started" | "ended",
 ) => void;
 
-/** Reuses configured output; the caller defers notices while voice/replay is busy. */
+/**
+ * Reuses configured output; the caller defers notices while voice/replay is busy. Each sound is a
+ * notice of the screen's output (spec tts-single-lane §4.4): it never sounds over speech or another
+ * notice. Without a shared screen output (a settings preview) the hook keeps its own.
+ */
 export function useTimerTone(
 	settings: {
 		outputDevice?: string;
@@ -22,6 +23,7 @@ export function useTimerTone(
 	sessionAudio?: () => Pick<AudioController, "play" | "stopPlayback"> | null,
 	speech?: (text: string, signal: AbortSignal) => Promise<Uint8Array>,
 	prepareOnGesture = true,
+	sharedOutput?: ScreenOutput,
 ) {
 	const [ready, setReadyState] = useState(false);
 	const readyRef = useRef(false);
@@ -33,34 +35,19 @@ export function useTimerTone(
 	useEffect(() => {
 		latest.current = { settings, sessionAudio, speech };
 	}, [settings, sessionAudio, speech]);
-	const output = useRef<{ device: string; audio: OutputController } | null>(
-		null,
-	);
-	const release = useCallback(() => {
-		const owned = output.current;
-		output.current = null;
-		void owned?.audio.stop();
-	}, []);
-	useEffect(() => () => release(), [release]);
+	const [ownOutput] = useState(() => createScreenOutput());
+	const screen = sharedOutput ?? ownOutput;
+	useEffect(() => () => ownOutput.release(), [ownOutput]);
+	const used = useRef<ReturnType<ScreenOutput["controller"]> | null>(null);
 	const ensureOutput = useCallback(
 		(outputDevice: string) => {
-			if (output.current?.device !== outputDevice) {
-				// A changed device needs a fresh preparation on the next gesture.
-				if (output.current) setReady(false);
-				void output.current?.audio.stop();
-				output.current = {
-					device: outputDevice,
-					audio: createAudioController(
-						() => {},
-						() => {},
-						() => {},
-						{ outputDevice, keepAlive: false },
-					),
-				};
-			}
-			return output.current!;
+			const entry = screen.controller(outputDevice);
+			// A changed device needs a fresh preparation on the next gesture.
+			if (used.current && used.current !== entry) setReady(false);
+			used.current = entry;
+			return entry;
 		},
-		[setReady],
+		[screen, setReady],
 	);
 	const prepare = useCallback(async () => {
 		const { settings: audio, sessionAudio: session } = latest.current;
@@ -71,16 +58,13 @@ export function useTimerTone(
 		}
 		const owned = ensureOutput(audio.outputDevice ?? "");
 		try {
-			await owned.audio.startOutput();
-			if (output.current === owned) setReady(true);
+			await screen.start(owned);
+			if (used.current === owned) setReady(true);
 		} catch (error) {
-			if (output.current === owned) {
-				release();
-				setReady(false);
-			}
+			if (used.current === owned) setReady(false);
 			throw error;
 		}
-	}, [ensureOutput, release, setReady]);
+	}, [ensureOutput, screen, setReady]);
 	useEffect(() => {
 		// Finish the gesture before hiding the preparation card. Preparing on pointerdown
 		// can remove a pressed button before its click and send the click to another card.
@@ -108,107 +92,110 @@ export function useTimerTone(
 			onToneDelivered?: () => void,
 			completed = false,
 			trace?: PlaybackTrace,
+			/** Told when the notice lane gives this notice its turn (its own time starts there). */
+			onTurn?: () => void,
 		) => {
 			signal.throwIfAborted();
 			const { outputDevice = "", outputVolume = 1 } = latest.current.settings;
 			if (outputVolume <= 0) throw new Error("audio_muted");
-			const session = latest.current.sessionAudio?.();
-			if (!session) ensureOutput(outputDevice);
-			const owned = session ? null : output.current!;
-			const target = session ?? owned!.audio;
-			const report: PlaybackTrace = (part, phase) => {
-				try {
-					trace?.(part, phase);
-				} catch {
-					// Diagnostic observers cannot interrupt playback or its completion.
-				}
-			};
-			const play = (
-				bytes: Uint8Array,
-				playbackSignal: AbortSignal = signal,
-				part: "tone" | "completion" = "tone",
-			) =>
-				new Promise<void>((resolve, reject) => {
-					let started = false;
-					const finish = (error?: Error) => {
-						playbackSignal.removeEventListener("abort", abort);
-						if (error) reject(error);
-						else resolve();
-					};
-					const abort = () => {
-						target.stopPlayback();
-						if (owned) {
-							void owned.audio.stop();
-							if (output.current === owned) output.current = null;
-						}
-						finish(new Error("audio_interrupted"));
-					};
-					playbackSignal.addEventListener("abort", abort, { once: true });
-					if (playbackSignal.aborted) {
-						abort();
-						return;
+			// The whole notice (tone, completion voice, message) sounds alone on the screen's output.
+			return screen.notice(signal, async () => {
+				onTurn?.();
+				const session = latest.current.sessionAudio?.();
+				const owned = session ? null : ensureOutput(outputDevice);
+				const target = session ?? owned!.audio;
+				const report: PlaybackTrace = (part, phase) => {
+					try {
+						trace?.(part, phase);
+					} catch {
+						// Diagnostic observers cannot interrupt playback or its completion.
 					}
-					void (async () => {
-						try {
-							if (owned) await owned.audio.startOutput();
-							playbackSignal.throwIfAborted();
-							await target.play(
-								bytes,
-								() => {
-									report(part, "ended");
-									finish();
-								},
-								{
-									volume: Math.min(1, outputVolume),
-									suppressInput: true,
-									shouldPlay: () => !playbackSignal.aborted,
-									onStarted: () => {
-										started = true;
-										report(part, "started");
-									},
-									onInterrupted: () => finish(new Error("audio_interrupted")),
-								},
-							);
-							if (!started) finish(new Error("audio_not_started"));
-						} catch (error) {
-							if (owned) {
-								void owned.audio.stop();
-								if (output.current === owned) output.current = null;
-							}
-							finish(
-								error instanceof Error ? error : new Error("audio_blocked"),
-							);
+				};
+				const play = (
+					bytes: Uint8Array,
+					playbackSignal: AbortSignal = signal,
+					part: "tone" | "completion" = "tone",
+				) =>
+					new Promise<void>((resolve, reject) => {
+						let started = false;
+						const finish = (error?: Error) => {
+							playbackSignal.removeEventListener("abort", abort);
+							if (error) reject(error);
+							else resolve();
+						};
+						const abort = () => {
+							target.stopPlayback();
+							// An output still waiting to start (a gesture) is released; a started one stays shared.
+							screen.discardUnstarted(owned);
+							finish(new Error("audio_interrupted"));
+						};
+						playbackSignal.addEventListener("abort", abort, { once: true });
+						if (playbackSignal.aborted) {
+							abort();
+							return;
 						}
-					})();
-				});
-			await play(
-				(await latest.current.settings.loadTone?.(signal)) ?? timerToneWav(),
-			);
-			onToneDelivered?.();
-			if (completed) {
-				const voice = await latest.current.settings.loadCompletion?.(signal);
-				signal.throwIfAborted();
-				if (voice) await play(voice, signal, "completion");
-			}
-			// Speech is best effort: an unavailable TTS provider must not erase a delivered beep.
-			if (message && latest.current.speech) {
-				const speechAbort = new AbortController();
-				const abortSpeech = () => speechAbort.abort();
-				signal.addEventListener("abort", abortSpeech, { once: true });
-				const timeout = setTimeout(abortSpeech, 6000);
-				try {
+						void (async () => {
+							try {
+								if (owned) await screen.start(owned);
+								playbackSignal.throwIfAborted();
+								await target.play(
+									bytes,
+									() => {
+										report(part, "ended");
+										finish();
+									},
+									{
+										volume: Math.min(1, outputVolume),
+										suppressInput: true,
+										shouldPlay: () => !playbackSignal.aborted,
+										onStarted: () => {
+											started = true;
+											report(part, "started");
+										},
+										onInterrupted: () => finish(new Error("audio_interrupted")),
+									},
+								);
+								if (!started) finish(new Error("audio_not_started"));
+							} catch (error) {
+								screen.discardUnstarted(owned);
+								finish(
+									error instanceof Error ? error : new Error("audio_blocked"),
+								);
+							}
+						})();
+					});
+				await play(
+					(await latest.current.settings.loadTone?.(signal)) ?? timerToneWav(),
+				);
+				onToneDelivered?.();
+				if (completed) {
+					const voice = await latest.current.settings.loadCompletion?.(signal);
 					signal.throwIfAborted();
-					const wav = await latest.current.speech(message, speechAbort.signal);
-					await play(wav, speechAbort.signal);
-				} catch {
-					signal.throwIfAborted();
-				} finally {
-					clearTimeout(timeout);
-					signal.removeEventListener("abort", abortSpeech);
+					if (voice) await play(voice, signal, "completion");
 				}
-			}
+				// Speech is best effort: an unavailable TTS provider must not erase a delivered beep.
+				if (message && latest.current.speech) {
+					const speechAbort = new AbortController();
+					const abortSpeech = () => speechAbort.abort();
+					signal.addEventListener("abort", abortSpeech, { once: true });
+					const timeout = setTimeout(abortSpeech, 6000);
+					try {
+						signal.throwIfAborted();
+						const wav = await latest.current.speech(
+							message,
+							speechAbort.signal,
+						);
+						await play(wav, speechAbort.signal);
+					} catch {
+						signal.throwIfAborted();
+					} finally {
+						clearTimeout(timeout);
+						signal.removeEventListener("abort", abortSpeech);
+					}
+				}
+			});
 		},
-		[ensureOutput],
+		[ensureOutput, screen],
 	);
 	const repeat = useCallback(
 		async (signal: AbortSignal) => {

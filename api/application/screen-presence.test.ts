@@ -51,10 +51,36 @@ test("screen notifications use existing API authentication, enforce origin and a
 		).status,
 	).toBe(409);
 	expect(seen).toEqual([]);
-	expect((await request(update(1, true))).status).toBe(204);
-	expect((await request(update(3, false))).status).toBe(204);
-	expect((await request(update(2, true))).status).toBe(204);
+	const answer = async (body: string) => {
+		const response = await request(body);
+		return [response.status, await response.json()];
+	};
+	// The only screen plays sound, hidden or not; a stale report changes nothing.
+	expect(await answer(update(1, true))).toEqual([
+		200,
+		{ playbackScreen: true },
+	]);
+	expect(await answer(update(3, false))).toEqual([
+		200,
+		{ playbackScreen: true },
+	]);
+	expect(await answer(update(2, true))).toEqual([
+		200,
+		{ playbackScreen: true },
+	]);
 	expect(seen).toEqual([true, false]);
+	const asked = await app.request(path, { headers: auth });
+	expect([asked.status, await asked.json()]).toEqual([
+		200,
+		{ playbackScreen: true },
+	]);
+	const leaving = JSON.stringify({
+		revision: 4,
+		active: false,
+		sentAt: Date.now(),
+		leaving: true,
+	});
+	expect(await answer(leaving)).toEqual([200, { playbackScreen: false }]);
 	expect(
 		(
 			await app.request("/api/inference/screen/not-a-uuid", {

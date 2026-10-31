@@ -87,7 +87,8 @@ for (const purpose of ["asr", "tts"] as const) {
 		expect(hook.result.current[purpose].selected).toBe("larm");
 		expect(
 			client.applySettings.mock.calls[1]![0].settings.routes[purpose].mode,
-		).toBe("larm-preferred");
+			// Speech has no cloud fallback; recognition keeps LARM first with its fallback.
+		).toBe(purpose === "tts" ? "larm-only" : "larm-preferred");
 	});
 }
 

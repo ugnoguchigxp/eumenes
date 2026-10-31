@@ -32,6 +32,12 @@ LLMのみの要求は `providers: ["llm"]`、音声の要求は `providers` を�
 
 設定は [setup.md](setup.md)(環境変数)と [settings.md](settings.md)(画面)を参照してください。
 
+### 広告上限と実確保容量
+
+catalogの`contextWindow.maxTokens`は提供可能な最大容量、作成要求の`contextTokens`は明示する要求容量、claimの`contextWindow.maxTokens`は実際に確保された容量です。省略時にruntimeの既定容量が広告上限より小さくても接続できます。主200k明示・補助省略の既存選択方針を維持し、全接続に広告上限を要求しません。
+
+claimは正の安全な整数で、広告上限以下、明示要求がある場合はその値と一致する必要があります。create/readyが実容量を返す場合はclaimと照合します。他のcontextWindow項目、モデル・プロトコル・接続先などの検証、renew時の容量変更拒否は維持します。入力計数・出力予約・履歴の予算にはcatalogでなくclaimの容量を使います。503統一・空き待ちとは別の契約です（[修正と受入計画](../spec/larm-context-capacity-contract-fix-2026-11-01.md)）。
+
 ## チャット画面表示中のProfile利用依頼
 
 表示中のチャット画面から30秒周期でbackendへ生存通知を送り、有効な通知がある間だけ既存の`POST /v1/agent-connections`を30秒周期で繰り返します。同じclient・Profile・audience・Provider構成・catalog revisionを使い、新しい利用依頼ごとにIdempotency-Keyを発行します。認証は既存の`LARM_API_TOKEN`のままです。専用の所有更新API・別トークン・ダミー推論は使いません。

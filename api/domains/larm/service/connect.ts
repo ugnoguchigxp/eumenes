@@ -1,4 +1,9 @@
 import { getLogger } from "../../../infrastructure/logger";
+import { assertAgentCapacity, claimExpiry } from "./agent-capacity";
+import {
+	assertClaimContextWindow,
+	requestedContextTokens,
+} from "./context-capacity";
 import { providerChatInput } from "./chat-input";
 import type { Capability } from "../contracts";
 import {
@@ -23,6 +28,8 @@ type Rec = Record<string, unknown>;
 /** Hosts that may receive provider credentials: the LARM base host plus explicit extras. */
 export type ProviderHosts = { base: URL; extra: readonly string[] };
 export type ProfileRequest = {
+	/** Absent for legacy and speech scopes. Managed LLM agents validate exact role capacity. */
+	connectionRole?: "main" | "sub";
 	profile: string;
 	client: string;
 	audience: string;
@@ -93,6 +100,9 @@ export async function createConnection(
 				...(input.fullProfile ? {} : { Prefer: "wait=1" }),
 			},
 			body: JSON.stringify({
+				...(requestedContextTokens(input.connectionRole) !== undefined
+					? { contextTokens: requestedContextTokens(input.connectionRole) }
+					: {}),
 				profile: input.profile,
 				client: input.client,
 				audience: input.audience,
@@ -125,6 +135,7 @@ export async function awaitReady(
 		startedAt?: number;
 		kind?: ProviderName;
 		readinessLog?: Map<string, string>;
+		connectionRole?: "main" | "sub";
 	},
 ): Promise<Rec> {
 	let { created } = input;
@@ -190,7 +201,13 @@ export async function awaitReady(
 					p.endpoint !== endpoints[name as ProviderName])
 			)
 				throw new Error("larm_provider_not_ready");
-			return p.readiness === "ready";
+			if (p.readiness === "ready" && name === "llm" && input.connectionRole)
+				assertAgentCapacity(p, input.connectionRole);
+			return (
+				p.readiness === "ready" &&
+				(!input.connectionRole ||
+					(created.status === "ready" && p.claimable === true))
+			);
 		});
 	};
 	while (!check()) {
@@ -216,6 +233,7 @@ export async function claimProviders(
 		/** The decision provider is claimed on its own (a connection that carries it alone). */
 		decision?: boolean;
 		claimNames?: string[];
+		connectionRole?: "main" | "sub";
 		hosts: ProviderHosts;
 	},
 ): Promise<{ expiresAt: number; providers: Map<ProviderName, Provider> }> {
@@ -242,7 +260,7 @@ export async function claimProviders(
 		!Array.isArray(claimed.providers)
 	)
 		throw new Error("larm_invalid_claim");
-	const expiresAt = Date.parse(string(claimed.expiresAt));
+	const expiresAt = claimExpiry(claimed);
 	if (!Number.isFinite(expiresAt) || expiresAt < Date.now() + 30_000)
 		throw new Error("larm_expired");
 	const providers = new Map<ProviderName, Provider>();
@@ -258,13 +276,17 @@ export async function claimProviders(
 			info.model !== declared?.model
 		)
 			throw new Error("larm_claim_mismatch");
-		if (
-			name === "llm" &&
-			Object.entries(record(declared.contextWindow)).some(
-				([key, value]) => record(info.contextWindow)[key] !== value,
-			)
-		)
-			throw new Error("larm_claim_context_mismatch");
+		if (name === "llm" && input.connectionRole) {
+			assertAgentCapacity(announced!, input.connectionRole);
+			assertAgentCapacity(info, input.connectionRole);
+		}
+		if (name === "llm")
+			assertClaimContextWindow(
+				declared,
+				announced,
+				info,
+				requestedContextTokens(input.connectionRole),
+			);
 		if (
 			name === "llm" &&
 			JSON.stringify(providerChatInput(info)) !==
@@ -393,7 +415,11 @@ function decisionProvider(
 /** Renews a lease and re-claims credentials, checking nothing about the contract changed. */
 export async function renewProviders(
 	control: Control,
-	current: { id: string; providers: Map<ProviderName, Provider> },
+	current: {
+		id: string;
+		bootEpoch?: string;
+		providers: Map<ProviderName, Provider>;
+	},
 	hosts: ProviderHosts,
 ): Promise<{ expiresAt: number; providers: Map<ProviderName, Provider> }> {
 	const renewed = record(
@@ -414,6 +440,8 @@ export async function renewProviders(
 	);
 	if (
 		renewed.id !== current.id ||
+		(current.bootEpoch !== undefined &&
+			renewed.bootEpoch !== current.bootEpoch) ||
 		terminalStatuses.includes(String(renewed.status))
 	)
 		throw new Error("larm_renew_invalid");
@@ -441,7 +469,7 @@ export async function renewProviders(
 		!Array.isArray(claimed.providers)
 	)
 		throw new Error("larm_invalid_claim");
-	const nextExpiry = Date.parse(string(claimed.expiresAt));
+	const nextExpiry = claimExpiry(claimed);
 	if (!Number.isFinite(nextExpiry) || nextExpiry <= Date.now() + 180_000)
 		throw new Error("larm_renew_expired");
 	const next = new Map<ProviderName, Provider>();

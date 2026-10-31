@@ -14,7 +14,10 @@ type Activity = "working" | "idle" | "waiting" | undefined;
 export function useClaudeCodeArtifacts(
 	client: EumenesClient,
 	open: () => void,
-	chime: () => void,
+	chime: (
+		completed?: boolean,
+		notices?: { source: string; ids: readonly string[] },
+	) => void,
 ) {
 	const seen = useRef<number | null>(null);
 	const activities = useRef<Map<string, Activity> | null>(null);
@@ -45,7 +48,7 @@ export function useClaudeCodeArtifacts(
 				(was !== undefined && was !== "idle" && activity === "idle") ||
 				(activity === "waiting" && was !== "waiting")
 			) {
-				chime();
+				chime(false, { source: "claude-code", ids: [`${key}:${activity}`] });
 				return;
 			}
 		}

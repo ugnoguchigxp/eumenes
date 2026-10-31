@@ -1,6 +1,6 @@
 # 利用状況アーティファクト：LiveとCodex SDK
 
-状態: 2026-10-31、Asia/Tokyo。利用者が画像生成後の実装を指示し、独立メニューから開くアーティファクトと指定。既存のアーティファクト枠内へ表示し、全画面・アプリのナビゲーションは追加しない。サーバーの起動・停止・再起動と課金を伴う試験は行わない。
+状態: 2026-10-31、Asia/Tokyo。実装後の追加依頼で、入口を「設定」メニュー内へ移動する。既存のアーティファクト枠内へ表示する。サーバーの起動・停止・再起動と課金を伴う試験は行わない。
 
 ## 1. 目的と範囲
 
@@ -45,7 +45,7 @@
 
 ## 4. 設定画面案
 
-独立メニュー **「利用状況」** から、既存ホスト内のアーティファクトを開く。読み取り画面の期間・フィルター変更には設定の保存ボタンを出さない。単価編集だけを別タブに分け、保存前に入力と適用開始日を確認できるフォームを使う。画像案は [artifact-design.png](verification/usage-dashboard-2026-10-31/artifact-design.png)。画像内の値は例示であり実測値ではない。
+「設定」の「管理と確認」に置く **「利用状況」** から、既存ホスト内のアーティファクトを開く。読み取り画面の期間・フィルター変更には設定の保存ボタンを出さない。単価編集だけを別タブに分け、保存前に入力と適用開始日を確認できるフォームを使う。画像案は [artifact-design.png](verification/usage-dashboard-2026-10-31/artifact-design.png)。画像内の値は例示であり実測値ではない。
 
 画面の対象範囲は「Eumenes経由で記録した利用」と明記し、OpenAIアカウント全体の消費や他アプリの利用を含む表示にしない。
 
@@ -124,7 +124,7 @@ Liveとinferenceがそれぞれの利用事実を保存し、各domainの公開�
 
 単価はSQLiteの改訂付きデータとして、モデル・課金経路・通貨/credit・単位・適用開始・確認日・出典を保持する。単価改訂は追記し、過去の根拠を保持する。モデル名やprofile名、料金を製品定数・ファイル名へ固定しない。価格変更前後を混ぜた平均単価で履歴を再計算しない。
 
-新画面はbundle＋登録adapterとして追加する。artifact名はusage.dashboard。groupなしlauncherで独立メニューへ公開し、既存のアーティファクトホスト・Rendererで表示する。既存のSelect、Table、日付入力を再利用し、不足する集計表示だけを再利用可能なDesignSystem部品として追加する。初期表示・フィルター変更・明細ページングは読み取り専用query、料金編集は登録済み操作の受付・保存経路を使う。
+新画面はbundle＋登録adapterとして追加する。artifact名はusage.dashboard。launcher.groupで「管理と確認」に所属させ、設定hubのnavigate登録から既存のアーティファクトホスト・Rendererで表示する。既存のSelect、Table、日付入力を再利用し、不足する集計表示だけを再利用可能なDesignSystem部品として追加する。初期表示・フィルター変更・明細ページングは読み取り専用query、料金編集は登録済み操作の受付・保存経路を使う。
 
 単価データの文書・保存操作はusage側が所有し、設定domainから上位domainを参照しない。共通のフォーム・下書き・変更確認のUIを再利用することと、settings文書専用の保存処理へ別domainのデータを押し込むことは分ける。新しい登録adapterはusageの公開操作だけを呼ぶ。
 
@@ -176,6 +176,10 @@ MVPの到達点はLive時間・概算USDとCodexモデル別tokensを正しく�
 初回の計画段階では、公式資料と既存実装の読み取り、計画書・索引の追加のみを行った。後続の画像生成・実装は、利用者の明示指示で着手した。
 
 ## 12. 実装の範囲と残作業
+
+追加依頼「設定メニューに移動」: usage.dashboard@1とsettings.hub@9を保持して、usage.dashboard@2（group=管理と確認）とsettings.hub@10（usageへのnavigate）を登録する。既存のmenuEntries、設定一覧、navigate処理を再利用する。変更は入口の登録・関連文書・既存試験の接続先だけ。完了条件は独立メニューから消え、「設定 → 利用状況」で同じ集計アーティファクトが開くこと。部分のbundle検査、公開API/登録の結合試験、サーバー不要のブラウザ操作、capabilities/settings/usageの標準verifyで確認する。課金接続やサーバー操作は行わない。
+
+移動の検証完了: bundle検査と公開API/設定移行試験3件が成功。usage/capabilities/settingsの標準verify（Bun 355件＋Web 17件＝372件）が成功し、入力整合性エラーなし。明暗・390/900/1440pxのブラウザ6条件で、上部メニューが「設定」のみであること、設定内の「利用状況」から開き、フィルター・ページ送り・単価保存が動くことを確認。[標準結果](verification/usage-dashboard-2026-10-31/settings-menu-verification.json)・[画面結果](verification/usage-dashboard-2026-10-31/settings-menu-browser.json)。公開済みrevisionを上書きしていない。集計・LLMの判断・担当選択への変更はない。サーバー操作・課金接続は未実施。
 
 独立メニューのartifact:usage.dashboard@1、adapter:usage@1、登録OpenUI viewと共通DesignSystem部品を追加。全画面ルートは作らない。音声設定は既存revisionを保ち、新しいartifact:settings.live@4の関連画面からも移動できる。
 

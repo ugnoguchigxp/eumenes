@@ -159,6 +159,10 @@ export function executionStep(
 				{
 					sessionRole: "subagent",
 					taskId: input.executionId,
+					agentSession: {
+						conversationId: input.sourceRefs.conversationId,
+						agentId: input.executionId,
+					},
 					refs: input.sourceRefs,
 				},
 			).finally(() => ctx.inference.releaseTaskSession?.(input.executionId));

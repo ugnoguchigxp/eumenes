@@ -123,6 +123,8 @@ export async function setup(
 		});
 		value.routes[p].fallbackId = id;
 	}
+	// Speech has no fallback: without a LARM voice (or its judge) the fixture speaks on a cloud-only route.
+	if (!local.speak && !local.judge) value.routes.tts.mode = "cloud-only";
 	await settings.apply({
 		requestId: crypto.randomUUID(),
 		expectedRevision: 0,

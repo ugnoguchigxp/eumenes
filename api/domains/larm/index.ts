@@ -13,6 +13,8 @@ export {
 } from "./contracts/user-intent";
 export { registerLarmStatus } from "./controller";
 export { createLarm } from "./service";
+export { createAgentLarm } from "./service/agent-connections";
+export { createGenerationLanes } from "./service/generation-lanes";
 export { createActivityRecorder } from "./service/activity";
 export {
 	createMonitoringClient,

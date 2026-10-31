@@ -217,6 +217,7 @@ export function createToolchainCommandHandler(
 				status: "ready",
 				input: {
 					runId: run.id,
+					conversationId: run.conversationId,
 					revision: (byId(tx, run.id) as Run).revision,
 					toolchainRevisionId: claim.payload.toolchainRevisionId,
 					requestId,
@@ -246,7 +247,14 @@ export function createToolchainCommandHandler(
 					input.messages,
 					signal,
 					input.control,
-					{ sessionRole: "subagent", taskId: input.runId },
+					{
+						sessionRole: "subagent",
+						taskId: input.runId,
+						agentSession: {
+							conversationId: input.conversationId,
+							agentId: input.runId,
+						},
+					},
 				).finally(() =>
 					larm
 						.releaseTaskSession?.(input.runId)

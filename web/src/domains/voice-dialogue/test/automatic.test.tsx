@@ -10,6 +10,8 @@ type Inputs = {
 	messages: Message[];
 	enabled: boolean;
 	blocked?: boolean;
+	playback?: boolean;
+	speakerSession?: string | null;
 };
 const answer = (
 	id: string,
@@ -39,14 +41,24 @@ function fixture(initial: Run[] = [], messages: Message[] = []) {
 		prepare: vi.fn(async () => undefined as never),
 	};
 	const ownsSpeech = vi.fn((id: string | null) => id === "owned");
+	const claim = vi.fn(async (_sourceKey: string) => true);
 	const initialProps: Inputs = { runs: initial, messages, enabled: true };
 	const hook = renderHook(
-		(props: Inputs) => useAutomaticSpeech({ ...props, player, ownsSpeech }),
+		(props: Inputs) =>
+			useAutomaticSpeech({
+				...props,
+				player,
+				ownsSpeech,
+				screen: { playbackScreen: props.playback ?? true, claim },
+				speaker: props.speakerSession
+					? { id: props.speakerSession, state: "active" }
+					: null,
+			}),
 		{
 			initialProps,
 		},
 	);
-	return { hook, player };
+	return { hook, player, claim };
 }
 
 test("an adopted handover announcement without a final message is spoken once, but not from history or native speech", async () => {
@@ -254,4 +266,112 @@ test("an agency utterance that arrives while automatic speech is off is never sp
 	hook.rerender({ runs: [], messages: [fresh], enabled: true });
 	await act(async () => {});
 	expect(player.play).not.toHaveBeenCalled();
+});
+
+test("each answer, announcement and agency utterance is claimed with its own key before it is read", async () => {
+	const { hook, player, claim } = fixture();
+	const adopted = answer("claimed");
+	const handover = {
+		...answer("handover").run,
+		revision: 3,
+		answerMessageId: null,
+		announcement: "調べます。",
+	};
+	const agency = { id: "agency:s1-1:t9", text: "ねえ。" };
+	hook.rerender({
+		runs: [adopted.run, handover],
+		messages: [adopted.message, agency],
+		enabled: true,
+	});
+	await waitFor(() => expect(player.play).toHaveBeenCalledTimes(3));
+	expect(claim.mock.calls.map((call) => call[0])).toEqual([
+		"run:claimed:answer",
+		"run:handover:announcement:3",
+		"message:agency:s1-1:t9",
+	]);
+});
+
+test("a refused claim is skipped and the next answer is still read", async () => {
+	const { hook, player, claim } = fixture();
+	claim.mockResolvedValueOnce(false);
+	const taken = answer("taken"),
+		next = answer("next");
+	hook.rerender({
+		runs: [taken.run, next.run],
+		messages: [taken.message, next.message],
+		enabled: true,
+	});
+	await waitFor(() => expect(player.play).toHaveBeenCalledOnce());
+	expect(player.play.mock.calls[0]?.[0]).toBe("answer:next");
+});
+
+test("a screen that does not play sound reads nothing, claims nothing and does not catch up later", async () => {
+	const { hook, player, claim } = fixture();
+	const quiet = answer("quiet");
+	const agency = { id: "agency:s1-1:t10", text: "ふむ。" };
+	const props = {
+		runs: [quiet.run],
+		messages: [quiet.message, agency],
+		enabled: true,
+		playback: false,
+	};
+	hook.rerender(props);
+	await act(async () => {});
+	expect(claim).not.toHaveBeenCalled();
+	expect(player.play).not.toHaveBeenCalled();
+	hook.rerender({ ...props, playback: true });
+	await act(async () => {});
+	expect(player.play).not.toHaveBeenCalled();
+	const fresh = answer("fresh");
+	hook.rerender({
+		...props,
+		playback: true,
+		runs: [quiet.run, fresh.run],
+		messages: [...props.messages, fresh.message],
+	});
+	await waitFor(() => expect(player.play).toHaveBeenCalledOnce());
+	expect(player.play.mock.calls[0]?.[0]).toBe("answer:fresh");
+});
+
+test("losing the playback screen stops the reading in progress and drops the queue", async () => {
+	const { hook, player } = fixture();
+	player.play.mockImplementationOnce(() => new Promise<void>(() => {}));
+	const one = answer("one"),
+		two = answer("two");
+	const props = {
+		runs: [one.run, two.run],
+		messages: [one.message, two.message],
+		enabled: true,
+	};
+	hook.rerender(props);
+	await waitFor(() => expect(player.play).toHaveBeenCalledOnce());
+	hook.rerender({ ...props, playback: false });
+	expect(player.stopAutomatic).toHaveBeenCalled();
+	hook.rerender({ ...props, playback: true });
+	await act(async () => {});
+	expect(player.play).toHaveBeenCalledOnce();
+});
+
+test("a specialist's answer is read only while the conversation is switched to that specialist", async () => {
+	const { hook, player } = fixture();
+	const during = {
+		...answer("during").run,
+		specialistSessionId: "session-1",
+	};
+	const after = { ...answer("after").run, specialistSessionId: "session-1" };
+	hook.rerender({
+		runs: [during],
+		messages: [answer("during").message],
+		enabled: true,
+		speakerSession: "session-1",
+	});
+	await waitFor(() => expect(player.play).toHaveBeenCalledOnce());
+	hook.rerender({
+		runs: [during, after],
+		messages: [answer("during").message, answer("after").message],
+		enabled: true,
+		speakerSession: null,
+	});
+	await act(async () => {});
+	expect(player.play).toHaveBeenCalledOnce();
 });

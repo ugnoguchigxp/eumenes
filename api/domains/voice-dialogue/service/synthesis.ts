@@ -1,7 +1,7 @@
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import type { DialogueService } from "../../dialogue";
 import type { InferencePort, Receipt } from "../../inference";
-import { isRetryableSpeechError } from "../../inference";
+import { toErrorCode } from "../../../infrastructure/error-code";
 import type { SpeechPreparation } from "../../delivery";
 import type { Speech } from "./speech-state";
 import { SpeechSentences } from "./sentences";
@@ -142,64 +142,51 @@ export function createSpeechSynthesis({
 					} = pending.shift()!;
 					if (!canSpeak(id, runId, controller.signal))
 						throw new Error("permission_revoked");
-					// A transient LARM failure on one clause must not end the whole turn:
-					// retry with a fresh chunk index (each attempt is its own request),
-					// then skip the clause and keep speaking the rest.
-					let synthesized:
-						| {
-								n: number;
-								requestId?: string;
-								receipt?: Receipt;
-								wav: Uint8Array;
-						  }
-						| undefined;
-					let lastError: unknown;
-					for (let attempt = 0; attempt < 3 && !synthesized; attempt++) {
-						const n = index++;
-						try {
-							const requestId = larm.captureSpeechChunkInTransaction
-								? await store.write((db) =>
-										larm.captureSpeechChunkInTransaction!(db, id, n),
+					// A failed clause is not spoken: no retry and no other voice (spec tts-single-lane §4.6).
+					// The turn goes on with the next clause and fails only if nothing could be spoken.
+					const n = index++;
+					let synthesized: {
+						requestId?: string;
+						receipt?: Receipt;
+						wav: Uint8Array;
+					};
+					try {
+						const requestId = larm.captureSpeechChunkInTransaction
+							? await store.write((db) =>
+									larm.captureSpeechChunkInTransaction!(db, id, n),
+								)
+							: undefined;
+						const receipt =
+							requestId && larm.executeRequest
+								? await larm.executeRequest(
+										requestId,
+										text,
+										controller.signal,
+										clausePreparation,
 									)
 								: undefined;
-							const receipt =
-								requestId && larm.executeRequest
-									? await larm.executeRequest(
-											requestId,
-											text,
-											controller.signal,
-											clausePreparation,
-										)
-									: undefined;
-							const wav = receipt
-								? (receipt.value as Uint8Array)
-								: await larm.speak(text, controller.signal);
-							synthesized = { n, requestId, receipt, wav };
-						} catch (error) {
-							if (
-								controller.signal.aborted ||
-								(error instanceof Error &&
-									error.message === "permission_revoked")
-							)
-								throw error;
-							lastError = error;
-							if (!isRetryableSpeechError(error)) break;
-							log.warn(
-								"voice.chunk_retry",
-								{ utteranceId: id, runId, count: n, attempt: attempt + 1 },
-								error,
-							);
-						}
-					}
-					if (!synthesized) {
-						// The turn fails only if no clause could be spoken at all.
-						skipError ??= lastError;
+						const wav = receipt
+							? (receipt.value as Uint8Array)
+							: await larm.speak(text, controller.signal);
+						synthesized = { requestId, receipt, wav };
+					} catch (error) {
+						if (
+							controller.signal.aborted ||
+							(error instanceof Error && error.message === "permission_revoked")
+						)
+							throw error;
+						skipError ??= error;
 						state.skipped++;
 						wake();
-						log.warn("voice.chunk_skipped", { utteranceId: id, runId });
+						log.warn("voice.speech_skipped", {
+							utteranceId: id,
+							runId,
+							count: n,
+							reason: toErrorCode(error, "tts_failed"),
+						});
 						continue;
 					}
-					const { n, requestId, receipt, wav } = synthesized;
+					const { requestId, receipt, wav } = synthesized;
 					if (!canSpeak(id, runId, controller.signal))
 						throw new Error("permission_revoked");
 					const published = await store.write((db) => {

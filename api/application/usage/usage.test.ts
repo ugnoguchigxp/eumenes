@@ -22,7 +22,7 @@ const bundle = JSON.parse(
 );
 import { harness } from "../toolchain/toolchain.fixture";
 
-test("independent launcher and authenticated read are available without a model call", async () => {
+test("settings navigation and authenticated usage are available without a model call", async () => {
 	const h = await harness();
 	try {
 		const entries = (await (await h.request("/api/toolchain-artifacts")).json())
@@ -33,11 +33,25 @@ test("independent launcher and authenticated read are available without a model 
 			),
 		).toMatchObject({
 			title: "利用状況",
-			artifactRevisionId: "artifact:usage.dashboard@1",
+			artifactRevisionId: "artifact:usage.dashboard@2",
+			launcher: { group: "管理と確認" },
 		});
+		const hubEntry = entries.find(
+			(e: { artifactId: string }) => e.artifactId === "settings.hub",
+		);
+		expect(hubEntry.artifactRevisionId).toBe("artifact:settings.hub@10");
+		const hub = await (
+			await h.request(
+				"/api/toolchain-artifacts/" +
+					encodeURIComponent(hubEntry.artifactRevisionId),
+			)
+		).json();
+		expect(hub.artifact.actionBindings[0].navigateTo.artifacts.usage).toBe(
+			"usage.dashboard",
+		);
 		const base =
 			"/api/toolchain-artifacts/" +
-			encodeURIComponent("artifact:usage.dashboard@1");
+			encodeURIComponent("artifact:usage.dashboard@2");
 		const response = await h.request(base + "/sources/usage");
 		expect(response.status).toBe(200);
 		expect(await response.json()).toMatchObject({
@@ -75,7 +89,7 @@ test("independent launcher and authenticated read are available without a model 
 			eventCreatedAt: new Date().toISOString(),
 			eventExpiresAt: new Date(Date.now() + 60000).toISOString(),
 			artifactId: "usage-fixture",
-			artifactRevisionId: "artifact:usage.dashboard@1",
+			artifactRevisionId: "artifact:usage.dashboard@2",
 			scopeRef: registration.scopeRef,
 			source: "usage",
 			sourceRevision: 0,
@@ -125,7 +139,11 @@ test("registered artifact reads owner records across pages and stores reviewed r
 			bundleHost: offlineBundleHost,
 		});
 		const checked = capabilityBundleV1.parse(bundle);
-		expect(checked.artifacts[0]!.launcher).not.toHaveProperty("group");
+		expect(
+			checked.artifacts.find(
+				(a) => a.id === "usage.dashboard" && a.revision === 2,
+			)!.launcher,
+		).toHaveProperty("group", "管理と確認");
 		await caps.seed();
 		const adapter = createUsageAdapter(settings);
 		await store.write((db) => {

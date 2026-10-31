@@ -943,7 +943,7 @@ test("deleting a connection removes its models, frees the routes that used them 
 	expect(saved.connections.map((c) => c.id)).toEqual([other]);
 	expect(saved.resources).toEqual([]);
 	expect(saved.routes.tts.fallbackId).toBeNull();
-	expect(saved.routes.tts.mode).toBe("larm-preferred");
+	expect(saved.routes.tts.mode).toBe("larm-only");
 	expect(h.settings.diagnostics().connections.map((c) => c.id)).toEqual([
 		other,
 	]);
@@ -1140,7 +1140,7 @@ test("changing a model's purpose resets the purpose's values and frees its route
 		voice: null,
 	});
 	expect(saved.routes.tts.fallbackId).toBeNull();
-	expect(saved.routes.tts.mode).toBe("larm-preferred");
+	expect(saved.routes.tts.mode).toBe("larm-only");
 });
 
 test("turning cloud sending off leaves a cloud-only purpose LARM only", async () => {
@@ -1323,7 +1323,7 @@ test("sources list connections without credentials, models per purpose and the r
 	});
 	const routes = read("query:settings.routes@1").routes;
 	expect(routes.tts).toMatchObject({
-		mode: "larm-preferred",
+		mode: "larm-only",
 		fallbackId: null,
 		fallbackLabel: null,
 		resourceCount: 2,
@@ -1374,7 +1374,7 @@ test("the AI and external-work artifacts apply through the action ledger with st
 			eventCreatedAt: new Date(now).toISOString(),
 			eventExpiresAt: new Date(now + 60_000).toISOString(),
 			artifactId: "tab-ai",
-			artifactRevisionId: "artifact:settings.ai-connections@8",
+			artifactRevisionId: "artifact:settings.ai-connections@9",
 			source: "settings-ai",
 			sourceRevision: rev(h),
 			actionId: "apply",

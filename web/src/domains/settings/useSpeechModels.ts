@@ -109,7 +109,9 @@ export function useSpeechModels(client: EumenesClient) {
 			const settings = structuredClone(value);
 			const route = settings.routes[purpose];
 			if (id === "larm") {
-				if (route.mode === "cloud-only") route.mode = "larm-preferred";
+				// Speech has no cloud fallback (a failed clause is not spoken).
+				if (purpose === "tts") route.mode = "larm-only";
+				else if (route.mode === "cloud-only") route.mode = "larm-preferred";
 			} else {
 				const entry = unregistered.get(id);
 				if (entry) {

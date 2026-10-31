@@ -373,6 +373,7 @@ export async function warmConversation(
 			{
 				sessionRole: "auxiliary",
 				onConversation: true,
+				agentSession: { conversationId, agentId: conversationId },
 				readAhead: true,
 			},
 		);
@@ -517,6 +518,7 @@ export function createContextKeeper(
 				{
 					sessionRole: "auxiliary",
 					onConversation: true,
+					agentSession: { conversationId, agentId: conversationId },
 				},
 			);
 			abort.signal.throwIfAborted();

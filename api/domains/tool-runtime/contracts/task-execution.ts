@@ -245,6 +245,10 @@ export function executionCallSession(child: ChildExecution) {
 	return {
 		sessionRole: "subagent" as const,
 		taskId: child.id,
+		agentSession: {
+			conversationId: child.source.conversationId,
+			agentId: child.id,
+		},
 		refs: {
 			conversationId: child.source.conversationId,
 			messageIds: [

@@ -460,7 +460,20 @@ export async function executeRequest(
 			: undefined;
 	const key = `${row.purpose}:${JSON.stringify({ larm: row.snapshot.larm, route: routeConfig, resource: selected?.resource, connection: selected?.connection, voice })}`;
 	try {
-		return await runAttempts(request, key);
+		if (row.purpose !== "tts") return await runAttempts(request, key);
+		return await env.speechLane.run(
+			signal,
+			() => runAttempts(request, key),
+			(waited, ahead) => {
+				if (ahead)
+					log.info("inference.speech_lane_waited", {
+						inferenceId: row.id,
+						subjectId: row.subject,
+						durationMs: Math.round(waited),
+						count: ahead,
+					});
+			},
+		);
 	} catch (error) {
 		// Optional auxiliary work shares the answer's authority, but its provider failure is not the answer's
 		// terminal state, and a retained call leaves the request for another call. A conversation's call (`main`)

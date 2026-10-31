@@ -15,6 +15,7 @@ import {
 	voiceStartSchema,
 	chunkPlayedSchema,
 	inputCommitSchema,
+	speechClaimSchema,
 } from "../contracts";
 
 const log = getLogger("voice");
@@ -118,6 +119,12 @@ export function registerVoiceDialogue(
 			),
 			202,
 		);
+	});
+	app.post("/api/voice/speech-claims", async (c) => {
+		const parsed = await parseJsonBody(c, speechClaimSchema);
+		if (!parsed.ok) return parsed.response;
+		service.claimSpeech(parsed.data.screenId, parsed.data.sourceKey);
+		return c.json({ claimed: true });
 	});
 	app.post("/api/voice/replay/sentences", async (c) => {
 		const parsed = await parseJsonBody(c, replayInputSchema);

@@ -127,7 +127,7 @@ test("input and cloud edits join the shared change review and save to the regist
 	const saved = backend.saved();
 	expect(saved.voice.silenceMs).toBe(1800);
 	expect(saved.resources[0]!.voice).toBe("nova");
-	expect(saved.routes.tts.mode).toBe("larm-preferred");
+	expect(saved.routes.tts.mode).toBe("larm-only");
 	// The wire carries strings; the adapter reads them back into the document's types.
 	expect(backend.sent[0]!.input).toMatchObject({
 		changes: expect.arrayContaining([
@@ -279,7 +279,7 @@ test("every registered voice/input setting reaches the shared draft, applies, an
 		autoStrength: 1.5,
 	});
 	expect(saved.resources[0]).toMatchObject({ voice: "nova", speed: 1.2 });
-	expect(saved.routes.tts.mode).toBe("larm-preferred");
+	expect(saved.routes.tts.mode).toBe("larm-only");
 });
 
 test("voice actions refresh the catalog, and cancel playback", async () => {

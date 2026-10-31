@@ -9,12 +9,13 @@ import { captureBackgroundControl } from "./background-control";
 import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import type { LarmPort } from "../../larm";
+import { createGenerationLanes } from "../../larm";
 import {
 	createConfiguredLarm,
 	sharesLarmClient,
 	stableLarmClient,
 } from "./configured-larm";
-import { createScreenPresence } from "./screen-presence";
+import { createScreenPresence, screenOperations } from "./screen-presence";
 import type { SpeechPreparation } from "../../delivery/contracts";
 import type { SettingsService, Settings, Purpose } from "../../settings";
 import type {
@@ -72,12 +73,14 @@ const runControl = (env: Env, ...[id, m, s, c, session]: ControlArgs) =>
 	);
 import { createIndependentControls } from "./independent-control";
 import { createIntentJudge } from "./intent-judge";
+import { createSpeechLane } from "./speech-lane";
 export function createInference(
 	store: SqliteStore,
 	settings: SettingsService,
 	options: InferenceOptions = {},
 ) {
 	const ports = new Map<string, LarmPort>();
+	const larmLanes = createGenerationLanes();
 	const collectionAdoptions = new Map<string, CollectionAdoption>();
 	const unsubscribeCollection = options.attitudeDataset
 		? store.onCommit(() => {
@@ -106,6 +109,7 @@ export function createInference(
 	const screen = createScreenPresence(
 		() => port(settings.get()),
 		(changed) => settings.onChange(changed),
+		() => listeners.forEach((listener) => listener()),
 	);
 	function prune() {
 		const keep = new Set([
@@ -140,6 +144,7 @@ export function createInference(
 					s,
 					options,
 					stableLarmClient(settings.derivedKey("larm.client"), s.larm),
+					larmLanes,
 				);
 			ports.set(key, p);
 			const unsubscribeStatus = p.onChange?.(() => {
@@ -201,6 +206,7 @@ export function createInference(
 		options,
 		active,
 		cooldown,
+		speechLane: createSpeechLane(),
 		collectionAdoptions,
 		port,
 		resolve,
@@ -498,9 +504,7 @@ export function createInference(
 			return store.read((db) => valid(db, id));
 		},
 		connect: () => port(settings.get()).connect(),
-		screenPresence: screen.update,
-		screenPresent: screen.present,
-		onScreenShown: screen.onShown,
+		...screenOperations(screen),
 		prepareVoice: (signal: AbortSignal) =>
 			port(settings.get()).prepareVoice?.(signal) ?? Promise.resolve(),
 		status: () => port(settings.get()).status(),
@@ -531,7 +535,7 @@ export function createInference(
 			},
 		larmProfiles: async (signal: AbortSignal) =>
 			(await port(settings.get()).conversationProfiles?.(signal)) ?? [],
-		...createVoiceAccess({ settings, port, standalone, standaloneReceipt }),
+		...createVoiceAccess({ settings, port, standaloneReceipt }),
 		answer: (messages: Messages, signal: AbortSignal) =>
 			standalone("llm", messages, signal) as Promise<string>,
 		answerStream: (

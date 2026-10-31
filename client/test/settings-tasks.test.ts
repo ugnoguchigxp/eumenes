@@ -24,7 +24,7 @@ const settings = {
 	},
 	connections: [],
 	resources: [],
-	routes: { llm: route, asr: route, tts: route },
+	routes: { llm: route, asr: route, tts: { ...route, mode: "larm-only" } },
 	voice: {
 		autoSpeak: true,
 		outputVolume: 1,

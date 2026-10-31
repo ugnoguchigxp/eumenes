@@ -28,6 +28,9 @@ export function chatRequest(
 ) {
 	return {
 		model: provider.model,
+		...(options?.promptCacheKey
+			? { prompt_cache_key: options.promptCacheKey }
+			: {}),
 		messages: messages.map(
 			({ images, role, content: text, tool_calls, tool_call_id }) => {
 				const m = {

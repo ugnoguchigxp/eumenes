@@ -33,6 +33,8 @@ export async function repeatProfile(
 	signal?.throwIfAborted();
 	if (
 		created.profile !== current.request.profile ||
+		(current.bootEpoch !== undefined &&
+			created.bootEpoch !== current.bootEpoch) ||
 		created.agentProfile !== current.agentProfile ||
 		["released", "expired"].includes(String(created.status)) ||
 		!Array.isArray(created.providers)
@@ -48,7 +50,11 @@ export async function repeatProfile(
 		if (
 			!provider ||
 			provider.model !== previous.model ||
-			provider.protocol !== previous.protocol
+			provider.protocol !== previous.protocol ||
+			(name === "llm" &&
+				current.request.connectionRole &&
+				record(provider.contextWindow).maxTokens !==
+					previous.contextWindow?.maxTokens)
 		)
 			throw new Error("larm_retention_provider_changed");
 	}

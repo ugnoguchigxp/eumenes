@@ -1,21 +1,38 @@
 import { statusResponseSchema } from "../api/domains/larm/contracts";
+import {
+	playbackScreenSchema,
+	type ScreenDetails,
+} from "../api/domains/inference/contracts";
 import { callJson, json, type Transport } from "./transport";
 export function larmClient(transport: Transport) {
 	return {
 		identity: transport.identity,
-		async screenPresence(
+		/** Reports the screen; the answer says whether it is the one screen that plays sound. */
+		screenPresence: async (
 			id: string,
 			revision: number,
 			active: boolean,
 			sentAt: number,
 			signal?: AbortSignal,
-		) {
-			await transport.call(`/api/inference/screen/${encodeURIComponent(id)}`, {
-				...json({ revision, active, sentAt }, "PUT"),
-				keepalive: true,
-				signal,
-			});
-		},
+			details: ScreenDetails = {},
+		) =>
+			callJson(
+				transport,
+				playbackScreenSchema,
+				`/api/inference/screen/${encodeURIComponent(id)}`,
+				{
+					...json({ revision, active, sentAt, ...details }, "PUT"),
+					keepalive: true,
+					signal,
+				},
+			),
+		playbackScreen: async (id: string, signal?: AbortSignal) =>
+			callJson(
+				transport,
+				playbackScreenSchema,
+				`/api/inference/screen/${encodeURIComponent(id)}`,
+				{ signal },
+			),
 		status: async () =>
 			callJson(transport, statusResponseSchema, "/api/status"),
 		connectLarm: async () =>

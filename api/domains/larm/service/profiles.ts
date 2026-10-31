@@ -28,6 +28,7 @@ export type Provider = {
 	voice?: string;
 };
 export type Lease = {
+	bootEpoch?: string;
 	/** Exact original Profile request; periodic use preserves its session scope and revision. */
 	request: ProfileRequest;
 	id: string;

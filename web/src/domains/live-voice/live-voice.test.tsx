@@ -28,7 +28,11 @@ function settingsFixture() {
 		larm: { baseUrl: null, audience: "same-host", voice: "" },
 		connections: [],
 		resources: [],
-		routes: { llm: route(), asr: route(), tts: route() },
+		routes: {
+			llm: route(),
+			asr: route(),
+			tts: { ...route(), mode: "larm-only" },
+		},
 		voice: {
 			autoSpeak: true,
 			bargeIn: true,

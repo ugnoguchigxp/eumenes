@@ -9,6 +9,7 @@ import {
 	freshSignal,
 	judged,
 	enableEnglishSpeech,
+	cloudSpeech,
 } from "./inference.fixture";
 import { settle, waitFor } from "../../../infrastructure/wait-for";
 afterEach(async () => {
@@ -194,7 +195,7 @@ test("decision timeout keeps manual voice, fences late results and cancellation 
 	expect(parameters).toHaveLength(1);
 	expect(h.calls).toHaveLength(0);
 });
-test("speech text is rewritten for the local provider and for the cloud fallback", async () => {
+test("speech text is rewritten for the local provider and for cloud speech", async () => {
 	const local: string[] = [];
 	const h = await setup({
 		speechText: (text) => text.replace("SAAA", "サー"),
@@ -208,6 +209,7 @@ test("speech text is rewritten for the local provider and for the cloud fallback
 	const cloud = await setup({
 		speechText: (text) => text.replace("SAAA", "サー"),
 	});
+	await cloudSpeech(cloud);
 	await cloud.inference.speak("SAAAです", new AbortController().signal);
 	expect(JSON.parse(cloud.payloads.at(-1) as string).input).toBe("サーです");
 });
@@ -275,7 +277,7 @@ test("a sample shares the existing port through unrelated saves", async () => {
 			});
 		},
 	});
-	await enableEnglishSpeech(h, true);
+	await enableEnglishSpeech(h);
 	const close = spyOn(h.port, "close");
 	const sample = h.inference
 		.speak("試聴です。", freshSignal(), { voice: "Zundamon", speed: 1.1 })
@@ -415,7 +417,7 @@ test("each clause routes by its own text; English bypasses the Japanese dictiona
 			return wav();
 		},
 	});
-	await enableEnglishSpeech(h, true);
+	await enableEnglishSpeech(h);
 	await h.inference.speakWithDelivery("Open the API settings.", freshSignal());
 	await h.inference.speakWithDelivery("APIを確認します。", freshSignal());
 	await h.inference.speak(
@@ -453,7 +455,7 @@ test("without an English voice an English clause is spoken by the Japanese voice
 			return wav();
 		},
 	});
-	await enableEnglishSpeech(h, true);
+	await enableEnglishSpeech(h);
 	expect(
 		await h.inference.speak("Thank you for waiting.", freshSignal()),
 	).toEqual(wav());
@@ -471,44 +473,33 @@ test("an English voice synthesis error is not retried with the Japanese voice", 
 			throw new Error("larm_inference_500");
 		},
 	});
-	await enableEnglishSpeech(h, true);
+	await enableEnglishSpeech(h);
 	await expect(
 		h.inference.speak("Thank you for waiting.", freshSignal()),
 	).rejects.toThrow("larm_inference_500");
 	expect(languages).toEqual(["en"]);
 });
-test("when the LARM voices are unavailable every clause falls back to cloud speech without language routing", async () => {
+test("a failed LARM clause is not sent to the cloud voice; an English clause without its voice still tries the Japanese voice", async () => {
 	const languages: Array<string | undefined> = [];
 	const h = await setup({
-		speechText: (text) => `辞書${text}`,
 		localSpeech: async (_text, _signal, options) => {
 			languages.push(options?.speechLanguage);
 			throw new Error(
 				options?.speechLanguage === "en"
 					? "speech_tts_target_unavailable"
-					: "larm_inference_503",
+					: "larm_inference_429",
 			);
 		},
 	});
 	await enableEnglishSpeech(h);
-	expect(
-		await h.inference.speak("Thank you for waiting.", freshSignal()),
-	).toEqual(wav());
-	expect(await h.inference.speak("今日は晴れです。", freshSignal())).toEqual(
-		wav(),
-	);
-	// English falls to the Japanese voice first; each voice cools down on its own.
+	await expect(
+		h.inference.speak("Thank you for waiting.", freshSignal()),
+	).rejects.toThrow("larm_inference_429");
+	await expect(
+		h.inference.speak("今日は晴れです。", freshSignal()),
+	).rejects.toThrow("larm_inference_429");
 	expect(languages).toEqual(["en", "ja", "ja"]);
-	const speech = h.calls.filter((url) => url.endsWith("audio/speech"));
-	expect(speech).toHaveLength(2);
-	const inputs = h.payloads
-		.filter((body): body is string => typeof body === "string")
-		.map((body) => JSON.parse(body) as { input?: string })
-		.map((body) => body.input);
-	expect(inputs).toEqual([
-		"辞書Thank you for waiting.",
-		"辞書今日は晴れです。",
-	]);
+	expect(h.calls.filter((url) => url.endsWith("audio/speech"))).toEqual([]);
 });
 
 test("the delivery judge reads the spoken turns only: a kept tool call and its result are not talk", async () => {

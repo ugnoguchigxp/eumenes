@@ -1,4 +1,5 @@
 import { useNotificationAudio } from "./useNotificationAudio";
+import { useScreenSound } from "./useScreenSound";
 import { chatSend } from "./chat-send";
 import { useChatAttachments } from "./useChatAttachments";
 import { useDrawingArtifacts } from "../domains/excalidraw/useDrawingArtifacts";
@@ -24,7 +25,7 @@ import { activeTimersQuery } from "../domains/timers/queries";
 import { TIMER_ADAPTER_REF } from "../domains/timers/toolchain-adapter";
 import { useTimerArtifacts } from "../domains/timers/useTimerArtifacts";
 import { useToolchainArtifacts } from "../domains/toolchain-artifacts";
-import type { AudioStore } from "../domains/audio";
+import { createScreenOutput, type AudioStore } from "../domains/audio";
 import { useArtifactWorkspace } from "../domains/artifact";
 import { useConversation } from "../domains/conversation";
 import { useCancel, useRuns, useSubmit } from "../domains/dialogue";
@@ -127,16 +128,20 @@ export function useWorkspace({
 		}),
 		[client],
 	);
+	const [screenOutput] = useState(() => createScreenOutput());
 	const voice = useVoiceDialogue(
 		voiceClient,
 		store,
 		undefined,
 		settings.data?.voice,
+		screenOutput.noticeQuiet,
 	);
+	const sound = useScreenSound(client, screenOutput, voice);
 	const timerAudio = useNotificationAudio(
 		settings.data?.voice,
 		voice.audio,
 		(text, signal) => client.replayAudio(text, signal),
+		sound.notice,
 	);
 	const chime = timerAudio.chime;
 	useClaudeCodeArtifacts(client, openClaudeCode, chime);
@@ -145,18 +150,9 @@ export function useWorkspace({
 	const replay = useReplay(client, settings.data?.voice, {
 		sessionAudio: voice.audio,
 		interruptLive: voice.interrupt,
+		output: screenOutput,
 	});
 	const live = useWorkspaceLive(client, settings.data, voice, replay);
-	useAutomaticSpeech({
-		runs: runs.data,
-		messages: conversation.data?.messages,
-		enabled: !live.active && settings.data?.voice.autoSpeak,
-		player: replay,
-		ownsSpeech: voice.ownsSpeech,
-		blocked:
-			!!voice.turn?.runId &&
-			["responding", "synthesizing", "ready"].includes(voice.turn.status),
-	});
 	const mute = useVoiceMute(client);
 	const automaticInput = input.dictated && voice.active;
 	const recognitionId = voice.recognitionId;
@@ -259,6 +255,18 @@ export function useWorkspace({
 		toolchain,
 		runSignature: latestRun ? `${latestRun.id}:${latestRun.status}` : "",
 	});
+	useAutomaticSpeech({
+		runs: runs.data,
+		messages: conversation.data?.messages,
+		enabled: !live.active && settings.data?.voice.autoSpeak,
+		player: replay,
+		ownsSpeech: voice.ownsSpeech,
+		blocked:
+			!!voice.turn?.runId &&
+			["responding", "synthesizing", "ready"].includes(voice.turn.status),
+		screen: sound,
+		speaker: specialist.session,
+	});
 	const currentViewing = useCurrentViewing(
 		specialist.viewing,
 		artifacts.active,
@@ -292,6 +300,7 @@ export function useWorkspace({
 	return {
 		attachments,
 		live,
+		playbackScreen: sound.playbackScreen,
 		openLiveSettings: () => void openById("settings.live"),
 		draft,
 		artifacts,

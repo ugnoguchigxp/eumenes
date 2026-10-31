@@ -1,8 +1,10 @@
 import { createRoot } from "react-dom/client";
+import { useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ToolchainArtifactHost } from "../../../web/src/domains/toolchain-artifacts/ToolchainArtifactHost";
 import { createWebAdapterRegistry } from "../../../web/src/domains/toolchain-artifacts/registry";
 import { usageWebAdapter } from "../../../web/src/domains/usage/toolchain-adapter";
+import { menuEntries } from "../../../web/src/domains/toolchain-artifacts/launcher";
 import type { EumenesClient } from "../../../client";
 import type { UsageDashboardResource } from "@eumenes/artifact-ui/contracts";
 import type { ArtifactDefinitionV1 } from "../../../api/domains/capabilities/contracts";
@@ -10,8 +12,33 @@ import bundle from "../../../api/domains/capabilities/bundles/usage-dashboard.bu
 import "@eumenes/design-system/styles";
 import "@eumenes/artifact-ui/styles";
 
-const artifact = bundle.artifacts[0] as ArtifactDefinitionV1;
-const revision = "artifact:usage.dashboard@1";
+const artifact = bundle.artifacts.find(
+	(a) => a.id === "usage.dashboard" && a.revision === 2,
+) as ArtifactDefinitionV1;
+const revision = "artifact:usage.dashboard@2";
+const hub = bundle.artifacts.find(
+	(a) => a.id === "settings.hub" && a.revision === 10,
+) as ArtifactDefinitionV1;
+const hubRevision = "artifact:settings.hub@10";
+const entries = [
+	{
+		artifactRevisionId: revision,
+		artifactId: "usage.dashboard",
+		title: "利用状況",
+		launcher: artifact.launcher,
+		adapterRef: "adapter:usage@1",
+	},
+	{
+		artifactRevisionId: hubRevision,
+		artifactId: "settings.hub",
+		title: "設定",
+		launcher: hub.launcher,
+		adapterRef: "adapter:settings@1",
+	},
+];
+document.documentElement.dataset.topMenu = menuEntries(entries)
+	.map((entry) => entry.title)
+	.join(",");
 const localDay = (n: number) =>
 	new Date(n + 9 * 3600000).toISOString().slice(0, 10);
 const today = localDay(Date.now());
@@ -38,18 +65,10 @@ const rates: UsageDashboardResource["rates"] = [];
 let sourceReads = 0;
 const client = {
 	identity: "usage-browser-fixture",
-	toolchainArtifacts: async () => [
-		{
-			artifactRevisionId: revision,
-			artifactId: "usage.dashboard",
-			title: "利用状況",
-			launcher: artifact.launcher,
-			adapterRef: "adapter:usage@1",
-		},
-	],
-	toolchainArtifact: async () => ({
-		artifact,
-		artifactRevisionId: revision,
+	toolchainArtifacts: async () => entries,
+	toolchainArtifact: async (requested: string) => ({
+		artifact: requested === hubRevision ? hub : artifact,
+		artifactRevisionId: requested,
 		digest: "fixture",
 		scopeRef: "scope:main",
 	}),
@@ -170,24 +189,34 @@ const client = {
 const cache = new QueryClient({
 	defaultOptions: { queries: { retry: false } },
 });
-createRoot(document.getElementById("root")!).render(
-	<QueryClientProvider client={cache}>
-		<main
-			style={{
-				margin: "16px auto",
-				maxWidth: 940,
-				border: "1px solid var(--border)",
-				borderRadius: 10,
-				overflow: "hidden",
-			}}
-		>
-			<ToolchainArtifactHost
-				client={client}
-				adapters={createWebAdapterRegistry([usageWebAdapter])}
-				artifactId="usage-fixture"
-				artifactRevisionId={revision}
-				visible
-			/>
-		</main>
-	</QueryClientProvider>,
-);
+function Fixture() {
+	const [selected, setSelected] = useState(hubRevision);
+	return (
+		<QueryClientProvider client={cache}>
+			<main
+				style={{
+					margin: "16px auto",
+					maxWidth: 940,
+					border: "1px solid var(--border)",
+					borderRadius: 10,
+					overflow: "hidden",
+				}}
+			>
+				<ToolchainArtifactHost
+					key={selected}
+					client={client}
+					adapters={createWebAdapterRegistry([usageWebAdapter])}
+					artifactId="usage-fixture"
+					artifactRevisionId={selected}
+					onNavigate={(id) => {
+						if (id !== "usage.dashboard") return false;
+						setSelected(revision);
+						return true;
+					}}
+					visible
+				/>
+			</main>
+		</QueryClientProvider>
+	);
+}
+createRoot(document.getElementById("root")!).render(<Fixture />);

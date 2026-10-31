@@ -56,7 +56,11 @@ export function defaults(env: Record<string, string | undefined>): Settings {
 		},
 		connections: [],
 		resources: [],
-		routes: { llm: route(), asr: route(), tts: route() },
+		routes: {
+			llm: route(),
+			asr: route(),
+			tts: { ...route(), mode: "larm-only" as const },
+		},
 		voice: {
 			autoSpeak: true,
 			outputVolume: 1,

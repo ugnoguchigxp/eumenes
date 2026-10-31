@@ -1,6 +1,6 @@
 export type { ChatImage } from "./contracts";
 export { createInference, type InferenceService } from "./service";
-export { fallbackErrors, isRetryableSpeechError } from "./service/errors";
+export { fallbackErrors } from "./service/errors";
 export {
 	/** @public */ migration,
 	/** @public */ parentsMigration,

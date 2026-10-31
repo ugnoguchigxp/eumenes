@@ -50,6 +50,7 @@ async function releaseConnection(current: Lease, control: Control) {
 }
 
 type Options = {
+	connectionRole?: "main" | "sub";
 	base: URL | undefined;
 	token: string | undefined;
 	profile: string;

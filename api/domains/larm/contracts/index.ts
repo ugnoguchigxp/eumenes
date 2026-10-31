@@ -39,6 +39,14 @@ import type {
 	NativeToolCall,
 } from "../../../infrastructure/chat-stream";
 export type LarmCallOptions = {
+	/** Host agent identity, independent of LARM connection ids and Provider credentials. */
+	agentSession?: {
+		conversationId: string | null;
+		agentId: string;
+		branchId?: string;
+	};
+	/** OpenAI input-cache identity; the connection manager supplies an opaque stable value. */
+	promptCacheKey?: string;
 	/** The attempt's own time limit when longer than usual: the stuck-stream guard is never shorter. */
 	attemptMs?: number;
 	/** One-off synthesis values; reuse the claimed connection. Undefined style explicitly resets it. */

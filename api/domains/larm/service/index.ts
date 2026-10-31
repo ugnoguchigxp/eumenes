@@ -38,7 +38,7 @@ function conversationProfile(item: unknown) {
 		: [];
 }
 
-export function createLarm(config: {
+type LarmConfig = {
 	/** LARM control origin. There is no default: without it the port stays unconfigured. */
 	baseUrl?: string;
 	/** Extra hosts that may receive provider credentials; supplied by the composition root from Config (EUMENES_LARM_PROVIDER_HOSTS). */
@@ -47,6 +47,9 @@ export function createLarm(config: {
 	profile?: string;
 	audience?: string;
 	client?: string;
+	/** Capacity of an explicitly managed agent connection; speech selection is unchanged. */
+	connectionRole?: "main" | "sub";
+	promptCacheKey?: string;
 	voice?: string;
 	fetch?: Fetcher;
 	speed?: number;
@@ -64,7 +67,19 @@ export function createLarm(config: {
 	 * nothing else. It answers `judgeIntent` only; the conversation's port answers the attitude `judge` only.
 	 */
 	decisionOnly?: boolean;
-}): LarmPort {
+};
+
+function assertSpeechSettings(config: LarmConfig) {
+	const speed = config.speed ?? 1;
+	if (!Number.isFinite(speed) || speed < 0.5 || speed > 2)
+		throw new Error("larm_tts_speed_invalid");
+	if (config.pitchScale !== undefined && (!Number.isFinite(config.pitchScale) || config.pitchScale < -0.15 || config.pitchScale > 0.15))
+		throw new Error("larm_tts_pitch_invalid");
+	if (config.intonationScale !== undefined && (!Number.isFinite(config.intonationScale) || config.intonationScale < 0 || config.intonationScale > 2))
+		throw new Error("larm_tts_intonation_invalid");
+}
+
+export function createLarm(config: LarmConfig): LarmPort {
 	const baseText = config.baseUrl?.trim();
 	const base = baseText
 		? localEndpoint(baseText, [new URL(baseText).hostname])
@@ -88,23 +103,7 @@ export function createLarm(config: {
 	)
 		throw new Error("larm_same_host_requires_loopback");
 	const voice = config.voice?.trim() || undefined;
-	const speed = config.speed ?? 1;
-	if (!Number.isFinite(speed) || speed < 0.5 || speed > 2)
-		throw new Error("larm_tts_speed_invalid");
-	if (
-		config.pitchScale !== undefined &&
-		(!Number.isFinite(config.pitchScale) ||
-			config.pitchScale < -0.15 ||
-			config.pitchScale > 0.15)
-	)
-		throw new Error("larm_tts_pitch_invalid");
-	if (
-		config.intonationScale !== undefined &&
-		(!Number.isFinite(config.intonationScale) ||
-			config.intonationScale < 0 ||
-			config.intonationScale > 2)
-	)
-		throw new Error("larm_tts_intonation_invalid");
+	assertSpeechSettings(config);
 	const idleTimeoutMs = config.idleTimeoutMs ?? 300_000;
 	const hostsFor = () => {
 		if (!base) throw new Error("larm_base_url_unconfigured");
@@ -143,6 +142,7 @@ export function createLarm(config: {
 		control,
 		lifetime,
 		decisionOnly: config.decisionOnly,
+		connectionRole: config.connectionRole,
 	});
 	const { connect, withProvider, status } = leases;
 	async function inferAnswer(
@@ -152,13 +152,23 @@ export function createLarm(config: {
 		options?: LarmCallOptions,
 	) {
 		return withProvider("llm", signal, (p, connectionId) =>
-			answerRequest(p, messages, signal, onDelta, options, {
-				profile,
-				request,
-				sameClaim: () => leases.current("llm")?.providers.get("llm") === p,
-				send: (init) =>
-					infer(p, "chat/completions", init, signal, connectionId, options),
-			}),
+			answerRequest(
+				p,
+				messages,
+				signal,
+				onDelta,
+				{
+					...options,
+					promptCacheKey: config.promptCacheKey ?? options?.promptCacheKey,
+				},
+				{
+					profile,
+					request,
+					sameClaim: () => leases.current("llm")?.providers.get("llm") === p,
+					send: (init) =>
+						infer(p, "chat/completions", init, signal, connectionId, options),
+				},
+			),
 		);
 	}
 	async function answer(

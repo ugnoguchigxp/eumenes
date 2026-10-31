@@ -5,6 +5,7 @@ export type {
 } from "./controller";
 export { createAudioController } from "./controller";
 export { useTimerTone } from "./useTimerTone";
+export { createScreenOutput, type ScreenOutput } from "./screen-output";
 export type { AudioStore } from "./store";
 export type { SegmentTiming } from "./controller/segment-timing";
 export { createAudioStore } from "./store";

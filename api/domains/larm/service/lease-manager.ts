@@ -72,6 +72,7 @@ export function createLeaseManager({
 	profile,
 	audience,
 	client,
+	connectionRole,
 	idleTimeoutMs,
 	keepAlive = false,
 	hostsFor,
@@ -83,6 +84,7 @@ export function createLeaseManager({
 	profile: string;
 	audience: string;
 	client: string;
+	connectionRole?: "main" | "sub";
 	idleTimeoutMs: number;
 	/** The connection is held while the port is open, as LARM's input cache lives on it (not only while a screen shows). */
 	keepAlive?: boolean;
@@ -212,6 +214,12 @@ export function createLeaseManager({
 		const idempotencyKey = crypto.randomUUID();
 		checkingProfile = requestProfile;
 		log[requestProfile ? "debug" : "info"]("larm.connection_started", {
+			sessionRole: connectionRole,
+			maxTokens: connectionRole
+				? connectionRole === "main"
+					? 200000
+					: 131072
+				: undefined,
 			count: required.length,
 		});
 		connecting = (async () => {
@@ -255,6 +263,7 @@ export function createLeaseManager({
 					hosts: hostsFor,
 					profile,
 					client,
+					connectionRole,
 					audience,
 					idleTimeoutMs,
 					lifetime: lifetime.signal,

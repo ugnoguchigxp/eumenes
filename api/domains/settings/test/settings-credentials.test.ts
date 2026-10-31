@@ -271,6 +271,39 @@ test("a stored sentence-language switch migrates to englishSpeechEnabled and dro
 	expect(reopened.get().larm).toEqual(migrated);
 });
 
+test("a stored speech route that preferred LARM with a cloud fallback becomes LARM only; other purposes keep their fallback", async () => {
+	const h = await setup();
+	const raw = JSON.parse(
+		(
+			h.store.read((db) =>
+				db.query("SELECT document FROM settings_document WHERE id=1").get(),
+			) as { document: string }
+		).document,
+	);
+	for (const purpose of ["llm", "asr", "tts"])
+		raw.routes[purpose] = { ...raw.routes[purpose], mode: "larm-preferred" };
+	await h.store.write((db) => {
+		db.query("UPDATE settings_document SET document=? WHERE id=1").run(
+			JSON.stringify(raw),
+		);
+	});
+	const migrated = h.settings.get();
+	expect(migrated.routes.tts.mode).toBe("larm-only");
+	expect(migrated.routes.llm.mode).toBe("larm-preferred");
+	expect(migrated.routes.asr.mode).toBe("larm-preferred");
+	const reopened = await createSettings(h.store, { dbPath: h.dbPath, env: {} });
+	expect(reopened.get().routes.tts.mode).toBe("larm-only");
+	expect(
+		settingsSchema.safeParse({
+			...migrated,
+			routes: {
+				...migrated.routes,
+				tts: { ...migrated.routes.tts, mode: "larm-preferred" },
+			},
+		}).success,
+	).toBe(false);
+});
+
 test("world.curationResourceId must name a registered LLM resource", async () => {
 	const h = await setup();
 	const s = h.settings.get();

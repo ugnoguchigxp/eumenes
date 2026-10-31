@@ -19,11 +19,13 @@ import { queryRoots } from "../../../queryKeys";
 import { createVoiceMachine, isCurrent } from "./machine";
 import { createInputLedger } from "./input-timing";
 import { describeError } from "../../../errorMessages";
+/** `noticeQuiet` holds a reply chunk while a notice sounds on the screen (spec tts-single-lane §4.4). */
 export function useVoiceDialogue(
 	client: VoiceDialogueClient,
 	store: AudioStore,
 	createAudio: CreateAudio = createAudioController,
 	settings?: Settings["voice"],
+	noticeQuiet?: () => Promise<void>,
 ) {
 	const cache = useQueryClient();
 	const options = useRef(settings);
@@ -107,7 +109,6 @@ export function useVoiceDialogue(
 		const active = machine.get().session;
 		const valid = () =>
 			!!active && isCurrent(machine.get(), active.token, value.utteranceId);
-		const canPlay = () => valid();
 		if (
 			value.audioChunks !== undefined &&
 			active &&
@@ -142,9 +143,10 @@ export function useVoiceDialogue(
 				markDelivered: (key) =>
 					machine.dispatch({ type: "delivered_marked", key }),
 				queued: () => machine.get().player?.epoch === playback.epoch,
-				valid: canPlay,
+				valid,
 				setSubtitle,
 				setAvatarCue,
+				noticeQuiet,
 				fail: (e) => {
 					if (!valid()) return;
 					setError(describeError(e));
@@ -169,7 +171,7 @@ export function useVoiceDialogue(
 			void client
 				.voiceAudio(value.utteranceId)
 				.then((bytes) => {
-					if (!isCurrent(machine.get(), active.token) || !canPlay()) return;
+					if (!valid()) return;
 					return controller.current?.play(
 						bytes,
 						() => {
@@ -189,14 +191,13 @@ export function useVoiceDialogue(
 						{
 							waitForPrevious: options.current?.bargeIn === false,
 							volume: options.current?.outputVolume,
-							shouldPlay: () =>
-								isCurrent(machine.get(), active.token) && canPlay(),
+							shouldPlay: valid,
 						},
 					);
 				})
 				.catch((e) => setError(describeError(e)));
 		}
-	}, [turn.data, client, cache, turnId, machine, cancelPlayback]);
+	}, [turn.data, client, cache, turnId, machine, cancelPlayback, noticeQuiet]);
 	useEffect(() => {
 		const value = turn.data;
 		if (

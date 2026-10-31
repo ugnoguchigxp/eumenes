@@ -118,6 +118,14 @@ export function callOptionsFor(
 			? { history: r.session.context }
 			: {}),
 		...sessionCallOptions(r.session),
+		...(r.row.purpose === "llm"
+			? {
+					agentSession: r.session?.agentSession ?? {
+						conversationId: null,
+						agentId: r.session?.taskId ?? r.row.id,
+					},
+				}
+			: {}),
 		// The level of the side that answers: a fallback attempt on the cloud takes the cloud's. Only the conversation's
 		// own call names one; a call on the conversation takes the conversation's LARM level (it reads the same prefix),
 		// and every other LARM chat call thinks at `low`, the least level every model accepts (one refuses `none` with

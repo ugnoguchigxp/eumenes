@@ -97,6 +97,12 @@ export interface BackgroundControl {
  * `auxiliary` (default): a one-shot call.
  */
 export type CallSession = {
+	/** Logical owner of the LARM session. A new history branch has a different branchId. */
+	agentSession?: {
+		conversationId: string | null;
+		agentId: string;
+		branchId?: string;
+	};
 	sessionRole?: "main" | "subagent" | "auxiliary";
 	/** `required`: the only valid output is a call of one of its tools. */
 	toolChoice?: "required";
@@ -346,6 +352,8 @@ export interface InferencePort {
 	/** Check a control receipt before delegation without adopting an answer. */
 	validateReceiptInTransaction?(db: Database, receipt: Receipt): boolean;
 	validRequest?(id: string): boolean;
+	/** Whether this screen is the one that plays sound (spec tts-single-lane §4.2). */
+	isPlaybackScreen?(screenId: string): boolean;
 	validInTransaction?(db: Database, id: string): boolean;
 	skipInTransaction?(db: Database, subject: string, purpose: Purpose): void;
 }
@@ -435,3 +443,4 @@ export const errorStatus = {
 	screen_presence_capacity: 429,
 	screen_presence_expired: 409,
 } as const satisfies Record<string, HttpErrorStatus>;
+export * from "./screen-presence";

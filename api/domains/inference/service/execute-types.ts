@@ -17,6 +17,7 @@ import {
 import { type RequestRow } from "../repository";
 import { type CallSessionRole } from "./attempt-record";
 import type { CloudAgents } from "../adapters/cloud-agents";
+import type { SpeechLane } from "./speech-lane";
 
 export type InferenceOptions = {
 	/** Agent SDK providers for connections whose kind is not openai-compatible. */
@@ -69,6 +70,8 @@ export type Env = {
 	options: InferenceOptions;
 	active: Map<string, Running>;
 	cooldown: Map<string, number>;
+	/** Speech synthesis takes turns here: one TTS request runs at a time. */
+	speechLane: SpeechLane;
 	collectionAdoptions: Map<string, CollectionAdoption>;
 	port(s: Settings): LarmPort;
 	resolve(

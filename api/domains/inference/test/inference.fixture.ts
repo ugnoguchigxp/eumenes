@@ -185,11 +185,20 @@ export const probeRow = (
 	);
 export async function enableEnglishSpeech(
 	h: Awaited<ReturnType<typeof setup>>,
-	localOnly = false,
 ) {
 	const s = h.settings.get();
 	s.larm.englishSpeechEnabled = true;
-	if (localOnly) s.routes.tts.mode = "larm-only";
+	await h.settings.apply({
+		requestId: crypto.randomUUID(),
+		expectedRevision: s.revision,
+		settings: s,
+		keys: [],
+	});
+}
+/** Speech has no fallback: the cloud voice speaks only on a cloud-only route. */
+export async function cloudSpeech(h: Awaited<ReturnType<typeof setup>>) {
+	const s = h.settings.get();
+	s.routes.tts.mode = "cloud-only";
 	await h.settings.apply({
 		requestId: crypto.randomUUID(),
 		expectedRevision: s.revision,

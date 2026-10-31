@@ -52,6 +52,8 @@ export function createRefresh({
 		const state = record(await readJson(response));
 		signal?.throwIfAborted();
 		if (state.id !== current.id) throw new Error("larm_invalid_connection");
+		if (current.bootEpoch && state.bootEpoch !== current.bootEpoch)
+			throw new Error("larm_connection_expired");
 		if (["failed", "expired", "released"].includes(String(state.status)))
 			throw new Error(`larm_connection_${state.status}`);
 		if (

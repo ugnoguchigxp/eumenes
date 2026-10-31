@@ -5,7 +5,7 @@ import type { InferenceService } from "../service";
 
 export function registerScreenPresence(
 	app: Hono,
-	service: Pick<InferenceService, "screenPresence">,
+	service: Pick<InferenceService, "screenPresence" | "isPlaybackScreen">,
 ) {
 	app.put("/api/inference/screen/:id", async (c) => {
 		if (!z.uuid().safeParse(c.req.param("id")).success)
@@ -18,12 +18,23 @@ export function registerScreenPresence(
 				.catch(() => null),
 		);
 		if (!input.success) return c.json({ error: "invalid_request" }, 400);
-		service.screenPresence(
-			c.req.param("id"),
-			input.data.revision,
-			input.data.active,
-			input.data.sentAt,
-		);
-		return c.body(null, 204);
+		const { revision, active, sentAt, ...details } = input.data;
+		return c.json({
+			playbackScreen: service.screenPresence(
+				c.req.param("id"),
+				revision,
+				active,
+				sentAt,
+				details,
+			),
+		});
+	});
+	/** Whether this screen is the one that plays sound; asked again on every change notice. */
+	app.get("/api/inference/screen/:id", (c) => {
+		if (!z.uuid().safeParse(c.req.param("id")).success)
+			return c.json({ error: "invalid_request" }, 400);
+		return c.json({
+			playbackScreen: service.isPlaybackScreen(c.req.param("id")),
+		});
 	});
 }

@@ -79,7 +79,27 @@ export const errorStatus = {
 	voice_input_stale: 409,
 	voice_input_not_ready: 409,
 	voice_audio_capacity: 503,
+	not_playback_screen: 409,
+	speech_already_claimed: 409,
+	speech_owned_by_voice_turn: 409,
+	speech_not_speaker: 409,
 } as const satisfies Record<string, HttpErrorStatus>;
+/**
+ * What an automatic speech or notice claims before it is played (spec tts-single-lane §4.3):
+ * `run:<runId>:answer`, `run:<runId>:announcement:<revision>`, `message:<agency message id>`,
+ * `notice:<source>:<id>`. The first claim wins; every other screen stays silent.
+ */
+export const speechClaimSchema = z
+	.object({
+		screenId: z.uuid(),
+		sourceKey: z
+			.string()
+			.max(240)
+			.regex(
+				/^(run:[^:\s]{1,120}:(answer|announcement:\d{1,9})|message:agency:\S{1,200}|notice:[a-z-]{1,40}:\S{1,160})$/,
+			),
+	})
+	.strict();
 
 const ms = z.number().int().nonnegative().max(600_000);
 /** Where the input's time went in the browser before its transcript was shown (ms, numbers only). */

@@ -5,12 +5,13 @@ import {
 	setup,
 	wav,
 	freshSignal,
+	cloudSpeech,
 } from "./inference.fixture";
 import { settle, waitFor } from "../../../infrastructure/wait-for";
 afterEach(async () => {
 	for (const close of cleanup.splice(0)) await close();
 });
-test("three purposes fall back once, adapters preserve paths and usage; no duplicate adoption", async () => {
+test("answers and transcripts fall back once, speech never does; adapters preserve paths and usage; no duplicate adoption", async () => {
 	const h = await setup();
 	expect(await h.inference.answer(messages, new AbortController().signal)).toBe(
 		"cloud-answer",
@@ -18,14 +19,18 @@ test("three purposes fall back once, adapters preserve paths and usage; no dupli
 	expect(
 		await h.inference.transcribe(wav(), new AbortController().signal),
 	).toBe("音声入力");
-	expect(
-		await h.inference.speak("answer", new AbortController().signal),
-	).toEqual(wav());
+	await expect(
+		h.inference.speak("answer", new AbortController().signal),
+	).rejects.toThrow("larm_control_503");
 	expect(h.calls).toEqual([
 		"http://127.0.0.1:19999/v1/chat/completions",
 		"http://127.0.0.1:19999/v1/audio/transcriptions",
-		"http://127.0.0.1:19999/v1/audio/speech",
 	]);
+	await cloudSpeech(h);
+	expect(
+		await h.inference.speak("answer", new AbortController().signal),
+	).toEqual(wav());
+	expect(h.calls.at(-1)).toBe("http://127.0.0.1:19999/v1/audio/speech");
 	const usage = h.inference.usage() as {
 		accepted: number;
 		source: string;
@@ -65,6 +70,7 @@ test("service tests pin a cloud resource without changing routes or falling back
 });
 test("cloud TTS keeps its own voice and speed from the accepted settings snapshot", async () => {
 	const h = await setup();
+	await cloudSpeech(h);
 	const s = h.settings.get();
 	s.larm.voice = "local-voice";
 	s.larm.speed = 0.7;

@@ -7,9 +7,19 @@ const AGENCY_MESSAGE_PREFIX = "agency:";
 const isAgencyUtterance = (message: { id: string }) =>
 	message.id.startsWith(AGENCY_MESSAGE_PREFIX);
 
+type Pending = {
+	id: string;
+	text: string;
+	runId: string | null;
+	/** The claim's key (spec tts-single-lane §4.3). */
+	sourceKey: string;
+};
+
 /**
  * New adopted answers and new agency utterances share the existing player; live voice turns own
- * their chunks.
+ * their chunks. Eumenes speaks as one (spec tts-single-lane §4.1–4.3): only the playback screen
+ * reads, only the conversation agent or the specialist the conversation is switched to is read, and
+ * each one is claimed on the backend first so no other screen reads it too.
  */
 export function useAutomaticSpeech({
 	runs,
@@ -18,6 +28,8 @@ export function useAutomaticSpeech({
 	player,
 	ownsSpeech,
 	blocked = false,
+	screen,
+	speaker,
 }: {
 	runs: Run[] | undefined;
 	messages: Array<{ id: string; text: string }> | undefined;
@@ -29,18 +41,27 @@ export function useAutomaticSpeech({
 	ownsSpeech: (utteranceId: string | null) => boolean;
 	/** Wait until the shared voice controller finishes its existing answer. */
 	blocked?: boolean;
+	screen: {
+		/** This screen is the one that plays sound. */
+		playbackScreen: boolean;
+		/** Claims the speech for this screen; false means another screen or nobody reads it. */
+		claim: (sourceKey: string) => Promise<boolean>;
+	};
+	/** The conversation's specialist session; it speaks only while active (switched to). */
+	speaker: { id: string; state: string } | null | undefined;
 }) {
+	const { playbackScreen: playback, claim } = screen;
+	const speakerSession = speaker?.state === "active" ? speaker.id : null;
 	const seen = useRef<Set<string> | null>(null);
 	const seenUtterances = useRef<Set<string> | null>(null);
-	const pending = useRef<
-		Array<{ id: string; text: string; runId: string | null }>
-	>([]);
+	const pending = useRef<Pending[]>([]);
 	const epoch = useRef(0);
 	const busy = useRef(false);
-	const latest = useRef({ enabled, player, blocked });
+	const audible = !!enabled && playback;
+	const latest = useRef({ audible, player, blocked, claim });
 	useEffect(() => {
-		latest.current = { enabled, player, blocked };
-	}, [enabled, player, blocked]);
+		latest.current = { audible, player, blocked, claim };
+	}, [audible, player, blocked, claim]);
 	const clearQueue = useCallback(() => {
 		pending.current = [];
 		epoch.current++;
@@ -61,7 +82,11 @@ export function useAutomaticSpeech({
 		}
 		for (const run of runs) {
 			if (run.status !== "completed" || seen.current.has(run.id)) continue;
-			if (!enabled || ownsSpeech(run.utteranceId)) {
+			if (
+				!audible ||
+				ownsSpeech(run.utteranceId) ||
+				(run.specialistSessionId && run.specialistSessionId !== speakerSession)
+			) {
 				seen.current.add(run.id);
 				continue;
 			}
@@ -80,6 +105,9 @@ export function useAutomaticSpeech({
 				id: message.id,
 				text: message.text,
 				runId: run.id,
+				sourceKey: run.answerMessageId
+					? `run:${run.id}:answer`
+					: `run:${run.id}:announcement:${run.revision}`,
 			});
 		}
 		for (const message of messages) {
@@ -89,25 +117,34 @@ export function useAutomaticSpeech({
 			)
 				continue;
 			seenUtterances.current!.add(message.id);
-			if (!enabled || !message.text.trim()) continue;
-			pending.current.push({ id: message.id, text: message.text, runId: null });
+			if (!audible || !message.text.trim()) continue;
+			pending.current.push({
+				id: message.id,
+				text: message.text,
+				runId: null,
+				sourceKey: `message:${message.id}`,
+			});
 		}
-		if (!enabled) {
+		if (!audible) {
 			clearQueue();
 			return;
 		}
 		if (blocked || busy.current || !pending.current.length) return;
 		busy.current = true;
 		const mine = epoch.current;
+		const current = () =>
+			mine === epoch.current &&
+			latest.current.audible &&
+			!latest.current.blocked;
 		void (async () => {
 			try {
-				while (
-					mine === epoch.current &&
-					latest.current.enabled &&
-					!latest.current.blocked
-				) {
+				while (current()) {
 					const answer = pending.current.shift();
 					if (!answer) break;
+					const claimed = await latest.current
+						.claim(answer.sourceKey)
+						.catch(() => false);
+					if (!claimed || !current()) continue;
 					await latest.current.player.play(
 						answer.id,
 						answer.text,
@@ -119,10 +156,20 @@ export function useAutomaticSpeech({
 				if (mine === epoch.current) busy.current = false;
 			}
 		})();
-	}, [runs, messages, enabled, player, ownsSpeech, blocked, clearQueue]);
+	}, [
+		runs,
+		messages,
+		enabled,
+		audible,
+		player,
+		ownsSpeech,
+		blocked,
+		speakerSession,
+		clearQueue,
+	]);
 	useEffect(() => {
 		const prepare = () => {
-			if (latest.current.enabled)
+			if (latest.current.audible)
 				void latest.current.player.prepare().catch(() => {});
 		};
 		document.addEventListener("pointerdown", prepare);

@@ -611,13 +611,13 @@ test("a runless message's host delivery reaches synthesis only for a clause of t
 });
 
 test.each([
-	["larm_inference_500", 3],
-	["workers_ai_http_400", 1],
-	["larm_inference_422", 1],
-	["network_unavailable", 3],
+	"larm_inference_429",
+	"larm_inference_500",
+	"workers_ai_http_400",
+	"network_unavailable",
 ] as const)(
-	"a failed clause (%s) is skipped after %i attempts and the rest is spoken",
-	async (code, attempts) => {
+	"a failed clause (%s) is skipped after one attempt and the rest is spoken",
+	async (code) => {
 		const dir = mkdtempSync(join(tmpdir(), "eumenes-voice-skip-"));
 		try {
 			const store = openStore(join(dir, "db.sqlite3"), schemaMigrations());
@@ -669,7 +669,7 @@ test.each([
 			)
 				await pause(20);
 			expect(voice.get(utteranceId)?.status).toBe("ready");
-			expect(calls.filter((t) => t.includes("壊れ"))).toHaveLength(attempts);
+			expect(calls.filter((t) => t.includes("壊れ"))).toHaveLength(1);
 			expect(voice.get(utteranceId)?.audioChunks.map((c) => c.text)).toEqual([
 				"最初です。",
 				"最後です。",

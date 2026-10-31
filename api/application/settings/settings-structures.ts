@@ -53,6 +53,10 @@ const confirmLarmOrigin = z.strictObject({
 
 export type ApplyKey = { connectionId: string; value?: string; delete?: true };
 
+/** The LARM mode a route returns to: speech has no cloud fallback. */
+const localMode = (purpose: Purpose) =>
+	purpose === "tts" ? ("larm-only" as const) : ("larm-preferred" as const);
+
 /**
  * Routes that would lose their cloud fallback fall back to LARM, as the legacy screen did; the
  * dedicated World model of a removed model goes back to the conversation route.
@@ -62,7 +66,7 @@ function releaseFallbacks(doc: Settings, resourceIds: ReadonlySet<string>) {
 		const route = doc.routes[purpose];
 		if (!route.fallbackId || !resourceIds.has(route.fallbackId)) continue;
 		route.fallbackId = null;
-		if (route.mode === "cloud-only") route.mode = "larm-preferred";
+		if (route.mode === "cloud-only") route.mode = localMode(purpose);
 	}
 	const curation = doc.world.curationResourceId;
 	if (curation && resourceIds.has(curation))
@@ -230,7 +234,7 @@ export function followPurposeChange(
 	const route = doc.routes[was.purpose];
 	if (route.fallbackId === resourceId) {
 		route.fallbackId = null;
-		if (route.mode === "cloud-only") route.mode = "larm-preferred";
+		if (route.mode === "cloud-only") route.mode = localMode(was.purpose);
 	}
 }
 

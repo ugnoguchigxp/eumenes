@@ -88,7 +88,9 @@ export function Workspace({
 			/>
 			<TimerNotifications
 				client={client}
-				playTone={timerAudio.play}
+				playTone={(signal, message, delivered, onTurn) =>
+					timerAudio.play(signal, message, delivered, false, undefined, onTurn)
+				}
 				repeatTone={timerAudio.repeat}
 				audioReady={timerAudio.ready}
 				prepareAudio={timerAudio.prepare}
@@ -97,6 +99,8 @@ export function Workspace({
 				inputBusy={() => voice.audio()?.isInputBusy?.() ?? false}
 				muted={mute.muted || settings.data?.voice.outputVolume === 0}
 				busy={
+					// Another screen plays sound: this one never claims a notice.
+					!state.playbackScreen ||
 					!mute.ready ||
 					settings.isPending ||
 					!!activeRun ||

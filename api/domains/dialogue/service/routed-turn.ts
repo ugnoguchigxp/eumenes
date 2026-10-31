@@ -160,6 +160,10 @@ function createTurn(
 	};
 	const session: CallSession = {
 		sessionRole: "main",
+		agentSession: {
+			conversationId: input.conversationId,
+			agentId: input.conversationId,
+		},
 		// The turn settles its request itself (a model answer, or the host's words): a failed call ends only that call,
 		// so a choice can be made again, the talk turn follow it, or the host answer.
 		retainRequest: true,

@@ -4,7 +4,7 @@ import { expect, test } from "bun:test";
 import type { LarmPort } from "../../larm";
 import { completion, setup, say, until, wav } from "./settings-voice.fixture";
 
-test("one voice turn uses fallback in all three stages, adopts one answer, and does not repeat duplicate upload", async () => {
+test("one voice turn uses the cloud in all three stages, adopts one answer, and does not repeat duplicate upload", async () => {
 	const h = await setup();
 	const session = crypto.randomUUID(),
 		id = crypto.randomUUID();
@@ -20,7 +20,7 @@ test("one voice turn uses fallback in all three stages, adopts one answer, and d
 	]);
 	expect(h.voice.takeAudio(id)).toEqual(wav());
 	const revoked = h.settings.get();
-	revoked.routes.tts.cloudAllowed = false;
+	Object.assign(revoked.routes.tts, { mode: "larm-only", cloudAllowed: false });
 	await h.settings.apply({
 		requestId: crypto.randomUUID(),
 		expectedRevision: revoked.revision,

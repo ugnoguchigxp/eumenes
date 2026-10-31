@@ -22,7 +22,7 @@ test("unsaved-row registration upgrades the existing screen without rewriting it
 			h.ledger
 				.artifacts()
 				.some(
-					(a) => a.artifactRevisionId === "artifact:settings.ai-connections@8",
+					(a) => a.artifactRevisionId === "artifact:settings.ai-connections@9",
 				),
 		).toBe(true);
 		for (const [field, code] of [
@@ -32,9 +32,9 @@ test("unsaved-row registration upgrades the existing screen without rewriting it
 			const bundle = structuredClone(h.bundle);
 			const screen = bundle.artifacts.find(
 				(a: { id: string; revision: number }) =>
-					a.id === "settings.ai-connections" && a.revision === 8,
+					a.id === "settings.ai-connections" && a.revision === 9,
 			);
-			screen.revision = 9;
+			screen.revision = 10;
 			screen.collections.find(
 				(c: { source: string }) => c.source === "settings-connections",
 			).create.preview.label = field;
@@ -67,7 +67,7 @@ test("registration rejects bad input without writes and saves the corrected conn
 					eventCreatedAt: new Date().toISOString(),
 					eventExpiresAt: new Date(Date.now() + 60_000).toISOString(),
 					artifactId: "registration-test",
-					artifactRevisionId: "artifact:settings.ai-connections@8",
+					artifactRevisionId: "artifact:settings.ai-connections@9",
 					source: "settings-ai",
 					sourceRevision: h.settings.get().revision,
 					actionId: "apply",

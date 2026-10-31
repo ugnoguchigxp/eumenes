@@ -10,7 +10,6 @@ import { ConversationHistory } from "./ConversationHistory";
 import { ConversationStatusBar } from "./ConversationStatusBar";
 import { usePanelFileDrop } from "./usePanelFileDrop";
 import { usePanelResources } from "./usePanelResources";
-import { useScreenPresence } from "./useScreenPresence";
 import type { WorkspaceState } from "./useWorkspace";
 
 export function ConversationPanel({
@@ -25,7 +24,6 @@ export function ConversationPanel({
 	/** Background mode: the chat stays mounted but hidden, and the background takes input. */
 	chatHidden?: boolean;
 }) {
-	useScreenPresence(client);
 	const resources = usePanelResources(client, state);
 	const { panel, dragging } = usePanelFileDrop(state);
 	const {

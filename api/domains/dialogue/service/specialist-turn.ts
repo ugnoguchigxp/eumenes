@@ -344,7 +344,14 @@ export function createSpecialistTurnHandler(
 				messages,
 				signal,
 				input.control,
-				{ sessionRole: "subagent", taskId: input.sessionId },
+				{
+					sessionRole: "subagent",
+					taskId: input.sessionId,
+					agentSession: {
+						conversationId: input.conversationId,
+						agentId: input.sessionId,
+					},
+				},
 			);
 			receipts.push(receipt);
 			const raw = String(receipt.value);

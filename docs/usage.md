@@ -1,6 +1,6 @@
 # 利用状況
 
-独立メニュー「利用状況」からアーティファクトを開く。既存のワークスペース内に表示し、全画面への遷移は行わない。音声会話設定の「関連画面」からも開ける。
+「設定 → 利用状況」（管理と確認）からアーティファクトを開く。既存のワークスペース内に表示する。音声会話設定の「関連画面」からも開ける。
 
 「概要」「Live」「Codex SDK」「料金設定」の4タブ。期間は今月を初期表示とし、今日・7日間・任意期間（366日以内）、モデル・接続で絞り込める。Codex SDKタブでは、保存済みの現在の会話モデルがCodex接続なら初期選択する。モデル識別子の完全一致で集計する。
 
@@ -19,7 +19,7 @@ Liveの事実はlive-voice、SDKはinferenceが所有する。既存の忘却処
 
 usage domainは公開読み取りportから数値を受け、集計と単価履歴のみを所有する。画面は15秒ごとに保存値を再読する。Providerの追加呼出し、LLMによる分類、追加APIキーは不要。金額は小数文字列と整数演算で12桁の小数精度まで計算し、表示時に整える。
 
-登録は `usage-dashboard.bundle.json`、`artifact:usage.dashboard@1`、`adapter:usage@1`。OpenUIの `usage-dashboard` は共通DesignSystem部品を呼ぶ登録view。独自の全画面ルートやWorkspaceArtifactsの分岐は追加しない。
+登録は `usage-dashboard.bundle.json`、`artifact:usage.dashboard@2`、`artifact:settings.hub@10`、`adapter:usage@1`。OpenUIの `usage-dashboard` は共通DesignSystem部品を呼ぶ登録view。独自の全画面ルートやWorkspaceArtifactsの分岐は追加しない。
 
 Codex実通信は毎回ephemeral threadを新規作成し1turn実行する。従ってthreadのtotalが今回のattempt量となる。lastは直近の上流呼出しであり、全量として使わない。将来thread再開を追加する場合は開始前累計を差し引く必要がある。モデル変更通知があった累計を元モデルだけに付けず「不明・複数モデル」に残す。
 

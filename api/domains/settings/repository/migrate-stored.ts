@@ -16,6 +16,7 @@ const isObject = (v: unknown): v is Json =>
  * - The removed dedicated LLM selections (`subagent`, `agency.resourceId`) and the agency ON/OFF (`agency.enabled`: spontaneous speech is always on) are dropped: every inference
  *   other than World curation runs on the one LLM configured for the conversation.
  * - The removed `codingSupervision` section (instruction approval for the retired CLI runner) is dropped.
+ * - Speech has no fallback: a `larm-preferred` speech route becomes `larm-only`.
  * It is idempotent: a migrated document passes through unchanged.
  */
 export function migrateStoredSettings(
@@ -44,6 +45,19 @@ export function migrateStoredSettings(
 			larm.englishSpeechEnabled ??= sentenceLanguageEnabled;
 		raw = { ...raw, larm };
 	}
+	if (
+		isObject(raw) &&
+		isObject(raw.routes) &&
+		isObject(raw.routes.tts) &&
+		raw.routes.tts.mode === "larm-preferred"
+	)
+		raw = {
+			...raw,
+			routes: {
+				...raw.routes,
+				tts: { ...raw.routes.tts, mode: "larm-only" },
+			},
+		};
 	if (!isObject(raw) || !Array.isArray(raw.connections))
 		return { document: raw, removedConnectionIds: [] };
 	const hasCredential = (c: Json) =>
@@ -86,7 +100,12 @@ export function migrateStoredSettings(
 					{
 						...route,
 						fallbackId: null,
-						mode: route.mode === "cloud-only" ? "larm-preferred" : route.mode,
+						mode:
+							route.mode !== "cloud-only"
+								? route.mode
+								: purpose === "tts"
+									? "larm-only"
+									: "larm-preferred",
 					},
 				];
 			}),

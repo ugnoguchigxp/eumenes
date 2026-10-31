@@ -13,6 +13,7 @@ import { SpeechSentences } from "./sentences";
 import { spokenText } from "./spoken-text";
 import { cancelHeard, recordPlayed } from "./playback";
 import { replaySentences, replayTextMatches } from "./replay-playback";
+import { createSpeechClaims } from "./speech-claims";
 import { connectAnnouncementDelivery } from "./announcement-delivery";
 
 import type { SqliteStore } from "../../../infrastructure/sqlite";
@@ -189,8 +190,11 @@ export function createVoiceDialogue(
 		}),
 		clock,
 	});
+	const speechClaims = createSpeechClaims({ store, dialogue, larm });
 	return {
 		available: () => !externalActive(),
+		/** Claims an automatic speech or notice for this screen; throws the refusal code. */
+		claimSpeech: speechClaims.claim,
 		pauseAll() {
 			return pauseLegacy(sessions, this.stop, controllers, warming, audio);
 		},

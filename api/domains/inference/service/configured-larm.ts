@@ -1,5 +1,5 @@
 import { createHmac } from "node:crypto";
-import { createLarm } from "../../larm";
+import { createAgentLarm, createGenerationLanes } from "../../larm";
 import type { Settings } from "../../settings";
 import type { InferenceOptions } from "./execute-types";
 
@@ -23,21 +23,27 @@ export function createConfiguredLarm(
 	s: Settings,
 	options: InferenceOptions,
 	client?: string,
+	lanes?: ReturnType<typeof createGenerationLanes>,
 ) {
-	return createLarm({
-		...(options.keepLarmConnection ? { keepAlive: true, client } : {}),
-		baseUrl: s.larm.baseUrl ?? undefined,
-		token: options.token,
-		providerHosts: options.providerHosts,
-		profile: s.larm.profile,
-		audience: s.larm.audience,
-		voice: s.larm.voice || undefined,
-		speed: s.larm.speed,
-		style: s.larm.style,
-		pitchScale: s.larm.pitchScale,
-		intonationScale: s.larm.intonationScale,
-		judgeActivity: options.judgeActivity,
-	});
+	return createAgentLarm(
+		{
+			client,
+			...(options.keepLarmConnection ? { keepAlive: true } : {}),
+			fetch: options.fetch,
+			baseUrl: s.larm.baseUrl ?? undefined,
+			token: options.token,
+			providerHosts: options.providerHosts,
+			profile: s.larm.profile,
+			audience: s.larm.audience,
+			voice: s.larm.voice || undefined,
+			speed: s.larm.speed,
+			style: s.larm.style,
+			pitchScale: s.larm.pitchScale,
+			intonationScale: s.larm.intonationScale,
+			judgeActivity: options.judgeActivity,
+		},
+		lanes,
+	);
 }
 
 /** Whether the port saved under `name` (its LARM settings as JSON) has the client, so the connection, of any of `others`. */

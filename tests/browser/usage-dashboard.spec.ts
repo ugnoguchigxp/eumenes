@@ -61,6 +61,8 @@ for (const [width, theme] of [
 		))
 			await page.addStyleTag({ url: "/assets/" + file });
 		await page.addScriptTag({ type: "module", url: "/fixture.js" });
+		await expect(page.locator("html")).toHaveAttribute("data-top-menu", "設定");
+		await page.getByRole("button", { name: /^利用状況/ }).click();
 		await expect(
 			page.getByRole("heading", { name: "利用状況", exact: true }),
 		).toBeVisible();

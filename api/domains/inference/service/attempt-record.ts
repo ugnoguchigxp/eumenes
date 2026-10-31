@@ -7,6 +7,7 @@ import type { RequestRow } from "../repository";
 
 /** A call's resolved session lifetime (LLM calls only). */
 export type CallSessionRole = {
+	agentSession?: CallSession["agentSession"];
 	sessionRole: "main" | "subagent" | "auxiliary";
 	taskId?: string;
 	/** An auxiliary call on the conversation's connection, yielding to the conversation. */
@@ -32,6 +33,7 @@ export type CallSessionRole = {
 export const sessionCallOptions = (session?: CallSessionRole) =>
 	session
 		? {
+				agentSession: session.agentSession,
 				sessionRole: session.sessionRole,
 				...(session.taskId ? { taskId: session.taskId } : {}),
 				...(session.onConversation ? { onConversation: true as const } : {}),
@@ -72,6 +74,7 @@ export function resolveSession(
 		throw new Error("invalid_failure_scope");
 	if (row.purpose !== "llm") {
 		if (
+			given?.agentSession ||
 			given?.sessionRole ||
 			given?.taskId ||
 			given?.context ||
@@ -85,6 +88,17 @@ export function resolveSession(
 		return undefined;
 	}
 	const sessionRole = given?.sessionRole ?? "auxiliary";
+	if (given?.agentSession) {
+		const owner = given.agentSession;
+		if (
+			[owner.agentId, owner.conversationId, owner.branchId].some((id, index) =>
+				(index === 1 && id === null) || (index === 2 && id === undefined)
+					? false
+					: typeof id !== "string" || !id || id.length > 200,
+			)
+		)
+			throw new Error("invalid_session_role");
+	}
 	if (
 		(given?.onConversation && sessionRole !== "auxiliary") ||
 		(given?.yields && sessionRole !== "auxiliary") ||
@@ -122,6 +136,7 @@ export function resolveSession(
 		throw new Error("invalid_session_context");
 	return {
 		sessionRole,
+		...(given?.agentSession ? { agentSession: { ...given.agentSession } } : {}),
 		...(given?.taskId ? { taskId: given.taskId } : {}),
 		...(given?.onConversation ? { onConversation: true as const } : {}),
 		...(given?.yields ? { yields: true as const } : {}),

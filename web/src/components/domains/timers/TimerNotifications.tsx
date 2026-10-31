@@ -26,6 +26,8 @@ type TimerNotificationsProps = {
 		signal: AbortSignal,
 		message?: string,
 		onToneDelivered?: () => void,
+		/** Told when the screen's notice lane gives this notice its turn. */
+		onTurn?: () => void,
 	) => Promise<void>;
 	muted?: boolean;
 	busy?: boolean;
@@ -37,6 +39,23 @@ type TimerNotificationsProps = {
 	todo?: TodoNotifications;
 };
 
+/**
+ * Aborts an attempt ten seconds after the screen's notice lane gives it its turn (`arm` again then),
+ * and never later than the claim's lease, so waiting for the turn is not counted as a stalled output.
+ */
+function attemptLimit(attempt: Attempt, available: number) {
+	const claimedAt = Date.now();
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	const arm = () => {
+		clearTimeout(timer);
+		timer = setTimeout(
+			() => attempt.controller.abort(),
+			Math.max(0, Math.min(available - (Date.now() - claimedAt), 10_000)),
+		);
+	};
+	arm();
+	return { arm, clear: () => clearTimeout(timer) };
+}
 function notificationAudioAction(
 	prepareAudio: (() => Promise<void>) | undefined,
 	onError: (message: string) => void,
@@ -199,7 +218,7 @@ export function TimerNotifications({
 		active.current.attempt = attempt;
 		void (async () => {
 			let claimId: string | undefined;
-			let timeout: ReturnType<typeof setTimeout> | undefined;
+			let limit: ReturnType<typeof attemptLimit> | undefined;
 			try {
 				if (latest.current.muted) {
 					await client.silenceTimerNotification(note.id, {
@@ -242,10 +261,7 @@ export function TimerNotifications({
 					else available = 0;
 				}
 				if (available <= 0) throw new Error("claim_expired");
-				timeout = setTimeout(
-					() => attempt.controller.abort(),
-					Math.min(available, 10_000),
-				);
+				limit = attemptLimit(attempt, available);
 				attempt.controller.signal.throwIfAborted();
 				if (delivered.current.has(note.id)) {
 					// Already sounded: confirm it with the server without ringing again.
@@ -271,6 +287,7 @@ export function TimerNotifications({
 						attempt.delivered = true;
 						delivered.current.add(note.id);
 					},
+					limit.arm,
 				);
 				attempt.controller.signal.throwIfAborted();
 				await client.ackTimerNotification(note.id, {
@@ -312,7 +329,7 @@ export function TimerNotifications({
 					}
 				}
 			} finally {
-				if (timeout) clearTimeout(timeout);
+				limit?.clear();
 				if (active.current.attempt === attempt) active.current.attempt = null;
 				void cache.invalidateQueries({
 					queryKey: [queryRoots.timers, "notifications"],

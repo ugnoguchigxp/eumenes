@@ -115,3 +115,45 @@ test("inference exposes screen ownership on its existing saved-settings port and
 	await h.inference.close();
 	expect(seen).toEqual([true, false, true, false]);
 });
+
+test("one screen plays sound: the voice session first, then the latest touch, then the latest registered; leaving hands it on", () => {
+	jest.useFakeTimers();
+	const changes: Array<string | null> = [];
+	const player = () =>
+		["one", "two"].find((id) => screen.isPlaybackScreen(id)) ?? null;
+	const screen = createScreenPresence(
+		() => ({ retain: () => {} }),
+		() => () => {},
+		() => changes.push(player()),
+	);
+	try {
+		expect(screen.update("one", 1, true, Date.now())).toBe(true);
+		jest.advanceTimersByTime(10);
+		// The newer screen takes it until someone touches a screen.
+		expect(screen.update("two", 1, false, Date.now())).toBe(true);
+		expect(screen.update("one", 2, true, Date.now(), { gestureAgeMs: 0 })).toBe(
+			true,
+		);
+		jest.advanceTimersByTime(10);
+		// The microphone's session wins over a later touch elsewhere.
+		expect(
+			screen.update("two", 2, false, Date.now(), { voiceSession: true }),
+		).toBe(true);
+		expect(screen.update("one", 3, true, Date.now(), { gestureAgeMs: 0 })).toBe(
+			false,
+		);
+		// A hidden screen keeps it; leaving hands it to the other screen.
+		expect(screen.update("two", 3, false, Date.now(), { leaving: true })).toBe(
+			false,
+		);
+		expect(screen.isPlaybackScreen("one")).toBe(true);
+		expect(changes).toEqual(["one", "two", "one", "two", "one"]);
+		// An older report never undoes a newer one.
+		expect(screen.update("two", 2, true, Date.now())).toBe(false);
+		jest.advanceTimersByTime(90_001);
+		expect(screen.isPlaybackScreen("one")).toBe(false);
+		expect(changes.at(-1)).toBeNull();
+	} finally {
+		screen.close();
+	}
+});
