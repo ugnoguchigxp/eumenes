@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import { RESEARCH_BUDGET } from "../../agent-runtime";
 import { packageRuntimeOf, type ToolchainCard } from "../../capabilities";
 import type { ExecutionReference } from "../../tool-runtime";
 import type { Run } from "../contracts";
@@ -166,14 +167,16 @@ export function dispatchInTransaction(
 		default: {
 			if (!agents || !runtime.route)
 				return { ok: false, code: "invalid_conversation_operation" };
-			// Only the selected package receives its declared research time; explicit outer deadlines stay fixed.
-			const serviceTime =
-				packageRuntimeOf(packageRevisionId.replace(/^package:|@\d+$/g, ""))
-					?.budget === "service"
-					? 360000
-					: 0;
-			if (serviceTime && run.deadlineFixed === false) {
-				const until = Date.parse(run.createdAt) + serviceTime;
+			// Only the selected package receives its declared research time (and the parent's margin); explicit outer
+			// deadlines stay fixed.
+			const researchMs = packageRuntimeOf(
+				packageRevisionId.replace(/^package:|@\d+$/g, ""),
+			)?.researchMs;
+			const runTime = researchMs
+				? researchMs + RESEARCH_BUDGET.parentMilliseconds
+				: 0;
+			if (runTime && run.deadlineFixed === false) {
+				const until = Date.parse(run.createdAt) + runTime;
 				if (until > deadline) {
 					extendRunDeadline(tx, run.id, new Date(until).toISOString());
 					deps.larm.extendDeadlineInTransaction?.(tx, run.id, until);

@@ -446,9 +446,10 @@ test("operations stop early enough to leave finish, verification and one repair"
 });
 
 test("a finish that leaves no room for verification is not saved", async () => {
+	// The history investigation's limit (11): a finish needs the verification's call and its repair left.
 	for (const [calls, accepted] of [
-		[5, true],
-		[6, false],
+		[9, true],
+		[10, false],
 	] as const) {
 		const h = await harness();
 		try {
@@ -456,7 +457,7 @@ test("a finish that leaves no room for verification is not saved", async () => {
 			await h.startHistory(id, "調査");
 			const c = h.agents.list(id).find((t) => t.kind === "worker")!;
 			expect(modelLimit({ package: { backend: "history" } } as Prepared)).toBe(
-				7,
+				11,
 			);
 			await h.store.write((db) =>
 				db

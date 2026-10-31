@@ -146,6 +146,9 @@ test.each([
 	["サブエージェントは何をしたの？", "read_agents"],
 	["さっきの調べものでどのページを見た？", "read_agents"],
 	["World だと Eumenes について何が記録されてる？", "read_world"],
+	// Old conversations and the whole record go to the history investigation (a sub-agent), recent words to the read.
+	["半年前の会話で決めたことを履歴から調べて", "history.research"],
+	["これまでの会話全体から旅行の話の経緯を洗い出して", "history.research"],
 ])("「%s」 puts %s first in the search", (text, expected) => {
 	expect(search(text)[0]?.id).toBe(expected);
 });

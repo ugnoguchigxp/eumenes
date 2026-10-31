@@ -13,7 +13,10 @@ export const RESEARCH_BUDGET = Object.freeze({
 	modelStepMilliseconds: 45000,
 	operationReserveMilliseconds: 60000,
 	webModelCalls: 12,
-	historyModelCalls: 7,
+	/** The conversation history investigation reaches back over old conversations: more pages, more steps. */
+	historyModelCalls: 11,
+	historyLocalCalls: 8,
+	worldModelCalls: 7,
 	localCalls: 4,
 	externalCalls: 5,
 	searches: 2,
@@ -52,30 +55,34 @@ export const serviceBudget = (p: Prepared | undefined) =>
 export const operationLimits = (p: Prepared | undefined) =>
 	serviceBudget(p)
 		? { localCalls: 0, externalCalls: 3, searches: 1, reads: 1 }
-		: guidedWeb(p)
-			? {
-					...RESEARCH_BUDGET,
-					localCalls: 4,
-					externalCalls: isQuickWeb(p) ? 6 : 8,
-					reads: isQuickWeb(p) ? 4 : 6,
-				}
-			: isRecipeWeb(p)
-				? RECIPE_WEB_BUDGET
-				: isQuickWeb(p)
-					? QUICK_WEB_BUDGET
-					: returnsSearchResults(p)
-						? SEARCH_BUDGET
-						: RESEARCH_BUDGET;
+		: isHistory(p)
+			? { ...RESEARCH_BUDGET, localCalls: RESEARCH_BUDGET.historyLocalCalls }
+			: guidedWeb(p)
+				? {
+						...RESEARCH_BUDGET,
+						localCalls: 4,
+						externalCalls: isQuickWeb(p) ? 6 : 8,
+						reads: isQuickWeb(p) ? 4 : 6,
+					}
+				: isRecipeWeb(p)
+					? RECIPE_WEB_BUDGET
+					: isQuickWeb(p)
+						? QUICK_WEB_BUDGET
+						: returnsSearchResults(p)
+							? SEARCH_BUDGET
+							: RESEARCH_BUDGET;
 /** Model calls kept back for the one repair of a research report's verification. */
 const repairReserve = 1;
 export const modelLimit = (p: Prepared | undefined) =>
 	serviceBudget(p)
 		? 5
-		: isHistory(p) || isWorld(p)
+		: isHistory(p)
 			? RESEARCH_BUDGET.historyModelCalls
-			: isQuickWeb(p)
-				? QUICK_WEB_BUDGET.modelCalls
-				: RESEARCH_BUDGET.webModelCalls;
+			: isWorld(p)
+				? RESEARCH_BUDGET.worldModelCalls
+				: isQuickWeb(p)
+					? QUICK_WEB_BUDGET.modelCalls
+					: RESEARCH_BUDGET.webModelCalls;
 /** Reads that stay inside the host (saved bodies, history, World) and use the local-call budget. */
 export const localTool = (meta: ToolRuntimeMeta | undefined) =>
 	meta?.operation === "saved_read" ||
@@ -94,9 +101,8 @@ export function workerDeadline(
 ) {
 	const deadline = Math.min(
 		now +
-			(packageRuntimeOf(packageId ?? "")?.budget === "service"
-				? 330000
-				: RESEARCH_BUDGET.workerMilliseconds),
+			(packageRuntimeOf(packageId ?? "")?.researchMs ??
+				RESEARCH_BUDGET.workerMilliseconds),
 		parentDeadline - RESEARCH_BUDGET.parentMilliseconds,
 	);
 	if (deadline <= now) throw new Error("agent_budget_exhausted");

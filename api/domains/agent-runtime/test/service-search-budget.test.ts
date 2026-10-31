@@ -32,6 +32,13 @@ test("service budgets preserve fallback and final answer without changing existi
 			.canOperate,
 	).toBe(false);
 });
+test("the history investigation is given its own research time; other research keeps the default", () => {
+	// 300 seconds, within the run's deadline less the parent's margin (spec conversation-read-tools-design §8).
+	expect(workerDeadline(360000, 0, "history.research")).toBe(300000);
+	expect(workerDeadline(180000, 0, "history.research")).toBe(150000);
+	expect(workerDeadline(360000, 0, "web.search")).toBe(150000);
+	expect(workerDeadline(360000, 0, "world.query")).toBe(150000);
+});
 test("revoking the frozen package revokes a research child's caller authority", async () => {
 	const h = await harness(Date.now, undefined, true, true);
 	try {

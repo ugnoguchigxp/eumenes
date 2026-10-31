@@ -122,7 +122,7 @@ read_world: World に記録された対象と主張、取り込んだ資料を�
 | 担当 | 案 | 理由 |
 | --- | --- | --- |
 | `memory_check`（同日に足した即答の担当） | 消す（bundle、adapter の instant、`memoryCheck`、試験、`docs/memory.md`・`docs/toolchain.md` の記載）。memory domain の読取り `check` は `read_memory` が使う | `read_memory` が同じことをどの回でもできる。道が2つあると迷う |
-| `conversation_history`（調査のサブエージェント） | **保留（訂正 10-31）**。合意の時点では「ほかに使う所はない」と書いたが誤り。登録済みの履歴調査の要件profile（[登録手順](../docs/toolchain-extension.md) §9 A1）は、会話がこの担当に頼んだときにサブエージェントが当てる。消すと要件profileつきの履歴調査が会話から使えなくなる。同じ日に別の作業（[未参照コードの整理](unreferenced-code-cleanup-plan-2026-10-31.md)）が seed からこの担当の定義を外しており、試験 H1・H7 と要件profileの10件はその変更で落ちている（本計画の変更では落ちない）。扱いは利用者の判断を待つ | 簡単な会話ログの確認は `read_history` が受ける |
+| `conversation_history`（調査のサブエージェント） | **残す（10-31 利用者「Aよりかな、かなり古い履歴も対象にして探してくれるサブエージェントとしようと思います」）**。古い会話まで遡る詳しい調査と、登録済みの履歴調査の要件profile（[登録手順](../docs/toolchain-extension.md) §9 A1）の担当にする（§8）。合意の時点の「ほかに使う所はない」は誤りだった | 最近の発言の確認は `read_history` が受ける |
 | `world_query`（調査のサブエージェント） | 残す。avoidWhen に「記録の確認だけ（会話の回の read_world）」を足す新しい revision | 影響・依存・仮定の比較は、複数の照会を組み合わせる調べもの |
 
 固定の道具 `memory` の read は `read_memory` に移し、`memory` は選ぶ呼出しの `memory.request` だけが使う。
@@ -185,3 +185,42 @@ read_world: World に記録された対象と主張、取り込んだ資料を�
 - R4 の World の読取り口（`recordsInTransaction` の実装）。World domain が同日の整理で作業中のため後に回した。実装までは `read_world` は道具にも候補にも出ない
 - `conversation_history` の扱い（§3、利用者の判断待ち）
 - 反映の再起動と、検索の確認（`bun scripts/toolchain-search-check.ts`）、live（LFM が道具を呼びすぎないか、呼ぶべきときに呼ぶか）。測定は利用者の合図の後
+
+## 8 会話履歴のサブエージェント（古い会話の調査）
+
+利用者（10-31）「Aよりかな、かなり古い履歴も対象にして探してくれるサブエージェントとしようと思います」。今の制約: 1回の `history.search` は新しい方から最大500件・1MB を走査し、日時を指定しても新しい方から走査する。サブエージェントはホスト内の操作4回・モデル7回・150秒（run の期限3分の内）。遡れるのは概ね2,000件まで。
+
+| 項目 | 決め |
+| --- | --- |
+| 担当 | `history.research` の toolchain revision 2 を bundle（`conversation-history.bundle.json`）で戻す（seed からは同日の整理で外れた）。関数名は `conversation_history` のまま。題は「会話履歴の調査」 |
+| 検索の文 | 何週間・何か月も前の会話を探す、会話の記録全体から経緯や根拠を洗い出す、要件に沿って調べる依頼を書く。さっき・今朝などの最近の発言の確認は書かず、`read_history` へ redirect |
+| SKILL | revision 3。古い時期は from・until でその期間から探す。時期が分からなければ語で探し、cursor があり走査が終わっていなければ予算の範囲で続ける。予算が尽きたら、どこまで確かめたかを limitations に書く |
+| 日時で絞った走査 | 会話ログの検索の行の選択に、日時の範囲を SQL の条件として入れる（`julianday` で比べる）。結果は今と同じで、走査の上限（500件・1MB）は範囲内の行だけに使う。古い期間へ直接届く。`read_history` も同じ検索を使う |
+| 予算 | 会話履歴の調査だけ、ホスト内の操作 4→8、モデル呼出し 7→11。World の調査は今のまま（7） |
+| 時間（10-31 利用者「この時間制限の見直しをして300秒にしましょう」） | 会話履歴の調査は300秒（調査の既定は150秒）。会話がこの担当に頼んだ run は、期限が外から固定されていなければ、作成から330秒（調査の300秒と親の余裕30秒）まで延ばす。仕組みは、サービス内検索だけにあった「package の調査時間」を package の実行時の情報 `researchMs` に一般化したもの（サービス内検索は今と同じ330秒・run 360秒） |
+| 変えないもの | run の期限、要件profileの適用、根拠の検証、報告の形 |
+
+時間の上限の種類（10-31 時点）: 調査型のサブエージェント（Web検索・会話履歴・World）の既定は150秒で共通（run の期限から親の余裕30秒を引いた内）。例外は package ごとの調査時間（サービス内検索330秒、会話履歴の調査300秒）。専門担当のセッションは bundle の `timeLimits`（既定 run 180秒・1ターン120秒）、画像・作曲は生成の時間（300秒）で run を延ばす。調査の1回のモデル呼出しは45秒（サービス内検索は30秒）。
+
+### 8.1 実施記録（2026-10-31、fixture 検証済み、live 未実施）
+
+| 項目 | 実装 |
+| --- | --- |
+| 担当 | `api/domains/capabilities/bundles/conversation-history.bundle.json`: skill revision 3（古い時期の探し方を足した本文）、package revision 3、toolchain revision 2（題「会話履歴の調査」、関数名 `conversation_history`、最近の発言の確認は `read_history` へ redirect） |
+| 日時で絞った走査 | `conversation/repository/history.ts` の `historyBatch` が範囲を SQL の条件（`julianday`）で受け、`conversation/service/history.ts` の検索が from・until を UTC にして渡す |
+| 予算 | `agent-runtime/service/exploration.ts`: 会話履歴の調査はホスト内の操作8・モデル11。World は7のまま |
+| 文書 | `docs/toolchain.md` の担当表 |
+
+検証（fixture）: `bun run verify -- --domain conversation`・`agent-runtime` は成功。capabilities・dialogue の verify は、別セッションが編集中の画像のファイルの整形で止まった（本計画の変更ではない）。試験: 会話ログの検索で、新しい1,200件の奥の4月の発言に日時の範囲で1回で届き走査が完了する（`history.test.ts`）。検索の確認で「半年前の会話で決めたことを履歴から調べて」「これまでの会話全体から旅行の話の経緯を洗い出して」は会話履歴の調査が1位、最近の発言は `read_history` が1位のまま（`read-tools-search.test.ts`）。担当が戻ったので `research-history.test.ts` の H1・H7 と要件profileの10件は成功に戻った。失敗しているのは別セッションの画像の bundle の2件（`toolchain:image.create@3`）だけ。
+
+未実施: 既存の DB への反映の再起動、live（古い会話を探す依頼で、期限の内に何回の操作で届くか）。
+
+### 8.2 調査の時間（2026-10-31、fixture 検証済み）
+
+| 項目 | 実装 |
+| --- | --- |
+| 調査時間 | `capabilities/contracts/runtime-meta.ts` の `PackageRuntimeMeta.researchMs`。`web.service-search` 330000、`history.research` 300000 |
+| サブエージェントの期限 | `agent-runtime/service/exploration.ts` の `workerDeadline` が `researchMs`（なければ150秒）を使う。親の余裕30秒は今と同じ |
+| run の期限 | `dialogue/service/work-dispatch.ts` が、頼む package に `researchMs` があり run の期限が固定されていなければ、作成から `researchMs`＋30秒まで延ばす（サービス内検索のハードコードの360秒を置き換え） |
+
+検証（fixture）: `service-search-budget.test.ts`（会話履歴300秒、外の期限が短ければその内、Web検索・World は150秒）、`research-history.test.ts` H1（頼んだ run が作成から330秒）、サービス内検索の試験（330秒・360秒のまま）。agent-runtime の試験 159件、dialogue・capabilities の verify は成功。

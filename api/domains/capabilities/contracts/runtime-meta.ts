@@ -44,6 +44,11 @@ export type PackageRuntimeMeta = {
 	 * No generic route policy is added, and the bodies are not repeated as data.
 	 */
 	context?: "set";
+	/**
+	 * The time this package's research worker is given (ms), instead of the research default. A run that hands work to
+	 * it, and whose deadline is not fixed from outside, is given that time and the parent's margin.
+	 */
+	researchMs?: number;
 };
 
 const tools: Readonly<Record<string, ToolRuntimeMeta>> = {
@@ -63,11 +68,18 @@ const tools: Readonly<Record<string, ToolRuntimeMeta>> = {
 	"timer.list": { operation: "local_action" },
 };
 const packages: Readonly<Record<string, PackageRuntimeMeta>> = {
-	"web.service-search": { budget: "service", report: "search", context: "set" },
+	"web.service-search": {
+		budget: "service",
+		report: "search",
+		context: "set",
+		researchMs: 330000,
+	},
 	"web.quick": { budget: "quick", report: "search" },
 	"web.search": { report: "search" },
 	"web.recipe": { budget: "recipe", report: "search", context: "set" },
 	"world.query": { report: "search", context: "set" },
+	// Reaches back over old conversations (spec conversation-read-tools-design 2026-10-31 §8).
+	"history.research": { researchMs: 300000 },
 };
 const toolchains: Readonly<
 	Record<string, import("./toolchains").ToolchainRuntimeMeta>

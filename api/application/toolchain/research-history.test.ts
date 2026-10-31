@@ -209,6 +209,11 @@ test("H1/H8: history search/read, without Memory or Web, answers from preserved 
 				d.observations.every((s) => s.basis === "conversation"),
 			),
 		).toBe(true);
+		// The run handed to the history investigation is given its research time and the parent's margin.
+		const settled = h.dialogue.get(run.id)!;
+		expect(
+			Date.parse(settled.deadlineAt!) - Date.parse(settled.createdAt),
+		).toBe(330000);
 	} finally {
 		await h.close();
 	}

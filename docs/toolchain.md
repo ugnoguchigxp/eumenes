@@ -49,7 +49,7 @@ streamでは、function名や制御区切りになり得る末尾だけを保留
 | 関数名（選定の記録） | ツールチェーン | package | 実行 | 検索 | 読取り | 保存本文 | モデル呼出し | 報告 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `web_search` | `web.search` | `package:web.recipe@5` | LARMの調査担当。guided、手順キャッシュ付き | 2 | 4 | local予算4 | 5 | 本文根拠と完成回答 |
-| `conversation_history` | `history.research` | `package:history.research@2` | 調査担当 | — | — | 履歴 | 7 | V3報告 |
+| `conversation_history` | `history.research` | `package:history.research@3`（`conversation-history.bundle.json`） | 調査担当。古い会話まで遡る詳しい調査と登録済みの要件profile。最近の発言の確認は読む道具 `read_history`。日時で絞った検索は範囲内の行だけを走査する | — | — | 履歴（ホスト内の操作8、調査の時間300秒） | 11 | V3報告 |
 | `world_query` | `world.query` | `package:world.query@5` | World有効時の調査担当。ホスト内の読取 | — | — | Worldの主張・収集資料 | 7 | search報告 |
 | `timer` | `timers.manage` | `package:timers.manage@2` | 操作担当→タイマー操作 | — | — | — | 1+回答 | 操作結果 |
 | `music` / `music_library` | `music.create` / `music.library` | `package:music.create@2` / `package:music.playback@1` | 音楽domainの計画担当 | — | — | — | 計画+回答 | 音楽結果 |

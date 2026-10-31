@@ -148,6 +148,8 @@ test("without vectors every available toolchain is offered; with vectors the top
 			"pipeline.studio",
 			// The dots delegation bundle (backend `dots`, offered by this setup).
 			"dots.delegate",
+			// The conversation history investigation bundle (backend `history`).
+			"history.research",
 		]
 			.filter(
 				(id) =>

@@ -35,17 +35,27 @@ export function historyBatch(
 	last: string | null,
 	includeLast: boolean,
 	limit: number,
+	/**
+	 * The search's own time range, applied in SQL (as instants): the batch holds only messages it could match, so the
+	 * scan bound is spent inside the range and an old period is reached directly.
+	 */
+	range: { from?: string; until?: string } = {},
 ): HistoryRow[] {
 	if (!bound) return [];
+	const params: Array<string | number> = [
+		conversationId,
+		bound,
+		conversationId,
+	];
+	if (last) params.push(last, conversationId);
+	if (range.from) params.push(range.from);
+	if (range.until) params.push(range.until);
+	params.push(limit);
 	return db
 		.query(
-			`SELECT id,role,created_at,length(text) AS size FROM messages WHERE conversation_id=? AND rowid <= (SELECT rowid FROM messages WHERE id=? AND conversation_id=?)${last ? ` AND rowid ${includeLast ? "<=" : "<"} (SELECT rowid FROM messages WHERE id=? AND conversation_id=?)` : ""}${live(db)} ORDER BY rowid DESC LIMIT ?`,
+			`SELECT id,role,created_at,length(text) AS size FROM messages WHERE conversation_id=? AND rowid <= (SELECT rowid FROM messages WHERE id=? AND conversation_id=?)${last ? ` AND rowid ${includeLast ? "<=" : "<"} (SELECT rowid FROM messages WHERE id=? AND conversation_id=?)` : ""}${range.from ? " AND julianday(created_at) >= julianday(?)" : ""}${range.until ? " AND julianday(created_at) < julianday(?)" : ""}${live(db)} ORDER BY rowid DESC LIMIT ?`,
 		)
-		.all(
-			...(last
-				? [conversationId, bound, conversationId, last, conversationId, limit]
-				: [conversationId, bound, conversationId, limit]),
-		) as HistoryRow[];
+		.all(...params) as HistoryRow[];
 }
 export function historyChunk(
 	db: Database,

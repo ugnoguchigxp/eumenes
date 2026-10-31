@@ -129,6 +129,57 @@ test("H2/H3: 240 turns, identical timestamps and sparse rowids paginate without 
 		await h.close();
 	}
 });
+test("a time range is applied before the scan: an old message behind more than one scan of newer ones is found at once", async () => {
+	const h = await fixture();
+	try {
+		await h.store.write((db) => {
+			h.conversation.appendInTransaction(db, {
+				id: "old",
+				conversationId: "main",
+				role: "user",
+				text: "旅行は京都にしよう",
+				createdAt: "2026-04-10T12:00:00Z",
+				runId: null,
+			});
+			for (let i = 0; i < 1200; i++)
+				h.conversation.appendInTransaction(db, {
+					id: `new${i}`,
+					conversationId: "main",
+					role: i % 2 ? "assistant" : "user",
+					text: "旅行の話ではない",
+					createdAt: "2026-10-09T23:00:00Z",
+					runId: null,
+				});
+		});
+		await h.append("current", "確認");
+		// Without a range the scan stops at its bound among the newer messages.
+		const unbounded = h.search({ query: "京都" });
+		expect(unbounded.candidates).toEqual([]);
+		expect(unbounded.scope.scanComplete).toBe(false);
+		// The range (an offset time, as a model writes it) reaches April directly, and the scan completes.
+		const april = h.search({
+			query: "京都",
+			from: "2026-04-01T00:00:00+09:00",
+			until: "2026-05-01T00:00:00+09:00",
+		});
+		expect(april.candidates.map((c) => c.messageId)).toEqual(["old"]);
+		expect(april.scope.scanComplete).toBe(true);
+		expect(april.cursor).toBeNull();
+		// The bounds keep their meaning: from includes, until excludes.
+		expect(h.search({ until: "2026-04-10T12:00:00Z" }).candidates).toEqual([]);
+		expect(
+			h
+				.search({
+					from: "2026-04-10T21:00:00+09:00",
+					until: "2026-04-11T00:00:00Z",
+				})
+				.candidates.map((c) => c.messageId),
+		).toEqual(["old"]);
+	} finally {
+		await h.close();
+	}
+});
+
 test("H2/H3: a large single message is scanned in finite chunks and a boundary-spanning match is not lost; read continues in Unicode positions", async () => {
 	const h = await fixture();
 	try {

@@ -197,6 +197,10 @@ export function createHistory(now: () => number, outbox: OutboxOptions) {
 			last,
 			offset > 0,
 			501,
+			{
+				...(c.from ? { from: new Date(c.from).toISOString() } : {}),
+				...(c.until ? { until: new Date(c.until).toISOString() } : {}),
+			},
 		);
 		const { candidates, scannedBytes, scannedMessages, complete, next } =
 			scanHistory(db, owner, c, sessionId, rows, last, offset, view);
