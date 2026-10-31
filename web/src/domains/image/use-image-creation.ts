@@ -130,22 +130,27 @@ export function useImageCreation(
 							? "画像が完成しました"
 							: "画像を生成しています",
 			description:
-				statusItem?.state === "planning"
-					? "テーマから構図を考えています。"
-					: running(currentRun?.status) && !submitted
-						? "制作依頼を受け付けました。"
-						: statusItem?.errorCode === "generation_unknown"
-							? "通信が途切れ、生成結果を確認できませんでした。過去の画像の一覧を更新してください。"
-							: statusItem?.errorCode === "larm_http_507"
-								? "画像の保存容量が不足しています。"
-								: statusItem?.errorCode === "image_model_unavailable"
-									? "選択したモデルは準備中、または利用できません。"
-									: statusItem?.errorCode === "media_variant_busy" ||
-										  statusItem?.errorCode === "larm_http_409"
-										? "ほかの重量級処理が実行中です。完了後に再度操作してください。"
-										: statusItem?.errorCode === "larm_http_400"
-											? "モデルと画像の設定を確認してください。"
-											: undefined,
+				statusItem?.state === "generating" &&
+				statusItem.phase === "waiting_capacity"
+					? "LARMの空きを待っています。ほかの処理が終わりしだい始めます。"
+					: statusItem?.state === "planning"
+						? "テーマから構図を考えています。"
+						: running(currentRun?.status) && !submitted
+							? "制作依頼を受け付けました。"
+							: statusItem?.errorCode === "generation_unknown"
+								? "通信が途切れ、生成結果を確認できませんでした。過去の画像の一覧を更新してください。"
+								: statusItem?.errorCode === "larm_capacity_timeout"
+									? "LARMの空きを待ちましたが、待てる時間内に空かなかったため中止しました。"
+									: statusItem?.errorCode === "larm_http_507"
+										? "画像の保存容量が不足しています。"
+										: statusItem?.errorCode === "image_model_unavailable"
+											? "選択したモデルは準備中、または利用できません。"
+											: statusItem?.errorCode === "media_variant_busy" ||
+												  statusItem?.errorCode === "larm_http_409"
+												? "ほかの重量級処理が実行中です。完了後に再度操作してください。"
+												: statusItem?.errorCode === "larm_http_400"
+													? "モデルと画像の設定を確認してください。"
+													: undefined,
 			canCancel: !!cancelRunId,
 		},
 	};

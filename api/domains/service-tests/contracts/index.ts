@@ -132,6 +132,8 @@ export function testErrorLabel(code: string) {
 		larm_http_403: "利用が許可されていません。",
 		larm_http_409: "ほかの処理が使用中です。時間をおいて試してください。",
 		larm_http_503: "サービスが準備できていません。",
+		larm_capacity_busy:
+			"LARMのメモリに空きがありません。ほかの処理が終わってから試してください。",
 		network_unavailable: "接続できませんでした。",
 		generation_unknown:
 			"生成が続いている可能性があります。自動再送は行いません。",

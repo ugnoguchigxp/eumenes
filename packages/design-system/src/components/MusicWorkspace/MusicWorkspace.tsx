@@ -180,9 +180,14 @@ export function MusicWorkspace({
 										)}
 										<p role={artworkStatus === "failed" ? "alert" : undefined}>
 											{artworkStatus === "generating"
-												? "楽曲イメージを生成しています。"
+												? current?.artworkWaiting
+													? "LARMの空きを待っています。ほかの処理が終わりしだい始めます。"
+													: "楽曲イメージを生成しています。"
 												: artworkStatus === "failed"
-													? "楽曲イメージを作成できませんでした。"
+													? current?.artworkErrorCode ===
+														"larm_capacity_timeout"
+														? "LARMの空きを待ちましたが、待てる時間内に空かなかったため中止しました。"
+														: "楽曲イメージを作成できませんでした。"
 													: image
 														? "楽曲イメージを読み込めませんでした。"
 														: "この楽曲のイメージは未登録です。"}

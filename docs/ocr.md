@@ -62,7 +62,7 @@ WebP等の画像はbackendで向きを反映し、透明部分を白にして、
 
 解放後は、同じ通常LARM資格でConnectionのallocation bindingと`/state`を読み、停止状態を最長30秒・1秒間隔で確認する。対象runtimeの新鮮なCOLD（`releasedAt`以降、取得時点から10秒以内、未来でない観測）だけを「停止確認」と表示し、取得失敗・古い観測・対象不明・期限超過は「停止未確認」とする。停止確認はLARMの稼働状態の観測であり、プロセス終了やGPUメモリ解放の保証ではない。観測中も次の分析を受け付ける。
 
-readyになればclaimableのキャッシュ値を待たずclaimへ進む。指定された一時的なclaimエラーだけを既存の120秒枠で待ち直し、推論POSTは再送しない。[停止確認の受入記録](../spec/verification/visual-stop-observation-2026-10-25/README.md)に固定試験・実API・実画面の結果を分けて残した。
+readyになればclaimableのキャッシュ値を待たずclaimへ進む。指定された一時的なclaimエラーだけを既存の120秒枠で待ち直し、推論POSTは再送しない。LARMのメモリ不足（503 `resource_exhausted`、resource `memory`）で接続作成・claim・推論POST・解析POSTが断られたときは失敗にせず、状態を待機中（`capacityWait`）にして30秒ごと（`Retry-After` が長ければそれ）に同じ解析を送り直し、最初の拒否から30分で `larm_capacity_timeout` にする（[LARMの空き待ち](larm.md#larmの空き待ち)）。[停止確認の受入記録](../spec/verification/visual-stop-observation-2026-10-25/README.md)に固定試験・実API・実画面の結果を分けて残した。
 
 ## 確認
 

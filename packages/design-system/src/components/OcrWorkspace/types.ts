@@ -20,6 +20,8 @@ export type OcrRecord = {
 	progress: unknown;
 	errorCode: string | null;
 	canRecheck?: boolean;
+	/** Set while the analysis waits for LARM memory; the state stays "queued". */
+	capacityWait?: { startedAt: number; count: number };
 	result:
 		| {
 				kind: "image";

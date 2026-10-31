@@ -22,6 +22,8 @@ export function createImage(deps: {
 	gateway: () => LarmPlayground;
 	onJob: (db: Database, runId: string, jobId: string) => void;
 	onFinished: (db: Database, runId: string) => void;
+	/** Extends the conversation run's deadline for a capacity wait; its deadline afterwards, or null. */
+	onWaiting?: (db: Database, runId: string, untilMs: number) => number | null;
 	validateExecutionInTransaction?: (
 		db: Database,
 		child: ChildExecution,
@@ -34,11 +36,13 @@ export function createImage(deps: {
 		runId: string,
 		deadline: number,
 		stage: "plan" | "generate",
+		wait?: { at: number; count: number },
 	) {
 		const { job } = queue.enqueueInTransaction(db, {
 			scope: "image",
 			kind: `image.${stage}`,
-			dedupeKey: `${id}:${stage}`,
+			dedupeKey: wait ? `${id}:${stage}:w${wait.count}` : `${id}:${stage}`,
+			...(wait ? { availableAtMs: wait.at } : {}),
 			payload: { id },
 			subjectRef: id,
 			lane: "interactive",

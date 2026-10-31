@@ -36,6 +36,20 @@ export type {
 	TestArtifact,
 } from "./contracts/playground";
 export { findServiceTarget } from "./service/playground-select";
+export {
+	LARM_CAPACITY_BUSY,
+	LARM_CAPACITY_RETRY_MS,
+	LARM_CAPACITY_TIMEOUT,
+	LARM_CAPACITY_WAITING,
+	planCapacityWait,
+	type CapacityWait,
+} from "./contracts/capacity";
+export {
+	checkRefusal,
+	isCapacityBusy,
+	LarmCapacityBusy,
+	sendAgainIfLost,
+} from "./service/resend";
 export { silentWav, code as playgroundError } from "./service/playground-http";
 
 export { trackQuery, type TrackQuery } from "./contracts/music-library";

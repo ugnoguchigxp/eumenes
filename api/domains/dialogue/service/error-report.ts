@@ -61,6 +61,10 @@ const REFERENCES: Array<{
 		section: "LARM正式計数の診断",
 		codes: ["chat_token_count_unavailable", "context_budget_exceeded"],
 	},
+	{
+		section: "LARMの空き待ち",
+		codes: ["larm_capacity_busy", "larm_capacity_timeout"],
+	},
 ];
 
 function referenceFor(...codes: Array<string | undefined>) {

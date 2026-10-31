@@ -13,11 +13,11 @@ export const domains = {
 		depends: { api: [], web: [], test: [] },
 	},
 	docling: {
-		tier: 0,
+		tier: 1,
 		backend: "api/domains/docling",
 		web: "web/src/domains/docling",
 		components: "packages/design-system/src/components/ExternalAppLauncher",
-		depends: { api: [], web: [], test: [] },
+		depends: { api: ["larm"], web: [], test: [] },
 	},
 	"google-accounts": {
 		tier: 0,
@@ -74,7 +74,11 @@ export const domains = {
 		backend: "api/domains/model3d",
 		web: "web/src/domains/model3d",
 		components: "packages/design-system/src/components/Model3dWorkspace",
-		depends: { api: ["queue", "resources"], web: ["resources"], test: [] },
+		depends: {
+			api: ["larm", "queue", "resources"],
+			web: ["resources"],
+			test: [],
+		},
 	},
 	browser: {
 		tier: 1,

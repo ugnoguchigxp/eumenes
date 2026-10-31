@@ -66,7 +66,7 @@ export function code(error: unknown): string {
 		return "deadline_exceeded";
 	if (error instanceof TypeError) return "network_unavailable";
 	const message = error instanceof Error ? error.message : "provider_failed";
-	return /^(larm_http_\d{3}|invalid_[a-z_]+|provider_[a-z_]+|stale_catalog|response_too_large|deadline_exceeded|network_unavailable|generation_unknown|cancel_unconfirmed|result_fetch_failed|larm_unconfigured|larm_base_url_unconfigured|larm_provider_host_mismatch)$/.test(
+	return /^(larm_http_\d{3}|larm_capacity_busy|invalid_[a-z_]+|provider_[a-z_]+|stale_catalog|response_too_large|deadline_exceeded|network_unavailable|generation_unknown|cancel_unconfirmed|result_fetch_failed|larm_unconfigured|larm_base_url_unconfigured|larm_provider_host_mismatch)$/.test(
 		message,
 	)
 		? message

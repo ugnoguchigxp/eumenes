@@ -10,6 +10,7 @@ import { musicRequest } from "./music-request";
 import { createMusicLibrary } from "./music-library";
 import { createProviderAccess } from "./playground-provider";
 import { createPlaygroundCatalog } from "./playground-catalog";
+import { checkRefusal, isCapacityBusy } from "./resend";
 import type {
 	LarmTestTarget,
 	TestHealth,
@@ -122,7 +123,7 @@ export function createLarmPlayground(config: {
 			headers: { Authorization: `Bearer ${config.token}`, ...init.headers },
 		});
 		if (!accepted.includes(r.status)) {
-			await r.body?.cancel();
+			await checkRefusal(r, url.pathname, false);
 			throw new Error(`larm_http_${r.status}`);
 		}
 		return r;
@@ -386,17 +387,25 @@ export function createLarmPlayground(config: {
 			// Collect a late 202 even after local cancellation, then send DELETE to the same job.
 			let j: Record<string, unknown>;
 			try {
-				j = await json(
-					await control(
-						target.endpoint,
-						AbortSignal.timeout(60_000),
-						post(requestBody),
-						[202],
-						true,
-					),
+				const accepted = await control(
+					target.endpoint,
+					AbortSignal.timeout(60_000),
+					post(requestBody),
+					[202, 503],
+					true,
 				);
+				if (accepted.status === 503) {
+					// No free memory is refused before acceptance; any other 503 stays an unknown result.
+					await checkRefusal(accepted, target.endpoint, true);
+					throw new Error("larm_http_503");
+				}
+				j = await json(accepted);
 			} catch (e) {
-				if (/^larm_http_(400|401|403|404|409|422|429)$/.test(code(e))) throw e;
+				if (
+					isCapacityBusy(e) ||
+					/^larm_http_(400|401|403|404|409|422|429)$/.test(code(e))
+				)
+					throw e;
 				throw new Error("generation_unknown");
 			}
 			const jobId = str(j.jobId);

@@ -22,6 +22,7 @@ const sessionSchema: z.ZodType<DrawingSession> = z.object({
 	title: z.string(),
 	state: z.enum(["starting", "ready", "failed", "idle", "closed"]),
 	errorCode: z.string().nullable(),
+	retryAfterMs: z.number().nullable().optional(),
 	revision: z.number().nullable(),
 	url: z.string().nullable(),
 	epoch: z.number(),
@@ -35,6 +36,7 @@ const operationSchema = z.object({
 	referenceId: z.string().nullable(),
 	sessionId: z.string().nullable(),
 	url: z.string().nullable(),
+	errorCode: z.string().nullable().optional(),
 });
 const createdSchema = documentSchema.extend({ referenceId: z.string() });
 

@@ -479,3 +479,38 @@ test("a spoken reply takes its place when adopted and keeps only what was heard;
 	expect(messages.slice(2, -1).map((m) => m.content)).toEqual(["猫の絵ができ"]);
 	expect(messages.at(-1)!.content).toStartWith("本当？\n\n## State\n");
 });
+
+test("an image waiting for LARM memory extends its open run, never shortens it, and not after it ends", async () => {
+	h = await setup();
+	h.state.steps.push(
+		choice({ choice: IMAGE.id, say: "描きますね。", request: "猫の絵" }),
+	);
+	const waiting = await h.say("猫の絵を描いて", "queued");
+	const before = Date.parse(h.dialogue.get(waiting.id)!.deadlineAt!);
+	const until = before + 600_000;
+	expect(
+		await h.store.write((db) =>
+			h!.dialogue.extendOperationDeadlineInTransaction(db, waiting.id, until),
+		),
+	).toBe(until);
+	expect(Date.parse(h.dialogue.get(waiting.id)!.deadlineAt!)).toBe(until);
+	expect(
+		await h.store.write((db) =>
+			h!.dialogue.extendOperationDeadlineInTransaction(
+				db,
+				waiting.id,
+				until - 60_000,
+			),
+		),
+	).toBe(until);
+	await h.finishImage(waiting.id, { state: "completed", title: "猫" });
+	expect(
+		await h.store.write((db) =>
+			h!.dialogue.extendOperationDeadlineInTransaction(
+				db,
+				waiting.id,
+				until + 60_000,
+			),
+		),
+	).toBeNull();
+});

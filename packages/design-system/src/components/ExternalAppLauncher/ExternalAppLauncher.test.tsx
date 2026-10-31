@@ -64,3 +64,21 @@ it("opens only on a click, and disables the action while connecting or unavailab
 	expect(screen.getByRole("button")).toBeDisabled();
 	expect(screen.getByRole("alert")).toHaveTextContent("接続できません");
 });
+it("shows a waiting message but keeps both actions disabled while the host is preparing", () => {
+	const retry = vi.fn();
+	render(
+		<ExternalAppLauncher
+			label="文章ナレッジベース管理を開く"
+			available={false}
+			preparing
+			error="LARMの空きを待っています。ほかの処理が終わりしだい始めます。"
+			onOpen={vi.fn()}
+			onRetry={retry}
+		/>,
+	);
+	expect(screen.getByRole("alert")).toHaveTextContent("LARMの空き");
+	const again = screen.getByRole("button", { name: "起動を再試行" });
+	expect(again).toBeDisabled();
+	fireEvent.click(again);
+	expect(retry).not.toHaveBeenCalled();
+});

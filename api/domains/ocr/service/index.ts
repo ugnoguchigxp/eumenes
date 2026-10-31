@@ -21,7 +21,7 @@ import {
 	record,
 	row,
 } from "../repository";
-import { registerOcrHandlers } from "./handlers";
+import { ANALYZE_BUDGET_MS, registerOcrHandlers } from "./handlers";
 import { createOcrQr } from "./qr";
 import { createOcrCorrections } from "./corrections";
 export function createOcr(deps: {
@@ -138,7 +138,7 @@ export function createOcr(deps: {
 					bytes,
 					JSON.stringify(v),
 					binding(connection),
-					now + 600_000,
+					now + ANALYZE_BUDGET_MS,
 				);
 				enqueue(db, requestId, "analyze");
 				return v;
@@ -226,7 +226,7 @@ export function createOcr(deps: {
 				const state =
 					v.errorCode === "ocr_cancel_unconfirmed" ? "cancelling" : "running";
 				db.query("UPDATE ocr_inputs SET deadline=? WHERE id=?").run(
-					Date.now() + 600000,
+					Date.now() + ANALYZE_BUDGET_MS,
 					id,
 				);
 				const updated = patch(db, id, { state, errorCode: null, result: null });

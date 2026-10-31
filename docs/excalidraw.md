@@ -28,6 +28,8 @@ Linux上のloopback入口をMacBookから直接使わない。MacBook上のbacke
 | DELETE `/api/excalidraw/references/{id}` | `conversationId`（既定main）の参照だけを削除する。短いleaseで上流の`DELETE /api/documents/{documentId}`を確認してから参照を消す。上流のDELETEが404でも、文書を読み取れる場合は削除未対応のhostとして`excalidraw_delete_unsupported`を返し、参照を残す。読み取りも404なら削除済みとして参照を消す。削除した図を開いている編集sessionは閉じ、未保存の内容はブラウザ下書きとダウンロードで保護する。204 |
 | GET `/api/excalidraw/operations` | 会話担当のplanning/starting/completed/failed/cancelled。モデルへ渡す結果とOpenUIの入口 |
 
+LARMのメモリ不足（503 `resource_exhausted`、resource `memory`）でleaseを確保できなかった起動は、sessionを `failed`・`errorCode=larm_capacity_busy`・`retryAfterMs` にし、拒否を受けた後のAPIは503 `{error:"larm_capacity_busy",retryAfterMs}` を返す。`ready()`・activity・保存はLARMへ送り直さない。画面は「LARMの空きを待っています」と表示し、1本の時計で30秒ごと（`retryAfterMs` が長ければそれ）に起動を送り直す。待機中は画面復帰の再接続・手動再接続・保存を動かさない。最初の拒否から30分で止める。会話からの `excalidraw.open` は `waiting_capacity` でキューに入れ直し、会話runの期限を延ばす（[LARMの空き待ち](larm.md#larmの空き待ち)）。
+
 ready URLはEumenesのWeb originにある`/#drawing/{referenceId}?revision={revision}`。新しい図は`/#drawing/new/{draftId}`（任意で`title`・`conversationId`）で、ブラウザ内の未保存の編集画面を開く。初回保存で作成した参照のURLへ再読み込みなしで置き換える。会話から新しい図を頼まれた場合もこの未保存リンクを返し、LARMには接続しない。main以外の会話では`conversationId`もURLへ付け、編集画面の再表示要求へ渡す。会話と参照の一致はbackendで引き続き検査する。URLにcredentialを含めない。歴史版も取得できるが、保存には現在版との一致が必要で、競合時に上書きはしない。版指定を省いた再表示は上流の最新版から復帰する。
 
 アーティファクトはこのURLの同一origin・図ID・版・会話を検証し、専用入口`/excalidraw?embedded=1#drawing/{referenceId}?...`へ変換する。専用入口だけが同一originのiframeを許可し、親子の通知も送信元originとwindowを照合する。通知するのは表示状態と編集操作で、credentialやsceneは渡さない。APIと通常画面の埋め込み拒否は維持する。保存処理は既存のEumenes編集画面とAPIを使用し、原本はLARMに保存する。LARMの画面や認証方式の追加開発は不要。

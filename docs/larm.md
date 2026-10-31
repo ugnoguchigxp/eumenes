@@ -4,7 +4,7 @@
 
 画像・音楽・効果音の制作はオンデマンド起動を含むため、会話から制作担当へ渡す時点で、既存のrun期限延長操作を使って300秒（5分）の処理時間を確保する。ジャケット画像の共通queueにも同じ300秒を設定する。起動・生成・結果取得を含む有限の総時間であり、進捗のたびに期限を延ばさない。既に長い期限は縮めず、呼出元が明示した期限や委任タスクの予算は超えない。制作計画のLLM、通常会話、保存済み画像・楽曲の一覧取得の時間は変えない。
 
-LARMがHTTPエラーまたは失敗状態を返した場合は既存どおり失敗とし、生成POSTを自動再送しない。取消と期限切れ後の遅い結果は採用しない。音楽の生成受付POSTは最大60秒でjob IDを受け取り、queued/loading/generating/encodingはその同じjobを制作期限まで照会する。モデルの起動完了を60秒で打ち切るものではない。
+LARMがHTTPエラーまたは失敗状態を返した場合は既存どおり失敗とし、生成POSTを自動再送しない。例外はLARMのメモリ不足の拒否（HTTP 503、`resource_exhausted`、resource `memory`）だけで、受付前の拒否なので30秒ごとに同じ依頼を送り直す（[LARMの空き待ち](#larmの空き待ち)）。取消と期限切れ後の遅い結果は採用しない。音楽の生成受付POSTは最大60秒でjob IDを受け取り、queued/loading/generating/encodingはその同じjobを制作期限まで照会する。モデルの起動完了を60秒で打ち切るものではない。
 
 今回の調整は既存のrun・推論要求の期限延長とqueueの期限設定の再利用に限る。DB・API・ツール選択・LLM指示・LARMの起動制御は変更しない。検証は期限延長と明示期限の部分試験、旧3分を超えた結果の採用・取消・期限切れ・HTTPエラーの固定試験、画像/音楽の会話結合試験、影響domainのverifyの順に行う。サーバー操作と新規の実生成は行わない。
 
@@ -99,7 +99,7 @@ LLM・TTS・ASR・画像生成・音楽生成の通信は、backendの共通入�
 
 内部では各辺を32ピクセル刻みに合わせて生成し、保存・返却画像は指定どおりの寸法に縮小されます。利用側では32の倍数に丸めません。下書きには小さめのサイズ、写真風・イラストの仕上げには大きめのサイズと具体的な描写指示を使います。参照画像による編集は現行APIでは未対応です。
 
-モデルの起動・生成・保存・停止とFLUXの指示文補完はLARMが管理します。FLUXの重み・対応エンジン配置、実生成確認、本番配備は未完了です。503 `image_model_unavailable` はモデル未準備、409 `media_variant_busy` は重量級処理の競合として表示します。未知モデルやmodelとstepsの不一致は400です。別モデルへ自動切替しません。生成APIは同期応答で、起動・生成・停止の待ち時間を含みます。応答の `artifacts[0].contentUrl` または `artifact.contentUrl` をControlのURLに解決してGETします。保存画像はモデル停止後も取得できるため、取得失敗時はGETだけを再試行します。生成POSTは自動再送しません。
+モデルの起動・生成・保存・停止とFLUXの指示文補完はLARMが管理します。FLUXの重み・対応エンジン配置、実生成確認、本番配備は未完了です。503 `image_model_unavailable` はモデル未準備、409 `media_variant_busy` は重量級処理の競合として表示します。503 `resource_exhausted`（resource `memory`）は失敗にせず、[LARMの空き待ち](#larmの空き待ち)に入ります。未知モデルやmodelとstepsの不一致は400です。別モデルへ自動切替しません。生成APIは同期応答で、起動・生成・停止の待ち時間を含みます。応答の `artifacts[0].contentUrl` または `artifact.contentUrl` をControlのURLに解決してGETします。保存画像はモデル停止後も取得できるため、取得失敗時はGETだけを再試行します。生成POSTは、空き待ちのとき以外は自動再送しません。
 
 利用者が示したこのPCでの実測目安（2026-10-10）は、512角約16秒、768角約31秒、1024角約58秒、1200×777約53秒、1280角約102秒です。負荷や起動状態で変わります。試用の待機上限は既存の15分を維持します。
 
@@ -110,6 +110,21 @@ ASRの文字起こしは会話入力になり、発話の続き判定や言語�
 画像生成ツールチェーンと、プロンプト編集・全画面の画像一覧を接続しました。保存画像の一覧と取得はControlの `/v1/image-artifacts` を使用し、生成やProvider claimは不要です。2026-10-13の配備OpenAPIで `DELETE /v1/image-artifacts/{id}`、Bearer認証、HTTP200と`{id,deleted:true}`を確認しました。一覧から保存画像を物理削除し、Eumenesでは応答IDが対象と一致することを検査します。生成履歴は維持し、削除を自動再送しません。詳細は[画像生成](images.md)を参照してください。
 
 端末画像・Googleフォトの選択写真は、Eumenesで正規化したWebPを本番 `POST /v1/image-artifacts/imports` へ送る。Control認証とUUIDを使い、receiptを `GET /v1/image-imports/{requestId}` で照会する。取込だけではGPU・画像生成・3D生成を起動しない。[現行契約](../spec/reference/larm-image-import-v1/README.txt)と[取込処理](images.md#画像の取込)を参照。
+
+## LARMの空き待ち
+
+LARMはメモリに空きがないとき、依頼を受け付ける前に統一の形で断る（2026-11-01 利用者が決定）。
+
+```http
+HTTP/1.1 503 Service Unavailable
+Retry-After: 30
+
+{"error":{"code":"resource_exhausted","resource":"memory","message":"..."}}
+```
+
+オンデマンド起動の機能（画像生成、ジャケット画像、音楽・効果音、3D生成の送信、詳細分析、OCR・物体認識の解析、Excalidraw、文章ナレッジベース管理）は、この拒否を失敗にしない。状態を `waiting_capacity`（「LARMの空きを待っています」）にして、30秒後（`Retry-After` が長ければその時刻、上限5分）に同じ依頼を送り直す。待てるのは最初の拒否から30分までで、制作の300秒などの処理時間とは別に数える。会話runの期限はその分だけ延ばすが、呼出元が固定した期限・委任タスクの予算は超えない。待機中はLARMの接続を手放し、取消すれば待っている依頼も取り消す。30分で空かなければ `larm_capacity_timeout` で失敗する。
+
+判定と送り直しは `api/domains/larm/service/resend.ts` の1か所だけで行う。規則は、空きなし（上の拒否）、準備中（同じ接続へのclaim）、応答の喪失（同じ `Idempotency-Key` で1回）の3つで、各機能・キュー・Webは独自に送り直さない。ほかの状態コードや、503でもコード・resourceが違う拒否は待たない。会話のLLM・ASR・TTS・判定・embeddingとサービス試用は待たない（サービス試用は `larm_capacity_busy` を表示する）。設計は [LARMの空き待ち](../spec/larm-capacity-wait-design-2026-11-01.md)、ログは [logging](logging.md#larmの空き待ち)。
 
 ## 保存曲のプレイリストと再生
 
@@ -133,7 +148,9 @@ music domainのプレイリストは会話/run・検索条件・曲IDを保存�
 
 接続の内部設定は `larm.englishSpeechEnabled`（省略時無効）。旧 `sentenceLanguageEnabled` は保存文書の移行で引き継ぎ、`sentenceLanguageProvider` は削除する。英語の声は日本語の公開 `voice_presentation` が女性・中性ならRosie、男性ならJasperへ固定し、速度は常に1.0。旧 `englishVoice` / `englishMasculineVoice` / `englishSpeed` は保存文書の互換読取り用に受理するが実行には使わない。`en` 区間には日本語の声・style・pitch・intonation・速度・読み辞書を使わない。逐次音声の表情は英語区間も句ごとに判定するが、日本語向けの抑揚パラメーターは英語TTSへ渡さない。英語TTSの到達確認は `/api/inference/voices?language=en`。言語の任意指定は合成APIに公開しない。
 
-英語TTSを確保できない場合（`speech_tts_target_unavailable`）は、その区間を `ja` として日本語TTSで合成し、読み辞書と話し方判定を適用する（`inference.english_speech_fallback` を warn で記録）。英語TTSの合成エラーは日本語TTSへ転送しない。LARM の合成がフォールバック対象の失敗で終わり、route が許せばクラウドTTS（Cloudflare Workers AI など）へ進む。クラウドでは言語判定を行わず、日本語読み辞書を適用する。
+英語TTSを確保できない場合（`speech_tts_target_unavailable`）は、その区間を `ja` として日本語TTSで合成し、読み辞書と話し方判定を適用する（`inference.english_speech_fallback` を warn で記録）。英語TTSの合成エラーは日本語TTSへ転送しない。TTSにはクラウドへの代替がない。読み上げの経路は「LARMのみ」か「クラウドのみ」で、LARMの合成が失敗（429を含む）した句は発話せず、再試行もしない（[設計](../spec/tts-single-lane-design-2026-11-01.md) §4.6）。クラウドのみの経路（Cloudflare Workers AI など）では言語判定を行わず、日本語読み辞書を適用する。
+
+TTSの合成は backend 全体で同時に1件。音声対話の句・読み上げ直し・自動読み上げ・通知の読み上げ・試聴が先着順に並び、待つ間に取り消された要求は LARM へ送らない。まだ生成していない同じ入力（文・設定revision・声の上書き・話し方の準備）の読み上げ直し・通知・試聴は1回の合成にまとめ、合流した全員が取り消したときだけ止める。生成済みの音声は再利用しない。待ちは `inference.speech_lane_waited`（`durationMs`・`count`）、統合は `inference.speech_joined`、発話しなかった句は `voice.speech_skipped` で記録する。
 
 再確認は `bun scripts/mixed-speech-live.ts --run`。隔離backendに保存済みLARM設定を保存し、固定の日英混在回答を区間化して、区間ごとに日本語・英語TTSのどちらで合成されたか（attemptのmodel）とWAV取得を `verification-reports/mixed-speech-live/`（ローカルの検証記録。リポジトリには含めない）に記録する。合成音声の取得はスピーカー再生の実機器受入に数えない。旧Ruri分類の接続記録は [検証記録](../spec/verification/ruri-sentence-language-2026-10-12/README.md) に残す。
 

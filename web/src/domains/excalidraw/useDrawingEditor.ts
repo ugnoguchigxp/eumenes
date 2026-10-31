@@ -1,10 +1,11 @@
+import { useDrawingCapacityWait } from "./useDrawingCapacityWait";
 import { useDrawingEditorLifecycle } from "./useDrawingEditorLifecycle";
 import {
 	reconnectDrawingSession,
 	downloadScene,
 	createDrawingDocument,
 } from "./editor-session";
-import { useDrawingSessionStatus } from "./useDrawingSessionStatus";
+import { useDrawingSessionSync } from "./useDrawingSessionSync";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { EumenesClient } from "../../../../client";
 import type {
@@ -45,6 +46,11 @@ export function useDrawingEditor(
 	const [busy, setBusy] = useState(true),
 		[canvasEpoch, setCanvasEpoch] = useState(0);
 	const [unsaved, setUnsaved] = useState(false);
+	// LARM has no free memory: one timer starts the same connection again; no other path may.
+	const { wait, waiting, onWaiting, refused } = useDrawingCapacityWait(
+		setStatus,
+		setError,
+	);
 	const current = useRef<Drawing | null>(null),
 		selected = useRef<DrawingSession | null>(null),
 		dirty = useRef(false),
@@ -52,8 +58,7 @@ export function useDrawingEditor(
 	const pending = useRef<DrawingDraft | null>(null),
 		latest = useRef<{ title: string; scene: Scene } | null>(null),
 		timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-	const activityAt = useRef(0),
-		initializing = useRef(true);
+	const initializing = useRef(true);
 	const drafts = useDrawingDraftProtection(
 		draftKey,
 		current,
@@ -62,7 +67,6 @@ export function useDrawingEditor(
 		setError,
 	);
 	const { hasDraft, protect, check } = drafts;
-
 	const apply = useCallback(
 		(doc: Drawing) => {
 			initializing.current = true;
@@ -93,6 +97,8 @@ export function useDrawingEditor(
 		referenceId: location.kind === "reference" ? location.referenceId : null,
 		revision,
 		conversationId,
+		wait,
+		onWaiting,
 		onReady: (ready, doc) => {
 			selected.current = ready;
 			setSession(ready);
@@ -122,35 +128,16 @@ export function useDrawingEditor(
 			if (timer.current) clearTimeout(timer.current);
 		},
 	});
-	const receiveStatus = useCallback((value: DrawingSession) => {
-		if (
-			selected.current?.id !== value.id ||
-			selected.current.state === "closed"
-		)
-			return;
-		selected.current = value;
-		if (value.state === "idle" && !dirty.current && !saving.current)
-			setStatus("無操作のため接続を解放しました。次の操作で復帰します。");
-	}, []);
-	useDrawingSessionStatus(client, session?.id, receiveStatus);
-
-	const activity = useCallback(async () => {
-		const s = selected.current;
-		if (!s || Date.now() - activityAt.current < 10000) return;
-		activityAt.current = Date.now();
-		try {
-			if (s.state === "idle") setStatus("再接続中です。");
-			await client.drawingActivity(s.id);
-			if (s.state === "idle") {
-				selected.current = { ...s, state: "ready" };
-				setStatus("再接続しました。");
-			}
-		} catch {
-			setStatus(
-				"再接続が必要です。編集中の内容を保存またはダウンロードしてください。",
-			);
-		}
-	}, [client]);
+	const activity = useDrawingSessionSync(client, {
+		session,
+		selected: () => selected.current,
+		adopt: (value) => {
+			selected.current = value;
+		},
+		editing: () => dirty.current || saving.current,
+		waiting: wait.waiting,
+		setStatus,
+	});
 	async function create(input: { title: string; scene: Scene }, key: string) {
 		const created = await createDrawingDocument(client, {
 			session: selected.current,
@@ -177,6 +164,7 @@ export function useDrawingEditor(
 	}
 	async function save() {
 		if (
+			wait.waiting() ||
 			saving.current ||
 			!dirty.current ||
 			!current.current ||
@@ -209,6 +197,7 @@ export function useDrawingEditor(
 			const doc = saved.current
 				? await client.saveDrawing(selected.current!.id, body, key)
 				: await create({ title: body.title, scene: body.scene }, key);
+			wait.reset();
 			pending.current = null;
 			current.current = doc;
 			setDrawing(doc);
@@ -226,8 +215,10 @@ export function useDrawingEditor(
 				drafts.clearSaved();
 				setStatus(`保存済み（版 ${doc.revision}）`);
 			}
-		} catch {
+		} catch (error) {
 			const preserved = protect();
+			// The same candidate and key are sent again by the one timer.
+			if (preserved && refused(error, () => void save(), "保存失敗")) return;
 			setError(
 				preserved
 					? "保存に失敗しました。下書きを保持しています。「保存」で同じ操作を再送できます。版が競合した場合は編集中の図をダウンロードしてください。"
@@ -265,6 +256,7 @@ export function useDrawingEditor(
 		if (!pending.current) timer.current = setTimeout(() => void save(), 1000);
 	}
 	async function reconnect() {
+		if (wait.waiting()) return;
 		const signal = AbortSignal.any([
 			lifecycle.signal(),
 			AbortSignal.timeout(180000),
@@ -304,8 +296,10 @@ export function useDrawingEditor(
 				const doc = await client.drawingDocument(s.id, signal);
 				if (!signal.aborted) apply(doc);
 			} else setStatus("再接続しました。未保存の図を保存できます。");
-		} catch {
+			wait.reset();
+		} catch (error) {
 			if (signal.aborted) return;
+			if (refused(error, () => void reconnect())) return;
 			setError(
 				"再接続できませんでした。画面を閉じず、編集中の内容を保存またはダウンロードしてください。",
 			);
@@ -359,7 +353,7 @@ export function useDrawingEditor(
 		title,
 		status,
 		error,
-		busy,
+		busy: busy || waiting,
 		hasDraft,
 		canvasEpoch,
 		activity,

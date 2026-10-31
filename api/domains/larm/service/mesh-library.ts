@@ -19,6 +19,7 @@ import {
 	type MeshGenerationRequest,
 } from "../contracts/mesh";
 import { bytes, json } from "./playground-http";
+import { capacityRefusal } from "./resend";
 
 type Control = (
 	path: string,
@@ -40,11 +41,14 @@ export class MeshHttpError extends Error {
 		super(`larm_http_${status}`);
 	}
 }
-async function refusal(r: Response) {
+/** `submits`: only a submission is refused before LARM accepts it, so only it may become a wait. */
+async function refusal(r: Response, path: string, submits: boolean) {
 	const retry = Number(r.headers.get("retry-after"));
 	let reason: string | null = null;
 	try {
 		const body = await json(r);
+		const busy = submits && capacityRefusal(r.status, body, r.headers, path);
+		if (busy) return busy;
 		const value = body.code ?? body.error ?? body.reason;
 		const text =
 			typeof value === "string"
@@ -77,9 +81,10 @@ export function createMeshLibrary(
 		signal: AbortSignal,
 		init: RequestInit = {},
 		ok = [200],
+		submits = false,
 	) {
 		const r = await control(path, signal, init, [...ok, ...refusals]);
-		if (!ok.includes(r.status)) throw await refusal(r);
+		if (!ok.includes(r.status)) throw await refusal(r, path, submits);
 		return r;
 	}
 	async function media(path: string, signal: AbortSignal) {
@@ -147,6 +152,7 @@ export function createMeshLibrary(
 					body: JSON.stringify(meshGenerationRequest.parse(body)),
 				},
 				[200, 201, 202],
+				true,
 			);
 			return meshAccepted.parse(await json(r)).jobId;
 		},

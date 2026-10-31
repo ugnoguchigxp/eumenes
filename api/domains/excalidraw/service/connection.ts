@@ -1,5 +1,10 @@
 import { readBounded } from "../../../infrastructure/bounded-read";
-import type { LocalServiceLease, LocalServicesPort } from "../../larm";
+import {
+	isCapacityBusy,
+	type LarmCapacityBusy,
+	type LocalServiceLease,
+	type LocalServicesPort,
+} from "../../larm";
 export type DrawingConnection = {
 	version: string;
 	gatewayUrl: string;
@@ -16,7 +21,11 @@ type Use = {
 	active: number;
 	lastOperation: number;
 	epoch: number;
+	/** LARM had no free memory for this use; only `reset` (a new start) sends the lease request again. */
+	refused?: LarmCapacityBusy;
 };
+/** How long a start may wait for its lease to become ready, and its budget once LARM accepts it. */
+export const START_WAIT_MS = 180_000;
 export function drawingConnection(
 	get: () => DrawingConnection,
 	options: {
@@ -58,6 +67,7 @@ export function drawingConnection(
 			uses.set(id, use);
 		}
 		use.lastOperation = clock();
+		if (use.refused) throw use.refused;
 		if (use.pending) return use.pending;
 		const selected = use,
 			epoch = use.epoch;
@@ -123,6 +133,7 @@ export function drawingConnection(
 		try {
 			return await task;
 		} catch (e) {
+			if (isCapacityBusy(e)) selected.refused = e;
 			// A reset may already have installed a new use under this session ID.
 			await releaseUse(selected);
 			throw e;
@@ -186,7 +197,7 @@ export function drawingConnection(
 			const use = uses.get(id);
 			if (use) use.lastOperation = clock();
 			// Actual gestures trigger this, never a visibility/status timer.
-			await ready(id, AbortSignal.timeout(180000));
+			await ready(id, AbortSignal.timeout(START_WAIT_MS));
 		},
 		release,
 		async reset(id: string) {

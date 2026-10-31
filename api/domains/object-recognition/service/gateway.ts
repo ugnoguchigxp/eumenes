@@ -1,4 +1,5 @@
 import { readBounded } from "../../../infrastructure/bounded-read";
+import { checkRefusal } from "../../larm";
 import {
 	acceptedJob,
 	detectionResult,
@@ -14,6 +15,7 @@ export function recognitionGateway(
 		init: RequestInit,
 		signal: AbortSignal,
 		parseBody = true,
+		waitable = false,
 	) {
 		let response: Response;
 		try {
@@ -27,7 +29,8 @@ export function recognitionGateway(
 			throw new Error("recognition_connection_failed");
 		}
 		if (!response.ok) {
-			await response.body?.cancel();
+			// A capacity refusal is thrown only for the request that starts work; it becomes a wait.
+			await checkRefusal(response, path, waitable);
 			throw new Error(
 				response.status === 429 || response.status === 503
 					? "recognition_busy"
@@ -69,6 +72,8 @@ export function recognitionGateway(
 				"/api/analyze",
 				{ method: "POST", body: form },
 				signal,
+				true,
+				true,
 			);
 			const parsed =
 				r.status === 202

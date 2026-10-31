@@ -2,6 +2,7 @@ import { z } from "zod";
 import { drawingDocuments } from "./documents";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import { documentSchema, openDrawing, type DrawingSession } from "../contracts";
+import { isCapacityBusy, LARM_CAPACITY_RETRY_MS } from "../../larm";
 import {
 	getSession,
 	updateSession,
@@ -9,7 +10,22 @@ import {
 	reference,
 	saveReference,
 } from "../repository";
-import { drawingConnection, type DrawingConnection } from "./connection";
+import {
+	drawingConnection,
+	START_WAIT_MS,
+	type DrawingConnection,
+} from "./connection";
+/** The failed start; LARM's lack of free memory carries the wait the Web screen applies before it starts again. */
+const startFailure = (e: unknown): Partial<DrawingSession> => ({
+	state: "failed",
+	errorCode:
+		e instanceof Error && /^[a-z_0-9]+$/.test(e.message)
+			? e.message
+			: "excalidraw_start_failed",
+	retryAfterMs: isCapacityBusy(e)
+		? (e.retryAfterMs ?? LARM_CAPACITY_RETRY_MS)
+		: null,
+});
 export function createExcalidraw(deps: {
 	store: SqliteStore;
 	connection: () => DrawingConnection;
@@ -52,7 +68,7 @@ export function createExcalidraw(deps: {
 			try {
 				const signal = AbortSignal.any([
 					controller.signal,
-					AbortSignal.timeout(180000),
+					AbortSignal.timeout(START_WAIT_MS),
 				]);
 				await connection.ready(id, signal);
 				const ref = s.referenceId
@@ -83,6 +99,7 @@ export function createExcalidraw(deps: {
 							: {}),
 						state: "ready",
 						errorCode: null,
+						retryAfterMs: null,
 						lastOperation: clock(),
 					});
 				});
@@ -90,13 +107,7 @@ export function createExcalidraw(deps: {
 			} catch (e) {
 				await store.write((db) => {
 					if (getSession(db, id)?.epoch === epoch)
-						updateSession(db, id, {
-							state: "failed",
-							errorCode:
-								e instanceof Error && /^[a-z_0-9]+$/.test(e.message)
-									? e.message
-									: "excalidraw_start_failed",
-						});
+						updateSession(db, id, startFailure(e));
 				});
 			}
 		})();
@@ -164,6 +175,7 @@ export function createExcalidraw(deps: {
 			updateSession(db, id, {
 				state: "starting",
 				errorCode: null,
+				retryAfterMs: null,
 				lastOperation: clock(),
 				epoch: s.epoch + 1,
 			});
@@ -218,7 +230,7 @@ export function createExcalidraw(deps: {
 						await connection.request(
 							s.id,
 							`/api/documents/${ref.documentId}`,
-							AbortSignal.timeout(180000),
+							AbortSignal.timeout(START_WAIT_MS),
 							{ method: "DELETE" },
 						),
 					);
@@ -233,7 +245,7 @@ export function createExcalidraw(deps: {
 					.request(
 						s.id,
 						`/api/documents/${ref.documentId}`,
-						AbortSignal.timeout(180000),
+						AbortSignal.timeout(START_WAIT_MS),
 					)
 					.then(
 						() => false,

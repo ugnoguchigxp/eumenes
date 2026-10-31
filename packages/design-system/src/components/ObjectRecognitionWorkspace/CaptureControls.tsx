@@ -1,4 +1,9 @@
 import { Button } from "../Button";
+import {
+	capacityTimeoutMessage,
+	capacityWaitingMessage,
+	isCapacityWaiting,
+} from "../VisualAnalysis/capacity";
 import { stateLabel } from "./RecognitionHistory";
 import type { RecognitionItem } from "./types";
 import type { CaptureOrigin, useCameraCapture } from "./useCameraCapture";
@@ -9,6 +14,7 @@ export type CameraControls = Omit<
 >;
 
 const errors: Record<string, string> = {
+	larm_capacity_timeout: capacityTimeoutMessage,
 	recognition_busy: "サービスが混雑しています。",
 	recognition_invalid_input: "形式または動画の長さを確認してください。",
 	recognition_input_too_large: "入力が16 MiBを超えています。",
@@ -199,7 +205,9 @@ export function RecognitionStatus({
 				{analyzing && (
 					<span className="recognition-spinner" aria-hidden="true" />
 				)}
-				<strong>{stateLabel(item)}</strong>
+				<strong>
+					{isCapacityWaiting(item) ? capacityWaitingMessage : stateLabel(item)}
+				</strong>
 			</div>
 			{progress && <span>{progress}</span>}
 			{["queued", "starting", "running"].includes(item.state) && (

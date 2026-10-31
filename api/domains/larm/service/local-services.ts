@@ -1,4 +1,5 @@
 import { readBounded } from "../../../infrastructure/bounded-read";
+import { checkRefusal } from "./resend";
 import {
 	localServiceLease,
 	type LocalServiceLease,
@@ -18,12 +19,14 @@ export function createLocalServices(options: {
 		base.hash
 	)
 		throw new Error("invalid_local_service_url");
+	/** `starts`: the request asks LARM to start the service, so a capacity refusal becomes a wait. */
 	async function request(
 		path: string,
 		method: string,
 		signal: AbortSignal,
 		body?: unknown,
 		key?: string,
+		starts = false,
 	) {
 		const r = await (options.fetch ?? fetch)(
 			`${options.baseUrl.replace(/\/$/, "")}${path}`,
@@ -40,7 +43,7 @@ export function createLocalServices(options: {
 			},
 		);
 		if (!r.ok) {
-			await r.body?.cancel();
+			await checkRefusal(r, path, starts);
 			throw new Error(`local_service_http_${r.status}`);
 		}
 		return r;
@@ -51,8 +54,9 @@ export function createLocalServices(options: {
 		signal: AbortSignal,
 		body?: unknown,
 		key?: string,
+		starts = false,
 	) {
-		const r = await request(path, method, signal, body, key);
+		const r = await request(path, method, signal, body, key, starts);
 		const bytes = await readBounded(r.body, {
 			limit: 131072,
 			missing: "local_service_empty",
@@ -80,6 +84,7 @@ export function createLocalServices(options: {
 				signal,
 				{},
 				key,
+				true,
 			);
 			if (value.serviceId !== service)
 				throw new Error("local_service_identity_mismatch");

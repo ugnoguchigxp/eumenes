@@ -6,6 +6,12 @@ import type {
 	AdapterState,
 	WebArtifactAdapter,
 } from "../toolchain-artifacts/registry";
+import {
+	capacityBusyOf,
+	capacityTimeoutMessage,
+	capacityWaitingMessage,
+	useCapacityWait,
+} from "../../hooks/capacity-wait";
 import { doclingMessages, openDocling } from "./open";
 
 const configurationError =
@@ -38,13 +44,18 @@ function useDoclingArtifact({
 	const [preparation, setPreparation] = useState<{
 		scope: typeof scope;
 		ready: boolean;
+		/** LARM has no free memory; the one timer sends the startup again. */
+		waiting?: boolean;
 		error?: string;
 	} | null>(null);
 	const [opening, setOpening] = useState<typeof scope | null>(null);
 	const active = useRef<AbortController | null>(null);
+	const { wait } = useCapacityWait();
 	useEffect(() => {
 		const controller = new AbortController();
 		if (scope.configured && scope.publicOrigin) {
+			// Only one request is out at a time: a pending timer must not send another.
+			wait.supersede();
 			const signal = AbortSignal.any([
 				controller.signal,
 				AbortSignal.timeout(200_000),
@@ -64,23 +75,37 @@ function useDoclingArtifact({
 						value.publicOrigin !== scope.publicOrigin
 					)
 						throw new Error("docling_connection_changed");
+					wait.reset();
 					setPreparation({ scope, ready: true });
 				})
 				.catch((error: unknown) => {
-					if (!controller.signal.aborted)
-						setPreparation({
-							scope,
-							ready: false,
-							error:
-								doclingMessages[
-									signal.aborted
-										? "docling_timeout"
-										: error instanceof Error
-											? error.message
-											: ""
-								] ??
-								"起動を準備できませんでした。接続を確認して、再試行してください。",
-						});
+					if (controller.signal.aborted) return;
+					const busy = signal.aborted ? null : capacityBusyOf(error);
+					if (busy) {
+						const next = wait.refuse(busy.retryAfterMs, () =>
+							setAttempt((v) => v + 1),
+						);
+						setPreparation(
+							next === "waiting"
+								? { scope, ready: false, waiting: true }
+								: { scope, ready: false, error: capacityTimeoutMessage },
+						);
+						return;
+					}
+					wait.reset();
+					setPreparation({
+						scope,
+						ready: false,
+						error:
+							doclingMessages[
+								signal.aborted
+									? "docling_timeout"
+									: error instanceof Error
+										? error.message
+										: ""
+							] ??
+							"起動を準備できませんでした。接続を確認して、再試行してください。",
+					});
 				})
 				.finally(() => {
 					if (active.current === controller) active.current = null;
@@ -91,7 +116,7 @@ function useDoclingArtifact({
 			active.current?.abort();
 			active.current = null;
 		};
-	}, [client, scope, attempt]);
+	}, [client, scope, attempt, wait]);
 	const current = preparation?.scope === scope ? preparation : null;
 	const ready = !query.isError && !!scope.configured && !!current?.ready;
 	const source =
@@ -105,8 +130,16 @@ function useDoclingArtifact({
 				revision: query.data?.revision ?? 0,
 				available: ready,
 				busy: opening === scope || (query.isError && query.isFetching),
-				preparing: !query.isError && !!scope.configured && !current,
-				error: query.isError ? configurationError : current?.error,
+				// While LARM has no free memory the launcher keeps "preparing", which also disables the retry.
+				preparing:
+					!query.isError &&
+					!!scope.configured &&
+					(!current || !!current.waiting),
+				error: query.isError
+					? configurationError
+					: current?.waiting
+						? capacityWaitingMessage
+						: current?.error,
 			},
 		},
 		targetOf: () => undefined,
@@ -133,6 +166,8 @@ function useDoclingArtifact({
 		settled: () => {},
 		refresh: () => {
 			if (active.current) return;
+			// A refresh the host or the person starts counts the wait anew.
+			wait.reset();
 			const controller = new AbortController();
 			active.current = controller;
 			setPreparation(null);

@@ -216,3 +216,4 @@ export {
 	type TrackQuery,
 } from "./music-library";
 export { musicProviders, musicGenerationInput } from "./music-generation";
+export * from "./capacity";

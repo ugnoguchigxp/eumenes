@@ -39,6 +39,8 @@ export type DrawingSession = {
 	title: string;
 	state: "starting" | "ready" | "failed" | "idle" | "closed";
 	errorCode: string | null;
+	/** With `larm_capacity_busy`: how long the Web screen waits before it sends the start again. */
+	retryAfterMs?: number | null;
 	revision: number | null;
 	url: string | null;
 	epoch: number;

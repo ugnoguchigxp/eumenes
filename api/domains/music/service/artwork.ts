@@ -1,11 +1,20 @@
 import type { Database } from "bun:sqlite";
 import { z } from "zod";
 import type { HandlerDefinition } from "../../queue";
-import { findServiceTarget, type TestOutput } from "../../larm";
+import {
+	findServiceTarget,
+	isCapacityBusy,
+	LARM_CAPACITY_TIMEOUT,
+	LARM_CAPACITY_WAITING,
+	planCapacityWait,
+	type TestOutput,
+} from "../../larm";
 import { MEDIA_GENERATION_TIMEOUT_MS } from "../../capabilities";
+import { getLogger } from "../../../infrastructure/logger";
 import type { MusicRecord } from "../contracts";
 import { row, record, patch, media } from "../repository";
 import type { createMusic } from "./index";
+const log = getLogger("music");
 const payload = z.object({ id: z.string(), revision: z.number().int() });
 const SIZE = 256;
 const MAX_BYTES = 4 * 1024 * 1024;
@@ -42,10 +51,12 @@ export function createArtwork(deps: Parameters<typeof createMusic>[0]) {
 			? r
 			: null;
 	};
+	/** LARM had no free memory: the artwork request waits and is queued again, never sent from here. */
+	type CapacityWait = { capacityWait: number | null };
 	const handler: HandlerDefinition<
 		{ id: string; revision: number },
 		{ id: string; revision: number; prompt: string },
-		TestOutput
+		TestOutput | CapacityWait
 	> = {
 		kind: "music.artwork",
 		payloadVersions: [1],
@@ -56,6 +67,8 @@ export function createArtwork(deps: Parameters<typeof createMusic>[0]) {
 			const r = current(db, claim.payload.id, claim.payload.revision);
 			if (!r)
 				return { status: "stale", reason: "music_artwork_not_generating" };
+			const { phase: waiting, ...artwork } = record(r).artwork!;
+			if (waiting) patch(db, r.id, { artwork });
 			return {
 				status: "ready",
 				input: { ...claim.payload, prompt: artworkPrompt(record(r)) },
@@ -89,6 +102,7 @@ export function createArtwork(deps: Parameters<typeof createMusic>[0]) {
 						.catch(() => {});
 				return output;
 			} catch (e) {
+				if (isCapacityBusy(e)) return { capacityWait: e.retryAfterMs };
 				throw new Error(safeError(e));
 			}
 		},
@@ -96,7 +110,65 @@ export function createArtwork(deps: Parameters<typeof createMusic>[0]) {
 		settleInTransaction(db, claim, input, outcome) {
 			const r = current(db, claim.payload.id, claim.payload.revision);
 			if (!r) return "stale";
-			const artwork = record(r).artwork!;
+			const {
+				phase: _phase,
+				capacityWait: previous,
+				...artwork
+			} = record(r).artwork!;
+			if (
+				outcome.type === "success" &&
+				input &&
+				"capacityWait" in outcome.result
+			) {
+				const now = Date.now();
+				const plan = planCapacityWait({
+					now,
+					previous,
+					retryAfterMs: outcome.result.capacityWait,
+					budgetMs: MEDIA_GENERATION_TIMEOUT_MS,
+				});
+				if (!plan) {
+					log.warn("music.capacity_wait_expired", {
+						reason: LARM_CAPACITY_TIMEOUT,
+						waitedMs: now - (previous?.startedAt ?? now),
+					});
+					patch(db, r.id, {
+						artwork: {
+							...artwork,
+							state: "failed",
+							errorCode: LARM_CAPACITY_TIMEOUT,
+						},
+					});
+					return "applied";
+				}
+				const { job } = queue.enqueueInTransaction(db, {
+					scope: "music",
+					kind: "music.artwork",
+					dedupeKey: `${r.id}:artwork:${artwork.revision}:w${plan.count}`,
+					payload: claim.payload,
+					subjectRef: r.id,
+					lane: "interactive",
+					resourceKey: "image.generate",
+					maxAttempts: 1,
+					availableAtMs: plan.at,
+					deadlineAtMs: plan.deadline,
+				});
+				patch(db, r.id, {
+					artwork: {
+						...artwork,
+						phase: LARM_CAPACITY_WAITING,
+						capacityWait: { startedAt: plan.startedAt, count: plan.count },
+					},
+				});
+				log.info("music.capacity_wait_scheduled", {
+					jobId: job.id,
+					subjectId: r.id,
+					waitCount: plan.count,
+					waitedMs: now - plan.startedAt,
+					nextInMs: plan.at - now,
+				});
+				return "applied";
+			}
 			if (outcome.type !== "success" || !input) {
 				patch(db, r.id, {
 					artwork: {
@@ -112,9 +184,10 @@ export function createArtwork(deps: Parameters<typeof createMusic>[0]) {
 				});
 				return "applied";
 			}
+			const output = outcome.result as TestOutput;
 			db.query(
 				"UPDATE music_generations SET artwork=?, artwork_mime=? WHERE id=?",
-			).run(outcome.result.bytes!, outcome.result.mime!, r.id);
+			).run(output.bytes!, output.mime!, r.id);
 			patch(db, r.id, {
 				artwork: { ...artwork, state: "completed", errorCode: null },
 			});
@@ -123,12 +196,13 @@ export function createArtwork(deps: Parameters<typeof createMusic>[0]) {
 		cancelInTransaction(db, job) {
 			const r = current(db, job.payload.id, job.payload.revision);
 			if (!r) return;
+			const {
+				phase: _phase,
+				capacityWait: _wait,
+				...artwork
+			} = record(r).artwork!;
 			patch(db, r.id, {
-				artwork: {
-					...record(r).artwork!,
-					state: "failed",
-					errorCode: "cancel_requested",
-				},
+				artwork: { ...artwork, state: "failed", errorCode: "cancel_requested" },
 			});
 		},
 	};

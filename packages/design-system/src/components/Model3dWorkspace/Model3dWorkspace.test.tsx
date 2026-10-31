@@ -185,6 +185,25 @@ describe("Model3dWorkspace generations", () => {
 		expect(screen.getByRole("button", { name: /状態を再確認/ })).toBeTruthy();
 	});
 
+	it("offers no recheck when no job exists to follow", () => {
+		render(
+			<Model3dWorkspace
+				{...props({
+					generations: [
+						generation({
+							state: "failed",
+							stageLabel: "生成失敗",
+							errorLabel: "LARMの空きを待ちましたが、中止しました",
+							recheckable: false,
+						}),
+					],
+				})}
+			/>,
+		);
+		expect(screen.getByText(/LARMの空きを待ちました/)).toBeTruthy();
+		expect(screen.queryByRole("button", { name: /状態を再確認/ })).toBeNull();
+	});
+
 	it("opens a completed model and says when it was deleted", async () => {
 		const user = userEvent.setup();
 		const p = props({

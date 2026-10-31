@@ -19,6 +19,10 @@ export const imageRecord = z.object({
 	model: z.string().optional(),
 	actualModel: z.string().nullable(),
 	errorCode: z.string().nullable(),
+	/** Set while LARM's free-memory wait is running: when it began and how many tries were scheduled. */
+	capacityWait: z
+		.object({ startedAt: z.number(), count: z.number().int() })
+		.optional(),
 	createdAt: z.number(),
 	updatedAt: z.number(),
 });

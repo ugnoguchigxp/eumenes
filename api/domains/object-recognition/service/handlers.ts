@@ -1,10 +1,20 @@
 import { z } from "zod";
 import type { Database } from "bun:sqlite";
+import { getLogger } from "../../../infrastructure/logger";
 import type { HandlerDefinition } from "../../queue";
+import {
+	isCapacityBusy,
+	LARM_CAPACITY_TIMEOUT,
+	planCapacityWait,
+} from "../../larm";
 import type { createObjectRecognition } from "./index";
 import { row, patch, record } from "../repository";
 import { recognitionGateway } from "./gateway";
 import type { Connection } from "../contracts";
+const log = getLogger("object-recognition");
+/** The processing time one analyze try gets once LARM has room again. */
+/** How long one analysis may take after the gateway accepts it. */
+export const ANALYZE_BUDGET_MS = 600_000;
 type Stage = "analyze" | "poll" | "cancel";
 type Deps = Parameters<typeof createObjectRecognition>[0] & {
 	enqueue: (db: Database, id: string, stage: Stage, delay?: number) => string;
@@ -40,6 +50,7 @@ function registerStage(deps: Deps, stage: Stage) {
 	type Output =
 		| Awaited<ReturnType<ReturnType<typeof recognitionGateway>["analyze"]>>
 		| Awaited<ReturnType<ReturnType<typeof recognitionGateway>["status"]>>
+		| { capacityWait: number | null }
 		| null;
 	const handler: HandlerDefinition<
 		{ id: string; step: number },
@@ -96,7 +107,11 @@ function registerStage(deps: Deps, stage: Stage) {
 		async execute(input, { signal }) {
 			const gateway = recognitionGateway(input.connection, deps.fetcher);
 			if (stage === "analyze") {
-				const result = await gateway.analyze(input.file, signal);
+				const result = await gateway.analyze(input.file, signal).catch((e) => {
+					if (isCapacityBusy(e)) return { capacityWait: e.retryAfterMs };
+					throw e;
+				});
+				if ("capacityWait" in result) return result;
 				if ("statusUrl" in result && input.file.type.startsWith("image/"))
 					throw new Error("recognition_invalid_response");
 				if (
@@ -156,12 +171,58 @@ function registerStage(deps: Deps, stage: Stage) {
 			}
 			const result = outcome.result;
 			if (!result) return "stale";
+			if ("capacityWait" in result) {
+				if (v.state === "cancelling") {
+					patch(db, r.id, { state: "cancelled", result: null });
+					return "applied";
+				}
+				const now = Date.now();
+				const wait = planCapacityWait({
+					now,
+					previous: v.capacityWait,
+					retryAfterMs: result.capacityWait,
+					budgetMs: ANALYZE_BUDGET_MS,
+					limitAt: null,
+				});
+				if (!wait) {
+					log.warn("object-recognition.capacity_wait_expired", {
+						jobId: claim.jobId,
+						subjectId: r.id,
+						reason: LARM_CAPACITY_TIMEOUT,
+						waitedMs: now - (v.capacityWait?.startedAt ?? now),
+					});
+					patch(db, r.id, {
+						state: "failed",
+						errorCode: LARM_CAPACITY_TIMEOUT,
+						result: null,
+					});
+					return { status: "failed", errorCode: LARM_CAPACITY_TIMEOUT };
+				}
+				db.query(
+					"UPDATE object_recognition_inputs SET deadline=? WHERE id=?",
+				).run(wait.deadline, r.id);
+				patch(db, r.id, {
+					state: "queued",
+					capacityWait: { startedAt: wait.startedAt, count: wait.count },
+				});
+				const jobId = deps.enqueue(db, r.id, "analyze", wait.at - now);
+				log.info("object-recognition.capacity_wait_scheduled", {
+					jobId,
+					subjectId: r.id,
+					waitCount: wait.count,
+					waitedMs: now - wait.startedAt,
+					nextInMs: wait.at - now,
+				});
+				return "applied";
+			}
 			if ("statusUrl" in result) {
 				db.query(
 					"UPDATE object_recognition_inputs SET upstream_id=? WHERE id=?",
 				).run(result.id, r.id);
+				// Accepted: the wait for LARM memory is over (queued now means the gateway's queue).
 				patch(db, r.id, {
 					state: v.state === "cancelling" ? "cancelling" : "queued",
+					capacityWait: undefined,
 				});
 				deps.enqueue(
 					db,

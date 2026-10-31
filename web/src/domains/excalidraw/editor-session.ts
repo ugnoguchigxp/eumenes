@@ -1,8 +1,17 @@
+import { capacityBusy } from "../../hooks/capacity-wait";
 import type { EumenesClient } from "../../../../client";
 import type {
 	DrawingSession,
 	Scene,
 } from "../../../../api/domains/excalidraw/contracts";
+
+/** A session start LARM refused for lack of free memory: it holds no lease and may be started again. */
+class DrawingCapacityBusy extends Error {
+	constructor(readonly retryAfterMs: number | null) {
+		super(capacityBusy);
+	}
+}
+
 export async function waitForDrawing(
 	client: EumenesClient,
 	s: DrawingSession,
@@ -13,6 +22,9 @@ export async function waitForDrawing(
 		await new Promise((resolve) => setTimeout(resolve, 250));
 		s = await client.drawingSession(s.id, signal);
 	}
+	// LARM had no free memory: the owner waits and starts again; this is not a failed connection.
+	if (s.state === "failed" && s.errorCode === capacityBusy)
+		throw new DrawingCapacityBusy(s.retryAfterMs ?? null);
 	// A status read may observe idle before the document read. That read ensures its lease.
 	if (s.state !== "ready" && s.state !== "idle")
 		throw new Error(

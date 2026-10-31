@@ -1,5 +1,5 @@
 import type { Database } from "bun:sqlite";
-import { byId, byRequest, linkAnswer } from "../repository";
+import { byId, byRequest, extendRunDeadline, linkAnswer } from "../repository";
 import { GENERATE_KIND, type DialogueDeps } from "./context";
 import {
 	recordHeardInTransaction,
@@ -88,6 +88,23 @@ export function createOperationPorts(deps: DialogueDeps) {
 		},
 		linkOperationJobInTransaction(db: Database, runId: string, jobId: string) {
 			linkAnswer(db, runId, jobId);
+		},
+		/**
+		 * An operation waiting for LARM memory keeps its run open until `untilMs`. A run whose caller fixed
+		 * the deadline is not extended. Returns the run's deadline afterwards, or null for a finished run.
+		 */
+		extendOperationDeadlineInTransaction(
+			db: Database,
+			runId: string,
+			untilMs: number,
+		) {
+			const run = byId(db, runId);
+			if (!run || !["queued", "running"].includes(run.status)) return null;
+			const current = Date.parse(run.deadlineAt!);
+			if (run.deadlineFixed !== false || untilMs <= current) return current;
+			extendRunDeadline(db, run.id, new Date(untilMs).toISOString());
+			deps.larm.extendDeadlineInTransaction?.(db, run.id, untilMs);
+			return untilMs;
 		},
 		finishOperationInTransaction(db: Database, runId: string) {
 			const run = byId(db, runId);

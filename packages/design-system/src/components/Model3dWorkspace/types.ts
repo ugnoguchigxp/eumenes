@@ -23,6 +23,8 @@ export type Model3dGenerationItem = {
 	deleted: boolean;
 	warnings: readonly string[];
 	errorLabel: string | null;
+	/** A failed generation can be followed again; `false` when no job exists to follow (default `true`). */
+	recheckable?: boolean;
 };
 
 export type Model3dAssetItem = {

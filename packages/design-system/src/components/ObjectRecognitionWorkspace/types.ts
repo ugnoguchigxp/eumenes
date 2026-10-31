@@ -19,6 +19,8 @@ export type RecognitionItem = {
 		| "failed"
 		| "cancelled";
 	canRecheck?: boolean;
+	/** Set while the analysis waits for LARM memory; the state stays "queued". */
+	capacityWait?: { startedAt: number; count: number };
 	captureSave?: "queued" | "saved" | "failed" | "unconfirmed";
 	progress: unknown;
 	errorCode: string | null;

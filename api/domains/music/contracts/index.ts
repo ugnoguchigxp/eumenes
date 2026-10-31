@@ -1,8 +1,17 @@
 import { z } from "zod";
+const capacityWait = z.object({
+	/** When LARM's first free-memory refusal of this request arrived. */
+	startedAt: z.number(),
+	/** How many tries were scheduled after a refusal. */
+	count: z.number().int(),
+});
 const musicArtwork = z.object({
 	state: z.enum(["generating", "completed", "failed"]),
 	revision: z.number().int(),
 	errorCode: z.string().nullable(),
+	/** `waiting_capacity` while the request waits for LARM's free memory. */
+	phase: z.string().optional(),
+	capacityWait: capacityWait.optional(),
 });
 export const musicRecord = z.object({
 	id: z.string(),
@@ -21,6 +30,7 @@ export const musicRecord = z.object({
 	phase: z.string(),
 	jobId: z.string().nullable(),
 	errorCode: z.string().nullable(),
+	capacityWait: capacityWait.optional(),
 	mime: z.string().nullable(),
 	actualModel: z.string().nullable(),
 	/** Artwork is generated on demand from the track's prompt; absent until requested. */

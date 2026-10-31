@@ -158,6 +158,8 @@ export function useMusicRuntime(
 				url: item.id === id ? url : undefined,
 				artworkStatus:
 					item.id === id && artwork?.failed ? "failed" : item.artwork?.state,
+				artworkWaiting: item.artwork?.phase === "waiting_capacity",
+				artworkErrorCode: item.artwork?.errorCode ?? undefined,
 				artworkUrl: item.id === id ? artwork?.url : undefined,
 				downloadName: `${item.title}.${item.mime === "audio/ogg" ? "opus" : item.mime === "audio/mpeg" ? "mp3" : item.mime === "audio/flac" ? "flac" : "wav"}`,
 			})),

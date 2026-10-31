@@ -90,6 +90,10 @@ export const ocrRecord = z.object({
 	createdAt: z.number(),
 	updatedAt: z.number(),
 	canRecheck: z.boolean().optional(),
+	/** Set while the analysis waits for LARM memory to free; the state stays `queued`. */
+	capacityWait: z
+		.object({ startedAt: z.number(), count: z.number().int() })
+		.optional(),
 });
 export type OcrRecord = z.infer<typeof ocrRecord>;
 export type OcrResult = z.infer<typeof ocrResult>;

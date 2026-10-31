@@ -26,6 +26,8 @@ export function musicFixture(
 		artworkFailure?: boolean;
 		jobStatuses?: string[];
 		postStatus?: number;
+		/** LARM's unified "no free memory" refusal on the generation POST. */
+		capacityRefusal?: boolean;
 	} = {},
 ) {
 	const requests: Array<{ method: string; path: string; body: unknown }> = [];
@@ -141,6 +143,11 @@ export function musicFixture(
 						return Response.json(
 							{ error: "invalid_request" },
 							{ status: fixtureOptions.postStatus },
+						);
+					if (fixtureOptions.capacityRefusal)
+						return Response.json(
+							{ error: { code: "resource_exhausted", resource: "memory" } },
+							{ status: 503 },
 						);
 					if (mode === "failure")
 						return Response.json({ error: "unavailable" }, { status: 503 });

@@ -88,6 +88,10 @@ export const recognitionRecord = z.object({
 	createdAt: z.number(),
 	updatedAt: z.number(),
 	canRecheck: z.boolean().optional(),
+	/** Set while the analysis waits for LARM memory to free; the state stays `queued`. */
+	capacityWait: z
+		.object({ startedAt: z.number(), count: z.number().int() })
+		.optional(),
 	/** How the still or video was taken; absent on records saved before it was recorded. */
 	origin: z.enum(["camera", "screen", "file"]).optional(),
 	captureSave: z.enum(["queued", "saved", "failed", "unconfirmed"]).optional(),

@@ -197,6 +197,10 @@ export const analysisRecordSchema = z.object({
 	elapsedMs: ms.nullable(),
 	createdAt: ms,
 	updatedAt: ms,
+	/** Set while the analysis waits for LARM memory: the first refusal and the tries scheduled since. */
+	capacityWait: z
+		.object({ startedAt: ms, count: z.number().int().positive() })
+		.optional(),
 });
 export type AnalysisRecord = z.infer<typeof analysisRecordSchema>;
 export type PerceptionPort = {

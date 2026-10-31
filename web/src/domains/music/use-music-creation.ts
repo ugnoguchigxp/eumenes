@@ -120,19 +120,24 @@ export function useMusicCreation(
 						? "楽曲の制作を取り消しました"
 						: "楽曲を生成しています",
 			description:
-				status === "failed" &&
-				[
-					"larm_http_400",
-					"music_request_invalid",
-					"music_plan_invalid_contract",
-					"music_duration_exceeded",
-				].includes(statusItem?.errorCode ?? "")
-					? "用途・長さ・歌詞・生成オプションの指定を確認してください。上限を超えた長さや矛盾する条件は送れません。"
-					: statusItem?.state === "planning"
-						? "テーマから曲調を考えています。"
-						: running(run.data?.status) && !submitted
-							? "制作依頼を受け付けました。"
-							: undefined,
+				statusItem?.state === "generating" &&
+				statusItem.phase === "waiting_capacity"
+					? "LARMの空きを待っています。ほかの処理が終わりしだい始めます。"
+					: status === "failed" &&
+						  [
+								"larm_http_400",
+								"music_request_invalid",
+								"music_plan_invalid_contract",
+								"music_duration_exceeded",
+						  ].includes(statusItem?.errorCode ?? "")
+						? "用途・長さ・歌詞・生成オプションの指定を確認してください。上限を超えた長さや矛盾する条件は送れません。"
+						: statusItem?.errorCode === "larm_capacity_timeout"
+							? "LARMの空きを待ちましたが、待てる時間内に空かなかったため中止しました。"
+							: statusItem?.state === "planning"
+								? "テーマから曲調を考えています。"
+								: running(run.data?.status) && !submitted
+									? "制作依頼を受け付けました。"
+									: undefined,
 			canCancel: !!cancelRunId,
 		},
 	};

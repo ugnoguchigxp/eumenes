@@ -13,6 +13,7 @@ import { observeVisualStop } from "./visual-stop-observation";
 import { gzipFetch } from "./gzip-fetch";
 import { parseProviderHosts, providerHostAllowed } from "./guards";
 import { json, localUrl, object, list, str } from "./playground-http";
+import { checkRefusal } from "./resend";
 
 export class VisualPerceptionError extends Error {
 	constructor(readonly code: string) {
@@ -59,7 +60,7 @@ export function createVisualPerception(config: {
 			redirect: "error",
 		});
 		if (!accepted.includes(r.status)) {
-			await r.body?.cancel();
+			await checkRefusal(r, url.pathname, false);
 			throw new Error(`larm_http_${r.status}`);
 		}
 		return r;
@@ -256,7 +257,7 @@ export function createVisualPerception(config: {
 						redirect: "error",
 					});
 					if (response.status !== 200) {
-						await response.body?.cancel();
+						await checkRefusal(response, endpoint.pathname, true);
 						throw new Error(`larm_http_${response.status}`);
 					}
 					const bytes = await readBounded(response.body, {

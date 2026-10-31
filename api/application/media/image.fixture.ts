@@ -61,7 +61,7 @@ export function imageFixture(
 		| "fetch-failure" = "success",
 	gate?: Promise<void>,
 	artifactId: (ordinal: number) => string = () => "new-image",
-	failure?: { status: number; code: string },
+	failure?: { status: number; code: string; resource?: string },
 ) {
 	let generated = 0;
 	const requests: Array<{
@@ -163,7 +163,12 @@ export function imageFixture(
 					if (gate) await gate;
 					if (failure)
 						return Response.json(
-							{ error: { code: failure.code } },
+							{
+								error: {
+									code: failure.code,
+									...(failure.resource ? { resource: failure.resource } : {}),
+								},
+							},
 							{ status: failure.status },
 						);
 					if (mode === "failure") return new Response(null, { status: 503 });

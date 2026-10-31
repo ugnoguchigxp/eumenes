@@ -1,6 +1,11 @@
 import type { TestInput } from "../contracts/playground";
 import { expect, test } from "bun:test";
-import { createLarmPlayground, type LarmTestTarget } from "..";
+import {
+	createLarmPlayground,
+	isCapacityBusy,
+	type LarmCapacityBusy,
+	type LarmTestTarget,
+} from "..";
 
 const target: LarmTestTarget = {
 	id: "image-target",
@@ -263,4 +268,53 @@ test("image transport failure never resubmits or fetches an unconfirmed result",
 		"POST /acquired-image",
 		"DELETE /v1/agent-connections/image-connection",
 	]);
+});
+const memoryRefusal = (headers: HeadersInit = {}) =>
+	Response.json(
+		{
+			error: {
+				code: "resource_exhausted",
+				resource: "memory",
+				message: "private response",
+			},
+		},
+		{ status: 503, headers },
+	);
+test("image without free LARM memory is refused once for the owner to send later", async () => {
+	const h = fixture((path) =>
+		path === "/acquired-image"
+			? memoryRefusal({ "Retry-After": "90" })
+			: undefined,
+	);
+	const error = await h.execute().catch((e: unknown) => e);
+	expect(isCapacityBusy(error)).toBe(true);
+	expect((error as LarmCapacityBusy).retryAfterMs).toBe(90_000);
+	expect(h.calls).toEqual([
+		"POST /v1/agent-connections",
+		"POST /acquired-image",
+		"DELETE /v1/agent-connections/image-connection",
+	]);
+});
+test("a connection refused for LARM memory is not created again nor used", async () => {
+	const h = fixture((path) =>
+		path === "/v1/agent-connections" ? memoryRefusal() : undefined,
+	);
+	const error = await h.execute().catch((e: unknown) => e);
+	expect(isCapacityBusy(error)).toBe(true);
+	expect((error as LarmCapacityBusy).retryAfterMs).toBeNull();
+	expect(h.calls).toEqual(["POST /v1/agent-connections"]);
+});
+test("another resource or code in a 503 stays an ordinary refusal", async () => {
+	for (const error of [
+		{ code: "resource_exhausted", resource: "gpu" },
+		{ code: "service_unavailable", resource: "memory" },
+	]) {
+		const h = fixture((path) =>
+			path === "/acquired-image"
+				? Response.json({ error }, { status: 503 })
+				: undefined,
+		);
+		await expect(h.execute()).rejects.toThrow("larm_http_503");
+		expect(h.calls.filter((c) => c === "POST /acquired-image")).toHaveLength(1);
+	}
 });

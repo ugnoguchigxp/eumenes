@@ -66,6 +66,13 @@ export interface LogFields {
 	durationMs?: number;
 	/** The time limit that applied (ms). */
 	limitMs?: number;
+	/** LARM's own refusal code: a short identifier only (`unknown` otherwise), never its message. */
+	larmCode?: string;
+	/** A wait for LARM memory: Retry-After, tries scheduled, time waited and time to the next try (ms). */
+	retryAfterMs?: number;
+	waitCount?: number;
+	waitedMs?: number;
+	nextInMs?: number;
 	bytes?: number;
 	count?: number;
 	attempt?: number;
@@ -238,6 +245,11 @@ const keys = new Set<keyof LogFields>([
 	"next",
 	"durationMs",
 	"limitMs",
+	"larmCode",
+	"retryAfterMs",
+	"waitCount",
+	"waitedMs",
+	"nextInMs",
 	"bytes",
 	"count",
 	"attempt",

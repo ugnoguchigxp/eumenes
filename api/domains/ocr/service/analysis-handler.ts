@@ -1,8 +1,15 @@
 import { z } from "zod";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import { imageForInput } from "../../../infrastructure/media-image";
-import type { HandlerDefinition } from "../../queue";
-import type { AnalysisRecord, PerceptionPort } from "../../larm";
+import { getLogger } from "../../../infrastructure/logger";
+import type { HandlerDefinition, QueueService } from "../../queue";
+import {
+	isCapacityBusy,
+	LARM_CAPACITY_TIMEOUT,
+	planCapacityWait,
+	type AnalysisRecord,
+	type PerceptionPort,
+} from "../../larm";
 import { row } from "../repository";
 import {
 	analysisRow,
@@ -10,8 +17,13 @@ import {
 	updateAnalysis,
 } from "../repository/analyses";
 import { active, valid } from "./analysis-source";
+const log = getLogger("ocr");
+/** The processing time one try gets once LARM has room again. */
+/** How long one detail analysis may take after LARM accepts it. */
+export const ANALYSIS_BUDGET_MS = 360_000;
 export function analysisHandler(
 	store: SqliteStore,
+	queue: QueueService,
 	visual: () => PerceptionPort,
 ) {
 	type Prepared = {
@@ -27,7 +39,8 @@ export function analysisHandler(
 				value: Awaited<ReturnType<PerceptionPort["perceive"]>>;
 				timestamp: number | null;
 		  }
-		| { ok: false; code: string };
+		| { ok: false; code: string }
+		| { capacityWait: number | null };
 	const handler: HandlerDefinition<{ id: string }, Prepared, Output> = {
 		kind: "ocr.analysis",
 		payloadVersions: [1],
@@ -89,6 +102,7 @@ export function analysisHandler(
 								db.query(
 									"UPDATE ocr_analyses SET connection_id=? WHERE id=?",
 								).run(id!, r.id);
+								updateAnalysis(db, r, { releaseConfirmed: null });
 							} else if (phase === "lifecycle") {
 								if (observation)
 									updateAnalysis(db, r, { stopObservation: observation });
@@ -103,6 +117,7 @@ export function analysisHandler(
 				);
 				return { ok: true, value, timestamp: image.timestamp };
 			} catch (error) {
+				if (isCapacityBusy(error)) return { capacityWait: error.retryAfterMs };
 				const message = error instanceof Error ? error.message : "";
 				const code =
 					/^(analysis_[a-z_]+|larm_http_\d{3}|invalid_[a-z_]+|provider_[a-z_]+|stale_catalog|deadline_exceeded|larm_[a-z_]+)$/.test(
@@ -133,7 +148,7 @@ export function analysisHandler(
 					? "analysis_connection_changed"
 					: outcome.type !== "success"
 						? "analysis_interrupted"
-						: !outcome.result.ok
+						: "ok" in outcome.result && !outcome.result.ok
 							? outcome.result.code
 							: null;
 			if (failure) {
@@ -144,7 +159,62 @@ export function analysisHandler(
 				});
 				return { status: "failed", errorCode: failure };
 			}
-			if (outcome.type !== "success" || !outcome.result.ok) return "stale";
+			if (outcome.type !== "success") return "stale";
+			if ("capacityWait" in outcome.result) {
+				const now = Date.now();
+				const wait = planCapacityWait({
+					now,
+					previous: v.capacityWait,
+					retryAfterMs: outcome.result.capacityWait,
+					budgetMs: ANALYSIS_BUDGET_MS,
+					limitAt: null,
+				});
+				if (!wait) {
+					log.warn("ocr.capacity_wait_expired", {
+						jobId: claim.jobId,
+						subjectId: r.id,
+						reason: LARM_CAPACITY_TIMEOUT,
+						waitedMs: now - (v.capacityWait?.startedAt ?? now),
+					});
+					updateAnalysis(db, r, {
+						state: "failed",
+						errorCode: LARM_CAPACITY_TIMEOUT,
+						result: null,
+					});
+					return { status: "failed", errorCode: LARM_CAPACITY_TIMEOUT };
+				}
+				const next = queue.enqueueInTransaction(db, {
+					scope: "ocr",
+					kind: "ocr.analysis",
+					dedupeKey: `${r.id}:analysis:w${wait.count}`,
+					payload: { id: r.id },
+					subjectRef: r.id,
+					lane: "interactive",
+					resourceKey: "vision.perception",
+					concurrencyKey: "vision.perception",
+					availableAtMs: wait.at,
+					deadlineAtMs: wait.deadline,
+					maxAttempts: 1,
+				});
+				db.query("UPDATE ocr_analyses SET job_id=? WHERE id=?").run(
+					next.job.id,
+					r.id,
+				);
+				updateAnalysis(db, r, {
+					state: "queued",
+					capacityWait: { startedAt: wait.startedAt, count: wait.count },
+					errorCode: null,
+				});
+				log.info("ocr.capacity_wait_scheduled", {
+					jobId: next.job.id,
+					subjectId: r.id,
+					waitCount: wait.count,
+					waitedMs: now - wait.startedAt,
+					nextInMs: wait.at - now,
+				});
+				return "applied";
+			}
+			if (!outcome.result.ok) return "stale";
 			const { value, timestamp } = outcome.result;
 			updateAnalysis(db, r, {
 				state: "completed",

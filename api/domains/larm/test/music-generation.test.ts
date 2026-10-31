@@ -127,6 +127,7 @@ function gateway(
 	statuses: string[],
 	options: {
 		postStatus?: number;
+		postBody?: Record<string, unknown>;
 		cancelLate?: AbortController;
 		format?: string;
 	} = {},
@@ -155,10 +156,9 @@ function gateway(
 			if (path === "/v1/music/providers") return Response.json(catalog);
 			if (method === "POST") {
 				options.cancelLate?.abort();
-				return Response.json(
-					{ jobId: "track" },
-					{ status: options.postStatus ?? 202 },
-				);
+				return Response.json(options.postBody ?? { jobId: "track" }, {
+					status: options.postStatus ?? 202,
+				});
 			}
 			if (method === "DELETE")
 				return Response.json({ jobId: "track", status: "cancelled" });
@@ -268,6 +268,17 @@ for (const status of [500, 503])
 			target.endpoint,
 		]);
 	});
+test("music without free LARM memory is a capacity refusal, not an unknown result", async () => {
+	const { g, calls } = gateway([], {
+		postStatus: 503,
+		postBody: { error: { code: "resource_exhausted", resource: "memory" } },
+	});
+	await expect(
+		g.execute(target, cases[0]!, AbortSignal.timeout(1000), async () => {}),
+	).rejects.toThrow("larm_capacity_busy");
+	expect(calls.filter((c) => c.method === "POST")).toHaveLength(1);
+	expect(calls.some((c) => c.method === "DELETE")).toBe(false);
+});
 test("a late 202 after local cancellation sends DELETE and never fetches audio", async () => {
 	const c = new AbortController();
 	const { g, calls } = gateway(["completed"], { cancelLate: c });

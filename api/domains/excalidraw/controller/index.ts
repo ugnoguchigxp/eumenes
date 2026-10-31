@@ -1,6 +1,7 @@
 import type { Hono, Context } from "hono";
 import { z } from "zod";
 import { readBounded } from "../../../infrastructure/bounded-read";
+import { isCapacityBusy, LARM_CAPACITY_RETRY_MS } from "../../larm";
 import type { ExcalidrawService } from "../service";
 async function body(request: Request) {
 	return JSON.parse(
@@ -20,6 +21,15 @@ export function registerExcalidraw(app: Hono, s: ExcalidrawService) {
 			try {
 				return await handler(c);
 			} catch (e) {
+				// LARM has no free memory: the Web screen sends the same request again later.
+				if (isCapacityBusy(e))
+					return c.json(
+						{
+							error: e.message,
+							retryAfterMs: e.retryAfterMs ?? LARM_CAPACITY_RETRY_MS,
+						},
+						503,
+					);
 				const message = e instanceof Error ? e.message : "";
 				return c.json(
 					{

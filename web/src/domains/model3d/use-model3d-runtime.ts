@@ -60,6 +60,8 @@ function toGeneration(g: Model3dGeneration) {
 		deleted: g.deleted,
 		warnings: g.warnings,
 		errorLabel: g.errorLabel,
+		// Waiting for LARM's memory ended before any job existed, so there is nothing to follow again.
+		recheckable: g.errorCode !== "larm_capacity_timeout",
 	};
 }
 function toAsset(a: Model3dAsset) {

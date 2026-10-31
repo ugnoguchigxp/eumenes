@@ -5,14 +5,24 @@ import { z } from "zod";
 import { musicPlanV3, type Prepared } from "../../capabilities";
 import type { Receipt } from "../../inference";
 import type { HandlerDefinition } from "../../queue";
-import { findServiceTarget, type TestOutput } from "../../larm";
+import {
+	findServiceTarget,
+	isCapacityBusy,
+	LARM_CAPACITY_TIMEOUT,
+	LARM_CAPACITY_WAITING,
+	planCapacityWait,
+	type TestOutput,
+} from "../../larm";
+import { MEDIA_GENERATION_TIMEOUT_MS } from "../../capabilities";
+import { getLogger } from "../../../infrastructure/logger";
 import type { MusicRecord } from "../contracts";
-import { row, record, patch } from "../repository";
+import { row, record, patch, type Row } from "../repository";
 import { musicContext, PLAN_MS } from "./context";
 import type { createMusic } from "./index";
 type GenerationPlan = Omit<z.infer<typeof musicPlanV3>, "task"> & {
 	task?: "music" | "sound-effect";
 };
+const log = getLogger("music");
 const payload = z.object({ id: z.string() });
 const active = (r: MusicRecord) =>
 	r.state === "planning" || r.state === "generating";
@@ -20,6 +30,69 @@ const safeError = (error: unknown) =>
 	error instanceof Error && /^[a-z_0-9]{1,80}$/.test(error.message)
 		? error.message
 		: "music_generation_failed";
+/** LARM had no free memory: schedules the same generate stage later, or fails once the wait cannot go on. */
+function settleCapacityWait(
+	db: Database,
+	r: Row,
+	retryAfterMs: number | null,
+	ports: {
+		onWaiting?: (db: Database, runId: string, untilMs: number) => number | null;
+		enqueue: (
+			db: Database,
+			id: string,
+			runId: string,
+			deadline: number,
+			stage: "generate",
+			wait: { at: number; count: number },
+		) => string;
+		fail: (db: Database, id: string, code: string) => void;
+	},
+) {
+	const now = Date.now();
+	const previous = record(r).capacityWait;
+	const execution = JSON.parse(r.request_json).execution;
+	const plan = planCapacityWait({
+		now,
+		previous,
+		retryAfterMs,
+		budgetMs: MEDIA_GENERATION_TIMEOUT_MS,
+		limitAt: execution ? r.deadline : null,
+	});
+	// A child execution's deadline is fixed by its caller; a run's deadline is extended or the wait ends.
+	const extended =
+		plan !== null &&
+		(execution ||
+			!ports.onWaiting ||
+			(ports.onWaiting(db, r.run_id, plan.deadline) ?? 0) >= plan.deadline);
+	if (!plan || !extended) {
+		log.warn("music.capacity_wait_expired", {
+			reason: LARM_CAPACITY_TIMEOUT,
+			waitedMs: now - (previous?.startedAt ?? now),
+		});
+		ports.fail(db, r.id, LARM_CAPACITY_TIMEOUT);
+		return "applied" as const;
+	}
+	db.query("UPDATE music_generations SET deadline=? WHERE id=?").run(
+		plan.deadline,
+		r.id,
+	);
+	patch(db, r.id, {
+		phase: LARM_CAPACITY_WAITING,
+		capacityWait: { startedAt: plan.startedAt, count: plan.count },
+	});
+	const jobId = ports.enqueue(db, r.id, r.run_id, plan.deadline, "generate", {
+		at: plan.at,
+		count: plan.count,
+	});
+	log.info("music.capacity_wait_scheduled", {
+		jobId,
+		subjectId: r.id,
+		waitCount: plan.count,
+		waitedMs: now - plan.startedAt,
+		nextInMs: plan.at - now,
+	});
+	return "applied" as const;
+}
 export function registerMusicHandlers(
 	deps: Parameters<typeof createMusic>[0] & {
 		enqueue: (
@@ -28,6 +101,7 @@ export function registerMusicHandlers(
 			runId: string,
 			deadline: number,
 			stage: "plan" | "generate",
+			wait?: { at: number; count: number },
 		) => string;
 		fail: (db: Database, id: string, code: string) => void;
 		cancel: (db: Database, job: { payload: { id: string } }) => void;
@@ -151,10 +225,12 @@ export function registerMusicHandlers(
 		prepared: Prepared;
 		execution?: ChildExecution;
 	};
+	/** LARM had no free memory: the generate stage waits and is queued again, never sent from here. */
+	type CapacityWait = { capacityWait: number | null };
 	const generateHandler: HandlerDefinition<
 		{ id: string },
 		GenerateInput,
-		TestOutput
+		TestOutput | CapacityWait
 	> = {
 		kind: "music.generate",
 		payloadVersions: [1],
@@ -167,6 +243,8 @@ export function registerMusicHandlers(
 				return { status: "stale", reason: "music_not_generating" };
 			const prepared = JSON.parse(r.bindings_json) as Prepared;
 			capabilities.validateInTransaction(db, prepared);
+			if (record(r).phase === LARM_CAPACITY_WAITING)
+				patch(db, r.id, { phase: "queued" });
 			return {
 				status: "ready",
 				input: {
@@ -228,6 +306,7 @@ export function registerMusicHandlers(
 					throw new Error("music_audio_too_large");
 				return output;
 			} catch (e) {
+				if (isCapacityBusy(e)) return { capacityWait: e.retryAfterMs };
 				throw new Error(safeError(e));
 			}
 		},
@@ -235,6 +314,23 @@ export function registerMusicHandlers(
 		settleInTransaction(db, claim, input, outcome) {
 			const r = row(db, claim.payload.id);
 			if (!r || record(r).state !== "generating") return "stale";
+			if (
+				outcome.type === "success" &&
+				input &&
+				"capacityWait" in outcome.result
+			) {
+				try {
+					capabilities.validateInTransaction(db, input.prepared);
+				} catch {
+					fail(db, r.id, "capability_revoked");
+					return "applied";
+				}
+				return settleCapacityWait(db, r, outcome.result.capacityWait, {
+					onWaiting: deps.onWaiting,
+					enqueue,
+					fail,
+				});
+			}
 			if (outcome.type !== "success" || !input) {
 				fail(
 					db,
@@ -251,7 +347,7 @@ export function registerMusicHandlers(
 				fail(db, r.id, "capability_revoked");
 				return "applied";
 			}
-			const output = outcome.result;
+			const output = outcome.result as TestOutput;
 			db.query("UPDATE music_generations SET audio=? WHERE id=?").run(
 				output.bytes!,
 				r.id,

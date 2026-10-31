@@ -681,6 +681,8 @@ export async function harness(options: HarnessOptions = {}) {
 					dialogue.linkOperationJobInTransaction(db, runId, jobId),
 				onFinished: (db, runId) =>
 					dialogue.finishOperationInTransaction(db, runId),
+				onWaiting: (db, runId, untilMs) =>
+					dialogue.extendOperationDeadlineInTransaction(db, runId, untilMs),
 			})
 		: undefined;
 	const image = options.imageGateway
@@ -696,6 +698,8 @@ export async function harness(options: HarnessOptions = {}) {
 					dialogue.linkOperationJobInTransaction(db, runId, jobId),
 				onFinished: (db, runId) =>
 					dialogue.finishOperationInTransaction(db, runId),
+				onWaiting: (db, runId, untilMs) =>
+					dialogue.extendOperationDeadlineInTransaction(db, runId, untilMs),
 			})
 		: undefined;
 	const excalidraw = options.drawingConnection
@@ -721,6 +725,8 @@ export async function harness(options: HarnessOptions = {}) {
 					dialogue.linkOperationJobInTransaction(db, runId, jobId),
 				onFinished: (db, runId) =>
 					dialogue.finishOperationInTransaction(db, runId),
+				onWaiting: (db, runId, untilMs) =>
+					dialogue.extendOperationDeadlineInTransaction(db, runId, untilMs),
 			})
 		: undefined;
 	const objectRecognition = options.recognitionFetcher

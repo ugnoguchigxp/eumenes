@@ -1,4 +1,5 @@
 import { readBounded } from "../../../infrastructure/bounded-read";
+import { checkRefusal, isCapacityBusy } from "../../larm";
 import { doclingPrepared, type DoclingConnection } from "../contracts";
 
 export type DoclingFetch = (url: URL, init: RequestInit) => Promise<Response>;
@@ -58,6 +59,8 @@ export function createDocling(deps: {
 					},
 				);
 				if (response.status !== 200) {
+					// A capacity refusal is thrown as LarmCapacityBusy; the Web screen sends again later.
+					await checkRefusal(response, "/auth/ui-tickets", true);
 					await response.body?.cancel();
 					throw new Error(
 						[401, 403].includes(response.status)
@@ -114,6 +117,7 @@ export function createDocling(deps: {
 				return { url: url.href, expiresIn };
 			} catch (error) {
 				// Never propagate fetch errors, upstream bodies or URLs: they can contain credentials.
+				if (isCapacityBusy(error)) throw error;
 				if (callerSignal.aborted) throw new Error("docling_cancelled");
 				if (signal.aborted) throw new Error("docling_timeout");
 				if (

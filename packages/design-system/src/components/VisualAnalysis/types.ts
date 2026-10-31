@@ -26,6 +26,8 @@ export type VisualAnalysisRecord = {
 		| "cancelling"
 		| "cancelled";
 	options: VisualAnalysisOptions;
+	/** Set while the analysis waits for LARM memory; the state stays "queued". */
+	capacityWait?: { startedAt: number; count: number };
 	errorCode: string | null;
 	releaseConfirmed: boolean | null;
 	stopObservation?: { status: "observing" | "cold" | "unconfirmed" };

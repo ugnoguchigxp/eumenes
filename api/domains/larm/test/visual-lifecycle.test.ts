@@ -80,6 +80,35 @@ test.each([
 		expect(f.requests.filter((r) => r.method === "DELETE")).toHaveLength(1);
 	},
 );
+test("a claim refused for LARM memory is not claimed again and releases", async () => {
+	const f = visualFetcher({
+		claim: () =>
+			Response.json(
+				{ error: { code: "resource_exhausted", resource: "memory" } },
+				{ status: 503 },
+			),
+	});
+	await expect(perceive(f)).rejects.toThrow("larm_capacity_busy");
+	expect(f.requests.filter((r) => r.path.endsWith("/claim"))).toHaveLength(1);
+	expect(
+		f.requests.filter((r) => r.path === "/v1/agent-connections"),
+	).toHaveLength(1);
+	expect(f.requests.filter((r) => r.method === "DELETE")).toHaveLength(1);
+});
+test("an inference refused for LARM memory is sent once and releases", async () => {
+	const f = visualFetcher({
+		infer: async () =>
+			Response.json(
+				{ error: { code: "resource_exhausted", resource: "memory" } },
+				{ status: 503 },
+			),
+	});
+	await expect(perceive(f)).rejects.toThrow("larm_capacity_busy");
+	expect(
+		f.requests.filter((r) => r.path === "/v1/vision/perceive"),
+	).toHaveLength(1);
+	expect(f.requests.filter((r) => r.method === "DELETE")).toHaveLength(1);
+});
 test.each([409, 503])(
 	"unrelated claim HTTP %i is never retried and releases",
 	async (status) => {

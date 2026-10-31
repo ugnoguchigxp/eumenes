@@ -79,7 +79,7 @@ export function Model3dGenerationList({
 									取り消す
 								</Button>
 							)}
-							{item.state === "failed" && (
+							{item.state === "failed" && item.recheckable !== false && (
 								<Button
 									type="button"
 									variant="outline"

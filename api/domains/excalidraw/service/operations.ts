@@ -15,14 +15,33 @@ import {
 	type Receipt,
 } from "../../inference";
 import type { QueueService, HandlerDefinition } from "../../queue";
+import {
+	LARM_CAPACITY_BUSY,
+	LARM_CAPACITY_RETRY_MS,
+	LARM_CAPACITY_TIMEOUT,
+	LARM_CAPACITY_WAITING,
+	planCapacityWait,
+	type CapacityWait,
+} from "../../larm";
+import { getLogger } from "../../../infrastructure/logger";
 import { references } from "../repository";
 import type { ExcalidrawService } from "./index";
+import { START_WAIT_MS } from "./connection";
 import type { ChildExecution } from "../../tool-runtime";
+const log = getLogger("excalidraw");
 type RecordValue = {
 	id: string;
 	runId: string;
 	conversationId: string;
-	state: "planning" | "starting" | "completed" | "failed" | "cancelled";
+	state:
+		| "planning"
+		| "starting"
+		| typeof LARM_CAPACITY_WAITING
+		| "completed"
+		| "failed"
+		| "cancelled";
+	/** Set while waiting for LARM memory and kept after, so the wait limit counts from the first refusal. */
+	capacityWait?: CapacityWait;
 	sessionId: string | null;
 	referenceId: string | null;
 	url: string | null;
@@ -51,7 +70,7 @@ function patch(db: Database, r: Row, change: Partial<RecordValue>) {
 		r.id,
 	);
 }
-export function registerDrawingOperations(deps: {
+type Deps = {
 	store: SqliteStore;
 	queue: QueueService;
 	inference: InferencePort;
@@ -59,35 +78,98 @@ export function registerDrawingOperations(deps: {
 	service: ExcalidrawService;
 	onJob: (db: Database, runId: string, jobId: string) => void;
 	onFinished: (db: Database, runId: string) => void;
+	/** Keeps the conversation run open until `untilMs`; returns the run's deadline, or null if it cannot. */
+	onWaiting?: (db: Database, runId: string, untilMs: number) => number | null;
+	clock?: () => number;
 	validateExecutionInTransaction?: (
 		db: Database,
 		child: ChildExecution,
 	) => boolean;
-}) {
-	const { queue, inference, capabilities, service } = deps;
-	function enqueue(db: Database, r: Row, stage: "plan" | "open") {
-		const { job } = queue.enqueueInTransaction(db, {
-			scope: "excalidraw",
-			kind: `excalidraw.${stage}`,
-			dedupeKey: `${r.id}:${stage}`,
-			payload: { id: r.id },
-			subjectRef: r.id,
-			lane: "interactive",
-			resourceKey: stage === "plan" ? "inference.llm" : "excalidraw.connect",
-			maxAttempts: 1,
-			deadlineAtMs: r.deadline - 15000,
+};
+function enqueueStage(
+	deps: Deps,
+	db: Database,
+	r: Row,
+	stage: "plan" | "open",
+	wait?: CapacityWait,
+) {
+	const { job } = deps.queue.enqueueInTransaction(db, {
+		scope: "excalidraw",
+		kind: `excalidraw.${stage}`,
+		dedupeKey: wait ? `${r.id}:${stage}:w${wait.count}` : `${r.id}:${stage}`,
+		...(wait ? { availableAtMs: wait.at } : {}),
+		payload: { id: r.id },
+		subjectRef: r.id,
+		lane: "interactive",
+		resourceKey: stage === "plan" ? "inference.llm" : "excalidraw.connect",
+		maxAttempts: 1,
+		deadlineAtMs: r.deadline - 15000,
+	});
+	db.query("UPDATE excalidraw_operations SET job_id=? WHERE id=?").run(
+		job.id,
+		r.id,
+	);
+	if (!JSON.parse(r.request_json).execution) deps.onJob(db, r.run_id, job.id);
+	return job.id;
+}
+const failOperation = (deps: Deps, db: Database, r: Row, code: string) => {
+	patch(db, r, { state: "failed", errorCode: code });
+	if (!JSON.parse(r.request_json).execution) deps.onFinished(db, r.run_id);
+};
+/**
+ * LARM refused the lease for lack of free memory. The same start is queued again at the planned time;
+ * a run whose caller fixed the deadline, or the 30-minute limit, ends it as `larm_capacity_timeout`.
+ */
+function waitForCapacity(
+	deps: Deps,
+	db: Database,
+	r: Row,
+	retryAfterMs: number,
+) {
+	const record = view(r),
+		now = (deps.clock ?? Date.now)(),
+		delegated = !!JSON.parse(r.request_json).execution;
+	const plan = planCapacityWait({
+		now,
+		previous: record.capacityWait,
+		retryAfterMs,
+		budgetMs: START_WAIT_MS,
+		limitAt: delegated ? r.deadline : null,
+	});
+	const until =
+		plan && !delegated ? deps.onWaiting?.(db, r.run_id, plan.deadline) : null;
+	const extended = plan && (delegated ? r.deadline : until);
+	if (!plan || extended == null || extended < plan.deadline) {
+		log.warn("excalidraw.capacity_wait_expired", {
+			jobId: r.job_id ?? undefined,
+			subjectId: r.id,
+			reason: LARM_CAPACITY_TIMEOUT,
+			waitedMs: now - (record.capacityWait?.startedAt ?? now),
 		});
-		db.query("UPDATE excalidraw_operations SET job_id=? WHERE id=?").run(
-			job.id,
-			r.id,
-		);
-		if (!JSON.parse(r.request_json).execution) deps.onJob(db, r.run_id, job.id);
-		return job.id;
+		failOperation(deps, db, r, LARM_CAPACITY_TIMEOUT);
+		return "applied" as const;
 	}
-	const fail = (db: Database, r: Row, code: string) => {
-		patch(db, r, { state: "failed", errorCode: code });
-		if (!JSON.parse(r.request_json).execution) deps.onFinished(db, r.run_id);
-	};
+	patch(db, r, { state: LARM_CAPACITY_WAITING, capacityWait: plan });
+	db.query("UPDATE excalidraw_operations SET deadline=? WHERE id=?").run(
+		extended,
+		r.id,
+	);
+	const jobId = enqueueStage(deps, db, read(db, r.id)!, "open", plan);
+	log.info("excalidraw.capacity_wait_scheduled", {
+		jobId,
+		subjectId: r.id,
+		waitCount: plan.count,
+		waitedMs: now - plan.startedAt,
+		nextInMs: plan.at - now,
+	});
+	return "applied" as const;
+}
+export function registerDrawingOperations(deps: Deps) {
+	const { queue, inference, capabilities, service } = deps;
+	const enqueue = (db: Database, r: Row, stage: "plan" | "open") =>
+		enqueueStage(deps, db, r, stage);
+	const fail = (db: Database, r: Row, code: string) =>
+		failOperation(deps, db, r, code);
 	const cancel = (db: Database, job: { payload: { id: string } }) => {
 		const r = read(db, job.payload.id);
 		if (r) patch(db, r, { state: "cancelled", errorCode: "cancel_requested" });
@@ -234,7 +316,7 @@ export function registerDrawingOperations(deps: {
 	const opener: HandlerDefinition<
 		{ id: string },
 		Row,
-		Awaited<ReturnType<ExcalidrawService["wait"]>>
+		Awaited<ReturnType<ExcalidrawService["wait"]> | { capacityWait: number }>
 	> = {
 		kind: "excalidraw.open",
 		payloadVersions: [1],
@@ -243,9 +325,12 @@ export function registerDrawingOperations(deps: {
 		resourceKey: "excalidraw.connect",
 		prepareInTransaction(db, claim) {
 			const r = read(db, claim.payload.id);
-			if (!r || view(r).state !== "starting")
+			if (!r || !["starting", LARM_CAPACITY_WAITING].includes(view(r).state))
 				return { status: "stale", reason: "drawing_not_starting" };
 			capabilities.validateInTransaction(db, JSON.parse(r.bindings_json));
+			// The scheduled try has started: the record shows a start again, not a wait.
+			if (view(r).state === LARM_CAPACITY_WAITING)
+				patch(db, r, { state: "starting" });
 			return { status: "ready", input: r };
 		},
 		async execute(r, { signal }) {
@@ -258,7 +343,8 @@ export function registerDrawingOperations(deps: {
 				),
 			);
 			const s = await service.session({
-				requestId: r.id,
+				// A try after a refusal is a new start; the first one's session stays failed.
+				requestId: view(r).capacityWait ? crypto.randomUUID() : r.id,
 				conversationId: r.conversation_id,
 				title: plan.title,
 				referenceId: plan.referenceId!,
@@ -273,7 +359,18 @@ export function registerDrawingOperations(deps: {
 					await service.release(s.id);
 					signal.throwIfAborted();
 				}
-				return await service.wait(s.id);
+				const started = await service.wait(s.id);
+				// LARM had no free memory: the lease request was refused before it was accepted.
+				if (
+					started?.state === "failed" &&
+					started.errorCode === LARM_CAPACITY_BUSY
+				) {
+					await service.release(s.id);
+					return {
+						capacityWait: started.retryAfterMs ?? LARM_CAPACITY_RETRY_MS,
+					};
+				}
+				return started;
 			} finally {
 				signal.removeEventListener("abort", abort);
 			}
@@ -283,9 +380,18 @@ export function registerDrawingOperations(deps: {
 			const r = read(db, claim.payload.id);
 			if (!r || view(r).state !== "starting") return "stale";
 			if (
+				input &&
+				outcome.type === "success" &&
+				outcome.result &&
+				"capacityWait" in outcome.result
+			)
+				return waitForCapacity(deps, db, r, outcome.result.capacityWait);
+			if (
 				!input ||
 				outcome.type !== "success" ||
-				outcome.result?.state !== "ready"
+				!outcome.result ||
+				!("state" in outcome.result) ||
+				outcome.result.state !== "ready"
 			) {
 				fail(db, r, "excalidraw_start_failed");
 				return "applied";
@@ -315,7 +421,7 @@ export function registerDrawingOperations(deps: {
 }
 
 function drawingOperations(
-	deps: Parameters<typeof registerDrawingOperations>[0],
+	deps: Deps,
 	enqueue: (db: Database, r: Row, stage: "plan" | "open") => string,
 	cancel: (db: Database, job: { payload: { id: string } }) => void,
 ) {
@@ -402,7 +508,10 @@ function drawingOperations(
 		},
 		cancelCallInTransaction(db: Database, id: string) {
 			const r = read(db, id);
-			if (r?.job_id && ["planning", "starting"].includes(view(r).state)) {
+			if (
+				r?.job_id &&
+				["planning", "starting", LARM_CAPACITY_WAITING].includes(view(r).state)
+			) {
 				cancel(db, { payload: { id } });
 				queue.cancelInTransaction(db, r.job_id, "execution_cancelled");
 			}

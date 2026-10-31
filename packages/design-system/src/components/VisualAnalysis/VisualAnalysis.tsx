@@ -1,8 +1,17 @@
 import { useId, useState } from "react";
 import { Button } from "../Button";
-import type { VisualAnalysisProps, VisualAnalysisTask } from "./types";
+import type {
+	VisualAnalysisProps,
+	VisualAnalysisRecord,
+	VisualAnalysisTask,
+} from "./types";
 import "./visual-analysis.css";
 import { StopObservationStatus } from "./StopObservationStatus";
+import {
+	capacityTimeoutMessage,
+	capacityWaitingMessage,
+	isCapacityWaiting,
+} from "./capacity";
 const tasks: Record<VisualAnalysisTask, string> = {
 	describe: "画像を説明",
 	referring: "条件に合う物を探す",
@@ -23,6 +32,7 @@ const states = {
 	cancelled: "中止済み",
 };
 const errors: Record<string, string> = {
+	larm_capacity_timeout: capacityTimeoutMessage,
 	analysis_image_too_large:
 		"詳細分析の画像上限を超えています。4 MiB・約419万画素・各辺8192px以内の画像を使ってください。",
 	analysis_unconfigured: "LARMの接続設定を確認してください。",
@@ -45,6 +55,15 @@ const errors: Record<string, string> = {
 };
 const decoderLabel = (value: string | null) =>
 	value === null ? "decoder非搭載" : value;
+/** A cancel whose release is unconfirmed, a wait for LARM memory, or the state itself. */
+function statusLabel(analysis: VisualAnalysisRecord) {
+	if (analysis.state === "cancelled" && analysis.releaseConfirmed === null)
+		return "中止処理中（結果は採用しません）";
+	return isCapacityWaiting(analysis)
+		? capacityWaitingMessage
+		: states[analysis.state];
+}
+
 export function VisualAnalysis(props: VisualAnalysisProps) {
 	const id = useId().replace(/:/g, "");
 	const [task, setTask] = useState<VisualAnalysisTask>("describe");
@@ -188,14 +207,7 @@ export function VisualAnalysis(props: VisualAnalysisProps) {
 							)}
 						</div>
 					</div>
-					{analysis && (
-						<p role="status">
-							{analysis.state === "cancelled" &&
-							analysis.releaseConfirmed === null
-								? "中止処理中（結果は採用しません）"
-								: states[analysis.state]}
-						</p>
-					)}
+					{analysis && <p role="status">{statusLabel(analysis)}</p>}
 					{analysis?.errorCode && (
 						<p role="alert">
 							{errors[analysis.errorCode] ??

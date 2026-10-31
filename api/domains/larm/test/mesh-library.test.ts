@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import { createLarmPlayground } from "../service/playground";
 import { MeshHttpError } from "../service/mesh-library";
+import { isCapacityBusy } from "../service/resend";
 
 const base = "http://127.0.0.1:18799";
 type Seen = { url: string; method: string; headers: Headers; body?: string };
@@ -115,6 +116,18 @@ test("a submission carries the idempotency key and no steps; 429 reports Retry-A
 		.catch((e) => e);
 	expect(refused).toBeInstanceOf(MeshHttpError);
 	expect(refused).toMatchObject({ status: 429, retryAfterMs: 7000 });
+
+	const full = larm(() =>
+		json({ error: { code: "resource_exhausted", resource: "memory" } }, 503, {
+			"Retry-After": "45",
+		}),
+	);
+	const waiting = await full.meshes
+		.submit("/v1/3d/generations", body, "key-1", signal())
+		.catch((e) => e);
+	expect(isCapacityBusy(waiting)).toBe(true);
+	expect(waiting).toMatchObject({ retryAfterMs: 45_000 });
+	expect(full.seen).toHaveLength(1);
 });
 
 test("job status keeps stage and status apart; assets are reduced to known fields", async () => {

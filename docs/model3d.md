@@ -11,7 +11,7 @@
 ## 生成の流れ
 
 1. 依頼（画面の `POST /api/model3d/generations`、または会話の `model3d_studio`）を保存し、UUID の再送キーを発行する。
-2. キューのジョブ `model3d.submit` が catalog を読み、要求本文を一度だけ確定して保存してから POST する。通信断や再起動の後は、同じキーと同じ本文で送り直す。429 は `Retry-After` を待つ。400・401・409・503・507 は理由を付けて失敗にし、作り直さない。
+2. キューのジョブ `model3d.submit` が catalog を読み、要求本文を一度だけ確定して保存してから POST する。応答が届かなかった（通信断・時間切れ）ときと、再起動で送信が中断したときは、同じキーと同じ本文でそれぞれ1回だけ送り直す（LARM は1キー1ジョブ）。キューの再実行では送らない。LARM のメモリ不足（503 `resource_exhausted`、resource `memory`）は失敗にせず、stage を `waiting_capacity`（「LARMの空きを待っています」）にして30秒ごと（`Retry-After` が長ければそれ、上限5分）に同じキーで送り直し、最初の拒否から30分で `larm_capacity_timeout` にする（[LARMの空き待ち](larm.md#larmの空き待ち)）。429 は `model3d_busy`、400・401・409・503・507 は理由を付けて失敗にし、作り直さない。
 3. `model3d.poll` が `GET /v1/3d/generations/:jobId` を数秒おきに読み、status と stage を別々に保存する。画面は stage を日本語に置き換えて表示し、進捗率は出さない。60分たっても終わらなければ待つのをやめ、画面の「状態を再確認」で再び追う。
 4. 完了すると assetId と warnings を保存する。会話から頼まれた生成なら、その会話へ完了（または失敗）の発言を一件追加する。`deleted:true` の完了は「完成品は削除済み」と表示する。
 5. 取消は `DELETE /v1/3d/generations/:jobId`。取消の後に届いた完了は採用しない。完成品の削除とは別の操作である。

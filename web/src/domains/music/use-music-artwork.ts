@@ -73,6 +73,8 @@ export function useTrackArtwork(
 						...(g?.task ? { task: g.task } : {}),
 						...(g?.runtime ? { runtime: g.runtime } : {}),
 						artworkStatus: artwork?.failed ? ("failed" as const) : state,
+						artworkWaiting: g?.artwork?.phase === "waiting_capacity",
+						artworkErrorCode: g?.artwork?.errorCode ?? undefined,
 						artworkUrl: artwork?.url,
 					}
 				: t,

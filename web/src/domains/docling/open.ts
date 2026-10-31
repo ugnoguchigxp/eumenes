@@ -7,6 +7,8 @@ export const doclingMessages: Record<string, string> = {
 	docling_connection_changed:
 		"接続設定が変わりました。もう一度開いてください。",
 	docling_timeout: "接続に時間がかかっています。もう一度開いてください。",
+	larm_capacity_busy:
+		"LARMに空きがなく開けませんでした。ほかの処理が終わってから、もう一度開いてください。",
 };
 
 /** Reserve the tab during the click, before the first await; never store the ticket URL. */

@@ -381,3 +381,41 @@ test("a music screen submit generates a track though the conversation earlier us
 		await h.close();
 	}
 });
+
+test("LARM's free-memory refusal puts the music into a wait: one POST, run kept open, cancel stops it", async () => {
+	const f = musicFixture("success", { capacityRefusal: true });
+	const h = await harness({ model: f.model, musicGateway: f.gateway });
+	const posts = () =>
+		f.requests.filter(
+			(r) => r.method === "POST" && r.path === "/v1/music/generations",
+		);
+	try {
+		const submitted = await (
+			await h.request("/api/runs", {
+				requestId: crypto.randomUUID(),
+				conversationId: "main",
+				text: musicQuestion,
+			})
+		).json();
+		await waitFor(() => h.music!.list("main")[0]?.phase === "waiting_capacity");
+		const record = h.music!.list("main")[0]!;
+		expect(record).toMatchObject({ state: "generating", jobId: null });
+		expect(record.capacityWait?.count).toBe(1);
+		expect(posts()).toHaveLength(1);
+		expect(["queued", "running"]).toContain(
+			h.dialogue.get(submitted.id)?.status ?? "",
+		);
+		await h.dialogue.cancel(submitted.id);
+		await waitFor(() => h.music!.list("main")[0]!.state === "cancelled");
+		await Bun.sleep(50);
+		expect(posts()).toHaveLength(1);
+		// No job was accepted by LARM, so there is nothing to DELETE there.
+		expect(
+			f.requests.some(
+				(r) => r.method === "DELETE" && r.path.endsWith("/track"),
+			),
+		).toBe(false);
+	} finally {
+		await h.close();
+	}
+});

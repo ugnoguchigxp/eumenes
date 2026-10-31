@@ -43,6 +43,8 @@ export type MusicResource = {
 		favorite?: boolean;
 		artworkUrl?: string;
 		artworkStatus?: "generating" | "completed" | "failed";
+		artworkWaiting?: boolean;
+		artworkErrorCode?: string;
 		lyrics?: string;
 		prompt?: string;
 		model?: string;

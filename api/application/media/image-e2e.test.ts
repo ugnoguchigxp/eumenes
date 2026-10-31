@@ -345,3 +345,48 @@ for (const [status, code] of [
 			await h.close();
 		}
 	});
+
+test("LARM's free-memory refusal puts the image into a wait: connection released, one POST, run kept open, cancel stops it", async () => {
+	const f = imageFixture("success", undefined, undefined, {
+		status: 503,
+		code: "resource_exhausted",
+		resource: "memory",
+	});
+	const h = await harness({ model: f.model, imageGateway: f.gateway });
+	const posts = () =>
+		f.requests.filter(
+			(r) => r.method === "POST" && r.path === "/v1/images/generations",
+		);
+	try {
+		const submitted = await (
+			await h.request("/api/runs", {
+				requestId: crypto.randomUUID(),
+				conversationId: "main",
+				text: imageQuestion,
+			})
+		).json();
+		await waitFor(() => h.image!.list("main")[0]?.phase === "waiting_capacity");
+		const record = h.image!.list("main")[0]!;
+		expect(record).toMatchObject({ state: "generating" });
+		expect(record.capacityWait?.count).toBe(1);
+		expect(posts()).toHaveLength(1);
+		// The connection was released before the wait began.
+		expect(
+			f.requests.some(
+				(r) =>
+					r.method === "DELETE" &&
+					r.path === "/v1/agent-connections/image-connection",
+			),
+		).toBe(true);
+		// The run stays open while the image waits.
+		const run = await (await h.request(`/api/runs/${submitted.id}`)).json();
+		expect(["queued", "running"]).toContain(run.status);
+		// Cancelling the run cancels the waiting job; nothing is sent afterwards.
+		await h.dialogue.cancel(submitted.id);
+		await waitFor(() => h.image!.list("main")[0]!.state === "cancelled");
+		await Bun.sleep(50);
+		expect(posts()).toHaveLength(1);
+	} finally {
+		await h.close();
+	}
+});

@@ -5,7 +5,11 @@ import type { ReactNode } from "react";
 import type { ArtifactEvent } from "@eumenes/artifact-ui/contracts";
 import { imageStudioSource, useImageRuntime } from "./use-image-runtime";
 afterEach(cleanup);
-function setup(onClose?: () => void, errorCode: string | null = null) {
+function setup(
+	onClose?: () => void,
+	errorCode: string | null = null,
+	override: Record<string, unknown> = {},
+) {
 	const items = [
 		{
 			id: "image-record",
@@ -27,6 +31,7 @@ function setup(onClose?: () => void, errorCode: string | null = null) {
 			errorCode,
 			createdAt: 1,
 			updatedAt: 1,
+			...override,
 		},
 	];
 	const api = {
@@ -255,3 +260,23 @@ for (const [code, description] of [
 		expect(r.api.submit).not.toHaveBeenCalled();
 		r.cache.clear();
 	});
+
+test("a generation waiting for LARM's free memory says so, and a timed-out wait has its own message", async () => {
+	const waiting = setup(undefined, null, {
+		state: "generating",
+		phase: "waiting_capacity",
+	});
+	await waitFor(() =>
+		expect(waiting.resource().statusDescription).toBe(
+			"LARMの空きを待っています。ほかの処理が終わりしだい始めます。",
+		),
+	);
+	const timedOut = setup(undefined, "larm_capacity_timeout");
+	await waitFor(() =>
+		expect(timedOut.resource()).toMatchObject({
+			status: "failed",
+			statusDescription:
+				"LARMの空きを待ちましたが、待てる時間内に空かなかったため中止しました。",
+		}),
+	);
+});

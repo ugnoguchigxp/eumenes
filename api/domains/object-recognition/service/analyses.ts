@@ -1,4 +1,4 @@
-import { analysisHandler } from "./analysis-handler";
+import { ANALYSIS_BUDGET_MS, analysisHandler } from "./analysis-handler";
 import { active, digest, frame, valid } from "./analysis-source";
 import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
@@ -36,7 +36,7 @@ export function createRecognitionAnalyses(deps: {
 			throw new Error("analysis_not_found");
 		return r;
 	};
-	queue.registerHandler(analysisHandler(store, visual));
+	queue.registerHandler(analysisHandler(store, queue, visual));
 	function removeInTransaction(db: Database, sourceId: string) {
 		const rows = db
 			.query("SELECT * FROM object_recognition_analyses WHERE source_id=?")
@@ -82,7 +82,7 @@ export function createRecognitionAnalyses(deps: {
 							reason: "observation_interrupted",
 							checkedAt: Date.now(),
 						},
-						...(active(c)
+						...(active(c) && !(c.state === "queued" && c.capacityWait)
 							? {
 									state: "failed" as const,
 									errorCode: "analysis_interrupted",
@@ -163,7 +163,7 @@ export function createRecognitionAnalyses(deps: {
 					resourceKey: "vision.perception",
 					concurrencyKey: "vision.perception",
 					availableAtMs: now,
-					deadlineAtMs: now + 360000,
+					deadlineAtMs: now + ANALYSIS_BUDGET_MS,
 					maxAttempts: 1,
 				});
 				db.query(

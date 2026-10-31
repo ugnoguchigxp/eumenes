@@ -21,6 +21,16 @@ function setup(
 		other?: boolean;
 		targetRef?: string;
 		prompt?: string;
+		item?: {
+			phase?: string;
+			errorCode?: string;
+			artwork?: {
+				state: string;
+				revision: number;
+				errorCode: string | null;
+				phase?: string;
+			};
+		};
 	} = {},
 ) {
 	vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:audio");
@@ -36,12 +46,18 @@ function setup(
 					description: "制作意図",
 					prompt: options.prompt ?? null,
 					artwork: undefined as
-						| { state: string; revision: number; errorCode: null }
+						| {
+								state: string;
+								revision: number;
+								errorCode: string | null;
+								phase?: string;
+						  }
 						| undefined,
 					durationSeconds: 30,
 					mime: "audio/ogg",
 					createdAt: 1,
 					updatedAt: 1,
+					...options.item,
 				},
 				...(options.other
 					? [
@@ -66,8 +82,10 @@ function setup(
 		musicAudio: vi.fn(async () => new Blob(["fixture"])),
 		musicArtwork: vi.fn(async () => new Blob(["png"])),
 		generateMusicArtwork: vi.fn(async (_id: string) => {
-			items[0]!.artwork = { state: "completed", revision: 1, errorCode: null };
-			items[0]!.updatedAt = 3;
+			Object.assign(items[0]!, {
+				artwork: { state: "completed", revision: 1, errorCode: null },
+				updatedAt: 3,
+			});
 			return items[0];
 		}),
 		submit: vi.fn(
@@ -303,4 +321,56 @@ test("structured SFX selections survive submission and mixed lyrics are rejected
 	).toMatchObject({ status: "accepted" });
 	expect(r.api.submit.mock.calls[0]![0].text).toContain(JSON.stringify(input));
 	expect(r.api.submit.mock.calls[0]![0].text).not.toContain("hidden words");
+});
+
+test("a track waiting for LARM's free memory says so, and so does its cover image; a timed-out wait has its own message", async () => {
+	const waiting = setup("generating", {
+		item: { phase: "waiting_capacity" },
+	});
+	await waitFor(() =>
+		expect(waiting.resource().creation?.description).toBe(
+			"LARMの空きを待っています。ほかの処理が終わりしだい始めます。",
+		),
+	);
+	const timedOut = setup("failed", {
+		item: { errorCode: "larm_capacity_timeout" },
+	});
+	await waitFor(() =>
+		expect(timedOut.resource().creation).toMatchObject({
+			status: "failed",
+			description:
+				"LARMの空きを待ちましたが、待てる時間内に空かなかったため中止しました。",
+		}),
+	);
+	const cover = setup("completed", {
+		item: {
+			artwork: {
+				state: "generating",
+				revision: 1,
+				errorCode: null,
+				phase: "waiting_capacity",
+			},
+		},
+	});
+	await waitFor(() =>
+		expect(cover.resource().tracks[0]).toMatchObject({
+			artworkStatus: "generating",
+			artworkWaiting: true,
+		}),
+	);
+	const coverTimedOut = setup("completed", {
+		item: {
+			artwork: {
+				state: "failed",
+				revision: 1,
+				errorCode: "larm_capacity_timeout",
+			},
+		},
+	});
+	await waitFor(() =>
+		expect(coverTimedOut.resource().tracks[0]).toMatchObject({
+			artworkStatus: "failed",
+			artworkErrorCode: "larm_capacity_timeout",
+		}),
+	);
 });

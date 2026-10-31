@@ -87,6 +87,19 @@ bun run logs -- --since 2026-10-08T10:00:00+09:00 --component inference --json
 
 応答に契約に合う`bootEpoch`・`configRevision`がある場合だけ保持し、現在値で過去の情報を埋めません。既知のcredentialと同じ値は相関情報からも除外します。主会話と補助接続の対応は`larm.connection_ready`・計数イベント・`larm.connection_released`のconnectionIdで追います。状態確認の失敗にも同じIDとclaimの期限を残します。失敗した会話のエラーレポートにも接続ID・上流要求ID・固定コードを表示します。これらのログは接続先の応答を診断するもので、新しいヘッダーや接続の再確保・自動再送は追加しません。
 
+## LARMの空き待ち
+
+オンデマンド起動の機能（画像・ジャケット画像・音楽/効果音・3D送信・詳細分析・OCR/物体認識・Excalidraw・Docling）は、LARMのメモリ不足の拒否（HTTP 503、`resource_exhausted`、resource `memory`）を受けると失敗せず、30秒ごと（`Retry-After`が長ければそれ、上限5分）に同じ依頼を送り直します。待てるのは最初の拒否から30分までで、呼出元が固定した期限は超えません（[設計](../spec/larm-capacity-wait-design-2026-11-01.md)）。
+
+| イベント | レベル | 項目 |
+| --- | --- | --- |
+| `larm.capacity_refused` | info | 空きなしの拒否。`route`（IDを`:id`に置換）・`status`・`larmCode`・`retryAfterMs` |
+| `larm.refused` | info | それ以外の拒否。`route`・`status`・`larmCode` |
+| `<domain>.capacity_wait_scheduled` | info | 送り直しの予定。`jobId`・`subjectId`・`waitCount`・`waitedMs`・`nextInMs` |
+| `<domain>.capacity_wait_expired` | warn | 待てる時間内に空かなかった。`reason=larm_capacity_timeout`・`waitedMs` |
+
+`larmCode`は`^[a-z][a-z0-9_]{0,63}$`に合うLARMのコードだけで、合わないものは`unknown`です。拒否本文・message・Providerの生応答は記録しません。理由コード`larm_capacity_busy`は待たない経路（サービス試用など）での空きなしの拒否、`larm_capacity_timeout`は空き待ちの打ち切りです。待機中の記録は各機能の状態`waiting_capacity`で確認します。
+
 ## DBの手動バックアップ
 
 APIが停止している状態で `bun run db:backup` を実行すると、通常のDB所有ロック・適用済みmigrationのチェックサム検証・`PRAGMA integrity_check` を経て、`VACUUM INTO` で `eumenes.sqlite3.manual-<時刻>.bak`（権限 `0600`）をDBの隣に作ります。保存先は実行結果の `backupPath` です。APIの起動中は所有ロックで拒否され、`db_backup_failed` で終了します。

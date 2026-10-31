@@ -25,7 +25,12 @@ import {
 	settleOperation,
 	type GenerationRow,
 } from "../repository";
-import { registerModel3dHandlers, type Stage } from "./handlers";
+import { LARM_CAPACITY_WAITING } from "../../larm";
+import {
+	registerModel3dHandlers,
+	type Stage,
+	type SubmitExtra,
+} from "./handlers";
 import { createModel3dCommands } from "./commands";
 import { createModel3dAssets } from "./assets";
 
@@ -48,7 +53,13 @@ export function createModel3d(deps: {
 	followMs?: number;
 }) {
 	const { store, queue } = deps;
-	function enqueue(db: Database, id: string, stage: Stage, delay = 0) {
+	function enqueue(
+		db: Database,
+		id: string,
+		stage: Stage,
+		delay = 0,
+		extra: SubmitExtra = {},
+	) {
 		const r = generationRow(db, id)!;
 		const step = r.step + 1;
 		patchGeneration(db, id, { step });
@@ -56,13 +67,14 @@ export function createModel3d(deps: {
 			scope: "model3d",
 			kind: `model3d.${stage}`,
 			dedupeKey: `${id}:${step}`,
-			payload: { id, step },
+			payload: { id, step, ...extra },
 			subjectRef: id,
 			lane: "interactive",
 			resourceKey: "model3d",
 			concurrencyKey: `model3d:${id}`,
 			availableAtMs: Date.now() + delay,
-			maxAttempts: 3,
+			// The queue never runs a stage twice; the stages schedule their own next step.
+			maxAttempts: 1,
 		});
 	}
 	function announce(
@@ -137,6 +149,7 @@ export function createModel3d(deps: {
 		cancelUnconfirmed,
 		pollMs: deps.pollMs ?? 3000,
 		waitMs: (deps.pollMs ?? 3000) * 3,
+		followMs: deps.followMs ?? FOLLOW_MS,
 	});
 
 	function createInTransaction(
@@ -198,19 +211,8 @@ export function createModel3d(deps: {
 		});
 		return generationView(generationRow(db, id)!);
 	}
-	function cancelInTransaction(db: Database, owner: string, id: string) {
-		const r = ownedGeneration(db, id, owner);
-		if (!["submitting", "queued", "running"].includes(r.state))
-			return generationView(r);
-		const cancelled = patchGeneration(db, id, {
-			state: "cancelled",
-			stage: null,
-		});
-		if (r.job_id) enqueue(db, id, "cancel");
-		// A sent body may have started a job: resend it to learn the job ID, then cancel that job.
-		else if (r.request_json) enqueue(db, id, "submit");
-		return generationView(cancelled);
-	}
+	const cancelInTransaction = (db: Database, owner: string, id: string) =>
+		cancelGeneration(db, queue, enqueue, owner, id);
 	let lastStatus: { available: boolean; reason: string | null } | null = null;
 	const assets = createModel3dAssets(store, deps.larm, (status) => {
 		lastStatus = status;
@@ -369,4 +371,39 @@ function cancelCommandExecution(
 			running ? "model3d_operation_unconfirmed" : "cancel_requested",
 		);
 	}
+}
+
+/** Cancels a generation; a send still waiting for LARM's memory is stopped instead of resent. */
+function cancelGeneration(
+	db: Database,
+	queue: QueueService,
+	enqueue: (db: Database, id: string, stage: Stage) => void,
+	owner: string,
+	id: string,
+) {
+	const r = ownedGeneration(db, id, owner);
+	if (!["submitting", "queued", "running"].includes(r.state))
+		return generationView(r);
+	const cancelled = patchGeneration(db, id, {
+		state: "cancelled",
+		stage: null,
+	});
+	const waiting =
+		!r.job_id && r.state === "submitting" && r.stage === LARM_CAPACITY_WAITING
+			? queue.findByDedupeInTransaction(
+					db,
+					"model3d",
+					"model3d.submit",
+					`${id}:${r.step}`,
+				)
+			: null;
+	if (r.job_id) enqueue(db, id, "cancel");
+	else if (waiting?.state === "queued") {
+		// LARM refused the body before accepting it, so no job exists: stop the scheduled send.
+		queue.cancelInTransaction(db, waiting.id, "cancelled");
+		patchGeneration(db, id, { error_code: null });
+	}
+	// A sent body may have started a job: resend it to learn the job ID, then cancel that job.
+	else if (r.request_json) enqueue(db, id, "submit");
+	return generationView(cancelled);
 }

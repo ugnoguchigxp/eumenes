@@ -1,5 +1,11 @@
 import { expect, test } from "bun:test";
-import { createDocling, type DoclingConnection, type DoclingFetch } from "..";
+import { Hono } from "hono";
+import {
+	createDocling,
+	registerDocling,
+	type DoclingConnection,
+	type DoclingFetch,
+} from "..";
 
 const token = "fixture-backend-only-credential";
 const relative = `/auth/exchange?ticket=${"a".repeat(43)}`;
@@ -214,3 +220,48 @@ test.each(["cancel", "change"] as const)(
 		);
 	},
 );
+
+const noMemory = (headers: Record<string, string> = {}) =>
+	new Response(
+		JSON.stringify({
+			error: { code: "resource_exhausted", resource: "memory", message: token },
+		}),
+		{
+			status: 503,
+			headers: { "Content-Type": "application/json", ...headers },
+		},
+	);
+test.each([
+	["ready", {}, 30_000],
+	["ui-tickets", { "Retry-After": "90" }, 90_000],
+] as const)(
+	"a LARM capacity refusal on %s is HTTP 503 with the wait to apply, one gateway POST, no body leaked",
+	async (path, headers, retryAfterMs) => {
+		let calls = 0;
+		const { service } = fixture((async () => {
+			calls++;
+			return noMemory(headers);
+		}) as DoclingFetch);
+		const app = new Hono();
+		registerDocling(app, service);
+		const response = await app.request(`/api/docling/${path}`, {
+			method: "POST",
+		});
+		expect(response.status).toBe(503);
+		expect(await response.json()).toEqual({
+			error: "larm_capacity_busy",
+			retryAfterMs,
+		});
+		expect(calls).toBe(1);
+	},
+);
+test("a refusal that is not the capacity refusal keeps its upstream failure", async () => {
+	const { service } = fixture((async () =>
+		Response.json(
+			{ error: { code: "image_model_unavailable" } },
+			{ status: 503 },
+		)) as DoclingFetch);
+	await expect(service.ticket(new AbortController().signal)).rejects.toThrow(
+		"docling_upstream_failed",
+	);
+});

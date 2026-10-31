@@ -8,6 +8,12 @@ import { useDrawingPreviews } from "./useDrawingPreviews";
 import { draftDrawingHash, drawingLocation } from "./location";
 import { queryRoots } from "../../queryKeys";
 import { useLiveDrawingScreen } from "./resource-screen";
+import {
+	capacityBusy,
+	capacityTimeoutMessage,
+	capacityWaitingMessage,
+	useCapacityWait,
+} from "../../hooks/capacity-wait";
 const emptyReferences: Awaited<ReturnType<EumenesClient["drawingReferences"]>> =
 	[];
 export function DrawingArtifact({
@@ -59,10 +65,32 @@ export function DrawingArtifact({
 			owned.clear();
 		};
 	}, [client]);
+	// LARM has no free memory: one timer starts the same drawing again; nothing else may.
+	const { wait, waiting } = useCapacityWait();
+	const refusal = useRef<string | null>(null);
 	const status = useQuery({
 		queryKey: ["drawing-session", session?.id],
 		enabled: !!session,
-		queryFn: ({ signal }) => client.drawingSession(session!.id, signal),
+		queryFn: async ({ signal }) => {
+			const value = await client.drawingSession(session!.id, signal);
+			if (value.state === "ready" || value.state === "idle") wait.reset();
+			else if (
+				value.state === "failed" &&
+				value.errorCode === capacityBusy &&
+				value.referenceId &&
+				refusal.current !== value.id
+			) {
+				refusal.current = value.id;
+				const referenceId = value.referenceId;
+				const next = wait.refuse(value.retryAfterMs ?? null, () => {
+					openReference(referenceId, crypto.randomUUID()).catch(() =>
+						setError("Excalidrawに接続できませんでした。"),
+					);
+				});
+				if (next === "expired") setError(capacityTimeoutMessage);
+			}
+			return value;
+		},
 		refetchInterval: (q) => (q.state.data?.state === "starting" ? 500 : false),
 	});
 
@@ -135,8 +163,10 @@ export function DrawingArtifact({
 	]);
 
 	const busy =
+		waiting ||
 		shown?.state === "starting" ||
-		(!!latestOp && ["planning", "starting"].includes(latestOp.state));
+		(!!latestOp &&
+			["planning", "starting", "waiting_capacity"].includes(latestOp.state));
 	/** Connects the editor to the saved drawing, replacing the one it was on. */
 	async function openReference(referenceId: string, requestId: string) {
 		if (active.current) await client.releaseDrawing(active.current);
@@ -166,15 +196,20 @@ export function DrawingArtifact({
 				revision,
 				references: refs.data ?? [],
 				previews,
-				status: busy
-					? "Excalidrawを準備中です。"
-					: shown?.state === "ready"
-						? "利用可能です。"
-						: shown?.state === "idle"
-							? "接続を解放しています。Excalidrawを開くと再接続します。"
-							: shown?.state === "failed"
-								? "起動できませんでした。接続設定を確認して再度開いてください。"
-								: "保存済みの図を開くか、新しい図を作成できます。",
+				status: waiting
+					? capacityWaitingMessage
+					: busy
+						? "Excalidrawを準備中です。"
+						: shown?.state === "ready"
+							? "利用可能です。"
+							: shown?.state === "idle"
+								? "接続を解放しています。Excalidrawを開くと再接続します。"
+								: shown?.state === "failed"
+									? "起動できませんでした。接続設定を確認して再度開いてください。"
+									: latestOp?.state === "failed" &&
+										  latestOp.errorCode === "larm_capacity_timeout"
+										? capacityTimeoutMessage
+										: "保存済みの図を開くか、新しい図を作成できます。",
 				error,
 				busy,
 				url: busy

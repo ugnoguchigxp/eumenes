@@ -44,7 +44,8 @@ function failure(c: Context, e: unknown) {
 		return c.json({ error: "model3d_larm_unconfigured" }, 503);
 	if (code === "larm_http_401" || code === "larm_http_403")
 		return c.json({ error: "model3d_auth_failed" }, 502);
-	if (code === "larm_http_429") return c.json({ error: "model3d_busy" }, 429);
+	if (code === "larm_http_429" || code === "larm_capacity_busy")
+		return c.json({ error: "model3d_busy" }, 429);
 	if (code === "larm_http_503")
 		return c.json({ error: "model3d_unavailable" }, 503);
 	if (code === "larm_http_507")

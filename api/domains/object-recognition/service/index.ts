@@ -26,7 +26,7 @@ import {
 	record,
 	row,
 } from "../repository";
-import { registerRecognitionHandlers } from "./handlers";
+import { ANALYZE_BUDGET_MS, registerRecognitionHandlers } from "./handlers";
 import { bindCapture, createHandoffs } from "./handoff";
 const workspaceArtifact = "artifact:object-recognition.workspace@";
 export function createObjectRecognition(
@@ -141,7 +141,7 @@ export function createObjectRecognition(
 					bytes,
 					JSON.stringify(v),
 					binding(connection),
-					now + 600_000,
+					now + ANALYZE_BUDGET_MS,
 				);
 				enqueue(db, requestId, "analyze");
 				return enqueueCaptureSave(db, v, owner, deps.captureSaveInTransaction);
@@ -317,7 +317,7 @@ export function createObjectRecognition(
 						: "running";
 				db.query(
 					"UPDATE object_recognition_inputs SET deadline=? WHERE id=?",
-				).run(Date.now() + 600000, id);
+				).run(Date.now() + ANALYZE_BUDGET_MS, id);
 				const updated = patch(db, id, { state, errorCode: null, result: null });
 				enqueue(db, id, "poll");
 				return updated;

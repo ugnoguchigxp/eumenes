@@ -1,4 +1,9 @@
 import { VisualAnalysis } from "../VisualAnalysis";
+import {
+	capacityTimeoutMessage,
+	capacityWaitingMessage,
+	isCapacityWaiting,
+} from "../VisualAnalysis/capacity";
 import { useEffect, useRef, useState } from "react";
 import { Camera, FileUp, ScanText, Video } from "lucide-react";
 import { Button } from "../Button";
@@ -7,6 +12,7 @@ import { OcrResult } from "./OcrResult";
 import { stateLabels, type OcrWorkspaceProps } from "./types";
 import "./ocr.css";
 const errors: Record<string, string> = {
+	larm_capacity_timeout: capacityTimeoutMessage,
 	ocr_busy: "OCRサービスが混雑しています。",
 	ocr_invalid_input: "ファイル形式か動画の長さを確認してください。",
 	ocr_input_too_large: "16 MiBを超えています。",
@@ -167,7 +173,11 @@ export function OcrPanel(props: OcrWorkspaceProps) {
 			)}
 			{item && item.state !== "completed" && (
 				<div className="ocr-status" role="status">
-					<strong>{stateLabels[item.state]}</strong>
+					<strong>
+						{isCapacityWaiting(item)
+							? capacityWaitingMessage
+							: stateLabels[item.state]}
+					</strong>
 					{item.errorCode && (
 						<p>{errors[item.errorCode] ?? "処理に失敗しました。"}</p>
 					)}

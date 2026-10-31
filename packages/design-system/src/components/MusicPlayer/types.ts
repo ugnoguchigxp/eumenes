@@ -9,6 +9,9 @@ export type PlaylistTrack = {
 	favorite?: boolean;
 	artworkUrl?: string;
 	artworkStatus?: "generating" | "completed" | "failed";
+	/** The artwork waits for LARM memory before it is generated. */
+	artworkWaiting?: boolean;
+	artworkErrorCode?: string;
 	lyrics?: string;
 	prompt?: string;
 	model?: string;

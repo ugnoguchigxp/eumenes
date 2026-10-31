@@ -1,5 +1,6 @@
 import type { LarmTestTarget } from "../contracts/playground";
 import { json, list, str, post, pause } from "./playground-http";
+import { capacityRefusal, sendAgainIfLost } from "./resend";
 export async function withAgentConnection<T>(
 	deps: {
 		control: (
@@ -47,45 +48,47 @@ export async function withAgentConnection<T>(
 		signal.throwIfAborted();
 		const idempotencyKey = crypto.randomUUID(),
 			clientId = `eumenes-service-${crypto.randomUUID()}`;
-		const create = async () =>
-			json(
-				await control(
-					"/v1/agent-connections",
-					AbortSignal.timeout(15_000),
-					{
-						...post({
-							profile: target.selector,
-							audience: deps.audience,
-							// This call owns its release; a concurrent call must never share its credential.
-							client: clientId,
-							providers: [target.mode === "provider" ? target.name : "llm"],
-							ttlSeconds: deps.ttlSeconds ?? 300,
-							allowFallback: false,
-							deploymentPolicy: "existing-only",
-							expectedCatalogRevision: target.revision,
-						}),
-						headers: {
-							"Content-Type": "application/json",
-							"Idempotency-Key": idempotencyKey,
-							Prefer: "wait=1",
-						},
+		const create = async () => {
+			const response = await control(
+				"/v1/agent-connections",
+				AbortSignal.timeout(15_000),
+				{
+					...post({
+						profile: target.selector,
+						audience: deps.audience,
+						// This call owns its release; a concurrent call must never share its credential.
+						client: clientId,
+						providers: [target.mode === "provider" ? target.name : "llm"],
+						ttlSeconds: deps.ttlSeconds ?? 300,
+						allowFallback: false,
+						deploymentPolicy: "existing-only",
+						expectedCatalogRevision: target.revision,
+					}),
+					headers: {
+						"Content-Type": "application/json",
+						"Idempotency-Key": idempotencyKey,
+						Prefer: "wait=1",
 					},
-					target.mode === "service" ? [201, 202, 503] : [201, 202],
-				),
+				},
+				[201, 202, 503],
 			);
-		let state;
-		try {
-			state = await create();
-		} catch (error) {
-			if (
-				!(
-					error instanceof TypeError ||
-					(error instanceof DOMException && error.name === "TimeoutError")
-				)
-			)
-				throw error;
-			state = await create();
-		}
+			if (response.status !== 503) return json(response);
+			// No free memory is refused before acceptance. Otherwise a service connection may answer 503
+			// while it starts, and a provider connection is refused.
+			const body: Record<string, unknown> = await json(response).catch(
+				() => ({}),
+			);
+			const busy = capacityRefusal(
+				503,
+				body,
+				response.headers,
+				"/v1/agent-connections",
+			);
+			if (busy) throw busy;
+			if (target.mode !== "service") throw new Error("larm_http_503");
+			return body;
+		};
+		let state = await sendAgainIfLost(create);
 
 		id = str(state.id);
 		if (!/^[A-Za-z0-9_-]{1,160}$/.test(id))

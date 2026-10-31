@@ -55,6 +55,8 @@ export function buildMedia(
 			deps.dialogue().linkOperationJobInTransaction(db, runId, jobId),
 		onFinished: (db: Database, runId: string) =>
 			deps.dialogue().finishOperationInTransaction(db, runId),
+		onWaiting: (db: Database, runId: string, untilMs: number) =>
+			deps.dialogue().extendOperationDeadlineInTransaction(db, runId, untilMs),
 	};
 	const music = createMusic(mediaDependencies);
 	const image = createImage(mediaDependencies);

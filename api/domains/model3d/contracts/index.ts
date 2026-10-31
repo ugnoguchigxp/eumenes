@@ -1,4 +1,8 @@
 import { z } from "zod";
+import {
+	LARM_CAPACITY_TIMEOUT,
+	LARM_CAPACITY_WAITING,
+} from "../../larm/contracts";
 
 /** LARM's id grammar for jobs, assets and image artifacts. */
 export const model3dId = z
@@ -77,6 +81,8 @@ const stageLabels: Record<string, string> = {
 	queued: "受付済み・待機中",
 	image: "元画像を生成中",
 	waiting_gpu: "生成枠・メモリの空きを待機中",
+	[LARM_CAPACITY_WAITING]:
+		"LARMの空きを待っています。ほかの処理が終わりしだい始めます。",
 	background: "背景を除去中",
 	mesh: "3Dモデルを生成中",
 	validating: "3Dデータを検証中",
@@ -92,7 +98,10 @@ export function stageLabel(
 	deleted: boolean,
 ) {
 	if (deleted) return stageLabels.deleted!;
-	if (state === "submitting") return "LARMへ送信中";
+	if (state === "submitting")
+		return stage === LARM_CAPACITY_WAITING
+			? stageLabels[stage]!
+			: "LARMへ送信中";
 	if (state === "completed" || state === "failed" || state === "cancelled")
 		return stageLabels[state]!;
 	return (stage && stageLabels[stage]) || "処理中";
@@ -111,6 +120,9 @@ const errorLabels: Record<string, string> = {
 	model3d_idempotency_conflict:
 		"同じ依頼に別の内容が送られました。元の依頼を確認してください",
 	model3d_unavailable: "LARMの3D生成が利用できません",
+	model3d_busy: "LARMが混み合っています。しばらくしてからやり直してください",
+	[LARM_CAPACITY_TIMEOUT]:
+		"LARMの空きを待ちましたが、待てる時間内に空かなかったため中止しました。",
 	model3d_storage_full: "LARMの保存容量が不足しています",
 	model3d_interrupted: "生成が中断されました（自動では作り直しません）",
 	model3d_worker_stop_failed:
@@ -192,7 +204,7 @@ export interface Model3dLarm {
 	): Promise<{ bytes: Uint8Array; mime: string }>;
 }
 
-/** A LARM refusal as the larm library reports it (structural: the domain does not import larm). */
+/** A LARM refusal as the larm library reports it (structural; a capacity refusal has its own class). */
 export type LarmRefusal = Error & {
 	status: number;
 	reason: string | null;

@@ -1,6 +1,15 @@
 import { z } from "zod";
 import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
+import { getLogger } from "../../../infrastructure/logger";
+import {
+	isCapacityBusy,
+	LARM_CAPACITY_TIMEOUT,
+	LARM_CAPACITY_WAITING,
+	planCapacityWait,
+	sendAgainIfLost,
+	type CapacityWait,
+} from "../../larm";
 import type { HandlerDefinition, QueueService } from "../../queue";
 import {
 	isLarmRefusal,
@@ -19,12 +28,25 @@ import {
 	type GenerationRow,
 } from "../repository";
 
+const log = getLogger("model3d");
+
 export type Stage = "submit" | "poll" | "cancel";
+/** What a re-enqueued submit carries: the capacity wait so far, and whether its one recovery was used. */
+export type SubmitExtra = {
+	capacity?: Pick<CapacityWait, "startedAt" | "count">;
+	recovered?: true;
+};
 export type Deps = {
 	store: SqliteStore;
 	queue: QueueService;
 	larm: () => Model3dLarm | null;
-	enqueue: (db: Database, id: string, stage: Stage, delay?: number) => void;
+	enqueue: (
+		db: Database,
+		id: string,
+		stage: Stage,
+		delay?: number,
+		extra?: SubmitExtra,
+	) => void;
 	notify: (
 		db: Database,
 		r: GenerationRow,
@@ -35,22 +57,23 @@ export type Deps = {
 	pollMs: number;
 	/** Pause after a busy or unreachable LARM that gave no Retry-After. */
 	waitMs: number;
+	/** How long a generation is followed once LARM accepts it. */
+	followMs: number;
 };
 type Body = Parameters<Model3dLarm["submit"]>[1];
 
-/** LARM refusals that end the attempt with a code the user can act on; the rest are retried. */
+/** LARM refusals that end the attempt with a code the user can act on. */
 function refusalCode(e: unknown) {
 	if (!isLarmRefusal(e)) return null;
 	if (e.status === 400 || e.status === 422) return "model3d_invalid_request";
 	if (e.status === 401 || e.status === 403) return "model3d_auth_failed";
 	if (e.status === 404) return "model3d_not_found";
 	if (e.status === 409) return "model3d_idempotency_conflict";
+	if (e.status === 429) return "model3d_busy";
 	if (e.status === 503) return "model3d_unavailable";
 	if (e.status === 507) return "model3d_storage_full";
 	return null;
 }
-const failsOnce = (e: unknown) =>
-	e instanceof Error && /^model3d_[a-z_]+$/.test(e.message) ? "fail" : "retry";
 function larmOf(deps: Deps) {
 	const larm = deps.larm();
 	if (!larm) throw new Error("model3d_larm_unconfigured");
@@ -60,13 +83,18 @@ function larmOf(deps: Deps) {
 const CALL_MS = 60_000;
 const bounded = (signal: AbortSignal) =>
 	AbortSignal.any([signal, AbortSignal.timeout(CALL_MS)]);
-/** A 429 waits for Retry-After; any other refusal becomes a model3d code. */
-async function guarded<T>(work: () => Promise<T>, waitMs: number) {
+/**
+ * Any refusal becomes a model3d code and is not sent again. A capacity refusal passes through only
+ * where `passBusy` is set (the submit decides to wait); elsewhere it is the busy code.
+ */
+async function guarded<T>(work: () => Promise<T>, passBusy = false) {
 	try {
-		return { ok: true as const, value: await work() };
+		return await work();
 	} catch (e) {
-		if (isLarmRefusal(e) && e.status === 429)
-			return { ok: false as const, waitMs: e.retryAfterMs ?? waitMs };
+		if (isCapacityBusy(e)) {
+			if (passBusy) throw e;
+			throw new Error("model3d_busy");
+		}
 		if (e instanceof Error && e.message === "invalid_mesh_service")
 			throw new Error("model3d_service_invalid");
 		const code = refusalCode(e);
@@ -90,7 +118,8 @@ async function patient<T>(
 			throw new Error(refusalCode(e)!);
 		return {
 			ok: false as const,
-			waitMs: (isLarmRefusal(e) && e.retryAfterMs) || waitMs,
+			waitMs:
+				((isLarmRefusal(e) || isCapacityBusy(e)) && e.retryAfterMs) || waitMs,
 		};
 	}
 }
@@ -119,16 +148,71 @@ function registerSubmit(deps: Deps) {
 		tags: string[];
 		seed: number;
 	};
-	type Output = { jobId: string } | { waitMs: number };
-	const handler: HandlerDefinition<
-		{ id: string; step: number },
-		Input,
-		Output
-	> = {
+	/** Fixes the body once, then sends it; the lost-response rule sends the same key once more. */
+	async function send(input: Input, signal: AbortSignal) {
+		const larm = larmOf(deps);
+		let { body, path } = input;
+		if (!body || !path) {
+			const found = await guarded(() => larm.discover(bounded(signal)), true);
+			if (!found.mesh) throw new Error("model3d_service_unavailable");
+			if (input.source.type === "prompt" && !found.image)
+				throw new Error("model3d_image_service_unavailable");
+			const built: Body = {
+				model: found.mesh.model,
+				source:
+					input.source.type === "prompt"
+						? {
+								type: "prompt",
+								prompt: input.source.prompt,
+								imageModel: found.image!.model,
+							}
+						: input.source,
+				title: input.title,
+				tags: input.tags,
+				resolution: 512,
+				seed: input.seed,
+			};
+			const fixed = await deps.store.write((db) => {
+				const r = generationRow(db, input.id);
+				if (!r || r.state !== "submitting") return null;
+				if (r.request_json && r.service_path)
+					return {
+						body: JSON.parse(r.request_json) as Body,
+						path: r.service_path,
+					};
+				patchGeneration(db, r.id, {
+					request_json: JSON.stringify(built),
+					service_path: found.mesh!.path,
+				});
+				return { body: built, path: found.mesh!.path };
+			});
+			if (!fixed) throw new Error("model3d_state_changed");
+			({ body, path } = fixed);
+		}
+		return await guarded(
+			() =>
+				sendAgainIfLost(() =>
+					larm.submit(path!, body!, input.key, bounded(signal)),
+				),
+			true,
+		);
+	}
+	/** `capacityWait` is LARM's "no free memory" refusal; it carries Retry-After. */
+	type Output = { jobId: string } | { capacityWait: number | null };
+	type Payload = { id: string; step: number } & SubmitExtra;
+	const handler: HandlerDefinition<Payload, Input, Output> = {
 		kind: "model3d.submit",
 		payloadVersions: [1],
-		schema: z.object({ id: z.uuid(), step: z.number().int() }),
-		recovery: "replay_safe",
+		schema: z.object({
+			id: z.uuid(),
+			step: z.number().int(),
+			capacity: z
+				.object({ startedAt: z.number(), count: z.number().int() })
+				.optional(),
+			recovered: z.literal(true).optional(),
+		}),
+		// A restart mid-send is recovered once by settle, never replayed by the queue.
+		recovery: "interrupt",
 		resourceKey: "model3d",
 		prepareInTransaction(db, claim) {
 			const r = generationRow(db, claim.payload.id);
@@ -140,6 +224,9 @@ function registerSubmit(deps: Deps) {
 				(r.state !== "submitting" && !resend)
 			)
 				return { status: "stale", reason: "model3d_state_changed" };
+			// The scheduled send starts: it no longer waits, and a cancel from now on must find its job.
+			if (r.stage === LARM_CAPACITY_WAITING)
+				patchGeneration(db, r.id, { stage: null });
 			return {
 				status: "ready",
 				input: {
@@ -155,62 +242,18 @@ function registerSubmit(deps: Deps) {
 			};
 		},
 		async execute(input, { signal }) {
-			const larm = larmOf(deps);
-			let { body, path } = input;
-			if (!body || !path) {
-				// The body is fixed once and resent unchanged with the same key.
-				const discovered = await guarded(
-					() => larm.discover(bounded(signal)),
-					deps.waitMs,
-				);
-				if (!discovered.ok) return { waitMs: discovered.waitMs };
-				const found = discovered.value;
-				if (!found.mesh) throw new Error("model3d_service_unavailable");
-				if (input.source.type === "prompt" && !found.image)
-					throw new Error("model3d_image_service_unavailable");
-				const built: Body = {
-					model: found.mesh.model,
-					source:
-						input.source.type === "prompt"
-							? {
-									type: "prompt",
-									prompt: input.source.prompt,
-									imageModel: found.image!.model,
-								}
-							: input.source,
-					title: input.title,
-					tags: input.tags,
-					resolution: 512,
-					seed: input.seed,
-				};
-				const fixed = await deps.store.write((db) => {
-					const r = generationRow(db, input.id);
-					if (!r || r.state !== "submitting") return null;
-					if (r.request_json && r.service_path)
-						return {
-							body: JSON.parse(r.request_json) as Body,
-							path: r.service_path,
-						};
-					patchGeneration(db, r.id, {
-						request_json: JSON.stringify(built),
-						service_path: found.mesh!.path,
-					});
-					return { body: built, path: found.mesh!.path };
-				});
-				if (!fixed) throw new Error("model3d_state_changed");
-				({ body, path } = fixed);
+			try {
+				return { jobId: await send(input, signal) };
+			} catch (e) {
+				if (isCapacityBusy(e)) return { capacityWait: e.retryAfterMs };
+				throw e;
 			}
-			const sent = await guarded(
-				() => larm.submit(path!, body!, input.key, bounded(signal)),
-				deps.waitMs,
-			);
-			return sent.ok ? { jobId: sent.value } : { waitMs: sent.waitMs };
 		},
-		classify: failsOnce,
+		classify: () => "fail",
 		settleInTransaction(db, claim, _input, outcome) {
 			const r = generationRow(db, claim.payload.id);
 			if (!r || r.step !== claim.payload.step) return "stale";
-			if (outcome.type === "retry") return "applied";
+			const { capacity, recovered } = claim.payload;
 			if (outcome.type === "success" && "jobId" in outcome.result) {
 				if (r.state === "cancelled") {
 					// Cancelled while the POST was in flight: cancel the job LARM accepted.
@@ -227,20 +270,66 @@ function registerSubmit(deps: Deps) {
 				deps.enqueue(db, r.id, "poll", deps.pollMs);
 				return "applied";
 			}
-			if (outcome.type === "success" && "waitMs" in outcome.result) {
-				if (Date.now() < r.deadline) {
-					deps.enqueue(db, r.id, "submit", outcome.result.waitMs);
+			if (outcome.type === "success" && "capacityWait" in outcome.result) {
+				// Refused before acceptance: LARM holds no job, so a cancelled generation has nothing to learn.
+				if (r.state !== "submitting") return "stale";
+				const now = Date.now();
+				// A deadline a task fixed is never extended; the wait must end inside it.
+				const fixed = r.origin === "task";
+				const plan = planCapacityWait({
+					now,
+					previous: capacity,
+					retryAfterMs: outcome.result.capacityWait,
+					budgetMs: fixed ? 0 : deps.followMs,
+					limitAt: fixed ? r.deadline : null,
+				});
+				const waitedMs = now - (capacity?.startedAt ?? now);
+				if (!plan) {
+					log.warn("model3d.capacity_wait_expired", {
+						subjectId: r.id,
+						reason: LARM_CAPACITY_TIMEOUT,
+						waitedMs,
+					});
+					deps.notify(
+						db,
+						patchGeneration(db, r.id, {
+							state: "failed",
+							stage: null,
+							error_code: LARM_CAPACITY_TIMEOUT,
+						}),
+						"failed",
+					);
 					return "applied";
 				}
-				if (r.state !== "submitting") return "stale";
-				deps.notify(
-					db,
-					patchGeneration(db, r.id, {
-						state: "failed",
-						error_code: "model3d_timeout",
-					}),
-					"failed",
-				);
+				// The follow window starts when LARM accepts, so it moves with the wait.
+				patchGeneration(db, r.id, {
+					stage: LARM_CAPACITY_WAITING,
+					...(fixed ? {} : { deadline: plan.deadline }),
+				});
+				// Refused before acceptance: the next send is a new try, not a recovery.
+				deps.enqueue(db, r.id, "submit", Math.max(0, plan.at - now), {
+					capacity: { startedAt: plan.startedAt, count: plan.count },
+				});
+				log.info("model3d.capacity_wait_scheduled", {
+					subjectId: r.id,
+					waitCount: plan.count,
+					waitedMs,
+					nextInMs: plan.at - now,
+				});
+				return "applied";
+			}
+			const resendOnly =
+				r.state === "cancelled" && !r.job_id && !!r.request_json;
+			if (
+				outcome.type === "interrupted" &&
+				!recovered &&
+				(r.state === "submitting" || resendOnly)
+			) {
+				// The lost-response rule after a restart: one more send of the same fixed body and key.
+				deps.enqueue(db, r.id, "submit", 0, {
+					recovered: true,
+					...(capacity ? { capacity } : {}),
+				});
 				return "applied";
 			}
 			if (r.state !== "submitting") return "stale";
@@ -250,7 +339,11 @@ function registerSubmit(deps: Deps) {
 					: "model3d_submission_unconfirmed";
 			deps.notify(
 				db,
-				patchGeneration(db, r.id, { state: "failed", error_code: code }),
+				patchGeneration(db, r.id, {
+					state: "failed",
+					stage: null,
+					error_code: code,
+				}),
 				"failed",
 			);
 			return "applied";
@@ -283,7 +376,8 @@ function registerPoll(deps: Deps) {
 		kind: "model3d.poll",
 		payloadVersions: [1],
 		schema: z.object({ id: z.uuid(), step: z.number().int() }),
-		recovery: "replay_safe",
+		// Following is GET only; patient waits re-enqueue it, the queue never runs it twice.
+		recovery: "interrupt",
 		resourceKey: "model3d",
 		prepareInTransaction(db, claim) {
 			const r = generationRow(db, claim.payload.id);
@@ -316,7 +410,7 @@ function registerPoll(deps: Deps) {
 				asset = await larm.asset(assetId, bounded(signal)).catch(() => null);
 			return { job, asset };
 		},
-		classify: failsOnce,
+		classify: () => "fail",
 		settleInTransaction(db, claim, _input, outcome) {
 			const r = generationRow(db, claim.payload.id);
 			if (
@@ -325,7 +419,11 @@ function registerPoll(deps: Deps) {
 				!["queued", "running"].includes(r.state)
 			)
 				return "stale";
-			if (outcome.type === "retry") return "applied";
+			// A restart only interrupts a status read (GET): follow again until the deadline.
+			if (outcome.type === "interrupted" && Date.now() < r.deadline) {
+				deps.enqueue(db, r.id, "poll", deps.pollMs);
+				return "applied";
+			}
 			if (outcome.type !== "success") {
 				const code =
 					"errorCode" in outcome && /^model3d_[a-z_]+$/.test(outcome.errorCode)
@@ -441,71 +539,59 @@ function registerPoll(deps: Deps) {
 
 function registerCancel(deps: Deps) {
 	type Input = { path: string; jobId: string };
-	const handler: HandlerDefinition<
-		{ id: string; step: number },
-		Input,
-		{ waitMs: number } | null
-	> = {
-		kind: "model3d.cancel",
-		payloadVersions: [1],
-		schema: z.object({ id: z.uuid(), step: z.number().int() }),
-		recovery: "replay_safe",
-		resourceKey: "model3d",
-		prepareInTransaction(db, claim) {
-			const r = generationRow(db, claim.payload.id);
-			if (
-				!r ||
-				r.step !== claim.payload.step ||
-				r.state !== "cancelled" ||
-				!r.job_id ||
-				!r.service_path
-			)
-				return { status: "stale", reason: "model3d_state_changed" };
-			return {
-				status: "ready",
-				input: { path: r.service_path, jobId: r.job_id },
-			};
-		},
-		async execute(input, { signal }) {
-			const sent = await guarded(
-				() => larmOf(deps).cancel(input.path, input.jobId, bounded(signal)),
-				deps.waitMs,
-			);
-			return sent.ok ? null : { waitMs: sent.waitMs };
-		},
-		classify: (e) =>
-			e instanceof Error && e.message === "model3d_not_found"
-				? "fail"
-				: failsOnce(e),
-		settleInTransaction(db, claim, _input, outcome) {
-			const r = generationRow(db, claim.payload.id);
-			if (!r || r.step !== claim.payload.step || r.state !== "cancelled")
-				return "stale";
-			if (outcome.type === "retry") return "applied";
-			if (outcome.type === "success" && outcome.result) {
-				deps.enqueue(db, r.id, "cancel", outcome.result.waitMs);
-				return "applied";
-			}
-			if (
-				outcome.type === "success" ||
-				("errorCode" in outcome && outcome.errorCode === "model3d_not_found")
-			)
-				patchGeneration(db, r.id, { error_code: null });
-			// A job LARM no longer knows is as good as cancelled.
-			if (
-				outcome.type !== "success" &&
-				!("errorCode" in outcome && outcome.errorCode === "model3d_not_found")
-			)
-				deps.cancelUnconfirmed(
-					db,
-					patchGeneration(db, r.id, {
-						error_code: "model3d_cancel_unconfirmed",
-					}),
+	const handler: HandlerDefinition<{ id: string; step: number }, Input, null> =
+		{
+			kind: "model3d.cancel",
+			payloadVersions: [1],
+			schema: z.object({ id: z.uuid(), step: z.number().int() }),
+			recovery: "interrupt",
+			resourceKey: "model3d",
+			prepareInTransaction(db, claim) {
+				const r = generationRow(db, claim.payload.id);
+				if (
+					!r ||
+					r.step !== claim.payload.step ||
+					r.state !== "cancelled" ||
+					!r.job_id ||
+					!r.service_path
+				)
+					return { status: "stale", reason: "model3d_state_changed" };
+				return {
+					status: "ready",
+					input: { path: r.service_path, jobId: r.job_id },
+				};
+			},
+			async execute(input, { signal }) {
+				await guarded(() =>
+					larmOf(deps).cancel(input.path, input.jobId, bounded(signal)),
 				);
-			return "applied";
-		},
-		cancelInTransaction() {},
-	};
+				return null;
+			},
+			classify: () => "fail",
+			settleInTransaction(db, claim, _input, outcome) {
+				const r = generationRow(db, claim.payload.id);
+				if (!r || r.step !== claim.payload.step || r.state !== "cancelled")
+					return "stale";
+				if (
+					outcome.type === "success" ||
+					("errorCode" in outcome && outcome.errorCode === "model3d_not_found")
+				)
+					patchGeneration(db, r.id, { error_code: null });
+				// A job LARM no longer knows is as good as cancelled.
+				if (
+					outcome.type !== "success" &&
+					!("errorCode" in outcome && outcome.errorCode === "model3d_not_found")
+				)
+					deps.cancelUnconfirmed(
+						db,
+						patchGeneration(db, r.id, {
+							error_code: "model3d_cancel_unconfirmed",
+						}),
+					);
+				return "applied";
+			},
+			cancelInTransaction() {},
+		};
 	deps.queue.registerHandler(handler);
 }
 
@@ -516,7 +602,7 @@ function registerOperation(deps: Deps) {
 		assetId: string;
 		patch: { title?: string; tags?: string[] } | null;
 	};
-	type Output = { asset: Model3dAsset | null } | { waitMs: number };
+	type Output = { asset: Model3dAsset | null };
 	const handler: HandlerDefinition<{ id: string }, Input, Output> = {
 		kind: "model3d.operation",
 		payloadVersions: [1],
@@ -539,22 +625,19 @@ function registerOperation(deps: Deps) {
 		},
 		async execute(input, { signal }) {
 			const larm = larmOf(deps);
-			const done = await guarded(
-				async () =>
+			return {
+				asset: await guarded(async () =>
 					input.kind === "delete"
 						? (await larm.remove(input.assetId, bounded(signal)), null)
 						: await larm.update(input.assetId, input.patch!, bounded(signal)),
-				deps.waitMs,
-			);
-			return done.ok ? { asset: done.value } : { waitMs: done.waitMs };
+				),
+			};
 		},
 		classify: () => "fail",
 		settleInTransaction(db, claim, input, outcome) {
 			const o = operationRow(db, claim.payload.id);
 			if (!o || o.state !== "pending") return "stale";
-			if (outcome.type === "success" && "waitMs" in outcome.result) {
-				settleOperation(db, o.id, "failed", "model3d_busy");
-			} else if (outcome.type === "success" && "asset" in outcome.result) {
+			if (outcome.type === "success") {
 				if (o.kind === "delete") forgetAsset(db, o.owner, o.asset_id);
 				else if (outcome.result.asset)
 					rememberAssets(db, o.owner, [outcome.result.asset]);

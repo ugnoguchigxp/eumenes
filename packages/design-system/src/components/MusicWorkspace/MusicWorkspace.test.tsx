@@ -235,3 +235,35 @@ it("selects the next track when the current one ends, and stops after the last",
 	fireEvent.ended(r.container.querySelector("audio")!);
 	expect(r.select).not.toHaveBeenCalled();
 });
+
+it("shows the cover image's wait for LARM and its timed-out wait in their own words", () => {
+	const track = { id: "a", title: "曲A", prompt: "静かなピアノ" };
+	const show = (extra: Record<string, unknown>) =>
+		render(
+			<MusicWorkspace
+				tracks={[{ ...track, ...extra }]}
+				track={{ ...track, src: "blob:audio" }}
+				currentTrackId="a"
+				onSelect={() => {}}
+				onArtwork={() => {}}
+			/>,
+		);
+	const first = show({ artworkStatus: "generating", artworkWaiting: true });
+	fireEvent.click(screen.getByRole("button", { name: "楽曲イメージ" }));
+	expect(
+		screen.getByText(
+			"LARMの空きを待っています。ほかの処理が終わりしだい始めます。",
+		),
+	).toBeInTheDocument();
+	expect(screen.getByRole("button", { name: /生成中/ })).toBeDisabled();
+	first.unmount();
+	show({ artworkStatus: "failed", artworkErrorCode: "larm_capacity_timeout" });
+	fireEvent.click(screen.getByRole("button", { name: "楽曲イメージ" }));
+	expect(
+		screen.getByRole("alert", {
+			name: "",
+		}),
+	).toHaveTextContent(
+		"LARMの空きを待ちましたが、待てる時間内に空かなかったため中止しました。",
+	);
+});

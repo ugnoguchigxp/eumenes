@@ -82,7 +82,10 @@ export function visualFetcher(
 		) => Promise<Response>;
 		create?: (signal: AbortSignal) => Promise<void>;
 		releaseFail?: boolean;
-		claim?: (attempt: number) => Response;
+		/** Answers the nth connection create instead of accepting it; `undefined` accepts. */
+		createResponse?: (attempt: number) => Response | undefined;
+		/** Answers the nth claim instead of granting it; `undefined` grants. */
+		claim?: (attempt: number) => Response | undefined;
 		connection?: (state: Record<string, unknown>) => Record<string, unknown>;
 		snapshot?: () => Response | Promise<Response>;
 		wrongHost?: boolean;
@@ -108,7 +111,8 @@ export function visualFetcher(
 		services: [],
 	};
 	let polls = 0,
-		claims = 0;
+		claims = 0,
+		creates = 0;
 	let releasedAt: string | undefined;
 	const fetcher = (async (input, init = {}) => {
 		const url = new URL(String(input)),
@@ -158,6 +162,8 @@ export function visualFetcher(
 			providers: [{ ...provider, claimable: true, readiness: "ready" }],
 		};
 		if (url.pathname === "/v1/agent-connections") {
+			const refused = options.createResponse?.(++creates);
+			if (refused) return refused;
 			await options.create?.(init.signal!);
 			return Response.json(options.connection?.(state) ?? state, {
 				status: 202,

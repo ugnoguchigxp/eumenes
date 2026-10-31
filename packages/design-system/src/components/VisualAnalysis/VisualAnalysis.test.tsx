@@ -98,6 +98,39 @@ describe("explicit visual analysis", () => {
 		);
 		expect(screen.getByRole("button", { name: "分析する" })).toBeEnabled();
 	});
+	it("says it is waiting for LARM memory, offers no second run, and explains the timeout", () => {
+		const { rerender } = render(
+			<VisualAnalysis
+				analysisAvailable
+				analysisOpen
+				analysis={{
+					...record,
+					state: "queued",
+					result: null,
+					capacityWait: { startedAt: 1, count: 1 },
+				}}
+			/>,
+		);
+		expect(screen.getByRole("status")).toHaveTextContent(
+			"LARMの空きを待っています。ほかの処理が終わりしだい始めます。",
+		);
+		expect(screen.getByRole("button", { name: "分析する" })).toBeDisabled();
+		rerender(
+			<VisualAnalysis
+				analysisAvailable
+				analysisOpen
+				analysis={{
+					...record,
+					state: "failed",
+					result: null,
+					errorCode: "larm_capacity_timeout",
+				}}
+			/>,
+		);
+		expect(screen.getByRole("alert")).toHaveTextContent(
+			"LARMの空きを待ちましたが、待てる時間内に空かなかったため中止しました。",
+		);
+	});
 	it("opens only on the button and sends the chosen task and unmodified query", () => {
 		const open = vi.fn(),
 			run = vi.fn();
