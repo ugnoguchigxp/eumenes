@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { createLarm } from "..";
 import type { LarmPort } from "..";
-import { waitFor as until } from "../../../infrastructure/wait-for";
+import { waitFor as until, settle } from "../../../infrastructure/wait-for";
 
 function deferred<T>() {
 	let resolve!: (value: T) => void;
@@ -31,6 +31,8 @@ function fixture() {
 	>();
 	const claimed: string[] = [],
 		released: string[] = [];
+	const deleting: string[] = [];
+	const controls = { releaseGate: null as Promise<void> | null };
 	const specs = (_profile: string) =>
 		["llm", "asr", "tts"].map((name) => ({
 			name,
@@ -109,6 +111,8 @@ function fixture() {
 			const [, , , id, operation] = url.pathname.split("/");
 			const c = connections.get(id!)!;
 			if (init?.method === "DELETE") {
+				deleting.push(id!);
+				await controls.releaseGate;
 				connections.delete(id!);
 				released.push(id!);
 				const waiting = [...connections.values()].find((x) => !x.ready);
@@ -173,13 +177,54 @@ function fixture() {
 			fetch: request,
 			...options,
 		});
-	return { create, connections, bodies, inference, claimed, released };
+	return {
+		create,
+		connections,
+		bodies,
+		inference,
+		claimed,
+		released,
+		deleting,
+		controls,
+	};
 }
 const history = (key: string) => [
 	{ role: "user" as const, content: `私の識別子は${key}です。` },
 	{ role: "assistant" as const, content: `識別子${key}を記憶しました。` },
 	{ role: "user" as const, content: "私の識別子を答えてください。" },
 ];
+
+test("a replacement helper waits for the evicted connection's DELETE to finish before requesting capacity", async () => {
+	const f = fixture();
+	const main = f.create();
+	const signal = AbortSignal.timeout(5000);
+	const release = deferred<void>();
+	const helper = (key: string) =>
+		main.answer(history(key), signal, { sessionRole: "subagent", taskId: key });
+	const work = [helper("first"), helper("busy")];
+	try {
+		await until(() => f.inference.size === 2);
+		f.inference.get("session1")!.output.resolve("first");
+		await work[0];
+		f.controls.releaseGate = release.promise;
+		work.push(helper("replacement"));
+		await until(() => f.deleting.includes("session1"));
+		await settle();
+		// Main plus two helpers: replacement must not create a fourth connection yet.
+		expect(f.bodies).toHaveLength(3);
+		expect(f.inference.has("session3")).toBe(false);
+		release.resolve();
+		await until(() => f.inference.has("session3"));
+		f.inference.get("session2")!.output.resolve("busy");
+		f.inference.get("session3")!.output.resolve("replacement");
+		expect(await Promise.all(work)).toEqual(["first", "busy", "replacement"]);
+	} finally {
+		release.resolve();
+		const done = Promise.allSettled(work);
+		await main.close();
+		await done;
+	}
+});
 
 test("a helper connection serves one prefix: the same instructions reuse it, a new prefix evicts the idle least-used one or waits", async () => {
 	const f = fixture();
@@ -228,6 +273,36 @@ test("a helper connection serves one prefix: the same instructions reuse it, a n
 		await Promise.allSettled(work);
 	}
 	expect(f.connections.size).toBe(0);
+});
+
+test("cancelling while a helper release is pending never creates the replacement connection", async () => {
+	const f = fixture();
+	const main = f.create();
+	const release = deferred<void>();
+	const abort = new AbortController();
+	const signal = AbortSignal.timeout(5000);
+	const helper = (key: string, scoped = signal) =>
+		main.answer(history(key), scoped, { sessionRole: "auxiliary" });
+	const work = [helper("first"), helper("busy")];
+	try {
+		await until(() => f.inference.size === 2);
+		f.inference.get("session1")!.output.resolve("first");
+		await work[0];
+		f.controls.releaseGate = release.promise;
+		const waiting = Promise.allSettled([helper("cancelled", abort.signal)]);
+		await until(() => f.deleting.includes("session1"));
+		abort.abort();
+		expect((await waiting)[0]!.status).toBe("rejected");
+		release.resolve();
+		await settle();
+		expect(f.bodies).toHaveLength(3);
+		expect(f.inference.size).toBe(2);
+	} finally {
+		release.resolve();
+		const done = Promise.allSettled(work);
+		await main.close();
+		await done;
+	}
 });
 
 test("a restarted host with the same client gets its kept connections back; keep-alive holds the connection without a call", async () => {

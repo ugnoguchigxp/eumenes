@@ -76,6 +76,19 @@ Eumenes の評価（Technical 約65/100・Project 約55/100、いずれも暫定
 - Phase 3: 自己改善は候補1件の全工程記録、導入はクリーン環境での成立記録で確認する。
 - 各 Phase の終わりに、影響する利用側 domain も含めて `bun run verify` を再実行し、fixture / live / 実機器の結果を分けて記録する。
 
+## 実施記録（2026-10-31）
+
+- Phase 0-1（検証の再実行）: `bun run verify -- --domain shell --domain capabilities --domain dialogue` を実行。静的検査（inventory・boundaries・system-context・size-budget・sql-boundaries・domain-docs・format・lint・design-system・typecheck）は全て pass、bun tests は 539 pass / 1 fail。失敗は `api/domains/shell/test/shell.test.ts` の実 PTY 試験の timeout で、サンドボックス内では PTY を開けないことが原因（最小再現で `Failed to open PTY`）。サンドボックス外では同試験が pass（37〜40 ms）し、shell domain 単独の verify でも試験は全て pass した。全体の verify は並行作業で検証中にソースが変わったため `invalidated` となり、クリーンな状態での再実行が残る。
+- Phase 0-2（CI/CD）: 利用者判断により対象外。ワークフローは変更していない。
+- Phase 0-3（README）: CLI 行を確認（承認）ありへ更新。表の日付は各行の記載日を維持し、全体の再検証は音声受入後に行う。
+- Phase 1-4（音声実機器）: 未実施。実機器・利用者の立ち会いとサーバー操作の許可が必要な手動 gate のため、自動では進めない。
+- Phase 1-5（シェル承認）: 実装済み・固定試験済み。toolchain `cli.run@3` に `minImpact: modify_existing` を新 revision で追加し、既存の委任確認に乗せた。新規の承認機構は作っていない。`bun run toolchain:bundle -- check` と `api/application/shell/cli-toolchain.test.ts`（承認前は起動・保存されないこと、登録実行は従来どおり動くこと）で確認。
+- Phase 2-6（再起動継続）: 利用者判断（2026-10-31）により実施しない。設計書 [restart-continuation-design-2026-10-31.md](restart-continuation-design-2026-10-31.md) は判断の記録として残す。現行の扱い（会話生成は中断、shell は自動再実行しない）を維持する。
+- Phase 2-7（性能予算）: `docs/performance.md` を追加（暫定予算と測定手順）。達成の判定は今後の live 測定で行う。
+- Phase 3-8（自己改善）: 設計書 [harness-self-improvement-design-2026-10-31.md](harness-self-improvement-design-2026-10-31.md) を作成（案・合意待ち）。候補の単位と状態遷移（提案→試験運用→採用/棄却/切戻し、遷移は人の操作のみ）を定めた。実装は合意後。
+- Phase 3-9（導入摩擦）: `docs/setup.md` に「うまくいかないとき」を追加。クリーン環境での成立所要の実測は未実施。
+- Phase 3-10（継続性）: `docs/operations.md` を追加し、`docs/README.md` の索引へ登録した。
+
 ## Risks / Open Questions
 
 - Phase 2-6（再起動継続）は実行台帳と冪等性に触れるため、設計を先に固める。方式の判断が必要になった場合は実装前に本書を改訂する。

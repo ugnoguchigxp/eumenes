@@ -27,7 +27,7 @@ UI自由制作の専門担当は、1回の推論に33〜38秒かかり、作り�
 | 推論1回（`attemptDuration`） | LARM 120秒、クラウド60秒 | `inference/service/attempt-work.ts` | 1回の推論の試行。サブエージェント用のリソースを保存していれば専門担当はクラウド経路で、60秒が先に効く |
 | 推論要求の期限 | `min(呼出し側の期限, 会話側の推論要求の期限)` | `inference/service/index.ts`の`captureControlInTransaction` | 専門担当の各推論 |
 | 音声の待ち | run期限までの残り＋10秒 | `voice-dialogue/service/respond.ts` | 音声のターンがrunの返答を待つ時間。超えるとrunを取り消し`dialogue_wait_timeout` |
-| ツールチェーンの指示の推論 | `min(run期限−15秒, 現在＋45秒)` | `dialogue/service/toolchain-command.ts` | 通常担当がツールチェーンを操作する1回の推論 |
+| ツールチェーンの指示の推論 | `run期限−15秒` | `dialogue/service/toolchain-command.ts` | 通常担当がツールチェーンを操作する1回の推論。2026-10-31の改修で45秒の上限を外した。LARMの準備上限60秒より先に打ち切らないため（[改修記録](model3d-command-readiness-fix-2026-10-31.md)）。会話全体の期限は延ばさない |
 | 調査の作業 | 作業150秒、1手45秒 | `agent-runtime/service/exploration.ts` | 調査系。根はrunの180秒 |
 
 変えないもの: queueのlease（30秒、10秒ごとに更新する生存確認で、長さの上限ではない）、LARMの通信の見張り（300秒）。ただし§3の推論の上限が300秒を超える場合、見張りもその値に合わせる（§3.4）。

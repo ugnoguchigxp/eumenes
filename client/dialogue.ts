@@ -43,8 +43,8 @@ export function dialogueClient(transport: Transport) {
 				method: "POST",
 			});
 		},
-		submit: async (input: PublicSubmit) =>
-			callJson(transport, runSchema, "/api/runs", json(input)),
+		submit: async (input: PublicSubmit, signal?: AbortSignal) =>
+			callJson(transport, runSchema, "/api/runs", { ...json(input), signal }),
 		run: async (id: string, signal?: AbortSignal) =>
 			callJson(transport, runSchema, `/api/runs/${encodeURIComponent(id)}`, {
 				signal,

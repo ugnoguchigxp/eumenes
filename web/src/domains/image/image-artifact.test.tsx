@@ -217,3 +217,63 @@ it("OpenUI image artifact defaults to Qwen and sends the explicitly selected pre
 		),
 	);
 });
+
+it("fills the open artifact's prompt after the generated record arrives and enables another generation", async () => {
+	const definition = JSON.stringify({
+		view: "image-workspace",
+		source: "images",
+	});
+	const dispatch = vi.fn(async () => ({
+		status: "accepted" as const,
+		message: "受付",
+	}));
+	const view = render(
+		<ArtifactRenderer
+			definition={definition}
+			runtime={{
+				snapshot: {
+					images: { ...image, defaults: { ...image.defaults, prompt: "" } },
+				},
+				dispatch,
+			}}
+		/>,
+	);
+	expect(screen.getByRole("button", { name: "画像を生成" })).toHaveProperty(
+		"disabled",
+		true,
+	);
+	view.rerender(
+		<ArtifactRenderer
+			definition={definition}
+			runtime={{
+				snapshot: {
+					images: {
+						...image,
+						revision: 2,
+						identity: "completed-image",
+						defaults: {
+							...image.defaults,
+							prompt: "生成画像に使ったプロンプト",
+						},
+					},
+				},
+				dispatch,
+			}}
+		/>,
+	);
+	expect(screen.getByLabelText("画像作成プロンプト")).toHaveProperty(
+		"value",
+		"生成画像に使ったプロンプト",
+	);
+	fireEvent.click(screen.getByRole("button", { name: "画像を生成" }));
+	await waitFor(() =>
+		expect(dispatch).toHaveBeenCalledWith(
+			expect.objectContaining({
+				action: "image-generate",
+				values: expect.objectContaining({
+					prompt: "生成画像に使ったプロンプト",
+				}),
+			}),
+		),
+	);
+});

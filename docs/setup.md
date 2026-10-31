@@ -13,6 +13,13 @@ README のクイックスタートの補足です。トークン、LARM、TTS、
 
 backend は `127.0.0.1:8787` のみで待ち受けます。API・Viteともに単一ユーザーの端末での利用を前提にしています。Viteのローカルproxyは同一オリジンからの要求にAPI認証を付けるため、同じ端末の別ユーザーもViteのポート経由でAPIを使えます。複数ユーザーが同居する端末では開発サーバーを起動したままにしないでください。起動時に未適用のmigrationがある既存DBは、`PRAGMA integrity_check` の後にDBと同じディレクトリへ `*.pre-migration-<時刻>.bak`（0600）を作成してから適用します。最新3世代を保持し、整合性検査に失敗した場合は起動を中止します。Chrome/Chromium の Playwright fixture で画面・音声経路を確認しています。実マイク・ヘッドホンによる3往復の受入は未実施です。
 
+## うまくいかないとき
+
+- API に繋がらない: backend が `127.0.0.1:8787` で起動しているか、Vite と同じ `.env`・同じ API token を使っているかを確認する。既に起動中の API がある場合は、一度終了してから `bun run dev` を実行する。
+- LARM が未設定・接続できない: 設定アーティファクトの「AIと接続」で接続を保存したかを確認する。保存するまで接続は試みられず、Profile の既定値はない。接続先は SQLite の保存設定が正本で、環境変数での再指定はしない。
+- 音声が始まらない: ブラウザのマイク許可と、発話検出モデルの読み込みを確認する。読み込めない場合は音声入力を開始しない仕様。
+- 障害の追跡は `bun run logs -- --level warn` から runId・jobId で絞る（[logging.md](logging.md)、[operations.md](operations.md)）。
+
 ## DesignSystem
 
 DesignSystem は `packages/design-system` にソースとビルド設定を持つ workspace package です。元の `main` から取り込み、Eumenes 内では `@eumenes/design-system` として管理します。`bun run build:design-system` で再ビルドでき、元の MIT ライセンスを同梱しています。

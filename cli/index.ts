@@ -1,5 +1,6 @@
 import { resolve } from "node:path";
-import { ApiError, ApiConnectionError, createClient } from "../client";
+import { createClient } from "../client";
+import { cliFailure } from "./failure";
 import { submitSchema } from "../api/domains/dialogue/contracts";
 import { readApiToken } from "../api/infrastructure/auth-config";
 import { commands } from "./commands";
@@ -200,22 +201,14 @@ async function main(): Promise<number> {
 try {
 	process.exitCode = await main();
 } catch (error) {
-	if (error instanceof ApiError) {
-		console.error(error.message);
-		if (error.requestId) console.error(`API request ID: ${error.requestId}`);
-		process.exitCode = error.status === 401 ? 2 : 3;
-	} else if (error instanceof ApiConnectionError) {
-		console.error(
-			`Cannot connect to ${url}. Start backend with bun run start.`,
-		);
-		process.exitCode = 5;
-	} else {
-		console.error(error instanceof Error ? error.message : String(error));
-		process.exitCode =
-			command === "web" &&
+	const failure = cliFailure(
+		error,
+		command === "web" &&
 			error instanceof Error &&
 			["TimeoutError", "AbortError"].includes(error.name)
-				? 4
-				: 2;
-	}
+			? 4
+			: 2,
+	);
+	for (const line of failure.lines) console.error(line);
+	process.exitCode = failure.exitCode;
 }

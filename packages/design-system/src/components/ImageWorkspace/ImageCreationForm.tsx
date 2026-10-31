@@ -241,23 +241,37 @@ export function ImageCreationForm({
 		seed: initialValues.seed,
 	}));
 	const [prompt, setPrompt] = useState(initialValues.prompt);
+	const [sourcePrompt, setSourcePrompt] = useState(initialValues.prompt);
+	const [promptChanged, setPromptChanged] = useState(false);
 	const [edited, setEdited] = useState(!!initialValues.prompt);
 	const [pending, setPending] = useState(false);
 	const [previous, setPrevious] = useState<string>();
 	const [search, setSearch] = useState("");
+	// A mounted studio can receive the generated record after its first render.
+	if (sourcePrompt !== initialValues.prompt) {
+		setSourcePrompt(initialValues.prompt);
+		if (initialValues.prompt && !promptChanged) {
+			setPrompt(initialValues.prompt);
+			setEdited(true);
+			setPending(false);
+		}
+	}
 	const disabled = busy || sending;
 	const update = (next: ImageSelection) => {
+		setPromptChanged(true);
 		setSelection(next);
 		if (edited) setPending(true);
 		else setPrompt(imageSelectionText(next, creationOptions));
 	};
 	const reflect = () => {
+		setPromptChanged(true);
 		setPrevious(prompt);
 		setPrompt(imageSelectionText(selection, creationOptions));
 		setEdited(false);
 		setPending(false);
 	};
 	const reset = () => {
+		setPromptChanged(true);
 		setPrevious(prompt);
 		setSelection(emptyImageSelection(creationOptions));
 		setParameters({ ...creationOptions.defaults });
@@ -280,8 +294,10 @@ export function ImageCreationForm({
 			aria-label="画像の制作設定"
 			onSubmit={(event) => {
 				event.preventDefault();
-				if (!disabled && !pending && prompt.trim() && prompt.length <= 7600)
+				if (!disabled && !pending && prompt.trim() && prompt.length <= 7600) {
+					setPromptChanged(false);
 					onGenerate({ ...parameters, prompt: prompt.trim() });
+				}
 			}}
 		>
 			<div className="image-creation-settings">
@@ -443,6 +459,7 @@ export function ImageCreationForm({
 					rows={5}
 					placeholder="選択内容から作成した文章を、自由に編集できます"
 					onChange={(event) => {
+						setPromptChanged(true);
 						setPrompt(event.target.value);
 						setEdited(true);
 					}}
@@ -456,6 +473,7 @@ export function ImageCreationForm({
 							size="sm"
 							disabled={disabled}
 							onClick={() => {
+								setPromptChanged(true);
 								setPrompt(previous);
 								setPrevious(undefined);
 								setEdited(true);

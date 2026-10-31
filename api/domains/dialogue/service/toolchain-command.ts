@@ -183,10 +183,9 @@ export function createToolchainCommandHandler(
 			}
 			const { request, original, resume, snapshot, tools, toolIds } =
 				loaded.source;
-			const deadline = Math.min(
-				Date.parse(run.deadlineAt!) - 15000,
-				Date.now() + 45000,
-			);
+			// Preparation alone may take up to 60 seconds. Use the run's remaining budget,
+			// keeping the existing reserve for the answer, rather than expiring during readiness.
+			const deadline = Date.parse(run.deadlineAt!) - 15000;
 			// Too little time left for one model call and the answer: end with a clear code.
 			if (deadline <= Date.now() + 5000) {
 				fail(tx, run, "deadline_exceeded");

@@ -199,3 +199,100 @@ it("registered model choices preserve the prompt, show preparation status, and r
 		"default-image",
 	);
 });
+
+it("loads prompts that arrive after mount and follows new generated results without changing the selected model", () => {
+	const generate = vi.fn();
+	const view = render(
+		<ImageCreationForm initialValues={defaults} onGenerate={generate} />,
+	);
+	view.rerender(
+		<ImageCreationForm
+			initialValues={{ ...defaults, prompt: "最初の生成で使った文章" }}
+			onGenerate={generate}
+		/>,
+	);
+	expect(prompt().value).toBe("最初の生成で使った文章");
+	expect(screen.getByRole("button", { name: "画像を生成" })).toHaveProperty(
+		"disabled",
+		false,
+	);
+	view.rerender(
+		<ImageCreationForm
+			initialValues={{ ...defaults, prompt: "次の生成で使った文章" }}
+			onGenerate={generate}
+		/>,
+	);
+	expect(prompt().value).toBe("次の生成で使った文章");
+});
+it("keeps an explicit reset empty when another generated prompt arrives", () => {
+	const view = render(
+		<ImageCreationForm
+			initialValues={{ ...defaults, prompt: "前の画像" }}
+			onGenerate={vi.fn()}
+		/>,
+	);
+	fireEvent.click(screen.getByRole("button", { name: "リセット" }));
+	view.rerender(
+		<ImageCreationForm
+			initialValues={{ ...defaults, prompt: "後から届いた画像" }}
+			onGenerate={vi.fn()}
+		/>,
+	);
+	expect(prompt().value).toBe("");
+});
+it("keeps the submitted prompt through planning and adopts the actual generation prompt after submission", () => {
+	const generate = vi.fn();
+	const view = render(
+		<ImageCreationForm initialValues={defaults} onGenerate={generate} />,
+	);
+	fireEvent.change(prompt(), { target: { value: "制作したい画像の文章" } });
+	fireEvent.click(screen.getByRole("button", { name: "画像を生成" }));
+	view.rerender(
+		<ImageCreationForm initialValues={defaults} busy onGenerate={generate} />,
+	);
+	expect(prompt().value).toBe("制作したい画像の文章");
+	view.rerender(
+		<ImageCreationForm
+			initialValues={{ ...defaults, prompt: "実際に生成に使用した文章" }}
+			onGenerate={generate}
+		/>,
+	);
+	expect(prompt().value).toBe("実際に生成に使用した文章");
+});
+
+it("loads the generated prompt while keeping a model selected before the record arrived", () => {
+	const generate = vi.fn();
+	const creationOptions = {
+		...defaultImageCreationOptions,
+		models: [
+			{ value: "first", label: "最初のモデル" },
+			{ value: "second", label: "選んだモデル" },
+		],
+		defaults: { ...defaultImageCreationOptions.defaults, model: "first" },
+	};
+	const view = render(
+		<ImageCreationForm
+			initialValues={defaults}
+			creationOptions={creationOptions}
+			onGenerate={generate}
+		/>,
+	);
+	fireEvent.change(screen.getByLabelText("推論モデル"), {
+		target: { value: "second" },
+	});
+	view.rerender(
+		<ImageCreationForm
+			initialValues={{ ...defaults, prompt: "保存済みの生成プロンプト" }}
+			creationOptions={creationOptions}
+			onGenerate={generate}
+		/>,
+	);
+	expect(prompt().value).toBe("保存済みの生成プロンプト");
+	expect(screen.getByLabelText("推論モデル")).toHaveProperty("value", "second");
+	fireEvent.click(screen.getByRole("button", { name: "画像を生成" }));
+	expect(generate).toHaveBeenCalledWith({
+		...defaults,
+		model: "second",
+		prompt: "保存済みの生成プロンプト",
+	});
+});

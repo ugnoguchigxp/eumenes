@@ -44,7 +44,7 @@ export function createHelperConnections(
 	const helpers: Helper[] = [];
 	let idle = new Set<() => void>();
 	let closed = false;
-	/** Evicted helpers whose release is still running: a new helper of the same client waits for it. */
+	/** Releasing helpers still occupy LARM capacity, including for a different client. */
 	const releasing = new Map<string, Promise<void>>();
 	function released() {
 		const waiting = idle;
@@ -59,10 +59,15 @@ export function createHelperConnections(
 	}
 	async function acquire(key: string, signal: AbortSignal) {
 		for (;;) {
+			signal.throwIfAborted();
 			if (closed) throw new Error("larm_closed");
 			const own = helpers.filter((helper) => helper.key === key);
 			const ready = own.find((helper) => !helper.calls);
 			if (ready) return take(ready);
+			if (releasing.size) {
+				await untilAborted(Promise.race(releasing.values()), signal);
+				continue;
+			}
 			if (helpers.length < HELPER_CONNECTIONS) {
 				const used = new Set(own.map((helper) => helper.client));
 				let n = 0;
@@ -73,11 +78,6 @@ export function createHelperConnections(
 				const helperClient = n
 					? `${client}-aux-${key}-${n}`
 					: `${client}-aux-${key}`;
-				const pending = releasing.get(helperClient);
-				if (pending) {
-					await untilAborted(pending, signal);
-					continue;
-				}
 				const helper: Helper = {
 					key,
 					client: helperClient,

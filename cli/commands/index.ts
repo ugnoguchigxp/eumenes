@@ -1,6 +1,7 @@
 import { run as requirements } from "./requirements";
 import type { CommandRun } from "./types";
 import { run as cancel } from "./cancel";
+import { run as chat } from "./chat";
 import { run as capabilities } from "./capabilities";
 import { run as collection } from "./collection";
 import { run as history } from "./history";
@@ -20,6 +21,7 @@ import { run as web } from "./web";
 export const commands: Readonly<Record<string, CommandRun>> = {
 	requirements,
 	cancel,
+	chat,
 	capabilities,
 	collection,
 	history,

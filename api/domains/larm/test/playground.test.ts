@@ -793,12 +793,19 @@ test("image uses the discovered service URL and preserves arbitrary dimensions a
 	).targets.find((t) => t.kind === "image")!;
 	await h.gateway.execute(
 		target,
-		{ text: "写真", width: 1200, height: 777, seed: 42, format: "png" },
+		{
+			text: "写真",
+			model: "selected-image",
+			width: 1200,
+			height: 777,
+			seed: 42,
+			format: "png",
+		},
 		AbortSignal.timeout(1000),
 		async () => {},
 	);
 	expect(h.calls.find((c) => c.url === serviceUrl)?.body).toEqual({
-		model: "model-image-discovered",
+		model: "selected-image",
 		prompt: "写真",
 		width: 1200,
 		height: 777,
@@ -832,7 +839,6 @@ test("image defaults an omitted edge to 512, format to webp and seed to zero", a
 	expect(
 		h.calls.find((c) => c.path === "/v1/images/generations")?.body,
 	).toEqual({
-		model: "model-image",
 		prompt: "写真",
 		width: 100,
 		height: 512,

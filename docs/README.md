@@ -8,6 +8,7 @@
 | --- | --- |
 | [setup.md](setup.md) | 起動の詳細。API token、LARM、TTS、VOICEVOX の環境変数と起動後の動作 |
 | [settings.md](settings.md) | 設定アーティファクト(会話・AIと接続・音声と入力・表示・記録)とサービスの試用・自己診断 |
+| [cli-chat.md](cli-chat.md) | CLIの対話モードとAIによる再現・デバッグ。会話共有、JSONL、実行IDからの追跡、固定試験 |
 | [realtime.md](realtime.md) | SSE 通知と再接続の仕様、定期取得をしない方針 |
 | [larm.md](larm.md) | LARM の接続、claim、予算、session 構成 |
 | [logging.md](logging.md) | JSONL ログの保存先・相関 ID・障害調査の手順 |
@@ -20,6 +21,8 @@
 | --- | --- |
 | [domains.md](domains.md) | domain の一覧・依存・公開入口(自動生成)、所有試験、migration の規則、音声 MVP の所有境界 |
 | [verification.md](verification.md) | verify / verify:live / ログの使い分けと現在の限界の詳細 |
+| [performance.md](performance.md) | 代表条件の性能予算（暫定）と再実行可能な測定手順 |
+| [operations.md](operations.md) | 保守・障害対応・保全の手順（継続性） |
 | [acceptance.md](acceptance.md) | 音声 MVP の受入記録(fixture、live、実機器の区別) |
 | [nl-acceptance.md](nl-acceptance.md) | 自然言語UI受入。固定Playwright回帰の上に足す層。タイマーpilotは未合格 |
 | [saaa-provenance.md](saaa-provenance.md) | SAAA 参照元と教訓 |
