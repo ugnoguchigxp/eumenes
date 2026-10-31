@@ -108,7 +108,10 @@ test("only a new done notice requests completion speech; waiting, blockers and g
 		previous.unshift({ ...notice(kind), kind });
 		await h.change([...previous]);
 		await waitFor(() =>
-			expect(h.chime).toHaveBeenLastCalledWith(kind === "done"),
+			expect(h.chime).toHaveBeenLastCalledWith(kind === "done", {
+				source: "kanban",
+				ids: [kind],
+			}),
 		);
 	}
 });

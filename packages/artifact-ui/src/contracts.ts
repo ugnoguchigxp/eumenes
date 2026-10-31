@@ -305,6 +305,7 @@ export type SettingsResource = {
 	volume: number;
 };
 export type Resource =
+	| UsageDashboardResource
 	| {
 			kind: "external-app-launcher";
 			revision: number;
@@ -369,3 +370,5 @@ export type { ArtifactEvent } from "./event-contracts";
 export type { Receipt } from "./receipt-contracts";
 
 export type { ActivityResource } from "./activity-components";
+import type { UsageDashboardResource } from "./usage-components";
+export type { UsageDashboardResource } from "./usage-components";

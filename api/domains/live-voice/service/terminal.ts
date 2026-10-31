@@ -5,6 +5,7 @@ import {
 	type LiveSnapshot,
 } from "../contracts";
 import { session } from "../repository";
+import { observeUsage } from "../repository/usage";
 import type { Runtime } from "./runtime";
 import { publishSegments } from "./transcripts";
 /** Even when SQLite cannot commit the terminal state, a failed connection must stop sending and executing. */
@@ -52,15 +53,10 @@ export function createTerminator({
 						id,
 					);
 				}
+				observeUsage(db, id, usage, clock(), true);
 				db.query(
-					"UPDATE live_voice_sessions SET status=?,error=?,usage_confirmed=?,usage=? WHERE id=?",
-				).run(
-					status,
-					error,
-					usage !== undefined ? 1 : 0,
-					usage === undefined ? null : JSON.stringify(usage),
-					id,
-				);
+					"UPDATE live_voice_sessions SET status=?,error=?,ended_at=? WHERE id=?",
+				).run(status, error, clock(), id);
 			});
 			runtimes.delete(id);
 		} catch {

@@ -196,6 +196,7 @@ const catalog: readonly Migration[] = [
 	...taskReportsMigrations,
 	...retiredCodingSupervisionMigrations,
 	...googleAccountsMigrations,
+	...usageMigrations,
 ];
 
 /**
@@ -222,3 +223,4 @@ function resolve(all: readonly Migration[]): Migration[] {
 
 /** Everything, ordered topologically (for the frozen part: exactly the legacy order). */
 export const migrations: readonly Migration[] = resolve(catalog);
+import { migrations as usageMigrations } from "../domains/usage";

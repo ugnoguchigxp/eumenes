@@ -321,8 +321,6 @@ export function createInference(
 			const root = policy ? get(db, policy.id) : null;
 			if (!root || !allowed(db, root)) throw new Error("permission_revoked");
 			const snapshot = structuredClone(root.snapshot);
-			snapshot.routes.llm.mode = "larm-only";
-			snapshot.routes.llm.cloudAllowed = false;
 			const requestId = capture(
 				db,
 				input.subject,

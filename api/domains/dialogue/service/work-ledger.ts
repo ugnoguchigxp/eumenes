@@ -6,6 +6,7 @@ import type { PendingConfirmation, TodoItem } from "./work-items";
 import { forgetWorkResources, workLinksOf } from "../repository/resources";
 import { recordWorkLinksInTransaction } from "./work-links";
 import { noticeOf } from "./todo-notices";
+import { resultText } from "./result-text";
 import type { TodoNotice } from "../contracts/todo-notices";
 import {
 	archiveWork,
@@ -184,6 +185,29 @@ function recordReportLinks(
 		);
 }
 
+/** The settled notification is also factual context for an external voice frontend. */
+function reportExternalWork(
+	deps: Pick<DialogueDeps, "externalOutput">,
+	db: Database,
+	next: WorkRow,
+) {
+	if (next.status === "done")
+		deps.externalOutput?.report?.(db, {
+			id: `work:${next.id}:${next.revision}`,
+			runId: next.runId,
+			conversationId: next.conversationId,
+			text: resultText({
+				ref: `t${next.ref}`,
+				title: next.title,
+				status: next.status,
+				...(next.outcome ? { outcome: next.outcome } : {}),
+				result: next.result,
+				made: [],
+				resource: () => null,
+			}).text,
+		});
+}
+
 /** What `## State`, the TODO screen and the notices read of finished (archived) work. */
 function finishedViews(deps: Pick<DialogueDeps, "clock" | "toolchains">) {
 	return {
@@ -244,6 +268,7 @@ export function createWorkLedger(
 		| "toolchains"
 		| "resources"
 		| "resourceLedger"
+		| "externalOutput"
 	>,
 ) {
 	const { clock, id, continuity } = deps;
@@ -397,6 +422,7 @@ export function createWorkLedger(
 			if (report.status === "done") archiveWork(db, workId, clock());
 			const next = workById(db, workId)!;
 			logResult(db, next);
+			reportExternalWork(deps, db, next);
 			return next;
 		},
 		/** The agent's check: the TODO as it is now (its result is the check's answer). */

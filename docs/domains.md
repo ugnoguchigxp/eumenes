@@ -7,6 +7,7 @@
 <!-- domains:start -->
 | Domain | Tier | Backend 入口 | Web 入口 | Components | 依存 (api) | 依存 (web) | 依存 (試験のみ) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
+| `usage` | 4 | `api/domains/usage/index.ts` | `web/src/domains/usage/` | `packages/design-system/src/components/UsageDashboard/index.tsx` | なし | なし | なし |
 | `docling` | 0 | `api/domains/docling/index.ts` | `web/src/domains/docling/` | `packages/design-system/src/components/ExternalAppLauncher/index.ts` | なし | なし | なし |
 | `google-accounts` | 0 | `api/domains/google-accounts/index.ts` | `web/src/domains/google-accounts/` | `packages/design-system/src/components/GoogleAccounts/index.tsx` | なし | なし | なし |
 | `excalidraw` | 3 | `api/domains/excalidraw/index.ts` | `web/src/domains/excalidraw/` | なし | `capabilities`、`inference`、`larm`、`queue`、`resources`、`tool-runtime` | `resources` | なし |

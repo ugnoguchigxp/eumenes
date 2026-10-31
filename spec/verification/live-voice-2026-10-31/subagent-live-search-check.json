@@ -1,0 +1,169 @@
+{
+  "conversationId": "debug-live-subagent-48cffb83-aeeb-43ca-b782-259fe29d782b",
+  "startedAt": "2026-10-31T12:05:22.595Z",
+  "events": [
+    {
+      "phase": "live_active",
+      "at": "2026-10-31T12:05:25.770Z"
+    },
+    {
+      "phase": "run",
+      "runId": "27f3baf6-52e8-45c1-b3a8-52549d15dd1b",
+      "at": "2026-10-31T12:05:26.069Z"
+    },
+    {
+      "phase": "tasks",
+      "states": [],
+      "spokenCharacters": 0,
+      "audioEvents": 14,
+      "at": "2026-10-31T12:05:27.773Z"
+    },
+    {
+      "phase": "announcement_painted",
+      "at": "2026-10-31T12:05:33.900Z"
+    },
+    {
+      "phase": "tasks",
+      "states": [
+        {
+          "kind": "worker",
+          "status": "running",
+          "errorCode": null,
+          "modelCalls": 1,
+          "toolCalls": 0
+        },
+        {
+          "kind": "coordinator",
+          "status": "waiting_child",
+          "errorCode": null,
+          "modelCalls": 0,
+          "toolCalls": 0
+        }
+      ],
+      "spokenCharacters": 0,
+      "audioEvents": 93,
+      "at": "2026-10-31T12:05:35.780Z"
+    },
+    {
+      "phase": "tasks",
+      "states": [
+        {
+          "kind": "worker",
+          "status": "waiting_tool",
+          "errorCode": null,
+          "modelCalls": 1,
+          "toolCalls": 1
+        },
+        {
+          "kind": "coordinator",
+          "status": "waiting_child",
+          "errorCode": null,
+          "modelCalls": 0,
+          "toolCalls": 0
+        }
+      ],
+      "spokenCharacters": 0,
+      "audioEvents": 170,
+      "at": "2026-10-31T12:05:43.787Z"
+    },
+    {
+      "phase": "tasks",
+      "states": [
+        {
+          "kind": "worker",
+          "status": "running",
+          "errorCode": null,
+          "modelCalls": 2,
+          "toolCalls": 1
+        },
+        {
+          "kind": "coordinator",
+          "status": "waiting_child",
+          "errorCode": null,
+          "modelCalls": 0,
+          "toolCalls": 0
+        }
+      ],
+      "spokenCharacters": 0,
+      "audioEvents": 190,
+      "at": "2026-10-31T12:05:45.789Z"
+    },
+    {
+      "phase": "tasks",
+      "states": [
+        {
+          "kind": "worker",
+          "status": "running",
+          "errorCode": null,
+          "modelCalls": 3,
+          "toolCalls": 1
+        },
+        {
+          "kind": "coordinator",
+          "status": "waiting_child",
+          "errorCode": null,
+          "modelCalls": 0,
+          "toolCalls": 0
+        }
+      ],
+      "spokenCharacters": 0,
+      "audioEvents": 364,
+      "at": "2026-10-31T12:06:03.805Z"
+    },
+    {
+      "phase": "announcement_painted",
+      "at": "2026-10-31T12:06:09.291Z"
+    },
+    {
+      "phase": "tasks",
+      "states": [
+        {
+          "kind": "worker",
+          "status": "completed",
+          "errorCode": null,
+          "modelCalls": 3,
+          "toolCalls": 1
+        },
+        {
+          "kind": "coordinator",
+          "status": "completed",
+          "errorCode": null,
+          "modelCalls": 0,
+          "toolCalls": 0
+        }
+      ],
+      "spokenCharacters": 0,
+      "audioEvents": 422,
+      "at": "2026-10-31T12:06:09.810Z"
+    },
+    {
+      "phase": "result",
+      "runId": "27f3baf6-52e8-45c1-b3a8-52549d15dd1b",
+      "completedWorkers": 1,
+      "spokenCharacters": 78,
+      "audioEvents": 583,
+      "at": "2026-10-31T12:06:25.971Z"
+    }
+  ],
+  "runId": "27f3baf6-52e8-45c1-b3a8-52549d15dd1b",
+  "workerStates": [
+    {
+      "kind": "worker",
+      "status": "completed",
+      "errorCode": null,
+      "modelCalls": 3,
+      "toolCalls": 1
+    },
+    {
+      "kind": "coordinator",
+      "status": "completed",
+      "errorCode": null,
+      "modelCalls": 0,
+      "toolCalls": 0
+    }
+  ],
+  "spokenCharacters": 78,
+  "audioEvents": 583,
+  "completedWorkers": 1,
+  "stopStatus": 200
+}

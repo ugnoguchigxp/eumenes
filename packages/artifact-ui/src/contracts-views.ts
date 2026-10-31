@@ -109,6 +109,15 @@ const musicCreationOptions = z
 	});
 
 export const viewRegistry = {
+	"usage-dashboard": {
+		name: "UsageDashboard",
+		label: "利用状況の集計",
+		schema: z.strictObject({
+			view: z.literal("usage-dashboard"),
+			source,
+			title,
+		}),
+	},
 	"external-app-launcher": {
 		name: "ExternalAppLauncher",
 		label: "外部アプリを開く",

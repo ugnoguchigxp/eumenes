@@ -57,6 +57,10 @@ export function monitoringItems(
 				health,
 				activity: item.state.activity,
 				stale,
+				...(item.state.readiness ? { readiness: item.state.readiness } : {}),
+				...(item.state.runtimeStates
+					? { runtimeStates: item.state.runtimeStates }
+					: {}),
 				...(item.state.utilization === undefined
 					? {}
 					: { utilization: item.state.utilization }),

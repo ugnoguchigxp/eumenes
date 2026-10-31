@@ -126,7 +126,10 @@ test("only a newly succeeded TODO requests completion speech", async () => {
 		previous.unshift({ ...notice(outcome), outcome });
 		await h.change([...previous]);
 		await waitFor(() =>
-			expect(h.chime).toHaveBeenLastCalledWith(outcome === "succeeded"),
+			expect(h.chime).toHaveBeenLastCalledWith(outcome === "succeeded", {
+				source: "todo",
+				ids: [outcome],
+			}),
 		);
 	}
 });

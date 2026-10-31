@@ -1,4 +1,12 @@
-import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
+import {
+	act,
+	cleanup,
+	render,
+	renderHook,
+	screen,
+	fireEvent,
+	waitFor,
+} from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
@@ -43,6 +51,7 @@ const fake = vi.hoisted(() => ({
 }));
 vi.mock("../audio", () => ({ createLivePcm: fake.create }));
 import { useLiveVoice } from "./useLiveVoice";
+import { LiveVoicePanel } from "./LiveVoicePanel";
 afterEach(() => {
 	cleanup();
 	vi.clearAllMocks();
@@ -178,4 +187,40 @@ test("a session refused by the provider closes the already granted microphone", 
 	expect(fake.close).toHaveBeenCalled();
 	expect(h.result.current.error).toContain("接続できません");
 	expect(f.methods.liveStream).not.toHaveBeenCalled();
+});
+test("live subtitles display the configured agent name before they enter history", async () => {
+	const f = fixture();
+	f.settings.general.agentName = "光";
+	function View() {
+		const live = useLiveVoice(f.client, f.settings);
+		return (
+			<>
+				<button onClick={() => void live.start()}>開始</button>
+				<LiveVoicePanel live={live} agentName={f.settings.general.agentName} />
+			</>
+		);
+	}
+	render(<View />, { wrapper: f.wrapper });
+	await act(async () => {
+		fireEvent.click(screen.getByText("開始"));
+	});
+	await waitFor(() => expect(f.methods.liveStream).toHaveBeenCalledOnce());
+	await act(() =>
+		f.state({
+			status: "active",
+			segments: [
+				{
+					id: "answer",
+					speaker: "assistant",
+					text: "お聞きしています。",
+					startMs: 0,
+					endMs: 100,
+					messageId: null,
+				},
+			],
+		}),
+	);
+	expect(await screen.findByText("光 · 文字起こし")).toBeTruthy();
+	expect(screen.queryByText("Eumenes · 文字起こし")).toBeNull();
+	expect(screen.getByText("お聞きしています。")).toBeTruthy();
 });

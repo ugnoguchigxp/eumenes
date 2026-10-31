@@ -1,6 +1,6 @@
 import type { Database } from "bun:sqlite";
 import type { Settings } from "../../settings/contracts";
-/** LARM-only control requests authorized by their host operation, independent of a dialogue parent. */
+/** Control requests authorized by their host operation, independent of a dialogue parent. */
 export function createIndependentControls(
 	snapshotInTransaction: (db: Database) => Settings,
 	capture: (
@@ -54,6 +54,7 @@ export function createIndependentControls(
 				subject: string;
 				deadline: number;
 				maxOutputTokens: number;
+				route?: "subagent";
 				structuredOutput?: boolean;
 			},
 		) {
@@ -68,8 +69,10 @@ export function createIndependentControls(
 			)
 				throw new Error("invalid_user_control");
 			const snapshot = structuredClone(snapshotInTransaction(db));
-			snapshot.routes.llm.mode = "larm-only";
-			snapshot.routes.llm.cloudAllowed = false;
+			if (input.route !== "subagent") {
+				snapshot.routes.llm.mode = "larm-only";
+				snapshot.routes.llm.cloudAllowed = false;
+			}
 			const requestId = capture(
 				db,
 				input.subject,

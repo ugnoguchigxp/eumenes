@@ -266,7 +266,7 @@ test("a cloud-only route does not show LARM's connection as starting", async () 
 	expect(items.asr?.state.activity).toBe("starting");
 });
 
-test("concurrent reads share one host sample instead of measuring a tiny window", async () => {
+test("all readers share a host sample for one minute", async () => {
 	let clock = 0;
 	let reads = 0;
 	const host = createHostMetrics(
@@ -277,7 +277,14 @@ test("concurrent reads share one host sample instead of measuring a tiny window"
 	const [a, b] = await Promise.all([host.sample(), host.sample()]);
 	expect(a).toBe(b);
 	expect(reads).toBe(1);
-	clock = 2000;
+	for (clock = 2000; clock < 60_000; clock += 2000) {
+		expect(await host.sample()).toBe(a);
+		expect(reads).toBe(1);
+	}
+	clock = 59_999;
+	expect(await host.sample()).toBe(a);
+	expect(reads).toBe(1);
+	clock = 60_000;
 	await host.sample();
 	expect(reads).toBe(2);
 });

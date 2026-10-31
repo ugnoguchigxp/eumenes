@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { healthLabels, type SpatialItem, type SpatialState } from "./contracts";
 import { healthColors } from "./options";
+import { statusColor, statusLabel, readinessLabels } from "./status";
 
 const activityLabels: Record<SpatialState["activity"], string> = {
-	idle: "待機",
+	idle: "待機中",
 	starting: "準備中",
 	working: "処理中",
 };
@@ -30,6 +31,14 @@ export function SpatialDetail({
 }) {
 	const { state } = item;
 	const at = state.checkedAt ?? state.observedAt;
+	const showActivity =
+		(state.readiness !== undefined ||
+			state.source === "activity" ||
+			state.source === "demo" ||
+			state.activity !== "idle") &&
+		statusLabel(state) !== activityLabels[state.activity] &&
+		(!state.readiness ||
+			readinessLabels[state.readiness] !== activityLabels[state.activity]);
 	// The age keeps counting while the panel stays open between monitoring updates.
 	const [now, setNow] = useState(() => Date.now());
 	useEffect(() => {
@@ -39,13 +48,13 @@ export function SpatialDetail({
 	}, [at]);
 	return (
 		<div className="spatial-detail-body">
-			<p className="spatial-detail-health">
-				<i
-					style={{ background: healthColors[state.health] }}
-					aria-hidden="true"
-				/>
+			<p
+				className="spatial-detail-health"
+				style={{ color: statusColor(state) }}
+			>
+				<i style={{ background: statusColor(state) }} aria-hidden="true" />
 				<span>
-					{healthLabels[state.health]}
+					{statusLabel(state)}
 					{state.stale ? "（更新を確認できません）" : ""}
 				</span>
 				<span className="spatial-detail-source">
@@ -53,8 +62,24 @@ export function SpatialDetail({
 				</span>
 			</p>
 			<dl>
-				<dt>活動</dt>
-				<dd>{activityLabels[state.activity]}</dd>
+				{state.health === "healthy" && statusLabel(state) !== "Healthy" && (
+					<>
+						<dt>健全性</dt>
+						<dd style={{ color: healthColors.healthy }}>Healthy（正常）</dd>
+					</>
+				)}
+				{state.readiness && (
+					<>
+						<dt>準備状態</dt>
+						<dd>{readinessLabels[state.readiness]}</dd>
+					</>
+				)}
+				{showActivity && (
+					<>
+						<dt>活動</dt>
+						<dd>{activityLabels[state.activity]}</dd>
+					</>
+				)}
 				{state.utilization !== undefined && (
 					<>
 						<dt>利用率</dt>
@@ -64,6 +89,16 @@ export function SpatialDetail({
 				<dt>最終確認</dt>
 				<dd>{observed(at, now)}</dd>
 			</dl>
+			{state.runtimeStates?.length ? (
+				<dl className="spatial-runtime-states" aria-label="実行基盤の準備状態">
+					{state.runtimeStates.map(({ readiness, count }) => (
+						<div key={readiness}>
+							<dt>{readinessLabels[readiness]}</dt>
+							<dd>{count}件</dd>
+						</div>
+					))}
+				</dl>
+			) : null}
 			{state.details?.length ? (
 				<ul className="spatial-detail-notes">
 					{state.details.map((note, index) => (

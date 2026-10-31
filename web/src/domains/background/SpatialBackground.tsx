@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-	healthLabels,
 	type SceneStatus,
 	type SpatialItem,
 	type SpatialState,
@@ -13,6 +12,7 @@ import {
 	type SpatialOptions,
 } from "./options";
 import "./style.css";
+import { statusColor, statusLabel, statusLegend } from "./status";
 
 type SceneModule = typeof import("./controller/scene");
 type ModelModule = typeof import("./models");
@@ -218,10 +218,14 @@ export function SpatialBackground({
 			{active && hoveredItem && hovered && (
 				<div
 					className="spatial-hover-label"
-					style={{ left: hovered.x + 14, top: hovered.y + 14 }}
+					style={{
+						left: hovered.x + 14,
+						top: hovered.y + 14,
+						color: statusColor(hoveredItem.state),
+					}}
 					aria-hidden="true"
 				>
-					{hoveredItem.label} · {healthLabels[hoveredItem.state.health]}
+					{hoveredItem.label} · {statusLabel(hoveredItem.state)}
 				</div>
 			)}
 			{active && interactive && selection && status !== "failed" && (
@@ -288,7 +292,7 @@ export function SpatialBackground({
 												setSelected(selected === item.id ? null : item.id)
 											}
 										>
-											{item.label}：{healthLabels[item.state.health]}
+											{item.label}：{statusLabel(item.state)}
 											{item.state.stale ? "（情報が古い）" : ""}
 										</button>
 									</li>
@@ -302,6 +306,16 @@ export function SpatialBackground({
 							)}
 						</section>
 					)}
+				</div>
+			)}
+			{active && interactive && (
+				<div className="spatial-status-legend" aria-label="状態色の凡例">
+					{statusLegend.map(([label, color]) => (
+						<span key={label} style={{ color }}>
+							<i aria-hidden="true" />
+							{label}
+						</span>
+					))}
 				</div>
 			)}
 		</div>

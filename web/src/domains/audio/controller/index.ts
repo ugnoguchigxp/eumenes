@@ -1,4 +1,5 @@
 import { createOutputWatch } from "./output-watch";
+import { traceAudioOutput } from "./playback-trace";
 import { createResampler } from "./resample";
 import { createSegmentClock, type SegmentTiming } from "./segment-timing";
 import {
@@ -386,7 +387,7 @@ export function createAudioController(
 		emit(playback ? "playing" : "idle");
 	}
 
-	return {
+	return traceAudioOutput({
 		async start() {
 			if (disposed || stream) return;
 			inputPaused = false;
@@ -717,7 +718,7 @@ export function createAudioController(
 		},
 		/** Stop recording while keeping the accepted answer's output context alive. */
 		pauseInput,
-	};
+	});
 }
 type Controller = ReturnType<typeof createAudioController>;
 export type AudioController = Pick<

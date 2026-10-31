@@ -35,6 +35,18 @@ export function routeState(
 	);
 	return {
 		...state,
+		readiness:
+			!reachable || state.health === "disconnected"
+				? "unknown"
+				: state.activity === "starting"
+					? "starting"
+					: (route.mode !== "cloud-only" &&
+								status.state === "ready" &&
+								status.capabilities.includes(purpose)) ||
+						  (route.mode === "cloud-only" &&
+								observation.lastSuccessAt !== null)
+						? "ready"
+						: "configured",
 		...(!state.reason && !reachable
 			? { reason: viaLarm ? "larm_failed" : "service_connection_unavailable" }
 			: {}),

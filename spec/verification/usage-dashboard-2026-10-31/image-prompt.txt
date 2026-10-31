@@ -1,0 +1,7 @@
+Use case: ui-mockup
+Asset type: high fidelity Japanese embedded artifact panel, not a full-screen application.
+Primary request: Eumenesの「利用状況」アーティファクト。Render ONLY the self-contained rectangular content panel which opens inside an existing application artifact area. 900px wide panel with compact titlebar「利用状況」and small close icon. NO app sidebar, NO global navigation, NO application shell, NO browser chrome. This is an embeddable artifact, never a whole dashboard app.
+Layout: charcoal panel with 24px padding, quiet subtitle「Eumenes経由の利用 · 開始日で集計」. Header right small「更新」button. Compact period row「今日」「7日間」「今月」with 今月 selected, two date inputs, model Select「すべてのモデル」. Tabs「概要」「Live」「Codex SDK」「料金設定」.
+Four modest metric cards in 2x2 grid: 「Live 接続時間」42分18秒 · API報告済み; 「Live 概算費用」$1.27 · 登録単価で換算; 「Codex SDK」128,400 token · 入力120,000 / 出力8,400; 「キャッシュ読取」72,000 token · 入力の内訳. Values illustrative.
+One compact「日別の利用」bar chart with blue thin bars and metric Select「Live 時間」. Bottom table「モデル別の内訳」columns サービス / モデル / 回数 / 利用量 / 概算費用, rows use voice-model and selected-model placeholders. Small footer「最終量未確認 1件 · 単価未設定 1件」.
+Style: refined functional dark UI, readable Japanese sans serif, title22px, body14px, number28px, subtle borders, 8px radii, small blue accents, no gradients, no oversized titles. background #141b24 cards #1a2330 text #eaf0f8 muted #99a8bb accent #4b91fb. Tidy alignment, no squeezed labels. No sidebar or full-screen app structure.

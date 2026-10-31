@@ -2,6 +2,7 @@ import type { MonitoringObservation } from "../../larm/contracts";
 import type { MonitoringItem } from "../contracts";
 import type { LarmView } from "../contracts/larm";
 import { offLan } from "./rules";
+import { runtimeReadiness } from "./runtime-readiness";
 
 type Observation = MonitoringObservation<unknown>;
 type State = MonitoringItem["state"];
@@ -170,6 +171,18 @@ export function larmItems(
 						gpus?.length ? "selection_required" : "gpu_unavailable",
 					),
 		];
+		const readiness = measured(core.readiness);
+		states[0]!.readiness =
+			readiness === "ready"
+				? "ready"
+				: readiness === "starting" || readiness === "verifying"
+					? "starting"
+					: readiness === "draining"
+						? "stopping"
+						: readiness === "failed"
+							? "failed"
+							: "unknown";
+		states[0]!.runtimeStates = runtimeReadiness(snapshot);
 		for (const [index, kind] of [
 			[2, "node"],
 			[3, "gpu"],

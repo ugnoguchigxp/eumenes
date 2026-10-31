@@ -2,7 +2,8 @@ import { readFileSync } from "node:fs";
 import { expect, test } from "vitest";
 import { evaluateParticle, type AnimationInput } from "./evaluator";
 import { particleModelIds } from "./catalog";
-import { healthColors, particleColorOptions } from "../options";
+import { healthColors, standbyColor } from "../options";
+import { statusColor } from "../status";
 import { scatterPositionGLSL } from "./diffusion";
 
 test("all roles keep fixed geometry/size, health priority and at most ten percent activity uplift", () => {
@@ -36,8 +37,8 @@ test("all roles keep fixed geometry/size, health priority and at most ten percen
 							expect(channel).toBeGreaterThanOrEqual(0);
 							expect(channel).toBeLessThanOrEqual(1);
 						}
-						if (health !== "healthy") {
-							const hex = parseInt(healthColors[health].slice(1), 16);
+						{
+							const hex = parseInt(statusColor(input).slice(1), 16);
 							expect(sample.color).toEqual([
 								((hex >> 16) & 255) / 255,
 								((hex >> 8) & 255) / 255,
@@ -80,83 +81,62 @@ const healthy: AnimationInput = {
 	reducedMotion: false,
 };
 
-test("healthy stars retain distinct cool colours and only a distributed fraction changes slowly", () => {
+test("status hues remain distinct at every time and load, with waiting white and no warning tint from load", () => {
 	const data = cpuColors();
-	let idleChanges = 0,
-		workingChanges = 0,
-		rising = 0,
-		falling = 0;
-	const colours = new Set<string>();
-	for (let i = 0; i < data.length / 8; i++) {
-		const at = evaluateParticle(data, i, 2, healthy).color;
-		const next = evaluateParticle(data, i, 3, healthy).color;
-		colours.add(at.map((v) => v.toFixed(2)).join(","));
-		const difference = next[0] - at[0];
-		if (at.some((v, c) => Math.abs(v - next[c]!) > 1e-6)) idleChanges++;
-		if (difference > 1e-5) rising++;
-		if (difference < -1e-5) falling++;
-		const working = { ...healthy, activity: "working" as const };
-		const activeAt = evaluateParticle(data, i, 2, working).color;
-		const activeNext = evaluateParticle(data, i, 3, working).color;
-		if (activeAt.some((v, c) => Math.abs(v - activeNext[c]!) > 1e-6))
-			workingChanges++;
-		const frame = evaluateParticle(data, i, 2 + 1 / 30, healthy).color;
-		expect(Math.max(...at.map((v, c) => Math.abs(v - frame[c]!)))).toBeLessThan(
-			0.007,
-		);
-		expect(evaluateParticle(data, i, 33600, healthy).color).toEqual(
-			evaluateParticle(data, i, 0, healthy).color,
-		);
-		const beforeWrap = evaluateParticle(data, i, 33600 - 1 / 30, healthy).color;
-		const afterWrap = evaluateParticle(data, i, 0, healthy).color;
-		expect(
-			Math.max(...beforeWrap.map((v, c) => Math.abs(v - afterWrap[c]!))),
-		).toBeLessThan(0.007);
-	}
-	const count = data.length / 8;
-	expect(colours.size).toBeGreaterThan(100);
-	expect(idleChanges / count).toBeGreaterThan(0.35);
-	expect(idleChanges / count).toBeLessThan(0.5);
-	expect(workingChanges / count).toBeGreaterThan(0.6);
-	expect(workingChanges / count).toBeLessThan(0.75);
-	expect(rising).toBeGreaterThan(count * 0.1);
-	expect(falling).toBeGreaterThan(count * 0.1);
-});
-
-test("only observed utilization increases the warm-star fraction, independently of scatter cohorts", () => {
-	const data = cpuColors(),
-		counts = [0, 0, 0],
-		byDecile = Array<number>(10).fill(0),
-		totals = Array<number>(10).fill(0);
-	for (let i = 0; i < data.length / 8; i++) {
-		const absent = evaluateParticle(data, i, 4, healthy).color;
-		expect(
-			evaluateParticle(data, i, 4, { ...healthy, utilization: 0 }).color,
-		).toEqual(absent);
-		for (const [index, utilization] of [0, 0.5, 1].entries()) {
-			const color = evaluateParticle(data, i, 4, {
+	const cases = [
+		{ state: healthy, color: healthColors.healthy },
+		{ state: { ...healthy, readiness: "ready" as const }, color: standbyColor },
+		{
+			state: {
 				...healthy,
-				utilization,
-			}).color;
-			if (color[0] > color[2]) {
-				counts[index]!++;
-				if (utilization === 1)
-					byDecile[Math.min(9, Math.floor(data[i * 8 + 5]! * 10))]!++;
-			}
-		}
-		totals[Math.min(9, Math.floor(data[i * 8 + 5]! * 10))]!++;
+				readiness: "configured" as const,
+				health: "unknown" as const,
+			},
+			color: standbyColor,
+		},
+		{
+			state: {
+				...healthy,
+				readiness: "warm_ready" as const,
+				activity: "working" as const,
+			},
+			color: healthColors.healthy,
+		},
+		{
+			state: {
+				...healthy,
+				health: "pressure" as const,
+				readiness: "ready" as const,
+			},
+			color: healthColors.pressure,
+		},
+		{
+			state: {
+				...healthy,
+				health: "fault" as const,
+				readiness: "ready" as const,
+			},
+			color: healthColors.fault,
+		},
+		{
+			state: { ...healthy, health: "disconnected" as const, stale: true },
+			color: healthColors.disconnected,
+		},
+	];
+	for (const { state, color } of cases) {
+		const hex = parseInt(color.slice(1), 16);
+		const expected = [
+			((hex >> 16) & 255) / 255,
+			((hex >> 8) & 255) / 255,
+			(hex & 255) / 255,
+		];
+		for (const utilization of [0, 0.5, 1])
+			for (const time of [0, 7, 33600])
+				for (let i = 0; i < data.length / 8; i += 31)
+					expect(
+						evaluateParticle(data, i, time, { ...state, utilization }).color,
+					).toEqual(expected);
 	}
-	expect(counts[0]).toBe(0);
-	expect(counts[1]).toBeGreaterThan(0);
-	expect(counts[2]).toBeGreaterThan(counts[1]!);
-	expect(counts[2]! / (data.length / 8)).toBeGreaterThan(
-		particleColorOptions.warmFractionAtFullUtilization - 0.08,
-	);
-	expect(counts[2]! / (data.length / 8)).toBeLessThan(
-		particleColorOptions.warmFractionAtFullUtilization + 0.04,
-	);
-	for (let band = 0; band < 10; band++)
-		expect(byDecile[band]! / totals[band]!).toBeGreaterThan(0.2);
 });
 test("actual GLSL leaves 40/60 percent unchanged and uses six/four seed deciles", () => {
 	const scalar = scatterPositionGLSL.split("vec3 scatterPosition")[0]!;
@@ -198,7 +178,7 @@ test("actual GLSL leaves 40/60 percent unchanged and uses six/four seed deciles"
 		}
 });
 
-test("a disconnection shows fault red at full light, even without a fresh value", () => {
+test("a disconnection stays purple at full light and distinct from a fault", () => {
 	const data = cpuColors();
 	const red = evaluateParticle(data, 0, 4, { ...healthy, health: "fault" });
 	for (const stale of [false, true]) {
@@ -207,7 +187,10 @@ test("a disconnection shows fault red at full light, even without a fresh value"
 			health: "disconnected",
 			stale,
 		});
-		expect(cut.color).toEqual(red.color);
+		expect(cut.color).not.toEqual(red.color);
+		expect(statusColor({ ...healthy, health: "disconnected", stale })).toBe(
+			healthColors.disconnected,
+		);
 		expect(cut.intensity).toBe(cut.baseIntensity);
 	}
 });

@@ -9,13 +9,11 @@ import {
 	ShaderMaterial,
 } from "three";
 import type { SpatialModel, SpatialState } from "../contracts";
-import { particleColorOptions } from "../options";
 import { particleModelIds } from "./catalog";
 import {
 	evaluateParticle,
 	type AnimationInput,
 	type ParticleSample,
-	type ParticleColorMix,
 } from "./evaluator";
 import { fragmentShader, vertexShader } from "./shaders";
 import { createParticleEnvelope, PARTICLE_MODEL_SCALE } from "./envelope";
@@ -85,50 +83,11 @@ export function createParticleModel(data: ParticleData): SpatialModel {
 		selected = false,
 		time = 0,
 		destroyed = false;
-	const colorMix: ParticleColorMix = { animatedFraction: 0, warmFraction: 0 };
-	const colorFrom = { ...colorMix },
-		colorTarget = { ...colorMix };
-	let colorInitialized = false;
-	let colorElapsed: number = particleColorOptions.stateTransitionSeconds;
 	const canAnimate = () =>
 		motion &&
 		!current.stale &&
 		current.health !== "unknown" &&
 		current.health !== "disconnected";
-	function updateColorTarget(immediate = false) {
-		const animatedFraction =
-			particleColorOptions.animatedFraction[current.activity];
-		const warmFraction = Number.isFinite(current.utilization)
-			? Math.max(0, Math.min(1, current.utilization!)) *
-				particleColorOptions.warmFractionAtFullUtilization
-			: 0;
-		if (
-			immediate ||
-			!colorInitialized ||
-			!canAnimate() ||
-			current.health !== "healthy"
-		) {
-			colorMix.animatedFraction =
-				colorFrom.animatedFraction =
-				colorTarget.animatedFraction =
-					animatedFraction;
-			colorMix.warmFraction =
-				colorFrom.warmFraction =
-				colorTarget.warmFraction =
-					warmFraction;
-			colorElapsed = particleColorOptions.stateTransitionSeconds;
-		} else if (
-			colorTarget.animatedFraction !== animatedFraction ||
-			colorTarget.warmFraction !== warmFraction
-		) {
-			colorFrom.animatedFraction = colorMix.animatedFraction;
-			colorFrom.warmFraction = colorMix.warmFraction;
-			colorTarget.animatedFraction = animatedFraction;
-			colorTarget.warmFraction = warmFraction;
-			colorElapsed = 0;
-		}
-		colorInitialized = true;
-	}
 	const sample: ParticleSample = {
 		intensity: 0,
 		baseIntensity: 0,
@@ -141,7 +100,6 @@ export function createParticleModel(data: ParticleData): SpatialModel {
 			...current,
 			model: id!,
 			reducedMotion: !motion,
-			colorMix,
 			utilization: Number.isFinite(current.utilization)
 				? Math.max(0, Math.min(1, current.utilization!))
 				: undefined,
@@ -159,10 +117,8 @@ export function createParticleModel(data: ParticleData): SpatialModel {
 		object,
 		bounds: createParticleEnvelope(data),
 		update(state, isSelected) {
-			const healthChanged = current.health !== state.health;
 			current = state;
 			selected = isSelected;
-			updateColorTarget(healthChanged);
 			paint();
 		},
 		configure(next, core, motionEnabled, visibility = 1) {
@@ -180,28 +136,11 @@ export function createParticleModel(data: ParticleData): SpatialModel {
 				(Math.min(window.devicePixelRatio || 1, 1.5) * next.pointSize) / 100;
 			uniforms.uVisibility.value = (visibility * next.opacity) / 100;
 			if (changed) {
-				updateColorTarget(true);
 				paint();
 			}
 		},
-		animate(seconds, deltaSeconds) {
+		animate(seconds) {
 			if (!canAnimate()) return;
-			if (colorElapsed < particleColorOptions.stateTransitionSeconds) {
-				colorElapsed = Math.min(
-					particleColorOptions.stateTransitionSeconds,
-					colorElapsed +
-						(Number.isFinite(deltaSeconds) ? Math.max(0, deltaSeconds) : 0),
-				);
-				const progress =
-					colorElapsed / particleColorOptions.stateTransitionSeconds;
-				const blend = progress * progress * (3 - 2 * progress);
-				colorMix.animatedFraction =
-					colorFrom.animatedFraction +
-					(colorTarget.animatedFraction - colorFrom.animatedFraction) * blend;
-				colorMix.warmFraction =
-					colorFrom.warmFraction +
-					(colorTarget.warmFraction - colorFrom.warmFraction) * blend;
-			}
 			time = seconds;
 			paint();
 		},

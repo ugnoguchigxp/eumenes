@@ -85,6 +85,7 @@ export async function acquireProvider(
 			created: state,
 			required: [externalName],
 			startedAt: current.startedAt,
+			readinessLog: (current.readinessLog ??= new Map()),
 			kind: name,
 			profile: current.request.profile,
 			agentProfile: current.agentProfile,

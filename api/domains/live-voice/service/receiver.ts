@@ -2,6 +2,7 @@ import type { SqliteStore } from "../../../infrastructure/sqlite";
 import type { LiveConversationPort, LiveEvent } from "../contracts";
 import type { Runtime } from "./runtime";
 import { session } from "../repository";
+import { observeUsage } from "../repository/usage";
 import { appendTranscript, publishSegments } from "./transcripts";
 import { validPcm } from "./protocol";
 export function createReceiver({
@@ -107,6 +108,9 @@ export function createReceiver({
 			return;
 		}
 		switch (event.type) {
+			case "session.usage.updated":
+				await store.write((db) => observeUsage(db, id, event.usage, clock()));
+				break;
 			case "session.started":
 				clearTimeout(runtimes.get(id)?.startupTimer);
 				if (store.read((db) => session(db, id)?.muted))

@@ -171,3 +171,4 @@ export * from "./components/WorkResultPanel";
 export * from "./components/ExternalAppLauncher";
 
 export * from "./components/VisualAnalysis";
+export * from "./components/UsageDashboard";

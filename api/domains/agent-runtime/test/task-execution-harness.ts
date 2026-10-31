@@ -1,5 +1,5 @@
 /** Shared fixture for the parent execution tests: a real store and queue with scripted model decisions. */
-import { afterEach } from "bun:test";
+import { afterEach, expect } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -58,7 +58,13 @@ export async function setup(
 		valid = true,
 		result = initial;
 	const inference = {
-		captureUserControlInTransaction: () => crypto.randomUUID(),
+		captureUserControlInTransaction: (
+			_db: unknown,
+			input: { route?: "subagent" },
+		) => {
+			expect(input.route).toBe("subagent");
+			return crypto.randomUUID();
+		},
 		acceptInTransaction: () => true,
 		executeStream: async (
 			requestId: string,

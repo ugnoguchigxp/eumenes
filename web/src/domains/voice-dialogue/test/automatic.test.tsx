@@ -49,6 +49,49 @@ function fixture(initial: Run[] = [], messages: Message[] = []) {
 	return { hook, player };
 }
 
+test("an adopted handover announcement without a final message is spoken once, but not from history or native speech", async () => {
+	const completed = {
+		...answer("handover").run,
+		revision: 2,
+		answerMessageId: null,
+		announcement: "資料の確認を進めます。",
+	};
+	const { hook, player } = fixture();
+	const props = { runs: [completed], messages: [], enabled: true };
+	hook.rerender(props);
+	await waitFor(() => expect(player.play).toHaveBeenCalledOnce());
+	expect(player.play).toHaveBeenCalledWith(
+		"announcement:handover:2",
+		completed.announcement,
+		completed.id,
+		{ automatic: true },
+	);
+	hook.rerender({ ...props, runs: [...props.runs] });
+	expect(player.play).toHaveBeenCalledOnce();
+	hook.rerender({
+		...props,
+		runs: [
+			...props.runs,
+			{ ...completed, id: "native-handover", utteranceId: "owned" },
+		],
+	});
+	expect(player.play).toHaveBeenCalledOnce();
+	const history = fixture([completed]);
+	await act(async () => {});
+	expect(history.player.play).not.toHaveBeenCalled();
+});
+
+test("an announcement does not replace a final answer whose message has not arrived", async () => {
+	const { hook, player } = fixture();
+	const adopted = answer("final");
+	const run = { ...adopted.run, announcement: "確認を始めます。" };
+	hook.rerender({ runs: [run], messages: [], enabled: true });
+	expect(player.play).not.toHaveBeenCalled();
+	hook.rerender({ runs: [run], messages: [adopted.message], enabled: true });
+	await waitFor(() => expect(player.play).toHaveBeenCalledOnce());
+	expect(player.play.mock.calls[0]?.[1]).toBe(adopted.message.text);
+});
+
 test("all adopted answer sources use TTS once; existing history and native playback are not repeated", async () => {
 	const old = answer("old");
 	const { hook, player } = fixture([old.run], [old.message]);

@@ -181,7 +181,7 @@ export async function recordAttemptStart(
 	await store.write((db) =>
 		db
 			.query(
-				"INSERT INTO inference_attempts(id,request_id,source,connection_id,resource_id,model,status,reason,started,session_role,task_id,billing_path,refs) VALUES(?,?,?,?,?,?,'running',?,?,?,?,?,?)",
+				"INSERT INTO inference_attempts(id,request_id,source,connection_id,resource_id,model,status,reason,started,session_role,task_id,billing_path,refs,connection_name,connection_kind) VALUES(?,?,?,?,?,?,'running',?,?,?,?,?,?,?,?)",
 			)
 			.run(
 				attemptId,
@@ -199,6 +199,8 @@ export async function recordAttemptStart(
 				a.session?.refs && cloud && isAgentConnection(cloud.connection)
 					? JSON.stringify(a.session.refs)
 					: null,
+				cloud?.connection.name ?? null,
+				cloud?.connection.kind ?? null,
 			),
 	);
 	return attemptId;

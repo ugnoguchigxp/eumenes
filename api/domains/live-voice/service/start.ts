@@ -76,7 +76,7 @@ export function createStarter({
 				throw new Error("live_conversation_busy");
 			conversation.ensure(db, input.conversationId, at);
 			db.query(
-				"INSERT INTO live_voice_sessions(id,request_id,conversation_id,status,muted,test,started_at,connection_id,connection_epoch) VALUES(?,?,?,'connecting',?,?,?,?,?)",
+				"INSERT INTO live_voice_sessions(id,request_id,conversation_id,status,muted,test,started_at,connection_id,connection_epoch,model,connection_name) VALUES(?,?,?,'connecting',?,?,?,?,?,?,?)",
 			).run(
 				id,
 				input.requestId,
@@ -86,6 +86,8 @@ export function createStarter({
 				at,
 				cfg.connection.id,
 				cfg.connection.epoch,
+				cfg.live.model,
+				cfg.connection.name,
 			);
 		});
 		let socket: LiveSocket;
@@ -123,7 +125,10 @@ export function createStarter({
 					type: "session.start",
 					session: {
 						model: cfg.live.model,
-						instructions: liveInstructions(cfg),
+						instructions: liveInstructions(
+							cfg,
+							conversation.persona(cfg.persona),
+						),
 						audio: {
 							format: { type: "audio/pcm", rate: 24000 },
 							...(cfg.live.voice ? { output: { voice: cfg.live.voice } } : {}),

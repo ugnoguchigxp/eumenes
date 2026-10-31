@@ -124,11 +124,12 @@ export async function awaitReady(
 		agentProfile: unknown;
 		startedAt?: number;
 		kind?: ProviderName;
+		readinessLog?: Map<string, string>;
 	},
 ): Promise<Rec> {
 	let { created } = input;
 	const { id, required } = input;
-	let previous = "";
+	const previous = input.readinessLog ?? new Map<string, string>();
 	const check = () => {
 		if (created.id !== id) throw new Error("larm_invalid_connection");
 		if (terminalStatuses.includes(String(created.status)))
@@ -162,9 +163,11 @@ export async function awaitReady(
 				? String(p?.readiness)
 				: "unknown";
 		});
-		const signature = `${status}:${states.join(",")}`;
-		if (signature !== previous && input.startedAt !== undefined) {
-			for (let i = 0; i < required.length; i++)
+		if (input.startedAt !== undefined) {
+			for (let i = 0; i < required.length; i++) {
+				const name = required[i]!;
+				const signature = `${status}:${states[i]}`;
+				if (previous.get(name) === signature) continue;
 				getLogger("larm").info("larm.provider_readiness", {
 					connectionId: id,
 					kind: input.kind ?? required[i],
@@ -172,7 +175,8 @@ export async function awaitReady(
 					next: states[i],
 					durationMs: Math.round(performance.now() - input.startedAt),
 				});
-			previous = signature;
+				previous.set(name, signature);
+			}
 		}
 		return required.every((name) => {
 			const p = providersOf(created).find((p) => p.name === name);

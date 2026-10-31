@@ -50,7 +50,7 @@ test("overlapping transcripts preserve spaces, repetition and raw deltas without
 			h!.service.state(id)!.segments[0]!.text === "  はい、はい  ",
 	);
 	expect(h.conversation.get("main").messages).toHaveLength(0);
-	h.peer.event({ type: "session.closed", usage: { duration: 1 } });
+	h.peer.event({ type: "session.closed", usage: { seconds: 1 } });
 	await until(() => h!.service.state(id)?.status === "closed");
 	expect(h.conversation.get("main").messages.map((m) => m.text)).toEqual([
 		"  はい、はい  ",

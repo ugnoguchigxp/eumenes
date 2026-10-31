@@ -34,6 +34,8 @@ export type Lease = {
 	state?: Record<string, unknown>;
 	catalogProviders?: Record<string, unknown>[];
 	startedAt?: number;
+	/** Last logged readiness per external Provider; diagnostic only, never used to accept a Provider. */
+	readinessLog?: Map<string, string>;
 	expiresAt: number;
 	providers: Map<ProviderName, Provider>;
 	agentProfile: string;

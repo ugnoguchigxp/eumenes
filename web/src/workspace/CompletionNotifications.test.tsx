@@ -25,6 +25,7 @@ vi.mock("../domains/audio/controller", () => ({
 afterEach(() => {
 	cleanup();
 	vi.clearAllMocks();
+	vi.restoreAllMocks();
 	vi.unstubAllGlobals();
 });
 const wav = (marker: number) => {
@@ -36,6 +37,8 @@ const wav = (marker: number) => {
 };
 
 test("real notice hooks append the saved voice after the tone only for successful work; repeated snapshots and timers do not speak completion", async () => {
+	const trace = vi.spyOn(console, "info").mockImplementation(() => {});
+	const traces = () => trace.mock.calls.map(([, entry]) => JSON.parse(entry));
 	vi.stubGlobal(
 		"fetch",
 		vi.fn(
@@ -117,6 +120,28 @@ test("real notice hooks append the saved voice after the tone only for successfu
 		await cache.invalidateQueries({ queryKey: [queryRoots.dialogue] });
 	});
 	await waitFor(() => expect(output.play).toHaveBeenCalledTimes(3));
+	await waitFor(() => expect(trace).toHaveBeenCalledTimes(6));
+	expect(traces().map((entry) => entry.stage)).toEqual([
+		"requested",
+		"tone.started",
+		"tone.ended",
+		"completion.started",
+		"completion.ended",
+		"finished",
+	]);
+	expect(new Set(traces().map((entry) => entry.playbackId)).size).toBe(1);
+	expect(new Set(traces().map((entry) => entry.instanceId)).size).toBe(1);
+	expect(Object.keys(traces()[0]).sort()).toEqual([
+		"instanceId",
+		"noticeIds",
+		"noticeSource",
+		"playbackId",
+		"stage",
+	]);
+	expect(traces()[0]).toMatchObject({
+		noticeSource: "todo",
+		noticeIds: ["finished"],
+	});
 	expect(output.play.mock.calls.map((call) => call[0][44])).toEqual([1, 1, 2]);
 	await act(async () => {
 		await cache.invalidateQueries({ queryKey: [queryRoots.dialogue] });

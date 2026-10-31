@@ -68,24 +68,12 @@ export function activityStrength(state: SpatialState) {
 		return 0;
 	return bounded(state.strength ?? 0.65, 0, 1, 0);
 }
-/** A disconnection is an anomaly: fault red, told apart only by its stopped light (spec §12). */
+/** Status colours requested by the user; utilization must never change their meaning. */
 export const healthColors: Record<SpatialState["health"], string> = {
-	healthy: "#a8d6ff",
-	pressure: "#ffaf62",
-	fault: "#ff6177",
-	disconnected: "#ff6177",
-	unknown: "#a99fd2",
+	healthy: "#00b8f5",
+	pressure: "#ffe600",
+	fault: "#ff243f",
+	disconnected: "#b65cff",
+	unknown: "#8795a5",
 };
-
-/** Rendering tuning only; these do not classify measurements or change motion. */
-export const particleColorOptions = {
-	coolPalette: ["#4c7dff", "#38d9ed", "#a36aff"],
-	warmPalette: ["#ffd27d", "#ffb67f"],
-	// One transition is half of a cosine cycle. All cycles divide the bounded scene clock.
-	transitionSeconds: [6, 8, 10, 12, 14],
-	animatedFraction: { idle: 0.45, starting: 0.6, working: 0.7 },
-	warmFractionAtFullUtilization: 0.4,
-	stateTransitionSeconds: 8,
-	selectionBlend: 0.1,
-	warmSelectionBlend: 0.16,
-} as const;
+export const standbyColor = "#ffffff";

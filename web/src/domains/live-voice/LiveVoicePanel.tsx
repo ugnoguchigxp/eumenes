@@ -48,8 +48,10 @@ function Notice({
 }
 export function LiveVoicePanel({
 	live,
+	agentName,
 }: {
 	live: ReturnType<typeof useLiveVoice>;
+	agentName?: string;
 }) {
 	if (!live.session || (live.session.test && !live.active)) return null;
 	return (
@@ -67,7 +69,8 @@ export function LiveVoicePanel({
 						className={`live-transcript live-transcript-${segment.speaker}`}
 					>
 						<small>
-							{segment.speaker === "user" ? "あなた" : "Eumenes"} · 文字起こし
+							{segment.speaker === "user" ? "あなた" : agentName || "Eumenes"} ·
+							文字起こし
 						</small>
 						<p style={{ whiteSpace: "pre-wrap" }}>{segment.text}</p>
 					</div>

@@ -23,6 +23,7 @@ const keys = existing.artifacts.find(
 	(a) => a.id === "settings.ai-connections",
 )!;
 const settings = settingsFixture();
+settings.general.agentName = "光";
 const client = {
 	identity: "live-browser-fixture",
 	settings: async () => settings,
@@ -123,7 +124,7 @@ function Fixture() {
 		<QueryClientProvider client={cache}>
 			<main style={{ maxWidth: 1100, margin: "auto", padding: 12 }}>
 				<h1>音声会話 UI fixture</h1>
-				<LiveVoicePanel live={live} />
+				<LiveVoicePanel live={live} agentName={settings.general.agentName} />
 				<ConversationComposer state={state} store={store} />
 				{open && (
 					<ToolchainArtifactHost

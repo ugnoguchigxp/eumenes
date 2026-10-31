@@ -67,8 +67,8 @@ export const systemProbes: HostProbes = {
 	},
 };
 
-/** Reads within this span share one sample, so concurrent readers never measure a few-ms window. */
-const SHARE_MS = 2000;
+/** Share minute monitoring samples across readers, including extra snapshot requests. */
+const SHARE_MS = 60_000;
 
 /** Each sample covers the time since the previous one (the first: since creation). */
 export function createHostMetrics(

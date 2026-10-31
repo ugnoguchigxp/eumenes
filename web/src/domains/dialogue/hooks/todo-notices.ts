@@ -18,7 +18,10 @@ type NoticeClient = Pick<
  */
 export function useTodoNotices(
 	client: NoticeClient,
-	chime: (completed?: boolean) => void,
+	chime: (
+		completed?: boolean,
+		notices?: { source: string; ids: readonly string[] },
+	) => void,
 ) {
 	const cache = useQueryClient();
 	const seen = useRef<Set<string> | null>(null);
@@ -34,7 +37,14 @@ export function useTodoNotices(
 		seen.current = new Set(data.notices.map((notice) => notice.id));
 		if (before) {
 			const fresh = data.notices.filter((n) => !n.read && !before.has(n.id));
-			if (fresh.length) chime(fresh.some((n) => n.outcome === "succeeded"));
+			if (fresh.length)
+				chime(
+					fresh.some((n) => n.outcome === "succeeded"),
+					{
+						source: "todo",
+						ids: fresh.map((n) => n.id),
+					},
+				);
 		}
 	}, [data, chime]);
 	const [readError, setReadError] = useState<string | null>(null);

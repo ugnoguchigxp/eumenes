@@ -519,9 +519,7 @@ function taskInference(ports: TaskRunnerPorts) {
 				subject: `browser-task:${input.taskId}-${input.step}`,
 				deadline,
 				maxOutputTokens: OUTPUT_TOKENS,
-				...(frozenSchema.parse(input.frozen ?? {}).execution
-					? { route: "subagent" as const }
-					: {}),
+				route: "subagent",
 			}),
 		);
 		const discard = () =>

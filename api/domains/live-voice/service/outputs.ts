@@ -46,7 +46,8 @@ export function bindOutputs({
 			if (!outputs.length) continue;
 			enqueue(id, async () => {
 				for (const out of outputs) {
-					if (out.run_id) {
+					// Settled work may outlive its input turn; normal reply drafts still need that version.
+					if (out.run_id && out.kind !== "report") {
 						try {
 							store.read((db) => delivery.assertCurrent(db, out.run_id!));
 						} catch {

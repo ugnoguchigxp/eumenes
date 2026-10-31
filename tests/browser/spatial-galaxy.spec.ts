@@ -70,7 +70,7 @@ test("LARM measurement quality reaches the existing fourteen-shape fallback with
 	});
 	await expect(host).toHaveAttribute("data-background-state", "failed");
 	await page
-		.getByRole("button", { name: "LARM CPU：未確認", exact: true })
+		.getByRole("button", { name: "LARM CPU：状態情報なし", exact: true })
 		.click();
 	await expect(page.getByText("計測権限なし", { exact: true })).toBeVisible();
 	await expect(
@@ -207,7 +207,7 @@ test("14 models, saved zero-speed pause, demo health, resize, context loss and r
 		page.locator(".spatial-background-summary li button"),
 	).toHaveCount(14);
 	await expect(
-		page.getByRole("button", { name: "CPU：正常", exact: true }),
+		page.getByRole("button", { name: "CPU：Healthy", exact: true }),
 	).toBeVisible();
 	await page.getByRole("button", { name: "再表示", exact: true }).click();
 	await expect(host).toHaveAttribute("data-background-state", "ready");

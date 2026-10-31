@@ -111,6 +111,7 @@ export function executionStep(
 				throw new Error("control_unavailable");
 			const requestId = ctx.inference.captureUserControlInTransaction(db, {
 				subject: `execution:${row.id}-${state.calls}`,
+				route: "subagent",
 				deadline: Math.min(row.deadline, ctx.now() + 45_000),
 				maxOutputTokens: 2048,
 			});

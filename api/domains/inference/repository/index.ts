@@ -145,4 +145,19 @@ AND connection_id IN (
 		after: ["inference/0011-control-engine-codex"],
 		sql: "ALTER TABLE inference_requests ADD COLUMN attempt_ms INTEGER;",
 	},
+	{
+		id: "inference/0014-usage",
+		after: [
+			"inference/0013-attempt-limit",
+			"inference/0012-total-input-tokens",
+		],
+		sql: `
+ALTER TABLE inference_attempts ADD COLUMN connection_name TEXT;
+ALTER TABLE inference_attempts ADD COLUMN connection_kind TEXT;
+ALTER TABLE inference_attempts ADD COLUMN usage_model TEXT;
+ALTER TABLE inference_attempts ADD COLUMN usage_observed INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE inference_attempts ADD COLUMN reasoning_tokens INTEGER;
+CREATE INDEX inference_usage_started ON inference_attempts(started,billing_path);
+`,
+	},
 ];

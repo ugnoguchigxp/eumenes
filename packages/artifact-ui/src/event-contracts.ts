@@ -6,6 +6,9 @@ export type ArtifactEvent = {
 	source: string;
 	revision: number;
 	action:
+		| "usage-query"
+		| "usage-refresh"
+		| "usage-rate-save"
 		| "external-app-open"
 		| "dots-project-role"
 		| "work-select"

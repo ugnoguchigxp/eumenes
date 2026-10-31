@@ -1,0 +1,193 @@
+{
+  "conversationId": "debug-live-subagent-c5f9f14e-b707-4cb8-bcc5-b6f6bb9784a2",
+  "startedAt": "2026-10-31T12:15:43.463Z",
+  "events": [
+    {
+      "phase": "live_active",
+      "at": "2026-10-31T12:15:45.532Z"
+    },
+    {
+      "phase": "run",
+      "runId": "1363b74c-d883-46a2-8627-e62bc30a6336",
+      "at": "2026-10-31T12:15:45.677Z"
+    },
+    {
+      "phase": "tasks",
+      "states": [],
+      "spokenCharacters": 0,
+      "audioEvents": 12,
+      "at": "2026-10-31T12:15:47.536Z"
+    },
+    {
+      "phase": "announcement_painted",
+      "at": "2026-10-31T12:15:51.849Z"
+    },
+    {
+      "phase": "tasks",
+      "states": [
+        {
+          "kind": "coordinator",
+          "status": "waiting_child",
+          "errorCode": null,
+          "modelCalls": 0,
+          "toolCalls": 0
+        },
+        {
+          "kind": "worker",
+          "status": "running",
+          "errorCode": null,
+          "modelCalls": 1,
+          "toolCalls": 0
+        }
+      ],
+      "spokenCharacters": 0,
+      "audioEvents": 72,
+      "at": "2026-10-31T12:15:53.541Z"
+    },
+    {
+      "phase": "tasks",
+      "states": [
+        {
+          "kind": "coordinator",
+          "status": "waiting_child",
+          "errorCode": null,
+          "modelCalls": 0,
+          "toolCalls": 0
+        },
+        {
+          "kind": "worker",
+          "status": "running",
+          "errorCode": null,
+          "modelCalls": 2,
+          "toolCalls": 1
+        }
+      ],
+      "spokenCharacters": 0,
+      "audioEvents": 160,
+      "at": "2026-10-31T12:16:03.549Z"
+    },
+    {
+      "phase": "tasks",
+      "states": [
+        {
+          "kind": "coordinator",
+          "status": "waiting_child",
+          "errorCode": null,
+          "modelCalls": 0,
+          "toolCalls": 0
+        },
+        {
+          "kind": "worker",
+          "status": "running",
+          "errorCode": null,
+          "modelCalls": 3,
+          "toolCalls": 2
+        }
+      ],
+      "spokenCharacters": 0,
+      "audioEvents": 228,
+      "at": "2026-10-31T12:16:09.573Z"
+    },
+    {
+      "phase": "tasks",
+      "states": [
+        {
+          "kind": "coordinator",
+          "status": "waiting_child",
+          "errorCode": null,
+          "modelCalls": 0,
+          "toolCalls": 0
+        },
+        {
+          "kind": "worker",
+          "status": "running",
+          "errorCode": null,
+          "modelCalls": 4,
+          "toolCalls": 3
+        }
+      ],
+      "spokenCharacters": 0,
+      "audioEvents": 287,
+      "at": "2026-10-31T12:16:15.576Z"
+    },
+    {
+      "phase": "tasks",
+      "states": [
+        {
+          "kind": "coordinator",
+          "status": "waiting_child",
+          "errorCode": null,
+          "modelCalls": 0,
+          "toolCalls": 0
+        },
+        {
+          "kind": "worker",
+          "status": "running",
+          "errorCode": null,
+          "modelCalls": 5,
+          "toolCalls": 4
+        }
+      ],
+      "spokenCharacters": 0,
+      "audioEvents": 362,
+      "at": "2026-10-31T12:16:23.584Z"
+    },
+    {
+      "phase": "announcement_painted",
+      "at": "2026-10-31T12:16:31.666Z"
+    },
+    {
+      "phase": "tasks",
+      "states": [
+        {
+          "kind": "coordinator",
+          "status": "completed",
+          "errorCode": null,
+          "modelCalls": 0,
+          "toolCalls": 0
+        },
+        {
+          "kind": "worker",
+          "status": "completed",
+          "errorCode": null,
+          "modelCalls": 5,
+          "toolCalls": 4
+        }
+      ],
+      "spokenCharacters": 10,
+      "audioEvents": 464,
+      "at": "2026-10-31T12:16:33.615Z"
+    },
+    {
+      "phase": "result",
+      "runId": "1363b74c-d883-46a2-8627-e62bc30a6336",
+      "completedWorkers": 1,
+      "spokenCharacters": 102,
+      "audioEvents": 664,
+      "at": "2026-10-31T12:16:53.772Z"
+    }
+  ],
+  "runId": "1363b74c-d883-46a2-8627-e62bc30a6336",
+  "workerStates": [
+    {
+      "kind": "coordinator",
+      "status": "completed",
+      "errorCode": null,
+      "modelCalls": 0,
+      "toolCalls": 0
+    },
+    {
+      "kind": "worker",
+      "status": "completed",
+      "errorCode": null,
+      "modelCalls": 5,
+      "toolCalls": 4
+    }
+  ],
+  "spokenCharacters": 102,
+  "audioEvents": 664,
+  "completedWorkers": 1,
+  "stopStatus": 200,
+  "finalSessionState": "closed",
+  "finalSessionError": null
+}

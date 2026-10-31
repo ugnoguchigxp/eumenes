@@ -104,6 +104,7 @@ export function executionExtract(
 				throw new Error("control_unavailable");
 			const requestId = ctx.inference.captureUserControlInTransaction(db, {
 				subject: `execution:${row.id}-extract-${state.calls}`,
+				route: "subagent",
 				deadline: Math.min(row.deadline, ctx.now() + 45_000),
 				maxOutputTokens: OUTPUT_TOKENS,
 			});

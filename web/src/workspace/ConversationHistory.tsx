@@ -106,7 +106,7 @@ export function ConversationHistory({
 				onReplay={onReplay}
 			/>
 			{activeRun && <ThinkingRow state={state} run={activeRun} />}
-			{state.live && <LiveVoicePanel live={state.live} />}
+			{state.live && <LiveVoicePanel live={state.live} agentName={agentName} />}
 		</div>
 	);
 }

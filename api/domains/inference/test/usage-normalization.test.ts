@@ -222,7 +222,10 @@ test("the total-input migration adds the cache counters for Claude Agent SDK att
 	const path = join(dir, "test.db");
 	const before = [
 		...settingsMigrations,
-		...migrations.filter((m) => m.id !== "inference/0012-total-input-tokens"),
+		...migrations.slice(
+			0,
+			migrations.findIndex((m) => m.id === "inference/0012-total-input-tokens"),
+		),
 	];
 	let store = openStore(path, before);
 	try {

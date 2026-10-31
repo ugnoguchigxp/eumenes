@@ -6,6 +6,19 @@ export type SpatialState = {
 	health: "healthy" | "pressure" | "fault" | "disconnected" | "unknown";
 	activity: "idle" | "starting" | "working";
 	stale: boolean;
+	readiness?:
+		| "configured"
+		| "ready"
+		| "warm_ready"
+		| "cold"
+		| "starting"
+		| "stopping"
+		| "failed"
+		| "unknown";
+	runtimeStates?: readonly {
+		readiness: NonNullable<SpatialState["readiness"]>;
+		count: number;
+	}[];
 	/** Optional observations: absence means unavailable, not zero. */
 	utilization?: number;
 	strength?: number;

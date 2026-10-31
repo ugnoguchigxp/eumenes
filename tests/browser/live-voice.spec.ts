@@ -104,6 +104,9 @@ for (const [width, theme] of [
 		expect(await page.locator(".live-transcript-user p").textContent()).toBe(
 			"  はい、はい  ",
 		);
+		await expect(page.locator(".live-transcript-assistant small")).toHaveText(
+			"光 · 文字起こし",
+		);
 		await page.getByRole("button", { name: "内容を確認しました" }).click();
 		await expect(
 			page.getByRole("button", { name: "内容を確認しました" }),

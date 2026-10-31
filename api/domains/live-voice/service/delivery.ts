@@ -151,5 +151,22 @@ export function createLiveDelivery(
 		waiters.get(noticeId)?.();
 		sendState(id);
 	}
-	return { owns, assertCurrent, capture, offer, announce, displayed };
+	function report(
+		db: Database,
+		input: { id: string; runId: string; conversationId: string; text: string },
+	) {
+		const row = active(db, input.conversationId);
+		if (!row || row.test || row.status !== "active" || !usable(row.id))
+			return false;
+		const noticeId = `report:${input.id}`;
+		const inserted = db
+			.query("INSERT OR IGNORE INTO live_voice_notices VALUES(?,?,?,?,0)")
+			.run(noticeId, row.id, input.text, "announcement");
+		if (inserted.changes)
+			db.query(
+				"INSERT INTO live_voice_outputs(session_id,run_id,text,kind) VALUES(?,?,?,'report')",
+			).run(row.id, input.runId, input.text);
+		return true;
+	}
+	return { owns, assertCurrent, capture, offer, announce, displayed, report };
 }

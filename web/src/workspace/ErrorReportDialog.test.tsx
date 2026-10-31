@@ -89,6 +89,23 @@ test("a report that cannot be fetched is said so and cannot be copied", async ()
 	).toBe(true);
 });
 
+test("an announcement keeps the configured conversation agent's name", () => {
+	render(
+		<RunDetails
+			client={{} as EumenesClient}
+			message={{ id: "m1", text: "質問" }}
+			runs={[run({ announcement: "確認しますね。" })]}
+			agentName="光"
+		/>,
+	);
+	expect(
+		screen
+			.getByText("確認しますね。")
+			.closest("article")
+			?.querySelector(".message-author")?.textContent,
+	).toBe("光");
+});
+
 test("a failed run shows the error bubble with its cause; a run that did not fail does not", async () => {
 	const client = {
 		identity: "t",

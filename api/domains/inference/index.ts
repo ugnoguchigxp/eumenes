@@ -59,3 +59,4 @@ export {
 	type TaskState,
 	type TaskToolResult,
 } from "./contracts/agent-task";
+export { codexUsageInTransaction } from "./service/accounting";

@@ -1,0 +1,193 @@
+{
+	"formatVersion": 1,
+	"bundleId": "usage-dashboard",
+	"pins": [],
+	"definitions": [],
+	"bindings": [],
+	"artifacts": [
+		{
+			"kind": "artifact",
+			"id": "usage.dashboard",
+			"revision": 1,
+			"title": "利用状況",
+			"variants": [
+				{
+					"id": "standard",
+					"label": "標準",
+					"definition": {
+						"view": "usage-dashboard",
+						"source": "usage",
+						"title": "利用状況"
+					}
+				}
+			],
+			"defaultVariant": "standard",
+			"sourceBindings": [
+				{
+					"source": "usage",
+					"adapterRef": "adapter:usage@1",
+					"query": "query:usage.dashboard@1",
+					"target": "none",
+					"paramsSchemaRef": "schema:usage-query@1"
+				}
+			],
+			"actionBindings": [
+				{
+					"actionId": "query",
+					"eventAction": "usage-query",
+					"source": "usage",
+					"inputSchemaRef": "schema:usage-query-form@1",
+					"effect": "local"
+				},
+				{
+					"actionId": "refresh",
+					"eventAction": "usage-refresh",
+					"source": "usage",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "local"
+				},
+				{
+					"actionId": "save",
+					"eventAction": "usage-rate-save",
+					"source": "usage",
+					"inputSchemaRef": "schema:usage-rate@1",
+					"effect": "write",
+					"operationId": "usage.rate-save"
+				}
+			],
+			"launcher": {
+				"label": "利用状況",
+				"description": "Liveの利用時間・概算費用とCodex SDKのモデル別利用量",
+				"order": 85
+			}
+		}
+	],
+	"schemas": [
+		{
+			"kind": "schema",
+			"id": "usage-query",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"start": {
+						"type": "string"
+					},
+					"end": {
+						"type": "string"
+					},
+					"service": {
+						"type": "string",
+						"enum": ["all", "live", "codex"]
+					},
+					"model": {
+						"type": "string",
+						"maxLength": 200
+					},
+					"connectionId": {
+						"type": "string",
+						"maxLength": 200
+					},
+					"pageIndex": {
+						"type": "integer",
+						"minimum": 0,
+						"maximum": 100000
+					}
+				},
+				"required": [
+					"start",
+					"end",
+					"service",
+					"model",
+					"connectionId",
+					"pageIndex"
+				]
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "usage-query-form",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"start": {
+						"type": "string"
+					},
+					"end": {
+						"type": "string"
+					},
+					"service": {
+						"type": "string",
+						"enum": ["all", "live", "codex"]
+					},
+					"model": {
+						"type": "string",
+						"maxLength": 200
+					},
+					"connectionId": {
+						"type": "string",
+						"maxLength": 200
+					},
+					"pageIndex": {
+						"type": "string",
+						"maxLength": 6
+					}
+				},
+				"required": [
+					"start",
+					"end",
+					"service",
+					"model",
+					"connectionId",
+					"pageIndex"
+				]
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "usage-rate",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"expectedRevision": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 9
+					},
+					"model": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 200
+					},
+					"amount": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 16
+					},
+					"effectiveFrom": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 50
+					},
+					"source": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 500
+					}
+				},
+				"required": [
+					"expectedRevision",
+					"model",
+					"amount",
+					"effectiveFrom",
+					"source"
+				]
+			}
+		}
+	]
+}

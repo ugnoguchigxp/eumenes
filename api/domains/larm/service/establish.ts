@@ -79,6 +79,7 @@ export async function establishLease(
 	try {
 		const readyInput = {
 			startedAt,
+			readinessLog: new Map<string, string>(),
 			id,
 			required,
 			profile,
@@ -126,6 +127,7 @@ export async function establishLease(
 		signal?.throwIfAborted();
 		lifetime.throwIfAborted();
 		const current: Lease = {
+			readinessLog: readyInput.readinessLog,
 			request: { profile, client, audience, fullProfile, catalogRevision },
 			id,
 			expiresAt,

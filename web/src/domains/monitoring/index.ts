@@ -25,6 +25,7 @@ export function useMonitoringItems(client: EumenesClient, enabled: boolean) {
 		queryKey: [queryRoots.monitoring, client.identity],
 		queryFn: ({ signal }) => client.monitoringSnapshot(signal),
 		enabled: polling,
+		staleTime: 60_000,
 		refetchInterval: 60_000,
 		retry: 0,
 	});

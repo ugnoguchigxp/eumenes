@@ -6,12 +6,13 @@ import {
 	IMAGE,
 	type Harness,
 } from "../../domains/dialogue/test/generation.fixture";
-import { createSettings } from "../../domains/settings";
+import { createSettings, type Settings } from "../../domains/settings";
 import { migrations } from "../../domains/live-voice";
 import type { LiveSocket } from "../../domains/live-voice/contracts";
 import { Peer, until } from "../../domains/live-voice/test/live.fixture";
 import { buildLiveVoice } from "./live-voice";
 import type { ExternalOutputPort } from "../../domains/dialogue/contracts/external-output";
+import { conversationPersona } from "../../domains/dialogue";
 
 let h: Harness | undefined;
 let built: ReturnType<typeof buildLiveVoice> | undefined;
@@ -21,7 +22,10 @@ afterEach(async () => {
 	built = undefined;
 	h = undefined;
 });
-async function fixture(confirm = false) {
+async function fixture(
+	confirm = false,
+	persona: Settings["general"]["persona"] = "maid",
+) {
 	const sink: ExternalOutputPort = {
 		active: (tx, id) => built?.externalOutput.active(tx, id) ?? false,
 		reattach: (tx, id, conv, input) =>
@@ -30,6 +34,7 @@ async function fixture(confirm = false) {
 		assertCurrent: (tx, id) => built?.externalOutput.assertCurrent(tx, id),
 		offer: (tx, run, text, confirmation) =>
 			built?.externalOutput.offer(tx, run, text, confirmation) ?? false,
+		report: (tx, input) => built?.externalOutput.report(tx, input) ?? false,
 		announce: (run, text, signal) =>
 			built!.externalOutput.announce(run, text, signal),
 	};
@@ -47,6 +52,9 @@ async function fixture(confirm = false) {
 		env: {},
 	});
 	const doc = settings.get();
+	doc.general.agentName = "光";
+	doc.general.userName = "ご主人さま";
+	doc.general.persona = persona;
 	const connectionId = crypto.randomUUID();
 	doc.connections.push({
 		id: connectionId,
@@ -95,8 +103,23 @@ async function fixture(confirm = false) {
 	peer.open();
 	peer.event({ type: "session.started" });
 	await until(() => built!.live.state(state.id)?.status === "active");
-	return { peer, id: state.id };
+	return { peer, id: state.id, settings };
 }
+test.each(["maid", "butler", "strategist", "sage"] as const)(
+	"Live retains the normal conversation identity and %s role and style independently of its voice",
+	async (persona) => {
+		const { peer, settings } = await fixture(false, persona);
+		const own = conversationPersona(settings.get().general);
+		const start = peer.sent[0] as {
+			session: { instructions: string; audio: { output?: unknown } };
+		};
+		expect(start.session.instructions).toContain(own.role);
+		expect(start.session.instructions).toContain(own.style);
+		expect(start.session.instructions).toContain("光");
+		expect(start.session.instructions).toContain("ご主人さま");
+		expect(start.session.audio.output).toBeUndefined();
+	},
+);
 test("Live transcript delegates through the actual routed harness and returns only its actual spoken transcript to chat", async () => {
 	const { peer, id } = await fixture();
 	h!.state.steps.push({
@@ -146,6 +169,60 @@ test("a typed request during Live uses the same tools and external output withou
 	expect(
 		h!.conversation.get("main").messages.filter((m) => m.role === "assistant"),
 	).toHaveLength(0);
+});
+test("a delegated work's completion returns its result and source to Live once, while keeping the normal notice", async () => {
+	const { peer } = await fixture();
+	h!.state.steps.push({
+		text: JSON.stringify({
+			choice: IMAGE.id,
+			say: "調べます。",
+			request: "資料を確認して",
+		}),
+	});
+	const run = await h!.say("資料を確認して", "queued");
+	const result = {
+		summary: "資料の更新を確認しました。",
+		claims: [
+			{
+				text: "新しい機能が公開されています。",
+				evidence: [{ sourceId: "source-1", quote: "新しい機能" }],
+			},
+		],
+		sources: [
+			{
+				sourceId: "source-1",
+				title: "公式のお知らせ",
+				url: "https://example.com/news",
+			},
+		],
+		limitations: [],
+		outcome: "answered",
+	};
+	await h!.finishImage(run.id, result);
+	await until(() =>
+		peer.sent.some((e) => e.type === "session.commentary.append"),
+	);
+	const spoken = peer.sent
+		.filter((e) => e.type === "session.commentary.append")
+		.map((e) => e.content)
+		.join("");
+	expect(spoken).toContain("新しい機能が公開されています");
+	expect(spoken).toContain("https://example.com/news");
+	expect(h!.notices().unread).toBe(1);
+	expect(h!.dialogue.answerText(run.id)).toBeNull();
+	expect(
+		h!.conversation.get("main").messages.filter((m) => m.role === "assistant"),
+	).toHaveLength(0);
+	const count = peer.sent.filter(
+		(e) => e.type === "session.commentary.append",
+	).length;
+	await h!.store.write((db) =>
+		h!.dialogue.finishOperationInTransaction(db, run.id),
+	);
+	await Bun.sleep(30);
+	expect(
+		peer.sent.filter((e) => e.type === "session.commentary.append"),
+	).toHaveLength(count);
 });
 test("pre-delegation announcement waits for the screen receipt and never calls legacy TTS", async () => {
 	const { peer } = await fixture();

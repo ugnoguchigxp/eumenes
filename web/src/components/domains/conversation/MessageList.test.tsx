@@ -15,6 +15,52 @@ const delivery: SpeechDelivery = {
 	latencyMs: 100,
 };
 const base = { conversationId: "main", createdAt: "now", runId: "run" };
+test("Live history keeps the same author as normal replies, with transcription provenance separate", () => {
+	const { container } = render(
+		<MessageList
+			agentName="光"
+			streaming="返答中"
+			conversation={{
+				id: "main",
+				revision: 1,
+				messages: [
+					{ ...base, id: "normal", role: "assistant", text: "通常の返答" },
+					{
+						...base,
+						id: "live",
+						role: "assistant",
+						text: "音声の返答",
+						attribution: {
+							namespace: "live-voice",
+							sourceId: "live",
+							displayName: "AI音声の文字起こし（再生範囲未確認）",
+						},
+					},
+					{
+						...base,
+						id: "live-user",
+						role: "user",
+						text: "音声の質問",
+						attribution: {
+							namespace: "live-voice",
+							sourceId: "live-user",
+							displayName: "音声の文字起こし",
+						},
+					},
+				],
+			}}
+		/>,
+	);
+	expect(
+		[
+			...container.querySelectorAll(".message-assistant > small:first-child"),
+		].map((node) => node.textContent),
+	).toEqual(["光", "光", "光"]);
+	expect(
+		container.querySelector(".message-user .message-author")?.textContent,
+	).toBe("あなた");
+	expect(screen.getByText("AI音声の文字起こし（再生範囲未確認）")).toBeTruthy();
+});
 test("activity after a request stays outside the user's bubble and before the answer", () => {
 	const { container } = render(
 		<MessageList

@@ -42,7 +42,7 @@ test("HTML selection works without WebGL and an initialization failure can be re
 			screen.getByText("背景を表示できません。状態一覧は確認できます。"),
 		).toBeTruthy(),
 	);
-	fireEvent.click(screen.getByRole("button", { name: "CPU：未確認" }));
+	fireEvent.click(screen.getByRole("button", { name: "CPU：状態情報なし" }));
 	expect(screen.getByText("選択中：CPU")).toBeTruthy();
 	const scene = mockScene();
 	fireEvent.click(screen.getByRole("button", { name: "再表示" }));
@@ -104,11 +104,11 @@ test("fallback details keep the owner-provided measurement quality and history g
 	);
 	await waitFor(() =>
 		expect(
-			screen.getByRole("button", { name: "LARM CPU：未確認（情報が古い）" }),
+			screen.getByRole("button", { name: "LARM CPU：注意（情報が古い）" }),
 		).toBeTruthy(),
 	);
 	fireEvent.click(
-		screen.getByRole("button", { name: "LARM CPU：未確認（情報が古い）" }),
+		screen.getByRole("button", { name: "LARM CPU：注意（情報が古い）" }),
 	);
 	expect(screen.getByText("計測権限なし")).toBeTruthy();
 	expect(screen.getByText("過去の履歴に欠落があります")).toBeTruthy();
@@ -124,7 +124,7 @@ test("background mode shows a clicked object's details and closes them by empty 
 	fireEvent.click(host, { clientX: 10, clientY: 20 });
 	expect(scene.pick).toHaveBeenLastCalledWith(10, 20);
 	expect(screen.getByRole("complementary", { name: "CPUの詳細" })).toBeTruthy();
-	expect(screen.getAllByText("未確認")).toHaveLength(2);
+	expect(screen.getAllByText("未確認")).toHaveLength(1);
 	expect(screen.getAllByText("未取得")).toHaveLength(1);
 	expect(screen.queryByText("利用率")).toBeNull();
 	await waitFor(() => expect(scene.select).toHaveBeenLastCalledWith("mac-cpu"));
@@ -182,7 +182,7 @@ test("the click panel shows supplied measurements and owner notes", async () => 
 	scene.pick.mockReturnValue("llm");
 	fireEvent.click(document.querySelector(".spatial-background")!);
 	const panel = screen.getByRole("complementary", { name: "LLMの詳細" });
-	for (const text of ["正常", "実測", "処理中", "63%", "取得済み"])
+	for (const text of ["Healthy", "実測", "処理中", "63%", "取得済み"])
 		expect(panel.textContent).toContain(text);
 	expect(panel.textContent).toMatch(/（\d+秒前）/);
 });

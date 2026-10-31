@@ -201,3 +201,55 @@ div.spatial-background {
 		width: 45%;
 	}
 }
+
+/* Keep the state hue strong and identical to the particle colour. */
+.spatial-detail-health {
+	font-size: 0.95rem;
+	font-weight: 700;
+}
+.spatial-detail-health i {
+	width: 12px;
+	height: 12px;
+	flex-shrink: 0;
+	box-shadow: 0 0 10px currentColor;
+}
+.spatial-detail-source {
+	font-size: 0.72rem;
+	font-weight: 400;
+}
+.spatial-runtime-states {
+	margin-top: 10px !important;
+	padding-top: 10px;
+	border-top: 1px solid var(--border);
+}
+.spatial-runtime-states > div {
+	display: contents;
+}
+.spatial-status-legend {
+	position: absolute;
+	z-index: 4;
+	bottom: 16px;
+	left: 16px;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px 14px;
+	max-width: calc(100% - 32px);
+	padding: 9px 12px;
+	border-radius: 10px;
+	background: #101620e8;
+	font-size: 0.75rem;
+	font-weight: 600;
+	pointer-events: none;
+}
+.spatial-status-legend span {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+.spatial-status-legend i {
+	width: 10px;
+	height: 10px;
+	border-radius: 50%;
+	background: currentColor;
+	box-shadow: 0 0 8px currentColor;
+}

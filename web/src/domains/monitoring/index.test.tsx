@@ -1,4 +1,9 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+	focusManager,
+	onlineManager,
+	QueryClient,
+	QueryClientProvider,
+} from "@tanstack/react-query";
 import { act, cleanup, renderHook } from "@testing-library/react";
 import type { PropsWithChildren } from "react";
 import { afterEach, expect, test, vi } from "vitest";
@@ -29,6 +34,8 @@ afterEach(() => {
 	caches.length = 0;
 	vi.useRealTimers();
 	vi.restoreAllMocks();
+	focusManager.setFocused(undefined);
+	onlineManager.setOnline(true);
 });
 async function advance(ms = 1) {
 	await act(async () => {
@@ -98,6 +105,30 @@ test("an initially hidden Spatial does not fetch; visibility starts and stops po
 	expect(h.monitoringSnapshot).toHaveBeenCalledTimes(1);
 	h.visible(true);
 	await advance();
+	expect(h.monitoringSnapshot).toHaveBeenCalledTimes(2);
+});
+
+test("focus, reconnect and returning to Spatial reuse a sample younger than one minute", async () => {
+	const h = setup();
+	await advance();
+	await advance(10_000);
+	act(() => focusManager.setFocused(false));
+	act(() => focusManager.setFocused(true));
+	act(() => onlineManager.setOnline(false));
+	act(() => onlineManager.setOnline(true));
+	await advance();
+	expect(h.monitoringSnapshot).toHaveBeenCalledTimes(1);
+	h.visible(false);
+	await advance(10_000);
+	h.visible(true);
+	await advance();
+	expect(h.monitoringSnapshot).toHaveBeenCalledTimes(1);
+	h.rerender({ enabled: false });
+	await advance(10_000);
+	h.rerender({ enabled: true });
+	await advance();
+	expect(h.monitoringSnapshot).toHaveBeenCalledTimes(1);
+	await advance(60_000);
 	expect(h.monitoringSnapshot).toHaveBeenCalledTimes(2);
 });
 

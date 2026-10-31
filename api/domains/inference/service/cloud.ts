@@ -121,6 +121,8 @@ function fitMessages(
 }
 
 type AttemptUsage = {
+	reasoning?: unknown;
+	model?: string | null;
 	input?: unknown;
 	output?: unknown;
 	cacheRead?: unknown;
@@ -173,7 +175,7 @@ async function recordUsage(
 	await env.store.write((db) =>
 		db
 			.query(
-				"UPDATE inference_attempts SET input_tokens=?,output_tokens=?,cache_read_tokens=?,cache_creation_tokens=?,cost_usd=?,billing_path=? WHERE id=?",
+				"UPDATE inference_attempts SET input_tokens=?,output_tokens=?,cache_read_tokens=?,cache_creation_tokens=?,cost_usd=?,billing_path=?,reasoning_tokens=?,usage_model=?,usage_observed=1 WHERE id=?",
 			)
 			.run(
 				count(usage.input),
@@ -182,6 +184,8 @@ async function recordUsage(
 				count(usage.cacheCreation),
 				cost,
 				billingPath(connection),
+				count(usage.reasoning),
+				usage.model === undefined ? null : usage.model,
 				attemptId,
 			),
 	);
@@ -252,28 +256,48 @@ async function agentRequest(
 		role && fitted.context ? { ...role, context: fitted.context } : role,
 		attemptId,
 	);
-	const result = await env.agents.run({
-		kind: connection.kind as CloudAgentKind,
-		connectionId: connection.id,
-		...(session ? { session } : {}),
-		model: resource.model,
-		baseUrl: connection.baseUrl,
-		credential,
-		auth: connection.auth,
-		messages: fitted.messages,
-		tools:
-			options?.toolOutputFormat === "json-schema" ? undefined : options?.tools,
-		outputSchema: options?.jsonOutput ? options.jsonSchema : undefined,
-		// The conversation's level for the cloud (`off` sends none) takes the place of a control call's effort.
-		reasoningEffort:
-			options?.reasoning !== undefined
-				? options.reasoning === "off"
+	const observations: Promise<void>[] = [];
+	const result = await env.agents
+		.run({
+			kind: connection.kind as CloudAgentKind,
+			connectionId: connection.id,
+			...(session ? { session } : {}),
+			model: resource.model,
+			baseUrl: connection.baseUrl,
+			credential,
+			auth: connection.auth,
+			messages: fitted.messages,
+			tools:
+				options?.toolOutputFormat === "json-schema"
 					? undefined
-					: options.reasoning
-				: options?.reasoningEffort,
-		signal,
-		onDelta,
-	});
+					: options?.tools,
+			outputSchema: options?.jsonOutput ? options.jsonSchema : undefined,
+			// The conversation's level for the cloud (`off` sends none) takes the place of a control call's effort.
+			reasoningEffort:
+				options?.reasoning !== undefined
+					? options.reasoning === "off"
+						? undefined
+						: options.reasoning
+					: options?.reasoningEffort,
+			signal,
+			onDelta,
+			onUsage: (usage) => {
+				const pending = recordUsage(env, attemptId, connection, {
+					input: usage.inputTokens,
+					output: usage.outputTokens,
+					cacheRead: usage.cacheReadTokens,
+					cacheCreation: usage.cacheCreationTokens,
+					reasoning: usage.reasoningTokens,
+					model: usage.usageModel,
+				});
+				// Attach immediately; drain before leaving even when the turn fails or is cancelled.
+				pending.catch(() => {});
+				observations.push(pending);
+			},
+		})
+		.finally(async () => {
+			await Promise.all(observations);
+		});
 	signal.throwIfAborted();
 	if (result.toolCalls?.length) {
 		if (!options?.tools?.length || !options.onToolCalls)
@@ -288,6 +312,8 @@ async function agentRequest(
 		cacheRead: result.cacheReadTokens,
 		cacheCreation: result.cacheCreationTokens,
 		costUsd: result.costUsd,
+		reasoning: result.reasoningTokens,
+		model: result.usageModel,
 	});
 	return result.text;
 }

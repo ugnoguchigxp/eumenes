@@ -149,7 +149,9 @@ test("an agent connection answers through the agent runner and records usage wit
 	expect(seen?.kind).toBe("claude-agent-sdk");
 	expect(seen?.credential).toBe("key");
 	expect(seen?.auth).toBe("api-key");
-	expect(usage).toEqual([[3, 1, 20, 5, 0.25, "claude-api-key", "attempt"]]);
+	expect(usage).toEqual([
+		[3, 1, 20, 5, 0.25, "claude-api-key", null, null, "attempt"],
+	]);
 });
 
 test("agent tool calls are forwarded to the conversation", async () => {

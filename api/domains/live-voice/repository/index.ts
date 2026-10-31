@@ -18,6 +18,21 @@ CREATE TABLE live_voice_outputs(id INTEGER PRIMARY KEY AUTOINCREMENT,session_id 
 CREATE TABLE live_voice_notices(id TEXT PRIMARY KEY,session_id TEXT NOT NULL,text TEXT NOT NULL,kind TEXT NOT NULL,displayed INTEGER NOT NULL DEFAULT 0);
 `,
 	},
+	{
+		id: "live-voice/0002-usage",
+		after: ["live-voice/0001-init"],
+		sql: `
+ALTER TABLE live_voice_sessions ADD COLUMN model TEXT;
+ALTER TABLE live_voice_sessions ADD COLUMN connection_name TEXT;
+ALTER TABLE live_voice_sessions ADD COLUMN ended_at TEXT;
+ALTER TABLE live_voice_sessions ADD COLUMN observed_seconds REAL;
+ALTER TABLE live_voice_sessions ADD COLUMN usage_observed_at TEXT;
+UPDATE live_voice_sessions SET observed_seconds=json_extract(usage,'$.seconds')
+WHERE json_valid(usage) AND json_type(usage,'$.seconds') IN ('integer','real') AND json_extract(usage,'$.seconds')>=0;
+UPDATE live_voice_sessions SET usage_confirmed=0 WHERE observed_seconds IS NULL;
+CREATE INDEX live_voice_usage_started ON live_voice_sessions(started_at);
+`,
+	},
 ];
 
 export type SessionRow = {

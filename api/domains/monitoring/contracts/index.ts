@@ -29,6 +29,16 @@ export const monitoringHealthSchema = z.enum([
 	"disconnected",
 	"unknown",
 ]);
+export const monitoringReadinessSchema = z.enum([
+	"configured",
+	"ready",
+	"warm_ready",
+	"cold",
+	"starting",
+	"stopping",
+	"failed",
+	"unknown",
+]);
 
 export const monitoringItemSchema = z.object({
 	/** Instance id chosen by the backend; never a Spatial shape sample id. */
@@ -43,6 +53,16 @@ export const monitoringItemSchema = z.object({
 		/** Machine-readable code of the newest failure behind a fault or disconnection. */
 		reason: z.string().optional(),
 		stale: z.boolean().optional(),
+		/** Preparation is separate from recent execution success and physical health. */
+		readiness: monitoringReadinessSchema.optional(),
+		runtimeStates: z
+			.array(
+				z.object({
+					readiness: monitoringReadinessSchema,
+					count: z.number().int().positive(),
+				}),
+			)
+			.optional(),
 		/** Saved route and actual recent outcomes; configuration alone is not a successful probe. */
 		service: z
 			.object({

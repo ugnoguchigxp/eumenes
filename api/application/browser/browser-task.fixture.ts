@@ -53,6 +53,8 @@ export function fakeInference(script: Reply[]) {
 	let n = 0;
 	const ports: TaskRunnerPorts["inference"] = {
 		captureUserControlInTransaction(_db, input) {
+			if (input.route !== "subagent")
+				throw new Error("fixture_subagent_route_required");
 			state.subjects.push(input.subject);
 			return `request-${state.subjects.length}`;
 		},

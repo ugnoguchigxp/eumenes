@@ -1,15 +1,31 @@
 import { expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openStore } from "../../infrastructure/sqlite";
 import { migrations } from "../migrations";
 import { createCapabilities } from "../../domains/capabilities";
 import { offlineBundleHost } from "../toolchain/toolchain-adapters";
-import primary from "../../domains/capabilities/bundles/settings.bundle.json";
+const primary = JSON.parse(
+	readFileSync(
+		new URL(
+			"../../domains/capabilities/bundles/settings.bundle.json",
+			import.meta.url,
+		),
+		"utf8",
+	),
+);
 import previous from "./fixtures/settings-live-v1.fixture.json";
 import intermediate from "./fixtures/settings-live-v2.fixture.json";
-import current from "../../domains/capabilities/bundles/settings.live.bundle.json";
+const current = JSON.parse(
+	readFileSync(
+		new URL(
+			"../../domains/capabilities/bundles/settings.live.bundle.json",
+			import.meta.url,
+		),
+		"utf8",
+	),
+);
 test("Live settings upgrade publishes the new selects and persistent save layout without changing the existing revision", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-live-upgrade-"));
 	const store = openStore(join(dir, "db"), migrations);
@@ -46,8 +62,13 @@ test("Live settings upgrade publishes the new selects and persistent save layout
 		expect(
 			store
 				.read((db) => caps.artifactsInTransaction(db))
-				.some((a) => a.artifactRevisionId === "artifact:settings.live@3"),
+				.some((a) => a.artifactRevisionId === "artifact:settings.live@4"),
 		).toBe(true);
+		expect(
+			store.read((db) =>
+				caps.documentInTransaction(db, "artifact:settings.live@3"),
+			),
+		).not.toBeNull();
 		const replay = await store.write((db) =>
 			caps.importBundleInTransaction(db, current, host),
 		);

@@ -300,6 +300,7 @@ export async function createToolchain(
 			: []),
 		...(options.settings
 			? [
+					createUsageAdapter(options.settings),
 					createSettingsAdapter(options.settings, {
 						fields: publishedSettingsFields(() => capabilities),
 					}),
@@ -635,3 +636,4 @@ function configureResearchReview(
 		}),
 	);
 }
+import { createUsageAdapter } from "../usage/usage-adapter";

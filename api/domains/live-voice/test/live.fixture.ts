@@ -91,6 +91,7 @@ export async function setup() {
 			stopped++;
 		},
 		conversation: {
+			persona: () => ({ role: "会話の役割", style: "会話の口調" }),
 			ensure: () => {},
 			history: () => [],
 			publish: (tx, input) =>

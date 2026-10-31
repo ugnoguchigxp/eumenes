@@ -1,0 +1,296 @@
+{
+  "config": {
+    "argv": [
+      "/Users/y.noguchi/.local/share/mise/installs/node/24.11.1/bin/node",
+      "/private/var/folders/mx/jbv8qfwd52z14q0mby_273lhlp5gd2/T/eumenes-usage-check-7sntvpr_/node_modules/.bin/playwright",
+      "test",
+      "tests/browser/usage-dashboard.spec.ts"
+    ],
+    "configFile": "/private/var/folders/mx/jbv8qfwd52z14q0mby_273lhlp5gd2/T/eumenes-usage-check-7sntvpr_/playwright.config.ts",
+    "rootDir": "/private/var/folders/mx/jbv8qfwd52z14q0mby_273lhlp5gd2/T/eumenes-usage-check-7sntvpr_/tests/browser",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/private/var/folders/mx/jbv8qfwd52z14q0mby_273lhlp5gd2/T/eumenes-usage-check-7sntvpr_/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "",
+        "name": "",
+        "testDir": "/private/var/folders/mx/jbv8qfwd52z14q0mby_273lhlp5gd2/T/eumenes-usage-check-7sntvpr_/tests/browser",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "html",
+        {
+          "open": "never"
+        }
+      ],
+      [
+        "json",
+        {
+          "outputFile": "test-results/playwright.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.61.1",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "usage-dashboard.spec.ts",
+      "file": "usage-dashboard.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "registered usage artifact at 900px dark, without a server",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 837,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-31T13:47:35.102Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "26f58a653ba4add85761-bd11edfc0ef026bcb7ec",
+          "file": "usage-dashboard.spec.ts",
+          "line": 36,
+          "column": 2
+        },
+        {
+          "title": "registered usage artifact at 390px dark, without a server",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 662,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-31T13:47:36.825Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "26f58a653ba4add85761-2085ae3396f7d8b740d5",
+          "file": "usage-dashboard.spec.ts",
+          "line": 36,
+          "column": 2
+        },
+        {
+          "title": "registered usage artifact at 1440px dark, without a server",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 681,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-31T13:47:37.492Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "26f58a653ba4add85761-4cf1e35bc5b24ad32d3e",
+          "file": "usage-dashboard.spec.ts",
+          "line": 36,
+          "column": 2
+        },
+        {
+          "title": "registered usage artifact at 900px light, without a server",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 693,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-31T13:47:38.177Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "26f58a653ba4add85761-3d419a70981a5a77d99c",
+          "file": "usage-dashboard.spec.ts",
+          "line": 36,
+          "column": 2
+        },
+        {
+          "title": "registered usage artifact at 390px light, without a server",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 662,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-31T13:47:38.874Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "26f58a653ba4add85761-f3590240dab316345ed7",
+          "file": "usage-dashboard.spec.ts",
+          "line": 36,
+          "column": 2
+        },
+        {
+          "title": "registered usage artifact at 1440px light, without a server",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 664,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-31T13:47:39.540Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "26f58a653ba4add85761-6b5f3c19dc2bcb284b4f",
+          "file": "usage-dashboard.spec.ts",
+          "line": 36,
+          "column": 2
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-10-31T13:47:34.651Z",
+    "duration": 5588.678,
+    "expected": 6,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

@@ -166,6 +166,7 @@ const renderers = {
 	"todo-workspace": TodoWorkspaceView,
 	"collection-workspace": CollectionWorkspaceView,
 	"service-test-workspace": ServiceTestWorkspaceView,
+	"usage-dashboard": UsageDashboardView,
 	"avatar-motion-lab": AvatarMotionLabView,
 	"model3d-workspace": Model3dWorkspaceView,
 	"compute-workspace": ComputeWorkspaceView,
@@ -313,7 +314,7 @@ function LayoutView({ request, nested }: { request: Layout; nested: boolean }) {
 				className="aui-composition aui-composition-tabs"
 			>
 				{request.draftSource ? (
-					<header className="aui-settings-heading">
+					<header className="aui-settings-heading ds-settings-heading">
 						{heading}
 						<SettingsDraftBarView source={request.draftSource} />
 					</header>
@@ -415,3 +416,4 @@ export const artifactLibrary = createLibrary({
 		}),
 	],
 });
+import { UsageDashboardView } from "./usage-components";

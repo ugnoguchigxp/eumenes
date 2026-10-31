@@ -305,8 +305,10 @@ test("successful completion plays the selected tone then its voice on the same o
 	const h = renderHook(() =>
 		useTimerTone({ loadTone, loadCompletion, outputVolume: 0.4 }),
 	);
+	const trace = vi.fn();
 	const playback = h.result.current.playCompletion(
 		new AbortController().signal,
+		trace,
 	);
 	await waitFor(() => expect(fake.output.play).toHaveBeenCalledOnce());
 	expect(loadCompletion).not.toHaveBeenCalled();
@@ -326,6 +328,12 @@ test("successful completion plays the selected tone then its voice on the same o
 		ended[1]!();
 		await playback;
 	});
+	expect(trace.mock.calls).toEqual([
+		["tone", "started"],
+		["tone", "ended"],
+		["completion", "started"],
+		["completion", "ended"],
+	]);
 	const normal = h.result.current.play(new AbortController().signal);
 	await waitFor(() => expect(fake.output.play).toHaveBeenCalledTimes(3));
 	await act(async () => {
@@ -357,4 +365,23 @@ test("cancelling while the completion voice is loading discards late bytes after
 	complete(new Uint8Array([2]));
 	await rejected;
 	expect(fake.output.play).toHaveBeenCalledOnce();
+});
+
+test("a failing diagnostic observer does not interrupt the completion voice", async () => {
+	fake.output.play.mockImplementation(async (_bytes, done, options) => {
+		options.onStarted();
+		done();
+	});
+	const h = renderHook(() =>
+		useTimerTone({
+			loadTone: async () => new Uint8Array([1]),
+			loadCompletion: async () => new Uint8Array([2]),
+		}),
+	);
+	await expect(
+		h.result.current.playCompletion(new AbortController().signal, () => {
+			throw new Error("diagnostic_unavailable");
+		}),
+	).resolves.toBeUndefined();
+	expect(fake.output.play.mock.calls.map((call) => call[0][0])).toEqual([1, 2]);
 });

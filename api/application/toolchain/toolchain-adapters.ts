@@ -204,6 +204,7 @@ export function bundleHostOf(
 export const hostAdapterDescriptions: Array<
 	Pick<DomainAdapter, "ref" | "describe">
 > = [
+	{ ref: USAGE_ADAPTER_REF, describe: describeUsageAdapter },
 	{ ref: DOCLING_ADAPTER_REF, describe: describeDoclingAdapter },
 	{ ref: DOTS_DELEGATION_ADAPTER_REF, describe: describeDotsDelegationAdapter },
 	{ ref: DOTS_MESSAGING_ADAPTER_REF, describe: describeDotsMessagingAdapter },
@@ -432,3 +433,7 @@ export function toolchainMaintenance(
 			: []),
 	];
 }
+import {
+	USAGE_ADAPTER_REF,
+	describeUsageAdapter,
+} from "../usage/usage-adapter";

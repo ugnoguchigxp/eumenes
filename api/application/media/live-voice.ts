@@ -2,7 +2,10 @@ import type { SqliteStore } from "../../infrastructure/sqlite";
 import type { SettingsService } from "../../domains/settings";
 import type { ConversationService } from "../../domains/conversation";
 import type { ContinuityService } from "../../domains/continuity";
-import type { DialogueService } from "../../domains/dialogue";
+import {
+	conversationPersona,
+	type DialogueService,
+} from "../../domains/dialogue";
 import { createLiveVoice } from "../../domains/live-voice";
 import type { ConnectLive } from "../../domains/live-voice/contracts";
 
@@ -31,6 +34,7 @@ export function buildLiveVoice({
 		stopLegacy,
 		connect,
 		conversation: {
+			persona: conversationPersona,
 			ensure: () => {},
 			history: (tx, id) =>
 				conversation
@@ -92,6 +96,7 @@ export function buildLiveVoice({
 			owns: live.delivery.owns,
 			assertCurrent: live.delivery.assertCurrent,
 			offer: live.delivery.offer,
+			report: live.delivery.report,
 			announce: live.delivery.announce,
 		},
 		async displayed(sessionId: string, noticeId: string) {

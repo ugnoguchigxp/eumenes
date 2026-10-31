@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 import { disabledFeatures, type CodexRuntime } from "./codex-sdk";
+import { codexUsage, type CodexUsage } from "./codex-usage";
 
 /** One conversation turn over `codex app-server` (stdio JSON-RPC), which streams
  * agent message deltas that `codex exec --json` only reports when complete. */
@@ -14,8 +15,9 @@ export type CodexTurn = {
 	signal: AbortSignal;
 	/** The current agent message so far (cumulative), on every delta. */
 	onMessage?: (text: string) => void;
+	onUsage?: (usage: CodexUsage) => void;
 };
-export type CodexTurnResult = {
+export type CodexTurnResult = CodexUsage & {
 	text: string;
 	inputTokens: number | null;
 	outputTokens: number | null;
@@ -76,7 +78,11 @@ export async function runCodexTurn(
 	let nextId = 1;
 	const pending = new Map<
 		number,
-		{ resolve: (value: unknown) => void; reject: (error: Error) => void }
+		{
+			method: string;
+			resolve: (value: unknown) => void;
+			reject: (error: Error) => void;
+		}
 	>();
 	let settle!: {
 		resolve: (value: CodexTurnResult) => void;
@@ -107,7 +113,7 @@ export async function runCodexTurn(
 		const id = nextId++;
 		send({ id, method, params });
 		return new Promise<unknown>((resolve, reject) =>
-			pending.set(id, { resolve, reject }),
+			pending.set(id, { method, resolve, reject }),
 		);
 	};
 
@@ -116,7 +122,8 @@ export async function runCodexTurn(
 	let messageId: string | undefined;
 	let message = "";
 	let final = "";
-	let usage: { inputTokens: number; outputTokens: number } | undefined;
+	let usage: CodexUsage | null = null;
+	let usageModel: string | null = turn.model;
 	let received = 0;
 
 	const onLine = (line: string) => {
@@ -133,6 +140,8 @@ export async function runCodexTurn(
 			const p = pending.get(value.id);
 			if (!p) return;
 			pending.delete(value.id);
+			if (p.method === "turn/start" && !value.error)
+				turnId = (value.result as { turn?: { id?: string } })?.turn?.id;
 			if (value.error) p.reject(fail("codex_turn_failed"));
 			else p.resolve(value.result);
 			return;
@@ -148,6 +157,8 @@ export async function runCodexTurn(
 			return;
 		}
 		if (params.threadId !== undefined && params.threadId !== threadId) return;
+		if (params.turnId !== undefined && turnId && params.turnId !== turnId)
+			return;
 		if (method === "item/agentMessage/delta") {
 			if (params.itemId !== messageId) {
 				messageId = params.itemId as string;
@@ -160,12 +171,37 @@ export async function runCodexTurn(
 			if (item?.type === "agentMessage" && typeof item.text === "string")
 				final = item.text;
 		} else if (method === "thread/tokenUsage/updated") {
-			const last = (
-				params.tokenUsage as {
-					last?: { inputTokens: number; outputTokens: number };
-				}
-			)?.last;
-			if (last) usage = last;
+			if (
+				!threadId ||
+				params.threadId !== threadId ||
+				!turnId ||
+				params.turnId !== turnId
+			)
+				return;
+			const next = codexUsage(params.tokenUsage, usageModel);
+			if (
+				next &&
+				(!usage ||
+					(next.inputTokens! >= usage.inputTokens! &&
+						next.outputTokens! >= usage.outputTokens!))
+			) {
+				usage = next;
+				turn.onUsage?.(next);
+			}
+		} else if (method === "model/rerouted") {
+			if (
+				!threadId ||
+				params.threadId !== threadId ||
+				!turnId ||
+				params.turnId !== turnId
+			)
+				return;
+			// Cumulative totals cannot be split between the old and new models.
+			usageModel = null;
+			if (usage) {
+				usage = { ...usage, usageModel: null };
+				turn.onUsage?.(usage);
+			}
 		} else if (method === "turn/completed") {
 			const t = params.turn as { id?: string; status?: string };
 			if (turnId && t?.id !== turnId) return;
@@ -174,6 +210,10 @@ export async function runCodexTurn(
 					text: final,
 					inputTokens: usage?.inputTokens ?? null,
 					outputTokens: usage?.outputTokens ?? null,
+					cacheReadTokens: usage?.cacheReadTokens ?? null,
+					cacheCreationTokens: usage?.cacheCreationTokens ?? null,
+					reasoningTokens: usage?.reasoningTokens ?? null,
+					usageModel,
 				});
 			else finish(fail("codex_turn_failed"));
 		}

@@ -6,6 +6,11 @@ import {
 } from "./controller";
 import { timerToneWav } from "./tone";
 
+type PlaybackTrace = (
+	part: "tone" | "completion",
+	phase: "started" | "ended",
+) => void;
+
 /** Reuses configured output; the caller defers notices while voice/replay is busy. */
 export function useTimerTone(
 	settings: {
@@ -102,6 +107,7 @@ export function useTimerTone(
 			message?: string,
 			onToneDelivered?: () => void,
 			completed = false,
+			trace?: PlaybackTrace,
 		) => {
 			signal.throwIfAborted();
 			const { outputDevice = "", outputVolume = 1 } = latest.current.settings;
@@ -110,7 +116,18 @@ export function useTimerTone(
 			if (!session) ensureOutput(outputDevice);
 			const owned = session ? null : output.current!;
 			const target = session ?? owned!.audio;
-			const play = (bytes: Uint8Array, playbackSignal: AbortSignal = signal) =>
+			const report: PlaybackTrace = (part, phase) => {
+				try {
+					trace?.(part, phase);
+				} catch {
+					// Diagnostic observers cannot interrupt playback or its completion.
+				}
+			};
+			const play = (
+				bytes: Uint8Array,
+				playbackSignal: AbortSignal = signal,
+				part: "tone" | "completion" = "tone",
+			) =>
 				new Promise<void>((resolve, reject) => {
 					let started = false;
 					const finish = (error?: Error) => {
@@ -135,15 +152,23 @@ export function useTimerTone(
 						try {
 							if (owned) await owned.audio.startOutput();
 							playbackSignal.throwIfAborted();
-							await target.play(bytes, () => finish(), {
-								volume: Math.min(1, outputVolume),
-								suppressInput: true,
-								shouldPlay: () => !playbackSignal.aborted,
-								onStarted: () => {
-									started = true;
+							await target.play(
+								bytes,
+								() => {
+									report(part, "ended");
+									finish();
 								},
-								onInterrupted: () => finish(new Error("audio_interrupted")),
-							});
+								{
+									volume: Math.min(1, outputVolume),
+									suppressInput: true,
+									shouldPlay: () => !playbackSignal.aborted,
+									onStarted: () => {
+										started = true;
+										report(part, "started");
+									},
+									onInterrupted: () => finish(new Error("audio_interrupted")),
+								},
+							);
 							if (!started) finish(new Error("audio_not_started"));
 						} catch (error) {
 							if (owned) {
@@ -163,7 +188,7 @@ export function useTimerTone(
 			if (completed) {
 				const voice = await latest.current.settings.loadCompletion?.(signal);
 				signal.throwIfAborted();
-				if (voice) await play(voice);
+				if (voice) await play(voice, signal, "completion");
 			}
 			// Speech is best effort: an unavailable TTS provider must not erase a delivered beep.
 			if (message && latest.current.speech) {
@@ -206,7 +231,8 @@ export function useTimerTone(
 		[playTone],
 	);
 	const playCompletion = useCallback(
-		(signal: AbortSignal) => playTone(signal, undefined, undefined, true),
+		(signal: AbortSignal, trace?: PlaybackTrace) =>
+			playTone(signal, undefined, undefined, true, trace),
 		[playTone],
 	);
 	return { play: playTone, playCompletion, repeat, ready, prepare };

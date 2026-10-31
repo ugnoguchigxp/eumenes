@@ -194,6 +194,7 @@ export function createStepHandler(ctx: RuntimeContext, ops: TaskOps) {
 				const requestId = execution
 					? inference.captureUserControlInTransaction!(db, {
 							subject: `execution-research:${t.id}-${t.current_step}`,
+							route: "subagent",
 							deadline: Math.min(capture.deadline, now() + 45_000),
 							maxOutputTokens: capture.maxOutputTokens,
 						})

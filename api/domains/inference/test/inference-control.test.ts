@@ -268,7 +268,7 @@ test("a dedicated resource that can not be used falls back to the conversation r
 	expect(routeOf(await background("other", otherPath.resource.id))).toEqual(
 		larmOnly,
 	);
-	// A control request has no route of its own: it stays on LARM.
+	// A child has no separate route: it inherits the parent's selected LLM.
 	const plain = await h.store.write((db) =>
 		h.inference.captureControlInTransaction!(db, {
 			subject: "agent:plain",
@@ -277,7 +277,7 @@ test("a dedicated resource that can not be used falls back to the conversation r
 			maxOutputTokens: 512,
 		}),
 	);
-	expect(routeOf(plain)).toEqual(larmOnly);
+	expect(routeOf(plain)).toEqual(keep);
 });
 test("a control request may ask for a long output (a large draft), up to 32k tokens", async () => {
 	let opts: unknown;

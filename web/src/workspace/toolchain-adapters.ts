@@ -26,6 +26,7 @@ import { kanbanWebAdapter, sharedKanbanWebAdapter } from "../domains/kanban";
 
 /** Every domain adapter the common artifact host can render. Adding a domain adds one line. */
 export const toolchainWebAdapters = createWebAdapterRegistry([
+	usageWebAdapter,
 	doclingWebAdapter,
 	dotsMessagingWebAdapter,
 	dotsWorkWebAdapter,
@@ -50,3 +51,4 @@ export const toolchainWebAdapters = createWebAdapterRegistry([
 	sharedKanbanWebAdapter,
 	codexTasksWebAdapter,
 ]);
+import { usageWebAdapter } from "../domains/usage/toolchain-adapter";

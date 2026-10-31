@@ -146,8 +146,15 @@ export function createMonitoring(deps: MonitoringDeps) {
 					lan,
 					credentials,
 				);
-			const recorded = (o: ActivityObservation) =>
-				serviceState({ ...o, ...recentOnly(o, since) }, larm, starting, !lan);
+			const recorded = (o: ActivityObservation): MonitoringItem["state"] => ({
+				...serviceState(
+					{ ...o, ...recentOnly(o, since) },
+					larm,
+					starting,
+					!lan,
+				),
+				...(larm ? { readiness: starting ? "starting" : "configured" } : {}),
+			});
 			return {
 				observedAt,
 				...(remote ? { larm: remote } : {}),

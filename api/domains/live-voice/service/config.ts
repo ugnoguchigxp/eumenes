@@ -20,11 +20,12 @@ export function liveConfig(settings: SettingsService, requireModel = true) {
 	if (!key) throw new Error("live_credential_missing");
 	return { live, connection, key, persona: doc.general };
 }
-export function liveInstructions(config: ReturnType<typeof liveConfig>) {
+export function liveInstructions(
+	config: ReturnType<typeof liveConfig>,
+	persona: { role: string; style: string },
+) {
 	return systemContext("live-voice.contexts.session", {
-		agent: config.persona.agentName,
-		user: config.persona.userName,
-		persona: config.persona.persona,
+		...persona,
 		extra: config.live.instructions,
 	});
 }

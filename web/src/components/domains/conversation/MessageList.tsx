@@ -182,18 +182,20 @@ const MessageRow = memo(function MessageRow({
 }) {
 	if (message.presentation === "artifact")
 		return <>{renderHiddenMessage?.(message)}</>;
+	const transcript = message.attribution?.namespace === "live-voice";
 	return (
 		<>
 			<article
 				className={`message message-${message.role}${editing ? " message-editing" : ""}`}
 			>
 				<small className="message-author">
-					{message.attribution?.displayName ??
+					{(!transcript ? message.attribution?.displayName : undefined) ??
 						(message.role === "user" ? "あなた" : assistantLabel)}
 					{message.role === "assistant" && (
 						<EmotionIcon delivery={message.delivery} />
 					)}
 				</small>
+				{transcript && <small>{message.attribution?.displayName}</small>}
 				{message.role === "assistant" && onReplay && (
 					<button
 						type="button"

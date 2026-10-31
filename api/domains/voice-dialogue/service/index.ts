@@ -12,7 +12,7 @@ const log = getLogger("voice-dialogue");
 import { SpeechSentences } from "./sentences";
 import { spokenText } from "./spoken-text";
 import { cancelHeard, recordPlayed } from "./playback";
-import { replaySentences } from "./replay-playback";
+import { replaySentences, replayTextMatches } from "./replay-playback";
 import { connectAnnouncementDelivery } from "./announcement-delivery";
 
 import type { SqliteStore } from "../../../infrastructure/sqlite";
@@ -214,12 +214,7 @@ export function createVoiceDialogue(
 				throw new Error("replay_text_invalid");
 			if (runId) {
 				const run = dialogue.get(runId);
-				if (
-					run?.status !== "completed" ||
-					!new SpeechSentences()
-						.append(spokenText(dialogue.answerText(runId) ?? ""), true)
-						.includes(text)
-				)
+				if (!replayTextMatches(run, dialogue.answerText(runId), text))
 					throw new Error("replay_text_invalid");
 			}
 			const context = runId ? dialogue.answerContext?.(runId) : undefined;

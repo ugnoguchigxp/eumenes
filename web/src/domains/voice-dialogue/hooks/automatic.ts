@@ -65,9 +65,14 @@ export function useAutomaticSpeech({
 				seen.current.add(run.id);
 				continue;
 			}
-			const message = messages.find(
-				(message) => message.id === run.answerMessageId,
-			);
+			const message = run.answerMessageId
+				? messages.find((message) => message.id === run.answerMessageId)
+				: run.announcement
+					? {
+							id: `announcement:${run.id}:${run.revision}`,
+							text: run.announcement,
+						}
+					: undefined;
 			if (!message) continue; // The two queries can settle in either order.
 			seen.current.add(run.id);
 			if (!message.text.trim()) continue;

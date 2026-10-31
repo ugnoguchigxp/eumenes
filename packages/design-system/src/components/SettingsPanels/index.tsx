@@ -134,8 +134,17 @@ export function SettingsSection({
 			));
 	return (
 		<Card className="ds-settings-panel">
-			<CardHeader>
+			<CardHeader className={hideFooter ? undefined : "ds-settings-heading"}>
 				<CardTitle>{title}</CardTitle>
+				{!hideFooter && (
+					<SettingsDraftBar
+						dirty={dirty}
+						busy={busy}
+						blocked={blocked}
+						onApply={onApply}
+						onReview={onReview}
+					/>
+				)}
 			</CardHeader>
 			<CardContent>
 				{description && <p className="ds-settings-hint">{description}</p>}
@@ -198,15 +207,6 @@ export function SettingsSection({
 					{supplement && (
 						<div className="ds-settings-supplement">{supplement}</div>
 					)}
-					{!hideFooter && (
-						<SettingsDraftBar
-							dirty={dirty}
-							busy={busy}
-							blocked={blocked}
-							onApply={onApply}
-							onReview={onReview}
-						/>
-					)}
 				</form>
 				{message && <output aria-live="polite">{message}</output>}
 			</CardContent>
@@ -234,6 +234,7 @@ export function SettingsDraftBar({
 			{onApply && (
 				<Button
 					type="button"
+					className="ds-settings-save"
 					aria-label={busy ? "保存中…" : "設定の変更をすべて保存"}
 					disabled={!dirty || busy || blocked}
 					onClick={onApply}
@@ -243,6 +244,7 @@ export function SettingsDraftBar({
 			)}
 			<Button
 				type="button"
+				className="ds-settings-review"
 				variant="secondary"
 				aria-label="変更一覧を開く"
 				onClick={onReview}
@@ -530,8 +532,16 @@ export function SettingsChanges({
 }) {
 	return (
 		<Card className="ds-settings-panel">
-			<CardHeader>
+			<CardHeader className="ds-settings-heading">
 				<CardTitle>{title}</CardTitle>
+				<Button
+					className="ds-settings-save"
+					aria-label={busy ? "適用中…" : "設定の変更をすべて適用"}
+					disabled={!dirty || busy || blocked}
+					onClick={onApply}
+				>
+					{busy ? "保存中…" : "変更を保存"}
+				</Button>
 			</CardHeader>
 			<CardContent>
 				<h3 className="ds-settings-change-count">
@@ -554,9 +564,6 @@ export function SettingsChanges({
 				</dl>
 				{rows.length === 0 && <p>未適用の変更はありません</p>}
 				<footer className="ds-settings-footer">
-					<Button disabled={!dirty || busy || blocked} onClick={onApply}>
-						{busy ? "適用中…" : "設定の変更をすべて適用"}
-					</Button>
 					<Button
 						variant="secondary"
 						disabled={!dirty || busy}

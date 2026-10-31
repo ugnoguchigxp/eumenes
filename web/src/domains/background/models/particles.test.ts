@@ -5,11 +5,7 @@ import { expect, test } from "vitest";
 import type { Points } from "three";
 import { createParticleModel } from "./particles";
 import { decodeParticles, particleModelIds } from ".";
-import {
-	defaultSpatialOptions,
-	healthColors,
-	particleColorOptions,
-} from "../options";
+import { defaultSpatialOptions, healthColors } from "../options";
 import { evaluateParticle } from "./evaluator";
 import hashes from "./source-hashes.json";
 function fixture(id: string) {
@@ -158,7 +154,7 @@ test("the actual colour buffer receives per-star evaluator RGB without replacing
 	model.dispose();
 });
 
-test("observed load transitions over seconds, identical reads do not restart it, and fault red is immediate", () => {
+test("status colour changes immediately and high load cannot blur warning, fault or disconnect colours", () => {
 	const d = fixture("cpu"),
 		model = createParticleModel({
 			id: "cpu",
@@ -169,66 +165,31 @@ test("observed load transitions over seconds, identical reads do not restart it,
 	const attr = (model.object.children[0] as Points).geometry.getAttribute(
 		"color",
 	);
-	const state = {
-		health: "healthy" as const,
-		activity: "idle" as const,
-		stale: false,
-		utilization: 0,
-	};
-	const warmCount = () => {
-		let count = 0;
-		for (let i = 0; i < attr.count; i++)
-			if (attr.getX(i) > attr.getZ(i)) count++;
-		return count;
-	};
 	model.configure?.(defaultSpatialOptions, 40, true);
-	model.update(state, false);
-	const before = Array.from(attr.array);
-	model.update({ ...state, utilization: 1 }, false);
-	// Existing utilization brightness changes immediately; hue starts from its displayed value.
-	let hueDifference = 0;
-	for (let i = 0; i < attr.count; i++) {
-		const oldMax = Math.max(...before.slice(i * 3, i * 3 + 3));
-		const nextMax = Math.max(attr.getX(i), attr.getY(i), attr.getZ(i));
-		for (let c = 0; c < 3; c++)
-			hueDifference = Math.max(
-				hueDifference,
-				Math.abs(
-					attr.array[i * 3 + c]! / nextMax - before[i * 3 + c]! / oldMax,
-				),
-			);
+	for (const health of [
+		"healthy",
+		"pressure",
+		"fault",
+		"disconnected",
+	] as const) {
+		model.update(
+			{ health, activity: "working", stale: false, utilization: 1 },
+			false,
+		);
+		model.animate?.(9, 1);
+		const hex = parseInt(healthColors[health].slice(1), 16);
+		const expected = [
+			((hex >> 16) & 255) / 255,
+			((hex >> 8) & 255) / 255,
+			(hex & 255) / 255,
+		];
+		const max = Math.max(...expected);
+		for (let i = 0; i < attr.count; i += 31) {
+			const actual = [attr.getX(i), attr.getY(i), attr.getZ(i)];
+			const magnitude = Math.max(...actual);
+			for (let c = 0; c < 3; c++)
+				expect(actual[c]! / magnitude).toBeCloseTo(expected[c]! / max, 6);
+		}
 	}
-	expect(hueDifference).toBeLessThan(1e-6);
-	model.animate?.(2, 2);
-	const early = warmCount();
-	model.update({ ...state, utilization: 1 }, true);
-	model.animate?.(4, 2);
-	const middle = warmCount();
-	model.animate?.(8, 4);
-	const complete = warmCount();
-	expect(middle).toBeGreaterThan(early);
-	expect(complete).toBeGreaterThan(middle);
-	expect(complete / attr.count).toBeGreaterThan(0.3);
-	for (let i = 0; i < attr.count; i += 31) {
-		const expected = evaluateParticle(d.points, i, 8, {
-			...state,
-			utilization: 1,
-			model: "cpu",
-			reducedMotion: false,
-		});
-		expect(attr.getX(i)).toBeCloseTo(expected.color[0] * expected.intensity, 6);
-	}
-	model.update({ ...state, health: "fault", utilization: 1 }, false);
-	for (let i = 0; i < attr.count; i += 31) {
-		expect(attr.getY(i) / attr.getX(i)).toBeCloseTo(0x61 / 0xff, 6);
-		expect(attr.getZ(i) / attr.getX(i)).toBeCloseTo(0x77 / 0xff, 6);
-	}
-	model.update({ ...state, utilization: 1 }, false);
-	model.configure?.(defaultSpatialOptions, 40, false);
-	model.update(state, false);
-	const stopped = Array.from(attr.array);
-	model.animate?.(100, particleColorOptions.stateTransitionSeconds);
-	expect(Array.from(attr.array)).toEqual(stopped);
-	expect(warmCount()).toBe(0);
 	model.dispose();
 });

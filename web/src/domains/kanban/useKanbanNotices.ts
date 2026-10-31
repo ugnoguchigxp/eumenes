@@ -15,7 +15,10 @@ type NoticeClient = { identity: string } & Pick<
  */
 export function useKanbanNotices(
 	client: NoticeClient,
-	chime: (completed?: boolean) => void,
+	chime: (
+		completed?: boolean,
+		notices?: { source: string; ids: readonly string[] },
+	) => void,
 	openById: (artifactId: string) => Promise<boolean>,
 ) {
 	const cache = useQueryClient();
@@ -32,7 +35,14 @@ export function useKanbanNotices(
 		seen.current = new Set(data.notices.map((notice) => notice.id));
 		if (before) {
 			const fresh = data.notices.filter((n) => !n.read && !before.has(n.id));
-			if (fresh.length) chime(fresh.some((n) => n.kind === "done"));
+			if (fresh.length)
+				chime(
+					fresh.some((n) => n.kind === "done"),
+					{
+						source: "kanban",
+						ids: fresh.map((n) => n.id),
+					},
+				);
 		}
 	}, [data, chime]);
 	const [readingIds, setReadingIds] = useState<string[]>([]);

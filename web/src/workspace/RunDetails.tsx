@@ -38,6 +38,7 @@ export function RunDetails({
 		<>
 			{run?.announcement && (
 				<article className="message message-assistant">
+					<small className="message-author">{agentName || "Eumenes"}</small>
 					<output aria-live="polite" style={{ whiteSpace: "pre-wrap" }}>
 						{run.announcement}
 					</output>

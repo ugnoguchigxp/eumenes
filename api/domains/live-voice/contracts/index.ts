@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { Database } from "bun:sqlite";
+import type { Settings } from "../../settings";
 
 export const liveStartSchema = z
 	.object({
@@ -60,6 +61,7 @@ export type LiveSocket = Pick<
 export type ConnectLive = (key: string) => LiveSocket;
 /** Higher domains connect through these ports; Live never reads their tables. */
 export type LiveConversationPort = {
+	persona(general: Settings["general"]): { role: string; style: string };
 	ensure(tx: Database, conversationId: string, at: string): void;
 	history(
 		tx: Database,

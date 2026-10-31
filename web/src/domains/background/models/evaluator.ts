@@ -1,10 +1,7 @@
 import type { SpatialState } from "../contracts";
-import { healthColors, particleColorOptions as colorOptions } from "../options";
+import { healthColors, standbyColor } from "../options";
+import { statusColor } from "../status";
 import type { ParticleModelId } from "./catalog";
-export type ParticleColorMix = {
-	animatedFraction: number;
-	warmFraction: number;
-};
 export type AnimationInput = SpatialState & {
 	model: ParticleModelId;
 	reducedMotion: boolean;
@@ -16,8 +13,6 @@ export type AnimationInput = SpatialState & {
 	faultEventAge?: number;
 	thermalThrottle?: boolean;
 	baseBrightness?: number;
-	/** Smoothed rendering fractions supplied by the model, never inferred health. */
-	colorMix?: ParticleColorMix;
 };
 export type ParticleSample = {
 	intensity: number;
@@ -54,86 +49,23 @@ const rgb = (hex: string): readonly [number, number, number] => {
 		(value & 255) / 255,
 	];
 };
-const healthRgb = Object.fromEntries(
-	Object.entries(healthColors).map(([health, color]) => [health, rgb(color)]),
-) as Record<SpatialState["health"], readonly [number, number, number]>;
-const coolRgb = colorOptions.coolPalette.map(rgb);
-const warmRgb = colorOptions.warmPalette.map(rgb);
-/** Cheap, deterministic independent streams; no random calls or per-point allocations. */
-const hash = (value: number) => {
-	let bits = Math.imul(value ^ (value >>> 16), 0x45d9f3b);
-	bits = Math.imul(bits ^ (bits >>> 16), 0x45d9f3b);
-	return ((bits ^ (bits >>> 16)) >>> 0) / 0x100000000;
-};
-const membership = (
-	seed: number,
-	fraction: number,
-	width: number = colorOptions.selectionBlend,
-) => {
-	const value = clamp((fraction - seed) / width);
-	return value * value * (3 - 2 * value);
-};
-function paintColor(
-	out: ParticleSample["color"],
-	seed: number,
-	phase: number,
-	group: number,
-	time: number,
-	input: AnimationInput,
-	stopped: boolean,
-) {
-	if (input.health !== "healthy") {
-		const color = healthRgb[input.health];
-		out[0] = color[0];
-		out[1] = color[1];
-		out[2] = color[2];
-		return;
-	}
-	const identity =
-		(seed * 0xffffff) ^ (phase * 0xffff) ^ Math.imul(group, 0x9e3779b9);
-	const base = hash(identity),
-		cycle = hash(identity ^ 0x68bc21eb),
-		active = hash(identity ^ 0x02e5be93),
-		warm = hash(identity ^ 0x967a889b);
-	const index = Math.min(coolRgb.length - 1, Math.floor(base * coolRgb.length));
-	const first = coolRgb[index]!,
-		second = coolRgb[(index + 1) % coolRgb.length]!,
-		warmColor =
-			warmRgb[Math.min(warmRgb.length - 1, Math.floor(base * warmRgb.length))]!;
-	const duration =
-		colorOptions.transitionSeconds[
-			Math.min(
-				colorOptions.transitionSeconds.length - 1,
-				Math.floor(cycle * colorOptions.transitionSeconds.length),
-			)
-		]!;
-	const animatedFraction =
-		input.colorMix?.animatedFraction ??
-		colorOptions.animatedFraction[input.activity];
-	const blend = stopped
-		? 0
-		: membership(active, animatedFraction) *
-			(0.5 - 0.5 * Math.cos(Math.PI * (time / duration + base * 2)));
-	const warmFraction =
-		input.utilization === undefined
-			? 0
-			: (input.colorMix?.warmFraction ??
-				clamp(input.utilization) * colorOptions.warmFractionAtFullUtilization);
-	const warmth = membership(
-		warm,
-		warmFraction,
-		colorOptions.warmSelectionBlend,
-	);
-	for (let channel = 0; channel < 3; channel++) {
-		const cool = first[channel]! + (second[channel]! - first[channel]!) * blend;
-		out[channel] = cool + (warmColor[channel]! - cool) * warmth;
-	}
+const statusRgb = Object.fromEntries(
+	[...Object.values(healthColors), standbyColor].map((color) => [
+		color,
+		rgb(color),
+	]),
+) as Record<string, readonly [number, number, number]>;
+function paintColor(out: ParticleSample["color"], input: AnimationInput) {
+	const color = statusRgb[statusColor(input)]!;
+	out[0] = color[0];
+	out[1] = color[1];
+	out[2] = color[2];
 }
 const pulse = (phase: number, progress: number, width = 0.18) => {
 	const d = Math.abs(wrap(phase - progress + 0.5) - 0.5);
 	return Math.max(0, 1 - d / width) ** 2;
 };
-/** Fixed coordinates/sizes, bounded brightness and asynchronous healthy star colours. */
+/** Fixed coordinates/sizes, bounded brightness and unambiguous status colours. */
 export function evaluateParticle(
 	data: Float32Array,
 	index: number,
@@ -244,8 +176,11 @@ export function evaluateParticle(
 	// Static utilization is allowed under reduced motion, without temporal changes.
 	if (s.reducedMotion && s.health === "healthy" && !s.stale)
 		uplift = 0.03 * (s.utilization ?? 0);
-	// A disconnection has no fresh value by nature; its red stays at full light (spec §12).
-	const dim = s.health === "unknown" ? 0.65 : 1;
+	// Keep disconnected purple visible even when no fresh measurement exists.
+	const dim =
+		s.health === "unknown" && (!s.readiness || s.readiness === "unknown")
+			? 0.7
+			: 1;
 	const old = s.stale && s.health !== "disconnected";
 	const base =
 		(s.baseBrightness !== undefined && Number.isFinite(s.baseBrightness)
@@ -257,7 +192,7 @@ export function evaluateParticle(
 		base * (1 + Math.min(0.1, Math.max(0, uplift))) * dim * (old ? 0.45 : 1);
 	out.baseIntensity = base;
 	out.uplift = Math.min(0.1, Math.max(0, uplift));
-	paintColor(out.color, data[p + 5]!, phase, group, t, s, !!stopped);
+	paintColor(out.color, s);
 	out.size = data[p + 6]!;
 	return out;
 }

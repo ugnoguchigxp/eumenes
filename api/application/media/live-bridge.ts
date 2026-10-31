@@ -18,6 +18,7 @@ export function createLiveBridge() {
 		assertCurrent: (tx, id) => liveVoice?.externalOutput.assertCurrent(tx, id),
 		offer: (tx, run, text, confirmation) =>
 			liveVoice?.externalOutput.offer(tx, run, text, confirmation) ?? false,
+		report: (tx, input) => liveVoice?.externalOutput.report(tx, input) ?? false,
 		announce: async (run, text, signal) => {
 			if (!liveVoice) throw new Error("live_session_inactive");
 			return liveVoice.externalOutput.announce(run, text, signal);

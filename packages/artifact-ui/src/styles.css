@@ -544,36 +544,17 @@
 	border-bottom: 1px solid var(--border);
 }
 .aui-settings-heading {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	flex-wrap: wrap;
-	gap: 0.5rem 1.5rem;
 	padding: 1rem 1.25rem;
 	border-bottom: 1px solid var(--border);
-	position: sticky;
-	top: 0;
-	z-index: 10;
 	background: var(--card);
 }
 .aui-settings-heading > .aui-composition-title {
 	margin: 0;
-	font-size: 1.5rem;
+	font-size: 1.125rem;
 	font-weight: 700;
 }
 .aui-settings-heading .aui-settings-save-bar {
-	flex: 1 1 22rem;
-	border: 0;
-	position: static;
-}
-.aui-settings-heading .ds-settings-footer {
-	margin: 0;
-	padding: 0;
-	gap: 0.65rem;
-}
-.aui-settings-heading .ds-settings-footer output {
-	flex: 1 1 8rem;
-	font-size: 0.8rem;
+	display: contents;
 }
 .aui-composition-tabs > * {
 	min-width: 0;
@@ -586,20 +567,13 @@
 .aui-settings-heading .aui-settings-save-bar > .ds-settings-footer {
 	padding: 0;
 }
-@container (max-width: 620px) {
-	.aui-settings-heading .ds-settings-footer output {
-		flex-basis: 100%;
-	}
-}
-.aui-settings-save-bar .ds-settings-footer > button:last-child {
-	order: 1;
-}
-.aui-settings-save-bar .ds-settings-footer > button:nth-child(2) {
-	order: 2;
-}
 .aui-settings-save-bar > output {
 	display: block;
 	padding: 0 1.25rem 0.75rem;
+}
+.aui-settings-heading .aui-settings-save-bar > output {
+	grid-column: 1 / -1;
+	padding: 0;
 }
 .aui-settings-save-bar > output:empty {
 	display: none;

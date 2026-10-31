@@ -48,6 +48,7 @@ export type AgentSessionCall = {
 	drop(): Promise<void>;
 };
 export type CloudAgentCall = {
+	onUsage?: (usage: import("./codex-usage").CodexUsage) => void;
 	kind: CloudAgentKind;
 	/** The saved connection (log correlation only). */
 	connectionId?: string;
@@ -67,6 +68,8 @@ export type CloudAgentCall = {
 	onDelta?: (text: string) => void;
 };
 type CloudAgentResult = {
+	reasoningTokens?: number | null;
+	usageModel?: string | null;
 	text: string;
 	toolCalls?: NativeToolCall[];
 	inputTokens?: number | null;
@@ -298,6 +301,7 @@ async function runCodex(
 						? { outputSchema: call.outputSchema }
 						: {}),
 				signal: call.signal,
+				onUsage: call.onUsage,
 				onMessage: (text) => {
 					// With tools the turn is a JSON choice: only its reply text streams.
 					const visible = tools ? codexReplyPrefix(checkedText(text)) : text;
@@ -324,6 +328,10 @@ async function runCodex(
 			...choice,
 			inputTokens: result.inputTokens,
 			outputTokens: result.outputTokens,
+			cacheReadTokens: result.cacheReadTokens,
+			cacheCreationTokens: result.cacheCreationTokens,
+			reasoningTokens: result.reasoningTokens,
+			usageModel: result.usageModel,
 		};
 	} finally {
 		await removeRoot(cwd, untrack);
