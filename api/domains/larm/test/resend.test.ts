@@ -127,6 +127,16 @@ test("a lost response is sent once more; any other failure is not", async () => 
 		}),
 	).rejects.toBe(loss);
 	expect(sent).toBe(2);
+	// A request that keeps its key for every later try waits instead.
+	sent = 0;
+	const busy = new LarmCapacityBusy(null);
+	await expect(
+		sendAgainIfLost(async () => {
+			sent++;
+			if (sent === 1) throw loss;
+			throw busy;
+		}, true),
+	).rejects.toBe(busy);
 	for (const error of [
 		new DOMException("a", "AbortError"),
 		new Error("larm_http_500"),
