@@ -6,7 +6,7 @@ import type { HandlerDefinition, QueueService } from "../../queue";
 import {
 	isCapacityBusy,
 	LARM_CAPACITY_TIMEOUT,
-	planCapacityWait,
+	settleCapacityWait,
 	type AnalysisRecord,
 	type PerceptionPort,
 } from "../../larm";
@@ -161,57 +161,47 @@ export function analysisHandler(
 			}
 			if (outcome.type !== "success") return "stale";
 			if ("capacityWait" in outcome.result) {
-				const now = Date.now();
-				const wait = planCapacityWait({
-					now,
+				const waiting = settleCapacityWait({
+					domain: "object-recognition",
+					subjectId: r.id,
+					now: Date.now(),
 					previous: v.capacityWait,
 					retryAfterMs: outcome.result.capacityWait,
 					budgetMs: ANALYSIS_BUDGET_MS,
-					limitAt: null,
+					expire: () =>
+						updateAnalysis(db, r, {
+							state: "failed",
+							errorCode: LARM_CAPACITY_TIMEOUT,
+							result: null,
+						}),
+					schedule(wait) {
+						const next = queue.enqueueInTransaction(db, {
+							scope: "object-recognition",
+							kind: "object-recognition.analysis",
+							dedupeKey: `${r.id}:analysis:w${wait.count}`,
+							payload: { id: r.id },
+							subjectRef: r.id,
+							lane: "interactive",
+							resourceKey: "vision.perception",
+							concurrencyKey: "vision.perception",
+							availableAtMs: wait.at,
+							deadlineAtMs: wait.deadline,
+							maxAttempts: 1,
+						});
+						db.query(
+							"UPDATE object_recognition_analyses SET job_id=? WHERE id=?",
+						).run(next.job.id, r.id);
+						updateAnalysis(db, r, {
+							state: "queued",
+							capacityWait: { startedAt: wait.startedAt, count: wait.count },
+							errorCode: null,
+						});
+						return next.job.id;
+					},
 				});
-				if (!wait) {
-					log.warn("object-recognition.capacity_wait_expired", {
-						jobId: claim.jobId,
-						subjectId: r.id,
-						reason: LARM_CAPACITY_TIMEOUT,
-						waitedMs: now - (v.capacityWait?.startedAt ?? now),
-					});
-					updateAnalysis(db, r, {
-						state: "failed",
-						errorCode: LARM_CAPACITY_TIMEOUT,
-						result: null,
-					});
-					return { status: "failed", errorCode: LARM_CAPACITY_TIMEOUT };
-				}
-				const next = queue.enqueueInTransaction(db, {
-					scope: "object-recognition",
-					kind: "object-recognition.analysis",
-					dedupeKey: `${r.id}:analysis:w${wait.count}`,
-					payload: { id: r.id },
-					subjectRef: r.id,
-					lane: "interactive",
-					resourceKey: "vision.perception",
-					concurrencyKey: "vision.perception",
-					availableAtMs: wait.at,
-					deadlineAtMs: wait.deadline,
-					maxAttempts: 1,
-				});
-				db.query(
-					"UPDATE object_recognition_analyses SET job_id=? WHERE id=?",
-				).run(next.job.id, r.id);
-				updateAnalysis(db, r, {
-					state: "queued",
-					capacityWait: { startedAt: wait.startedAt, count: wait.count },
-					errorCode: null,
-				});
-				log.info("object-recognition.capacity_wait_scheduled", {
-					jobId: next.job.id,
-					subjectId: r.id,
-					waitCount: wait.count,
-					waitedMs: now - wait.startedAt,
-					nextInMs: wait.at - now,
-				});
-				return "applied";
+				return waiting
+					? "applied"
+					: { status: "failed", errorCode: LARM_CAPACITY_TIMEOUT };
 			}
 			if (!outcome.result.ok) return "stale";
 			const { value, timestamp } = outcome.result;

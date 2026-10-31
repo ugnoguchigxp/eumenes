@@ -380,3 +380,48 @@ test("T10: a refused session start fails once as larm_capacity_busy; ready() and
 	expect(ready).toMatchObject({ state: "ready", errorCode: null });
 	expect(h.leaseRequests).toHaveLength(2);
 });
+
+test("T11: an idle session refused for memory repeats the refusal only inside the wait, then a save sends the lease request again", async () => {
+	const h = await setup();
+	const s = await h.service.session({
+		requestId: crypto.randomUUID(),
+		conversationId: "main",
+		referenceId: h.referenceId,
+	});
+	expect((await h.service.wait(s.id))?.state).toBe("ready");
+	h.clock.t += 31_000;
+	await h.service.tick();
+	expect(h.service.get(s.id)?.state).toBe("idle");
+	h.leaseRequests.length = 0;
+	const t0 = h.clock.t;
+	const update = { title: "図", scene: blank, expectedRevision: 1 };
+	// A gesture finds LARM full: the lease request is refused once.
+	h.refuse.on = true;
+	await expect(h.service.activity(s.id)).rejects.toThrow("larm_capacity_busy");
+	expect(h.leaseRequests).toEqual([t0]);
+	// Inside the window nothing reaches LARM, however often it is asked.
+	h.clock.t = t0 + 29_000;
+	await expect(
+		h.service.save(s.id, update, "k1", AbortSignal.timeout(1000)),
+	).rejects.toThrow("larm_capacity_busy");
+	await expect(h.service.activity(s.id)).rejects.toThrow("larm_capacity_busy");
+	expect(h.leaseRequests).toHaveLength(1);
+	// After the window the save really sends, is refused again while full, and opens a new window.
+	h.clock.t = t0 + 30_000;
+	await expect(
+		h.service.save(s.id, update, "k1", AbortSignal.timeout(1000)),
+	).rejects.toThrow("larm_capacity_busy");
+	expect(h.leaseRequests).toEqual([t0, t0 + 30_000]);
+	// Memory frees; the next save after that window succeeds.
+	h.refuse.on = false;
+	h.clock.t = t0 + 60_000;
+	await h.service.tick();
+	const saved = await h.service.save(
+		s.id,
+		update,
+		"k1",
+		AbortSignal.timeout(1000),
+	);
+	expect(saved.revision).toBe(2);
+	expect(h.leaseRequests).toEqual([t0, t0 + 30_000, t0 + 60_000]);
+});

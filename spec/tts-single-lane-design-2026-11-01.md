@@ -231,4 +231,14 @@ live（2026-11-01 08:02 の再起動後、読み取りのみ）: 保存済みの
 
 live（08:18 の再起動後）: LARM は ready に戻った。TODO の完了通知は 08:17:42（成功、完了音声あり）と 08:18:56（失敗、通知音のみ）で、確保はそれぞれ1回（別の画面ID）、拒否なし。この時点の画面は Brave と Cursor 内のブラウザーの2つ。利用者は 08:17:42 の完了音声が二重に聞こえたと報告したが、backend の確保は1回で、2回目は確保を通らない経路から鳴っている。Cursor の画面を閉じた後は Brave の1画面だけが接続している。発生元の画面は特定していない（各画面のコンソールの `eumenes.completion_audio` で追える）。
 
+live（08:25 の再起動後、利用者の許可で実行。音は出していない。`/api/voice/replay/audio` の音声データを検証スクリプトが受け取るだけ）:
+
+| 検証 | 結果 |
+| --- | --- |
+| 同じ文を同時に2回 | LARM の合成は1回（attempt 1件、2,219ms）。`inference.speech_joined count=2`。2つの応答は同じ音声（75,820 bytes、同じ hash） |
+| 違う文を同時に3回 | 1件目は即時、2件目はレーンで 2,186ms 待ってから合成（`inference.speech_lane_waited`）。合成の時間帯は重ならない。3件目は既存の HTTP の費用上限（replay・試聴は同時2件、`api/application/app.ts`）で即時 429 `too_many_requests`。LARM の 429 ではない |
+| 声の切替 | TTS の attempt はすべて `source=larm`。TTS の `cloud_selected`・`larm_inference_429` は0件 |
+
+HTTP の上限は以前からの費用の歯止め。1画面の読み上げで同時に飛ぶ要求は次の句の先読み程度で、通常の利用では当たらない。この時点で LARM の Ruri（system-one）と LLM の接続は失敗していたが、TTS は別の割り当てで動いた。
+
 実機器（初回の再起動時）: 再起動直後から LARM の接続がすべて `larm_claim_context_mismatch` で失敗している（`larm/service/connect.ts` の変更と未追跡の `context-capacity.ts`。並行作業の capacity wait の作業中のファイルで、本改修の対象外）。TTS は合成できず、新しい規則どおり発話しない。LARM の接続が戻った後、2つの画面を開いた状態で、自発発話・入力した質問・音声入力の返事・完了通知が各1回だけ、同じ声で、重ならずに聞こえることを確認する。
