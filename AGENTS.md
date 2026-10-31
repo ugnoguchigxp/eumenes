@@ -17,3 +17,9 @@
 - 検証は `bun run verify -- --domain <name>` を使い、変更の影響がある利用側 domain も選んで確認する。E2E は対象 domain の試験ファイルを明示して個別に実行する。`verify:all` にブラウザE2Eは含めない。fixture、live、実機器受入の結果を分けて記録する。
 - 実装済み、検証済み、計画を区別する。実機器の3往復受入を通すまで音声 MVP の完成を宣言しない。
 - 障害調査では `bun run logs -- --level warn` から始め、runId・jobId・HTTPの `X-Request-Id` で JSONL を絞る。手順は `docs/logging.md`。ログに会話本文・音声・認証情報・設定・Providerの生応答を渡さない。
+
+## Cursor Cloud specific instructions
+
+- 環境の `start` が `bun run dev` を起動する。API は `127.0.0.1:8787`、画面は `http://127.0.0.1:5173`。両方とも loopback だけで、`127.0.0.1` 以外の host は拒否される。すでに応答しているプロセスは停止・再起動しない。
+- Bun 1.4.3 は `/usr/local/bin/bun` を使う。ログインシェルは `~/.bashrc` を読まない。
+- `EUMENES_API_TOKEN` が空なら `data/keys/api.token` に生成される。LARM 未登録の `base_url_unconfigured` は、設定アーティファクトで接続を保存するまでの通常状態。接続先の環境変数は要求しない。
